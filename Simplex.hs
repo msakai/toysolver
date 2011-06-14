@@ -21,7 +21,7 @@ module Simplex
   , Model
   , SatResult (..)
   , OptResult (..)
-  , Term (..)
+  , Expr (..)
   , var
   , Atom (..)
   , RelOp (..)
@@ -42,23 +42,12 @@ import Debug.Trace
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
+import Expr
+
 infixl 6 .+., .-.
 infix 4 .<=., .>=., .=.
 
 -- ---------------------------------------------------------------------------
-
--- | Variables are represented as non-negative integers
-type Var = Int
-type VarSet = IS.IntSet
-type VarMap = IM.IntMap
-
-class Variables a where
-  vars :: a -> VarSet
-
-instance Variables a => Variables [a] where
-  vars = IS.unions . map vars
-
-type Model r = VarMap r
 
 data SatResult r = Unknown | Unsat | Sat (Model r)
   deriving (Show, Eq, Ord)
@@ -68,59 +57,19 @@ data OptResult r = OptUnknown | OptUnsat | Unbounded | Optimum r (Model r)
 
 -- ---------------------------------------------------------------------------
 
-data Term r
-  = Const r
-  | Var Var
-  | Term r :+: Term r
-  | Term r :*: Term r
-  | Term r :/: Term r
-  deriving (Eq, Ord, Show)
-
-data Atom r = Rel (Term r) RelOp (Term r)
+data Atom r = Rel (Expr r) RelOp (Expr r)
     deriving (Show, Eq, Ord)
 
 data RelOp = Le | Ge | Eql
     deriving (Show, Eq, Ord)
 
-instance Num r => Num (Term r) where
-  a + b = a :+: b
-  a * b = a :*: b
-  a - b = a + negate b
-  negate a = Const (-1) :*: a
-  abs a = a
-  signum _ = 1
-  fromInteger = Const . fromInteger
-
-instance Fractional r => Fractional (Term r) where
-  a / b = a :/: b
-  fromRational x = fromInteger (numerator x) / fromInteger (denominator x)
-
-instance Variables (Term r) where
-  vars (Const _) = IS.empty
-  vars (Var v) = IS.singleton v
-  vars (a :+: b) = vars a `IS.union` vars b
-  vars (a :*: b) = vars a `IS.union` vars b
-  vars (a :/: b) = vars a `IS.union` vars b
-
 instance Variables (Atom r) where
   vars (Rel a _ b) = vars a `IS.union` vars b
 
-var :: Var -> Term r
-var = Var
-
-(.<=.), (.>=.), (.=.) :: Num r => Term r -> Term r -> Atom r
+(.<=.), (.>=.), (.=.) :: Num r => Expr r -> Expr r -> Atom r
 a .<=. b = Rel a Le b
 a .>=. b = Rel a Ge b
 a .=. b = Rel a Eql b
-
-eval :: Fractional r => Model r -> Term r -> r
-eval m = f
-  where
-    f (Const x) = x
-    f (Var v) = m IM.! v
-    f (a :+: b) = f a + f b
-    f (a :*: b) = f a * f b
-    f (a :/: b) = f a / f b   
 
 -- ---------------------------------------------------------------------------
 
@@ -181,7 +130,7 @@ applySubst s (Tm m) = foldr (.+.) (constTm 0) (map f (IM.toList m))
         Just tm -> tm
         Nothing -> varTm v
 
-term :: (Real r, Fractional r) => Term r -> Maybe (Tm r)
+term :: (Real r, Fractional r) => Expr r -> Maybe (Tm r)
 term (Const c) = return (constTm c)
 term (Var c) = return (varTm c)
 term (a :+: b) = liftM2 (.+.) (term a) (term b)
@@ -321,10 +270,10 @@ dualPivot isMinimize tbl
 
 -- ---------------------------------------------------------------------------
 
-maximize :: (Real r, Fractional r) => Term r -> [Atom r] -> OptResult r
+maximize :: (Real r, Fractional r) => Expr r -> [Atom r] -> OptResult r
 maximize = twoPhasedSimplex False
 
-minimize :: (Real r, Fractional r) => Term r -> [Atom r] -> OptResult r
+minimize :: (Real r, Fractional r) => Expr r -> [Atom r] -> OptResult r
 minimize = twoPhasedSimplex True
 
 solve :: (Real r, Fractional r) => [Atom r] -> SatResult r
@@ -343,7 +292,7 @@ solve' cs =
     vs = vars cs
     (tbl, vs', avs, defs) = tableau vs cs
 
-twoPhasedSimplex :: (Real r, Fractional r) => Bool -> Term r -> [Atom r] -> OptResult r
+twoPhasedSimplex :: (Real r, Fractional r) => Bool -> Expr r -> [Atom r] -> OptResult r
 twoPhasedSimplex isMinimize obj2 cs2 = fromMaybe OptUnknown $ do
   obj <- term obj2  
   cs <- mapM atom cs2
@@ -369,7 +318,7 @@ twoPhasedSimplex' isMinimize obj cs =
 
 phaseI :: (Real r, Fractional r) => Tableau r -> VarSet -> Maybe (Tableau r)
 phaseI tbl avs
-  | currentObjValue tbl1' /= 0 = Nothing
+  | currentObjValue tbl1 /= 0 = Nothing
   | otherwise = Just $ IM.delete objRow $ removeArtificialVariables avs $ go tbl1
   where
     tbl1 = setObjRow tbl (IM.fromList [(v,1) | v <- IS.toList avs], 0)
@@ -509,7 +458,7 @@ toCSV tbl = unlines . map (concat . intersperse ",") $ header : body
 
 -- ---------------------------------------------------------------------------
 
-example_3_2 :: (Term Rational, [Atom Rational])
+example_3_2 :: (Expr Rational, [Atom Rational])
 example_3_2 = (obj, cond)
   where
     x1 = var 1
@@ -528,7 +477,7 @@ test_3_2 :: OptResult Rational
 test_3_2 = uncurry maximize example_3_2
 -- Optimum (27 % 5) (fromList [(1,1 % 5),(2,0 % 1),(3,8 % 5)])
 
-example_3_5 :: (Term Rational, [Atom Rational])
+example_3_5 :: (Expr Rational, [Atom Rational])
 example_3_5 = (obj, cond)
   where
     x1 = var 1
@@ -550,7 +499,7 @@ test_3_5 :: OptResult Rational
 test_3_5 = uncurry minimize example_3_5
 -- Optimum (19 % 1) (fromList [(1,(-1) % 1),(2,0 % 1),(3,1 % 1),(4,0 % 1),(5,2 % 1)])
 
-example_4_1 :: (Term Rational, [Atom Rational])
+example_4_1 :: (Expr Rational, [Atom Rational])
 example_4_1 = (obj, cond)
   where
     x1 = var 1
@@ -566,7 +515,7 @@ test_4_1 ::OptResult Rational
 test_4_1 = uncurry maximize example_4_1
 -- OptUnsat
 
-example_4_2 :: (Term Rational, [Atom Rational])
+example_4_2 :: (Expr Rational, [Atom Rational])
 example_4_2 = (obj, cond)
   where
     x1 = var 1
@@ -582,7 +531,7 @@ test_4_2 :: OptResult Rational
 test_4_2 = uncurry maximize example_4_2
 -- Unbounded
 
-example_4_3 :: (Term Rational, [Atom Rational])
+example_4_3 :: (Expr Rational, [Atom Rational])
 example_4_3 = (obj, cond)
   where
     x1 = var 1
@@ -598,7 +547,7 @@ test_4_3 :: OptResult Rational
 test_4_3 = uncurry maximize example_4_3
 -- Optimum (12 % 1) (fromList [(1,4 % 1),(2,6 % 1)])
 
-example_4_5 :: (Term Rational, [Atom Rational])
+example_4_5 :: (Expr Rational, [Atom Rational])
 example_4_5 = (obj, cond)
   where
     x1 = var 1
@@ -615,7 +564,7 @@ test_4_5 :: OptResult Rational
 test_4_5 = uncurry maximize example_4_5
 -- Optimum (5 % 1) (fromList [(1,3 % 2),(2,2 % 1)])
 
-example_4_6 :: (Term Rational, [Atom Rational])
+example_4_6 :: (Expr Rational, [Atom Rational])
 example_4_6 = (obj, cond)
   where
     x1 = var 1
@@ -637,7 +586,7 @@ test_4_6 :: OptResult Rational
 test_4_6 = uncurry maximize example_4_6
 -- Optimum (165 % 4) (fromList [(1,2 % 1),(2,1 % 1),(3,0 % 1),(4,1 % 1)])
 
-example_4_7 :: (Term Rational, [Atom Rational])
+example_4_7 :: (Expr Rational, [Atom Rational])
 example_4_7 = (obj, cond)
   where
     x1 = var 1
