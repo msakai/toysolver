@@ -40,6 +40,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Text.ParserCombinators.Parsec hiding (label)
 
+import Util (combineMaybe)
+
 -- ---------------------------------------------------------------------------
 
 data LP
@@ -245,7 +247,7 @@ boundsSection = do
   tok $ string' "bound" >> optional (char 's')
   liftM (Map.map g . Map.fromListWith f) $ many (try bound)
   where
-    f (lb1,ub1) (lb2,ub2) = (merge max lb1 lb2, merge min ub1 ub2)
+    f (lb1,ub1) (lb2,ub2) = (combineMaybe max lb1 lb2, combineMaybe min ub1 ub2)
     g (lb, ub) = ( fromMaybe (fst defaultBounds) lb
                  , fromMaybe (snd defaultBounds) ub
                  )
@@ -345,7 +347,7 @@ term flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
   v <- liftM Var ident <|> qexpr
-  return $ case merge (*) s c of
+  return $ case combineMaybe (*) s c of
     Nothing -> v
     Just d -> Const d :*: v
 
@@ -362,7 +364,7 @@ qterm flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
   es <- qfactor `chainl1`  (tok (char '*') >> return (:*:))
-  return $ case merge (*) s c of
+  return $ case combineMaybe (*) s c of
     Nothing -> es
     Just d -> Const d :*: es
 
@@ -399,14 +401,6 @@ number = tok $ do
                 , return id
                 ]
       liftM f nat
-
--- ---------------------------------------------------------------------------
-
-merge :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a
-merge f (Just x) (Just y) = Just (f x y)
-merge _ (Just x) Nothing = Just x
-merge _ Nothing (Just x) = Just x
-merge _ Nothing Nothing = Nothing
 
 -- ---------------------------------------------------------------------------
 

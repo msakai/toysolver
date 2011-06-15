@@ -38,6 +38,7 @@ import qualified Data.IntSet as IS
 import Expr
 import Formula
 import Tm
+import Util (combineMaybe)
 
 -- ---------------------------------------------------------------------------
 
@@ -281,7 +282,7 @@ intersectR :: IntervalR -> IntervalR -> IntervalR
 intersectR (l1,u1) (l2,u2) = (maxEP l1 l2, minEP u1 u2)
   where 
     maxEP :: EP -> EP -> EP
-    maxEP = combine $ \(in1,x1) (in2,x2) ->
+    maxEP = combineMaybe $ \(in1,x1) (in2,x2) ->
       ( case x1 `compare` x2 of
           EQ -> in1 && in2
           LT -> in2
@@ -290,7 +291,7 @@ intersectR (l1,u1) (l2,u2) = (maxEP l1 l2, minEP u1 u2)
       )
 
     minEP :: EP -> EP -> EP
-    minEP = combine $ \(in1,x1) (in2,x2) ->
+    minEP = combineMaybe $ \(in1,x1) (in2,x2) ->
       ( case x1 `compare` x2 of
           EQ -> in1 && in2
           LT -> in1
@@ -411,7 +412,7 @@ univZ :: IntervalZ
 univZ = (Nothing, Nothing)
 
 intersectZ :: IntervalZ -> IntervalZ -> IntervalZ
-intersectZ (l1,u1) (l2,u2) = (combine max l1 l2, combine min u1 u2)
+intersectZ (l1,u1) (l2,u2) = (combineMaybe max l1 l2, combineMaybe min u1 u2)
 
 pickupZ :: IntervalZ -> Maybe Integer
 pickupZ (Nothing,Nothing) = return 0
@@ -424,11 +425,6 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 gcd' :: [Integer] -> Integer
 gcd' [] = 1
 gcd' xs = foldl1' gcd xs
-
-combine :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a
-combine _ Nothing y = y
-combine _ x Nothing = x
-combine f (Just x) (Just y) = Just (f x y)
 
 -- ---------------------------------------------------------------------------
 
