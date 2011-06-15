@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  FourierMotzkin
@@ -15,14 +16,8 @@
 --
 -----------------------------------------------------------------------------
 module FourierMotzkin
-    ( Var
-    , Term (..)
-    , RelOp (..)
-    , Formula (..)
-    , Boolean (..)
-    , andF, orF
-    , (.+.), (.-.), (.*.)
-    , (.<.), (.<=.), (.>=.), (.>.), (.==.), (./=.)
+    ( module Expr
+    , module Formula
     , Tm (..)
     , Lit (..)
     , DNF (..)
@@ -30,7 +25,7 @@ module FourierMotzkin
     , eliminateQuantifiersZ
     , solveR
     , solveZ
-    , Model
+    , termR -- FIXME
     ) where
 
 import Control.Monad
@@ -40,182 +35,30 @@ import Data.Ratio
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
--- ---------------------------------------------------------------------------
-
--- | Variables are represented as non-negative integers
-type Var = Int
-
-class Variables a where
-  vars :: a -> IS.IntSet
-
-instance Variables a => Variables [a] where
-  vars = IS.unions . map vars
-
-type Model c = IM.IntMap c
+import Expr
+import Formula
+import Tm
 
 -- ---------------------------------------------------------------------------
 
-data Term c
-    = Const c
-    | Var Var
-    | Add (Term c) (Term c)
-    | Mul c (Term c)
-    deriving (Show, Eq, Ord)
-
-data RelOp = Lt | Le | Ge | Gt | Eql | NEq
-    deriving (Show, Eq, Ord)
-
-data Formula c
-    = T
-    | F
-    | Rel (Term c) RelOp (Term c)
-    | And (Formula c) (Formula c)
-    | Or (Formula c) (Formula c)
-    | Not (Formula c)
-    | Imply (Formula c) (Formula c)
-    | Equiv (Formula c) (Formula c)
-    | Forall Var (Formula c)
-    | Exists Var (Formula c)
-    deriving (Show, Eq, Ord)
-
-instance Variables (Term c) where
-  vars (Const _) = IS.empty
-  vars (Var v) = IS.singleton v
-  vars (Add a b) = vars a `IS.union` vars b
-  vars (Mul _ a) = vars a
-
-instance Variables (Formula c) where
-  vars T = IS.empty
-  vars F = IS.empty
-  vars (Rel a _ b) = vars a `IS.union` vars b
-  vars (And a b) = vars a `IS.union` vars b
-  vars (Or a b) = vars a `IS.union` vars b
-  vars (Not a) = vars a
-  vars (Imply a b) = vars a `IS.union` vars b
-  vars (Equiv a b) = vars a `IS.union` vars b
-  vars (Forall v a) = IS.delete v (vars a)
-  vars (Exists v a) = IS.delete v (vars a)
-
-pushNot :: Formula c -> Formula c
-pushNot T = F
-pushNot F = T
-pushNot (Rel a op b) = Rel a op' b
-  where
-    op' = case op of
-            Lt -> Ge
-            Le -> Gt
-            Ge -> Lt
-            Gt -> Le
-            Eql -> NEq
-            NEq -> Eql
-pushNot (And a b) = Or (pushNot a) (pushNot b)
-pushNot (Or a b) = And (pushNot a) (pushNot b)
-pushNot (Not a) = a
-pushNot (Imply a b) = And a (pushNot b)
-pushNot (Equiv a b) = Or (And a (pushNot b)) (And b (pushNot a))
-pushNot (Forall v a) = Exists v (pushNot a)
-pushNot (Exists v a) = Forall v (pushNot a)
-
--- ---------------------------------------------------------------------------
--- DSL
-
-infixr 7 .*.
-infixl 6 .+., .-.
-infix 4 .<., .<=., .>=., .>., .==., ./=.
-infixr 3 .&&.
-infixr 2 .||.
-infix 1 .=>. , .<=>.
-
-class Boolean a where
-  true, false :: a
-  notF :: a -> a
-  (.&&.), (.||.), (.=>.), (.<=>.) :: a -> a -> a
-  x .=>. y = notF x .||. y
-  x .<=>. y = (x .=>. y) .&&. (y .=>. x)
-
-instance Boolean (Formula c) where
-  true = T
-  false = F
-  notF = Not
-  (.&&.) = And
-  (.||.) = Or
-  (.=>.) = Imply
-  (.<=>.) = Equiv
-
-andF :: Boolean a => [a] -> a
-andF = foldr (.&&.) true
-
-orF :: Boolean a => [a] -> a
-orF = foldr (.||.) false
-
-(.+.) :: Term c -> Term c -> Term c
-(.+.) = Add
-
-(.-.) :: Num c => Term c -> Term c -> Term c
-a .-. b = a .+. (-1).*.b
-
-(.*.) :: c -> Term c -> Term c
-(.*.) = Mul
-
-(.<.), (.<=.), (.>=.), (.>.), (.==.), (./=.) :: Term c -> Term c -> Formula c
-a .<. b = Rel a Lt b
-a .<=. b = Rel a Le b
-a .>. b = Rel a Gt b
-a .>=. b = Rel a Ge b
-a .==. b = Rel a Eql b
-a ./=. b = Rel a NEq b
-
--- ---------------------------------------------------------------------------
-
--- Linear combination of variables and constants.
--- Non-negative keys are used for variables's coefficients.
--- key '-1' is used for constants.
-newtype Tm = Tm (IM.IntMap Integer) deriving (Eq, Ord, Show)
+type TmZ = Tm Integer
 
 -- | (t,c) represents t/c, and c must be >0.
-type Rat = (Tm, Integer)
-
-instance Variables Tm where
-  vars (Tm t) = IS.delete (-1) $ IM.keysSet t
-
-normalizeTm :: Tm -> Tm
-normalizeTm (Tm t) = Tm $ IM.filter (0/=) t
-
-constTm :: Integer -> Tm
-constTm c = normalizeTm $ Tm $ IM.singleton (-1) c
-
-varTm :: Var -> Tm
-varTm v = Tm $ IM.singleton v 1
-
-plusTm :: Tm -> Tm -> Tm
-plusTm (Tm t1) (Tm t2) = normalizeTm $ Tm $ IM.unionWith (+) t1 t2
-
-minusTm :: Tm -> Tm -> Tm
-minusTm t1 t2 = t1 `plusTm` negateTm t2
-
-scaleTm :: Integer -> Tm -> Tm
-scaleTm c (Tm t) = normalizeTm $ Tm $ IM.map (c*) t
-
-negateTm :: Tm -> Tm
-negateTm = scaleTm (-1)
-
-evalTm :: Model Integer -> Tm -> Integer
-evalTm model (Tm t) = sum [(model' IM.! var) * c | (var,c) <- IM.toList t]
-  where model' = IM.insert (-1) 1 model
+type Rat = (TmZ, Integer)
 
 evalRat :: Model Rational -> Rat -> Rational
 evalRat model (Tm t, c1) = sum [(model' IM.! var) * (c % c1) | (var,c) <- IM.toList t]
   where model' = IM.insert (-1) 1 model
 
 -- | Literal
-data Lit = Nonneg Tm | Pos Tm deriving (Show, Eq, Ord)
+data Lit = Nonneg TmZ | Pos TmZ deriving (Show, Eq, Ord)
 
 instance Variables Lit where
   vars (Pos t) = vars t
   vars (Nonneg t) = vars t
 
 -- | Disjunctive normal form
-newtype DNF = DNF{ unDNF :: [[Lit]] }
+newtype DNF = DNF{ unDNF :: [[Lit]] } deriving (Show)
 
 instance Boolean DNF where
   true = DNF [[]]
@@ -243,7 +86,7 @@ simplify = fmap concat . mapM f
         Just x -> guard (x >= 0) >> return []
         Nothing -> return [lit]
 
-    g :: Tm -> Maybe Integer
+    g :: TmZ -> Maybe Integer
     g (Tm tm) =
       case IM.toList tm of
         [] -> Just 0
@@ -252,69 +95,81 @@ simplify = fmap concat . mapM f
 
 -- ---------------------------------------------------------------------------
 
-atomR :: RelOp -> Term Rational -> Term Rational -> DNF
-atomR Le a b = DNF [[termR a `leR` termR b]]
-atomR Lt a b = DNF [[termR a `ltR` termR b]]
-atomR Ge a b = DNF [[termR a `geR` termR b]]
-atomR Gt a b = DNF [[termR a `gtR` termR b]]
-atomR Eql a b = DNF [[termR a `leR` termR b, termR a `geR` termR b]]
-atomR NEq a b = DNF [[termR a `ltR` termR b], [termR a `gtR` termR b]]
+atomR :: RelOp -> Expr Rational -> Expr Rational -> Maybe DNF
+atomR op a b = do
+  a' <- termR a
+  b' <- termR b
+  return $ case op of
+    Le -> DNF [[a' `leR` b']]
+    Lt -> DNF [[a' `ltR` b']]
+    Ge -> DNF [[a' `geR` b']]
+    Gt -> DNF [[a' `gtR` b']]
+    Eql -> DNF [[a' `leR` b', a' `geR` b']]
+    NEq -> DNF [[a' `ltR` b'], [a' `gtR` b']]
 
-termR :: Term Rational -> Rat
-termR (Const c) = (constTm (numerator c), denominator c)
-termR (Var v) = (varTm v, 1)
-termR (Add a b) =
-  case (termR a, termR b) of
-    ((t1,c1), (t2,c2)) ->
-      (scaleTm c2 t1 `plusTm` scaleTm c1 t2, c1*c2)
-termR (Mul c a) =
-  case termR a of
-    (t,c1) ->
-      (scaleTm (numerator c) t, c1 * denominator c)
+termR :: Expr Rational -> Maybe Rat
+termR (Const c) = return (constTm (numerator c), denominator c)
+termR (Var v) = return (varTm v, 1)
+termR (a :+: b) = do
+  (t1,c1) <- termR a
+  (t2,c2) <- termR b
+  return (scaleTm c2 t1 .+. scaleTm c1 t2, c1*c2)
+termR (a :*: b) = do
+  (t1,c1) <- termR a
+  (t2,c2) <- termR b
+  msum [ do{ c <- asConst t1; return (scaleTm c t2, c1*c2) }
+       , do{ c <- asConst t2; return (scaleTm c t1, c1*c2) }
+       ]
+termR (a :/: b) = do
+  (t1,c1) <- termR a
+  (t2,c2) <- termR b
+  c3 <- asConst t2
+  guard $ c3 /= 0
+  return (scaleTm c2 t1, c1*c3)
 
 leR, ltR, geR, gtR :: Rat -> Rat -> Lit
-leR (tm1,c) (tm2,d) = Nonneg $ normalizeTmR $ scaleTm c tm2 `minusTm` scaleTm d tm1
-ltR (tm1,c) (tm2,d) = Pos $ normalizeTmR $ scaleTm c tm2 `minusTm` scaleTm d tm1
+leR (tm1,c) (tm2,d) = Nonneg $ normalizeTmR $ scaleTm c tm2 .-. scaleTm d tm1
+ltR (tm1,c) (tm2,d) = Pos $ normalizeTmR $ scaleTm c tm2 .-. scaleTm d tm1
 geR = flip leR
 gtR = flip gtR
 
-normalizeTmR :: Tm -> Tm
+normalizeTmR :: TmZ -> TmZ
 normalizeTmR (Tm m) = Tm (IM.map (`div` d) m)
   where d = gcd' $ map snd $ IM.toList m
 
 -- ---------------------------------------------------------------------------
 
-atomZ :: RelOp -> Term Integer -> Term Integer -> DNF
-atomZ Le a b = DNF [[termZ a `leZ` termZ b]]
-atomZ Lt a b = DNF [[termZ a `ltZ` termZ b]]
-atomZ Ge a b = DNF [[termZ a `geZ` termZ b]]
-atomZ Gt a b = DNF [[termZ a `gtZ` termZ b]]
-atomZ Eql a b = eqZ (termZ a) (termZ b)
-atomZ NEq a b = DNF [[termZ a `ltZ` termZ b], [termZ a `gtZ` termZ b]]
+atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe DNF
+atomZ op a b = do
+  (tm1,c1) <- termR a
+  (tm2,c2) <- termR b
+  let a' = scaleTm c2 tm1
+      b' = scaleTm c1 tm2
+  return $ case op of
+    Le -> DNF [[a' `leZ` b']]
+    Lt -> DNF [[a' `ltZ` b']]
+    Ge -> DNF [[a' `geZ` b']]
+    Gt -> DNF [[a' `gtZ` b']]
+    Eql -> eqZ a' b'
+    NEq -> DNF [[a' `ltZ` b'], [a' `gtZ` b']]
 
-termZ :: Term Integer -> Tm
-termZ (Const c) = constTm c
-termZ (Var v) = varTm v
-termZ (Add t1 t2) =  termZ t1 `plusTm` termZ t2
-termZ (Mul c t) = scaleTm c (termZ t)
-
-leZ, ltZ, geZ, gtZ :: Tm -> Tm -> Lit
+leZ, ltZ, geZ, gtZ :: TmZ -> TmZ -> Lit
 -- Note that constants may be floored by division
 leZ tm1 tm2 = Nonneg (Tm (IM.map (`div` d) m))
   where
-    Tm m = tm2 `minusTm` tm1
+    Tm m = tm2 .-. tm1
     d = gcd' [c | (var,c) <- IM.toList m, var /= -1]
-ltZ tm1 tm2 = (tm1 `plusTm` constTm 1) `leZ` tm2
+ltZ tm1 tm2 = (tm1 .+. constTm 1) `leZ` tm2
 geZ = flip leZ
 gtZ = flip gtZ
 
-eqZ :: Tm -> Tm -> DNF
+eqZ :: TmZ -> TmZ -> DNF
 eqZ tm1 tm2
   = if fromMaybe 0 (IM.lookup (-1) m) `mod` d == 0
     then DNF [[Nonneg tm, Nonneg (negateTm tm)]]
     else false
   where
-    Tm m = tm1 `minusTm` tm2
+    Tm m = tm1 .-. tm2
     tm = Tm (IM.map (`div` d) m)
     d = gcd' [c | (var,c) <- IM.toList m, var /= -1]
 
@@ -338,7 +193,7 @@ collectBoundsR v = foldr phi (([],[],[],[]),[])
     phi lit@(Nonneg t) x = f False lit t x
     phi lit@(Pos t) x = f True lit t x
 
-    f :: Bool -> Lit -> Tm -> (BoundsR, [Lit]) -> (BoundsR, [Lit])
+    f :: Bool -> Lit -> TmZ -> (BoundsR, [Lit]) -> (BoundsR, [Lit])
     f strict lit (Tm t) (bnd@(ls1,ls2,us1,us2), xs) = 
       case c `compare` 0 of
         EQ -> (bnd, lit : xs)
@@ -361,24 +216,33 @@ boundConditionsR  (ls1, ls2, us1, us2) = DNF $ maybeToList $ simplify $
   [ x `ltR` y | x <- ls2, y <- us1 ] ++
   [ x `ltR` y | x <- ls2, y <- us2 ]
 
-eliminateQuantifiersR :: Formula Rational -> DNF
+eliminateQuantifiersR :: Formula Rational -> Maybe DNF
 eliminateQuantifiersR = f
   where
-    f T = true
-    f F = false
-    f (Rel a op b) = atomR op a b
-    f (And a b) = f a .&&. f b
-    f (Or a b) = f a .||. f b
+    f T = return true
+    f F = return false
+    f (Atom (Rel a op b)) = atomR op a b
+    f (And a b) = liftM2 (.&&.) (f a) (f b)
+    f (Or a b) = liftM2 (.||.) (f a) (f b)
     f (Not a) = f (pushNot a)
     f (Imply a b) = f (Or (Not a) b)
     f (Equiv a b) = f (And (Imply a b) (Imply b a))
-    f (Forall v a) = notF $ f (Exists v (pushNot a))
-    f (Exists v a) = orF [eliminateR v xs | xs <- unDNF (f a)]
+    f (Forall v a) = do
+      dnf <- f (Exists v (pushNot a))
+      return (notF dnf)
+    f (Exists v a) = do
+      dnf <- f a
+      return $ orF [eliminateR v xs | xs <- unDNF dnf]
 
-solveR :: Formula Rational -> Maybe (Model Rational)
-solveR formula = msum [solveR' vs xs | xs <- unDNF dnf]
+solveR :: Formula Rational -> SatResult Rational
+solveR formula =
+  case eliminateQuantifiersR formula of
+    Nothing -> Unknown
+    Just dnf ->
+      case msum [solveR' vs xs | xs <- unDNF dnf] of
+        Nothing -> Unsat
+        Just m -> Sat m
   where
-    dnf = eliminateQuantifiersR formula
     vs = IS.toList (vars formula)
 
 solveR' :: [Var] -> [Lit] -> Maybe (Model Rational)
@@ -461,7 +325,7 @@ collectBoundsZ :: Var -> [Lit] -> (BoundsZ,[Lit])
 collectBoundsZ v = foldr phi (([],[]),[])
   where
     phi :: Lit -> (BoundsZ,[Lit]) -> (BoundsZ,[Lit])
-    phi (Pos t) x = phi (Nonneg (t `minusTm` constTm 1)) x
+    phi (Pos t) x = phi (Nonneg (t .-. constTm 1)) x
     phi lit@(Nonneg (Tm t)) ((ls,us),xs) =
       case c `compare` 0 of
         EQ -> ((ls, us), lit : xs)
@@ -475,7 +339,7 @@ boundConditionsZ :: BoundsZ -> DNF
 boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $ cond1 : cond2
   where
      cond1 =
-       [ constTm ((a-1)*(b-1)) `leZ` (scaleTm a d `minusTm` scaleTm b c)
+       [ constTm ((a-1)*(b-1)) `leZ` (scaleTm a d .-. scaleTm b c)
        | (c,a)<-ls , (d,b)<-us ]
      cond2 = 
        [ [scaleTm a' c `leZ` scaleTm a val | (c,a)<-ls] ++
@@ -484,30 +348,39 @@ boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $ cond1 : cond2
        , let m = maximum [b | (_,b)<-us]
        ,  (c',a') <- ls
        , k <- [0 .. (m*a'-a'-m) `div` m]
-       , let val = c' `plusTm` constTm k
+       , let val = c' .+. constTm k
        -- x = val / a'
        -- c / a ≤ x ⇔ c / a ≤ val / a' ⇔ a' c ≤ a val
        -- x ≤ d / b ⇔ val / a' ≤ d / b ⇔ b val ≤ a' d
        ]
 
-eliminateQuantifiersZ :: Formula Integer -> DNF
+eliminateQuantifiersZ :: Formula Rational -> Maybe DNF
 eliminateQuantifiersZ = f
   where
-    f T = true
-    f F = false
-    f (Rel a op b) = atomZ op a b
-    f (And a b) = f a .&&. f b
-    f (Or a b) = f a .||. f b
+    f T = return true
+    f F = return false
+    f (Atom (Rel a op b)) = atomZ op a b
+    f (And a b) = liftM2 (.&&.) (f a) (f b)
+    f (Or a b) = liftM2 (.||.) (f a) (f b)
     f (Not a) = f (pushNot a)
     f (Imply a b) = f (Or (Not a) b)
     f (Equiv a b) = f (And (Imply a b) (Imply b a))
-    f (Forall v a) = notF $ f (Exists v (pushNot a))
-    f (Exists v a) = orF [eliminateZ v xs | xs <- unDNF (f a)]
+    f (Forall v a) = do
+      dnf <- f (Exists v (pushNot a))
+      return $ notF dnf
+    f (Exists v a) = do
+      dnf <- f a
+      return $ orF [eliminateZ v xs | xs <- unDNF dnf]
 
-solveZ :: Formula Integer -> Maybe (Model Integer)
-solveZ formula = msum [solveZ' vs xs | xs <- unDNF dnf]
+solveZ :: Formula Rational -> SatResult Integer
+solveZ formula =
+  case eliminateQuantifiersZ formula of
+    Nothing -> Unknown
+    Just dnf ->
+      case msum [solveZ' vs xs | xs <- unDNF dnf] of
+        Nothing -> Unsat
+        Just m -> Sat m
   where
-    dnf = eliminateQuantifiersZ formula
     vs = IS.toList (vars formula)
 
 solveZ' :: [Var] -> [Lit] -> Maybe (Model Integer)
@@ -568,16 +441,16 @@ combine f (Just x) (Just y) = Just (f x y)
 satisfiable in R
 but unsatisfiable in Z
 -}
-test1 :: Num c => Formula c
+test1 :: Formula Rational
 test1 = c1 .&&. c2 .&&. c3 .&&. c4
   where
     x = Var 0
     y = Var 1
     z = Var 2
-    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. Const 17
-    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. Const 7
-    c3 = Const 1 .<=. x .&&. x .<=. Const 40
-    c4 = Const (-50) .<=. y .&&. y .<=. Const 50
+    c1 = 7*x + 12*y + 31*z .==. 17
+    c2 = 3*x + 5*y + 14*z .==. 7
+    c3 = 1 .<=. x .&&. x .<=. 40
+    c4 = (-50) .<=. y .&&. y .<=. 50
 
 {-
 27 ≤ 11x+13y ≤ 45
@@ -586,14 +459,14 @@ test1 = c1 .&&. c2 .&&. c3 .&&. c4
 satisfiable in R
 but unsatisfiable in Z
 -}
-test2 :: Num c => Formula c
+test2 :: Formula Rational
 test2 = c1 .&&. c2
   where
     x = Var 0
     y = Var 1
-    t1 = 11.*.x .+. 13.*.y
-    t2 = 7.*.x .-. 9.*.y
-    c1 = Const 27 .<=. t1 .&&. t1 .<=. Const 45
-    c2 = Const (-10) .<=. t2 .&&. t2 .<=. Const 4
+    t1 = 11*x + 13*y
+    t2 = 7*x - 9*y
+    c1 = 27 .<=. t1 .&&. t1 .<=. 45
+    c2 = (-10) .<=. t2 .&&. t2 .<=. 4
 
 -- ---------------------------------------------------------------------------

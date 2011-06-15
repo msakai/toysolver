@@ -1,3 +1,10 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Expr
+-- Copyright   :  (c) Masahiro Sakai 2011
+-- License     :  BSD-style
+-- 
+-----------------------------------------------------------------------------
 module Expr
   ( Var
   , VarSet
@@ -7,11 +14,17 @@ module Expr
   , Expr (..)
   , var
   , eval
+
+  -- FIXME: どこか違うモジュールへ?
+  , SatResult (..)
+  , OptResult (..)
   ) where
 
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Ratio
+
+-- ---------------------------------------------------------------------------
 
 -- | Variables are represented as non-negative integers
 type Var = Int
@@ -25,6 +38,8 @@ instance Variables a => Variables [a] where
   vars = IS.unions . map vars
 
 type Model r = VarMap r
+
+-- ---------------------------------------------------------------------------
 
 data Expr r
   = Const r
@@ -47,9 +62,18 @@ instance Fractional r => Fractional (Expr r) where
   a / b = a :/: b
   fromRational x = fromInteger (numerator x) / fromInteger (denominator x)
 
+instance Functor Expr where
+  fmap f = g
+    where
+      g (Const c) = Const (f c)
+      g (Var v)   = Var v
+      g (a :+: b) = g a :+: g b
+      g (a :*: b) = g a :*: g b
+      g (a :/: b) = g a :/: g b
+
 instance Variables (Expr r) where
   vars (Const _) = IS.empty
-  vars (Var v) = IS.singleton v
+  vars (Var v)   = IS.singleton v
   vars (a :+: b) = vars a `IS.union` vars b
   vars (a :*: b) = vars a `IS.union` vars b
   vars (a :/: b) = vars a `IS.union` vars b
@@ -65,3 +89,13 @@ eval m = f
     f (a :+: b) = f a + f b
     f (a :*: b) = f a * f b
     f (a :/: b) = f a / f b
+
+-- ---------------------------------------------------------------------------
+
+data SatResult r = Unknown | Unsat | Sat (Model r)
+  deriving (Show, Eq, Ord)
+
+data OptResult r = OptUnknown | OptUnsat | Unbounded | Optimum r (Model r)
+  deriving (Show, Eq, Ord)
+
+-- ---------------------------------------------------------------------------

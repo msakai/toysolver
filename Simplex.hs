@@ -16,17 +16,7 @@
 --
 -----------------------------------------------------------------------------
 module Simplex
-  ( Var
-  , Variables (..)
-  , Model
-  , SatResult (..)
-  , OptResult (..)
-  , Expr (..)
-  , var
-  , Atom (..)
-  , RelOp (..)
-  , (.<=.), (.>=.), (.=.)
-  , eval
+  ( module Expr
   , minimize
   , maximize
   , solve
@@ -43,92 +33,21 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
 import Expr
-
-infixl 6 .+., .-.
-infix 4 .<=., .>=., .=.
-
--- ---------------------------------------------------------------------------
-
-data SatResult r = Unknown | Unsat | Sat (Model r)
-  deriving (Show, Eq, Ord)
-
-data OptResult r = OptUnknown | OptUnsat | Unbounded | Optimum r (Model r)
-  deriving (Show, Eq, Ord)
+import Formula
+import Tm
 
 -- ---------------------------------------------------------------------------
 
-data Atom r = Rel (Expr r) RelOp (Expr r)
+data RelOp2 = Le2 | Ge2 | Eql2
     deriving (Show, Eq, Ord)
-
-data RelOp = Le | Ge | Eql
-    deriving (Show, Eq, Ord)
-
-instance Variables (Atom r) where
-  vars (Rel a _ b) = vars a `IS.union` vars b
-
-(.<=.), (.>=.), (.=.) :: Num r => Expr r -> Expr r -> Atom r
-a .<=. b = Rel a Le b
-a .>=. b = Rel a Ge b
-a .=. b = Rel a Eql b
 
 -- ---------------------------------------------------------------------------
 
--- Linear combination of variables and constants.
--- Non-negative keys are used for variables's coefficients.
--- key '-1' is used for constants.
-newtype Tm r = Tm{ unTm :: IM.IntMap r } deriving (Eq, Ord, Show)
-
-data Constraint r = Rel2 (Tm r) RelOp (Tm r)
+data Constraint r = Rel2 (Tm r) RelOp2 (Tm r)
     deriving (Show, Eq, Ord)
-
-instance Variables (Tm r) where
-  vars (Tm m) = IS.delete constKey (IM.keysSet m)
 
 instance Variables (Constraint r) where
   vars (Rel2 a _ b) = vars a `IS.union` vars b
-
-constKey :: Int
-constKey = -1
-
-asConst :: Num r => Tm r -> Maybe r
-asConst (Tm m) =
-  case IM.toList m of
-    [] -> Just 0
-    [(-1,x)] -> Just x
-    _ -> Nothing
-
-normalizeTm :: Num r => Tm r -> Tm r
-normalizeTm (Tm t) = Tm $ IM.filter (0/=) t
-
-varTm :: Num r => Var -> Tm r
-varTm v = Tm $ IM.singleton v 1
-
-constTm :: Num r => r -> Tm r
-constTm c = normalizeTm $ Tm $ IM.singleton constKey c
-
-(.+.) :: Num r => Tm r -> Tm r -> Tm r
-Tm t1 .+. Tm t2 = normalizeTm $ Tm $ IM.unionWith (+) t1 t2
-
-(.-.) :: Num r => Tm r -> Tm r -> Tm r
-a .-. b = a .+. negateTm b
-
-scaleTm :: Num r => r -> Tm r -> Tm r
-scaleTm c (Tm t) = normalizeTm $ Tm $ IM.map (c*) t
-
-negateTm :: Num r => Tm r -> Tm r
-negateTm = scaleTm (-1)
-
-evalTm :: Num r => Model r -> Tm r -> r
-evalTm m (Tm t) = sum [(m' IM.! v) * c | (v,c) <- IM.toList t]
-  where m' = IM.insert constKey 1 m
-
-applySubst :: Num r => VarMap (Tm r) -> Tm r -> Tm r
-applySubst s (Tm m) = foldr (.+.) (constTm 0) (map f (IM.toList m))
-  where
-    f (v,c) = scaleTm c $ 
-      case IM.lookup v s of
-        Just tm -> tm
-        Nothing -> varTm v
 
 term :: (Real r, Fractional r) => Expr r -> Maybe (Tm r)
 term (Const c) = return (constTm c)
@@ -149,7 +68,14 @@ atom :: (Real r, Fractional r) => Atom r -> Maybe (Constraint r)
 atom (Rel a op b) = do
   a' <- term a
   b' <- term b
-  return $ Rel2 a' op b'
+  op2 <- case op of
+    Le  -> return Le2
+    Ge  -> return Ge2
+    Eql -> return Eql2
+    Lt  -> Nothing
+    Gt  -> Nothing
+    NEq -> Nothing
+  return $ Rel2 a' op2 b'
 
 -- ---------------------------------------------------------------------------
 
@@ -352,7 +278,7 @@ tableau vs cs = flip evalState g $ tableauM cs
   where
     g = 1 + maximum ((-1) : IS.toList vs)
 
-type Constraint' r = (Tm r, RelOp, r)
+type Constraint' r = (Tm r, RelOp2, r)
 type M = State Var
 
 gensym :: M Var
@@ -378,9 +304,9 @@ toConstraint' :: Real r => Constraint r -> Constraint' r
 toConstraint' (Rel2 a op b) = g (Tm (IM.delete constKey m)) op (- fromMaybe 0 (IM.lookup constKey m))
   where
     Tm m = a .-. b
-    g x Le  y = if y < 0 then (negateTm x, Ge, -y)  else (x, Le, y)
-    g x Ge  y = if y < 0 then (negateTm x, Le, -y)  else (x, Ge, y)
-    g x Eql y = if y < 0 then (negateTm x, Eql, -y) else (x, Eql, y)
+    g x Le2  y = if y < 0 then (negateTm x, Ge2, -y)  else (x, Le2, y)
+    g x Ge2  y = if y < 0 then (negateTm x, Le2, -y)  else (x, Ge2, y)
+    g x Eql2 y = if y < 0 then (negateTm x, Eql2, -y) else (x, Eql2, y)
 
 collectNonnegVars :: forall r. (Fractional r, Real r) => [Constraint' r] -> (VarSet, [Constraint' r])
 collectNonnegVars = foldr h (IS.empty, [])
@@ -392,15 +318,15 @@ collectNonnegVars = foldr h (IS.empty, [])
         _ -> (vs, cond:cs)
 
     calcLB :: Constraint' r -> Maybe (Var,r)
-    calcLB (Tm m, Ge, b) = 
+    calcLB (Tm m, Ge2, b) = 
       case IM.toList m of
         [(v,c)] | c > 0 -> Just (v, b / c)
         _ -> Nothing
-    calcLB (Tm m, Le, b) =
+    calcLB (Tm m, Le2, b) =
       case IM.toList m of
         [(v,c)] | c < 0 -> Just (v, b / c)
         _ -> Nothing
-    calcLB (Tm m, Eql, b) =
+    calcLB (Tm m, Eql2, b) =
       case IM.toList m of
         [(v,c)] -> Just (v, b / c)
         _ -> Nothing
@@ -408,20 +334,20 @@ collectNonnegVars = foldr h (IS.empty, [])
 mkRow :: Num r => Constraint' r -> M (Var, Row r, VarSet)
 mkRow (tm, rop, b) =
   case rop of
-    Le -> do
+    Le2 -> do
       v <- gensym -- slack variable
       return ( v
              , (unTm tm, b)
              , IS.empty
              )
-    Ge -> do
+    Ge2 -> do
       v1 <- gensym -- surplus variable
       v2 <- gensym -- artificial variable
       return ( v2
              , (unTm (tm .-. varTm v1 .+. varTm v2), b)
              , IS.singleton v2
              )
-    Eql -> do
+    Eql2 -> do
       v <- gensym -- artificial variable
       return ( v
              , (unTm (tm .+. varTm v), b)
@@ -486,9 +412,9 @@ example_3_5 = (obj, cond)
     x4 = var 4
     x5 = var 5
     obj = -2*x1 + 4*x2 + 7*x3 + x4 + 5*x5
-    cond = [ -x1 +   x2 + 2*x3 +   x4 + 2*x5 .=. 7
-           , -x1 + 2*x2 + 3*x3 +   x4 +   x5 .=. 6
-           , -x1 +   x2 +   x3 + 2*x4 +   x5 .=. 4
+    cond = [ -x1 +   x2 + 2*x3 +   x4 + 2*x5 .==. 7
+           , -x1 + 2*x2 + 3*x3 +   x4 +   x5 .==. 6
+           , -x1 +   x2 +   x3 + 2*x4 +   x5 .==. 4
            , x2 .>=. 0
            , x3 .>=. 0
            , x4 .>=. 0
@@ -596,8 +522,8 @@ example_4_7 = (obj, cond)
     obj = x1 + 1.5*x2 + 5*x3 + 2*x4
     cond = [ 3*x1 + 2*x2 +   x3 + 4*x4 .<=. 6
            , 2*x1 +   x2 + 5*x3 +   x4 .<=. 4
-           , 2*x1 + 6*x2 - 4*x3 + 8*x4 .=. 0
-           ,   x1 + 3*x2 - 2*x3 + 4*x4 .=. 0
+           , 2*x1 + 6*x2 - 4*x3 + 8*x4 .==. 0
+           ,   x1 + 3*x2 - 2*x3 + 4*x4 .==. 0
            , x1 .>=. 0
            , x2 .>=. 0
            , x3 .>=. 0
