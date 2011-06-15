@@ -17,6 +17,7 @@
 -----------------------------------------------------------------------------
 module Simplex
   ( module Expr
+  , module Formula
   , minimize
   , maximize
   , solve
@@ -244,10 +245,11 @@ twoPhasedSimplex' isMinimize obj cs =
 
 phaseI :: (Real r, Fractional r) => Tableau r -> VarSet -> Maybe (Tableau r)
 phaseI tbl avs
-  | currentObjValue tbl1 /= 0 = Nothing
-  | otherwise = Just $ IM.delete objRow $ removeArtificialVariables avs $ go tbl1
+  | currentObjValue tbl1' /= 0 = Nothing
+  | otherwise = Just $ IM.delete objRow $ removeArtificialVariables avs $ tbl1'
   where
     tbl1 = setObjRow tbl (IM.fromList [(v,1) | v <- IS.toList avs], 0)
+    tbl1' = go tbl1
     go tbl
       | currentObjValue tbl == 0 = tbl
       | otherwise = 
