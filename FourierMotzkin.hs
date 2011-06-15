@@ -79,7 +79,7 @@ simplify = fmap concat . mapM f
   where
     f :: Lit -> Maybe [Lit]
     f lit@(Pos tm) =
-      case g tm of
+      case asConst tm of
         Just x -> guard (x > 0) >> return []
         Nothing -> return [lit]
     f lit@(Nonneg tm) =
