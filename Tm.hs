@@ -28,7 +28,7 @@ asConst :: Num r => Tm r -> Maybe r
 asConst (Tm m) =
   case IM.toList m of
     [] -> Just 0
-    [(-1,x)] -> Just x
+    [(v,x)] | v==constKey -> Just x
     _ -> Nothing
 
 normalizeTm :: Num r => Tm r -> Tm r

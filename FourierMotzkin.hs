@@ -49,7 +49,7 @@ type Rat = (TmZ, Integer)
 
 evalRat :: Model Rational -> Rat -> Rational
 evalRat model (Tm t, c1) = sum [(model' IM.! var) * (c % c1) | (var,c) <- IM.toList t]
-  where model' = IM.insert (-1) 1 model
+  where model' = IM.insert constKey 1 model
 
 -- | Literal
 data Lit = Nonneg TmZ | Pos TmZ deriving (Show, Eq, Ord)
@@ -83,16 +83,9 @@ simplify = fmap concat . mapM f
         Just x -> guard (x > 0) >> return []
         Nothing -> return [lit]
     f lit@(Nonneg tm) =
-      case g tm of
+      case asConst tm of
         Just x -> guard (x >= 0) >> return []
         Nothing -> return [lit]
-
-    g :: TmZ -> Maybe Integer
-    g (Tm tm) =
-      case IM.toList tm of
-        [] -> Just 0
-        [(-1,x)] -> Just x
-        _ -> Nothing
 
 -- ---------------------------------------------------------------------------
 
@@ -159,20 +152,20 @@ leZ, ltZ, geZ, gtZ :: TmZ -> TmZ -> Lit
 leZ tm1 tm2 = Nonneg (Tm (IM.map (`div` d) m))
   where
     Tm m = tm2 .-. tm1
-    d = gcd' [c | (var,c) <- IM.toList m, var /= -1]
+    d = gcd' [c | (var,c) <- IM.toList m, var /= constKey]
 ltZ tm1 tm2 = (tm1 .+. constTm 1) `leZ` tm2
 geZ = flip leZ
 gtZ = flip gtZ
 
 eqZ :: TmZ -> TmZ -> DNF
 eqZ tm1 tm2
-  = if fromMaybe 0 (IM.lookup (-1) m) `mod` d == 0
+  = if fromMaybe 0 (IM.lookup constKey m) `mod` d == 0
     then DNF [[Nonneg tm, Nonneg (negateTm tm)]]
     else false
   where
     Tm m = tm1 .-. tm2
     tm = Tm (IM.map (`div` d) m)
-    d = gcd' [c | (var,c) <- IM.toList m, var /= -1]
+    d = gcd' [c | (var,c) <- IM.toList m, var /= constKey]
 
 -- ---------------------------------------------------------------------------
 
