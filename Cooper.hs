@@ -32,19 +32,19 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import Tm
+import LC
 import FourierMotzkin (termR)
 
 -- ---------------------------------------------------------------------------
 
-type TmZ = Tm Integer
+type LCZ = LC Integer
 
 atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe Formula'
 atomZ op a b = do
-  (tm1,c1) <- termR a
-  (tm2,c2) <- termR b
-  let a' = scaleTm c2 tm1
-      b' = scaleTm c1 tm2
+  (lc1,c1) <- termR a
+  (lc2,c2) <- termR b
+  let a' = scaleLC c2 lc1
+      b' = scaleLC c1 lc2
   case op of
     Le -> return $ Lit $ a' `leZ` b'
     Lt -> return $ Lit $ a' `ltZ` b'
@@ -53,19 +53,19 @@ atomZ op a b = do
     Eql -> return $ eqZ a' b'
     NEq -> liftM notF (atomZ Eql a b)
 
-leZ, ltZ, geZ, gtZ :: TmZ -> TmZ -> Lit
-leZ tm1 tm2 = tm1 `ltZ` (tm2 .+. constTm 1)
-ltZ tm1 tm2 = Pos $ (tm2 .-. tm1)
+leZ, ltZ, geZ, gtZ :: LCZ -> LCZ -> Lit
+leZ lc1 lc2 = lc1 `ltZ` (lc2 .+. constLC 1)
+ltZ lc1 lc2 = Pos $ (lc2 .-. lc1)
 geZ = flip leZ
 gtZ = flip gtZ
 
-eqZ :: TmZ -> TmZ -> Formula'
-eqZ tm1 tm2 = Lit (tm1 `leZ` tm2) .&&. Lit (tm1 `geZ` tm2)
+eqZ :: LCZ -> LCZ -> Formula'
+eqZ lc1 lc2 = Lit (lc1 `leZ` lc2) .&&. Lit (lc1 `geZ` lc2)
 
 -- | Literal
 data Lit
-    = Pos TmZ
-    | Divisible Bool Integer TmZ
+    = Pos LCZ
+    | Divisible Bool Integer LCZ
     deriving (Show, Eq, Ord)
 
 instance Variables Lit where
@@ -92,24 +92,24 @@ instance Boolean Formula' where
   (.||.) = Or'
 
 notLit :: Lit -> Lit
-notLit (Pos tm) = tm `leZ` constTm 0
-notLit (Divisible b c tm) = Divisible (not b) c tm
+notLit (Pos lc) = lc `leZ` constLC 0
+notLit (Divisible b c lc) = Divisible (not b) c lc
 
-subst1 :: Var -> TmZ -> Formula' -> Formula'
-subst1 x tm = go
+subst1 :: Var -> LCZ -> Formula' -> Formula'
+subst1 x lc = go
   where
     go T' = T'
     go F' = F'
     go (And' a b) = And' (go a) (go b)
     go (Or' a b) = Or' (go a) (go b)
-    go (Lit (Divisible b c tm1)) = Lit $ Divisible b c $ subst1' x tm tm1
-    go (Lit (Pos tm1)) = Lit $ Pos $ subst1' x tm tm1
+    go (Lit (Divisible b c lc1)) = Lit $ Divisible b c $ subst1' x lc lc1
+    go (Lit (Pos lc1)) = Lit $ Pos $ subst1' x lc lc1
 
-subst1' :: Var -> TmZ -> TmZ -> TmZ
-subst1' x tm tm1@(Tm m) =
+subst1' :: Var -> LCZ -> LCZ -> LCZ
+subst1' x lc lc1@(LC m) =
   case IM.lookup x m of
-    Nothing -> tm1
-    Just c -> scaleTm c tm .+. Tm (IM.delete x m)
+    Nothing -> lc1
+    Just c -> scaleLC c lc .+. LC (IM.delete x m)
 
 simplify :: Formula' -> Formula'
 simplify T' = T'
@@ -128,24 +128,24 @@ simplify (Or' a b) =
     (T', _) -> true
     (_, T') -> true
     (a',b') -> a' .||. b'
-simplify lit@(Lit (Pos tm)) =
-  case asConst tm of
+simplify lit@(Lit (Pos lc)) =
+  case asConst lc of
     Nothing -> lit
     Just c -> if c > 0 then true else false
-simplify lit@(Lit (Divisible b c tm@(Tm m))) = 
-  case asConst tm of
+simplify lit@(Lit (Divisible b c lc@(LC m))) = 
+  case asConst lc of
     Just c' ->
       if b == (c' `mod` c == 0) then true else false
     Nothing
       | c==d -> if b then true else false
       | d==1 -> lit
-      | otherwise -> Lit (Divisible b (c `div` d) (Tm (IM.map (`div` d) m)))
+      | otherwise -> Lit (Divisible b (c `div` d) (LC (IM.map (`div` d) m)))
   where
     d = foldl gcd c (IM.elems m)
 
 -- ---------------------------------------------------------------------------
 
-data Witness = WCase1 Integer TmZ | WCase2 Integer Integer Integer [TmZ]
+data Witness = WCase1 Integer LCZ | WCase2 Integer Integer Integer [LCZ]
 
 eliminateZ :: Var -> Formula' -> Formula'
 eliminateZ x formula = simplify $ orF $ map fst $ eliminateZ' x formula
@@ -161,29 +161,29 @@ eliminateZ' x formula = case1 ++ case2
          f F' = 1
          f (And' a b) = lcm (f a) (f b)
          f (Or' a b) = lcm (f a) (f b)
-         f (Lit (Pos (Tm m))) = fromMaybe 1 (IM.lookup x m)
-         f (Lit (Divisible _ _ (Tm m))) = fromMaybe 1 (IM.lookup x m)
+         f (Lit (Pos (LC m))) = fromMaybe 1 (IM.lookup x m)
+         f (Lit (Divisible _ _ (LC m))) = fromMaybe 1 (IM.lookup x m)
     
     formula1 :: Formula'
-    formula1 = f formula .&&. Lit (Divisible True c (varTm x))
+    formula1 = f formula .&&. Lit (Divisible True c (varLC x))
       where
         f :: Formula' -> Formula'
         f T' = T'
         f F' = F'
         f (And' a b) = f a .&&. f b
         f (Or' a b) = f a .||. f b
-        f lit@(Lit (Pos (Tm m))) =
+        f lit@(Lit (Pos (LC m))) =
           case IM.lookup x m of
             Nothing -> lit
             Just a ->
               let e = c `div` abs a
-              in Lit $ Pos $ Tm $ IM.mapWithKey (\x' c' -> if x==x' then signum c' else e*c') m
-        f lit@(Lit (Divisible b d (Tm m))) =
+              in Lit $ Pos $ LC $ IM.mapWithKey (\x' c' -> if x==x' then signum c' else e*c') m
+        f lit@(Lit (Divisible b d (LC m))) =
           case IM.lookup x m of
             Nothing -> lit
             Just a ->
               let e = c `div` abs a
-              in Lit $ Divisible b (e*d) $ Tm $ IM.mapWithKey (\x' c' -> if x==x' then signum c' else e*c') m
+              in Lit $ Divisible b (e*d) $ LC $ IM.mapWithKey (\x' c' -> if x==x' then signum c' else e*c') m
 
     delta :: Integer
     delta = f formula1
@@ -196,23 +196,23 @@ eliminateZ' x formula = case1 ++ case2
         f (Lit (Divisible _ c' _)) = c'
         f (Lit (Pos _)) = 1
 
-    bs :: [TmZ]
+    bs :: [LCZ]
     bs = f formula1
       where
-        f :: Formula' -> [TmZ]
+        f :: Formula' -> [LCZ]
         f T' = []
         f F' = []
         f (And' a b) = f a ++ f b
         f (Or' a b) = f a ++ f b
         f (Lit (Divisible _ _ _)) = []
-        f (Lit (Pos (Tm m))) =
+        f (Lit (Pos (LC m))) =
             case IM.lookup x m of
               Nothing -> []
-              Just c' -> if c' > 0 then [negateTm (Tm (IM.delete x m))] else [Tm (IM.delete x m)]    
+              Just c' -> if c' > 0 then [negateLC (LC (IM.delete x m))] else [LC (IM.delete x m)]    
 
     case1 :: [(Formula', Witness)]
-    case1 = [ (subst1 x tm formula1, WCase1 c tm)
-            | j <- [1..delta], b <- bs, let tm = b .+. constTm j ]
+    case1 = [ (subst1 x lc formula1, WCase1 c lc)
+            | j <- [1..delta], b <- bs, let lc = b .+. constLC j ]
 
     p :: Formula'
     p = f formula1
@@ -222,36 +222,36 @@ eliminateZ' x formula = case1 ++ case2
         f F' = F'
         f (And' a b) = f a .&&. f b
         f (Or' a b) = f a .||. f b
-        f lit@(Lit (Pos (Tm m))) =
+        f lit@(Lit (Pos (LC m))) =
           case IM.lookup x m of
             Nothing -> lit
             Just c -> if c < 0 then T' else F'
         f lit@(Lit (Divisible _ _ _)) = lit
 
-    us :: [TmZ]
+    us :: [LCZ]
     us = f formula1
       where
-        f :: Formula' -> [TmZ]
+        f :: Formula' -> [LCZ]
         f T' = []
         f F' = []
         f (And' a b) = f a ++ f b
         f (Or' a b) = f a ++ f b
-        f (Lit (Pos (Tm m))) =
+        f (Lit (Pos (LC m))) =
           case IM.lookup x m of
             Nothing -> []
-            Just c -> if c < 0 then [Tm (IM.delete x m)] else []
+            Just c -> if c < 0 then [LC (IM.delete x m)] else []
         f (Lit (Divisible _ _ _)) = []
 
     case2 :: [(Formula', Witness)]
-    case2 = [(subst1 x (constTm j) p, WCase2 c j delta us) | j <- [1..delta]]
+    case2 = [(subst1 x (constLC j) p, WCase2 c j delta us) | j <- [1..delta]]
 
 evalWitness :: Model Integer -> Witness -> Integer
-evalWitness model (WCase1 c tm) = evalTm model tm `div` c
+evalWitness model (WCase1 c lc) = evalLC model lc `div` c
 evalWitness model (WCase2 c j delta us)
   | null us' = j `div` c
   | otherwise = (j + (((u - delta - 1) `div` delta) * delta)) `div` c
   where
-    us' = map (evalTm model) us
+    us' = map (evalLC model) us
     u = minimum us'
 
 -- ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ eliminateQuantifiers = f
   where
     f T = return T'
     f F = return F'
-    f (Atom (Rel tm1 op tm2)) = atomZ op tm1 tm2
+    f (Atom (Rel lc1 op lc2)) = atomZ op lc1 lc2
     f (And a b) = liftM2 (.&&.) (f a) (f b)
     f (Or a b) = liftM2 (.||.) (f a) (f b)
     f (Not a) = f (pushNot a)

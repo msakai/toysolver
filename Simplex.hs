@@ -35,7 +35,7 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import Tm
+import LC
 
 -- ---------------------------------------------------------------------------
 
@@ -44,26 +44,26 @@ data RelOp2 = Le2 | Ge2 | Eql2
 
 -- ---------------------------------------------------------------------------
 
-data Constraint r = Rel2 (Tm r) RelOp2 (Tm r)
+data Constraint r = Rel2 (LC r) RelOp2 (LC r)
     deriving (Show, Eq, Ord)
 
 instance Variables (Constraint r) where
   vars (Rel2 a _ b) = vars a `IS.union` vars b
 
-term :: (Real r, Fractional r) => Expr r -> Maybe (Tm r)
-term (Const c) = return (constTm c)
-term (Var c) = return (varTm c)
+term :: (Real r, Fractional r) => Expr r -> Maybe (LC r)
+term (Const c) = return (constLC c)
+term (Var c) = return (varLC c)
 term (a :+: b) = liftM2 (.+.) (term a) (term b)
 term (a :*: b) = do
   x <- term a
   y <- term b
-  msum [ do{ c <- asConst x; return (scaleTm c y) }
-       , do{ c <- asConst y; return (scaleTm c x) }
+  msum [ do{ c <- asConst x; return (scaleLC c y) }
+       , do{ c <- asConst y; return (scaleLC c x) }
        ]
 term (a :/: b) = do
   x <- term a
   c <- asConst =<< term b
-  return $ scaleTm (1/c) x
+  return $ scaleLC (1/c) x
 
 atom :: (Real r, Fractional r) => Atom r -> Maybe (Constraint r)
 atom (Rel a op b) = do
@@ -116,10 +116,10 @@ mkModel xs tbl = bs `IM.union` nbs
     bs = IM.map snd (IM.delete objRow tbl)
     nbs = IM.fromList [(x,0) | x <- IS.toList xs]
 
-project :: Num r => VarSet -> VarMap (Tm r) -> Model r -> Model r
+project :: Num r => VarSet -> VarMap (LC r) -> Model r -> Model r
 project vs defs m = 
   IM.filterWithKey (\i _ -> i `IS.member` vs) $
-  IM.map (evalTm m) defs `IM.union` m
+  IM.map (evalLC m) defs `IM.union` m
 
 currentObjValue :: Num r => Tableau r -> r
 currentObjValue = snd . lookupRow objRow
@@ -225,7 +225,7 @@ twoPhasedSimplex isMinimize obj2 cs2 = fromMaybe OptUnknown $ do
   cs <- mapM atom cs2
   return (twoPhasedSimplex' isMinimize obj cs)
 
-twoPhasedSimplex' :: (Real r, Fractional r) => Bool -> Tm r -> [Constraint r] -> OptResult r
+twoPhasedSimplex' :: (Real r, Fractional r) => Bool -> LC r -> [Constraint r] -> OptResult r
 twoPhasedSimplex' isMinimize obj cs =
   case phaseI tbl avs of
     Nothing -> OptUnsat
@@ -235,7 +235,7 @@ twoPhasedSimplex' isMinimize obj cs =
         result -> result
       where
         obj2 = (IM.map ((-1)*) (IM.delete constKey m), IM.findWithDefault 0 constKey m)
-          where m = unTm $ applySubst defs obj
+          where m = unLC $ applySubst defs obj
         tbl2 = setObjRow tbl1 obj2
   where
     vs = vars cs `IS.union` vars obj
@@ -275,12 +275,12 @@ removeArtificialVariables avs tbl0 = tbl2
 
 -- ---------------------------------------------------------------------------
 
-tableau :: (Fractional r, Real r) => VarSet -> [Constraint r] -> (Tableau r, VarSet, VarSet, VarMap (Tm r))
+tableau :: (Fractional r, Real r) => VarSet -> [Constraint r] -> (Tableau r, VarSet, VarSet, VarMap (LC r))
 tableau vs cs = flip evalState g $ tableauM cs
   where
     g = 1 + maximum ((-1) : IS.toList vs)
 
-type Constraint' r = (Tm r, RelOp2, r)
+type Constraint' r = (LC r, RelOp2, r)
 type M = State Var
 
 gensym :: M Var
@@ -288,27 +288,27 @@ gensym = do{ x <- get; put (x+1); return x }
 
 tableauM
   :: (Fractional r, Real r)
-  => [Constraint r] -> M (Tableau r, VarSet, VarSet, VarMap (Tm r))
+  => [Constraint r] -> M (Tableau r, VarSet, VarSet, VarMap (LC r))
 tableauM cs = do
   let (nonnegVars, cs') = collectNonnegVars (map toConstraint' cs)
       fvs = vars (map (\(x,_,_) -> x) cs') `IS.difference` nonnegVars
   s <- liftM IM.fromList $ forM (IS.toList fvs) $ \v -> do
     v1 <- gensym
     v2 <- gensym
-    return (v, varTm v1 .-. varTm v2)
-  xs <- mapM mkRow $ map (\(tm,rop,b) -> (applySubst s tm, rop, b)) $ cs'
+    return (v, varLC v1 .-. varLC v2)
+  xs <- mapM mkRow $ map (\(lc,rop,b) -> (applySubst s lc, rop, b)) $ cs'
   let tbl = IM.fromList [(v, row) | (v, row, _) <- xs]
       avs = IS.unions [vs | (_, _, vs) <- xs]
       vs = IS.unions [nonnegVars, vars (IM.elems s), avs, IM.keysSet tbl]
   return (tbl,vs,avs,s)
 
 toConstraint' :: Real r => Constraint r -> Constraint' r
-toConstraint' (Rel2 a op b) = g (Tm (IM.delete constKey m)) op (- fromMaybe 0 (IM.lookup constKey m))
+toConstraint' (Rel2 a op b) = g (LC (IM.delete constKey m)) op (- fromMaybe 0 (IM.lookup constKey m))
   where
-    Tm m = a .-. b
-    g x Le2  y = if y < 0 then (negateTm x, Ge2, -y)  else (x, Le2, y)
-    g x Ge2  y = if y < 0 then (negateTm x, Le2, -y)  else (x, Ge2, y)
-    g x Eql2 y = if y < 0 then (negateTm x, Eql2, -y) else (x, Eql2, y)
+    LC m = a .-. b
+    g x Le2  y = if y < 0 then (negateLC x, Ge2, -y)  else (x, Le2, y)
+    g x Ge2  y = if y < 0 then (negateLC x, Le2, -y)  else (x, Ge2, y)
+    g x Eql2 y = if y < 0 then (negateLC x, Eql2, -y) else (x, Eql2, y)
 
 collectNonnegVars :: forall r. (Fractional r, Real r) => [Constraint' r] -> (VarSet, [Constraint' r])
 collectNonnegVars = foldr h (IS.empty, [])
@@ -320,39 +320,39 @@ collectNonnegVars = foldr h (IS.empty, [])
         _ -> (vs, cond:cs)
 
     calcLB :: Constraint' r -> Maybe (Var,r)
-    calcLB (Tm m, Ge2, b) = 
+    calcLB (LC m, Ge2, b) = 
       case IM.toList m of
         [(v,c)] | c > 0 -> Just (v, b / c)
         _ -> Nothing
-    calcLB (Tm m, Le2, b) =
+    calcLB (LC m, Le2, b) =
       case IM.toList m of
         [(v,c)] | c < 0 -> Just (v, b / c)
         _ -> Nothing
-    calcLB (Tm m, Eql2, b) =
+    calcLB (LC m, Eql2, b) =
       case IM.toList m of
         [(v,c)] -> Just (v, b / c)
         _ -> Nothing
 
 mkRow :: Num r => Constraint' r -> M (Var, Row r, VarSet)
-mkRow (tm, rop, b) =
+mkRow (lc, rop, b) =
   case rop of
     Le2 -> do
       v <- gensym -- slack variable
       return ( v
-             , (unTm tm, b)
+             , (unLC lc, b)
              , IS.empty
              )
     Ge2 -> do
       v1 <- gensym -- surplus variable
       v2 <- gensym -- artificial variable
       return ( v2
-             , (unTm (tm .-. varTm v1 .+. varTm v2), b)
+             , (unLC (lc .-. varLC v1 .+. varLC v2), b)
              , IS.singleton v2
              )
     Eql2 -> do
       v <- gensym -- artificial variable
       return ( v
-             , (unTm (tm .+. varTm v), b)
+             , (unLC (lc .+. varLC v), b)
              , IS.singleton v
              )
 

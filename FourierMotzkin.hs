@@ -18,7 +18,7 @@
 module FourierMotzkin
     ( module Expr
     , module Formula
-    , Tm (..)
+    , LC (..)
     , Lit (..)
     , DNF (..)
     , eliminateQuantifiersR
@@ -37,22 +37,22 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import Tm
+import LC
 import Util (combineMaybe)
 
 -- ---------------------------------------------------------------------------
 
-type TmZ = Tm Integer
+type LCZ = LC Integer
 
 -- | (t,c) represents t/c, and c must be >0.
-type Rat = (TmZ, Integer)
+type Rat = (LCZ, Integer)
 
 evalRat :: Model Rational -> Rat -> Rational
-evalRat model (Tm t, c1) = sum [(model' IM.! var) * (c % c1) | (var,c) <- IM.toList t]
+evalRat model (LC t, c1) = sum [(model' IM.! var) * (c % c1) | (var,c) <- IM.toList t]
   where model' = IM.insert constKey 1 model
 
 -- | Literal
-data Lit = Nonneg TmZ | Pos TmZ deriving (Show, Eq, Ord)
+data Lit = Nonneg LCZ | Pos LCZ deriving (Show, Eq, Ord)
 
 instance Variables Lit where
   vars (Pos t) = vars t
@@ -67,8 +67,8 @@ instance Boolean DNF where
   notF (DNF xs) = DNF . sequence . map (map f) $ xs
     where
       f :: Lit -> Lit
-      f (Pos t) = Nonneg (negateTm t)
-      f (Nonneg t) = Pos (negateTm t)
+      f (Pos t) = Nonneg (negateLC t)
+      f (Nonneg t) = Pos (negateLC t)
   DNF xs .&&. DNF ys = DNF [x++y | x<-xs, y<-ys]
   DNF xs .||. DNF ys = DNF (xs++ys)
 
@@ -78,12 +78,12 @@ simplify :: [Lit] -> Maybe [Lit]
 simplify = fmap concat . mapM f
   where
     f :: Lit -> Maybe [Lit]
-    f lit@(Pos tm) =
-      case asConst tm of
+    f lit@(Pos lc) =
+      case asConst lc of
         Just x -> guard (x > 0) >> return []
         Nothing -> return [lit]
-    f lit@(Nonneg tm) =
-      case asConst tm of
+    f lit@(Nonneg lc) =
+      case asConst lc of
         Just x -> guard (x >= 0) >> return []
         Nothing -> return [lit]
 
@@ -102,43 +102,43 @@ atomR op a b = do
     NEq -> DNF [[a' `ltR` b'], [a' `gtR` b']]
 
 termR :: Expr Rational -> Maybe Rat
-termR (Const c) = return (constTm (numerator c), denominator c)
-termR (Var v) = return (varTm v, 1)
+termR (Const c) = return (constLC (numerator c), denominator c)
+termR (Var v) = return (varLC v, 1)
 termR (a :+: b) = do
   (t1,c1) <- termR a
   (t2,c2) <- termR b
-  return (scaleTm c2 t1 .+. scaleTm c1 t2, c1*c2)
+  return (scaleLC c2 t1 .+. scaleLC c1 t2, c1*c2)
 termR (a :*: b) = do
   (t1,c1) <- termR a
   (t2,c2) <- termR b
-  msum [ do{ c <- asConst t1; return (scaleTm c t2, c1*c2) }
-       , do{ c <- asConst t2; return (scaleTm c t1, c1*c2) }
+  msum [ do{ c <- asConst t1; return (scaleLC c t2, c1*c2) }
+       , do{ c <- asConst t2; return (scaleLC c t1, c1*c2) }
        ]
 termR (a :/: b) = do
   (t1,c1) <- termR a
   (t2,c2) <- termR b
   c3 <- asConst t2
   guard $ c3 /= 0
-  return (scaleTm c2 t1, c1*c3)
+  return (scaleLC c2 t1, c1*c3)
 
 leR, ltR, geR, gtR :: Rat -> Rat -> Lit
-leR (tm1,c) (tm2,d) = Nonneg $ normalizeTmR $ scaleTm c tm2 .-. scaleTm d tm1
-ltR (tm1,c) (tm2,d) = Pos $ normalizeTmR $ scaleTm c tm2 .-. scaleTm d tm1
+leR (lc1,c) (lc2,d) = Nonneg $ normalizeLCR $ scaleLC c lc2 .-. scaleLC d lc1
+ltR (lc1,c) (lc2,d) = Pos $ normalizeLCR $ scaleLC c lc2 .-. scaleLC d lc1
 geR = flip leR
 gtR = flip gtR
 
-normalizeTmR :: TmZ -> TmZ
-normalizeTmR (Tm m) = Tm (IM.map (`div` d) m)
+normalizeLCR :: LCZ -> LCZ
+normalizeLCR (LC m) = LC (IM.map (`div` d) m)
   where d = gcd' $ map snd $ IM.toList m
 
 -- ---------------------------------------------------------------------------
 
 atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe DNF
 atomZ op a b = do
-  (tm1,c1) <- termR a
-  (tm2,c2) <- termR b
-  let a' = scaleTm c2 tm1
-      b' = scaleTm c1 tm2
+  (lc1,c1) <- termR a
+  (lc2,c2) <- termR b
+  let a' = scaleLC c2 lc1
+      b' = scaleLC c1 lc2
   return $ case op of
     Le -> DNF [[a' `leZ` b']]
     Lt -> DNF [[a' `ltZ` b']]
@@ -147,24 +147,24 @@ atomZ op a b = do
     Eql -> eqZ a' b'
     NEq -> DNF [[a' `ltZ` b'], [a' `gtZ` b']]
 
-leZ, ltZ, geZ, gtZ :: TmZ -> TmZ -> Lit
+leZ, ltZ, geZ, gtZ :: LCZ -> LCZ -> Lit
 -- Note that constants may be floored by division
-leZ tm1 tm2 = Nonneg (Tm (IM.map (`div` d) m))
+leZ lc1 lc2 = Nonneg (LC (IM.map (`div` d) m))
   where
-    Tm m = tm2 .-. tm1
+    LC m = lc2 .-. lc1
     d = gcd' [c | (var,c) <- IM.toList m, var /= constKey]
-ltZ tm1 tm2 = (tm1 .+. constTm 1) `leZ` tm2
+ltZ lc1 lc2 = (lc1 .+. constLC 1) `leZ` lc2
 geZ = flip leZ
 gtZ = flip gtZ
 
-eqZ :: TmZ -> TmZ -> DNF
-eqZ tm1 tm2
+eqZ :: LCZ -> LCZ -> DNF
+eqZ lc1 lc2
   = if fromMaybe 0 (IM.lookup constKey m) `mod` d == 0
-    then DNF [[Nonneg tm, Nonneg (negateTm tm)]]
+    then DNF [[Nonneg lc, Nonneg (negateLC lc)]]
     else false
   where
-    Tm m = tm1 .-. tm2
-    tm = Tm (IM.map (`div` d) m)
+    LC m = lc1 .-. lc2
+    lc = LC (IM.map (`div` d) m)
     d = gcd' [c | (var,c) <- IM.toList m, var /= constKey]
 
 -- ---------------------------------------------------------------------------
@@ -187,21 +187,21 @@ collectBoundsR v = foldr phi (([],[],[],[]),[])
     phi lit@(Nonneg t) x = f False lit t x
     phi lit@(Pos t) x = f True lit t x
 
-    f :: Bool -> Lit -> TmZ -> (BoundsR, [Lit]) -> (BoundsR, [Lit])
-    f strict lit (Tm t) (bnd@(ls1,ls2,us1,us2), xs) = 
+    f :: Bool -> Lit -> LCZ -> (BoundsR, [Lit]) -> (BoundsR, [Lit])
+    f strict lit (LC t) (bnd@(ls1,ls2,us1,us2), xs) = 
       case c `compare` 0 of
         EQ -> (bnd, lit : xs)
         GT ->
           if strict
-          then ((ls1, (negateTm t', c) : ls2, us1, us2), xs) -- 0 < cx + M ⇔ -M/c <  x
-          else (((negateTm t', c) : ls1, ls2, us1, us2), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
+          then ((ls1, (negateLC t', c) : ls2, us1, us2), xs) -- 0 < cx + M ⇔ -M/c <  x
+          else (((negateLC t', c) : ls1, ls2, us1, us2), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
         LT -> 
           if strict
           then ((ls1, ls2, us1, (t', negate c) : us2), xs) -- 0 < cx + M ⇔ x < M/-c
           else ((ls1, ls2, (t', negate c) : us1, us2), xs) -- 0 ≤ cx + M ⇔ x ≤ M/-c
       where
         c = fromMaybe 0 $ IM.lookup v t
-        t' = Tm $ IM.delete v t
+        t' = LC $ IM.delete v t
 
 boundConditionsR :: BoundsR -> DNF
 boundConditionsR  (ls1, ls2, us1, us2) = DNF $ maybeToList $ simplify $ 
@@ -319,30 +319,30 @@ collectBoundsZ :: Var -> [Lit] -> (BoundsZ,[Lit])
 collectBoundsZ v = foldr phi (([],[]),[])
   where
     phi :: Lit -> (BoundsZ,[Lit]) -> (BoundsZ,[Lit])
-    phi (Pos t) x = phi (Nonneg (t .-. constTm 1)) x
-    phi lit@(Nonneg (Tm t)) ((ls,us),xs) =
+    phi (Pos t) x = phi (Nonneg (t .-. constLC 1)) x
+    phi lit@(Nonneg (LC t)) ((ls,us),xs) =
       case c `compare` 0 of
         EQ -> ((ls, us), lit : xs)
-        GT -> (((negateTm t', c) : ls, us), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
+        GT -> (((negateLC t', c) : ls, us), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
         LT -> ((ls, (t', negate c) : us), xs)   -- 0 ≤ cx + M ⇔ x ≤ M/-c
       where
         c = fromMaybe 0 $ IM.lookup v t
-        t' = Tm $ IM.delete v t
+        t' = LC $ IM.delete v t
 
 boundConditionsZ :: BoundsZ -> DNF
 boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $ cond1 : cond2
   where
      cond1 =
-       [ constTm ((a-1)*(b-1)) `leZ` (scaleTm a d .-. scaleTm b c)
+       [ constLC ((a-1)*(b-1)) `leZ` (scaleLC a d .-. scaleLC b c)
        | (c,a)<-ls , (d,b)<-us ]
      cond2 = 
-       [ [scaleTm a' c `leZ` scaleTm a val | (c,a)<-ls] ++
-         [scaleTm b val `geZ` scaleTm a' d | (d,b)<-us]
+       [ [scaleLC a' c `leZ` scaleLC a val | (c,a)<-ls] ++
+         [scaleLC b val `geZ` scaleLC a' d | (d,b)<-us]
        | not (null us)
        , let m = maximum [b | (_,b)<-us]
        ,  (c',a') <- ls
        , k <- [0 .. (m*a'-a'-m) `div` m]
-       , let val = c' .+. constTm k
+       , let val = c' .+. constLC k
        -- x = val / a'
        -- c / a ≤ x ⇔ c / a ≤ val / a' ⇔ a' c ≤ a val
        -- x ≤ d / b ⇔ val / a' ≤ d / b ⇔ b val ≤ a' d
@@ -394,8 +394,8 @@ solveZ' vs xs = simplify xs >>= go vs
 evalBoundsZ :: Model Integer -> BoundsZ -> IntervalZ
 evalBoundsZ model (ls,us) =
   foldl' intersectZ univZ $ 
-    [ (Just (ceiling (evalTm model x % c)), Nothing) | (x,c) <- ls ] ++ 
-    [ (Nothing, Just (floor (evalTm model x % c))) | (x,c) <- us ]
+    [ (Just (ceiling (evalLC model x % c)), Nothing) | (x,c) <- ls ] ++ 
+    [ (Nothing, Just (floor (evalLC model x % c))) | (x,c) <- us ]
 
 -- ---------------------------------------------------------------------------
 
