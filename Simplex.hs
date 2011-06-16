@@ -184,7 +184,7 @@ primalPivot isMinimize tbl
 dualSimplex :: (Real r, Fractional r) => Bool -> VarSet -> Tableau r -> OptResult r
 dualSimplex isMinimize vs tbl =
   case dualSimplex' isMinimize tbl of
-    (False, tbl) -> Unbounded
+    (False, tbl) -> OptUnsat
     (True, tbl)  -> Optimum (currentObjValue tbl) (mkModel vs tbl)
 
 dualSimplex' :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
