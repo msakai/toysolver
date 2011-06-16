@@ -149,13 +149,19 @@ setObjRow tbl row = IM.insert objRow (normalizeObjRow tbl row) tbl
 -- primal simplex
 
 simplex :: (Real r, Fractional r) => Bool -> VarSet -> Tableau r -> OptResult r
-simplex isMinimize vs = go
+simplex isMinimize vs tbl =
+  case simplex' isMinimize tbl of
+    (False, _)  -> Unbounded
+    (True, tbl) -> Optimum (currentObjValue tbl) (mkModel vs tbl)
+
+simplex' :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
+simplex' isMinimize = go
   where
     go tbl =
       case primalPivot isMinimize tbl of
-        PivotUnbounded -> Unbounded
+        PivotFinished  -> (True, tbl)
+        PivotUnbounded -> (False, tbl)
         PivotSuccess tbl' -> go tbl'
-        PivotFinished -> Optimum (currentObjValue tbl) (mkModel vs tbl)
 
 primalPivot :: (Real r, Fractional r) => Bool -> Tableau r -> PivotResult r
 primalPivot isMinimize tbl
@@ -176,13 +182,19 @@ primalPivot isMinimize tbl
 -- dual simplex
 
 dualSimplex :: (Real r, Fractional r) => Bool -> VarSet -> Tableau r -> OptResult r
-dualSimplex isMinimize vs = go
+dualSimplex isMinimize vs tbl =
+  case dualSimplex' isMinimize tbl of
+    (False, tbl) -> Unbounded
+    (True, tbl)  -> Optimum (currentObjValue tbl) (mkModel vs tbl)
+
+dualSimplex' :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
+dualSimplex' isMinimize = go
   where
     go tbl =
       case dualPivot isMinimize tbl of
-        PivotUnbounded -> Unbounded
+        PivotFinished  -> (True, tbl)
+        PivotUnbounded -> (False, tbl)
         PivotSuccess tbl' -> go tbl'
-        PivotFinished -> Optimum (currentObjValue tbl) (mkModel vs tbl)
 
 dualPivot :: (Real r, Fractional r) => Bool -> Tableau r -> PivotResult r
 dualPivot isMinimize tbl
