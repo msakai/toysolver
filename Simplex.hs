@@ -81,7 +81,13 @@ atom (Rel a op b) = do
 -- ---------------------------------------------------------------------------
 
 type Tableau r = VarMap (Row r)
-type RowIndex = Int 
+{-
+tbl ! v == (m, val)
+==>
+varLC v .+. m .==. constLC r
+-}
+
+type RowIndex = Int
 type ColIndex = Int
 type Row r = (VarMap r, r)
 data PivotResult r = PivotUnbounded | PivotFinished | PivotSuccess (Tableau r)
@@ -346,13 +352,13 @@ mkRow (lc, rop, b) =
       v1 <- gensym -- surplus variable
       v2 <- gensym -- artificial variable
       return ( v2
-             , (unLC (lc .-. varLC v1 .+. varLC v2), b)
+             , (unLC (lc .-. varLC v1), b)
              , IS.singleton v2
              )
     Eql2 -> do
       v <- gensym -- artificial variable
       return ( v
-             , (unLC (lc .+. varLC v), b)
+             , (unLC lc, b)
              , IS.singleton v
              )
 
@@ -401,9 +407,10 @@ example_3_2 = (obj, cond)
            , x3 .>=. 0
            ]
 
-test_3_2 :: OptResult Rational
-test_3_2 = uncurry maximize example_3_2
--- Optimum (27 % 5) (fromList [(1,1 % 5),(2,0 % 1),(3,8 % 5)])
+test_3_2 :: Bool
+test_3_2 =
+  uncurry maximize example_3_2 == 
+  Optimum (27 % 5) (IM.fromList [(1,1 % 5),(2,0 % 1),(3,8 % 5)])
 
 example_3_5 :: (Expr Rational, [Atom Rational])
 example_3_5 = (obj, cond)
@@ -423,9 +430,10 @@ example_3_5 = (obj, cond)
            , x5 .>=. 0
            ]
 
-test_3_5 :: OptResult Rational
-test_3_5 = uncurry minimize example_3_5
--- Optimum (19 % 1) (fromList [(1,(-1) % 1),(2,0 % 1),(3,1 % 1),(4,0 % 1),(5,2 % 1)])
+test_3_5 :: Bool
+test_3_5 =
+  uncurry minimize example_3_5 ==
+  Optimum (19 % 1) (IM.fromList [(1,(-1) % 1),(2,0 % 1),(3,1 % 1),(4,0 % 1),(5,2 % 1)]) 
 
 example_4_1 :: (Expr Rational, [Atom Rational])
 example_4_1 = (obj, cond)
@@ -439,9 +447,10 @@ example_4_1 = (obj, cond)
            , x2 .>=. 0
            ]
 
-test_4_1 ::OptResult Rational
-test_4_1 = uncurry maximize example_4_1
--- OptUnsat
+test_4_1 :: Bool
+test_4_1 =
+  uncurry maximize example_4_1 ==
+  OptUnsat
 
 example_4_2 :: (Expr Rational, [Atom Rational])
 example_4_2 = (obj, cond)
@@ -455,9 +464,10 @@ example_4_2 = (obj, cond)
            , x2 .>=. 0
            ]
 
-test_4_2 :: OptResult Rational
-test_4_2 = uncurry maximize example_4_2
--- Unbounded
+test_4_2 :: Bool
+test_4_2 =
+  uncurry maximize example_4_2 ==
+  Unbounded
 
 example_4_3 :: (Expr Rational, [Atom Rational])
 example_4_3 = (obj, cond)
@@ -471,9 +481,10 @@ example_4_3 = (obj, cond)
            , x2 .>=. 0
            ]
 
-test_4_3 :: OptResult Rational
-test_4_3 = uncurry maximize example_4_3
--- Optimum (12 % 1) (fromList [(1,4 % 1),(2,6 % 1)])
+test_4_3 :: Bool
+test_4_3 =
+  uncurry maximize example_4_3 ==
+  Optimum (12 % 1) (IM.fromList [(1,4 % 1),(2,6 % 1)])
 
 example_4_5 :: (Expr Rational, [Atom Rational])
 example_4_5 = (obj, cond)
@@ -488,9 +499,10 @@ example_4_5 = (obj, cond)
            , x2 .>=. 0
            ]
 
-test_4_5 :: OptResult Rational
-test_4_5 = uncurry maximize example_4_5
--- Optimum (5 % 1) (fromList [(1,3 % 2),(2,2 % 1)])
+test_4_5 :: Bool
+test_4_5 =
+  uncurry maximize example_4_5 ==
+  Optimum (5 % 1) (IM.fromList [(1,3 % 2),(2,2 % 1)])
 
 example_4_6 :: (Expr Rational, [Atom Rational])
 example_4_6 = (obj, cond)
@@ -510,9 +522,10 @@ example_4_6 = (obj, cond)
            , x4 .>=. 0
            ]
 
-test_4_6 :: OptResult Rational
-test_4_6 = uncurry maximize example_4_6
--- Optimum (165 % 4) (fromList [(1,2 % 1),(2,1 % 1),(3,0 % 1),(4,1 % 1)])
+test_4_6 :: Bool
+test_4_6 =
+  uncurry maximize example_4_6 ==
+  Optimum (165 % 4) (IM.fromList [(1,2 % 1),(2,1 % 1),(3,0 % 1),(4,1 % 1)])
 
 example_4_7 :: (Expr Rational, [Atom Rational])
 example_4_7 = (obj, cond)
@@ -532,8 +545,21 @@ example_4_7 = (obj, cond)
            , x4 .>=. 0
            ]
 
-test_4_7 :: OptResult Rational
-test_4_7 = uncurry maximize example_4_7
--- Optimum (48 % 11) (fromList [(1,0 % 1),(2,0 % 1),(3,8 % 11),(4,4 % 11)])
+test_4_7 :: Bool
+test_4_7 =
+  uncurry maximize example_4_7 ==
+  Optimum (48 % 11) (IM.fromList [(1,0 % 1),(2,0 % 1),(3,8 % 11),(4,4 % 11)])
+
+testAll :: Bool
+testAll = and
+  [ test_3_2
+  , test_3_5
+  , test_4_1
+  , test_4_2
+  , test_4_3
+  , test_4_5
+  , test_4_6
+  , test_4_7
+  ]
 
 -- ---------------------------------------------------------------------------
