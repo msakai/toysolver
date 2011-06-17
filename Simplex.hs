@@ -42,33 +42,31 @@ import LC
 data RelOp2 = Le2 | Ge2 | Eql2
     deriving (Show, Eq, Ord)
 
--- ---------------------------------------------------------------------------
-
-data Constraint r = Rel2 (LC r) RelOp2 (LC r)
+data Constraint r = Rel2 (LC r) RelOp2 r
     deriving (Show, Eq, Ord)
 
 instance Variables (Constraint r) where
-  vars (Rel2 a _ b) = vars a `IS.union` vars b
+  vars (Rel2 a _ b) = vars a
 
-term :: (Real r, Fractional r) => Expr r -> Maybe (LC r)
-term (Const c) = return (constLC c)
-term (Var c) = return (varLC c)
-term (a :+: b) = liftM2 (.+.) (term a) (term b)
-term (a :*: b) = do
-  x <- term a
-  y <- term b
+compileExpr :: (Real r, Fractional r) => Expr r -> Maybe (LC r)
+compileExpr (Const c) = return (constLC c)
+compileExpr (Var c) = return (varLC c)
+compileExpr (a :+: b) = liftM2 (.+.) (compileExpr a) (compileExpr b)
+compileExpr (a :*: b) = do
+  x <- compileExpr a
+  y <- compileExpr b
   msum [ do{ c <- asConst x; return (scaleLC c y) }
        , do{ c <- asConst y; return (scaleLC c x) }
        ]
-term (a :/: b) = do
-  x <- term a
-  c <- asConst =<< term b
+compileExpr (a :/: b) = do
+  x <- compileExpr a
+  c <- asConst =<< compileExpr b
   return $ scaleLC (1/c) x
 
-atom :: (Real r, Fractional r) => Atom r -> Maybe (Constraint r)
-atom (Rel a op b) = do
-  a' <- term a
-  b' <- term b
+compileAtom :: (Real r, Fractional r) => Atom r -> Maybe (Constraint r)
+compileAtom (Rel a op b) = do
+  a' <- compileExpr a
+  b' <- compileExpr b
   op2 <- case op of
     Le  -> return Le2
     Ge  -> return Ge2
@@ -76,7 +74,15 @@ atom (Rel a op b) = do
     Lt  -> Nothing
     Gt  -> Nothing
     NEq -> Nothing
-  return $ Rel2 a' op2 b'
+  let LC m = a' .-. b'
+  return $ Rel2 (LC (IM.delete constKey m)) op2 (- IM.findWithDefault 0 constKey m)
+
+normalizeConstraint :: Real r => Constraint r -> Constraint r
+normalizeConstraint (Rel2 a op b) = g a op b
+  where
+    g x Le2  y = if y < 0 then Rel2 (negateLC x) Ge2 (-y)  else Rel2 x Le2 y
+    g x Ge2  y = if y < 0 then Rel2 (negateLC x) Le2 (-y)  else Rel2 x Ge2 y
+    g x Eql2 y = if y < 0 then Rel2 (negateLC x) Eql2 (-y) else Rel2 x Eql2 y
 
 -- ---------------------------------------------------------------------------
 
@@ -116,20 +122,6 @@ pivot r s tbl = tbl'
 lookupRow :: RowIndex -> Tableau r -> Row r
 lookupRow r m = m IM.! r
 
-mkModel :: Fractional r => VarSet -> Tableau r -> Model r
-mkModel xs tbl = bs `IM.union` nbs
-  where
-    bs = IM.map snd (IM.delete objRow tbl)
-    nbs = IM.fromList [(x,0) | x <- IS.toList xs]
-
-project :: Num r => VarSet -> VarMap (LC r) -> Model r -> Model r
-project vs defs m = 
-  IM.filterWithKey (\i _ -> i `IS.member` vs) $
-  IM.map (evalLC m) defs `IM.union` m
-
-currentObjValue :: Num r => Tableau r -> r
-currentObjValue = snd . lookupRow objRow
-
 -- 目的関数の行の基底変数の列が0になるように変形
 normalizeObjRow :: Num r => Tableau r -> Row r -> Row r
 normalizeObjRow a (row0,val0) = obj'
@@ -142,20 +134,39 @@ normalizeObjRow a (row0,val0) = obj'
     f (m1,v1) (m2,v2) = (IM.unionWith (+) m1 m2, v1+v2)
     g (m,v) = (IM.filter (0/=) m, v)
 
+setObjFun :: Num r => Tableau r -> LC r -> Tableau r
+setObjFun tbl (LC m) = setObjRow tbl row
+  where
+    row = (IM.map negate (IM.delete constKey m), IM.findWithDefault 0 constKey m)
+
 setObjRow :: Num r => Tableau r -> Row r -> Tableau r
 setObjRow tbl row = IM.insert objRow (normalizeObjRow tbl row) tbl
+
+copyObjRow :: Num r => Tableau r -> Tableau r -> Tableau r
+copyObjRow from to =
+  case IM.lookup objRow from of
+    Nothing -> IM.delete objRow to
+    Just row -> setObjRow to row
+
+currentObjValue :: Num r => Tableau r -> r
+currentObjValue = snd . lookupRow objRow
+
+mkModel :: Fractional r => VarSet -> Tableau r -> Model r
+mkModel xs tbl = bs `IM.union` nbs
+  where
+    bs = IM.map snd (IM.delete objRow tbl)
+    nbs = IM.fromList [(x,0) | x <- IS.toList xs]
+
+project :: Num r => VarSet -> VarMap (LC r) -> Model r -> Model r
+project vs defs m = 
+  IM.filterWithKey (\i _ -> i `IS.member` vs) $
+  IM.map (evalLC m) defs `IM.union` m
 
 -- ---------------------------------------------------------------------------
 -- primal simplex
 
-simplex :: (Real r, Fractional r) => Bool -> VarSet -> Tableau r -> OptResult r
-simplex isMinimize vs tbl =
-  case simplex' isMinimize tbl of
-    (False, _)  -> Unbounded
-    (True, tbl) -> Optimum (currentObjValue tbl) (mkModel vs tbl)
-
-simplex' :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
-simplex' isMinimize = go
+simplex :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
+simplex isMinimize = go
   where
     go tbl =
       case primalPivot isMinimize tbl of
@@ -181,14 +192,8 @@ primalPivot isMinimize tbl
 -- ---------------------------------------------------------------------------
 -- dual simplex
 
-dualSimplex :: (Real r, Fractional r) => Bool -> VarSet -> Tableau r -> OptResult r
-dualSimplex isMinimize vs tbl =
-  case dualSimplex' isMinimize tbl of
-    (False, tbl) -> OptUnsat
-    (True, tbl)  -> Optimum (currentObjValue tbl) (mkModel vs tbl)
-
-dualSimplex' :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
-dualSimplex' isMinimize = go
+dualSimplex :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
+dualSimplex isMinimize = go
   where
     go tbl =
       case dualPivot isMinimize tbl of
@@ -214,59 +219,14 @@ dualPivot isMinimize tbl
     (obj,_) = lookupRow objRow tbl
 
 -- ---------------------------------------------------------------------------
-
-maximize :: (Real r, Fractional r) => Expr r -> [Atom r] -> OptResult r
-maximize = twoPhasedSimplex False
-
-minimize :: (Real r, Fractional r) => Expr r -> [Atom r] -> OptResult r
-minimize = twoPhasedSimplex True
-
-solve :: (Real r, Fractional r) => [Atom r] -> SatResult r
-solve cs2 = fromMaybe Unknown $ do
-  cs <- mapM atom cs2
-  return (solve' cs)
-
--- ---------------------------------------------------------------------------
-
-solve' :: (Real r, Fractional r) => [Constraint r] -> SatResult r
-solve' cs =
-  case phaseI tbl avs of
-    Nothing -> Unsat
-    Just tbl1 -> Sat (project vs defs (mkModel vs' tbl1))
-  where
-    vs = vars cs
-    (tbl, vs', avs, defs) = tableau vs cs
-
-twoPhasedSimplex :: (Real r, Fractional r) => Bool -> Expr r -> [Atom r] -> OptResult r
-twoPhasedSimplex isMinimize obj2 cs2 = fromMaybe OptUnknown $ do
-  obj <- term obj2  
-  cs <- mapM atom cs2
-  return (twoPhasedSimplex' isMinimize obj cs)
-
-twoPhasedSimplex' :: (Real r, Fractional r) => Bool -> LC r -> [Constraint r] -> OptResult r
-twoPhasedSimplex' isMinimize obj cs =
-  case phaseI tbl avs of
-    Nothing -> OptUnsat
-    Just tbl1 -> 
-      case simplex isMinimize vs' tbl2 of
-        Optimum val m -> Optimum val (project vs defs m)
-        result -> result
-      where
-        obj2 = (IM.map ((-1)*) (IM.delete constKey m), IM.findWithDefault 0 constKey m)
-          where m = unLC $ applySubst defs obj
-        tbl2 = setObjRow tbl1 obj2
-  where
-    vs = vars cs `IS.union` vars obj
-    (tbl, vs', avs, defs) = tableau vs cs
-
--- ---------------------------------------------------------------------------
+-- phase I of the two-phased method
 
 phaseI :: (Real r, Fractional r) => Tableau r -> VarSet -> Maybe (Tableau r)
 phaseI tbl avs
   | currentObjValue tbl1' /= 0 = Nothing
-  | otherwise = Just $ IM.delete objRow $ removeArtificialVariables avs $ tbl1'
+  | otherwise = Just $ copyObjRow tbl $ removeArtificialVariables avs $ tbl1'
   where
-    tbl1 = setObjRow tbl (IM.fromList [(v,1) | v <- IS.toList avs], 0)
+    tbl1 = setObjFun tbl $ foldl' (.-.) (constLC 0) [(varLC v) | v <- IS.toList avs]
     tbl1' = go tbl1
     go tbl
       | currentObjValue tbl == 0 = tbl
@@ -293,66 +253,13 @@ removeArtificialVariables avs tbl0 = tbl2
 
 -- ---------------------------------------------------------------------------
 
-tableau :: (Fractional r, Real r) => VarSet -> [Constraint r] -> (Tableau r, VarSet, VarSet, VarMap (LC r))
-tableau vs cs = flip evalState g $ tableauM cs
-  where
-    g = 1 + maximum ((-1) : IS.toList vs)
-
-type Constraint' r = (LC r, RelOp2, r)
 type M = State Var
 
 gensym :: M Var
-gensym = do{ x <- get; put (x+1); return x }   
+gensym = do{ x <- get; put (x+1); return x }
 
-tableauM
-  :: (Fractional r, Real r)
-  => [Constraint r] -> M (Tableau r, VarSet, VarSet, VarMap (LC r))
-tableauM cs = do
-  let (nonnegVars, cs') = collectNonnegVars (map toConstraint' cs)
-      fvs = vars (map (\(x,_,_) -> x) cs') `IS.difference` nonnegVars
-  s <- liftM IM.fromList $ forM (IS.toList fvs) $ \v -> do
-    v1 <- gensym
-    v2 <- gensym
-    return (v, varLC v1 .-. varLC v2)
-  xs <- mapM mkRow $ map (\(lc,rop,b) -> (applySubst s lc, rop, b)) $ cs'
-  let tbl = IM.fromList [(v, row) | (v, row, _) <- xs]
-      avs = IS.unions [vs | (_, _, vs) <- xs]
-      vs = IS.unions [nonnegVars, vars (IM.elems s), avs, IM.keysSet tbl]
-  return (tbl,vs,avs,s)
-
-toConstraint' :: Real r => Constraint r -> Constraint' r
-toConstraint' (Rel2 a op b) = g (LC (IM.delete constKey m)) op (- fromMaybe 0 (IM.lookup constKey m))
-  where
-    LC m = a .-. b
-    g x Le2  y = if y < 0 then (negateLC x, Ge2, -y)  else (x, Le2, y)
-    g x Ge2  y = if y < 0 then (negateLC x, Le2, -y)  else (x, Ge2, y)
-    g x Eql2 y = if y < 0 then (negateLC x, Eql2, -y) else (x, Eql2, y)
-
-collectNonnegVars :: forall r. (Fractional r, Real r) => [Constraint' r] -> (VarSet, [Constraint' r])
-collectNonnegVars = foldr h (IS.empty, [])
-  where
-    h :: Constraint' r -> (VarSet, [Constraint' r]) -> (VarSet, [Constraint' r])
-    h cond (vs,cs) =
-      case calcLB cond of
-        Just (v, lb) | lb >= 0 -> (IS.insert v vs, if lb==0 then cs else cond:cs)
-        _ -> (vs, cond:cs)
-
-    calcLB :: Constraint' r -> Maybe (Var,r)
-    calcLB (LC m, Ge2, b) = 
-      case IM.toList m of
-        [(v,c)] | c > 0 -> Just (v, b / c)
-        _ -> Nothing
-    calcLB (LC m, Le2, b) =
-      case IM.toList m of
-        [(v,c)] | c < 0 -> Just (v, b / c)
-        _ -> Nothing
-    calcLB (LC m, Eql2, b) =
-      case IM.toList m of
-        [(v,c)] -> Just (v, b / c)
-        _ -> Nothing
-
-mkRow :: Num r => Constraint' r -> M (Var, Row r, VarSet)
-mkRow (lc, rop, b) =
+mkRow :: Num r => Constraint r -> M (Var, Row r, VarSet)
+mkRow (Rel2 lc rop b) =
   case rop of
     Le2 -> do
       v <- gensym -- slack variable
@@ -373,6 +280,93 @@ mkRow (lc, rop, b) =
              , (unLC lc, b)
              , IS.singleton v
              )
+
+tableauM
+  :: (Fractional r, Real r)
+  => [Constraint r] -> M (Tableau r, VarSet, VarSet, VarMap (LC r))
+tableauM cs = do
+  let (nonnegVars, cs') = collectNonnegVars (map normalizeConstraint cs)
+      fvs = vars (map (\(Rel2 x _ _) -> x) cs') `IS.difference` nonnegVars
+  s <- liftM IM.fromList $ forM (IS.toList fvs) $ \v -> do
+    v1 <- gensym
+    v2 <- gensym
+    return (v, varLC v1 .-. varLC v2)
+  xs <- mapM mkRow $ map (\(Rel2 lc rop b) -> Rel2 (applySubst s lc) rop b) $ cs'
+  let tbl = IM.fromList [(v, row) | (v, row, _) <- xs]
+      avs = IS.unions [vs | (_, _, vs) <- xs]
+      vs = IS.unions [nonnegVars, vars (IM.elems s), avs, IM.keysSet tbl]
+  return (tbl,vs,avs,s)
+
+collectNonnegVars :: forall r. (Fractional r, Real r) => [Constraint r] -> (VarSet, [Constraint r])
+collectNonnegVars = foldr h (IS.empty, [])
+  where
+    h :: Constraint r -> (VarSet, [Constraint r]) -> (VarSet, [Constraint r])
+    h cond (vs,cs) =
+      case calcLB cond of
+        Just (v, lb) | lb >= 0 -> (IS.insert v vs, if lb==0 then cs else cond:cs)
+        _ -> (vs, cond:cs)
+
+    calcLB :: Constraint r -> Maybe (Var,r)
+    calcLB (Rel2 (LC m) Ge2 b) = 
+      case IM.toList m of
+        [(v,c)] | c > 0 -> Just (v, b / c)
+        _ -> Nothing
+    calcLB (Rel2 (LC m) Le2 b) =
+      case IM.toList m of
+        [(v,c)] | c < 0 -> Just (v, b / c)
+        _ -> Nothing
+    calcLB (Rel2 (LC m) Eql2 b) =
+      case IM.toList m of
+        [(v,c)] -> Just (v, b / c)
+        _ -> Nothing
+
+-- ---------------------------------------------------------------------------
+
+solve' :: (Real r, Fractional r) => [Constraint r] -> SatResult r
+solve' cs =
+  case phaseI tbl avs of
+    Nothing -> Unsat
+    Just tbl1 -> Sat (project vs defs (mkModel vs' tbl1))
+  where
+    vs = vars cs
+    (tbl, vs', avs, defs) = tableau vs cs
+
+twoPhasedSimplex' :: (Real r, Fractional r) => Bool -> LC r -> [Constraint r] -> OptResult r
+twoPhasedSimplex' isMinimize obj cs =
+  case phaseI tbl avs of
+    Nothing -> OptUnsat
+    Just tbl1 -> 
+      case simplex isMinimize (setObjFun tbl1 (applySubst defs obj)) of
+        (True, tbl) -> Optimum (currentObjValue tbl) (project vs defs (mkModel vs' tbl))
+        (False, _) -> Unbounded
+  where
+    vs = vars cs `IS.union` vars obj
+    (tbl, vs', avs, defs) = tableau vs cs
+
+tableau :: (Fractional r, Real r) => VarSet -> [Constraint r] -> (Tableau r, VarSet, VarSet, VarMap (LC r))
+tableau vs cs = flip evalState g $ tableauM cs
+  where
+    g = 1 + maximum ((-1) : IS.toList vs)
+
+-- ---------------------------------------------------------------------------
+-- High Level interface
+
+maximize :: (Real r, Fractional r) => Expr r -> [Atom r] -> OptResult r
+maximize = optimize False
+
+minimize :: (Real r, Fractional r) => Expr r -> [Atom r] -> OptResult r
+minimize = optimize True
+
+optimize :: (Real r, Fractional r) => Bool -> Expr r -> [Atom r] -> OptResult r
+optimize isMinimize obj2 cs2 = fromMaybe OptUnknown $ do
+  obj <- compileExpr obj2  
+  cs <- mapM compileAtom cs2
+  return (twoPhasedSimplex' isMinimize obj cs)
+
+solve :: (Real r, Fractional r) => [Atom r] -> SatResult r
+solve cs2 = fromMaybe Unknown $ do
+  cs <- mapM compileAtom cs2
+  return (solve' cs)
 
 -- ---------------------------------------------------------------------------
 
