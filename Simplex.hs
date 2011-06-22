@@ -81,7 +81,7 @@ lookupRow r m = m IM.! r
 normalizeObjRow :: Num r => Tableau r -> Row r -> Row r
 normalizeObjRow a (row0,val0) = obj'
   where
-    obj' = g $ foldl' f (IM.empty, 0) $ 
+    obj' = g $ foldl' f (IM.empty, val0) $ 
            [ case IM.lookup j a of
                Nothing -> (IM.singleton j x, 0)
                Just (row,val) -> (IM.map ((-x)*) (IM.delete j row), -x*val)
