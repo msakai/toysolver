@@ -16,7 +16,8 @@ import System.Exit
 import System.IO
 import Text.Printf
 
-import qualified Simplex
+-- import qualified Simplex
+import qualified LPSolver
 import qualified LPFile as LP
 
 run :: LP.LP -> IO ()
@@ -31,19 +32,19 @@ run lp = do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure
 
-  let fun = if LP.isMinimize lp then Simplex.minimize else Simplex.maximize
+  let fun = if LP.isMinimize lp then LPSolver.minimize else LPSolver.maximize
 
   case fun obj (cs1 ++ cs2) of
-    Simplex.OptUnknown -> do
+    LPSolver.OptUnknown -> do
       putStrLn "unknown"
       exitFailure
-    Simplex.OptUnsat -> do
+    LPSolver.OptUnsat -> do
       putStrLn "unsat"
       exitFailure
-    Simplex.Unbounded -> do
+    LPSolver.Unbounded -> do
       putStrLn "unbounded"
       exitFailure
-    Simplex.Optimum r m -> do
+    LPSolver.Optimum r m -> do
       putStrLn "optimum"
       print $ showValue r
       forM_ (Set.toList vs) $ \v -> do
@@ -54,28 +55,28 @@ run lp = do
     nameToVar = Map.fromList vsAssoc
     varToName = IM.fromList [(v,name) | (name,v) <- vsAssoc]
 
-    compileE :: LP.Expr -> Simplex.Expr Rational
-    compileE (LP.Const r) = Simplex.Const r
-    compileE (LP.Var v) = Simplex.Var (nameToVar Map.! v)
-    compileE (a LP.:+: b) = compileE a Simplex.:+: compileE b
-    compileE (a LP.:*: b) = compileE a Simplex.:*: compileE b
-    compileE (a LP.:/: b) = compileE a Simplex.:/: compileE b
+    compileE :: LP.Expr -> LPSolver.Expr Rational
+    compileE (LP.Const r) = LPSolver.Const r
+    compileE (LP.Var v) = LPSolver.Var (nameToVar Map.! v)
+    compileE (a LP.:+: b) = compileE a LPSolver.:+: compileE b
+    compileE (a LP.:*: b) = compileE a LPSolver.:*: compileE b
+    compileE (a LP.:/: b) = compileE a LPSolver.:/: compileE b
 
     obj = compileE $ snd $ LP.objectiveFunction lp
 
     cs1 = do
       v <- Set.toList vs
-      let v2 = Simplex.Var (nameToVar Map.! v)
+      let v2 = LPSolver.Var (nameToVar Map.! v)
       let (l,u) = LP.getBounds lp v
-      [Simplex.Const x Simplex..<=. v2 | LP.Finite x <- return l] ++
-        [v2 Simplex..<=. Simplex.Const x | LP.Finite x <- return u]
+      [LPSolver.Const x LPSolver..<=. v2 | LP.Finite x <- return l] ++
+        [v2 LPSolver..<=. LPSolver.Const x | LP.Finite x <- return u]
     cs2 = do
       (_, _, (lhs, rel, rhs)) <- LP.constraints lp
       let rel2 = case rel of
-                  LP.Ge  -> Simplex.Ge
-                  LP.Le  -> Simplex.Le
-                  LP.Eql -> Simplex.Eql
-      return (Simplex.Rel (compileE lhs) rel2 (Simplex.Const rhs))
+                  LP.Ge  -> LPSolver.Ge
+                  LP.Le  -> LPSolver.Le
+                  LP.Eql -> LPSolver.Eql
+      return (LPSolver.Rel (compileE lhs) rel2 (LPSolver.Const rhs))
 
     showValue v = show (fromRational v :: Double)
 
