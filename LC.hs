@@ -5,13 +5,25 @@
 -- License     :  BSD-style
 -- 
 -----------------------------------------------------------------------------
-module LC where
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+module LC
+  ( module Linear
+  , LC (..)
+  , constKey
+  , asConst
+  , normalizeLC
+  , varLC
+  , constLC
+  , negateLC
+  , evalLC
+  , applySubst
+  , fvLC
+  ) where
 
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Linear
 import Expr
-
-infixl 6 .+., .-.
 
 -- Linear combination of variables and constants.
 -- Non-negative keys are used for variables's coefficients.
@@ -40,17 +52,12 @@ varLC v = LC $ IM.singleton v 1
 constLC :: Num r => r -> LC r
 constLC c = normalizeLC $ LC $ IM.singleton constKey c
 
-(.+.) :: Num r => LC r -> LC r -> LC r
-LC t1 .+. LC t2 = normalizeLC $ LC $ IM.unionWith (+) t1 t2
-
-(.-.) :: Num r => LC r -> LC r -> LC r
-a .-. b = a .+. negateLC b
-
-scaleLC :: Num r => r -> LC r -> LC r
-scaleLC c (LC t) = normalizeLC $ LC $ IM.map (c*) t
+instance Num r => Linear r (LC r) where
+  LC t1 .+. LC t2 = normalizeLC $ LC $ IM.unionWith (+) t1 t2
+  c .*. (LC t) = normalizeLC $ LC $ IM.map (c*) t
 
 negateLC :: Num r => LC r -> LC r
-negateLC = scaleLC (-1)
+negateLC x = (-1) .*. x
 
 evalLC :: Num r => Model r -> LC r -> r
 evalLC m (LC t) = sum [(m' IM.! v) * c | (v,c) <- IM.toList t]
@@ -59,10 +66,10 @@ evalLC m (LC t) = sum [(m' IM.! v) * c | (v,c) <- IM.toList t]
 applySubst :: Num r => VarMap (LC r) -> LC r -> LC r
 applySubst s (LC m) = foldr (.+.) (constLC 0) (map f (IM.toList m))
   where
-    f (v,c) = scaleLC c $ 
+    f (v,c) = c .*. (
       case IM.lookup v s of
         Just tm -> tm
-        Nothing -> varLC v
+        Nothing -> varLC v)
 
 fvLC :: LC r -> VarSet
 fvLC (LC m) = IS.fromAscList [v | (v,_) <- IM.toAscList m, v /= constKey]

@@ -107,23 +107,23 @@ termR (Var v) = return (varLC v, 1)
 termR (a :+: b) = do
   (t1,c1) <- termR a
   (t2,c2) <- termR b
-  return (scaleLC c2 t1 .+. scaleLC c1 t2, c1*c2)
+  return (c2 .*. t1 .+. c1 .*. t2, c1*c2)
 termR (a :*: b) = do
   (t1,c1) <- termR a
   (t2,c2) <- termR b
-  msum [ do{ c <- asConst t1; return (scaleLC c t2, c1*c2) }
-       , do{ c <- asConst t2; return (scaleLC c t1, c1*c2) }
+  msum [ do{ c <- asConst t1; return (c .*. t2, c1*c2) }
+       , do{ c <- asConst t2; return (c .*. t1, c1*c2) }
        ]
 termR (a :/: b) = do
   (t1,c1) <- termR a
   (t2,c2) <- termR b
   c3 <- asConst t2
   guard $ c3 /= 0
-  return (scaleLC c2 t1, c1*c3)
+  return (c2 .*. t1, c1*c3)
 
 leR, ltR, geR, gtR :: Rat -> Rat -> Lit
-leR (lc1,c) (lc2,d) = Nonneg $ normalizeLCR $ scaleLC c lc2 .-. scaleLC d lc1
-ltR (lc1,c) (lc2,d) = Pos $ normalizeLCR $ scaleLC c lc2 .-. scaleLC d lc1
+leR (lc1,c) (lc2,d) = Nonneg $ normalizeLCR $ c .*. lc2 .-. d .*. lc1
+ltR (lc1,c) (lc2,d) = Pos $ normalizeLCR $ c .*. lc2 .-. d .*. lc1
 geR = flip leR
 gtR = flip gtR
 
@@ -137,8 +137,8 @@ atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe DNF
 atomZ op a b = do
   (lc1,c1) <- termR a
   (lc2,c2) <- termR b
-  let a' = scaleLC c2 lc1
-      b' = scaleLC c1 lc2
+  let a' = c2 .*. lc1
+      b' = c1 .*. lc2
   return $ case op of
     Le -> DNF [[a' `leZ` b']]
     Lt -> DNF [[a' `ltZ` b']]
@@ -333,11 +333,11 @@ boundConditionsZ :: BoundsZ -> DNF
 boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $ cond1 : cond2
   where
      cond1 =
-       [ constLC ((a-1)*(b-1)) `leZ` (scaleLC a d .-. scaleLC b c)
+       [ constLC ((a-1)*(b-1)) `leZ` (a .*. d .-. b .*. c)
        | (c,a)<-ls , (d,b)<-us ]
      cond2 = 
-       [ [scaleLC a' c `leZ` scaleLC a val | (c,a)<-ls] ++
-         [scaleLC b val `geZ` scaleLC a' d | (d,b)<-us]
+       [ [(a' .*. c) `leZ` (a .*. val) | (c,a)<-ls] ++
+         [(b .*. val) `geZ` (a' .*. d) | (d,b)<-us]
        | not (null us)
        , let m = maximum [b | (_,b)<-us]
        ,  (c',a') <- ls

@@ -43,8 +43,8 @@ atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe Formula'
 atomZ op a b = do
   (lc1,c1) <- termR a
   (lc2,c2) <- termR b
-  let a' = scaleLC c2 lc1
-      b' = scaleLC c1 lc2
+  let a' = c2 .*. lc1
+      b' = c1 .*. lc2
   case op of
     Le -> return $ Lit $ a' `leZ` b'
     Lt -> return $ Lit $ a' `ltZ` b'
@@ -109,7 +109,7 @@ subst1' :: Var -> LCZ -> LCZ -> LCZ
 subst1' x lc lc1@(LC m) =
   case IM.lookup x m of
     Nothing -> lc1
-    Just c -> scaleLC c lc .+. LC (IM.delete x m)
+    Just c -> c .*. lc .+. LC (IM.delete x m)
 
 simplify :: Formula' -> Formula'
 simplify T' = T'
