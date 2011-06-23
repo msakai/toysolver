@@ -39,6 +39,65 @@ import Simplex
 
 -- ---------------------------------------------------------------------------
 
+type Solver r = (Var, Tableau r, VarSet, VarMap (LC r))
+type LP r = State (Solver r)
+
+gensym :: LP r Var
+gensym = do
+  (x,tbl,avs,defs) <- get
+  put (x+1,tbl,avs,defs)
+  return x
+
+addConstraint :: Real r => Constraint r -> LP r ()
+addConstraint c = do
+  let Rel2 lc rop b = normalizeConstraint c
+  lc <- expandDefs lc -- FIXME 定数が復活してしまう可能性
+  case rop of
+    Le2 -> do
+      v <- gensym -- slack variable
+      (x,tbl,avs,defs) <- get
+      put (x, IM.insert v (unLC lc, b) tbl, avs, defs)
+    Ge2 -> do
+      v1 <- gensym -- surplus variable
+      v2 <- gensym -- artificial variable
+      (x,tbl,avs,defs) <- get
+      put (x, IM.insert v2 (unLC (lc .-. varLC v1), b) tbl, IS.insert v2 avs, defs)
+    Eql2 -> do
+      v <- gensym -- artificial variable
+      (x,tbl,avs,defs) <- get
+      put (x, IM.insert v (unLC lc, b) tbl, IS.insert v avs, defs)
+
+expandDefs :: Num r => LC r -> LP r (LC r)
+expandDefs e = do
+  (_,_,_,defs) <- get
+  return $ applySubst defs e
+
+define :: Var -> LC r -> LP r ()
+define v e = do
+  (x,tbl,avs,defs) <- get
+  put (x,tbl,avs, IM.insert v e defs)  
+
+tableau :: (Fractional r, Real r) => [Constraint r] -> LP r ()
+tableau cs = do
+  let (nonnegVars, cs') = collectNonnegVars (map normalizeConstraint cs)
+      fvs = vars (map (\(Rel2 x _ _) -> x) cs') `IS.difference` nonnegVars
+  forM_ (IS.toList fvs) $ \v -> do
+    v1 <- gensym
+    v2 <- gensym
+    define v (varLC v1 .-. varLC v2)
+  mapM_ addConstraint cs'
+
+getModel :: Fractional r => VarSet -> LP r (Model r)
+getModel vs = do
+  (_,tbl,_,defs) <- get
+  let bs = IM.map snd (IM.delete objRow tbl)
+      vs' = vs `IS.union` IS.fromList [v | e <- IM.elems defs, v <- IS.toList (fvLC e)]
+      -- Note that IM.union is left-biased
+      m0 = bs `IM.union` IM.fromList [(v,0) | v <- IS.toList vs']
+  return $ IM.filterWithKey (\k _ -> k `IS.member` vs) $ IM.map (evalLC m0) defs `IM.union` m0
+
+-- ---------------------------------------------------------------------------
+
 data RelOp2 = Le2 | Ge2 | Eql2
     deriving (Show, Eq, Ord)
 
@@ -84,65 +143,6 @@ normalizeConstraint (Rel2 a op b) = g a op b
     g x Ge2  y = if y < 0 then Rel2 (negateLC x) Le2 (-y)  else Rel2 x Ge2 y
     g x Eql2 y = if y < 0 then Rel2 (negateLC x) Eql2 (-y) else Rel2 x Eql2 y
 
--- ---------------------------------------------------------------------------
-
-mkModel :: Fractional r => VarSet -> Tableau r -> Model r
-mkModel xs tbl = bs `IM.union` nbs
-  where
-    bs = IM.map snd (IM.delete objRow tbl)
-    nbs = IM.fromList [(x,0) | x <- IS.toList xs]
-
-project :: Num r => VarSet -> VarMap (LC r) -> Model r -> Model r
-project vs defs m = 
-  IM.filterWithKey (\i _ -> i `IS.member` vs) $
-  IM.map (evalLC m) defs `IM.union` m
-
--- ---------------------------------------------------------------------------
-
-type M = State Var
-
-gensym :: M Var
-gensym = do{ x <- get; put (x+1); return x }
-
-mkRow :: Num r => Constraint r -> M (Var, Row r, VarSet)
-mkRow (Rel2 lc rop b) =
-  case rop of
-    Le2 -> do
-      v <- gensym -- slack variable
-      return ( v
-             , (unLC lc, b)
-             , IS.empty
-             )
-    Ge2 -> do
-      v1 <- gensym -- surplus variable
-      v2 <- gensym -- artificial variable
-      return ( v2
-             , (unLC (lc .-. varLC v1), b)
-             , IS.singleton v2
-             )
-    Eql2 -> do
-      v <- gensym -- artificial variable
-      return ( v
-             , (unLC lc, b)
-             , IS.singleton v
-             )
-
-tableauM
-  :: (Fractional r, Real r)
-  => [Constraint r] -> M (Tableau r, VarSet, VarSet, VarMap (LC r))
-tableauM cs = do
-  let (nonnegVars, cs') = collectNonnegVars (map normalizeConstraint cs)
-      fvs = vars (map (\(Rel2 x _ _) -> x) cs') `IS.difference` nonnegVars
-  s <- liftM IM.fromList $ forM (IS.toList fvs) $ \v -> do
-    v1 <- gensym
-    v2 <- gensym
-    return (v, varLC v1 .-. varLC v2)
-  xs <- mapM mkRow $ map (\(Rel2 lc rop b) -> Rel2 (applySubst s lc) rop b) $ cs'
-  let tbl = IM.fromList [(v, row) | (v, row, _) <- xs]
-      avs = IS.unions [vs | (_, _, vs) <- xs]
-      vs = IS.unions [nonnegVars, vars (IM.elems s), avs, IM.keysSet tbl]
-  return (tbl,vs,avs,s)
-
 collectNonnegVars :: forall r. (Fractional r, Real r) => [Constraint r] -> (VarSet, [Constraint r])
 collectNonnegVars = foldr h (IS.empty, [])
   where
@@ -170,30 +170,34 @@ collectNonnegVars = foldr h (IS.empty, [])
 
 solve' :: (Real r, Fractional r) => [Constraint r] -> SatResult r
 solve' cs =
-  case phaseI tbl avs of
-    Nothing -> Unsat
-    Just tbl1 -> Sat (project vs defs (mkModel vs' tbl1))
+  flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
+    tableau cs
+    (v,tbl,avs,defs) <- get
+    case phaseI tbl avs of
+      Nothing -> return $ Unsat
+      Just tbl1 -> do
+        put (v,tbl1,avs,defs)
+        m <- getModel vs
+        return $ Sat m
   where
     vs = vars cs
-    (tbl, vs', avs, defs) = tableau vs cs
 
 twoPhasedSimplex' :: (Real r, Fractional r) => Bool -> LC r -> [Constraint r] -> OptResult r
 twoPhasedSimplex' isMinimize obj cs =
-  case phaseI tbl avs of
-    Nothing -> OptUnsat
-    Just tbl1 -> 
-      case simplex isMinimize (setObjFun tbl1 (applySubst defs obj)) of
-        (True, tbl) -> Optimum (currentObjValue tbl) (project vs defs (mkModel vs' tbl))
-        (False, _) -> Unbounded
+  flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
+    tableau cs
+    (v,tbl,avs,defs) <- get    
+    case phaseI tbl avs of
+      Nothing -> return OptUnsat
+      Just tbl1 -> 
+        case simplex isMinimize (setObjFun tbl1 (applySubst defs obj)) of
+          (True, tbl) -> do
+             put (v,tbl,avs,defs)
+             m <- getModel vs
+             return $ Optimum (currentObjValue tbl) m
+          (False, _) -> return $ Unbounded
   where
     vs = vars cs `IS.union` vars obj
-    (tbl, vs', avs, defs) = tableau vs cs
-
-tableau :: (Fractional r, Real r) => VarSet -> [Constraint r] -> (Tableau r, VarSet, VarSet, VarMap (LC r))
-tableau vs cs = flip evalState g $ tableauM cs
-  where
-    g = 1 + maximum ((-1) : IS.toList vs)
-
 
 -- ---------------------------------------------------------------------------
 -- High Level interface

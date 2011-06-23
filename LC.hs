@@ -63,3 +63,6 @@ applySubst s (LC m) = foldr (.+.) (constLC 0) (map f (IM.toList m))
       case IM.lookup v s of
         Just tm -> tm
         Nothing -> varLC v
+
+fvLC :: LC r -> VarSet
+fvLC (LC m) = IS.fromAscList [v | (v,_) <- IM.toAscList m, v /= constKey]
