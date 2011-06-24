@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses #-}
-module IntervalR
+module Interval
   ( EndPoint
-  , IntervalR (..)
+  , Interval (..)
   , univR
   , singletonR
   , intersectR
@@ -15,21 +15,21 @@ import Util (combineMaybe)
 -- (isInclusive, value)
 type EndPoint r = Maybe (Bool, r)
 
-data IntervalR r
-  = IntervalR
+data Interval r
+  = Interval
   { lowerBound :: EndPoint r
   , upperBound :: EndPoint r
   }
   deriving (Eq,Ord,Show)
 
-univR :: IntervalR r
-univR = IntervalR Nothing Nothing
+univR :: Interval r
+univR = Interval Nothing Nothing
 
-singletonR :: r -> IntervalR r
-singletonR x = IntervalR (Just (True, x)) (Just (True, x))
+singletonR :: r -> Interval r
+singletonR x = Interval (Just (True, x)) (Just (True, x))
 
-intersectR :: forall r. RealFrac r => IntervalR r -> IntervalR r -> IntervalR r
-intersectR (IntervalR l1 u1) (IntervalR l2 u2) = IntervalR (maxEP l1 l2) (minEP u1 u2)
+intersectR :: forall r. RealFrac r => Interval r -> Interval r -> Interval r
+intersectR (Interval l1 u1) (Interval l2 u2) = Interval (maxEP l1 l2) (minEP u1 u2)
   where 
     maxEP :: EndPoint r -> EndPoint r -> EndPoint r
     maxEP = combineMaybe $ \(in1,x1) (in2,x2) ->
@@ -49,11 +49,11 @@ intersectR (IntervalR l1 u1) (IntervalR l2 u2) = IntervalR (maxEP l1 l2) (minEP 
       , min x1 x2
       )
 
-pickupR :: RealFrac r => IntervalR r -> Maybe r
-pickupR (IntervalR Nothing Nothing) = Just 0
-pickupR (IntervalR (Just (in1,x1)) Nothing) = Just $ if in1 then x1 else x1+1
-pickupR (IntervalR Nothing (Just (in2,x2))) = Just $ if in2 then x2 else x2-1
-pickupR (IntervalR (Just (in1,x1)) (Just (in2,x2))) =
+pickupR :: RealFrac r => Interval r -> Maybe r
+pickupR (Interval Nothing Nothing) = Just 0
+pickupR (Interval (Just (in1,x1)) Nothing) = Just $ if in1 then x1 else x1+1
+pickupR (Interval Nothing (Just (in2,x2))) = Just $ if in2 then x2 else x2-1
+pickupR (Interval (Just (in1,x1)) (Just (in2,x2))) =
   case x1 `compare` x2 of
     GT -> Nothing
     LT -> Just $ (x1+x2) / 2
@@ -61,14 +61,14 @@ pickupR (IntervalR (Just (in1,x1)) (Just (in2,x2))) =
 
 -- Interval airthmetics.
 -- Note that this instance does not satisfy algebraic laws of linear spaces.
-instance (RealFrac r) => Linear r (IntervalR r) where
+instance (RealFrac r) => Linear r (Interval r) where
   zero = singletonR 0
-  IntervalR lb1 ub1 .+. IntervalR lb2 ub2 = IntervalR (f lb1 lb2) (f ub1 ub2)
+  Interval lb1 ub1 .+. Interval lb2 ub2 = Interval (f lb1 lb2) (f ub1 ub2)
     where
       f = combineMaybe $ \(in1,x1) (in2,x2) -> (in1 && in2, x1 + x2)
-  c .*. IntervalR lb ub
-    | c < 0     = IntervalR (f ub) (f lb)
-    | otherwise = IntervalR (f lb) (f ub)
+  c .*. Interval lb ub
+    | c < 0     = Interval (f ub) (f lb)
+    | otherwise = Interval (f lb) (f ub)
     where
       f Nothing = Nothing
       f (Just (incl,val)) = Just (incl, c * val)

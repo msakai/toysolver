@@ -38,7 +38,7 @@ import qualified Data.IntSet as IS
 import Expr
 import Formula
 import LC
-import IntervalR
+import Interval
 import Util (combineMaybe)
 
 -- ---------------------------------------------------------------------------
@@ -253,13 +253,13 @@ solveR' vs xs = simplify xs >>= go vs
           val <- pickupR (evalBoundsR model bnd)
           return $ IM.insert v val model
 
-evalBoundsR :: Model Rational -> BoundsR -> IntervalR Rational
+evalBoundsR :: Model Rational -> BoundsR -> Interval Rational
 evalBoundsR model (ls1,ls2,us1,us2) =
   foldl' intersectR univR $ 
-    [ IntervalR (Just (True, evalRat model x)) Nothing  | x <- ls1 ] ++
-    [ IntervalR (Just (False, evalRat model x)) Nothing | x <- ls2 ] ++
-    [ IntervalR Nothing (Just (True, evalRat model x))  | x <- us1 ] ++
-    [ IntervalR Nothing (Just (False, evalRat model x)) | x <- us2 ]
+    [ Interval (Just (True, evalRat model x)) Nothing  | x <- ls1 ] ++
+    [ Interval (Just (False, evalRat model x)) Nothing | x <- ls2 ] ++
+    [ Interval Nothing (Just (True, evalRat model x))  | x <- us1 ] ++
+    [ Interval Nothing (Just (False, evalRat model x)) | x <- us2 ]
 
 -- ---------------------------------------------------------------------------
 
