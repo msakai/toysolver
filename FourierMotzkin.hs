@@ -250,12 +250,12 @@ solveR' vs xs = simplify xs >>= go vs
         (bnd, rest) = collectBoundsR v ys
         f zs = do
           model <- go vs (zs ++ rest)
-          val <- pickupR (evalBoundsR model bnd)
+          val <- pickup (evalBoundsR model bnd)
           return $ IM.insert v val model
 
 evalBoundsR :: Model Rational -> BoundsR -> Interval Rational
 evalBoundsR model (ls1,ls2,us1,us2) =
-  foldl' intersectR univR $ 
+  foldl' Interval.intersect univ $ 
     [ Interval (Just (True, evalRat model x)) Nothing  | x <- ls1 ] ++
     [ Interval (Just (False, evalRat model x)) Nothing | x <- ls2 ] ++
     [ Interval Nothing (Just (True, evalRat model x))  | x <- us1 ] ++
