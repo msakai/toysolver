@@ -11,12 +11,9 @@ import qualified Data.IntMap as IM
 
 import Expr
 import Formula
+import LA
 import LC
 import Interval
-
-type Bounds r = VarMap (Interval r)
-
-type Constraint r = (LC r, RelOp, LC r)
 
 type C r = (RelOp, LC r)
 
@@ -25,7 +22,7 @@ inferBounds bounds constraints = loop bounds
   where
     cs :: VarMap [C r]
     cs = IM.fromListWith (++) $ do
-      (lhs, op, rhs) <- constraints
+      LARel lhs op rhs <- constraints
       let LC m = lhs .-. rhs
       (v,c) <- IM.toList m
       guard $ v /= constKey

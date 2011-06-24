@@ -34,7 +34,7 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import LC
+import LA
 import Interval
 import Simplex
 import qualified BoundsInference as BI
@@ -76,10 +76,10 @@ expandDefs e = do
   return $ applySubst defs e
 
 expandDefs' :: Num r => Constraint r -> LP r (Constraint r)
-expandDefs' (Rel2 lhs op rhs) = do
+expandDefs' (LARel lhs op rhs) = do
   lhs' <- expandDefs lhs
   rhs' <- expandDefs rhs
-  return $ Rel2 lhs' op rhs'
+  return $ LARel lhs' op rhs'
 
 define :: Var -> LC r -> LP r ()
 define v e = do
@@ -89,7 +89,7 @@ define v e = do
 tableau :: (Real r, Fractional r) => [Constraint r] -> LP r ()
 tableau cs = do
   let (nonnegVars, cs') = collectNonnegVars cs
-      fvs = vars (map (\(Rel2 x _ _) -> x) cs') `IS.difference` nonnegVars
+      fvs = vars (map (\(LARel x _ _) -> x) cs') `IS.difference` nonnegVars
   forM_ (IS.toList fvs) $ \v -> do
     v1 <- gensym
     v2 <- gensym
@@ -107,35 +107,8 @@ getModel vs = do
 
 -- ---------------------------------------------------------------------------
 
-data Constraint r = Rel2 (LC r) RelOp (LC r)
-    deriving (Show, Eq, Ord)
-
-instance Variables (Constraint r) where
-  vars (Rel2 a _ b) = vars a `IS.union` vars b
-
-compileExpr :: (Real r, Fractional r) => Expr r -> Maybe (LC r)
-compileExpr (Const c) = return (constLC c)
-compileExpr (Var c) = return (varLC c)
-compileExpr (a :+: b) = liftM2 (.+.) (compileExpr a) (compileExpr b)
-compileExpr (a :*: b) = do
-  x <- compileExpr a
-  y <- compileExpr b
-  msum [ do{ c <- asConst x; return (c .*. y) }
-       , do{ c <- asConst y; return (c .*. x) }
-       ]
-compileExpr (a :/: b) = do
-  x <- compileExpr a
-  c <- asConst =<< compileExpr b
-  return $ (1/c) .*. x
-
-compileAtom :: (Real r, Fractional r) => Atom r -> Maybe (Constraint r)
-compileAtom (Rel a op b) = do
-  a' <- compileExpr a
-  b' <- compileExpr b
-  return $ Rel2 a' op b'
-
 normalizeConstraint :: forall r. Real r => Constraint r -> (LC r, RelOp, r)
-normalizeConstraint (Rel2 a op b)
+normalizeConstraint (LARel a op b)
   | rhs < 0   = (negateLC lhs, flipOp op, negate rhs)
   | otherwise = (lhs, op, rhs)
   where
@@ -147,7 +120,7 @@ collectNonnegVars :: forall r. (Fractional r, Real r) => [Constraint r] -> (VarS
 collectNonnegVars cs = (nonnegVars, cs)
   where
     vs = vars cs
-    bounds = BI.inferBounds initialBounds (map (\(Rel2 a op b) -> (a,op,b))  cs)
+    bounds = BI.inferBounds initialBounds cs
       where
         initialBounds = IM.fromList [(v, Interval Nothing Nothing) | v <- IS.toList vs]
     nonnegVars = IS.filter f vs
@@ -157,7 +130,7 @@ collectNonnegVars cs = (nonnegVars, cs)
                 _ -> False
 
     isTriviallyTrue :: Constraint r -> Bool
-    isTriviallyTrue (Rel2 a op b) =
+    isTriviallyTrue (LARel a op b) =
       case op of
         Le ->
           case ub of
@@ -175,8 +148,8 @@ collectNonnegVars cs = (nonnegVars, cs)
           case lb of
             Nothing -> False
             Just (incl, val) -> val > 0 || (not incl && val >= 0)
-        Eql -> isTriviallyTrue (Rel2 c Le zero) && isTriviallyTrue (Rel2 c Ge zero)
-        NEq -> isTriviallyTrue (Rel2 c Lt zero) && isTriviallyTrue (Rel2 c Gt zero)
+        Eql -> isTriviallyTrue (LARel c Le zero) && isTriviallyTrue (LARel c Ge zero)
+        NEq -> isTriviallyTrue (LARel c Lt zero) && isTriviallyTrue (LARel c Gt zero)
       where
         c = a .-. b
         Interval lb ub = BI.evalToInterval bounds c
