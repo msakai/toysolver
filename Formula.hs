@@ -6,6 +6,7 @@ module Formula
   , RelOp (..)
   , Rel (..)
   , (.<.), (.<=.), (.>=.), (.>.), (.==.), (./=.)
+  , flipOp
   , Atom (..)
   , Formula (..)
   , pushNot
@@ -49,6 +50,14 @@ a .>. b  = rel Gt  a b
 a .>=. b = rel Ge  a b
 a .==. b = rel Eql a b
 a ./=. b = rel NEq a b
+
+flipOp :: RelOp -> RelOp 
+flipOp Le = Ge
+flipOp Ge = Le
+flipOp Lt = Gt
+flipOp Gt = Lt
+flipOp Eql = Eql
+flipOp NEq = NEq
 
 -- ---------------------------------------------------------------------------
 
