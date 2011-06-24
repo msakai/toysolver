@@ -132,14 +132,7 @@ compileAtom :: (Real r, Fractional r) => Atom r -> Maybe (Constraint r)
 compileAtom (Rel a op b) = do
   a' <- compileExpr a
   b' <- compileExpr b
-  op2 <- case op of
-    Le  -> return Le
-    Ge  -> return Ge
-    Eql -> return Eql
-    Lt  -> Nothing
-    Gt  -> Nothing
-    NEq -> Nothing
-  return $ Rel2 a' op2 b'
+  return $ Rel2 a' op b'
 
 normalizeConstraint :: forall r. Real r => Constraint r -> (LC r, RelOp, r)
 normalizeConstraint (Rel2 a op b)
