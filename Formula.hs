@@ -11,7 +11,6 @@ module Formula
   , pushNot
   ) where
 
-import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Expr
 
