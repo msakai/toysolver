@@ -35,7 +35,9 @@ import qualified Data.IntSet as IS
 import Expr
 import Formula
 import LC
+import Interval
 import Simplex
+import qualified BoundsInference as BI
 
 -- ---------------------------------------------------------------------------
 
@@ -50,36 +52,43 @@ gensym = do
 
 addConstraint :: Real r => Constraint r -> LP r ()
 addConstraint c = do
-  let Rel2 lc rop b = normalizeConstraint c
-  lc <- expandDefs lc -- FIXME 定数が復活してしまう可能性
+  c <- expandDefs' c
+  let (lc, rop, b) = normalizeConstraint c
   case rop of
-    Le2 -> do
+    Le -> do
       v <- gensym -- slack variable
       (x,tbl,avs,defs) <- get
       put (x, IM.insert v (unLC lc, b) tbl, avs, defs)
-    Ge2 -> do
+    Ge -> do
       v1 <- gensym -- surplus variable
       v2 <- gensym -- artificial variable
       (x,tbl,avs,defs) <- get
       put (x, IM.insert v2 (unLC (lc .-. varLC v1), b) tbl, IS.insert v2 avs, defs)
-    Eql2 -> do
+    Eql -> do
       v <- gensym -- artificial variable
       (x,tbl,avs,defs) <- get
       put (x, IM.insert v (unLC lc, b) tbl, IS.insert v avs, defs)
+    _ -> error $ "addConstraint does not support " ++ show rop
 
 expandDefs :: Num r => LC r -> LP r (LC r)
 expandDefs e = do
   (_,_,_,defs) <- get
   return $ applySubst defs e
 
+expandDefs' :: Num r => Constraint r -> LP r (Constraint r)
+expandDefs' (Rel2 lhs op rhs) = do
+  lhs' <- expandDefs lhs
+  rhs' <- expandDefs rhs
+  return $ Rel2 lhs' op rhs'
+
 define :: Var -> LC r -> LP r ()
 define v e = do
   (x,tbl,avs,defs) <- get
   put (x,tbl,avs, IM.insert v e defs)  
 
-tableau :: (Fractional r, Real r) => [Constraint r] -> LP r ()
+tableau :: (Real r, Fractional r) => [Constraint r] -> LP r ()
 tableau cs = do
-  let (nonnegVars, cs') = collectNonnegVars (map normalizeConstraint cs)
+  let (nonnegVars, cs') = collectNonnegVars cs
       fvs = vars (map (\(Rel2 x _ _) -> x) cs') `IS.difference` nonnegVars
   forM_ (IS.toList fvs) $ \v -> do
     v1 <- gensym
@@ -98,14 +107,11 @@ getModel vs = do
 
 -- ---------------------------------------------------------------------------
 
-data RelOp2 = Le2 | Ge2 | Eql2
-    deriving (Show, Eq, Ord)
-
-data Constraint r = Rel2 (LC r) RelOp2 r
+data Constraint r = Rel2 (LC r) RelOp (LC r)
     deriving (Show, Eq, Ord)
 
 instance Variables (Constraint r) where
-  vars (Rel2 a _ _) = vars a
+  vars (Rel2 a _ b) = vars a `IS.union` vars b
 
 compileExpr :: (Real r, Fractional r) => Expr r -> Maybe (LC r)
 compileExpr (Const c) = return (constLC c)
@@ -127,44 +133,60 @@ compileAtom (Rel a op b) = do
   a' <- compileExpr a
   b' <- compileExpr b
   op2 <- case op of
-    Le  -> return Le2
-    Ge  -> return Ge2
-    Eql -> return Eql2
+    Le  -> return Le
+    Ge  -> return Ge
+    Eql -> return Eql
     Lt  -> Nothing
     Gt  -> Nothing
     NEq -> Nothing
-  let LC m = a' .-. b'
-  return $ Rel2 (LC (IM.delete constKey m)) op2 (- IM.findWithDefault 0 constKey m)
+  return $ Rel2 a' op2 b'
 
-normalizeConstraint :: Real r => Constraint r -> Constraint r
-normalizeConstraint (Rel2 a op b) = g a op b
+normalizeConstraint :: forall r. Real r => Constraint r -> (LC r, RelOp, r)
+normalizeConstraint (Rel2 a op b)
+  | rhs < 0   = (negateLC lhs, flipOp op, negate rhs)
+  | otherwise = (lhs, op, rhs)
   where
-    g x Le2  y = if y < 0 then Rel2 (negateLC x) Ge2 (-y)  else Rel2 x Le2 y
-    g x Ge2  y = if y < 0 then Rel2 (negateLC x) Le2 (-y)  else Rel2 x Ge2 y
-    g x Eql2 y = if y < 0 then Rel2 (negateLC x) Eql2 (-y) else Rel2 x Eql2 y
+    LC m = a .-. b
+    rhs = - IM.findWithDefault 0 constKey m
+    lhs = LC (IM.delete constKey m)
 
 collectNonnegVars :: forall r. (Fractional r, Real r) => [Constraint r] -> (VarSet, [Constraint r])
-collectNonnegVars = foldr h (IS.empty, [])
+collectNonnegVars cs = (nonnegVars, cs)
   where
-    h :: Constraint r -> (VarSet, [Constraint r]) -> (VarSet, [Constraint r])
-    h cond (vs,cs) =
-      case calcLB cond of
-        Just (v, lb) | lb >= 0 -> (IS.insert v vs, if lb==0 then cs else cond:cs)
-        _ -> (vs, cond:cs)
+    vs = vars cs
+    bounds = BI.inferBounds initialBounds (map (\(Rel2 a op b) -> (a,op,b))  cs)
+      where
+        initialBounds = IM.fromList [(v, Interval Nothing Nothing) | v <- IS.toList vs]
+    nonnegVars = IS.filter f vs
+      where
+        f v = case bounds IM.! v of
+                Interval (Just (_, lb)) _ | 0 <= lb -> True
+                _ -> False
 
-    calcLB :: Constraint r -> Maybe (Var,r)
-    calcLB (Rel2 (LC m) Ge2 b) = 
-      case IM.toList m of
-        [(v,c)] | c > 0 -> Just (v, b / c)
-        _ -> Nothing
-    calcLB (Rel2 (LC m) Le2 b) =
-      case IM.toList m of
-        [(v,c)] | c < 0 -> Just (v, b / c)
-        _ -> Nothing
-    calcLB (Rel2 (LC m) Eql2 b) =
-      case IM.toList m of
-        [(v,c)] -> Just (v, b / c)
-        _ -> Nothing
+    isTriviallyTrue :: Constraint r -> Bool
+    isTriviallyTrue (Rel2 a op b) =
+      case op of
+        Le ->
+          case ub of
+            Nothing -> False
+            Just (_, val) -> val <= 0
+        Ge ->
+          case lb of
+            Nothing -> False
+            Just (_, val) -> val >= 0
+        Lt ->
+          case ub of
+            Nothing -> False
+            Just (incl, val) -> val < 0 || (not incl && val <= 0)
+        Gt ->
+          case lb of
+            Nothing -> False
+            Just (incl, val) -> val > 0 || (not incl && val >= 0)
+        Eql -> isTriviallyTrue (Rel2 c Le zero) && isTriviallyTrue (Rel2 c Ge zero)
+        NEq -> isTriviallyTrue (Rel2 c Lt zero) && isTriviallyTrue (Rel2 c Gt zero)
+      where
+        c = a .-. b
+        Interval lb ub = BI.evalToInterval bounds c
 
 -- ---------------------------------------------------------------------------
 
