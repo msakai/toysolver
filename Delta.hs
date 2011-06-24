@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Delta
@@ -21,15 +22,17 @@
 
 module Delta where
 
+import Linear
+
 -- | "Delta r k" denotes r + kδ for infinitesimal parameter δ.
 data Delta r = Delta !r !r deriving (Ord, Eq, Show)
 
 delta :: Num r => Delta r
 delta = Delta 0 1
 
-instance Linear r (Delta r) where
+instance Num r => Linear r (Delta r) where
   Delta r1 k1 .+. Delta r2 k2 = Delta (r1+r2) (k1+k2)
-　c .*. Delta r k = Delta (c*r) (c*k)
+  c .*. Delta r k = Delta (c*r) (c*k)
   zero = Delta 0 0
 
 floor', ceiling' :: (RealFrac r, Integral a) => Delta r -> a
