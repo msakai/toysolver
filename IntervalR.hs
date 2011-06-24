@@ -1,12 +1,14 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses #-}
 module IntervalR
   ( EndPoint
   , IntervalR (..)
   , univR
+  , singletonR
   , intersectR
   , pickupR
   ) where
 
+import Linear
 import Util (combineMaybe)
 
 -- | Endpoint
@@ -22,6 +24,9 @@ data IntervalR r
 
 univR :: IntervalR r
 univR = IntervalR Nothing Nothing
+
+singletonR :: r -> IntervalR r
+singletonR x = IntervalR (Just (True, x)) (Just (True, x))
 
 intersectR :: forall r. RealFrac r => IntervalR r -> IntervalR r -> IntervalR r
 intersectR (IntervalR l1 u1) (IntervalR l2 u2) = IntervalR (maxEP l1 l2) (minEP u1 u2)
@@ -53,3 +58,17 @@ pickupR (IntervalR (Just (in1,x1)) (Just (in2,x2))) =
     GT -> Nothing
     LT -> Just $ (x1+x2) / 2
     EQ -> if in1 && in2 then Just x1 else Nothing
+
+-- Interval airthmetics.
+-- Note that this instance does not satisfy algebraic laws of linear spaces.
+instance (RealFrac r) => Linear r (IntervalR r) where
+  zero = singletonR 0
+  IntervalR lb1 ub1 .+. IntervalR lb2 ub2 = IntervalR (f lb1 lb2) (f ub1 ub2)
+    where
+      f = combineMaybe $ \(in1,x1) (in2,x2) -> (in1 && in2, x1 + x2)
+  c .*. IntervalR lb ub
+    | c < 0     = IntervalR (f ub) (f lb)
+    | otherwise = IntervalR (f lb) (f ub)
+    where
+      f Nothing = Nothing
+      f (Just (incl,val)) = Just (incl, c * val)
