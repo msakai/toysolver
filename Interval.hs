@@ -4,7 +4,7 @@ module Interval
   , Interval (..)
   , univ
   , singleton
-  , intersect
+  , intersection
   , pickup
   ) where
 
@@ -29,8 +29,8 @@ univ = Interval Nothing Nothing
 singleton :: r -> Interval r
 singleton x = Interval (Just (True, x)) (Just (True, x))
 
-intersect :: forall r. Real r => Interval r -> Interval r -> Interval r
-intersect (Interval l1 u1) (Interval l2 u2) = Interval (maxEP l1 l2) (minEP u1 u2)
+intersection :: forall r. Real r => Interval r -> Interval r -> Interval r
+intersection (Interval l1 u1) (Interval l2 u2) = Interval (maxEP l1 l2) (minEP u1 u2)
   where 
     maxEP :: EndPoint r -> EndPoint r -> EndPoint r
     maxEP = combineMaybe $ \(in1,x1) (in2,x2) ->

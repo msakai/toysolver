@@ -255,7 +255,7 @@ solveR' vs xs = simplify xs >>= go vs
 
 evalBoundsR :: Model Rational -> BoundsR -> Interval Rational
 evalBoundsR model (ls1,ls2,us1,us2) =
-  foldl' Interval.intersect univ $ 
+  foldl' Interval.intersection univ $ 
     [ Interval (Just (True, evalRat model x)) Nothing  | x <- ls1 ] ++
     [ Interval (Just (False, evalRat model x)) Nothing | x <- ls2 ] ++
     [ Interval Nothing (Just (True, evalRat model x))  | x <- us1 ] ++

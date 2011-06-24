@@ -42,7 +42,7 @@ inferBounds bounds constraints = loop bounds
     refine b = IM.mapWithKey (\v i -> f b (IM.findWithDefault [] v cs) i) b
 
 f :: (Real r, Fractional r) => Bounds r -> [C r] -> Interval r -> Interval r
-f b cs i = foldr intersect i $ do
+f b cs i = foldr intersection i $ do
   (op, rhs) <- cs
   let i'@(Interval lb ub) = evalToInterval b rhs
   case op of
