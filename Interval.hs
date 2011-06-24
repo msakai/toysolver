@@ -2,7 +2,9 @@
 module Interval
   ( EndPoint
   , Interval (..)
+  , interval
   , univ
+  , empty
   , singleton
   , intersection
   , pickup
@@ -23,14 +25,25 @@ data Interval r
   }
   deriving (Eq,Ord,Show)
 
+interval :: Real r => EndPoint r -> EndPoint r -> Interval r
+interval lb@(Just (in1,x1)) ub@(Just (in2,x2)) =
+  case x1 `compare` x2 of
+    GT -> empty
+    LT -> Interval lb ub
+    EQ -> if in1 && in2 then Interval lb ub else empty
+interval lb ub = Interval lb ub
+
 univ :: Interval r
 univ = Interval Nothing Nothing
+
+empty :: Num r => Interval r
+empty = Interval (Just (False,0)) (Just (False,0))
 
 singleton :: r -> Interval r
 singleton x = Interval (Just (True, x)) (Just (True, x))
 
 intersection :: forall r. Real r => Interval r -> Interval r -> Interval r
-intersection (Interval l1 u1) (Interval l2 u2) = Interval (maxEP l1 l2) (minEP u1 u2)
+intersection (Interval l1 u1) (Interval l2 u2) = interval (maxEP l1 l2) (minEP u1 u2)
   where 
     maxEP :: EndPoint r -> EndPoint r -> EndPoint r
     maxEP = combineMaybe $ \(in1,x1) (in2,x2) ->
@@ -64,12 +77,12 @@ pickup (Interval (Just (in1,x1)) (Just (in2,x2))) =
 -- Note that this instance does not satisfy algebraic laws of linear spaces.
 instance (Real r) => Linear r (Interval r) where
   zero = singleton 0
-  Interval lb1 ub1 .+. Interval lb2 ub2 = Interval (f lb1 lb2) (f ub1 ub2)
+  Interval lb1 ub1 .+. Interval lb2 ub2 = interval (f lb1 lb2) (f ub1 ub2)
     where
       f = liftM2 $ \(in1,x1) (in2,x2) -> (in1 && in2, x1 + x2)
   c .*. Interval lb ub
-    | c < 0     = Interval (f ub) (f lb)
-    | otherwise = Interval (f lb) (f ub)
+    | c < 0     = interval (f ub) (f lb)
+    | otherwise = interval (f lb) (f ub)
     where
       f Nothing = Nothing
       f (Just (incl,val)) = Just (incl, c * val)

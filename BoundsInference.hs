@@ -44,10 +44,10 @@ f b cs i = foldr intersection i $ do
   let i'@(Interval lb ub) = evalToInterval b rhs
   case op of
     Eql -> return i'
-    Le -> return $ Interval Nothing ub
-    Ge -> return $ Interval lb Nothing
-    Lt -> return $ Interval Nothing (strict ub)
-    Gt -> return $ Interval (strict lb) Nothing
+    Le -> return $ interval Nothing ub
+    Ge -> return $ interval lb Nothing
+    Lt -> return $ interval Nothing (strict ub)
+    Gt -> return $ interval (strict lb) Nothing
     NEq -> []
 
 evalToInterval :: (Real r, Fractional r) => Bounds r -> LC r -> Interval r
