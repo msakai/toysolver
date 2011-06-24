@@ -256,10 +256,10 @@ solveR' vs xs = simplify xs >>= go vs
 evalBoundsR :: Model Rational -> BoundsR -> IntervalR
 evalBoundsR model (ls1,ls2,us1,us2) =
   foldl' intersectR univR $ 
-    [ (Just (True, evalRat model x), Nothing)  | x <- ls1 ] ++
-    [ (Just (False, evalRat model x), Nothing) | x <- ls2 ] ++
-    [ (Nothing, Just (True, evalRat model x))  | x <- us1 ] ++
-    [ (Nothing, Just (False, evalRat model x)) | x <- us2 ]
+    [ IntervalR (Just (True, evalRat model x)) Nothing  | x <- ls1 ] ++
+    [ IntervalR (Just (False, evalRat model x)) Nothing | x <- ls2 ] ++
+    [ IntervalR Nothing (Just (True, evalRat model x))  | x <- us1 ] ++
+    [ IntervalR Nothing (Just (False, evalRat model x)) | x <- us2 ]
 
 -- ---------------------------------------------------------------------------
 

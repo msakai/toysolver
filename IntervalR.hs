@@ -1,6 +1,6 @@
 module IntervalR
-  ( EP
-  , IntervalR
+  ( EndPoint
+  , IntervalR (..)
   , univR
   , intersectR
   , pickupR
@@ -10,17 +10,22 @@ import Util (combineMaybe)
 
 -- | Endpoint
 -- (isInclusive, value)
-type EP = Maybe (Bool, Rational)
+type EndPoint = Maybe (Bool, Rational)
 
-type IntervalR = (EP, EP)
+data IntervalR
+  = IntervalR
+  { lowerBound :: EndPoint
+  , upperBound :: EndPoint
+  }
+  deriving (Eq,Ord,Show)
 
 univR :: IntervalR
-univR = (Nothing, Nothing)
+univR = IntervalR Nothing Nothing
 
 intersectR :: IntervalR -> IntervalR -> IntervalR
-intersectR (l1,u1) (l2,u2) = (maxEP l1 l2, minEP u1 u2)
+intersectR (IntervalR l1 u1) (IntervalR l2 u2) = IntervalR (maxEP l1 l2) (minEP u1 u2)
   where 
-    maxEP :: EP -> EP -> EP
+    maxEP :: EndPoint -> EndPoint -> EndPoint
     maxEP = combineMaybe $ \(in1,x1) (in2,x2) ->
       ( case x1 `compare` x2 of
           EQ -> in1 && in2
@@ -29,7 +34,7 @@ intersectR (l1,u1) (l2,u2) = (maxEP l1 l2, minEP u1 u2)
       , max x1 x2
       )
 
-    minEP :: EP -> EP -> EP
+    minEP :: EndPoint -> EndPoint -> EndPoint
     minEP = combineMaybe $ \(in1,x1) (in2,x2) ->
       ( case x1 `compare` x2 of
           EQ -> in1 && in2
@@ -39,10 +44,10 @@ intersectR (l1,u1) (l2,u2) = (maxEP l1 l2, minEP u1 u2)
       )
 
 pickupR :: IntervalR -> Maybe Rational
-pickupR (Nothing,Nothing) = Just 0
-pickupR (Just (in1,x1), Nothing) = Just $ if in1 then x1 else x1+1
-pickupR (Nothing, Just (in2,x2)) = Just $ if in2 then x2 else x2-1
-pickupR (Just (in1,x1), Just (in2,x2)) =
+pickupR (IntervalR Nothing Nothing) = Just 0
+pickupR (IntervalR (Just (in1,x1)) Nothing) = Just $ if in1 then x1 else x1+1
+pickupR (IntervalR Nothing (Just (in2,x2))) = Just $ if in2 then x2 else x2-1
+pickupR (IntervalR (Just (in1,x1)) (Just (in2,x2))) =
   case x1 `compare` x2 of
     GT -> Nothing
     LT -> Just $ (x1+x2) / 2
