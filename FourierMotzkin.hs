@@ -253,7 +253,7 @@ solveR' vs xs = simplify xs >>= go vs
           val <- pickupR (evalBoundsR model bnd)
           return $ IM.insert v val model
 
-evalBoundsR :: Model Rational -> BoundsR -> IntervalR
+evalBoundsR :: Model Rational -> BoundsR -> IntervalR Rational
 evalBoundsR model (ls1,ls2,us1,us2) =
   foldl' intersectR univR $ 
     [ IntervalR (Just (True, evalRat model x)) Nothing  | x <- ls1 ] ++

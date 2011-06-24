@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module IntervalR
   ( EndPoint
   , IntervalR (..)
@@ -10,22 +11,22 @@ import Util (combineMaybe)
 
 -- | Endpoint
 -- (isInclusive, value)
-type EndPoint = Maybe (Bool, Rational)
+type EndPoint r = Maybe (Bool, r)
 
-data IntervalR
+data IntervalR r
   = IntervalR
-  { lowerBound :: EndPoint
-  , upperBound :: EndPoint
+  { lowerBound :: EndPoint r
+  , upperBound :: EndPoint r
   }
   deriving (Eq,Ord,Show)
 
-univR :: IntervalR
+univR :: IntervalR r
 univR = IntervalR Nothing Nothing
 
-intersectR :: IntervalR -> IntervalR -> IntervalR
+intersectR :: forall r. RealFrac r => IntervalR r -> IntervalR r -> IntervalR r
 intersectR (IntervalR l1 u1) (IntervalR l2 u2) = IntervalR (maxEP l1 l2) (minEP u1 u2)
   where 
-    maxEP :: EndPoint -> EndPoint -> EndPoint
+    maxEP :: EndPoint r -> EndPoint r -> EndPoint r
     maxEP = combineMaybe $ \(in1,x1) (in2,x2) ->
       ( case x1 `compare` x2 of
           EQ -> in1 && in2
@@ -34,7 +35,7 @@ intersectR (IntervalR l1 u1) (IntervalR l2 u2) = IntervalR (maxEP l1 l2) (minEP 
       , max x1 x2
       )
 
-    minEP :: EndPoint -> EndPoint -> EndPoint
+    minEP :: EndPoint r -> EndPoint r -> EndPoint r
     minEP = combineMaybe $ \(in1,x1) (in2,x2) ->
       ( case x1 `compare` x2 of
           EQ -> in1 && in2
@@ -43,7 +44,7 @@ intersectR (IntervalR l1 u1) (IntervalR l2 u2) = IntervalR (maxEP l1 l2) (minEP 
       , min x1 x2
       )
 
-pickupR :: IntervalR -> Maybe Rational
+pickupR :: RealFrac r => IntervalR r -> Maybe r
 pickupR (IntervalR Nothing Nothing) = Just 0
 pickupR (IntervalR (Just (in1,x1)) Nothing) = Just $ if in1 then x1 else x1+1
 pickupR (IntervalR Nothing (Just (in2,x2))) = Just $ if in2 then x2 else x2-1
