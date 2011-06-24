@@ -8,6 +8,7 @@ module Interval
   , pickup
   ) where
 
+import Control.Monad
 import Linear
 import Util (combineMaybe)
 
@@ -65,7 +66,7 @@ instance (RealFrac r) => Linear r (Interval r) where
   zero = singleton 0
   Interval lb1 ub1 .+. Interval lb2 ub2 = Interval (f lb1 lb2) (f ub1 ub2)
     where
-      f = combineMaybe $ \(in1,x1) (in2,x2) -> (in1 && in2, x1 + x2)
+      f = liftM2 $ \(in1,x1) (in2,x2) -> (in1 && in2, x1 + x2)
   c .*. Interval lb ub
     | c < 0     = Interval (f ub) (f lb)
     | otherwise = Interval (f lb) (f ub)
