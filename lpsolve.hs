@@ -46,7 +46,7 @@ run lp = do
       exitFailure
     LPSolver.Optimum r m -> do
       putStrLn "optimum"
-      print $ showValue r
+      putStrLn $ showValue r
       forM_ (Set.toList vs) $ \v -> do
         printf "%s: %s\n" v (showValue (m IM.! (nameToVar Map.! v)))
   where
