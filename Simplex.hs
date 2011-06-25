@@ -35,6 +35,7 @@ import Data.Function (on)
 import Data.List (minimumBy, foldl')
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Control.Exception
 
 import Expr
 import LC
@@ -58,7 +59,10 @@ objRow :: RowIndex
 objRow = -1
 
 pivot :: Fractional r => RowIndex -> ColIndex -> Tableau r -> Tableau r
-pivot r s tbl = tbl'
+pivot r s tbl =
+    assert (validTableau tbl) $  -- precondition
+    assert (validTableau tbl') $ -- postcondition
+      tbl'
   where
     tbl' = IM.insert s row_s $ IM.map f $ IM.delete r $ tbl
     f orig@(row_i, row_i_val) =
@@ -70,9 +74,9 @@ pivot r s tbl = tbl'
           )
     (row_r, row_r_val) = lookupRow r tbl
     a_rs = row_r IM.! s
-    row_r' = IM.map (/ a_rs) $ IM.delete s row_r
+    row_r' = IM.map (/ a_rs) $ IM.insert r 1 $ IM.delete s row_r
     row_r_val' = row_r_val / a_rs
-    row_s = (IM.insert s 1 row_r', row_r_val')
+    row_s = (row_r', row_r_val')
 
 lookupRow :: RowIndex -> Tableau r -> Row r
 lookupRow r m = m IM.! r
@@ -105,6 +109,14 @@ copyObjRow from to =
 
 currentObjValue :: Num r => Tableau r -> r
 currentObjValue = snd . lookupRow objRow
+
+validTableau :: Tableau r -> Bool
+validTableau tbl =
+  and [v `IM.notMember` m | (v, (m,_)) <- IM.toList tbl, v /= objRow] &&
+  and [IS.null (IM.keysSet m `IS.intersection` vs) | (v, (m,_)) <- IM.toList tbl']
+  where
+    tbl' = IM.delete objRow tbl
+    vs = IM.keysSet tbl' 
 
 -- ---------------------------------------------------------------------------
 -- primal simplex
