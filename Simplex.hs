@@ -172,12 +172,12 @@ phaseI tbl avs
   where
     tbl1 = setObjFun tbl $ foldl' (.-.) (constLC 0) [(varLC v) | v <- IS.toList avs]
     tbl1' = go tbl1
-    go tbl
-      | currentObjValue tbl == 0 = tbl
+    go tbl2
+      | currentObjValue tbl2 == 0 = tbl2
       | otherwise = 
-        case primalPivot False tbl of
-          PivotSuccess tbl' -> go tbl'
-          PivotFinished -> tbl
+        case primalPivot False tbl2 of
+          PivotSuccess tbl2' -> go tbl2'
+          PivotFinished -> tbl2
           PivotUnbounded -> error "phaseI: should not happen"
 
 -- post-processing of phaseI
