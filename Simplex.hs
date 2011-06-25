@@ -165,10 +165,10 @@ dualPivot isMinimize tbl
 -- ---------------------------------------------------------------------------
 -- phase I of the two-phased method
 
-phaseI :: (Real r, Fractional r) => Tableau r -> VarSet -> Maybe (Tableau r)
+phaseI :: (Real r, Fractional r) => Tableau r -> VarSet -> (Bool, Tableau r)
 phaseI tbl avs
-  | currentObjValue tbl1' /= 0 = Nothing
-  | otherwise = Just $ copyObjRow tbl $ removeArtificialVariables avs $ tbl1'
+  | currentObjValue tbl1' /= 0 = (False, tbl1')
+  | otherwise = (True, copyObjRow tbl $ removeArtificialVariables avs $ tbl1')
   where
     tbl1 = setObjFun tbl $ foldl' (.-.) (constLC 0) [(varLC v) | v <- IS.toList avs]
     tbl1' = go tbl1

@@ -161,9 +161,10 @@ solve' cs =
   flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
     tableau cs
     (v,tbl,avs,defs) <- get
-    case phaseI tbl avs of
-      Nothing -> return $ Unsat
-      Just tbl1 -> do
+    let (ret, tbl1) = phaseI tbl avs
+    if not ret
+      then return Unsat
+      else do
         put (v,tbl1,avs,defs)
         m <- getModel vs
         return $ Sat m
@@ -175,9 +176,10 @@ twoPhasedSimplex' isMinimize obj cs =
   flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
     tableau cs
     (v,tbl,avs,defs) <- get    
-    case phaseI tbl avs of
-      Nothing -> return OptUnsat
-      Just tbl1 -> 
+    let (ret, tbl1) = phaseI tbl avs
+    if not ret
+      then return OptUnsat
+      else 
         case simplex isMinimize (setObjFun tbl1 (applySubst defs obj)) of
           (True, tbl) -> do
              put (v,tbl,avs,defs)
