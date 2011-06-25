@@ -122,7 +122,7 @@ expandDefs' (LARel lhs op rhs) = do
 tableau :: (Real r, Fractional r) => [Constraint r] -> LP r ()
 tableau cs = do
   let (nonnegVars, cs') = collectNonnegVars cs
-      fvs = vars (map (\(LARel x _ _) -> x) cs') `IS.difference` nonnegVars
+      fvs = vars cs `IS.difference` nonnegVars
   forM_ (IS.toList fvs) $ \v -> do
     v1 <- gensym
     v2 <- gensym
