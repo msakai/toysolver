@@ -36,12 +36,13 @@ import Expr
 import Formula
 import LA
 import Interval
-import Simplex
+import qualified Simplex
 import qualified BoundsInference as BI
 
 -- ---------------------------------------------------------------------------
+-- LP Monad
 
-type Solver r = (Var, Tableau r, VarSet, VarMap (LC r))
+type Solver r = (Var, Simplex.Tableau r, VarSet, VarMap (LC r))
 type LP r = State (Solver r)
 
 gensym :: LP r Var
@@ -50,29 +51,66 @@ gensym = do
   put (x+1,tbl,avs,defs)
   return x
 
+getTableau :: LP r (Simplex.Tableau r)
+getTableau = do
+  (_,tbl,_,_) <- get
+  return tbl
+
+putTableau :: Simplex.Tableau r -> LP r ()
+putTableau tbl = do
+  (x,_,avs,defs) <- get
+  put (x,tbl,avs,defs)
+
+addArtificialVariable :: Var -> LP r ()
+addArtificialVariable v = do
+  (x,tbl,avs,defs) <- get
+  put (x, tbl, IS.insert v avs, defs)
+
+getArtificialVariables :: LP r VarSet
+getArtificialVariables = do
+  (_,_,avs,_) <- get
+  return avs
+
+clearArtificialVariables :: LP r ()
+clearArtificialVariables = do
+  (x,tbl,_,defs) <- get
+  put (x, tbl, IS.empty, defs)
+
+define :: Var -> LC r -> LP r ()
+define v e = do
+  (x,tbl,avs,defs) <- get
+  put (x,tbl,avs, IM.insert v e defs)
+
+getDefs :: LP r (VarMap (LC r))
+getDefs = do
+  (_,_,_,defs) <- get
+  return defs
+
+-- ---------------------------------------------------------------------------
+
 addConstraint :: Real r => Constraint r -> LP r ()
 addConstraint c = do
   c <- expandDefs' c
   let (lc, rop, b) = normalizeConstraint c
+  tbl <- getTableau
   case rop of
     Le -> do
       v <- gensym -- slack variable
-      (x,tbl,avs,defs) <- get
-      put (x, IM.insert v (unLC lc, b) tbl, avs, defs)
+      putTableau $ IM.insert v (unLC lc, b) tbl
     Ge -> do
       v1 <- gensym -- surplus variable
       v2 <- gensym -- artificial variable
-      (x,tbl,avs,defs) <- get
-      put (x, IM.insert v2 (unLC (lc .-. varLC v1), b) tbl, IS.insert v2 avs, defs)
+      putTableau $ IM.insert v2 (unLC (lc .-. varLC v1), b) tbl
+      addArtificialVariable v2
     Eql -> do
       v <- gensym -- artificial variable
-      (x,tbl,avs,defs) <- get
-      put (x, IM.insert v (unLC lc, b) tbl, IS.insert v avs, defs)
+      putTableau $ IM.insert v (unLC lc, b) tbl
+      addArtificialVariable v
     _ -> error $ "addConstraint does not support " ++ show rop
 
 expandDefs :: Num r => LC r -> LP r (LC r)
 expandDefs e = do
-  (_,_,_,defs) <- get
+  defs <- getDefs
   return $ applySubst defs e
 
 expandDefs' :: Num r => Constraint r -> LP r (Constraint r)
@@ -80,11 +118,6 @@ expandDefs' (LARel lhs op rhs) = do
   lhs' <- expandDefs lhs
   rhs' <- expandDefs rhs
   return $ LARel lhs' op rhs'
-
-define :: Var -> LC r -> LP r ()
-define v e = do
-  (x,tbl,avs,defs) <- get
-  put (x,tbl,avs, IM.insert v e defs)  
 
 tableau :: (Real r, Fractional r) => [Constraint r] -> LP r ()
 tableau cs = do
@@ -98,12 +131,30 @@ tableau cs = do
 
 getModel :: Fractional r => VarSet -> LP r (Model r)
 getModel vs = do
-  (_,tbl,_,defs) <- get
-  let bs = IM.map snd (IM.delete objRow tbl)
+  tbl <- getTableau
+  defs <- getDefs
+  let bs = IM.map snd (IM.delete Simplex.objRow tbl)
       vs' = vs `IS.union` IS.fromList [v | e <- IM.elems defs, v <- IS.toList (fvLC e)]
       -- Note that IM.union is left-biased
       m0 = bs `IM.union` IM.fromList [(v,0) | v <- IS.toList vs']
   return $ IM.filterWithKey (\k _ -> k `IS.member` vs) $ IM.map (evalLC m0) defs `IM.union` m0
+
+phaseI :: (Fractional r, Real r) => LP r Bool
+phaseI = do
+  tbl <- getTableau
+  avs <- getArtificialVariables
+  let (ret, tbl') = Simplex.phaseI tbl avs
+  putTableau tbl'
+  when ret clearArtificialVariables
+  return ret
+
+simplex :: (Fractional r, Real r) => Bool -> LC r -> LP r Bool
+simplex isMinimize obj = do
+  tbl <- getTableau
+  defs <- getDefs
+  let (ret, tbl') = Simplex.simplex isMinimize (Simplex.setObjFun tbl (applySubst defs obj))
+  putTableau tbl'
+  return ret
 
 -- ---------------------------------------------------------------------------
 
@@ -156,25 +207,11 @@ collectNonnegVars cs = (nonnegVars, cs)
 
 -- ---------------------------------------------------------------------------
 
-phaseI' :: (Fractional r, Real r) => LP r Bool
-phaseI' = do
-  (v,tbl,avs,defs) <- get
-  let (ret, tbl') = phaseI tbl avs
-  put (v, tbl', if ret then IS.empty else avs, defs)
-  return ret
-
-simplex' :: (Fractional r, Real r) => Bool -> LC r -> LP r Bool
-simplex' isMinimize obj = do
-  (v,tbl,avs,defs) <- get
-  let (ret, tbl') = simplex isMinimize (setObjFun tbl (applySubst defs obj))
-  put (v,tbl',avs,defs)
-  return ret
-
 solve' :: (Real r, Fractional r) => [Constraint r] -> SatResult r
 solve' cs =
   flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
     tableau cs
-    ret <- phaseI'
+    ret <- phaseI
     if not ret
       then return Unsat
       else do
@@ -187,17 +224,17 @@ twoPhasedSimplex' :: (Real r, Fractional r) => Bool -> LC r -> [Constraint r] ->
 twoPhasedSimplex' isMinimize obj cs =
   flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
     tableau cs
-    ret <- phaseI'
+    ret <- phaseI
     if not ret
       then return OptUnsat
       else do
-        ret2 <- simplex' isMinimize obj
+        ret2 <- simplex isMinimize obj
         if not ret2
           then return Unbounded
           else do
              m <- getModel vs
-             (_,tbl,_,_) <- get
-             return $ Optimum (currentObjValue tbl) m
+             tbl <- getTableau 
+             return $ Optimum (Simplex.currentObjValue tbl) m
   where
     vs = vars cs `IS.union` vars obj
 
@@ -223,27 +260,27 @@ solve cs2 = fromMaybe Unknown $ do
 
 -- ---------------------------------------------------------------------------
 
-toCSV :: (Real r, Fractional r) => Tableau r -> String
+toCSV :: (Real r, Fractional r) => Simplex.Tableau r -> String
 toCSV tbl = unlines . map (concat . intersperse ",") $ header : body
   where
     header :: [String]
     header = "" : map colName cols ++ [""]
 
     body :: [[String]]
-    body = [showRow i (lookupRow i tbl) | i <- rows]
+    body = [showRow i (Simplex.lookupRow i tbl) | i <- rows]
 
-    rows :: [RowIndex]
-    rows = IM.keys (IM.delete objRow tbl) ++ [objRow]
+    rows :: [Simplex.RowIndex]
+    rows = IM.keys (IM.delete Simplex.objRow tbl) ++ [Simplex.objRow]
 
-    cols :: [ColIndex]
+    cols :: [Simplex.ColIndex]
     cols = [0..colMax]
       where
         colMax = maximum (-1 : [c | (row, _) <- IM.elems tbl, c <- IM.keys row])
 
-    rowName :: RowIndex -> String
-    rowName i = if i==objRow then "obj" else "x" ++ show i
+    rowName :: Simplex.RowIndex -> String
+    rowName i = if i==Simplex.objRow then "obj" else "x" ++ show i
 
-    colName :: ColIndex -> String
+    colName :: Simplex.ColIndex -> String
     colName j = "x" ++ show j
 
     showCell x = show (fromRational (toRational x) :: Double)
