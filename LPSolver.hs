@@ -156,18 +156,30 @@ collectNonnegVars cs = (nonnegVars, cs)
 
 -- ---------------------------------------------------------------------------
 
+phaseI' :: (Fractional r, Real r) => LP r Bool
+phaseI' = do
+  (v,tbl,avs,defs) <- get
+  let (ret, tbl') = phaseI tbl avs
+  put (v, tbl', if ret then IS.empty else avs, defs)
+  return ret
+
+simplex' :: (Fractional r, Real r) => Bool -> LC r -> LP r Bool
+simplex' isMinimize obj = do
+  (v,tbl,avs,defs) <- get
+  let (ret, tbl') = simplex isMinimize (setObjFun tbl (applySubst defs obj))
+  put (v,tbl',avs,defs)
+  return ret
+
 solve' :: (Real r, Fractional r) => [Constraint r] -> SatResult r
 solve' cs =
   flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
     tableau cs
-    (v,tbl,avs,defs) <- get
-    let (ret, tbl1) = phaseI tbl avs
+    ret <- phaseI'
     if not ret
       then return Unsat
       else do
-        put (v,tbl1,avs,defs)
         m <- getModel vs
-        return $ Sat m
+        return (Sat m)
   where
     vs = vars cs
 
@@ -175,17 +187,17 @@ twoPhasedSimplex' :: (Real r, Fractional r) => Bool -> LC r -> [Constraint r] ->
 twoPhasedSimplex' isMinimize obj cs =
   flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
     tableau cs
-    (v,tbl,avs,defs) <- get    
-    let (ret, tbl1) = phaseI tbl avs
+    ret <- phaseI'
     if not ret
       then return OptUnsat
-      else 
-        case simplex isMinimize (setObjFun tbl1 (applySubst defs obj)) of
-          (True, tbl) -> do
-             put (v,tbl,avs,defs)
+      else do
+        ret2 <- simplex' isMinimize obj
+        if not ret2
+          then return Unbounded
+          else do
              m <- getModel vs
+             (_,tbl,_,_) <- get
              return $ Optimum (currentObjValue tbl) m
-          (False, _) -> return $ Unbounded
   where
     vs = vars cs `IS.union` vars obj
 
