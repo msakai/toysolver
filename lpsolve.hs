@@ -12,28 +12,23 @@ import Control.Monad
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
 import System.Exit
 import System.IO
 import Text.Printf
 
 import Expr
 import Formula
-import qualified LPSolverHL
+import qualified MIPSolverHL
 import qualified LPFile as LP
 
 run :: LP.LP -> IO ()
 run lp = do
-  unless (Set.null (LP.integerVariables lp)) $ do
-    hPutStrLn stderr "integer variables are not supported."
-    exitFailure
-  unless (Set.null (LP.binaryVariables lp)) $ do
-    hPutStrLn stderr "binary variables are not supported."
-    exitFailure
   unless (Set.null (LP.semiContinuousVariables lp)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure
 
-  case LPSolverHL.optimize (LP.isMinimize lp) obj (cs1 ++ cs2) of
+  case MIPSolverHL.optimize (LP.isMinimize lp) obj (cs1 ++ cs2 ++ cs3) ivs of
     OptUnknown -> do
       putStrLn "unknown"
       exitFailure
@@ -76,6 +71,14 @@ run lp = do
                   LP.Le  -> Le
                   LP.Eql -> Eql
       return (Rel (compileE lhs) rel2 (Const rhs))
+    cs3 = do
+      v <- Set.toList (LP.binaryVariables lp)
+      let v' = nameToVar Map.! v
+      [ Const 0 .<=. Var v', Var v' .<=. Const 1 ]
+
+    ivs = f (LP.integerVariables lp) `IS.union` f (LP.binaryVariables lp)
+      where
+        f = IS.fromList . map (nameToVar Map.!) . Set.toList
 
     showValue v = show (fromRational v :: Double)
 
