@@ -249,7 +249,5 @@ toCSV showCell tbl = unlines . map (concat . intersperse ",") $ header : body
     colName :: Simplex.ColIndex -> String
     colName j = "x" ++ show j
 
-    -- showCell x = show (fromRational (toRational x) :: Double)
-
     showRow i (row, row_val) = rowName i : [showCell (IM.findWithDefault 0 j row') | j <- cols] ++ [showCell row_val]
       where row' = IM.insert i 1 row

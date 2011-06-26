@@ -47,7 +47,7 @@ optimize :: (Real r, Fractional r) => Bool -> Expr r -> [Atom r] -> OptResult r
 optimize isMinimize obj2 cs2 = fromMaybe OptUnknown $ do
   obj <- compileExpr obj2  
   cs <- mapM compileAtom cs2
-  return (twoPhasedSimplex' isMinimize obj cs)
+  return (optimize' isMinimize obj cs)
 
 solve :: (Real r, Fractional r) => [Atom r] -> SatResult r
 solve cs2 = fromMaybe Unknown $ do
@@ -69,8 +69,8 @@ solve' cs =
   where
     vs = vars cs
 
-twoPhasedSimplex' :: (Real r, Fractional r) => Bool -> LC r -> [Constraint r] -> OptResult r
-twoPhasedSimplex' isMinimize obj cs =
+optimize' :: (Real r, Fractional r) => Bool -> LC r -> [Constraint r] -> OptResult r
+optimize' isMinimize obj cs =
   flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
     tableau cs
     ret <- phaseI
