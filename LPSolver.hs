@@ -164,6 +164,14 @@ simplex isMinimize obj = do
   putTableau tbl'
   return ret
 
+dualSimplex :: (Fractional r, Real r) => Bool -> LC r -> LP r Bool
+dualSimplex isMinimize obj = do
+  tbl <- getTableau
+  defs <- getDefs
+  let (ret, tbl') = Simplex.dualSimplex isMinimize (Simplex.setObjFun tbl (applySubst defs obj))
+  putTableau tbl'
+  return ret
+
 -- ---------------------------------------------------------------------------
 
 normalizeConstraint :: forall r. Real r => Constraint r -> (LC r, RelOp, r)
