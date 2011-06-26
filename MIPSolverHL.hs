@@ -61,7 +61,7 @@ solve cs2 ivs = fromMaybe Unknown $ do
 optimize' :: RealFrac r => Bool -> LC r -> [Constraint r] -> VarSet -> OptResult r
 optimize' isMinimize obj cs ivs =
   flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
-    tableau cs
+    ivs2 <- tableau' cs
     ret <- phaseI
     if not ret
       then return OptUnsat
@@ -71,11 +71,11 @@ optimize' isMinimize obj cs ivs =
           then return Unbounded
                -- FIXME: original problem might not be unbounded 
                -- even if LP relaxiation is unbounded.
-          else loop
+          else loop (ivs `IS.union` ivs2)
   where
     vs = vars cs `IS.union` vars obj
 
-    loop = do
+    loop ivs = do
       tbl <- getTableau
       let xs = [ (fracPart val, m)
                | v <- IS.toList ivs
@@ -93,8 +93,20 @@ optimize' isMinimize obj cs ivs =
           putTableau $ IM.insert s (IM.map (negate . fracPart) m, negate f0) tbl
           ret <- dualSimplex isMinimize obj
           if ret
-            then loop
+            then loop ivs
             else return OptUnsat
+
+tableau' :: (Real r, Fractional r) => [Constraint r] -> LP r VarSet
+tableau' cs = do
+  let (nonnegVars, cs') = collectNonnegVars cs
+      fvs = vars cs `IS.difference` nonnegVars
+  ivs <- liftM IS.unions $ forM (IS.toList fvs) $ \v -> do
+    v1 <- gensym
+    v2 <- gensym
+    define v (varLC v1 .-. varLC v2)
+    return $ IS.fromList [v1,v2]
+  mapM_ addConstraint cs'
+  return ivs
 
 -- ---------------------------------------------------------------------------
 
