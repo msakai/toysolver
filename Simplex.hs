@@ -119,17 +119,33 @@ validTableau tbl =
     tbl' = IM.delete objRow tbl
     vs = IM.keysSet tbl' 
 
+isFeasible :: Real r => Tableau r -> Bool
+isFeasible tbl = 
+  and [val >= 0 | (v, (_,val)) <- IM.toList tbl, v /= objRow]
+
+isOptimal :: Real r => Bool -> Tableau r -> Bool
+isOptimal isMinimize tbl =
+  and [not (cmp cj) | cj <- IM.elems (fst (lookupRow objRow tbl))]
+  where
+    cmp = if isMinimize then (0<) else (0>)
+
+isImproving :: Real r => Bool -> Tableau r -> Tableau r -> Bool
+isImproving isMinimize from to =
+  if isMinimize
+  then currentObjValue to <= currentObjValue from 
+  else currentObjValue to >= currentObjValue from 
+
 -- ---------------------------------------------------------------------------
 -- primal simplex
 
 simplex :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
 simplex isMinimize = go
   where
-    go tbl =
+    go tbl = assert (isFeasible tbl) $
       case primalPivot isMinimize tbl of
-        PivotFinished  -> (True, tbl)
+        PivotFinished  -> assert (isOptimal isMinimize tbl) (True, tbl)
         PivotUnbounded -> (False, tbl)
-        PivotSuccess tbl' -> go tbl'
+        PivotSuccess tbl' -> assert (isImproving isMinimize tbl tbl') $ go tbl'
 
 primalPivot :: (Real r, Fractional r) => Bool -> Tableau r -> PivotResult r
 primalPivot isMinimize tbl
@@ -152,9 +168,9 @@ primalPivot isMinimize tbl
 dualSimplex :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
 dualSimplex isMinimize = go
   where
-    go tbl =
+    go tbl = assert (isOptimal isMinimize tbl) $
       case dualPivot isMinimize tbl of
-        PivotFinished  -> (True, tbl)
+        PivotFinished  -> assert (isFeasible tbl) $ (True, tbl)
         PivotUnbounded -> (False, tbl)
         PivotSuccess tbl' -> go tbl'
 
@@ -164,10 +180,9 @@ dualPivot isMinimize tbl
   | null cs   = PivotUnbounded
   | otherwise = PivotSuccess (pivot r s tbl)
   where
-    cmp = if isMinimize then (0<) else (0>)
-    rs = [(i, row_i) | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRow, cmp y_i0]
+    rs = [(i, row_i) | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRow, 0 > y_i0]
     (r, row_r) = head rs
-    cs = [ (j, - y_0j / y_rj)
+    cs = [ (j, if isMinimize then y_0j / y_rj else - y_0j / y_rj)
          | (j, y_rj) <- IM.toList row_r
          , y_rj < 0
          , let y_0j = IM.findWithDefault 0 j obj
