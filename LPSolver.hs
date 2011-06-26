@@ -104,7 +104,7 @@ addConstraint c = do
   where
     isSingleVar (LC m) =
       case IM.toList m of
-        [(v,1)] -> True
+        [(_,1)] -> True
         _ -> False
 
 expandDefs :: Num r => LC r -> LP r (LC r)

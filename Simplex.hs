@@ -114,7 +114,7 @@ currentObjValue = snd . lookupRow objRow
 validTableau :: Tableau r -> Bool
 validTableau tbl =
   and [v `IM.notMember` m | (v, (m,_)) <- IM.toList tbl, v /= objRow] &&
-  and [IS.null (IM.keysSet m `IS.intersection` vs) | (v, (m,_)) <- IM.toList tbl']
+  and [IS.null (IM.keysSet m `IS.intersection` vs) | (m,_) <- IM.elems tbl']
   where
     tbl' = IM.delete objRow tbl
     vs = IM.keysSet tbl' 
@@ -243,10 +243,10 @@ toCSV showCell tbl = unlines . map (concat . intersperse ",") $ header : body
       where
         colMax = maximum (-1 : [c | (row, _) <- IM.elems tbl, c <- IM.keys row])
 
-    rowName :: Simplex.RowIndex -> String
+    rowName :: RowIndex -> String
     rowName i = if i==Simplex.objRow then "obj" else "x" ++ show i
 
-    colName :: Simplex.ColIndex -> String
+    colName :: ColIndex -> String
     colName j = "x" ++ show j
 
     showRow i (row, row_val) = rowName i : [showCell (IM.findWithDefault 0 j row') | j <- cols] ++ [showCell row_val]
