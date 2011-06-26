@@ -10,6 +10,12 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
+-- References:
+--
+-- Ralph E. Gomory.
+-- Outline of an algorithm for integer solutions to linear programs.
+-- Bull. Amer. Math. Soc., Vol. 64, No. 5. (1958), pp. 275-278.
+-- http://projecteuclid.org/euclid.bams/1183522679
 -----------------------------------------------------------------------------
 
 module MIPSolverHL
