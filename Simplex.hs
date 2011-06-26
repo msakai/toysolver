@@ -29,10 +29,11 @@ module Simplex
   , simplex
   , dualSimplex
   , phaseI
+  , toCSV
   ) where
 
 import Data.Function (on)
-import Data.List (minimumBy, foldl')
+import Data.List (intersperse, minimumBy, foldl')
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Control.Exception
@@ -207,3 +208,33 @@ removeArtificialVariables avs tbl0 = tbl2
             [] -> IM.delete i tbl
             j:_ -> pivot i j tbl
 
+
+-- ---------------------------------------------------------------------------
+
+toCSV :: Num r => (r -> String) -> Tableau r -> String
+toCSV showCell tbl = unlines . map (concat . intersperse ",") $ header : body
+  where
+    header :: [String]
+    header = "" : map colName cols ++ [""]
+
+    body :: [[String]]
+    body = [showRow i (Simplex.lookupRow i tbl) | i <- rows]
+
+    rows :: [Simplex.RowIndex]
+    rows = IM.keys (IM.delete Simplex.objRow tbl) ++ [Simplex.objRow]
+
+    cols :: [Simplex.ColIndex]
+    cols = [0..colMax]
+      where
+        colMax = maximum (-1 : [c | (row, _) <- IM.elems tbl, c <- IM.keys row])
+
+    rowName :: Simplex.RowIndex -> String
+    rowName i = if i==Simplex.objRow then "obj" else "x" ++ show i
+
+    colName :: Simplex.ColIndex -> String
+    colName j = "x" ++ show j
+
+    -- showCell x = show (fromRational (toRational x) :: Double)
+
+    showRow i (row, row_val) = rowName i : [showCell (IM.findWithDefault 0 j row') | j <- cols] ++ [showCell row_val]
+      where row' = IM.insert i 1 row

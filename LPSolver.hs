@@ -26,7 +26,6 @@ module LPSolver
 
 import Control.Monad
 import Control.Monad.State
-import Data.List (intersperse)
 import Data.Maybe (fromMaybe)
 import Data.Ratio
 import qualified Data.IntMap as IM
@@ -273,35 +272,6 @@ solve :: (Real r, Fractional r) => [Atom r] -> SatResult r
 solve cs2 = fromMaybe Unknown $ do
   cs <- mapM compileAtom cs2
   return (solve' cs)
-
--- ---------------------------------------------------------------------------
-
-toCSV :: (Real r, Fractional r) => Simplex.Tableau r -> String
-toCSV tbl = unlines . map (concat . intersperse ",") $ header : body
-  where
-    header :: [String]
-    header = "" : map colName cols ++ [""]
-
-    body :: [[String]]
-    body = [showRow i (Simplex.lookupRow i tbl) | i <- rows]
-
-    rows :: [Simplex.RowIndex]
-    rows = IM.keys (IM.delete Simplex.objRow tbl) ++ [Simplex.objRow]
-
-    cols :: [Simplex.ColIndex]
-    cols = [0..colMax]
-      where
-        colMax = maximum (-1 : [c | (row, _) <- IM.elems tbl, c <- IM.keys row])
-
-    rowName :: Simplex.RowIndex -> String
-    rowName i = if i==Simplex.objRow then "obj" else "x" ++ show i
-
-    colName :: Simplex.ColIndex -> String
-    colName j = "x" ++ show j
-
-    showCell x = show (fromRational (toRational x) :: Double)
-    showRow i (row, row_val) = rowName i : [showCell (IM.findWithDefault 0 j row') | j <- cols] ++ [showCell row_val]
-      where row' = IM.insert i 1 row
 
 -- ---------------------------------------------------------------------------
 
