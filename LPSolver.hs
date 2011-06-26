@@ -94,6 +94,9 @@ addConstraint c = do
   let (lc, rop, b) = normalizeConstraint c
   tbl <- getTableau
   case rop of
+    -- x≥b で b≤0 なら追加しない。ad hoc なので一般化したい。
+    Ge | isSingleVar lc && b<=0 -> return ()
+
     Le -> do
       v <- gensym -- slack variable
       putTableau $ IM.insert v (unLC lc, b) tbl
@@ -107,6 +110,11 @@ addConstraint c = do
       putTableau $ IM.insert v (unLC lc, b) tbl
       addArtificialVariable v
     _ -> error $ "addConstraint does not support " ++ show rop
+  where
+    isSingleVar (LC m) =
+      case IM.toList m of
+        [(v,1)] -> True
+        _ -> False
 
 expandDefs :: Num r => LC r -> LP r (LC r)
 expandDefs e = do
