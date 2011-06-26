@@ -33,7 +33,7 @@ delta = Delta 0 1
 instance Num r => Linear r (Delta r) where
   Delta r1 k1 .+. Delta r2 k2 = Delta (r1+r2) (k1+k2)
   c .*. Delta r k = Delta (c*r) (c*k)
-  zero = Delta 0 0
+  lzero = Delta 0 0
 
 floor', ceiling' :: (RealFrac r, Integral a) => Delta r -> a
 

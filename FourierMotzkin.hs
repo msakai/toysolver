@@ -68,8 +68,8 @@ instance Boolean DNF where
   notF (DNF xs) = DNF . sequence . map (map f) $ xs
     where
       f :: Lit -> Lit
-      f (Pos t) = Nonneg (negateLC t)
-      f (Nonneg t) = Pos (negateLC t)
+      f (Pos t) = Nonneg (lnegate t)
+      f (Nonneg t) = Pos (lnegate t)
   DNF xs .&&. DNF ys = DNF [x++y | x<-xs, y<-ys]
   DNF xs .||. DNF ys = DNF (xs++ys)
 
@@ -161,7 +161,7 @@ gtZ = flip gtZ
 eqZ :: LCZ -> LCZ -> DNF
 eqZ lc1 lc2
   = if fromMaybe 0 (IM.lookup constKey m) `mod` d == 0
-    then DNF [[Nonneg lc, Nonneg (negateLC lc)]]
+    then DNF [[Nonneg lc, Nonneg (lnegate lc)]]
     else false
   where
     LC m = lc1 .-. lc2
@@ -194,8 +194,8 @@ collectBoundsR v = foldr phi (([],[],[],[]),[])
         EQ -> (bnd, lit : xs)
         GT ->
           if strict
-          then ((ls1, (negateLC t', c) : ls2, us1, us2), xs) -- 0 < cx + M ⇔ -M/c <  x
-          else (((negateLC t', c) : ls1, ls2, us1, us2), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
+          then ((ls1, (lnegate t', c) : ls2, us1, us2), xs) -- 0 < cx + M ⇔ -M/c <  x
+          else (((lnegate t', c) : ls1, ls2, us1, us2), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
         LT -> 
           if strict
           then ((ls1, ls2, us1, (t', negate c) : us2), xs) -- 0 < cx + M ⇔ x < M/-c
@@ -282,7 +282,7 @@ collectBoundsZ v = foldr phi (([],[]),[])
     phi lit@(Nonneg (LC t)) ((ls,us),xs) =
       case c `compare` 0 of
         EQ -> ((ls, us), lit : xs)
-        GT -> (((negateLC t', c) : ls, us), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
+        GT -> (((lnegate t', c) : ls, us), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
         LT -> ((ls, (t', negate c) : us), xs)   -- 0 ≤ cx + M ⇔ x ≤ M/-c
       where
         c = fromMaybe 0 $ IM.lookup v t

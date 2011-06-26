@@ -14,7 +14,6 @@ module LC
   , normalizeLC
   , varLC
   , constLC
-  , negateLC
   , evalLC
   , applySubst
   , fvLC
@@ -55,10 +54,7 @@ constLC c = normalizeLC $ LC $ IM.singleton constKey c
 instance Num r => Linear r (LC r) where
   LC t1 .+. LC t2 = normalizeLC $ LC $ IM.unionWith (+) t1 t2
   c .*. (LC t) = normalizeLC $ LC $ IM.map (c*) t
-  zero = LC $ IM.empty
-
-negateLC :: Num r => LC r -> LC r
-negateLC x = (-1) .*. x
+  lzero = LC $ IM.empty
 
 evalLC :: Num r => Model r -> LC r -> r
 evalLC m (LC t) = sum [(m' IM.! v) * c | (v,c) <- IM.toList t]

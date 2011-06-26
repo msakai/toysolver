@@ -76,7 +76,7 @@ pickup (Interval (Just (in1,x1)) (Just (in2,x2))) =
 -- Interval airthmetics.
 -- Note that this instance does not satisfy algebraic laws of linear spaces.
 instance (Real r) => Linear r (Interval r) where
-  zero = singleton 0
+  lzero = singleton 0
   Interval lb1 ub1 .+. Interval lb2 ub2 = interval (f lb1 lb2) (f ub1 ub2)
     where
       f = liftM2 $ \(in1,x1) (in2,x2) -> (in1 && in2, x1 + x2)

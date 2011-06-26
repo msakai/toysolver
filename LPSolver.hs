@@ -167,7 +167,7 @@ dualSimplex isMinimize obj = do
 
 normalizeConstraint :: forall r. Real r => Constraint r -> (LC r, RelOp, r)
 normalizeConstraint (LARel a op b)
-  | rhs < 0   = (negateLC lhs, flipOp op, negate rhs)
+  | rhs < 0   = (lnegate lhs, flipOp op, negate rhs)
   | otherwise = (lhs, op, rhs)
   where
     LC m = a .-. b
@@ -206,8 +206,8 @@ collectNonnegVars cs = (nonnegVars, cs)
           case lb of
             Nothing -> False
             Just (incl, val) -> val > 0 || (not incl && val >= 0)
-        Eql -> isTriviallyTrue (LARel c Le zero) && isTriviallyTrue (LARel c Ge zero)
-        NEq -> isTriviallyTrue (LARel c Lt zero) && isTriviallyTrue (LARel c Gt zero)
+        Eql -> isTriviallyTrue (LARel c Le lzero) && isTriviallyTrue (LARel c Ge lzero)
+        NEq -> isTriviallyTrue (LARel c Lt lzero) && isTriviallyTrue (LARel c Gt lzero)
       where
         c = a .-. b
         Interval lb ub = BI.evalToInterval bounds c

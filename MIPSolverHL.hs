@@ -137,7 +137,7 @@ test1 = optimize' isMinimize obj cs ivs
     (isMinimize, obj, cs, ivs) = example1
 
 test2 :: OptResult Rational
-test2 = optimize' (not isMinimize) (negateLC obj) cs ivs
+test2 = optimize' (not isMinimize) (lnegate obj) cs ivs
   where
     (isMinimize, obj, cs, ivs) = example1
 

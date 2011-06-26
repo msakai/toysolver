@@ -208,7 +208,7 @@ eliminateZ' x formula = case1 ++ case2
         f (Lit (Pos (LC m))) =
             case IM.lookup x m of
               Nothing -> []
-              Just c' -> if c' > 0 then [negateLC (LC (IM.delete x m))] else [LC (IM.delete x m)]    
+              Just c' -> if c' > 0 then [lnegate (LC (IM.delete x m))] else [LC (IM.delete x m)]    
 
     case1 :: [(Formula', Witness)]
     case1 = [ (subst1 x lc formula1, WCase1 c lc)
