@@ -198,14 +198,15 @@ phaseI tbl avs
   | currentObjValue tbl1' /= 0 = (False, tbl1')
   | otherwise = (True, copyObjRow tbl $ removeArtificialVariables avs $ tbl1')
   where
-    tbl1 = setObjFun tbl $ foldl' (.-.) (constLC 0) [(varLC v) | v <- IS.toList avs]
+    isMinimize = False
+    tbl1 = setObjFun tbl $ lnegate $ lsum [varLC v | v <- IS.toList avs]
     tbl1' = go tbl1
     go tbl2
       | currentObjValue tbl2 == 0 = tbl2
       | otherwise = 
         case primalPivot False tbl2 of
-          PivotSuccess tbl2' -> go tbl2'
-          PivotFinished -> tbl2
+          PivotSuccess tbl2' -> assert (isImproving isMinimize tbl2 tbl2') $ go tbl2'
+          PivotFinished -> assert (isOptimal isMinimize tbl2) tbl2
           PivotUnbounded -> error "phaseI: should not happen"
 
 -- post-processing of phaseI
