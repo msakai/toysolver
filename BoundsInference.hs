@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 module BoundsInference
   ( Bounds
   , Constraint
@@ -19,8 +19,8 @@ import Util (isInteger)
 
 type C r = (RelOp, LC r)
 
-inferBounds :: forall r. (RealFrac r) => Bounds r -> [Constraint r] -> VarSet -> Bounds r
-inferBounds bounds constraints ivs = loop bounds
+inferBounds :: forall r. (RealFrac r) => Bounds r -> [Constraint r] -> VarSet -> Int -> Bounds r
+inferBounds bounds constraints ivs limit = loop 0 bounds
   where
     cs :: VarMap [C r]
     cs = IM.fromListWith (++) $ do
@@ -32,8 +32,8 @@ inferBounds bounds constraints ivs = loop bounds
           rhs' = (-1/c) .*. LC (IM.delete v m)
       return (v, [(op', rhs')])
 
-    loop  :: Bounds r -> Bounds r
-    loop b = if b==b' then b else loop b'
+    loop  :: Int -> Bounds r -> Bounds r
+    loop !i b = if (limit>=0 && i>=limit) || b==b' then b else loop (i+1) b'
       where
         b' = refine b
 

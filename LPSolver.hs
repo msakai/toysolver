@@ -178,7 +178,7 @@ collectNonnegVars :: forall r. (RealFrac r) => [Constraint r] -> VarSet -> (VarS
 collectNonnegVars cs ivs = (nonnegVars, cs)
   where
     vs = vars cs
-    bounds = BI.inferBounds initialBounds cs ivs
+    bounds = BI.inferBounds initialBounds cs ivs 1000
       where
         initialBounds = IM.fromList [(v, Interval.univ) | v <- IS.toList vs]
     nonnegVars = IS.filter f vs
