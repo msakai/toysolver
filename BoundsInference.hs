@@ -45,7 +45,7 @@ inferBounds bounds constraints ivs = loop bounds
     tighten v x@(Interval lb ub) =
       if v `IS.notMember` ivs
         then x
-        else interval (fmap tightenLB lb) (fmap tightenUB lb)
+        else interval (fmap tightenLB lb) (fmap tightenUB ub)
       where
         tightenLB (incl,lb) =
           ( True
