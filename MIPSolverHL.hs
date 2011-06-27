@@ -67,7 +67,7 @@ solve cs2 ivs = fromMaybe Unknown $ do
 optimize' :: RealFrac r => Bool -> LC r -> [Constraint r] -> VarSet -> OptResult r
 optimize' isMinimize obj cs ivs =
   flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
-    ivs2 <- tableau' cs
+    ivs2 <- tableau' cs ivs
     ret <- phaseI
     if not ret
       then return OptUnsat
@@ -102,17 +102,17 @@ optimize' isMinimize obj cs ivs =
             then loop ivs
             else return OptUnsat
 
-tableau' :: (Real r, Fractional r) => [Constraint r] -> LP r VarSet
-tableau' cs = do
+tableau' :: (Real r, Fractional r) => [Constraint r] -> VarSet -> LP r VarSet
+tableau' cs ivs = do
   let (nonnegVars, cs') = collectNonnegVars cs
       fvs = vars cs `IS.difference` nonnegVars
-  ivs <- liftM IS.unions $ forM (IS.toList fvs) $ \v -> do
+  ivs2 <- liftM IS.unions $ forM (IS.toList fvs) $ \v -> do
     v1 <- gensym
     v2 <- gensym
     define v (varLC v1 .-. varLC v2)
-    return $ IS.fromList [v1,v2]
+    return $ if v `IS.member` ivs then IS.fromList [v1,v2] else IS.empty
   mapM_ addConstraint cs'
-  return ivs
+  return ivs2
 
 -- ---------------------------------------------------------------------------
 
