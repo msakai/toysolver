@@ -37,26 +37,26 @@ import LPSolver
 
 -- ---------------------------------------------------------------------------
 
-maximize :: (Real r, Fractional r) => Expr r -> [Atom r] -> OptResult r
+maximize :: (RealFrac r) => Expr r -> [Atom r] -> OptResult r
 maximize = optimize False
 
-minimize :: (Real r, Fractional r) => Expr r -> [Atom r] -> OptResult r
+minimize :: (RealFrac r) => Expr r -> [Atom r] -> OptResult r
 minimize = optimize True
 
-optimize :: (Real r, Fractional r) => Bool -> Expr r -> [Atom r] -> OptResult r
+optimize :: (RealFrac r) => Bool -> Expr r -> [Atom r] -> OptResult r
 optimize isMinimize obj2 cs2 = fromMaybe OptUnknown $ do
   obj <- compileExpr obj2  
   cs <- mapM compileAtom cs2
   return (optimize' isMinimize obj cs)
 
-solve :: (Real r, Fractional r) => [Atom r] -> SatResult r
+solve :: (RealFrac r) => [Atom r] -> SatResult r
 solve cs2 = fromMaybe Unknown $ do
   cs <- mapM compileAtom cs2
   return (solve' cs)
 
 -- ---------------------------------------------------------------------------
 
-solve' :: (Real r, Fractional r) => [Constraint r] -> SatResult r
+solve' :: (RealFrac r) => [Constraint r] -> SatResult r
 solve' cs =
   flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
     tableau cs
@@ -69,7 +69,7 @@ solve' cs =
   where
     vs = vars cs
 
-optimize' :: (Real r, Fractional r) => Bool -> LC r -> [Constraint r] -> OptResult r
+optimize' :: (RealFrac r) => Bool -> LC r -> [Constraint r] -> OptResult r
 optimize' isMinimize obj cs =
   flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
     tableau cs

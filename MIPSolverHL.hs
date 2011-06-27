@@ -103,9 +103,9 @@ optimize' isMinimize obj cs ivs =
             then loop ivs
             else return OptUnsat
 
-tableau' :: (Real r, Fractional r) => [Constraint r] -> VarSet -> LP r VarSet
+tableau' :: (RealFrac r) => [Constraint r] -> VarSet -> LP r VarSet
 tableau' cs ivs = do
-  let (nonnegVars, cs') = collectNonnegVars cs
+  let (nonnegVars, cs') = collectNonnegVars cs ivs
       fvs = vars cs `IS.difference` nonnegVars
   ivs2 <- liftM IS.unions $ forM (IS.toList fvs) $ \v -> do
     v1 <- gensym

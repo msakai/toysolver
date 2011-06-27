@@ -118,9 +118,9 @@ expandDefs' (LARel lhs op rhs) = do
   rhs' <- expandDefs rhs
   return $ LARel lhs' op rhs'
 
-tableau :: (Real r, Fractional r) => [Constraint r] -> LP r ()
+tableau :: (RealFrac r) => [Constraint r] -> LP r ()
 tableau cs = do
-  let (nonnegVars, cs') = collectNonnegVars cs
+  let (nonnegVars, cs') = collectNonnegVars cs IS.empty
       fvs = vars cs `IS.difference` nonnegVars
   forM_ (IS.toList fvs) $ \v -> do
     v1 <- gensym
@@ -174,11 +174,11 @@ normalizeConstraint (LARel a op b)
     rhs = - IM.findWithDefault 0 constKey m
     lhs = LC (IM.delete constKey m)
 
-collectNonnegVars :: forall r. (Fractional r, Real r) => [Constraint r] -> (VarSet, [Constraint r])
-collectNonnegVars cs = (nonnegVars, cs)
+collectNonnegVars :: forall r. (RealFrac r) => [Constraint r] -> VarSet -> (VarSet, [Constraint r])
+collectNonnegVars cs ivs = (nonnegVars, cs)
   where
     vs = vars cs
-    bounds = BI.inferBounds initialBounds cs
+    bounds = BI.inferBounds initialBounds cs ivs
       where
         initialBounds = IM.fromList [(v, Interval.univ) | v <- IS.toList vs]
     nonnegVars = IS.filter f vs

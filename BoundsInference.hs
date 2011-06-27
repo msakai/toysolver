@@ -8,17 +8,19 @@ module BoundsInference
 
 import Control.Monad
 import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
 
 import Expr
 import Formula
 import LA
 import LC
 import Interval
+import Util (isInteger)
 
 type C r = (RelOp, LC r)
 
-inferBounds :: forall r. (Real r, Fractional r) => Bounds r -> [Constraint r] -> Bounds r
-inferBounds bounds constraints = loop bounds
+inferBounds :: forall r. (RealFrac r) => Bounds r -> [Constraint r] -> VarSet -> Bounds r
+inferBounds bounds constraints ivs = loop bounds
   where
     cs :: VarMap [C r]
     cs = IM.fromListWith (++) $ do
@@ -36,7 +38,27 @@ inferBounds bounds constraints = loop bounds
         b' = refine b
 
     refine :: Bounds r -> Bounds r
-    refine b = IM.mapWithKey (\v i -> f b (IM.findWithDefault [] v cs) i) b
+    refine b = IM.mapWithKey (\v i -> tighten v $ f b (IM.findWithDefault [] v cs) i) b
+
+    -- tighten bounds of integer variables
+    tighten :: Var -> Interval r -> Interval r
+    tighten v x@(Interval lb ub) =
+      if v `IS.notMember` ivs
+        then x
+        else interval (fmap tightenLB lb) (fmap tightenUB lb)
+      where
+        tightenLB (incl,lb) =
+          ( True
+          , if isInteger lb && not incl
+            then lb + 1
+            else fromIntegral (ceiling lb :: Integer)
+          )
+        tightenUB (incl,ub) =
+          ( True
+          , if isInteger ub && not incl
+            then ub - 1
+            else fromIntegral (floor ub :: Integer)
+          )
 
 f :: (Real r, Fractional r) => Bounds r -> [C r] -> Interval r -> Interval r
 f b cs i = foldr intersection i $ do
