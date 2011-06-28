@@ -24,6 +24,7 @@ module Simplex
   , objRow
   , pivot
   , lookupRow
+  , setRow
   , setObjFun
   , currentObjValue
   , simplex
@@ -82,9 +83,9 @@ pivot r s tbl =
 lookupRow :: RowIndex -> Tableau r -> Row r
 lookupRow r m = m IM.! r
 
--- 目的関数の行の基底変数の列が0になるように変形
-normalizeObjRow :: Num r => Tableau r -> Row r -> Row r
-normalizeObjRow a (row0,val0) = obj'
+-- 行の基底変数の列が0になるように変形
+normalizeRow :: Num r => Tableau r -> Row r -> Row r
+normalizeRow a (row0,val0) = obj'
   where
     obj' = g $ foldl' f (IM.empty, val0) $ 
            [ case IM.lookup j a of
@@ -94,19 +95,21 @@ normalizeObjRow a (row0,val0) = obj'
     f (m1,v1) (m2,v2) = (IM.unionWith (+) m1 m2, v1+v2)
     g (m,v) = (IM.filter (0/=) m, v)
 
+setRow :: Num r => RowIndex -> Tableau r -> Row r -> Tableau r
+setRow i tbl row = assert (validTableau tbl) $ assert (validTableau tbl') $ tbl'
+  where
+    tbl' = IM.insert i (normalizeRow tbl row) tbl
+
 setObjFun :: Num r => Tableau r -> LC r -> Tableau r
-setObjFun tbl (LC m) = setObjRow tbl row
+setObjFun tbl (LC m) = setRow objRow tbl row
   where
     row = (IM.map negate (IM.delete constKey m), IM.findWithDefault 0 constKey m)
-
-setObjRow :: Num r => Tableau r -> Row r -> Tableau r
-setObjRow tbl row = IM.insert objRow (normalizeObjRow tbl row) tbl
 
 copyObjRow :: Num r => Tableau r -> Tableau r -> Tableau r
 copyObjRow from to =
   case IM.lookup objRow from of
     Nothing -> IM.delete objRow to
-    Just row -> setObjRow to row
+    Just row -> setRow objRow to row
 
 currentObjValue :: Num r => Tableau r -> r
 currentObjValue = snd . lookupRow objRow

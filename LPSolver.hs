@@ -90,15 +90,15 @@ addConstraint c = do
 
     Le -> do
       v <- gensym -- slack variable
-      putTableau $ IM.insert v (unLC lc, b) tbl
+      putTableau $ Simplex.setRow v tbl (unLC lc, b)
     Ge -> do
       v1 <- gensym -- surplus variable
       v2 <- gensym -- artificial variable
-      putTableau $ IM.insert v2 (unLC (lc .-. varLC v1), b) tbl
+      putTableau $ Simplex.setRow v2 tbl (unLC (lc .-. varLC v1), b)
       addArtificialVariable v2
     Eql -> do
       v <- gensym -- artificial variable
-      putTableau $ IM.insert v (unLC lc, b) tbl
+      putTableau $ Simplex.setRow v tbl (unLC lc, b)
       addArtificialVariable v
     _ -> error $ "addConstraint does not support " ++ show rop
   where
