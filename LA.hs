@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  LA
@@ -48,3 +49,6 @@ compileAtom (Rel a op b) = do
   a' <- compileExpr a
   b' <- compileExpr b
   return $ LARel a' op b'
+
+instance Rel (LC r) (Constraint r) where
+  rel op a b = LARel a op b
