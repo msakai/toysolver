@@ -18,13 +18,14 @@
 module FourierMotzkin
     ( module Expr
     , module Formula
-    , LC (..)
+    , module LA
     , Lit (..)
     , DNF (..)
     , eliminateQuantifiersR
     , eliminateQuantifiersZ
     , solveR
     , solveZ
+    , solveQFLA
     , termR -- FIXME
     ) where
 
@@ -37,7 +38,7 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import LC
+import LA
 import Interval
 import Util (combineMaybe)
 
@@ -374,6 +375,59 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 
 -- ---------------------------------------------------------------------------
 
+solveQFLA :: [Constraint Rational] -> VarSet -> Maybe (Model Rational)
+solveQFLA cs ivs = msum [ simplify xs >>= go1 (IS.toList rvs) | xs <- unDNF dnf ]
+  where
+    vs  = vars cs
+    rvs = vs `IS.difference` ivs
+    dnf = constraintsToDNF cs
+
+    go1 :: [Var] -> [Lit] -> Maybe (Model Rational)
+    go1 [] xs = fmap (fmap fromIntegral) $ go2 (IS.toList ivs) xs
+    go1 (v:vs) ys = msum (map f (unDNF (boundConditionsR bnd)))
+      where
+        (bnd, rest) = collectBoundsR v ys
+        f zs = do
+          model <- go1 vs (zs ++ rest)
+          val <- pickup (evalBoundsR model bnd)
+          return $ IM.insert v val model
+
+    go2 :: [Var] -> [Lit] -> Maybe (Model Integer)
+    go2 [] [] = return IM.empty
+    go2 [] _ = mzero
+    go2 (v:vs) ys = msum (map f (unDNF (boundConditionsZ bnd)))
+      where
+        (bnd, rest) = collectBoundsZ v ys
+        f zs = do
+          model <- go2 vs (zs ++ rest)
+          val <- pickupZ (evalBoundsZ model bnd)
+          return $ IM.insert v val model
+
+constraintsToDNF :: [Constraint Rational] -> DNF
+constraintsToDNF = andF . map constraintToDNF
+
+constraintToDNF :: Constraint Rational -> DNF
+constraintToDNF (LARel a op b) = DNF $
+  case op of
+    Eql -> [[Nonneg c, Nonneg (lnegate c)]]
+    NEq -> [[Pos c], [Pos (lnegate c)]]
+    Ge  -> [[Nonneg c]]
+    Le  -> [[Nonneg (lnegate c)]]
+    Gt  -> [[Pos c]]
+    Lt  -> [[Pos (lnegate c)]]
+  where
+    c = normalize (a .-. b)
+
+    normalize :: LC Rational -> LCZ
+    normalize (LC m)
+      | IM.null m = LC IM.empty
+      | otherwise = LC $ IM.map (round . (*c)) m
+           where
+             c = fromIntegral $ foldl' lcm 1 (map denominator (IM.elems m))
+    
+
+-- ---------------------------------------------------------------------------
+
 gcd' :: [Integer] -> Integer
 gcd' [] = 1
 gcd' xs = foldl1' gcd xs
@@ -399,6 +453,17 @@ test1 = c1 .&&. c2 .&&. c3 .&&. c4
     c2 = 3*x + 5*y + 14*z .==. 7
     c3 = 1 .<=. x .&&. x .<=. 40
     c4 = (-50) .<=. y .&&. y .<=. 50
+
+test1' :: [Constraint Rational]
+test1' = [c1, c2] ++ c3 ++ c4
+  where
+    x = varLC 0
+    y = varLC 1
+    z = varLC 2
+    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. constLC 17
+    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. constLC 7
+    c3 = [constLC 1 .<=. x, x .<=. constLC 40]
+    c4 = [constLC (-50) .<=. y, y .<=. constLC 50]
 
 {-
 27 ≤ 11x+13y ≤ 45
