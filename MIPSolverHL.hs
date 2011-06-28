@@ -40,6 +40,7 @@ import LA
 import qualified Simplex
 import Util (isInteger, fracPart)
 import LPSolver
+import qualified FourierMotzkin
 
 -- ---------------------------------------------------------------------------
 
@@ -73,11 +74,20 @@ optimize' isMinimize obj cs ivs =
       then return OptUnsat
       else do
         ret2 <- simplex isMinimize obj
-        if not ret2
-          then return Unbounded
-               -- FIXME: original problem might not be unbounded 
-               -- even if LP relaxiation is unbounded.
-          else loop (ivs `IS.union` ivs2)
+        if ret2
+          then loop (ivs `IS.union` ivs2)
+          else
+            {-
+               Fallback to Fourier-Motzkin + OmegaTest
+               * In general, original problem may have optimal
+                 solution even though LP relaxiation is unbounded.
+               * But if restricted to rational numbers, the
+                 original problem is unbounded or unsatisfiable
+                 when LP relaxation is unbounded.
+            -}
+            case FourierMotzkin.solveQFLA (map conv cs) ivs of
+              Nothing -> return OptUnsat
+              Just _ -> return Unbounded
   where
     vs = vars cs `IS.union` vars obj
 
@@ -114,6 +124,11 @@ tableau' cs ivs = do
     return $ if v `IS.member` ivs then IS.fromList [v1,v2] else IS.empty
   mapM_ addConstraint cs'
   return ivs2
+
+conv :: RealFrac r => Constraint r -> Constraint Rational
+conv (LARel a op b) = LARel (f a) op (f b)
+  where
+    f (LC t) = normalizeLC $ LC (fmap toRational t)
 
 -- ---------------------------------------------------------------------------
 
