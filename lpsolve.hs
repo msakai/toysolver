@@ -65,12 +65,14 @@ run lp = do
       [Const x .<=. v2 | LP.Finite x <- return l] ++
         [v2 .<=. Const x | LP.Finite x <- return u]
     cs2 = do
-      (_, _, (lhs, rel, rhs)) <- LP.constraints lp
+      (_, ind, (lhs, rel, rhs)) <- LP.constraints lp
       let rel2 = case rel of
                   LP.Ge  -> Ge
                   LP.Le  -> Le
                   LP.Eql -> Eql
-      return (Rel (compileE lhs) rel2 (Const rhs))
+      case ind of
+        Nothing -> return (Rel (compileE lhs) rel2 (Const rhs))
+        Just _ -> error "indicator constraint is not supported yet"
     cs3 = do
       v <- Set.toList (LP.binaryVariables lp)
       let v' = nameToVar Map.! v
