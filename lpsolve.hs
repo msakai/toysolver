@@ -9,11 +9,14 @@
 module Main where
 
 import Control.Monad
+import Data.List
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import System.Exit
+import System.Environment
+import System.Console.GetOpt
 import System.IO
 import Text.Printf
 
@@ -21,6 +24,40 @@ import Expr
 import Formula
 import qualified MIPSolverHL
 import qualified LPFile as LP
+
+-- ---------------------------------------------------------------------------
+
+data Flag
+    = Help
+    | Version
+    -- | FourierMotzkin
+    -- | SatMode
+    -- | Load String
+    -- | Trace String
+    deriving Eq
+
+options :: [OptDescr Flag]
+options =
+    [ Option ['h'] ["help"]    (NoArg Help)            "show help"
+    , Option ['v'] ["version"] (NoArg Version)         "show version number"
+--    , Option ['i'] ["fourier-motzkin"] (NoArg FourierMotzkin) "check satisfiability using Fourier-Motzkin + OmegaTest"
+{-
+    , Option ['l'] ["load"]    (ReqArg Load "FILE") "load FILE"
+    , Option ['t'] ["trace"]    (OptArg (Trace . fromMaybe "on") "[on|off]")
+             "enable/disable trace"
+-}
+    ]
+
+version :: [Int]
+version = [0,0,1]
+
+versionStr :: String
+versionStr = intercalate "." $ map show $ version
+
+header :: String
+header = "Usage: toysolver [OPTION...] file.lp"
+
+-- ---------------------------------------------------------------------------
 
 run :: LP.LP -> IO ()
 run lp = do
@@ -84,9 +121,19 @@ run lp = do
 
     showValue v = show (fromRational v :: Double)
 
+-- ---------------------------------------------------------------------------
+
 main :: IO ()
 main = do
-  s <- getContents
-  case LP.parseString "-" s of
-    Left err -> hPrint stderr err >> exitFailure
-    Right lp -> run lp
+  args <- getArgs
+  case getOpt Permute options args of
+    (o,_,[])
+      | Help `elem` o    -> putStrLn (usageInfo header options)
+      | Version `elem` o -> putStrLn versionStr
+    (o,[fname],[]) -> do
+      ret <- LP.parseFile fname
+      case ret of
+        Left err -> hPrint stderr err >> exitFailure
+        Right lp -> run lp
+    (_,_,errs) ->
+        hPutStrLn stderr $ concat errs ++ usageInfo header options
