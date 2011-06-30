@@ -77,17 +77,20 @@ optimize' isMinimize obj cs ivs =
         if ret2
           then loop (ivs `IS.union` ivs2)
           else
-            {-
-               Fallback to Fourier-Motzkin + OmegaTest
-               * In general, original problem may have optimal
-                 solution even though LP relaxiation is unbounded.
-               * But if restricted to rational numbers, the
-                 original problem is unbounded or unsatisfiable
-                 when LP relaxation is unbounded.
-            -}
-            case FourierMotzkin.solveQFLA (map conv cs) ivs of
-              Nothing -> return OptUnsat
-              Just _ -> return Unbounded
+            if IS.null ivs
+            then return Unbounded
+            else
+              {-
+                 Fallback to Fourier-Motzkin + OmegaTest
+                 * In general, original problem may have optimal
+                   solution even though LP relaxiation is unbounded.
+                 * But if restricted to rational numbers, the
+                   original problem is unbounded or unsatisfiable
+                   when LP relaxation is unbounded.
+              -}
+              case FourierMotzkin.solveQFLA (map conv cs) ivs of
+                Nothing -> return OptUnsat
+                Just _ -> return Unbounded
   where
     vs = vars cs `IS.union` vars obj
 
