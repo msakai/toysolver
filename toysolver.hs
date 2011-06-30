@@ -22,15 +22,19 @@ import Text.Printf
 
 import Expr
 import Formula
+import LA
+import qualified FourierMotzkin
 import qualified MIPSolverHL
 import qualified LPFile as LP
 
 -- ---------------------------------------------------------------------------
 
+data Solver = SolverMIP | SolverOmegaTest
+
 data Flag
     = Help
     | Version
-    -- | FourierMotzkin
+    | OmegaTest
     -- | SatMode
     -- | Load String
     -- | Trace String
@@ -40,7 +44,7 @@ options :: [OptDescr Flag]
 options =
     [ Option ['h'] ["help"]    (NoArg Help)            "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
---    , Option ['i'] ["fourier-motzkin"] (NoArg FourierMotzkin) "check satisfiability using Fourier-Motzkin + OmegaTest"
+    , Option [] ["omega-test"] (NoArg OmegaTest)       "use Omega Test + Fourier-Motzkin variable elimination"
 {-
     , Option ['l'] ["load"]    (ReqArg Load "FILE") "load FILE"
     , Option ['t'] ["trace"]    (OptArg (Trace . fromMaybe "on") "[on|off]")
@@ -59,27 +63,42 @@ header = "Usage: toysolver [OPTION...] file.lp"
 
 -- ---------------------------------------------------------------------------
 
-run :: LP.LP -> IO ()
-run lp = do
+run :: Solver -> LP.LP -> IO ()
+run solver lp = do
   unless (Set.null (LP.semiContinuousVariables lp)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure
 
-  case MIPSolverHL.optimize (LP.isMinimize lp) obj (cs1 ++ cs2 ++ cs3) ivs of
-    OptUnknown -> do
-      putStrLn "unknown"
-      exitFailure
-    OptUnsat -> do
-      putStrLn "unsat"
-      exitFailure
-    Unbounded -> do
-      putStrLn "unbounded"
-      exitFailure
-    Optimum r m -> do
-      putStrLn "optimum"
-      putStrLn $ showValue r
-      forM_ (Set.toList vs) $ \v -> do
-        printf "%s: %s\n" v (showValue (m IM.! (nameToVar Map.! v)))
+  case solver of
+    SolverOmegaTest ->
+      case mapM LA.compileAtom (cs1 ++ cs2 ++ cs3) of
+        Nothing -> do
+          putStrLn "unknown"
+          exitFailure
+        Just cs ->
+          case FourierMotzkin.solveQFLA cs ivs of
+            Nothing -> do
+              putStrLn "unsat"
+              exitFailure
+            Just m -> do
+              putStrLn "sat"
+              putStrLn $ showValue (Expr.eval m obj)
+              printModel m vs
+    SolverMIP ->
+      case MIPSolverHL.optimize (LP.isMinimize lp) obj (cs1 ++ cs2 ++ cs3) ivs of
+        OptUnknown -> do
+          putStrLn "unknown"
+          exitFailure
+        OptUnsat -> do
+          putStrLn "unsat"
+          exitFailure
+        Unbounded -> do
+          putStrLn "unbounded"
+          exitFailure
+        Optimum r m -> do
+          putStrLn "optimum"
+          putStrLn $ showValue r
+          printModel m vs
   where
     vs = LP.variables lp
     vsAssoc = zip (Set.toList vs) [0..]
@@ -119,6 +138,12 @@ run lp = do
       where
         f = IS.fromList . map (nameToVar Map.!) . Set.toList
 
+    printModel :: Model Rational -> Set.Set String -> IO ()
+    printModel m vs =
+      forM_ (Set.toList vs) $ \v -> do
+        printf "%s: %s\n" v (showValue (m IM.! (nameToVar Map.! v)))
+
+    showValue :: Rational -> String
     showValue v = show (fromRational v :: Double)
 
 -- ---------------------------------------------------------------------------
@@ -134,6 +159,6 @@ main = do
       ret <- LP.parseFile fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
-        Right lp -> run lp
+        Right lp -> run (if OmegaTest `elem` o then SolverOmegaTest else SolverMIP) lp
     (_,_,errs) ->
         hPutStrLn stderr $ concat errs ++ usageInfo header options
