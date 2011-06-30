@@ -248,6 +248,29 @@ test_4_7 =
   uncurry maximize example_4_7 ==
   Optimum (48 % 11) (IM.fromList [(1,0 % 1),(2,0 % 1),(3,8 % 11),(4,4 % 11)])
 
+-- 退化して巡回の起こるKuhnの7変数3制約の例
+kuhn_7_3 :: (Expr Rational, [Atom Rational])
+kuhn_7_3 = (obj, cond)
+  where
+    [x1,x2,x3,x4,x5,x6,x7] = map var [1..7]
+    obj = -2*x4-3*x5+x6+12*x7
+    cond = [ x1 - 2*x4 - 9*x5 + x6 + 9*x7 .==. 0
+           , x2 + (1/3)*x4 + x5 - (1/3)*x6 - 2*x7 .==. 0
+           , x3 + 2*x4 + 3*x5 - x6 - 12*x7 .==. 2
+           , x1 .>=. 0
+           , x2 .>=. 0
+           , x3 .>=. 0
+           , x4 .>=. 0
+           , x5 .>=. 0
+           , x6 .>=. 0
+           , x7 .>=. 0
+           ]
+
+test_kuhn_7_3 :: Bool
+test_kuhn_7_3 =
+  uncurry minimize kuhn_7_3 ==
+  Optimum ((-2) % 1) (IM.fromList [(1,2 % 1),(2,0 % 1),(3,0 % 1),(4,2 % 1),(5,0 % 1),(6,2 % 1),(7,0 % 1)])
+
 testAll :: Bool
 testAll = and
   [ test_3_2
@@ -258,6 +281,7 @@ testAll = and
   , test_4_5
   , test_4_6
   , test_4_7
+  , test_kuhn_7_3
   ]
 
 -- ---------------------------------------------------------------------------
