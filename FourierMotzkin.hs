@@ -60,17 +60,19 @@ instance Variables Lit where
   vars (Pos t) = vars t
   vars (Nonneg t) = vars t
 
+instance Complement Lit where
+  notF (Pos t) = Nonneg (lnegate t)
+  notF (Nonneg t) = Pos (lnegate t)
+
 -- | Disjunctive normal form
 newtype DNF = DNF{ unDNF :: [[Lit]] } deriving (Show)
+
+instance Complement DNF where
+  notF (DNF xs) = DNF . sequence . map (map notF) $ xs
 
 instance Boolean DNF where
   true = DNF [[]]
   false = DNF []
-  notF (DNF xs) = DNF . sequence . map (map f) $ xs
-    where
-      f :: Lit -> Lit
-      f (Pos t) = Nonneg (lnegate t)
-      f (Nonneg t) = Pos (lnegate t)
   DNF xs .&&. DNF ys = DNF [x++y | x<-xs, y<-ys]
   DNF xs .||. DNF ys = DNF (xs++ys)
 

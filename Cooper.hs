@@ -72,6 +72,10 @@ instance Variables Lit where
   vars (Pos t) = vars t
   vars (Divisible _ _ t) = vars t
 
+instance Complement Lit where
+  notF (Pos lc) = lc `leZ` constLC 0
+  notF (Divisible b c lc) = Divisible (not b) c lc
+
 data Formula'
     = T'
     | F'
@@ -80,20 +84,18 @@ data Formula'
     | Lit Lit
     deriving (Show, Eq, Ord)
 
-instance Boolean Formula' where
-  true = T'
-  false = F'
+instance Complement Formula' where
   notF T' = F'
   notF F' = T'
   notF (And' a b) = Or' (notF a) (notF b)
   notF (Or' a b) = And' (notF a) (notF b)
-  notF (Lit lit) = Lit (notLit lit)
+  notF (Lit lit) = Lit (notF lit)
+
+instance Boolean Formula' where
+  true = T'
+  false = F'
   (.&&.) = And'
   (.||.) = Or'
-
-notLit :: Lit -> Lit
-notLit (Pos lc) = lc `leZ` constLC 0
-notLit (Divisible b c lc) = Divisible (not b) c lc
 
 subst1 :: Var -> LCZ -> Formula' -> Formula'
 subst1 x lc = go

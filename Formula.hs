@@ -1,6 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 module Formula
-  ( Boolean (..)
+  ( Complement (..)
+  , Boolean (..)
   , andF
   , orF
   , RelOp (..)
@@ -22,9 +23,11 @@ infixr 3 .&&.
 infixr 2 .||.
 infix 1 .=>. , .<=>.
 
-class Boolean a where
-  true, false :: a
+class Complement a where
   notF :: a -> a
+
+class Complement a => Boolean a where
+  true, false :: a
   (.&&.), (.||.), (.=>.), (.<=>.) :: a -> a -> a
   x .=>. y = notF x .||. y
   x .<=>. y = (x .=>. y) .&&. (y .=>. x)
@@ -97,10 +100,12 @@ instance Variables (Formula c) where
   vars (Forall v a) = IS.delete v (vars a)
   vars (Exists v a) = IS.delete v (vars a)
 
+instance Complement (Formula c) where
+  notF = Not
+
 instance Boolean (Formula c) where
   true = T
   false = F
-  notF = Not
   (.&&.) = And
   (.||.) = Or
   (.=>.) = Imply
