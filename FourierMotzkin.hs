@@ -49,7 +49,7 @@ type LCZ = LC Integer
 type Rat = (LCZ, Integer)
 
 evalRat :: Model Rational -> Rat -> Rational
-evalRat model (LC t, c1) = sum [(model' IM.! var) * (c % c1) | (var,c) <- IM.toList t]
+evalRat model (LC t, c1) = sum [(model' IM.! v) * (c % c1) | (v,c) <- IM.toList t]
   where model' = IM.insert constKey 1 model
 
 -- | Literal
@@ -143,7 +143,7 @@ leZ, ltZ, geZ, gtZ :: LCZ -> LCZ -> Lit
 leZ lc1 lc2 = Nonneg (LC (IM.map (`div` d) m))
   where
     LC m = lc2 .-. lc1
-    d = gcd' [c | (var,c) <- IM.toList m, var /= constKey]
+    d = gcd' [c | (v,c) <- IM.toList m, v /= constKey]
 ltZ lc1 lc2 = (lc1 .+. constLC 1) `leZ` lc2
 geZ = flip leZ
 gtZ = flip gtZ
@@ -156,7 +156,7 @@ eqZ lc1 lc2
   where
     LC m = lc1 .-. lc2
     lc = LC (IM.map (`div` d) m)
-    d = gcd' [c | (var,c) <- IM.toList m, var /= constKey]
+    d = gcd' [c | (v,c) <- IM.toList m, v /= constKey]
 
 -- ---------------------------------------------------------------------------
 
