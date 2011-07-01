@@ -214,31 +214,20 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 -- ---------------------------------------------------------------------------
 
 solveQFLA :: [Constraint Rational] -> VarSet -> Maybe (Model Rational)
-solveQFLA cs ivs = msum [ simplify xs >>= go1 (IS.toList rvs) | xs <- unDNF dnf ]
+solveQFLA cs ivs = msum [ simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
   where
     vs  = vars cs
     rvs = vs `IS.difference` ivs
     dnf = constraintsToDNF cs
 
-    go1 :: [Var] -> [Lit] -> Maybe (Model Rational)
-    go1 [] xs = fmap (fmap fromIntegral) $ go2 (IS.toList ivs) xs
-    go1 (v:vs) ys = msum (map f (unDNF (FM.boundConditions bnd)))
+    go :: [Var] -> [Lit] -> Maybe (Model Rational)
+    go [] xs = fmap (fmap fromIntegral) $ solve' (IS.toList ivs) xs
+    go (v:vs) ys = msum (map f (unDNF (FM.boundConditions bnd)))
       where
         (bnd, rest) = FM.collectBounds v ys
         f zs = do
-          model <- go1 vs (zs ++ rest)
+          model <- go vs (zs ++ rest)
           val <- pickup (FM.evalBounds model bnd)
-          return $ IM.insert v val model
-
-    go2 :: [Var] -> [Lit] -> Maybe (Model Integer)
-    go2 [] [] = return IM.empty
-    go2 [] _ = mzero
-    go2 (v:vs) ys = msum (map f (unDNF (boundConditionsZ bnd)))
-      where
-        (bnd, rest) = collectBoundsZ v ys
-        f zs = do
-          model <- go2 vs (zs ++ rest)
-          val <- pickupZ (evalBoundsZ model bnd)
           return $ IM.insert v val model
 
 constraintsToDNF :: [Constraint Rational] -> DNF Lit
