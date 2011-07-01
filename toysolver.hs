@@ -23,7 +23,7 @@ import Text.Printf
 import Expr
 import Formula
 import LA
-import qualified FourierMotzkin
+import qualified OmegaTest
 import qualified MIPSolverHL
 import qualified LPFile as LP
 
@@ -76,7 +76,7 @@ run solver lp = do
           putStrLn "unknown"
           exitFailure
         Just cs ->
-          case FourierMotzkin.solveQFLA cs ivs of
+          case OmegaTest.solveQFLA cs ivs of
             Nothing -> do
               putStrLn "unsat"
               exitFailure

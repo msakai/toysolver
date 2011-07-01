@@ -40,7 +40,7 @@ import LA
 import qualified Simplex
 import Util (isInteger, fracPart)
 import LPSolver
-import qualified FourierMotzkin
+import qualified OmegaTest
 
 -- ---------------------------------------------------------------------------
 
@@ -88,7 +88,7 @@ optimize' isMinimize obj cs ivs =
                    original problem is unbounded or unsatisfiable
                    when LP relaxation is unbounded.
               -}
-              case FourierMotzkin.solveQFLA (map conv cs) ivs of
+              case OmegaTest.solveQFLA (map conv cs) ivs of
                 Nothing -> return OptUnsat
                 Just _ -> return Unbounded
   where
