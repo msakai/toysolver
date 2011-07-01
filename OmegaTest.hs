@@ -14,6 +14,11 @@
 -- 
 -- see http://users.cecs.anu.edu.au/~michaeln/pubs/arithmetic-dps.pdf for detail
 --
+-- References:
+--
+-- William Pugh. The Omega test: a fast and practical integer
+-- programming algorithm for dependence analysis. In Proceedings of
+-- the 1991 ACM/IEEE conference on Supercomputing (1991), pp. 4-13.
 -----------------------------------------------------------------------------
 module OmegaTest
     ( module Expr
