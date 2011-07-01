@@ -20,15 +20,15 @@ module FourierMotzkin
     , module Formula
     , module LA
     , Lit (..)
-    , eliminateQuantifiersR
-    , solveR
+    , eliminateQuantifiers
+    , solve
 
     -- FIXME
     , termR
     , Rat
-    , collectBoundsR
-    , boundConditionsR
-    , evalBoundsR
+    , collectBounds
+    , boundConditions
+    , evalBounds
     ) where
 
 import Control.Monad
@@ -132,13 +132,13 @@ normalizeLCR (LC m) = LC (IM.map (`div` d) m)
 -}
 type BoundsR = ([Rat], [Rat], [Rat], [Rat])
 
-eliminateR :: Var -> [Lit] -> DNF Lit
-eliminateR v xs = DNF [rest] .&&. boundConditionsR bnd
+eliminate :: Var -> [Lit] -> DNF Lit
+eliminate v xs = DNF [rest] .&&. boundConditions bnd
   where
-    (bnd, rest) = collectBoundsR v xs
+    (bnd, rest) = collectBounds v xs
 
-collectBoundsR :: Var -> [Lit] -> (BoundsR, [Lit])
-collectBoundsR v = foldr phi (([],[],[],[]),[])
+collectBounds :: Var -> [Lit] -> (BoundsR, [Lit])
+collectBounds v = foldr phi (([],[],[],[]),[])
   where
     phi :: Lit -> (BoundsR, [Lit]) -> (BoundsR, [Lit])
     phi lit@(Nonneg t) x = f False lit t x
@@ -160,15 +160,15 @@ collectBoundsR v = foldr phi (([],[],[],[]),[])
         c = fromMaybe 0 $ IM.lookup v t
         t' = LC $ IM.delete v t
 
-boundConditionsR :: BoundsR -> DNF Lit
-boundConditionsR  (ls1, ls2, us1, us2) = DNF $ maybeToList $ simplify $ 
+boundConditions :: BoundsR -> DNF Lit
+boundConditions  (ls1, ls2, us1, us2) = DNF $ maybeToList $ simplify $ 
   [ x `leR` y | x <- ls1, y <- us1 ] ++
   [ x `ltR` y | x <- ls1, y <- us2 ] ++ 
   [ x `ltR` y | x <- ls2, y <- us1 ] ++
   [ x `ltR` y | x <- ls2, y <- us2 ]
 
-eliminateQuantifiersR :: Formula Rational -> Maybe (DNF Lit)
-eliminateQuantifiersR = f
+eliminateQuantifiers :: Formula Rational -> Maybe (DNF Lit)
+eliminateQuantifiers = f
   where
     f T = return true
     f F = return false
@@ -183,34 +183,34 @@ eliminateQuantifiersR = f
       return (notF dnf)
     f (Exists v a) = do
       dnf <- f a
-      return $ orF [eliminateR v xs | xs <- unDNF dnf]
+      return $ orF [eliminate v xs | xs <- unDNF dnf]
 
-solveR :: Formula Rational -> SatResult Rational
-solveR formula =
-  case eliminateQuantifiersR formula of
+solve :: Formula Rational -> SatResult Rational
+solve formula =
+  case eliminateQuantifiers formula of
     Nothing -> Unknown
     Just dnf ->
-      case msum [solveR' vs xs | xs <- unDNF dnf] of
+      case msum [solve' vs xs | xs <- unDNF dnf] of
         Nothing -> Unsat
         Just m -> Sat m
   where
     vs = IS.toList (vars formula)
 
-solveR' :: [Var] -> [Lit] -> Maybe (Model Rational)
-solveR' vs xs = simplify xs >>= go vs
+solve' :: [Var] -> [Lit] -> Maybe (Model Rational)
+solve' vs xs = simplify xs >>= go vs
   where
     go [] [] = return IM.empty
     go [] _ = mzero
-    go (v:vs) ys = msum (map f (unDNF (boundConditionsR bnd)))
+    go (v:vs) ys = msum (map f (unDNF (boundConditions bnd)))
       where
-        (bnd, rest) = collectBoundsR v ys
+        (bnd, rest) = collectBounds v ys
         f zs = do
           model <- go vs (zs ++ rest)
-          val <- pickup (evalBoundsR model bnd)
+          val <- pickup (evalBounds model bnd)
           return $ IM.insert v val model
 
-evalBoundsR :: Model Rational -> BoundsR -> Interval Rational
-evalBoundsR model (ls1,ls2,us1,us2) =
+evalBounds :: Model Rational -> BoundsR -> Interval Rational
+evalBounds model (ls1,ls2,us1,us2) =
   foldl' Interval.intersection univ $ 
     [ interval (Just (True, evalRat model x)) Nothing  | x <- ls1 ] ++
     [ interval (Just (False, evalRat model x)) Nothing | x <- ls2 ] ++

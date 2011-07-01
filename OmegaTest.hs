@@ -20,8 +20,8 @@ module OmegaTest
     , module Formula
     , module LA
     , Lit (..)
-    , eliminateQuantifiersZ
-    , solveZ
+    , eliminateQuantifiers
+    , solve
     , solveQFLA
     ) where
 
@@ -37,7 +37,8 @@ import Formula
 import LA
 import Interval
 import Util (combineMaybe)
-import FourierMotzkin
+import qualified FourierMotzkin as FM
+import FourierMotzkin (Lit (..), Rat (..))
 
 -- ---------------------------------------------------------------------------
 
@@ -62,8 +63,8 @@ simplify = fmap concat . mapM f
 
 atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe (DNF Lit)
 atomZ op a b = do
-  (lc1,c1) <- termR a
-  (lc2,c2) <- termR b
+  (lc1,c1) <- FM.termR a
+  (lc2,c2) <- FM.termR b
   let a' = c2 .*. lc1
       b' = c1 .*. lc2
   return $ case op of
@@ -102,8 +103,8 @@ eqZ lc1 lc2
 -}
 type BoundsZ = ([Rat],[Rat])
 
-eliminateZ :: Var -> [Lit] -> DNF Lit
-eliminateZ v xs = DNF [rest] .&&. boundConditionsZ bnd
+eliminate :: Var -> [Lit] -> DNF Lit
+eliminate v xs = DNF [rest] .&&. boundConditionsZ bnd
    where
      (bnd,rest) = collectBoundsZ v xs
 
@@ -140,8 +141,8 @@ boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $ cond1 : cond2
        -- x ≤ d / b ⇔ val / a' ≤ d / b ⇔ b val ≤ a' d
        ]
 
-eliminateQuantifiersZ :: Formula Rational -> Maybe (DNF Lit)
-eliminateQuantifiersZ = f
+eliminateQuantifiers :: Formula Rational -> Maybe (DNF Lit)
+eliminateQuantifiers = f
   where
     f T = return true
     f F = return false
@@ -156,21 +157,21 @@ eliminateQuantifiersZ = f
       return $ notF dnf
     f (Exists v a) = do
       dnf <- f a
-      return $ orF [eliminateZ v xs | xs <- unDNF dnf]
+      return $ orF [eliminate v xs | xs <- unDNF dnf]
 
-solveZ :: Formula Rational -> SatResult Integer
-solveZ formula =
-  case eliminateQuantifiersZ formula of
+solve :: Formula Rational -> SatResult Integer
+solve formula =
+  case eliminateQuantifiers formula of
     Nothing -> Unknown
     Just dnf ->
-      case msum [solveZ' vs xs | xs <- unDNF dnf] of
+      case msum [solve' vs xs | xs <- unDNF dnf] of
         Nothing -> Unsat
         Just m -> Sat m
   where
     vs = IS.toList (vars formula)
 
-solveZ' :: [Var] -> [Lit] -> Maybe (Model Integer)
-solveZ' vs xs = simplify xs >>= go vs
+solve' :: [Var] -> [Lit] -> Maybe (Model Integer)
+solve' vs xs = simplify xs >>= go vs
   where
     go :: [Var] -> [Lit] -> Maybe (Model Integer)
     go [] [] = return IM.empty
@@ -216,12 +217,12 @@ solveQFLA cs ivs = msum [ simplify xs >>= go1 (IS.toList rvs) | xs <- unDNF dnf 
 
     go1 :: [Var] -> [Lit] -> Maybe (Model Rational)
     go1 [] xs = fmap (fmap fromIntegral) $ go2 (IS.toList ivs) xs
-    go1 (v:vs) ys = msum (map f (unDNF (boundConditionsR bnd)))
+    go1 (v:vs) ys = msum (map f (unDNF (FM.boundConditions bnd)))
       where
-        (bnd, rest) = collectBoundsR v ys
+        (bnd, rest) = FM.collectBounds v ys
         f zs = do
           model <- go1 vs (zs ++ rest)
-          val <- pickup (evalBoundsR model bnd)
+          val <- pickup (FM.evalBounds model bnd)
           return $ IM.insert v val model
 
     go2 :: [Var] -> [Lit] -> Maybe (Model Integer)
