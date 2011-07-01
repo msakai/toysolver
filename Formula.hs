@@ -11,6 +11,7 @@ module Formula
   , Atom (..)
   , Formula (..)
   , pushNot
+  , DNF (..)
   ) where
 
 import qualified Data.IntSet as IS
@@ -133,3 +134,15 @@ pushNot (Imply a b) = And a (pushNot b)
 pushNot (Equiv a b) = Or (And a (pushNot b)) (And b (pushNot a))
 pushNot (Forall v a) = Exists v (pushNot a)
 pushNot (Exists v a) = Forall v (pushNot a)
+
+-- | Disjunctive normal form
+newtype DNF lit = DNF{ unDNF :: [[lit]] } deriving (Show)
+
+instance Complement lit => Complement (DNF lit) where
+  notF (DNF xs) = DNF . sequence . map (map notF) $ xs
+
+instance Complement lit => Boolean (DNF lit) where
+  true = DNF [[]]
+  false = DNF []
+  DNF xs .&&. DNF ys = DNF [x++y | x<-xs, y<-ys]
+  DNF xs .||. DNF ys = DNF (xs++ys)

@@ -20,7 +20,6 @@ module FourierMotzkin
     , module Formula
     , module LA
     , Lit (..)
-    , DNF (..)
     , eliminateQuantifiersR
     , eliminateQuantifiersZ
     , solveR
@@ -64,18 +63,6 @@ instance Complement Lit where
   notF (Pos t) = Nonneg (lnegate t)
   notF (Nonneg t) = Pos (lnegate t)
 
--- | Disjunctive normal form
-newtype DNF = DNF{ unDNF :: [[Lit]] } deriving (Show)
-
-instance Complement DNF where
-  notF (DNF xs) = DNF . sequence . map (map notF) $ xs
-
-instance Boolean DNF where
-  true = DNF [[]]
-  false = DNF []
-  DNF xs .&&. DNF ys = DNF [x++y | x<-xs, y<-ys]
-  DNF xs .||. DNF ys = DNF (xs++ys)
-
 -- 制約集合の単純化
 -- It returns Nothing when a inconsistency is detected.
 simplify :: [Lit] -> Maybe [Lit]
@@ -93,7 +80,7 @@ simplify = fmap concat . mapM f
 
 -- ---------------------------------------------------------------------------
 
-atomR :: RelOp -> Expr Rational -> Expr Rational -> Maybe DNF
+atomR :: RelOp -> Expr Rational -> Expr Rational -> Maybe (DNF Lit)
 atomR op a b = do
   a' <- termR a
   b' <- termR b
@@ -137,7 +124,7 @@ normalizeLCR (LC m) = LC (IM.map (`div` d) m)
 
 -- ---------------------------------------------------------------------------
 
-atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe DNF
+atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe (DNF Lit)
 atomZ op a b = do
   (lc1,c1) <- termR a
   (lc2,c2) <- termR b
@@ -161,7 +148,7 @@ ltZ lc1 lc2 = (lc1 .+. constLC 1) `leZ` lc2
 geZ = flip leZ
 gtZ = flip gtZ
 
-eqZ :: LCZ -> LCZ -> DNF
+eqZ :: LCZ -> LCZ -> (DNF Lit)
 eqZ lc1 lc2
   = if fromMaybe 0 (IM.lookup constKey m) `mod` d == 0
     then DNF [[Nonneg lc, Nonneg (lnegate lc)]]
@@ -179,7 +166,7 @@ eqZ lc1 lc2
 -}
 type BoundsR = ([Rat], [Rat], [Rat], [Rat])
 
-eliminateR :: Var -> [Lit] -> DNF
+eliminateR :: Var -> [Lit] -> DNF Lit
 eliminateR v xs = DNF [rest] .&&. boundConditionsR bnd
   where
     (bnd, rest) = collectBoundsR v xs
@@ -207,14 +194,14 @@ collectBoundsR v = foldr phi (([],[],[],[]),[])
         c = fromMaybe 0 $ IM.lookup v t
         t' = LC $ IM.delete v t
 
-boundConditionsR :: BoundsR -> DNF
+boundConditionsR :: BoundsR -> DNF Lit
 boundConditionsR  (ls1, ls2, us1, us2) = DNF $ maybeToList $ simplify $ 
   [ x `leR` y | x <- ls1, y <- us1 ] ++
   [ x `ltR` y | x <- ls1, y <- us2 ] ++ 
   [ x `ltR` y | x <- ls2, y <- us1 ] ++
   [ x `ltR` y | x <- ls2, y <- us2 ]
 
-eliminateQuantifiersR :: Formula Rational -> Maybe DNF
+eliminateQuantifiersR :: Formula Rational -> Maybe (DNF Lit)
 eliminateQuantifiersR = f
   where
     f T = return true
@@ -272,7 +259,7 @@ evalBoundsR model (ls1,ls2,us1,us2) =
 -}
 type BoundsZ = ([Rat],[Rat])
 
-eliminateZ :: Var -> [Lit] -> DNF
+eliminateZ :: Var -> [Lit] -> DNF Lit
 eliminateZ v xs = DNF [rest] .&&. boundConditionsZ bnd
    where
      (bnd,rest) = collectBoundsZ v xs
@@ -291,7 +278,7 @@ collectBoundsZ v = foldr phi (([],[]),[])
         c = fromMaybe 0 $ IM.lookup v t
         t' = LC $ IM.delete v t
 
-boundConditionsZ :: BoundsZ -> DNF
+boundConditionsZ :: BoundsZ -> DNF Lit
 boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $ cond1 : cond2
   where
      cond1 =
@@ -310,7 +297,7 @@ boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $ cond1 : cond2
        -- x ≤ d / b ⇔ val / a' ≤ d / b ⇔ b val ≤ a' d
        ]
 
-eliminateQuantifiersZ :: Formula Rational -> Maybe DNF
+eliminateQuantifiersZ :: Formula Rational -> Maybe (DNF Lit)
 eliminateQuantifiersZ = f
   where
     f T = return true
@@ -405,10 +392,10 @@ solveQFLA cs ivs = msum [ simplify xs >>= go1 (IS.toList rvs) | xs <- unDNF dnf 
           val <- pickupZ (evalBoundsZ model bnd)
           return $ IM.insert v val model
 
-constraintsToDNF :: [Constraint Rational] -> DNF
+constraintsToDNF :: [Constraint Rational] -> DNF Lit
 constraintsToDNF = andF . map constraintToDNF
 
-constraintToDNF :: Constraint Rational -> DNF
+constraintToDNF :: Constraint Rational -> DNF Lit
 constraintToDNF (LARel a op b) = DNF $
   case op of
     Eql -> [[Nonneg c, Nonneg (lnegate c)]]
