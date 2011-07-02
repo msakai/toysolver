@@ -40,7 +40,7 @@ import qualified Data.IntSet as IS
 import Expr
 import Formula
 import LA
-import Interval
+import qualified Interval
 import Util (combineMaybe)
 import qualified FourierMotzkin as FM
 import FourierMotzkin (Lit (..), Rat (..))
@@ -128,7 +128,10 @@ collectBoundsZ v = foldr phi (([],[]),[])
         t' = LC $ IM.delete v t
 
 boundConditionsZ :: BoundsZ -> DNF Lit
-boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $ cond1 : cond2
+boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $
+  if isExact (ls,us)
+    then [cond1]
+    else cond1 : cond2
   where
      cond1 =
        [ constLC ((a-1)*(b-1)) `leZ` (a .*. d .-. b .*. c)
@@ -145,6 +148,9 @@ boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $ cond1 : cond2
        -- c / a ≤ x ⇔ c / a ≤ val / a' ⇔ a' c ≤ a val
        -- x ≤ d / b ⇔ val / a' ≤ d / b ⇔ b val ≤ a' d
        ]
+
+isExact :: BoundsZ -> Bool
+isExact (ls,us) = and [a==1 || b==1 | (c,a)<-ls , (d,b)<-us]
 
 eliminateQuantifiers :: Formula Rational -> Maybe (DNF Lit)
 eliminateQuantifiers = f
@@ -181,13 +187,20 @@ solve' vs xs = simplify xs >>= go vs
     go :: [Var] -> [Lit] -> Maybe (Model Integer)
     go [] [] = return IM.empty
     go [] _ = mzero
-    go (v:vs) ys = msum (map f (unDNF (boundConditionsZ bnd)))
+    go vs ys = msum (map f (unDNF (boundConditionsZ bnd)))
       where
-        (bnd, rest) = collectBoundsZ v ys
+        (v,vs',bnd,rest) = chooseVariable vs ys
         f zs = do
-          model <- go vs (zs ++ rest)
+          model <- go vs' (zs ++ rest)
           val <- pickupZ (evalBoundsZ model bnd)
           return $ IM.insert v val model
+
+chooseVariable :: [Var] -> [Lit] -> (Var, [Var], BoundsZ, [Lit])
+chooseVariable vs xs = head $ [e | e@(_,_,bnd,_) <- table, isExact bnd] ++ table
+  where
+    table = [ (v, vs', bnd, rest)
+            | (v,vs') <- pickup vs, let (bnd, rest) = collectBoundsZ v xs
+            ]
 
 evalBoundsZ :: Model Integer -> BoundsZ -> IntervalZ
 evalBoundsZ model (ls,us) =
@@ -227,7 +240,7 @@ solveQFLA cs ivs = msum [ simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
         (bnd, rest) = FM.collectBounds v ys
         f zs = do
           model <- go vs (zs ++ rest)
-          val <- pickup (FM.evalBounds model bnd)
+          val <- Interval.pickup (FM.evalBounds model bnd)
           return $ IM.insert v val model
 
 constraintsToDNF :: [Constraint Rational] -> DNF Lit
@@ -258,6 +271,10 @@ constraintToDNF (LARel a op b) = DNF $
 gcd' :: [Integer] -> Integer
 gcd' [] = 1
 gcd' xs = foldl1' gcd xs
+
+pickup :: [a] -> [(a,[a])]
+pickup [] = []
+pickup (x:xs) = (x,xs) : [(y,x:ys) | (y,ys) <- pickup xs]
 
 -- ---------------------------------------------------------------------------
 
