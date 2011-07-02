@@ -30,9 +30,11 @@ module LPFile
   , getBounds
   , parseString
   , parseFile
+  , render
   ) where
 
 import Control.Monad
+import Control.Monad.Writer
 import Data.Char
 import Data.Maybe
 import Data.Ratio
@@ -404,6 +406,140 @@ number = tok $ do
 
 -- ---------------------------------------------------------------------------
 
+render :: LP -> Maybe String
+render lp = fmap ($ "") $ execWriterT (render' lp)
+
+render' :: LP -> WriterT ShowS Maybe ()
+render' lp = do
+  tell $ showString $ if isMinimize lp then "MINIMIZE" else "MAXIMIZE"
+  tell $ showChar '\n'
+
+  let (l, obj) = objectiveFunction lp
+  renderLabel l
+  renderExpr obj
+  tell $ showChar '\n'
+
+  tell $ showString "SUBJECT TO\n"
+
+  forM_ (constraints lp) $ \(l, cond, (e, op, val)) -> do
+    renderLabel l
+    case cond of
+      Nothing -> return ()
+      Just (v,val) -> do
+        tell $ showString v . showString " = "
+        renderValue val
+        tell $ showString " -> "
+
+    renderExpr e
+    tell $ showChar ' '
+    renderOp op
+    tell $ showChar ' '
+    renderValue val
+    tell $ showChar '\n'
+
+  tell $ showString "BOUNDS\n"
+  forM_ (Map.toAscList (bounds lp)) $ \(v, b@(lb,ub)) -> do
+    renderBoundExpr lb
+    tell $ showString " <= "
+    tell $ showString v
+    tell $ showString " <= "
+    renderBoundExpr ub
+    tell $ showChar '\n'
+
+  unless (Set.null (integerVariables lp)) $ do
+    tell $ showString "GENERALS\n"
+    forM_ (Set.toList (integerVariables lp)) $ \v -> do
+      tell $ showString v
+      tell $ showChar '\n'
+
+  unless (Set.null (binaryVariables lp)) $ do
+    tell $ showString "BINARIES\n"
+    forM_ (Set.toList (binaryVariables lp)) $ \v -> do
+      tell $ showString v
+      tell $ showChar '\n'
+
+  unless (Set.null (semiContinuousVariables lp)) $ do
+    tell $ showString "SEMI-CONTINUOUS\n"
+    forM_ (Set.toList (semiContinuousVariables lp)) $ \v -> do
+      tell $ showString v
+      tell $ showChar '\n'
+
+  unless (null (sos lp)) $ do
+    tell $ showString "SOS\n"
+    forM_ (sos lp) $ \(l, typ, xs) -> do
+      renderLabel l
+      tell $ shows typ
+      tell $ showString " ::"
+      forM_ xs $ \(v, r) -> do
+        tell $ showString "  "
+        tell $ showString v
+        tell $ showString " : "
+        renderValue r
+      tell $ showChar '\n'
+
+  tell $ showString "END\n"
+
+renderExpr :: Expr -> WriterT ShowS Maybe ()
+renderExpr e = do
+  e' <- lift $ liftM (Map.filter (0/=)) $ compileExpr e
+  forM_ (Map.toAscList e') $ \(v,c) -> do
+    tell $ showString $ if c >= 0 then " + " else " - "
+    let c' = abs c
+    when (c' /= 1) $ do
+      renderValue c'
+      tell $ showChar ' '
+    tell $ showString v
+
+renderValue :: Rational -> WriterT ShowS Maybe ()
+renderValue c =
+  if denominator c == 1
+    then tell $ shows (numerator c)
+    else tell $ shows (fromRational c :: Double)
+
+renderLabel :: Maybe Label -> WriterT ShowS Maybe ()
+renderLabel l =
+  case l of
+    Nothing -> return ()
+    Just s -> tell $ showString s . showString ": "
+
+renderOp :: RelOp -> WriterT ShowS Maybe ()
+renderOp Le = tell $ showString "<="
+renderOp Ge = tell $ showString ">="
+renderOp Eql = tell $ showString "="
+
+renderBoundExpr :: BoundExpr -> WriterT ShowS Maybe ()
+renderBoundExpr (Finite r) = renderValue r
+renderBoundExpr NegInf = tell $ showString "-inf"
+renderBoundExpr PosInf = tell $ showString "+inf"
+
+-- ---------------------------------------------------------------------------
+
+-- LC.hs にほぼ同じものがある
+asConst :: Map.Map Var Rational -> Maybe Rational
+asConst m =
+  case Map.toList m of
+    [] -> Just 0
+    [("",x)] -> Just x
+    _ -> Nothing
+
+-- LA.hs にほぼ同じものがある
+compileExpr :: Expr -> Maybe (Map.Map Var Rational)
+compileExpr (Const c) = return $ Map.singleton "" c
+compileExpr (Var c) = return $ Map.singleton c 1
+compileExpr (a :+: b) = liftM2 (Map.unionWith (+)) (compileExpr a) (compileExpr b)
+compileExpr (a :*: b) = do
+  x <- compileExpr a
+  y <- compileExpr b
+  msum [ do{ c <- asConst x; return (fmap (c*) y) }
+       , do{ c <- asConst y; return (fmap (c*) x) }
+       ]
+compileExpr (a :/: b) = do
+  x <- compileExpr a
+  c <- asConst =<< compileExpr b
+  return $ fmap (/c) x
+
+-- ---------------------------------------------------------------------------
+
 testdata :: String
 testdata = unlines
   [ "Maximize"
@@ -422,5 +558,14 @@ testdata = unlines
 
 test :: Either ParseError LP
 test = parseString "test" testdata
+
+testRender :: IO ()
+testRender =
+  case test of
+    Right lp ->
+      case render lp of
+        Nothing -> putStrLn "render failure"
+        Just s -> putStr s
+    Left s -> putStrLn (show s)
 
 -- ---------------------------------------------------------------------------
