@@ -1,0 +1,68 @@
+Name:		toysolver
+Version:	0.0.1
+License:	BSD3
+License-File:	COPYING
+Author:		Masahiro Sakai (masahiro.sakai@gmail.com)
+Maintainer:	masahiro.sakai@gmail.com
+Category:	Algorithms
+Cabal-Version:	>= 1.6
+Synopsis:	My sandbox for experimenting solver algorithms.
+Description:	My sandbox for experimenting solver algorithms.
+Extra-Source-Files:
+   README
+   COPYING
+   SAT.rb
+   src/TseitinEncode.hs
+   samples/*.lp
+   samples/*.mod
+Build-Type: Simple
+
+source-repository head
+  type:     git
+  location: git://github.com/msakai/toysolver.git
+
+Executable toysolver
+  Main-is: toysolver.hs
+  HS-Source-Dirs: src
+  Other-Modules:
+     BoundsInference
+     Cooper
+     Delta
+     Expr
+     Formula
+     FourierMotzkin
+     Interval
+     LA
+     LC
+     LPFile
+     LPSolver
+     LPSolverHL
+     Linear
+     MIPSolverHL
+     OmegaTest
+     Simplex
+     Util
+  Build-Depends: base >=4 && <5, mtl, containers, parsec
+  Extensions:
+     BangPatterns
+     ScopedTypeVariables
+     FlexibleInstances
+     MultiParamTypeClasses
+     FunctionalDependencies
+     GeneralizedNewtypeDeriving
+
+Executable lp2ys
+  Main-is: LP2YS.hs
+  HS-Source-Dirs: src
+  Other-Modules:
+     LPFile
+     Util
+  Build-Depends: base >=4 && <5, mtl, containers, parsec
+  Extensions:
+     BangPatterns
+     ScopedTypeVariables
+     FlexibleInstances
+     MultiParamTypeClasses
+     FunctionalDependencies
+     GeneralizedNewtypeDeriving
+
