@@ -51,8 +51,8 @@ Executable toysolver
      FunctionalDependencies
      GeneralizedNewtypeDeriving
 
-Executable lp2ys
-  Main-is: LP2YS.hs
+Executable lp2yices
+  Main-is: lp2yices.hs
   HS-Source-Dirs: src
   Other-Modules:
      LPFile
