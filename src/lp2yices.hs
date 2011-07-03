@@ -6,6 +6,7 @@ import Data.List
 import Data.Ratio
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import System.Environment
 import System.Exit
 import System.IO
 import Text.Printf
@@ -147,10 +148,17 @@ lp2ys lp = unlinesS $ defs ++ map assert (conditions False env lp)
 
 main :: IO ()
 main = do
-  s <- getContents
-  case LP.parseString "-" s of
+  args <- getArgs
+  ret <- case args of
+           ["-"]   -> fmap (LP.parseString "-") getContents
+           [fname] -> LP.parseFile fname
+           _ -> hPutStrLn stderr header >> exitFailure
+  case ret of
     Right lp -> putStrLn $ lp2ys lp ""
     Left err -> hPrint stderr err >> exitFailure
+
+header :: String
+header = "Usage: lp2yice [file.lp|-]"
 
 testFile :: FilePath -> IO ()
 testFile fname = do

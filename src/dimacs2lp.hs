@@ -5,6 +5,7 @@ import Data.Array.IArray
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import System.IO
+import System.Environment
 import System.Exit
 
 import LPFile
@@ -38,10 +39,17 @@ cnfToLP cnf
 
 main :: IO ()
 main = do
-  s <- BS.hGetContents stdin
-  case DIMACS.parseByteString "-" s of
+  args <- getArgs
+  ret <- case args of
+           ["-"]   -> fmap (DIMACS.parseByteString "-") $ BS.hGetContents stdin
+           [fname] -> DIMACS.parseFile fname
+           _ -> hPutStrLn stderr header >> exitFailure
+  case ret of
     Left err -> hPrint stderr err >> exitFailure
     Right cnf ->
       case LPFile.render (cnfToLP cnf) of
         Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
         Just s2 -> putStr s2
+
+header :: String
+header = "Usage: dimacs2lp [file.cnf|-]"
