@@ -11,6 +11,11 @@
 -- Portability :  portable
 --
 -- References:
+-- 
+-- Ralph E. Gomory.
+-- An Algorithm for the Mixed Integer Problem, Technical Report
+-- RM-2597, The Rand Corporation, Santa Monica, CA.
+-- http://www.rand.org/pubs/research_memoranda/RM2597.html
 --
 -- Ralph E. Gomory.
 -- Outline of an algorithm for integer solutions to linear programs.
