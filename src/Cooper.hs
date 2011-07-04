@@ -22,6 +22,7 @@ module Cooper
     , Formula' (..)
     , eliminateQuantifiers
     , solve
+    , solveQFLA
     , Model
     ) where
 
@@ -32,8 +33,9 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import LC
-import FourierMotzkin (termR)
+import LA
+import qualified FourierMotzkin as FM
+import qualified Interval
 
 -- ---------------------------------------------------------------------------
 
@@ -41,8 +43,8 @@ type LCZ = LC Integer
 
 atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe Formula'
 atomZ op a b = do
-  (lc1,c1) <- termR a
-  (lc2,c2) <- termR b
+  (lc1,c1) <- FM.termR a
+  (lc2,c2) <- FM.termR b
   let a' = c2 .*. lc1
       b' = c1 .*. lc2
   case op of
@@ -296,6 +298,29 @@ solve' vs formula = go vs (simplify formula)
         model <- go vs (simplify formula')
         let val = evalWitness model witness 
         return $ IM.insert v val model
+
+-- ---------------------------------------------------------------------------
+
+solveQFLA :: [Constraint Rational] -> VarSet -> Maybe (Model Rational)
+solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
+  where
+    vs  = vars cs
+    rvs = vs `IS.difference` ivs
+    dnf = FM.constraintsToDNF cs
+
+    go :: [Var] -> [FM.Lit] -> Maybe (Model Rational)
+    go [] xs = fmap (fmap fromIntegral) $ solve' (IS.toList ivs) (foldr And' T' (map f xs))
+    go (v:vs) ys = msum (map f (unDNF (FM.boundConditions bnd)))
+      where
+        (bnd, rest) = FM.collectBounds v ys
+        f zs = do
+          model <- go vs (zs ++ rest)
+          val <- Interval.pickup (FM.evalBounds model bnd)
+          return $ IM.insert v val model
+
+    f :: FM.Lit -> Formula'
+    f (FM.Nonneg lc) = Lit $ lc `geZ` (constLC 0)
+    f (FM.Pos lc)    = Lit $ lc `gtZ` (constLC 0)
 
 -- ---------------------------------------------------------------------------
 

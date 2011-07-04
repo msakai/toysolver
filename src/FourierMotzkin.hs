@@ -29,6 +29,8 @@ module FourierMotzkin
     , collectBounds
     , boundConditions
     , evalBounds
+    , simplify
+    , constraintsToDNF
     ) where
 
 import Control.Monad
@@ -216,6 +218,30 @@ evalBounds model (ls1,ls2,us1,us2) =
     [ interval (Just (False, evalRat model x)) Nothing | x <- ls2 ] ++
     [ interval Nothing (Just (True, evalRat model x))  | x <- us1 ] ++
     [ interval Nothing (Just (False, evalRat model x)) | x <- us2 ]
+
+-- ---------------------------------------------------------------------------
+
+constraintsToDNF :: [Constraint Rational] -> DNF Lit
+constraintsToDNF = andF . map constraintToDNF
+
+constraintToDNF :: Constraint Rational -> DNF Lit
+constraintToDNF (LARel a op b) = DNF $
+  case op of
+    Eql -> [[Nonneg c, Nonneg (lnegate c)]]
+    NEq -> [[Pos c], [Pos (lnegate c)]]
+    Ge  -> [[Nonneg c]]
+    Le  -> [[Nonneg (lnegate c)]]
+    Gt  -> [[Pos c]]
+    Lt  -> [[Pos (lnegate c)]]
+  where
+    c = normalize (a .-. b)
+
+    normalize :: LC Rational -> LCZ
+    normalize (LC m)
+      | IM.null m = LC IM.empty
+      | otherwise = LC $ IM.map (round . (*c)) m
+           where
+             c = fromIntegral $ foldl' lcm 1 (map denominator (IM.elems m))
 
 -- ---------------------------------------------------------------------------
 

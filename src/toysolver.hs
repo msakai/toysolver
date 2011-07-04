@@ -24,17 +24,16 @@ import Expr
 import Formula
 import LA
 import qualified OmegaTest
+import qualified Cooper
 import qualified MIPSolverHL
 import qualified LPFile as LP
 
 -- ---------------------------------------------------------------------------
 
-data Solver = SolverMIP | SolverOmegaTest
-
 data Flag
     = Help
     | Version
-    | OmegaTest
+    | Solver String
     -- | SatMode
     -- | Load String
     -- | Trace String
@@ -44,7 +43,7 @@ options :: [OptDescr Flag]
 options =
     [ Option ['h'] ["help"]    (NoArg Help)            "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
-    , Option [] ["omega-test"] (NoArg OmegaTest)       "use Omega Test + Fourier-Motzkin variable elimination"
+    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "gomory-cut (default), omega-test, cooper"
 {-
     , Option ['l'] ["load"]    (ReqArg Load "FILE") "load FILE"
     , Option ['t'] ["trace"]    (OptArg (Trace . fromMaybe "on") "[on|off]")
@@ -63,42 +62,15 @@ header = "Usage: toysolver [OPTION...] file.lp"
 
 -- ---------------------------------------------------------------------------
 
-run :: Solver -> LP.LP -> IO ()
+run :: String -> LP.LP -> IO ()
 run solver lp = do
   unless (Set.null (LP.semiContinuousVariables lp)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure
 
   case solver of
-    SolverOmegaTest ->
-      case mapM LA.compileAtom (cs1 ++ cs2 ++ cs3) of
-        Nothing -> do
-          putStrLn "unknown"
-          exitFailure
-        Just cs ->
-          case OmegaTest.solveQFLA cs ivs of
-            Nothing -> do
-              putStrLn "unsat"
-              exitFailure
-            Just m -> do
-              putStrLn "sat"
-              putStrLn $ showValue (Expr.eval m obj)
-              printModel m vs
-    SolverMIP ->
-      case MIPSolverHL.optimize (LP.isMinimize lp) obj (cs1 ++ cs2 ++ cs3) ivs of
-        OptUnknown -> do
-          putStrLn "unknown"
-          exitFailure
-        OptUnsat -> do
-          putStrLn "unsat"
-          exitFailure
-        Unbounded -> do
-          putStrLn "unbounded"
-          exitFailure
-        Optimum r m -> do
-          putStrLn "optimum"
-          putStrLn $ showValue r
-          printModel m vs
+    _ | solver `elem` ["omega-test", "cooper"] -> solveByQE
+    _ -> solveByMIP
   where
     vs = LP.variables lp
     vsAssoc = zip (Set.toList vs) [0..]
@@ -138,6 +110,42 @@ run solver lp = do
       where
         f = IS.fromList . map (nameToVar Map.!) . Set.toList
 
+    solveByQE =
+      case mapM LA.compileAtom (cs1 ++ cs2 ++ cs3) of
+        Nothing -> do
+          putStrLn "unknown"
+          exitFailure
+        Just cs ->
+          case f cs ivs of
+            Nothing -> do
+              putStrLn "unsat"
+              exitFailure
+            Just m -> do
+              putStrLn "sat"
+              putStrLn $ showValue (Expr.eval m obj)
+              printModel m vs
+       where
+         f = case solver of
+               "omega-test" -> OmegaTest.solveQFLA
+               "cooper"     -> Cooper.solveQFLA
+               _ -> error "unknown solver"
+
+    solveByMIP =
+      case MIPSolverHL.optimize (LP.isMinimize lp) obj (cs1 ++ cs2 ++ cs3) ivs of
+        OptUnknown -> do
+          putStrLn "unknown"
+          exitFailure
+        OptUnsat -> do
+          putStrLn "unsat"
+          exitFailure
+        Unbounded -> do
+          putStrLn "unbounded"
+          exitFailure
+        Optimum r m -> do
+          putStrLn "optimum"
+          putStrLn $ showValue r
+          printModel m vs               
+
     printModel :: Model Rational -> Set.Set String -> IO ()
     printModel m vs =
       forM_ (Set.toList vs) $ \v -> do
@@ -147,6 +155,9 @@ run solver lp = do
     showValue v = show (fromRational v :: Double)
 
 -- ---------------------------------------------------------------------------
+
+getSolver :: [Flag] -> String
+getSolver xs = last $ "gomory-cut" : [s | Solver s <- xs]
 
 main :: IO ()
 main = do
@@ -159,6 +170,6 @@ main = do
       ret <- LP.parseFile fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
-        Right lp -> run (if OmegaTest `elem` o then SolverOmegaTest else SolverMIP) lp
+        Right lp -> run (getSolver o) lp
     (_,_,errs) ->
         hPutStrLn stderr $ concat errs ++ usageInfo header options

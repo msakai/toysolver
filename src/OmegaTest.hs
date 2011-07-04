@@ -227,11 +227,11 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 -- ---------------------------------------------------------------------------
 
 solveQFLA :: [Constraint Rational] -> VarSet -> Maybe (Model Rational)
-solveQFLA cs ivs = msum [ simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
+solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
   where
     vs  = vars cs
     rvs = vs `IS.difference` ivs
-    dnf = constraintsToDNF cs
+    dnf = FM.constraintsToDNF cs
 
     go :: [Var] -> [Lit] -> Maybe (Model Rational)
     go [] xs = fmap (fmap fromIntegral) $ solve' (IS.toList ivs) xs
@@ -242,29 +242,6 @@ solveQFLA cs ivs = msum [ simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
           model <- go vs (zs ++ rest)
           val <- Interval.pickup (FM.evalBounds model bnd)
           return $ IM.insert v val model
-
-constraintsToDNF :: [Constraint Rational] -> DNF Lit
-constraintsToDNF = andF . map constraintToDNF
-
-constraintToDNF :: Constraint Rational -> DNF Lit
-constraintToDNF (LARel a op b) = DNF $
-  case op of
-    Eql -> [[Nonneg c, Nonneg (lnegate c)]]
-    NEq -> [[Pos c], [Pos (lnegate c)]]
-    Ge  -> [[Nonneg c]]
-    Le  -> [[Nonneg (lnegate c)]]
-    Gt  -> [[Pos c]]
-    Lt  -> [[Pos (lnegate c)]]
-  where
-    c = normalize (a .-. b)
-
-    normalize :: LC Rational -> LCZ
-    normalize (LC m)
-      | IM.null m = LC IM.empty
-      | otherwise = LC $ IM.map (round . (*c)) m
-           where
-             c = fromIntegral $ foldl' lcm 1 (map denominator (IM.elems m))
-    
 
 -- ---------------------------------------------------------------------------
 
