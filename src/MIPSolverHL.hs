@@ -114,8 +114,17 @@ optimize' isMinimize obj cs ivs =
           let (f0, m) = maximumBy (compare `on` fst) xs
           tbl <- getTableau
           s <- gensym
-          let g x = if x >= 0 then x else (f0 / (f0 - 1)) * x
-          putTableau $ IM.insert s (IM.map (negate . g) m, negate f0) tbl
+          let g j x =
+               if j `IS.member` ivs
+               then
+                 if fracPart x <= f0
+                 then fracPart x
+                 else (f0 / (f0 - 1)) * (fracPart x - 1)
+               else
+                 if x >= 0
+                 then x
+                 else (f0 / (f0 - 1)) * x
+          putTableau $ IM.insert s (IM.mapWithKey (\j x -> negate (g j x)) m, negate f0) tbl
           ret <- dualSimplex isMinimize obj
           if ret
             then loop ivs
