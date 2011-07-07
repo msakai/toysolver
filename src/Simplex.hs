@@ -158,7 +158,10 @@ primalPivot isMinimize tbl
   where
     cmp = if isMinimize then (0<) else (0>)
     cs = [(j,cj) | (j,cj) <- IM.toList (fst (lookupRow objRow tbl)), cmp cj]
+    -- smallest subscript rule
     s = fst $ head cs
+    -- classical rule
+    --s = fst $ (if isMinimize then maximumBy else minimumBy) (compare `on` snd) cs
     rs = [ (i, y_i0 / y_is)
          | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRow
          , let y_is = IM.findWithDefault 0 s row_i, y_is > 0
@@ -255,3 +258,19 @@ toCSV showCell tbl = unlines . map (concat . intersperse ",") $ header : body
 
     showRow i (row, row_val) = rowName i : [showCell (IM.findWithDefault 0 j row') | j <- cols] ++ [showCell row_val]
       where row' = IM.insert i 1 row
+
+-- ---------------------------------------------------------------------------
+
+-- 退化して巡回の起こるKuhnの7変数3制約の例
+
+kuhn_7_3 :: Tableau Rational
+kuhn_7_3 = IM.fromList
+  [ (1, (IM.fromList [(4,-2), (5,-9), (6,1), (7,9)],       0))
+  , (2, (IM.fromList [(4,1/3), (5,1), (6,-1/3), (7,-2)],   0))
+  , (3, (IM.fromList [(4,2), (5,3), (6,-1), (7,-12)],      2))
+  , (objRow, (IM.fromList [(4,2), (5,3), (6,-1), (7,-12)], 0))
+  ]
+
+test_kuhn_7_3 = simplex True kuhn_7_3
+
+-- ---------------------------------------------------------------------------
