@@ -81,3 +81,7 @@ Executable dimacs2lp
      FunctionalDependencies
      GeneralizedNewtypeDeriving
 
+Executable maxsat2lp
+  Main-is: maxsat2lp.hs
+  HS-Source-Dirs: src
+  Build-Depends: base >=4 && <5
