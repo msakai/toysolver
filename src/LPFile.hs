@@ -10,8 +10,11 @@
 -- Portability :  portable
 --
 -- A CPLEX .lp format parser library.
--- See http://lpsolve.sourceforge.net/5.1/CPLEX-format.htm for detail of the
--- the formart.
+-- 
+-- References:
+-- http://publib.boulder.ibm.com/infocenter/cosinfoc/v12r2/index.jsp?topic=/ilog.odms.cplex.help/Content/Optimization/Documentation/CPLEX/_pubskel/CPLEX880.html
+-- http://www.gurobi.com/doc/45/refman/node589.html
+-- http://lpsolve.sourceforge.net/5.5/CPLEX-format.htm
 --
 -----------------------------------------------------------------------------
 module LPFile
