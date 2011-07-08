@@ -178,7 +178,7 @@ dualSimplex isMinimize = go
       case dualPivot isMinimize tbl of
         PivotFinished  -> assert (isFeasible tbl) $ (True, tbl)
         PivotUnbounded -> (False, tbl)
-        PivotSuccess tbl' -> go tbl'
+        PivotSuccess tbl' -> assert (isImproving isMinimize tbl' tbl) $ go tbl'
 
 dualPivot :: (Real r, Fractional r) => Bool -> Tableau r -> PivotResult r
 dualPivot isMinimize tbl
