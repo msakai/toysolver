@@ -26,17 +26,18 @@ type WeightedClause = (Weight, Clause)
 
 convert :: Int -> Weight -> [WeightedClause] -> String 
 convert nvar top ls = unlines $
-  [ "MAXIMIZE" ] ++
-  [ intercalate " + " [ printf "%d %s" w v | (v,(w,_)) <- zs ] ] ++
+  [ "MINIMIZE" ] ++
+  [ intercalate " + " [ printf "%d %s" w v | (v,(w,_)) <- zs, w < top ] ] ++
   [ "SUBJECT TO" ] ++
   [ case f xs of
-      (s,n) -> printf "%s- %s >= %d" s z (negate n)
-  | (z,(_,xs)) <- zs
+      (s,n)
+        | w==top    -> printf "%s >= %d" s (1 - n)       -- hard constraint
+        | otherwise -> printf "%s+ %s >= %d" s z (1 - n) -- soft constraint
+  | (z,(w,xs)) <- zs
   ] ++
-  [ printf "%s = 1" v | (v,(w,_)) <- zs, w==top ] ++
   [ "BINARY" ] ++
   [ printf "x%d" n | n <- [(1::Int)..nvar]] ++ 
-  [ z | (z,_) <- zs ] ++
+  [ z | (z,(w,_)) <- zs, w /= top ] ++
   [ "END" ]
   where
     zs = zip (map (\x -> "z" ++ show x) [(1::Int)..]) ls
