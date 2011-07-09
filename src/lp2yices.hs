@@ -6,6 +6,7 @@ import Data.List
 import Data.Ratio
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import System.Console.GetOpt
 import System.Environment
 import System.Exit
 import System.IO
@@ -119,9 +120,11 @@ nonAdjacentPairs :: [a] -> [(a,a)]
 nonAdjacentPairs (x1:x2:xs) = [(x1,x3) | x3 <- xs] ++ nonAdjacentPairs (x2:xs)
 nonAdjacentPairs _ = []
 
-lp2ys :: LP.LP -> ShowS
-lp2ys lp = unlinesS $ defs ++ map assert (conditions False env lp)
-                   ++ [list [showString "check"], assert optimality, list [showString "check"]]
+lp2ys :: LP.LP -> Bool -> Bool -> ShowS
+lp2ys lp optimize check =
+  unlinesS $ defs ++ map assert (conditions False env lp)
+             ++ [ assert optimality | optimize ]
+             ++ [ list [showString "check"] | check ]
   where
     vs = LP.variables lp
     real_vs = vs `Set.difference` int_vs
@@ -146,16 +149,35 @@ lp2ys lp = unlinesS $ defs ++ map assert (conditions False env lp)
                            ]
                     ]
 
+data Flag
+    = Help
+    | Optimize
+    | NoCheck
+    deriving Eq
+
+options :: [OptDescr Flag]
+options =
+    [ Option ['h'] ["help"]  (NoArg Help)       "show help"
+    , Option [] ["optimize"] (NoArg Optimize)   "output optimiality condition which uses quantifiers"
+    , Option [] ["no-check"] (NoArg NoCheck)    "do not output \"(check)\""
+    ]
+
+
 main :: IO ()
 main = do
   args <- getArgs
-  ret <- case args of
-           ["-"]   -> fmap (LP.parseString "-") getContents
-           [fname] -> LP.parseFile fname
-           _ -> hPutStrLn stderr header >> exitFailure
-  case ret of
-    Right lp -> putStrLn $ lp2ys lp ""
-    Left err -> hPrint stderr err >> exitFailure
+  case getOpt Permute options args of
+    (o,_,[])
+      | Help `elem` o    -> putStrLn (usageInfo header options)
+    (o,[fname],[]) -> do
+      ret <- if fname == "-"
+             then fmap (LP.parseString "-") getContents
+             else LP.parseFile fname
+      case ret of
+        Right lp -> putStrLn $ lp2ys lp (Optimize `elem` o) (not (NoCheck `elem` o)) ""
+        Left err -> hPrint stderr err >> exitFailure
+    (_,_,errs) ->
+        hPutStrLn stderr $ concat errs ++ usageInfo header options
 
 header :: String
 header = "Usage: lp2yice [file.lp|-]"
@@ -164,11 +186,11 @@ testFile :: FilePath -> IO ()
 testFile fname = do
   result <- LP.parseFile fname
   case result of
-    Right lp -> putStrLn $ lp2ys lp ""
+    Right lp -> putStrLn $ lp2ys lp True True ""
     Left err -> hPrint stderr err
 
 test :: IO ()
-test = putStrLn $ lp2ys testdata ""
+test = putStrLn $ lp2ys testdata True True ""
 
 testdata :: LP.LP
 Right testdata = LP.parseString "test" $ unlines
