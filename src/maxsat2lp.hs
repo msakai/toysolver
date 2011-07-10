@@ -13,7 +13,6 @@
 
 module Main where
 
-import Data.List
 import System.Environment
 import System.Exit
 import System.IO
@@ -27,7 +26,7 @@ type WeightedClause = (Weight, Clause)
 convert :: Int -> Weight -> [WeightedClause] -> String 
 convert nvar top ls = unlines $
   [ "MINIMIZE" ] ++
-  [ intercalate " + " [ printf "%d %s" w v | (v,(w,_)) <- zs, w < top ] ] ++
+  [ printf "+ %d %s" w v | (v,(w,_)) <- zs, w < top ] ++
   [ "SUBJECT TO" ] ++
   [ case f xs of
       (s,n)
