@@ -18,9 +18,9 @@ import System.Exit
 import System.IO
 import Text.Printf
 
-type Lit = Int
+type Lit = Integer
 type Clause = [Lit]
-type Weight = Int
+type Weight = Integer -- should be able to represent 2^63
 type WeightedClause = (Weight, Clause)
 
 convert :: Int -> Weight -> [WeightedClause] -> String 
