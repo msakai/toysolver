@@ -13,12 +13,15 @@
 
 module Main where
 
+import Data.List
+import qualified Data.Map as Map
 import System.Environment
 import System.Exit
 import System.IO
 import Text.Printf
 
 type Lit = Integer
+type Var = Lit
 type Clause = [Lit]
 type Weight = Integer -- should be able to represent 2^63
 type WeightedClause = (Weight, Clause)
@@ -30,8 +33,8 @@ convert nvar top ls = unlines $
   [ "SUBJECT TO" ] ++
   [ case f xs of
       (s,n)
-        | w==top    -> printf "%s >= %d" s (1 - n)       -- hard constraint
-        | otherwise -> printf "%s+ %s >= %d" s z (1 - n) -- soft constraint
+        | w==top    -> printf "%s >= %d" (g s) (1 - n)        -- hard constraint
+        | otherwise -> printf "%s + %s >= %d" (g s) z (1 - n) -- soft constraint
   | (z,(w,xs)) <- zs
   ] ++
   [ "BINARY" ] ++
@@ -41,12 +44,22 @@ convert nvar top ls = unlines $
   where
     zs = zip (map (\x -> "z" ++ show x) [(1::Int)..]) ls
 
-    f :: [Lit] -> (String, Int)
-    f = foldr phi ("",0)
-      where
+    f :: [Lit] -> (Map.Map Var Int, Int)
+    f = foldr phi (Map.empty,0)
+      where        
         phi lit (s,m)
-         | lit >= 0  = (printf "+ x%d " lit ++ s, m)
-         | otherwise = (printf "- x%d " (negate lit) ++ s, m+1)
+         | lit >= 0  = (Map.insertWith (+) (abs lit) 1 s, m)
+         | otherwise = (Map.insertWith (+) (abs lit) (-1) s, m+1)
+
+    g :: Map.Map Var Int -> String
+    g m = intercalate " " $ do
+      (v,c) <- Map.toList m
+      let sign = if c < 0 then "-" else "+"
+      let c' = abs c
+      return $
+        if c' == 1
+        then printf "%s x%d" sign v
+        else printf "%s %d x%d" sign c' v
 
 isComment :: String -> Bool
 isComment ('c':_) = True
