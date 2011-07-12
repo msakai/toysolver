@@ -124,6 +124,7 @@ lp2ys :: LP.LP -> Bool -> Bool -> ShowS
 lp2ys lp optimize check =
   unlinesS $ defs ++ map assert (conditions False env lp)
              ++ [ assert optimality | optimize ]
+             ++ [ list [showString "set-evidence!", showString "true"] | check ]
              ++ [ list [showString "check"] | check ]
   where
     vs = LP.variables lp
