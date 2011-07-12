@@ -132,8 +132,10 @@ lp2ys lp optimize check =
     int_vs = LP.integerVariables lp `Set.union` LP.binaryVariables lp
     ts = [(v, "real")| v <- Set.toList real_vs] ++ [(v, "int") | v <- Set.toList int_vs]
     obj = snd (LP.objectiveFunction lp)
-    env = Map.fromList [(v, "x"++show i) | (v,i) <- zip (Set.toList vs) [(1::Int)..]]
-    env2 = Map.fromList [(v, "y"++show i) | (v,i) <- zip (Set.toList vs) [(1::Int)..]]
+    env = Map.fromList [(v, encode v) | v <- Set.toList vs]
+    -- Note that identifiers of LPFile does not contain '-'.
+    -- So that there are no name crash.
+    env2 = Map.fromList [(v, encode v ++ "-2") | v <- Set.toList vs]
 
     defs = do
       (v,t) <- ts
@@ -149,6 +151,15 @@ lp2ys lp optimize check =
                            , expr env obj, expr env2 obj
                            ]
                     ]
+
+encode :: String -> String
+encode s = concatMap f s
+  where
+    -- Note that '[', ']', '\\' does not appear in identifiers of LP file.
+    f '(' = "["
+    f ')' = "]"
+    f c | c `elem` "/\";" = printf "\\x%02d" (fromEnum c :: Int)
+    f c = [c]
 
 data Flag
     = Help
