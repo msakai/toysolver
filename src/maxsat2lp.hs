@@ -68,11 +68,19 @@ isComment _ = False
 parseWCNFLine :: String -> WeightedClause
 parseWCNFLine s =
   case map read (words s) of
-    (w:xs) -> (w, init xs)
+    (w:xs) ->
+        let ys = init xs
+        in seq w $ seqList ys $ (w, ys)
     _ -> error "parse error"
 
 parseCNFLine :: String -> WeightedClause
-parseCNFLine s = (1, init (map read (words s)))
+parseCNFLine s = seq xs $ seqList xs $ (1, xs)
+  where
+    xs = init (map read (words s))
+
+seqList :: [a] -> b -> b
+seqList [] b = b
+seqList (x:xs) b = seq x $ seqList xs b
 
 header :: String
 header = "Usage: maxsat2lp [file.cnf|file.wcnf|-]"
