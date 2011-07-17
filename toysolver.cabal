@@ -85,3 +85,11 @@ Executable maxsat2lp
   Main-is: maxsat2lp.hs
   HS-Source-Dirs: src
   Build-Depends: base >=4 && <5
+
+Executable pb2lp
+  Main-is: pb2lp.hs
+  HS-Source-Dirs: src
+  Other-Modules:
+     LPFile
+     PBFile
+  Build-Depends: base >=4 && <5, mtl, containers, array, parsec
