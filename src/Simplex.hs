@@ -61,6 +61,9 @@ objRow :: RowIndex
 objRow = -1
 
 pivot :: Fractional r => RowIndex -> ColIndex -> Tableau r -> Tableau r
+{-# INLINE pivot #-}
+{-# SPECIALIZE pivot :: RowIndex -> ColIndex -> Tableau Rational -> Tableau Rational #-}
+{-# SPECIALIZE pivot :: RowIndex -> ColIndex -> Tableau Double -> Tableau Double #-}
 pivot r s tbl =
     assert (validTableau tbl) $  -- precondition
     assert (validTableau tbl') $ -- postcondition
@@ -142,6 +145,8 @@ isImproving isMinimize from to =
 -- primal simplex
 
 simplex :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
+{-# SPECIALIZE simplex :: Bool -> Tableau Rational -> (Bool, Tableau Rational) #-}
+{-# SPECIALIZE simplex :: Bool -> Tableau Double -> (Bool, Tableau Double) #-}
 simplex isMinimize = go
   where
     go tbl = assert (isFeasible tbl) $
@@ -151,6 +156,7 @@ simplex isMinimize = go
         PivotSuccess tbl' -> assert (isImproving isMinimize tbl tbl') $ go tbl'
 
 primalPivot :: (Real r, Fractional r) => Bool -> Tableau r -> PivotResult r
+{-# INLINE primalPivot #-}
 primalPivot isMinimize tbl
   | null cs   = PivotFinished
   | null rs   = PivotUnbounded
@@ -172,6 +178,8 @@ primalPivot isMinimize tbl
 -- dual simplex
 
 dualSimplex :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
+{-# SPECIALIZE dualSimplex :: Bool -> Tableau Rational -> (Bool, Tableau Rational) #-}
+{-# SPECIALIZE dualSimplex :: Bool -> Tableau Double -> (Bool, Tableau Double) #-}
 dualSimplex isMinimize = go
   where
     go tbl = assert (isOptimal isMinimize tbl) $
@@ -181,6 +189,7 @@ dualSimplex isMinimize = go
         PivotSuccess tbl' -> assert (isImproving isMinimize tbl' tbl) $ go tbl'
 
 dualPivot :: (Real r, Fractional r) => Bool -> Tableau r -> PivotResult r
+{-# INLINE dualPivot #-}
 dualPivot isMinimize tbl
   | null rs   = PivotFinished
   | null cs   = PivotUnbounded
@@ -200,6 +209,8 @@ dualPivot isMinimize tbl
 -- phase I of the two-phased method
 
 phaseI :: (Real r, Fractional r) => Tableau r -> VarSet -> (Bool, Tableau r)
+{-# SPECIALIZE phaseI :: Tableau Rational -> VarSet -> (Bool, Tableau Rational) #-}
+{-# SPECIALIZE phaseI :: Tableau Double -> VarSet -> (Bool, Tableau Double) #-}
 phaseI tbl avs
   | currentObjValue tbl1' /= 0 = (False, tbl1')
   | otherwise = (True, copyObjRow tbl $ removeArtificialVariables avs $ tbl1')
