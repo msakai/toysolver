@@ -36,6 +36,9 @@ import qualified BoundsInference as BI
 type Solver r = (Var, Simplex.Tableau r, VarSet, VarMap (LC r))
 type LP r = State (Solver r)
 
+emptySolver :: VarSet -> Solver r
+emptySolver vs = (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty)
+
 gensym :: LP r Var
 gensym = do
   (x,tbl,avs,defs) <- get

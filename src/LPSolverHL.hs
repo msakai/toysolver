@@ -58,7 +58,7 @@ solve cs2 = fromMaybe Unknown $ do
 
 solve' :: (RealFrac r) => [Constraint r] -> SatResult r
 solve' cs =
-  flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
+  flip evalState (emptySolver vs) $ do
     tableau cs
     ret <- phaseI
     if not ret
@@ -71,7 +71,7 @@ solve' cs =
 
 optimize' :: (RealFrac r) => Bool -> LC r -> [Constraint r] -> OptResult r
 optimize' isMinimize obj cs =
-  flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
+  flip evalState (emptySolver vs) $ do
     tableau cs
     ret <- phaseI
     if not ret

@@ -72,7 +72,7 @@ solve cs2 ivs = fromMaybe Unknown $ do
 
 optimize' :: RealFrac r => Bool -> LC r -> [Constraint r] -> VarSet -> OptResult r
 optimize' isMinimize obj cs ivs =
-  flip evalState (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty) $ do
+  flip evalState (emptySolver vs) $ do
     ivs2 <- tableau' cs ivs
     ret <- phaseI
     if not ret
