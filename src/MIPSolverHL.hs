@@ -5,10 +5,7 @@
 -- Module      :  MIPSolverHL
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
--- 
 -- Maintainer  :  masahiro.sakai@gmail.com
--- Stability   :  provisional
--- Portability :  portable
 --
 -- References:
 -- 
@@ -70,65 +67,52 @@ solve cs2 ivs = fromMaybe Unknown $ do
 
 -- ---------------------------------------------------------------------------
 
-optimize' :: RealFrac r => Bool -> LC r -> [Constraint r] -> VarSet -> OptResult r
-optimize' isMinimize obj cs ivs =
-  flip evalState (emptySolver vs) $ do
-    ivs2 <- tableau' cs ivs
-    ret <- phaseI
-    if not ret
-      then return OptUnsat
-      else do
-        ret2 <- simplex isMinimize obj
-        if ret2
-          then loop (ivs `IS.union` ivs2)
-          else
-            if IS.null ivs
-            then return Unbounded
-            else
-              {-
-                 Fallback to Fourier-Motzkin + OmegaTest
-                 * In general, original problem may have optimal
-                   solution even though LP relaxiation is unbounded.
-                 * But if restricted to rational numbers, the
-                   original problem is unbounded or unsatisfiable
-                   when LP relaxation is unbounded.
-              -}
-              case OmegaTest.solveQFLA (map conv cs) ivs of
-                Nothing -> return OptUnsat
-                Just _ -> return Unbounded
-  where
-    vs = vars cs `IS.union` vars obj
+data Node r
+  = Node
+  { ndSolver :: LPSolver.Solver r
+  , ndDepth  :: {-# UNPACK #-} !Int
+--  , ndCutSlackVariables :: VarSet
+  }
 
-    loop ivs = do
-      tbl <- getTableau
-      let xs = [ (fracPart val, m)
-               | v <- IS.toList ivs
-               , Just (m, val) <- return (IM.lookup v tbl)
-               , not (isInteger val)
-               ]
-      if null xs
-        then do
+ndTableau :: Node r -> Simplex.Tableau r
+ndTableau node = evalState getTableau (ndSolver node)
+
+ndLowerBound :: Num r => Node r -> r
+ndLowerBound node = evalState (liftM Simplex.currentObjValue getTableau) (ndSolver node)
+
+data Err = ErrUnbounded | ErrUnsat deriving (Ord, Eq, Show, Enum, Bounded)
+
+optimize' :: RealFrac r => Bool -> LC r -> [Constraint r] -> VarSet -> OptResult r
+optimize' isMinimize obj cs ivs = 
+  case mkInitialNode isMinimize obj cs ivs of
+    Left err ->
+      case err of
+        ErrUnsat -> OptUnsat
+        ErrUnbounded ->
+          if IS.null ivs
+          then Unbounded
+          else
+            {-
+               Fallback to Fourier-Motzkin + OmegaTest
+               * In general, original problem may have optimal
+                 solution even though LP relaxiation is unbounded.
+               * But if restricted to rational numbers, the
+                 original problem is unbounded or unsatisfiable
+                 when LP relaxation is unbounded.
+            -}
+            case OmegaTest.solveQFLA (map conv cs) ivs of
+              Nothing -> OptUnsat
+              Just _ -> Unbounded        
+    Right (node0, ivs2) -> 
+      case traverse isMinimize obj ivs2 node0 of
+        Left ErrUnbounded -> error "shoud not happen"
+        Left ErrUnsat -> OptUnsat
+        Right node -> flip evalState (ndSolver node) $ do
+          tbl <- getTableau
           model <- getModel vs
           return $ Optimum (Simplex.currentObjValue tbl) model
-        else do
-          let (f0, m) = maximumBy (compare `on` fst) xs
-          tbl <- getTableau
-          s <- gensym
-          let g j x =
-               if j `IS.member` ivs
-               then
-                 if fracPart x <= f0
-                 then fracPart x
-                 else (f0 / (f0 - 1)) * (fracPart x - 1)
-               else
-                 if x >= 0
-                 then x
-                 else (f0 / (f0 - 1)) * x
-          putTableau $ IM.insert s (IM.mapWithKey (\j x -> negate (g j x)) m, negate f0) tbl
-          ret <- dualSimplex isMinimize obj
-          if ret
-            then loop ivs
-            else return OptUnsat
+  where
+    vs = vars cs `IS.union` vars obj
 
 tableau' :: (RealFrac r) => [Constraint r] -> VarSet -> LP r VarSet
 tableau' cs ivs = do
@@ -146,6 +130,95 @@ conv :: RealFrac r => Constraint r -> Constraint Rational
 conv (LARel a op b) = LARel (f a) op (f b)
   where
     f (LC t) = normalizeLC $ LC (fmap toRational t)
+
+mkInitialNode :: RealFrac r => Bool -> LC r -> [Constraint r] -> VarSet -> Either Err (Node r, VarSet)
+mkInitialNode isMinimize obj cs ivs =
+  flip evalState (emptySolver vs) $ do
+    ivs2 <- tableau' cs ivs
+    ret <- phaseI
+    if not ret
+      then return (Left ErrUnsat)
+      else do
+        ret2 <- simplex isMinimize obj
+        if ret2
+          then do
+            solver <- get
+            return $ Right $
+              ( Node{ ndSolver = solver
+                    , ndDepth = 0
+--                    , ndCutSlackVariables = IS.empty
+                    }
+              , ivs `IS.union` ivs2
+              )
+          else return (Left ErrUnbounded)
+  where
+    vs = vars cs `IS.union` vars obj
+
+isStrictlyBetter :: RealFrac r => Bool -> r -> r -> Bool
+isStrictlyBetter isMinimize = if isMinimize then (<) else (>)
+
+traverse :: forall r. RealFrac r => Bool -> LC r -> VarSet -> Node r -> Either Err (Node r)
+traverse isMinimize obj ivs node0 = loop [node0] Nothing
+  where
+    loop :: [Node r] -> Maybe (Node r) -> Either Err (Node r)
+    loop [] (Just best) = Right best
+    loop [] Nothing = Left ErrUnsat
+    loop (n:ns) Nothing =
+      case children n of
+        Nothing -> loop ns (Just n)
+        Just cs -> loop (cs++ns) Nothing
+    loop (n:ns) (Just best)
+      | isStrictlyBetter isMinimize (ndLowerBound n) (ndLowerBound best) =
+          case children n of
+            Nothing -> loop ns (Just n)
+            Just cs -> loop (cs++ns) (Just best)
+      | otherwise = loop ns (Just best)
+
+    reopt :: Solver r -> Maybe (Solver r)
+    reopt s = flip evalState s $ do
+      ret <- dualSimplex isMinimize obj
+      if ret
+        then liftM Just get
+        else return Nothing
+
+    children :: Node r -> Maybe [Node r]
+    children node
+      | null xs = Nothing -- no violation
+      | ndDepth node `mod` 100 == 0 = -- cut
+          let
+            (f0, m0) = maximumBy (compare `on` fst) [(fracPart val, m) | (_,m,val) <- xs]
+            sv = flip execState (ndSolver node) $ do
+                   s <- gensym
+                   let g j x =
+                        if j `IS.member` ivs
+                        then
+                          if fracPart x <= f0
+                          then fracPart x
+                          else (f0 / (f0 - 1)) * (fracPart x - 1)
+                        else
+                          if x >= 0
+                          then x
+                          else (f0 / (f0 - 1)) * x
+                   putTableau $ IM.insert s (IM.mapWithKey (\j x -> negate (g j x)) m0, negate f0) tbl
+          in Just $ [node{ ndSolver = sv2, ndDepth = ndDepth node + 1 } | sv2 <- maybeToList (reopt sv)]
+      | otherwise = -- branch
+          let (v0, val0) = snd $ maximumBy (compare `on` fst) [(fracPart val, (v, val)) | (v,_,val) <- xs]
+              cs = [ LARel (varLC v0) Ge (constLC (fromIntegral (ceiling val0 :: Integer)))
+                   , LARel (varLC v0) Le (constLC (fromIntegral (floor val0 :: Integer)))
+                   ]
+              svs = [execState (addConstraint2 c) (ndSolver node) | c <- cs]
+          in Just $ [node{ ndSolver = sv, ndDepth = ndDepth node + 1 } | Just sv <- map reopt svs]
+        
+      where
+        tbl :: Simplex.Tableau r
+        tbl = ndTableau node
+
+        xs :: [(Var, VarMap r, r)]
+        xs = [ (v, m, val)
+             | v <- IS.toList ivs
+             , Just (m, val) <- return (IM.lookup v tbl)
+             , not (isInteger val)
+             ]
 
 -- ---------------------------------------------------------------------------
 

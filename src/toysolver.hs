@@ -43,7 +43,7 @@ options :: [OptDescr Flag]
 options =
     [ Option ['h'] ["help"]    (NoArg Help)            "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
-    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "gomory-cut (default), omega-test, cooper"
+    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper"
 {-
     , Option ['l'] ["load"]    (ReqArg Load "FILE") "load FILE"
     , Option ['t'] ["trace"]    (OptArg (Trace . fromMaybe "on") "[on|off]")
@@ -157,7 +157,7 @@ run solver lp = do
 -- ---------------------------------------------------------------------------
 
 getSolver :: [Flag] -> String
-getSolver xs = last $ "gomory-cut" : [s | Solver s <- xs]
+getSolver xs = last $ "mip" : [s | Solver s <- xs]
 
 main :: IO ()
 main = do
