@@ -123,7 +123,8 @@ nonAdjacentPairs _ = []
 lp2ys :: LP.LP -> Bool -> Bool -> ShowS
 lp2ys lp optimize check =
   unlinesS $ defs ++ map assert (conditions False env lp)
-             ++ [ assert optimality | optimize ]
+             ++ [ optimalityDef ]
+             ++ [ assert (showString "optimality") | optimize ]
              ++ [ list [showString "set-evidence!", showString "true"] | check ]
              ++ [ list [showString "check"] | check ]
   where
@@ -141,6 +142,8 @@ lp2ys lp optimize check =
       (v,t) <- ts
       let v2 = env Map.! v
       return $ showString $ printf "(define %s::%s) ; %s"  v2 t v
+
+    optimalityDef = list [showString "define", showString "optimality::bool", optimality]
 
     optimality = list [showString "forall", decl, body]
       where
