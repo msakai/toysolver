@@ -110,6 +110,34 @@ addConstraint c = do
         [(_,1)] -> True
         _ -> False
 
+addConstraint2 :: Real r => Constraint r -> LP r ()
+addConstraint2 c = do
+  (LARel lhs rop rhs) <- expandDefs' c
+  let
+    LC m = lhs .-. rhs
+    lc = LC (IM.delete constKey m)
+    b = - IM.findWithDefault 0 constKey m
+  tbl <- getTableau
+  case rop of
+    Le -> f lc b
+    Ge -> f (lnegate lc) (negate b)
+    Eql -> do
+      f lc b
+      f (lnegate lc) (negate b)
+    _ -> error $ "addConstraint does not support " ++ show rop
+  where
+    -- -x≤b で -b≤0 なら追加しない。ad hoc なので一般化したい。
+    f lc b  | isSingleNegatedVar lc && -b <= 0 = return ()
+    f lc b = do
+      tbl <- getTableau
+      v <- gensym -- slack variable
+      putTableau $ Simplex.setRow v tbl (unLC lc, b)
+
+    isSingleNegatedVar (LC m) =
+      case IM.toList m of
+        [(_,-1)] -> True
+        _ -> False
+
 expandDefs :: Num r => LC r -> LP r (LC r)
 expandDefs e = do
   defs <- getDefs
