@@ -47,16 +47,16 @@ import qualified OmegaTest
 -- ---------------------------------------------------------------------------
 
 maximize :: RealFrac r => Expr r -> [Atom r] -> VarSet -> OptResult r
-maximize = optimize False
+maximize = optimize OptMax
 
 minimize :: RealFrac r => Expr r -> [Atom r] -> VarSet -> OptResult r
-minimize = optimize True
+minimize = optimize OptMin
 
-optimize :: RealFrac r => Bool -> Expr r -> [Atom r] -> VarSet -> OptResult r
-optimize isMinimize obj2 cs2 ivs = fromMaybe OptUnknown $ do
+optimize :: RealFrac r => OptDir -> Expr r -> [Atom r] -> VarSet -> OptResult r
+optimize optdir obj2 cs2 ivs = fromMaybe OptUnknown $ do
   obj <- compileExpr obj2  
   cs <- mapM compileAtom cs2
-  return (optimize' isMinimize obj cs ivs)
+  return (optimize' optdir obj cs ivs)
 
 {-
 solve :: RealFrac r => [Atom r] -> VarSet -> SatResult r
@@ -82,9 +82,9 @@ ndLowerBound node = evalState (liftM Simplex.currentObjValue getTableau) (ndSolv
 
 data Err = ErrUnbounded | ErrUnsat deriving (Ord, Eq, Show, Enum, Bounded)
 
-optimize' :: RealFrac r => Bool -> LC r -> [Constraint r] -> VarSet -> OptResult r
-optimize' isMinimize obj cs ivs = 
-  case mkInitialNode isMinimize obj cs ivs of
+optimize' :: RealFrac r => OptDir -> LC r -> [Constraint r] -> VarSet -> OptResult r
+optimize' optdir obj cs ivs = 
+  case mkInitialNode optdir obj cs ivs of
     Left err ->
       case err of
         ErrUnsat -> OptUnsat
@@ -104,7 +104,7 @@ optimize' isMinimize obj cs ivs =
               Nothing -> OptUnsat
               Just _ -> Unbounded        
     Right (node0, ivs2) -> 
-      case traverse isMinimize obj ivs2 node0 of
+      case traverse optdir obj ivs2 node0 of
         Left ErrUnbounded -> error "shoud not happen"
         Left ErrUnsat -> OptUnsat
         Right node -> flip evalState (ndSolver node) $ do
@@ -131,15 +131,15 @@ conv (LARel a op b) = LARel (f a) op (f b)
   where
     f (LC t) = normalizeLC $ LC (fmap toRational t)
 
-mkInitialNode :: RealFrac r => Bool -> LC r -> [Constraint r] -> VarSet -> Either Err (Node r, VarSet)
-mkInitialNode isMinimize obj cs ivs =
+mkInitialNode :: RealFrac r => OptDir -> LC r -> [Constraint r] -> VarSet -> Either Err (Node r, VarSet)
+mkInitialNode optdir obj cs ivs =
   flip evalState (emptySolver vs) $ do
     ivs2 <- tableau' cs ivs
     ret <- phaseI
     if not ret
       then return (Left ErrUnsat)
       else do
-        ret2 <- simplex isMinimize obj
+        ret2 <- simplex optdir obj
         if ret2
           then do
             solver <- get
@@ -154,11 +154,11 @@ mkInitialNode isMinimize obj cs ivs =
   where
     vs = vars cs `IS.union` vars obj
 
-isStrictlyBetter :: RealFrac r => Bool -> r -> r -> Bool
-isStrictlyBetter isMinimize = if isMinimize then (<) else (>)
+isStrictlyBetter :: RealFrac r => OptDir -> r -> r -> Bool
+isStrictlyBetter optdir = if optdir==OptMin then (<) else (>)
 
-traverse :: forall r. RealFrac r => Bool -> LC r -> VarSet -> Node r -> Either Err (Node r)
-traverse isMinimize obj ivs node0 = loop [node0] Nothing
+traverse :: forall r. RealFrac r => OptDir -> LC r -> VarSet -> Node r -> Either Err (Node r)
+traverse optdir obj ivs node0 = loop [node0] Nothing
   where
     loop :: [Node r] -> Maybe (Node r) -> Either Err (Node r)
     loop [] (Just best) = Right best
@@ -168,7 +168,7 @@ traverse isMinimize obj ivs node0 = loop [node0] Nothing
         Nothing -> loop ns (Just n)
         Just cs -> loop (cs++ns) Nothing
     loop (n:ns) (Just best)
-      | isStrictlyBetter isMinimize (ndLowerBound n) (ndLowerBound best) =
+      | isStrictlyBetter optdir (ndLowerBound n) (ndLowerBound best) =
           case children n of
             Nothing -> loop ns (Just n)
             Just cs -> loop (cs++ns) (Just best)
@@ -176,7 +176,7 @@ traverse isMinimize obj ivs node0 = loop [node0] Nothing
 
     reopt :: Solver r -> Maybe (Solver r)
     reopt s = flip evalState s $ do
-      ret <- dualSimplex isMinimize obj
+      ret <- dualSimplex optdir obj
       if ret
         then liftM Just get
         else return Nothing
@@ -222,9 +222,9 @@ traverse isMinimize obj ivs node0 = loop [node0] Nothing
 
 -- ---------------------------------------------------------------------------
 
-example1 = (isMinimize, obj, cs, ivs)
+example1 = (optdir, obj, cs, ivs)
   where
-    isMinimize = False
+    optdir = OptMax
     x1 = varLC 1
     x2 = varLC 2
     x3 = varLC 3
@@ -244,13 +244,15 @@ example1 = (isMinimize, obj, cs, ivs)
     ivs = IS.singleton 4
 
 test1 :: OptResult Rational
-test1 = optimize' isMinimize obj cs ivs
+test1 = optimize' optdir obj cs ivs
   where
-    (isMinimize, obj, cs, ivs) = example1
+    (optdir, obj, cs, ivs) = example1
 
 test2 :: OptResult Rational
-test2 = optimize' (not isMinimize) (lnegate obj) cs ivs
+test2 = optimize' (f optdir) (lnegate obj) cs ivs
   where
-    (isMinimize, obj, cs, ivs) = example1
+    (optdir, obj, cs, ivs) = example1
+    f OptMin = OptMax
+    f OptMax = OptMin
 
 -- ---------------------------------------------------------------------------

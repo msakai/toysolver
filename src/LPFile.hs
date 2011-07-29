@@ -20,6 +20,7 @@
 module LPFile
   ( LP (..)
   , Expr (..)
+  , OptDir (..)
   , ObjectiveFunction
   , Constraint
   , Bounds
@@ -45,6 +46,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Text.ParserCombinators.Parsec hiding (label)
 
+import Expr (OptDir (..))
 import Util (combineMaybe)
 
 -- ---------------------------------------------------------------------------
@@ -52,7 +54,7 @@ import Util (combineMaybe)
 data LP
   = LP
   { variables :: Set.Set Var
-  , isMinimize :: Bool
+  , dir :: OptDir
   , objectiveFunction :: ObjectiveFunction
   , constraints :: [Constraint]
   , bounds :: Map.Map Var Bounds
@@ -188,10 +190,10 @@ lpfile = do
            [Set.fromList (map fst xs) | (_,_,xs) <- ss]
   return $ LP vs flag obj cs bnds ints bins scs ss
 
-problem :: Parser (Bool, ObjectiveFunction)
+problem :: Parser (OptDir, ObjectiveFunction)
 problem = do
-  flag <-  (try minimize >> return True)
-       <|> (try maximize >> return False)
+  flag <-  (try minimize >> return OptMin)
+       <|> (try maximize >> return OptMax)
   name <- optionMaybe (try label)
   obj <- expr
   return (flag, (name, obj))
@@ -414,7 +416,10 @@ render lp = fmap ($ "") $ execWriterT (render' lp)
 
 render' :: LP -> WriterT ShowS Maybe ()
 render' lp = do
-  tell $ showString $ if isMinimize lp then "MINIMIZE" else "MAXIMIZE"
+  tell $ showString $
+    case dir lp of
+      OptMin -> "MINIMIZE"
+      OptMax -> "MAXIMIZE"
   tell $ showChar '\n'
 
   let (l, obj) = objectiveFunction lp

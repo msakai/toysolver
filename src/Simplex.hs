@@ -129,45 +129,47 @@ isFeasible :: Real r => Tableau r -> Bool
 isFeasible tbl = 
   and [val >= 0 | (v, (_,val)) <- IM.toList tbl, v /= objRow]
 
-isOptimal :: Real r => Bool -> Tableau r -> Bool
-isOptimal isMinimize tbl =
+isOptimal :: Real r => OptDir -> Tableau r -> Bool
+isOptimal optdir tbl =
   and [not (cmp cj) | cj <- IM.elems (fst (lookupRow objRow tbl))]
   where
-    cmp = if isMinimize then (0<) else (0>)
+    cmp = case optdir of
+            OptMin -> (0<)
+            OptMax -> (0>)
 
-isImproving :: Real r => Bool -> Tableau r -> Tableau r -> Bool
-isImproving isMinimize from to =
-  if isMinimize
-  then currentObjValue to <= currentObjValue from 
-  else currentObjValue to >= currentObjValue from 
+isImproving :: Real r => OptDir -> Tableau r -> Tableau r -> Bool
+isImproving OptMin from to = currentObjValue to <= currentObjValue from 
+isImproving OptMax from to = currentObjValue to >= currentObjValue from 
 
 -- ---------------------------------------------------------------------------
 -- primal simplex
 
-simplex :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
-{-# SPECIALIZE simplex :: Bool -> Tableau Rational -> (Bool, Tableau Rational) #-}
-{-# SPECIALIZE simplex :: Bool -> Tableau Double -> (Bool, Tableau Double) #-}
-simplex isMinimize = go
+simplex :: (Real r, Fractional r) => OptDir -> Tableau r -> (Bool, Tableau r)
+{-# SPECIALIZE simplex :: OptDir -> Tableau Rational -> (Bool, Tableau Rational) #-}
+{-# SPECIALIZE simplex :: OptDir -> Tableau Double -> (Bool, Tableau Double) #-}
+simplex optdir = go
   where
     go tbl = assert (isFeasible tbl) $
-      case primalPivot isMinimize tbl of
-        PivotFinished  -> assert (isOptimal isMinimize tbl) (True, tbl)
+      case primalPivot optdir tbl of
+        PivotFinished  -> assert (isOptimal optdir tbl) (True, tbl)
         PivotUnbounded -> (False, tbl)
-        PivotSuccess tbl' -> assert (isImproving isMinimize tbl tbl') $ go tbl'
+        PivotSuccess tbl' -> assert (isImproving optdir tbl tbl') $ go tbl'
 
-primalPivot :: (Real r, Fractional r) => Bool -> Tableau r -> PivotResult r
+primalPivot :: (Real r, Fractional r) => OptDir -> Tableau r -> PivotResult r
 {-# INLINE primalPivot #-}
-primalPivot isMinimize tbl
+primalPivot optdir tbl
   | null cs   = PivotFinished
   | null rs   = PivotUnbounded
   | otherwise = PivotSuccess (pivot r s tbl)
   where
-    cmp = if isMinimize then (0<) else (0>)
+    cmp = case optdir of
+            OptMin -> (0<)
+            OptMax -> (0>)
     cs = [(j,cj) | (j,cj) <- IM.toList (fst (lookupRow objRow tbl)), cmp cj]
     -- smallest subscript rule
     s = fst $ head cs
     -- classical rule
-    --s = fst $ (if isMinimize then maximumBy else minimumBy) (compare `on` snd) cs
+    --s = fst $ (if optdir==OptMin then maximumBy else minimumBy) (compare `on` snd) cs
     rs = [ (i, y_i0 / y_is)
          | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRow
          , let y_is = IM.findWithDefault 0 s row_i, y_is > 0
@@ -177,27 +179,27 @@ primalPivot isMinimize tbl
 -- ---------------------------------------------------------------------------
 -- dual simplex
 
-dualSimplex :: (Real r, Fractional r) => Bool -> Tableau r -> (Bool, Tableau r)
-{-# SPECIALIZE dualSimplex :: Bool -> Tableau Rational -> (Bool, Tableau Rational) #-}
-{-# SPECIALIZE dualSimplex :: Bool -> Tableau Double -> (Bool, Tableau Double) #-}
-dualSimplex isMinimize = go
+dualSimplex :: (Real r, Fractional r) => OptDir -> Tableau r -> (Bool, Tableau r)
+{-# SPECIALIZE dualSimplex :: OptDir -> Tableau Rational -> (Bool, Tableau Rational) #-}
+{-# SPECIALIZE dualSimplex :: OptDir -> Tableau Double -> (Bool, Tableau Double) #-}
+dualSimplex optdir = go
   where
-    go tbl = assert (isOptimal isMinimize tbl) $
-      case dualPivot isMinimize tbl of
+    go tbl = assert (isOptimal optdir tbl) $
+      case dualPivot optdir tbl of
         PivotFinished  -> assert (isFeasible tbl) $ (True, tbl)
         PivotUnbounded -> (False, tbl)
-        PivotSuccess tbl' -> assert (isImproving isMinimize tbl' tbl) $ go tbl'
+        PivotSuccess tbl' -> assert (isImproving optdir tbl' tbl) $ go tbl'
 
-dualPivot :: (Real r, Fractional r) => Bool -> Tableau r -> PivotResult r
+dualPivot :: (Real r, Fractional r) => OptDir -> Tableau r -> PivotResult r
 {-# INLINE dualPivot #-}
-dualPivot isMinimize tbl
+dualPivot optdir tbl
   | null rs   = PivotFinished
   | null cs   = PivotUnbounded
   | otherwise = PivotSuccess (pivot r s tbl)
   where
     rs = [(i, row_i) | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRow, 0 > y_i0]
     (r, row_r) = head rs
-    cs = [ (j, if isMinimize then y_0j / y_rj else - y_0j / y_rj)
+    cs = [ (j, if optdir==OptMin then y_0j / y_rj else - y_0j / y_rj)
          | (j, y_rj) <- IM.toList row_r
          , y_rj < 0
          , let y_0j = IM.findWithDefault 0 j obj
@@ -215,15 +217,15 @@ phaseI tbl avs
   | currentObjValue tbl1' /= 0 = (False, tbl1')
   | otherwise = (True, copyObjRow tbl $ removeArtificialVariables avs $ tbl1')
   where
-    isMinimize = False
+    optdir = OptMax
     tbl1 = setObjFun tbl $ lnegate $ lsum [varLC v | v <- IS.toList avs]
     tbl1' = go tbl1
     go tbl2
       | currentObjValue tbl2 == 0 = tbl2
       | otherwise = 
-        case primalPivot False tbl2 of
-          PivotSuccess tbl2' -> assert (isImproving isMinimize tbl2 tbl2') $ go tbl2'
-          PivotFinished -> assert (isOptimal isMinimize tbl2) tbl2
+        case primalPivot optdir tbl2 of
+          PivotSuccess tbl2' -> assert (isImproving optdir tbl2 tbl2') $ go tbl2'
+          PivotFinished -> assert (isOptimal optdir tbl2) tbl2
           PivotUnbounded -> error "phaseI: should not happen"
 
 -- post-processing of phaseI
@@ -282,6 +284,6 @@ kuhn_7_3 = IM.fromList
   , (objRow, (IM.fromList [(4,2), (5,3), (6,-1), (7,-12)], 0))
   ]
 
-test_kuhn_7_3 = simplex True kuhn_7_3
+test_kuhn_7_3 = simplex OptMin kuhn_7_3
 
 -- ---------------------------------------------------------------------------

@@ -150,7 +150,7 @@ lp2ys lp optimize check =
         decl = list [showString $ printf "%s::%s" (env2 Map.! v) t | (v,t) <- ts]
         body = list [showString "=>"
                     , and' (conditions True env2 lp)
-                    , list [ showString $ if LP.isMinimize lp then "<=" else ">="
+                    , list [ showString $ if LP.dir lp == LP.OptMin then "<=" else ">="
                            , expr env obj, expr env2 obj
                            ]
                     ]

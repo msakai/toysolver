@@ -178,19 +178,19 @@ phaseI = do
   when ret clearArtificialVariables
   return ret
 
-simplex :: (Fractional r, Real r) => Bool -> LC r -> LP r Bool
-simplex isMinimize obj = do
+simplex :: (Fractional r, Real r) => OptDir -> LC r -> LP r Bool
+simplex optdir obj = do
   tbl <- getTableau
   defs <- getDefs
-  let (ret, tbl') = Simplex.simplex isMinimize (Simplex.setObjFun tbl (applySubst defs obj))
+  let (ret, tbl') = Simplex.simplex optdir (Simplex.setObjFun tbl (applySubst defs obj))
   putTableau tbl'
   return ret
 
-dualSimplex :: (Fractional r, Real r) => Bool -> LC r -> LP r Bool
-dualSimplex isMinimize obj = do
+dualSimplex :: (Fractional r, Real r) => OptDir -> LC r -> LP r Bool
+dualSimplex optdir obj = do
   tbl <- getTableau
   defs <- getDefs
-  let (ret, tbl') = Simplex.dualSimplex isMinimize (Simplex.setObjFun tbl (applySubst defs obj))
+  let (ret, tbl') = Simplex.dualSimplex optdir (Simplex.setObjFun tbl (applySubst defs obj))
   putTableau tbl'
   return ret
 

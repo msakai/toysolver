@@ -15,7 +15,7 @@ header = "Usage: pb2lp2 [file.opb|-]"
 convert :: PBFile.Formula -> LPFile.LP
 convert formula@(obj, cs) = LPFile.LP
   { LPFile.variables = vs2
-  , LPFile.isMinimize = True
+  , LPFile.dir = LPFile.OptMin
   , LPFile.objectiveFunction = (Nothing, obj2)
   , LPFile.constraints = cs2
   , LPFile.bounds = Map.empty

@@ -131,7 +131,7 @@ run solver lp = do
                _ -> error "unknown solver"
 
     solveByMIP =
-      case MIPSolverHL.optimize (LP.isMinimize lp) obj (cs1 ++ cs2 ++ cs3) ivs of
+      case MIPSolverHL.optimize (LP.dir lp) obj (cs1 ++ cs2 ++ cs3) ivs of
         OptUnknown -> do
           putStrLn "unknown"
           exitFailure

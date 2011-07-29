@@ -38,16 +38,16 @@ import LPSolver
 -- ---------------------------------------------------------------------------
 
 maximize :: (RealFrac r) => Expr r -> [Atom r] -> OptResult r
-maximize = optimize False
+maximize = optimize OptMax
 
 minimize :: (RealFrac r) => Expr r -> [Atom r] -> OptResult r
-minimize = optimize True
+minimize = optimize OptMin
 
-optimize :: (RealFrac r) => Bool -> Expr r -> [Atom r] -> OptResult r
-optimize isMinimize obj2 cs2 = fromMaybe OptUnknown $ do
+optimize :: (RealFrac r) => OptDir -> Expr r -> [Atom r] -> OptResult r
+optimize optdir obj2 cs2 = fromMaybe OptUnknown $ do
   obj <- compileExpr obj2  
   cs <- mapM compileAtom cs2
-  return (optimize' isMinimize obj cs)
+  return (optimize' optdir obj cs)
 
 solve :: (RealFrac r) => [Atom r] -> SatResult r
 solve cs2 = fromMaybe Unknown $ do
@@ -69,15 +69,15 @@ solve' cs =
   where
     vs = vars cs
 
-optimize' :: (RealFrac r) => Bool -> LC r -> [Constraint r] -> OptResult r
-optimize' isMinimize obj cs =
+optimize' :: (RealFrac r) => OptDir -> LC r -> [Constraint r] -> OptResult r
+optimize' optdir obj cs =
   flip evalState (emptySolver vs) $ do
     tableau cs
     ret <- phaseI
     if not ret
       then return OptUnsat
       else do
-        ret2 <- simplex isMinimize obj
+        ret2 <- simplex optdir obj
         if not ret2
           then return Unbounded
           else do

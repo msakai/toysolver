@@ -15,7 +15,7 @@ cnfToLP :: DIMACS.CNF -> LPFile.LP
 cnfToLP cnf
   = LP
   { variables = Set.fromList vs
-  , isMinimize = False
+  , dir = OptMax
   , objectiveFunction = (Nothing, foldr1 (:+:) (map Var vs))
   , constraints = cs
   , LPFile.bounds = Map.empty
