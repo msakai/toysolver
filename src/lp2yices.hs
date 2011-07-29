@@ -38,21 +38,18 @@ not' x = list [showString "not", x]
 
 expr :: Env -> LP.Expr -> ShowS
 expr env e =
-  case map f (terms e) of
+  case e of
     [] -> showChar '0'
-    xs -> list (showChar '+' : xs)
+    _ -> list (showChar '+' : map f e)
   where
-    f (LP.Var v) = showString (env Map.! v)
-    f (LP.Const r) = num r
-    f ((LP.Const 1) LP.:*: b) = f b
-    f (a LP.:*: b) = list [showChar '*', f a, f b]
-    f (a LP.:+: b) = if a == LP.Const 1 then f b else list [showString "+", f a, f b]
-    f (a LP.:/: b) = list [showChar '/', f a, f b]
-
-    terms :: LP.Expr -> [LP.Expr]
-    terms (a LP.:+: b) = terms a ++ terms b
-    terms (LP.Const 0) = []
-    terms x = [x]
+    f (LP.Term c []) = num c
+    f (LP.Term c vs) =
+      case xs of
+        [] -> showChar '1'
+        [x] -> x
+        _ -> list (showChar '*' : xs)
+      where
+        xs = [num c | c /= 1] ++ [showString (env Map.! v) | v <- vs]
 
 num :: Rational -> ShowS
 num r
@@ -74,7 +71,7 @@ constraint q env (_, g, (e, op, b)) =
     Nothing -> c
     Just (var,val) ->
       list [ showString "=>"
-           , rel q LP.Eql (expr env (LP.Var var)) (num val)
+           , rel q LP.Eql (expr env [LP.Term 1 [var]]) (num val)
            , c
            ]
   where

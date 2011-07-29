@@ -30,7 +30,7 @@ convert formula@(obj, cs) = LPFile.LP
 
     obj2 =
       case obj of
-        Nothing -> foldr (LPFile.:+:) (LPFile.Const 0) (map LPFile.Var (Set.toList vs2))
+        Nothing -> [LPFile.Term 1 [v] | v <- Set.toList vs2]
         Just obj' -> g obj'
     cs2 = do
       (lhs,op,rhs) <- cs
@@ -40,17 +40,20 @@ convert formula@(obj, cs) = LPFile.LP
       return (Nothing, Nothing, (g lhs, op2, fromIntegral rhs))
 
     g :: PBFile.Sum -> LPFile.Expr
-    g = foldr (LPFile.:+:) (LPFile.Const 0) . map g2
+    g = concatMap g2
       where
         g2 :: PBFile.WeightedTerm -> LPFile.Expr
-        g2 (w, tm) = foldl (LPFile.:*:) (LPFile.Const (fromIntegral w)) (map g3 tm)
+        g2 (w, tm) = [LPFile.Term (fromIntegral w * c) vs  | LPFile.Term c vs <- concatMap g3 tm]
 
         g3 :: PBFile.Lit -> LPFile.Expr
-        g3 (PBFile.Pos x) = g4 x
-        g3 (PBFile.Neg x) = LPFile.Const 1 LPFile.:+: (LPFile.Const (-1) LPFile.:*: g4 x)
+        g3 (PBFile.Pos x) = [LPFile.Term 1 [h x]]
+        g3 (PBFile.Neg x) = [LPFile.Term 1 [], LPFile.Term (-1) [h x]]
 
-        g4 :: PBFile.Var -> LPFile.Expr
-        g4 = LPFile.Var . h
+        prodE :: LPFile.Expr -> LPFile.Expr -> LPFile.Expr
+        prodE e1 e2 = [prodT t1 t2 | t1 <- e1, t2 <- e2]
+
+        prodT :: LPFile.Term -> LPFile.Term -> LPFile.Term
+        prodT (LPFile.Term c1 vs1) (LPFile.Term c2 vs2) = LPFile.Term (c1*c2) (vs1++vs2)
 
     h :: PBFile.Var -> LPFile.Var
     h x = ("x" ++ show x)

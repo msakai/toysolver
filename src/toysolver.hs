@@ -78,11 +78,11 @@ run solver lp = do
     varToName = IM.fromList [(v,name) | (name,v) <- vsAssoc]
 
     compileE :: LP.Expr -> Expr Rational
-    compileE (LP.Const r) = Const r
-    compileE (LP.Var v) = Var (nameToVar Map.! v)
-    compileE (a LP.:+: b) = compileE a + compileE b
-    compileE (a LP.:*: b) = compileE a * compileE b
-    compileE (a LP.:/: b) = compileE a / compileE b
+    compileE = foldr (+) (Const 0) . map compileT
+
+    compileT :: LP.Term -> Expr Rational
+    compileT (LP.Term c vs) =
+      foldr (*) (Const c) [Var (nameToVar Map.! v) | v <- vs]
 
     obj = compileE $ snd $ LP.objectiveFunction lp
 

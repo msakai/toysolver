@@ -16,7 +16,7 @@ cnfToLP cnf
   = LP
   { variables = Set.fromList vs
   , dir = OptMax
-  , objectiveFunction = (Nothing, foldr1 (:+:) (map Var vs))
+  , objectiveFunction = (Nothing, [Term 1 [v] | v <- vs])
   , constraints = cs
   , LPFile.bounds = Map.empty
   , integerVariables = Set.empty
@@ -28,13 +28,13 @@ cnfToLP cnf
     vs = ["x" ++ show i | i <- [1 .. DIMACS.numVars cnf]]
     cs = do
       cl <- DIMACS.clauses cnf      
-      let (lhs,n) = foldr f (Const 0, 0) (elems cl)
+      let (lhs,n) = foldr f ([], 0) (elems cl)
       return (Nothing, Nothing, (lhs, Ge, fromIntegral $ 1 - n))
     f :: Int -> (Expr,Integer) -> (Expr,Integer)
     f i (vs,n) =
       if i > 0
-      then (Var v :+: vs, n)
-      else (Const (negate 1) :*: Var v :+: vs, n+1)
+      then (Term 1 [v] : vs, n)
+      else (Term (-1) [v] : vs, n+1)
       where v = "x" ++ show (abs i)
 
 main :: IO ()

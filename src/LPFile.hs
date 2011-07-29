@@ -19,7 +19,8 @@
 -----------------------------------------------------------------------------
 module LPFile
   ( LP (..)
-  , Expr (..)
+  , Expr
+  , Term (..)
   , OptDir (..)
   , ObjectiveFunction
   , Constraint
@@ -40,6 +41,7 @@ module LPFile
 import Control.Monad
 import Control.Monad.Writer
 import Data.Char
+import Data.List
 import Data.Maybe
 import Data.Ratio
 import qualified Data.Map as Map
@@ -65,12 +67,9 @@ data LP
   }
   deriving (Show, Eq, Ord)
 
-data Expr
-  = Const Rational
-  | Var Var
-  | Expr :+: Expr
-  | Expr :*: Expr
-  | Expr :/: Expr
+type Expr = [Term]
+
+data Term = Term Rational [Var]
   deriving (Eq, Ord, Show)
 
 type ObjectiveFunction = (Maybe Label, Expr)
@@ -95,12 +94,8 @@ instance Variables a => Variables [a] where
 instance Variables LP where
   vars = variables
 
-instance Variables Expr where
-  vars (Const _) = Set.empty
-  vars (Var v) = Set.singleton v
-  vars (a :+: b) = vars a `Set.union` vars b
-  vars (a :*: b) = vars a `Set.union` vars b
-  vars (a :/: b) = vars a `Set.union` vars b
+instance Variables Term where
+  vars (Term _ xs) = Set.fromList xs
 
 defaultBounds :: Bounds
 defaultBounds = (Finite 0, PosInf)
@@ -163,6 +158,7 @@ reserved = Set.fromList
   , "semi", "semi-continuous", "semis"
   , "sos"
   , "end"
+  , "subject"
   ]
 
 -- ---------------------------------------------------------------------------
@@ -231,7 +227,7 @@ constraint = do
     return (var, val)
 
   -- It seems that CPLEX allows empty lhs, but GLPK rejects it.
-  e <- try expr <|> return (Const 0)
+  e <- expr
   op <- relOp
   s <- option 1 sign
   rhs <- number
@@ -341,10 +337,13 @@ sosSection = do
 -- ---------------------------------------------------------------------------
 
 expr :: Parser Expr
-expr = do
-  t <- term True
-  ts <- many (term False)
-  return (foldl (:+:) t ts)
+expr = try expr1 <|> return []
+  where
+    expr1 :: Parser Expr
+    expr1 = do
+      t <- term True
+      ts <- many (term False)
+      return $ concat (t : ts)
 
 sign :: Num a => Parser a
 sign = tok ((char '+' >> return 1) <|> (char '-' >> return (-1)))
@@ -353,10 +352,10 @@ term :: Bool -> Parser Expr
 term flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
-  v <- liftM Var ident <|> qexpr
+  e <- liftM (\s -> [Term 1 [s]]) ident <|> qexpr
   return $ case combineMaybe (*) s c of
-    Nothing -> v
-    Just d -> Const d :*: v
+    Nothing -> e
+    Just d -> [Term (d*c) vs | Term c vs <- e]
 
 qexpr :: Parser Expr
 qexpr = do
@@ -364,22 +363,22 @@ qexpr = do
   t <- qterm True
   ts <- many (qterm False)
   mapM_ (tok . char) "]/2"
-  return (foldl (:+:) t ts :/: Const 2) 
+  return [Term (r / 2) vs | Term r vs <- t:ts]
 
-qterm :: Bool -> Parser Expr
+qterm :: Bool -> Parser Term
 qterm flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
-  es <- qfactor `chainl1`  (tok (char '*') >> return (:*:))
+  es <- qfactor `chainl1`  (tok (char '*') >> return (++))
   return $ case combineMaybe (*) s c of
-    Nothing -> es
-    Just d -> Const d :*: es
+    Nothing -> Term 1 es
+    Just d -> Term d es
 
-qfactor :: Parser Expr
+qfactor :: Parser [Var]
 qfactor = do
-  v <- liftM Var ident
-  msum [ tok (char '^') >> tok (char '2') >> return (v :*: v)
-       , return v
+  v <- ident
+  msum [ tok (char '^') >> tok (char '2') >> return [v,v]
+       , return [v]
        ]
 
 number :: Parser Rational
@@ -489,14 +488,22 @@ render' lp = do
 
 renderExpr :: Expr -> WriterT ShowS Maybe ()
 renderExpr e = do
-  e' <- lift $ liftM (Map.filter (0/=)) $ compileExpr e
-  forM_ (Map.toAscList e') $ \(v,c) -> do
+  forM_ e $ \(Term c vs) -> do
     tell $ showString $ if c >= 0 then " + " else " - "
     let c' = abs c
-    when (c' /= 1) $ do
-      renderValue c'
-      tell $ showChar ' '
-    tell $ showString v
+    case vs of
+      [] -> renderValue c'
+      [v] -> do
+        when (c' /= 1) $ do
+          renderValue c'
+          tell $ showChar ' '
+        tell $ showString v
+      _ -> do
+        tell $ showString "[ "
+        renderValue (2*c')
+        tell $ showChar ' '
+        tell $ showString (intercalate "*" vs)
+        tell $ showString " ]/2"
 
 renderValue :: Rational -> WriterT ShowS Maybe ()
 renderValue c =
@@ -522,29 +529,13 @@ renderBoundExpr PosInf = tell $ showString "+inf"
 
 -- ---------------------------------------------------------------------------
 
--- LC.hs にほぼ同じものがある
-asConst :: Map.Map Var Rational -> Maybe Rational
-asConst m =
-  case Map.toList m of
-    [] -> Just 0
-    [("",x)] -> Just x
-    _ -> Nothing
-
--- LA.hs にほぼ同じものがある
 compileExpr :: Expr -> Maybe (Map.Map Var Rational)
-compileExpr (Const c) = return $ Map.singleton "" c
-compileExpr (Var c) = return $ Map.singleton c 1
-compileExpr (a :+: b) = liftM2 (Map.unionWith (+)) (compileExpr a) (compileExpr b)
-compileExpr (a :*: b) = do
-  x <- compileExpr a
-  y <- compileExpr b
-  msum [ do{ c <- asConst x; return (fmap (c*) y) }
-       , do{ c <- asConst y; return (fmap (c*) x) }
-       ]
-compileExpr (a :/: b) = do
-  x <- compileExpr a
-  c <- asConst =<< compileExpr b
-  return $ fmap (/c) x
+compileExpr e = do
+  xs <- forM e $ \(Term c vs) ->
+    case vs of
+      [v] -> return (v, c)
+      _ -> mzero
+  return (Map.fromList xs)
 
 -- ---------------------------------------------------------------------------
 
