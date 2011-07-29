@@ -27,10 +27,12 @@ list xs = showParen True $ concatS (intersperse (showChar ' ') xs)
 
 and' :: [ShowS] -> ShowS
 and' [] = showString "true"
+and' [x] = x
 and' xs = list (showString "and" : xs)
 
 or' :: [ShowS] -> ShowS
 or' [] = showString "false"
+or' [x] = x
 or' xs = list (showString "or" : xs)
 
 not' :: ShowS -> ShowS
