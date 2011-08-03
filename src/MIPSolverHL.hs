@@ -38,6 +38,7 @@ import Data.List (maximumBy)
 import Data.Function
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.Ratio
 
 import Expr
 import Formula
@@ -248,16 +249,46 @@ example1 = (optdir, obj, cs, ivs)
       ]
     ivs = IS.singleton 4
 
-test1 :: OptResult Rational
-test1 = optimize' optdir obj cs ivs
+test1 :: Bool
+test1 = result==expected
   where
     (optdir, obj, cs, ivs) = example1
+    result, expected :: OptResult Rational
+    result = optimize' optdir obj cs ivs
+    expected = Optimum (245 % 2) (IM.fromList [(1,40 % 1),(2,21 % 2),(3,39 % 2),(4,3 % 1)])
 
-test2 :: OptResult Rational
-test2 = optimize' (f optdir) (lnegate obj) cs ivs
+test1' :: Bool
+test1' = result==expected
   where
     (optdir, obj, cs, ivs) = example1
     f OptMin = OptMax
     f OptMax = OptMin
+    result, expected :: OptResult Rational
+    result = optimize' (f optdir) (lnegate obj) cs ivs
+    expected = Optimum (-245 % 2) (IM.fromList [(1,40 % 1),(2,21 % 2),(3,39 % 2),(4,3 % 1)])
+
+-- 『数理計画法の基礎』(坂和 正敏) p.109 例 3.8
+example2 = (optdir, obj, cs, ivs)
+  where
+    optdir = OptMin
+    [x1,x2,x3] = map varLC [1..3]
+    obj = (-1) .*. x1 .-. 3 .*. x2 .-. 5 .*. x3
+    cs =
+      [ LARel (3 .*. x1 .+. 4 .*. x2) Le (constLC 10)
+      , LARel (2 .*. x1 .+. x2 .+. x3) Le (constLC 7)
+      , LARel (3.*.x1 .+. x2 .+. 4 .*. x3) Eql (constLC 12)
+      , LARel (constLC 0) Le x1
+      , LARel (constLC 0) Le x2
+      , LARel (constLC 0) Le x3
+      ]
+    ivs = IS.fromList [1,2]
+
+test2 :: Bool
+test2 = result == expected
+  where
+    result, expected :: OptResult Rational
+    result = optimize' optdir obj cs ivs
+    expected = Optimum ((-37) % 2) (IM.fromList [(1,0 % 1),(2,2 % 1),(3,5 % 2)])
+    (optdir, obj, cs, ivs) = example2
 
 -- ---------------------------------------------------------------------------
