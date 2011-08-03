@@ -9,11 +9,13 @@
 --
 -- References:
 -- 
+-- [Gomory1960]
 -- Ralph E. Gomory.
 -- An Algorithm for the Mixed Integer Problem, Technical Report
--- RM-2597, The Rand Corporation, Santa Monica, CA.
+-- RM-2597, 1960, The Rand Corporation, Santa Monica, CA.
 -- http://www.rand.org/pubs/research_memoranda/RM2597.html
 --
+-- [Gomory1958]
 -- Ralph E. Gomory.
 -- Outline of an algorithm for integer solutions to linear programs.
 -- Bull. Amer. Math. Soc., Vol. 64, No. 5. (1958), pp. 275-278.
@@ -29,6 +31,7 @@ module MIPSolverHL
 --  , solve
   ) where
 
+import Control.Exception
 import Control.Monad.State
 import Data.Maybe
 import Data.List (maximumBy)
@@ -189,16 +192,18 @@ traverse optdir obj ivs node0 = loop [node0] Nothing
             (f0, m0) = maximumBy (compare `on` fst) [(fracPart val, m) | (_,m,val) <- xs]
             sv = flip execState (ndSolver node) $ do
                    s <- gensym
-                   let g j x =
-                        if j `IS.member` ivs
-                        then
-                          if fracPart x <= f0
-                          then fracPart x
-                          else (f0 / (f0 - 1)) * (fracPart x - 1)
-                        else
-                          if x >= 0
-                          then x
-                          else (f0 / (f0 - 1)) * x
+                   let g j x = assert (a >= 0) a
+                         where
+                           a | j `IS.member` ivs =
+                                if fracPart x <= f0
+                                then fracPart x
+                                else (f0 / (f0 - 1)) * (fracPart x - 1)
+                                     -- [Gomory1960] では (f0 / (1 - f0)) * (fracPart x - 1) としているが、
+                                     -- これは誤り
+                             | otherwise =
+                                if x >= 0
+                                then x
+                                else (f0 / (f0 - 1)) * x
                    putTableau $ IM.insert s (IM.mapWithKey (\j x -> negate (g j x)) m0, negate f0) tbl
           in Just $ [node{ ndSolver = sv2, ndDepth = ndDepth node + 1 } | sv2 <- maybeToList (reopt sv)]
       | otherwise = -- branch
