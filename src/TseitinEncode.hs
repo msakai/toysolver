@@ -55,8 +55,8 @@ enc (Or xs) = do
 enc (Not x) = do
   v <- newVar
   v2 <- enc x
-  emitClause [Neg v, Pos v2]
-  emitClause [Pos v, Neg v2]
+  emitClause [Pos v, Pos v2]
+  emitClause [Neg v, Neg v2]
   return v
 enc (Imply x y) = enc (Or [Not x, y])
 
