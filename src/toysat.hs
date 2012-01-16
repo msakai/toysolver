@@ -29,9 +29,10 @@ solveCNF cnf = do
     SAT.addClause solver (elems clause)
   result <- SAT.solve solver
   putStrLn $ "s " ++ (if result then "SATISFIABLE" else "UNSATISFIABLE")
-  m <- SAT.model solver  
-  forM_ (IM.toList m) $ \(var,val) -> putStrLn ("v " ++ show (SAT.literal var val))
-  putStrLn "v 0"
+  when result $ do
+    m <- SAT.model solver  
+    forM_ (IM.toList m) $ \(var,val) -> putStrLn ("v " ++ show (SAT.literal var val))
+    putStrLn "v 0"
 
 header :: String
 header = "Usage: toysat2lp [file.cnf|-]"
