@@ -11,7 +11,6 @@ Description:	My sandbox for experimenting solver algorithms.
 Extra-Source-Files:
    README
    COPYING
-   SAT.rb
    src/TseitinEncode.hs
    samples/*.lp
    samples/*.mod
