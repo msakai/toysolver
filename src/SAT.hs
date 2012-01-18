@@ -84,7 +84,7 @@ data Assignment
   = Assignment
   { aValue  :: !Bool
   , aLevel  :: {-# UNPACK #-} !Level
-  , aReason :: !(Maybe ClauseData)
+  , aReason :: !(Maybe SomeConstraint)
   }
 
 data VarData
@@ -97,7 +97,7 @@ data VarData
 data LitData
   = LitData
   { -- | will be invoked when this literal is falsified
-    ldWatches :: !(IORef [ClauseData])
+    ldWatches :: !(IORef [SomeConstraint])
   }
 
 newVarData :: IO VarData
@@ -147,7 +147,7 @@ varLevel s v = do
 litLevel :: Solver -> Lit -> IO Level
 litLevel s l = varLevel s (litVar l)
 
-varReason :: Solver -> Var -> IO (Maybe ClauseData)
+varReason :: Solver -> Var -> IO (Maybe SomeConstraint)
 varReason s v = do
   vd <- varData s v
   m <- readIORef (vdAssignment vd)
@@ -162,7 +162,7 @@ data Solver
   , svAssigned     :: !(IORef (LevelMap [Lit]))
   , svVarCounter   :: !(IORef Int)
   , svVarData      :: !(IORef (VarMap VarData))
-  , svClauseDB     :: !(IORef [ClauseData])
+  , svClauseDB     :: !(IORef [SomeConstraint])
   , svLevel        :: !(IORef Level)
   , svBCPQueue     :: !(IORef [Lit])
   , svModel        :: !(IORef (Maybe (VarMap Bool)))
@@ -181,8 +181,14 @@ bcpDequeue solver = do
       writeIORef ref ls'
       return (Just l)
 
-assign :: Solver -> Lit -> Maybe ClauseData -> IO Bool
-assign solver lit reason = assert (validLit lit) $ do
+assignBy :: Constraint c => Solver -> Lit -> c -> IO Bool
+assignBy solver lit c = assign_ solver lit (Just (toSomeConstraint c))
+
+assign :: Solver -> Lit -> IO Bool
+assign solver lit = assign_ solver lit Nothing
+
+assign_ :: Solver -> Lit -> Maybe SomeConstraint -> IO Bool
+assign_ solver lit reason = assert (validLit lit) $ do
   vd <- varData solver (litVar lit)
   m <- readIORef (vdAssignment vd)
   case m of
@@ -218,15 +224,15 @@ unassign solver v = assert (validVar v) $ do
   modifyIORef (svUnassigned solver) (IS.insert v)
 
 -- | Register the constraint to be notified when the literal becames false.
-watch :: Solver -> Lit -> ClauseData -> IO ()
-watch solver lit cl = do
-  lits <- watchedLiterals solver cl
+watch :: Constraint c => Solver -> Lit -> c -> IO ()
+watch solver lit c = do
+  lits <- watchedLiterals solver c
   assert (lit `elem` lits) $ return ()
   ld <- litData solver lit
-  modifyIORef (ldWatches ld) (cl:)
+  modifyIORef (ldWatches ld) (toSomeConstraint c : )
 
 -- | Returns list of constraints that are watching the literal.
-watches :: Solver -> Lit -> IO [ClauseData]
+watches :: Solver -> Lit -> IO [SomeConstraint]
 watches solver lit = do
   ld <- litData solver lit
   readIORef (ldWatches ld)
@@ -277,13 +283,13 @@ addClause solver lits = do
     Nothing -> return ()
     Just [] -> writeIORef (svOk solver) False
     Just [lit] -> do
-      ret <- assign solver lit Nothing
+      ret <- assign solver lit
       unless ret $ writeIORef (svOk solver) False
     Just lits'@(l1:l2:_) -> do
       clause <- newClauseData lits'
       watch solver l1 clause
       watch solver l2 clause
-      modifyIORef (svClauseDB solver) (clause:)
+      modifyIORef (svClauseDB solver) (toSomeConstraint clause : )
       sanityCheck solver
 
 solve :: Solver -> IO Bool
@@ -334,7 +340,7 @@ solve solver = do
               debugPrintf "learnt clause: %s\n" (show learntClause)
               (cl, level, lit) <- newLearntClause solver learntClause
               backtrackTo solver level
-              assign solver lit (Just cl)
+              assignBy solver lit cl
               loop
 
 model :: Solver -> IO (VarMap Bool)
@@ -361,13 +367,13 @@ decide solver lit = do
   modifyIORef (svLevel solver) (+1)
   val <- litValue solver lit
   assert (isNothing val) $ return ()
-  assign solver lit Nothing
+  assign solver lit
   return ()
 
-deduce :: Solver -> IO (Maybe ClauseData)
+deduce :: Solver -> IO (Maybe SomeConstraint)
 deduce solver = loop
   where
-    loop :: IO (Maybe ClauseData)
+    loop :: IO (Maybe SomeConstraint)
     loop = do
       r <- bcpDequeue solver
       case r of
@@ -378,7 +384,7 @@ deduce solver = loop
             Just _ -> return ret
             Nothing -> loop
 
-    processLit :: Lit -> IO (Maybe ClauseData)
+    processLit :: Lit -> IO (Maybe SomeConstraint)
     processLit lit = do
       let lit2 = litNot lit
       ld <- litData solver lit2
@@ -479,7 +485,7 @@ newLearntClause solver lits = do
       level = head $ filter (< d) (map snd xs ++ [levelRoot])              
 
   cl <- newClauseData lits2
-  modifyIORef (svClauseDB solver) (cl:)
+  modifyIORef (svClauseDB solver) (toSomeConstraint cl : )
   case lits2 of
     l1:l2:_ -> do
       watch solver l1 cl
@@ -493,6 +499,8 @@ newLearntClause solver lits = do
 --------------------------------------------------------------------}
 
 class Constraint a where
+  toSomeConstraint :: a -> SomeConstraint
+
   showConstraint :: Solver -> a -> IO String
 
   watchedLiterals :: Solver -> a -> IO [Lit]
@@ -505,11 +513,26 @@ class Constraint a where
   -- assignment.
   reasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
+  isSatisfied :: Solver -> a -> IO Bool
+
+newtype SomeConstraint
+  = MConstrClause ClauseData
+  deriving Eq
+
+instance Constraint SomeConstraint where
+  toSomeConstraint = id
+  showConstraint s (MConstrClause c) = showConstraint s c
+  watchedLiterals s (MConstrClause c) = watchedLiterals s c
+  propagate s (MConstrClause c) lit = propagate s c lit
+  reasonOf s (MConstrClause c) l = reasonOf s c l
+  isSatisfied s (MConstrClause c) = isSatisfied s c
+  
 {--------------------------------------------------------------------
   Clause
 --------------------------------------------------------------------}
 
 newtype ClauseData = ClauseData{ unClauseData :: IOUArray Int Lit }
+  deriving Eq
 
 newClauseData :: Clause -> IO ClauseData
 newClauseData ls = do
@@ -518,17 +541,19 @@ newClauseData ls = do
   return (ClauseData a)
 
 instance Constraint ClauseData where
-  showConstraint _ cs = do
-    lits <- getElems (unClauseData cs)
+  toSomeConstraint = MConstrClause
+
+  showConstraint _ (ClauseData a) = do
+    lits <- getElems a
     return (show lits)
 
-  watchedLiterals _ cs = do
-    lits <- getElems (unClauseData cs)
+  watchedLiterals _ (ClauseData a) = do
+    lits <- getElems a
     case lits of
       l1:l2:_ -> return [l1, l2]
       _ -> return []
 
-  propagate s cs falsifiedLit = do
+  propagate s this@(ClauseData a) falsifiedLit = do
     preprocess
 
     lits <- getElems a
@@ -539,7 +564,7 @@ instance Constraint ClauseData where
     if val0 == Just True
       then do
         debugPrintf "propagate: already satisfied\n"
-        watch s falsifiedLit cs
+        watch s falsifiedLit this
         return True 
       else do
         (lb,ub) <- getBounds a
@@ -548,20 +573,18 @@ instance Constraint ClauseData where
         case ret of
           Nothing -> do
             debugPrintf "propagate: unit or conflict\n"
-            watch s falsifiedLit cs
-            assign s lit0 (Just cs)
+            watch s falsifiedLit this
+            assignBy s lit0 this
           Just i  -> do
             debugPrintf "propagate: watch updated\n"
             lit1 <- readArray a 1
             liti <- readArray a i
             writeArray a 1 liti
             writeArray a i lit1
-            watch s liti cs
+            watch s liti this
             return True
 
     where
-      a = unClauseData cs
-
       preprocess :: IO ()
       preprocess = do
         l0 <- readArray a 0
@@ -579,13 +602,18 @@ instance Constraint ClauseData where
           then return (Just i)
           else findForWatch (i+1) end
 
-  reasonOf _ cs l = do
-    lits <- getElems (unClauseData cs)
+  reasonOf _ (ClauseData a) l = do
+    lits <- getElems a
     case l of
       Nothing -> return lits
       Just lit -> do
         assert (lit == head lits) $ return ()
         return $ tail lits
+
+  isSatisfied solver (ClauseData a) = do
+    lits <- getElems a
+    vals <- mapM (litValue solver) lits
+    return $ Just True `elem` vals
 
 {-
 TODO:
@@ -610,11 +638,7 @@ debugPrint a = hPutStr stderr "c " >> hPrint stderr a
 checkSatisfied :: Solver -> IO ()
 checkSatisfied solver = do
   cls <- readIORef (svClauseDB solver)
-  xs <- forM cls $ \clause -> do
-    let a = unClauseData clause
-    lits <- getElems a
-    vals <- mapM (litValue solver) lits
-    return $ Just True `elem` vals
+  xs <- mapM (isSatisfied solver) cls 
   assert (and xs) $ return ()
 
 sanityCheck :: Solver -> IO ()
@@ -622,11 +646,10 @@ sanityCheck _ | not debugMode = return ()
 sanityCheck solver = do
   cls <- readIORef (svClauseDB solver)
   forM_ cls $ \constr -> do
-    let a = unClauseData constr
     lits <- watchedLiterals solver constr
     forM_ lits $ \l -> do
-      ws <- liftM (map unClauseData) $ watches solver l
-      unless (a `elem` ws) $ error $ printf "sanityCheck:A:%s" (show lits)
+      ws <- watches solver l
+      unless (constr `elem` ws) $ error $ printf "sanityCheck:A:%s" (show lits)
 
   m <- readIORef (svVarData solver)
   let lits = [l | v <- IM.keys m, l <- [literal v True, literal v False]]
