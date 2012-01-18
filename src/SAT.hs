@@ -292,6 +292,33 @@ addClause solver lits = do
       modifyIORef (svClauseDB solver) (toSomeConstraint clause : )
       sanityCheck solver
 
+addAtLeast :: Solver -> [Lit] -> Int -> IO ()
+addAtLeast solver lits n = do
+  d <- readIORef (svLevel solver)
+  assert (d == levelRoot) $ return ()
+
+  -- TODO: normalization
+  let lits' = IS.toList $ IS.fromList $ lits
+      len = length lits'
+
+  if n <= 0 then return ()
+    else if n > len then writeIORef (svOk solver) False
+    else if n == len then do
+      forM_ lits' $ \l -> do
+        ret <- assign solver l
+        unless ret $ writeIORef (svOk solver) False
+    else do
+      c <- newAtLeastData lits' n
+      forM_ (take (n+1) lits) $ \l -> watch solver l c
+      modifyIORef (svClauseDB solver) (toSomeConstraint c : )
+      sanityCheck solver
+
+addAtMost :: Solver -> [Lit] -> Int -> IO ()
+addAtMost solver lits n = addAtLeast solver lits' (len-n)
+  where
+    len   = length lits
+    lits' = map litNot lits
+
 solve :: Solver -> IO Bool
 solve solver = do
   writeIORef (svModel solver) Nothing
@@ -515,17 +542,28 @@ class Constraint a where
 
   isSatisfied :: Solver -> a -> IO Bool
 
-newtype SomeConstraint
-  = MConstrClause ClauseData
+data SomeConstraint
+  = MConstrClause !ClauseData
+  | MConstrAtLeast !AtLeastData
   deriving Eq
 
 instance Constraint SomeConstraint where
   toSomeConstraint = id
-  showConstraint s (MConstrClause c) = showConstraint s c
-  watchedLiterals s (MConstrClause c) = watchedLiterals s c
-  propagate s (MConstrClause c) lit = propagate s c lit
-  reasonOf s (MConstrClause c) l = reasonOf s c l
-  isSatisfied s (MConstrClause c) = isSatisfied s c
+
+  showConstraint s (MConstrClause c)  = showConstraint s c
+  showConstraint s (MConstrAtLeast c) = showConstraint s c
+
+  watchedLiterals s (MConstrClause c)  = watchedLiterals s c
+  watchedLiterals s (MConstrAtLeast c) = watchedLiterals s c
+
+  propagate s (MConstrClause c)  lit = propagate s c lit
+  propagate s (MConstrAtLeast c) lit = propagate s c lit
+
+  reasonOf s (MConstrClause c)  l = reasonOf s c l
+  reasonOf s (MConstrAtLeast c) l = reasonOf s c l
+
+  isSatisfied s (MConstrClause c)  = isSatisfied s c
+  isSatisfied s (MConstrAtLeast c) = isSatisfied s c
   
 {--------------------------------------------------------------------
   Clause
@@ -614,6 +652,106 @@ instance Constraint ClauseData where
     lits <- getElems a
     vals <- mapM (litValue solver) lits
     return $ Just True `elem` vals
+
+{--------------------------------------------------------------------
+  Cardinality Constraint
+--------------------------------------------------------------------}
+
+data AtLeastData
+  = AtLeastData
+  { atLeastLits :: IOUArray Int Lit
+  , atLeastNum :: !Int
+  }
+  deriving Eq
+
+newAtLeastData :: [Lit] -> Int -> IO AtLeastData
+newAtLeastData ls n = do
+  let size = length ls
+  a <- newListArray (0, size-1) ls
+  return (AtLeastData a n)
+
+instance Constraint AtLeastData where
+  toSomeConstraint = MConstrAtLeast
+
+  showConstraint solver (AtLeastData a n) = do
+    lits <- getElems a
+    return $ show lits ++ " >= " ++ show n
+
+  watchedLiterals solver (AtLeastData a n) = do
+    lits <- getElems a
+    let ws = if length lits > n then take (n+1) lits else []
+    return ws
+
+  propagate s this@(AtLeastData a n) falsifiedLit = do
+    preprocess
+
+    lits <- getElems a
+    str <- showConstraint s this
+    debugPrintf "propagating %d to %s\n" (litNot falsifiedLit) str
+
+    (lb,ub) <- getBounds a
+    assert (lb==0) $ return ()
+    ret <- findForWatch (n+1) ub
+    case ret of
+      Nothing -> do
+        debugPrintf "propagate AtLeast: unit or conflict or satisfied\n"
+        watch s falsifiedLit this
+        let loop :: Int -> IO Bool
+            loop i
+              | i >= n = return True
+              | otherwise = do                  
+                  liti <- readArray a i
+                  ret <- assignBy s liti this
+                  if ret
+                    then loop (i+1)
+                    else return False
+        loop 0
+      Just i  -> do
+        debugPrintf "propagate AtLeast: watch updated\n"
+        liti <- readArray a i
+        litn <- readArray a n
+        writeArray a i litn
+        writeArray a n liti
+        watch s liti this
+        return True
+
+    where
+      preprocess :: IO ()
+      preprocess = loop 0
+        where
+          loop :: Int -> IO ()
+          loop i
+            | i >= n = return ()
+            | otherwise = do
+              li <- readArray a i
+              if (li /= falsifiedLit)
+                then loop (i+1)
+                else do
+                  ln <- readArray a n
+                  writeArray a n li
+                  writeArray a i ln
+        
+
+      findForWatch :: Int -> Int -> IO (Maybe Int)
+      findForWatch i end | i > end = return Nothing
+      findForWatch i end = do
+        val <- litValue s =<< readArray a i
+        if val /= Just False
+          then return (Just i)
+          else findForWatch (i+1) end
+
+  reasonOf _ this@(AtLeastData a n) l = do
+    lits <- getElems a
+    case l of
+      Nothing -> return $ drop (n-1) lits
+      Just lit -> do
+        assert (lit `elem` take n lits) $ return ()
+        return $ drop n lits
+
+  isSatisfied solver (AtLeastData a n) = do
+    lits <- getElems a
+    vals <- mapM (litValue solver) lits
+    return $ length [v | v <- vals, v == Just True] >= n
 
 {-
 TODO:
@@ -708,3 +846,25 @@ test4 = do
   print =<< solve solver -- sat
   addClause solver [literal x1 False, literal x2 True]  -- not x1 or x2
   print =<< solve solver -- unsat
+
+testAtLeast1 :: IO ()
+testAtLeast1 = do
+  solver <- newSolver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- newVar solver
+  addAtLeast solver [x1,x2,x3] 2
+  addAtLeast solver [-x1,-x2,-x3] 2
+  print =<< solve solver -- unsat
+
+testAtLeast2 :: IO ()
+testAtLeast2 = do
+  solver <- newSolver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- newVar solver
+  x4 <- newVar solver
+  addAtLeast solver [x1,x2,x3,x4] 2
+  addClause solver [-x1,-x2]
+  addClause solver [-x1,-x3]
+  print =<< solve solver
