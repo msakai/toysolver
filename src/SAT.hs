@@ -111,12 +111,22 @@ type Clause = [Lit]
 --
 -- 'Nothing' if the clause is trivially true.
 normalizeClause :: Clause -> Maybe Clause
-normalizeClause xs =
-  if IS.null (IS.intersection ys (IS.map litNot ys))
-    then Just (IS.toList ys)
+normalizeClause lits = assert (IS.size ys `mod` 2 == 0) $ 
+  if IS.null ys
+    then Just (IS.toList xs)
     else Nothing
   where
-    ys = IS.fromList xs
+    xs = IS.fromList lits
+    ys = xs `IS.intersection` (IS.map litNot xs)
+
+normalizeAtLeast :: ([Lit],Int) -> ([Lit],Int)
+normalizeAtLeast (lits,n) = assert (IS.size ys `mod` 2 == 0) $ 
+   (IS.toList lits', n')
+   where
+     xs = IS.fromList lits
+     ys = xs `IS.intersection` (IS.map litNot xs)
+     lits' = xs `IS.difference` ys
+     n' = n - (IS.size ys `div` 2)
 
 {--------------------------------------------------------------------
   internal data structures
@@ -352,19 +362,19 @@ addAtLeast solver lits n = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
-  -- TODO: normalization
-  let lits' = IS.toList $ IS.fromList $ lits
+  let (lits',n') = normalizeAtLeast (lits,n)
       len = length lits'
 
-  if n <= 0 then return ()
-    else if n > len then writeIORef (svOk solver) False
-    else if n == len then do
+  if n' <= 0 then return ()
+    else if n' > len then writeIORef (svOk solver) False
+    else if n' == 1 then addClause solver lits'
+    else if n' == len then do
       forM_ lits' $ \l -> do
         ret <- assign solver l
         unless ret $ writeIORef (svOk solver) False
     else do
-      c <- newAtLeastData lits' n
-      forM_ (take (n+1) lits) $ \l -> watch solver l c
+      c <- newAtLeastData lits' n'
+      forM_ (take (n'+1) lits) $ \l -> watch solver l c
       modifyIORef (svClauseDB solver) (toConstraint c : )
       sanityCheck solver
 
