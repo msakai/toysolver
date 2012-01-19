@@ -34,9 +34,11 @@ data Flag
     = Help
     | Version
     | Solver String
-    -- | SatMode
-    -- | Load String
-    -- | Trace String
+{-
+    | SatMode
+    | Load String
+    | Trace String
+-}
     deriving Eq
 
 options :: [OptDescr Flag]
