@@ -1,17 +1,51 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  SAT
+-- Copyright   :  (c) Masahiro Sakai 2012
+-- License     :  BSD-style
+--
+-- A toy-level SAT solver based on CDCL.
+--
+-- TODO:
+--
+-- * PB constraint
+--
+-- * XOR clause
+--
+-- * VSIDS heauristics
+--
+-- * RESTART
+--
+-----------------------------------------------------------------------------
 module SAT
-  ( Var
+  (
+  -- * The @Solver@ type
+    Solver
+  , newSolver
+
+  -- * Basic data structures
+  , Var
   , Lit
   , literal
   , litNot
   , litVar
   , litPolarity
   , Clause
-  , Solver
-  , newSolver
+
+  -- * Problem specification
   , newVar
   , addClause
+  , addAtLeast
+  , addAtMost
+
+  -- * Solving
   , solve
+
+--  -- * Read state
+
+  -- * Extract results
+  , Model
   , model
   ) where
 
@@ -31,37 +65,51 @@ import Text.Printf
   pure/persistent data structures
 --------------------------------------------------------------------}
 
+-- | Variable is represented as positive integers (DIMACS format).
 type Var = Int
+
 type VarSet = IS.IntSet
 type VarMap = IM.IntMap
 
 validVar :: Var -> Bool
 validVar v = v > 0
 
+-- | Positive (resp. negative) literals are represented as positive (resp.
+-- negative) integers. (DIMACS format).
 type Lit = Int
+
 type LitSet = IS.IntSet
 
 validLit :: Lit -> Bool
 validLit l = l /= 0
 
-literal :: Var -> Bool -> Lit
+-- | Construct a literal from a variable and its polarity.
+-- 'True' (resp 'False') means positive (resp. negative) literal.
+literal :: Var  -- ^ variable
+        -> Bool -- ^ polarity
+        -> Lit
 literal v polarity =
   assert (validVar v) $ if polarity then v else litNot v
 
+-- | Negation of the 'Lit'.
 litNot :: Lit -> Lit
 litNot l = assert (validLit l) $ negate l
 
+-- | Underlying variable of the 'Lit'
 litVar :: Lit -> Var
 litVar l = assert (validLit l) $ abs l
 
+-- | Polarity of the 'Lit'.
+-- 'True' means positive literal and 'False' means negative literal.
 litPolarity :: Lit -> Bool
 litPolarity l = assert (validLit l) $ l > 0
 
+-- | Disjunction of 'Lit'.
 type Clause = [Lit]
 
 -- | Normalizing clause
--- 
--- @Nothing@ if the clause is trivially true.
+--
+-- 'Nothing' if the clause is trivially true.
 normalizeClause :: Clause -> Maybe Clause
 normalizeClause xs =
   if IS.null (IS.intersection ys (IS.map litNot ys))
@@ -80,7 +128,7 @@ type LevelMap = IM.IntMap
 levelRoot :: Level
 levelRoot = -1
 
-data Assignment 
+data Assignment
   = Assignment
   { aValue  :: !Bool
   , aLevel  :: {-# UNPACK #-} !Level
@@ -134,7 +182,7 @@ varValue s v = do
 litValue :: Solver -> Lit -> IO (Maybe Bool)
 litValue s l = do
   m <- varValue s (litVar l)
-  return $ fmap (if litPolarity l then id else not) m  
+  return $ fmap (if litPolarity l then id else not) m
 
 varLevel :: Solver -> Var -> IO Level
 varLevel s v = do
@@ -182,7 +230,7 @@ bcpDequeue solver = do
       return (Just l)
 
 assignBy :: Constraint c => Solver -> Lit -> c -> IO Bool
-assignBy solver lit c = assign_ solver lit (Just (toSomeConstraint c))
+assignBy solver lit c = assign_ solver lit (Just (toConstraint c))
 
 assign :: Solver -> Lit -> IO Bool
 assign solver lit = assign_ solver lit Nothing
@@ -195,14 +243,14 @@ assign_ solver lit reason = assert (validLit lit) $ do
     Just a -> return $ litPolarity lit == aValue a
     Nothing -> do
       lv <- readIORef (svLevel solver)
-    
-      writeIORef (vdAssignment vd) $ Just $ 
+
+      writeIORef (vdAssignment vd) $ Just $
         Assignment
         { aValue  = litPolarity lit
         , aLevel  = lv
         , aReason = reason
         }
-    
+
       modifyIORef (svAssigned solver) (IM.insertWith (++) lv [lit])
       modifyIORef (svUnassigned solver) (IS.delete (litVar lit))
       bcpEnqueue solver lit
@@ -229,7 +277,7 @@ watch solver lit c = do
   lits <- watchedLiterals solver c
   assert (lit `elem` lits) $ return ()
   ld <- litData solver lit
-  modifyIORef (ldWatches ld) (toSomeConstraint c : )
+  modifyIORef (ldWatches ld) (toConstraint c : )
 
 -- | Returns list of constraints that are watching the literal.
 watches :: Solver -> Lit -> IO [SomeConstraint]
@@ -241,6 +289,7 @@ watches solver lit = do
   external API
 --------------------------------------------------------------------}
 
+-- | Create a new Solver instance.
 newSolver :: IO Solver
 newSolver = do
   ok   <- newIORef True
@@ -252,7 +301,7 @@ newSolver = do
   lv  <- newIORef levelRoot
   q   <- newIORef []
   m   <- newIORef Nothing
-  return $ 
+  return $
     Solver
     { svOk = ok
     , svVarCounter = vcnt
@@ -265,6 +314,7 @@ newSolver = do
     , svModel      = m
     }
 
+-- |Add a new variable
 newVar :: Solver -> IO Var
 newVar s = do
   v <- readIORef (svVarCounter s)
@@ -274,6 +324,7 @@ newVar s = do
   modifyIORef (svVarData s) (IM.insert v vd)
   return v
 
+-- |Add a clause to the solver.
 addClause :: Solver -> Clause -> IO ()
 addClause solver lits = do
   d <- readIORef (svLevel solver)
@@ -289,10 +340,14 @@ addClause solver lits = do
       clause <- newClauseData lits'
       watch solver l1 clause
       watch solver l2 clause
-      modifyIORef (svClauseDB solver) (toSomeConstraint clause : )
+      modifyIORef (svClauseDB solver) (toConstraint clause : )
       sanityCheck solver
 
-addAtLeast :: Solver -> [Lit] -> Int -> IO ()
+-- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
+addAtLeast :: Solver -- ^ The 'Solver' argument.
+           -> [Lit]  -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)
+           -> Int    -- ^ /n/.
+           -> IO ()
 addAtLeast solver lits n = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
@@ -310,15 +365,22 @@ addAtLeast solver lits n = do
     else do
       c <- newAtLeastData lits' n
       forM_ (take (n+1) lits) $ \l -> watch solver l c
-      modifyIORef (svClauseDB solver) (toSomeConstraint c : )
+      modifyIORef (svClauseDB solver) (toConstraint c : )
       sanityCheck solver
 
-addAtMost :: Solver -> [Lit] -> Int -> IO ()
+-- | Add a cardinality constraints /atmost({l1,l2,..},n)/.
+addAtMost :: Solver -- ^ The 'Solver' argument
+          -> [Lit]  -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)
+          -> Int    -- ^ /n/
+          -> IO ()
 addAtMost solver lits n = addAtLeast solver lits' (len-n)
   where
     len   = length lits
     lits' = map litNot lits
 
+-- | Solve constraints.
+-- Returns 'True' if the problem is SATISFIABLE.
+-- Returns 'False' if the problem is UNSATISFIABLE.
 solve :: Solver -> IO Bool
 solve solver = do
   writeIORef (svModel solver) Nothing
@@ -339,7 +401,6 @@ solve solver = do
       return result
 
   where
-   
     loop :: IO Bool
     loop = do
       sanityCheck solver
@@ -370,7 +431,10 @@ solve solver = do
               assignBy solver lit cl
               loop
 
-model :: Solver -> IO (VarMap Bool)
+type Model = IM.IntMap Bool
+
+-- | After 'solve' returns True, it returns the model.
+model :: Solver -> IO Model
 model solver = do
   m <- readIORef (svModel solver)
   return (fromJust m)
@@ -388,7 +452,7 @@ pickBranchLit solver = do
     Just (v,vs') -> do
       writeIORef ref vs'
       return (Just (literal v True))
-  
+
 decide :: Solver -> Lit -> IO ()
 decide solver lit = do
   modifyIORef (svLevel solver) (+1)
@@ -473,7 +537,7 @@ analyzeConflict solver constr = do
   return $ IS.toList lits
 
 -- | Revert to the state at given level
--- (keeping all assignment at 'level' but not beyond).
+-- (keeping all assignment at @level@ but not beyond).
 backtrackTo :: Solver -> Int -> IO ()
 backtrackTo solver level = do
   debugPrintf "backtrackTo: %d\n" level
@@ -484,7 +548,7 @@ backtrackTo solver level = do
   writeIORef (svLevel solver) level
   where
     loop :: LevelMap [Lit] -> IO (LevelMap [Lit])
-    loop m = 
+    loop m =
       case IM.maxViewWithKey m of
         Just ((lv,lits),m') | level < lv -> do
           forM_ lits $ \lit -> unassign solver (litVar lit)
@@ -497,7 +561,8 @@ constructModel solver = do
   xs <- forM (IM.toAscList vds) $ \(v, vd) -> do
     a <- readIORef (vdAssignment vd)
     return $ (v, aValue (fromJust a))
-  writeIORef (svModel solver) (Just (IM.fromAscList xs))
+  let m = IM.fromAscList xs
+  writeIORef (svModel solver) (Just m)
 
 newLearntClause :: Solver -> Clause -> IO (ClauseData, Level, Lit)
 newLearntClause solver lits = do
@@ -509,10 +574,10 @@ newLearntClause solver lits = do
       return (l,lv)
 
   let lits2 = map fst xs
-      level = head $ filter (< d) (map snd xs ++ [levelRoot])              
+      level = head $ filter (< d) (map snd xs ++ [levelRoot])
 
   cl <- newClauseData lits2
-  modifyIORef (svClauseDB solver) (toSomeConstraint cl : )
+  modifyIORef (svClauseDB solver) (toConstraint cl : )
   case lits2 of
     l1:l2:_ -> do
       watch solver l1 cl
@@ -526,7 +591,7 @@ newLearntClause solver lits = do
 --------------------------------------------------------------------}
 
 class Constraint a where
-  toSomeConstraint :: a -> SomeConstraint
+  toConstraint :: a -> SomeConstraint
 
   showConstraint :: Solver -> a -> IO String
 
@@ -543,33 +608,33 @@ class Constraint a where
   isSatisfied :: Solver -> a -> IO Bool
 
 data SomeConstraint
-  = MConstrClause !ClauseData
-  | MConstrAtLeast !AtLeastData
+  = ConstrClause !ClauseData
+  | ConstrAtLeast !AtLeastData
   deriving Eq
 
 instance Constraint SomeConstraint where
-  toSomeConstraint = id
+  toConstraint = id
 
-  showConstraint s (MConstrClause c)  = showConstraint s c
-  showConstraint s (MConstrAtLeast c) = showConstraint s c
+  showConstraint s (ConstrClause c)  = showConstraint s c
+  showConstraint s (ConstrAtLeast c) = showConstraint s c
 
-  watchedLiterals s (MConstrClause c)  = watchedLiterals s c
-  watchedLiterals s (MConstrAtLeast c) = watchedLiterals s c
+  watchedLiterals s (ConstrClause c)  = watchedLiterals s c
+  watchedLiterals s (ConstrAtLeast c) = watchedLiterals s c
 
-  propagate s (MConstrClause c)  lit = propagate s c lit
-  propagate s (MConstrAtLeast c) lit = propagate s c lit
+  propagate s (ConstrClause c)  lit = propagate s c lit
+  propagate s (ConstrAtLeast c) lit = propagate s c lit
 
-  reasonOf s (MConstrClause c)  l = reasonOf s c l
-  reasonOf s (MConstrAtLeast c) l = reasonOf s c l
+  reasonOf s (ConstrClause c)  l = reasonOf s c l
+  reasonOf s (ConstrAtLeast c) l = reasonOf s c l
 
-  isSatisfied s (MConstrClause c)  = isSatisfied s c
-  isSatisfied s (MConstrAtLeast c) = isSatisfied s c
-  
+  isSatisfied s (ConstrClause c)  = isSatisfied s c
+  isSatisfied s (ConstrAtLeast c) = isSatisfied s c
+
 {--------------------------------------------------------------------
   Clause
 --------------------------------------------------------------------}
 
-newtype ClauseData = ClauseData{ unClauseData :: IOUArray Int Lit }
+newtype ClauseData = ClauseData (IOUArray Int Lit)
   deriving Eq
 
 newClauseData :: Clause -> IO ClauseData
@@ -579,7 +644,7 @@ newClauseData ls = do
   return (ClauseData a)
 
 instance Constraint ClauseData where
-  toSomeConstraint = MConstrClause
+  toConstraint = ConstrClause
 
   showConstraint _ (ClauseData a) = do
     lits <- getElems a
@@ -603,7 +668,7 @@ instance Constraint ClauseData where
       then do
         debugPrintf "propagate: already satisfied\n"
         watch s falsifiedLit this
-        return True 
+        return True
       else do
         (lb,ub) <- getBounds a
         assert (lb==0) $ return ()
@@ -671,13 +736,13 @@ newAtLeastData ls n = do
   return (AtLeastData a n)
 
 instance Constraint AtLeastData where
-  toSomeConstraint = MConstrAtLeast
+  toConstraint = ConstrAtLeast
 
-  showConstraint solver (AtLeastData a n) = do
+  showConstraint _ (AtLeastData a n) = do
     lits <- getElems a
     return $ show lits ++ " >= " ++ show n
 
-  watchedLiterals solver (AtLeastData a n) = do
+  watchedLiterals _ (AtLeastData a n) = do
     lits <- getElems a
     let ws = if length lits > n then take (n+1) lits else []
     return ws
@@ -685,7 +750,6 @@ instance Constraint AtLeastData where
   propagate s this@(AtLeastData a n) falsifiedLit = do
     preprocess
 
-    lits <- getElems a
     str <- showConstraint s this
     debugPrintf "propagating %d to %s\n" (litNot falsifiedLit) str
 
@@ -699,10 +763,10 @@ instance Constraint AtLeastData where
         let loop :: Int -> IO Bool
             loop i
               | i >= n = return True
-              | otherwise = do                  
+              | otherwise = do
                   liti <- readArray a i
-                  ret <- assignBy s liti this
-                  if ret
+                  ret2 <- assignBy s liti this
+                  if ret2
                     then loop (i+1)
                     else return False
         loop 0
@@ -730,7 +794,6 @@ instance Constraint AtLeastData where
                   ln <- readArray a n
                   writeArray a n li
                   writeArray a i ln
-        
 
       findForWatch :: Int -> Int -> IO (Maybe Int)
       findForWatch i end | i > end = return Nothing
@@ -740,7 +803,7 @@ instance Constraint AtLeastData where
           then return (Just i)
           else findForWatch (i+1) end
 
-  reasonOf _ this@(AtLeastData a n) l = do
+  reasonOf _ (AtLeastData a n) l = do
     lits <- getElems a
     case l of
       Nothing -> return $ drop (n-1) lits
@@ -753,13 +816,6 @@ instance Constraint AtLeastData where
     vals <- mapM (litValue solver) lits
     return $ length [v | v <- vals, v == Just True] >= n
 
-{-
-TODO:
-* cardinality constraint
-* PB constraint
-* XOR clause
--}
-
 {--------------------------------------------------------------------
   debug
 --------------------------------------------------------------------}
@@ -768,7 +824,7 @@ debugMode :: Bool
 debugMode = False
 
 debugPrintf :: HPrintfType r => String -> r
-debugPrintf s = hPrintf stderr ("c " ++ s) 
+debugPrintf s = hPrintf stderr ("c " ++ s)
 
 debugPrint :: Show a => a -> IO ()
 debugPrint a = hPutStr stderr "c " >> hPrint stderr a
@@ -776,7 +832,7 @@ debugPrint a = hPutStr stderr "c " >> hPrint stderr a
 checkSatisfied :: Solver -> IO ()
 checkSatisfied solver = do
   cls <- readIORef (svClauseDB solver)
-  xs <- mapM (isSatisfied solver) cls 
+  xs <- mapM (isSatisfied solver) cls
   assert (and xs) $ return ()
 
 sanityCheck :: Solver -> IO ()
