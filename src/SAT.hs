@@ -229,6 +229,9 @@ data Solver
   , svModel        :: !(IORef (Maybe (VarMap Bool)))
   }
 
+markBad :: Solver -> IO ()
+markBad solver = writeIORef (svOk solver) False
+
 bcpEnqueue :: Solver -> Lit -> IO ()
 bcpEnqueue solver l = modifyIORef (svBCPQueue solver) (l:)
 
@@ -345,10 +348,10 @@ addClause solver lits = do
 
   case normalizeClause lits of
     Nothing -> return ()
-    Just [] -> writeIORef (svOk solver) False
+    Just [] -> markBad solver
     Just [lit] -> do
       ret <- assign solver lit
-      unless ret $ writeIORef (svOk solver) False
+      unless ret $ markBad solver
     Just lits'@(l1:l2:_) -> do
       clause <- newClauseData lits'
       watch solver l1 clause
@@ -369,12 +372,12 @@ addAtLeast solver lits n = do
       len = length lits'
 
   if n' <= 0 then return ()
-    else if n' > len then writeIORef (svOk solver) False
+    else if n' > len then markBad solver
     else if n' == 1 then addClause solver lits'
     else if n' == len then do
       forM_ lits' $ \l -> do
         ret <- assign solver l
-        unless ret $ writeIORef (svOk solver) False
+        unless ret $ markBad solver
     else do
       c <- newAtLeastData lits' n'
       forM_ (take (n'+1) lits) $ \l -> watch solver l c
