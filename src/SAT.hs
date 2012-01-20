@@ -38,6 +38,7 @@ module SAT
   , addClause
   , addAtLeast
   , addAtMost
+  , addExactly
 
   -- * Solving
   , solve
@@ -387,6 +388,15 @@ addAtMost solver lits n = addAtLeast solver lits' (len-n)
   where
     len   = length lits
     lits' = map litNot lits
+
+-- | Add a cardinality constraints /exactly({l1,l2,..},n)/.
+addExactly :: Solver -- ^ The 'Solver' argument
+           -> [Lit]  -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)1
+           -> Int    -- ^ /n/
+           -> IO ()
+addExactly solver lits n = do
+  addAtLeast solver lits n
+  addAtMost solver lits n
 
 -- | Solve constraints.
 -- Returns 'True' if the problem is SATISFIABLE.
