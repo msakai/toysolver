@@ -41,6 +41,9 @@ module SAT
   , addAtLeast
   , addAtMost
   , addExactly
+  , addPBAtLeast
+  , addPBAtMost
+  , addPBExactly
 
   -- * Solving
   , solve
@@ -61,6 +64,7 @@ import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import qualified Data.Set as Set
 import System.IO
 import Text.Printf
 
@@ -82,6 +86,7 @@ validVar v = v > 0
 type Lit = Int
 
 type LitSet = IS.IntSet
+type LitMap = IM.IntMap
 
 validLit :: Lit -> Bool
 validLit l = l /= 0
@@ -463,6 +468,53 @@ addExactly solver lits n = do
   addAtLeast solver lits n
   addAtMost solver lits n
 
+-- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≥ n/.
+addPBAtLeast :: Solver          -- ^ The 'Solver' argument.
+             -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
+             -> Integer         -- ^ /n/.
+             -> IO ()
+addPBAtLeast solver ts n = do
+  d <- readIORef (svLevel solver)
+  assert (d == levelRoot) $ return ()
+
+  let (ts',degree) = normalizePBAtLeast (ts,n)
+      cs = map fst ts'
+      slack = sum cs - degree
+
+  if degree <= 0 then return ()
+    else if slack < 0 then markBad solver
+    else if Set.size (Set.fromList cs) == 1 then do
+      let c = head cs
+      addAtLeast solver (map snd ts') (fromInteger ((degree+c-1) `div` c))
+    else do
+      forM_ ts' $ \(c,l) -> do
+        when (slack - c < 0) $ do
+          ret <- assign solver l
+          unless ret $ markBad solver
+      ok <- readIORef (svOk solver)
+      when ok $ do
+        c <- newPBAtLeastData ts' degree
+        forM_ ts' $ \(_,l) -> do
+          watch solver l c
+        modifyIORef (svClauseDB solver) (toConstraint c : )
+        sanityCheck solver
+
+-- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
+addPBAtMost :: Solver          -- ^ The 'Solver' argument.
+            -> [(Integer,Lit)] -- ^ list of @[(c1,l1),(c2,l2),…]@
+            -> Integer         -- ^ /n/.
+            -> IO ()
+addPBAtMost solver ts n = addPBAtLeast solver [(-c,l) | (c,l) <- ts] (negate n)
+
+-- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … = n/.
+addPBExactly :: Solver          -- ^ The 'Solver' argument.
+             -> [(Integer,Lit)] -- ^ list of terms @[(c1,l1),(c2,l2),…]@
+             -> Integer         -- ^ /n/.
+             -> IO ()
+addPBExactly solver ts n = do
+  addPBAtLeast solver ts n
+  addPBAtMost solver ts n
+
 -- | Solve constraints.
 -- Returns 'True' if the problem is SATISFIABLE.
 -- Returns 'False' if the problem is UNSATISFIABLE.
@@ -695,25 +747,31 @@ class Constraint a where
 data SomeConstraint
   = ConstrClause !ClauseData
   | ConstrAtLeast !AtLeastData
+  | ConstrPBAtLeast !PBAtLeastData
   deriving Eq
 
 instance Constraint SomeConstraint where
   toConstraint = id
 
-  showConstraint s (ConstrClause c)  = showConstraint s c
-  showConstraint s (ConstrAtLeast c) = showConstraint s c
+  showConstraint s (ConstrClause c)    = showConstraint s c
+  showConstraint s (ConstrAtLeast c)   = showConstraint s c
+  showConstraint s (ConstrPBAtLeast c) = showConstraint s c
 
-  watchedLiterals s (ConstrClause c)  = watchedLiterals s c
-  watchedLiterals s (ConstrAtLeast c) = watchedLiterals s c
+  watchedLiterals s (ConstrClause c)    = watchedLiterals s c
+  watchedLiterals s (ConstrAtLeast c)   = watchedLiterals s c
+  watchedLiterals s (ConstrPBAtLeast c) = watchedLiterals s c
 
-  propagate s (ConstrClause c)  lit = propagate s c lit
-  propagate s (ConstrAtLeast c) lit = propagate s c lit
+  propagate s (ConstrClause c)  lit   = propagate s c lit
+  propagate s (ConstrAtLeast c) lit   = propagate s c lit
+  propagate s (ConstrPBAtLeast c) lit = propagate s c lit
 
-  reasonOf s (ConstrClause c)  l = reasonOf s c l
-  reasonOf s (ConstrAtLeast c) l = reasonOf s c l
+  reasonOf s (ConstrClause c)  l   = reasonOf s c l
+  reasonOf s (ConstrAtLeast c) l   = reasonOf s c l
+  reasonOf s (ConstrPBAtLeast c) l = reasonOf s c l
 
-  isSatisfied s (ConstrClause c)  = isSatisfied s c
-  isSatisfied s (ConstrAtLeast c) = isSatisfied s c
+  isSatisfied s (ConstrClause c)    = isSatisfied s c
+  isSatisfied s (ConstrAtLeast c)   = isSatisfied s c
+  isSatisfied s (ConstrPBAtLeast c) = isSatisfied s c
 
 {--------------------------------------------------------------------
   Clause
@@ -902,6 +960,84 @@ instance Constraint AtLeastData where
     return $ length [v | v <- vals, v == Just True] >= n
 
 {--------------------------------------------------------------------
+  Pseudo Boolean Constraint
+--------------------------------------------------------------------}
+
+data PBAtLeastData
+  = PBAtLeastData
+  { pbTerms  :: !(LitMap Integer)
+  , pbDegree :: !Integer
+  , pbSlack  :: !(IORef Integer)
+  }
+  deriving Eq
+
+newPBAtLeastData :: [(Integer,Lit)] -> Integer -> IO PBAtLeastData
+newPBAtLeastData ts degree = do
+  let slack = sum (map fst ts) - degree
+      m = IM.fromList [(l,c) | (c,l) <- ts]
+  s <- newIORef slack
+  return (PBAtLeastData m degree s)
+
+instance Constraint PBAtLeastData where
+  toConstraint = ConstrPBAtLeast
+
+  showConstraint _ (PBAtLeastData m degree _) = do
+    return $ show [(c,l) | (l,c) <- IM.toList m] ++ " >= " ++ show degree
+
+  watchedLiterals _ (PBAtLeastData m _ _) = do
+    return $ IM.keys m
+
+  propagate solver this@(PBAtLeastData m _ slack) falsifiedLit = do
+    watch solver falsifiedLit this
+
+    let c = m IM.! falsifiedLit
+    modifyIORef slack (subtract c)
+    addBacktrackCB solver (litVar falsifiedLit) $ modifyIORef slack (+ c)
+    s <- readIORef slack
+
+    str <- showConstraint solver this
+    debugPrintf "propagating %d to %s (new slack = %d)\n" (litNot falsifiedLit) str s
+
+    if s < 0
+      then return False
+      else if s == 0 then return True
+      else do
+        forM_ (IM.toList m) $ \(l1,c1) ->
+          when (c1 > s) $ do
+            v <- litValue solver l1
+            case v of
+              Just _ -> return ()
+              Nothing -> do
+                assignBy solver l1 (toConstraint this)
+                return ()
+        return True
+
+  reasonOf solver (PBAtLeastData m degree _) l = do
+    xs <- do
+      tmp <- filterM (\(lit,_) -> liftM (Just False ==) (litValue solver lit)) (IM.toList m)
+      return $ sortBy (flip compare `on` snd) tmp
+    let max_slack = sum (map snd $ IM.toList m) - degree
+    case l of
+      Nothing -> return $ f max_slack xs
+      Just lit -> return $ f (max_slack - (m IM.! lit)) xs
+    where
+      f :: Integer -> [(Lit,Integer)] -> [Lit]
+      f s xs = go s xs []
+
+      go :: Integer -> [(Lit,Integer)] -> [Lit] -> [Lit]
+      go s _ ret | s < 0 = ret
+      go _ [] _ = error "should not happen"
+      go s ((lit,c):xs) ret = go (s - c) xs (lit:ret)
+
+  isSatisfied solver (PBAtLeastData m degree _) = do
+    xs <- forM (IM.toList m) $ \(l,c) -> do
+      v <- litValue solver l
+      case v of
+        Just True -> return c
+        _ -> return 0
+    return $ sum xs >= degree
+
+{--------------------------------------------------------------------
   debug
 --------------------------------------------------------------------}
 
@@ -1008,4 +1144,22 @@ testAtLeast2 = do
   addAtLeast solver [x1,x2,x3,x4] 2
   addClause solver [-x1,-x2]
   addClause solver [-x1,-x3]
+  print =<< solve solver
+
+-- from http://www.cril.univ-artois.fr/PB11/format.pdf
+testPB1 :: IO ()
+testPB1 = do
+  solver <- newSolver
+
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- newVar solver
+  x4 <- newVar solver
+  x5 <- newVar solver
+
+  addPBAtLeast solver [(1,x1),(4,x2),(-2,x5)] 2
+  addPBAtLeast solver [(-1,x1),(4,x2),(-2,x5)] 3
+  addPBAtLeast solver [(12345678901234567890,x4),(4,x3)] 10
+  addPBExactly solver [(2,x2),(3,x4),(2,x1),(3,x5)] 5
+
   print =<< solve solver
