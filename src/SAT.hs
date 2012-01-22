@@ -193,6 +193,7 @@ data Assignment
   { aValue  :: !Bool
   , aLevel  :: {-# UNPACK #-} !Level
   , aReason :: !(Maybe SomeConstraint)
+  , aBacktrackCBs :: !(IORef [IO ()])
   }
 
 data VarData
@@ -306,12 +307,14 @@ assign_ solver lit reason = assert (validLit lit) $ do
     Just a -> return $ litPolarity lit == aValue a
     Nothing -> do
       lv <- readIORef (svLevel solver)
+      bt <- newIORef []
 
       writeIORef (vdAssignment vd) $ Just $
         Assignment
         { aValue  = litPolarity lit
         , aLevel  = lv
         , aReason = reason
+        , aBacktrackCBs = bt
         }
 
       modifyIORef (svAssigned solver) (IM.insertWith (++) lv [lit])
@@ -329,10 +332,20 @@ assign_ solver lit reason = assert (validLit lit) $ do
 unassign :: Solver -> Var -> IO ()
 unassign solver v = assert (validVar v) $ do
   vd <- varData solver v
-  a <- readIORef (vdAssignment vd)
-  assert (isJust a) $ return ()
+  m <- readIORef (vdAssignment vd)
+  case m of
+    Nothing -> error "should not happen"
+    Just a -> readIORef (aBacktrackCBs a) >>= sequence_
   writeIORef (vdAssignment vd) Nothing
   modifyIORef (svUnassigned solver) (IS.insert v)
+
+addBacktrackCB :: Solver -> Var -> IO () -> IO ()
+addBacktrackCB solver v callback = do
+  vd <- varData solver v
+  m <- readIORef (vdAssignment vd)
+  case m of
+    Nothing -> error "should not happen"
+    Just a -> modifyIORef (aBacktrackCBs a) (callback :)
 
 -- | Register the constraint to be notified when the literal becames false.
 watch :: Constraint c => Solver -> Lit -> c -> IO ()
