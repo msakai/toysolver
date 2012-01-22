@@ -131,6 +131,53 @@ normalizeAtLeast (lits,n) = assert (IS.size ys `mod` 2 == 0) $
      lits' = xs `IS.difference` ys
      n' = n - (IS.size ys `div` 2)
 
+normalizePBAtLeast :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+normalizePBAtLeast a =
+　case step2 $ step1 $ a of
+    (xs,n)
+      | n > 0     -> (saturate n xs, n)
+      | otherwise -> ([], 0) -- trivially true
+  where
+    -- 同じ変数が複数回現れないように、一度全部 @v@ に統一。
+    step1 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step1 (xs,n) =
+      case loop (IM.empty,n) xs of
+        (ys,n') -> ([(c,v) | (v,c) <- IM.toList ys], n')
+      where
+        loop :: (VarMap Integer, Integer) -> [(Integer,Lit)] -> (VarMap Integer, Integer)
+        loop (ys,m) [] = (ys,m)
+        loop (ys,m) ((c,l):zs) =
+          if litPolarity l
+            then loop (IM.insertWith (+) l c ys, m) zs
+            else loop (IM.insertWith (+) (litNot l) (negate c) ys, m-c) zs
+
+    -- 係数が0のものも取り除き、係数が負のリテラルを反転することで、
+    -- 係数が正になるようにする。
+    step2 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step2 (xs,n) = loop ([],n) xs
+      where
+        loop (ys,m) [] = (ys,m)
+        loop (ys,m) (t@(c,l):zs)
+          | c == 0 = loop (ys,m) zs
+          | c < 0  = loop ((negate c,litNot l):ys, m-c) zs
+          | otherwise = loop (t:ys,m) zs
+
+    -- degree以上の係数はそこで抑える。
+    saturate :: Integer -> [(Integer,Lit)] -> [(Integer,Lit)]
+    saturate n xs = [assert (c>0) (min n c, l) | (c,l) <- xs]
+
+    -- TODO: 係数のgcdをとって割ったりとかもする?
+
+{-
+-4*(not x1) + 3*x1 + 10*(not x2) >= 3
+⇔ -4*(1 - x1) + 3*x1 + 10*(not x2) >= 3
+⇔ -4 + 4*x1 + 3*x1 + 10*(not x2)>= 3
+⇔ 7*x1 + 10*(not x2) >= 7
+⇒ 7*x1 + 7*(not x2) >= 7
+-}
+test_normalizePBAtLeast :: ([(Integer, Lit)],Integer)
+test_normalizePBAtLeast = normalizePBAtLeast ([(-4,-1),(3,1),(10,-2)], 3)
+
 {--------------------------------------------------------------------
   internal data structures
 --------------------------------------------------------------------}
