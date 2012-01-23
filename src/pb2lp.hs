@@ -10,7 +10,7 @@ import qualified PBFile
 import qualified LPFile
 
 header :: String
-header = "Usage: pb2lp2 [file.opb|-]"
+header = "Usage: pb2lp [file.opb|-]"
 
 convert :: PBFile.Formula -> LPFile.LP
 convert formula@(obj, cs) = LPFile.LP

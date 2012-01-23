@@ -35,4 +35,4 @@ solveCNF cnf = do
     putStrLn "v 0"
 
 header :: String
-header = "Usage: toysat2lp [file.cnf|-]"
+header = "Usage: toysat2 [file.cnf|-]"
