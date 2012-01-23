@@ -520,13 +520,14 @@ addPBExactly solver ts n = do
 -- Returns 'False' if the problem is UNSATISFIABLE.
 solve :: Solver -> IO Bool
 solve solver = do
+  debugPrintf "Solving starts ...\n"
   writeIORef (svModel solver) Nothing
-  backtrackTo solver levelRoot
 
   ok <- readIORef (svOk solver)
   if not ok
     then return False
     else do
+      backtrackTo solver levelRoot
       lits <- liftM (IM.findWithDefault [] levelRoot) $
         readIORef (svAssigned solver)
       mapM_ (bcpEnqueue solver) lits
@@ -534,7 +535,7 @@ solve solver = do
       when result $ do
         when debugMode $ checkSatisfied solver
         constructModel solver
-        backtrackTo solver levelRoot
+      backtrackTo solver levelRoot
       return result
 
   where
