@@ -46,8 +46,9 @@ convert formula@(obj, cs) = LPFile.LP
         g2 (w, tm) = [LPFile.Term (fromIntegral w * c) vs  | LPFile.Term c vs <- concatMap g3 tm]
 
         g3 :: PBFile.Lit -> LPFile.Expr
-        g3 (PBFile.Pos x) = [LPFile.Term 1 [h x]]
-        g3 (PBFile.Neg x) = [LPFile.Term 1 [], LPFile.Term (-1) [h x]]
+        g3 x
+          | x > 0     = [LPFile.Term 1 [h x]]
+          | otherwise = [LPFile.Term 1 [], LPFile.Term (-1) [h (abs x)]]
 
         prodE :: LPFile.Expr -> LPFile.Expr -> LPFile.Expr
         prodE e1 e2 = [prodT t1 t2 | t1 <- e1, t2 <- e2]
@@ -65,9 +66,7 @@ collectVariables (obj, cs) = Set.unions $ maybe Set.empty f obj : [f s | (s,_,_)
     f xs = Set.fromList $ do
       (_,ts) <- xs
       lit <- ts
-      case lit of
-        PBFile.Pos v -> return v
-        PBFile.Neg v -> return v
+      return $ abs lit
 
 main :: IO ()
 main = do

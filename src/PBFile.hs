@@ -48,7 +48,7 @@ type SoftConstraint = (Maybe Integer, Constraint)
 type Sum = [WeightedTerm]
 type WeightedTerm = (Integer, Term)
 type Term = [Lit]
-data Lit = Pos Var | Neg Var deriving (Eq, Ord, Show)
+type Lit = Int
 type Var = Int
 
 -- <formula>::= <sequence_of_comments> [<objective>] <sequence_of_comments_or_constraints>
@@ -173,7 +173,7 @@ oneOrMoreLiterals = do
 
 -- <literal>::= <variablename> | "~"<variablename>
 literal :: Parser Lit
-literal = (liftM Pos variablename) <|> (char '~' >> liftM Neg variablename)
+literal = variablename <|> (char '~' >> liftM negate variablename)
 
 parseOPBString :: SourceName -> String -> Either ParseError Formula
 parseOPBString = parse formula
