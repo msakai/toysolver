@@ -1,0 +1,16 @@
+* #variable= 6 #constraint= 3 #product= 9 sizeproduct= 18
+*
+* Factorization problem: find the smallest P such that P*Q=N
+* P is a 3 bits number (x3 x2 x1)
+* Q is a 3 bits number (x6 x5 x4)
+* N=35
+* 
+* minimize the value of P
+min: +1 x1 +2 x2 +4 x3 ;
+* P>=2 (to avoid trivial factorization)
++1 x1 +2 x2 +4 x3 >=2;
+* Q>=2 (to avoid trivial factorization)
++1 x4 +2 x5 +4 x6 >=2;
+*
+* P*Q=N
++1 x1 x4 +2 x1 x5 +4 x1 x6 +2 x2 x4 +4 x2 x5 +8 x2 x6 +4 x3 x4 +8 x3 x5 +16 x3 x6 = 35;
