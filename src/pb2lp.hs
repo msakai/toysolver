@@ -1,6 +1,7 @@
 module Main where
 
 import Control.Monad
+import Data.List
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import System.Environment
@@ -37,13 +38,16 @@ convert formula@(obj, cs) = LPFile.LP
       let op2 = case op of
                   PBFile.Ge -> LPFile.Ge
                   PBFile.Eq -> LPFile.Eql
-      return (Nothing, Nothing, (g lhs, op2, fromIntegral rhs))
+          lhs2 = g lhs
+          c = sum [c | LPFile.Term c [] <- lhs2]
+          lhs3 = [t | t@(LPFile.Term c (_:_)) <- lhs2]
+      return (Nothing, Nothing, (lhs3, op2, fromIntegral rhs - c))
 
     g :: PBFile.Sum -> LPFile.Expr
     g = concatMap g2
       where
         g2 :: PBFile.WeightedTerm -> LPFile.Expr
-        g2 (w, tm) = [LPFile.Term (fromIntegral w * c) vs  | LPFile.Term c vs <- concatMap g3 tm]
+        g2 (w, tm) = foldl' prodE [LPFile.Term (fromIntegral w) []] (map g3 tm)
 
         g3 :: PBFile.Lit -> LPFile.Expr
         g3 x
