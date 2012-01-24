@@ -53,6 +53,9 @@ module SAT
   -- * Extract results
   , Model
   , model
+
+  -- * Internal API
+  , normalizePBAtLeast
   ) where
 
 import Control.Monad
