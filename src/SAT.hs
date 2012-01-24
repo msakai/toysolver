@@ -527,10 +527,8 @@ solve solver = do
   if not ok
     then return False
     else do
-      backtrackTo solver levelRoot
-      lits <- liftM (IM.findWithDefault [] levelRoot) $
-        readIORef (svAssigned solver)
-      mapM_ (bcpEnqueue solver) lits
+      d <- readIORef (svLevel solver)
+      assert (d == levelRoot) $ return ()
       result <- loop
       when result $ do
         when debugMode $ checkSatisfied solver
