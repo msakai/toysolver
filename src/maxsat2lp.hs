@@ -20,7 +20,7 @@ import System.Exit
 import System.IO
 import Text.Printf
 
-type Lit = Integer
+type Lit = Int
 type Var = Lit
 type Clause = [Lit]
 type Weight = Integer -- should be able to represent 2^63
@@ -33,7 +33,7 @@ convert nvar top ls = unlines $
   [ "SUBJECT TO" ] ++
   [ case f xs of
       (s,n)
-        | w==top    -> printf "%s >= %d" (g s) (1 - n)        -- hard constraint
+        | w>=top    -> printf "%s >= %d" (g s) (1 - n)        -- hard constraint
         | otherwise -> printf "%s + %s >= %d" (g s) z (1 - n) -- soft constraint
   | (z,(w,xs)) <- zs
   ] ++
@@ -69,7 +69,7 @@ parseWCNFLine :: String -> WeightedClause
 parseWCNFLine s =
   case map read (words s) of
     (w:xs) ->
-        let ys = init xs
+        let ys = map fromIntegral $ init xs
         in seq w $ seqList ys $ (w, ys)
     _ -> error "parse error"
 
