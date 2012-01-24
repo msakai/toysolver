@@ -94,8 +94,10 @@ main = do
          _ -> hPutStrLn stderr header >> exitFailure
   let (l:ls) = filter (not . isComment) (lines s)
   case words l of
-    (["p","wcnf", nvar, _, top]) -> do
+    (["p","wcnf", nvar, nclause, top]) -> do
       putStrLn $ convert (read nvar) (read top) (map parseWCNFLine ls)
-    (["p","cnf", nvar, _]) -> do
+    (["p","wcnf", nvar, nclause]) -> do
+      putStrLn $ convert (read nvar) (2^(63::Int)) (map parseWCNFLine ls)
+    (["p","cnf", nvar, nclause]) -> do
       putStrLn $ convert (read nvar) 2 (map parseCNFLine ls)
     _ -> error "parse error"
