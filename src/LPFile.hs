@@ -502,7 +502,7 @@ renderExpr e = do
         tell $ showString "[ "
         renderValue (2*c')
         tell $ showChar ' '
-        tell $ showString (intercalate "*" vs)
+        tell $ showString (intercalate " * " vs)
         tell $ showString " ]/2"
 
 renderValue :: Rational -> WriterT ShowS Maybe ()
