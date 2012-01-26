@@ -247,7 +247,7 @@ type Bounds2 = (Maybe BoundExpr, Maybe BoundExpr)
 
 boundsSection :: Parser (Map.Map Var Bounds)
 boundsSection = do
-  tok $ string' "bound" >> optional (char 's')
+  tok $ string' "bound" >> optional (char' 's')
   liftM (Map.map g . Map.fromListWith f) $ many (try bound)
   where
     f (lb1,ub1) (lb2,ub2) = (combineMaybe max lb1 lb2, combineMaybe min ub1 ub2)
