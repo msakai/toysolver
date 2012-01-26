@@ -5,14 +5,20 @@ import Control.Monad
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.IntMap as IM
+import qualified Data.Set as Set
+import qualified Data.Map as Map
 import Data.Char
+import Data.List
 import Data.Maybe
+import Data.Ratio
 import System.IO
 import System.Environment
 import System.Exit
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
+import Text.Printf
 import qualified SAT
 import qualified PBFile
+import qualified LPFile
 
 -- ------------------------------------------------------------------------
 
@@ -23,6 +29,7 @@ main = do
     arg:args2 | map toLower arg == "--pb"     -> mainPB args2
     arg:args2 | map toLower arg == "--wbo"    -> mainWBO args2
     arg:args2 | map toLower arg == "--maxsat" -> mainMaxSAT args2
+    arg:args2 | map toLower arg == "--lp"     -> mainLP args2
     _ -> mainSAT args
 
 header :: String
@@ -32,6 +39,7 @@ header = unlines
   , "  toysat --pb [file.opb|-]"
   , "  toysat --wbo [file.wbo|-]"
   , "  toysat --maxsat [file.cnf|file.wcnf|-]"
+  , "  toysat --lp [file.lp|-]"
   ]
 
 -- ------------------------------------------------------------------------
@@ -278,5 +286,67 @@ maxsatPrintModel m = do
     putStrLn ("v " ++ show (SAT.literal var val))
   -- no terminating 0 is necessary
   hFlush stdout
+
+-- ------------------------------------------------------------------------
+
+mainLP :: [String] -> IO ()
+mainLP args = do
+  ret <- case args of
+           ["-"]   -> fmap (LPFile.parseString "-") $ hGetContents stdin
+           [fname] -> LPFile.parseFile fname
+           _ -> hPutStrLn stderr header >> exitFailure
+  case ret of
+    Left err -> hPrint stderr err >> exitFailure
+    Right lp -> solveLP lp
+
+solveLP :: LPFile.LP -> IO ()
+solveLP lp = do
+  if not (Set.null nbvs)
+    then do
+      hPutStrLn stderr ("cannot handle non-binary variables: " ++ show nbvs)
+      exitFailure
+    else do
+      solver <- SAT.newSolver
+
+      vmap <- liftM Map.fromList $ forM (Set.toList (LPFile.binaryVariables lp)) $ \v -> do
+        v2 <- SAT.newVar solver 
+        return (v,v2)
+
+      forM_ (LPFile.constraints lp) $ \(label, indicator, (lhs, op, rhs)) -> do
+        when (isJust indicator) $ error "indicator constraint is not supported yet"
+        let d = foldl' lcm 1 (map denominator  (rhs:[r | LPFile.Term r _ <- lhs]))
+            lhs' = [(numerator (r * fromIntegral d), vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- lhs]
+            rhs' = numerator (rhs * fromIntegral d)
+        case op of
+          LPFile.Le  -> SAT.addPBAtLeast solver lhs' rhs'
+          LPFile.Ge  -> SAT.addPBAtLeast solver lhs' rhs'
+          LPFile.Eql -> SAT.addPBExactly solver lhs' rhs'
+
+      let (label,obj) = LPFile.objectiveFunction lp      
+          d = foldl' lcm 1 [denominator r | LPFile.Term r _ <- obj] *
+              (if LPFile.dir lp == LPFile.OptMin then 1 else -1)
+          obj2 = [(numerator (r * fromIntegral d), vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- obj]
+
+      result <- minimize solver obj2 $ \val -> do
+        putStrLn $ "o " ++ show (fromIntegral val / fromIntegral d :: Double)
+        hFlush stdout
+
+      case result of
+        Nothing -> do
+          putStrLn $ "s " ++ "UNSATISFIABLE"
+          hFlush stdout
+        Just m -> do
+          putStrLn $ "s " ++ "OPTIMUM FOUND"
+          hFlush stdout
+          
+          forM_ (Set.toList (LPFile.binaryVariables lp)) $ \v -> do
+            let val = m IM.! (vmap Map.! v)
+            printf "v %s = %s\n" v (if val then "1" else "0")
+          hFlush stdout
+  where
+    nbvs = LPFile.variables lp `Set.difference` LPFile.binaryVariables lp
+
+    asSingleton [v] = v
+    asSingleton _ = error "not a singleton"
 
 -- ------------------------------------------------------------------------
