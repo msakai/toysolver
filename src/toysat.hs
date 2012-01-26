@@ -85,22 +85,26 @@ solvePB formula@(obj, cs) = do
       PBFile.Ge -> SAT.addPBAtLeast solver lhs' rhs
       PBFile.Eq -> SAT.addPBExactly solver lhs' rhs
 
-  result <- SAT.solve solver
   case obj of
     Nothing -> do
+      result <- SAT.solve solver
       putStrLn $ "s " ++ (if result then "SATISFIABLE" else "UNSATISFIABLE")
       hFlush stdout
       when result $ do
         m <- SAT.model solver
         pbPrintModel m
+
     Just obj' -> do
-      if not result
-        then do
+      result <- minimize solver (pbConvSum obj') $ \val -> do
+        putStrLn $ "o " ++ show val
+        hFlush stdout
+      case result of
+        Nothing -> do
           putStrLn $ "s " ++ "UNSATISFIABLE"
           hFlush stdout
-        else do
-          let obj'' = pbConvSum obj'
-          m <- pbMinimize solver obj''
+        Just m -> do
+          putStrLn $ "s " ++ "OPTIMUM FOUND"
+          hFlush stdout          
           pbPrintModel m
 
 pbConvSum :: PBFile.Sum -> [(Integer, SAT.Lit)]
@@ -109,25 +113,23 @@ pbConvSum = map f
     f (w,[lit]) = (w,lit)
     f _ = error "non-linear terms are not supported"
 
-pbMinimize :: SAT.Solver -> [(Integer, SAT.Lit)] -> IO SAT.Model
-pbMinimize solver obj = do
-  m <- loop
-  putStrLn $ "s " ++ "OPTIMUM FOUND"
-  hFlush stdout
-  return m
+minimize :: SAT.Solver -> [(Integer, SAT.Lit)] -> (Integer -> IO ()) -> IO (Maybe SAT.Model)
+minimize solver obj update = do
+  result <- SAT.solve solver
+  if result
+    then liftM Just loop
+    else return Nothing
   where
    loop :: IO SAT.Model
    loop = do
      m <- SAT.model solver
      let v = pbEval m obj
-     putStrLn $ "o " ++ show v
-     hFlush stdout
+     update v
      SAT.addPBAtMost solver obj (v - 1)
      result <- SAT.solve solver
      if result
        then loop
        else return m
-
 
 pbEval :: SAT.Model -> [(Integer, SAT.Lit)] -> Integer
 pbEval m xs = sum [c | (c,lit) <- xs, m IM.! SAT.litVar lit == SAT.litPolarity lit]
@@ -194,14 +196,16 @@ solveWBO isMaxSat formula@(tco, cs) = do
     Nothing -> return ()
     Just c -> SAT.addPBAtMost solver obj (c-1)
 
-  result <- SAT.solve solver
-
-  if not result
-    then do
+  result <- minimize solver obj $ \val -> do
+     putStrLn $ "o " ++ show val
+     hFlush stdout
+  case result of
+    Nothing -> do
       putStrLn $ "s " ++ "UNSATISFIABLE"
       hFlush stdout
-    else do
-      m <- pbMinimize solver obj
+    Just m -> do
+      putStrLn $ "s " ++ "OPTIMUM FOUND"
+      hFlush stdout
       let m2 = IM.filterWithKey (\v _ -> v <= nvar) m
       if isMaxSat
         then maxsatPrintModel m2
