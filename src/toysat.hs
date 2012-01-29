@@ -8,6 +8,7 @@ import qualified Data.IntMap as IM
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.Char
+import Data.Function
 import Data.List
 import Data.Maybe
 import Data.Ratio
@@ -316,8 +317,6 @@ solveLP lp = do
         v2 <- SAT.newVar solver 
         return (v,v2)
 
-      unless (null (LPFile.sos lp)) $ error "SOS is not supported yet"
-
       forM_ (Map.toList (LPFile.bounds lp)) $ \(var, (lb,ub)) -> do
         let var' = vmap Map.! var
         case lb of
@@ -351,6 +350,14 @@ solveLP lp = do
               0 -> f (SAT.litNot var')
               _ -> return ()
 
+      forM_ (LPFile.sos lp) $ \(label, typ, xs) -> do
+        case typ of
+          LPFile.S1 -> SAT.addAtMost solver (map ((vmap Map.!) . fst) xs) 1
+          LPFile.S2 -> do
+            let ps = nonAdjacentPairs $ map fst $ sortBy (compare `on` snd) $ xs
+            forM_ ps $ \(x1,x2) -> do
+              SAT.addClause solver [SAT.litNot (vmap Map.! x1) | v <- [x1,x2]]
+
       let (label,obj) = LPFile.objectiveFunction lp      
           d = foldl' lcm 1 [denominator r | LPFile.Term r _ <- obj] *
               (if LPFile.dir lp == LPFile.OptMin then 1 else -1)
@@ -383,5 +390,9 @@ solveLP lp = do
     asInteger r
       | denominator r /= 1 = error (show r ++ " is not integer")
       | otherwise = numerator r
+    
+    nonAdjacentPairs :: [a] -> [(a,a)]
+    nonAdjacentPairs (x1:x2:xs) = [(x1,x3) | x3 <- xs] ++ nonAdjacentPairs (x2:xs)
+    nonAdjacentPairs _ = []
 
 -- ------------------------------------------------------------------------
