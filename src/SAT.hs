@@ -452,7 +452,7 @@ addAtLeast solver lits n = do
         unless ret $ markBad solver
     else do
       c <- newAtLeastData lits' n'
-      forM_ (take (n'+1) lits) $ \l -> watch solver l c
+      forM_ (take (n'+1) lits') $ \l -> watch solver l c
       modifyIORef (svClauseDB solver) (toConstraint c : )
       sanityCheck solver
       str <- showConstraint solver c
