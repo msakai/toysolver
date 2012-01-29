@@ -330,9 +330,9 @@ assign_ solver lit reason = assert (validLit lit) $ do
       bcpEnqueue solver lit
 
       -- debug
-      r <- case reason of
-             Nothing -> return ""
-             Just constr -> liftM (" by " ++) $ showConstraint solver constr
+      let r = case reason of
+                Nothing -> ""
+                Just _ -> " by propagation"
       debugPrintf "assign(level=%d): %d%s\n" lv lit r
 
       return True
@@ -571,7 +571,6 @@ solve solver = do
             then return False
             else do
               learntClause <- analyzeConflict solver constr
-              debugPrintf "learnt clause: %s\n" (show learntClause)
               (cl, level, lit) <- newLearntClause solver learntClause
               backtrackTo solver level
               assignBy solver lit cl
@@ -811,14 +810,10 @@ instance Constraint ClauseData where
   propagate s this@(ClauseData a) falsifiedLit = do
     preprocess
 
-    lits <- getElems a
-    debugPrintf "propagating %d to clause %s\n" (litNot falsifiedLit) (show lits)
-
     lit0 <- readArray a 0
     val0 <- litValue s lit0
     if val0 == Just True
       then do
-        debugPrintf "propagate: already satisfied\n"
         watch s falsifiedLit this
         return True
       else do
@@ -827,11 +822,10 @@ instance Constraint ClauseData where
         ret <- findForWatch 2 ub
         case ret of
           Nothing -> do
-            debugPrintf "propagate: unit or conflict\n"
+            debugPrintf "propagate: %s is unit\n" =<< showConstraint s this
             watch s falsifiedLit this
             assignBy s lit0 this
           Just i  -> do
-            debugPrintf "propagate: watch updated\n"
             lit1 <- readArray a 1
             liti <- readArray a i
             writeArray a 1 liti
@@ -914,15 +908,12 @@ instance Constraint AtLeastData where
   propagate s this@(AtLeastData a n) falsifiedLit = do
     preprocess
 
-    str <- showConstraint s this
-    debugPrintf "propagating %d to %s\n" (litNot falsifiedLit) str
-
     (lb,ub) <- getBounds a
     assert (lb==0) $ return ()
     ret <- findForWatch (n+1) ub
     case ret of
       Nothing -> do
-        debugPrintf "propagate AtLeast: unit or conflict or satisfied\n"
+        debugPrintf "propagate: %s is unit\n" =<< showConstraint s this
         watch s falsifiedLit this
         let loop :: Int -> IO Bool
             loop i
@@ -935,7 +926,6 @@ instance Constraint AtLeastData where
                     else return False
         loop 0
       Just i  -> do
-        debugPrintf "propagate AtLeast: watch updated\n"
         liti <- readArray a i
         litn <- readArray a n
         writeArray a i litn
@@ -1028,20 +1018,20 @@ instance Constraint PBAtLeastData where
     addBacktrackCB solver (litVar falsifiedLit) $ modifyIORef slack (+ c)
     s <- readIORef slack
 
-    str <- showConstraint solver this
-    debugPrintf "propagating %d to %s (new slack = %d)\n" (litNot falsifiedLit) str s
-
     if s < 0
       then return False
       else if s == 0 then return True
       else do
-        forM_ (IM.toList m) $ \(l1,c1) ->
-          when (c1 > s) $ do
+        let ls = [l1 | (l1,c1) <- IM.toList m, c1 > s]
+        when (not (null ls)) $ do
+          str <- showConstraint solver this
+          debugPrintf "propagate: %s is unit (new slack = %d)\n" str s
+          forM_ ls $ \l1 -> do
             v <- litValue solver l1
             case v of
               Just _ -> return ()
               Nothing -> do
-                assignBy solver l1 (toConstraint this)
+                assignBy solver l1 this
                 return ()
         return True
 
