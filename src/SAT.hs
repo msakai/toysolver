@@ -258,7 +258,7 @@ varLevel s v = do
   vd <- varData s v
   m <- readIORef (vdAssignment vd)
   case m of
-    Nothing -> error "varLevel: unassigned var"
+    Nothing -> error ("varLevel: unassigned var " ++ show v)
     Just a -> return (aLevel a)
 
 litLevel :: Solver -> Lit -> IO Level
@@ -269,7 +269,7 @@ varReason s v = do
   vd <- varData s v
   m <- readIORef (vdAssignment vd)
   case m of
-    Nothing -> error "varReason: unassigned var"
+    Nothing -> error ("varReason: unassigned var " ++ show v)
     Just a -> return (aReason a)
 
 data Solver
@@ -679,6 +679,18 @@ analyzeConflict solver constr = do
   (ys,zs) <- split conflictClause
   trail <- liftM (IM.! d) $ readIORef (svAssigned solver)
   lits <- loop ys zs (IS.union ys zs) trail
+
+  when debugMode $ do
+    let f l = do
+          lv <- litLevel solver l
+          return $ lv >= d
+    litsd <- filterM f (IS.toList lits)
+    when (length litsd /= 1) $ do
+      xs <- forM (IS.toList lits) $ \l -> do
+        lv <- litLevel solver l
+        return (l,lv)
+      error $ printf "analyzeConflict: not assertive: %s\n" (show xs)
+
   return $ IS.toList lits
 
 -- | Revert to the state at given level
@@ -748,9 +760,32 @@ class Constraint a where
   -- | deduce a clause C∨l from the constraint and return C.
   -- C and l should be false and true respectively under the current
   -- assignment.
-  reasonOf :: Solver -> a -> Maybe Lit -> IO Clause
+  basicReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
   isSatisfied :: Solver -> a -> IO Bool
+
+-- | deduce a clause C∨l from the constraint and return C.
+-- C and l should be false and true respectively under the current
+-- assignment.
+reasonOf :: Constraint a => Solver -> a -> Maybe Lit -> IO Clause
+reasonOf solver c x = do
+  when debugMode $
+    case x of
+      Nothing -> return ()
+      Just lit -> do
+        val <- litValue solver lit
+        unless (Just True == val) $ do
+          str <- showConstraint solver c
+          error (printf "reasonOf: value of literal %d should be True but %s (basicReasonOf %s %s)" lit (show val) str (show x))
+  cl <- basicReasonOf solver c x
+  when debugMode $ do
+    forM_ cl $ \lit -> do
+      val <- litValue solver lit
+      unless (Just False == val) $ do
+        m <- readIORef (svVarData solver)
+        str <- showConstraint solver c
+        error (printf "reasonOf: value of literal %d should be False but %s (basicReasonOf %s %s)" lit (show val) str (show x))
+  return cl
 
 data SomeConstraint
   = ConstrClause !ClauseData
@@ -773,9 +808,9 @@ instance Constraint SomeConstraint where
   propagate s (ConstrAtLeast c) lit   = propagate s c lit
   propagate s (ConstrPBAtLeast c) lit = propagate s c lit
 
-  reasonOf s (ConstrClause c)  l   = reasonOf s c l
-  reasonOf s (ConstrAtLeast c) l   = reasonOf s c l
-  reasonOf s (ConstrPBAtLeast c) l = reasonOf s c l
+  basicReasonOf s (ConstrClause c)  l   = basicReasonOf s c l
+  basicReasonOf s (ConstrAtLeast c) l   = basicReasonOf s c l
+  basicReasonOf s (ConstrPBAtLeast c) l = basicReasonOf s c l
 
   isSatisfied s (ConstrClause c)    = isSatisfied s c
   isSatisfied s (ConstrAtLeast c)   = isSatisfied s c
@@ -851,7 +886,7 @@ instance Constraint ClauseData where
           then return (Just i)
           else findForWatch (i+1) end
 
-  reasonOf _ (ClauseData a) l = do
+  basicReasonOf _ (ClauseData a) l = do
     lits <- getElems a
     case l of
       Nothing -> return lits
@@ -957,7 +992,7 @@ instance Constraint AtLeastData where
           then return (Just i)
           else findForWatch (i+1) end
 
-  reasonOf _ (AtLeastData a n) l = do
+  basicReasonOf _ (AtLeastData a n) l = do
     lits <- getElems a
     case l of
       Nothing -> return $ drop (n-1) lits
@@ -1035,7 +1070,7 @@ instance Constraint PBAtLeastData where
                 return ()
         return True
 
-  reasonOf solver (PBAtLeastData m degree _) l = do
+  basicReasonOf solver (PBAtLeastData m degree _) l = do
     xs <- do
       tmp <- filterM (\(lit,_) -> liftM (Just False ==) (litValue solver lit)) (IM.toList m)
       return $ sortBy (flip compare `on` snd) tmp
