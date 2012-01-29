@@ -414,7 +414,8 @@ addClause solver lits = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
-  case normalizeClause lits of
+  lits <- instantiateClause solver lits
+  case normalizeClause =<< lits of
     Nothing -> return ()
     Just [] -> markBad solver
     Just [lit] -> do
@@ -438,6 +439,7 @@ addAtLeast solver lits n = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
+  (lits,n) <- instantiateAtLeast solver (lits,n)
   let (lits',n') = normalizeAtLeast (lits,n)
       len = length lits'
 
@@ -484,6 +486,7 @@ addPBAtLeast solver ts n = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
+  (ts,n) <- instantiatePBAtLeast solver (ts,n)
   let (ts',degree) = normalizePBAtLeast (ts,n)
       cs = map fst ts'
       slack = sum cs - degree
@@ -869,6 +872,18 @@ instance Constraint ClauseData where
     vals <- mapM (litValue solver) lits
     return $ Just True `elem` vals
 
+instantiateClause :: Solver -> Clause -> IO (Maybe Clause)
+instantiateClause solver = loop []
+  where
+    loop :: [Lit] -> [Lit] -> IO (Maybe Clause)
+    loop ret [] = return $ Just ret
+    loop ret (l:ls) = do
+      val <- litValue solver l
+      case val of
+        Nothing -> loop (l : ret) ls
+        Just True -> return $ Nothing
+        Just False -> loop ret ls
+
 {--------------------------------------------------------------------
   Cardinality Constraint
 --------------------------------------------------------------------}
@@ -967,6 +982,18 @@ instance Constraint AtLeastData where
     vals <- mapM (litValue solver) lits
     return $ length [v | v <- vals, v == Just True] >= n
 
+instantiateAtLeast :: Solver -> ([Lit],Int) -> IO ([Lit],Int)
+instantiateAtLeast solver (xs,n) = loop ([],n) xs
+  where
+    loop :: ([Lit],Int) -> [Lit] -> IO ([Lit],Int)
+    loop ret [] = return ret
+    loop (ys,n) (l:ls) = do
+      val <- litValue solver l
+      case val of
+        Nothing -> loop (l:ys, n) ls
+        Just True -> loop (ys, n-1) ls
+        Just False -> loop (ys, n) ls
+
 {--------------------------------------------------------------------
   Pseudo Boolean Constraint
 --------------------------------------------------------------------}
@@ -1044,6 +1071,18 @@ instance Constraint PBAtLeastData where
         Just True -> return c
         _ -> return 0
     return $ sum xs >= degree
+
+instantiatePBAtLeast :: Solver -> ([(Integer,Lit)],Integer) -> IO ([(Integer,Lit)],Integer)
+instantiatePBAtLeast solver (xs,n) = loop ([],n) xs
+  where
+    loop :: ([(Integer,Lit)],Integer) -> [(Integer,Lit)] -> IO ([(Integer,Lit)],Integer)
+    loop ret [] = return ret
+    loop (ys,n) ((c,l):ts) = do
+      val <- litValue solver l
+      case val of
+        Nothing -> loop ((c,l):ys, n) ts
+        Just True -> loop (ys, n-c) ts
+        Just False -> loop (ys, n) ts
 
 {--------------------------------------------------------------------
   debug
