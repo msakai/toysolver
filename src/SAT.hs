@@ -369,6 +369,13 @@ watches solver lit = do
   ld <- litData solver lit
   readIORef (ldWatches ld)
 
+attachConstraint :: Constraint c => Solver -> c -> IO ()
+attachConstraint solver c = do
+  modifyIORef (svClauseDB solver) (toConstraint c : )
+  str <- showConstraint solver c
+  debugPrintf "constraint %s is added\n" str
+  sanityCheck solver
+
 {--------------------------------------------------------------------
   external API
 --------------------------------------------------------------------}
@@ -425,10 +432,7 @@ addClause solver lits = do
       clause <- newClauseData lits'
       watch solver l1 clause
       watch solver l2 clause
-      modifyIORef (svClauseDB solver) (toConstraint clause : )
-      sanityCheck solver
-      str <- showConstraint solver clause
-      debugPrintf "constraint %s is added\n" str
+      attachConstraint solver clause
 
 -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
 addAtLeast :: Solver -- ^ The 'Solver' argument.
@@ -453,10 +457,7 @@ addAtLeast solver lits n = do
     else do
       c <- newAtLeastData lits' n'
       forM_ (take (n'+1) lits') $ \l -> watch solver l c
-      modifyIORef (svClauseDB solver) (toConstraint c : )
-      sanityCheck solver
-      str <- showConstraint solver c
-      debugPrintf "constraint %s is added\n" str
+      attachConstraint solver c
 
 -- | Add a cardinality constraints /atmost({l1,l2,..},n)/.
 addAtMost :: Solver -- ^ The 'Solver' argument
@@ -506,10 +507,7 @@ addPBAtLeast solver ts n = do
         c <- newPBAtLeastData ts' degree
         forM_ ts' $ \(_,l) -> do
           watch solver l c
-        modifyIORef (svClauseDB solver) (toConstraint c : )
-        sanityCheck solver
-        str <- showConstraint solver c
-        debugPrintf "constraint %s is added\n" str
+        attachConstraint solver c
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMost :: Solver          -- ^ The 'Solver' argument.
@@ -725,11 +723,11 @@ newLearntClause solver lits = do
       level = head $ filter (< d) (map snd xs ++ [levelRoot])
 
   cl <- newClauseData lits2
-  modifyIORef (svClauseDB solver) (toConstraint cl : )
   case lits2 of
     l1:l2:_ -> do
       watch solver l1 cl
       watch solver l2 cl
+      attachConstraint solver cl
     _ -> return ()
 
   return (cl, level, head lits2)
