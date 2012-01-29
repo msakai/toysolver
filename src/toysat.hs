@@ -318,7 +318,7 @@ solveLP lp = do
             lhs' = [(numerator (r * fromIntegral d), vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- lhs]
             rhs' = numerator (rhs * fromIntegral d)
         case op of
-          LPFile.Le  -> SAT.addPBAtLeast solver lhs' rhs'
+          LPFile.Le  -> SAT.addPBAtMost  solver lhs' rhs'
           LPFile.Ge  -> SAT.addPBAtLeast solver lhs' rhs'
           LPFile.Eql -> SAT.addPBExactly solver lhs' rhs'
 
