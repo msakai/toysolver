@@ -426,6 +426,8 @@ addClause solver lits = do
       watch solver l2 clause
       modifyIORef (svClauseDB solver) (toConstraint clause : )
       sanityCheck solver
+      str <- showConstraint solver clause
+      debugPrintf "constraint %s is added\n" str
 
 -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
 addAtLeast :: Solver -- ^ The 'Solver' argument.
@@ -451,6 +453,8 @@ addAtLeast solver lits n = do
       forM_ (take (n'+1) lits) $ \l -> watch solver l c
       modifyIORef (svClauseDB solver) (toConstraint c : )
       sanityCheck solver
+      str <- showConstraint solver c
+      debugPrintf "constraint %s is added\n" str
 
 -- | Add a cardinality constraints /atmost({l1,l2,..},n)/.
 addAtMost :: Solver -- ^ The 'Solver' argument
@@ -501,6 +505,8 @@ addPBAtLeast solver ts n = do
           watch solver l c
         modifyIORef (svClauseDB solver) (toConstraint c : )
         sanityCheck solver
+        str <- showConstraint solver c
+        debugPrintf "constraint %s is added\n" str
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMost :: Solver          -- ^ The 'Solver' argument.
