@@ -174,10 +174,14 @@ wboAddAtLeast solver sel lhs rhs = do
   let (lhs',rhs') = SAT.normalizePBAtLeast (lhs,rhs)
   SAT.addPBAtLeast solver ((rhs', SAT.litNot sel) : lhs') rhs'
 
+wboAddAtMost :: SAT.Solver -> SAT.Lit -> [(Integer,SAT.Lit)] -> Integer -> IO ()
+wboAddAtMost solver sel lhs rhs =
+  wboAddAtLeast solver sel [(negate c, lit) | (c,lit) <- lhs] (negate rhs)
+
 wboAddExactly :: SAT.Solver -> SAT.Lit -> [(Integer,SAT.Lit)] -> Integer -> IO ()
 wboAddExactly solver sel lhs rhs = do
   wboAddAtLeast solver sel lhs rhs
-  wboAddAtLeast solver sel [(negate c, lit) | (c,lit) <- lhs] (negate rhs)
+  wboAddAtMost solver sel lhs rhs
 
 solveWBO :: Bool -> PBFile.SoftFormula -> IO ()
 solveWBO isMaxSat formula@(tco, cs) = do
@@ -326,14 +330,26 @@ solveLP lp = do
           LPFile.PosInf   -> return ()
 
       forM_ (LPFile.constraints lp) $ \(label, indicator, (lhs, op, rhs)) -> do
-        when (isJust indicator) $ error "indicator constraint is not supported yet"
         let d = foldl' lcm 1 (map denominator  (rhs:[r | LPFile.Term r _ <- lhs]))
             lhs' = [(asInteger (r * fromIntegral d), vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- lhs]
             rhs' = asInteger (rhs * fromIntegral d)
-        case op of
-          LPFile.Le  -> SAT.addPBAtMost  solver lhs' rhs'
-          LPFile.Ge  -> SAT.addPBAtLeast solver lhs' rhs'
-          LPFile.Eql -> SAT.addPBExactly solver lhs' rhs'
+        case indicator of
+          Nothing ->
+            case op of
+              LPFile.Le  -> SAT.addPBAtMost  solver lhs' rhs'
+              LPFile.Ge  -> SAT.addPBAtLeast solver lhs' rhs'
+              LPFile.Eql -> SAT.addPBExactly solver lhs' rhs'
+          Just (var, val) -> do
+            let var' = vmap Map.! var
+                f sel = do
+                  case op of
+                    LPFile.Le  -> wboAddAtMost  solver sel lhs' rhs'
+                    LPFile.Ge  -> wboAddAtLeast solver sel lhs' rhs'
+                    LPFile.Eql -> wboAddExactly solver sel lhs' rhs'
+            case  val of
+              1 -> f var'
+              0 -> f (SAT.litNot var')
+              _ -> return ()
 
       let (label,obj) = LPFile.objectiveFunction lp      
           d = foldl' lcm 1 [denominator r | LPFile.Term r _ <- obj] *
