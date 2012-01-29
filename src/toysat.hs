@@ -303,7 +303,7 @@ solveLP :: LPFile.LP -> IO ()
 solveLP lp = do
   if not (Set.null nbvs)
     then do
-      hPutStrLn stderr ("cannot handle non-binary variables: " ++ show nbvs)
+      hPutStrLn stderr ("cannot handle non-binary variables: " ++ intercalate ", " (Set.toList nbvs))
       exitFailure
     else do
       solver <- SAT.newSolver
@@ -312,11 +312,24 @@ solveLP lp = do
         v2 <- SAT.newVar solver 
         return (v,v2)
 
+      unless (null (LPFile.sos lp)) $ error "SOS is not supported yet"
+
+      forM_ (Map.toList (LPFile.bounds lp)) $ \(var, (lb,ub)) -> do
+        let var' = vmap Map.! var
+        case lb of
+          LPFile.NegInf   -> return ()
+          LPFile.Finite x -> SAT.addPBAtLeast solver [(1, var')] (ceiling x)
+          LPFile.PosInf   -> SAT.addPBAtLeast solver [] 1
+        case ub of
+          LPFile.NegInf   -> SAT.addPBAtMost solver [] (-1)
+          LPFile.Finite x -> SAT.addPBAtMost solver [(1, var')] (ceiling x)
+          LPFile.PosInf   -> return ()
+
       forM_ (LPFile.constraints lp) $ \(label, indicator, (lhs, op, rhs)) -> do
         when (isJust indicator) $ error "indicator constraint is not supported yet"
         let d = foldl' lcm 1 (map denominator  (rhs:[r | LPFile.Term r _ <- lhs]))
-            lhs' = [(numerator (r * fromIntegral d), vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- lhs]
-            rhs' = numerator (rhs * fromIntegral d)
+            lhs' = [(asInteger (r * fromIntegral d), vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- lhs]
+            rhs' = asInteger (rhs * fromIntegral d)
         case op of
           LPFile.Le  -> SAT.addPBAtMost  solver lhs' rhs'
           LPFile.Ge  -> SAT.addPBAtLeast solver lhs' rhs'
@@ -346,7 +359,13 @@ solveLP lp = do
   where
     nbvs = LPFile.variables lp `Set.difference` LPFile.binaryVariables lp
 
+    asSingleton :: [a] -> a
     asSingleton [v] = v
     asSingleton _ = error "not a singleton"
+
+    asInteger :: Rational -> Integer
+    asInteger r
+      | denominator r /= 1 = error (show r ++ " is not integer")
+      | otherwise = numerator r
 
 -- ------------------------------------------------------------------------
