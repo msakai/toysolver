@@ -315,8 +315,10 @@ solveLP lp = do
 
       vmap <- liftM Map.fromList $ forM (Set.toList (LPFile.binaryVariables lp)) $ \v -> do
         v2 <- SAT.newVar solver 
+        _ <- printf "c x%d := %s\n" v2 v
         return (v,v2)
 
+      putStrLn "c Loading bounds"
       forM_ (Map.toList (LPFile.bounds lp)) $ \(var, (lb,ub)) -> do
         let var' = vmap Map.! var
         case lb of
@@ -328,6 +330,7 @@ solveLP lp = do
           LPFile.Finite x -> SAT.addPBAtMost solver [(1, var')] (ceiling x)
           LPFile.PosInf   -> return ()
 
+      putStrLn "c Loading constraints"
       forM_ (LPFile.constraints lp) $ \(label, indicator, (lhs, op, rhs)) -> do
         let d = foldl' lcm 1 (map denominator  (rhs:[r | LPFile.Term r _ <- lhs]))
             lhs' = [(asInteger (r * fromIntegral d), vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- lhs]
@@ -350,6 +353,7 @@ solveLP lp = do
               0 -> f (SAT.litNot var')
               _ -> return ()
 
+      putStrLn "c Loading SOS constraints"
       forM_ (LPFile.sos lp) $ \(label, typ, xs) -> do
         case typ of
           LPFile.S1 -> SAT.addAtMost solver (map ((vmap Map.!) . fst) xs) 1
