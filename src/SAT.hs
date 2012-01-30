@@ -949,6 +949,10 @@ instance Constraint AtLeastData where
   propagate s this@(AtLeastData a n) falsifiedLit = do
     preprocess
 
+    when debugMode $ do
+      litn <- readArray a n
+      unless (litn == falsifiedLit) $ error "AtLeastData.propagate: should not happen"
+
     (lb,ub) <- getBounds a
     assert (lb==0) $ return ()
     ret <- findForWatch (n+1) ub
