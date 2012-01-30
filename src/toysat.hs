@@ -1,4 +1,14 @@
 {-# OPTIONS_GHC -Wall #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  toysat
+-- Copyright   :  (c) Masahiro Sakai 2012
+-- License     :  BSD-style
+--
+-- A toy-level SAT solver based on CDCL.
+--
+-----------------------------------------------------------------------------
+
 module Main where
 
 import Control.Monad
