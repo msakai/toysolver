@@ -9,8 +9,6 @@
 --
 -- TODO:
 --
--- * PB constraint
---
 -- * XOR clause
 --
 -- * VSIDS heauristics
