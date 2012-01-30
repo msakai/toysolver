@@ -998,10 +998,19 @@ instance Constraint AtLeastData where
           then return (Just i)
           else findForWatch (i+1) end
 
-  basicReasonOf _ (AtLeastData a n) l = do
+  basicReasonOf s (AtLeastData a n) l = do
     lits <- getElems a
     case l of
-      Nothing -> return $ drop (n-1) lits
+      Nothing -> do
+        let f :: [Lit] -> IO Lit
+            f [] = error "AtLeastData.basicReasonOf: should not happen"
+            f (l:ls) = do
+              val <- litValue s l
+              if val == Just False
+                then return l
+                else f ls
+        lit <- f (take n lits)
+        return $ lit : drop n lits
       Just lit -> do
         assert (lit `elem` take n lits) $ return ()
         return $ drop n lits
