@@ -68,6 +68,7 @@ import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
+import qualified Data.Sequence as Seq
 import System.IO
 import Text.Printf
 
@@ -281,7 +282,7 @@ data Solver
   , svVarData      :: !(IORef (VarMap VarData))
   , svClauseDB     :: !(IORef [SomeConstraint])
   , svLevel        :: !(IORef Level)
-  , svBCPQueue     :: !(IORef [Lit])
+  , svBCPQueue     :: !(IORef (Seq.Seq Lit))
   , svModel        :: !(IORef (Maybe (VarMap Bool)))
   }
 
@@ -289,15 +290,15 @@ markBad :: Solver -> IO ()
 markBad solver = writeIORef (svOk solver) False
 
 bcpEnqueue :: Solver -> Lit -> IO ()
-bcpEnqueue solver l = modifyIORef (svBCPQueue solver) (l:)
+bcpEnqueue solver l = modifyIORef (svBCPQueue solver) (Seq.|> l)
 
 bcpDequeue :: Solver -> IO (Maybe Lit)
 bcpDequeue solver = do
   let ref = svBCPQueue solver
   ls <- readIORef ref
-  case ls of
-    [] -> return Nothing
-    (l:ls') -> do
+  case Seq.viewl ls of
+    Seq.EmptyL -> return Nothing
+    l Seq.:< ls' -> do
       writeIORef ref ls'
       return (Just l)
 
@@ -390,7 +391,7 @@ newSolver = do
   vars <- newIORef IM.empty
   db  <- newIORef []
   lv  <- newIORef levelRoot
-  q   <- newIORef []
+  q   <- newIORef Seq.empty
   m   <- newIORef Nothing
   return $
     Solver
@@ -651,26 +652,31 @@ analyzeConflict solver constr = do
               then go (IS.insert l xs, ys) ls
               else go (xs, IS.insert l ys) ls
 
+  -- trailを順番に見ていって上手くいくのはbcpQueueが本物のキューだから。
+  -- bcpQueueが本物のキューでない場合には、下記のAの箇所で無視した 'litNot l'
+  -- が後から必要になることがあり得る。
   let loop :: LitSet -> LitSet -> LitSet -> [Lit] -> IO LitSet
       loop lits1 lits2 seen trail
         | sz==1 = do
             return $ lits1 `IS.union` lits2
         | sz>=2 = do
             case trail of
-              [] -> return $ lits1 `IS.union` lits2
-              (l:trail') ->
+              [] -> error $ printf "analyzeConflict: should not happen: loop %s %s %s %s"
+                              (show lits1) (show lits2) (show seen) (show trail)
+              (l:trail') -> do
                 if litNot l `IS.notMember` lits1
-                then loop lits1 lits2 seen trail'
-                else do
+                 then loop lits1 lits2 seen trail' -- (A)
+                 else do
+                  let seen' = IS.insert (litNot l) seen
                   m <- varReason solver (litVar l)
                   case m of
-                    Nothing -> loop lits1 lits2 seen trail'
+                    Nothing -> loop lits1 lits2 seen' trail'
                     Just constr2 -> do
                       xs <- liftM IS.fromList $ reasonOf solver constr2 (Just l)
-                      (ys,zs) <- split (IS.toList (xs `IS.difference` seen))
-                      loop (IS.delete (litNot l) lits1 `IS.union` ys)
+                      (ys,zs) <- split (IS.toList xs)
+                      loop (IS.delete (litNot l) lits1 `IS.union` (ys `IS.difference` seen))
                            (lits2 `IS.union` zs)
-                           (seen `IS.union` xs) trail'
+                           seen' trail'
         | otherwise = error "analyzeConflict: should not happen"
         where
           sz = IS.size lits1
@@ -678,7 +684,7 @@ analyzeConflict solver constr = do
   conflictClause <- reasonOf solver constr Nothing
   (ys,zs) <- split conflictClause
   trail <- liftM (IM.! d) $ readIORef (svAssigned solver)
-  lits <- loop ys zs (IS.union ys zs) trail
+  lits <- loop ys zs IS.empty trail
 
   when debugMode $ do
     let f l = do
@@ -701,7 +707,7 @@ backtrackTo solver level = do
   m <- readIORef (svAssigned solver)
   m' <- loop m
   writeIORef (svAssigned solver) m'
-  writeIORef (svBCPQueue solver) []
+  writeIORef (svBCPQueue solver) Seq.empty
   writeIORef (svLevel solver) level
   where
     loop :: LevelMap [Lit] -> IO (LevelMap [Lit])
