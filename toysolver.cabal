@@ -100,4 +100,4 @@ Executable toysat
      SAT
      LPFile
      PBFile
-  Build-Depends: base >=4 && <5, containers, array, parsec, bytestring, parse-dimacs
+  Build-Depends: base >=4 && <5, containers, array, parsec, bytestring, parse-dimacs, priority-queue

@@ -67,6 +67,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
+import qualified Data.PriorityQueue as PQ
 import System.IO
 import Text.Printf
 
@@ -274,7 +275,8 @@ varReason s v = do
 data Solver
   = Solver
   { svOk           :: !(IORef Bool)
-  , svUnassigned   :: !(IORef VarSet)
+  , svVarQueue     :: !(PQ.PriorityQueue IO (Var,VarScore))
+  , svVarScore     :: !(IORef (VarMap VarScore))
   , svAssigned     :: !(IORef (LevelMap [Lit]))
   , svVarCounter   :: !(IORef Int)
   , svVarData      :: !(IORef (VarMap VarData))
@@ -325,7 +327,6 @@ assign_ solver lit reason = assert (validLit lit) $ do
         }
 
       modifyIORef (svAssigned solver) (IM.insertWith (++) lv [lit])
-      modifyIORef (svUnassigned solver) (IS.delete (litVar lit))
       bcpEnqueue solver lit
 
       -- debug
@@ -344,7 +345,8 @@ unassign solver v = assert (validVar v) $ do
     Nothing -> error "should not happen"
     Just a -> readIORef (aBacktrackCBs a) >>= sequence_
   writeIORef (vdAssignment vd) Nothing
-  modifyIORef (svUnassigned solver) (IS.insert v)
+  score <- varScore solver v
+  PQ.enqueue (svVarQueue solver) (v,score)
 
 addBacktrackCB :: Solver -> Var -> IO () -> IO ()
 addBacktrackCB solver v callback = do
@@ -375,6 +377,26 @@ attachConstraint solver c = do
   debugPrintf "constraint %s is added\n" str
   sanityCheck solver
 
+type VarScore = Int
+
+varScore :: Solver -> Var -> IO VarScore
+varScore solver v = do
+  vscore <- readIORef (svVarScore solver)
+  return $! IM.findWithDefault 0 v vscore
+
+incVarScore :: Solver -> Var -> IO ()
+incVarScore solver v = do
+  modifyIORef (svVarScore solver) (IM.insertWith (+) v 1)
+
+updateVarQueue :: Solver -> IO ()
+updateVarQueue solver = do
+  let vqueue = svVarQueue solver
+  vscore <- readIORef (svVarScore solver)
+  xs <- PQ.dequeueBatch vqueue
+  forM_ xs $ \(v,_) -> do
+    let score = IM.findWithDefault 0 v vscore
+    PQ.enqueue vqueue (v,score)
+
 {--------------------------------------------------------------------
   external API
 --------------------------------------------------------------------}
@@ -384,7 +406,8 @@ newSolver :: IO Solver
 newSolver = do
   ok   <- newIORef True
   vcnt <- newIORef 1
-  unassigned <- newIORef IS.empty
+  vqueue <- PQ.newPriorityQueue (\(_,score) -> -score)
+  vscore <- newIORef IM.empty
   assigned <- newIORef IM.empty
   vars <- newIORef IM.empty
   db  <- newIORef []
@@ -395,7 +418,8 @@ newSolver = do
     Solver
     { svOk = ok
     , svVarCounter = vcnt
-    , svUnassigned = unassigned
+    , svVarQueue   = vqueue
+    , svVarScore   = vscore
     , svAssigned   = assigned
     , svVarData    = vars
     , svClauseDB   = db
@@ -409,7 +433,7 @@ newVar :: Solver -> IO Var
 newVar s = do
   v <- readIORef (svVarCounter s)
   writeIORef (svVarCounter s) (v+1)
-  modifyIORef (svUnassigned s) (IS.insert v)
+  PQ.enqueue (svVarQueue s) (v,0)
   vd <- newVarData
   modifyIORef (svVarData s) (IM.insert v vd)
   return v
@@ -432,6 +456,7 @@ addClause solver lits = do
       watch solver l1 clause
       watch solver l2 clause
       attachConstraint solver clause
+      forM_ lits' $ \lit -> incVarScore solver (litVar lit)
 
 -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
 addAtLeast :: Solver -- ^ The 'Solver' argument.
@@ -457,6 +482,7 @@ addAtLeast solver lits n = do
       c <- newAtLeastData lits' n'
       forM_ (take (n'+1) lits') $ \l -> watch solver l c
       attachConstraint solver c
+      forM_ lits $ \lit -> incVarScore solver (litVar lit)
 
 -- | Add a cardinality constraints /atmost({l1,l2,..},n)/.
 addAtMost :: Solver -- ^ The 'Solver' argument
@@ -507,6 +533,7 @@ addPBAtLeast solver ts n = do
         forM_ ts' $ \(_,l) -> do
           watch solver l c
         attachConstraint solver c
+        forM_ ts' $ \(_,lit) -> incVarScore solver (litVar lit)
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMost :: Solver          -- ^ The 'Solver' argument.
@@ -536,6 +563,8 @@ solve solver = do
   if not ok
     then return False
     else do
+      when debugMode $ dumpVarScore solver
+      updateVarQueue solver
       d <- readIORef (svLevel solver)
       assert (d == levelRoot) $ return ()
       result <- loop
@@ -543,6 +572,7 @@ solve solver = do
         when debugMode $ checkSatisfied solver
         constructModel solver
       backtrackTo solver levelRoot
+      when debugMode $ dumpVarScore solver
       return result
 
   where
@@ -589,13 +619,19 @@ model solver = do
 
 pickBranchLit :: Solver -> IO (Maybe Lit)
 pickBranchLit solver = do
-  let ref = svUnassigned solver
-  vs <- readIORef ref
-  case IS.minView vs of
-    Nothing -> return Nothing
-    Just (v,vs') -> do
-      writeIORef ref vs'
-      return (Just (literal v True))
+  let vqueue = svVarQueue solver
+
+      loop :: IO (Maybe Var)
+      loop = do
+        m <- PQ.dequeue vqueue
+        case m of
+          Nothing -> return Nothing
+          Just (var,_) -> do
+            val <- varValue solver var
+            case val of
+              Nothing -> return (Just var)
+              Just _ -> loop
+  loop
 
 decide :: Solver -> Lit -> IO ()
 decide solver lit = do
@@ -743,6 +779,7 @@ newLearntClause solver lits = do
       watch solver l1 cl
       watch solver l2 cl
       attachConstraint solver cl
+      forM_ lits2 $ \lit -> incVarScore solver (litVar lit)
     _ -> return ()
 
   return (cl, level, head lits2)
@@ -1161,6 +1198,13 @@ sanityCheck solver = do
       lits2 <- watchedLiterals solver constr
       unless (l `elem` lits2) $ do
         error $ printf "sanityCheck:C:%d %s" l (show lits2)
+
+dumpVarScore :: Solver -> IO ()
+dumpVarScore solver = do
+  vscore <- readIORef (svVarScore solver)
+  debugPrintf "Variable scores:\n"
+  forM_ (IM.toList vscore) $ \(v,score) ->
+    debugPrintf "score(%d) = %d\n" v score
 
 {--------------------------------------------------------------------
   test
