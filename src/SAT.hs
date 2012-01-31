@@ -450,7 +450,11 @@ addClause solver lits = do
     Just [] -> markBad solver
     Just [lit] -> do
       ret <- assign solver lit
-      unless ret $ markBad solver
+      assert ret $ return ()
+      ret <- deduce solver
+      case ret of
+        Nothing -> return ()
+        Just _ -> markBad solver
     Just lits'@(l1:l2:_) -> do
       clause <- newClauseData lits'
       watch solver l1 clause
@@ -477,7 +481,11 @@ addAtLeast solver lits n = do
     else if n' == len then do
       forM_ lits' $ \l -> do
         ret <- assign solver l
-        unless ret $ markBad solver
+        assert ret $ return ()
+        ret <- deduce solver
+        case ret of
+          Nothing -> return ()
+          Just _ -> markBad solver
     else do
       c <- newAtLeastData lits' n'
       forM_ (take (n'+1) lits') $ \l -> watch solver l c
@@ -526,7 +534,12 @@ addPBAtLeast solver ts n = do
       forM_ ts' $ \(c,l) -> do
         when (slack - c < 0) $ do
           ret <- assign solver l
-          unless ret $ markBad solver
+          assert ret $ return ()
+      ret <- deduce solver
+      case ret of
+        Nothing -> return ()
+        Just _ -> markBad solver
+
       ok <- readIORef (svOk solver)
       when ok $ do
         c <- newPBAtLeastData ts' degree
