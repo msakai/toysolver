@@ -49,6 +49,8 @@ Executable toysolver
      MultiParamTypeClasses
      FunctionalDependencies
      GeneralizedNewtypeDeriving
+  if impl(ghc >= 7)
+    GHC-Options: -rtsopts
 
 Executable lp2yices
   Main-is: lp2yices.hs
@@ -101,3 +103,5 @@ Executable toysat
      LPFile
      PBFile
   Build-Depends: base >=4 && <5, containers, array, parsec, bytestring, parse-dimacs, priority-queue
+  if impl(ghc >= 7)
+    GHC-Options: -rtsopts
