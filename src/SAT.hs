@@ -329,11 +329,11 @@ assign_ solver lit reason = assert (validLit lit) $ do
       modifyIORef (svAssigned solver) (IM.insertWith (++) lv [lit])
       bcpEnqueue solver lit
 
-      -- debug
-      let r = case reason of
-                Nothing -> ""
-                Just _ -> " by propagation"
-      debugPrintf "assign(level=%d): %d%s\n" lv lit r
+      when debugMode $ do
+        let r = case reason of
+                  Nothing -> ""
+                  Just _ -> " by propagation"
+        debugPrintf "assign(level=%d): %d%s\n" lv lit r
 
       return True
 
@@ -605,9 +605,9 @@ solve solver = do
         Just constr -> do
           d <- readIORef (svLevel solver)
 
-          -- debug
-          str <- showConstraint solver constr
-          debugPrintf "conflict(level=%d): %s\n" d str
+          when debugMode $ do
+            str <- showConstraint solver constr
+            debugPrintf "conflict(level=%d): %s\n" d str
 
           if d == levelRoot
             then return False
@@ -750,7 +750,7 @@ analyzeConflict solver constr = do
 -- (keeping all assignment at @level@ but not beyond).
 backtrackTo :: Solver -> Int -> IO ()
 backtrackTo solver level = do
-  debugPrintf "backtrackTo: %d\n" level
+  when debugMode $ debugPrintf "backtrackTo: %d\n" level
   m <- readIORef (svAssigned solver)
   m' <- loop m
   writeIORef (svAssigned solver) m'
@@ -911,7 +911,7 @@ instance Constraint ClauseData where
         ret <- findForWatch 2 ub
         case ret of
           Nothing -> do
-            debugPrintf "propagate: %s is unit\n" =<< showConstraint s this
+            when debugMode $ debugPrintf "propagate: %s is unit\n" =<< showConstraint s this
             watch s falsifiedLit this
             assignBy s lit0 this
           Just i  -> do
@@ -1006,7 +1006,7 @@ instance Constraint AtLeastData where
     ret <- findForWatch (n+1) ub
     case ret of
       Nothing -> do
-        debugPrintf "propagate: %s is unit\n" =<< showConstraint s this
+        when debugMode $ debugPrintf "propagate: %s is unit\n" =<< showConstraint s this
         watch s falsifiedLit this
         let loop :: Int -> IO Bool
             loop i
@@ -1126,8 +1126,9 @@ instance Constraint PBAtLeastData where
       else do
         let ls = [l1 | (l1,c1) <- IM.toList m, c1 > s]
         when (not (null ls)) $ do
-          str <- showConstraint solver this
-          debugPrintf "propagate: %s is unit (new slack = %d)\n" str s
+          when debugMode $ do
+            str <- showConstraint solver this
+            debugPrintf "propagate: %s is unit (new slack = %d)\n" str s
           forM_ ls $ \l1 -> do
             v <- litValue solver l1
             case v of
