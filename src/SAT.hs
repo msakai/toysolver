@@ -374,7 +374,7 @@ attachConstraint :: Constraint c => Solver -> c -> IO ()
 attachConstraint solver c = do
   modifyIORef (svClauseDB solver) (toConstraint c : )
   str <- showConstraint solver c
-  debugPrintf "constraint %s is added\n" str
+  when debugMode $ debugPrintf "constraint %s is added\n" str
   sanityCheck solver
 
 type VarScore = Int
