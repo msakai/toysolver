@@ -207,6 +207,7 @@ data Assignment
 data VarData
   = VarData
   { vdAssignment :: !(IORef (Maybe Assignment))
+  , vdPolarity   :: !(IORef Bool)
   , vdPosLitData :: !LitData
   , vdNegLitData :: !LitData
   }
@@ -220,9 +221,10 @@ data LitData
 newVarData :: IO VarData
 newVarData = do
   ainfo <- newIORef Nothing
+  polarity <- newIORef True
   pos <- newLitData
   neg <- newLitData
-  return $ VarData ainfo pos neg
+  return $ VarData ainfo polarity pos neg
 
 newLitData :: IO LitData
 newLitData = do
@@ -343,7 +345,9 @@ unassign solver v = assert (validVar v) $ do
   m <- readIORef (vdAssignment vd)
   case m of
     Nothing -> error "should not happen"
-    Just a -> readIORef (aBacktrackCBs a) >>= sequence_
+    Just a -> do
+      writeIORef (vdPolarity vd) (aValue a)
+      readIORef (aBacktrackCBs a) >>= sequence_
   writeIORef (vdAssignment vd) Nothing
   score <- varScore solver v
   PQ.enqueue (svVarQueue solver) (v,score)
@@ -642,7 +646,10 @@ pickBranchLit solver = do
           Just (var,_) -> do
             val <- varValue solver var
             case val of
-              Nothing -> return (Just var)
+              Nothing -> do
+                vd <- varData solver var
+                p <- readIORef (vdPolarity vd)
+                return $ Just $ literal var p
               Just _ -> loop
   loop
 
