@@ -695,9 +695,12 @@ analyzeConflict solver constr = do
           go (xs,ys) [] = return (xs,ys)
           go (xs,ys) (l:ls) = do
             lv <- litLevel solver l
-            if lv >= d
-              then go (IS.insert l xs, ys) ls
-              else go (xs, IS.insert l ys) ls
+            if lv == levelRoot then
+                go (xs,ys) ls
+              else if lv >= d then
+                go (IS.insert l xs, ys) ls
+              else
+                go (xs, IS.insert l ys) ls
 
   -- trailを順番に見ていって上手くいくのはbcpQueueが本物のキューだから。
   -- bcpQueueが本物のキューでない場合には、下記のAの箇所で無視した 'litNot l'
@@ -733,6 +736,8 @@ analyzeConflict solver constr = do
   trail <- liftM (IM.! d) $ readIORef (svAssigned solver)
   lits <- loop ys zs IS.empty trail
 
+  lits <- minimizeConflictClauseRecursive solver lits
+
   when debugMode $ do
     let f l = do
           lv <- litLevel solver l
@@ -745,6 +750,72 @@ analyzeConflict solver constr = do
       error $ printf "analyzeConflict: not assertive: %s\n" (show xs)
 
   return $ IS.toList lits
+
+minimizeConflictClauseLocal :: Solver -> LitSet -> IO LitSet
+minimizeConflictClauseLocal solver lits = do
+  let xs = IS.toAscList lits
+  ys <- filterM (liftM not . isRedundant) xs
+  when debugMode $ do
+    debugPrintf $ "minimizeConflictClauseLocal:\n"
+    debugPrint xs
+    debugPrint ys
+  return $ IS.fromAscList $ ys
+
+  where
+    isRedundant :: Lit -> IO Bool
+    isRedundant lit = do
+      c <- varReason solver (litVar lit)
+      case c of
+        Nothing -> return False
+        Just c -> do
+          ls <- reasonOf solver c (Just (litNot lit))
+          allM test ls
+
+    test :: Lit -> IO Bool
+    test lit = do
+      lv <- litLevel solver lit
+      return $ lv == levelRoot || lit `IS.member` lits
+
+minimizeConflictClauseRecursive :: Solver -> LitSet -> IO LitSet
+minimizeConflictClauseRecursive solver lits = do
+  cacheRef <- newIORef IM.empty
+
+  let
+    test :: Lit -> IO Bool
+    test lit = do
+      lv <- litLevel solver lit
+      if lv == levelRoot || lit `IS.member` lits
+        then return True
+        else do
+          cache <- readIORef cacheRef
+          case IM.lookup lit cache of
+            Just b -> return b
+            Nothing -> do
+              c <- varReason solver (litVar lit)
+              case c of
+                Nothing -> return False
+                Just c -> do
+                  ls <- reasonOf solver c (Just (litNot lit))
+                  ret <- allM test ls
+                  modifyIORef cacheRef (IM.insert lit ret)
+                  return ret
+
+    isRedundant :: Lit -> IO Bool
+    isRedundant lit = do
+      c <- varReason solver (litVar lit)
+      case c of
+        Nothing -> return False
+        Just c -> do
+          ls <- reasonOf solver c (Just (litNot lit))
+          allM test ls
+
+  let xs = IS.toAscList lits
+  ys <- filterM (liftM not . isRedundant) xs
+  when debugMode $ do
+    debugPrintf $ "minimizeConflictClauseRecursive:\n"
+    debugPrint xs
+    debugPrint ys
+  return $ IS.fromAscList $ ys
 
 -- | Revert to the state at given level
 -- (keeping all assignment at @level@ but not beyond).
@@ -1174,6 +1245,20 @@ instantiatePBAtLeast solver (xs,n) = loop ([],n) xs
         Nothing -> loop ((c,l):ys, n) ts
         Just True -> loop (ys, n-c) ts
         Just False -> loop (ys, n) ts
+
+{--------------------------------------------------------------------
+  utility
+--------------------------------------------------------------------}
+
+allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+allM p = go
+  where
+    go [] = return True
+    go (x:xs) = do
+      b <- p x
+      if b
+        then go xs
+        else return False
 
 {--------------------------------------------------------------------
   debug
