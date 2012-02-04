@@ -68,6 +68,7 @@ import qualified Data.IntSet as IS
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified Data.PriorityQueue as PQ
+import qualified Data.Vector as V
 import System.IO
 import Text.Printf
 
@@ -83,6 +84,9 @@ type VarMap = IM.IntMap
 
 validVar :: Var -> Bool
 validVar v = v > 0
+
+varToIdx :: Var -> Int
+varToIdx v = v - 1
 
 -- | Positive (resp. negative) literals are represented as positive (resp.
 -- negative) integers. (DIMACS format).
@@ -233,8 +237,8 @@ newLitData = do
 
 varData :: Solver -> Var -> IO VarData
 varData s v = do
-  m <- readIORef (svVarData s)
-  return $! m IM.! v
+  vec <- readIORef (svVarData s)
+  return $! vec V.! (varToIdx v)
 
 litData :: Solver -> Lit -> IO LitData
 litData s l = do
@@ -281,7 +285,7 @@ data Solver
   , svVarScore     :: !(IORef (VarMap VarScore))
   , svAssigned     :: !(IORef (LevelMap [Lit]))
   , svVarCounter   :: !(IORef Int)
-  , svVarData      :: !(IORef (VarMap VarData))
+  , svVarData      :: !(IORef (V.Vector VarData))
   , svClauseDB     :: !(IORef [SomeConstraint])
   , svLevel        :: !(IORef Level)
   , svBCPQueue     :: !(IORef (Seq.Seq Lit))
@@ -413,7 +417,7 @@ newSolver = do
   vqueue <- PQ.newPriorityQueue (\(_,score) -> -score)
   vscore <- newIORef IM.empty
   assigned <- newIORef IM.empty
-  vars <- newIORef IM.empty
+  vars <- newIORef V.empty
   db  <- newIORef []
   lv  <- newIORef levelRoot
   q   <- newIORef Seq.empty
@@ -439,7 +443,7 @@ newVar s = do
   writeIORef (svVarCounter s) (v+1)
   PQ.enqueue (svVarQueue s) (v,0)
   vd <- newVarData
-  modifyIORef (svVarData s) (IM.insert v vd)
+  modifyIORef (svVarData s) (\vec -> V.snoc vec vd)
   return v
 
 -- |Add a clause to the solver.
@@ -846,7 +850,7 @@ backtrackTo solver level = do
 constructModel :: Solver -> IO ()
 constructModel solver = do
   vds <- readIORef (svVarData solver)
-  xs <- forM (IM.toAscList vds) $ \(v, vd) -> do
+  xs <- forM (zip [1..] (V.toList vds)) $ \(v, vd) -> do
     a <- readIORef (vdAssignment vd)
     return $ (v, aValue (fromJust a))
   let m = IM.fromAscList xs
@@ -914,7 +918,6 @@ reasonOf solver c x = do
     forM_ cl $ \lit -> do
       val <- litValue solver lit
       unless (Just False == val) $ do
-        m <- readIORef (svVarData solver)
         str <- showConstraint solver c
         error (printf "reasonOf: value of literal %d should be False but %s (basicReasonOf %s %s)" lit (show val) str (show x))
   return cl
@@ -1297,7 +1300,7 @@ sanityCheck solver = do
       unless (constr `elem` ws) $ error $ printf "sanityCheck:A:%s" (show lits)
 
   m <- readIORef (svVarData solver)
-  let lits = [l | v <- IM.keys m, l <- [literal v True, literal v False]]
+  let lits = [l | v <- [1 .. V.length m], l <- [literal v True, literal v False]]
   forM_ lits $ \l -> do
     cs <- watches solver l
     forM_ cs $ \constr -> do
