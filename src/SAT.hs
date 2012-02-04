@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
+{-# LANGUAGE BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  SAT
@@ -252,12 +253,18 @@ varValue :: Solver -> Var -> IO (Maybe Bool)
 varValue s v = do
   vd <- varData s v
   m <- readIORef (vdAssignment vd)
-  return $ fmap aValue m
+  return $! fmap aValue m
 
 litValue :: Solver -> Lit -> IO (Maybe Bool)
 litValue s l = do
   m <- varValue s (litVar l)
-  return $ fmap (if litPolarity l then id else not) m
+  -- hot spot なので汚くても極力 allocation を減らすように
+  if litPolarity l
+    then return m
+    else
+      case m of
+        Nothing -> return m
+        Just x -> return $! Just $! not x
 
 varLevel :: Solver -> Var -> IO Level
 varLevel s v = do
@@ -978,7 +985,7 @@ instance Constraint ClauseData where
       l1:l2:_ -> return [l1, l2]
       _ -> return []
 
-  propagate s this@(ClauseData a) falsifiedLit = do
+  propagate !s this@(ClauseData a) !falsifiedLit = do
     preprocess
 
     lit0 <- readArray a 0
@@ -988,7 +995,7 @@ instance Constraint ClauseData where
         watch s falsifiedLit this
         return True
       else do
-        (lb,ub) <- getBounds a
+        (!lb,!ub) <- getBounds a
         assert (lb==0) $ return ()
         ret <- findForWatch 2 ub
         case ret of
@@ -996,7 +1003,7 @@ instance Constraint ClauseData where
             when debugMode $ debugPrintf "propagate: %s is unit\n" =<< showConstraint s this
             watch s falsifiedLit this
             assignBy s lit0 this
-          Just i  -> do
+          Just !i  -> do
             lit1 <- readArray a 1
             liti <- readArray a i
             writeArray a 1 liti
