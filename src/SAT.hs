@@ -367,8 +367,9 @@ addBacktrackCB solver v callback = do
 -- | Register the constraint to be notified when the literal becames false.
 watch :: Constraint c => Solver -> Lit -> c -> IO ()
 watch solver lit c = do
-  lits <- watchedLiterals solver c
-  assert (lit `elem` lits) $ return ()
+  when debugMode $ do
+    lits <- watchedLiterals solver c
+    unless (lit `elem` lits) $ error "watch: should not happen"
   ld <- litData solver lit
   modifyIORef (ldWatches ld) (toConstraint c : )
 
