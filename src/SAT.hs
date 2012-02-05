@@ -297,6 +297,8 @@ data Solver
   , svLevel        :: !(IORef Level)
   , svBCPQueue     :: !(IORef (Seq.Seq Lit))
   , svModel        :: !(IORef (Maybe (VarMap Bool)))
+  , svNDecision    :: !(IORef Int)
+  , svNConflict    :: !(IORef Int)
   }
 
 markBad :: Solver -> IO ()
@@ -430,6 +432,8 @@ newSolver = do
   lv  <- newIORef levelRoot
   q   <- newIORef Seq.empty
   m   <- newIORef Nothing
+  ndecision <- newIORef 0
+  nconflict <- newIORef 0
   return $
     Solver
     { svOk = ok
@@ -442,6 +446,8 @@ newSolver = do
     , svLevel      = lv
     , svBCPQueue   = q
     , svModel      = m
+    , svNDecision  = ndecision
+    , svNConflict  = nconflict
     }
 
 -- |Add a new variable
@@ -602,6 +608,8 @@ solve solver = do
         constructModel solver
       backtrackTo solver levelRoot
       when debugMode $ dumpVarScore solver
+      debugPrintf "c #decision = %d\n" =<< readIORef (svNDecision solver)
+      debugPrintf "c #conflict = %d\n" =<< readIORef (svNConflict solver)
       return result
 
   where
@@ -619,6 +627,7 @@ solve solver = do
             Just lit -> decide solver lit >> loop
 
         Just constr -> do
+          modifyIORef' (svNConflict solver) (+1)
           d <- readIORef (svLevel solver)
 
           when debugMode $ do
@@ -667,6 +676,7 @@ pickBranchLit solver = do
 
 decide :: Solver -> Lit -> IO ()
 decide solver lit = do
+  modifyIORef' (svNDecision solver) (+1)
   modifyIORef (svLevel solver) (+1)
   val <- litValue solver lit
   assert (isNothing val) $ return ()
@@ -1277,6 +1287,11 @@ allM p = go
       if b
         then go xs
         else return False
+
+modifyIORef' :: IORef a -> (a -> a) -> IO ()
+modifyIORef' ref f = do
+  x <- readIORef ref
+  writeIORef ref $! f x
 
 {--------------------------------------------------------------------
   debug
