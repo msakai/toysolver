@@ -237,7 +237,7 @@ newLitData = do
   return $ LitData ws
 
 varData :: Solver -> Var -> IO VarData
-varData s v = do
+varData s !v = do
   vec <- readIORef (svVarData s)
   return $! vec V.! (varToIdx v)
 
@@ -278,7 +278,7 @@ litLevel :: Solver -> Lit -> IO Level
 litLevel s l = varLevel s (litVar l)
 
 varReason :: Solver -> Var -> IO (Maybe SomeConstraint)
-varReason s v = do
+varReason s !v = do
   vd <- varData s v
   m <- readIORef (vdAssignment vd)
   case m of
@@ -398,12 +398,12 @@ attachConstraint solver c = do
 type VarScore = Int
 
 varScore :: Solver -> Var -> IO VarScore
-varScore solver v = do
+varScore solver !v = do
   vscore <- readIORef (svVarScore solver)
   return $! IM.findWithDefault 0 v vscore
 
 incVarScore :: Solver -> Var -> IO ()
-incVarScore solver v = do
+incVarScore solver !v = do
   modifyIORef (svVarScore solver) (IM.insertWith (+) v 1)
 
 updateVarQueue :: Solver -> IO ()
@@ -656,7 +656,7 @@ model solver = do
 --------------------------------------------------------------------}
 
 pickBranchLit :: Solver -> IO (Maybe Lit)
-pickBranchLit solver = do
+pickBranchLit !solver = do
   let vqueue = svVarQueue solver
 
       loop :: IO (Maybe Var)
@@ -670,7 +670,8 @@ pickBranchLit solver = do
               Nothing -> do
                 vd <- varData solver var
                 p <- readIORef (vdPolarity vd)
-                return $ Just $ literal var p
+                let lit = literal var p
+                seq lit $ return (Just lit)
               Just _ -> loop
   loop
 
