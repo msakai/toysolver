@@ -75,7 +75,7 @@ mainSAT args = do
 
 solveCNF :: DIMACS.CNF -> IO ()
 solveCNF cnf = do
-  solver <- SAT.newSolver
+  solver <- newSolver
   _ <- replicateM (DIMACS.numVars cnf) (SAT.newVar solver)
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
@@ -88,6 +88,12 @@ solveCNF cnf = do
       putStrLn ("v " ++ show (SAT.literal var val))
     putStrLn "v 0"
     hFlush stdout
+
+newSolver :: IO SAT.Solver
+newSolver = do
+  solver <- SAT.newSolver
+  SAT.setRestartFirst solver (-1) -- disable restart
+  return solver
 
 -- ------------------------------------------------------------------------
 
@@ -103,7 +109,7 @@ mainPB args = do
 
 solvePB :: PBFile.Formula -> IO ()
 solvePB formula@(obj, cs) = do
-  solver <- SAT.newSolver
+  solver <- newSolver
   let n = pbNumVars formula
   _ <- replicateM n (SAT.newVar solver)
   forM_ cs $ \(lhs, op, rhs) -> do
@@ -204,7 +210,7 @@ wboAddExactly solver sel lhs rhs = do
 
 solveWBO :: Bool -> PBFile.SoftFormula -> IO ()
 solveWBO isMaxSat formula@(tco, cs) = do
-  solver <- SAT.newSolver
+  solver <- newSolver
   let nvar = wboNumVars formula
   _ <- replicateM nvar (SAT.newVar solver)
 
@@ -329,7 +335,7 @@ solveLP lp = do
       hPutStrLn stderr ("cannot handle non-binary variables: " ++ intercalate ", " (Set.toList nbvs))
       exitFailure
     else do
-      solver <- SAT.newSolver
+      solver <- newSolver
 
       vmap <- liftM Map.fromList $ forM (Set.toList bvs) $ \v -> do
         v2 <- SAT.newVar solver 

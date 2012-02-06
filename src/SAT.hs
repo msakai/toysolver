@@ -44,6 +44,10 @@ module SAT
   , addPBAtMost
   , addPBExactly
 
+  -- * Parameters
+  , setRestartFirst
+  , setRestartInc
+
   -- * Solving
   , solve
 
@@ -313,12 +317,19 @@ data Solver
   , svModel        :: !(IORef (Maybe (VarMap Bool)))
   , svNDecision    :: !(IORef Int)
   , svNConflict    :: !(IORef Int)
+  , svNRestart     :: !(IORef Int)
 
   -- | Inverse of the clause activity decay factor. (1 / 0.999)
   , svClaDecay     :: !(IORef Double) 
 
   -- | Amount to bump next clause with.
   , svClaInc       :: !(IORef Double)
+
+  -- | The initial restart limit. (default 100)
+  , svRestartFirst :: !(IORef Int)
+
+  -- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
+  , svRestartInc :: !(IORef Double)
   }
 
 markBad :: Solver -> IO ()
@@ -525,9 +536,12 @@ newSolver = do
   m   <- newIORef Nothing
   ndecision <- newIORef 0
   nconflict <- newIORef 0
+  nrestart  <- newIORef 0
 
   claDecay <- newIORef (1 / 0.999)
   claInc   <- newIORef 1
+  restartFirst <- newIORef 100
+  restartInc <- newIORef 1.5
 
   return $
     Solver
@@ -543,8 +557,11 @@ newSolver = do
     , svModel      = m
     , svNDecision  = ndecision
     , svNConflict  = nconflict
+    , svNRestart   = nrestart
     , svClaDecay   = claDecay
     , svClaInc     = claInc
+    , svRestartFirst = restartFirst
+    , svRestartInc   = restartInc
     }
 
 -- |Add a new variable
@@ -713,10 +730,25 @@ solve solver = do
       d <- readIORef (svLevel solver)
       assert (d == levelRoot) $ return ()
 
-      start <- getCPUTime
+      restartFirst <- readIORef (svRestartFirst solver)
+      restartInc   <- readIORef (svRestartInc solver)
+
+      let loop !conflict_lim learnt_lim = do
+            ret <- search solver conflict_lim learnt_lim
+            case ret of
+              Just x -> return x
+              Nothing -> do
+                modifyIORef' (svNRestart solver) (+1)
+                backtrackTo solver levelRoot
+                loop (ceiling (fromIntegral conflict_lim * restartInc))
+                     (ceiling (fromIntegral learnt_lim * learntSizeInc))
+      
       nc <- nClauses solver
       nv <- nVars solver
-      result <- loop (nc*3 + nv*2)
+      let learntSizeFirst = max (nc + 2*nv) 16
+
+      start <- getCPUTime
+      result <- loop restartFirst learntSizeFirst
       end <- getCPUTime
 
       when result $ do
@@ -730,12 +762,15 @@ solve solver = do
       debugPrintf "solving time = %.3fs\n" (fromIntegral (end - start) / 10^(12::Int) :: Double)
       debugPrintf "#decision = %d\n" =<< readIORef (svNDecision solver)
       debugPrintf "#conflict = %d\n" =<< readIORef (svNConflict solver)
+      debugPrintf "#restart = %d\n" =<< readIORef (svNRestart solver)
 
       return result
 
+search :: Solver -> Int -> Int -> IO (Maybe Bool)
+search solver !conflict_lim !learnt_lim = loop 0
   where
-    loop :: Int -> IO Bool
-    loop learnt_lim = do
+    loop :: Int -> IO (Maybe Bool)
+    loop !c = do
       sanityCheck solver
       conflict <- deduce solver
       sanityCheck solver
@@ -747,8 +782,8 @@ solve solver = do
 
           r <- pickBranchLit solver
           case r of
-            Nothing -> return True
-            Just lit -> decide solver lit >> loop learnt_lim 
+            Nothing -> return (Just True)
+            Just lit -> decide solver lit >> loop c
 
         Just constr -> do
           claDecayActivity solver
@@ -761,14 +796,28 @@ solve solver = do
             debugPrintf "conflict(level=%d): %s\n" d str
 
           if d == levelRoot
-            then return False
+            then return (Just False)
+            else if conflict_lim >= 0 && c+1 >= conflict_lim then
+              return Nothing
             else do
               learntClause <- analyzeConflict solver constr
               (cl, level, lit) <- newLearntClause solver learntClause
               backtrackTo solver level
               assignBy solver lit cl
               claBumpActivity solver cl
-              loop learnt_lim
+              loop (c+1)
+
+-- | The initial restart limit. (default 100)
+setRestartFirst :: Solver -> Int -> IO ()
+setRestartFirst solver !n = writeIORef (svRestartFirst solver) n
+
+-- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
+setRestartInc :: Solver -> Double -> IO ()
+setRestartInc solver !r = writeIORef (svRestartInc solver) r
+
+-- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
+learntSizeInc :: Double
+learntSizeInc = 1.1
 
 type Model = IM.IntMap Bool
 
