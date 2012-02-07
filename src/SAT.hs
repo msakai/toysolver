@@ -72,6 +72,7 @@ import qualified Data.PriorityQueue as PQ
 import qualified Data.Vector as V
 import System.IO
 import Text.Printf
+import LBool
 
 {--------------------------------------------------------------------
   pure/persistent data structures
@@ -249,22 +250,21 @@ litData s l = do
     then vdPosLitData vd
     else vdNegLitData vd
 
-varValue :: Solver -> Var -> IO (Maybe Bool)
+varValue :: Solver -> Var -> IO LBool
 varValue s v = do
   vd <- varData s v
   m <- readIORef (vdAssignment vd)
-  return $! fmap aValue m
+  case m of
+    Nothing -> return lUndef
+    Just x -> return $! (liftBool $! aValue x)
 
-litValue :: Solver -> Lit -> IO (Maybe Bool)
+litValue :: Solver -> Lit -> IO LBool
 litValue s l = do
   m <- varValue s (litVar l)
   -- hot spot なので汚くても極力 allocation を減らすように
   if litPolarity l
-    then return m
-    else
-      case m of
-        Nothing -> return m
-        Just x -> return $! Just $! not x
+    then return $! m
+    else return $! lnot m
 
 varLevel :: Solver -> Var -> IO Level
 varLevel s v = do
@@ -666,13 +666,13 @@ pickBranchLit !solver = do
           Nothing -> return Nothing
           Just (var,_) -> do
             val <- varValue solver var
-            case val of
-              Nothing -> do
+            if val /= lUndef
+              then loop
+              else do
                 vd <- varData solver var
                 p <- readIORef (vdPolarity vd)
                 let lit = literal var p
-                seq lit $ return (Just lit)
-              Just _ -> loop
+                seq lit $ return (Just lit)              
   loop
 
 decide :: Solver -> Lit -> IO ()
@@ -680,7 +680,7 @@ decide solver lit = do
   modifyIORef' (svNDecision solver) (+1)
   modifyIORef (svLevel solver) (+1)
   val <- litValue solver lit
-  assert (isNothing val) $ return ()
+  assert (val == lUndef) $ return ()
   assign solver lit
   return ()
 
@@ -929,14 +929,14 @@ reasonOf solver c x = do
       Nothing -> return ()
       Just lit -> do
         val <- litValue solver lit
-        unless (Just True == val) $ do
+        unless (lTrue == val) $ do
           str <- showConstraint solver c
           error (printf "reasonOf: value of literal %d should be True but %s (basicReasonOf %s %s)" lit (show val) str (show x))
   cl <- basicReasonOf solver c x
   when debugMode $ do
     forM_ cl $ \lit -> do
       val <- litValue solver lit
-      unless (Just False == val) $ do
+      unless (lFalse == val) $ do
         str <- showConstraint solver c
         error (printf "reasonOf: value of literal %d should be False but %s (basicReasonOf %s %s)" lit (show val) str (show x))
   return cl
@@ -1001,7 +1001,7 @@ instance Constraint ClauseData where
 
     lit0 <- readArray a 0
     val0 <- litValue s lit0
-    if val0 == Just True
+    if val0 == lTrue
       then do
         watch s falsifiedLit this
         return True
@@ -1036,7 +1036,7 @@ instance Constraint ClauseData where
       findForWatch i end | i > end = return Nothing
       findForWatch i end = do
         val <- litValue s =<< readArray a i
-        if val /= Just False
+        if val /= lFalse
           then return (Just i)
           else findForWatch (i+1) end
 
@@ -1051,7 +1051,7 @@ instance Constraint ClauseData where
   isSatisfied solver (ClauseData a) = do
     lits <- getElems a
     vals <- mapM (litValue solver) lits
-    return $ Just True `elem` vals
+    return $ lTrue `elem` vals
 
 instantiateClause :: Solver -> Clause -> IO (Maybe Clause)
 instantiateClause solver = loop []
@@ -1060,10 +1060,12 @@ instantiateClause solver = loop []
     loop ret [] = return $ Just ret
     loop ret (l:ls) = do
       val <- litValue solver l
-      case val of
-        Nothing -> loop (l : ret) ls
-        Just True -> return $ Nothing
-        Just False -> loop ret ls
+      if val==lTrue then
+         return Nothing
+       else if val==lFalse then
+         loop ret ls
+       else
+         loop (l : ret) ls
 
 {--------------------------------------------------------------------
   Cardinality Constraint
@@ -1146,7 +1148,7 @@ instance Constraint AtLeastData where
       findForWatch i end | i > end = return Nothing
       findForWatch i end = do
         val <- litValue s =<< readArray a i
-        if val /= Just False
+        if val /= lFalse
           then return (Just i)
           else findForWatch (i+1) end
 
@@ -1158,7 +1160,7 @@ instance Constraint AtLeastData where
             f [] = error "AtLeastData.basicReasonOf: should not happen"
             f (l:ls) = do
               val <- litValue s l
-              if val == Just False
+              if val == lFalse
                 then return l
                 else f ls
         lit <- f (take n lits)
@@ -1170,7 +1172,7 @@ instance Constraint AtLeastData where
   isSatisfied solver (AtLeastData a n) = do
     lits <- getElems a
     vals <- mapM (litValue solver) lits
-    return $ length [v | v <- vals, v == Just True] >= n
+    return $ length [v | v <- vals, v == lTrue] >= n
 
 instantiateAtLeast :: Solver -> ([Lit],Int) -> IO ([Lit],Int)
 instantiateAtLeast solver (xs,n) = loop ([],n) xs
@@ -1179,10 +1181,12 @@ instantiateAtLeast solver (xs,n) = loop ([],n) xs
     loop ret [] = return ret
     loop (ys,n) (l:ls) = do
       val <- litValue solver l
-      case val of
-        Nothing -> loop (l:ys, n) ls
-        Just True -> loop (ys, n-1) ls
-        Just False -> loop (ys, n) ls
+      if val == lTrue then
+         loop (ys, n-1) ls
+       else if val == lFalse then
+         loop (ys, n) ls
+       else
+         loop (l:ys, n) ls
 
 {--------------------------------------------------------------------
   Pseudo Boolean Constraint
@@ -1231,16 +1235,14 @@ instance Constraint PBAtLeastData where
             debugPrintf "propagate: %s is unit (new slack = %d)\n" str s
           forM_ ls $ \l1 -> do
             v <- litValue solver l1
-            case v of
-              Just _ -> return ()
-              Nothing -> do
-                assignBy solver l1 this
-                return ()
+            when (v == lUndef) $ do
+              assignBy solver l1 this
+              return ()
         return True
 
   basicReasonOf solver (PBAtLeastData m degree _) l = do
     xs <- do
-      tmp <- filterM (\(lit,_) -> liftM (Just False ==) (litValue solver lit)) (IM.toList m)
+      tmp <- filterM (\(lit,_) -> liftM (lFalse ==) (litValue solver lit)) (IM.toList m)
       return $ sortBy (flip compare `on` snd) tmp
     let max_slack = sum (map snd $ IM.toList m) - degree
     case l of
@@ -1258,9 +1260,9 @@ instance Constraint PBAtLeastData where
   isSatisfied solver (PBAtLeastData m degree _) = do
     xs <- forM (IM.toList m) $ \(l,c) -> do
       v <- litValue solver l
-      case v of
-        Just True -> return c
-        _ -> return 0
+      if v == lTrue
+        then return c
+        else return 0
     return $ sum xs >= degree
 
 instantiatePBAtLeast :: Solver -> ([(Integer,Lit)],Integer) -> IO ([(Integer,Lit)],Integer)
@@ -1270,10 +1272,12 @@ instantiatePBAtLeast solver (xs,n) = loop ([],n) xs
     loop ret [] = return ret
     loop (ys,n) ((c,l):ts) = do
       val <- litValue solver l
-      case val of
-        Nothing -> loop ((c,l):ys, n) ts
-        Just True -> loop (ys, n-c) ts
-        Just False -> loop (ys, n) ts
+      if val == lTrue then
+         loop (ys, n-c) ts
+       else if val == lFalse then
+         loop (ys, n) ts
+       else
+         loop ((c,l):ys, n) ts
 
 {--------------------------------------------------------------------
   utility
