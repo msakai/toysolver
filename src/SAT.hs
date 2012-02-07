@@ -87,6 +87,7 @@ type VarMap = IM.IntMap
 validVar :: Var -> Bool
 validVar v = v > 0
 
+{-# INLINE varToIdx #-}
 varToIdx :: Var -> Int
 varToIdx v = v - 1
 
@@ -112,10 +113,12 @@ literal v polarity =
 litNot :: Lit -> Lit
 litNot l = assert (validLit l) $ negate l
 
+{-# INLINE litVar #-}
 -- | Underlying variable of the 'Lit'
 litVar :: Lit -> Var
 litVar l = assert (validLit l) $ abs l
 
+{-# INLINE litPolarity #-}
 -- | Polarity of the 'Lit'.
 -- 'True' means positive literal and 'False' means negative literal.
 litPolarity :: Lit -> Bool
@@ -240,7 +243,8 @@ newLitData = do
 varData :: Solver -> Var -> IO VarData
 varData s !v = do
   vec <- readIORef (svVarData s)
-  return $! vec V.! (varToIdx v)
+  let idx = varToIdx v
+  seq idx (return $! vec V.! idx)
 
 litData :: Solver -> Lit -> IO LitData
 litData s l = do
@@ -250,6 +254,7 @@ litData s l = do
     then vdPosLitData vd
     else vdNegLitData vd
 
+{-# INLINE varValue #-}
 varValue :: Solver -> Var -> IO LBool
 varValue s v = do
   vd <- varData s v
@@ -258,6 +263,7 @@ varValue s v = do
     Nothing -> return lUndef
     Just x -> return $! (liftBool $! aValue x)
 
+{-# INLINE litValue #-}
 litValue :: Solver -> Lit -> IO LBool
 litValue s l = do
   m <- varValue s (litVar l)
@@ -672,15 +678,16 @@ pickBranchLit !solver = do
                 vd <- varData solver var
                 p <- readIORef (vdPolarity vd)
                 let lit = literal var p
-                seq lit $ return (Just lit)              
+                seq lit $ return (Just lit)
   loop
 
 decide :: Solver -> Lit -> IO ()
 decide solver lit = do
   modifyIORef' (svNDecision solver) (+1)
   modifyIORef (svLevel solver) (+1)
-  val <- litValue solver lit
-  assert (val == lUndef) $ return ()
+  when debugMode $ do
+    val <- litValue solver lit
+    when (val /= lUndef) $ error "decide: should not happen"
   assign solver lit
   return ()
 
