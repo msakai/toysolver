@@ -18,19 +18,19 @@ module LBool
 import Data.Int
 
 -- | lifted Bool type.
-newtype LBool = LBool (Maybe Bool) deriving Eq
+newtype LBool = LBool Int8 deriving Eq
 
 {-# INLINE lTrue #-}
 lTrue :: LBool
-lTrue = LBool (Just True)
+lTrue = LBool 1
 
 {-# INLINE lFalse #-}
 lFalse :: LBool
-lFalse = LBool (Just False)
+lFalse = LBool (-1)
 
 {-# INLINE lUndef #-}
 lUndef :: LBool
-lUndef = LBool Nothing
+lUndef = LBool 0
 
 {-# INLINE lnot #-}
 lnot :: LBool -> LBool
