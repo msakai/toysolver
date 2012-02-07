@@ -614,8 +614,8 @@ solve solver = do
         constructModel solver
       backtrackTo solver levelRoot
       when debugMode $ dumpVarScore solver
-      debugPrintf "c #decision = %d\n" =<< readIORef (svNDecision solver)
-      debugPrintf "c #conflict = %d\n" =<< readIORef (svNConflict solver)
+      debugPrintf "#decision = %d\n" =<< readIORef (svNDecision solver)
+      debugPrintf "#conflict = %d\n" =<< readIORef (svNConflict solver)
       return result
 
   where
