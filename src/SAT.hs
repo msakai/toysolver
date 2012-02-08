@@ -879,8 +879,9 @@ backtrackTo solver level = do
 
 constructModel :: Solver -> IO ()
 constructModel solver = do
-  vds <- readIORef (svVarData solver)
-  xs <- forM (zip [1..] (V.toList vds)) $ \(v, vd) -> do
+  vs <- variables solver
+  xs <- forM vs $ \v -> do
+    vd <- varData solver v
     a <- readIORef (vdAssignment vd)
     return $ (v, aValue (fromJust a))
   let m = IM.fromAscList xs
