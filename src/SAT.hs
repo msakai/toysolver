@@ -219,6 +219,7 @@ data VarData
   , vdPolarity   :: !(IORef Bool)
   , vdPosLitData :: !LitData
   , vdNegLitData :: !LitData
+  , vdScore      :: !(IORef VarScore)
   }
 
 data LitData
@@ -233,7 +234,8 @@ newVarData = do
   polarity <- newIORef True
   pos <- newLitData
   neg <- newLitData
-  return $ VarData ainfo polarity pos neg
+  score <- newIORef 0
+  return $ VarData ainfo polarity pos neg score
 
 newLitData :: IO LitData
 newLitData = do
@@ -295,7 +297,6 @@ data Solver
   = Solver
   { svOk           :: !(IORef Bool)
   , svVarQueue     :: !(PQ.PriorityQueue IO (Var,VarScore))
-  , svVarScore     :: !(IORef (VarMap VarScore))
   , svAssigned     :: !(IORef (LevelMap [Lit]))
   , svVarCounter   :: !(IORef Int)
   , svVarData      :: !(IORef (V.Vector VarData))
@@ -405,21 +406,26 @@ type VarScore = Int
 
 varScore :: Solver -> Var -> IO VarScore
 varScore solver !v = do
-  vscore <- readIORef (svVarScore solver)
-  return $! IM.findWithDefault 0 v vscore
+  vd <- varData solver v
+  readIORef (vdScore vd)
 
 incVarScore :: Solver -> Var -> IO ()
 incVarScore solver !v = do
-  modifyIORef (svVarScore solver) (IM.insertWith (+) v 1)
+  vd <- varData solver v
+  modifyIORef' (vdScore vd) (+1)
 
 updateVarQueue :: Solver -> IO ()
 updateVarQueue solver = do
   let vqueue = svVarQueue solver
-  vscore <- readIORef (svVarScore solver)
   xs <- PQ.dequeueBatch vqueue
   forM_ xs $ \(v,_) -> do
-    let score = IM.findWithDefault 0 v vscore
+    score <- varScore solver v
     PQ.enqueue vqueue (v,score)
+
+variables :: Solver -> IO [Var]
+variables solver = do
+  vcnt <- readIORef (svVarCounter solver)
+  return [1 .. vcnt-1]
 
 {--------------------------------------------------------------------
   external API
@@ -431,7 +437,6 @@ newSolver = do
   ok   <- newIORef True
   vcnt <- newIORef 1
   vqueue <- PQ.newPriorityQueue (\(_,score) -> -score)
-  vscore <- newIORef IM.empty
   assigned <- newIORef IM.empty
   vars <- newIORef V.empty
   db  <- newIORef []
@@ -445,7 +450,6 @@ newSolver = do
     { svOk = ok
     , svVarCounter = vcnt
     , svVarQueue   = vqueue
-    , svVarScore   = vscore
     , svAssigned   = assigned
     , svVarData    = vars
     , svClauseDB   = db
@@ -1334,8 +1338,8 @@ sanityCheck solver = do
       ws <- watches solver l
       unless (constr `elem` ws) $ error $ printf "sanityCheck:A:%s" (show lits)
 
-  m <- readIORef (svVarData solver)
-  let lits = [l | v <- [1 .. V.length m], l <- [literal v True, literal v False]]
+  vs <- variables solver
+  let lits = [l | v <- vs, l <- [literal v True, literal v False]]
   forM_ lits $ \l -> do
     cs <- watches solver l
     forM_ cs $ \constr -> do
@@ -1345,9 +1349,10 @@ sanityCheck solver = do
 
 dumpVarScore :: Solver -> IO ()
 dumpVarScore solver = do
-  vscore <- readIORef (svVarScore solver)
   debugPrintf "Variable scores:\n"
-  forM_ (IM.toList vscore) $ \(v,score) ->
+  vs <- variables solver
+  forM_ vs $ \v -> do
+    score <- varScore solver v
     debugPrintf "score(%d) = %d\n" v score
 
 {--------------------------------------------------------------------
