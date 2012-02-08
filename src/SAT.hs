@@ -69,7 +69,6 @@ import qualified Data.IntSet as IS
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified Data.PriorityQueue as PQ
-import qualified Data.Vector as V
 import System.IO
 import Text.Printf
 import LBool
@@ -86,10 +85,6 @@ type VarMap = IM.IntMap
 
 validVar :: Var -> Bool
 validVar v = v > 0
-
-{-# INLINE varToIdx #-}
-varToIdx :: Var -> Int
-varToIdx v = v - 1
 
 -- | Positive (resp. negative) literals are represented as positive (resp.
 -- negative) integers. (DIMACS format).
@@ -244,17 +239,15 @@ newLitData = do
 
 varData :: Solver -> Var -> IO VarData
 varData s !v = do
-  vec <- readIORef (svVarData s)
-  let idx = varToIdx v
-  seq idx (return $! vec V.! idx)
+  a <- readIORef (svVarData s)
+  readArray a v
 
 litData :: Solver -> Lit -> IO LitData
 litData s l = do
   vd <- varData s (litVar l)
-  return $!
-    if litPolarity l
-    then vdPosLitData vd
-    else vdNegLitData vd
+  if litPolarity l
+    then return $ vdPosLitData vd
+    else return $ vdNegLitData vd
 
 {-# INLINE varValue #-}
 varValue :: Solver -> Var -> IO LBool
@@ -299,7 +292,7 @@ data Solver
   , svVarQueue     :: !(PQ.PriorityQueue IO (Var,VarScore))
   , svAssigned     :: !(IORef (LevelMap [Lit]))
   , svVarCounter   :: !(IORef Int)
-  , svVarData      :: !(IORef (V.Vector VarData))
+  , svVarData      :: !(IORef (IOArray Int VarData))
   , svClauseDB     :: !(IORef [SomeConstraint])
   , svLevel        :: !(IORef Level)
   , svBCPQueue     :: !(IORef (Seq.Seq Lit))
@@ -438,7 +431,7 @@ newSolver = do
   vcnt <- newIORef 1
   vqueue <- PQ.newPriorityQueue (\(_,score) -> -score)
   assigned <- newIORef IM.empty
-  vars <- newIORef V.empty
+  vars <- newIORef =<< newArray_ (1,0)
   db  <- newIORef []
   lv  <- newIORef levelRoot
   q   <- newIORef Seq.empty
@@ -467,7 +460,20 @@ newVar s = do
   writeIORef (svVarCounter s) (v+1)
   PQ.enqueue (svVarQueue s) (v,0)
   vd <- newVarData
-  modifyIORef (svVarData s) (\vec -> V.snoc vec vd)
+
+  a <- readIORef (svVarData s)
+  (lb,ub) <- getBounds a
+  if v <= ub
+    then writeArray a v vd
+    else do
+      let ub' = max 2 (ub * 3 `div` 2)
+      a' <- newArray_ (1,ub')
+      forM_ [1..ub] $ \v -> do
+        vd <- readArray a v
+        writeArray a' v vd
+      writeArray a' v vd
+      writeIORef (svVarData s) a'
+
   return v
 
 -- |Add a clause to the solver.
