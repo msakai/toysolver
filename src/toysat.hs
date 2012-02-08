@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toysat
@@ -22,9 +22,11 @@ import Data.Function
 import Data.List
 import Data.Maybe
 import Data.Ratio
+import Data.Version
 import System.IO
 import System.Environment
 import System.Exit
+import qualified System.Info as SysInfo
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import Text.Printf
 import qualified SAT
@@ -53,6 +55,12 @@ header = unlines
   , "  toysat --lp [file.lp|-]"
   ]
 
+printSysInfo :: IO ()
+printSysInfo = do
+  hPrintf stdout "c arch = %s\n" SysInfo.arch
+  hPrintf stdout "c os = %s\n" SysInfo.os
+  hPrintf stdout "c compiler = %s %s\n" SysInfo.compilerName (showVersion SysInfo.compilerVersion)
+
 -- ------------------------------------------------------------------------
 
 mainSAT :: [String] -> IO ()
@@ -63,7 +71,7 @@ mainSAT args = do
            _ -> hPutStrLn stderr header >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right cnf -> solveCNF cnf
+    Right cnf -> printSysInfo >> solveCNF cnf
 
 solveCNF :: DIMACS.CNF -> IO ()
 solveCNF cnf = do
@@ -91,7 +99,7 @@ mainPB args = do
            _ -> hPutStrLn stderr header >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right formula -> solvePB formula
+    Right formula -> printSysInfo >> solvePB formula
 
 solvePB :: PBFile.Formula -> IO ()
 solvePB formula@(obj, cs) = do
@@ -178,7 +186,7 @@ mainWBO args = do
            _ -> hPutStrLn stderr header >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right formula -> solveWBO False formula
+    Right formula -> printSysInfo >> solveWBO False formula
 
 wboAddAtLeast :: SAT.Solver -> SAT.Lit -> [(Integer,SAT.Lit)] -> Integer -> IO ()
 wboAddAtLeast solver sel lhs rhs = do
@@ -262,7 +270,7 @@ mainMaxSAT args = do
         (["p","cnf", nvar, nclause]) ->
           (read nvar, 2, map parseCNFLine ls)
         _ -> error "parse error"
-  solveMaxSAT wcnf
+  printSysInfo >> solveMaxSAT wcnf
 
 isComment :: String -> Bool
 isComment ('c':_) = True
@@ -312,7 +320,7 @@ mainLP args = do
            _ -> hPutStrLn stderr header >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right lp -> solveLP lp
+    Right lp -> printSysInfo >> solveLP lp
 
 solveLP :: LPFile.LP -> IO ()
 solveLP lp = do
