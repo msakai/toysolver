@@ -331,13 +331,14 @@ solveLP lp = do
     else do
       solver <- SAT.newSolver
 
-      vmap <- liftM Map.fromList $ forM (Set.toList (LPFile.binaryVariables lp)) $ \v -> do
+      vmap <- liftM Map.fromList $ forM (Set.toList bvs) $ \v -> do
         v2 <- SAT.newVar solver 
         _ <- printf "c x%d := %s\n" v2 v
         return (v,v2)
 
       putStrLn "c Loading bounds"
-      forM_ (Map.toList (LPFile.bounds lp)) $ \(var, (lb,ub)) -> do
+      forM_ (Set.toList (LPFile.variables lp)) $ \var -> do
+        let (lb,ub) = LPFile.getBounds lp var
         let var' = vmap Map.! var
         case lb of
           LPFile.NegInf   -> return ()
@@ -397,12 +398,17 @@ solveLP lp = do
           putStrLn $ "s " ++ "OPTIMUM FOUND"
           hFlush stdout
           
-          forM_ (Set.toList (LPFile.binaryVariables lp)) $ \v -> do
+          forM_ (Set.toList bvs) $ \v -> do
             let val = m IM.! (vmap Map.! v)
             printf "v %s = %s\n" v (if val then "1" else "0")
           hFlush stdout
   where
-    nbvs = LPFile.variables lp `Set.difference` LPFile.binaryVariables lp
+    bvs = LPFile.binaryVariables lp `Set.union` Set.filter p (LPFile.integerVariables lp)
+      where
+        p v = case LPFile.getBounds lp v of
+                (LPFile.Finite lb, LPFile.Finite ub) -> 0 <= lb && ub <= 1
+                _ -> False
+    nbvs = LPFile.variables lp `Set.difference` bvs
 
     asSingleton :: [a] -> a
     asSingleton [v] = v
