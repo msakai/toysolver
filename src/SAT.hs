@@ -70,6 +70,7 @@ import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified Data.PriorityQueue as PQ
 import System.IO
+import System.CPUTime
 import Text.Printf
 import LBool
 
@@ -618,14 +619,22 @@ solve solver = do
       updateVarQueue solver
       d <- readIORef (svLevel solver)
       assert (d == levelRoot) $ return ()
+
+      start <- getCPUTime
       result <- loop
+      end <- getCPUTime
+
       when result $ do
         when debugMode $ checkSatisfied solver
         constructModel solver
+
       backtrackTo solver levelRoot
+
       when debugMode $ dumpVarScore solver
+      debugPrintf "solving time = %.3fs\n" (fromIntegral (end - start) / 10^12 :: Double)
       debugPrintf "#decision = %d\n" =<< readIORef (svNDecision solver)
       debugPrintf "#conflict = %d\n" =<< readIORef (svNConflict solver)
+
       return result
 
   where
