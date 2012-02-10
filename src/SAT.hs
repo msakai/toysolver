@@ -633,7 +633,7 @@ solve solver = do
       backtrackTo solver levelRoot
 
       when debugMode $ dumpVarScore solver
-      debugPrintf "solving time = %.3fs\n" (fromIntegral (end - start) / 10^12 :: Double)
+      debugPrintf "solving time = %.3fs\n" (fromIntegral (end - start) / 10^(12::Int) :: Double)
       debugPrintf "#decision = %d\n" =<< readIORef (svNDecision solver)
       debugPrintf "#conflict = %d\n" =<< readIORef (svNConflict solver)
 
