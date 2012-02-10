@@ -937,7 +937,7 @@ class Constraint a where
   watchedLiterals :: Solver -> a -> IO [Lit]
 
   -- | invoked with the watched literal when the literal is falsified.
-  propagate :: Solver -> a -> Lit -> IO Bool
+  basicPropagate :: Solver -> a -> Lit -> IO Bool
 
   -- | deduce a clause C∨l from the constraint and return C.
   -- C and l should be false and true respectively under the current
@@ -945,6 +945,10 @@ class Constraint a where
   basicReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
   isSatisfied :: Solver -> a -> IO Bool
+
+-- | invoked with the watched literal when the literal is falsified.
+propagate :: Solver -> SomeConstraint -> Lit -> IO Bool
+propagate solver c l = basicPropagate solver c l
 
 -- | deduce a clause C∨l from the constraint and return C.
 -- C and l should be false and true respectively under the current
@@ -985,9 +989,9 @@ instance Constraint SomeConstraint where
   watchedLiterals s (ConstrAtLeast c)   = watchedLiterals s c
   watchedLiterals s (ConstrPBAtLeast c) = watchedLiterals s c
 
-  propagate s (ConstrClause c)  lit   = propagate s c lit
-  propagate s (ConstrAtLeast c) lit   = propagate s c lit
-  propagate s (ConstrPBAtLeast c) lit = propagate s c lit
+  basicPropagate s (ConstrClause c)  lit   = basicPropagate s c lit
+  basicPropagate s (ConstrAtLeast c) lit   = basicPropagate s c lit
+  basicPropagate s (ConstrPBAtLeast c) lit = basicPropagate s c lit
 
   basicReasonOf s (ConstrClause c)  l   = basicReasonOf s c l
   basicReasonOf s (ConstrAtLeast c) l   = basicReasonOf s c l
@@ -1023,7 +1027,7 @@ instance Constraint ClauseData where
       l1:l2:_ -> return [l1, l2]
       _ -> return []
 
-  propagate !s this@(ClauseData a) !falsifiedLit = do
+  basicPropagate !s this@(ClauseData a) !falsifiedLit = do
     preprocess
 
     lit0 <- readArray a 0
@@ -1038,7 +1042,7 @@ instance Constraint ClauseData where
         ret <- findForWatch 2 ub
         case ret of
           Nothing -> do
-            when debugMode $ debugPrintf "propagate: %s is unit\n" =<< showConstraint s this
+            when debugMode $ debugPrintf "basicPropagate: %s is unit\n" =<< showConstraint s this
             watch s falsifiedLit this
             assignBy s lit0 this
           Just !i  -> do
@@ -1123,7 +1127,7 @@ instance Constraint AtLeastData where
     let ws = if length lits > n then take (n+1) lits else []
     return ws
 
-  propagate s this@(AtLeastData a n) falsifiedLit = do
+  basicPropagate s this@(AtLeastData a n) falsifiedLit = do
     preprocess
 
     when debugMode $ do
@@ -1135,7 +1139,7 @@ instance Constraint AtLeastData where
     ret <- findForWatch (n+1) ub
     case ret of
       Nothing -> do
-        when debugMode $ debugPrintf "propagate: %s is unit\n" =<< showConstraint s this
+        when debugMode $ debugPrintf "basicPropagate: %s is unit\n" =<< showConstraint s this
         watch s falsifiedLit this
         let loop :: Int -> IO Bool
             loop i
@@ -1243,7 +1247,7 @@ instance Constraint PBAtLeastData where
   watchedLiterals _ (PBAtLeastData m _ _) = do
     return $ IM.keys m
 
-  propagate solver this@(PBAtLeastData m _ slack) falsifiedLit = do
+  basicPropagate solver this@(PBAtLeastData m _ slack) falsifiedLit = do
     watch solver falsifiedLit this
 
     let c = m IM.! falsifiedLit
@@ -1259,7 +1263,7 @@ instance Constraint PBAtLeastData where
         when (not (null ls)) $ do
           when debugMode $ do
             str <- showConstraint solver this
-            debugPrintf "propagate: %s is unit (new slack = %d)\n" str s
+            debugPrintf "basicPropagate: %s is unit (new slack = %d)\n" str s
           forM_ ls $ \l1 -> do
             v <- litValue solver l1
             when (v == lUndef) $ do
