@@ -244,7 +244,7 @@ varData s !v = do
   readArray a v
 
 litData :: Solver -> Lit -> IO LitData
-litData s l = do
+litData s !l = do
   vd <- varData s (litVar l)
   if litPolarity l
     then return $ vdPosLitData vd
@@ -252,7 +252,7 @@ litData s l = do
 
 {-# INLINE varValue #-}
 varValue :: Solver -> Var -> IO LBool
-varValue s v = do
+varValue s !v = do
   vd <- varData s v
   m <- readIORef (vdAssignment vd)
   case m of
@@ -261,7 +261,7 @@ varValue s v = do
 
 {-# INLINE litValue #-}
 litValue :: Solver -> Lit -> IO LBool
-litValue s l = do
+litValue s !l = do
   m <- varValue s (litVar l)
   -- hot spot なので汚くても極力 allocation を減らすように
   if litPolarity l
@@ -269,7 +269,7 @@ litValue s l = do
     else return $! lnot m
 
 varLevel :: Solver -> Var -> IO Level
-varLevel s v = do
+varLevel s !v = do
   vd <- varData s v
   m <- readIORef (vdAssignment vd)
   case m of
@@ -325,7 +325,7 @@ assign :: Solver -> Lit -> IO Bool
 assign solver lit = assign_ solver lit Nothing
 
 assign_ :: Solver -> Lit -> Maybe SomeConstraint -> IO Bool
-assign_ solver lit reason = assert (validLit lit) $ do
+assign_ solver !lit reason = assert (validLit lit) $ do
   vd <- varData solver (litVar lit)
   m <- readIORef (vdAssignment vd)
   case m of
@@ -354,7 +354,7 @@ assign_ solver lit reason = assert (validLit lit) $ do
       return True
 
 unassign :: Solver -> Var -> IO ()
-unassign solver v = assert (validVar v) $ do
+unassign solver !v = assert (validVar v) $ do
   vd <- varData solver v
   m <- readIORef (vdAssignment vd)
   case m of
@@ -367,7 +367,7 @@ unassign solver v = assert (validVar v) $ do
   PQ.enqueue (svVarQueue solver) (v,score)
 
 addBacktrackCB :: Solver -> Var -> IO () -> IO ()
-addBacktrackCB solver v callback = do
+addBacktrackCB solver !v callback = do
   vd <- varData solver v
   m <- readIORef (vdAssignment vd)
   case m of
@@ -376,7 +376,7 @@ addBacktrackCB solver v callback = do
 
 -- | Register the constraint to be notified when the literal becames false.
 watch :: Constraint c => Solver -> Lit -> c -> IO ()
-watch solver lit c = do
+watch solver !lit c = do
   when debugMode $ do
     lits <- watchedLiterals solver c
     unless (lit `elem` lits) $ error "watch: should not happen"
@@ -385,7 +385,7 @@ watch solver lit c = do
 
 -- | Returns list of constraints that are watching the literal.
 watches :: Solver -> Lit -> IO [SomeConstraint]
-watches solver lit = do
+watches solver !lit = do
   ld <- litData solver lit
   readIORef (ldWatches ld)
 
@@ -701,9 +701,9 @@ pickBranchLit !solver = do
   loop
 
 decide :: Solver -> Lit -> IO ()
-decide solver lit = do
+decide solver !lit = do
   modifyIORef' (svNDecision solver) (+1)
-  modifyIORef (svLevel solver) (+1)
+  modifyIORef' (svLevel solver) (+1)
   when debugMode $ do
     val <- litValue solver lit
     when (val /= lUndef) $ error "decide: should not happen"
@@ -725,7 +725,7 @@ deduce solver = loop
             Nothing -> loop
 
     processLit :: Lit -> IO (Maybe SomeConstraint)
-    processLit lit = do
+    processLit !lit = do
       let lit2 = litNot lit
       ld <- litData solver lit2
       let wsref = ldWatches ld
@@ -1032,8 +1032,8 @@ instance Constraint ClauseData where
   basicPropagate !s this (ClauseData a) !falsifiedLit = do
     preprocess
 
-    lit0 <- readArray a 0
-    val0 <- litValue s lit0
+    !lit0 <- readArray a 0
+    !val0 <- litValue s lit0
     if val0 == lTrue
       then do
         watch s falsifiedLit this
@@ -1048,8 +1048,8 @@ instance Constraint ClauseData where
             watch s falsifiedLit this
             assignBy s lit0 this
           Just !i  -> do
-            lit1 <- readArray a 1
-            liti <- readArray a i
+            !lit1 <- readArray a 1
+            !liti <- readArray a i
             writeArray a 1 liti
             writeArray a i lit1
             watch s liti this
@@ -1058,8 +1058,8 @@ instance Constraint ClauseData where
     where
       preprocess :: IO ()
       preprocess = do
-        l0 <- readArray a 0
-        l1 <- readArray a 1
+        !l0 <- readArray a 0
+        !l1 <- readArray a 1
         assert (l0==falsifiedLit || l1==falsifiedLit) $ return ()
         when (l0==falsifiedLit) $ do
           writeArray a 0 l1
@@ -1253,8 +1253,8 @@ instance Constraint PBAtLeastData where
     watch solver falsifiedLit this
 
     let c = m IM.! falsifiedLit
-    modifyIORef slack (subtract c)
-    addBacktrackCB solver (litVar falsifiedLit) $ modifyIORef slack (+ c)
+    modifyIORef' slack (subtract c)
+    addBacktrackCB solver (litVar falsifiedLit) $ modifyIORef' slack (+ c)
     s <- readIORef slack
 
     if s < 0
