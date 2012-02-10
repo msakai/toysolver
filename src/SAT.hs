@@ -937,7 +937,9 @@ class Constraint a where
   watchedLiterals :: Solver -> a -> IO [Lit]
 
   -- | invoked with the watched literal when the literal is falsified.
-  basicPropagate :: Solver -> a -> Lit -> IO Bool
+  -- 'watch' で 'toConstraint' を呼び出して heap allocation が発生するのを
+  -- 避けるために、元の 'SomeConstraint' も渡しておく。
+  basicPropagate :: Solver -> SomeConstraint -> a -> Lit -> IO Bool
 
   -- | deduce a clause C∨l from the constraint and return C.
   -- C and l should be false and true respectively under the current
@@ -948,7 +950,7 @@ class Constraint a where
 
 -- | invoked with the watched literal when the literal is falsified.
 propagate :: Solver -> SomeConstraint -> Lit -> IO Bool
-propagate solver c l = basicPropagate solver c l
+propagate solver c l = basicPropagate solver c c l
 
 -- | deduce a clause C∨l from the constraint and return C.
 -- C and l should be false and true respectively under the current
@@ -989,9 +991,9 @@ instance Constraint SomeConstraint where
   watchedLiterals s (ConstrAtLeast c)   = watchedLiterals s c
   watchedLiterals s (ConstrPBAtLeast c) = watchedLiterals s c
 
-  basicPropagate s (ConstrClause c)  lit   = basicPropagate s c lit
-  basicPropagate s (ConstrAtLeast c) lit   = basicPropagate s c lit
-  basicPropagate s (ConstrPBAtLeast c) lit = basicPropagate s c lit
+  basicPropagate s this (ConstrClause c)  lit   = basicPropagate s this c lit
+  basicPropagate s this (ConstrAtLeast c) lit   = basicPropagate s this c lit
+  basicPropagate s this (ConstrPBAtLeast c) lit = basicPropagate s this c lit
 
   basicReasonOf s (ConstrClause c)  l   = basicReasonOf s c l
   basicReasonOf s (ConstrAtLeast c) l   = basicReasonOf s c l
@@ -1027,7 +1029,7 @@ instance Constraint ClauseData where
       l1:l2:_ -> return [l1, l2]
       _ -> return []
 
-  basicPropagate !s this@(ClauseData a) !falsifiedLit = do
+  basicPropagate !s this (ClauseData a) !falsifiedLit = do
     preprocess
 
     lit0 <- readArray a 0
@@ -1127,7 +1129,7 @@ instance Constraint AtLeastData where
     let ws = if length lits > n then take (n+1) lits else []
     return ws
 
-  basicPropagate s this@(AtLeastData a n) falsifiedLit = do
+  basicPropagate s this (AtLeastData a n) falsifiedLit = do
     preprocess
 
     when debugMode $ do
@@ -1247,7 +1249,7 @@ instance Constraint PBAtLeastData where
   watchedLiterals _ (PBAtLeastData m _ _) = do
     return $ IM.keys m
 
-  basicPropagate solver this@(PBAtLeastData m _ slack) falsifiedLit = do
+  basicPropagate solver this (PBAtLeastData m _ slack) falsifiedLit = do
     watch solver falsifiedLit this
 
     let c = m IM.! falsifiedLit
