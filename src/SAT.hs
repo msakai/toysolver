@@ -60,6 +60,7 @@ module SAT
 import Control.Monad
 import Control.Exception
 import Data.Array.IO
+import Data.Array.Base (unsafeRead, unsafeWrite)
 import Data.Function
 import Data.IORef
 import Data.List
@@ -242,6 +243,7 @@ varData :: Solver -> Var -> IO VarData
 varData s !v = do
   a <- readIORef (svVarData s)
   readArray a v
+  -- unsafeRead a $! (v-1)
 
 litData :: Solver -> Lit -> IO LitData
 litData s !l = do
@@ -1032,7 +1034,7 @@ instance Constraint ClauseData where
   basicPropagate !s this (ClauseData a) !falsifiedLit = do
     preprocess
 
-    !lit0 <- readArray a 0
+    !lit0 <- unsafeRead a 0
     !val0 <- litValue s lit0
     if val0 == lTrue
       then do
@@ -1048,27 +1050,27 @@ instance Constraint ClauseData where
             watch s falsifiedLit this
             assignBy s lit0 this
           Just !i  -> do
-            !lit1 <- readArray a 1
-            !liti <- readArray a i
-            writeArray a 1 liti
-            writeArray a i lit1
+            !lit1 <- unsafeRead a 1
+            !liti <- unsafeRead a i
+            unsafeWrite a 1 liti
+            unsafeWrite a i lit1
             watch s liti this
             return True
 
     where
       preprocess :: IO ()
       preprocess = do
-        !l0 <- readArray a 0
-        !l1 <- readArray a 1
+        !l0 <- unsafeRead a 0
+        !l1 <- unsafeRead a 1
         assert (l0==falsifiedLit || l1==falsifiedLit) $ return ()
         when (l0==falsifiedLit) $ do
-          writeArray a 0 l1
-          writeArray a 1 l0
+          unsafeWrite a 0 l1
+          unsafeWrite a 1 l0
 
       findForWatch :: Int -> Int -> IO (Maybe Int)
       findForWatch i end | i > end = return Nothing
       findForWatch i end = do
-        val <- litValue s =<< readArray a i
+        val <- litValue s =<< unsafeRead a i
         if val /= lFalse
           then return (Just i)
           else findForWatch (i+1) end
