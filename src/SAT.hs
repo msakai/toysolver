@@ -219,10 +219,10 @@ data VarData
   , vdScore      :: !(IORef VarScore)
   }
 
-data LitData
+newtype LitData
   = LitData
   { -- | will be invoked when this literal is falsified
-    ldWatches :: !(IORef [SomeConstraint])
+    ldWatches :: IORef [SomeConstraint]
   }
 
 newVarData :: IO VarData
