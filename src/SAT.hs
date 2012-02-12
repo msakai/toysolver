@@ -268,11 +268,13 @@ varValue s !v = do
 {-# INLINE litValue #-}
 litValue :: Solver -> Lit -> IO LBool
 litValue s !l = do
-  m <- varValue s (litVar l)
-  -- hot spot なので汚くても極力 allocation を減らすように
+  -- litVar による heap allocation を避けるために、
+  -- litPolarityによる分岐後にvarDataを呼ぶ。
   if litPolarity l
-    then return $! m
-    else return $! lnot m
+    then varValue s l
+    else do
+      m <- varValue s (negate l)
+      return $! lnot m
 
 varLevel :: Solver -> Var -> IO Level
 varLevel s !v = do
@@ -1047,13 +1049,13 @@ instance Constraint ClauseData where
       else do
         (!lb,!ub) <- getBounds a
         assert (lb==0) $ return ()
-        ret <- findForWatch 2 ub
-        case ret of
-          Nothing -> do
+        i <- findForWatch 2 ub
+        case i of
+          -1 -> do
             when debugMode $ debugPrintf "basicPropagate: %s is unit\n" =<< showConstraint s this
             watch s falsifiedLit this
             assignBy s lit0 this
-          Just !i  -> do
+          _  -> do
             !lit1 <- unsafeRead a 1
             !liti <- unsafeRead a i
             unsafeWrite a 1 liti
@@ -1071,12 +1073,14 @@ instance Constraint ClauseData where
           unsafeWrite a 0 l1
           unsafeWrite a 1 l0
 
-      findForWatch :: Int -> Int -> IO (Maybe Int)
-      findForWatch i end | i > end = return Nothing
+      -- Maybe を heap allocation するのを避けるために、
+      -- 見つからなかったときは -1 を返すことに。
+      findForWatch :: Int -> Int -> IO Int
+      findForWatch i end | i > end = return (-1)
       findForWatch i end = do
         val <- litValue s =<< unsafeRead a i
         if val /= lFalse
-          then return (Just i)
+          then return i
           else findForWatch (i+1) end
 
   basicReasonOf _ (ClauseData a) l = do
