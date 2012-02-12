@@ -1136,7 +1136,7 @@ instance Constraint AtLeastData where
 
     when debugMode $ do
       litn <- readArray a n
-      unless (litn == falsifiedLit) $ error "AtLeastData.propagate: should not happen"
+      unless (litn == falsifiedLit) $ error "AtLeastData.basicPropagate: should not happen"
 
     (lb,ub) <- getBounds a
     assert (lb==0) $ return ()
