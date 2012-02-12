@@ -242,8 +242,7 @@ newLitData = do
 varData :: Solver -> Var -> IO VarData
 varData s !v = do
   a <- readIORef (svVarData s)
-  readArray a v
-  -- unsafeRead a $! (v-1)
+  unsafeRead a (v-1)
 
 litData :: Solver -> Lit -> IO LitData
 litData s !l = do
