@@ -108,3 +108,9 @@ Executable toysat
      BangPatterns
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
+
+Test-suite TestSAT
+  Type:              exitcode-stdio-1.0
+  HS-Source-Dirs:    src
+  Main-is:           TestSAT.hs
+  Build-depends:     test-framework,test-framework-hunit,HUnit
