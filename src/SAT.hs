@@ -245,11 +245,16 @@ varData s !v = do
   unsafeRead a (v-1)
 
 litData :: Solver -> Lit -> IO LitData
-litData s !l = do
-  vd <- varData s (litVar l)
+litData s !l =
+  -- litVar による heap allocation を避けるために、
+  -- litPolarityによる分岐後にvarDataを呼ぶ。
   if litPolarity l
-    then return $ vdPosLitData vd
-    else return $ vdNegLitData vd
+    then do
+      vd <- varData s l
+      return $ vdPosLitData vd
+    else do
+      vd <- varData s (negate l)
+      return $ vdNegLitData vd
 
 {-# INLINE varValue #-}
 varValue :: Solver -> Var -> IO LBool
