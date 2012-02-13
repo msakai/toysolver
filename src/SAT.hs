@@ -47,7 +47,11 @@ module SAT
   -- * Solving
   , solve
 
---  -- * Read state
+  -- * Read state
+  , nVars
+  , nAssigns
+  , nClauses
+  , nLearnt
 
   -- * Extract results
   , Model
@@ -303,6 +307,7 @@ data Solver
   , svVarCounter   :: !(IORef Int)
   , svVarData      :: !(IORef (IOArray Int VarData))
   , svClauseDB     :: !(IORef [SomeConstraint])
+  , svLearntDB     :: !(IORef [SomeConstraint])
   , svLevel        :: !(IORef Level)
   , svBCPQueue     :: !(IORef (Seq.Seq Lit))
   , svModel        :: !(IORef (Maybe (VarMap Bool)))
@@ -404,6 +409,13 @@ attachConstraint solver c = do
   when debugMode $ debugPrintf "constraint %s is added\n" str
   sanityCheck solver
 
+attachLearntConstraint :: Constraint c => Solver -> c -> IO ()
+attachLearntConstraint solver c = do
+  modifyIORef (svLearntDB solver) (toConstraint c : )
+  str <- showConstraint solver c
+  when debugMode $ debugPrintf "constraint %s is added\n" str
+  sanityCheck solver
+
 type VarScore = Int
 
 varScore :: Solver -> Var -> IO VarScore
@@ -426,8 +438,29 @@ updateVarQueue solver = do
 
 variables :: Solver -> IO [Var]
 variables solver = do
+  n <- nVars solver
+  return [1 .. n]
+
+nVars :: Solver -> IO Int
+nVars solver = do
   vcnt <- readIORef (svVarCounter solver)
-  return [1 .. vcnt-1]
+  return $! (vcnt-1)
+
+nAssigns :: Solver -> IO Int
+nAssigns solver = do
+  m <- readIORef (svAssigned solver)
+  let f !r xs = r + length xs
+  return $! IM.foldl' f 0 m
+
+nClauses :: Solver -> IO Int
+nClauses solver = do
+  xs <- readIORef (svClauseDB solver)
+  return $ length xs
+
+nLearnt :: Solver -> IO Int
+nLearnt solver = do
+  xs <- readIORef (svLearntDB solver)
+  return $ length xs
 
 {--------------------------------------------------------------------
   external API
@@ -442,6 +475,7 @@ newSolver = do
   assigned <- newIORef IM.empty
   vars <- newIORef =<< newArray_ (1,0)
   db  <- newIORef []
+  db2 <- newIORef []
   lv  <- newIORef levelRoot
   q   <- newIORef Seq.empty
   m   <- newIORef Nothing
@@ -455,6 +489,7 @@ newSolver = do
     , svAssigned   = assigned
     , svVarData    = vars
     , svClauseDB   = db
+    , svLearntDB   = db2
     , svLevel      = lv
     , svBCPQueue   = q
     , svModel      = m
@@ -927,7 +962,7 @@ newLearntClause solver lits = do
     l1:l2:_ -> do
       watch solver l1 cl
       watch solver l2 cl
-      attachConstraint solver cl
+      attachLearntConstraint solver cl
       forM_ lits2 $ \lit -> incVarScore solver (litVar lit)
     _ -> return ()
 
