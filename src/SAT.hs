@@ -422,6 +422,13 @@ attachLearntConstraint solver c = do
   when debugMode $ debugPrintf "constraint %s is added\n" str
   sanityCheck solver
 
+removeConstraint :: Solver -> SomeConstraint -> IO ()
+removeConstraint solver c = do
+  lits <- watchedLiterals solver c
+  forM_ lits $ \lit -> do
+    ld <- litData solver lit
+    modifyIORef' (ldWatches ld) (delete c)
+
 type VarScore = Int
 
 varScore :: Solver -> Var -> IO VarScore
@@ -1050,6 +1057,20 @@ reasonOf solver c x = do
         error (printf "reasonOf: value of literal %d should be False but %s (basicReasonOf %s %s)" lit (show val) str (show x))
   return cl
 
+isLocked :: Solver -> SomeConstraint -> IO Bool
+isLocked solver c = anyM p =<< watchedLiterals solver c
+  where
+    p :: Lit -> IO Bool
+    p lit = do
+      val <- litValue solver lit
+      if val /= lTrue
+        then return False
+        else do
+          m <- varReason solver (litVar lit)
+          case m of
+            Nothing -> return False
+            Just c2 -> return $! c == c2
+
 data SomeConstraint
   = ConstrClause !ClauseData
   | ConstrAtLeast !AtLeastData
@@ -1420,6 +1441,16 @@ allM p = go
       if b
         then go xs
         else return False
+
+anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+anyM p = go
+  where
+    go [] = return False
+    go (x:xs) = do
+      b <- p x
+      if b
+        then return True
+        else go xs
 
 modifyIORef' :: IORef a -> (a -> a) -> IO ()
 modifyIORef' ref f = do
