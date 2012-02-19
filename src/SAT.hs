@@ -429,6 +429,30 @@ removeConstraint solver c = do
     ld <- litData solver lit
     modifyIORef' (ldWatches ld) (delete c)
 
+reduceDB :: Solver -> IO ()
+reduceDB solver = do
+  cs <- readIORef (svLearntDB solver)
+
+  xs <- forM cs $ \c@(ConstrClause (ClauseData a act)) -> do
+    size <- liftM rangeSize (getBounds a)
+    actval <- readIORef act
+    return (c, (size <= 2, actval))
+
+  -- Note that False <= True
+  let ys = sortBy (compare `on` snd) xs
+      (zs,ws) = splitAt (length ys `div` 2) ys
+
+  let loop [] ret = return ret
+      loop ((c,(True,_)):xs) ret = loop xs (c:ret)
+      loop ((c,_):xs) ret = removeConstraint solver c >> loop xs ret            
+  zs2 <- loop zs []
+
+  let cs2 = zs2 ++ map fst ws
+
+  when debugMode $ do
+    debugPrintf "reduceDB: %d -> %d\n" (length cs) (length cs2)
+  writeIORef (svLearntDB solver) cs2
+
 type VarScore = Int
 
 varScore :: Solver -> Var -> IO VarScore
@@ -683,7 +707,9 @@ solve solver = do
       assert (d == levelRoot) $ return ()
 
       start <- getCPUTime
-      result <- loop
+      nc <- nClauses solver
+      nv <- nVars solver
+      result <- loop (nc*3 + nv*2)
       end <- getCPUTime
 
       when result $ do
@@ -701,18 +727,21 @@ solve solver = do
       return result
 
   where
-    loop :: IO Bool
-    loop = do
+    loop :: Int -> IO Bool
+    loop learnt_lim = do
       sanityCheck solver
       conflict <- deduce solver
       sanityCheck solver
 
       case conflict of
         Nothing -> do
+          n <- nLearnt solver
+          when (learnt_lim >= 0 && n > learnt_lim) $ reduceDB solver
+
           r <- pickBranchLit solver
           case r of
             Nothing -> return True
-            Just lit -> decide solver lit >> loop
+            Just lit -> decide solver lit >> loop learnt_lim 
 
         Just constr -> do
           claDecayActivity solver
@@ -732,7 +761,7 @@ solve solver = do
               backtrackTo solver level
               assignBy solver lit cl
               claBumpActivity solver cl
-              loop
+              loop learnt_lim
 
 type Model = IM.IntMap Bool
 
