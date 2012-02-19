@@ -1088,7 +1088,9 @@ instance Constraint SomeConstraint where
 --------------------------------------------------------------------}
 
 data ClauseData = ClauseData !(IOUArray Int Lit) !(IORef Double)
-  deriving Eq
+
+instance Eq ClauseData where
+  ClauseData a1 _ == ClauseData a2 _ = a1 == a2
 
 newClauseData :: Clause -> Bool -> IO ClauseData
 newClauseData ls learnt = do
