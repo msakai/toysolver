@@ -313,6 +313,12 @@ data Solver
   , svModel        :: !(IORef (Maybe (VarMap Bool)))
   , svNDecision    :: !(IORef Int)
   , svNConflict    :: !(IORef Int)
+
+  -- | Inverse of the clause activity decay factor. (1 / 0.999)
+  , svClaDecay     :: !(IORef Double) 
+
+  -- | Amount to bump next clause with.
+  , svClaInc       :: !(IORef Double)
   }
 
 markBad :: Solver -> IO ()
@@ -481,6 +487,10 @@ newSolver = do
   m   <- newIORef Nothing
   ndecision <- newIORef 0
   nconflict <- newIORef 0
+
+  claDecay <- newIORef (1 / 0.999)
+  claInc   <- newIORef 1
+
   return $
     Solver
     { svOk = ok
@@ -495,6 +505,8 @@ newSolver = do
     , svModel      = m
     , svNDecision  = ndecision
     , svNConflict  = nconflict
+    , svClaDecay   = claDecay
+    , svClaInc     = claInc
     }
 
 -- |Add a new variable
@@ -538,7 +550,7 @@ addClause solver lits = do
         Nothing -> return ()
         Just _ -> markBad solver
     Just lits'@(l1:l2:_) -> do
-      clause <- newClauseData lits'
+      clause <- newClauseData lits' False
       watch solver l1 clause
       watch solver l2 clause
       attachConstraint solver clause
@@ -674,6 +686,7 @@ solve solver = do
       backtrackTo solver levelRoot
 
       when debugMode $ dumpVarScore solver
+      when debugMode $ dumpClaActivity solver
       debugPrintf "solving time = %.3fs\n" (fromIntegral (end - start) / 10^(12::Int) :: Double)
       debugPrintf "#decision = %d\n" =<< readIORef (svNDecision solver)
       debugPrintf "#conflict = %d\n" =<< readIORef (svNConflict solver)
@@ -695,6 +708,8 @@ solve solver = do
             Just lit -> decide solver lit >> loop
 
         Just constr -> do
+          claDecayActivity solver
+
           modifyIORef' (svNConflict solver) (+1)
           d <- readIORef (svLevel solver)
 
@@ -709,6 +724,7 @@ solve solver = do
               (cl, level, lit) <- newLearntClause solver learntClause
               backtrackTo solver level
               assignBy solver lit cl
+              claBumpActivity solver cl
               loop
 
 type Model = IM.IntMap Bool
@@ -821,6 +837,7 @@ analyzeConflict solver constr = do
                   case m of
                     Nothing -> loop lits1 lits2 seen' trail'
                     Just constr2 -> do
+                      claBumpActivity solver constr2
                       xs <- liftM IS.fromList $ reasonOf solver constr2 (Just l)
                       (ys,zs) <- split (IS.toList xs)
                       loop (IS.delete (litNot l) lits1 `IS.union` (ys `IS.difference` seen))
@@ -830,6 +847,7 @@ analyzeConflict solver constr = do
         where
           sz = IS.size lits1
 
+  claBumpActivity solver constr
   conflictClause <- reasonOf solver constr Nothing
   (ys,zs) <- split conflictClause
   trail <- liftM (IM.! d) $ readIORef (svAssigned solver)
@@ -957,7 +975,7 @@ newLearntClause solver lits = do
   let lits2 = map fst xs
       level = head $ filter (< d) (map snd xs ++ [levelRoot])
 
-  cl <- newClauseData lits2
+  cl <- newClauseData lits2 True
   case lits2 of
     l1:l2:_ -> do
       watch solver l1 cl
@@ -967,6 +985,18 @@ newLearntClause solver lits = do
     _ -> return ()
 
   return (cl, level, head lits2)
+
+claDecayActivity :: Solver -> IO ()
+claDecayActivity solver = do
+  d <- readIORef (svClaDecay solver)
+  modifyIORef' (svClaInc solver) (d*)
+
+claRescaleActivity :: Solver -> IO ()
+claRescaleActivity solver = do
+  xs <- readIORef (svLearntDB solver)
+  forM_ xs $ \(ConstrClause (ClauseData _ act)) -> do
+    modifyIORef' act (* 1e-20)
+  modifyIORef' (svClaInc solver) (* 1e-20)
 
 {--------------------------------------------------------------------
   constraint implementation
@@ -990,6 +1020,9 @@ class Constraint a where
   basicReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
   isSatisfied :: Solver -> a -> IO Bool
+
+  claBumpActivity :: Solver -> a -> IO ()
+  claBumpActivity _ _ = return ()
 
 -- | invoked with the watched literal when the literal is falsified.
 propagate :: Solver -> SomeConstraint -> Lit -> IO Bool
@@ -1046,33 +1079,38 @@ instance Constraint SomeConstraint where
   isSatisfied s (ConstrAtLeast c)   = isSatisfied s c
   isSatisfied s (ConstrPBAtLeast c) = isSatisfied s c
 
+  claBumpActivity s (ConstrClause c)    = claBumpActivity s c
+  claBumpActivity s (ConstrAtLeast c)   = claBumpActivity s c
+  claBumpActivity s (ConstrPBAtLeast c) = claBumpActivity s c
+
 {--------------------------------------------------------------------
   Clause
 --------------------------------------------------------------------}
 
-newtype ClauseData = ClauseData (IOUArray Int Lit)
+data ClauseData = ClauseData !(IOUArray Int Lit) !(IORef Double)
   deriving Eq
 
-newClauseData :: Clause -> IO ClauseData
-newClauseData ls = do
+newClauseData :: Clause -> Bool -> IO ClauseData
+newClauseData ls learnt = do
   let size = length ls
   a <- newListArray (0, size-1) ls
-  return (ClauseData a)
+  act <- newIORef $! (if learnt then 0 else -1)
+  return (ClauseData a act)
 
 instance Constraint ClauseData where
   toConstraint = ConstrClause
 
-  showConstraint _ (ClauseData a) = do
+  showConstraint _ (ClauseData a _) = do
     lits <- getElems a
     return (show lits)
 
-  watchedLiterals _ (ClauseData a) = do
+  watchedLiterals _ (ClauseData a _) = do
     lits <- getElems a
     case lits of
       l1:l2:_ -> return [l1, l2]
       _ -> return []
 
-  basicPropagate !s this (ClauseData a) !falsifiedLit = do
+  basicPropagate !s this (ClauseData a _) !falsifiedLit = do
     preprocess
 
     !lit0 <- unsafeRead a 0
@@ -1118,7 +1156,7 @@ instance Constraint ClauseData where
           then return i
           else findForWatch (i+1) end
 
-  basicReasonOf _ (ClauseData a) l = do
+  basicReasonOf _ (ClauseData a _) l = do
     lits <- getElems a
     case l of
       Nothing -> return lits
@@ -1126,10 +1164,20 @@ instance Constraint ClauseData where
         assert (lit == head lits) $ return ()
         return $ tail lits
 
-  isSatisfied solver (ClauseData a) = do
+  isSatisfied solver (ClauseData a _) = do
     lits <- getElems a
     vals <- mapM (litValue solver) lits
     return $ lTrue `elem` vals
+
+  claBumpActivity solver (ClauseData _ act) = do
+    aval <- readIORef act
+    when (aval >= 0) $ do
+      inc <- readIORef (svClaInc solver)
+      writeIORef act (aval+inc)
+    aval <- readIORef act
+    when (aval > 1e20) $
+      -- Rescale
+      claRescaleActivity solver
 
 instantiateClause :: Solver -> Clause -> IO (Maybe Clause)
 instantiateClause solver = loop []
@@ -1421,6 +1469,15 @@ dumpVarScore solver = do
   forM_ vs $ \v -> do
     score <- varScore solver v
     debugPrintf "score(%d) = %d\n" v score
+
+dumpClaActivity :: Solver -> IO ()
+dumpClaActivity solver = do
+  debugPrintf "Learnt clause activity:\n"
+  xs <- readIORef (svLearntDB solver)
+  forM_ xs $ \c@(ConstrClause (ClauseData _ act)) -> do
+    s <- showConstraint solver c
+    aval <- readIORef act
+    debugPrintf "activity(%s) = %f\n" s aval
 
 {--------------------------------------------------------------------
   test
