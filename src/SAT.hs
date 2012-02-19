@@ -443,8 +443,15 @@ reduceDB solver = do
       (zs,ws) = splitAt (length ys `div` 2) ys
 
   let loop [] ret = return ret
-      loop ((c,(True,_)):xs) ret = loop xs (c:ret)
-      loop ((c,_):xs) ret = removeConstraint solver c >> loop xs ret            
+      loop ((c,(isShort,_)):xs) ret = do
+        flag <- if isShort
+                then return True
+                else isLocked solver c
+        if flag
+          then loop xs (c:ret)
+          else do
+            removeConstraint solver c
+            loop xs ret            
   zs2 <- loop zs []
 
   let cs2 = zs2 ++ map fst ws
