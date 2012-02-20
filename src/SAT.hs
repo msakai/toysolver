@@ -14,10 +14,6 @@
 --
 -- * VSIDS heauristics
 --
--- * Clause deletion
---
--- * RESTART
---
 -----------------------------------------------------------------------------
 module SAT
   (
@@ -47,6 +43,7 @@ module SAT
   -- * Parameters
   , setRestartFirst
   , setRestartInc
+  , setLearntSizeInc
 
   -- * Solving
   , solve
@@ -330,6 +327,9 @@ data Solver
 
   -- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
   , svRestartInc :: !(IORef Double)
+
+  -- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
+  , svLearntSizeInc :: !(IORef Double)
   }
 
 markBad :: Solver -> IO ()
@@ -518,7 +518,7 @@ nLearnt solver = do
   return $ length xs
 
 {--------------------------------------------------------------------
-  external API
+  Solver
 --------------------------------------------------------------------}
 
 -- | Create a new Solver instance.
@@ -542,6 +542,7 @@ newSolver = do
   claInc   <- newIORef 1
   restartFirst <- newIORef 100
   restartInc <- newIORef 1.5
+  learntSizeInc <- newIORef 1.1
 
   return $
     Solver
@@ -562,7 +563,12 @@ newSolver = do
     , svClaInc     = claInc
     , svRestartFirst = restartFirst
     , svRestartInc   = restartInc
+    , svLearntSizeInc = learntSizeInc
     }
+
+{--------------------------------------------------------------------
+  Problem specification
+--------------------------------------------------------------------}
 
 -- |Add a new variable
 newVar :: Solver -> IO Var
@@ -713,6 +719,10 @@ addPBExactly solver ts n = do
   addPBAtLeast solver ts n
   addPBAtMost solver ts n
 
+{--------------------------------------------------------------------
+  Problem solving
+--------------------------------------------------------------------}
+
 -- | Solve constraints.
 -- Returns 'True' if the problem is SATISFIABLE.
 -- Returns 'False' if the problem is UNSATISFIABLE.
@@ -730,8 +740,9 @@ solve solver = do
       d <- readIORef (svLevel solver)
       assert (d == levelRoot) $ return ()
 
-      restartFirst <- readIORef (svRestartFirst solver)
-      restartInc   <- readIORef (svRestartInc solver)
+      restartFirst  <- readIORef (svRestartFirst solver)
+      restartInc    <- readIORef (svRestartInc solver)
+      learntSizeInc <- readIORef (svLearntSizeInc solver)
 
       let loop !conflict_lim learnt_lim = do
             ret <- search solver conflict_lim learnt_lim
@@ -807,6 +818,18 @@ search solver !conflict_lim !learnt_lim = loop 0
               claBumpActivity solver cl
               loop (c+1)
 
+type Model = IM.IntMap Bool
+
+-- | After 'solve' returns True, it returns the model.
+model :: Solver -> IO Model
+model solver = do
+  m <- readIORef (svModel solver)
+  return (fromJust m)
+
+{--------------------------------------------------------------------
+  Parameter settings.
+--------------------------------------------------------------------}
+
 -- | The initial restart limit. (default 100)
 setRestartFirst :: Solver -> Int -> IO ()
 setRestartFirst solver !n = writeIORef (svRestartFirst solver) n
@@ -815,17 +838,8 @@ setRestartFirst solver !n = writeIORef (svRestartFirst solver) n
 setRestartInc :: Solver -> Double -> IO ()
 setRestartInc solver !r = writeIORef (svRestartInc solver) r
 
--- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
-learntSizeInc :: Double
-learntSizeInc = 1.1
-
-type Model = IM.IntMap Bool
-
--- | After 'solve' returns True, it returns the model.
-model :: Solver -> IO Model
-model solver = do
-  m <- readIORef (svModel solver)
-  return (fromJust m)
+setLearntSizeInc :: Solver -> Double -> IO ()
+setLearntSizeInc solver !r = writeIORef (svLearntSizeInc solver) r
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
