@@ -16,8 +16,6 @@
 --
 -- * XOR clause
 --
--- * VSIDS heauristics
---
 -----------------------------------------------------------------------------
 module SAT
   (
@@ -228,7 +226,7 @@ data VarData
   , vdPolarity   :: !(IORef Bool)
   , vdPosLitData :: !LitData
   , vdNegLitData :: !LitData
-  , vdScore      :: !(IORef VarScore)
+  , vdActivity   :: !(IORef VarActivity)
   }
 
 newtype LitData
@@ -243,8 +241,8 @@ newVarData = do
   polarity <- newIORef True
   pos <- newLitData
   neg <- newLitData
-  score <- newIORef 0
-  return $ VarData ainfo polarity pos neg score
+  activity <- newIORef 0
+  return $ VarData ainfo polarity pos neg activity
 
 newLitData :: IO LitData
 newLitData = do
@@ -310,7 +308,7 @@ varReason s !v = do
 data Solver
   = Solver
   { svOk           :: !(IORef Bool)
-  , svVarQueue     :: !(PQ.PriorityQueue IO (Var,VarScore))
+  , svVarQueue     :: !(PQ.PriorityQueue IO (Var,VarActivity))
   , svAssigned     :: !(IORef (LevelMap [Lit]))
   , svVarCounter   :: !(IORef Int)
   , svVarData      :: !(IORef (IOArray Int VarData))
@@ -322,6 +320,12 @@ data Solver
   , svNDecision    :: !(IORef Int)
   , svNConflict    :: !(IORef Int)
   , svNRestart     :: !(IORef Int)
+
+  -- | Inverse of the variable activity decay factor. (default 1 / 0.95)
+  , svVarDecay     :: !(IORef Double)
+
+  -- | Amount to bump next variable with.
+  , svVarInc       :: !(IORef Double)
 
   -- | Inverse of the clause activity decay factor. (1 / 0.999)
   , svClaDecay     :: !(IORef Double) 
@@ -400,8 +404,8 @@ unassign solver !v = assert (validVar v) $ do
       writeIORef (vdPolarity vd) (aValue a)
       readIORef (aBacktrackCBs a) >>= sequence_
   writeIORef (vdAssignment vd) Nothing
-  score <- varScore solver v
-  PQ.enqueue (svVarQueue solver) (v,score)
+  activity <- varActivity solver v
+  PQ.enqueue (svVarQueue solver) (v,activity)
 
 addBacktrackCB :: Solver -> Var -> IO () -> IO ()
 addBacktrackCB solver !v callback = do
@@ -479,25 +483,44 @@ reduceDB solver = do
     debugPrintf "reduceDB: %d -> %d\n" n n2
   writeIORef (svLearntDB solver) (n2,cs2)
 
-type VarScore = Int
+type VarActivity = Double
 
-varScore :: Solver -> Var -> IO VarScore
-varScore solver !v = do
+varActivity :: Solver -> Var -> IO VarActivity
+varActivity solver !v = do
   vd <- varData solver v
-  readIORef (vdScore vd)
+  readIORef (vdActivity vd)
 
-incVarScore :: Solver -> Var -> IO ()
-incVarScore solver !v = do
+varDecayActivity :: Solver -> IO ()
+varDecayActivity solver = do
+  d <- readIORef (svVarDecay solver)
+  modifyIORef' (svVarInc solver) (d*)
+
+varBumpActivity :: Solver -> Var -> IO ()
+varBumpActivity solver !v = do
+  inc <- readIORef (svVarInc solver)
   vd <- varData solver v
-  modifyIORef' (vdScore vd) (+1)
+  modifyIORef' (vdActivity vd) (+inc)
+  aval <- readIORef (vdActivity vd)
+  when (aval > 1e20) $
+    -- Rescale
+    varRescaleActivity solver
+
+varRescaleActivity :: Solver -> IO ()
+varRescaleActivity solver = do
+  vs <- variables solver
+  forM_ vs $ \v -> do
+    vd <- varData solver v
+    modifyIORef' (vdActivity vd) (* 1e-20)
+  modifyIORef' (svVarInc solver) (* 1e-20)
+  updateVarQueue solver
 
 updateVarQueue :: Solver -> IO ()
 updateVarQueue solver = do
   let vqueue = svVarQueue solver
   xs <- PQ.dequeueBatch vqueue
   forM_ xs $ \(v,_) -> do
-    score <- varScore solver v
-    PQ.enqueue vqueue (v,score)
+    activity <- varActivity solver v
+    PQ.enqueue vqueue (v,activity)
 
 variables :: Solver -> IO [Var]
 variables solver = do
@@ -539,7 +562,7 @@ newSolver :: IO Solver
 newSolver = do
   ok   <- newIORef True
   vcnt <- newIORef 1
-  vqueue <- PQ.newPriorityQueue (\(_,score) -> -score)
+  vqueue <- PQ.newPriorityQueue (\(_,activity) -> -activity)
   assigned <- newIORef IM.empty
   vars <- newIORef =<< newArray_ (1,0)
   db  <- newIORef []
@@ -553,6 +576,8 @@ newSolver = do
 
   claDecay <- newIORef (1 / 0.999)
   claInc   <- newIORef 1
+  varDecay <- newIORef (1 / 0.95)
+  varInc   <- newIORef 1
   restartFirst <- newIORef defaultRestartFirst
   restartInc <- newIORef defaultRestartInc
   learntSizeInc <- newIORef defaultLearntSizeInc
@@ -572,6 +597,8 @@ newSolver = do
     , svNDecision  = ndecision
     , svNConflict  = nconflict
     , svNRestart   = nrestart
+    , svVarDecay   = varDecay
+    , svVarInc     = varInc
     , svClaDecay   = claDecay
     , svClaInc     = claInc
     , svRestartFirst = restartFirst
@@ -628,7 +655,6 @@ addClause solver lits = do
       watch solver l1 clause
       watch solver l2 clause
       attachConstraint solver clause
-      forM_ lits' $ \lit -> incVarScore solver (litVar lit)
 
 -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
 addAtLeast :: Solver -- ^ The 'Solver' argument.
@@ -658,7 +684,6 @@ addAtLeast solver lits n = do
       c <- newAtLeastData lits' n'
       forM_ (take (n'+1) lits') $ \l -> watch solver l c
       attachConstraint solver c
-      forM_ lits $ \lit -> incVarScore solver (litVar lit)
 
 -- | Add a cardinality constraints /atmost({l1,l2,..},n)/.
 addAtMost :: Solver -- ^ The 'Solver' argument
@@ -714,7 +739,6 @@ addPBAtLeast solver ts n = do
         forM_ ts' $ \(_,l) -> do
           watch solver l c
         attachConstraint solver c
-        forM_ ts' $ \(_,lit) -> incVarScore solver (litVar lit)
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMost :: Solver          -- ^ The 'Solver' argument.
@@ -748,7 +772,7 @@ solve solver = do
   if not ok
     then return False
     else do
-      when debugMode $ dumpVarScore solver
+      when debugMode $ dumpVarActivity solver
       updateVarQueue solver
       d <- readIORef (svLevel solver)
       assert (d == levelRoot) $ return ()
@@ -781,7 +805,7 @@ solve solver = do
 
       backtrackTo solver levelRoot
 
-      when debugMode $ dumpVarScore solver
+      when debugMode $ dumpVarActivity solver
       when debugMode $ dumpClaActivity solver
       debugPrintf "solving time = %.3fs\n" (fromIntegral (end - start) / 10^(12::Int) :: Double)
       debugPrintf "#decision = %d\n" =<< readIORef (svNDecision solver)
@@ -810,6 +834,7 @@ search solver !conflict_lim !learnt_lim = loop 0
             Just lit -> decide solver lit >> loop c
 
         Just constr -> do
+          varDecayActivity solver
           claDecayActivity solver
 
           modifyIORef' (svNConflict solver) (+1)
@@ -978,6 +1003,7 @@ analyzeConflict solver constr = do
                       claBumpActivity solver constr2
                       xs <- reasonOf solver constr2 (Just l)
                       unassign solver (litVar l)
+                      forM_ xs $ \lit -> varBumpActivity solver (litVar lit)
                       (ys,zs) <- split xs
                       loop (IS.delete (litNot l) lits1 `IS.union` (ys `IS.difference` seen))
                            (lits2 `IS.union` zs)
@@ -988,6 +1014,7 @@ analyzeConflict solver constr = do
 
   claBumpActivity solver constr
   conflictClause <- reasonOf solver constr Nothing
+  forM_ conflictClause $ \lit -> varBumpActivity solver (litVar lit)
   (ys,zs) <- split conflictClause
   lits <- loop ys zs IS.empty
 
@@ -1119,7 +1146,6 @@ newLearntClause solver lits = do
       watch solver l1 cl
       watch solver l2 cl
       attachLearntConstraint solver cl
-      forM_ lits2 $ \lit -> incVarScore solver (litVar lit)
     _ -> return ()
 
   return (cl, level, head lits2)
@@ -1626,13 +1652,13 @@ sanityCheck solver = do
       unless (l `elem` lits2) $ do
         error $ printf "sanityCheck:C:%d %s" l (show lits2)
 
-dumpVarScore :: Solver -> IO ()
-dumpVarScore solver = do
-  debugPrintf "Variable scores:\n"
+dumpVarActivity :: Solver -> IO ()
+dumpVarActivity solver = do
+  debugPrintf "Variable activity:\n"
   vs <- variables solver
   forM_ vs $ \v -> do
-    score <- varScore solver v
-    debugPrintf "score(%d) = %d\n" v score
+    activity <- varActivity solver v
+    debugPrintf "activity(%d) = %d\n" v activity
 
 dumpClaActivity :: Solver -> IO ()
 dumpClaActivity solver = do
