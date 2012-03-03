@@ -944,8 +944,8 @@ analyzeConflict solver constr = do
                     Nothing -> loop lits1 lits2 seen' trail'
                     Just constr2 -> do
                       claBumpActivity solver constr2
-                      xs <- liftM IS.fromList $ reasonOf solver constr2 (Just l)
-                      (ys,zs) <- split (IS.toList xs)
+                      xs <- reasonOf solver constr2 (Just l)
+                      (ys,zs) <- split xs
                       loop (IS.delete (litNot l) lits1 `IS.union` (ys `IS.difference` seen))
                            (lits2 `IS.union` zs)
                            seen' trail'
