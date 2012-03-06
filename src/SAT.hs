@@ -855,7 +855,7 @@ pickBranchLit :: Solver -> IO (Maybe Lit)
 pickBranchLit !solver = do
   let vqueue = svVarQueue solver
 
-      loop :: IO (Maybe Var)
+      loop :: IO (Maybe Lit)
       loop = do
         m <- PQ.dequeue vqueue
         case m of
