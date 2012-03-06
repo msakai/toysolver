@@ -308,7 +308,7 @@ data Solver
   , svVarCounter   :: !(IORef Int)
   , svVarData      :: !(IORef (IOArray Int VarData))
   , svClauseDB     :: !(IORef [SomeConstraint])
-  , svLearntDB     :: !(IORef [SomeConstraint])
+  , svLearntDB     :: !(IORef (Int,[SomeConstraint]))
   , svLevel        :: !(IORef Level)
   , svBCPQueue     :: !(IORef (Seq.Seq Lit))
   , svModel        :: !(IORef (Maybe (VarMap Bool)))
@@ -428,7 +428,7 @@ attachConstraint solver c = do
 
 attachLearntConstraint :: Constraint c => Solver -> c -> IO ()
 attachLearntConstraint solver c = do
-  modifyIORef (svLearntDB solver) (toConstraint c : )
+  modifyIORef (svLearntDB solver) $ \(n,xs) -> (n+1, toConstraint c : xs)
   str <- showConstraint solver c
   when debugMode $ debugPrintf "constraint %s is added\n" str
   sanityCheck solver
@@ -442,7 +442,7 @@ removeConstraint solver c = do
 
 reduceDB :: Solver -> IO ()
 reduceDB solver = do
-  cs <- readIORef (svLearntDB solver)
+  (n,cs) <- readIORef (svLearntDB solver)
 
   xs <- forM cs $ \c@(ConstrClause (ClauseData a act)) -> do
     size <- liftM rangeSize (getBounds a)
@@ -466,10 +466,11 @@ reduceDB solver = do
   zs2 <- loop zs []
 
   let cs2 = zs2 ++ map fst ws
+      n2 = length cs2
 
   when debugMode $ do
-    debugPrintf "reduceDB: %d -> %d\n" (length cs) (length cs2)
-  writeIORef (svLearntDB solver) cs2
+    debugPrintf "reduceDB: %d -> %d\n" n n2
+  writeIORef (svLearntDB solver) (n2,cs2)
 
 type VarScore = Int
 
@@ -514,8 +515,13 @@ nClauses solver = do
 
 nLearnt :: Solver -> IO Int
 nLearnt solver = do
-  xs <- readIORef (svLearntDB solver)
-  return $ length xs
+  (n,_) <- readIORef (svLearntDB solver)
+  return n
+
+learnt :: Solver -> IO [SomeConstraint]
+learnt solver = do
+  (_,cs) <- readIORef (svLearntDB solver)
+  return cs
 
 {--------------------------------------------------------------------
   Solver
@@ -530,7 +536,7 @@ newSolver = do
   assigned <- newIORef IM.empty
   vars <- newIORef =<< newArray_ (1,0)
   db  <- newIORef []
-  db2 <- newIORef []
+  db2 <- newIORef (0,[])
   lv  <- newIORef levelRoot
   q   <- newIORef Seq.empty
   m   <- newIORef Nothing
@@ -1099,7 +1105,7 @@ claDecayActivity solver = do
 
 claRescaleActivity :: Solver -> IO ()
 claRescaleActivity solver = do
-  xs <- readIORef (svLearntDB solver)
+  xs <- learnt solver
   forM_ xs $ \(ConstrClause (ClauseData _ act)) -> do
     modifyIORef' act (* 1e-20)
   modifyIORef' (svClaInc solver) (* 1e-20)
@@ -1605,7 +1611,7 @@ dumpVarScore solver = do
 dumpClaActivity :: Solver -> IO ()
 dumpClaActivity solver = do
   debugPrintf "Learnt clause activity:\n"
-  xs <- readIORef (svLearntDB solver)
+  xs <- learnt solver
   forM_ xs $ \c@(ConstrClause (ClauseData _ act)) -> do
     s <- showConstraint solver c
     aval <- readIORef act
