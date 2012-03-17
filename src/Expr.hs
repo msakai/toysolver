@@ -24,6 +24,7 @@ module Expr
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Ratio
+import Data.OptDir
 
 -- ---------------------------------------------------------------------------
 
@@ -92,9 +93,6 @@ eval m = f
     f (a :/: b) = f a / f b
 
 -- ---------------------------------------------------------------------------
-
-data OptDir = OptMin | OptMax
-  deriving (Show, Eq, Ord, Bounded, Enum)
 
 data SatResult r = Unknown | Unsat | Sat (Model r)
   deriving (Show, Eq, Ord)

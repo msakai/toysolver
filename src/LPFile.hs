@@ -46,9 +46,9 @@ import Data.Maybe
 import Data.Ratio
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.OptDir
 import Text.ParserCombinators.Parsec hiding (label)
 
-import Expr (OptDir (..))
 import Util (combineMaybe)
 
 -- ---------------------------------------------------------------------------

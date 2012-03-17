@@ -41,7 +41,7 @@ Executable toysolver
      OmegaTest
      Simplex
      Util
-  Build-Depends: base >=4 && <5, mtl, containers, parsec
+  Build-Depends: base >=4 && <5, mtl, containers, parsec, OptDir
   Extensions:
      BangPatterns
      ScopedTypeVariables
@@ -58,7 +58,7 @@ Executable lp2yices
   Other-Modules:
      LPFile
      Util
-  Build-Depends: base >=4 && <5, mtl, containers, parsec
+  Build-Depends: base >=4 && <5, mtl, containers, parsec, OptDir
   Extensions:
      BangPatterns
      ScopedTypeVariables
@@ -73,7 +73,7 @@ Executable dimacs2lp
   Other-Modules:
      LPFile
      Util
-  Build-Depends: base >=4 && <5, mtl, containers, array, parsec, bytestring, parse-dimacs
+  Build-Depends: base >=4 && <5, mtl, containers, array, parsec, bytestring, parse-dimacs, OptDir
   Extensions:
      BangPatterns
      ScopedTypeVariables
@@ -93,7 +93,7 @@ Executable pb2lp
   Other-Modules:
      LPFile
      PBFile
-  Build-Depends: base >=4 && <5, mtl, containers, array, parsec
+  Build-Depends: base >=4 && <5, mtl, containers, array, parsec, OptDir
 
 Executable toysat
   Main-is: toysat.hs
