@@ -48,7 +48,7 @@ type Tableau r = VarMap (Row r)
 {-
 tbl ! v == (m, val)
 ==>
-varLC v .+. m .==. constLC r
+varLC v .+. m .==. constLC val
 -}
 
 type RowIndex = Int
