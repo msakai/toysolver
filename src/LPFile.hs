@@ -98,10 +98,16 @@ instance Variables Term where
   vars (Term _ xs) = Set.fromList xs
 
 defaultBounds :: Bounds
-defaultBounds = (Finite 0, PosInf)
+defaultBounds = (defaultLB, defaultUB)
+
+defaultLB :: BoundExpr
+defaultLB = Finite 0
+
+defaultUB :: BoundExpr
+defaultUB = PosInf
 
 getBounds :: LP -> Var -> Bounds
-getBounds lp v = fromMaybe defaultBounds (Map.lookup v (bounds lp))
+getBounds lp v = Map.findWithDefault defaultBounds v (bounds lp)
 
 -- ---------------------------------------------------------------------------
 
@@ -251,8 +257,8 @@ boundsSection = do
   liftM (Map.map g . Map.fromListWith f) $ many (try bound)
   where
     f (lb1,ub1) (lb2,ub2) = (combineMaybe max lb1 lb2, combineMaybe min ub1 ub2)
-    g (lb, ub) = ( fromMaybe (fst defaultBounds) lb
-                 , fromMaybe (snd defaultBounds) ub
+    g (lb, ub) = ( fromMaybe defaultLB lb
+                 , fromMaybe defaultUB ub
                  )
 
 bound :: Parser (Var, Bounds2)
