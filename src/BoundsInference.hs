@@ -73,9 +73,7 @@ f b cs i = foldr intersection i $ do
     NEq -> []
 
 evalToInterval :: (Real r, Fractional r) => Bounds r -> LC r -> Interval r
-evalToInterval b (LC m) = lsum
-  [ if v==constKey then singleton c else c .*. (b IM.! v)
-  | (v,c) <- IM.toList m ]
+evalToInterval b lc = lift1LC (singleton 1) (b IM.!) lc
 
 strict :: EndPoint r -> EndPoint r
 strict Nothing = Nothing

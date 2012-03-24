@@ -106,14 +106,8 @@ subst1 x lc = go
     go F' = F'
     go (And' a b) = And' (go a) (go b)
     go (Or' a b) = Or' (go a) (go b)
-    go (Lit (Divisible b c lc1)) = Lit $ Divisible b c $ subst1' x lc lc1
-    go (Lit (Pos lc1)) = Lit $ Pos $ subst1' x lc lc1
-
-subst1' :: Var -> LCZ -> LCZ -> LCZ
-subst1' x lc lc1@(LC m) =
-  case IM.lookup x m of
-    Nothing -> lc1
-    Just c -> c .*. lc .+. LC (IM.delete x m)
+    go (Lit (Divisible b c lc1)) = Lit $ Divisible b c $ applySubst1 x lc lc1
+    go (Lit (Pos lc1)) = Lit $ Pos $ applySubst1 x lc lc1
 
 simplify :: Formula' -> Formula'
 simplify T' = T'

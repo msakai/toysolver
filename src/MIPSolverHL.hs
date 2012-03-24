@@ -133,7 +133,7 @@ tableau' cs ivs = do
 conv :: RealFrac r => Constraint r -> Constraint Rational
 conv (LARel a op b) = LARel (f a) op (f b)
   where
-    f (LC t) = normalizeLC $ LC (fmap toRational t)
+    f = mapLC toRational
 
 mkInitialNode :: RealFrac r => OptDir -> LC r -> [Constraint r] -> VarSet -> Either Err (Node r, VarSet)
 mkInitialNode optdir obj cs ivs =

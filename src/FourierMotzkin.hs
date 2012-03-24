@@ -53,8 +53,7 @@ type LCZ = LC Integer
 type Rat = (LCZ, Integer)
 
 evalRat :: Model Rational -> Rat -> Rational
-evalRat model (LC t, c1) = sum [(model' IM.! v) * (c % c1) | (v,c) <- IM.toList t]
-  where model' = IM.insert constKey 1 model
+evalRat model (lc, c1) = lift1LC 1 (model IM.!) (mapLC fromIntegral lc) / (fromIntegral c1)
 
 -- | Literal
 data Lit = Nonneg LCZ | Pos LCZ deriving (Show, Eq, Ord)
@@ -123,8 +122,8 @@ geR = flip leR
 gtR = flip gtR
 
 normalizeLCR :: LCZ -> LCZ
-normalizeLCR (LC m) = LC (IM.map (`div` d) m)
-  where d = gcd' $ map snd $ IM.toList m
+normalizeLCR lc = mapLC (`div` d) lc
+  where d = gcd' $ map snd $ IM.toList $ unLC lc
 
 -- ---------------------------------------------------------------------------
 

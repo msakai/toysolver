@@ -104,9 +104,11 @@ setRow i tbl row = assert (validTableau tbl) $ assert (validTableau tbl') $ tbl'
     tbl' = IM.insert i (normalizeRow tbl row) tbl
 
 setObjFun :: Num r => Tableau r -> LC r -> Tableau r
-setObjFun tbl (LC m) = setRow objRow tbl row
+setObjFun tbl lc = setRow objRow tbl row
   where
-    row = (IM.map negate (IM.delete constKey m), IM.findWithDefault 0 constKey m)
+    row =
+      case pickupLC constKey lc of
+        (c, lc') -> (unLC (lnegate lc'), c)
 
 copyObjRow :: Num r => Tableau r -> Tableau r -> Tableau r
 copyObjRow from to =
