@@ -16,7 +16,8 @@
 --
 -----------------------------------------------------------------------------
 module Simplex
-  ( Tableau
+  ( module Data.OptDir
+  , Tableau
   , RowIndex
   , ColIndex
   , Row
@@ -37,6 +38,7 @@ import Data.Function (on)
 import Data.List (intersperse, minimumBy, foldl')
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.OptDir
 import Control.Exception
 
 import Expr

@@ -16,7 +16,6 @@ module Expr
   , eval
 
   -- FIXME: どこか違うモジュールへ?
-  , OptDir (..)
   , SatResult (..)
   , OptResult (..)
   ) where
@@ -24,7 +23,6 @@ module Expr
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Ratio
-import Data.OptDir
 
 -- ---------------------------------------------------------------------------
 

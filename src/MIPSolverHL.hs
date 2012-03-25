@@ -25,6 +25,7 @@
 module MIPSolverHL
   ( module Expr
   , module Formula
+  , module Data.OptDir
   , minimize
   , maximize
   , optimize
@@ -39,6 +40,7 @@ import Data.Function
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Ratio
+import Data.OptDir
 
 import Expr
 import Formula

@@ -28,6 +28,7 @@ import Data.Maybe (fromMaybe)
 import Data.Ratio
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.OptDir
 
 import Expr
 import Formula
