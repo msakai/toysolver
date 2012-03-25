@@ -42,7 +42,8 @@ import Data.Ratio
 
 import Expr
 import Formula
-import LA
+import Linear
+import qualified LA
 import qualified Simplex
 import Util (isInteger, fracPart)
 import LPSolver
@@ -58,8 +59,8 @@ minimize = optimize OptMin
 
 optimize :: RealFrac r => OptDir -> Expr r -> [Atom r] -> VarSet -> OptResult r
 optimize optdir obj2 cs2 ivs = fromMaybe OptUnknown $ do
-  obj <- compileExpr obj2  
-  cs <- mapM compileAtom cs2
+  obj <- LA.compileExpr obj2  
+  cs <- mapM LA.compileAtom cs2
   return (optimize' optdir obj cs ivs)
 
 {-
@@ -86,7 +87,7 @@ ndLowerBound node = evalState (liftM Simplex.currentObjValue getTableau) (ndSolv
 
 data Err = ErrUnbounded | ErrUnsat deriving (Ord, Eq, Show, Enum, Bounded)
 
-optimize' :: RealFrac r => OptDir -> LC r -> [Constraint r] -> VarSet -> OptResult r
+optimize' :: RealFrac r => OptDir -> LA.Expr r -> [LA.Atom r] -> VarSet -> OptResult r
 optimize' optdir obj cs ivs = 
   case mkInitialNode optdir obj cs ivs of
     Left err ->
@@ -118,24 +119,24 @@ optimize' optdir obj cs ivs =
   where
     vs = vars cs `IS.union` vars obj
 
-tableau' :: (RealFrac r) => [Constraint r] -> VarSet -> LP r VarSet
+tableau' :: (RealFrac r) => [LA.Atom r] -> VarSet -> LP r VarSet
 tableau' cs ivs = do
   let (nonnegVars, cs') = collectNonnegVars cs ivs
       fvs = vars cs `IS.difference` nonnegVars
   ivs2 <- liftM IS.unions $ forM (IS.toList fvs) $ \v -> do
     v1 <- gensym
     v2 <- gensym
-    define v (varLC v1 .-. varLC v2)
+    define v (LA.varExpr v1 .-. LA.varExpr v2)
     return $ if v `IS.member` ivs then IS.fromList [v1,v2] else IS.empty
   mapM_ addConstraint cs'
   return ivs2
 
-conv :: RealFrac r => Constraint r -> Constraint Rational
-conv (LARel a op b) = LARel (f a) op (f b)
+conv :: RealFrac r => LA.Atom r -> LA.Atom Rational
+conv (LA.Atom a op b) = LA.Atom (f a) op (f b)
   where
-    f = mapLC toRational
+    f = LA.mapCoeff toRational
 
-mkInitialNode :: RealFrac r => OptDir -> LC r -> [Constraint r] -> VarSet -> Either Err (Node r, VarSet)
+mkInitialNode :: RealFrac r => OptDir -> LA.Expr r -> [LA.Atom r] -> VarSet -> Either Err (Node r, VarSet)
 mkInitialNode optdir obj cs ivs =
   flip evalState (emptySolver vs) $ do
     ivs2 <- tableau' cs ivs
@@ -161,7 +162,7 @@ mkInitialNode optdir obj cs ivs =
 isStrictlyBetter :: RealFrac r => OptDir -> r -> r -> Bool
 isStrictlyBetter optdir = if optdir==OptMin then (<) else (>)
 
-traverse :: forall r. RealFrac r => OptDir -> LC r -> VarSet -> Node r -> Either Err (Node r)
+traverse :: forall r. RealFrac r => OptDir -> LA.Expr r -> VarSet -> Node r -> Either Err (Node r)
 traverse optdir obj ivs node0 = loop [node0] Nothing
   where
     loop :: [Node r] -> Maybe (Node r) -> Either Err (Node r)
@@ -209,8 +210,8 @@ traverse optdir obj ivs node0 = loop [node0] Nothing
           in Just $ [node{ ndSolver = sv2, ndDepth = ndDepth node + 1 } | sv2 <- maybeToList (reopt sv)]
       | otherwise = -- branch
           let (v0, val0) = snd $ maximumBy (compare `on` fst) [(fracPart val, (v, val)) | (v,_,val) <- xs]
-              cs = [ LARel (varLC v0) Ge (constLC (fromIntegral (ceiling val0 :: Integer)))
-                   , LARel (varLC v0) Le (constLC (fromIntegral (floor val0 :: Integer)))
+              cs = [ LA.Atom (LA.varExpr v0) Ge (LA.constExpr (fromIntegral (ceiling val0 :: Integer)))
+                   , LA.Atom (LA.varExpr v0) Le (LA.constExpr (fromIntegral (floor val0 :: Integer)))
                    ]
               svs = [execState (addConstraint2 c) (ndSolver node) | c <- cs]
           in Just $ [node{ ndSolver = sv, ndDepth = ndDepth node + 1 } | Just sv <- map reopt svs]
@@ -231,21 +232,21 @@ traverse optdir obj ivs node0 = loop [node0] Nothing
 example1 = (optdir, obj, cs, ivs)
   where
     optdir = OptMax
-    x1 = varLC 1
-    x2 = varLC 2
-    x3 = varLC 3
-    x4 = varLC 4
+    x1 = LA.varExpr 1
+    x2 = LA.varExpr 2
+    x3 = LA.varExpr 3
+    x4 = LA.varExpr 4
     obj = x1 .+. 2 .*. x2 .+. 3 .*. x3 .+. x4
     cs =
-      [ LARel ((-1) .*. x1 .+. x2 .+. x3 .+. 10.*.x4) Le (constLC 20)
-      , LARel (x1 .-. 3 .*. x2 .+. x3) Le (constLC 30)
-      , LARel (x2 .-. 3.5 .*. x4) Eql (constLC 0)
-      , LARel (constLC 0) Le x1
-      , LARel x1 Le (constLC 40)
-      , LARel (constLC 0) Le x2
-      , LARel (constLC 0) Le x3
-      , LARel (constLC 2) Le x4
-      , LARel x4 Le (constLC 3)
+      [ LA.Atom ((-1) .*. x1 .+. x2 .+. x3 .+. 10.*.x4) Le (LA.constExpr 20)
+      , LA.Atom (x1 .-. 3 .*. x2 .+. x3) Le (LA.constExpr 30)
+      , LA.Atom (x2 .-. 3.5 .*. x4) Eql (LA.constExpr 0)
+      , LA.Atom (LA.constExpr 0) Le x1
+      , LA.Atom x1 Le (LA.constExpr 40)
+      , LA.Atom (LA.constExpr 0) Le x2
+      , LA.Atom (LA.constExpr 0) Le x3
+      , LA.Atom (LA.constExpr 2) Le x4
+      , LA.Atom x4 Le (LA.constExpr 3)
       ]
     ivs = IS.singleton 4
 
@@ -271,15 +272,15 @@ test1' = result==expected
 example2 = (optdir, obj, cs, ivs)
   where
     optdir = OptMin
-    [x1,x2,x3] = map varLC [1..3]
+    [x1,x2,x3] = map LA.varExpr [1..3]
     obj = (-1) .*. x1 .-. 3 .*. x2 .-. 5 .*. x3
     cs =
-      [ LARel (3 .*. x1 .+. 4 .*. x2) Le (constLC 10)
-      , LARel (2 .*. x1 .+. x2 .+. x3) Le (constLC 7)
-      , LARel (3.*.x1 .+. x2 .+. 4 .*. x3) Eql (constLC 12)
-      , LARel (constLC 0) Le x1
-      , LARel (constLC 0) Le x2
-      , LARel (constLC 0) Le x3
+      [ LA.Atom (3 .*. x1 .+. 4 .*. x2) Le (LA.constExpr 10)
+      , LA.Atom (2 .*. x1 .+. x2 .+. x3) Le (LA.constExpr 7)
+      , LA.Atom (3.*.x1 .+. x2 .+. 4 .*. x3) Eql (LA.constExpr 12)
+      , LA.Atom (LA.constExpr 0) Le x1
+      , LA.Atom (LA.constExpr 0) Le x2
+      , LA.Atom (LA.constExpr 0) Le x3
       ]
     ivs = IS.fromList [1,2]
 

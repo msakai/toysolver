@@ -25,7 +25,8 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import LA
+import Linear
+import qualified LA
 import Interval
 import qualified Simplex
 import qualified BoundsInference as BI
@@ -33,7 +34,7 @@ import qualified BoundsInference as BI
 -- ---------------------------------------------------------------------------
 -- LP Monad
 
-type Solver r = (Var, Simplex.Tableau r, VarSet, VarMap (LC r))
+type Solver r = (Var, Simplex.Tableau r, VarSet, VarMap (LA.Expr r))
 type LP r = State (Solver r)
 
 emptySolver :: VarSet -> Solver r
@@ -70,93 +71,92 @@ clearArtificialVariables = do
   (x,tbl,_,defs) <- get
   put (x, tbl, IS.empty, defs)
 
-define :: Var -> LC r -> LP r ()
+define :: Var -> LA.Expr r -> LP r ()
 define v e = do
   (x,tbl,avs,defs) <- get
   put (x,tbl,avs, IM.insert v e defs)
 
-getDefs :: LP r (VarMap (LC r))
+getDefs :: LP r (VarMap (LA.Expr r))
 getDefs = do
   (_,_,_,defs) <- get
   return defs
 
 -- ---------------------------------------------------------------------------
 
-addConstraint :: Real r => Constraint r -> LP r ()
+addConstraint :: Real r => LA.Atom r -> LP r ()
 addConstraint c = do
   c <- expandDefs' c
-  let (lc, rop, b) = normalizeConstraint c
+  let (e, rop, b) = normalizeConstraint c
   tbl <- getTableau
   case rop of
     -- x≥b で b≤0 なら追加しない。ad hoc なので一般化したい。
-    Ge | isSingleVar lc && b<=0 -> return ()
+    Ge | isSingleVar e && b<=0 -> return ()
 
     Le -> do
       v <- gensym -- slack variable
-      putTableau $ Simplex.setRow v tbl (unLC lc, b)
+      putTableau $ Simplex.setRow v tbl (LA.coeffMap e, b)
     Ge -> do
       v1 <- gensym -- surplus variable
       v2 <- gensym -- artificial variable
-      putTableau $ Simplex.setRow v2 tbl (unLC (lc .-. varLC v1), b)
+      putTableau $ Simplex.setRow v2 tbl (LA.coeffMap (e .-. LA.varExpr v1), b)
       addArtificialVariable v2
     Eql -> do
       v <- gensym -- artificial variable
-      putTableau $ Simplex.setRow v tbl (unLC lc, b)
+      putTableau $ Simplex.setRow v tbl (LA.coeffMap e, b)
       addArtificialVariable v
     _ -> error $ "addConstraint does not support " ++ show rop
   where
-    isSingleVar (LC m) =
-      case IM.toList m of
-        [(_,1)] -> True
+    isSingleVar e =
+      case LA.terms e of
+        [(1,_)] -> True
         _ -> False
 
-addConstraint2 :: Real r => Constraint r -> LP r ()
+addConstraint2 :: Real r => LA.Atom r -> LP r ()
 addConstraint2 c = do
-  (LARel lhs rop rhs) <- expandDefs' c
+  (LA.Atom lhs rop rhs) <- expandDefs' c
   let
-    LC m = lhs .-. rhs
-    lc = LC (IM.delete constKey m)
-    b = - IM.findWithDefault 0 constKey m
+    (b', e) = LA.pickupTerm LA.constKey (lhs .-. rhs)
+    b = - b'
   tbl <- getTableau
   case rop of
-    Le -> f lc b
-    Ge -> f (lnegate lc) (negate b)
+    Le -> f e b
+    Ge -> f (lnegate e) (negate b)
     Eql -> do
-      f lc b
-      f (lnegate lc) (negate b)
+      f e b
+      f (lnegate e) (negate b)
     _ -> error $ "addConstraint does not support " ++ show rop
   where
     -- -x≤b で -b≤0 なら追加しない。ad hoc なので一般化したい。
-    f lc b  | isSingleNegatedVar lc && -b <= 0 = return ()
-    f lc b = do
+    f e b  | isSingleNegatedVar e && -b <= 0 = return ()
+    f e b = do
       tbl <- getTableau
       v <- gensym -- slack variable
-      putTableau $ Simplex.setRow v tbl (unLC lc, b)
+      putTableau $ Simplex.setRow v tbl (LA.coeffMap e, b)
 
-    isSingleNegatedVar (LC m) =
-      case IM.toList m of
-        [(_,-1)] -> True
+    isSingleNegatedVar e =
+      case LA.terms e of
+        [(-1,_)] -> True
         _ -> False
 
-expandDefs :: Num r => LC r -> LP r (LC r)
+expandDefs :: Num r => LA.Expr r -> LP r (LA.Expr r)
 expandDefs e = do
   defs <- getDefs
-  return $ applySubst defs e
+  return $ LA.applySubst defs e
 
-expandDefs' :: Num r => Constraint r -> LP r (Constraint r)
-expandDefs' (LARel lhs op rhs) = do
+expandDefs' :: Num r => LA.Atom r -> LP r (LA.Atom r)
+expandDefs' (LA.Atom lhs op rhs) = do
   lhs' <- expandDefs lhs
   rhs' <- expandDefs rhs
-  return $ LARel lhs' op rhs'
+  return $ LA.Atom lhs' op rhs'
 
-tableau :: (RealFrac r) => [Constraint r] -> LP r ()
+tableau :: (RealFrac r) => [LA.Atom r] -> LP r ()
 tableau cs = do
   let (nonnegVars, cs') = collectNonnegVars cs IS.empty
       fvs = vars cs `IS.difference` nonnegVars
   forM_ (IS.toList fvs) $ \v -> do
     v1 <- gensym
     v2 <- gensym
-    define v (varLC v1 .-. varLC v2)
+    define v (LA.varExpr v1 .-. LA.varExpr v2)
   mapM_ addConstraint cs'
 
 getModel :: Fractional r => VarSet -> LP r (Model r)
@@ -164,10 +164,10 @@ getModel vs = do
   tbl <- getTableau
   defs <- getDefs
   let bs = IM.map snd (IM.delete Simplex.objRow tbl)
-      vs' = vs `IS.union` IS.fromList [v | e <- IM.elems defs, v <- IS.toList (fvLC e)]
+      vs' = vs `IS.union` IS.fromList [v | e <- IM.elems defs, v <- IS.toList (vars e)]
       -- Note that IM.union is left-biased
       m0 = bs `IM.union` IM.fromList [(v,0) | v <- IS.toList vs']
-  return $ IM.filterWithKey (\k _ -> k `IS.member` vs) $ IM.map (evalLC m0) defs `IM.union` m0
+  return $ IM.filterWithKey (\k _ -> k `IS.member` vs) $ IM.map (LA.evalExpr m0) defs `IM.union` m0
 
 phaseI :: (Fractional r, Real r) => LP r Bool
 phaseI = do
@@ -178,34 +178,33 @@ phaseI = do
   when ret clearArtificialVariables
   return ret
 
-simplex :: (Fractional r, Real r) => OptDir -> LC r -> LP r Bool
+simplex :: (Fractional r, Real r) => OptDir -> LA.Expr r -> LP r Bool
 simplex optdir obj = do
   tbl <- getTableau
   defs <- getDefs
-  let (ret, tbl') = Simplex.simplex optdir (Simplex.setObjFun tbl (applySubst defs obj))
+  let (ret, tbl') = Simplex.simplex optdir (Simplex.setObjFun tbl (LA.applySubst defs obj))
   putTableau tbl'
   return ret
 
-dualSimplex :: (Fractional r, Real r) => OptDir -> LC r -> LP r Bool
+dualSimplex :: (Fractional r, Real r) => OptDir -> LA.Expr r -> LP r Bool
 dualSimplex optdir obj = do
   tbl <- getTableau
   defs <- getDefs
-  let (ret, tbl') = Simplex.dualSimplex optdir (Simplex.setObjFun tbl (applySubst defs obj))
+  let (ret, tbl') = Simplex.dualSimplex optdir (Simplex.setObjFun tbl (LA.applySubst defs obj))
   putTableau tbl'
   return ret
 
 -- ---------------------------------------------------------------------------
 
-normalizeConstraint :: forall r. Real r => Constraint r -> (LC r, RelOp, r)
-normalizeConstraint (LARel a op b)
+normalizeConstraint :: forall r. Real r => LA.Atom r -> (LA.Expr r, RelOp, r)
+normalizeConstraint (LA.Atom a op b)
   | rhs < 0   = (lnegate lhs, flipOp op, negate rhs)
   | otherwise = (lhs, op, rhs)
   where
-    LC m = a .-. b
-    rhs = - IM.findWithDefault 0 constKey m
-    lhs = LC (IM.delete constKey m)
+    (c, lhs) = LA.pickupTerm LA.constKey (a .-. b)
+    rhs = - c
 
-collectNonnegVars :: forall r. (RealFrac r) => [Constraint r] -> VarSet -> (VarSet, [Constraint r])
+collectNonnegVars :: forall r. (RealFrac r) => [LA.Atom r] -> VarSet -> (VarSet, [LA.Atom r])
 collectNonnegVars cs ivs = (nonnegVars, cs)
   where
     vs = vars cs
@@ -218,8 +217,8 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
                 Interval (Just (_, lb)) _ | 0 <= lb -> True
                 _ -> False
 
-    isTriviallyTrue :: Constraint r -> Bool
-    isTriviallyTrue (LARel a op b) =
+    isTriviallyTrue :: LA.Atom r -> Bool
+    isTriviallyTrue (LA.Atom a op b) =
       case op of
         Le ->
           case ub of
@@ -237,8 +236,8 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
           case lb of
             Nothing -> False
             Just (incl, val) -> val > 0 || (not incl && val >= 0)
-        Eql -> isTriviallyTrue (LARel c Le lzero) && isTriviallyTrue (LARel c Ge lzero)
-        NEq -> isTriviallyTrue (LARel c Lt lzero) && isTriviallyTrue (LARel c Gt lzero)
+        Eql -> isTriviallyTrue (LA.Atom c Le lzero) && isTriviallyTrue (LA.Atom c Ge lzero)
+        NEq -> isTriviallyTrue (LA.Atom c Lt lzero) && isTriviallyTrue (LA.Atom c Gt lzero)
       where
         c = a .-. b
         Interval lb ub = BI.evalToInterval bounds c

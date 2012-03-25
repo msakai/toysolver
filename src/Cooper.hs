@@ -33,20 +33,21 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import LA
+import Linear
+import qualified LA
 import qualified FourierMotzkin as FM
 import qualified Interval
 
 -- ---------------------------------------------------------------------------
 
-type LCZ = LC Integer
+type ExprZ = LA.Expr Integer
 
 atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe Formula'
 atomZ op a b = do
-  (lc1,c1) <- FM.termR a
-  (lc2,c2) <- FM.termR b
-  let a' = c2 .*. lc1
-      b' = c1 .*. lc2
+  (e1,c1) <- FM.termR a
+  (e2,c2) <- FM.termR b
+  let a' = c2 .*. e1
+      b' = c1 .*. e2
   case op of
     Le -> return $ Lit $ a' `leZ` b'
     Lt -> return $ Lit $ a' `ltZ` b'
@@ -55,19 +56,19 @@ atomZ op a b = do
     Eql -> return $ eqZ a' b'
     NEq -> liftM notF (atomZ Eql a b)
 
-leZ, ltZ, geZ, gtZ :: LCZ -> LCZ -> Lit
-leZ lc1 lc2 = lc1 `ltZ` (lc2 .+. constLC 1)
-ltZ lc1 lc2 = Pos $ (lc2 .-. lc1)
+leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
+leZ e1 e2 = e1 `ltZ` (e2 .+. LA.constExpr 1)
+ltZ e1 e2 = Pos $ (e2 .-. e1)
 geZ = flip leZ
 gtZ = flip gtZ
 
-eqZ :: LCZ -> LCZ -> Formula'
-eqZ lc1 lc2 = Lit (lc1 `leZ` lc2) .&&. Lit (lc1 `geZ` lc2)
+eqZ :: ExprZ -> ExprZ -> Formula'
+eqZ e1 e2 = Lit (e1 `leZ` e2) .&&. Lit (e1 `geZ` e2)
 
 -- | Literal
 data Lit
-    = Pos LCZ
-    | Divisible Bool Integer LCZ
+    = Pos ExprZ
+    | Divisible Bool Integer ExprZ
     deriving (Show, Eq, Ord)
 
 instance Variables Lit where
@@ -75,8 +76,8 @@ instance Variables Lit where
   vars (Divisible _ _ t) = vars t
 
 instance Complement Lit where
-  notF (Pos lc) = lc `leZ` constLC 0
-  notF (Divisible b c lc) = Divisible (not b) c lc
+  notF (Pos e) = e `leZ` LA.constExpr 0
+  notF (Divisible b c e) = Divisible (not b) c e
 
 data Formula'
     = T'
@@ -99,15 +100,15 @@ instance Boolean Formula' where
   (.&&.) = And'
   (.||.) = Or'
 
-subst1 :: Var -> LCZ -> Formula' -> Formula'
-subst1 x lc = go
+subst1 :: Var -> ExprZ -> Formula' -> Formula'
+subst1 x e = go
   where
     go T' = T'
     go F' = F'
     go (And' a b) = And' (go a) (go b)
     go (Or' a b) = Or' (go a) (go b)
-    go (Lit (Divisible b c lc1)) = Lit $ Divisible b c $ applySubst1 x lc lc1
-    go (Lit (Pos lc1)) = Lit $ Pos $ applySubst1 x lc lc1
+    go (Lit (Divisible b c e1)) = Lit $ Divisible b c $ LA.applySubst1 x e e1
+    go (Lit (Pos e1)) = Lit $ Pos $ LA.applySubst1 x e e1
 
 simplify :: Formula' -> Formula'
 simplify T' = T'
@@ -126,24 +127,24 @@ simplify (Or' a b) =
     (T', _) -> true
     (_, T') -> true
     (a',b') -> a' .||. b'
-simplify lit@(Lit (Pos lc)) =
-  case asConst lc of
+simplify lit@(Lit (Pos e)) =
+  case LA.asConst e of
     Nothing -> lit
     Just c -> if c > 0 then true else false
-simplify lit@(Lit (Divisible b c lc@(LC m))) = 
-  case asConst lc of
+simplify lit@(Lit (Divisible b c e)) = 
+  case LA.asConst e of
     Just c' ->
       if b == (c' `mod` c == 0) then true else false
     Nothing
       | c==d -> if b then true else false
       | d==1 -> lit
-      | otherwise -> Lit (Divisible b (c `div` d) (LC (IM.map (`div` d) m)))
+      | otherwise -> Lit (Divisible b (c `div` d) (LA.mapCoeff (`div` d) e))
   where
-    d = foldl gcd c (IM.elems m)
+    d = foldl gcd c [c | (c,_) <- LA.terms e]
 
 -- ---------------------------------------------------------------------------
 
-data Witness = WCase1 Integer LCZ | WCase2 Integer Integer Integer [LCZ]
+data Witness = WCase1 Integer ExprZ | WCase2 Integer Integer Integer [ExprZ]
 
 eliminateZ :: Var -> Formula' -> Formula'
 eliminateZ x formula = simplify $ orF $ map fst $ eliminateZ' x formula
@@ -151,6 +152,7 @@ eliminateZ x formula = simplify $ orF $ map fst $ eliminateZ' x formula
 eliminateZ' :: Var -> Formula' -> [(Formula', Witness)]
 eliminateZ' x formula = case1 ++ case2
   where
+    -- xの係数の最小公倍数
     c :: Integer
     c = f formula
       where
@@ -159,30 +161,33 @@ eliminateZ' x formula = case1 ++ case2
          f F' = 1
          f (And' a b) = lcm (f a) (f b)
          f (Or' a b) = lcm (f a) (f b)
-         f (Lit (Pos (LC m))) = fromMaybe 1 (IM.lookup x m)
-         f (Lit (Divisible _ _ (LC m))) = fromMaybe 1 (IM.lookup x m)
+         f (Lit (Pos e)) = fromMaybe 1 (LA.lookupCoeff' x e)
+         f (Lit (Divisible _ _ e)) = fromMaybe 1 (LA.lookupCoeff' x e)
     
+    -- 式をスケールしてxの係数をcへと変換し、その後cxをxで置き換え、xがcで割り切れるという制約を追加した論理式
     formula1 :: Formula'
-    formula1 = f formula .&&. Lit (Divisible True c (varLC x))
+    formula1 = f formula .&&. Lit (Divisible True c (LA.varExpr x))
       where
         f :: Formula' -> Formula'
         f T' = T'
         f F' = F'
         f (And' a b) = f a .&&. f b
         f (Or' a b) = f a .||. f b
-        f lit@(Lit (Pos (LC m))) =
-          case IM.lookup x m of
+        f lit@(Lit (Pos e)) =
+          case LA.lookupCoeff' x e of
+            Nothing -> lit
+            Just a -> Lit $ Pos $ g (c `div` abs a) e
+        f lit@(Lit (Divisible b d e)) =
+          case LA.lookupCoeff' x e of
             Nothing -> lit
             Just a ->
-              let e = c `div` abs a
-              in Lit $ Pos $ LC $ IM.mapWithKey (\x' c' -> if x==x' then signum c' else e*c') m
-        f lit@(Lit (Divisible b d (LC m))) =
-          case IM.lookup x m of
-            Nothing -> lit
-            Just a ->
-              let e = c `div` abs a
-              in Lit $ Divisible b (e*d) $ LC $ IM.mapWithKey (\x' c' -> if x==x' then signum c' else e*c') m
+              let s = c `div` abs a
+              in Lit $ Divisible b (s*d) $ g s e
 
+        g :: Integer -> ExprZ -> ExprZ
+        g s = LA.mapCoeffWithVar (\c' x' -> if x==x' then signum c' else s*c')
+
+    -- d|x+t という形の論理式の d の最小公倍数
     delta :: Integer
     delta = f formula1
       where
@@ -190,66 +195,76 @@ eliminateZ' x formula = case1 ++ case2
         f T' = 1
         f F' = 1
         f (And' a b) = lcm (f a) (f b)
-        f (Or' a b) = lcm (f a) (f b)
-        f (Lit (Divisible _ c' _)) = c'
+        f (Or' a b)  = lcm (f a) (f b)
+        f (Lit (Divisible _ d _)) = d
         f (Lit (Pos _)) = 1
 
-    bs :: [LCZ]
-    bs = f formula1
+    -- ts = {t | t < x は formula1 に現れる原子論理式}
+    ts :: [ExprZ]
+    ts = f formula1
       where
-        f :: Formula' -> [LCZ]
+        f :: Formula' -> [ExprZ]
         f T' = []
         f F' = []
         f (And' a b) = f a ++ f b
         f (Or' a b) = f a ++ f b
         f (Lit (Divisible _ _ _)) = []
-        f (Lit (Pos (LC m))) =
-            case IM.lookup x m of
-              Nothing -> []
-              Just c' -> if c' > 0 then [lnegate (LC (IM.delete x m))] else [LC (IM.delete x m)]    
+        f (Lit (Pos e)) =
+          case LA.pickupTerm' x e of
+            Nothing -> []
+            Just (1, e')  -> [lnegate e'] -- Pos e <=> (x + e' > 0) <=> (-e' < x)
+            Just (-1, e') -> [] -- Pos e <=> (-x + e' > 0) <=> (x < e')
+            _ -> error "should not happen"
 
+    -- formula1を真にする最小のxが存在する場合
     case1 :: [(Formula', Witness)]
-    case1 = [ (subst1 x lc formula1, WCase1 c lc)
-            | j <- [1..delta], b <- bs, let lc = b .+. constLC j ]
+    case1 = [ (subst1 x e formula1, WCase1 c e)
+            | j <- [1..delta], t <- ts, let e = t .+. LA.constExpr j ]
 
-    p :: Formula'
-    p = f formula1
+    -- formula1のなかの x < t を真に t < x を偽に置き換えた論理式
+    formula2 :: Formula'
+    formula2 = f formula1
       where        
         f :: Formula' -> Formula'
         f T' = T'
         f F' = F'
         f (And' a b) = f a .&&. f b
         f (Or' a b) = f a .||. f b
-        f lit@(Lit (Pos (LC m))) =
-          case IM.lookup x m of
+        f lit@(Lit (Pos e)) =
+          case LA.lookupCoeff' x e of
             Nothing -> lit
-            Just c -> if c < 0 then T' else F'
+            Just 1    -> F' -- Pos e <=> ( x + e' > 0) <=> -e' < x
+            Just (-1) -> T' -- Pos e <=> (-x + e' > 0) <=> x < e'
+            _ -> error "should not happen"
         f lit@(Lit (Divisible _ _ _)) = lit
 
-    us :: [LCZ]
+    us :: [ExprZ]
     us = f formula1
       where
-        f :: Formula' -> [LCZ]
+        f :: Formula' -> [ExprZ]
         f T' = []
         f F' = []
         f (And' a b) = f a ++ f b
         f (Or' a b) = f a ++ f b
-        f (Lit (Pos (LC m))) =
-          case IM.lookup x m of
+        f (Lit (Pos e)) =
+          case LA.pickupTerm' x e of
             Nothing -> []
-            Just c -> if c < 0 then [LC (IM.delete x m)] else []
+            Just (1, e')  -> []   -- Pos e <=> ( x + e' > 0) <=> -e' < x
+            Just (-1, e') -> [e'] -- Pos e <=> (-x + e' > 0) <=> x < e'
+            _ -> error "should not happen"
         f (Lit (Divisible _ _ _)) = []
 
+    -- formula1を真にする最小のxが存在しない場合
     case2 :: [(Formula', Witness)]
-    case2 = [(subst1 x (constLC j) p, WCase2 c j delta us) | j <- [1..delta]]
+    case2 = [(subst1 x (LA.constExpr j) formula2, WCase2 c j delta us) | j <- [1..delta]]
 
 evalWitness :: Model Integer -> Witness -> Integer
-evalWitness model (WCase1 c lc) = evalLC model lc `div` c
+evalWitness model (WCase1 c e) = LA.evalExpr model e `div` c
 evalWitness model (WCase2 c j delta us)
   | null us' = j `div` c
   | otherwise = (j + (((u - delta - 1) `div` delta) * delta)) `div` c
   where
-    us' = map (evalLC model) us
+    us' = map (LA.evalExpr model) us
     u = minimum us'
 
 -- ---------------------------------------------------------------------------
@@ -259,7 +274,7 @@ eliminateQuantifiers = f
   where
     f T = return T'
     f F = return F'
-    f (Atom (Rel lc1 op lc2)) = atomZ op lc1 lc2
+    f (Atom (Rel e1 op e2)) = atomZ op e1 e2
     f (And a b) = liftM2 (.&&.) (f a) (f b)
     f (Or a b) = liftM2 (.||.) (f a) (f b)
     f (Not a) = f (pushNot a)
@@ -295,7 +310,7 @@ solve' vs formula = go vs (simplify formula)
 
 -- ---------------------------------------------------------------------------
 
-solveQFLA :: [Constraint Rational] -> VarSet -> Maybe (Model Rational)
+solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
 solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
   where
     vs  = vars cs
@@ -313,8 +328,8 @@ solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dn
           return $ IM.insert v val model
 
     f :: FM.Lit -> Formula'
-    f (FM.Nonneg lc) = Lit $ lc `geZ` (constLC 0)
-    f (FM.Pos lc)    = Lit $ lc `gtZ` (constLC 0)
+    f (FM.Nonneg e) = Lit $ e `geZ` (LA.constExpr 0)
+    f (FM.Pos e)    = Lit $ e `gtZ` (LA.constExpr 0)
 
 -- ---------------------------------------------------------------------------
 
@@ -338,6 +353,9 @@ test1 = c1 .&&. c2 .&&. c3 .&&. c4
     c3 = 1 .<=. x .&&. x .<=. 40
     c4 = (-50) .<=. y .&&. y .<=. 50
 
+test1' :: Formula Rational
+test1' = Exists 0 $ Exists 1 $ Exists 2 $ test1
+
 {-
 27 ≤ 11x+13y ≤ 45
 -10 ≤ 7x-9y ≤ 4
@@ -354,5 +372,26 @@ test2 = c1 .&&. c2
     t2 = 7*x - 9*y
     c1 = 27 .<=. t1 .&&. t1 .<=. 45
     c2 = (-10) .<=. t2 .&&. t2 .<=. 4
+
+test2' :: Formula Rational
+test2' = Exists 0 $ Exists 1 $ test2
+
+testHagiya :: Formula'
+testHagiya = eliminateZ 1 $ c1 .&&. c2 .&&. c3
+  where
+    [x,y,z] = map LA.varExpr [1..3]
+    c1 = Lit $ x `ltZ` (y .+. y)   -- x < y+y
+    c2 = Lit $ z `ltZ` x           -- z < x
+    c3 = Lit $ Divisible True 3 x  -- 3 | x
+
+{-
+Or' (And' (Lit (Pos (Expr {coeffMap = fromList [(-1,-1),(2,2),(3,-1)]}))) (Lit (Divisible True 3 (Expr {coeffMap = fromList [(-1,1),(3,1)]}))))
+    (Or' (And' (Lit (Pos (Expr {coeffMap = fromList [(-1,-2),(2,2),(3,-1)]}))) (Lit (Divisible True 3 (Expr {coeffMap = fromList [(-1,2),(3,1)]}))))
+         (And' (Lit (Pos (Expr {coeffMap = fromList [(-1,-3),(2,2),(3,-1)]}))) (Lit (Divisible True 3 (Expr {coeffMap = fromList [(-1,3),(3,1)]})))))
+
+(2y-z >  0 && 3|z+1) ||
+(2y-z > -2 && 3|z+2) ||
+(2y-z > -3 && 3|z+3) ||
+-}
 
 -- ---------------------------------------------------------------------------

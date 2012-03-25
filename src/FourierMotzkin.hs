@@ -42,21 +42,22 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import LA
+import Linear
+import qualified LA
 import Interval
 
 -- ---------------------------------------------------------------------------
 
-type LCZ = LC Integer
+type ExprZ = LA.Expr Integer
 
 -- | (t,c) represents t/c, and c must be >0.
-type Rat = (LCZ, Integer)
+type Rat = (ExprZ, Integer)
 
 evalRat :: Model Rational -> Rat -> Rational
-evalRat model (lc, c1) = lift1LC 1 (model IM.!) (mapLC fromIntegral lc) / (fromIntegral c1)
+evalRat model (e, d) = LA.lift1 1 (model IM.!) (LA.mapCoeff fromIntegral e) / (fromIntegral d)
 
 -- | Literal
-data Lit = Nonneg LCZ | Pos LCZ deriving (Show, Eq, Ord)
+data Lit = Nonneg ExprZ | Pos ExprZ deriving (Show, Eq, Ord)
 
 instance Variables Lit where
   vars (Pos t) = vars t
@@ -72,12 +73,12 @@ simplify :: [Lit] -> Maybe [Lit]
 simplify = fmap concat . mapM f
   where
     f :: Lit -> Maybe [Lit]
-    f lit@(Pos lc) =
-      case asConst lc of
+    f lit@(Pos e) =
+      case LA.asConst e of
         Just x -> guard (x > 0) >> return []
         Nothing -> return [lit]
-    f lit@(Nonneg lc) =
-      case asConst lc of
+    f lit@(Nonneg e) =
+      case LA.asConst e of
         Just x -> guard (x >= 0) >> return []
         Nothing -> return [lit]
 
@@ -96,8 +97,8 @@ atomR op a b = do
     NEq -> DNF [[a' `ltR` b'], [a' `gtR` b']]
 
 termR :: Expr Rational -> Maybe Rat
-termR (Const c) = return (constLC (numerator c), denominator c)
-termR (Var v) = return (varLC v, 1)
+termR (Const c) = return (LA.constExpr (numerator c), denominator c)
+termR (Var v) = return (LA.varExpr v, 1)
 termR (a :+: b) = do
   (t1,c1) <- termR a
   (t2,c2) <- termR b
@@ -105,25 +106,25 @@ termR (a :+: b) = do
 termR (a :*: b) = do
   (t1,c1) <- termR a
   (t2,c2) <- termR b
-  msum [ do{ c <- asConst t1; return (c .*. t2, c1*c2) }
-       , do{ c <- asConst t2; return (c .*. t1, c1*c2) }
+  msum [ do{ c <- LA.asConst t1; return (c .*. t2, c1*c2) }
+       , do{ c <- LA.asConst t2; return (c .*. t1, c1*c2) }
        ]
 termR (a :/: b) = do
   (t1,c1) <- termR a
   (t2,c2) <- termR b
-  c3 <- asConst t2
+  c3 <- LA.asConst t2
   guard $ c3 /= 0
   return (c2 .*. t1, c1*c3)
 
 leR, ltR, geR, gtR :: Rat -> Rat -> Lit
-leR (lc1,c) (lc2,d) = Nonneg $ normalizeLCR $ c .*. lc2 .-. d .*. lc1
-ltR (lc1,c) (lc2,d) = Pos $ normalizeLCR $ c .*. lc2 .-. d .*. lc1
+leR (e1,c) (e2,d) = Nonneg $ normalizeExprR $ c .*. e2 .-. d .*. e1
+ltR (e1,c) (e2,d) = Pos $ normalizeExprR $ c .*. e2 .-. d .*. e1
 geR = flip leR
 gtR = flip gtR
 
-normalizeLCR :: LCZ -> LCZ
-normalizeLCR lc = mapLC (`div` d) lc
-  where d = gcd' $ map snd $ IM.toList $ unLC lc
+normalizeExprR :: ExprZ -> ExprZ
+normalizeExprR e = LA.mapCoeff (`div` d) e
+  where d = gcd' $ map fst $ LA.terms e
 
 -- ---------------------------------------------------------------------------
 
@@ -145,21 +146,20 @@ collectBounds v = foldr phi (([],[],[],[]),[])
     phi lit@(Nonneg t) x = f False lit t x
     phi lit@(Pos t) x = f True lit t x
 
-    f :: Bool -> Lit -> LCZ -> (BoundsR, [Lit]) -> (BoundsR, [Lit])
-    f strict lit (LC t) (bnd@(ls1,ls2,us1,us2), xs) = 
-      case c `compare` 0 of
-        EQ -> (bnd, lit : xs)
-        GT ->
-          if strict
-          then ((ls1, (lnegate t', c) : ls2, us1, us2), xs) -- 0 < cx + M ⇔ -M/c <  x
-          else (((lnegate t', c) : ls1, ls2, us1, us2), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
-        LT -> 
-          if strict
-          then ((ls1, ls2, us1, (t', negate c) : us2), xs) -- 0 < cx + M ⇔ x < M/-c
-          else ((ls1, ls2, (t', negate c) : us1, us2), xs) -- 0 ≤ cx + M ⇔ x ≤ M/-c
-      where
-        c = fromMaybe 0 $ IM.lookup v t
-        t' = LC $ IM.delete v t
+    f :: Bool -> Lit -> ExprZ -> (BoundsR, [Lit]) -> (BoundsR, [Lit])
+    f strict lit t (bnd@(ls1,ls2,us1,us2), xs) =
+      case LA.pickupTerm v t of
+        (c,t') ->
+          case c `compare` 0 of
+            EQ -> (bnd, lit : xs)
+            GT ->
+              if strict
+              then ((ls1, (lnegate t', c) : ls2, us1, us2), xs) -- 0 < cx + M ⇔ -M/c <  x
+              else (((lnegate t', c) : ls1, ls2, us1, us2), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
+            LT ->
+              if strict
+              then ((ls1, ls2, us1, (t', negate c) : us2), xs) -- 0 < cx + M ⇔ x < M/-c
+              else ((ls1, ls2, (t', negate c) : us1, us2), xs) -- 0 ≤ cx + M ⇔ x ≤ M/-c
 
 boundConditions :: BoundsR -> DNF Lit
 boundConditions  (ls1, ls2, us1, us2) = DNF $ maybeToList $ simplify $ 
@@ -220,11 +220,11 @@ evalBounds model (ls1,ls2,us1,us2) =
 
 -- ---------------------------------------------------------------------------
 
-constraintsToDNF :: [Constraint Rational] -> DNF Lit
+constraintsToDNF :: [LA.Atom Rational] -> DNF Lit
 constraintsToDNF = andF . map constraintToDNF
 
-constraintToDNF :: Constraint Rational -> DNF Lit
-constraintToDNF (LARel a op b) = DNF $
+constraintToDNF :: LA.Atom Rational -> DNF Lit
+constraintToDNF (LA.Atom a op b) = DNF $
   case op of
     Eql -> [[Nonneg c, Nonneg (lnegate c)]]
     NEq -> [[Pos c], [Pos (lnegate c)]]
@@ -235,12 +235,11 @@ constraintToDNF (LARel a op b) = DNF $
   where
     c = normalize (a .-. b)
 
-    normalize :: LC Rational -> LCZ
-    normalize (LC m)
-      | IM.null m = LC IM.empty
-      | otherwise = LC $ IM.map (round . (*c)) m
-           where
-             c = fromIntegral $ foldl' lcm 1 (map denominator (IM.elems m))
+    normalize :: LA.Expr Rational -> ExprZ
+    normalize e = LA.mapCoeff (round . (*c)) e
+      where
+        c = fromIntegral $ foldl' lcm 1 ds
+        ds = [denominator c | (c,v) <- LA.terms e]
 
 -- ---------------------------------------------------------------------------
 
@@ -270,16 +269,16 @@ test1 = c1 .&&. c2 .&&. c3 .&&. c4
     c3 = 1 .<=. x .&&. x .<=. 40
     c4 = (-50) .<=. y .&&. y .<=. 50
 
-test1' :: [Constraint Rational]
+test1' :: [LA.Atom Rational]
 test1' = [c1, c2] ++ c3 ++ c4
   where
-    x = varLC 0
-    y = varLC 1
-    z = varLC 2
-    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. constLC 17
-    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. constLC 7
-    c3 = [constLC 1 .<=. x, x .<=. constLC 40]
-    c4 = [constLC (-50) .<=. y, y .<=. constLC 50]
+    x = LA.varExpr 0
+    y = LA.varExpr 1
+    z = LA.varExpr 2
+    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. LA.constExpr 17
+    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. LA.constExpr 7
+    c3 = [LA.constExpr 1 .<=. x, x .<=. LA.constExpr 40]
+    c4 = [LA.constExpr (-50) .<=. y, y .<=. LA.constExpr 50]
 
 {-
 27 ≤ 11x+13y ≤ 45

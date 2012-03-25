@@ -40,7 +40,8 @@ import qualified Data.IntSet as IS
 import Control.Exception
 
 import Expr
-import LC
+import Linear
+import qualified LA
 
 -- ---------------------------------------------------------------------------
 
@@ -48,7 +49,7 @@ type Tableau r = VarMap (Row r)
 {-
 tbl ! v == (m, val)
 ==>
-varLC v .+. m .==. constLC val
+varExpr v .+. m .==. constExpr val
 -}
 
 type RowIndex = Int
@@ -103,12 +104,12 @@ setRow i tbl row = assert (validTableau tbl) $ assert (validTableau tbl') $ tbl'
   where
     tbl' = IM.insert i (normalizeRow tbl row) tbl
 
-setObjFun :: Num r => Tableau r -> LC r -> Tableau r
-setObjFun tbl lc = setRow objRow tbl row
+setObjFun :: Num r => Tableau r -> LA.Expr r -> Tableau r
+setObjFun tbl e = setRow objRow tbl row
   where
     row =
-      case pickupLC constKey lc of
-        (c, lc') -> (unLC (lnegate lc'), c)
+      case LA.pickupTerm LA.constKey e of
+        (c, e') -> (LA.coeffMap (lnegate e'), c)
 
 copyObjRow :: Num r => Tableau r -> Tableau r -> Tableau r
 copyObjRow from to =
@@ -220,7 +221,7 @@ phaseI tbl avs
   | otherwise = (True, copyObjRow tbl $ removeArtificialVariables avs $ tbl1')
   where
     optdir = OptMax
-    tbl1 = setObjFun tbl $ lnegate $ lsum [varLC v | v <- IS.toList avs]
+    tbl1 = setObjFun tbl $ lnegate $ lsum [LA.varExpr v | v <- IS.toList avs]
     tbl1' = go tbl1
     go tbl2
       | currentObjValue tbl2 == 0 = tbl2

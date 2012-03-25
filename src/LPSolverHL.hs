@@ -31,7 +31,7 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import LA
+import qualified LA
 import qualified Simplex
 import LPSolver
 
@@ -45,18 +45,18 @@ minimize = optimize OptMin
 
 optimize :: (RealFrac r) => OptDir -> Expr r -> [Atom r] -> OptResult r
 optimize optdir obj2 cs2 = fromMaybe OptUnknown $ do
-  obj <- compileExpr obj2  
-  cs <- mapM compileAtom cs2
+  obj <- LA.compileExpr obj2  
+  cs <- mapM LA.compileAtom cs2
   return (optimize' optdir obj cs)
 
 solve :: (RealFrac r) => [Atom r] -> SatResult r
 solve cs2 = fromMaybe Unknown $ do
-  cs <- mapM compileAtom cs2
+  cs <- mapM LA.compileAtom cs2
   return (solve' cs)
 
 -- ---------------------------------------------------------------------------
 
-solve' :: (RealFrac r) => [Constraint r] -> SatResult r
+solve' :: (RealFrac r) => [LA.Atom r] -> SatResult r
 solve' cs =
   flip evalState (emptySolver vs) $ do
     tableau cs
@@ -69,7 +69,7 @@ solve' cs =
   where
     vs = vars cs
 
-optimize' :: (RealFrac r) => OptDir -> LC r -> [Constraint r] -> OptResult r
+optimize' :: (RealFrac r) => OptDir -> LA.Expr r -> [LA.Atom r] -> OptResult r
 optimize' optdir obj cs =
   flip evalState (emptySolver vs) $ do
     tableau cs

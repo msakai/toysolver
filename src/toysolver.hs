@@ -22,7 +22,7 @@ import Text.Printf
 
 import Expr
 import Formula
-import LA
+import qualified LA
 import qualified OmegaTest
 import qualified Cooper
 import qualified MIPSolverHL

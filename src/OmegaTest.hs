@@ -39,7 +39,8 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import LA
+import Linear
+import qualified LA
 import qualified Interval
 import Util (combineMaybe)
 import qualified FourierMotzkin as FM
@@ -47,7 +48,7 @@ import FourierMotzkin (Lit (..), Rat (..))
 
 -- ---------------------------------------------------------------------------
 
-type LCZ = LC Integer
+type ExprZ = LA.Expr Integer
 
 -- 制約集合の単純化
 -- It returns Nothing when a inconsistency is detected.
@@ -55,12 +56,12 @@ simplify :: [Lit] -> Maybe [Lit]
 simplify = fmap concat . mapM f
   where
     f :: Lit -> Maybe [Lit]
-    f lit@(Pos lc) =
-      case asConst lc of
+    f lit@(Pos e) =
+      case LA.asConst e of
         Just x -> guard (x > 0) >> return []
         Nothing -> return [lit]
-    f lit@(Nonneg lc) =
-      case asConst lc of
+    f lit@(Nonneg e) =
+      case LA.asConst e of
         Just x -> guard (x >= 0) >> return []
         Nothing -> return [lit]
 
@@ -68,10 +69,10 @@ simplify = fmap concat . mapM f
 
 atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe (DNF Lit)
 atomZ op a b = do
-  (lc1,c1) <- FM.termR a
-  (lc2,c2) <- FM.termR b
-  let a' = c2 .*. lc1
-      b' = c1 .*. lc2
+  (e1,c1) <- FM.termR a
+  (e2,c2) <- FM.termR b
+  let a' = c2 .*. e1
+      b' = c1 .*. e2
   return $ case op of
     Le -> DNF [[a' `leZ` b']]
     Lt -> DNF [[a' `ltZ` b']]
@@ -80,25 +81,25 @@ atomZ op a b = do
     Eql -> eqZ a' b'
     NEq -> DNF [[a' `ltZ` b'], [a' `gtZ` b']]
 
-leZ, ltZ, geZ, gtZ :: LCZ -> LCZ -> Lit
+leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
 -- Note that constants may be floored by division
-leZ lc1 lc2 = Nonneg (LC (IM.map (`div` d) m))
+leZ e1 e2 = Nonneg (LA.mapCoeff (`div` d) e)
   where
-    LC m = lc2 .-. lc1
-    d = gcd' [c | (v,c) <- IM.toList m, v /= constKey]
-ltZ lc1 lc2 = (lc1 .+. constLC 1) `leZ` lc2
+    e = e2 .-. e1
+    d = gcd' [c | (c,v) <- LA.terms e, v /= LA.constKey]
+ltZ e1 e2 = (e1 .+. LA.constExpr 1) `leZ` e2
 geZ = flip leZ
 gtZ = flip gtZ
 
-eqZ :: LCZ -> LCZ -> (DNF Lit)
-eqZ lc1 lc2
-  = if fromMaybe 0 (IM.lookup constKey m) `mod` d == 0
-    then DNF [[Nonneg lc, Nonneg (lnegate lc)]]
+eqZ :: ExprZ -> ExprZ -> (DNF Lit)
+eqZ e1 e2
+  = if LA.lookupCoeff LA.constKey e3 `mod` d == 0
+    then DNF [[Nonneg e, Nonneg (lnegate e)]]
     else false
   where
-    LC m = lc1 .-. lc2
-    lc = LC (IM.map (`div` d) m)
-    d = gcd' [c | (v,c) <- IM.toList m, v /= constKey]
+    e = LA.mapCoeff (`div` d) e3
+    e3 = e1 .-. e2
+    d = gcd' [c | (c,v) <- LA.terms e3, v /= LA.constKey]
 
 -- ---------------------------------------------------------------------------
 
@@ -117,15 +118,14 @@ collectBoundsZ :: Var -> [Lit] -> (BoundsZ,[Lit])
 collectBoundsZ v = foldr phi (([],[]),[])
   where
     phi :: Lit -> (BoundsZ,[Lit]) -> (BoundsZ,[Lit])
-    phi (Pos t) x = phi (Nonneg (t .-. constLC 1)) x
-    phi lit@(Nonneg (LC t)) ((ls,us),xs) =
-      case c `compare` 0 of
-        EQ -> ((ls, us), lit : xs)
-        GT -> (((lnegate t', c) : ls, us), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
-        LT -> ((ls, (t', negate c) : us), xs)   -- 0 ≤ cx + M ⇔ x ≤ M/-c
-      where
-        c = fromMaybe 0 $ IM.lookup v t
-        t' = LC $ IM.delete v t
+    phi (Pos t) x = phi (Nonneg (t .-. LA.constExpr 1)) x
+    phi lit@(Nonneg t) ((ls,us),xs) =
+      case LA.pickupTerm v t of
+        (c,t') -> 
+          case c `compare` 0 of
+            EQ -> ((ls, us), lit : xs)
+            GT -> (((lnegate t', c) : ls, us), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
+            LT -> ((ls, (t', negate c) : us), xs)   -- 0 ≤ cx + M ⇔ x ≤ M/-c
 
 boundConditionsZ :: BoundsZ -> DNF Lit
 boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $
@@ -134,7 +134,7 @@ boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $
     else cond1 : cond2
   where
      cond1 =
-       [ constLC ((a-1)*(b-1)) `leZ` (a .*. d .-. b .*. c)
+       [ LA.constExpr ((a-1)*(b-1)) `leZ` (a .*. d .-. b .*. c)
        | (c,a)<-ls , (d,b)<-us ]
      cond2 = 
        [ [(a' .*. c) `leZ` (a .*. val) | (c,a)<-ls] ++
@@ -143,7 +143,7 @@ boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $
        , let m = maximum [b | (_,b)<-us]
        ,  (c',a') <- ls
        , k <- [0 .. (m*a'-a'-m) `div` m]
-       , let val = c' .+. constLC k
+       , let val = c' .+. LA.constExpr k
        -- x = val / a'
        -- c / a ≤ x ⇔ c / a ≤ val / a' ⇔ a' c ≤ a val
        -- x ≤ d / b ⇔ val / a' ≤ d / b ⇔ b val ≤ a' d
@@ -205,8 +205,8 @@ chooseVariable vs xs = head $ [e | e@(_,_,bnd,_) <- table, isExact bnd] ++ table
 evalBoundsZ :: Model Integer -> BoundsZ -> IntervalZ
 evalBoundsZ model (ls,us) =
   foldl' intersectZ univZ $ 
-    [ (Just (ceiling (evalLC model x % c)), Nothing) | (x,c) <- ls ] ++ 
-    [ (Nothing, Just (floor (evalLC model x % c))) | (x,c) <- us ]
+    [ (Just (ceiling (LA.evalExpr model x % c)), Nothing) | (x,c) <- ls ] ++ 
+    [ (Nothing, Just (floor (LA.evalExpr model x % c))) | (x,c) <- us ]
 
 -- ---------------------------------------------------------------------------
 
@@ -226,7 +226,7 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 
 -- ---------------------------------------------------------------------------
 
-solveQFLA :: [Constraint Rational] -> VarSet -> Maybe (Model Rational)
+solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
 solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
   where
     vs  = vars cs
@@ -275,16 +275,16 @@ test1 = c1 .&&. c2 .&&. c3 .&&. c4
     c3 = 1 .<=. x .&&. x .<=. 40
     c4 = (-50) .<=. y .&&. y .<=. 50
 
-test1' :: [Constraint Rational]
+test1' :: [LA.Atom Rational]
 test1' = [c1, c2] ++ c3 ++ c4
   where
-    x = varLC 0
-    y = varLC 1
-    z = varLC 2
-    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. constLC 17
-    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. constLC 7
-    c3 = [constLC 1 .<=. x, x .<=. constLC 40]
-    c4 = [constLC (-50) .<=. y, y .<=. constLC 50]
+    x = LA.varExpr 0
+    y = LA.varExpr 1
+    z = LA.varExpr 2
+    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. LA.constExpr 17
+    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. LA.constExpr 7
+    c3 = [LA.constExpr 1 .<=. x, x .<=. LA.constExpr 40]
+    c4 = [LA.constExpr (-50) .<=. y, y .<=. LA.constExpr 50]
 
 {-
 27 ≤ 11x+13y ≤ 45

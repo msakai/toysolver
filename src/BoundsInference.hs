@@ -1,7 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 module BoundsInference
   ( Bounds
-  , Constraint
   , inferBounds
   , evalToInterval
   ) where
@@ -12,32 +11,33 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import LA
-import LC
+import Linear
+import LA (Bounds)
+import qualified LA
 import Interval
 import Util (isInteger)
 
-type C r = (RelOp, LC r)
+type C r = (RelOp, LA.Expr r)
 
-inferBounds :: forall r. (RealFrac r) => Bounds r -> [Constraint r] -> VarSet -> Int -> Bounds r
+inferBounds :: forall r. (RealFrac r) => LA.Bounds r -> [LA.Atom r] -> VarSet -> Int -> LA.Bounds r
 inferBounds bounds constraints ivs limit = loop 0 bounds
   where
     cs :: VarMap [C r]
     cs = IM.fromListWith (++) $ do
-      LARel lhs op rhs <- constraints
-      let LC m = lhs .-. rhs
+      LA.Atom lhs op rhs <- constraints
+      let m = LA.coeffMap (lhs .-. rhs)
       (v,c) <- IM.toList m
-      guard $ v /= constKey
+      guard $ v /= LA.constKey
       let op' = if c < 0 then flipOp op else op
-          rhs' = (-1/c) .*. LC (IM.delete v m)
+          rhs' = (-1/c) .*. LA.fromCoeffMap (IM.delete v m)
       return (v, [(op', rhs')])
 
-    loop  :: Int -> Bounds r -> Bounds r
+    loop  :: Int -> LA.Bounds r -> LA.Bounds r
     loop !i b = if (limit>=0 && i>=limit) || b==b' then b else loop (i+1) b'
       where
         b' = refine b
 
-    refine :: Bounds r -> Bounds r
+    refine :: LA.Bounds r -> LA.Bounds r
     refine b = IM.mapWithKey (\v i -> tighten v $ f b (IM.findWithDefault [] v cs) i) b
 
     -- tighten bounds of integer variables
@@ -60,7 +60,7 @@ inferBounds bounds constraints ivs limit = loop 0 bounds
             else fromIntegral (floor ub :: Integer)
           )
 
-f :: (Real r, Fractional r) => Bounds r -> [C r] -> Interval r -> Interval r
+f :: (Real r, Fractional r) => LA.Bounds r -> [C r] -> Interval r -> Interval r
 f b cs i = foldr intersection i $ do
   (op, rhs) <- cs
   let i'@(Interval lb ub) = evalToInterval b rhs
@@ -72,8 +72,8 @@ f b cs i = foldr intersection i $ do
     Gt -> return $ interval (strict lb) Nothing
     NEq -> []
 
-evalToInterval :: (Real r, Fractional r) => Bounds r -> LC r -> Interval r
-evalToInterval b lc = lift1LC (singleton 1) (b IM.!) lc
+evalToInterval :: (Real r, Fractional r) => LA.Bounds r -> LA.Expr r -> Interval r
+evalToInterval b = LA.lift1 (singleton 1) (b IM.!)
 
 strict :: EndPoint r -> EndPoint r
 strict Nothing = Nothing

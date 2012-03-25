@@ -32,7 +32,6 @@ Executable toysolver
      FourierMotzkin
      Interval
      LA
-     LC
      LPFile
      LPSolver
      LPSolverHL
