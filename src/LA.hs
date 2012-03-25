@@ -33,6 +33,7 @@ module LA
 
   -- * Atomic formula of linear arithmetics
   , Atom (..)
+  , solveFor
 
   -- * misc
   , BoundsEnv
@@ -152,6 +153,17 @@ instance Variables (Atom r) where
 
 instance Formula.Rel (Expr r) (Atom r) where
   rel op a b = Atom a op b
+
+-- | Solve linear (in)equation for the given variable.
+--
+-- @solveFor a v@ returns @Just (op, e)@ such that @Atom v op e@
+-- is equivalent to @a@.
+solveFor :: (Real r, Fractional r) => Atom r -> Var -> Maybe (Formula.RelOp, Expr r)
+solveFor (Atom lhs op rhs) v = do
+  (c,e) <- pickupTerm' v (lhs .-. rhs)
+  return ( if c < 0 then Formula.flipOp op else op
+         , (1/c) .*. lnegate e
+         )
 
 -----------------------------------------------------------------------------
 
