@@ -35,7 +35,8 @@ module LA
   , Atom (..)
 
   -- * misc
-  , Bounds
+  , BoundsEnv
+  , computeInterval
   , compileExpr
   , compileAtom
   ) where
@@ -154,7 +155,11 @@ instance Formula.Rel (Expr r) (Atom r) where
 
 -----------------------------------------------------------------------------
 
-type Bounds r = Expr.VarMap (Interval r)
+type BoundsEnv r = Expr.VarMap (Interval r)
+
+-- | compute bounds for a @Expr@ with respect to @BoundsEnv@.
+computeInterval :: (Real r, Fractional r) => BoundsEnv r -> Expr r -> Interval r
+computeInterval b = lift1 (singleton 1) (b IM.!)
 
 -----------------------------------------------------------------------------
 

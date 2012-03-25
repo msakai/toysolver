@@ -13,9 +13,9 @@
 -- 
 -----------------------------------------------------------------------------
 module BoundsInference
-  ( Bounds
+  ( BoundsEnv
   , inferBounds
-  , evalToInterval
+  , LA.computeInterval
   ) where
 
 import Control.Monad
@@ -25,7 +25,7 @@ import qualified Data.IntSet as IS
 import Expr
 import Formula
 import Linear
-import LA (Bounds)
+import LA (BoundsEnv)
 import qualified LA
 import Interval
 import Util (isInteger)
@@ -34,11 +34,11 @@ type C r = (RelOp, LA.Expr r)
 
 -- | tightening variable bounds by constraint propagation.
 inferBounds :: forall r. (RealFrac r)
-  => LA.Bounds r -- ^ initial bounds
-  -> [LA.Atom r] -- ^ constraints
-  -> VarSet      -- ^ integral variables
-  -> Int         -- ^ limit of iterations
-  -> LA.Bounds r
+  => LA.BoundsEnv r -- ^ initial bounds
+  -> [LA.Atom r]    -- ^ constraints
+  -> VarSet         -- ^ integral variables
+  -> Int            -- ^ limit of iterations
+  -> LA.BoundsEnv r
 inferBounds bounds constraints ivs limit = loop 0 bounds
   where
     cs :: VarMap [C r]
@@ -51,12 +51,12 @@ inferBounds bounds constraints ivs limit = loop 0 bounds
           rhs' = (-1/c) .*. LA.fromCoeffMap (IM.delete v m)
       return (v, [(op', rhs')])
 
-    loop  :: Int -> LA.Bounds r -> LA.Bounds r
+    loop  :: Int -> LA.BoundsEnv r -> LA.BoundsEnv r
     loop !i b = if (limit>=0 && i>=limit) || b==b' then b else loop (i+1) b'
       where
         b' = refine b
 
-    refine :: LA.Bounds r -> LA.Bounds r
+    refine :: LA.BoundsEnv r -> LA.BoundsEnv r
     refine b = IM.mapWithKey (\v i -> tighten v $ f b (IM.findWithDefault [] v cs) i) b
 
     -- tighten bounds of integer variables
@@ -64,28 +64,12 @@ inferBounds bounds constraints ivs limit = loop 0 bounds
     tighten v x =
       if v `IS.notMember` ivs
         then x
-        else interval (fmap tightenLB lb) (fmap tightenUB ub)
-      where
-        lb = Interval.lowerBound x
-        ub = Interval.upperBound x
+        else tightenToInteger x
 
-        tightenLB (incl,lb) =
-          ( True
-          , if isInteger lb && not incl
-            then lb + 1
-            else fromIntegral (ceiling lb :: Integer)
-          )
-        tightenUB (incl,ub) =
-          ( True
-          , if isInteger ub && not incl
-            then ub - 1
-            else fromIntegral (floor ub :: Integer)
-          )
-
-f :: (Real r, Fractional r) => LA.Bounds r -> [C r] -> Interval r -> Interval r
+f :: (Real r, Fractional r) => LA.BoundsEnv r -> [C r] -> Interval r -> Interval r
 f b cs i = foldr intersection i $ do
   (op, rhs) <- cs
-  let i' = evalToInterval b rhs
+  let i' = LA.computeInterval b rhs
       lb = lowerBound i'
       ub = upperBound i'
   case op of
@@ -95,10 +79,6 @@ f b cs i = foldr intersection i $ do
     Lt -> return $ interval Nothing (strict ub)
     Gt -> return $ interval (strict lb) Nothing
     NEq -> []
-
--- | compute bounds for a @Expr@ with respect to @Bounds@.
-evalToInterval :: (Real r, Fractional r) => LA.Bounds r -> LA.Expr r -> Interval r
-evalToInterval b = LA.lift1 (singleton 1) (b IM.!)
 
 strict :: EndPoint r -> EndPoint r
 strict Nothing = Nothing

@@ -23,11 +23,12 @@ module Interval
   , singleton
   , intersection
   , pickup
+  , tightenToInteger
   ) where
 
 import Control.Monad
 import Linear
-import Util (combineMaybe)
+import Util (combineMaybe, isInteger)
 
 -- | Endpoint
 -- (isInclusive, value)
@@ -94,6 +95,23 @@ pickup (Interval (Just (in1,x1)) (Just (in2,x2))) =
     GT -> Nothing
     LT -> Just $ (x1+x2) / 2
     EQ -> if in1 && in2 then Just x1 else Nothing
+
+-- | tightening intervals by ceiling lower bounds and flooring upper bounds.
+tightenToInteger :: forall r. (RealFrac r) => Interval r -> Interval r
+tightenToInteger (Interval lb ub) = interval (fmap tightenLB lb) (fmap tightenUB ub)
+  where
+    tightenLB (incl,lb) =
+      ( True
+      , if isInteger lb && not incl
+        then lb + 1
+        else fromIntegral (ceiling lb :: Integer)
+      )
+    tightenUB (incl,ub) =
+      ( True
+      , if isInteger ub && not incl
+        then ub - 1
+        else fromIntegral (floor ub :: Integer)
+      )
 
 -- | Interval airthmetics.
 -- Note that this instance does not satisfy algebraic laws of linear spaces.

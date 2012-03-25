@@ -241,7 +241,7 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
         NEq -> isTriviallyTrue (LA.Atom c Lt lzero) && isTriviallyTrue (LA.Atom c Gt lzero)
       where
         c = a .-. b
-        i = BI.evalToInterval bounds c
+        i = LA.computeInterval bounds c
         lb = Interval.lowerBound i
         ub = Interval.upperBound i
 
