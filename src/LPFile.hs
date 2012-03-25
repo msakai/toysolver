@@ -104,7 +104,9 @@ data RelOp = Le | Ge | Eql
     deriving (Eq, Ord, Enum, Show)
 
 -- | types of SOS (special ordered sets) constraints
-data SOSType = S1 | S2
+data SOSType
+  = S1 -- ^ Type 1 SOS constraint
+  | S2 -- ^ Type 2 SOS constraint
     deriving (Eq, Ord, Enum, Show, Read)
 
 -- | SOS (special ordered sets) constraints

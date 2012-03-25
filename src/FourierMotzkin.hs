@@ -12,7 +12,9 @@
 --
 -- Naïve implementation of Fourier-Motzkin Variable Elimination
 -- 
--- see http://users.cecs.anu.edu.au/~michaeln/pubs/arithmetic-dps.pdf for detail
+-- Reference:
+--
+-- * <http://users.cecs.anu.edu.au/~michaeln/pubs/arithmetic-dps.pdf>
 --
 -----------------------------------------------------------------------------
 module FourierMotzkin

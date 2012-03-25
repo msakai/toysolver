@@ -12,7 +12,9 @@
 --
 -- Naïve implementation of Simplex method
 -- 
--- see http://www.math.cuhk.edu.hk/~wei/lpch3.pdf for detail
+-- Reference:
+--
+-- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
 --
 -----------------------------------------------------------------------------
 module Simplex

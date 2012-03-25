@@ -9,17 +9,17 @@
 --
 -- References:
 -- 
--- [Gomory1960]
--- Ralph E. Gomory.
--- An Algorithm for the Mixed Integer Problem, Technical Report
--- RM-2597, 1960, The Rand Corporation, Santa Monica, CA.
--- http://www.rand.org/pubs/research_memoranda/RM2597.html
+-- * [Gomory1960]
+--   Ralph E. Gomory.
+--   An Algorithm for the Mixed Integer Problem, Technical Report
+--   RM-2597, 1960, The Rand Corporation, Santa Monica, CA.
+--   <http://www.rand.org/pubs/research_memoranda/RM2597.html>
 --
--- [Gomory1958]
--- Ralph E. Gomory.
--- Outline of an algorithm for integer solutions to linear programs.
--- Bull. Amer. Math. Soc., Vol. 64, No. 5. (1958), pp. 275-278.
--- http://projecteuclid.org/euclid.bams/1183522679
+-- * [Gomory1958]
+--   Ralph E. Gomory.
+--   Outline of an algorithm for integer solutions to linear programs.
+--   Bull. Amer. Math. Soc., Vol. 64, No. 5. (1958), pp. 275-278.
+--   <http://projecteuclid.org/euclid.bams/1183522679>
 -----------------------------------------------------------------------------
 
 module MIPSolverHL
