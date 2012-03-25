@@ -8,6 +8,7 @@ module Formula
   , Rel (..)
   , (.<.), (.<=.), (.>=.), (.>.), (.==.), (./=.)
   , flipOp
+  , negOp
   , Atom (..)
   , Formula (..)
   , pushNot
@@ -63,10 +64,21 @@ flipOp Gt = Lt
 flipOp Eql = Eql
 flipOp NEq = NEq
 
+negOp :: RelOp -> RelOp
+negOp Lt = Ge
+negOp Le = Gt
+negOp Ge = Lt
+negOp Gt = Le
+negOp Eql = NEq
+negOp NEq = Eql
+
 -- ---------------------------------------------------------------------------
 
 data Atom c = Rel (Expr c) RelOp (Expr c)
     deriving (Show, Eq, Ord)
+
+instance Complement (Atom c) where
+  notF (Rel lhs op rhs) = Rel lhs (negOp op) rhs
 
 instance Variables (Atom c) where
   vars (Rel a _ b) = vars a `IS.union` vars b
@@ -118,15 +130,7 @@ instance Rel (Expr c) (Formula c) where
 pushNot :: Formula c -> Formula c
 pushNot T = F
 pushNot F = T
-pushNot (Atom (Rel a op b)) = Atom $ Rel a op' b
-  where
-    op' = case op of
-            Lt -> Ge
-            Le -> Gt
-            Ge -> Lt
-            Gt -> Le
-            Eql -> NEq
-            NEq -> Eql
+pushNot (Atom (Rel a op b)) = Atom $ Rel a (negOp op) b
 pushNot (And a b) = Or (pushNot a) (pushNot b)
 pushNot (Or a b) = And (pushNot a) (pushNot b)
 pushNot (Not a) = a

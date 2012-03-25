@@ -137,15 +137,17 @@ pickupTerm' v (Expr m) =
 -- | Atomic Formula
 data Atom r = Atom (Expr r) Formula.RelOp (Expr r)
     deriving (Show, Eq, Ord)
-type Literal = Atom
+
+instance Formula.Complement (Atom r) where
+  notF (Atom  lhs op rhs) = Atom lhs (Formula.negOp op) rhs
 
 instance Variables (Atom r) where
   vars (Atom a _ b) = Expr.vars a `IS.union` Expr.vars b
 
-type Bounds r = Expr.VarMap (Interval r)
-
 instance Formula.Rel (Expr r) (Atom r) where
   rel op a b = Atom a op b
+
+type Bounds r = Expr.VarMap (Interval r)
 
 -----------------------------------------------------------------------------
 
