@@ -22,13 +22,16 @@ module Interval
   , empty
   , singleton
   , intersection
+  , null
   , pickup
   , tightenToInteger
   ) where
 
 import Control.Monad
+import Data.Maybe
 import Linear
 import Util (combineMaybe, isInteger)
+import Prelude hiding (null)
 
 -- | Endpoint
 -- (isInclusive, value)
@@ -84,6 +87,10 @@ intersection (Interval l1 u1) (Interval l2 u2) = interval (maxEP l1 l2) (minEP u
           GT -> in2
       , min x1 x2
       )
+
+-- | Is the interval empty?
+null :: (Real r, Fractional r) => Interval r -> Bool
+null i = isJust (pickup i)
 
 -- | pick up an element from the interval if the interval is not empty.
 pickup :: (Real r, Fractional r) => Interval r -> Maybe r
