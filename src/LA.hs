@@ -11,6 +11,7 @@
 module LA
   ( module Linear
 
+  -- * Expression of linear arithmetics
   , Expr
   , terms
   , coeffMap
@@ -30,8 +31,10 @@ module LA
   , pickupTerm
   , pickupTerm'
 
+  -- * Atomic formula of linear arithmetics
   , Atom (..)
 
+  -- * misc
   , Bounds
   , compileExpr
   , compileAtom
@@ -48,9 +51,9 @@ import Interval
 
 -----------------------------------------------------------------------------
 
--- Linear combination of variables and constants.
+-- | Linear combination of variables and constants.
 -- Non-negative keys are used for variables's coefficients.
--- key '-1' is used for constants.
+-- key 'constKey' is used for constants.
 newtype Expr r = Expr{ coeffMap :: IM.IntMap r } deriving (Eq, Ord, Show)
 
 fromCoeffMap :: Num r => IM.IntMap r -> Expr r
@@ -75,9 +78,11 @@ asConst (Expr m) =
 normalizeExpr :: Num r => Expr r -> Expr r
 normalizeExpr (Expr t) = Expr $ IM.filter (0/=) t
 
+-- | variable
 varExpr :: Num r => Var -> Expr r
 varExpr v = Expr $ IM.singleton v 1
 
+-- | constant
 constExpr :: Num r => r -> Expr r
 constExpr c = normalizeExpr $ Expr $ IM.singleton constKey c
 
@@ -134,7 +139,7 @@ pickupTerm' v (Expr m) =
 
 -----------------------------------------------------------------------------
 
--- | Atomic Formula
+-- | Atomic Formula of Linear Arithmetics
 data Atom r = Atom (Expr r) Formula.RelOp (Expr r)
     deriving (Show, Eq, Ord)
 
@@ -146,6 +151,8 @@ instance Variables (Atom r) where
 
 instance Formula.Rel (Expr r) (Atom r) where
   rel op a b = Atom a op b
+
+-----------------------------------------------------------------------------
 
 type Bounds r = Expr.VarMap (Interval r)
 

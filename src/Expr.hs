@@ -4,6 +4,12 @@
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-- Arithmetic expressions (not limited to linear ones).
+-- 
 -----------------------------------------------------------------------------
 module Expr
   ( Var
@@ -28,19 +34,26 @@ import Data.Ratio
 
 -- | Variables are represented as non-negative integers
 type Var = Int
+
+-- | Set of variables
 type VarSet = IS.IntSet
+
+-- | Map from variables
 type VarMap = IM.IntMap
 
+-- | collecting free variables
 class Variables a where
   vars :: a -> VarSet
 
 instance Variables a => Variables [a] where
   vars = IS.unions . map vars
 
+-- | A @Model@ is a map from variables to values.
 type Model r = VarMap r
 
 -- ---------------------------------------------------------------------------
 
+-- | Arithmetic expressions
 data Expr r
   = Const r
   | Var Var
@@ -78,9 +91,11 @@ instance Variables (Expr r) where
   vars (a :*: b) = vars a `IS.union` vars b
   vars (a :/: b) = vars a `IS.union` vars b
 
+-- | single variable expression
 var :: Var -> Expr r
 var = Var
 
+-- | evaluate an 'Expr' with respect to a 'Model'
 eval :: Fractional r => Model r -> Expr r -> r
 eval m = f
   where
@@ -92,9 +107,11 @@ eval m = f
 
 -- ---------------------------------------------------------------------------
 
+-- | results of satisfiability checking
 data SatResult r = Unknown | Unsat | Sat (Model r)
   deriving (Show, Eq, Ord)
 
+-- | results of optimization
 data OptResult r = OptUnknown | OptUnsat | Unbounded | Optimum r (Model r)
   deriving (Show, Eq, Ord)
 

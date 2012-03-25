@@ -1,4 +1,17 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  BoundsInference
+-- Copyright   :  (c) Masahiro Sakai 2011
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable (ScopedTypeVariables, BangPatterns)
+--
+-- Tightening variable bounds by constraint propagation.
+-- 
+-----------------------------------------------------------------------------
 module BoundsInference
   ( Bounds
   , inferBounds
@@ -19,7 +32,13 @@ import Util (isInteger)
 
 type C r = (RelOp, LA.Expr r)
 
-inferBounds :: forall r. (RealFrac r) => LA.Bounds r -> [LA.Atom r] -> VarSet -> Int -> LA.Bounds r
+-- | tightening variable bounds by constraint propagation.
+inferBounds :: forall r. (RealFrac r)
+  => LA.Bounds r -- ^ initial bounds
+  -> [LA.Atom r] -- ^ constraints
+  -> VarSet      -- ^ integral variables
+  -> Int         -- ^ limit of iterations
+  -> LA.Bounds r
 inferBounds bounds constraints ivs limit = loop 0 bounds
   where
     cs :: VarMap [C r]
@@ -42,11 +61,14 @@ inferBounds bounds constraints ivs limit = loop 0 bounds
 
     -- tighten bounds of integer variables
     tighten :: Var -> Interval r -> Interval r
-    tighten v x@(Interval lb ub) =
+    tighten v x =
       if v `IS.notMember` ivs
         then x
         else interval (fmap tightenLB lb) (fmap tightenUB ub)
       where
+        lb = Interval.lowerBound x
+        ub = Interval.upperBound x
+
         tightenLB (incl,lb) =
           ( True
           , if isInteger lb && not incl
@@ -63,7 +85,9 @@ inferBounds bounds constraints ivs limit = loop 0 bounds
 f :: (Real r, Fractional r) => LA.Bounds r -> [C r] -> Interval r -> Interval r
 f b cs i = foldr intersection i $ do
   (op, rhs) <- cs
-  let i'@(Interval lb ub) = evalToInterval b rhs
+  let i' = evalToInterval b rhs
+      lb = lowerBound i'
+      ub = upperBound i'
   case op of
     Eql -> return i'
     Le -> return $ interval Nothing ub
@@ -72,6 +96,7 @@ f b cs i = foldr intersection i $ do
     Gt -> return $ interval (strict lb) Nothing
     NEq -> []
 
+-- | compute bounds for a @Expr@ with respect to @Bounds@.
 evalToInterval :: (Real r, Fractional r) => LA.Bounds r -> LA.Expr r -> Interval r
 evalToInterval b = LA.lift1 (singleton 1) (b IM.!)
 

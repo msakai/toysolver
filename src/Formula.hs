@@ -1,4 +1,17 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Formula
+-- Copyright   :  (c) Masahiro Sakai 2011
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable (MultiParamTypeClasses, FunctionalDependencies)
+--
+-- Formula of first order logic.
+-- 
+-----------------------------------------------------------------------------
 module Formula
   ( Complement (..)
   , Boolean (..)
@@ -25,37 +38,62 @@ infixr 3 .&&.
 infixr 2 .||.
 infix 1 .=>. , .<=>.
 
+-- | types that can be negated.
 class Complement a where
   notF :: a -> a
 
+-- | types that can be combined with boolean operations.
 class Complement a => Boolean a where
   true, false :: a
   (.&&.), (.||.), (.=>.), (.<=>.) :: a -> a -> a
   x .=>. y = notF x .||. y
   x .<=>. y = (x .=>. y) .&&. (y .=>. x)
 
+-- | n-ary conjunction
 andF :: Boolean a => [a] -> a
 andF = foldr (.&&.) true
 
+-- | n-ary disjunction
 orF :: Boolean a => [a] -> a
 orF = foldr (.||.) false
 
 -- ---------------------------------------------------------------------------
 
+-- | relational operators
 data RelOp = Lt | Le | Ge | Gt | Eql | NEq
     deriving (Show, Eq, Ord)
 
+-- | type class for constructing relational formula
 class Rel e r | r -> e where
   rel :: RelOp -> e -> e -> r
 
-(.<.), (.<=.), (.>=.), (.>.), (.==.), (./=.) :: Rel e r => e -> e -> r
+-- | constructing relational formula
+(.<.) :: Rel e r => e -> e -> r
 a .<. b  = rel Lt  a b
+
+-- | constructing relational formula
+(.<=.) :: Rel e r => e -> e -> r
 a .<=. b = rel Le  a b
+
+-- | constructing relational formula
+(.>.) :: Rel e r => e -> e -> r
 a .>. b  = rel Gt  a b
+
+-- | constructing relational formula
+(.>=.) :: Rel e r => e -> e -> r
 a .>=. b = rel Ge  a b
+
+-- | constructing relational formula
+(.==.) :: Rel e r => e -> e -> r
 a .==. b = rel Eql a b
+
+-- | constructing relational formula
+(./=.) :: Rel e r => e -> e -> r
 a ./=. b = rel NEq a b
 
+-- | flipping relational operator
+--
+-- @rel (flipOp op) a b@ is equivalent to @rel op b a@
 flipOp :: RelOp -> RelOp 
 flipOp Le = Ge
 flipOp Ge = Le
@@ -64,6 +102,9 @@ flipOp Gt = Lt
 flipOp Eql = Eql
 flipOp NEq = NEq
 
+-- | negating relational operator
+--
+-- @rel (negOp op) a b@ is equivalent to @notF (rel op a b)@
 negOp :: RelOp -> RelOp
 negOp Lt = Ge
 negOp Le = Gt
@@ -74,6 +115,7 @@ negOp NEq = Eql
 
 -- ---------------------------------------------------------------------------
 
+-- | Atomic formula
 data Atom c = Rel (Expr c) RelOp (Expr c)
     deriving (Show, Eq, Ord)
 
@@ -88,6 +130,7 @@ instance Rel (Expr c) (Atom c) where
 
 -- ---------------------------------------------------------------------------
 
+-- | formulas of first order logic
 data Formula c
     = T
     | F
@@ -127,6 +170,7 @@ instance Boolean (Formula c) where
 instance Rel (Expr c) (Formula c) where
   rel op a b = Atom $ rel op a b
 
+-- | convert a formula into negation normal form
 pushNot :: Formula c -> Formula c
 pushNot T = F
 pushNot F = T
@@ -140,7 +184,10 @@ pushNot (Forall v a) = Exists v (pushNot a)
 pushNot (Exists v a) = Forall v (pushNot a)
 
 -- | Disjunctive normal form
-newtype DNF lit = DNF{ unDNF :: [[lit]] } deriving (Show)
+newtype DNF lit
+  = DNF
+  { unDNF :: [[lit]] -- ^ list of conjunction of literals
+  } deriving (Show)
 
 instance Complement lit => Complement (DNF lit) where
   notF (DNF xs) = DNF . sequence . map (map notF) $ xs

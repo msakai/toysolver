@@ -7,16 +7,18 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses)
+--
+-- Augmenting number types with infinitesimal parameter δ.
 --
 -- Reference:
 -- 
--- Bruno Dutertre, Leonardo de Moura.
--- A Fast Linear-Arithmetic Solver for DPLL(T).
--- Computer Aided Verification In Computer Aided Verification, Vol. 4144
--- (2006), pp. 81-94.
--- http://dx.doi.org/10.1007/11817963_11
--- http://www.csl.sri.com/users/demoura/papers/CAV06/index.html
+-- * Bruno Dutertre, Leonardo de Moura.
+--   A Fast Linear-Arithmetic Solver for DPLL(T).
+--   Computer Aided Verification In Computer Aided Verification, Vol. 4144
+--   (2006), pp. 81-94.
+--   <http://dx.doi.org/10.1007/11817963_11>
+--   <http://yices.csl.sri.com/cav06.pdf>
 --
 -----------------------------------------------------------------------------
 
@@ -24,9 +26,10 @@ module Delta where
 
 import Linear
 
--- | "Delta r k" denotes r + kδ for infinitesimal parameter δ.
+-- | @Delta r k@ represents r + kδ for symbolic infinitesimal parameter δ.
 data Delta r = Delta !r !r deriving (Ord, Eq, Show)
 
+-- | symbolic infinitesimal parameter δ.
 delta :: Num r => Delta r
 delta = Delta 0 1
 
@@ -35,13 +38,15 @@ instance Num r => Linear r (Delta r) where
   c .*. Delta r k = Delta (c*r) (c*k)
   lzero = Delta 0 0
 
-floor', ceiling' :: (RealFrac r, Integral a) => Delta r -> a
-
+-- | 'Delta' version of 'floor'
+floor' :: (RealFrac r, Integral a) => Delta r -> a
 floor' (Delta r k) = fromInteger $ if r2==r && k < 0 then i-1 else i
   where
     i = floor r
     r2 = fromInteger i
 
+-- | 'Delta' version of 'ceiling'
+ceiling' :: (RealFrac r, Integral a) => Delta r -> a
 ceiling' (Delta r k) = fromInteger $ if r2==r && k > 0 then i+1 else i
   where
     i = ceiling r

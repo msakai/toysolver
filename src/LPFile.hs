@@ -12,9 +12,12 @@
 -- A CPLEX .lp format parser library.
 -- 
 -- References:
--- http://publib.boulder.ibm.com/infocenter/cosinfoc/v12r2/index.jsp?topic=/ilog.odms.cplex.help/Content/Optimization/Documentation/CPLEX/_pubskel/CPLEX880.html
--- http://www.gurobi.com/doc/45/refman/node589.html
--- http://lpsolve.sourceforge.net/5.5/CPLEX-format.htm
+-- 
+-- * <http://publib.boulder.ibm.com/infocenter/cosinfoc/v12r2/index.jsp?topic=/ilog.odms.cplex.help/Content/Optimization/Documentation/CPLEX/_pubskel/CPLEX880.html>
+-- 
+-- * <http://www.gurobi.com/doc/45/refman/node589.html>
+-- 
+-- * <http://lpsolve.sourceforge.net/5.5/CPLEX-format.htm>
 --
 -----------------------------------------------------------------------------
 module LPFile
@@ -32,6 +35,8 @@ module LPFile
   , SOSType (..)
   , SOS
   , defaultBounds
+  , defaultLB
+  , defaultUB
   , getBounds
   , parseString
   , parseFile
@@ -53,6 +58,7 @@ import Util (combineMaybe)
 
 -- ---------------------------------------------------------------------------
 
+-- | Problem
 data LP
   = LP
   { variables :: Set.Set Var
@@ -67,22 +73,41 @@ data LP
   }
   deriving (Show, Eq, Ord)
 
+-- | expressions
 type Expr = [Term]
 
+-- | terms
 data Term = Term Rational [Var]
   deriving (Eq, Ord, Show)
 
+-- | objective function
 type ObjectiveFunction = (Maybe Label, Expr)
+
+-- | constraint
 type Constraint = (Maybe Label, Maybe (Var, Rational), (Expr, RelOp, Rational))
+
+-- | type for representing lower/upper bound of variables
 type Bounds = (BoundExpr, BoundExpr)
+
+-- | label
 type Label = String
+
+-- | variable
 type Var = String
+
+-- | type for representing lower/upper bound of variables
 data BoundExpr = NegInf | Finite Rational | PosInf
     deriving (Eq, Ord, Show)
+
+-- | relational operators
 data RelOp = Le | Ge | Eql
     deriving (Eq, Ord, Enum, Show)
+
+-- | types of SOS (special ordered sets) constraints
 data SOSType = S1 | S2
     deriving (Eq, Ord, Enum, Show, Read)
+
+-- | SOS (special ordered sets) constraints
 type SOS = (Maybe Label, SOSType, [(Var, Rational)])
 
 class Variables a where
@@ -97,23 +122,30 @@ instance Variables LP where
 instance Variables Term where
   vars (Term _ xs) = Set.fromList xs
 
+-- | default bounds
 defaultBounds :: Bounds
 defaultBounds = (defaultLB, defaultUB)
 
+-- | default lower bound (0)
 defaultLB :: BoundExpr
 defaultLB = Finite 0
 
+-- | default upper bound (+∞)
 defaultUB :: BoundExpr
 defaultUB = PosInf
 
+-- | lookuping bounds for a variable
 getBounds :: LP -> Var -> Bounds
 getBounds lp v = Map.findWithDefault defaultBounds v (bounds lp)
 
 -- ---------------------------------------------------------------------------
 
+-- | Parse a string containing LP file data.
+-- The source name is only | used in error messages and may be the empty string.
 parseString :: SourceName -> String -> Either ParseError LP
 parseString = parse lpfile
 
+-- | Parse a file containing LP file data.
 parseFile :: FilePath -> IO (Either ParseError LP)
 parseFile = parseFromFile lpfile
 
@@ -416,6 +448,7 @@ number = tok $ do
 
 -- ---------------------------------------------------------------------------
 
+-- | Render a problem into a string.
 render :: LP -> Maybe String
 render lp = fmap ($ "") $ execWriterT (render' lp)
 

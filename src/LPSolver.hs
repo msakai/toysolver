@@ -214,8 +214,8 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
         initialBounds = IM.fromList [(v, Interval.univ) | v <- IS.toList vs]
     nonnegVars = IS.filter f vs
       where
-        f v = case bounds IM.! v of
-                Interval (Just (_, lb)) _ | 0 <= lb -> True
+        f v = case Interval.lowerBound (bounds IM.! v) of
+                Just (_, lb) | 0 <= lb -> True
                 _ -> False
 
     isTriviallyTrue :: LA.Atom r -> Bool
@@ -241,6 +241,8 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
         NEq -> isTriviallyTrue (LA.Atom c Lt lzero) && isTriviallyTrue (LA.Atom c Gt lzero)
       where
         c = a .-. b
-        Interval lb ub = BI.evalToInterval bounds c
+        i = BI.evalToInterval bounds c
+        lb = Interval.lowerBound i
+        ub = Interval.upperBound i
 
 -- ---------------------------------------------------------------------------

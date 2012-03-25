@@ -11,13 +11,17 @@
 --
 -- Naive implementation of Cooper's algorithm
 --
--- http://hagi.is.s.u-tokyo.ac.jp/pub/staff/hagiya/kougiroku/ronri/5.txt
--- http://www.cs.cmu.edu/~emc/spring06/home1_files/Presburger%20Arithmetic.ppt
+-- Reference:
+-- 
+-- * <http://hagi.is.s.u-tokyo.ac.jp/pub/staff/hagiya/kougiroku/ronri/5.txt>
+-- 
+-- * <http://www.cs.cmu.edu/~emc/spring06/home1_files/Presburger%20Arithmetic.ppt>
 -- 
 -----------------------------------------------------------------------------
 module Cooper
     ( module Expr
     , module Formula
+    , ExprZ
     , Lit (..)
     , Formula' (..)
     , eliminateQuantifiers
@@ -40,6 +44,7 @@ import qualified Interval
 
 -- ---------------------------------------------------------------------------
 
+-- | Linear arithmetic expression over integers.
 type ExprZ = LA.Expr Integer
 
 atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe Formula'
@@ -66,6 +71,12 @@ eqZ :: ExprZ -> ExprZ -> Formula'
 eqZ e1 e2 = Lit (e1 `leZ` e2) .&&. Lit (e1 `geZ` e2)
 
 -- | Literal
+-- 
+-- * @Pos e@ means @e > 0@
+-- 
+-- * @Divisible True d e@ means @e@ can be divided by @d@ (i.e. @d|e@)
+-- 
+-- * @Divisible False d e@ means @e@ can not be divided by @d@ (i.e. @¬(d|e)@)
 data Lit
     = Pos ExprZ
     | Divisible Bool Integer ExprZ
@@ -79,6 +90,7 @@ instance Complement Lit where
   notF (Pos e) = e `leZ` LA.constExpr 0
   notF (Divisible b c e) = Divisible (not b) c e
 
+-- | quantifier-free negation normal form
 data Formula'
     = T'
     | F'
@@ -269,6 +281,7 @@ evalWitness model (WCase2 c j delta us)
 
 -- ---------------------------------------------------------------------------
 
+-- | eliminate quantifiers and returns equivalent quantifier-free formula.
 eliminateQuantifiers :: Formula Rational -> Maybe Formula'
 eliminateQuantifiers = f
   where
@@ -285,6 +298,8 @@ eliminateQuantifiers = f
 
 -- ---------------------------------------------------------------------------
 
+-- | solve a formula and returns assignment of outer-most existential quantified
+-- variables.
 solve :: Formula Rational -> SatResult Integer
 solve formula =
   case eliminateQuantifiers formula of
@@ -310,6 +325,7 @@ solve' vs formula = go vs (simplify formula)
 
 -- ---------------------------------------------------------------------------
 
+-- | solve a (open) quantifier-free formula
 solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
 solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
   where

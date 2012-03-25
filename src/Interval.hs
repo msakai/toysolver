@@ -1,7 +1,22 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Interval
+-- Copyright   :  (c) Masahiro Sakai 2011
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses)
+--
+-- Interval datatype.
+-- 
+-----------------------------------------------------------------------------
 module Interval
   ( EndPoint
-  , Interval (..)
+  , Interval
+  , lowerBound
+  , upperBound
   , interval
   , univ
   , empty
@@ -18,13 +33,15 @@ import Util (combineMaybe)
 -- (isInclusive, value)
 type EndPoint r = Maybe (Bool, r)
 
+-- | interval
 data Interval r
   = Interval
-  { lowerBound :: EndPoint r
-  , upperBound :: EndPoint r
+  { lowerBound :: EndPoint r -- ^ lower bound of the interval
+  , upperBound :: EndPoint r -- ^ upper bound of the interval
   }
   deriving (Eq,Ord,Show)
 
+-- | smart constructor for 'Interval'
 interval :: Real r => EndPoint r -> EndPoint r -> Interval r
 interval lb@(Just (in1,x1)) ub@(Just (in2,x2)) =
   case x1 `compare` x2 of
@@ -33,15 +50,19 @@ interval lb@(Just (in1,x1)) ub@(Just (in2,x2)) =
     EQ -> if in1 && in2 then Interval lb ub else empty
 interval lb ub = Interval lb ub
 
+-- | (-∞, ∞)
 univ :: Interval r
 univ = Interval Nothing Nothing
 
+-- | empty (contradicting) interval
 empty :: Num r => Interval r
 empty = Interval (Just (False,0)) (Just (False,0))
 
+-- | singleton set \[x,x\]
 singleton :: r -> Interval r
 singleton x = Interval (Just (True, x)) (Just (True, x))
 
+-- | intersection of two intervals
 intersection :: forall r. Real r => Interval r -> Interval r -> Interval r
 intersection (Interval l1 u1) (Interval l2 u2) = interval (maxEP l1 l2) (minEP u1 u2)
   where 
@@ -63,6 +84,7 @@ intersection (Interval l1 u1) (Interval l2 u2) = interval (maxEP l1 l2) (minEP u
       , min x1 x2
       )
 
+-- | pick up an element from the interval if the interval is not empty.
 pickup :: (Real r, Fractional r) => Interval r -> Maybe r
 pickup (Interval Nothing Nothing) = Just 0
 pickup (Interval (Just (in1,x1)) Nothing) = Just $ if in1 then x1 else x1+1
@@ -73,7 +95,7 @@ pickup (Interval (Just (in1,x1)) (Just (in2,x2))) =
     LT -> Just $ (x1+x2) / 2
     EQ -> if in1 && in2 then Just x1 else Nothing
 
--- Interval airthmetics.
+-- | Interval airthmetics.
 -- Note that this instance does not satisfy algebraic laws of linear spaces.
 instance (Real r) => Linear r (Interval r) where
   lzero = singleton 0
