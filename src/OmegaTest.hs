@@ -86,20 +86,20 @@ leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
 leZ e1 e2 = Nonneg (LA.mapCoeff (`div` d) e)
   where
     e = e2 .-. e1
-    d = gcd' [c | (c,v) <- LA.terms e, v /= LA.constKey]
+    d = gcd' [c | (c,v) <- LA.terms e, v /= LA.constVar]
 ltZ e1 e2 = (e1 .+. LA.constExpr 1) `leZ` e2
 geZ = flip leZ
 gtZ = flip gtZ
 
 eqZ :: ExprZ -> ExprZ -> (DNF Lit)
 eqZ e1 e2
-  = if LA.lookupCoeff LA.constKey e3 `mod` d == 0
+  = if LA.lookupCoeff LA.constVar e3 `mod` d == 0
     then DNF [[Nonneg e, Nonneg (lnegate e)]]
     else false
   where
     e = LA.mapCoeff (`div` d) e3
     e3 = e1 .-. e2
-    d = gcd' [c | (c,v) <- LA.terms e3, v /= LA.constKey]
+    d = gcd' [c | (c,v) <- LA.terms e3, v /= LA.constVar]
 
 -- ---------------------------------------------------------------------------
 
@@ -120,7 +120,7 @@ collectBoundsZ v = foldr phi (([],[]),[])
     phi :: Lit -> (BoundsZ,[Lit]) -> (BoundsZ,[Lit])
     phi (Pos t) x = phi (Nonneg (t .-. LA.constExpr 1)) x
     phi lit@(Nonneg t) ((ls,us),xs) =
-      case LA.pickupTerm v t of
+      case LA.extract v t of
         (c,t') -> 
           case c `compare` 0 of
             EQ -> ((ls, us), lit : xs)

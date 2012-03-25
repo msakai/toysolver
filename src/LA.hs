@@ -16,7 +16,7 @@ module LA
   , terms
   , coeffMap
   , fromCoeffMap
-  , constKey
+  , constVar
   , asConst
   , varExpr
   , constExpr
@@ -28,8 +28,8 @@ module LA
   , applySubst1
   , lookupCoeff
   , lookupCoeff'
-  , pickupTerm
-  , pickupTerm'
+  , extract
+  , extract'
 
   -- * Atomic formula of linear arithmetics
   , Atom (..)
@@ -55,26 +55,32 @@ import Interval
 
 -- | Linear combination of variables and constants.
 -- Non-negative keys are used for variables's coefficients.
--- key 'constKey' is used for constants.
-newtype Expr r = Expr{ coeffMap :: IM.IntMap r } deriving (Eq, Ord, Show)
+-- key 'constVar' is used for constants.
+newtype Expr r
+  = Expr
+  { coeffMap :: IM.IntMap r
+  } deriving (Eq, Ord, Show)
 
+-- | Create a @Expr@ from a mapping from variables to coefficients.
 fromCoeffMap :: Num r => IM.IntMap r -> Expr r
 fromCoeffMap m = normalizeExpr (Expr m)
 
+-- | terms contained in the expression.
 terms :: Expr r -> [(r,Var)]
 terms (Expr m) = [(c,v) | (v,c) <- IM.toList m]
 
 instance Variables (Expr r) where
-  vars (Expr m) = IS.delete constKey (IM.keysSet m)
+  vars (Expr m) = IS.delete constVar (IM.keysSet m)
 
-constKey :: Int
-constKey = -1
+-- | Special variable that should always be evaluated to 1.
+constVar :: Var
+constVar = -1
 
 asConst :: Num r => Expr r -> Maybe r
 asConst (Expr m) =
   case IM.toList m of
     [] -> Just 0
-    [(v,x)] | v==constKey -> Just x
+    [(v,x)] | v==constVar -> Just x
     _ -> Nothing
 
 normalizeExpr :: Num r => Expr r -> Expr r
@@ -86,11 +92,13 @@ varExpr v = Expr $ IM.singleton v 1
 
 -- | constant
 constExpr :: Num r => r -> Expr r
-constExpr c = normalizeExpr $ Expr $ IM.singleton constKey c
+constExpr c = normalizeExpr $ Expr $ IM.singleton constVar c
 
+-- | map coefficients.
 mapCoeff :: Num b => (a -> b) -> Expr a -> Expr b
 mapCoeff f (Expr t) = normalizeExpr $ Expr $ IM.map f t
 
+-- | map coefficients.
 mapCoeffWithVar :: Num b => (a -> Var -> b) -> Expr a -> Expr b
 mapCoeffWithVar f (Expr t) = normalizeExpr $ Expr $ IM.mapWithKey (flip f) t
 
@@ -99,15 +107,16 @@ instance Num r => Linear r (Expr r) where
   c .*. (Expr t) = normalizeExpr $ Expr $ IM.map (c*) t
   lzero = Expr $ IM.empty
 
+-- | evaluate the expression under the model.
 evalExpr :: Num r => Model r -> Expr r -> r
 evalExpr m (Expr t) = sum [(m' IM.! v) * c | (v,c) <- IM.toList t]
-  where m' = IM.insert constKey 1 m
+  where m' = IM.insert constVar 1 m
 
 lift1 :: Linear r x => x -> (Var -> x) -> Expr r -> x
 lift1 unit f (Expr t) = lsum [c .*. (g v) | (v,c) <- IM.toList t]
   where
     g v
-      | v==constKey = unit
+      | v==constVar = unit
       | otherwise   = f v
 
 applySubst :: Num r => VarMap (Expr r) -> Expr r -> Expr r
@@ -120,21 +129,33 @@ applySubst s (Expr m) = lsum (map f (IM.toList m))
 
 applySubst1 :: Num r => Var -> Expr r -> Expr r -> Expr r
 applySubst1 x e e1@(Expr m) = 
-  case pickupTerm' x e1 of
+  case extract' x e1 of
     Nothing -> e1
     Just (c,e2) -> c .*. e .+. e2
 
+-- | lookup a coefficient of the variable.
+-- @
+--   lookupCoeff v e == fst (extract v e)
+-- @
 lookupCoeff :: Num r => Var -> Expr r -> r
 lookupCoeff v (Expr m) = IM.findWithDefault 0 v m
 
+-- | lookup a coefficient of the variable.
+-- It returns @Nothing@ if the expression does not contain @v@.
+-- @
+--   lookupCoeff' v e == fmap fst (extract' v e)
+-- @
 lookupCoeff' :: Num r => Var -> Expr r -> Maybe r
 lookupCoeff' v (Expr m) = IM.lookup v m  
 
-pickupTerm :: Num r => Var -> Expr r -> (r, Expr r)
-pickupTerm v (Expr m) = (IM.findWithDefault 0 v m, Expr (IM.delete v m))
+-- | @extract v e@ returns @(c, e')@ such that @e == c .*. v .+. e'@
+extract :: Num r => Var -> Expr r -> (r, Expr r)
+extract v (Expr m) = (IM.findWithDefault 0 v m, Expr (IM.delete v m))
 
-pickupTerm' :: Num r => Var -> Expr r -> Maybe (r, Expr r)
-pickupTerm' v (Expr m) =
+-- | @extract' v e@ returns @Just (c, e')@ such that @e == c .*. v .+. e'@
+-- if @e@ contains v, and returns @Nothing@ otherwise.
+extract' :: Num r => Var -> Expr r -> Maybe (r, Expr r)
+extract' v (Expr m) =
   case IM.lookup v m of
     Nothing -> Nothing
     Just c -> Just (c, Expr (IM.delete v m))
@@ -160,7 +181,7 @@ instance Formula.Rel (Expr r) (Atom r) where
 -- is equivalent to @a@.
 solveFor :: (Real r, Fractional r) => Atom r -> Var -> Maybe (Formula.RelOp, Expr r)
 solveFor (Atom lhs op rhs) v = do
-  (c,e) <- pickupTerm' v (lhs .-. rhs)
+  (c,e) <- extract' v (lhs .-. rhs)
   return ( if c < 0 then Formula.flipOp op else op
          , (1/c) .*. lnegate e
          )

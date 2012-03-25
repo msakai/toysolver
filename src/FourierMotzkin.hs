@@ -150,7 +150,7 @@ collectBounds v = foldr phi (([],[],[],[]),[])
 
     f :: Bool -> Lit -> ExprZ -> (BoundsR, [Lit]) -> (BoundsR, [Lit])
     f strict lit t (bnd@(ls1,ls2,us1,us2), xs) =
-      case LA.pickupTerm v t of
+      case LA.extract v t of
         (c,t') ->
           case c `compare` 0 of
             EQ -> (bnd, lit : xs)

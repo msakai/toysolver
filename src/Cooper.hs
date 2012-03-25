@@ -222,7 +222,7 @@ eliminateZ' x formula = case1 ++ case2
         f (Or' a b) = f a ++ f b
         f (Lit (Divisible _ _ _)) = []
         f (Lit (Pos e)) =
-          case LA.pickupTerm' x e of
+          case LA.extract' x e of
             Nothing -> []
             Just (1, e')  -> [lnegate e'] -- Pos e <=> (x + e' > 0) <=> (-e' < x)
             Just (-1, e') -> [] -- Pos e <=> (-x + e' > 0) <=> (x < e')
@@ -259,7 +259,7 @@ eliminateZ' x formula = case1 ++ case2
         f (And' a b) = f a ++ f b
         f (Or' a b) = f a ++ f b
         f (Lit (Pos e)) =
-          case LA.pickupTerm' x e of
+          case LA.extract' x e of
             Nothing -> []
             Just (1, e')  -> []   -- Pos e <=> ( x + e' > 0) <=> -e' < x
             Just (-1, e') -> [e'] -- Pos e <=> (-x + e' > 0) <=> x < e'
