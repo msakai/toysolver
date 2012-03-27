@@ -31,6 +31,7 @@ module Cooper
     ) where
 
 import Control.Monad
+import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
@@ -139,20 +140,29 @@ simplify (Or' a b) =
     (T', _) -> true
     (_, T') -> true
     (a',b') -> a' .||. b'
-simplify lit@(Lit (Pos e)) =
+simplify (Lit lit) = simplifyLit lit
+
+simplifyLit :: Lit -> Formula'
+simplifyLit lit@(Pos e) =
   case LA.asConst e of
-    Nothing -> lit
     Just c -> if c > 0 then true else false
-simplify lit@(Lit (Divisible b c e)) = 
-  case LA.asConst e of
-    Just c' ->
-      if b == (c' `mod` c == 0) then true else false
-    Nothing
-      | c==d -> if b then true else false
-      | d==1 -> lit
-      | otherwise -> Lit (Divisible b (c `div` d) (LA.mapCoeff (`div` d) e))
+    Nothing ->
+      -- e > 0  <=>  e - 1 >= 0
+      -- <=>  LA.mapCoeff (`div` d) (e - 1) >= 0
+      -- <=>  LA.mapCoeff (`div` d) (e - 1) + 1 > 0
+      Lit $ Pos $ LA.mapCoeff (`div` d) (e .-. LA.constExpr 1) .+. LA.constExpr 1
   where
-    d = foldl gcd c [c | (c,_) <- LA.terms e]
+    d = if null cs then 1 else foldl1' gcd cs
+    cs = [c | (c,x) <- LA.terms e, x /= LA.constVar]
+simplifyLit lit@(Divisible b c e)
+  | LA.lookupCoeff LA.constVar e `mod` d /= 0 = if b then false else true
+  | c' == 1   = if b then true else false
+  | d  == 1   = Lit lit
+  | otherwise = Lit $ Divisible b c' e'
+  where
+    d  = foldl' gcd c [c | (c,x) <- LA.terms e, x /= LA.constVar]
+    c' = c `div` d
+    e' = LA.mapCoeff (`div` d) e
 
 -- ---------------------------------------------------------------------------
 
@@ -176,9 +186,10 @@ eliminateZ' x formula = case1 ++ case2
          f (Lit (Pos e)) = fromMaybe 1 (LA.lookupCoeff' x e)
          f (Lit (Divisible _ _ e)) = fromMaybe 1 (LA.lookupCoeff' x e)
     
-    -- 式をスケールしてxの係数をcへと変換し、その後cxをxで置き換え、xがcで割り切れるという制約を追加した論理式
+    -- 式をスケールしてxの係数の絶対値をcへと変換し、その後cxをxで置き換え、
+    -- xがcで割り切れるという制約を追加した論理式
     formula1 :: Formula'
-    formula1 = f formula .&&. Lit (Divisible True c (LA.varExpr x))
+    formula1 = simplify $ f formula .&&. Lit (Divisible True c (LA.varExpr x))
       where
         f :: Formula' -> Formula'
         f T' = T'
@@ -188,12 +199,14 @@ eliminateZ' x formula = case1 ++ case2
         f lit@(Lit (Pos e)) =
           case LA.lookupCoeff' x e of
             Nothing -> lit
-            Just a -> Lit $ Pos $ g (c `div` abs a) e
+            Just a ->
+              let s = abs (c `div` a)
+              in Lit $ Pos $ g s e
         f lit@(Lit (Divisible b d e)) =
           case LA.lookupCoeff' x e of
             Nothing -> lit
             Just a ->
-              let s = c `div` abs a
+              let s = abs (c `div` a)
               in Lit $ Divisible b (s*d) $ g s e
 
         g :: Integer -> ExprZ -> ExprZ
@@ -235,7 +248,7 @@ eliminateZ' x formula = case1 ++ case2
 
     -- formula1のなかの x < t を真に t < x を偽に置き換えた論理式
     formula2 :: Formula'
-    formula2 = f formula1
+    formula2 = simplify $ f formula1
       where        
         f :: Formula' -> Formula'
         f T' = T'
@@ -246,10 +259,11 @@ eliminateZ' x formula = case1 ++ case2
           case LA.lookupCoeff' x e of
             Nothing -> lit
             Just 1    -> F' -- Pos e <=> ( x + e' > 0) <=> -e' < x
-            Just (-1) -> T' -- Pos e <=> (-x + e' > 0) <=> x < e'
+            Just (-1) -> T' -- Pos e <=> (-x + e' > 0) <=>  x  < e'
             _ -> error "should not happen"
         f lit@(Lit (Divisible _ _ _)) = lit
 
+    -- us = {u | x < u は formula1 に現れる原子論理式}
     us :: [ExprZ]
     us = f formula1
       where
@@ -262,7 +276,7 @@ eliminateZ' x formula = case1 ++ case2
           case LA.extract' x e of
             Nothing -> []
             Just (1, e')  -> []   -- Pos e <=> ( x + e' > 0) <=> -e' < x
-            Just (-1, e') -> [e'] -- Pos e <=> (-x + e' > 0) <=> x < e'
+            Just (-1, e') -> [e'] -- Pos e <=> (-x + e' > 0) <=>  x  < e'
             _ -> error "should not happen"
         f (Lit (Divisible _ _ _)) = []
 
@@ -273,7 +287,7 @@ eliminateZ' x formula = case1 ++ case2
 evalWitness :: Model Integer -> Witness -> Integer
 evalWitness model (WCase1 c e) = LA.evalExpr model e `div` c
 evalWitness model (WCase2 c j delta us)
-  | null us' = j `div` c
+  | null us'  = j `div` c
   | otherwise = (j + (((u - delta - 1) `div` delta) * delta)) `div` c
   where
     us' = map (LA.evalExpr model) us
@@ -408,6 +422,22 @@ Or' (And' (Lit (Pos (Expr {coeffMap = fromList [(-1,-1),(2,2),(3,-1)]}))) (Lit (
 (2y-z >  0 && 3|z+1) ||
 (2y-z > -2 && 3|z+2) ||
 (2y-z > -3 && 3|z+3) ||
+-}
+
+test3 :: Formula'
+test3 = eliminateZ 1 (andF [p1,p2,p3,p4])
+  where
+    x = LA.varExpr 0
+    y = LA.varExpr 1
+    p1 = Lit $ Pos y
+    p2 = Lit $ Pos (y .-. 2 .*. x)
+    p3 = Lit $ Pos (x .+. LA.constExpr 2 .-. y)
+    p4 = Lit $ Divisible True 2 y
+
+{-
+∃ y. 0 < y ∧ 2x<y ∧ y < x+2 ∧ 2|y
+⇔
+(2x < 2 ∧ 0 < x) ∨ (0 < 2x+2 ∧ x < 0)
 -}
 
 -- ---------------------------------------------------------------------------
