@@ -13,15 +13,23 @@
 -- 
 -----------------------------------------------------------------------------
 module Formula
-  ( Complement (..)
+  (
+
+  -- * Overloaded operations for formula.
+    Complement (..)
   , Boolean (..)
   , andF
   , orF
+
+  -- * Relational operators
   , RelOp (..)
   , Rel (..)
   , (.<.), (.<=.), (.>=.), (.>.), (.==.), (./=.)
   , flipOp
   , negOp
+  , showOp
+
+  -- * Concrete formula
   , Atom (..)
   , Formula (..)
   , pushNot
@@ -112,6 +120,15 @@ negOp Ge = Lt
 negOp Gt = Le
 negOp Eql = NEq
 negOp NEq = Eql
+
+-- | operator symbol
+showOp :: RelOp -> String
+showOp Lt = "<"
+showOp Le = "<="
+showOp Ge = ">="
+showOp Gt = ">"
+showOp Eql = "="
+showOp NEq = "/="
 
 -- ---------------------------------------------------------------------------
 

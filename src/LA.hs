@@ -14,6 +14,7 @@ module LA
   -- * Expression of linear arithmetics
   , Expr
   , terms
+  , fromTerms
   , coeffMap
   , fromCoeffMap
   , constVar
@@ -30,9 +31,11 @@ module LA
   , lookupCoeff'
   , extract
   , extract'
+  , showExpr
 
   -- * Atomic formula of linear arithmetics
   , Atom (..)
+  , showAtom
   , solveFor
 
   -- * misc
@@ -43,6 +46,8 @@ module LA
   ) where
 
 import Control.Monad
+import Data.List
+import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Expr
@@ -59,7 +64,7 @@ import Interval
 newtype Expr r
   = Expr
   { coeffMap :: IM.IntMap r
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Ord)
 
 -- | Create a @Expr@ from a mapping from variables to coefficients.
 fromCoeffMap :: Num r => IM.IntMap r -> Expr r
@@ -69,8 +74,22 @@ fromCoeffMap m = normalizeExpr (Expr m)
 terms :: Expr r -> [(r,Var)]
 terms (Expr m) = [(c,v) | (v,c) <- IM.toList m]
 
+-- | Create a @Expr@ from a list of terms.
+fromTerms :: Num r => [(r,Var)] -> Expr r
+fromTerms ts = fromCoeffMap $ IM.fromListWith (+) [(x,c) | (c,x) <- ts]
+
 instance Variables (Expr r) where
   vars (Expr m) = IS.delete constVar (IM.keysSet m)
+
+instance Show r => Show (Expr r) where
+  showsPrec d m  = showParen (d > 10) $
+    showString "fromTerms " . shows (terms m)
+
+instance (Num r, Read r) => Read (Expr r) where
+  readsPrec p = readParen (p > 10) $ \ r -> do
+    ("fromTerms",s) <- lex r
+    (xs,t) <- reads s
+    return (fromTerms xs, t)
 
 -- | Special variable that should always be evaluated to 1.
 constVar :: Var
@@ -160,6 +179,21 @@ extract' v (Expr m) =
     Nothing -> Nothing
     Just c -> Just (c, Expr (IM.delete v m))
 
+showExpr :: (Num r, Show r) => Expr r -> String
+showExpr = showExprWith f
+  where
+    f x = "x" ++ show x
+
+showExprWith :: (Num r, Show r) => (Var -> String) -> Expr r -> String
+showExprWith env (Expr m) = foldr (.) id xs ""
+  where
+    xs = intersperse (showString " + ") ts
+    ts = [if c==1
+            then showString (env x)
+            else showsPrec 8 c . showString "*" . showString (env x)
+          | (x,c) <- IM.toList m, x /= constVar] ++
+         [showsPrec 7 c | c <- maybeToList (IM.lookup constVar m)]
+
 -----------------------------------------------------------------------------
 
 -- | Atomic Formula of Linear Arithmetics
@@ -174,6 +208,9 @@ instance Variables (Atom r) where
 
 instance Formula.Rel (Expr r) (Atom r) where
   rel op a b = Atom a op b
+
+showAtom :: (Num r, Show r) => Atom r -> String
+showAtom (Atom lhs op rhs) = showExpr lhs ++ Formula.showOp op ++ showExpr rhs
 
 -- | Solve linear (in)equation for the given variable.
 --
