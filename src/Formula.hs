@@ -18,8 +18,6 @@ module Formula
   -- * Overloaded operations for formula.
     Complement (..)
   , Boolean (..)
-  , andF
-  , orF
 
   -- * Relational operators
   , RelOp (..)
@@ -54,16 +52,17 @@ class Complement a where
 class Complement a => Boolean a where
   true, false :: a
   (.&&.), (.||.), (.=>.), (.<=>.) :: a -> a -> a
+
+  -- | n-ary conjunction
+  andF :: [a] -> a
+
+  -- | n-ary disjunction
+  orF :: [a] -> a
+
   x .=>. y = notF x .||. y
   x .<=>. y = (x .=>. y) .&&. (y .=>. x)
-
--- | n-ary conjunction
-andF :: Boolean a => [a] -> a
-andF = foldr (.&&.) true
-
--- | n-ary disjunction
-orF :: Boolean a => [a] -> a
-orF = foldr (.||.) false
+  andF = foldr (.&&.) true
+  orF = foldr (.||.) false
 
 -- ---------------------------------------------------------------------------
 
