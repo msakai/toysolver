@@ -126,7 +126,7 @@ gtR = flip gtR
 
 normalizeExprR :: ExprZ -> ExprZ
 normalizeExprR e = LA.mapCoeff (`div` d) e
-  where d = gcd' $ map fst $ LA.terms e
+  where d = abs $ gcd' $ map fst $ LA.terms e
 
 -- ---------------------------------------------------------------------------
 

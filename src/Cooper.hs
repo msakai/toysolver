@@ -152,7 +152,7 @@ simplifyLit lit@(Pos e) =
       -- <=>  LA.mapCoeff (`div` d) (e - 1) + 1 > 0
       Lit $ Pos $ LA.mapCoeff (`div` d) (e .-. LA.constExpr 1) .+. LA.constExpr 1
   where
-    d = if null cs then 1 else foldl1' gcd cs
+    d = if null cs then 1 else abs $ foldl1' gcd cs
     cs = [c | (c,x) <- LA.terms e, x /= LA.constVar]
 simplifyLit lit@(Divisible b c e)
   | LA.lookupCoeff LA.constVar e `mod` d /= 0 = if b then false else true
@@ -160,7 +160,7 @@ simplifyLit lit@(Divisible b c e)
   | d  == 1   = Lit lit
   | otherwise = Lit $ Divisible b c' e'
   where
-    d  = foldl' gcd c [c | (c,x) <- LA.terms e, x /= LA.constVar]
+    d  = abs $ foldl' gcd c [c | (c,x) <- LA.terms e, x /= LA.constVar]
     c' = c `div` d
     e' = LA.mapCoeff (`div` d) e
 
