@@ -23,21 +23,30 @@ module LBool
 
 import Data.Int
 
--- | lifted Bool type.
+-- | Lifted Bool type. It has three values 'lTrue', 'lFalse', 'lUndef'.
 newtype LBool = LBool Int8 deriving Eq
 
+-- | lifted true value
 {-# INLINE lTrue #-}
 lTrue :: LBool
 lTrue = LBool 1
 
+-- | lifted false value
 {-# INLINE lFalse #-}
 lFalse :: LBool
 lFalse = LBool (-1)
 
+-- | undefined truth value
 {-# INLINE lUndef #-}
 lUndef :: LBool
 lUndef = LBool 0
 
+-- |
+-- @
+--   lnot lTrue == lFalse
+--   lnot lFalse == lTrue
+--   lnot lUndef == lUndef
+-- @
 {-# INLINE lnot #-}
 lnot :: LBool -> LBool
 lnot x
@@ -45,11 +54,22 @@ lnot x
   | x == lFalse = lTrue
   | otherwise   = lUndef
 
+-- |
+-- @
+--   liftBool True == lTrue
+--   liftBool False == lFalse
+-- @
 {-# INLINE liftBool #-}
 liftBool :: Bool -> LBool
 liftBool True  = lTrue
 liftBool False = lFalse
 
+-- |
+-- @
+--   unliftBool lTrue == Just True
+--   unliftBool lFalse == Just False
+--   unliftBool lUndef == Nothing
+-- @
 {-# INLINE unliftBool #-}
 unliftBool :: LBool -> Maybe Bool
 unliftBool x

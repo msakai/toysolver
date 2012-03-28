@@ -155,6 +155,7 @@ normalizeAtLeast (lits,n) = assert (IS.size ys `mod` 2 == 0) $
      lits' = xs `IS.difference` ys
      n' = n - (IS.size ys `div` 2)
 
+-- | normalizing PB constraint of the form /c1 x1 + c2 cn ... cn xn >= b/.
 normalizePBAtLeast :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
 normalizePBAtLeast a =
 　case step2 $ step1 $ a of
@@ -305,6 +306,7 @@ varReason s !v = do
     Nothing -> error ("varReason: unassigned var " ++ show v)
     Just a -> return (aReason a)
 
+-- | Solver instance
 data Solver
   = Solver
   { svOk           :: !(IORef Bool)
@@ -527,22 +529,26 @@ variables solver = do
   n <- nVars solver
   return [1 .. n]
 
+-- | number of variables of the problem.
 nVars :: Solver -> IO Int
 nVars solver = do
   vcnt <- readIORef (svVarCounter solver)
   return $! (vcnt-1)
 
+-- | number of assigned variables.
 nAssigns :: Solver -> IO Int
 nAssigns solver = do
   m <- readIORef (svAssigned solver)
   let f !r xs = r + length xs
   return $! IM.foldl' f 0 m
 
+-- | number of clauses.
 nClauses :: Solver -> IO Int
 nClauses solver = do
   xs <- readIORef (svClauseDB solver)
   return $ length xs
 
+-- | number of learnt constrints.
 nLearnt :: Solver -> IO Int
 nLearnt solver = do
   (n,_) <- readIORef (svLearntDB solver)
@@ -856,6 +862,7 @@ search solver !conflict_lim !learnt_lim = loop 0
               claBumpActivity solver cl
               loop (c+1)
 
+-- | A model is represented as a mapping from variables to its values.
 type Model = IM.IntMap Bool
 
 -- | After 'solve' returns True, it returns the model.
@@ -869,9 +876,11 @@ model solver = do
 --------------------------------------------------------------------}
 
 -- | The initial restart limit. (default 100)
+-- Negative value is used to disable restart.
 setRestartFirst :: Solver -> Int -> IO ()
 setRestartFirst solver !n = writeIORef (svRestartFirst solver) n
 
+-- | default value for @RestartFirst@.
 defaultRestartFirst :: Int
 defaultRestartFirst = 100
 
@@ -879,12 +888,15 @@ defaultRestartFirst = 100
 setRestartInc :: Solver -> Double -> IO ()
 setRestartInc solver !r = writeIORef (svRestartInc solver) r
 
+-- | default value for @RestartInc@.
 defaultRestartInc :: Double
 defaultRestartInc = 1.5
 
+-- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
 setLearntSizeInc :: Solver -> Double -> IO ()
 setLearntSizeInc solver !r = writeIORef (svLearntSizeInc solver) r
 
+-- | default value for @LearntSizeInc@.
 defaultLearntSizeInc :: Double
 defaultLearntSizeInc = 1.1
 

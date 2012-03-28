@@ -10,14 +10,17 @@
 -- A parser library for .opb file and .wbo files used by PB Competition.
 -- 
 -- References:
--- Input/Output Format and Solver Requirements for the Competitions of
--- Pseudo-Boolean Solvers
--- http://www.cril.univ-artois.fr/PB11/format.pdf
+--
+-- * Input/Output Format and Solver Requirements for the Competitions of
+--   Pseudo-Boolean Solvers
+--   <http://www.cril.univ-artois.fr/PB11/format.pdf>
 --
 -----------------------------------------------------------------------------
 
 module PBFile
-  ( Formula
+  (
+  -- * Abstract Syntax
+    Formula
   , Constraint
   , Op (..)
   , SoftFormula
@@ -27,8 +30,13 @@ module PBFile
   , Term
   , Lit (..)
   , Var
+
+  -- * Parsing .opb files
   , parseOPBString
   , parseOPBFile
+
+
+  -- * Parsing .wbo files
   , parseWBOString
   , parseWBOFile
   ) where
@@ -38,17 +46,37 @@ import Control.Monad
 import Data.Maybe
 import Text.ParserCombinators.Parsec
 
+-- | Pair of /objective function/ and a list of constraints.
 type Formula = (Maybe Sum, [Constraint])
-type Constraint = (Sum, Op, Integer)
-data Op = Ge | Eq deriving (Eq, Ord, Show, Enum, Bounded)
 
+-- | Lhs, relational operator and rhs.
+type Constraint = (Sum, Op, Integer)
+
+-- | Relational operators
+data Op
+  = Ge -- ^ /greater than or equal/
+  | Eq -- ^ /equal/
+  deriving (Eq, Ord, Show, Enum, Bounded)
+
+-- | A pair of /top cost/ and a list of soft constraints.
 type SoftFormula = (Maybe Integer, [SoftConstraint])
+
+-- | A pair of weight and constraint.
 type SoftConstraint = (Maybe Integer, Constraint)
 
+-- | Sum of 'WeightedTerm'
 type Sum = [WeightedTerm]
+
+-- | Coefficient and 'Term'
 type WeightedTerm = (Integer, Term)
+
+-- | List of variables interpreted as products
 type Term = [Lit]
+
+-- | Positive (resp. negative) literal is represented as a positive (resp. negative) integer.
 type Lit = Int
+
+-- | Variable are repserented positive integer.
 type Var = Int
 
 -- <formula>::= <sequence_of_comments> [<objective>] <sequence_of_comments_or_constraints>
@@ -175,9 +203,11 @@ oneOrMoreLiterals = do
 literal :: Parser Lit
 literal = variablename <|> (char '~' >> liftM negate variablename)
 
+-- | Parse a .opb file containing pseudo boolean problem.
 parseOPBString :: SourceName -> String -> Either ParseError Formula
 parseOPBString = parse formula
 
+-- | Parse a .opb format string containing pseudo boolean problem.
 parseOPBFile :: FilePath -> IO (Either ParseError Formula)
 parseOPBFile = parseFromFile formula
 
@@ -224,9 +254,11 @@ softconstraint = do
   c <- constraint
   return (Just cost, c)
 
+-- | Parse a .wbo file containing weighted boolean optimization problem.
 parseWBOString :: SourceName -> String -> Either ParseError SoftFormula
 parseWBOString = parse softformula
 
+-- | Parse a .wbo format string containing weighted boolean optimization problem.
 parseWBOFile :: FilePath -> IO (Either ParseError SoftFormula)
 parseWBOFile = parseFromFile softformula
 
