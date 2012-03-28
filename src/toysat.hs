@@ -44,13 +44,19 @@ data Mode = ModeHelp | ModeSAT | ModePB | ModeWBO | ModeMaxSAT | ModeLP
 
 data Options
   = Options
-  { optMode :: Mode
+  { optMode          :: Mode
+  , optRestartFirst  :: Int
+  , optRestartInc    :: Double
+  , optLearntSizeInc :: Double
   }
 
 defaultOptions :: Options
 defaultOptions
   = Options
-  { optMode = ModeSAT
+  { optMode          = ModeSAT
+  , optRestartFirst  = SAT.defaultRestartFirst
+  , optRestartInc    = SAT.defaultRestartInc
+  , optLearntSizeInc = SAT.defaultLearntSizeInc
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -60,6 +66,17 @@ options =
     , Option []    ["wbo"]    (NoArg (\opt -> opt{ optMode = ModeWBO    })) "solve weighted boolean optimization problem in .opb file"
     , Option []    ["maxsat"] (NoArg (\opt -> opt{ optMode = ModeMaxSAT })) "solve MaxSAT problem in .cnf or .wcnf file"
     , Option []    ["lp"]     (NoArg (\opt -> opt{ optMode = ModeLP     })) "solve binary integer programming problem in .lp file"
+
+    , Option [] ["restart-first"]
+        (ReqArg (\val opt -> opt{ optRestartFirst = read val }) "<integer>")
+        (printf "The initial restart limit. (default %d)" SAT.defaultRestartFirst)
+    , Option [] ["restart-inc"]
+        (ReqArg (\val opt -> opt{ optRestartInc = read val }) "<real>")
+        (printf "The factor with which the restart limit is multiplied in each restart. (default %f)" SAT.defaultRestartInc)
+    , Option [] ["learnt-size-inc"]
+        (ReqArg (\val opt -> opt{ optLearntSizeInc = read val }) "<real>")
+        (printf "The limit for learnt clauses is multiplied with this factor each restart. (default %f)" SAT.defaultLearntSizeInc)
+
     ]
 
 main :: IO ()
@@ -68,13 +85,14 @@ main = do
   case getOpt Permute options args of
     (o,args2,[]) -> do
       let opt = foldl (flip id) defaultOptions o
+      solver <- newSolver opt
       case optMode opt of
         ModeHelp   -> showHelp stdout
-        ModeSAT    -> mainSAT args2
-        ModePB     -> mainPB args2
-        ModeWBO    -> mainWBO args2
-        ModeMaxSAT -> mainMaxSAT args2
-        ModeLP     -> mainLP args2
+        ModeSAT    -> mainSAT solver args2
+        ModePB     -> mainPB solver args2
+        ModeWBO    -> mainWBO solver args2
+        ModeMaxSAT -> mainMaxSAT solver args2
+        ModeLP     -> mainLP solver args2
     (_,_,errs) -> do
       mapM_ putStrLn errs
       exitFailure
@@ -100,21 +118,28 @@ printSysInfo = do
   hPrintf stdout "c os = %s\n" SysInfo.os
   hPrintf stdout "c compiler = %s %s\n" SysInfo.compilerName (showVersion SysInfo.compilerVersion)
 
+newSolver :: Options -> IO SAT.Solver
+newSolver opts = do
+  solver <- SAT.newSolver
+  SAT.setRestartFirst  solver (optRestartFirst opts)
+  SAT.setRestartInc    solver (optRestartInc opts)
+  SAT.setLearntSizeInc solver (optLearntSizeInc opts)
+  return solver
+
 -- ------------------------------------------------------------------------
 
-mainSAT :: [String] -> IO ()
-mainSAT args = do
+mainSAT :: SAT.Solver -> [String] -> IO ()
+mainSAT solver args = do
   ret <- case args of
            ["-"]   -> fmap (DIMACS.parseByteString "-") $ BS.hGetContents stdin
            [fname] -> DIMACS.parseFile fname
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right cnf -> printSysInfo >> solveCNF cnf
+    Right cnf -> printSysInfo >> solveCNF solver cnf
 
-solveCNF :: DIMACS.CNF -> IO ()
-solveCNF cnf = do
-  solver <- newSolver
+solveCNF :: SAT.Solver -> DIMACS.CNF -> IO ()
+solveCNF solver cnf = do
   _ <- replicateM (DIMACS.numVars cnf) (SAT.newVar solver)
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
@@ -128,27 +153,20 @@ solveCNF cnf = do
     putStrLn "v 0"
     hFlush stdout
 
-newSolver :: IO SAT.Solver
-newSolver = do
-  solver <- SAT.newSolver
-  SAT.setRestartFirst solver (-1) -- disable restart
-  return solver
-
 -- ------------------------------------------------------------------------
 
-mainPB :: [String] -> IO ()
-mainPB args = do
+mainPB :: SAT.Solver -> [String] -> IO ()
+mainPB solver args = do
   ret <- case args of
            ["-"]   -> fmap (PBFile.parseOPBString "-") $ hGetContents stdin
            [fname] -> PBFile.parseOPBFile fname
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right formula -> printSysInfo >> solvePB formula
+    Right formula -> printSysInfo >> solvePB solver formula
 
-solvePB :: PBFile.Formula -> IO ()
-solvePB formula@(obj, cs) = do
-  solver <- newSolver
+solvePB :: SAT.Solver -> PBFile.Formula -> IO ()
+solvePB solver formula@(obj, cs) = do
   let n = pbNumVars formula
   _ <- replicateM n (SAT.newVar solver)
   forM_ cs $ \(lhs, op, rhs) -> do
@@ -223,15 +241,15 @@ pbPrintModel m = do
 
 -- ------------------------------------------------------------------------
 
-mainWBO :: [String] -> IO ()
-mainWBO args = do
+mainWBO :: SAT.Solver -> [String] -> IO ()
+mainWBO solver args = do
   ret <- case args of
            ["-"]   -> fmap (PBFile.parseWBOString "-") $ hGetContents stdin
            [fname] -> PBFile.parseWBOFile fname
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right formula -> printSysInfo >> solveWBO False formula
+    Right formula -> printSysInfo >> solveWBO solver False formula
 
 wboAddAtLeast :: SAT.Solver -> SAT.Lit -> [(Integer,SAT.Lit)] -> Integer -> IO ()
 wboAddAtLeast solver sel lhs rhs = do
@@ -247,9 +265,8 @@ wboAddExactly solver sel lhs rhs = do
   wboAddAtLeast solver sel lhs rhs
   wboAddAtMost solver sel lhs rhs
 
-solveWBO :: Bool -> PBFile.SoftFormula -> IO ()
-solveWBO isMaxSat formula@(tco, cs) = do
-  solver <- newSolver
+solveWBO :: SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
+solveWBO solver isMaxSat formula@(tco, cs) = do
   let nvar = wboNumVars formula
   _ <- replicateM nvar (SAT.newVar solver)
 
@@ -300,8 +317,8 @@ wboNumVars (_, cs) = maximum vs
 
 type WeightedClause = (Integer, SAT.Clause)
 
-mainMaxSAT :: [String] -> IO ()
-mainMaxSAT args = do
+mainMaxSAT :: SAT.Solver -> [String] -> IO ()
+mainMaxSAT solver args = do
   s <- case args of
          ["-"]   -> getContents
          [fname] -> readFile fname
@@ -315,7 +332,7 @@ mainMaxSAT args = do
         (["p","cnf", nvar, nclause]) ->
           (read nvar, 2, map parseCNFLine ls)
         _ -> error "parse error"
-  printSysInfo >> solveMaxSAT wcnf
+  printSysInfo >> solveMaxSAT solver wcnf
 
 isComment :: String -> Bool
 isComment ('c':_) = True
@@ -338,9 +355,9 @@ seqList :: [a] -> b -> b
 seqList [] b = b
 seqList (x:xs) b = seq x $ seqList xs b
 
-solveMaxSAT :: (Int, Integer, [WeightedClause]) -> IO ()
-solveMaxSAT (_, top, cs) = do
-  solveWBO True
+solveMaxSAT :: SAT.Solver -> (Int, Integer, [WeightedClause]) -> IO ()
+solveMaxSAT solver (_, top, cs) = do
+  solveWBO solver True
            ( Nothing
            , [ (if w >= top then Nothing else Just w
              , ([(1,[lit]) | lit<-lits], PBFile.Ge, 1))
@@ -357,25 +374,23 @@ maxsatPrintModel m = do
 
 -- ------------------------------------------------------------------------
 
-mainLP :: [String] -> IO ()
-mainLP args = do
+mainLP :: SAT.Solver -> [String] -> IO ()
+mainLP solver args = do
   ret <- case args of
            ["-"]   -> fmap (LPFile.parseString "-") $ hGetContents stdin
            [fname] -> LPFile.parseFile fname
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right lp -> printSysInfo >> solveLP lp
+    Right lp -> printSysInfo >> solveLP solver lp
 
-solveLP :: LPFile.LP -> IO ()
-solveLP lp = do
+solveLP :: SAT.Solver -> LPFile.LP -> IO ()
+solveLP solver lp = do
   if not (Set.null nbvs)
     then do
       hPutStrLn stderr ("cannot handle non-binary variables: " ++ intercalate ", " (Set.toList nbvs))
       exitFailure
     else do
-      solver <- newSolver
-
       vmap <- liftM Map.fromList $ forM (Set.toList bvs) $ \v -> do
         v2 <- SAT.newVar solver 
         _ <- printf "c x%d := %s\n" v2 v

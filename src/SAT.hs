@@ -46,8 +46,11 @@ module SAT
 
   -- * Parameters
   , setRestartFirst
+  , defaultRestartFirst
   , setRestartInc
+  , defaultRestartInc
   , setLearntSizeInc
+  , defaultLearntSizeInc
 
   -- * Solving
   , solve
@@ -550,9 +553,9 @@ newSolver = do
 
   claDecay <- newIORef (1 / 0.999)
   claInc   <- newIORef 1
-  restartFirst <- newIORef 100
-  restartInc <- newIORef 1.5
-  learntSizeInc <- newIORef 1.1
+  restartFirst <- newIORef defaultRestartFirst
+  restartInc <- newIORef defaultRestartInc
+  learntSizeInc <- newIORef defaultLearntSizeInc
 
   return $
     Solver
@@ -844,12 +847,21 @@ model solver = do
 setRestartFirst :: Solver -> Int -> IO ()
 setRestartFirst solver !n = writeIORef (svRestartFirst solver) n
 
+defaultRestartFirst :: Int
+defaultRestartFirst = 100
+
 -- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
 setRestartInc :: Solver -> Double -> IO ()
 setRestartInc solver !r = writeIORef (svRestartInc solver) r
 
+defaultRestartInc :: Double
+defaultRestartInc = 1.5
+
 setLearntSizeInc :: Solver -> Double -> IO ()
 setLearntSizeInc solver !r = writeIORef (svLearntSizeInc solver) r
+
+defaultLearntSizeInc :: Double
+defaultLearntSizeInc = 1.1
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
