@@ -5,6 +5,10 @@
 -- Module      :  SAT
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable (BangPatterns)
 --
 -- A toy-level SAT solver based on CDCL.
 --

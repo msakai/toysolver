@@ -4,6 +4,10 @@
 -- Module      :  toysat
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  experimental
+-- Portability :  portable
 --
 -- A toy-level SAT solver based on CDCL.
 --

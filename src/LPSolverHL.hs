@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (ScopedTypeVariables)
 --
 -- High-Level API for LPSolver.hs
 --

@@ -1,4 +1,15 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  TseitingEncoding
+-- Copyright   :  (c) Masahiro Sakai 2011
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable (GeneralizedNewtypeDeriving)
+-- 
+-----------------------------------------------------------------------------
 module TseitingEncoding
   ( Var
   , Lit

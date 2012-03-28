@@ -1,4 +1,15 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  lp2yices
+-- Copyright   :  (c) Masahiro Sakai 2011
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  experimental
+-- Portability :  portable
+--
+-----------------------------------------------------------------------------
 module Main where
 
 import Data.Function (on)
