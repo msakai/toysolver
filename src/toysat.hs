@@ -30,6 +30,7 @@ import Data.Version
 import System.IO
 import System.Environment
 import System.Exit
+import System.Console.GetOpt
 import qualified System.Info as SysInfo
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import Text.Printf
@@ -39,15 +40,47 @@ import qualified LPFile
 
 -- ------------------------------------------------------------------------
 
+data Mode = ModeHelp | ModeSAT | ModePB | ModeWBO | ModeMaxSAT | ModeLP
+
+data Options
+  = Options
+  { optMode :: Mode
+  }
+
+defaultOptions :: Options
+defaultOptions
+  = Options
+  { optMode = ModeSAT
+  }
+
+options :: [OptDescr (Options -> Options)]
+options =
+    [ Option ['h'] ["help"]   (NoArg (\opt -> opt{ optMode = ModeHelp   })) "show help"
+    , Option []    ["pb"]     (NoArg (\opt -> opt{ optMode = ModePB     })) "solve pseudo boolean problems in .pb file"
+    , Option []    ["wbo"]    (NoArg (\opt -> opt{ optMode = ModeWBO    })) "solve weighted boolean optimization problem in .opb file"
+    , Option []    ["maxsat"] (NoArg (\opt -> opt{ optMode = ModeMaxSAT })) "solve MaxSAT problem in .cnf or .wcnf file"
+    , Option []    ["lp"]     (NoArg (\opt -> opt{ optMode = ModeLP     })) "solve binary integer programming problem in .lp file"
+    ]
+
 main :: IO ()
 main = do
   args <- getArgs
-  case args of
-    arg:args2 | map toLower arg == "--pb"     -> mainPB args2
-    arg:args2 | map toLower arg == "--wbo"    -> mainWBO args2
-    arg:args2 | map toLower arg == "--maxsat" -> mainMaxSAT args2
-    arg:args2 | map toLower arg == "--lp"     -> mainLP args2
-    _ -> mainSAT args
+  case getOpt Permute options args of
+    (o,args2,[]) -> do
+      let opt = foldl (flip id) defaultOptions o
+      case optMode opt of
+        ModeHelp   -> showHelp stdout
+        ModeSAT    -> mainSAT args2
+        ModePB     -> mainPB args2
+        ModeWBO    -> mainWBO args2
+        ModeMaxSAT -> mainMaxSAT args2
+        ModeLP     -> mainLP args2
+    (_,_,errs) -> do
+      mapM_ putStrLn errs
+      exitFailure
+
+showHelp :: Handle -> IO ()
+showHelp h = hPutStrLn h (usageInfo header options)
 
 header :: String
 header = unlines
@@ -57,6 +90,8 @@ header = unlines
   , "  toysat --wbo [file.wbo|-]"
   , "  toysat --maxsat [file.cnf|file.wcnf|-]"
   , "  toysat --lp [file.lp|-]"
+  , ""
+  , "Options:"
   ]
 
 printSysInfo :: IO ()
@@ -72,7 +107,7 @@ mainSAT args = do
   ret <- case args of
            ["-"]   -> fmap (DIMACS.parseByteString "-") $ BS.hGetContents stdin
            [fname] -> DIMACS.parseFile fname
-           _ -> hPutStrLn stderr header >> exitFailure
+           _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
     Right cnf -> printSysInfo >> solveCNF cnf
@@ -106,7 +141,7 @@ mainPB args = do
   ret <- case args of
            ["-"]   -> fmap (PBFile.parseOPBString "-") $ hGetContents stdin
            [fname] -> PBFile.parseOPBFile fname
-           _ -> hPutStrLn stderr header >> exitFailure
+           _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
     Right formula -> printSysInfo >> solvePB formula
@@ -193,7 +228,7 @@ mainWBO args = do
   ret <- case args of
            ["-"]   -> fmap (PBFile.parseWBOString "-") $ hGetContents stdin
            [fname] -> PBFile.parseWBOFile fname
-           _ -> hPutStrLn stderr header >> exitFailure
+           _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
     Right formula -> printSysInfo >> solveWBO False formula
@@ -270,7 +305,7 @@ mainMaxSAT args = do
   s <- case args of
          ["-"]   -> getContents
          [fname] -> readFile fname
-         _ -> hPutStrLn stderr header >> exitFailure
+         _ -> showHelp stderr  >> exitFailure
   let (l:ls) = filter (not . isComment) (lines s)
   let wcnf = case words l of
         (["p","wcnf", nvar, nclause, top]) ->
@@ -327,7 +362,7 @@ mainLP args = do
   ret <- case args of
            ["-"]   -> fmap (LPFile.parseString "-") $ hGetContents stdin
            [fname] -> LPFile.parseFile fname
-           _ -> hPutStrLn stderr header >> exitFailure
+           _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
     Right lp -> printSysInfo >> solveLP lp
