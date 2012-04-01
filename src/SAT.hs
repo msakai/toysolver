@@ -10,11 +10,9 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (BangPatterns)
 --
--- A toy-level SAT solver based on CDCL.
+-- A CDCL SAT solver.
 --
--- TODO:
---
--- * XOR clause
+-- It follows design of MiniSat and SAT4J.
 --
 -----------------------------------------------------------------------------
 module SAT
