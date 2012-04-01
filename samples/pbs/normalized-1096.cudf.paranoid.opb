@@ -1,0 +1,7 @@
+* #variable= 1 #constraint= 1
+****************************************
+* begin normalizer comments
+* category= DEC-SMALLINT-LIN
+* end normalizer comments
+****************************************
++1 x1 >= 1 ;
