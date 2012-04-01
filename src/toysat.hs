@@ -37,6 +37,7 @@ import Text.Printf
 import qualified SAT
 import qualified PBFile
 import qualified LPFile
+import qualified Linearizer as Lin
 
 -- ------------------------------------------------------------------------
 
@@ -169,8 +170,10 @@ solvePB :: SAT.Solver -> PBFile.Formula -> IO ()
 solvePB solver formula@(obj, cs) = do
   let n = pbNumVars formula
   _ <- replicateM n (SAT.newVar solver)
+  lin <- Lin.newLinearizer solver
+
   forM_ cs $ \(lhs, op, rhs) -> do
-    let lhs' = pbConvSum lhs
+    lhs' <- pbConvSum lin lhs
     case op of
       PBFile.Ge -> SAT.addPBAtLeast solver lhs' rhs
       PBFile.Eq -> SAT.addPBExactly solver lhs' rhs
@@ -185,7 +188,8 @@ solvePB solver formula@(obj, cs) = do
         pbPrintModel m
 
     Just obj' -> do
-      result <- minimize solver (pbConvSum obj') $ \val -> do
+      obj'' <- pbConvSum lin obj'
+      result <- minimize solver obj'' $ \val -> do
         putStrLn $ "o " ++ show val
         hFlush stdout
       case result of
@@ -197,11 +201,12 @@ solvePB solver formula@(obj, cs) = do
           hFlush stdout          
           pbPrintModel m
 
-pbConvSum :: PBFile.Sum -> [(Integer, SAT.Lit)]
-pbConvSum = map f
+pbConvSum :: Lin.Linearizer -> PBFile.Sum -> IO [(Integer, SAT.Lit)]
+pbConvSum lin = mapM f
   where
-    f (w,[lit]) = (w,lit)
-    f _ = error "non-linear terms are not supported"
+    f (w,ls) = do
+      l <- Lin.translate lin ls
+      return (w,l)
 
 minimize :: SAT.Solver -> [(Integer, SAT.Lit)] -> (Integer -> IO ()) -> IO (Maybe SAT.Model)
 minimize solver obj update = do
@@ -269,9 +274,10 @@ solveWBO :: SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
 solveWBO solver isMaxSat formula@(tco, cs) = do
   let nvar = wboNumVars formula
   _ <- replicateM nvar (SAT.newVar solver)
+  lin <- Lin.newLinearizer solver
 
   obj <- liftM concat $ forM cs $ \(cost, (lhs, op, rhs)) -> do
-    let lhs' = pbConvSum lhs
+    lhs' <- pbConvSum lin lhs
     case cost of
       Nothing -> do
         case op of
