@@ -12,6 +12,10 @@
 --
 -- Note that current implementation is very naïve and introduce many variables.
 --
+-- TODO:
+-- * reduce variables.
+-- * unify with TseitinEncode.hs
+--
 -- Reference:
 -- 
 -- * [For60] R. Fortet. Application de l'algèbre de Boole en rechercheop
@@ -80,9 +84,14 @@ translate lin ls = do
       v <- SAT.newVar sat
       let ls3 = IS.toList ls2
           n = IS.size ls2
+      -- ((l1∧l2∧…∧ln) → v)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ v)
       SAT.addClause sat (v : [SAT.litNot l | l <- ls3])
       if usePB
-        then SAT.addPBAtLeast sat ((- fromIntegral n, v) : [(1, SAT.litNot l) | l <- ls3]) 0
-        else forM_ ls3 $ \l -> SAT.addClause sat [l, SAT.litNot v]
+        then
+          -- Σli - n*v >= 0  ⇔  Σli >= n*v  ⇔  ∀i.(v →li)
+          SAT.addPBAtLeast sat ((- fromIntegral n, v) : [(1, l) | l <- ls3]) 0
+        else
+          -- (¬v ∨ li)  ⇔  (v → li)
+          forM_ ls3 $ \l -> SAT.addClause sat [l, SAT.litNot v]
       writeIORef (tableRef lin) (Map.insert ls2 v table)
       return v
