@@ -44,6 +44,7 @@ module Linearizer
 
   -- * Operations
   , translate
+  , variables
   ) where
 
 import Control.Monad
@@ -58,6 +59,7 @@ data Linearizer
   { solver   :: !SAT.Solver
   , tableRef :: !(IORef (Map.Map IS.IntSet SAT.Lit))
   , usePBRef :: !(IORef Bool)
+  , varsRef  :: !(IORef IS.IntSet)
   }
 
 -- | Create a @Linearizer@ instance.
@@ -65,7 +67,8 @@ newLinearizer :: SAT.Solver -> IO Linearizer
 newLinearizer sat = do
   ref1 <- newIORef Map.empty
   ref2 <- newIORef False
-  return $ Linearizer sat ref1 ref2
+  ref3 <- newIORef IS.empty
+  return $ Linearizer sat ref1 ref2 ref3
 
 -- | Use /pseudo boolean constraints/ or use only /clauses/.
 setUsePB :: Linearizer -> Bool -> IO ()
@@ -83,6 +86,7 @@ translate lin ls = do
       let sat = solver lin
       usePB <- readIORef (usePBRef lin)
       v <- SAT.newVar sat
+      modifyIORef (varsRef lin) (IS.insert v)
       let ls3 = IS.toList ls2
           n = IS.size ls2
       -- ((l1∧l2∧…∧ln) → v)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ v)
@@ -96,3 +100,7 @@ translate lin ls = do
           forM_ ls3 $ \l -> SAT.addClause sat [l, SAT.litNot v]
       writeIORef (tableRef lin) (Map.insert ls2 v table)
       return v
+
+-- | Variables that introduced by linearizing process.
+variables :: Linearizer -> IO IS.IntSet
+variables lin = readIORef (varsRef lin)
