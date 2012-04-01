@@ -17,6 +17,7 @@ module Main where
 
 import Control.Monad
 import Data.Array.IArray
+import Data.Char
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.IntMap as IM
 import qualified Data.Set as Set
@@ -49,6 +50,7 @@ data Options
   , optRestartFirst  :: Int
   , optRestartInc    :: Double
   , optLearntSizeInc :: Double
+  , optLinearizePB   :: Bool
   }
 
 defaultOptions :: Options
@@ -58,6 +60,7 @@ defaultOptions
   , optRestartFirst  = SAT.defaultRestartFirst
   , optRestartInc    = SAT.defaultRestartInc
   , optLearntSizeInc = SAT.defaultLearntSizeInc
+  , optLinearizePB   = False
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -77,8 +80,17 @@ options =
     , Option [] ["learnt-size-inc"]
         (ReqArg (\val opt -> opt{ optLearntSizeInc = read val }) "<real>")
         (printf "The limit for learnt clauses is multiplied with this factor each restart. (default %f)" SAT.defaultLearntSizeInc)
-
+    , Option [] ["linearize-pb"]
+        (ReqArg (\val opt -> opt{ optLinearizePB = parseOnOff val }) "<on|off>")
+        "Use PB constraint for linearization. (default off)"
     ]
+  where
+    parseOnOff :: String -> Bool
+    parseOnOff s =
+      case map toLower s of
+        "on"  -> True
+        "off" -> False
+        _     -> error $ "parseOnOff: " ++ show s ++ " is not \"on\" or \"off\""
 
 main :: IO ()
 main = do
@@ -89,11 +101,11 @@ main = do
       solver <- newSolver opt
       case optMode opt of
         ModeHelp   -> showHelp stdout
-        ModeSAT    -> mainSAT solver args2
-        ModePB     -> mainPB solver args2
-        ModeWBO    -> mainWBO solver args2
-        ModeMaxSAT -> mainMaxSAT solver args2
-        ModeLP     -> mainLP solver args2
+        ModeSAT    -> mainSAT opt solver args2
+        ModePB     -> mainPB opt solver args2
+        ModeWBO    -> mainWBO opt solver args2
+        ModeMaxSAT -> mainMaxSAT opt solver args2
+        ModeLP     -> mainLP opt solver args2
     (_,_,errs) -> do
       mapM_ putStrLn errs
       exitFailure
@@ -129,8 +141,8 @@ newSolver opts = do
 
 -- ------------------------------------------------------------------------
 
-mainSAT :: SAT.Solver -> [String] -> IO ()
-mainSAT solver args = do
+mainSAT :: Options -> SAT.Solver -> [String] -> IO ()
+mainSAT opt solver args = do
   ret <- case args of
            ["-"]   -> fmap (DIMACS.parseByteString "-") $ BS.hGetContents stdin
            [fname] -> DIMACS.parseFile fname
@@ -156,21 +168,22 @@ solveCNF solver cnf = do
 
 -- ------------------------------------------------------------------------
 
-mainPB :: SAT.Solver -> [String] -> IO ()
-mainPB solver args = do
+mainPB :: Options -> SAT.Solver -> [String] -> IO ()
+mainPB opt solver args = do
   ret <- case args of
            ["-"]   -> fmap (PBFile.parseOPBString "-") $ hGetContents stdin
            [fname] -> PBFile.parseOPBFile fname
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right formula -> printSysInfo >> solvePB solver formula
+    Right formula -> printSysInfo >> solvePB opt solver formula
 
-solvePB :: SAT.Solver -> PBFile.Formula -> IO ()
-solvePB solver formula@(obj, cs) = do
+solvePB :: Options -> SAT.Solver -> PBFile.Formula -> IO ()
+solvePB opt solver formula@(obj, cs) = do
   let n = pbNumVars formula
   _ <- replicateM n (SAT.newVar solver)
   lin <- Lin.newLinearizer solver
+  Lin.setUsePB lin (optLinearizePB opt)
 
   forM_ cs $ \(lhs, op, rhs) -> do
     lhs' <- pbConvSum lin lhs
@@ -246,15 +259,15 @@ pbPrintModel m = do
 
 -- ------------------------------------------------------------------------
 
-mainWBO :: SAT.Solver -> [String] -> IO ()
-mainWBO solver args = do
+mainWBO :: Options -> SAT.Solver -> [String] -> IO ()
+mainWBO opt solver args = do
   ret <- case args of
            ["-"]   -> fmap (PBFile.parseWBOString "-") $ hGetContents stdin
            [fname] -> PBFile.parseWBOFile fname
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right formula -> printSysInfo >> solveWBO solver False formula
+    Right formula -> printSysInfo >> solveWBO opt solver False formula
 
 wboAddAtLeast :: SAT.Solver -> SAT.Lit -> [(Integer,SAT.Lit)] -> Integer -> IO ()
 wboAddAtLeast solver sel lhs rhs = do
@@ -270,11 +283,12 @@ wboAddExactly solver sel lhs rhs = do
   wboAddAtLeast solver sel lhs rhs
   wboAddAtMost solver sel lhs rhs
 
-solveWBO :: SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
-solveWBO solver isMaxSat formula@(tco, cs) = do
+solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
+solveWBO opt solver isMaxSat formula@(tco, cs) = do
   let nvar = wboNumVars formula
   _ <- replicateM nvar (SAT.newVar solver)
   lin <- Lin.newLinearizer solver
+  Lin.setUsePB lin (optLinearizePB opt)
 
   obj <- liftM concat $ forM cs $ \(cost, (lhs, op, rhs)) -> do
     lhs' <- pbConvSum lin lhs
@@ -323,8 +337,8 @@ wboNumVars (_, cs) = maximum vs
 
 type WeightedClause = (Integer, SAT.Clause)
 
-mainMaxSAT :: SAT.Solver -> [String] -> IO ()
-mainMaxSAT solver args = do
+mainMaxSAT :: Options -> SAT.Solver -> [String] -> IO ()
+mainMaxSAT opt solver args = do
   s <- case args of
          ["-"]   -> getContents
          [fname] -> readFile fname
@@ -338,7 +352,7 @@ mainMaxSAT solver args = do
         (["p","cnf", nvar, nclause]) ->
           (read nvar, 2, map parseCNFLine ls)
         _ -> error "parse error"
-  printSysInfo >> solveMaxSAT solver wcnf
+  printSysInfo >> solveMaxSAT opt solver wcnf
 
 isComment :: String -> Bool
 isComment ('c':_) = True
@@ -361,9 +375,9 @@ seqList :: [a] -> b -> b
 seqList [] b = b
 seqList (x:xs) b = seq x $ seqList xs b
 
-solveMaxSAT :: SAT.Solver -> (Int, Integer, [WeightedClause]) -> IO ()
-solveMaxSAT solver (_, top, cs) = do
-  solveWBO solver True
+solveMaxSAT :: Options -> SAT.Solver -> (Int, Integer, [WeightedClause]) -> IO ()
+solveMaxSAT opt solver (_, top, cs) = do
+  solveWBO opt solver True
            ( Nothing
            , [ (if w >= top then Nothing else Just w
              , ([(1,[lit]) | lit<-lits], PBFile.Ge, 1))
@@ -380,8 +394,8 @@ maxsatPrintModel m = do
 
 -- ------------------------------------------------------------------------
 
-mainLP :: SAT.Solver -> [String] -> IO ()
-mainLP solver args = do
+mainLP :: Options -> SAT.Solver -> [String] -> IO ()
+mainLP opt solver args = do
   ret <- case args of
            ["-"]   -> fmap (LPFile.parseString "-") $ hGetContents stdin
            [fname] -> LPFile.parseFile fname
