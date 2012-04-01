@@ -79,7 +79,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
-import qualified Data.PriorityQueue as PQ
+import qualified PriorityQueue as PQ
 import System.IO
 import System.CPUTime
 import Text.Printf
@@ -310,7 +310,7 @@ varReason s !v = do
 data Solver
   = Solver
   { svOk           :: !(IORef Bool)
-  , svVarQueue     :: !(PQ.PriorityQueue IO (Var,VarActivity))
+  , svVarQueue     :: !(PQ.PriorityQueue (Var,VarActivity))
   , svAssigned     :: !(IORef (LevelMap [Lit]))
   , svVarCounter   :: !(IORef Int)
   , svVarData      :: !(IORef (IOArray Int VarData))
@@ -568,7 +568,7 @@ newSolver :: IO Solver
 newSolver = do
   ok   <- newIORef True
   vcnt <- newIORef 1
-  vqueue <- PQ.newPriorityQueue (\(_,activity) -> -activity)
+  vqueue <- PQ.newPriorityQueueBy ltVar
   assigned <- newIORef IM.empty
   vars <- newIORef =<< newArray_ (1,0)
   db  <- newIORef []
@@ -611,6 +611,9 @@ newSolver = do
     , svRestartInc   = restartInc
     , svLearntSizeInc = learntSizeInc
     }
+
+ltVar :: (Var,VarActivity) -> (Var,VarActivity) -> Bool
+ltVar = (>) `on` snd
 
 {--------------------------------------------------------------------
   Problem specification

@@ -102,8 +102,11 @@ Executable toysat
      LBool
      LPFile
      PBFile
-  Build-Depends: base >=4 && <5, containers >= 0.4.2, array, parsec, bytestring, parse-dimacs, priority-queue
+     PriorityQueue
+  Build-Depends: base >=4 && <5, containers >= 0.4.2, array, parsec, bytestring, parse-dimacs, queue
   Extensions:
+     MultiParamTypeClasses
+     FlexibleInstances
      BangPatterns
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
