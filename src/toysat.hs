@@ -198,7 +198,8 @@ solvePB opt solver formula@(obj, cs) = do
       hFlush stdout
       when result $ do
         m <- SAT.model solver
-        pbPrintModel m
+        let m2 = IM.filterWithKey (\v _ -> v <= n) m
+        pbPrintModel m2
 
     Just obj' -> do
       obj'' <- pbConvSum lin obj'
@@ -212,7 +213,8 @@ solvePB opt solver formula@(obj, cs) = do
         Just m -> do
           putStrLn $ "s " ++ "OPTIMUM FOUND"
           hFlush stdout          
-          pbPrintModel m
+          let m2 = IM.filterWithKey (\v _ -> v <= n) m
+          pbPrintModel m2
 
 pbConvSum :: Lin.Linearizer -> PBFile.Sum -> IO [(Integer, SAT.Lit)]
 pbConvSum lin = mapM f
