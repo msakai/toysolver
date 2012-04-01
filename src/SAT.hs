@@ -158,7 +158,7 @@ normalizePBAtLeast :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
 normalizePBAtLeast a =
 　case step2 $ step1 $ a of
     (xs,n)
-      | n > 0     -> (saturate n xs, n)
+      | n > 0     -> step3 (saturate n xs, n)
       | otherwise -> ([], 0) -- trivially true
   where
     -- 同じ変数が複数回現れないように、一度全部 @v@ に統一。
@@ -189,14 +189,20 @@ normalizePBAtLeast a =
     saturate :: Integer -> [(Integer,Lit)] -> [(Integer,Lit)]
     saturate n xs = [assert (c>0) (min n c, l) | (c,l) <- xs]
 
-    -- TODO: 係数のgcdをとって割ったりとかもする?
+    -- omega test と同様の係数の gcd による単純化
+    step3 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step3 ([],n) = ([],n)
+    step3 (xs,n) = ([(c `div` d, l) | (c,l) <- xs], (n+d-1) `div` d)
+      where
+        d = foldl1' gcd [c | (c,_) <- xs]
 
 {-
 -4*(not x1) + 3*x1 + 10*(not x2) >= 3
 ⇔ -4*(1 - x1) + 3*x1 + 10*(not x2) >= 3
 ⇔ -4 + 4*x1 + 3*x1 + 10*(not x2)>= 3
 ⇔ 7*x1 + 10*(not x2) >= 7
-⇒ 7*x1 + 7*(not x2) >= 7
+⇔ 7*x1 + 7*(not x2) >= 7
+⇔ x1 + (not x2) >= 1
 -}
 test_normalizePBAtLeast :: ([(Integer, Lit)],Integer)
 test_normalizePBAtLeast = normalizePBAtLeast ([(-4,-1),(3,1),(10,-2)], 3)
