@@ -1015,8 +1015,8 @@ analyzeConflict solver constr = do
                     Just constr2 -> do
                       claBumpActivity solver constr2
                       xs <- reasonOf solver constr2 (Just l)
-                      unassign solver (litVar l)
                       forM_ xs $ \lit -> varBumpActivity solver (litVar lit)
+                      unassign solver (litVar l)
                       (ys,zs) <- split xs
                       loop (IS.delete (litNot l) lits1 `IS.union` (ys `IS.difference` seen))
                            (lits2 `IS.union` zs)
