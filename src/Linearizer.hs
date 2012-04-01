@@ -73,6 +73,7 @@ setUsePB lin usePB = writeIORef (usePBRef lin) usePB
 
 -- | Translate conjunction of literals and return equivalent literal.
 translate :: Linearizer -> [SAT.Lit] -> IO SAT.Lit
+translate lin [l] = return l
 translate lin ls = do
   let ls2 = IS.fromList ls
   table <- readIORef (tableRef lin)
