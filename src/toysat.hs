@@ -149,10 +149,10 @@ mainSAT opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right cnf -> printSysInfo >> solveCNF solver cnf
+    Right cnf -> printSysInfo >> solveSAT solver cnf
 
-solveCNF :: SAT.Solver -> DIMACS.CNF -> IO ()
-solveCNF solver cnf = do
+solveSAT :: SAT.Solver -> DIMACS.CNF -> IO ()
+solveSAT solver cnf = do
   _ <- replicateM (DIMACS.numVars cnf) (SAT.newVar solver)
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
@@ -161,10 +161,16 @@ solveCNF solver cnf = do
   hFlush stdout
   when result $ do
     m <- SAT.model solver
-    forM_ (IM.toList m) $ \(var,val) ->
-      putStrLn ("v " ++ show (SAT.literal var val))
-    putStrLn "v 0"
-    hFlush stdout
+    satPrintModel m
+
+satPrintModel :: SAT.Model -> IO ()
+satPrintModel m = do
+  forM_ (split 10 (IM.toList m)) $ \xs -> do
+    putStr "v"
+    forM_ xs $ \(var,val) -> putStr (' ': show (SAT.literal var val))
+    putStrLn ""
+  putStrLn "v 0"
+  hFlush stdout
 
 -- ------------------------------------------------------------------------
 
@@ -254,9 +260,11 @@ pbNumVars (m, cs) = maximum (0 : vs)
       return $ abs lit
 
 pbPrintModel :: SAT.Model -> IO ()
-pbPrintModel m = do
-  forM_ (IM.toList m) $ \(var,val) ->
-    putStrLn ("v " ++ (if val then "" else "-") ++ "x" ++ show var)
+pbPrintModel m = do  
+  forM_ (split 10 (IM.toList m)) $ \xs -> do
+    putStr "v"
+    forM_ xs $ \(var,val) -> putStr (" " ++ (if val then "" else "-") ++ "x" ++ show var)
+    putStrLn ""
   hFlush stdout
 
 -- ------------------------------------------------------------------------
@@ -389,8 +397,10 @@ solveMaxSAT opt solver (_, top, cs) = do
 
 maxsatPrintModel :: SAT.Model -> IO ()
 maxsatPrintModel m = do
-  forM_ (IM.toList m) $ \(var,val) ->
-    putStrLn ("v " ++ show (SAT.literal var val))
+  forM_ (split 10 (IM.toList m)) $ \xs -> do
+    putStr "v"
+    forM_ xs $ \(var,val) -> putStr (' ' : show (SAT.literal var val))
+    putStrLn ""
   -- no terminating 0 is necessary
   hFlush stdout
 
@@ -506,3 +516,12 @@ solveLP solver lp = do
     nonAdjacentPairs _ = []
 
 -- ------------------------------------------------------------------------
+
+split :: Int -> [a] -> [[a]]
+split n = go
+  where
+    go [] = []
+    go xs =
+      case splitAt n xs of
+        (ys, zs) -> ys : go zs
+
