@@ -1082,25 +1082,6 @@ minimizeConflictClauseRecursive solver lits = do
   cacheRef <- newIORef IM.empty
 
   let
-    test :: Lit -> IO Bool
-    test lit = do
-      lv <- litLevel solver lit
-      if lv == levelRoot || lit `IS.member` lits
-        then return True
-        else do
-          cache <- readIORef cacheRef
-          case IM.lookup lit cache of
-            Just b -> return b
-            Nothing -> do
-              c <- varReason solver (litVar lit)
-              case c of
-                Nothing -> return False
-                Just c -> do
-                  ls <- reasonOf solver c (Just (litNot lit))
-                  ret <- allM test ls
-                  modifyIORef cacheRef (IM.insert lit ret)
-                  return ret
-
     isRedundant :: Lit -> IO Bool
     isRedundant lit = do
       c <- varReason solver (litVar lit)
@@ -1108,7 +1089,21 @@ minimizeConflictClauseRecursive solver lits = do
         Nothing -> return False
         Just c -> do
           ls <- reasonOf solver c (Just (litNot lit))
-          allM test ls
+          go ls IS.empty
+
+    go :: [Lit] -> IS.IntSet -> IO Bool
+    go [] _ = return True
+    go (lit : ls) seen = do
+      lv <- litLevel solver lit
+      if lv == levelRoot || lit `IS.member` lits || lit `IS.member` seen
+        then go ls seen
+        else do
+          c <- varReason solver (litVar lit)
+          case c of
+            Nothing -> return False
+            Just c -> do
+              ls2 <- reasonOf solver c (Just (litNot lit))
+              go (ls2 ++ ls) (IS.insert lit seen)
 
   let xs = IS.toAscList lits
   ys <- filterM (liftM not . isRedundant) xs
