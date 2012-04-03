@@ -51,6 +51,7 @@ data Options
   , optRestartInc    :: Double
   , optLearntSizeInc :: Double
   , optLinearizerPB  :: Bool
+  , optPolarityObjFun :: Bool
   }
 
 defaultOptions :: Options
@@ -61,6 +62,7 @@ defaultOptions
   , optRestartInc    = SAT.defaultRestartInc
   , optLearntSizeInc = SAT.defaultLearntSizeInc
   , optLinearizerPB  = False
+  , optPolarityObjFun = False
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -83,6 +85,9 @@ options =
     , Option [] ["linearizer-pb"]
         (NoArg (\opt -> opt{ optLinearizerPB = True }))
         "Use PB constraint in linearization."
+    , Option [] ["polarity-objfun"]
+        (NoArg (\opt -> opt{ optPolarityObjFun = True }))
+        "Set default polarity of variables according to optimize objective function."
     ]
   where
     parseOnOff :: String -> Bool
@@ -209,7 +214,7 @@ solvePB opt solver formula@(obj, cs) = do
 
     Just obj' -> do
       obj'' <- pbConvSum lin obj'
-      result <- minimize solver obj'' $ \val -> do
+      result <- minimize opt solver obj'' $ \val -> do
         putStrLn $ "o " ++ show val
         hFlush stdout
       case result of
@@ -229,8 +234,12 @@ pbConvSum lin = mapM f
       l <- Lin.translate lin ls
       return (w,l)
 
-minimize :: SAT.Solver -> [(Integer, SAT.Lit)] -> (Integer -> IO ()) -> IO (Maybe SAT.Model)
-minimize solver obj update = do
+minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (Integer -> IO ()) -> IO (Maybe SAT.Model)
+minimize opt solver obj update = do
+  when (optPolarityObjFun opt) $ do
+    forM_ obj $ \(c,l) -> do
+      let p = if c > 0 then not (SAT.litPolarity l) else SAT.litPolarity l
+      SAT.setVarPolarity solver (SAT.litVar l) p
   result <- SAT.solve solver
   if result
     then liftM Just loop
@@ -319,7 +328,7 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
     Nothing -> return ()
     Just c -> SAT.addPBAtMost solver obj (c-1)
 
-  result <- minimize solver obj $ \val -> do
+  result <- minimize opt solver obj $ \val -> do
      putStrLn $ "o " ++ show val
      hFlush stdout
   case result of
@@ -414,10 +423,10 @@ mainLP opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right lp -> printSysInfo >> solveLP solver lp
+    Right lp -> printSysInfo >> solveLP opt solver lp
 
-solveLP :: SAT.Solver -> LPFile.LP -> IO ()
-solveLP solver lp = do
+solveLP :: Options -> SAT.Solver -> LPFile.LP -> IO ()
+solveLP opt solver lp = do
   if not (Set.null nbvs)
     then do
       hPutStrLn stderr ("cannot handle non-binary variables: " ++ intercalate ", " (Set.toList nbvs))
@@ -478,7 +487,7 @@ solveLP solver lp = do
               (if LPFile.dir lp == LPFile.OptMin then 1 else -1)
           obj2 = [(numerator (r * fromIntegral d), vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- obj]
 
-      result <- minimize solver obj2 $ \val -> do
+      result <- minimize opt solver obj2 $ \val -> do
         putStrLn $ "o " ++ show (fromIntegral val / fromIntegral d :: Double)
         hFlush stdout
 

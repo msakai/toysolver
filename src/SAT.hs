@@ -47,6 +47,7 @@ module SAT
   , defaultRestartInc
   , setLearntSizeInc
   , defaultLearntSizeInc
+  , setVarPolarity
 
   -- * Solving
   , solve
@@ -906,6 +907,12 @@ setLearntSizeInc solver !r = writeIORef (svLearntSizeInc solver) r
 -- | default value for @LearntSizeInc@.
 defaultLearntSizeInc :: Double
 defaultLearntSizeInc = 1.1
+
+-- | The default polarity of a variable.
+setVarPolarity :: Solver -> Var -> Bool -> IO ()
+setVarPolarity solver v val = do
+  vd <- varData solver v
+  writeIORef (vdPolarity vd) val
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
