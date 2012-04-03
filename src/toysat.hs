@@ -50,7 +50,7 @@ data Options
   , optRestartFirst  :: Int
   , optRestartInc    :: Double
   , optLearntSizeInc :: Double
-  , optLinearizePB   :: Bool
+  , optLinearizerPB  :: Bool
   }
 
 defaultOptions :: Options
@@ -60,7 +60,7 @@ defaultOptions
   , optRestartFirst  = SAT.defaultRestartFirst
   , optRestartInc    = SAT.defaultRestartInc
   , optLearntSizeInc = SAT.defaultLearntSizeInc
-  , optLinearizePB   = False
+  , optLinearizerPB  = False
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -80,9 +80,9 @@ options =
     , Option [] ["learnt-size-inc"]
         (ReqArg (\val opt -> opt{ optLearntSizeInc = read val }) "<real>")
         (printf "The limit for learnt clauses is multiplied with this factor each restart. (default %f)" SAT.defaultLearntSizeInc)
-    , Option [] ["linearize-pb"]
-        (ReqArg (\val opt -> opt{ optLinearizePB = parseOnOff val }) "<on|off>")
-        "Use PB constraint for linearization. (default off)"
+    , Option [] ["linearizer-pb"]
+        (NoArg (\opt -> opt{ optLinearizerPB = True }))
+        "Use PB constraint in linearization."
     ]
   where
     parseOnOff :: String -> Bool
@@ -189,7 +189,7 @@ solvePB opt solver formula@(obj, cs) = do
   let n = pbNumVars formula
   _ <- replicateM n (SAT.newVar solver)
   lin <- Lin.newLinearizer solver
-  Lin.setUsePB lin (optLinearizePB opt)
+  Lin.setUsePB lin (optLinearizerPB opt)
 
   forM_ cs $ \(lhs, op, rhs) -> do
     lhs' <- pbConvSum lin lhs
@@ -298,7 +298,7 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
   let nvar = wboNumVars formula
   _ <- replicateM nvar (SAT.newVar solver)
   lin <- Lin.newLinearizer solver
-  Lin.setUsePB lin (optLinearizePB opt)
+  Lin.setUsePB lin (optLinearizerPB opt)
 
   obj <- liftM concat $ forM cs $ \(cost, (lhs, op, rhs)) -> do
     lhs' <- pbConvSum lin lhs
