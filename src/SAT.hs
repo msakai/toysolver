@@ -1093,8 +1093,6 @@ minimizeConflictClauseLocal solver lits = do
 
 minimizeConflictClauseRecursive :: Solver -> LitSet -> IO LitSet
 minimizeConflictClauseRecursive solver lits = do
-  cacheRef <- newIORef IM.empty
-
   let
     isRedundant :: Lit -> IO Bool
     isRedundant lit = do
