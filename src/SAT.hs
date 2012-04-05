@@ -47,6 +47,8 @@ module SAT
   , defaultRestartInc
   , setLearntSizeInc
   , defaultLearntSizeInc
+  , setCCMin
+  , defaultCCMin
   , setVarPolarity
   , setLogger
 
@@ -350,6 +352,9 @@ data Solver
   -- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
   , svLearntSizeInc :: !(IORef Double)
 
+  -- | Controls conflict clause minimization (0=none, 1=local, 2=recursive)
+  , svCCMin :: !(IORef Int)
+
   , svLogger :: !(IORef (Maybe (String -> IO ())))
   }
 
@@ -596,6 +601,7 @@ newSolver = do
   restartFirst <- newIORef defaultRestartFirst
   restartInc <- newIORef defaultRestartInc
   learntSizeInc <- newIORef defaultLearntSizeInc
+  ccMin <- newIORef defaultCCMin
 
   logger <- newIORef Nothing
 
@@ -621,6 +627,7 @@ newSolver = do
     , svRestartFirst = restartFirst
     , svRestartInc   = restartInc
     , svLearntSizeInc = learntSizeInc
+    , svCCMin = ccMin
     , svLogger = logger
     }
 
@@ -915,6 +922,14 @@ setLearntSizeInc solver !r = writeIORef (svLearntSizeInc solver) r
 defaultLearntSizeInc :: Double
 defaultLearntSizeInc = 1.1
 
+-- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
+setCCMin :: Solver -> Int -> IO ()
+setCCMin solver !v = writeIORef (svCCMin solver) v
+
+-- | default value for @CCMin@.
+defaultCCMin :: Int
+defaultCCMin = 2
+
 -- | The default polarity of a variable.
 setVarPolarity :: Solver -> Var -> Bool -> IO ()
 setVarPolarity solver v val = do
@@ -1051,7 +1066,14 @@ analyzeConflict solver constr = do
   (ys,zs) <- split conflictClause
   lits <- loop ys zs IS.empty
 
-  lits <- minimizeConflictClauseRecursive solver lits
+  lits <- do
+    ccmin <- readIORef (svCCMin solver)
+    if ccmin >= 2 then
+       minimizeConflictClauseRecursive solver lits
+     else if ccmin >= 1 then
+       minimizeConflictClauseLocal solver lits
+     else
+       return lits
 
   when debugMode $ do
     let f l = do
