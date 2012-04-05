@@ -142,6 +142,10 @@ newSolver opts = do
   SAT.setRestartFirst  solver (optRestartFirst opts)
   SAT.setRestartInc    solver (optRestartInc opts)
   SAT.setLearntSizeInc solver (optLearntSizeInc opts)
+  SAT.setLogger solver $ \str -> do
+    putStr "c "
+    putStrLn str
+    hFlush stdout
   return solver
 
 -- ------------------------------------------------------------------------

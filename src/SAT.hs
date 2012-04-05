@@ -40,7 +40,7 @@ module SAT
   , addPBAtMost
   , addPBExactly
 
-  -- * Parameters
+  -- * Solver configulation
   , setRestartFirst
   , defaultRestartFirst
   , setRestartInc
@@ -48,6 +48,7 @@ module SAT
   , setLearntSizeInc
   , defaultLearntSizeInc
   , setVarPolarity
+  , setLogger
 
   -- * Solving
   , solve
@@ -66,6 +67,7 @@ module SAT
   , normalizePBAtLeast
   ) where
 
+import Prelude hiding (log)
 import Control.Monad
 import Control.Exception
 import Data.Array.IO
@@ -79,7 +81,6 @@ import qualified Data.IntSet as IS
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified PriorityQueue as PQ
-import System.IO
 import System.CPUTime
 import Text.Printf
 import LBool
@@ -348,6 +349,8 @@ data Solver
 
   -- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
   , svLearntSizeInc :: !(IORef Double)
+
+  , svLogger :: !(IORef (Maybe (String -> IO ())))
   }
 
 markBad :: Solver -> IO ()
@@ -393,11 +396,11 @@ assign_ solver !lit reason = assert (validLit lit) $ do
       modifyIORef (svAssigned solver) (IM.insertWith (++) lv [lit])
       bcpEnqueue solver lit
 
-      when debugMode $ do
+      when debugMode $ logIO solver $ do
         let r = case reason of
                   Nothing -> ""
                   Just _ -> " by propagation"
-        debugPrintf "assign(level=%d): %d%s\n" lv lit r
+        return $ printf "assign(level=%d): %d%s" lv lit r
 
       return True
 
@@ -440,15 +443,17 @@ watches solver !lit = do
 attachConstraint :: Constraint c => Solver -> c -> IO ()
 attachConstraint solver c = do
   modifyIORef (svClauseDB solver) (toConstraint c : )
-  str <- showConstraint solver c
-  when debugMode $ debugPrintf "constraint %s is added\n" str
+  when debugMode $ logIO solver $ do
+    str <- showConstraint solver c
+    return $ printf "constraint %s is added" str
   sanityCheck solver
 
 attachLearntConstraint :: Constraint c => Solver -> c -> IO ()
 attachLearntConstraint solver c = do
   modifyIORef (svLearntDB solver) $ \(n,xs) -> (n+1, toConstraint c : xs)
-  str <- showConstraint solver c
-  when debugMode $ debugPrintf "constraint %s is added\n" str
+  when debugMode $ logIO solver $ do
+    str <- showConstraint solver c
+    return $ printf "constraint %s is added" str
   sanityCheck solver
 
 removeConstraint :: Solver -> SomeConstraint -> IO ()
@@ -486,8 +491,7 @@ reduceDB solver = do
   let cs2 = zs2 ++ map fst ws
       n2 = length cs2
 
-  when debugMode $ do
-    debugPrintf "reduceDB: %d -> %d\n" n n2
+  when debugMode $ log solver $ printf "reduceDB: %d -> %d" n n2
   writeIORef (svLearntDB solver) (n2,cs2)
 
 type VarActivity = Double
@@ -593,6 +597,8 @@ newSolver = do
   restartInc <- newIORef defaultRestartInc
   learntSizeInc <- newIORef defaultLearntSizeInc
 
+  logger <- newIORef Nothing
+
   return $
     Solver
     { svOk = ok
@@ -615,6 +621,7 @@ newSolver = do
     , svRestartFirst = restartFirst
     , svRestartInc   = restartInc
     , svLearntSizeInc = learntSizeInc
+    , svLogger = logger
     }
 
 ltVar :: (Var,VarActivity) -> (Var,VarActivity) -> Bool
@@ -779,7 +786,7 @@ addPBExactly solver ts n = do
 -- Returns 'False' if the problem is UNSATISFIABLE.
 solve :: Solver -> IO Bool
 solve solver = do
-  debugPrintf "Solving starts ...\n"
+  log solver "Solving starts ..."
   writeIORef (svModel solver) Nothing
 
   ok <- readIORef (svOk solver)
@@ -821,10 +828,10 @@ solve solver = do
 
       when debugMode $ dumpVarActivity solver
       when debugMode $ dumpClaActivity solver
-      debugPrintf "solving time = %.3fs\n" (fromIntegral (end - start) / 10^(12::Int) :: Double)
-      debugPrintf "#decision = %d\n" =<< readIORef (svNDecision solver)
-      debugPrintf "#conflict = %d\n" =<< readIORef (svNConflict solver)
-      debugPrintf "#restart = %d\n" =<< readIORef (svNRestart solver)
+      (log solver . printf "solving time = %.3fs") (fromIntegral (end - start) / 10^(12::Int) :: Double)
+      (log solver . printf "#decision = %d") =<< readIORef (svNDecision solver)
+      (log solver . printf "#conflict = %d") =<< readIORef (svNConflict solver)
+      (log solver . printf "#restart = %d")  =<< readIORef (svNRestart solver)
 
       return result
 
@@ -854,9 +861,9 @@ search solver !conflict_lim !learnt_lim = loop 0
           modifyIORef' (svNConflict solver) (+1)
           d <- readIORef (svLevel solver)
 
-          when debugMode $ do
+          when debugMode $ logIO solver $ do
             str <- showConstraint solver constr
-            debugPrintf "conflict(level=%d): %s\n" d str
+            return $ printf "conflict(level=%d): %s" d str
 
           if d == levelRoot
             then return (Just False)
@@ -1055,7 +1062,7 @@ analyzeConflict solver constr = do
       xs <- forM (IS.toList lits) $ \l -> do
         lv <- litLevel solver l
         return (l,lv)
-      error $ printf "analyzeConflict: not assertive: %s\n" (show xs)
+      error $ printf "analyzeConflict: not assertive: %s" (show xs)
 
   return $ IS.toList lits
 
@@ -1064,9 +1071,9 @@ minimizeConflictClauseLocal solver lits = do
   let xs = IS.toAscList lits
   ys <- filterM (liftM not . isRedundant) xs
   when debugMode $ do
-    debugPrintf $ "minimizeConflictClauseLocal:\n"
-    debugPrint xs
-    debugPrint ys
+    log solver "minimizeConflictClauseLocal:"
+    log solver $ show xs
+    log solver $ show ys
   return $ IS.fromAscList $ ys
 
   where
@@ -1115,16 +1122,16 @@ minimizeConflictClauseRecursive solver lits = do
   let xs = IS.toAscList lits
   ys <- filterM (liftM not . isRedundant) xs
   when debugMode $ do
-    debugPrintf $ "minimizeConflictClauseRecursive:\n"
-    debugPrint xs
-    debugPrint ys
+    log solver "minimizeConflictClauseRecursive:"
+    log solver $ show xs
+    log solver $ show ys
   return $ IS.fromAscList $ ys
 
 -- | Revert to the state at given level
 -- (keeping all assignment at @level@ but not beyond).
 backtrackTo :: Solver -> Int -> IO ()
 backtrackTo solver level = do
-  when debugMode $ debugPrintf "backtrackTo: %d\n" level
+  when debugMode $ log solver $ printf "backtrackTo: %d" level
   m <- readIORef (svAssigned solver)
   m' <- loop m
   writeIORef (svAssigned solver) m'
@@ -1326,7 +1333,9 @@ instance Constraint ClauseData where
         i <- findForWatch 2 ub
         case i of
           -1 -> do
-            when debugMode $ debugPrintf "basicPropagate: %s is unit\n" =<< showConstraint s this
+            when debugMode $ logIO s $ do
+               str <- showConstraint s this
+               return $ printf "basicPropagate: %s is unit" str
             watch s falsifiedLit this
             assignBy s lit0 this
           _  -> do
@@ -1435,7 +1444,9 @@ instance Constraint AtLeastData where
     ret <- findForWatch (n+1) ub
     case ret of
       Nothing -> do
-        when debugMode $ debugPrintf "basicPropagate: %s is unit\n" =<< showConstraint s this
+        when debugMode $ logIO s $ do
+          str <- showConstraint s this
+          return $ printf "basicPropagate: %s is unit" str
         watch s falsifiedLit this
         let loop :: Int -> IO Bool
             loop i
@@ -1557,9 +1568,9 @@ instance Constraint PBAtLeastData where
       else do
         let ls = [l1 | (l1,c1) <- IM.toList m, c1 > s]
         when (not (null ls)) $ do
-          when debugMode $ do
+          when debugMode $ logIO solver $ do
             str <- showConstraint solver this
-            debugPrintf "basicPropagate: %s is unit (new slack = %d)\n" str s
+            return $ printf "basicPropagate: %s is unit (new slack = %d)" str s
           forM_ ls $ \l1 -> do
             v <- litValue solver l1
             when (v == lUndef) $ do
@@ -1642,12 +1653,6 @@ modifyIORef' ref f = do
 debugMode :: Bool
 debugMode = False
 
-debugPrintf :: HPrintfType r => String -> r
-debugPrintf s = hPrintf stderr ("c " ++ s)
-
-debugPrint :: Show a => a -> IO ()
-debugPrint a = hPutStr stderr "c " >> hPrint stderr a
-
 checkSatisfied :: Solver -> IO ()
 checkSatisfied solver = do
   cls <- readIORef (svClauseDB solver)
@@ -1675,20 +1680,35 @@ sanityCheck solver = do
 
 dumpVarActivity :: Solver -> IO ()
 dumpVarActivity solver = do
-  debugPrintf "Variable activity:\n"
+  log solver "Variable activity:"
   vs <- variables solver
   forM_ vs $ \v -> do
     activity <- varActivity solver v
-    debugPrintf "activity(%d) = %d\n" v activity
+    log solver $ printf "activity(%d) = %d" v activity
 
 dumpClaActivity :: Solver -> IO ()
 dumpClaActivity solver = do
-  debugPrintf "Learnt clause activity:\n"
+  log solver "Learnt clause activity:"
   xs <- learnt solver
   forM_ xs $ \c@(ConstrClause (ClauseData _ act)) -> do
     s <- showConstraint solver c
     aval <- readIORef act
-    debugPrintf "activity(%s) = %f\n" s aval
+    log solver $ printf "activity(%s) = %f" s aval
+
+-- | set callback function for receiving messages.
+setLogger :: Solver -> (String -> IO ()) -> IO ()
+setLogger solver logger = do
+  writeIORef (svLogger solver) (Just logger)
+
+log :: Solver -> String -> IO ()
+log solver msg = logIO solver (return msg)
+
+logIO :: Solver -> IO String -> IO ()
+logIO solver action = do
+  m <- readIORef (svLogger solver)
+  case m of
+    Nothing -> return ()
+    Just logger -> action >>= logger
 
 {--------------------------------------------------------------------
   test
