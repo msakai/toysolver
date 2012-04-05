@@ -50,6 +50,7 @@ data Options
   , optRestartFirst  :: Int
   , optRestartInc    :: Double
   , optLearntSizeInc :: Double
+  , optCCMin         :: Int
   , optLinearizerPB  :: Bool
   , optPolarityObjFun :: Bool
   }
@@ -61,6 +62,7 @@ defaultOptions
   , optRestartFirst  = SAT.defaultRestartFirst
   , optRestartInc    = SAT.defaultRestartInc
   , optLearntSizeInc = SAT.defaultLearntSizeInc
+  , optCCMin         = SAT.defaultCCMin
   , optLinearizerPB  = False
   , optPolarityObjFun = False
   }
@@ -82,6 +84,10 @@ options =
     , Option [] ["learnt-size-inc"]
         (ReqArg (\val opt -> opt{ optLearntSizeInc = read val }) "<real>")
         (printf "The limit for learnt clauses is multiplied with this factor each restart. (default %f)" SAT.defaultLearntSizeInc)
+    , Option [] ["ccmin"]
+        (ReqArg (\val opt -> opt{ optCCMin = read val }) "<int>")
+        (printf "Conflict clause minimization (0=none, 1=local, 2=recursive; default %d)" SAT.defaultCCMin)
+
     , Option [] ["linearizer-pb"]
         (NoArg (\opt -> opt{ optLinearizerPB = True }))
         "Use PB constraint in linearization."
@@ -142,6 +148,7 @@ newSolver opts = do
   SAT.setRestartFirst  solver (optRestartFirst opts)
   SAT.setRestartInc    solver (optRestartInc opts)
   SAT.setLearntSizeInc solver (optLearntSizeInc opts)
+  SAT.setCCMin         solver (optCCMin opts)
   SAT.setLogger solver $ \str -> do
     putStr "c "
     putStrLn str
