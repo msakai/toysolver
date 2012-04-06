@@ -104,7 +104,7 @@ Executable toysat
      PBFile
      PriorityQueue
      Linearizer
-  Build-Depends: base >=4 && <5, containers >= 0.4.2, array, parsec, bytestring, parse-dimacs, queue, OptDir
+  Build-Depends: base >=4 && <5, containers >= 0.4.2, array, parsec, bytestring, parse-dimacs, queue, OptDir, time, old-locale
   Extensions:
      MultiParamTypeClasses
      FlexibleInstances

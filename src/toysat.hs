@@ -28,9 +28,12 @@ import Data.List
 import Data.Maybe
 import Data.Ratio
 import Data.Version
+import Data.Time.LocalTime
+import Data.Time.Format
 import System.IO
 import System.Environment
 import System.Exit
+import System.Locale
 import System.Console.GetOpt
 import qualified System.Info as SysInfo
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
@@ -141,6 +144,8 @@ printSysInfo = do
   hPrintf stdout "c arch = %s\n" SysInfo.arch
   hPrintf stdout "c os = %s\n" SysInfo.os
   hPrintf stdout "c compiler = %s %s\n" SysInfo.compilerName (showVersion SysInfo.compilerVersion)
+  tm <- getZonedTime
+  hPrintf stdout "c %s\n" (formatTime defaultTimeLocale "%FT%X%z" tm)
 
 newSolver :: Options -> IO SAT.Solver
 newSolver opts = do
