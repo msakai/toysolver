@@ -99,6 +99,26 @@ testPB1 = do
   ret <- solve solver
   assertEqual "testPB1" True ret
 
+testAssumption :: IO ()
+testAssumption = do
+  solver <- newSolver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- newVar solver
+  addClause solver [x1, x2]       -- x1 or x2
+  addClause solver [x1, -x2]      -- x1 or not x2
+  addClause solver [-x1, -x2]     -- not x1 or not x2
+  addClause solver [-x3, -x1, x2] -- not x3 or not x1 or x2
+
+  ret <- solve solver -- sat
+  assertEqual "testAssumpttion1" True ret
+
+  ret <- solveWith solver [x3] -- unsat
+  assertEqual "testAssumpttion2" False ret  
+
+  ret <- solve solver -- sat
+  assertEqual "testAssumpttion3" True ret
+
 ------------------------------------------------------------------------
 -- Test harness
 
@@ -114,6 +134,7 @@ tests =
     , testCase "testAtLeast1" testAtLeast1
     , testCase "testAtLeast2" testAtLeast2
     , testCase "testPB1" testPB1
+    , testCase "testAssumption" testAssumption
     ]
 {-
     [ testProperty "bernstein" pHash

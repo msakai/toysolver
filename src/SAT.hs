@@ -54,6 +54,7 @@ module SAT
 
   -- * Solving
   , solve
+  , solveWith
 
   -- * Read state
   , nVars
@@ -103,6 +104,9 @@ validVar v = v > 0
 -- | Positive (resp. negative) literals are represented as positive (resp.
 -- negative) integers. (DIMACS format).
 type Lit = Int
+
+litUndef :: Lit
+litUndef = 0
 
 type LitSet = IS.IntSet
 type LitMap = IM.IntMap
@@ -324,6 +328,7 @@ data Solver
   , svVarData      :: !(IORef (IOArray Int VarData))
   , svClauseDB     :: !(IORef [SomeConstraint])
   , svLearntDB     :: !(IORef (Int,[SomeConstraint]))
+  , svAssumptions  :: !(IORef (IOUArray Int Lit))
   , svLevel        :: !(IORef Level)
   , svBCPQueue     :: !(IORef (Seq.Seq Lit))
   , svModel        :: !(IORef (Maybe (VarMap Bool)))
@@ -587,6 +592,7 @@ newSolver = do
   vars <- newIORef =<< newArray_ (1,0)
   db  <- newIORef []
   db2 <- newIORef (0,[])
+  as  <- newIORef =<< newArray_ (0,-1)
   lv  <- newIORef levelRoot
   q   <- newIORef Seq.empty
   m   <- newIORef Nothing
@@ -614,6 +620,7 @@ newSolver = do
     , svVarData    = vars
     , svClauseDB   = db
     , svLearntDB   = db2
+    , svAssumptions = as
     , svLevel      = lv
     , svBCPQueue   = q
     , svModel      = m
@@ -793,6 +800,23 @@ addPBExactly solver ts n = do
 -- Returns 'False' if the problem is UNSATISFIABLE.
 solve :: Solver -> IO Bool
 solve solver = do
+  as <- newArray_ (0,-1)
+  writeIORef (svAssumptions solver) as
+  solve_ solver
+
+-- | Solve constraints under assuptions.
+-- Returns 'True' if the problem is SATISFIABLE.
+-- Returns 'False' if the problem is UNSATISFIABLE.
+solveWith :: Solver
+          -> [Lit]    -- ^ Assumptions
+          -> IO Bool
+solveWith solver ls = do
+  as <- newListArray (0, length ls -1) ls
+  writeIORef (svAssumptions solver) as
+  solve_ solver
+
+solve_ :: Solver -> IO Bool
+solve_ solver = do
   log solver "Solving starts ..."
   writeIORef (svModel solver) Nothing
 
@@ -856,10 +880,16 @@ search solver !conflict_lim !learnt_lim = loop 0
           n <- nLearnt solver
           when (learnt_lim >= 0 && n > learnt_lim) $ reduceDB solver
 
-          r <- pickBranchLit solver
+          r <- pickAssumption
           case r of
-            Nothing -> return (Just True)
-            Just lit -> decide solver lit >> loop c
+            Nothing -> return (Just False)
+            Just lit
+              | lit /= litUndef -> decide solver lit >> loop c
+              | otherwise -> do
+                  r <- pickBranchLit solver
+                  case r of
+                    Nothing -> return (Just True)
+                    Just lit -> decide solver lit >> loop c
 
         Just constr -> do
           varDecayActivity solver
@@ -883,6 +913,29 @@ search solver !conflict_lim !learnt_lim = loop 0
               assignBy solver lit cl
               claBumpActivity solver cl
               loop (c+1)
+
+    pickAssumption :: IO (Maybe Lit)
+    pickAssumption = do
+      !as <- readIORef (svAssumptions solver)
+      !b <- getBounds as
+      let go = do
+              d <- readIORef (svLevel solver)
+              if not (inRange b (d+1))
+                then return (Just litUndef)
+                else do
+                  l <- readArray as (d+1)
+                  val <- litValue solver l
+                  if val == lTrue then do
+                     -- dummy decision level
+                     modifyIORef' (svLevel solver) (+1)
+                     go
+                   else if val == lFalse then
+                     -- conflict with assumption
+                     return Nothing
+                   else
+                     return (Just l)
+      go
+
 
 -- | A model is represented as a mapping from variables to its values.
 type Model = IM.IntMap Bool
