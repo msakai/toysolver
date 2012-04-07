@@ -40,6 +40,14 @@ module SAT
   , addPBAtMost
   , addPBExactly
 
+  -- * Solving
+  , solve
+  , solveWith
+
+  -- * Extract results
+  , Model
+  , model
+
   -- * Solver configulation
   , setRestartFirst
   , defaultRestartFirst
@@ -52,19 +60,11 @@ module SAT
   , setVarPolarity
   , setLogger
 
-  -- * Solving
-  , solve
-  , solveWith
-
   -- * Read state
   , nVars
   , nAssigns
   , nClauses
   , nLearnt
-
-  -- * Extract results
-  , Model
-  , model
 
   -- * Internal API
   , normalizePBAtLeast
@@ -95,7 +95,6 @@ import LBool
 -- | Variable is represented as positive integers (DIMACS format).
 type Var = Int
 
-type VarSet = IS.IntSet
 type VarMap = IM.IntMap
 
 validVar :: Var -> Bool
@@ -654,15 +653,15 @@ newVar s = do
   vd <- newVarData
 
   a <- readIORef (svVarData s)
-  (lb,ub) <- getBounds a
+  (_,ub) <- getBounds a
   if v <= ub
     then writeArray a v vd
     else do
       let ub' = max 2 (ub * 3 `div` 2)
       a' <- newArray_ (1,ub')
-      forM_ [1..ub] $ \v -> do
-        vd <- readArray a v
-        writeArray a' v vd
+      forM_ [1..ub] $ \v2 -> do
+        vd2 <- readArray a v2
+        writeArray a' v2 vd2
       writeArray a' v vd
       writeIORef (svVarData s) a'
 
@@ -674,8 +673,8 @@ addClause solver lits = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
-  lits <- instantiateClause solver lits
-  case normalizeClause =<< lits of
+  lits2 <- instantiateClause solver lits
+  case normalizeClause =<< lits2 of
     Nothing -> return ()
     Just [] -> markBad solver
     Just [lit] -> do
@@ -685,8 +684,8 @@ addClause solver lits = do
       case ret of
         Nothing -> return ()
         Just _ -> markBad solver
-    Just lits'@(l1:l2:_) -> do
-      clause <- newClauseData lits' False
+    Just lits3@(l1:l2:_) -> do
+      clause <- newClauseData lits3 False
       watch solver l1 clause
       watch solver l2 clause
       attachConstraint solver clause
@@ -886,10 +885,10 @@ search solver !conflict_lim !learnt_lim = loop 0
             Just lit
               | lit /= litUndef -> decide solver lit >> loop c
               | otherwise -> do
-                  r <- pickBranchLit solver
-                  case r of
-                    Nothing -> return (Just True)
-                    Just lit -> decide solver lit >> loop c
+                  lit <- pickBranchLit solver
+                  if lit == litUndef
+                    then return (Just True)
+                    else decide solver lit >> loop c
 
         Just constr -> do
           varDecayActivity solver
@@ -993,15 +992,15 @@ setVarPolarity solver v val = do
   API for implementation of @solve@
 --------------------------------------------------------------------}
 
-pickBranchLit :: Solver -> IO (Maybe Lit)
+pickBranchLit :: Solver -> IO Lit
 pickBranchLit !solver = do
   let vqueue = svVarQueue solver
 
-      loop :: IO (Maybe Lit)
+      loop :: IO Lit
       loop = do
         m <- PQ.dequeue vqueue
         case m of
-          Nothing -> return Nothing
+          Nothing -> return litUndef
           Just (var,_) -> do
             val <- varValue solver var
             if val /= lUndef
@@ -1010,7 +1009,7 @@ pickBranchLit !solver = do
                 vd <- varData solver var
                 p <- readIORef (vdPolarity vd)
                 let lit = literal var p
-                seq lit $ return (Just lit)
+                seq lit $ return lit
   loop
 
 decide :: Solver -> Lit -> IO ()
@@ -1782,92 +1781,3 @@ logIO solver action = do
   case m of
     Nothing -> return ()
     Just logger -> action >>= logger
-
-{--------------------------------------------------------------------
-  test
---------------------------------------------------------------------}
-
--- should be SAT
-test1 :: IO ()
-test1 = do
-  solver <- newSolver
-  x1 <- newVar solver
-  x2 <- newVar solver
-  addClause solver [literal x1 True,  literal x2 True]  -- x1 or x2
-  addClause solver [literal x1 True,  literal x2 False] -- x1 or not x2
-  addClause solver [literal x1 False, literal x2 False] -- not x1 or not x2
-  print =<< solve solver
-
--- shuld be UNSAT
-test2 :: IO ()
-test2 = do
-  solver <- newSolver
-  x1 <- newVar solver
-  x2 <- newVar solver
-  addClause solver [literal x1 True,  literal x2 True]  -- x1 or x2
-  addClause solver [literal x1 False, literal x2 True]  -- not x1 or x2
-  addClause solver [literal x1 True,  literal x2 False] -- x1 or not x2
-  addClause solver [literal x1 False, literal x2 False] -- not x2 or not x2
-  print =<< solve solver
-
--- top level でいきなり矛盾
-test3 :: IO ()
-test3 = do
-  solver <- newSolver
-  x1 <- newVar solver
-  addClause solver [literal x1 True]
-  addClause solver [literal x1 False]
-  print =<< solve solver -- unsat
-
--- incremental に制約を追加
-test4 :: IO ()
-test4 = do
-  solver <- newSolver
-  x1 <- newVar solver
-  x2 <- newVar solver
-  addClause solver [literal x1 True,  literal x2 True]  -- x1 or x2
-  addClause solver [literal x1 True,  literal x2 False] -- x1 or not x2
-  addClause solver [literal x1 False, literal x2 False] -- not x1 or not x2
-  print =<< solve solver -- sat
-  addClause solver [literal x1 False, literal x2 True]  -- not x1 or x2
-  print =<< solve solver -- unsat
-
-testAtLeast1 :: IO ()
-testAtLeast1 = do
-  solver <- newSolver
-  x1 <- newVar solver
-  x2 <- newVar solver
-  x3 <- newVar solver
-  addAtLeast solver [x1,x2,x3] 2
-  addAtLeast solver [-x1,-x2,-x3] 2
-  print =<< solve solver -- unsat
-
-testAtLeast2 :: IO ()
-testAtLeast2 = do
-  solver <- newSolver
-  x1 <- newVar solver
-  x2 <- newVar solver
-  x3 <- newVar solver
-  x4 <- newVar solver
-  addAtLeast solver [x1,x2,x3,x4] 2
-  addClause solver [-x1,-x2]
-  addClause solver [-x1,-x3]
-  print =<< solve solver
-
--- from http://www.cril.univ-artois.fr/PB11/format.pdf
-testPB1 :: IO ()
-testPB1 = do
-  solver <- newSolver
-
-  x1 <- newVar solver
-  x2 <- newVar solver
-  x3 <- newVar solver
-  x4 <- newVar solver
-  x5 <- newVar solver
-
-  addPBAtLeast solver [(1,x1),(4,x2),(-2,x5)] 2
-  addPBAtLeast solver [(-1,x1),(4,x2),(-2,x5)] 3
-  addPBAtLeast solver [(12345678901234567890,x4),(4,x3)] 10
-  addPBExactly solver [(2,x2),(3,x4),(2,x1),(3,x5)] 5
-
-  print =<< solve solver

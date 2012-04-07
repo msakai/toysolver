@@ -17,12 +17,10 @@ module Main where
 
 import Control.Monad
 import Data.Array.IArray
-import Data.Char
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.IntMap as IM
 import qualified Data.Set as Set
 import qualified Data.Map as Map
-import Data.Char
 import Data.Function
 import Data.List
 import Data.Maybe
@@ -98,13 +96,6 @@ options =
         (NoArg (\opt -> opt{ optPolarityObjFun = True }))
         "Set default polarity of variables according to optimize objective function."
     ]
-  where
-    parseOnOff :: String -> Bool
-    parseOnOff s =
-      case map toLower s of
-        "on"  -> True
-        "off" -> False
-        _     -> error $ "parseOnOff: " ++ show s ++ " is not \"on\" or \"off\""
 
 main :: IO ()
 main = do
@@ -170,10 +161,10 @@ mainSAT opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right cnf -> printSysInfo >> solveSAT solver cnf
+    Right cnf -> printSysInfo >> solveSAT opt solver cnf
 
-solveSAT :: SAT.Solver -> DIMACS.CNF -> IO ()
-solveSAT solver cnf = do
+solveSAT :: Options -> SAT.Solver -> DIMACS.CNF -> IO ()
+solveSAT _ solver cnf = do
   _ <- replicateM (DIMACS.numVars cnf) (SAT.newVar solver)
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
@@ -333,12 +324,12 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
           PBFile.Ge -> SAT.addPBAtLeast solver lhs' rhs
           PBFile.Eq -> SAT.addPBExactly solver lhs' rhs
         return []
-      Just cost -> do
+      Just cval -> do
         sel <- SAT.newVar solver
         case op of
           PBFile.Ge -> wboAddAtLeast solver sel lhs' rhs
           PBFile.Eq -> wboAddExactly solver sel lhs' rhs
-        return [(cost, SAT.litNot sel)]
+        return [(cval, SAT.litNot sel)]
 
   case tco of
     Nothing -> return ()
@@ -380,11 +371,11 @@ mainMaxSAT opt solver args = do
          _ -> showHelp stderr  >> exitFailure
   let (l:ls) = filter (not . isComment) (lines s)
   let wcnf = case words l of
-        (["p","wcnf", nvar, nclause, top]) ->
+        (["p","wcnf", nvar, _nclause, top]) ->
           (read nvar, read top, map parseWCNFLine ls)
-        (["p","wcnf", nvar, nclause]) ->
+        (["p","wcnf", nvar, _nclause]) ->
           (read nvar, 2^(63::Int), map parseWCNFLine ls)
-        (["p","cnf", nvar, nclause]) ->
+        (["p","cnf", nvar, _nclause]) ->
           (read nvar, 2, map parseCNFLine ls)
         _ -> error "parse error"
   printSysInfo >> solveMaxSAT opt solver wcnf
@@ -467,7 +458,7 @@ solveLP opt solver lp = do
           LPFile.PosInf   -> return ()
 
       putStrLn "c Loading constraints"
-      forM_ (LPFile.constraints lp) $ \(label, indicator, (lhs, op, rhs)) -> do
+      forM_ (LPFile.constraints lp) $ \(_label, indicator, (lhs, op, rhs)) -> do
         let d = foldl' lcm 1 (map denominator  (rhs:[r | LPFile.Term r _ <- lhs]))
             lhs' = [(asInteger (r * fromIntegral d), vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- lhs]
             rhs' = asInteger (rhs * fromIntegral d)
@@ -490,15 +481,15 @@ solveLP opt solver lp = do
               _ -> return ()
 
       putStrLn "c Loading SOS constraints"
-      forM_ (LPFile.sos lp) $ \(label, typ, xs) -> do
+      forM_ (LPFile.sos lp) $ \(_label, typ, xs) -> do
         case typ of
           LPFile.S1 -> SAT.addAtMost solver (map ((vmap Map.!) . fst) xs) 1
           LPFile.S2 -> do
             let ps = nonAdjacentPairs $ map fst $ sortBy (compare `on` snd) $ xs
             forM_ ps $ \(x1,x2) -> do
-              SAT.addClause solver [SAT.litNot (vmap Map.! x1) | v <- [x1,x2]]
+              SAT.addClause solver [SAT.litNot (vmap Map.! v) | v <- [x1,x2]]
 
-      let (label,obj) = LPFile.objectiveFunction lp      
+      let (_label,obj) = LPFile.objectiveFunction lp      
           d = foldl' lcm 1 [denominator r | LPFile.Term r _ <- obj] *
               (if LPFile.dir lp == LPFile.OptMin then 1 else -1)
           obj2 = [(numerator (r * fromIntegral d), vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- obj]
