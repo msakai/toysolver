@@ -293,4 +293,15 @@ kuhn_7_3 = IM.fromList
 
 test_kuhn_7_3 = simplex OptMin kuhn_7_3
 
+-- from http://www.math.cuhk.edu.hk/~wei/lpch5.pdf
+example_5_7 :: Tableau Rational
+example_5_7 = IM.fromList
+  [ (4, (IM.fromList [(1,-1), (2,-2), (3,-3)], -5))
+  , (5, (IM.fromList [(1,-2), (2,-2), (3,-1)], -6))
+  , (objRow, (IM.fromList [(1,3),(2,4),(3,5)], 0))
+  ]
+
+test_example_5_7 = dualSimplex OptMax example_5_7
+-- optimal value should be -11
+
 -- ---------------------------------------------------------------------------
