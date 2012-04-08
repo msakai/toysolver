@@ -15,6 +15,7 @@ module Main where
 
 import Control.Monad
 import Data.List
+import Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Data.IntMap as IM
@@ -32,6 +33,7 @@ import qualified OmegaTest
 import qualified Cooper
 import qualified MIPSolverHL
 import qualified LPFile as LP
+import qualified Simplex2
 
 -- ---------------------------------------------------------------------------
 
@@ -50,7 +52,7 @@ options :: [OptDescr Flag]
 options =
     [ Option ['h'] ["help"]    (NoArg Help)            "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
-    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper"
+    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, simplex2"
 {-
     , Option ['l'] ["load"]    (ReqArg Load "FILE") "load FILE"
     , Option ['t'] ["trace"]    (OptArg (Trace . fromMaybe "on") "[on|off]")
@@ -77,6 +79,7 @@ run solver lp = do
 
   case solver of
     _ | solver `elem` ["omega-test", "cooper"] -> solveByQE
+    _ | solver == "simplex2" -> solveBySimplex2
     _ -> solveByMIP
   where
     vs = LP.variables lp
@@ -151,7 +154,33 @@ run solver lp = do
         Optimum r m -> do
           putStrLn "optimum"
           putStrLn $ showValue r
-          printModel m vs               
+          printModel m vs
+
+    solveBySimplex2 = do
+      solver <- Simplex2.newSolver
+      replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
+      Simplex2.setOptDir solver (LP.dir lp)
+      Simplex2.setObj solver $ fromJust (LA.compileExpr obj)
+      putStr "Loading constraints... " >> hFlush stdout
+      forM_ (cs1 ++ cs2 ++ cs3) $ \c -> do
+        Simplex2.assertAtom solver $ fromJust (LA.compileAtom c)
+      putStrLn "done" >> hFlush stdout
+      ret <- Simplex2.check solver
+      if not ret then do
+        putStrLn "unsat"
+        exitFailure
+      else do
+        putStrLn "sat" >> hFlush stdout
+        ret2 <- Simplex2.optimize solver
+        if not ret2 then do
+          putStrLn "unbounded"
+          exitFailure
+        else do
+          m <- Simplex2.model solver
+          r <- Simplex2.getObjValue solver
+          putStrLn "optimum"
+          putStrLn $ showValue r
+          printModel m vs
 
     printModel :: Model Rational -> Set.Set String -> IO ()
     printModel m vs =

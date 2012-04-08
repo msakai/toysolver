@@ -39,6 +39,7 @@ Executable toysolver
      MIPSolverHL
      OmegaTest
      Simplex
+     Simplex2
      Util
   Build-Depends: base >=4 && <5, mtl, containers, parsec, OptDir
   Extensions:
@@ -48,6 +49,7 @@ Executable toysolver
      MultiParamTypeClasses
      FunctionalDependencies
      GeneralizedNewtypeDeriving
+     DoAndIfThenElse
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
 
