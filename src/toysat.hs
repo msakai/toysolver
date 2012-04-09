@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
@@ -7,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable (ScopedTypeVariables)
 --
 -- A toy-level SAT solver based on CDCL.
 --
@@ -16,11 +17,13 @@
 module Main where
 
 import Control.Monad
+import Control.Exception
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.IntMap as IM
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import Data.IORef
 import Data.Function
 import Data.List
 import Data.Maybe
@@ -221,18 +224,34 @@ solvePB opt solver formula@(obj, cs) = do
 
     Just obj' -> do
       obj'' <- pbConvSum lin obj'
-      result <- minimize opt solver obj'' $ \val -> do
+
+      modelRef <- newIORef Nothing
+
+      result <- try $ minimize opt solver obj'' $ \m val -> do
+        writeIORef modelRef (Just m)
         putStrLn $ "o " ++ show val
         hFlush stdout
+
       case result of
-        Nothing -> do
+        Right Nothing -> do
           putStrLn $ "s " ++ "UNSATISFIABLE"
           hFlush stdout
-        Just m -> do
+        Right (Just m) -> do
           putStrLn $ "s " ++ "OPTIMUM FOUND"
           hFlush stdout          
           let m2 = IM.filterWithKey (\v _ -> v <= n) m
           pbPrintModel m2
+        Left (e :: AsyncException) -> do
+          r <- readIORef modelRef
+          case r of
+            Nothing -> do
+              putStrLn $ "s " ++ "UNKNOWN"
+              hFlush stdout
+            Just m -> do
+              putStrLn $ "s " ++ "SATISFIABLE"
+              let m2 = IM.filterWithKey (\v _ -> v <= n) m
+              pbPrintModel m2
+          throwIO e
 
 pbConvSum :: Lin.Linearizer -> PBFile.Sum -> IO [(Integer, SAT.Lit)]
 pbConvSum lin = mapM f
@@ -241,7 +260,7 @@ pbConvSum lin = mapM f
       l <- Lin.translate lin ls
       return (w,l)
 
-minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (Integer -> IO ()) -> IO (Maybe SAT.Model)
+minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
 minimize opt solver obj update = do
   when (optPolarityObjFun opt) $ do
     forM_ obj $ \(c,l) -> do
@@ -256,7 +275,7 @@ minimize opt solver obj update = do
    loop = do
      m <- SAT.model solver
      let v = pbEval m obj
-     update v
+     update m v
      SAT.addPBAtMost solver obj (v - 1)
      result <- SAT.solve solver
      if result
@@ -335,20 +354,34 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
     Nothing -> return ()
     Just c -> SAT.addPBAtMost solver obj (c-1)
 
-  result <- minimize opt solver obj $ \val -> do
+  modelRef <- newIORef Nothing
+  result <- try $ minimize opt solver obj $ \m val -> do
+     writeIORef modelRef (Just m)
      putStrLn $ "o " ++ show val
      hFlush stdout
+
   case result of
-    Nothing -> do
+    Right Nothing -> do
       putStrLn $ "s " ++ "UNSATISFIABLE"
       hFlush stdout
-    Just m -> do
+    Right (Just m) -> do
       putStrLn $ "s " ++ "OPTIMUM FOUND"
       hFlush stdout
       let m2 = IM.filterWithKey (\v _ -> v <= nvar) m
       if isMaxSat
         then maxsatPrintModel m2
         else pbPrintModel m2
+    Left (e :: AsyncException) -> do
+      r <- readIORef modelRef
+      case r of
+        Just m | not isMaxSat -> do
+          putStrLn $ "s " ++ "SATISFIABLE"
+          let m2 = IM.filterWithKey (\v _ -> v <= nvar) m
+          pbPrintModel m2
+        _ -> do
+          putStrLn $ "s " ++ "UNKNOWN"
+          hFlush stdout
+      throwIO e
 
 wboNumVars :: PBFile.SoftFormula -> Int
 wboNumVars (_, cs) = maximum vs
@@ -494,22 +527,38 @@ solveLP opt solver lp = do
               (if LPFile.dir lp == LPFile.OptMin then 1 else -1)
           obj2 = [(numerator (r * fromIntegral d), vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- obj]
 
-      result <- minimize opt solver obj2 $ \val -> do
+      modelRef <- newIORef Nothing
+
+      result <- try $ minimize opt solver obj2 $ \m val -> do
+        writeIORef modelRef (Just m)
         putStrLn $ "o " ++ show (fromIntegral val / fromIntegral d :: Double)
         hFlush stdout
 
+      let printModel :: SAT.Model -> IO ()
+          printModel m = do
+            forM_ (Set.toList bvs) $ \v -> do
+              let val = m IM.! (vmap Map.! v)
+              printf "v %s = %s\n" v (if val then "1" else "0")
+            hFlush stdout
+
       case result of
-        Nothing -> do
+        Right Nothing -> do
           putStrLn $ "s " ++ "UNSATISFIABLE"
           hFlush stdout
-        Just m -> do
+        Right (Just m) -> do
           putStrLn $ "s " ++ "OPTIMUM FOUND"
           hFlush stdout
-          
-          forM_ (Set.toList bvs) $ \v -> do
-            let val = m IM.! (vmap Map.! v)
-            printf "v %s = %s\n" v (if val then "1" else "0")
-          hFlush stdout
+          printModel m
+        Left (e :: AsyncException) -> do
+          r <- readIORef modelRef
+          case r of
+            Nothing -> do
+              putStrLn $ "s " ++ "UNKNOWN"
+              hFlush stdout
+            Just m -> do
+              putStrLn $ "s " ++ "SATISFIABLE"
+              printModel m
+          throwIO e
   where
     bvs = LPFile.binaryVariables lp `Set.union` Set.filter p (LPFile.integerVariables lp)
       where
