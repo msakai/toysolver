@@ -119,16 +119,25 @@ constExpr c = normalizeExpr $ Expr $ IM.singleton constVar c
 
 -- | map coefficients.
 mapCoeff :: Num b => (a -> b) -> Expr a -> Expr b
-mapCoeff f (Expr t) = normalizeExpr $ Expr $ IM.map f t
+mapCoeff f (Expr t) = Expr $ IM.mapMaybe g t
+  where
+    g c = if c' == 0 then Nothing else Just c'
+      where c' = f c
 
 -- | map coefficients.
 mapCoeffWithVar :: Num b => (a -> Var -> b) -> Expr a -> Expr b
-mapCoeffWithVar f (Expr t) = normalizeExpr $ Expr $ IM.mapWithKey (flip f) t
+mapCoeffWithVar f (Expr t) = Expr $ IM.mapMaybeWithKey g t
+  where
+    g v c = if c' == 0 then Nothing else Just c'
+      where c' = f c v
 
 instance Num r => Linear r (Expr r) where
-  Expr t1 .+. Expr t2 = normalizeExpr $ Expr $ IM.unionWith (+) t1 t2
-  c .*. (Expr t) = normalizeExpr $ Expr $ IM.map (c*) t
+  e1 .+. e2 = normalizeExpr $ plus e1 e2
+  c .*. e = mapCoeff (c*) e
   lzero = Expr $ IM.empty
+
+plus :: Num r => Expr r -> Expr r -> Expr r
+plus (Expr t1) (Expr t2) = Expr $ IM.unionWith (+) t1 t2
 
 -- | evaluate the expression under the model.
 evalExpr :: Num r => Model r -> Expr r -> r
@@ -151,7 +160,7 @@ applySubst s (Expr m) = lsum (map f (IM.toList m))
         Nothing -> varExpr v)
 
 applySubst1 :: Num r => Var -> Expr r -> Expr r -> Expr r
-applySubst1 x e e1@(Expr m) = 
+applySubst1 x e e1 =
   case extract' x e1 of
     Nothing -> e1
     Just (c,e2) -> c .*. e .+. e2
