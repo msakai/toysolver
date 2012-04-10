@@ -227,20 +227,6 @@ check solver = do
     when result $ checkFeasibility solver
     return result
 
--- select the smallest basic variable xi such that β(xi) < li or β(xi) > ui
-selectViolatingBasicVariable :: Solver -> IO (Maybe Var)
-selectViolatingBasicVariable solver = do
-  let
-    p :: Var -> IO Bool
-    p x | x == objVar = return False
-    p xi = do
-      li <- getLB solver xi
-      ui <- getUB solver xi
-      vi <- getValue solver xi
-      return $ not (testLB li vi) || not (testUB ui vi)
-  t <- readIORef (svTableau solver)
-  findM p (IM.keys t)
-
 dualSimplex :: Solver -> IO Bool
 dualSimplex solver = do
   let
@@ -328,6 +314,20 @@ dualSimplex solver = do
     when result $ checkFeasibility solver
     return result
 
+-- select the smallest basic variable xi such that β(xi) < li or β(xi) > ui
+selectViolatingBasicVariable :: Solver -> IO (Maybe Var)
+selectViolatingBasicVariable solver = do
+  let
+    p :: Var -> IO Bool
+    p x | x == objVar = return False
+    p xi = do
+      li <- getLB solver xi
+      ui <- getUB solver xi
+      vi <- getValue solver xi
+      return $ not (testLB li vi) || not (testUB ui vi)
+  t <- readIORef (svTableau solver)
+  findM p (IM.keys t)
+
 {--------------------------------------------------------------------
   Optimization
 --------------------------------------------------------------------}
@@ -339,77 +339,115 @@ optimize solver = do
     then return False
     else do
       result <- loop
-      checkFeasibility solver
       when result $ checkOptimality solver
       return result
   where
     loop :: IO Bool
     loop = do
       checkFeasibility solver
-      dir <- readIORef (svOptDir solver)
-      obj_def <- getDef solver objVar
-      ret <- findM (canEnter solver) (LA.terms obj_def)
+      ret <- selectEnteringVariable solver
       case ret of
        Nothing -> return True -- finished
        Just (c,xj) -> do
+         dir <- readIORef (svOptDir solver)
          r <- if dir==OptMin
               then if c > 0
-                then decrease xj -- xj を小さくして目的関数を小さくする
-                else increase xj -- xj を大きくして目的関数を小さくする
+                then decreaseNB solver xj -- xj を小さくして目的関数を小さくする
+                else increaseNB solver xj -- xj を大きくして目的関数を小さくする
               else if c > 0
-                then increase xj -- xj を大きくして目的関数を大きくする
-                else decrease xj -- xj を小さくして目的関数を大きくする
+                then increaseNB solver xj -- xj を大きくして目的関数を大きくする
+                else decreaseNB solver xj -- xj を小さくして目的関数を大きくする
          if r
            then loop
            else return False -- unbounded
 
-    -- | non-basic variable xj の値を大きくする
-    increase :: Var -> IO Bool
-    increase xj = do
-      t <- readIORef (svTableau solver)
+selectEnteringVariable :: Solver -> IO (Maybe (Rational, Var))
+selectEnteringVariable solver = do
+  obj_def <- getDef solver objVar
+  findM (canEnter solver) (LA.terms obj_def) 
 
-      -- Upper bounds of θ
-      -- NOTE: xjを反対のboundに移動するのも候補に含める
-      ubs <- liftM concat $ forM ((xj, LA.varExpr xj) : IM.toList t) $ \(xi,ei) ->
-        case LA.lookupCoeff' xj ei of
-          Nothing -> return []
-          Just aij -> do
-            v1 <- getValue solver xi
-            li <- getLB solver xi
-            ui <- getUB solver xi
-            return [assert (theta >= 0) ((xi,v2), theta) | Just v2 <- [ui | aij > 0] ++ [li | aij < 0], let theta = (v2 - v1) / aij]
+canEnter :: Solver -> (Rational, Var) -> IO Bool
+canEnter _ (_,x) | x == LA.constVar = return False
+canEnter solver (c,x) = do
+  dir <- readIORef (svOptDir solver)
+  if dir==OptMin then
+    if c > 0 then canDecrease solver x      -- xを小さくすることで目的関数を小さくできる
+    else if c < 0 then canIncrease solver x -- xを大きくすることで目的関数を小さくできる
+    else return False
+  else
+    if c > 0 then canIncrease solver x      -- xを大きくすることで目的関数を大きくできる
+    else if c < 0 then canDecrease solver x -- xを小さくすることで目的関数を大きくできる
+    else return False
 
-      -- β(xj) := β(xj) + θ なので θ を大きく
-      case ubs of
-        [] -> return False -- unbounded
-        _ -> do
-          let (xi, v) = fst $ minimumBy (compare `on` snd) ubs
-          pivotAndUpdate solver xi xj v
-          return True
+canDecrease :: Solver -> Var -> IO Bool
+canDecrease solver x = do
+  l <- getLB solver x
+  v <- getValue solver x
+  case l of
+    Nothing -> return True
+    Just lv -> return $! (lv < v)
 
-    -- | non-basic variable xj の値を小さくする
-    decrease :: Var -> IO Bool
-    decrease xj = do
-      t <- readIORef (svTableau solver)
+canIncrease :: Solver -> Var -> IO Bool
+canIncrease solver x = do
+  u <- getUB solver x
+  v <- getValue solver x
+  case u of
+    Nothing -> return True
+    Just uv -> return $! (v < uv)
 
-      -- Lower bounds of θ
-      -- NOTE: xjを反対のboundに移動するのも候補に含める
-      lbs <- liftM concat $ forM ((xj, LA.varExpr xj) : IM.toList t) $ \(xi,ei) ->
-        case LA.lookupCoeff' xj ei of
-          Nothing -> return []
-          Just aij -> do
-            v1 <- getValue solver xi
-            li <- getLB solver xi
-            ui <- getUB solver xi
-            return [assert (theta <= 0) ((xi,v2), theta) | Just v2 <- [li | aij > 0] ++ [ui | aij < 0], let theta = (v2 - v1) / aij]
+-- | feasibility を保ちつつ non-basic variable xj の値を大きくする
+increaseNB :: Solver -> Var -> IO Bool
+increaseNB solver xj = do
+  col <- getCol solver xj
 
-      -- β(xj) := β(xj) + θ なので θ を小さく
-      case lbs of
-        [] -> return False -- unbounded
-        _ -> do
-          let (xi, v) = fst $ maximumBy (compare `on` snd) lbs
-          pivotAndUpdate solver xi xj v
-          return True
+  -- Upper bounds of θ
+  -- NOTE: xjを反対のboundに移動するのも候補に含めている。
+  ubs <- liftM concat $ forM ((xj,1) : col) $ \(xi,aij) -> do
+    v1 <- getValue solver xi
+    li <- getLB solver xi
+    ui <- getUB solver xi
+    return [ assert (theta >= 0) ((xi,v2), theta)
+           | Just v2 <- [ui | aij > 0] ++ [li | aij < 0]
+           , let theta = (v2 - v1) / aij ]
+
+  -- β(xj) := β(xj) + θ なので θ を大きく
+  case ubs of
+    [] -> return False -- unbounded
+    _ -> do
+      let (xi, v) = fst $ minimumBy (compare `on` snd) ubs
+      pivotAndUpdate solver xi xj v
+      return True
+
+-- | feasibility を保ちつつ non-basic variable xj の値を小さくする
+decreaseNB :: Solver -> Var -> IO Bool
+decreaseNB solver xj = do
+  col <- getCol solver xj
+
+  -- Lower bounds of θ
+  -- NOTE: xjを反対のboundに移動するのも候補に含めている。
+  lbs <- liftM concat $ forM ((xj,1) : col) $ \(xi,aij) -> do
+    v1 <- getValue solver xi
+    li <- getLB solver xi
+    ui <- getUB solver xi
+    return [ assert (theta <= 0) ((xi,v2), theta)
+           | Just v2 <- [li | aij > 0] ++ [ui | aij < 0]
+           , let theta = (v2 - v1) / aij ]
+
+  -- β(xj) := β(xj) + θ なので θ を小さく
+  case lbs of
+    [] -> return False -- unbounded
+    _ -> do
+      let (xi, v) = fst $ maximumBy (compare `on` snd) lbs
+      pivotAndUpdate solver xi xj v
+      return True
+
+-- aijが非ゼロの列も全部探しているのは効率が悪い
+getCol :: Solver -> Var -> IO [(Var,Rational)]
+getCol solver xj = do
+  t <- readIORef (svTableau solver)
+  return [ (xi, aij)
+         | (xi, xi_def) <- IM.toList t
+         , aij <- maybeToList (LA.lookupCoeff' xj xi_def) ]
 
 {--------------------------------------------------------------------
   Extract results
@@ -505,35 +543,6 @@ isBasic solver x = do
 
 isNonBasic  :: Solver -> Var -> IO Bool
 isNonBasic solver x = liftM not (isBasic solver x)
-
-canEnter :: Solver -> (Rational, Var) -> IO Bool
-canEnter _ (_,x) | x == LA.constVar = return False
-canEnter solver (c,x) = do
-  dir <- readIORef (svOptDir solver)
-  if dir==OptMin then
-    if c > 0 then canDecrease x      -- xを小さくすることで目的関数を小さくできる
-    else if c < 0 then canIncrease x -- xを大きくすることで目的関数を小さくできる
-    else return False
-  else
-    if c > 0 then canIncrease x      -- xを大きくすることで目的関数を大きくできる
-    else if c < 0 then canDecrease x -- xを小さくすることで目的関数を大きくできる
-    else return False
-  where
-    canDecrease :: Var -> IO Bool
-    canDecrease x = do
-      l <- getLB solver x
-      v <- getValue solver x
-      case l of
-        Nothing -> return True
-        Just lv -> return $! (lv < v)
-
-    canIncrease :: Var -> IO Bool
-    canIncrease x = do
-      u <- getUB solver x
-      v <- getValue solver x
-      case u of
-        Nothing -> return True
-        Just uv -> return $! (v < uv)
 
 markBad :: Solver -> IO ()
 markBad solver = writeIORef (svOk solver) False
