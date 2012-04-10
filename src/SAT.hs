@@ -1636,7 +1636,6 @@ instance Constraint PBAtLeastData where
 
     if s < 0
       then return False
-      else if s == 0 then return True
       else do
         let ls = [l1 | (l1,c1) <- IM.toList m, c1 > s]
         when (not (null ls)) $ do
