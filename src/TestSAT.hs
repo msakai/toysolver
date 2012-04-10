@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Control.Monad
 import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.Providers.HUnit
@@ -56,6 +57,52 @@ test4 = do
   ret <- solve solver -- unsat
   assertEqual "test4a" False ret
 
+-- 自明に真な節
+test5 :: IO ()
+test5 = do
+  solver <- newSolver
+  x1 <- newVar solver
+  addClause solver [x1, -x1] -- x1 or not x1
+  ret <- solve solver
+  assertEqual "test5" True ret
+
+-- 冗長な節
+test6 :: IO ()
+test6 = do
+  solver <- newSolver
+  x1 <- newVar solver
+  addClause solver [x1,x1] -- x1 or x1
+  ret <- solve solver
+  assertEqual "test6" True ret
+
+testInstantiateClause :: IO ()
+testInstantiateClause = do
+  solver <- newSolver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  addClause solver [x1]
+  addClause solver [x1,x2]
+  addClause solver [-x1,x2]
+  ret <- solve solver
+  assertEqual "InstantiateClause" True ret
+
+testInstantiateAtLeast :: IO ()
+testInstantiateAtLeast = do
+  solver <- newSolver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- newVar solver
+  x4 <- newVar solver
+  addClause solver [x1]
+
+  addAtLeast solver [x1,x2,x3,x4] 2
+  ret <- solve solver
+  assertEqual "testInstantiateClause1" True ret
+
+  addAtLeast solver [-x1,-x2,-x3,-x4] 2
+  ret <- solve solver
+  assertEqual "testInstantiateClause2" True ret
+
 testAtLeast1 :: IO ()
 testAtLeast1 = do
   solver <- newSolver
@@ -80,6 +127,16 @@ testAtLeast2 = do
   ret <- solve solver
   assertEqual "testAtLeast2" True ret
 
+testAtLeast3 :: IO ()
+testAtLeast3 = do
+  forM_ [(-1) .. 3] $ \n -> do
+    solver <- newSolver
+    x1 <- newVar solver
+    x2 <- newVar solver
+    addAtLeast solver [x1,x2] n
+    ret <- solve solver
+    assertEqual ("testAtLeast3_" ++ show n) (n <= 2) ret
+
 -- from http://www.cril.univ-artois.fr/PB11/format.pdf
 testPB1 :: IO ()
 testPB1 = do
@@ -98,6 +155,35 @@ testPB1 = do
 
   ret <- solve solver
   assertEqual "testPB1" True ret
+
+-- 一部の変数を否定に置き換えたもの
+testPB2 :: IO ()
+testPB2 = do
+  solver <- newSolver
+
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- newVar solver
+  x4 <- newVar solver
+  x5 <- newVar solver
+
+  addPBAtLeast solver [(1,x1),(4,-x2),(-2,x5)] 2
+  addPBAtLeast solver [(-1,x1),(4,-x2),(-2,x5)] 3
+  addPBAtLeast solver [(12345678901234567890,-x4),(4,x3)] 10
+  addPBExactly solver [(2,-x2),(3,-x4),(2,x1),(3,x5)] 5
+
+  ret <- solve solver
+  assertEqual "testPB2" True ret
+
+-- いきなり矛盾したPB制約
+testPB3 :: IO ()
+testPB3 = do
+  solver <- newSolver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  addPBAtLeast solver [(2,x1),(3,x2)] 6
+  ret <- solve solver
+  assertEqual "testPB3" False ret
 
 testAssumption :: IO ()
 testAssumption = do
@@ -119,6 +205,17 @@ testAssumption = do
   ret <- solve solver -- sat
   assertEqual "testAssumpttion3" True ret
 
+
+testAssumption2 :: IO ()
+testAssumption2 = do
+  solver <- newSolver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  addClause solver [x1]      -- x1
+  addClause solver [-x1, x2] -- -x1 or x2
+  ret <- solveWith solver [x2]
+  assertEqual "already assigned vairable is assumed" True ret
+
 ------------------------------------------------------------------------
 -- Test harness
 
@@ -131,10 +228,18 @@ tests =
     , testCase "test2" test2
     , testCase "test3" test3
     , testCase "test4" test4
+    , testCase "test5" test5
+    , testCase "test6" test6
+    , testCase "testInstantiateClause" testInstantiateClause
+    , testCase "testInstantiateAtLeast" testInstantiateAtLeast
     , testCase "testAtLeast1" testAtLeast1
     , testCase "testAtLeast2" testAtLeast2
+    , testCase "testAtLeast3" testAtLeast3
     , testCase "testPB1" testPB1
+    , testCase "testPB2" testPB2
+    , testCase "testPB3" testPB3
     , testCase "testAssumption" testAssumption
+    , testCase "testAssumption2" testAssumption2
     ]
 {-
     [ testProperty "bernstein" pHash
