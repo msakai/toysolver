@@ -185,6 +185,16 @@ testPB3 = do
   ret <- solve solver
   assertEqual "testPB3" False ret
 
+testPB4 :: IO ()
+testPB4 = do
+  solver <- newSolver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  addPBAtLeast solver [(1,x1),(3,x2)] 3
+  addClause solver [-x1]
+  ret <- solve solver
+  assertEqual "testPB4" True ret
+
 testAssumption :: IO ()
 testAssumption = do
   solver <- newSolver
@@ -238,6 +248,7 @@ tests =
     , testCase "testPB1" testPB1
     , testCase "testPB2" testPB2
     , testCase "testPB3" testPB3
+    , testCase "testPB4" testPB4
     , testCase "testAssumption" testAssumption
     , testCase "testAssumption2" testAssumption2
     ]
