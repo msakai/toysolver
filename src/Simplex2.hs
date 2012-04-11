@@ -25,8 +25,12 @@ module Simplex2
   -- * Reading status
   , isFeasible
   , isOptimal
+
+  -- * Configulation
+  , setLogger
   ) where
 
+import Prelude hiding (log)
 import Control.Exception
 import Control.Monad
 import Data.Function
@@ -36,6 +40,7 @@ import Data.Maybe
 import qualified Data.IntMap as IM
 import Text.Printf
 import Data.OptDir
+import System.CPUTime
 
 import qualified LA as LA
 import qualified Formula as F
@@ -56,6 +61,9 @@ data Solver
   , svVCnt    :: !(IORef Int)
   , svOk      :: !(IORef Bool)
   , svOptDir  :: !(IORef OptDir)
+
+  , svLogger :: !(IORef (Maybe (String -> IO ())))
+  , svNPivot  :: !(IORef Int)
   }
 
 -- special basic variable
@@ -71,6 +79,8 @@ newSolver = do
   v <- newIORef 0
   ok <- newIORef True
   dir <- newIORef OptMin
+  logger <- newIORef Nothing
+  npivot <- newIORef 0
   return $
     Solver
     { svTableau = t
@@ -80,6 +90,8 @@ newSolver = do
     , svVCnt    = v
     , svOk      = ok
     , svOptDir  = dir
+    , svLogger  = logger
+    , svNPivot  = npivot
     }
 
 {--------------------------------------------------------------------
@@ -223,7 +235,8 @@ check solver = do
   if not ok
   then return False
   else do
-    result <- loop
+    log solver "check"
+    result <- recordTime solver loop
     when result $ checkFeasibility solver
     return result
 
@@ -310,7 +323,9 @@ dualSimplex solver = do
   if not ok
   then return False
   else do
-    result <- loop
+    log solver "dual simplex"
+    result <- recordTime solver loop
+    (log solver . printf "#pivot = %d") =<< readIORef (svNPivot solver)
     when result $ checkFeasibility solver
     return result
 
@@ -338,7 +353,8 @@ optimize solver = do
   if not ret
     then return False
     else do
-      result <- loop
+      log solver "optimize"
+      result <- recordTime solver loop
       when result $ checkOptimality solver
       return result
   where
@@ -471,7 +487,7 @@ getObjValue solver = getValue solver objVar
 
 update :: Solver -> Var -> Rational -> IO ()
 update solver xj v = do
-  -- printf "before update x%d (%s)\n" xj (show v)
+  -- log solver $ printf "before update x%d (%s)" xj (show v)
   -- dump solver
 
   t <- readIORef (svTableau solver)
@@ -482,12 +498,13 @@ update solver xj v = do
     let m2 = IM.map (\ei -> LA.lookupCoeff xj ei * diff) t
     in IM.insert xj v $ IM.unionWith (+) m2 m
 
-  -- printf "after update x%d (%s)\n" xj (show v)
+  -- log solver $ printf "after update x%d (%s)" xj (show v)
   -- dump solver
 
 pivot :: Solver -> Var -> Var -> IO ()
 pivot solver xi xj = do
-  modifyIORef (svTableau solver) $ \defs ->
+  modifyIORef' (svNPivot solver) (+1)
+  modifyIORef' (svTableau solver) $ \defs ->
     case LA.solveFor (LA.Atom (LA.varExpr xi) F.Eql (defs IM.! xi)) xj of
       Just (F.Eql, xj_def) ->
         IM.insert xj xj_def . IM.map (LA.applySubst1 xj xj_def) . IM.delete xi $ defs
@@ -499,7 +516,7 @@ pivotAndUpdate solver xi xj v = do
   -- xi is basic variable
   -- xj is non-basic varaible
 
-  -- printf "before pivotAndUpdate x%d x%d (%s)\n" xi xj (show v)
+  -- log solver $ printf "before pivotAndUpdate x%d x%d (%s)" xi xj (show v)
   -- dump solver
 
   m <- readIORef (svModel solver)
@@ -512,7 +529,7 @@ pivotAndUpdate solver xi xj v = do
   writeIORef (svModel solver) (IM.union m' m) -- note that 'IM.union' is left biased.
   pivot solver xi xj
 
-  -- printf "after pivotAndUpdate x%d x%d (%s)\n" xi xj (show v)
+  -- log solver $ printf "after pivotAndUpdate x%d x%d (%s)" xi xj (show v)
   -- dump solver
 
 getLB :: Solver -> Var -> IO (Maybe Rational)
@@ -572,6 +589,43 @@ variables solver = do
   vcnt <- readIORef (svVCnt solver)
   return [0..vcnt-1]
 
+modifyIORef' :: IORef a -> (a -> a) -> IO ()
+modifyIORef' ref f = do
+  x <- readIORef ref
+  writeIORef ref $! f x
+
+recordTime :: Solver -> IO a -> IO a
+recordTime solver act = do
+  dumpSize solver
+  writeIORef (svNPivot solver) 0
+
+  start <- getCPUTime
+  result <- act
+  end <- getCPUTime
+
+  (log solver . printf "time = %.3fs") (fromIntegral (end - start) / 10^(12::Int) :: Double)
+  (log solver . printf "#pivot = %d") =<< readIORef (svNPivot solver)
+  return result
+
+{--------------------------------------------------------------------
+  Logging
+--------------------------------------------------------------------}
+
+-- | set callback function for receiving messages.
+setLogger :: Solver -> (String -> IO ()) -> IO ()
+setLogger solver logger = do
+  writeIORef (svLogger solver) (Just logger)
+
+log :: Solver -> String -> IO ()
+log solver msg = logIO solver (return msg)
+
+logIO :: Solver -> IO String -> IO ()
+logIO solver action = do
+  m <- readIORef (svLogger solver)
+  case m of
+    Nothing -> return ()
+    Just logger -> action >>= logger
+
 {--------------------------------------------------------------------
   debug and tests
 --------------------------------------------------------------------}
@@ -579,6 +633,7 @@ variables solver = do
 test1 :: IO ()
 test1 = do
   solver <- newSolver
+  setLogger solver putStrLn
   x <- newVar solver
   y <- newVar solver
   z <- newVar solver
@@ -605,6 +660,7 @@ test1 = do
 test2 :: IO ()
 test2 = do
   solver <- newSolver
+  setLogger solver putStrLn
   x <- newVar solver
   y <- newVar solver
   assertAtom solver (LA.Atom (LA.fromTerms [(11,x), (13,y)]) F.Ge (LA.constExpr 27))
@@ -637,6 +693,7 @@ End
 test3 :: IO ()
 test3 = do
   solver <- newSolver
+  setLogger solver putStrLn
   _ <- newVar solver
   x1 <- newVar solver
   x2 <- newVar solver
@@ -667,6 +724,7 @@ test3 = do
 test4 :: IO ()
 test4 = do
   solver <- newSolver
+  setLogger solver putStrLn
   x0 <- newVar solver
   x1 <- newVar solver
 
@@ -682,6 +740,7 @@ test4 = do
 test5 :: IO ()
 test5 = do
   solver <- newSolver
+  setLogger solver putStrLn
   x0 <- newVar solver
   x1 <- newVar solver
 
@@ -710,6 +769,7 @@ optimal value is 11
 test6 :: IO ()
 test6 = do
   solver <- newSolver
+  setLogger solver putStrLn
   _  <- newVar solver
   x1 <- newVar solver
   x2 <- newVar solver
@@ -725,7 +785,7 @@ test6 = do
   setOptDir solver OptMin
   dump solver
   checkOptimality solver
-  putStrLn "ok"
+  log solver "ok"
 
   ret <- dualSimplex solver
   print ret
@@ -745,6 +805,7 @@ optimal value should be -11
 test7 :: IO ()
 test7 = do
   solver <- newSolver
+  setLogger solver putStrLn
   _  <- newVar solver
   x1 <- newVar solver
   x2 <- newVar solver
@@ -760,42 +821,50 @@ test7 = do
   setOptDir solver OptMax
   dump solver
   checkOptimality solver
-  putStrLn "ok"
+  log solver "ok"
 
   ret <- dualSimplex solver
   print ret
   dump solver
 
+dumpSize :: Solver -> IO ()
+dumpSize solver = do
+  t <- readIORef (svTableau solver)
+  let nrows = IM.size t
+  log solver $ "number of rows: " ++ show nrows
+  xs <- variables solver 
+  log solver $ "number of columns: " ++ show (length xs - nrows)
+
 dump :: Solver -> IO ()
 dump solver = do
-  putStrLn "============="
+  log solver "============="
 
-  putStrLn "Tableau:"
+  log solver "Tableau:"
   t <- readIORef (svTableau solver)
-  printf "obj = %s\n" (show (t IM.! objVar))
+  log solver $ printf "obj = %s" (show (t IM.! objVar))
   forM_ (IM.toList t) $ \(xi, e) -> do
-    when (xi /= objVar) $ printf "x%d = %s\n" xi (show e)
+    when (xi /= objVar) $ log solver $ printf "x%d = %s" xi (show e)
 
-  putStrLn ""
+  log solver ""
 
-  putStrLn "Assignments and Bounds:"
+  log solver "Assignments and Bounds:"
   objVal <- getValue solver objVar
-  printf "beta(obj) = %s\n" (show objVal)
+  log solver $ printf "beta(obj) = %s" (show objVal)
   xs <- variables solver 
   forM_ xs $ \x -> do
     l <- getLB solver x
     u <- getUB solver x
     v <- getValue solver x
-    printf "beta(x%d) = %s; %s <= x%d <= %s\n" x (show v) (show l) x (show u)
+    log solver $ printf "beta(x%d) = %s; %s <= x%d <= %s" x (show v) (show l) x (show u)
 
-  putStrLn ""
-  putStrLn "Status:"
+  log solver ""
+  log solver "Status:"
   is_fea <- isFeasible solver
   is_opt <- isOptimal solver
-  printf "Feasible: %s\n" (show is_fea)
-  printf "Optimal: %s\n" (show is_opt)
+  log solver $ printf "Feasible: %s" (show is_fea)
+  log solver $ printf "Optimal: %s" (show is_opt)
 
-  putStrLn "============="
+  log solver "============="
 
 isFeasible :: Solver -> IO Bool
 isFeasible solver = do

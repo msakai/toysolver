@@ -158,6 +158,7 @@ run solver lp = do
 
     solveBySimplex2 = do
       solver <- Simplex2.newSolver
+      Simplex2.setLogger solver (\s -> putStr "c " >> putStrLn s)
       replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
       Simplex2.setOptDir solver (LP.dir lp)
       Simplex2.setObj solver $ fromJust (LA.compileExpr obj)
