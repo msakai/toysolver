@@ -325,7 +325,6 @@ dualSimplex solver = do
   else do
     log solver "dual simplex"
     result <- recordTime solver loop
-    (log solver . printf "#pivot = %d") =<< readIORef (svNPivot solver)
     when result $ checkFeasibility solver
     return result
 
@@ -380,20 +379,20 @@ optimize solver = do
 selectEnteringVariable :: Solver -> IO (Maybe (Rational, Var))
 selectEnteringVariable solver = do
   obj_def <- getDef solver objVar
-  findM (canEnter solver) (LA.terms obj_def) 
-
-canEnter :: Solver -> (Rational, Var) -> IO Bool
-canEnter _ (_,x) | x == LA.unitVar = return False
-canEnter solver (c,x) = do
-  dir <- readIORef (svOptDir solver)
-  if dir==OptMin then
-    if c > 0 then canDecrease solver x      -- xを小さくすることで目的関数を小さくできる
-    else if c < 0 then canIncrease solver x -- xを大きくすることで目的関数を小さくできる
-    else return False
-  else
-    if c > 0 then canIncrease solver x      -- xを大きくすることで目的関数を大きくできる
-    else if c < 0 then canDecrease solver x -- xを小さくすることで目的関数を大きくできる
-    else return False
+  findM canEnter (LA.terms obj_def)
+  where
+    canEnter :: (Rational, Var) -> IO Bool
+    canEnter (_,xj) | xj == LA.unitVar = return False
+    canEnter (c,xj) = do
+      dir <- readIORef (svOptDir solver)
+      if dir==OptMin then
+        if c > 0 then canDecrease solver xj      -- xを小さくすることで目的関数を小さくできる
+        else if c < 0 then canIncrease solver xj -- xを大きくすることで目的関数を小さくできる
+        else return False
+      else
+        if c > 0 then canIncrease solver xj      -- xを大きくすることで目的関数を大きくできる
+        else if c < 0 then canDecrease solver xj -- xを小さくすることで目的関数を大きくできる
+        else return False
 
 canDecrease :: Solver -> Var -> IO Bool
 canDecrease solver x = do
@@ -417,8 +416,7 @@ increaseNB solver xj = do
   col <- getCol solver xj
 
   -- Upper bounds of θ
-  -- NOTE: xjを反対のboundに移動するのも候補に含めている。
-  ubs <- liftM concat $ forM ((xj,1) : col) $ \(xi,aij) -> do
+  ubs <- liftM concat $ forM col $ \(xi,aij) -> do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
@@ -440,8 +438,7 @@ decreaseNB solver xj = do
   col <- getCol solver xj
 
   -- Lower bounds of θ
-  -- NOTE: xjを反対のboundに移動するのも候補に含めている。
-  lbs <- liftM concat $ forM ((xj,1) : col) $ \(xi,aij) -> do
+  lbs <- liftM concat $ forM col $ \(xi,aij) -> do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
@@ -878,7 +875,7 @@ isFeasible solver = do
 isOptimal :: Solver -> IO Bool
 isOptimal solver = do
   obj <- getDef solver objVar
-  ret <- findM (canEnter solver) (LA.terms obj)
+  ret <- selectEnteringVariable solver
   return $! isNothing ret
 
 checkFeasibility :: Solver -> IO ()
@@ -913,8 +910,7 @@ checkNBFeasibility solver = do
 checkOptimality :: Solver -> IO ()
 checkOptimality _ | True = return ()
 checkOptimality solver = do
-  obj <- getDef solver objVar
-  ret <- findM (canEnter solver) (LA.terms obj)
+  ret <- selectEnteringVariable solver
   case ret of
     Nothing -> return () -- optimal
     Just (_,x) -> error (printf "checkOptimality: not optimal (x%d can be changed)" x)
