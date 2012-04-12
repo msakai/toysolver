@@ -46,7 +46,7 @@ inferBounds bounds constraints ivs limit = loop 0 bounds
       LA.Atom lhs op rhs <- constraints
       let m = LA.coeffMap (lhs .-. rhs)
       (v,c) <- IM.toList m
-      guard $ v /= LA.constVar
+      guard $ v /= LA.unitVar
       let op' = if c < 0 then flipOp op else op
           rhs' = (-1/c) .*. LA.fromCoeffMap (IM.delete v m)
       return (v, [(op', rhs')])

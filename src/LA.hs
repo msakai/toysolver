@@ -21,7 +21,7 @@ module LA
   , fromTerms
   , coeffMap
   , fromCoeffMap
-  , constVar
+  , unitVar
   , asConst
   , varExpr
   , constExpr
@@ -31,10 +31,10 @@ module LA
   , lift1
   , applySubst
   , applySubst1
+  , coeff
   , lookupCoeff
-  , lookupCoeff'
   , extract
-  , extract'
+  , extractMaybe
   , showExpr
 
   -- * Atomic formula of linear arithmetics
@@ -64,7 +64,7 @@ import Interval
 
 -- | Linear combination of variables and constants.
 -- Non-negative keys are used for variables's coefficients.
--- key 'constVar' is used for constants.
+-- key 'unitVar' is used for constants.
 newtype Expr r
   = Expr
   { coeffMap :: IM.IntMap r
@@ -83,7 +83,7 @@ fromTerms :: Num r => [(r,Var)] -> Expr r
 fromTerms ts = fromCoeffMap $ IM.fromListWith (+) [(x,c) | (c,x) <- ts]
 
 instance Variables (Expr r) where
-  vars (Expr m) = IS.delete constVar (IM.keysSet m)
+  vars (Expr m) = IS.delete unitVar (IM.keysSet m)
 
 instance Show r => Show (Expr r) where
   showsPrec d m  = showParen (d > 10) $
@@ -96,14 +96,14 @@ instance (Num r, Read r) => Read (Expr r) where
     return (fromTerms xs, t)
 
 -- | Special variable that should always be evaluated to 1.
-constVar :: Var
-constVar = -1
+unitVar :: Var
+unitVar = -1
 
 asConst :: Num r => Expr r -> Maybe r
 asConst (Expr m) =
   case IM.toList m of
     [] -> Just 0
-    [(v,x)] | v==constVar -> Just x
+    [(v,x)] | v==unitVar -> Just x
     _ -> Nothing
 
 normalizeExpr :: Num r => Expr r -> Expr r
@@ -115,7 +115,7 @@ varExpr v = Expr $ IM.singleton v 1
 
 -- | constant
 constExpr :: Num r => r -> Expr r
-constExpr c = normalizeExpr $ Expr $ IM.singleton constVar c
+constExpr c = normalizeExpr $ Expr $ IM.singleton unitVar c
 
 -- | map coefficients.
 mapCoeff :: Num b => (a -> b) -> Expr a -> Expr b
@@ -142,13 +142,13 @@ plus (Expr t1) (Expr t2) = Expr $ IM.unionWith (+) t1 t2
 -- | evaluate the expression under the model.
 evalExpr :: Num r => Model r -> Expr r -> r
 evalExpr m (Expr t) = sum [(m' IM.! v) * c | (v,c) <- IM.toList t]
-  where m' = IM.insert constVar 1 m
+  where m' = IM.insert unitVar 1 m
 
 lift1 :: Linear r x => x -> (Var -> x) -> Expr r -> x
 lift1 unit f (Expr t) = lsum [c .*. (g v) | (v,c) <- IM.toList t]
   where
     g v
-      | v==constVar = unit
+      | v==unitVar = unit
       | otherwise   = f v
 
 applySubst :: Num r => VarMap (Expr r) -> Expr r -> Expr r
@@ -161,33 +161,33 @@ applySubst s (Expr m) = lsum (map f (IM.toList m))
 
 applySubst1 :: Num r => Var -> Expr r -> Expr r -> Expr r
 applySubst1 x e e1 =
-  case extract' x e1 of
+  case extractMaybe x e1 of
     Nothing -> e1
     Just (c,e2) -> c .*. e .+. e2
 
 -- | lookup a coefficient of the variable.
 -- @
---   lookupCoeff v e == fst (extract v e)
+--   coeff v e == fst (extract v e)
 -- @
-lookupCoeff :: Num r => Var -> Expr r -> r
-lookupCoeff v (Expr m) = IM.findWithDefault 0 v m
+coeff :: Num r => Var -> Expr r -> r
+coeff v (Expr m) = IM.findWithDefault 0 v m
 
 -- | lookup a coefficient of the variable.
 -- It returns @Nothing@ if the expression does not contain @v@.
 -- @
---   lookupCoeff' v e == fmap fst (extract' v e)
+--   lookupCoeff v e == fmap fst (extractMaybe v e)
 -- @
-lookupCoeff' :: Num r => Var -> Expr r -> Maybe r
-lookupCoeff' v (Expr m) = IM.lookup v m  
+lookupCoeff :: Num r => Var -> Expr r -> Maybe r
+lookupCoeff v (Expr m) = IM.lookup v m  
 
 -- | @extract v e@ returns @(c, e')@ such that @e == c .*. v .+. e'@
 extract :: Num r => Var -> Expr r -> (r, Expr r)
 extract v (Expr m) = (IM.findWithDefault 0 v m, Expr (IM.delete v m))
 
--- | @extract' v e@ returns @Just (c, e')@ such that @e == c .*. v .+. e'@
+-- | @extractMaybe v e@ returns @Just (c, e')@ such that @e == c .*. v .+. e'@
 -- if @e@ contains v, and returns @Nothing@ otherwise.
-extract' :: Num r => Var -> Expr r -> Maybe (r, Expr r)
-extract' v (Expr m) =
+extractMaybe :: Num r => Var -> Expr r -> Maybe (r, Expr r)
+extractMaybe v (Expr m) =
   case IM.lookup v m of
     Nothing -> Nothing
     Just c -> Just (c, Expr (IM.delete v m))
@@ -204,8 +204,8 @@ showExprWith env (Expr m) = foldr (.) id xs ""
     ts = [if c==1
             then showString (env x)
             else showsPrec 8 c . showString "*" . showString (env x)
-          | (x,c) <- IM.toList m, x /= constVar] ++
-         [showsPrec 7 c | c <- maybeToList (IM.lookup constVar m)]
+          | (x,c) <- IM.toList m, x /= unitVar] ++
+         [showsPrec 7 c | c <- maybeToList (IM.lookup unitVar m)]
 
 -----------------------------------------------------------------------------
 
@@ -231,7 +231,7 @@ showAtom (Atom lhs op rhs) = showExpr lhs ++ Formula.showOp op ++ showExpr rhs
 -- is equivalent to @a@.
 solveFor :: (Real r, Fractional r) => Atom r -> Var -> Maybe (Formula.RelOp, Expr r)
 solveFor (Atom lhs op rhs) v = do
-  (c,e) <- extract' v (lhs .-. rhs)
+  (c,e) <- extractMaybe v (lhs .-. rhs)
   return ( if c < 0 then Formula.flipOp op else op
          , (1/c) .*. lnegate e
          )

@@ -108,7 +108,7 @@ newVar solver = do
 assertAtom :: Solver -> LA.Atom Rational -> IO ()
 assertAtom solver (LA.Atom lhs op rhs) = do
   let (lhs',rhs') =
-        case LA.extract LA.constVar (lhs .-. rhs) of
+        case LA.extract LA.unitVar (lhs .-. rhs) of
           (n,e) -> (e, -n)
   v <-
     case LA.terms lhs' of
@@ -274,7 +274,7 @@ dualSimplex solver = do
                     xi_def  <- getDef solver xi
                     ts <- filterM q (LA.terms xi_def)
                     ws <- liftM concat $ forM ts $ \(aij, xj) -> do
-                      let cj = LA.lookupCoeff xj obj_def
+                      let cj = LA.coeff xj obj_def
                           ratio = if dir==OptMin then (cj / aij) else - (cj / aij)
                       return [(xj, ratio) | ratio >= 0]
                     case ws of
@@ -305,7 +305,7 @@ dualSimplex solver = do
                     xi_def  <- getDef solver xi
                     ts <- filterM q (LA.terms xi_def)
                     ws <- liftM concat $ forM ts $ \(aij, xj) -> do
-                      let cj = LA.lookupCoeff xj obj_def
+                      let cj = LA.coeff xj obj_def
                           ratio = if dir==OptMin then - (cj / aij) else (cj / aij)
                       return [(xj, ratio) | ratio >= 0]
                     case ws of
@@ -383,7 +383,7 @@ selectEnteringVariable solver = do
   findM (canEnter solver) (LA.terms obj_def) 
 
 canEnter :: Solver -> (Rational, Var) -> IO Bool
-canEnter _ (_,x) | x == LA.constVar = return False
+canEnter _ (_,x) | x == LA.unitVar = return False
 canEnter solver (c,x) = do
   dir <- readIORef (svOptDir solver)
   if dir==OptMin then
@@ -463,7 +463,7 @@ getCol solver xj = do
   t <- readIORef (svTableau solver)
   return [ (xi, aij)
          | (xi, xi_def) <- IM.toList t
-         , aij <- maybeToList (LA.lookupCoeff' xj xi_def) ]
+         , aij <- maybeToList (LA.lookupCoeff xj xi_def) ]
 
 {--------------------------------------------------------------------
   Extract results
@@ -495,7 +495,7 @@ update solver xj v = do
   let diff = v - v0
 
   modifyIORef (svModel solver) $ \m ->
-    let m2 = IM.map (\ei -> LA.lookupCoeff xj ei * diff) t
+    let m2 = IM.map (\ei -> LA.coeff xj ei * diff) t
     in IM.insert xj v $ IM.unionWith (+) m2 m
 
   -- log solver $ printf "after update x%d (%s)" xj (show v)
@@ -521,10 +521,10 @@ pivotAndUpdate solver xi xj v = do
 
   m <- readIORef (svModel solver)
   t <- readIORef (svTableau solver)
-  let theta = (v - (m IM.! xi)) / (LA.lookupCoeff xj (t IM.! xi))
+  let theta = (v - (m IM.! xi)) / (LA.coeff xj (t IM.! xi))
   let m' = IM.fromList $
            [(xi, v), (xj, (m IM.! xj) + theta)] ++
-           [(xk, (m IM.! xk) + (LA.lookupCoeff xj e * theta)) | (xk, e) <- IM.toList t, xk /= xi]
+           [(xk, (m IM.! xk) + (LA.coeff xj e * theta)) | (xk, e) <- IM.toList t, xk /= xi]
 
   writeIORef (svModel solver) (IM.union m' m) -- note that 'IM.union' is left biased.
   pivot solver xi xj

@@ -153,14 +153,14 @@ simplifyLit lit@(Pos e) =
       Lit $ Pos $ LA.mapCoeff (`div` d) (e .-. LA.constExpr 1) .+. LA.constExpr 1
   where
     d = if null cs then 1 else abs $ foldl1' gcd cs
-    cs = [c | (c,x) <- LA.terms e, x /= LA.constVar]
+    cs = [c | (c,x) <- LA.terms e, x /= LA.unitVar]
 simplifyLit lit@(Divisible b c e)
-  | LA.lookupCoeff LA.constVar e `mod` d /= 0 = if b then false else true
+  | LA.coeff LA.unitVar e `mod` d /= 0 = if b then false else true
   | c' == 1   = if b then true else false
   | d  == 1   = Lit lit
   | otherwise = Lit $ Divisible b c' e'
   where
-    d  = abs $ foldl' gcd c [c | (c,x) <- LA.terms e, x /= LA.constVar]
+    d  = abs $ foldl' gcd c [c | (c,x) <- LA.terms e, x /= LA.unitVar]
     c' = c `div` d
     e' = LA.mapCoeff (`div` d) e
 
@@ -183,8 +183,8 @@ eliminateZ' x formula = case1 ++ case2
          f F' = 1
          f (And' a b) = lcm (f a) (f b)
          f (Or' a b) = lcm (f a) (f b)
-         f (Lit (Pos e)) = fromMaybe 1 (LA.lookupCoeff' x e)
-         f (Lit (Divisible _ _ e)) = fromMaybe 1 (LA.lookupCoeff' x e)
+         f (Lit (Pos e)) = fromMaybe 1 (LA.lookupCoeff x e)
+         f (Lit (Divisible _ _ e)) = fromMaybe 1 (LA.lookupCoeff x e)
     
     -- 式をスケールしてxの係数の絶対値をcへと変換し、その後cxをxで置き換え、
     -- xがcで割り切れるという制約を追加した論理式
@@ -197,13 +197,13 @@ eliminateZ' x formula = case1 ++ case2
         f (And' a b) = f a .&&. f b
         f (Or' a b) = f a .||. f b
         f lit@(Lit (Pos e)) =
-          case LA.lookupCoeff' x e of
+          case LA.lookupCoeff x e of
             Nothing -> lit
             Just a ->
               let s = abs (c `div` a)
               in Lit $ Pos $ g s e
         f lit@(Lit (Divisible b d e)) =
-          case LA.lookupCoeff' x e of
+          case LA.lookupCoeff x e of
             Nothing -> lit
             Just a ->
               let s = abs (c `div` a)
@@ -235,7 +235,7 @@ eliminateZ' x formula = case1 ++ case2
         f (Or' a b) = f a ++ f b
         f (Lit (Divisible _ _ _)) = []
         f (Lit (Pos e)) =
-          case LA.extract' x e of
+          case LA.extractMaybe x e of
             Nothing -> []
             Just (1, e')  -> [lnegate e'] -- Pos e <=> (x + e' > 0) <=> (-e' < x)
             Just (-1, e') -> [] -- Pos e <=> (-x + e' > 0) <=> (x < e')
@@ -256,7 +256,7 @@ eliminateZ' x formula = case1 ++ case2
         f (And' a b) = f a .&&. f b
         f (Or' a b) = f a .||. f b
         f lit@(Lit (Pos e)) =
-          case LA.lookupCoeff' x e of
+          case LA.lookupCoeff x e of
             Nothing -> lit
             Just 1    -> F' -- Pos e <=> ( x + e' > 0) <=> -e' < x
             Just (-1) -> T' -- Pos e <=> (-x + e' > 0) <=>  x  < e'
@@ -273,7 +273,7 @@ eliminateZ' x formula = case1 ++ case2
         f (And' a b) = f a ++ f b
         f (Or' a b) = f a ++ f b
         f (Lit (Pos e)) =
-          case LA.extract' x e of
+          case LA.extractMaybe x e of
             Nothing -> []
             Just (1, e')  -> []   -- Pos e <=> ( x + e' > 0) <=> -e' < x
             Just (-1, e') -> [e'] -- Pos e <=> (-x + e' > 0) <=>  x  < e'

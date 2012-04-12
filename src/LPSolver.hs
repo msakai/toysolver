@@ -118,7 +118,7 @@ addConstraint2 :: Real r => LA.Atom r -> LP r ()
 addConstraint2 c = do
   (LA.Atom lhs rop rhs) <- expandDefs' c
   let
-    (b', e) = LA.extract LA.constVar (lhs .-. rhs)
+    (b', e) = LA.extract LA.unitVar (lhs .-. rhs)
     b = - b'
   tbl <- getTableau
   case rop of
@@ -204,7 +204,7 @@ normalizeConstraint (LA.Atom a op b)
   | rhs < 0   = (lnegate lhs, flipOp op, negate rhs)
   | otherwise = (lhs, op, rhs)
   where
-    (c, lhs) = LA.extract LA.constVar (a .-. b)
+    (c, lhs) = LA.extract LA.unitVar (a .-. b)
     rhs = - c
 
 collectNonnegVars :: forall r. (RealFrac r) => [LA.Atom r] -> VarSet -> (VarSet, [LA.Atom r])

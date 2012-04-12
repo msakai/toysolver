@@ -112,7 +112,7 @@ setObjFun :: Num r => Tableau r -> LA.Expr r -> Tableau r
 setObjFun tbl e = setRow objRow tbl row
   where
     row =
-      case LA.extract LA.constVar e of
+      case LA.extract LA.unitVar e of
         (c, e') -> (LA.coeffMap (lnegate e'), c)
 
 copyObjRow :: Num r => Tableau r -> Tableau r -> Tableau r

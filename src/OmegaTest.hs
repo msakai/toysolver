@@ -86,20 +86,20 @@ leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
 leZ e1 e2 = Nonneg (LA.mapCoeff (`div` d) e)
   where
     e = e2 .-. e1
-    d = abs $ gcd' [c | (c,v) <- LA.terms e, v /= LA.constVar]
+    d = abs $ gcd' [c | (c,v) <- LA.terms e, v /= LA.unitVar]
 ltZ e1 e2 = (e1 .+. LA.constExpr 1) `leZ` e2
 geZ = flip leZ
 gtZ = flip gtZ
 
 eqZ :: ExprZ -> ExprZ -> (DNF Lit)
 eqZ e1 e2
-  = if LA.lookupCoeff LA.constVar e3 `mod` d == 0
+  = if LA.coeff LA.unitVar e3 `mod` d == 0
     then DNF [[Nonneg e, Nonneg (lnegate e)]]
     else false
   where
     e = LA.mapCoeff (`div` d) e3
     e3 = e1 .-. e2
-    d = abs $ gcd' [c | (c,v) <- LA.terms e3, v /= LA.constVar]
+    d = abs $ gcd' [c | (c,v) <- LA.terms e3, v /= LA.unitVar]
 
 -- ---------------------------------------------------------------------------
 

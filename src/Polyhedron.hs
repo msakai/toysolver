@@ -77,7 +77,7 @@ fromAtom :: AtomR  -> [Polyhedron]
 fromAtom (LA.Atom lhs NEq rhs) =
   fromAtom (LA.Atom lhs Lt rhs) ++ fromAtom (LA.Atom lhs Gt rhs)
 fromAtom (LA.Atom lhs op rhs) =
-  case LA.extract LA.constVar (lhs .-. rhs) of
+  case LA.extract LA.unitVar (lhs .-. rhs) of
     (c, e1) ->
       case toRat e1 of
         (lhs1, d) ->
