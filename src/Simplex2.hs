@@ -416,7 +416,8 @@ increaseNB solver xj = do
   col <- getCol solver xj
 
   -- Upper bounds of θ
-  ubs <- liftM concat $ forM col $ \(xi,aij) -> do
+  -- NOTE: xj 自体の上限も考慮するのに注意
+  ubs <- liftM concat $ forM ((xj,1) : col) $ \(xi,aij) -> do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
@@ -438,7 +439,8 @@ decreaseNB solver xj = do
   col <- getCol solver xj
 
   -- Lower bounds of θ
-  lbs <- liftM concat $ forM col $ \(xi,aij) -> do
+  -- NOTE: xj 自体の下限も考慮するのに注意
+  lbs <- liftM concat $ forM ((xj,1) : col) $ \(xi,aij) -> do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
