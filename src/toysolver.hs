@@ -16,6 +16,7 @@ module Main where
 import Control.Monad
 import Data.List
 import Data.Maybe
+import Data.Ratio
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Data.IntMap as IM
@@ -41,6 +42,7 @@ data Flag
     = Help
     | Version
     | Solver String
+    | PrintRational
 {-
     | SatMode
     | Load String
@@ -53,6 +55,7 @@ options =
     [ Option ['h'] ["help"]    (NoArg Help)            "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
     , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, simplex2"
+    , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers omstead of decimals"
 {-
     , Option ['l'] ["load"]    (ReqArg Load "FILE") "load FILE"
     , Option ['t'] ["trace"]    (OptArg (Trace . fromMaybe "on") "[on|off]")
@@ -71,8 +74,8 @@ header = "Usage: toysolver [OPTION...] file.lp"
 
 -- ---------------------------------------------------------------------------
 
-run :: String -> LP.LP -> IO ()
-run solver lp = do
+run :: String -> Bool -> LP.LP -> IO ()
+run solver printRat lp = do
   unless (Set.null (LP.semiContinuousVariables lp)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure
@@ -189,7 +192,10 @@ run solver lp = do
         printf "%s: %s\n" v (showValue (m IM.! (nameToVar Map.! v)))
 
     showValue :: Rational -> String
-    showValue v = show (fromRational v :: Double)
+    showValue v
+      | denominator v == 1 = show (numerator v)
+      | printRat  = show (numerator v) ++ "/" ++ show (denominator v)
+      | otherwise = show (fromRational v :: Double)
 
 -- ---------------------------------------------------------------------------
 
@@ -207,6 +213,6 @@ main = do
       ret <- LP.parseFile fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
-        Right lp -> run (getSolver o) lp
+        Right lp -> run (getSolver o) (PrintRational `elem` o) lp
     (_,_,errs) ->
         hPutStrLn stderr $ concat errs ++ usageInfo header options
