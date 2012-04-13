@@ -828,11 +828,10 @@ test7 = do
 
 dumpSize :: Solver -> IO ()
 dumpSize solver = do
-  t <- readIORef (svTableau solver)
-  let nrows = IM.size t
-  log solver $ "number of rows: " ++ show nrows
-  xs <- variables solver 
-  log solver $ "number of columns: " ++ show (length xs - nrows)
+  nrows <- liftM (subtract 1 . IM.size) $ readIORef (svTableau solver)
+  xs <- variables solver
+  let ncols = length xs - nrows
+  log solver $ printf "%d rows, %d columns" nrows ncols
 
 dump :: Solver -> IO ()
 dump solver = do
