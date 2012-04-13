@@ -273,11 +273,15 @@ dualSimplex solver = do
                     dir <- readIORef (svOptDir solver)
                     obj_def <- getDef solver objVar
                     xi_def  <- getDef solver xi
-                    ts <- filterM q (LA.terms xi_def)
-                    ws <- liftM concat $ forM ts $ \(aij, xj) -> do
-                      let cj = LA.coeff xj obj_def
-                          ratio = if dir==OptMin then (cj / aij) else - (cj / aij)
-                      return [(xj, ratio) | ratio >= 0]
+                    ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
+                      b <- q (aij, xj)
+                      if b
+                      then do
+                        cj <- getCoeff solver objVar xj
+                        let ratio = if dir==OptMin then (cj / aij) else - (cj / aij)
+                        return [(xj, ratio) | ratio >= 0]
+                      else
+                        return []
                     case ws of
                       [] -> return Nothing
                       _ -> return $ Just $ fst $ minimumBy (compare `on` snd) ws
@@ -304,11 +308,15 @@ dualSimplex solver = do
                     dir <- readIORef (svOptDir solver)
                     obj_def <- getDef solver objVar
                     xi_def  <- getDef solver xi
-                    ts <- filterM q (LA.terms xi_def)
-                    ws <- liftM concat $ forM ts $ \(aij, xj) -> do
-                      let cj = LA.coeff xj obj_def
-                          ratio = if dir==OptMin then - (cj / aij) else (cj / aij)
-                      return [(xj, ratio) | ratio >= 0]
+                    ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
+                      b <- q (aij, xj)
+                      if b
+                      then do
+                        cj <- getCoeff solver objVar xj
+                        let ratio = if dir==OptMin then - (cj / aij) else (cj / aij)
+                        return [(xj, ratio) | ratio >= 0]
+                      else
+                        return []
                     case ws of
                       [] -> return Nothing
                       _ -> return $ Just $ fst $ minimumBy (compare `on` snd) ws
@@ -521,7 +529,8 @@ pivotAndUpdate solver xi xj v = do
 
   m <- readIORef (svModel solver)
   t <- readIORef (svTableau solver)
-  let theta = (v - (m IM.! xi)) / (LA.coeff xj (t IM.! xi))
+  aij <- getCoeff solver xi xj
+  let theta = (v - (m IM.! xi)) / aij
   let m' = IM.fromList $
            [(xi, v), (xj, (m IM.! xj) + theta)] ++
            [(xk, (m IM.! xk) + (LA.coeff xj e * theta)) | (xk, e) <- IM.toList t, xk /= xi]
@@ -552,6 +561,11 @@ getDef solver x = do
   -- x should be basic variable or 'objVar'
   t <- readIORef (svTableau solver)
   return $! (t IM.! x)
+
+getCoeff :: Solver -> Var -> Var -> IO Rational
+getCoeff solver xi xj = do
+  xi_def <- getDef solver xi
+  return $! LA.coeff xj xi_def
 
 isBasic  :: Solver -> Var -> IO Bool
 isBasic solver x = do
