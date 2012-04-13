@@ -110,13 +110,14 @@ assertAtom solver (LA.Atom lhs op rhs) = do
   let (lhs',rhs') =
         case LA.extract LA.unitVar (lhs .-. rhs) of
           (n,e) -> (e, -n)
-  v <-
+  (v,op,rhs') <-
     case LA.terms lhs' of
-      [(1,v)] -> return v
+      [(1,v)] -> return (v, op, rhs')
+      [(-1,v)] -> return (v, F.flipOp op, -rhs')
       _ -> do
         v <- newVar solver
         modifyIORef (svTableau solver) (IM.insert v lhs')
-        return v
+        return (v,op,rhs')
   case op of
     F.Le  -> assertUpper solver v rhs'
     F.Ge  -> assertLower solver v rhs'
@@ -825,6 +826,32 @@ test7 = do
   ret <- dualSimplex solver
   print ret
   dump solver
+
+testAssertAtom :: IO ()
+testAssertAtom = do
+  solver <- newSolver
+  x0 <- newVar solver
+  assertAtom solver (LA.Atom (LA.constExpr 1) F.Le (LA.varExpr x0))
+  ret <- getLB solver x0
+  print $ ret == Just 1
+
+  solver <- newSolver
+  x0 <- newVar solver
+  assertAtom solver (LA.Atom (LA.varExpr x0) F.Ge (LA.constExpr 1))
+  ret <- getLB solver x0
+  print $ ret == Just 1
+
+  solver <- newSolver
+  x0 <- newVar solver
+  assertAtom solver (LA.Atom (LA.constExpr 1) F.Ge (LA.varExpr x0))
+  ret <- getUB solver x0
+  print $ ret == Just 1
+
+  solver <- newSolver
+  x0 <- newVar solver
+  assertAtom solver (LA.Atom (LA.varExpr x0) F.Le (LA.constExpr 1))
+  ret <- getUB solver x0
+  print $ ret == Just 1
 
 dumpSize :: Solver -> IO ()
 dumpSize solver = do
