@@ -28,6 +28,8 @@ module Simplex2
 
   -- * Configulation
   , setLogger
+  , PivotStrategy (..)
+  , setPivotStrategy
   ) where
 
 import Prelude hiding (log)
@@ -63,6 +65,7 @@ data Solver
   , svOptDir  :: !(IORef OptDir)
 
   , svLogger :: !(IORef (Maybe (String -> IO ())))
+  , svPivotStrategy :: !(IORef PivotStrategy)
   , svNPivot  :: !(IORef Int)
   }
 
@@ -80,6 +83,7 @@ newSolver = do
   ok <- newIORef True
   dir <- newIORef OptMin
   logger <- newIORef Nothing
+  pivot <- newIORef PivotStrategyBlandRule
   npivot <- newIORef 0
   return $
     Solver
@@ -92,7 +96,25 @@ newSolver = do
     , svOptDir  = dir
     , svLogger  = logger
     , svNPivot  = npivot
+    , svPivotStrategy = pivot
     }
+
+{-
+Largest coefficient rule: original rule suggested by G. Dantzig.
+Largest increase rule: computationally more expensive in comparison with Largest coefficient, but locally maximizes the progress.
+Steepest edge rule: best pivot rule in practice, an efficient approximate implementation is "Devex".
+Bland’s rule: avoids cycling but one of the slowest rules.
+Random edge rule: Randomized have lead to the current best provable bounds for the number of pivot steps of the simplex method.
+Lexicographic rule: used for avoiding cyclying.
+-}
+data PivotStrategy
+  = PivotStrategyBlandRule
+  | PivotStrategyLargestCoefficient
+--  | PivotStrategySteepestEdge
+  deriving (Eq, Ord, Enum, Show, Read)
+
+setPivotStrategy :: Solver -> PivotStrategy -> IO ()
+setPivotStrategy solver ps = writeIORef (svPivotStrategy solver) ps
 
 {--------------------------------------------------------------------
   problem description
@@ -350,7 +372,24 @@ selectViolatingBasicVariable solver = do
       vi <- getValue solver xi
       return $ not (testLB li vi) || not (testUB ui vi)
   t <- readIORef (svTableau solver)
-  findM p (IM.keys t)
+
+  ps <- readIORef (svPivotStrategy solver)
+  case ps of
+    PivotStrategyBlandRule ->
+      findM p (IM.keys t)
+    PivotStrategyLargestCoefficient -> do
+      xs <- filterM p (IM.keys t)
+      case xs of
+        [] -> return Nothing
+        _ -> do
+          xs2 <- forM xs $ \xi -> do
+              vi <- getValue solver xi
+              li <- getLB solver xi
+              ui <- getUB solver xi
+              if not (testLB li vi)
+                then return (xi, fromJust li - vi)
+                else return (xi, vi - fromJust ui)
+          return $ Just $ fst $ maximumBy (compare `on` snd) xs2
 
 {--------------------------------------------------------------------
   Optimization
@@ -388,8 +427,16 @@ optimize solver = do
 
 selectEnteringVariable :: Solver -> IO (Maybe (Rational, Var))
 selectEnteringVariable solver = do
+  ps <- readIORef (svPivotStrategy solver)
   obj_def <- getDef solver objVar
-  findM canEnter (LA.terms obj_def)
+  case ps of
+    PivotStrategyBlandRule ->
+      findM canEnter (LA.terms obj_def)
+    PivotStrategyLargestCoefficient -> do
+      ts <- filterM canEnter (LA.terms obj_def)
+      case ts of
+        [] -> return Nothing
+        _ -> return $ Just $ snd $ maximumBy (compare `on` fst) [(abs c, (c,xj)) | (c,xj) <- ts]
   where
     canEnter :: (Rational, Var) -> IO Bool
     canEnter (_,xj) | xj == LA.unitVar = return False

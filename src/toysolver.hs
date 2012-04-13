@@ -43,6 +43,7 @@ data Flag
     | Version
     | Solver String
     | PrintRational
+    | PivotStrategy String
 {-
     | SatMode
     | Load String
@@ -56,6 +57,7 @@ options =
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
     , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, simplex2"
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers omstead of decimals"
+    , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex2 solver (default: bland-rule)"
 {-
     , Option ['l'] ["load"]    (ReqArg Load "FILE") "load FILE"
     , Option ['t'] ["trace"]    (OptArg (Trace . fromMaybe "on") "[on|off]")
@@ -74,8 +76,8 @@ header = "Usage: toysolver [OPTION...] file.lp"
 
 -- ---------------------------------------------------------------------------
 
-run :: String -> Bool -> LP.LP -> IO ()
-run solver printRat lp = do
+run :: String -> [Flag] -> LP.LP -> IO ()
+run solver opt lp = do
   unless (Set.null (LP.semiContinuousVariables lp)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure
@@ -161,6 +163,13 @@ run solver printRat lp = do
 
     solveBySimplex2 = do
       solver <- Simplex2.newSolver
+
+      let ps = last ("bland-rule" : [s | PivotStrategy s <- opt])
+      case ps of
+        "bland-rule"          -> Simplex2.setPivotStrategy solver Simplex2.PivotStrategyBlandRule
+        "largest-coefficient" -> Simplex2.setPivotStrategy solver Simplex2.PivotStrategyLargestCoefficient
+        _ -> error ("unknown pivot strategy \"" ++ ps ++ "\"")
+
       Simplex2.setLogger solver (\s -> putStr "c " >> putStrLn s)
       replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
       Simplex2.setOptDir solver (LP.dir lp)
@@ -191,6 +200,9 @@ run solver printRat lp = do
       forM_ (Set.toList vs) $ \v -> do
         printf "%s: %s\n" v (showValue (m IM.! (nameToVar Map.! v)))
 
+    printRat :: Bool
+    printRat = PrintRational `elem` opt
+
     showValue :: Rational -> String
     showValue v
       | denominator v == 1 = show (numerator v)
@@ -213,6 +225,6 @@ main = do
       ret <- LP.parseFile fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
-        Right lp -> run (getSolver o) (PrintRational `elem` o) lp
+        Right lp -> run (getSolver o) o lp
     (_,_,errs) ->
         hPutStrLn stderr $ concat errs ++ usageInfo header options
