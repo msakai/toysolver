@@ -41,7 +41,7 @@ Executable toysolver
      Simplex
      Simplex2
      Util
-  Build-Depends: base >=4 && <5, mtl, containers, parsec, OptDir
+  Build-Depends: base >=4 && <5, mtl, containers, parsec, OptDir, hashtables
   Extensions:
      BangPatterns
      ScopedTypeVariables

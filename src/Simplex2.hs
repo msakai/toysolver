@@ -38,6 +38,7 @@ import Data.IORef
 import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
+import qualified Data.HashTable.IO as H
 import Text.Printf
 import Data.OptDir
 import System.CPUTime
@@ -45,6 +46,8 @@ import System.CPUTime
 import qualified LA as LA
 import qualified Formula as F
 import Linear
+
+type HashTable k v = H.BasicHashTable k v
 
 {--------------------------------------------------------------------
   The @Solver@ type
@@ -54,7 +57,7 @@ type Var = Int
 
 data Solver
   = Solver
-  { svTableau :: !(IORef (IM.IntMap (LA.Expr Rational)))
+  { svTableau :: !(HashTable Var (HashTable Var Rational))
   , svLB      :: !(IORef (IM.IntMap Rational))
   , svUB      :: !(IORef (IM.IntMap Rational))
   , svModel   :: !(IORef (IM.IntMap Rational))
@@ -72,7 +75,8 @@ objVar = -1
 
 newSolver :: IO Solver
 newSolver = do
-  t <- newIORef (IM.singleton objVar lzero)
+  t <- H.new
+  H.insert t objVar =<< H.new
   l <- newIORef IM.empty
   u <- newIORef IM.empty
   m <- newIORef (IM.singleton objVar 0)
@@ -116,8 +120,8 @@ assertAtom solver (LA.Atom lhs op rhs) = do
       [(-1,v)] -> return (v, F.flipOp op, -rhs')
       _ -> do
         v <- newVar solver
-        t <- readIORef (svTableau solver)
-        modifyIORef (svTableau solver) (IM.insert v (LA.applySubst t lhs'))
+        row <- newRow solver lhs'
+        H.insert (svTableau solver) v row
         return (v,op,rhs')
   case op of
     F.Le  -> assertUpper solver v rhs'
@@ -160,12 +164,11 @@ assertUpper solver x u = do
 -- FIXME: 式に定数項が含まれる可能性を考えるとこれじゃまずい?
 setObj :: Solver -> LA.Expr Rational -> IO ()
 setObj solver e = do
-  t <- readIORef (svTableau solver)
   m <- readIORef (svModel solver)
   let v  = LA.evalExpr m e
-      e' = LA.applySubst t e
-  writeIORef (svTableau solver) (IM.insert objVar e' t)
   writeIORef (svModel solver) (IM.insert objVar v m)
+  obj_row <- newRow solver e
+  H.insert (svTableau solver) objVar obj_row
 
 setOptDir :: Solver -> OptDir -> IO ()
 setOptDir solver dir = writeIORef (svOptDir solver) dir
@@ -202,7 +205,7 @@ check solver = do
                   find :: IO (Maybe Var)
                   find = do
                     xi_def <- getDef solver xi
-                    liftM (fmap snd) $ findM q (LA.terms xi_def)
+                    liftM (fmap snd) $ findM q xi_def
               r <- find
               case r of
                 Nothing -> markBad solver >> return False
@@ -224,7 +227,7 @@ check solver = do
                   find :: IO (Maybe Var)
                   find = do
                     xi_def <- getDef solver xi
-                    liftM (fmap snd) $ findM q (LA.terms xi_def)
+                    liftM (fmap snd) $ findM q xi_def
               r <- find
               case r of
                 Nothing -> markBad solver >> return False
@@ -274,7 +277,7 @@ dualSimplex solver = do
                     dir <- readIORef (svOptDir solver)
                     obj_def <- getDef solver objVar
                     xi_def  <- getDef solver xi
-                    ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
+                    ws <- liftM concat $ forM xi_def $ \(aij, xj) -> do
                       b <- q (aij, xj)
                       if b
                       then do
@@ -309,7 +312,7 @@ dualSimplex solver = do
                     dir <- readIORef (svOptDir solver)
                     obj_def <- getDef solver objVar
                     xi_def  <- getDef solver xi
-                    ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
+                    ws <- liftM concat $ forM xi_def $ \(aij, xj) -> do
                       b <- q (aij, xj)
                       if b
                       then do
@@ -349,8 +352,8 @@ selectViolatingBasicVariable solver = do
       ui <- getUB solver xi
       vi <- getValue solver xi
       return $ not (testLB li vi) || not (testUB ui vi)
-  t <- readIORef (svTableau solver)
-  findM p (IM.keys t)
+  t <- H.toList (svTableau solver)
+  findM p (sort (map fst t))
 
 {--------------------------------------------------------------------
   Optimization
@@ -389,7 +392,7 @@ optimize solver = do
 selectEnteringVariable :: Solver -> IO (Maybe (Rational, Var))
 selectEnteringVariable solver = do
   obj_def <- getDef solver objVar
-  findM canEnter (LA.terms obj_def)
+  findM canEnter (sortBy (compare `on` snd) obj_def)
   where
     canEnter :: (Rational, Var) -> IO Bool
     canEnter (_,xj) | xj == LA.unitVar = return False
@@ -466,13 +469,15 @@ decreaseNB solver xj = do
       pivotAndUpdate solver xi xj v
       return True
 
--- aijが非ゼロの列も全部探しているのは効率が悪い
+-- aijがゼロの行も全部探しているのは効率が悪い
 getCol :: Solver -> Var -> IO [(Var,Rational)]
 getCol solver xj = do
-  t <- readIORef (svTableau solver)
-  return [ (xi, aij)
-         | (xi, xi_def) <- IM.toList t
-         , aij <- maybeToList (LA.lookupCoeff xj xi_def) ]
+  t <- H.toList (svTableau solver)
+  liftM concat $ forM t $ \(xi, xi_def) -> do
+    aijMaybe <- H.lookup xi_def xj
+    case aijMaybe of
+      Nothing -> return []
+      Just aij -> return [(xi, aij)]
 
 {--------------------------------------------------------------------
   Extract results
@@ -499,25 +504,41 @@ update solver xj v = do
   -- log solver $ printf "before update x%d (%s)" xj (show v)
   -- dump solver
 
-  t <- readIORef (svTableau solver)
   v0 <- getValue solver xj
   let diff = v - v0
 
-  modifyIORef (svModel solver) $ \m ->
-    let m2 = IM.map (\ei -> LA.coeff xj ei * diff) t
-    in IM.insert xj v $ IM.unionWith (+) m2 m
+  flip H.mapM_ (svTableau solver) $ \(xi,row) -> do
+    aijMaybe <- H.lookup row xj
+    case aijMaybe of
+      Nothing  -> return ()
+      Just aij -> modifyIORef (svModel solver) $ IM.insertWith (+) xi (aij * diff)
+  modifyIORef (svModel solver) $ IM.insert xj v
 
   -- log solver $ printf "after update x%d (%s)" xj (show v)
   -- dump solver
 
 pivot :: Solver -> Var -> Var -> IO ()
-pivot solver xi xj = do
+pivot solver xr xs = do
   modifyIORef' (svNPivot solver) (+1)
-  modifyIORef' (svTableau solver) $ \defs ->
-    case LA.solveFor (LA.Atom (LA.varExpr xi) F.Eql (defs IM.! xi)) xj of
-      Just (F.Eql, xj_def) ->
-        IM.insert xj xj_def . IM.map (LA.applySubst1 xj xj_def) . IM.delete xi $ defs
-      _ -> error "pivot: should not happen"
+
+  Just xr_row <- H.lookup (svTableau solver) xr
+  H.delete (svTableau solver) xr
+
+  Just ars <- H.lookup xr_row xs
+  xs_def <- do
+    tmp <- H.toList xr_row
+    return $ (xr, 1 / ars) : [(xj, - arj / ars) | (xj,arj) <- tmp, xj /= xs]
+  xs_row <- H.fromList xs_def
+
+  flip H.mapM_ (svTableau solver) $ \(xi,xi_row) -> do
+    aisMaybe <- H.lookup xi_row xs
+    case aisMaybe of
+      Nothing  -> return ()
+      Just ais -> do
+        H.delete xi_row xs
+        forM_ xs_def $ \(xj,aij) -> hAdd xi_row xj (ais*aij)
+
+  H.insert (svTableau solver) xs xs_row
 
 pivotAndUpdate :: Solver -> Var -> Var -> Rational -> IO ()
 pivotAndUpdate solver xi xj v | xi == xj = update solver xi v -- xi = xj is non-basic variable
@@ -528,15 +549,19 @@ pivotAndUpdate solver xi xj v = do
   -- log solver $ printf "before pivotAndUpdate x%d x%d (%s)" xi xj (show v)
   -- dump solver
 
-  m <- readIORef (svModel solver)
-  t <- readIORef (svTableau solver)
   aij <- getCoeff solver xi xj
-  let theta = (v - (m IM.! xi)) / aij
-  let m' = IM.fromList $
-           [(xi, v), (xj, (m IM.! xj) + theta)] ++
-           [(xk, (m IM.! xk) + (LA.coeff xj e * theta)) | (xk, e) <- IM.toList t, xk /= xi]
+  v0 <- getValue solver xi
+  let theta = (v - v0) / aij
 
-  writeIORef (svModel solver) (IM.union m' m) -- note that 'IM.union' is left biased.
+  flip H.mapM_ (svTableau solver) $ \(xk, xk_row) -> do
+    unless (xk == xi) $ do
+      akjMaybe <- H.lookup xk_row xj
+      case akjMaybe of
+        Nothing -> return ()
+        Just akj -> modifyIORef (svModel solver) (IM.insertWith (+) xk (akj*theta))
+  modifyIORef (svModel solver) (IM.insertWith (+) xj theta)
+  modifyIORef (svModel solver) (IM.insert xi v)
+
   pivot solver xi xj
 
   -- log solver $ printf "after pivotAndUpdate x%d x%d (%s)" xi xj (show v)
@@ -557,27 +582,37 @@ getValue solver x = do
   m <- readIORef (svModel solver)
   return $ m IM.! x
 
-getDef :: Solver -> Var -> IO (LA.Expr Rational)
+getDef :: Solver -> Var -> IO [(Rational, Var)]
 getDef solver x = do
   -- x should be basic variable or 'objVar'
-  t <- readIORef (svTableau solver)
-  return $! (t IM.! x)
+  Just x_row <- H.lookup (svTableau solver) x
+  xs <- H.toList x_row
+  return [(aij,xj) | (xj,aij) <- xs]
 
 getCoeff :: Solver -> Var -> Var -> IO Rational
 getCoeff solver xi xj = do
-  xi_def <- getDef solver xi
-  return $! LA.coeff xj xi_def
+  Just xi_row <- H.lookup (svTableau solver) xi
+  liftM fromJust $ H.lookup xi_row xj
 
 isBasic  :: Solver -> Var -> IO Bool
-isBasic solver x = do
-  t <- readIORef (svTableau solver)
-  return $! x `IM.member` t
+isBasic solver x =
+  liftM isJust $ H.lookup (svTableau solver) x
 
 isNonBasic  :: Solver -> Var -> IO Bool
 isNonBasic solver x = liftM not (isBasic solver x)
 
 markBad :: Solver -> IO ()
 markBad solver = writeIORef (svOk solver) False
+
+newRow :: Solver -> LA.Expr Rational -> IO (HashTable Var Rational)
+newRow solver e = do
+  row <- H.new
+  forM_ (LA.terms e) $ \(ci,xi) -> do
+    ret <- H.lookup (svTableau solver) xi
+    case ret of
+      Nothing -> hAdd row xi ci
+      Just xi_row -> flip H.mapM_ xi_row $ \(xj,aij) -> hAdd row xj (ci*aij)
+  return row
 
 {--------------------------------------------------------------------
   utility
@@ -621,6 +656,17 @@ recordTime solver act = do
   (log solver . printf "time = %.3fs") (fromIntegral (end - start) / 10^(12::Int) :: Double)
   (log solver . printf "#pivot = %d") =<< readIORef (svNPivot solver)
   return result
+
+hAdd :: (Num v) => HashTable Var v -> Var -> v -> IO ()
+hAdd !_ !_ 0 = return ()
+hAdd !h !k !v = do
+  ret <- H.lookup h k
+  case ret of
+    Nothing -> H.insert h k v
+    Just v1 ->
+      case v1 + v of
+        0  -> H.delete h k
+        v2 -> H.insert h k v2
 
 {--------------------------------------------------------------------
   Logging
@@ -743,7 +789,7 @@ test4 = do
   x0 <- newVar solver
   x1 <- newVar solver
 
-  writeIORef (svTableau solver) (IM.fromList [(x1, LA.varExpr x0)])
+  H.insert (svTableau solver) x1 =<< H.fromList [(x0, 1)]
   writeIORef (svLB solver) (IM.fromList [(x0, 0), (x1, 0)])
   writeIORef (svUB solver) (IM.fromList [(x0, 2), (x1, 3)])
   setObj solver (LA.fromTerms [(-1, x0)])
@@ -759,7 +805,7 @@ test5 = do
   x0 <- newVar solver
   x1 <- newVar solver
 
-  writeIORef (svTableau solver) (IM.fromList [(x1, LA.varExpr x0)])
+  H.insert (svTableau solver) x1 =<< H.fromList [(x0, 1)]
   writeIORef (svLB solver) (IM.fromList [(x0, 0), (x1, 0)])
   writeIORef (svUB solver) (IM.fromList [(x0, 2), (x1, 0)])
   setObj solver (LA.fromTerms [(-1, x0)])
@@ -870,7 +916,7 @@ testAssertAtom = do
 
 dumpSize :: Solver -> IO ()
 dumpSize solver = do
-  nrows <- liftM (subtract 1 . IM.size) $ readIORef (svTableau solver)
+  nrows <- liftM (subtract 1 . length) $ H.toList (svTableau solver)
   xs <- variables solver
   let ncols = length xs - nrows
   log solver $ printf "%d rows, %d columns" nrows ncols
@@ -880,10 +926,14 @@ dump solver = do
   log solver "============="
 
   log solver "Tableau:"
-  t <- readIORef (svTableau solver)
-  log solver $ printf "obj = %s" (show (t IM.! objVar))
-  forM_ (IM.toList t) $ \(xi, e) -> do
-    when (xi /= objVar) $ log solver $ printf "x%d = %s" xi (show e)
+  Just obj_row <- H.lookup (svTableau solver) objVar
+  obj_def <- liftM (LA.fromTerms . map (\(x,c) -> (c,x))) $ H.toList obj_row
+  log solver $ printf "obj = %s" (show obj_def)
+
+  flip H.mapM_ (svTableau solver) $ \(xi, xi_row) -> do
+    when (xi /= objVar) $ do
+      xi_def <- liftM (LA.fromTerms . map (\(x,c) -> (c,x))) $ H.toList xi_row
+      log solver $ printf "x%d = %s" xi (show xi_def)
 
   log solver ""
 
