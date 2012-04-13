@@ -870,10 +870,12 @@ testAssertAtom = do
 
 dumpSize :: Solver -> IO ()
 dumpSize solver = do
-  nrows <- liftM (subtract 1 . IM.size) $ readIORef (svTableau solver)
+  t <- readIORef (svTableau solver)
+  let nrows = IM.size t - 1 -- -1 is objVar
   xs <- variables solver
   let ncols = length xs - nrows
-  log solver $ printf "%d rows, %d columns" nrows ncols
+  let nnz = sum [IM.size $ LA.coeffMap xi_def | (xi,xi_def) <- IM.toList t, xi /= objVar]
+  log solver $ printf "%d rows, %d columns, %d non-zeros" nrows ncols nnz
 
 dump :: Solver -> IO ()
 dump solver = do
