@@ -1079,23 +1079,22 @@ analyzeConflict solver constr = do
             return $ Just l
           _ -> return Nothing
 
-  let loop :: LitSet -> LitSet -> LitSet -> IO LitSet
-      loop lits1 lits2 seen
+  let loop :: LitSet -> LitSet -> IO LitSet
+      loop lits1 lits2
         | sz==1 = do
             return $ lits1 `IS.union` lits2
         | sz>=2 = do
             ret <- pop
             case ret of
               Nothing -> do
-                error $ printf "analyzeConflict: should not happen: empty trail: loop %s %s %s"
-                               (show lits1) (show lits2) (show seen)
+                error $ printf "analyzeConflict: should not happen: empty trail: loop %s %s"
+                               (show lits1) (show lits2)
               Just l -> do
                 if litNot l `IS.notMember` lits1
                  then do
                    unassign solver (litVar l)
-                   loop lits1 lits2 seen
+                   loop lits1 lits2
                  else do
-                  let seen' = IS.insert (litNot l) seen
                   m <- varReason solver (litVar l)
                   case m of
                     Nothing -> error "analyzeConflict: should not happen"
@@ -1105,9 +1104,8 @@ analyzeConflict solver constr = do
                       forM_ xs $ \lit -> varBumpActivity solver (litVar lit)
                       unassign solver (litVar l)
                       (ys,zs) <- split xs
-                      loop (IS.delete (litNot l) lits1 `IS.union` (ys `IS.difference` seen))
+                      loop (IS.delete (litNot l) lits1 `IS.union` ys)
                            (lits2 `IS.union` zs)
-                           seen'
         | otherwise = error "analyzeConflict: should not happen: reason of current level is empty"
         where
           sz = IS.size lits1
@@ -1116,7 +1114,7 @@ analyzeConflict solver constr = do
   conflictClause <- reasonOf solver constr Nothing
   forM_ conflictClause $ \lit -> varBumpActivity solver (litVar lit)
   (ys,zs) <- split conflictClause
-  lits <- loop ys zs IS.empty
+  lits <- loop ys zs
 
   lits <- do
     ccmin <- readIORef (svCCMin solver)
