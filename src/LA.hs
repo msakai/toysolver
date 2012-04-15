@@ -183,6 +183,13 @@ lookupCoeff v (Expr m) = IM.lookup v m
 -- | @extract v e@ returns @(c, e')@ such that @e == c .*. v .+. e'@
 extract :: Num r => Var -> Expr r -> (r, Expr r)
 extract v (Expr m) = (IM.findWithDefault 0 v m, Expr (IM.delete v m))
+{-
+-- Alternative implementation which may be faster but allocte more memory
+extract v (Expr m) = 
+  case IM.updateLookupWithKey (\_ _ -> Nothing) v m of
+    (Nothing, _) -> (0, Expr m)
+    (Just c, m2) -> (c, Expr m2)
+-}
 
 -- | @extractMaybe v e@ returns @Just (c, e')@ such that @e == c .*. v .+. e'@
 -- if @e@ contains v, and returns @Nothing@ otherwise.
@@ -191,6 +198,13 @@ extractMaybe v (Expr m) =
   case IM.lookup v m of
     Nothing -> Nothing
     Just c -> Just (c, Expr (IM.delete v m))
+{-
+-- Alternative implementation which may be faster but allocte more memory
+extractMaybe v (Expr m) =
+  case IM.updateLookupWithKey (\_ _ -> Nothing) v m of
+    (Nothing, _) -> Nothing
+    (Just c, m2) -> Just (c, Expr m2)
+-}
 
 showExpr :: (Num r, Show r) => Expr r -> String
 showExpr = showExprWith f
