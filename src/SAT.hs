@@ -214,6 +214,38 @@ normalizePBAtLeast a =
 test_normalizePBAtLeast :: ([(Integer, Lit)],Integer)
 test_normalizePBAtLeast = normalizePBAtLeast ([(-4,-1),(3,1),(10,-2)], 3)
 
+cutResolve :: ([(Integer,Lit)],Integer) -> ([(Integer,Lit)],Integer) -> Var -> ([(Integer,Lit)],Integer)
+cutResolve (lhs1,rhs1) (lhs2,rhs2) v = assert (l1 == litNot l2) $ normalizePBAtLeast pb
+  where
+    (c1,l1) = head [(c,l) | (c,l) <- lhs1, litVar l == v]
+    (c2,l2) = head [(c,l) | (c,l) <- lhs2, litVar l == v]
+    g = gcd c1 c2
+    s1 = c2 `div` g
+    s2 = c1 `div` g
+    pb = ([(s1*c,l) | (c,l) <- lhs1] ++ [(s2*c,l) | (c,l) <- lhs2], s1*rhs1 + s2 * rhs2)
+
+test_cutResolve1 :: Bool
+test_cutResolve1 = (sort lhs, rhs) == (sort [(1,3),(1,4)], 1)
+  where
+    x1 = 1
+    x2 = 2
+    x3 = 3
+    x4 = 4
+    pb1 = ([(1,x1), (1,x2), (1,x3)], 1)
+    pb2 = ([(2,-x1), (2,-x2), (1,x4)], 3)
+    (lhs,rhs) = cutResolve pb1 pb2 x1
+
+test_cutResolve2 :: Bool
+test_cutResolve2 = (sort lhs, rhs) == (sort [(3,1),(2,-2),(2,4)], 3)
+  where
+    x1 = 1
+    x2 = 2
+    x3 = 3
+    x4 = 4
+    pb1 = ([(3,x1), (2,-x2), (1,x3), (1,x4)], 3)
+    pb2 = ([(1,-x3), (1,x4)], 1)
+    (lhs,rhs) = cutResolve pb1 pb2 x3
+
 {--------------------------------------------------------------------
   internal data structures
 --------------------------------------------------------------------}
