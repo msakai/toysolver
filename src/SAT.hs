@@ -1400,10 +1400,14 @@ instance Constraint SomeConstraint where
   Clause
 --------------------------------------------------------------------}
 
-data ClauseData = ClauseData !(IOUArray Int Lit) !(IORef Double)
+data ClauseData
+  = ClauseData
+  { claLits :: !(IOUArray Int Lit)
+  , claActivity :: !(IORef Double)
+  }
 
 instance Eq ClauseData where
-  ClauseData a1 _ == ClauseData a2 _ = a1 == a2
+  c1 == c2 = claActivity c1 == claActivity c2
 
 newClauseData :: Clause -> Bool -> IO ClauseData
 newClauseData ls learnt = do
@@ -1415,25 +1419,25 @@ newClauseData ls learnt = do
 instance Constraint ClauseData where
   toConstraint = ConstrClause
 
-  showConstraint _ (ClauseData a _) = do
-    lits <- getElems a
+  showConstraint _ this = do
+    lits <- getElems (claLits this)
     return (show lits)
 
-  attach solver this@(ClauseData a _) = do
-    lits <- getElems a
+  attach solver this = do
+    lits <- getElems (claLits this)
     case lits of
       l1:l2:_ -> do
         watch solver l1 this
         watch solver l2 this
       _ -> return ()
 
-  watchedLiterals _ (ClauseData a _) = do
-    lits <- getElems a
+  watchedLiterals _ this = do
+    lits <- getElems (claLits this)
     case lits of
       l1:l2:_ -> return [l1, l2]
       _ -> return []
 
-  basicPropagate !s this (ClauseData a _) !falsifiedLit = do
+  basicPropagate !s this this2 !falsifiedLit = do
     preprocess
 
     !lit0 <- unsafeRead a 0
@@ -1462,6 +1466,8 @@ instance Constraint ClauseData where
             return True
 
     where
+      a = claLits this2
+
       preprocess :: IO ()
       preprocess = do
         !l0 <- unsafeRead a 0
@@ -1481,20 +1487,21 @@ instance Constraint ClauseData where
           then return i
           else findForWatch (i+1) end
 
-  basicReasonOf _ (ClauseData a _) l = do
-    lits <- getElems a
+  basicReasonOf _ this l = do
+    lits <- getElems (claLits this)
     case l of
       Nothing -> return lits
       Just lit -> do
         assert (lit == head lits) $ return ()
         return $ tail lits
 
-  isSatisfied solver (ClauseData a _) = do
-    lits <- getElems a
+  isSatisfied solver this = do
+    lits <- getElems (claLits this)
     vals <- mapM (litValue solver) lits
     return $ lTrue `elem` vals
 
-  constrBumpActivity solver (ClauseData _ act) = do
+  constrBumpActivity solver this = do
+    let act = claActivity this
     aval <- readIORef act
     when (aval >= 0) $ do -- learnt clause
       inc <- readIORef (svClaInc solver)
@@ -1504,7 +1511,8 @@ instance Constraint ClauseData where
         -- Rescale
         constrRescaleAllActivity solver
 
-  constrRescaleActivity _ (ClauseData _ act) = do
+  constrRescaleActivity _ this = do
+    let act = claActivity this
     aval <- readIORef act
     when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
 
@@ -1530,6 +1538,7 @@ data AtLeastData
   = AtLeastData
   { atLeastLits :: IOUArray Int Lit
   , atLeastNum :: !Int
+  , atLeastActivity :: !(IORef Double)
   }
   deriving Eq
 
@@ -1537,26 +1546,30 @@ newAtLeastData :: [Lit] -> Int -> IO AtLeastData
 newAtLeastData ls n = do
   let size = length ls
   a <- newListArray (0, size-1) ls
-  return (AtLeastData a n)
+  let learnt = False -- FIXME
+  act <- newIORef $! (if learnt then 0 else -1)
+  return (AtLeastData a n act)
 
 instance Constraint AtLeastData where
   toConstraint = ConstrAtLeast
 
-  showConstraint _ (AtLeastData a n) = do
-    lits <- getElems a
-    return $ show lits ++ " >= " ++ show n
+  showConstraint _ this = do
+    lits <- getElems (atLeastLits this)
+    return $ show lits ++ " >= " ++ show (atLeastNum this)
 
-  attach solver this@(AtLeastData a n) = do
-    lits <- getElems a
+  attach solver this = do
+    lits <- getElems (atLeastLits this)
+    let n = atLeastNum this
     let ws = if length lits > n then take (n+1) lits else []
     forM_ ws $ \l -> watch solver l this
 
-  watchedLiterals _ (AtLeastData a n) = do
-    lits <- getElems a
+  watchedLiterals _ this = do
+    lits <- getElems (atLeastLits this)
+    let n = atLeastNum this
     let ws = if length lits > n then take (n+1) lits else []
     return ws
 
-  basicPropagate s this (AtLeastData a n) falsifiedLit = do
+  basicPropagate s this this2 falsifiedLit = do
     preprocess
 
     when debugMode $ do
@@ -1591,6 +1604,9 @@ instance Constraint AtLeastData where
         return True
 
     where
+      a = atLeastLits this2
+      n = atLeastNum this2
+
       preprocess :: IO ()
       preprocess = loop 0
         where
@@ -1614,8 +1630,9 @@ instance Constraint AtLeastData where
           then return (Just i)
           else findForWatch (i+1) end
 
-  basicReasonOf s (AtLeastData a n) l = do
-    lits <- getElems a
+  basicReasonOf s this l = do
+    lits <- getElems (atLeastLits this)
+    let n = atLeastNum this
     case l of
       Nothing -> do
         let f :: [Lit] -> IO Lit
@@ -1631,10 +1648,26 @@ instance Constraint AtLeastData where
         assert (lit `elem` take n lits) $ return ()
         return $ drop n lits
 
-  isSatisfied solver (AtLeastData a n) = do
-    lits <- getElems a
+  isSatisfied solver this = do
+    lits <- getElems (atLeastLits this)
     vals <- mapM (litValue solver) lits
-    return $ length [v | v <- vals, v == lTrue] >= n
+    return $ length [v | v <- vals, v == lTrue] >= atLeastNum this
+
+  constrBumpActivity solver this = do
+    let act = atLeastActivity this
+    aval <- readIORef act
+    when (aval >= 0) $ do -- learnt clause
+      inc <- readIORef (svClaInc solver)
+      let aval2 = aval+inc
+      writeIORef act $! aval2
+      when (aval2 > 1e20) $
+        -- Rescale
+        constrRescaleAllActivity solver
+
+  constrRescaleActivity _ this = do
+    let act = atLeastActivity this
+    aval <- readIORef act
+    when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
 
 instantiateAtLeast :: Solver -> ([Lit],Int) -> IO ([Lit],Int)
 instantiateAtLeast solver (xs,n) = loop ([],n) xs
@@ -1659,6 +1692,7 @@ data PBAtLeastData
   { pbTerms  :: !(LitMap Integer)
   , pbDegree :: !Integer
   , pbSlack  :: !(IORef Integer)
+  , pbActivity :: !(IORef Double)
   }
   deriving Eq
 
@@ -1667,24 +1701,27 @@ newPBAtLeastData ts degree = do
   let slack = sum (map fst ts) - degree
       m = IM.fromList [(l,c) | (c,l) <- ts]
   s <- newIORef slack
-  return (PBAtLeastData m degree s)
+  let learnt = False -- FIXME
+  act <- newIORef $! (if learnt then 0 else -1)
+  return (PBAtLeastData m degree s act)
 
 instance Constraint PBAtLeastData where
   toConstraint = ConstrPBAtLeast
 
-  showConstraint _ (PBAtLeastData m degree _) = do
-    return $ show [(c,l) | (l,c) <- IM.toList m] ++ " >= " ++ show degree
+  showConstraint _ this = do
+    return $ show [(c,l) | (l,c) <- IM.toList (pbTerms this)] ++ " >= " ++ show (pbDegree this)
 
-  attach solver this@(PBAtLeastData m _ _) = do
-    forM_ (IM.keys m) $ \l -> watch solver l this
+  attach solver this = do
+    forM_ (IM.keys (pbTerms this)) $ \l -> watch solver l this
 
-  watchedLiterals _ (PBAtLeastData m _ _) = do
-    return $ IM.keys m
+  watchedLiterals _ this = do
+    return $ IM.keys $ pbTerms this
 
-  basicPropagate solver this (PBAtLeastData m _ slack) falsifiedLit = do
+  basicPropagate solver this this2 falsifiedLit = do
     watch solver falsifiedLit this
 
-    let c = m IM.! falsifiedLit
+    let c = pbTerms this2 IM.! falsifiedLit
+    let slack = pbSlack this2
     modifyIORef' slack (subtract c)
     addBacktrackCB solver (litVar falsifiedLit) $ modifyIORef' slack (+ c)
     s <- readIORef slack
@@ -1692,7 +1729,7 @@ instance Constraint PBAtLeastData where
     if s < 0
       then return False
       else do
-        let ls = [l1 | (l1,c1) <- IM.toList m, c1 > s]
+        let ls = [l1 | (l1,c1) <- IM.toList (pbTerms this2), c1 > s]
         when (not (null ls)) $ do
           when debugMode $ logIO solver $ do
             str <- showConstraint solver this
@@ -1704,11 +1741,12 @@ instance Constraint PBAtLeastData where
               return ()
         return True
 
-  basicReasonOf solver (PBAtLeastData m degree _) l = do
+  basicReasonOf solver this l = do
+    let m = pbTerms this
     xs <- do
       tmp <- filterM (\(lit,_) -> liftM (lFalse ==) (litValue solver lit)) (IM.toList m)
       return $ sortBy (flip compare `on` snd) tmp
-    let max_slack = sum (map snd $ IM.toList m) - degree
+    let max_slack = sum (map snd $ IM.toList m) - pbDegree this
     case l of
       Nothing -> return $ f max_slack xs
       Just lit -> return $ f (max_slack - (m IM.! lit)) xs
@@ -1721,13 +1759,29 @@ instance Constraint PBAtLeastData where
       go _ [] _ = error "should not happen"
       go s ((lit,c):xs) ret = go (s - c) xs (lit:ret)
 
-  isSatisfied solver (PBAtLeastData m degree _) = do
-    xs <- forM (IM.toList m) $ \(l,c) -> do
+  isSatisfied solver this = do
+    xs <- forM (IM.toList (pbTerms this)) $ \(l,c) -> do
       v <- litValue solver l
       if v == lTrue
         then return c
         else return 0
-    return $ sum xs >= degree
+    return $ sum xs >= pbDegree this
+
+  constrBumpActivity solver this = do
+    let act = pbActivity this
+    aval <- readIORef act
+    when (aval >= 0) $ do -- learnt clause
+      inc <- readIORef (svClaInc solver)
+      let aval2 = aval+inc
+      writeIORef act $! aval2
+      when (aval2 > 1e20) $
+        -- Rescale
+        constrRescaleAllActivity solver
+
+  constrRescaleActivity _ this = do
+    let act = pbActivity this
+    aval <- readIORef act
+    when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
 
 instantiatePBAtLeast :: Solver -> ([(Integer,Lit)],Integer) -> IO ([(Integer,Lit)],Integer)
 instantiatePBAtLeast solver (xs,n) = loop ([],n) xs
@@ -1816,9 +1870,9 @@ dumpClaActivity :: Solver -> IO ()
 dumpClaActivity solver = do
   log solver "Learnt clause activity:"
   xs <- learnt solver
-  forM_ xs $ \c@(ConstrClause (ClauseData _ act)) -> do
+  forM_ xs $ \c@(ConstrClause cla) -> do
     s <- showConstraint solver c
-    aval <- readIORef act
+    aval <- readIORef (claActivity cla)
     log solver $ printf "activity(%s) = %f" s aval
 
 -- | set callback function for receiving messages.
