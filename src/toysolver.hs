@@ -128,16 +128,16 @@ run solver opt lp = do
     solveByQE =
       case mapM LA.compileAtom (cs1 ++ cs2 ++ cs3) of
         Nothing -> do
-          putStrLn "unknown"
+          putStrLn "s UNKNOWN"
           exitFailure
         Just cs ->
           case f cs ivs of
             Nothing -> do
-              putStrLn "unsat"
+              putStrLn "s UNSATISFIABLE"
               exitFailure
             Just m -> do
-              putStrLn "sat"
-              putStrLn $ showValue (Expr.eval m obj)
+              putStrLn $ "o " ++ showValue (Expr.eval m obj)
+              putStrLn "s SATISFIABLE"
               printModel m vs
        where
          f = case solver of
@@ -148,17 +148,17 @@ run solver opt lp = do
     solveByMIP =
       case MIPSolverHL.optimize (LP.dir lp) obj (cs1 ++ cs2 ++ cs3) ivs of
         OptUnknown -> do
-          putStrLn "unknown"
+          putStrLn "s UNKNOWN"
           exitFailure
         OptUnsat -> do
-          putStrLn "unsat"
+          putStrLn "s UNSATISFIABLE"
           exitFailure
         Unbounded -> do
-          putStrLn "unbounded"
+          putStrLn "s UNBOUNDED"
           exitFailure
         Optimum r m -> do
-          putStrLn "optimum"
-          putStrLn $ showValue r
+          putStrLn $ "o " ++ showValue r
+          putStrLn "s OPTIMUM FOUND"
           printModel m vs
 
     solveBySimplex2 = do
@@ -170,7 +170,7 @@ run solver opt lp = do
         "largest-coefficient" -> Simplex2.setPivotStrategy solver Simplex2.PivotStrategyLargestCoefficient
         _ -> error ("unknown pivot strategy \"" ++ ps ++ "\"")
 
-      Simplex2.setLogger solver (\s -> putStr "c " >> putStrLn s)
+      Simplex2.setLogger solver (\s -> putStr "c " >> putStrLn s >> hFlush stdout)
       replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
       Simplex2.setOptDir solver (LP.dir lp)
       Simplex2.setObj solver $ fromJust (LA.compileExpr obj)
@@ -180,25 +180,25 @@ run solver opt lp = do
       putStrLn "done" >> hFlush stdout
       ret <- Simplex2.check solver
       if not ret then do
-        putStrLn "unsat"
+        putStrLn "s UNSATISFIABLE"
         exitFailure
       else do
-        putStrLn "sat" >> hFlush stdout
+        putStrLn "c SATISFIABLE" >> hFlush stdout
         ret2 <- Simplex2.optimize solver
         if not ret2 then do
-          putStrLn "unbounded"
+          putStrLn "s UNBOUNDED"
           exitFailure
         else do
           m <- Simplex2.model solver
           r <- Simplex2.getObjValue solver
-          putStrLn "optimum"
-          putStrLn $ showValue r
+          putStrLn $ "o " ++ showValue r
+          putStrLn "s OPTIMUM FOUND"
           printModel m vs
 
     printModel :: Model Rational -> Set.Set String -> IO ()
     printModel m vs =
       forM_ (Set.toList vs) $ \v -> do
-        printf "%s: %s\n" v (showValue (m IM.! (nameToVar Map.! v)))
+        printf "v %s = %s\n" v (showValue (m IM.! (nameToVar Map.! v)))
 
     printRat :: Bool
     printRat = PrintRational `elem` opt
