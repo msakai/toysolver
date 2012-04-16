@@ -111,6 +111,7 @@ Executable toysat
      MultiParamTypeClasses
      FlexibleInstances
      BangPatterns
+     DoAndIfThenElse
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
 
