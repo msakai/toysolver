@@ -1496,16 +1496,17 @@ instance Constraint ClauseData where
 
   constrBumpActivity solver (ClauseData _ act) = do
     aval <- readIORef act
-    when (aval >= 0) $ do
+    when (aval >= 0) $ do -- learnt clause
       inc <- readIORef (svClaInc solver)
-      writeIORef act (aval+inc)
-    aval2 <- readIORef act
-    when (aval2 > 1e20) $
-      -- Rescale
-      constrRescaleAllActivity solver
+      let aval2 = aval+inc
+      writeIORef act $! aval2
+      when (aval2 > 1e20) $
+        -- Rescale
+        constrRescaleAllActivity solver
 
   constrRescaleActivity _ (ClauseData _ act) = do
-    modifyIORef' act (* 1e-20)
+    aval <- readIORef act
+    when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
 
 instantiateClause :: Solver -> Clause -> IO (Maybe Clause)
 instantiateClause solver = loop []
