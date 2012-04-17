@@ -68,6 +68,8 @@ module SAT
 
   -- * Internal API
   , normalizePBAtLeast
+  , varBumpActivity
+  , varDecayActivity
   ) where
 
 import Prelude hiding (log)

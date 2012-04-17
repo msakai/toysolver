@@ -57,6 +57,7 @@ data Options
   , optCCMin         :: Int
   , optLinearizerPB  :: Bool
   , optPolarityObjFun :: Bool
+  , optBumpObjFunVars :: Bool
   , optBinarySearch  :: Bool
   }
 
@@ -70,6 +71,7 @@ defaultOptions
   , optCCMin         = SAT.defaultCCMin
   , optLinearizerPB  = False
   , optPolarityObjFun = False
+  , optBumpObjFunVars = False
   , optBinarySearch   = False
   }
 
@@ -100,6 +102,9 @@ options =
     , Option [] ["polarity-objfun"]
         (NoArg (\opt -> opt{ optPolarityObjFun = True }))
         "Set default polarity of variables according to optimize objective function."
+    , Option [] ["bump-objfun-vars"]
+        (NoArg (\opt -> opt{ optBumpObjFunVars = True }))
+        "Bump activity scores of variables that appears in objective function."
 
     , Option [] ["search"]
         (ReqArg (\val opt -> opt{ optBinarySearch = parseSearch val }) "<str>")
@@ -279,6 +284,11 @@ minimize opt solver obj update = do
     forM_ obj $ \(c,l) -> do
       let p = if c > 0 then not (SAT.litPolarity l) else SAT.litPolarity l
       SAT.setVarPolarity solver (SAT.litVar l) p
+  when (optBumpObjFunVars opt) $ do
+    forM_ (map snd (sortBy (compare `on` fst) [(abs c, l) | (c,l) <- obj])) $ \l -> do
+      SAT.varBumpActivity solver (SAT.litVar l)
+      SAT.varDecayActivity solver
+
   result <- SAT.solve solver
   if not result then
     return Nothing
