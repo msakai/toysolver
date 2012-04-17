@@ -52,6 +52,7 @@ data Mode = ModeHelp | ModeSAT | ModePB | ModeWBO | ModeMaxSAT | ModeLP
 data Options
   = Options
   { optMode          :: Mode
+  , optRestartStrategy :: SAT.RestartStrategy
   , optRestartFirst  :: Int
   , optRestartInc    :: Double
   , optLearntSizeInc :: Double
@@ -67,6 +68,7 @@ defaultOptions :: Options
 defaultOptions
   = Options
   { optMode          = ModeSAT
+  , optRestartStrategy = SAT.defaultRestartStrategy
   , optRestartFirst  = SAT.defaultRestartFirst
   , optRestartInc    = SAT.defaultRestartInc
   , optLearntSizeInc = SAT.defaultLearntSizeInc
@@ -84,6 +86,9 @@ options =
     , Option []    ["maxsat"] (NoArg (\opt -> opt{ optMode = ModeMaxSAT })) "solve MaxSAT problem in .cnf or .wcnf file"
     , Option []    ["lp"]     (NoArg (\opt -> opt{ optMode = ModeLP     })) "solve binary integer programming problem in .lp file"
 
+    , Option [] ["restart"]
+        (ReqArg (\val opt -> opt{ optRestartStrategy = parseRestartStrategy val }) "<str>")
+        "Restart startegy: MiniSAT (default), Armin."
     , Option [] ["restart-first"]
         (ReqArg (\val opt -> opt{ optRestartFirst = read val }) "<integer>")
         (printf "The initial restart limit. (default %d)" SAT.defaultRestartFirst)
@@ -112,6 +117,12 @@ options =
         "Disable heuristics for polarity/activity of variables in objective function"
     ]
   where
+    parseRestartStrategy s =
+      case map toLower s of
+        "minisat" -> SAT.MiniSATRestarts
+        "armin" -> SAT.ArminRestarts
+        _ -> undefined
+
     parseSearch s =
       case map toLower s of
         "linear" -> False
@@ -162,6 +173,7 @@ printSysInfo = do
 newSolver :: Options -> IO SAT.Solver
 newSolver opts = do
   solver <- SAT.newSolver
+  SAT.setRestartStrategy solver (optRestartStrategy opts)
   SAT.setRestartFirst  solver (optRestartFirst opts)
   SAT.setRestartInc    solver (optRestartInc opts)
   SAT.setLearntSizeInc solver (optLearntSizeInc opts)

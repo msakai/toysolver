@@ -49,6 +49,9 @@ module SAT
   , model
 
   -- * Solver configulation
+  , RestartStrategy (..)
+  , setRestartStrategy
+  , defaultRestartStrategy
   , setRestartFirst
   , defaultRestartFirst
   , setRestartInc
@@ -381,6 +384,8 @@ data Solver
   -- | Amount to bump next clause with.
   , svClaInc       :: !(IORef Double)
 
+  , svRestartStrategy :: !(IORef RestartStrategy)
+
   -- | The initial restart limit. (default 100)
   , svRestartFirst :: !(IORef Int)
 
@@ -630,6 +635,7 @@ newSolver = do
   claInc   <- newIORef 1
   varDecay <- newIORef (1 / 0.95)
   varInc   <- newIORef 1
+  restartStrat <- newIORef defaultRestartStrategy
   restartFirst <- newIORef defaultRestartFirst
   restartInc <- newIORef defaultRestartInc
   learntSizeInc <- newIORef defaultLearntSizeInc
@@ -657,6 +663,7 @@ newSolver = do
     , svVarInc     = varInc
     , svClaDecay   = claDecay
     , svClaInc     = claInc
+    , svRestartStrategy = restartStrat
     , svRestartFirst = restartFirst
     , svRestartInc   = restartInc
     , svLearntSizeInc = learntSizeInc
@@ -851,26 +858,28 @@ solve_ solver = do
       d <- readIORef (svLevel solver)
       assert (d == levelRoot) $ return ()
 
+      restartStrategy <- readIORef (svRestartStrategy solver)
       restartFirst  <- readIORef (svRestartFirst solver)
       restartInc    <- readIORef (svRestartInc solver)
+      let restartSeq = mkRestartSeq restartStrategy restartFirst restartInc
+
       learntSizeInc <- readIORef (svLearntSizeInc solver)
 
-      let loop !conflict_lim learnt_lim = do
+      let loop (conflict_lim:rs) learnt_lim = do
             ret <- search solver conflict_lim learnt_lim
             case ret of
               Just x -> return x
               Nothing -> do
                 modifyIORef' (svNRestart solver) (+1)
                 backtrackTo solver levelRoot
-                loop (ceiling (fromIntegral conflict_lim * restartInc))
-                     (ceiling (fromIntegral learnt_lim * learntSizeInc))
+                loop rs (ceiling (fromIntegral learnt_lim * learntSizeInc))
 
       nc <- nClauses solver
       nv <- nVars solver
       let learntSizeFirst = max (nc + 2*nv) 16
 
       start <- getCPUTime
-      result <- loop restartFirst learntSizeFirst
+      result <- loop restartSeq learntSizeFirst
       end <- getCPUTime
 
       when result $ do
@@ -980,6 +989,13 @@ model solver = do
 {--------------------------------------------------------------------
   Parameter settings.
 --------------------------------------------------------------------}
+
+setRestartStrategy :: Solver -> RestartStrategy -> IO ()
+setRestartStrategy solver s = writeIORef (svRestartStrategy solver) s
+
+-- | default value for @RestartStrategy@.
+defaultRestartStrategy :: RestartStrategy
+defaultRestartStrategy = MiniSATRestarts
 
 -- | The initial restart limit. (default 100)
 -- Negative value is used to disable restart.
@@ -1798,6 +1814,35 @@ instantiatePBAtLeast solver (xs,n) = loop ([],n) xs
          loop (ys, n) ts
        else
          loop ((c,l):ys, n) ts
+
+{--------------------------------------------------------------------
+  Restart strategy
+--------------------------------------------------------------------}
+
+data RestartStrategy = MiniSATRestarts | ArminRestarts
+  deriving (Show, Eq, Ord)
+
+mkRestartSeq :: RestartStrategy -> Int -> Double -> [Int]
+mkRestartSeq MiniSATRestarts = miniSatRestartSeq
+mkRestartSeq ArminRestarts   = arminRestartSeq
+
+miniSatRestartSeq :: Int -> Double -> [Int]
+miniSatRestartSeq init inc = iterate (ceiling . (inc *) . fromIntegral) init
+
+{-
+miniSatRestartSeq :: Int -> Double -> [Int]
+miniSatRestartSeq init inc = map round $ iterate (inc*) (fromIntegral init)
+-}
+
+arminRestartSeq :: Int -> Double -> [Int]
+arminRestartSeq init inc = go (fromIntegral init) (fromIntegral init)
+  where  
+    go !inner !outer = round inner : go inner' outer'
+      where
+        (inner',outer') = 
+          if inner >= outer
+          then (fromIntegral init, outer * inc)
+          else (inner * inc, outer)
 
 {--------------------------------------------------------------------
   utility
