@@ -23,6 +23,7 @@ import qualified Data.ByteString.Lazy as BS
 import qualified Data.IntMap as IM
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import Data.Char
 import Data.IORef
 import Data.Function
 import Data.List
@@ -59,6 +60,7 @@ data Options
   , optPolarityObjFun :: Bool
   , optBumpObjFunVars :: Bool
   , optBinarySearch  :: Bool
+  , optObjFunVarsHeauristics :: Bool
   }
 
 defaultOptions :: Options
@@ -70,9 +72,8 @@ defaultOptions
   , optLearntSizeInc = SAT.defaultLearntSizeInc
   , optCCMin         = SAT.defaultCCMin
   , optLinearizerPB  = False
-  , optPolarityObjFun = False
-  , optBumpObjFunVars = False
   , optBinarySearch   = False
+  , optObjFunVarsHeauristics = True
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -99,21 +100,23 @@ options =
     , Option [] ["linearizer-pb"]
         (NoArg (\opt -> opt{ optLinearizerPB = True }))
         "Use PB constraint in linearization."
-    , Option [] ["polarity-objfun"]
-        (NoArg (\opt -> opt{ optPolarityObjFun = True }))
-        "Set default polarity of variables according to optimize objective function."
-    , Option [] ["bump-objfun-vars"]
-        (NoArg (\opt -> opt{ optBumpObjFunVars = True }))
-        "Bump activity scores of variables that appears in objective function."
 
     , Option [] ["search"]
         (ReqArg (\val opt -> opt{ optBinarySearch = parseSearch val }) "<str>")
         "Search algorithm used in optimization; linear (default), binary"
+    , Option [] ["objfun-heuristics"]
+        (NoArg (\opt -> opt{ optObjFunVarsHeauristics = True }))
+        "Enable heuristics for polarity/activity of variables in objective function (default)"
+    , Option [] ["no-objfun-heuristics"]
+        (NoArg (\opt -> opt{ optObjFunVarsHeauristics = False }))
+        "Disable heuristics for polarity/activity of variables in objective function"
     ]
   where
-    parseSearch "linear" = False
-    parseSearch "binary" = True
-    parseSearch _ = undefined
+    parseSearch s =
+      case map toLower s of
+        "linear" -> False
+        "binary" -> True
+        _ -> undefined
 
 main :: IO ()
 main = do
@@ -280,11 +283,10 @@ pbLowerBound xs = sum [if c < 0 then c else 0 | (c,_) <- xs]
 
 minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
 minimize opt solver obj update = do
-  when (optPolarityObjFun opt) $ do
+  when (optObjFunVarsHeauristics opt) $ do
     forM_ obj $ \(c,l) -> do
       let p = if c > 0 then not (SAT.litPolarity l) else SAT.litPolarity l
       SAT.setVarPolarity solver (SAT.litVar l) p
-  when (optBumpObjFunVars opt) $ do
     forM_ (map snd (sortBy (compare `on` fst) [(abs c, l) | (c,l) <- obj])) $ \l -> do
       SAT.varBumpActivity solver (SAT.litVar l)
       SAT.varDecayActivity solver
