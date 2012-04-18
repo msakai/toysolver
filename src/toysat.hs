@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, DoAndIfThenElse #-}
+{-# LANGUAGE ScopedTypeVariables, DoAndIfThenElse, CPP #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
@@ -40,6 +40,10 @@ import System.Console.GetOpt
 import qualified System.Info as SysInfo
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import Text.Printf
+#ifdef __GLASGOW_HASKELL__
+import GHC.Environment (getFullArgs)
+#endif
+
 import qualified SAT
 import qualified PBFile
 import qualified LPFile
@@ -132,6 +136,11 @@ main = do
   args <- getArgs
   case getOpt Permute options args of
     (o,args2,[]) -> do
+      printSysInfo
+#ifdef __GLASGOW_HASKELL__
+      args <- getFullArgs
+#endif
+      printf "c command line = %s\n" (show args)
       let opt = foldl (flip id) defaultOptions o
       solver <- newSolver opt
       case optMode opt of
@@ -162,11 +171,11 @@ header = unlines
 
 printSysInfo :: IO ()
 printSysInfo = do
+  tm <- getZonedTime
+  hPrintf stdout "c %s\n" (formatTime defaultTimeLocale "%FT%X%z" tm)
   hPrintf stdout "c arch = %s\n" SysInfo.arch
   hPrintf stdout "c os = %s\n" SysInfo.os
   hPrintf stdout "c compiler = %s %s\n" SysInfo.compilerName (showVersion SysInfo.compilerVersion)
-  tm <- getZonedTime
-  hPrintf stdout "c %s\n" (formatTime defaultTimeLocale "%FT%X%z" tm)
 
 newSolver :: Options -> IO SAT.Solver
 newSolver opts = do
@@ -192,10 +201,12 @@ mainSAT opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right cnf -> printSysInfo >> solveSAT opt solver cnf
+    Right cnf -> solveSAT opt solver cnf
 
 solveSAT :: Options -> SAT.Solver -> DIMACS.CNF -> IO ()
 solveSAT _ solver cnf = do
+  printf "c #vars %d\n" (DIMACS.numVars cnf)
+  printf "c #constraints %d\n" (length (DIMACS.clauses cnf))
   _ <- replicateM (DIMACS.numVars cnf) (SAT.newVar solver)
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
@@ -225,11 +236,15 @@ mainPB opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right formula -> printSysInfo >> solvePB opt solver formula
+    Right formula -> solvePB opt solver formula
 
 solvePB :: Options -> SAT.Solver -> PBFile.Formula -> IO ()
 solvePB opt solver formula@(obj, cs) = do
   let n = pbNumVars formula
+
+  printf "c #vars %d\n" n
+  printf "c #constraints %d\n" (length cs)
+
   _ <- replicateM n (SAT.newVar solver)
   lin <- Lin.newLinearizer solver
   Lin.setUsePB lin (optLinearizerPB opt)
@@ -398,7 +413,7 @@ mainWBO opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right formula -> printSysInfo >> solveWBO opt solver False formula
+    Right formula -> solveWBO opt solver False formula
 
 addPBAtLeastSoft :: SAT.Solver -> SAT.Lit -> [(Integer,SAT.Lit)] -> Integer -> IO ()
 addPBAtLeastSoft solver sel lhs rhs = do
@@ -417,6 +432,9 @@ addPBExactlySoft solver sel lhs rhs = do
 solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
 solveWBO opt solver isMaxSat formula@(tco, cs) = do
   let nvar = wboNumVars formula
+  printf "c #vars %d\n" nvar
+  printf "c #constraints %d\n" (length cs)
+
   _ <- replicateM nvar (SAT.newVar solver)
   lin <- Lin.newLinearizer solver
   Lin.setUsePB lin (optLinearizerPB opt)
@@ -497,7 +515,7 @@ mainMaxSAT opt solver args = do
         (["p","cnf", nvar, _nclause]) ->
           (read nvar, 2, map parseCNFLine ls)
         _ -> error "parse error"
-  printSysInfo >> solveMaxSAT opt solver wcnf
+  solveMaxSAT opt solver wcnf
 
 isComment :: String -> Bool
 isComment ('c':_) = True
@@ -549,7 +567,7 @@ mainLP opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right lp -> printSysInfo >> solveLP opt solver lp
+    Right lp -> solveLP opt solver lp
 
 solveLP :: Options -> SAT.Solver -> LPFile.LP -> IO ()
 solveLP opt solver lp = do
