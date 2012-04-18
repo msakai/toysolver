@@ -312,9 +312,8 @@ minimize opt solver obj update = do
     forM_ obj $ \(c,l) -> do
       let p = if c > 0 then not (SAT.litPolarity l) else SAT.litPolarity l
       SAT.setVarPolarity solver (SAT.litVar l) p
-    forM_ (map snd (sortBy (compare `on` fst) [(abs c, l) | (c,l) <- obj])) $ \l -> do
-      SAT.varBumpActivity solver (SAT.litVar l)
-      SAT.varDecayActivity solver
+    forM_ (zip [1..] (map snd (sortBy (compare `on` fst) [(abs c, l) | (c,l) <- obj]))) $ \(n,l) -> do
+      replicateM n $ SAT.varBumpActivity solver (SAT.litVar l)
 
   result <- SAT.solve solver
   if not result then
