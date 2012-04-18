@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, DoAndIfThenElse #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  SAT
@@ -395,6 +395,8 @@ data Solver
   -- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
   , svLearntSizeInc :: !(IORef Double)
 
+  , svLearntLim :: !(IORef Int)
+
   -- | Controls conflict clause minimization (0=none, 1=local, 2=recursive)
   , svCCMin :: !(IORef Int)
 
@@ -641,6 +643,8 @@ newSolver = do
   learntSizeInc <- newIORef defaultLearntSizeInc
   ccMin <- newIORef defaultCCMin
 
+  learntLim <- newIORef undefined
+
   logger <- newIORef Nothing
 
   return $
@@ -668,6 +672,7 @@ newSolver = do
     , svRestartInc   = restartInc
     , svLearntSizeInc = learntSizeInc
     , svCCMin = ccMin
+    , svLearntLim = learntLim
     , svLogger = logger
     }
 
@@ -864,22 +869,38 @@ solve_ solver = do
       let restartSeq = mkRestartSeq restartStrategy restartFirst restartInc
 
       learntSizeInc <- readIORef (svLearntSizeInc solver)
+      nc <- nClauses solver
+      nv <- nVars solver
+      let learntSizeSeq   = iterate (ceiling . (learntSizeInc*) . fromIntegral) (max (nc + 2*nv) 16)
+      let learntSizeAdjSeq = iterate (\x -> (x * 3) `div` 2) (100::Int)
+      nextLearntSize    <- gen learntSizeSeq
+      nextLearntSizeAdj <- gen learntSizeAdjSeq
 
-      let loop (conflict_lim:rs) learnt_lim = do
-            ret <- search solver conflict_lim learnt_lim
+      learntSizeAdjCnt <- newIORef undefined
+      let learntSizeAdj = do
+            size <- nextLearntSize
+            adj <- nextLearntSizeAdj
+            writeIORef (svLearntLim solver) size
+            writeIORef learntSizeAdjCnt adj
+          onConflict = do
+            cnt <- readIORef learntSizeAdjCnt
+            if (cnt==0)
+            then learntSizeAdj
+            else writeIORef (learntSizeAdjCnt) $! cnt-1
+
+      learntSizeAdj
+
+      let loop (conflict_lim:rs) = do
+            ret <- search solver conflict_lim onConflict
             case ret of
               Just x -> return x
               Nothing -> do
                 modifyIORef' (svNRestart solver) (+1)
                 backtrackTo solver levelRoot
-                loop rs (ceiling (fromIntegral learnt_lim * learntSizeInc))
-
-      nc <- nClauses solver
-      nv <- nVars solver
-      let learntSizeFirst = max (nc + 2*nv) 16
+                loop rs
 
       start <- getCPUTime
-      result <- loop restartSeq learntSizeFirst
+      result <- loop restartSeq
       end <- getCPUTime
 
       when result $ do
@@ -897,8 +918,8 @@ solve_ solver = do
 
       return result
 
-search :: Solver -> Int -> Int -> IO (Maybe Bool)
-search solver !conflict_lim !learnt_lim = loop 0
+search :: Solver -> Int -> IO () -> IO (Maybe Bool)
+search solver !conflict_lim onConflict = loop 0
   where
     loop :: Int -> IO (Maybe Bool)
     loop !c = do
@@ -909,6 +930,7 @@ search solver !conflict_lim !learnt_lim = loop 0
       case conflict of
         Nothing -> do
           n <- nLearnt solver
+          learnt_lim <- readIORef (svLearntLim solver)
           when (learnt_lim >= 0 && n > learnt_lim) $ reduceDB solver
 
           r <- pickAssumption
@@ -925,6 +947,7 @@ search solver !conflict_lim !learnt_lim = loop 0
         Just constr -> do
           varDecayActivity solver
           constrDecayActivity solver
+          onConflict
 
           modifyIORef' (svNConflict solver) (+1)
           d <- readIORef (svLevel solver)
@@ -1872,6 +1895,14 @@ modifyIORef' :: IORef a -> (a -> a) -> IO ()
 modifyIORef' ref f = do
   x <- readIORef ref
   writeIORef ref $! f x
+
+gen :: [a] -> IO (IO a)
+gen xs = do
+  ref <- newIORef xs
+  return $ do
+    (y:ys) <- readIORef ref
+    writeIORef ref ys
+    return y
 
 {--------------------------------------------------------------------
   debug
