@@ -58,8 +58,6 @@ data Options
   , optLearntSizeInc :: Double
   , optCCMin         :: Int
   , optLinearizerPB  :: Bool
-  , optPolarityObjFun :: Bool
-  , optBumpObjFunVars :: Bool
   , optBinarySearch  :: Bool
   , optObjFunVarsHeauristics :: Bool
   }
