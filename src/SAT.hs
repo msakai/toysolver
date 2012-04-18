@@ -534,7 +534,7 @@ reduceDB solver = do
   let cs2 = zs2 ++ map fst ws
       n2 = length cs2
 
-  when debugMode $ log solver $ printf "reduceDB: %d -> %d" n n2
+  log solver $ printf "learnt constraints deletion: %d -> %d" n n2
   writeIORef (svLearntDB solver) (n2,cs2)
 
 type VarActivity = Double
