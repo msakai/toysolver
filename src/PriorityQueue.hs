@@ -84,7 +84,7 @@ clone q = do
 instance Ord a => NewFifo (PriorityQueue a) IO where
   newFifo = newPriorityQueue
 
-instance Show a => Enqueue (PriorityQueue a) IO a where
+instance Enqueue (PriorityQueue a) IO a where
   enqueue q val = do
     (n,arr) <- readIORef (heap q)
     c <- liftM rangeSize $ A.getBounds arr
@@ -102,7 +102,7 @@ instance Show a => Enqueue (PriorityQueue a) IO a where
         writeIORef (heap q) (n+1,arr')
     up q n
 
-instance Show a => Dequeue (PriorityQueue a) IO a where
+instance Dequeue (PriorityQueue a) IO a where
   dequeue q = do
     (n,arr) <- readIORef (heap q)
     case n of
