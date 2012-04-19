@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
-{-# LANGUAGE BangPatterns, DoAndIfThenElse #-}
+{-# LANGUAGE BangPatterns, DoAndIfThenElse, DoRec #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  SAT
@@ -88,7 +88,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
-import qualified PriorityQueue as PQ
+import qualified IndexedPriorityQueue as PQ
 import System.CPUTime
 import Text.Printf
 import LBool
@@ -358,7 +358,7 @@ varReason s !v = do
 data Solver
   = Solver
   { svOk           :: !(IORef Bool)
-  , svVarQueue     :: !(PQ.PriorityQueue (Var,VarActivity))
+  , svVarQueue     :: !PQ.PriorityQueue
   , svAssigned     :: !(IORef (LevelMap [Lit]))
   , svVarCounter   :: !(IORef Int)
   , svVarData      :: !(IORef (IOArray Int VarData))
@@ -465,7 +465,7 @@ unassign solver !v = assert (validVar v) $ do
       readIORef (aBacktrackCBs a) >>= sequence_
   writeIORef (vdAssignment vd) Nothing
   activity <- varActivity solver v
-  PQ.enqueue (svVarQueue solver) (v,activity)
+  PQ.enqueue (svVarQueue solver) v
 
 addBacktrackCB :: Solver -> Var -> IO () -> IO ()
 addBacktrackCB solver !v callback = do
@@ -554,6 +554,7 @@ varBumpActivity solver !v = do
   inc <- readIORef (svVarInc solver)
   vd <- varData solver v
   modifyIORef' (vdActivity vd) (+inc)
+  PQ.update (svVarQueue solver) v
   aval <- readIORef (vdActivity vd)
   when (aval > 1e20) $
     -- Rescale
@@ -569,12 +570,7 @@ varRescaleAllActivity solver = do
   updateVarQueue solver
 
 updateVarQueue :: Solver -> IO ()
-updateVarQueue solver = do
-  let vqueue = svVarQueue solver
-  xs <- PQ.dequeueBatch vqueue
-  forM_ xs $ \(v,_) -> do
-    activity <- varActivity solver v
-    PQ.enqueue vqueue (v,activity)
+updateVarQueue solver = return ()
 
 variables :: Solver -> IO [Var]
 variables solver = do
@@ -618,11 +614,12 @@ learnt solver = do
 -- | Create a new Solver instance.
 newSolver :: IO Solver
 newSolver = do
+ rec
   ok   <- newIORef True
   vcnt <- newIORef 1
-  vqueue <- PQ.newPriorityQueueBy ltVar
   assigned <- newIORef IM.empty
   vars <- newIORef =<< newArray_ (1,0)
+  vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
   db2 <- newIORef (0,[])
   as  <- newIORef =<< newArray_ (0,-1)
@@ -647,37 +644,41 @@ newSolver = do
 
   logger <- newIORef Nothing
 
-  return $
-    Solver
-    { svOk = ok
-    , svVarCounter = vcnt
-    , svVarQueue   = vqueue
-    , svAssigned   = assigned
-    , svVarData    = vars
-    , svClauseDB   = db
-    , svLearntDB   = db2
-    , svAssumptions = as
-    , svLevel      = lv
-    , svBCPQueue   = q
-    , svModel      = m
-    , svNDecision  = ndecision
-    , svNConflict  = nconflict
-    , svNRestart   = nrestart
-    , svVarDecay   = varDecay
-    , svVarInc     = varInc
-    , svClaDecay   = claDecay
-    , svClaInc     = claInc
-    , svRestartStrategy = restartStrat
-    , svRestartFirst = restartFirst
-    , svRestartInc   = restartInc
-    , svLearntSizeInc = learntSizeInc
-    , svCCMin = ccMin
-    , svLearntLim = learntLim
-    , svLogger = logger
-    }
+  let solver =
+        Solver
+        { svOk = ok
+        , svVarCounter = vcnt
+        , svVarQueue   = vqueue
+        , svAssigned   = assigned
+        , svVarData    = vars
+        , svClauseDB   = db
+        , svLearntDB   = db2
+        , svAssumptions = as
+        , svLevel      = lv
+        , svBCPQueue   = q
+        , svModel      = m
+        , svNDecision  = ndecision
+        , svNConflict  = nconflict
+        , svNRestart   = nrestart
+        , svVarDecay   = varDecay
+        , svVarInc     = varInc
+        , svClaDecay   = claDecay
+        , svClaInc     = claInc
+        , svRestartStrategy = restartStrat
+        , svRestartFirst = restartFirst
+        , svRestartInc   = restartInc
+        , svLearntSizeInc = learntSizeInc
+        , svCCMin = ccMin
+        , svLearntLim = learntLim
+        , svLogger = logger
+        }
+ return solver
 
-ltVar :: (Var,VarActivity) -> (Var,VarActivity) -> Bool
-ltVar = (>) `on` snd
+ltVar :: Solver -> Var -> Var -> IO Bool
+ltVar solver v1 v2 = do
+  a1 <- varActivity solver v1
+  a2 <- varActivity solver v2
+  return $! a1 < a2
 
 {--------------------------------------------------------------------
   Problem specification
@@ -688,7 +689,6 @@ newVar :: Solver -> IO Var
 newVar s = do
   v <- readIORef (svVarCounter s)
   writeIORef (svVarCounter s) (v+1)
-  PQ.enqueue (svVarQueue s) (v,0)
   vd <- newVarData
 
   a <- readIORef (svVarData s)
@@ -704,6 +704,7 @@ newVar s = do
       writeArray a' v vd
       writeIORef (svVarData s) a'
 
+  PQ.enqueue (svVarQueue s) v
   return v
 
 -- |Add a clause to the solver.
@@ -1072,7 +1073,8 @@ pickBranchLit !solver = do
         m <- PQ.dequeue vqueue
         case m of
           Nothing -> return litUndef
-          Just (var,_) -> do
+          Just var -> do
+            nv <- nVars solver
             val <- varValue solver var
             if val /= lUndef
               then loop
