@@ -678,7 +678,7 @@ ltVar :: Solver -> Var -> Var -> IO Bool
 ltVar solver v1 v2 = do
   a1 <- varActivity solver v1
   a2 <- varActivity solver v2
-  return $! a1 < a2
+  return $! a1 > a2
 
 {--------------------------------------------------------------------
   Problem specification
