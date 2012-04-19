@@ -63,7 +63,7 @@ data Options
   , optCCMin         :: Int
   , optLinearizerPB  :: Bool
   , optBinarySearch  :: Bool
-  , optObjFunVarsHeauristics :: Bool
+  , optObjFunVarsHeuristics :: Bool
   }
 
 defaultOptions :: Options
@@ -77,7 +77,7 @@ defaultOptions
   , optCCMin         = SAT.defaultCCMin
   , optLinearizerPB  = False
   , optBinarySearch   = False
-  , optObjFunVarsHeauristics = True
+  , optObjFunVarsHeuristics = True
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -112,10 +112,10 @@ options =
         (ReqArg (\val opt -> opt{ optBinarySearch = parseSearch val }) "<str>")
         "Search algorithm used in optimization; linear (default), binary"
     , Option [] ["objfun-heuristics"]
-        (NoArg (\opt -> opt{ optObjFunVarsHeauristics = True }))
+        (NoArg (\opt -> opt{ optObjFunVarsHeuristics = True }))
         "Enable heuristics for polarity/activity of variables in objective function (default)"
     , Option [] ["no-objfun-heuristics"]
-        (NoArg (\opt -> opt{ optObjFunVarsHeauristics = False }))
+        (NoArg (\opt -> opt{ optObjFunVarsHeuristics = False }))
         "Disable heuristics for polarity/activity of variables in objective function"
     ]
   where
@@ -308,7 +308,7 @@ pbLowerBound xs = sum [if c < 0 then c else 0 | (c,_) <- xs]
 
 minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
 minimize opt solver obj update = do
-  when (optObjFunVarsHeauristics opt) $ do
+  when (optObjFunVarsHeuristics opt) $ do
     forM_ obj $ \(c,l) -> do
       let p = if c > 0 then not (SAT.litPolarity l) else SAT.litPolarity l
       SAT.setVarPolarity solver (SAT.litVar l) p
