@@ -2,6 +2,7 @@
 module Main (main) where
 
 import Control.Monad
+import Data.List
 import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
@@ -18,7 +19,7 @@ case_solve_SAT = do
   addClause solver [literal x1 True,  literal x2 False] -- x1 or not x2
   addClause solver [literal x1 False, literal x2 False] -- not x1 or not x2
   ret <- solve solver
-  assertEqual "test1" True ret
+  ret @?= True
 
 -- shuld be UNSAT
 case_solve_UNSAT :: IO ()
@@ -31,7 +32,7 @@ case_solve_UNSAT = do
   addClause solver [literal x1 True,  literal x2 False] -- x1 or not x2
   addClause solver [literal x1 False, literal x2 False] -- not x2 or not x2
   ret <- solve solver
-  assertEqual "test2" False ret
+  ret @?= False
 
 -- top level でいきなり矛盾
 case_root_inconsistent :: IO ()
@@ -270,6 +271,45 @@ case_solveWith_2 = do
 
   ret <- solveWith solver [-x2]
   ret @?= False
+
+------------------------------------------------------------------------
+
+{-
+-4*(not x1) + 3*x1 + 10*(not x2) >= 3
+⇔ -4*(1 - x1) + 3*x1 + 10*(not x2) >= 3
+⇔ -4 + 4*x1 + 3*x1 + 10*(not x2)>= 3
+⇔ 7*x1 + 10*(not x2) >= 7
+⇔ 7*x1 + 7*(not x2) >= 7
+⇔ x1 + (not x2) >= 1
+-}
+case_normalizePBAtLeast :: Assertion
+case_normalizePBAtLeast = (sort lhs, rhs) @?= (sort [(1,x1),(1,-x2)], 1)
+  where
+    x1 = 1
+    x2 = 2
+    (lhs,rhs) = normalizePBAtLeast ([(-4,-x1),(3,x1),(10,-x2)], 3)
+
+case_cutResolve_1 :: Assertion
+case_cutResolve_1 = (sort lhs, rhs) @?= (sort [(1,x3),(1,x4)], 1)
+  where
+    x1 = 1
+    x2 = 2
+    x3 = 3
+    x4 = 4
+    pb1 = ([(1,x1), (1,x2), (1,x3)], 1)
+    pb2 = ([(2,-x1), (2,-x2), (1,x4)], 3)
+    (lhs,rhs) = cutResolve pb1 pb2 x1
+
+case_cutResolve_2 :: Assertion
+case_cutResolve_2 = (sort lhs, rhs) @?= (sort [(3,x1),(2,-x2),(2,x4)], 3)
+  where
+    x1 = 1
+    x2 = 2
+    x3 = 3
+    x4 = 4
+    pb1 = ([(3,x1), (2,-x2), (1,x3), (1,x4)], 3)
+    pb2 = ([(1,-x3), (1,x4)], 1)
+    (lhs,rhs) = cutResolve pb1 pb2 x3
 
 ------------------------------------------------------------------------
 -- Test harness

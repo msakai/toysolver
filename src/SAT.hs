@@ -70,6 +70,7 @@ module SAT
   , nLearnt
 
   -- * Internal API
+  , cutResolve
   , normalizePBAtLeast
   , varBumpActivity
   , varDecayActivity
@@ -208,17 +209,6 @@ normalizePBAtLeast a =
       where
         d = foldl1' gcd [c | (c,_) <- xs]
 
-{-
--4*(not x1) + 3*x1 + 10*(not x2) >= 3
-⇔ -4*(1 - x1) + 3*x1 + 10*(not x2) >= 3
-⇔ -4 + 4*x1 + 3*x1 + 10*(not x2)>= 3
-⇔ 7*x1 + 10*(not x2) >= 7
-⇔ 7*x1 + 7*(not x2) >= 7
-⇔ x1 + (not x2) >= 1
--}
-test_normalizePBAtLeast :: ([(Integer, Lit)],Integer)
-test_normalizePBAtLeast = normalizePBAtLeast ([(-4,-1),(3,1),(10,-2)], 3)
-
 cutResolve :: ([(Integer,Lit)],Integer) -> ([(Integer,Lit)],Integer) -> Var -> ([(Integer,Lit)],Integer)
 cutResolve (lhs1,rhs1) (lhs2,rhs2) v = assert (l1 == litNot l2) $ normalizePBAtLeast pb
   where
@@ -228,28 +218,6 @@ cutResolve (lhs1,rhs1) (lhs2,rhs2) v = assert (l1 == litNot l2) $ normalizePBAtL
     s1 = c2 `div` g
     s2 = c1 `div` g
     pb = ([(s1*c,l) | (c,l) <- lhs1] ++ [(s2*c,l) | (c,l) <- lhs2], s1*rhs1 + s2 * rhs2)
-
-test_cutResolve1 :: Bool
-test_cutResolve1 = (sort lhs, rhs) == (sort [(1,3),(1,4)], 1)
-  where
-    x1 = 1
-    x2 = 2
-    x3 = 3
-    x4 = 4
-    pb1 = ([(1,x1), (1,x2), (1,x3)], 1)
-    pb2 = ([(2,-x1), (2,-x2), (1,x4)], 3)
-    (lhs,rhs) = cutResolve pb1 pb2 x1
-
-test_cutResolve2 :: Bool
-test_cutResolve2 = (sort lhs, rhs) == (sort [(3,1),(2,-2),(2,4)], 3)
-  where
-    x1 = 1
-    x2 = 2
-    x3 = 3
-    x4 = 4
-    pb1 = ([(3,x1), (2,-x2), (1,x3), (1,x4)], 3)
-    pb2 = ([(1,-x3), (1,x4)], 1)
-    (lhs,rhs) = cutResolve pb1 pb2 x3
 
 {--------------------------------------------------------------------
   internal data structures
@@ -359,7 +327,7 @@ data Solver
   = Solver
   { svOk           :: !(IORef Bool)
   , svVarQueue     :: !PQ.PriorityQueue
-  , svAssigned     :: !(IORef (LevelMap [Lit]))
+  , svTrail        :: !(IORef (LevelMap [Lit]))
   , svVarCounter   :: !(IORef Int)
   , svVarData      :: !(IORef (IOArray Int VarData))
   , svClauseDB     :: !(IORef [SomeConstraint])
@@ -443,7 +411,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
         , aBacktrackCBs = bt
         }
 
-      modifyIORef (svAssigned solver) (IM.insertWith (++) lv [lit])
+      modifyIORef (svTrail solver) (IM.insertWith (++) lv [lit])
       bcpEnqueue solver lit
 
       when debugMode $ logIO solver $ do
@@ -464,7 +432,6 @@ unassign solver !v = assert (validVar v) $ do
       writeIORef (vdPolarity vd) (aValue a)
       readIORef (aBacktrackCBs a) >>= sequence_
   writeIORef (vdAssignment vd) Nothing
-  activity <- varActivity solver v
   PQ.enqueue (svVarQueue solver) v
 
 addBacktrackCB :: Solver -> Var -> IO () -> IO ()
@@ -567,10 +534,6 @@ varRescaleAllActivity solver = do
     vd <- varData solver v
     modifyIORef' (vdActivity vd) (* 1e-20)
   modifyIORef' (svVarInc solver) (* 1e-20)
-  updateVarQueue solver
-
-updateVarQueue :: Solver -> IO ()
-updateVarQueue solver = return ()
 
 variables :: Solver -> IO [Var]
 variables solver = do
@@ -586,7 +549,7 @@ nVars solver = do
 -- | number of assigned variables.
 nAssigns :: Solver -> IO Int
 nAssigns solver = do
-  m <- readIORef (svAssigned solver)
+  m <- readIORef (svTrail solver)
   let f !r xs = r + length xs
   return $! IM.foldl' f 0 m
 
@@ -602,8 +565,8 @@ nLearnt solver = do
   (n,_) <- readIORef (svLearntDB solver)
   return n
 
-learnt :: Solver -> IO [SomeConstraint]
-learnt solver = do
+learntConstraints :: Solver -> IO [SomeConstraint]
+learntConstraints solver = do
   (_,cs) <- readIORef (svLearntDB solver)
   return cs
 
@@ -617,7 +580,7 @@ newSolver = do
  rec
   ok   <- newIORef True
   vcnt <- newIORef 1
-  assigned <- newIORef IM.empty
+  trail <- newIORef IM.empty
   vars <- newIORef =<< newArray_ (1,0)
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
@@ -649,7 +612,7 @@ newSolver = do
         { svOk = ok
         , svVarCounter = vcnt
         , svVarQueue   = vqueue
-        , svAssigned   = assigned
+        , svTrail      = trail
         , svVarData    = vars
         , svClauseDB   = db
         , svLearntDB   = db2
@@ -860,7 +823,6 @@ solve_ solver = do
     then return False
     else do
       when debugMode $ dumpVarActivity solver
-      updateVarQueue solver
       d <- readIORef (svLevel solver)
       assert (d == levelRoot) $ return ()
 
@@ -891,7 +853,8 @@ solve_ solver = do
 
       learntSizeAdj
 
-      let loop (conflict_lim:rs) = do
+      let loop [] = error "should not happen"
+          loop (conflict_lim:rs) = do
             ret <- search solver conflict_lim onConflict
             case ret of
               Just x -> return x
@@ -1143,21 +1106,12 @@ analyzeConflict solver constr = do
               else
                 go (xs, IS.insert l ys) ls
 
-  let pop :: IO (Maybe Lit)
-      pop = do
-        m <- readIORef (svAssigned solver)
-        case IM.lookup d m of
-          Just (l:ls) -> do
-            writeIORef (svAssigned solver) (IM.insert d ls m)
-            return $ Just l
-          _ -> return Nothing
-
   let loop :: LitSet -> LitSet -> IO LitSet
       loop lits1 lits2
         | sz==1 = do
             return $ lits1 `IS.union` lits2
         | sz>=2 = do
-            ret <- pop
+            ret <- popTrail solver
             case ret of
               Nothing -> do
                 error $ printf "analyzeConflict: should not happen: empty trail: loop %s %s"
@@ -1279,14 +1233,23 @@ minimizeConflictClauseRecursive solver lits = do
     log solver $ show ys
   return $ IS.fromAscList $ ys
 
+popTrail :: Solver -> IO (Maybe Lit)
+popTrail solver = do
+  m <- readIORef (svTrail solver)
+  case IM.maxViewWithKey m of
+    Just ((d, l:ls), m2) -> do
+      writeIORef (svTrail solver) (IM.insert d ls m2)
+      return $ Just l
+    _ -> return Nothing
+
 -- | Revert to the state at given level
 -- (keeping all assignment at @level@ but not beyond).
 backtrackTo :: Solver -> Int -> IO ()
 backtrackTo solver level = do
   when debugMode $ log solver $ printf "backtrackTo: %d" level
-  m <- readIORef (svAssigned solver)
+  m <- readIORef (svTrail solver)
   m' <- loop m
-  writeIORef (svAssigned solver) m'
+  writeIORef (svTrail solver) m'
   writeIORef (svBCPQueue solver) Seq.empty
   writeIORef (svLevel solver) level
   where
@@ -1315,7 +1278,7 @@ constrDecayActivity solver = do
 
 constrRescaleAllActivity :: Solver -> IO ()
 constrRescaleAllActivity solver = do
-  xs <- learnt solver
+  xs <- learntConstraints solver
   forM_ xs $ \c -> constrRescaleActivity solver c
   modifyIORef' (svClaInc solver) (* 1e-20)
 
@@ -1852,21 +1815,21 @@ mkRestartSeq MiniSATRestarts = miniSatRestartSeq
 mkRestartSeq ArminRestarts   = arminRestartSeq
 
 miniSatRestartSeq :: Int -> Double -> [Int]
-miniSatRestartSeq init inc = iterate (ceiling . (inc *) . fromIntegral) init
+miniSatRestartSeq start inc = iterate (ceiling . (inc *) . fromIntegral) start
 
 {-
 miniSatRestartSeq :: Int -> Double -> [Int]
-miniSatRestartSeq init inc = map round $ iterate (inc*) (fromIntegral init)
+miniSatRestartSeq start inc = map round $ iterate (inc*) (fromIntegral start)
 -}
 
 arminRestartSeq :: Int -> Double -> [Int]
-arminRestartSeq init inc = go (fromIntegral init) (fromIntegral init)
+arminRestartSeq start inc = go (fromIntegral start) (fromIntegral start)
   where  
     go !inner !outer = round inner : go inner' outer'
       where
         (inner',outer') = 
           if inner >= outer
-          then (fromIntegral init, outer * inc)
+          then (fromIntegral start, outer * inc)
           else (inner * inc, outer)
 
 {--------------------------------------------------------------------
@@ -1949,7 +1912,7 @@ dumpVarActivity solver = do
 dumpClaActivity :: Solver -> IO ()
 dumpClaActivity solver = do
   log solver "Learnt clause activity:"
-  xs <- learnt solver
+  xs <- learntConstraints solver
   forM_ xs $ \c@(ConstrClause cla) -> do
     s <- showConstraint solver c
     aval <- readIORef (claActivity cla)
