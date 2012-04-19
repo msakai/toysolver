@@ -119,4 +119,5 @@ Test-suite TestSAT
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    src
   Main-is:           TestSAT.hs
-  Build-depends:     test-framework,test-framework-hunit,HUnit,OptDir
+  Build-depends:     test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
+  Extensions: TemplateHaskell
