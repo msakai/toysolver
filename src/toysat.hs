@@ -37,6 +37,7 @@ import System.Environment
 import System.Exit
 import System.Locale
 import System.Console.GetOpt
+import System.CPUTime
 import qualified System.Info as SysInfo
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import Text.Printf
@@ -133,6 +134,7 @@ options =
 
 main :: IO ()
 main = do
+  start <- getCPUTime
   args <- getArgs
   case getOpt Permute options args of
     (o,args2,[]) -> do
@@ -150,6 +152,8 @@ main = do
         ModeWBO    -> mainWBO opt solver args2
         ModeMaxSAT -> mainMaxSAT opt solver args2
         ModeLP     -> mainLP opt solver args2
+      end <- getCPUTime
+      printf "c total time = %.3fs\n" (fromIntegral (end - start) / 10^(12::Int) :: Double)
     (_,_,errs) -> do
       mapM_ putStrLn errs
       exitFailure
