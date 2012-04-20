@@ -109,10 +109,11 @@ instance Dequeue (PriorityQueue a) IO a where
       0 -> return Nothing
       _ -> do
         val <- A.unsafeRead arr 0
-        val1 <- A.unsafeRead arr (n-1)
-        A.unsafeWrite arr 0 val1
         writeIORef (heap q) (n-1, arr)
-        down q 0
+        when (n > 1) $ do
+          val1 <- A.unsafeRead arr (n-1)
+          A.unsafeWrite arr 0 val1
+          down q 0
         return (Just val)
 
   dequeueBatch q = go []
