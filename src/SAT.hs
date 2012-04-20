@@ -360,7 +360,7 @@ data Solver
   -- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
   , svRestartInc :: !(IORef Double)
 
-  -- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
+  -- | The limit for learnt clauses is multiplied with this factor periodically. (default 1.1)
   , svLearntSizeInc :: !(IORef Double)
 
   , svLearntLim :: !(IORef Int)

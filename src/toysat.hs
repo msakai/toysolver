@@ -100,7 +100,7 @@ options =
         (printf "The factor with which the restart limit is multiplied in each restart. (default %f)" SAT.defaultRestartInc)
     , Option [] ["learnt-size-inc"]
         (ReqArg (\val opt -> opt{ optLearntSizeInc = read val }) "<real>")
-        (printf "The limit for learnt clauses is multiplied with this factor each restart. (default %f)" SAT.defaultLearntSizeInc)
+        (printf "The limit for learnt clauses is multiplied with this factor periodically. (default %f)" SAT.defaultLearntSizeInc)
     , Option [] ["ccmin"]
         (ReqArg (\val opt -> opt{ optCCMin = read val }) "<int>")
         (printf "Conflict clause minimization (0=none, 1=local, 2=recursive; default %d)" SAT.defaultCCMin)
