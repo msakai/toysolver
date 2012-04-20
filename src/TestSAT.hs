@@ -274,14 +274,12 @@ case_solveWith_2 = do
 
 ------------------------------------------------------------------------
 
-{-
--4*(not x1) + 3*x1 + 10*(not x2) >= 3
-⇔ -4*(1 - x1) + 3*x1 + 10*(not x2) >= 3
-⇔ -4 + 4*x1 + 3*x1 + 10*(not x2)>= 3
-⇔ 7*x1 + 10*(not x2) >= 7
-⇔ 7*x1 + 7*(not x2) >= 7
-⇔ x1 + (not x2) >= 1
--}
+-- -4*(not x1) + 3*x1 + 10*(not x2) >= 3
+-- ⇔ -4*(1 - x1) + 3*x1 + 10*(not x2) >= 3
+-- ⇔ -4 + 4*x1 + 3*x1 + 10*(not x2) >= 3
+-- ⇔ 7*x1 + 10*(not x2) >= 7
+-- ⇔ 7*x1 + 7*(not x2) >= 7
+-- ⇔ x1 + (not x2) >= 1
 case_normalizePBAtLeast :: Assertion
 case_normalizePBAtLeast = (sort lhs, rhs) @?= (sort [(1,x1),(1,-x2)], 1)
   where
