@@ -39,6 +39,9 @@ module SAT
   , addPBAtLeast
   , addPBAtMost
   , addPBExactly
+  , addPBAtLeastSoft
+  , addPBAtMostSoft
+  , addPBExactlySoft
 
   -- * Solving
   , solve
@@ -732,7 +735,7 @@ addAtMost solver lits n = addAtLeast solver lits' (len-n)
 
 -- | Add a cardinality constraints /exactly({l1,l2,..},n)/.
 addExactly :: Solver -- ^ The 'Solver' argument
-           -> [Lit]  -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)1
+           -> [Lit]  -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)
            -> Int    -- ^ /n/
            -> IO ()
 addExactly solver lits n = do
@@ -742,7 +745,7 @@ addExactly solver lits n = do
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≥ n/.
 addPBAtLeast :: Solver          -- ^ The 'Solver' argument.
              -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
-             -> Integer         -- ^ /n/.
+             -> Integer         -- ^ /n/
              -> IO ()
 addPBAtLeast solver ts n = do
   d <- readIORef (svLevel solver)
@@ -776,18 +779,50 @@ addPBAtLeast solver ts n = do
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMost :: Solver          -- ^ The 'Solver' argument.
             -> [(Integer,Lit)] -- ^ list of @[(c1,l1),(c2,l2),…]@
-            -> Integer         -- ^ /n/.
+            -> Integer         -- ^ /n/
             -> IO ()
 addPBAtMost solver ts n = addPBAtLeast solver [(-c,l) | (c,l) <- ts] (negate n)
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … = n/.
 addPBExactly :: Solver          -- ^ The 'Solver' argument.
              -> [(Integer,Lit)] -- ^ list of terms @[(c1,l1),(c2,l2),…]@
-             -> Integer         -- ^ /n/.
+             -> Integer         -- ^ /n/
              -> IO ()
 addPBExactly solver ts n = do
   addPBAtLeast solver ts n
   addPBAtMost solver ts n
+
+-- | Add a soft pseudo boolean constraints /lit ⇒ c1*l1 + c2*l2 + … ≥ n/.
+addPBAtLeastSoft
+  :: Solver          -- ^ The 'Solver' argument.
+  -> Lit             -- ^ indicator @lit@
+  -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
+  -> Integer         -- ^ /n/
+  -> IO ()
+addPBAtLeastSoft solver sel lhs rhs = do
+  let (lhs',rhs') = SAT.normalizePBAtLeast (lhs,rhs)
+  SAT.addPBAtLeast solver ((rhs', SAT.litNot sel) : lhs') rhs'
+
+-- | Add a soft pseudo boolean constraints /lit ⇒ c1*l1 + c2*l2 + … ≤ n/.
+addPBAtMostSoft
+  :: Solver          -- ^ The 'Solver' argument.
+  -> Lit             -- ^ indicator @lit@
+  -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
+  -> Integer         -- ^ /n/
+  -> IO ()
+addPBAtMostSoft solver sel lhs rhs =
+  addPBAtLeastSoft solver sel [(negate c, lit) | (c,lit) <- lhs] (negate rhs)
+
+-- | Add a soft pseudo boolean constraints /lit ⇒ c1*l1 + c2*l2 + … = n/.
+addPBExactlySoft
+  :: Solver          -- ^ The 'Solver' argument.
+  -> Lit             -- ^ indicator @lit@
+  -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
+  -> Integer         -- ^ /n/
+  -> IO ()
+addPBExactlySoft solver sel lhs rhs = do
+  addPBAtLeastSoft solver sel lhs rhs
+  addPBAtMostSoft solver sel lhs rhs
 
 {--------------------------------------------------------------------
   Problem solving

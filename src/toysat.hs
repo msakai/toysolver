@@ -361,7 +361,7 @@ minimize opt solver obj update = do
            let mid = (lb + ub) `div` 2
            printf "c Binary Search: %d <= obj <= %d; guessing obj <= %d\n" lb ub mid
            sel <- SAT.newVar solver
-           addPBAtMostSoft solver sel obj mid
+           SAT.addPBAtMostSoft solver sel obj mid
            ret <- SAT.solveWith solver [sel]
            if ret
            then do
@@ -418,20 +418,6 @@ mainWBO opt solver args = do
     Left err -> hPrint stderr err >> exitFailure
     Right formula -> solveWBO opt solver False formula
 
-addPBAtLeastSoft :: SAT.Solver -> SAT.Lit -> [(Integer,SAT.Lit)] -> Integer -> IO ()
-addPBAtLeastSoft solver sel lhs rhs = do
-  let (lhs',rhs') = SAT.normalizePBAtLeast (lhs,rhs)
-  SAT.addPBAtLeast solver ((rhs', SAT.litNot sel) : lhs') rhs'
-
-addPBAtMostSoft :: SAT.Solver -> SAT.Lit -> [(Integer,SAT.Lit)] -> Integer -> IO ()
-addPBAtMostSoft solver sel lhs rhs =
-  addPBAtLeastSoft solver sel [(negate c, lit) | (c,lit) <- lhs] (negate rhs)
-
-addPBExactlySoft :: SAT.Solver -> SAT.Lit -> [(Integer,SAT.Lit)] -> Integer -> IO ()
-addPBExactlySoft solver sel lhs rhs = do
-  addPBAtLeastSoft solver sel lhs rhs
-  addPBAtMostSoft solver sel lhs rhs
-
 solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
 solveWBO opt solver isMaxSat formula@(tco, cs) = do
   let nvar = wboNumVars formula
@@ -453,8 +439,8 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
       Just cval -> do
         sel <- SAT.newVar solver
         case op of
-          PBFile.Ge -> addPBAtLeastSoft solver sel lhs' rhs
-          PBFile.Eq -> addPBExactlySoft solver sel lhs' rhs
+          PBFile.Ge -> SAT.addPBAtLeastSoft solver sel lhs' rhs
+          PBFile.Eq -> SAT.addPBExactlySoft solver sel lhs' rhs
         return [(cval, SAT.litNot sel)]
 
   case tco of
@@ -612,9 +598,9 @@ solveLP opt solver lp = do
             let var' = vmap Map.! var
                 f sel = do
                   case op of
-                    LPFile.Le  -> addPBAtMostSoft  solver sel lhs' rhs'
-                    LPFile.Ge  -> addPBAtLeastSoft solver sel lhs' rhs'
-                    LPFile.Eql -> addPBExactlySoft solver sel lhs' rhs'
+                    LPFile.Le  -> SAT.addPBAtMostSoft  solver sel lhs' rhs'
+                    LPFile.Ge  -> SAT.addPBAtLeastSoft solver sel lhs' rhs'
+                    LPFile.Eql -> SAT.addPBExactlySoft solver sel lhs' rhs'
             case  val of
               1 -> f var'
               0 -> f (SAT.litNot var')
