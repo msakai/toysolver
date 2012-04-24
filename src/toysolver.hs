@@ -56,7 +56,7 @@ options =
     [ Option ['h'] ["help"]    (NoArg Help)            "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
     , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, simplex2"
-    , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers omstead of decimals"
+    , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex2 solver (default: bland-rule)"
 {-
     , Option ['l'] ["load"]    (ReqArg Load "FILE") "load FILE"
