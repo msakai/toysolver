@@ -67,6 +67,7 @@ data Options
   , optLinearizerPB  :: Bool
   , optBinarySearch  :: Bool
   , optObjFunVarsHeuristics :: Bool
+  , optPrintRational :: Bool
   }
 
 defaultOptions :: Options
@@ -81,6 +82,7 @@ defaultOptions
   , optLinearizerPB  = False
   , optBinarySearch   = False
   , optObjFunVarsHeuristics = True
+  , optPrintRational = False
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -120,6 +122,10 @@ options =
     , Option [] ["no-objfun-heuristics"]
         (NoArg (\opt -> opt{ optObjFunVarsHeuristics = False }))
         "Disable heuristics for polarity/activity of variables in objective function"
+
+    , Option [] ["print-rational"]
+        (NoArg (\opt -> opt{ optPrintRational = True }))
+        "print rational numbers instead of decimals"
     ]
   where
     parseRestartStrategy s =
@@ -616,11 +622,17 @@ solveLP opt solver lp = do
           obj2 = lsum [asInteger (r * fromIntegral d) .*. (vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- obj]
           SAT.Integer.Expr obj3 obj3_c = obj2
 
+      let showValue :: Rational -> String
+          showValue v
+            | denominator v == 1 = show (numerator v)
+            | optPrintRational opt = show (numerator v) ++ "/" ++ show (denominator v)
+            | otherwise = show (fromRational v :: Double)
+
       modelRef <- newIORef Nothing
 
       result <- try $ minimize opt solver obj3 $ \m val -> do
         writeIORef modelRef (Just m)
-        putStrLn $ "o " ++ show (fromIntegral (val + obj3_c) / fromIntegral d :: Double)
+        putStrLn $ "o " ++ showValue (fromIntegral (val + obj3_c) / fromIntegral d)
         hFlush stdout
 
       let printModel :: SAT.Model -> IO ()
