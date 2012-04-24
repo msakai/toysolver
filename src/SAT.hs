@@ -74,6 +74,7 @@ module SAT
 
   -- * Internal API
   , cutResolve
+  , cardinalityReduction
   , normalizePBAtLeast
   , varBumpActivity
   , varDecayActivity
@@ -221,6 +222,18 @@ cutResolve (lhs1,rhs1) (lhs2,rhs2) v = assert (l1 == litNot l2) $ normalizePBAtL
     s1 = c2 `div` g
     s2 = c1 `div` g
     pb = ([(s1*c,l) | (c,l) <- lhs1] ++ [(s2*c,l) | (c,l) <- lhs2], s1*rhs1 + s2 * rhs2)
+
+cardinalityReduction :: ([(Integer,Lit)],Integer) -> ([Lit],Int)
+cardinalityReduction (lhs,rhs) = (ls, k)
+  where
+    k = go1 0 0 (sortBy (flip compare `on` fst) lhs)
+    go1 !s !k ((a,x):ts)
+      | s < rhs   = go1 (s+a) (k+1) ts
+      | otherwise = k
+    ls = go2 (minimum (rhs : map (subtract 1 . fst) lhs)) (sortBy (compare `on` fst) lhs)
+    go2 !guard ((a,x) : ts)
+      | a - 1 < guard = go2 (guard - a) ts
+      | otherwise     = map snd ts
 
 {--------------------------------------------------------------------
   internal data structures

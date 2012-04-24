@@ -309,6 +309,11 @@ case_cutResolve_2 = (sort lhs, rhs) @?= (sort [(3,x1),(2,-x2),(2,x4)], 3)
     pb2 = ([(1,-x3), (1,x4)], 1)
     (lhs,rhs) = cutResolve pb1 pb2 x3
 
+case_cardinalityReduction :: Assertion
+case_cardinalityReduction = (sort lhs, rhs) @?= ([1,2,3,4,5],4)
+  where
+    (lhs, rhs) = cardinalityReduction ([(6,1),(5,2),(4,3),(3,4),(2,5),(1,6)], 17)
+
 ------------------------------------------------------------------------
 -- Test harness
 
