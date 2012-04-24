@@ -140,6 +140,9 @@ defaultUB = PosInf
 getBounds :: LP -> Var -> Bounds
 getBounds lp v = Map.findWithDefault defaultBounds v (bounds lp)
 
+intersectBounds :: Bounds -> Bounds -> Bounds
+intersectBounds (lb1,ub1) (lb2,ub2) = (max lb1 lb2, min ub1 ub2)
+
 -- ---------------------------------------------------------------------------
 
 -- | Parse a string containing LP file data.
@@ -212,6 +215,8 @@ lpfile = do
   xs <- many (liftM Left generalSection <|> liftM Right binarySection)
   let ints = Set.fromList $ concat [x | Left  x <- xs]
       bins = Set.fromList $ concat [x | Right x <- xs]
+  bnds <- return $ Map.unionWith intersectBounds
+            bnds (Map.fromAscList [(v, (Finite 0, Finite 1)) | v <- Set.toAscList bins])
   scs <- liftM Set.fromList $ option [] (try semiSection)
   ss <- option [] (try sosSection)
   end
