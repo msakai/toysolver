@@ -62,6 +62,7 @@ data Options
   , optRestartStrategy :: SAT.RestartStrategy
   , optRestartFirst  :: Int
   , optRestartInc    :: Double
+  , optLearningStrategy :: SAT.LearningStrategy
   , optLearntSizeInc :: Double
   , optCCMin         :: Int
   , optLinearizerPB  :: Bool
@@ -77,6 +78,7 @@ defaultOptions
   , optRestartStrategy = SAT.defaultRestartStrategy
   , optRestartFirst  = SAT.defaultRestartFirst
   , optRestartInc    = SAT.defaultRestartInc
+  , optLearningStrategy = SAT.defaultLearningStrategy
   , optLearntSizeInc = SAT.defaultLearntSizeInc
   , optCCMin         = SAT.defaultCCMin
   , optLinearizerPB  = False
@@ -102,6 +104,9 @@ options =
     , Option [] ["restart-inc"]
         (ReqArg (\val opt -> opt{ optRestartInc = read val }) "<real>")
         (printf "The factor with which the restart limit is multiplied in each restart. (default %f)" SAT.defaultRestartInc)
+    , Option [] ["learning"]
+        (ReqArg (\val opt -> opt{ optLearningStrategy = parseLS val }) "<name>")
+        "Leaning scheme: clause (default)"
     , Option [] ["learnt-size-inc"]
         (ReqArg (\val opt -> opt{ optLearntSizeInc = read val }) "<real>")
         (printf "The limit for learnt clauses is multiplied with this factor periodically. (default %f)" SAT.defaultLearntSizeInc)
@@ -139,6 +144,9 @@ options =
         "linear" -> False
         "binary" -> True
         _ -> undefined
+
+    parseLS "clause" = SAT.LearningClause
+    parseLS s = error (printf "unknown learning strategy %s" s)
 
 main :: IO ()
 main = do
@@ -197,6 +205,7 @@ newSolver opts = do
   SAT.setRestartInc    solver (optRestartInc opts)
   SAT.setLearntSizeInc solver (optLearntSizeInc opts)
   SAT.setCCMin         solver (optCCMin opts)
+  SAT.setLearningStrategy solver (optLearningStrategy opts)
   SAT.setLogger solver $ \str -> do
     putStr "c "
     putStrLn str

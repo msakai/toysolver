@@ -63,6 +63,9 @@ module SAT
   , defaultLearntSizeInc
   , setCCMin
   , defaultCCMin
+  , LearningStrategy (..)
+  , setLearningStrategy
+  , defaultLearningStrategy
   , setVarPolarity
   , setLogger
 
@@ -384,6 +387,8 @@ data Solver
   -- | Controls conflict clause minimization (0=none, 1=local, 2=recursive)
   , svCCMin :: !(IORef Int)
 
+  , svLearningStrategy :: !(IORef LearningStrategy)
+
   , svLogger :: !(IORef (Maybe (String -> IO ())))
   }
 
@@ -616,6 +621,7 @@ newSolver = do
   restartStrat <- newIORef defaultRestartStrategy
   restartFirst <- newIORef defaultRestartFirst
   restartInc <- newIORef defaultRestartInc
+  learning <- newIORef defaultLearningStrategy
   learntSizeInc <- newIORef defaultLearntSizeInc
   ccMin <- newIORef defaultCCMin
 
@@ -646,6 +652,7 @@ newSolver = do
         , svRestartStrategy = restartStrat
         , svRestartFirst = restartFirst
         , svRestartInc   = restartInc
+        , svLearningStrategy = learning
         , svLearntSizeInc = learntSizeInc
         , svCCMin = ccMin
         , svLearntLim = learntLim
@@ -1048,6 +1055,15 @@ setRestartInc solver !r = writeIORef (svRestartInc solver) r
 -- | default value for @RestartInc@.
 defaultRestartInc :: Double
 defaultRestartInc = 1.5
+
+data LearningStrategy
+  = LearningClause
+
+setLearningStrategy :: Solver -> LearningStrategy -> IO ()
+setLearningStrategy solver l = writeIORef (svLearningStrategy solver) $! l
+
+defaultLearningStrategy :: LearningStrategy
+defaultLearningStrategy = LearningClause
 
 -- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
 setLearntSizeInc :: Solver -> Double -> IO ()
