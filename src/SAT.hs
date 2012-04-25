@@ -1773,27 +1773,11 @@ instance Constraint PBAtLeastData where
 
   basicPropagate solver this this2 falsifiedLit = do
     watch solver falsifiedLit this
-
     let c = pbTerms this2 IM.! falsifiedLit
     let slack = pbSlack this2
     modifyIORef' slack (subtract c)
     addBacktrackCB solver (litVar falsifiedLit) $ modifyIORef' slack (+ c)
-    s <- readIORef slack
-
-    if s < 0
-      then return False
-      else do
-        let ls = [l1 | (l1,c1) <- IM.toList (pbTerms this2), c1 > s]
-        when (not (null ls)) $ do
-          when debugMode $ logIO solver $ do
-            str <- showConstraint solver this
-            return $ printf "basicPropagate: %s is unit (new slack = %d)" str s
-          forM_ ls $ \l1 -> do
-            v <- litValue solver l1
-            when (v == lUndef) $ do
-              assignBy solver l1 this
-              return ()
-        return True
+    pbPropagate solver this2
 
   basicReasonOf solver this l = do
     let m = pbTerms this
@@ -1850,6 +1834,25 @@ instantiatePBAtLeast solver (xs,n) = loop ([],n) xs
          loop (ys, n) ts
        else
          loop ((c,l):ys, n) ts
+
+pbPropagate :: Solver -> PBAtLeastData -> IO Bool
+pbPropagate solver this = do
+  let slack = pbSlack this
+  s <- readIORef slack
+  if s < 0
+    then return False
+    else do
+      let ls = [l1 | (l1,c1) <- IM.toList (pbTerms this ), c1 > s]
+      when (not (null ls)) $ do
+        when debugMode $ logIO solver $ do
+          str <- showConstraint solver this
+          return $ printf "pbPropagate: %s is unit (new slack = %d)" str s
+        forM_ ls $ \l1 -> do
+          v <- litValue solver l1
+          when (v == lUndef) $ do
+            assignBy solver l1 this
+            return ()
+      return True
 
 {--------------------------------------------------------------------
   Restart strategy
