@@ -1369,6 +1369,8 @@ class Constraint a where
   -- assignment.
   basicReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
+  toPBAtLeast :: Solver -> a -> IO ([(Integer,Lit)], Integer)
+
   isSatisfied :: Solver -> a -> IO Bool
 
   constrBumpActivity :: Solver -> a -> IO ()
@@ -1453,6 +1455,10 @@ instance Constraint SomeConstraint where
   basicReasonOf s (ConstrClause c)  l   = basicReasonOf s c l
   basicReasonOf s (ConstrAtLeast c) l   = basicReasonOf s c l
   basicReasonOf s (ConstrPBAtLeast c) l = basicReasonOf s c l
+
+  toPBAtLeast s (ConstrClause c)    = toPBAtLeast s c
+  toPBAtLeast s (ConstrAtLeast c)   = toPBAtLeast s c
+  toPBAtLeast s (ConstrPBAtLeast c) = toPBAtLeast s c
 
   isSatisfied s (ConstrClause c)    = isSatisfied s c
   isSatisfied s (ConstrAtLeast c)   = isSatisfied s c
@@ -1564,6 +1570,10 @@ instance Constraint ClauseData where
       Just lit -> do
         assert (lit == head lits) $ return ()
         return $ tail lits
+
+  toPBAtLeast solver (ClauseData a _) = do
+    lits <- getElems a
+    return ([(1,l) | l <- lits], 1)
 
   isSatisfied solver this = do
     lits <- getElems (claLits this)
@@ -1718,6 +1728,10 @@ instance Constraint AtLeastData where
         assert (lit `elem` take n lits) $ return ()
         return $ drop n lits
 
+  toPBAtLeast solver this = do
+    lits <- getElems (atLeastLits this)
+    return ([(1,l) | l <- lits], fromIntegral (atLeastNum this))
+
   isSatisfied solver this = do
     lits <- getElems (atLeastLits this)
     vals <- mapM (litValue solver) lits
@@ -1812,6 +1826,10 @@ instance Constraint PBAtLeastData where
       go s _ ret | s < 0 = ret
       go _ [] _ = error "should not happen"
       go s ((lit,c):xs) ret = go (s - c) xs (lit:ret)
+
+  toPBAtLeast solver this = do
+    return ([(c,l) | (l,c) <- IM.toList (pbTerms this)], pbDegree this)
+
 
   isSatisfied solver this = do
     xs <- forM (IM.toList (pbTerms this)) $ \(l,c) -> do
