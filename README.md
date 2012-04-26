@@ -1,6 +1,13 @@
 toysolver
 =========
-  
+
+Installation
+------------
+
+* unpack
+* cd toysolver
+* cabal install
+
 Usage
 -----
 
