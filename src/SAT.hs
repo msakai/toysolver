@@ -739,7 +739,7 @@ addAtLeast solver lits n = do
           Nothing -> return ()
           Just _ -> markBad solver
     else do
-      c <- newAtLeastData lits' n'
+      c <- newAtLeastData lits' n' False
       attach solver c
       addToDB solver c
 
@@ -792,7 +792,7 @@ addPBAtLeast solver ts n = do
 
       ok <- readIORef (svOk solver)
       when ok $ do
-        c <- newPBAtLeastData ts' degree
+        c <- newPBAtLeastData ts' degree False
         attach solver c
         addToDB solver c
 
@@ -980,20 +980,50 @@ search solver !conflict_lim onConflict = loop 0
             else if conflict_lim >= 0 && c+1 >= conflict_lim then
               return Nothing
             else do
-              (learntClause, level) <- analyzeConflict solver constr
-              backtrackTo solver level
-              case learntClause of
-                [] -> error "should not happen"
-                [lit] -> do
-                  ret <- assign solver lit
-                  assert ret $ return ()
-                  return ()
-                lit:_ -> do
-                  cl <- newClauseData learntClause True
-                  attach solver cl
-                  addToLearntDB solver cl
-                  assignBy solver lit cl
-                  constrBumpActivity solver cl
+              strat <- readIORef (svLearningStrategy solver)
+              case strat of
+                LearningClause -> do
+                  (learntClause, level) <- analyzeConflict solver constr
+                  backtrackTo solver level
+                  case learntClause of
+                    [] -> error "should not happen"
+                    [lit] -> do
+                      ret <- assign solver lit
+                      assert ret $ return ()
+                      return ()
+                    lit:_ -> do
+                      cl <- newClauseData learntClause True
+                      attach solver cl
+                      addToLearntDB solver cl
+                      assignBy solver lit cl
+                      constrBumpActivity solver cl
+                LearningHybrid -> do
+                  let loop2 constr = do
+                        (learntClause, level, pb) <- analyzeConflictHybrid solver constr
+                        backtrackTo solver level
+                        pb <- newPBAtLeastData (fst pb) (snd pb) True
+                        attach solver pb
+                        addToLearntDB solver pb
+                        slack <- readIORef (pbSlack pb)
+                        if slack < 0
+                          then loop2 (toConstraint pb)
+                          else do
+                            case learntClause of
+                              [] -> error "should not happen"
+                              [lit] -> do
+                                ret <- assign solver lit
+                                assert ret $ return ()
+                                return ()
+                              lit:_ -> do
+                                cl <- newClauseData learntClause True
+                                attach solver cl
+                                addToLearntDB solver cl
+                                assignBy solver lit cl
+                                constrBumpActivity solver cl
+                            pbPropagate solver pb
+                            constrBumpActivity solver pb
+                  loop2 constr
+
               loop (c+1)
 
     pickAssumption :: IO (Maybe Lit)
@@ -1058,6 +1088,7 @@ defaultRestartInc = 1.5
 
 data LearningStrategy
   = LearningClause
+  | LearningHybrid
 
 setLearningStrategy :: Solver -> LearningStrategy -> IO ()
 setLearningStrategy solver l = writeIORef (svLearningStrategy solver) $! l
@@ -1237,6 +1268,101 @@ analyzeConflict solver constr = do
                 [_] -> levelRoot
                 _:(_,lv):_ -> lv
   return (map fst xs, level)
+
+analyzeConflictHybrid :: Constraint c => Solver -> c -> IO (Clause, Level, ([(Integer,Lit)], Integer))
+analyzeConflictHybrid solver constr = do
+  d <- readIORef (svLevel solver)
+
+  let split :: [Lit] -> IO (LitSet, LitSet)
+      split = go (IS.empty, IS.empty)
+        where
+          go (xs,ys) [] = return (xs,ys)
+          go (xs,ys) (l:ls) = do
+            lv <- litLevel solver l
+            if lv == levelRoot then
+                go (xs,ys) ls
+              else if lv >= d then
+                go (IS.insert l xs, ys) ls
+              else
+                go (xs, IS.insert l ys) ls
+
+  let loop :: LitSet -> LitSet -> ([(Integer,Lit)],Integer) -> IO (LitSet, ([(Integer,Lit)],Integer))
+      loop lits1 lits2 pb
+        | sz==1 = do
+            return $ (lits1 `IS.union` lits2, pb)
+        | sz>=2 = do
+            ret <- popTrail solver
+            case ret of
+              Nothing -> do
+                error $ printf "analyzeConflictHybrid: should not happen: empty trail: loop %s %s"
+                               (show lits1) (show lits2)
+              Just l -> do
+                m <- varReason solver (litVar l)
+                case m of
+                  Nothing -> error "analyzeConflictHybrid: should not happen"
+                  Just constr2 -> do
+                    xs <- reasonOf solver constr2 (Just l)
+                    (lits1',lits2') <- 
+                      if litNot l `IS.notMember` lits1
+                      then return (lits1,lits2)
+                      else do
+                        constrBumpActivity solver constr2
+                        forM_ xs $ \lit -> varBumpActivity solver (litVar lit)
+                        (ys,zs) <- split xs
+                        return  (IS.delete (litNot l) lits1 `IS.union` ys, lits2 `IS.union` zs)
+
+                    pb2 <- toPBAtLeast solver constr2
+                    o <- pbOverSAT solver pb2
+                    let pb3 = if o then ([(1,l) | l <- l:xs],1) else pb2
+                    let pb' =
+                           if any (\(_,l2) -> litNot l == l2) (fst pb)
+                           then cutResolve pb pb3 (litVar l)
+                           else pb
+
+                    unassign solver (litVar l)
+                    loop lits1' lits2' pb'
+
+        | otherwise = error "analyzeConflictHybrid: should not happen: reason of current level is empty"
+        where
+          sz = IS.size lits1
+
+  constrBumpActivity solver constr
+  conflictClause <- reasonOf solver constr Nothing
+  pbConfl <- toPBAtLeast solver constr
+  forM_ conflictClause $ \lit -> varBumpActivity solver (litVar lit)
+  (ys,zs) <- split conflictClause
+  (lits, pb) <- loop ys zs pbConfl
+
+  lits <- do
+    ccmin <- readIORef (svCCMin solver)
+    if ccmin >= 2 then
+       minimizeConflictClauseRecursive solver lits
+     else if ccmin >= 1 then
+       minimizeConflictClauseLocal solver lits
+     else
+       return lits
+
+  when debugMode $ do
+    let f l = do
+          lv <- litLevel solver l
+          return $ lv >= d
+    litsd <- filterM f (IS.toList lits)
+    when (length litsd /= 1) $ do
+      xs <- forM (IS.toList lits) $ \l -> do
+        lv <- litLevel solver l
+        return (l,lv)
+      error $ printf "analyzeConflictHybrid: not assertive: %s" (show xs)
+
+  xs <- liftM (sortBy (flip (compare `on` snd))) $
+    forM (IS.toList lits) $ \l -> do
+      lv <- litLevel solver l
+      return (l,lv)
+
+  let level = case xs of
+                [] -> error "analyzeConflict: should not happen"
+                [_] -> levelRoot
+                _:(_,lv):_ -> lv
+  return (map fst xs, level, pb)
 
 minimizeConflictClauseLocal :: Solver -> LitSet -> IO LitSet
 minimizeConflictClauseLocal solver lits = do
@@ -1622,11 +1748,10 @@ data AtLeastData
   }
   deriving Eq
 
-newAtLeastData :: [Lit] -> Int -> IO AtLeastData
-newAtLeastData ls n = do
+newAtLeastData :: [Lit] -> Int -> Bool -> IO AtLeastData
+newAtLeastData ls n learnt = do
   let size = length ls
   a <- newListArray (0, size-1) ls
-  let learnt = False -- FIXME
   act <- newIORef $! (if learnt then 0 else -1)
   return (AtLeastData a n act)
 
@@ -1780,12 +1905,11 @@ data PBAtLeastData
   }
   deriving Eq
 
-newPBAtLeastData :: [(Integer,Lit)] -> Integer -> IO PBAtLeastData
-newPBAtLeastData ts degree = do
+newPBAtLeastData :: [(Integer,Lit)] -> Integer -> Bool -> IO PBAtLeastData
+newPBAtLeastData ts degree learnt = do
   let slack = sum (map fst ts) - degree
       m = IM.fromList [(l,c) | (c,l) <- ts]
   s <- newIORef slack
-  let learnt = False -- FIXME
   act <- newIORef $! (if learnt then 0 else -1)
   return (PBAtLeastData m degree s act)
 
@@ -1829,7 +1953,6 @@ instance Constraint PBAtLeastData where
 
   toPBAtLeast solver this = do
     return ([(c,l) | (l,c) <- IM.toList (pbTerms this)], pbDegree this)
-
 
   isSatisfied solver this = do
     xs <- forM (IM.toList (pbTerms this)) $ \(l,c) -> do
@@ -1887,6 +2010,15 @@ pbPropagate solver this = do
             assignBy solver l1 this
             return ()
       return True
+
+pbOverSAT :: Solver -> ([(Integer,Lit)],Integer) -> IO Bool
+pbOverSAT solver (lhs, rhs) = do
+  ss <- forM lhs $ \(c,l) -> do
+    v <- litValue solver l
+    if v /= lFalse
+      then return c
+      else return 0
+  return $! sum ss > rhs
 
 {--------------------------------------------------------------------
   Restart strategy

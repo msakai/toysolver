@@ -146,6 +146,7 @@ options =
         _ -> undefined
 
     parseLS "clause" = SAT.LearningClause
+    parseLS "hybrid" = SAT.LearningHybrid
     parseLS s = error (printf "unknown learning strategy %s" s)
 
 main :: IO ()
