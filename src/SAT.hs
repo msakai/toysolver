@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
-{-# LANGUAGE BangPatterns, DoAndIfThenElse, DoRec #-}
+{-# LANGUAGE BangPatterns, DoAndIfThenElse, DoRec, ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  SAT
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns)
+-- Portability :  non-portable (BangPatterns, DoAndIfThenElse, DoRec, ScopedTypeVariables)
 --
 -- A CDCL SAT solver.
 --
@@ -88,6 +88,7 @@ import Control.Monad
 import Control.Exception
 import Data.Array.IO
 import Data.Array.Base (unsafeRead, unsafeWrite)
+import Data.Array.Unboxed
 import Data.Function
 import Data.IORef
 import Data.List
@@ -354,7 +355,7 @@ data Solver
   , svAssumptions  :: !(IORef (IOUArray Int Lit))
   , svLevel        :: !(IORef Level)
   , svBCPQueue     :: !(IORef (Seq.Seq Lit))
-  , svModel        :: !(IORef (Maybe (VarMap Bool)))
+  , svModel        :: !(IORef (Maybe Model))
   , svNDecision    :: !(IORef Int)
   , svNConflict    :: !(IORef Int)
   , svNRestart     :: !(IORef Int)
@@ -1050,7 +1051,7 @@ search solver !conflict_lim onConflict = loop 0
 
 
 -- | A model is represented as a mapping from variables to its values.
-type Model = IM.IntMap Bool
+type Model = UArray Var Bool
 
 -- | After 'solve' returns True, it returns the model.
 model :: Solver -> IO Model
@@ -1453,12 +1454,13 @@ backtrackTo solver level = do
 
 constructModel :: Solver -> IO ()
 constructModel solver = do
-  vs <- variables solver
-  xs <- forM vs $ \v -> do
+  n <- nVars solver
+  (marr::IOUArray Var Bool) <- newArray_ (1,n)
+  forM_ [1..n] $ \v -> do
     vd <- varData solver v
     a <- readIORef (vdAssignment vd)
-    return $ (v, aValue (fromJust a))
-  let m = IM.fromAscList xs
+    writeArray marr v (aValue (fromJust a))
+  m <- unsafeFreeze marr
   writeIORef (svModel solver) (Just m)
 
 constrDecayActivity :: Solver -> IO ()

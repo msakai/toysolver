@@ -241,7 +241,7 @@ solveSAT _ solver cnf = do
 
 satPrintModel :: SAT.Model -> IO ()
 satPrintModel m = do
-  forM_ (split 10 (IM.toList m)) $ \xs -> do
+  forM_ (split 10 (assocs m)) $ \xs -> do
     putStr "v"
     forM_ xs $ \(var,val) -> putStr (' ': show (SAT.literal var val))
     putStrLn ""
@@ -284,8 +284,7 @@ solvePB opt solver formula@(obj, cs) = do
       hFlush stdout
       when result $ do
         m <- SAT.model solver
-        let m2 = IM.filterWithKey (\v _ -> v <= n) m
-        pbPrintModel m2
+        pbPrintModel m n
 
     Just obj' -> do
       obj'' <- pbConvSum lin obj'
@@ -303,9 +302,8 @@ solvePB opt solver formula@(obj, cs) = do
           hFlush stdout
         Right (Just m) -> do
           putStrLn $ "s " ++ "OPTIMUM FOUND"
-          hFlush stdout          
-          let m2 = IM.filterWithKey (\v _ -> v <= n) m
-          pbPrintModel m2
+          hFlush stdout
+          pbPrintModel m n
         Left (e :: AsyncException) -> do
           r <- readIORef modelRef
           case r of
@@ -314,8 +312,7 @@ solvePB opt solver formula@(obj, cs) = do
               hFlush stdout
             Just m -> do
               putStrLn $ "s " ++ "SATISFIABLE"
-              let m2 = IM.filterWithKey (\v _ -> v <= n) m
-              pbPrintModel m2
+              pbPrintModel m n
           throwIO e
 
 pbConvSum :: Lin.Linearizer -> PBFile.Sum -> IO [(Integer, SAT.Lit)]
@@ -405,7 +402,7 @@ minimize opt solver obj update = do
      loop (pbLowerBound obj) (v - 1) m
 
 pbEval :: SAT.Model -> [(Integer, SAT.Lit)] -> Integer
-pbEval m xs = sum [c | (c,lit) <- xs, m IM.! SAT.litVar lit == SAT.litPolarity lit]
+pbEval m xs = sum [c | (c,lit) <- xs, m ! SAT.litVar lit == SAT.litPolarity lit]
 
 pbNumVars :: PBFile.Formula -> Int
 pbNumVars (m, cs) = maximum (0 : vs)
@@ -416,9 +413,10 @@ pbNumVars (m, cs) = maximum (0 : vs)
       lit <- tm
       return $ abs lit
 
-pbPrintModel :: SAT.Model -> IO ()
-pbPrintModel m = do  
-  forM_ (split 10 (IM.toList m)) $ \xs -> do
+pbPrintModel :: SAT.Model -> Int -> IO ()
+pbPrintModel m n = do
+  let as = takeWhile (\(v,_) -> v <= n) $ assocs m
+  forM_ (split 10 as) $ \xs -> do
     putStr "v"
     forM_ xs $ \(var,val) -> putStr (" " ++ (if val then "" else "-") ++ "x" ++ show var)
     putStrLn ""
@@ -478,17 +476,15 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
     Right (Just m) -> do
       putStrLn $ "s " ++ "OPTIMUM FOUND"
       hFlush stdout
-      let m2 = IM.filterWithKey (\v _ -> v <= nvar) m
       if isMaxSat
-        then maxsatPrintModel m2
-        else pbPrintModel m2
+        then maxsatPrintModel m nvar
+        else pbPrintModel m nvar
     Left (e :: AsyncException) -> do
       r <- readIORef modelRef
       case r of
         Just m | not isMaxSat -> do
           putStrLn $ "s " ++ "SATISFIABLE"
-          let m2 = IM.filterWithKey (\v _ -> v <= nvar) m
-          pbPrintModel m2
+          pbPrintModel m nvar
         _ -> do
           putStrLn $ "s " ++ "UNKNOWN"
           hFlush stdout
@@ -555,9 +551,10 @@ solveMaxSAT opt solver (_, top, cs) = do
              ]
            )
 
-maxsatPrintModel :: SAT.Model -> IO ()
-maxsatPrintModel m = do
-  forM_ (split 10 (IM.toList m)) $ \xs -> do
+maxsatPrintModel :: SAT.Model -> Int -> IO ()
+maxsatPrintModel m n = do
+  let as = takeWhile (\(v,_) -> v <= n) $ assocs m
+  forM_ (split 10 as) $ \xs -> do
     putStr "v"
     forM_ xs $ \(var,val) -> putStr (' ' : show (SAT.literal var val))
     putStrLn ""
@@ -649,7 +646,7 @@ solveLP opt solver lp = do
           printModel m = do
             forM_ (Set.toList ivs) $ \v -> do
               let SAT.Integer.Expr ts c = vmap Map.! v
-              let val = sum [if m IM.! (SAT.litVar lit) == SAT.litPolarity lit then n else 0 | (n,lit) <- ts] + c
+              let val = sum [if m ! SAT.litVar lit == SAT.litPolarity lit then n else 0 | (n,lit) <- ts] + c
               printf "v %s = %d\n" v val
             hFlush stdout
 
