@@ -228,16 +228,16 @@ cutResolve (lhs1,rhs1) (lhs2,rhs2) v = assert (l1 == litNot l2) $ normalizePBAtL
     pb = ([(s1*c,l) | (c,l) <- lhs1] ++ [(s2*c,l) | (c,l) <- lhs2], s1*rhs1 + s2 * rhs2)
 
 cardinalityReduction :: ([(Integer,Lit)],Integer) -> ([Lit],Int)
-cardinalityReduction (lhs,rhs) = (ls, k)
+cardinalityReduction (lhs,rhs) = (ls, rhs')
   where
-    k = go1 0 0 (sortBy (flip compare `on` fst) lhs)
-    go1 !s !k ((a,x):ts)
+    rhs' = go1 0 0 (sortBy (flip compare `on` fst) lhs)
+    go1 !s !k ((a,_):ts)
       | s < rhs   = go1 (s+a) (k+1) ts
       | otherwise = k
     ls = go2 (minimum (rhs : map (subtract 1 . fst) lhs)) (sortBy (compare `on` fst) lhs)
-    go2 !guard ((a,x) : ts)
-      | a - 1 < guard = go2 (guard - a) ts
-      | otherwise     = map snd ts
+    go2 !guard' ((a,_) : ts)
+      | a - 1 < guard' = go2 (guard' - a) ts
+      | otherwise      = map snd ts
 
 {--------------------------------------------------------------------
   internal data structures
@@ -499,10 +499,10 @@ reduceDB :: Solver -> IO ()
 reduceDB solver = do
   (n,cs) <- readIORef (svLearntDB solver)
 
-  xs <- forM cs $ \c@(ConstrClause (ClauseData a act)) -> do
-    size <- liftM rangeSize (getBounds a)
-    actval <- readIORef act
-    return (c, (size <= 2, actval))
+  xs <- forM cs $ \c -> do
+    p <- constrIsProtected solver c
+    actval <- constrActivity solver c
+    return (c, (p, actval))
 
   -- Note that False <= True
   let ys = sortBy (compare `on` snd) xs
@@ -999,8 +999,8 @@ search solver !conflict_lim onConflict = loop 0
                       assignBy solver lit cl
                       constrBumpActivity solver cl
                 LearningHybrid -> do
-                  let loop2 constr = do
-                        (learntClause, level, pb) <- analyzeConflictHybrid solver constr
+                  let loop2 confl = do
+                        (learntClause, level, pb) <- analyzeConflictHybrid solver confl
                         backtrackTo solver level
                         pb <- newPBAtLeastData (fst pb) (snd pb) True
                         attach solver pb
@@ -1248,17 +1248,6 @@ analyzeConflict solver constr = do
      else
        return lits
 
-  when debugMode $ do
-    let f l = do
-          lv <- litLevel solver l
-          return $ lv >= d
-    litsd <- filterM f (IS.toList lits)
-    when (length litsd /= 1) $ do
-      xs <- forM (IS.toList lits) $ \l -> do
-        lv <- litLevel solver l
-        return (l,lv)
-      error $ printf "analyzeConflict: not assertive: %s" (show xs)
-
   xs <- liftM (sortBy (flip (compare `on` snd))) $
     forM (IS.toList lits) $ \l -> do
       lv <- litLevel solver l
@@ -1342,17 +1331,6 @@ analyzeConflictHybrid solver constr = do
        minimizeConflictClauseLocal solver lits
      else
        return lits
-
-  when debugMode $ do
-    let f l = do
-          lv <- litLevel solver l
-          return $ lv >= d
-    litsd <- filterM f (IS.toList lits)
-    when (length litsd /= 1) $ do
-      xs <- forM (IS.toList lits) $ \l -> do
-        lv <- litLevel solver l
-        return (l,lv)
-      error $ printf "analyzeConflictHybrid: not assertive: %s" (show xs)
 
   xs <- liftM (sortBy (flip (compare `on` snd))) $
     forM (IS.toList lits) $ \l -> do
@@ -1501,6 +1479,11 @@ class Constraint a where
 
   isSatisfied :: Solver -> a -> IO Bool
 
+  constrIsProtected :: Solver -> a -> IO Bool
+  constrIsProtected _ _ = return False
+
+  constrActivity :: Solver -> a -> IO Double
+
   constrBumpActivity :: Solver -> a -> IO ()
   constrBumpActivity _ _ = return ()
 
@@ -1591,6 +1574,14 @@ instance Constraint SomeConstraint where
   isSatisfied s (ConstrClause c)    = isSatisfied s c
   isSatisfied s (ConstrAtLeast c)   = isSatisfied s c
   isSatisfied s (ConstrPBAtLeast c) = isSatisfied s c
+
+  constrIsProtected s (ConstrClause c)    = constrIsProtected s c
+  constrIsProtected s (ConstrAtLeast c)   = constrIsProtected s c
+  constrIsProtected s (ConstrPBAtLeast c) = constrIsProtected s c
+
+  constrActivity s (ConstrClause c)    = constrActivity s c
+  constrActivity s (ConstrAtLeast c)   = constrActivity s c
+  constrActivity s (ConstrPBAtLeast c) = constrActivity s c
 
   constrBumpActivity s (ConstrClause c)    = constrBumpActivity s c
   constrBumpActivity s (ConstrAtLeast c)   = constrBumpActivity s c
@@ -1699,7 +1690,7 @@ instance Constraint ClauseData where
         assert (lit == head lits) $ return ()
         return $ tail lits
 
-  toPBAtLeast solver (ClauseData a _) = do
+  toPBAtLeast _ (ClauseData a _) = do
     lits <- getElems a
     return ([(1,l) | l <- lits], 1)
 
@@ -1707,6 +1698,14 @@ instance Constraint ClauseData where
     lits <- getElems (claLits this)
     vals <- mapM (litValue solver) lits
     return $ lTrue `elem` vals
+
+  constrIsProtected _ this = do
+    size <- liftM rangeSize (getBounds (claLits this))
+    return $! size <= 2
+
+  constrActivity _ this = do
+    let act = claActivity this
+    readIORef act
 
   constrBumpActivity solver this = do
     let act = claActivity this
@@ -1837,10 +1836,10 @@ instance Constraint AtLeastData where
           then return (Just i)
           else findForWatch (i+1) end
 
-  basicReasonOf s this l = do
+  basicReasonOf s this concl = do
     lits <- getElems (atLeastLits this)
     let n = atLeastNum this
-    case l of
+    case concl of
       Nothing -> do
         let f :: [Lit] -> IO Lit
             f [] = error "AtLeastData.basicReasonOf: should not happen"
@@ -1855,7 +1854,7 @@ instance Constraint AtLeastData where
         assert (lit `elem` take n lits) $ return ()
         return $ drop n lits
 
-  toPBAtLeast solver this = do
+  toPBAtLeast _ this = do
     lits <- getElems (atLeastLits this)
     return ([(1,l) | l <- lits], fromIntegral (atLeastNum this))
 
@@ -1863,6 +1862,10 @@ instance Constraint AtLeastData where
     lits <- getElems (atLeastLits this)
     vals <- mapM (litValue solver) lits
     return $ length [v | v <- vals, v == lTrue] >= atLeastNum this
+
+  constrActivity _ this = do
+    let act = atLeastActivity this
+    readIORef act
 
   constrBumpActivity solver this = do
     let act = atLeastActivity this
@@ -1885,14 +1888,14 @@ instantiateAtLeast solver (xs,n) = loop ([],n) xs
   where
     loop :: ([Lit],Int) -> [Lit] -> IO ([Lit],Int)
     loop ret [] = return ret
-    loop (ys,n) (l:ls) = do
+    loop (ys,m) (l:ls) = do
       val <- litValue solver l
       if val == lTrue then
-         loop (ys, n-1) ls
+         loop (ys, m-1) ls
        else if val == lFalse then
-         loop (ys, n) ls
+         loop (ys, m) ls
        else
-         loop (l:ys, n) ls
+         loop (l:ys, m) ls
 
 {--------------------------------------------------------------------
   Pseudo Boolean Constraint
@@ -1953,7 +1956,7 @@ instance Constraint PBAtLeastData where
       go _ [] _ = error "should not happen"
       go s ((lit,c):xs) ret = go (s - c) xs (lit:ret)
 
-  toPBAtLeast solver this = do
+  toPBAtLeast _ this = do
     return ([(c,l) | (l,c) <- IM.toList (pbTerms this)], pbDegree this)
 
   isSatisfied solver this = do
@@ -1963,6 +1966,10 @@ instance Constraint PBAtLeastData where
         then return c
         else return 0
     return $ sum xs >= pbDegree this
+
+  constrActivity _ this = do
+    let act = pbActivity this
+    readIORef act
 
   constrBumpActivity solver this = do
     let act = pbActivity this
@@ -1985,14 +1992,14 @@ instantiatePBAtLeast solver (xs,n) = loop ([],n) xs
   where
     loop :: ([(Integer,Lit)],Integer) -> [(Integer,Lit)] -> IO ([(Integer,Lit)],Integer)
     loop ret [] = return ret
-    loop (ys,n) ((c,l):ts) = do
+    loop (ys,m) ((c,l):ts) = do
       val <- litValue solver l
       if val == lTrue then
-         loop (ys, n-c) ts
+         loop (ys, m-c) ts
        else if val == lFalse then
-         loop (ys, n) ts
+         loop (ys, m) ts
        else
-         loop ((c,l):ys, n) ts
+         loop ((c,l):ys, m) ts
 
 pbPropagate :: Solver -> PBAtLeastData -> IO Bool
 pbPropagate solver this = do
@@ -2128,9 +2135,9 @@ dumpClaActivity :: Solver -> IO ()
 dumpClaActivity solver = do
   log solver "Learnt clause activity:"
   xs <- learntConstraints solver
-  forM_ xs $ \c@(ConstrClause cla) -> do
+  forM_ xs $ \c -> do
     s <- showConstraint solver c
-    aval <- readIORef (claActivity cla)
+    aval <- constrActivity solver c
     log solver $ printf "activity(%s) = %f" s aval
 
 -- | set callback function for receiving messages.
