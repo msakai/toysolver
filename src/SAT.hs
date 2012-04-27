@@ -2001,12 +2001,8 @@ pbPropagate solver this = do
   if s < 0
     then return False
     else do
-      let ls = [l1 | (l1,c1) <- IM.toList (pbTerms this ), c1 > s]
-      when (not (null ls)) $ do
-        when debugMode $ logIO solver $ do
-          str <- showConstraint solver this
-          return $ printf "pbPropagate: %s is unit (new slack = %d)" str s
-        forM_ ls $ \l1 -> do
+      forM_ (IM.toList (pbTerms this)) $ \(l1,c1) -> do
+        when (c1 > s) $ do
           v <- litValue solver l1
           when (v == lUndef) $ do
             assignBy solver l1 this
