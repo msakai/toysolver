@@ -20,7 +20,6 @@ import Control.Monad
 import Control.Exception
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy as BS
-import qualified Data.IntMap as IM
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.Char
@@ -577,7 +576,8 @@ solveLP :: Options -> SAT.Solver -> LPFile.LP -> IO ()
 solveLP opt solver lp = do
   if not (Set.null nivs)
     then do
-      hPutStrLn stderr ("cannot handle non-integer variables: " ++ intercalate ", " (Set.toList nivs))
+      putStrLn $ "c cannot handle non-integer variables: " ++ intercalate ", " (Set.toList nivs)
+      putStrLn "s UNKNOWN"
       exitFailure
     else do
       putStrLn "c Loading variables and bounds"
@@ -588,7 +588,8 @@ solveLP opt solver lp = do
             v2 <- SAT.Integer.newVar solver (ceiling lb') (floor ub')
             return (v,v2)
           _ -> do
-            hPutStrLn stderr ("cannot handle unbounded variable: " ++ v)
+            putStrLn $ "c cannot handle unbounded variable: " ++ v
+            putStrLn "s UNKNOWN"
             exitFailure
 
       putStrLn "c Loading constraints"
