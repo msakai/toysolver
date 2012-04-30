@@ -314,6 +314,59 @@ case_cardinalityReduction = (sort lhs, rhs) @?= ([1,2,3,4,5],4)
   where
     (lhs, rhs) = cardinalityReduction ([(6,1),(5,2),(4,3),(3,4),(2,5),(1,6)], 17)
 
+-- from "Pueblo: A Hybrid Pseudo-Boolean SAT Solver"
+-- clauseがunitになるレベルで、PB制約が違反状態のままという例。
+case_hybridLearning_1 :: IO ()
+case_hybridLearning_1 = do
+  solver <- newSolver
+  [x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11] <- replicateM 11 (newVar solver)
+
+  addClause solver [x11, x10, x9] -- C1
+  addClause solver [x8, x7, x6]   -- C2
+  addClause solver [x5, x4, x3]   -- C3
+  addAtLeast solver [-x2, -x5, -x8, -x11] 3 -- C4
+  addAtLeast solver [-x1, -x4, -x7, -x10] 3 -- C5
+
+  replicateM 3 (varBumpActivity solver x3)
+  setVarPolarity solver x3 False
+
+  replicateM 2 (varBumpActivity solver x6)
+  setVarPolarity solver x6 False
+
+  replicateM 1 (varBumpActivity solver x9)
+  setVarPolarity solver x9 False
+
+  setVarPolarity solver x1 True
+
+  setLearningStrategy solver LearningHybrid
+  ret <- solve solver
+  ret @?= True
+
+-- from "Pueblo: A Hybrid Pseudo-Boolean SAT Solver"
+-- clauseがunitになるレベルで、PB制約が違反状態のままという例。
+-- さらに、学習したPB制約はunitにはならない。
+case_hybridLearning_2 :: IO ()
+case_hybridLearning_2 = do
+  solver <- newSolver
+  [x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12] <- replicateM 12 (newVar solver)
+
+  addClause solver [x11, x10, x9] -- C1
+  addClause solver [x8, x7, x6]   -- C2
+  addClause solver [x5, x4, x3]   -- C3
+  addAtLeast solver [-x2, -x5, -x8, -x11] 3 -- C4
+  addAtLeast solver [-x1, -x4, -x7, -x10] 3 -- C5
+
+  addClause solver [x12, -x3]
+  addClause solver [x12, -x6]
+  addClause solver [x12, -x9]
+
+  varBumpActivity solver x12
+  setVarPolarity solver x12 False
+
+  setLearningStrategy solver LearningHybrid
+  ret <- solve solver
+  ret @?= True
+
 ------------------------------------------------------------------------
 -- Test harness
 
