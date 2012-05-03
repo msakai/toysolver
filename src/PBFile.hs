@@ -36,18 +36,25 @@ module PBFile
   , parseOPBString
   , parseOPBFile
 
-
   -- * Parsing .wbo files
   , parseWBOString
   , parseWBOFile
+
+  -- * Show .opb files
+  , showOPB
+
+  -- * Show .wbo files
+  , showWBO
   ) where
 
 import Prelude hiding (sum)
 import Control.Monad
 import Data.Maybe
+import Data.List hiding (sum)
 import Text.ParserCombinators.Parsec
 import Data.Word
 import Control.Exception (assert)
+import Text.Printf
 
 -- | Pair of /objective function/ and a list of constraints.
 type Formula = (Maybe Sum, [Constraint])
@@ -304,6 +311,74 @@ parseWBOFile :: FilePath -> IO (Either ParseError SoftFormula)
 parseWBOFile = parseFromFile softformula
 
 
+showOPB :: Formula -> ShowS
+showOPB opb@(obj, cs) = (size . part1 . part2)
+  where
+    nv = pbNumVars opb
+    nc = length cs
+    size = showString (printf "* #variable= %d #constraint= %d\n" nv nc)
+    part1 = 
+      case obj of
+        Nothing -> id
+        Just o -> showString "min: " . showSum o . showString ";\n"
+    part2 = foldr (.) id (map showConstraint cs)
+
+showWBO :: SoftFormula -> ShowS
+showWBO wbo@(top, cs) = size . part1 . part2
+  where
+    nv = wboNumVars wbo
+    nc = length cs
+    size = showString (printf "* #variable= %d #constraint= %d\n" nv nc)
+    part1 = 
+      case top of
+        Nothing -> showString "soft: "
+        Just t -> showString "soft: " . showsPrec 0 t . showString ";\n"
+    part2 = foldr (.) id (map showSoftConstraint cs)
+
+showSum :: Sum -> ShowS
+showSum = foldr (.) id . map showWeightedTerm
+
+showWeightedTerm :: WeightedTerm -> ShowS
+showWeightedTerm (c, lits) = foldr (\f g -> f . showChar ' ' . g) id (x:xs)
+  where
+    x = if c >= 0 then showChar '+' . showsPrec 0 c else showsPrec 0 c
+    xs = map showLit lits
+
+showLit :: Lit -> ShowS
+showLit lit =   if lit > 0 then v else showChar '~' . v
+  where
+    v = showChar 'x' . showsPrec 0 (abs lit)
+
+showConstraint :: Constraint -> ShowS
+showConstraint (lhs, op, rhs) =
+  showSum lhs . f op .  showChar ' ' . showsPrec 0 rhs . showString ";\n"
+  where
+    f Eq = showString "="
+    f Ge = showString ">="
+
+showSoftConstraint :: SoftConstraint -> ShowS
+showSoftConstraint (cost, constr) =
+  case cost of
+    Nothing -> showConstraint constr
+    Just c -> showChar '[' . showsPrec 0 c . showChar ']' . showChar ' ' . showConstraint constr
+
+pbNumVars :: PBFile.Formula -> Int
+pbNumVars (m, cs) = maximum (0 : vs)
+  where
+    vs = do
+      s <- maybeToList m ++ [s | (s,_,_) <- cs]
+      (_, tm) <- s
+      lit <- tm
+      return $ abs lit
+
+wboNumVars :: PBFile.SoftFormula -> Int
+wboNumVars (_, cs) = maximum vs
+  where
+    vs = do
+      s <- [s | (_, (s,_,_)) <- cs]
+      (_, tm) <- s
+      lit <- tm
+      return $ abs lit
 
 
 exampleLIN :: String
@@ -381,3 +456,17 @@ exampleWBO3 = unlines $
   , "-1 x1 -1 x2 >= -1 ;"
   , "-1 x3 -1 x4 >= -1 ;"
   ]
+
+testOPB :: String -> Bool
+testOPB s = sf == sf2
+  where
+    Right sf  = parseOPBString "-" s
+    s2 = showOPB sf ""
+    Right sf2 = parseOPBString "-" s2
+
+testWBO :: String -> Bool
+testWBO s = sf == sf2
+  where
+    Right sf  = parseWBOString "-" s
+    s2 = showWBO sf ""
+    Right sf2 = parseWBOString "-" s2
