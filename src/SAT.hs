@@ -1036,7 +1036,6 @@ search solver !conflict_lim onConflict = loop 0
                                       assignBy solver lit cl
                                       constrBumpActivity solver cl
                                 pbPropagate solver pb
-                                constrBumpActivity solver pb
                                 loop (c+1)
                   loop2 constr
 
@@ -2051,6 +2050,7 @@ pbPropagate solver this = do
           v <- litValue solver l1
           when (v == lUndef) $ do
             assignBy solver l1 this
+            constrBumpActivity solver this
             return ()
       return True
 
