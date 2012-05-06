@@ -359,6 +359,7 @@ data Solver
   , svNDecision    :: !(IORef Int)
   , svNConflict    :: !(IORef Int)
   , svNRestart     :: !(IORef Int)
+  , svNAssigns     :: !(IORef Int)
 
   -- | Inverse of the variable activity decay factor. (default 1 / 0.95)
   , svVarDecay     :: !(IORef Double)
@@ -434,6 +435,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
         }
 
       modifyIORef (svTrail solver) (IM.insertWith (++) lv [lit])
+      modifyIORef' (svNAssigns solver) (+1)
       bcpEnqueue solver lit
 
       when debugMode $ logIO solver $ do
@@ -454,6 +456,7 @@ unassign solver !v = assert (validVar v) $ do
       writeIORef (vdPolarity vd) (aValue a)
       readIORef (aBacktrackCBs a) >>= sequence_
   writeIORef (vdAssignment vd) Nothing
+  modifyIORef' (svNAssigns solver) (subtract 1)
   PQ.enqueue (svVarQueue solver) v
 
 addBacktrackCB :: Solver -> Var -> IO () -> IO ()
@@ -570,10 +573,7 @@ nVars solver = do
 
 -- | number of assigned variables.
 nAssigns :: Solver -> IO Int
-nAssigns solver = do
-  m <- readIORef (svTrail solver)
-  let f !r xs = r + length xs
-  return $! IM.foldl' f 0 m
+nAssigns solver = readIORef (svNAssigns solver)
 
 -- | number of clauses.
 nClauses :: Solver -> IO Int
@@ -614,6 +614,7 @@ newSolver = do
   ndecision <- newIORef 0
   nconflict <- newIORef 0
   nrestart  <- newIORef 0
+  nassigns  <- newIORef 0
 
   claDecay <- newIORef (1 / 0.999)
   claInc   <- newIORef 1
@@ -646,6 +647,7 @@ newSolver = do
         , svNDecision  = ndecision
         , svNConflict  = nconflict
         , svNRestart   = nrestart
+        , svNAssigns   = nassigns
         , svVarDecay   = varDecay
         , svVarInc     = varInc
         , svClaDecay   = claDecay
@@ -950,8 +952,9 @@ search solver !conflict_lim onConflict = loop 0
       case conflict of
         Nothing -> do
           n <- nLearnt solver
+          m <- nAssigns solver
           learnt_lim <- readIORef (svLearntLim solver)
-          when (learnt_lim >= 0 && n > learnt_lim) $ reduceDB solver
+          when (learnt_lim >= 0 && n - m > learnt_lim) $ reduceDB solver
 
           r <- pickAssumption
           case r of
