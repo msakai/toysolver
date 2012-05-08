@@ -2070,12 +2070,13 @@ pbOverSAT solver (lhs, rhs) = do
   Restart strategy
 --------------------------------------------------------------------}
 
-data RestartStrategy = MiniSATRestarts | ArminRestarts
+data RestartStrategy = MiniSATRestarts | ArminRestarts | LubyRestarts
   deriving (Show, Eq, Ord)
 
 mkRestartSeq :: RestartStrategy -> Int -> Double -> [Int]
 mkRestartSeq MiniSATRestarts = miniSatRestartSeq
 mkRestartSeq ArminRestarts   = arminRestartSeq
+mkRestartSeq LubyRestarts    = lubyRestartSeq
 
 miniSatRestartSeq :: Int -> Double -> [Int]
 miniSatRestartSeq start inc = iterate (ceiling . (inc *) . fromIntegral) start
@@ -2094,6 +2095,35 @@ arminRestartSeq start inc = go (fromIntegral start) (fromIntegral start)
           if inner >= outer
           then (fromIntegral start, outer * inc)
           else (inner * inc, outer)
+
+lubyRestartSeq :: Int -> Double -> [Int]
+lubyRestartSeq start inc = map (ceiling . luby inc) [0..]
+
+{-
+  Finite subsequences of the Luby-sequence:
+
+  0: 1
+  1: 1 1 2
+  2: 1 1 2 1 1 2 4
+  3: 1 1 2 1 1 2 4 1 1 2 1 1 2 4 8
+  ...
+
+
+-}
+luby :: Double -> Integer -> Double
+luby y x = go2 size seq x
+  where
+    -- Find the finite subsequence that contains index 'x', and the
+    -- size of that subsequence:
+    (size, seq) = go 1 0
+    go size seq
+      | size < x+1 = go (2*size+1) (seq+1)
+      | otherwise  = (size, seq)
+
+    go2 size seq x
+      | size-1 /= x = let size' = (size-1) `div` 2 in go2 size' (seq - 1) (x `mod` size')
+      | otherwise = y ^ seq
+
 
 {--------------------------------------------------------------------
   utility

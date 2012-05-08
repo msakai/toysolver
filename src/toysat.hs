@@ -96,7 +96,7 @@ options =
 
     , Option [] ["restart"]
         (ReqArg (\val opt -> opt{ optRestartStrategy = parseRestartStrategy val }) "<str>")
-        "Restart startegy: MiniSAT (default), Armin."
+        "Restart startegy: MiniSAT (default), Armin, Luby."
     , Option [] ["restart-first"]
         (ReqArg (\val opt -> opt{ optRestartFirst = read val }) "<integer>")
         (printf "The initial restart limit. (default %d)" SAT.defaultRestartFirst)
@@ -136,6 +136,7 @@ options =
       case map toLower s of
         "minisat" -> SAT.MiniSATRestarts
         "armin" -> SAT.ArminRestarts
+        "luby" -> SAT.LubyRestarts
         _ -> undefined
 
     parseSearch s =
