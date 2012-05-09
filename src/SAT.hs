@@ -1017,32 +1017,29 @@ search solver !conflict_lim onConflict = loop 0
                         attach solver pbdata
                         addToLearntDB solver pbdata
 
-                        if level3 < levelRoot
+                        backtrackTo solver level3
+                        slack <- readIORef (pbSlack pbdata)
+                        if slack < 0
                           then do
-                            backtrackTo solver levelRoot
-                            markBad solver
-                            return $ Just False
+                            if level3 == levelRoot
+                             then markBad solver >> return (Just False)
+                             else loop2 (toConstraint pbdata)
                           else do
-                            backtrackTo solver level3
-                            slack <- readIORef (pbSlack pbdata)
-                            if slack < 0
-                              then loop2 (toConstraint pbdata)
-                              else do
-                                case learntClause of
-                                  [] -> error "should not happen"
-                                  [lit] -> do
-                                    ret <- assign solver lit
-                                    assert ret $ return ()
-                                    return ()
-                                  lit:_ -> do
-                                    cl <- newClauseData learntClause True
-                                    attach solver cl
-                                    addToLearntDB solver cl
-                                    when (level3 == level) $ do
-                                      assignBy solver lit cl
-                                      constrBumpActivity solver cl
-                                pbPropagate solver pbdata
-                                loop (c+1)
+                            case learntClause of
+                              [] -> error "should not happen"
+                              [lit] -> do
+                                ret <- assign solver lit
+                                assert ret $ return ()
+                                return ()
+                              lit:_ -> do
+                                cl <- newClauseData learntClause True
+                                attach solver cl
+                                addToLearntDB solver cl
+                                when (level3 == level) $ do
+                                  assignBy solver lit cl
+                                  constrBumpActivity solver cl
+                            pbPropagate solver pbdata
+                            loop (c+1)
                   loop2 constr
 
     pickAssumption :: IO (Maybe Lit)
@@ -1347,17 +1344,20 @@ analyzeConflictHybrid solver constr = do
   return (map fst xs, level, pb)
 
 pbBacktrackLevel :: Solver -> ([(Integer,Lit)],Integer) -> IO Level
+pbBacktrackLevel solver ([], rhs) = assert (rhs > 0) $ return levelRoot
 pbBacktrackLevel solver (lhs, rhs) = do
-  let go lv lvs lhs' s
-        | s < 0 = return lv -- conflict
-        | takeWhile (\(c,_,_) -> c >= s) lhs' /= [] = return lv -- unit
-        | otherwise = do
-            case IS.minView lvs of
-              Nothing -> error "should not happen"
-              Just (lv2, lvs2) -> do
-                let s2    = s - sum [c | (c,_,lv3) <- lhs', Just lv2 == lv3]
-                    lhs2 = [x | x@(_,_,lv3) <- lhs', Just lv2 /= lv3]
-                go lv2 lvs2 lhs2 s2
+  let go lvs lhs' s = 
+        case IS.minView lvs of
+          Nothing -> error "pbBacktrackLevel: should not happen"
+          Just (lv2, lvs2) -> do
+            let s2   = s - sum [c | (c,_,lv3) <- lhs', Just lv2 == lv3]
+                lhs2 = [x | x@(_,_,lv3) <- lhs', Just lv2 /= lv3]
+            if s2 < 0 then
+              return lv2 -- conflict
+            else if takeWhile (\(c,_,_) -> c >= s) lhs2 /= [] then
+              return lv2 --unit
+            else
+              go lvs2 lhs2 s2
 
   lhs' <- forM (sortBy (flip compare `on` fst) lhs) $ \(c, lit) -> do
     v <- litValue solver lit
@@ -1369,8 +1369,7 @@ pbBacktrackLevel solver (lhs, rhs) = do
 
   let lvs = IS.fromList [lv | (_,_,Just lv) <- lhs']
       s0 = sum [c | (c,_) <- lhs] - rhs
-  go (levelRoot - 1) lvs lhs' s0
-
+  go lvs lhs' s0
 
 minimizeConflictClause :: Solver -> LitSet -> IO LitSet
 minimizeConflictClause solver lits = do
