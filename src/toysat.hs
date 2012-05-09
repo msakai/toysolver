@@ -157,9 +157,11 @@ main = do
     (o,args2,[]) -> do
       printSysInfo
 #ifdef __GLASGOW_HASKELL__
-      args <- getFullArgs
+      fullArgs <- getFullArgs
+#else
+      let fullArgs = args
 #endif
-      printf "c command line = %s\n" (show args)
+      printf "c command line = %s\n" (show fullArgs)
       let opt = foldl (flip id) defaultOptions o
       solver <- newSolver opt
       case optMode opt of
@@ -365,11 +367,12 @@ minimize opt solver obj update = do
          , let l' = (if l < 0 then "~" else "") ++ "x" ++ show (SAT.litVar l)
          ]
 -}
-     m <- SAT.model solver
-     let v = pbEval m obj
-     update m v
-     let ub = v - 1
-     SAT.addPBAtMost solver obj ub
+     m0 <- SAT.model solver
+     let v0 = pbEval m0 obj
+     update m0 v0
+     let ub0 = v0 - 1
+         lb0 = pbLowerBound obj
+     SAT.addPBAtMost solver obj ub0
 
      let loop lb ub m | ub < lb = return m
          loop lb ub m = do
@@ -380,16 +383,16 @@ minimize opt solver obj update = do
            ret <- SAT.solveWith solver [sel]
            if ret
            then do
-             m <- SAT.model solver
-             let v = pbEval m obj
-             update m v
+             m2 <- SAT.model solver
+             let v = pbEval m2 obj
+             update m2 v
              -- deactivating temporary constraint
              -- FIXME: –{—ˆ‚Í§–ñ‚Ìíœ‚ð‚µ‚½‚¢
              SAT.addClause solver [-sel]
              let ub' = v - 1
              printf "c Binary Search: updating upper bound: %d -> %d\n" ub ub'
              SAT.addPBAtMost solver obj ub'
-             loop lb ub' m
+             loop lb ub' m2
            else do
              -- deactivating temporary constraint
              -- FIXME: –{—ˆ‚Í§–ñ‚Ìíœ‚ð‚µ‚½‚¢
@@ -399,7 +402,7 @@ minimize opt solver obj update = do
              SAT.addPBAtLeast solver obj lb'
              loop lb' ub m
 
-     loop (pbLowerBound obj) (v - 1) m
+     loop lb0 ub0 m0
 
 pbEval :: SAT.Model -> [(Integer, SAT.Lit)] -> Integer
 pbEval m xs = sum [c | (c,lit) <- xs, m ! SAT.litVar lit == SAT.litPolarity lit]

@@ -231,13 +231,18 @@ cardinalityReduction :: ([(Integer,Lit)],Integer) -> ([Lit],Int)
 cardinalityReduction (lhs,rhs) = (ls, rhs')
   where
     rhs' = go1 0 0 (sortBy (flip compare `on` fst) lhs)
+
     go1 !s !k ((a,_):ts)
       | s < rhs   = go1 (s+a) (k+1) ts
       | otherwise = k
+    go1 _ _ [] = error "cardinalityReduction: should not happen"
+
     ls = go2 (minimum (rhs : map (subtract 1 . fst) lhs)) (sortBy (compare `on` fst) lhs)
+
     go2 !guard' ((a,_) : ts)
       | a - 1 < guard' = go2 (guard' - a) ts
       | otherwise      = map snd ts
+    go2 _ [] = error "cardinalityReduction: should not happen"
 
 {--------------------------------------------------------------------
   internal data structures
@@ -1004,15 +1009,13 @@ search solver !conflict_lim onConflict = loop 0
                   loop (c+1)
                 LearningHybrid -> do
                   let loop2 confl = do
-                        s <- showConstraint solver confl
-
                         (learntClause, level, pb) <- analyzeConflictHybrid solver confl
                         level2 <- pbBacktrackLevel solver pb
                         let level3 = min level level2
 
-                        pb <- newPBAtLeastData (fst pb) (snd pb) True
-                        attach solver pb
-                        addToLearntDB solver pb
+                        pbdata <- newPBAtLeastData (fst pb) (snd pb) True
+                        attach solver pbdata
+                        addToLearntDB solver pbdata
 
                         if level3 < levelRoot
                           then do
@@ -1021,9 +1024,9 @@ search solver !conflict_lim onConflict = loop 0
                             return $ Just False
                           else do
                             backtrackTo solver level3
-                            slack <- readIORef (pbSlack pb)
+                            slack <- readIORef (pbSlack pbdata)
                             if slack < 0
-                              then loop2 (toConstraint pb)
+                              then loop2 (toConstraint pbdata)
                               else do
                                 case learntClause of
                                   [] -> error "should not happen"
@@ -1038,7 +1041,7 @@ search solver !conflict_lim onConflict = loop 0
                                     when (level3 == level) $ do
                                       assignBy solver lit cl
                                       constrBumpActivity solver cl
-                                pbPropagate solver pb
+                                pbPropagate solver pbdata
                                 loop (c+1)
                   loop2 constr
 
@@ -1148,7 +1151,6 @@ pickBranchLit !solver = do
         case m of
           Nothing -> return litUndef
           Just var -> do
-            nv <- nVars solver
             val <- varValue solver var
             if val /= lUndef
               then loop
@@ -1156,7 +1158,7 @@ pickBranchLit !solver = do
                 vd <- varData solver var
                 p <- readIORef (vdPolarity vd)
                 let lit = literal var p
-                seq lit $ return lit
+                return $! lit
   loop
 
 decide :: Solver -> Lit -> IO ()
@@ -1254,17 +1256,10 @@ analyzeConflict solver constr = do
   (ys,zs) <- split conflictClause
   lits <- loop ys zs
 
-  lits <- do
-    ccmin <- readIORef (svCCMin solver)
-    if ccmin >= 2 then
-       minimizeConflictClauseRecursive solver lits
-     else if ccmin >= 1 then
-       minimizeConflictClauseLocal solver lits
-     else
-       return lits
+  lits2 <- minimizeConflictClause solver lits
 
   xs <- liftM (sortBy (flip (compare `on` snd))) $
-    forM (IS.toList lits) $ \l -> do
+    forM (IS.toList lits2) $ \l -> do
       lv <- litLevel solver l
       return (l,lv)
 
@@ -1318,7 +1313,7 @@ analyzeConflictHybrid solver constr = do
 
                     pb2 <- toPBAtLeast solver constr2
                     o <- pbOverSAT solver pb2
-                    let pb3 = if o then ([(1,l) | l <- l:xs],1) else pb2
+                    let pb3 = if o then ([(1,l2) | l2 <- l:xs],1) else pb2
                     let pb' =
                            if any (\(_,l2) -> litNot l == l2) (fst pb)
                            then cutResolve pb pb3 (litVar l)
@@ -1338,17 +1333,10 @@ analyzeConflictHybrid solver constr = do
   (ys,zs) <- split conflictClause
   (lits, pb) <- loop ys zs pbConfl
 
-  lits <- do
-    ccmin <- readIORef (svCCMin solver)
-    if ccmin >= 2 then
-       minimizeConflictClauseRecursive solver lits
-     else if ccmin >= 1 then
-       minimizeConflictClauseLocal solver lits
-     else
-       return lits
+  lits2 <- minimizeConflictClause solver lits
 
   xs <- liftM (sortBy (flip (compare `on` snd))) $
-    forM (IS.toList lits) $ \l -> do
+    forM (IS.toList lits2) $ \l -> do
       lv <- litLevel solver l
       return (l,lv)
 
@@ -1360,6 +1348,17 @@ analyzeConflictHybrid solver constr = do
 
 pbBacktrackLevel :: Solver -> ([(Integer,Lit)],Integer) -> IO Level
 pbBacktrackLevel solver (lhs, rhs) = do
+  let go lv lvs lhs' s
+        | s < 0 = return lv -- conflict
+        | takeWhile (\(c,_,_) -> c >= s) lhs' /= [] = return lv -- unit
+        | otherwise = do
+            case IS.minView lvs of
+              Nothing -> error "should not happen"
+              Just (lv2, lvs2) -> do
+                let s2    = s - sum [c | (c,_,lv3) <- lhs', Just lv2 == lv3]
+                    lhs2 = [x | x@(_,_,lv3) <- lhs', Just lv2 /= lv3]
+                go lv2 lvs2 lhs2 s2
+
   lhs' <- forM (sortBy (flip compare `on` fst) lhs) $ \(c, lit) -> do
     v <- litValue solver lit
     if v /= lFalse
@@ -1368,20 +1367,20 @@ pbBacktrackLevel solver (lhs, rhs) = do
         lv <- litLevel solver lit
         return (c, lit, Just lv)
 
-  let go lv lvs lhs s
-        | s < 0 = return lv -- conflict
-        | takeWhile (\(c,_,_) -> c >= s) lhs /= [] = return lv -- unit
-        | otherwise = do
-            case IS.minView lvs of
-              Nothing -> error "should not happen"
-              Just (lv2, lvs2) -> do
-                let s'   = s - sum [c | (c,_,lv3) <- lhs, Just lv2 == lv3]
-                    lhs' = [x | x@(_,_,lv3) <- lhs, Just lv2 /= lv3]
-                go lv2 lvs2 lhs' s'
-
   let lvs = IS.fromList [lv | (_,_,Just lv) <- lhs']
       s0 = sum [c | (c,_) <- lhs] - rhs
   go (levelRoot - 1) lvs lhs' s0
+
+
+minimizeConflictClause :: Solver -> LitSet -> IO LitSet
+minimizeConflictClause solver lits = do
+  ccmin <- readIORef (svCCMin solver)
+  if ccmin >= 2 then
+     minimizeConflictClauseRecursive solver lits
+   else if ccmin >= 1 then
+     minimizeConflictClauseLocal solver lits
+   else
+     return lits
 
 minimizeConflictClauseLocal :: Solver -> LitSet -> IO LitSet
 minimizeConflictClauseLocal solver lits = do
@@ -2097,7 +2096,7 @@ arminRestartSeq start inc = go (fromIntegral start) (fromIntegral start)
           else (inner * inc, outer)
 
 lubyRestartSeq :: Int -> Double -> [Int]
-lubyRestartSeq start inc = map (ceiling . luby inc) [0..]
+lubyRestartSeq start inc = map (ceiling . (fromIntegral start *) . luby inc) [0..]
 
 {-
   Finite subsequences of the Luby-sequence:
@@ -2111,18 +2110,21 @@ lubyRestartSeq start inc = map (ceiling . luby inc) [0..]
 
 -}
 luby :: Double -> Integer -> Double
-luby y x = go2 size seq x
+luby y x = go2 size1 sequ1 x
   where
     -- Find the finite subsequence that contains index 'x', and the
     -- size of that subsequence:
-    (size, seq) = go 1 0
-    go size seq
-      | size < x+1 = go (2*size+1) (seq+1)
-      | otherwise  = (size, seq)
+    (size1, sequ1) = go 1 0
 
-    go2 size seq x
-      | size-1 /= x = let size' = (size-1) `div` 2 in go2 size' (seq - 1) (x `mod` size')
-      | otherwise = y ^ seq
+    go :: Integer -> Integer -> (Integer, Integer)
+    go size sequ
+      | size < x+1 = go (2*size+1) (sequ+1)
+      | otherwise  = (size, sequ)
+
+    go2 :: Integer -> Integer -> Integer -> Double
+    go2 size sequ x2
+      | size-1 /= x2 = let size' = (size-1) `div` 2 in go2 size' (sequ - 1) (x2 `mod` size')
+      | otherwise = y ^ sequ
 
 
 {--------------------------------------------------------------------
