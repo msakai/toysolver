@@ -3,6 +3,7 @@ module Simplex2
   -- * The @Solver@ type
     Solver
   , newSolver
+  , cloneSolver
 
   -- * Problem specification  
   , newVar
@@ -98,6 +99,32 @@ newSolver = do
     , svNPivot  = npivot
     , svPivotStrategy = pivot
     }
+
+cloneSolver :: Solver -> IO Solver
+cloneSolver solver = do
+  t      <- newIORef =<< readIORef (svTableau solver)
+  l      <- newIORef =<< readIORef (svLB solver)
+  u      <- newIORef =<< readIORef (svUB solver)
+  m      <- newIORef =<< readIORef (svModel solver)
+  v      <- newIORef =<< readIORef (svVCnt solver)
+  ok     <- newIORef =<< readIORef (svOk solver)
+  dir    <- newIORef =<< readIORef (svOptDir solver)
+  logger <- newIORef =<< readIORef (svLogger solver)
+  pivot  <- newIORef =<< readIORef (svPivotStrategy solver)
+  npivot <- newIORef =<< readIORef (svNPivot solver)
+  return $
+    Solver
+    { svTableau = t
+    , svLB      = l
+    , svUB      = u
+    , svModel   = m
+    , svVCnt    = v
+    , svOk      = ok
+    , svOptDir  = dir
+    , svLogger  = logger
+    , svNPivot  = npivot
+    , svPivotStrategy = pivot
+    }  
 
 {-
 Largest coefficient rule: original rule suggested by G. Dantzig.
