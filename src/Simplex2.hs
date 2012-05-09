@@ -1,3 +1,21 @@
+{-# LANGUAGE DoAndIfThenElse #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Simplex2
+-- Copyright   :  (c) Masahiro Sakai 2012
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable (ScopedTypeVariables)
+--
+-- Naïve implementation of Simplex method
+-- 
+-- Reference:
+--
+-- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
+--
+-----------------------------------------------------------------------------
 module Simplex2
   (
   -- * The @Solver@ type
@@ -7,15 +25,20 @@ module Simplex2
 
   -- * Problem specification  
   , newVar
+  , RelOp (..)
+  , (.<=.), (.>=.), (.==.)
+  , Atom (..)
   , assertAtom
   , assertLower
   , assertUpper
   , setObj
+  , OptDir (..)
   , setOptDir
 
   -- * Solving
   , check
   , optimize
+  , dualSimplex
 
   -- * Extract results
   , Model
@@ -26,6 +49,8 @@ module Simplex2
   -- * Reading status
   , isFeasible
   , isOptimal
+  , getLB
+  , getUB
 
   -- * Configulation
   , setLogger
@@ -46,7 +71,9 @@ import Data.OptDir
 import System.CPUTime
 
 import qualified LA as LA
+import LA (Atom (..))
 import qualified Formula as F
+import Formula (RelOp (..), (.<=.), (.>=.), (.==.))
 import Linear
 
 {--------------------------------------------------------------------
@@ -719,97 +746,6 @@ logIO solver action = do
   debug and tests
 --------------------------------------------------------------------}
 
-test1 :: IO ()
-test1 = do
-  solver <- newSolver
-  setLogger solver putStrLn
-  x <- newVar solver
-  y <- newVar solver
-  z <- newVar solver
-  assertAtom solver (LA.Atom (LA.fromTerms [(7,x), (12,y), (31,z)]) F.Eql (LA.constExpr 17))
-  assertAtom solver (LA.Atom (LA.fromTerms [(3,x), (5,y), (14,z)])  F.Eql (LA.constExpr 7))
-  assertAtom solver (LA.Atom (LA.varExpr x) F.Ge (LA.constExpr 1))
-  assertAtom solver (LA.Atom (LA.varExpr x) F.Le (LA.constExpr 40))
-  assertAtom solver (LA.Atom (LA.varExpr y) F.Ge (LA.constExpr (-50)))
-  assertAtom solver (LA.Atom (LA.varExpr y) F.Le (LA.constExpr 50))
-
-  ret <- check solver
-  print ret
-
-  vx <- getValue solver x
-  vy <- getValue solver y
-  vz <- getValue solver z
-  print $ 7*vx + 12*vy + 31*vz == 17
-  print $ 3*vx + 5*vy + 14*vz == 7
-  print $ vx >= 1
-  print $ vx <= 40
-  print $ vy >= -50
-  print $ vy <= 50
-
-test2 :: IO ()
-test2 = do
-  solver <- newSolver
-  setLogger solver putStrLn
-  x <- newVar solver
-  y <- newVar solver
-  assertAtom solver (LA.Atom (LA.fromTerms [(11,x), (13,y)]) F.Ge (LA.constExpr 27))
-  assertAtom solver (LA.Atom (LA.fromTerms [(11,x), (13,y)]) F.Le (LA.constExpr 45))
-  assertAtom solver (LA.Atom (LA.fromTerms [(7,x), (-9,y)]) F.Ge (LA.constExpr (-10)))
-  assertAtom solver (LA.Atom (LA.fromTerms [(7,x), (-9,y)]) F.Le (LA.constExpr 4))
-
-  ret <- check solver
-  print ret
-
-  vx <- getValue solver x
-  vy <- getValue solver y
-  let v1 = 11*vx + 13*vy
-      v2 = 7*vx - 9*vy
-  print $ 27 <= v1 && v1 <= 45
-  print $ -10 <= v2 && v2 <= 4
-
-{-
-Minimize
- obj: - x1 - 2 x2 - 3 x3 - x4
-Subject To
- c1: - x1 + x2 + x3 + 10 x4 <= 20
- c2: x1 - 3 x2 + x3 <= 30
- c3: x2 - 3.5 x4 = 0
-Bounds
- 0 <= x1 <= 40
- 2 <= x4 <= 3
-End
--}
-test3 :: IO ()
-test3 = do
-  solver <- newSolver
-  setLogger solver putStrLn
-  _ <- newVar solver
-  x1 <- newVar solver
-  x2 <- newVar solver
-  x3 <- newVar solver
-  x4 <- newVar solver
-
-  setObj solver (LA.fromTerms [(-1,x1), (-2,x2), (-3,x3), (-1,x4)])
-
-  assertAtom solver (LA.Atom (LA.fromTerms [(-1,x1), (1,x2), (1,x3), (10,x4)]) F.Le (LA.constExpr 20))
-  assertAtom solver (LA.Atom (LA.fromTerms [(1,x1), (-3,x2), (1,x3)]) F.Le (LA.constExpr 30))
-  assertAtom solver (LA.Atom (LA.fromTerms [(1,x2), (-3.5,x4)]) F.Eql (LA.constExpr 0))
-
-  assertAtom solver (LA.Atom (LA.fromTerms [(1,x1)]) F.Ge (LA.constExpr 0))
-  assertAtom solver (LA.Atom (LA.fromTerms [(1,x1)]) F.Le (LA.constExpr 40))
-  assertAtom solver (LA.Atom (LA.fromTerms [(1,x2)]) F.Ge (LA.constExpr 0))
-  assertAtom solver (LA.Atom (LA.fromTerms [(1,x3)]) F.Ge (LA.constExpr 0))
-  assertAtom solver (LA.Atom (LA.fromTerms [(1,x4)]) F.Ge (LA.constExpr 2))
-  assertAtom solver (LA.Atom (LA.fromTerms [(1,x4)]) F.Le (LA.constExpr 3))
-
-  ret1 <- check solver
-  print ret1
-  dump solver
-
-  ret2 <- optimize solver
-  print ret2
-  dump solver
-
 test4 :: IO ()
 test4 = do
   solver <- newSolver
@@ -843,104 +779,6 @@ test5 = do
   ret <- optimize solver
   print ret
   dump solver
-
-{-
-http://www.math.cuhk.edu.hk/~wei/lpch5.pdf
-example 5.7
-
-minimize 3 x1 + 4 x2 + 5 x3
-subject to 
-1 x1 + 2 x2 + 3 x3 >= 5
-2 x1 + 2 x2 + 1 x3 >= 6
-
-optimal value is 11
--}
-test6 :: IO ()
-test6 = do
-  solver <- newSolver
-  setLogger solver putStrLn
-  _  <- newVar solver
-  x1 <- newVar solver
-  x2 <- newVar solver
-  x3 <- newVar solver
-
-  assertLower solver x1 0
-  assertLower solver x2 0
-  assertLower solver x3 0
-  assertAtom solver (LA.Atom (LA.fromTerms [(1,x1),(2,x2),(3,x3)]) F.Ge (LA.constExpr 5))
-  assertAtom solver (LA.Atom (LA.fromTerms [(2,x1),(2,x2),(1,x3)]) F.Ge (LA.constExpr 6))
-
-  setObj solver (LA.fromTerms [(3,x1),(4,x2),(5,x3)])
-  setOptDir solver OptMin
-  dump solver
-  checkOptimality solver
-  log solver "ok"
-
-  ret <- dualSimplex solver
-  print ret
-  dump solver
-
-{-
-http://www.math.cuhk.edu.hk/~wei/lpch5.pdf
-example 5.7
-
-maximize -3 x1 -4 x2 -5 x3
-subject to 
--1 x1 -2 x2 -3 x3 <= -5
--2 x1 -2 x2 -1 x3 <= -6
-
-optimal value should be -11
--}
-test7 :: IO ()
-test7 = do
-  solver <- newSolver
-  setLogger solver putStrLn
-  _  <- newVar solver
-  x1 <- newVar solver
-  x2 <- newVar solver
-  x3 <- newVar solver
-
-  assertLower solver x1 0
-  assertLower solver x2 0
-  assertLower solver x3 0
-  assertAtom solver (LA.Atom (LA.fromTerms [(-1,x1),(-2,x2),(-3,x3)]) F.Le (LA.constExpr (-5)))
-  assertAtom solver (LA.Atom (LA.fromTerms [(-2,x1),(-2,x2),(-1,x3)]) F.Le (LA.constExpr (-6)))
-
-  setObj solver (LA.fromTerms [(-3,x1),(-4,x2),(-5,x3)])
-  setOptDir solver OptMax
-  dump solver
-  checkOptimality solver
-  log solver "ok"
-
-  ret <- dualSimplex solver
-  print ret
-  dump solver
-
-testAssertAtom :: IO ()
-testAssertAtom = do
-  solver <- newSolver
-  x0 <- newVar solver
-  assertAtom solver (LA.Atom (LA.constExpr 1) F.Le (LA.varExpr x0))
-  ret <- getLB solver x0
-  print $ ret == Just 1
-
-  solver <- newSolver
-  x0 <- newVar solver
-  assertAtom solver (LA.Atom (LA.varExpr x0) F.Ge (LA.constExpr 1))
-  ret <- getLB solver x0
-  print $ ret == Just 1
-
-  solver <- newSolver
-  x0 <- newVar solver
-  assertAtom solver (LA.Atom (LA.constExpr 1) F.Ge (LA.varExpr x0))
-  ret <- getUB solver x0
-  print $ ret == Just 1
-
-  solver <- newSolver
-  x0 <- newVar solver
-  assertAtom solver (LA.Atom (LA.varExpr x0) F.Le (LA.constExpr 1))
-  ret <- getUB solver x0
-  print $ ret == Just 1
 
 dumpSize :: Solver -> IO ()
 dumpSize solver = do
