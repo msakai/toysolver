@@ -96,8 +96,8 @@ import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
-import qualified Data.Sequence as Seq
 import qualified IndexedPriorityQueue as PQ
+import qualified SeqQueue as SQ
 import System.CPUTime
 import Text.Printf
 import LBool
@@ -359,7 +359,7 @@ data Solver
   , svLearntDB     :: !(IORef (Int,[SomeConstraint]))
   , svAssumptions  :: !(IORef (IOUArray Int Lit))
   , svLevel        :: !(IORef Level)
-  , svBCPQueue     :: !(IORef (Seq.Seq Lit))
+  , svBCPQueue     :: !(SQ.SeqQueue Lit)
   , svModel        :: !(IORef (Maybe Model))
   , svNDecision    :: !(IORef Int)
   , svNConflict    :: !(IORef Int)
@@ -403,17 +403,10 @@ markBad :: Solver -> IO ()
 markBad solver = writeIORef (svOk solver) False
 
 bcpEnqueue :: Solver -> Lit -> IO ()
-bcpEnqueue solver l = modifyIORef (svBCPQueue solver) (Seq.|> l)
+bcpEnqueue solver l = SQ.enqueue (svBCPQueue solver) l
 
 bcpDequeue :: Solver -> IO (Maybe Lit)
-bcpDequeue solver = do
-  let ref = svBCPQueue solver
-  ls <- readIORef ref
-  case Seq.viewl ls of
-    Seq.EmptyL -> return Nothing
-    l Seq.:< ls' -> do
-      writeIORef ref ls'
-      return (Just l)
+bcpDequeue solver = SQ.dequeue (svBCPQueue solver)
 
 assignBy :: Constraint c => Solver -> Lit -> c -> IO Bool
 assignBy solver lit c = assign_ solver lit (Just (toConstraint c))
@@ -614,7 +607,7 @@ newSolver = do
   db2 <- newIORef (0,[])
   as  <- newIORef =<< newArray_ (0,-1)
   lv  <- newIORef levelRoot
-  q   <- newIORef Seq.empty
+  q   <- SQ.newFifo
   m   <- newIORef Nothing
   ndecision <- newIORef 0
   nconflict <- newIORef 0
@@ -1456,8 +1449,8 @@ backtrackTo solver level = do
   when debugMode $ log solver $ printf "backtrackTo: %d" level
   m <- readIORef (svTrail solver)
   m' <- loop m
+  SQ.clear (svBCPQueue solver)
   writeIORef (svTrail solver) m'
-  writeIORef (svBCPQueue solver) Seq.empty
   writeIORef (svLevel solver) level
   where
     loop :: LevelMap [Lit] -> IO (LevelMap [Lit])

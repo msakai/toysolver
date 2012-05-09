@@ -105,6 +105,7 @@ Executable toysat
      LPFile
      PBFile
      IndexedPriorityQueue
+     SeqQueue
      Linearizer
      SAT.Integer
   Build-Depends: base >=4 && <5, containers >= 0.4.2, array, parsec, bytestring, parse-dimacs, queue, OptDir, time, old-locale
