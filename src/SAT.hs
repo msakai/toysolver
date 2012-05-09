@@ -892,7 +892,7 @@ solve_ solver = do
       learntSizeInc <- readIORef (svLearntSizeInc solver)
       nc <- nClauses solver
       nv <- nVars solver
-      let learntSizeSeq   = iterate (ceiling . (learntSizeInc*) . fromIntegral) (max (nc + 2*nv) 16)
+      let learntSizeSeq   = iterate (ceiling . (learntSizeInc*) . fromIntegral) (max ((nc + nv) `div` 3) 16)
       let learntSizeAdjSeq = iterate (\x -> (x * 3) `div` 2) (100::Int)
       nextLearntSize    <- gen learntSizeSeq
       nextLearntSizeAdj <- gen learntSizeAdjSeq
