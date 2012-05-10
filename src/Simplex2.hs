@@ -23,7 +23,8 @@ module Simplex2
   , newSolver
   , cloneSolver
 
-  -- * Problem specification  
+  -- * Problem specification
+  , Var
   , newVar
   , RelOp (..)
   , (.<=.), (.>=.), (.==.)
@@ -34,6 +35,7 @@ module Simplex2
   , setObj
   , OptDir (..)
   , setOptDir
+  , getOptDir
 
   -- * Solving
   , check
@@ -246,6 +248,9 @@ setObj solver e = do
 setOptDir :: Solver -> OptDir -> IO ()
 setOptDir solver dir = writeIORef (svOptDir solver) dir
 
+getOptDir :: Solver -> IO OptDir
+getOptDir solver = readIORef (svOptDir solver)
+
 {--------------------------------------------------------------------
   Satisfiability solving
 --------------------------------------------------------------------}
@@ -407,7 +412,7 @@ dualSimplex solver = do
 
   ok <- readIORef (svOk solver)
   if not ok
-  then return False
+  then return False -- unsat
   else do
     log solver "dual simplex"
     result <- recordTime solver loop
@@ -453,7 +458,7 @@ optimize :: Solver -> IO Bool
 optimize solver = do
   ret <- check solver
   if not ret
-    then return False
+    then return False -- unsat
     else do
       log solver "optimize"
       result <- recordTime solver loop
