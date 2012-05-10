@@ -35,6 +35,7 @@ import qualified Cooper
 import qualified MIPSolverHL
 import qualified LPFile as LP
 import qualified Simplex2
+import qualified MIPSolver2
 
 -- ---------------------------------------------------------------------------
 
@@ -55,7 +56,7 @@ options :: [OptDescr Flag]
 options =
     [ Option ['h'] ["help"]    (NoArg Help)            "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
-    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, simplex2"
+    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, simplex2, mip2"
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex2 solver (default: bland-rule)"
 {-
@@ -84,7 +85,8 @@ run solver opt lp = do
 
   case solver of
     _ | solver `elem` ["omega-test", "cooper"] -> solveByQE
-    _ | solver == "simplex2" -> solveBySimplex2
+    _ | solver == "simplex2" -> solveBySimplex2 False
+    _ | solver == "mip2" -> solveBySimplex2 True
     _ -> solveByMIP
   where
     vs = LP.variables lp
@@ -161,7 +163,7 @@ run solver opt lp = do
           putStrLn "s OPTIMUM FOUND"
           printModel m vs
 
-    solveBySimplex2 = do
+    solveBySimplex2 isMIP = do
       solver <- Simplex2.newSolver
 
       let ps = last ("bland-rule" : [s | PivotStrategy s <- opt])
@@ -178,24 +180,43 @@ run solver opt lp = do
       forM_ (cs1 ++ cs2 ++ cs3) $ \c -> do
         Simplex2.assertAtom solver $ fromJust (LA.compileAtom c)
       putStrLn "done" >> hFlush stdout
-      ret <- Simplex2.check solver
-      if not ret then do
-        putStrLn "s UNSATISFIABLE"
-        exitFailure
-      else do
-        putStrLn "c SATISFIABLE" >> hFlush stdout
-        ret2 <- Simplex2.optimize solver
-        case ret2 of
-          Simplex2.Unsat -> error "should not happen"
-          Simplex2.Unbounded -> do
-            putStrLn "s UNBOUNDED"
+
+      if not isMIP
+        then do
+          ret <- Simplex2.check solver
+          if not ret then do
+            putStrLn "s UNSATISFIABLE"
             exitFailure
-          Simplex2.Optimum -> do
-            m <- Simplex2.model solver
-            r <- Simplex2.getObjValue solver
-            putStrLn $ "o " ++ showValue r
-            putStrLn "s OPTIMUM FOUND"
-            printModel m vs
+          else do
+            putStrLn "c SATISFIABLE" >> hFlush stdout
+            ret2 <- Simplex2.optimize solver
+            case ret2 of
+              Simplex2.Unsat -> error "should not happen"
+              Simplex2.Unbounded -> do
+                putStrLn "s UNBOUNDED"
+                exitFailure
+              Simplex2.Optimum -> do
+                m <- Simplex2.model solver
+                r <- Simplex2.getObjValue solver
+                putStrLn $ "o " ++ showValue r
+                putStrLn "s OPTIMUM FOUND"
+                printModel m vs
+        else do
+          mip <- MIPSolver2.newSolver solver ivs
+          ret <- MIPSolver2.optimize mip
+          case ret of
+            Simplex2.Unsat -> do
+              putStrLn "s UNSATISFIABLE"
+              exitFailure
+            Simplex2.Unbounded -> do
+              putStrLn "s UNBOUNDED"
+              exitFailure
+            Simplex2.Optimum -> do
+              m <- MIPSolver2.model mip
+              r <- MIPSolver2.getObjValue mip
+              putStrLn $ "o " ++ showValue r
+              putStrLn "s OPTIMUM FOUND"
+              printModel m vs
 
     printModel :: Model Rational -> Set.Set String -> IO ()
     printModel m vs =
