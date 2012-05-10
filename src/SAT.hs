@@ -249,7 +249,6 @@ cardinalityReduction (lhs,rhs) = (ls, rhs')
 --------------------------------------------------------------------}
 
 type Level = Int
-type LevelMap = IM.IntMap
 
 levelRoot :: Level
 levelRoot = -1
@@ -352,7 +351,7 @@ data Solver
   = Solver
   { svOk           :: !(IORef Bool)
   , svVarQueue     :: !PQ.PriorityQueue
-  , svTrail        :: !(IORef (LevelMap [Lit]))
+  , svTrail        :: !(IORef [Lit])
   , svVarCounter   :: !(IORef Int)
   , svVarData      :: !(IORef (IOArray Int VarData))
   , svClauseDB     :: !(IORef [SomeConstraint])
@@ -432,7 +431,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
         , aBacktrackCBs = bt
         }
 
-      modifyIORef (svTrail solver) (IM.insertWith (++) lv [lit])
+      modifyIORef (svTrail solver) (lit:)
       modifyIORef' (svNAssigns solver) (+1)
       bcpEnqueue solver lit
 
@@ -600,7 +599,7 @@ newSolver = do
  rec
   ok   <- newIORef True
   vcnt <- newIORef 1
-  trail <- newIORef IM.empty
+  trail <- newIORef []
   vars <- newIORef =<< newArray_ (1,0)
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
@@ -1436,30 +1435,28 @@ minimizeConflictClauseRecursive solver lits = do
 popTrail :: Solver -> IO (Maybe Lit)
 popTrail solver = do
   m <- readIORef (svTrail solver)
-  case IM.maxViewWithKey m of
-    Just ((d, l:ls), m2) -> do
-      writeIORef (svTrail solver) (IM.insert d ls m2)
+  case m of
+    []   -> return Nothing
+    l:ls -> do
+      writeIORef (svTrail solver) ls
       return $ Just l
-    _ -> return Nothing
 
 -- | Revert to the state at given level
 -- (keeping all assignment at @level@ but not beyond).
 backtrackTo :: Solver -> Int -> IO ()
 backtrackTo solver level = do
   when debugMode $ log solver $ printf "backtrackTo: %d" level
-  m <- readIORef (svTrail solver)
-  m' <- loop m
+  writeIORef (svTrail solver) =<< loop =<< readIORef (svTrail solver)
   SQ.clear (svBCPQueue solver)
-  writeIORef (svTrail solver) m'
   writeIORef (svLevel solver) level
   where
-    loop :: LevelMap [Lit] -> IO (LevelMap [Lit])
-    loop m =
-      case IM.maxViewWithKey m of
-        Just ((lv,lits),m') | level < lv -> do
-          forM_ lits $ \lit -> unassign solver (litVar lit)
-          loop m'
-        _ -> return m
+    loop :: [Lit] -> IO [Lit]
+    loop [] = return []
+    loop lls@(l:ls) = do
+      lv <- litLevel solver l
+      if lv <= level
+        then return lls
+        else unassign solver (litVar l) >> loop ls
 
 constructModel :: Solver -> IO ()
 constructModel solver = do
