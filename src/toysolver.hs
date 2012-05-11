@@ -185,15 +185,17 @@ run solver opt lp = do
       else do
         putStrLn "c SATISFIABLE" >> hFlush stdout
         ret2 <- Simplex2.optimize solver
-        if not ret2 then do
-          putStrLn "s UNBOUNDED"
-          exitFailure
-        else do
-          m <- Simplex2.model solver
-          r <- Simplex2.getObjValue solver
-          putStrLn $ "o " ++ showValue r
-          putStrLn "s OPTIMUM FOUND"
-          printModel m vs
+        case ret2 of
+          Simplex2.Unsat -> error "should not happen"
+          Simplex2.Unbounded -> do
+            putStrLn "s UNBOUNDED"
+            exitFailure
+          Simplex2.Optimum -> do
+            m <- Simplex2.model solver
+            r <- Simplex2.getObjValue solver
+            putStrLn $ "o " ++ showValue r
+            putStrLn "s OPTIMUM FOUND"
+            printModel m vs
 
     printModel :: Model Rational -> Set.Set String -> IO ()
     printModel m vs =

@@ -39,6 +39,7 @@ module Simplex2
 
   -- * Solving
   , check
+  , OptResult (..)
   , optimize
   , dualSimplex
 
@@ -49,6 +50,9 @@ module Simplex2
   , getObjValue
 
   -- * Reading status
+  , getTableau
+  , nVars
+  , isBasicVariable
   , isFeasible
   , isOptimal
   , getLB
@@ -255,6 +259,18 @@ getOptDir :: Solver -> IO OptDir
 getOptDir solver = readIORef (svOptDir solver)
 
 {--------------------------------------------------------------------
+  Status
+--------------------------------------------------------------------}
+
+nVars :: Solver -> IO Int
+nVars solver = readIORef (svVCnt solver)
+
+isBasicVariable :: Solver -> Var -> IO Bool
+isBasicVariable solver v = do
+  t <- readIORef (svTableau solver)
+  return $ v `IM.member` t
+
+{--------------------------------------------------------------------
   Satisfiability solving
 --------------------------------------------------------------------}
 
@@ -326,10 +342,10 @@ check solver = do
     when result $ checkFeasibility solver
     return result
 
-dualSimplex :: Solver -> IO Bool
+dualSimplex :: Solver -> IO OptResult
 dualSimplex solver = do
   let
-    loop :: IO Bool
+    loop :: IO OptResult
     loop = do
       checkOptimality solver
 
@@ -337,7 +353,7 @@ dualSimplex solver = do
       m <- selectViolatingBasicVariable solver
 
       case m of
-        Nothing -> return True
+        Nothing -> return Optimum
         Just xi  -> do
           li <- getLB solver xi
           vi <- getValue solver xi
@@ -372,7 +388,7 @@ dualSimplex solver = do
                       _ -> return $ Just $ fst $ minimumBy (compare `on` snd) ws
               r <- find
               case r of
-                Nothing -> markBad solver >> return False
+                Nothing -> markBad solver >> return Unsat
                 Just xj -> do
                   l <- getLB solver xi
                   pivotAndUpdate solver xi xj (fromJust l)
@@ -407,7 +423,7 @@ dualSimplex solver = do
                       _ -> return $ Just $ fst $ minimumBy (compare `on` snd) ws
               r <- find
               case r of
-                Nothing -> markBad solver >> return False
+                Nothing -> markBad solver >> return Unsat
                 Just xj -> do
                   u <- getUB solver xi
                   pivotAndUpdate solver xi xj (fromJust u)
@@ -415,11 +431,11 @@ dualSimplex solver = do
 
   ok <- readIORef (svOk solver)
   if not ok
-  then return False -- unsat
+  then return Unsat
   else do
     log solver "dual simplex"
     result <- recordTime solver loop
-    when result $ checkFeasibility solver
+    when (result == Optimum) $ checkFeasibility solver
     return result
 
 -- select the smallest basic variable xi such that β(xi) < li or β(xi) > ui
@@ -457,23 +473,27 @@ selectViolatingBasicVariable solver = do
   Optimization
 --------------------------------------------------------------------}
 
-optimize :: Solver -> IO Bool
+-- | results of optimization
+data OptResult = Optimum | Unsat | Unbounded
+  deriving (Show, Eq, Ord)
+
+optimize :: Solver -> IO OptResult
 optimize solver = do
   ret <- check solver
   if not ret
-    then return False -- unsat
+    then return Unsat -- unsat
     else do
       log solver "optimize"
       result <- recordTime solver loop
-      when result $ checkOptimality solver
+      when (result == Optimum) $ checkOptimality solver
       return result
   where
-    loop :: IO Bool
+    loop :: IO OptResult
     loop = do
       checkFeasibility solver
       ret <- selectEnteringVariable solver
       case ret of
-       Nothing -> return True -- finished
+       Nothing -> return Optimum
        Just (c,xj) -> do
          dir <- readIORef (svOptDir solver)
          r <- if dir==OptMin
@@ -485,7 +505,7 @@ optimize solver = do
                 else decreaseNB solver xj -- xj を小さくして目的関数を大きくする
          if r
            then loop
-           else return False -- unbounded
+           else return Unbounded
 
 selectEnteringVariable :: Solver -> IO (Maybe (Rational, Var))
 selectEnteringVariable solver = do
@@ -661,6 +681,11 @@ getUB solver x = do
   ub <- readIORef (svUB solver)
   return $ IM.lookup x ub
 
+getTableau :: Solver -> IO (IM.IntMap (LA.Expr Rational))
+getTableau solver = do
+  t <- readIORef (svTableau solver)
+  return $ IM.delete objVar t
+
 getValue :: Solver -> Var -> IO Rational
 getValue solver x = do
   m <- readIORef (svModel solver)
@@ -710,7 +735,7 @@ testUB (Just u) x = x <= u
 
 variables :: Solver -> IO [Var]
 variables solver = do
-  vcnt <- readIORef (svVCnt solver)
+  vcnt <- nVars solver
   return [0..vcnt-1]
 
 modifyIORef' :: IORef a -> (a -> a) -> IO ()
