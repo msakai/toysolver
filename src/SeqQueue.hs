@@ -4,6 +4,7 @@ module SeqQueue
   , NewFifo (..)
   , Enqueue (..)
   , Dequeue (..)
+  , QueueSize (..)
   , clear
   ) where
 
@@ -36,6 +37,11 @@ instance Dequeue (SeqQueue a) IO a where
     s <- readIORef ref
     writeIORef ref Seq.empty
     return (toList s)
+
+instance QueueSize (SeqQueue a) IO where
+  queueSize (SeqQueue ref) = do
+    s <- readIORef ref
+    return $! Seq.length s
 
 clear :: SeqQueue a -> IO ()
 clear (SeqQueue ref) = do
