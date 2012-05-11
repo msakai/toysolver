@@ -195,7 +195,10 @@ assertAtom solver (LA.Atom lhs op rhs) = do
       _ -> do
         v <- newVar solver
         t <- readIORef (svTableau solver)
-        modifyIORef (svTableau solver) (IM.insert v (LA.applySubst t lhs'))
+        let def = LA.applySubst t lhs'
+        modifyIORef (svTableau solver) (IM.insert v def)
+        m <- readIORef (svModel solver)
+        modifyIORef (svModel solver) (IM.insert v (LA.evalExpr m def))
         return (v,op,rhs')
   case op of
     F.Le  -> assertUpper solver v rhs'
