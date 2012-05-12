@@ -51,6 +51,7 @@ module Simplex2
 
   -- * Reading status
   , getTableau
+  , getRow
   , nVars
   , isBasicVariable
   , isFeasible
@@ -62,6 +63,9 @@ module Simplex2
   , setLogger
   , PivotStrategy (..)
   , setPivotStrategy
+
+  -- * Debug
+  , dump
   ) where
 
 import Prelude hiding (log)
@@ -301,7 +305,7 @@ check solver = do
 
                   find :: IO (Maybe Var)
                   find = do
-                    xi_def <- getDef solver xi
+                    xi_def <- getRow solver xi
                     liftM (fmap snd) $ findM q (LA.terms xi_def)
               r <- find
               case r of
@@ -323,7 +327,7 @@ check solver = do
 
                   find :: IO (Maybe Var)
                   find = do
-                    xi_def <- getDef solver xi
+                    xi_def <- getRow solver xi
                     liftM (fmap snd) $ findM q (LA.terms xi_def)
               r <- find
               case r of
@@ -372,8 +376,8 @@ dualSimplex solver = do
                   find :: IO (Maybe Var)
                   find = do
                     dir <- readIORef (svOptDir solver)
-                    obj_def <- getDef solver objVar
-                    xi_def  <- getDef solver xi
+                    obj_def <- getRow solver objVar
+                    xi_def  <- getRow solver xi
                     ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
                       b <- q (aij, xj)
                       if b
@@ -407,8 +411,8 @@ dualSimplex solver = do
                   find :: IO (Maybe Var)
                   find = do
                     dir <- readIORef (svOptDir solver)
-                    obj_def <- getDef solver objVar
-                    xi_def  <- getDef solver xi
+                    obj_def <- getRow solver objVar
+                    xi_def  <- getRow solver xi
                     ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
                       b <- q (aij, xj)
                       if b
@@ -510,7 +514,7 @@ optimize solver = do
 selectEnteringVariable :: Solver -> IO (Maybe (Rational, Var))
 selectEnteringVariable solver = do
   ps <- readIORef (svPivotStrategy solver)
-  obj_def <- getDef solver objVar
+  obj_def <- getRow solver objVar
   case ps of
     PivotStrategyBlandRule ->
       findM canEnter (LA.terms obj_def)
@@ -691,15 +695,15 @@ getValue solver x = do
   m <- readIORef (svModel solver)
   return $ m IM.! x
 
-getDef :: Solver -> Var -> IO (LA.Expr Rational)
-getDef solver x = do
+getRow :: Solver -> Var -> IO (LA.Expr Rational)
+getRow solver x = do
   -- x should be basic variable or 'objVar'
   t <- readIORef (svTableau solver)
   return $! (t IM.! x)
 
 getCoeff :: Solver -> Var -> Var -> IO Rational
 getCoeff solver xi xj = do
-  xi_def <- getDef solver xi
+  xi_def <- getRow solver xi
   return $! LA.coeff xj xi_def
 
 isBasic  :: Solver -> Var -> IO Bool
@@ -864,7 +868,7 @@ isFeasible solver = do
 
 isOptimal :: Solver -> IO Bool
 isOptimal solver = do
-  obj <- getDef solver objVar
+  obj <- getRow solver objVar
   ret <- selectEnteringVariable solver
   return $! isNothing ret
 
