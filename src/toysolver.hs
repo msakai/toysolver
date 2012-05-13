@@ -18,6 +18,7 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Ratio
+import qualified Data.Version as V
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Data.IntMap as IM
@@ -37,6 +38,7 @@ import qualified MIPSolverHL
 import qualified LPFile as LP
 import qualified Simplex2
 import qualified MIPSolver2
+import Version
 
 -- ---------------------------------------------------------------------------
 
@@ -66,12 +68,6 @@ options =
              "enable/disable trace"
 -}
     ]
-
-version :: [Int]
-version = [0,0,1]
-
-versionStr :: String
-versionStr = intercalate "." $ map show $ version
 
 header :: String
 header = "Usage: toysolver [OPTION...] file.lp"
@@ -227,7 +223,7 @@ main = do
   case getOpt Permute options args of
     (o,_,[])
       | Help `elem` o    -> putStrLn (usageInfo header options)
-      | Version `elem` o -> putStrLn versionStr
+      | Version `elem` o -> putStrLn (V.showVersion version)
     (o,[fname],[]) -> do
       ret <- LP.parseFile fname
       case ret of

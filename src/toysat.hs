@@ -50,10 +50,11 @@ import qualified PBFile
 import qualified LPFile
 import qualified Linearizer as Lin
 import qualified SAT.Integer
+import Version
 
 -- ------------------------------------------------------------------------
 
-data Mode = ModeHelp | ModeSAT | ModePB | ModeWBO | ModeMaxSAT | ModeLP
+data Mode = ModeHelp | ModeVersion | ModeSAT | ModePB | ModeWBO | ModeMaxSAT | ModeLP
 
 data Options
   = Options
@@ -89,6 +90,8 @@ defaultOptions
 options :: [OptDescr (Options -> Options)]
 options =
     [ Option ['h'] ["help"]   (NoArg (\opt -> opt{ optMode = ModeHelp   })) "show help"
+    , Option [] ["version"]   (NoArg (\opt -> opt{ optMode = ModeVersion})) "show version"
+
     , Option []    ["pb"]     (NoArg (\opt -> opt{ optMode = ModePB     })) "solve pseudo boolean problems in .pb file"
     , Option []    ["wbo"]    (NoArg (\opt -> opt{ optMode = ModeWBO    })) "solve weighted boolean optimization problem in .opb file"
     , Option []    ["maxsat"] (NoArg (\opt -> opt{ optMode = ModeMaxSAT })) "solve MaxSAT problem in .cnf or .wcnf file"
@@ -166,6 +169,7 @@ main = do
       solver <- newSolver opt
       case optMode opt of
         ModeHelp   -> showHelp stdout
+        ModeVersion -> hPutStrLn stdout (showVersion version)
         ModeSAT    -> mainSAT opt solver args2
         ModePB     -> mainPB opt solver args2
         ModeWBO    -> mainWBO opt solver args2
