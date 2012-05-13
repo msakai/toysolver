@@ -50,6 +50,7 @@ module LA
   ) where
 
 import Control.Monad
+import Control.DeepSeq
 import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
@@ -94,6 +95,9 @@ instance (Num r, Read r) => Read (Expr r) where
     ("fromTerms",s) <- lex r
     (xs,t) <- reads s
     return (fromTerms xs, t)
+
+instance NFData r => NFData (Expr r) where
+  rnf (Expr m) = rnf m
 
 -- | Special variable that should always be evaluated to 1.
 unitVar :: Var

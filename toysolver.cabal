@@ -43,7 +43,7 @@ Executable toysolver
      MIPSolver2
      Util
      Version
-  Build-Depends: base >=4 && <5, mtl, containers, parsec, OptDir, stm >=2.3
+  Build-Depends: base >=4 && <5, mtl, containers, parsec, OptDir, deepseq, stm >=2.3
   Extensions:
      BangPatterns
      ScopedTypeVariables
