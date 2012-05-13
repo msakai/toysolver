@@ -126,7 +126,8 @@ optimize solver update = do
   if not ret
   then return Unsat
   else do
-    log solver "MIP: LP relaxation is satisfiable"
+    s0 <- showValue solver =<< Simplex2.getObjValue lp
+    log solver (printf "MIP: LP relaxation is satisfiable with obj = %s" s0)
     log solver "MIP: Optimizing LP relaxation"
     ret2 <- Simplex2.optimize lp
     case ret2 of
