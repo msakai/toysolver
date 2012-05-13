@@ -172,14 +172,16 @@ run solver opt lp = do
         "largest-coefficient" -> Simplex2.setPivotStrategy solver Simplex2.PivotStrategyLargestCoefficient
         _ -> error ("unknown pivot strategy \"" ++ ps ++ "\"")
 
-      Simplex2.setLogger solver (\s -> putStr "c " >> putStrLn s >> hFlush stdout)
+      let logger s = putStr "c " >> putStrLn s >> hFlush stdout
+
+      Simplex2.setLogger solver logger
       replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
       Simplex2.setOptDir solver (LP.dir lp)
       Simplex2.setObj solver $ fromJust (LA.compileExpr obj)
-      putStr "Loading constraints... " >> hFlush stdout
+      logger "Loading constraints... "
       forM_ (cs1 ++ cs2 ++ cs3) $ \c -> do
         Simplex2.assertAtom solver $ fromJust (LA.compileAtom c)
-      putStrLn "done" >> hFlush stdout
+      logger "Loading constraints finished"
 
       if not isMIP
         then do
@@ -203,7 +205,11 @@ run solver opt lp = do
                 printModel m vs
         else do
           mip <- MIPSolver2.newSolver solver ivs
-          ret <- MIPSolver2.optimize mip
+          MIPSolver2.setShowRational mip printRat
+          MIPSolver2.setLogger mip logger
+          let update m val = do
+                putStrLn $ "o " ++ showValue val
+          ret <- MIPSolver2.optimize mip update
           case ret of
             Simplex2.Unsat -> do
               putStrLn "s UNSATISFIABLE"
@@ -214,7 +220,6 @@ run solver opt lp = do
             Simplex2.Optimum -> do
               m <- MIPSolver2.model mip
               r <- MIPSolver2.getObjValue mip
-              putStrLn $ "o " ++ showValue r
               putStrLn "s OPTIMUM FOUND"
               printModel m vs
 
