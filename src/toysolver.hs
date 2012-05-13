@@ -14,6 +14,7 @@
 module Main where
 
 import Control.Monad
+import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Ratio
@@ -56,7 +57,7 @@ options :: [OptDescr Flag]
 options =
     [ Option ['h'] ["help"]    (NoArg Help)            "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
-    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, simplex2, mip2"
+    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, old-mip"
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex2 solver (default: bland-rule)"
 {-
@@ -83,10 +84,10 @@ run solver opt lp = do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure
 
-  case solver of
-    _ | solver `elem` ["omega-test", "cooper"] -> solveByQE
-    _ | solver `elem` ["simplex2", "mip2"] -> solveByMIP2
-    _ -> solveByMIP
+  case map toLower solver of
+    s | s `elem` ["omega-test", "cooper"] -> solveByQE
+    s | s `elem` ["old-mip"] -> solveByMIP
+    _ -> solveByMIP2
   where
     vs = LP.variables lp
     vsAssoc = zip (Set.toList vs) [0..]
