@@ -76,6 +76,7 @@ Executable toysat
      Linearizer
      SAT.Integer
      SAT.Types
+     SAT.TheorySolver
      Version
   Build-Depends: base >=4 && <5, mtl, containers >= 0.4.2, array, parsec, bytestring, parse-dimacs, queue, OptDir, time, old-locale
   Extensions:
