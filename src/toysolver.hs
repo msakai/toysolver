@@ -49,11 +49,6 @@ data Flag
     | PrintRational
     | PivotStrategy String
     | NThread !Int
-{-
-    | SatMode
-    | Load String
-    | Trace String
--}
     deriving Eq
 
 options :: [OptDescr Flag]
@@ -64,11 +59,6 @@ options =
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
     , Option [] ["threads"] (ReqArg (NThread . read) "INTEGER") "number of threads to use"
-{-
-    , Option ['l'] ["load"]    (ReqArg Load "FILE") "load FILE"
-    , Option ['t'] ["trace"]    (OptArg (Trace . fromMaybe "on") "[on|off]")
-             "enable/disable trace"
--}
     ]
 
 header :: String
