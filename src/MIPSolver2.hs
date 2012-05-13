@@ -1,7 +1,35 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  MIPSolver2
+-- Copyright   :  (c) Masahiro Sakai 2012
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-- Naïve implementation of MIP solver based on Simplex2 module
+-- 
+-- Reference:
+--
+-- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
+-- 
+-- * R. C. Daniel and Martyn Jeffreys.
+--   "Unboundedness in Integer and Discrete Programming L.P. Relaxations"
+--   The Journal of the Operational Research Society, Vol. 30, No. 12. (1979)
+--   <http://www.jstor.org/stable/3009435>
+-- 
+-----------------------------------------------------------------------------
 module MIPSolver2
-  ( Solver
+  (
+  -- * The @Solver@ type
+    Solver
   , newSolver
+
+  -- * Solving
   , optimize
+
+  -- * Extract results
   , model
   , getObjValue
 

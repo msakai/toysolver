@@ -1,7 +1,26 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  SeqQueue
+-- Copyright   :  (c) Masahiro Sakai 2012
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses)
+--
+-- Queue implemented using IORef and Sequence.
+-- 
+-----------------------------------------------------------------------------
 module SeqQueue
-  ( SeqQueue
+  (
+  -- * SeqQueue type
+    SeqQueue
+
+  -- * Constructors
   , NewFifo (..)
+
+  -- * Operators  
   , Enqueue (..)
   , Dequeue (..)
   , QueueSize (..)

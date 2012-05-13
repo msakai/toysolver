@@ -7,13 +7,23 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables)
+-- Portability :  non-portable (DoAndIfThenElse)
 --
 -- Naïve implementation of Simplex method
 -- 
 -- Reference:
 --
 -- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
+-- 
+-- * Bruno Dutertre and Leonardo de Moura.
+--   A Fast Linear-Arithmetic Solver for DPLL(T).
+--   Computer Aided Verification In Computer Aided Verification, Vol. 4144 (2006), pp. 81-94.
+--   <http://yices.csl.sri.com/cav06.pdf>
+--
+-- * Bruno Dutertre and Leonardo de Moura.
+--   Integrating Simplex with DPLL(T).
+--   CSL Technical Report SRI-CSL-06-01. 2006.
+--   <http://yices.csl.sri.com/sri-csl-06-01.pdf>
 --
 -----------------------------------------------------------------------------
 module Simplex2
@@ -97,7 +107,7 @@ data Solver
   { svTableau :: !(IORef (IM.IntMap (LA.Expr Rational)))
   , svLB      :: !(IORef (IM.IntMap Rational))
   , svUB      :: !(IORef (IM.IntMap Rational))
-  , svModel   :: !(IORef (IM.IntMap Rational))
+  , svModel   :: !(IORef Model)
   , svVCnt    :: !(IORef Int)
   , svOk      :: !(IORef Bool)
   , svOptDir  :: !(IORef OptDir)

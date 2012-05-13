@@ -17,6 +17,8 @@ module IndexedPriorityQueue
   (
   -- * PriorityQueue type
     PriorityQueue
+  , Value
+  , Index
 
   -- * Constructors
   , newPriorityQueue
