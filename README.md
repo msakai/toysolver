@@ -24,7 +24,7 @@ Usage: toysolver [OPTION...] file.lp
 
     -h  --help           show help
     -v  --version        show version number
-        --solver=SOLVER  mip (default), omega-test, cooper
+        --solver=SOLVER  mip (default), omega-test, cooper, old-mip
 
 ### toysat
 
@@ -56,11 +56,11 @@ Usage: lp2yice [file.lp|-]
         --optimize  output optimiality condition which uses quantifiers
         --no-check  do not output "(check)"
 
-### dimacs2lp
+### cnf2lp
 
 Converter from DIMACS .cnf file to .lp file.
 
-Usage: dimacs2lp [file.cnf|-]
+Usage: cnf2lp [file.cnf|-]
 
 ### maxsat2lp
 

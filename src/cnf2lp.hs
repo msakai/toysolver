@@ -96,4 +96,4 @@ main = do
       hPutStrLn stderr $ concat errs ++ usageInfo header options
 
 header :: String
-header = "Usage: dimacs2lp [file.cnf|-]"
+header = "Usage: cnf2lp [file.cnf|-]"
