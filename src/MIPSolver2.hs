@@ -110,89 +110,99 @@ optimize :: Solver -> (Model -> Rational -> IO ()) -> IO OptResult
 optimize solver update = do
   let lp = mipRootLP solver
   log solver "MIP: Solving LP relaxation..."
-  ret <- Simplex2.optimize lp
-  case ret of
-    Unbounded -> do
-      log solver "MIP: LP relaxation is unbounded"
-      let ivs = mipIVs solver
-      if IS.null ivs
-        then return Unbounded
-        else do
-          {-
-            Fallback to Fourier-Motzkin + OmegaTest
-            * In general, original problem may have optimal
-              solution even though LP relaxiation is unbounded.
-            * But if restricted to rational numbers, the
-              original problem is unbounded or unsatisfiable
-              when LP relaxation is unbounded.
-          -}
-          log solver "MIP: falling back to Fourier-Motzkin + OmegaTest"
-          t <- Simplex2.getTableau lp
-          let ds = [LA.varExpr v .==. def | (v, def) <- IM.toList t]
-          n <- Simplex2.nVars lp
-          bs <- liftM concat $ forM [0..n-1] $ \v -> do
-            lb <- Simplex2.getLB lp v
-            ub <- Simplex2.getUB lp v
-            return $ [LA.varExpr v .>=. LA.constExpr (fromJust lb) | isJust lb] ++
-                     [LA.varExpr v .<=. LA.constExpr (fromJust ub) | isJust ub]
-          case OmegaTest.solveQFLA (bs ++ ds) ivs of
-            Just _ -> return Unbounded
-            Nothing -> return Unsat
+  ret <- Simplex2.check lp
+  if not ret
+  then return Unsat
+  else do
+    log solver "MIP: LP relaxation is satisfiable"
+    log solver "MIP: Optimizing LP relaxation"
+    ret <- Simplex2.optimize lp
+    case ret of
+      Unbounded -> do
+        log solver "MIP: LP relaxation is unbounded"
+        let ivs = mipIVs solver
+        if IS.null ivs
+          then return Unbounded
+          else do
+            {-
+              Fallback to Fourier-Motzkin + OmegaTest
+              * In general, original problem may have optimal
+                solution even though LP relaxiation is unbounded.
+              * But if restricted to rational numbers, the
+                original problem is unbounded or unsatisfiable
+                when LP relaxation is unbounded.
+            -}
+            log solver "MIP: falling back to Fourier-Motzkin + OmegaTest"
+            t <- Simplex2.getTableau lp
+            let ds = [LA.varExpr v .==. def | (v, def) <- IM.toList t]
+            n <- Simplex2.nVars lp
+            bs <- liftM concat $ forM [0..n-1] $ \v -> do
+              lb <- Simplex2.getLB lp v
+              ub <- Simplex2.getUB lp v
+              return $ [LA.varExpr v .>=. LA.constExpr (fromJust lb) | isJust lb] ++
+                       [LA.varExpr v .<=. LA.constExpr (fromJust ub) | isJust ub]
+            case OmegaTest.solveQFLA (bs ++ ds) ivs of
+              Just _ -> return Unbounded
+              Nothing -> return Unsat  
+      Optimum -> do
+        s0 <- showValue solver =<< Simplex2.getObjValue lp
+        log solver $ "MIP: LP relaxation optimum is " ++ s0
+        log solver "MIP: Integer optimization begins..."
+        branchAndBound solver update
+        m <- readIORef (mipBest solver)
+        case m of
+          Nothing -> return Unsat
+          Just _ -> return Optimum
 
-    Optimum -> do
-      s0 <- showValue solver =<< Simplex2.getObjValue lp
-      log solver ("MIP: LP relaxation optimum is " ++ s0)
-      log solver "MIP: Integer optimization begins..."
-      let root = Node{ ndLP = lp, ndDepth = 0 }
-      q <- SQ.newFifo :: IO (SQ.SeqQueue Node)
-      SQ.enqueue q root
-      let loop = do
-            size <- SQ.queueSize q
-            m <- SQ.dequeue q
-            case m of
-              Nothing -> return ()
-              Just nd -> do
-                let lp = ndLP nd
-                val <- Simplex2.getObjValue lp
-                p <- prune solver val
-                if p
-                  then loop
-                  else do
-                    xs <- violated nd (mipIVs solver)
-                    case xs of
-                      [] -> do
-                        writeIORef (mipBest solver) (Just nd)
-                        m <- Simplex2.model lp
-                        update m val
-                        loop
-                      _ -> do
-                        r <- if ndDepth nd `mod` 100 /= 0
-                             then return Nothing
-                             else liftM listToMaybe $ filterM (canDeriveGomoryCut lp) $ map fst xs
-                        case r of
-                          Nothing -> do -- branch
-                            let (v0,val0) = fst $ maximumBy (comparing snd)
-                                            [((v,val), abs (fromIntegral (round val) - val)) | (v,val) <- xs]
-                            let lp1 = lp
-                            lp2 <- Simplex2.cloneSolver lp
-                            Simplex2.assertAtom lp1 (LA.varExpr v0 .<=. LA.constExpr (fromIntegral (floor val0)))
-                            Simplex2.assertAtom lp2 (LA.varExpr v0 .>=. LA.constExpr (fromIntegral (ceiling val0)))
-                            b <- Simplex2.dualSimplex lp1
-                            when (b == Optimum) $ SQ.enqueue q (Node lp1 (ndDepth nd + 1))
-                            b <- Simplex2.dualSimplex lp2
-                            when (b == Optimum) $ SQ.enqueue q (Node lp2 (ndDepth nd + 1))
-                          Just v -> do -- cut
-                            atom <- deriveGomoryCut lp (mipIVs solver) v
-                            Simplex2.assertAtom lp atom
-                            b <- Simplex2.dualSimplex lp
-                            when (b == Optimum) $ SQ.enqueue q (Node lp (ndDepth nd + 1))
-                        loop
+branchAndBound :: Solver -> (Model -> Rational -> IO ()) -> IO ()
+branchAndBound solver update = do
+  let root = Node{ ndLP = mipRootLP solver, ndDepth = 0 }
+  q <- SQ.newFifo :: IO (SQ.SeqQueue Node)
+  SQ.enqueue q root
 
-      loop
-      m <- readIORef (mipBest solver)
-      case m of
-        Nothing -> return Unsat
-        Just _ -> return Optimum
+  let loop = do
+        size <- SQ.queueSize q
+        m <- SQ.dequeue q
+        case m of
+          Nothing -> return ()
+          Just nd -> do
+            let lp = ndLP nd
+            val <- Simplex2.getObjValue lp
+            p <- prune solver val
+            if p
+              then loop
+              else do
+                xs <- violated nd (mipIVs solver)
+                case xs of
+                  [] -> do
+                    writeIORef (mipBest solver) (Just nd)
+                    m <- Simplex2.model lp
+                    update m val
+                    loop
+                  _ -> do
+                    r <- if ndDepth nd `mod` 100 /= 0
+                         then return Nothing
+                         else liftM listToMaybe $ filterM (canDeriveGomoryCut lp) $ map fst xs
+                    case r of
+                      Nothing -> do -- branch
+                        let (v0,val0) = fst $ maximumBy (comparing snd)
+                                        [((v,val), abs (fromIntegral (round val) - val)) | (v,val) <- xs]
+                        let lp1 = lp
+                        lp2 <- Simplex2.cloneSolver lp
+                        Simplex2.assertAtom lp1 (LA.varExpr v0 .<=. LA.constExpr (fromIntegral (floor val0)))
+                        Simplex2.assertAtom lp2 (LA.varExpr v0 .>=. LA.constExpr (fromIntegral (ceiling val0)))
+                        b <- Simplex2.dualSimplex lp1
+                        when (b == Optimum) $ SQ.enqueue q (Node lp1 (ndDepth nd + 1))
+                        b <- Simplex2.dualSimplex lp2
+                        when (b == Optimum) $ SQ.enqueue q (Node lp2 (ndDepth nd + 1))
+                      Just v -> do -- cut
+                        atom <- deriveGomoryCut lp (mipIVs solver) v
+                        Simplex2.assertAtom lp atom
+                        b <- Simplex2.dualSimplex lp
+                        when (b == Optimum) $ SQ.enqueue q (Node lp (ndDepth nd + 1))
+                    loop
+  
+  loop
 
 model :: Solver -> IO Model
 model solver = do

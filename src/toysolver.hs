@@ -85,8 +85,7 @@ run solver opt lp = do
 
   case solver of
     _ | solver `elem` ["omega-test", "cooper"] -> solveByQE
-    _ | solver == "simplex2" -> solveBySimplex2 False
-    _ | solver == "mip2" -> solveBySimplex2 True
+    _ | solver `elem` ["simplex2", "mip2"] -> solveByMIP2
     _ -> solveByMIP
   where
     vs = LP.variables lp
@@ -163,7 +162,7 @@ run solver opt lp = do
           putStrLn "s OPTIMUM FOUND"
           printModel m vs
 
-    solveBySimplex2 isMIP = do
+    solveByMIP2 = do
       solver <- Simplex2.newSolver
 
       let ps = last ("bland-rule" : [s | PivotStrategy s <- opt])
@@ -183,45 +182,24 @@ run solver opt lp = do
         Simplex2.assertAtom solver $ fromJust (LA.compileAtom c)
       logger "Loading constraints finished"
 
-      if not isMIP
-        then do
-          ret <- Simplex2.check solver
-          if not ret then do
-            putStrLn "s UNSATISFIABLE"
-            exitFailure
-          else do
-            putStrLn "c SATISFIABLE" >> hFlush stdout
-            ret2 <- Simplex2.optimize solver
-            case ret2 of
-              Simplex2.Unsat -> error "should not happen"
-              Simplex2.Unbounded -> do
-                putStrLn "s UNBOUNDED"
-                exitFailure
-              Simplex2.Optimum -> do
-                m <- Simplex2.model solver
-                r <- Simplex2.getObjValue solver
-                putStrLn $ "o " ++ showValue r
-                putStrLn "s OPTIMUM FOUND"
-                printModel m vs
-        else do
-          mip <- MIPSolver2.newSolver solver ivs
-          MIPSolver2.setShowRational mip printRat
-          MIPSolver2.setLogger mip logger
-          let update m val = do
-                putStrLn $ "o " ++ showValue val
-          ret <- MIPSolver2.optimize mip update
-          case ret of
-            Simplex2.Unsat -> do
-              putStrLn "s UNSATISFIABLE"
-              exitFailure
-            Simplex2.Unbounded -> do
-              putStrLn "s UNBOUNDED"
-              exitFailure
-            Simplex2.Optimum -> do
-              m <- MIPSolver2.model mip
-              r <- MIPSolver2.getObjValue mip
-              putStrLn "s OPTIMUM FOUND"
-              printModel m vs
+      mip <- MIPSolver2.newSolver solver ivs
+      MIPSolver2.setShowRational mip printRat
+      MIPSolver2.setLogger mip logger
+      let update m val = do
+            putStrLn $ "o " ++ showValue val
+      ret <- MIPSolver2.optimize mip update
+      case ret of
+        Simplex2.Unsat -> do
+          putStrLn "s UNSATISFIABLE"
+          exitFailure
+        Simplex2.Unbounded -> do
+          putStrLn "s UNBOUNDED"
+          exitFailure
+        Simplex2.Optimum -> do
+          m <- MIPSolver2.model mip
+          r <- MIPSolver2.getObjValue mip
+          putStrLn "s OPTIMUM FOUND"
+          printModel m vs
 
     printModel :: Model Rational -> Set.Set String -> IO ()
     printModel m vs =

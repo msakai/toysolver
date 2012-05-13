@@ -493,7 +493,9 @@ data OptResult = Optimum | Unsat | Unbounded
 
 optimize :: Solver -> IO OptResult
 optimize solver = do
-  ret <- check solver
+  ret <- do
+    is_fea <- isFeasible solver
+    if is_fea then return True else check solver
   if not ret
     then return Unsat -- unsat
     else do
