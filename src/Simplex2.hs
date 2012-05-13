@@ -82,7 +82,7 @@ module Simplex2
 import Prelude hiding (log)
 import Control.Exception
 import Control.Monad
-import Data.Function
+import Data.Ord
 import Data.IORef
 import Data.List
 import Data.Maybe
@@ -400,7 +400,7 @@ dualSimplex solver = do
                         return []
                     case ws of
                       [] -> return Nothing
-                      _ -> return $ Just $ fst $ minimumBy (compare `on` snd) ws
+                      _ -> return $ Just $ fst $ minimumBy (comparing snd) ws
               r <- find
               case r of
                 Nothing -> markBad solver >> return Unsat
@@ -435,7 +435,7 @@ dualSimplex solver = do
                         return []
                     case ws of
                       [] -> return Nothing
-                      _ -> return $ Just $ fst $ minimumBy (compare `on` snd) ws
+                      _ -> return $ Just $ fst $ minimumBy (comparing snd) ws
               r <- find
               case r of
                 Nothing -> markBad solver >> return Unsat
@@ -482,7 +482,7 @@ selectViolatingBasicVariable solver = do
               if not (testLB li vi)
                 then return (xi, fromJust li - vi)
                 else return (xi, vi - fromJust ui)
-          return $ Just $ fst $ maximumBy (compare `on` snd) xs2
+          return $ Just $ fst $ maximumBy (comparing snd) xs2
 
 {--------------------------------------------------------------------
   Optimization
@@ -535,7 +535,7 @@ selectEnteringVariable solver = do
       ts <- filterM canEnter (LA.terms obj_def)
       case ts of
         [] -> return Nothing
-        _ -> return $ Just $ snd $ maximumBy (compare `on` fst) [(abs c, (c,xj)) | (c,xj) <- ts]
+        _ -> return $ Just $ snd $ maximumBy (comparing fst) [(abs c, (c,xj)) | (c,xj) <- ts]
   where
     canEnter :: (Rational, Var) -> IO Bool
     canEnter (_,xj) | xj == LA.unitVar = return False
@@ -585,7 +585,7 @@ increaseNB solver xj = do
   case ubs of
     [] -> return False -- unbounded
     _ -> do
-      let (xi, v) = fst $ minimumBy (compare `on` snd) ubs
+      let (xi, v) = fst $ minimumBy (comparing snd) ubs
       pivotAndUpdate solver xi xj v
       return True
 
@@ -608,7 +608,7 @@ decreaseNB solver xj = do
   case lbs of
     [] -> return False -- unbounded
     _ -> do
-      let (xi, v) = fst $ maximumBy (compare `on` snd) lbs
+      let (xi, v) = fst $ maximumBy (comparing snd) lbs
       pivotAndUpdate solver xi xj v
       return True
 

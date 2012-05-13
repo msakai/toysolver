@@ -36,7 +36,7 @@ module Simplex
   , toCSV
   ) where
 
-import Data.Function (on)
+import Data.Ord
 import Data.List (intersperse, minimumBy, foldl')
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
@@ -181,7 +181,7 @@ primalPivot optdir tbl
          | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRow
          , let y_is = IM.findWithDefault 0 s row_i, y_is > 0
          ]
-    r = fst $ minimumBy (compare `on` snd) rs
+    r = fst $ minimumBy (comparing snd) rs
 
 -- ---------------------------------------------------------------------------
 -- dual simplex
@@ -211,7 +211,7 @@ dualPivot optdir tbl
          , y_rj < 0
          , let y_0j = IM.findWithDefault 0 j obj
          ]
-    s = fst $ minimumBy (compare `on` snd) cs
+    s = fst $ minimumBy (comparing snd) cs
     (obj,_) = lookupRow objRow tbl
 
 -- ---------------------------------------------------------------------------

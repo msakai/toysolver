@@ -12,7 +12,7 @@
 -----------------------------------------------------------------------------
 module Main where
 
-import Data.Function (on)
+import Data.Ord
 import Data.List
 import Data.Ratio
 import qualified Data.Set as Set
@@ -119,7 +119,7 @@ conditions q env lp = bnds ++ bins ++ cs ++ ss
     sos (_, typ, xs) = do
       (x1,x2) <- case typ of
                     LP.S1 -> pairs $ map fst xs
-                    LP.S2 -> nonAdjacentPairs $ map fst $ sortBy (compare `on` snd) $ xs
+                    LP.S2 -> nonAdjacentPairs $ map fst $ sortBy (comparing snd) $ xs
       return $ not' $ and' [list [showString "/=", showString (env Map.! v), showChar '0']  | v<-[x1,x2]]
 
 pairs :: [a] -> [(a,a)]

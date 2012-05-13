@@ -37,9 +37,9 @@ module MIPSolverHL
 
 import Control.Exception
 import Control.Monad.State
+import Data.Ord
 import Data.Maybe
 import Data.List (maximumBy)
-import Data.Function
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Ratio
@@ -196,7 +196,7 @@ traverse optdir obj ivs node0 = loop [node0] Nothing
       | null xs = Nothing -- no violation
       | ndDepth node `mod` 100 == 0 = -- cut
           let
-            (f0, m0) = maximumBy (compare `on` fst) [(fracPart val, m) | (_,m,val) <- xs]
+            (f0, m0) = maximumBy (comparing fst) [(fracPart val, m) | (_,m,val) <- xs]
             sv = flip execState (ndSolver node) $ do
                    s <- gensym
                    let g j x = assert (a >= 0) a
@@ -214,7 +214,7 @@ traverse optdir obj ivs node0 = loop [node0] Nothing
                    putTableau $ IM.insert s (IM.mapWithKey (\j x -> negate (g j x)) m0, negate f0) tbl
           in Just $ [node{ ndSolver = sv2, ndDepth = ndDepth node + 1 } | sv2 <- maybeToList (reopt sv)]
       | otherwise = -- branch
-          let (v0, val0) = snd $ maximumBy (compare `on` fst) [(fracPart val, (v, val)) | (v,_,val) <- xs]
+          let (v0, val0) = snd $ maximumBy (comparing fst) [(fracPart val, (v, val)) | (v,_,val) <- xs]
               cs = [ LA.Atom (LA.varExpr v0) Ge (LA.constExpr (fromIntegral (ceiling val0 :: Integer)))
                    , LA.Atom (LA.varExpr v0) Le (LA.constExpr (fromIntegral (floor val0 :: Integer)))
                    ]

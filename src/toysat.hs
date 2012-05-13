@@ -24,9 +24,9 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.Char
 import Data.IORef
-import Data.Function
 import Data.List
 import Data.Maybe
+import Data.Ord
 import Data.Ratio
 import Data.Version
 import Data.Time.LocalTime
@@ -337,7 +337,7 @@ minimize opt solver obj update = do
     forM_ obj $ \(c,l) -> do
       let p = if c > 0 then not (SAT.litPolarity l) else SAT.litPolarity l
       SAT.setVarPolarity solver (SAT.litVar l) p
-    forM_ (zip [1..] (map snd (sortBy (compare `on` fst) [(abs c, l) | (c,l) <- obj]))) $ \(n,l) -> do
+    forM_ (zip [1..] (map snd (sortBy (comparing fst) [(abs c, l) | (c,l) <- obj]))) $ \(n,l) -> do
       replicateM n $ SAT.varBumpActivity solver (SAT.litVar l)
 
   result <- SAT.solve solver
@@ -628,7 +628,7 @@ solveLP opt solver lp = do
         case typ of
           LPFile.S1 -> SAT.addAtMost solver (map (asBin . (vmap Map.!) . fst) xs) 1
           LPFile.S2 -> do
-            let ps = nonAdjacentPairs $ map fst $ sortBy (compare `on` snd) $ xs
+            let ps = nonAdjacentPairs $ map fst $ sortBy (comparing snd) $ xs
             forM_ ps $ \(x1,x2) -> do
               SAT.addClause solver [SAT.litNot $ asBin $ vmap Map.! v | v <- [x1,x2]]
 

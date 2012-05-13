@@ -5,15 +5,21 @@ License-File:	COPYING
 Author:		Masahiro Sakai (masahiro.sakai@gmail.com)
 Maintainer:	masahiro.sakai@gmail.com
 Category:	Algorithms
-Cabal-Version:	>= 1.6
+Cabal-Version:	>= 1.8
 Synopsis:	My sandbox for experimenting solver algorithms.
 Description:	My sandbox for experimenting solver algorithms.
 Extra-Source-Files:
-   README
+   README.md
    COPYING
    src/TseitinEncode.hs
-   samples/*.lp
-   samples/*.mod
+   samples/lp/*.lp
+   samples/lp/error/*.lp
+   samples/maxsat/*.cnf
+   samples/maxsat/*.wcnf
+   samples/pbo/*.opb
+   samples/pbs/*.opb
+   samples/sat/*.cnf
+   samples/wbo/*.wbo
 Build-Type: Simple
 
 source-repository head
@@ -57,6 +63,29 @@ Executable toysolver
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
 
+Executable toysat
+  Main-is: toysat.hs
+  HS-Source-Dirs: src
+  Other-Modules:
+     SAT
+     LBool
+     LPFile
+     PBFile
+     IndexedPriorityQueue
+     SeqQueue
+     Linearizer
+     SAT.Integer
+     SAT.Types
+     Version
+  Build-Depends: base >=4 && <5, mtl, containers >= 0.4.2, array, parsec, bytestring, parse-dimacs, queue, OptDir, time, old-locale
+  Extensions:
+     MultiParamTypeClasses
+     FlexibleInstances
+     BangPatterns
+     DoAndIfThenElse
+  if impl(ghc >= 7)
+    GHC-Options: -rtsopts
+
 Executable lp2yices
   Main-is: lp2yices.hs
   HS-Source-Dirs: src
@@ -90,7 +119,7 @@ Executable cnf2lp
 Executable maxsat2lp
   Main-is: maxsat2lp.hs
   HS-Source-Dirs: src
-  Build-Depends: base >=4 && <5
+  Build-Depends: base >=4 && <5, containers
 
 Executable pb2lp
   Main-is: pb2lp.hs
@@ -100,38 +129,16 @@ Executable pb2lp
      PBFile
   Build-Depends: base >=4 && <5, mtl, containers, array, parsec, OptDir
 
-Executable toysat
-  Main-is: toysat.hs
-  HS-Source-Dirs: src
-  Other-Modules:
-     SAT
-     LBool
-     LPFile
-     PBFile
-     IndexedPriorityQueue
-     SeqQueue
-     Linearizer
-     SAT.Integer
-     Version
-  Build-Depends: base >=4 && <5, containers >= 0.4.2, array, parsec, bytestring, parse-dimacs, queue, OptDir, time, old-locale
-  Extensions:
-     MultiParamTypeClasses
-     FlexibleInstances
-     BangPatterns
-     DoAndIfThenElse
-  if impl(ghc >= 7)
-    GHC-Options: -rtsopts
-
 Test-suite TestSAT
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    src
   Main-is:           TestSAT.hs
-  Build-depends:     test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
+  Build-depends:     base >=4 && <5, array, containers, queue, test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestSimplex2
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    src
   Main-is:           TestSimplex2.hs
-  Build-depends:     test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
+  Build-depends:     base >=4 && <5, containers, deepseq, queue, test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
   Extensions: TemplateHaskell, DoAndIfThenElse
