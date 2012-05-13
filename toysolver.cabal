@@ -68,8 +68,8 @@ Executable lp2yices
      FunctionalDependencies
      GeneralizedNewtypeDeriving
 
-Executable dimacs2lp
-  Main-is: dimacs2lp.hs
+Executable cnf2lp
+  Main-is: cnf2lp.hs
   HS-Source-Dirs: src
   Other-Modules:
      LPFile

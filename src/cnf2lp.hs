@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  dimacs2lp
+-- Module      :  cnf2lp
 -- Copyright   :  (c) Masahiro Sakai 2011-2012
 -- License     :  BSD-style
 -- 
