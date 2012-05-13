@@ -71,6 +71,7 @@ module Simplex2
 
   -- * Configulation
   , setLogger
+  , clearLogger
   , PivotStrategy (..)
   , setPivotStrategy
 
@@ -780,6 +781,9 @@ recordTime solver act = do
 setLogger :: Solver -> (String -> IO ()) -> IO ()
 setLogger solver logger = do
   writeIORef (svLogger solver) (Just logger)
+
+clearLogger :: Solver -> IO ()
+clearLogger solver = writeIORef (svLogger solver) Nothing
 
 log :: Solver -> String -> IO ()
 log solver msg = logIO solver (return msg)
