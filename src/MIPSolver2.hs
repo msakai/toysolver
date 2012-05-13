@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables, Rank2Types #-}
+{-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  MIPSolver2
@@ -34,6 +36,7 @@ module MIPSolver2
   , getObjValue
 
   -- * Configulation
+  , setNThread
   , setLogger
   , setShowRational
   ) where
@@ -41,7 +44,9 @@ module MIPSolver2
 import Prelude hiding (log)
 
 import Control.Monad
-import Control.Exception (assert)
+import Control.Exception
+import Control.Concurrent
+import Control.Concurrent.STM
 import Data.List
 import Data.OptDir
 import Data.Ord
@@ -50,13 +55,15 @@ import Data.Maybe
 import Data.Ratio
 import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
-import qualified SeqQueue as SQ
+import qualified Data.Set as Set
+import qualified Data.Sequence as Seq
+import System.CPUTime
 import Text.Printf
 
 import qualified LA
-import Formula (RelOp (..), (.<=.), (.>=.), (.==.))
+import Formula ((.<=.), (.>=.), (.==.))
 import qualified Simplex2
-import Simplex2 (OptResult (..), Var (..), Model (..))
+import Simplex2 (OptResult (..), Var, Model)
 import qualified OmegaTest
 import Linear
 import Util (isInteger, fracPart)
@@ -65,9 +72,10 @@ data Solver
   = MIP
   { mipRootLP :: Simplex2.Solver
   , mipIVs    :: IS.IntSet
-  , mipBest   :: IORef (Maybe Node)
+  , mipBest   :: IORef (Maybe (Node, Rational))
 
-  , mipLogger :: IORef (Maybe (String -> IO ()))
+  , mipNThread :: IORef Int
+  , mipLogger  :: IORef (Maybe (String -> IO ()))
   , mipShowRational :: IORef Bool
   }
 
@@ -87,13 +95,15 @@ newSolver lp ivs = do
       Just l | not (isInteger l) ->
         Simplex2.assertLower lp2 v (fromInteger (ceiling l))
       _ -> return ()
-    u <- Simplex2.getUB lp2 v
-    case u of
+    ub <- Simplex2.getUB lp2 v
+    case ub of
       Just u | not (isInteger u) ->
         Simplex2.assertLower lp2 v (fromInteger (floor u))
       _ -> return ()
 
   bestRef <- newIORef Nothing
+
+  nthreadRef <- newIORef 0
   logRef  <- newIORef Nothing
   showRef <- newIORef False
 
@@ -102,6 +112,8 @@ newSolver lp ivs = do
     { mipRootLP = lp2
     , mipIVs    = ivs
     , mipBest   = bestRef
+
+    , mipNThread = nthreadRef
     , mipLogger = logRef
     , mipShowRational = showRef
     }
@@ -116,8 +128,9 @@ optimize solver update = do
   else do
     log solver "MIP: LP relaxation is satisfiable"
     log solver "MIP: Optimizing LP relaxation"
-    ret <- Simplex2.optimize lp
-    case ret of
+    ret2 <- Simplex2.optimize lp
+    case ret2 of
+      Unsat -> error "should not happen"
       Unbounded -> do
         log solver "MIP: LP relaxation is unbounded"
         let ivs = mipIVs solver
@@ -148,6 +161,7 @@ optimize solver update = do
         s0 <- showValue solver =<< Simplex2.getObjValue lp
         log solver $ "MIP: LP relaxation optimum is " ++ s0
         log solver "MIP: Integer optimization begins..."
+        Simplex2.clearLogger lp
         branchAndBound solver update
         m <- readIORef (mipBest solver)
         case m of
@@ -157,66 +171,151 @@ optimize solver update = do
 branchAndBound :: Solver -> (Model -> Rational -> IO ()) -> IO ()
 branchAndBound solver update = do
   let root = Node{ ndLP = mipRootLP solver, ndDepth = 0 }
-  q <- SQ.newFifo :: IO (SQ.SeqQueue Node)
-  SQ.enqueue q root
 
-  let loop = do
-        size <- SQ.queueSize q
-        m <- SQ.dequeue q
-        case m of
-          Nothing -> return ()
-          Just nd -> do
-            let lp = ndLP nd
+  pool <- newTVarIO (Seq.singleton root)
+  activeThreads <- newTVarIO (Set.empty)
+
+  let addNode :: Node -> IO ()
+      addNode nd = atomically $ do
+        modifyTVar pool (Seq.|> nd)
+
+      pickNode :: IO (Maybe Node)
+      pickNode = do
+        self <- myThreadId
+        atomically $ modifyTVar activeThreads (Set.delete self)
+        atomically $ do
+          s <- readTVar pool
+          case Seq.viewl s of
+            nd Seq.:< s2 -> do
+              writeTVar pool s2
+              modifyTVar activeThreads (Set.insert self)
+              return (Just nd)
+            Seq.EmptyL -> do
+              ths <- readTVar activeThreads
+              if Set.null ths
+                then return Nothing
+                else retry
+
+      updateBest :: Node -> Rational -> IO ()
+      updateBest node val = do
+        let lp = ndLP node
+        m <- Simplex2.model lp
+        dir <- Simplex2.getOptDir lp
+        ret <- atomicModifyIORef (mipBest solver) $ \old -> do
+          case old of
+            Nothing -> (Just (node, val), True)
+            Just (_, best) -> do
+              let isBetter = if dir==OptMin then val < best else val > best
+              if isBetter
+                then (Just (node, val), True)
+                else (old, False)
+        when ret $ update m val -- 複数スレッドからupdateが同時に呼ばれてまずい可能性がある
+
+      processNode :: Node -> IO ()
+      processNode node = do
+        let lp = ndLP node
+        ret <- Simplex2.dualSimplex lp
+        case ret of
+          Unbounded -> error "should not happen"
+          Unsat ->  return ()
+          Optimum -> do
             val <- Simplex2.getObjValue lp
             p <- prune solver val
-            if p
-              then loop
-              else do
-                xs <- violated nd (mipIVs solver)
-                case xs of
-                  [] -> do
-                    writeIORef (mipBest solver) (Just nd)
-                    m <- Simplex2.model lp
-                    update m val
-                    loop
-                  _ -> do
-                    r <- if ndDepth nd `mod` 100 /= 0
-                         then return Nothing
-                         else liftM listToMaybe $ filterM (canDeriveGomoryCut lp) $ map fst xs
-                    case r of
-                      Nothing -> do -- branch
-                        let (v0,val0) = fst $ maximumBy (comparing snd)
-                                        [((v,val), abs (fromIntegral (round val) - val)) | (v,val) <- xs]
-                        let lp1 = lp
-                        lp2 <- Simplex2.cloneSolver lp
-                        Simplex2.assertAtom lp1 (LA.varExpr v0 .<=. LA.constExpr (fromIntegral (floor val0)))
-                        Simplex2.assertAtom lp2 (LA.varExpr v0 .>=. LA.constExpr (fromIntegral (ceiling val0)))
-                        b <- Simplex2.dualSimplex lp1
-                        when (b == Optimum) $ SQ.enqueue q (Node lp1 (ndDepth nd + 1))
-                        b <- Simplex2.dualSimplex lp2
-                        when (b == Optimum) $ SQ.enqueue q (Node lp2 (ndDepth nd + 1))
-                      Just v -> do -- cut
-                        atom <- deriveGomoryCut lp (mipIVs solver) v
-                        Simplex2.assertAtom lp atom
-                        b <- Simplex2.dualSimplex lp
-                        when (b == Optimum) $ SQ.enqueue q (Node lp (ndDepth nd + 1))
-                    loop
-  
-  loop
+            unless p $ do
+              xs <- violated node (mipIVs solver)
+              case xs of
+                [] -> updateBest node val
+                _ -> do
+                  r <- if ndDepth node `mod` 100 /= 0
+                       then return Nothing
+                       else liftM listToMaybe $ filterM (canDeriveGomoryCut lp) $ map fst xs
+                  case r of
+                    Nothing -> do -- branch
+                      let (v0,val0) = fst $ maximumBy (comparing snd)
+                                      [((v,val), abs (fromInteger (round val) - val)) | (v,val) <- xs]
+                      let lp1 = lp
+                      lp2 <- Simplex2.cloneSolver lp
+                      Simplex2.assertAtom lp1 (LA.varExpr v0 .<=. LA.constExpr (fromInteger (floor val0)))
+                      addNode $ Node lp1 (ndDepth node + 1)
+                      Simplex2.assertAtom lp2 (LA.varExpr v0 .>=. LA.constExpr (fromInteger (ceiling val0)))
+                      addNode $ Node lp2 (ndDepth node + 1)
+                    Just v -> do -- cut
+                      atom <- deriveGomoryCut lp (mipIVs solver) v
+                      Simplex2.assertAtom lp atom
+                      addNode $ Node lp (ndDepth node + 1)
+
+  let isCompleted = do
+        nodes <- readTVar pool
+        threads <- readTVar activeThreads
+        return $ Seq.null nodes && Set.null threads
+
+  -- fork worker threads
+  nthreads <- do
+    n <- readIORef (mipNThread solver)
+    if n >= 1
+      then return n
+      else return 1 -- getNumCapabilities -- base-4.4.0.0以降にしか存在しない
+
+  let child = do
+        m <- pickNode
+        case m of
+          Nothing -> return ()
+          Just node -> processNode node >> child
+
+  log solver $ printf "MIP: forking %d worker threads..." nthreads
+  start <- getCPUTime
+  ex <- newEmptyTMVarIO
+  threads <- replicateM nthreads $ do
+    mask $ \restore -> forkIO $ do
+      ret <- try (restore child)
+      case ret of
+        Left e -> atomically (putTMVar ex e)
+        Right _ -> return ()
+
+  th <- forkIO $ do
+    let loop = do
+          n <- atomically $ do
+            nodes   <- readTVar pool
+            athreads <- readTVar activeThreads
+            return (Seq.length nodes + Set.size athreads)
+          if n == 0
+            then return ()
+            else do
+              now <- getCPUTime
+              let spent = (now - start) `div` 10^(12::Int)
+              log solver $ printf "time = %d sec; nodes: %d" spent n
+              threadDelay (2*1000*1000) -- 2s
+              loop
+    loop
+
+  -- join
+  let wait = isCompleted >>= guard >> return Nothing
+  let loop :: (forall a. IO a -> IO a) -> IO ()
+      loop restore = do
+        ret <- try $ restore $ atomically $ wait `orElse` (liftM Just (readTMVar ex))
+        case ret of
+          Right Nothing  -> return ()
+          Right (Just (e::SomeException)) -> do
+            mapM_ (\t -> throwTo t e) (th:threads)
+            throwIO e
+          Left (e::SomeException) -> do
+            mapM_ (\t -> throwTo t e) (th:threads)
+            throwIO e
+  mask loop
 
 model :: Solver -> IO Model
 model solver = do
   m <- readIORef (mipBest solver)
   case m of
     Nothing -> error "no model"
-    Just node -> Simplex2.model (ndLP node)
+    Just (node,_) -> Simplex2.model (ndLP node)
 
 getObjValue :: Solver -> IO Rational
 getObjValue solver = do
   m <- readIORef (mipBest solver)
   case m of
     Nothing -> error "no model"
-    Just node -> Simplex2.getObjValue (ndLP node)
+    Just (_,val) -> return val
 
 violated :: Node -> IS.IntSet -> IO [(Var, Rational)]
 violated node ivs = do
@@ -229,10 +328,9 @@ prune solver lb = do
   b <- readIORef (mipBest solver)
   case b of
     Nothing -> return False
-    Just bestNode -> do
-      bestObj <- Simplex2.getObjValue (ndLP bestNode)
+    Just (_, best) -> do
       dir <- Simplex2.getOptDir (mipRootLP solver)
-      return $ if dir==OptMin then bestObj <= lb else bestObj >= lb
+      return $ if dir==OptMin then best <= lb else best >= lb
 
 showValue :: Solver -> Rational -> IO String
 showValue solver v
@@ -245,6 +343,9 @@ showValue solver v
 
 setShowRational :: Solver -> Bool -> IO ()
 setShowRational solver = writeIORef (mipShowRational solver)
+
+setNThread :: Solver -> Int -> IO ()
+setNThread solver = writeIORef (mipNThread solver)
 
 {--------------------------------------------------------------------
   Logging
@@ -278,7 +379,7 @@ deriveGomoryCut lp ivs xi = do
   row <- Simplex2.getRow lp xi
 
   -- remove fixed variables
-  let p (aij,xj) = do
+  let p (_,xj) = do
         lb <- Simplex2.getLB lp xj
         ub <- Simplex2.getUB lp xj
         case (lb,ub) of
@@ -326,7 +427,7 @@ canDeriveGomoryCut lp xi = do
         then return False
         else do
           row <- Simplex2.getRow lp xi
-          ys <- forM (LA.terms row) $ \(ai,xj) -> do
+          ys <- forM (LA.terms row) $ \(_,xj) -> do
             vj <- Simplex2.getValue lp xj
             lb <- Simplex2.getLB lp xj
             ub <- Simplex2.getUB lp xj

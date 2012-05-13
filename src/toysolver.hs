@@ -48,6 +48,7 @@ data Flag
     | Solver String
     | PrintRational
     | PivotStrategy String
+    | NThread !Int
 {-
     | SatMode
     | Load String
@@ -62,6 +63,7 @@ options =
     , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, old-mip"
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
+    , Option [] ["threads"] (ReqArg (NThread . read) "INTEGER") "number of threads to use"
 {-
     , Option ['l'] ["load"]    (ReqArg Load "FILE") "load FILE"
     , Option ['t'] ["trace"]    (OptArg (Trace . fromMaybe "on") "[on|off]")
@@ -168,6 +170,8 @@ run solver opt lp = do
         "largest-coefficient" -> Simplex2.setPivotStrategy solver Simplex2.PivotStrategyLargestCoefficient
         _ -> error ("unknown pivot strategy \"" ++ ps ++ "\"")
 
+      let nthreads = last (0 : [n | NThread n <- opt])
+
       let logger s = putStr "c " >> putStrLn s >> hFlush stdout
 
       Simplex2.setLogger solver logger
@@ -182,6 +186,7 @@ run solver opt lp = do
       mip <- MIPSolver2.newSolver solver ivs
       MIPSolver2.setShowRational mip printRat
       MIPSolver2.setLogger mip logger
+      MIPSolver2.setNThread mip nthreads
       let update m val = do
             putStrLn $ "o " ++ showValue val
       ret <- MIPSolver2.optimize mip update
