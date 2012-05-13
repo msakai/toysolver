@@ -480,14 +480,14 @@ render' lp = do
       Nothing -> return ()
       Just (v,val) -> do
         tell $ showString v . showString " = "
-        renderValue val
+        tell $ showValue val
         tell $ showString " -> "
 
     renderExpr e
     tell $ showChar ' '
     renderOp op
     tell $ showChar ' '
-    renderValue val
+    tell $ showValue val
     tell $ showChar '\n'
 
   tell $ showString "BOUNDS\n"
@@ -501,21 +501,15 @@ render' lp = do
 
   unless (Set.null (integerVariables lp)) $ do
     tell $ showString "GENERALS\n"
-    forM_ (Set.toList (integerVariables lp)) $ \v -> do
-      tell $ showString v
-      tell $ showChar '\n'
+    renderVariableList $ Set.toList $ integerVariables lp
 
   unless (Set.null (binaryVariables lp)) $ do
     tell $ showString "BINARIES\n"
-    forM_ (Set.toList (binaryVariables lp)) $ \v -> do
-      tell $ showString v
-      tell $ showChar '\n'
+    renderVariableList $ Set.toList $ binaryVariables lp
 
   unless (Set.null (semiContinuousVariables lp)) $ do
     tell $ showString "SEMI-CONTINUOUS\n"
-    forM_ (Set.toList (semiContinuousVariables lp)) $ \v -> do
-      tell $ showString v
-      tell $ showChar '\n'
+    renderVariableList $ Set.toList $ semiContinuousVariables lp
 
   unless (null (sos lp)) $ do
     tell $ showString "SOS\n"
@@ -527,35 +521,36 @@ render' lp = do
         tell $ showString "  "
         tell $ showString v
         tell $ showString " : "
-        renderValue r
+        tell $ showValue r
       tell $ showChar '\n'
 
   tell $ showString "END\n"
 
 renderExpr :: Expr -> WriterT ShowS Maybe ()
-renderExpr e = do
-  forM_ e $ \(Term c vs) -> do
-    tell $ showString $ if c >= 0 then " + " else " - "
-    let c' = abs c
-    case vs of
-      [] -> renderValue c'
-      [v] -> do
-        when (c' /= 1) $ do
-          renderValue c'
-          tell $ showChar ' '
-        tell $ showString v
-      _ -> do
-        tell $ showString "[ "
-        renderValue (2*c')
-        tell $ showChar ' '
-        tell $ showString (intercalate " * " vs)
-        tell $ showString " ]/2"
+renderExpr e =
+  mapM_ tell $ intersperse (showChar ' ') $ map showTerm e
 
-renderValue :: Rational -> WriterT ShowS Maybe ()
-renderValue c =
+showTerm :: Term -> ShowS
+showTerm (Term c vs) = 
+  showString (if c >= 0 then "+ " else "- ") . s
+  where
+    c' = abs c
+    s = case vs of
+          [] -> showValue c'
+          [v] ->
+            (if c' /= 1 then showValue c' . showChar ' ' else id) . showString v
+          _ ->
+            showString "[ " .
+            showValue (2*c') .
+            showChar ' ' .
+            showString (intercalate " * " vs) .
+            showString " ]/2"
+
+showValue :: Rational -> ShowS
+showValue c =
   if denominator c == 1
-    then tell $ shows (numerator c)
-    else tell $ shows (fromRational c :: Double)
+    then shows (numerator c)
+    else shows (fromRational c :: Double)
 
 renderLabel :: Maybe Label -> WriterT ShowS Maybe ()
 renderLabel l =
@@ -569,9 +564,19 @@ renderOp Ge = tell $ showString ">="
 renderOp Eql = tell $ showString "="
 
 renderBoundExpr :: BoundExpr -> WriterT ShowS Maybe ()
-renderBoundExpr (Finite r) = renderValue r
+renderBoundExpr (Finite r) = tell $ showValue r
 renderBoundExpr NegInf = tell $ showString "-inf"
 renderBoundExpr PosInf = tell $ showString "+inf"
+
+renderVariableList :: [Var] -> WriterT ShowS Maybe ()
+renderVariableList vs = go vs 0 >> tell (showChar '\n')
+  where
+    go [] _ = return ()
+    go (v:vs) 0 = tell (showString v) >> go vs (length v)
+    go (v:vs) width =
+      if width + 1 + length v <= 80
+      then tell (showChar ' ' . showString v) >> go vs (width + 1 + length v)
+      else tell (showChar '\n') >> go (v:vs) 0
 
 -- ---------------------------------------------------------------------------
 
