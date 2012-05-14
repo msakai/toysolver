@@ -216,8 +216,7 @@ assertAtom solver (LA.Atom lhs op rhs) = do
         t <- readIORef (svTableau solver)
         let def = LA.applySubst t lhs'
         modifyIORef (svTableau solver) (IM.insert v def)
-        m <- readIORef (svModel solver)
-        modifyIORef (svModel solver) (IM.insert v (LA.evalExpr m def))
+        modifyIORef (svModel solver) $ \m -> IM.insert v (LA.evalExpr m def) m
         return (v,op,rhs')
   case op of
     F.Le  -> assertUpper solver v rhs'
@@ -260,12 +259,10 @@ assertUpper solver x u = do
 -- FIXME: 式に定数項が含まれる可能性を考えるとこれじゃまずい?
 setObj :: Solver -> LA.Expr Rational -> IO ()
 setObj solver e = do
-  t <- readIORef (svTableau solver)
-  m <- readIORef (svModel solver)
-  let v  = LA.evalExpr m e
-      e' = LA.applySubst t e
-  writeIORef (svTableau solver) (IM.insert objVar e' t)
-  writeIORef (svModel solver) (IM.insert objVar v m)
+  modifyIORef (svTableau solver) $ \t ->
+    IM.insert objVar (LA.applySubst t e) t
+  modifyIORef (svModel solver) $ \m -> 
+    IM.insert objVar (LA.evalExpr m e) m
 
 setOptDir :: Solver -> OptDir -> IO ()
 setOptDir solver dir = writeIORef (svOptDir solver) dir
@@ -393,7 +390,7 @@ dualSimplex solver = do
                       b <- q (aij, xj)
                       if b
                       then do
-                        cj <- getCoeff solver objVar xj
+                        let cj = LA.coeff xj obj_def
                         let ratio = if dir==OptMin then (cj / aij) else - (cj / aij)
                         return [(xj, ratio) | ratio >= 0]
                       else
@@ -428,7 +425,7 @@ dualSimplex solver = do
                       b <- q (aij, xj)
                       if b
                       then do
-                        cj <- getCoeff solver objVar xj
+                        let cj = LA.coeff xj obj_def
                         let ratio = if dir==OptMin then - (cj / aij) else (cj / aij)
                         return [(xj, ratio) | ratio >= 0]
                       else
