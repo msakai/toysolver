@@ -16,12 +16,13 @@
 
 module Linear
   ( Linear (..)
+  , (./.)
   ) where
 
 import Data.Ratio
 
 infixl 6 .+., .-.
-infixl 7 .*.
+infixl 7 .*., ./.
 
 -- | The class of linear spaces.
 class Num k => Linear k a | a -> k where
@@ -44,6 +45,10 @@ class Num k => Linear k a | a -> k where
 
   lsum :: [a] -> a
   lsum = foldr (.+.) lzero
+
+-- | division
+(./.) :: (Linear k a, Fractional k) => a -> k -> a
+a ./. b = (1/b) .*. a
 
 instance Integral a => Linear (Ratio a) (Ratio a) where
   (.*.) = (*)

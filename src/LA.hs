@@ -28,6 +28,7 @@ module LA
   , mapCoeff
   , mapCoeffWithVar
   , evalExpr
+  , evalLinear
   , lift1
   , applySubst
   , applySubst1
@@ -147,6 +148,11 @@ plus (Expr t1) (Expr t2) = Expr $ IM.unionWith (+) t1 t2
 evalExpr :: Num r => Model r -> Expr r -> r
 evalExpr m (Expr t) = sum [(m' IM.! v) * c | (v,c) <- IM.toList t]
   where m' = IM.insert unitVar 1 m
+
+-- | evaluate the expression under the model.
+evalLinear :: Linear r a => Model a -> a -> Expr r -> a
+evalLinear m u (Expr t) = lsum [c .*. (m' IM.! v) | (v,c) <- IM.toList t]
+  where m' = IM.insert unitVar u m
 
 lift1 :: Linear r x => x -> (Var -> x) -> Expr r -> x
 lift1 unit f (Expr t) = lsum [c .*. (g v) | (v,c) <- IM.toList t]

@@ -25,6 +25,7 @@
 module Delta where
 
 import Linear
+import Util (isInteger)
 
 -- | @Delta r k@ represents r + kδ for symbolic infinitesimal parameter δ.
 data Delta r = Delta !r !r deriving (Ord, Eq, Show)
@@ -32,6 +33,9 @@ data Delta r = Delta !r !r deriving (Ord, Eq, Show)
 -- | symbolic infinitesimal parameter δ.
 delta :: Num r => Delta r
 delta = Delta 0 1
+
+fromReal :: Num r => r -> Delta r
+fromReal x = Delta x 0
 
 instance Num r => Linear r (Delta r) where
   Delta r1 k1 .+. Delta r2 k2 = Delta (r1+r2) (k1+k2)
@@ -51,3 +55,6 @@ ceiling' (Delta r k) = fromInteger $ if r2==r && k > 0 then i+1 else i
   where
     i = ceiling r
     r2 = fromInteger i
+
+isInteger' :: RealFrac r => Delta r -> Bool
+isInteger' (Delta r k) = isInteger r && k == 0

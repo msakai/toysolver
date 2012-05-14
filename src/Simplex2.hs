@@ -54,8 +54,11 @@ module Simplex2
   , dualSimplex
 
   -- * Extract results
+  , Value
   , Model
   , model
+  , RawModel
+  , rawModel
   , getValue
   , getObjValue
 
@@ -94,8 +97,25 @@ import System.CPUTime
 import qualified LA as LA
 import LA (Atom (..))
 import qualified Formula as F
-import Formula (RelOp (..), (.<=.), (.>=.), (.==.))
+import Formula (RelOp (..), (.<=.), (.>=.), (.==.), (.<.), (.>.))
 import Linear
+import Delta
+
+{--------------------------------------------------------------------
+  Value
+--------------------------------------------------------------------}
+
+{-
+type Value = Delta Rational
+
+toValue :: Rational -> Value
+toValue = fromReal
+-}
+
+type Value = Rational
+
+toValue :: Rational -> Value
+toValue = id
 
 {--------------------------------------------------------------------
   The @Solver@ type
@@ -106,9 +126,9 @@ type Var = Int
 data Solver
   = Solver
   { svTableau :: !(IORef (IM.IntMap (LA.Expr Rational)))
-  , svLB      :: !(IORef (IM.IntMap Rational))
-  , svUB      :: !(IORef (IM.IntMap Rational))
-  , svModel   :: !(IORef Model)
+  , svLB      :: !(IORef (IM.IntMap Value))
+  , svUB      :: !(IORef (IM.IntMap Value))
+  , svModel   :: !(IORef RawModel)
   , svVCnt    :: !(IORef Int)
   , svOk      :: !(IORef Bool)
   , svOptDir  :: !(IORef OptDir)
@@ -127,7 +147,7 @@ newSolver = do
   t <- newIORef (IM.singleton objVar lzero)
   l <- newIORef IM.empty
   u <- newIORef IM.empty
-  m <- newIORef (IM.singleton objVar 0)
+  m <- newIORef (IM.singleton objVar lzero)
   v <- newIORef 0
   ok <- newIORef True
   dir <- newIORef OptMin
@@ -199,7 +219,7 @@ newVar :: Solver -> IO Var
 newVar solver = do
   v <- readIORef (svVCnt solver)
   writeIORef (svVCnt solver) $! v+1
-  modifyIORef (svModel solver) (IM.insert v 0)
+  modifyIORef (svModel solver) (IM.insert v lzero)
   return v
 
 assertAtom :: Solver -> LA.Atom Rational -> IO ()
@@ -216,18 +236,22 @@ assertAtom solver (LA.Atom lhs op rhs) = do
         t <- readIORef (svTableau solver)
         let def = LA.applySubst t lhs'
         modifyIORef (svTableau solver) (IM.insert v def)
-        modifyIORef (svModel solver) $ \m -> IM.insert v (LA.evalExpr m def) m
+        modifyIORef (svModel solver) $ \m -> IM.insert v (LA.evalLinear m (toValue 1) def) m
         return (v,op,rhs')
   case op of
-    F.Le  -> assertUpper solver v rhs'
-    F.Ge  -> assertLower solver v rhs'
+    F.Le  -> assertUpper solver v (toValue rhs')
+    F.Ge  -> assertLower solver v (toValue rhs')
+{-
+    F.Lt  -> assertUpper solver v (toValue rhs' .-. delta)
+    F.Gt  -> assertLower solver v (toValue rhs' .+. delta)
+-}
     F.Eql -> do
-      assertLower solver v rhs'
-      assertUpper solver v rhs'
+      assertLower solver v (toValue rhs')
+      assertUpper solver v (toValue rhs')
     _ -> error "unsupported"
   return ()
 
-assertLower :: Solver -> Var -> Rational -> IO ()
+assertLower :: Solver -> Var -> Value -> IO ()
 assertLower solver x l = do
   l0 <- getLB solver x
   u0 <- getUB solver x
@@ -241,7 +265,7 @@ assertLower solver x l = do
       when (b && not (l <= v)) $ update solver x l
       checkNBFeasibility solver
 
-assertUpper :: Solver -> Var -> Rational -> IO ()
+assertUpper :: Solver -> Var -> Value -> IO ()
 assertUpper solver x u = do
   l0 <- getLB solver x
   u0 <- getUB solver x
@@ -262,7 +286,7 @@ setObj solver e = do
   modifyIORef (svTableau solver) $ \t ->
     IM.insert objVar (LA.applySubst t e) t
   modifyIORef (svModel solver) $ \m -> 
-    IM.insert objVar (LA.evalExpr m e) m
+    IM.insert objVar (LA.evalLinear m (toValue 1) e) m
 
 setOptDir :: Solver -> OptDir -> IO ()
 setOptDir solver dir = writeIORef (svOptDir solver) dir
@@ -477,8 +501,8 @@ selectViolatingBasicVariable solver = do
               li <- getLB solver xi
               ui <- getUB solver xi
               if not (testLB li vi)
-                then return (xi, fromJust li - vi)
-                else return (xi, vi - fromJust ui)
+                then return (xi, fromJust li .-. vi)
+                else return (xi, vi .-. fromJust ui)
           return $ Just $ fst $ maximumBy (comparing snd) xs2
 
 {--------------------------------------------------------------------
@@ -574,9 +598,9 @@ increaseNB solver xj = do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
-    return [ assert (theta >= 0) ((xi,v2), theta)
+    return [ assert (theta >= lzero) ((xi,v2), theta)
            | Just v2 <- [ui | aij > 0] ++ [li | aij < 0]
-           , let theta = (v2 - v1) / aij ]
+           , let theta = (v2 .-. v1) ./. aij ]
 
   -- β(xj) := β(xj) + θ なので θ を大きく
   case ubs of
@@ -597,9 +621,9 @@ decreaseNB solver xj = do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
-    return [ assert (theta <= 0) ((xi,v2), theta)
+    return [ assert (theta <= lzero) ((xi,v2), theta)
            | Just v2 <- [li | aij > 0] ++ [ui | aij < 0]
-           , let theta = (v2 - v1) / aij ]
+           , let theta = (v2 .-. v1) ./. aij ]
 
   -- β(xj) := β(xj) + θ なので θ を小さく
   case lbs of
@@ -621,34 +645,57 @@ getCol solver xj = do
   Extract results
 --------------------------------------------------------------------}
 
-type Model = IM.IntMap Rational
+type RawModel = IM.IntMap Value
 
-model :: Solver -> IO Model
-model solver = do
+rawModel :: Solver -> IO RawModel
+rawModel solver = do
   xs <- variables solver
   liftM IM.fromList $ forM xs $ \x -> do
     val <- getValue solver x
     return (x,val)
 
-getObjValue :: Solver -> IO Rational
+getObjValue :: Solver -> IO Value
 getObjValue solver = getValue solver objVar  
 
+type Model = IM.IntMap Rational
+
+{-
+model :: Solver -> IO Model
+model solver = do
+  xs <- variables solver
+  ys <- liftM concat $ forM xs $ \x -> do
+    Delta p q  <- getValue solver x
+    lb <- getLB solver x
+    ub <- getUB solver x
+    return $
+      [(p - c) / (k - q) | Just (Delta c k) <- return lb, c < p, k > q] ++
+      [(d - p) / (q - h) | Just (Delta d h) <- return ub, p < d, q > h]
+  let delta0 :: Rational
+      delta0 = minimum ys
+      f :: Value -> Rational
+      f (Delta r k) = r + k * delta0
+  liftM (IM.map f) $ readIORef (svModel solver)
+-}
+
+model :: Solver -> IO Model
+model = rawModel
+  
 {--------------------------------------------------------------------
   major function
 --------------------------------------------------------------------}
 
-update :: Solver -> Var -> Rational -> IO ()
+update :: Solver -> Var -> Value -> IO ()
 update solver xj v = do
   -- log solver $ printf "before update x%d (%s)" xj (show v)
   -- dump solver
 
   t <- readIORef (svTableau solver)
   v0 <- getValue solver xj
-  let diff = v - v0
+  let diff = v .-. v0
 
   modifyIORef (svModel solver) $ \m ->
-    let m2 = IM.map (\ei -> LA.coeff xj ei * diff) t
-    in IM.insert xj v $ IM.unionWith (+) m2 m
+    let m2 = IM.map (\ei -> LA.coeff xj ei .*. diff) t
+    in IM.insert xj v $ IM.unionWith (.+.) m2 m
 
   -- log solver $ printf "after update x%d (%s)" xj (show v)
   -- dump solver
@@ -662,7 +709,7 @@ pivot solver xi xj = do
         IM.insert xj xj_def . IM.map (LA.applySubst1 xj xj_def) . IM.delete xi $ defs
       _ -> error "pivot: should not happen"
 
-pivotAndUpdate :: Solver -> Var -> Var -> Rational -> IO ()
+pivotAndUpdate :: Solver -> Var -> Var -> Value -> IO ()
 pivotAndUpdate solver xi xj v | xi == xj = update solver xi v -- xi = xj is non-basic variable
 pivotAndUpdate solver xi xj v = do
   -- xi is basic variable
@@ -674,10 +721,10 @@ pivotAndUpdate solver xi xj v = do
   m <- readIORef (svModel solver)
   t <- readIORef (svTableau solver)
   aij <- getCoeff solver xi xj
-  let theta = (v - (m IM.! xi)) / aij
+  let theta = (v .-. (m IM.! xi)) ./. aij
   let m' = IM.fromList $
-           [(xi, v), (xj, (m IM.! xj) + theta)] ++
-           [(xk, (m IM.! xk) + (LA.coeff xj e * theta)) | (xk, e) <- IM.toList t, xk /= xi]
+           [(xi, v), (xj, (m IM.! xj) .+. theta)] ++
+           [(xk, (m IM.! xk) .+. (LA.coeff xj e .*. theta)) | (xk, e) <- IM.toList t, xk /= xi]
 
   writeIORef (svModel solver) (IM.union m' m) -- note that 'IM.union' is left biased.
   pivot solver xi xj
@@ -685,12 +732,12 @@ pivotAndUpdate solver xi xj v = do
   -- log solver $ printf "after pivotAndUpdate x%d x%d (%s)" xi xj (show v)
   -- dump solver
 
-getLB :: Solver -> Var -> IO (Maybe Rational)
+getLB :: Solver -> Var -> IO (Maybe Value)
 getLB solver x = do
   lb <- readIORef (svLB solver)
   return $ IM.lookup x lb
 
-getUB :: Solver -> Var -> IO (Maybe Rational)
+getUB :: Solver -> Var -> IO (Maybe Value)
 getUB solver x = do
   ub <- readIORef (svUB solver)
   return $ IM.lookup x ub
@@ -700,7 +747,7 @@ getTableau solver = do
   t <- readIORef (svTableau solver)
   return $ IM.delete objVar t
 
-getValue :: Solver -> Var -> IO Rational
+getValue :: Solver -> Var -> IO Value
 getValue solver x = do
   m <- readIORef (svModel solver)
   return $ m IM.! x
@@ -739,11 +786,11 @@ findM p (x:xs) = do
   then return (Just x)
   else findM p xs
 
-testLB :: Maybe Rational -> Rational -> Bool
+testLB :: Maybe Value -> Value -> Bool
 testLB Nothing _  = True
 testLB (Just l) x = l <= x
 
-testUB :: Maybe Rational -> Rational -> Bool
+testUB :: Maybe Value -> Value -> Bool
 testUB Nothing _  = True
 testUB (Just u) x = x <= u
 
@@ -804,8 +851,8 @@ test4 = do
   x1 <- newVar solver
 
   writeIORef (svTableau solver) (IM.fromList [(x1, LA.varExpr x0)])
-  writeIORef (svLB solver) (IM.fromList [(x0, 0), (x1, 0)])
-  writeIORef (svUB solver) (IM.fromList [(x0, 2), (x1, 3)])
+  writeIORef (svLB solver) (IM.fromList [(x0, toValue 0), (x1, toValue 0)])
+  writeIORef (svUB solver) (IM.fromList [(x0, toValue 2), (x1, toValue 3)])
   setObj solver (LA.fromTerms [(-1, x0)])
 
   ret <- optimize solver
@@ -820,8 +867,8 @@ test5 = do
   x1 <- newVar solver
 
   writeIORef (svTableau solver) (IM.fromList [(x1, LA.varExpr x0)])
-  writeIORef (svLB solver) (IM.fromList [(x0, 0), (x1, 0)])
-  writeIORef (svUB solver) (IM.fromList [(x0, 2), (x1, 0)])
+  writeIORef (svLB solver) (IM.fromList [(x0, toValue 0), (x1, toValue 0)])
+  writeIORef (svUB solver) (IM.fromList [(x0, toValue 2), (x1, toValue 0)])
   setObj solver (LA.fromTerms [(-1, x0)])
 
   checkFeasibility solver
@@ -829,6 +876,22 @@ test5 = do
   ret <- optimize solver
   print ret
   dump solver
+
+test6 :: IO ()
+test6 = do
+  solver <- newSolver
+  setLogger solver putStrLn
+  x0 <- newVar solver
+
+  assertAtom solver (LA.constExpr 1 .<. LA.varExpr x0)
+  assertAtom solver (LA.constExpr 2 .>. LA.varExpr x0)
+
+  ret <- check solver
+  print ret
+  dump solver
+
+  m <- model solver
+  print m
 
 dumpSize :: Solver -> IO ()
 dumpSize solver = do
