@@ -84,10 +84,10 @@ data Node r
 --  , ndCutSlackVariables :: VarSet
   }
 
-ndTableau :: Node r -> Simplex.Tableau r
+ndTableau :: Node r  -> Simplex.Tableau r
 ndTableau node = evalState getTableau (ndSolver node)
 
-ndLowerBound :: Num r => Node r -> r
+ndLowerBound :: (Num r, Eq r) => Node r -> r
 ndLowerBound node = evalState (liftM Simplex.currentObjValue getTableau) (ndSolver node)
 
 data Err = ErrUnbounded | ErrUnsat deriving (Ord, Eq, Show, Enum, Bounded)

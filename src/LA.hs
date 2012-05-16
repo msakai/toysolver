@@ -73,7 +73,7 @@ newtype Expr r
   } deriving (Eq, Ord)
 
 -- | Create a @Expr@ from a mapping from variables to coefficients.
-fromCoeffMap :: Num r => IM.IntMap r -> Expr r
+fromCoeffMap :: (Num r, Eq r) => IM.IntMap r -> Expr r
 fromCoeffMap m = normalizeExpr (Expr m)
 
 -- | terms contained in the expression.
@@ -81,7 +81,7 @@ terms :: Expr r -> [(r,Var)]
 terms (Expr m) = [(c,v) | (v,c) <- IM.toList m]
 
 -- | Create a @Expr@ from a list of terms.
-fromTerms :: Num r => [(r,Var)] -> Expr r
+fromTerms :: (Num r, Eq r) => [(r,Var)] -> Expr r
 fromTerms ts = fromCoeffMap $ IM.fromListWith (+) [(x,c) | (c,x) <- ts]
 
 instance Variables (Expr r) where
@@ -91,7 +91,7 @@ instance Show r => Show (Expr r) where
   showsPrec d m  = showParen (d > 10) $
     showString "fromTerms " . shows (terms m)
 
-instance (Num r, Read r) => Read (Expr r) where
+instance (Num r, Eq r, Read r) => Read (Expr r) where
   readsPrec p = readParen (p > 10) $ \ r -> do
     ("fromTerms",s) <- lex r
     (xs,t) <- reads s
@@ -111,7 +111,7 @@ asConst (Expr m) =
     [(v,x)] | v==unitVar -> Just x
     _ -> Nothing
 
-normalizeExpr :: Num r => Expr r -> Expr r
+normalizeExpr :: (Num r, Eq r) => Expr r -> Expr r
 normalizeExpr (Expr t) = Expr $ IM.filter (0/=) t
 
 -- | variable
@@ -119,24 +119,24 @@ varExpr :: Num r => Var -> Expr r
 varExpr v = Expr $ IM.singleton v 1
 
 -- | constant
-constExpr :: Num r => r -> Expr r
+constExpr :: (Num r, Eq r) => r -> Expr r
 constExpr c = normalizeExpr $ Expr $ IM.singleton unitVar c
 
 -- | map coefficients.
-mapCoeff :: Num b => (a -> b) -> Expr a -> Expr b
+mapCoeff :: (Num b, Eq b) => (a -> b) -> Expr a -> Expr b
 mapCoeff f (Expr t) = Expr $ IM.mapMaybe g t
   where
     g c = if c' == 0 then Nothing else Just c'
       where c' = f c
 
 -- | map coefficients.
-mapCoeffWithVar :: Num b => (a -> Var -> b) -> Expr a -> Expr b
+mapCoeffWithVar :: (Num b, Eq b) => (a -> Var -> b) -> Expr a -> Expr b
 mapCoeffWithVar f (Expr t) = Expr $ IM.mapMaybeWithKey g t
   where
     g v c = if c' == 0 then Nothing else Just c'
       where c' = f c v
 
-instance Num r => Linear r (Expr r) where
+instance (Num r, Eq r) => Linear r (Expr r) where
   e1 .+. e2 = normalizeExpr $ plus e1 e2
   c .*. e = mapCoeff (c*) e
   lzero = Expr $ IM.empty
@@ -161,7 +161,7 @@ lift1 unit f (Expr t) = lsum [c .*. (g v) | (v,c) <- IM.toList t]
       | v==unitVar = unit
       | otherwise   = f v
 
-applySubst :: Num r => VarMap (Expr r) -> Expr r -> Expr r
+applySubst :: (Num r, Eq r) => VarMap (Expr r) -> Expr r -> Expr r
 applySubst s (Expr m) = lsum (map f (IM.toList m))
   where
     f (v,c) = c .*. (
@@ -169,7 +169,7 @@ applySubst s (Expr m) = lsum (map f (IM.toList m))
         Just tm -> tm
         Nothing -> varExpr v)
 
-applySubst1 :: Num r => Var -> Expr r -> Expr r -> Expr r
+applySubst1 :: (Num r, Eq r) => Var -> Expr r -> Expr r -> Expr r
 applySubst1 x e e1 =
   case extractMaybe x e1 of
     Nothing -> e1
@@ -216,12 +216,12 @@ extractMaybe v (Expr m) =
     (Just c, m2) -> Just (c, Expr m2)
 -}
 
-showExpr :: (Num r, Show r) => Expr r -> String
+showExpr :: (Num r, Eq r, Show r) => Expr r -> String
 showExpr = showExprWith f
   where
     f x = "x" ++ show x
 
-showExprWith :: (Num r, Show r) => (Var -> String) -> Expr r -> String
+showExprWith :: (Num r, Show r, Eq r) => (Var -> String) -> Expr r -> String
 showExprWith env (Expr m) = foldr (.) id xs ""
   where
     xs = intersperse (showString " + ") ts
@@ -246,7 +246,7 @@ instance Variables (Atom r) where
 instance Formula.Rel (Expr r) (Atom r) where
   rel op a b = Atom a op b
 
-showAtom :: (Num r, Show r) => Atom r -> String
+showAtom :: (Num r, Eq r, Show r) => Atom r -> String
 showAtom (Atom lhs op rhs) = showExpr lhs ++ Formula.showOp op ++ showExpr rhs
 
 -- | Solve linear (in)equation for the given variable.

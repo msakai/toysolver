@@ -65,7 +65,7 @@ data PivotResult r = PivotUnbounded | PivotFinished | PivotSuccess (Tableau r)
 objRow :: RowIndex
 objRow = -1
 
-pivot :: Fractional r => RowIndex -> ColIndex -> Tableau r -> Tableau r
+pivot :: (Fractional r, Eq r) => RowIndex -> ColIndex -> Tableau r -> Tableau r
 {-# INLINE pivot #-}
 {-# SPECIALIZE pivot :: RowIndex -> ColIndex -> Tableau Rational -> Tableau Rational #-}
 {-# SPECIALIZE pivot :: RowIndex -> ColIndex -> Tableau Double -> Tableau Double #-}
@@ -92,7 +92,7 @@ lookupRow :: RowIndex -> Tableau r -> Row r
 lookupRow r m = m IM.! r
 
 -- 行の基底変数の列が0になるように変形
-normalizeRow :: Num r => Tableau r -> Row r -> Row r
+normalizeRow :: (Num r, Eq r) => Tableau r -> Row r -> Row r
 normalizeRow a (row0,val0) = obj'
   where
     obj' = g $ foldl' f (IM.empty, val0) $ 
@@ -103,25 +103,25 @@ normalizeRow a (row0,val0) = obj'
     f (m1,v1) (m2,v2) = (IM.unionWith (+) m1 m2, v1+v2)
     g (m,v) = (IM.filter (0/=) m, v)
 
-setRow :: Num r => RowIndex -> Tableau r -> Row r -> Tableau r
+setRow :: (Num r, Eq r) => RowIndex -> Tableau r -> Row r -> Tableau r
 setRow i tbl row = assert (validTableau tbl) $ assert (validTableau tbl') $ tbl'
   where
     tbl' = IM.insert i (normalizeRow tbl row) tbl
 
-setObjFun :: Num r => Tableau r -> LA.Expr r -> Tableau r
+setObjFun :: (Num r, Eq r) => Tableau r -> LA.Expr r -> Tableau r
 setObjFun tbl e = setRow objRow tbl row
   where
     row =
       case LA.extract LA.unitVar e of
         (c, e') -> (LA.coeffMap (lnegate e'), c)
 
-copyObjRow :: Num r => Tableau r -> Tableau r -> Tableau r
+copyObjRow :: (Num r, Eq r) => Tableau r -> Tableau r -> Tableau r
 copyObjRow from to =
   case IM.lookup objRow from of
     Nothing -> IM.delete objRow to
     Just row -> setRow objRow to row
 
-currentObjValue :: Num r => Tableau r -> r
+currentObjValue :: (Num r, Eq r) => Tableau r -> r
 currentObjValue = snd . lookupRow objRow
 
 validTableau :: Tableau r -> Bool
@@ -253,7 +253,7 @@ removeArtificialVariables avs tbl0 = tbl2
 
 -- ---------------------------------------------------------------------------
 
-toCSV :: Num r => (r -> String) -> Tableau r -> String
+toCSV :: (Num r, Eq r, Show r) => (r -> String) -> Tableau r -> String
 toCSV showCell tbl = unlines . map (concat . intersperse ",") $ header : body
   where
     header :: [String]

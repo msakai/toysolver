@@ -141,12 +141,12 @@ addConstraint2 c = do
         [(-1,_)] -> True
         _ -> False
 
-expandDefs :: Num r => LA.Expr r -> LP r (LA.Expr r)
+expandDefs :: (Num r, Eq r) => LA.Expr r -> LP r (LA.Expr r)
 expandDefs e = do
   defs <- getDefs
   return $ LA.applySubst defs e
 
-expandDefs' :: Num r => LA.Atom r -> LP r (LA.Atom r)
+expandDefs' :: (Num r, Eq r) => LA.Atom r -> LP r (LA.Atom r)
 expandDefs' (LA.Atom lhs op rhs) = do
   lhs' <- expandDefs lhs
   rhs' <- expandDefs rhs
