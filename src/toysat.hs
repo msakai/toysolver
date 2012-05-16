@@ -203,6 +203,9 @@ printSysInfo = do
   hPrintf stdout "c arch = %s\n" SysInfo.arch
   hPrintf stdout "c os = %s\n" SysInfo.os
   hPrintf stdout "c compiler = %s %s\n" SysInfo.compilerName (showVersion SysInfo.compilerVersion)
+  hPutStrLn stdout "c packages:"
+  forM_ packageVersions $ \(package, ver) -> do
+    hPrintf stdout "c   %s-%s\n" package ver
 
 newSolver :: Options -> IO SAT.Solver
 newSolver opts = do

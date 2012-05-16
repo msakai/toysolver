@@ -84,6 +84,7 @@ Executable toysat
      FlexibleInstances
      BangPatterns
      DoAndIfThenElse
+     CPP
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
 
