@@ -43,6 +43,9 @@ import Text.Printf
 #ifdef __GLASGOW_HASKELL__
 import GHC.Environment (getFullArgs)
 #endif
+#ifdef FORCE_CHAR8
+import GHC.IO.Encoding
+#endif
 
 import Linear
 import qualified SAT
@@ -154,6 +157,12 @@ options =
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setLocaleEncoding char8
+  setForeignEncoding char8
+  setFileSystemEncoding char8
+#endif
+
   start <- getCPUTime
   args <- getArgs
   case getOpt Permute options args of
