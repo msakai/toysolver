@@ -54,6 +54,7 @@ import qualified LPFile
 import qualified Linearizer as Lin
 import qualified SAT.Integer
 import Version
+import Util (showRational)
 
 -- ------------------------------------------------------------------------
 
@@ -650,17 +651,11 @@ solveLP opt solver lp = do
           obj2 = lsum [asInteger (r * fromIntegral d) .*. (vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- obj]
           SAT.Integer.Expr obj3 obj3_c = obj2
 
-      let showValue :: Rational -> String
-          showValue v
-            | denominator v == 1 = show (numerator v)
-            | optPrintRational opt = show (numerator v) ++ "/" ++ show (denominator v)
-            | otherwise = show (fromRational v :: Double)
-
       modelRef <- newIORef Nothing
 
       result <- try $ minimize opt solver obj3 $ \m val -> do
         writeIORef modelRef (Just m)
-        putStrLn $ "o " ++ showValue (fromIntegral (val + obj3_c) / fromIntegral d)
+        putStrLn $ "o " ++ showRational (optPrintRational opt) (fromIntegral (val + obj3_c) / fromIntegral d)
         hFlush stdout
 
       let printModel :: SAT.Model -> IO ()

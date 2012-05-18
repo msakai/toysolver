@@ -78,6 +78,9 @@ module Simplex2
   , PivotStrategy (..)
   , setPivotStrategy
 
+  -- * Utility
+  , showValue
+
   -- * Debug
   , dump
   ) where
@@ -89,6 +92,7 @@ import Data.Ord
 import Data.IORef
 import Data.List
 import Data.Maybe
+import Data.Ratio
 import qualified Data.IntMap as IM
 import Text.Printf
 import Data.OptDir
@@ -100,6 +104,7 @@ import qualified Formula as F
 import Formula (RelOp (..), (.<=.), (.>=.), (.==.), (.<.), (.>.))
 import Linear
 import Delta
+import Util (showRational)
 
 {--------------------------------------------------------------------
   Value
@@ -816,6 +821,22 @@ recordTime solver act = do
   (log solver . printf "time = %.3fs") (fromIntegral (end - start) / 10^(12::Int) :: Double)
   (log solver . printf "#pivot = %d") =<< readIORef (svNPivot solver)
   return result
+
+showValue :: Bool -> Rational -> String
+showValue = showRational
+-- showValue = showDelta
+
+showDelta :: Bool -> Delta Rational -> String
+showDelta asRatio v = 
+  case v of
+    (Delta r k) -> 
+      f r ++
+        case compare k 0 of
+          EQ -> ""
+          GT -> " + " ++ f k ++ " delta"
+          LT -> " - " ++ f (abs k) ++ " delta"
+  where
+    f = showRational asRatio
 
 {--------------------------------------------------------------------
   Logging

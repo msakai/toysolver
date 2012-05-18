@@ -15,6 +15,8 @@
 
 module Util where
 
+import Data.Ratio
+
 -- | Combining two @Maybe@ values using given function.
 combineMaybe :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a
 combineMaybe _ Nothing y = y
@@ -36,3 +38,9 @@ isInteger x = fromInteger (round x) == x
 -- @
 fracPart :: RealFrac a => a -> a
 fracPart x = x - fromInteger (floor x)
+
+showRational :: Bool -> Rational -> String
+showRational asRatio v
+  | denominator v == 1 = show (numerator v)
+  | asRatio            = show (numerator v) ++ "/" ++ show (denominator v)
+  | otherwise          = show (fromRational v :: Double)

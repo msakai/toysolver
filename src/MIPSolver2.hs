@@ -334,13 +334,9 @@ prune solver lb = do
       return $ if dir==OptMin then best <= lb else best >= lb
 
 showValue :: Solver -> Rational -> IO String
-showValue solver v
-  | denominator v == 1 = return $ show (numerator v)
-  | otherwise = do
-      printRat <- readIORef (mipShowRational solver)
-      if printRat
-        then return $ show (numerator v) ++ "/" ++ show (denominator v)
-        else return $ show (fromRational v :: Double)
+showValue solver v = do
+  printRat <- readIORef (mipShowRational solver)
+  return $ Simplex2.showValue printRat v
 
 setShowRational :: Solver -> Bool -> IO ()
 setShowRational solver = writeIORef (mipShowRational solver)

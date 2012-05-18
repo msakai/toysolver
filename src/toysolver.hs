@@ -39,6 +39,7 @@ import qualified LPFile as LP
 import qualified Simplex2
 import qualified MIPSolver2
 import Version
+import Util
 
 -- ---------------------------------------------------------------------------
 
@@ -202,10 +203,7 @@ run solver opt lp = do
     printRat = PrintRational `elem` opt
 
     showValue :: Rational -> String
-    showValue v
-      | denominator v == 1 = show (numerator v)
-      | printRat  = show (numerator v) ++ "/" ++ show (denominator v)
-      | otherwise = show (fromRational v :: Double)
+    showValue = showRational printRat
 
 -- ---------------------------------------------------------------------------
 
