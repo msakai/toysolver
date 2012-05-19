@@ -395,7 +395,7 @@ deriveGomoryCut lp ivs xi = do
 
   xs1 <- forM js $ \(aij, xj) -> do
     vj <- Simplex2.getValue lp xj
-    let fj = fracPart vj
+    let fj = fracPart aij
     Just lj <- Simplex2.getLB lp xj
     let c = if xj `IS.member` ivs
             then (if fj <= 1 - f0 then fj  / (1 - f0) else ((1 - fj) / f0))
@@ -403,7 +403,7 @@ deriveGomoryCut lp ivs xi = do
     return $ c .*. (LA.varExpr xj .-. LA.constExpr lj)
   xs2 <- forM ks $ \(aij, xj) -> do
     vj <- Simplex2.getValue lp xj
-    let fj = fracPart vj
+    let fj = fracPart aij
     Just uj <- Simplex2.getUB lp xj
     let c = if xj `IS.member` ivs
             then (if fj <= f0 then fj  / f0 else ((1 - fj) / (1 - f0)))
