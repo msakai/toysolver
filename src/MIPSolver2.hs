@@ -178,9 +178,10 @@ branchAndBound solver update = do
 
   pool <- newTVarIO (Seq.singleton root)
   activeThreads <- newTVarIO (Map.empty)
+  visitedNodes <- newTVarIO 0
 
-  let addNode :: Node -> IO ()
-      addNode nd = atomically $ do
+  let addNode :: Node -> STM ()
+      addNode nd = do
         modifyTVar pool (Seq.|> nd)
 
       pickNode :: IO (Maybe Node)
@@ -241,13 +242,16 @@ branchAndBound solver update = do
                       let lp1 = lp
                       lp2 <- Simplex2.cloneSolver lp
                       Simplex2.assertAtom lp1 (LA.varExpr v0 .<=. LA.constExpr (fromInteger (floor val0)))
-                      addNode $ Node lp1 (ndDepth node + 1) val
                       Simplex2.assertAtom lp2 (LA.varExpr v0 .>=. LA.constExpr (fromInteger (ceiling val0)))
-                      addNode $ Node lp2 (ndDepth node + 1) val
+                      atomically $ do
+                        addNode $ Node lp1 (ndDepth node + 1) val
+                        addNode $ Node lp2 (ndDepth node + 1) val
+                        modifyTVar visitedNodes (+1)
                     Just v -> do -- cut
                       atom <- deriveGomoryCut lp (mipIVs solver) v
                       Simplex2.assertAtom lp atom
-                      addNode $ Node lp (ndDepth node + 1) val
+                      atomically $ do
+                        addNode $ Node lp (ndDepth node + 1) val
 
   let isCompleted = do
         nodes <- readTVar pool
@@ -279,10 +283,11 @@ branchAndBound solver update = do
 
   th <- forkIO $ do
     let loop = do
-          nodes <- atomically $ do
+          (nodes, visited::Int) <- atomically $ do
             nodes   <- readTVar pool
             athreads <- readTVar activeThreads
-            return (Seq.fromList (Map.elems athreads) Seq.>< nodes)
+            visited <- readTVar visitedNodes
+            return (Seq.fromList (Map.elems athreads) Seq.>< nodes, visited)
           if Seq.null nodes
             then return ()
             else do
@@ -316,7 +321,7 @@ branchAndBound solver update = do
                       OptMin -> p ++ " >= " ++ d
                       OptMax -> p ++ " <= " ++ d
 
-              log solver $ printf "time = %d sec; nodes: %d; %s; gap = %s" spent (Seq.length nodes) range g
+              log solver $ printf "time = %d sec; active nodes = %d; visited nodes = %d; %s; gap = %s" spent (Seq.length nodes) visited range g
               threadDelay (2*1000*1000) -- 2s
               loop
     loop
