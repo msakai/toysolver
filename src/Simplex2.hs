@@ -238,10 +238,7 @@ assertAtom solver (LA.Atom lhs op rhs) = do
       [(-1,v)] -> return (v, F.flipOp op, -rhs')
       _ -> do
         v <- newVar solver
-        t <- readIORef (svTableau solver)
-        let def = LA.applySubst t lhs'
-        modifyIORef (svTableau solver) (IM.insert v def)
-        modifyIORef (svModel solver) $ \m -> IM.insert v (LA.evalLinear m (toValue 1) def) m
+        setRow solver v lhs'
         return (v,op,rhs')
   case op of
     F.Le  -> assertUpper solver v (toValue rhs')
@@ -287,11 +284,14 @@ assertUpper solver x u = do
 -- | minimization
 -- FIXME: 式に定数項が含まれる可能性を考えるとこれじゃまずい?
 setObj :: Solver -> LA.Expr Rational -> IO ()
-setObj solver e = do
+setObj solver e = setRow solver objVar e
+
+setRow :: Solver -> Var -> LA.Expr Rational -> IO ()
+setRow solver v e = do
   modifyIORef (svTableau solver) $ \t ->
-    IM.insert objVar (LA.applySubst t e) t
+    IM.insert v (LA.applySubst t e) t
   modifyIORef (svModel solver) $ \m -> 
-    IM.insert objVar (LA.evalLinear m (toValue 1) e) m
+    IM.insert v (LA.evalLinear m (toValue 1) e) m  
 
 setOptDir :: Solver -> OptDir -> IO ()
 setOptDir solver dir = writeIORef (svOptDir solver) dir
@@ -490,14 +490,14 @@ selectViolatingBasicVariable solver = do
       ui <- getUB solver xi
       vi <- getValue solver xi
       return $ not (testLB li vi) || not (testUB ui vi)
-  t <- readIORef (svTableau solver)
+  vs <- basicVariables solver
 
   ps <- readIORef (svPivotStrategy solver)
   case ps of
     PivotStrategyBlandRule ->
-      findM p (IM.keys t)
+      findM p vs
     PivotStrategyLargestCoefficient -> do
-      xs <- filterM p (IM.keys t)
+      xs <- filterM p vs
       case xs of
         [] -> return Nothing
         _ -> do
@@ -599,7 +599,7 @@ increaseNB solver xj = do
 
   -- Upper bounds of θ
   -- NOTE: xj 自体の上限も考慮するのに注意
-  ubs <- liftM concat $ forM ((xj,1) : col) $ \(xi,aij) -> do
+  ubs <- liftM concat $ forM ((xj,1) : IM.toList col) $ \(xi,aij) -> do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
@@ -622,7 +622,7 @@ decreaseNB solver xj = do
 
   -- Lower bounds of θ
   -- NOTE: xj 自体の下限も考慮するのに注意
-  lbs <- liftM concat $ forM ((xj,1) : col) $ \(xi,aij) -> do
+  lbs <- liftM concat $ forM ((xj,1) : IM.toList col) $ \(xi,aij) -> do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
@@ -639,12 +639,10 @@ decreaseNB solver xj = do
       return True
 
 -- aijが非ゼロの列も全部探しているのは効率が悪い
-getCol :: Solver -> Var -> IO [(Var,Rational)]
+getCol :: Solver -> Var -> IO (IM.IntMap Rational)
 getCol solver xj = do
   t <- readIORef (svTableau solver)
-  return [ (xi, aij)
-         | (xi, xi_def) <- IM.toList t
-         , aij <- maybeToList (LA.lookupCoeff xj xi_def) ]
+  return $ IM.mapMaybe (LA.lookupCoeff xj) t
 
 {--------------------------------------------------------------------
   Extract results
@@ -694,12 +692,12 @@ update solver xj v = do
   -- log solver $ printf "before update x%d (%s)" xj (show v)
   -- dump solver
 
-  t <- readIORef (svTableau solver)
   v0 <- getValue solver xj
   let diff = v .-. v0
 
+  aj <- getCol solver xj
   modifyIORef (svModel solver) $ \m ->
-    let m2 = IM.map (\ei -> LA.coeff xj ei .*. diff) t
+    let m2 = IM.map (\aij -> aij .*. diff) aj
     in IM.insert xj v $ IM.unionWith (.+.) m2 m
 
   -- log solver $ printf "after update x%d (%s)" xj (show v)
@@ -724,14 +722,16 @@ pivotAndUpdate solver xi xj v = do
   -- dump solver
 
   m <- readIORef (svModel solver)
-  t <- readIORef (svTableau solver)
-  aij <- getCoeff solver xi xj
+
+  aj <- getCol solver xj
+  let aij = aj IM.! xi
   let theta = (v .-. (m IM.! xi)) ./. aij
+
   let m' = IM.fromList $
            [(xi, v), (xj, (m IM.! xj) .+. theta)] ++
-           [(xk, (m IM.! xk) .+. (LA.coeff xj e .*. theta)) | (xk, e) <- IM.toList t, xk /= xi]
-
+           [(xk, (m IM.! xk) .+. (akj .*. theta)) | (xk, akj) <- IM.toList aj, xk /= xi]
   writeIORef (svModel solver) (IM.union m' m) -- note that 'IM.union' is left biased.
+
   pivot solver xi xj
 
   -- log solver $ printf "after pivotAndUpdate x%d x%d (%s)" xi xj (show v)
@@ -803,6 +803,11 @@ variables :: Solver -> IO [Var]
 variables solver = do
   vcnt <- nVars solver
   return [0..vcnt-1]
+
+basicVariables :: Solver -> IO [Var]
+basicVariables solver = do
+  t <- readIORef (svTableau solver)
+  return (IM.keys t)
 
 modifyIORef' :: IORef a -> (a -> a) -> IO ()
 modifyIORef' ref f = do
