@@ -137,7 +137,11 @@ mapCoeffWithVar f (Expr t) = Expr $ IM.mapMaybeWithKey g t
       where c' = f c v
 
 instance (Num r, Eq r) => Linear r (Expr r) where
+  Expr t .+. e2 | IM.null t = e2
+  e1 .+. Expr t | IM.null t = e1
   e1 .+. e2 = normalizeExpr $ plus e1 e2
+  1 .*. e = e
+  0 .*. e = lzero
   c .*. e = mapCoeff (c*) e
   lzero = Expr $ IM.empty
 
@@ -169,6 +173,7 @@ applySubst s (Expr m) = lsum (map f (IM.toList m))
         Just tm -> tm
         Nothing -> varExpr v)
 
+-- | applySubst1 x e e1 == e1[e/x]
 applySubst1 :: (Num r, Eq r) => Var -> Expr r -> Expr r -> Expr r
 applySubst1 x e e1 =
   case extractMaybe x e1 of
