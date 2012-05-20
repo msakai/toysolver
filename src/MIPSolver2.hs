@@ -52,11 +52,11 @@ import Data.OptDir
 import Data.Ord
 import Data.IORef
 import Data.Maybe
-import Data.Ratio
 import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
-import qualified Data.Set as Set
+import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
+import qualified Data.Foldable as F
 import System.CPUTime
 import Text.Printf
 
@@ -72,7 +72,7 @@ data Solver
   = MIP
   { mipRootLP :: Simplex2.Solver
   , mipIVs    :: IS.IntSet
-  , mipBest   :: IORef (Maybe (Node, Rational))
+  , mipBest   :: TVar (Maybe (Node, Rational))
 
   , mipNThread :: IORef Int
   , mipLogger  :: IORef (Maybe (String -> IO ()))
@@ -83,6 +83,7 @@ data Node =
   Node
   { ndLP    :: Simplex2.Solver
   , ndDepth :: {-# UNPACK #-} !Int
+  , ndValue :: Rational
   }
 
 newSolver :: Simplex2.Solver -> IS.IntSet -> IO Solver
@@ -101,7 +102,7 @@ newSolver lp ivs = do
         Simplex2.assertLower lp2 v (fromInteger (floor u))
       _ -> return ()
 
-  bestRef <- newIORef Nothing
+  bestRef <- newTVarIO Nothing
 
   nthreadRef <- newIORef 0
   logRef  <- newIORef Nothing
@@ -164,17 +165,19 @@ optimize solver update = do
         log solver "MIP: Integer optimization begins..."
         Simplex2.clearLogger lp
         branchAndBound solver update
-        m <- readIORef (mipBest solver)
+        m <- readTVarIO (mipBest solver)
         case m of
           Nothing -> return Unsat
           Just _ -> return Optimum
 
 branchAndBound :: Solver -> (Model -> Rational -> IO ()) -> IO ()
 branchAndBound solver update = do
-  let root = Node{ ndLP = mipRootLP solver, ndDepth = 0 }
+  dir <- Simplex2.getOptDir (mipRootLP solver)
+  rootVal <- Simplex2.getObjValue (mipRootLP solver)
+  let root = Node{ ndLP = mipRootLP solver, ndDepth = 0, ndValue = rootVal }
 
   pool <- newTVarIO (Seq.singleton root)
-  activeThreads <- newTVarIO (Set.empty)
+  activeThreads <- newTVarIO (Map.empty)
 
   let addNode :: Node -> IO ()
       addNode nd = atomically $ do
@@ -183,17 +186,17 @@ branchAndBound solver update = do
       pickNode :: IO (Maybe Node)
       pickNode = do
         self <- myThreadId
-        atomically $ modifyTVar activeThreads (Set.delete self)
+        atomically $ modifyTVar activeThreads (Map.delete self)
         atomically $ do
           s <- readTVar pool
           case Seq.viewl s of
             nd Seq.:< s2 -> do
               writeTVar pool s2
-              modifyTVar activeThreads (Set.insert self)
+              modifyTVar activeThreads (Map.insert self nd)
               return (Just nd)
             Seq.EmptyL -> do
               ths <- readTVar activeThreads
-              if Set.null ths
+              if Map.null ths
                 then return Nothing
                 else retry
 
@@ -201,15 +204,16 @@ branchAndBound solver update = do
       updateBest node val = do
         let lp = ndLP node
         m <- Simplex2.model lp
-        dir <- Simplex2.getOptDir lp
-        ret <- atomicModifyIORef (mipBest solver) $ \old -> do
+        ret <- atomically $ do
+          old <- readTVar (mipBest solver)
           case old of
-            Nothing -> (Just (node, val), True)
+            Nothing -> do
+              writeTVar (mipBest solver) (Just (node, val))
+              return True
             Just (_, best) -> do
               let isBetter = if dir==OptMin then val < best else val > best
-              if isBetter
-                then (Just (node, val), True)
-                else (old, False)
+              when isBetter $ writeTVar (mipBest solver) (Just (node, val))
+              return isBetter
         when ret $ update m val -- 複数スレッドからupdateが同時に呼ばれてまずい可能性がある
 
       processNode :: Node -> IO ()
@@ -237,18 +241,18 @@ branchAndBound solver update = do
                       let lp1 = lp
                       lp2 <- Simplex2.cloneSolver lp
                       Simplex2.assertAtom lp1 (LA.varExpr v0 .<=. LA.constExpr (fromInteger (floor val0)))
-                      addNode $ Node lp1 (ndDepth node + 1)
+                      addNode $ Node lp1 (ndDepth node + 1) val
                       Simplex2.assertAtom lp2 (LA.varExpr v0 .>=. LA.constExpr (fromInteger (ceiling val0)))
-                      addNode $ Node lp2 (ndDepth node + 1)
+                      addNode $ Node lp2 (ndDepth node + 1) val
                     Just v -> do -- cut
                       atom <- deriveGomoryCut lp (mipIVs solver) v
                       Simplex2.assertAtom lp atom
-                      addNode $ Node lp (ndDepth node + 1)
+                      addNode $ Node lp (ndDepth node + 1) val
 
   let isCompleted = do
         nodes <- readTVar pool
         threads <- readTVar activeThreads
-        return $ Seq.null nodes && Set.null threads
+        return $ Seq.null nodes && Map.null threads
 
   -- fork worker threads
   nthreads <- do
@@ -275,16 +279,43 @@ branchAndBound solver update = do
 
   th <- forkIO $ do
     let loop = do
-          n <- atomically $ do
+          nodes <- atomically $ do
             nodes   <- readTVar pool
             athreads <- readTVar activeThreads
-            return (Seq.length nodes + Set.size athreads)
-          if n == 0
+            return (Seq.fromList (Map.elems athreads) Seq.>< nodes)
+          if Seq.null nodes
             then return ()
             else do
               now <- getCPUTime
               let spent = (now - start) `div` 10^(12::Int)
-              log solver $ printf "time = %d sec; nodes: %d" spent n
+
+              let vs = map ndValue (F.toList nodes)
+                  dualBound =
+                    case dir of
+                      OptMin -> minimum vs
+                      OptMax -> maximum vs
+
+              primalBound <- do
+                x <- readTVarIO (mipBest solver)
+                return $ case x of
+                  Nothing -> Nothing
+                  Just (_, val) -> Just val
+
+              (p,g) <- case primalBound of
+                     Nothing -> return ("not yet found", "--")
+                     Just val -> do
+                       p <- showValue solver val
+                       let gap :: Double
+                           gap = fromRational (abs (dualBound - val) * 100 / abs val)
+                       return (p, printf "%.2f%%" gap)
+              d <- showValue solver dualBound
+ 
+              let range =
+                    case dir of
+                      OptMin -> p ++ " >= " ++ d
+                      OptMax -> p ++ " <= " ++ d
+
+              log solver $ printf "time = %d sec; nodes: %d; %s; gap = %s" spent (Seq.length nodes) range g
               threadDelay (2*1000*1000) -- 2s
               loop
     loop
@@ -306,14 +337,14 @@ branchAndBound solver update = do
 
 model :: Solver -> IO Model
 model solver = do
-  m <- readIORef (mipBest solver)
+  m <- readTVarIO (mipBest solver)
   case m of
     Nothing -> error "no model"
     Just (node,_) -> Simplex2.model (ndLP node)
 
 getObjValue :: Solver -> IO Rational
 getObjValue solver = do
-  m <- readIORef (mipBest solver)
+  m <- readTVarIO (mipBest solver)
   case m of
     Nothing -> error "no model"
     Just (_,val) -> return val
@@ -326,7 +357,7 @@ violated node ivs = do
 
 prune :: Solver -> Rational -> IO Bool
 prune solver lb = do
-  b <- readIORef (mipBest solver)
+  b <- readTVarIO (mipBest solver)
   case b of
     Nothing -> return False
     Just (_, best) -> do
