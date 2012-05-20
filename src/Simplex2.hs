@@ -676,7 +676,7 @@ model solver = do
       [(p - c) / (k - q) | Just (Delta c k) <- return lb, c < p, k > q] ++
       [(d - p) / (q - h) | Just (Delta d h) <- return ub, p < d, q > h]
   let delta0 :: Rational
-      delta0 = minimum ys
+      delta0 = if null ys then 0.1 else minimum ys
       f :: Value -> Rational
       f (Delta r k) = r + k * delta0
   liftM (IM.map f) $ readIORef (svModel solver)
