@@ -37,6 +37,12 @@ delta = Delta 0 1
 fromReal :: Num r => r -> Delta r
 fromReal x = Delta x 0
 
+realPart :: Delta r -> r
+realPart (Delta r _) = r
+
+deltaPart :: Delta r -> r
+deltaPart (Delta _ k) = k
+
 instance Num r => Linear r (Delta r) where
   Delta r1 k1 .+. Delta r2 k2 = Delta (r1+r2) (k1+k2)
   c .*. Delta r k = Delta (c*r) (c*k)
