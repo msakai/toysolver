@@ -72,7 +72,7 @@ data Solver
   = MIP
   { mipRootLP :: Simplex2.Solver
   , mipIVs    :: IS.IntSet
-  , mipBest   :: TVar (Maybe (Node, Rational))
+  , mipBest   :: TVar (Maybe Node)
 
   , mipNThread :: IORef Int
   , mipLogger  :: IORef (Maybe (String -> IO ()))
@@ -201,21 +201,21 @@ branchAndBound solver update = do
                 then return Nothing
                 else retry
 
-      updateBest :: Node -> Rational -> IO ()
-      updateBest node val = do
+      updateBest :: Node -> IO ()
+      updateBest node = do
         let lp = ndLP node
         m <- Simplex2.model lp
         ret <- atomically $ do
           old <- readTVar (mipBest solver)
           case old of
             Nothing -> do
-              writeTVar (mipBest solver) (Just (node, val))
+              writeTVar (mipBest solver) (Just node)
               return True
-            Just (_, best) -> do
-              let isBetter = if dir==OptMin then val < best else val > best
-              when isBetter $ writeTVar (mipBest solver) (Just (node, val))
+            Just best -> do
+              let isBetter = if dir==OptMin then ndValue node < ndValue best else ndValue node > ndValue best
+              when isBetter $ writeTVar (mipBest solver) (Just node)
               return isBetter
-        when ret $ update m val -- 複数スレッドからupdateが同時に呼ばれてまずい可能性がある
+        when ret $ update m (ndValue node) -- 複数スレッドからupdateが同時に呼ばれてまずい可能性がある
 
       processNode :: Node -> IO ()
       processNode node = do
@@ -230,7 +230,7 @@ branchAndBound solver update = do
             unless p $ do
               xs <- violated node (mipIVs solver)
               case xs of
-                [] -> updateBest node val
+                [] -> updateBest (node { ndValue = val })
                 _ -> do
                   r <- if ndDepth node `mod` 100 /= 0
                        then return Nothing
@@ -304,7 +304,7 @@ branchAndBound solver update = do
                 x <- readTVarIO (mipBest solver)
                 return $ case x of
                   Nothing -> Nothing
-                  Just (_, val) -> Just val
+                  Just node -> Just (ndValue node)
 
               (p,g) <- case primalBound of
                      Nothing -> return ("not yet found", "--")
@@ -346,14 +346,14 @@ model solver = do
   m <- readTVarIO (mipBest solver)
   case m of
     Nothing -> error "no model"
-    Just (node,_) -> Simplex2.model (ndLP node)
+    Just node -> Simplex2.model (ndLP node)
 
 getObjValue :: Solver -> IO Rational
 getObjValue solver = do
   m <- readTVarIO (mipBest solver)
   case m of
     Nothing -> error "no model"
-    Just (_,val) -> return val
+    Just node -> return $ ndValue node
 
 violated :: Node -> IS.IntSet -> IO [(Var, Rational)]
 violated node ivs = do
@@ -366,9 +366,9 @@ prune solver lb = do
   b <- readTVarIO (mipBest solver)
   case b of
     Nothing -> return False
-    Just (_, best) -> do
+    Just node -> do
       dir <- Simplex2.getOptDir (mipRootLP solver)
-      return $ if dir==OptMin then best <= lb else best >= lb
+      return $ if dir==OptMin then ndValue node <= lb else ndValue node >= lb
 
 showValue :: Solver -> Rational -> IO String
 showValue solver v = do
