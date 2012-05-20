@@ -305,9 +305,10 @@ branchAndBound solver update = do
                      Nothing -> return ("not yet found", "--")
                      Just val -> do
                        p <- showValue solver val
-                       let gap :: Double
-                           gap = fromRational (abs (dualBound - val) * 100 / abs val)
-                       return (p, printf "%.2f%%" gap)
+                       let g = if val == 0
+                               then "inf"
+                               else printf "%.2f%%" (fromRational (abs (dualBound - val) * 100 / abs val) :: Double)
+                       return (p, g)
               d <- showValue solver dualBound
  
               let range =
