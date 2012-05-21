@@ -8,6 +8,7 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import SAT
+import SAT.Types
 
 -- should be SAT
 case_solve_SAT :: IO ()

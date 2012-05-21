@@ -76,9 +76,6 @@ module SAT
   , nLearnt
 
   -- * Internal API
-  , cutResolve
-  , cardinalityReduction
-  , normalizePBAtLeast
   , varBumpActivity
   , varDecayActivity
   ) where
