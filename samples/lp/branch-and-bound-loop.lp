@@ -1,8 +1,8 @@
 \ Integrating Simplex with DPLL(T)
 \ by Bruno Dutertre and Leonardo de Moura
 \ 
-\ the constraint 1 <= 3x − 3y <= 2 is not satisfiable if x and y are
-\ integers, but has unbounded real solutions. On this example, a naıve
+\ the constraint 1 <= 3x - 3y <= 2 is not satisfiable if x and y are
+\ integers, but has unbounded real solutions. On this example, a naive
 \ branch-and-bound implementation loops.
 \
 \ Gurobi: OK
