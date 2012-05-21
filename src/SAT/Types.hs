@@ -1,5 +1,28 @@
 {-# LANGUAGE BangPatterns #-}
-module SAT.Types where
+module SAT.Types
+  ( Var
+  , VarMap
+  , validVar
+
+  , Lit
+  , LitSet
+  , LitMap
+  , litUndef
+  , validLit
+  , literal
+  , litNot
+  , litVar
+  , litPolarity
+
+  , Clause
+  , normalizeClause
+
+  , normalizeAtLeast
+
+  , normalizePBAtLeast
+  , cutResolve
+  , cardinalityReduction  
+  ) where
 
 import Control.Monad
 import Control.Exception
