@@ -288,6 +288,21 @@ case_normalizePBAtLeast = (sort lhs, rhs) @?= (sort [(1,x1),(1,-x2)], 1)
     x2 = 2
     (lhs,rhs) = normalizePBAtLeast ([(-4,-x1),(3,x1),(10,-x2)], 3)
 
+case_normalizePBExactly_1 :: Assertion
+case_normalizePBExactly_1 = (sort lhs, rhs) @?= (sort [(3,x1),(2,x2)], 1)
+  where
+    x1 = 1
+    x2 = 2
+    (lhs,rhs) = normalizePBExactly ([(6,x1),(4,x2)], 2)
+
+case_normalizePBExactly_2 :: Assertion
+case_normalizePBExactly_2 = (sort lhs, rhs) @?= ([], 1)
+  where
+    x1 = 1
+    x2 = 2
+    x3 = 3
+    (lhs,rhs) = normalizePBExactly ([(2,x1),(2,x2),(2,x3)], 3)
+
 case_cutResolve_1 :: Assertion
 case_cutResolve_1 = (sort lhs, rhs) @?= (sort [(1,x3),(1,x4)], 1)
   where

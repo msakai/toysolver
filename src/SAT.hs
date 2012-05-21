@@ -628,7 +628,7 @@ addPBAtLeast solver ts n = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
-  (ts',degree) <- liftM normalizePBAtLeast $ instantiatePBAtLeast solver (ts,n)
+  (ts',degree) <- liftM normalizePBAtLeast $ instantiatePB solver (ts,n)
   let cs = map fst ts'
       slack = sum cs - degree
 
@@ -666,8 +666,9 @@ addPBExactly :: Solver          -- ^ The 'Solver' argument.
              -> Integer         -- ^ /n/
              -> IO ()
 addPBExactly solver ts n = do
-  addPBAtLeast solver ts n
-  addPBAtMost solver ts n
+  (ts2,n2) <- liftM normalizePBExactly $ instantiatePB solver (ts,n)
+  addPBAtLeast solver ts2 n2
+  addPBAtMost solver ts2 n2
 
 -- | Add a soft pseudo boolean constraints /lit ⇒ c1*l1 + c2*l2 + … ≥ n/.
 addPBAtLeastSoft
@@ -677,7 +678,7 @@ addPBAtLeastSoft
   -> Integer         -- ^ /n/
   -> IO ()
 addPBAtLeastSoft solver sel lhs rhs = do
-  let (lhs',rhs') = normalizePBAtLeast (lhs,rhs)
+  (lhs', rhs') <- liftM normalizePBAtLeast $ instantiatePB solver (lhs,rhs)
   addPBAtLeast solver ((rhs', litNot sel) : lhs') rhs'
 
 -- | Add a soft pseudo boolean constraints /lit ⇒ c1*l1 + c2*l2 + … ≤ n/.
@@ -698,8 +699,9 @@ addPBExactlySoft
   -> Integer         -- ^ /n/
   -> IO ()
 addPBExactlySoft solver sel lhs rhs = do
-  addPBAtLeastSoft solver sel lhs rhs
-  addPBAtMostSoft solver sel lhs rhs
+  (lhs2, rhs2) <- liftM normalizePBExactly $ instantiatePB solver (lhs,rhs)
+  addPBAtLeastSoft solver sel lhs2 rhs2
+  addPBAtMostSoft solver sel lhs2 rhs2
 
 {--------------------------------------------------------------------
   Problem solving
@@ -1872,8 +1874,8 @@ instance Constraint PBAtLeastData where
     aval <- readIORef act
     when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
 
-instantiatePBAtLeast :: Solver -> ([(Integer,Lit)],Integer) -> IO ([(Integer,Lit)],Integer)
-instantiatePBAtLeast solver (xs,n) = loop ([],n) xs
+instantiatePB :: Solver -> ([(Integer,Lit)],Integer) -> IO ([(Integer,Lit)],Integer)
+instantiatePB solver (xs,n) = loop ([],n) xs
   where
     loop :: ([(Integer,Lit)],Integer) -> [(Integer,Lit)] -> IO ([(Integer,Lit)],Integer)
     loop ret [] = return ret

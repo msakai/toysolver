@@ -20,6 +20,7 @@ module SAT.Types
   , normalizeAtLeast
 
   , normalizePBAtLeast
+  , normalizePBExactly
   , cutResolve
   , cardinalityReduction  
   ) where
@@ -140,6 +141,47 @@ normalizePBAtLeast a =
     step3 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
     step3 ([],n) = ([],n)
     step3 (xs,n) = ([(c `div` d, l) | (c,l) <- xs], (n+d-1) `div` d)
+      where
+        d = foldl1' gcd [c | (c,_) <- xs]
+
+-- | normalizing PB constraint of the form /c1 x1 + c2 cn ... cn xn >= b/.
+normalizePBExactly :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+normalizePBExactly a =
+　case step2 $ step1 $ a of
+    (xs,n)
+      | n >= 0    -> step3 (xs, n)
+      | otherwise -> ([], 1) -- false
+  where
+    -- 同じ変数が複数回現れないように、一度全部 @v@ に統一。
+    step1 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step1 (xs,n) =
+      case loop (IM.empty,n) xs of
+        (ys,n') -> ([(c,v) | (v,c) <- IM.toList ys], n')
+      where
+        loop :: (VarMap Integer, Integer) -> [(Integer,Lit)] -> (VarMap Integer, Integer)
+        loop (ys,m) [] = (ys,m)
+        loop (ys,m) ((c,l):zs) =
+          if litPolarity l
+            then loop (IM.insertWith (+) l c ys, m) zs
+            else loop (IM.insertWith (+) (litNot l) (negate c) ys, m-c) zs
+
+    -- 係数が0のものも取り除き、係数が負のリテラルを反転することで、
+    -- 係数が正になるようにする。
+    step2 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step2 (xs,n) = loop ([],n) xs
+      where
+        loop (ys,m) [] = (ys,m)
+        loop (ys,m) (t@(c,l):zs)
+          | c == 0 = loop (ys,m) zs
+          | c < 0  = loop ((negate c,litNot l):ys, m-c) zs
+          | otherwise = loop (t:ys,m) zs
+
+    -- omega test と同様の係数の gcd による単純化
+    step3 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step3 ([],n) = ([],n)
+    step3 (xs,n)
+      | n `mod` d == 0 = ([(c `div` d, l) | (c,l) <- xs], n `div` d)
+      | otherwise      = ([], 1) -- false
       where
         d = foldl1' gcd [c | (c,_) <- xs]
 
