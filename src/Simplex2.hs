@@ -1,4 +1,4 @@
-{-# LANGUAGE DoAndIfThenElse #-}
+{-# LANGUAGE DoAndIfThenElse, TypeSynonymInstances, FlexibleContexts, FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Simplex2
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (DoAndIfThenElse)
+-- Portability :  non-portable (DoAndIfThenElse, TypeSynonymInstances, FlexibleContexts, FlexibleInstances)
 --
 -- Naïve implementation of Simplex method
 -- 
@@ -30,6 +30,8 @@ module Simplex2
   (
   -- * The @Solver@ type
     Solver
+  , GenericSolver
+  , SolverValue (..)
   , newSolver
   , cloneSolver
 
@@ -37,9 +39,10 @@ module Simplex2
   , Var
   , newVar
   , RelOp (..)
-  , (.<=.), (.>=.), (.==.)
+  , (.<=.), (.>=.), (.==.), (.<.), (.>.)
   , Atom (..)
   , assertAtom
+  , assertAtomEx
   , assertLower
   , assertUpper
   , setObj
@@ -54,7 +57,6 @@ module Simplex2
   , dualSimplex
 
   -- * Extract results
-  , Value
   , Model
   , model
   , RawModel
@@ -77,9 +79,6 @@ module Simplex2
   , clearLogger
   , PivotStrategy (..)
   , setPivotStrategy
-
-  -- * Utility
-  , showValue
 
   -- * Debug
   , dump
@@ -107,33 +106,17 @@ import Delta
 import Util (showRational)
 
 {--------------------------------------------------------------------
-  Value
---------------------------------------------------------------------}
-
-{-
-type Value = Delta Rational
-
-toValue :: Rational -> Value
-toValue = fromReal
--}
-
-type Value = Rational
-
-toValue :: Rational -> Value
-toValue = id
-
-{--------------------------------------------------------------------
   The @Solver@ type
 --------------------------------------------------------------------}
 
 type Var = Int
 
-data Solver
-  = Solver
+data GenericSolver v
+  = GenericSolver
   { svTableau :: !(IORef (IM.IntMap (LA.Expr Rational)))
-  , svLB      :: !(IORef (IM.IntMap Value))
-  , svUB      :: !(IORef (IM.IntMap Value))
-  , svModel   :: !(IORef RawModel)
+  , svLB      :: !(IORef (IM.IntMap v))
+  , svUB      :: !(IORef (IM.IntMap v))
+  , svModel   :: !(IORef (IM.IntMap v))
   , svVCnt    :: !(IORef Int)
   , svOk      :: !(IORef Bool)
   , svOptDir  :: !(IORef OptDir)
@@ -143,11 +126,13 @@ data Solver
   , svNPivot  :: !(IORef Int)
   }
 
+type Solver = GenericSolver Rational
+
 -- special basic variable
 objVar :: Int
 objVar = -1
 
-newSolver :: IO Solver
+newSolver :: SolverValue v => IO (GenericSolver v)
 newSolver = do
   t <- newIORef (IM.singleton objVar lzero)
   l <- newIORef IM.empty
@@ -160,7 +145,7 @@ newSolver = do
   pivot <- newIORef PivotStrategyBlandRule
   npivot <- newIORef 0
   return $
-    Solver
+    GenericSolver
     { svTableau = t
     , svLB      = l
     , svUB      = u
@@ -173,7 +158,7 @@ newSolver = do
     , svPivotStrategy = pivot
     }
 
-cloneSolver :: Solver -> IO Solver
+cloneSolver :: GenericSolver v -> IO (GenericSolver v)
 cloneSolver solver = do
   t      <- newIORef =<< readIORef (svTableau solver)
   l      <- newIORef =<< readIORef (svLB solver)
@@ -186,7 +171,7 @@ cloneSolver solver = do
   pivot  <- newIORef =<< readIORef (svPivotStrategy solver)
   npivot <- newIORef =<< readIORef (svNPivot solver)
   return $
-    Solver
+    GenericSolver
     { svTableau = t
     , svLB      = l
     , svUB      = u
@@ -198,6 +183,34 @@ cloneSolver solver = do
     , svNPivot  = npivot
     , svPivotStrategy = pivot
     }  
+
+class (Linear Rational v, Ord v) => SolverValue v where
+  toValue :: Rational -> v
+  showValue :: Bool -> v -> String
+  model :: GenericSolver v -> IO Model
+
+instance SolverValue Rational where
+  toValue = id
+  showValue = showRational
+  model = rawModel
+
+instance SolverValue (Delta Rational) where
+  toValue = fromReal
+  showValue = showDelta
+  model solver = do
+    xs <- variables solver
+    ys <- liftM concat $ forM xs $ \x -> do
+      Delta p q  <- getValue solver x
+      lb <- getLB solver x
+      ub <- getUB solver x
+      return $
+        [(p - c) / (k - q) | Just (Delta c k) <- return lb, c < p, k > q] ++
+        [(d - p) / (q - h) | Just (Delta d h) <- return ub, p < d, q > h]
+    let delta0 :: Rational
+        delta0 = if null ys then 0.1 else minimum ys
+        f :: Delta Rational -> Rational
+        f (Delta r k) = r + k * delta0
+    liftM (IM.map f) $ readIORef (svModel solver)
 
 {-
 Largest coefficient rule: original rule suggested by G. Dantzig.
@@ -213,14 +226,14 @@ data PivotStrategy
 --  | PivotStrategySteepestEdge
   deriving (Eq, Ord, Enum, Show, Read)
 
-setPivotStrategy :: Solver -> PivotStrategy -> IO ()
+setPivotStrategy :: GenericSolver v -> PivotStrategy -> IO ()
 setPivotStrategy solver ps = writeIORef (svPivotStrategy solver) ps
 
 {--------------------------------------------------------------------
   problem description
 --------------------------------------------------------------------}
 
-newVar :: Solver -> IO Var
+newVar :: SolverValue v => GenericSolver v -> IO Var
 newVar solver = do
   v <- readIORef (svVCnt solver)
   writeIORef (svVCnt solver) $! v+1
@@ -243,17 +256,36 @@ assertAtom solver (LA.Atom lhs op rhs) = do
   case op of
     F.Le  -> assertUpper solver v (toValue rhs')
     F.Ge  -> assertLower solver v (toValue rhs')
-{-
-    F.Lt  -> assertUpper solver v (toValue rhs' .-. delta)
-    F.Gt  -> assertLower solver v (toValue rhs' .+. delta)
--}
     F.Eql -> do
       assertLower solver v (toValue rhs')
       assertUpper solver v (toValue rhs')
     _ -> error "unsupported"
   return ()
 
-assertLower :: Solver -> Var -> Value -> IO ()
+assertAtomEx :: GenericSolver (Delta Rational) -> LA.Atom Rational -> IO ()
+assertAtomEx solver (LA.Atom lhs op rhs) = do
+  let (lhs',rhs') =
+        case LA.extract LA.unitVar (lhs .-. rhs) of
+          (n,e) -> (e, -n)
+  (v,op,rhs') <-
+    case LA.terms lhs' of
+      [(1,v)] -> return (v, op, rhs')
+      [(-1,v)] -> return (v, F.flipOp op, -rhs')
+      _ -> do
+        v <- newVar solver
+        setRow solver v lhs'
+        return (v,op,rhs')
+  case op of
+    F.Le  -> assertUpper solver v (toValue rhs')
+    F.Ge  -> assertLower solver v (toValue rhs')
+    F.Lt  -> assertUpper solver v (toValue rhs' .-. delta)
+    F.Gt  -> assertLower solver v (toValue rhs' .+. delta)
+    F.Eql -> do
+      assertLower solver v (toValue rhs')
+      assertUpper solver v (toValue rhs')
+  return ()
+
+assertLower :: SolverValue v => GenericSolver v -> Var -> v -> IO ()
 assertLower solver x l = do
   l0 <- getLB solver x
   u0 <- getUB solver x
@@ -267,7 +299,7 @@ assertLower solver x l = do
       when (b && not (l <= v)) $ update solver x l
       checkNBFeasibility solver
 
-assertUpper :: Solver -> Var -> Value -> IO ()
+assertUpper :: SolverValue v => GenericSolver v -> Var -> v -> IO ()
 assertUpper solver x u = do
   l0 <- getLB solver x
   u0 <- getUB solver x
@@ -283,30 +315,30 @@ assertUpper solver x u = do
 
 -- | minimization
 -- FIXME: 式に定数項が含まれる可能性を考えるとこれじゃまずい?
-setObj :: Solver -> LA.Expr Rational -> IO ()
+setObj :: SolverValue v => GenericSolver v -> LA.Expr Rational -> IO ()
 setObj solver e = setRow solver objVar e
 
-setRow :: Solver -> Var -> LA.Expr Rational -> IO ()
+setRow :: SolverValue v => GenericSolver v -> Var -> LA.Expr Rational -> IO ()
 setRow solver v e = do
   modifyIORef (svTableau solver) $ \t ->
     IM.insert v (LA.applySubst t e) t
   modifyIORef (svModel solver) $ \m -> 
     IM.insert v (LA.evalLinear m (toValue 1) e) m  
 
-setOptDir :: Solver -> OptDir -> IO ()
+setOptDir :: GenericSolver v -> OptDir -> IO ()
 setOptDir solver dir = writeIORef (svOptDir solver) dir
 
-getOptDir :: Solver -> IO OptDir
+getOptDir :: GenericSolver v -> IO OptDir
 getOptDir solver = readIORef (svOptDir solver)
 
 {--------------------------------------------------------------------
   Status
 --------------------------------------------------------------------}
 
-nVars :: Solver -> IO Int
+nVars :: GenericSolver v -> IO Int
 nVars solver = readIORef (svVCnt solver)
 
-isBasicVariable :: Solver -> Var -> IO Bool
+isBasicVariable :: GenericSolver v -> Var -> IO Bool
 isBasicVariable solver v = do
   t <- readIORef (svTableau solver)
   return $ v `IM.member` t
@@ -315,7 +347,7 @@ isBasicVariable solver v = do
   Satisfiability solving
 --------------------------------------------------------------------}
 
-check :: Solver -> IO Bool
+check :: SolverValue v => GenericSolver v -> IO Bool
 check solver = do
   let
     loop :: IO Bool
@@ -480,7 +512,7 @@ dualSimplex solver = do
     return result
 
 -- select the smallest basic variable xi such that β(xi) < li or β(xi) > ui
-selectViolatingBasicVariable :: Solver -> IO (Maybe Var)
+selectViolatingBasicVariable :: SolverValue v => GenericSolver v -> IO (Maybe Var)
 selectViolatingBasicVariable solver = do
   let
     p :: Var -> IO Bool
@@ -550,7 +582,7 @@ optimize solver = do
            then loop
            else return Unbounded
 
-selectEnteringVariable :: Solver -> IO (Maybe (Rational, Var))
+selectEnteringVariable :: SolverValue v => GenericSolver v -> IO (Maybe (Rational, Var))
 selectEnteringVariable solver = do
   ps <- readIORef (svPivotStrategy solver)
   obj_def <- getRow solver objVar
@@ -576,7 +608,7 @@ selectEnteringVariable solver = do
         else if c < 0 then canDecrease solver xj -- xを小さくすることで目的関数を大きくできる
         else return False
 
-canDecrease :: Solver -> Var -> IO Bool
+canDecrease :: SolverValue v => GenericSolver v -> Var -> IO Bool
 canDecrease solver x = do
   l <- getLB solver x
   v <- getValue solver x
@@ -584,7 +616,7 @@ canDecrease solver x = do
     Nothing -> return True
     Just lv -> return $! (lv < v)
 
-canIncrease :: Solver -> Var -> IO Bool
+canIncrease :: SolverValue v => GenericSolver v -> Var -> IO Bool
 canIncrease solver x = do
   u <- getUB solver x
   v <- getValue solver x
@@ -593,7 +625,7 @@ canIncrease solver x = do
     Just uv -> return $! (v < uv)
 
 -- | feasibility を保ちつつ non-basic variable xj の値を大きくする
-increaseNB :: Solver -> Var -> IO Bool
+increaseNB :: SolverValue v => GenericSolver v -> Var -> IO Bool
 increaseNB solver xj = do
   col <- getCol solver xj
 
@@ -616,7 +648,7 @@ increaseNB solver xj = do
       return True
 
 -- | feasibility を保ちつつ non-basic variable xj の値を小さくする
-decreaseNB :: Solver -> Var -> IO Bool
+decreaseNB :: SolverValue v => GenericSolver v -> Var -> IO Bool
 decreaseNB solver xj = do
   col <- getCol solver xj
 
@@ -639,7 +671,7 @@ decreaseNB solver xj = do
       return True
 
 -- aijが非ゼロの列も全部探しているのは効率が悪い
-getCol :: Solver -> Var -> IO (IM.IntMap Rational)
+getCol :: SolverValue v => GenericSolver v -> Var -> IO (IM.IntMap Rational)
 getCol solver xj = do
   t <- readIORef (svTableau solver)
   return $ IM.mapMaybe (LA.lookupCoeff xj) t
@@ -648,46 +680,25 @@ getCol solver xj = do
   Extract results
 --------------------------------------------------------------------}
 
-type RawModel = IM.IntMap Value
+type RawModel v = IM.IntMap v
 
-rawModel :: Solver -> IO RawModel
+rawModel :: GenericSolver v -> IO (RawModel v)
 rawModel solver = do
   xs <- variables solver
   liftM IM.fromList $ forM xs $ \x -> do
     val <- getValue solver x
     return (x,val)
 
-getObjValue :: Solver -> IO Value
+getObjValue :: GenericSolver v -> IO v
 getObjValue solver = getValue solver objVar  
 
 type Model = IM.IntMap Rational
-
-{-
-model :: Solver -> IO Model
-model solver = do
-  xs <- variables solver
-  ys <- liftM concat $ forM xs $ \x -> do
-    Delta p q  <- getValue solver x
-    lb <- getLB solver x
-    ub <- getUB solver x
-    return $
-      [(p - c) / (k - q) | Just (Delta c k) <- return lb, c < p, k > q] ++
-      [(d - p) / (q - h) | Just (Delta d h) <- return ub, p < d, q > h]
-  let delta0 :: Rational
-      delta0 = if null ys then 0.1 else minimum ys
-      f :: Value -> Rational
-      f (Delta r k) = r + k * delta0
-  liftM (IM.map f) $ readIORef (svModel solver)
--}
-
-model :: Solver -> IO Model
-model = rawModel
   
 {--------------------------------------------------------------------
   major function
 --------------------------------------------------------------------}
 
-update :: Solver -> Var -> Value -> IO ()
+update :: SolverValue v => GenericSolver v -> Var -> v -> IO ()
 update solver xj v = do
   -- log solver $ printf "before update x%d (%s)" xj (show v)
   -- dump solver
@@ -703,7 +714,7 @@ update solver xj v = do
   -- log solver $ printf "after update x%d (%s)" xj (show v)
   -- dump solver
 
-pivot :: Solver -> Var -> Var -> IO ()
+pivot :: SolverValue v => GenericSolver v -> Var -> Var -> IO ()
 pivot solver xi xj = do
   modifyIORef' (svNPivot solver) (+1)
   modifyIORef' (svTableau solver) $ \defs ->
@@ -712,7 +723,7 @@ pivot solver xi xj = do
         IM.insert xj xj_def . IM.map (LA.applySubst1 xj xj_def) . IM.delete xi $ defs
       _ -> error "pivot: should not happen"
 
-pivotAndUpdate :: Solver -> Var -> Var -> Value -> IO ()
+pivotAndUpdate :: SolverValue v => GenericSolver v -> Var -> Var -> v -> IO ()
 pivotAndUpdate solver xi xj v | xi == xj = update solver xi v -- xi = xj is non-basic variable
 pivotAndUpdate solver xi xj v = do
   -- xi is basic variable
@@ -737,46 +748,46 @@ pivotAndUpdate solver xi xj v = do
   -- log solver $ printf "after pivotAndUpdate x%d x%d (%s)" xi xj (show v)
   -- dump solver
 
-getLB :: Solver -> Var -> IO (Maybe Value)
+getLB :: GenericSolver v -> Var -> IO (Maybe v)
 getLB solver x = do
   lb <- readIORef (svLB solver)
   return $ IM.lookup x lb
 
-getUB :: Solver -> Var -> IO (Maybe Value)
+getUB :: GenericSolver v -> Var -> IO (Maybe v)
 getUB solver x = do
   ub <- readIORef (svUB solver)
   return $ IM.lookup x ub
 
-getTableau :: Solver -> IO (IM.IntMap (LA.Expr Rational))
+getTableau :: GenericSolver v -> IO (IM.IntMap (LA.Expr Rational))
 getTableau solver = do
   t <- readIORef (svTableau solver)
   return $ IM.delete objVar t
 
-getValue :: Solver -> Var -> IO Value
+getValue :: GenericSolver v -> Var -> IO v
 getValue solver x = do
   m <- readIORef (svModel solver)
   return $ m IM.! x
 
-getRow :: Solver -> Var -> IO (LA.Expr Rational)
+getRow :: GenericSolver v -> Var -> IO (LA.Expr Rational)
 getRow solver x = do
   -- x should be basic variable or 'objVar'
   t <- readIORef (svTableau solver)
   return $! (t IM.! x)
 
-getCoeff :: Solver -> Var -> Var -> IO Rational
+getCoeff :: GenericSolver v -> Var -> Var -> IO Rational
 getCoeff solver xi xj = do
   xi_def <- getRow solver xi
   return $! LA.coeff xj xi_def
 
-isBasic  :: Solver -> Var -> IO Bool
+isBasic  :: GenericSolver v -> Var -> IO Bool
 isBasic solver x = do
   t <- readIORef (svTableau solver)
   return $! x `IM.member` t
 
-isNonBasic  :: Solver -> Var -> IO Bool
+isNonBasic  :: GenericSolver v -> Var -> IO Bool
 isNonBasic solver x = liftM not (isBasic solver x)
 
-markBad :: Solver -> IO ()
+markBad :: GenericSolver v -> IO ()
 markBad solver = writeIORef (svOk solver) False
 
 {--------------------------------------------------------------------
@@ -791,20 +802,20 @@ findM p (x:xs) = do
   then return (Just x)
   else findM p xs
 
-testLB :: Maybe Value -> Value -> Bool
+testLB :: SolverValue v => Maybe v -> v -> Bool
 testLB Nothing _  = True
 testLB (Just l) x = l <= x
 
-testUB :: Maybe Value -> Value -> Bool
+testUB :: SolverValue v => Maybe v -> v -> Bool
 testUB Nothing _  = True
 testUB (Just u) x = x <= u
 
-variables :: Solver -> IO [Var]
+variables :: GenericSolver v -> IO [Var]
 variables solver = do
   vcnt <- nVars solver
   return [0..vcnt-1]
 
-basicVariables :: Solver -> IO [Var]
+basicVariables :: GenericSolver v -> IO [Var]
 basicVariables solver = do
   t <- readIORef (svTableau solver)
   return (IM.keys t)
@@ -814,7 +825,7 @@ modifyIORef' ref f = do
   x <- readIORef ref
   writeIORef ref $! f x
 
-recordTime :: Solver -> IO a -> IO a
+recordTime :: SolverValue v => GenericSolver v -> IO a -> IO a
 recordTime solver act = do
   dumpSize solver
   writeIORef (svNPivot solver) 0
@@ -826,10 +837,6 @@ recordTime solver act = do
   (log solver . printf "time = %.3fs") (fromIntegral (end - start) / 10^(12::Int) :: Double)
   (log solver . printf "#pivot = %d") =<< readIORef (svNPivot solver)
   return result
-
-showValue :: Bool -> Rational -> String
-showValue = showRational
--- showValue = showDelta
 
 showDelta :: Bool -> Delta Rational -> String
 showDelta asRatio v = 
@@ -848,17 +855,17 @@ showDelta asRatio v =
 --------------------------------------------------------------------}
 
 -- | set callback function for receiving messages.
-setLogger :: Solver -> (String -> IO ()) -> IO ()
+setLogger :: GenericSolver v -> (String -> IO ()) -> IO ()
 setLogger solver logger = do
   writeIORef (svLogger solver) (Just logger)
 
-clearLogger :: Solver -> IO ()
+clearLogger :: GenericSolver v -> IO ()
 clearLogger solver = writeIORef (svLogger solver) Nothing
 
-log :: Solver -> String -> IO ()
+log :: GenericSolver v -> String -> IO ()
 log solver msg = logIO solver (return msg)
 
-logIO :: Solver -> IO String -> IO ()
+logIO :: GenericSolver v -> IO String -> IO ()
 logIO solver action = do
   m <- readIORef (svLogger solver)
   case m of
@@ -919,7 +926,7 @@ test6 = do
   m <- model solver
   print m
 
-dumpSize :: Solver -> IO ()
+dumpSize :: SolverValue v => GenericSolver v -> IO ()
 dumpSize solver = do
   t <- readIORef (svTableau solver)
   let nrows = IM.size t - 1 -- -1 is objVar
@@ -928,7 +935,7 @@ dumpSize solver = do
   let nnz = sum [IM.size $ LA.coeffMap xi_def | (xi,xi_def) <- IM.toList t, xi /= objVar]
   log solver $ printf "%d rows, %d columns, %d non-zeros" nrows ncols nnz
 
-dump :: Solver -> IO ()
+dump :: SolverValue v => GenericSolver v -> IO ()
 dump solver = do
   log solver "============="
 
@@ -942,13 +949,15 @@ dump solver = do
 
   log solver "Assignments and Bounds:"
   objVal <- getValue solver objVar
-  log solver $ printf "beta(obj) = %s" (show objVal)
+  log solver $ printf "beta(obj) = %s" (showValue True objVal)
   xs <- variables solver 
   forM_ xs $ \x -> do
     l <- getLB solver x
     u <- getUB solver x
     v <- getValue solver x
-    log solver $ printf "beta(x%d) = %s; %s <= x%d <= %s" x (show v) (show l) x (show u)
+    let f Nothing = "Nothing"
+        f (Just x) = showValue True v
+    log solver $ printf "beta(x%d) = %s; %s <= x%d <= %s" x (showValue True v) (f l) x (f u)
 
   log solver ""
   log solver "Status:"
@@ -959,7 +968,7 @@ dump solver = do
 
   log solver "============="
 
-isFeasible :: Solver -> IO Bool
+isFeasible :: SolverValue v => GenericSolver v -> IO Bool
 isFeasible solver = do
   xs <- variables solver
   liftM and $ forM xs $ \x -> do
@@ -968,13 +977,13 @@ isFeasible solver = do
     u <- getUB solver x
     return (testLB l v && testUB u v)
 
-isOptimal :: Solver -> IO Bool
+isOptimal :: SolverValue v => GenericSolver v -> IO Bool
 isOptimal solver = do
   obj <- getRow solver objVar
   ret <- selectEnteringVariable solver
   return $! isNothing ret
 
-checkFeasibility :: Solver -> IO ()
+checkFeasibility :: SolverValue v => GenericSolver v -> IO ()
 checkFeasibility _ | True = return ()
 checkFeasibility solver = do
   xs <- variables solver
@@ -982,13 +991,15 @@ checkFeasibility solver = do
     v <- getValue solver x
     l <- getLB solver x
     u <- getUB solver x
+    let f Nothing = "Nothing"
+        f (Just x) = showValue True x
     unless (testLB l v) $
-      error (printf "(%s) <= x%d is violated; x%d = (%s)" (show l) x x (show v))
+      error (printf "(%s) <= x%d is violated; x%d = (%s)" (f l) x x (showValue True v))
     unless (testUB u v) $
-      error (printf "x%d <= (%s) is violated; x%d = (%s)" x (show u) x (show v))
+      error (printf "x%d <= (%s) is violated; x%d = (%s)" x (f u) x (showValue True v))
     return ()
 
-checkNBFeasibility :: Solver -> IO ()
+checkNBFeasibility :: SolverValue v => GenericSolver v -> IO ()
 checkNBFeasibility _ | True = return ()
 checkNBFeasibility solver = do
   xs <- variables solver
@@ -998,12 +1009,14 @@ checkNBFeasibility solver = do
       v <- getValue solver x
       l <- getLB solver x
       u <- getUB solver x
+      let f Nothing = "Nothing"
+          f (Just x) = showValue True x
       unless (testLB l v) $
-        error (printf "checkNBFeasibility: (%s) <= x%d is violated; x%d = (%s)" (show l) x x (show v))
+        error (printf "checkNBFeasibility: (%s) <= x%d is violated; x%d = (%s)" (f l) x x (showValue True v))
       unless (testUB u v) $
-        error (printf "checkNBFeasibility: x%d <= (%s) is violated; x%d = (%s)" x (show u) x (show v))
+        error (printf "checkNBFeasibility: x%d <= (%s) is violated; x%d = (%s)" x (f u) x (showValue True v))
 
-checkOptimality :: Solver -> IO ()
+checkOptimality :: SolverValue v => GenericSolver v -> IO ()
 checkOptimality _ | True = return ()
 checkOptimality solver = do
   ret <- selectEnteringVariable solver
