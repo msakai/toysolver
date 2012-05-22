@@ -1,0 +1,19 @@
+c http://www.satcompetition.org/2011/rules.pdf
+c
+c Example of group oriented CNF
+c
+c Represents the following formula
+c D = {x1 or x2 or x3}
+c G1 = {x1 -> x2, x2 -> x3}
+c G2 = {x3}
+c G3 = {x3 -> x2, -x2 or -x3}
+c G4 = {x2 -> x3}
+c
+p gcnf 5 7 4
+{0} 1 2 3 0
+{1} -1 2 0
+{1} -2 3 0
+{2} -3 0
+{3} 2 -3 0
+{3} -2 -3 0
+{4} -2 3 0
