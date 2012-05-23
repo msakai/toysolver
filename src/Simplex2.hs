@@ -241,18 +241,8 @@ newVar solver = do
   return v
 
 assertAtom :: Solver -> LA.Atom Rational -> IO ()
-assertAtom solver (LA.Atom lhs op rhs) = do
-  let (lhs',rhs') =
-        case LA.extract LA.unitVar (lhs .-. rhs) of
-          (n,e) -> (e, -n)
-  (v,op,rhs') <-
-    case LA.terms lhs' of
-      [(1,v)] -> return (v, op, rhs')
-      [(-1,v)] -> return (v, F.flipOp op, -rhs')
-      _ -> do
-        v <- newVar solver
-        setRow solver v lhs'
-        return (v,op,rhs')
+assertAtom solver atom = do
+  (v,op,rhs') <- simplifyAtom solver atom
   case op of
     F.Le  -> assertUpper solver v (toValue rhs')
     F.Ge  -> assertLower solver v (toValue rhs')
@@ -263,18 +253,8 @@ assertAtom solver (LA.Atom lhs op rhs) = do
   return ()
 
 assertAtomEx :: GenericSolver (Delta Rational) -> LA.Atom Rational -> IO ()
-assertAtomEx solver (LA.Atom lhs op rhs) = do
-  let (lhs',rhs') =
-        case LA.extract LA.unitVar (lhs .-. rhs) of
-          (n,e) -> (e, -n)
-  (v,op,rhs') <-
-    case LA.terms lhs' of
-      [(1,v)] -> return (v, op, rhs')
-      [(-1,v)] -> return (v, F.flipOp op, -rhs')
-      _ -> do
-        v <- newVar solver
-        setRow solver v lhs'
-        return (v,op,rhs')
+assertAtomEx solver atom = do
+  (v,op,rhs') <- simplifyAtom solver atom
   case op of
     F.Le  -> assertUpper solver v (toValue rhs')
     F.Ge  -> assertLower solver v (toValue rhs')
@@ -284,6 +264,20 @@ assertAtomEx solver (LA.Atom lhs op rhs) = do
       assertLower solver v (toValue rhs')
       assertUpper solver v (toValue rhs')
   return ()
+
+simplifyAtom :: SolverValue v => GenericSolver v -> LA.Atom Rational -> IO (Var, F.RelOp, Rational)
+simplifyAtom solver (LA.Atom lhs op rhs) = do
+  let (lhs',rhs') =
+        case LA.extract LA.unitVar (lhs .-. rhs) of
+          (n,e) -> (e, -n)
+  case LA.terms lhs' of
+    [(1,v)] -> return (v, op, rhs')
+    [(-1,v)] -> return (v, F.flipOp op, -rhs')
+    _ -> do
+      -- TODO: 既存の変数が再利用できる場合には再利用する
+      v <- newVar solver
+      setRow solver v lhs'
+      return (v,op,rhs')
 
 assertLower :: SolverValue v => GenericSolver v -> Var -> v -> IO ()
 assertLower solver x l = do
@@ -313,7 +307,6 @@ assertUpper solver x u = do
       when (b && not (v <= u)) $ update solver x u
       checkNBFeasibility solver
 
--- | minimization
 -- FIXME: 式に定数項が含まれる可能性を考えるとこれじゃまずい?
 setObj :: SolverValue v => GenericSolver v -> LA.Expr Rational -> IO ()
 setObj solver e = setRow solver objVar e
