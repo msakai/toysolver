@@ -956,7 +956,7 @@ dump solver = do
     u <- getUB solver x
     v <- getValue solver x
     let f Nothing = "Nothing"
-        f (Just x) = showValue True v
+        f (Just x) = showValue True x
     log solver $ printf "beta(x%d) = %s; %s <= x%d <= %s" x (showValue True v) (f l) x (f u)
 
   log solver ""
