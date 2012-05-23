@@ -92,6 +92,7 @@ import Data.IORef
 import Data.List
 import Data.Maybe
 import Data.Ratio
+import qualified Data.Map as Map
 import qualified Data.IntMap as IM
 import Text.Printf
 import Data.OptDir
@@ -121,6 +122,8 @@ data GenericSolver v
   , svOk      :: !(IORef Bool)
   , svOptDir  :: !(IORef OptDir)
 
+  , svDefDB  :: !(IORef (Map.Map (LA.Expr Rational) Var))
+
   , svLogger :: !(IORef (Maybe (String -> IO ())))
   , svPivotStrategy :: !(IORef PivotStrategy)
   , svNPivot  :: !(IORef Int)
@@ -141,6 +144,7 @@ newSolver = do
   v <- newIORef 0
   ok <- newIORef True
   dir <- newIORef OptMin
+  defs <- newIORef Map.empty
   logger <- newIORef Nothing
   pivot <- newIORef PivotStrategyBlandRule
   npivot <- newIORef 0
@@ -153,6 +157,7 @@ newSolver = do
     , svVCnt    = v
     , svOk      = ok
     , svOptDir  = dir
+    , svDefDB   = defs
     , svLogger  = logger
     , svNPivot  = npivot
     , svPivotStrategy = pivot
@@ -167,6 +172,7 @@ cloneSolver solver = do
   v      <- newIORef =<< readIORef (svVCnt solver)
   ok     <- newIORef =<< readIORef (svOk solver)
   dir    <- newIORef =<< readIORef (svOptDir solver)
+  defs   <- newIORef =<< readIORef (svDefDB solver)
   logger <- newIORef =<< readIORef (svLogger solver)
   pivot  <- newIORef =<< readIORef (svPivotStrategy solver)
   npivot <- newIORef =<< readIORef (svNPivot solver)
@@ -179,6 +185,7 @@ cloneSolver solver = do
     , svVCnt    = v
     , svOk      = ok
     , svOptDir  = dir
+    , svDefDB   = defs
     , svLogger  = logger
     , svNPivot  = npivot
     , svPivotStrategy = pivot
@@ -274,10 +281,25 @@ simplifyAtom solver (LA.Atom lhs op rhs) = do
     [(1,v)] -> return (v, op, rhs')
     [(-1,v)] -> return (v, F.flipOp op, -rhs')
     _ -> do
-      -- TODO: 既存の変数が再利用できる場合には再利用する
-      v <- newVar solver
-      setRow solver v lhs'
-      return (v,op,rhs')
+      defs <- readIORef (svDefDB solver)
+      let (c,lhs'') = scale lhs' -- lhs' = lhs'' / c = rhs'
+          rhs'' = c .*. rhs'
+          op''  = if c < 0 then F.flipOp op else op
+      case Map.lookup lhs'' defs of
+        Just v -> do
+          return (v,op'',rhs'')
+        Nothing -> do
+          v <- newVar solver
+          setRow solver v lhs''
+          modifyIORef (svDefDB solver) $ Map.insert lhs'' v
+          return (v,op'',rhs'')
+  where
+    scale :: LA.Expr Rational -> (Rational, LA.Expr Rational)
+    scale e = (c, c .*. e)
+      where
+        c = c1 * c2
+        c1 = fromIntegral $ foldl' lcm 1 [denominator c | (c, _) <- LA.terms e]
+        c2 = signum $ head ([c | (c,x) <- LA.terms e] ++ [1])
 
 assertLower :: SolverValue v => GenericSolver v -> Var -> v -> IO ()
 assertLower solver x l = do
