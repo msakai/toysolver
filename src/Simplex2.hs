@@ -565,7 +565,7 @@ canIncrease solver x = do
     Just uv -> return $! (v < uv)
 
 -- | feasibility を保ちつつ non-basic variable xj の値を大きくする
-increaseNB :: SolverValue v => GenericSolver v -> Var -> IO Bool
+increaseNB :: Solver -> Var -> IO Bool
 increaseNB solver xj = do
   col <- getCol solver xj
 
@@ -588,7 +588,7 @@ increaseNB solver xj = do
       return True
 
 -- | feasibility を保ちつつ non-basic variable xj の値を小さくする
-decreaseNB :: SolverValue v => GenericSolver v -> Var -> IO Bool
+decreaseNB :: Solver -> Var -> IO Bool
 decreaseNB solver xj = do
   col <- getCol solver xj
 
@@ -1029,7 +1029,7 @@ checkNBFeasibility solver = do
       unless (testUB u v) $
         error (printf "checkNBFeasibility: x%d <= (%s) is violated; x%d = (%s)" x (f u) x (showValue True v))
 
-checkOptimality :: SolverValue v => GenericSolver v -> IO ()
+checkOptimality :: Solver -> IO ()
 checkOptimality _ | True = return ()
 checkOptimality solver = do
   ret <- selectEnteringVariable solver
