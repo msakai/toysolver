@@ -524,7 +524,7 @@ optimize solver opt = do
       case ret of
        Nothing -> return Optimum
        Just (c,xj) -> do
-         dir <- readIORef (svOptDir solver)
+         dir <- getOptDir solver
          r <- if dir==OptMin
               then if c > 0
                 then decreaseNB solver xj -- xj を小さくして目的関数を小さくする
@@ -552,7 +552,7 @@ selectEnteringVariable solver = do
     canEnter :: (Rational, Var) -> IO Bool
     canEnter (_,xj) | xj == LA.unitVar = return False
     canEnter (c,xj) = do
-      dir <- readIORef (svOptDir solver)
+      dir <- getOptDir solver
       if dir==OptMin then
         if c > 0 then canDecrease solver xj      -- xを小さくすることで目的関数を小さくできる
         else if c < 0 then canIncrease solver xj -- xを大きくすることで目的関数を小さくできる
@@ -656,7 +656,7 @@ dualSimplex solver opt = do
     
                       find :: IO (Maybe Var)
                       find = do
-                        dir <- readIORef (svOptDir solver)
+                        dir <- getOptDir solver
                         obj_def <- getRow solver objVar
                         xi_def  <- getRow solver xi
                         ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
@@ -691,7 +691,7 @@ dualSimplex solver opt = do
     
                       find :: IO (Maybe Var)
                       find = do
-                        dir <- readIORef (svOptDir solver)
+                        dir <- getOptDir solver
                         obj_def <- getRow solver objVar
                         xi_def  <- getRow solver xi
                         ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
