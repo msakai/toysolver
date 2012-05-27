@@ -130,7 +130,7 @@ optimize solver update = do
     s0 <- showValue solver =<< Simplex2.getObjValue lp
     log solver (printf "MIP: LP relaxation is satisfiable with obj = %s" s0)
     log solver "MIP: Optimizing LP relaxation"
-    ret2 <- Simplex2.optimize lp
+    ret2 <- Simplex2.optimize lp Simplex2.defaultOptions
     case ret2 of
       Unsat -> error "should not happen"
       Unbounded -> do
@@ -220,10 +220,13 @@ branchAndBound solver update = do
       processNode :: Node -> IO ()
       processNode node = do
         let lp = ndLP node
-        ret <- Simplex2.dualSimplex lp
+        lim <- liftM (fmap ndValue) $ readTVarIO (mipBest solver)
+        ret <- Simplex2.dualSimplex lp Simplex2.defaultOptions{ Simplex2.objLimit = lim }
+
         case ret of
           Unbounded -> error "should not happen"
           Unsat ->  return ()
+          ObjLimit -> return ()
           Optimum -> do
             val <- Simplex2.getObjValue lp
             p <- prune solver val

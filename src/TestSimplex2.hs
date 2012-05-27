@@ -101,7 +101,7 @@ case_test3 = do
   ret1 <- check solver
   ret1 @?= True
 
-  ret2 <- optimize solver
+  ret2 <- optimize solver defaultOptions
   ret2 @?= Optimum
 
 {-
@@ -135,7 +135,7 @@ case_test6 = do
   b <- isOptimal solver
   assertBool "should be optimal" $ b
 
-  ret <- dualSimplex solver
+  ret <- dualSimplex solver defaultOptions
   ret @?= Optimum
 
   val <- getObjValue solver
@@ -172,7 +172,7 @@ case_test7 = do
   b <- isOptimal solver
   assertBool "should be optimal" $ b
 
-  ret <- dualSimplex solver
+  ret <- dualSimplex solver defaultOptions
   ret @?= Optimum
 
   val <- getObjValue solver

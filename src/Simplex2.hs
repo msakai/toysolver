@@ -52,6 +52,8 @@ module Simplex2
 
   -- * Solving
   , check
+  , Options (..)
+  , defaultOptions
   , OptResult (..)
   , optimize
   , dualSimplex
@@ -487,11 +489,23 @@ selectViolatingBasicVariable solver = do
 --------------------------------------------------------------------}
 
 -- | results of optimization
-data OptResult = Optimum | Unsat | Unbounded
+data OptResult = Optimum | Unsat | Unbounded | ObjLimit
   deriving (Show, Eq, Ord)
 
-optimize :: Solver -> IO OptResult
-optimize solver = do
+data Options
+  = Options
+  { objLimit :: Maybe Rational
+  }
+  deriving (Show, Eq, Ord)
+
+defaultOptions :: Options
+defaultOptions
+  = Options
+  { objLimit = Nothing
+  }
+
+optimize :: Solver -> Options -> IO OptResult
+optimize solver opt = do
   ret <- do
     is_fea <- isFeasible solver
     if is_fea then return True else check solver
@@ -610,92 +624,95 @@ decreaseNB solver xj = do
       pivotAndUpdate solver xi xj v
       return True
 
-dualSimplex :: Solver -> IO OptResult
-dualSimplex solver = do
+dualSimplex :: Solver -> Options -> IO OptResult
+dualSimplex solver opt = do
   let
     loop :: IO OptResult
     loop = do
       checkOptimality solver
 
-      -- select the smallest basic variable xi such that β(xi) < li or β(xi) > ui
-      m <- selectViolatingBasicVariable solver
-
-      case m of
-        Nothing -> return Optimum
-        Just xi  -> do
-          li <- getLB solver xi
-          vi <- getValue solver xi
-          if not (testLB li vi)
-            then do
-              -- select non-basic variable xj such that
-              -- (aij > 0 and β(xj) < uj) or (aij < 0 and β(xj) > lj)
-              let q :: (Rational, Var) -> IO Bool
-                  q (aij, xj) = do
-                    l <- getLB solver xj
-                    u <- getUB solver xj
-                    v <- getValue solver xj
-                    return $ (aij > 0 && (isNothing u || v < fromJust u)) ||
-                             (aij < 0 && (isNothing l || fromJust l < v))
-
-                  find :: IO (Maybe Var)
-                  find = do
-                    dir <- readIORef (svOptDir solver)
-                    obj_def <- getRow solver objVar
-                    xi_def  <- getRow solver xi
-                    ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
-                      b <- q (aij, xj)
-                      if b
-                      then do
-                        let cj = LA.coeff xj obj_def
-                        let ratio = if dir==OptMin then (cj / aij) else - (cj / aij)
-                        return [(xj, ratio) | ratio >= 0]
-                      else
-                        return []
-                    case ws of
-                      [] -> return Nothing
-                      _ -> return $ Just $ fst $ minimumBy (comparing snd) ws
-              r <- find
-              case r of
-                Nothing -> markBad solver >> return Unsat
-                Just xj -> do
-                  l <- getLB solver xi
-                  pivotAndUpdate solver xi xj (fromJust l)
-                  loop
-            else do
-              -- select non-basic variable xj such that
-              -- (aij < 0 and β(xj) < uj) or (aij > 0 and β(xj) > lj)
-              let q :: (Rational, Var) -> IO Bool
-                  q (aij, xj) = do
-                    l <- getLB solver xj
-                    u <- getUB solver xj
-                    v <- getValue solver xj
-                    return $ (aij < 0 && (isNothing u || v < fromJust u)) ||
-                             (aij > 0 && (isNothing l || fromJust l < v))
-
-                  find :: IO (Maybe Var)
-                  find = do
-                    dir <- readIORef (svOptDir solver)
-                    obj_def <- getRow solver objVar
-                    xi_def  <- getRow solver xi
-                    ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
-                      b <- q (aij, xj)
-                      if b
-                      then do
-                        let cj = LA.coeff xj obj_def
-                        let ratio = if dir==OptMin then - (cj / aij) else (cj / aij)
-                        return [(xj, ratio) | ratio >= 0]
-                      else
-                        return []
-                    case ws of
-                      [] -> return Nothing
-                      _ -> return $ Just $ fst $ minimumBy (comparing snd) ws
-              r <- find
-              case r of
-                Nothing -> markBad solver >> return Unsat
-                Just xj -> do
-                  u <- getUB solver xi
-                  pivotAndUpdate solver xi xj (fromJust u)
-                  loop
+      p <- prune solver opt
+      if p
+        then return ObjLimit
+        else do
+          -- select the smallest basic variable xi such that β(xi) < li or β(xi) > ui
+          m <- selectViolatingBasicVariable solver
+          case m of
+            Nothing -> return Optimum
+            Just xi  -> do
+              li <- getLB solver xi
+              vi <- getValue solver xi
+              if not (testLB li vi)
+                then do
+                  -- select non-basic variable xj such that
+                  -- (aij > 0 and β(xj) < uj) or (aij < 0 and β(xj) > lj)
+                  let q :: (Rational, Var) -> IO Bool
+                      q (aij, xj) = do
+                        l <- getLB solver xj
+                        u <- getUB solver xj
+                        v <- getValue solver xj
+                        return $ (aij > 0 && (isNothing u || v < fromJust u)) ||
+                                 (aij < 0 && (isNothing l || fromJust l < v))
+    
+                      find :: IO (Maybe Var)
+                      find = do
+                        dir <- readIORef (svOptDir solver)
+                        obj_def <- getRow solver objVar
+                        xi_def  <- getRow solver xi
+                        ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
+                          b <- q (aij, xj)
+                          if b
+                          then do
+                            let cj = LA.coeff xj obj_def
+                            let ratio = if dir==OptMin then (cj / aij) else - (cj / aij)
+                            return [(xj, ratio) | ratio >= 0]
+                          else
+                            return []
+                        case ws of
+                          [] -> return Nothing
+                          _ -> return $ Just $ fst $ minimumBy (comparing snd) ws
+                  r <- find
+                  case r of
+                    Nothing -> markBad solver >> return Unsat
+                    Just xj -> do
+                      l <- getLB solver xi
+                      pivotAndUpdate solver xi xj (fromJust l)
+                      loop
+                else do
+                  -- select non-basic variable xj such that
+                  -- (aij < 0 and β(xj) < uj) or (aij > 0 and β(xj) > lj)
+                  let q :: (Rational, Var) -> IO Bool
+                      q (aij, xj) = do
+                        l <- getLB solver xj
+                        u <- getUB solver xj
+                        v <- getValue solver xj
+                        return $ (aij < 0 && (isNothing u || v < fromJust u)) ||
+                                 (aij > 0 && (isNothing l || fromJust l < v))
+    
+                      find :: IO (Maybe Var)
+                      find = do
+                        dir <- readIORef (svOptDir solver)
+                        obj_def <- getRow solver objVar
+                        xi_def  <- getRow solver xi
+                        ws <- liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
+                          b <- q (aij, xj)
+                          if b
+                          then do
+                            let cj = LA.coeff xj obj_def
+                            let ratio = if dir==OptMin then - (cj / aij) else (cj / aij)
+                            return [(xj, ratio) | ratio >= 0]
+                          else
+                            return []
+                        case ws of
+                          [] -> return Nothing
+                          _ -> return $ Just $ fst $ minimumBy (comparing snd) ws
+                  r <- find
+                  case r of
+                    Nothing -> markBad solver >> return Unsat
+                    Just xj -> do
+                      u <- getUB solver xi
+                      pivotAndUpdate solver xi xj (fromJust u)
+                      loop
 
   ok <- readIORef (svOk solver)
   if not ok
@@ -705,6 +722,17 @@ dualSimplex solver = do
     result <- recordTime solver loop
     when (result == Optimum) $ checkFeasibility solver
     return result
+
+prune :: Solver -> Options -> IO Bool
+prune solver opt =
+  case objLimit opt of
+    Nothing -> return False
+    Just lim -> do    
+      o <- getObjValue solver
+      dir <- getOptDir solver
+      case dir of
+        OptMin -> return $! (lim <= o)
+        OptMax -> return $! (lim >= o)
 
 {--------------------------------------------------------------------
   Extract results
@@ -916,7 +944,7 @@ test4 = do
   writeIORef (svUB solver) (IM.fromList [(x0, toValue 2), (x1, toValue 3)])
   setObj solver (LA.fromTerms [(-1, x0)])
 
-  ret <- optimize solver
+  ret <- optimize solver defaultOptions
   print ret
   dump solver
 
@@ -934,7 +962,7 @@ test5 = do
 
   checkFeasibility solver
 
-  ret <- optimize solver
+  ret <- optimize solver defaultOptions
   print ret
   dump solver
 
