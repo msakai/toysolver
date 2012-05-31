@@ -68,6 +68,7 @@ module SAT
   , defaultLearningStrategy
   , setVarPolarity
   , setLogger
+  , setCheckModel
 
   -- * Read state
   , nVars
@@ -253,6 +254,8 @@ data Solver
   , svLearningStrategy :: !(IORef LearningStrategy)
 
   , svLogger :: !(IORef (Maybe (String -> IO ())))
+
+  , svCheckModel :: !(IORef Bool)
   }
 
 markBad :: Solver -> IO ()
@@ -480,6 +483,7 @@ newSolver = do
   learning <- newIORef defaultLearningStrategy
   learntSizeInc <- newIORef defaultLearntSizeInc
   ccMin <- newIORef defaultCCMin
+  checkModel <- newIORef False
 
   learntLim <- newIORef undefined
 
@@ -514,6 +518,7 @@ newSolver = do
         , svCCMin = ccMin
         , svLearntLim = learntLim
         , svLogger = logger
+        , svCheckModel = checkModel
         }
  return solver
 
@@ -780,7 +785,8 @@ solve_ solver = do
       end <- getCPUTime
 
       when result $ do
-        when debugMode $ checkSatisfied solver
+        checkModel <- readIORef (svCheckModel solver)
+        when checkModel $ checkSatisfied solver
         constructModel solver
 
       backtrackTo solver levelRoot
@@ -982,6 +988,10 @@ setVarPolarity :: Solver -> Var -> Bool -> IO ()
 setVarPolarity solver v val = do
   vd <- varData solver v
   writeIORef (vdPolarity vd) val
+
+setCheckModel :: Solver -> Bool -> IO ()
+setCheckModel solver flag = do
+  writeIORef (svCheckModel solver) flag
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
@@ -2026,8 +2036,11 @@ debugMode = False
 checkSatisfied :: Solver -> IO ()
 checkSatisfied solver = do
   cls <- readIORef (svClauseDB solver)
-  xs <- mapM (isSatisfied solver) cls
-  assert (and xs) $ return ()
+  forM_ cls $ \c -> do
+    b <- isSatisfied solver c
+    unless b $ do
+      s <- showConstraint solver c
+      log solver $ "BUG: " ++ s ++ " is violated"
 
 sanityCheck :: Solver -> IO ()
 sanityCheck _ | not debugMode = return ()

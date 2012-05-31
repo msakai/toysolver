@@ -73,6 +73,7 @@ data Options
   , optBinarySearch  :: Bool
   , optObjFunVarsHeuristics :: Bool
   , optPrintRational :: Bool
+  , optCheckModel  :: Bool
   }
 
 defaultOptions :: Options
@@ -88,7 +89,8 @@ defaultOptions
   , optLinearizerPB  = False
   , optBinarySearch   = False
   , optObjFunVarsHeuristics = True
-  , optPrintRational = False
+  , optPrintRational = False  
+  , optCheckModel = False
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -137,6 +139,10 @@ options =
     , Option [] ["print-rational"]
         (NoArg (\opt -> opt{ optPrintRational = True }))
         "print rational numbers instead of decimals"
+
+    , Option [] ["check-model"]
+        (NoArg (\opt -> opt{ optCheckModel = True }))
+        "check model for debug"
     ]
   where
     parseRestartStrategy s =
@@ -230,6 +236,7 @@ newSolver opts = do
     putStr "c "
     putStrLn str
     hFlush stdout
+  SAT.setCheckModel solver (optCheckModel opts)
   return solver
 
 -- ------------------------------------------------------------------------
