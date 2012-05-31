@@ -308,7 +308,7 @@ unassign solver !v = assert (validVar v) $ do
   vd <- varData solver v
   m <- readIORef (vdAssignment vd)
   case m of
-    Nothing -> error "should not happen"
+    Nothing -> error "unassign: should not happen"
     Just a -> do
       writeIORef (vdPolarity vd) (aValue a)
       readIORef (aBacktrackCBs a) >>= sequence_
@@ -321,7 +321,7 @@ addBacktrackCB solver !v callback = do
   vd <- varData solver v
   m <- readIORef (vdAssignment vd)
   case m of
-    Nothing -> error "should not happen"
+    Nothing -> error "addBacktrackCB: should not happen"
     Just a -> modifyIORef (aBacktrackCBs a) (callback :)
 
 -- | Register the constraint to be notified when the literal becames false.
@@ -770,7 +770,7 @@ solve_ solver = do
 
       learntSizeAdj
 
-      let loop [] = error "should not happen"
+      let loop [] = error "solve_: should not happen"
           loop (conflict_lim:rs) = do
             ret <- search solver conflict_lim onConflict
             case ret of
@@ -850,7 +850,7 @@ search solver !conflict_lim onConflict = loop 0
                   (learntClause, level) <- analyzeConflict solver constr
                   backtrackTo solver level
                   case learntClause of
-                    [] -> error "should not happen"
+                    [] -> error "search(LearningClause): should not happen"
                     [lit] -> do
                       ret <- assign solver lit
                       assert ret $ return ()
@@ -881,7 +881,7 @@ search solver !conflict_lim onConflict = loop 0
                              else loop2 (toConstraint pbdata)
                           else do
                             case learntClause of
-                              [] -> error "should not happen"
+                              [] -> error "search(LearningHybrid): should not happen"
                               [lit] -> do
                                 ret <- assign solver lit
                                 assert ret $ return ()
@@ -1854,7 +1854,7 @@ instance Constraint PBAtLeastData where
 
       go :: Integer -> [(Lit,Integer)] -> [Lit] -> [Lit]
       go s _ ret | s < 0 = ret
-      go _ [] _ = error "should not happen"
+      go _ [] _ = error "PBAtLeastData.basicReasonOf: should not happen"
       go s ((lit,c):xs) ret = go (s - c) xs (lit:ret)
 
   toPBAtLeast _ this = do
