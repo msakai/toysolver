@@ -1824,7 +1824,9 @@ instance Constraint PBAtLeastData where
     cs <- forM (IM.toList (pbTerms this)) $ \(l,c) -> do
       v <- litValue solver l
       if v == lFalse
-        then return 0
+        then do
+          addBacktrackCB solver (litVar l) $ modifyIORef' (pbSlack this) (+ c)
+          return 0
         else return c
     writeIORef (pbSlack this) $! sum cs - pbDegree this
 
