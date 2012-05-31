@@ -1213,7 +1213,7 @@ pbBacktrackLevel solver (lhs, rhs) = do
                 lhs2 = [x | x@(_,_,lv3) <- lhs', Just lv2 /= lv3]
             if s2 < 0 then
               return lv2 -- conflict
-            else if takeWhile (\(c,_,_) -> c >= s) lhs2 /= [] then
+            else if takeWhile (\(c,_,_) -> c > s) lhs2 /= [] then
               return lv2 --unit
             else
               go lvs2 lhs2 s2
