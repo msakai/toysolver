@@ -638,20 +638,18 @@ addPBAtLeast solver ts n = do
       let c = head cs
       addAtLeast solver (map snd ts') (fromInteger ((degree+c-1) `div` c))
     else do
-      forM_ ts' $ \(c,l) -> do
-        when (slack - c < 0) $ do
-          ret <- assign solver l
-          assert ret $ return ()
-      ret <- deduce solver
-      case ret of
-        Nothing -> return ()
-        Just _ -> markBad solver
-
-      ok <- readIORef (svOk solver)
-      when ok $ do
-        c <- newPBAtLeastData ts' degree False
-        attach solver c
-        addToDB solver c
+      c <- newPBAtLeastData ts' degree False
+      attach solver c
+      addToDB solver c
+      ret <- pbPropagate solver c
+      if not ret
+       then do
+         markBad solver
+       else do
+         ret2 <- deduce solver
+         case ret2 of
+           Nothing -> return ()
+           Just _ -> markBad solver
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMost :: Solver          -- ^ The 'Solver' argument.
@@ -1813,6 +1811,12 @@ instance Constraint PBAtLeastData where
 
   attach solver this = do
     forM_ (IM.keys (pbTerms this)) $ \l -> watch solver l this
+    cs <- forM (IM.toList (pbTerms this)) $ \(l,c) -> do
+      v <- litValue solver l
+      if v == lFalse
+        then return 0
+        else return c
+    writeIORef (pbSlack this) $! sum cs - pbDegree this
 
   watchedLiterals _ this = do
     return $ IM.keys $ pbTerms this
