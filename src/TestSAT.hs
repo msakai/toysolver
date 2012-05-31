@@ -383,6 +383,18 @@ case_hybridLearning_2 = do
   ret <- solve solver
   ret @?= True
 
+-- regression test for the bug triggered by normalized-blast-floppy1-8.ucl.opb.bz2
+case_addPBAtLeast_regression :: IO ()
+case_addPBAtLeast_regression = do
+  solver <- newSolver
+  [x1,x2,x3,x4] <- replicateM 4 (newVar solver)
+  addClause solver [-x1]
+  addClause solver [-x2, -x3]
+  addClause solver [-x2, -x4]
+  addPBAtLeast solver [(1,x1),(2,x2),(1,x3),(1,x4)] 3
+  ret <- solve solver
+  ret @?= False
+
 ------------------------------------------------------------------------
 -- Test harness
 
