@@ -3,11 +3,17 @@
 {-
 メモ
 
+Monomial order
+http://en.wikipedia.org/wiki/Monomial_order
+
 Gröbner basis
 http://en.wikipedia.org/wiki/Gr%C3%B6bner_basis
 
 グレブナー基底
 http://d.hatena.ne.jp/keyword/%A5%B0%A5%EC%A5%D6%A5%CA%A1%BC%B4%F0%C4%EC
+
+Gröbner Bases and Buchberger’s Algorithm
+http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
 
 Rubyでの実装
 http://www.math.kobe-u.ac.jp/~kodama/tips-RubyPoly.html
