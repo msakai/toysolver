@@ -1,4 +1,22 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+
+{-
+メモ
+
+Gröbner basis
+http://en.wikipedia.org/wiki/Gr%C3%B6bner_basis
+
+グレブナー基底
+http://d.hatena.ne.jp/keyword/%A5%B0%A5%EC%A5%D6%A5%CA%A1%BC%B4%F0%C4%EC
+
+Rubyでの実装
+http://www.math.kobe-u.ac.jp/~kodama/tips-RubyPoly.html
+
+HaskellではDoConに実装があり
+http://www.haskell.org/docon/
+GBasisモジュール
+-}
+
 module Polynomial
   (
   -- * Polynomial type
