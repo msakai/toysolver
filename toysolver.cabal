@@ -13,6 +13,7 @@ Extra-Source-Files:
    COPYING
    src/TseitinEncode.hs
    src/Polynomial.hs
+   src/ContiTraverso.hs
    samples/lp/*.lp
    samples/lp/error/*.lp
    samples/maxsat/*.cnf
