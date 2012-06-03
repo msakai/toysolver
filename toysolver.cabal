@@ -12,6 +12,7 @@ Extra-Source-Files:
    README.md
    COPYING
    src/TseitinEncode.hs
+   src/Polynomial.hs
    samples/lp/*.lp
    samples/lp/error/*.lp
    samples/maxsat/*.cnf
