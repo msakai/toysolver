@@ -25,17 +25,20 @@ module Polynomial
   , Monomial
   , Polynomial
 
-  -- * Constructions
+  -- * Conversion
   , var
   , fromMonomials
   , fromMonomial
+  , terms
 
   -- * Query
-  , terms
   , leadingTerm
   , deg
   , monomialDegree
   , monicMonomialDegree
+
+  -- * Operations
+  , deriv
 
   -- * Monomial order
   , MonomialOrder
@@ -60,6 +63,10 @@ import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.IntMultiSet as IMS
+
+{--------------------------------------------------------------------
+  Polynomial type
+--------------------------------------------------------------------}
 
 type Var = Int
 type MonicMonomial = IMS.IntMultiSet
@@ -109,7 +116,13 @@ monomialDegree (_,xs) = monicMonomialDegree xs
 monicMonomialDegree :: MonicMonomial -> Integer
 monicMonomialDegree xs = fromIntegral $ IMS.size xs
 
-
+deriv :: (Eq k, Num k) => Polynomial k -> Var -> Polynomial k
+deriv p x = sum $ do
+  (c,xs) <- terms p
+  let n = IMS.occur x xs
+  if n == 0
+    then return 0
+    else return $ fromMonomial (c * fromIntegral n, IMS.delete x xs)
 
 showPoly :: (Eq k, Ord k, Num k, Show k) => Polynomial k -> String
 showPoly p = intercalate " " [f c xs | (c,xs) <- sortBy (flip grlex `on` snd) $ terms p]
