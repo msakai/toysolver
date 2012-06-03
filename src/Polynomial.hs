@@ -45,6 +45,7 @@ module Polynomial
   , MonomialOrder
   , lex
   , grlex
+  , grevlex
 
   -- * Gröbner basis
   , buchberger
@@ -150,21 +151,56 @@ lex xs1 xs2 = go (IMS.toAscOccurList xs1) (IMS.toAscOccurList xs2)
         GT -> LT -- = compare 0 n2
         EQ -> compare n1 n2 `mappend` go xs1 xs2
 
-test_lex_1 = lex (IMS.singleton 1) (IMS.singleton 2) == GT
-test_lex_2 = lex (IMS.fromOccurList [(1,1),(2,1)]) (IMS.fromOccurList [(1,1),(2,2)]) == LT
-test_lex_3 = lex (IMS.fromOccurList [(2,2)]) (IMS.fromOccurList [(1,1),(2,1)]) == LT
+-- http://en.wikipedia.org/wiki/Monomial_order
+test_lex = sortBy lex [a,b,c,d] == [b,a,d,c]
+  where
+    x = 1
+    y = 2
+    z = 3
+    a = IMS.fromOccurList [(x,1),(y,2),(z,1)]
+    b = IMS.fromOccurList [(z,2)]
+    c = IMS.fromOccurList [(x,3)]
+    d = IMS.fromOccurList [(x,2),(z,2)]
+
+revlex :: MonomialOrder
+revlex xs1 xs2 = go (reverse (IMS.toAscOccurList xs1)) (reverse (IMS.toAscOccurList xs2))
+  where
+    go [] [] = EQ
+    go [] _ = GT
+    go _ [] = LT
+    go ((x1,n1):xs1) ((x2,n2):xs2) =
+      case compare x1 x2 of
+        LT -> LT -- = compare 0 n1
+        GT -> GT -- = compare n2 0
+        EQ -> compare n2 n1 `mappend` go xs1 xs2
 
 grlex :: MonomialOrder
 grlex = (compare `on` monicMonomialDegree) `mappend` lex
 
-test_grlex = fromMonomial (leadingTerm grlex f) == x^3*y^2 &&
-             fromMonomial (leadingTerm grlex g) == 3*x^4*y
+-- http://en.wikipedia.org/wiki/Monomial_order
+test_grlex = sortBy grlex [a,b,c,d] == [b,c,a,d]
   where
-    x = var 1
-    y = var 2
-    f, g :: Polynomial Rational
-    f = x^3*y^2 - x^2*y^3
-    g = 3*x^4*y + y^2
+    x = 1
+    y = 2
+    z = 3
+    a = IMS.fromOccurList [(x,1),(y,2),(z,1)]
+    b = IMS.fromOccurList [(z,2)]
+    c = IMS.fromOccurList [(x,3)]
+    d = IMS.fromOccurList [(x,2),(z,2)]
+
+grevlex :: MonomialOrder
+grevlex = (compare `on` monicMonomialDegree) `mappend` revlex
+
+-- http://en.wikipedia.org/wiki/Monomial_order
+test_grevlex = sortBy grevlex [a,b,c,d] == [b,c,d,a]
+  where
+    x = 1
+    y = 2
+    z = 3
+    a = IMS.fromOccurList [(x,1),(y,2),(z,1)]
+    b = IMS.fromOccurList [(z,2)]
+    c = IMS.fromOccurList [(x,3)]
+    d = IMS.fromOccurList [(x,2),(z,2)]
 
 lcmMonicMonomial :: MonicMonomial -> MonicMonomial -> MonicMonomial
 lcmMonicMonomial = IMS.maxUnion
