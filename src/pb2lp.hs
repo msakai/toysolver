@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  pb2lp
--- Copyright   :  (c) Masahiro Sakai 2011
+-- Copyright   :  (c) Masahiro Sakai 2011-2012
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -12,6 +12,7 @@
 module Main where
 
 import Control.Monad
+import Data.Char
 import Data.List
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
@@ -19,16 +20,14 @@ import qualified Data.Map as Map
 import System.Environment
 import System.IO
 import System.Exit
+import System.Console.GetOpt
 import qualified PBFile
 import qualified LPFile
 
-header :: String
-header = "Usage: pb2lp [--wbo] [file.opb|file.wbo|-]"
-
-convert :: PBFile.Formula -> LPFile.LP
-convert formula@(obj, cs) = LPFile.LP
+convert :: ObjType -> PBFile.Formula -> LPFile.LP
+convert objType formula@(obj, cs) = LPFile.LP
   { LPFile.variables = vs2
-  , LPFile.dir = LPFile.OptMin
+  , LPFile.dir = dir
   , LPFile.objectiveFunction = (Nothing, obj2)
   , LPFile.constraints = cs2
   , LPFile.bounds = Map.empty
@@ -41,10 +40,14 @@ convert formula@(obj, cs) = LPFile.LP
     vs1 = collectVariables formula
     vs2 = (Set.fromList . map convVar . IS.toList) $ vs1
 
-    obj2 =
+    (dir,obj2) =
       case obj of
-        Nothing -> [LPFile.Term 1 [v] | v <- Set.toList vs2]
-        Just obj' -> convExpr obj'
+        Just obj' -> (LPFile.OptMin, convExpr obj')
+        Nothing ->
+          case objType of
+            ObjNone    -> (LPFile.OptMin, [LPFile.Term 0 (take 1 (Set.toList vs2 ++ ["x0"]))])
+            ObjMaxOne  -> (LPFile.OptMax, [LPFile.Term 1 [v] | v <- Set.toList vs2])
+            ObjMaxZero -> (LPFile.OptMin, [LPFile.Term 1 [v] | v <- Set.toList vs2])
     cs2 = do
       (lhs,op,rhs) <- cs
       let op2 = case op of
@@ -128,31 +131,58 @@ collectVariablesWBO (top, cs) = IS.unions [f s | (_,(s,_,_)) <- cs]
       lit <- ts
       return $ abs lit
 
+data Flag
+  = Help
+  | WBO
+  | ObjType ObjType
+  deriving Eq
 
+data ObjType = ObjNone | ObjMaxOne | ObjMaxZero
+  deriving Eq
+
+options :: [OptDescr Flag]
+options =
+    [ Option ['h'] ["help"] (NoArg Help) "show help"
+    , Option []    ["wbo"]  (NoArg WBO)  "input is .wbo file"
+    , Option []    ["obj"]  (ReqArg (ObjType . parseObjType) "STRING") "objective function for PBS: none (default), max-one, max-zero"
+    ]
+  where
+    parseObjType s =
+      case map toLower s of
+        "none"     -> ObjNone
+        "max-one"  -> ObjMaxOne
+        "max-zero" -> ObjMaxZero
+        _          -> error ("unknown obj: " ++ s)
 
 main :: IO ()
 main = do
   args <- getArgs
+  case getOpt Permute options args of
+    (o,_,[])
+      | Help `elem` o -> putStrLn (usageInfo header options)
+    (o,[fname],[]) -> do
+      let objType = last (ObjNone : [t | ObjType t <- o])
+      lp <-
+        if WBO `elem` o
+        then do
+          ret <- if fname == "-"
+                 then liftM (PBFile.parseWBOString "-") getContents
+                 else PBFile.parseWBOFile fname
+          case ret of
+            Left err -> hPrint stderr err >> exitFailure
+            Right formula -> return (convertWBO formula)      
+        else do
+          ret <- if fname == "-"
+                 then liftM (PBFile.parseOPBString "-") getContents
+                 else PBFile.parseOPBFile fname
+          case ret of
+            Left err -> hPrint stderr err >> exitFailure
+            Right formula -> return (convert objType formula)
+      case LPFile.render lp of
+        Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
+        Just s -> putStr s
+    (o,_,errs) ->
+      hPutStrLn stderr $ concat errs ++ usageInfo header options
 
-  lp <-
-    case args of
-      "--wbo":args2 -> do
-        ret <- case args2 of
-               ["-"]   -> liftM (PBFile.parseWBOString "-") getContents
-               [fname] -> PBFile.parseWBOFile fname
-               _ -> hPutStrLn stderr header >> exitFailure
-        case ret of
-          Left err -> hPrint stderr err >> exitFailure
-          Right formula -> return (convertWBO formula)      
-      args2 -> do
-        ret <- case args2 of
-               ["-"]   -> liftM (PBFile.parseOPBString "-") getContents
-               [fname] -> PBFile.parseOPBFile fname
-               _ -> hPutStrLn stderr header >> exitFailure
-        case ret of
-          Left err -> hPrint stderr err >> exitFailure
-          Right formula -> return (convert formula)
-
-  case LPFile.render lp of
-    Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
-    Just s -> putStr s
+header :: String
+header = "Usage: pb2lp [--wbo] [file.opb|file.wbo|-]"
