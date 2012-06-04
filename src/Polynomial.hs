@@ -61,6 +61,7 @@ module Polynomial
 
   -- * Utility functions
   , showPoly
+  , spolynomial
   ) where
 
 import Prelude hiding (lex)
@@ -157,17 +158,6 @@ lex xs1 xs2 = go (IMS.toAscOccurList xs1) (IMS.toAscOccurList xs2)
         GT -> LT -- = compare 0 n2
         EQ -> compare n1 n2 `mappend` go xs1 xs2
 
--- http://en.wikipedia.org/wiki/Monomial_order
-test_lex = sortBy lex [a,b,c,d] == [b,a,d,c]
-  where
-    x = 1
-    y = 2
-    z = 3
-    a = IMS.fromOccurList [(x,1),(y,2),(z,1)]
-    b = IMS.fromOccurList [(z,2)]
-    c = IMS.fromOccurList [(x,3)]
-    d = IMS.fromOccurList [(x,2),(z,2)]
-
 revlex :: MonomialOrder
 revlex xs1 xs2 = go (reverse (IMS.toAscOccurList xs1)) (reverse (IMS.toAscOccurList xs2))
   where
@@ -183,30 +173,8 @@ revlex xs1 xs2 = go (reverse (IMS.toAscOccurList xs1)) (reverse (IMS.toAscOccurL
 grlex :: MonomialOrder
 grlex = (compare `on` monicMonomialDegree) `mappend` lex
 
--- http://en.wikipedia.org/wiki/Monomial_order
-test_grlex = sortBy grlex [a,b,c,d] == [b,c,a,d]
-  where
-    x = 1
-    y = 2
-    z = 3
-    a = IMS.fromOccurList [(x,1),(y,2),(z,1)]
-    b = IMS.fromOccurList [(z,2)]
-    c = IMS.fromOccurList [(x,3)]
-    d = IMS.fromOccurList [(x,2),(z,2)]
-
 grevlex :: MonomialOrder
 grevlex = (compare `on` monicMonomialDegree) `mappend` revlex
-
--- http://en.wikipedia.org/wiki/Monomial_order
-test_grevlex = sortBy grevlex [a,b,c,d] == [b,c,d,a]
-  where
-    x = 1
-    y = 2
-    z = 3
-    a = IMS.fromOccurList [(x,1),(y,2),(z,1)]
-    b = IMS.fromOccurList [(z,2)]
-    c = IMS.fromOccurList [(x,3)]
-    d = IMS.fromOccurList [(x,2),(z,2)]
 
 lcmMonicMonomial :: MonicMonomial -> MonicMonomial -> MonicMonomial
 lcmMonicMonomial = IMS.maxUnion
@@ -252,16 +220,6 @@ spolynomial cmp f g =
     (c1, xs1) = leadingTerm cmp f
     (c2, xs2) = leadingTerm cmp g
 
--- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
--- Example 1
-test_spolynomial = spolynomial grlex f g == - x^3*y^3 - constant (1/3) * y^3 + x^2
-  where
-    x = var 1
-    y = var 2
-    f, g :: Polynomial Rational
-    f = x^3*y^2 - x^2*y^3 + x
-    g = 3*x^4*y + y^2
-
 buchberger :: forall k. (Eq k, Fractional k, Ord k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
 buchberger cmp fs = (reduceGBase cmp . Set.toList . go . Set.fromList) fs
   where  
@@ -287,47 +245,6 @@ reduceGBase cmp ps = map f $ go [(leadingTerm cmp p, p) | p <- ps] []
     go (x:xs) ys = go (g x xs) (x : g x ys)
       where
         g ((_,lt1),_) xs = [x | x@((_,lt2),_) <- xs, not (monicMonomialDivisible lt2 lt1)]
-
--- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
--- Exercise 1
-test_buchberger1 = buchberger lex [x^2-y, x^3-z]
-  where
-    x :: Polynomial Rational
-    x = var 1
-    y = var 2
-    z = var 3
-
--- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
--- Exercise 2
-test_buchberger2 = buchberger grlex [x^3-2*x*y, x^2*y-2*y^2+x]
-  where
-    x :: Polynomial Rational
-    x = var 1
-    y = var 2
-
--- http://www.iisdavinci.it/jeometry/buchberger.html
-test_buchberger3 = Set.fromList gbase == Set.fromList expected
-  where
-    gbase = buchberger lex [x^2+2*x*y^2, x*y+2*y^3-1]
-    expected = [x, y^3 - constant (1/2)]
-    x :: Polynomial Rational
-    x = var 1
-    y = var 2
-
--- http://www.orcca.on.ca/~reid/NewWeb/DetResDes/node4.html
--- lexでやりたいけど、lexだとしばらく待っても終わらなかった
-test_buchberger4 = buchberger grlex [x^2+y*z-2, x*z+y^2-3, x*y+z^2-5]
-  where
-    x :: Polynomial Rational
-    x = var 1
-    y = var 2
-    z = var 3
-
-test_seventrees = reduce lex (x^7 - x) gbase == 0
-  where
-    x :: Polynomial Rational
-    x = var 1
-    gbase = buchberger lex [x-(x^2 + 1)]
 
 pairs :: [a] -> [(a,a)]
 pairs [] = []

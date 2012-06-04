@@ -153,3 +153,10 @@ Test-suite TestSimplex2
   Main-is:           TestSimplex2.hs
   Build-depends:     base >=4 && <5, containers, deepseq, queue, test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
   Extensions: TemplateHaskell, DoAndIfThenElse
+
+Test-suite TestPolynomial
+  Type:              exitcode-stdio-1.0
+  HS-Source-Dirs:    src
+  Main-is:           TestPolynomial.hs
+  Build-depends:     base >=4 && <5, containers, multiset, test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
+  Extensions: TemplateHaskell, DoAndIfThenElse
