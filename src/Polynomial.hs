@@ -138,7 +138,7 @@ deriv p x = sum $ do
 showPoly :: (Eq k, Ord k, Num k, Show k) => Polynomial k -> String
 showPoly p = intercalate " + " [f c xs | (c,xs) <- sortBy (flip grlex `on` snd) $ terms p]
   where
-    f c xs = (intercalate "*" ([showsPrec 8 c "" | c /= 1] ++ [g x n | (x,n) <- IMS.toOccurList xs]))
+    f c xs = (intercalate "*" ([showsPrec 8 c "" | c /= 1 || IMS.null xs] ++ [g x n | (x,n) <- IMS.toOccurList xs]))
     g x 1 = "x" ++ show x
     g x n = "x" ++ show x ++ "^" ++ show n
 
@@ -253,6 +253,7 @@ spolynomial cmp f g =
     (c2, xs2) = leadingTerm cmp g
 
 -- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
+-- Example 1
 test_spolynomial = spolynomial grlex f g == - x^3*y^3 - constant (1/3) * y^3 + x^2
   where
     x = var 1
@@ -262,7 +263,7 @@ test_spolynomial = spolynomial grlex f g == - x^3*y^3 - constant (1/3) * y^3 + x
     g = 3*x^4*y + y^2
 
 buchberger :: forall k. (Eq k, Fractional k, Ord k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
-buchberger cmp fs = (Set.toList . go . Set.fromList) fs
+buchberger cmp fs = (reduceGBase cmp . Set.toList . go . Set.fromList) fs
   where  
     go :: Set.Set (Polynomial k) -> Set.Set (Polynomial k)
     go fs = if fs2 `Set.isSubsetOf` fs
@@ -277,6 +278,18 @@ buchberger cmp fs = (Set.toList . go . Set.fromList) fs
           guard $ p /= 0
           return p
 
+reduceGBase :: forall k. Fractional k => MonomialOrder -> [Polynomial k] -> [Polynomial k]
+reduceGBase cmp ps = map f $ go [(leadingTerm cmp p, p) | p <- ps] []
+  where
+    f ((c,lt), p) = constant (1/c) * p
+
+    go [] ys = ys
+    go (x:xs) ys = go (g x xs) (x : g x ys)
+      where
+        g ((_,lt1),_) xs = [x | x@((_,lt2),_) <- xs, not (monicMonomialDivisible lt2 lt1)]
+
+-- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
+-- Exercise 1
 test_buchberger1 = buchberger lex [x^2-y, x^3-z]
   where
     x :: Polynomial Rational
@@ -284,26 +297,37 @@ test_buchberger1 = buchberger lex [x^2-y, x^3-z]
     y = var 2
     z = var 3
 
-test_buchberger2 = buchberger lex [x^3-2*x*y, x^2*y-2*y^2+x]
+-- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
+-- Exercise 2
+test_buchberger2 = buchberger grlex [x^3-2*x*y, x^2*y-2*y^2+x]
   where
     x :: Polynomial Rational
     x = var 1
     y = var 2
 
 -- http://www.iisdavinci.it/jeometry/buchberger.html
-test_buchberger3 = buchberger lex [x^2+2*x*y^2, x*y+2*y^3-1]
+test_buchberger3 = Set.fromList gbase == Set.fromList expected
   where
+    gbase = buchberger lex [x^2+2*x*y^2, x*y+2*y^3-1]
+    expected = [x, y^3 - constant (1/2)]
     x :: Polynomial Rational
     x = var 1
     y = var 2
 
 -- http://www.orcca.on.ca/~reid/NewWeb/DetResDes/node4.html
-test_buchberger4 = buchberger grlex [x^2+y*z-2, x*z*y^2-3, x*y+z^2-5]
+-- lexでやりたいけど、lexだとしばらく待っても終わらなかった
+test_buchberger4 = buchberger grlex [x^2+y*z-2, x*z+y^2-3, x*y+z^2-5]
   where
     x :: Polynomial Rational
     x = var 1
     y = var 2
     z = var 3
+
+test_seventrees = reduce lex (x^7 - x) gbase == 0
+  where
+    x :: Polynomial Rational
+    x = var 1
+    gbase = buchberger lex [x-(x^2 + 1)]
 
 pairs :: [a] -> [(a,a)]
 pairs [] = []
