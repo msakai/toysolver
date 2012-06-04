@@ -97,11 +97,35 @@ test_buchberger4 = buchberger grlex [x^2+y*z-2, x*z+y^2-3, x*y+z^2-5]
     y = var 2
     z = var 3
 
-case_seventrees = reduce lex (x^7 - x) gbase @?= 0
+-- Seven Trees in One
+-- http://arxiv.org/abs/math/9405205
+case_Seven_Trees_in_One = reduce lex (x^7 - x) gbase @?= 0
   where
     x :: Polynomial Rational
     x = var 1
     gbase = buchberger lex [x-(x^2 + 1)]
+
+-- Non-linear loop invariant generation using Gröbner bases
+-- http://portal.acm.org/citation.cfm?id=964028
+-- http://www-step.stanford.edu/papers/popl04.pdf
+-- Example 3
+-- Consider again the ideal from Example 2; I = {f : x^2-y, g : y-z, h
+-- : x+z}.  The Gröbner basis for I is G = {f' : z^2-z, g : y-z, h :
+-- x+z}. With this basis, every reduction of p : x^2 - y^2 will yield
+-- a normal form 0.
+case_sankaranarayanan04nonlinear = do
+  Set.fromList gbase @?= Set.fromList [f', g, h]
+  reduce lex (x^2 - y^2) gbase @?= 0
+  where
+    x :: Polynomial Rational
+    x = var 1
+    y = var 2
+    z = var 3
+    f = x^2 - y
+    g = y - z
+    h = x + z
+    f' = z^2 - z
+    gbase = buchberger lex [f, g, h]
 
 ------------------------------------------------------------------------
 -- Test harness
