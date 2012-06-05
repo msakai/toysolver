@@ -126,7 +126,7 @@ monomialDegree :: Monomial k -> Integer
 monomialDegree (_,xs) = monicMonomialDegree xs
 
 monicMonomialDegree :: MonicMonomial -> Integer
-monicMonomialDegree xs = fromIntegral $ IMS.size xs
+monicMonomialDegree = sum . map (fromIntegral . snd) . IMS.toOccurList
 
 deriv :: (Eq k, Num k) => Polynomial k -> Var -> Polynomial k
 deriv p x = sum $ do
@@ -150,8 +150,8 @@ lex :: MonomialOrder
 lex xs1 xs2 = go (IMS.toAscOccurList xs1) (IMS.toAscOccurList xs2)
   where
     go [] [] = EQ
-    go [] _ = LT
-    go _ [] = GT
+    go [] _  = LT -- = cmpare 0 n2
+    go _ []  = GT -- = cmpare n1 0
     go ((x1,n1):xs1) ((x2,n2):xs2) =
       case compare x1 x2 of
         LT -> GT -- = compare n1 0
@@ -162,13 +162,14 @@ revlex :: MonomialOrder
 revlex xs1 xs2 = go (reverse (IMS.toAscOccurList xs1)) (reverse (IMS.toAscOccurList xs2))
   where
     go [] [] = EQ
-    go [] _ = GT
-    go _ [] = LT
+    go [] _  = GT -- = cmp 0 n2
+    go _ []  = LT -- = cmp n1 0
     go ((x1,n1):xs1) ((x2,n2):xs2) =
       case compare x1 x2 of
-        LT -> LT -- = compare 0 n1
-        GT -> GT -- = compare n2 0
-        EQ -> compare n2 n1 `mappend` go xs1 xs2
+        LT -> GT -- = cmp 0 n2
+        GT -> LT -- = cmp n1 0
+        EQ -> cmp n1 n2 `mappend` go xs1 xs2
+    cmp n1 n2 = compare n2 n1
 
 grlex :: MonomialOrder
 grlex = (compare `on` monicMonomialDegree) `mappend` lex
