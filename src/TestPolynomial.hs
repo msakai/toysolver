@@ -1,14 +1,17 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 import Prelude hiding (lex)
+import Control.Monad
 import Data.List
 import Data.Ratio
 import qualified Data.Set as Set
 import qualified Data.IntMultiSet as IMS
 import Test.HUnit hiding (Test)
+import Test.QuickCheck
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
+import Test.Framework.Providers.QuickCheck2
 import Polynomial
 
 -- http://en.wikipedia.org/wiki/Monomial_order
@@ -44,6 +47,64 @@ case_grevlex = sortBy grevlex [a,b,c,d] @?= [b,c,d,a]
     c = IMS.fromOccurList [(x,3)]
     d = IMS.fromOccurList [(x,2),(z,2)]
 
+prop_refl_lex     = propRefl lex
+prop_refl_grlex   = propRefl grlex
+prop_refl_grevlex = propRefl grevlex
+
+prop_trans_lex     = propTrans lex
+prop_trans_grlex   = propTrans grlex
+prop_trans_grevlex = propTrans grevlex
+
+prop_sym_lex     = propSym lex
+prop_sym_grlex   = propSym grlex
+prop_sym_grevlex = propSym grevlex
+
+prop_monomial_order_property1_lex     = monomialOrderProp1 lex
+prop_monomial_order_property1_grlex   = monomialOrderProp1 grlex
+prop_monomial_order_property1_grevlex = monomialOrderProp1 grevlex
+
+prop_monomial_order_property2_lex     = monomialOrderProp2 lex
+prop_monomial_order_property2_grlex   = monomialOrderProp2 grlex
+prop_monomial_order_property2_grevlex = monomialOrderProp2 grevlex
+
+propRefl cmp =
+  forAll monicMonomials $ \a -> cmp a a == EQ
+
+propTrans cmp =
+  forAll monicMonomials $ \a ->
+  forAll monicMonomials $ \b ->
+    cmp a b == LT ==>
+      forAll monicMonomials $ \c ->
+        cmp b c == LT ==> cmp a c == LT
+
+propSym cmp =
+  forAll monicMonomials $ \a ->
+  forAll monicMonomials $ \b ->
+    cmp a b == flipOrdering (cmp b a)
+  where
+    flipOrdering EQ = EQ
+    flipOrdering LT = GT
+    flipOrdering GT = LT
+
+monomialOrderProp1 cmp =
+  forAll monicMonomials $ \a ->
+  forAll monicMonomials $ \b ->
+    let r = cmp a b
+    in cmp a b /= EQ ==>
+         forAll monicMonomials $ \c ->
+           cmp (IMS.union a c) (IMS.union b c) == r
+
+monomialOrderProp2 cmp =
+  forAll monicMonomials $ \a ->
+    a /= IMS.empty ==> cmp IMS.empty a == LT
+
+monicMonomials = do
+  size <- choose (0, 3)
+  liftM (IMS.unions) $ replicateM size $ do
+    v <- choose (-5, 5)
+    e <- choose (1,100) -- liftM ((+1) . abs) arbitrary -- e should be >0
+    return $ IMS.fromOccurList [(v,e)]
+-- IntMultiSetを使ってるとIntのオーバーフローですぐダメになるなぁ。
 
 -- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
 -- Example 1
