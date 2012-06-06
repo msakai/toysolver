@@ -62,6 +62,7 @@ module Polynomial
   -- * Utility functions
   , showPoly
   , spolynomial
+  , reduceGBase
   ) where
 
 import Prelude hiding (lex)
@@ -249,16 +250,18 @@ buchberger_old cmp fs = (reduceGBase cmp . Set.toList . go . Set.fromList) fs
           guard $ p /= 0
           return p
 
-reduceGBase :: forall k. (Eq k, Fractional k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
-reduceGBase cmp ps = map f $ go [(leadingTerm cmp p, p) | p <- ps] []
-  where
-    f ((c,lt), p) = constant (1/c) * p
-
-    go [] ys = ys
-    go (x:xs) ys = go (g x xs) (x : g x ys)
-      where
-        g ((_,lt1),_) xs = [x | x@((_,lt2),_) <- xs, not (monicMonomialDivisible lt2 lt1)]
+reduceGBase :: forall k. (Eq k, Ord k, Fractional k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
+reduceGBase cmp ps = Set.toList $ Set.fromList $ do
+  (p,qs) <- choose ps
+  let q = reduce cmp p qs
+  guard $ q /= 0
+  let (c,_) = leadingTerm cmp q
+  return $ constant (1/c) * q
 
 pairs :: [a] -> [(a,a)]
 pairs [] = []
 pairs (x:xs) = [(x,y) | y <- xs] ++ pairs xs
+
+choose :: [a] -> [(a,[a])]
+choose [] = []
+choose (x:xs) = (x,xs) : [(y,x:ys) | (y,ys) <- choose xs]

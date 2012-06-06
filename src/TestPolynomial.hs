@@ -5,6 +5,7 @@ import Control.Monad
 import Data.List
 import Data.Ratio
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 import qualified Data.IntMultiSet as IMS
 import Test.HUnit hiding (Test)
 import Test.QuickCheck
@@ -150,13 +151,31 @@ case_buchberger3 = Set.fromList gbase @?= Set.fromList expected
     y = var 2
 
 -- http://www.orcca.on.ca/~reid/NewWeb/DetResDes/node4.html
--- lexでやりたいけど、lexだとしばらく待っても終わらなかった
-test_buchberger4 = buchberger grlex [x^2+y*z-2, x*z+y^2-3, x*y+z^2-5]
+-- 時間がかかるので自動実行されるテストケースには含めていない
+test_buchberger4 = Set.fromList gbase @?= Set.fromList expected                   
   where
     x :: Polynomial Rational
     x = var 1
     y = var 2
     z = var 3
+
+    gbase = buchberger lex [x^2+y*z-2, x*z+y^2-3, x*y+z^2-5]
+
+    expected = reduceGBase lex $
+      [ 8*z^8-100*z^6+438*z^4-760*z^2+361
+      , 361*y+8*z^7+52*z^5-740*z^3+1425*z
+      , 361*x-88*z^7+872*z^5-2690*z^3+2375*z
+      ]
+{-
+Risa/Asir での結果
+
+load("gr");
+gr([x^2+y*z-2, x*z+y^2-3, x*y+z^2-5],[x,y,z], 2);
+
+[8*z^8-100*z^6+438*z^4-760*z^2+361,
+361*y+8*z^7+52*z^5-740*z^3+1425*z,
+361*x-88*z^7+872*z^5-2690*z^3+2375*z]
+-}
 
 -- Seven Trees in One
 -- http://arxiv.org/abs/math/9405205
