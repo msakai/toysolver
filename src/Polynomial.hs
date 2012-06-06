@@ -212,7 +212,7 @@ reduce cmp p fs = go p
           guard $ monomialDivisible h a
           return (g - fromMonomial (monomialDiv h a) * f)
 
-spolynomial :: Fractional k => MonomialOrder -> Polynomial k -> Polynomial k -> Polynomial k
+spolynomial :: (Eq k, Fractional k) => MonomialOrder -> Polynomial k -> Polynomial k -> Polynomial k
 spolynomial cmp f g =
       fromMonomial ((1,xs) `monomialDiv` (c1,xs1)) * f
     - fromMonomial ((1,xs) `monomialDiv` (c2,xs2)) * g
@@ -237,7 +237,7 @@ buchberger cmp fs = (reduceGBase cmp . Set.toList . go . Set.fromList) fs
           guard $ p /= 0
           return p
 
-reduceGBase :: forall k. Fractional k => MonomialOrder -> [Polynomial k] -> [Polynomial k]
+reduceGBase :: forall k. (Eq k, Fractional k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
 reduceGBase cmp ps = map f $ go [(leadingTerm cmp p, p) | p <- ps] []
   where
     f ((c,lt), p) = constant (1/c) * p
