@@ -222,7 +222,19 @@ spolynomial cmp f g =
     (c2, xs2) = leadingTerm cmp g
 
 buchberger :: forall k. (Eq k, Fractional k, Ord k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
-buchberger cmp fs = (reduceGBase cmp . Set.toList . go . Set.fromList) fs
+buchberger cmp fs = reduceGBase cmp $ go fs (pairs fs)
+  where  
+    go :: [Polynomial k] -> [(Polynomial k, Polynomial k)] -> [Polynomial k]
+    go gs [] = gs
+    go gs ((fi,fj):ps)
+      | r == 0    = go gs ps
+      | otherwise = go (r:gs) ([(r,g) | g <- gs] ++ ps)
+      where
+        spoly = spolynomial cmp fi fj
+        r = reduce cmp spoly gs
+
+buchberger_old :: forall k. (Eq k, Fractional k, Ord k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
+buchberger_old cmp fs = (reduceGBase cmp . Set.toList . go . Set.fromList) fs
   where  
     go :: Set.Set (Polynomial k) -> Set.Set (Polynomial k)
     go fs = if fs2 `Set.isSubsetOf` fs
