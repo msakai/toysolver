@@ -187,6 +187,24 @@ test_lcmMonicMonomial = lcmMonicMonomial p1 p2 == IMS.fromOccurList [(1,3),(2,4)
     p1 = IMS.fromOccurList [(1,2),(2,4)]
     p2 = IMS.fromOccurList [(1,3),(2,1)]
 
+gcdMonicMonomial :: MonicMonomial -> MonicMonomial -> MonicMonomial
+gcdMonicMonomial m1 m2 = IMS.fromDistinctAscOccurList xs
+  where
+    xs = f (IMS.toAscOccurList m1) (IMS.toAscOccurList m2)
+    f [] _ = []
+    f _ [] = []
+    f xxs1@((x1,c1):xs1) xxs2@((x2,c2):xs2) =
+      case compare x1 x2 of
+        EQ -> (x1, min c1 c2) : f xs1 xs2
+        LT -> f xs1 xxs2
+        GT -> f xxs1 xs2
+
+-- gcd (x1^2 * x2^4) (x2^1 * x3^2) = x2
+test_gcdMonicMonomial = gcdMonicMonomial p1 p2 == IMS.fromOccurList [(2,1)]
+  where
+    p1 = IMS.fromOccurList [(1,2),(2,4)]
+    p2 = IMS.fromOccurList [(2,1),(3,2)]
+
 monicMonomialDivisible :: MonicMonomial -> MonicMonomial -> Bool
 monicMonomialDivisible xs1 xs2 = xs2 `IMS.isSubsetOf` xs1
 
