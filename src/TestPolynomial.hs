@@ -15,6 +15,22 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 import Polynomial
 
+prop_mmOne_unit = 
+  forAll monicMonomials $ \a -> 
+    mmOne `mmProd` a == a && a `mmProd` mmOne == a
+
+prop_mmProd_Divisible = 
+  forAll monicMonomials $ \a -> 
+  forAll monicMonomials $ \b -> 
+    let c = a `mmProd` b
+    in mmDivisible c a && mmDivisible c b
+
+prop_mmProd_Div = 
+  forAll monicMonomials $ \a -> 
+  forAll monicMonomials $ \b -> 
+    let c = a `mmProd` b
+    in c `mmDiv` a == b && c `mmDiv` b == a
+
 -- lcm (x1^2 * x2^4) (x1^3 * x2^1) = x1^3 * x2^4
 case_mmLCM = mmLCM p1 p2 @?= IMS.fromOccurList [(1,3),(2,4)]
   where
@@ -26,6 +42,18 @@ case_mmGCD = mmGCD p1 p2 @?= IMS.fromOccurList [(2,1)]
   where
     p1 = IMS.fromOccurList [(1,2),(2,4)]
     p2 = IMS.fromOccurList [(2,1),(3,2)]
+
+prop_mmLCM_divisible = 
+  forAll monicMonomials $ \a -> 
+  forAll monicMonomials $ \b -> 
+    let c = mmLCM a b
+    in c `mmDivisible` a && c `mmDivisible` b
+
+prop_mmGCD_divisible = 
+  forAll monicMonomials $ \a -> 
+  forAll monicMonomials $ \b -> 
+    let c = mmGCD a b
+    in a `mmDivisible` c && b `mmDivisible` c
 
 -- http://en.wikipedia.org/wiki/Monomial_order
 case_lex = sortBy lex [a,b,c,d] @?= [b,a,d,c]
@@ -105,11 +133,11 @@ monomialOrderProp1 cmp =
     let r = cmp a b
     in cmp a b /= EQ ==>
          forAll monicMonomials $ \c ->
-           cmp (IMS.union a c) (IMS.union b c) == r
+           cmp (a `mmProd` c) (b `mmProd` c) == r
 
 monomialOrderProp2 cmp =
   forAll monicMonomials $ \a ->
-    a /= IMS.empty ==> cmp IMS.empty a == LT
+    a /= mmOne ==> cmp mmOne a == LT
 
 monicMonomials = do
   size <- choose (0, 3)

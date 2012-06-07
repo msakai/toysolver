@@ -46,12 +46,15 @@ module Polynomial
   -- * Monomial
   , Monomial
   , monomialDegree
+  , monomialProd
   , monomialDivisible
   , monomialDiv
 
   -- * Monic monomial
   , MonicMonomial
+  , mmOne
   , mmDegree
+  , mmProd
   , mmDivisible
   , mmDiv
   , mmLCM
@@ -95,13 +98,13 @@ newtype Polynomial k = Polynomial (Map.Map MonicMonomial k)
 instance (Eq k, Num k) => Num (Polynomial k) where
   Polynomial m1 + Polynomial m2 = normalize $ Polynomial $ Map.unionWith (+) m1 m2
   Polynomial m1 * Polynomial m2 = normalize $ Polynomial $ Map.fromListWith (+)
-      [ (xs1 `IMS.union` xs2, c1*c2)
+      [ (xs1 `mmProd` xs2, c1*c2)
       | (xs1,c1) <- Map.toList m1, (xs2,c2) <- Map.toList m2
       ]
   negate (Polynomial m) = Polynomial $ Map.map negate m
   abs x = x    -- OK?
   signum x = 1 -- OK?
-  fromInteger x = normalize $ Polynomial $ Map.singleton IMS.empty (fromInteger x)
+  fromInteger x = normalize $ Polynomial $ Map.singleton mmOne (fromInteger x)
 
 normalize :: (Eq k, Num k) => Polynomial k -> Polynomial k
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
@@ -110,7 +113,7 @@ var :: (Eq k, Num k) => Var -> Polynomial k
 var x = Polynomial (Map.singleton (IMS.singleton x) 1)
 
 constant :: (Eq k, Num k) => k -> Polynomial k
-constant c = normalize $ Polynomial (Map.singleton IMS.empty c)
+constant c = normalize $ Polynomial (Map.singleton mmOne c)
 
 fromMonomials :: (Eq k, Num k) => [Monomial k] -> Polynomial k
 fromMonomials = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
@@ -124,7 +127,7 @@ terms (Polynomial m) = [(c,xs) | (xs,c) <- Map.toList m]
 leadingTerm :: (Eq k, Num k) => MonomialOrder -> Polynomial k -> Monomial k
 leadingTerm cmp p =
   case terms p of
-    [] -> (0, IMS.empty) -- should be error?
+    [] -> (0, mmOne) -- should be error?
     ms -> maximumBy (cmp `on` snd) ms
 
 deg :: Polynomial k -> Integer
@@ -154,6 +157,9 @@ type Monomial k = (k, MonicMonomial)
 monomialDegree :: Monomial k -> Integer
 monomialDegree (_,xs) = mmDegree xs
 
+monomialProd :: Num k => Monomial k -> Monomial k -> Monomial k
+monomialProd (c1,xs1) (c2,xs2) = (c1*c2, xs1 `mmProd` xs2)
+
 monomialDivisible :: Fractional k => Monomial k -> Monomial k -> Bool
 monomialDivisible (c1,xs1) (c2,xs2) = mmDivisible xs1 xs2
 
@@ -168,6 +174,12 @@ type MonicMonomial = IMS.IntMultiSet
 
 mmDegree :: MonicMonomial -> Integer
 mmDegree = sum . map (fromIntegral . snd) . IMS.toOccurList
+
+mmOne :: MonicMonomial
+mmOne = IMS.empty
+
+mmProd :: MonicMonomial -> MonicMonomial -> MonicMonomial
+mmProd xs1 xs2 = xs1 `IMS.union` xs2
 
 mmDivisible :: MonicMonomial -> MonicMonomial -> Bool
 mmDivisible xs1 xs2 = xs2 `IMS.isSubsetOf` xs1
