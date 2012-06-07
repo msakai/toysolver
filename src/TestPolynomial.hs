@@ -15,6 +15,18 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 import Polynomial
 
+-- lcm (x1^2 * x2^4) (x1^3 * x2^1) = x1^3 * x2^4
+case_mmLCM = mmLCM p1 p2 @?= IMS.fromOccurList [(1,3),(2,4)]
+  where
+    p1 = IMS.fromOccurList [(1,2),(2,4)]
+    p2 = IMS.fromOccurList [(1,3),(2,1)]
+
+-- gcd (x1^2 * x2^4) (x2^1 * x3^2) = x2
+case_mmGCD = mmGCD p1 p2 @?= IMS.fromOccurList [(2,1)]
+  where
+    p1 = IMS.fromOccurList [(1,2),(2,4)]
+    p2 = IMS.fromOccurList [(2,1),(3,2)]
+
 -- http://en.wikipedia.org/wiki/Monomial_order
 case_lex = sortBy lex [a,b,c,d] @?= [b,a,d,c]
   where

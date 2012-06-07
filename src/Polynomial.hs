@@ -27,8 +27,6 @@ module Polynomial
   (
   -- * Polynomial type
     Var
-  , MonicMonomial
-  , Monomial
   , Polynomial
 
   -- * Conversion
@@ -41,28 +39,39 @@ module Polynomial
   -- * Query
   , leadingTerm
   , deg
-  , monomialDegree
-  , monicMonomialDegree
 
   -- * Operations
   , deriv
 
+  -- * Monomial
+  , Monomial
+  , monomialDegree
+  , monomialDivisible
+  , monomialDiv
+
+  -- * Monic monomial
+  , MonicMonomial
+  , mmDegree
+  , mmDivisible
+  , mmDiv
+  , mmLCM
+  , mmGCD
+
   -- * Monomial order
   , MonomialOrder
   , lex
+  , revlex
   , grlex
   , grevlex
 
   -- * Gröbner basis
   , buchberger
-
-  -- * Multivariate division algorithm
   , reduce
+  , spolynomial
+  , reduceGBase
 
   -- * Utility functions
   , showPoly
-  , spolynomial
-  , reduceGBase
   ) where
 
 import Prelude hiding (lex)
@@ -79,8 +88,6 @@ import qualified Data.IntMultiSet as IMS
 --------------------------------------------------------------------}
 
 type Var = Int
-type MonicMonomial = IMS.IntMultiSet
-type Monomial k = (k, MonicMonomial)
 
 newtype Polynomial k = Polynomial (Map.Map MonicMonomial k)
   deriving (Eq, Ord, Show)
@@ -123,12 +130,6 @@ leadingTerm cmp p =
 deg :: Polynomial k -> Integer
 deg = maximum . map monomialDegree . terms
 
-monomialDegree :: Monomial k -> Integer
-monomialDegree (_,xs) = monicMonomialDegree xs
-
-monicMonomialDegree :: MonicMonomial -> Integer
-monicMonomialDegree = sum . map (fromIntegral . snd) . IMS.toOccurList
-
 deriv :: (Eq k, Num k) => Polynomial k -> Var -> Polynomial k
 deriv p x = sum $ do
   (c,xs) <- terms p
@@ -144,9 +145,58 @@ showPoly p = intercalate " + " [f c xs | (c,xs) <- sortBy (flip grlex `on` snd) 
     g x 1 = "x" ++ show x
     g x n = "x" ++ show x ++ "^" ++ show n
 
+{--------------------------------------------------------------------
+  Monomial
+--------------------------------------------------------------------}
+
+type Monomial k = (k, MonicMonomial)
+
+monomialDegree :: Monomial k -> Integer
+monomialDegree (_,xs) = mmDegree xs
+
+monomialDivisible :: Fractional k => Monomial k -> Monomial k -> Bool
+monomialDivisible (c1,xs1) (c2,xs2) = mmDivisible xs1 xs2
+
+monomialDiv :: Fractional k => Monomial k -> Monomial k -> Monomial k
+monomialDiv (c1,xs1) (c2,xs2) = (c1 / c2, xs1 `mmDiv` xs2)
+
+{--------------------------------------------------------------------
+  Monic Monomial
+--------------------------------------------------------------------}
+
+type MonicMonomial = IMS.IntMultiSet
+
+mmDegree :: MonicMonomial -> Integer
+mmDegree = sum . map (fromIntegral . snd) . IMS.toOccurList
+
+mmDivisible :: MonicMonomial -> MonicMonomial -> Bool
+mmDivisible xs1 xs2 = xs2 `IMS.isSubsetOf` xs1
+
+mmDiv :: MonicMonomial -> MonicMonomial -> MonicMonomial
+mmDiv xs1 xs2 = xs1 `IMS.difference` xs2
+
+mmLCM :: MonicMonomial -> MonicMonomial -> MonicMonomial
+mmLCM = IMS.maxUnion
+
+mmGCD :: MonicMonomial -> MonicMonomial -> MonicMonomial
+mmGCD m1 m2 = IMS.fromDistinctAscOccurList xs
+  where
+    xs = f (IMS.toAscOccurList m1) (IMS.toAscOccurList m2)
+    f [] _ = []
+    f _ [] = []
+    f xxs1@((x1,c1):xs1) xxs2@((x2,c2):xs2) =
+      case compare x1 x2 of
+        EQ -> (x1, min c1 c2) : f xs1 xs2
+        LT -> f xs1 xxs2
+        GT -> f xxs1 xs2
+
+{--------------------------------------------------------------------
+  Monomial Order
+--------------------------------------------------------------------}
 
 type MonomialOrder = MonicMonomial -> MonicMonomial -> Ordering
 
+-- | Lexicographic order
 lex :: MonomialOrder
 lex xs1 xs2 = go (IMS.toAscOccurList xs1) (IMS.toAscOccurList xs2)
   where
@@ -159,7 +209,9 @@ lex xs1 xs2 = go (IMS.toAscOccurList xs1) (IMS.toAscOccurList xs2)
         GT -> LT -- = compare 0 n2
         EQ -> compare n1 n2 `mappend` go xs1 xs2
 
-revlex :: MonomialOrder
+-- | Reverse lexicographic order
+-- Note that revlex is NOT a monomial order.
+revlex :: MonicMonomial -> MonicMonomial -> Ordering
 revlex xs1 xs2 = go (reverse (IMS.toAscOccurList xs1)) (reverse (IMS.toAscOccurList xs2))
   where
     go [] [] = EQ
@@ -172,50 +224,17 @@ revlex xs1 xs2 = go (reverse (IMS.toAscOccurList xs1)) (reverse (IMS.toAscOccurL
         EQ -> cmp n1 n2 `mappend` go xs1 xs2
     cmp n1 n2 = compare n2 n1
 
+-- | graded lexicographic order
 grlex :: MonomialOrder
-grlex = (compare `on` monicMonomialDegree) `mappend` lex
+grlex = (compare `on` mmDegree) `mappend` lex
 
+-- | graded reverse lexicographic order
 grevlex :: MonomialOrder
-grevlex = (compare `on` monicMonomialDegree) `mappend` revlex
+grevlex = (compare `on` mmDegree) `mappend` revlex
 
-lcmMonicMonomial :: MonicMonomial -> MonicMonomial -> MonicMonomial
-lcmMonicMonomial = IMS.maxUnion
-
--- lcm (x1^2 * x2^4) (x1^3 * x2^1) = x1^3 * x2^4
-test_lcmMonicMonomial = lcmMonicMonomial p1 p2 == IMS.fromOccurList [(1,3),(2,4)]
-  where
-    p1 = IMS.fromOccurList [(1,2),(2,4)]
-    p2 = IMS.fromOccurList [(1,3),(2,1)]
-
-gcdMonicMonomial :: MonicMonomial -> MonicMonomial -> MonicMonomial
-gcdMonicMonomial m1 m2 = IMS.fromDistinctAscOccurList xs
-  where
-    xs = f (IMS.toAscOccurList m1) (IMS.toAscOccurList m2)
-    f [] _ = []
-    f _ [] = []
-    f xxs1@((x1,c1):xs1) xxs2@((x2,c2):xs2) =
-      case compare x1 x2 of
-        EQ -> (x1, min c1 c2) : f xs1 xs2
-        LT -> f xs1 xxs2
-        GT -> f xxs1 xs2
-
--- gcd (x1^2 * x2^4) (x2^1 * x3^2) = x2
-test_gcdMonicMonomial = gcdMonicMonomial p1 p2 == IMS.fromOccurList [(2,1)]
-  where
-    p1 = IMS.fromOccurList [(1,2),(2,4)]
-    p2 = IMS.fromOccurList [(2,1),(3,2)]
-
-monicMonomialDivisible :: MonicMonomial -> MonicMonomial -> Bool
-monicMonomialDivisible xs1 xs2 = xs2 `IMS.isSubsetOf` xs1
-
-monicMonomialDiv :: MonicMonomial -> MonicMonomial -> MonicMonomial
-monicMonomialDiv xs1 xs2 = xs1 `IMS.difference` xs2
-
-monomialDivisible :: Fractional k => Monomial k -> Monomial k -> Bool
-monomialDivisible (c1,xs1) (c2,xs2) = monicMonomialDivisible xs1 xs2
-
-monomialDiv :: Fractional k => Monomial k -> Monomial k -> Monomial k
-monomialDiv (c1,xs1) (c2,xs2) = (c1 / c2, xs1 `monicMonomialDiv` xs2)
+{--------------------------------------------------------------------
+  Gröbner basis
+--------------------------------------------------------------------}
 
 -- | Multivariate division algorithm
 reduce  :: (Eq k, Fractional k) => MonomialOrder -> Polynomial k -> [Polynomial k] -> Polynomial k
@@ -236,7 +255,7 @@ spolynomial cmp f g =
       fromMonomial ((1,xs) `monomialDiv` (c1,xs1)) * f
     - fromMonomial ((1,xs) `monomialDiv` (c2,xs2)) * g
   where
-    xs = lcmMonicMonomial xs1 xs2
+    xs = mmLCM xs1 xs2
     (c1, xs1) = leadingTerm cmp f
     (c2, xs2) = leadingTerm cmp g
 
@@ -252,22 +271,6 @@ buchberger cmp fs = reduceGBase cmp $ go fs (pairs fs)
         spoly = spolynomial cmp fi fj
         r = reduce cmp spoly gs
 
-buchberger_old :: forall k. (Eq k, Fractional k, Ord k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
-buchberger_old cmp fs = (reduceGBase cmp . Set.toList . go . Set.fromList) fs
-  where  
-    go :: Set.Set (Polynomial k) -> Set.Set (Polynomial k)
-    go fs = if fs2 `Set.isSubsetOf` fs
-            then fs
-            else go (fs `Set.union` fs2)
-      where
-        fs2 = Set.fromList $ do
-          (fi,fj) <- pairs (Set.toList fs)
-          guard $ fi /= fj
-          let spoly = spolynomial cmp fi fj
-          let p = reduce cmp spoly (Set.toList fs)
-          guard $ p /= 0
-          return p
-
 reduceGBase :: forall k. (Eq k, Ord k, Fractional k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
 reduceGBase cmp ps = Set.toList $ Set.fromList $ do
   (p,qs) <- choose ps
@@ -275,6 +278,10 @@ reduceGBase cmp ps = Set.toList $ Set.fromList $ do
   guard $ q /= 0
   let (c,_) = leadingTerm cmp q
   return $ constant (1/c) * q
+
+{--------------------------------------------------------------------
+  Utilities
+--------------------------------------------------------------------}
 
 pairs :: [a] -> [(a,a)]
 pairs [] = []
