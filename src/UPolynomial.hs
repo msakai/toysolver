@@ -18,6 +18,11 @@ module UPolynomial
 
   -- * Operations
   , deriv
+  , polyDiv
+  , polyMod
+  , polyDivMod
+  , polyGCD
+  , polyLCM
 
   -- * Monomial
   , Monomial
@@ -60,9 +65,10 @@ instance (Eq k, Num k) => Num (Polynomial k) where
 polyDiv :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> Polynomial k
 polyDiv f1 f2 = fst (polyDivMod f1 f2)
 
-polymod :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> Polynomial k
-polymod f1 f2 = snd (polyDivMod f1 f2)
+polyMod :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> Polynomial k
+polyMod f1 f2 = snd (polyDivMod f1 f2)
 
+-- 符号の扱いをちゃんと考えないと
 polyDivMod :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> (Polynomial k, Polynomial k)
 polyDivMod f1 f2 = go f1
   where
@@ -76,7 +82,6 @@ polyDivMod f1 f2 = go f1
       where
         m1 = leadingTerm f1
 
--- test_polyDivMod :: (Polynomial Rational, Polynomial Rational)
 test_polyDivMod = f == g*q + r
   where
     x :: Polynomial Rational
@@ -84,6 +89,24 @@ test_polyDivMod = f == g*q + r
     f = x^3 + x^2 + x
     g = x^2 + 1
     (q,r) = f `polyDivMod` g
+
+-- 符号の扱いをちゃんと考えないと
+polyGCD :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> Polynomial k
+polyGCD f1 0 = f1
+polyGCD f1 f2 = polyGCD f2 (f1 `polyMod` f2)
+
+test_polyGCD = polyGCD f1 f2
+  where 
+    x :: Polynomial Rational
+    x = var
+    f1 = x^3 + x^2 + x
+    f2 = x^2 + 1
+
+-- 符号の扱いをちゃんと考えないと
+polyLCM :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> Polynomial k
+polyLCM _ 0 = 0
+polyLCM 0 _ = 0
+polyLCM f1 f2 = (f1 `polyMod` (polyGCD f1 f2)) * f2
 
 normalize :: (Eq k, Num k) => Polynomial k -> Polynomial k
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
@@ -122,7 +145,8 @@ deriv p x = sum $ do
 showPoly :: (Eq k, Ord k, Num k, Show k) => Polynomial k -> String
 showPoly p = intercalate " + " [f c xs | (c,xs) <- reverse $ terms p]
   where
-    f c xs = concat [showsPrec 8 c "" | c /= 1 || xs == mmOne] ++ "*" ++ g xs
+    f c 0  = showsPrec 8 c ""
+    f c xs = intercalate "*" $ [showsPrec 8 c "" | c /= 1 || xs == mmOne] ++ [g xs]
     g 1 = "x"
     g n = "x" ++ "^" ++ show n
 
