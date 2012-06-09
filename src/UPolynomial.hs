@@ -68,7 +68,6 @@ polyDiv f1 f2 = fst (polyDivMod f1 f2)
 polyMod :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> Polynomial k
 polyMod f1 f2 = snd (polyDivMod f1 f2)
 
--- 符号の扱いをちゃんと考えないと
 polyDivMod :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> (Polynomial k, Polynomial k)
 polyDivMod f1 f2 = go f1
   where
@@ -90,9 +89,13 @@ test_polyDivMod = f == g*q + r
     g = x^2 + 1
     (q,r) = f `polyDivMod` g
 
--- 符号の扱いをちゃんと考えないと
+scaleLeadingTermToMonic :: (Eq k, Fractional k) => Polynomial k -> Polynomial k
+scaleLeadingTermToMonic f = constant (1/c) * f
+  where
+    (c,_) = leadingTerm f
+
 polyGCD :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> Polynomial k
-polyGCD f1 0 = f1
+polyGCD f1 0  = scaleLeadingTermToMonic f1
 polyGCD f1 f2 = polyGCD f2 (f1 `polyMod` f2)
 
 test_polyGCD = polyGCD f1 f2
@@ -102,11 +105,10 @@ test_polyGCD = polyGCD f1 f2
     f1 = x^3 + x^2 + x
     f2 = x^2 + 1
 
--- 符号の扱いをちゃんと考えないと
 polyLCM :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> Polynomial k
 polyLCM _ 0 = 0
 polyLCM 0 _ = 0
-polyLCM f1 f2 = (f1 `polyMod` (polyGCD f1 f2)) * f2
+polyLCM f1 f2 = scaleLeadingTermToMonic $ (f1 `polyMod` (polyGCD f1 f2)) * f2    
 
 normalize :: (Eq k, Num k) => Polynomial k -> Polynomial k
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
