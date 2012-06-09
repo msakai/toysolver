@@ -190,8 +190,7 @@ mmDiv :: MonicMonomial -> MonicMonomial -> MonicMonomial
 mmDiv xs1 xs2 = xs1 - xs2
 
 mmLCM :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmLCM = min
+mmLCM = max
 
 mmGCD :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmGCD = max
-
+mmGCD = min
