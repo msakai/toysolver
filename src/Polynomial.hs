@@ -89,7 +89,7 @@ import Data.List
 import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified Data.IntMultiSet as IMS
+import qualified Data.IntMap as IM
 
 {--------------------------------------------------------------------
   Polynomial type
@@ -175,53 +175,51 @@ monomialDeriv (c,xs) x =
   Monic Monomial
 --------------------------------------------------------------------}
 
-type MonicMonomial = IMS.IntMultiSet
+type MonicMonomial = IM.IntMap Integer
 
 mmDegree :: MonicMonomial -> Integer
-mmDegree = sum . map (fromIntegral . snd) . IMS.toOccurList
+mmDegree = sum . IM.elems 
 
 mmVar :: Var -> MonicMonomial
-mmVar x = IMS.singleton x
+mmVar x = IM.singleton x 1
 
 mmOne :: MonicMonomial
-mmOne = IMS.empty
+mmOne = IM.empty
 
 mmFromList :: [(Var, Integer)] -> MonicMonomial
-mmFromList xs = IMS.fromOccurList [(x, fromInteger n) | (x,n) <- xs]
+mmFromList xs = IM.fromList [(x, n) | (x,n) <- xs, n /= 0]
 
 mmToList :: MonicMonomial -> [(Var, Integer)]
-mmToList xs = [(x, fromIntegral n) | (x,n) <- IMS.toAscOccurList xs]
+mmToList = IM.toAscList
 
 mmProd :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmProd xs1 xs2 = xs1 `IMS.union` xs2
+mmProd xs1 xs2 = IM.unionWith (+) xs1 xs2
 
 mmDivisible :: MonicMonomial -> MonicMonomial -> Bool
-mmDivisible xs1 xs2 = xs2 `IMS.isSubsetOf` xs1
+mmDivisible xs1 xs2 = IM.isSubmapOfBy (<=) xs2 xs1
 
 mmDiv :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmDiv xs1 xs2 = xs1 `IMS.difference` xs2
+mmDiv xs1 xs2 = IM.differenceWith f xs1 xs2
+  where
+    f m n
+      | m <= n    = Nothing
+      | otherwise = Just (m - n)
 
 mmDeriv :: MonicMonomial -> Var -> (Integer, MonicMonomial)
 mmDeriv xs x
-  | n==0      = (0, IMS.empty)
-  | otherwise = (fromIntegral n, IMS.delete x xs)
+  | n==0      = (0, IM.empty)
+  | otherwise = (n, IM.update f x xs)
   where
-    n = IMS.occur x xs
+    n = IM.findWithDefault 0 x xs
+    f m
+      | m <= 1    = Nothing
+      | otherwise = Just $! m - 1
 
 mmLCM :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmLCM = IMS.maxUnion
+mmLCM = IM.unionWith max
 
 mmGCD :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmGCD m1 m2 = IMS.fromDistinctAscOccurList xs
-  where
-    xs = f (IMS.toAscOccurList m1) (IMS.toAscOccurList m2)
-    f [] _ = []
-    f _ [] = []
-    f xxs1@((x1,c1):xs1) xxs2@((x2,c2):xs2) =
-      case compare x1 x2 of
-        EQ -> (x1, min c1 c2) : f xs1 xs2
-        LT -> f xs1 xxs2
-        GT -> f xxs1 xs2
+mmGCD m1 m2 = IM.filter (0/=) $ IM.intersectionWith min m1 m2
 
 {--------------------------------------------------------------------
   Monomial Order

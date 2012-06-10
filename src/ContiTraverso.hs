@@ -9,7 +9,6 @@ import Data.Function
 import Data.Monoid
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
-import qualified Data.IntMultiSet as IMS
 
 import qualified LA
 import Expr (Variables (..))
@@ -40,8 +39,9 @@ solve cmp vs cs obj =
     t = v2 + length cs
 
     cmp2 :: MonomialOrder
-    cmp2 = elimOrdering (IS.fromList (t:vs2)) `mappend` costOrdering obj `mappend` cmp
+    cmp2 = elimOrdering (IS.fromList vs2) `mappend` elimOrdering (IS.singleton t) `mappend` costOrdering obj `mappend` cmp
 
+    gbase :: [Polynomial Rational]
     gbase = buchberger cmp2 (product (map var (t:vs2)) - 1 : phi)
       where
         phi = do
@@ -57,10 +57,11 @@ solve cmp vs cs obj =
     m = mkModel (vs++vs2++[t]) z
 
 mkModel :: [Var] -> MonicMonomial -> Model
-mkModel vs xs = IM.fromList [(x, fromIntegral (IMS.occur x xs)) | x <- vs]
+mkModel vs xs = xs `IM.union` IM.fromList [(x, 0) | x <- vs] 
+-- IM.union is left-biased
 
 costOrdering :: LA.Expr Integer -> MonomialOrder
-costOrdering obj = \xs1 xs2 -> f xs1 `compare` f xs2
+costOrdering obj = compare `on` f
   where
     vs = vars obj
     f xs = LA.evalExpr (mkModel (IS.toList vs) xs) obj
@@ -68,7 +69,7 @@ costOrdering obj = \xs1 xs2 -> f xs1 `compare` f xs2
 elimOrdering :: IS.IntSet -> MonomialOrder
 elimOrdering xs = compare `on` f
   where
-    f ys = not (IS.null (xs `IS.intersection` IMS.toSet ys))
+    f ys = not (IS.null (xs `IS.intersection` IM.keysSet ys))
 
 -- http://madscientist.jp/~ikegami/articles/IntroSequencePolynomial.html
 -- optimum is (3,2,0)

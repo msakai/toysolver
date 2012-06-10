@@ -84,6 +84,14 @@ prop_negate_involution =
   Monic Monomial
 --------------------------------------------------------------------}
 
+prop_mmDegreeOfProduct =
+  forAll monicMonomials $ \a -> 
+  forAll monicMonomials $ \b -> 
+    mmDegree (a `mmProd` b) == mmDegree a + mmDegree b
+
+prop_mmDegreeOfOne =
+  mmDegree mmOne == 0
+
 prop_mmProd_unitL = 
   forAll monicMonomials $ \a -> 
     mmOne `mmProd` a == a
@@ -345,10 +353,9 @@ monicMonomials = do
   size <- choose (0, 3)
   xs <- replicateM size $ do
     v <- choose (-5, 5)
-    e <- choose (1,100) -- liftM ((+1) . abs) arbitrary -- e should be >0
+    e <- liftM ((+1) . abs) arbitrary
     return $ mmFromList [(v,e)]
   return $ foldl mmProd mmOne xs
--- IntMultiSetを使ってるとIntのオーバーフローですぐダメになるなぁ。
 
 monomials :: Gen (Monomial Rational)
 monomials = do
