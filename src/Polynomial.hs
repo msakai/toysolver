@@ -49,14 +49,17 @@ module Polynomial
   , monomialProd
   , monomialDivisible
   , monomialDiv
+  , monomialDeriv
 
   -- * Monic monomial
   , MonicMonomial
+  , mmVar
   , mmOne
   , mmDegree
   , mmProd
   , mmDivisible
   , mmDiv
+  , mmDeriv
   , mmLCM
   , mmGCD
 
@@ -104,16 +107,16 @@ instance (Eq k, Num k) => Num (Polynomial k) where
   negate (Polynomial m) = Polynomial $ Map.map negate m
   abs x = x    -- OK?
   signum x = 1 -- OK?
-  fromInteger x = normalize $ Polynomial $ Map.singleton mmOne (fromInteger x)
+  fromInteger x = constant (fromInteger x)
 
 normalize :: (Eq k, Num k) => Polynomial k -> Polynomial k
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
 
 var :: (Eq k, Num k) => Var -> Polynomial k
-var x = Polynomial (Map.singleton (IMS.singleton x) 1)
+var x = fromMonomial (1, mmVar x)
 
 constant :: (Eq k, Num k) => k -> Polynomial k
-constant c = normalize $ Polynomial (Map.singleton mmOne c)
+constant c = fromMonomial (c, mmOne)
 
 fromMonomials :: (Eq k, Num k) => [Monomial k] -> Polynomial k
 fromMonomials = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
@@ -134,12 +137,7 @@ deg :: Polynomial k -> Integer
 deg = maximum . map monomialDegree . terms
 
 deriv :: (Eq k, Num k) => Polynomial k -> Var -> Polynomial k
-deriv p x = sum $ do
-  (c,xs) <- terms p
-  let n = IMS.occur x xs
-  if n == 0
-    then return 0
-    else return $ fromMonomial (c * fromIntegral n, IMS.delete x xs)
+deriv p x = sum [fromMonomial (monomialDeriv m x) | m <- terms p]
 
 showPoly :: (Eq k, Ord k, Num k, Show k) => Polynomial k -> String
 showPoly p = intercalate " + " [f c xs | (c,xs) <- sortBy (flip grlex `on` snd) $ terms p]
@@ -166,6 +164,11 @@ monomialDivisible (c1,xs1) (c2,xs2) = mmDivisible xs1 xs2
 monomialDiv :: Fractional k => Monomial k -> Monomial k -> Monomial k
 monomialDiv (c1,xs1) (c2,xs2) = (c1 / c2, xs1 `mmDiv` xs2)
 
+monomialDeriv :: (Eq k, Num k) => Monomial k -> Var -> Monomial k
+monomialDeriv (c,xs) x =
+  case mmDeriv xs x of
+    (s,ys) -> (c * fromIntegral s, ys)
+
 {--------------------------------------------------------------------
   Monic Monomial
 --------------------------------------------------------------------}
@@ -174,6 +177,9 @@ type MonicMonomial = IMS.IntMultiSet
 
 mmDegree :: MonicMonomial -> Integer
 mmDegree = sum . map (fromIntegral . snd) . IMS.toOccurList
+
+mmVar :: Var -> MonicMonomial
+mmVar x = IMS.singleton x
 
 mmOne :: MonicMonomial
 mmOne = IMS.empty
@@ -186,6 +192,13 @@ mmDivisible xs1 xs2 = xs2 `IMS.isSubsetOf` xs1
 
 mmDiv :: MonicMonomial -> MonicMonomial -> MonicMonomial
 mmDiv xs1 xs2 = xs1 `IMS.difference` xs2
+
+mmDeriv :: MonicMonomial -> Var -> (Integer, MonicMonomial)
+mmDeriv xs x
+  | n==0      = (0, IMS.empty)
+  | otherwise = (fromIntegral n, IMS.delete x xs)
+  where
+    n = IMS.occur x xs
 
 mmLCM :: MonicMonomial -> MonicMonomial -> MonicMonomial
 mmLCM = IMS.maxUnion

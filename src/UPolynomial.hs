@@ -2,8 +2,7 @@
 module UPolynomial
   (
     -- * Polynomial type
-    Var
-  , Polynomial
+    Polynomial
 
   -- * Conversion
   , var
@@ -30,14 +29,17 @@ module UPolynomial
   , monomialProd
   , monomialDivisible
   , monomialDiv
+  , monomialDeriv
 
   -- * Monic monomial
   , MonicMonomial
+  , mmVar
   , mmOne
   , mmDegree
   , mmProd
   , mmDivisible
   , mmDiv
+  , mmDeriv
   , mmLCM
   , mmGCD
   ) where
@@ -45,8 +47,6 @@ module UPolynomial
 import Data.Function
 import Data.List
 import qualified Data.Map as Map
-
-type Var = Int
 
 newtype Polynomial k = Polynomial (Map.Map Integer k)
   deriving (Eq, Ord, Show)
@@ -60,7 +60,7 @@ instance (Eq k, Num k) => Num (Polynomial k) where
   negate (Polynomial m) = Polynomial $ Map.map negate m
   abs x = x    -- OK?
   signum x = 1 -- OK?
-  fromInteger x = normalize $ Polynomial $ Map.singleton mmOne (fromInteger x)
+  fromInteger x = constant (fromInteger x)
 
 polyDiv :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> Polynomial k
 polyDiv f1 f2 = fst (polyDivMod f1 f2)
@@ -113,11 +113,11 @@ polyLCM f1 f2 = scaleLeadingTermToMonic $ (f1 `polyMod` (polyGCD f1 f2)) * f2
 normalize :: (Eq k, Num k) => Polynomial k -> Polynomial k
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
 
-var :: Num k => Polynomial k
-var = Polynomial (Map.singleton 1 1)
+var :: (Eq k, Num k) => Polynomial k
+var = fromMonomial (1, mmVar)
 
 constant :: (Eq k, Num k) => k -> Polynomial k
-constant c = normalize $ Polynomial (Map.singleton mmOne c)
+constant c = fromMonomial (c, mmOne)
 
 fromMonomials :: (Eq k, Num k) => [Monomial k] -> Polynomial k
 fromMonomials = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
@@ -137,12 +137,8 @@ leadingTerm (Polynomial p) =
 deg :: Polynomial k -> Integer
 deg = maximum . map monomialDegree . terms
 
-deriv :: (Eq k, Num k) => Polynomial k -> Var -> Polynomial k
-deriv p x = sum $ do
-  (c,xs) <- terms p
-  if xs == 0
-    then return 0
-    else return $ fromMonomial (c * fromIntegral xs, xs - 1)
+deriv :: (Eq k, Num k) => Polynomial k -> Polynomial k
+deriv p = sum [fromMonomial (monomialDeriv m) | m <- terms p]
 
 showPoly :: (Eq k, Ord k, Num k, Show k) => Polynomial k -> String
 showPoly p = intercalate " + " [f c xs | (c,xs) <- reverse $ terms p]
@@ -170,6 +166,11 @@ monomialDivisible (c1,xs1) (c2,xs2) = mmDivisible xs1 xs2
 monomialDiv :: Fractional k => Monomial k -> Monomial k -> Monomial k
 monomialDiv (c1,xs1) (c2,xs2) = (c1 / c2, xs1 `mmDiv` xs2)
 
+monomialDeriv :: (Eq k, Num k) => Monomial k -> Monomial k
+monomialDeriv (c,xs) =
+  case mmDeriv xs of
+    (s,ys) -> (c * fromIntegral s, ys)
+
 {--------------------------------------------------------------------
   Monic Monomial
 --------------------------------------------------------------------}
@@ -178,6 +179,9 @@ type MonicMonomial = Integer
 
 mmDegree :: MonicMonomial -> Integer
 mmDegree = id
+
+mmVar :: MonicMonomial
+mmVar = 1
 
 mmOne :: MonicMonomial
 mmOne = 0
@@ -190,6 +194,11 @@ mmDivisible xs1 xs2 = xs1 >= xs2
 
 mmDiv :: MonicMonomial -> MonicMonomial -> MonicMonomial
 mmDiv xs1 xs2 = xs1 - xs2
+
+mmDeriv :: MonicMonomial -> (Integer, MonicMonomial)
+mmDeriv xs
+  | xs==0     = (0, 0)
+  | otherwise = (xs, xs - 1)
 
 mmLCM :: MonicMonomial -> MonicMonomial -> MonicMonomial
 mmLCM = max
