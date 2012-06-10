@@ -6,7 +6,6 @@ import Data.List
 import Data.Ratio
 import qualified Data.Set as Set
 import qualified Data.Map as Map
-import qualified Data.IntMultiSet as IMS
 import Test.HUnit hiding (Test)
 import Test.QuickCheck
 import Test.Framework (Test, defaultMain, testGroup)
@@ -85,9 +84,24 @@ prop_negate_involution =
   Monic Monomial
 --------------------------------------------------------------------}
 
-prop_mmOne_unit = 
+prop_mmProd_unitL = 
   forAll monicMonomials $ \a -> 
-    mmOne `mmProd` a == a && a `mmProd` mmOne == a
+    mmOne `mmProd` a == a
+
+prop_mmProd_unitR = 
+  forAll monicMonomials $ \a -> 
+    a `mmProd` mmOne == a
+
+prop_mmProd_comm = 
+  forAll monicMonomials $ \a -> 
+  forAll monicMonomials $ \b -> 
+    a `mmProd` b == b `mmProd` a
+
+prop_mmProd_assoc = 
+  forAll monicMonomials $ \a ->
+  forAll monicMonomials $ \b ->
+  forAll monicMonomials $ \c ->
+    a `mmProd` (b `mmProd` c) == (a `mmProd` b) `mmProd` c
 
 prop_mmProd_Divisible = 
   forAll monicMonomials $ \a -> 
@@ -101,17 +115,22 @@ prop_mmProd_Div =
     let c = a `mmProd` b
     in c `mmDiv` a == b && c `mmDiv` b == a
 
--- lcm (x1^2 * x2^4) (x1^3 * x2^1) = x1^3 * x2^4
-case_mmLCM = mmLCM p1 p2 @?= IMS.fromOccurList [(1,3),(2,4)]
+case_mmDeriv = mmDeriv p 1 @?= (2, q)
   where
-    p1 = IMS.fromOccurList [(1,2),(2,4)]
-    p2 = IMS.fromOccurList [(1,3),(2,1)]
+    p = mmFromList [(1,2),(2,4)]
+    q = mmFromList [(1,1),(2,4)]
+
+-- lcm (x1^2 * x2^4) (x1^3 * x2^1) = x1^3 * x2^4
+case_mmLCM = mmLCM p1 p2 @?= mmFromList [(1,3),(2,4)]
+  where
+    p1 = mmFromList [(1,2),(2,4)]
+    p2 = mmFromList [(1,3),(2,1)]
 
 -- gcd (x1^2 * x2^4) (x2^1 * x3^2) = x2
-case_mmGCD = mmGCD p1 p2 @?= IMS.fromOccurList [(2,1)]
+case_mmGCD = mmGCD p1 p2 @?= mmFromList [(2,1)]
   where
-    p1 = IMS.fromOccurList [(1,2),(2,4)]
-    p2 = IMS.fromOccurList [(2,1),(3,2)]
+    p1 = mmFromList [(1,2),(2,4)]
+    p2 = mmFromList [(2,1),(3,2)]
 
 prop_mmLCM_divisible = 
   forAll monicMonomials $ \a -> 
@@ -135,10 +154,10 @@ case_lex = sortBy lex [a,b,c,d] @?= [b,a,d,c]
     x = 1
     y = 2
     z = 3
-    a = IMS.fromOccurList [(x,1),(y,2),(z,1)]
-    b = IMS.fromOccurList [(z,2)]
-    c = IMS.fromOccurList [(x,3)]
-    d = IMS.fromOccurList [(x,2),(z,2)]
+    a = mmFromList [(x,1),(y,2),(z,1)]
+    b = mmFromList [(z,2)]
+    c = mmFromList [(x,3)]
+    d = mmFromList [(x,2),(z,2)]
 
 -- http://en.wikipedia.org/wiki/Monomial_order
 case_grlex = sortBy grlex [a,b,c,d] @?= [b,c,a,d]
@@ -146,10 +165,10 @@ case_grlex = sortBy grlex [a,b,c,d] @?= [b,c,a,d]
     x = 1
     y = 2
     z = 3
-    a = IMS.fromOccurList [(x,1),(y,2),(z,1)]
-    b = IMS.fromOccurList [(z,2)]
-    c = IMS.fromOccurList [(x,3)]
-    d = IMS.fromOccurList [(x,2),(z,2)]
+    a = mmFromList [(x,1),(y,2),(z,1)]
+    b = mmFromList [(z,2)]
+    c = mmFromList [(x,3)]
+    d = mmFromList [(x,2),(z,2)]
 
 -- http://en.wikipedia.org/wiki/Monomial_order
 case_grevlex = sortBy grevlex [a,b,c,d] @?= [b,c,d,a]
@@ -157,10 +176,10 @@ case_grevlex = sortBy grevlex [a,b,c,d] @?= [b,c,d,a]
     x = 1
     y = 2
     z = 3
-    a = IMS.fromOccurList [(x,1),(y,2),(z,1)]
-    b = IMS.fromOccurList [(z,2)]
-    c = IMS.fromOccurList [(x,3)]
-    d = IMS.fromOccurList [(x,2),(z,2)]
+    a = mmFromList [(x,1),(y,2),(z,1)]
+    b = mmFromList [(z,2)]
+    c = mmFromList [(x,3)]
+    d = mmFromList [(x,2),(z,2)]
 
 prop_refl_lex     = propRefl lex
 prop_refl_grlex   = propRefl grlex
@@ -321,12 +340,14 @@ case_sankaranarayanan04nonlinear = do
   Generators
 --------------------------------------------------------------------}
 
+monicMonomials :: Gen MonicMonomial
 monicMonomials = do
   size <- choose (0, 3)
-  liftM (IMS.unions) $ replicateM size $ do
+  xs <- replicateM size $ do
     v <- choose (-5, 5)
     e <- choose (1,100) -- liftM ((+1) . abs) arbitrary -- e should be >0
-    return $ IMS.fromOccurList [(v,e)]
+    return $ mmFromList [(v,e)]
+  return $ foldl mmProd mmOne xs
 -- IntMultiSetを使ってるとIntのオーバーフローですぐダメになるなぁ。
 
 monomials :: Gen (Monomial Rational)

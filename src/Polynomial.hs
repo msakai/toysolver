@@ -55,6 +55,8 @@ module Polynomial
   , MonicMonomial
   , mmVar
   , mmOne
+  , mmFromList
+  , mmToList
   , mmDegree
   , mmProd
   , mmDivisible
@@ -142,7 +144,7 @@ deriv p x = sum [fromMonomial (monomialDeriv m x) | m <- terms p]
 showPoly :: (Eq k, Ord k, Num k, Show k) => Polynomial k -> String
 showPoly p = intercalate " + " [f c xs | (c,xs) <- sortBy (flip grlex `on` snd) $ terms p]
   where
-    f c xs = (intercalate "*" ([showsPrec 8 c "" | c /= 1 || IMS.null xs] ++ [g x n | (x,n) <- IMS.toOccurList xs]))
+    f c xs = (intercalate "*" ([showsPrec 8 c "" | c /= 1 || null (mmToList xs)] ++ [g x n | (x,n) <- mmToList xs]))
     g x 1 = "x" ++ show x
     g x n = "x" ++ show x ++ "^" ++ show n
 
@@ -184,6 +186,12 @@ mmVar x = IMS.singleton x
 mmOne :: MonicMonomial
 mmOne = IMS.empty
 
+mmFromList :: [(Var, Integer)] -> MonicMonomial
+mmFromList xs = IMS.fromOccurList [(x, fromInteger n) | (x,n) <- xs]
+
+mmToList :: MonicMonomial -> [(Var, Integer)]
+mmToList xs = [(x, fromIntegral n) | (x,n) <- IMS.toAscOccurList xs]
+
 mmProd :: MonicMonomial -> MonicMonomial -> MonicMonomial
 mmProd xs1 xs2 = xs1 `IMS.union` xs2
 
@@ -223,7 +231,7 @@ type MonomialOrder = MonicMonomial -> MonicMonomial -> Ordering
 
 -- | Lexicographic order
 lex :: MonomialOrder
-lex xs1 xs2 = go (IMS.toAscOccurList xs1) (IMS.toAscOccurList xs2)
+lex xs1 xs2 = go (mmToList xs1) (mmToList xs2)
   where
     go [] [] = EQ
     go [] _  = LT -- = cmpare 0 n2
@@ -237,7 +245,7 @@ lex xs1 xs2 = go (IMS.toAscOccurList xs1) (IMS.toAscOccurList xs2)
 -- | Reverse lexicographic order
 -- Note that revlex is NOT a monomial order.
 revlex :: MonicMonomial -> MonicMonomial -> Ordering
-revlex xs1 xs2 = go (reverse (IMS.toAscOccurList xs1)) (reverse (IMS.toAscOccurList xs2))
+revlex xs1 xs2 = go (reverse (mmToList xs1)) (reverse (mmToList xs2))
   where
     go [] [] = EQ
     go [] _  = GT -- = cmp 0 n2
