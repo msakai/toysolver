@@ -15,6 +15,76 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 import Polynomial
 
+{--------------------------------------------------------------------
+  Polynomial type
+--------------------------------------------------------------------}
+
+prop_plus_comm = 
+  forAll polynomials $ \a ->
+  forAll polynomials $ \b ->
+    a + b == b + a
+
+prop_plus_assoc = 
+  forAll polynomials $ \a ->
+  forAll polynomials $ \b ->
+  forAll polynomials $ \c ->
+    a + (b + c) == (a + b) + c
+
+prop_plus_unitL = 
+  forAll polynomials $ \a ->
+    constant 0 + a == a
+
+prop_plus_unitR = 
+  forAll polynomials $ \a ->
+    a + constant 0 == a
+
+prop_prod_comm = 
+  forAll polynomials $ \a ->
+  forAll polynomials $ \b ->
+    a * b == b * a
+
+prop_prod_assoc = 
+  forAll polynomials $ \a ->
+  forAll polynomials $ \b ->
+  forAll polynomials $ \c ->
+    a * (b * c) == (a * b) * c
+
+prop_prod_unitL = 
+  forAll polynomials $ \a ->
+    constant 1 * a == a
+
+prop_prod_unitR = 
+  forAll polynomials $ \a ->
+    a * constant 1 == a
+
+prop_distL = 
+  forAll polynomials $ \a ->
+  forAll polynomials $ \b ->
+  forAll polynomials $ \c ->
+    a * (b + c) == a * b + a * c
+
+prop_distR = 
+  forAll polynomials $ \a ->
+  forAll polynomials $ \b ->
+  forAll polynomials $ \c ->
+    (b + c) * a == b * a + c * a
+
+prop_negate =
+  forAll polynomials $ \a ->
+    a + negate a == 0
+
+prop_negate_involution =
+  forAll polynomials $ \a ->
+    negate (negate a) == a
+
+{--------------------------------------------------------------------
+  Monomial
+--------------------------------------------------------------------}
+
+{--------------------------------------------------------------------
+  Monic Monomial
+--------------------------------------------------------------------}
+
 prop_mmOne_unit = 
   forAll monicMonomials $ \a -> 
     mmOne `mmProd` a == a && a `mmProd` mmOne == a
@@ -54,6 +124,10 @@ prop_mmGCD_divisible =
   forAll monicMonomials $ \b -> 
     let c = mmGCD a b
     in a `mmDivisible` c && b `mmDivisible` c
+
+{--------------------------------------------------------------------
+  Monomial Order
+--------------------------------------------------------------------}
 
 -- http://en.wikipedia.org/wiki/Monomial_order
 case_lex = sortBy lex [a,b,c,d] @?= [b,a,d,c]
@@ -139,13 +213,9 @@ monomialOrderProp2 cmp =
   forAll monicMonomials $ \a ->
     a /= mmOne ==> cmp mmOne a == LT
 
-monicMonomials = do
-  size <- choose (0, 3)
-  liftM (IMS.unions) $ replicateM size $ do
-    v <- choose (-5, 5)
-    e <- choose (1,100) -- liftM ((+1) . abs) arbitrary -- e should be >0
-    return $ IMS.fromOccurList [(v,e)]
--- IntMultiSetを使ってるとIntのオーバーフローですぐダメになるなぁ。
+{--------------------------------------------------------------------
+  Gröbner basis
+--------------------------------------------------------------------}
 
 -- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
 -- Example 1
@@ -246,6 +316,30 @@ case_sankaranarayanan04nonlinear = do
     h = x + z
     f' = z^2 - z
     gbase = buchberger lex [f, g, h]
+
+{--------------------------------------------------------------------
+  Generators
+--------------------------------------------------------------------}
+
+monicMonomials = do
+  size <- choose (0, 3)
+  liftM (IMS.unions) $ replicateM size $ do
+    v <- choose (-5, 5)
+    e <- choose (1,100) -- liftM ((+1) . abs) arbitrary -- e should be >0
+    return $ IMS.fromOccurList [(v,e)]
+-- IntMultiSetを使ってるとIntのオーバーフローですぐダメになるなぁ。
+
+monomials :: Gen (Monomial Rational)
+monomials = do
+  m <- monicMonomials
+  c <- arbitrary
+  return (c,m)
+
+polynomials :: Gen (Polynomial Rational)
+polynomials = do
+  size <- choose (0, 5)
+  xs <- replicateM size monomials
+  return $ sum $ map fromMonomial xs 
 
 ------------------------------------------------------------------------
 -- Test harness
