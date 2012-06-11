@@ -303,12 +303,15 @@ buchberger cmp fs = reduceGBase cmp $ go fs (pairs fs)
         r = reduce cmp spoly gs
 
 reduceGBase :: forall k. (Eq k, Ord k, Fractional k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
-reduceGBase cmp ps = Set.toList $ Set.fromList $ do
-  (p,qs) <- choose ps
-  let q = reduce cmp p qs
-  guard $ q /= 0
-  let (c,_) = leadingTerm cmp q
-  return $ constant (1/c) * q
+reduceGBase cmp ps = Set.toList $ Set.fromList $ go ps []
+  where
+    go [] qs = qs
+    go (p:ps) qs
+      | q == 0    = go ps qs
+      | otherwise = go ps (constant (1/c) * q : qs)
+      where
+        q = reduce cmp p (ps++qs)
+        (c,_) = leadingTerm cmp q
 
 {--------------------------------------------------------------------
   Utilities
@@ -317,7 +320,3 @@ reduceGBase cmp ps = Set.toList $ Set.fromList $ do
 pairs :: [a] -> [(a,a)]
 pairs [] = []
 pairs (x:xs) = [(x,y) | y <- xs] ++ pairs xs
-
-choose :: [a] -> [(a,[a])]
-choose [] = []
-choose (x:xs) = (x,xs) : [(y,x:ys) | (y,ys) <- choose xs]
