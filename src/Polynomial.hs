@@ -42,6 +42,8 @@ module Polynomial
 
   -- * Operations
   , deriv
+  , eval
+  , mapCoeff
 
   -- * Monomial
   , Monomial
@@ -140,6 +142,12 @@ deg = maximum . map monomialDegree . terms
 
 deriv :: (Eq k, Num k) => Polynomial k -> Var -> Polynomial k
 deriv p x = sum [fromMonomial (monomialDeriv m x) | m <- terms p]
+
+eval :: Num k => (Var -> k) -> Polynomial k -> k
+eval env p = sum [c * product [(env x) ^ n | (x,n) <- mmToList xs] | (c,xs) <- terms p]
+
+mapCoeff :: (Eq k1, Num k1) => (k -> k1) -> Polynomial k -> Polynomial k1
+mapCoeff f (Polynomial m) = normalize $ Polynomial $ Map.map f m
 
 showPoly :: (Eq k, Ord k, Num k, Show k) => Polynomial k -> String
 showPoly p = intercalate " + " [f c xs | (c,xs) <- sortBy (flip grlex `on` snd) $ terms p]
