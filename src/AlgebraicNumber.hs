@@ -15,13 +15,13 @@ newtype A = A{ unA :: Polynomial Rational }
   deriving (Show, Eq, Ord)
 
 add :: A -> A -> A
-add (A p1) (A p2) = A $ lift (+) p1 p2
+add (Root p1) (Root p2) = A $ lift (+) p1 p2
 
 sub :: A -> A -> A
-sub (A p1) (A p2) = A $ lift (flip subtract) p1 p2
+sub (Root p1) (Root p2) = A $ lift (flip subtract) p1 p2
 
 prod :: A -> A -> A
-prod (A p1) (A p2) = A $ lift (*) p1 p2
+prod (Root p1) (Root p2) = A $ lift (*) p1 p2
 
 lift :: (Polynomial Rational -> Polynomial Rational -> Polynomial Rational)
      -> Polynomial Rational -> Polynomial Rational -> Polynomial Rational
@@ -54,21 +54,27 @@ lift f p1 p2 = sum [constant c * var 0 ^ n | (n,c) <- zip [0..] coeffs]
         cmp2 = grlex
         gbase2 = buchberger cmp2 es
 
+recip' :: A -> A
+recip' (Root p) = Root q
+  where
+    d = deg p
+    q = fromMonomials [(c, mmFromList [(0, d - mmDegree xs)]) | (c, xs) <- terms p]
+
 -- √2
 sqrt2 :: A
-sqrt2 = A (x^2 - 2)
+sqrt2 = Root (x^2 - 2)
   where
     x = var 0
 
 -- √3
 sqrt3 :: A
-sqrt3 = A (x^2 - 3)
+sqrt3 = Root (x^2 - 3)
   where
     x = var 0
 
 -- √4
 sqrt4 :: A
-sqrt4 = A (x^2 - 4)
+sqrt4 = Root (x^2 - 4)
   where
     x = var 0
 
