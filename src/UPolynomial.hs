@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses #-}
 -- Univalent polynomials
 module UPolynomial
   (
@@ -47,6 +48,7 @@ module UPolynomial
 import Data.Function
 import Data.List
 import qualified Data.Map as Map
+import Linear
 
 newtype Polynomial k = Polynomial (Map.Map Integer k)
   deriving (Eq, Ord, Show)
@@ -61,6 +63,11 @@ instance (Eq k, Num k) => Num (Polynomial k) where
   abs x = x    -- OK?
   signum x = 1 -- OK?
   fromInteger x = constant (fromInteger x)
+
+instance (Eq k, Num k) => Linear k (Polynomial k) where
+  k .*. p = constant k * p
+  p .+. q = p + q
+  lzero = 0
 
 polyDiv :: (Eq k, Fractional k) => Polynomial k -> Polynomial k -> Polynomial k
 polyDiv f1 f2 = fst (polyDivMod f1 f2)

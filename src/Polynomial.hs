@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses #-}
 
 {-
 メモ
@@ -92,6 +92,7 @@ import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.IntMap as IM
+import Linear
 
 {--------------------------------------------------------------------
   Polynomial type
@@ -112,6 +113,11 @@ instance (Eq k, Num k) => Num (Polynomial k) where
   abs x = x    -- OK?
   signum x = 1 -- OK?
   fromInteger x = constant (fromInteger x)
+
+instance (Eq k, Num k) => Linear k (Polynomial k) where
+  k .*. p = constant k * p
+  p .+. q = p + q
+  lzero = 0
 
 normalize :: (Eq k, Num k) => Polynomial k -> Polynomial k
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
