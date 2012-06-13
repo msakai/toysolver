@@ -7,7 +7,7 @@ module UPolynomial
   -- * Conversion
   , var
   , constant
-  , fromMonomials
+  , fromTerms
   , fromMonomial
   , terms
 
@@ -119,8 +119,8 @@ var = fromMonomial (1, mmVar)
 constant :: (Eq k, Num k) => k -> Polynomial k
 constant c = fromMonomial (c, mmOne)
 
-fromMonomials :: (Eq k, Num k) => [Monomial k] -> Polynomial k
-fromMonomials = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
+fromTerms :: (Eq k, Num k) => [Monomial k] -> Polynomial k
+fromTerms = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
 
 fromMonomial :: (Eq k, Num k) => Monomial k -> Polynomial k
 fromMonomial (c,xs) = normalize $ Polynomial $ Map.singleton xs c

@@ -58,7 +58,7 @@ recip' :: A -> A
 recip' (Root p) = Root q
   where
     d = deg p
-    q = fromMonomials [(c, mmFromList [(0, d - mmDegree xs)]) | (c, xs) <- terms p]
+    q = fromTerms [(c, mmFromList [(0, d - mmDegree xs)]) | (c, xs) <- terms p]
 
 -- √2
 sqrt2 :: A
