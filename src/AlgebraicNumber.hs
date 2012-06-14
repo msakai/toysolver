@@ -11,17 +11,17 @@ import Data.Monoid
 import Polynomial
 
 -- 本当は根の区別をしないといけないけど、それはまだ理解できていない
-newtype A = A{ unA :: Polynomial Rational }
+newtype A = Root (Polynomial Rational)
   deriving (Show, Eq, Ord)
 
 add :: A -> A -> A
-add (Root p1) (Root p2) = A $ lift (+) p1 p2
+add (Root p1) (Root p2) = Root $ lift (+) p1 p2
 
 sub :: A -> A -> A
-sub (Root p1) (Root p2) = A $ lift (flip subtract) p1 p2
+sub (Root p1) (Root p2) = Root $ lift (flip subtract) p1 p2
 
 prod :: A -> A -> A
-prod (Root p1) (Root p2) = A $ lift (*) p1 p2
+prod (Root p1) (Root p2) = Root $ lift (*) p1 p2
 
 lift :: (Polynomial Rational -> Polynomial Rational -> Polynomial Rational)
      -> Polynomial Rational -> Polynomial Rational -> Polynomial Rational
