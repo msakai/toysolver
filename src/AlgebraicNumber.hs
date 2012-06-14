@@ -54,6 +54,11 @@ lift f p1 p2 = sum [constant c * var 0 ^ n | (n,c) <- zip [0..] coeffs]
         cmp2 = grlex
         gbase2 = buchberger cmp2 es
 
+negate' :: A -> A
+negate' (Root p) = Root q
+  where
+    q = fromTerms [(if mmDegree xs `mod` 2 == 0 then c else -c, xs) | (c, xs) <- terms p]
+
 recip' :: A -> A
 recip' (Root p) = Root q
   where
@@ -91,3 +96,7 @@ test_sub_sqrt2_sqrt4 = sub sqrt2 sqrt4
 test_sub_sqrt3_sqrt3 = sub sqrt3 sqrt3
 test_sub_sqrt3_sqrt4 = sub sqrt3 sqrt4
 test_sub_sqrt4_sqrt4 = sub sqrt4 sqrt4
+
+test_negate' = negate' sqrt3 == Root (- x^3 - 3)
+  where
+    x = var 0
