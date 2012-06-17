@@ -49,6 +49,7 @@ module Polynomial
   , eval
   , mapVar
   , mapCoeff
+  , toZ
   , polyDiv
   , polyMod
   , polyDivMod
@@ -101,6 +102,7 @@ import Control.Monad
 import Data.Function
 import Data.List
 import Data.Monoid
+import Data.Ratio
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.IntMap as IM
@@ -183,6 +185,12 @@ mapVar f (Polynomial m) = normalize $ Polynomial $ Map.mapKeysWith (+) (mmMapVar
 mapCoeff :: (Eq k1, Num k1, Ord v) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
 mapCoeff f (Polynomial m) = normalize $ Polynomial $ Map.map f m
 
+toZ :: (Real r, Ord v) => Polynomial r v -> Polynomial Integer v
+toZ p = fromTerms [(numerator (c * fromInteger s), xs) | (c,xs) <- ts]
+  where
+    ts = [(toRational c, xs) | (c,xs) <- terms p]
+    s = foldl' lcm  1 (map (denominator . fst) ts)
+
 showPoly :: (Eq k, Ord k, Num k, Show k, Ord v, Show v) => Polynomial k v -> String
 showPoly p = intercalate " + " [f c xs | (c,xs) <- sortBy (flip grlex `on` snd) $ terms p]
   where
@@ -191,7 +199,7 @@ showPoly p = intercalate " + " [f c xs | (c,xs) <- sortBy (flip grlex `on` snd) 
     g x n = "x" ++ show x ++ "^" ++ show n
 
 {--------------------------------------------------------------------
-  Monomial
+  Univalent polynomials
 --------------------------------------------------------------------}
 
 polyDiv :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k

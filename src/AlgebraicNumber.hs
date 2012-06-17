@@ -17,7 +17,8 @@ import Polynomial
 type Var = Int
 
 -- 本当は根の区別をしないといけないけど、それはまだ理解できていない
-newtype A = Root (UPolynomial Rational)
+-- あと多項式を因数分解して最小多項式にするようにしないと
+newtype A = Root (UPolynomial Integer)
   deriving (Show, Eq, Ord)
 
 add :: A -> A -> A
@@ -30,8 +31,8 @@ prod :: A -> A -> A
 prod (Root p1) (Root p2) = Root $ lift2 (*) p1 p2
 
 lift2 :: (forall a. Num a => a -> a -> a)
-      -> UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
-lift2 f p1 p2 = findPoly f_a_b gbase 2
+      -> UPolynomial Integer -> UPolynomial Integer -> UPolynomial Integer
+lift2 f p1 p2 = toZ $ findPoly f_a_b gbase 2
   where
     a, b :: Var
     a = 0
@@ -41,16 +42,16 @@ lift2 f p1 p2 = findPoly f_a_b gbase 2
     f_a_b = f (var a) (var b)
 
     gbase :: [Polynomial Rational Var]
-    gbase = [ mapVar (\() -> a) p1, mapVar (\() -> b) p2 ]              
+    gbase = map (mapCoeff fromInteger) [ mapVar (\() -> a) p1, mapVar (\() -> b) p2 ]              
 
-findPoly :: Polynomial Rational Int -> [Polynomial Rational Int] -> Int -> UPolynomial Rational
+findPoly :: Polynomial Rational Var -> [Polynomial Rational Var] -> Var -> UPolynomial Rational
 findPoly c ps vn = fromTerms [(coeff, mmFromList [((), n)]) | (n,coeff) <- zip [0..] coeffs]
   where
     coeffs = head $ catMaybes $ [isLinearlyDependent cs2 | cs2 <- inits cs]
       where
         cs = iterate (\p -> reduce grlex (c * p) ps) 1
 
-    isLinearlyDependent :: [(Polynomial Rational Int)] -> Maybe [Rational]
+    isLinearlyDependent :: [Polynomial Rational Var] -> Maybe [Rational]
     isLinearlyDependent cs = if any (0/=) sol then Just sol else Nothing
       where
         cs2 = zip [vn..] cs
