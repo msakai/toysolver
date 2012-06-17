@@ -57,7 +57,7 @@ solve cmp vs cs obj =
     m = mkModel (vs++vs2++[t]) z
 
 mkModel :: [Var] -> MonicMonomial -> Model
-mkModel vs xs = xs `IM.union` IM.fromList [(x, 0) | x <- vs] 
+mkModel vs xs = mmToIntMap xs `IM.union` IM.fromList [(x, 0) | x <- vs] 
 -- IM.union is left-biased
 
 costOrdering :: LA.Expr Integer -> MonomialOrder
@@ -69,7 +69,7 @@ costOrdering obj = compare `on` f
 elimOrdering :: IS.IntSet -> MonomialOrder
 elimOrdering xs = compare `on` f
   where
-    f ys = not (IS.null (xs `IS.intersection` IM.keysSet ys))
+    f ys = not (IS.null (xs `IS.intersection` IM.keysSet (mmToIntMap ys)))
 
 -- http://madscientist.jp/~ikegami/articles/IntroSequencePolynomial.html
 -- optimum is (3,2,0)

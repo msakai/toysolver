@@ -59,6 +59,7 @@ module Polynomial
   , mmOne
   , mmFromList
   , mmToList
+  , mmToIntMap
   , mmDegree
   , mmProd
   , mmDivisible
@@ -189,40 +190,44 @@ monomialDeriv (c,xs) x =
   Monic Monomial
 --------------------------------------------------------------------}
 
-type MonicMonomial = IM.IntMap Integer
+newtype MonicMonomial = MonicMonomial (IM.IntMap Integer)
+  deriving (Eq, Ord, Show)
 
 mmDegree :: MonicMonomial -> Integer
-mmDegree = sum . IM.elems 
+mmDegree (MonicMonomial m) = sum $ IM.elems m
 
 mmVar :: Var -> MonicMonomial
-mmVar x = IM.singleton x 1
+mmVar x = MonicMonomial $ IM.singleton x 1
 
 mmOne :: MonicMonomial
-mmOne = IM.empty
+mmOne = MonicMonomial $ IM.empty
 
 mmFromList :: [(Var, Integer)] -> MonicMonomial
-mmFromList xs = IM.fromList [(x, n) | (x,n) <- xs, n /= 0]
+mmFromList xs = MonicMonomial $ IM.fromList [(x, n) | (x,n) <- xs, n /= 0]
 
 mmToList :: MonicMonomial -> [(Var, Integer)]
-mmToList = IM.toAscList
+mmToList (MonicMonomial m) = IM.toAscList m
+
+mmToIntMap :: MonicMonomial -> IM.IntMap Integer
+mmToIntMap (MonicMonomial m) = m
 
 mmProd :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmProd xs1 xs2 = IM.unionWith (+) xs1 xs2
+mmProd (MonicMonomial xs1) (MonicMonomial xs2) = MonicMonomial $ IM.unionWith (+) xs1 xs2
 
 mmDivisible :: MonicMonomial -> MonicMonomial -> Bool
-mmDivisible xs1 xs2 = IM.isSubmapOfBy (<=) xs2 xs1
+mmDivisible (MonicMonomial xs1) (MonicMonomial xs2) = IM.isSubmapOfBy (<=) xs2 xs1
 
 mmDiv :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmDiv xs1 xs2 = IM.differenceWith f xs1 xs2
+mmDiv (MonicMonomial xs1) (MonicMonomial xs2) = MonicMonomial $ IM.differenceWith f xs1 xs2
   where
     f m n
       | m <= n    = Nothing
       | otherwise = Just (m - n)
 
 mmDeriv :: MonicMonomial -> Var -> (Integer, MonicMonomial)
-mmDeriv xs x
-  | n==0      = (0, IM.empty)
-  | otherwise = (n, IM.update f x xs)
+mmDeriv (MonicMonomial xs) x
+  | n==0      = (0, mmOne)
+  | otherwise = (n, MonicMonomial $ IM.update f x xs)
   where
     n = IM.findWithDefault 0 x xs
     f m
@@ -230,10 +235,10 @@ mmDeriv xs x
       | otherwise = Just $! m - 1
 
 mmLCM :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmLCM = IM.unionWith max
+mmLCM (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ IM.unionWith max m1 m2
 
 mmGCD :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmGCD m1 m2 = IM.filter (0/=) $ IM.intersectionWith min m1 m2
+mmGCD (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ IM.filter (0/=) $ IM.intersectionWith min m1 m2
 
 {--------------------------------------------------------------------
   Monomial Order
