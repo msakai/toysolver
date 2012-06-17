@@ -14,9 +14,11 @@ import qualified LA
 import Expr (Variables (..))
 import Polynomial
 
+type Var = Int
+
 type Model = IM.IntMap Integer
 
-solve :: MonomialOrder -> [Var] -> [(LA.Expr Integer, Integer)] -> LA.Expr Integer -> Maybe Model
+solve :: MonomialOrder Var -> [Var] -> [(LA.Expr Integer, Integer)] -> LA.Expr Integer -> Maybe Model
 solve cmp vs cs obj = 
   if IM.keysSet (IM.filter (/= 0) m) `IS.isSubsetOf` vs'
     then Just $ IM.filterWithKey (\y _ -> y `IS.member` vs') m
@@ -38,10 +40,10 @@ solve cmp vs cs obj =
     t :: Var
     t = v2 + length cs
 
-    cmp2 :: MonomialOrder
+    cmp2 :: MonomialOrder Var
     cmp2 = elimOrdering (IS.fromList vs2) `mappend` elimOrdering (IS.singleton t) `mappend` costOrdering obj `mappend` cmp
 
-    gbase :: [Polynomial Rational]
+    gbase :: [Polynomial Rational Var]
     gbase = buchberger cmp2 (product (map var (t:vs2)) - 1 : phi)
       where
         phi = do
@@ -56,17 +58,17 @@ solve cmp vs cs obj =
 
     m = mkModel (vs++vs2++[t]) z
 
-mkModel :: [Var] -> MonicMonomial -> Model
+mkModel :: [Var] -> MonicMonomial Var -> Model
 mkModel vs xs = mmToIntMap xs `IM.union` IM.fromList [(x, 0) | x <- vs] 
 -- IM.union is left-biased
 
-costOrdering :: LA.Expr Integer -> MonomialOrder
+costOrdering :: LA.Expr Integer -> MonomialOrder Var
 costOrdering obj = compare `on` f
   where
     vs = vars obj
     f xs = LA.evalExpr (mkModel (IS.toList vs) xs) obj
 
-elimOrdering :: IS.IntSet -> MonomialOrder
+elimOrdering :: IS.IntSet -> MonomialOrder Var
 elimOrdering xs = compare `on` f
   where
     f ys = not (IS.null (xs `IS.intersection` IM.keysSet (mmToIntMap ys)))

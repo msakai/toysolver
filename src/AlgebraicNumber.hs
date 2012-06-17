@@ -10,8 +10,10 @@ import qualified Data.Map as Map
 import Data.Monoid
 import Polynomial
 
+type Var = Int
+
 -- 本当は根の区別をしないといけないけど、それはまだ理解できていない
-newtype A = Root (Polynomial Rational)
+newtype A = Root (Polynomial Rational Var)
   deriving (Show, Eq, Ord)
 
 add :: A -> A -> A
@@ -23,11 +25,11 @@ sub (Root p1) (Root p2) = Root $ lift (flip subtract) p1 p2
 prod :: A -> A -> A
 prod (Root p1) (Root p2) = Root $ lift (*) p1 p2
 
-lift :: (Polynomial Rational -> Polynomial Rational -> Polynomial Rational)
-     -> Polynomial Rational -> Polynomial Rational -> Polynomial Rational
+lift :: (Polynomial Rational Var -> Polynomial Rational Var -> Polynomial Rational Var)
+     -> Polynomial Rational Var -> Polynomial Rational Var -> Polynomial Rational Var
 lift f p1 p2 = sum [constant c * var 0 ^ n | (n,c) <- zip [0..] coeffs]
   where
-    a, b :: Polynomial Rational
+    a, b :: Polynomial Rational Var
     a = var 0
     b = var 1
 

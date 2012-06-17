@@ -26,8 +26,8 @@ GBasisモジュール
 module Polynomial
   (
   -- * Polynomial type
-    Var
-  , Polynomial
+    Polynomial
+  , UPolynomial
 
   -- * Conversion
   , var
@@ -45,7 +45,13 @@ module Polynomial
   -- * Operations
   , deriv
   , eval
+  , mapVar
   , mapCoeff
+  , polyDiv
+  , polyMod
+  , polyDivMod
+  , polyGCD
+  , polyLCM
 
   -- * Monomial
   , Monomial
@@ -69,6 +75,7 @@ module Polynomial
   , mmDeriv
   , mmLCM
   , mmGCD
+  , mmMapVar
 
   -- * Monomial order
   , MonomialOrder
@@ -101,12 +108,13 @@ import Linear
   Polynomial type
 --------------------------------------------------------------------}
 
-type Var = Int
-
-newtype Polynomial k = Polynomial (Map.Map MonicMonomial k)
+newtype Polynomial k v = Polynomial (Map.Map (MonicMonomial v) k)
   deriving (Eq, Ord, Show)
 
-instance (Eq k, Num k) => Num (Polynomial k) where
+-- | Univalent polynomials
+type UPolynomial k = Polynomial k ()
+
+instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
   Polynomial m1 + Polynomial m2 = normalize $ Polynomial $ Map.unionWith (+) m1 m2
   Polynomial m1 * Polynomial m2 = normalize $ Polynomial $ Map.fromListWith (+)
       [ (xs1 `mmProd` xs2, c1*c2)
@@ -117,56 +125,59 @@ instance (Eq k, Num k) => Num (Polynomial k) where
   signum x = 1 -- OK?
   fromInteger x = constant (fromInteger x)
 
-instance (Eq k, Num k) => Module k (Polynomial k) where
+instance (Eq k, Num k, Ord v) => Module k (Polynomial k v) where
   k .*. p = constant k * p
   p .+. q = p + q
   lzero = 0
 
-instance (Eq k, Fractional k) => Linear k (Polynomial k)
+instance (Eq k, Fractional k, Ord v) => Linear k (Polynomial k v)
 
-normalize :: (Eq k, Num k) => Polynomial k -> Polynomial k
+normalize :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
 
-var :: (Eq k, Num k) => Var -> Polynomial k
+var :: (Eq k, Num k, Ord v) => v -> Polynomial k v
 var x = fromMonomial (1, mmVar x)
 
-constant :: (Eq k, Num k) => k -> Polynomial k
+constant :: (Eq k, Num k, Ord v) => k -> Polynomial k v
 constant c = fromMonomial (c, mmOne)
 
-fromTerms :: (Eq k, Num k) => [Monomial k] -> Polynomial k
+fromTerms :: (Eq k, Num k, Ord v) => [Monomial k v] -> Polynomial k v
 fromTerms = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
 
-fromMonomial :: (Eq k, Num k) => Monomial k -> Polynomial k
+fromMonomial :: (Eq k, Num k, Ord v) => Monomial k v -> Polynomial k v
 fromMonomial (c,xs) = normalize $ Polynomial $ Map.singleton xs c
 
-terms :: Polynomial k -> [Monomial k]
+terms :: Polynomial k v -> [Monomial k v]
 terms (Polynomial m) = [(c,xs) | (xs,c) <- Map.toList m]
 
-leadingTerm :: (Eq k, Num k) => MonomialOrder -> Polynomial k -> Monomial k
+leadingTerm :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Monomial k v
 leadingTerm cmp p =
   case terms p of
     [] -> (0, mmOne) -- should be error?
     ms -> maximumBy (cmp `on` snd) ms
 
-deg :: Polynomial k -> Integer
+deg :: Polynomial k v -> Integer
 deg = maximum . map monomialDegree . terms
 
-coeff :: Num k => MonicMonomial -> Polynomial k -> k
+coeff :: (Num k, Ord v) => MonicMonomial v -> Polynomial k v -> k
 coeff xs (Polynomial m) = Map.findWithDefault 0 xs m
 
-lookupCoeff :: MonicMonomial -> Polynomial k -> Maybe k
+lookupCoeff :: Ord v => MonicMonomial v -> Polynomial k v -> Maybe k
 lookupCoeff xs (Polynomial m) = Map.lookup xs m
 
-deriv :: (Eq k, Num k) => Polynomial k -> Var -> Polynomial k
+deriv :: (Eq k, Num k, Ord v) => Polynomial k v -> v -> Polynomial k v
 deriv p x = sum [fromMonomial (monomialDeriv m x) | m <- terms p]
 
-eval :: Num k => (Var -> k) -> Polynomial k -> k
+eval :: (Num k, Ord v) => (v -> k) -> Polynomial k v -> k
 eval env p = sum [c * product [(env x) ^ n | (x,n) <- mmToList xs] | (c,xs) <- terms p]
 
-mapCoeff :: (Eq k1, Num k1) => (k -> k1) -> Polynomial k -> Polynomial k1
+mapVar :: (Num k, Eq k, Ord v1, Ord v2) => (v1 -> v2) -> Polynomial k v1 -> Polynomial k v2
+mapVar f (Polynomial m) = normalize $ Polynomial $ Map.mapKeysWith (+) (mmMapVar f) m
+
+mapCoeff :: (Eq k1, Num k1, Ord v) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
 mapCoeff f (Polynomial m) = normalize $ Polynomial $ Map.map f m
 
-showPoly :: (Eq k, Ord k, Num k, Show k) => Polynomial k -> String
+showPoly :: (Eq k, Ord k, Num k, Show k, Ord v, Show v) => Polynomial k v -> String
 showPoly p = intercalate " + " [f c xs | (c,xs) <- sortBy (flip grlex `on` snd) $ terms p]
   where
     f c xs = (intercalate "*" ([showsPrec 8 c "" | c /= 1 || null (mmToList xs)] ++ [g x n | (x,n) <- mmToList xs]))
@@ -177,21 +188,73 @@ showPoly p = intercalate " + " [f c xs | (c,xs) <- sortBy (flip grlex `on` snd) 
   Monomial
 --------------------------------------------------------------------}
 
-type Monomial k = (k, MonicMonomial)
+polyDiv :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+polyDiv f1 f2 = fst (polyDivMod f1 f2)
 
-monomialDegree :: Monomial k -> Integer
+polyMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+polyMod f1 f2 = snd (polyDivMod f1 f2)
+
+polyDivMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> (UPolynomial k, UPolynomial k)
+polyDivMod f1 f2 = go f1
+  where
+    m2 = leadingTerm lex f2
+    go 0 = (0,0)
+    go f1
+      | m1 `monomialDivisible` m2 =
+          case go (f1 - fromMonomial (m1 `monomialDiv` m2) * f2) of
+            (q,r) -> (q + fromMonomial (m1 `monomialDiv` m2), r)
+      | otherwise = (0, f1)
+      where
+        m1 = leadingTerm lex f1
+
+test_polyDivMod = f == g*q + r
+  where
+    x :: UPolynomial Rational
+    x = var ()
+    f = x^3 + x^2 + x
+    g = x^2 + 1
+    (q,r) = f `polyDivMod` g
+
+scaleLeadingTermToMonic :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k
+scaleLeadingTermToMonic f = constant (1/c) * f
+  where
+    (c,_) = leadingTerm lex f
+
+polyGCD :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+polyGCD f1 0  = scaleLeadingTermToMonic f1
+polyGCD f1 f2 = polyGCD f2 (f1 `polyMod` f2)
+
+test_polyGCD = polyGCD f1 f2
+  where 
+    x :: UPolynomial Rational
+    x = var ()
+    f1 = x^3 + x^2 + x
+    f2 = x^2 + 1
+
+polyLCM :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+polyLCM _ 0 = 0
+polyLCM 0 _ = 0
+polyLCM f1 f2 = scaleLeadingTermToMonic $ (f1 `polyMod` (polyGCD f1 f2)) * f2    
+
+{--------------------------------------------------------------------
+  Monomial
+--------------------------------------------------------------------}
+
+type Monomial k v = (k, MonicMonomial v)
+
+monomialDegree :: Monomial k v -> Integer
 monomialDegree (_,xs) = mmDegree xs
 
-monomialProd :: Num k => Monomial k -> Monomial k -> Monomial k
+monomialProd :: (Num k, Ord v) => Monomial k v -> Monomial k v -> Monomial k v
 monomialProd (c1,xs1) (c2,xs2) = (c1*c2, xs1 `mmProd` xs2)
 
-monomialDivisible :: Fractional k => Monomial k -> Monomial k -> Bool
+monomialDivisible :: (Fractional k, Ord v) => Monomial k v -> Monomial k v -> Bool
 monomialDivisible (c1,xs1) (c2,xs2) = mmDivisible xs1 xs2
 
-monomialDiv :: Fractional k => Monomial k -> Monomial k -> Monomial k
+monomialDiv :: (Fractional k, Ord v) => Monomial k v -> Monomial k v -> Monomial k v
 monomialDiv (c1,xs1) (c2,xs2) = (c1 / c2, xs1 `mmDiv` xs2)
 
-monomialDeriv :: (Eq k, Num k) => Monomial k -> Var -> Monomial k
+monomialDeriv :: (Eq k, Num k, Ord v) => Monomial k v -> v -> Monomial k v
 monomialDeriv (c,xs) x =
   case mmDeriv xs x of
     (s,ys) -> (c * fromIntegral s, ys)
@@ -200,64 +263,69 @@ monomialDeriv (c,xs) x =
   Monic Monomial
 --------------------------------------------------------------------}
 
-newtype MonicMonomial = MonicMonomial (IM.IntMap Integer)
+-- 本当は変数の型に応じて type family で表現を変えたい
+
+newtype MonicMonomial v = MonicMonomial (Map.Map v Integer)
   deriving (Eq, Ord, Show)
 
-mmDegree :: MonicMonomial -> Integer
-mmDegree (MonicMonomial m) = sum $ IM.elems m
+mmDegree :: MonicMonomial v -> Integer
+mmDegree (MonicMonomial m) = sum $ Map.elems m
 
-mmVar :: Var -> MonicMonomial
-mmVar x = MonicMonomial $ IM.singleton x 1
+mmVar :: Ord v => v -> MonicMonomial v
+mmVar x = MonicMonomial $ Map.singleton x 1
 
-mmOne :: MonicMonomial
-mmOne = MonicMonomial $ IM.empty
+mmOne :: MonicMonomial v
+mmOne = MonicMonomial $ Map.empty
 
-mmFromList :: [(Var, Integer)] -> MonicMonomial
-mmFromList xs = MonicMonomial $ IM.fromList [(x, n) | (x,n) <- xs, n /= 0]
+mmFromList :: Ord v => [(v, Integer)] -> MonicMonomial v
+mmFromList xs = MonicMonomial $ Map.fromList [(x, n) | (x,n) <- xs, n /= 0]
 
-mmToList :: MonicMonomial -> [(Var, Integer)]
-mmToList (MonicMonomial m) = IM.toAscList m
+mmToList :: Ord v => MonicMonomial v -> [(v, Integer)]
+mmToList (MonicMonomial m) = Map.toAscList m
 
-mmToIntMap :: MonicMonomial -> IM.IntMap Integer
-mmToIntMap (MonicMonomial m) = m
+mmToIntMap :: MonicMonomial Int -> IM.IntMap Integer
+mmToIntMap (MonicMonomial m) = IM.fromDistinctAscList $ Map.toAscList m
 
-mmProd :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmProd (MonicMonomial xs1) (MonicMonomial xs2) = MonicMonomial $ IM.unionWith (+) xs1 xs2
+mmProd :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
+mmProd (MonicMonomial xs1) (MonicMonomial xs2) = MonicMonomial $ Map.unionWith (+) xs1 xs2
 
-mmDivisible :: MonicMonomial -> MonicMonomial -> Bool
-mmDivisible (MonicMonomial xs1) (MonicMonomial xs2) = IM.isSubmapOfBy (<=) xs2 xs1
+mmDivisible :: Ord v => MonicMonomial v -> MonicMonomial v -> Bool
+mmDivisible (MonicMonomial xs1) (MonicMonomial xs2) = Map.isSubmapOfBy (<=) xs2 xs1
 
-mmDiv :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmDiv (MonicMonomial xs1) (MonicMonomial xs2) = MonicMonomial $ IM.differenceWith f xs1 xs2
+mmDiv :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
+mmDiv (MonicMonomial xs1) (MonicMonomial xs2) = MonicMonomial $ Map.differenceWith f xs1 xs2
   where
     f m n
       | m <= n    = Nothing
       | otherwise = Just (m - n)
 
-mmDeriv :: MonicMonomial -> Var -> (Integer, MonicMonomial)
+mmDeriv :: Ord v => MonicMonomial v -> v -> (Integer, MonicMonomial v)
 mmDeriv (MonicMonomial xs) x
   | n==0      = (0, mmOne)
-  | otherwise = (n, MonicMonomial $ IM.update f x xs)
+  | otherwise = (n, MonicMonomial $ Map.update f x xs)
   where
-    n = IM.findWithDefault 0 x xs
+    n = Map.findWithDefault 0 x xs
     f m
       | m <= 1    = Nothing
       | otherwise = Just $! m - 1
 
-mmLCM :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmLCM (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ IM.unionWith max m1 m2
+mmLCM :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
+mmLCM (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ Map.unionWith max m1 m2
 
-mmGCD :: MonicMonomial -> MonicMonomial -> MonicMonomial
-mmGCD (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ IM.filter (0/=) $ IM.intersectionWith min m1 m2
+mmGCD :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
+mmGCD (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ Map.filter (0/=) $ Map.intersectionWith min m1 m2
+
+mmMapVar :: (Ord v1, Ord v2) => (v1 -> v2) -> MonicMonomial v1 -> MonicMonomial v2
+mmMapVar f (MonicMonomial m) = MonicMonomial $ Map.filter (0/=) $ Map.mapKeysWith (+) f m
 
 {--------------------------------------------------------------------
   Monomial Order
 --------------------------------------------------------------------}
 
-type MonomialOrder = MonicMonomial -> MonicMonomial -> Ordering
+type MonomialOrder v = MonicMonomial v -> MonicMonomial v -> Ordering
 
 -- | Lexicographic order
-lex :: MonomialOrder
+lex :: Ord v => MonomialOrder v
 lex xs1 xs2 = go (mmToList xs1) (mmToList xs2)
   where
     go [] [] = EQ
@@ -271,7 +339,7 @@ lex xs1 xs2 = go (mmToList xs1) (mmToList xs2)
 
 -- | Reverse lexicographic order
 -- Note that revlex is NOT a monomial order.
-revlex :: MonicMonomial -> MonicMonomial -> Ordering
+revlex :: Ord v => MonicMonomial v -> MonicMonomial v -> Ordering
 revlex xs1 xs2 = go (reverse (mmToList xs1)) (reverse (mmToList xs2))
   where
     go [] [] = EQ
@@ -285,11 +353,11 @@ revlex xs1 xs2 = go (reverse (mmToList xs1)) (reverse (mmToList xs2))
     cmp n1 n2 = compare n2 n1
 
 -- | graded lexicographic order
-grlex :: MonomialOrder
+grlex :: Ord v => MonomialOrder v
 grlex = (compare `on` mmDegree) `mappend` lex
 
 -- | graded reverse lexicographic order
-grevlex :: MonomialOrder
+grevlex :: Ord v => MonomialOrder v
 grevlex = (compare `on` mmDegree) `mappend` revlex
 
 {--------------------------------------------------------------------
@@ -297,7 +365,7 @@ grevlex = (compare `on` mmDegree) `mappend` revlex
 --------------------------------------------------------------------}
 
 -- | Multivariate division algorithm
-reduce  :: (Eq k, Fractional k) => MonomialOrder -> Polynomial k -> [Polynomial k] -> Polynomial k
+reduce  :: (Eq k, Fractional k, Ord v) => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> Polynomial k v
 reduce cmp p fs = go p
   where
     ls = [(leadingTerm cmp f, f) | f <- fs]
@@ -310,7 +378,7 @@ reduce cmp p fs = go p
           guard $ monomialDivisible h a
           return (g - fromMonomial (monomialDiv h a) * f)
 
-spolynomial :: (Eq k, Fractional k) => MonomialOrder -> Polynomial k -> Polynomial k -> Polynomial k
+spolynomial :: (Eq k, Fractional k, Ord v) => MonomialOrder v -> Polynomial k v -> Polynomial k v -> Polynomial k v
 spolynomial cmp f g =
       fromMonomial ((1,xs) `monomialDiv` (c1,xs1)) * f
     - fromMonomial ((1,xs) `monomialDiv` (c2,xs2)) * g
@@ -319,10 +387,10 @@ spolynomial cmp f g =
     (c1, xs1) = leadingTerm cmp f
     (c2, xs2) = leadingTerm cmp g
 
-buchberger :: forall k. (Eq k, Fractional k, Ord k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
+buchberger :: forall k v. (Eq k, Fractional k, Ord k, Ord v) => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
 buchberger cmp fs = reduceGBase cmp $ go fs (pairs fs)
   where  
-    go :: [Polynomial k] -> [(Polynomial k, Polynomial k)] -> [Polynomial k]
+    go :: [Polynomial k v] -> [(Polynomial k v, Polynomial k v)] -> [Polynomial k v]
     go gs [] = gs
     go gs ((fi,fj):ps)
       | r == 0    = go gs ps
@@ -331,7 +399,7 @@ buchberger cmp fs = reduceGBase cmp $ go fs (pairs fs)
         spoly = spolynomial cmp fi fj
         r = reduce cmp spoly gs
 
-reduceGBase :: forall k. (Eq k, Ord k, Fractional k) => MonomialOrder -> [Polynomial k] -> [Polynomial k]
+reduceGBase :: forall k v. (Eq k, Ord k, Fractional k, Ord v) => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
 reduceGBase cmp ps = Set.toList $ Set.fromList $ go ps []
   where
     go [] qs = qs

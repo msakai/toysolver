@@ -250,7 +250,7 @@ case_spolynomial = spolynomial grlex f g @?= - x^3*y^3 - constant (1/3) * y^3 + 
   where
     x = var 1
     y = var 2
-    f, g :: Polynomial Rational
+    f, g :: Polynomial Rational Int
     f = x^3*y^2 - x^2*y^3 + x
     g = 3*x^4*y + y^2
 
@@ -262,7 +262,7 @@ case_buchberger1 = Set.fromList gbase @?= Set.fromList expected
     gbase = buchberger lex [x^2-y, x^3-z]
     expected = [y^3 - z^2, x^2 - y, x*z - y^2, x*y - z]
 
-    x :: Polynomial Rational
+    x :: Polynomial Rational Int
     x = var 1
     y = var 2
     z = var 3
@@ -274,7 +274,7 @@ case_buchberger2 = Set.fromList gbase @?= Set.fromList expected
     gbase = buchberger grlex [x^3-2*x*y, x^2*y-2*y^2+x]
     expected = [x^2, x*y, y^2 - constant (1/2) * x]
 
-    x :: Polynomial Rational
+    x :: Polynomial Rational Int
     x = var 1
     y = var 2
 
@@ -283,7 +283,7 @@ case_buchberger3 = Set.fromList gbase @?= Set.fromList expected
   where
     gbase = buchberger lex [x^2+2*x*y^2, x*y+2*y^3-1]
     expected = [x, y^3 - constant (1/2)]
-    x :: Polynomial Rational
+    x :: Polynomial Rational Int
     x = var 1
     y = var 2
 
@@ -291,7 +291,7 @@ case_buchberger3 = Set.fromList gbase @?= Set.fromList expected
 -- 時間がかかるので自動実行されるテストケースには含めていない
 test_buchberger4 = Set.fromList gbase @?= Set.fromList expected                   
   where
-    x :: Polynomial Rational
+    x :: Polynomial Rational Int
     x = var 1
     y = var 2
     z = var 3
@@ -318,7 +318,7 @@ gr([x^2+y*z-2, x*z+y^2-3, x*y+z^2-5],[x,y,z], 2);
 -- http://arxiv.org/abs/math/9405205
 case_Seven_Trees_in_One = reduce lex (x^7 - x) gbase @?= 0
   where
-    x :: Polynomial Rational
+    x :: Polynomial Rational Int
     x = var 1
     gbase = buchberger lex [x-(x^2 + 1)]
 
@@ -334,7 +334,7 @@ case_sankaranarayanan04nonlinear = do
   Set.fromList gbase @?= Set.fromList [f', g, h]
   reduce lex (x^2 - y^2) gbase @?= 0
   where
-    x :: Polynomial Rational
+    x :: Polynomial Rational Int
     x = var 1
     y = var 2
     z = var 3
@@ -348,7 +348,7 @@ case_sankaranarayanan04nonlinear = do
   Generators
 --------------------------------------------------------------------}
 
-monicMonomials :: Gen MonicMonomial
+monicMonomials :: Gen (MonicMonomial Int)
 monicMonomials = do
   size <- choose (0, 3)
   xs <- replicateM size $ do
@@ -357,13 +357,13 @@ monicMonomials = do
     return $ mmFromList [(v,e)]
   return $ foldl mmProd mmOne xs
 
-monomials :: Gen (Monomial Rational)
+monomials :: Gen (Monomial Rational Int)
 monomials = do
   m <- monicMonomials
   c <- arbitrary
   return (c,m)
 
-polynomials :: Gen (Polynomial Rational)
+polynomials :: Gen (Polynomial Rational Int)
 polynomials = do
   size <- choose (0, 5)
   xs <- replicateM size monomials
