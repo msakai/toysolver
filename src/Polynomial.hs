@@ -115,10 +115,12 @@ instance (Eq k, Num k) => Num (Polynomial k) where
   signum x = 1 -- OK?
   fromInteger x = constant (fromInteger x)
 
-instance (Eq k, Num k) => Linear k (Polynomial k) where
+instance (Eq k, Num k) => Module k (Polynomial k) where
   k .*. p = constant k * p
   p .+. q = p + q
   lzero = 0
+
+instance (Eq k, Fractional k) => Linear k (Polynomial k)
 
 normalize :: (Eq k, Num k) => Polynomial k -> Polynomial k
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)

@@ -136,7 +136,7 @@ mapCoeffWithVar f (Expr t) = Expr $ IM.mapMaybeWithKey g t
     g v c = if c' == 0 then Nothing else Just c'
       where c' = f c v
 
-instance (Num r, Eq r) => Linear r (Expr r) where
+instance (Num r, Eq r) => Module r (Expr r) where
   Expr t .+. e2 | IM.null t = e2
   e1 .+. Expr t | IM.null t = e1
   e1 .+. e2 = normalizeExpr $ plus e1 e2
@@ -144,6 +144,8 @@ instance (Num r, Eq r) => Linear r (Expr r) where
   0 .*. e = lzero
   c .*. e = mapCoeff (c*) e
   lzero = Expr $ IM.empty
+
+instance (Fractional r, Eq r) => Linear r (Expr r)
 
 plus :: Num r => Expr r -> Expr r -> Expr r
 plus (Expr t1) (Expr t2) = Expr $ IM.unionWith (+) t1 t2

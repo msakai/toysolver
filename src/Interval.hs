@@ -122,7 +122,7 @@ tightenToInteger (Interval lb ub) = interval (fmap tightenLB lb) (fmap tightenUB
 
 -- | Interval airthmetics.
 -- Note that this instance does not satisfy algebraic laws of linear spaces.
-instance (Real r) => Linear r (Interval r) where
+instance Real r => Module r (Interval r) where
   lzero = singleton 0
   Interval lb1 ub1 .+. Interval lb2 ub2 = interval (f lb1 lb2) (f ub1 ub2)
     where
@@ -133,3 +133,5 @@ instance (Real r) => Linear r (Interval r) where
     where
       f Nothing = Nothing
       f (Just (incl,val)) = Just (incl, c * val)
+
+instance (Real r, Fractional r) => Linear r (Interval r)

@@ -43,10 +43,12 @@ realPart (Delta r _) = r
 deltaPart :: Delta r -> r
 deltaPart (Delta _ k) = k
 
-instance Num r => Linear r (Delta r) where
+instance Num r => Module r (Delta r) where
   Delta r1 k1 .+. Delta r2 k2 = Delta (r1+r2) (k1+k2)
   c .*. Delta r k = Delta (c*r) (c*k)
   lzero = Delta 0 0
+
+instance Fractional r => Linear r (Delta r)
 
 -- | 'Delta' version of 'floor'
 floor' :: (RealFrac r, Integral a) => Delta r -> a

@@ -21,7 +21,7 @@ newVar solver lo hi = do
 constant :: Integer -> Expr
 constant c = Expr [] c
 
-instance Linear Integer Expr where
+instance Module Integer Expr where
   n .*. Expr xs c = Expr [(n*m,lit) | (m,lit) <- xs] (n*c)
   Expr xs1 c1 .+. Expr xs2 c2 = Expr (xs1++xs2) (c1+c2)
   lzero = Expr [] 0

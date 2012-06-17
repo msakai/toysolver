@@ -15,8 +15,8 @@
 -----------------------------------------------------------------------------
 
 module Linear
-  ( Linear (..)
-  , (./.)
+  ( Module (..)
+  , Linear (..)
   ) where
 
 import Data.Ratio
@@ -24,9 +24,9 @@ import Data.Ratio
 infixl 6 .+., .-.
 infixl 7 .*., ./.
 
--- | The class of linear spaces.
-class Num k => Linear k a | a -> k where
-  (.*.) :: k -> a -> a
+-- | The class of R-modules.
+class Num r => Module r a | a -> r where
+  (.*.) :: r -> a -> a
   -- ^ scalar multiplication
 
   (.+.) :: a -> a -> a
@@ -46,21 +46,27 @@ class Num k => Linear k a | a -> k where
   lsum :: [a] -> a
   lsum = foldr (.+.) lzero
 
--- | division
-(./.) :: (Linear k a, Fractional k) => a -> k -> a
-a ./. b = (1/b) .*. a
+-- | The class of linear spaces.
+class (Module k a, Fractional k) => Linear k a | a -> k where
+  -- | division
+  (./.) :: a -> k -> a
+  a ./. b = (1/b) .*. a
 
-instance Integral a => Linear (Ratio a) (Ratio a) where
+instance Integral a => Module (Ratio a) (Ratio a) where
   (.*.) = (*)
   (.+.) = (+)
   lzero = 0
 
-instance Linear Integer Integer where
+instance Integral a => Linear (Ratio a) (Ratio a)
+
+instance Module Integer Integer where
   (.*.) = (*)
   (.+.) = (+)
   lzero = 0
 
-instance Linear Double Double where
+instance Module Double Double where
   (.*.) = (*)
   (.+.) = (+)
   lzero = 0
+
+instance Linear Double Double
