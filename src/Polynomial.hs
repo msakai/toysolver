@@ -21,6 +21,8 @@ http://www.math.kobe-u.ac.jp/~kodama/tips-RubyPoly.html
 HaskellではDoConに実装があり
 http://www.haskell.org/docon/
 GBasisモジュール
+
+http://hackage.haskell.org/package/constructive-algebra
 -}
 
 module Polynomial
