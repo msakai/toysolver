@@ -157,7 +157,7 @@ leadingTerm cmp p =
     ms -> maximumBy (cmp `on` snd) ms
 
 deg :: Polynomial k v -> Integer
-deg = maximum . map monomialDegree . terms
+deg = maximum . (0:) . map monomialDegree . terms
 
 coeff :: (Num k, Ord v) => MonicMonomial v -> Polynomial k v -> k
 coeff xs (Polynomial m) = Map.findWithDefault 0 xs m
@@ -207,29 +207,14 @@ polyDivMod f1 f2 = go f1
       where
         m1 = leadingTerm lex f1
 
-test_polyDivMod = f == g*q + r
-  where
-    x :: UPolynomial Rational
-    x = var ()
-    f = x^3 + x^2 + x
-    g = x^2 + 1
-    (q,r) = f `polyDivMod` g
-
 scaleLeadingTermToMonic :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k
-scaleLeadingTermToMonic f = constant (1/c) * f
+scaleLeadingTermToMonic f = if c==0 then f else constant (1/c) * f
   where
     (c,_) = leadingTerm lex f
 
 polyGCD :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyGCD f1 0  = scaleLeadingTermToMonic f1
 polyGCD f1 f2 = polyGCD f2 (f1 `polyMod` f2)
-
-test_polyGCD = polyGCD f1 f2
-  where 
-    x :: UPolynomial Rational
-    x = var ()
-    f1 = x^3 + x^2 + x
-    f2 = x^2 + 1
 
 polyLCM :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyLCM _ 0 = 0
@@ -278,7 +263,7 @@ mmOne :: MonicMonomial v
 mmOne = MonicMonomial $ Map.empty
 
 mmFromList :: Ord v => [(v, Integer)] -> MonicMonomial v
-mmFromList xs = MonicMonomial $ Map.fromList [(x, n) | (x,n) <- xs, n /= 0]
+mmFromList xs = MonicMonomial $ Map.fromListWith (+) [(x, n) | (x,n) <- xs, n > 0]
 
 mmToList :: Ord v => MonicMonomial v -> [(v, Integer)]
 mmToList (MonicMonomial m) = Map.toAscList m
@@ -313,10 +298,10 @@ mmLCM :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
 mmLCM (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ Map.unionWith max m1 m2
 
 mmGCD :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
-mmGCD (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ Map.filter (0/=) $ Map.intersectionWith min m1 m2
+mmGCD (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ Map.intersectionWith min m1 m2
 
 mmMapVar :: (Ord v1, Ord v2) => (v1 -> v2) -> MonicMonomial v1 -> MonicMonomial v2
-mmMapVar f (MonicMonomial m) = MonicMonomial $ Map.filter (0/=) $ Map.mapKeysWith (+) f m
+mmMapVar f (MonicMonomial m) = MonicMonomial $ Map.mapKeysWith (+) f m
 
 {--------------------------------------------------------------------
   Monomial Order

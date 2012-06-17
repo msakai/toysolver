@@ -77,6 +77,55 @@ prop_negate_involution =
     negate (negate a) == a
 
 {--------------------------------------------------------------------
+  Univalent polynomials
+--------------------------------------------------------------------}
+
+prop_polyDivMod =
+  forAll upolynomials $ \a ->
+  forAll upolynomials $ \b ->
+    b /= 0 ==> 
+      let (q,r) = polyDivMod a b
+      in a == q*b + r && (r==0 || deg b > deg r)
+
+case_polyDivMod_1 =  g*q + r @?= f
+  where
+    x :: UPolynomial Rational
+    x = var ()
+    f = x^3 + x^2 + x
+    g = x^2 + 1
+    (q,r) = f `polyDivMod` g
+
+prop_polyGCD_divisible =
+  forAll upolynomials $ \a ->
+  forAll upolynomials $ \b ->
+    let c = polyGCD a b
+    in a `polyMod` c == 0 && b `polyMod` c == 0
+
+prop_polyGCD_comm = 
+  forAll upolynomials $ \a ->
+  forAll upolynomials $ \b ->
+    polyGCD a b == polyGCD b a
+
+case_polyGCD_1 = polyGCD f1 f2 @?= 1
+  where 
+    x :: UPolynomial Rational
+    x = var ()
+    f1 = x^3 + x^2 + x
+    f2 = x^2 + 1
+
+prop_polyLCM_divisible =
+  forAll upolynomials $ \a ->
+  forAll upolynomials $ \b ->
+    (a /= 0 && b /= 0) ==>
+      let c = polyLCM a b
+      in c `polyMod` a == 0 && c `polyMod` b == 0
+
+prop_polyLCM_comm = 
+  forAll upolynomials $ \a ->
+  forAll upolynomials $ \b ->
+    polyLCM a b == polyLCM b a
+
+{--------------------------------------------------------------------
   Monomial
 --------------------------------------------------------------------}
 
@@ -367,6 +416,26 @@ polynomials :: Gen (Polynomial Rational Int)
 polynomials = do
   size <- choose (0, 5)
   xs <- replicateM size monomials
+  return $ sum $ map fromMonomial xs 
+
+umonicMonomials :: Gen (MonicMonomial ())
+umonicMonomials = do
+  size <- choose (0, 3)
+  xs <- replicateM size $ do
+    e <- choose (1, 4)
+    return $ mmFromList [((),e)]
+  return $ foldl mmProd mmOne xs
+
+umonomials :: Gen (Monomial Rational ())
+umonomials = do
+  m <- umonicMonomials
+  c <- arbitrary
+  return (c,m)
+
+upolynomials :: Gen (UPolynomial Rational)
+upolynomials = do
+  size <- choose (0, 5)
+  xs <- replicateM size umonomials
   return $ sum $ map fromMonomial xs 
 
 ------------------------------------------------------------------------
