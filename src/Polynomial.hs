@@ -111,7 +111,7 @@ import Linear
 --------------------------------------------------------------------}
 
 newtype Polynomial k v = Polynomial (Map.Map (MonicMonomial v) k)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
 
 -- | Univalent polynomials
 type UPolynomial k = Polynomial k ()
@@ -133,6 +133,10 @@ instance (Eq k, Num k, Ord v) => Module k (Polynomial k v) where
   lzero = 0
 
 instance (Eq k, Fractional k, Ord v) => Linear k (Polynomial k v)
+
+instance (Show v, Ord v, Show k) => Show (Polynomial k v) where
+  showsPrec d p  = showParen (d > 10) $
+    showString "fromTerms " . shows (terms p)
 
 normalize :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
@@ -253,7 +257,11 @@ monomialDeriv (c,xs) x =
 -- 本当は変数の型に応じて type family で表現を変えたい
 
 newtype MonicMonomial v = MonicMonomial (Map.Map v Integer)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance (Ord v, Show v) => Show (MonicMonomial v) where
+  showsPrec d m  = showParen (d > 10) $
+    showString "mmFromList " . shows (mmToList m)
 
 mmDegree :: MonicMonomial v -> Integer
 mmDegree (MonicMonomial m) = sum $ Map.elems m
