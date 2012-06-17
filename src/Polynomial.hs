@@ -39,6 +39,8 @@ module Polynomial
   -- * Query
   , leadingTerm
   , deg
+  , coeff
+  , lookupCoeff
 
   -- * Operations
   , deriv
@@ -148,6 +150,12 @@ leadingTerm cmp p =
 
 deg :: Polynomial k -> Integer
 deg = maximum . map monomialDegree . terms
+
+coeff :: Num k => MonicMonomial -> Polynomial k -> k
+coeff xs (Polynomial m) = Map.findWithDefault 0 xs m
+
+lookupCoeff :: MonicMonomial -> Polynomial k -> Maybe k
+lookupCoeff xs (Polynomial m) = Map.lookup xs m
 
 deriv :: (Eq k, Num k) => Polynomial k -> Var -> Polynomial k
 deriv p x = sum [fromMonomial (monomialDeriv m x) | m <- terms p]
