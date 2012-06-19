@@ -17,6 +17,9 @@ Extra-Source-Files:
    src/Data/Polynomial/Sturm.hs
    src/Data/AlgebraicNumber.hs
    src/Data/Polyhedron.hs
+   src/pbverify.hs
+   src/pigeonhole.hs
+   samples/gcnf/*.gcnf
    samples/lp/*.lp
    samples/lp/error/*.lp
    samples/maxsat/*.cnf
