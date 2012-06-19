@@ -11,6 +11,7 @@ import Data.Maybe
 import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.Monoid
 import Polynomial
 
@@ -19,7 +20,20 @@ type Var = Int
 -- 本当は根の区別をしないといけないけど、それはまだ理解できていない
 -- あと多項式を因数分解して最小多項式にするようにしないと
 newtype A = Root (UPolynomial Integer)
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq)
+
+instance Num A where
+  (+) = add
+  (-) = sub
+  (*) = prod
+  negate = negate'
+  abs    = undefined
+  signum = undefined
+  fromInteger i = Root (var () - constant i) 
+
+instance Fractional A where
+  recip = recip'
+  fromRational r = Root $ toZ (var () - constant r)
 
 add :: A -> A -> A
 add (Root p1) (Root p2) = Root $ lift2 (+) p1 p2
@@ -49,7 +63,8 @@ findPoly c ps vn = fromTerms [(coeff, mmFromList [((), n)]) | (n,coeff) <- zip [
   where
     coeffs = head $ catMaybes $ [isLinearlyDependent cs2 | cs2 <- inits cs]
       where
-        cs = iterate (\p -> reduce grlex (c * p) ps) 1
+        ps' = buchberger grlex ps
+        cs  = iterate (\p -> reduce grlex (c * p) ps') 1
 
     isLinearlyDependent :: [Polynomial Rational Var] -> Maybe [Rational]
     isLinearlyDependent cs = if any (0/=) sol then Just sol else Nothing
@@ -103,6 +118,33 @@ recip' (Root p) = Root q
   where
     d = deg p
     q = fromTerms [(c, mmFromList [((), d - mmDegree xs)]) | (c, xs) <- terms p]
+
+-- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
+simpPoly :: UPolynomial A -> UPolynomial Rational
+simpPoly p = findPoly (var 0) ps (Set.size coeffsPoly + 1)
+  where
+    coeffsPoly :: Set.Set (UPolynomial Integer)
+    coeffsPoly = Set.fromList [q | (Root q, xs) <- terms p]
+
+    ys :: [(UPolynomial Integer, Var)]
+    ys = zip (Set.toAscList coeffsPoly) [1 .. Set.size coeffsPoly]
+
+    m :: Map.Map (UPolynomial Integer) Var
+    m = Map.fromAscList ys
+
+    p' :: Polynomial Rational Var
+    p' = eval (\() -> var 0) (mapCoeff (\(Root q) -> var (m Map.! q)) p)
+
+    ps :: [Polynomial Rational Var]
+    ps = p' : [mapCoeff fromInteger $ mapVar (\() -> x) q | (q, x) <- ys]
+
+-- 期待値は Wolfram Alpha で x^3 - Sqrt[2]*x + 3 を調べて Real root の exact form で得た
+test_simpPoly = simpPoly p == q
+  where
+    x :: forall k. (Num k, Eq k) => UPolynomial k
+    x = var ()
+    p = x^3 - constant sqrt2 * x + 3
+    q = x^6 + 6*x^3 - 2*x^2 + 9
 
 -- √2
 sqrt2 :: A
