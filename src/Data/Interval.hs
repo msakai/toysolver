@@ -23,6 +23,7 @@ module Data.Interval
   , singleton
   , intersection
   , null
+  , member
   , pickup
   , tightenToInteger
   ) where
@@ -91,6 +92,15 @@ intersection (Interval l1 u1) (Interval l2 u2) = interval (maxEP l1 l2) (minEP u
 -- | Is the interval empty?
 null :: (Real r, Fractional r) => Interval r -> Bool
 null i = isJust (pickup i)
+
+-- | Is the element in the interval?
+member :: Real r => r -> Interval r -> Bool
+member x (Interval lb ub) = testLB x lb && testUB x ub
+  where
+    testLB x Nothing = True
+    testLB x (Just (in1,x1)) = if in1 then x1 <= x else x1 < x
+    testUB x Nothing = True
+    testUB x (Just (in2,x2)) = if in2 then x <= x2 else x < x2
 
 -- | pick up an element from the interval if the interval is not empty.
 pickup :: (Real r, Fractional r) => Interval r -> Maybe r
