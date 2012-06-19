@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  PBFile
+-- Module      :  Text.PBFile
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -18,7 +18,7 @@
 --
 -----------------------------------------------------------------------------
 
-module PBFile
+module Text.PBFile
   (
   -- * Abstract Syntax
     Formula
@@ -362,7 +362,7 @@ showSoftConstraint (cost, constr) =
     Nothing -> showConstraint constr
     Just c -> showChar '[' . showsPrec 0 c . showChar ']' . showChar ' ' . showConstraint constr
 
-pbNumVars :: PBFile.Formula -> Int
+pbNumVars :: Formula -> Int
 pbNumVars (m, cs) = maximum (0 : vs)
   where
     vs = do
@@ -371,7 +371,7 @@ pbNumVars (m, cs) = maximum (0 : vs)
       lit <- tm
       return $ abs lit
 
-wboNumVars :: PBFile.SoftFormula -> Int
+wboNumVars :: SoftFormula -> Int
 wboNumVars (_, cs) = maximum vs
   where
     vs = do

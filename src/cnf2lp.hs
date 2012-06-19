@@ -21,37 +21,38 @@ import System.Environment
 import System.Exit
 import System.Console.GetOpt
 
-import LPFile
+import Data.OptDir
+import qualified Text.LPFile as LPFile
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 cnfToLP :: DIMACS.CNF -> ObjType -> LPFile.LP
 cnfToLP cnf objType
-  = LP
-  { variables = Set.fromList vs
-  , dir = dir
-  , objectiveFunction = (Nothing, obj)
-  , constraints = cs
+  = LPFile.LP
+  { LPFile.variables = Set.fromList vs
+  , LPFile.dir = dir
+  , LPFile.objectiveFunction = (Nothing, obj)
+  , LPFile.constraints = cs
   , LPFile.bounds = Map.empty
-  , integerVariables = Set.empty
-  , binaryVariables = Set.fromList vs
-  , semiContinuousVariables = Set.empty
-  , sos = []
+  , LPFile.integerVariables = Set.empty
+  , LPFile.binaryVariables = Set.fromList vs
+  , LPFile.semiContinuousVariables = Set.empty
+  , LPFile.sos = []
   }
   where
     dir = if objType == ObjMaxZero then OptMin else OptMax
-    obj = if objType == ObjNone then [Term 0 (take 1 vs)] else [Term 1 [v] | v <- vs]
+    obj = if objType == ObjNone then [LPFile.Term 0 (take 1 vs)] else [LPFile.Term 1 [v] | v <- vs]
     vs = if DIMACS.numVars cnf == 0
          then ["x0"]
          else ["x" ++ show i | i <- [1 .. DIMACS.numVars cnf]]
     cs = do
       cl <- DIMACS.clauses cnf      
       let (lhs,n) = foldr f ([], 0) (elems cl)
-      return (Nothing, Nothing, (lhs, Ge, fromIntegral $ 1 - n))
-    f :: Int -> (Expr,Integer) -> (Expr,Integer)
+      return (Nothing, Nothing, (lhs, LPFile.Ge, fromIntegral $ 1 - n))
+    f :: Int -> (LPFile.Expr,Integer) -> (LPFile.Expr,Integer)
     f i (vs,n) =
       if i > 0
-      then (Term 1 [v] : vs, n)
-      else (Term (-1) [v] : vs, n+1)
+      then (LPFile.Term 1 [v] : vs, n)
+      else (LPFile.Term (-1) [v] : vs, n+1)
       where v = "x" ++ show (abs i)
 
 data Flag

@@ -35,7 +35,7 @@ import qualified LA
 import qualified OmegaTest
 import qualified Cooper
 import qualified MIPSolverHL
-import qualified LPFile as LP
+import qualified Text.LPFile as LP
 import qualified Simplex2
 import qualified MIPSolver2
 import Version

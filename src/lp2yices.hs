@@ -22,7 +22,7 @@ import System.Environment
 import System.Exit
 import System.IO
 import Text.Printf
-import qualified LPFile as LP
+import qualified Text.LPFile as LP
 
 type Var = String
 type Env = Map.Map LP.Var Var

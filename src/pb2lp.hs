@@ -21,8 +21,8 @@ import System.Environment
 import System.IO
 import System.Exit
 import System.Console.GetOpt
-import qualified PBFile
-import qualified LPFile
+import qualified Text.PBFile as PBFile
+import qualified Text.LPFile as LPFile
 
 convert :: ObjType -> PBFile.Formula -> LPFile.LP
 convert objType formula@(obj, cs) = LPFile.LP

@@ -4,7 +4,7 @@ import Data.List
 import System.Environment
 import System.Exit
 import System.IO
-import PBFile
+import Text.PBFile as PBFile
 
 pigeonHole :: Integer -> Integer -> Formula
 pigeonHole p h = (Nothing, cs1 ++ cs2)

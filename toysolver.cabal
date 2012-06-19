@@ -42,13 +42,13 @@ Executable toysolver
      Data.Delta
      Data.Linear
      Data.Interval
+     Text.LPFile
      BoundsInference
      Cooper
      Expr
      Formula
      FourierMotzkin
      LA
-     LPFile
      LPSolver
      LPSolverHL
      MIPSolverHL
@@ -79,9 +79,9 @@ Executable toysat
      Data.LBool
      Data.IndexedPriorityQueue
      Data.SeqQueue
+     Text.LPFile
+     Text.PBFile
      SAT
-     LPFile
-     PBFile
      Linearizer
      SAT.Integer
      SAT.Types
@@ -104,7 +104,7 @@ Executable lp2yices
   Main-is: lp2yices.hs
   HS-Source-Dirs: src
   Other-Modules:
-     LPFile
+     Text.LPFile
      Util
   Build-Depends: base >=4 && <5, mtl, containers, parsec, OptDir
   Extensions:
@@ -119,7 +119,7 @@ Executable cnf2lp
   Main-is: cnf2lp.hs
   HS-Source-Dirs: src
   Other-Modules:
-     LPFile
+     Text.LPFile
      Util
   Build-Depends: base >=4 && <5, mtl, containers, array, parsec, bytestring, parse-dimacs, OptDir
   Extensions:
@@ -139,8 +139,8 @@ Executable pb2lp
   Main-is: pb2lp.hs
   HS-Source-Dirs: src
   Other-Modules:
-     LPFile
-     PBFile
+     Text.LPFile
+     Text.PBFile
   Build-Depends: base >=4 && <5, mtl, containers, array, parsec, OptDir
 
 Test-suite TestSAT

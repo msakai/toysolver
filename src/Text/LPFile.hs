@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  LPFile
+-- Module      :  Text.LPFile
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -20,7 +20,7 @@
 -- * <http://lpsolve.sourceforge.net/5.5/CPLEX-format.htm>
 --
 -----------------------------------------------------------------------------
-module LPFile
+module Text.LPFile
   ( LP (..)
   , Expr
   , Term (..)

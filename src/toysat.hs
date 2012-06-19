@@ -49,8 +49,8 @@ import GHC.IO.Encoding
 
 import Data.Linear
 import qualified SAT
-import qualified PBFile
-import qualified LPFile
+import qualified Text.PBFile as PBFile
+import qualified Text.LPFile as LPFile
 import qualified Linearizer as Lin
 import qualified SAT.Integer
 import Version
