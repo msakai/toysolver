@@ -15,6 +15,7 @@ import Test.Framework.Providers.QuickCheck2
 
 import Data.Polynomial
 import Data.Polynomial.Sturm
+import qualified Data.Polynomial.Lagrange as Lagrange
 import qualified Data.Interval as Interval
 
 {--------------------------------------------------------------------
@@ -488,7 +489,7 @@ case_numberOfDistinctRealRoots_2 =
     x = var ()
     p = x^2 - 4
 
-test_separate = do
+case_separate = do
   forM_ (zip vals intervals) $ \(v,ival) -> do
     Interval.member v ival @?= True
     forM_ (filter (v/=) vals) $ \v2 -> do
@@ -498,6 +499,32 @@ test_separate = do
     p = x^5 - 3*x - 1
     intervals = separate p
     vals = [-1.21465, -0.334734, 1.38879]
+
+------------------------------------------------------------------------
+
+-- http://en.wikipedia.org/wiki/Lagrange_polynomial
+case_Lagrange_interpolation_1 = p @?= q
+  where
+    x :: UPolynomial Rational
+    x = var ()
+    p = Lagrange.interpolation
+        [ (1, 1)
+        , (2, 4)
+        , (3, 9)
+        ]
+    q = x^2
+
+-- http://en.wikipedia.org/wiki/Lagrange_polynomial
+case_Lagrange_interpolation_2 = p @?= q
+  where
+    x :: UPolynomial Rational
+    x = var ()
+    p = Lagrange.interpolation
+        [ (1, 1)
+        , (2, 8)
+        , (3, 27)
+        ]
+    q = 6*x^2 - 11*x + 6
 
 ------------------------------------------------------------------------
 -- Test harness
