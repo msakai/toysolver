@@ -16,8 +16,18 @@
 --
 -- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
 -- 
+-- * Ralph E. Gomory.
+--   \"An Algorithm for the Mixed Integer Problem\", Technical Report
+--   RM-2597, 1960, The Rand Corporation, Santa Monica, CA.
+--   <http://www.rand.org/pubs/research_memoranda/RM2597.html>
+--
+-- * Ralph E. Gomory.
+--   \"Outline of an algorithm for integer solutions to linear programs\".
+--   Bull. Amer. Math. Soc., Vol. 64, No. 5. (1958), pp. 275-278.
+--   <http://projecteuclid.org/euclid.bams/1183522679>
+-- 
 -- * R. C. Daniel and Martyn Jeffreys.
---   "Unboundedness in Integer and Discrete Programming L.P. Relaxations"
+--   \"Unboundedness in Integer and Discrete Programming L.P. Relaxations\"
 --   The Journal of the Operational Research Society, Vol. 30, No. 12. (1979)
 --   <http://www.jstor.org/stable/3009435>
 -- 
