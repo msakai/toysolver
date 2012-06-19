@@ -1,30 +1,33 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses #-}
-
-{-
-メモ
-
-Monomial order
-http://en.wikipedia.org/wiki/Monomial_order
-
-Gröbner basis
-http://en.wikipedia.org/wiki/Gr%C3%B6bner_basis
-
-グレブナー基底
-http://d.hatena.ne.jp/keyword/%A5%B0%A5%EC%A5%D6%A5%CA%A1%BC%B4%F0%C4%EC
-
-Gröbner Bases and Buchberger’s Algorithm
-http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
-
-Rubyでの実装
-http://www.math.kobe-u.ac.jp/~kodama/tips-RubyPoly.html
-
-HaskellではDoConに実装があり
-http://www.haskell.org/docon/
-GBasisモジュール
-
-http://hackage.haskell.org/package/constructive-algebra
--}
-
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Data.Polynomial
+-- Copyright   :  (c) Masahiro Sakai 2012
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses)
+--
+-- Polynomials
+--
+-- References:
+--
+-- * Monomial order <http://en.wikipedia.org/wiki/Monomial_order>
+-- 
+-- * Gröbner basis <http://en.wikipedia.org/wiki/Gr%C3%B6bner_basis>
+--
+-- * グレブナー基底 <http://d.hatena.ne.jp/keyword/%A5%B0%A5%EC%A5%D6%A5%CA%A1%BC%B4%F0%C4%EC>
+--
+-- * Gröbner Bases and Buchberger’s Algorithm <http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf>
+--
+-- * Polynomial class for Ruby <http://www.math.kobe-u.ac.jp/~kodama/tips-RubyPoly.html>
+--
+-- * Docon <http://www.haskell.org/docon/>
+--
+-- * constructive-algebra package <http://hackage.haskell.org/package/constructive-algebra>
+-- 
+-----------------------------------------------------------------------------
 module Data.Polynomial
   (
   -- * Polynomial type
@@ -48,6 +51,7 @@ module Data.Polynomial
   , deriv
   , integral
   , eval
+  , evalM
   , mapVar
   , mapCoeff
   , toZ
@@ -119,11 +123,12 @@ import Data.Linear
   Polynomial type
 --------------------------------------------------------------------}
 
+-- | Polynomial over commutative ring r
 newtype Polynomial k v = Polynomial (Map.Map (MonicMonomial v) k)
   deriving (Eq, Ord)
 
--- | Univalent polynomials
-type UPolynomial k = Polynomial k ()
+-- | Univalent polynomials over commutative ring r
+type UPolynomial r = Polynomial r ()
 
 instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
   Polynomial m1 + Polynomial m2 = normalize $ Polynomial $ Map.unionWith (+) m1 m2
@@ -150,27 +155,34 @@ instance (Show v, Ord v, Show k) => Show (Polynomial k v) where
 normalize :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
 
+-- | construct a polynomial from a variable
 var :: (Eq k, Num k, Ord v) => v -> Polynomial k v
 var x = fromMonomial (1, mmVar x)
 
+-- | construct a polynomial from a constant
 constant :: (Eq k, Num k, Ord v) => k -> Polynomial k v
 constant c = fromMonomial (c, mmOne)
 
+-- | construct a polynomial from a list of monomials
 fromTerms :: (Eq k, Num k, Ord v) => [Monomial k v] -> Polynomial k v
 fromTerms = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
 
+-- | construct a polynomial from a monomial
 fromMonomial :: (Eq k, Num k, Ord v) => Monomial k v -> Polynomial k v
 fromMonomial (c,xs) = normalize $ Polynomial $ Map.singleton xs c
 
+-- | list of monomials
 terms :: Polynomial k v -> [Monomial k v]
 terms (Polynomial m) = [(c,xs) | (xs,c) <- Map.toList m]
 
+-- | leading term with respect to a given monomial order
 leadingTerm :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Monomial k v
 leadingTerm cmp p =
   case terms p of
     [] -> (0, mmOne) -- should be error?
     ms -> maximumBy (cmp `on` snd) ms
 
+-- | total degree of a given polynomial
 deg :: Polynomial k v -> Integer
 deg = maximum . (0:) . map monomialDegree . terms
 
@@ -180,14 +192,24 @@ coeff xs (Polynomial m) = Map.findWithDefault 0 xs m
 lookupCoeff :: Ord v => MonicMonomial v -> Polynomial k v -> Maybe k
 lookupCoeff xs (Polynomial m) = Map.lookup xs m
 
+-- | Formal derivative of polynomials
 deriv :: (Eq k, Num k, Ord v) => Polynomial k v -> v -> Polynomial k v
 deriv p x = sum [fromMonomial (monomialDeriv m x) | m <- terms p]
 
+-- | Formal integral of polynomials
 integral :: (Eq k, Fractional k, Ord v) => Polynomial k v -> v -> Polynomial k v
 integral p x = sum [fromMonomial (monomialIntegral m x) | m <- terms p]
 
+-- | Evaluation or substitution
 eval :: (Num k, Ord v) => (v -> k) -> Polynomial k v -> k
 eval env p = sum [c * product [(env x) ^ n | (x,n) <- mmToList xs] | (c,xs) <- terms p]
+
+-- | Monadic evaluation
+evalM :: (Num k, Ord v, Monad m) => (v -> m k) -> Polynomial k v -> m k
+evalM env p = do
+  liftM sum $ forM (terms p) $ \(c,xs) -> do
+    rs <- mapM (\(x,n) -> liftM (^ n) (env x)) (mmToList xs)
+    return (c * product rs)
 
 mapVar :: (Num k, Eq k, Ord v1, Ord v2) => (v1 -> v2) -> Polynomial k v1 -> Polynomial k v2
 mapVar f (Polynomial m) = normalize $ Polynomial $ Map.mapKeysWith (+) (mmMapVar f) m
@@ -258,12 +280,15 @@ instance RenderVar () where
   Univalent polynomials
 --------------------------------------------------------------------}
 
+-- | division of univalent polynomials
 polyDiv :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyDiv f1 f2 = fst (polyDivMod f1 f2)
 
+-- | division of univalent polynomials
 polyMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyMod f1 f2 = snd (polyDivMod f1 f2)
 
+-- | division of univalent polynomials
 polyDivMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> (UPolynomial k, UPolynomial k)
 polyDivMod f1 f2 = go f1
   where
@@ -282,10 +307,12 @@ scaleLeadingTermToMonic f = if c==0 then f else constant (1/c) * f
   where
     (c,_) = leadingTerm lex f
 
+-- | GCD of univalent polynomials
 polyGCD :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyGCD f1 0  = scaleLeadingTermToMonic f1
 polyGCD f1 f2 = polyGCD f2 (f1 `polyMod` f2)
 
+-- | LCM of univalent polynomials
 polyLCM :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyLCM _ 0 = 0
 polyLCM 0 _ = 0
@@ -325,6 +352,7 @@ monomialIntegral (c,xs) x =
 
 -- 本当は変数の型に応じて type family で表現を変えたい
 
+-- | Monic monomials
 newtype MonicMonomial v = MonicMonomial (Map.Map v Integer)
   deriving (Eq, Ord)
 
