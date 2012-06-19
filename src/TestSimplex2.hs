@@ -3,16 +3,16 @@ module Main (main) where
 
 import Control.Monad
 import Data.List
+import Data.Ratio
 import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Text.Printf
 
+import Data.Linear
 import Simplex2
 import qualified LA as LA
--- import qualified Formula as F
--- import Data.Linear
 
 case_test1 :: IO ()
 case_test1 = do
@@ -203,6 +203,204 @@ case_AssertAtom = do
   assertAtom solver (LA.varExpr x0 .<=. LA.constExpr 1)
   ret <- getUB solver x0
   ret @?= Just 1
+
+------------------------------------------------------------------------
+
+case_example_3_2 = do
+  solver <- newSolver
+  [x1,x2,x3] <- replicateM 3 (newVar solver)
+  setOptDir solver OptMax
+  setObj solver $ LA.fromTerms [(3,x1), (2,x2), (3,x3)]
+  mapM_ (assertAtom solver) $
+    [ LA.fromTerms [(2,x1), (1,x2), (1,x3)] .<=. LA.constExpr 2
+    , LA.fromTerms [(1,x1), (2,x2), (3,x3)] .<=. LA.constExpr 5
+    , LA.fromTerms [(2,x1), (2,x2), (1,x3)] .<=. LA.constExpr 6
+    , LA.varExpr x1 .>=. LA.constExpr 0
+    , LA.varExpr x2 .>=. LA.constExpr 0
+    , LA.varExpr x3 .>=. LA.constExpr 0
+    ]
+
+  ret <- optimize solver defaultOptions
+  ret @?= Optimum
+  val <- getObjValue solver
+  val @?= 27/5
+
+  forM_ [(x1,1/5),(x2,0),(x3,8/5)] $ \(var,expected) -> do
+    val <- getValue solver var
+    val @?= expected
+
+case_example_3_5 = do
+  solver <- newSolver
+  [x1,x2,x3,x4,x5] <- replicateM 5 (newVar solver)
+  setOptDir solver OptMin
+  setObj solver $ LA.fromTerms [(-2,x1), (4,x2), (7,x3), (1,x4), (5,x5)]
+  mapM_ (assertAtom solver) $
+    [ LA.fromTerms [(-1,x1), (1,x2), (2,x3), (1,x4), (2,x5)] .==. LA.constExpr 7
+    , LA.fromTerms [(-1,x1), (2,x2), (3,x3), (1,x4), (1,x5)] .==. LA.constExpr 6
+    , LA.fromTerms [(-1,x1), (1,x2), (1,x3), (2,x4), (1,x5)] .==. LA.constExpr 4
+    , LA.varExpr x2 .>=. LA.constExpr 0
+    , LA.varExpr x3 .>=. LA.constExpr 0
+    , LA.varExpr x4 .>=. LA.constExpr 0
+    , LA.varExpr x5 .>=. LA.constExpr 0
+    ]
+
+  ret <- optimize solver defaultOptions
+  ret @?= Optimum
+  val <- getObjValue solver
+  val @?= 19
+
+  forM_ [(x1,-1),(x2,0),(x3,1),(x4,0),(x5,2)] $ \(var,expected) -> do
+    val <- getValue solver var
+    val @?= expected
+
+case_example_4_1 = do
+  solver <- newSolver
+  [x1,x2] <- replicateM 2 (newVar solver)
+  setOptDir solver OptMin
+  setObj solver $ LA.fromTerms [(2,x1), (1,x2)]
+  mapM_ (assertAtom solver) $
+    [ LA.fromTerms [(-1,x1), (1,x2)] .>=. LA.constExpr 2
+    , LA.fromTerms [( 1,x1), (1,x2)] .<=. LA.constExpr 1
+    , LA.varExpr x1 .>=. LA.constExpr 0
+    , LA.varExpr x2 .>=. LA.constExpr 0
+    ]
+  ret <- optimize solver defaultOptions
+  ret @?= Unsat
+
+case_example_4_2 = do
+  solver <- newSolver
+  [x1,x2] <- replicateM 2 (newVar solver)
+  setOptDir solver OptMax
+  setObj solver $ LA.fromTerms [(2,x1), (1,x2)]
+  mapM_ (assertAtom solver) $
+    [ LA.fromTerms [(-1,x1), (-1,x2)] .<=. LA.constExpr 10
+    , LA.fromTerms [( 2,x1), (-1,x2)] .<=. LA.constExpr 40
+    , LA.varExpr x1 .>=. LA.constExpr 0
+    , LA.varExpr x2 .>=. LA.constExpr 0
+    ]
+  ret <- optimize solver defaultOptions
+  ret @?= Unbounded
+
+case_example_4_3 = do
+  solver <- newSolver
+  [x1,x2] <- replicateM 2 (newVar solver)
+  setOptDir solver OptMax
+  setObj solver $ LA.fromTerms [(6,x1), (-2,x2)]
+  mapM_ (assertAtom solver) $
+    [ LA.fromTerms [(2,x1), (-1,x2)] .<=. LA.constExpr 2
+    , LA.varExpr x1 .<=. LA.constExpr 4
+    , LA.varExpr x1 .>=. LA.constExpr 0
+    , LA.varExpr x2 .>=. LA.constExpr 0
+    ]
+
+  ret <- optimize solver defaultOptions
+  ret @?= Optimum
+  val <- getObjValue solver
+  val @?= 12
+
+  forM_ [(x1,4),(x2,6)] $ \(var,expected) -> do
+    val <- getValue solver var
+    val @?= expected
+
+case_example_4_5 = do
+  solver <- newSolver
+  [x1,x2] <- replicateM 2 (newVar solver)
+  setOptDir solver OptMax
+  setObj solver $ LA.fromTerms [(2,x1), (1,x2)]
+  mapM_ (assertAtom solver) $
+    [ LA.fromTerms [(4,x1), ( 3,x2)] .<=. LA.constExpr 12
+    , LA.fromTerms [(4,x1), ( 1,x2)] .<=. LA.constExpr 8
+    , LA.fromTerms [(4,x1), (-1,x2)] .<=. LA.constExpr 8
+    , LA.varExpr x1 .>=. LA.constExpr 0
+    , LA.varExpr x2 .>=. LA.constExpr 0
+    ]
+
+  ret <- optimize solver defaultOptions
+  ret @?= Optimum
+  val <- getObjValue solver
+  val @?= 5
+
+  forM_ [(x1,3/2),(x2,2)] $ \(var,expected) -> do
+    val <- getValue solver var
+    val @?= expected
+
+case_example_4_6 = do
+  solver <- newSolver
+  [x1,x2,x3,x4] <- replicateM 4 (newVar solver)
+  setOptDir solver OptMax
+  setObj solver $ LA.fromTerms [(20,x1), (1/2,x2), (-6,x3), (3/4,x4)]
+  mapM_ (assertAtom solver) $
+    [ LA.varExpr x1 .<=. LA.constExpr 2
+    , LA.fromTerms [( 8,x1), (  -1,x2), (9,x3), (1/4, x4)] .<=. LA.constExpr 16
+    , LA.fromTerms [(12,x1), (-1/2,x2), (3,x3), (1/2, x4)] .<=. LA.constExpr 24
+    , LA.varExpr x2 .<=. LA.constExpr 1
+    , LA.varExpr x1 .>=. LA.constExpr 0
+    , LA.varExpr x2 .>=. LA.constExpr 0
+    , LA.varExpr x3 .>=. LA.constExpr 0
+    , LA.varExpr x4 .>=. LA.constExpr 0
+    ]
+
+  ret <- optimize solver defaultOptions
+  ret @?= Optimum
+  val <- getObjValue solver
+  val @?= 165/4
+
+  forM_ [(x1,2),(x2,1),(x3,0),(x4,1)] $ \(var,expected) -> do
+    val <- getValue solver var
+    val @?= expected
+
+case_example_4_7 = do
+  solver <- newSolver
+  [x1,x2,x3,x4] <- replicateM 4 (newVar solver)
+  setOptDir solver OptMax
+  setObj solver $ LA.fromTerms [(1,x1), (1.5,x2), (5,x3), (2,x4)]
+  mapM_ (assertAtom solver) $
+    [ LA.fromTerms [(3,x1), (2,x2), ( 1,x3), (4,x4)] .<=. LA.constExpr 6
+    , LA.fromTerms [(2,x1), (1,x2), ( 5,x3), (1,x4)] .<=. LA.constExpr 4
+    , LA.fromTerms [(2,x1), (6,x2), (-4,x3), (8,x4)] .==. LA.constExpr 0
+    , LA.fromTerms [(1,x1), (3,x2), (-2,x3), (4,x4)] .==. LA.constExpr 0
+    , LA.varExpr x1 .>=. LA.constExpr 0
+    , LA.varExpr x2 .>=. LA.constExpr 0
+    , LA.varExpr x3 .>=. LA.constExpr 0
+    , LA.varExpr x4 .>=. LA.constExpr 0
+    ]
+
+  ret <- optimize solver defaultOptions
+  ret @?= Optimum
+  val <- getObjValue solver
+  val @?= 48/11
+
+  forM_ [(x1,0),(x2,0),(x3,8/11),(x4,4/11)] $ \(var,expected) -> do
+    val <- getValue solver var
+    val @?= expected
+
+-- 退化して巡回の起こるKuhnの7変数3制約の例
+case_kuhn_7_3 = do
+  solver <- newSolver
+  [x1,x2,x3,x4,x5,x6,x7] <- replicateM 7 (newVar solver)
+  setOptDir solver OptMin
+  setObj solver $ LA.fromTerms [(-2,x4),(-3,x5),(1,x6),(12,x7)]
+  mapM_ (assertAtom solver) $
+    [ LA.fromTerms [(1,x1), ( -2,x4), (-9,x5), (   1,x6), (  9,x7)] .==. LA.constExpr 0
+    , LA.fromTerms [(1,x2), (1/3,x4), ( 1,x5), (-1/3,x6), ( -2,x7)] .==. LA.constExpr 0
+    , LA.fromTerms [(1,x3), (  2,x4), ( 3,x5), (  -1,x6), (-12,x7)] .==. LA.constExpr 2
+    , LA.varExpr x1 .>=. LA.constExpr 0
+    , LA.varExpr x2 .>=. LA.constExpr 0
+    , LA.varExpr x3 .>=. LA.constExpr 0
+    , LA.varExpr x4 .>=. LA.constExpr 0
+    , LA.varExpr x5 .>=. LA.constExpr 0
+    , LA.varExpr x6 .>=. LA.constExpr 0
+    , LA.varExpr x7 .>=. LA.constExpr 0
+    ]
+
+  ret <- optimize solver defaultOptions
+  ret @?= Optimum
+  val <- getObjValue solver
+  val @?= -2
+
+  forM_ [(x1,2),(x2,0),(x3,0),(x4,2),(x5,0),(x6,2),(x7,0)] $ \(var,expected) -> do
+    val <- getValue solver var
+    val @?= expected
 
 ------------------------------------------------------------------------
 -- Test harness
