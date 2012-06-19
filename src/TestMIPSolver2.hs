@@ -15,7 +15,7 @@ import Text.Printf
 import Data.Linear
 import Simplex2
 import MIPSolver2
-import qualified LA as LA
+import qualified Data.LA as LA
 
 ------------------------------------------------------------------------
 

@@ -22,12 +22,12 @@ import Control.Monad
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
-import Expr
-import Formula
+import Data.Expr
+import Data.Formula
 import Data.Linear
 import Data.Interval
-import LA (BoundsEnv)
-import qualified LA
+import Data.LA (BoundsEnv)
+import qualified Data.LA as LA
 import Util (isInteger)
 
 type C r = (RelOp, LA.Expr r)

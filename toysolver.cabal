@@ -43,15 +43,15 @@ Executable toysolver
   HS-Source-Dirs: src
   Other-Modules:
      Data.Delta
+     Data.Expr
+     Data.Formula
+     Data.LA
      Data.Linear
      Data.Interval
      Text.LPFile
      BoundsInference
-     Cooper
-     Expr
-     Formula
+     Cooper     
      FourierMotzkin
-     LA
      LPSolver
      LPSolverHL
      MIPSolverHL

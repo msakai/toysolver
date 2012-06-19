@@ -10,8 +10,8 @@ import Data.Monoid
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
-import qualified LA
-import Expr (Variables (..))
+import qualified Data.LA as LA
+import Data.Expr (Variables (..))
 import Polynomial
 
 type Var = Int

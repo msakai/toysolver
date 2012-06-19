@@ -21,9 +21,8 @@
 -- * <http://users.cecs.anu.edu.au/~michaeln/pubs/arithmetic-dps.pdf>
 -----------------------------------------------------------------------------
 module OmegaTest
-    ( module Expr
-    , module Formula
-    , module LA
+    ( module Data.Expr
+    , module Data.Formula
     , Lit (..)
     , eliminateQuantifiers
     , solve
@@ -37,10 +36,10 @@ import Data.Ratio
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
-import Expr
-import Formula
+import Data.Expr
+import Data.Formula
 import Data.Linear
-import qualified LA
+import qualified Data.LA as LA
 import qualified Data.Interval as Interval
 import Util (combineMaybe)
 import qualified FourierMotzkin as FM

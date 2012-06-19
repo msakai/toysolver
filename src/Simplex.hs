@@ -43,9 +43,9 @@ import qualified Data.IntSet as IS
 import Data.OptDir
 import Control.Exception
 
-import Expr
+import Data.Expr
 import Data.Linear
-import qualified LA
+import qualified Data.LA as LA
 
 -- ---------------------------------------------------------------------------
 

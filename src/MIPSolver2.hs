@@ -70,8 +70,8 @@ import qualified Data.Foldable as F
 import System.CPUTime
 import Text.Printf
 
-import qualified LA
-import Formula ((.<=.), (.>=.), (.==.))
+import qualified Data.LA as LA
+import Data.Formula ((.<=.), (.>=.), (.==.))
 import qualified Simplex2
 import Simplex2 (OptResult (..), Var, Model)
 import qualified OmegaTest

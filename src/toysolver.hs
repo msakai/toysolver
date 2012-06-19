@@ -29,9 +29,9 @@ import System.Console.GetOpt
 import System.IO
 import Text.Printf
 
-import Expr
-import Formula
-import qualified LA
+import Data.Expr
+import Data.Formula
+import qualified Data.LA as LA
 import qualified OmegaTest
 import qualified Cooper
 import qualified MIPSolverHL
@@ -127,7 +127,7 @@ run solver opt lp = do
               putStrLn "s UNSATISFIABLE"
               exitFailure
             Just m -> do
-              putStrLn $ "o " ++ showValue (Expr.eval m obj)
+              putStrLn $ "o " ++ showValue (Data.Expr.eval m obj)
               putStrLn "s SATISFIABLE"
               printModel m vs
        where

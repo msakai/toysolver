@@ -103,10 +103,10 @@ import Text.Printf
 import Data.OptDir
 import System.CPUTime
 
-import qualified LA as LA
-import LA (Atom (..))
-import qualified Formula as F
-import Formula (RelOp (..), (.<=.), (.>=.), (.==.), (.<.), (.>.))
+import qualified Data.LA as LA
+import Data.LA (Atom (..))
+import qualified Data.Formula as F
+import Data.Formula (RelOp (..), (.<=.), (.>=.), (.==.), (.<.), (.>.))
 import Data.Linear
 import Data.Delta
 import Util (showRational)

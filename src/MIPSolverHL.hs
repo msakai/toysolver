@@ -26,8 +26,8 @@
 -----------------------------------------------------------------------------
 
 module MIPSolverHL
-  ( module Expr
-  , module Formula
+  ( module Data.Expr
+  , module Data.Formula
   , module Data.OptDir
   , minimize
   , maximize
@@ -45,10 +45,10 @@ import qualified Data.IntSet as IS
 import Data.Ratio
 import Data.OptDir
 
-import Expr
-import Formula
+import Data.Expr
+import Data.Formula
 import Data.Linear
-import qualified LA
+import qualified Data.LA as LA
 import qualified Simplex
 import Util (isInteger, fracPart)
 import LPSolver

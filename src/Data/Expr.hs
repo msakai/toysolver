@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Expr
+-- Module      :  Data.Expr
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -11,7 +11,7 @@
 -- Arithmetic expressions (not limited to linear ones).
 -- 
 -----------------------------------------------------------------------------
-module Expr
+module Data.Expr
   ( Var
   , VarSet
   , VarMap

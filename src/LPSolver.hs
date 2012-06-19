@@ -26,10 +26,10 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.OptDir
 
-import Expr
-import Formula
+import Data.Expr
+import Data.Formula
 import Data.Linear
-import qualified LA
+import qualified Data.LA as LA
 import qualified Data.Interval as Interval
 import qualified Simplex
 import qualified BoundsInference as BI

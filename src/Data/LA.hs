@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  LA
+-- Module      :  Data.LA
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -12,7 +12,7 @@
 -- Some definition for Theory of Linear Arithmetics.
 -- 
 -----------------------------------------------------------------------------
-module LA
+module Data.LA
   ( module Data.Linear
 
   -- * Expression of linear arithmetics
@@ -56,9 +56,9 @@ import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
-import qualified Expr
-import Expr (Var, VarMap, VarSet, Variables, Model)
-import qualified Formula
+import qualified Data.Expr as Expr
+import Data.Expr (Var, VarMap, VarSet, Variables, Model)
+import qualified Data.Formula as Formula
 import Data.Linear
 import Data.Interval
 

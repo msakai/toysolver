@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Formula
+-- Module      :  Data.Formula
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -12,7 +12,7 @@
 -- Formula of first order logic.
 -- 
 -----------------------------------------------------------------------------
-module Formula
+module Data.Formula
   (
 
   -- * Overloaded operations for formula.
@@ -35,7 +35,7 @@ module Formula
   ) where
 
 import qualified Data.IntSet as IS
-import Expr
+import Data.Expr
 
 -- ---------------------------------------------------------------------------
 

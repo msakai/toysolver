@@ -19,8 +19,8 @@
 -- 
 -----------------------------------------------------------------------------
 module Cooper
-    ( module Expr
-    , module Formula
+    ( module Data.Expr
+    , module Data.Formula
     , ExprZ
     , Lit (..)
     , Formula' (..)
@@ -36,10 +36,10 @@ import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
-import Expr
-import Formula
+import Data.Expr
+import Data.Formula
 import Data.Linear
-import qualified LA
+import qualified Data.LA as LA
 import qualified FourierMotzkin as FM
 import qualified Data.Interval as Interval
 

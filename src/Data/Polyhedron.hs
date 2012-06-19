@@ -27,9 +27,9 @@ import qualified Data.Map as Map
 import Prelude hiding (null)
 
 import qualified Data.Interval as Interval
-import Expr (Variables (..))
-import Formula (RelOp (..), flipOp)
-import qualified LA
+import Data.Expr (Variables (..))
+import Data.Formula (RelOp (..), flipOp)
+import qualified Data.LA as LA
 import Data.Linear
 
 type ExprR = LA.Expr Rational

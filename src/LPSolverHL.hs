@@ -15,8 +15,8 @@
 -----------------------------------------------------------------------------
 
 module LPSolverHL
-  ( module Expr
-  , module Formula
+  ( module Data.Expr
+  , module Data.Formula
   , minimize
   , maximize
   , optimize
@@ -30,9 +30,9 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.OptDir
 
-import Expr
-import Formula
-import qualified LA
+import Data.Expr
+import Data.Formula
+import qualified Data.LA as LA
 import qualified Simplex
 import LPSolver
 
