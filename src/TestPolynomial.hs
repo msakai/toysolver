@@ -127,6 +127,18 @@ prop_polyLCM_comm =
   forAll upolynomials $ \b ->
     polyLCM a b == polyLCM b a
 
+prop_deriv_integral =
+  forAll upolynomials $ \a ->
+    deriv (integral a x) x == a
+  where
+    x = ()
+
+prop_integral_deriv =
+  forAll upolynomials $ \a ->
+    deg (integral (deriv a x) x - a) == 0
+  where
+    x = ()
+
 {--------------------------------------------------------------------
   Monomial
 --------------------------------------------------------------------}

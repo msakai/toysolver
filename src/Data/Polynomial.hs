@@ -46,6 +46,7 @@ module Data.Polynomial
 
   -- * Operations
   , deriv
+  , integral
   , eval
   , mapVar
   , mapCoeff
@@ -63,6 +64,7 @@ module Data.Polynomial
   , monomialDivisible
   , monomialDiv
   , monomialDeriv
+  , monomialIntegral
 
   -- * Monic monomial
   , MonicMonomial
@@ -76,6 +78,7 @@ module Data.Polynomial
   , mmDivisible
   , mmDiv
   , mmDeriv
+  , mmIntegral
   , mmLCM
   , mmGCD
   , mmMapVar
@@ -176,6 +179,9 @@ lookupCoeff xs (Polynomial m) = Map.lookup xs m
 
 deriv :: (Eq k, Num k, Ord v) => Polynomial k v -> v -> Polynomial k v
 deriv p x = sum [fromMonomial (monomialDeriv m x) | m <- terms p]
+
+integral :: (Eq k, Fractional k, Ord v) => Polynomial k v -> v -> Polynomial k v
+integral p x = sum [fromMonomial (monomialIntegral m x) | m <- terms p]
 
 eval :: (Num k, Ord v) => (v -> k) -> Polynomial k v -> k
 eval env p = sum [c * product [(env x) ^ n | (x,n) <- mmToList xs] | (c,xs) <- terms p]
@@ -308,6 +314,11 @@ monomialDeriv (c,xs) x =
   case mmDeriv xs x of
     (s,ys) -> (c * fromIntegral s, ys)
 
+monomialIntegral :: (Eq k, Fractional k, Ord v) => Monomial k v -> v -> Monomial k v
+monomialIntegral (c,xs) x =
+  case mmIntegral xs x of
+    (s,ys) -> (c * fromRational s, ys)
+
 {--------------------------------------------------------------------
   Monic Monomial
 --------------------------------------------------------------------}
@@ -361,6 +372,12 @@ mmDeriv (MonicMonomial xs) x
     f m
       | m <= 1    = Nothing
       | otherwise = Just $! m - 1
+
+mmIntegral :: Ord v => MonicMonomial v -> v -> (Rational, MonicMonomial v)
+mmIntegral (MonicMonomial xs) x =
+  (1 % fromIntegral (n + 1), MonicMonomial $ Map.insert x (n+1) xs)
+  where
+    n = Map.findWithDefault 0 x xs
 
 mmLCM :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
 mmLCM (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ Map.unionWith max m1 m2
