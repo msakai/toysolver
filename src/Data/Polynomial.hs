@@ -94,7 +94,7 @@ module Data.Polynomial
   , reduceGBase
 
   -- * Utility functions
-  , showPoly
+  , render
   ) where
 
 import Prelude hiding (lex)
@@ -192,12 +192,61 @@ toZ p = fromTerms [(numerator (c * fromInteger s), xs) | (c,xs) <- ts]
     ts = [(toRational c, xs) | (c,xs) <- terms p]
     s = foldl' lcm  1 (map (denominator . fst) ts)
 
-showPoly :: (Eq k, Ord k, Num k, Show k, Ord v, Show v) => Polynomial k v -> String
-showPoly p = intercalate " + " [f c xs | (c,xs) <- sortBy (flip grlex `on` snd) $ terms p]
+{--------------------------------------------------------------------
+  Rendering
+--------------------------------------------------------------------}
+
+class Render k v where
+  render :: Polynomial k v -> String
+
+instance Render Integer Int where
+  render = renderPoly (0>) renderZ renderVarInt
+
+instance Render Integer () where
+  render = renderPoly (0>) renderZ renderVarU
+
+instance Render Rational Int where
+  render = renderPoly (0>) renderQ renderVarInt
+
+instance Render Rational () where
+  render = renderPoly (0>) renderQ renderVarU
+
+renderPoly
+  :: (Eq k, Ord k, Num k, Show k, Ord v)
+  => (k -> Bool)
+  -> (Int -> k -> ShowS)
+  -> (Int -> v -> ShowS)
+  -> Polynomial k v -> String
+renderPoly isNeg s1 s2 p =
+  case sortBy (flip grlex `on` snd) $ terms p of
+    [] -> "0"
+    (c,xs):ts -> f c xs ++ concat [if isNeg c then " - " ++ (f (-c) xs) else " + " ++ f c xs | (c,xs) <- ts]
   where
-    f c xs = (intercalate "*" ([showsPrec 8 c "" | c /= 1 || null (mmToList xs)] ++ [g x n | (x,n) <- mmToList xs]))
-    g x 1 = "x" ++ show x
-    g x n = "x" ++ show x ++ "^" ++ show n
+    f c xs = (intercalate "*" ([s1 8 c "" | c /= 1 || null (mmToList xs)] ++ [g x n | (x,n) <- mmToList xs]))
+    g x 1 = s2 8 x ""
+    g x n = s2 9 x "" ++ "^" ++ show n
+
+renderVarInt :: Int -> Int -> ShowS
+renderVarInt prec n s = "x" ++ show n ++ s
+
+renderVarU :: Int -> () -> ShowS
+renderVarU prec n s = "x" ++ s
+
+renderZ :: Int -> Integer -> ShowS
+renderZ = showsPrec
+
+renderQ :: Int -> Rational -> ShowS
+renderQ p r
+  | denominator r == 1 = showsPrec p (numerator r)
+  | otherwise = 
+      showParen (p > ratioPrec) $
+      showsPrec ratioPrec1 (numerator r) .
+      showString "/" .
+      showsPrec ratioPrec1 (denominator r)
+  where
+    ratioPrec, ratioPrec1 :: Int
+    ratioPrec  = 7  -- Precedence of '/'
+    ratioPrec1 = ratioPrec + 1
 
 {--------------------------------------------------------------------
   Univalent polynomials
