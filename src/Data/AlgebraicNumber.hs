@@ -21,7 +21,7 @@ type Var = Int
 -- 本当は複数の根の区別をしないといけないけど、それはまだ理解できていない
 -- あと多項式を因数分解して規約多項式にするようにしないと
 newtype A = Root (UPolynomial Integer)
-  deriving (Show, Eq)
+  deriving (Show)
 
 instance Num A where
   (+) = add
@@ -35,6 +35,11 @@ instance Num A where
 instance Fractional A where
   recip = recip'
   fromRational r = Root $ toZ (var () - constant r)
+
+instance Eq A where
+  a == b = eval (\() -> 0) p == 0
+    where
+      Root p = sub a b
 
 add :: A -> A -> A
 add (Root p1) (Root p2) = Root $ lift2 (+) p1 p2
@@ -171,6 +176,10 @@ test_recip = abs valP <= 0.0001
     x = var ()
     Root p = recip' (Root (x^3 - 3))
     valP = eval (\() -> 1 / (3 ** (1/3))) $ mapCoeff fromInteger p
+
+test_eq = (p, eval (\() -> 0) p, eval (\() -> 0) p == 0)
+  where
+    Root p = sqrt2*sqrt2 - 2
 
 -- 期待値は Wolfram Alpha で x^3 - Sqrt[2]*x + 3 を調べて Real root の exact form で得た
 test_simpPoly = simpPoly p == q
