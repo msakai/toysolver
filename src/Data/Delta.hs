@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Delta
+-- Module      :  Data.Delta
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -22,9 +22,9 @@
 --
 -----------------------------------------------------------------------------
 
-module Delta where
+module Data.Delta where
 
-import Linear
+import Data.Linear
 import Util (isInteger)
 
 -- | @Delta r k@ represents r + kδ for symbolic infinitesimal parameter δ.

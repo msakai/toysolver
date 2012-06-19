@@ -47,7 +47,7 @@ import GHC.Environment (getFullArgs)
 import GHC.IO.Encoding
 #endif
 
-import Linear
+import Data.Linear
 import qualified SAT
 import qualified PBFile
 import qualified LPFile

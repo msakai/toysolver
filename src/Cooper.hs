@@ -38,10 +38,10 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import Linear
+import Data.Linear
 import qualified LA
 import qualified FourierMotzkin as FM
-import qualified Interval
+import qualified Data.Interval as Interval
 
 -- ---------------------------------------------------------------------------
 

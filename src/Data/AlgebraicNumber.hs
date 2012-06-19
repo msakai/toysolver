@@ -3,7 +3,7 @@
 -- WIP
 
 -- http://www.dpmms.cam.ac.uk/~wtg10/galois.html
-module AlgebraicNumber where
+module Data.AlgebraicNumber where
 
 import Data.Function
 import Data.List
@@ -13,7 +13,8 @@ import qualified Data.IntMap as IM
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Monoid
-import Polynomial
+
+import Data.Polynomial
 
 type Var = Int
 

@@ -12,8 +12,10 @@ Extra-Source-Files:
    README.md
    COPYING
    src/TseitinEncode.hs
-   src/Polynomial.hs
    src/ContiTraverso.hs
+   src/Data/Polynomial.hs
+   src/Data/AlgebraicNumber.hs
+   src/Data/Polyhedron.hs
    samples/lp/*.lp
    samples/lp/error/*.lp
    samples/maxsat/*.cnf
@@ -36,18 +38,18 @@ Executable toysolver
   Main-is: toysolver.hs
   HS-Source-Dirs: src
   Other-Modules:
+     Data.Delta
+     Data.Linear
+     Data.Interval
      BoundsInference
      Cooper
-     Delta
      Expr
      Formula
      FourierMotzkin
-     Interval
      LA
      LPFile
      LPSolver
      LPSolverHL
-     Linear
      MIPSolverHL
      OmegaTest
      Simplex
@@ -73,12 +75,12 @@ Executable toysat
   Main-is: toysat.hs
   HS-Source-Dirs: src
   Other-Modules:
+     Data.LBool
+     Data.IndexedPriorityQueue
+     Data.SeqQueue
      SAT
-     LBool
      LPFile
      PBFile
-     IndexedPriorityQueue
-     SeqQueue
      Linearizer
      SAT.Integer
      SAT.Types

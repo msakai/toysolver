@@ -94,12 +94,12 @@ import Data.Ord
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
-import qualified IndexedPriorityQueue as PQ
-import qualified SeqQueue as SQ
+import qualified Data.IndexedPriorityQueue as PQ
+import qualified Data.SeqQueue as SQ
 import System.CPUTime
 import Text.Printf
 
-import LBool
+import Data.LBool
 import SAT.Types
 
 {--------------------------------------------------------------------

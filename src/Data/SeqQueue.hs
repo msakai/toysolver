@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  SeqQueue
+-- Module      :  Data.SeqQueue
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -12,7 +12,7 @@
 -- Queue implemented using IORef and Sequence.
 -- 
 -----------------------------------------------------------------------------
-module SeqQueue
+module Data.SeqQueue
   (
   -- * SeqQueue type
     SeqQueue

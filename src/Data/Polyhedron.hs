@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Polyhedron
+-- Module      :  Data.Polyhedron
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -11,7 +11,7 @@
 -- Affine subspaces that are characterized by a set of linear (in)equalities.
 -- 
 -----------------------------------------------------------------------------
-module Polyhedron
+module Data.Polyhedron
   ( Polyhedron
   , univ
   , empty
@@ -26,11 +26,11 @@ import qualified Data.IntSet as IS
 import qualified Data.Map as Map
 import Prelude hiding (null)
 
-import qualified Interval
+import qualified Data.Interval as Interval
 import Expr (Variables (..))
 import Formula (RelOp (..), flipOp)
 import qualified LA
-import Linear
+import Data.Linear
 
 type ExprR = LA.Expr Rational
 type ExprZ = LA.Expr Integer

@@ -28,9 +28,9 @@ import Data.OptDir
 
 import Expr
 import Formula
-import Linear
+import Data.Linear
 import qualified LA
-import Interval
+import qualified Data.Interval as Interval
 import qualified Simplex
 import qualified BoundsInference as BI
 

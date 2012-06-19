@@ -13,7 +13,7 @@
 -- 
 -----------------------------------------------------------------------------
 module LA
-  ( module Linear
+  ( module Data.Linear
 
   -- * Expression of linear arithmetics
   , Expr
@@ -59,8 +59,8 @@ import qualified Data.IntSet as IS
 import qualified Expr
 import Expr (Var, VarMap, VarSet, Variables, Model)
 import qualified Formula
-import Linear
-import Interval
+import Data.Linear
+import Data.Interval
 
 -----------------------------------------------------------------------------
 

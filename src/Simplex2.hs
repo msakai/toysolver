@@ -107,8 +107,8 @@ import qualified LA as LA
 import LA (Atom (..))
 import qualified Formula as F
 import Formula (RelOp (..), (.<=.), (.>=.), (.==.), (.<.), (.>.))
-import Linear
-import Delta
+import Data.Linear
+import Data.Delta
 import Util (showRational)
 
 {--------------------------------------------------------------------

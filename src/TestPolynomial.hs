@@ -12,7 +12,8 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
-import Polynomial
+
+import Data.Polynomial
 
 {--------------------------------------------------------------------
   Polynomial type

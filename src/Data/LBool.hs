@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  LBool
+-- Module      :  Data.LBool
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -11,7 +11,7 @@
 -- Lifted boolean type.
 -- 
 -----------------------------------------------------------------------------
-module LBool
+module Data.LBool
   ( LBool
   , lTrue
   , lFalse

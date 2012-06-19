@@ -44,7 +44,7 @@ import Data.OptDir
 import Control.Exception
 
 import Expr
-import Linear
+import Data.Linear
 import qualified LA
 
 -- ---------------------------------------------------------------------------

@@ -65,7 +65,7 @@ import Formula ((.<=.), (.>=.), (.==.))
 import qualified Simplex2
 import Simplex2 (OptResult (..), Var, Model)
 import qualified OmegaTest
-import Linear
+import Data.Linear
 import Util (isInteger, fracPart)
 
 data Solver

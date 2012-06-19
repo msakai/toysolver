@@ -44,9 +44,9 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import Linear
+import Data.Linear
 import qualified LA
-import Interval
+import qualified Data.Interval as Interval
 
 -- ---------------------------------------------------------------------------
 
@@ -209,16 +209,16 @@ solve' vs xs = simplify xs >>= go vs
         (bnd, rest) = collectBounds v ys
         f zs = do
           model <- go vs (zs ++ rest)
-          val <- pickup (evalBounds model bnd)
+          val <- Interval.pickup (evalBounds model bnd)
           return $ IM.insert v val model
 
-evalBounds :: Model Rational -> BoundsR -> Interval Rational
+evalBounds :: Model Rational -> BoundsR -> Interval.Interval Rational
 evalBounds model (ls1,ls2,us1,us2) =
-  foldl' Interval.intersection univ $ 
-    [ interval (Just (True, evalRat model x)) Nothing  | x <- ls1 ] ++
-    [ interval (Just (False, evalRat model x)) Nothing | x <- ls2 ] ++
-    [ interval Nothing (Just (True, evalRat model x))  | x <- us1 ] ++
-    [ interval Nothing (Just (False, evalRat model x)) | x <- us2 ]
+  foldl' Interval.intersection Interval.univ $ 
+    [ Interval.interval (Just (True, evalRat model x)) Nothing  | x <- ls1 ] ++
+    [ Interval.interval (Just (False, evalRat model x)) Nothing | x <- ls2 ] ++
+    [ Interval.interval Nothing (Just (True, evalRat model x))  | x <- us1 ] ++
+    [ Interval.interval Nothing (Just (False, evalRat model x)) | x <- us2 ]
 
 -- ---------------------------------------------------------------------------
 

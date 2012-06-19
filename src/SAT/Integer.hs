@@ -4,7 +4,7 @@ module SAT.Integer where
 import Control.Monad
 import Text.Printf
 import SAT
-import Linear
+import Data.Linear
 
 data Expr = Expr [(Integer, SAT.Lit)] Integer
 

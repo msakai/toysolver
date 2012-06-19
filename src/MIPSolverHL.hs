@@ -47,7 +47,7 @@ import Data.OptDir
 
 import Expr
 import Formula
-import Linear
+import Data.Linear
 import qualified LA
 import qualified Simplex
 import Util (isInteger, fracPart)

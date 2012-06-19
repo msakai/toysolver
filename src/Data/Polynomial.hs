@@ -25,7 +25,7 @@ GBasisモジュール
 http://hackage.haskell.org/package/constructive-algebra
 -}
 
-module Polynomial
+module Data.Polynomial
   (
   -- * Polynomial type
     Polynomial
@@ -106,7 +106,8 @@ import Data.Ratio
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.IntMap as IM
-import Linear
+
+import Data.Linear
 
 {--------------------------------------------------------------------
   Polynomial type

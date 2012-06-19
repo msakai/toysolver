@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  PriorityQueue
+-- Module      :  Data.PriorityQueue
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -13,7 +13,7 @@
 -- Priority queue implemented as array-based binary heap.
 --
 -----------------------------------------------------------------------------
-module PriorityQueue
+module Data.PriorityQueue
   (
   -- * PriorityQueue type
     PriorityQueue

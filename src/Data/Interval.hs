@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Interval
+-- Module      :  Data.Interval
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -12,7 +12,7 @@
 -- Interval datatype.
 -- 
 -----------------------------------------------------------------------------
-module Interval
+module Data.Interval
   ( EndPoint
   , Interval
   , lowerBound
@@ -29,7 +29,7 @@ module Interval
 
 import Control.Monad
 import Data.Maybe
-import Linear
+import Data.Linear
 import Util (combineMaybe, isInteger)
 import Prelude hiding (null)
 

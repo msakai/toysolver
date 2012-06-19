@@ -12,7 +12,7 @@ import Text.Printf
 import Simplex2
 import qualified LA as LA
 -- import qualified Formula as F
--- import Linear
+-- import Data.Linear
 
 case_test1 :: IO ()
 case_test1 = do

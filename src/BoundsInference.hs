@@ -24,10 +24,10 @@ import qualified Data.IntSet as IS
 
 import Expr
 import Formula
-import Linear
+import Data.Linear
+import Data.Interval
 import LA (BoundsEnv)
 import qualified LA
-import Interval
 import Util (isInteger)
 
 type C r = (RelOp, LA.Expr r)

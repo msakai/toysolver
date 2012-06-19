@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Linear
+-- Module      :  Data.Linear
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -14,7 +14,7 @@
 -- 
 -----------------------------------------------------------------------------
 
-module Linear
+module Data.Linear
   ( Module (..)
   , Linear (..)
   ) where
