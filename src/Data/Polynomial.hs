@@ -98,6 +98,9 @@ module Data.Polynomial
 
   -- * Utility functions
   , render
+  , renderWith
+  , RenderCoeff (..)
+  , RenderVar (..)
   ) where
 
 import Prelude hiding (lex)
@@ -202,57 +205,54 @@ toZ p = fromTerms [(numerator (c * fromInteger s), xs) | (c,xs) <- ts]
   Rendering
 --------------------------------------------------------------------}
 
-class Render k v where
-  render :: Polynomial k v -> String
+render
+  :: (Eq k, Ord k, Num k, Ord v, RenderCoeff k, RenderVar v)
+  => Polynomial k v -> String
+render = renderWith renderVar
 
-instance Render Integer Int where
-  render = renderPoly (0>) renderZ renderVarInt
-
-instance Render Integer () where
-  render = renderPoly (0>) renderZ renderVarU
-
-instance Render Rational Int where
-  render = renderPoly (0>) renderQ renderVarInt
-
-instance Render Rational () where
-  render = renderPoly (0>) renderQ renderVarU
-
-renderPoly
-  :: (Eq k, Ord k, Num k, Show k, Ord v)
-  => (k -> Bool)
-  -> (Int -> k -> ShowS)
-  -> (Int -> v -> ShowS)
+renderWith
+  :: (Eq k, Ord k, Num k, Ord v, RenderCoeff k)
+  => (Int -> v -> ShowS)
   -> Polynomial k v -> String
-renderPoly isNeg s1 s2 p =
+renderWith s2 p =
   case sortBy (flip grlex `on` snd) $ terms p of
     [] -> "0"
-    (c,xs):ts -> f c xs ++ concat [if isNeg c then " - " ++ (f (-c) xs) else " + " ++ f c xs | (c,xs) <- ts]
+    (c,xs):ts -> f c xs ++ concat [if isNegativeCoeff c then " - " ++ (f (-c) xs) else " + " ++ f c xs | (c,xs) <- ts]
   where
-    f c xs = (intercalate "*" ([s1 8 c "" | c /= 1 || null (mmToList xs)] ++ [g x n | (x,n) <- mmToList xs]))
+    f c xs = (intercalate "*" ([renderCoeff 8 c "" | c /= 1 || null (mmToList xs)] ++ [g x n | (x,n) <- mmToList xs]))
     g x 1 = s2 8 x ""
     g x n = s2 9 x "" ++ "^" ++ show n
 
-renderVarInt :: Int -> Int -> ShowS
-renderVarInt prec n s = "x" ++ show n ++ s
+class RenderCoeff a where
+  renderCoeff :: Int -> a -> ShowS
+  isNegativeCoeff :: a -> Bool
 
-renderVarU :: Int -> () -> ShowS
-renderVarU prec n s = "x" ++ s
+instance RenderCoeff Integer where
+  renderCoeff = showsPrec
+  isNegativeCoeff = (0>)
 
-renderZ :: Int -> Integer -> ShowS
-renderZ = showsPrec
+instance RenderCoeff Rational where
+  renderCoeff p r
+    | denominator r == 1 = showsPrec p (numerator r)
+    | otherwise = 
+        showParen (p > ratioPrec) $
+        showsPrec ratioPrec1 (numerator r) .
+        showString "/" .
+        showsPrec ratioPrec1 (denominator r)
+    where
+      ratioPrec, ratioPrec1 :: Int
+      ratioPrec  = 7  -- Precedence of '/'
+      ratioPrec1 = ratioPrec + 1
+  isNegativeCoeff = (0>)
 
-renderQ :: Int -> Rational -> ShowS
-renderQ p r
-  | denominator r == 1 = showsPrec p (numerator r)
-  | otherwise = 
-      showParen (p > ratioPrec) $
-      showsPrec ratioPrec1 (numerator r) .
-      showString "/" .
-      showsPrec ratioPrec1 (denominator r)
-  where
-    ratioPrec, ratioPrec1 :: Int
-    ratioPrec  = 7  -- Precedence of '/'
-    ratioPrec1 = ratioPrec + 1
+class RenderVar v where
+  renderVar :: Int -> v -> ShowS
+
+instance RenderVar Int where
+  renderVar prec n = showChar 'x' . showsPrec 0 n
+
+instance RenderVar () where
+  renderVar prec n = showChar 'x'
 
 {--------------------------------------------------------------------
   Univalent polynomials
