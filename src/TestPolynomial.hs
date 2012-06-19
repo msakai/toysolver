@@ -14,6 +14,7 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
 import Data.Polynomial
+import Data.Polynomial.Sturm
 
 {--------------------------------------------------------------------
   Polynomial type
@@ -438,6 +439,41 @@ upolynomials = do
   size <- choose (0, 5)
   xs <- replicateM size umonomials
   return $ sum $ map fromMonomial xs 
+
+------------------------------------------------------------------------
+
+-- http://mathworld.wolfram.com/SturmFunction.html
+case_sturmChain = sturmChain p0 @?= chain
+  where
+    x = var ()
+    p0 = x^5 - 3*x - 1
+    p1 = 5*x^4 - 3
+    p2 = constant (1/5) * (12*x + 5)
+    p3 = constant (59083 / 20736)
+    chain = [p0, p1, p2, p3]
+
+-- http://mathworld.wolfram.com/SturmFunction.html
+case_numberOfDistinctRealRoots_1 =
+  sequence_
+  [ numberOfDistinctRealRoots p (-2,0)      @?= 2
+  , numberOfDistinctRealRoots p (0,2)       @?= 1
+  , numberOfDistinctRealRoots p (-1.5,-1.0) @?= 1
+  , numberOfDistinctRealRoots p (-0.5,0)    @?= 1
+  , numberOfDistinctRealRoots p (1,1.5)     @?= 1
+  ]
+  where
+    x = var ()
+    p = x^5 - 3*x - 1
+
+-- intervals are interpreted as half-open intervals.
+case_numberOfDistinctRealRoots_2 =
+  sequence_
+  [ numberOfDistinctRealRoots p (2,3) @?= 0
+  , numberOfDistinctRealRoots p (1,2) @?= 1
+  ]
+  where
+    x = var ()
+    p = x^2 - 4
 
 ------------------------------------------------------------------------
 -- Test harness
