@@ -19,9 +19,11 @@
 module Data.Polynomial.Sturm
   ( numberOfDistinctRealRoots
   , sturmChain
+  , separate
   ) where
 
 import Data.Polynomial
+import qualified Data.Interval as Interval
 
 -- | the number of distinct real roots of p in (a,b]
 numberOfDistinctRealRoots
@@ -60,3 +62,34 @@ countChanges (x:xs) = go x xs 0
     go x1 (x2:xs) r
       | x1==x2    = go x1 xs r
       | otherwise = go x2 xs (r+1)
+
+-- | Closed interval that contains all real roots of a given polynomial.
+-- 根の限界
+-- <http://aozoragakuen.sakura.ne.jp/taiwa/taiwaNch02/node26.html>
+bounds :: UPolynomial Rational -> (Rational, Rational)
+bounds p = (-m, m)
+  where
+    m = if p==0
+        then 0
+        else max 1 (sum [abs (c/s) | (c,_) <- terms p] - 1)
+    (s,_) = leadingTerm grlex p
+
+-- disjoint intervals each of which contains exactly one real roots.
+separate :: UPolynomial Rational -> [Interval.Interval Rational]
+separate p = f (bounds p)
+  where
+    chain = sturmChain p
+    n x = countSignChanges [eval (\() -> x) q | q <- chain]
+
+    f (lb,ub) =
+      if eval (\() -> lb) p == 0
+      then Interval.singleton lb : g (lb,ub)
+      else g (lb,ub)
+    
+    g (lb,ub) =
+      case n lb - n ub of
+        0 -> []
+        1 -> [Interval.interval (Just (False, lb)) (Just (True, ub))]
+        _ -> g (lb, mid) ++ g (mid, ub)
+      where
+        mid = (lb + ub) / 2

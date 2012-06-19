@@ -15,6 +15,7 @@ import Test.Framework.Providers.QuickCheck2
 
 import Data.Polynomial
 import Data.Polynomial.Sturm
+import qualified Data.Interval as Interval
 
 {--------------------------------------------------------------------
   Polynomial type
@@ -486,6 +487,17 @@ case_numberOfDistinctRealRoots_2 =
   where
     x = var ()
     p = x^2 - 4
+
+test_separate = do
+  forM_ (zip vals intervals) $ \(v,ival) -> do
+    Interval.member v ival @?= True
+    forM_ (filter (v/=) vals) $ \v2 -> do
+      Interval.member v2 ival @?= False
+  where
+    x = var ()
+    p = x^5 - 3*x - 1
+    intervals = separate p
+    vals = [-1.21465, -0.334734, 1.38879]
 
 ------------------------------------------------------------------------
 -- Test harness
