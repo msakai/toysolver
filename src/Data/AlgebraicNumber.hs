@@ -18,15 +18,15 @@ import Data.Polynomial
 
 type Var = Int
 
--- 本当は根の区別をしないといけないけど、それはまだ理解できていない
--- あと多項式を因数分解して最小多項式にするようにしないと
+-- 本当は複数の根の区別をしないといけないけど、それはまだ理解できていない
+-- あと多項式を因数分解して規約多項式にするようにしないと
 newtype A = Root (UPolynomial Integer)
   deriving (Show, Eq)
 
 instance Num A where
   (+) = add
   (-) = sub
-  (*) = prod
+  (*) = mul
   negate = negate'
   abs    = undefined
   signum = undefined
@@ -42,12 +42,12 @@ add (Root p1) (Root p2) = Root $ lift2 (+) p1 p2
 sub :: A -> A -> A
 sub (Root p1) (Root p2) = Root $ lift2 (flip subtract) p1 p2
 
-prod :: A -> A -> A
-prod (Root p1) (Root p2) = Root $ lift2 (*) p1 p2
+mul :: A -> A -> A
+mul (Root p1) (Root p2) = Root $ lift2 (*) p1 p2
 
 lift2 :: (forall a. Num a => a -> a -> a)
       -> UPolynomial Integer -> UPolynomial Integer -> UPolynomial Integer
-lift2 f p1 p2 = toZ $ findPoly f_a_b gbase 2
+lift2 f p1 p2 = toZ $ findPoly f_a_b gbase
   where
     a, b :: Var
     a = 0
@@ -59,13 +59,21 @@ lift2 f p1 p2 = toZ $ findPoly f_a_b gbase 2
     gbase :: [Polynomial Rational Var]
     gbase = map (mapCoeff fromInteger) [ mapVar (\() -> a) p1, mapVar (\() -> b) p2 ]              
 
-findPoly :: Polynomial Rational Var -> [Polynomial Rational Var] -> Var -> UPolynomial Rational
-findPoly c ps vn = fromTerms [(coeff, mmFromList [((), n)]) | (n,coeff) <- zip [0..] coeffs]
-  where
+-- ps のもとで c を根とする多項式を求める
+findPoly :: Polynomial Rational Var -> [Polynomial Rational Var] -> UPolynomial Rational
+findPoly c ps = fromTerms [(coeff, mmFromList [((), n)]) | (n,coeff) <- zip [0..] coeffs]
+  where  
+    vn :: Var
+    vn = if Set.null vs then 0 else Set.findMax vs + 1
+      where
+        vs = Set.fromList [x | p <- (c:ps), (_,xs) <- terms p, (x,_) <- mmToList xs]
+
+    coeffs :: [Rational]
     coeffs = head $ catMaybes $ [isLinearlyDependent cs2 | cs2 <- inits cs]
       where
-        ps' = buchberger grlex ps
-        cs  = iterate (\p -> reduce grlex (c * p) ps') 1
+        cmp = grlex
+        ps' = buchberger cmp ps
+        cs  = iterate (\p -> reduce cmp (c * p) ps') 1
 
     isLinearlyDependent :: [Polynomial Rational Var] -> Maybe [Rational]
     isLinearlyDependent cs = if any (0/=) sol then Just sol else Nothing
@@ -81,34 +89,6 @@ findPoly c ps vn = fromTerms [(coeff, mmFromList [((), n)]) | (n,coeff) <- zip [
               zs = mmFromList [(x,m) | (x,m) <- xs', x >= vn]
           return (ys, fromMonomial (n,zs))
 
-test_findPoly_1 = abs valP <= 0.0001
-  where
-    a = var 0
-    b = var 1
-
-    p :: Polynomial Rational ()
-    p = findPoly (a+b) [a^2 - 2, b^2 - 3] 2
-
-    valX :: Double
-    valX = sqrt 2 + sqrt 3
-
-    valP :: Double
-    valP = eval (\() -> valX) $ mapCoeff fromRational p
-
-test_findPoly_2 = abs valP <= 0.0001
-  where
-    a = var 0
-    b = var 1
-
-    p :: Polynomial Rational ()
-    p = findPoly (a*b) [a^2 - 2, b^2 - 3] 2
-
-    valX :: Double
-    valX = sqrt 2 * sqrt 3
-
-    valP :: Double
-    valP = eval (\() -> valX) $ mapCoeff fromRational p
-
 negate' :: A -> A
 negate' (Root p) = Root q
   where
@@ -122,22 +102,75 @@ recip' (Root p) = Root q
 
 -- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
 simpPoly :: UPolynomial A -> UPolynomial Rational
-simpPoly p = findPoly (var 0) ps (Set.size coeffsPoly + 1)
+simpPoly p = findPoly (var 0) ps
   where
-    coeffsPoly :: Set.Set (UPolynomial Integer)
-    coeffsPoly = Set.fromList [q | (Root q, xs) <- terms p]
-
     ys :: [(UPolynomial Integer, Var)]
-    ys = zip (Set.toAscList coeffsPoly) [1 .. Set.size coeffsPoly]
+    ys = zip (Set.toAscList $ Set.fromList [q | (Root q, xs) <- terms p]) [1..]
 
     m :: Map.Map (UPolynomial Integer) Var
-    m = Map.fromAscList ys
+    m = Map.fromDistinctAscList ys
 
     p' :: Polynomial Rational Var
     p' = eval (\() -> var 0) (mapCoeff (\(Root q) -> var (m Map.! q)) p)
 
     ps :: [Polynomial Rational Var]
     ps = p' : [mapCoeff fromInteger $ mapVar (\() -> x) q | (q, x) <- ys]
+
+{--------------------------------------------------------------------
+  Test cases
+--------------------------------------------------------------------}
+
+tests =
+  [ test_add
+  , test_sub
+  , test_mul
+  , test_negate
+  , test_negate_2
+  , test_recip
+  , test_simpPoly
+  ]
+
+test_add = abs valP <= 0.0001
+  where
+    p :: UPolynomial Integer
+    Root p = add sqrt2 sqrt3
+
+    valP :: Double
+    valP = eval (\() -> sqrt 2 + sqrt 3) $ mapCoeff fromInteger p
+
+test_sub = abs valP <= 0.0001
+  where
+    p :: UPolynomial Integer
+    Root p = sub sqrt2 sqrt3
+
+    valP :: Double
+    valP = eval (\() -> sqrt 2 - sqrt 3) $ mapCoeff fromInteger p
+
+test_mul = abs valP <= 0.0001
+  where
+    p :: UPolynomial Integer
+    Root p = mul sqrt2 sqrt3
+
+    valP :: Double
+    valP = eval (\() -> sqrt 2 * sqrt 3) $ mapCoeff fromInteger p
+
+test_negate = abs valP <= 0.0001
+  where
+    x = var ()
+    Root p = negate' (Root (x^3 - 3))
+    valP = eval (\() -> - (3 ** (1/3))) $ mapCoeff fromInteger p
+
+test_negate_2 = negate' (Root p) == Root q
+  where
+    x = var ()
+    p =   x^3 - 3
+    q = - x^3 - 3
+
+test_recip = abs valP <= 0.0001
+  where
+    x = var ()
+    Root p = recip' (Root (x^3 - 3))
+    valP = eval (\() -> 1 / (3 ** (1/3))) $ mapCoeff fromInteger p
 
 -- 期待値は Wolfram Alpha で x^3 - Sqrt[2]*x + 3 を調べて Real root の exact form で得た
 test_simpPoly = simpPoly p == q
@@ -164,23 +197,3 @@ sqrt4 :: A
 sqrt4 = Root (x^2 - 4)
   where
     x = var ()
-
-test_add_sqrt2_sqrt2 = add sqrt2 sqrt2
-test_add_sqrt2_sqrt3 = add sqrt2 sqrt3
-test_add_sqrt2_sqrt4 = add sqrt2 sqrt4
-test_add_sqrt3_sqrt3 = add sqrt3 sqrt3
-test_add_sqrt3_sqrt4 = add sqrt3 sqrt4
-test_add_sqrt4_sqrt4 = add sqrt4 sqrt4
-
-test_sub_sqrt2_sqrt2 = sub sqrt2 sqrt2
-test_sub_sqrt2_sqrt3 = sub sqrt2 sqrt3
-test_sub_sqrt2_sqrt4 = sub sqrt2 sqrt4
-test_sub_sqrt3_sqrt3 = sub sqrt3 sqrt3
-test_sub_sqrt3_sqrt4 = sub sqrt3 sqrt4
-test_sub_sqrt4_sqrt4 = sub sqrt4 sqrt4
-
-test_negate' = negate' (Root p) == Root q
-  where
-    x = var ()
-    p =   x^3 - 3
-    q = - x^3 - 3
