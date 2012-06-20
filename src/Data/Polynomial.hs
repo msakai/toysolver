@@ -52,6 +52,7 @@ module Data.Polynomial
   , integral
   , eval
   , evalM
+  , isRootOf
   , mapVar
   , mapCoeff
   , toZ
@@ -210,6 +211,9 @@ evalM env p = do
   liftM sum $ forM (terms p) $ \(c,xs) -> do
     rs <- mapM (\(x,n) -> liftM (^ n) (env x)) (mmToList xs)
     return (c * product rs)
+
+isRootOf :: (Num k, Eq k) => k -> UPolynomial k -> Bool
+isRootOf x p = eval (\_ -> x) p == 0
 
 mapVar :: (Num k, Eq k, Ord v1, Ord v2) => (v1 -> v2) -> Polynomial k v1 -> Polynomial k v2
 mapVar f (Polynomial m) = normalize $ Polynomial $ Map.mapKeysWith (+) (mmMapVar f) m
