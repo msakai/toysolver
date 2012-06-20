@@ -91,7 +91,7 @@ intersection (Interval l1 u1) (Interval l2 u2) = interval (maxEP l1 l2) (minEP u
 
 -- | Is the interval empty?
 null :: (Real r, Fractional r) => Interval r -> Bool
-null i = isJust (pickup i)
+null i = not $ isJust (pickup i)
 
 -- | Is the element in the interval?
 member :: Real r => r -> Interval r -> Bool
