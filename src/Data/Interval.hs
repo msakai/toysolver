@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Interval
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, DeriveDataTypeable)
 --
 -- Interval datatype.
 -- 
@@ -18,6 +18,7 @@ module Data.Interval
   , lowerBound
   , upperBound
   , interval
+  , closedInterval
   , univ
   , empty
   , singleton
@@ -31,6 +32,7 @@ module Data.Interval
 import Control.Monad
 import Data.Maybe
 import Data.Linear
+import Data.Typeable
 import Util (combineMaybe, isInteger)
 import Prelude hiding (null)
 
@@ -44,7 +46,14 @@ data Interval r
   { lowerBound :: EndPoint r -- ^ lower bound of the interval
   , upperBound :: EndPoint r -- ^ upper bound of the interval
   }
-  deriving (Eq,Ord,Show)
+  deriving (Eq, Ord, Typeable)
+
+instance Show r => Show (Interval r) where
+  showsPrec p x  = showParen (p > appPrec) $
+    showString "interval " .
+    showsPrec appPrec1 (lowerBound x) .
+    showChar ' ' . 
+    showsPrec appPrec1 (upperBound x)
 
 -- | smart constructor for 'Interval'
 interval :: Real r => EndPoint r -> EndPoint r -> Interval r
@@ -54,6 +63,9 @@ interval lb@(Just (in1,x1)) ub@(Just (in2,x2)) =
     LT -> Interval lb ub
     EQ -> if in1 && in2 then Interval lb ub else empty
 interval lb ub = Interval lb ub
+
+closedInterval :: Real r => r -> r -> Interval r
+closedInterval lb ub = interval (Just (True, lb)) (Just (True, ub))
 
 -- | (-∞, ∞)
 univ :: Interval r
@@ -145,3 +157,7 @@ instance Real r => Module r (Interval r) where
       f (Just (incl,val)) = Just (incl, c * val)
 
 instance (Real r, Fractional r) => Linear r (Interval r)
+
+appPrec, appPrec1 :: Int
+appPrec = 10
+appPrec1 = appPrec + 1
