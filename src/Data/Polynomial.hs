@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, TypeSynonymInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Polynomial
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, TypeSynonymInstances)
 --
 -- Polynomials
 --
@@ -130,7 +130,7 @@ newtype Polynomial k v = Polynomial (Map.Map (MonicMonomial v) k)
 -- | Univalent polynomials over commutative ring r
 type UPolynomial r = Polynomial r ()
 
-instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
+instance (Eq k, Num k, Ord v, Show v) => Num (Polynomial k v) where
   Polynomial m1 + Polynomial m2 = normalize $ Polynomial $ Map.unionWith (+) m1 m2
   Polynomial m1 * Polynomial m2 = normalize $ Polynomial $ Map.fromListWith (+)
       [ (xs1 `mmProd` xs2, c1*c2)
@@ -141,12 +141,12 @@ instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
   signum x = 1 -- OK?
   fromInteger x = constant (fromInteger x)
 
-instance (Eq k, Num k, Ord v) => Module k (Polynomial k v) where
+instance (Eq k, Num k, Ord v, Show v) => Module k (Polynomial k v) where
   k .*. p = constant k * p
   p .+. q = p + q
   lzero = 0
 
-instance (Eq k, Fractional k, Ord v) => Linear k (Polynomial k v)
+instance (Eq k, Fractional k, Ord v, Show v) => Linear k (Polynomial k v)
 
 instance (Show v, Ord v, Show k) => Show (Polynomial k v) where
   showsPrec d p  = showParen (d > 10) $
@@ -193,11 +193,11 @@ lookupCoeff :: Ord v => MonicMonomial v -> Polynomial k v -> Maybe k
 lookupCoeff xs (Polynomial m) = Map.lookup xs m
 
 -- | Formal derivative of polynomials
-deriv :: (Eq k, Num k, Ord v) => Polynomial k v -> v -> Polynomial k v
+deriv :: (Eq k, Num k, Ord v, Show v) => Polynomial k v -> v -> Polynomial k v
 deriv p x = sum [fromMonomial (monomialDeriv m x) | m <- terms p]
 
 -- | Formal integral of polynomials
-integral :: (Eq k, Fractional k, Ord v) => Polynomial k v -> v -> Polynomial k v
+integral :: (Eq k, Fractional k, Ord v, Show v) => Polynomial k v -> v -> Polynomial k v
 integral p x = sum [fromMonomial (monomialIntegral m x) | m <- terms p]
 
 -- | Evaluation or substitution
@@ -463,7 +463,9 @@ grevlex = (compare `on` mmDegree) `mappend` revlex
 --------------------------------------------------------------------}
 
 -- | Multivariate division algorithm
-reduce  :: (Eq k, Fractional k, Ord v) => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> Polynomial k v
+reduce
+  :: (Eq k, Fractional k, Ord v, Show v)
+  => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> Polynomial k v
 reduce cmp p fs = go p
   where
     ls = [(leadingTerm cmp f, f) | f <- fs]
@@ -476,7 +478,9 @@ reduce cmp p fs = go p
           guard $ monomialDivisible h a
           return (g - fromMonomial (monomialDiv h a) * f)
 
-spolynomial :: (Eq k, Fractional k, Ord v) => MonomialOrder v -> Polynomial k v -> Polynomial k v -> Polynomial k v
+spolynomial
+  :: (Eq k, Fractional k, Ord v, Show v)
+  => MonomialOrder v -> Polynomial k v -> Polynomial k v -> Polynomial k v
 spolynomial cmp f g =
       fromMonomial ((1,xs) `monomialDiv` (c1,xs1)) * f
     - fromMonomial ((1,xs) `monomialDiv` (c2,xs2)) * g
@@ -485,7 +489,9 @@ spolynomial cmp f g =
     (c1, xs1) = leadingTerm cmp f
     (c2, xs2) = leadingTerm cmp g
 
-buchberger :: forall k v. (Eq k, Fractional k, Ord k, Ord v) => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
+buchberger
+  :: forall k v. (Eq k, Fractional k, Ord k, Ord v, Show v)
+  => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
 buchberger cmp fs = reduceGBase cmp $ go fs (pairs fs)
   where  
     go :: [Polynomial k v] -> [(Polynomial k v, Polynomial k v)] -> [Polynomial k v]
@@ -497,7 +503,9 @@ buchberger cmp fs = reduceGBase cmp $ go fs (pairs fs)
         spoly = spolynomial cmp fi fj
         r = reduce cmp spoly gs
 
-reduceGBase :: forall k v. (Eq k, Ord k, Fractional k, Ord v) => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
+reduceGBase
+  :: forall k v. (Eq k, Ord k, Fractional k, Ord v, Show v)
+  => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
 reduceGBase cmp ps = Set.toList $ Set.fromList $ go ps []
   where
     go [] qs = qs
