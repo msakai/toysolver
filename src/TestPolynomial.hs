@@ -467,23 +467,23 @@ case_sturmChain = sturmChain p0 @?= chain
     chain = [p0, p1, p2, p3]
 
 -- http://mathworld.wolfram.com/SturmFunction.html
-case_numberOfDistinctRealRoots_1 =
+case_numRoots_1 =
   sequence_
-  [ numberOfDistinctRealRoots p (-2,0)      @?= 2
-  , numberOfDistinctRealRoots p (0,2)       @?= 1
-  , numberOfDistinctRealRoots p (-1.5,-1.0) @?= 1
-  , numberOfDistinctRealRoots p (-0.5,0)    @?= 1
-  , numberOfDistinctRealRoots p (1,1.5)     @?= 1
+  [ numRoots p (-2,0)      @?= 2
+  , numRoots p (0,2)       @?= 1
+  , numRoots p (-1.5,-1.0) @?= 1
+  , numRoots p (-0.5,0)    @?= 1
+  , numRoots p (1,1.5)     @?= 1
   ]
   where
     x = var ()
     p = x^5 - 3*x - 1
 
 -- intervals are interpreted as half-open intervals.
-case_numberOfDistinctRealRoots_2 =
+case_numRoots_2 =
   sequence_
-  [ numberOfDistinctRealRoots p (2,3) @?= 0
-  , numberOfDistinctRealRoots p (1,2) @?= 1
+  [ numRoots p (2,3) @?= 0
+  , numRoots p (1,2) @?= 1
   ]
   where
     x = var ()
