@@ -15,6 +15,7 @@ Extra-Source-Files:
    src/ContiTraverso.hs
    src/Data/Polynomial.hs
    src/Data/Polynomial/FactorZ.hs
+   src/Data/Polynomial/Graeffe.hs
    src/Data/Polynomial/Lagrange.hs
    src/Data/Polynomial/Sturm.hs
    src/Data/AlgebraicNumber.hs
