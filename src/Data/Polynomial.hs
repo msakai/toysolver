@@ -52,9 +52,11 @@ module Data.Polynomial
   , integral
   , eval
   , evalM
+  , subst
   , isRootOf
   , mapVar
   , mapCoeff
+  , toMonic
   , toZ
   , polyDiv
   , polyMod
@@ -201,7 +203,7 @@ deriv p x = sum [fromMonomial (monomialDeriv m x) | m <- terms p]
 integral :: (Eq k, Fractional k, Ord v, Show v) => Polynomial k v -> v -> Polynomial k v
 integral p x = sum [fromMonomial (monomialIntegral m x) | m <- terms p]
 
--- | Evaluation or substitution
+-- | Evaluation
 eval :: (Num k, Ord v) => (v -> k) -> Polynomial k v -> k
 eval env p = sum [c * product [(env x) ^ n | (x,n) <- mmToList xs] | (c,xs) <- terms p]
 
@@ -212,6 +214,11 @@ evalM env p = do
     rs <- mapM (\(x,n) -> liftM (^ n) (env x)) (mmToList xs)
     return (c * product rs)
 
+-- | Substitution or bind
+subst :: (Num k, Eq k, Ord v1, Ord v2, Show v2) => Polynomial k v1 -> (v1 -> Polynomial k v2) -> Polynomial k v2
+subst p s =
+  sum [constant c * product [(s x)^n | (x,n) <- mmToList xs] | (c, xs) <- terms p]
+
 isRootOf :: (Num k, Eq k) => k -> UPolynomial k -> Bool
 isRootOf x p = eval (\_ -> x) p == 0
 
@@ -220,6 +227,13 @@ mapVar f (Polynomial m) = normalize $ Polynomial $ Map.mapKeysWith (+) (mmMapVar
 
 mapCoeff :: (Eq k1, Num k1, Ord v) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
 mapCoeff f (Polynomial m) = normalize $ Polynomial $ Map.map f m
+
+toMonic :: (Real r, Fractional r, Ord v) => Polynomial r v -> Polynomial r v
+toMonic p
+  | c == 0 = p
+  | otherwise = mapCoeff (/c) p
+  where
+    (c,_) = leadingTerm grlex p
 
 toZ :: (Real r, Ord v) => Polynomial r v -> Polynomial Integer v
 toZ p = fromTerms [(numerator (c * fromInteger s), xs) | (c,xs) <- ts]
