@@ -205,19 +205,19 @@ integral p x = sum [fromMonomial (monomialIntegral m x) | m <- terms p]
 
 -- | Evaluation
 eval :: (Num k, Ord v) => (v -> k) -> Polynomial k v -> k
-eval env p = sum [c * product [(env x) ^ n | (x,n) <- mmToList xs] | (c,xs) <- terms p]
+eval env p = sum [c * product [(env x) ^ e | (x,e) <- mmToList xs] | (c,xs) <- terms p]
 
 -- | Monadic evaluation
 evalM :: (Num k, Ord v, Monad m) => (v -> m k) -> Polynomial k v -> m k
 evalM env p = do
   liftM sum $ forM (terms p) $ \(c,xs) -> do
-    rs <- mapM (\(x,n) -> liftM (^ n) (env x)) (mmToList xs)
+    rs <- mapM (\(x,e) -> liftM (^ e) (env x)) (mmToList xs)
     return (c * product rs)
 
 -- | Substitution or bind
 subst :: (Num k, Eq k, Ord v1, Ord v2, Show v2) => Polynomial k v1 -> (v1 -> Polynomial k v2) -> Polynomial k v2
 subst p s =
-  sum [constant c * product [(s x)^n | (x,n) <- mmToList xs] | (c, xs) <- terms p]
+  sum [constant c * product [(s x)^e | (x,e) <- mmToList xs] | (c, xs) <- terms p]
 
 isRootOf :: (Num k, Eq k) => k -> UPolynomial k -> Bool
 isRootOf x p = eval (\_ -> x) p == 0
@@ -259,7 +259,7 @@ renderWith s2 p =
     [] -> "0"
     (c,xs):ts -> f c xs ++ concat [if isNegativeCoeff c then " - " ++ (f (-c) xs) else " + " ++ f c xs | (c,xs) <- ts]
   where
-    f c xs = (intercalate "*" ([renderCoeff 8 c "" | c /= 1 || null (mmToList xs)] ++ [g x n | (x,n) <- mmToList xs]))
+    f c xs = (intercalate "*" ([renderCoeff 8 c "" | c /= 1 || null (mmToList xs)] ++ [g x e | (x,e) <- mmToList xs]))
     g x 1 = s2 8 x ""
     g x n = s2 9 x "" ++ "^" ++ show n
 
@@ -388,7 +388,9 @@ mmOne :: MonicMonomial v
 mmOne = MonicMonomial $ Map.empty
 
 mmFromList :: Ord v => [(v, Integer)] -> MonicMonomial v
-mmFromList xs = MonicMonomial $ Map.fromListWith (+) [(x, n) | (x,n) <- xs, n > 0]
+mmFromList xs
+  | any (\(x,e) -> 0>e) xs = error "mmFromList: negative exponent"
+  | otherwise = MonicMonomial $ Map.fromListWith (+) [(x,e) | (x,e) <- xs, e > 0]
 
 mmToList :: Ord v => MonicMonomial v -> [(v, Integer)]
 mmToList (MonicMonomial m) = Map.toAscList m

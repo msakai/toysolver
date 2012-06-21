@@ -23,6 +23,7 @@ module Data.Polynomial.Sturm
   , numRoots'
   , numRoots''
   , separate
+  , separate'
   , narrow
   , narrow'
   , approx
@@ -33,8 +34,6 @@ import Data.Maybe
 import Data.Polynomial
 import qualified Data.Interval as Interval
 import Data.Interval (Interval)
-
-import Debug.Trace
 
 type SturmChain = [UPolynomial Rational]
 
@@ -65,7 +64,7 @@ numRoots' chain (a,b)
   | a < b     = n a - n b
   | otherwise = error $ "numRoots': \"" ++ show a ++ " < " ++ show b ++ "\" failed"
   where
-    n x = countSignChanges [eval (\() -> x) q | q <- chain]
+    n x = countSignChanges [eval (\_ -> x) q | q <- chain]
 
 -- | the number of distinct real roots of p in a given interval
 numRoots''
@@ -117,14 +116,19 @@ boundInterval p ival = Interval.intersection ival (Interval.closedInterval lb ub
     (lb,ub) = bounds p
 
 -- disjoint intervals each of which contains exactly one real roots.
+-- The intervals can be further narrowed by 'narrow'.
 separate :: UPolynomial Rational -> [Interval Rational]
-separate p = f (bounds p)
+separate p = separate' (sturmChain p)
+
+-- disjoint intervals each of which contains exactly one real roots.
+-- The intervals can be further narrowed by 'narrow'.
+separate' :: SturmChain -> [Interval Rational]
+separate' chain@(p:_) = f (bounds p)
   where
-    chain = sturmChain p
     n x = countSignChanges [eval (\() -> x) q | q <- chain]
 
     f (lb,ub) =
-      if eval (\() -> lb) p == 0
+      if lb `isRootOf` p
       then Interval.singleton lb : g (lb,ub)
       else g (lb,ub)
     
@@ -137,19 +141,19 @@ separate p = f (bounds p)
         mid = (lb + ub) / 2
 
 narrow :: UPolynomial Rational -> Interval Rational -> Rational -> Interval Rational
-narrow p ival epsilon = narrow' (sturmChain p) ival epsilon
+narrow p ival size = narrow' (sturmChain p) ival size
 
 narrow' :: SturmChain -> Interval Rational -> Rational -> Interval Rational
-narrow' chain@(p:_) ival epsilon = go (boundInterval p ival)
+narrow' chain@(p:_) ival size = go (boundInterval p ival)
   where
     go ival
-      | size < epsilon = ival
+      | s < size = ival
       | numRoots'' chain ivalL > 0 = go ivalL
       | otherwise = go ivalR -- numRoots'' chain ivalR > 0
       where
         (_,lb) = fromJust $ Interval.lowerBound ival
         (_,ub) = fromJust $ Interval.upperBound ival
-        size = ub - lb
+        s = ub - lb
         mid = (lb + ub) / 2
         ivalL = Interval.interval (Interval.lowerBound ival) (Just (True,mid))
         ivalR = Interval.interval (Just (False,mid)) (Interval.upperBound ival)
@@ -158,5 +162,4 @@ approx :: UPolynomial Rational -> Interval Rational -> Rational -> Rational
 approx p = approx' (sturmChain p)
 
 approx' :: SturmChain -> Interval Rational -> Rational -> Rational
-approx' chain ival epsilon = fromJust $ Interval.pickup $ narrow' chain ival (epsilon / 2)
-
+approx' chain ival epsilon = fromJust $ Interval.pickup $ narrow' chain ival epsilon
