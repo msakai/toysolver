@@ -101,7 +101,7 @@ addConstraint c = do
     Ge -> do
       v1 <- gensym -- surplus variable
       v2 <- gensym -- artificial variable
-      putTableau $ Simplex.setRow v2 tbl (LA.coeffMap (e .-. LA.varExpr v1), b)
+      putTableau $ Simplex.setRow v2 tbl (LA.coeffMap (e .-. LA.var v1), b)
       addArtificialVariable v2
     Eql -> do
       v <- gensym -- artificial variable
@@ -159,7 +159,7 @@ tableau cs = do
   forM_ (IS.toList fvs) $ \v -> do
     v1 <- gensym
     v2 <- gensym
-    define v (LA.varExpr v1 .-. LA.varExpr v2)
+    define v (LA.var v1 .-. LA.var v2)
   mapM_ addConstraint cs'
 
 getModel :: Fractional r => VarSet -> LP r (Model r)

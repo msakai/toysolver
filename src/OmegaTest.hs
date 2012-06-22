@@ -86,7 +86,7 @@ leZ e1 e2 = Nonneg (LA.mapCoeff (`div` d) e)
   where
     e = e2 .-. e1
     d = abs $ gcd' [c | (c,v) <- LA.terms e, v /= LA.unitVar]
-ltZ e1 e2 = (e1 .+. LA.constExpr 1) `leZ` e2
+ltZ e1 e2 = (e1 .+. LA.constant 1) `leZ` e2
 geZ = flip leZ
 gtZ = flip gtZ
 
@@ -117,7 +117,7 @@ collectBoundsZ :: Var -> [Lit] -> (BoundsZ,[Lit])
 collectBoundsZ v = foldr phi (([],[]),[])
   where
     phi :: Lit -> (BoundsZ,[Lit]) -> (BoundsZ,[Lit])
-    phi (Pos t) x = phi (Nonneg (t .-. LA.constExpr 1)) x
+    phi (Pos t) x = phi (Nonneg (t .-. LA.constant 1)) x
     phi lit@(Nonneg t) ((ls,us),xs) =
       case LA.extract v t of
         (c,t') -> 
@@ -133,7 +133,7 @@ boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $
     else cond1 : cond2
   where
      cond1 =
-       [ LA.constExpr ((a-1)*(b-1)) `leZ` (a .*. d .-. b .*. c)
+       [ LA.constant ((a-1)*(b-1)) `leZ` (a .*. d .-. b .*. c)
        | (c,a)<-ls , (d,b)<-us ]
      cond2 = 
        [ [(a' .*. c) `leZ` (a .*. val) | (c,a)<-ls] ++
@@ -142,7 +142,7 @@ boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $
        , let m = maximum [b | (_,b)<-us]
        ,  (c',a') <- ls
        , k <- [0 .. (m*a'-a'-m) `div` m]
-       , let val = c' .+. LA.constExpr k
+       , let val = c' .+. LA.constant k
        -- x = val / a'
        -- c / a ≤ x ⇔ c / a ≤ val / a' ⇔ a' c ≤ a val
        -- x ≤ d / b ⇔ val / a' ≤ d / b ⇔ b val ≤ a' d
@@ -277,13 +277,13 @@ test1 = c1 .&&. c2 .&&. c3 .&&. c4
 test1' :: [LA.Atom Rational]
 test1' = [c1, c2] ++ c3 ++ c4
   where
-    x = LA.varExpr 0
-    y = LA.varExpr 1
-    z = LA.varExpr 2
-    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. LA.constExpr 17
-    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. LA.constExpr 7
-    c3 = [LA.constExpr 1 .<=. x, x .<=. LA.constExpr 40]
-    c4 = [LA.constExpr (-50) .<=. y, y .<=. LA.constExpr 50]
+    x = LA.var 0
+    y = LA.var 1
+    z = LA.var 2
+    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. LA.constant 17
+    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. LA.constant 7
+    c3 = [LA.constant 1 .<=. x, x .<=. LA.constant 40]
+    c4 = [LA.constant (-50) .<=. y, y .<=. LA.constant 50]
 
 {-
 27 ≤ 11x+13y ≤ 45

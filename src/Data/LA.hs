@@ -17,14 +17,24 @@ module Data.LA
 
   -- * Expression of linear arithmetics
   , Expr
+
+  -- * Conversion
+  , var
+  , constant
   , terms
   , fromTerms
   , coeffMap
   , fromCoeffMap
   , unitVar
   , asConst
-  , varExpr
-  , constExpr
+
+  -- * Query
+  , coeff
+  , lookupCoeff
+  , extract
+  , extractMaybe  
+
+  -- * Operations
   , mapCoeff
   , mapCoeffWithVar
   , evalExpr
@@ -32,10 +42,6 @@ module Data.LA
   , lift1
   , applySubst
   , applySubst1
-  , coeff
-  , lookupCoeff
-  , extract
-  , extractMaybe
   , showExpr
 
   -- * Atomic formula of linear arithmetics
@@ -115,12 +121,12 @@ normalizeExpr :: (Num r, Eq r) => Expr r -> Expr r
 normalizeExpr (Expr t) = Expr $ IM.filter (0/=) t
 
 -- | variable
-varExpr :: Num r => Var -> Expr r
-varExpr v = Expr $ IM.singleton v 1
+var :: Num r => Var -> Expr r
+var v = Expr $ IM.singleton v 1
 
 -- | constant
-constExpr :: (Num r, Eq r) => r -> Expr r
-constExpr c = normalizeExpr $ Expr $ IM.singleton unitVar c
+constant :: (Num r, Eq r) => r -> Expr r
+constant c = normalizeExpr $ Expr $ IM.singleton unitVar c
 
 -- | map coefficients.
 mapCoeff :: (Num b, Eq b) => (a -> b) -> Expr a -> Expr b
@@ -173,7 +179,7 @@ applySubst s (Expr m) = lsum (map f (IM.toList m))
     f (v,c) = c .*. (
       case IM.lookup v s of
         Just tm -> tm
-        Nothing -> varExpr v)
+        Nothing -> var v)
 
 -- | applySubst1 x e e1 == e1[e/x]
 applySubst1 :: (Num r, Eq r) => Var -> Expr r -> Expr r -> Expr r
@@ -278,8 +284,8 @@ computeInterval b = lift1 (singleton 1) (b IM.!)
 -----------------------------------------------------------------------------
 
 compileExpr :: (Real r, Fractional r) => Expr.Expr r -> Maybe (Expr r)
-compileExpr (Expr.Const c) = return (constExpr c)
-compileExpr (Expr.Var c) = return (varExpr c)
+compileExpr (Expr.Const c) = return (constant c)
+compileExpr (Expr.Var c) = return (var c)
 compileExpr (a Expr.:+: b) = liftM2 (.+.) (compileExpr a) (compileExpr b)
 compileExpr (a Expr.:*: b) = do
   x <- compileExpr a

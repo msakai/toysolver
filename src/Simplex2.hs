@@ -724,7 +724,7 @@ pivot :: SolverValue v => GenericSolver v -> Var -> Var -> IO ()
 pivot solver xi xj = do
   modifyIORef' (svNPivot solver) (+1)
   modifyIORef' (svTableau solver) $ \defs ->
-    case LA.solveFor (LA.Atom (LA.varExpr xi) F.Eql (defs IM.! xi)) xj of
+    case LA.solveFor (LA.Atom (LA.var xi) F.Eql (defs IM.! xi)) xj of
       Just (F.Eql, xj_def) ->
         IM.insert xj xj_def . IM.map (LA.applySubst1 xj xj_def) . IM.delete xi $ defs
       _ -> error "pivot: should not happen"
@@ -887,7 +887,7 @@ test4 = do
   x0 <- newVar solver
   x1 <- newVar solver
 
-  writeIORef (svTableau solver) (IM.fromList [(x1, LA.varExpr x0)])
+  writeIORef (svTableau solver) (IM.fromList [(x1, LA.var x0)])
   writeIORef (svLB solver) (IM.fromList [(x0, toValue 0), (x1, toValue 0)])
   writeIORef (svUB solver) (IM.fromList [(x0, toValue 2), (x1, toValue 3)])
   setObj solver (LA.fromTerms [(-1, x0)])
@@ -903,7 +903,7 @@ test5 = do
   x0 <- newVar solver
   x1 <- newVar solver
 
-  writeIORef (svTableau solver) (IM.fromList [(x1, LA.varExpr x0)])
+  writeIORef (svTableau solver) (IM.fromList [(x1, LA.var x0)])
   writeIORef (svLB solver) (IM.fromList [(x0, toValue 0), (x1, toValue 0)])
   writeIORef (svUB solver) (IM.fromList [(x0, toValue 2), (x1, toValue 0)])
   setObj solver (LA.fromTerms [(-1, x0)])
@@ -920,8 +920,8 @@ test6 = do
   setLogger solver putStrLn
   x0 <- newVar solver
 
-  assertAtom solver (LA.constExpr 1 .<. LA.varExpr x0)
-  assertAtom solver (LA.constExpr 2 .>. LA.varExpr x0)
+  assertAtom solver (LA.constant 1 .<. LA.var x0)
+  assertAtom solver (LA.constant 2 .>. LA.var x0)
 
   ret <- check solver
   print ret

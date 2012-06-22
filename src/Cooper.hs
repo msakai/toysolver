@@ -63,7 +63,7 @@ atomZ op a b = do
     NEq -> liftM notF (atomZ Eql a b)
 
 leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
-leZ e1 e2 = e1 `ltZ` (e2 .+. LA.constExpr 1)
+leZ e1 e2 = e1 `ltZ` (e2 .+. LA.constant 1)
 ltZ e1 e2 = Pos $ (e2 .-. e1)
 geZ = flip leZ
 gtZ = flip gtZ
@@ -88,7 +88,7 @@ instance Variables Lit where
   vars (Divisible _ _ t) = vars t
 
 instance Complement Lit where
-  notF (Pos e) = e `leZ` LA.constExpr 0
+  notF (Pos e) = e `leZ` LA.constant 0
   notF (Divisible b c e) = Divisible (not b) c e
 
 -- | quantifier-free negation normal form
@@ -150,7 +150,7 @@ simplifyLit lit@(Pos e) =
       -- e > 0  <=>  e - 1 >= 0
       -- <=>  LA.mapCoeff (`div` d) (e - 1) >= 0
       -- <=>  LA.mapCoeff (`div` d) (e - 1) + 1 > 0
-      Lit $ Pos $ LA.mapCoeff (`div` d) (e .-. LA.constExpr 1) .+. LA.constExpr 1
+      Lit $ Pos $ LA.mapCoeff (`div` d) (e .-. LA.constant 1) .+. LA.constant 1
   where
     d = if null cs then 1 else abs $ foldl1' gcd cs
     cs = [c | (c,x) <- LA.terms e, x /= LA.unitVar]
@@ -189,7 +189,7 @@ eliminateZ' x formula = case1 ++ case2
     -- 式をスケールしてxの係数の絶対値をcへと変換し、その後cxをxで置き換え、
     -- xがcで割り切れるという制約を追加した論理式
     formula1 :: Formula'
-    formula1 = simplify $ f formula .&&. Lit (Divisible True c (LA.varExpr x))
+    formula1 = simplify $ f formula .&&. Lit (Divisible True c (LA.var x))
       where
         f :: Formula' -> Formula'
         f T' = T'
@@ -244,7 +244,7 @@ eliminateZ' x formula = case1 ++ case2
     -- formula1を真にする最小のxが存在する場合
     case1 :: [(Formula', Witness)]
     case1 = [ (subst1 x e formula1, WCase1 c e)
-            | j <- [1..delta], t <- ts, let e = t .+. LA.constExpr j ]
+            | j <- [1..delta], t <- ts, let e = t .+. LA.constant j ]
 
     -- formula1のなかの x < t を真に t < x を偽に置き換えた論理式
     formula2 :: Formula'
@@ -282,7 +282,7 @@ eliminateZ' x formula = case1 ++ case2
 
     -- formula1を真にする最小のxが存在しない場合
     case2 :: [(Formula', Witness)]
-    case2 = [(subst1 x (LA.constExpr j) formula2, WCase2 c j delta us) | j <- [1..delta]]
+    case2 = [(subst1 x (LA.constant j) formula2, WCase2 c j delta us) | j <- [1..delta]]
 
 evalWitness :: Model Integer -> Witness -> Integer
 evalWitness model (WCase1 c e) = LA.evalExpr model e `div` c
@@ -358,8 +358,8 @@ solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dn
           return $ IM.insert v val model
 
     f :: FM.Lit -> Formula'
-    f (FM.Nonneg e) = Lit $ e `geZ` (LA.constExpr 0)
-    f (FM.Pos e)    = Lit $ e `gtZ` (LA.constExpr 0)
+    f (FM.Nonneg e) = Lit $ e `geZ` (LA.constant 0)
+    f (FM.Pos e)    = Lit $ e `gtZ` (LA.constant 0)
 
 -- ---------------------------------------------------------------------------
 
@@ -409,7 +409,7 @@ test2' = Exists 0 $ Exists 1 $ test2
 testHagiya :: Formula'
 testHagiya = eliminateZ 1 $ c1 .&&. c2 .&&. c3
   where
-    [x,y,z] = map LA.varExpr [1..3]
+    [x,y,z] = map LA.var [1..3]
     c1 = Lit $ x `ltZ` (y .+. y)   -- x < y+y
     c2 = Lit $ z `ltZ` x           -- z < x
     c3 = Lit $ Divisible True 3 x  -- 3 | x
@@ -427,11 +427,11 @@ Or' (And' (Lit (Pos (Expr {coeffMap = fromList [(-1,-1),(2,2),(3,-1)]}))) (Lit (
 test3 :: Formula'
 test3 = eliminateZ 1 (andF [p1,p2,p3,p4])
   where
-    x = LA.varExpr 0
-    y = LA.varExpr 1
+    x = LA.var 0
+    y = LA.var 1
     p1 = Lit $ Pos y
     p2 = Lit $ Pos (y .-. 2 .*. x)
-    p3 = Lit $ Pos (x .+. LA.constExpr 2 .-. y)
+    p3 = Lit $ Pos (x .+. LA.constant 2 .-. y)
     p4 = Lit $ Divisible True 2 y
 
 {-

@@ -98,8 +98,8 @@ atomR op a b = do
     NEq -> DNF [[a' `ltR` b'], [a' `gtR` b']]
 
 termR :: Expr Rational -> Maybe Rat
-termR (Const c) = return (LA.constExpr (numerator c), denominator c)
-termR (Var v) = return (LA.varExpr v, 1)
+termR (Const c) = return (LA.constant (numerator c), denominator c)
+termR (Var v) = return (LA.var v, 1)
 termR (a :+: b) = do
   (t1,c1) <- termR a
   (t2,c2) <- termR b
@@ -273,13 +273,13 @@ test1 = c1 .&&. c2 .&&. c3 .&&. c4
 test1' :: [LA.Atom Rational]
 test1' = [c1, c2] ++ c3 ++ c4
   where
-    x = LA.varExpr 0
-    y = LA.varExpr 1
-    z = LA.varExpr 2
-    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. LA.constExpr 17
-    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. LA.constExpr 7
-    c3 = [LA.constExpr 1 .<=. x, x .<=. LA.constExpr 40]
-    c4 = [LA.constExpr (-50) .<=. y, y .<=. LA.constExpr 50]
+    x = LA.var 0
+    y = LA.var 1
+    z = LA.var 2
+    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. LA.constant 17
+    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. LA.constant 7
+    c3 = [LA.constant 1 .<=. x, x .<=. LA.constant 40]
+    c4 = [LA.constant (-50) .<=. y, y .<=. LA.constant 50]
 
 {-
 27 ≤ 11x+13y ≤ 45

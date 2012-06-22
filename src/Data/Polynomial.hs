@@ -37,9 +37,11 @@ module Data.Polynomial
   -- * Conversion
   , var
   , constant
-  , fromTerms
-  , fromMonomial
   , terms
+  , fromTerms
+  , coeffMap
+  , fromCoeffMap
+  , fromMonomial
 
   -- * Query
   , leadingTerm
@@ -127,7 +129,7 @@ import Data.Linear
 --------------------------------------------------------------------}
 
 -- | Polynomial over commutative ring r
-newtype Polynomial k v = Polynomial (Map.Map (MonicMonomial v) k)
+newtype Polynomial k v = Polynomial{ coeffMap :: Map.Map (MonicMonomial v) k }
   deriving (Eq, Ord)
 
 -- | Univalent polynomials over commutative ring r
@@ -169,6 +171,9 @@ constant c = fromMonomial (c, mmOne)
 -- | construct a polynomial from a list of monomials
 fromTerms :: (Eq k, Num k, Ord v) => [Monomial k v] -> Polynomial k v
 fromTerms = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
+
+fromCoeffMap :: (Eq k, Num k, Ord v) => Map.Map (MonicMonomial v) k -> Polynomial k v
+fromCoeffMap m = normalize $ Polynomial m
 
 -- | construct a polynomial from a monomial
 fromMonomial :: (Eq k, Num k, Ord v) => Monomial k v -> Polynomial k v

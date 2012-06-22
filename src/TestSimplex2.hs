@@ -20,12 +20,12 @@ case_test1 = do
   x <- newVar solver
   y <- newVar solver
   z <- newVar solver
-  assertAtom solver (LA.fromTerms [(7,x), (12,y), (31,z)] .==. LA.constExpr 17)
-  assertAtom solver (LA.fromTerms [(3,x), (5,y), (14,z)]  .==. LA.constExpr 7)
-  assertAtom solver (LA.varExpr x .>=. LA.constExpr 1)
-  assertAtom solver (LA.varExpr x .<=. LA.constExpr 40)
-  assertAtom solver (LA.varExpr y .>=. LA.constExpr (-50))
-  assertAtom solver (LA.varExpr y .<=. LA.constExpr 50)
+  assertAtom solver (LA.fromTerms [(7,x), (12,y), (31,z)] .==. LA.constant 17)
+  assertAtom solver (LA.fromTerms [(3,x), (5,y), (14,z)]  .==. LA.constant 7)
+  assertAtom solver (LA.var x .>=. LA.constant 1)
+  assertAtom solver (LA.var x .<=. LA.constant 40)
+  assertAtom solver (LA.var y .>=. LA.constant (-50))
+  assertAtom solver (LA.var y .<=. LA.constant 50)
 
   ret <- check solver
   ret @?= True
@@ -45,10 +45,10 @@ case_test2 = do
   solver <- newSolver
   x <- newVar solver
   y <- newVar solver
-  assertAtom solver (LA.fromTerms [(11,x), (13,y)] .>=. LA.constExpr 27)
-  assertAtom solver (LA.fromTerms [(11,x), (13,y)] .<=. LA.constExpr 45)
-  assertAtom solver (LA.fromTerms [(7,x), (-9,y)] .>=. LA.constExpr (-10))
-  assertAtom solver (LA.fromTerms [(7,x), (-9,y)] .<=. LA.constExpr 4)
+  assertAtom solver (LA.fromTerms [(11,x), (13,y)] .>=. LA.constant 27)
+  assertAtom solver (LA.fromTerms [(11,x), (13,y)] .<=. LA.constant 45)
+  assertAtom solver (LA.fromTerms [(7,x), (-9,y)] .>=. LA.constant (-10))
+  assertAtom solver (LA.fromTerms [(7,x), (-9,y)] .<=. LA.constant 4)
 
   ret <- check solver
   ret @?= True
@@ -87,16 +87,16 @@ case_test3 = do
 
   setObj solver (LA.fromTerms [(-1,x1), (-2,x2), (-3,x3), (-1,x4)])
 
-  assertAtom solver (LA.fromTerms [(-1,x1), (1,x2), (1,x3), (10,x4)] .<=. LA.constExpr 20)
-  assertAtom solver (LA.fromTerms [(1,x1), (-3,x2), (1,x3)] .<=. LA.constExpr 30)
-  assertAtom solver (LA.fromTerms [(1,x2), (-3.5,x4)] .==. LA.constExpr 0)
+  assertAtom solver (LA.fromTerms [(-1,x1), (1,x2), (1,x3), (10,x4)] .<=. LA.constant 20)
+  assertAtom solver (LA.fromTerms [(1,x1), (-3,x2), (1,x3)] .<=. LA.constant 30)
+  assertAtom solver (LA.fromTerms [(1,x2), (-3.5,x4)] .==. LA.constant 0)
 
-  assertAtom solver (LA.fromTerms [(1,x1)] .>=. LA.constExpr 0)
-  assertAtom solver (LA.fromTerms [(1,x1)] .<=. LA.constExpr 40)
-  assertAtom solver (LA.fromTerms [(1,x2)] .>=. LA.constExpr 0)
-  assertAtom solver (LA.fromTerms [(1,x3)] .>=. LA.constExpr 0)
-  assertAtom solver (LA.fromTerms [(1,x4)] .>=. LA.constExpr 2)
-  assertAtom solver (LA.fromTerms [(1,x4)] .<=. LA.constExpr 3)
+  assertAtom solver (LA.fromTerms [(1,x1)] .>=. LA.constant 0)
+  assertAtom solver (LA.fromTerms [(1,x1)] .<=. LA.constant 40)
+  assertAtom solver (LA.fromTerms [(1,x2)] .>=. LA.constant 0)
+  assertAtom solver (LA.fromTerms [(1,x3)] .>=. LA.constant 0)
+  assertAtom solver (LA.fromTerms [(1,x4)] .>=. LA.constant 2)
+  assertAtom solver (LA.fromTerms [(1,x4)] .<=. LA.constant 3)
 
   ret1 <- check solver
   ret1 @?= True
@@ -127,8 +127,8 @@ case_test6 = do
   assertLower solver x1 0
   assertLower solver x2 0
   assertLower solver x3 0
-  assertAtom solver (LA.fromTerms [(1,x1),(2,x2),(3,x3)] .>=. LA.constExpr 5)
-  assertAtom solver (LA.fromTerms [(2,x1),(2,x2),(1,x3)] .>=. LA.constExpr 6)
+  assertAtom solver (LA.fromTerms [(1,x1),(2,x2),(3,x3)] .>=. LA.constant 5)
+  assertAtom solver (LA.fromTerms [(2,x1),(2,x2),(1,x3)] .>=. LA.constant 6)
 
   setObj solver (LA.fromTerms [(3,x1),(4,x2),(5,x3)])
   setOptDir solver OptMin
@@ -164,8 +164,8 @@ case_test7 = do
   assertLower solver x1 0
   assertLower solver x2 0
   assertLower solver x3 0
-  assertAtom solver (LA.fromTerms [(-1,x1),(-2,x2),(-3,x3)] .<=. LA.constExpr (-5))
-  assertAtom solver (LA.fromTerms [(-2,x1),(-2,x2),(-1,x3)] .<=. LA.constExpr (-6))
+  assertAtom solver (LA.fromTerms [(-1,x1),(-2,x2),(-3,x3)] .<=. LA.constant (-5))
+  assertAtom solver (LA.fromTerms [(-2,x1),(-2,x2),(-1,x3)] .<=. LA.constant (-6))
 
   setObj solver (LA.fromTerms [(-3,x1),(-4,x2),(-5,x3)])
   setOptDir solver OptMax
@@ -182,25 +182,25 @@ case_AssertAtom :: IO ()
 case_AssertAtom = do
   solver <- newSolver
   x0 <- newVar solver
-  assertAtom solver (LA.constExpr 1 .<=. LA.varExpr x0)
+  assertAtom solver (LA.constant 1 .<=. LA.var x0)
   ret <- getLB solver x0
   ret @?= Just 1
 
   solver <- newSolver
   x0 <- newVar solver
-  assertAtom solver (LA.varExpr x0 .>=. LA.constExpr 1)
+  assertAtom solver (LA.var x0 .>=. LA.constant 1)
   ret <- getLB solver x0
   ret @?= Just 1
 
   solver <- newSolver
   x0 <- newVar solver
-  assertAtom solver (LA.constExpr 1 .>=. LA.varExpr x0)
+  assertAtom solver (LA.constant 1 .>=. LA.var x0)
   ret <- getUB solver x0
   ret @?= Just 1
 
   solver <- newSolver
   x0 <- newVar solver
-  assertAtom solver (LA.varExpr x0 .<=. LA.constExpr 1)
+  assertAtom solver (LA.var x0 .<=. LA.constant 1)
   ret <- getUB solver x0
   ret @?= Just 1
 
@@ -212,12 +212,12 @@ case_example_3_2 = do
   setOptDir solver OptMax
   setObj solver $ LA.fromTerms [(3,x1), (2,x2), (3,x3)]
   mapM_ (assertAtom solver) $
-    [ LA.fromTerms [(2,x1), (1,x2), (1,x3)] .<=. LA.constExpr 2
-    , LA.fromTerms [(1,x1), (2,x2), (3,x3)] .<=. LA.constExpr 5
-    , LA.fromTerms [(2,x1), (2,x2), (1,x3)] .<=. LA.constExpr 6
-    , LA.varExpr x1 .>=. LA.constExpr 0
-    , LA.varExpr x2 .>=. LA.constExpr 0
-    , LA.varExpr x3 .>=. LA.constExpr 0
+    [ LA.fromTerms [(2,x1), (1,x2), (1,x3)] .<=. LA.constant 2
+    , LA.fromTerms [(1,x1), (2,x2), (3,x3)] .<=. LA.constant 5
+    , LA.fromTerms [(2,x1), (2,x2), (1,x3)] .<=. LA.constant 6
+    , LA.var x1 .>=. LA.constant 0
+    , LA.var x2 .>=. LA.constant 0
+    , LA.var x3 .>=. LA.constant 0
     ]
 
   ret <- optimize solver defaultOptions
@@ -235,13 +235,13 @@ case_example_3_5 = do
   setOptDir solver OptMin
   setObj solver $ LA.fromTerms [(-2,x1), (4,x2), (7,x3), (1,x4), (5,x5)]
   mapM_ (assertAtom solver) $
-    [ LA.fromTerms [(-1,x1), (1,x2), (2,x3), (1,x4), (2,x5)] .==. LA.constExpr 7
-    , LA.fromTerms [(-1,x1), (2,x2), (3,x3), (1,x4), (1,x5)] .==. LA.constExpr 6
-    , LA.fromTerms [(-1,x1), (1,x2), (1,x3), (2,x4), (1,x5)] .==. LA.constExpr 4
-    , LA.varExpr x2 .>=. LA.constExpr 0
-    , LA.varExpr x3 .>=. LA.constExpr 0
-    , LA.varExpr x4 .>=. LA.constExpr 0
-    , LA.varExpr x5 .>=. LA.constExpr 0
+    [ LA.fromTerms [(-1,x1), (1,x2), (2,x3), (1,x4), (2,x5)] .==. LA.constant 7
+    , LA.fromTerms [(-1,x1), (2,x2), (3,x3), (1,x4), (1,x5)] .==. LA.constant 6
+    , LA.fromTerms [(-1,x1), (1,x2), (1,x3), (2,x4), (1,x5)] .==. LA.constant 4
+    , LA.var x2 .>=. LA.constant 0
+    , LA.var x3 .>=. LA.constant 0
+    , LA.var x4 .>=. LA.constant 0
+    , LA.var x5 .>=. LA.constant 0
     ]
 
   ret <- optimize solver defaultOptions
@@ -259,10 +259,10 @@ case_example_4_1 = do
   setOptDir solver OptMin
   setObj solver $ LA.fromTerms [(2,x1), (1,x2)]
   mapM_ (assertAtom solver) $
-    [ LA.fromTerms [(-1,x1), (1,x2)] .>=. LA.constExpr 2
-    , LA.fromTerms [( 1,x1), (1,x2)] .<=. LA.constExpr 1
-    , LA.varExpr x1 .>=. LA.constExpr 0
-    , LA.varExpr x2 .>=. LA.constExpr 0
+    [ LA.fromTerms [(-1,x1), (1,x2)] .>=. LA.constant 2
+    , LA.fromTerms [( 1,x1), (1,x2)] .<=. LA.constant 1
+    , LA.var x1 .>=. LA.constant 0
+    , LA.var x2 .>=. LA.constant 0
     ]
   ret <- optimize solver defaultOptions
   ret @?= Unsat
@@ -273,10 +273,10 @@ case_example_4_2 = do
   setOptDir solver OptMax
   setObj solver $ LA.fromTerms [(2,x1), (1,x2)]
   mapM_ (assertAtom solver) $
-    [ LA.fromTerms [(-1,x1), (-1,x2)] .<=. LA.constExpr 10
-    , LA.fromTerms [( 2,x1), (-1,x2)] .<=. LA.constExpr 40
-    , LA.varExpr x1 .>=. LA.constExpr 0
-    , LA.varExpr x2 .>=. LA.constExpr 0
+    [ LA.fromTerms [(-1,x1), (-1,x2)] .<=. LA.constant 10
+    , LA.fromTerms [( 2,x1), (-1,x2)] .<=. LA.constant 40
+    , LA.var x1 .>=. LA.constant 0
+    , LA.var x2 .>=. LA.constant 0
     ]
   ret <- optimize solver defaultOptions
   ret @?= Unbounded
@@ -287,10 +287,10 @@ case_example_4_3 = do
   setOptDir solver OptMax
   setObj solver $ LA.fromTerms [(6,x1), (-2,x2)]
   mapM_ (assertAtom solver) $
-    [ LA.fromTerms [(2,x1), (-1,x2)] .<=. LA.constExpr 2
-    , LA.varExpr x1 .<=. LA.constExpr 4
-    , LA.varExpr x1 .>=. LA.constExpr 0
-    , LA.varExpr x2 .>=. LA.constExpr 0
+    [ LA.fromTerms [(2,x1), (-1,x2)] .<=. LA.constant 2
+    , LA.var x1 .<=. LA.constant 4
+    , LA.var x1 .>=. LA.constant 0
+    , LA.var x2 .>=. LA.constant 0
     ]
 
   ret <- optimize solver defaultOptions
@@ -308,11 +308,11 @@ case_example_4_5 = do
   setOptDir solver OptMax
   setObj solver $ LA.fromTerms [(2,x1), (1,x2)]
   mapM_ (assertAtom solver) $
-    [ LA.fromTerms [(4,x1), ( 3,x2)] .<=. LA.constExpr 12
-    , LA.fromTerms [(4,x1), ( 1,x2)] .<=. LA.constExpr 8
-    , LA.fromTerms [(4,x1), (-1,x2)] .<=. LA.constExpr 8
-    , LA.varExpr x1 .>=. LA.constExpr 0
-    , LA.varExpr x2 .>=. LA.constExpr 0
+    [ LA.fromTerms [(4,x1), ( 3,x2)] .<=. LA.constant 12
+    , LA.fromTerms [(4,x1), ( 1,x2)] .<=. LA.constant 8
+    , LA.fromTerms [(4,x1), (-1,x2)] .<=. LA.constant 8
+    , LA.var x1 .>=. LA.constant 0
+    , LA.var x2 .>=. LA.constant 0
     ]
 
   ret <- optimize solver defaultOptions
@@ -330,14 +330,14 @@ case_example_4_6 = do
   setOptDir solver OptMax
   setObj solver $ LA.fromTerms [(20,x1), (1/2,x2), (-6,x3), (3/4,x4)]
   mapM_ (assertAtom solver) $
-    [ LA.varExpr x1 .<=. LA.constExpr 2
-    , LA.fromTerms [( 8,x1), (  -1,x2), (9,x3), (1/4, x4)] .<=. LA.constExpr 16
-    , LA.fromTerms [(12,x1), (-1/2,x2), (3,x3), (1/2, x4)] .<=. LA.constExpr 24
-    , LA.varExpr x2 .<=. LA.constExpr 1
-    , LA.varExpr x1 .>=. LA.constExpr 0
-    , LA.varExpr x2 .>=. LA.constExpr 0
-    , LA.varExpr x3 .>=. LA.constExpr 0
-    , LA.varExpr x4 .>=. LA.constExpr 0
+    [ LA.var x1 .<=. LA.constant 2
+    , LA.fromTerms [( 8,x1), (  -1,x2), (9,x3), (1/4, x4)] .<=. LA.constant 16
+    , LA.fromTerms [(12,x1), (-1/2,x2), (3,x3), (1/2, x4)] .<=. LA.constant 24
+    , LA.var x2 .<=. LA.constant 1
+    , LA.var x1 .>=. LA.constant 0
+    , LA.var x2 .>=. LA.constant 0
+    , LA.var x3 .>=. LA.constant 0
+    , LA.var x4 .>=. LA.constant 0
     ]
 
   ret <- optimize solver defaultOptions
@@ -355,14 +355,14 @@ case_example_4_7 = do
   setOptDir solver OptMax
   setObj solver $ LA.fromTerms [(1,x1), (1.5,x2), (5,x3), (2,x4)]
   mapM_ (assertAtom solver) $
-    [ LA.fromTerms [(3,x1), (2,x2), ( 1,x3), (4,x4)] .<=. LA.constExpr 6
-    , LA.fromTerms [(2,x1), (1,x2), ( 5,x3), (1,x4)] .<=. LA.constExpr 4
-    , LA.fromTerms [(2,x1), (6,x2), (-4,x3), (8,x4)] .==. LA.constExpr 0
-    , LA.fromTerms [(1,x1), (3,x2), (-2,x3), (4,x4)] .==. LA.constExpr 0
-    , LA.varExpr x1 .>=. LA.constExpr 0
-    , LA.varExpr x2 .>=. LA.constExpr 0
-    , LA.varExpr x3 .>=. LA.constExpr 0
-    , LA.varExpr x4 .>=. LA.constExpr 0
+    [ LA.fromTerms [(3,x1), (2,x2), ( 1,x3), (4,x4)] .<=. LA.constant 6
+    , LA.fromTerms [(2,x1), (1,x2), ( 5,x3), (1,x4)] .<=. LA.constant 4
+    , LA.fromTerms [(2,x1), (6,x2), (-4,x3), (8,x4)] .==. LA.constant 0
+    , LA.fromTerms [(1,x1), (3,x2), (-2,x3), (4,x4)] .==. LA.constant 0
+    , LA.var x1 .>=. LA.constant 0
+    , LA.var x2 .>=. LA.constant 0
+    , LA.var x3 .>=. LA.constant 0
+    , LA.var x4 .>=. LA.constant 0
     ]
 
   ret <- optimize solver defaultOptions
@@ -381,16 +381,16 @@ case_kuhn_7_3 = do
   setOptDir solver OptMin
   setObj solver $ LA.fromTerms [(-2,x4),(-3,x5),(1,x6),(12,x7)]
   mapM_ (assertAtom solver) $
-    [ LA.fromTerms [(1,x1), ( -2,x4), (-9,x5), (   1,x6), (  9,x7)] .==. LA.constExpr 0
-    , LA.fromTerms [(1,x2), (1/3,x4), ( 1,x5), (-1/3,x6), ( -2,x7)] .==. LA.constExpr 0
-    , LA.fromTerms [(1,x3), (  2,x4), ( 3,x5), (  -1,x6), (-12,x7)] .==. LA.constExpr 2
-    , LA.varExpr x1 .>=. LA.constExpr 0
-    , LA.varExpr x2 .>=. LA.constExpr 0
-    , LA.varExpr x3 .>=. LA.constExpr 0
-    , LA.varExpr x4 .>=. LA.constExpr 0
-    , LA.varExpr x5 .>=. LA.constExpr 0
-    , LA.varExpr x6 .>=. LA.constExpr 0
-    , LA.varExpr x7 .>=. LA.constExpr 0
+    [ LA.fromTerms [(1,x1), ( -2,x4), (-9,x5), (   1,x6), (  9,x7)] .==. LA.constant 0
+    , LA.fromTerms [(1,x2), (1/3,x4), ( 1,x5), (-1/3,x6), ( -2,x7)] .==. LA.constant 0
+    , LA.fromTerms [(1,x3), (  2,x4), ( 3,x5), (  -1,x6), (-12,x7)] .==. LA.constant 2
+    , LA.var x1 .>=. LA.constant 0
+    , LA.var x2 .>=. LA.constant 0
+    , LA.var x3 .>=. LA.constant 0
+    , LA.var x4 .>=. LA.constant 0
+    , LA.var x5 .>=. LA.constant 0
+    , LA.var x6 .>=. LA.constant 0
+    , LA.var x7 .>=. LA.constant 0
     ]
 
   ret <- optimize solver defaultOptions

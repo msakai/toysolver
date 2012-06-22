@@ -98,18 +98,18 @@ fromAtom (LA.Atom lhs op rhs) =
 
 -- | Convert the polyhedron to a list of linear (in)equalities.
 toConstraints :: Polyhedron -> [AtomR]
-toConstraints Empty = [LA.Atom (LA.constExpr 0) Lt (LA.constExpr 0)]
+toConstraints Empty = [LA.Atom (LA.constant 0) Lt (LA.constant 0)]
 toConstraints (Polyhedron m) = do
   (e, ival) <- Map.toList m
   let e' = LA.mapCoeff fromIntegral e
       xs = case Interval.lowerBound ival of
              Nothing -> []
-             Just (True,c)  -> [LA.Atom (LA.constExpr c) Le e']
-             Just (False,c) -> [LA.Atom (LA.constExpr c) Lt e']
+             Just (True,c)  -> [LA.Atom (LA.constant c) Le e']
+             Just (False,c) -> [LA.Atom (LA.constant c) Lt e']
       ys = case Interval.upperBound ival of
              Nothing -> []
-             Just (True,c)  -> [LA.Atom e' Le (LA.constExpr c)]
-             Just (False,c) -> [LA.Atom e' Lt (LA.constExpr c)]
+             Just (True,c)  -> [LA.Atom e' Le (LA.constant c)]
+             Just (False,c) -> [LA.Atom e' Lt (LA.constant c)]
   xs ++ ys
 
 p :: ExprZ -> Bool

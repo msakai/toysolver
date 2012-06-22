@@ -159,13 +159,13 @@ optimize solver update = do
             -}
             log solver "MIP: falling back to Fourier-Motzkin + OmegaTest"
             t <- Simplex2.getTableau lp
-            let ds = [LA.varExpr v .==. def | (v, def) <- IM.toList t]
+            let ds = [LA.var v .==. def | (v, def) <- IM.toList t]
             n <- Simplex2.nVars lp
             bs <- liftM concat $ forM [0..n-1] $ \v -> do
               lb <- Simplex2.getLB lp v
               ub <- Simplex2.getUB lp v
-              return $ [LA.varExpr v .>=. LA.constExpr (fromJust lb) | isJust lb] ++
-                       [LA.varExpr v .<=. LA.constExpr (fromJust ub) | isJust ub]
+              return $ [LA.var v .>=. LA.constant (fromJust lb) | isJust lb] ++
+                       [LA.var v .<=. LA.constant (fromJust ub) | isJust ub]
             case OmegaTest.solveQFLA (bs ++ ds) ivs of
               Just _ -> return Unbounded
               Nothing -> return Unsat  
@@ -254,8 +254,8 @@ branchAndBound solver update = do
                                       [((v,val), abs (fromInteger (round val) - val)) | (v,val) <- xs]
                       let lp1 = lp
                       lp2 <- Simplex2.cloneSolver lp
-                      Simplex2.assertAtom lp1 (LA.varExpr v0 .<=. LA.constExpr (fromInteger (floor val0)))
-                      Simplex2.assertAtom lp2 (LA.varExpr v0 .>=. LA.constExpr (fromInteger (ceiling val0)))
+                      Simplex2.assertAtom lp1 (LA.var v0 .<=. LA.constant (fromInteger (floor val0)))
+                      Simplex2.assertAtom lp2 (LA.var v0 .>=. LA.constant (fromInteger (ceiling val0)))
                       atomically $ do
                         addNode $ Node lp1 (ndDepth node + 1) val
                         addNode $ Node lp2 (ndDepth node + 1) val
@@ -449,16 +449,16 @@ deriveGomoryCut lp ivs xi = do
     let c = if xj `IS.member` ivs
             then (if fj <= 1 - f0 then fj  / (1 - f0) else ((1 - fj) / f0))
             else (if aij > 0      then aij / (1 - f0) else (-aij     / f0))
-    return $ c .*. (LA.varExpr xj .-. LA.constExpr lj)
+    return $ c .*. (LA.var xj .-. LA.constant lj)
   xs2 <- forM ks $ \(aij, xj) -> do
     let fj = fracPart aij
     Just uj <- Simplex2.getUB lp xj
     let c = if xj `IS.member` ivs
             then (if fj <= f0 then fj  / f0 else ((1 - fj) / (1 - f0)))
             else (if aij > 0  then aij / f0 else (-aij     / (1 - f0)))
-    return $ c .*. (LA.constExpr uj .-. LA.varExpr xj)
+    return $ c .*. (LA.constant uj .-. LA.var xj)
 
-  return $ lsum xs1 .+. lsum xs2 .>=. LA.constExpr 1
+  return $ lsum xs1 .+. lsum xs2 .>=. LA.constant 1
 
 -- TODO: Simplex2をδに対応させたら、xi, xj がδを含まない有理数であるという条件も必要
 canDeriveGomoryCut :: Simplex2.Solver -> Var -> IO Bool

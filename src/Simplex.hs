@@ -53,7 +53,7 @@ type Tableau r = VarMap (Row r)
 {-
 tbl ! v == (m, val)
 ==>
-varExpr v .+. m .==. constExpr val
+var v .+. m .==. constant val
 -}
 
 type RowIndex = Int
@@ -225,7 +225,7 @@ phaseI tbl avs
   | otherwise = (True, copyObjRow tbl $ removeArtificialVariables avs $ tbl1')
   where
     optdir = OptMax
-    tbl1 = setObjFun tbl $ lnegate $ lsum [LA.varExpr v | v <- IS.toList avs]
+    tbl1 = setObjFun tbl $ lnegate $ lsum [LA.var v | v <- IS.toList avs]
     tbl1' = go tbl1
     go tbl2
       | currentObjValue tbl2 == 0 = tbl2
