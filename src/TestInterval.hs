@@ -1,11 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-import Prelude hiding (lex)
-import Control.Monad
-import Data.List
-import Data.Ratio
-import qualified Data.Set as Set
-import qualified Data.Map as Map
+import Data.Maybe
 import Test.HUnit hiding (Test)
 import Test.QuickCheck
 import Test.Framework (Test, defaultMain, testGroup)
@@ -13,6 +8,7 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
+import Data.Interval (Interval)
 import qualified Data.Interval as Interval
 
 {--------------------------------------------------------------------
@@ -28,7 +24,7 @@ prop_null_empty =
     Interval.null a == (a == Interval.empty)
 
 case_null_empty =
-  Interval.null Interval.empty @?= True
+  Interval.null (Interval.empty :: Interval Rational) @?= True
 
 {--------------------------------------------------------------------
   univ
@@ -39,7 +35,7 @@ prop_univ_is_top =
     Interval.isSubsetOf a Interval.univ
 
 case_nonnull_top =
-  Interval.null Interval.univ @?= False
+  Interval.null (Interval.univ :: Interval Rational) @?= False
 
 {--------------------------------------------------------------------
   singleton
@@ -181,11 +177,17 @@ prop_pickup_member_null =
       Nothing -> Interval.null a
       Just x -> Interval.member x a
 
+case_pickup_empty =
+  Interval.pickup (Interval.empty :: Interval Rational) @?= Nothing
+
+case_pickup_univ =
+  isJust (Interval.pickup (Interval.univ :: Interval Rational)) @?= True
+
 {--------------------------------------------------------------------
   Generators
 --------------------------------------------------------------------}
 
-intervals :: Gen (Interval.Interval Rational)
+intervals :: Gen (Interval Rational)
 intervals = do
   lb <- arbitrary
   ub <- arbitrary
