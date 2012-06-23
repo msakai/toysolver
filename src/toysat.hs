@@ -25,7 +25,6 @@ import qualified Data.Map as Map
 import Data.Char
 import Data.IORef
 import Data.List
-import Data.Maybe
 import Data.Ord
 import Data.Ratio
 import Data.Version
@@ -288,7 +287,7 @@ mainPB opt solver args = do
 
 solvePB :: Options -> SAT.Solver -> PBFile.Formula -> IO ()
 solvePB opt solver formula@(obj, cs) = do
-  let n = pbNumVars formula
+  let n = PBFile.pbNumVars formula
 
   printf "c #vars %d\n" n
   printf "c #constraints %d\n" (length cs)
@@ -431,15 +430,6 @@ minimize opt solver obj update = do
 pbEval :: SAT.Model -> [(Integer, SAT.Lit)] -> Integer
 pbEval m xs = sum [c | (c,lit) <- xs, m ! SAT.litVar lit == SAT.litPolarity lit]
 
-pbNumVars :: PBFile.Formula -> Int
-pbNumVars (m, cs) = maximum (0 : vs)
-  where
-    vs = do
-      s <- maybeToList m ++ [s | (s,_,_) <- cs]
-      (_, tm) <- s
-      lit <- tm
-      return $ abs lit
-
 pbPrintModel :: SAT.Model -> Int -> IO ()
 pbPrintModel m n = do
   let as = takeWhile (\(v,_) -> v <= n) $ assocs m
@@ -463,7 +453,7 @@ mainWBO opt solver args = do
 
 solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
 solveWBO opt solver isMaxSat formula@(tco, cs) = do
-  let nvar = wboNumVars formula
+  let nvar = PBFile.wboNumVars formula
   printf "c #vars %d\n" nvar
   printf "c #constraints %d\n" (length cs)
 
@@ -516,15 +506,6 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
           putStrLn $ "s " ++ "UNKNOWN"
           hFlush stdout
       throwIO e
-
-wboNumVars :: PBFile.SoftFormula -> Int
-wboNumVars (_, cs) = maximum vs
-  where
-    vs = do
-      s <- [s | (_, (s,_,_)) <- cs]
-      (_, tm) <- s
-      lit <- tm
-      return $ abs lit
 
 -- ------------------------------------------------------------------------
 

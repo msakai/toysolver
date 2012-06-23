@@ -1,9 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
 module SAT.Types
-  ( Var
+  (
+  -- * Variable
+    Var
   , VarMap
   , validVar
 
+  -- * Literal
   , Lit
   , LitSet
   , LitMap
@@ -14,15 +17,18 @@ module SAT.Types
   , litVar
   , litPolarity
 
+  -- * Clause
   , Clause
   , normalizeClause
 
+  -- * Cardinality Constraint
   , normalizeAtLeast
 
+  -- * Pseudo Boolean Constraint
   , normalizePBAtLeast
   , normalizePBExactly
   , cutResolve
-  , cardinalityReduction  
+  , cardinalityReduction
   ) where
 
 import Control.Monad
@@ -144,7 +150,7 @@ normalizePBAtLeast a =
       where
         d = foldl1' gcd [c | (c,_) <- xs]
 
--- | normalizing PB constraint of the form /c1 x1 + c2 cn ... cn xn >= b/.
+-- | normalizing PB constraint of the form /c1 x1 + c2 cn ... cn xn = b/.
 normalizePBExactly :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
 normalizePBExactly a =
 　case step2 $ step1 $ a of

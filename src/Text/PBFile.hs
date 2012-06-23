@@ -45,6 +45,10 @@ module Text.PBFile
 
   -- * Show .wbo files
   , showWBO
+
+  -- * Utility
+  , pbNumVars
+  , wboNumVars
   ) where
 
 import Prelude hiding (sum)
