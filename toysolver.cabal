@@ -77,6 +77,7 @@ Executable toysolver
     GHC-Options: -threaded
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
+  GHC-Prof-Options: -auto-all
 
 Executable toysat
   Main-is: toysat.hs
@@ -102,6 +103,7 @@ Executable toysat
      CPP
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
+  GHC-Prof-Options: -auto-all
   if flag(ForceChar8) && impl(ghc)
     Build-Depends: base >=4.5
     CPP-OPtions: "-DFORCE_CHAR8"
