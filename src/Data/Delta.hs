@@ -13,8 +13,8 @@
 --
 -- Reference:
 -- 
--- * Bruno Dutertre, Leonardo de Moura.
---   A Fast Linear-Arithmetic Solver for DPLL(T).
+-- * Bruno Dutertre and Leonardo de Moura,
+--   \"/A Fast Linear-Arithmetic Solver for DPLL(T)/\",
 --   Computer Aided Verification In Computer Aided Verification, Vol. 4144
 --   (2006), pp. 81-94.
 --   <http://dx.doi.org/10.1007/11817963_11>
@@ -22,7 +22,24 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Delta where
+module Data.Delta
+  (
+  -- * The Delta type
+    Delta (..)
+
+  -- * Construction
+  , fromReal
+  , delta
+
+  -- * Query
+  , realPart
+  , deltaPart
+
+  -- * Relationship with integers
+  , floor'
+  , ceiling'
+  , isInteger'
+  ) where
 
 import Data.Linear
 import Util (isInteger)
@@ -34,12 +51,15 @@ data Delta r = Delta !r !r deriving (Ord, Eq, Show)
 delta :: Num r => Delta r
 delta = Delta 0 1
 
+-- | Conversion from a base @r@ value to @Delta r@.
 fromReal :: Num r => r -> Delta r
 fromReal x = Delta x 0
 
+-- | Extracts the real part..
 realPart :: Delta r -> r
 realPart (Delta r _) = r
 
+-- | Extracts the δ part..
 deltaPart :: Delta r -> r
 deltaPart (Delta _ k) = k
 
@@ -50,19 +70,22 @@ instance Num r => Module r (Delta r) where
 
 instance Fractional r => Linear r (Delta r)
 
--- | 'Delta' version of 'floor'
+-- | 'Delta' version of 'floor'.
+-- @'floor'' x@ returns the greatest integer not greater than @x@
 floor' :: (RealFrac r, Integral a) => Delta r -> a
 floor' (Delta r k) = fromInteger $ if r2==r && k < 0 then i-1 else i
   where
     i = floor r
     r2 = fromInteger i
 
--- | 'Delta' version of 'ceiling'
+-- | 'Delta' version of 'ceiling'.
+-- @'ceiling'' x@ returns the least integer not less than @x@
 ceiling' :: (RealFrac r, Integral a) => Delta r -> a
 ceiling' (Delta r k) = fromInteger $ if r2==r && k > 0 then i+1 else i
   where
     i = ceiling r
     r2 = fromInteger i
 
+-- | Is this a integer?
 isInteger' :: RealFrac r => Delta r -> Bool
 isInteger' (Delta r k) = isInteger r && k == 0

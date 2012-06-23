@@ -18,7 +18,7 @@ module Data.LA
   -- * Expression of linear arithmetics
   , Expr
 
-  -- * Conversion
+  -- ** Conversion
   , var
   , constant
   , terms
@@ -28,13 +28,13 @@ module Data.LA
   , unitVar
   , asConst
 
-  -- * Query
+  -- ** Query
   , coeff
   , lookupCoeff
   , extract
   , extractMaybe  
 
-  -- * Operations
+  -- ** Operations
   , mapCoeff
   , mapCoeffWithVar
   , evalExpr
@@ -75,7 +75,8 @@ import Data.Interval
 -- key 'unitVar' is used for constants.
 newtype Expr r
   = Expr
-  { coeffMap :: IM.IntMap r
+  { -- | a mapping from variables to coefficients
+    coeffMap :: IM.IntMap r
   } deriving (Eq, Ord)
 
 -- | Create a @Expr@ from a mapping from variables to coefficients.
