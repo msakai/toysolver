@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
-{-# LANGUAGE BangPatterns, DoAndIfThenElse, DoRec, ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns, DoAndIfThenElse, DoRec, ScopedTypeVariables, CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  SAT
@@ -84,7 +84,12 @@ module SAT
 import Prelude hiding (log)
 import Control.Monad
 import Control.Exception
+#if MIN_VERSION_array(0,4,0)
+import Data.Array.IO hiding (unsafeFreeze)
+import Data.Array.Unsafe (unsafeFreeze)
+#else
 import Data.Array.IO
+#endif
 import Data.Array.Base (unsafeRead, unsafeWrite)
 import Data.Array.Unboxed
 import Data.IORef
