@@ -13,20 +13,33 @@
 -- 
 -----------------------------------------------------------------------------
 module Data.Interval
-  ( EndPoint
-  , Interval
-  , lowerBound
-  , upperBound
+  (
+  -- * Interval type
+    Interval
+  , EndPoint
+
+  -- * Construction
   , interval
   , closedInterval
+  , openInterval
   , univ
   , empty
   , singleton
-  , intersection
-  , join
+
+  -- * Query
   , null
   , member
+  , notMember
   , isSubsetOf
+  , isProperSubsetOf
+  , lowerBound
+  , upperBound
+
+  -- * Combine
+  , intersection
+  , join
+
+  -- * Operations
   , pickup
   , tightenToInteger
   ) where
@@ -38,17 +51,18 @@ import Data.Typeable
 import Util (combineMaybe, isInteger)
 import Prelude hiding (null)
 
--- | Endpoint
--- (isInclusive, value)
-type EndPoint r = Maybe (Bool, r)
-
--- | interval
+-- | Interval
 data Interval r
   = Interval
   { lowerBound :: EndPoint r -- ^ lower bound of the interval
   , upperBound :: EndPoint r -- ^ upper bound of the interval
   }
   deriving (Eq, Ord, Typeable)
+
+-- | Endpoint
+-- 
+-- > (isInclusive, value)
+type EndPoint r = Maybe (Bool, r)
 
 instance Show r => Show (Interval r) where
   showsPrec p x  = showParen (p > appPrec) $
@@ -58,7 +72,11 @@ instance Show r => Show (Interval r) where
     showsPrec appPrec1 (upperBound x)
 
 -- | smart constructor for 'Interval'
-interval :: Real r => EndPoint r -> EndPoint r -> Interval r
+interval
+  :: (Ord r, Num r)
+  => EndPoint r -- ^ lower bound
+  -> EndPoint r -- ^ upper bound
+  -> Interval r
 interval lb@(Just (in1,x1)) ub@(Just (in2,x2)) =
   case x1 `compare` x2 of
     GT -> empty
@@ -66,10 +84,23 @@ interval lb@(Just (in1,x1)) ub@(Just (in2,x2)) =
     EQ -> if in1 && in2 then Interval lb ub else empty
 interval lb ub = Interval lb ub
 
-closedInterval :: Real r => r -> r -> Interval r
+-- | closed set [@l, @u]
+closedInterval
+  :: (Ord r, Num r)
+  => r -- ^ lower bound @l@
+  -> r -- ^ upper bound @u@
+  -> Interval r
 closedInterval lb ub = interval (Just (True, lb)) (Just (True, ub))
 
--- | (-∞, ∞)
+-- | open set (@l, @u)
+openInterval
+  :: (Ord r, Num r)
+  => r -- ^ lower bound @l@
+  -> r -- ^ upper bound @u@
+  -> Interval r
+openInterval lb ub = interval (Just (False, lb)) (Just (False, ub))
+
+-- | universal set (-∞, ∞)
 univ :: Interval r
 univ = Interval Nothing Nothing
 
@@ -81,8 +112,8 @@ empty = Interval (Just (False,0)) (Just (False,0))
 singleton :: r -> Interval r
 singleton x = Interval (Just (True, x)) (Just (True, x))
 
--- | intersection of two intervals
-intersection :: forall r. Real r => Interval r -> Interval r -> Interval r
+-- | intersection (greatest lower bounds) of two intervals
+intersection :: forall r. (Ord r, Num r) => Interval r -> Interval r -> Interval r
 intersection (Interval l1 u1) (Interval l2 u2) = interval (maxLB l1 l2) (minLB u1 u2)
   where
     maxLB :: EndPoint r -> EndPoint r -> EndPoint r
@@ -102,8 +133,8 @@ intersection (Interval l1 u1) (Interval l2 u2) = interval (maxLB l1 l2) (minLB u
       , min x1 x2
       )
 
--- | join of two intervals
-join :: forall r. Real r => Interval r -> Interval r -> Interval r
+-- | join (least upperbound) of two intervals.
+join :: forall r. (Ord r, Num r) => Interval r -> Interval r -> Interval r
 join x1 x2
   | null x1 = x2
   | null x2 = x1
@@ -133,7 +164,7 @@ join (Interval l1 u1) (Interval l2 u2) = interval (minLB l1 l2) (maxUB u1 u2)
         )
 
 -- | Is the interval empty?
-null :: Real r => Interval r -> Bool
+null :: Ord r => Interval r -> Bool
 null (Interval (Just (in1,x1)) (Just (in2,x2))) = 
   case x1 `compare` x2 of
     GT -> True
@@ -142,7 +173,7 @@ null (Interval (Just (in1,x1)) (Just (in2,x2))) =
 null _ = False
 
 -- | Is the element in the interval?
-member :: Real r => r -> Interval r -> Bool
+member :: Ord r => r -> Interval r -> Bool
 member x (Interval lb ub) = testLB x lb && testUB x ub
   where
     testLB x Nothing = True
@@ -150,7 +181,13 @@ member x (Interval lb ub) = testLB x lb && testUB x ub
     testUB x Nothing = True
     testUB x (Just (in2,x2)) = if in2 then x <= x2 else x < x2
 
-isSubsetOf :: Real r => Interval r -> Interval r -> Bool
+-- | Is the element not in the interval?
+notMember :: Ord r => r -> Interval r -> Bool
+notMember a i = not $ member a i
+
+-- | Is this a subset?
+-- @(i1 `isSubsetOf` i2)@ tells whether @i1@ is a subset of @i2@.
+isSubsetOf :: Ord r => Interval r -> Interval r -> Bool
 isSubsetOf x _ | null x = True
 isSubsetOf (Interval lb1 ub1) (Interval lb2 ub2) = testLB lb1 lb2 && testUB ub1 ub2
   where
@@ -169,6 +206,10 @@ isSubsetOf (Interval lb1 ub1) (Interval lb2 ub2) = testLB lb1 lb2 && testUB ub1 
         GT -> False
         EQ -> not in1 || in2 -- in1 => in2
     testUB Nothing _ = False
+
+-- | Is this a proper subset? (ie. a subset but not equal).
+isProperSubsetOf :: Ord r => Interval r -> Interval r -> Bool
+isProperSubsetOf i1 i2 = i1 /= i2 && i1 `isSubsetOf` i2
 
 -- | pick up an element from the interval if the interval is not empty.
 pickup :: (Real r, Fractional r) => Interval r -> Maybe r
