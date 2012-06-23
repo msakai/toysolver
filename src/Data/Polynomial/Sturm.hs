@@ -10,9 +10,11 @@
 -- 
 -- Reference:
 -- 
--- * <http://en.wikipedia.org/wiki/Sturm%27s_theorem>
+-- * \"/Sturm's theorem/.\" Wikipedia, The Free Encyclopedia. Wikimedia Foundation, Inc.
+--   2012-06-23. <http://en.wikipedia.org/wiki/Sturm%27s_theorem>
 -- 
--- * <http://mathworld.wolfram.com/SturmFunction.html>
+-- * Weisstein, Eric W. \"/Sturm Function/.\" From MathWorld--A Wolfram Web Resource.
+--   <http://mathworld.wolfram.com/SturmFunction.html>
 -- 
 -----------------------------------------------------------------------------
 
@@ -21,7 +23,6 @@ module Data.Polynomial.Sturm
   , sturmChain
   , numRoots
   , numRoots'
-  , numRoots''
   , separate
   , separate'
   , narrow
@@ -35,9 +36,10 @@ import Data.Polynomial
 import qualified Data.Interval as Interval
 import Data.Interval (Interval)
 
+-- | Sturm's chain (Sturm's sequence)
 type SturmChain = [UPolynomial Rational]
 
--- | Sturm's sequence 
+-- | Sturm's sequence of a polynomial
 sturmChain :: UPolynomial Rational -> SturmChain
 sturmChain p = p0 : p1 : go p0 p1
   where
@@ -48,30 +50,20 @@ sturmChain p = p0 : p1 : go p0 p1
       where
         r = - (p `polyMod` q)
 
--- | the number of distinct real roots of p in (a,b]
+-- | The number of distinct real roots of @p@ in a given interval
 numRoots
-  :: UPolynomial Rational -- ^ p
-  -> (Rational,Rational)  -- ^ (a,b)
+  :: UPolynomial Rational
+  -> Interval Rational
   -> Int
-numRoots p = numRoots' (sturmChain p)
+numRoots p ival = numRoots' (sturmChain p) ival
 
--- | the number of distinct real roots of p in (a,b]
+-- | The number of distinct real roots of @p@ in a given interval.
+-- This function takes @p@'s sturm chain instead of @p@ itself.
 numRoots'
-  :: SturmChain           -- ^ chain
-  -> (Rational,Rational)  -- ^ (a,b)
-  -> Int
-numRoots' chain (a,b)
-  | a < b     = n a - n b
-  | otherwise = error $ "numRoots': \"" ++ show a ++ " < " ++ show b ++ "\" failed"
-  where
-    n x = countSignChanges [eval (\_ -> x) q | q <- chain]
-
--- | the number of distinct real roots of p in a given interval
-numRoots''
   :: SturmChain
   -> Interval Rational
   -> Int
-numRoots'' chain@(p:_) ival
+numRoots' chain@(p:_) ival
   | Interval.null ival2 = 0
   | otherwise =
       case (Interval.lowerBound ival2, Interval.upperBound ival2) of
@@ -115,13 +107,14 @@ boundInterval p ival = Interval.intersection ival (Interval.closedInterval lb ub
   where
     (lb,ub) = bounds p
 
--- disjoint intervals each of which contains exactly one real roots.
--- The intervals can be further narrowed by 'narrow'.
+-- | Disjoint intervals each of which contains exactly one real roots of the given polynoimal @p@.
+-- The intervals can be further narrowed by 'narrow' or 'narrow''.
 separate :: UPolynomial Rational -> [Interval Rational]
 separate p = separate' (sturmChain p)
 
--- disjoint intervals each of which contains exactly one real roots.
--- The intervals can be further narrowed by 'narrow'.
+-- | Disjoint intervals each of which contains exactly one real roots of the given polynoimal @p@.
+-- The intervals can be further narrowed by 'narrow' or 'narrow''.
+-- This function takes @p@'s sturm chain instead of @p@ itself.
 separate' :: SturmChain -> [Interval Rational]
 separate' chain@(p:_) = f (bounds p)
   where
@@ -148,8 +141,8 @@ narrow' chain@(p:_) ival size = go (boundInterval p ival)
   where
     go ival
       | s < size = ival
-      | numRoots'' chain ivalL > 0 = go ivalL
-      | otherwise = go ivalR -- numRoots'' chain ivalR > 0
+      | numRoots' chain ivalL > 0 = go ivalL
+      | otherwise = go ivalR -- numRoots' chain ivalR > 0
       where
         (_,lb) = fromJust $ Interval.lowerBound ival
         (_,ub) = fromJust $ Interval.upperBound ival

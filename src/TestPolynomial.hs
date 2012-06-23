@@ -469,21 +469,23 @@ case_sturmChain = sturmChain p0 @?= chain
 -- http://mathworld.wolfram.com/SturmFunction.html
 case_numRoots_1 =
   sequence_
-  [ numRoots p (-2,0)      @?= 2
-  , numRoots p (0,2)       @?= 1
-  , numRoots p (-1.5,-1.0) @?= 1
-  , numRoots p (-0.5,0)    @?= 1
-  , numRoots p (1,1.5)     @?= 1
+  [ numRoots p (Interval.closedInterval (-2) 0)        @?= 2
+  , numRoots p (Interval.closedInterval 0 2)           @?= 1
+  , numRoots p (Interval.closedInterval (-1.5) (-1.0)) @?= 1
+  , numRoots p (Interval.closedInterval (-0.5) 0)      @?= 1
+  , numRoots p (Interval.closedInterval 1 (1.5))       @?= 1
   ]
   where
     x = var ()
     p = x^5 - 3*x - 1
 
--- intervals are interpreted as half-open intervals.
+-- check interpretation of intervals
 case_numRoots_2 =
   sequence_
-  [ numRoots p (2,3) @?= 0
-  , numRoots p (1,2) @?= 1
+  [ numRoots p (Interval.interval (Just (False,2)) (Just (True,3)))  @?= 0
+  , numRoots p (Interval.interval (Just (True,2))  (Just (True,3)))  @?= 1
+  , numRoots p (Interval.interval (Just (False,1)) (Just (False,2))) @?= 0
+  , numRoots p (Interval.interval (Just (False,1)) (Just (True,2)))  @?= 1
   ]
   where
     x = var ()
