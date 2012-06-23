@@ -176,3 +176,10 @@ Test-suite TestPolynomial
   Main-is:           TestPolynomial.hs
   Build-depends:     base >=4 && <5, containers, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
+
+Test-suite TestInterval
+  Type:              exitcode-stdio-1.0
+  HS-Source-Dirs:    src
+  Main-is:           TestInterval.hs
+  Build-depends:     base >=4 && <5, containers, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Extensions: TemplateHaskell, DoAndIfThenElse

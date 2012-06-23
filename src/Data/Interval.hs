@@ -23,13 +23,15 @@ module Data.Interval
   , empty
   , singleton
   , intersection
+  , join
   , null
   , member
+  , isSubsetOf
   , pickup
   , tightenToInteger
   ) where
 
-import Control.Monad
+import Control.Monad hiding (join)
 import Data.Maybe
 import Data.Linear
 import Data.Typeable
@@ -81,19 +83,18 @@ singleton x = Interval (Just (True, x)) (Just (True, x))
 
 -- | intersection of two intervals
 intersection :: forall r. Real r => Interval r -> Interval r -> Interval r
-intersection (Interval l1 u1) (Interval l2 u2) = interval (maxEP l1 l2) (minEP u1 u2)
-  where 
-    maxEP :: EndPoint r -> EndPoint r -> EndPoint r
-    maxEP = combineMaybe $ \(in1,x1) (in2,x2) ->
+intersection (Interval l1 u1) (Interval l2 u2) = interval (maxLB l1 l2) (minLB u1 u2)
+  where
+    maxLB :: EndPoint r -> EndPoint r -> EndPoint r
+    maxLB = combineMaybe $ \(in1,x1) (in2,x2) ->
       ( case x1 `compare` x2 of
           EQ -> in1 && in2
           LT -> in2
           GT -> in1
       , max x1 x2
-      )
-
-    minEP :: EndPoint r -> EndPoint r -> EndPoint r
-    minEP = combineMaybe $ \(in1,x1) (in2,x2) ->
+      )    
+    minLB :: EndPoint r -> EndPoint r -> EndPoint r
+    minLB = combineMaybe $ \(in1,x1) (in2,x2) ->
       ( case x1 `compare` x2 of
           EQ -> in1 && in2
           LT -> in1
@@ -101,9 +102,44 @@ intersection (Interval l1 u1) (Interval l2 u2) = interval (maxEP l1 l2) (minEP u
       , min x1 x2
       )
 
+-- | join of two intervals
+join :: forall r. Real r => Interval r -> Interval r -> Interval r
+join x1 x2
+  | null x1 = x2
+  | null x2 = x1
+join (Interval l1 u1) (Interval l2 u2) = interval (minLB l1 l2) (maxUB u1 u2)
+  where
+    maxUB :: EndPoint r -> EndPoint r -> EndPoint r
+    maxUB u1 u2 = do
+      (in1,x1) <- u1
+      (in2,x2) <- u2
+      return $
+        ( case x1 `compare` x2 of
+          EQ -> in1 || in2
+          LT -> in2
+          GT -> in1
+        , max x1 x2
+        )
+    minLB :: EndPoint r -> EndPoint r -> EndPoint r
+    minLB l1 l2 = do
+      (in1,x1) <- l1
+      (in2,x2) <- l2
+      return $
+        ( case x1 `compare` x2 of
+          EQ -> in1 || in2
+          LT -> in1
+          GT -> in2
+        , min x1 x2
+        )
+
 -- | Is the interval empty?
-null :: (Real r, Fractional r) => Interval r -> Bool
-null i = not $ isJust (pickup i)
+null :: Real r => Interval r -> Bool
+null (Interval (Just (in1,x1)) (Just (in2,x2))) = 
+  case x1 `compare` x2 of
+    GT -> True
+    LT -> False
+    EQ -> if in1 && in2 then False else True
+null _ = False
 
 -- | Is the element in the interval?
 member :: Real r => r -> Interval r -> Bool
@@ -113,6 +149,26 @@ member x (Interval lb ub) = testLB x lb && testUB x ub
     testLB x (Just (in1,x1)) = if in1 then x1 <= x else x1 < x
     testUB x Nothing = True
     testUB x (Just (in2,x2)) = if in2 then x <= x2 else x < x2
+
+isSubsetOf :: Real r => Interval r -> Interval r -> Bool
+isSubsetOf x _ | null x = True
+isSubsetOf (Interval lb1 ub1) (Interval lb2 ub2) = testLB lb1 lb2 && testUB ub1 ub2
+  where
+    testLB _ Nothing = True
+    testLB (Just (in1,x1)) (Just (in2,x2)) =
+      case x1 `compare` x2 of
+        GT -> True
+        LT -> False
+        EQ -> not in1 || in2 -- in1 => in2
+    testLB Nothing _ = False
+
+    testUB _ Nothing = True
+    testUB (Just (in1,x1)) (Just (in2,x2)) =
+      case x1 `compare` x2 of
+        LT -> True
+        GT -> False
+        EQ -> not in1 || in2 -- in1 => in2
+    testUB Nothing _ = False
 
 -- | pick up an element from the interval if the interval is not empty.
 pickup :: (Real r, Fractional r) => Interval r -> Maybe r
@@ -161,3 +217,4 @@ instance (Real r, Fractional r) => Linear r (Interval r)
 appPrec, appPrec1 :: Int
 appPrec = 10
 appPrec1 = appPrec + 1
+
