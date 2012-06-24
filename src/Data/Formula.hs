@@ -14,10 +14,8 @@
 -----------------------------------------------------------------------------
 module Data.Formula
   (
-
   -- * Overloaded operations for formula.
-    Complement (..)
-  , Boolean (..)
+    module Data.Lattice
 
   -- * Relational operators
   , RelOp (..)
@@ -36,33 +34,11 @@ module Data.Formula
 
 import qualified Data.IntSet as IS
 import Data.Expr
+import Data.Lattice
 
 -- ---------------------------------------------------------------------------
 
 infix 4 .<., .<=., .>=., .>., .==., ./=.
-infixr 3 .&&.
-infixr 2 .||.
-infix 1 .=>. , .<=>.
-
--- | types that can be negated.
-class Complement a where
-  notF :: a -> a
-
--- | types that can be combined with boolean operations.
-class Complement a => Boolean a where
-  true, false :: a
-  (.&&.), (.||.), (.=>.), (.<=>.) :: a -> a -> a
-
-  -- | n-ary conjunction
-  andF :: [a] -> a
-
-  -- | n-ary disjunction
-  orF :: [a] -> a
-
-  x .=>. y = notF x .||. y
-  x .<=>. y = (x .=>. y) .&&. (y .=>. x)
-  andF = foldr (.&&.) true
-  orF = foldr (.||.) false
 
 -- ---------------------------------------------------------------------------
 
@@ -111,7 +87,7 @@ flipOp NEq = NEq
 
 -- | negating relational operator
 --
--- @rel (negOp op) a b@ is equivalent to @notF (rel op a b)@
+-- @rel (negOp op) a b@ is equivalent to @notB (rel op a b)@
 negOp :: RelOp -> RelOp
 negOp Lt = Ge
 negOp Le = Gt
@@ -136,7 +112,7 @@ data Atom c = Rel (Expr c) RelOp (Expr c)
     deriving (Show, Eq, Ord)
 
 instance Complement (Atom c) where
-  notF (Rel lhs op rhs) = Rel lhs (negOp op) rhs
+  notB (Rel lhs op rhs) = Rel lhs (negOp op) rhs
 
 instance Variables (Atom c) where
   vars (Rel a _ b) = vars a `IS.union` vars b
@@ -173,14 +149,16 @@ instance Variables (Formula c) where
   vars (Exists v a) = IS.delete v (vars a)
 
 instance Complement (Formula c) where
-  notF = Not
+  notB = Not
+
+instance Lattice (Formula c) where
+  top    = T
+  bottom = F
+  meet   = And
+  join   = Or
 
 instance Boolean (Formula c) where
-  true = T
-  false = F
-  (.&&.) = And
-  (.||.) = Or
-  (.=>.) = Imply
+  (.=>.)  = Imply
   (.<=>.) = Equiv
 
 instance Rel (Expr c) (Formula c) where
@@ -206,10 +184,12 @@ newtype DNF lit
   } deriving (Show)
 
 instance Complement lit => Complement (DNF lit) where
-  notF (DNF xs) = DNF . sequence . map (map notF) $ xs
+  notB (DNF xs) = DNF . sequence . map (map notB) $ xs
 
-instance Complement lit => Boolean (DNF lit) where
-  true = DNF [[]]
-  false = DNF []
-  DNF xs .&&. DNF ys = DNF [x++y | x<-xs, y<-ys]
-  DNF xs .||. DNF ys = DNF (xs++ys)
+instance Complement lit => Lattice (DNF lit) where
+  top    = DNF [[]]
+  bottom = DNF []
+  DNF xs `meet` DNF ys = DNF [x++y | x<-xs, y<-ys]
+  DNF xs `join` DNF ys = DNF (xs++ys)
+
+instance Complement lit => Boolean (DNF lit)

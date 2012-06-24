@@ -47,6 +47,7 @@ Executable toysolver
   Other-Modules:
      Data.Delta
      Data.Expr
+     Data.Lattice
      Data.Formula
      Data.LA
      Data.Linear

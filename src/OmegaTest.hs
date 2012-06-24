@@ -164,10 +164,10 @@ eliminateQuantifiers = f
     f (Equiv a b) = f (And (Imply a b) (Imply b a))
     f (Forall v a) = do
       dnf <- f (Exists v (pushNot a))
-      return $ notF dnf
+      return $ notB dnf
     f (Exists v a) = do
       dnf <- f a
-      return $ orF [eliminate v xs | xs <- unDNF dnf]
+      return $ orB [eliminate v xs | xs <- unDNF dnf]
 
 solve :: Formula Rational -> SatResult Integer
 solve formula =

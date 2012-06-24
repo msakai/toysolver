@@ -31,6 +31,7 @@ import Data.Expr (Variables (..))
 import Data.Formula (RelOp (..), flipOp)
 import qualified Data.LA as LA
 import Data.Linear
+import Data.Lattice
 
 type ExprR = LA.Expr Rational
 type ExprZ = LA.Expr Integer
@@ -48,6 +49,15 @@ data Polyhedron
 instance Variables Polyhedron where
   vars (Polyhedron m) = IS.unions [vars e | e <- Map.keys m]
   vars Empty = IS.empty
+
+instance Lattice Polyhedron where
+  top    = univ
+  bottom = empty
+  meet   = intersection
+  join Empty b = b
+  join a Empty = a
+  join (Polyhedron m1) (Polyhedron m2) =
+    normalize $ Polyhedron (Map.intersectionWith Interval.join m1 m2)
 
 normalize :: Polyhedron -> Polyhedron
 normalize (Polyhedron m) | any Interval.null (Map.elems m) = Empty

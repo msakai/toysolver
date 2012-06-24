@@ -47,6 +47,7 @@ module Data.Interval
 import Control.Monad hiding (join)
 import Data.Maybe
 import Data.Linear
+import Data.Lattice
 import Data.Typeable
 import Util (combineMaybe, isInteger)
 import Prelude hiding (null)
@@ -57,12 +58,18 @@ data Interval r
   { lowerBound :: EndPoint r -- ^ lower bound of the interval
   , upperBound :: EndPoint r -- ^ upper bound of the interval
   }
-  deriving (Eq, Ord, Typeable)
+  deriving (Eq, Ord, Typeable)  
 
 -- | Endpoint
 -- 
 -- > (isInclusive, value)
 type EndPoint r = Maybe (Bool, r)
+
+instance (Ord r, Num r) => Lattice (Interval r) where
+  top    = univ
+  bottom = empty
+  join   = join'
+  meet   = intersection
 
 instance Show r => Show (Interval r) where
   showsPrec p x  = showParen (p > appPrec) $
@@ -134,11 +141,11 @@ intersection (Interval l1 u1) (Interval l2 u2) = interval (maxLB l1 l2) (minLB u
       )
 
 -- | join (least upperbound) of two intervals.
-join :: forall r. (Ord r, Num r) => Interval r -> Interval r -> Interval r
-join x1 x2
+join' :: forall r. (Ord r, Num r) => Interval r -> Interval r -> Interval r
+join' x1 x2
   | null x1 = x2
   | null x2 = x1
-join (Interval l1 u1) (Interval l2 u2) = interval (minLB l1 l2) (maxUB u1 u2)
+join' (Interval l1 u1) (Interval l2 u2) = interval (minLB l1 l2) (maxUB u1 u2)
   where
     maxUB :: EndPoint r -> EndPoint r -> EndPoint r
     maxUB u1 u2 = do

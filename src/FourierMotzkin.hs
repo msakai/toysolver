@@ -65,8 +65,8 @@ instance Variables Lit where
   vars (Nonneg t) = vars t
 
 instance Complement Lit where
-  notF (Pos t) = Nonneg (lnegate t)
-  notF (Nonneg t) = Pos (lnegate t)
+  notB (Pos t) = Nonneg (lnegate t)
+  notB (Nonneg t) = Pos (lnegate t)
 
 -- 制約集合の単純化
 -- It returns Nothing when a inconsistency is detected.
@@ -182,10 +182,10 @@ eliminateQuantifiers = f
     f (Equiv a b) = f (And (Imply a b) (Imply b a))
     f (Forall v a) = do
       dnf <- f (Exists v (pushNot a))
-      return (notF dnf)
+      return (notB dnf)
     f (Exists v a) = do
       dnf <- f a
-      return $ orF [eliminate v xs | xs <- unDNF dnf]
+      return $ orB [eliminate v xs | xs <- unDNF dnf]
 
 solve :: Formula Rational -> SatResult Rational
 solve formula =
@@ -222,7 +222,7 @@ evalBounds model (ls1,ls2,us1,us2) =
 -- ---------------------------------------------------------------------------
 
 constraintsToDNF :: [LA.Atom Rational] -> DNF Lit
-constraintsToDNF = andF . map constraintToDNF
+constraintsToDNF = andB . map constraintToDNF
 
 constraintToDNF :: LA.Atom Rational -> DNF Lit
 constraintToDNF (LA.Atom a op b) = DNF $

@@ -60,7 +60,7 @@ atomZ op a b = do
     Ge -> return $ Lit $ a' `geZ` b'
     Gt -> return $ Lit $ a' `gtZ` b'
     Eql -> return $ eqZ a' b'
-    NEq -> liftM notF (atomZ Eql a b)
+    NEq -> liftM notB (atomZ Eql a b)
 
 leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
 leZ e1 e2 = e1 `ltZ` (e2 .+. LA.constant 1)
@@ -88,8 +88,8 @@ instance Variables Lit where
   vars (Divisible _ _ t) = vars t
 
 instance Complement Lit where
-  notF (Pos e) = e `leZ` LA.constant 0
-  notF (Divisible b c e) = Divisible (not b) c e
+  notB (Pos e) = e `leZ` LA.constant 0
+  notB (Divisible b c e) = Divisible (not b) c e
 
 -- | quantifier-free negation normal form
 data Formula'
@@ -101,17 +101,19 @@ data Formula'
     deriving (Show, Eq, Ord)
 
 instance Complement Formula' where
-  notF T' = F'
-  notF F' = T'
-  notF (And' a b) = Or' (notF a) (notF b)
-  notF (Or' a b) = And' (notF a) (notF b)
-  notF (Lit lit) = Lit (notF lit)
+  notB T' = F'
+  notB F' = T'
+  notB (And' a b) = Or' (notB a) (notB b)
+  notB (Or' a b) = And' (notB a) (notB b)
+  notB (Lit lit) = Lit (notB lit)
 
-instance Boolean Formula' where
-  true = T'
-  false = F'
-  (.&&.) = And'
-  (.||.) = Or'
+instance Lattice Formula' where
+  top    = T'
+  bottom = F'
+  meet   = And'
+  join   = Or'
+
+instance Boolean Formula'
 
 subst1 :: Var -> ExprZ -> Formula' -> Formula'
 subst1 x e = go
@@ -169,7 +171,7 @@ simplifyLit lit@(Divisible b c e)
 data Witness = WCase1 Integer ExprZ | WCase2 Integer Integer Integer [ExprZ]
 
 eliminateZ :: Var -> Formula' -> Formula'
-eliminateZ x formula = simplify $ orF $ map fst $ eliminateZ' x formula
+eliminateZ x formula = simplify $ orB $ map fst $ eliminateZ' x formula
 
 eliminateZ' :: Var -> Formula' -> [(Formula', Witness)]
 eliminateZ' x formula = case1 ++ case2
@@ -307,7 +309,7 @@ eliminateQuantifiers = f
     f (Not a) = f (pushNot a)
     f (Imply a b) = f $ Or (Not a) b
     f (Equiv a b) = f $ And (Imply a b) (Imply b a)
-    f (Forall x body) = liftM notF $ f $ Exists x $ pushNot body
+    f (Forall x body) = liftM notB $ f $ Exists x $ pushNot body
     f (Exists x body) = liftM (eliminateZ x) (f body)
 
 -- ---------------------------------------------------------------------------
@@ -425,7 +427,7 @@ Or' (And' (Lit (Pos (Expr {coeffMap = fromList [(-1,-1),(2,2),(3,-1)]}))) (Lit (
 -}
 
 test3 :: Formula'
-test3 = eliminateZ 1 (andF [p1,p2,p3,p4])
+test3 = eliminateZ 1 (andB [p1,p2,p3,p4])
   where
     x = LA.var 0
     y = LA.var 1
