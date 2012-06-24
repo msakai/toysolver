@@ -45,7 +45,9 @@ module Data.Interval
   ) where
 
 import Control.Monad hiding (join)
+import Data.List hiding (null)
 import Data.Maybe
+import Data.Monoid
 import Data.Linear
 import Data.Lattice
 import Data.Typeable
@@ -271,3 +273,84 @@ appPrec, appPrec1 :: Int
 appPrec = 10
 appPrec1 = appPrec + 1
 
+
+instance forall r. (Real r, Fractional r) => Num (Interval r) where
+  a + b = a .+. b
+  a - b = a .-. b
+  negate a = (-1) .*. a
+  fromInteger i = singleton (fromInteger i)
+  abs x = ((x `intersection` nonneg) `join` (negate x `intersection` nonneg))
+    where
+      nonneg = interval (Just (True,0)) Nothing
+  signum x = zero `join` pos `join` neg
+    where
+      zero = if member 0 x then singleton 0 else empty
+      pos = if null $ intersection (Interval (Just (False,0)) Nothing) x
+            then empty
+            else singleton 1
+      neg = if null $ intersection (Interval Nothing (Just (False,0))) x
+            then empty
+            else singleton (-1)
+  i1 * i2 | null i1 || null i2 = empty
+  Interval lb1 ub1 * Interval lb2 ub2 = Interval lb3 ub3
+    where
+      xs = [ mulInf' x1 x2
+           | x1 <- [lbToInf lb1, ubToInf ub1]
+           , x2 <- [lbToInf lb2, ubToInf ub2]
+           ]
+      ub3 = infToUB $ maximumBy cmpUB xs
+      lb3 = infToLB $ minimumBy cmpLB xs
+
+      cmpUB, cmpLB :: (Bool, Inf r) -> (Bool, Inf r) -> Ordering
+      cmpUB (in1,x1) (in2,x2) = compare x1 x2 `mappend` compare in1 in2
+      cmpLB (in1,x1) (in2,x2) = compare x1 x2 `mappend` flip compare in1 in2          
+
+data Inf r = NegInf | Finite !r | PosInf
+  deriving (Ord, Eq)
+
+negateInf :: Num r => Inf r -> Inf r
+negateInf NegInf = PosInf
+negateInf PosInf = NegInf
+negateInf (Finite x) = Finite (negate x)
+
+mulInf' :: (Num r, Ord r) => (Bool, Inf r) -> (Bool, Inf r) -> (Bool, Inf r)
+mulInf' (True, Finite 0) _ = (True, Finite 0)
+mulInf' _ (True, Finite 0) = (True, Finite 0)
+mulInf' (in1,x1) (in2,x2) = (in1 && in2, mulInf x1 x2)
+
+mulInf :: (Num r, Ord r) => Inf r -> Inf r -> Inf r
+mulInf (Finite x1) (Finite x2) = Finite (x1 * x2)
+mulInf inf (Finite x2) =
+  case compare x2 0 of
+    EQ -> Finite 0
+    GT -> inf
+    LT -> negateInf inf
+mulInf (Finite x1) inf =
+  case compare x1 0 of
+    EQ -> Finite 0
+    GT -> inf
+    LT -> negateInf inf
+mulInf PosInf PosInf = PosInf
+mulInf PosInf NegInf = NegInf
+mulInf NegInf PosInf = NegInf
+mulInf NegInf NegInf = PosInf
+
+lbToInf :: Num r => EndPoint r -> (Bool, Inf r)
+lbToInf Nothing = (False, NegInf)
+lbToInf (Just (in1,x1)) = (in1, Finite x1)
+
+ubToInf :: Num r => EndPoint r -> (Bool, Inf r)
+ubToInf Nothing = (False, PosInf)
+ubToInf (Just (in1,x1)) = (in1, Finite x1)
+
+infToLB :: Num r => (Bool, Inf r) -> EndPoint r
+infToLB (in1, Finite x)  = Just (in1, x)
+infToLB (False, NegInf)  = Nothing
+infToLB (_, PosInf)      = error "infToLB: should not happen"
+infToLB (True, NegInf)   = error "infToLB: should not happen"
+
+infToUB :: Num r => (Bool, Inf r) -> EndPoint r
+infToUB (in1, Finite x)  = Just (in1, x)
+infToUB (False, PosInf)  = Nothing
+infToUB (_, NegInf)      = error "infToUB: should not happen"
+infToUB (True, PosInf)   = error "infToUB: should not happen"
