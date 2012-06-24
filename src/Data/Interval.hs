@@ -56,11 +56,19 @@ import Prelude hiding (null)
 
 -- | Interval
 data Interval r
-  = Interval
-  { lowerBound :: EndPoint r -- ^ lower bound of the interval
-  , upperBound :: EndPoint r -- ^ upper bound of the interval
-  }
-  deriving (Eq, Ord, Typeable)  
+  = Empty
+  | Interval (EndPoint r) (EndPoint r)
+  deriving (Eq, Typeable)  
+
+-- | Lower bound of the interval
+lowerBound :: Num r => Interval r -> EndPoint r
+lowerBound Empty = Just (False,0)
+lowerBound (Interval lb _) = lb
+
+-- | Upper bound of the interval
+upperBound :: Num r => Interval r -> EndPoint r
+upperBound Empty = Just (False,0)
+upperBound (Interval _ ub) = ub
 
 -- | Endpoint
 -- 
@@ -73,7 +81,7 @@ instance (Ord r, Num r) => Lattice (Interval r) where
   join   = join'
   meet   = intersection
 
-instance Show r => Show (Interval r) where
+instance (Num r, Show r) => Show (Interval r) where
   showsPrec p x  = showParen (p > appPrec) $
     showString "interval " .
     showsPrec appPrec1 (lowerBound x) .
@@ -110,20 +118,19 @@ openInterval
 openInterval lb ub = interval (Just (False, lb)) (Just (False, ub))
 
 -- | universal set (-∞, ∞)
-univ :: Interval r
-univ = Interval Nothing Nothing
+univ :: (Num r, Ord r) => Interval r
+univ = interval Nothing Nothing
 
 -- | empty (contradicting) interval
 empty :: Num r => Interval r
-empty = Interval (Just (False,0)) (Just (False,0))
+empty = Empty
 
 -- | singleton set \[x,x\]
-singleton :: r -> Interval r
-singleton x = Interval (Just (True, x)) (Just (True, x))
+singleton :: (Num r, Ord r) => r -> Interval r
+singleton x = interval (Just (True, x)) (Just (True, x))
 
 -- | intersection (greatest lower bounds) of two intervals
 intersection :: forall r. (Ord r, Num r) => Interval r -> Interval r -> Interval r
-intersection i1 i2 | null i1 || null i2 = empty
 intersection (Interval l1 u1) (Interval l2 u2) = interval (maxLB l1 l2) (minUB u1 u2)
   where
     maxLB :: EndPoint r -> EndPoint r -> EndPoint r
@@ -142,12 +149,12 @@ intersection (Interval l1 u1) (Interval l2 u2) = interval (maxLB l1 l2) (minUB u
           GT -> in2
       , min x1 x2
       )
+intersection _ _ = empty
 
 -- | join (least upperbound) of two intervals.
 join' :: forall r. (Ord r, Num r) => Interval r -> Interval r -> Interval r
-join' x1 x2
-  | null x1 = x2
-  | null x2 = x1
+join' Empty x2 = x2
+join' x1 Empty = x1
 join' (Interval l1 u1) (Interval l2 u2) = interval (minLB l1 l2) (maxUB u1 u2)
   where
     maxUB :: EndPoint r -> EndPoint r -> EndPoint r
@@ -175,15 +182,12 @@ join' (Interval l1 u1) (Interval l2 u2) = interval (minLB l1 l2) (maxUB u1 u2)
 
 -- | Is the interval empty?
 null :: Ord r => Interval r -> Bool
-null (Interval (Just (in1,x1)) (Just (in2,x2))) = 
-  case x1 `compare` x2 of
-    GT -> True
-    LT -> False
-    EQ -> if in1 && in2 then False else True
+null Empty = True
 null _ = False
 
 -- | Is the element in the interval?
 member :: Ord r => r -> Interval r -> Bool
+member _ Empty = False
 member x (Interval lb ub) = testLB x lb && testUB x ub
   where
     testLB x Nothing = True
@@ -198,7 +202,8 @@ notMember a i = not $ member a i
 -- | Is this a subset?
 -- @(i1 `isSubsetOf` i2)@ tells whether @i1@ is a subset of @i2@.
 isSubsetOf :: Ord r => Interval r -> Interval r -> Bool
-isSubsetOf x _ | null x = True
+isSubsetOf Empty _ = True
+isSubsetOf _ Empty = False
 isSubsetOf (Interval lb1 ub1) (Interval lb2 ub2) = testLB lb1 lb2 && testUB ub1 ub2
   where
     testLB _ Nothing = True
@@ -223,6 +228,7 @@ isProperSubsetOf i1 i2 = i1 /= i2 && i1 `isSubsetOf` i2
 
 -- | pick up an element from the interval if the interval is not empty.
 pickup :: (Real r, Fractional r) => Interval r -> Maybe r
+pickup Empty = Nothing
 pickup (Interval Nothing Nothing) = Just 0
 pickup (Interval (Just (in1,x1)) Nothing) = Just $ if in1 then x1 else x1+1
 pickup (Interval Nothing (Just (in2,x2))) = Just $ if in2 then x2 else x2-1
@@ -234,6 +240,7 @@ pickup (Interval (Just (in1,x1)) (Just (in2,x2))) =
 
 -- | tightening intervals by ceiling lower bounds and flooring upper bounds.
 tightenToInteger :: forall r. (RealFrac r) => Interval r -> Interval r
+tightenToInteger Empty = Empty
 tightenToInteger (Interval lb ub) = interval (fmap tightenLB lb) (fmap tightenUB ub)
   where
     tightenLB (incl,lb) =
@@ -253,11 +260,13 @@ tightenToInteger (Interval lb ub) = interval (fmap tightenLB lb) (fmap tightenUB
 -- Note that this instance does not satisfy algebraic laws of linear spaces.
 instance Real r => Module r (Interval r) where
   lzero = singleton 0
-  i1 .+. i2 | null i1 || null i2 = empty
+
   Interval lb1 ub1 .+. Interval lb2 ub2 = interval (f lb1 lb2) (f ub1 ub2)
     where
       f = liftM2 $ \(in1,x1) (in2,x2) -> (in1 && in2, x1 + x2)
-  c .*. i | null i = i
+  _ .+. _ = Empty
+
+  _ .*. Empty = Empty
   c .*. Interval lb ub =
     case compare c 0 of
       EQ -> singleton 0
@@ -279,20 +288,22 @@ instance forall r. (Real r, Fractional r) => Num (Interval r) where
   a - b = a .-. b
   negate a = (-1) .*. a
   fromInteger i = singleton (fromInteger i)
+
   abs x = ((x `intersection` nonneg) `join` (negate x `intersection` nonneg))
     where
       nonneg = interval (Just (True,0)) Nothing
+
   signum x = zero `join` pos `join` neg
     where
       zero = if member 0 x then singleton 0 else empty
-      pos = if null $ intersection (Interval (Just (False,0)) Nothing) x
+      pos = if null $ intersection (interval (Just (False,0)) Nothing) x
             then empty
             else singleton 1
-      neg = if null $ intersection (Interval Nothing (Just (False,0))) x
+      neg = if null $ intersection (interval Nothing (Just (False,0))) x
             then empty
             else singleton (-1)
-  i1 * i2 | null i1 || null i2 = empty
-  Interval lb1 ub1 * Interval lb2 ub2 = Interval lb3 ub3
+
+  Interval lb1 ub1 * Interval lb2 ub2 = interval lb3 ub3
     where
       xs = [ mulInf' x1 x2
            | x1 <- [lbToInf lb1, ubToInf ub1]
@@ -304,6 +315,7 @@ instance forall r. (Real r, Fractional r) => Num (Interval r) where
       cmpUB, cmpLB :: (Bool, Inf r) -> (Bool, Inf r) -> Ordering
       cmpUB (in1,x1) (in2,x2) = compare x1 x2 `mappend` compare in1 in2
       cmpLB (in1,x1) (in2,x2) = compare x1 x2 `mappend` flip compare in1 in2          
+  _ * _ = Empty
 
 data Inf r = NegInf | Finite !r | PosInf
   deriving (Ord, Eq)
