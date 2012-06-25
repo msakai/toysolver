@@ -18,37 +18,71 @@ import Data.Polynomial
 
 type Var = Int
 
+{--------------------------------------------------------------------
+  Algebraic numbers
+--------------------------------------------------------------------}
+
 -- 本当は複数の根の区別をしないといけないけど、それはまだ理解できていない
 -- あと多項式を因数分解して規約多項式にするようにしないと
 newtype A = Root (UPolynomial Integer)
   deriving (Show)
 
 instance Num A where
-  (+) = add
-  (-) = sub
-  (*) = mul
-  negate = negate'
+  Root p1 + Root p2 = Root $ rootAdd p1 p2
+  Root p1 - Root p2 = Root $ rootSub p1 p2
+  Root p1 * Root p2 = Root $ rootMul p1 p2
+  negate (Root p)   = Root $ rootNegate p
   abs    = undefined
   signum = undefined
   fromInteger i = Root (var () - constant i) 
 
 instance Fractional A where
-  recip = recip'
+  recip (Root p) = Root $ rootRecip p
   fromRational r = Root $ toZ (var () - constant r)
 
 instance Eq A where
-  a == b = eval (\() -> 0) p == 0
-    where
-      Root p = sub a b
+  Root p == Root q = 0 `isRootOf` rootSub p q
 
-add :: A -> A -> A
-add (Root p1) (Root p2) = Root $ lift2 (+) p1 p2
+-- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
+simpPoly :: UPolynomial A -> UPolynomial Integer
+simpPoly p = rootSimpPoly (\(Root q) -> q) p
 
-sub :: A -> A -> A
-sub (Root p1) (Root p2) = Root $ lift2 (flip subtract) p1 p2
+{--------------------------------------------------------------------
+  Manipulation of polynomials
+--------------------------------------------------------------------}
 
-mul :: A -> A -> A
-mul (Root p1) (Root p2) = Root $ lift2 (*) p1 p2
+rootAdd :: UPolynomial Integer -> UPolynomial Integer -> UPolynomial Integer
+rootAdd p1 p2 = lift2 (+) p1 p2
+
+rootSub :: UPolynomial Integer -> UPolynomial Integer -> UPolynomial Integer
+rootSub p1 p2 = lift2 (flip subtract) p1 p2
+
+rootMul :: UPolynomial Integer -> UPolynomial Integer -> UPolynomial Integer
+rootMul p1 p2 = lift2 (*) p1 p2
+
+rootNegate :: UPolynomial Integer -> UPolynomial Integer
+rootNegate p = fromTerms [(if mmDegree xs `mod` 2 == 0 then c else -c, xs) | (c, xs) <- terms p]
+
+rootRecip :: UPolynomial Integer -> UPolynomial Integer
+rootRecip p = fromTerms [(c, mmFromList [((), d - mmDegree xs)]) | (c, xs) <- terms p]
+  where
+    d = deg p
+
+-- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
+rootSimpPoly :: (a -> UPolynomial Integer) -> UPolynomial a -> UPolynomial Integer
+rootSimpPoly f p = toZ $ findPoly (var 0) ps
+  where
+    ys :: [(UPolynomial Integer, Var)]
+    ys = zip (Set.toAscList $ Set.fromList [f c | (c, xs) <- terms p]) [1..]
+
+    m :: Map.Map (UPolynomial Integer) Var
+    m = Map.fromDistinctAscList ys
+
+    p' :: Polynomial Rational Var
+    p' = eval (\() -> var 0) (mapCoeff (\c -> var (m Map.! (f c))) p)
+
+    ps :: [Polynomial Rational Var]
+    ps = p' : [mapCoeff fromInteger $ mapVar (\() -> x) q | (q, x) <- ys]
 
 lift2 :: (forall a. Num a => a -> a -> a)
       -> UPolynomial Integer -> UPolynomial Integer -> UPolynomial Integer
@@ -94,87 +128,75 @@ findPoly c ps = fromTerms [(coeff, mmFromList [((), n)]) | (n,coeff) <- zip [0..
               zs = mmFromList [(x,m) | (x,m) <- xs', x >= vn]
           return (ys, fromMonomial (n,zs))
 
-negate' :: A -> A
-negate' (Root p) = Root q
-  where
-    q = fromTerms [(if mmDegree xs `mod` 2 == 0 then c else -c, xs) | (c, xs) <- terms p]
-
-recip' :: A -> A
-recip' (Root p) = Root q
-  where
-    d = deg p
-    q = fromTerms [(c, mmFromList [((), d - mmDegree xs)]) | (c, xs) <- terms p]
-
--- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
-simpPoly :: UPolynomial A -> UPolynomial Rational
-simpPoly p = findPoly (var 0) ps
-  where
-    ys :: [(UPolynomial Integer, Var)]
-    ys = zip (Set.toAscList $ Set.fromList [q | (Root q, xs) <- terms p]) [1..]
-
-    m :: Map.Map (UPolynomial Integer) Var
-    m = Map.fromDistinctAscList ys
-
-    p' :: Polynomial Rational Var
-    p' = eval (\() -> var 0) (mapCoeff (\(Root q) -> var (m Map.! q)) p)
-
-    ps :: [Polynomial Rational Var]
-    ps = p' : [mapCoeff fromInteger $ mapVar (\() -> x) q | (q, x) <- ys]
-
 {--------------------------------------------------------------------
   Test cases
 --------------------------------------------------------------------}
 
 tests =
-  [ test_add
-  , test_sub
-  , test_mul
-  , test_negate
-  , test_negate_2
-  , test_recip
+  [ test_rootAdd
+  , test_rootSub
+  , test_rootMul
+  , test_rootNegate
+  , test_rootNegate_2
+  , test_rootRecip
   , test_simpPoly
   ]
 
-test_add = abs valP <= 0.0001
+test_rootAdd = abs valP <= 0.0001
   where
+    x = var ()
+
     p :: UPolynomial Integer
-    Root p = add sqrt2 sqrt3
+    p = rootAdd (x^2 - 2) (x^2 - 3)
 
     valP :: Double
     valP = eval (\() -> sqrt 2 + sqrt 3) $ mapCoeff fromInteger p
 
-test_sub = abs valP <= 0.0001
+test_rootSub = abs valP <= 0.0001
   where
+    x = var ()
+
     p :: UPolynomial Integer
-    Root p = sub sqrt2 sqrt3
+    p = rootSub (x^2 - 2) (x^2 - 3)
 
     valP :: Double
     valP = eval (\() -> sqrt 2 - sqrt 3) $ mapCoeff fromInteger p
 
-test_mul = abs valP <= 0.0001
+test_rootMul = abs valP <= 0.0001
   where
+    x = var ()
+
     p :: UPolynomial Integer
-    Root p = mul sqrt2 sqrt3
+    p = rootMul (x^2 - 2) (x^2 - 3)
 
     valP :: Double
     valP = eval (\() -> sqrt 2 * sqrt 3) $ mapCoeff fromInteger p
 
-test_negate = abs valP <= 0.0001
+test_rootNegate = abs valP <= 0.0001
   where
     x = var ()
-    Root p = negate' (Root (x^3 - 3))
+
+    p :: UPolynomial Integer
+    p = rootNegate (x^3 - 3)
+
+    valP :: Double
     valP = eval (\() -> - (3 ** (1/3))) $ mapCoeff fromInteger p
 
-test_negate_2 = negate' (Root p) == Root q
+test_rootNegate_2 = rootNegate p == q
   where
+    x :: UPolynomial Integer
     x = var ()
     p =   x^3 - 3
     q = - x^3 - 3
 
-test_recip = abs valP <= 0.0001
+test_rootRecip = abs valP <= 0.0001
   where
     x = var ()
-    Root p = recip' (Root (x^3 - 3))
+
+    p :: UPolynomial Integer
+    p = rootRecip (x^3 - 3)
+
+    valP :: Double
     valP = eval (\() -> 1 / (3 ** (1/3))) $ mapCoeff fromInteger p
 
 test_eq = (p, eval (\() -> 0) p, eval (\() -> 0) p == 0)
