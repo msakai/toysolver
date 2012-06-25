@@ -318,14 +318,24 @@ instance forall r. (Real r, Fractional r) => Num (Interval r) where
            ]
       ub3 = infToUB $ maximumBy cmpUB xs
       lb3 = infToLB $ minimumBy cmpLB xs
-
-      cmpUB, cmpLB :: (Bool, Inf r) -> (Bool, Inf r) -> Ordering
-      cmpUB (in1,x1) (in2,x2) = compare x1 x2 `mappend` compare in1 in2
-      cmpLB (in1,x1) (in2,x2) = compare x1 x2 `mappend` flip compare in1 in2          
   _ * _ = Empty
+
+instance forall r. (Real r, Fractional r) => Fractional (Interval r) where
+  fromRational r = singleton (fromRational r)
+  recip Empty = Empty
+  recip i | 0 `member` i = univ -- should be error?
+  recip (Interval lb ub) = interval lb3 ub3
+    where
+      ub3 = infToUB $ maximumBy cmpUB xs
+      lb3 = infToLB $ minimumBy cmpLB xs
+      xs = [recipLB (lbToInf lb), recipUB (ubToInf ub)]
 
 data Inf r = NegInf | Finite !r | PosInf
   deriving (Ord, Eq)
+
+cmpUB, cmpLB :: Real r => (Bool, Inf r) -> (Bool, Inf r) -> Ordering
+cmpUB (in1,x1) (in2,x2) = compare x1 x2 `mappend` compare in1 in2
+cmpLB (in1,x1) (in2,x2) = compare x1 x2 `mappend` flip compare in1 in2
 
 negateInf :: Num r => Inf r -> Inf r
 negateInf NegInf = PosInf
@@ -353,6 +363,19 @@ mulInf PosInf PosInf = PosInf
 mulInf PosInf NegInf = NegInf
 mulInf NegInf PosInf = NegInf
 mulInf NegInf NegInf = PosInf
+
+recipLB :: (Fractional r, Ord r) => (Bool, Inf r) -> (Bool, Inf r)
+recipLB (_, Finite 0) = (False, PosInf)
+recipLB (in1, x1) = (in1, recipInf x1)
+
+recipUB :: (Fractional r, Ord r) => (Bool, Inf r) -> (Bool, Inf r)
+recipUB (_, Finite 0) = (False, NegInf)
+recipUB (in1, x1) = (in1, recipInf x1)
+
+recipInf :: (Fractional r, Ord r) => Inf r -> Inf r
+recipInf PosInf = Finite 0
+recipInf NegInf = Finite 0
+recipInf (Finite x) = Finite (1/x)
 
 lbToInf :: Num r => EndPoint r -> (Bool, Inf r)
 lbToInf Nothing = (False, NegInf)

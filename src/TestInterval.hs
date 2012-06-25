@@ -307,6 +307,28 @@ case_mult_test6 = ival1 * ival2 @?= ival3
     ival3 = Interval.interval Nothing (Just (False,-4))
 
 {--------------------------------------------------------------------
+  Fractional
+--------------------------------------------------------------------}
+
+prop_recip_singleton =
+  forAll arbitrary $ \r ->
+    let n = fromIntegral (numerator r)
+        d = fromIntegral (denominator r)
+    in Interval.singleton n / Interval.singleton d == Interval.singleton (r::Rational)
+
+case_recip_pos =
+  recip pos @?= pos
+
+case_recip_neg =
+  recip neg @?= neg
+
+case_recip_test1 = recip i1 @?= i2
+  where
+    i1, i2 :: Interval Rational
+    i1 = Interval.interval (Just (True,2)) Nothing
+    i2 = Interval.interval (Just (False,0)) (Just (True,1/2))
+
+{--------------------------------------------------------------------
   Generators
 --------------------------------------------------------------------}
 
@@ -315,6 +337,18 @@ intervals = do
   lb <- arbitrary
   ub <- arbitrary
   return $ Interval.interval lb ub
+
+pos :: Interval Rational
+pos = Interval.interval (Just (False,0)) Nothing
+
+neg :: Interval Rational
+neg = Interval.interval Nothing (Just (False,0))
+
+nonpos :: Interval Rational
+nonpos = Interval.interval Nothing (Just (True,0))
+
+nonneg :: Interval Rational
+nonneg = Interval.interval (Just (True,0)) Nothing
 
 ------------------------------------------------------------------------
 -- Test harness
