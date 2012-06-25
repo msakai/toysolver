@@ -34,6 +34,7 @@ module Data.Interval
   , isProperSubsetOf
   , lowerBound
   , upperBound
+  , size
 
   -- * Combine
   , intersection
@@ -225,6 +226,12 @@ isSubsetOf (Interval lb1 ub1) (Interval lb2 ub2) = testLB lb1 lb2 && testUB ub1 
 -- | Is this a proper subset? (ie. a subset but not equal).
 isProperSubsetOf :: Ord r => Interval r -> Interval r -> Bool
 isProperSubsetOf i1 i2 = i1 /= i2 && i1 `isSubsetOf` i2
+
+-- | Size of a interval. Size of an unbounded interval is @undefined@.
+size :: (Num r, Ord r) => Interval r -> r
+size Empty = 0
+size (Interval (Just (_,l)) (Just (_,u))) = u - l
+size _ = error "Data.Interval.size: unbounded interval"
 
 -- | pick up an element from the interval if the interval is not empty.
 pickup :: (Real r, Fractional r) => Interval r -> Maybe r
