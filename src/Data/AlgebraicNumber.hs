@@ -5,6 +5,7 @@
 -- http://www.dpmms.cam.ac.uk/~wtg10/galois.html
 module Data.AlgebraicNumber where
 
+import Control.Exception (assert)
 import Data.Function
 import Data.List
 import Data.Maybe
@@ -15,6 +16,9 @@ import qualified Data.Set as Set
 import Data.Monoid
 
 import Data.Polynomial
+import qualified Data.Polynomial.Sturm as Sturm
+import Data.Interval (Interval)
+import qualified Data.Interval as Interval
 
 type Var = Int
 
@@ -23,7 +27,7 @@ type Var = Int
 --------------------------------------------------------------------}
 
 -- 本当は複数の根の区別をしないといけないけど、それはまだ理解できていない
--- あと多項式を因数分解して規約多項式にするようにしないと
+-- あと多項式を因数分解して既約多項式にするようにしないと
 newtype A = Root (UPolynomial Integer)
   deriving (Show)
 
@@ -46,6 +50,110 @@ instance Eq A where
 -- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
 simpPoly :: UPolynomial A -> UPolynomial Integer
 simpPoly p = rootSimpPoly (\(Root q) -> q) p
+
+{--------------------------------------------------------------------
+  Algebraic reals
+--------------------------------------------------------------------}
+
+-- TODO: 多項式を因数分解して既約多項式にするようにしないと
+
+data AReal = RealRoot (UPolynomial Integer) (Interval Rational)
+  deriving Show
+
+realRoots :: UPolynomial Rational -> [AReal]
+realRoots p = [RealRoot p' i | i <- Sturm.separate p]
+  where
+    p' = toZ p
+
+testRealRoots = (a+b, a*b, a < b, a==b, a > b)
+  where
+    x = var ()
+    [a,b] = realRoots (x^2 - 2)
+
+isZero :: AReal -> Bool
+isZero (RealRoot p i) = 0 `Interval.member` i && 0 `isRootOf` p
+
+instance Eq AReal where
+  a == b = isZero (a - b)
+
+instance Ord AReal where
+  compare a b
+    | isZero c = EQ
+    | Sturm.numRoots p' ipos == 1 = GT
+    | otherwise = assert (Sturm.numRoots p' ineg == 1) LT
+    where
+      c@(RealRoot p i) = a - b
+      p' = mapCoeff fromInteger p
+      ipos = Interval.intersection i (Interval.interval (Just (False,0)) Nothing)
+      ineg = Interval.intersection i (Interval.interval Nothing (Just (False,0)))
+
+instance Num AReal where
+  RealRoot p1 i1 + RealRoot p2 i2 = RealRoot p3 i3
+    where
+      p3 = rootAdd p1 p2
+      i3 = go i1 i2 (Sturm.separate p3')
+
+      p1' = mapCoeff fromInteger p1
+      p2' = mapCoeff fromInteger p2
+      p3' = mapCoeff fromInteger p3
+
+      go i1 i2 is3 =
+        case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots p3' i5 > 0] of
+          [] -> error "AReal.+: should not happen"
+          [i5] -> i5
+          is5 ->
+            go (Sturm.narrow p1' i1 (Interval.size i1 / 2))
+               (Sturm.narrow p2' i2 (Interval.size i2 / 2))
+               [Sturm.narrow p3' i5 (Interval.size i5 / 2) | i5 <- is5]
+        where
+          i4 = i1 + i2
+
+  RealRoot p1 i1 * RealRoot p2 i2 = RealRoot p3 i3
+    where
+      p3 = rootMul p1 p2
+      i3 = go i1 i2 (Sturm.separate p3')
+
+      p1' = mapCoeff fromInteger p1
+      p2' = mapCoeff fromInteger p2
+      p3' = mapCoeff fromInteger p3
+
+      go i1 i2 is3 =
+        case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots p3' i5 > 0] of
+          [] -> error "AReal.*: should not happen"
+          [i5] -> i5
+          is5 ->
+            go (Sturm.narrow p1' i1 (Interval.size i1 / 2))
+               (Sturm.narrow p2' i2 (Interval.size i2 / 2))
+               [Sturm.narrow p3' i5 (Interval.size i5 / 2) | i5 <- is5]
+        where
+          i4 = i1 * i2
+
+  negate (RealRoot p i) = RealRoot (rootNegate p) (-i)
+
+  abs a =
+    case compare 0 a of
+      EQ -> fromInteger 0
+      LT -> a
+      GT -> negate a
+
+  signum a = fromInteger $
+    case compare 0 a of
+      EQ -> 0
+      LT -> 1
+      GT -> -1
+
+  fromInteger i = RealRoot (x - constant i) (Interval.singleton (fromInteger i))
+    where
+      x = var ()
+
+instance Fractional AReal where
+  fromRational r = RealRoot (toZ (x - constant r)) (Interval.singleton r)
+    where
+      x = var ()
+
+  recip a@(RealRoot p i)
+    | isZero a  = error "AReal.recip: zero division"
+    | otherwise = RealRoot (rootRecip p) (recip i)
 
 {--------------------------------------------------------------------
   Manipulation of polynomials
@@ -152,6 +260,13 @@ test_rootAdd = abs valP <= 0.0001
     valP :: Double
     valP = eval (\() -> sqrt 2 + sqrt 3) $ mapCoeff fromInteger p
 
+-- bug?
+test_rootAdd_2 = p
+  where
+    x = var ()    
+    p :: UPolynomial Integer
+    p = rootAdd (x^2 - 2) (x^6 + 6*x^3 - 2*x^2 + 9)
+
 test_rootSub = abs valP <= 0.0001
   where
     x = var ()
@@ -217,14 +332,3 @@ sqrt2 = Root (x^2 - 2)
   where
     x = var ()
 
--- √3
-sqrt3 :: A
-sqrt3 = Root (x^2 - 3)
-  where
-    x = var ()
-
--- √4
-sqrt4 :: A
-sqrt4 = Root (x^2 - 4)
-  where
-    x = var ()
