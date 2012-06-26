@@ -29,6 +29,7 @@ module SAT.Types
   , normalizePBExactly
   , cutResolve
   , cardinalityReduction
+  , negatePBAtLeast
   ) where
 
 import Control.Monad
@@ -217,3 +218,6 @@ cardinalityReduction (lhs,rhs) = (ls, rhs')
       | a - 1 < guard' = go2 (guard' - a) ts
       | otherwise      = map snd ts
     go2 _ [] = error "cardinalityReduction: should not happen"
+
+negatePBAtLeast :: ([(Integer, Lit)], Integer) -> ([(Integer, Lit)], Integer)
+negatePBAtLeast (xs, rhs) = ([(-c,lit) | (c,lit)<-xs] , -rhs + 1)
