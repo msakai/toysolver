@@ -1926,19 +1926,30 @@ pbPropagate solver this = do
   if s < 0
     then return False
     else do
+      ref <- newIORef Nothing
+      let m = do
+            x <- readIORef ref
+            case x of
+              Just r -> return r
+              Nothing -> do
+                let isFalse (l,_) = liftM (lFalse==) (litValue solver l)
+                r <- filterM isFalse $ IM.toAscList $ pbTerms this
+                writeIORef ref (Just r)
+                return r
+
       forM_ (IM.toList (pbTerms this)) $ \(l1,c1) -> do
         when (c1 > s) $ do
           v <- litValue solver l1
           when (v == lUndef) $ do
             -- あとでbasicReasonOfで使うために、
             -- その時点でfalseになっているリテラルを保存しておく
-            let isFalse (l,_) = liftM (lFalse==) (litValue solver l)
-            r <- filterM isFalse $ IM.toAscList $ pbTerms this
+            r <- m
             modifyIORef (pbReasons this) (IM.insert l1 r)
 
             assignBy solver l1 this
             constrBumpActivity solver this
             return ()
+
       return True
 
 pbOverSAT :: Solver -> ([(Integer,Lit)],Integer) -> IO Bool
