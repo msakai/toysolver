@@ -1807,6 +1807,7 @@ data PBAtLeastData
   , pbDegree :: !Integer
   , pbSlack  :: !(IORef Integer)
   , pbActivity :: !(IORef Double)
+  , pbReasons :: !(IORef (LitMap [(Lit, Integer)]))
   }
   deriving Eq
 
@@ -1816,7 +1817,8 @@ newPBAtLeastData ts degree learnt = do
       m = IM.fromList [(l,c) | (c,l) <- ts]
   s <- newIORef slack
   act <- newIORef $! (if learnt then 0 else -1)
-  return (PBAtLeastData m degree s act)
+  rs <- newIORef IM.empty
+  return (PBAtLeastData m degree s act rs)
 
 instance Constraint PBAtLeastData where
   toConstraint = ConstrPBAtLeast
@@ -1848,9 +1850,17 @@ instance Constraint PBAtLeastData where
 
   basicReasonOf solver this l = do
     let m = pbTerms this
-    xs <- do
-      tmp <- filterM (\(lit,_) -> liftM (lFalse ==) (litValue solver lit)) (IM.toList m)
-      return $ sortBy (flip (comparing snd)) tmp
+    xs <-
+      case l of
+        Just lit -> do
+          -- 保存しておいたものを使わないと、
+          -- その後に割り当てられたものを含んでしまってまずいことがある。
+          rs <- readIORef (pbReasons this)
+          return $ sortBy (flip (comparing snd)) $ (rs IM.! lit)
+        Nothing -> do
+          -- 直接のコンフリクトの場合には現在のもので大丈夫なはず
+          tmp <- filterM (\(lit,_) -> liftM (lFalse ==) (litValue solver lit)) (IM.toList m)
+          return $ sortBy (flip (comparing snd)) $ tmp
     let max_slack = sum (map snd $ IM.toList m) - pbDegree this
     case l of
       Nothing -> return $ f max_slack xs
@@ -1920,6 +1930,12 @@ pbPropagate solver this = do
         when (c1 > s) $ do
           v <- litValue solver l1
           when (v == lUndef) $ do
+            -- あとでbasicReasonOfで使うために、
+            -- その時点でfalseになっているリテラルを保存しておく
+            let isFalse (l,_) = liftM (lFalse==) (litValue solver l)
+            r <- filterM isFalse $ IM.toAscList $ pbTerms this
+            modifyIORef (pbReasons this) (IM.insert l1 r)
+
             assignBy solver l1 this
             constrBumpActivity solver this
             return ()
