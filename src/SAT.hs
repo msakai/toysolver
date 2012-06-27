@@ -849,58 +849,10 @@ search solver !conflict_lim onConflict = loop 0
             else if conflict_lim >= 0 && c+1 >= conflict_lim then
               return Nothing
             else do
-              strat <- readIORef (svLearningStrategy solver)
-              case strat of
-                LearningClause -> do
-                  (learntClause, level) <- analyzeConflict solver constr
-                  backtrackTo solver level
-                  case learntClause of
-                    [] -> error "search(LearningClause): should not happen"
-                    [lit] -> do
-                      ret <- assign solver lit
-                      assert ret $ return ()
-                      return ()
-                    lit:_ -> do
-                      cl <- newClauseData learntClause True
-                      attach solver cl
-                      addToLearntDB solver cl
-                      assignBy solver lit cl
-                      constrBumpActivity solver cl
-                  loop (c+1)
-                LearningHybrid -> do
-                  let loop2 confl = do
-                        (learntClause, level, pb) <- analyzeConflictHybrid solver confl
-                        level2 <- pbBacktrackLevel solver pb
-                        let level3 = min level level2
-
-                        pbdata <- newPBAtLeastData (fst pb) (snd pb) True
-                        attach solver pbdata
-                        addToLearntDB solver pbdata
-
-                        backtrackTo solver level3
-                        slack <- readIORef (pbSlack pbdata)
-                        if slack < 0
-                          then do
-                            if level3 == levelRoot
-                             then markBad solver >> return (Just False)
-                             else loop2 (toConstraint pbdata)
-                          else do
-                            case learntClause of
-                              [] -> error "search(LearningHybrid): should not happen"
-                              [lit] -> do
-                                ret <- assign solver lit
-                                assert ret $ return ()
-                                return ()
-                              lit:_ -> do
-                                cl <- newClauseData learntClause True
-                                attach solver cl
-                                addToLearntDB solver cl
-                                when (level3 == level) $ do
-                                  assignBy solver lit cl
-                                  constrBumpActivity solver cl
-                            pbPropagate solver pbdata
-                            loop (c+1)
-                  loop2 constr
+              b <- handleConflict constr
+              if b
+                then loop (c+1)
+                else markBad solver >> return (Just False)
 
     pickAssumption :: IO (Maybe Lit)
     pickAssumption = do
@@ -924,6 +876,60 @@ search solver !conflict_lim onConflict = loop 0
                      return (Just l)
       go
 
+    handleConflict :: SomeConstraint -> IO Bool
+    handleConflict constr = do
+      strat <- readIORef (svLearningStrategy solver)
+      case strat of
+        LearningClause -> do
+          (learntClause, level) <- analyzeConflict solver constr
+          backtrackTo solver level
+          case learntClause of
+            [] -> error "search(LearningClause): should not happen"
+            [lit] -> do
+              ret <- assign solver lit
+              assert ret $ return ()
+              return ()
+            lit:_ -> do
+              cl <- newClauseData learntClause True
+              attach solver cl
+              addToLearntDB solver cl
+              assignBy solver lit cl
+              constrBumpActivity solver cl
+          return True
+        LearningHybrid -> do
+          let loop2 confl = do
+                (learntClause, level, pb) <- analyzeConflictHybrid solver confl
+                level2 <- pbBacktrackLevel solver pb
+                let level3 = min level level2
+
+                pbdata <- newPBAtLeastData (fst pb) (snd pb) True
+                attach solver pbdata
+                addToLearntDB solver pbdata
+
+                backtrackTo solver level3
+                slack <- readIORef (pbSlack pbdata)
+                if slack < 0
+                  then do
+                    if level3 == levelRoot
+                     then return False
+                     else loop2 (toConstraint pbdata)
+                  else do
+                    case learntClause of
+                      [] -> error "search(LearningHybrid): should not happen"
+                      [lit] -> do
+                        ret <- assign solver lit
+                        assert ret $ return ()
+                        return ()
+                      lit:_ -> do
+                        cl <- newClauseData learntClause True
+                        attach solver cl
+                        addToLearntDB solver cl
+                        when (level3 == level) $ do
+                          assignBy solver lit cl
+                          constrBumpActivity solver cl
+                    pbPropagate solver pbdata
+                    return True
+          loop2 constr
 
 -- | A model is represented as a mapping from variables to its values.
 type Model = UArray Var Bool
