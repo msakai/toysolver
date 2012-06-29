@@ -73,3 +73,11 @@ Usage: maxsat2lp [file.cnf|file.wcnf|-]
 Converter from .opb/.wbo file to .lp file.
 
 Usage: pb2lp [--wbo] [file.opb|file.wbo|-]
+
+TODO
+----
+
+* Gröbner basis
+* Cylindrical algebraic decomposition
+* Local search
+* Suvery propagation
