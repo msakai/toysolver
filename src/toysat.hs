@@ -48,10 +48,11 @@ import GHC.IO.Encoding
 
 import Data.Linear
 import qualified SAT
+import qualified SAT.Integer
+import SAT.Printer
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
 import qualified Linearizer as Lin
-import qualified SAT.Integer
 import Version
 import Util (showRational)
 
@@ -262,16 +263,7 @@ solveSAT _ solver cnf = do
   hFlush stdout
   when result $ do
     m <- SAT.model solver
-    satPrintModel m
-
-satPrintModel :: SAT.Model -> IO ()
-satPrintModel m = do
-  forM_ (split 10 (assocs m)) $ \xs -> do
-    putStr "v"
-    forM_ xs $ \(var,val) -> putStr (' ': show (SAT.literal var val))
-    putStrLn ""
-  putStrLn "v 0"
-  hFlush stdout
+    satPrintModel stdout m (DIMACS.numVars cnf)
 
 -- ------------------------------------------------------------------------
 
@@ -309,7 +301,7 @@ solvePB opt solver formula@(obj, cs) = do
       hFlush stdout
       when result $ do
         m <- SAT.model solver
-        pbPrintModel m n
+        pbPrintModel stdout m n
 
     Just obj' -> do
       obj'' <- pbConvSum lin obj'
@@ -328,7 +320,7 @@ solvePB opt solver formula@(obj, cs) = do
         Right (Just m) -> do
           putStrLn $ "s " ++ "OPTIMUM FOUND"
           hFlush stdout
-          pbPrintModel m n
+          pbPrintModel stdout m n
         Left (e :: AsyncException) -> do
           r <- readIORef modelRef
           case r of
@@ -337,7 +329,7 @@ solvePB opt solver formula@(obj, cs) = do
               hFlush stdout
             Just m -> do
               putStrLn $ "s " ++ "SATISFIABLE"
-              pbPrintModel m n
+              pbPrintModel stdout m n
           throwIO e
 
 pbConvSum :: Lin.Linearizer -> PBFile.Sum -> IO [(Integer, SAT.Lit)]
@@ -430,15 +422,6 @@ minimize opt solver obj update = do
 pbEval :: SAT.Model -> [(Integer, SAT.Lit)] -> Integer
 pbEval m xs = sum [c | (c,lit) <- xs, m ! SAT.litVar lit == SAT.litPolarity lit]
 
-pbPrintModel :: SAT.Model -> Int -> IO ()
-pbPrintModel m n = do
-  let as = takeWhile (\(v,_) -> v <= n) $ assocs m
-  forM_ (split 10 as) $ \xs -> do
-    putStr "v"
-    forM_ xs $ \(var,val) -> putStr (" " ++ (if val then "" else "-") ++ "x" ++ show var)
-    putStrLn ""
-  hFlush stdout
-
 -- ------------------------------------------------------------------------
 
 mainWBO :: Options -> SAT.Solver -> [String] -> IO ()
@@ -494,14 +477,14 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
       putStrLn $ "s " ++ "OPTIMUM FOUND"
       hFlush stdout
       if isMaxSat
-        then maxsatPrintModel m nvar
-        else pbPrintModel m nvar
+        then maxsatPrintModel stdout m nvar
+        else pbPrintModel stdout m nvar
     Left (e :: AsyncException) -> do
       r <- readIORef modelRef
       case r of
         Just m | not isMaxSat -> do
           putStrLn $ "s " ++ "SATISFIABLE"
-          pbPrintModel m nvar
+          pbPrintModel stdout m nvar
         _ -> do
           putStrLn $ "s " ++ "UNKNOWN"
           hFlush stdout
@@ -558,16 +541,6 @@ solveMaxSAT opt solver (_, top, cs) = do
              | (w,lits) <- cs
              ]
            )
-
-maxsatPrintModel :: SAT.Model -> Int -> IO ()
-maxsatPrintModel m n = do
-  let as = takeWhile (\(v,_) -> v <= n) $ assocs m
-  forM_ (split 10 as) $ \xs -> do
-    putStr "v"
-    forM_ xs $ \(var,val) -> putStr (' ' : show (SAT.literal var val))
-    putStrLn ""
-  -- no terminating 0 is necessary
-  hFlush stdout
 
 -- ------------------------------------------------------------------------
 
@@ -694,12 +667,4 @@ solveLP opt solver lp = do
     asBin _ = error "asBin: failure"
 
 -- ------------------------------------------------------------------------
-
-split :: Int -> [a] -> [[a]]
-split n = go
-  where
-    go [] = []
-    go xs =
-      case splitAt n xs of
-        (ys, zs) -> ys : go zs
 

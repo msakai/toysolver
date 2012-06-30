@@ -91,7 +91,6 @@ import Data.Array.Unsafe (unsafeFreeze)
 import Data.Array.IO
 #endif
 import Data.Array.Base (unsafeRead, unsafeWrite)
-import Data.Array.Unboxed
 import Data.IORef
 import Data.List
 import Data.Maybe
@@ -928,9 +927,6 @@ search solver !conflict_lim onConflict = loop 0
                     constrBumpActivity solver cl
               pbPropagate solver pbdata
               return True
-
--- | A model is represented as a mapping from variables to its values.
-type Model = UArray Var Bool
 
 -- | After 'solve' returns True, it returns the model.
 model :: Solver -> IO Model

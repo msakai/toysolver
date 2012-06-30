@@ -6,6 +6,9 @@ module SAT.Types
   , VarMap
   , validVar
 
+  -- * Model
+  , Model
+
   -- * Literal
   , Lit
   , LitSet
@@ -34,6 +37,7 @@ module SAT.Types
 
 import Control.Monad
 import Control.Exception
+import Data.Array.Unboxed
 import Data.Ord
 import Data.List
 import qualified Data.IntMap as IM
@@ -47,6 +51,9 @@ type VarMap = IM.IntMap
 
 validVar :: Var -> Bool
 validVar v = v > 0
+
+-- | A model is represented as a mapping from variables to its values.
+type Model = UArray Var Bool
 
 -- | Positive (resp. negative) literals are represented as positive (resp.
 -- negative) integers. (DIMACS format).
