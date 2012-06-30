@@ -19,6 +19,7 @@ module SAT.Types
   , litNot
   , litVar
   , litPolarity
+  , evalLit
 
   -- * Clause
   , Clause
@@ -33,6 +34,9 @@ module SAT.Types
   , cutResolve
   , cardinalityReduction
   , negatePBAtLeast
+  , pbEval
+  , pbLowerBound
+  , pbUpperBound
   ) where
 
 import Control.Monad
@@ -49,6 +53,7 @@ type Var = Int
 
 type VarMap = IM.IntMap
 
+{-# INLINE validVar #-}
 validVar :: Var -> Bool
 validVar v = v > 0
 
@@ -59,15 +64,18 @@ type Model = UArray Var Bool
 -- negative) integers. (DIMACS format).
 type Lit = Int
 
+{-# INLINE litUndef #-}
 litUndef :: Lit
 litUndef = 0
 
 type LitSet = IS.IntSet
 type LitMap = IM.IntMap
 
+{-# INLINE validLit #-}
 validLit :: Lit -> Bool
 validLit l = l /= 0
 
+{-# INLINE literal #-}
 -- | Construct a literal from a variable and its polarity.
 -- 'True' (resp 'False') means positive (resp. negative) literal.
 literal :: Var  -- ^ variable
@@ -76,6 +84,7 @@ literal :: Var  -- ^ variable
 literal v polarity =
   assert (validVar v) $ if polarity then v else litNot v
 
+{-# INLINE litNot #-}
 -- | Negation of the 'Lit'.
 litNot :: Lit -> Lit
 litNot l = assert (validLit l) $ negate l
@@ -90,6 +99,10 @@ litVar l = assert (validLit l) $ abs l
 -- 'True' means positive literal and 'False' means negative literal.
 litPolarity :: Lit -> Bool
 litPolarity l = assert (validLit l) $ l > 0
+
+{-# INLINE evalLit #-}
+evalLit :: Model -> Lit -> Bool
+evalLit m l = if l > 0 then m ! l else not (m ! abs l)
 
 -- | Disjunction of 'Lit'.
 type Clause = [Lit]
@@ -228,3 +241,12 @@ cardinalityReduction (lhs,rhs) = (ls, rhs')
 
 negatePBAtLeast :: ([(Integer, Lit)], Integer) -> ([(Integer, Lit)], Integer)
 negatePBAtLeast (xs, rhs) = ([(-c,lit) | (c,lit)<-xs] , -rhs + 1)
+
+pbEval :: Model -> [(Integer, Lit)] -> Integer
+pbEval m xs = sum [c | (c,lit) <- xs, evalLit m lit]
+
+pbLowerBound :: [(Integer, Lit)] -> Integer
+pbLowerBound xs = sum [if c < 0 then c else 0 | (c,_) <- xs]
+
+pbUpperBound :: [(Integer, Lit)] -> Integer
+pbUpperBound xs = sum [if c > 0 then c else 0 | (c,_) <- xs]

@@ -49,6 +49,7 @@ import GHC.IO.Encoding
 import Data.Linear
 import qualified SAT
 import qualified SAT.Integer
+import SAT.Types (pbEval, pbLowerBound)
 import SAT.Printer
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
@@ -339,9 +340,6 @@ pbConvSum lin = mapM f
       l <- Lin.translate lin ls
       return (w,l)
 
-pbLowerBound :: [(Integer, SAT.Lit)] -> Integer
-pbLowerBound xs = sum [if c < 0 then c else 0 | (c,_) <- xs]
-
 minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
 minimize opt solver obj update = do
   when (optObjFunVarsHeuristics opt) $ do
@@ -418,9 +416,6 @@ minimize opt solver obj update = do
              loop lb' ub m
 
      loop lb0 ub0 m0
-
-pbEval :: SAT.Model -> [(Integer, SAT.Lit)] -> Integer
-pbEval m xs = sum [c | (c,lit) <- xs, m ! SAT.litVar lit == SAT.litPolarity lit]
 
 -- ------------------------------------------------------------------------
 
