@@ -14,6 +14,7 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
 import Data.Polynomial
+import Data.Polynomial.GBase
 import Data.Polynomial.Sturm
 import qualified Data.Polynomial.Lagrange as Lagrange
 import qualified Data.Interval as Interval

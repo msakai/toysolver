@@ -16,6 +16,7 @@ import qualified Data.Set as Set
 import Data.Monoid
 
 import Data.Polynomial
+import Data.Polynomial.GBase
 import qualified Data.Polynomial.Sturm as Sturm
 import Data.Interval (Interval)
 import qualified Data.Interval as Interval

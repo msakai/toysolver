@@ -12,7 +12,8 @@ import qualified Data.IntSet as IS
 
 import qualified Data.LA as LA
 import Data.Expr (Variables (..))
-import Polynomial
+import Data.Polynomial
+import Data.Polynomial.GBase
 
 type Var = Int
 

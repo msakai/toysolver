@@ -65,6 +65,7 @@ module Data.Polynomial
   , polyDivMod
   , polyGCD
   , polyLCM
+  , reduce
 
   -- * Monomial
   , Monomial
@@ -98,12 +99,6 @@ module Data.Polynomial
   , revlex
   , grlex
   , grevlex
-
-  -- * Gröbner basis
-  , buchberger
-  , reduce
-  , spolynomial
-  , reduceGBase
 
   -- * Utility functions
   , render
@@ -245,6 +240,22 @@ toZ p = fromTerms [(numerator (c * fromInteger s), xs) | (c,xs) <- ts]
   where
     ts = [(toRational c, xs) | (c,xs) <- terms p]
     s = foldl' lcm  1 (map (denominator . fst) ts)
+
+-- | Multivariate division algorithm
+reduce
+  :: (Eq k, Fractional k, Ord v, Show v)
+  => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> Polynomial k v
+reduce cmp p fs = go p
+  where
+    ls = [(leadingTerm cmp f, f) | f <- fs]
+    go g = if null xs then g else go (head xs)
+      where
+        ms = sortBy (flip cmp `on` snd) (terms g)
+        xs = do
+          (a,f) <- ls
+          h <- ms
+          guard $ monomialDivisible h a
+          return (g - fromMonomial (monomialDiv h a) * f)
 
 {--------------------------------------------------------------------
   Rendering
@@ -482,69 +493,3 @@ grlex = (compare `on` mmDegree) `mappend` lex
 -- | graded reverse lexicographic order
 grevlex :: Ord v => MonomialOrder v
 grevlex = (compare `on` mmDegree) `mappend` revlex
-
-{--------------------------------------------------------------------
-  Gröbner basis
---------------------------------------------------------------------}
-
--- | Multivariate division algorithm
-reduce
-  :: (Eq k, Fractional k, Ord v, Show v)
-  => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> Polynomial k v
-reduce cmp p fs = go p
-  where
-    ls = [(leadingTerm cmp f, f) | f <- fs]
-    go g = if null xs then g else go (head xs)
-      where
-        ms = sortBy (flip cmp `on` snd) (terms g)
-        xs = do
-          (a,f) <- ls
-          h <- ms
-          guard $ monomialDivisible h a
-          return (g - fromMonomial (monomialDiv h a) * f)
-
-spolynomial
-  :: (Eq k, Fractional k, Ord v, Show v)
-  => MonomialOrder v -> Polynomial k v -> Polynomial k v -> Polynomial k v
-spolynomial cmp f g =
-      fromMonomial ((1,xs) `monomialDiv` (c1,xs1)) * f
-    - fromMonomial ((1,xs) `monomialDiv` (c2,xs2)) * g
-  where
-    xs = mmLCM xs1 xs2
-    (c1, xs1) = leadingTerm cmp f
-    (c2, xs2) = leadingTerm cmp g
-
-buchberger
-  :: forall k v. (Eq k, Fractional k, Ord k, Ord v, Show v)
-  => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
-buchberger cmp fs = reduceGBase cmp $ go fs (pairs fs)
-  where  
-    go :: [Polynomial k v] -> [(Polynomial k v, Polynomial k v)] -> [Polynomial k v]
-    go gs [] = gs
-    go gs ((fi,fj):ps)
-      | r == 0    = go gs ps
-      | otherwise = go (r:gs) ([(r,g) | g <- gs] ++ ps)
-      where
-        spoly = spolynomial cmp fi fj
-        r = reduce cmp spoly gs
-
-reduceGBase
-  :: forall k v. (Eq k, Ord k, Fractional k, Ord v, Show v)
-  => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
-reduceGBase cmp ps = Set.toList $ Set.fromList $ go ps []
-  where
-    go [] qs = qs
-    go (p:ps) qs
-      | q == 0    = go ps qs
-      | otherwise = go ps (constant (1/c) * q : qs)
-      where
-        q = reduce cmp p (ps++qs)
-        (c,_) = leadingTerm cmp q
-
-{--------------------------------------------------------------------
-  Utilities
---------------------------------------------------------------------}
-
-pairs :: [a] -> [(a,a)]
-pairs [] = []
-pairs (x:xs) = [(x,y) | y <- xs] ++ pairs xs
