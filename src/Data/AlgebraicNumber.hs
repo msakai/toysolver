@@ -174,6 +174,11 @@ rootNegate p = fromTerms [(if (d - mmDegree xs) `mod` 2 == 0 then c else -c, xs)
   where
     d = deg p
 
+rootScale :: Rational -> UPolynomial Integer -> UPolynomial Integer
+rootScale r p = toZ $ fromTerms [(r^(d - mmDegree xs) * fromIntegral c, xs) | (c, xs) <- terms p]
+  where
+    d = deg p
+
 rootRecip :: UPolynomial Integer -> UPolynomial Integer
 rootRecip p = fromTerms [(c, mmFromList [((), d - mmDegree xs)]) | (c, xs) <- terms p]
   where
@@ -250,6 +255,7 @@ tests =
   , test_rootNegate
   , test_rootNegate_2
   , test_rootNegate_3
+  , test_rootScale
   , test_rootRecip
   , test_simpPoly
   ]
@@ -314,6 +320,13 @@ test_rootNegate_3 = rootNegate p == q
     x = var ()
     p = (x-2)*(x-3)*(x-4)
     q = (x+2)*(x+3)*(x+4)
+
+test_rootScale = rootScale 2 p == q
+  where
+    x :: UPolynomial Integer
+    x = var ()
+    p = (x-2)*(x-3)*(x-4)
+    q = (x-4)*(x-6)*(x-8)
 
 test_rootRecip = abs valP <= 0.0001
   where
