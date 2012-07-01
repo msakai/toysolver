@@ -62,19 +62,25 @@ spolynomial cmp f g =
 buchberger
   :: forall k v. (Eq k, Fractional k, Ord k, Ord v, Show v)
   => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
-buchberger cmp fs = reduceGBase cmp $ go fs (H.fromList [item cmp fi fj | (fi,fj) <- pairs fs])
-  where  
+buchberger cmp fs = reduceGBase cmp $ go fs (H.fromList [item cmp fi fj | (fi,fj) <- pairs fs, checkGCD fi fj])
+  where
     go :: [Polynomial k v] -> H.Heap (Item k v) -> [Polynomial k v]
     go gs h | H.null h = gs
     go gs h
       | r == 0    = go gs h'
-      | otherwise = go (r:gs) (H.union h' (H.fromList [item cmp r g | g <- gs]))
+      | otherwise = go (r:gs) (H.union h' (H.fromList [item cmp r g | g <- gs, checkGCD fi fj]))
       where
         Just (i, h') = H.viewMin h
         fi = iFst i
         fj = iSnd i
         spoly = spolynomial cmp fi fj
         r = reduce cmp spoly gs
+
+    -- gcdが1となる組は選ばなくて良い
+    checkGCD fi fj = mmGCD mm1 mm2 /= mmOne
+      where
+        (_, mm1) = leadingTerm cmp fi
+        (_, mm2) = leadingTerm cmp fj
 
 reduceGBase
   :: forall k v. (Eq k, Ord k, Fractional k, Ord v, Show v)
