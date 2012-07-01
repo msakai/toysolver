@@ -25,32 +25,11 @@ type Var = Int
 
 {--------------------------------------------------------------------
   Algebraic numbers
+
+以下の代数的実数の場合にはスツルムの定理による根の分離で色々できているけど、
+一般の代数的数の場合にどうすれば良いかはまだちゃんと理解できていない。
+なので、一旦色々削除した。
 --------------------------------------------------------------------}
-
--- 本当は複数の根の区別をしないといけないけど、それはまだ理解できていない
--- あと多項式を因数分解して既約多項式にするようにしないと
-newtype A = Root (UPolynomial Integer)
-  deriving (Show)
-
-instance Num A where
-  Root p1 + Root p2 = Root $ rootAdd p1 p2
-  Root p1 - Root p2 = Root $ rootSub p1 p2
-  Root p1 * Root p2 = Root $ rootMul p1 p2
-  negate (Root p)   = Root $ rootNegate p
-  abs    = undefined
-  signum = undefined
-  fromInteger i = Root (var () - constant i) 
-
-instance Fractional A where
-  recip (Root p) = Root $ rootRecip p
-  fromRational r = Root $ toZ (var () - constant r)
-
-instance Eq A where
-  Root p == Root q = 0 `isRootOf` rootSub p q
-
--- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
-simpPoly :: UPolynomial A -> UPolynomial Integer
-simpPoly p = rootSimpPoly (\(Root q) -> q) p
 
 {--------------------------------------------------------------------
   Algebraic reals
@@ -156,6 +135,10 @@ instance Fractional AReal where
     | isZero a  = error "AReal.recip: zero division"
     | otherwise = RealRoot (rootRecip p) (recip i)
 
+-- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
+simpARealPoly :: UPolynomial AReal -> UPolynomial Integer
+simpARealPoly p = rootSimpPoly (\(RealRoot q _) -> q) p
+
 {--------------------------------------------------------------------
   Manipulation of polynomials
 --------------------------------------------------------------------}
@@ -257,7 +240,7 @@ tests =
   , test_rootNegate_3
   , test_rootScale
   , test_rootRecip
-  , test_simpPoly
+  , test_simpARealPoly
   ]
 
 test_rootAdd = abs valP <= 0.0001
@@ -338,12 +321,10 @@ test_rootRecip = abs valP <= 0.0001
     valP :: Double
     valP = eval (\() -> 1 / (3 ** (1/3))) $ mapCoeff fromInteger p
 
-test_eq = (p, eval (\() -> 0) p, eval (\() -> 0) p == 0)
-  where
-    Root p = sqrt2*sqrt2 - 2
+test_eq = sqrt2*sqrt2 - 2 == 0
 
 -- 期待値は Wolfram Alpha で x^3 - Sqrt[2]*x + 3 を調べて Real root の exact form で得た
-test_simpPoly = simpPoly p == q
+test_simpARealPoly = simpARealPoly p == q
   where
     x :: forall k. (Num k, Eq k) => UPolynomial k
     x = var ()
@@ -351,8 +332,13 @@ test_simpPoly = simpPoly p == q
     q = x^6 + 6*x^3 - 2*x^2 + 9
 
 -- √2
-sqrt2 :: A
-sqrt2 = Root (x^2 - 2)
+sqrt2 :: AReal
+[_, sqrt2] = realRoots (x^2 - 2)
   where
     x = var ()
 
+-- √3
+sqrt3 :: AReal
+[_, sqrt3] = realRoots (x^2 - 3)
+  where
+    x = var ()
