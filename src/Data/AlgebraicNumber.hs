@@ -170,7 +170,9 @@ rootMul :: UPolynomial Integer -> UPolynomial Integer -> UPolynomial Integer
 rootMul p1 p2 = lift2 (*) p1 p2
 
 rootNegate :: UPolynomial Integer -> UPolynomial Integer
-rootNegate p = fromTerms [(if mmDegree xs `mod` 2 == 0 then c else -c, xs) | (c, xs) <- terms p]
+rootNegate p = fromTerms [(if (d - mmDegree xs) `mod` 2 == 0 then c else -c, xs) | (c, xs) <- terms p]
+  where
+    d = deg p
 
 rootRecip :: UPolynomial Integer -> UPolynomial Integer
 rootRecip p = fromTerms [(c, mmFromList [((), d - mmDegree xs)]) | (c, xs) <- terms p]
@@ -247,6 +249,7 @@ tests =
   , test_rootMul
   , test_rootNegate
   , test_rootNegate_2
+  , test_rootNegate_3
   , test_rootRecip
   , test_simpPoly
   ]
@@ -302,8 +305,15 @@ test_rootNegate_2 = rootNegate p == q
   where
     x :: UPolynomial Integer
     x = var ()
-    p =   x^3 - 3
-    q = - x^3 - 3
+    p = x^3 - 3
+    q = x^3 + 3
+
+test_rootNegate_3 = rootNegate p == q
+  where
+    x :: UPolynomial Integer
+    x = var ()
+    p = (x-2)*(x-3)*(x-4)
+    q = (x+2)*(x+3)*(x+4)
 
 test_rootRecip = abs valP <= 0.0001
   where
