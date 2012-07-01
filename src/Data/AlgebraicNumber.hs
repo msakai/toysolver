@@ -135,6 +135,61 @@ instance Fractional AReal where
     | isZero a  = error "AReal.recip: zero division"
     | otherwise = RealRoot (rootRecip p) (recip i)
 
+toRational' :: AReal -> Rational -> Rational
+toRational' (RealRoot p i) epsilon = Sturm.approx (mapCoeff toRational p) i epsilon
+
+properFraction' :: Integral b => AReal -> (b, AReal)
+properFraction' x =
+  case compare x 0 of
+    EQ -> (0, 0)
+    GT -> (fromInteger floor_x, x - fromInteger floor_x)
+    LT -> (fromInteger ceiling_x, x - fromInteger ceiling_x)
+  where
+    floor_x   = floor' x
+    ceiling_x = ceiling' x
+
+truncate' :: Integral b => AReal -> b
+truncate' = fst . properFraction'
+
+round' :: Integral b => AReal -> b
+round' x = 
+  case signum (abs r - 0.5) of
+    -1 -> n
+    0  -> if even n then n else m
+    1  -> m
+    _  -> error "round default defn: Bad value"
+  where
+    (n,r) = properFraction' x
+    m = if r < 0 then n - 1 else n + 1
+
+ceiling' :: Integral b => AReal -> b
+ceiling' (RealRoot p i) =
+  if Sturm.numRoots' chain (Interval.intersection i2 i3) > 1
+    then fromInteger ceiling_lb
+    else fromInteger ceiling_ub
+  where
+    chain = Sturm.sturmChain (mapCoeff fromInteger p)
+    i2 = Sturm.narrow' chain i (1/2)
+    Just (inLB, lb) = Interval.lowerBound i2
+    Just (inUB, ub) = Interval.upperBound i2
+    ceiling_lb = ceiling lb
+    ceiling_ub = ceiling ub
+    i3 = Interval.interval Nothing (Just (True, fromInteger ceiling_lb))
+
+floor' :: Integral b => AReal -> b
+floor' (RealRoot p i) =
+  if Sturm.numRoots' chain (Interval.intersection i2 i3) > 1
+    then fromInteger floor_ub
+    else fromInteger floor_lb
+  where
+    chain = Sturm.sturmChain (mapCoeff fromInteger p)
+    i2 = Sturm.narrow' chain i (1/2)
+    Just (inLB, lb) = Interval.lowerBound i2
+    Just (inUB, ub) = Interval.upperBound i2
+    floor_lb = floor lb
+    floor_ub = floor ub
+    i3 = Interval.interval (Just (True, fromInteger floor_ub)) Nothing
+
 -- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
 simpARealPoly :: UPolynomial AReal -> UPolynomial Integer
 simpARealPoly p = rootSimpPoly (\(RealRoot q _) -> q) p
@@ -241,6 +296,23 @@ tests =
   , test_rootScale
   , test_rootRecip
   , test_simpARealPoly
+  , test_eq
+  , test_eq_refl
+  , test_diseq_1
+  , test_diseq_2
+  , test_cmp_1
+  , test_cmp_2
+  , test_cmp_3
+  , test_cmp_4
+  , test_floor_sqrt2
+  , test_floor_neg_sqrt2
+  , test_floor_1
+  , test_floor_neg_1
+  , test_ceiling_sqrt2
+  , test_ceiling_neg_sqrt2
+  , test_ceiling_1
+  , test_ceiling_neg_1
+  , test_round_sqrt2
   ]
 
 test_rootAdd = abs valP <= 0.0001
@@ -323,6 +395,38 @@ test_rootRecip = abs valP <= 0.0001
 
 test_eq = sqrt2*sqrt2 - 2 == 0
 
+test_eq_refl = sqrt2 == sqrt2
+
+test_diseq_1 = sqrt2 /= sqrt3
+
+test_diseq_2 = sqrt2 /= neg_sqrt2
+
+test_cmp_1 = 0 < sqrt2
+
+test_cmp_2 = neg_sqrt2 < 0
+
+test_cmp_3 = 0 < neg_sqrt2 * neg_sqrt2
+
+test_cmp_4 = neg_sqrt2 * neg_sqrt2 * neg_sqrt2 < 0
+
+test_floor_sqrt2 = floor' sqrt2 == 1
+
+test_floor_neg_sqrt2 = floor' neg_sqrt2 == -2
+
+test_floor_1 = floor' 1 == 1
+
+test_floor_neg_1 = floor' (-1) == -1
+
+test_ceiling_sqrt2 = ceiling' sqrt2 == 2
+
+test_ceiling_neg_sqrt2 = ceiling' neg_sqrt2 == -1
+
+test_ceiling_1 = ceiling' 1 == 1
+
+test_ceiling_neg_1 = ceiling' (-1) == -1
+
+test_round_sqrt2 = round' sqrt2 == 1
+
 -- 期待値は Wolfram Alpha で x^3 - Sqrt[2]*x + 3 を調べて Real root の exact form で得た
 test_simpARealPoly = simpARealPoly p == q
   where
@@ -333,12 +437,12 @@ test_simpARealPoly = simpARealPoly p == q
 
 -- √2
 sqrt2 :: AReal
-[_, sqrt2] = realRoots (x^2 - 2)
+[neg_sqrt2, sqrt2] = realRoots (x^2 - 2)
   where
     x = var ()
 
 -- √3
 sqrt3 :: AReal
-[_, sqrt3] = realRoots (x^2 - 3)
+[neg_sqrt3, sqrt3] = realRoots (x^2 - 3)
   where
     x = var ()
