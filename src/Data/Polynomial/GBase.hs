@@ -9,6 +9,8 @@
 -- Stability   :  provisional
 -- Portability :  portable
 -- 
+-- Gröbner basis
+--
 -- References:
 --
 -- * Monomial order <http://en.wikipedia.org/wiki/Monomial_order>
@@ -36,11 +38,15 @@ module Data.Polynomial.GBase
   ) where
 
 import qualified Data.Set as Set
+import qualified Data.Heap as H -- http://hackage.haskell.org/package/heaps
 import Data.Polynomial
 
-{--------------------------------------------------------------------
-  Gröbner basis
---------------------------------------------------------------------}
+{-
+data Strategy
+  = NormalStrategy
+  | SugarStrategy
+  deriving (Eq, Ord, Show, Read, Bounded, Enum)
+-}
 
 spolynomial
   :: (Eq k, Fractional k, Ord v, Show v)
@@ -56,14 +62,17 @@ spolynomial cmp f g =
 buchberger
   :: forall k v. (Eq k, Fractional k, Ord k, Ord v, Show v)
   => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
-buchberger cmp fs = reduceGBase cmp $ go fs (pairs fs)
+buchberger cmp fs = reduceGBase cmp $ go fs (H.fromList [item cmp fi fj | (fi,fj) <- pairs fs])
   where  
-    go :: [Polynomial k v] -> [(Polynomial k v, Polynomial k v)] -> [Polynomial k v]
-    go gs [] = gs
-    go gs ((fi,fj):ps)
-      | r == 0    = go gs ps
-      | otherwise = go (r:gs) ([(r,g) | g <- gs] ++ ps)
+    go :: [Polynomial k v] -> H.Heap (Item k v) -> [Polynomial k v]
+    go gs h | H.null h = gs
+    go gs h
+      | r == 0    = go gs h'
+      | otherwise = go (r:gs) (H.union h' (H.fromList [item cmp r g | g <- gs]))
       where
+        Just (i, h') = H.viewMin h
+        fi = iFst i
+        fj = iSnd i
         spoly = spolynomial cmp fi fj
         r = reduce cmp spoly gs
 
@@ -79,6 +88,30 @@ reduceGBase cmp ps = Set.toList $ Set.fromList $ go ps []
       where
         q = reduce cmp p (ps++qs)
         (c,_) = leadingTerm cmp q
+
+{--------------------------------------------------------------------
+  Item
+--------------------------------------------------------------------}
+
+data Item k v
+  = Item
+  { iFst :: Polynomial k v
+  , iSnd :: Polynomial k v
+  , iCmp :: MonomialOrder v
+  , iLCM :: MonicMonomial v
+  }
+
+item :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Polynomial k v -> Item k v
+item cmp f g = Item f g cmp (mmLCM mm1 mm2)
+  where
+    (_, mm1) = leadingTerm cmp f
+    (_, mm2) = leadingTerm cmp g
+
+instance Ord v => Ord (Item k v) where
+  a `compare` b = iCmp a (iLCM a) (iLCM b)
+
+instance Ord v => Eq (Item k v) where
+  a == b = compare a b == EQ
 
 {--------------------------------------------------------------------
   Utilities
