@@ -44,3 +44,21 @@ showRational asRatio v
   | denominator v == 1 = show (numerator v)
   | asRatio            = show (numerator v) ++ "/" ++ show (denominator v)
   | otherwise          = show (fromRational v :: Double)
+
+
+{-# INLINE revSequence #-}
+revSequence :: Monad m => [m a] -> m [a]
+revSequence = go []
+  where
+    go xs [] = return xs
+    go xs (m:ms) = do
+      x <- m
+      go (x:xs) ms
+
+{-# INLINE revMapM #-}
+revMapM :: Monad m => (a -> m b) -> ([a] -> m [b])
+revMapM f = revSequence . map f
+
+{-# INLINE revForM #-}
+revForM :: Monad m => [a] -> (a -> m b) -> m [b]
+revForM = flip revMapM

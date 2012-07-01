@@ -55,7 +55,7 @@ import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
 import qualified Linearizer as Lin
 import Version
-import Util (showRational)
+import Util (showRational, revMapM, revForM)
 
 -- ------------------------------------------------------------------------
 
@@ -334,7 +334,7 @@ solvePB opt solver formula@(obj, cs) = do
           throwIO e
 
 pbConvSum :: Lin.Linearizer -> PBFile.Sum -> IO [(Integer, SAT.Lit)]
-pbConvSum lin = mapM f
+pbConvSum lin = revMapM f
   where
     f (w,ls) = do
       l <- Lin.translate lin ls
@@ -439,7 +439,7 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
   lin <- Lin.newLinearizer solver
   Lin.setUsePB lin (optLinearizerPB opt)
 
-  obj <- liftM concat $ forM cs $ \(cost, (lhs, op, rhs)) -> do
+  obj <- liftM concat $ revForM cs $ \(cost, (lhs, op, rhs)) -> do
     lhs' <- pbConvSum lin lhs
     case cost of
       Nothing -> do
@@ -558,7 +558,7 @@ solveLP opt solver lp = do
       exitFailure
     else do
       putStrLn "c Loading variables and bounds"
-      vmap <- liftM Map.fromList $ forM (Set.toList ivs) $ \v -> do
+      vmap <- liftM Map.fromList $ revForM (Set.toList ivs) $ \v -> do
         let (lb,ub) = LPFile.getBounds lp v
         case (lb,ub) of
           (LPFile.Finite lb', LPFile.Finite ub') -> do
