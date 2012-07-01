@@ -14,6 +14,7 @@ module Main where
 import Control.Monad
 import Data.Char
 import Data.List
+import Data.Maybe
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -87,8 +88,8 @@ collectVariables (obj, cs) = IS.unions $ maybe IS.empty f obj : [f s | (s,_,_) <
       lit <- ts
       return $ abs lit
 
-convertWBO :: PBFile.SoftFormula -> LPFile.LP
-convertWBO formula@(top, cs) = LPFile.LP
+convertWBO :: PBFile.SoftFormula -> Bool -> LPFile.LP
+convertWBO formula@(top, cs) useIndicator = LPFile.LP
   { LPFile.variables = vs2
   , LPFile.dir = LPFile.OptMin
   , LPFile.objectiveFunction = (Nothing, obj2)
@@ -109,18 +110,42 @@ convertWBO formula@(top, cs) = LPFile.LP
     cs2 :: [([(Integer, LPFile.Var)], LPFile.Constraint)]
     cs2 = do
       (n, (w, (lhs,op,rhs))) <- zip [0..] cs
-      let op2 = case op of
-                  PBFile.Ge -> LPFile.Ge
-                  PBFile.Eq -> LPFile.Eql
+      let 
           lhs2 = convExpr lhs
           c = sum [c | LPFile.Term c [] <- lhs2]
           lhs3 = [t | t@(LPFile.Term c (_:_)) <- lhs2]
-      let v = "r" ++ show n
+          rhs3 = fromIntegral rhs - c
+          v = "r" ++ show n
           (ts,ind) =
             case w of
               Nothing -> ([], Nothing)
               Just w2 -> ([(w2, v)], Just (v,0))
-      return (ts, (Nothing, ind, (lhs3, op2, fromIntegral rhs - c)))
+      if isNothing w || useIndicator then do
+         let op2 =
+               case op of
+                 PBFile.Ge -> LPFile.Ge
+                 PBFile.Eq -> LPFile.Eql
+         return (ts, (Nothing, ind, (lhs3, op2, rhs3)))
+       else do
+         let (lhsGE,rhsGE) = relaxGE v (lhs3,rhs3)
+         case op of
+           PBFile.Ge -> do
+             return (ts, (Nothing, Nothing, (lhsGE, LPFile.Ge, rhsGE)))
+           PBFile.Eq -> do
+             let (lhsLE,rhsLE) = relaxLE v (lhs3,rhs3)
+             [ (ts, (Nothing, Nothing, (lhsGE, LPFile.Ge, rhsGE)))
+               , ([], (Nothing, Nothing, (lhsLE, LPFile.Le, rhsLE)))
+               ]
+
+relaxGE :: LPFile.Var -> (LPFile.Expr, Rational) -> (LPFile.Expr, Rational)
+relaxGE v (lhs, rhs) = (LPFile.Term (rhs - lhs_lb) [v] : lhs, rhs)
+  where
+    lhs_lb = sum [min c 0 | LPFile.Term c _ <- lhs]
+
+relaxLE :: LPFile.Var -> (LPFile.Expr, Rational) -> (LPFile.Expr, Rational)
+relaxLE v (lhs, rhs) = (LPFile.Term (rhs - lhs_ub) [v] : lhs, rhs)
+  where
+    lhs_ub = sum [max c 0 | LPFile.Term c _ <- lhs]
 
 collectVariablesWBO :: PBFile.SoftFormula -> IS.IntSet
 collectVariablesWBO (top, cs) = IS.unions [f s | (_,(s,_,_)) <- cs]
@@ -135,6 +160,7 @@ data Flag
   = Help
   | WBO
   | ObjType ObjType
+  | IndicatorConstraint
   deriving Eq
 
 data ObjType = ObjNone | ObjMaxOne | ObjMaxZero
@@ -145,6 +171,7 @@ options =
     [ Option ['h'] ["help"] (NoArg Help) "show help"
     , Option []    ["wbo"]  (NoArg WBO)  "input is .wbo file"
     , Option []    ["obj"]  (ReqArg (ObjType . parseObjType) "STRING") "objective function for PBS: none (default), max-one, max-zero"
+    , Option []    ["indicator"] (NoArg IndicatorConstraint) "use indicator constraints in output LP file"
     ]
   where
     parseObjType s =
@@ -170,7 +197,7 @@ main = do
                  else PBFile.parseWBOFile fname
           case ret of
             Left err -> hPrint stderr err >> exitFailure
-            Right formula -> return (convertWBO formula)      
+            Right formula -> return (convertWBO formula (IndicatorConstraint `elem` o))
         else do
           ret <- if fname == "-"
                  then liftM (PBFile.parseOPBString "-") getContents
