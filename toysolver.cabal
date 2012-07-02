@@ -20,6 +20,7 @@ Extra-Source-Files:
    src/Data/Polynomial/Lagrange.hs
    src/Data/Polynomial/Sturm.hs
    src/Data/AlgebraicNumber.hs
+   src/Data/AlgebraicNumber/Root.hs
    src/Data/Polyhedron.hs
    src/TestAReal2.hs
    src/pbverify.hs

@@ -11,6 +11,7 @@ import Test.Framework.Providers.QuickCheck2
 
 import Data.Polynomial
 import Data.AlgebraicNumber
+import Data.AlgebraicNumber.Root
 
 import Control.Monad
 import System.IO
