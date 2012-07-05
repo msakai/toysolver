@@ -10,7 +10,7 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
 import Data.Linear
-import Data.Interval (Interval)
+import Data.Interval (Interval, (<!), (<=!), (==!), (>=!), (>!), (<?), (<=?), (==?), (>=?), (>?))
 import qualified Data.Interval as Interval
 
 {--------------------------------------------------------------------
@@ -188,6 +188,46 @@ case_pickup_empty =
 
 case_pickup_univ =
   isJust (Interval.pickup (Interval.univ :: Interval Rational)) @?= True
+
+{--------------------------------------------------------------------
+  Comparison
+--------------------------------------------------------------------}
+
+prop_lt_all_singleton =
+  forAll arbitrary $ \a ->
+  forAll arbitrary $ \b ->
+    (a::Rational) < b ==> Interval.singleton a <! Interval.singleton b
+
+prop_lt_all_singleton_2 =
+  forAll arbitrary $ \a ->
+    not $ Interval.singleton (a::Rational) <! Interval.singleton a
+
+prop_le_all_singleton =
+  forAll arbitrary $ \a ->
+  forAll arbitrary $ \b ->
+    (a::Rational) <= b ==> Interval.singleton a <=! Interval.singleton b
+
+prop_le_all_singleton_2 =
+  forAll arbitrary $ \a ->
+    Interval.singleton (a::Rational) <=! Interval.singleton a
+
+prop_lt_some_singleton =
+  forAll arbitrary $ \a ->
+  forAll arbitrary $ \b ->
+    (a::Rational) < b ==> Interval.singleton a <? Interval.singleton b
+
+prop_lt_some_singleton_2 =
+  forAll arbitrary $ \a ->
+    not $ Interval.singleton (a::Rational) <? Interval.singleton a
+
+prop_le_some_singleton =
+  forAll arbitrary $ \a ->
+  forAll arbitrary $ \b ->
+    (a::Rational) <= b ==> Interval.singleton a <=? Interval.singleton b
+
+prop_le_some_singleton_2 =
+  forAll arbitrary $ \a ->
+    Interval.singleton (a::Rational) <=? Interval.singleton a
 
 {--------------------------------------------------------------------
   Num

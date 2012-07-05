@@ -36,6 +36,10 @@ module Data.Interval
   , upperBound
   , size
 
+  -- * Comparison
+  , (<!), (<=!), (==!), (>=!), (>!)
+  , (<?), (<=?), (==?), (>=?), (>?)
+
   -- * Combine
   , intersection
   , join
@@ -262,6 +266,85 @@ tightenToInteger (Interval lb ub) = interval (fmap tightenLB lb) (fmap tightenUB
         then ub - 1
         else fromIntegral (floor ub :: Integer)
       )
+
+-- | For all @x@ in @X@, @y@ in @Y@. @x '<' y@
+(<!) :: Real r => Interval r -> Interval r -> Bool
+a <! b
+  | null a = True
+  | null b = True
+  | otherwise =
+    case upperBound a of
+      Nothing -> False
+      Just (in1,ub1) ->
+        case lowerBound b of
+          Nothing -> False
+          Just (in2,lb2) ->
+            ub1 < lb2 || (ub1==lb2 && not (in1 && in2))
+
+-- | For all @x@ in @X@, @y@ in @Y@. @x '<=' y@
+(<=!) :: Real r => Interval r -> Interval r -> Bool
+a <=! b
+  | null a = True
+  | null b = True
+  | otherwise =
+    case upperBound a of
+      Nothing -> False
+      Just (in1,ub1) ->
+        case lowerBound b of
+          Nothing -> False
+          Just (in2,lb2) ->
+            ub1 <= lb2
+
+-- | For all @x@ in @X@, @y@ in @Y@. @x '==' y@
+(==!) :: Real r => Interval r -> Interval r -> Bool
+a ==! b = a <=! b && a >=! b
+
+-- | For all @x@ in @X@, @y@ in @Y@. @x '>=' y@
+(>=!) :: Real r => Interval r -> Interval r -> Bool
+(>=!) = flip (<=!)
+
+-- | For all @x@ in @X@, @y@ in @Y@. @x '>' y@
+(>!) :: Real r => Interval r -> Interval r -> Bool
+(>!) = flip (<!)
+
+-- | Does there exist an @x@ in @X@, @y@ in @Y@ such that @x '<' y@?
+(<?) :: Real r => Interval r -> Interval r -> Bool
+a <? b
+  | null a = False
+  | null b = False
+  | otherwise =
+    case lowerBound a of
+      Nothing -> True
+      Just (in1,lb) ->
+        case upperBound b of
+          Nothing -> True
+          Just (in2,ub) -> lb < ub
+
+-- | Does there exist an @x@ in @X@, @y@ in @Y@ such that @x '<=' y@?
+(<=?) :: Real r => Interval r -> Interval r -> Bool
+a <=? b
+  | null a = False
+  | null b = False
+  | otherwise =
+    case lowerBound a of
+      Nothing -> True
+      Just (in1,lb) ->
+        case upperBound b of
+          Nothing -> True
+          Just (in2,ub) ->
+            lb < ub || (lb==ub && in1 && in2)
+
+-- | Does there exist an @x@ in @X@, @y@ in @Y@ such that @x '==' y@?
+(==?) :: Real r => Interval r -> Interval r -> Bool
+a ==? b = not $ null $ intersection a b
+
+-- | Does there exist an @x@ in @X@, @y@ in @Y@ such that @x '>=' y@?
+(>=?) :: Real r => Interval r -> Interval r -> Bool
+(>=?) = flip (<=?)
+
+-- | Does there exist an @x@ in @X@, @y@ in @Y@ such that @x '>' y@?
+(>?) :: Real r => Interval r -> Interval r -> Bool
+(>?) = flip (<?)
 
 -- | Interval airthmetics.
 -- Note that this instance does not satisfy algebraic laws of linear spaces.
