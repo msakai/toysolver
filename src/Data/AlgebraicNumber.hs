@@ -24,6 +24,11 @@ module Data.AlgebraicNumber
   -- * Construction
   , realRoots
 
+  -- * Properties
+  , minimalPolynomial
+  , deg
+  , isAlgebraicInteger
+
   -- * Real-like functions
   , toRational'
 
@@ -39,9 +44,14 @@ module Data.AlgebraicNumber
   ) where
 
 import Control.Exception (assert)
+import Control.Monad
+import Data.List
+import Data.Ratio
 
-import Data.Polynomial
+import Data.Polynomial hiding (deg)
+import qualified Data.Polynomial as P
 import qualified Data.Polynomial.Sturm as Sturm
+import qualified Data.Polynomial.FactorZ as FactorZ
 import Data.Interval (Interval)
 import qualified Data.Interval as Interval
 import Data.AlgebraicNumber.Root
@@ -58,16 +68,26 @@ import Data.AlgebraicNumber.Root
   Algebraic reals
 --------------------------------------------------------------------}
 
--- TODO: 多項式を因数分解して既約多項式にするようにしないと
-
 data AReal = RealRoot (UPolynomial Integer) (Interval Rational)
   deriving Show
 
 -- | Real roots of the rational coefficient polynomial.
 realRoots :: UPolynomial Rational -> [AReal]
-realRoots p = [RealRoot p' i | i <- Sturm.separate p]
+realRoots p = sort $ do
+  q <- FactorZ.factor $ toZ p
+  guard $ P.deg q > 0
+  let d = foldl1' gcd [c | (c,_) <- terms q]
+      q' = if q==0
+           then q
+           else mapCoeff (`div` d) q
+  i <- Sturm.separate (mapCoeff fromInteger q')
+  return $ RealRoot q' i
+
+minimalPolynomial :: AReal -> UPolynomial Rational
+minimalPolynomial (RealRoot p _) = mapCoeff f p
   where
-    p' = toZ p
+    (c,_) = leadingTerm grlex p
+    f x = x % c
 
 isZero :: AReal -> Bool
 isZero (RealRoot p i) = 0 `Interval.member` i && 0 `isRootOf` p
@@ -213,6 +233,18 @@ floor' (RealRoot p i) =
     floor_lb = floor lb
     floor_ub = floor ub
     i3 = Interval.interval (Just (True, fromInteger floor_ub)) Nothing
+
+{--------------------------------------------------------------------
+  Properties
+--------------------------------------------------------------------}
+
+deg :: AReal -> Integer
+deg (RealRoot p _) = P.deg p
+
+isAlgebraicInteger :: AReal -> Bool
+isAlgebraicInteger (RealRoot p _) = c==1
+  where
+    (c,_) = leadingTerm grlex p
 
 {--------------------------------------------------------------------
   Manipulation of polynomials

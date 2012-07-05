@@ -9,7 +9,7 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
-import Data.Polynomial
+import Data.Polynomial hiding (deg)
 import Data.AlgebraicNumber
 import Data.AlgebraicNumber.Root
 
@@ -118,11 +118,18 @@ case_rootRecip = assertBool "" $ abs valP <= 0.0001
   algebraic reals
 --------------------------------------------------------------------}
 
-case_realRoot_minus_one = realRoots (x^2 + 1) @?= []
+case_realRoots_zero = realRoots (0 :: UPolynomial Rational) @?= []
+
+case_realRoots_nonminimal =
+  realRoots ((x^2 - 1) * (x - 3)) @?= [-1,1,3]
   where
     x = var ()
 
-case_realRoot_two = length (realRoots (x^2 - 2)) @?= 2
+case_realRoots_minus_one = realRoots (x^2 + 1) @?= []
+  where
+    x = var ()
+
+case_realRoots_two = length (realRoots (x^2 - 2)) @?= 2
   where
     x = var ()
 
@@ -167,6 +174,14 @@ case_simpARealPoly = simpARealPoly p @?= q
     x = var ()
     p = x^3 - constant sqrt2 * x + 3
     q = x^6 + 6*x^3 - 2*x^2 + 9
+
+case_deg_sqrt2 = deg sqrt2 @?= 2
+
+case_deg_neg_sqrt2 = deg neg_sqrt2 @?= 2
+
+case_isAlgebraicInteger_sqrt2 = isAlgebraicInteger sqrt2 @?= True
+
+case_isAlgebraicInteger_neg_sqrt2 = isAlgebraicInteger neg_sqrt2 @?= True
 
 ------------------------------------------------------------------------
 -- Test harness
