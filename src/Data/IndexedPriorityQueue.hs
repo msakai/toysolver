@@ -34,6 +34,7 @@ module Data.IndexedPriorityQueue
   , QueueSize (..)
   , member
   , update
+  , getHeapArray
   ) where
 
 import Control.Monad
@@ -231,6 +232,10 @@ down q !i = do
   j <- loop i
   A.unsafeWrite arr j val
   A.unsafeWrite idx val j
+
+-- | Get the internal representation of a given priority queue.
+getHeapArray :: PriorityQueue -> IO (A.IOUArray Index Value)
+getHeapArray q = liftM snd $ readIORef (heap q)
 
 {--------------------------------------------------------------------
   Index "traversal" functions

@@ -69,6 +69,9 @@ module SAT
   , setVarPolarity
   , setLogger
   , setCheckModel
+  , setRandomFreq
+  , defaultRandomFreq
+  , setRandomSeed
 
   -- * Read state
   , nVars
@@ -101,6 +104,7 @@ import qualified Data.Set as Set
 import qualified Data.IndexedPriorityQueue as PQ
 import qualified Data.SeqQueue as SQ
 import System.CPUTime
+import qualified System.Random as Rand
 import Text.Printf
 
 import Data.LBool
@@ -223,6 +227,7 @@ data Solver
   , svBCPQueue     :: !(SQ.SeqQueue Lit)
   , svModel        :: !(IORef (Maybe Model))
   , svNDecision    :: !(IORef Int)
+  , svNRandomDecision :: !(IORef Int)
   , svNConflict    :: !(IORef Int)
   , svNRestart     :: !(IORef Int)
   , svNAssigns     :: !(IORef Int)
@@ -260,6 +265,9 @@ data Solver
   , svLogger :: !(IORef (Maybe (String -> IO ())))
 
   , svCheckModel :: !(IORef Bool)
+
+  , svRandomFreq :: !(IORef Double)
+  , svRandomGen  :: !(IORef Rand.StdGen)
   }
 
 markBad :: Solver -> IO ()
@@ -473,6 +481,7 @@ newSolver = do
   q   <- SQ.newFifo
   m   <- newIORef Nothing
   ndecision <- newIORef 0
+  nranddec  <- newIORef 0
   nconflict <- newIORef 0
   nrestart  <- newIORef 0
   nassigns  <- newIORef 0
@@ -493,6 +502,9 @@ newSolver = do
 
   logger <- newIORef Nothing
 
+  randfreq <- newIORef defaultRandomFreq
+  randgen  <- newIORef =<< Rand.newStdGen
+
   let solver =
         Solver
         { svOk = ok
@@ -507,6 +519,7 @@ newSolver = do
         , svBCPQueue   = q
         , svModel      = m
         , svNDecision  = ndecision
+        , svNRandomDecision = nranddec
         , svNConflict  = nconflict
         , svNRestart   = nrestart
         , svNAssigns   = nassigns
@@ -523,6 +536,8 @@ newSolver = do
         , svLearntLim = learntLim
         , svLogger = logger
         , svCheckModel = checkModel
+        , svRandomFreq = randfreq
+        , svRandomGen  = randgen
         }
  return solver
 
@@ -799,6 +814,7 @@ solve_ solver = do
       when debugMode $ dumpClaActivity solver
       (log solver . printf "solving time = %.3fs") (fromIntegral (end - start) / 10^(12::Int) :: Double)
       (log solver . printf "#decision = %d") =<< readIORef (svNDecision solver)
+      (log solver . printf "#random_decision = %d") =<< readIORef (svNRandomDecision solver)
       (log solver . printf "#conflict = %d") =<< readIORef (svNConflict solver)
       (log solver . printf "#restart = %d")  =<< readIORef (svNRestart solver)
 
@@ -998,6 +1014,19 @@ setCheckModel :: Solver -> Bool -> IO ()
 setCheckModel solver flag = do
   writeIORef (svCheckModel solver) flag
 
+-- | The frequency with which the decision heuristic tries to choose a random variable
+setRandomFreq :: Solver -> Double -> IO ()
+setRandomFreq solver r = do
+  writeIORef (svRandomFreq solver) r
+
+defaultRandomFreq :: Double
+defaultRandomFreq = 0.005
+
+-- | Used by the random variable selection
+setRandomSeed :: Solver -> Int -> IO ()
+setRandomSeed solver seed = do
+  writeIORef (svRandomGen solver) (Rand.mkStdGen seed)
+
 {--------------------------------------------------------------------
   API for implementation of @solve@
 --------------------------------------------------------------------}
@@ -1006,7 +1035,33 @@ pickBranchLit :: Solver -> IO Lit
 pickBranchLit !solver = do
   let vqueue = svVarQueue solver
 
-      loop :: IO Lit
+  -- Random decision
+  let withRandGen :: (Rand.StdGen -> (a, Rand.StdGen)) -> IO a
+      withRandGen f = do
+        randgen  <- readIORef (svRandomGen solver)
+        let (r, randgen') = f randgen
+        writeIORef (svRandomGen solver) randgen'
+        return r
+  !randfreq <- readIORef (svRandomFreq solver)
+  !size <- PQ.queueSize vqueue
+  !r <- withRandGen Rand.random
+  var <-
+    if (r < randfreq && size >= 2)
+    then do
+      a <- PQ.getHeapArray vqueue
+      i <- withRandGen $ Rand.randomR (0, size-1)
+      var <- readArray a i
+      val <- varValue solver var
+      if val == lUndef
+       then do
+         modifyIORef' (svNRandomDecision solver) (1+)
+         return var
+       else return litUndef
+    else
+      return litUndef
+
+  -- Activity based decision
+  let loop :: IO Var
       loop = do
         m <- PQ.dequeue vqueue
         case m of
@@ -1015,12 +1070,19 @@ pickBranchLit !solver = do
             val <- varValue solver var
             if val /= lUndef
               then loop
-              else do
-                vd <- varData solver var
-                p <- readIORef (vdPolarity vd)
-                let lit = literal var p
-                return $! lit
-  loop
+              else return var
+  var <-
+    if var==litUndef
+    then loop
+    else return var
+
+  if var==litUndef
+    then return litUndef
+    else do
+      vd <- varData solver var
+      -- TODO: random polarity
+      p <- readIORef (vdPolarity vd)
+      return $! literal var p
 
 decide :: Solver -> Lit -> IO ()
 decide solver !lit = do

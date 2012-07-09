@@ -70,6 +70,8 @@ data Options
   , optLearningStrategy :: SAT.LearningStrategy
   , optLearntSizeInc :: Double
   , optCCMin         :: Int
+  , optRandomFreq    :: Double
+  , optRandomSeed    :: Int
   , optLinearizerPB  :: Bool
   , optBinarySearch  :: Bool
   , optObjFunVarsHeuristics :: Bool
@@ -87,6 +89,8 @@ defaultOptions
   , optLearningStrategy = SAT.defaultLearningStrategy
   , optLearntSizeInc = SAT.defaultLearntSizeInc
   , optCCMin         = SAT.defaultCCMin
+  , optRandomFreq    = SAT.defaultRandomFreq
+  , optRandomSeed    = 0
   , optLinearizerPB  = False
   , optBinarySearch   = False
   , optObjFunVarsHeuristics = True
@@ -122,6 +126,13 @@ options =
     , Option [] ["ccmin"]
         (ReqArg (\val opt -> opt{ optCCMin = read val }) "<int>")
         (printf "Conflict clause minimization (0=none, 1=local, 2=recursive; default %d)" SAT.defaultCCMin)
+
+    , Option [] ["random-freq"]
+        (ReqArg (\val opt -> opt{ optRandomFreq = read val }) "<0..1>")
+        (printf "The frequency with which the decision heuristic tries to choose a random variable (default %f)" SAT.defaultRandomFreq)
+    , Option [] ["random-seed"]
+        (ReqArg (\val opt -> opt{ optRandomSeed = read val }) "<int>")
+        "Used by the random variable selection"
 
     , Option [] ["linearizer-pb"]
         (NoArg (\opt -> opt{ optLinearizerPB = True }))
@@ -232,6 +243,9 @@ newSolver opts = do
   SAT.setRestartInc    solver (optRestartInc opts)
   SAT.setLearntSizeInc solver (optLearntSizeInc opts)
   SAT.setCCMin         solver (optCCMin opts)
+  SAT.setRandomFreq    solver (optRandomFreq opts)
+  when (optRandomSeed opts /= 0) $ 
+    SAT.setRandomSeed solver (optRandomSeed opts)
   SAT.setLearningStrategy solver (optLearningStrategy opts)
   SAT.setLogger solver $ \str -> do
     putStr "c "
