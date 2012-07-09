@@ -52,7 +52,7 @@ import Data.Polynomial hiding (deg)
 import qualified Data.Polynomial as P
 import qualified Data.Polynomial.Sturm as Sturm
 import qualified Data.Polynomial.FactorZ as FactorZ
-import Data.Interval (Interval)
+import Data.Interval (Interval, (<!), (>!))
 import qualified Data.Interval as Interval
 import Data.AlgebraicNumber.Root
 
@@ -93,18 +93,20 @@ isZero :: AReal -> Bool
 isZero (RealRoot p i) = 0 `Interval.member` i && 0 `isRootOf` p
 
 instance Eq AReal where
-  a == b = isZero (a - b)
+  a == b = (compare a b == EQ)
 
 instance Ord AReal where
-  compare a b
+  compare a@(RealRoot _ i1) b@(RealRoot _ i2)
+    | i1 >! i2 = GT
+    | i1 <! i2 = LT
     | isZero c = EQ
     | Sturm.numRoots p' ipos == 1 = GT
     | otherwise = assert (Sturm.numRoots p' ineg == 1) LT
     where
-      c@(RealRoot p i) = a - b
+      c@(RealRoot p i3) = a - b
       p' = mapCoeff fromInteger p
-      ipos = Interval.intersection i (Interval.interval (Just (False,0)) Nothing)
-      ineg = Interval.intersection i (Interval.interval Nothing (Just (False,0)))
+      ipos = Interval.intersection i3 (Interval.interval (Just (False,0)) Nothing)
+      ineg = Interval.intersection i3 (Interval.interval Nothing (Just (False,0)))
 
 instance Num AReal where
   RealRoot p1 i1 + RealRoot p2 i2 = RealRoot p3 i3
