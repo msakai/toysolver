@@ -193,6 +193,78 @@ case_pickup_univ =
   Comparison
 --------------------------------------------------------------------}
 
+case_lt_all_1 = (a <! b) @?= False
+  where
+    a, b :: Interval Rational
+    a = Interval.interval Nothing (Just (True,0))
+    b = Interval.interval (Just (True,0)) Nothing
+
+case_lt_all_2 = (a <! b) @?= True
+  where
+    a, b :: Interval Rational
+    a = Interval.interval Nothing (Just (False,0))
+    b = Interval.interval (Just (True,0)) Nothing
+
+case_lt_all_3 = (a <! b) @?= True
+  where
+    a, b :: Interval Rational
+    a = Interval.interval Nothing (Just (True,0))
+    b = Interval.interval (Just (False,0)) Nothing
+
+case_lt_all_4 = (a <! b) @?= False
+  where
+    a, b :: Interval Rational
+    a = Interval.interval (Just (True,0)) Nothing
+    b = Interval.interval (Just (True,1)) Nothing
+
+case_lt_some_1 = (a <? b) @?= False
+  where
+    a, b :: Interval Rational
+    a = Interval.interval (Just (True,0)) Nothing
+    b = Interval.interval Nothing (Just (True,0))
+
+case_lt_some_2 = (a <? b) @?= False
+  where
+    a, b :: Interval Rational
+    a = Interval.interval (Just (False,0)) Nothing
+    b = Interval.interval Nothing (Just (True,0))
+
+case_lt_some_3 = (a <? b) @?= False
+  where
+    a, b :: Interval Rational
+    a = Interval.interval (Just (True,0)) Nothing
+    b = Interval.interval Nothing (Just (False,0))
+
+case_lt_some_4 = (a <! b) @?= False
+  where
+    a, b :: Interval Rational
+    a = Interval.interval (Just (True,0)) Nothing
+    b = Interval.interval (Just (True,1)) Nothing
+
+case_le_some_1 = (a <=? b) @?= True
+  where
+    a, b :: Interval Rational
+    a = Interval.interval (Just (True,0)) Nothing
+    b = Interval.interval Nothing (Just (True,0))
+
+case_le_some_2 = (a <=? b) @?= False
+  where
+    a, b :: Interval Rational
+    a = Interval.interval (Just (False,0)) Nothing
+    b = Interval.interval Nothing (Just (True,0))
+
+case_le_some_3 = (a <=? b) @?= False
+  where
+    a, b :: Interval Rational
+    a = Interval.interval (Just (True,0)) Nothing
+    b = Interval.interval Nothing (Just (False,0))
+
+prop_lt_all_not_refl =
+  forAll intervals $ \a -> not (Interval.null a) ==> not (a <! a)
+
+prop_le_some_refl =
+  forAll intervals $ \a -> not (Interval.null a) ==> a <=? a
+
 prop_lt_all_singleton =
   forAll arbitrary $ \a ->
   forAll arbitrary $ \b ->
