@@ -19,15 +19,11 @@ import System.Environment
 import System.Exit
 import System.IO
 import Text.Printf
+import Text.MaxSAT
+import SAT.Types
 
-type Lit = Int
-type Var = Lit
-type Clause = [Lit]
-type Weight = Integer -- should be able to represent 2^63
-type WeightedClause = (Weight, Clause)
-
-convert :: Int -> Weight -> [WeightedClause] -> String 
-convert nvar top ls = unlines $
+convert :: WCNF -> String 
+convert (nvar, top, ls) = unlines $
   [ "MINIMIZE" ] ++
   [ printf "+ %d %s" w v | (v,(w,_)) <- zs, w < top ] ++
   [ "SUBJECT TO" ] ++
@@ -61,27 +57,6 @@ convert nvar top ls = unlines $
         then printf "%s x%d" sign v
         else printf "%s %d x%d" sign c' v
 
-isComment :: String -> Bool
-isComment ('c':_) = True
-isComment _ = False
-
-parseWCNFLine :: String -> WeightedClause
-parseWCNFLine s =
-  case map read (words s) of
-    (w:xs) ->
-        let ys = map fromIntegral $ init xs
-        in seq w $ seqList ys $ (w, ys)
-    _ -> error "parse error"
-
-parseCNFLine :: String -> WeightedClause
-parseCNFLine s = seq xs $ seqList xs $ (1, xs)
-  where
-    xs = init (map read (words s))
-
-seqList :: [a] -> b -> b
-seqList [] b = b
-seqList (x:xs) b = seq x $ seqList xs b
-
 header :: String
 header = "Usage: maxsat2lp [file.cnf|file.wcnf|-]"
 
@@ -92,12 +67,5 @@ main = do
          ["-"]   -> getContents
          [fname] -> readFile fname
          _ -> hPutStrLn stderr header >> exitFailure
-  let (l:ls) = filter (not . isComment) (lines s)
-  case words l of
-    (["p","wcnf", nvar, nclause, top]) -> do
-      putStrLn $ convert (read nvar) (read top) (map parseWCNFLine ls)
-    (["p","wcnf", nvar, nclause]) -> do
-      putStrLn $ convert (read nvar) (2^(63::Int)) (map parseWCNFLine ls)
-    (["p","cnf", nvar, nclause]) -> do
-      putStrLn $ convert (read nvar) 2 (map parseCNFLine ls)
-    _ -> error "parse error"
+  let wcnf = parseWCNFString s
+  putStrLn $ convert wcnf

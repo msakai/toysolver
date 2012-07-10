@@ -53,6 +53,7 @@ import SAT.Types (pbEval, pbLowerBound)
 import SAT.Printer
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
+import qualified Text.MaxSAT as MaxSAT
 import qualified Linearizer as Lin
 import Version
 import Util (showRational, revMapM, revForM)
@@ -501,47 +502,16 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
 
 -- ------------------------------------------------------------------------
 
-type WeightedClause = (Integer, SAT.Clause)
-
 mainMaxSAT :: Options -> SAT.Solver -> [String] -> IO ()
 mainMaxSAT opt solver args = do
   s <- case args of
          ["-"]   -> getContents
          [fname] -> readFile fname
          _ -> showHelp stderr  >> exitFailure
-  let (l:ls) = filter (not . isComment) (lines s)
-  let wcnf = case words l of
-        (["p","wcnf", nvar, _nclause, top]) ->
-          (read nvar, read top, map parseWCNFLine ls)
-        (["p","wcnf", nvar, _nclause]) ->
-          (read nvar, 2^(63::Int), map parseWCNFLine ls)
-        (["p","cnf", nvar, _nclause]) ->
-          (read nvar, 2, map parseCNFLine ls)
-        _ -> error "parse error"
+  let wcnf = MaxSAT.parseWCNFString s
   solveMaxSAT opt solver wcnf
 
-isComment :: String -> Bool
-isComment ('c':_) = True
-isComment _ = False
-
-parseWCNFLine :: String -> WeightedClause
-parseWCNFLine s =
-  case map read (words s) of
-    (w:xs) ->
-        let ys = map fromIntegral $ init xs
-        in seq w $ seqList ys $ (w, ys)
-    _ -> error "parse error"
-
-parseCNFLine :: String -> WeightedClause
-parseCNFLine s = seq xs $ seqList xs $ (1, xs)
-  where
-    xs = init (map read (words s))
-
-seqList :: [a] -> b -> b
-seqList [] b = b
-seqList (x:xs) b = seq x $ seqList xs b
-
-solveMaxSAT :: Options -> SAT.Solver -> (Int, Integer, [WeightedClause]) -> IO ()
+solveMaxSAT :: Options -> SAT.Solver -> MaxSAT.WCNF -> IO ()
 solveMaxSAT opt solver (_, top, cs) = do
   solveWBO opt solver True
            ( Nothing
