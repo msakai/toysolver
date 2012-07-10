@@ -8,6 +8,7 @@ Category:	Algorithms
 Cabal-Version:	>= 1.8
 Synopsis:	My sandbox for experimenting solver algorithms.
 Description:	My sandbox for experimenting solver algorithms.
+Bug-Reports:	https://github.com/msakai/toysolver/issues
 Extra-Source-Files:
    README.md
    COPYING
