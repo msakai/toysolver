@@ -527,8 +527,14 @@ render' lp = do
   tell $ showString "END\n"
 
 renderExpr :: Expr -> WriterT ShowS Maybe ()
-renderExpr e =
-  mapM_ tell $ intersperse (showChar ' ') $ map showTerm e
+renderExpr e = go (map (\t -> showTerm t "") e) 0
+  where
+    go [] _ = return ()
+    go (x:xs) 0 = tell (showString x) >> go xs (length x)
+    go (x:xs) width =
+      if width + 1 + length x <= 80
+        then tell (showChar ' ' . showString x) >> go xs (width + 1 + length x)
+        else tell (showChar '\n') >> go (x:xs) 0
 
 showTerm :: Term -> ShowS
 showTerm (Term c vs) = 
