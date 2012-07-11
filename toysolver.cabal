@@ -153,7 +153,8 @@ Executable maxsat2lp
   Other-Modules:
      SAT.Types
      Text.MaxSAT
-  Build-Depends: base >=4 && <5, containers, array
+     Converter.MaxSAT2LP
+  Build-Depends: base >=4 && <5, mtl, containers, array, parsec, OptDir
 
 Executable pb2lp
   Main-is: pb2lp.hs
