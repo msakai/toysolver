@@ -23,6 +23,7 @@ Extra-Source-Files:
    src/Data/AlgebraicNumber.hs
    src/Data/AlgebraicNumber/Root.hs
    src/Data/Polyhedron.hs
+   src/Text/SDPFile.hs
    src/TestAReal2.hs
    src/pbverify.hs
    src/pigeonhole.hs
@@ -35,6 +36,8 @@ Extra-Source-Files:
    samples/pbs/*.opb
    samples/sat/*.cnf
    samples/wbo/*.wbo
+   samples/sdp/*.dat
+   samples/sdp/*.dat-s
 Build-Type: Simple
 
 Flag ForceChar8
