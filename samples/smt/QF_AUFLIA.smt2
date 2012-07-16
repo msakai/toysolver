@@ -1,0 +1,15 @@
+(set-logic QF_AUFLIA)
+(declare-fun A () (Array Int Int))
+(declare-fun x () Int)
+(declare-fun y () Int)
+(declare-fun P () Bool)
+(declare-sort U 0)
+(declare-fun f (U) (Array Int Int))
+(declare-fun c () U)
+(assert
+  (let ((fc (f c)))
+    (and
+      (=> (= A (store fc x 5)) (> (+ (select fc y) (* 4 x)) 0))
+      (= P (< (select A (+ 3 y)) (* (- 2) x))))))
+(check-sat)
+(exit)

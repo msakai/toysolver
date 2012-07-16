@@ -38,6 +38,7 @@ Extra-Source-Files:
    samples/wbo/*.wbo
    samples/sdp/*.dat
    samples/sdp/*.dat-s
+   samples/smt/*.smt2
 Build-Type: Simple
 
 Flag ForceChar8
