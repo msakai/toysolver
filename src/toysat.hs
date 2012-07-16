@@ -25,6 +25,7 @@ import qualified Data.Map as Map
 import Data.Char
 import Data.IORef
 import Data.List
+import Data.Maybe
 import Data.Ord
 import Data.Ratio
 import Data.Version
@@ -36,6 +37,7 @@ import System.Exit
 import System.Locale
 import System.Console.GetOpt
 import System.CPUTime
+import System.Timeout
 import qualified System.Info as SysInfo
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import Text.Printf
@@ -78,6 +80,7 @@ data Options
   , optObjFunVarsHeuristics :: Bool
   , optPrintRational :: Bool
   , optCheckModel  :: Bool
+  , optTimeout :: Integer
   }
 
 defaultOptions :: Options
@@ -97,6 +100,7 @@ defaultOptions
   , optObjFunVarsHeuristics = True
   , optPrintRational = False  
   , optCheckModel = False
+  , optTimeout = 0
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -156,6 +160,10 @@ options =
     , Option [] ["check-model"]
         (NoArg (\opt -> opt{ optCheckModel = True }))
         "check model for debug"
+
+    , Option [] ["timeout"]
+        (ReqArg (\val opt -> opt{ optTimeout = read val }) "<int>")
+        "Kill toysat after given number of seconds (default 0 (no limit))"
     ]
   where
     parseRestartStrategy s =
@@ -194,18 +202,33 @@ main = do
       let fullArgs = args
 #endif
       printf "c command line = %s\n" (show fullArgs)
-      let opt = foldl (flip id) defaultOptions o
-      solver <- newSolver opt
-      case optMode opt of
-        ModeHelp   -> showHelp stdout
-        ModeVersion -> hPutStrLn stdout (showVersion version)
-        ModeSAT    -> mainSAT opt solver args2
-        ModePB     -> mainPB opt solver args2
-        ModeWBO    -> mainWBO opt solver args2
-        ModeMaxSAT -> mainMaxSAT opt solver args2
-        ModeLP     -> mainLP opt solver args2
-      end <- getCPUTime
-      printf "c total time = %.3fs\n" (fromIntegral (end - start) / 10^(12::Int) :: Double)
+      let opt = foldl (flip id) defaultOptions o      
+          timelim = optTimeout opt * 10^(6::Int)
+
+      if (timelim > fromIntegral (maxBound :: Int))
+       then do
+         printf "c TIMEOUT is too long"
+         printf "s UNKNOWN"
+         exitFailure
+       else do
+         ret <- timeout (if timelim > 0 then fromIntegral timelim else (-1)) $ do
+            solver <- newSolver opt
+            case optMode opt of
+              ModeHelp    -> showHelp stdout
+              ModeVersion -> hPutStrLn stdout (showVersion version)
+              ModeSAT     -> mainSAT opt solver args2
+              ModePB      -> mainPB opt solver args2
+              ModeWBO     -> mainWBO opt solver args2
+              ModeMaxSAT  -> mainMaxSAT opt solver args2
+              ModeLP      -> mainLP opt solver args2
+
+         when (isNothing ret) $ do
+           putStrLn "c TIMEOUT"
+           putStrLn "s UNKNOWN"
+         end <- getCPUTime
+         printf "c total time = %.3fs\n" (fromIntegral (end - start) / 10^(12::Int) :: Double)
+         when (isNothing ret) exitFailure
+
     (_,_,errs) -> do
       mapM_ putStrLn errs
       exitFailure
