@@ -1,4 +1,6 @@
-\...
+\ GLPK: error
+\ Gurobi 5.0.1: error
+\ SCIP: OK
 Maximize
  obj: x1 + 2 x2 + 3 x3 + x4
 Subject To

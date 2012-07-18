@@ -1,6 +1,7 @@
 \GLPK: parse error
 \Gurobi: OK
 \CPLEX: OK
+\SCIP: OK
 Maximize
 obj: 
 Subject To

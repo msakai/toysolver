@@ -1,6 +1,7 @@
 \GLPK: parse error
 \Gurobi: OK
 \CPLEX: OK
+\SCIP: OK
 Maximize
 Subject To
 c1: - x1 + x2 + x3 + 10 x4 <= 20

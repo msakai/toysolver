@@ -15,3 +15,4 @@ End
 \ GLPK: samples/inconsistent-bound-neg-inf.lp:9: invalid use of `-inf' as upper bound
 \ Gurobi: Model is infeasible or unbounded
 \ lpsolve: bound contradicts earlier bounds on line 9
+\ SCIP: infeasible
