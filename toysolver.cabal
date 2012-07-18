@@ -39,6 +39,7 @@ Extra-Source-Files:
    samples/sdp/*.dat
    samples/sdp/*.dat-s
    samples/smt/*.smt2
+   samples/qbf/*.qdimacs
 Build-Type: Simple
 
 Flag ForceChar8
