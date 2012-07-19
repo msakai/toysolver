@@ -407,8 +407,11 @@ qexpr = do
   tok (char '[')
   t <- qterm True
   ts <- many (qterm False)
-  mapM_ (tok . char) "]/2"
-  return [Term (r / 2) vs | Term r vs <- t:ts]
+  tok (char ']')
+  -- Gurobi allows ommiting "/2"
+  (do mapM_ (tok . char) "/2"
+      return [Term (r / 2) vs | Term r vs <- t:ts])
+   <|> return (t:ts)
 
 qterm :: Bool -> Parser Term
 qterm flag = do
@@ -550,7 +553,7 @@ showTerm (Term c vs) =
             showValue (2*c') .
             showChar ' ' .
             showString (intercalate " * " vs) .
-            showString " ]/2"
+            showString " ] / 2"
 
 showValue :: Rational -> ShowS
 showValue c =
