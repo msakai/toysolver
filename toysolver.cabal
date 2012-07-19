@@ -212,3 +212,17 @@ Test-suite TestAReal
   Main-is:           TestAReal.hs
   Build-depends:     base >=4 && <5, containers, heaps, primes, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
+
+Test-suite TestLPFile
+  Type:              exitcode-stdio-1.0
+  HS-Source-Dirs:    src
+  Main-is:           TestLPFIle.hs
+  Build-depends:     base >=4 && <5, mtl, containers, parsec, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Extensions: TemplateHaskell, DoAndIfThenElse
+
+Test-suite TestPBFile
+  Type:              exitcode-stdio-1.0
+  HS-Source-Dirs:    src
+  Main-is:           TestPBFIle.hs
+  Build-depends:     base >=4 && <5, mtl, containers, parsec, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Extensions: TemplateHaskell, DoAndIfThenElse
