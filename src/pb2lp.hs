@@ -71,8 +71,9 @@ main = do
       case LPFile.render lp of
         Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
         Just s -> putStr s
-    (_,_,errs) ->
+    (_,_,errs) -> do
       hPutStrLn stderr $ concat errs ++ usageInfo header options
+      exitFailure
 
 header :: String
-header = "Usage: pb2lp [--wbo] [file.opb|file.wbo|-]"
+header = "Usage: pb2lp [OPTION]... [file.opb|file.wbo|-]"

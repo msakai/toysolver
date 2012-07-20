@@ -239,11 +239,11 @@ showHelp h = hPutStrLn h (usageInfo header options)
 header :: String
 header = unlines
   [ "Usage:"
-  , "  toysat [file.cnf||-]"
-  , "  toysat --pb [file.opb|-]"
-  , "  toysat --wbo [file.wbo|-]"
-  , "  toysat --maxsat [file.cnf|file.wcnf|-]"
-  , "  toysat --lp [file.lp|-]"
+  , "  toysat [OPTION]... [file.cnf||-]"
+  , "  toysat [OPTION]... --pb [file.opb|-]"
+  , "  toysat [OPTION]... --wbo [file.wbo|-]"
+  , "  toysat [OPTION]... --maxsat [file.cnf|file.wcnf|-]"
+  , "  toysat [OPTION]... --lp [file.lp|-]"
   , ""
   , "Options:"
   ]

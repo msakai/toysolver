@@ -63,7 +63,7 @@ options =
     ]
 
 header :: String
-header = "Usage: toysolver [OPTION...] file.lp"
+header = "Usage: toysolver [OPTION]... file.lp"
 
 -- ---------------------------------------------------------------------------
 

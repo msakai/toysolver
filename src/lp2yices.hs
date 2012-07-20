@@ -201,11 +201,12 @@ main = do
       case ret of
         Right lp -> putStrLn $ lp2ys lp (Optimize `elem` o) (not (NoCheck `elem` o)) ""
         Left err -> hPrint stderr err >> exitFailure
-    (_,_,errs) ->
+    (_,_,errs) -> do
         hPutStrLn stderr $ concat errs ++ usageInfo header options
+        exitFailure
 
 header :: String
-header = "Usage: lp2yice [file.lp|-]"
+header = "Usage: lp2yice [OPTION]... [file.lp|-]"
 
 testFile :: FilePath -> IO ()
 testFile fname = do

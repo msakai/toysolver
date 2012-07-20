@@ -59,8 +59,9 @@ main = do
           case LPFile.render (convert cnf objType) of
             Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
             Just s2 -> putStr s2
-    (_,_,errs) ->
+    (_,_,errs) -> do
       hPutStrLn stderr $ concat errs ++ usageInfo header options
+      exitFailure
 
 header :: String
-header = "Usage: cnf2lp [file.cnf|-]"
+header = "Usage: cnf2lp [OPTION]... [file.cnf|-]"
