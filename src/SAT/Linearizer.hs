@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Linearizer
+-- Module      :  SAT.Linearizer
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -19,19 +19,19 @@
 -- Reference:
 -- 
 -- * [For60] R. Fortet. Application de l'algèbre de Boole en rechercheop
---   opérationelle. Revue Française de Recherche Opérationelle, 4:17–26,
+--   opérationelle. Revue Française de Recherche Opérationelle, 4:17-26,
 --   1960. 
 --
 -- * [BM84a] E. Balas and J. B. Mazzola. Nonlinear 0-1 programming:
---   I. Linearization techniques. Mathematical Programming, 30(1):1–21,
+--   I. Linearization techniques. Mathematical Programming, 30(1):1-21,
 --   1984.
 -- 
 -- * [BM84b] E. Balas and J. B. Mazzola. Nonlinear 0-1 programming:
 --   II. Dominance relations and algorithms. Mathematical Programming,
---   30(1):22–45, 1984.
+--   30(1):22-45, 1984.
 --
 -----------------------------------------------------------------------------
-module Linearizer
+module SAT.Linearizer
   (
   -- * The @Linearizer@ type
     Linearizer

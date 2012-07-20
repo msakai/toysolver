@@ -100,7 +100,7 @@ Executable toysat
      Text.PBFile
      Text.MaxSAT
      SAT
-     Linearizer
+     SAT.Linearizer
      SAT.Integer
      SAT.Types
      SAT.TheorySolver

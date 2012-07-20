@@ -51,12 +51,12 @@ import GHC.IO.Encoding
 import Data.Linear
 import qualified SAT
 import qualified SAT.Integer
+import qualified SAT.Linearizer as Lin
 import SAT.Types (pbEval, pbLowerBound)
 import SAT.Printer
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
 import qualified Text.MaxSAT as MaxSAT
-import qualified Linearizer as Lin
 import Version
 import Util (showRational, revMapM, revForM)
 
