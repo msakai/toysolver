@@ -9,6 +9,7 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import SAT
 import SAT.Types
+import SAT.TseitinEncoder
 
 -- should be SAT
 case_solve_SAT :: IO ()
@@ -392,6 +393,35 @@ case_addPBAtLeast_regression = do
   addClause solver [-x2, -x3]
   addClause solver [-x2, -x4]
   addPBAtLeast solver [(1,x1),(2,x2),(1,x3),(1,x4)] 3
+  ret <- solve solver
+  ret @?= False
+
+------------------------------------------------------------------------
+
+case_addFormula = do
+  solver <- newSolver
+  [x1,x2,x3,x4,x5] <- replicateM 5 $ liftM Var $ newVar solver
+  addFormula solver $ Or [Imply x1 (And [x3,x4]), Imply x2 (And [x3,x5])]
+  -- x6 = x3 ∧ x4
+  -- x7 = x3 ∧ x5
+  addFormula solver $ Or [x1, x2]
+  addFormula solver $ Imply x4 (Not x5)
+  ret <- solve solver
+  ret @?= True
+
+  addFormula solver $ Equiv x2 x4
+  ret <- solve solver
+  ret @?= True
+
+  addFormula solver $ Equiv x1 x5
+  ret <- solve solver
+  ret @?= True
+
+  addFormula solver $ Imply (Not x1) (And [x3,x5])
+  ret <- solve solver
+  ret @?= True
+
+  addFormula solver $ Imply (Not x2) (And [x3,x4])
   ret <- solve solver
   ret @?= False
 

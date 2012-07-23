@@ -102,6 +102,7 @@ Executable toysat
      SAT
      SAT.Linearizer
      SAT.Integer
+     SAT.TseitinEncoder
      SAT.Types
      SAT.TheorySolver
      SAT.Printer
