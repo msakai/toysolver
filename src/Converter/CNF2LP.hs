@@ -45,7 +45,12 @@ convert cnf objType
     cs = do
       cl <- DIMACS.clauses cnf      
       let (lhs,n) = foldr f ([], 0) (elems cl)
-      return (Nothing, Nothing, (lhs, LPFile.Ge, fromIntegral $ 1 - n))
+      return $ LPFile.Constraint
+        { LPFile.constrType      = LPFile.NormalConstraint
+        , LPFile.constrLabel     = Nothing
+        , LPFile.constrIndicator = Nothing
+        , LPFile.constrBody      = (lhs, LPFile.Ge, fromIntegral $ 1 - n)
+        }
     f :: Int -> (LPFile.Expr,Integer) -> (LPFile.Expr,Integer)
     f lit (es,n) =
       if lit > 0

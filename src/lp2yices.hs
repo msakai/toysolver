@@ -79,7 +79,7 @@ assert :: ShowS -> ShowS
 assert x = list [showString "assert", x]
 
 constraint :: Bool -> Env -> LP.Constraint -> ShowS
-constraint q env (_, g, (e, op, b)) =
+constraint q env LP.Constraint{ LP.constrIndicator = g, LP.constrBody = (e, op, b) } =
   case g of 
     Nothing -> c
     Just (var,val) ->

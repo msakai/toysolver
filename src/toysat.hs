@@ -577,7 +577,9 @@ solveLP opt solver lp = do
             exitFailure
 
       putStrLn "c Loading constraints"
-      forM_ (LPFile.constraints lp) $ \(_label, indicator, (lhs, op, rhs)) -> do
+      forM_ (LPFile.constraints lp) $ \c -> do
+        let indicator      = LPFile.constrIndicator c
+            (lhs, op, rhs) = LPFile.constrBody c
         let d = foldl' lcm 1 (map denominator  (rhs:[r | LPFile.Term r _ <- lhs]))
             lhs' = lsum [asInteger (r * fromIntegral d) .*. (vmap Map.! asSingleton vs) | LPFile.Term r vs <- lhs]
             rhs' = asInteger (rhs * fromIntegral d)

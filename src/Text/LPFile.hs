@@ -26,7 +26,8 @@ module Text.LPFile
   , Term (..)
   , OptDir (..)
   , ObjectiveFunction
-  , Constraint
+  , ConstraintType (..)
+  , Constraint (..)
   , Bounds
   , Label
   , Var
@@ -83,8 +84,21 @@ data Term = Term Rational [Var]
 -- | objective function
 type ObjectiveFunction = (Maybe Label, Expr)
 
+data ConstraintType
+  = NormalConstraint
+  | LazyConstraint
+  | UserDefinedCut
+  deriving (Eq, Ord, Bounded, Enum, Show)
+
 -- | constraint
-type Constraint = (Maybe Label, Maybe (Var, Rational), (Expr, RelOp, Rational))
+data Constraint
+  = Constraint
+  { constrType      :: ConstraintType
+  , constrLabel     :: Maybe Label
+  , constrIndicator :: Maybe (Var, Rational)
+  , constrBody      :: (Expr, RelOp, Rational)
+  }
+  deriving (Eq, Ord, Show)
 
 -- | type for representing lower/upper bound of variables
 type Bounds = (BoundExpr, BoundExpr)
@@ -123,6 +137,12 @@ instance Variables LP where
 
 instance Variables Term where
   vars (Term _ xs) = Set.fromList xs
+
+instance Variables Constraint where
+  vars Constraint{ constrIndicator = ind, constrBody = (lhs, _, _) } =
+    vars lhs `Set.union` vs2
+    where
+      vs2 = maybe Set.empty (Set.singleton . fst) ind
 
 -- | default bounds
 defaultBounds :: Bounds
@@ -210,7 +230,13 @@ lpfile :: Parser LP
 lpfile = do
   sep
   (flag, obj) <- problem
-  cs <- constraintSection
+
+  cs <- liftM concat $ many $ msum $
+    [ constraintSection
+    , lazyConstraintsSection
+    , userCutsSection
+    ]
+
   bnds <- option Map.empty (try boundsSection)
   xs <- many (liftM Left generalSection <|> liftM Right binarySection)
   let ints = Set.fromList $ concat [x | Left  x <- xs]
@@ -218,10 +244,10 @@ lpfile = do
   bnds <- return $ Map.unionWith intersectBounds
             bnds (Map.fromAscList [(v, (Finite 0, Finite 1)) | v <- Set.toAscList bins])
   scs <- liftM Set.fromList $ option [] (try semiSection)
+
   ss <- option [] (try sosSection)
   end
-  let f (_, _, (e, _, _)) = vars e
-      vs = Set.unions $ map f cs ++
+  let vs = Set.unions $ map vars cs ++
            [ Map.keysSet bnds
            , ints
            , bins
@@ -249,7 +275,7 @@ end = tok $ string' "end"
 -- ---------------------------------------------------------------------------
 
 constraintSection :: Parser [Constraint]
-constraintSection = subjectTo >> many (try constraint)
+constraintSection = subjectTo >> many (try (constraint NormalConstraint))
 
 subjectTo :: Parser ()
 subjectTo = msum
@@ -260,8 +286,8 @@ subjectTo = msum
         >> tok (char '.') >> return ()
   ]
 
-constraint :: Parser Constraint
-constraint = do
+constraint :: ConstraintType -> Parser Constraint
+constraint t = do
   name <- optionMaybe (try label)
 
   g <- optionMaybe $ try $ do
@@ -276,7 +302,12 @@ constraint = do
   op <- relOp
   s <- option 1 sign
   rhs <- number
-  return (name, g, (e, op, s*rhs))
+  return $ Constraint
+    { constrType      = t
+    , constrLabel     = name
+    , constrIndicator = g
+    , constrBody      = (e, op, s*rhs)
+    }
 
 relOp :: Parser RelOp
 relOp = tok $ msum
@@ -287,6 +318,18 @@ relOp = tok $ msum
                      , return Eql
                      ]
   ]
+
+lazyConstraintsSection :: Parser [Constraint]
+lazyConstraintsSection = do
+  tok $ string' "lazy"
+  tok $ string' "constraints"
+  many $ try $ constraint LazyConstraint
+
+userCutsSection :: Parser [Constraint]
+userCutsSection = do
+  tok $ string' "user"
+  tok $ string' "cuts"
+  many $ try $ constraint $ UserDefinedCut
 
 type Bounds2 = (Maybe BoundExpr, Maybe BoundExpr)
 
@@ -476,22 +519,24 @@ render' lp = do
   tell $ showChar '\n'
 
   tell $ showString "SUBJECT TO\n"
+  forM_ (constraints lp) $ \c -> do
+    when (constrType c == NormalConstraint) $ do
+      renderConstraint c
+      tell $ showChar '\n'
 
-  forM_ (constraints lp) $ \(l, cond, (e, op, val)) -> do
-    renderLabel l
-    case cond of
-      Nothing -> return ()
-      Just (v,val) -> do
-        tell $ showString v . showString " = "
-        tell $ showValue val
-        tell $ showString " -> "
+  let lcs = [c | c <- constraints lp, constrType c == LazyConstraint]
+  unless (null lcs) $ do
+    tell $ showString "LAZY CONSTRAINTS\n"
+    forM_ lcs $ \c -> do
+      renderConstraint c
+      tell $ showChar '\n'
 
-    renderExpr e
-    tell $ showChar ' '
-    renderOp op
-    tell $ showChar ' '
-    tell $ showValue val
-    tell $ showChar '\n'
+  let cuts = [c | c <- constraints lp, constrType c == UserDefinedCut]
+  unless (null cuts) $ do
+    tell $ showString "USER CUTS\n"
+    forM_ cuts $ \c -> do
+      renderConstraint c
+      tell $ showChar '\n'
 
   tell $ showString "BOUNDS\n"
   forM_ (Map.toAscList (bounds lp)) $ \(v, b@(lb,ub)) -> do
@@ -571,6 +616,22 @@ renderOp :: RelOp -> WriterT ShowS Maybe ()
 renderOp Le = tell $ showString "<="
 renderOp Ge = tell $ showString ">="
 renderOp Eql = tell $ showString "="
+
+renderConstraint :: Constraint -> WriterT ShowS Maybe ()
+renderConstraint c@Constraint{ constrBody = (e,op,val) }  = do
+  renderLabel (constrLabel c)
+  case constrIndicator c of
+    Nothing -> return ()
+    Just (v,val) -> do
+      tell $ showString v . showString " = "
+      tell $ showValue val
+      tell $ showString " -> "
+
+  renderExpr e
+  tell $ showChar ' '
+  renderOp op
+  tell $ showChar ' '
+  tell $ showValue val
 
 renderBoundExpr :: BoundExpr -> WriterT ShowS Maybe ()
 renderBoundExpr (Finite r) = tell $ showValue r

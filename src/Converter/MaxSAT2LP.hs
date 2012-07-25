@@ -36,13 +36,18 @@ convert (nvar, top, ls) = LPFile.LP
     obj = [ LPFile.Term (fromIntegral w) [v] | (v,(w,_)) <- zs, w < top ]
     vs = [ "x" ++ show n | n <- [(1::Int)..nvar]] ++ 
          [ z | (z,(w,_)) <- zs, w /= top ]
-    cs = [(Nothing, Nothing, h (z,(w,xs))) | (z,(w,xs)) <- zs]
+    cs = [h (z,(w,xs)) | (z,(w,xs)) <- zs]
       where
-        h (z,(w,xs)) = 
-          case f xs of
-            (s,n)
-              | w>=top    -> (g s, LPFile.Ge, fromIntegral (1 - n)) -- hard constraint
-              | otherwise -> (LPFile.Term 1 [z] : g s, LPFile.Ge, fromIntegral (1 - n)) -- soft constraint
+        h (z,(w,xs)) = LPFile.Constraint
+          { LPFile.constrType      = LPFile.NormalConstraint
+          , LPFile.constrLabel     = Nothing
+          , LPFile.constrIndicator = Nothing
+          , LPFile.constrBody      = 
+              case f xs of
+                (s,n)
+                  | w>=top    -> (g s, LPFile.Ge, fromIntegral (1 - n)) -- hard constraint
+                  | otherwise -> (LPFile.Term 1 [z] : g s, LPFile.Ge, fromIntegral (1 - n)) -- soft constraint
+          }
 
     zs = zip (map (\x -> "z" ++ show x) [(1::Int)..]) ls
 

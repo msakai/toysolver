@@ -99,7 +99,10 @@ run solver opt lp = do
       [Const x .<=. v2 | LP.Finite x <- return l] ++
         [v2 .<=. Const x | LP.Finite x <- return u]
     cs2 = do
-      (_, ind, (lhs, rel, rhs)) <- LP.constraints lp
+      LP.Constraint
+        { LP.constrIndicator = ind
+        , LP.constrBody = (lhs, rel, rhs)
+        } <- LP.constraints lp
       let rel2 = case rel of
                   LP.Ge  -> Ge
                   LP.Le  -> Le

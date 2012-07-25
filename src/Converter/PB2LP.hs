@@ -57,7 +57,12 @@ convert objType formula@(obj, cs) = LPFile.LP
           lhs2 = convExpr lhs
           lhs3a = [t | t@(LPFile.Term _ (_:_)) <- lhs2]
           lhs3b = sum [c | LPFile.Term c [] <- lhs2]
-      return (Nothing, Nothing, (lhs3a, op2, fromIntegral rhs - lhs3b))
+      return $ LPFile.Constraint
+        { LPFile.constrType      = LPFile.NormalConstraint
+        , LPFile.constrLabel     = Nothing
+        , LPFile.constrIndicator = Nothing
+        , LPFile.constrBody      = (lhs3a, op2, fromIntegral rhs - lhs3b)
+        }
 
 convExpr :: PBFile.Sum -> LPFile.Expr
 convExpr = concatMap g2
@@ -124,17 +129,33 @@ convertWBO formula@(_top, cs) useIndicator = LPFile.LP
                case op of
                  PBFile.Ge -> LPFile.Ge
                  PBFile.Eq -> LPFile.Eql
-         return (ts, (Nothing, ind, (lhs3, op2, rhs3)))
+             c = LPFile.Constraint
+                 { LPFile.constrType      = LPFile.NormalConstraint
+                 , LPFile.constrLabel     = Nothing
+                 , LPFile.constrIndicator = ind
+                 , LPFile.constrBody      = (lhs3, op2, rhs3)
+                 }
+         return (ts, c)
        else do
          let (lhsGE,rhsGE) = relaxGE v (lhs3,rhs3)
+             c1 = LPFile.Constraint
+                  { LPFile.constrType      = LPFile.NormalConstraint
+                  , LPFile.constrLabel     = Nothing
+                  , LPFile.constrIndicator = Nothing
+                  , LPFile.constrBody      = (lhsGE, LPFile.Ge, rhsGE)
+                  }
          case op of
            PBFile.Ge -> do
-             return (ts, (Nothing, Nothing, (lhsGE, LPFile.Ge, rhsGE)))
+             return (ts, c1)
            PBFile.Eq -> do
              let (lhsLE,rhsLE) = relaxLE v (lhs3,rhs3)
-             [ (ts, (Nothing, Nothing, (lhsGE, LPFile.Ge, rhsGE)))
-               , ([], (Nothing, Nothing, (lhsLE, LPFile.Le, rhsLE)))
-               ]
+                 c2 = LPFile.Constraint
+                      { LPFile.constrType      = LPFile.NormalConstraint
+                      , LPFile.constrLabel     = Nothing
+                      , LPFile.constrIndicator = Nothing
+                      , LPFile.constrBody      = (lhsLE, LPFile.Le, rhsLE)
+                      }
+             [ (ts, c1), ([], c2) ]
 
 relaxGE :: LPFile.Var -> (LPFile.Expr, Rational) -> (LPFile.Expr, Rational)
 relaxGE v (lhs, rhs) = (LPFile.Term (rhs - lhs_lb) [v] : lhs, rhs)
