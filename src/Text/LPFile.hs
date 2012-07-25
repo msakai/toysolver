@@ -515,7 +515,7 @@ render' lp = do
 
   let (l, obj) = objectiveFunction lp
   renderLabel l
-  renderExpr obj
+  renderExpr True obj
   tell $ showChar '\n'
 
   tell $ showString "SUBJECT TO\n"
@@ -574,8 +574,9 @@ render' lp = do
 
   tell $ showString "END\n"
 
-renderExpr :: Expr -> WriterT ShowS Maybe ()
-renderExpr e = go (map (\t -> showTerm t "") e) 0
+-- FIXME: Gurobi は quadratic term が最後に一つある形式でないとダメっぽい
+renderExpr :: Bool -> Expr -> WriterT ShowS Maybe ()
+renderExpr isObj e = go (map (\t -> showTerm isObj t "") e) 0
   where
     go [] _ = return ()
     go (x:xs) 0 = tell (showString x) >> go xs (length x)
@@ -584,21 +585,24 @@ renderExpr e = go (map (\t -> showTerm t "") e) 0
         then tell (showChar ' ' . showString x) >> go xs (width + 1 + length x)
         else tell (showChar '\n') >> go (x:xs) 0
 
-showTerm :: Term -> ShowS
-showTerm (Term c vs) = 
-  showString (if c >= 0 then "+ " else "- ") . s
+showTerm :: Bool -> Term -> ShowS
+showTerm isObj (Term c vs) = 
+  s
   where
     c' = abs c
     s = case vs of
-          [] -> showValue c'
+          [] -> showString (if c >= 0 then "+ " else "- ") . showValue c'
           [v] ->
-            (if c' /= 1 then showValue c' . showChar ' ' else id) . showString v
+            showString (if c >= 0 then "+ " else "- ") . 
+            (if c' /= 1 then showValue c' . showChar ' ' else id) .
+            showString v
           _ ->
-            showString "[ " .
-            showValue (2*c') .
+            -- マイナスで始めるとSCIP 2.1.1 は「cannot have '-' in front of quadratic part ('[')」というエラーを出す
+            showString "+ [ " .
+            (if isObj then showValue (2*c) else showValue c) .
             showChar ' ' .
             showString (intercalate " * " vs) .
-            showString " ] / 2"
+            (if isObj then showString " ] / 2" else showString " ]")
 
 showValue :: Rational -> ShowS
 showValue c =
@@ -627,7 +631,7 @@ renderConstraint c@Constraint{ constrBody = (e,op,val) }  = do
       tell $ showValue val
       tell $ showString " -> "
 
-  renderExpr e
+  renderExpr False e
   tell $ showChar ' '
   renderOp op
   tell $ showChar ' '
