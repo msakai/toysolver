@@ -2,6 +2,7 @@
 module SAT.Integer where
 
 import Control.Monad
+import Data.Array.IArray
 import Text.Printf
 import SAT
 import Data.Linear
@@ -55,3 +56,6 @@ addEqSoft :: SAT.Solver -> SAT.Lit -> Expr -> Expr -> IO ()
 addEqSoft solver ind lhs rhs = do
   let Expr xs c = lhs .-. rhs
   SAT.addPBExactlySoft solver ind xs (-c)
+
+eval :: SAT.Model -> Expr -> Integer
+eval m (Expr ts c) = sum [if m ! SAT.litVar lit == SAT.litPolarity lit then n else 0 | (n,lit) <- ts] + c

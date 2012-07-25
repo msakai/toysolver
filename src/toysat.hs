@@ -626,8 +626,7 @@ solveLP opt solver lp = do
       let printModel :: SAT.Model -> IO ()
           printModel m = do
             forM_ (Set.toList ivs) $ \v -> do
-              let SAT.Integer.Expr ts c = vmap Map.! v
-              let val = sum [if m ! SAT.litVar lit == SAT.litPolarity lit then n else 0 | (n,lit) <- ts] + c
+              let val = SAT.Integer.eval m (vmap Map.! v)
               printf "v %s = %d\n" v val
             hFlush stdout
 
