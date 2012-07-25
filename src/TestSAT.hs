@@ -9,7 +9,8 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import SAT
 import SAT.Types
-import SAT.TseitinEncoder
+import qualified SAT.TseitinEncoder as Tseitin
+import SAT.TseitinEncoder (Formula (..))
 
 -- should be SAT
 case_solve_SAT :: IO ()
@@ -400,28 +401,30 @@ case_addPBAtLeast_regression = do
 
 case_addFormula = do
   solver <- newSolver
+  enc <- Tseitin.newEncoder solver
+
   [x1,x2,x3,x4,x5] <- replicateM 5 $ liftM Var $ newVar solver
-  addFormula solver $ Or [Imply x1 (And [x3,x4]), Imply x2 (And [x3,x5])]
+  Tseitin.addFormula enc $ Or [Imply x1 (And [x3,x4]), Imply x2 (And [x3,x5])]
   -- x6 = x3 ∧ x4
   -- x7 = x3 ∧ x5
-  addFormula solver $ Or [x1, x2]
-  addFormula solver $ Imply x4 (Not x5)
+  Tseitin.addFormula enc $ Or [x1, x2]
+  Tseitin.addFormula enc $ Imply x4 (Not x5)
   ret <- solve solver
   ret @?= True
 
-  addFormula solver $ Equiv x2 x4
+  Tseitin.addFormula enc $ Equiv x2 x4
   ret <- solve solver
   ret @?= True
 
-  addFormula solver $ Equiv x1 x5
+  Tseitin.addFormula enc $ Equiv x1 x5
   ret <- solve solver
   ret @?= True
 
-  addFormula solver $ Imply (Not x1) (And [x3,x5])
+  Tseitin.addFormula enc $ Imply (Not x1) (And [x3,x5])
   ret <- solve solver
   ret @?= True
 
-  addFormula solver $ Imply (Not x2) (And [x3,x4])
+  Tseitin.addFormula enc $ Imply (Not x2) (And [x3,x4])
   ret <- solve solver
   ret @?= False
 
