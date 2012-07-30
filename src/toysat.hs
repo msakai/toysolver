@@ -51,7 +51,7 @@ import GHC.IO.Encoding
 import Data.Linear
 import qualified SAT
 import qualified SAT.Integer
-import qualified SAT.Linearizer as Lin
+import qualified SAT.TseitinEncoder as Tseitin
 import SAT.Types (pbEval, pbLowerBound)
 import SAT.Printer
 import qualified Text.PBFile as PBFile
@@ -324,11 +324,11 @@ solvePB opt solver formula@(obj, cs) = do
   printf "c #constraints %d\n" (length cs)
 
   _ <- replicateM n (SAT.newVar solver)
-  lin <- Lin.newLinearizer solver
-  Lin.setUsePB lin (optLinearizerPB opt)
+  enc <- Tseitin.newEncoder solver
+  Tseitin.setUsePB enc (optLinearizerPB opt)
 
   forM_ cs $ \(lhs, op, rhs) -> do
-    lhs' <- pbConvSum lin lhs
+    lhs' <- pbConvSum enc lhs
     case op of
       PBFile.Ge -> SAT.addPBAtLeast solver lhs' rhs
       PBFile.Eq -> SAT.addPBExactly solver lhs' rhs
@@ -343,7 +343,7 @@ solvePB opt solver formula@(obj, cs) = do
         pbPrintModel stdout m n
 
     Just obj' -> do
-      obj'' <- pbConvSum lin obj'
+      obj'' <- pbConvSum enc obj'
 
       modelRef <- newIORef Nothing
 
@@ -371,11 +371,11 @@ solvePB opt solver formula@(obj, cs) = do
               pbPrintModel stdout m n
           throwIO e
 
-pbConvSum :: Lin.Linearizer -> PBFile.Sum -> IO [(Integer, SAT.Lit)]
-pbConvSum lin = revMapM f
+pbConvSum :: Tseitin.Encoder -> PBFile.Sum -> IO [(Integer, SAT.Lit)]
+pbConvSum enc = revMapM f
   where
     f (w,ls) = do
-      l <- Lin.translate lin ls
+      l <- Tseitin.encodeConj enc ls
       return (w,l)
 
 minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
@@ -474,11 +474,11 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
   printf "c #constraints %d\n" (length cs)
 
   _ <- replicateM nvar (SAT.newVar solver)
-  lin <- Lin.newLinearizer solver
-  Lin.setUsePB lin (optLinearizerPB opt)
+  enc <- Tseitin.newEncoder solver
+  Tseitin.setUsePB enc (optLinearizerPB opt)
 
   obj <- liftM concat $ revForM cs $ \(cost, (lhs, op, rhs)) -> do
-    lhs' <- pbConvSum lin lhs
+    lhs' <- pbConvSum enc lhs
     case cost of
       Nothing -> do
         case op of

@@ -428,6 +428,46 @@ case_addFormula = do
   ret <- solve solver
   ret @?= False
 
+case_encodeConj = do
+  solver <- newSolver
+  enc <- Tseitin.newEncoder solver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- Tseitin.encodeConj enc [x1,x2]
+
+  ret <- solveWith solver [x3]
+  ret @?= True
+  m <- model solver
+  evalLit m x1 @?= True
+  evalLit m x2 @?= True
+  evalLit m x3 @?= True
+
+  ret <- solveWith solver [-x3]
+  ret @?= True
+  m <- model solver
+  (evalLit m x1 && evalLit m x2) @?= False
+  evalLit m x3 @?= False
+
+case_encodeDisj = do
+  solver <- newSolver
+  enc <- Tseitin.newEncoder solver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- Tseitin.encodeDisj enc [x1,x2]
+
+  ret <- solveWith solver [x3]
+  ret @?= True
+  m <- model solver
+  (evalLit m x1 || evalLit m x2) @?= True
+  evalLit m x3 @?= True
+
+  ret <- solveWith solver [-x3]
+  ret @?= True
+  m <- model solver
+  evalLit m x1 @?= False
+  evalLit m x2 @?= False
+  evalLit m x3 @?= False
+
 ------------------------------------------------------------------------
 -- Test harness
 

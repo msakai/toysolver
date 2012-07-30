@@ -11,6 +11,27 @@
 -- 
 -- Tseitin encoding
 --
+-- TODO:
+-- 
+-- * reduce variables.
+--
+-- References:
+--
+-- * [Tse83] G. Tseitin. On the complexity of derivation in propositional
+--   calculus. Automation of Reasoning: Classical Papers in Computational
+--   Logic, 2:466-483, 1983. Springer-Verlag. 
+--
+-- * [For60] R. Fortet. Application de l'algèbre de Boole en rechercheop
+--   opérationelle. Revue Française de Recherche Opérationelle, 4:17-26,
+--   1960. 
+--
+-- * [BM84a] E. Balas and J. B. Mazzola. Nonlinear 0-1 programming:
+--   I. Linearization techniques. Mathematical Programming, 30(1):1-21,
+--   1984.
+-- 
+-- * [BM84b] E. Balas and J. B. Mazzola. Nonlinear 0-1 programming:
+--   II. Dominance relations and algorithms. Mathematical Programming,
+--   30(1):22-45, 1984.
 -----------------------------------------------------------------------------
 module SAT.TseitinEncoder
   (
@@ -22,10 +43,14 @@ module SAT.TseitinEncoder
   -- * Encoding of boolean formula
   , Formula (..)
   , addFormula
+  , encodeConj
+  , encodeDisj
   ) where
 
 import Control.Monad
 import Data.IORef
+import qualified Data.Map as Map
+import qualified Data.IntSet as IS
 import qualified SAT as SAT
 
 -- | Arbitrary formula not restricted to CNF
@@ -41,18 +66,21 @@ data Formula
 -- | Encoder instance
 data Encoder =
   Encoder
-  { encSolver :: SAT.Solver
-  , encUsePB  :: IORef Bool
+  { encSolver    :: SAT.Solver
+  , encUsePB     :: IORef Bool
+  , encConjTable :: !(IORef (Map.Map IS.IntSet SAT.Lit))
   }
 
 -- | Create a @Encoder@ instance.
 newEncoder :: SAT.Solver -> IO Encoder
 newEncoder solver = do
   usePBRef <- newIORef False
+  table <- newIORef Map.empty
   return $
     Encoder
     { encSolver = solver
     , encUsePB  = usePBRef
+    , encConjTable = table
     }
 
 -- | Use /pseudo boolean constraints/ or use only /clauses/.
@@ -102,7 +130,6 @@ encodeToClause encoder formula =
 encodeToLit :: Encoder -> Formula -> IO SAT.Lit
 encodeToLit encoder formula = do
   let solver = encSolver encoder
-  usePB <- readIORef (encUsePB encoder)
   case formula of
     Var v -> return v
     And xs -> do
@@ -129,21 +156,28 @@ encodeToLit encoder formula = do
             ]
         -- Varにリテラルを渡しているのは少し気持ち悪い
 
-addIsDisjOf :: Encoder -> SAT.Lit -> [SAT.Lit] -> IO ()
-addIsDisjOf encoder l ls = do
-  let solver = encSolver encoder
-  usePB <- readIORef (encUsePB encoder)
-  if usePB
-   then do
-     -- ∀i.(li → l) ⇔ Σli <= n*l ⇔ Σli - n*l <= 0
-     let n = length ls
-     SAT.addPBAtMost solver ((- fromIntegral n, l) : [(1,l) | l <- ls]) 0
-   else do
-     forM_ ls $ \li -> do
-       -- (li → l)  ⇔  (¬li ∨ l)
-       SAT.addClause solver [SAT.litNot li, l]
-  -- (l → (l1 ∨ l2 ∨ … ∨ ln))  ⇔  (¬l ∨ l1 ∨ l2 ∨ … ∨ ln)
-  SAT.addClause solver (SAT.litNot l : ls)
+-- | Return an literal which is equivalent to a given conjunction.
+encodeConj :: Encoder -> [SAT.Lit] -> IO SAT.Lit
+encodeConj _ [l] =  return l
+encodeConj encoder ls =  do
+  let ls2 = IS.fromList ls
+  table <- readIORef (encConjTable encoder)
+  case Map.lookup ls2 table of
+    Just l -> return l
+    Nothing -> do
+      let sat = encSolver encoder
+      v <- SAT.newVar sat
+      addIsConjOf encoder v ls
+      writeIORef (encConjTable encoder) (Map.insert ls2 v table)
+      return v
+
+-- | Return an literal which is equivalent to a given disjunction.
+encodeDisj :: Encoder -> [SAT.Lit] -> IO SAT.Lit
+encodeDisj _ [l] =  return l
+encodeDisj encoder ls = do
+  -- ¬l ⇔ ¬(¬l1 ∧ … ∧ ¬ln) ⇔ (l1 ∨ … ∨ ln)
+  l <- encodeConj encoder [SAT.litNot li | li <- ls]
+  return $ SAT.litNot l
 
 addIsConjOf :: Encoder -> SAT.Lit -> [SAT.Lit] -> IO ()
 addIsConjOf encoder l ls = do
@@ -153,10 +187,14 @@ addIsConjOf encoder l ls = do
    then do
      -- ∀i.(l → li) ⇔ Σli >= n*l ⇔ Σli - n*l >= 0
      let n = length ls
-     SAT.addPBAtLeast solver ((- fromIntegral n, l) : [(1,l) | l <- ls]) 0
+     SAT.addPBAtLeast solver ((- fromIntegral n, l) : [(1,li) | li <- ls]) 0
    else do
      forM_ ls $ \li -> do
        -- (l → li)  ⇔  (¬l ∨ li)
        SAT.addClause solver [SAT.litNot l, li]
   -- ((l1 ∧ l2 ∧ … ∧ ln) → l)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ l)
   SAT.addClause solver (l : map SAT.litNot ls)
+
+addIsDisjOf :: Encoder -> SAT.Lit -> [SAT.Lit] -> IO ()
+addIsDisjOf encoder l ls =
+  addIsConjOf encoder (SAT.litNot l) [SAT.litNot li | li <- ls]
