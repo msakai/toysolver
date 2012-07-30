@@ -8,11 +8,17 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, DoAndIfThenElse, DoRec, ScopedTypeVariables)
+-- Portability :  non-portable (BangPatterns, DoAndIfThenElse, DoRec, ScopedTypeVariables, CPP)
 --
 -- A CDCL SAT solver.
 --
--- It follows design of MiniSat and SAT4J.
+-- It follows the design of MiniSat and SAT4J.
+--
+-- See also:
+--
+-- * <http://hackage.haskell.org/package/funsat>
+--
+-- * <http://hackage.haskell.org/package/incremental-sat-solver>
 --
 -----------------------------------------------------------------------------
 module SAT

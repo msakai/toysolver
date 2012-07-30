@@ -17,6 +17,10 @@
 -- 
 -- * <http://www.cs.cmu.edu/~emc/spring06/home1_files/Presburger%20Arithmetic.ppt>
 -- 
+-- See also:
+--
+-- * <http://hackage.haskell.org/package/presburger>
+--
 -----------------------------------------------------------------------------
 module Cooper
     ( module Data.Expr
