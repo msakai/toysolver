@@ -576,39 +576,48 @@ render' lp = do
 
 -- FIXME: Gurobi は quadratic term が最後に一つある形式でないとダメっぽい
 renderExpr :: Bool -> Expr -> WriterT ShowS Maybe ()
-renderExpr isObj e = go (map (\t -> showTerm isObj t "") e) 0
+renderExpr isObj e = fill 80 (ts1 ++ ts2)
   where
-    go [] _ = return ()
-    go (x:xs) 0 = tell (showString x) >> go xs (length x)
-    go (x:xs) width =
-      if width + 1 + length x <= 80
-        then tell (showChar ' ' . showString x) >> go xs (width + 1 + length x)
-        else tell (showChar '\n') >> go (x:xs) 0
+    (ts,qts) = partition isLin e 
+    isLin (Term _ [])  = True
+    isLin (Term _ [_]) = True
+    isLin _ = False
 
-showTerm :: Bool -> Term -> ShowS
-showTerm isObj (Term c vs) = 
-  s
-  where
-    c' = abs c
-    s = case vs of
-          [] -> showString (if c >= 0 then "+ " else "- ") . showValue c'
-          [v] ->
-            showString (if c >= 0 then "+ " else "- ") . 
-            (if c' /= 1 then showValue c' . showChar ' ' else id) .
-            showString v
-          _ ->
-            -- マイナスで始めるとSCIP 2.1.1 は「cannot have '-' in front of quadratic part ('[')」というエラーを出す
-            showString "+ [ " .
-            (if isObj then showValue (2*c) else showValue c) .
-            showChar ' ' .
-            showString (intercalate " * " vs) .
-            (if isObj then showString " ] / 2" else showString " ]")
+    ts1 = map f ts
+    ts2
+      | null qts  = []
+      | otherwise =
+        -- マイナスで始めるとSCIP 2.1.1 は「cannot have '-' in front of quadratic part ('[')」というエラーを出す
+        ["+ ["] ++ map g qts ++ [if isObj then "] / 2" else "]"]
+
+    f :: Term -> String
+    f (Term c [])  = showConstTerm c ""
+    f (Term c [v]) = showCoeff c v
+    f _ = error "should not happen"
+
+    g :: Term -> String
+    g (Term c vs) = 
+      (if isObj then showCoeff (2*c) else showCoeff c)
+      (intercalate " * " vs)
 
 showValue :: Rational -> ShowS
 showValue c =
   if denominator c == 1
     then shows (numerator c)
     else shows (fromRational c :: Double)
+
+showCoeff :: Rational -> ShowS
+showCoeff c = s . v
+  where
+    c' = abs c
+    s = showString (if c >= 0 then "+ " else "- ")
+    v = (if c' /= 1 then showValue c' . showChar ' ' else id)
+
+showConstTerm :: Rational -> ShowS
+showConstTerm c = s . v
+  where
+    s = showString (if c >= 0 then "+ " else "- ")
+    v = showValue (abs c)
 
 renderLabel :: Maybe Label -> WriterT ShowS Maybe ()
 renderLabel l =
@@ -643,14 +652,17 @@ renderBoundExpr NegInf = tell $ showString "-inf"
 renderBoundExpr PosInf = tell $ showString "+inf"
 
 renderVariableList :: [Var] -> WriterT ShowS Maybe ()
-renderVariableList vs = go vs 0 >> tell (showChar '\n')
+renderVariableList vs = fill 80 vs >> tell (showChar '\n')
+
+fill :: Int -> [String] -> WriterT ShowS Maybe ()
+fill width xs = go xs 0
   where
     go [] _ = return ()
-    go (v:vs) 0 = tell (showString v) >> go vs (length v)
-    go (v:vs) width =
-      if width + 1 + length v <= 80
-      then tell (showChar ' ' . showString v) >> go vs (width + 1 + length v)
-      else tell (showChar '\n') >> go (v:vs) 0
+    go (x:xs) 0 = tell (showString x) >> go xs (length x)
+    go (x:xs) w =
+      if w + 1 + length x <= width
+        then tell (showChar ' ' . showString x) >> go xs (w + 1 + length x)
+        else tell (showChar '\n') >> go (x:xs) 0
 
 -- ---------------------------------------------------------------------------
 
