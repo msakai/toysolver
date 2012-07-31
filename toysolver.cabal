@@ -13,6 +13,7 @@ Extra-Source-Files:
    README.md
    COPYING
    src/TseitinEncode.hs
+   src/CongruenceClosure.hs
    src/ContiTraverso.hs
    src/Data/Polynomial.hs
    src/Data/Polynomial/GBase.hs
