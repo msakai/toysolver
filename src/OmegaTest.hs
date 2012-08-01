@@ -19,6 +19,11 @@
 --   the 1991 ACM/IEEE conference on Supercomputing (1991), pp. 4-13.
 --
 -- * <http://users.cecs.anu.edu.au/~michaeln/pubs/arithmetic-dps.pdf>
+--
+-- See also:
+--
+-- * <http://hackage.haskell.org/package/Omega>
+--
 -----------------------------------------------------------------------------
 module OmegaTest
     ( module Data.Expr
