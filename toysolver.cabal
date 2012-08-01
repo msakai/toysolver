@@ -227,3 +227,10 @@ Test-suite TestPBFile
   Main-is:           TestPBFIle.hs
   Build-depends:     base >=4 && <5, mtl, containers, parsec, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
+
+Benchmark BenchmarkSATLIB
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   src
+  main-is:          BenchmarkSATLIB.hs
+  build-depends:    base >=4 && <5, array, containers, random, queue, parse-dimacs, criterion
+  Extensions: TemplateHaskell, DoAndIfThenElse
