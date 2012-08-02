@@ -107,7 +107,7 @@ Executable toysat
      SAT.TheorySolver
      SAT.Printer
      Version
-  Build-Depends: base >=4 && <5, mtl, containers >= 0.4.2, array, random, parsec, bytestring, parse-dimacs, queue, OptDir, time, old-locale
+  Build-Depends: base >=4 && <5, mtl, containers >= 0.4.2, array, random, parsec, bytestring, filepath, parse-dimacs, queue, OptDir, time, old-locale
   Extensions:
      MultiParamTypeClasses
      FlexibleInstances

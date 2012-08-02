@@ -37,6 +37,7 @@ import System.Exit
 import System.Locale
 import System.Console.GetOpt
 import System.CPUTime
+import System.FilePath
 import System.Timeout
 import qualified System.Info as SysInfo
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
@@ -66,7 +67,7 @@ data Mode = ModeHelp | ModeVersion | ModeSAT | ModePB | ModeWBO | ModeMaxSAT | M
 
 data Options
   = Options
-  { optMode          :: Mode
+  { optMode          :: Maybe Mode
   , optRestartStrategy :: SAT.RestartStrategy
   , optRestartFirst  :: Int
   , optRestartInc    :: Double
@@ -86,7 +87,7 @@ data Options
 defaultOptions :: Options
 defaultOptions
   = Options
-  { optMode          = ModeSAT
+  { optMode          = Nothing
   , optRestartStrategy = SAT.defaultRestartStrategy
   , optRestartFirst  = SAT.defaultRestartFirst
   , optRestartInc    = SAT.defaultRestartInc
@@ -105,13 +106,14 @@ defaultOptions
 
 options :: [OptDescr (Options -> Options)]
 options =
-    [ Option ['h'] ["help"]   (NoArg (\opt -> opt{ optMode = ModeHelp   })) "show help"
-    , Option [] ["version"]   (NoArg (\opt -> opt{ optMode = ModeVersion})) "show version"
+    [ Option ['h'] ["help"]   (NoArg (\opt -> opt{ optMode = Just ModeHelp   })) "show help"
+    , Option [] ["version"]   (NoArg (\opt -> opt{ optMode = Just ModeVersion})) "show version"
 
-    , Option []    ["pb"]     (NoArg (\opt -> opt{ optMode = ModePB     })) "solve pseudo boolean problems in .pb file"
-    , Option []    ["wbo"]    (NoArg (\opt -> opt{ optMode = ModeWBO    })) "solve weighted boolean optimization problem in .opb file"
-    , Option []    ["maxsat"] (NoArg (\opt -> opt{ optMode = ModeMaxSAT })) "solve MaxSAT problem in .cnf or .wcnf file"
-    , Option []    ["lp"]     (NoArg (\opt -> opt{ optMode = ModeLP     })) "solve binary integer programming problem in .lp file"
+    , Option []    ["sat"]    (NoArg (\opt -> opt{ optMode = Just ModeSAT    })) "solve pseudo boolean problems in .cnf file (default)"
+    , Option []    ["pb"]     (NoArg (\opt -> opt{ optMode = Just ModePB     })) "solve pseudo boolean problems in .pb file"
+    , Option []    ["wbo"]    (NoArg (\opt -> opt{ optMode = Just ModeWBO    })) "solve weighted boolean optimization problem in .opb file"
+    , Option []    ["maxsat"] (NoArg (\opt -> opt{ optMode = Just ModeMaxSAT })) "solve MaxSAT problem in .cnf or .wcnf file"
+    , Option []    ["lp"]     (NoArg (\opt -> opt{ optMode = Just ModeLP     })) "solve binary integer programming problem in .lp file"
 
     , Option [] ["restart"]
         (ReqArg (\val opt -> opt{ optRestartStrategy = parseRestartStrategy val }) "<str>")
@@ -213,7 +215,21 @@ main = do
        else do
          ret <- timeout (if timelim > 0 then fromIntegral timelim else (-1)) $ do
             solver <- newSolver opt
-            case optMode opt of
+            let mode =
+                  case optMode opt of
+                    Just m  -> m
+                    Nothing ->
+                      case args2 of
+                        [] -> ModeHelp
+                        fname : _ ->
+                          case map toLower (takeExtension fname) of
+                            ".cnf"  -> ModeSAT
+                            ".opb"  -> ModePB
+                            ".wbo"  -> ModeWBO
+                            ".wcnf" -> ModeMaxSAT
+                            ".lp"   -> ModeLP
+                            _ -> ModeSAT
+            case mode of
               ModeHelp    -> showHelp stdout
               ModeVersion -> hPutStrLn stdout (showVersion version)
               ModeSAT     -> mainSAT opt solver args2
