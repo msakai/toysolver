@@ -25,9 +25,11 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import System.Exit
 import System.Environment
+import System.FilePath
 import System.Console.GetOpt
 import System.IO
 import Text.Printf
+import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 import Data.Expr
 import Data.Formula
@@ -36,12 +38,20 @@ import qualified OmegaTest
 import qualified Cooper
 import qualified MIPSolverHL
 import qualified Text.LPFile as LP
+import qualified Text.PBFile as PBFile
+import qualified Text.MaxSAT as MaxSAT
+import qualified Converter.CNF2LP as CNF2LP
+import qualified Converter.PB2LP as PB2LP
+import qualified Converter.MaxSAT2LP as MaxSAT2LP
 import qualified Simplex2
 import qualified MIPSolver2
 import Version
 import Util
 
 -- ---------------------------------------------------------------------------
+
+data Mode = ModeSAT | ModePB | ModeWBO | ModeMaxSAT | ModeLP
+  deriving (Eq, Ord)
 
 data Flag
     = Help
@@ -50,6 +60,7 @@ data Flag
     | PrintRational
     | PivotStrategy String
     | NThread !Int
+    | Mode !Mode
     deriving Eq
 
 options :: [OptDescr Flag]
@@ -60,6 +71,12 @@ options =
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
     , Option [] ["threads"] (ReqArg (NThread . read) "INTEGER") "number of threads to use"
+
+    , Option []    ["sat"]    (NoArg (Mode ModeSAT))    "solve pseudo boolean problems in .cnf file"
+    , Option []    ["pb"]     (NoArg (Mode ModePB))     "solve pseudo boolean problems in .pb file"
+    , Option []    ["wbo"]    (NoArg (Mode ModeWBO))    "solve weighted boolean optimization problem in .opb file"
+    , Option []    ["maxsat"] (NoArg (Mode ModeMaxSAT)) "solve MaxSAT problem in .cnf or .wcnf file"
+    , Option []    ["lp"]     (NoArg (Mode ModeLP))     "solve binary integer programming problem in .lp file (default)"
     ]
 
 header :: String
@@ -71,8 +88,7 @@ run :: String -> [Flag] -> LP.LP -> IO ()
 run solver opt lp = do
   unless (Set.null (LP.semiContinuousVariables lp)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
-    exitFailure
-
+    exitFailure  
   case map toLower solver of
     s | s `elem` ["omega-test", "cooper"] -> solveByQE
     s | s `elem` ["old-mip"] -> solveByMIP
@@ -221,9 +237,49 @@ main = do
       | Help `elem` o    -> putStrLn (usageInfo header options)
       | Version `elem` o -> putStrLn (V.showVersion version)
     (o,[fname],[]) -> do
-      ret <- LP.parseFile fname
-      case ret of
-        Left err -> hPrint stderr err >> exitFailure
-        Right lp -> run (getSolver o) o lp
+
+      let mode =
+            case reverse [m | Mode m <- o] of
+              m:_ -> m
+              [] ->
+                case map toLower (takeExtension fname) of
+                  ".cnf"  -> ModeSAT
+                  ".opb"  -> ModePB
+                  ".wbo"  -> ModeWBO
+                  ".wcnf" -> ModeMaxSAT
+                  ".lp"   -> ModeLP
+                  _ -> ModeLP
+
+      case mode of
+        ModeSAT -> do
+          ret <- DIMACS.parseFile fname
+          case ret of
+            Left err -> hPrint stderr err >> exitFailure
+            Right cnf -> do
+              let lp = CNF2LP.convert cnf CNF2LP.ObjNone
+              run (getSolver o) o lp
+        ModePB -> do
+          ret <- PBFile.parseOPBFile fname
+          case ret of
+            Left err -> hPrint stderr err >> exitFailure
+            Right pb -> do
+              let lp = PB2LP.convert CNF2LP.ObjNone pb
+              run (getSolver o) o lp
+        ModeWBO -> do
+          ret <- PBFile.parseWBOFile fname
+          case ret of
+            Left err -> hPrint stderr err >> exitFailure
+            Right wbo -> do
+              let lp = PB2LP.convertWBO wbo False
+              run (getSolver o) o lp
+        ModeMaxSAT -> do
+          wcnf <- MaxSAT.parseWCNFFile fname
+          let lp = MaxSAT2LP.convert wcnf
+          run (getSolver o) o lp
+        ModeLP -> do
+          ret <- LP.parseFile fname
+          case ret of
+            Left err -> hPrint stderr err >> exitFailure
+            Right lp -> run (getSolver o) o lp
     (_,_,errs) ->
         hPutStrLn stderr $ concat errs ++ usageInfo header options

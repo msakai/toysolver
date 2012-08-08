@@ -55,6 +55,9 @@ Executable toysolver
   Main-is: toysolver.hs
   HS-Source-Dirs: src
   Other-Modules:
+     Converter.CNF2LP
+     Converter.ObjType
+     Converter.PB2LP
      Data.Delta
      Data.Expr
      Data.Lattice
@@ -63,6 +66,8 @@ Executable toysolver
      Data.Linear
      Data.Interval
      Text.LPFile
+     Text.PBFile
+     Text.MaxSAT
      BoundsInference
      Cooper     
      FourierMotzkin
@@ -75,7 +80,7 @@ Executable toysolver
      MIPSolver2
      Util
      Version
-  Build-Depends: base >=4 && <5, mtl, containers, parsec, OptDir, deepseq, stm >=2.3
+  Build-Depends: base >=4 && <5, mtl, containers, array, filepath, parsec, OptDir, deepseq, stm >=2.3, parse-dimacs
   Extensions:
      BangPatterns
      ScopedTypeVariables
