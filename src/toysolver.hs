@@ -256,21 +256,21 @@ main = do
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
-              let lp = CNF2LP.convert cnf CNF2LP.ObjNone
+              let lp = CNF2LP.convert CNF2LP.ObjNone cnf
               run (getSolver o) o lp
         ModePB -> do
           ret <- PBFile.parseOPBFile fname
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right pb -> do
-              let lp = PB2LP.convert CNF2LP.ObjNone pb
+              let lp = PB2LP.convert PB2LP.ObjNone pb
               run (getSolver o) o lp
         ModeWBO -> do
           ret <- PBFile.parseWBOFile fname
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right wbo -> do
-              let lp = PB2LP.convertWBO wbo False
+              let lp = PB2LP.convertWBO False wbo
               run (getSolver o) o lp
         ModeMaxSAT -> do
           wcnf <- MaxSAT.parseWCNFFile fname

@@ -23,8 +23,8 @@ import qualified Text.LPFile as LPFile
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import Converter.ObjType
 
-convert :: DIMACS.CNF -> ObjType -> LPFile.LP
-convert cnf objType
+convert :: ObjType -> DIMACS.CNF -> LPFile.LP
+convert objType cnf
   = LPFile.LP
   { LPFile.variables = Set.fromList vs
   , LPFile.dir = dir

@@ -56,7 +56,7 @@ main = do
         Left err -> hPrint stderr err >> exitFailure
         Right cnf -> do
           let objType = last (ObjNone : [t | ObjType t <- o])
-          case LPFile.render (convert cnf objType) of
+          case LPFile.render (convert objType cnf) of
             Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
             Just s2 -> putStr s2
     (_,_,errs) -> do

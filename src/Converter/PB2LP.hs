@@ -93,8 +93,8 @@ collectVariables (obj, cs) = IS.unions $ maybe IS.empty f obj : [f s | (s,_,_) <
       lit <- ts
       return $ abs lit
 
-convertWBO :: PBFile.SoftFormula -> Bool -> LPFile.LP
-convertWBO formula@(_top, cs) useIndicator = LPFile.LP
+convertWBO :: Bool -> PBFile.SoftFormula -> LPFile.LP
+convertWBO useIndicator formula@(_top, cs) = LPFile.LP
   { LPFile.variables = vs2
   , LPFile.dir = LPFile.OptMin
   , LPFile.objectiveFunction = (Nothing, obj2)

@@ -60,7 +60,7 @@ main = do
                  else PBFile.parseWBOFile fname
           case ret of
             Left err -> hPrint stderr err >> exitFailure
-            Right formula -> return (convertWBO formula (IndicatorConstraint `elem` o))
+            Right formula -> return (convertWBO (IndicatorConstraint `elem` o) formula)
         else do
           ret <- if fname == "-"
                  then liftM (PBFile.parseOPBString "-") getContents
