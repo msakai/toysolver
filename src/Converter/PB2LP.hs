@@ -16,6 +16,7 @@ module Converter.PB2LP
   , convertWBO
   ) where
 
+import Data.Array.IArray
 import Data.List
 import Data.Maybe
 import qualified Data.IntSet as IS
@@ -23,23 +24,27 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
+import qualified SAT.Types as SAT
 import Converter.ObjType
 
-convert :: ObjType -> PBFile.Formula -> LPFile.LP
-convert objType formula@(obj, cs) = LPFile.LP
-  { LPFile.variables = vs2
-  , LPFile.dir = dir
-  , LPFile.objectiveFunction = (Nothing, obj2)
-  , LPFile.constraints = cs2
-  , LPFile.bounds = Map.empty
-  , LPFile.integerVariables = Set.empty
-  , LPFile.binaryVariables = vs2
-  , LPFile.semiContinuousVariables = Set.empty
-  , LPFile.sos = []
-  }
+convert :: ObjType -> PBFile.Formula -> (LPFile.LP, Map.Map LPFile.Var Rational -> SAT.Model)
+convert objType formula@(obj, cs) = (lp, mtrans nvar)
   where
+    lp = LPFile.LP
+      { LPFile.variables = vs2
+      , LPFile.dir = dir
+      , LPFile.objectiveFunction = (Nothing, obj2)
+      , LPFile.constraints = cs2
+      , LPFile.bounds = Map.empty
+      , LPFile.integerVariables = Set.empty
+      , LPFile.binaryVariables = vs2
+      , LPFile.semiContinuousVariables = Set.empty
+      , LPFile.sos = []
+      }
+
     vs1 = collectVariables formula
     vs2 = (Set.fromList . map convVar . IS.toList) $ vs1
+    nvar = IS.findMax (IS.insert 0 vs1)
 
     (dir,obj2) =
       case obj of
@@ -93,22 +98,25 @@ collectVariables (obj, cs) = IS.unions $ maybe IS.empty f obj : [f s | (s,_,_) <
       lit <- ts
       return $ abs lit
 
-convertWBO :: Bool -> PBFile.SoftFormula -> LPFile.LP
-convertWBO useIndicator formula@(_top, cs) = LPFile.LP
-  { LPFile.variables = vs2
-  , LPFile.dir = LPFile.OptMin
-  , LPFile.objectiveFunction = (Nothing, obj2)
-  , LPFile.constraints = map snd cs2
-  , LPFile.bounds = Map.empty
-  , LPFile.integerVariables = Set.empty
-  , LPFile.binaryVariables = vs2
-  , LPFile.semiContinuousVariables = Set.empty
-  , LPFile.sos = []
-  }
+convertWBO :: Bool -> PBFile.SoftFormula -> (LPFile.LP, Map.Map LPFile.Var Rational -> SAT.Model)
+convertWBO useIndicator formula@(_top, cs) = (lp, mtrans nvar)
   where
+    lp = LPFile.LP
+      { LPFile.variables = vs2
+      , LPFile.dir = LPFile.OptMin
+      , LPFile.objectiveFunction = (Nothing, obj2)
+      , LPFile.constraints = map snd cs2
+      , LPFile.bounds = Map.empty
+      , LPFile.integerVariables = Set.empty
+      , LPFile.binaryVariables = vs2
+      , LPFile.semiContinuousVariables = Set.empty
+      , LPFile.sos = []
+      }
+
     vs1 = collectVariablesWBO formula
     vs2 = ((Set.fromList . map convVar . IS.toList) $ vs1) `Set.union` vs3
     vs3 = Set.fromList [v | (ts, _) <- cs2, (_, v) <- ts]
+    nvar = IS.findMax (IS.insert 0 vs1)
 
     obj2 = [LPFile.Term (fromIntegral w) [v] | (ts, _) <- cs2, (w, v) <- ts]
 
@@ -175,3 +183,15 @@ collectVariablesWBO (_top, cs) = IS.unions [f s | (_,(s,_,_)) <- cs]
       (_,ts) <- xs
       lit <- ts
       return $ abs lit
+
+mtrans :: Int -> Map.Map LPFile.Var Rational -> SAT.Model
+mtrans nvar m =
+  array (1, nvar)
+    [　(i, val)
+    | i <- [1 .. nvar]
+    , let val =
+            case m Map.! (convVar i) of
+              0  -> False
+              1  -> True
+              v0 -> error (show v0 ++ " is neither 0 nor 1")
+    ]

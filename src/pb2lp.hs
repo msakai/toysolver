@@ -52,7 +52,7 @@ main = do
       | Help `elem` o -> putStrLn (usageInfo header options)
     (o,[fname],[]) -> do
       let objType = last (ObjNone : [t | ObjType t <- o])
-      lp <-
+      (lp, _) <-
         if WBO `elem` o
         then do
           ret <- if fname == "-"

@@ -31,7 +31,7 @@ main = do
             ["-"]   -> liftM MaxSAT.parseWCNFString getContents
             [fname] -> MaxSAT.parseWCNFFile fname
             _ -> hPutStrLn stderr header >> exitFailure
-  let lp = MaxSAT2LP.convert wcnf
+  let (lp, _) = MaxSAT2LP.convert wcnf
   case LPFile.render lp of
     Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
     Just s -> putStr s

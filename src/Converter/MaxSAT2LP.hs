@@ -14,25 +14,38 @@ module Converter.MaxSAT2LP
   ( convert
   ) where
 
+import Data.Array.IArray
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Text.LPFile as LPFile
 import qualified Text.MaxSAT as MaxSAT
 import SAT.Types
 
-convert :: MaxSAT.WCNF -> LPFile.LP
-convert (nvar, top, ls) = LPFile.LP
-  { LPFile.variables = Set.fromList vs
-  , LPFile.dir = LPFile.OptMin
-  , LPFile.objectiveFunction = (Nothing, obj)
-  , LPFile.constraints = cs
-  , LPFile.bounds = Map.empty
-  , LPFile.integerVariables = Set.empty
-  , LPFile.binaryVariables = Set.fromList vs
-  , LPFile.semiContinuousVariables = Set.empty
-  , LPFile.sos = []
-  }
+convert :: MaxSAT.WCNF -> (LPFile.LP, Map.Map LPFile.Var Rational -> Model)
+convert (nvar, top, ls) = (lp, mtrans)
   where
+    lp = LPFile.LP
+      { LPFile.variables = Set.fromList vs
+      , LPFile.dir = LPFile.OptMin
+      , LPFile.objectiveFunction = (Nothing, obj)
+      , LPFile.constraints = cs
+      , LPFile.bounds = Map.empty
+      , LPFile.integerVariables = Set.empty
+      , LPFile.binaryVariables = Set.fromList vs
+      , LPFile.semiContinuousVariables = Set.empty
+      , LPFile.sos = []
+      }
+    mtrans m =
+      array (1, nvar)
+        [　(i, val)
+        | i <- [1 .. nvar]
+        , let val =
+                case m Map.! ("x" ++ show i) of
+                  0  -> False
+                  1  -> True
+                  v0 -> error (show v0 ++ " is neither 0 nor 1")
+        ]
+
     obj = [ LPFile.Term (fromIntegral w) [v] | (v,(w,_)) <- zs, w < top ]
     vs = [ "x" ++ show n | n <- [(1::Int)..nvar]] ++ 
          [ z | (z,(w,_)) <- zs, w /= top ]
