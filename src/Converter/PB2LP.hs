@@ -28,7 +28,7 @@ import qualified SAT.Types as SAT
 import Converter.ObjType
 
 convert :: ObjType -> PBFile.Formula -> (LPFile.LP, Map.Map LPFile.Var Rational -> SAT.Model)
-convert objType formula@(obj, cs) = (lp, mtrans nvar)
+convert objType formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
   where
     lp = LPFile.LP
       { LPFile.variables = vs2
@@ -44,7 +44,6 @@ convert objType formula@(obj, cs) = (lp, mtrans nvar)
 
     vs1 = collectVariables formula
     vs2 = (Set.fromList . map convVar . IS.toList) $ vs1
-    nvar = IS.findMax (IS.insert 0 vs1)
 
     (dir,obj2) =
       case obj of
@@ -99,7 +98,7 @@ collectVariables (obj, cs) = IS.unions $ maybe IS.empty f obj : [f s | (s,_,_) <
       return $ abs lit
 
 convertWBO :: Bool -> PBFile.SoftFormula -> (LPFile.LP, Map.Map LPFile.Var Rational -> SAT.Model)
-convertWBO useIndicator formula@(_top, cs) = (lp, mtrans nvar)
+convertWBO useIndicator formula@(_top, cs) = (lp, mtrans (PBFile.wboNumVars formula))
   where
     lp = LPFile.LP
       { LPFile.variables = vs2
@@ -116,7 +115,6 @@ convertWBO useIndicator formula@(_top, cs) = (lp, mtrans nvar)
     vs1 = collectVariablesWBO formula
     vs2 = ((Set.fromList . map convVar . IS.toList) $ vs1) `Set.union` vs3
     vs3 = Set.fromList [v | (ts, _) <- cs2, (_, v) <- ts]
-    nvar = IS.findMax (IS.insert 0 vs1)
 
     obj2 = [LPFile.Term (fromIntegral w) [v] | (ts, _) <- cs2, (w, v) <- ts]
 
