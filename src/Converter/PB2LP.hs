@@ -98,13 +98,13 @@ collectVariables (obj, cs) = IS.unions $ maybe IS.empty f obj : [f s | (s,_,_) <
       return $ abs lit
 
 convertWBO :: Bool -> PBFile.SoftFormula -> (LPFile.LP, Map.Map LPFile.Var Rational -> SAT.Model)
-convertWBO useIndicator formula@(_top, cs) = (lp, mtrans (PBFile.wboNumVars formula))
+convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formula))
   where
     lp = LPFile.LP
       { LPFile.variables = vs2
       , LPFile.dir = LPFile.OptMin
       , LPFile.objectiveFunction = (Nothing, obj2)
-      , LPFile.constraints = map snd cs2
+      , LPFile.constraints = topConstr ++ map snd cs2
       , LPFile.bounds = Map.empty
       , LPFile.integerVariables = Set.empty
       , LPFile.binaryVariables = vs2
@@ -117,6 +117,19 @@ convertWBO useIndicator formula@(_top, cs) = (lp, mtrans (PBFile.wboNumVars form
     vs3 = Set.fromList [v | (ts, _) <- cs2, (_, v) <- ts]
 
     obj2 = [LPFile.Term (fromIntegral w) [v] | (ts, _) <- cs2, (w, v) <- ts]
+
+    topConstr :: [LPFile.Constraint]
+    topConstr = 
+     case top of
+       Nothing -> []
+       Just t ->
+          [ LPFile.Constraint
+            { LPFile.constrType      = LPFile.NormalConstraint
+            , LPFile.constrLabel     = Nothing
+            , LPFile.constrIndicator = Nothing
+            , LPFile.constrBody      = (obj2, LPFile.Le, fromInteger t - 1)
+            }
+          ]
 
     cs2 :: [([(Integer, LPFile.Var)], LPFile.Constraint)]
     cs2 = do
