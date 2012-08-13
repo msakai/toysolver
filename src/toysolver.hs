@@ -45,6 +45,7 @@ import qualified Converter.PB2LP as PB2LP
 import qualified Converter.MaxSAT2LP as MaxSAT2LP
 import qualified Simplex2
 import qualified MIPSolver2
+import SAT.Printer
 import Version
 import Util
 
@@ -84,8 +85,13 @@ header = "Usage: toysolver [OPTION]... file.lp"
 
 -- ---------------------------------------------------------------------------
 
-run :: String -> [Flag] -> LP.LP -> IO ()
-run solver opt lp = do
+run
+  :: String
+  -> [Flag]
+  -> LP.LP
+  -> (Map.Map String Rational -> IO ())
+  -> IO ()
+run solver opt lp printModel = do
   unless (Set.null (LP.semiContinuousVariables lp)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure  
@@ -148,7 +154,8 @@ run solver opt lp = do
             Just m -> do
               putStrLn $ "o " ++ showValue (Data.Expr.eval m obj)
               putStrLn "s SATISFIABLE"
-              printModel m vs
+              let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+              printModel m2
        where
          f = case solver of
                "omega-test" -> OmegaTest.solveQFLA
@@ -169,7 +176,8 @@ run solver opt lp = do
         Optimum r m -> do
           putStrLn $ "o " ++ showValue r
           putStrLn "s OPTIMUM FOUND"
-          printModel m vs
+          let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+          printModel m2
 
     solveByMIP2 = do
       solver <- Simplex2.newSolver
@@ -211,18 +219,19 @@ run solver opt lp = do
           m <- MIPSolver2.model mip
           r <- MIPSolver2.getObjValue mip
           putStrLn "s OPTIMUM FOUND"
-          printModel m vs
-
-    printModel :: Model Rational -> Set.Set String -> IO ()
-    printModel m vs =
-      forM_ (Set.toList vs) $ \v -> do
-        printf "v %s = %s\n" v (showValue (m IM.! (nameToVar Map.! v)))
+          let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+          printModel m2
 
     printRat :: Bool
     printRat = PrintRational `elem` opt
 
     showValue :: Rational -> String
     showValue = showRational printRat
+
+lpPrintModel :: Handle -> Bool -> Map.Map String Rational -> IO ()
+lpPrintModel h asRat m = do
+  forM_ (Map.toList m) $ \(v, val) -> do
+    printf "v %s = %s\n" v (showRational asRat val)
 
 -- ---------------------------------------------------------------------------
 
@@ -257,29 +266,35 @@ main = do
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
               let (lp,mtrans) = CNF2LP.convert CNF2LP.ObjNone cnf
-              run (getSolver o) o lp
+              run (getSolver o) o lp $ \m -> do
+                satPrintModel stdout (mtrans m) 0
         ModePB -> do
           ret <- PBFile.parseOPBFile fname
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right pb -> do
               let (lp,mtrans) = PB2LP.convert PB2LP.ObjNone pb
-              run (getSolver o) o lp
+              run (getSolver o) o lp $ \m -> do
+                pbPrintModel stdout (mtrans m) 0
         ModeWBO -> do
           ret <- PBFile.parseWBOFile fname
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right wbo -> do
               let (lp,mtrans) = PB2LP.convertWBO False wbo
-              run (getSolver o) o lp
+              run (getSolver o) o lp $ \m -> do
+                pbPrintModel stdout (mtrans m) 0
         ModeMaxSAT -> do
           wcnf <- MaxSAT.parseWCNFFile fname
           let (lp,mtrans) = MaxSAT2LP.convert wcnf
-          run (getSolver o) o lp
+          run (getSolver o) o lp $ \m -> do
+            maxsatPrintModel stdout (mtrans m) 0
         ModeLP -> do
           ret <- LP.parseFile fname
           case ret of
             Left err -> hPrint stderr err >> exitFailure
-            Right lp -> run (getSolver o) o lp
+            Right lp -> do
+              run (getSolver o) o lp $ \m -> do
+                lpPrintModel stdout (PrintRational `elem` o) m
     (_,_,errs) ->
         hPutStrLn stderr $ concat errs ++ usageInfo header options

@@ -65,6 +65,7 @@ Executable toysolver
      Data.LA
      Data.Linear
      Data.Interval
+     SAT.Printer
      Text.LPFile
      Text.PBFile
      Text.MaxSAT

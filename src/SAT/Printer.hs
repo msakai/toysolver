@@ -27,7 +27,9 @@ import SAT.Types
 -- See <http://www.satcompetition.org/2011/rules.pdf> for details.
 satPrintModel :: Handle -> Model -> Int -> IO ()
 satPrintModel h m n = do
-  let as = takeWhile (\(v,_) -> v <= n) $ assocs m
+  let as = if n > 0
+           then takeWhile (\(v,_) -> v <= n) $ assocs m
+           else assocs m
   forM_ (split 10 as) $ \xs -> do
     hPutStr h "v"
     forM_ xs $ \(var,val) -> hPutStr h (' ': show (literal var val))
@@ -39,7 +41,9 @@ satPrintModel h m n = do
 -- See <http://maxsat.ia.udl.cat/requirements/> for details.
 maxsatPrintModel :: Handle -> Model -> Int -> IO ()
 maxsatPrintModel h m n = do
-  let as = takeWhile (\(v,_) -> v <= n) $ assocs m
+  let as = if n > 0
+           then takeWhile (\(v,_) -> v <= n) $ assocs m
+           else assocs m
   forM_ (split 10 as) $ \xs -> do
     hPutStr h "v"
     forM_ xs $ \(var,val) -> hPutStr h (' ' : show (literal var val))
@@ -51,7 +55,9 @@ maxsatPrintModel h m n = do
 -- See <http://www.cril.univ-artois.fr/PB12/format.pdf> for details.
 pbPrintModel :: Handle -> Model -> Int -> IO ()
 pbPrintModel h m n = do
-  let as = takeWhile (\(v,_) -> v <= n) $ assocs m
+  let as = if n > 0
+           then takeWhile (\(v,_) -> v <= n) $ assocs m
+           else assocs m
   forM_ (split 10 as) $ \xs -> do
     hPutStr h "v"
     forM_ xs $ \(var,val) -> hPutStr h (" " ++ (if val then "" else "-") ++ "x" ++ show var)
