@@ -12,8 +12,10 @@ import Test.Framework.Providers.QuickCheck2
 import Data.Polynomial hiding (deg)
 import Data.AlgebraicNumber
 import Data.AlgebraicNumber.Root
+import Data.AlgebraicNumber.RealInstance
 
 import Control.Monad
+import Control.Exception
 import System.IO
 
 {--------------------------------------------------------------------
@@ -166,6 +168,17 @@ case_ceiling_1 = ceiling' 1 @?= 1
 case_ceiling_neg_1 = ceiling' (-1) @?= -1
 
 case_round_sqrt2 = round' sqrt2 @?= 1
+
+case_toRational = toRational r @?= 3/2
+  where
+    x = var ()
+    [r] = realRoots (2*x - 3)
+
+case_toRational_error = do
+  r <- try $ evaluate $ toRational sqrt2
+  case r of
+    Left (e :: SomeException) -> return ()
+    Right _ -> assertFailure "shuold be error"
 
 -- 期待値は Wolfram Alpha で x^3 - Sqrt[2]*x + 3 を調べて Real root の exact form で得た
 case_simpARealPoly = simpARealPoly p @?= q
