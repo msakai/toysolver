@@ -6,8 +6,8 @@ Author:		Masahiro Sakai (masahiro.sakai@gmail.com)
 Maintainer:	masahiro.sakai@gmail.com
 Category:	Algorithms
 Cabal-Version:	>= 1.8
-Synopsis:	My sandbox for experimenting solver algorithms.
-Description:	My sandbox for experimenting solver algorithms.
+Synopsis:	Assorted decision procedures
+Description:	Assorted decision procedures
 Bug-Reports:	https://github.com/msakai/toysolver/issues
 Extra-Source-Files:
    README.md
