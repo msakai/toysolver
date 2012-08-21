@@ -81,6 +81,13 @@ prop_negate_involution =
   forAll polynomials $ \a ->
     negate (negate a) == a
 
+prop_polyMDivMod =
+  forAll polynomials $ \g ->
+    forAll (replicateM 3 polynomials) $ \fs ->
+      all (0/=) fs ==>
+        let (qs, r) = polyMDivMod lex g fs
+        in sum (zipWith (*) fs qs) + r == g
+
 {--------------------------------------------------------------------
   Univalent polynomials
 --------------------------------------------------------------------}

@@ -65,6 +65,7 @@ module Data.Polynomial
   , polyDivMod
   , polyGCD
   , polyLCM
+  , polyMDivMod
   , reduce
 
   -- * Monomial
@@ -240,6 +241,28 @@ toZ p = fromTerms [(numerator (c * fromInteger s), xs) | (c,xs) <- ts]
   where
     ts = [(toRational c, xs) | (c,xs) <- terms p]
     s = foldl' lcm  1 (map (denominator . fst) ts)
+
+-- | Multivariate division algorithm
+polyMDivMod
+  :: forall k v. (Eq k, Fractional k, Ord v, Show v)
+  => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> ([Polynomial k v], Polynomial k v)
+polyMDivMod cmp p fs = go IM.empty p
+  where
+    ls = [(leadingTerm cmp f, f) | f <- fs]
+
+    go :: IM.IntMap (Polynomial k v) -> Polynomial k v -> ([Polynomial k v], Polynomial k v)
+    go qs g =
+      case xs of
+        [] -> ([IM.findWithDefault 0 i qs | i <- [0 .. length fs - 1]], g)
+        (i, b, g') : _ -> go (IM.insertWith (+) i b qs) g'
+      where
+        ms = sortBy (flip cmp `on` snd) (terms g)
+        xs = do
+          (i,(a,f)) <- zip [0..] ls
+          h <- ms
+          guard $ monomialDivisible h a
+          let b = fromMonomial $ monomialDiv h a
+          return (i, b, g - b * f)
 
 -- | Multivariate division algorithm
 reduce
