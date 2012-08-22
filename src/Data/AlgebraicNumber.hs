@@ -68,7 +68,7 @@ import Data.AlgebraicNumber.Root
   Algebraic reals
 --------------------------------------------------------------------}
 
-data AReal = RealRoot (UPolynomial Integer) (Interval Rational)
+data AReal = RealRoot (UPolynomial Rational) (Interval Rational)
   deriving Show
 
 -- | Real roots of the rational coefficient polynomial.
@@ -76,18 +76,16 @@ realRoots :: UPolynomial Rational -> [AReal]
 realRoots p = sort $ do
   q <- FactorZ.factor $ toZ p
   guard $ P.deg q > 0
-  let d = foldl1' gcd [c | (c,_) <- terms q]
-      q' = if q==0
-           then q
-           else mapCoeff (`div` d) q
-  i <- Sturm.separate (mapCoeff fromInteger q')
+  let (c,_) = leadingTerm grlex q
+      q' = mapCoeff (% c) q
+  i <- Sturm.separate q'
   return $ RealRoot q' i
 
 minimalPolynomial :: AReal -> UPolynomial Rational
 minimalPolynomial (RealRoot p _) = mapCoeff f p
   where
     (c,_) = leadingTerm grlex p
-    f x = x % c
+    f x = x / c
 
 isZero :: AReal -> Bool
 isZero (RealRoot p i) = 0 `Interval.member` i && 0 `isRootOf` p
@@ -100,11 +98,10 @@ instance Ord AReal where
     | i1 >! i2 = GT
     | i1 <! i2 = LT
     | isZero c = EQ
-    | Sturm.numRoots p' ipos == 1 = GT
-    | otherwise = assert (Sturm.numRoots p' ineg == 1) LT
+    | Sturm.numRoots p ipos == 1 = GT
+    | otherwise = assert (Sturm.numRoots p ineg == 1) LT
     where
       c@(RealRoot p i3) = a - b
-      p' = mapCoeff fromInteger p
       ipos = Interval.intersection i3 (Interval.interval (Just (False,0)) Nothing)
       ineg = Interval.intersection i3 (Interval.interval Nothing (Just (False,0)))
 
@@ -112,40 +109,32 @@ instance Num AReal where
   RealRoot p1 i1 + RealRoot p2 i2 = RealRoot p3 i3
     where
       p3 = rootAdd p1 p2
-      i3 = go i1 i2 (Sturm.separate p3')
-
-      p1' = mapCoeff fromInteger p1
-      p2' = mapCoeff fromInteger p2
-      p3' = mapCoeff fromInteger p3
+      i3 = go i1 i2 (Sturm.separate p3)
 
       go i1 i2 is3 =
-        case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots p3' i5 > 0] of
+        case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots p3 i5 > 0] of
           [] -> error "AReal.+: should not happen"
           [i5] -> i5
           is5 ->
-            go (Sturm.narrow p1' i1 (Interval.size i1 / 2))
-               (Sturm.narrow p2' i2 (Interval.size i2 / 2))
-               [Sturm.narrow p3' i5 (Interval.size i5 / 2) | i5 <- is5]
+            go (Sturm.narrow p1 i1 (Interval.size i1 / 2))
+               (Sturm.narrow p2 i2 (Interval.size i2 / 2))
+               [Sturm.narrow p3 i5 (Interval.size i5 / 2) | i5 <- is5]
         where
           i4 = i1 + i2
 
   RealRoot p1 i1 * RealRoot p2 i2 = RealRoot p3 i3
     where
       p3 = rootMul p1 p2
-      i3 = go i1 i2 (Sturm.separate p3')
-
-      p1' = mapCoeff fromInteger p1
-      p2' = mapCoeff fromInteger p2
-      p3' = mapCoeff fromInteger p3
+      i3 = go i1 i2 (Sturm.separate p3)
 
       go i1 i2 is3 =
-        case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots p3' i5 > 0] of
+        case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots p3 i5 > 0] of
           [] -> error "AReal.*: should not happen"
           [i5] -> i5
           is5 ->
-            go (Sturm.narrow p1' i1 (Interval.size i1 / 2))
-               (Sturm.narrow p2' i2 (Interval.size i2 / 2))
-               [Sturm.narrow p3' i5 (Interval.size i5 / 2) | i5 <- is5]
+            go (Sturm.narrow p1 i1 (Interval.size i1 / 2))
+               (Sturm.narrow p2 i2 (Interval.size i2 / 2))
+               [Sturm.narrow p3 i5 (Interval.size i5 / 2) | i5 <- is5]
         where
           i4 = i1 * i2
 
@@ -163,12 +152,12 @@ instance Num AReal where
       LT -> 1
       GT -> -1
 
-  fromInteger i = RealRoot (x - constant i) (Interval.singleton (fromInteger i))
+  fromInteger i = RealRoot (x - constant (fromInteger i)) (Interval.singleton (fromInteger i))
     where
       x = var ()
 
 instance Fractional AReal where
-  fromRational r = RealRoot (toZ (x - constant r)) (Interval.singleton r)
+  fromRational r = RealRoot (x - constant r) (Interval.singleton r)
     where
       x = var ()
 
@@ -213,7 +202,7 @@ ceiling' (RealRoot p i) =
     then fromInteger ceiling_lb
     else fromInteger ceiling_ub
   where
-    chain = Sturm.sturmChain (mapCoeff fromInteger p)
+    chain = Sturm.sturmChain p
     i2 = Sturm.narrow' chain i (1/2)
     Just (inLB, lb) = Interval.lowerBound i2
     Just (inUB, ub) = Interval.upperBound i2
@@ -228,7 +217,7 @@ floor' (RealRoot p i) =
     then fromInteger floor_ub
     else fromInteger floor_lb
   where
-    chain = Sturm.sturmChain (mapCoeff fromInteger p)
+    chain = Sturm.sturmChain p
     i2 = Sturm.narrow' chain i (1/2)
     Just (inLB, lb) = Interval.lowerBound i2
     Just (inUB, ub) = Interval.upperBound i2
@@ -253,5 +242,5 @@ isAlgebraicInteger (RealRoot p _) = c==1
 --------------------------------------------------------------------}
 
 -- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
-simpARealPoly :: UPolynomial AReal -> UPolynomial Integer
+simpARealPoly :: UPolynomial AReal -> UPolynomial Rational
 simpARealPoly p = rootSimpPoly (\(RealRoot q _) -> q) p

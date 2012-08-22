@@ -42,66 +42,66 @@ case__rootAdd_sqrt2_sqrt3 = assertBool "" $ abs valP <= 0.0001
   where
     x = var ()
 
-    p :: UPolynomial Integer
+    p :: UPolynomial Rational
     p = rootAdd (x^2 - 2) (x^2 - 3)
 
     valP :: Double
-    valP = eval (\() -> sqrt 2 + sqrt 3) $ mapCoeff fromInteger p
+    valP = eval (\() -> sqrt 2 + sqrt 3) $ mapCoeff fromRational p
 
 -- bug?
 test_rootAdd = p
   where
     x = var ()    
-    p :: UPolynomial Integer
+    p :: UPolynomial Rational
     p = rootAdd (x^2 - 2) (x^6 + 6*x^3 - 2*x^2 + 9)
 
 case_rootSub_sqrt2_sqrt3 = assertBool "" $ abs valP <= 0.0001
   where
     x = var ()
 
-    p :: UPolynomial Integer
+    p :: UPolynomial Rational
     p = rootSub (x^2 - 2) (x^2 - 3)
 
     valP :: Double
-    valP = eval (\() -> sqrt 2 - sqrt 3) $ mapCoeff fromInteger p
+    valP = eval (\() -> sqrt 2 - sqrt 3) $ mapCoeff fromRational p
 
 case_rootMul_sqrt2_sqrt3 = assertBool "" $ abs valP <= 0.0001
   where
     x = var ()
 
-    p :: UPolynomial Integer
+    p :: UPolynomial Rational
     p = rootMul (x^2 - 2) (x^2 - 3)
 
     valP :: Double
-    valP = eval (\() -> sqrt 2 * sqrt 3) $ mapCoeff fromInteger p
+    valP = eval (\() -> sqrt 2 * sqrt 3) $ mapCoeff fromRational p
 
 case_rootNegate_test1 = assertBool "" $ abs valP <= 0.0001
   where
     x = var ()
 
-    p :: UPolynomial Integer
+    p :: UPolynomial Rational
     p = rootNegate (x^3 - 3)
 
     valP :: Double
-    valP = eval (\() -> - (3 ** (1/3))) $ mapCoeff fromInteger p
+    valP = eval (\() -> - (3 ** (1/3))) $ mapCoeff fromRational p
 
 case_rootNegate_test2 = rootNegate p @?= q
   where
-    x :: UPolynomial Integer
+    x :: UPolynomial Rational
     x = var ()
     p = x^3 - 3
     q = x^3 + 3
 
 case_rootNegate_test3 = rootNegate p @?= q
   where
-    x :: UPolynomial Integer
+    x :: UPolynomial Rational
     x = var ()
     p = (x-2)*(x-3)*(x-4)
     q = (x+2)*(x+3)*(x+4)
 
 case_rootScale = rootScale 2 p @?= q
   where
-    x :: UPolynomial Integer
+    x :: UPolynomial Rational
     x = var ()
     p = (x-2)*(x-3)*(x-4)
     q = (x-4)*(x-6)*(x-8)
@@ -110,11 +110,11 @@ case_rootRecip = assertBool "" $ abs valP <= 0.0001
   where
     x = var ()
 
-    p :: UPolynomial Integer
+    p :: UPolynomial Rational
     p = rootRecip (x^3 - 3)
 
     valP :: Double
-    valP = eval (\() -> 1 / (3 ** (1/3))) $ mapCoeff fromInteger p
+    valP = eval (\() -> 1 / (3 ** (1/3))) $ mapCoeff fromRational p
 
 {--------------------------------------------------------------------
   algebraic reals

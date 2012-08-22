@@ -32,49 +32,49 @@ type Var = Int
   Manipulation of polynomials
 --------------------------------------------------------------------}
 
-rootAdd :: UPolynomial Integer -> UPolynomial Integer -> UPolynomial Integer
+rootAdd :: UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
 rootAdd p1 p2 = lift2 (+) p1 p2
 
-rootSub :: UPolynomial Integer -> UPolynomial Integer -> UPolynomial Integer
+rootSub :: UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
 rootSub p1 p2 = lift2 (flip subtract) p1 p2
 
-rootMul :: UPolynomial Integer -> UPolynomial Integer -> UPolynomial Integer
+rootMul :: UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
 rootMul p1 p2 = lift2 (*) p1 p2
 
-rootNegate :: UPolynomial Integer -> UPolynomial Integer
+rootNegate :: UPolynomial Rational -> UPolynomial Rational
 rootNegate p = fromTerms [(if (d - mmDegree xs) `mod` 2 == 0 then c else -c, xs) | (c, xs) <- terms p]
   where
     d = deg p
 
-rootScale :: Rational -> UPolynomial Integer -> UPolynomial Integer
-rootScale r p = toZ $ fromTerms [(r^(d - mmDegree xs) * fromIntegral c, xs) | (c, xs) <- terms p]
+rootScale :: Rational -> UPolynomial Rational -> UPolynomial Rational
+rootScale r p = fromTerms [(r^(d - mmDegree xs) * c, xs) | (c, xs) <- terms p]
   where
     d = deg p
 
-rootRecip :: UPolynomial Integer -> UPolynomial Integer
+rootRecip :: UPolynomial Rational -> UPolynomial Rational
 rootRecip p = fromTerms [(c, mmFromList [((), d - mmDegree xs)]) | (c, xs) <- terms p]
   where
     d = deg p
 
 -- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
-rootSimpPoly :: (a -> UPolynomial Integer) -> UPolynomial a -> UPolynomial Integer
-rootSimpPoly f p = toZ $ findPoly (var 0) ps
+rootSimpPoly :: (a -> UPolynomial Rational) -> UPolynomial a -> UPolynomial Rational
+rootSimpPoly f p = findPoly (var 0) ps
   where
-    ys :: [(UPolynomial Integer, Var)]
+    ys :: [(UPolynomial Rational, Var)]
     ys = zip (Set.toAscList $ Set.fromList [f c | (c, _) <- terms p]) [1..]
 
-    m :: Map.Map (UPolynomial Integer) Var
+    m :: Map.Map (UPolynomial Rational) Var
     m = Map.fromDistinctAscList ys
 
     p' :: Polynomial Rational Var
     p' = eval (\() -> var 0) (mapCoeff (\c -> var (m Map.! (f c))) p)
 
     ps :: [Polynomial Rational Var]
-    ps = p' : [mapCoeff fromInteger $ mapVar (\() -> x) q | (q, x) <- ys]
+    ps = p' : [mapVar (\() -> x) q | (q, x) <- ys]
 
 lift2 :: (forall a. Num a => a -> a -> a)
-      -> UPolynomial Integer -> UPolynomial Integer -> UPolynomial Integer
-lift2 f p1 p2 = toZ $ findPoly f_a_b gbase
+      -> UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
+lift2 f p1 p2 = findPoly f_a_b gbase
   where
     a, b :: Var
     a = 0
@@ -84,7 +84,7 @@ lift2 f p1 p2 = toZ $ findPoly f_a_b gbase
     f_a_b = f (var a) (var b)
 
     gbase :: [Polynomial Rational Var]
-    gbase = map (mapCoeff fromInteger) [ mapVar (\() -> a) p1, mapVar (\() -> b) p2 ]              
+    gbase = [ mapVar (\() -> a) p1, mapVar (\() -> b) p2 ]              
 
 -- ps のもとで c を根とする多項式を求める
 findPoly :: Polynomial Rational Var -> [Polynomial Rational Var] -> UPolynomial Rational
