@@ -166,7 +166,7 @@ instance Fractional AReal where
     | otherwise = RealRoot (rootRecip p) (recip i)
 
 toRational' :: AReal -> Rational -> Rational
-toRational' (RealRoot p i) epsilon = Sturm.approx (mapCoeff toRational p) i epsilon
+toRational' (RealRoot p i) epsilon = Sturm.approx p i epsilon
 
 -- | Same as 'properFraction'.
 properFraction' :: Integral b => AReal -> (b, AReal)
