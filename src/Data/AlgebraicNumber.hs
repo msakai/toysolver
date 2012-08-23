@@ -74,18 +74,35 @@ data AReal = RealRoot (UPolynomial Rational) (Interval Rational)
 -- | Real roots of the rational coefficient polynomial.
 realRoots :: UPolynomial Rational -> [AReal]
 realRoots p = sort $ do
+  q <- factor' p 
+  i <- Sturm.separate q
+  return $ RealRoot q i
+
+factor' :: UPolynomial Rational -> [UPolynomial Rational]
+factor' p = do
   q <- FactorZ.factor $ toZ p
   guard $ P.deg q > 0
   let (c,_) = leadingTerm grlex q
-      q' = mapCoeff (% c) q
-  i <- Sturm.separate q'
-  return $ RealRoot q' i
+  return $ mapCoeff (% c) q
 
-minimalPolynomial :: AReal -> UPolynomial Rational
-minimalPolynomial (RealRoot p _) = mapCoeff f p
+realRoot :: UPolynomial Rational -> Interval Rational -> AReal
+realRoot p i = 
+  case [q | q <- factor' p, Sturm.numRoots q i == 1] of
+    p2:_ -> RealRoot p2 i
+    []   -> error "Data.AlgebraicNumber.realRoot: invalid interval"
+
+-- p must be already factored.
+realRoot2 :: UPolynomial Rational -> Interval Rational -> AReal
+realRoot2 p i = RealRoot (normalizePoly p) i
+
+normalizePoly :: UPolynomial Rational -> UPolynomial Rational
+normalizePoly p = mapCoeff f p
   where
     (c,_) = leadingTerm grlex p
     f x = x / c
+
+minimalPolynomial :: AReal -> UPolynomial Rational
+minimalPolynomial (RealRoot p _) = p
 
 isZero :: AReal -> Bool
 isZero (RealRoot p i) = 0 `Interval.member` i && 0 `isRootOf` p
@@ -106,7 +123,7 @@ instance Ord AReal where
       ineg = Interval.intersection i3 (Interval.interval Nothing (Just (False,0)))
 
 instance Num AReal where
-  RealRoot p1 i1 + RealRoot p2 i2 = RealRoot p3 i3
+  RealRoot p1 i1 + RealRoot p2 i2 = realRoot p3 i3
     where
       p3 = rootAdd p1 p2
       i3 = go i1 i2 (Sturm.separate p3)
@@ -122,7 +139,7 @@ instance Num AReal where
         where
           i4 = i1 + i2
 
-  RealRoot p1 i1 * RealRoot p2 i2 = RealRoot p3 i3
+  RealRoot p1 i1 * RealRoot p2 i2 = realRoot p3 i3
     where
       p3 = rootMul p1 p2
       i3 = go i1 i2 (Sturm.separate p3)
@@ -138,7 +155,7 @@ instance Num AReal where
         where
           i4 = i1 * i2
 
-  negate (RealRoot p i) = RealRoot (rootNegate p) (-i)
+  negate (RealRoot p i) = realRoot2 (rootNegate p) (-i)
 
   abs a =
     case compare 0 a of
@@ -163,7 +180,7 @@ instance Fractional AReal where
 
   recip a@(RealRoot p i)
     | isZero a  = error "AReal.recip: zero division"
-    | otherwise = RealRoot (rootRecip p) (recip i)
+    | otherwise = realRoot2 (rootRecip p) (recip i)
 
 toRational' :: AReal -> Rational -> Rational
 toRational' (RealRoot p i) epsilon = Sturm.approx p i epsilon

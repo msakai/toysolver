@@ -192,6 +192,10 @@ case_deg_sqrt2 = deg sqrt2 @?= 2
 
 case_deg_neg_sqrt2 = deg neg_sqrt2 @?= 2
 
+case_deg_sqrt2_minus_sqrt2 = deg (sqrt2 - sqrt2) @?= 1
+
+case_deg_sqrt2_times_sqrt2 = deg (sqrt2 * sqrt2) @?= 1
+
 case_isAlgebraicInteger_sqrt2 = isAlgebraicInteger sqrt2 @?= True
 
 case_isAlgebraicInteger_neg_sqrt2 = isAlgebraicInteger neg_sqrt2 @?= True
