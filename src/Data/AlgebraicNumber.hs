@@ -250,9 +250,11 @@ deg :: AReal -> Integer
 deg (RealRoot p _) = P.deg p
 
 isAlgebraicInteger :: AReal -> Bool
-isAlgebraicInteger (RealRoot p _) = c==1
+isAlgebraicInteger x = cn * fromIntegral d == 1
   where
-    (c,_) = leadingTerm grlex p
+    p = minimalPolynomial x
+    d = foldl' lcm 1 [denominator c | (c,_) <- terms p]
+    (cn,_) = leadingTerm grlex p
 
 {--------------------------------------------------------------------
   Manipulation of polynomials

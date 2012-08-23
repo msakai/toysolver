@@ -200,6 +200,10 @@ case_isAlgebraicInteger_sqrt2 = isAlgebraicInteger sqrt2 @?= True
 
 case_isAlgebraicInteger_neg_sqrt2 = isAlgebraicInteger neg_sqrt2 @?= True
 
+case_isAlgebraicInteger_one_half = isAlgebraicInteger (1/2) @?= False
+
+case_isAlgebraicInteger_one_sqrt2 = isAlgebraicInteger (1 / sqrt2) @?= False
+
 ------------------------------------------------------------------------
 -- Test harness
 
