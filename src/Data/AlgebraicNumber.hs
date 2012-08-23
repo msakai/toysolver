@@ -27,7 +27,9 @@ module Data.AlgebraicNumber
   -- * Properties
   , minimalPolynomial
   , deg
+  , isRational
   , isAlgebraicInteger
+  , height
 
   -- * Real-like functions
   , toRational'
@@ -249,12 +251,22 @@ floor' (RealRoot p i) =
 deg :: AReal -> Integer
 deg (RealRoot p _) = P.deg p
 
+isRational :: AReal -> Bool
+isRational x = deg x == 1
+
 isAlgebraicInteger :: AReal -> Bool
 isAlgebraicInteger x = cn * fromIntegral d == 1
   where
     p = minimalPolynomial x
     d = foldl' lcm 1 [denominator c | (c,_) <- terms p]
     (cn,_) = leadingTerm grlex p
+
+height :: AReal -> Integer
+height x = maximum [ assert (denominator c' == 1) (abs (numerator c'))
+                   | (c,_) <- terms p, let c' = c * fromInteger d ]
+  where
+    p = minimalPolynomial x
+    d = foldl' lcm 1 [denominator c | (c,_) <- terms p]
 
 {--------------------------------------------------------------------
   Manipulation of polynomials

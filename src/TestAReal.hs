@@ -204,6 +204,10 @@ case_isAlgebraicInteger_one_half = isAlgebraicInteger (1/2) @?= False
 
 case_isAlgebraicInteger_one_sqrt2 = isAlgebraicInteger (1 / sqrt2) @?= False
 
+case_height_sqrt2 = height sqrt2 @?= 2
+
+case_height_10 = height 10 @?= 10
+
 ------------------------------------------------------------------------
 -- Test harness
 
