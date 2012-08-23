@@ -40,6 +40,7 @@ factor' p =
     Just qs -> concatMap factor' qs
 
 factor2 :: UPolynomial Integer -> Maybe [UPolynomial Integer]
+factor2 p | p == var () = Nothing
 factor2 p =
   case find (\(_,yi) -> yi==0) vs of
     Just (xi,_) ->
