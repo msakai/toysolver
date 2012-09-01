@@ -224,14 +224,14 @@ Test-suite TestAReal
 Test-suite TestLPFile
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    src
-  Main-is:           TestLPFIle.hs
+  Main-is:           TestLPFile.hs
   Build-depends:     base >=4 && <5, mtl, containers, parsec, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestPBFile
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    src
-  Main-is:           TestPBFIle.hs
+  Main-is:           TestPBFile.hs
   Build-depends:     base >=4 && <5, mtl, containers, parsec, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
