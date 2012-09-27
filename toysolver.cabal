@@ -29,6 +29,7 @@ Extra-Source-Files:
    src/TestAReal2.hs
    src/pbverify.hs
    src/pigeonhole.hs
+   src/Wang.hs
    samples/gcnf/*.gcnf
    samples/lp/*.lp
    samples/lp/error/*.lp
