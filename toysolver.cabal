@@ -1,5 +1,5 @@
 Name:		toysolver
-Version:	0.0.1
+Version:	0.0.2
 License:	BSD3
 License-File:	COPYING
 Author:		Masahiro Sakai (masahiro.sakai@gmail.com)
@@ -7,7 +7,7 @@ Maintainer:	masahiro.sakai@gmail.com
 Category:	Algorithms
 Cabal-Version:	>= 1.8
 Synopsis:	Assorted decision procedures
-Description:	Assorted decision procedures
+Description:	Toy-level implementation of some decision procedures
 Bug-Reports:	https://github.com/msakai/toysolver/issues
 Extra-Source-Files:
    README.md
