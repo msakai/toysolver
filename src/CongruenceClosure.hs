@@ -20,7 +20,10 @@ module CongruenceClosure
   ( Solver
   , Var
   , FlatTerm (..)
-  , 
+  , newSolver
+  , newVar
+  , merge
+  , areCongruent
   ) where
 
 import Prelude hiding (lookup)
