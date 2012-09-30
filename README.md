@@ -77,7 +77,6 @@ Usage: pb2lp [--wbo] [file.opb|file.wbo|-]
 TODO
 ----
 
-* Gröbner basis
 * Cylindrical algebraic decomposition
 * Local search
 * Suvery propagation
