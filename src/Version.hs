@@ -7,7 +7,7 @@ import Data.Version
 version :: Version
 version
   = Version
-  { versionBranch = [0,0,1]
+  { versionBranch = [0,0,3]
   , versionTags   = []
   }
 
