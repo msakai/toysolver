@@ -12,6 +12,7 @@ Bug-Reports:	https://github.com/msakai/toysolver/issues
 Extra-Source-Files:
    README.md
    COPYING
+   .travis.yml
    src/TseitinEncode.hs
    src/CongruenceClosure.hs
    src/ContiTraverso.hs
@@ -43,6 +44,8 @@ Extra-Source-Files:
    samples/sdp/*.dat-s
    samples/smt/*.smt2
    samples/qbf/*.qdimacs
+   benchmarks/UF250.1065.100/*.cnf
+   benchmarks/UUF250.1065.100/*.cnf
 Build-Type: Simple
 
 Flag ForceChar8
