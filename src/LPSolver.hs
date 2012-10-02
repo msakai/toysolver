@@ -27,7 +27,7 @@ import qualified Data.IntSet as IS
 import Data.OptDir
 
 import Data.Expr
-import Data.Formula
+import Data.ArithRel
 import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Interval as Interval

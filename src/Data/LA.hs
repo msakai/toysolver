@@ -64,6 +64,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Expr as Expr
 import Data.Expr (Var, VarMap, VarSet, Variables, Model)
+import qualified Data.ArithRel as ArithRel
 import qualified Data.Formula as Formula
 import Data.Linear
 import Data.Interval
@@ -248,29 +249,29 @@ showExprWith env (Expr m) = foldr (.) id xs ""
 -----------------------------------------------------------------------------
 
 -- | Atomic Formula of Linear Arithmetics
-data Atom r = Atom (Expr r) Formula.RelOp (Expr r)
+data Atom r = Atom (Expr r) ArithRel.RelOp (Expr r)
     deriving (Show, Eq, Ord)
 
 instance Formula.Complement (Atom r) where
-  notB (Atom  lhs op rhs) = Atom lhs (Formula.negOp op) rhs
+  notB (Atom  lhs op rhs) = Atom lhs (ArithRel.negOp op) rhs
 
 instance Variables (Atom r) where
   vars (Atom a _ b) = Expr.vars a `IS.union` Expr.vars b
 
-instance Formula.Rel (Expr r) (Atom r) where
+instance ArithRel.Rel (Expr r) (Atom r) where
   rel op a b = Atom a op b
 
 showAtom :: (Num r, Eq r, Show r) => Atom r -> String
-showAtom (Atom lhs op rhs) = showExpr lhs ++ Formula.showOp op ++ showExpr rhs
+showAtom (Atom lhs op rhs) = showExpr lhs ++ ArithRel.showOp op ++ showExpr rhs
 
 -- | Solve linear (in)equation for the given variable.
 --
 -- @solveFor a v@ returns @Just (op, e)@ such that @Atom v op e@
 -- is equivalent to @a@.
-solveFor :: (Real r, Fractional r) => Atom r -> Var -> Maybe (Formula.RelOp, Expr r)
+solveFor :: (Real r, Fractional r) => Atom r -> Var -> Maybe (ArithRel.RelOp, Expr r)
 solveFor (Atom lhs op rhs) v = do
   (c,e) <- extractMaybe v (lhs .-. rhs)
-  return ( if c < 0 then Formula.flipOp op else op
+  return ( if c < 0 then ArithRel.flipOp op else op
          , (1/c) .*. lnegate e
          )
 

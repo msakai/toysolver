@@ -63,6 +63,7 @@ Executable toysolver
      Converter.CNF2LP
      Converter.ObjType
      Converter.PB2LP
+     Data.ArithRel
      Data.Delta
      Data.Expr
      Data.Lattice

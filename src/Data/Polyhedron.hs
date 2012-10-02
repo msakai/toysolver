@@ -28,7 +28,7 @@ import Prelude hiding (null)
 
 import qualified Data.Interval as Interval
 import Data.Expr (Variables (..))
-import Data.Formula (RelOp (..), flipOp)
+import Data.ArithRel (RelOp (..), flipOp)
 import qualified Data.LA as LA
 import Data.Linear
 import Data.Lattice

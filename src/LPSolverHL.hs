@@ -31,7 +31,8 @@ import qualified Data.IntSet as IS
 import Data.OptDir
 
 import Data.Expr
-import Data.Formula
+import Data.ArithRel
+import Data.Formula (Atom)
 import qualified Data.LA as LA
 import qualified Simplex
 import LPSolver

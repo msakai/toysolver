@@ -23,7 +23,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
 import Data.Expr
-import Data.Formula
+import Data.ArithRel
 import Data.Linear
 import Data.Interval
 import Data.LA (BoundsEnv)

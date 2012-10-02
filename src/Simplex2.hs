@@ -105,8 +105,7 @@ import System.CPUTime
 
 import qualified Data.LA as LA
 import Data.LA (Atom (..))
-import qualified Data.Formula as F
-import Data.Formula (RelOp (..), (.<=.), (.>=.), (.==.), (.<.), (.>.))
+import Data.ArithRel
 import Data.Linear
 import Data.Delta
 import Util (showRational)
@@ -256,9 +255,9 @@ assertAtom :: Solver -> LA.Atom Rational -> IO ()
 assertAtom solver atom = do
   (v,op,rhs') <- simplifyAtom solver atom
   case op of
-    F.Le  -> assertUpper solver v (toValue rhs')
-    F.Ge  -> assertLower solver v (toValue rhs')
-    F.Eql -> do
+    Le  -> assertUpper solver v (toValue rhs')
+    Ge  -> assertLower solver v (toValue rhs')
+    Eql -> do
       assertLower solver v (toValue rhs')
       assertUpper solver v (toValue rhs')
     _ -> error "unsupported"
@@ -268,28 +267,28 @@ assertAtomEx :: GenericSolver (Delta Rational) -> LA.Atom Rational -> IO ()
 assertAtomEx solver atom = do
   (v,op,rhs') <- simplifyAtom solver atom
   case op of
-    F.Le  -> assertUpper solver v (toValue rhs')
-    F.Ge  -> assertLower solver v (toValue rhs')
-    F.Lt  -> assertUpper solver v (toValue rhs' .-. delta)
-    F.Gt  -> assertLower solver v (toValue rhs' .+. delta)
-    F.Eql -> do
+    Le  -> assertUpper solver v (toValue rhs')
+    Ge  -> assertLower solver v (toValue rhs')
+    Lt  -> assertUpper solver v (toValue rhs' .-. delta)
+    Gt  -> assertLower solver v (toValue rhs' .+. delta)
+    Eql -> do
       assertLower solver v (toValue rhs')
       assertUpper solver v (toValue rhs')
   return ()
 
-simplifyAtom :: SolverValue v => GenericSolver v -> LA.Atom Rational -> IO (Var, F.RelOp, Rational)
+simplifyAtom :: SolverValue v => GenericSolver v -> LA.Atom Rational -> IO (Var, RelOp, Rational)
 simplifyAtom solver (LA.Atom lhs op rhs) = do
   let (lhs',rhs') =
         case LA.extract LA.unitVar (lhs .-. rhs) of
           (n,e) -> (e, -n)
   case LA.terms lhs' of
     [(1,v)] -> return (v, op, rhs')
-    [(-1,v)] -> return (v, F.flipOp op, -rhs')
+    [(-1,v)] -> return (v, flipOp op, -rhs')
     _ -> do
       defs <- readIORef (svDefDB solver)
       let (c,lhs'') = scale lhs' -- lhs' = lhs'' / c = rhs'
           rhs'' = c .*. rhs'
-          op''  = if c < 0 then F.flipOp op else op
+          op''  = if c < 0 then flipOp op else op
       case Map.lookup lhs'' defs of
         Just v -> do
           return (v,op'',rhs'')
@@ -724,8 +723,8 @@ pivot :: SolverValue v => GenericSolver v -> Var -> Var -> IO ()
 pivot solver xi xj = do
   modifyIORef' (svNPivot solver) (+1)
   modifyIORef' (svTableau solver) $ \defs ->
-    case LA.solveFor (LA.Atom (LA.var xi) F.Eql (defs IM.! xi)) xj of
-      Just (F.Eql, xj_def) ->
+    case LA.solveFor (LA.Atom (LA.var xi) Eql (defs IM.! xi)) xj of
+      Just (Eql, xj_def) ->
         IM.insert xj xj_def . IM.map (LA.applySubst1 xj xj_def) . IM.delete xi $ defs
       _ -> error "pivot: should not happen"
 

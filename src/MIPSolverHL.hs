@@ -46,7 +46,8 @@ import Data.Ratio
 import Data.OptDir
 
 import Data.Expr
-import Data.Formula
+import Data.ArithRel
+import Data.Formula (Atom)
 import Data.Linear
 import qualified Data.LA as LA
 import qualified Simplex

@@ -71,7 +71,7 @@ import System.CPUTime
 import Text.Printf
 
 import qualified Data.LA as LA
-import Data.Formula ((.<=.), (.>=.), (.==.))
+import Data.ArithRel ((.<=.), (.>=.), (.==.))
 import qualified Simplex2
 import Simplex2 (OptResult (..), Var, Model)
 import qualified OmegaTest

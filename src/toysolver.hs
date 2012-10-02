@@ -32,7 +32,8 @@ import Text.Printf
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 import Data.Expr
-import Data.Formula
+import Data.ArithRel
+import Data.Formula (Atom (..))
 import qualified Data.LA as LA
 import qualified OmegaTest
 import qualified Cooper
