@@ -116,7 +116,7 @@ addConstraint c = do
 
 addConstraint2 :: Real r => LA.Atom r -> LP r ()
 addConstraint2 c = do
-  (LA.Atom lhs rop rhs) <- expandDefs' c
+  Rel lhs rop rhs <- expandDefs' c
   let
     (b', e) = LA.extract LA.unitVar (lhs .-. rhs)
     b = - b'
@@ -147,10 +147,10 @@ expandDefs e = do
   return $ LA.applySubst defs e
 
 expandDefs' :: (Num r, Eq r) => LA.Atom r -> LP r (LA.Atom r)
-expandDefs' (LA.Atom lhs op rhs) = do
+expandDefs' (Rel lhs op rhs) = do
   lhs' <- expandDefs lhs
   rhs' <- expandDefs rhs
-  return $ LA.Atom lhs' op rhs'
+  return $ Rel lhs' op rhs'
 
 tableau :: (RealFrac r) => [LA.Atom r] -> LP r ()
 tableau cs = do
@@ -200,7 +200,7 @@ dualSimplex optdir obj = do
 -- ---------------------------------------------------------------------------
 
 normalizeConstraint :: forall r. Real r => LA.Atom r -> (LA.Expr r, RelOp, r)
-normalizeConstraint (LA.Atom a op b)
+normalizeConstraint (Rel a op b)
   | rhs < 0   = (lnegate lhs, flipOp op, negate rhs)
   | otherwise = (lhs, op, rhs)
   where
@@ -221,7 +221,7 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
                 _ -> False
 
     isTriviallyTrue :: LA.Atom r -> Bool
-    isTriviallyTrue (LA.Atom a op b) =
+    isTriviallyTrue (Rel a op b) =
       case op of
         Le ->
           case ub of
@@ -239,8 +239,8 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
           case lb of
             Nothing -> False
             Just (incl, val) -> val > 0 || (not incl && val >= 0)
-        Eql -> isTriviallyTrue (LA.Atom c Le lzero) && isTriviallyTrue (LA.Atom c Ge lzero)
-        NEq -> isTriviallyTrue (LA.Atom c Lt lzero) && isTriviallyTrue (LA.Atom c Gt lzero)
+        Eql -> isTriviallyTrue (c .<=. lzero) && isTriviallyTrue (c .>=. lzero)
+        NEq -> isTriviallyTrue (c .<. lzero) || isTriviallyTrue (c .>. lzero)
       where
         c = a .-. b
         i = LA.computeInterval bounds c

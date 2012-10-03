@@ -41,6 +41,7 @@ import Data.Ratio
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
+import Data.ArithRel
 import Data.Expr
 import Data.Formula
 import Data.Linear
@@ -225,7 +226,7 @@ constraintsToDNF :: [LA.Atom Rational] -> DNF Lit
 constraintsToDNF = andB . map constraintToDNF
 
 constraintToDNF :: LA.Atom Rational -> DNF Lit
-constraintToDNF (LA.Atom a op b) = DNF $
+constraintToDNF (Rel a op b) = DNF $
   case op of
     Eql -> [[Nonneg c, Nonneg (lnegate c)]]
     NEq -> [[Pos c], [Pos (lnegate c)]]

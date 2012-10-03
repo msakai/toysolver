@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.ArithRel
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses, FunctionalDependencies)
+-- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies)
 --
 -- Arithmetic relations
 -- 
@@ -16,46 +16,30 @@ module Data.ArithRel
   (
   -- * Relational operators
     RelOp (..)
-  , Rel (..)
-  , (.<.), (.<=.), (.>=.), (.>.), (.==.), (./=.)
   , flipOp
   , negOp
   , showOp
+
+  -- * Relation
+  , Rel (..)
+
+  -- * DSL
+  , IsRel (..)
+  , (.<.), (.<=.), (.>=.), (.>.), (.==.), (./=.)
   ) where
 
+import qualified Data.IntSet as IS
+import Data.Expr (Variables (..))
+import Data.Lattice (Complement (..))
+
 infix 4 .<., .<=., .>=., .>., .==., ./=.
+
+-- ---------------------------------------------------------------------------
 
 -- | relational operators
 data RelOp = Lt | Le | Ge | Gt | Eql | NEq
     deriving (Show, Eq, Ord)
 
--- | type class for constructing relational formula
-class Rel e r | r -> e where
-  rel :: RelOp -> e -> e -> r
-
--- | constructing relational formula
-(.<.) :: Rel e r => e -> e -> r
-a .<. b  = rel Lt  a b
-
--- | constructing relational formula
-(.<=.) :: Rel e r => e -> e -> r
-a .<=. b = rel Le  a b
-
--- | constructing relational formula
-(.>.) :: Rel e r => e -> e -> r
-a .>. b  = rel Gt  a b
-
--- | constructing relational formula
-(.>=.) :: Rel e r => e -> e -> r
-a .>=. b = rel Ge  a b
-
--- | constructing relational formula
-(.==.) :: Rel e r => e -> e -> r
-a .==. b = rel Eql a b
-
--- | constructing relational formula
-(./=.) :: Rel e r => e -> e -> r
-a ./=. b = rel NEq a b
 
 -- | flipping relational operator
 --
@@ -88,3 +72,49 @@ showOp Gt = ">"
 showOp Eql = "="
 showOp NEq = "/="
 
+-- ---------------------------------------------------------------------------
+
+-- | type class for constructing relational formula
+class IsRel e r | r -> e where
+  rel :: RelOp -> e -> e -> r
+
+-- | constructing relational formula
+(.<.) :: IsRel e r => e -> e -> r
+a .<. b  = rel Lt  a b
+
+-- | constructing relational formula
+(.<=.) :: IsRel e r => e -> e -> r
+a .<=. b = rel Le  a b
+
+-- | constructing relational formula
+(.>.) :: IsRel e r => e -> e -> r
+a .>. b  = rel Gt  a b
+
+-- | constructing relational formula
+(.>=.) :: IsRel e r => e -> e -> r
+a .>=. b = rel Ge  a b
+
+-- | constructing relational formula
+(.==.) :: IsRel e r => e -> e -> r
+a .==. b = rel Eql a b
+
+-- | constructing relational formula
+(./=.) :: IsRel e r => e -> e -> r
+a ./=. b = rel NEq a b
+
+-- ---------------------------------------------------------------------------
+
+-- | Atomic formula
+data Rel e = Rel e RelOp e
+    deriving (Show, Eq, Ord)
+
+instance Complement (Rel c) where
+  notB (Rel lhs op rhs) = Rel lhs (negOp op) rhs
+
+instance IsRel e (Rel e) where
+  rel op a b = Rel a op b
+
+instance Variables e => Variables (Rel e) where
+  vars (Rel a _ b) = vars a `IS.union` vars b
+
+-- ---------------------------------------------------------------------------

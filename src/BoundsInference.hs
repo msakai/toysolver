@@ -43,7 +43,7 @@ inferBounds bounds constraints ivs limit = loop 0 bounds
   where
     cs :: VarMap [C r]
     cs = IM.fromListWith (++) $ do
-      LA.Atom lhs op rhs <- constraints
+      Rel lhs op rhs <- constraints
       let m = LA.coeffMap (lhs .-. rhs)
       (v,c) <- IM.toList m
       guard $ v /= LA.unitVar

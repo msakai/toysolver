@@ -277,7 +277,7 @@ assertAtomEx solver atom = do
   return ()
 
 simplifyAtom :: SolverValue v => GenericSolver v -> LA.Atom Rational -> IO (Var, RelOp, Rational)
-simplifyAtom solver (LA.Atom lhs op rhs) = do
+simplifyAtom solver (Rel lhs op rhs) = do
   let (lhs',rhs') =
         case LA.extract LA.unitVar (lhs .-. rhs) of
           (n,e) -> (e, -n)
@@ -723,7 +723,7 @@ pivot :: SolverValue v => GenericSolver v -> Var -> Var -> IO ()
 pivot solver xi xj = do
   modifyIORef' (svNPivot solver) (+1)
   modifyIORef' (svTableau solver) $ \defs ->
-    case LA.solveFor (LA.Atom (LA.var xi) Eql (defs IM.! xi)) xj of
+    case LA.solveFor (LA.var xi .==. (defs IM.! xi)) xj of
       Just (Eql, xj_def) ->
         IM.insert xj xj_def . IM.map (LA.applySubst1 xj xj_def) . IM.delete xi $ defs
       _ -> error "pivot: should not happen"

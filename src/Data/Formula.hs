@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Formula
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses, FunctionalDependencies)
+-- Portability :  non-portable (MultiParamTypeClasses)
 --
 -- Formula of first order logic.
 -- 
@@ -35,17 +35,7 @@ import Data.ArithRel
 -- ---------------------------------------------------------------------------
 
 -- | Atomic formula
-data Atom c = Rel (Expr c) RelOp (Expr c)
-    deriving (Show, Eq, Ord)
-
-instance Complement (Atom c) where
-  notB (Rel lhs op rhs) = Rel lhs (negOp op) rhs
-
-instance Variables (Atom c) where
-  vars (Rel a _ b) = vars a `IS.union` vars b
-
-instance Rel (Expr c) (Atom c) where
-  rel op a b = Rel a op b
+type Atom c = Rel (Expr c)
 
 -- ---------------------------------------------------------------------------
 
@@ -88,7 +78,7 @@ instance Boolean (Formula c) where
   (.=>.)  = Imply
   (.<=>.) = Equiv
 
-instance Rel (Expr c) (Formula c) where
+instance IsRel (Expr c) (Formula c) where
   rel op a b = Atom $ rel op a b
 
 -- | convert a formula into negation normal form

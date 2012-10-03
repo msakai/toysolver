@@ -249,27 +249,17 @@ showExprWith env (Expr m) = foldr (.) id xs ""
 -----------------------------------------------------------------------------
 
 -- | Atomic Formula of Linear Arithmetics
-data Atom r = Atom (Expr r) ArithRel.RelOp (Expr r)
-    deriving (Show, Eq, Ord)
-
-instance Formula.Complement (Atom r) where
-  notB (Atom  lhs op rhs) = Atom lhs (ArithRel.negOp op) rhs
-
-instance Variables (Atom r) where
-  vars (Atom a _ b) = Expr.vars a `IS.union` Expr.vars b
-
-instance ArithRel.Rel (Expr r) (Atom r) where
-  rel op a b = Atom a op b
+type Atom r = ArithRel.Rel (Expr r)
 
 showAtom :: (Num r, Eq r, Show r) => Atom r -> String
-showAtom (Atom lhs op rhs) = showExpr lhs ++ ArithRel.showOp op ++ showExpr rhs
+showAtom (ArithRel.Rel lhs op rhs) = showExpr lhs ++ ArithRel.showOp op ++ showExpr rhs
 
 -- | Solve linear (in)equation for the given variable.
 --
 -- @solveFor a v@ returns @Just (op, e)@ such that @Atom v op e@
 -- is equivalent to @a@.
 solveFor :: (Real r, Fractional r) => Atom r -> Var -> Maybe (ArithRel.RelOp, Expr r)
-solveFor (Atom lhs op rhs) v = do
+solveFor (ArithRel.Rel lhs op rhs) v = do
   (c,e) <- extractMaybe v (lhs .-. rhs)
   return ( if c < 0 then ArithRel.flipOp op else op
          , (1/c) .*. lnegate e
@@ -301,9 +291,9 @@ compileExpr (a Expr.:/: b) = do
   return $ (1/c) .*. x
 
 compileAtom :: (Real r, Fractional r) => Formula.Atom r -> Maybe (Atom r)
-compileAtom (Formula.Rel a op b) = do
+compileAtom (ArithRel.Rel a op b) = do
   a' <- compileExpr a
   b' <- compileExpr b
-  return $ Atom a' op b'
+  return $ ArithRel.rel op a' b'
 
 -----------------------------------------------------------------------------

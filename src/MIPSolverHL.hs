@@ -138,7 +138,7 @@ tableau' cs ivs = do
   return ivs2
 
 conv :: RealFrac r => LA.Atom r -> LA.Atom Rational
-conv (LA.Atom a op b) = LA.Atom (f a) op (f b)
+conv (Rel a op b) = Rel (f a) op (f b)
   where
     f = LA.mapCoeff toRational
 
@@ -216,8 +216,8 @@ traverse optdir obj ivs node0 = loop [node0] Nothing
           in Just $ [node{ ndSolver = sv2, ndDepth = ndDepth node + 1 } | sv2 <- maybeToList (reopt sv)]
       | otherwise = -- branch
           let (v0, val0) = snd $ maximumBy (comparing fst) [(fracPart val, (v, val)) | (v,_,val) <- xs]
-              cs = [ LA.Atom (LA.var v0) Ge (LA.constant (fromIntegral (ceiling val0 :: Integer)))
-                   , LA.Atom (LA.var v0) Le (LA.constant (fromIntegral (floor val0 :: Integer)))
+              cs = [ LA.var v0 .>=. LA.constant (fromIntegral (ceiling val0 :: Integer))
+                   , LA.var v0 .<=. LA.constant (fromIntegral (floor val0 :: Integer))
                    ]
               svs = [execState (addConstraint2 c) (ndSolver node) | c <- cs]
           in Just $ [node{ ndSolver = sv, ndDepth = ndDepth node + 1 } | Just sv <- map reopt svs]
@@ -244,15 +244,15 @@ example1 = (optdir, obj, cs, ivs)
     x4 = LA.var 4
     obj = x1 .+. 2 .*. x2 .+. 3 .*. x3 .+. x4
     cs =
-      [ LA.Atom ((-1) .*. x1 .+. x2 .+. x3 .+. 10.*.x4) Le (LA.constant 20)
-      , LA.Atom (x1 .-. 3 .*. x2 .+. x3) Le (LA.constant 30)
-      , LA.Atom (x2 .-. 3.5 .*. x4) Eql (LA.constant 0)
-      , LA.Atom (LA.constant 0) Le x1
-      , LA.Atom x1 Le (LA.constant 40)
-      , LA.Atom (LA.constant 0) Le x2
-      , LA.Atom (LA.constant 0) Le x3
-      , LA.Atom (LA.constant 2) Le x4
-      , LA.Atom x4 Le (LA.constant 3)
+      [ (-1) .*. x1 .+. x2 .+. x3 .+. 10.*.x4 .<=. LA.constant 20
+      , x1 .-. 3 .*. x2 .+. x3 .<=. LA.constant 30
+      , x2 .-. 3.5 .*. x4 .==. LA.constant 0
+      , LA.constant 0 .<=. x1
+      , x1 .<=. LA.constant 40
+      , LA.constant 0 .<=. x2
+      , LA.constant 0 .<=. x3
+      , LA.constant 2 .<=. x4
+      , x4 .<=. LA.constant 3
       ]
     ivs = IS.singleton 4
 
@@ -281,12 +281,12 @@ example2 = (optdir, obj, cs, ivs)
     [x1,x2,x3] = map LA.var [1..3]
     obj = (-1) .*. x1 .-. 3 .*. x2 .-. 5 .*. x3
     cs =
-      [ LA.Atom (3 .*. x1 .+. 4 .*. x2) Le (LA.constant 10)
-      , LA.Atom (2 .*. x1 .+. x2 .+. x3) Le (LA.constant 7)
-      , LA.Atom (3.*.x1 .+. x2 .+. 4 .*. x3) Eql (LA.constant 12)
-      , LA.Atom (LA.constant 0) Le x1
-      , LA.Atom (LA.constant 0) Le x2
-      , LA.Atom (LA.constant 0) Le x3
+      [ 3 .*. x1 .+. 4 .*. x2 .<=. LA.constant 10
+      , 2 .*. x1 .+. x2 .+. x3 .<=. LA.constant 7
+      , 3.*.x1 .+. x2 .+. 4 .*. x3 .==. LA.constant 12
+      , LA.constant 0 .<=. x1
+      , LA.constant 0 .<=. x2
+      , LA.constant 0 .<=. x3
       ]
     ivs = IS.fromList [1,2]
 

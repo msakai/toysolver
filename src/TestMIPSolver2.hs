@@ -29,15 +29,15 @@ example1 = (optdir, obj, cs, ivs)
     x4 = LA.var 4
     obj = x1 .+. 2 .*. x2 .+. 3 .*. x3 .+. x4
     cs =
-      [ LA.Atom ((-1) .*. x1 .+. x2 .+. x3 .+. 10.*.x4) Le (LA.constant 20)
-      , LA.Atom (x1 .-. 3 .*. x2 .+. x3) Le (LA.constant 30)
-      , LA.Atom (x2 .-. 3.5 .*. x4) Eql (LA.constant 0)
-      , LA.Atom (LA.constant 0) Le x1
-      , LA.Atom x1 Le (LA.constant 40)
-      , LA.Atom (LA.constant 0) Le x2
-      , LA.Atom (LA.constant 0) Le x3
-      , LA.Atom (LA.constant 2) Le x4
-      , LA.Atom x4 Le (LA.constant 3)
+      [ (-1) .*. x1 .+. x2 .+. x3 .+. 10.*.x4 .<=. LA.constant 20
+      , x1 .-. 3 .*. x2 .+. x3 .<=. LA.constant 30
+      , x2 .-. 3.5 .*. x4 .==. LA.constant 0
+      , LA.constant 0 .<=. x1
+      , x1 .<=. LA.constant 40
+      , LA.constant 0 .<=. x2
+      , LA.constant 0 .<=. x3
+      , LA.constant 2 .<=. x4
+      , x4 .<=. LA.constant 3
       ]
     ivs = IS.singleton 4
 
@@ -90,12 +90,12 @@ example2 = (optdir, obj, cs, ivs)
     [x1,x2,x3] = map LA.var [1..3]
     obj = (-1) .*. x1 .-. 3 .*. x2 .-. 5 .*. x3
     cs =
-      [ LA.Atom (3 .*. x1 .+. 4 .*. x2) Le (LA.constant 10)
-      , LA.Atom (2 .*. x1 .+. x2 .+. x3) Le (LA.constant 7)
-      , LA.Atom (3.*.x1 .+. x2 .+. 4 .*. x3) Eql (LA.constant 12)
-      , LA.Atom (LA.constant 0) Le x1
-      , LA.Atom (LA.constant 0) Le x2
-      , LA.Atom (LA.constant 0) Le x3
+      [ 3 .*. x1 .+. 4 .*. x2 .<=. LA.constant 10
+      , 2 .*. x1 .+. x2 .+. x3 .<=. LA.constant 7
+      , 3.*.x1 .+. x2 .+. 4 .*. x3 .==. LA.constant 12
+      , LA.constant 0 .<=. x1
+      , LA.constant 0 .<=. x2
+      , LA.constant 0 .<=. x3
       ]
     ivs = IS.fromList [1,2]
 
