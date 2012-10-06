@@ -26,6 +26,7 @@ Extra-Source-Files:
    src/Data/AlgebraicNumber/Root.hs
    src/Data/AlgebraicNumber/RealInstance.hs
    src/Data/Polyhedron.hs
+   src/FOLModelFinder.hs
    src/Text/SDPFile.hs
    src/TestAReal2.hs
    src/pbverify.hs
