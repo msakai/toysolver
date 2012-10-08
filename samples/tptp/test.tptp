@@ -1,0 +1,2 @@
+fof( foo, axiom, ![X] : ?[Y] : (f(Y) = X & X != Y) ).
+

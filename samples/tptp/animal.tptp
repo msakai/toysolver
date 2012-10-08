@@ -1,0 +1,3 @@
+fof( foo, axiom, ![X] : (animal(X) => ?[Y] : (heart(Y) & has(X,Y))) ).
+fof( bar, axiom, ?[X] : animal(X) ).
+fof( baz, axiom, ![X] : ~animal(X) | ~heart(X) ).

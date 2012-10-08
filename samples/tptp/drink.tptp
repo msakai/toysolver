@@ -1,0 +1,1 @@
+fof( drinker, axiom, ?[X] : (drink(X) => ![Y] : drink(Y)) ).

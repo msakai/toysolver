@@ -422,17 +422,17 @@ data Model
   , mFunctions :: Map.Map FSym [([Entity], Entity)]
   }
 
-showModel :: Model -> String
+showModel :: Model -> [String]
 showModel m = 
-  printf "DOMAIN = {%s}\n" (intercalate ", " (map showEntity (mUniverse m))) ++
-  concat [ printf "%s = { %s }\n" p s
-         | (p, xss) <- Map.toList (mRelations m)
-         , let s = intercalate ", " [showEntityTuple xs | xs <- xss]
-         ] ++
-  concat [ printf "%s%s = %s\n" f (showEntityTuple xs) (showEntity y)
-         | (f, xss) <- Map.toList (mFunctions m)
-         , (xs, y) <- xss
-         ]
+  printf "DOMAIN = {%s}" (intercalate ", " (map showEntity (mUniverse m))) :
+  [ printf "%s = { %s }" p s
+  | (p, xss) <- Map.toList (mRelations m)
+  , let s = intercalate ", " [showEntityTuple xs | xs <- xss]
+  ] ++
+  [ printf "%s%s = %s" f (showEntityTuple xs) (showEntity y)
+  | (f, xss) <- Map.toList (mFunctions m)
+  , (xs, y) <- xss
+  ]
 
 -- ---------------------------------------------------------------------------
 
@@ -528,7 +528,7 @@ test = do
     Nothing -> putStrLn "=== NO MODEL FOUND ==="
     Just m -> do
       putStrLn "=== A MODEL FOUND ==="
-      putStr $ showModel m
+      mapM_ putStrLn $ showModel m
 
 test2 = do
   let phi = Forall "x" $ Exists "y" $
@@ -548,6 +548,6 @@ test2 = do
     Nothing -> putStrLn "=== NO MODEL FOUND ==="
     Just m -> do
       putStrLn "=== A MODEL FOUND ==="
-      putStr $ showModel m
+      mapM_ putStrLn $ showModel m
 
 -- ---------------------------------------------------------------------------
