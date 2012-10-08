@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  FOLModelFinder
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances)
+-- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables)
 --
 -- A simple model finder.
 --
@@ -27,8 +27,12 @@ module FOLModelFinder
   , PSym
   , GenLit (..)
   , Term (..)
+  , Atom (..)
   , Lit
   , Clause
+  , Formula
+  , GenFormula (..)
+  , toSkolemNF
 
   -- * Model types
   , Model (..)
@@ -45,6 +49,7 @@ import Control.Monad.State
 import Data.Array.IArray
 import Data.IORef
 import Data.List
+import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Text.Printf
@@ -68,6 +73,7 @@ class Vars a where
 instance Vars a => Vars [a] where
   vars = Set.unions . map vars
 
+-- | Generalized literal type parameterized by atom type
 data GenLit a
   = Pos a
   | Neg a
@@ -89,6 +95,7 @@ data Atom = PApp PSym [Term]
   deriving (Show, Eq, Ord)
 
 type Lit = GenLit Atom
+
 type Clause = [Lit]
 
 instance Vars Term where
@@ -97,6 +104,127 @@ instance Vars Term where
 
 instance Vars Atom where
   vars (PApp _ ts) = vars ts
+
+-- ---------------------------------------------------------------------------
+
+-- Formula type
+type Formula = GenFormula Atom
+
+-- Generalized formula parameterized by atom type
+data GenFormula a
+  = T
+  | F
+  | Atom a
+  | And (GenFormula a) (GenFormula a)
+  | Or (GenFormula a) (GenFormula a)
+  | Not (GenFormula a)
+  | Imply (GenFormula a) (GenFormula a)
+  | Equiv (GenFormula a) (GenFormula a)
+  | Forall Var (GenFormula a)
+  | Exists Var (GenFormula a)
+  deriving (Show, Eq, Ord)
+
+instance Vars a => Vars (GenFormula a) where
+  vars T               = Set.empty
+  vars F               = Set.empty
+  vars (Atom a)        = vars a
+  vars (And phi psi)   = vars phi `Set.union` vars psi
+  vars (Or phi psi)    = vars phi `Set.union` vars psi
+  vars (Not phi)       = vars phi
+  vars (Imply phi psi) = vars phi `Set.union` vars psi
+  vars (Equiv phi psi) = vars phi `Set.union` vars psi
+  vars (Forall v phi)  = Set.delete v (vars phi)
+  vars (Exists v phi)  = Set.delete v (vars phi)
+
+toNNF :: Formula -> Formula
+toNNF = f
+  where 
+    f (And phi psi)   = f phi `And` f psi
+    f (Or phi psi)    = f phi `Or` f psi
+    f (Not phi)       = g phi
+    f (Imply phi psi) = g phi `Or` f psi
+    f (Equiv phi psi) = f (And (Imply phi psi) (Imply psi phi))
+    f (Forall v phi)  = Forall v (f phi)
+    f (Exists v phi)  = Exists v (f phi)
+    f phi = phi
+
+    g :: Formula -> Formula
+    g T = F
+    g F = T
+    g (And phi psi)   = g phi `Or` g psi
+    g (Or phi psi)    = g phi `And` g psi
+    g (Not phi)       = f phi
+    g (Imply phi psi) = f phi `And` g psi
+    g (Equiv phi psi) = g (And (Imply phi psi) (Imply psi phi))
+    g (Forall v phi)  = Exists v (g phi)
+    g (Exists v phi)  = Forall v (g phi)
+    g (Atom a)        = Not (Atom a)
+
+-- | normalize a formula into a skolem normal form.
+-- 
+-- TODO:
+-- 
+-- * Tseitin encoding
+toSkolemNF :: forall m. Monad m => (String -> Int -> m FSym) -> Formula -> m [Clause]
+toSkolemNF skolem phi = f [] Map.empty (toNNF phi)
+  where
+    f :: [Var] -> Map.Map Var Term -> Formula -> m [Clause]
+    f _ _ T = return []
+    f _ _ F = return [[]]
+    f _ s (Atom a) = return [[Pos (substAtom s a)]]
+    f _ s (Not (Atom a)) = return [[Neg (substAtom s a)]]
+    f uvs s (And phi psi) = do
+      phi' <- f uvs s phi
+      psi' <- f uvs s psi
+      return $ phi' ++ psi'
+    f uvs s (Or phi psi) = do
+      phi' <- f uvs s phi
+      psi' <- f uvs s psi
+      return $ [c1++c2 | c1 <- phi', c2 <- psi']
+    f uvs s psi@(Forall v phi) = do
+      let v' = gensym v (vars psi `Set.union` Set.fromList uvs)
+      f (v' : uvs) (Map.insert v (TmVar v') s) phi
+    f uvs s (Exists v phi) = do
+      fsym <- skolem v (length uvs)
+      f uvs (Map.insert v (TmApp fsym [TmVar v | v <- reverse uvs]) s) phi
+    f _ _ _ = error "toSkolemNF: should not happen"
+
+    gensym :: String -> Set.Set Var -> Var
+    gensym template vs = head [name | name <- names, Set.notMember name vs]
+      where
+        names = template : [template ++ show n | n <-[1..]]
+
+    substAtom :: Map.Map Var Term -> Atom -> Atom
+    substAtom s (PApp p ts) = PApp p (map (substTerm s) ts)
+
+    substTerm :: Map.Map Var Term -> Term -> Term
+    substTerm s (TmVar v)    = fromMaybe (TmVar v) (Map.lookup v s)
+    substTerm s (TmApp f ts) = TmApp f (map (substTerm s) ts)
+
+test_toSkolemNF = do
+  ref <- newIORef 0
+  let skolem name _ = do
+        n <- readIORef ref
+        let fsym = name ++ "#" ++ show n
+        writeIORef ref (n+1)
+        return fsym
+
+  -- ∀x. animal(a) → (∃y. heart(y) ∧ has(x,y))
+  let phi = Forall "x" $
+              Imply
+                (Atom (PApp "animal" [TmVar "x"]))
+                (Exists "y" $
+                   And (Atom (PApp "heart" [TmVar "y"]))
+                       (Atom (PApp "has" [TmVar "x", TmVar "y"])))
+
+  phi' <- toSkolemNF skolem phi
+
+  print phi'
+{-
+[[Neg (PApp "animal" [TmVar "x"]),Pos (PApp "heart" [TmApp "y#0" [TmVar "x"]])],[Neg (PApp "animal" [TmVar "x"]),Pos (PApp "has" [TmVar "x",TmApp "y#0" [TmVar "x"]])]]
+
+{¬animal(x) ∨ heart(y#1(x)), ¬animal(x) ∨ has(x1, y#0(x))}
+-}
 
 -- ---------------------------------------------------------------------------
 
@@ -214,8 +342,10 @@ f(x) ≠ z ∨ a ≠ y ∨ P(y,z)
 
 -- ---------------------------------------------------------------------------
 
+-- | Element of model.
 type Entity = Int
 
+-- | print entity
 showEntity :: Entity -> String
 showEntity e = "$" ++ show e
 
@@ -394,6 +524,26 @@ test = do
   let c1 = [Pos $ PApp "=" [TmApp "f" [TmApp "g" [TmVar "x"]], TmVar "x"]]
       c2 = [Neg $ PApp "=" [TmVar "x", TmApp "g" [TmVar "x"]]]
   ret <- findModel 3 [c1, c2]
+  case ret of
+    Nothing -> putStrLn "=== NO MODEL FOUND ==="
+    Just m -> do
+      putStrLn "=== A MODEL FOUND ==="
+      putStr $ showModel m
+
+test2 = do
+  let phi = Forall "x" $ Exists "y" $
+              And (Not (Atom (PApp "=" [TmVar "x", TmVar "y"])))
+                  (Atom (PApp "=" [TmApp "f" [TmVar "y"], TmVar "x"]))
+
+  ref <- newIORef 0
+  let skolem name _ = do
+        n <- readIORef ref
+        let fsym = name ++ "#" ++ show n
+        writeIORef ref (n+1)
+        return fsym
+  cs <- toSkolemNF skolem phi
+
+  ret <- findModel 3 cs
   case ret of
     Nothing -> putStrLn "=== NO MODEL FOUND ==="
     Just m -> do
