@@ -14,6 +14,8 @@
 
 import Control.Monad
 import Data.IORef
+import qualified Data.Map as Map
+import Data.Ratio
 import System.Environment
 import System.IO
 import qualified Codec.TPTP as TPTP
@@ -46,7 +48,9 @@ solve fpath size = do
       putStrLn "s NO MODEL FOUND"
     Just m -> do
       putStrLn "s SATISFIABLE"
-      forM_ (MF.showModel m) $ \s ->
+      let isSkolem k = '#' `elem` k
+      let m' = m{ MF.mFunctions = Map.filterWithKey (\k _ -> not (isSkolem k)) (MF.mFunctions m) }
+      forM_ (MF.showModel m') $ \s ->
         putStrLn $ "v " ++ s
 
   return ()
@@ -101,10 +105,15 @@ translateTerm :: TPTP.Term -> MF.Term
 translateTerm = TPTP.foldT str num var app
   where
     str s = MF.TmApp (show s) []
-    num r = MF.TmApp (show r) []
+    num r = MF.TmApp (showRational r) []
     var (TPTP.V v) = MF.TmVar v
     app (TPTP.AtomicWord f) ts = MF.TmApp f ts'
       where
         ts' = map translateTerm ts
+
+    showRational r =
+      if denominator r == 1
+      then show (numerator r)
+      else show (numerator r) ++ "/" ++ show (denominator r)
 
 -- ---------------------------------------------------------------------------

@@ -427,9 +427,9 @@ showModel m =
   printf "DOMAIN = {%s}" (intercalate ", " (map showEntity (mUniverse m))) :
   [ printf "%s = { %s }" p s
   | (p, xss) <- Map.toList (mRelations m)
-  , let s = intercalate ", " [showEntityTuple xs | xs <- xss]
+  , let s = intercalate ", " [if length xs == 1 then showEntity (head xs) else showEntityTuple xs | xs <- xss]
   ] ++
-  [ printf "%s%s = %s" f (showEntityTuple xs) (showEntity y)
+  [ printf "%s%s = %s" f (if length xs == 0 then "" else showEntityTuple xs) (showEntity y)
   | (f, xss) <- Map.toList (mFunctions m)
   , (xs, y) <- xss
   ]
