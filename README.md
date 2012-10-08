@@ -46,6 +46,14 @@ Usage:
     toysat --maxsat [file.cnf|file.wcnf|-]
     toysat --lp [file.lp|-]
 
+### toyfmf
+
+SAT-based finite model finder for first order logic (FOL).
+
+Usage:
+
+    toyfmf file.tptp size
+
 ### lp2yices
 
 Converter from LP file to Yices input file.
