@@ -110,7 +110,7 @@ example_3_2 = (obj, cond)
 test_3_2 :: Bool
 test_3_2 =
   uncurry maximize example_3_2 == 
-  Optimum (27 % 5) (IM.fromList [(1,1 % 5),(2,0 % 1),(3,8 % 5)])
+  Optimum (27/5) (IM.fromList [(1,1/5),(2,0),(3,8/5)])
 
 example_3_5 :: (Expr Rational, [Atom Rational])
 example_3_5 = (obj, cond)
@@ -133,7 +133,7 @@ example_3_5 = (obj, cond)
 test_3_5 :: Bool
 test_3_5 =
   uncurry minimize example_3_5 ==
-  Optimum (19 % 1) (IM.fromList [(1,(-1) % 1),(2,0 % 1),(3,1 % 1),(4,0 % 1),(5,2 % 1)]) 
+  Optimum 19 (IM.fromList [(1,-1),(2,0),(3,1),(4,0),(5,2)])
 
 example_4_1 :: (Expr Rational, [Atom Rational])
 example_4_1 = (obj, cond)
@@ -184,7 +184,7 @@ example_4_3 = (obj, cond)
 test_4_3 :: Bool
 test_4_3 =
   uncurry maximize example_4_3 ==
-  Optimum (12 % 1) (IM.fromList [(1,4 % 1),(2,6 % 1)])
+  Optimum 12 (IM.fromList [(1,4),(2,6)])
 
 example_4_5 :: (Expr Rational, [Atom Rational])
 example_4_5 = (obj, cond)
@@ -202,7 +202,7 @@ example_4_5 = (obj, cond)
 test_4_5 :: Bool
 test_4_5 =
   uncurry maximize example_4_5 ==
-  Optimum (5 % 1) (IM.fromList [(1,3 % 2),(2,2 % 1)])
+  Optimum 5 (IM.fromList [(1,3/2),(2,2)])
 
 example_4_6 :: (Expr Rational, [Atom Rational])
 example_4_6 = (obj, cond)
@@ -225,7 +225,7 @@ example_4_6 = (obj, cond)
 test_4_6 :: Bool
 test_4_6 =
   uncurry maximize example_4_6 ==
-  Optimum (165 % 4) (IM.fromList [(1,2 % 1),(2,1 % 1),(3,0 % 1),(4,1 % 1)])
+  Optimum (165/4) (IM.fromList [(1,2),(2,1),(3,0),(4,1)])
 
 example_4_7 :: (Expr Rational, [Atom Rational])
 example_4_7 = (obj, cond)
@@ -248,7 +248,7 @@ example_4_7 = (obj, cond)
 test_4_7 :: Bool
 test_4_7 =
   uncurry maximize example_4_7 ==
-  Optimum (48 % 11) (IM.fromList [(1,0 % 1),(2,0 % 1),(3,8 % 11),(4,4 % 11)])
+  Optimum (48/11) (IM.fromList [(1,0),(2,0),(3,81),(4,41)])
 
 -- 退化して巡回の起こるKuhnの7変数3制約の例
 kuhn_7_3 :: (Expr Rational, [Atom Rational])
@@ -271,7 +271,7 @@ kuhn_7_3 = (obj, cond)
 test_kuhn_7_3 :: Bool
 test_kuhn_7_3 =
   uncurry minimize kuhn_7_3 ==
-  Optimum ((-2) % 1) (IM.fromList [(1,2 % 1),(2,0 % 1),(3,0 % 1),(4,2 % 1),(5,0 % 1),(6,2 % 1),(7,0 % 1)])
+  Optimum (-2) (IM.fromList [(1,2),(2,0),(3,0),(4,2),(5,0),(6,2),(7,0)])
 
 testAll :: Bool
 testAll = and

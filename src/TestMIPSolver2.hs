@@ -54,11 +54,11 @@ case_test1 = do
   ret @?= Simplex2.Optimum
 
   m <- MIPSolver2.model mip
-  forM_ [(1,40 % 1),(2,21 % 2),(3,39 % 2),(4,3 % 1)] $ \(var, val) ->
+  forM_ [(1,40),(2,21/2),(3,39/2),(4,3)] $ \(var, val) ->
     m IM.! var @?= val
 
   v <- MIPSolver2.getObjValue mip
-  v @?= (245 % 2)
+  v @?= 245/2
 
 case_test1' = do
   let (optdir, obj, cs, ivs) = example1
@@ -73,11 +73,11 @@ case_test1' = do
   ret @?= Simplex2.Optimum
 
   m <- MIPSolver2.model mip
-  forM_ [(1,40 % 1),(2,21 % 2),(3,39 % 2),(4,3 % 1)] $ \(var, val) ->
+  forM_ [(1,40),(2,21/2),(3,39/2),(4,3)] $ \(var, val) ->
     m IM.! var @?= val
 
   v <- MIPSolver2.getObjValue mip
-  v @?= (- 245 % 2)
+  v @?= -245/2
 
   where
     f OptMin = OptMax
@@ -112,11 +112,11 @@ case_test2 = do
   ret @?= Simplex2.Optimum
 
   m <- MIPSolver2.model mip
-  forM_ [(1,0 % 1),(2,2 % 1),(3,5 % 2)] $ \(var, val) ->
+  forM_ [(1,0),(2,2),(3,5/2)] $ \(var, val) ->
     m IM.! var @?= val
 
   v <- MIPSolver2.getObjValue mip
-  v @?= (- 37 % 2)
+  v @?= -37/2
 
 ------------------------------------------------------------------------
 -- Test harness

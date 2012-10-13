@@ -262,7 +262,7 @@ test1 = result==expected
     (optdir, obj, cs, ivs) = example1
     result, expected :: OptResult Rational
     result = optimize' optdir obj cs ivs
-    expected = Optimum (245 % 2) (IM.fromList [(1,40 % 1),(2,21 % 2),(3,39 % 2),(4,3 % 1)])
+    expected = Optimum (245/2) (IM.fromList [(1,40),(2,21/2),(3,39/2),(4,3)])
 
 test1' :: Bool
 test1' = result==expected
@@ -272,7 +272,7 @@ test1' = result==expected
     f OptMax = OptMin
     result, expected :: OptResult Rational
     result = optimize' (f optdir) (lnegate obj) cs ivs
-    expected = Optimum (-245 % 2) (IM.fromList [(1,40 % 1),(2,21 % 2),(3,39 % 2),(4,3 % 1)])
+    expected = Optimum (-245/2) (IM.fromList [(1,40),(2,21/2),(3,39/2),(4,3)])
 
 -- 『数理計画法の基礎』(坂和 正敏) p.109 例 3.8
 example2 = (optdir, obj, cs, ivs)
@@ -295,7 +295,7 @@ test2 = result == expected
   where
     result, expected :: OptResult Rational
     result = optimize' optdir obj cs ivs
-    expected = Optimum ((-37) % 2) (IM.fromList [(1,0 % 1),(2,2 % 1),(3,5 % 2)])
+    expected = Optimum (-37/2) (IM.fromList [(1,0),(2,2),(3,5/2)])
     (optdir, obj, cs, ivs) = example2
 
 -- ---------------------------------------------------------------------------
