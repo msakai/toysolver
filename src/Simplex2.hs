@@ -46,6 +46,7 @@ module Simplex2
   , assertLower
   , assertUpper
   , setObj
+  , getObj
   , OptDir (..)
   , setOptDir
   , getOptDir
@@ -336,6 +337,9 @@ assertUpper solver x u = do
 -- FIXME: 式に定数項が含まれる可能性を考えるとこれじゃまずい?
 setObj :: SolverValue v => GenericSolver v -> LA.Expr Rational -> IO ()
 setObj solver e = setRow solver objVar e
+
+getObj :: SolverValue v => GenericSolver v -> IO (LA.Expr Rational)
+getObj solver = getRow solver objVar
 
 setRow :: SolverValue v => GenericSolver v -> Var -> LA.Expr Rational -> IO ()
 setRow solver v e = do
