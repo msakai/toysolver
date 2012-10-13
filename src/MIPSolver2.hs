@@ -71,10 +71,9 @@ import System.CPUTime
 import Text.Printf
 
 import qualified Data.LA as LA
-import Data.ArithRel ((.<=.), (.>=.), (.==.))
+import Data.ArithRel ((.<=.), (.>=.))
 import qualified Simplex2
 import Simplex2 (OptResult (..), Var, Model)
-import qualified OmegaTest
 import Data.Linear
 import Util (isInteger, fracPart)
 
@@ -150,41 +149,41 @@ optimize solver update = do
           then return Unbounded
           else do
             {-
-              Fallback to Fourier-Motzkin + OmegaTest
               * In general, original problem may have optimal
                 solution even though LP relaxiation is unbounded.
               * But if restricted to rational numbers, the
                 original problem is unbounded or unsatisfiable
                 when LP relaxation is unbounded.
             -}
-            log solver "MIP: falling back to Fourier-Motzkin + OmegaTest"
-            t <- Simplex2.getTableau lp
-            let ds = [LA.var v .==. def | (v, def) <- IM.toList t]
-            n <- Simplex2.nVars lp
-            bs <- liftM concat $ forM [0..n-1] $ \v -> do
-              lb <- Simplex2.getLB lp v
-              ub <- Simplex2.getUB lp v
-              return $ [LA.var v .>=. LA.constant (fromJust lb) | isJust lb] ++
-                       [LA.var v .<=. LA.constant (fromJust ub) | isJust ub]
-            case OmegaTest.solveQFLA (bs ++ ds) ivs of
-              Just _ -> return Unbounded
-              Nothing -> return Unsat  
+            origObj <- Simplex2.getObj lp
+            lp2 <- Simplex2.cloneSolver lp
+            Simplex2.clearLogger lp2
+            Simplex2.setObj lp2 (LA.constant 0)
+            branchAndBound solver lp2 $ \m _ -> do
+              update m (LA.evalExpr m origObj)
+            best <- readTVarIO (mipBest solver)
+            case best of
+              Just nd -> do
+                m <- Simplex2.model (ndLP nd)
+                atomically $ writeTVar (mipBest solver) $ Just nd{ ndValue = LA.evalExpr m origObj }
+                return Unbounded
+              Nothing -> return Unsat
       Optimum -> do
         s0 <- showValue solver =<< Simplex2.getObjValue lp
         log solver $ "MIP: LP relaxation optimum is " ++ s0
         log solver "MIP: Integer optimization begins..."
         Simplex2.clearLogger lp
-        branchAndBound solver update
+        branchAndBound solver lp update
         m <- readTVarIO (mipBest solver)
         case m of
           Nothing -> return Unsat
           Just _ -> return Optimum
 
-branchAndBound :: Solver -> (Model -> Rational -> IO ()) -> IO ()
-branchAndBound solver update = do
-  dir <- Simplex2.getOptDir (mipRootLP solver)
-  rootVal <- Simplex2.getObjValue (mipRootLP solver)
-  let root = Node{ ndLP = mipRootLP solver, ndDepth = 0, ndValue = rootVal }
+branchAndBound :: Solver -> Simplex2.Solver -> (Model -> Rational -> IO ()) -> IO ()
+branchAndBound solver rootLP update = do
+  dir <- Simplex2.getOptDir rootLP
+  rootVal <- Simplex2.getObjValue rootLP
+  let root = Node{ ndLP = rootLP, ndDepth = 0, ndValue = rootVal }
 
   pool <- newTVarIO (Seq.singleton root)
   activeThreads <- newTVarIO (Map.empty)

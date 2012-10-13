@@ -215,6 +215,9 @@ run solver opt lp printModel = do
           exitFailure
         Simplex2.Unbounded -> do
           putStrLn "s UNBOUNDED"
+          m <- MIPSolver2.model mip
+          let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+          printModel m2
           exitFailure
         Simplex2.Optimum -> do
           m <- MIPSolver2.model mip
