@@ -48,7 +48,7 @@ import qualified Data.LA as LA
 import qualified Data.Interval as Interval
 import Util (combineMaybe)
 import qualified FourierMotzkin as FM
-import FourierMotzkin (Lit (..), Rat (..))
+import FourierMotzkin (Lit (..), Rat)
 
 -- ---------------------------------------------------------------------------
 
@@ -154,9 +154,9 @@ boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $
        ]
 
 isExact :: BoundsZ -> Bool
-isExact (ls,us) = and [a==1 || b==1 | (c,a)<-ls , (d,b)<-us]
+isExact (ls,us) = and [a==1 || b==1 | (_,a)<-ls , (_,b)<-us]
 
-eliminateQuantifiers :: Formula Rational -> Maybe (DNF Lit)
+eliminateQuantifiers :: Formula (Atom Rational) -> Maybe (DNF Lit)
 eliminateQuantifiers = f
   where
     f T = return true
@@ -174,7 +174,7 @@ eliminateQuantifiers = f
       dnf <- f a
       return $ orB [eliminate v xs | xs <- unDNF dnf]
 
-solve :: Formula Rational -> SatResult Integer
+solve :: Formula (Atom Rational) -> SatResult Integer
 solve formula =
   case eliminateQuantifiers formula of
     Nothing -> Unknown
@@ -186,7 +186,7 @@ solve formula =
     vs = IS.toList (vars formula)
 
 solve' :: [Var] -> [Lit] -> Maybe (Model Integer)
-solve' vs xs = simplify xs >>= go vs
+solve' vs2 xs = simplify xs >>= go vs2
   where
     go :: [Var] -> [Lit] -> Maybe (Model Integer)
     go [] [] = return IM.empty
@@ -233,8 +233,7 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
 solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
   where
-    vs  = vars cs
-    rvs = vs `IS.difference` ivs
+    rvs = vars cs `IS.difference` ivs
     dnf = FM.constraintsToDNF cs
 
     go :: [Var] -> [Lit] -> Maybe (Model Rational)
@@ -268,7 +267,7 @@ pickup (x:xs) = (x,xs) : [(y,x:ys) | (y,ys) <- pickup xs]
 satisfiable in R
 but unsatisfiable in Z
 -}
-test1 :: Formula Rational
+test1 :: Formula (Atom Rational)
 test1 = c1 .&&. c2 .&&. c3 .&&. c4
   where
     x = Var 0
@@ -297,7 +296,7 @@ test1' = [c1, c2] ++ c3 ++ c4
 satisfiable in R
 but unsatisfiable in Z
 -}
-test2 :: Formula Rational
+test2 :: Formula (Atom Rational)
 test2 = c1 .&&. c2
   where
     x = Var 0

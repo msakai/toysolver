@@ -238,24 +238,24 @@ lpfile = do
     ]
 
   bnds <- option Map.empty (try boundsSection)
-  xs <- many (liftM Left generalSection <|> liftM Right binarySection)
-  let ints = Set.fromList $ concat [x | Left  x <- xs]
-      bins = Set.fromList $ concat [x | Right x <- xs]
-  bnds <- return $ Map.unionWith intersectBounds
+  exvs <- many (liftM Left generalSection <|> liftM Right binarySection)
+  let ints = Set.fromList $ concat [x | Left  x <- exvs]
+      bins = Set.fromList $ concat [x | Right x <- exvs]
+  bnds2 <- return $ Map.unionWith intersectBounds
             bnds (Map.fromAscList [(v, (Finite 0, Finite 1)) | v <- Set.toAscList bins])
   scs <- liftM Set.fromList $ option [] (try semiSection)
 
   ss <- option [] (try sosSection)
   end
   let vs = Set.unions $ map vars cs ++
-           [ Map.keysSet bnds
+           [ Map.keysSet bnds2
            , ints
            , bins
            , scs
            , vars (snd obj)
            ] ++
            [Set.fromList (map fst xs) | (_,_,xs) <- ss]
-  return $ LP vs flag obj cs bnds ints bins scs ss
+  return $ LP vs flag obj cs bnds2 ints bins scs ss
 
 problem :: Parser (OptDir, ObjectiveFunction)
 problem = do
@@ -440,10 +440,10 @@ term :: Bool -> Parser Expr
 term flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
-  e <- liftM (\s -> [Term 1 [s]]) ident <|> qexpr
+  e <- liftM (\s' -> [Term 1 [s']]) ident <|> qexpr
   return $ case combineMaybe (*) s c of
     Nothing -> e
-    Just d -> [Term (d*c) vs | Term c vs <- e]
+    Just d -> [Term (d*c') vs | Term c' vs <- e]
 
 qexpr :: Parser Expr
 qexpr = do
@@ -513,10 +513,11 @@ render' lp = do
       OptMax -> "MAXIMIZE"
   tell $ showChar '\n'
 
-  let (l, obj) = objectiveFunction lp
-  renderLabel l
-  renderExpr True obj
-  tell $ showChar '\n'
+  do
+    let (l, obj) = objectiveFunction lp
+    renderLabel l
+    renderExpr True obj
+    tell $ showChar '\n'
 
   tell $ showString "SUBJECT TO\n"
   forM_ (constraints lp) $ \c -> do
@@ -539,7 +540,7 @@ render' lp = do
       tell $ showChar '\n'
 
   tell $ showString "BOUNDS\n"
-  forM_ (Map.toAscList (bounds lp)) $ \(v, b@(lb,ub)) -> do
+  forM_ (Map.toAscList (bounds lp)) $ \(v, (lb,ub)) -> do
     renderBoundExpr lb
     tell $ showString " <= "
     tell $ showString v
@@ -635,9 +636,9 @@ renderConstraint c@Constraint{ constrBody = (e,op,val) }  = do
   renderLabel (constrLabel c)
   case constrIndicator c of
     Nothing -> return ()
-    Just (v,val) -> do
+    Just (v,vval) -> do
       tell $ showString v . showString " = "
-      tell $ showValue val
+      tell $ showValue vval
       tell $ showString " -> "
 
   renderExpr False e
@@ -655,7 +656,7 @@ renderVariableList :: [Var] -> WriterT ShowS Maybe ()
 renderVariableList vs = fill 80 vs >> tell (showChar '\n')
 
 fill :: Int -> [String] -> WriterT ShowS Maybe ()
-fill width xs = go xs 0
+fill width str = go str 0
   where
     go [] _ = return ()
     go (x:xs) 0 = tell (showString x) >> go xs (length x)
@@ -666,6 +667,7 @@ fill width xs = go xs 0
 
 -- ---------------------------------------------------------------------------
 
+{-
 compileExpr :: Expr -> Maybe (Map.Map Var Rational)
 compileExpr e = do
   xs <- forM e $ \(Term c vs) ->
@@ -673,5 +675,6 @@ compileExpr e = do
       [v] -> return (v, c)
       _ -> mzero
   return (Map.fromList xs)
+-}
 
 -- ---------------------------------------------------------------------------

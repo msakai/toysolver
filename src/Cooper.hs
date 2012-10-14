@@ -149,7 +149,7 @@ simplify (Or' a b) =
 simplify (Lit lit) = simplifyLit lit
 
 simplifyLit :: Lit -> Formula'
-simplifyLit lit@(Pos e) =
+simplifyLit (Pos e) =
   case LA.asConst e of
     Just c -> if c > 0 then true else false
     Nothing ->
@@ -166,7 +166,7 @@ simplifyLit lit@(Divisible b c e)
   | d  == 1   = Lit lit
   | otherwise = Lit $ Divisible b c' e'
   where
-    d  = abs $ foldl' gcd c [c | (c,x) <- LA.terms e, x /= LA.unitVar]
+    d  = abs $ foldl' gcd c [c2 | (c2,x) <- LA.terms e, x /= LA.unitVar]
     c' = c `div` d
     e' = LA.mapCoeff (`div` d) e
 
@@ -244,7 +244,7 @@ eliminateZ' x formula = case1 ++ case2
           case LA.extractMaybe x e of
             Nothing -> []
             Just (1, e')  -> [lnegate e'] -- Pos e <=> (x + e' > 0) <=> (-e' < x)
-            Just (-1, e') -> [] -- Pos e <=> (-x + e' > 0) <=> (x < e')
+            Just (-1, _) -> [] -- Pos e <=> (-x + e' > 0) <=> (x < e')
             _ -> error "should not happen"
 
     -- formula1を真にする最小のxが存在する場合
@@ -281,7 +281,7 @@ eliminateZ' x formula = case1 ++ case2
         f (Lit (Pos e)) =
           case LA.extractMaybe x e of
             Nothing -> []
-            Just (1, e')  -> []   -- Pos e <=> ( x + e' > 0) <=> -e' < x
+            Just (1, _)   -> []   -- Pos e <=> ( x + e' > 0) <=> -e' < x
             Just (-1, e') -> [e'] -- Pos e <=> (-x + e' > 0) <=>  x  < e'
             _ -> error "should not happen"
         f (Lit (Divisible _ _ _)) = []
@@ -302,7 +302,7 @@ evalWitness model (WCase2 c j delta us)
 -- ---------------------------------------------------------------------------
 
 -- | eliminate quantifiers and returns equivalent quantifier-free formula.
-eliminateQuantifiers :: Formula Rational -> Maybe Formula'
+eliminateQuantifiers :: Formula (Atom Rational) -> Maybe Formula'
 eliminateQuantifiers = f
   where
     f T = return T'
@@ -320,7 +320,7 @@ eliminateQuantifiers = f
 
 -- | solve a formula and returns assignment of outer-most existential quantified
 -- variables.
-solve :: Formula Rational -> SatResult Integer
+solve :: Formula (Atom Rational) -> SatResult Integer
 solve formula =
   case eliminateQuantifiers formula of
     Nothing -> Unknown
@@ -332,7 +332,7 @@ solve formula =
     vs = IS.toList (vars formula)
 
 solve' :: [Var] -> Formula' -> Maybe (Model Integer)
-solve' vs formula = go vs (simplify formula)
+solve' vs2 formula2 = go vs2 (simplify formula2)
   where
     go [] T' = return IM.empty
     go [] _ = mzero
@@ -349,23 +349,22 @@ solve' vs formula = go vs (simplify formula)
 solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
 solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
   where
-    vs  = vars cs
-    rvs = vs `IS.difference` ivs
+    rvs = vars cs `IS.difference` ivs
     dnf = FM.constraintsToDNF cs
 
     go :: [Var] -> [FM.Lit] -> Maybe (Model Rational)
     go [] xs = fmap (fmap fromIntegral) $ solve' (IS.toList ivs) (foldr And' T' (map f xs))
-    go (v:vs) ys = msum (map f (unDNF (FM.boundConditions bnd)))
+    go (v:vs) ys = msum $ map g $ unDNF $ FM.boundConditions bnd
       where
         (bnd, rest) = FM.collectBounds v ys
-        f zs = do
+        g zs = do
           model <- go vs (zs ++ rest)
           val <- Interval.pickup (FM.evalBounds model bnd)
           return $ IM.insert v val model
 
     f :: FM.Lit -> Formula'
-    f (FM.Nonneg e) = Lit $ e `geZ` (LA.constant 0)
-    f (FM.Pos e)    = Lit $ e `gtZ` (LA.constant 0)
+    f (FM.Nonneg e) = Lit $ e `geZ` LA.constant 0
+    f (FM.Pos e)    = Lit $ e `gtZ` LA.constant 0
 
 -- ---------------------------------------------------------------------------
 
@@ -378,7 +377,7 @@ solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dn
 satisfiable in R
 but unsatisfiable in Z
 -}
-test1 :: Formula Rational
+test1 :: Formula (Atom Rational)
 test1 = c1 .&&. c2 .&&. c3 .&&. c4
   where
     x = Var 0
@@ -389,7 +388,7 @@ test1 = c1 .&&. c2 .&&. c3 .&&. c4
     c3 = 1 .<=. x .&&. x .<=. 40
     c4 = (-50) .<=. y .&&. y .<=. 50
 
-test1' :: Formula Rational
+test1' :: Formula (Atom Rational)
 test1' = Exists 0 $ Exists 1 $ Exists 2 $ test1
 
 {-
@@ -399,7 +398,7 @@ test1' = Exists 0 $ Exists 1 $ Exists 2 $ test1
 satisfiable in R
 but unsatisfiable in Z
 -}
-test2 :: Formula Rational
+test2 :: Formula (Atom Rational)
 test2 = c1 .&&. c2
   where
     x = Var 0
@@ -409,7 +408,7 @@ test2 = c1 .&&. c2
     c1 = 27 .<=. t1 .&&. t1 .<=. 45
     c2 = (-10) .<=. t2 .&&. t2 .<=. 4
 
-test2' :: Formula Rational
+test2' :: Formula (Atom Rational)
 test2' = Exists 0 $ Exists 1 $ test2
 
 testHagiya :: Formula'

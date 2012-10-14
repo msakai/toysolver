@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Formula
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses)
+-- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances)
 --
 -- Formula of first order logic.
 -- 
@@ -40,23 +40,23 @@ type Atom c = Rel (Expr c)
 -- ---------------------------------------------------------------------------
 
 -- | formulas of first order logic
-data Formula c
+data Formula a
     = T
     | F
-    | Atom (Atom c)
-    | And (Formula c) (Formula c)
-    | Or (Formula c) (Formula c)
-    | Not (Formula c)
-    | Imply (Formula c) (Formula c)
-    | Equiv (Formula c) (Formula c)
-    | Forall Var (Formula c)
-    | Exists Var (Formula c)
+    | Atom a
+    | And (Formula a) (Formula a)
+    | Or (Formula a) (Formula a)
+    | Not (Formula a)
+    | Imply (Formula a) (Formula a)
+    | Equiv (Formula a) (Formula a)
+    | Forall Var (Formula a)
+    | Exists Var (Formula a)
     deriving (Show, Eq, Ord)
 
-instance Variables (Formula c) where
+instance Variables a => Variables (Formula a) where
   vars T = IS.empty
   vars F = IS.empty
-  vars (Atom atom) = vars atom
+  vars (Atom a) = vars a
   vars (And a b) = vars a `IS.union` vars b
   vars (Or a b) = vars a `IS.union` vars b
   vars (Not a) = vars a
@@ -65,7 +65,7 @@ instance Variables (Formula c) where
   vars (Forall v a) = IS.delete v (vars a)
   vars (Exists v a) = IS.delete v (vars a)
 
-instance Complement (Formula c) where
+instance Complement (Formula a) where
   notB = Not
 
 instance Lattice (Formula c) where
@@ -78,14 +78,14 @@ instance Boolean (Formula c) where
   (.=>.)  = Imply
   (.<=>.) = Equiv
 
-instance IsRel (Expr c) (Formula c) where
+instance IsRel (Expr c) (Formula (Atom c)) where
   rel op a b = Atom $ rel op a b
 
 -- | convert a formula into negation normal form
-pushNot :: Formula c -> Formula c
+pushNot :: Complement a => Formula a -> Formula a
 pushNot T = F
 pushNot F = T
-pushNot (Atom (Rel a op b)) = Atom $ Rel a (negOp op) b
+pushNot (Atom a) = Atom $ notB a
 pushNot (And a b) = Or (pushNot a) (pushNot b)
 pushNot (Or a b) = And (pushNot a) (pushNot b)
 pushNot (Not a) = a

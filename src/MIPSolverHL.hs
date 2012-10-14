@@ -235,6 +235,7 @@ traverse optdir obj ivs node0 = loop [node0] Nothing
 
 -- ---------------------------------------------------------------------------
 
+example1 :: (Fractional r, Eq r) => (OptDir, LA.Expr r, [LA.Atom r], VarSet)
 example1 = (optdir, obj, cs, ivs)
   where
     optdir = OptMax
@@ -275,6 +276,7 @@ test1' = result==expected
     expected = Optimum (-245/2) (IM.fromList [(1,40),(2,21/2),(3,39/2),(4,3)])
 
 -- 『数理計画法の基礎』(坂和 正敏) p.109 例 3.8
+example2 :: (Fractional r, Eq r) => (OptDir, LA.Expr r, [LA.Atom r], VarSet)
 example2 = (optdir, obj, cs, ivs)
   where
     optdir = OptMin

@@ -88,8 +88,8 @@ getDefs = do
 
 addConstraint :: Real r => LA.Atom r -> LP r ()
 addConstraint c = do
-  c <- expandDefs' c
-  let (e, rop, b) = normalizeConstraint c
+  c2 <- expandDefs' c
+  let (e, rop, b) = normalizeConstraint c2
   tbl <- getTableau
   case rop of
     -- x≥b で b≤0 なら追加しない。ad hoc なので一般化したい。
@@ -120,7 +120,6 @@ addConstraint2 c = do
   let
     (b', e) = LA.extract LA.unitVar (lhs .-. rhs)
     b = - b'
-  tbl <- getTableau
   case rop of
     Le -> f e b
     Ge -> f (lnegate e) (negate b)

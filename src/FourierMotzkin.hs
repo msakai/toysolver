@@ -170,7 +170,7 @@ boundConditions  (ls1, ls2, us1, us2) = DNF $ maybeToList $ simplify $
   [ x `ltR` y | x <- ls2, y <- us1 ] ++
   [ x `ltR` y | x <- ls2, y <- us2 ]
 
-eliminateQuantifiers :: Formula Rational -> Maybe (DNF Lit)
+eliminateQuantifiers :: Formula (Atom Rational) -> Maybe (DNF Lit)
 eliminateQuantifiers = f
   where
     f T = return true
@@ -188,7 +188,7 @@ eliminateQuantifiers = f
       dnf <- f a
       return $ orB [eliminate v xs | xs <- unDNF dnf]
 
-solve :: Formula Rational -> SatResult Rational
+solve :: Formula (Atom Rational) -> SatResult Rational
 solve formula =
   case eliminateQuantifiers formula of
     Nothing -> Unknown
@@ -200,7 +200,7 @@ solve formula =
     vs = IS.toList (vars formula)
 
 solve' :: [Var] -> [Lit] -> Maybe (Model Rational)
-solve' vs xs = simplify xs >>= go vs
+solve' vs2 xs = simplify xs >>= go vs2
   where
     go [] [] = return IM.empty
     go [] _ = mzero
@@ -226,22 +226,22 @@ constraintsToDNF :: [LA.Atom Rational] -> DNF Lit
 constraintsToDNF = andB . map constraintToDNF
 
 constraintToDNF :: LA.Atom Rational -> DNF Lit
-constraintToDNF (Rel a op b) = DNF $
+constraintToDNF (Rel lhs op rhs) = DNF $
   case op of
-    Eql -> [[Nonneg c, Nonneg (lnegate c)]]
-    NEq -> [[Pos c], [Pos (lnegate c)]]
-    Ge  -> [[Nonneg c]]
-    Le  -> [[Nonneg (lnegate c)]]
-    Gt  -> [[Pos c]]
-    Lt  -> [[Pos (lnegate c)]]
+    Eql -> [[Nonneg lhs', Nonneg (lnegate lhs')]]
+    NEq -> [[Pos lhs'], [Pos (lnegate lhs')]]
+    Ge  -> [[Nonneg lhs']]
+    Le  -> [[Nonneg (lnegate lhs')]]
+    Gt  -> [[Pos lhs']]
+    Lt  -> [[Pos (lnegate lhs')]]
   where
-    c = normalize (a .-. b)
+    lhs' = normalize (rhs .-. lhs)
 
     normalize :: LA.Expr Rational -> ExprZ
     normalize e = LA.mapCoeff (round . (*c)) e
       where
         c = fromIntegral $ foldl' lcm 1 ds
-        ds = [denominator c | (c,v) <- LA.terms e]
+        ds = [denominator c | (c,_) <- LA.terms e]
 
 -- ---------------------------------------------------------------------------
 
@@ -260,7 +260,7 @@ gcd' xs = foldl1' gcd xs
 satisfiable in R
 but unsatisfiable in Z
 -}
-test1 :: Formula Rational
+test1 :: Formula (Atom Rational)
 test1 = c1 .&&. c2 .&&. c3 .&&. c4
   where
     x = Var 0
@@ -289,7 +289,7 @@ test1' = [c1, c2] ++ c3 ++ c4
 satisfiable in R
 but unsatisfiable in Z
 -}
-test2 :: Formula Rational
+test2 :: Formula (Atom Rational)
 test2 = c1 .&&. c2
   where
     x = Var 0

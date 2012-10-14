@@ -141,7 +141,8 @@ optimize solver update = do
     log solver "MIP: Optimizing LP relaxation"
     ret2 <- Simplex2.optimize lp Simplex2.defaultOptions
     case ret2 of
-      Unsat -> error "should not happen"
+      Unsat    -> error "should not happen"
+      ObjLimit -> error "should not happen"
       Unbounded -> do
         log solver "MIP: LP relaxation is unbounded"
         let ivs = mipIVs solver
@@ -169,8 +170,8 @@ optimize solver update = do
                 return Unbounded
               Nothing -> return Unsat
       Optimum -> do
-        s0 <- showValue solver =<< Simplex2.getObjValue lp
-        log solver $ "MIP: LP relaxation optimum is " ++ s0
+        s1 <- showValue solver =<< Simplex2.getObjValue lp
+        log solver $ "MIP: LP relaxation optimum is " ++ s1
         log solver "MIP: Integer optimization begins..."
         Simplex2.clearLogger lp
         branchAndBound solver lp update
@@ -250,7 +251,7 @@ branchAndBound solver rootLP update = do
                   case r of
                     Nothing -> do -- branch
                       let (v0,val0) = fst $ maximumBy (comparing snd)
-                                      [((v,val), abs (fromInteger (round val) - val)) | (v,val) <- xs]
+                                      [((v,vval), abs (fromInteger (round vval) - vval)) | (v,vval) <- xs]
                       let lp1 = lp
                       lp2 <- Simplex2.cloneSolver lp
                       Simplex2.assertAtom lp1 (LA.var v0 .<=. LA.constant (fromInteger (floor val0)))

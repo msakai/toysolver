@@ -1072,23 +1072,23 @@ pickBranchLit !solver = do
         m <- PQ.dequeue vqueue
         case m of
           Nothing -> return litUndef
-          Just var -> do
-            val <- varValue solver var
-            if val /= lUndef
+          Just var2 -> do
+            val2 <- varValue solver var2
+            if val2 /= lUndef
               then loop
-              else return var
-  var <-
+              else return var2
+  var2 <-
     if var==litUndef
     then loop
     else return var
 
-  if var==litUndef
+  if var2==litUndef
     then return litUndef
     else do
-      vd <- varData solver var
+      vd <- varData solver var2
       -- TODO: random polarity
       p <- readIORef (vdPolarity vd)
-      return $! literal var p
+      return $! literal var2 p
 
 decide :: Solver -> Lit -> IO ()
 decide solver !lit = do
