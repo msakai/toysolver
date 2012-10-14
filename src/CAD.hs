@@ -242,19 +242,21 @@ collectPolynomials2
   -> Set.Set (P v)
   -> M v (Set.Set (P v))
 collectPolynomials2 v ps = do
-  ps <- go ps
+  ps <- go (f ps)
   trace ("collect finished: " ++ show (map render (Set.toList ps))) $ return ()
   return ps
   where
+    f = Set.filter (\p -> deg (asPolynomialOf p v) > 0) 
+
     go ps = do
       trace ("collect: " ++ show (map render (Set.toList ps))) $ return ()
       let rs1 = [deriv p v | p <- Set.toList ps]
       rs2 <- liftM (map (\(r, pd, qe) -> r) . catMaybes) $ 
-        forM [(p1,p2) | p1 <- Set.toList ps, p2 <- Set.toList ps, deg p1 > 0, deg p2 > 0] $ \(p1,p2) -> do
+        forM [(p1,p2) | p1 <- Set.toList ps, p2 <- Set.toList ps] $ \(p1,p2) -> do
           ret <- zmod v p1 p2
           trace (show (render p1, render p2, ret)) $ return ()
           return ret
-      let ps' = Set.unions [ps, Set.fromList rs1, Set.fromList rs2]
+      let ps' = f $ Set.unions [ps, Set.fromList rs1, Set.fromList rs2]
       if ps == ps'
         then return ps
         else go ps'
@@ -397,9 +399,9 @@ refineSignConf2 v p conf = do
     signAt (RootOf q) m = do
       Just (r,_pd,qe) <- zmod v p q
       tbl <- get
-      let s1 = if deg r > 0
-               then trace "bar" $ m Map.! r
-               else signOfConst $ coeff mmOne r
+      s1 <- if deg (asPolynomialOf r v) > 0
+            then return $ m Map.! r
+            else signCoeff r
       s2 <- signCoeff qe
       return $ signDiv s1 s2
 
