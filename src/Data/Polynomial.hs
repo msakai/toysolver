@@ -82,7 +82,10 @@ module Data.Polynomial
   , mmVar
   , mmOne
   , mmFromList
+  , mmFromMap
+  , mmFromIntMap
   , mmToList
+  , mmToMap
   , mmToIntMap
   , mmDegree
   , mmProd
@@ -410,7 +413,7 @@ monomialIntegral (c,xs) x =
 -- 本当は変数の型に応じて type family で表現を変えたい
 
 -- | Monic monomials
-newtype MonicMonomial v = MonicMonomial (Map.Map v Integer)
+newtype MonicMonomial v = MonicMonomial{ mmToMap :: Map.Map v Integer }
   deriving (Eq, Ord)
 
 instance (Ord v, Show v) => Show (MonicMonomial v) where
@@ -430,6 +433,14 @@ mmFromList :: Ord v => [(v, Integer)] -> MonicMonomial v
 mmFromList xs
   | any (\(x,e) -> 0>e) xs = error "mmFromList: negative exponent"
   | otherwise = MonicMonomial $ Map.fromListWith (+) [(x,e) | (x,e) <- xs, e > 0]
+
+mmFromMap :: Ord v => Map.Map v Integer -> MonicMonomial v
+mmFromMap m
+  | any (\(x,e) -> 0>e) (Map.toList m) = error "mmFromFromMap: negative exponent"
+  | otherwise = MonicMonomial $ Map.filter (>0) m
+
+mmFromIntMap :: IM.IntMap Integer -> MonicMonomial Int
+mmFromIntMap = mmFromMap . Map.fromDistinctAscList . IM.toAscList
 
 mmToList :: Ord v => MonicMonomial v -> [(v, Integer)]
 mmToList (MonicMonomial m) = Map.toAscList m
