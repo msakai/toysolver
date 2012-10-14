@@ -14,6 +14,7 @@ Extra-Source-Files:
    COPYING
    .travis.yml
    src/TseitinEncode.hs
+   src/CAD.hs
    src/CongruenceClosure.hs
    src/ContiTraverso.hs
    src/Data/Polynomial.hs
