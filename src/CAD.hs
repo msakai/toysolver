@@ -254,7 +254,11 @@ collectPolynomials2 v ps = do
       rs2 <- liftM (map (\(r, pd, qe) -> r) . catMaybes) $ 
         forM [(p1,p2) | p1 <- Set.toList ps, p2 <- Set.toList ps] $ \(p1,p2) -> do
           ret <- zmod v p1 p2
-          trace (show (render p1, render p2, ret)) $ return ()
+          case ret of
+            Nothing -> return ()
+            Just (result, pd, qe) ->
+              when (result /= 0 && deg (asPolynomialOf result v) > 0 && result `Set.notMember` ps) $ 
+                trace ("zmod " ++ show (render p1, render p2) ++ " = " ++ show (render result, render pd, render qe)) $ return ()
           return ret
       let ps' = f $ Set.unions [ps, Set.fromList rs1, Set.fromList rs2]
       if ps == ps'
@@ -325,7 +329,7 @@ zmod v p q = do
       q' = asPolynomialOf q v
   (pd, d) <- getHighestNonzeroTerm p'
   (qe, e) <- getHighestNonzeroTerm q'
-  if d < e || qe == 0
+  if not (d >= e) || 0 >= e
     then return Nothing
     else do
       let p'' = sum [pi * (var v ^ mmDegree mm) | (pi, mm) <- terms p', mmDegree mm <= d]
