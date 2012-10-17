@@ -327,6 +327,12 @@ instance RenderCoeff Rational where
       ratioPrec1 = ratioPrec + 1
   isNegativeCoeff = (0>)
 
+instance (Num c, Ord c, RenderCoeff c, Ord v, RenderVar v) => RenderCoeff (Polynomial c v) where
+  renderCoeff _prec c = showChar '(' . showString (render c) . showChar ')'
+  isNegativeCoeff p = isNegativeCoeff c
+    where
+      (c,_) = leadingTerm grlex p
+
 class RenderVar v where
   renderVar :: Int -> v -> ShowS
 
