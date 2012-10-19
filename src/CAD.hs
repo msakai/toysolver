@@ -45,12 +45,12 @@ import Debug.Trace
 
 -- ---------------------------------------------------------------------------
 
-data EndPoint c = NegInf | RootOf (UPolynomial c) | PosInf
+data Point c = NegInf | RootOf (UPolynomial c) | PosInf
   deriving (Eq, Ord, Show)
 
 data Cell c
-  = Point (EndPoint c)
-  | Interval -- open interval between two consective points
+  = Point (Point c)
+  | Interval (Point c) (Point c)
   deriving (Eq, Ord, Show)
 
 -- ---------------------------------------------------------------------------
@@ -93,31 +93,30 @@ signOfConst r =
 type SignConf c = [(Cell c, Map.Map (UPolynomial c) Sign)]
 
 emptySignConf :: SignConf c
-emptySignConf = [(Point NegInf, Map.empty), (Interval, Map.empty), (Point PosInf, Map.empty)]
+emptySignConf =
+  [ (Point NegInf, Map.empty)
+  , (Interval NegInf PosInf, Map.empty)
+  , (Point PosInf, Map.empty)
+  ]
 
 showSignConf :: forall c. (Num c, Ord c, RenderCoeff c) => SignConf c -> [String]
 showSignConf = f
   where
     f :: SignConf c -> [String]
-    f [] = []
-    f [(Point pt, m)] = showPt pt : g m
-    f ((Point lb, m1) : (Interval, m2) : xs@((Point ub, _) : _)) =
-      showPt lb : g m1 ++
-      showInterval lb ub : g m2 ++
-      f xs
-    f _ = error "showSignConf: should not happen"
+    f = concatMap $ \(cell, m) -> showCell cell : g m
 
     g :: Map.Map (UPolynomial c) Sign -> [String]
     g m =
       [printf "  %s: %s" (render p) (showSign s) | (p, s) <- Map.toList m]
 
-    showPt :: EndPoint c -> String
-    showPt NegInf = "-inf" 
-    showPt PosInf = "+inf"
-    showPt (RootOf p) = "rootOf(" ++ render p ++ ")"
+    showCell :: Cell c -> String
+    showCell (Point pt) = showPoint pt
+    showCell (Interval lb ub) = printf "(%s, %s)" (showPoint lb) (showPoint ub)
 
-    showInterval :: EndPoint c -> EndPoint c -> String
-    showInterval lb ub = printf "(%s, %s)" (showPt lb) (showPt ub)
+    showPoint :: Point c -> String
+    showPoint NegInf = "-inf" 
+    showPoint PosInf = "+inf"
+    showPoint (RootOf p) = "rootOf(" ++ render p ++ ")"
 
     showSign :: Sign -> String
     showSign Pos  = "+"
@@ -230,20 +229,21 @@ refineSignConfU p conf = extendIntervals $ map extendPoint conf
     extendPoint x = x
  
     extendIntervals :: [(Cell Rational, Map.Map (UPolynomial Rational) Sign)] -> [(Cell Rational, Map.Map (UPolynomial Rational) Sign)]
-    extendIntervals (pt1@(Point _, m1) : (Interval, m) : pt2@(Point _, m2) : xs) =
+    extendIntervals (pt1@(Point _, m1) : ((Interval lb ub), m) : pt2@(Point _, m2) : xs) =
       pt1 : ys ++ extendIntervals (pt2 : xs)
       where
         s1 = m1 Map.! p
         s2 = m2 Map.! p
+        root = RootOf p
         ys = if s1 == s2
-             then [ (Interval, Map.insert p s1 m) ]
-             else [ (Interval, Map.insert p s1 m)
-                  , (Point (RootOf p), Map.insert p Zero m)
-                  , (Interval, Map.insert p s2 m)
+             then [ (Interval lb ub, Map.insert p s1 m) ]
+             else [ (Interval lb root, Map.insert p s1   m)
+                  , (Point root,       Map.insert p Zero m)
+                  , (Interval root ub, Map.insert p s2   m)
                   ]
     extendIntervals xs = xs
  
-    signAt :: EndPoint Rational -> Map.Map (UPolynomial Rational) Sign -> Sign
+    signAt :: Point Rational -> Map.Map (UPolynomial Rational) Sign -> Sign
     signAt PosInf _ = signCoeff c
       where
         (c,_) = leadingTerm grlex p
@@ -395,20 +395,21 @@ refineSignConf p conf = liftM extendIntervals $ mapM extendPoint conf
     extendPoint x = return x
  
     extendIntervals :: [(Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)] -> [(Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)]
-    extendIntervals (pt1@(Point _, m1) : (Interval, m) : pt2@(Point _, m2) : xs) =
+    extendIntervals (pt1@(Point _, m1) : (Interval lb ub, m) : pt2@(Point _, m2) : xs) =
       pt1 : ys ++ extendIntervals (pt2 : xs)
       where
         s1 = m1 Map.! p
         s2 = m2 Map.! p
+        root = RootOf p
         ys = if s1 == s2
-             then [ (Interval, Map.insert p s1 m) ]
-             else [ (Interval, Map.insert p s1 m)
-                  , (Point (RootOf p), Map.insert p Zero m)
-                  , (Interval, Map.insert p s2 m)
+             then [ (Interval lb ub, Map.insert p s1 m) ]
+             else [ (Interval lb root, Map.insert p s1   m)
+                  , (Point root,       Map.insert p Zero m)
+                  , (Interval root ub, Map.insert p s2   m)
                   ]
     extendIntervals xs = xs
  
-    signAt :: EndPoint (Coeff v) -> Map.Map (UPolynomial (Coeff v)) Sign -> M v Sign
+    signAt :: Point (Coeff v) -> Map.Map (UPolynomial (Coeff v)) Sign -> M v Sign
     signAt PosInf _ = do
       (c,_) <- getHighestNonzeroTerm p
       signCoeff c
@@ -467,6 +468,9 @@ test_eliminate = eliminate [(p', Zero)]
     p :: Polynomial Rational Int
     p = a*x^(2::Int) + b*x + c
     p' = asPolynomialOf p 3
+
+test_eliminate_print :: IO ()
+test_eliminate_print = putStrLn $ showDNF $ test_eliminate
 
 test_collectPolynomials :: [(Set.Set (UPolynomial (Coeff Int)), Map.Map (Coeff Int) [Sign])]
 test_collectPolynomials = runM $ collectPolynomials (Set.singleton p')
