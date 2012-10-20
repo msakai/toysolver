@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  CAD
@@ -37,7 +37,7 @@ import qualified Data.Set as Set
 import Text.Printf
 
 import Data.ArithRel
--- import Data.AlgebraicNumber hiding (deg)
+import qualified Data.AlgebraicNumber as AReal
 import Data.Formula (DNF (..))
 import Data.Polynomial
 
@@ -45,13 +45,15 @@ import Debug.Trace
 
 -- ---------------------------------------------------------------------------
 
-data Point c = NegInf | RootOf (UPolynomial c) | PosInf
+data Point c = NegInf | RootOf (UPolynomial c) Int | PosInf
   deriving (Eq, Ord, Show)
 
 data Cell c
   = Point (Point c)
   | Interval (Point c) (Point c)
   deriving (Eq, Ord, Show)
+
+type Model v = Map.Map v AReal.AReal
 
 -- ---------------------------------------------------------------------------
 
@@ -116,7 +118,7 @@ showSignConf = f
     showPoint :: Point c -> String
     showPoint NegInf = "-inf" 
     showPoint PosInf = "+inf"
-    showPoint (RootOf p) = "rootOf(" ++ render p ++ ")"
+    showPoint (RootOf p n) = "rootOf(" ++ render p ++ ", " ++ show n ++ ")"
 
     showSign :: Sign -> String
     showSign Pos  = "+"
@@ -185,16 +187,30 @@ asPolynomialOf p v = fromTerms $ do
 
 -- ---------------------------------------------------------------------------
 
--- 解を取り出せるようにしたい
-eliminateU :: [(UPolynomial Rational, Sign)] -> Bool
-eliminateU cs = any ok conf
+solveU :: [(UPolynomial Rational, Sign)] -> Maybe AReal.AReal
+solveU cs = listToMaybe $ do
+  (cell, m) <- buildSignConfU (map fst cs)
+  guard $ and [checkSign m p s | (p,s) <- cs]
+  findSample cell
+
   where
-    conf = buildSignConfU (map fst cs)
-    ok (_, m) = and [checkSign m p s | (p,s) <- cs]
     checkSign m p s =
       if 1 > deg p 
         then signOfConst (coeff mmOne p) == s
         else (m Map.! p) == s
+
+    findSample :: MonadPlus m => Cell Rational -> m AReal.AReal
+    findSample (Point (RootOf p n)) =
+      return $ AReal.realRoots p !! n
+    findSample (Interval NegInf (RootOf p n)) =
+      return $ fromInteger $ AReal.floor'   ((AReal.realRoots p !! n) - 1)
+    findSample (Interval (RootOf p n) PosInf) =
+      return $ fromInteger $ AReal.ceiling' ((AReal.realRoots p !! n) + 1)
+    findSample (Interval (RootOf p1 n1) (RootOf p2 n2)) = assert (pt1 < pt2) $ return $ (pt1 + pt2) / 2
+      where
+        pt1 = AReal.realRoots p1 !! n1
+        pt2 = AReal.realRoots p2 !! n2
+    findSample _ = mzero
 
 buildSignConfU :: [UPolynomial Rational] -> SignConf Rational
 buildSignConfU ps = foldl' (flip refineSignConfU) emptySignConf ts
@@ -222,27 +238,36 @@ collectPolynomialsU ps = go ps1 ps1
        ps' = ps `Set.union` qs'
 
 refineSignConfU :: UPolynomial Rational -> SignConf Rational -> SignConf Rational
-refineSignConfU p conf = extendIntervals $ map extendPoint conf
+refineSignConfU p conf = extendIntervals 0 $ map extendPoint conf
   where 
-    extendPoint :: (Cell Rational, Map.Map (UPolynomial Rational) Sign) -> (Cell Rational, Map.Map (UPolynomial Rational) Sign)
+    extendPoint
+      :: (Cell Rational, Map.Map (UPolynomial Rational) Sign)
+      -> (Cell Rational, Map.Map (UPolynomial Rational) Sign)
     extendPoint (Point pt, m) = (Point pt, Map.insert p (signAt pt m) m)
     extendPoint x = x
  
-    extendIntervals :: [(Cell Rational, Map.Map (UPolynomial Rational) Sign)] -> [(Cell Rational, Map.Map (UPolynomial Rational) Sign)]
-    extendIntervals (pt1@(Point _, m1) : ((Interval lb ub), m) : pt2@(Point _, m2) : xs) =
-      pt1 : ys ++ extendIntervals (pt2 : xs)
+    extendIntervals
+      :: Int
+      -> [(Cell Rational, Map.Map (UPolynomial Rational) Sign)]
+      -> [(Cell Rational, Map.Map (UPolynomial Rational) Sign)]
+    extendIntervals !n (pt1@(Point _, m1) : ((Interval lb ub), m) : pt2@(Point _, m2) : xs) =
+      pt1 : ys ++ extendIntervals n2 (pt2 : xs)
       where
         s1 = m1 Map.! p
         s2 = m2 Map.! p
-        root = RootOf p
-        ys | s1 == s2   = [ (Interval lb ub, Map.insert p s1 m) ]
-           | s1 == Zero = [ (Interval lb ub, Map.insert p s2 m) ]
-           | s2 == Zero = [ (Interval lb ub, Map.insert p s1 m) ]
-           | otherwise  = [ (Interval lb root, Map.insert p s1   m)
-                          , (Point root,       Map.insert p Zero m)
-                          , (Interval root ub, Map.insert p s2   m)
-                          ]
-    extendIntervals xs = xs
+        n1 = if s1 == Zero then n+1 else n
+        root = RootOf p n1
+        (ys, n2)
+           | s1 == s2   = ( [ (Interval lb ub, Map.insert p s1 m) ], n1 )
+           | s1 == Zero = ( [ (Interval lb ub, Map.insert p s2 m) ], n1 )
+           | s2 == Zero = ( [ (Interval lb ub, Map.insert p s1 m) ], n1 )
+           | otherwise  = ( [ (Interval lb root, Map.insert p s1   m)
+                            , (Point root,       Map.insert p Zero m)
+                            , (Interval root ub, Map.insert p s2   m)
+                            ]
+                          , n1 + 1
+                          )
+    extendIntervals _ xs = xs
  
     signAt :: Point Rational -> Map.Map (UPolynomial Rational) Sign -> Sign
     signAt PosInf _ = signCoeff c
@@ -254,7 +279,7 @@ refineSignConfU p conf = extendIntervals $ map extendPoint conf
         else signNegate (signCoeff c)
       where
         (c,_) = leadingTerm grlex p
-    signAt (RootOf q) m
+    signAt (RootOf q _) m
       | deg r > 0 = m Map.! r
       | otherwise = signCoeff $ coeff mmOne r
       where
@@ -272,7 +297,21 @@ test1a = mapM_ putStrLn $ showSignConf conf
     conf = buildSignConfU [x + 1, -2*x + 3, x]
 
 test1b :: Bool
-test1b = eliminateU cs == True
+test1b = isJust $ solveU cs
+  where
+    x = var ()
+    cs = [(x + 1, Pos), (-2*x + 3, Pos), (x, Pos)]
+
+test1c :: Bool
+test1c = isJust $ do
+  v <- solveU cs
+  guard $ and $ do
+    (p, s) <- cs
+    let val = eval (\_ -> v) (mapCoeff fromRational p)
+    case s of
+      Pos  -> return $ val > 0
+      Neg  -> return $ val < 0
+      Zero -> return $ val == 0
   where
     x = var ()
     cs = [(x + 1, Pos), (-2*x + 3, Pos), (x, Pos)]
@@ -284,12 +323,12 @@ test2a = mapM_ putStrLn $ showSignConf conf
     conf = buildSignConfU [x^(2::Int)]
 
 test2b :: Bool
-test2b = eliminateU cs == False
+test2b = isNothing $ solveU cs
   where
     x = var ()
     cs = [(x^(2::Int), Neg)]
 
-test = and [test1b, test2b]
+test = and [test1b, test1c, test2b]
 
 -- ---------------------------------------------------------------------------
 
@@ -313,23 +352,65 @@ assume p ss =
       guard $ not $ null ss2
       put $ Map.insert p ss2 m
 
-eliminate :: (Ord v, Show v, RenderVar v) => [(UPolynomial (Coeff v), Sign)] -> DNF (Coeff v, Sign)
-eliminate cs = DNF [guess2cond gs | (conf, gs) <- result, any ok conf]
+project
+  :: forall v. (Ord v, Show v, RenderVar v)
+  => [(UPolynomial (Coeff v), Sign)]
+  -> (DNF (Coeff v, Sign), Model v -> AReal.AReal)
+project cs = (dnf, lifter)
   where
+    dnf :: DNF (Coeff v, Sign)
+    dnf = DNF [guess2cond gs | (_, gs) <- result]
+
+    result :: [(Cell (Coeff v), Map.Map (Coeff v) [Sign])]
     result = runM $ do
       forM_ cs $ \(p,s) -> do
         when (1 > deg p) $ assume (coeff mmOne p) [s]
-      buildSignConf (map fst cs)
-    ok (_, m) = and [checkSign m p s | (p,s) <- cs]
+      conf <- buildSignConf (map fst cs)
+      let satCells = [cell | (cell, m) <- conf, cell /= Point NegInf, cell /= Point PosInf, ok m]
+      case listToMaybe satCells of
+        Nothing -> mzero
+        Just cell -> return cell
+
+    ok :: Map.Map (UPolynomial (Coeff v)) Sign -> Bool
+    ok m = and [checkSign m p s | (p,s) <- cs]
+      where
+        checkSign m p s =
+          if 1 > deg p 
+            then True -- already assumed
+            else m Map.! p == s
+
+    guess2cond :: Map.Map (Coeff v) [Sign] -> [(Coeff v, Sign)]
     guess2cond gs = do
       (p,ss) <- Map.toList gs
       case ss of
         [s] -> return (p,s)
         _ -> error "FIXME" -- FIXME: 後で直す
-    checkSign m p s =
-      if 1 > deg p 
-        then True -- already assumed
-        else m Map.! p == s
+
+    lifter :: Model v -> AReal.AReal
+    lifter model =
+      case vs of
+        []  -> error "project: should not happen"
+        v:_ -> v
+      where
+        vs = do
+          (cell, gs) <- result
+          forM_ (Map.toList gs) $ \(cp,ss) -> do
+            let val = eval (model Map.!) (mapCoeff fromRational cp)
+            guard $ signOfConst val `elem` ss
+          return $ findSample $ evalCell model cell
+
+    findSample :: Cell Rational -> AReal.AReal
+    findSample (Point (RootOf p n)) =
+      AReal.realRoots p !! n
+    findSample (Interval NegInf (RootOf p n)) =
+      fromInteger $ AReal.floor'   ((AReal.realRoots p !! n) - 1)
+    findSample (Interval (RootOf p n) PosInf) =
+      fromInteger $ AReal.ceiling' ((AReal.realRoots p !! n) + 1)
+    findSample (Interval (RootOf p1 n1) (RootOf p2 n2)) = assert (pt1 < pt2) $ (pt1 + pt2) / 2
+      where
+        pt1 = AReal.realRoots p1 !! n1
+        pt2 = AReal.realRoots p2 !! n2
+    findSample _ = error "findSample: should not happen"
 
 buildSignConf :: (Ord v, Show v, RenderVar v) => [UPolynomial (Coeff v)] -> M v (SignConf (Coeff v))
 buildSignConf ps = do
@@ -389,30 +470,41 @@ zmod p q = do
           q' = fromTerms [(qi, mm) | (qi, mm) <- terms q, mmDegree mm <= e]
       return $ Just $ mr p' q'
 
-refineSignConf :: forall v. (Show v, Ord v, RenderVar v) => UPolynomial (Coeff v) -> SignConf (Coeff v) -> M v (SignConf (Coeff v))
-refineSignConf p conf = liftM extendIntervals $ mapM extendPoint conf
+refineSignConf
+  :: forall v. (Show v, Ord v, RenderVar v)
+  => UPolynomial (Coeff v) -> SignConf (Coeff v) -> M v (SignConf (Coeff v))
+refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
   where 
-    extendPoint :: (Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign) -> M v (Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)
+    extendPoint
+      :: (Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)
+      -> M v (Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)
     extendPoint (Point pt, m) = do
       s <- signAt pt m
       return (Point pt, Map.insert p s m)
     extendPoint x = return x
  
-    extendIntervals :: [(Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)] -> [(Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)]
-    extendIntervals (pt1@(Point _, m1) : (Interval lb ub, m) : pt2@(Point _, m2) : xs) =
-      pt1 : ys ++ extendIntervals (pt2 : xs)
+    extendIntervals
+      :: Int
+      -> [(Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)]
+      -> [(Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)]
+    extendIntervals !n (pt1@(Point _, m1) : (Interval lb ub, m) : pt2@(Point _, m2) : xs) =
+      pt1 : ys ++ extendIntervals n2 (pt2 : xs)
       where
         s1 = m1 Map.! p
         s2 = m2 Map.! p
-        root = RootOf p
-        ys | s1 == s2   = [ (Interval lb ub, Map.insert p s1 m) ]
-           | s1 == Zero = [ (Interval lb ub, Map.insert p s2 m) ]
-           | s2 == Zero = [ (Interval lb ub, Map.insert p s1 m) ]
-           | otherwise  = [ (Interval lb root, Map.insert p s1   m)
-                          , (Point root,       Map.insert p Zero m)
-                          , (Interval root ub, Map.insert p s2   m)
-                          ]
-    extendIntervals xs = xs
+        n1 = if s1 == Zero then n+1 else n
+        root = RootOf p n1
+        (ys, n2)
+           | s1 == s2   = ( [ (Interval lb ub, Map.insert p s1 m) ], n1 )
+           | s1 == Zero = ( [ (Interval lb ub, Map.insert p s2 m) ], n1 )
+           | s2 == Zero = ( [ (Interval lb ub, Map.insert p s1 m) ], n1 )
+           | otherwise  = ( [ (Interval lb root, Map.insert p s1   m)
+                            , (Point root,       Map.insert p Zero m)
+                            , (Interval root ub, Map.insert p s2   m)
+                            ]
+                          , n1 + 1
+                          )
+    extendIntervals _ xs = xs
  
     signAt :: Point (Coeff v) -> Map.Map (UPolynomial (Coeff v)) Sign -> M v Sign
     signAt PosInf _ = do
@@ -423,7 +515,7 @@ refineSignConf p conf = liftM extendIntervals $ mapM extendPoint conf
       if even d
         then signCoeff c
         else liftM signNegate $ signCoeff c
-    signAt (RootOf q) m = do
+    signAt (RootOf q _) m = do
       Just (bm,k,r) <- zmod p q
       s1 <- if deg r > 0
             then return $ m Map.! r
@@ -437,6 +529,16 @@ refineSignConf p conf = liftM extendIntervals $ mapM extendPoint conf
            | s <- [Neg, Zero, Pos]
            ]
 
+evalCell :: Ord v => Model v -> Cell (Coeff v) -> Cell Rational
+evalCell m (Point pt)         = Point $ evalPoint m pt
+evalCell m (Interval pt1 pt2) = Interval (evalPoint m pt1) (evalPoint m pt2)
+
+evalPoint :: Ord v => Model v -> Point (Coeff v) -> Point Rational
+evalPoint m NegInf = NegInf
+evalPoint m PosInf = PosInf
+evalPoint m (RootOf p n) =
+  RootOf (AReal.simpARealPoly $ mapCoeff (eval (m Map.!) . mapCoeff fromRational) p) n
+
 -- ---------------------------------------------------------------------------
 
 showDNF :: (Ord v, Show v, RenderVar v) => DNF (Coeff v, Sign) -> String
@@ -447,7 +549,6 @@ showDNF (DNF xss) = intercalate " | " [showConj xs | xs <- xss]
     g Zero = " = 0"
     g Pos  = " > 0"
     g Neg  = " < 0"
-
 
 dumpSignConf
   :: forall v.
@@ -463,8 +564,8 @@ dumpSignConf x =
 
 -- ---------------------------------------------------------------------------
 
-test_eliminate :: DNF (Coeff Int, Sign)
-test_eliminate = eliminate [(p', Zero)]
+test_project :: DNF (Coeff Int, Sign)
+test_project = fst $ project [(p', Zero)]
   where
     a = var 0
     b = var 1
@@ -474,8 +575,14 @@ test_eliminate = eliminate [(p', Zero)]
     p = a*x^(2::Int) + b*x + c
     p' = asPolynomialOf p 3
 
-test_eliminate_print :: IO ()
-test_eliminate_print = putStrLn $ showDNF $ test_eliminate
+test_project_print :: IO ()
+test_project_print = putStrLn $ showDNF $ test_project
+
+test_project_2 = project [(p, Zero), (x, Pos)]
+  where
+    x = var ()
+    p :: UPolynomial (Coeff Int)
+    p = x^(2::Int) + 4*x - 10
 
 test_collectPolynomials :: [(Set.Set (UPolynomial (Coeff Int)), Map.Map (Coeff Int) [Sign])]
 test_collectPolynomials = runM $ collectPolynomials (Set.singleton p')
@@ -495,7 +602,6 @@ test_collectPolynomials_print = do
     mapM_ (putStrLn . render) (Set.toList ps)
     forM_  (Map.toList s) $ \(p, sign) ->
       printf "%s %s\n" (render p) (show sign)
-    putStrLn "----"
 
 test_buildSignConf :: [(SignConf (Coeff Int), Map.Map (Coeff Int) [Sign])]
 test_buildSignConf = runM $ buildSignConf [asPolynomialOf p 3]
