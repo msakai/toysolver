@@ -314,18 +314,21 @@ assume p ss =
       put $ Map.insert p ss2 m
 
 eliminate :: (Ord v, Show v, RenderVar v) => [(UPolynomial (Coeff v), Sign)] -> DNF (Coeff v, Sign)
-eliminate cs = DNF [guess2cond gs | (conf, gs) <- result, any (ok gs) conf]
+eliminate cs = DNF [guess2cond gs | (conf, gs) <- result, any ok conf]
   where
-    result = runM $ buildSignConf (map fst cs)
-    ok gs (_, m) = and [checkSign gs m p s | (p,s) <- cs]
+    result = runM $ do
+      forM_ cs $ \(p,s) -> do
+        when (1 > deg p) $ assume (coeff mmOne p) [s]
+      buildSignConf (map fst cs)
+    ok (_, m) = and [checkSign m p s | (p,s) <- cs]
     guess2cond gs = do
       (p,ss) <- Map.toList gs
       case ss of
         [s] -> return (p,s)
         _ -> error "FIXME" -- FIXME: 後で直す
-    checkSign gs m p s =
+    checkSign m p s =
       if 1 > deg p 
-        then s `elem` (gs Map.! coeff mmOne p)
+        then True -- already assumed
         else m Map.! p == s
 
 buildSignConf :: (Ord v, Show v, RenderVar v) => [UPolynomial (Coeff v)] -> M v (SignConf (Coeff v))
