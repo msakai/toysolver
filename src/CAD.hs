@@ -235,12 +235,13 @@ refineSignConfU p conf = extendIntervals $ map extendPoint conf
         s1 = m1 Map.! p
         s2 = m2 Map.! p
         root = RootOf p
-        ys = if s1 == s2
-             then [ (Interval lb ub, Map.insert p s1 m) ]
-             else [ (Interval lb root, Map.insert p s1   m)
-                  , (Point root,       Map.insert p Zero m)
-                  , (Interval root ub, Map.insert p s2   m)
-                  ]
+        ys | s1 == s2   = [ (Interval lb ub, Map.insert p s1 m) ]
+           | s1 == Zero = [ (Interval lb ub, Map.insert p s2 m) ]
+           | s2 == Zero = [ (Interval lb ub, Map.insert p s1 m) ]
+           | otherwise  = [ (Interval lb root, Map.insert p s1   m)
+                          , (Point root,       Map.insert p Zero m)
+                          , (Interval root ub, Map.insert p s2   m)
+                          ]
     extendIntervals xs = xs
  
     signAt :: Point Rational -> Map.Map (UPolynomial Rational) Sign -> Sign
@@ -401,12 +402,13 @@ refineSignConf p conf = liftM extendIntervals $ mapM extendPoint conf
         s1 = m1 Map.! p
         s2 = m2 Map.! p
         root = RootOf p
-        ys = if s1 == s2
-             then [ (Interval lb ub, Map.insert p s1 m) ]
-             else [ (Interval lb root, Map.insert p s1   m)
-                  , (Point root,       Map.insert p Zero m)
-                  , (Interval root ub, Map.insert p s2   m)
-                  ]
+        ys | s1 == s2   = [ (Interval lb ub, Map.insert p s1 m) ]
+           | s1 == Zero = [ (Interval lb ub, Map.insert p s2 m) ]
+           | s2 == Zero = [ (Interval lb ub, Map.insert p s1 m) ]
+           | otherwise  = [ (Interval lb root, Map.insert p s1   m)
+                          , (Point root,       Map.insert p Zero m)
+                          , (Interval root ub, Map.insert p s2   m)
+                          ]
     extendIntervals xs = xs
  
     signAt :: Point (Coeff v) -> Map.Map (UPolynomial (Coeff v)) Sign -> M v Sign
@@ -514,5 +516,15 @@ test_buildSignConf_2 = runM $ buildSignConf [asPolynomialOf p 0 | p <- ps]
 
 test_buildSignConf_2_print :: IO ()
 test_buildSignConf_2_print = dumpSignConf test_buildSignConf_2
+
+test_buildSignConf_3 :: [(SignConf (Coeff Int), Map.Map (Coeff Int) [Sign])]
+test_buildSignConf_3 = runM $ buildSignConf [asPolynomialOf p 0 | p <- ps]
+  where
+    x = var 0
+    ps :: [Polynomial Rational Int]
+    ps = [x, 2*x]
+
+test_buildSignConf_3_print :: IO ()
+test_buildSignConf_3_print = dumpSignConf test_buildSignConf_3
 
 -- ---------------------------------------------------------------------------
