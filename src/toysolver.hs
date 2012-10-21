@@ -77,7 +77,7 @@ options =
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
     , Option [] ["threads"] (ReqArg (NThread . read) "INTEGER") "number of threads to use"
 
-    , Option []    ["sat"]    (NoArg (Mode ModeSAT))    "solve pseudo boolean problems in .cnf file"
+    , Option []    ["sat"]    (NoArg (Mode ModeSAT))    "solve boolean satisfiability problems in .cnf file"
     , Option []    ["pb"]     (NoArg (Mode ModePB))     "solve pseudo boolean problems in .pb file"
     , Option []    ["wbo"]    (NoArg (Mode ModeWBO))    "solve weighted boolean optimization problem in .opb file"
     , Option []    ["maxsat"] (NoArg (Mode ModeMaxSAT)) "solve MaxSAT problem in .cnf or .wcnf file"
