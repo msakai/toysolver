@@ -31,8 +31,8 @@ module Data.AlgebraicNumber
   , isAlgebraicInteger
   , height
 
-  -- * Real-like functions
-  , toRational'
+  -- * Approximation
+  , approx
 
   -- * Misc
   , simpARealPoly  
@@ -193,8 +193,8 @@ instance RealFrac AReal where
   ceiling        = ceiling'
   floor          = floor'
 
-toRational' :: AReal -> Rational -> Rational
-toRational' (RealRoot p i) epsilon = Sturm.approx p i epsilon
+approx :: AReal -> Rational -> Rational
+approx (RealRoot p i) epsilon = Sturm.approx p i epsilon
 
 -- | Same as 'properFraction'.
 properFraction' :: Integral b => AReal -> (b, AReal)

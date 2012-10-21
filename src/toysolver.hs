@@ -242,7 +242,7 @@ run solver opt lp printModel = do
               putStrLn "s UNSATISFIABLE"
               exitFailure
             Just m -> do
-              let m2 = IM.map (\x -> AReal.toRational' x (2^^(-64::Int))) $
+              let m2 = IM.map (\x -> AReal.approx x (2^^(-64::Int))) $
                          IM.fromAscList $ Map.toAscList $ m
               putStrLn $ "o " ++ showValue (Data.Expr.eval m2 obj)
               putStrLn "s SATISFIABLE"
