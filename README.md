@@ -18,13 +18,14 @@ This package includes several commands.
 Arithmetic solver for the following problems:
 
 * Mixed Integer Liner Programming (MILP or MIP)
+* Real Closed Field
 * LA(Q), LA(Z) (NOT IMPLEMENTED YET)
 
 Usage: toysolver [OPTION...] file.lp
 
     -h  --help           show help
     -v  --version        show version number
-        --solver=SOLVER  mip (default), omega-test, cooper, old-mip
+        --solver=SOLVER  mip (default), omega-test, cooper, cad, old-mip
 
 ### toysat
 
@@ -85,6 +86,5 @@ Usage: pb2lp [--wbo] [file.opb|file.wbo|-]
 TODO
 ----
 
-* Cylindrical algebraic decomposition
 * Local search
 * Suvery propagation

@@ -73,6 +73,12 @@ Executable toysolver
      Data.LA
      Data.Linear
      Data.Interval
+     Data.Polynomial
+     Data.Polynomial.FactorZ
+     Data.Polynomial.GBase
+     Data.Polynomial.Lagrange
+     Data.Polynomial.Sturm
+     Data.AlgebraicNumber
      SAT.Printer
      Text.LPFile
      Text.PBFile
@@ -89,7 +95,7 @@ Executable toysolver
      MIPSolver2
      Util
      Version
-  Build-Depends: base >=4 && <5, mtl, containers, array, filepath, parsec, OptDir, deepseq, stm >=2.3, parse-dimacs
+  Build-Depends: base >=4 && <5, mtl, containers, array, filepath, parsec, OptDir, deepseq, stm >=2.3, parse-dimacs, heaps, primes
   Extensions:
      BangPatterns
      ScopedTypeVariables

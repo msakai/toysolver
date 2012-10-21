@@ -35,6 +35,8 @@ import Data.Expr
 import Data.ArithRel
 import Data.Formula (Atom (..))
 import qualified Data.LA as LA
+import qualified Data.Polynomial as P
+import qualified Data.AlgebraicNumber as AReal
 import qualified OmegaTest
 import qualified Cooper
 import qualified MIPSolverHL
@@ -46,6 +48,7 @@ import qualified Converter.PB2LP as PB2LP
 import qualified Converter.MaxSAT2LP as MaxSAT2LP
 import qualified Simplex2
 import qualified MIPSolver2
+import qualified CAD
 import SAT.Printer
 import Version
 import Util
@@ -99,6 +102,7 @@ run solver opt lp printModel = do
   case map toLower solver of
     s | s `elem` ["omega-test", "cooper"] -> solveByQE
     s | s `elem` ["old-mip"] -> solveByMIP
+    s | s `elem` ["cad"] -> solveByCAD
     _ -> solveByMIP2
   where
     vs = LP.variables lp
@@ -225,6 +229,44 @@ run solver opt lp printModel = do
           putStrLn "s OPTIMUM FOUND"
           let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2
+
+    solveByCAD
+      | not (IS.null ivs) = do
+          putStrLn "s UNKNOWN"
+          putStrLn "c integer variables are not supported by CAD"
+          exitFailure
+      | otherwise = do
+          let cs = map g $ cs1 ++ cs2 ++ cs3
+          case CAD.solve cs of
+            Nothing -> do
+              putStrLn "s UNSATISFIABLE"
+              exitFailure
+            Just m -> do
+              let m2 = IM.map (\x -> AReal.toRational' x (2^^(-64::Int))) $
+                         IM.fromAscList $ Map.toAscList $ m
+              putStrLn $ "o " ++ showValue (Data.Expr.eval m2 obj)
+              putStrLn "s SATISFIABLE"
+              let m3 = Map.fromAscList [(v, m2 IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+              printModel m3
+      where
+        g (Rel lhs rel rhs) =
+          case rel of
+            Ge  -> (e, [CAD.Zero, CAD.Pos])
+            Le  -> (e, [CAD.Zero, CAD.Neg])
+            Eql -> (e, [CAD.Zero])
+          where
+            e = f lhs - f rhs
+
+        f (Const r)   = P.constant r
+        f (Var v)     = P.var v
+        f (e1 :+: e2) = f e1 + f e2
+        f (e1 :*: e2) = f e1 * f e2
+        f (e1 :/: e2)
+          | P.deg p > 0 = error "can't handle rational expression"
+          | otherwise   = P.mapCoeff (/ c) $ f e1 
+          where
+            p = f e2
+            c = P.coeff P.mmOne p
 
     printRat :: Bool
     printRat = PrintRational `elem` opt
