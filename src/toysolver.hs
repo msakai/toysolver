@@ -63,6 +63,7 @@ data Flag
     | Version
     | Solver String
     | PrintRational
+    | NoMIP
     | PivotStrategy String
     | NThread !Int
     | Mode !Mode
@@ -74,6 +75,7 @@ options =
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
     , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, old-mip"
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
+
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
     , Option [] ["threads"] (ReqArg (NThread . read) "INTEGER") "number of threads to use"
 
@@ -82,6 +84,8 @@ options =
     , Option []    ["wbo"]    (NoArg (Mode ModeWBO))    "solve weighted boolean optimization problem in .opb file"
     , Option []    ["maxsat"] (NoArg (Mode ModeMaxSAT)) "solve MaxSAT problem in .cnf or .wcnf file"
     , Option []    ["lp"]     (NoArg (Mode ModeLP))     "solve binary integer programming problem in .lp file (default)"
+
+    , Option [] ["nomip"] (NoArg NoMIP)                 "consider all integer variables as continuous"
     ]
 
 header :: String
@@ -142,7 +146,9 @@ run solver opt lp printModel = do
       let v' = nameToVar Map.! v
       [ Const 0 .<=. Var v', Var v' .<=. Const 1 ]
 
-    ivs = f (LP.integerVariables lp) `IS.union` f (LP.binaryVariables lp)
+    ivs
+      | NoMIP `elem` opt = IS.empty
+      | otherwise        = f (LP.integerVariables lp) `IS.union` f (LP.binaryVariables lp)
       where
         f = IS.fromList . map (nameToVar Map.!) . Set.toList
 
