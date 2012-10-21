@@ -385,6 +385,8 @@ findSample m cell =
   case evalCell m cell of
     Point (RootOf p n) -> 
       Just $ AReal.realRoots p !! n
+    Interval NegInf PosInf ->
+      Just $ 0
     Interval NegInf (RootOf p n) ->
       Just $ fromInteger $ floor   ((AReal.realRoots p !! n) - 1)
     Interval (RootOf p n) PosInf ->
@@ -395,7 +397,7 @@ findSample m cell =
       where
         pt1 = AReal.realRoots p1 !! n1
         pt2 = AReal.realRoots p2 !! n2
-    _ -> error "findSample: should not happen"
+    _ -> error $ "findSample: should not happen"
 
 evalCell :: Ord v => Model v -> Cell (Polynomial Rational v) -> Cell Rational
 evalCell m (Point pt)         = Point $ evalPoint m pt
