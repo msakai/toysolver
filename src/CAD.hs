@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables)
+-- Portability :  non-portable (ScopedTypeVariables, BangPatterns)
 --
 -- References:
 --
@@ -25,7 +24,32 @@
 --    <http://cstheory.blogoverflow.com/2012/02/something-you-should-know-about-quantifier-elimination-part-ii/>
 --
 -----------------------------------------------------------------------------
-module CAD where
+module CAD
+  (
+  -- * Basic data structures
+    Point (..)
+  , Cell (..)
+
+  -- * Algebra os Sign
+  , Sign (..)
+  , signNegate
+  , signMul
+  , signDiv
+  , signExp
+  , signOfConst
+
+  -- * Projection
+  , project
+
+  -- * Solving
+  , solve
+
+  -- * Model
+  , Model
+  , findSample
+  , evalCell
+  , evalPoint
+  ) where
 
 import Control.Exception
 import Control.Monad.State
@@ -52,8 +76,6 @@ data Cell c
   = Point (Point c)
   | Interval (Point c) (Point c)
   deriving (Eq, Ord, Show)
-
-type Model v = Map.Map v AReal.AReal
 
 -- ---------------------------------------------------------------------------
 
@@ -159,7 +181,7 @@ mr p q
         an = coeff (mmFromList [((), n)]) p
 
 test_mr_1 :: (Coeff Int, Integer, UPolynomial (Coeff Int))
-test_mr_1 = mr (asPolynomialOf p 3) (asPolynomialOf q 3)
+test_mr_1 = mr (toUPolynomialOf p 3) (toUPolynomialOf q 3)
   where
     a = var 0
     b = var 1
@@ -169,7 +191,7 @@ test_mr_1 = mr (asPolynomialOf p 3) (asPolynomialOf q 3)
     q = 2*a*x + b
 
 test_mr_2 :: (Coeff Int, Integer, UPolynomial (Coeff Int))
-test_mr_2 = mr (asPolynomialOf p 3) (asPolynomialOf p 3)
+test_mr_2 = mr (toUPolynomialOf p 3) (toUPolynomialOf p 3)
   where
     a = var 0
     b = var 1
@@ -177,169 +199,16 @@ test_mr_2 = mr (asPolynomialOf p 3) (asPolynomialOf p 3)
     x = var 3
     p = a*x^(2::Int) + b*x + c
 
-asPolynomialOf :: (Eq k, Ord k, Num k, Ord v, Show v) => Polynomial k v -> v -> UPolynomial (Polynomial k v)
-asPolynomialOf p v = fromTerms $ do
-  (c,mm) <- terms p
-  let m = mmToMap mm
-  return ( fromTerms [(c, mmFromMap (Map.delete v m))]
-         , mmFromList [((), Map.findWithDefault 0 v m)]
-         )
-
--- ---------------------------------------------------------------------------
-
-solveU :: [(UPolynomial Rational, Sign)] -> Maybe AReal.AReal
-solveU cs = listToMaybe $ do
-  (cell, m) <- buildSignConfU (map fst cs)
-  guard $ and [checkSign m p s | (p,s) <- cs]
-  findSample cell
-
-  where
-    checkSign m p s =
-      if 1 > deg p 
-        then signOfConst (coeff mmOne p) == s
-        else (m Map.! p) == s
-
-    findSample :: MonadPlus m => Cell Rational -> m AReal.AReal
-    findSample (Point (RootOf p n)) =
-      return $ AReal.realRoots p !! n
-    findSample (Interval NegInf (RootOf p n)) =
-      return $ fromInteger $ AReal.floor'   ((AReal.realRoots p !! n) - 1)
-    findSample (Interval (RootOf p n) PosInf) =
-      return $ fromInteger $ AReal.ceiling' ((AReal.realRoots p !! n) + 1)
-    findSample (Interval (RootOf p1 n1) (RootOf p2 n2)) = assert (pt1 < pt2) $ return $ (pt1 + pt2) / 2
-      where
-        pt1 = AReal.realRoots p1 !! n1
-        pt2 = AReal.realRoots p2 !! n2
-    findSample _ = mzero
-
-buildSignConfU :: [UPolynomial Rational] -> SignConf Rational
-buildSignConfU ps = foldl' (flip refineSignConfU) emptySignConf ts
-  where
-    ps2 = collectPolynomialsU (Set.fromList ps)
-    ts = sortBy (comparing deg) (Set.toList ps2)
-
-collectPolynomialsU :: (Fractional r, Ord r) => Set.Set (UPolynomial r) -> Set.Set (UPolynomial r)
-collectPolynomialsU ps = go ps1 ps1
-  where
-    ps1 = f ps
-
-    f :: Set.Set (UPolynomial r) -> Set.Set (UPolynomial r)
-    f = Set.filter (\p -> deg p > 0)
-
-    go qs ps | Set.null qs = ps
-    go qs ps = go qs' ps'
-      where
-       rs = f $ Set.unions $
-             [ Set.fromList [deriv p () | p <- Set.toList qs]
-             , Set.fromList [p1 `polyMod` p2 | p1 <- Set.toList qs, p2 <- Set.toList ps, deg p1 >= deg p2, p2 /= 0]
-             , Set.fromList [p1 `polyMod` p2 | p1 <- Set.toList ps, p2 <- Set.toList qs, deg p1 >= deg p2, p2 /= 0]
-             ]
-       qs' = rs `Set.difference` ps
-       ps' = ps `Set.union` qs'
-
-refineSignConfU :: UPolynomial Rational -> SignConf Rational -> SignConf Rational
-refineSignConfU p conf = extendIntervals 0 $ map extendPoint conf
-  where 
-    extendPoint
-      :: (Cell Rational, Map.Map (UPolynomial Rational) Sign)
-      -> (Cell Rational, Map.Map (UPolynomial Rational) Sign)
-    extendPoint (Point pt, m) = (Point pt, Map.insert p (signAt pt m) m)
-    extendPoint x = x
- 
-    extendIntervals
-      :: Int
-      -> [(Cell Rational, Map.Map (UPolynomial Rational) Sign)]
-      -> [(Cell Rational, Map.Map (UPolynomial Rational) Sign)]
-    extendIntervals !n (pt1@(Point _, m1) : ((Interval lb ub), m) : pt2@(Point _, m2) : xs) =
-      pt1 : ys ++ extendIntervals n2 (pt2 : xs)
-      where
-        s1 = m1 Map.! p
-        s2 = m2 Map.! p
-        n1 = if s1 == Zero then n+1 else n
-        root = RootOf p n1
-        (ys, n2)
-           | s1 == s2   = ( [ (Interval lb ub, Map.insert p s1 m) ], n1 )
-           | s1 == Zero = ( [ (Interval lb ub, Map.insert p s2 m) ], n1 )
-           | s2 == Zero = ( [ (Interval lb ub, Map.insert p s1 m) ], n1 )
-           | otherwise  = ( [ (Interval lb root, Map.insert p s1   m)
-                            , (Point root,       Map.insert p Zero m)
-                            , (Interval root ub, Map.insert p s2   m)
-                            ]
-                          , n1 + 1
-                          )
-    extendIntervals _ xs = xs
- 
-    signAt :: Point Rational -> Map.Map (UPolynomial Rational) Sign -> Sign
-    signAt PosInf _ = signCoeff c
-      where
-        (c,_) = leadingTerm grlex p
-    signAt NegInf _ =
-      if even (deg p)
-        then signCoeff c
-        else signNegate (signCoeff c)
-      where
-        (c,_) = leadingTerm grlex p
-    signAt (RootOf q _) m
-      | deg r > 0 = m Map.! r
-      | otherwise = signCoeff $ coeff mmOne r
-      where
-        r = p `polyMod` q
-
-    signCoeff :: Rational -> Sign
-    signCoeff = signOfConst
-
--- ---------------------------------------------------------------------------
-
-test1a :: IO ()
-test1a = mapM_ putStrLn $ showSignConf conf
-  where
-    x = var ()
-    conf = buildSignConfU [x + 1, -2*x + 3, x]
-
-test1b :: Bool
-test1b = isJust $ solveU cs
-  where
-    x = var ()
-    cs = [(x + 1, Pos), (-2*x + 3, Pos), (x, Pos)]
-
-test1c :: Bool
-test1c = isJust $ do
-  v <- solveU cs
-  guard $ and $ do
-    (p, s) <- cs
-    let val = eval (\_ -> v) (mapCoeff fromRational p)
-    case s of
-      Pos  -> return $ val > 0
-      Neg  -> return $ val < 0
-      Zero -> return $ val == 0
-  where
-    x = var ()
-    cs = [(x + 1, Pos), (-2*x + 3, Pos), (x, Pos)]
-
-test2a :: IO ()
-test2a = mapM_ putStrLn $ showSignConf conf
-  where
-    x = var ()
-    conf = buildSignConfU [x^(2::Int)]
-
-test2b :: Bool
-test2b = isNothing $ solveU cs
-  where
-    x = var ()
-    cs = [(x^(2::Int), Neg)]
-
-test = and [test1b, test1c, test2b]
-
 -- ---------------------------------------------------------------------------
 
 type Coeff v = Polynomial Rational v
 
-type M v = StateT (Map.Map (Coeff v) [Sign]) []
+type M v = StateT (Map.Map (Polynomial Rational v) [Sign]) []
 
-runM :: M v a -> [(a, Map.Map (Coeff v) [Sign])]
+runM :: M v a -> [(a, Map.Map (Polynomial Rational v) [Sign])]
 runM m = runStateT m Map.empty
 
-assume :: (Ord v, Show v, RenderVar v) => Coeff v -> [Sign] -> M v ()
+assume :: (Ord v, Show v, RenderVar v) => Polynomial Rational v -> [Sign] -> M v ()
 assume p ss =
   if deg p == 0
     then do
@@ -354,65 +223,34 @@ assume p ss =
 
 project
   :: forall v. (Ord v, Show v, RenderVar v)
-  => [(UPolynomial (Coeff v), Sign)]
-  -> (DNF (Coeff v, Sign), Model v -> AReal.AReal)
-project cs = (dnf, lifter)
+  => [(UPolynomial (Polynomial Rational v), [Sign])]
+  -> [([(Polynomial Rational v, [Sign])], [Cell (Polynomial Rational v)])]
+project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
   where
-    dnf :: DNF (Coeff v, Sign)
-    dnf = DNF [guess2cond gs | (_, gs) <- result]
-
-    result :: [(Cell (Coeff v), Map.Map (Coeff v) [Sign])]
+    result :: [([Cell (Polynomial Rational v)], Map.Map (Polynomial Rational v) [Sign])]
     result = runM $ do
-      forM_ cs $ \(p,s) -> do
-        when (1 > deg p) $ assume (coeff mmOne p) [s]
+      forM_ cs $ \(p,ss) -> do
+        when (1 > deg p) $ assume (coeff mmOne p) ss
       conf <- buildSignConf (map fst cs)
       let satCells = [cell | (cell, m) <- conf, cell /= Point NegInf, cell /= Point PosInf, ok m]
-      case listToMaybe satCells of
-        Nothing -> mzero
-        Just cell -> return cell
+      guard $ not $ null satCells
+      return satCells
 
-    ok :: Map.Map (UPolynomial (Coeff v)) Sign -> Bool
-    ok m = and [checkSign m p s | (p,s) <- cs]
+    ok :: Map.Map (UPolynomial (Polynomial Rational v)) Sign -> Bool
+    ok m = and [checkSign m p ss | (p,ss) <- cs]
       where
-        checkSign m p s =
+        checkSign m p ss =
           if 1 > deg p 
             then True -- already assumed
-            else m Map.! p == s
+            else m Map.! p `elem` ss
 
-    guess2cond :: Map.Map (Coeff v) [Sign] -> [(Coeff v, Sign)]
-    guess2cond gs = do
-      (p,ss) <- Map.toList gs
-      case ss of
-        [s] -> return (p,s)
-        _ -> error "FIXME" -- FIXME: 後で直す
+    guess2cond :: Map.Map (Polynomial Rational v) [Sign] -> [(Polynomial Rational v, [Sign])]
+    guess2cond gs = Map.toList gs
 
-    lifter :: Model v -> AReal.AReal
-    lifter model =
-      case vs of
-        []  -> error "project: should not happen"
-        v:_ -> v
-      where
-        vs = do
-          (cell, gs) <- result
-          forM_ (Map.toList gs) $ \(cp,ss) -> do
-            let val = eval (model Map.!) (mapCoeff fromRational cp)
-            guard $ signOfConst val `elem` ss
-          return $ findSample $ evalCell model cell
-
-    findSample :: Cell Rational -> AReal.AReal
-    findSample (Point (RootOf p n)) =
-      AReal.realRoots p !! n
-    findSample (Interval NegInf (RootOf p n)) =
-      fromInteger $ AReal.floor'   ((AReal.realRoots p !! n) - 1)
-    findSample (Interval (RootOf p n) PosInf) =
-      fromInteger $ AReal.ceiling' ((AReal.realRoots p !! n) + 1)
-    findSample (Interval (RootOf p1 n1) (RootOf p2 n2)) = assert (pt1 < pt2) $ (pt1 + pt2) / 2
-      where
-        pt1 = AReal.realRoots p1 !! n1
-        pt2 = AReal.realRoots p2 !! n2
-    findSample _ = error "findSample: should not happen"
-
-buildSignConf :: (Ord v, Show v, RenderVar v) => [UPolynomial (Coeff v)] -> M v (SignConf (Coeff v))
+buildSignConf
+  :: (Ord v, Show v, RenderVar v)
+  => [UPolynomial (Polynomial Rational v)]
+  -> M v (SignConf (Polynomial Rational v))
 buildSignConf ps = do
   ps2 <- collectPolynomials (Set.fromList ps)
   let ts = sortBy (comparing deg) (Set.toList ps2)
@@ -420,8 +258,8 @@ buildSignConf ps = do
 
 collectPolynomials
   :: (Ord v, Show v, RenderVar v)
-  => Set.Set (UPolynomial (Coeff v))
-  -> M v (Set.Set (UPolynomial (Coeff v)))
+  => Set.Set (UPolynomial (Polynomial Rational v))
+  -> M v (Set.Set (UPolynomial (Polynomial Rational v)))
 collectPolynomials ps = do
   ps <- go (f ps)
   return ps
@@ -440,7 +278,10 @@ collectPolynomials ps = do
         else go ps'
 
 -- TODO: 高次の項から見ていったほうが良い
-getHighestNonzeroTerm :: (Ord v, Show v, RenderVar v) => UPolynomial (Coeff v) -> M v (Coeff v, Integer)
+getHighestNonzeroTerm
+  :: (Ord v, Show v, RenderVar v)
+  => UPolynomial (Polynomial Rational v)
+  -> M v (Polynomial Rational v, Integer)
 getHighestNonzeroTerm p = msum
     [ do forM_ [d+1 .. deg_p] $ \i -> assume (f i) [Zero]
          if (d >= 0)
@@ -457,9 +298,9 @@ getHighestNonzeroTerm p = msum
 
 zmod
   :: forall v. (Ord v, Show v, RenderVar v)
-  => UPolynomial (Coeff v)
-  -> UPolynomial (Coeff v)
-  -> M v (Maybe (Coeff v, Integer, UPolynomial (Coeff v)))
+  => UPolynomial (Polynomial Rational v)
+  -> UPolynomial (Polynomial Rational v)
+  -> M v (Maybe (Polynomial Rational v, Integer, UPolynomial (Polynomial Rational v)))
 zmod p q = do
   (_, d) <- getHighestNonzeroTerm p
   (_, e) <- getHighestNonzeroTerm q
@@ -472,12 +313,14 @@ zmod p q = do
 
 refineSignConf
   :: forall v. (Show v, Ord v, RenderVar v)
-  => UPolynomial (Coeff v) -> SignConf (Coeff v) -> M v (SignConf (Coeff v))
+  => UPolynomial (Polynomial Rational v)
+  -> SignConf (Polynomial Rational v) 
+  -> M v (SignConf (Polynomial Rational v))
 refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
   where 
     extendPoint
-      :: (Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)
-      -> M v (Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)
+      :: (Cell (Polynomial Rational v), Map.Map (UPolynomial (Polynomial Rational v)) Sign)
+      -> M v (Cell (Polynomial Rational v), Map.Map (UPolynomial (Polynomial Rational v)) Sign)
     extendPoint (Point pt, m) = do
       s <- signAt pt m
       return (Point pt, Map.insert p s m)
@@ -485,8 +328,8 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
  
     extendIntervals
       :: Int
-      -> [(Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)]
-      -> [(Cell (Coeff v), Map.Map (UPolynomial (Coeff v)) Sign)]
+      -> [(Cell (Polynomial Rational v), Map.Map (UPolynomial (Polynomial Rational v)) Sign)]
+      -> [(Cell (Polynomial Rational v), Map.Map (UPolynomial (Polynomial Rational v)) Sign)]
     extendIntervals !n (pt1@(Point _, m1) : (Interval lb ub, m) : pt2@(Point _, m2) : xs) =
       pt1 : ys ++ extendIntervals n2 (pt2 : xs)
       where
@@ -506,7 +349,7 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
                           )
     extendIntervals _ xs = xs
  
-    signAt :: Point (Coeff v) -> Map.Map (UPolynomial (Coeff v)) Sign -> M v Sign
+    signAt :: Point (Polynomial Rational v) -> Map.Map (UPolynomial (Polynomial Rational v)) Sign -> M v Sign
     signAt PosInf _ = do
       (c,_) <- getHighestNonzeroTerm p
       signCoeff c
@@ -523,37 +366,86 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
       s2 <- signCoeff bm
       return $ signDiv s1 (signExp s2 k)
 
-    signCoeff :: Coeff v -> M v Sign
+    signCoeff :: Polynomial Rational v -> M v Sign
     signCoeff c =
       msum [ assume c [s] >> return s
            | s <- [Neg, Zero, Pos]
            ]
 
-evalCell :: Ord v => Model v -> Cell (Coeff v) -> Cell Rational
+-- ---------------------------------------------------------------------------
+
+type Model v = Map.Map v AReal.AReal
+
+findSample :: Ord v => Model v -> Cell (Polynomial Rational v) -> Maybe AReal.AReal
+findSample m cell =
+  case evalCell m cell of
+    Point (RootOf p n) -> 
+      Just $ AReal.realRoots p !! n
+    Interval NegInf (RootOf p n) ->
+      Just $ fromInteger $ AReal.floor'   ((AReal.realRoots p !! n) - 1)
+    Interval (RootOf p n) PosInf ->
+      Just $ fromInteger $ AReal.ceiling' ((AReal.realRoots p !! n) + 1)
+    Interval (RootOf p1 n1) (RootOf p2 n2)
+      | (pt1 < pt2) -> Just $ (pt1 + pt2) / 2
+      | otherwise   -> Nothing
+      where
+        pt1 = AReal.realRoots p1 !! n1
+        pt2 = AReal.realRoots p2 !! n2
+    _ -> error "findSample: should not happen"
+
+evalCell :: Ord v => Model v -> Cell (Polynomial Rational v) -> Cell Rational
 evalCell m (Point pt)         = Point $ evalPoint m pt
 evalCell m (Interval pt1 pt2) = Interval (evalPoint m pt1) (evalPoint m pt2)
 
-evalPoint :: Ord v => Model v -> Point (Coeff v) -> Point Rational
-evalPoint m NegInf = NegInf
-evalPoint m PosInf = PosInf
+evalPoint :: Ord v => Model v -> Point (Polynomial Rational v) -> Point Rational
+evalPoint _ NegInf = NegInf
+evalPoint _ PosInf = PosInf
 evalPoint m (RootOf p n) =
   RootOf (AReal.simpARealPoly $ mapCoeff (eval (m Map.!) . mapCoeff fromRational) p) n
 
 -- ---------------------------------------------------------------------------
 
-showDNF :: (Ord v, Show v, RenderVar v) => DNF (Coeff v, Sign) -> String
+solve
+  :: forall v. (Ord v, Show v, RenderVar v)
+  => [(Polynomial Rational v, [Sign])]
+  -> Maybe (Model v)
+solve cs0 = go vs0 cs0
+  where
+    vs0 = Set.toList $ Set.unions [variables p | (p,_) <- cs0]
+
+    go :: [v] -> [(Polynomial Rational v, [Sign])] -> Maybe (Model v)
+    go [] cs =
+      if and [signOfConst v `elem` ss | (p,ss) <- cs, let v = eval (\_ -> undefined) p]
+      then Just Map.empty
+      else Nothing
+    go (v:vs) cs = listToMaybe $ do
+      (cs2, cell:_) <- project [(toUPolynomialOf p v, ss) | (p,ss) <- cs]
+      case go vs cs2 of
+        Nothing -> mzero
+        Just m -> do
+          let Just val = findSample m cell
+          seq val $ return $ Map.insert v val m
+
+-- ---------------------------------------------------------------------------
+
+showDNF :: (Ord v, Show v, RenderVar v) => DNF (Polynomial Rational v, [Sign]) -> String
 showDNF (DNF xss) = intercalate " | " [showConj xs | xs <- xss]
   where
-    showConj xs = "(" ++ intercalate " & " [f p s | (p,s) <- xs] ++ ")"
-    f p s = render p ++ g s
-    g Zero = " = 0"
-    g Pos  = " > 0"
-    g Neg  = " < 0"
+    showConj xs = "(" ++ intercalate " & " [f p ss | (p,ss) <- xs] ++ ")"
+    f p ss = render p ++ g ss
+    g [Zero] = " = 0"
+    g [Pos]  = " > 0"
+    g [Neg]  = " < 0"
+    g xs
+      | Set.fromList xs == Set.fromList [Pos,Neg] = "/= 0"
+      | Set.fromList xs == Set.fromList [Zero,Pos] = ">= 0"
+      | Set.fromList xs == Set.fromList [Zero,Neg] = "<= 0"
+      | otherwise = error "showDNF: should not happen"
 
 dumpSignConf
   :: forall v.
      (Ord v, RenderVar v, Show v)
-  => [(SignConf (Coeff v), Map.Map (Coeff v) [Sign])]
+  => [(SignConf (Polynomial Rational v), Map.Map (Polynomial Rational v) [Sign])]
   -> IO ()
 dumpSignConf x = 
   forM_ x $ \(conf, as) -> do
@@ -564,8 +456,49 @@ dumpSignConf x =
 
 -- ---------------------------------------------------------------------------
 
-test_project :: DNF (Coeff Int, Sign)
-test_project = fst $ project [(p', Zero)]
+test1a :: IO ()
+test1a = mapM_ putStrLn $ showSignConf conf
+  where
+    x = var ()
+    ps :: [UPolynomial (Polynomial Rational Int)]
+    ps = [x + 1, -2*x + 3, x]
+    [(conf, _)] = runM $ buildSignConf ps
+
+test1b :: Bool
+test1b = isJust $ solve cs
+  where
+    x = var ()
+    cs = [(x + 1, [Pos]), (-2*x + 3, [Pos]), (x, [Pos])]
+
+test1c :: Bool
+test1c = isJust $ do
+  m <- solve cs
+  guard $ and $ do
+    (p, ss) <- cs
+    let val = eval (m Map.!) (mapCoeff fromRational p)
+    return $ signOfConst val `elem` ss
+  where
+    x = var ()
+    cs = [(x + 1, [Pos]), (-2*x + 3, [Pos]), (x, [Pos])]
+
+test2a :: IO ()
+test2a = mapM_ putStrLn $ showSignConf conf
+  where
+    x = var ()
+    ps :: [UPolynomial (Polynomial Rational Int)]
+    ps = [x^(2::Int)]
+    [(conf, _)] = runM $ buildSignConf ps
+
+test2b :: Bool
+test2b = isNothing $ solve cs
+  where
+    x = var ()
+    cs = [(x^(2::Int), [Neg])]
+
+test = and [test1b, test1c, test2b]
+
+test_project :: DNF (Polynomial Rational Int, [Sign])
+test_project = DNF $ map fst $ project [(p', [Zero])]
   where
     a = var 0
     b = var 1
@@ -573,18 +506,26 @@ test_project = fst $ project [(p', Zero)]
     x = var 3
     p :: Polynomial Rational Int
     p = a*x^(2::Int) + b*x + c
-    p' = asPolynomialOf p 3
+    p' = toUPolynomialOf p 3
 
 test_project_print :: IO ()
 test_project_print = putStrLn $ showDNF $ test_project
 
-test_project_2 = project [(p, Zero), (x, Pos)]
+test_project_2 = project [(p, [Zero]), (x, [Pos])]
   where
     x = var ()
-    p :: UPolynomial (Coeff Int)
+    p :: UPolynomial (Polynomial Rational Int)
     p = x^(2::Int) + 4*x - 10
 
-test_collectPolynomials :: [(Set.Set (UPolynomial (Coeff Int)), Map.Map (Coeff Int) [Sign])]
+test_solve = solve [(p, [Neg])]
+  where
+    a = var 0
+    b = var 1
+    c = var 2
+    p :: Polynomial Rational Int
+    p = a^(2::Int) + b^(2::Int) + c^(2::Int) - 1
+
+test_collectPolynomials :: [(Set.Set (UPolynomial (Polynomial Rational Int)), Map.Map (Polynomial Rational Int) [Sign])]
 test_collectPolynomials = runM $ collectPolynomials (Set.singleton p')
   where
     a = var 0
@@ -593,7 +534,7 @@ test_collectPolynomials = runM $ collectPolynomials (Set.singleton p')
     x = var 3
     p :: Polynomial Rational Int
     p = a*x^(2::Int) + b*x + c
-    p' = asPolynomialOf p 3
+    p' = toUPolynomialOf p 3
 
 test_collectPolynomials_print :: IO ()
 test_collectPolynomials_print = do
@@ -603,8 +544,8 @@ test_collectPolynomials_print = do
     forM_  (Map.toList s) $ \(p, sign) ->
       printf "%s %s\n" (render p) (show sign)
 
-test_buildSignConf :: [(SignConf (Coeff Int), Map.Map (Coeff Int) [Sign])]
-test_buildSignConf = runM $ buildSignConf [asPolynomialOf p 3]
+test_buildSignConf :: [(SignConf (Polynomial Rational Int), Map.Map (Polynomial Rational Int) [Sign])]
+test_buildSignConf = runM $ buildSignConf [toUPolynomialOf p 3]
   where
     a = var 0
     b = var 1
@@ -616,8 +557,8 @@ test_buildSignConf = runM $ buildSignConf [asPolynomialOf p 3]
 test_buildSignConf_print :: IO ()
 test_buildSignConf_print = dumpSignConf test_buildSignConf
 
-test_buildSignConf_2 :: [(SignConf (Coeff Int), Map.Map (Coeff Int) [Sign])]
-test_buildSignConf_2 = runM $ buildSignConf [asPolynomialOf p 0 | p <- ps]
+test_buildSignConf_2 :: [(SignConf (Polynomial Rational Int), Map.Map (Polynomial Rational Int) [Sign])]
+test_buildSignConf_2 = runM $ buildSignConf [toUPolynomialOf p 0 | p <- ps]
   where
     x = var 0
     ps :: [Polynomial Rational Int]
@@ -626,8 +567,8 @@ test_buildSignConf_2 = runM $ buildSignConf [asPolynomialOf p 0 | p <- ps]
 test_buildSignConf_2_print :: IO ()
 test_buildSignConf_2_print = dumpSignConf test_buildSignConf_2
 
-test_buildSignConf_3 :: [(SignConf (Coeff Int), Map.Map (Coeff Int) [Sign])]
-test_buildSignConf_3 = runM $ buildSignConf [asPolynomialOf p 0 | p <- ps]
+test_buildSignConf_3 :: [(SignConf (Polynomial Rational Int), Map.Map (Polynomial Rational Int) [Sign])]
+test_buildSignConf_3 = runM $ buildSignConf [toUPolynomialOf p 0 | p <- ps]
   where
     x = var 0
     ps :: [Polynomial Rational Int]
