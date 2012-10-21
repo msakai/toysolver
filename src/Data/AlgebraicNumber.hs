@@ -194,7 +194,10 @@ instance RealFrac AReal where
   floor          = floor'
 
 approx :: AReal -> Rational -> Rational
-approx (RealRoot p i) epsilon = Sturm.approx p i epsilon
+approx x@(RealRoot p i) epsilon =
+  if isRational x
+    then toRational x
+    else Sturm.approx p i epsilon
 
 -- | Same as 'properFraction'.
 properFraction' :: Integral b => AReal -> (b, AReal)
