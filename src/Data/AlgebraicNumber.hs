@@ -34,13 +34,6 @@ module Data.AlgebraicNumber
   -- * Real-like functions
   , toRational'
 
-  -- * RealFrac-like functions
-  , properFraction'
-  , truncate'
-  , round'
-  , ceiling'
-  , floor'
-
   -- * Misc
   , simpARealPoly  
   ) where
@@ -183,6 +176,22 @@ instance Fractional AReal where
   recip a@(RealRoot p i)
     | isZero a  = error "AReal.recip: zero division"
     | otherwise = realRoot2 (rootRecip p) (recip i)
+
+instance Real AReal where
+  toRational x
+    | Data.AlgebraicNumber.deg x == 1 =
+        let p = minimalPolynomial x
+            a = P.coeff (P.mmVar ()) p
+            b = P.coeff P.mmOne p
+        in - b / a
+    | otherwise  = error "toRational: proper algebraic number"
+
+instance RealFrac AReal where
+  properFraction = properFraction'
+  truncate       = truncate'
+  round          = round'
+  ceiling        = ceiling'
+  floor          = floor'
 
 toRational' :: AReal -> Rational -> Rational
 toRational' (RealRoot p i) epsilon = Sturm.approx p i epsilon

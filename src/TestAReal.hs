@@ -12,7 +12,6 @@ import Test.Framework.Providers.QuickCheck2
 import Data.Polynomial hiding (deg)
 import Data.AlgebraicNumber
 import Data.AlgebraicNumber.Root
-import Data.AlgebraicNumber.RealInstance
 
 import Control.Monad
 import Control.Exception
@@ -151,23 +150,23 @@ case_cmp_3 = assertBool "" $ 0 < neg_sqrt2 * neg_sqrt2
 
 case_cmp_4 = assertBool "" $ neg_sqrt2 * neg_sqrt2 * neg_sqrt2 < 0
 
-case_floor_sqrt2 = floor' sqrt2 @?= 1
+case_floor_sqrt2 = floor sqrt2 @?= 1
 
-case_floor_neg_sqrt2 = floor' neg_sqrt2 @?= -2
+case_floor_neg_sqrt2 = floor neg_sqrt2 @?= -2
 
-case_floor_1 = floor' 1 @?= 1
+case_floor_1 = floor 1 @?= 1
 
-case_floor_neg_1 = floor' (-1) @?= -1
+case_floor_neg_1 = floor (-1) @?= -1
 
-case_ceiling_sqrt2 = ceiling' sqrt2 @?= 2
+case_ceiling_sqrt2 = ceiling sqrt2 @?= 2
 
-case_ceiling_neg_sqrt2 = ceiling' neg_sqrt2 @?= -1
+case_ceiling_neg_sqrt2 = ceiling neg_sqrt2 @?= -1
 
-case_ceiling_1 = ceiling' 1 @?= 1
+case_ceiling_1 = ceiling 1 @?= 1
 
-case_ceiling_neg_1 = ceiling' (-1) @?= -1
+case_ceiling_neg_1 = ceiling (-1) @?= -1
 
-case_round_sqrt2 = round' sqrt2 @?= 1
+case_round_sqrt2 = round sqrt2 @?= 1
 
 case_toRational = toRational r @?= 3/2
   where

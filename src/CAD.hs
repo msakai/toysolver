@@ -382,9 +382,9 @@ findSample m cell =
     Point (RootOf p n) -> 
       Just $ AReal.realRoots p !! n
     Interval NegInf (RootOf p n) ->
-      Just $ fromInteger $ AReal.floor'   ((AReal.realRoots p !! n) - 1)
+      Just $ fromInteger $ floor   ((AReal.realRoots p !! n) - 1)
     Interval (RootOf p n) PosInf ->
-      Just $ fromInteger $ AReal.ceiling' ((AReal.realRoots p !! n) + 1)
+      Just $ fromInteger $ ceiling ((AReal.realRoots p !! n) + 1)
     Interval (RootOf p1 n1) (RootOf p2 n2)
       | (pt1 < pt2) -> Just $ (pt1 + pt2) / 2
       | otherwise   -> Nothing

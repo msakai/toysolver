@@ -25,7 +25,6 @@ Extra-Source-Files:
    src/Data/Polynomial/Sturm.hs
    src/Data/AlgebraicNumber.hs
    src/Data/AlgebraicNumber/Root.hs
-   src/Data/AlgebraicNumber/RealInstance.hs
    src/Data/Polyhedron.hs
    src/FOLModelFinder.hs
    src/Text/SDPFile.hs
