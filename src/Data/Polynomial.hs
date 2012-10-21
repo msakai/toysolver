@@ -48,6 +48,7 @@ module Data.Polynomial
   , deg
   , coeff
   , lookupCoeff
+  , variables
 
   -- * Operations
   , deriv
@@ -60,6 +61,7 @@ module Data.Polynomial
   , mapCoeff
   , toMonic
   , toZ
+  , toUPolynomialOf
   , polyDiv
   , polyMod
   , polyDivMod
@@ -199,6 +201,9 @@ coeff xs (Polynomial m) = Map.findWithDefault 0 xs m
 lookupCoeff :: Ord v => MonicMonomial v -> Polynomial k v -> Maybe k
 lookupCoeff xs (Polynomial m) = Map.lookup xs m
 
+variables :: Ord v => Polynomial k v -> Set.Set v
+variables p = Set.unions $ [Map.keysSet (mmToMap mm) | (_, mm) <- terms p]  
+
 -- | Formal derivative of polynomials
 deriv :: (Eq k, Num k, Ord v, Show v) => Polynomial k v -> v -> Polynomial k v
 deriv p x = sum [fromMonomial (monomialDeriv m x) | m <- terms p]
@@ -244,6 +249,14 @@ toZ p = fromTerms [(numerator (c * fromInteger s), xs) | (c,xs) <- ts]
   where
     ts = [(toRational c, xs) | (c,xs) <- terms p]
     s = foldl' lcm  1 (map (denominator . fst) ts)
+
+toUPolynomialOf :: (Eq k, Ord k, Num k, Ord v, Show v) => Polynomial k v -> v -> UPolynomial (Polynomial k v)
+toUPolynomialOf p v = fromTerms $ do
+  (c,mm) <- terms p
+  let m = mmToMap mm
+  return ( fromTerms [(c, mmFromMap (Map.delete v m))]
+         , mmFromList [((), Map.findWithDefault 0 v m)]
+         )
 
 -- | Multivariate division algorithm
 polyMDivMod
