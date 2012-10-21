@@ -363,8 +363,12 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
       s1 <- if deg r > 0
             then return $ m Map.! r
             else signCoeff $ coeff mmOne r
-      s2 <- signCoeff bm
-      return $ signDiv s1 (signExp s2 k)
+      -- 場合分けを出来るだけ避ける
+      if even k
+        then return s1
+        else do
+          s2 <- signCoeff bm
+          return $ signDiv s1 (signExp s2 k)
 
     signCoeff :: Polynomial Rational v -> M v Sign
     signCoeff c =
