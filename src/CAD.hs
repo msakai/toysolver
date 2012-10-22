@@ -214,12 +214,14 @@ assume p ss =
     then do
       let c = coeff mmOne p
       guard $ signOfConst c `elem` ss
-    else do
+    else do      
+      let (c,_) = leadingTerm grlex p
+          p' = mapCoeff (/c) p
       m <- get
-      let ss1 = Map.findWithDefault (Set.fromList [Neg, Zero, Pos]) p m
-          ss2 = Set.intersection ss1 (Set.fromList ss)
+      let ss1 = Map.findWithDefault (Set.fromList [Neg, Zero, Pos]) p' m
+          ss2 = Set.intersection ss1 $ Set.fromList $ [s `signDiv` signOfConst c | s <- ss]
       guard $ not $ Set.null ss2
-      put $ Map.insert p ss2 m
+      put $ Map.insert p' ss2 m
 
 project
   :: forall v. (Ord v, Show v, RenderVar v)
@@ -277,24 +279,20 @@ collectPolynomials ps = do
         then return ps
         else go ps'
 
--- TODO: 高次の項から見ていったほうが良い
 getHighestNonzeroTerm
-  :: (Ord v, Show v, RenderVar v)
+  :: forall v. (Ord v, Show v, RenderVar v)
   => UPolynomial (Polynomial Rational v)
   -> M v (Polynomial Rational v, Integer)
-getHighestNonzeroTerm p = msum
-    [ do forM_ [d+1 .. deg_p] $ \i -> assume (f i) [Zero]
-         if (d >= 0)
-           then do
-             assume (f d) [Pos, Neg]
-             return (f d, d)
-           else do
-             return (0, -1)
-    | d <- [-1 .. deg_p]
-    ]
+getHighestNonzeroTerm p = go $ sortBy (flip (comparing snd)) cs
   where
-    deg_p = deg p
-    f i = coeff (mmFromList [((), i)]) p
+    cs = [(c, mmDegree mm) | (c,mm) <- terms p]
+
+    go :: [(Polynomial Rational v, Integer)] -> M v (Polynomial Rational v, Integer)
+    go [] = return (0, -1)
+    go ((c,d):xs) =
+      mplus
+        (assume c [Pos, Neg] >> return (c,d))
+        (assume c [Zero] >> go xs)
 
 zmod
   :: forall v. (Ord v, Show v, RenderVar v)
