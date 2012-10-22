@@ -73,7 +73,7 @@ options :: [OptDescr Flag]
 options =
     [ Option ['h'] ["help"]    (NoArg Help)            "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
-    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, old-mip"
+    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, cad, old-mip"
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
 
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
@@ -104,7 +104,7 @@ run solver opt lp printModel = do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure  
   case map toLower solver of
-    s | s `elem` ["omega-test", "cooper"] -> solveByQE
+    s | s `elem` ["omega", "omega-test", "cooper"] -> solveByQE
     s | s `elem` ["old-mip"] -> solveByMIP
     s | s `elem` ["cad"] -> solveByCAD
     _ -> solveByMIP2
@@ -169,6 +169,7 @@ run solver opt lp printModel = do
               printModel m2
        where
          f = case solver of
+               "omega"      -> OmegaTest.solveQFLA
                "omega-test" -> OmegaTest.solveQFLA
                "cooper"     -> Cooper.solveQFLA
                _ -> error "unknown solver"
