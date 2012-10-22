@@ -235,7 +235,7 @@ constraintToDNF (Rel lhs op rhs) = DNF $
     Gt  -> [[Pos lhs']]
     Lt  -> [[Pos (lnegate lhs')]]
   where
-    lhs' = normalize (rhs .-. lhs)
+    lhs' = normalize (lhs .-. rhs)
 
     normalize :: LA.Expr Rational -> ExprZ
     normalize e = LA.mapCoeff (round . (*c)) e
