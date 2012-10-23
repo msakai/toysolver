@@ -262,22 +262,19 @@ collectPolynomials
   :: (Ord v, Show v, RenderVar v)
   => Set.Set (UPolynomial (Polynomial Rational v))
   -> M v (Set.Set (UPolynomial (Polynomial Rational v)))
-collectPolynomials ps = do
-  ps <- go (f ps)
-  return ps
+collectPolynomials ps = go Set.empty (f ps)
   where
     f = Set.filter (\p -> deg p > 0) 
-
-    go ps = do
-      let rs1 = [deriv p () | p <- Set.toList ps]
-      rs2 <- liftM (map (\(_,_,r) -> r) . catMaybes) $ 
-        forM [(p1,p2) | p1 <- Set.toList ps, p2 <- Set.toList ps] $ \(p1,p2) -> do
-          ret <- zmod p1 p2
-          return ret
-      let ps' = f $ Set.unions [ps, Set.fromList rs1, Set.fromList rs2]
-      if ps == ps'
-        then return ps
-        else go ps'
+    go result ps | Set.null ps = return result
+    go result ps = do
+      let rs1 = filter (\p -> deg p > 0) [deriv p () | p <- Set.toList ps]
+      rs2 <- liftM (filter (\p -> deg p > 0) . map (\(_,_,r) -> r) . concat) $
+        forM [(p1,p2) | p1 <- Set.toList ps, p2 <- Set.toList ps ++ Set.toList result, p1 /= p2] $ \(p1,p2) -> do
+          ret1 <- zmod p1 p2
+          ret2 <- zmod p2 p1
+          return $ catMaybes [ret1,ret2]
+      let ps' = Set.unions [Set.fromList rs | rs <- [rs1,rs2]] `Set.difference` result
+      go (result `Set.union` ps) ps'
 
 getHighestNonzeroTerm
   :: forall v. (Ord v, Show v, RenderVar v)
