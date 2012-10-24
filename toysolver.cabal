@@ -164,6 +164,21 @@ Executable toyfmf
     GHC-Options: -rtsopts
   GHC-Prof-Options: -auto-all
 
+Executable lp2smt
+  Main-is: lp2smt.hs
+  HS-Source-Dirs: src
+  Other-Modules:
+     Text.LPFile
+     Util
+  Build-Depends: base >=4 && <5, mtl, containers, parsec, OptDir
+  Extensions:
+     BangPatterns
+     ScopedTypeVariables
+     FlexibleInstances
+     MultiParamTypeClasses
+     FunctionalDependencies
+     GeneralizedNewtypeDeriving
+
 Executable lp2yices
   Main-is: lp2yices.hs
   HS-Source-Dirs: src
