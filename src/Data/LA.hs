@@ -47,6 +47,7 @@ module Data.LA
   -- * Atomic formula of linear arithmetics
   , Atom (..)
   , showAtom
+  , evalAtom
   , solveFor
 
   -- * misc
@@ -253,6 +254,10 @@ type Atom r = ArithRel.Rel (Expr r)
 
 showAtom :: (Num r, Eq r, Show r) => Atom r -> String
 showAtom (ArithRel.Rel lhs op rhs) = showExpr lhs ++ ArithRel.showOp op ++ showExpr rhs
+
+-- | evaluate the formula under the model.
+evalAtom :: (Num r, Ord r) => Model r -> Atom r -> Bool
+evalAtom m (ArithRel.Rel lhs op rhs) = ArithRel.evalOp op (evalExpr m lhs) (evalExpr m rhs)
 
 -- | Solve linear (in)equation for the given variable.
 --

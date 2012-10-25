@@ -19,6 +19,7 @@ module Data.ArithRel
   , flipOp
   , negOp
   , showOp
+  , evalOp
 
   -- * Relation
   , Rel (..)
@@ -71,6 +72,15 @@ showOp Ge = ">="
 showOp Gt = ">"
 showOp Eql = "="
 showOp NEq = "/="
+
+-- | evaluate an operator into a comparision function
+evalOp :: Ord a => RelOp -> a -> a -> Bool
+evalOp Lt = (<)
+evalOp Le = (<=)
+evalOp Ge = (>=)
+evalOp Gt = (>)
+evalOp Eql = (==)
+evalOp NEq = (/=)
 
 -- ---------------------------------------------------------------------------
 
