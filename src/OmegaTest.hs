@@ -142,7 +142,7 @@ boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $
        | (c,a)<-ls , (d,b)<-us ]
      cond2 = 
        [ [(a' .*. c) `leZ` (a .*. val) | (c,a)<-ls] ++
-         [(b .*. val) `geZ` (a' .*. d) | (d,b)<-us]
+         [(b .*. val) `leZ` (a' .*. d) | (d,b)<-us]
        | not (null us)
        , let m = maximum [b | (_,b)<-us]
        ,  (c',a') <- ls
