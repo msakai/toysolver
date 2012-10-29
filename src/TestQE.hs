@@ -146,19 +146,17 @@ case_FourierMotzkin_test2 =
 
 case_OmegaTest_test1 :: IO ()
 case_OmegaTest_test1 = 
-  case OmegaTest.solve test1 of
-    Unknown -> assertFailure "expected: Sat\n but got: Unknown"
-    Unsat   -> assertFailure "expected: Sat\n but got: Unsat"
-    Sat m   -> do
+  case OmegaTest.solveConj test1' of
+    Nothing -> assertFailure "expected: Just\n but got: Nothing"
+    Just m   -> do
       forM_ test1' $ \a -> do
         LA.evalAtom (IM.map fromInteger m) a @?= True
 
 case_OmegaTest_test2 :: IO ()
 case_OmegaTest_test2 = 
-  case OmegaTest.solve test2 of
-    Unknown -> assertFailure "expected: Unsat\n but got: Unknown"
-    Sat _   -> assertFailure "expected: Unsat\n but got: Sat"
-    Unsat   -> return ()
+  case OmegaTest.solveConj test2' of
+    Just _  -> assertFailure "expected: Nothing\n but got: Just"
+    Nothing -> return ()
 
 ------------------------------------------------------------------------
 

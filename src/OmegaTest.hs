@@ -29,14 +29,13 @@ module OmegaTest
     ( module Data.Expr
     , module Data.Formula
     , Lit (..)
-    , eliminateQuantifiers
-    , solve
+    , solveConj
     , solveQFLA
     ) where
 
 import Control.Monad
 import Data.List
-import Data.Maybe
+import Data.Ord
 import Data.Ratio
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
@@ -71,6 +70,7 @@ simplify = fmap concat . mapM f
 
 -- ---------------------------------------------------------------------------
 
+{-
 atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe (DNF Lit)
 atomZ op a b = do
   (e1,c1) <- FM.termR a
@@ -84,6 +84,7 @@ atomZ op a b = do
     Gt -> DNF [[a' `gtZ` b']]
     Eql -> eqZ a' b'
     NEq -> DNF [[a' `ltZ` b'], [a' `gtZ` b']]
+-}
 
 leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
 -- Note that constants may be floored by division
@@ -113,11 +114,6 @@ eqZ e1 e2
 -}
 type BoundsZ = ([Rat],[Rat])
 
-eliminate :: Var -> [Lit] -> DNF Lit
-eliminate v xs = DNF [rest] .&&. boundConditionsZ bnd
-   where
-     (bnd,rest) = collectBoundsZ v xs
-
 collectBoundsZ :: Var -> [Lit] -> (BoundsZ,[Lit])
 collectBoundsZ v = foldr phi (([],[]),[])
   where
@@ -131,73 +127,39 @@ collectBoundsZ v = foldr phi (([],[]),[])
             GT -> (((lnegate t', c) : ls, us), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
             LT -> ((ls, (t', negate c) : us), xs)   -- 0 ≤ cx + M ⇔ x ≤ M/-c
 
-boundConditionsZ :: BoundsZ -> DNF Lit
-boundConditionsZ (ls,us) = DNF $ catMaybes $ map simplify $
-  if isExact (ls,us)
-    then [cond1]
-    else cond1 : cond2
-  where
-     cond1 =
-       [ LA.constant ((a-1)*(b-1)) `leZ` (a .*. d .-. b .*. c)
-       | (c,a)<-ls , (d,b)<-us ]
-     cond2 = 
-       [ [(a' .*. c) `leZ` (a .*. val) | (c,a)<-ls] ++
-         [(b .*. val) `leZ` (a' .*. d) | (d,b)<-us]
-       | not (null us)
-       , let m = maximum [b | (_,b)<-us]
-       ,  (c',a') <- ls
-       , k <- [0 .. (m*a'-a'-m) `div` m]
-       , let val = c' .+. LA.constant k
-       -- x = val / a'
-       -- c / a ≤ x ⇔ c / a ≤ val / a' ⇔ a' c ≤ a val
-       -- x ≤ d / b ⇔ val / a' ≤ d / b ⇔ b val ≤ a' d
-       ]
-
 isExact :: BoundsZ -> Bool
 isExact (ls,us) = and [a==1 || b==1 | (_,a)<-ls , (_,b)<-us]
-
-eliminateQuantifiers :: Formula (Atom Rational) -> Maybe (DNF Lit)
-eliminateQuantifiers = f
-  where
-    f T = return true
-    f F = return false
-    f (Atom (Rel a op b)) = atomZ op a b
-    f (And a b) = liftM2 (.&&.) (f a) (f b)
-    f (Or a b) = liftM2 (.||.) (f a) (f b)
-    f (Not a) = f (pushNot a)
-    f (Imply a b) = f (Or (Not a) b)
-    f (Equiv a b) = f (And (Imply a b) (Imply b a))
-    f (Forall v a) = do
-      dnf <- f (Exists v (pushNot a))
-      return $ notB dnf
-    f (Exists v a) = do
-      dnf <- f a
-      return $ orB [eliminate v xs | xs <- unDNF dnf]
-
-solve :: Formula (Atom Rational) -> SatResult Integer
-solve formula =
-  case eliminateQuantifiers formula of
-    Nothing -> Unknown
-    Just dnf ->
-      case msum [solve' vs xs | xs <- unDNF dnf] of
-        Nothing -> Unsat
-        Just m -> Sat m
-  where
-    vs = IS.toList (vars formula)
 
 solve' :: [Var] -> [Lit] -> Maybe (Model Integer)
 solve' vs2 xs = simplify xs >>= go vs2
   where
     go :: [Var] -> [Lit] -> Maybe (Model Integer)
     go [] [] = return IM.empty
-    go [] _ = mzero
-    go vs ys = msum (map f (unDNF (boundConditionsZ bnd)))
+    go [] _  = mzero
+    go vs ys =
+      if isExact bnd
+        then case1
+        else case1 `mplus` case2
       where
-        (v,vs',bnd,rest) = chooseVariable vs ys
-        f zs = do
-          model <- go vs' (zs ++ rest)
-          val <- pickupZ (evalBoundsZ model bnd)
-          return $ IM.insert v val model
+        (v,vs',bnd@(ls,us),rest) = chooseVariable vs ys
+
+        case1 = do
+          let zs = [ LA.constant ((a-1)*(b-1)) `leZ` (a .*. d .-. b .*. c)
+                   | (c,a)<-ls , (d,b)<-us ]
+          model <- go vs' =<< simplify (zs ++ rest)
+          case pickupZ (evalBoundsZ model bnd) of
+            Nothing  -> error "solve': should not happen"
+            Just val -> return $ IM.insert v val model
+
+        case2 = msum
+          [ do eq <- isZero $ a' .*. LA.var v .-. (c' .+. LA.constant k)
+               let (vs'', lits'', mt) = elimEq eq (v:vs') ys
+               model <- go vs'' =<< simplify lits''
+               return $ mt model
+          | let m = maximum [b | (_,b)<-us]
+          ,  (c',a') <- ls
+          , k <- [0 .. (m*a'-a'-m) `div` m]
+          ]
 
 chooseVariable :: [Var] -> [Lit] -> (Var, [Var], BoundsZ, [Lit])
 chooseVariable vs xs = head $ [e | e@(_,_,bnd,_) <- table, isExact bnd] ++ table
@@ -211,6 +173,50 @@ evalBoundsZ model (ls,us) =
   foldl' intersectZ univZ $ 
     [ (Just (ceiling (LA.evalExpr model x % c)), Nothing) | (x,c) <- ls ] ++ 
     [ (Nothing, Just (floor (LA.evalExpr model x % c))) | (x,c) <- us ]
+
+elimEq :: ExprZ -> [Var] -> [Lit] -> ([Var], [Lit], Model Integer -> Model Integer)
+elimEq e vs lits = 
+  if abs ak == 1
+    then
+      case LA.extract xk e of
+        (_, e') ->
+          let xk_def = signum ak .*. lnegate e'
+          in ( vs
+             , [applySubst1Lit xk xk_def lit | lit <- lits]
+             , \model -> IM.insert xk (LA.evalExpr model xk_def) model
+             )
+    else
+      let m = abs ak + 1
+          xk_def = (- signum ak * m) .*. LA.var sigma .+.
+                     LA.fromTerms [(signum ak * (a `zmod` m), x) | (a,x) <- LA.terms e, x /= xk]
+          e2 = (- abs ak) .*. LA.var sigma .+. 
+                  LA.fromTerms [((floor (a%m + 1/2) + (a `zmod` m)), x) | (a,x) <- LA.terms e, x /= xk]
+               -- LA.applySubst1 xk xk_def e を normalize したもの
+      in case elimEq e2 (sigma : vs) [applySubst1Lit xk xk_def lit | lit <- lits] of
+           (vs2, lits2, mt) ->
+             ( vs2
+             , lits2
+             , \model ->
+                  let model2 = mt model
+                  in IM.delete sigma $ IM.insert xk (LA.evalExpr model2 xk_def) model2
+             )
+  where
+    (ak,xk) = minimumBy (comparing (abs . fst)) [(a,x) | (a,x) <- LA.terms e, x /= LA.unitVar]
+    sigma = maximum (-1 : vs) + 1
+
+applySubst1Lit :: Var -> ExprZ -> Lit -> Lit
+applySubst1Lit v e (Nonneg e2) = LA.applySubst1 v e e2 `geZ` LA.constant 0
+
+-- ---------------------------------------------------------------------------
+
+isZero :: ExprZ -> Maybe ExprZ
+isZero e
+  = if LA.coeff LA.unitVar e `mod` d == 0
+    then Just $ e2
+    else Nothing
+  where
+    e2 = LA.mapCoeff (`div` d) e
+    d = abs $ gcd' [c | (c,v) <- LA.terms e, v /= LA.unitVar]
 
 -- ---------------------------------------------------------------------------
 
@@ -230,6 +236,29 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 
 -- ---------------------------------------------------------------------------
 
+solveConj :: [LA.Atom Rational] -> Maybe (Model Integer)
+solveConj cs = msum [solve' (IS.toList vs) lits | lits <- unDNF dnf]
+  where
+    dnf = andB (map f cs)
+    vs = vars cs
+    f (Rel lhs op rhs) =
+      case op of
+        Lt  -> DNF [[a `ltZ` b]]
+        Le  -> DNF [[a `leZ` b]]
+        Gt  -> DNF [[a `gtZ` b]]
+        Ge  -> DNF [[a `geZ` b]]
+        Eql -> eqZ a b
+        NEq -> DNF [[a `ltZ` b], [a `gtZ` b]]
+      where
+        (e1,c1) = g lhs
+        (e2,c2) = g rhs
+        a = c2 .*. e1
+        b = c1 .*. e2
+    g :: LA.Expr Rational -> (ExprZ, Integer)
+    g a = (LA.mapCoeff (\c -> floor (c * fromInteger d)) a, d)
+      where
+        d = foldl' lcm 1 [denominator c | (c,_) <- LA.terms a]
+
 solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
 solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
   where
@@ -248,6 +277,9 @@ solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dn
 
 -- ---------------------------------------------------------------------------
 
+zmod :: Integer -> Integer -> Integer
+a `zmod` b = a - b * floor (a % b + 1 / 2)
+
 gcd' :: [Integer] -> Integer
 gcd' [] = 1
 gcd' xs = foldl1' gcd xs
@@ -255,55 +287,5 @@ gcd' xs = foldl1' gcd xs
 pickup :: [a] -> [(a,[a])]
 pickup [] = []
 pickup (x:xs) = (x,xs) : [(y,x:ys) | (y,ys) <- pickup xs]
-
--- ---------------------------------------------------------------------------
-
-{-
-7x + 12y + 31z = 17
-3x + 5y + 14z = 7
-1 ≤ x ≤ 40
--50 ≤ y ≤ 50
-
-satisfiable in R
-but unsatisfiable in Z
--}
-test1 :: Formula (Atom Rational)
-test1 = c1 .&&. c2 .&&. c3 .&&. c4
-  where
-    x = Var 0
-    y = Var 1
-    z = Var 2
-    c1 = 7*x + 12*y + 31*z .==. 17
-    c2 = 3*x + 5*y + 14*z .==. 7
-    c3 = 1 .<=. x .&&. x .<=. 40
-    c4 = (-50) .<=. y .&&. y .<=. 50
-
-test1' :: [LA.Atom Rational]
-test1' = [c1, c2] ++ c3 ++ c4
-  where
-    x = LA.var 0
-    y = LA.var 1
-    z = LA.var 2
-    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. LA.constant 17
-    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. LA.constant 7
-    c3 = [LA.constant 1 .<=. x, x .<=. LA.constant 40]
-    c4 = [LA.constant (-50) .<=. y, y .<=. LA.constant 50]
-
-{-
-27 ≤ 11x+13y ≤ 45
--10 ≤ 7x-9y ≤ 4
-
-satisfiable in R
-but unsatisfiable in Z
--}
-test2 :: Formula (Atom Rational)
-test2 = c1 .&&. c2
-  where
-    x = Var 0
-    y = Var 1
-    t1 = 11*x + 13*y
-    t2 = 7*x - 9*y
-    c1 = 27 .<=. t1 .&&. t1 .<=. 45
-    c2 = (-10) .<=. t2 .&&. t2 .<=. 4
 
 -- ---------------------------------------------------------------------------
