@@ -18,9 +18,9 @@ import qualified Data.LA as LA
 import qualified FourierMotzkin
 import qualified OmegaTest
 import qualified Cooper
+import qualified Simplex2
 
 ------------------------------------------------------------------------
-
 
 {-
 Example from the OmegaTest paper
@@ -175,6 +175,24 @@ case_Cooper_test2 =
     Unknown -> assertFailure "expected: Unsat\n but got: Unknown"
     Sat _   -> assertFailure "expected: Unsat\n but got: Sat"
     Unsat   -> return ()
+
+------------------------------------------------------------------------
+
+case_Simplex2_test1 :: IO ()
+case_Simplex2_test1 = do
+  solver <- Simplex2.newSolver
+  replicateM 3 (Simplex2.newVar solver) -- XXX
+  mapM_ (Simplex2.assertAtomEx solver) test1'
+  ret <- Simplex2.check solver
+  ret @?= True
+
+case_Simplex2_test2 :: IO ()
+case_Simplex2_test2 = do
+  solver <- Simplex2.newSolver
+  replicateM 2 (Simplex2.newVar solver) -- XXX
+  mapM_ (Simplex2.assertAtomEx solver) test2'
+  ret <- Simplex2.check solver
+  ret @?= True
 
 ------------------------------------------------------------------------
 -- Test harness
