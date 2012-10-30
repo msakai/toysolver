@@ -126,19 +126,17 @@ test2' =
 
 case_FourierMotzkin_test1 :: IO ()
 case_FourierMotzkin_test1 = 
-  case FourierMotzkin.solve test1 of
-    Unknown -> assertFailure "expected: Sat\n but got: Unknown"
-    Unsat   -> assertFailure "expected: Sat\n but got: Unsat"
-    Sat m   ->
+  case FourierMotzkin.solveConj test1' of
+    Nothing -> assertFailure "expected: Just\n but got: Nothing"
+    Just m  ->
       forM_ test1' $ \a -> do
         LA.evalAtom m a @?= True
 
 case_FourierMotzkin_test2 :: IO ()
 case_FourierMotzkin_test2 = 
-  case FourierMotzkin.solve test2 of
-    Unknown -> assertFailure "expected: Sat\n but got: Unknown"
-    Unsat   -> assertFailure "expected: Sat\n but got: Unsat"
-    Sat m   ->
+  case FourierMotzkin.solveConj test2' of
+    Nothing -> assertFailure "expected: Just\n but got: Nothing"
+    Just m  ->
       forM_ test2' $ \a -> do
         LA.evalAtom m a @?= True
 
@@ -148,7 +146,7 @@ case_OmegaTest_test1 :: IO ()
 case_OmegaTest_test1 = 
   case OmegaTest.solveConj test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
-    Just m   -> do
+    Just m  -> do
       forM_ test1' $ \a -> do
         LA.evalAtom (IM.map fromInteger m) a @?= True
 
@@ -162,19 +160,17 @@ case_OmegaTest_test2 =
 
 case_Cooper_test1 :: IO ()
 case_Cooper_test1 = 
-  case Cooper.solve test1 of
-    Unknown -> assertFailure "expected: Sat\n but got: Unknown"
-    Unsat   -> assertFailure "expected: Sat\n but got: Unsat"
-    Sat m   -> do
+  case Cooper.solveConj test1' of
+    Nothing -> assertFailure "expected: Just\n but got: Nothing"
+    Just m  -> do
       forM_ test1' $ \a -> do
         LA.evalAtom (IM.map fromInteger m) a @?= True
 
 case_Cooper_test2 :: IO ()
 case_Cooper_test2 = 
-  case Cooper.solve test2 of
-    Unknown -> assertFailure "expected: Unsat\n but got: Unknown"
-    Sat _   -> assertFailure "expected: Unsat\n but got: Sat"
-    Unsat   -> return ()
+  case Cooper.solveConj test2' of
+    Just _  -> assertFailure "expected: Nothing\n but got: Just"
+    Nothing -> return ()
 
 ------------------------------------------------------------------------
 

@@ -23,6 +23,7 @@ module FourierMotzkin
     , Lit (..)
     , eliminateQuantifiers
     , solve
+    , solveConj
 
     -- FIXME
     , termR
@@ -220,6 +221,11 @@ evalBounds model (ls1,ls2,us1,us2) =
     [ Interval.interval Nothing (Just (True, evalRat model x))  | x <- us1 ] ++
     [ Interval.interval Nothing (Just (False, evalRat model x)) | x <- us2 ]
 
+solveConj :: [LA.Atom Rational] -> Maybe (Model Rational)
+solveConj cs = msum [solve' vs cs2 | cs2 <- unDNF (constraintsToDNF cs)]
+  where
+    vs = IS.toList (vars cs)
+
 -- ---------------------------------------------------------------------------
 
 constraintsToDNF :: [LA.Atom Rational] -> DNF Lit
@@ -248,55 +254,5 @@ constraintToDNF (Rel lhs op rhs) = DNF $
 gcd' :: [Integer] -> Integer
 gcd' [] = 1
 gcd' xs = foldl1' gcd xs
-
--- ---------------------------------------------------------------------------
-
-{-
-7x + 12y + 31z = 17
-3x + 5y + 14z = 7
-1 ≤ x ≤ 40
--50 ≤ y ≤ 50
-
-satisfiable in R
-but unsatisfiable in Z
--}
-test1 :: Formula (Atom Rational)
-test1 = c1 .&&. c2 .&&. c3 .&&. c4
-  where
-    x = Var 0
-    y = Var 1
-    z = Var 2
-    c1 = 7*x + 12*y + 31*z .==. 17
-    c2 = 3*x + 5*y + 14*z .==. 7
-    c3 = 1 .<=. x .&&. x .<=. 40
-    c4 = (-50) .<=. y .&&. y .<=. 50
-
-test1' :: [LA.Atom Rational]
-test1' = [c1, c2] ++ c3 ++ c4
-  where
-    x = LA.var 0
-    y = LA.var 1
-    z = LA.var 2
-    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. LA.constant 17
-    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. LA.constant 7
-    c3 = [LA.constant 1 .<=. x, x .<=. LA.constant 40]
-    c4 = [LA.constant (-50) .<=. y, y .<=. LA.constant 50]
-
-{-
-27 ≤ 11x+13y ≤ 45
--10 ≤ 7x-9y ≤ 4
-
-satisfiable in R
-but unsatisfiable in Z
--}
-test2 :: Formula (Atom Rational)
-test2 = c1 .&&. c2
-  where
-    x = Var 0
-    y = Var 1
-    t1 = 11*x + 13*y
-    t2 = 7*x - 9*y
-    c1 = 27 .<=. t1 .&&. t1 .<=. 45
-    c2 = (-10) .<=. t2 .&&. t2 .<=. 4
 
 -- ---------------------------------------------------------------------------

@@ -30,6 +30,7 @@ module Cooper
     , Formula' (..)
     , eliminateQuantifiers
     , solve
+    , solveConj
     , solveQFLA
     , Model
     ) where
@@ -345,6 +346,16 @@ solve' vs2 formula2 = go vs2 (simplify formula2)
 
 -- ---------------------------------------------------------------------------
 
+solveConj :: [LA.Atom Rational] -> Maybe (Model Integer)
+solveConj cs = msum [ solve' vs (foldr And' T' (map f xs)) | xs <- unDNF dnf ]
+  where
+    dnf = FM.constraintsToDNF cs
+    vs = IS.toList (vars cs)
+
+    f :: FM.Lit -> Formula'
+    f (FM.Nonneg e) = Lit $ e `geZ` LA.constant 0
+    f (FM.Pos e)    = Lit $ e `gtZ` LA.constant 0
+
 -- | solve a (open) quantifier-free formula
 solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
 solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
@@ -367,49 +378,6 @@ solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dn
     f (FM.Pos e)    = Lit $ e `gtZ` LA.constant 0
 
 -- ---------------------------------------------------------------------------
-
-{-
-7x + 12y + 31z = 17
-3x + 5y + 14z = 7
-1 ≤ x ≤ 40
--50 ≤ y ≤ 50
-
-satisfiable in R
-but unsatisfiable in Z
--}
-test1 :: Formula (Atom Rational)
-test1 = c1 .&&. c2 .&&. c3 .&&. c4
-  where
-    x = Var 0
-    y = Var 1
-    z = Var 2
-    c1 = 7*x + 12*y + 31*z .==. 17
-    c2 = 3*x + 5*y + 14*z .==. 7
-    c3 = 1 .<=. x .&&. x .<=. 40
-    c4 = (-50) .<=. y .&&. y .<=. 50
-
-test1' :: Formula (Atom Rational)
-test1' = Exists 0 $ Exists 1 $ Exists 2 $ test1
-
-{-
-27 ≤ 11x+13y ≤ 45
--10 ≤ 7x-9y ≤ 4
-
-satisfiable in R
-but unsatisfiable in Z
--}
-test2 :: Formula (Atom Rational)
-test2 = c1 .&&. c2
-  where
-    x = Var 0
-    y = Var 1
-    t1 = 11*x + 13*y
-    t2 = 7*x - 9*y
-    c1 = 27 .<=. t1 .&&. t1 .<=. 45
-    c2 = (-10) .<=. t2 .&&. t2 .<=. 4
-
-test2' :: Formula (Atom Rational)
-test2' = Exists 0 $ Exists 1 $ test2
 
 testHagiya :: Formula'
 testHagiya = eliminateZ 1 $ c1 .&&. c2 .&&. c3

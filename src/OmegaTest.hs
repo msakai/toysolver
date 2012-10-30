@@ -26,9 +26,9 @@
 --
 -----------------------------------------------------------------------------
 module OmegaTest
-    ( module Data.Expr
-    , module Data.Formula
-    , Lit (..)
+    ( {- module Data.Expr
+    , module Data.Formula -}
+      Model
     , solveConj
     , solveQFLA
     ) where
