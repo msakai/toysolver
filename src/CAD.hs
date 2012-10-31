@@ -43,6 +43,7 @@ module CAD
 
   -- * Solving
   , solve
+  , solve'
 
   -- * Model
   , Model
@@ -408,9 +409,23 @@ evalPoint m (RootOf p n) =
 
 solve
   :: forall v. (Ord v, Show v, RenderVar v)
+  => [(Rel (Polynomial Rational v))]
+  -> Maybe (Model v)
+solve cs0 = solve' (map f cs0)
+  where
+    f (Rel lhs op rhs) = (lhs - rhs, g op)
+    g Le  = [Zero, Neg]
+    g Ge  = [Zero, Pos]
+    g Lt  = [Neg]
+    g Gt  = [Pos]
+    g Eql = [Zero]
+    g NEq = [Pos,Neg]
+
+solve'
+  :: forall v. (Ord v, Show v, RenderVar v)
   => [(Polynomial Rational v, [Sign])]
   -> Maybe (Model v)
-solve cs0 = go vs0 cs0
+solve' cs0 = go vs0 cs0
   where
     vs0 = Set.toList $ Set.unions [variables p | (p,_) <- cs0]
 
@@ -492,11 +507,11 @@ test1b :: Bool
 test1b = isJust $ solve cs
   where
     x = var ()
-    cs = [(x + 1, [Pos]), (-2*x + 3, [Pos]), (x, [Pos])]
+    cs = [x + 1 .>. 0, -2*x + 3 .>. 0, x .>. 0]
 
 test1c :: Bool
 test1c = isJust $ do
-  m <- solve cs
+  m <- solve' cs
   guard $ and $ do
     (p, ss) <- cs
     let val = eval (m Map.!) (mapCoeff fromRational p)
@@ -517,7 +532,7 @@ test2b :: Bool
 test2b = isNothing $ solve cs
   where
     x = var ()
-    cs = [(x^(2::Int), [Neg])]
+    cs = [x^(2::Int) .<. 0]
 
 test = and [test1b, test1c, test2b]
 
@@ -549,7 +564,7 @@ test_project_3_print =  dumpProjection $ project [(toUPolynomialOf p 0, [Neg])]
     p :: Polynomial Rational Int
     p = a^(2::Int) + b^(2::Int) + c^(2::Int) - 1
 
-test_solve = solve [(p, [Neg])]
+test_solve = solve [p .<. 0]
   where
     a = var 0
     b = var 1

@@ -18,20 +18,16 @@
 --
 -----------------------------------------------------------------------------
 module FourierMotzkin
-    ( module Data.Expr
-    , module Data.Formula
-    , Lit (..)
+    ( Lit (..)
+    , project
+    , projectN
     , eliminateQuantifiers
     , solve
     , solveConj
 
-    -- FIXME
+    -- Functions for internal use in OmegaTest
     , termR
     , Rat
-    , collectBounds
-    , boundConditions
-    , evalBounds
-    , simplify
     , constraintsToDNF
     ) where
 
@@ -91,13 +87,17 @@ atomR :: RelOp -> Expr Rational -> Expr Rational -> Maybe (DNF Lit)
 atomR op a b = do
   a' <- termR a
   b' <- termR b
-  return $ case op of
-    Le -> DNF [[a' `leR` b']]
-    Lt -> DNF [[a' `ltR` b']]
-    Ge -> DNF [[a' `geR` b']]
-    Gt -> DNF [[a' `gtR` b']]
-    Eql -> DNF [[a' `leR` b', a' `geR` b']]
-    NEq -> DNF [[a' `ltR` b'], [a' `gtR` b']]
+  return $ atomR' op a' b'
+
+atomR' :: RelOp -> Rat -> Rat -> DNF Lit
+atomR' op a b = 
+  case op of
+    Le -> DNF [[a `leR` b]]
+    Lt -> DNF [[a `ltR` b]]
+    Ge -> DNF [[a `geR` b]]
+    Gt -> DNF [[a `gtR` b]]
+    Eql -> DNF [[a `leR` b, a `geR` b]]
+    NEq -> DNF [[a `ltR` b], [a `gtR` b]]
 
 termR :: Expr Rational -> Maybe Rat
 termR (Const c) = return (LA.constant (numerator c), denominator c)
@@ -129,6 +129,10 @@ normalizeExprR :: ExprZ -> ExprZ
 normalizeExprR e = LA.mapCoeff (`div` d) e
   where d = abs $ gcd' $ map fst $ LA.terms e
 
+litToLAAtom :: Lit -> LA.Atom Rational
+litToLAAtom (Nonneg e) = LA.mapCoeff fromInteger e .>=. LA.constant 0
+litToLAAtom (Pos e)    = LA.mapCoeff fromInteger e .>. LA.constant 0
+
 -- ---------------------------------------------------------------------------
 
 {-
@@ -137,10 +141,39 @@ normalizeExprR e = LA.mapCoeff (`div` d) e
 -}
 type BoundsR = ([Rat], [Rat], [Rat], [Rat])
 
-eliminate :: Var -> [Lit] -> DNF Lit
-eliminate v xs = DNF [rest] .&&. boundConditions bnd
+project :: Var -> [LA.Atom Rational] -> [([LA.Atom Rational], Model Rational -> Model Rational)]
+project v xs = do
+  ys <- unDNF $ constraintsToDNF xs
+  (zs, mt) <- project' v ys
+  return (map litToLAAtom zs, mt)
+
+project' :: Var -> [Lit] -> [([Lit], Model Rational -> Model Rational)]
+project' v xs = do
+  case collectBounds v xs of
+    (bnd, rest) -> do
+      cond <- unDNF $ boundConditions bnd
+      let mt m =
+           case Interval.pickup (evalBounds m bnd) of
+             Nothing  -> error "FourierMotzkin.project: should not happen"
+             Just val -> IM.insert v val m
+      return (rest ++ cond, mt)
+
+projectN :: VarSet -> [LA.Atom Rational] -> [([LA.Atom Rational], Model Rational -> Model Rational)]
+projectN vs xs = do
+  ys <- unDNF $ constraintsToDNF xs
+  (zs, mt) <- projectN' vs ys
+  return (map litToLAAtom zs, mt)
+
+projectN' :: VarSet -> [Lit] -> [([Lit], Model Rational -> Model Rational)]
+projectN' vs2 xs2 = do
+  (zs, mt) <- f (IS.toList vs2) xs2
+  return (zs, mt)
   where
-    (bnd, rest) = collectBounds v xs
+    f [] xs     = return (xs, id)
+    f (v:vs) xs = do
+      (ys, mt1) <- project' v xs
+      (zs, mt2) <- f vs ys
+      return (zs, mt1 . mt2)
 
 collectBounds :: Var -> [Lit] -> (BoundsR, [Lit])
 collectBounds v = foldr phi (([],[],[],[]),[])
@@ -187,7 +220,7 @@ eliminateQuantifiers = f
       return (notB dnf)
     f (Exists v a) = do
       dnf <- f a
-      return $ orB [eliminate v xs | xs <- unDNF dnf]
+      return $ orB [DNF $ map fst $ project' v xs | xs <- unDNF dnf]
 
 solve :: Formula (Atom Rational) -> SatResult Rational
 solve formula =
@@ -200,18 +233,16 @@ solve formula =
   where
     vs = IS.toList (vars formula)
 
-solve' :: [Var] -> [Lit] -> Maybe (Model Rational)
-solve' vs2 xs = simplify xs >>= go vs2
+solveConj :: [LA.Atom Rational] -> Maybe (Model Rational)
+solveConj cs = msum [solve' vs cs2 | cs2 <- unDNF (constraintsToDNF cs)]
   where
-    go [] [] = return IM.empty
-    go [] _ = mzero
-    go (v:vs) ys = msum (map f (unDNF (boundConditions bnd)))
-      where
-        (bnd, rest) = collectBounds v ys
-        f zs = do
-          model <- go vs (zs ++ rest)
-          val <- Interval.pickup (evalBounds model bnd)
-          return $ IM.insert v val model
+    vs = IS.toList (vars cs)
+
+solve' :: [Var] -> [Lit] -> Maybe (Model Rational)
+solve' vs xs = listToMaybe $ do
+  (ys,mt) <- projectN' (IS.fromList vs) =<< maybeToList (simplify xs)
+  guard $ Just [] == simplify ys
+  return $ mt IM.empty
 
 evalBounds :: Model Rational -> BoundsR -> Interval.Interval Rational
 evalBounds model (ls1,ls2,us1,us2) =
@@ -220,11 +251,6 @@ evalBounds model (ls1,ls2,us1,us2) =
     [ Interval.interval (Just (False, evalRat model x)) Nothing | x <- ls2 ] ++
     [ Interval.interval Nothing (Just (True, evalRat model x))  | x <- us1 ] ++
     [ Interval.interval Nothing (Just (False, evalRat model x)) | x <- us2 ]
-
-solveConj :: [LA.Atom Rational] -> Maybe (Model Rational)
-solveConj cs = msum [solve' vs cs2 | cs2 <- unDNF (constraintsToDNF cs)]
-  where
-    vs = IS.toList (vars cs)
 
 -- ---------------------------------------------------------------------------
 
@@ -247,7 +273,7 @@ constraintToDNF (Rel lhs op rhs) = DNF $
     normalize e = LA.mapCoeff (round . (*c)) e
       where
         c = fromIntegral $ foldl' lcm 1 ds
-        ds = [denominator c | (c,_) <- LA.terms e]
+        ds = [denominator d | (d,_) <- LA.terms e]
 
 -- ---------------------------------------------------------------------------
 

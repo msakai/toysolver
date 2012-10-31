@@ -23,9 +23,7 @@
 --
 -----------------------------------------------------------------------------
 module Cooper
-    ( module Data.Expr
-    , module Data.Formula
-    , ExprZ
+    ( ExprZ
     , Lit (..)
     , Formula' (..)
     , eliminateQuantifiers
@@ -46,7 +44,6 @@ import Data.Formula
 import Data.Linear
 import qualified Data.LA as LA
 import qualified FourierMotzkin as FM
-import qualified Data.Interval as Interval
 
 -- ---------------------------------------------------------------------------
 
@@ -358,24 +355,12 @@ solveConj cs = msum [ solve' vs (foldr And' T' (map f xs)) | xs <- unDNF dnf ]
 
 -- | solve a (open) quantifier-free formula
 solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
-solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
+solveQFLA cs ivs = listToMaybe $ do
+  (cs2, mt) <- FM.projectN rvs cs
+  m <- maybeToList $ solveConj cs2
+  return $ mt $ IM.map fromInteger m
   where
     rvs = vars cs `IS.difference` ivs
-    dnf = FM.constraintsToDNF cs
-
-    go :: [Var] -> [FM.Lit] -> Maybe (Model Rational)
-    go [] xs = fmap (fmap fromIntegral) $ solve' (IS.toList ivs) (foldr And' T' (map f xs))
-    go (v:vs) ys = msum $ map g $ unDNF $ FM.boundConditions bnd
-      where
-        (bnd, rest) = FM.collectBounds v ys
-        g zs = do
-          model <- go vs (zs ++ rest)
-          val <- Interval.pickup (FM.evalBounds model bnd)
-          return $ IM.insert v val model
-
-    f :: FM.Lit -> Formula'
-    f (FM.Nonneg e) = Lit $ e `geZ` LA.constant 0
-    f (FM.Pos e)    = Lit $ e `gtZ` LA.constant 0
 
 -- ---------------------------------------------------------------------------
 

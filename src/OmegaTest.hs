@@ -26,15 +26,14 @@
 --
 -----------------------------------------------------------------------------
 module OmegaTest
-    ( {- module Data.Expr
-    , module Data.Formula -}
-      Model
-    , solveConj
+    ( Model
+    , solve
     , solveQFLA
     ) where
 
 import Control.Monad
 import Data.List
+import Data.Maybe
 import Data.Ord
 import Data.Ratio
 import qualified Data.IntMap as IM
@@ -44,7 +43,6 @@ import Data.Expr
 import Data.Formula
 import Data.Linear
 import qualified Data.LA as LA
-import qualified Data.Interval as Interval
 import Util (combineMaybe)
 import qualified FourierMotzkin as FM
 import FourierMotzkin (Lit (..), Rat)
@@ -69,22 +67,6 @@ simplify = fmap concat . mapM f
         Nothing -> return [lit]
 
 -- ---------------------------------------------------------------------------
-
-{-
-atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe (DNF Lit)
-atomZ op a b = do
-  (e1,c1) <- FM.termR a
-  (e2,c2) <- FM.termR b
-  let a' = c2 .*. e1
-      b' = c1 .*. e2
-  return $ case op of
-    Le -> DNF [[a' `leZ` b']]
-    Lt -> DNF [[a' `ltZ` b']]
-    Ge -> DNF [[a' `geZ` b']]
-    Gt -> DNF [[a' `gtZ` b']]
-    Eql -> eqZ a' b'
-    NEq -> DNF [[a' `ltZ` b'], [a' `gtZ` b']]
--}
 
 leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
 -- Note that constants may be floored by division
@@ -236,8 +218,8 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 
 -- ---------------------------------------------------------------------------
 
-solveConj :: [LA.Atom Rational] -> Maybe (Model Integer)
-solveConj cs = msum [solve' (IS.toList vs) lits | lits <- unDNF dnf]
+solve :: [LA.Atom Rational] -> Maybe (Model Integer)
+solve cs = msum [solve' (IS.toList vs) lits | lits <- unDNF dnf]
   where
     dnf = andB (map f cs)
     vs = vars cs
@@ -260,20 +242,12 @@ solveConj cs = msum [solve' (IS.toList vs) lits | lits <- unDNF dnf]
         d = foldl' lcm 1 [denominator c | (c,_) <- LA.terms a]
 
 solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
-solveQFLA cs ivs = msum [ FM.simplify xs >>= go (IS.toList rvs) | xs <- unDNF dnf ]
+solveQFLA cs ivs = listToMaybe $ do
+  (cs2, mt) <- FM.projectN rvs cs
+  m <- maybeToList $ solve cs2
+  return $ mt $ IM.map fromInteger m
   where
     rvs = vars cs `IS.difference` ivs
-    dnf = FM.constraintsToDNF cs
-
-    go :: [Var] -> [Lit] -> Maybe (Model Rational)
-    go [] xs = fmap (fmap fromIntegral) $ solve' (IS.toList ivs) xs
-    go (v:vs) ys = msum (map f (unDNF (FM.boundConditions bnd)))
-      where
-        (bnd, rest) = FM.collectBounds v ys
-        f zs = do
-          model <- go vs (zs ++ rest)
-          val <- Interval.pickup (FM.evalBounds model bnd)
-          return $ IM.insert v val model
 
 -- ---------------------------------------------------------------------------
 

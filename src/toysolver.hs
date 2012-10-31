@@ -256,13 +256,7 @@ run solver opt lp printModel = do
               let m3 = Map.fromAscList [(v, m2 IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m3
       where
-        g (Rel lhs rel rhs) =
-          case rel of
-            Ge  -> (e, [CAD.Zero, CAD.Pos])
-            Le  -> (e, [CAD.Zero, CAD.Neg])
-            Eql -> (e, [CAD.Zero])
-          where
-            e = f lhs - f rhs
+        g (Rel lhs rel rhs) = Rel (f lhs) rel (f rhs)
 
         f (Const r)   = P.constant r
         f (Var v)     = P.var v

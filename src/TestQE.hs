@@ -4,20 +4,24 @@ module Main (main) where
 import Control.Monad
 import Data.List
 import qualified Data.IntMap as IM
+import qualified Data.Map as Map
 import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 
+import Data.AlgebraicNumber
 import Data.ArithRel
 import Data.Expr
 import Data.Formula
 import Data.Linear
 import qualified Data.LA as LA
+import qualified Data.Polynomial as P
 
 import qualified FourierMotzkin
 import qualified OmegaTest
 import qualified Cooper
+import qualified CAD
 import qualified Simplex2
 
 ------------------------------------------------------------------------
@@ -142,9 +146,43 @@ case_FourierMotzkin_test2 =
 
 ------------------------------------------------------------------------
 
+case_CAD_test1 :: IO ()
+case_CAD_test1 = 
+  case CAD.solve test1'' of
+    Nothing -> assertFailure "expected: Just\n but got: Nothing"
+    Just m  ->
+      forM_ test1'' $ \a -> do
+        evalPAtom m a @?= True
+  where
+    test1'' = map toPRel test1'
+
+case_CAD_test2 :: IO ()
+case_CAD_test2 = 
+  case CAD.solve test2'' of
+    Nothing -> assertFailure "expected: Just\n but got: Nothing"
+    Just m  ->
+      forM_ test2'' $ \a -> do
+        evalPAtom m a @?= True
+  where
+    test2'' = map toPRel test2'
+
+toP :: LA.Expr Rational -> P.Polynomial Rational Int
+toP e = P.fromTerms [(c, if x == LA.unitVar then P.mmOne else P.mmVar x) | (c,x) <- LA.terms e]
+
+toPRel :: LA.Atom Rational -> Rel (P.Polynomial Rational Int)
+toPRel (Rel lhs op rhs) = Rel (toP lhs) op (toP rhs)  
+
+evalP :: Map.Map Int AReal -> P.Polynomial Rational Int -> AReal
+evalP m p = P.eval (m Map.!) $ P.mapCoeff fromRational p
+
+evalPAtom :: Map.Map Int AReal -> Rel (P.Polynomial Rational Int) -> Bool
+evalPAtom m (Rel lhs op rhs) =　evalOp op (evalP m lhs) (evalP m rhs)
+
+------------------------------------------------------------------------
+
 case_OmegaTest_test1 :: IO ()
 case_OmegaTest_test1 = 
-  case OmegaTest.solveConj test1' of
+  case OmegaTest.solve test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
       forM_ test1' $ \a -> do
@@ -152,7 +190,7 @@ case_OmegaTest_test1 =
 
 case_OmegaTest_test2 :: IO ()
 case_OmegaTest_test2 = 
-  case OmegaTest.solveConj test2' of
+  case OmegaTest.solve test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
 
