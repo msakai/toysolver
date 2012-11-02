@@ -23,6 +23,7 @@ import qualified OmegaTest
 import qualified Cooper
 import qualified CAD
 import qualified Simplex2
+import qualified ContiTraverso
 
 ------------------------------------------------------------------------
 
@@ -227,6 +228,24 @@ case_Simplex2_test2 = do
   mapM_ (Simplex2.assertAtomEx solver) test2'
   ret <- Simplex2.check solver
   ret @?= True
+
+------------------------------------------------------------------------
+
+-- Too slow
+
+disabled_case_ContiTraverso_test1 :: IO ()
+disabled_case_ContiTraverso_test1 = 
+  case ContiTraverso.solve P.grlex test1' (LA.constant 0) of
+    Nothing -> assertFailure "expected: Just\n but got: Nothing"
+    Just m  -> do
+      forM_ test1' $ \a -> do
+        LA.evalAtom (IM.map fromInteger m) a @?= True
+
+disabled_case_ContiTraverso_test2 :: IO ()
+disabled_case_ContiTraverso_test2 = 
+  case ContiTraverso.solve P.grlex test2' (LA.constant 0) of
+    Just _  -> assertFailure "expected: Nothing\n but got: Just"
+    Nothing -> return ()
 
 ------------------------------------------------------------------------
 -- Test harness

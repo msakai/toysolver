@@ -279,6 +279,13 @@ Test-suite TestQE
   Build-depends:     base >=4 && <5, mtl, containers, deepseq, heaps, primes, OptDir, stm, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
+Test-suite TestContiTraverso
+  Type:              exitcode-stdio-1.0
+  HS-Source-Dirs:    src
+  Main-is:           TestContiTraverso.hs
+  Build-depends:     base >=4 && <5, mtl, containers, deepseq, heaps, primes, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Extensions: TemplateHaskell, DoAndIfThenElse
+
 Test-suite TestLPFile
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    src
