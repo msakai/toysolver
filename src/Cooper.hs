@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Cooper
@@ -7,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (FlexibleInstances)
 --
 -- Naive implementation of Cooper's algorithm
 --
@@ -23,14 +24,28 @@
 --
 -----------------------------------------------------------------------------
 module Cooper
-    ( ExprZ
+    (
+    -- * Language of presburger arithmetics
+      ExprZ
     , Lit (..)
-    , Formula' (..)
+    , QFFormula (..)
+    , (.|.)
+    , Model
+
+    -- * Projection
+    , project
+    , projectCases
+    , projectCases'
+    , projectCasesN
+
+    -- * Quantifier elimination
     , eliminateQuantifiers
-    , solve
+
+    -- * Constraint solving
+    , solveFormula
+    , solveQFFormula
     , solveConj
     , solveQFLA
-    , Model
     ) where
 
 import Control.Monad
@@ -38,7 +53,9 @@ import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.Ratio
 
+import Data.ArithRel
 import Data.Expr
 import Data.Formula
 import Data.Linear
@@ -50,7 +67,7 @@ import qualified FourierMotzkin as FM
 -- | Linear arithmetic expression over integers.
 type ExprZ = LA.Expr Integer
 
-atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe Formula'
+atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe QFFormula
 atomZ op a b = do
   (e1,c1) <- FM.termR a
   (e2,c2) <- FM.termR b
@@ -70,7 +87,7 @@ ltZ e1 e2 = Pos $ (e2 .-. e1)
 geZ = flip leZ
 gtZ = flip gtZ
 
-eqZ :: ExprZ -> ExprZ -> Formula'
+eqZ :: ExprZ -> ExprZ -> QFFormula
 eqZ e1 e2 = Lit (e1 `leZ` e2) .&&. Lit (e1 `geZ` e2)
 
 -- | Literal
@@ -94,30 +111,50 @@ instance Complement Lit where
   notB (Divisible b c e) = Divisible (not b) c e
 
 -- | quantifier-free negation normal form
-data Formula'
+data QFFormula
     = T'
     | F'
-    | And' Formula' Formula'
-    | Or' Formula' Formula'
+    | And' QFFormula QFFormula
+    | Or' QFFormula QFFormula
     | Lit Lit
     deriving (Show, Eq, Ord)
 
-instance Complement Formula' where
+instance Complement QFFormula where
   notB T' = F'
   notB F' = T'
   notB (And' a b) = Or' (notB a) (notB b)
   notB (Or' a b) = And' (notB a) (notB b)
   notB (Lit lit) = Lit (notB lit)
 
-instance Lattice Formula' where
+instance Lattice QFFormula where
   top    = T'
   bottom = F'
   meet   = And'
   join   = Or'
 
-instance Boolean Formula'
+instance Boolean QFFormula
 
-subst1 :: Var -> ExprZ -> Formula' -> Formula'
+instance Variables QFFormula where
+  vars T' = IS.empty
+  vars F' = IS.empty
+  vars (And' a b) = vars a `IS.union` vars b
+  vars (Or' a b)  = vars a `IS.union` vars b
+  vars (Lit l)    = vars l
+
+instance IsRel (LA.Expr Integer) QFFormula where
+  rel op lhs rhs =
+    case op of
+      Le  -> Lit $ leZ lhs rhs
+      Ge  -> Lit $ geZ lhs rhs
+      Lt  -> Lit $ ltZ lhs rhs
+      Gt  -> Lit $ gtZ lhs rhs
+      Eql -> eqZ lhs rhs
+      NEq -> notB $ rel Eql lhs rhs
+
+(.|.) :: Integer -> ExprZ -> QFFormula
+n .|. e = Lit $ Divisible True n e
+
+subst1 :: Var -> ExprZ -> QFFormula -> QFFormula
 subst1 x e = go
   where
     go T' = T'
@@ -127,26 +164,31 @@ subst1 x e = go
     go (Lit (Divisible b c e1)) = Lit $ Divisible b c $ LA.applySubst1 x e e1
     go (Lit (Pos e1)) = Lit $ Pos $ LA.applySubst1 x e e1
 
-simplify :: Formula' -> Formula'
-simplify T' = T'
-simplify F' = F'
-simplify (And' a b) =
-  case (simplify a, simplify b) of
+simplify :: QFFormula -> QFFormula
+simplify (And' a b) = simplify1 $ And' (simplify a) (simplify b)
+simplify (Or' a b)  = simplify1 $ Or' (simplify a) (simplify b)
+simplify formula    = simplify1 formula
+
+simplify1 :: QFFormula -> QFFormula
+simplify1 T' = T'
+simplify1 F' = F'
+simplify1 (And' a b) =
+  case (a, b) of
     (T', b') -> b'
     (a', T') -> a'
     (F', _) -> false
     (_, F') -> false
     (a',b') -> a' .&&. b'
-simplify (Or' a b) =
-  case (simplify a, simplify b) of
+simplify1 (Or' a b) =
+  case (a, b) of
     (F', b') -> b'
     (a', F') -> a'
     (T', _) -> true
     (_, T') -> true
     (a',b') -> a' .||. b'
-simplify (Lit lit) = simplifyLit lit
+simplify1 (Lit lit) = simplifyLit lit
 
-simplifyLit :: Lit -> Formula'
+simplifyLit :: Lit -> QFFormula
 simplifyLit (Pos e) =
   case LA.asConst e of
     Just c -> if c > 0 then true else false
@@ -172,17 +214,33 @@ simplifyLit lit@(Divisible b c e)
 
 data Witness = WCase1 Integer ExprZ | WCase2 Integer Integer Integer [ExprZ]
 
-eliminateZ :: Var -> Formula' -> Formula'
-eliminateZ x formula = simplify $ orB $ map fst $ eliminateZ' x formula
+evalWitness :: Model Integer -> Witness -> Integer
+evalWitness model (WCase1 c e) = LA.evalExpr model e `div` c
+evalWitness model (WCase2 c j delta us)
+  | null us'  = j `div` c
+  | otherwise = (j + (((u - delta - 1) `div` delta) * delta)) `div` c
+  where
+    us' = map (LA.evalExpr model) us
+    u = minimum us'
 
-eliminateZ' :: Var -> Formula' -> [(Formula', Witness)]
-eliminateZ' x formula = case1 ++ case2
+-- ---------------------------------------------------------------------------
+
+project :: Var -> QFFormula -> QFFormula
+project x formula = simplify $ orB [phi | (phi,_) <- projectCases' x formula, phi /= F']
+
+projectCases :: Var -> QFFormula -> [(QFFormula, Model Integer -> Model Integer)]
+projectCases x formula = do
+  (phi, wit) <- projectCases' x formula
+  return (phi, \m -> IM.insert x (evalWitness m wit) m)
+
+projectCases' :: Var -> QFFormula -> [(QFFormula, Witness)]
+projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
   where
     -- xの係数の最小公倍数
     c :: Integer
     c = f formula
       where
-         f :: Formula' -> Integer
+         f :: QFFormula -> Integer
          f T' = 1
          f F' = 1
          f (And' a b) = lcm (f a) (f b)
@@ -192,10 +250,10 @@ eliminateZ' x formula = case1 ++ case2
     
     -- 式をスケールしてxの係数の絶対値をcへと変換し、その後cxをxで置き換え、
     -- xがcで割り切れるという制約を追加した論理式
-    formula1 :: Formula'
+    formula1 :: QFFormula
     formula1 = simplify $ f formula .&&. Lit (Divisible True c (LA.var x))
       where
-        f :: Formula' -> Formula'
+        f :: QFFormula -> QFFormula
         f T' = T'
         f F' = F'
         f (And' a b) = f a .&&. f b
@@ -220,7 +278,7 @@ eliminateZ' x formula = case1 ++ case2
     delta :: Integer
     delta = f formula1
       where
-        f :: Formula' -> Integer
+        f :: QFFormula -> Integer
         f T' = 1
         f F' = 1
         f (And' a b) = lcm (f a) (f b)
@@ -232,7 +290,7 @@ eliminateZ' x formula = case1 ++ case2
     ts :: [ExprZ]
     ts = f formula1
       where
-        f :: Formula' -> [ExprZ]
+        f :: QFFormula -> [ExprZ]
         f T' = []
         f F' = []
         f (And' a b) = f a ++ f b
@@ -246,15 +304,15 @@ eliminateZ' x formula = case1 ++ case2
             _ -> error "should not happen"
 
     -- formula1を真にする最小のxが存在する場合
-    case1 :: [(Formula', Witness)]
+    case1 :: [(QFFormula, Witness)]
     case1 = [ (subst1 x e formula1, WCase1 c e)
             | j <- [1..delta], t <- ts, let e = t .+. LA.constant j ]
 
     -- formula1のなかの x < t を真に t < x を偽に置き換えた論理式
-    formula2 :: Formula'
+    formula2 :: QFFormula
     formula2 = simplify $ f formula1
       where        
-        f :: Formula' -> Formula'
+        f :: QFFormula -> QFFormula
         f T' = T'
         f F' = F'
         f (And' a b) = f a .&&. f b
@@ -271,7 +329,7 @@ eliminateZ' x formula = case1 ++ case2
     us :: [ExprZ]
     us = f formula1
       where
-        f :: Formula' -> [ExprZ]
+        f :: QFFormula -> [ExprZ]
         f T' = []
         f F' = []
         f (And' a b) = f a ++ f b
@@ -285,22 +343,23 @@ eliminateZ' x formula = case1 ++ case2
         f (Lit (Divisible _ _ _)) = []
 
     -- formula1を真にする最小のxが存在しない場合
-    case2 :: [(Formula', Witness)]
+    case2 :: [(QFFormula, Witness)]
     case2 = [(subst1 x (LA.constant j) formula2, WCase2 c j delta us) | j <- [1..delta]]
 
-evalWitness :: Model Integer -> Witness -> Integer
-evalWitness model (WCase1 c e) = LA.evalExpr model e `div` c
-evalWitness model (WCase2 c j delta us)
-  | null us'  = j `div` c
-  | otherwise = (j + (((u - delta - 1) `div` delta) * delta)) `div` c
+projectCasesN :: VarSet -> QFFormula -> [(QFFormula, Model Integer -> Model Integer)]
+projectCasesN vs2 = f (IS.toList vs2)
   where
-    us' = map (LA.evalExpr model) us
-    u = minimum us'
+    f :: [Var] -> QFFormula -> [(QFFormula, Model Integer -> Model Integer)]
+    f [] formula = return (formula, id)
+    f (v:vs) formula = do
+      (formula2, mt1) <- projectCases v formula
+      (formula3, mt2) <- f vs formula2
+      return (formula3, mt1 . mt2)
 
 -- ---------------------------------------------------------------------------
 
 -- | eliminate quantifiers and returns equivalent quantifier-free formula.
-eliminateQuantifiers :: Formula (Atom Rational) -> Maybe Formula'
+eliminateQuantifiers :: Formula (Atom Rational) -> Maybe QFFormula
 eliminateQuantifiers = f
   where
     f T = return T'
@@ -311,47 +370,35 @@ eliminateQuantifiers = f
     f (Not a) = f (pushNot a)
     f (Imply a b) = f $ Or (Not a) b
     f (Equiv a b) = f $ And (Imply a b) (Imply b a)
-    f (Forall x body) = liftM notB $ f $ Exists x $ pushNot body
-    f (Exists x body) = liftM (eliminateZ x) (f body)
+    f (Forall x body) = liftM notB $ f $ Exists x $ Not body
+    f (Exists x body) = liftM (project x) (f body)
 
 -- ---------------------------------------------------------------------------
 
--- | solve a formula and returns assignment of outer-most existential quantified
--- variables.
-solve :: Formula (Atom Rational) -> SatResult Integer
-solve formula =
+solveFormula :: Formula (Atom Rational) -> SatResult Integer
+solveFormula formula =
   case eliminateQuantifiers formula of
     Nothing -> Unknown
     Just formula' ->
-       case solve' vs formula' of
+       case solveQFFormula formula' of
          Nothing -> Unsat
          Just m -> Sat m
-  where
-    vs = IS.toList (vars formula)
 
-solve' :: [Var] -> Formula' -> Maybe (Model Integer)
-solve' vs2 formula2 = go vs2 (simplify formula2)
-  where
-    go [] T' = return IM.empty
-    go [] _ = mzero
-    go (v:vs) formula = do
-      let xs = eliminateZ' v formula
-      msum $ flip map xs $ \(formula', witness) -> do
-        model <- go vs (simplify formula')
-        let val = evalWitness model witness 
-        return $ IM.insert v val model
+solveQFFormula :: QFFormula -> Maybe (Model Integer)
+solveQFFormula formula = listToMaybe $ do
+  (formula2, mt) <- projectCasesN (vars formula) formula
+  case formula2 of
+    T' -> return $ mt IM.empty
+    _  -> mzero
 
--- ---------------------------------------------------------------------------
-
+-- | solve a (open) quantifier-free formula
 solveConj :: [LA.Atom Rational] -> Maybe (Model Integer)
-solveConj cs = msum [ solve' vs (foldr And' T' (map f xs)) | xs <- unDNF dnf ]
+solveConj cs = solveQFFormula formula
   where
-    dnf = FM.constraintsToDNF cs
-    vs = IS.toList (vars cs)
-
-    f :: FM.Lit -> Formula'
-    f (FM.Nonneg e) = Lit $ e `geZ` LA.constant 0
-    f (FM.Pos e)    = Lit $ e `gtZ` LA.constant 0
+    formula = andB [rel op (f (lhs .-. rhs)) (LA.constant 0) | Rel lhs op rhs <- cs]
+    f e = LA.mapCoeff (round . (s*)) e
+      where
+        s = fromInteger $ foldl' lcm 1 [denominator c | (c,_) <- LA.terms e]
 
 -- | solve a (open) quantifier-free formula
 solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
@@ -364,33 +411,29 @@ solveQFLA cs ivs = listToMaybe $ do
 
 -- ---------------------------------------------------------------------------
 
-testHagiya :: Formula'
-testHagiya = eliminateZ 1 $ c1 .&&. c2 .&&. c3
+testHagiya :: QFFormula
+testHagiya = project 1 $ andB [c1, c2, c3]
   where
     [x,y,z] = map LA.var [1..3]
-    c1 = Lit $ x `ltZ` (y .+. y)   -- x < y+y
-    c2 = Lit $ z `ltZ` x           -- z < x
-    c3 = Lit $ Divisible True 3 x  -- 3 | x
+    c1 = x .<. (y .+. y)
+    c2 = z .<. x
+    c3 = 3 .|. x
 
 {-
-Or' (And' (Lit (Pos (Expr {coeffMap = fromList [(-1,-1),(2,2),(3,-1)]}))) (Lit (Divisible True 3 (Expr {coeffMap = fromList [(-1,1),(3,1)]}))))
-    (Or' (And' (Lit (Pos (Expr {coeffMap = fromList [(-1,-2),(2,2),(3,-1)]}))) (Lit (Divisible True 3 (Expr {coeffMap = fromList [(-1,2),(3,1)]}))))
-         (And' (Lit (Pos (Expr {coeffMap = fromList [(-1,-3),(2,2),(3,-1)]}))) (Lit (Divisible True 3 (Expr {coeffMap = fromList [(-1,3),(3,1)]})))))
-
-(2y-z >  0 && 3|z+1) ||
-(2y-z > -2 && 3|z+2) ||
-(2y-z > -3 && 3|z+3) ||
+∃ x. 0 < y+y ∧ z<x ∧ 3|x
+⇔
+(2y-z > 0 ∧ 3|z+1) ∨ (2y-z > -2 ∧ 3|z+2) ∨ (2y-z > -3 ∧ 3|z+3)
 -}
 
-test3 :: Formula'
-test3 = eliminateZ 1 (andB [p1,p2,p3,p4])
+test3 :: QFFormula
+test3 = project 1 $ andB [p1,p2,p3,p4]
   where
     x = LA.var 0
     y = LA.var 1
-    p1 = Lit $ Pos y
-    p2 = Lit $ Pos (y .-. 2 .*. x)
-    p3 = Lit $ Pos (x .+. LA.constant 2 .-. y)
-    p4 = Lit $ Divisible True 2 y
+    p1 = LA.constant 0 .<. y
+    p2 = 2 .*. x .<. y
+    p3 = y .<. x .+. LA.constant 2
+    p4 = 2 .|. y
 
 {-
 ∃ y. 0 < y ∧ 2x<y ∧ y < x+2 ∧ 2|y
