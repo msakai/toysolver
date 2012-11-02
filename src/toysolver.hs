@@ -34,6 +34,7 @@ import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import Data.Expr
 import Data.ArithRel
 import Data.Formula (Atom (..))
+import Data.OptDir
 import qualified Data.LA as LA
 import qualified Data.Polynomial as P
 import qualified Data.AlgebraicNumber as AReal
@@ -49,6 +50,7 @@ import qualified Converter.MaxSAT2LP as MaxSAT2LP
 import qualified Simplex2
 import qualified MIPSolver2
 import qualified CAD
+import qualified ContiTraverso
 import SAT.Printer
 import Version
 import Util
@@ -73,7 +75,7 @@ options :: [OptDescr Flag]
 options =
     [ Option ['h'] ["help"]    (NoArg Help)            "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
-    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, cad, old-mip"
+    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, cad, old-mip, ct"
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
 
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
@@ -107,6 +109,7 @@ run solver opt lp printModel = do
     s | s `elem` ["omega", "omega-test", "cooper"] -> solveByQE
     s | s `elem` ["old-mip"] -> solveByMIP
     s | s `elem` ["cad"] -> solveByCAD
+    s | s `elem` ["ct", "conti-traverso"] -> solveByContiTraverso
     _ -> solveByMIP2
   where
     vs = LP.variables lp
@@ -147,10 +150,10 @@ run solver opt lp printModel = do
       [ Const 0 .<=. Var v', Var v' .<=. Const 1 ]
 
     ivs
-      | NoMIP `elem` opt = IS.empty
-      | otherwise        = f (LP.integerVariables lp) `IS.union` f (LP.binaryVariables lp)
-      where
-        f = IS.fromList . map (nameToVar Map.!) . Set.toList
+      | NoMIP `elem` opt = Set.empty
+      | otherwise        = LP.integerVariables lp `Set.union` LP.binaryVariables lp
+
+    ivs2 = IS.fromList . map (nameToVar Map.!) . Set.toList $ ivs
 
     solveByQE =
       case mapM LA.compileAtom (cs1 ++ cs2 ++ cs3) of
@@ -158,7 +161,7 @@ run solver opt lp printModel = do
           putStrLn "s UNKNOWN"
           exitFailure
         Just cs ->
-          case f cs ivs of
+          case f cs ivs2 of
             Nothing -> do
               putStrLn "s UNSATISFIABLE"
               exitFailure
@@ -175,7 +178,7 @@ run solver opt lp printModel = do
                _ -> error "unknown solver"
 
     solveByMIP =
-      case MIPSolverHL.optimize (LP.dir lp) obj (cs1 ++ cs2 ++ cs3) ivs of
+      case MIPSolverHL.optimize (LP.dir lp) obj (cs1 ++ cs2 ++ cs3) ivs2 of
         OptUnknown -> do
           putStrLn "s UNKNOWN"
           exitFailure
@@ -213,7 +216,7 @@ run solver opt lp printModel = do
         Simplex2.assertAtom solver $ fromJust (LA.compileAtom c)
       logger "Loading constraints finished"
 
-      mip <- MIPSolver2.newSolver solver ivs
+      mip <- MIPSolver2.newSolver solver ivs2
       MIPSolver2.setShowRational mip printRat
       MIPSolver2.setLogger mip logger
       MIPSolver2.setNThread mip nthreads
@@ -238,7 +241,7 @@ run solver opt lp printModel = do
           printModel m2
 
     solveByCAD
-      | not (IS.null ivs) = do
+      | not (IS.null ivs2) = do
           putStrLn "s UNKNOWN"
           putStrLn "c integer variables are not supported by CAD"
           exitFailure
@@ -268,6 +271,32 @@ run solver opt lp printModel = do
           where
             p = f e2
             c = P.coeff P.mmOne p
+
+    solveByContiTraverso
+      | not (vs `Set.isSubsetOf` ivs) = do
+          putStrLn "s UNKNOWN"
+          putStrLn "c continuous variables are not supported by ContiTraverso algorithm"
+          exitFailure
+      | otherwise = do
+          case mapM LA.compileAtom (cs1 ++ cs2 ++ cs3) of
+            Nothing -> do
+              putStrLn "s UNKNOWN"
+              exitFailure
+            Just cs -> do
+              let obj2 = fromJust (LA.compileExpr obj) -- FIXME
+                  obj3 = case LP.dir lp of
+                           OptMin -> obj2
+                           OptMax -> LA.lnegate obj2
+              case ContiTraverso.solve P.grlex cs obj3 of
+                Nothing -> do
+                  putStrLn "s UNSATISFIABLE"
+                  exitFailure
+                Just m -> do
+                  let m2 = IM.map fromInteger m
+                  putStrLn $ "o " ++ showValue (Data.Expr.eval m2 obj)
+                  putStrLn "s OPTIMUM FOUND"
+                  let m3 = Map.fromAscList [(v, m2 IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+                  printModel m3
 
     printRat :: Bool
     printRat = PrintRational `elem` opt

@@ -14,9 +14,7 @@ Extra-Source-Files:
    COPYING
    .travis.yml
    src/TseitinEncode.hs
-   src/CAD.hs
    src/CongruenceClosure.hs
-   src/ContiTraverso.hs
    src/Data/Polynomial.hs
    src/Data/Polynomial/GBase.hs
    src/Data/Polynomial/FactorZ.hs
@@ -83,8 +81,10 @@ Executable toysolver
      Text.PBFile
      Text.MaxSAT
      BoundsInference
-     Cooper     
+     Cooper
      FourierMotzkin
+     ContiTraverso
+     CAD
      LPSolver
      LPSolverHL
      MIPSolverHL

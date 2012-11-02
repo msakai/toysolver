@@ -25,7 +25,7 @@ Usage: toysolver [OPTION...] file.lp
 
     -h  --help           show help
     -v  --version        show version number
-        --solver=SOLVER  mip (default), omega-test, cooper, cad, old-mip
+        --solver=SOLVER  mip (default), omega-test, cooper, cad, old-mip, ct
 
 ### toysat
 

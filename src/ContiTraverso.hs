@@ -3,34 +3,57 @@ http://posso.dm.unipi.it/users/traverso/conti-traverso-ip.ps
 http://madscientist.jp/~ikegami/articles/IntroSequencePolynomial.html
 http://www.kurims.kyoto-u.ac.jp/~kyodo/kokyuroku/contents/pdf/1295-27.pdf
 -}
-module ContiTraverso where
+module ContiTraverso
+  ( solve
+  , solve'
+  ) where
 
 import Data.Function
-import Data.Monoid
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.List
+import Data.Monoid
+import Data.Ratio
 
+import Data.ArithRel
+import Data.Linear
 import qualified Data.LA as LA
-import Data.Expr (Variables (..))
+import Data.Expr (Var, VarSet, Variables (..), Model)
 import Data.Polynomial
 import Data.Polynomial.GBase
+import qualified LPUtil
 
-type Var = Int
+solve :: MonomialOrder Var -> [LA.Atom Rational] -> LA.Expr Rational -> Maybe (Model Integer)
+solve cmp cs obj = do
+  m <- solve' cmp cs3 obj3
+  return . IM.map round . mt . IM.map fromInteger $ m
+  where
+    ((obj2,cs2), mt) = LPUtil.toStandardForm (obj,cs)
+    obj3 = LA.mapCoeff g obj2
+      where
+        g = round . (c*)
+        c = fromInteger $ foldl' lcm 1 [denominator c | (c,_) <- LA.terms obj]
+    cs3 = map f cs2
+    f (lhs,rhs) = (LA.mapCoeff g lhs, g rhs)
+      where
+        g = round . (c*)
+        c = fromInteger $ foldl' lcm 1 [denominator c | (c,_) <- LA.terms lhs]
 
-type Model = IM.IntMap Integer
-
-solve :: MonomialOrder Var -> [Var] -> [(LA.Expr Integer, Integer)] -> LA.Expr Integer -> Maybe Model
-solve cmp vs cs obj = 
+solve' :: MonomialOrder Var -> [(LA.Expr Integer, Integer)] -> LA.Expr Integer -> Maybe (Model Integer)
+solve' cmp cs obj = 
   if IM.keysSet (IM.filter (/= 0) m) `IS.isSubsetOf` vs'
     then Just $ IM.filterWithKey (\y _ -> y `IS.member` vs') m
     else Nothing
 
   where
-    vs' :: IS.IntSet
-    vs' = IS.fromList vs
+    vs :: [Var]
+    vs = IS.toList vs'
+
+    vs' :: VarSet
+    vs' = vars $ obj : [lhs | (lhs,_) <- cs]
 
     v2 :: Var
-    v2 = if null vs then 0 else maximum vs + 1
+    v2 = if IS.null vs' then 0 else IS.findMax vs' + 1
 
     vs2 :: [Var]
     vs2 = [v2 .. v2 + length cs - 1]
@@ -59,7 +82,7 @@ solve cmp vs cs obj =
 
     m = mkModel (vs++vs2++[t]) z
 
-mkModel :: [Var] -> MonicMonomial Var -> Model
+mkModel :: [Var] -> MonicMonomial Var -> Model Integer
 mkModel vs xs = mmToIntMap xs `IM.union` IM.fromList [(x, 0) | x <- vs] 
 -- IM.union is left-biased
 
@@ -76,10 +99,20 @@ elimOrdering xs = compare `on` f
 
 -- http://madscientist.jp/~ikegami/articles/IntroSequencePolynomial.html
 -- optimum is (3,2,0)
-test_ikegami = solve grlex vs cs obj
+test_ikegami = solve grlex cs obj
   where
-    [x,y,z] = vs
-    vs = [1..3]
+    [x,y,z] = map LA.var [1..3]
+    cs = [ 2.*.x .+. 2.*.y .+. 2.*.z .==. LA.constant 10
+         , 3.*.x .+. y .+. z .==. LA.constant 11
+         , x .>=. LA.constant 0
+         , y .>=. LA.constant 0
+         , z .>=. LA.constant 0
+         ]
+    obj = x .+. 2.*.y .+. 3.*.z
+
+test_ikegami' = solve' grlex cs obj
+  where
+    [x,y,z] = [1..3]
     cs = [ (LA.fromTerms [(2,x),(2,y),(2,z)], 10)
          , (LA.fromTerms [(3,x),(1,y),(1,z)], 11)
          ]
@@ -87,10 +120,19 @@ test_ikegami = solve grlex vs cs obj
 
 -- http://posso.dm.unipi.it/users/traverso/conti-traverso-ip.ps
 -- optimum is (39, 75, 1, 8, 122)
-test_1 = solve grlex vs cs obj
+test_1 = solve grlex cs obj
   where
-    [x1,x2,x3,x4,x5] = vs
-    vs = [1..5]
+    vs@[x1,x2,x3,x4,x5] = map LA.var [1..5]
+    cs = [ 2.*.x1 .+. 5.*.x2 .-. 3.*.x3 .+.     x4 .-. 2.*.x5 .==. LA.constant 214
+         ,     x1 .+. 7.*.x2 .+. 2.*.x3 .+. 3.*.x4 .+.     x5 .==. LA.constant 712
+         , 4.*.x1 .-. 2.*.x2 .-.     x3 .-. 5.*.x4 .+. 3.*.x5 .==. LA.constant 331
+         ] ++
+         [ v .>=. LA.constant 0 | v <- vs ]
+    obj = x1 .+. x2 .+. x3 .+. x4 .+. x5
+
+test_1' = solve' grlex cs obj
+  where
+    [x1,x2,x3,x4,x5] = [1..5]
     cs = [ (LA.fromTerms [(2, x1), ( 5, x2), (-3, x3), ( 1,x4), (-2, x5)], 214)
          , (LA.fromTerms [(1, x1), ( 7, x2), ( 2, x3), ( 3,x4), ( 1, x5)], 712)
          , (LA.fromTerms [(4, x1), (-2, x2), (-1, x3), (-5,x4), ( 3, x5)], 331)
@@ -98,17 +140,29 @@ test_1 = solve grlex vs cs obj
     obj = LA.fromTerms [(1,x1),(1,x2),(1,x3),(1,x4),(1,x5)]
 
 -- optimum is (0,2,2)
-test_2 = solve grlex vs cs obj
+test_2 = solve grlex cs obj
   where
-    [x1,x2,x3] = vs
-    vs = [1..3]
+    vs@[x1,x2,x3] = map LA.var [1..3]
+    cs = [ 2.*.x1 .+. 3.*.x2 .-. x3 .==. LA.constant 4 ] ++
+         [ v .>=. LA.constant 0 | v <- vs ]
+    obj = 2.*.x1 .+. x2
+
+test_2' = solve' grlex cs obj
+  where
+    [x1,x2,x3] = [1..3]
     cs = [ (LA.fromTerms [(2, x1), (3, x2), (-1, x3)], 4) ]
     obj = LA.fromTerms [(2,x1),(1,x2)]
 
 -- infeasible
-test_3 = solve grlex vs cs obj
+test_3 = solve grlex cs obj
   where
-    [x1,x2,x3] = vs
-    vs = [1..3]
+    vs@[x1,x2,x3] = map LA.var [1..3]
+    cs = [ 2.*.x1 .+. 2.*.x2 .+. 2.*.x3 .==. LA.constant 3 ] ++
+         [ v .>=. LA.constant 0 | v <- vs ]
+    obj = x1
+
+test_3' = solve' grlex cs obj
+  where
+    [x1,x2,x3] = [1..3]
     cs = [ (LA.fromTerms [(2, x1), (2, x2), (2, x3)], 3) ]
     obj = LA.fromTerms [(1,x1)]
