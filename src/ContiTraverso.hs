@@ -62,7 +62,9 @@ solve cmp dir obj cs = do
         c = fromInteger $ foldl' lcm 1 [denominator c | (c,_) <- LA.terms lhs]
 
 solve' :: MonomialOrder Var -> LA.Expr Integer -> [(LA.Expr Integer, Integer)] -> Maybe (Model Integer)
-solve' cmp obj cs =
+solve' cmp obj cs
+  | or [c < 0 | (c,x) <- LA.terms obj, x /= LA.unitVar] = error "all coefficient of cost function should be non-negative"
+  | otherwise =
   if IM.keysSet (IM.filter (/= 0) m) `IS.isSubsetOf` vs'
     then Just $ IM.filterWithKey (\y _ -> y `IS.member` vs') m
     else Nothing
