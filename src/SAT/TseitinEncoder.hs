@@ -39,6 +39,7 @@ module SAT.TseitinEncoder
     Encoder
   , newEncoder
   , setUsePB
+  , encSolver
 
   -- * Encoding of boolean formula
   , Formula (..)

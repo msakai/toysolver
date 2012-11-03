@@ -580,6 +580,9 @@ solveLP opt solver lp = do
       putStrLn "s UNKNOWN"
       exitFailure
     else do
+      enc <- Tseitin.newEncoder solver
+      Tseitin.setUsePB enc (optLinearizerPB opt)
+
       putStrLn "c Loading variables and bounds"
       vmap <- liftM Map.fromList $ revForM (Set.toList ivs) $ \v -> do
         let (lb,ub) = LPFile.getBounds lp v
@@ -597,21 +600,21 @@ solveLP opt solver lp = do
         let indicator      = LPFile.constrIndicator c
             (lhs, op, rhs) = LPFile.constrBody c
         let d = foldl' lcm 1 (map denominator  (rhs:[r | LPFile.Term r _ <- lhs]))
-            lhs' = lsum [asInteger (r * fromIntegral d) .*. (vmap Map.! asSingleton vs) | LPFile.Term r vs <- lhs]
+            lhs' = lsum [asInteger (r * fromIntegral d) .*. product [vmap Map.! v | v <- vs] | LPFile.Term r vs <- lhs]
             rhs' = asInteger (rhs * fromIntegral d)
         case indicator of
           Nothing ->
             case op of
-              LPFile.Le  -> SAT.Integer.addLe solver lhs' (SAT.Integer.constant rhs')
-              LPFile.Ge  -> SAT.Integer.addGe solver lhs' (SAT.Integer.constant rhs')
-              LPFile.Eql -> SAT.Integer.addEq solver lhs' (SAT.Integer.constant rhs')
+              LPFile.Le  -> SAT.Integer.addLe enc lhs' (SAT.Integer.constant rhs')
+              LPFile.Ge  -> SAT.Integer.addGe enc lhs' (SAT.Integer.constant rhs')
+              LPFile.Eql -> SAT.Integer.addEq enc lhs' (SAT.Integer.constant rhs')
           Just (var, val) -> do
             let var' = asBin (vmap Map.! var)
                 f sel = do
                   case op of
-                    LPFile.Le  -> SAT.Integer.addLeSoft solver sel lhs' (SAT.Integer.constant rhs')
-                    LPFile.Ge  -> SAT.Integer.addGeSoft solver sel lhs' (SAT.Integer.constant rhs')
-                    LPFile.Eql -> SAT.Integer.addEqSoft solver sel lhs' (SAT.Integer.constant rhs')
+                    LPFile.Le  -> SAT.Integer.addLeSoft enc sel lhs' (SAT.Integer.constant rhs')
+                    LPFile.Ge  -> SAT.Integer.addGeSoft enc sel lhs' (SAT.Integer.constant rhs')
+                    LPFile.Eql -> SAT.Integer.addEqSoft enc sel lhs' (SAT.Integer.constant rhs')
             case val of
               1 -> f var'
               0 -> f (SAT.litNot var')
@@ -629,8 +632,8 @@ solveLP opt solver lp = do
       let (_label,obj) = LPFile.objectiveFunction lp      
           d = foldl' lcm 1 [denominator r | LPFile.Term r _ <- obj] *
               (if LPFile.dir lp == LPFile.OptMin then 1 else -1)
-          obj2 = lsum [asInteger (r * fromIntegral d) .*. (vmap Map.! (asSingleton vs)) | LPFile.Term r vs <- obj]
-          SAT.Integer.Expr obj3 obj3_c = obj2
+          obj2 = lsum [asInteger (r * fromIntegral d) .*. product [vmap Map.! v | v <- vs] | LPFile.Term r vs <- obj]
+      (obj3,obj3_c) <- SAT.Integer.linearize enc obj2
 
       modelRef <- newIORef Nothing
 
@@ -668,10 +671,6 @@ solveLP opt solver lp = do
     ivs = LPFile.binaryVariables lp `Set.union` LPFile.integerVariables lp
     nivs = LPFile.variables lp `Set.difference` ivs
 
-    asSingleton :: [a] -> a
-    asSingleton [v] = v
-    asSingleton _ = error "not a singleton"
-
     asInteger :: Rational -> Integer
     asInteger r
       | denominator r /= 1 = error (show r ++ " is not integer")
@@ -682,7 +681,7 @@ solveLP opt solver lp = do
     nonAdjacentPairs _ = []
 
     asBin :: SAT.Integer.Expr -> SAT.Lit
-    asBin (SAT.Integer.Expr [(1,lit)] _) = lit
+    asBin (SAT.Integer.Expr [(1,[lit])]) = lit
     asBin _ = error "asBin: failure"
 
 -- ------------------------------------------------------------------------
