@@ -17,6 +17,7 @@ import Data.Formula
 import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Polynomial as P
+import Data.OptDir
 
 import qualified FourierMotzkin
 import qualified OmegaTest
@@ -235,7 +236,7 @@ case_Simplex2_test2 = do
 
 disabled_case_ContiTraverso_test1 :: IO ()
 disabled_case_ContiTraverso_test1 = 
-  case ContiTraverso.solve P.grlex test1' (LA.constant 0) of
+  case ContiTraverso.solve P.grlex OptMin (LA.constant 0) test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
       forM_ test1' $ \a -> do
@@ -243,7 +244,7 @@ disabled_case_ContiTraverso_test1 =
 
 disabled_case_ContiTraverso_test2 :: IO ()
 disabled_case_ContiTraverso_test2 = 
-  case ContiTraverso.solve P.grlex test2' (LA.constant 0) of
+  case ContiTraverso.solve P.grlex OptMin (LA.constant 0) test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
 

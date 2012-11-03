@@ -275,19 +275,20 @@ run solver opt lp printModel = do
     solveByContiTraverso
       | not (vs `Set.isSubsetOf` ivs) = do
           putStrLn "s UNKNOWN"
-          putStrLn "c continuous variables are not supported by ContiTraverso algorithm"
+          putStrLn "c continuous variables are not supported by Conti-Traverso algorithm"
           exitFailure
       | otherwise = do
-          case mapM LA.compileAtom (cs1 ++ cs2 ++ cs3) of
+          let tmp = do
+                linObj <- LA.compileExpr obj
+                linCon <- mapM LA.compileAtom (cs1 ++ cs2 ++ cs3)
+                return (linObj, linCon)
+          case tmp of
             Nothing -> do
               putStrLn "s UNKNOWN"
+              putStrLn "c non-linear expressions are not supported by Conti-Traverso algorithm"
               exitFailure
-            Just cs -> do
-              let obj2 = fromJust (LA.compileExpr obj) -- FIXME
-                  obj3 = case LP.dir lp of
-                           OptMin -> obj2
-                           OptMax -> LA.lnegate obj2
-              case ContiTraverso.solve P.grlex cs obj3 of
+            Just (linObj, linCon) -> do
+              case ContiTraverso.solve P.grlex (LP.dir lp) linObj linCon of
                 Nothing -> do
                   putStrLn "s UNSATISFIABLE"
                   exitFailure

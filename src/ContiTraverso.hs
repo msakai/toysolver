@@ -1,8 +1,29 @@
-{-
-http://posso.dm.unipi.it/users/traverso/conti-traverso-ip.ps
-http://madscientist.jp/~ikegami/articles/IntroSequencePolynomial.html
-http://www.kurims.kyoto-u.ac.jp/~kyodo/kokyuroku/contents/pdf/1295-27.pdf
--}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ContiTraverso
+-- Copyright   :  (c) Masahiro Sakai 2012
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-- References:
+--
+-- * P. Conti and C. Traverso, "Buchberger algorithm and integer programming,"
+--   Applied Algebra, Algebraic Algorithms and Error-Correcting Codes,
+--   Lecture Notes in Computer Science Volume 539, 1991, pp 130-139
+--   <http://dx.doi.org/10.1007/3-540-54522-0_102>
+--   <http://posso.dm.unipi.it/users/traverso/conti-traverso-ip.ps>
+--
+-- * IKEGAMI Daisuke, "数列と多項式の愛しい関係," 2011,
+--   <http://madscientist.jp/~ikegami/articles/IntroSequencePolynomial.html>
+--
+-- * 伊藤雅史, , 平林 隆一, "整数計画問題のための b-Gröbner 基底変換アルゴリズム,"
+--   <http://www.kurims.kyoto-u.ac.jp/~kyodo/kokyuroku/contents/pdf/1295-27.pdf>
+-- 
+--
+-----------------------------------------------------------------------------
 module ContiTraverso
   ( solve
   , solve'
@@ -19,16 +40,17 @@ import Data.ArithRel
 import Data.Linear
 import qualified Data.LA as LA
 import Data.Expr (Var, VarSet, Variables (..), Model)
+import Data.OptDir
 import Data.Polynomial
 import Data.Polynomial.GBase
 import qualified LPUtil
 
-solve :: MonomialOrder Var -> [LA.Atom Rational] -> LA.Expr Rational -> Maybe (Model Integer)
-solve cmp cs obj = do
-  m <- solve' cmp cs3 obj3
+solve :: MonomialOrder Var -> OptDir -> LA.Expr Rational -> [LA.Atom Rational] -> Maybe (Model Integer)
+solve cmp dir obj cs = do
+  m <- solve' cmp obj3 cs3
   return . IM.map round . mt . IM.map fromInteger $ m
   where
-    ((obj2,cs2), mt) = LPUtil.toStandardForm (obj,cs)
+    ((obj2,cs2), mt) = LPUtil.toStandardForm (if dir == OptMin then obj else lnegate obj, cs)
     obj3 = LA.mapCoeff g obj2
       where
         g = round . (c*)
@@ -39,8 +61,8 @@ solve cmp cs obj = do
         g = round . (c*)
         c = fromInteger $ foldl' lcm 1 [denominator c | (c,_) <- LA.terms lhs]
 
-solve' :: MonomialOrder Var -> [(LA.Expr Integer, Integer)] -> LA.Expr Integer -> Maybe (Model Integer)
-solve' cmp cs obj = 
+solve' :: MonomialOrder Var -> LA.Expr Integer -> [(LA.Expr Integer, Integer)] -> Maybe (Model Integer)
+solve' cmp obj cs =
   if IM.keysSet (IM.filter (/= 0) m) `IS.isSubsetOf` vs'
     then Just $ IM.filterWithKey (\y _ -> y `IS.member` vs') m
     else Nothing
