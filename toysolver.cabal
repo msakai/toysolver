@@ -80,6 +80,7 @@ Executable toysolver
      Text.LPFile
      Text.PBFile
      Text.MaxSAT
+     Text.GurobiSol
      BoundsInference
      Cooper
      FourierMotzkin
@@ -122,6 +123,7 @@ Executable toysat
      Text.PBFile
      Text.MaxSAT
      Text.GCNF
+     Text.GurobiSol
      SAT
      SAT.Integer
      SAT.TseitinEncoder

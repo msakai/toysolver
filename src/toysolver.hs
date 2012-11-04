@@ -14,6 +14,7 @@
 module Main where
 
 import Control.Monad
+import Data.Array.IArray
 import Data.Char
 import Data.List
 import Data.Maybe
@@ -44,6 +45,7 @@ import qualified MIPSolverHL
 import qualified Text.LPFile as LP
 import qualified Text.PBFile as PBFile
 import qualified Text.MaxSAT as MaxSAT
+import qualified Text.GurobiSol as GurobiSol
 import qualified Converter.CNF2LP as CNF2LP
 import qualified Converter.PB2LP as PB2LP
 import qualified Converter.MaxSAT2LP as MaxSAT2LP
@@ -52,6 +54,7 @@ import qualified MIPSolver2
 import qualified CAD
 import qualified ContiTraverso
 import SAT.Printer
+import qualified SAT.Types as SAT
 import Version
 import Util
 
@@ -65,6 +68,7 @@ data Flag
     | Version
     | Solver String
     | PrintRational
+    | WriteFile !FilePath
     | NoMIP
     | PivotStrategy String
     | NThread !Int
@@ -76,6 +80,9 @@ options =
     [ Option ['h'] ["help"]    (NoArg Help)            "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
     , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, cad, old-mip, ct"
+    , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
+    , Option ['w'] [] (ReqArg WriteFile "<filename>")  "write solution to filename in Gurobi .sol format"
+
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
 
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
@@ -344,7 +351,9 @@ main = do
             Right cnf -> do
               let (lp,mtrans) = CNF2LP.convert CNF2LP.ObjNone cnf
               run (getSolver o) o lp $ \m -> do
-                satPrintModel stdout (mtrans m) 0
+                let m2 = mtrans m
+                satPrintModel stdout m2 0
+                writeSOLFileSAT o m2
         ModePB -> do
           ret <- PBFile.parseOPBFile fname
           case ret of
@@ -352,7 +361,9 @@ main = do
             Right pb -> do
               let (lp,mtrans) = PB2LP.convert PB2LP.ObjNone pb
               run (getSolver o) o lp $ \m -> do
-                pbPrintModel stdout (mtrans m) 0
+                let m2 = mtrans m
+                pbPrintModel stdout m2 0
+                writeSOLFileSAT o m2
         ModeWBO -> do
           ret <- PBFile.parseWBOFile fname
           case ret of
@@ -360,12 +371,16 @@ main = do
             Right wbo -> do
               let (lp,mtrans) = PB2LP.convertWBO False wbo
               run (getSolver o) o lp $ \m -> do
-                pbPrintModel stdout (mtrans m) 0
+                let m2 = mtrans m
+                pbPrintModel stdout m2 0
+                writeSOLFileSAT o m2
         ModeMaxSAT -> do
           wcnf <- MaxSAT.parseWCNFFile fname
           let (lp,mtrans) = MaxSAT2LP.convert wcnf
           run (getSolver o) o lp $ \m -> do
-            maxsatPrintModel stdout (mtrans m) 0
+            let m2 = mtrans m
+            maxsatPrintModel stdout m2 0
+            writeSOLFileSAT o m2
         ModeLP -> do
           ret <- LP.parseFile fname
           case ret of
@@ -373,5 +388,19 @@ main = do
             Right lp -> do
               run (getSolver o) o lp $ \m -> do
                 lpPrintModel stdout (PrintRational `elem` o) m
+                writeSOLFileLP o m
     (_,_,errs) ->
         hPutStrLn stderr $ concat errs ++ usageInfo header options
+
+-- FIXME: 目的関数値を表示するように
+writeSOLFileLP :: [Flag] -> Map.Map String Rational -> IO ()
+writeSOLFileLP opt m = do
+  forM_ [fname | WriteFile fname <- opt ] $ \fname -> do
+    let m2 = Map.map fromRational m
+    writeFile fname (GurobiSol.render m2 Nothing)
+
+-- FIXME: 目的関数値を表示するように
+writeSOLFileSAT :: [Flag] -> SAT.Model -> IO ()
+writeSOLFileSAT opt m = do
+  let m2 = Map.fromList [("x" ++ show x, if b then 1 else 0) | (x,b) <- assocs m]
+  writeSOLFileLP opt m2

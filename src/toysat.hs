@@ -61,6 +61,7 @@ import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
 import qualified Text.MaxSAT as MaxSAT
 import qualified Text.GCNF as GCNF
+import qualified Text.GurobiSol as GurobiSol
 import Version
 import Util (showRational, revMapM, revForM)
 
@@ -85,6 +86,7 @@ data Options
   , optPrintRational :: Bool
   , optCheckModel  :: Bool
   , optTimeout :: Integer
+  , optWriteFile :: Maybe FilePath
   }
 
 defaultOptions :: Options
@@ -105,6 +107,7 @@ defaultOptions
   , optPrintRational = False  
   , optCheckModel = False
   , optTimeout = 0
+  , optWriteFile = Nothing
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -162,6 +165,9 @@ options =
     , Option [] ["print-rational"]
         (NoArg (\opt -> opt{ optPrintRational = True }))
         "print rational numbers instead of decimals"
+    , Option ['w'] []
+        (ReqArg (\val opt -> opt{ optWriteFile = Just val }) "<filename>")
+        "write model to filename in Gurobi .sol format"
 
     , Option [] ["check-model"]
         (NoArg (\opt -> opt{ optCheckModel = True }))
@@ -314,7 +320,7 @@ mainSAT opt solver args = do
     Right cnf -> solveSAT opt solver cnf
 
 solveSAT :: Options -> SAT.Solver -> DIMACS.CNF -> IO ()
-solveSAT _ solver cnf = do
+solveSAT opt solver cnf = do
   printf "c #vars %d\n" (DIMACS.numVars cnf)
   printf "c #constraints %d\n" (length (DIMACS.clauses cnf))
   _ <- replicateM (DIMACS.numVars cnf) (SAT.newVar solver)
@@ -326,6 +332,7 @@ solveSAT _ solver cnf = do
   when result $ do
     m <- SAT.model solver
     satPrintModel stdout m (DIMACS.numVars cnf)
+    writeSOLFile opt m Nothing (DIMACS.numVars cnf)
 
 -- ------------------------------------------------------------------------
 
@@ -338,7 +345,7 @@ mainMUS opt solver args = do
   solveMUS opt solver gcnf
 
 solveMUS :: Options -> SAT.Solver -> GCNF.GCNF -> IO ()
-solveMUS _ solver gcnf = do
+solveMUS opt solver gcnf = do
   printf "c #vars %d\n" (GCNF.nbvar gcnf)
   printf "c #constraints %d\n" (length (GCNF.clauses gcnf))
   printf "c #groups %d\n" (GCNF.lastgroupindex gcnf)
@@ -367,6 +374,7 @@ solveMUS _ solver gcnf = do
     then do
       m <- SAT.model solver
       satPrintModel stdout m (GCNF.nbvar gcnf)
+      writeSOLFile opt m Nothing (GCNF.nbvar gcnf)
     else do
       putStrLn "c computing a minimally unsatisfiable subformula"
       hFlush stdout
@@ -435,6 +443,7 @@ solvePB opt solver formula@(obj, cs) = do
       when result $ do
         m <- SAT.model solver
         pbPrintModel stdout m n
+        writeSOLFile opt m Nothing n
 
     Just obj' -> do
       obj'' <- pbConvSum enc obj'
@@ -454,6 +463,8 @@ solvePB opt solver formula@(obj, cs) = do
           putStrLn $ "s " ++ "OPTIMUM FOUND"
           hFlush stdout
           pbPrintModel stdout m n
+          let objval = pbEval m obj''
+          writeSOLFile opt m (Just objval) n
         Left (e :: AsyncException) -> do
           r <- readIORef modelRef
           case r of
@@ -463,6 +474,8 @@ solvePB opt solver formula@(obj, cs) = do
             Just m -> do
               putStrLn $ "s " ++ "SATISFIABLE"
               pbPrintModel stdout m n
+              let objval = pbEval m obj''
+              writeSOLFile opt m (Just objval) n
           throwIO e
 
 pbConvSum :: Tseitin.Encoder -> PBFile.Sum -> IO [(Integer, SAT.Lit)]
@@ -606,12 +619,16 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
       if isMaxSat
         then maxsatPrintModel stdout m nvar
         else pbPrintModel stdout m nvar
+      let objval = pbEval m obj
+      writeSOLFile opt m (Just objval) nvar
     Left (e :: AsyncException) -> do
       r <- readIORef modelRef
       case r of
         Just m | not isMaxSat -> do
           putStrLn $ "s " ++ "SATISFIABLE"
           pbPrintModel stdout m nvar
+          let objval = pbEval m obj
+          writeSOLFile opt m (Just objval) nvar
         _ -> do
           putStrLn $ "s " ++ "UNKNOWN"
           hFlush stdout
@@ -726,6 +743,18 @@ solveLP opt solver lp = do
               let val = SAT.Integer.eval m (vmap Map.! v)
               printf "v %s = %d\n" v val
             hFlush stdout
+            writeSol m
+
+          writeSol :: SAT.Model -> IO ()
+          writeSol m = do
+            case optWriteFile opt of
+              Nothing -> return ()
+              Just fname -> do
+                let m2 = Map.fromList [ (v, fromInteger val)     
+                                      | v <- Set.toList ivs
+                                      , let val = SAT.Integer.eval m (vmap Map.! v) ]
+                    o  = fromInteger $ SAT.Integer.eval m obj2
+                writeFile fname (GurobiSol.render m2 (Just o))
 
       case result of
         Right Nothing -> do
@@ -764,3 +793,10 @@ solveLP opt solver lp = do
 
 -- ------------------------------------------------------------------------
 
+writeSOLFile :: Options -> SAT.Model -> Maybe Integer -> Int -> IO ()
+writeSOLFile opt m obj nbvar = do
+  case optWriteFile opt of
+    Nothing -> return ()
+    Just fname -> do
+      let m2 = Map.fromList [("x" ++ show x, if b then 1 else 0) | (x,b) <- assocs m, x <= nbvar]
+      writeFile fname (GurobiSol.render (Map.map fromInteger m2) (fmap fromInteger obj))
