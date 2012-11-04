@@ -113,6 +113,8 @@ Executable toysat
   Main-is: toysat.hs
   HS-Source-Dirs: src
   Other-Modules:
+     Data.ArithRel
+     Data.Linear
      Data.LBool
      Data.IndexedPriorityQueue
      Data.SeqQueue

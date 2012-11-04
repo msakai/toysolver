@@ -49,6 +49,7 @@ import GHC.Environment (getFullArgs)
 import GHC.IO.Encoding
 #endif
 
+import Data.ArithRel
 import Data.Linear
 import qualified SAT
 import qualified SAT.Integer
@@ -605,16 +606,16 @@ solveLP opt solver lp = do
         case indicator of
           Nothing ->
             case op of
-              LPFile.Le  -> SAT.Integer.addLe enc lhs' (SAT.Integer.constant rhs')
-              LPFile.Ge  -> SAT.Integer.addGe enc lhs' (SAT.Integer.constant rhs')
-              LPFile.Eql -> SAT.Integer.addEq enc lhs' (SAT.Integer.constant rhs')
+              LPFile.Le  -> SAT.Integer.addConstraint enc $ lhs' .<=. fromInteger rhs'
+              LPFile.Ge  -> SAT.Integer.addConstraint enc $ lhs' .>=. fromInteger rhs'
+              LPFile.Eql -> SAT.Integer.addConstraint enc $ lhs' .==. fromInteger rhs'
           Just (var, val) -> do
             let var' = asBin (vmap Map.! var)
                 f sel = do
                   case op of
-                    LPFile.Le  -> SAT.Integer.addLeSoft enc sel lhs' (SAT.Integer.constant rhs')
-                    LPFile.Ge  -> SAT.Integer.addGeSoft enc sel lhs' (SAT.Integer.constant rhs')
-                    LPFile.Eql -> SAT.Integer.addEqSoft enc sel lhs' (SAT.Integer.constant rhs')
+                    LPFile.Le  -> SAT.Integer.addConstraintSoft enc sel $ lhs' .<=. fromInteger rhs'
+                    LPFile.Ge  -> SAT.Integer.addConstraintSoft enc sel $ lhs' .>=. fromInteger rhs'
+                    LPFile.Eql -> SAT.Integer.addConstraintSoft enc sel $ lhs' .==. fromInteger rhs'
             case val of
               1 -> f var'
               0 -> f (SAT.litNot var')

@@ -2,23 +2,20 @@
 module SAT.Integer
   ( Expr (..)
   , newVar
-  , constant
   , linearize
-  , addLe
-  , addGe
-  , addEq
-  , addLeSoft
-  , addGeSoft
-  , addEqSoft
+  , addConstraint
+  , addConstraintSoft
   , eval
   ) where
 
 import Control.Monad
 import Data.Array.IArray
 import Text.Printf
+
+import Data.ArithRel
+import Data.Linear
 import qualified SAT
 import qualified SAT.TseitinEncoder as TseitinEncoder
-import Data.Linear
 
 data Expr = Expr [(Integer, [SAT.Lit])]
 
@@ -31,9 +28,6 @@ newVar solver lo hi = do
   let xs = zip (iterate (2*) 1) vs
   SAT.addPBAtMost solver xs hi'
   return $ Expr ((lo,[]) : [(c,[x]) | (c,x) <- xs])
-
-constant :: Integer -> Expr
-constant c = Expr [(c,[])]
 
 instance Module Integer Expr where
   n .*. Expr xs = Expr [(n*m,lits) | (m,lits) <- xs]
@@ -57,41 +51,39 @@ linearize enc (Expr xs) = do
     return (c,l)
   return (zs, c)
 
-addLe :: TseitinEncoder.Encoder -> Expr -> Expr -> IO ()
-addLe enc lhs rhs = do
+addConstraint :: TseitinEncoder.Encoder -> Rel Expr -> IO ()
+addConstraint enc (Rel lhs op rhs) = do
   let solver = TseitinEncoder.encSolver enc
-  (xs,c) <- linearize enc (lhs - rhs)
-  SAT.addPBAtMost solver xs (-c)
+  (lhs2,c) <- linearize enc (lhs - rhs)
+  let rhs2 = -c
+  case op of
+    Le  -> SAT.addPBAtMost  solver lhs2 rhs2
+    Lt  -> SAT.addPBAtMost  solver lhs2 (rhs2-1)
+    Ge  -> SAT.addPBAtLeast solver lhs2 rhs2
+    Gt  -> SAT.addPBAtLeast solver lhs2 (rhs2+1)
+    Eql -> SAT.addPBExactly solver lhs2 rhs2
+    NEq -> do
+      sel <- SAT.newVar solver
+      SAT.addPBAtLeastSoft solver sel lhs2 (rhs2+1)
+      SAT.addPBAtMostSoft  solver (-sel) lhs2 (rhs2-1)
 
-addGe :: TseitinEncoder.Encoder -> Expr -> Expr -> IO ()
-addGe enc lhs rhs = do
+addConstraintSoft :: TseitinEncoder.Encoder -> SAT.Lit -> Rel Expr -> IO ()
+addConstraintSoft enc sel (Rel lhs op rhs) = do
   let solver = TseitinEncoder.encSolver enc
-  (xs,c) <- linearize enc (lhs - rhs)
-  SAT.addPBAtLeast solver xs (-c)
-
-addEq :: TseitinEncoder.Encoder -> Expr -> Expr -> IO ()
-addEq enc lhs rhs = do
-  let solver = TseitinEncoder.encSolver enc
-  (xs,c) <- linearize enc (lhs - rhs)
-  SAT.addPBExactly solver xs (-c)
-
-addLeSoft :: TseitinEncoder.Encoder -> SAT.Lit -> Expr -> Expr -> IO ()
-addLeSoft enc ind lhs rhs = do
-  let solver = TseitinEncoder.encSolver enc
-  (xs,c) <- linearize enc (lhs - rhs)
-  SAT.addPBAtMostSoft solver ind xs (-c)
-
-addGeSoft :: TseitinEncoder.Encoder -> SAT.Lit -> Expr -> Expr -> IO ()
-addGeSoft enc ind lhs rhs = do
-  let solver = TseitinEncoder.encSolver enc
-  (xs,c) <- linearize enc (lhs - rhs)
-  SAT.addPBAtLeastSoft solver ind xs (-c)
-
-addEqSoft :: TseitinEncoder.Encoder -> SAT.Lit -> Expr -> Expr -> IO ()
-addEqSoft enc ind lhs rhs = do
-  let solver = TseitinEncoder.encSolver enc
-  (xs,c) <- linearize enc (lhs - rhs)
-  SAT.addPBExactlySoft solver ind xs (-c)
+  (lhs2,c) <- linearize enc (lhs - rhs)
+  let rhs2 = -c
+  case op of
+    Le  -> SAT.addPBAtMostSoft  solver sel lhs2 rhs2
+    Lt  -> SAT.addPBAtMostSoft  solver sel lhs2 (rhs2-1)
+    Ge  -> SAT.addPBAtLeastSoft solver sel lhs2 rhs2
+    Gt  -> SAT.addPBAtLeastSoft solver sel lhs2 (rhs2+1)
+    Eql -> SAT.addPBExactlySoft solver sel lhs2 rhs2
+    NEq -> do
+      sel2 <- SAT.newVar solver
+      sel3 <- TseitinEncoder.encodeConj enc [sel,sel2]
+      sel4 <- TseitinEncoder.encodeConj enc [sel,-sel2]
+      SAT.addPBAtLeastSoft solver sel3 lhs2 (rhs2+1)
+      SAT.addPBAtMostSoft  solver sel4 lhs2 (rhs2-1)
 
 eval :: SAT.Model -> Expr -> Integer
 eval m (Expr ts) = sum [if and [m ! SAT.litVar lit == SAT.litPolarity lit | lit <- lits] then n else 0 | (n,lits) <- ts]
