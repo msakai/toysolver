@@ -121,6 +121,7 @@ Executable toysat
      Text.LPFile
      Text.PBFile
      Text.MaxSAT
+     Text.GCNF
      SAT
      SAT.Integer
      SAT.TseitinEncoder

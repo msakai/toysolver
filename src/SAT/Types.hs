@@ -3,6 +3,7 @@ module SAT.Types
   (
   -- * Variable
     Var
+  , VarSet
   , VarMap
   , validVar
 
@@ -51,6 +52,7 @@ import qualified Data.Set as Set
 -- | Variable is represented as positive integers (DIMACS format).
 type Var = Int
 
+type VarSet = IS.IntSet
 type VarMap = IM.IntMap
 
 {-# INLINE validVar #-}

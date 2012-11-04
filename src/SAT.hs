@@ -56,6 +56,7 @@ module SAT
   -- * Extract results
   , Model
   , model
+  , getBadAssumptions
 
   -- * Solver configulation
   , RestartStrategy (..)
@@ -274,6 +275,8 @@ data Solver
 
   , svRandomFreq :: !(IORef Double)
   , svRandomGen  :: !(IORef Rand.StdGen)
+
+  , svBadAssumptions :: !(IORef LitSet)
   }
 
 markBad :: Solver -> IO ()
@@ -511,6 +514,8 @@ newSolver = do
   randfreq <- newIORef defaultRandomFreq
   randgen  <- newIORef =<< Rand.newStdGen
 
+  badAssumptions <- newIORef IS.empty
+
   let solver =
         Solver
         { svOk = ok
@@ -544,6 +549,7 @@ newSolver = do
         , svCheckModel = checkModel
         , svRandomFreq = randfreq
         , svRandomGen  = randgen
+        , svBadAssumptions = badAssumptions
         }
  return solver
 
@@ -759,6 +765,7 @@ solve_ :: Solver -> IO Bool
 solve_ solver = do
   log solver "Solving starts ..."
   writeIORef (svModel solver) Nothing
+  writeIORef (svBadAssumptions solver) IS.empty
 
   ok <- readIORef (svOk solver)
   if not ok
@@ -890,8 +897,10 @@ search solver !conflict_lim onConflict = loop 0
                      -- dummy decision level
                      modifyIORef' (svLevel solver) (+1)
                      go
-                   else if val == lFalse then
+                   else if val == lFalse then do
                      -- conflict with assumption
+                     core <- analyzeFinal solver l
+                     writeIORef (svBadAssumptions solver) core
                      return Nothing
                    else
                      return (Just l)
@@ -955,6 +964,12 @@ model :: Solver -> IO Model
 model solver = do
   m <- readIORef (svModel solver)
   return (fromJust m)
+
+-- | After 'solveWith' returns False, it returns a set of assumptions
+-- that leads to contradiction. In particular, if it returns an empty
+-- set, the problem is unsatisiable without any assumptions.
+getBadAssumptions :: Solver -> IO LitSet
+getBadAssumptions solver = readIORef (svBadAssumptions solver)
 
 {--------------------------------------------------------------------
   Parameter settings.
@@ -1197,6 +1212,30 @@ analyzeConflict solver constr = do
                 [_] -> levelRoot
                 _:(_,lv):_ -> lv
   return (map fst xs, level)
+
+-- { p } ∪ { pにfalseを割り当てる原因のassumption }
+analyzeFinal :: Solver -> Lit -> IO LitSet
+analyzeFinal solver p = do
+  lits <- readIORef (svTrail solver)
+  let go :: [Lit] -> VarSet -> LitSet -> IO LitSet
+      go [] _ result = return result
+      go (l:ls) seen result = do
+        lv <- litLevel solver l
+        if lv == levelRoot then
+           return result
+         else if litVar l `IS.member` seen then do
+           r <- varReason solver (litVar l)
+           case r of
+             Nothing -> do
+               let seen' = IS.delete (litVar l) seen
+               go ls seen' (IS.insert l result)
+             Just constr  -> do
+               c <- reasonOf solver constr (Just l)
+               let seen' = IS.delete (litVar l) seen `IS.union` IS.fromList [litVar l2 | l2 <- c]
+               go ls seen' result
+         else
+           go ls seen result
+  go lits (IS.singleton (litVar p)) (IS.singleton p)
 
 analyzeConflictHybrid :: Constraint c => Solver -> c -> IO (Clause, Level, ([(Integer,Lit)], Integer))
 analyzeConflictHybrid solver constr = do

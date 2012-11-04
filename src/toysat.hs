@@ -22,6 +22,7 @@ import Data.Array.IArray
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import qualified Data.IntSet as IS
 import Data.Char
 import Data.IORef
 import Data.List
@@ -59,12 +60,13 @@ import SAT.Printer
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
 import qualified Text.MaxSAT as MaxSAT
+import qualified Text.GCNF as GCNF
 import Version
 import Util (showRational, revMapM, revForM)
 
 -- ------------------------------------------------------------------------
 
-data Mode = ModeHelp | ModeVersion | ModeSAT | ModePB | ModeWBO | ModeMaxSAT | ModeLP
+data Mode = ModeHelp | ModeVersion | ModeSAT | ModeMUS | ModePB | ModeWBO | ModeMaxSAT | ModeLP
 
 data Options
   = Options
@@ -111,6 +113,7 @@ options =
     , Option [] ["version"]   (NoArg (\opt -> opt{ optMode = Just ModeVersion})) "show version"
 
     , Option []    ["sat"]    (NoArg (\opt -> opt{ optMode = Just ModeSAT    })) "solve pseudo boolean problems in .cnf file (default)"
+    , Option []    ["mus"]    (NoArg (\opt -> opt{ optMode = Just ModeMUS    })) "solve minimally unsatisfiable subset problems in .gcnf file"
     , Option []    ["pb"]     (NoArg (\opt -> opt{ optMode = Just ModePB     })) "solve pseudo boolean problems in .pb file"
     , Option []    ["wbo"]    (NoArg (\opt -> opt{ optMode = Just ModeWBO    })) "solve weighted boolean optimization problem in .opb file"
     , Option []    ["maxsat"] (NoArg (\opt -> opt{ optMode = Just ModeMaxSAT })) "solve MaxSAT problem in .cnf or .wcnf file"
@@ -225,6 +228,7 @@ main = do
                         fname : _ ->
                           case map toLower (takeExtension fname) of
                             ".cnf"  -> ModeSAT
+                            ".gcnf" -> ModeMUS
                             ".opb"  -> ModePB
                             ".wbo"  -> ModeWBO
                             ".wcnf" -> ModeMaxSAT
@@ -234,6 +238,7 @@ main = do
               ModeHelp    -> showHelp stdout
               ModeVersion -> hPutStrLn stdout (showVersion version)
               ModeSAT     -> mainSAT opt solver args2
+              ModeMUS     -> mainMUS opt solver args2
               ModePB      -> mainPB opt solver args2
               ModeWBO     -> mainWBO opt solver args2
               ModeMaxSAT  -> mainMaxSAT opt solver args2
@@ -257,6 +262,7 @@ header :: String
 header = unlines
   [ "Usage:"
   , "  toysat [OPTION]... [file.cnf||-]"
+  , "  toysat [OPTION]... --mus [file.gcnf|-]"
   , "  toysat [OPTION]... --pb [file.opb|-]"
   , "  toysat [OPTION]... --wbo [file.wbo|-]"
   , "  toysat [OPTION]... --maxsat [file.cnf|file.wcnf|-]"
@@ -320,6 +326,77 @@ solveSAT _ solver cnf = do
   when result $ do
     m <- SAT.model solver
     satPrintModel stdout m (DIMACS.numVars cnf)
+
+-- ------------------------------------------------------------------------
+
+mainMUS :: Options -> SAT.Solver -> [String] -> IO ()
+mainMUS opt solver args = do
+  gcnf <- case args of
+           ["-"]   -> fmap GCNF.parseString $ hGetContents stdin
+           [fname] -> GCNF.parseFile fname
+           _ -> showHelp stderr >> exitFailure
+  solveMUS opt solver gcnf
+
+solveMUS :: Options -> SAT.Solver -> GCNF.GCNF -> IO ()
+solveMUS _ solver gcnf = do
+  printf "c #vars %d\n" (GCNF.nbvar gcnf)
+  printf "c #constraints %d\n" (length (GCNF.clauses gcnf))
+  printf "c #groups %d\n" (GCNF.lastgroupindex gcnf)
+
+  _ <- replicateM (GCNF.nbvar gcnf) (SAT.newVar solver)
+
+  tbl <- forM [1 .. GCNF.lastgroupindex gcnf] $ \i -> do
+    sel <- SAT.newVar solver
+    return (i, sel)
+  let idx2sel :: Array Int SAT.Var
+      idx2sel = array (1, GCNF.lastgroupindex gcnf) tbl
+      selrng  = if null tbl then (0,-1) else (snd $ head tbl, snd $ last tbl)
+      sel2idx :: Array SAT.Lit Int
+      sel2idx = array selrng [(sel, idx) | (idx, sel) <- tbl]
+
+  forM_ (GCNF.clauses gcnf) $ \(idx, clause) ->
+    if idx==0
+    then SAT.addClause solver clause
+    else SAT.addClause solver (- (idx2sel ! idx) : clause)
+
+  result <- SAT.solveWith solver (map (idx2sel !) [1..GCNF.lastgroupindex gcnf])
+  putStrLn $ "s " ++ (if result then "SATISFIABLE" else "UNSATISFIABLE")
+  hFlush stdout
+
+  if result
+    then do
+      m <- SAT.model solver
+      satPrintModel stdout m (GCNF.nbvar gcnf)
+    else do
+      putStrLn "c computing a minimally unsatisfiable subformula"
+      hFlush stdout
+
+      let loop core fixed = do
+            let is = core `IS.difference` fixed
+            if IS.null is
+              then return core
+              else do
+                let i2:is2 = IS.toList is
+                putStrLn $ "c core = {" ++ intercalate ", " (map show (IS.toList core)) ++ "}"
+                putStrLn $ "c trying to remove " ++ show i2
+                hFlush stdout
+                ret <- SAT.solveWith solver (map (idx2sel !) is2)
+                if not ret
+                  then do
+                    putStrLn $ "c successed to remove " ++ show i2
+                    ls2 <- SAT.getBadAssumptions solver
+                    let core2 = IS.map (sel2idx !) ls2 `IS.union` fixed
+                    loop core2 fixed
+                  else do
+                    putStrLn $ "c failed to remove " ++ show i2
+                    SAT.addClause solver [idx2sel ! i2]
+                    loop core (IS.insert i2 fixed)
+
+      ls <- SAT.getBadAssumptions solver
+      let core = IS.map (sel2idx !) ls
+      core2 <- loop core IS.empty
+
+      musPrintSol stdout (IS.toList core2)
 
 -- ------------------------------------------------------------------------
 

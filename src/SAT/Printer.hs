@@ -15,6 +15,7 @@ module SAT.Printer
   ( satPrintModel
   , maxsatPrintModel
   , pbPrintModel
+  , musPrintSol
   ) where
 
 import Control.Monad
@@ -63,6 +64,15 @@ pbPrintModel h m n = do
     forM_ xs $ \(var,val) -> hPutStr h (" " ++ (if val then "" else "-") ++ "x" ++ show var)
     hPutStrLn h ""
   hFlush stdout
+
+musPrintSol :: Handle -> [Int] -> IO ()
+musPrintSol h is = do
+  forM_ (split 10 is) $ \xs -> do
+    hPutStr h "v"
+    forM_ xs $ \i -> hPutStr h (' ': show i)
+    hPutStrLn h ""
+  hPutStrLn h "v 0"
+  hFlush h
 
 -- ------------------------------------------------------------------------
 

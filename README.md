@@ -32,6 +32,7 @@ Usage: toysolver [OPTION...] file.lp
 SAT-based solver for the following problems:
 
 * SAT
+    * Minimally Unsatisfiable Subset (MUS)
 * PB
     * Pseudo Boolean Satisfaction (PBS)
     * Pseudo Boolean Optimization (PBO)
@@ -42,6 +43,7 @@ SAT-based solver for the following problems:
 Usage:
 
     toysat [file.cnf||-]
+    toysat --mus [file.gcnf|-]
     toysat --pb [file.opb|-]
     toysat --wbo [file.wbo|-]
     toysat --maxsat [file.cnf|file.wcnf|-]
