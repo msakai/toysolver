@@ -27,6 +27,7 @@ module Text.MPSFile
   ) where
 
 import Control.Monad
+import Control.Monad.Error
 import Data.Char
 import Data.List
 import Data.Maybe
@@ -36,7 +37,7 @@ import qualified Data.Map as Map
 import Data.OptDir
 import qualified Text.LPFile as LPFile
 
-type M = Maybe
+type M = Either String
 
 type Column = String
 type Row = String
@@ -55,26 +56,32 @@ data BoundType
   | SC	-- upper bound for semi-continuous variable
   deriving (Eq, Ord, Show, Read)
 
-parseString :: String -> Maybe LPFile.LP
+parseString :: String -> Either String LPFile.LP
 parseString s = do
   let ls = [l | l <- lines s, not ("*" `isPrefixOf` l)]
-  (_name, ls1) <- nameSection ls
-  (rows, ls2) <- rowsSection ls1
-  (cols, ls3) <- colsSection ls2
-  (rhss, ls4) <- rhsSection ls3
-  (bnds, ls5) <- boundsSection ls4
-  guard $ ls5 == ["ENDATA"]
+  (_name, ls) <- nameSection ls
+  (objsense, ls) <- objSenseSection ls
+  (objname, ls)  <- objNameSection ls
+  (rows, ls) <- rowsSection ls
+  (cols, ls) <- colsSection ls
+  (rhss, ls) <- rhsSection ls
+  (bnds, ls) <- boundsSection ls
+  guard $ ls == ["ENDATA"]
 
-  let objrow = head [row | (Nothing, row) <- rows] -- XXX
+  let objrow =
+        case objname of
+          Nothing -> head [row | (Nothing, row) <- rows] -- XXX
+          Just r  -> r
+      objdir =
+        case objsense of
+          Nothing -> OptMin
+          Just d  -> d
       vs     = Set.fromList [col | (col,_,_,_) <- cols]
-      intvs  = Set.fromList [col | (col,True,_,_) <- cols]
+      intvs1 = Set.fromList [col | (col,True,_,_) <- cols]
+      intvs2 = Set.fromList [col | (t,_,col,_) <- bnds, t `elem` [BV,LI,UI]]
       scvs   = Set.fromList [col | (SC,_,col,_) <- bnds]
 
-  let f (a1,b1) (a2,b2) = (g a1 a2, g b1 b2)
-      g _ (Just x) = Just x
-      g x Nothing  = x
-
-      explicitBounds = Map.fromListWith f
+  let explicitBounds = Map.fromListWith f
         [ case typ of
             LO -> (col, (Just (LPFile.Finite val'), Nothing))
             UP -> (col, (Nothing, Just (LPFile.Finite val')))
@@ -87,11 +94,15 @@ parseString s = do
             UI -> (col, (Nothing, Just (LPFile.Finite val')))
             SC -> (col, (Nothing, Just (LPFile.Finite val')))
         | (typ,_,col,val) <- bnds, let val' = toRational val ]
+        where
+          f (a1,b1) (a2,b2) = (g a1 a2, g b1 b2)
+          g _ (Just x) = Just x
+          g x Nothing  = x
 
-      bounds = Map.fromList
+  let bounds = Map.fromList
         [ case Map.lookup v explicitBounds of
             Nothing ->
-              if v `Set.member` intvs
+              if v `Set.member` intvs1
               then
                 -- http://eaton.math.rpi.edu/cplex90html/reffileformatscplex/reffileformatscplex9.html
                 -- If no bounds are specified for the variables within markers, bounds of 0 (zero) and 1 (one) are assumed.
@@ -125,7 +136,7 @@ parseString s = do
   let lp =
         LPFile.LP
         { LPFile.variables               = Set.fromList [col | (col,_,_,_) <- cols]
-        , LPFile.dir                     = OptMin
+        , LPFile.dir                     = objdir
         , LPFile.objectiveFunction       = (Just objrow, [LPFile.Term (toRational c) [col] | (col,_,row,c) <- cols, objrow == row])
         , LPFile.constraints             =
             [ LPFile.Constraint
@@ -141,7 +152,7 @@ parseString s = do
             | (Just op, row) <- rows
             ]
         , LPFile.bounds                  = bounds
-        , LPFile.integerVariables        = intvs
+        , LPFile.integerVariables        = intvs1 `Set.union` intvs2
         , LPFile.binaryVariables         = Set.empty
         , LPFile.semiContinuousVariables = scvs
         , LPFile.sos                     = []
@@ -149,15 +160,28 @@ parseString s = do
 
   return lp
 
-parseFile :: FilePath -> IO (Maybe LPFile.LP)
+parseFile :: FilePath -> IO (Either String LPFile.LP)
 parseFile fname = liftM parseString $ readFile fname
 
-nameSection :: [String] -> M (String, [String])
+nameSection :: [String] -> M (Maybe String, [String])
 nameSection (l:ls) =
-  case stripPrefix "NAME " l of
-    Nothing -> mzero
-    Just s  -> return (strip s, ls)
-nameSection [] = mzero
+  case words l of
+    ["NAME"] -> return (Nothing, ls)
+    ["NAME", n] -> return (Just n, ls)
+    _ -> throwError "NAME expected"
+nameSection [] = throwError "NAME expected"
+
+objSenseSection :: [String] -> M (Maybe OptDir, [String])
+objSenseSection ("OBJSENSE":l:ls) =
+  case strip l of
+    "MAX" -> return (Just OptMax, ls)
+    "MIN" -> return (Just OptMin, ls)
+    s     -> throwError ("unknown OBJSENSE: " ++ s)
+objSenseSection ls = return (Nothing, ls)
+
+objNameSection :: [String] -> M (Maybe String, [String])
+objNameSection ("OBJNAME":l:ls) = return (Just (strip l), ls)
+objNameSection ls = return (Nothing, ls)
 
 rowsSection :: [String] -> M ([(Maybe LPFile.RelOp, Row)], [String])
 rowsSection ("ROWS":ls) = go ls
@@ -170,7 +194,7 @@ rowsSection ("ROWS":ls) = go ls
         ["L",name] -> go ls >>= \(xs, ls2) -> return ((Just LPFile.Le,  name) : xs, ls2)
         ["E",name] -> go ls >>= \(xs, ls2) -> return ((Just LPFile.Eql, name) : xs, ls2)
         _ -> return ([], lls)
-rowsSection _ = mzero
+rowsSection _ = throwError "ROWS expected"
 
 colsSection :: [String] -> M ([(Column, Bool, Row, Double)], [String])
 colsSection ("COLUMNS":ls) = go ls False
@@ -188,7 +212,7 @@ colsSection ("COLUMNS":ls) = go ls False
           return ((col, integrality, row1, read val1) : (col, integrality, row2, read val2) : xs, ls2)
         _ ->
           return ([], lls)
-colsSection _ = mzero
+colsSection _ = throwError "COLUMNS expected"
 
 rhsSection :: [String] -> M ([(RHS, Row, Double)], [String])
 rhsSection ("RHS":ls) = go ls
@@ -204,7 +228,7 @@ rhsSection ("RHS":ls) = go ls
           return ((rhs,row1,read val1) : (rhs,row2,read val2) : xs, ls2)
         _ ->
           return ([], lls)
-rhsSection _ = mzero
+rhsSection _ = throwError "RHS expected"
 
 boundsSection :: [String] -> M ([(BoundType, String, Column, Double)], [String])
 boundsSection ("BOUNDS":ls) = go ls
@@ -217,7 +241,7 @@ boundsSection ("BOUNDS":ls) = go ls
           return ((read typ, name, col, read val) : xs, ls2)
         _ ->
           return ([], lls)
-boundsSection _ = mzero
+boundsSection _ = throwError "BOUNDS expected"
 
 strip :: String -> String
 strip = reverse . f . reverse . f
