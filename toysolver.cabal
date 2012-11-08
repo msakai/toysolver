@@ -25,7 +25,6 @@ Extra-Source-Files:
    src/Data/AlgebraicNumber/Root.hs
    src/Data/Polyhedron.hs
    src/FOLModelFinder.hs
-   src/Text/MPSFile.hs
    src/Text/SDPFile.hs
    src/TestAReal2.hs
    src/pbverify.hs
@@ -79,6 +78,7 @@ Executable toysolver
      Data.AlgebraicNumber
      SAT.Printer
      Text.LPFile
+     Text.MPSFile
      Text.PBFile
      Text.MaxSAT
      Text.GurobiSol

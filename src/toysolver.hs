@@ -43,6 +43,7 @@ import qualified OmegaTest
 import qualified Cooper
 import qualified MIPSolverHL
 import qualified Text.LPFile as LP
+import qualified Text.MPSFile as MPS
 import qualified Text.PBFile as PBFile
 import qualified Text.MaxSAT as MaxSAT
 import qualified Text.GurobiSol as GurobiSol
@@ -383,12 +384,19 @@ main = do
             writeSOLFileSAT o m2
         ModeLP -> do
           ret <- LP.parseFile fname
-          case ret of
-            Left err -> hPrint stderr err >> exitFailure
-            Right lp -> do
-              run (getSolver o) o lp $ \m -> do
-                lpPrintModel stdout (PrintRational `elem` o) m
-                writeSOLFileLP o m
+          lp <- case ret of
+                  Right lp -> return lp
+                  Left err -> do
+                    ret <- MPS.parseFile fname
+                    case ret of
+                      Right lp -> return lp
+                      Left err2 -> do
+                        hPrint stderr err
+                        hPrint stderr err2
+                        exitFailure
+          run (getSolver o) o lp $ \m -> do
+            lpPrintModel stdout (PrintRational `elem` o) m
+            writeSOLFileLP o m
     (_,_,errs) ->
         hPutStrLn stderr $ concat errs ++ usageInfo header options
 
