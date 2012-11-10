@@ -60,20 +60,44 @@ parseString :: String -> Either String LPFile.LP
 parseString s = do
   let ls = [l | l <- lines s, not ("*" `isPrefixOf` l)]
   (_name, ls)    <- nameSection ls
+
+  -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_objsen.html
+  -- CPLEX extends the MPS standard by allowing two additional sections: OBJSEN and OBJNAME.
+  -- If these options are used, they must appear in order and as the first and second sections after the NAME section. 
   (objsense, ls) <- objSenseSection ls
   (objname, ls)  <- objNameSection ls
+
   (rows, ls)     <- rowsSection ls
+
+  -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_usercuts.html
+  -- The order of sections must be ROWS USERCUTS.  
   (usercuts, ls) <- userCutsSection ls
+
+  -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_lazycons.html
+  -- The order of sections must be ROWS USERCUTS LAZYCONS.
   (lazycons, ls) <- lazyConsSection ls
+
   (cols, ls)     <- colsSection ls
   (rhss, ls)     <- rhsSection ls
   (bnds, ls)     <- boundsSection ls
-  (sos,  ls)     <- sosSection ls
+
+  -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_quadobj.html
+  -- Following the BOUNDS section, a QMATRIX section may be specified. 
   (qobj1, ls)    <- quadObjSection ls
   (qobj2, ls)    <- qMatrixSection ls
+
+  -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_sos.html
+  -- Note that in an MPS file, the SOS section must follow the BOUNDS section.
+  (sos,  ls)     <- sosSection ls
+
+  -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_qcmatrix.html
+  -- QCMATRIX sections appear after the optional SOS section. 
+  (qterms, ls)   <- qcMatrixSection ls
+
+  -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_indicators.html
+  -- The INDICATORS section follows any quadratic constraint section and any quadratic objective section.
   (inds, ls)     <- indicatorsSection ls
-  -- TODO: SOS
-  (qterms, ls) <- qcMatrixSection ls
+
   guard $ ls == ["ENDATA"]
 
   let objrow =
@@ -295,7 +319,6 @@ sosSection ls = return ([], ls)
 quadObjSection :: [String] -> M ([LPFile.Term], [String])
 quadObjSection ("QUADOBJ":ls) = go ls
   where
-    cplex = False
     go lls@((' ':l):ls) =
       case words l of
         [col1, col2, val] -> do
@@ -303,7 +326,7 @@ quadObjSection ("QUADOBJ":ls) = go ls
           let val2 :: Double
               val2 = read val
               val3 =
-                if cplex && col1 /= col2 -- XXX: CPLEXとGurobiで解釈が違う
+                if col1 /= col2
                 then toRational val2
                 else toRational val2 / 2
           return (LPFile.Term val3 [col1, col2] : xs, ls2)
@@ -327,8 +350,6 @@ qMatrixSection lls@("QMATRIX":ls) = go ls
           return ([], lls)
     go ls = return ([], ls)
 qMatrixSection ls = return ([], ls)
-
--- TODO: SOS section
 
 qcMatrixSection :: [String] -> M (Map.Map Row [LPFile.Term], [String])
 qcMatrixSection lls@(l:ls) =
