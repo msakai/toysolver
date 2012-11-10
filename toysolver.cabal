@@ -299,6 +299,13 @@ Test-suite TestLPFile
   Build-depends:     base >=4 && <5, mtl, containers, parsec, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
+Test-suite TestMPSFile
+  Type:              exitcode-stdio-1.0
+  HS-Source-Dirs:    src
+  Main-is:           TestMPSFile.hs
+  Build-depends:     base >=4 && <5, mtl, containers, parsec, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Extensions: TemplateHaskell, DoAndIfThenElse
+
 Test-suite TestPBFile
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    src
