@@ -59,13 +59,21 @@ data BoundType
 parseString :: String -> Either String LPFile.LP
 parseString s = do
   let ls = [l | l <- lines s, not ("*" `isPrefixOf` l)]
-  (_name, ls) <- nameSection ls
+  (_name, ls)    <- nameSection ls
   (objsense, ls) <- objSenseSection ls
   (objname, ls)  <- objNameSection ls
-  (rows, ls) <- rowsSection ls
-  (cols, ls) <- colsSection ls
-  (rhss, ls) <- rhsSection ls
-  (bnds, ls) <- boundsSection ls
+  (rows, ls)     <- rowsSection ls
+  (usercuts, ls) <- userCutsSection ls
+  (lazycons, ls) <- lazyConsSection ls
+  (cols, ls)     <- colsSection ls
+  (rhss, ls)     <- rhsSection ls
+  (bnds, ls)     <- boundsSection ls
+  (sos,  ls)     <- sosSection ls
+  (qobj1, ls)    <- quadObjSection ls
+  (qobj2, ls)    <- qMatrixSection ls
+  (inds, ls)     <- indicatorsSection ls
+  -- TODO: SOS
+  (qterms, ls) <- qcMatrixSection ls
   guard $ ls == ["ENDATA"]
 
   let objrow =
@@ -137,25 +145,32 @@ parseString s = do
         LPFile.LP
         { LPFile.variables               = Set.fromList [col | (col,_,_,_) <- cols]
         , LPFile.dir                     = objdir
-        , LPFile.objectiveFunction       = (Just objrow, [LPFile.Term (toRational c) [col] | (col,_,row,c) <- cols, objrow == row])
+        , LPFile.objectiveFunction       =
+            ( Just objrow
+            , [LPFile.Term (toRational c) [col] | (col,_,row,c) <- cols, objrow == row]
+              ++ qobj1 ++ qobj2
+            )
         , LPFile.constraints             =
             [ LPFile.Constraint
-              { LPFile.constrType      = LPFile.NormalConstraint
+              { LPFile.constrType      = typ
               , LPFile.constrLabel     = Just row
-              , LPFile.constrIndicator = Nothing
+              , LPFile.constrIndicator = Map.lookup row inds
               , LPFile.constrBody      =
                   ( [LPFile.Term (toRational c)　[col] | (col,_,row2,c) <- cols, row == row2]
+                    ++ Map.findWithDefault [] row qterms 
                   , op
                   , head $ [toRational v | (_,row2,v) <- rhss, row == row2] ++ [0]
                   )
               }
-            | (Just op, row) <- rows
+            | (typ, (Just op, row)) <- zip (repeat LPFile.NormalConstraint) rows ++
+                                       zip (repeat LPFile.UserDefinedCut) usercuts ++
+                                       zip (repeat LPFile.LazyConstraint) lazycons
             ]
         , LPFile.bounds                  = bounds
         , LPFile.integerVariables        = intvs1 `Set.union` intvs2
         , LPFile.binaryVariables         = Set.empty
         , LPFile.semiContinuousVariables = scvs
-        , LPFile.sos                     = []
+        , LPFile.sos                     = sos
         }
 
   return lp
@@ -184,23 +199,31 @@ objNameSection ("OBJNAME":l:ls) = return (Just (strip l), ls)
 objNameSection ls = return (Nothing, ls)
 
 rowsSection :: [String] -> M ([(Maybe LPFile.RelOp, Row)], [String])
-rowsSection ("ROWS":ls) = go ls
-  where
-    go [] = return ([],[])
-    go lls@(l:ls) =
-      case words l of
-        ["N",name] -> go ls >>= \(xs, ls2) -> return ((Nothing, name) : xs, ls2)
-        ["G",name] -> go ls >>= \(xs, ls2) -> return ((Just LPFile.Ge,  name) : xs, ls2)
-        ["L",name] -> go ls >>= \(xs, ls2) -> return ((Just LPFile.Le,  name) : xs, ls2)
-        ["E",name] -> go ls >>= \(xs, ls2) -> return ((Just LPFile.Eql, name) : xs, ls2)
-        _ -> return ([], lls)
+rowsSection ("ROWS":ls) = rowsSection' ls
 rowsSection _ = throwError "ROWS expected"
+
+userCutsSection :: [String] -> M ([(Maybe LPFile.RelOp, Row)], [String])
+userCutsSection ("USERCUTS":ls) = rowsSection' ls
+userCutsSection ls = return ([], ls)
+
+lazyConsSection :: [String] -> M ([(Maybe LPFile.RelOp, Row)], [String])
+lazyConsSection ("LAZYCONS":ls) = rowsSection' ls
+lazyConsSection ls = return ([], ls)
+
+rowsSection' :: [String] -> M ([(Maybe LPFile.RelOp, Row)], [String])
+rowsSection' lls@((' ':l):ls) =
+  case words l of
+    ["N",name] -> rowsSection' ls >>= \(xs, ls2) -> return ((Nothing, name) : xs, ls2)
+    ["G",name] -> rowsSection' ls >>= \(xs, ls2) -> return ((Just LPFile.Ge,  name) : xs, ls2)
+    ["L",name] -> rowsSection' ls >>= \(xs, ls2) -> return ((Just LPFile.Le,  name) : xs, ls2)
+    ["E",name] -> rowsSection' ls >>= \(xs, ls2) -> return ((Just LPFile.Eql, name) : xs, ls2)
+    _ -> return ([], lls)
+rowsSection' ls = return ([],ls)
 
 colsSection :: [String] -> M ([(Column, Bool, Row, Double)], [String])
 colsSection ("COLUMNS":ls) = go ls False
   where
-    go [] _ = return ([],[])
-    go lls@(l:ls) integrality =
+    go lls@((' ':l):ls) integrality =
       case words l of
         [_marker, "'MARKER'", "'INTORG'"] -> go ls True
         [_marker, "'MARKER'", "'INTEND'"] -> go ls False
@@ -212,13 +235,13 @@ colsSection ("COLUMNS":ls) = go ls False
           return ((col, integrality, row1, read val1) : (col, integrality, row2, read val2) : xs, ls2)
         _ ->
           return ([], lls)
+    go ls _ = return ([],ls)
 colsSection _ = throwError "COLUMNS expected"
 
 rhsSection :: [String] -> M ([(RHS, Row, Double)], [String])
 rhsSection ("RHS":ls) = go ls
   where
-    go [] = return ([],[])
-    go lls@(l:ls) =
+    go lls@((' ':l):ls) =
       case words l of
         [rhs,row,val] -> do
           (xs,ls2) <- go ls
@@ -228,20 +251,120 @@ rhsSection ("RHS":ls) = go ls
           return ((rhs,row1,read val1) : (rhs,row2,read val2) : xs, ls2)
         _ ->
           return ([], lls)
+    go ls = return ([],ls)
 rhsSection _ = throwError "RHS expected"
 
 boundsSection :: [String] -> M ([(BoundType, String, Column, Double)], [String])
 boundsSection ("BOUNDS":ls) = go ls
   where
-    go [] = return ([],[])
-    go lls@(l:ls) =
+    go lls@((' ':l):ls) =
       case words l of
         [typ, name, col, val] -> do
           (xs,ls2) <- go ls
           return ((read typ, name, col, read val) : xs, ls2)
         _ ->
           return ([], lls)
-boundsSection _ = throwError "BOUNDS expected"
+    go ls = return ([],ls)
+boundsSection ls = return ([], ls)
+
+sosSection :: [String] -> M ([(Maybe String, LPFile.SOSType, [(Column, Rational)])], [String])
+sosSection ("SOS":ls) = go ls
+  where
+    go lls@((' ':l):ls) =
+      case words l of
+        ["S1", name] -> do
+          (set,ls) <- go2 ls
+          (xs,ls) <- go ls
+          return ((Just name, LPFile.S1, set) : xs, ls)
+        ["S2", name] -> do
+          (set,ls) <- go2 ls
+          (xs,ls) <- go ls
+          return ((Just name, LPFile.S2, set) : xs, ls)
+        _ ->
+          return ([], lls)
+    go ls = return ([],ls)
+    go2 lls@((' ':l):ls) =
+      case words l of
+        [col, w] | all isDigit w -> do
+          (set,ls) <- go2 ls
+          return ((col, fromInteger (read w)) : set, ls)
+        _ -> return ([],lls)
+    go2 ls = return ([], ls)
+sosSection ls = return ([], ls)
+
+quadObjSection :: [String] -> M ([LPFile.Term], [String])
+quadObjSection ("QUADOBJ":ls) = go ls
+  where
+    cplex = False
+    go lls@((' ':l):ls) =
+      case words l of
+        [col1, col2, val] -> do
+          (xs,ls2) <- go ls
+          let val2 :: Double
+              val2 = read val
+              val3 =
+                if cplex && col1 /= col2 -- XXX: CPLEXとGurobiで解釈が違う
+                then toRational val2
+                else toRational val2 / 2
+          return (LPFile.Term val3 [col1, col2] : xs, ls2)
+        _ ->
+          return ([], lls)
+    go ls = return ([], ls)
+quadObjSection ls = return ([], ls)
+
+qMatrixSection :: [String] -> M ([LPFile.Term], [String])
+qMatrixSection lls@("QMATRIX":ls) = go ls
+  where
+    go lls@((' ':l):ls) =
+      case words l of
+        [col1, col2, val] -> do
+          (xs,ls2) <- go ls
+          let val2 :: Double
+              val2 = read val
+              val3 = toRational val2 / 2
+          return (LPFile.Term val3 [col1, col2] : xs, ls2)
+        _ ->
+          return ([], lls)
+    go ls = return ([], ls)
+qMatrixSection ls = return ([], ls)
+
+-- TODO: SOS section
+
+qcMatrixSection :: [String] -> M (Map.Map Row [LPFile.Term], [String])
+qcMatrixSection lls@(l:ls) =
+  case words l of
+    ["QCMATRIX", row] -> do
+      (xs,ls)  <- go ls
+      (m,ls) <- qcMatrixSection ls
+      return (Map.insert row xs m, ls)
+    _ -> return (Map.empty, lls)
+  where
+    go lls@((' ':l):ls) =
+      case words l of
+        [col1, col2, val] -> do
+          (xs,ls2) <- go ls
+          let val2 :: Double
+              val2 = read val
+          return (LPFile.Term (toRational val2) [col1, col2] : xs, ls2)
+        _ ->
+          return ([], lls)
+    go ls = return ([], ls)
+qcMatrixSection ls = return (Map.empty, ls)
+
+indicatorsSection :: [String] -> M (Map.Map Row (Column, Rational), [String])
+indicatorsSection lls@("INDICATORS":ls) = go ls
+  where
+    go lls@((' ':l):ls) =
+      case words l of
+        ["IF", row, var, val] -> do
+          (xs,ls2) <- go ls
+          let val2 :: Integer
+              val2 = read val
+          return (Map.insert row (var, toRational val2) xs, ls2)
+        _ ->
+          return (Map.empty, lls)
+    go ls = return (Map.empty, ls)
+indicatorsSection ls = return (Map.empty, ls)
 
 strip :: String -> String
 strip = reverse . f . reverse . f
