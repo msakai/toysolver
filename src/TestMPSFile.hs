@@ -50,13 +50,13 @@ checkFile :: FilePath -> IO ()
 checkFile fname = do
   r <- parseFile fname
   case r of
-    Left err -> assertFailure err
+    Left err -> assertFailure (show err)
     Right lp -> return ()
 
 checkString :: String -> String -> IO ()
 checkString name str = do
-  case parseString str of
-    Left err -> assertFailure err
+  case parseString name str of
+    Left err -> assertFailure (show err)
     Right lp -> return ()
 
 ------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Text.MPSFile
@@ -27,21 +28,20 @@ module Text.MPSFile
   ) where
 
 import Control.Monad
-import Control.Monad.Error
 import Data.Char
-import Data.List
 import Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import Data.Ratio
+
+import qualified Text.ParserCombinators.Parsec as P
+import Text.ParserCombinators.Parsec hiding (spaces, newline, Column)
 
 import Data.OptDir
 import qualified Text.LPFile as LPFile
 
-type M = Either String
-
 type Column = String
 type Row = String
-type RHS = String
 
 data BoundType
   = LO	-- lower bound
@@ -56,49 +56,130 @@ data BoundType
   | SC	-- upper bound for semi-continuous variable
   deriving (Eq, Ord, Show, Read)
 
-parseString :: String -> Either String LPFile.LP
-parseString s = do
-  let ls = [l | l <- lines s, not ("*" `isPrefixOf` l)]
-  (_name, ls)    <- nameSection ls
+-- ---------------------------------------------------------------------------
+
+-- | Parse a string containing LP file data.
+-- The source name is only | used in error messages and may be the empty string.
+parseString :: SourceName -> String -> Either ParseError LPFile.LP
+parseString = parse mpsfile
+
+-- | Parse a file containing LP file data.
+parseFile :: FilePath -> IO (Either ParseError LPFile.LP)
+parseFile = parseFromFile mpsfile
+
+-- ---------------------------------------------------------------------------
+
+space' :: Parser Char
+space' = satisfy (\c -> isSpace c && c /= '\n')
+
+spaces' :: Parser ()
+spaces' = many space' >> return ()
+
+spaces1' :: Parser ()
+spaces1' = many1 space' >> return ()
+
+commentline :: Parser ()
+commentline = do
+  _ <- char '*'
+  _ <- manyTill anyChar P.newline
+  return ()
+
+newline' :: Parser ()
+newline' = do
+  spaces'
+  _ <- P.newline
+  skipMany commentline
+  return ()
+
+tok :: Parser a -> Parser a
+tok p = do
+  x <- p
+  msum [spaces1', lookAhead (try (char '\n' >> return ())), eof]
+  return x
+
+ident :: Parser String
+ident = tok $ many1 $ noneOf [' ', '\t', '\n']
+
+stringLn :: String -> Parser ()
+stringLn s = string s >> newline'
+
+sign :: Num a => Parser a
+sign = (char '+' >> return 1) <|> (char '-' >> return (-1))
+
+number :: Parser Rational
+number = tok $ do
+  b <- (do{ s <- option 1 sign; x <- nat; y <- option 0 frac; return (s * (fromInteger x + y)) })
+    <|> frac
+  c <- option 0 e
+  return (b*10^^c)
+  where
+    digits = many1 digit
+
+    nat :: Parser Integer
+    nat = liftM read digits
+
+    frac :: Parser Rational
+    frac = do
+      char '.'
+      s <- digits
+      return (read s % 10^(length s))
+
+    e :: Parser Integer
+    e = do
+      oneOf "eE"
+      f <- msum [ char '+' >> return id
+                , char '-' >> return negate
+                , return id
+                ]
+      liftM f nat
+
+-- ---------------------------------------------------------------------------
+
+mpsfile :: Parser LPFile.LP
+mpsfile = do
+  many commentline
+
+  _name <- nameSection
 
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_objsen.html
   -- CPLEX extends the MPS standard by allowing two additional sections: OBJSEN and OBJNAME.
   -- If these options are used, they must appear in order and as the first and second sections after the NAME section. 
-  (objsense, ls) <- objSenseSection ls
-  (objname, ls)  <- objNameSection ls
+  objsense <- optionMaybe $ objSenseSection
+  objname  <- optionMaybe $ objNameSection
 
-  (rows, ls)     <- rowsSection ls
+  rows <- rowsSection
 
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_usercuts.html
   -- The order of sections must be ROWS USERCUTS.  
-  (usercuts, ls) <- userCutsSection ls
+  usercuts <- option [] userCutsSection
 
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_lazycons.html
   -- The order of sections must be ROWS USERCUTS LAZYCONS.
-  (lazycons, ls) <- lazyConsSection ls
+  lazycons <- option [] lazyConsSection
 
-  (cols, ls)     <- colsSection ls
-  (rhss, ls)     <- rhsSection ls
-  (bnds, ls)     <- boundsSection ls
+  cols <- colsSection
+  rhss <- rhsSection
+  bnds <- option [] boundsSection
 
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_quadobj.html
-  -- Following the BOUNDS section, a QMATRIX section may be specified. 
-  (qobj1, ls)    <- quadObjSection ls
-  (qobj2, ls)    <- qMatrixSection ls
+  -- Following the BOUNDS section, a QMATRIX section may be specified.
+  -- TODO: どちらか片方にするように
+  qobj1 <- option [] quadObjSection
+  qobj2 <- option [] qMatrixSection
 
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_sos.html
   -- Note that in an MPS file, the SOS section must follow the BOUNDS section.
-  (sos,  ls)     <- sosSection ls
+  sos <- option [] sosSection
 
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_qcmatrix.html
   -- QCMATRIX sections appear after the optional SOS section. 
-  (qterms, ls)   <- qcMatrixSection ls
+  qterms <- liftM Map.fromList $ many qcMatrixSection
 
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_indicators.html
   -- The INDICATORS section follows any quadratic constraint section and any quadratic objective section.
-  (inds, ls)     <- indicatorsSection ls
+  inds <- option Map.empty indicatorsSection
 
-  guard $ ls == ["ENDATA"]
+  string "ENDATA"
 
   let objrow =
         case objname of
@@ -110,22 +191,22 @@ parseString s = do
           Just d  -> d
       vs     = Set.fromList [col | (col,_,_,_) <- cols]
       intvs1 = Set.fromList [col | (col,True,_,_) <- cols]
-      intvs2 = Set.fromList [col | (t,_,col,_) <- bnds, t `elem` [BV,LI,UI]]
-      scvs   = Set.fromList [col | (SC,_,col,_) <- bnds]
+      intvs2 = Set.fromList [col | (t,col,_) <- bnds, t `elem` [BV,LI,UI]]
+      scvs   = Set.fromList [col | (SC,col,_) <- bnds]
 
   let explicitBounds = Map.fromListWith f
         [ case typ of
-            LO -> (col, (Just (LPFile.Finite val'), Nothing))
-            UP -> (col, (Nothing, Just (LPFile.Finite val')))
-            FX -> (col, (Just (LPFile.Finite val'), Just (LPFile.Finite val')))
+            LO -> (col, (Just (LPFile.Finite val), Nothing))
+            UP -> (col, (Nothing, Just (LPFile.Finite val)))
+            FX -> (col, (Just (LPFile.Finite val), Just (LPFile.Finite val)))
             FR -> (col, (Just LPFile.NegInf, Just LPFile.PosInf))
             MI -> (col, (Just LPFile.NegInf, Nothing))
             PL -> (col, (Nothing, Just LPFile.PosInf))
             BV -> (col, (Just (LPFile.Finite 0), Just (LPFile.Finite 1)))
-            LI -> (col, (Just (LPFile.Finite val'), Nothing))
-            UI -> (col, (Nothing, Just (LPFile.Finite val')))
-            SC -> (col, (Nothing, Just (LPFile.Finite val')))
-        | (typ,_,col,val) <- bnds, let val' = toRational val ]
+            LI -> (col, (Just (LPFile.Finite val), Nothing))
+            UI -> (col, (Nothing, Just (LPFile.Finite val)))
+            SC -> (col, (Nothing, Just (LPFile.Finite val)))
+        | (typ,col,val) <- bnds ]
         where
           f (a1,b1) (a2,b2) = (g a1 a2, g b1 b2)
           g _ (Just x) = Just x
@@ -160,7 +241,7 @@ parseString s = do
                 than 0. A warning message is issued when this
                 exception is encountered.
               -}
-              (v, (LPFile.NegInf, LPFile.Finite (toRational ub)))
+              (v, (LPFile.NegInf, LPFile.Finite ub))
             Just (lb,ub) ->
               (v, (fromMaybe (LPFile.Finite 0) lb, fromMaybe LPFile.PosInf ub))
         | v <- Set.toList vs ]
@@ -171,7 +252,7 @@ parseString s = do
         , LPFile.dir                     = objdir
         , LPFile.objectiveFunction       =
             ( Just objrow
-            , [LPFile.Term (toRational c) [col] | (col,_,row,c) <- cols, objrow == row]
+            , [LPFile.Term c [col] | (col,_,row,c) <- cols, objrow == row]
               ++ qobj1 ++ qobj2
             )
         , LPFile.constraints             =
@@ -180,10 +261,10 @@ parseString s = do
               , LPFile.constrLabel     = Just row
               , LPFile.constrIndicator = Map.lookup row inds
               , LPFile.constrBody      =
-                  ( [LPFile.Term (toRational c)　[col] | (col,_,row2,c) <- cols, row == row2]
+                  ( [LPFile.Term c　[col] | (col,_,row2,c) <- cols, row == row2]
                     ++ Map.findWithDefault [] row qterms 
                   , op
-                  , head $ [toRational v | (_,row2,v) <- rhss, row == row2] ++ [0]
+                  , head $ [v | (row2,v) <- rhss, row == row2] ++ [0]
                   )
               }
             | (typ, (Just op, row)) <- zip (repeat LPFile.NormalConstraint) rows ++
@@ -199,195 +280,213 @@ parseString s = do
 
   return lp
 
-parseFile :: FilePath -> IO (Either String LPFile.LP)
-parseFile fname = liftM parseString $ readFile fname
+nameSection :: Parser (Maybe String)
+nameSection = do
+  string "NAME"
+  n <- optionMaybe $ do
+    spaces1'
+    ident
+  newline'
+  return n
 
-nameSection :: [String] -> M (Maybe String, [String])
-nameSection (l:ls) =
-  case words l of
-    ["NAME"] -> return (Nothing, ls)
-    ["NAME", n] -> return (Just n, ls)
-    _ -> throwError "NAME expected"
-nameSection [] = throwError "NAME expected"
+objSenseSection :: Parser OptDir
+objSenseSection = do
+  try $ stringLn "OBJSENSE"
+  spaces1'
+  d <-  (try (stringLn "MAX") >> return OptMax)
+    <|> (stringLn "MIN" >> return OptMin)
+  return d
 
-objSenseSection :: [String] -> M (Maybe OptDir, [String])
-objSenseSection ("OBJSENSE":l:ls) =
-  case strip l of
-    "MAX" -> return (Just OptMax, ls)
-    "MIN" -> return (Just OptMin, ls)
-    s     -> throwError ("unknown OBJSENSE: " ++ s)
-objSenseSection ls = return (Nothing, ls)
+objNameSection :: Parser String
+objNameSection = do
+  try $ stringLn "OBJNAME"
+  spaces1'
+  name <- ident
+  newline'
+  return name
 
-objNameSection :: [String] -> M (Maybe String, [String])
-objNameSection ("OBJNAME":l:ls) = return (Just (strip l), ls)
-objNameSection ls = return (Nothing, ls)
+rowsSection :: Parser [(Maybe LPFile.RelOp, Row)]
+rowsSection = do
+  try $ stringLn "ROWS"
+  rowsBody
 
-rowsSection :: [String] -> M ([(Maybe LPFile.RelOp, Row)], [String])
-rowsSection ("ROWS":ls) = rowsSection' ls
-rowsSection _ = throwError "ROWS expected"
+userCutsSection :: Parser [(Maybe LPFile.RelOp, Row)]
+userCutsSection = do
+  try $ stringLn "USERCUTS"
+  rowsBody
 
-userCutsSection :: [String] -> M ([(Maybe LPFile.RelOp, Row)], [String])
-userCutsSection ("USERCUTS":ls) = rowsSection' ls
-userCutsSection ls = return ([], ls)
+lazyConsSection :: Parser [(Maybe LPFile.RelOp, Row)]
+lazyConsSection = do
+  try $ stringLn "LAZYCONS"
+  rowsBody
 
-lazyConsSection :: [String] -> M ([(Maybe LPFile.RelOp, Row)], [String])
-lazyConsSection ("LAZYCONS":ls) = rowsSection' ls
-lazyConsSection ls = return ([], ls)
+rowsBody :: Parser [(Maybe LPFile.RelOp, Row)]
+rowsBody = many $ do
+  spaces1'
+  op <- msum
+        [ char 'N' >> return Nothing
+        , char 'G' >> return (Just LPFile.Ge)
+        , char 'L' >> return (Just LPFile.Le)
+        , char 'E' >> return (Just LPFile.Eql)
+        ]
+  spaces1'
+  name <- ident
+  newline'
+  return (op, name)
 
-rowsSection' :: [String] -> M ([(Maybe LPFile.RelOp, Row)], [String])
-rowsSection' lls@((' ':l):ls) =
-  case words l of
-    ["N",name] -> rowsSection' ls >>= \(xs, ls2) -> return ((Nothing, name) : xs, ls2)
-    ["G",name] -> rowsSection' ls >>= \(xs, ls2) -> return ((Just LPFile.Ge,  name) : xs, ls2)
-    ["L",name] -> rowsSection' ls >>= \(xs, ls2) -> return ((Just LPFile.Le,  name) : xs, ls2)
-    ["E",name] -> rowsSection' ls >>= \(xs, ls2) -> return ((Just LPFile.Eql, name) : xs, ls2)
-    _ -> return ([], lls)
-rowsSection' ls = return ([],ls)
-
-colsSection :: [String] -> M ([(Column, Bool, Row, Double)], [String])
-colsSection ("COLUMNS":ls) = go ls False
+colsSection :: Parser [(Column, Bool, Row, Rational)]
+colsSection = do
+  try $ stringLn "COLUMNS"
+  body False
   where
-    go lls@((' ':l):ls) integrality =
-      case words l of
-        [_marker, "'MARKER'", "'INTORG'"] -> go ls True
-        [_marker, "'MARKER'", "'INTEND'"] -> go ls False
-        [col,row,val] -> do
-          (xs,ls2) <- go ls integrality
-          return ((col, integrality, row, read val) : xs, ls2)
-        [col,row1,val1,row2,val2] -> do
-          (xs,ls2) <- go ls integrality
-          return ((col, integrality, row1, read val1) : (col, integrality, row2, read val2) : xs, ls2)
-        _ ->
-          return ([], lls)
-    go ls _ = return ([],ls)
-colsSection _ = throwError "COLUMNS expected"
+    body :: Bool -> Parser [(Column, Bool, Row, Rational)]
+    body isInt = msum
+      [ do isInt' <- try intMarker
+           option [] $ body isInt'
+      , do xs <- entry isInt
+           ys <- option [] $ body isInt
+           return $ xs ++ ys
+      ]
 
-rhsSection :: [String] -> M ([(RHS, Row, Double)], [String])
-rhsSection ("RHS":ls) = go ls
-  where
-    go lls@((' ':l):ls) =
-      case words l of
-        [rhs,row,val] -> do
-          (xs,ls2) <- go ls
-          return ((rhs,row, read val) : xs, ls2)
-        [rhs,row1,val1,row2,val2] -> do
-          (xs,ls2) <- go ls
-          return ((rhs,row1,read val1) : (rhs,row2,read val2) : xs, ls2)
-        _ ->
-          return ([], lls)
-    go ls = return ([],ls)
-rhsSection _ = throwError "RHS expected"
 
-boundsSection :: [String] -> M ([(BoundType, String, Column, Double)], [String])
-boundsSection ("BOUNDS":ls) = go ls
-  where
-    go lls@((' ':l):ls) =
-      case words l of
-        [typ, name, col, val] -> do
-          (xs,ls2) <- go ls
-          return ((read typ, name, col, read val) : xs, ls2)
-        _ ->
-          return ([], lls)
-    go ls = return ([],ls)
-boundsSection ls = return ([], ls)
+    intMarker :: Parser Bool
+    intMarker = do
+      spaces1'
+      _marker <- ident 
+      string "'MARKER'"
+      spaces1'
+      b <-  (try (string "'INTORG'") >> return True)
+        <|> (string "'INTEND'" >> return False)
+      newline'
+      return b
 
-sosSection :: [String] -> M ([(Maybe String, LPFile.SOSType, [(Column, Rational)])], [String])
-sosSection ("SOS":ls) = go ls
-  where
-    go lls@((' ':l):ls) =
-      case words l of
-        ["S1", name] -> do
-          (set,ls) <- go2 ls
-          (xs,ls) <- go ls
-          return ((Just name, LPFile.S1, set) : xs, ls)
-        ["S2", name] -> do
-          (set,ls) <- go2 ls
-          (xs,ls) <- go ls
-          return ((Just name, LPFile.S2, set) : xs, ls)
-        _ ->
-          return ([], lls)
-    go ls = return ([],ls)
-    go2 lls@((' ':l):ls) =
-      case words l of
-        [col, w] | all isDigit w -> do
-          (set,ls) <- go2 ls
-          return ((col, fromInteger (read w)) : set, ls)
-        _ -> return ([],lls)
-    go2 ls = return ([], ls)
-sosSection ls = return ([], ls)
+    entry :: Bool -> Parser [(Column, Bool, Row, Rational)]
+    entry isInt = do
+      spaces1'
+      col <- ident
+      (row1,val1) <- rowAndVal
+      opt <- optionMaybe rowAndVal
+      newline'
+      case opt of
+        Nothing -> return [(col, isInt, row1, val1)]
+        Just (row2,val2) ->  return [(col, isInt, row1, val1), (col, isInt, row2, val2)]
 
-quadObjSection :: [String] -> M ([LPFile.Term], [String])
-quadObjSection ("QUADOBJ":ls) = go ls
-  where
-    go lls@((' ':l):ls) =
-      case words l of
-        [col1, col2, val] -> do
-          (xs,ls2) <- go ls
-          let val2 :: Double
-              val2 = read val
-              val3 =
-                if col1 /= col2
-                then toRational val2
-                else toRational val2 / 2
-          return (LPFile.Term val3 [col1, col2] : xs, ls2)
-        _ ->
-          return ([], lls)
-    go ls = return ([], ls)
-quadObjSection ls = return ([], ls)
+rowAndVal :: Parser (Row, Rational)
+rowAndVal = do
+  row <- ident
+  val <- number
+  return (row, val)
 
-qMatrixSection :: [String] -> M ([LPFile.Term], [String])
-qMatrixSection lls@("QMATRIX":ls) = go ls
+rhsSection :: Parser [(Row, Rational)]
+rhsSection = do
+  try $ stringLn "RHS"
+  liftM concat $ many entry
   where
-    go lls@((' ':l):ls) =
-      case words l of
-        [col1, col2, val] -> do
-          (xs,ls2) <- go ls
-          let val2 :: Double
-              val2 = read val
-              val3 = toRational val2 / 2
-          return (LPFile.Term val3 [col1, col2] : xs, ls2)
-        _ ->
-          return ([], lls)
-    go ls = return ([], ls)
-qMatrixSection ls = return ([], ls)
+    entry = do
+      spaces1'
+      _name <- ident
+      rv1 <- rowAndVal
+      opt <- optionMaybe rowAndVal
+      newline'
+      case opt of
+        Nothing  -> return [rv1]
+        Just rv2 -> return [rv1, rv2]
 
-qcMatrixSection :: [String] -> M (Map.Map Row [LPFile.Term], [String])
-qcMatrixSection lls@(l:ls) =
-  case words l of
-    ["QCMATRIX", row] -> do
-      (xs,ls)  <- go ls
-      (m,ls) <- qcMatrixSection ls
-      return (Map.insert row xs m, ls)
-    _ -> return (Map.empty, lls)
+boundsSection :: Parser [(BoundType, Column, Rational)]
+boundsSection = do
+  try $ stringLn "BOUNDS"
+  many entry
   where
-    go lls@((' ':l):ls) =
-      case words l of
-        [col1, col2, val] -> do
-          (xs,ls2) <- go ls
-          let val2 :: Double
-              val2 = read val
-          return (LPFile.Term (toRational val2) [col1, col2] : xs, ls2)
-        _ ->
-          return ([], lls)
-    go ls = return ([], ls)
-qcMatrixSection ls = return (Map.empty, ls)
+    entry = do
+      spaces1'
+      typ   <- boundType
+      _name <- ident
+      col   <- ident
+      val   <- number
+      newline'
+      return (typ, col, val)
 
-indicatorsSection :: [String] -> M (Map.Map Row (Column, Rational), [String])
-indicatorsSection lls@("INDICATORS":ls) = go ls
-  where
-    go lls@((' ':l):ls) =
-      case words l of
-        ["IF", row, var, val] -> do
-          (xs,ls2) <- go ls
-          let val2 :: Integer
-              val2 = read val
-          return (Map.insert row (var, toRational val2) xs, ls2)
-        _ ->
-          return (Map.empty, lls)
-    go ls = return (Map.empty, ls)
-indicatorsSection ls = return (Map.empty, ls)
+boundType :: Parser BoundType
+boundType = tok $ do
+  let ks = ["LO", "UP", "FX", "FR", "MI", "PL", "BV", "LI", "UI", "SC"]
+  msum [try (string k) >> return (read k) | k <- ks]
 
-strip :: String -> String
-strip = reverse . f . reverse . f
+sosSection :: Parser [(Maybe String, LPFile.SOSType, [(Column, Rational)])]
+sosSection = do
+  try $ stringLn "SOS"
+  many entry
   where
-    f = dropWhile isSpace
+    entry = do
+      spaces1'
+      typ <-  (try (string "S1") >> return LPFile.S1)
+          <|> (string "S2" >> return LPFile.S2)
+      spaces1'
+      name <- ident
+      newline'
+      xs <- many (try identAndVal)
+      return (Just name, typ, xs)
+
+    identAndVal :: Parser (Row, Rational)
+    identAndVal = do
+      spaces1'
+      row <- ident
+      val <- number
+      newline'
+      return (row, val)
+
+quadObjSection :: Parser [LPFile.Term]
+quadObjSection = do
+  try $ stringLn "QUADOBJ"
+  many entry
+  where
+    entry = do
+      spaces1'
+      col1 <- ident
+      col2 <- ident
+      val  <- number
+      newline'
+      return $ LPFile.Term (if col1 /= col2 then val else val / 2) [col1, col2]
+
+qMatrixSection :: Parser [LPFile.Term]
+qMatrixSection = do
+  try $ stringLn "QMATRIX"
+  many entry
+  where
+    entry = do
+      spaces1'
+      col1 <- ident
+      col2 <- ident
+      val  <- number
+      newline'
+      return $ LPFile.Term (val / 2) [col1, col2]
+
+qcMatrixSection :: Parser (Row, [LPFile.Term])
+qcMatrixSection = do
+  try $ stringLn "QCMATRIX"
+  spaces1'
+  row <- ident
+  xs <- many entry
+  return (row, xs)
+  where
+    entry = do
+      spaces1'
+      col1 <- ident
+      col2 <- ident
+      val  <- number
+      newline'
+      return $ LPFile.Term val [col1, col2]
+
+indicatorsSection :: Parser (Map.Map Row (Column, Rational))
+indicatorsSection = do
+  try $ stringLn "INDICATORS"
+  liftM Map.fromList $ many entry
+  where
+    entry = do
+      spaces1'
+      string "IF"
+      spaces1'
+      row <- ident
+      var <- ident
+      val <- number
+      newline'
+      return (row, (var, val))
