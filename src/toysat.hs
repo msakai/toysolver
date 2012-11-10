@@ -59,6 +59,7 @@ import SAT.Types (pbEval, pbLowerBound)
 import SAT.Printer
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
+import qualified Text.MPSFile as MPSFile
 import qualified Text.MaxSAT as MaxSAT
 import qualified Text.GCNF as GCNF
 import qualified Text.GurobiSol as GurobiSol
@@ -120,7 +121,7 @@ options =
     , Option []    ["pb"]     (NoArg (\opt -> opt{ optMode = Just ModePB     })) "solve pseudo boolean problems in .pb file"
     , Option []    ["wbo"]    (NoArg (\opt -> opt{ optMode = Just ModeWBO    })) "solve weighted boolean optimization problem in .opb file"
     , Option []    ["maxsat"] (NoArg (\opt -> opt{ optMode = Just ModeMaxSAT })) "solve MaxSAT problem in .cnf or .wcnf file"
-    , Option []    ["lp"]     (NoArg (\opt -> opt{ optMode = Just ModeLP     })) "solve binary integer programming problem in .lp file"
+    , Option []    ["lp"]     (NoArg (\opt -> opt{ optMode = Just ModeLP     })) "solve binary integer programming problem in .lp or .mps file"
 
     , Option [] ["restart"]
         (ReqArg (\val opt -> opt{ optRestartStrategy = parseRestartStrategy val }) "<str>")
@@ -659,13 +660,26 @@ solveMaxSAT opt solver (_, top, cs) = do
 
 mainLP :: Options -> SAT.Solver -> [String] -> IO ()
 mainLP opt solver args = do
-  ret <- case args of
-           ["-"]   -> fmap (LPFile.parseString "-") $ hGetContents stdin
-           [fname] -> LPFile.parseFile fname
-           _ -> showHelp stderr >> exitFailure
-  case ret of
-    Left err -> hPrint stderr err >> exitFailure
-    Right lp -> solveLP opt solver lp
+  (fname,s) <-
+    case args of
+      ["-"]   -> do
+        s <- hGetContents stdin
+        return ("-", s)
+      [fname] -> do
+        s <- readFile fname
+        return (fname, s)
+      _ -> showHelp stderr >> exitFailure
+  lp <-
+    case LPFile.parseString fname s of
+      Right lp -> return lp
+      Left err ->
+        case MPSFile.parseString fname s of
+          Right lp -> return lp
+          Left err2 -> do
+            hPrint stderr err
+            hPrint stderr err2
+            exitFailure
+  solveLP opt solver lp
 
 solveLP :: Options -> SAT.Solver -> LPFile.LP -> IO ()
 solveLP opt solver lp = do

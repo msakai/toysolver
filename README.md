@@ -47,7 +47,7 @@ Usage:
     toysat --pb [file.opb|-]
     toysat --wbo [file.wbo|-]
     toysat --maxsat [file.cnf|file.wcnf|-]
-    toysat --lp [file.lp|-]
+    toysat --lp [file.lp|file.mps|-]
 
 ### toyfmf
 

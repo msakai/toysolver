@@ -122,6 +122,7 @@ Executable toysat
      Data.SeqQueue
      Text.LPFile
      Text.PBFile
+     Text.MPSFile
      Text.MaxSAT
      Text.GCNF
      Text.GurobiSol
