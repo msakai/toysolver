@@ -159,6 +159,7 @@ mpsfile = do
 
   cols <- colsSection
   rhss <- rhsSection
+  rngs <- option Map.empty rangesSection
   bnds <- option [] boundsSection
 
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_quadobj.html
@@ -270,16 +271,25 @@ mpsfile = do
               { LPFile.constrType      = typ
               , LPFile.constrLabel     = Just row
               , LPFile.constrIndicator = Map.lookup row inds
-              , LPFile.constrBody      =
-                  ( [LPFile.Term c　[col] | (col,_,row2,c) <- cols, row == row2]
-                    ++ Map.findWithDefault [] row qterms 
-                  , op
-                  , head $ [v | (row2,v) <- rhss, row == row2] ++ [0]
-                  )
+              , LPFile.constrBody      = (lhs, op2, rhs2)
               }
             | (typ, (Just op, row)) <- zip (repeat LPFile.NormalConstraint) rows ++
                                        zip (repeat LPFile.UserDefinedCut) usercuts ++
                                        zip (repeat LPFile.LazyConstraint) lazycons
+            , let lhs = [LPFile.Term c　[col] | (col,_,row2,c) <- cols, row == row2]
+                        ++ Map.findWithDefault [] row qterms
+            , let rhs = head $ [v | (row2,v) <- rhss, row == row2] ++ [0]
+            , (op2,rhs2) <-
+                case Map.lookup row rngs of
+                  Nothing  -> return (op, rhs)
+                  Just rng ->
+                    case op of
+                      LPFile.Ge  -> [(LPFile.Ge, rhs), (LPFile.Le, rhs + abs rng)]
+                      LPFile.Le  -> [(LPFile.Ge, rhs - abs rng), (LPFile.Le, rhs)]
+                      LPFile.Eql ->
+                        if rng < 0
+                        then [(LPFile.Ge, rhs + rng), (LPFile.Le, rhs)]
+                        else [(LPFile.Ge, rhs), (LPFile.Le, rhs + rng)]
             ]
         , LPFile.bounds                  = bounds
         , LPFile.integerVariables        = intvs1 `Set.union` intvs2
@@ -391,6 +401,21 @@ rhsSection :: Parser [(Row, Rational)]
 rhsSection = do
   try $ stringLn "RHS"
   liftM concat $ many entry
+  where
+    entry = do
+      spaces1'
+      _name <- ident
+      rv1 <- rowAndVal
+      opt <- optionMaybe rowAndVal
+      newline'
+      case opt of
+        Nothing  -> return [rv1]
+        Just rv2 -> return [rv1, rv2]
+
+rangesSection :: Parser (Map.Map Row Rational)
+rangesSection = do
+  try $ stringLn "RANGES"
+  liftM (Map.fromList . concat) $ many entry
   where
     entry = do
       spaces1'
