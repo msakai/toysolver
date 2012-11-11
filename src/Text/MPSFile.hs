@@ -434,7 +434,9 @@ boundsSection = do
       typ   <- boundType
       _name <- ident
       col   <- ident
-      val   <- number
+      val   <- if typ `elem` [FR, BV, MI, PL]
+               then return 0
+               else number
       newline'
       return (typ, col, val)
 
