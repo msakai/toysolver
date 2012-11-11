@@ -164,9 +164,7 @@ mpsfile = do
 
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_quadobj.html
   -- Following the BOUNDS section, a QMATRIX section may be specified.
-  -- TODO: どちらか片方にするように
-  qobj1 <- option [] quadObjSection
-  qobj2 <- option [] qMatrixSection
+  qobj <- msum [quadObjSection, qMatrixSection, return []]
 
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_sos.html
   -- Note that in an MPS file, the SOS section must follow the BOUNDS section.
@@ -263,8 +261,7 @@ mpsfile = do
         , LPFile.dir                     = objdir
         , LPFile.objectiveFunction       =
             ( Just objrow
-            , [LPFile.Term c [col] | (col,_,row,c) <- cols, objrow == row]
-              ++ qobj1 ++ qobj2
+            , [LPFile.Term c [col] | (col,_,row,c) <- cols, objrow == row] ++ qobj
             )
         , LPFile.constraints             =
             [ LPFile.Constraint
