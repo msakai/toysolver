@@ -242,6 +242,16 @@ mpsfile = do
                 exception is encountered.
               -}
               (v, (LPFile.NegInf, LPFile.Finite ub))
+            {-
+              lp_solve uses 1 as default lower bound for semi-continuous variable.
+              <http://lpsolve.sourceforge.net/5.5/mps-format.htm>
+              But Gurobi Optimizer uses 0 as default lower bound for semi-continuous variable.
+              Here we adopt Gurobi's way.
+            -}
+{-
+            Just (Nothing, ub) | v `Set.member` scvs ->
+              (v, (LPFile.Finite 1, fromMaybe LPFile.PosInf ub))
+-}
             Just (lb,ub) ->
               (v, (fromMaybe (LPFile.Finite 0) lb, fromMaybe LPFile.PosInf ub))
         | v <- Set.toList vs ]
