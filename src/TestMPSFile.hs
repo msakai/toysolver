@@ -17,7 +17,9 @@ case_intvar1  = checkFile "samples/mps/intvar1.mps"
 case_intvar2  = checkFile "samples/mps/intvar2.mps"
 case_quadobj1 = checkFile "samples/mps/quadobj1.mps"
 case_quadobj2 = checkFile "samples/mps/quadobj2.mps"
+case_ranges   = checkFile "samples/mps/ranges.mps"
 case_sos      = checkFile "samples/mps/sos.mps"
+case_sc       = checkFile "samples/mps/sc.mps"
 
 ------------------------------------------------------------------------
 -- Sample data
