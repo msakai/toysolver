@@ -240,6 +240,7 @@ main = do
                             ".wbo"  -> ModeWBO
                             ".wcnf" -> ModeMaxSAT
                             ".lp"   -> ModeLP
+                            ".mps"  -> ModeLP
                             _ -> ModeSAT
             case mode of
               ModeHelp    -> showHelp stdout
@@ -273,7 +274,7 @@ header = unlines
   , "  toysat [OPTION]... --pb [file.opb|-]"
   , "  toysat [OPTION]... --wbo [file.wbo|-]"
   , "  toysat [OPTION]... --maxsat [file.cnf|file.wcnf|-]"
-  , "  toysat [OPTION]... --lp [file.lp|-]"
+  , "  toysat [OPTION]... --lp [file.lp|file.mps|-]"
   , ""
   , "Options:"
   ]

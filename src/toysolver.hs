@@ -93,13 +93,13 @@ options =
     , Option []    ["pb"]     (NoArg (Mode ModePB))     "solve pseudo boolean problems in .pb file"
     , Option []    ["wbo"]    (NoArg (Mode ModeWBO))    "solve weighted boolean optimization problem in .opb file"
     , Option []    ["maxsat"] (NoArg (Mode ModeMaxSAT)) "solve MaxSAT problem in .cnf or .wcnf file"
-    , Option []    ["lp"]     (NoArg (Mode ModeLP))     "solve binary integer programming problem in .lp file (default)"
+    , Option []    ["lp"]     (NoArg (Mode ModeLP))     "solve binary integer programming problem in .lp or .mps file (default)"
 
     , Option [] ["nomip"] (NoArg NoMIP)                 "consider all integer variables as continuous"
     ]
 
 header :: String
-header = "Usage: toysolver [OPTION]... file.lp"
+header = "Usage: toysolver [OPTION]... file"
 
 -- ---------------------------------------------------------------------------
 
@@ -342,6 +342,7 @@ main = do
                   ".wbo"  -> ModeWBO
                   ".wcnf" -> ModeMaxSAT
                   ".lp"   -> ModeLP
+                  ".mps"  -> ModeLP
                   _ -> ModeLP
 
       case mode of
