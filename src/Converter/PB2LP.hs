@@ -35,10 +35,16 @@ convert objType formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
       , LPFile.dir = dir
       , LPFile.objectiveFunction = (Nothing, obj2)
       , LPFile.constraints = cs2
-      , LPFile.bounds = Map.empty
-      , LPFile.integerVariables = Set.empty
-      , LPFile.binaryVariables = vs2
-      , LPFile.semiContinuousVariables = Set.empty
+      , LPFile.varInfo = Map.fromAscList
+          [ ( v
+            , LPFile.VarInfo
+              { LPFile.varName   = v
+              , LPFile.varType   = LPFile.IntegerVariable
+              , LPFile.varBounds = (LPFile.Finite 0, LPFile.Finite 1)
+              }
+            )
+          | v <- Set.toAscList vs2
+          ]
       , LPFile.sos = []
       }
 
@@ -105,10 +111,16 @@ convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formu
       , LPFile.dir = LPFile.OptMin
       , LPFile.objectiveFunction = (Nothing, obj2)
       , LPFile.constraints = topConstr ++ map snd cs2
-      , LPFile.bounds = Map.empty
-      , LPFile.integerVariables = Set.empty
-      , LPFile.binaryVariables = vs2
-      , LPFile.semiContinuousVariables = Set.empty
+      , LPFile.varInfo = Map.fromAscList
+          [ ( v
+            , LPFile.VarInfo
+              { LPFile.varName   = v
+              , LPFile.varType   = LPFile.IntegerVariable
+              , LPFile.varBounds = (LPFile.Finite 0, LPFile.Finite 1)
+              }
+            )
+          | v <- Set.toAscList vs2
+          ]
       , LPFile.sos = []
       }
 

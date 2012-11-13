@@ -152,19 +152,15 @@ run solver opt lp printModel = do
       case ind of
         Nothing -> return (Rel (compileE lhs) rel2 (Const rhs))
         Just _ -> error "indicator constraint is not supported yet"
-    cs3 = do
-      v <- Set.toList (LP.binaryVariables lp)
-      let v' = nameToVar Map.! v
-      [ Const 0 .<=. Var v', Var v' .<=. Const 1 ]
 
     ivs
       | NoMIP `elem` opt = Set.empty
-      | otherwise        = LP.integerVariables lp `Set.union` LP.binaryVariables lp
+      | otherwise        = LP.integerVariables lp
 
     ivs2 = IS.fromList . map (nameToVar Map.!) . Set.toList $ ivs
 
     solveByQE =
-      case mapM LA.compileAtom (cs1 ++ cs2 ++ cs3) of
+      case mapM LA.compileAtom (cs1 ++ cs2) of
         Nothing -> do
           putStrLn "s UNKNOWN"
           exitFailure
@@ -186,7 +182,7 @@ run solver opt lp printModel = do
                _ -> error "unknown solver"
 
     solveByMIP =
-      case MIPSolverHL.optimize (LP.dir lp) obj (cs1 ++ cs2 ++ cs3) ivs2 of
+      case MIPSolverHL.optimize (LP.dir lp) obj (cs1 ++ cs2) ivs2 of
         OptUnknown -> do
           putStrLn "s UNKNOWN"
           exitFailure
@@ -220,7 +216,7 @@ run solver opt lp printModel = do
       Simplex2.setOptDir solver (LP.dir lp)
       Simplex2.setObj solver $ fromJust (LA.compileExpr obj)
       logger "Loading constraints... "
-      forM_ (cs1 ++ cs2 ++ cs3) $ \c -> do
+      forM_ (cs1 ++ cs2) $ \c -> do
         Simplex2.assertAtom solver $ fromJust (LA.compileAtom c)
       logger "Loading constraints finished"
 
@@ -254,7 +250,7 @@ run solver opt lp printModel = do
           putStrLn "c integer variables are not supported by CAD"
           exitFailure
       | otherwise = do
-          let cs = map g $ cs1 ++ cs2 ++ cs3
+          let cs = map g $ cs1 ++ cs2
           case CAD.solve cs of
             Nothing -> do
               putStrLn "s UNSATISFIABLE"
@@ -288,7 +284,7 @@ run solver opt lp printModel = do
       | otherwise = do
           let tmp = do
                 linObj <- LA.compileExpr obj
-                linCon <- mapM LA.compileAtom (cs1 ++ cs2 ++ cs3)
+                linCon <- mapM LA.compileAtom (cs1 ++ cs2)
                 return (linObj, linCon)
           case tmp of
             Nothing -> do

@@ -31,6 +31,8 @@ module Text.LPFile
   , Bounds
   , Label
   , Var
+  , VarType (..)
+  , VarInfo (..)
   , BoundExpr (..)
   , RelOp (..)
   , SOSType (..)
@@ -39,6 +41,8 @@ module Text.LPFile
   , defaultLB
   , defaultUB
   , getBounds
+  , integerVariables
+  , semiContinuousVariables
   , parseString
   , parseFile
   , render
@@ -66,10 +70,7 @@ data LP
   , dir :: OptDir
   , objectiveFunction :: ObjectiveFunction
   , constraints :: [Constraint]
-  , bounds :: Map.Map Var Bounds
-  , integerVariables :: Set.Set Var
-  , binaryVariables :: Set.Set Var
-  , semiContinuousVariables :: Set.Set Var
+  , varInfo :: Map.Map Var VarInfo
   , sos :: [SOS]
   }
   deriving (Show, Eq, Ord)
@@ -99,6 +100,30 @@ data Constraint
   , constrBody      :: (Expr, RelOp, Rational)
   }
   deriving (Eq, Ord, Show)
+
+data VarType
+  = ContinuousVariable
+  | IntegerVariable
+  -- | BinaryVariable
+  | SemiContinuousVariable
+  -- | SemiIntegerVariable
+  deriving (Eq, Ord, Show)
+
+data VarInfo
+  = VarInfo
+  { varName   :: Var
+  , varType   :: VarType
+  , varBounds :: Bounds
+  }
+ deriving (Eq, Ord, Show)
+
+defaultVarInfo :: VarInfo
+defaultVarInfo
+  = VarInfo
+  { varName   = ""
+  , varType   = ContinuousVariable
+  , varBounds = defaultBounds
+  }
 
 -- | type for representing lower/upper bound of variables
 type Bounds = (BoundExpr, BoundExpr)
@@ -158,10 +183,20 @@ defaultUB = PosInf
 
 -- | lookuping bounds for a variable
 getBounds :: LP -> Var -> Bounds
-getBounds lp v = Map.findWithDefault defaultBounds v (bounds lp)
+getBounds lp v = varBounds $ Map.findWithDefault defaultVarInfo v (varInfo lp)
 
 intersectBounds :: Bounds -> Bounds -> Bounds
 intersectBounds (lb1,ub1) (lb2,ub2) = (max lb1 lb2, min ub1 ub2)
+
+integerVariables :: LP -> Set.Set Var
+integerVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
+  where
+    p VarInfo{ varType = vt } = vt == IntegerVariable
+
+semiContinuousVariables :: LP -> Set.Set Var
+semiContinuousVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
+  where
+    p VarInfo{ varType = vt } = vt == SemiContinuousVariable
 
 -- ---------------------------------------------------------------------------
 
@@ -255,7 +290,28 @@ lpfile = do
            , vars (snd obj)
            ] ++
            [Set.fromList (map fst xs) | (_,_,xs) <- ss]
-  return $ LP vs flag obj cs bnds2 ints bins scs ss
+  return $
+    LP
+    { variables         = vs
+    , dir               = flag
+    , objectiveFunction = obj
+    , constraints       = cs
+    , sos               = ss
+    , varInfo           =
+        Map.fromAscList
+        [ ( v
+          , VarInfo
+            { varName   = v
+            , varBounds = Map.findWithDefault defaultBounds v bnds2
+            , varType   =
+                if v `Set.member` ints || v `Set.member` bins then IntegerVariable
+                else if v `Set.member` scs then SemiContinuousVariable
+                else ContinuousVariable
+            }
+          )
+        | v <- Set.toAscList vs
+        ]
+    }
 
 problem :: Parser (OptDir, ObjectiveFunction)
 problem = do
@@ -539,26 +595,31 @@ render' lp = do
       renderConstraint c
       tell $ showChar '\n'
 
+  let ivs = integerVariables lp
+      (bins,gens) = Set.partition (\v -> getBounds lp v == (Finite 0, Finite 1)) ivs
+      scs = semiContinuousVariables lp
+
   tell $ showString "BOUNDS\n"
-  forM_ (Map.toAscList (bounds lp)) $ \(v, (lb,ub)) -> do
-    renderBoundExpr lb
-    tell $ showString " <= "
-    tell $ showString v
-    tell $ showString " <= "
-    renderBoundExpr ub
-    tell $ showChar '\n'
+  forM_ (Map.toAscList (varInfo lp)) $ \(v, VarInfo{ varBounds = (lb,ub) }) -> do
+    unless (v `Set.member` bins) $ do
+      renderBoundExpr lb
+      tell $ showString " <= "
+      tell $ showString v
+      tell $ showString " <= "
+      renderBoundExpr ub
+      tell $ showChar '\n'
 
-  unless (Set.null (integerVariables lp)) $ do
+  unless (Set.null gens) $ do
     tell $ showString "GENERALS\n"
-    renderVariableList $ Set.toList $ integerVariables lp
+    renderVariableList $ Set.toList gens
 
-  unless (Set.null (binaryVariables lp)) $ do
+  unless (Set.null bins) $ do
     tell $ showString "BINARIES\n"
-    renderVariableList $ Set.toList $ binaryVariables lp
+    renderVariableList $ Set.toList bins
 
-  unless (Set.null (semiContinuousVariables lp)) $ do
+  unless (Set.null scs) $ do
     tell $ showString "SEMI-CONTINUOUS\n"
-    renderVariableList $ Set.toList $ semiContinuousVariables lp
+    renderVariableList $ Set.toList scs
 
   unless (null (sos lp)) $ do
     tell $ showString "SOS\n"

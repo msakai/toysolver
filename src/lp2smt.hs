@@ -66,7 +66,7 @@ expr isYices env lp e =
              [ v3
              | v <- vs
              , let v2 = env Map.! v
-             , let v3 = if not isYices && (v `Set.member` LP.integerVariables lp || v `Set.member` LP.binaryVariables lp)
+             , let v3 = if not isYices && (v `Set.member` LP.integerVariables lp)
                         then list [showString "to_real", showString v2]
                         else showString v2
              ]
@@ -107,13 +107,9 @@ constraint isYices q env lp LP.Constraint{ LP.constrIndicator = g, LP.constrBody
     c = rel q op (expr isYices env lp e) (realNum isYices b)
 
 conditions :: Bool -> Bool -> Env -> LP.LP -> [ShowS]
-conditions isYices q env lp = bnds ++ bins ++ cs ++ ss
+conditions isYices q env lp = bnds ++ cs ++ ss
   where
     vs = LP.variables lp
-    bins = do
-      v <- Set.toList (LP.binaryVariables lp)
-      let v2 = env Map.! v
-      return $ list [showString "or", rel q LP.Eql (showString v2) (showChar '0'), rel q LP.Eql (showString v2) (showChar '1')]
     bnds = map bnd (Set.toList vs)
     bnd v =
       if v `Set.member` (LP.semiContinuousVariables lp)
@@ -121,7 +117,7 @@ conditions isYices q env lp = bnds ++ bins ++ cs ++ ss
        else and' (s1 ++ s2)
       where
         v2 = env Map.! v
-        v3 = if v `Set.member` LP.integerVariables lp || v `Set.member` LP.binaryVariables lp
+        v3 = if not isYices && v `Set.member` LP.integerVariables lp
              then list [showString "to_real", showString v2]
              else showString v2
         (lb,ub) = LP.getBounds lp v
@@ -143,7 +139,7 @@ conditions isYices q env lp = bnds ++ bins ++ cs ++ ss
         [ list [showString "/=", v3, realNum isYices 0]
         | v<-[x1,x2]
         , let v2 = env Map.! v
-        , let v3 = if v `Set.member` LP.integerVariables lp || v `Set.member` LP.binaryVariables lp
+        , let v3 = if not isYices && v `Set.member` LP.integerVariables lp
                    then list [showString "to_real", showString v2]
                    else showString v2
         ]
@@ -172,7 +168,7 @@ lp2smt lp isYices optimize check =
   where
     vs = LP.variables lp
     real_vs = vs `Set.difference` int_vs
-    int_vs = LP.integerVariables lp `Set.union` LP.binaryVariables lp
+    int_vs = LP.integerVariables lp
     realType = if isYices then "real" else "Real"
     intType  = if isYices then "int" else "Int"
     ts = [(v, realType) | v <- Set.toList real_vs] ++ [(v, intType) | v <- Set.toList int_vs]

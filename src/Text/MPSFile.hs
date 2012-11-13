@@ -257,7 +257,7 @@ mpsfile = do
 
   let lp =
         LPFile.LP
-        { LPFile.variables               = Set.fromList [col | (col,_,_,_) <- cols]
+        { LPFile.variables               = vs
         , LPFile.dir                     = objdir
         , LPFile.objectiveFunction       =
             ( Just objrow
@@ -288,10 +288,20 @@ mpsfile = do
                         then [(LPFile.Ge, rhs + rng), (LPFile.Le, rhs)]
                         else [(LPFile.Ge, rhs), (LPFile.Le, rhs + rng)]
             ]
-        , LPFile.bounds                  = bounds
-        , LPFile.integerVariables        = intvs1 `Set.union` intvs2
-        , LPFile.binaryVariables         = Set.empty
-        , LPFile.semiContinuousVariables = scvs
+        , LPFile.varInfo                 =
+            Map.fromAscList
+            [ ( v
+              , LPFile.VarInfo
+                { LPFile.varName   = v
+                , LPFile.varBounds = Map.findWithDefault LPFile.defaultBounds v bounds
+                , LPFile.varType   =
+                    if v `Set.member` intvs1 || v `Set.member` intvs2 then LPFile.IntegerVariable
+                    else if v `Set.member` scvs then LPFile.SemiContinuousVariable
+                    else LPFile.ContinuousVariable
+                }
+              )
+            | v <- Set.toAscList vs
+            ]
         , LPFile.sos                     = sos
         }
 

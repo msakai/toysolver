@@ -790,7 +790,7 @@ solveLP opt solver lp = do
               printModel m
           throwIO e
   where
-    ivs = LPFile.binaryVariables lp `Set.union` LPFile.integerVariables lp
+    ivs  = LPFile.integerVariables lp
     nivs = LPFile.variables lp `Set.difference` ivs
 
     asInteger :: Rational -> Integer

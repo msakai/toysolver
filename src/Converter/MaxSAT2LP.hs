@@ -29,10 +29,16 @@ convert (nvar, top, ls) = (lp, mtrans)
       , LPFile.dir = LPFile.OptMin
       , LPFile.objectiveFunction = (Nothing, obj)
       , LPFile.constraints = cs
-      , LPFile.bounds = Map.empty
-      , LPFile.integerVariables = Set.empty
-      , LPFile.binaryVariables = Set.fromList vs
-      , LPFile.semiContinuousVariables = Set.empty
+      , LPFile.varInfo = Map.fromList
+          [ ( v
+            , LPFile.VarInfo
+              { LPFile.varName   = v
+              , LPFile.varType   = LPFile.IntegerVariable
+              , LPFile.varBounds = (LPFile.Finite 0, LPFile.Finite 1)
+              }
+            )
+          | v <- vs
+          ]
       , LPFile.sos = []
       }
     mtrans m =

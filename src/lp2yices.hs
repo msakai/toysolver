@@ -91,13 +91,9 @@ constraint q env LP.Constraint{ LP.constrIndicator = g, LP.constrBody = (e, op, 
     c = rel q op (expr env e) (num b)
 
 conditions :: Bool -> Env -> LP.LP -> [ShowS]
-conditions q env lp = bnds ++ bins ++ cs ++ ss
+conditions q env lp = bnds ++ cs ++ ss
   where
     vs = LP.variables lp
-    bins = do
-      v <- Set.toList (LP.binaryVariables lp)
-      let v2 = env Map.! v
-      return $ list [showString "or", rel q LP.Eql (showString v2) (showChar '0'), rel q LP.Eql (showString v2) (showChar '1')]
     bnds = map bnd (Set.toList vs)
     bnd v =
       if v `Set.member` (LP.semiContinuousVariables lp)
@@ -140,7 +136,7 @@ lp2ys lp optimize check =
   where
     vs = LP.variables lp
     real_vs = vs `Set.difference` int_vs
-    int_vs = LP.integerVariables lp `Set.union` LP.binaryVariables lp
+    int_vs = LP.integerVariables lp
     ts = [(v, "real")| v <- Set.toList real_vs] ++ [(v, "int") | v <- Set.toList int_vs]
     obj = snd (LP.objectiveFunction lp)
     env = Map.fromList [(v, encode v) | v <- Set.toList vs]
