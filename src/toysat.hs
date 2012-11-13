@@ -22,7 +22,6 @@ import Data.Array.IArray
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Set as Set
 import qualified Data.Map as Map
-import qualified Data.IntSet as IS
 import Data.Char
 import Data.IORef
 import Data.List
@@ -55,6 +54,7 @@ import Data.Linear
 import qualified SAT
 import qualified SAT.Integer
 import qualified SAT.TseitinEncoder as Tseitin
+import qualified SAT.MUS as MUS
 import SAT.Types (pbEval, pbLowerBound)
 import SAT.Printer
 import qualified Text.PBFile as PBFile
@@ -378,35 +378,15 @@ solveMUS opt solver gcnf = do
       satPrintModel stdout m (GCNF.nbvar gcnf)
       writeSOLFile opt m Nothing (GCNF.nbvar gcnf)
     else do
-      putStrLn "c computing a minimally unsatisfiable subformula"
-      hFlush stdout
-
-      let loop core fixed = do
-            let is = core `IS.difference` fixed
-            if IS.null is
-              then return core
-              else do
-                let i2:is2 = IS.toList is
-                putStrLn $ "c core = {" ++ intercalate ", " (map show (IS.toList core)) ++ "}"
-                putStrLn $ "c trying to remove " ++ show i2
-                hFlush stdout
-                ret <- SAT.solveWith solver (map (idx2sel !) is2)
-                if not ret
-                  then do
-                    putStrLn $ "c successed to remove " ++ show i2
-                    ls2 <- SAT.getBadAssumptions solver
-                    let core2 = IS.map (sel2idx !) ls2 `IS.union` fixed
-                    loop core2 fixed
-                  else do
-                    putStrLn $ "c failed to remove " ++ show i2
-                    SAT.addClause solver [idx2sel ! i2]
-                    loop core (IS.insert i2 fixed)
-
-      ls <- SAT.getBadAssumptions solver
-      let core = IS.map (sel2idx !) ls
-      core2 <- loop core IS.empty
-
-      musPrintSol stdout (IS.toList core2)
+      let opt2 = MUS.defaultOptions
+                 { MUS.optLogger = \s -> do
+                     putStrLn $ "c " ++ s
+                     hFlush stdout
+                 , MUS.optLitPrinter = \lit ->
+                     show (sel2idx ! lit)
+                 }
+      mus <- MUS.findMUS solver opt2
+      musPrintSol stdout (map (sel2idx !) mus)
 
 -- ------------------------------------------------------------------------
 
@@ -790,7 +770,7 @@ solveLP opt solver lp = do
               printModel m
           throwIO e
   where
-    ivs  = LPFile.integerVariables lp
+    ivs = LPFile.integerVariables lp
     nivs = LPFile.variables lp `Set.difference` ivs
 
     asInteger :: Rational -> Integer
