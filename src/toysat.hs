@@ -30,8 +30,7 @@ import Data.Maybe
 import Data.Ord
 import Data.Ratio
 import Data.Version
-import Data.Time.LocalTime
-import Data.Time.Format
+import Data.Time
 import System.IO
 import System.Environment
 import System.Exit
@@ -204,7 +203,8 @@ main = do
   setFileSystemEncoding char8
 #endif
 
-  start <- getCPUTime
+  startCPU <- getCPUTime
+  startWC  <- getCurrentTime
   args <- getArgs
   case getOpt Permute options args of
     (o,args2,[]) -> do
@@ -255,10 +255,10 @@ main = do
          when (isNothing ret) $ do
            putStrLn "c TIMEOUT"
            putStrLn "s UNKNOWN"
-         end <- getCPUTime
-         printf "c total time = %.3fs\n" (fromIntegral (end - start) / 10^(12::Int) :: Double)
-         when (isNothing ret) exitFailure
-
+         endCPU <- getCPUTime
+         endWC  <- getCurrentTime
+         printf "c total CPU time = %.3fs\n" (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
+         printf "c total wall clock time = %.3fs\n" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
     (_,_,errs) -> do
       mapM_ putStrLn errs
       exitFailure
