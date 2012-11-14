@@ -255,7 +255,6 @@ main = do
 
          when (isNothing ret) $ do
            putStrLn "c TIMEOUT"
-           putStrLn "s UNKNOWN"
          endCPU <- getCPUTime
          endWC  <- getCurrentTime
          printf "c total CPU time = %.3fs\n" (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
@@ -448,7 +447,7 @@ solvePB opt solver formula@(obj, cs) = do
           pbPrintModel stdout m n
           let objval = pbEval m obj''
           writeSOLFile opt m (Just objval) n
-        Left (e :: AsyncException) -> do
+        Left (e :: SomeException) -> do
           r <- readIORef modelRef
           case r of
             Nothing -> do
@@ -538,7 +537,7 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
         else pbPrintModel stdout m nvar
       let objval = pbEval m obj
       writeSOLFile opt m (Just objval) nvar
-    Left (e :: AsyncException) -> do
+    Left (e :: SomeException) -> do
       r <- readIORef modelRef
       case r of
         Just m | not isMaxSat -> do
@@ -694,7 +693,7 @@ solveLP opt solver lp = do
           putStrLn $ "s " ++ "OPTIMUM FOUND"
           hFlush stdout
           printModel m
-        Left (e :: AsyncException) -> do
+        Left (e :: SomeException) -> do
           r <- readIORef modelRef
           case r of
             Nothing -> do
