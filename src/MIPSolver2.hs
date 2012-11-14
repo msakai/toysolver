@@ -67,6 +67,7 @@ import qualified Data.IntMap as IM
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Foldable as F
+import Data.Time
 import System.CPUTime
 import Text.Printf
 
@@ -285,7 +286,8 @@ branchAndBound solver rootLP update = do
           Just node -> processNode node >> child
 
   log solver $ printf "MIP: forking %d worker threads..." nthreads
-  start <- getCPUTime
+  startCPU <- getCPUTime
+  startWC  <- getCurrentTime
   ex <- newEmptyTMVarIO
   threads <- replicateM nthreads $ do
     mask $ \restore -> forkIO $ do
@@ -304,8 +306,10 @@ branchAndBound solver rootLP update = do
           if Seq.null nodes
             then return ()
             else do
-              now <- getCPUTime
-              let spent = (now - start) `div` 10^(12::Int)
+              nowCPU <- getCPUTime
+              nowWC  <- getCurrentTime
+              let spentCPU = (nowCPU - startCPU) `div` 10^(12::Int)
+              let spentWC  = round (nowWC `diffUTCTime` startWC) :: Int
 
               let vs = map ndValue (F.toList nodes)
                   dualBound =
@@ -334,7 +338,8 @@ branchAndBound solver rootLP update = do
                       OptMin -> p ++ " >= " ++ d
                       OptMax -> p ++ " <= " ++ d
 
-              log solver $ printf "time = %d sec; active nodes = %d; visited nodes = %d; %s; gap = %s" spent (Seq.length nodes) visited range g
+              log solver $ printf "cpu time = %d sec; wc time = %d sec; active nodes = %d; visited nodes = %d; %s; gap = %s"
+                spentCPU spentWC (Seq.length nodes) visited range g
               threadDelay (2*1000*1000) -- 2s
               loop
     loop

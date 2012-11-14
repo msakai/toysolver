@@ -101,6 +101,7 @@ import Data.Ratio
 import qualified Data.Map as Map
 import qualified Data.IntMap as IM
 import Text.Printf
+import Data.Time
 import Data.OptDir
 import System.CPUTime
 
@@ -837,11 +838,16 @@ recordTime solver act = do
   dumpSize solver
   writeIORef (svNPivot solver) 0
 
-  start <- getCPUTime
-  result <- act
-  end <- getCPUTime
+  startCPU <- getCPUTime
+  startWC  <- getCurrentTime
 
-  (log solver . printf "time = %.3fs") (fromIntegral (end - start) / 10^(12::Int) :: Double)
+  result <- act
+
+  endCPU <- getCPUTime
+  endWC  <- getCurrentTime
+
+  (log solver . printf "cpu time = %.3fs") (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
+  (log solver . printf "wall clock time = %.3fs") (realToFrac (endWC `diffUTCTime` startWC) :: Double)
   (log solver . printf "#pivot = %d") =<< readIORef (svNPivot solver)
   return result
 

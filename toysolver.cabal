@@ -96,7 +96,7 @@ Executable toysolver
      MIPSolver2
      Util
      Version
-  Build-Depends: base >=4 && <5, mtl, containers, array, filepath, parsec, OptDir, deepseq, stm >=2.3, parse-dimacs, heaps, primes
+  Build-Depends: base >=4 && <5, mtl, containers, array, filepath, parsec, OptDir, deepseq, stm >=2.3, parse-dimacs, heaps, primes, time
   Extensions:
      BangPatterns
      ScopedTypeVariables
@@ -159,7 +159,7 @@ Executable toyfmf
      SAT
      SAT.Types
      Version
-  Build-Depends: base >=4 && <5, mtl, containers >= 0.4.2, array, random, queue, logic-TPTP
+  Build-Depends: base >=4 && <5, mtl, containers >= 0.4.2, array, random, queue, time, logic-TPTP
   Extensions:
      BangPatterns
      DoAndIfThenElse
@@ -242,21 +242,21 @@ Test-suite TestSAT
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    src
   Main-is:           TestSAT.hs
-  Build-depends:     base >=4 && <5, array, containers, random, queue, test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
+  Build-depends:     base >=4 && <5, array, containers, random, queue, time, test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestSimplex2
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    src
   Main-is:           TestSimplex2.hs
-  Build-depends:     base >=4 && <5, containers, deepseq, queue, test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
+  Build-depends:     base >=4 && <5, containers, deepseq, queue, time, test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestMIPSolver2
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    src
   Main-is:           TestMIPSolver2.hs
-  Build-depends:     base >=4 && <5, containers, deepseq, queue, test-framework, test-framework-th, test-framework-hunit, HUnit, OptDir, stm
+  Build-depends:     base >=4 && <5, containers, deepseq, queue, time, test-framework, test-framework-th, test-framework-hunit, HUnit, OptDir, stm
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestPolynomial
@@ -284,7 +284,7 @@ Test-suite TestQE
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    src
   Main-is:           TestQE.hs
-  Build-depends:     base >=4 && <5, mtl, containers, deepseq, heaps, primes, OptDir, stm, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, mtl, containers, deepseq, heaps, primes, OptDir, stm, time, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestContiTraverso
@@ -319,5 +319,5 @@ Benchmark BenchmarkSATLIB
   type:             exitcode-stdio-1.0
   hs-source-dirs:   src
   main-is:          BenchmarkSATLIB.hs
-  build-depends:    base >=4 && <5, array, containers, random, queue, parse-dimacs, criterion
+  build-depends:    base >=4 && <5, array, containers, random, queue, parse-dimacs, time, criterion
   Extensions: TemplateHaskell, DoAndIfThenElse

@@ -110,6 +110,7 @@ import qualified Data.IntSet as IS
 import qualified Data.Set as Set
 import qualified Data.IndexedPriorityQueue as PQ
 import qualified Data.SeqQueue as SQ
+import Data.Time
 import System.CPUTime
 import qualified System.Random as Rand
 import Text.Printf
@@ -812,9 +813,11 @@ solve_ solver = do
                 backtrackTo solver levelRoot
                 loop rs
 
-      start <- getCPUTime
+      startCPU <- getCPUTime
+      startWC  <- getCurrentTime
       result <- loop restartSeq
-      end <- getCPUTime
+      endCPU <- getCPUTime
+      endWC  <- getCurrentTime
 
       when result $ do
         checkModel <- readIORef (svCheckModel solver)
@@ -825,7 +828,8 @@ solve_ solver = do
 
       when debugMode $ dumpVarActivity solver
       when debugMode $ dumpClaActivity solver
-      (log solver . printf "solving time = %.3fs") (fromIntegral (end - start) / 10^(12::Int) :: Double)
+      (log solver . printf "#cpu_time = %.3fs") (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
+      (log solver . printf "#wall_clock_time = %.3fs") (realToFrac (endWC `diffUTCTime` startWC) :: Double)
       (log solver . printf "#decision = %d") =<< readIORef (svNDecision solver)
       (log solver . printf "#random_decision = %d") =<< readIORef (svNRandomDecision solver)
       (log solver . printf "#conflict = %d") =<< readIORef (svNConflict solver)
