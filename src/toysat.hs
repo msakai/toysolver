@@ -16,6 +16,7 @@
 
 module Main where
 
+import Control.Concurrent.Timeout
 import Control.Monad
 import Control.Exception
 import Data.Array.IArray
@@ -37,7 +38,6 @@ import System.Locale
 import System.Console.GetOpt
 import System.CPUTime
 import System.FilePath
-import System.Timeout
 import qualified System.Info as SysInfo
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import Text.Printf
@@ -219,46 +219,40 @@ main = do
       let opt = foldl (flip id) defaultOptions o      
           timelim = optTimeout opt * 10^(6::Int)
 
-      if (timelim > fromIntegral (maxBound :: Int))
-       then do
-         printf "c TIMEOUT is too long"
-         printf "s UNKNOWN"
-         exitFailure
-       else do
-         ret <- timeout (if timelim > 0 then fromIntegral timelim else (-1)) $ do
-            solver <- newSolver opt
-            let mode =
-                  case optMode opt of
-                    Just m  -> m
-                    Nothing ->
-                      case args2 of
-                        [] -> ModeHelp
-                        fname : _ ->
-                          case map toLower (takeExtension fname) of
-                            ".cnf"  -> ModeSAT
-                            ".gcnf" -> ModeMUS
-                            ".opb"  -> ModePB
-                            ".wbo"  -> ModeWBO
-                            ".wcnf" -> ModeMaxSAT
-                            ".lp"   -> ModeLP
-                            ".mps"  -> ModeLP
-                            _ -> ModeSAT
-            case mode of
-              ModeHelp    -> showHelp stdout
-              ModeVersion -> hPutStrLn stdout (showVersion version)
-              ModeSAT     -> mainSAT opt solver args2
-              ModeMUS     -> mainMUS opt solver args2
-              ModePB      -> mainPB opt solver args2
-              ModeWBO     -> mainWBO opt solver args2
-              ModeMaxSAT  -> mainMaxSAT opt solver args2
-              ModeLP      -> mainLP opt solver args2
+      ret <- timeout (if timelim > 0 then timelim else (-1)) $ do
+         solver <- newSolver opt
+         let mode =
+               case optMode opt of
+                 Just m  -> m
+                 Nothing ->
+                   case args2 of
+                     [] -> ModeHelp
+                     fname : _ ->
+                       case map toLower (takeExtension fname) of
+                         ".cnf"  -> ModeSAT
+                         ".gcnf" -> ModeMUS
+                         ".opb"  -> ModePB
+                         ".wbo"  -> ModeWBO
+                         ".wcnf" -> ModeMaxSAT
+                         ".lp"   -> ModeLP
+                         ".mps"  -> ModeLP
+                         _ -> ModeSAT
+         case mode of
+           ModeHelp    -> showHelp stdout
+           ModeVersion -> hPutStrLn stdout (showVersion version)
+           ModeSAT     -> mainSAT opt solver args2
+           ModeMUS     -> mainMUS opt solver args2
+           ModePB      -> mainPB opt solver args2
+           ModeWBO     -> mainWBO opt solver args2
+           ModeMaxSAT  -> mainMaxSAT opt solver args2
+           ModeLP      -> mainLP opt solver args2
 
-         when (isNothing ret) $ do
-           putStrLn "c TIMEOUT"
-         endCPU <- getCPUTime
-         endWC  <- getCurrentTime
-         printf "c total CPU time = %.3fs\n" (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
-         printf "c total wall clock time = %.3fs\n" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
+      when (isNothing ret) $ do
+        putStrLn "c TIMEOUT"
+      endCPU <- getCPUTime
+      endWC  <- getCurrentTime
+      printf "c total CPU time = %.3fs\n" (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
+      printf "c total wall clock time = %.3fs\n" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
     (_,_,errs) -> do
       mapM_ putStrLn errs
       exitFailure

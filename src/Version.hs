@@ -53,4 +53,7 @@ packageVersions = sort $ tail
 #ifdef VERSION_time
   , ("time",         VERSION_time         )
 #endif
+#ifdef VERSION_unbounded_delays
+  , ("unbounded-delays", VERSION_unbounded_delays)
+#endif
   ]
