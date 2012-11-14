@@ -52,10 +52,11 @@ import GHC.IO.Encoding
 import Data.ArithRel
 import Data.Linear
 import qualified SAT
+import qualified SAT.PBO as PBO
 import qualified SAT.Integer
 import qualified SAT.TseitinEncoder as Tseitin
 import qualified SAT.MUS as MUS
-import SAT.Types (pbEval, pbLowerBound)
+import SAT.Types (pbEval)
 import SAT.Printer
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
@@ -82,7 +83,7 @@ data Options
   , optRandomFreq    :: Double
   , optRandomSeed    :: Int
   , optLinearizerPB  :: Bool
-  , optBinarySearch  :: Bool
+  , optSearchStrategy       :: PBO.SearchStrategy
   , optObjFunVarsHeuristics :: Bool
   , optPrintRational :: Bool
   , optCheckModel  :: Bool
@@ -103,8 +104,8 @@ defaultOptions
   , optRandomFreq    = SAT.defaultRandomFreq
   , optRandomSeed    = 0
   , optLinearizerPB  = False
-  , optBinarySearch   = False
-  , optObjFunVarsHeuristics = True
+  , optSearchStrategy       = PBO.optSearchStrategy PBO.defaultOptions
+  , optObjFunVarsHeuristics = PBO.optObjFunVarsHeuristics PBO.defaultOptions
   , optPrintRational = False  
   , optCheckModel = False
   , optTimeout = 0
@@ -154,7 +155,7 @@ options =
         "Use PB constraint in linearization."
 
     , Option [] ["search"]
-        (ReqArg (\val opt -> opt{ optBinarySearch = parseSearch val }) "<str>")
+        (ReqArg (\val opt -> opt{ optSearchStrategy = parseSearch val }) "<str>")
         "Search algorithm used in optimization; linear (default), binary"
     , Option [] ["objfun-heuristics"]
         (NoArg (\opt -> opt{ optObjFunVarsHeuristics = True }))
@@ -188,9 +189,9 @@ options =
 
     parseSearch s =
       case map toLower s of
-        "linear" -> False
-        "binary" -> True
-        _ -> undefined
+        "linear" -> PBO.LinearSearch
+        "binary" -> PBO.BinarySearch
+        _ -> error (printf "unknown search strategy %s" s)
 
     parseLS "clause" = SAT.LearningClause
     parseLS "hybrid" = SAT.LearningHybrid
@@ -469,80 +470,14 @@ pbConvSum enc = revMapM f
 
 minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
 minimize opt solver obj update = do
-  when (optObjFunVarsHeuristics opt) $ do
-    forM_ obj $ \(c,l) -> do
-      let p = if c > 0 then not (SAT.litPolarity l) else SAT.litPolarity l
-      SAT.setVarPolarity solver (SAT.litVar l) p
-    forM_ (zip [1..] (map snd (sortBy (comparing fst) [(abs c, l) | (c,l) <- obj]))) $ \(n,l) -> do
-      replicateM n $ SAT.varBumpActivity solver (SAT.litVar l)
-
-  result <- SAT.solve solver
-  if not result then
-    return Nothing
-  else if optBinarySearch opt then
-    liftM Just binSearch 
-  else
-    liftM Just linSearch
-
-  where
-   linSearch :: IO SAT.Model
-   linSearch = do
-     m <- SAT.model solver
-     let v = pbEval m obj
-     update m v
-     SAT.addPBAtMost solver obj (v - 1)
-     result <- SAT.solve solver
-     if result
-       then linSearch
-       else return m
-
-   binSearch :: IO SAT.Model
-   binSearch = do
-{-
-     printf "c Binary Search: minimizing %s \n" $ 
-       intercalate " "
-         [c' ++ " " ++ l'
-         | (c,l) <- obj
-         , let c' = if c < 0 then show c else "+" ++ show c
-         , let l' = (if l < 0 then "~" else "") ++ "x" ++ show (SAT.litVar l)
-         ]
--}
-     m0 <- SAT.model solver
-     let v0 = pbEval m0 obj
-     update m0 v0
-     let ub0 = v0 - 1
-         lb0 = pbLowerBound obj
-     SAT.addPBAtMost solver obj ub0
-
-     let loop lb ub m | ub < lb = return m
-         loop lb ub m = do
-           let mid = (lb + ub) `div` 2
-           printf "c Binary Search: %d <= obj <= %d; guessing obj <= %d\n" lb ub mid
-           sel <- SAT.newVar solver
-           SAT.addPBAtMostSoft solver sel obj mid
-           ret <- SAT.solveWith solver [sel]
-           if ret
-           then do
-             m2 <- SAT.model solver
-             let v = pbEval m2 obj
-             update m2 v
-             -- deactivating temporary constraint
-             -- FIXME: –{—ˆ‚Í§–ñ‚Ìíœ‚ð‚µ‚½‚¢
-             SAT.addClause solver [-sel]
-             let ub' = v - 1
-             printf "c Binary Search: updating upper bound: %d -> %d\n" ub ub'
-             SAT.addPBAtMost solver obj ub'
-             loop lb ub' m2
-           else do
-             -- deactivating temporary constraint
-             -- FIXME: –{—ˆ‚Í§–ñ‚Ìíœ‚ð‚µ‚½‚¢
-             SAT.addClause solver [-sel]
-             let lb' = mid + 1
-             printf "c Binary Search: updating lower bound: %d -> %d\n" lb lb'
-             SAT.addPBAtLeast solver obj lb'
-             loop lb' ub m
-
-     loop lb0 ub0 m0
+  let opt2 =
+        PBO.defaultOptions
+        { PBO.optObjFunVarsHeuristics = optObjFunVarsHeuristics opt
+        , PBO.optSearchStrategy       = optSearchStrategy opt
+        , PBO.optLogger  = \s -> putStr "c " >> putStrLn s
+        , PBO.optUpdater = update
+        }
+  PBO.minimize solver obj opt2
 
 -- ------------------------------------------------------------------------
 
