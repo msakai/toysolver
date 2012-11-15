@@ -28,7 +28,6 @@ module Text.MPSFile
   ) where
 
 import Control.Monad
-import Data.Char
 import Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -70,13 +69,13 @@ parseFile = parseFromFile mpsfile
 -- ---------------------------------------------------------------------------
 
 space' :: Parser Char
-space' = satisfy (\c -> isSpace c && c /= '\n')
+space' = oneOf [' ', '\t']
 
 spaces' :: Parser ()
-spaces' = many space' >> return ()
+spaces' = skipMany space' >> return ()
 
 spaces1' :: Parser ()
-spaces1' = many1 space' >> return ()
+spaces1' = skipMany1 space' >> return ()
 
 commentline :: Parser ()
 commentline = do
@@ -188,8 +187,8 @@ mpsfile = do
         case objsense of
           Nothing -> OptMin
           Just d  -> d
-      vs     = Set.fromList [col | (col,_,_,_) <- cols]
-      intvs1 = Set.fromList [col | (col,True,_,_) <- cols]
+      vs     = Set.fromList [col | (col,_) <- Map.toList cols]
+      intvs1 = Set.fromList [col | (col,(True,_)) <- Map.toList cols]
       intvs2 = Set.fromList [col | (t,col,_) <- bnds, t `elem` [BV,LI,UI]]
       scvs   = Set.fromList [col | (SC,col,_) <- bnds]
 
@@ -261,7 +260,7 @@ mpsfile = do
         , LPFile.dir                     = objdir
         , LPFile.objectiveFunction       =
             ( Just objrow
-            , [LPFile.Term c [col] | (col,_,row,c) <- cols, objrow == row] ++ qobj
+            , [LPFile.Term c [col] | (col,(_,m)) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
             )
         , LPFile.constraints             =
             [ LPFile.Constraint
@@ -273,9 +272,9 @@ mpsfile = do
             | (typ, (Just op, row)) <- zip (repeat LPFile.NormalConstraint) rows ++
                                        zip (repeat LPFile.UserDefinedCut) usercuts ++
                                        zip (repeat LPFile.LazyConstraint) lazycons
-            , let lhs = [LPFile.Term c　[col] | (col,_,row2,c) <- cols, row == row2]
+            , let lhs = [LPFile.Term c　[col] | (col,(_,m)) <- Map.toList cols, c <- maybeToList (Map.lookup row m)]
                         ++ Map.findWithDefault [] row qterms
-            , let rhs = head $ [v | (row2,v) <- rhss, row == row2] ++ [0]
+            , let rhs = Map.findWithDefault 0 row rhss
             , (op2,rhs2) <-
                 case Map.lookup row rngs of
                   Nothing  -> return (op, rhs)
@@ -361,20 +360,25 @@ rowsBody = many $ do
   newline'
   return (op, name)
 
-colsSection :: Parser [(Column, Bool, Row, Rational)]
+colsSection :: Parser (Map.Map Column (Bool, Map.Map Row Rational))
 colsSection = do
   try $ stringLn "COLUMNS"
-  body False
+  body False Map.empty
   where
-    body :: Bool -> Parser [(Column, Bool, Row, Rational)]
-    body isInt = msum
+    body :: Bool -> Map.Map Column (Bool, Map.Map Row Rational) -> Parser (Map.Map Column (Bool, Map.Map Row Rational))
+    body isInt rs = msum
       [ do isInt' <- try intMarker
-           option [] $ body isInt'
-      , do xs <- entry isInt
-           ys <- option [] $ body isInt
-           return $ xs ++ ys
+           body isInt' rs
+      , do (k,v) <- entry isInt
+           let rs' = Map.insertWith f k v rs
+           seq rs' $ body isInt rs'
+      , return rs
       ]
 
+    f (isInt1,m1) (isInt2,m2) = seq isInt3 $ seq m3 $ (isInt3, m3)
+      where
+        isInt3 = isInt1 || isInt2
+        m3     = Map.union m1 m2
 
     intMarker :: Parser Bool
     intMarker = do
@@ -387,27 +391,27 @@ colsSection = do
       newline'
       return b
 
-    entry :: Bool -> Parser [(Column, Bool, Row, Rational)]
+    entry :: Bool -> Parser (Column, (Bool, Map.Map Row Rational))
     entry isInt = do
       spaces1'
       col <- ident
-      (row1,val1) <- rowAndVal
+      rv1 <- rowAndVal
       opt <- optionMaybe rowAndVal
       newline'
       case opt of
-        Nothing -> return [(col, isInt, row1, val1)]
-        Just (row2,val2) ->  return [(col, isInt, row1, val1), (col, isInt, row2, val2)]
+        Nothing -> return (col, (isInt, rv1))
+        Just rv2 ->  return (col, (isInt, Map.union rv1 rv2))
 
-rowAndVal :: Parser (Row, Rational)
+rowAndVal :: Parser (Map.Map Row Rational)
 rowAndVal = do
   row <- ident
   val <- number
-  return (row, val)
+  return $ Map.singleton row val
 
-rhsSection :: Parser [(Row, Rational)]
+rhsSection :: Parser (Map.Map Row Rational)
 rhsSection = do
   try $ stringLn "RHS"
-  liftM concat $ many entry
+  liftM Map.unions $ many entry
   where
     entry = do
       spaces1'
@@ -416,13 +420,13 @@ rhsSection = do
       opt <- optionMaybe rowAndVal
       newline'
       case opt of
-        Nothing  -> return [rv1]
-        Just rv2 -> return [rv1, rv2]
+        Nothing  -> return rv1
+        Just rv2 -> return $ Map.union rv1 rv2
 
 rangesSection :: Parser (Map.Map Row Rational)
 rangesSection = do
   try $ stringLn "RANGES"
-  liftM (Map.fromList . concat) $ many entry
+  liftM Map.unions $ many entry
   where
     entry = do
       spaces1'
@@ -431,8 +435,8 @@ rangesSection = do
       opt <- optionMaybe rowAndVal
       newline'
       case opt of
-        Nothing  -> return [rv1]
-        Just rv2 -> return [rv1, rv2]
+        Nothing  -> return rv1
+        Just rv2 -> return $ Map.union rv1 rv2
 
 boundsSection :: Parser [(BoundType, Column, Rational)]
 boundsSection = do
