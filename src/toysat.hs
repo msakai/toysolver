@@ -336,7 +336,14 @@ mainMUS :: Options -> SAT.Solver -> [String] -> IO ()
 mainMUS opt solver args = do
   gcnf <- case args of
            ["-"]   -> fmap GCNF.parseString $ hGetContents stdin
-           [fname] -> GCNF.parseFile fname
+           [fname] ->
+             case map toLower (takeExtension fname) of
+               ".cnf"  -> do
+                 ret <- DIMACS.parseFile fname
+                 case ret of
+                   Left err  -> hPrint stderr err >> exitFailure
+                   Right cnf -> return $ cnfToGCNF cnf
+               _ -> GCNF.parseFile fname
            _ -> showHelp stderr >> exitFailure
   solveMUS opt solver gcnf
 
@@ -381,6 +388,15 @@ solveMUS opt solver gcnf = do
                  }
       mus <- MUS.findMUSAssumptions solver opt2
       musPrintSol stdout (map (sel2idx !) mus)
+
+cnfToGCNF :: DIMACS.CNF -> GCNF.GCNF
+cnfToGCNF cnf
+  = GCNF.GCNF
+  { GCNF.nbvar          = DIMACS.numVars cnf
+  , GCNF.nbclauses      = DIMACS.numClauses cnf
+  , GCNF.lastgroupindex = DIMACS.numClauses cnf
+  , GCNF.clauses        = [(grp, elems c) | (grp,c) <- zip [1..] (DIMACS.clauses cnf)]
+  }
 
 -- ------------------------------------------------------------------------
 
