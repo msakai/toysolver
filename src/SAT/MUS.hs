@@ -14,14 +14,15 @@
 module SAT.MUS
   ( Options (..)
   , defaultOptions
-  , findMUS
+  , findMUSAssumptions
   ) where
 
+import Control.Monad
 import Data.List
 import qualified Data.IntSet as IS
 import SAT
 
--- | Options for 'findMUS' function
+-- | Options for 'findMUSAssumptions' function
 data Options
   = Options
   { optLogger     :: String -> IO ()
@@ -39,14 +40,14 @@ defaultOptions =
   }
 
 -- | Find a minimal set of assumptions that causes a conflict.
--- Initial set of assumptions is taken from 'SAT.getBadAssumptions'.
-findMUS
+-- Initial set of assumptions is taken from 'SAT.failedAssumptions'.
+findMUSAssumptions
   :: SAT.Solver
   -> Options
   -> IO [Lit]
-findMUS solver opt = do
-  log "computing a minimally unsatisfiable subformula"
-  core <- SAT.getBadAssumptions solver
+findMUSAssumptions solver opt = do
+  log "computing a minimal unsatisfiable core"
+  core <- liftM IS.fromList $ SAT.failedAssumptions solver
   mus <- loop core IS.empty
   return $ IS.toList mus
 
@@ -77,7 +78,7 @@ findMUS solver opt = do
           ret <- SAT.solveWith solver (IS.toList ls)
           if not ret
             then do
-              ls2 <- SAT.getBadAssumptions solver
+              ls2 <- liftM IS.fromList $ SAT.failedAssumptions solver
               log $ "successed to remove " ++ showLits (ls1 `IS.difference` ls2)
               loop ls2 fixed
             else do

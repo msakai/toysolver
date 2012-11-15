@@ -379,7 +379,7 @@ solveMUS opt solver gcnf = do
                  , MUS.optLitPrinter = \lit ->
                      show (sel2idx ! lit)
                  }
-      mus <- MUS.findMUS solver opt2
+      mus <- MUS.findMUSAssumptions solver opt2
       musPrintSol stdout (map (sel2idx !) mus)
 
 -- ------------------------------------------------------------------------
