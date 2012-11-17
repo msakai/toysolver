@@ -77,7 +77,8 @@ data Options
   , optRestartFirst  :: Int
   , optRestartInc    :: Double
   , optLearningStrategy :: SAT.LearningStrategy
-  , optLearntSizeInc :: Double
+  , optLearntSizeFirst  :: Int
+  , optLearntSizeInc    :: Double
   , optCCMin         :: Int
   , optRandomFreq    :: Double
   , optRandomSeed    :: Int
@@ -98,7 +99,8 @@ defaultOptions
   , optRestartFirst  = SAT.defaultRestartFirst
   , optRestartInc    = SAT.defaultRestartInc
   , optLearningStrategy = SAT.defaultLearningStrategy
-  , optLearntSizeInc = SAT.defaultLearntSizeInc
+  , optLearntSizeFirst  = SAT.defaultLearntSizeFirst
+  , optLearntSizeInc    = SAT.defaultLearntSizeInc
   , optCCMin         = SAT.defaultCCMin
   , optRandomFreq    = SAT.defaultRandomFreq
   , optRandomSeed    = 0
@@ -135,6 +137,9 @@ options =
     , Option [] ["learning"]
         (ReqArg (\val opt -> opt{ optLearningStrategy = parseLS val }) "<name>")
         "Leaning scheme: clause (default)"
+    , Option [] ["learnt-size-first"]
+        (ReqArg (\val opt -> opt{ optLearntSizeFirst = read val }) "<int>")
+        "The initial limit for learnt clauses."
     , Option [] ["learnt-size-inc"]
         (ReqArg (\val opt -> opt{ optLearntSizeInc = read val }) "<real>")
         (printf "The limit for learnt clauses is multiplied with this factor periodically. (default %f)" SAT.defaultLearntSizeInc)
@@ -288,11 +293,12 @@ newSolver :: Options -> IO SAT.Solver
 newSolver opts = do
   solver <- SAT.newSolver
   SAT.setRestartStrategy solver (optRestartStrategy opts)
-  SAT.setRestartFirst  solver (optRestartFirst opts)
-  SAT.setRestartInc    solver (optRestartInc opts)
-  SAT.setLearntSizeInc solver (optLearntSizeInc opts)
-  SAT.setCCMin         solver (optCCMin opts)
-  SAT.setRandomFreq    solver (optRandomFreq opts)
+  SAT.setRestartFirst    solver (optRestartFirst opts)
+  SAT.setRestartInc      solver (optRestartInc opts)
+  SAT.setLearntSizeFirst solver (optLearntSizeFirst opts)
+  SAT.setLearntSizeInc   solver (optLearntSizeInc opts)
+  SAT.setCCMin           solver (optCCMin opts)
+  SAT.setRandomFreq      solver (optRandomFreq opts)
   when (optRandomSeed opts /= 0) $ 
     SAT.setRandomSeed solver (optRandomSeed opts)
   SAT.setLearningStrategy solver (optLearningStrategy opts)

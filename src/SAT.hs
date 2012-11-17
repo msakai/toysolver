@@ -66,6 +66,8 @@ module SAT
   , defaultRestartFirst
   , setRestartInc
   , defaultRestartInc
+  , setLearntSizeFirst
+  , defaultLearntSizeFirst
   , setLearntSizeInc
   , defaultLearntSizeInc
   , setCCMin
@@ -259,6 +261,9 @@ data Solver
 
   -- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
   , svRestartInc :: !(IORef Double)
+
+  -- | The initial limit for learnt clauses.
+  , svLearntSizeFirst :: !(IORef Int)
 
   -- | The limit for learnt clauses is multiplied with this factor periodically. (default 1.1)
   , svLearntSizeInc :: !(IORef Double)
@@ -506,6 +511,7 @@ newSolver = do
   restartFirst <- newIORef defaultRestartFirst
   restartInc <- newIORef defaultRestartInc
   learning <- newIORef defaultLearningStrategy
+  learntSizeFirst <- newIORef defaultLearntSizeFirst
   learntSizeInc <- newIORef defaultLearntSizeInc
   ccMin <- newIORef defaultCCMin
   checkModel <- newIORef False
@@ -547,6 +553,7 @@ newSolver = do
         , svRestartFirst = restartFirst
         , svRestartInc   = restartInc
         , svLearningStrategy = learning
+        , svLearntSizeFirst = learntSizeFirst
         , svLearntSizeInc = learntSizeInc
         , svCCMin = ccMin
         , svLearntLim       = learntLim
@@ -799,10 +806,11 @@ solve_ solver = do
 
       cnt <- readIORef (svLearntLimAdjCnt solver)
       when (cnt == -1) $ do
-        learntSizeInc <- readIORef (svLearntSizeInc solver)
+        learntSizeFirst <- readIORef (svLearntSizeFirst solver)
+        learntSizeInc   <- readIORef (svLearntSizeInc solver)
         nc <- nClauses solver
         nv <- nVars solver
-        let initialLearntLim = max ((nc + nv) `div` 3) 16
+        let initialLearntLim = if learntSizeFirst > 0 then learntSizeFirst else max ((nc + nv) `div` 3) 16
             learntSizeSeq    = iterate (ceiling . (learntSizeInc*) . fromIntegral) initialLearntLim
             learntSizeAdjSeq = iterate (\x -> (x * 3) `div` 2) (100::Int)
         writeIORef (svLearntLimSeq solver) (zip learntSizeSeq learntSizeAdjSeq)
@@ -1017,6 +1025,14 @@ setLearningStrategy solver l = writeIORef (svLearningStrategy solver) $! l
 
 defaultLearningStrategy :: LearningStrategy
 defaultLearningStrategy = LearningClause
+
+-- | The initial limit for learnt clauses.
+setLearntSizeFirst :: Solver -> Int -> IO ()
+setLearntSizeFirst solver !x = writeIORef (svLearntSizeFirst solver) x
+
+-- | default value for @LearntSizeFirst@.
+defaultLearntSizeFirst :: Int
+defaultLearntSizeFirst = -1
 
 -- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
 setLearntSizeInc :: Solver -> Double -> IO ()
