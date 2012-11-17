@@ -263,7 +263,9 @@ data Solver
   -- | The limit for learnt clauses is multiplied with this factor periodically. (default 1.1)
   , svLearntSizeInc :: !(IORef Double)
 
-  , svLearntLim :: !(IORef Int)
+  , svLearntLim       :: !(IORef Int)
+  , svLearntLimAdjCnt :: !(IORef Int)
+  , svLearntLimSeq    :: !(IORef [(Int,Int)])
 
   -- | Controls conflict clause minimization (0=none, 1=local, 2=recursive)
   , svCCMin :: !(IORef Int)
@@ -508,7 +510,9 @@ newSolver = do
   ccMin <- newIORef defaultCCMin
   checkModel <- newIORef False
 
-  learntLim <- newIORef undefined
+  learntLim       <- newIORef undefined
+  learntLimAdjCnt <- newIORef (-1)
+  learntLimSeq    <- newIORef undefined
 
   logger <- newIORef Nothing
 
@@ -545,7 +549,9 @@ newSolver = do
         , svLearningStrategy = learning
         , svLearntSizeInc = learntSizeInc
         , svCCMin = ccMin
-        , svLearntLim = learntLim
+        , svLearntLim       = learntLim
+        , svLearntLimAdjCnt = learntLimAdjCnt
+        , svLearntLimSeq    = learntLimSeq
         , svLogger = logger
         , svCheckModel = checkModel
         , svRandomFreq = randfreq
@@ -781,27 +787,26 @@ solve_ solver = do
       restartInc    <- readIORef (svRestartInc solver)
       let restartSeq = mkRestartSeq restartStrategy restartFirst restartInc
 
-      learntSizeInc <- readIORef (svLearntSizeInc solver)
-      nc <- nClauses solver
-      nv <- nVars solver
-      let learntSizeSeq   = iterate (ceiling . (learntSizeInc*) . fromIntegral) (max ((nc + nv) `div` 3) 16)
-      let learntSizeAdjSeq = iterate (\x -> (x * 3) `div` 2) (100::Int)
-      nextLearntSize    <- gen learntSizeSeq
-      nextLearntSizeAdj <- gen learntSizeAdjSeq
-
-      learntSizeAdjCnt <- newIORef undefined
       let learntSizeAdj = do
-            size <- nextLearntSize
-            adj <- nextLearntSizeAdj
+            (size,adj) <- shift (svLearntLimSeq solver)
             writeIORef (svLearntLim solver) size
-            writeIORef learntSizeAdjCnt adj
+            writeIORef (svLearntLimAdjCnt solver) adj
           onConflict = do
-            cnt <- readIORef learntSizeAdjCnt
+            cnt <- readIORef (svLearntLimAdjCnt solver)
             if (cnt==0)
             then learntSizeAdj
-            else writeIORef (learntSizeAdjCnt) $! cnt-1
+            else writeIORef (svLearntLimAdjCnt solver) $! cnt-1
 
-      learntSizeAdj
+      cnt <- readIORef (svLearntLimAdjCnt solver)
+      when (cnt == -1) $ do
+        learntSizeInc <- readIORef (svLearntSizeInc solver)
+        nc <- nClauses solver
+        nv <- nVars solver
+        let initialLearntLim = max ((nc + nv) `div` 3) 16
+            learntSizeSeq    = iterate (ceiling . (learntSizeInc*) . fromIntegral) initialLearntLim
+            learntSizeAdjSeq = iterate (\x -> (x * 3) `div` 2) (100::Int)
+        writeIORef (svLearntLimSeq solver) (zip learntSizeSeq learntSizeAdjSeq)
+        learntSizeAdj
 
       let loop [] = error "solve_: should not happen"
           loop (conflict_lim:rs) = do
@@ -2163,13 +2168,11 @@ modifyIORef' ref f = do
   x <- readIORef ref
   writeIORef ref $! f x
 
-gen :: [a] -> IO (IO a)
-gen xs = do
-  ref <- newIORef xs
-  return $ do
-    (y:ys) <- readIORef ref
-    writeIORef ref ys
-    return y
+shift :: IORef [a] -> IO a
+shift ref = do
+  (x:xs) <- readIORef ref
+  writeIORef ref xs
+  return x    
 
 {--------------------------------------------------------------------
   debug
