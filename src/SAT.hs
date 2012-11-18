@@ -871,6 +871,9 @@ search solver !conflict_lim onConflict = loop 0
 
       case conflict of
         Nothing -> do
+          lv <- readIORef (svLevel solver)
+          when (lv == levelRoot) $ simplify solver
+
           n <- nLearnt solver
           m <- nAssigns solver
           learnt_lim <- readIORef (svLearntLim solver)
@@ -997,6 +1000,24 @@ model solver = do
 -- set, the problem is unsatisiable without any assumptions.
 failedAssumptions :: Solver -> IO [Lit]
 failedAssumptions solver = readIORef (svFailedAssumptions solver)
+
+-- | Simplify the clause database according to the current top-level assigment.
+simplify :: Solver -> IO ()
+simplify solver = do
+  xs <- readIORef (svClauseDB solver)
+  let loop [] rs !n     = return (rs,n)
+      loop (y:ys) rs !n = do
+        b1 <- isSatisfied solver y
+        b2 <- isLocked solver y
+        if b1 && not b2
+         then do
+           detach solver y
+           loop ys rs (n+1)
+         else loop ys (y:rs) n
+  (ys,n) <- loop xs [] (0::Int)
+  when (n > 0) $ 
+    log solver $ printf "simplify: %d satisfied constraints are removed" n
+  writeIORef (svClauseDB solver) ys
 
 {--------------------------------------------------------------------
   Parameter settings.
