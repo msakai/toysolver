@@ -11,6 +11,7 @@
 -- A toy-level model finder
 --
 -----------------------------------------------------------------------------
+module Main where
 
 import Control.Monad
 import Data.IORef

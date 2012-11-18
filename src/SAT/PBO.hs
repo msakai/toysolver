@@ -24,7 +24,8 @@ import SAT.Types
 data SearchStrategy
   = LinearSearch
   | BinarySearch
-  -- | AdaptiveSearch
+-- 'nothaddock' is inserted not to confuse haddock
+  -- nothaddock | AdaptiveSearch
 
 data Options
   = Options

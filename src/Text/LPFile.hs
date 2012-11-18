@@ -104,9 +104,10 @@ data Constraint
 data VarType
   = ContinuousVariable
   | IntegerVariable
-  -- | BinaryVariable
+-- 'nothaddock' is inserted not to confuse haddock
+  -- nothaddock | BinaryVariable
   | SemiContinuousVariable
-  -- | SemiIntegerVariable
+  -- nothaddock | SemiIntegerVariable
   deriving (Eq, Ord, Show)
 
 data VarInfo

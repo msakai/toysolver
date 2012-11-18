@@ -24,7 +24,7 @@ newVar solver lo hi = do
   when (lo > hi) $ error $ printf "SAT.Integer.newVar: inconsistent bounds given [%d, %d]" lo hi
   let hi' = hi - lo
       bitWidth = head $ [w | w <- [1..], let mx = 2 ^ w - 1, hi' <= mx]
-  vs <- replicateM bitWidth (SAT.newVar solver)
+  vs <- SAT.newVars solver bitWidth
   let xs = zip (iterate (2*) 1) vs
   SAT.addPBAtMost solver xs hi'
   return $ Expr ((lo,[]) : [(c,[x]) | (c,x) <- xs])
