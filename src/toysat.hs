@@ -55,6 +55,7 @@ import qualified SAT.PBO as PBO
 import qualified SAT.Integer
 import qualified SAT.TseitinEncoder as Tseitin
 import qualified SAT.MUS as MUS
+import qualified SAT.CAMUS as CAMUS
 import SAT.Types (pbEval)
 import SAT.Printer
 import qualified Text.PBFile as PBFile
@@ -85,6 +86,7 @@ data Options
   , optLinearizerPB  :: Bool
   , optSearchStrategy       :: PBO.SearchStrategy
   , optObjFunVarsHeuristics :: Bool
+  , optAllMUSes :: Bool
   , optPrintRational :: Bool
   , optCheckModel  :: Bool
   , optTimeout :: Integer
@@ -107,6 +109,7 @@ defaultOptions
   , optLinearizerPB  = False
   , optSearchStrategy       = PBO.optSearchStrategy PBO.defaultOptions
   , optObjFunVarsHeuristics = PBO.optObjFunVarsHeuristics PBO.defaultOptions
+  , optAllMUSes = False
   , optPrintRational = False  
   , optCheckModel = False
   , optTimeout = 0
@@ -167,6 +170,10 @@ options =
     , Option [] ["no-objfun-heuristics"]
         (NoArg (\opt -> opt{ optObjFunVarsHeuristics = False }))
         "Disable heuristics for polarity/activity of variables in objective function"
+
+    , Option [] ["all-mus"]
+        (NoArg (\opt -> opt{ optAllMUSes = True }))
+        "enumerate all MUSes"
 
     , Option [] ["print-rational"]
         (NoArg (\opt -> opt{ optPrintRational = True }))
@@ -378,22 +385,42 @@ solveMUS opt solver gcnf = do
   result <- SAT.solveWith solver (map (idx2sel !) [1..GCNF.lastgroupindex gcnf])
   putStrLn $ "s " ++ (if result then "SATISFIABLE" else "UNSATISFIABLE")
   hFlush stdout
-
   if result
     then do
       m <- SAT.model solver
       satPrintModel stdout m (GCNF.nbvar gcnf)
       writeSOLFile opt m Nothing (GCNF.nbvar gcnf)
     else do
-      let opt2 = MUS.defaultOptions
-                 { MUS.optLogger = \s -> do
-                     putStrLn $ "c " ++ s
-                     hFlush stdout
-                 , MUS.optLitPrinter = \lit ->
-                     show (sel2idx ! lit)
-                 }
-      mus <- MUS.findMUSAssumptions solver opt2
-      musPrintSol stdout (map (sel2idx !) mus)
+      if not (optAllMUSes opt)
+        then do
+          let opt2 = MUS.defaultOptions
+                     { MUS.optLogger = \s -> do
+                         putStrLn $ "c " ++ s
+                         hFlush stdout
+                     , MUS.optLitPrinter = \lit ->
+                         show (sel2idx ! lit)
+                     }
+          mus <- MUS.findMUSAssumptions solver opt2
+          musPrintSol stdout (map (sel2idx !) mus)
+        else do
+          ref <- newIORef []
+          let opt2 = CAMUS.defaultOptions
+                     { CAMUS.optLogger = \s -> do
+                         putStrLn $ "c " ++ s
+                         hFlush stdout
+                     , CAMUS.optCallback = \mcs -> do
+                         modifyIORef ref (mcs:)
+                         let mcs2 = map (sel2idx !) mcs
+                         putStrLn $ "c MCS found: " ++ show mcs2
+                         hFlush stdout
+                     }
+          CAMUS.enumMCSes solver (map snd tbl) opt2    
+          putStrLn "c MCS enumeration done"
+          hFlush stdout
+          muses <- liftM CAMUS.allMUSes $ readIORef ref
+          forM_ (zip [(1::Int)..] muses) $ \(i, mus) -> do
+            putStrLn $ "c MUS #" ++ show i
+            musPrintSol stdout (sort (map (sel2idx !) mus))
 
 cnfToGCNF :: DIMACS.CNF -> GCNF.GCNF
 cnfToGCNF cnf

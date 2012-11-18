@@ -3,6 +3,8 @@ module Main (main) where
 
 import Control.Monad
 import Data.List
+import qualified Data.Set as Set
+import qualified Data.IntSet as IS
 import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
@@ -11,6 +13,7 @@ import SAT
 import SAT.Types
 import qualified SAT.TseitinEncoder as Tseitin
 import SAT.TseitinEncoder (Formula (..))
+import qualified SAT.CAMUS as CAMUS
 
 -- should be SAT
 case_solve_SAT :: IO ()
@@ -467,6 +470,45 @@ case_encodeDisj = do
   evalLit m x1 @?= False
   evalLit m x2 @?= False
   evalLit m x3 @?= False
+
+------------------------------------------------------------------------
+
+{-
+c http://sun.iwu.edu/~mliffito/publications/jar_liffiton_CAMUS.pdf
+c￼φ= (x1) ∧ (¬x1) ∧ (¬x1∨x2) ∧ (¬x2) ∧ (¬x1∨x3) ∧ (¬x3)
+c MUSes(φ) = {{C1, C2}, {C1, C3, C4}, {C1, C5, C6}}
+c MCSes(φ) = {{C1}, {C2, C3, C5}, {C2, C3, C6}, {C2, C4, C5}, {C2, C4, C6}}
+p cnf 3 6
+1 0
+-1 0
+-1 2 0
+-2 0
+-1 3 0
+-3 0
+-}
+
+case_camus_allMCSes = do
+  solver <- newSolver
+  [x1,x2,x3] <- newVars solver 3
+  sels@[y1,y2,y3,y4,y5,y6] <- newVars solver 6
+  addClause solver [-y1, x1]
+  addClause solver [-y2, -x1]
+  addClause solver [-y3, -x1, x2]
+  addClause solver [-y4, -x2]
+  addClause solver [-y5, -x1, x3]
+  addClause solver [-y6, -x3]
+  actual <- CAMUS.allMCSes solver sels
+  let actual'   = Set.fromList $ map IS.fromList actual
+      expected  = [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
+      expected' = Set.fromList $ map (IS.fromList . map (+3)) expected
+  actual' @?= expected'
+
+case_camus_allMUSes = actual' @?= expected'
+  where
+    actual    = CAMUS.allMUSes [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
+    actual'   = Set.fromList $ map IS.fromList actual
+    expected  = [[1,2], [1,3,4], [1,5,6]]
+    expected' = Set.fromList $ map IS.fromList expected
 
 ------------------------------------------------------------------------
 -- Test harness

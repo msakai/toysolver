@@ -129,6 +129,7 @@ Executable toysat
      SAT
      SAT.Integer
      SAT.MUS
+     SAT.CAMUS
      SAT.TseitinEncoder
      SAT.Types
      SAT.TheorySolver
