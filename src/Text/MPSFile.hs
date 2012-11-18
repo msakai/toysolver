@@ -156,7 +156,7 @@ mpsfile = do
   -- The order of sections must be ROWS USERCUTS LAZYCONS.
   lazycons <- option [] lazyConsSection
 
-  cols <- colsSection
+  (cols, intvs1) <- colsSection
   rhss <- rhsSection
   rngs <- option Map.empty rangesSection
   bnds <- option [] boundsSection
@@ -187,8 +187,7 @@ mpsfile = do
         case objsense of
           Nothing -> OptMin
           Just d  -> d
-      vs     = Set.fromList [col | (col,_) <- Map.toList cols]
-      intvs1 = Set.fromList [col | (col,(True,_)) <- Map.toList cols]
+      vs     = Map.keysSet cols
       intvs2 = Set.fromList [col | (t,col,_) <- bnds, t `elem` [BV,LI,UI]]
       scvs   = Set.fromList [col | (SC,col,_) <- bnds]
 
@@ -260,7 +259,7 @@ mpsfile = do
         , LPFile.dir                     = objdir
         , LPFile.objectiveFunction       =
             ( Just objrow
-            , [LPFile.Term c [col] | (col,(_,m)) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
+            , [LPFile.Term c [col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
             )
         , LPFile.constraints             =
             [ LPFile.Constraint
@@ -272,7 +271,7 @@ mpsfile = do
             | (typ, (Just op, row)) <- zip (repeat LPFile.NormalConstraint) rows ++
                                        zip (repeat LPFile.UserDefinedCut) usercuts ++
                                        zip (repeat LPFile.LazyConstraint) lazycons
-            , let lhs = [LPFile.Term c　[col] | (col,(_,m)) <- Map.toList cols, c <- maybeToList (Map.lookup row m)]
+            , let lhs = [LPFile.Term c　[col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup row m)]
                         ++ Map.findWithDefault [] row qterms
             , let rhs = Map.findWithDefault 0 row rhss
             , (op2,rhs2) <-
@@ -360,25 +359,21 @@ rowsBody = many $ do
   newline'
   return (op, name)
 
-colsSection :: Parser (Map.Map Column (Bool, Map.Map Row Rational))
+colsSection :: Parser (Map.Map Column (Map.Map Row Rational), Set.Set Column)
 colsSection = do
   try $ stringLn "COLUMNS"
-  body False Map.empty
+  body False Map.empty Set.empty
   where
-    body :: Bool -> Map.Map Column (Bool, Map.Map Row Rational) -> Parser (Map.Map Column (Bool, Map.Map Row Rational))
-    body isInt rs = msum
+    body :: Bool -> Map.Map Column (Map.Map Row Rational) -> Set.Set Column -> Parser (Map.Map Column (Map.Map Row Rational), Set.Set Column)
+    body isInt rs ivs = msum
       [ do isInt' <- try intMarker
-           body isInt' rs
-      , do (k,v) <- entry isInt
-           let rs' = Map.insertWith f k v rs
-           seq rs' $ body isInt rs'
-      , return rs
+           body isInt' rs ivs
+      , do (k,v) <- entry
+           let rs'  = Map.insertWith Map.union k v rs
+               ivs' = if isInt then Set.insert k ivs else ivs
+           seq rs' $ seq ivs' $ body isInt rs' ivs'
+      , return (rs, ivs)
       ]
-
-    f (isInt1,m1) (isInt2,m2) = seq isInt3 $ seq m3 $ (isInt3, m3)
-      where
-        isInt3 = isInt1 || isInt2
-        m3     = Map.union m1 m2
 
     intMarker :: Parser Bool
     intMarker = do
@@ -391,16 +386,16 @@ colsSection = do
       newline'
       return b
 
-    entry :: Bool -> Parser (Column, (Bool, Map.Map Row Rational))
-    entry isInt = do
+    entry :: Parser (Column, Map.Map Row Rational)
+    entry = do
       spaces1'
       col <- ident
       rv1 <- rowAndVal
       opt <- optionMaybe rowAndVal
       newline'
       case opt of
-        Nothing -> return (col, (isInt, rv1))
-        Just rv2 ->  return (col, (isInt, Map.union rv1 rv2))
+        Nothing -> return (col, rv1)
+        Just rv2 ->  return (col, Map.union rv1 rv2)
 
 rowAndVal :: Parser (Map.Map Row Rational)
 rowAndVal = do
