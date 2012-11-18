@@ -903,7 +903,7 @@ search solver !conflict_lim onConflict = loop 0
             return $ printf "conflict(level=%d): %s" d str
 
           if d == levelRoot
-            then return (Just False)
+            then markBad solver >> return (Just False)
             else if conflict_lim >= 0 && c+1 >= conflict_lim then
               return Nothing
             else do
