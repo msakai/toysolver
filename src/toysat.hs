@@ -325,7 +325,7 @@ solveSAT :: Options -> SAT.Solver -> DIMACS.CNF -> IO ()
 solveSAT opt solver cnf = do
   printf "c #vars %d\n" (DIMACS.numVars cnf)
   printf "c #constraints %d\n" (length (DIMACS.clauses cnf))
-  _ <- replicateM (DIMACS.numVars cnf) (SAT.newVar solver)
+  SAT.newVars_ solver (DIMACS.numVars cnf)
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
   result <- SAT.solve solver
@@ -359,7 +359,7 @@ solveMUS opt solver gcnf = do
   printf "c #constraints %d\n" (length (GCNF.clauses gcnf))
   printf "c #groups %d\n" (GCNF.lastgroupindex gcnf)
 
-  _ <- replicateM (GCNF.nbvar gcnf) (SAT.newVar solver)
+  SAT.newVars_ solver (GCNF.nbvar gcnf)
 
   tbl <- forM [1 .. GCNF.lastgroupindex gcnf] $ \i -> do
     sel <- SAT.newVar solver
@@ -423,7 +423,7 @@ solvePB opt solver formula@(obj, cs) = do
   printf "c #vars %d\n" n
   printf "c #constraints %d\n" (length cs)
 
-  _ <- replicateM n (SAT.newVar solver)
+  SAT.newVars_ solver n
   enc <- Tseitin.newEncoder solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
 
@@ -512,7 +512,7 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
   printf "c #vars %d\n" nvar
   printf "c #constraints %d\n" (length cs)
 
-  _ <- replicateM nvar (SAT.newVar solver)
+  SAT.newVars_ solver nvar
   enc <- Tseitin.newEncoder solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
 

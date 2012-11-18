@@ -38,6 +38,8 @@ module SAT
 
   -- * Problem specification
   , newVar
+  , newVars
+  , newVars_
   , addClause
   , addAtLeast
   , addAtMost
@@ -599,6 +601,14 @@ newVar s = do
 
   PQ.enqueue (svVarQueue s) v
   return v
+
+-- |Add variables. @newVars solver n = replicateM n (newVar solver)@
+newVars :: Solver -> Int -> IO [Var]
+newVars s n = replicateM n (newVar s)
+
+-- |Add variables. @newVars_ solver n >> return () = newVars_ solver n@
+newVars_ :: Solver -> Int -> IO ()
+newVars_ s n = replicateM_ n (newVar s)
 
 -- |Add a clause to the solver.
 addClause :: Solver -> Clause -> IO ()
