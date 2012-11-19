@@ -13,6 +13,7 @@ import SAT
 import SAT.Types
 import qualified SAT.TseitinEncoder as Tseitin
 import SAT.TseitinEncoder (Formula (..))
+import qualified SAT.MUS as MUS
 import qualified SAT.CAMUS as CAMUS
 
 -- should be SAT
@@ -470,6 +471,27 @@ case_encodeDisj = do
   evalLit m x1 @?= False
   evalLit m x2 @?= False
   evalLit m x3 @?= False
+
+------------------------------------------------------------------------
+
+case_MUS = do
+  solver <- newSolver
+  [x1,x2,x3] <- newVars solver 3
+  sels@[y1,y2,y3,y4,y5,y6] <- newVars solver 6
+  addClause solver [-y1, x1]
+  addClause solver [-y2, -x1]
+  addClause solver [-y3, -x1, x2]
+  addClause solver [-y4, -x2]
+  addClause solver [-y5, -x1, x3]
+  addClause solver [-y6, -x3]
+
+  ret <- solveWith solver sels
+  ret @?= False
+
+  actual <- MUS.findMUSAssumptions solver MUS.defaultOptions
+  let actual'  = IS.fromList $ map (\x -> x-3) actual
+      expected = map IS.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
+  actual' `elem` expected @?= True
 
 ------------------------------------------------------------------------
 
