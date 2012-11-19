@@ -43,7 +43,7 @@ SAT-based solver for the following problems:
 Usage:
 
     toysat [file.cnf||-]
-    toysat --mus [file.gcnf|-]
+    toysat --mus [file.gcnf|file.cnf|-]
     toysat --pb [file.opb|-]
     toysat --wbo [file.wbo|-]
     toysat --maxsat [file.cnf|file.wcnf|-]
