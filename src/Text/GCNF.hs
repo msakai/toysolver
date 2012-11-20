@@ -33,9 +33,9 @@ import qualified SAT.Types as SAT
 
 data GCNF
   = GCNF
-  { nbvar          :: !Int
-  , nbclauses      :: !Int
-  , lastgroupindex :: !GroupIndex
+  { numVars        :: !Int
+  , numClauses     :: !Int
+  , lastGroupIndex :: !GroupIndex
   , clauses        :: [GClause]
   }
 
@@ -46,11 +46,11 @@ type GClause = (GroupIndex, SAT.Clause)
 parseString :: String -> GCNF
 parseString s =
   case words l of
-    (["p","gcnf", nbvar', nbclauses', lastgroupindex']) ->
+    (["p","gcnf", nbvar', nbclauses', lastGroupIndex']) ->
       GCNF
-      { nbvar          = read nbvar'
-      , nbclauses      = read nbclauses'
-      , lastgroupindex = read lastgroupindex'
+      { numVars        = read nbvar'
+      , numClauses     = read nbclauses'
+      , lastGroupIndex = read lastGroupIndex'
       , clauses        = map parseLine ls
       }
     _ -> error "parse error"

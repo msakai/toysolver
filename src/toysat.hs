@@ -362,17 +362,17 @@ mainMUS opt solver args = do
 
 solveMUS :: Options -> SAT.Solver -> GCNF.GCNF -> IO ()
 solveMUS opt solver gcnf = do
-  printf "c #vars %d\n" (GCNF.nbvar gcnf)
+  printf "c #vars %d\n" (GCNF.numVars gcnf)
   printf "c #constraints %d\n" (length (GCNF.clauses gcnf))
-  printf "c #groups %d\n" (GCNF.lastgroupindex gcnf)
+  printf "c #groups %d\n" (GCNF.lastGroupIndex gcnf)
 
-  SAT.newVars_ solver (GCNF.nbvar gcnf)
+  SAT.newVars_ solver (GCNF.numVars gcnf)
 
-  tbl <- forM [1 .. GCNF.lastgroupindex gcnf] $ \i -> do
+  tbl <- forM [1 .. GCNF.lastGroupIndex gcnf] $ \i -> do
     sel <- SAT.newVar solver
     return (i, sel)
   let idx2sel :: Array Int SAT.Var
-      idx2sel = array (1, GCNF.lastgroupindex gcnf) tbl
+      idx2sel = array (1, GCNF.lastGroupIndex gcnf) tbl
       selrng  = if null tbl then (0,-1) else (snd $ head tbl, snd $ last tbl)
       sel2idx :: Array SAT.Lit Int
       sel2idx = array selrng [(sel, idx) | (idx, sel) <- tbl]
@@ -382,14 +382,14 @@ solveMUS opt solver gcnf = do
     then SAT.addClause solver clause
     else SAT.addClause solver (- (idx2sel ! idx) : clause)
 
-  result <- SAT.solveWith solver (map (idx2sel !) [1..GCNF.lastgroupindex gcnf])
+  result <- SAT.solveWith solver (map (idx2sel !) [1..GCNF.lastGroupIndex gcnf])
   putStrLn $ "s " ++ (if result then "SATISFIABLE" else "UNSATISFIABLE")
   hFlush stdout
   if result
     then do
       m <- SAT.model solver
-      satPrintModel stdout m (GCNF.nbvar gcnf)
-      writeSOLFile opt m Nothing (GCNF.nbvar gcnf)
+      satPrintModel stdout m (GCNF.numVars gcnf)
+      writeSOLFile opt m Nothing (GCNF.numVars gcnf)
     else do
       if not (optAllMUSes opt)
         then do
@@ -425,9 +425,9 @@ solveMUS opt solver gcnf = do
 cnfToGCNF :: DIMACS.CNF -> GCNF.GCNF
 cnfToGCNF cnf
   = GCNF.GCNF
-  { GCNF.nbvar          = DIMACS.numVars cnf
-  , GCNF.nbclauses      = DIMACS.numClauses cnf
-  , GCNF.lastgroupindex = DIMACS.numClauses cnf
+  { GCNF.numVars        = DIMACS.numVars cnf
+  , GCNF.numClauses     = DIMACS.numClauses cnf
+  , GCNF.lastGroupIndex = DIMACS.numClauses cnf
   , GCNF.clauses        = [(grp, elems c) | (grp,c) <- zip [1..] (DIMACS.clauses cnf)]
   }
 
