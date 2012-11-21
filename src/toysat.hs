@@ -47,6 +47,9 @@ import GHC.Environment (getFullArgs)
 #ifdef FORCE_CHAR8
 import GHC.IO.Encoding
 #endif
+#if defined(__GLASGOW_HASKELL__) && MIN_VERSION_base(4,5,0)
+import qualified GHC.Stats as Stats
+#endif
 
 import Data.ArithRel
 import Data.Linear
@@ -265,6 +268,30 @@ main = do
       endWC  <- getCurrentTime
       printf "c total CPU time = %.3fs\n" (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
       printf "c total wall clock time = %.3fs\n" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
+
+#if defined(__GLASGOW_HASKELL__) && MIN_VERSION_base(4,5,0)
+      stat <- Stats.getGCStats
+      printf "c GCStats:\n"
+      printf "c   bytesAllocated = %d\n"         $ Stats.bytesAllocated stat
+      printf "c   numGcs = %d\n"                 $ Stats.numGcs stat
+      printf "c   maxBytesUsed = %d\n"           $ Stats.maxBytesUsed stat
+      printf "c   numByteUsageSamples = %d\n"    $ Stats.numByteUsageSamples stat
+      printf "c   cumulativeBytesUsed = %d\n"    $ Stats.cumulativeBytesUsed stat
+      printf "c   bytesCopied = %d\n"            $ Stats.bytesCopied stat
+      printf "c   currentBytesUsed = %d\n"       $ Stats.currentBytesUsed stat
+      printf "c   currentBytesSlop = %d\n"       $ Stats.currentBytesSlop stat
+      printf "c   maxBytesSlop = %d\n"           $ Stats.maxBytesSlop stat
+      printf "c   peakMegabytesAllocated = %d\n" $ Stats.peakMegabytesAllocated stat
+      printf "c   mutatorCpuSeconds = %5.2f\n"   $ Stats.mutatorCpuSeconds stat
+      printf "c   mutatorWallSeconds = %5.2f\n"  $ Stats.mutatorWallSeconds stat
+      printf "c   gcCpuSeconds = %5.2f\n"        $ Stats.gcCpuSeconds stat
+      printf "c   gcWallSeconds = %5.2f\n"       $ Stats.gcWallSeconds stat
+      printf "c   cpuSeconds = %5.2f\n"          $ Stats.cpuSeconds stat
+      printf "c   wallSeconds = %5.2f\n"         $ Stats.wallSeconds stat
+      printf "c   parAvgBytesCopied = %d\n"      $ Stats.parAvgBytesCopied stat
+      printf "c   parMaxBytesCopied = %d\n"      $ Stats.parMaxBytesCopied stat
+#endif
+
     (_,_,errs) -> do
       mapM_ putStrLn errs
       exitFailure
