@@ -100,7 +100,7 @@ minimize solver obj opt = do
      let loop lb ub m | ub < lb = return m
          loop lb ub m = do
            let mid = (lb + ub) `div` 2
-           logIO $ printf "Binary Search: %d <= obj <= %d; guessing obj <= %d\n" lb ub mid
+           logIO $ printf "Binary Search: %d <= obj <= %d; guessing obj <= %d" lb ub mid
            sel <- newVar solver
            addPBAtMostSoft solver sel obj mid
            ret <- solveWith solver [sel]
@@ -113,7 +113,7 @@ minimize solver obj opt = do
              -- FIXME: 本来は制約の削除をしたい
              addClause solver [-sel]
              let ub' = v - 1
-             logIO $ printf "Binary Search: updating upper bound: %d -> %d\n" ub ub'
+             logIO $ printf "Binary Search: updating upper bound: %d -> %d" ub ub'
              addPBAtMost solver obj ub'
              loop lb ub' m2
            else do
@@ -121,7 +121,7 @@ minimize solver obj opt = do
              -- FIXME: 本来は制約の削除をしたい
              addClause solver [-sel]
              let lb' = mid + 1
-             logIO $ printf "Binary Search: updating lower bound: %d -> %d\n" lb lb'
+             logIO $ printf "Binary Search: updating lower bound: %d -> %d" lb lb'
              addPBAtLeast solver obj lb'
              loop lb' ub m
 
