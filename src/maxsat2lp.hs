@@ -27,11 +27,14 @@ header = "Usage: maxsat2lp [file.cnf|file.wcnf|-]"
 main :: IO ()
 main = do
   args <- getArgs
-  wcnf <- case args of
+  ret <- case args of
             ["-"]   -> liftM MaxSAT.parseWCNFString getContents
             [fname] -> MaxSAT.parseWCNFFile fname
             _ -> hPutStrLn stderr header >> exitFailure
-  let (lp, _) = MaxSAT2LP.convert wcnf
-  case LPFile.render lp of
-    Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
-    Just s -> putStr s
+  case ret of
+    Left err -> hPutStrLn stderr err >> exitFailure
+    Right wcnf -> do
+      let (lp, _) = MaxSAT2LP.convert wcnf
+      case LPFile.render lp of
+        Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
+        Just s -> putStr s

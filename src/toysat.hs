@@ -348,7 +348,11 @@ solveSAT opt solver cnf = do
 mainMUS :: Options -> SAT.Solver -> [String] -> IO ()
 mainMUS opt solver args = do
   gcnf <- case args of
-           ["-"]   -> fmap GCNF.parseString $ hGetContents stdin
+           ["-"]   -> do
+             s <- hGetContents stdin
+             case GCNF.parseString s of
+               Left err   -> hPutStrLn stderr err >> exitFailure
+               Right gcnf -> return gcnf
            [fname] ->
              case map toLower (takeExtension fname) of
                ".cnf"  -> do
@@ -356,7 +360,11 @@ mainMUS opt solver args = do
                  case ret of
                    Left err  -> hPrint stderr err >> exitFailure
                    Right cnf -> return $ cnfToGCNF cnf
-               _ -> GCNF.parseFile fname
+               _ -> do
+                 ret <- GCNF.parseFile fname
+                 case ret of
+                   Left err   -> hPutStrLn stderr err >> exitFailure
+                   Right gcnf -> return gcnf
            _ -> showHelp stderr >> exitFailure
   solveMUS opt solver gcnf
 
@@ -601,18 +609,24 @@ mainMaxSAT opt solver args = do
          ["-"]   -> getContents
          [fname] -> readFile fname
          _ -> showHelp stderr  >> exitFailure
-  let wcnf = MaxSAT.parseWCNFString s
-  solveMaxSAT opt solver wcnf
+  let ret = MaxSAT.parseWCNFString s
+  case ret of
+    Left err -> hPutStrLn stderr err >> exitFailure
+    Right wcnf -> solveMaxSAT opt solver wcnf
 
 solveMaxSAT :: Options -> SAT.Solver -> MaxSAT.WCNF -> IO ()
-solveMaxSAT opt solver (_, top, cs) = do
-  solveWBO opt solver True
-           ( Nothing
-           , [ (if w >= top then Nothing else Just w
-             , ([(1,[lit]) | lit<-lits], PBFile.Ge, 1))
-             | (w,lits) <- cs
-             ]
-           )
+solveMaxSAT opt solver
+  MaxSAT.WCNF
+  { MaxSAT.topCost = top
+  , MaxSAT.clauses = cs
+  } = do
+    solveWBO opt solver True
+             ( Nothing
+             , [ (if w >= top then Nothing else Just w
+               , ([(1,[lit]) | lit<-lits], PBFile.Ge, 1))
+               | (w,lits) <- cs
+               ]
+             )
 
 -- ------------------------------------------------------------------------
 

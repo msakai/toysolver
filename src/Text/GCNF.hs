@@ -13,9 +13,6 @@
 -- 
 -- * <http://www.satcompetition.org/2011/rules.pdf>
 --
--- TODO:
---
--- * Error handling
 --
 -----------------------------------------------------------------------------
 module Text.GCNF
@@ -43,24 +40,26 @@ type GroupIndex = Int
 
 type GClause = (GroupIndex, SAT.Clause)
 
-parseString :: String -> GCNF
+parseString :: String -> Either String GCNF
 parseString s =
   case words l of
     (["p","gcnf", nbvar', nbclauses', lastGroupIndex']) ->
-      GCNF
-      { numVars        = read nbvar'
-      , numClauses     = read nbclauses'
-      , lastGroupIndex = read lastGroupIndex'
-      , clauses        = map parseLine ls
-      }
-    _ -> error "parse error"
+      Right $
+        GCNF
+        { numVars        = read nbvar'
+        , numClauses     = read nbclauses'
+        , lastGroupIndex = read lastGroupIndex'
+        , clauses        = map parseLine ls
+        }
+    _ ->
+      Left "cannot find gcnf header"
   where
     (l:ls) = filter (not . isComment) (lines s)
 
-parseFile :: FilePath -> IO GCNF
+parseFile :: FilePath -> IO (Either String GCNF)
 parseFile filename = do
   s <- readFile filename
-  return $! parseString s
+  return $ parseString s
 
 isComment :: String -> Bool
 isComment ('c':_) = True

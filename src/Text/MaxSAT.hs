@@ -13,14 +13,10 @@
 -- 
 -- * <http://maxsat.ia.udl.cat/requirements/>
 --
--- TODO:
---
--- * Error handling
---
 -----------------------------------------------------------------------------
 module Text.MaxSAT
   (
-    WCNF
+    WCNF (..)
   , WeightedClause
   , Weight
 
@@ -31,30 +27,55 @@ module Text.MaxSAT
 
 import qualified SAT.Types as SAT
 
-type WCNF = (Int, Weight, [WeightedClause])
+data WCNF
+  = WCNF
+  { numVars    :: !Int
+  , numClauses :: !Int
+  , topCost    :: !Weight
+  , clauses    :: [WeightedClause]
+  }
 
 type WeightedClause = (Weight, SAT.Clause)
 
 -- | should be able to represent 2^63
 type Weight = Integer
 
-parseWCNFString :: String -> WCNF
+parseWCNFString :: String -> Either String WCNF
 parseWCNFString s =
   case words l of
-    (["p","wcnf", nvar, _nclause, top]) ->
-      (read nvar, read top, map parseWCNFLine ls)
-    (["p","wcnf", nvar, _nclause]) ->
-      (read nvar, 2^(63::Int), map parseWCNFLine ls)
-    (["p","cnf", nvar, _nclause]) ->
-      (read nvar, 2, map parseCNFLine ls)
-    _ -> error "parse error"
+    (["p","wcnf", nvar, nclause, top]) ->
+      Right $
+        WCNF
+        { numVars    = read nvar
+        , numClauses = read nclause
+        , topCost    = read top
+        , clauses    = map parseWCNFLine ls
+        }
+    (["p","wcnf", nvar, nclause]) ->
+      Right $
+        WCNF
+        { numVars    = read nvar
+        , numClauses = read nclause
+        , topCost    = 2^(63::Int)
+        , clauses    = map parseWCNFLine ls
+        }
+    (["p","cnf", nvar, nclause]) ->
+      Right $
+        WCNF
+        { numVars    = read nvar
+        , numClauses = read nclause
+        , topCost    = 2
+        , clauses    = map parseCNFLine ls
+        }
+    _ ->
+      Left "cannot find wcnf/cnf header"
   where
     (l:ls) = filter (not . isComment) (lines s)
 
-parseWCNFFile :: FilePath -> IO WCNF
+parseWCNFFile :: FilePath -> IO (Either String WCNF)
 parseWCNFFile filename = do
   s <- readFile filename
-  return $! parseWCNFString s
+  return $ parseWCNFString s
 
 isComment :: String -> Bool
 isComment ('c':_) = True

@@ -373,12 +373,15 @@ main = do
                 pbPrintModel stdout m2 0
                 writeSOLFileSAT o m2
         ModeMaxSAT -> do
-          wcnf <- MaxSAT.parseWCNFFile fname
-          let (lp,mtrans) = MaxSAT2LP.convert wcnf
-          run (getSolver o) o lp $ \m -> do
-            let m2 = mtrans m
-            maxsatPrintModel stdout m2 0
-            writeSOLFileSAT o m2
+          ret <- MaxSAT.parseWCNFFile fname
+          case ret of
+            Left err -> hPutStrLn stderr err >> exitFailure
+            Right wcnf -> do
+              let (lp,mtrans) = MaxSAT2LP.convert wcnf
+              run (getSolver o) o lp $ \m -> do
+                let m2 = mtrans m
+                maxsatPrintModel stdout m2 0
+                writeSOLFileSAT o m2
         ModeLP -> do
           ret <- LP.parseFile fname
           lp <- case ret of

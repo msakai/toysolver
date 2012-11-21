@@ -22,7 +22,12 @@ import qualified Text.MaxSAT as MaxSAT
 import SAT.Types
 
 convert :: MaxSAT.WCNF -> (LPFile.LP, Map.Map LPFile.Var Rational -> Model)
-convert (nvar, top, ls) = (lp, mtrans)
+convert
+  MaxSAT.WCNF
+  { MaxSAT.numVars = nvar
+  , MaxSAT.topCost = top
+  , MaxSAT.clauses = ls
+  } = (lp, mtrans)
   where
     lp = LPFile.LP
       { LPFile.variables = Set.fromList vs
