@@ -14,18 +14,7 @@ Extra-Source-Files:
    COPYING
    .travis.yml
    src/TseitinEncode.hs
-   src/CongruenceClosure.hs
-   src/Data/Polynomial.hs
-   src/Data/Polynomial/GBase.hs
-   src/Data/Polynomial/FactorZ.hs
-   src/Data/Polynomial/Graeffe.hs
-   src/Data/Polynomial/Lagrange.hs
-   src/Data/Polynomial/Sturm.hs
-   src/Data/AlgebraicNumber.hs
-   src/Data/AlgebraicNumber/Root.hs
    src/Data/Polyhedron.hs
-   src/FOLModelFinder.hs
-   src/Text/SDPFile.hs
    src/TestAReal2.hs
    src/pbverify.hs
    src/pigeonhole.hs
@@ -54,6 +43,75 @@ Flag ForceChar8
 source-repository head
   type:     git
   location: git://github.com/msakai/toysolver.git
+
+Library
+  Exposed: False
+  Hs-source-dirs: src
+  Build-Depends:
+     base >=4 && <5,
+     containers >= 0.4.2, mtl, array, random, stm, parsec, bytestring, filepath, deepseq, time, old-locale, primes,
+     parse-dimacs, queue, heaps, unbounded-delays,
+     OptDir
+  Extensions:
+     MultiParamTypeClasses
+     FlexibleInstances
+     BangPatterns
+     DoAndIfThenElse
+     CPP
+  Exposed-Modules:
+     CAD
+     CongruenceClosure
+     ContiTraverso
+     Converter.CNF2LP
+     Converter.ObjType
+     Converter.PB2LP
+     Cooper
+     Data.AlgebraicNumber
+     Data.ArithRel
+     Data.Delta
+     Data.Expr
+     Data.Formula
+     Data.LA
+     Data.Lattice
+     Data.LBool
+     Data.Linear
+     Data.Interval
+     Data.Polynomial
+     Data.Polynomial.FactorZ
+     Data.Polynomial.GBase
+     Data.Polynomial.Lagrange
+     Data.Polynomial.Sturm
+     FOLModelFinder
+     FourierMotzkin
+     OmegaTest
+     SAT
+     SAT.Integer
+     SAT.MUS
+     SAT.CAMUS
+     SAT.TheorySolver
+     SAT.TseitinEncoder
+     SAT.Types
+     SAT.Printer
+     Text.GCNF
+     Text.GurobiSol
+     Text.LPFile
+     Text.MPSFile
+     Text.MaxSAT
+     Text.PBFile
+     Text.SDPFile
+  Other-Modules:
+     BoundsInference
+     Data.IndexedPriorityQueue
+     Data.SeqQueue
+     LPSolver
+     LPSolverHL
+     LPUtil
+     MIPSolverHL
+     MIPSolver2
+     Simplex
+     Simplex2
+     Util
+     Version
 
 Executable toysolver
   Main-is: toysolver.hs
@@ -89,6 +147,7 @@ Executable toysolver
      CAD
      LPSolver
      LPSolverHL
+     LPUtil
      MIPSolverHL
      OmegaTest
      Simplex
