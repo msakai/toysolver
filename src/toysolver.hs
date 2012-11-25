@@ -210,20 +210,18 @@ run solver opt lp printModel = do
 
       let nthreads = last (0 : [n | NThread n <- opt])
 
-      let logger s = putStr "c " >> putStrLn s >> hFlush stdout
-
-      Simplex2.setLogger solver logger
+      Simplex2.setLogger solver putCommentLine
       replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
       Simplex2.setOptDir solver (LP.dir lp)
       Simplex2.setObj solver $ fromJust (LA.compileExpr obj)
-      logger "Loading constraints... "
+      putCommentLine "Loading constraints... "
       forM_ (cs1 ++ cs2) $ \c -> do
         Simplex2.assertAtom solver $ fromJust (LA.compileAtom c)
-      logger "Loading constraints finished"
+      putCommentLine "Loading constraints finished"
 
       mip <- MIPSolver2.newSolver solver ivs2
       MIPSolver2.setShowRational mip printRat
-      MIPSolver2.setLogger mip logger
+      MIPSolver2.setLogger mip putCommentLine
       ncap <- getNumCapabilities
       MIPSolver2.setNThread mip $
         if nthreads >= 1
@@ -252,7 +250,7 @@ run solver opt lp printModel = do
     solveByCAD
       | not (IS.null ivs2) = do
           putStrLn "s UNKNOWN"
-          putStrLn "c integer variables are not supported by CAD"
+          putCommentLine "integer variables are not supported by CAD"
           exitFailure
       | otherwise = do
           let cs = map g $ cs1 ++ cs2
@@ -284,7 +282,7 @@ run solver opt lp printModel = do
     solveByContiTraverso
       | not (vs `Set.isSubsetOf` ivs) = do
           putStrLn "s UNKNOWN"
-          putStrLn "c continuous variables are not supported by Conti-Traverso algorithm"
+          putCommentLine "continuous variables are not supported by Conti-Traverso algorithm"
           exitFailure
       | otherwise = do
           let tmp = do
@@ -294,7 +292,7 @@ run solver opt lp printModel = do
           case tmp of
             Nothing -> do
               putStrLn "s UNKNOWN"
-              putStrLn "c non-linear expressions are not supported by Conti-Traverso algorithm"
+              putCommentLine "non-linear expressions are not supported by Conti-Traverso algorithm"
               exitFailure
             Just (linObj, linCon) -> do
               case ContiTraverso.solve P.grlex (LP.dir lp) linObj linCon of
@@ -318,6 +316,13 @@ lpPrintModel :: Handle -> Bool -> Map.Map String Rational -> IO ()
 lpPrintModel h asRat m = do
   forM_ (Map.toList m) $ \(v, val) -> do
     printf "v %s = %s\n" v (showRational asRat val)
+
+
+putCommentLine :: String -> IO ()
+putCommentLine s = do
+  putStr "c "
+  putStrLn s
+  hFlush stdout
 
 -- ---------------------------------------------------------------------------
 

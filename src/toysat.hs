@@ -256,7 +256,7 @@ main = do
 #else
           let fullArgs = args
 #endif
-          printf "c command line = %s\n" (show fullArgs)
+          putCommentLine $ printf "command line = %s" (show fullArgs)
 
           let timelim = optTimeout opt * 10^(6::Int)
     
@@ -273,33 +273,33 @@ main = do
                ModeLP      -> mainLP opt solver args2
     
           when (isNothing ret) $ do
-            putStrLn "c TIMEOUT"
+            putCommentLine "TIMEOUT"
           endCPU <- getCPUTime
           endWC  <- getCurrentTime
-          printf "c total CPU time = %.3fs\n" (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
-          printf "c total wall clock time = %.3fs\n" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
+          putCommentLine $ printf "total CPU time = %.3fs" (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
+          putCommentLine $ printf "total wall clock time = %.3fs" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
 
 #if defined(__GLASGOW_HASKELL__) && MIN_VERSION_base(4,5,0)
           stat <- Stats.getGCStats
-          printf "c GCStats:\n"
-          printf "c   bytesAllocated = %d\n"         $ Stats.bytesAllocated stat
-          printf "c   numGcs = %d\n"                 $ Stats.numGcs stat
-          printf "c   maxBytesUsed = %d\n"           $ Stats.maxBytesUsed stat
-          printf "c   numByteUsageSamples = %d\n"    $ Stats.numByteUsageSamples stat
-          printf "c   cumulativeBytesUsed = %d\n"    $ Stats.cumulativeBytesUsed stat
-          printf "c   bytesCopied = %d\n"            $ Stats.bytesCopied stat
-          printf "c   currentBytesUsed = %d\n"       $ Stats.currentBytesUsed stat
-          printf "c   currentBytesSlop = %d\n"       $ Stats.currentBytesSlop stat
-          printf "c   maxBytesSlop = %d\n"           $ Stats.maxBytesSlop stat
-          printf "c   peakMegabytesAllocated = %d\n" $ Stats.peakMegabytesAllocated stat
-          printf "c   mutatorCpuSeconds = %5.2f\n"   $ Stats.mutatorCpuSeconds stat
-          printf "c   mutatorWallSeconds = %5.2f\n"  $ Stats.mutatorWallSeconds stat
-          printf "c   gcCpuSeconds = %5.2f\n"        $ Stats.gcCpuSeconds stat
-          printf "c   gcWallSeconds = %5.2f\n"       $ Stats.gcWallSeconds stat
-          printf "c   cpuSeconds = %5.2f\n"          $ Stats.cpuSeconds stat
-          printf "c   wallSeconds = %5.2f\n"         $ Stats.wallSeconds stat
-          printf "c   parAvgBytesCopied = %d\n"      $ Stats.parAvgBytesCopied stat
-          printf "c   parMaxBytesCopied = %d\n"      $ Stats.parMaxBytesCopied stat
+          putCommentLine "GCStats:"
+          putCommentLine $ printf "  bytesAllocated = %d"         $ Stats.bytesAllocated stat
+          putCommentLine $ printf "  numGcs = %d"                 $ Stats.numGcs stat
+          putCommentLine $ printf "  maxBytesUsed = %d"           $ Stats.maxBytesUsed stat
+          putCommentLine $ printf "  numByteUsageSamples = %d"    $ Stats.numByteUsageSamples stat
+          putCommentLine $ printf "  cumulativeBytesUsed = %d"    $ Stats.cumulativeBytesUsed stat
+          putCommentLine $ printf "  bytesCopied = %d"            $ Stats.bytesCopied stat
+          putCommentLine $ printf "  currentBytesUsed = %d"       $ Stats.currentBytesUsed stat
+          putCommentLine $ printf "  currentBytesSlop = %d"       $ Stats.currentBytesSlop stat
+          putCommentLine $ printf "  maxBytesSlop = %d"           $ Stats.maxBytesSlop stat
+          putCommentLine $ printf "  peakMegabytesAllocated = %d" $ Stats.peakMegabytesAllocated stat
+          putCommentLine $ printf "  mutatorCpuSeconds = %5.2f"   $ Stats.mutatorCpuSeconds stat
+          putCommentLine $ printf "  mutatorWallSeconds = %5.2f"  $ Stats.mutatorWallSeconds stat
+          putCommentLine $ printf "  gcCpuSeconds = %5.2f"        $ Stats.gcCpuSeconds stat
+          putCommentLine $ printf "  gcWallSeconds = %5.2f"       $ Stats.gcWallSeconds stat
+          putCommentLine $ printf "  cpuSeconds = %5.2f"          $ Stats.cpuSeconds stat
+          putCommentLine $ printf "  wallSeconds = %5.2f"         $ Stats.wallSeconds stat
+          putCommentLine $ printf "  parAvgBytesCopied = %d"      $ Stats.parAvgBytesCopied stat
+          putCommentLine $ printf "  parMaxBytesCopied = %d"      $ Stats.parMaxBytesCopied stat
 #endif
 
 showHelp :: Handle -> IO ()
@@ -321,13 +321,19 @@ header = unlines
 printSysInfo :: IO ()
 printSysInfo = do
   tm <- getZonedTime
-  hPrintf stdout "c %s\n" (formatTime defaultTimeLocale "%FT%X%z" tm)
-  hPrintf stdout "c arch = %s\n" SysInfo.arch
-  hPrintf stdout "c os = %s\n" SysInfo.os
-  hPrintf stdout "c compiler = %s %s\n" SysInfo.compilerName (showVersion SysInfo.compilerVersion)
-  hPutStrLn stdout "c packages:"
+  putCommentLine $ printf "%s" (formatTime defaultTimeLocale "%FT%X%z" tm)
+  putCommentLine $ printf "arch = %s" SysInfo.arch
+  putCommentLine $ printf "os = %s" SysInfo.os
+  putCommentLine $ printf "compiler = %s %s" SysInfo.compilerName (showVersion SysInfo.compilerVersion)
+  putCommentLine "packages:"
   forM_ packageVersions $ \(package, ver) -> do
-    hPrintf stdout "c   %s-%s\n" package ver
+    putCommentLine $ printf "  %s-%s" package ver
+
+putCommentLine :: String -> IO ()
+putCommentLine s = do
+  putStr "c "
+  putStrLn s
+  hFlush stdout
 
 newSolver :: Options -> IO SAT.Solver
 newSolver opts = do
@@ -342,10 +348,7 @@ newSolver opts = do
   when (optRandomSeed opts /= 0) $ 
     SAT.setRandomSeed solver (optRandomSeed opts)
   SAT.setLearningStrategy solver (optLearningStrategy opts)
-  SAT.setLogger solver $ \str -> do
-    putStr "c "
-    putStrLn str
-    hFlush stdout
+  SAT.setLogger solver putCommentLine
   SAT.setCheckModel solver (optCheckModel opts)
   return solver
 
@@ -363,8 +366,8 @@ mainSAT opt solver args = do
 
 solveSAT :: Options -> SAT.Solver -> DIMACS.CNF -> IO ()
 solveSAT opt solver cnf = do
-  printf "c #vars %d\n" (DIMACS.numVars cnf)
-  printf "c #constraints %d\n" (length (DIMACS.clauses cnf))
+  putCommentLine $ printf "#vars %d" (DIMACS.numVars cnf)
+  putCommentLine $ printf "#constraints %d" (length (DIMACS.clauses cnf))
   SAT.newVars_ solver (DIMACS.numVars cnf)
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
@@ -396,9 +399,9 @@ mainMUS opt solver args = do
 
 solveMUS :: Options -> SAT.Solver -> GCNF.GCNF -> IO ()
 solveMUS opt solver gcnf = do
-  printf "c #vars %d\n" (GCNF.numVars gcnf)
-  printf "c #constraints %d\n" (length (GCNF.clauses gcnf))
-  printf "c #groups %d\n" (GCNF.lastGroupIndex gcnf)
+  putCommentLine $ printf "#vars %d" (GCNF.numVars gcnf)
+  putCommentLine $ printf "#constraints %d" (length (GCNF.clauses gcnf))
+  putCommentLine $ printf "#groups %d" (GCNF.lastGroupIndex gcnf)
 
   SAT.newVars_ solver (GCNF.numVars gcnf)
 
@@ -428,9 +431,7 @@ solveMUS opt solver gcnf = do
       if not (optAllMUSes opt)
         then do
           let opt2 = MUS.defaultOptions
-                     { MUS.optLogger = \s -> do
-                         putStrLn $ "c " ++ s
-                         hFlush stdout
+                     { MUS.optLogger = putCommentLine
                      , MUS.optLitPrinter = \lit ->
                          show (sel2idx ! lit)
                      }
@@ -438,17 +439,14 @@ solveMUS opt solver gcnf = do
           musPrintSol stdout (map (sel2idx !) mus)
         else do
           let opt2 = CAMUS.defaultOptions
-                     { CAMUS.optLogger = \s -> do
-                         putStrLn $ "c " ++ s
-                         hFlush stdout
+                     { CAMUS.optLogger = putCommentLine
                      , CAMUS.optCallback = \mcs -> do
                          let mcs2 = sort $ map (sel2idx !) mcs
-                         putStrLn $ "c MCS found: " ++ show mcs2
-                         hFlush stdout
+                         putCommentLine $ "MCS found: " ++ show mcs2
                      }
           muses <- CAMUS.allMUSAssumptions solver (map snd tbl) opt2
           forM_ (zip [(1::Int)..] muses) $ \(i, mus) -> do
-            putStrLn $ "c MUS #" ++ show i
+            putCommentLine $ "MUS #" ++ show i
             musPrintSol stdout (sort (map (sel2idx !) mus))
 
 -- ------------------------------------------------------------------------
@@ -467,8 +465,8 @@ solvePB :: Options -> SAT.Solver -> PBFile.Formula -> IO ()
 solvePB opt solver formula@(obj, cs) = do
   let n = PBFile.pbNumVars formula
 
-  printf "c #vars %d\n" n
-  printf "c #constraints %d\n" (length cs)
+  putCommentLine $ printf "#vars %d" n
+  putCommentLine $ printf "#constraints %d" (length cs)
 
   SAT.newVars_ solver n
   enc <- Tseitin.newEncoder solver
@@ -536,7 +534,7 @@ minimize opt solver obj update = do
         PBO.defaultOptions
         { PBO.optObjFunVarsHeuristics = optObjFunVarsHeuristics opt
         , PBO.optSearchStrategy       = optSearchStrategy opt
-        , PBO.optLogger  = \s -> putStr "c " >> putStrLn s
+        , PBO.optLogger  = putCommentLine
         , PBO.optUpdater = update
         }
   PBO.minimize solver obj opt2
@@ -556,8 +554,8 @@ mainWBO opt solver args = do
 solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
 solveWBO opt solver isMaxSat formula@(tco, cs) = do
   let nvar = PBFile.wboNumVars formula
-  printf "c #vars %d\n" nvar
-  printf "c #constraints %d\n" (length cs)
+  putCommentLine $ printf "#vars %d" nvar
+  putCommentLine $ printf "#constraints %d" (length cs)
 
   SAT.newVars_ solver nvar
   enc <- Tseitin.newEncoder solver
@@ -669,14 +667,14 @@ solveLP :: Options -> SAT.Solver -> LPFile.LP -> IO ()
 solveLP opt solver lp = do
   if not (Set.null nivs)
     then do
-      putStrLn $ "c cannot handle non-integer variables: " ++ intercalate ", " (Set.toList nivs)
+      putCommentLine $ "cannot handle non-integer variables: " ++ intercalate ", " (Set.toList nivs)
       putStrLn "s UNKNOWN"
       exitFailure
     else do
       enc <- Tseitin.newEncoder solver
       Tseitin.setUsePB enc (optLinearizerPB opt)
 
-      putStrLn "c Loading variables and bounds"
+      putCommentLine $ "Loading variables and bounds"
       vmap <- liftM Map.fromList $ revForM (Set.toList ivs) $ \v -> do
         let (lb,ub) = LPFile.getBounds lp v
         case (lb,ub) of
@@ -684,11 +682,11 @@ solveLP opt solver lp = do
             v2 <- SAT.Integer.newVar solver (ceiling lb') (floor ub')
             return (v,v2)
           _ -> do
-            putStrLn $ "c cannot handle unbounded variable: " ++ v
+            putCommentLine $ "cannot handle unbounded variable: " ++ v
             putStrLn "s UNKNOWN"
             exitFailure
 
-      putStrLn "c Loading constraints"
+      putCommentLine "Loading constraints"
       forM_ (LPFile.constraints lp) $ \c -> do
         let indicator      = LPFile.constrIndicator c
             (lhs, op, rhs) = LPFile.constrBody c
@@ -713,7 +711,7 @@ solveLP opt solver lp = do
               0 -> f (SAT.litNot var')
               _ -> return ()
 
-      putStrLn "c Loading SOS constraints"
+      putCommentLine "Loading SOS constraints"
       forM_ (LPFile.sos lp) $ \(_label, typ, xs) -> do
         case typ of
           LPFile.S1 -> SAT.addAtMost solver (map (asBin . (vmap Map.!) . fst) xs) 1
