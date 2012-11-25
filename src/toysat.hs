@@ -380,18 +380,11 @@ mainMUS opt solver args = do
              case GCNF.parseString s of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
-           [fname] ->
-             case map toLower (takeExtension fname) of
-               ".cnf"  -> do
-                 ret <- DIMACS.parseFile fname
-                 case ret of
-                   Left err  -> hPrint stderr err >> exitFailure
-                   Right cnf -> return $ cnfToGCNF cnf
-               _ -> do
-                 ret <- GCNF.parseFile fname
-                 case ret of
-                   Left err   -> hPutStrLn stderr err >> exitFailure
-                   Right gcnf -> return gcnf
+           [fname] -> do
+             ret <- GCNF.parseFile fname
+             case ret of
+               Left err   -> hPutStrLn stderr err >> exitFailure
+               Right gcnf -> return gcnf
            _ -> showHelp stderr >> exitFailure
   solveMUS opt solver gcnf
 
@@ -451,15 +444,6 @@ solveMUS opt solver gcnf = do
           forM_ (zip [(1::Int)..] muses) $ \(i, mus) -> do
             putStrLn $ "c MUS #" ++ show i
             musPrintSol stdout (sort (map (sel2idx !) mus))
-
-cnfToGCNF :: DIMACS.CNF -> GCNF.GCNF
-cnfToGCNF cnf
-  = GCNF.GCNF
-  { GCNF.numVars        = DIMACS.numVars cnf
-  , GCNF.numClauses     = DIMACS.numClauses cnf
-  , GCNF.lastGroupIndex = DIMACS.numClauses cnf
-  , GCNF.clauses        = [(grp, elems c) | (grp,c) <- zip [1..] (DIMACS.clauses cnf)]
-  }
 
 -- ------------------------------------------------------------------------
 

@@ -51,6 +51,14 @@ parseString s =
         , lastGroupIndex = read lastGroupIndex'
         , clauses        = map parseLine ls
         }
+    (["p","cnf", nbvar', nbclause']) ->
+      Right $
+        GCNF
+        { numVars        = read nbvar'
+        , numClauses     = read nbclause'
+        , lastGroupIndex = read nbclause'
+        , clauses        = zip [1..] $ map parseCNFLine ls
+        }
     _ ->
       Left "cannot find gcnf header"
   where
@@ -73,6 +81,11 @@ parseLine s =
             idx = read $ init w
         in seq idx $ seqList ys $ (idx, ys)
     _ -> error "parse error"
+
+parseCNFLine :: String -> SAT.Clause
+parseCNFLine s = seq xs $ seqList xs $ xs
+  where
+    xs = init (map read (words s))
 
 seqList :: [a] -> b -> b
 seqList [] b = b
