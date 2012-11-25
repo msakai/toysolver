@@ -112,6 +112,7 @@ Library
      Simplex2
      Util
      Version
+     Paths_toysolver
 
 Executable toysolver
   Main-is: toysolver.hs
@@ -194,6 +195,7 @@ Executable toysat
      SAT.TheorySolver
      SAT.Printer
      Version
+     Paths_toysolver
   Build-Depends: base >=4 && <5, mtl, containers >= 0.4.2, array, random, parsec, bytestring, filepath, parse-dimacs, queue, OptDir, time, old-locale, unbounded-delays
   Extensions:
      MultiParamTypeClasses
@@ -219,6 +221,7 @@ Executable toyfmf
      SAT
      SAT.Types
      Version
+     Paths_toysolver
   Build-Depends: base >=4 && <5, mtl, containers >= 0.4.2, array, random, queue, time, logic-TPTP
   Extensions:
      BangPatterns

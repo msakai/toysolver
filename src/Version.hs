@@ -1,15 +1,12 @@
 {-# LANGUAGE CPP #-}
-module Version where
+module Version
+  ( version
+  , packageVersions
+  ) where
 
 import Data.List
 import Data.Version
-
-version :: Version
-version
-  = Version
-  { versionBranch = [0,0,3]
-  , versionTags   = []
-  }
+import Paths_toysolver
 
 packageVersions :: [(String, String)]
 packageVersions = sort $ tail
