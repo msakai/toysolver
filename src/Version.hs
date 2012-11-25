@@ -29,6 +29,12 @@ packageVersions = sort $ tail
 #ifdef VERSION_deepseq
   , ("deepseq",      VERSION_deepseq      )
 #endif
+#ifdef VERSION_filepath
+  , ("filepath",     VERSION_filepath     )
+#endif
+#ifdef VERSION_heaps
+  , ("heaps",        VERSION_heaps     )
+#endif
 #ifdef VERSION_mtl
   , ("mtl",          VERSION_mtl          )
 #endif
@@ -41,16 +47,25 @@ packageVersions = sort $ tail
 #ifdef VERSION_parsec
   , ("parsec",       VERSION_parsec       )
 #endif
+#ifdef VERSION_primes
+  , ("primes",       VERSION_primes       )
+#endif
 #ifdef VERSION_queue
   , ("queue",        VERSION_queue        )
 #endif
+#ifdef VERSION_random
+  , ("random",       VERSION_random       )
+#endif
 #ifdef VERSION_stm
-  , ("stm",          VERSION_stm         )
+  , ("stm",          VERSION_stm          )
 #endif
 #ifdef VERSION_time
   , ("time",         VERSION_time         )
 #endif
 #ifdef VERSION_unbounded_delays
   , ("unbounded-delays", VERSION_unbounded_delays)
+#endif
+#ifdef VERSION_logic_TPTP
+  , ("logic-TPTP",   VERSION_logic_TPTP   )
 #endif
   ]
