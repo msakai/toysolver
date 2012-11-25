@@ -69,6 +69,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Foldable as F
 import Data.Time
 import System.CPUTime
+import System.Timeout
 import Text.Printf
 
 import qualified Data.LA as LA
@@ -190,6 +191,7 @@ branchAndBound solver rootLP update = do
   pool <- newTVarIO (Seq.singleton root)
   activeThreads <- newTVarIO (Map.empty)
   visitedNodes <- newTVarIO 0
+  solchan <- newTChanIO
 
   let addNode :: Node -> STM ()
       addNode nd = do
@@ -212,22 +214,6 @@ branchAndBound solver rootLP update = do
                 then return Nothing
                 else retry
 
-      updateBest :: Node -> IO ()
-      updateBest node = do
-        let lp = ndLP node
-        m <- Simplex2.model lp
-        ret <- atomically $ do
-          old <- readTVar (mipBest solver)
-          case old of
-            Nothing -> do
-              writeTVar (mipBest solver) (Just node)
-              return True
-            Just best -> do
-              let isBetter = if dir==OptMin then ndValue node < ndValue best else ndValue node > ndValue best
-              when isBetter $ writeTVar (mipBest solver) (Just node)
-              return isBetter
-        when ret $ update m (ndValue node) -- 複数スレッドからupdateが同時に呼ばれてまずい可能性がある
-
       processNode :: Node -> IO ()
       processNode node = do
         let lp = ndLP node
@@ -244,7 +230,7 @@ branchAndBound solver rootLP update = do
             unless p $ do
               xs <- violated node (mipIVs solver)
               case xs of
-                [] -> updateBest (node { ndValue = val })
+                [] -> atomically $ writeTChan solchan $ node { ndValue = val }
                 _ -> do
                   r <- if ndDepth node `mod` 100 /= 0
                        then return Nothing
@@ -273,91 +259,110 @@ branchAndBound solver rootLP update = do
         return $ Seq.null nodes && Map.null threads
 
   -- fork worker threads
-  nthreads <- do
-    n <- readIORef (mipNThread solver)
-    if n >= 1
-      then return n
-      else return 1 -- getNumCapabilities -- base-4.4.0.0以降にしか存在しない
-
-  let child = do
-        m <- pickNode
-        case m of
-          Nothing -> return ()
-          Just node -> processNode node >> child
+  nthreads <- liftM (max 1) $ readIORef (mipNThread solver)
 
   log solver $ printf "MIP: forking %d worker threads..." nthreads
+
   startCPU <- getCPUTime
   startWC  <- getCurrentTime
   ex <- newEmptyTMVarIO
-  threads <- replicateM nthreads $ do
-    mask $ \restore -> forkIO $ do
-      ret <- try (restore child)
-      case ret of
-        Left e -> atomically (putTMVar ex e)
-        Right _ -> return ()
 
-  th <- forkIO $ do
-    let loop = do
-          (nodes, visited::Int) <- atomically $ do
-            nodes   <- readTVar pool
-            athreads <- readTVar activeThreads
-            visited <- readTVar visitedNodes
-            return (Seq.fromList (Map.elems athreads) Seq.>< nodes, visited)
-          if Seq.null nodes
-            then return ()
-            else do
-              nowCPU <- getCPUTime
-              nowWC  <- getCurrentTime
-              let spentCPU = (nowCPU - startCPU) `div` 10^(12::Int)
-              let spentWC  = round (nowWC `diffUTCTime` startWC) :: Int
+  let printStatus :: Seq.Seq Node -> Int -> IO ()
+      printStatus nodes visited
+        | Seq.null nodes = return () -- should not happen
+        | otherwise = do
+            nowCPU <- getCPUTime
+            nowWC  <- getCurrentTime
+            let spentCPU = (nowCPU - startCPU) `div` 10^(12::Int)
+            let spentWC  = round (nowWC `diffUTCTime` startWC) :: Int
 
-              let vs = map ndValue (F.toList nodes)
-                  dualBound =
-                    case dir of
-                      OptMin -> minimum vs
-                      OptMax -> maximum vs
+            let vs = map ndValue (F.toList nodes)
+                dualBound =
+                  case dir of
+                    OptMin -> minimum vs
+                    OptMax -> maximum vs
 
-              primalBound <- do
-                x <- readTVarIO (mipBest solver)
-                return $ case x of
-                  Nothing -> Nothing
-                  Just node -> Just (ndValue node)
+            primalBound <- do
+              x <- readTVarIO (mipBest solver) -- TODO: 引数にするようにした方が良い?
+              return $ case x of
+                Nothing -> Nothing
+                Just node -> Just (ndValue node)
 
-              (p,g) <- case primalBound of
-                     Nothing -> return ("not yet found", "--")
-                     Just val -> do
-                       p <- showValue solver val
-                       let g = if val == 0
-                               then "inf"
-                               else printf "%.2f%%" (fromRational (abs (dualBound - val) * 100 / abs val) :: Double)
-                       return (p, g)
-              d <- showValue solver dualBound
+            (p,g) <- case primalBound of
+                   Nothing -> return ("not yet found", "--")
+                   Just val -> do
+                     p <- showValue solver val
+                     let g = if val == 0
+                             then "inf"
+                             else printf "%.2f%%" (fromRational (abs (dualBound - val) * 100 / abs val) :: Double)
+                     return (p, g)
+            d <- showValue solver dualBound
  
-              let range =
-                    case dir of
-                      OptMin -> p ++ " >= " ++ d
-                      OptMax -> p ++ " <= " ++ d
+            let range =
+                  case dir of
+                    OptMin -> p ++ " >= " ++ d
+                    OptMax -> p ++ " <= " ++ d
 
-              log solver $ printf "cpu time = %d sec; wc time = %d sec; active nodes = %d; visited nodes = %d; %s; gap = %s"
-                spentCPU spentWC (Seq.length nodes) visited range g
-              threadDelay (2*1000*1000) -- 2s
-              loop
-    loop
+            log solver $ printf "cpu time = %d sec; wc time = %d sec; active nodes = %d; visited nodes = %d; %s; gap = %s"
+              spentCPU spentWC (Seq.length nodes) visited range g
 
-  -- join
-  let wait = isCompleted >>= guard >> return Nothing
-  let loop :: (forall a. IO a -> IO a) -> IO ()
-      loop restore = do
-        ret <- try $ restore $ atomically $ wait `orElse` (liftM Just (readTMVar ex))
+  mask $ \(restore :: forall a. IO a -> IO a) -> do
+    threads <- replicateM nthreads $ do
+      forkIO $ do
+        let loop = do
+              m <- pickNode
+              case m of
+                Nothing -> return ()
+                Just node -> processNode node >> loop
+        ret <- try $ restore loop
         case ret of
-          Right Nothing  -> return ()
-          Right (Just (e::SomeException)) -> do
-            mapM_ (\t -> throwTo t e) (th:threads)
-            throwIO e
-          Left (e::SomeException) -> do
-            mapM_ (\t -> throwTo t e) (th:threads)
-            throwIO e
-  mask loop
+          Left e -> atomically (putTMVar ex e)
+          Right _ -> return ()    
+
+    let propagateException :: SomeException -> IO ()
+        propagateException e = do
+          mapM_ (\t -> throwTo t e) threads
+          throwIO e
+
+    let loop = do
+          ret <- try $ timeout (2*1000*1000) $ restore $ atomically $ msum
+            [ do node <- readTChan solchan
+                 ret <- do
+                   old <- readTVar (mipBest solver)
+                   case old of
+                     Nothing -> do
+                       writeTVar (mipBest solver) (Just node)
+                       return True
+                     Just best -> do
+                       let isBetter = if dir==OptMin then ndValue node < ndValue best else ndValue node > ndValue best
+                       when isBetter $ writeTVar (mipBest solver) (Just node)
+                       return isBetter
+                 return $ do
+                   when ret $ do
+                     let lp = ndLP node
+                     m <- Simplex2.model lp
+                     update m (ndValue node)
+                   loop
+            , do b <- isCompleted
+                 guard b
+                 return $ return ()
+            , do e <- readTMVar ex
+                 return $ propagateException e
+            ]
+
+          case ret of
+            Left (e::SomeException) -> propagateException e
+            Right (Just m) -> m
+            Right Nothing -> do -- timeout
+              (nodes, visited) <- atomically $ do
+                nodes    <- readTVar pool
+                athreads <- readTVar activeThreads
+                visited  <- readTVar visitedNodes
+                return (Seq.fromList (Map.elems athreads) Seq.>< nodes, visited)
+              printStatus nodes visited
+              loop
+
+    loop
 
 model :: Solver -> IO Model
 model solver = do

@@ -14,6 +14,7 @@
 module Main where
 
 import Control.Monad
+import Control.Concurrent
 import Data.Array.IArray
 import Data.Char
 import Data.List
@@ -223,7 +224,11 @@ run solver opt lp printModel = do
       mip <- MIPSolver2.newSolver solver ivs2
       MIPSolver2.setShowRational mip printRat
       MIPSolver2.setLogger mip logger
-      MIPSolver2.setNThread mip nthreads
+      ncap <- getNumCapabilities
+      MIPSolver2.setNThread mip $
+        if nthreads >= 1
+        then min ncap nthreads
+        else ncap
       let update m val = do
             putStrLn $ "o " ++ showValue val
       ret <- MIPSolver2.optimize mip update
