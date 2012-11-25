@@ -438,21 +438,16 @@ solveMUS opt solver gcnf = do
           mus <- MUS.findMUSAssumptions solver opt2
           musPrintSol stdout (map (sel2idx !) mus)
         else do
-          ref <- newIORef []
           let opt2 = CAMUS.defaultOptions
                      { CAMUS.optLogger = \s -> do
                          putStrLn $ "c " ++ s
                          hFlush stdout
                      , CAMUS.optCallback = \mcs -> do
-                         modifyIORef ref (mcs:)
-                         let mcs2 = map (sel2idx !) mcs
+                         let mcs2 = sort $ map (sel2idx !) mcs
                          putStrLn $ "c MCS found: " ++ show mcs2
                          hFlush stdout
                      }
-          CAMUS.enumMCSes solver (map snd tbl) opt2    
-          putStrLn "c MCS enumeration done"
-          hFlush stdout
-          muses <- liftM CAMUS.allMUSes $ readIORef ref
+          muses <- CAMUS.allMUSAssumptions solver (map snd tbl) opt2
           forM_ (zip [(1::Int)..] muses) $ \(i, mus) -> do
             putStrLn $ "c MUS #" ++ show i
             musPrintSol stdout (sort (map (sel2idx !) mus))

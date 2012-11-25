@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable
+-- Portability :  portable
 --
 -----------------------------------------------------------------------------
 module SAT.CAMUS
@@ -14,9 +14,10 @@ module SAT.CAMUS
   , MCS
   , Options (..)
   , defaultOptions
-  , enumMCSes
-  , allMCSes
-  , allMUSes
+  , allMCSAssumptions
+  , allMUSAssumptions
+  , enumMCSAssumptions
+  , hittingSetDual
   ) where
 
 import Control.Monad
@@ -29,11 +30,11 @@ import SAT
 type MUS = [Lit]
 type MCS = [Lit]
 
--- | Options for 'enumMCSes' function
+-- | Options for 'enumMCSAssumptions', 'allMCSAssumptions', 'allMUSAssumptions'
 data Options
   = Options
-  { optLogger   :: String -> IO ()
-  , optCallback :: MCS -> IO ()
+  { optLogger     :: String -> IO ()
+  , optCallback   :: MCS -> IO ()
   }
 
 -- | default 'Options' value
@@ -44,8 +45,8 @@ defaultOptions =
   , optCallback   = \_ -> return ()
   }
 
-enumMCSes :: SAT.Solver -> [Lit] -> Options -> IO ()
-enumMCSes solver sels opt = loop 1
+enumMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ()
+enumMCSAssumptions solver sels opt = loop 1
   where
     log :: String -> IO ()
     log = optLogger opt
@@ -53,6 +54,7 @@ enumMCSes solver sels opt = loop 1
     callback :: MCS -> IO ()
     callback = optCallback opt
 
+    loop :: Integer -> IO ()
     loop k = do
       log $ "CAMUS: k = " ++ show k
       ret <- SAT.solve solver
@@ -74,19 +76,31 @@ enumMCSes solver sels opt = loop 1
 evalLit :: Lit -> Model -> Bool
 evalLit l m = m ! SAT.litVar l == SAT.litPolarity l
 
-allMCSes :: SAT.Solver -> [Lit] -> IO [MCS]
-allMCSes solver sels = do
+allMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MCS]
+allMCSAssumptions solver sels opt = do
   ref <- newIORef []  
-  let opt =
-        defaultOptions
-        { optCallback = \mcs -> modifyIORef ref (mcs:)
+  let opt2 =
+        opt
+        { optCallback = \mcs -> do
+            modifyIORef ref (mcs:)
+            optCallback opt mcs
         }
-  enumMCSes solver sels opt
+  enumMCSAssumptions solver sels opt2
   readIORef ref
 
--- FIXME: nub
-allMUSes :: [MCS] -> [MUS]
-allMUSes mcses = nub $ f (map IS.fromList mcses) []
+allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MCS]
+allMUSAssumptions solver sels opt = do
+  log "CAMUS: MCS enumeration begins"
+  mcses <- allMCSAssumptions solver sels opt
+  log "CAMUS: MCS enumeration done"
+  return $ hittingSetDual mcses
+  where
+    log :: String -> IO ()
+    log = optLogger opt
+
+-- FIXME: remove nub
+hittingSetDual :: [MCS] -> [MUS]
+hittingSetDual mcses = nub $ f (map IS.fromList mcses) []
   where
     f :: [IS.IntSet] -> [Int] -> [MUS]
     f [] mus = return mus

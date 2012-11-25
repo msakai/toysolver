@@ -509,7 +509,7 @@ p cnf 3 6
 -3 0
 -}
 
-case_camus_allMCSes = do
+case_camus_allMCSAssumptions = do
   solver <- newSolver
   [x1,x2,x3] <- newVars solver 3
   sels@[y1,y2,y3,y4,y5,y6] <- newVars solver 6
@@ -519,15 +519,31 @@ case_camus_allMCSes = do
   addClause solver [-y4, -x2]
   addClause solver [-y5, -x1, x3]
   addClause solver [-y6, -x3]
-  actual <- CAMUS.allMCSes solver sels
+  actual <- CAMUS.allMCSAssumptions solver sels CAMUS.defaultOptions
   let actual'   = Set.fromList $ map IS.fromList actual
       expected  = [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
       expected' = Set.fromList $ map (IS.fromList . map (+3)) expected
   actual' @?= expected'
 
-case_camus_allMUSes = actual' @?= expected'
+case_camus_allMUSAssumptions = do
+  solver <- newSolver
+  [x1,x2,x3] <- newVars solver 3
+  sels@[y1,y2,y3,y4,y5,y6] <- newVars solver 6
+  addClause solver [-y1, x1]
+  addClause solver [-y2, -x1]
+  addClause solver [-y3, -x1, x2]
+  addClause solver [-y4, -x2]
+  addClause solver [-y5, -x1, x3]
+  addClause solver [-y6, -x3]
+  actual <- CAMUS.allMUSAssumptions solver sels CAMUS.defaultOptions
+  let actual'   = Set.fromList $ map IS.fromList actual
+      expected  = [[1,2], [1,3,4], [1,5,6]]
+      expected' = Set.fromList $ map (IS.fromList . map (+3)) expected
+  actual' @?= expected'
+
+case_camus_hittingSetDual = actual' @?= expected'
   where
-    actual    = CAMUS.allMUSes [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
+    actual    = CAMUS.hittingSetDual [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
     actual'   = Set.fromList $ map IS.fromList actual
     expected  = [[1,2], [1,3,4], [1,5,6]]
     expected' = Set.fromList $ map IS.fromList expected
