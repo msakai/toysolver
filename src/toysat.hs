@@ -223,78 +223,84 @@ main = do
   startWC  <- getCurrentTime
   args <- getArgs
   case getOpt Permute options args of
-    (o,args2,[]) -> do
-      printSysInfo
-#ifdef __GLASGOW_HASKELL__
-      fullArgs <- getFullArgs
-#else
-      let fullArgs = args
-#endif
-      printf "c command line = %s\n" (show fullArgs)
-      let opt = foldl (flip id) defaultOptions o      
-          timelim = optTimeout opt * 10^(6::Int)
-
-      ret <- timeout (if timelim > 0 then timelim else (-1)) $ do
-         solver <- newSolver opt
-         let mode =
-               case optMode opt of
-                 Just m  -> m
-                 Nothing ->
-                   case args2 of
-                     [] -> ModeHelp
-                     fname : _ ->
-                       case map toLower (takeExtension fname) of
-                         ".cnf"  -> ModeSAT
-                         ".gcnf" -> ModeMUS
-                         ".opb"  -> ModePB
-                         ".wbo"  -> ModeWBO
-                         ".wcnf" -> ModeMaxSAT
-                         ".lp"   -> ModeLP
-                         ".mps"  -> ModeLP
-                         _ -> ModeSAT
-         case mode of
-           ModeHelp    -> showHelp stdout
-           ModeVersion -> hPutStrLn stdout (showVersion version)
-           ModeSAT     -> mainSAT opt solver args2
-           ModeMUS     -> mainMUS opt solver args2
-           ModePB      -> mainPB opt solver args2
-           ModeWBO     -> mainWBO opt solver args2
-           ModeMaxSAT  -> mainMaxSAT opt solver args2
-           ModeLP      -> mainLP opt solver args2
-
-      when (isNothing ret) $ do
-        putStrLn "c TIMEOUT"
-      endCPU <- getCPUTime
-      endWC  <- getCurrentTime
-      printf "c total CPU time = %.3fs\n" (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
-      printf "c total wall clock time = %.3fs\n" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
-
-#if defined(__GLASGOW_HASKELL__) && MIN_VERSION_base(4,5,0)
-      stat <- Stats.getGCStats
-      printf "c GCStats:\n"
-      printf "c   bytesAllocated = %d\n"         $ Stats.bytesAllocated stat
-      printf "c   numGcs = %d\n"                 $ Stats.numGcs stat
-      printf "c   maxBytesUsed = %d\n"           $ Stats.maxBytesUsed stat
-      printf "c   numByteUsageSamples = %d\n"    $ Stats.numByteUsageSamples stat
-      printf "c   cumulativeBytesUsed = %d\n"    $ Stats.cumulativeBytesUsed stat
-      printf "c   bytesCopied = %d\n"            $ Stats.bytesCopied stat
-      printf "c   currentBytesUsed = %d\n"       $ Stats.currentBytesUsed stat
-      printf "c   currentBytesSlop = %d\n"       $ Stats.currentBytesSlop stat
-      printf "c   maxBytesSlop = %d\n"           $ Stats.maxBytesSlop stat
-      printf "c   peakMegabytesAllocated = %d\n" $ Stats.peakMegabytesAllocated stat
-      printf "c   mutatorCpuSeconds = %5.2f\n"   $ Stats.mutatorCpuSeconds stat
-      printf "c   mutatorWallSeconds = %5.2f\n"  $ Stats.mutatorWallSeconds stat
-      printf "c   gcCpuSeconds = %5.2f\n"        $ Stats.gcCpuSeconds stat
-      printf "c   gcWallSeconds = %5.2f\n"       $ Stats.gcWallSeconds stat
-      printf "c   cpuSeconds = %5.2f\n"          $ Stats.cpuSeconds stat
-      printf "c   wallSeconds = %5.2f\n"         $ Stats.wallSeconds stat
-      printf "c   parAvgBytesCopied = %d\n"      $ Stats.parAvgBytesCopied stat
-      printf "c   parMaxBytesCopied = %d\n"      $ Stats.parMaxBytesCopied stat
-#endif
-
-    (_,_,errs) -> do
+    (_,_,errs@(_:_)) -> do
       mapM_ putStrLn errs
       exitFailure
+
+    (o,args2,[]) -> do
+      let opt = foldl (flip id) defaultOptions o      
+          mode =
+            case optMode opt of
+              Just m  -> m
+              Nothing ->
+                case args2 of
+                  [] -> ModeHelp
+                  fname : _ ->
+                    case map toLower (takeExtension fname) of
+                      ".cnf"  -> ModeSAT
+                      ".gcnf" -> ModeMUS
+                      ".opb"  -> ModePB
+                      ".wbo"  -> ModeWBO
+                      ".wcnf" -> ModeMaxSAT
+                      ".lp"   -> ModeLP
+                      ".mps"  -> ModeLP
+                      _ -> ModeSAT
+
+      case mode of
+        ModeHelp    -> showHelp stdout
+        ModeVersion -> hPutStrLn stdout (showVersion version)
+        _ -> do
+          printSysInfo
+#ifdef __GLASGOW_HASKELL__
+          fullArgs <- getFullArgs
+#else
+          let fullArgs = args
+#endif
+          printf "c command line = %s\n" (show fullArgs)
+
+          let timelim = optTimeout opt * 10^(6::Int)
+    
+          ret <- timeout (if timelim > 0 then timelim else (-1)) $ do
+             solver <- newSolver opt
+             case mode of
+               ModeHelp    -> showHelp stdout
+               ModeVersion -> hPutStrLn stdout (showVersion version)
+               ModeSAT     -> mainSAT opt solver args2
+               ModeMUS     -> mainMUS opt solver args2
+               ModePB      -> mainPB opt solver args2
+               ModeWBO     -> mainWBO opt solver args2
+               ModeMaxSAT  -> mainMaxSAT opt solver args2
+               ModeLP      -> mainLP opt solver args2
+    
+          when (isNothing ret) $ do
+            putStrLn "c TIMEOUT"
+          endCPU <- getCPUTime
+          endWC  <- getCurrentTime
+          printf "c total CPU time = %.3fs\n" (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
+          printf "c total wall clock time = %.3fs\n" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
+
+#if defined(__GLASGOW_HASKELL__) && MIN_VERSION_base(4,5,0)
+          stat <- Stats.getGCStats
+          printf "c GCStats:\n"
+          printf "c   bytesAllocated = %d\n"         $ Stats.bytesAllocated stat
+          printf "c   numGcs = %d\n"                 $ Stats.numGcs stat
+          printf "c   maxBytesUsed = %d\n"           $ Stats.maxBytesUsed stat
+          printf "c   numByteUsageSamples = %d\n"    $ Stats.numByteUsageSamples stat
+          printf "c   cumulativeBytesUsed = %d\n"    $ Stats.cumulativeBytesUsed stat
+          printf "c   bytesCopied = %d\n"            $ Stats.bytesCopied stat
+          printf "c   currentBytesUsed = %d\n"       $ Stats.currentBytesUsed stat
+          printf "c   currentBytesSlop = %d\n"       $ Stats.currentBytesSlop stat
+          printf "c   maxBytesSlop = %d\n"           $ Stats.maxBytesSlop stat
+          printf "c   peakMegabytesAllocated = %d\n" $ Stats.peakMegabytesAllocated stat
+          printf "c   mutatorCpuSeconds = %5.2f\n"   $ Stats.mutatorCpuSeconds stat
+          printf "c   mutatorWallSeconds = %5.2f\n"  $ Stats.mutatorWallSeconds stat
+          printf "c   gcCpuSeconds = %5.2f\n"        $ Stats.gcCpuSeconds stat
+          printf "c   gcWallSeconds = %5.2f\n"       $ Stats.gcWallSeconds stat
+          printf "c   cpuSeconds = %5.2f\n"          $ Stats.cpuSeconds stat
+          printf "c   wallSeconds = %5.2f\n"         $ Stats.wallSeconds stat
+          printf "c   parAvgBytesCopied = %d\n"      $ Stats.parAvgBytesCopied stat
+          printf "c   parMaxBytesCopied = %d\n"      $ Stats.parMaxBytesCopied stat
+#endif
 
 showHelp :: Handle -> IO ()
 showHelp h = hPutStrLn h (usageInfo header options)
