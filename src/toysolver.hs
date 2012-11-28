@@ -40,9 +40,13 @@ import Data.OptDir
 import qualified Data.LA as LA
 import qualified Data.Polynomial as P
 import qualified Data.AlgebraicNumber as AReal
-import qualified OmegaTest
-import qualified Cooper
-import qualified MIPSolverHL
+import qualified Algorithm.OmegaTest as OmegaTest
+import qualified Algorithm.Cooper as Cooper
+import qualified Algorithm.MIPSolverHL as MIPSolverHL
+import qualified Algorithm.Simplex2 as Simplex2
+import qualified Algorithm.MIPSolver2 as MIPSolver2
+import qualified Algorithm.CAD as CAD
+import qualified Algorithm.ContiTraverso as ContiTraverso
 import qualified Text.LPFile as LP
 import qualified Text.MPSFile as MPS
 import qualified Text.PBFile as PBFile
@@ -51,10 +55,6 @@ import qualified Text.GurobiSol as GurobiSol
 import qualified Converter.CNF2LP as CNF2LP
 import qualified Converter.PB2LP as PB2LP
 import qualified Converter.MaxSAT2LP as MaxSAT2LP
-import qualified Simplex2
-import qualified MIPSolver2
-import qualified CAD
-import qualified ContiTraverso
 import SAT.Printer
 import qualified SAT.Types as SAT
 import Version

@@ -13,9 +13,11 @@ import Test.Framework.Providers.HUnit
 import Text.Printf
 
 import Data.Linear
-import Simplex2
-import MIPSolver2
 import qualified Data.LA as LA
+import qualified Algorithm.Simplex2 as Simplex2
+import Algorithm.Simplex2
+import qualified Algorithm.MIPSolver2 as MIPSolver2
+--import Algorithm.MIPSolver2
 
 ------------------------------------------------------------------------
 

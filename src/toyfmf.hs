@@ -20,7 +20,7 @@ import Data.Ratio
 import System.Environment
 import System.IO
 import qualified Codec.TPTP as TPTP
-import qualified FOLModelFinder as MF
+import qualified Algorithm.FOLModelFinder as MF
 
 main :: IO ()
 main = do

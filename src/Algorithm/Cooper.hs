@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Cooper
+-- Module      :  Algorithm.Cooper
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -23,7 +23,7 @@
 -- * <http://hackage.haskell.org/package/presburger>
 --
 -----------------------------------------------------------------------------
-module Cooper
+module Algorithm.Cooper
     (
     -- * Language of presburger arithmetics
       ExprZ
@@ -60,7 +60,7 @@ import Data.Expr
 import Data.Formula
 import Data.Linear
 import qualified Data.LA as LA
-import qualified FourierMotzkin as FM
+import qualified Algorithm.FourierMotzkin as FM
 
 -- ---------------------------------------------------------------------------
 

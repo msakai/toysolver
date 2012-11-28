@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  BoundsInference
+-- Module      :  Algorithm.BoundsInference
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -12,7 +12,7 @@
 -- Tightening variable bounds by constraint propagation.
 -- 
 -----------------------------------------------------------------------------
-module BoundsInference
+module Algorithm.BoundsInference
   ( BoundsEnv
   , inferBounds
   , LA.computeInterval

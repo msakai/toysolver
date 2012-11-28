@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  MIPSolverHL
+-- Module      :  Algorithm.MIPSolverHL
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 --
@@ -25,7 +25,7 @@
 --   <http://projecteuclid.org/euclid.bams/1183522679>
 -----------------------------------------------------------------------------
 
-module MIPSolverHL
+module Algorithm.MIPSolverHL
   ( module Data.Expr
   , module Data.Formula
   , module Data.OptDir
@@ -50,10 +50,11 @@ import Data.ArithRel
 import Data.Formula (Atom)
 import Data.Linear
 import qualified Data.LA as LA
-import qualified Simplex
+import qualified Algorithm.Simplex as Simplex
+import qualified Algorithm.LPSolver as LPSolver
+import Algorithm.LPSolver
+import qualified Algorithm.OmegaTest as OmegaTest
 import Util (isInteger, fracPart)
-import LPSolver
-import qualified OmegaTest
 
 -- ---------------------------------------------------------------------------
 

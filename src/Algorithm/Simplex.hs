@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Simplex
+-- Module      :  Algorithm.Simplex
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -17,7 +17,7 @@
 -- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
 --
 -----------------------------------------------------------------------------
-module Simplex
+module Algorithm.Simplex
   ( module Data.OptDir
   , Tableau
   , RowIndex
@@ -260,18 +260,18 @@ toCSV showCell tbl = unlines . map (concat . intersperse ",") $ header : body
     header = "" : map colName cols ++ [""]
 
     body :: [[String]]
-    body = [showRow i (Simplex.lookupRow i tbl) | i <- rows]
+    body = [showRow i (lookupRow i tbl) | i <- rows]
 
-    rows :: [Simplex.RowIndex]
-    rows = IM.keys (IM.delete Simplex.objRow tbl) ++ [Simplex.objRow]
+    rows :: [RowIndex]
+    rows = IM.keys (IM.delete objRow tbl) ++ [objRow]
 
-    cols :: [Simplex.ColIndex]
+    cols :: [ColIndex]
     cols = [0..colMax]
       where
         colMax = maximum (-1 : [c | (row, _) <- IM.elems tbl, c <- IM.keys row])
 
     rowName :: RowIndex -> String
-    rowName i = if i==Simplex.objRow then "obj" else "x" ++ show i
+    rowName i = if i==objRow then "obj" else "x" ++ show i
 
     colName :: ColIndex -> String
     colName j = "x" ++ show j

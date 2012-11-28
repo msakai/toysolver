@@ -1,7 +1,7 @@
 {-# LANGUAGE DoAndIfThenElse, TypeSynonymInstances, FlexibleContexts, FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Simplex2
+-- Module      :  Algorithm.Simplex2
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -26,7 +26,7 @@
 --   <http://yices.csl.sri.com/sri-csl-06-01.pdf>
 --
 -----------------------------------------------------------------------------
-module Simplex2
+module Algorithm.Simplex2
   (
   -- * The @Solver@ type
     Solver

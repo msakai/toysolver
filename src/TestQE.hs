@@ -19,12 +19,12 @@ import qualified Data.LA as LA
 import qualified Data.Polynomial as P
 import Data.OptDir
 
-import qualified FourierMotzkin
-import qualified OmegaTest
-import qualified Cooper
-import qualified CAD
-import qualified Simplex2
-import qualified ContiTraverso
+import qualified Algorithm.FourierMotzkin as FourierMotzkin
+import qualified Algorithm.OmegaTest as OmegaTest
+import qualified Algorithm.Cooper as Cooper
+import qualified Algorithm.CAD as CAD
+import qualified Algorithm.Simplex2 as Simplex2
+import qualified Algorithm.ContiTraverso as ContiTraverso
 
 ------------------------------------------------------------------------
 

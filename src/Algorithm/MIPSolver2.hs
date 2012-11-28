@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  MIPSolver2
+-- Module      :  Algorithm.MIPSolver2
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -32,7 +32,7 @@
 --   <http://www.jstor.org/stable/3009435>
 -- 
 -----------------------------------------------------------------------------
-module MIPSolver2
+module Algorithm.MIPSolver2
   (
   -- * The @Solver@ type
     Solver
@@ -74,8 +74,8 @@ import Text.Printf
 
 import qualified Data.LA as LA
 import Data.ArithRel ((.<=.), (.>=.))
-import qualified Simplex2
-import Simplex2 (OptResult (..), Var, Model)
+import qualified Algorithm.Simplex2 as Simplex2
+import Algorithm.Simplex2 (OptResult (..), Var, Model)
 import Data.Linear
 import Util (isInteger, fracPart)
 

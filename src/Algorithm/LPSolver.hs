@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  LPSolver
+-- Module      :  Algorithm.LPSolver
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -18,7 +18,7 @@
 --
 -----------------------------------------------------------------------------
 
-module LPSolver where
+module Algorithm.LPSolver where
 
 import Control.Monad
 import Control.Monad.State
@@ -31,8 +31,8 @@ import Data.ArithRel
 import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Interval as Interval
-import qualified Simplex
-import qualified BoundsInference as BI
+import qualified Algorithm.Simplex as Simplex
+import qualified Algorithm.BoundsInference as BI
 
 -- ---------------------------------------------------------------------------
 -- LP Monad

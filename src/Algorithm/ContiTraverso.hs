@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ContiTraverso
+-- Module      :  Algorithm.ContiTraverso
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -24,7 +24,7 @@
 -- 
 --
 -----------------------------------------------------------------------------
-module ContiTraverso
+module Algorithm.ContiTraverso
   ( solve
   , solve'
   ) where
@@ -43,7 +43,7 @@ import Data.Expr (Var, VarSet, Variables (..), Model)
 import Data.OptDir
 import Data.Polynomial
 import Data.Polynomial.GBase
-import qualified LPUtil
+import qualified Algorithm.LPUtil as LPUtil
 
 solve :: MonomialOrder Var -> OptDir -> LA.Expr Rational -> [LA.Atom Rational] -> Maybe (Model Integer)
 solve cmp dir obj cs = do

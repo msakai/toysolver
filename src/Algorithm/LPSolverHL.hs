@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  LPSolverHL
+-- Module      :  Algorithm.LPSolverHL
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -14,7 +14,7 @@
 --
 -----------------------------------------------------------------------------
 
-module LPSolverHL
+module Algorithm.LPSolverHL
   ( module Data.Expr
   , module Data.Formula
   , minimize
@@ -34,8 +34,8 @@ import Data.Expr
 import Data.ArithRel
 import Data.Formula (Atom)
 import qualified Data.LA as LA
-import qualified Simplex
-import LPSolver
+import qualified Algorithm.Simplex as Simplex
+import Algorithm.LPSolver
 
 -- ---------------------------------------------------------------------------
 

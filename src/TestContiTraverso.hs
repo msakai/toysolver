@@ -10,7 +10,7 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 
-import ContiTraverso
+import Algorithm.ContiTraverso
 
 import Data.ArithRel
 import Data.Linear

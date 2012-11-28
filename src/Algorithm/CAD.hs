@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  CAD
+-- Module      :  Algorithm.CAD
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -24,7 +24,7 @@
 --    <http://cstheory.blogoverflow.com/2012/02/something-you-should-know-about-quantifier-elimination-part-ii/>
 --
 -----------------------------------------------------------------------------
-module CAD
+module Algorithm.CAD
   (
   -- * Basic data structures
     Point (..)

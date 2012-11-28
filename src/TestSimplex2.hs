@@ -11,8 +11,8 @@ import Test.Framework.Providers.HUnit
 import Text.Printf
 
 import Data.Linear
-import Simplex2
 import qualified Data.LA as LA
+import Algorithm.Simplex2
 
 case_test1 :: IO ()
 case_test1 = do

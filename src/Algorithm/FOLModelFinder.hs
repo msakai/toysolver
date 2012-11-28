@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  FOLModelFinder
+-- Module      :  Algorithm.FOLModelFinder
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -19,7 +19,7 @@
 --   <http://www.cs.miami.edu/~geoff/Conferences/CADE/Archive/CADE-19/WS4/04.pdf>
 --
 -----------------------------------------------------------------------------
-module FOLModelFinder
+module Algorithm.FOLModelFinder
   (
   -- * Formula types
     Var

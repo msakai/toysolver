@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  CongruenceClosure
+-- Module      :  Algorithm.CongruenceClosure
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -16,7 +16,7 @@
 --   <http://www.lsi.upc.edu/~oliveras/espai/papers/IC.pdf>
 --
 -----------------------------------------------------------------------------
-module CongruenceClosure
+module Algorithm.CongruenceClosure
   ( Solver
   , Var
   , FlatTerm (..)

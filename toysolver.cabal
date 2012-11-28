@@ -18,7 +18,7 @@ Extra-Source-Files:
    src/TestAReal2.hs
    src/pbverify.hs
    src/pigeonhole.hs
-   src/Wang.hs
+   src/Algorithm/Wang.hs
    samples/gcnf/*.gcnf
    samples/lp/*.lp
    samples/lp/error/*.lp
@@ -59,13 +59,16 @@ Library
      DoAndIfThenElse
      CPP
   Exposed-Modules:
-     CAD
-     CongruenceClosure
-     ContiTraverso
+     Algorithm.CAD
+     Algorithm.CongruenceClosure
+     Algorithm.ContiTraverso
+     Algorithm.Cooper
+     Algorithm.FourierMotzkin
+     Algorithm.OmegaTest
+     Algorithm.FOLModelFinder
      Converter.CNF2LP
      Converter.ObjType
      Converter.PB2LP
-     Cooper
      Data.AlgebraicNumber
      Data.ArithRel
      Data.Delta
@@ -81,9 +84,6 @@ Library
      Data.Polynomial.GBase
      Data.Polynomial.Lagrange
      Data.Polynomial.Sturm
-     FOLModelFinder
-     FourierMotzkin
-     OmegaTest
      SAT
      SAT.Integer
      SAT.MUS
@@ -100,16 +100,16 @@ Library
      Text.PBFile
      Text.SDPFile
   Other-Modules:
-     BoundsInference
      Data.IndexedPriorityQueue
      Data.SeqQueue
-     LPSolver
-     LPSolverHL
-     LPUtil
-     MIPSolverHL
-     MIPSolver2
-     Simplex
-     Simplex2
+     Algorithm.BoundsInference
+     Algorithm.LPSolver
+     Algorithm.LPSolverHL
+     Algorithm.LPUtil
+     Algorithm.MIPSolverHL
+     Algorithm.MIPSolver2
+     Algorithm.Simplex
+     Algorithm.Simplex2
      Util
      Version
      Paths_toysolver
@@ -141,19 +141,19 @@ Executable toysolver
      Text.PBFile
      Text.MaxSAT
      Text.GurobiSol
-     BoundsInference
-     Cooper
-     FourierMotzkin
-     ContiTraverso
-     CAD
-     LPSolver
-     LPSolverHL
-     LPUtil
-     MIPSolverHL
-     OmegaTest
-     Simplex
-     Simplex2
-     MIPSolver2
+     Algorithm.BoundsInference
+     Algorithm.Cooper
+     Algorithm.FourierMotzkin
+     Algorithm.ContiTraverso
+     Algorithm.CAD
+     Algorithm.LPSolver
+     Algorithm.LPSolverHL
+     Algorithm.LPUtil
+     Algorithm.MIPSolverHL
+     Algorithm.OmegaTest
+     Algorithm.Simplex
+     Algorithm.Simplex2
+     Algorithm.MIPSolver2
      Util
      Version
   Build-Depends: base >=4.4 && <5, mtl, containers, array, filepath, parsec, OptDir, deepseq, stm >=2.3, parse-dimacs, heaps, primes, time
@@ -217,7 +217,7 @@ Executable toyfmf
      Data.LBool
      Data.IndexedPriorityQueue
      Data.SeqQueue
-     FOLModelFinder
+     Algorithm.FOLModelFinder
      SAT
      SAT.Types
      Version

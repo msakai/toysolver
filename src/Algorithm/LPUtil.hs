@@ -1,4 +1,4 @@
-module LPUtil
+module Algorithm.LPUtil
   ( toStandardForm
   , toStandardForm'
   ) where
@@ -15,7 +15,7 @@ import Data.ArithRel
 import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Interval as Interval
-import qualified BoundsInference as BI
+import qualified Algorithm.BoundsInference as BI
 
 toStandardForm
   :: (LA.Expr Rational, [Rel (LA.Expr Rational)])

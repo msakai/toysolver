@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  FourierMotzkin
+-- Module      :  Algorithm.FourierMotzkin
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -17,7 +17,7 @@
 -- * <http://users.cecs.anu.edu.au/~michaeln/pubs/arithmetic-dps.pdf>
 --
 -----------------------------------------------------------------------------
-module FourierMotzkin
+module Algorithm.FourierMotzkin
     ( Lit (..)
     , project
     , projectN

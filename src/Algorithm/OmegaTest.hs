@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  OmegaTest
+-- Module      :  Algorithm.OmegaTest
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -25,7 +25,7 @@
 -- * <http://hackage.haskell.org/package/Omega>
 --
 -----------------------------------------------------------------------------
-module OmegaTest
+module Algorithm.OmegaTest
     ( Model
     , solve
     , solveQFLA
@@ -44,8 +44,8 @@ import Data.Formula
 import Data.Linear
 import qualified Data.LA as LA
 import Util (combineMaybe)
-import qualified FourierMotzkin as FM
-import FourierMotzkin (Lit (..), Rat)
+import qualified Algorithm.FourierMotzkin as FM
+import Algorithm.FourierMotzkin (Lit (..), Rat)
 
 -- ---------------------------------------------------------------------------
 
