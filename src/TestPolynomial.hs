@@ -362,7 +362,7 @@ case_buchberger3 = Set.fromList gbase @?= Set.fromList expected
 
 -- http://www.orcca.on.ca/~reid/NewWeb/DetResDes/node4.html
 -- 時間がかかるので自動実行されるテストケースには含めていない
-test_buchberger4 = Set.fromList gbase @?= Set.fromList expected                   
+disabled_case_buchberger4 = Set.fromList gbase @?= Set.fromList expected                   
   where
     x :: Polynomial Rational Int
     x = var 1
