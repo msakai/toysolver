@@ -37,7 +37,7 @@ sqrt3 :: AReal
   root manipulation
 --------------------------------------------------------------------}
 
-case__rootAdd_sqrt2_sqrt3 = assertBool "" $ abs valP <= 0.0001
+case_rootAdd_sqrt2_sqrt3 = assertBool "" $ abs valP <= 0.0001
   where
     x = var ()
 
@@ -48,7 +48,7 @@ case__rootAdd_sqrt2_sqrt3 = assertBool "" $ abs valP <= 0.0001
     valP = eval (\() -> sqrt 2 + sqrt 3) $ mapCoeff fromRational p
 
 -- bug?
-test_rootAdd = p
+sample_rootAdd = p
   where
     x = var ()    
     p :: UPolynomial Rational
