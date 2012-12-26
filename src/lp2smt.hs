@@ -92,30 +92,41 @@ rel _ LP.Eql x y = list [showString "=", x, y]
 rel _ LP.Le x y = list [showString "<=", x, y]
 rel _ LP.Ge x y = list [showString ">=", x, y]
 
-assert :: ShowS -> ShowS
-assert x = list [showString "assert", x]
-
-constraint :: Bool -> Bool -> Env -> LP.LP -> LP.Constraint -> ShowS
-constraint isYices q env lp LP.Constraint{ LP.constrIndicator = g, LP.constrBody = (e, op, b) } =
-  case g of 
-    Nothing -> c
-    Just (var,val) ->
-      list [ showString "=>"
-           , rel q LP.Eql (expr isYices env lp [LP.Term 1 [var]]) (realNum isYices val)
-           , c
-           ]
+assert :: Bool -> (ShowS, Maybe String) -> ShowS
+assert isYices (x, label) = list [showString "assert", x']
   where
-    c = rel q op (expr isYices env lp e) (realNum isYices b)
+    x' = case label of
+           Just name | not isYices ->
+             list [ showString "!"
+                  , x
+                  , showString ":named"
+                  , showString (encode isYices name)
+                  ]
+           _ -> x
 
-conditions :: Bool -> Bool -> Env -> LP.LP -> [ShowS]
+constraint :: Bool -> Bool -> Env -> LP.LP -> LP.Constraint -> (ShowS, Maybe String)
+constraint isYices q env lp
+  LP.Constraint
+  { LP.constrLabel     = label
+  , LP.constrIndicator = g
+  , LP.constrBody      = (e, op, b)
+  } = (c1, label)
+  where
+    c0 = rel q op (expr isYices env lp e) (realNum isYices b)
+    c1 = case g of
+           Nothing -> c0
+           Just (var,val) ->
+             list [ showString "=>"
+                  , rel q LP.Eql (expr isYices env lp [LP.Term 1 [var]]) (realNum isYices val)
+                  , c0
+                  ]
+
+conditions :: Bool -> Bool -> Env -> LP.LP -> [(ShowS, Maybe String)]
 conditions isYices q env lp = bnds ++ cs ++ ss
   where
     vs = LP.variables lp
     bnds = map bnd (Set.toList vs)
-    bnd v =
-      if v `Set.member` (LP.semiContinuousVariables lp)
-       then or' [list [showString "=", showString v2, realNum isYices 0], and' (s1 ++ s2)]
-       else and' (s1 ++ s2)
+    bnd v = (c1, Nothing)
       where
         v2 = env Map.! v
         v3 = if not isYices && v `Set.member` LP.integerVariables lp
@@ -130,20 +141,25 @@ conditions isYices q env lp = bnds ++ cs ++ ss
                LP.NegInf -> [showString "false"]
                LP.PosInf -> []
                LP.Finite x -> [list [showString "<=", v3, realNum isYices x]]
+        c0 = and' (s1 ++ s2)
+        c1 = if v `Set.member` LP.semiContinuousVariables lp
+             then or' [list [showString "=", showString v2, realNum isYices 0], c0]
+             else c0
     cs = map (constraint isYices q env lp) (LP.constraints lp)
     ss = concatMap sos (LP.sos lp)
-    sos (_, typ, xs) = do
+    sos (label, typ, xs) = do
       (x1,x2) <- case typ of
                     LP.S1 -> pairs $ map fst xs
                     LP.S2 -> nonAdjacentPairs $ map fst $ sortBy (comparing snd) $ xs
-      return $ not' $ and'
-        [ list [showString "/=", v3, realNum isYices 0]
-        | v<-[x1,x2]
-        , let v2 = env Map.! v
-        , let v3 = if not isYices && v `Set.member` LP.integerVariables lp
-                   then list [showString "to_real", showString v2]
-                   else showString v2
-        ]
+      let c = not' $ and'
+            [ list [showString "/=", v3, realNum isYices 0]
+            | v<-[x1,x2]
+            , let v2 = env Map.! v
+            , let v3 = if not isYices && v `Set.member` LP.integerVariables lp
+                       then list [showString "to_real", showString v2]
+                       else showString v2
+            ]
+      return (c, label)
 
 pairs :: [a] -> [(a,a)]
 pairs [] = []
@@ -155,9 +171,9 @@ nonAdjacentPairs _ = []
 
 lp2smt :: LP.LP -> Bool -> Bool -> Bool -> ShowS
 lp2smt lp isYices optimize check =
-  unlinesS $ defs ++ map assert (conditions isYices False env lp)
+  unlinesS $ defs ++ map (assert isYices) (conditions isYices False env lp)
              ++ [ optimalityDef ]
-             ++ [ assert (showString "optimality") | optimize ]
+             ++ [ assert isYices (showString "optimality", Nothing) | optimize ]
              ++ [ if isYices
                   then list [showString "set-evidence!", showString "true"]
                   else list [showString "set-option", showString ":produce-models", showString "false"]
@@ -199,7 +215,7 @@ lp2smt lp isYices optimize check =
           then list [showString $ printf "%s::%s" (env2 Map.! v) t | (v,t) <- ts]
           else list [list [showString (env2 Map.! v), showString t] | (v,t) <- ts]
         body = list [showString "=>"
-                    , and' (conditions isYices True env2 lp)
+                    , and' (map fst (conditions isYices True env2 lp))
                     , list [ showString $ if LP.dir lp == LP.OptMin then "<=" else ">="
                            , expr isYices env lp obj, expr isYices env2 lp obj
                            ]
