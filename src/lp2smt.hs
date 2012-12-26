@@ -12,6 +12,7 @@
 -----------------------------------------------------------------------------
 module Main where
 
+import Data.Char
 import Data.Ord
 import Data.List
 import Data.Ratio
@@ -173,10 +174,10 @@ lp2smt lp isYices optimize check =
     intType  = if isYices then "int" else "Int"
     ts = [(v, realType) | v <- Set.toList real_vs] ++ [(v, intType) | v <- Set.toList int_vs]
     obj = snd (LP.objectiveFunction lp)
-    env = Map.fromList [(v, encode v) | v <- Set.toList vs]
+    env = Map.fromList [(v, encode isYices v) | v <- Set.toList vs]
     -- Note that identifiers of LPFile does not contain '-'.
     -- So that there are no name crash.
-    env2 = Map.fromList [(v, encode v ++ "-2") | v <- Set.toList vs]
+    env2 = Map.fromList [(v, encode isYices (v ++ "-2")) | v <- Set.toList vs]
 
     defs = do
       (v,t) <- ts
@@ -184,7 +185,7 @@ lp2smt lp isYices optimize check =
       return $ showString $
         if isYices
         then printf "(define %s::%s) ; %s"  v2 t v
-        else printf "(declare-fun %s () %s) ; %s" v2 t v
+        else printf "(declare-fun %s () %s)" v2 t
 
     optimalityDef =
       if isYices
@@ -204,9 +205,16 @@ lp2smt lp isYices optimize check =
                            ]
                     ]
 
-encode :: String -> String
-encode s = concatMap f s
+encode :: Bool -> String -> String
+encode isYices s
+  | isYices   = concatMap f s
+  | all p s   = s
+  | any q s   = error $ "cannot encode " ++ show s
+  | otherwise = "|" ++ s ++ "|"
   where
+    p c = isAscii c && (isAlpha c || isDigit c || c `elem` "~!@$%^&*_-+=<>.?/")
+    q c = c == '|' && c == '\\'
+
     -- Note that '[', ']', '\\' does not appear in identifiers of LP file.
     f '(' = "["
     f ')' = "]"
