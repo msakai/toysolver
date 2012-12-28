@@ -59,17 +59,26 @@ Library
      DoAndIfThenElse
      CPP
   Exposed-Modules:
+     Algorithm.BoundsInference
      Algorithm.CAD
      Algorithm.CongruenceClosure
      Algorithm.ContiTraverso
      Algorithm.Cooper
-     Algorithm.FourierMotzkin
-     Algorithm.OmegaTest
      Algorithm.FOLModelFinder
+     Algorithm.FourierMotzkin
+     Algorithm.LPSolver
+     Algorithm.LPSolverHL
+     Algorithm.LPUtil
+     Algorithm.MIPSolverHL
+     Algorithm.MIPSolver2
+     Algorithm.OmegaTest
+     Algorithm.Simplex
+     Algorithm.Simplex2
      Converter.CNF2LP
      Converter.ObjType
      Converter.PB2LP
      Data.AlgebraicNumber
+     Data.AlgebraicNumber.Root
      Data.ArithRel
      Data.Delta
      Data.Expr
@@ -102,14 +111,6 @@ Library
   Other-Modules:
      Data.IndexedPriorityQueue
      Data.SeqQueue
-     Algorithm.BoundsInference
-     Algorithm.LPSolver
-     Algorithm.LPSolverHL
-     Algorithm.LPUtil
-     Algorithm.MIPSolverHL
-     Algorithm.MIPSolver2
-     Algorithm.Simplex
-     Algorithm.Simplex2
      Util
      Version
      Paths_toysolver
@@ -303,79 +304,79 @@ Executable pb2lp
 
 Test-suite TestSAT
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    src
+  HS-Source-Dirs:    test
   Main-is:           TestSAT.hs
-  Build-depends:     base >=4 && <5, array, containers, random, queue, time, test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
+  Build-depends:     base >=4 && <5, array, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,HUnit
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestSimplex2
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    src
+  HS-Source-Dirs:    test
   Main-is:           TestSimplex2.hs
-  Build-depends:     base >=4 && <5, containers, deepseq, queue, time, test-framework,test-framework-th,test-framework-hunit,HUnit,OptDir
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,HUnit
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestMIPSolver2
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    src
+  HS-Source-Dirs:    test
   Main-is:           TestMIPSolver2.hs
-  Build-depends:     base >=4 && <5, containers, deepseq, queue, time, test-framework, test-framework-th, test-framework-hunit, HUnit, OptDir, stm
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework, test-framework-th, test-framework-hunit, HUnit, OptDir, stm
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestPolynomial
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    src
+  HS-Source-Dirs:    test
   Main-is:           TestPolynomial.hs
-  Build-depends:     base >=4 && <5, containers, heaps, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestInterval
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    src
+  HS-Source-Dirs:    test
   Main-is:           TestInterval.hs
-  Build-depends:     base >=4 && <5, containers, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestAReal
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    src
+  HS-Source-Dirs:    test
   Main-is:           TestAReal.hs
-  Build-depends:     base >=4 && <5, containers, heaps, primes, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestQE
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    src
+  HS-Source-Dirs:    test
   Main-is:           TestQE.hs
-  Build-depends:     base >=4 && <5, mtl, containers, deepseq, heaps, primes, OptDir, stm, time, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, toysolver, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestContiTraverso
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    src
+  HS-Source-Dirs:    test
   Main-is:           TestContiTraverso.hs
-  Build-depends:     base >=4 && <5, mtl, containers, deepseq, heaps, primes, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, toysolver, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestLPFile
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    src
+  HS-Source-Dirs:    test
   Main-is:           TestLPFile.hs
-  Build-depends:     base >=4 && <5, mtl, containers, parsec, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestMPSFile
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    src
+  HS-Source-Dirs:    test
   Main-is:           TestMPSFile.hs
-  Build-depends:     base >=4 && <5, mtl, containers, parsec, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestPBFile
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    src
+  HS-Source-Dirs:    test
   Main-is:           TestPBFile.hs
-  Build-depends:     base >=4 && <5, mtl, containers, parsec, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Benchmark BenchmarkSATLIB
