@@ -15,7 +15,6 @@ Extra-Source-Files:
    .travis.yml
    src/TseitinEncode.hs
    src/Data/Polyhedron.hs
-   src/TestAReal2.hs
    src/pbverify.hs
    src/pigeonhole.hs
    src/Algorithm/Wang.hs
@@ -32,6 +31,7 @@ Extra-Source-Files:
    samples/sdp/*.dat-s
    samples/smt/*.smt2
    samples/qbf/*.qdimacs
+   test/TestAReal2.hs
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
 Build-Type: Simple
