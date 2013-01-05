@@ -45,7 +45,13 @@ main = do
              then fmap (LP.parseString "-") getContents
              else LP.parseFile fname
       case ret of
-        Right lp -> putStrLn $ LP2SMT.convert lp (Yices `elem` o) (Optimize `elem` o) (not (NoCheck `elem` o)) ""
+        Right lp -> do
+          let opt = LP2SMT.defaultOptions
+                    { LP2SMT.optLanguage = if Yices `elem` o then LP2SMT.YICES else LP2SMT.SMTLIB2
+                    , LP2SMT.optCheckSAT = not (NoCheck `elem` o)
+                    , LP2SMT.optOptimize = Optimize `elem` o
+                    }
+          putStrLn $ LP2SMT.convert opt lp ""
         Left err -> hPrint stderr err >> exitFailure
     (_,_,errs) -> do
         hPutStrLn stderr $ concat errs ++ usageInfo header options
