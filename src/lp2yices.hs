@@ -17,7 +17,7 @@ import System.Environment
 import System.Exit
 import System.IO
 import qualified Text.LPFile as LP
-import qualified Converter.LP2Yices as LP2Yices
+import qualified Converter.LP2SMT as LP2SMT
 
 data Flag
     = Help
@@ -43,7 +43,13 @@ main = do
              then fmap (LP.parseString "-") getContents
              else LP.parseFile fname
       case ret of
-        Right lp -> putStrLn $ LP2Yices.convert lp (Optimize `elem` o) (not (NoCheck `elem` o)) ""
+        Right lp -> do
+          let opt = LP2SMT.defaultOptions
+                    { LP2SMT.optLanguage = LP2SMT.YICES
+                    , LP2SMT.optCheckSAT = not (NoCheck `elem` o)
+                    , LP2SMT.optOptimize = Optimize `elem` o
+                    }
+          putStrLn $ LP2SMT.convert opt lp ""
         Left err -> hPrint stderr err >> exitFailure
     (_,_,errs) -> do
         hPutStrLn stderr $ concat errs ++ usageInfo header options
