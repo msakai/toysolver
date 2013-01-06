@@ -40,6 +40,8 @@ module Text.LPFile
   , defaultBounds
   , defaultLB
   , defaultUB
+  , getVarInfo
+  , getVarType
   , getBounds
   , integerVariables
   , semiContinuousVariables
@@ -182,9 +184,17 @@ defaultLB = Finite 0
 defaultUB :: BoundExpr
 defaultUB = PosInf
 
--- | lookuping bounds for a variable
+-- | looking up attributes for a variable
+getVarInfo :: LP -> Var -> VarInfo
+getVarInfo lp v = Map.findWithDefault defaultVarInfo v (varInfo lp)
+
+-- | looking up bounds for a variable
+getVarType :: LP -> Var -> VarType
+getVarType lp v = varType $ getVarInfo lp v
+
+-- | looking up bounds for a variable
 getBounds :: LP -> Var -> Bounds
-getBounds lp v = varBounds $ Map.findWithDefault defaultVarInfo v (varInfo lp)
+getBounds lp v = varBounds $ getVarInfo lp v
 
 intersectBounds :: Bounds -> Bounds -> Bounds
 intersectBounds (lb1,ub1) (lb2,ub2) = (max lb1 lb2, min ub1 ub2)

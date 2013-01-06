@@ -94,7 +94,7 @@ expr opt env lp e =
              [ v3
              | v <- vs
              , let v2 = env Map.! v
-             , let v3 = if v `Set.member` LP.integerVariables lp
+             , let v3 = if LP.getVarType lp v == LP.IntegerVariable
                         then toReal opt (showString v2)
                         else showString v2
              ]
@@ -163,7 +163,7 @@ conditions opt q env lp = bnds ++ cs ++ ss
     bnd v = (c1, Nothing)
       where
         v2 = env Map.! v
-        v3 = if v `Set.member` LP.integerVariables lp
+        v3 = if LP.getVarType lp v == LP.IntegerVariable
              then toReal opt (showString v2)
              else showString v2
         (lb,ub) = LP.getBounds lp v
@@ -176,7 +176,7 @@ conditions opt q env lp = bnds ++ cs ++ ss
                LP.PosInf -> []
                LP.Finite x -> [list [showString "<=", v3, realNum opt x]]
         c0 = and' (s1 ++ s2)
-        c1 = if v `Set.member` LP.semiContinuousVariables lp
+        c1 = if LP.getVarType lp v == LP.SemiContinuousVariable
              then or' [list [showString "=", showString v2, realNum opt 0], c0]
              else c0
     cs = map (constraint opt q env lp) (LP.constraints lp)
@@ -189,7 +189,7 @@ conditions opt q env lp = bnds ++ cs ++ ss
             [ list [showString "/=", v3, realNum opt 0]
             | v<-[x1,x2]
             , let v2 = env Map.! v
-            , let v3 = if v `Set.member` LP.integerVariables lp
+            , let v3 = if LP.getVarType lp v == LP.IntegerVariable
                        then toReal opt (showString v2)
                        else showString v2
             ]
