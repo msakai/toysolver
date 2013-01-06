@@ -206,8 +206,7 @@ nonAdjacentPairs _ = []
 convert :: Options -> LP.LP -> ShowS
 convert opt lp =
   unlinesS $ defs ++ map (assert opt) (conditions opt False env lp)
-             ++ [ optimalityDef ]
-             ++ [ assert opt (showString "optimality", Nothing) | optOptimize opt ]
+             ++ [ assert opt (optimality, Nothing) | optOptimize opt ]
              ++ [ case optLanguage opt of
                     SMTLIB2 -> list [showString "set-option", showString ":produce-models", showString "true"]
                     YICES   -> list [showString "set-evidence!", showString "true"]
@@ -242,11 +241,6 @@ convert opt lp =
         case optLanguage opt of
           SMTLIB2 -> printf "(declare-fun %s () %s)" v2 t
           YICES   -> printf "(define %s::%s) ; %s"  v2 t v
-
-    optimalityDef =
-      case optLanguage opt of
-        SMTLIB2 -> list [showString "define-fun", showString "optimality", list [], showString "Bool", optimality]
-        YICES   -> list [showString "define", showString "optimality::bool", optimality]
 
     optimality = list [showString "forall", decl, body]
       where
