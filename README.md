@@ -49,6 +49,12 @@ Usage:
     toysat --maxsat [file.cnf|file.wcnf|-]
     toysat --lp [file.lp|file.mps|-]
 
+PB'12 competition result: 
+
+* toysat placed 2nd in PARTIAL-BIGINT-LIN and SOFT-BIGINT-LIN categories
+* toysat placed 4th in PARTIAL-SMALLINT-LIN and SOFT-SMALLINT-LIN categories
+* toysat placed 8th in OPT-BIGINT-LIN category
+
 ### toyfmf
 
 SAT-based finite model finder for first order logic (FOL).
@@ -57,33 +63,18 @@ Usage:
 
     toyfmf file.tptp size
 
-### lp2yices
+### lpconvert
 
-Converter from LP file to Yices input file.
+Converter between LP/MIP/SAT-related formats
 
-Usage: lp2yice [file.lp|-]
+Usage:
 
-    -h  --help      show help
-        --optimize  output optimiality condition which uses quantifiers
-        --no-check  do not output "(check)"
+    lpconvert -o <outputile> <inputfile>
 
-### cnf2lp
+Supported formats:
 
-Converter from DIMACS .cnf file to .lp file.
-
-Usage: cnf2lp [file.cnf|-]
-
-### maxsat2lp
-
-Converter from .cnf/.wcnf file to .lp file.
-
-Usage: maxsat2lp [file.cnf|file.wcnf|-]
-
-### pb2lp
-
-Converter from .opb/.wbo file to .lp file.
-
-Usage: pb2lp [--wbo] [file.opb|file.wbo|-]
+* Input formats: lp, mps, cnf, wcnf, opb, wbo
+* Output formats: lp, smt2, ys
 
 TODO
 ----
