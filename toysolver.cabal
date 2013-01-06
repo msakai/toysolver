@@ -289,6 +289,18 @@ Executable pb2lp
      Converter.ObjType
   Build-Depends: base >=4 && <5, mtl, containers, array, parsec, OptDir
 
+Executable lpconvert
+  Main-is: lpconvert.hs
+  HS-Source-Dirs: src
+  Build-Depends: base >=4 && <5, array, mtl, containers, filepath, parsec, bytestring, parse-dimacs, OptDir
+  Extensions:
+     BangPatterns
+     ScopedTypeVariables
+     FlexibleInstances
+     MultiParamTypeClasses
+     FunctionalDependencies
+     GeneralizedNewtypeDeriving
+
 Test-suite TestSAT
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
