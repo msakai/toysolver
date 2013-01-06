@@ -15,7 +15,9 @@
 
 module Util where
 
+import Control.Monad
 import Data.Ratio
+import qualified Data.Set as Set
 
 -- | Combining two @Maybe@ values using given function.
 combineMaybe :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a
@@ -45,6 +47,26 @@ showRational asRatio v
   | asRatio            = show (numerator v) ++ "/" ++ show (denominator v)
   | otherwise          = show (fromRational v :: Double)
 
+showRationalAsFiniteDecimal :: Rational -> Maybe String
+showRationalAsFiniteDecimal x = do
+  let a :: Integer
+      (a,b) = properFraction (abs x)
+      s1 = if x < 0 then "-" else ""
+      s2 = show a      
+  s3 <- if b == 0
+        then return ".0"
+        else liftM ("." ++ ) $ loop Set.empty b
+  return $ s1 ++ s2 ++ s3
+  where
+    loop :: Set.Set Rational -> Rational -> Maybe String
+    loop _ 0 = return ""
+    loop rs r
+      | r `Set.member` rs = mzero
+      | otherwise = do
+          let a :: Integer
+              (a,b) = properFraction (r * 10)
+          s <- loop (Set.insert r rs) b
+          return $ show a ++ s
 
 {-# INLINE revSequence #-}
 revSequence :: Monad m => [m a] -> m [a]

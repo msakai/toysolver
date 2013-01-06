@@ -26,6 +26,7 @@ import qualified Data.Map as Map
 import System.IO
 import Text.Printf
 import qualified Text.LPFile as LP
+import Util (showRationalAsFiniteDecimal)
 
 data Options
   = Options
@@ -110,9 +111,9 @@ realNum opt r =
         then shows (numerator r)
         else shows (numerator r) . showChar '/' . shows (denominator r)
   where
-    f r = if denominator r == 1
-          then shows (numerator r) . showString ".0"
-          else list [showChar '/', shows (numerator r) . showString ".0", shows (denominator r) . showString ".0"]
+    f r = case showRationalAsFiniteDecimal r of
+            Just s  -> showString s
+            Nothing -> list [showChar '/', shows (numerator r) . showString ".0", shows (denominator r) . showString ".0"]
 
 rel :: Bool -> LP.RelOp -> ShowS -> ShowS -> ShowS
 rel True LP.Eql x y = and' [rel False LP.Le x y, rel False LP.Ge x y]
