@@ -237,58 +237,6 @@ Executable toyfmf
     GHC-Options: -rtsopts
   GHC-Prof-Options: -auto-all
 
-Executable lp2smt
-  Main-is: lp2smt.hs
-  HS-Source-Dirs: src
-  Other-Modules:
-     Text.LPFile
-     Converter.LP2SMT
-     Util
-  Build-Depends: base >=4 && <5, mtl, containers, parsec, OptDir
-  Extensions:
-     BangPatterns
-     ScopedTypeVariables
-     FlexibleInstances
-     MultiParamTypeClasses
-     FunctionalDependencies
-     GeneralizedNewtypeDeriving
-
-Executable cnf2lp
-  Main-is: cnf2lp.hs
-  HS-Source-Dirs: src
-  Other-Modules:
-     Text.LPFile
-     Converter.CNF2LP
-     Converter.ObjType
-     Util
-  Build-Depends: base >=4 && <5, mtl, containers, array, parsec, bytestring, parse-dimacs, OptDir
-  Extensions:
-     BangPatterns
-     ScopedTypeVariables
-     FlexibleInstances
-     MultiParamTypeClasses
-     FunctionalDependencies
-     GeneralizedNewtypeDeriving
-
-Executable maxsat2lp
-  Main-is: maxsat2lp.hs
-  HS-Source-Dirs: src
-  Other-Modules:
-     SAT.Types
-     Text.MaxSAT
-     Converter.MaxSAT2LP
-  Build-Depends: base >=4 && <5, mtl, containers, array, parsec, OptDir
-
-Executable pb2lp
-  Main-is: pb2lp.hs
-  HS-Source-Dirs: src
-  Other-Modules:
-     Text.LPFile
-     Text.PBFile
-     Converter.PB2LP
-     Converter.ObjType
-  Build-Depends: base >=4 && <5, mtl, containers, array, parsec, OptDir
-
 Executable lpconvert
   Main-is: lpconvert.hs
   HS-Source-Dirs: src
