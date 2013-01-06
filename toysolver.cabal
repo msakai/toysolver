@@ -78,6 +78,7 @@ Library
      Converter.ObjType
      Converter.PB2LP
      Converter.LP2SMT
+     Converter.MaxSAT2LP
      Data.AlgebraicNumber
      Data.AlgebraicNumber.Root
      Data.ArithRel
@@ -98,6 +99,7 @@ Library
      SAT.Integer
      SAT.MUS
      SAT.CAMUS
+     SAT.PBO
      SAT.TheorySolver
      SAT.TseitinEncoder
      SAT.Types
@@ -110,63 +112,16 @@ Library
      Text.PBFile
      Text.SDPFile
      Util
+     Version
   Other-Modules:
      Data.IndexedPriorityQueue
      Data.SeqQueue
-     Version
      Paths_toysolver
 
 Executable toysolver
   Main-is: toysolver.hs
-  HS-Source-Dirs: src
-  Other-Modules:
-     Converter.CNF2LP
-     Converter.ObjType
-     Converter.PB2LP
-     Data.ArithRel
-     Data.Delta
-     Data.Expr
-     Data.Lattice
-     Data.Formula
-     Data.LA
-     Data.Linear
-     Data.Interval
-     Data.Polynomial
-     Data.Polynomial.FactorZ
-     Data.Polynomial.GBase
-     Data.Polynomial.Lagrange
-     Data.Polynomial.Sturm
-     Data.AlgebraicNumber
-     SAT.Printer
-     Text.LPFile
-     Text.MPSFile
-     Text.PBFile
-     Text.MaxSAT
-     Text.GurobiSol
-     Algorithm.BoundsInference
-     Algorithm.Cooper
-     Algorithm.FourierMotzkin
-     Algorithm.ContiTraverso
-     Algorithm.CAD
-     Algorithm.LPSolver
-     Algorithm.LPSolverHL
-     Algorithm.LPUtil
-     Algorithm.MIPSolverHL
-     Algorithm.OmegaTest
-     Algorithm.Simplex
-     Algorithm.Simplex2
-     Algorithm.MIPSolver2
-     Util
-     Version
-  Build-Depends: base >=4.4 && <5, mtl, containers, array, filepath, parsec, OptDir, deepseq, stm >=2.3, parse-dimacs, heaps, primes, time
-  Extensions:
-     BangPatterns
-     ScopedTypeVariables
-     FlexibleInstances
-     MultiParamTypeClasses
-     FunctionalDependencies
-     GeneralizedNewtypeDeriving
-     DoAndIfThenElse
+  HS-Source-Dirs: toysolver
+  Build-Depends: base >=4.4 && <5, containers, array, filepath, parsec, OptDir, parse-dimacs, toysolver
   if impl(ghc)
     GHC-Options: -threaded
   if impl(ghc >= 7)
@@ -175,36 +130,8 @@ Executable toysolver
 
 Executable toysat
   Main-is: toysat.hs
-  HS-Source-Dirs: src
-  Other-Modules:
-     Data.ArithRel
-     Data.Linear
-     Data.LBool
-     Data.IndexedPriorityQueue
-     Data.SeqQueue
-     Text.LPFile
-     Text.PBFile
-     Text.MPSFile
-     Text.MaxSAT
-     Text.GCNF
-     Text.GurobiSol
-     SAT
-     SAT.Integer
-     SAT.MUS
-     SAT.CAMUS
-     SAT.TseitinEncoder
-     SAT.Types
-     SAT.TheorySolver
-     SAT.Printer
-     Version
-     Paths_toysolver
-  Build-Depends: base >=4 && <5, mtl, containers >= 0.4.2, array, random, parsec, bytestring, filepath, parse-dimacs, queue, OptDir, time, old-locale, unbounded-delays
-  Extensions:
-     MultiParamTypeClasses
-     FlexibleInstances
-     BangPatterns
-     DoAndIfThenElse
-     CPP
+  HS-Source-Dirs: toysat
+  Build-Depends: base >=4 && <5, containers >= 0.4.2, array, parsec, bytestring, filepath, parse-dimacs, time, old-locale, unbounded-delays, toysolver
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
   GHC-Prof-Options: -auto-all
@@ -214,40 +141,16 @@ Executable toysat
 
 Executable toyfmf
   Main-is: toyfmf.hs
-  HS-Source-Dirs: src
-  Other-Modules:
-     Data.LBool
-     Data.IndexedPriorityQueue
-     Data.SeqQueue
-     Algorithm.FOLModelFinder
-     SAT
-     SAT.Types
-     Version
-     Paths_toysolver
-  Build-Depends: base >=4 && <5, mtl, containers >= 0.4.2, array, random, queue, time, logic-TPTP
-  Extensions:
-     BangPatterns
-     DoAndIfThenElse
-     DoRec
-     ScopedTypeVariables
-     CPP
-     TypeSynonymInstances
-     FlexibleInstances
+  HS-Source-Dirs: toyfmf
+  Build-Depends: base >=4 && <5, containers >= 0.4.2, toysolver, logic-TPTP
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
   GHC-Prof-Options: -auto-all
 
 Executable lpconvert
   Main-is: lpconvert.hs
-  HS-Source-Dirs: src
-  Build-Depends: base >=4 && <5, array, mtl, containers, filepath, parsec, bytestring, parse-dimacs, OptDir
-  Extensions:
-     BangPatterns
-     ScopedTypeVariables
-     FlexibleInstances
-     MultiParamTypeClasses
-     FunctionalDependencies
-     GeneralizedNewtypeDeriving
+  HS-Source-Dirs: lpconvert
+  Build-Depends: base >=4 && <5, containers, filepath, parse-dimacs, toysolver
 
 Test-suite TestSAT
   Type:              exitcode-stdio-1.0
