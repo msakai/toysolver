@@ -29,18 +29,20 @@ import qualified Text.LPFile as LP
 
 data Options
   = Options
-  { optLanguage :: Language
-  , optCheckSAT :: Bool
-  , optOptimize :: Bool
+  { optLanguage     :: Language
+  , optCheckSAT     :: Bool
+  , optProduceModel :: Bool
+  , optOptimize     :: Bool
   }
   deriving (Show, Eq, Ord)
 
 defaultOptions :: Options
 defaultOptions
   = Options
-  { optLanguage = SMTLIB2
-  , optCheckSAT = True
-  , optOptimize = False
+  { optLanguage     = SMTLIB2
+  , optCheckSAT     = True
+  , optProduceModel = True
+  , optOptimize     = False
   }
 
 data Language
@@ -209,7 +211,7 @@ convert opt lp =
              ++ [ case optLanguage opt of
                     SMTLIB2 -> list [showString "set-option", showString ":produce-models", showString "true"]
                     YICES   -> list [showString "set-evidence!", showString "true"]
-                | optCheckSAT opt ]
+                | optProduceModel opt ]
              ++ [ case optLanguage opt of
                     SMTLIB2 -> list [showString "check-sat"]
                     YICES   -> list [showString "check"]

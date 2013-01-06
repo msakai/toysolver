@@ -23,6 +23,7 @@ data Flag
     = Help
     | Optimize
     | NoCheck
+    | NoProduceModel
     | Yices
     deriving Eq
 
@@ -32,6 +33,7 @@ options =
     , Option [] ["yices"]    (NoArg Yices)      "output .ys instead of .smt2"
     , Option [] ["optimize"] (NoArg Optimize)   "output optimiality condition which uses quantifiers"
     , Option [] ["no-check"] (NoArg NoCheck)    "do not output \"(check)\""
+    , Option [] ["no-produce-model"] (NoArg NoProduceModel) "do not output \"(set-option :produce-models true)\""
     ]
 
 main :: IO ()
@@ -47,9 +49,10 @@ main = do
       case ret of
         Right lp -> do
           let opt = LP2SMT.defaultOptions
-                    { LP2SMT.optLanguage = if Yices `elem` o then LP2SMT.YICES else LP2SMT.SMTLIB2
-                    , LP2SMT.optCheckSAT = not (NoCheck `elem` o)
-                    , LP2SMT.optOptimize = Optimize `elem` o
+                    { LP2SMT.optLanguage     = if Yices `elem` o then LP2SMT.YICES else LP2SMT.SMTLIB2
+                    , LP2SMT.optCheckSAT     = not (NoCheck `elem` o)
+                    , LP2SMT.optProduceModel = not (NoProduceModel `elem` o)
+                    , LP2SMT.optOptimize     = Optimize `elem` o
                     }
           putStrLn $ LP2SMT.convert opt lp ""
         Left err -> hPrint stderr err >> exitFailure
