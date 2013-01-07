@@ -49,7 +49,7 @@ Library
   Hs-source-dirs: src
   Build-Depends:
      base >=4 && <5,
-     containers >= 0.4.2, mtl, array, random, stm, parsec, bytestring, filepath, deepseq, time, old-locale, primes,
+     containers >= 0.4.2, mtl, array, random, stm >=2.3, parsec, bytestring, filepath, deepseq, time, old-locale, primes,
      parse-dimacs, queue, heaps, unbounded-delays,
      OptDir
   Extensions:
