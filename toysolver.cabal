@@ -117,6 +117,7 @@ Library
      Data.IndexedPriorityQueue
      Data.SeqQueue
      Paths_toysolver
+  GHC-Prof-Options: -auto-all
 
 Executable toysolver
   Main-is: toysolver.hs
