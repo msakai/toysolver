@@ -238,7 +238,6 @@ Test-suite TestUtil
 
 Benchmark BenchmarkSATLIB
   type:             exitcode-stdio-1.0
-  hs-source-dirs:   src
+  hs-source-dirs:   benchmarks
   main-is:          BenchmarkSATLIB.hs
-  build-depends:    base >=4 && <5, array, containers, random, queue, parse-dimacs, time, criterion
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  build-depends:    base >=4 && <5, array, containers, random, parse-dimacs, toysolver, criterion
