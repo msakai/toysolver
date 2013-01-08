@@ -4,7 +4,7 @@ License:	BSD3
 License-File:	COPYING
 Author:		Masahiro Sakai (masahiro.sakai@gmail.com)
 Maintainer:	masahiro.sakai@gmail.com
-Category:	Algorithms
+Category:	Algorithms, Optimisation, Optimization
 Cabal-Version:	>= 1.8
 Synopsis:	Assorted decision procedures
 Description:	Toy-level implementation of some decision procedures
