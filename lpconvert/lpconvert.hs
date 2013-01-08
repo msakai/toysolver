@@ -14,6 +14,7 @@
 module Main where
 
 import Data.Char
+import qualified Data.Version as V
 import System.Environment
 import System.IO
 import System.Exit
@@ -30,9 +31,11 @@ import qualified Converter.CNF2LP as CNF2LP
 import qualified Converter.LP2SMT as LP2SMT
 import qualified Converter.MaxSAT2LP as MaxSAT2LP
 import qualified Converter.PB2LP as PB2LP
+import Version
 
 data Flag
   = Help
+  | Version
   | Output String
   | AsMaxSAT
   | ObjType ObjType
@@ -45,6 +48,7 @@ data Flag
 options :: [OptDescr Flag]
 options =
     [ Option ['h'] ["help"] (NoArg Help) "show help"
+    , Option ['v'] ["version"] (NoArg Version)         "show version number"
     , Option ['o'] [] (ReqArg Output "FILE") "output filename"
     , Option []    ["max-sat"]  (NoArg AsMaxSAT)  "treat *.cnf file as MAX-SAT problem"
     , Option []    ["obj"] (ReqArg (ObjType . parseObjType) "STRING") "objective function for SAT/PBS: none (default), max-one, max-zero"
@@ -154,7 +158,8 @@ main = do
   args <- getArgs
   case getOpt Permute options args of
     (o,_,[])
-      | Help `elem` o -> putStrLn (usageInfo header options)
+      | Help `elem` o    -> putStrLn (usageInfo header options)
+      | Version `elem` o -> putStrLn (V.showVersion version)
     (o,[fname],[]) -> do
       lp <- readLP o fname
       writeLP o lp
