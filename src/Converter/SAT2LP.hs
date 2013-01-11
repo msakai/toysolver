@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Converter.CNF2LP
+-- Module      :  Converter.SAT2LP
 -- Copyright   :  (c) Masahiro Sakai 2011-2012
 -- License     :  BSD-style
 -- 
@@ -10,7 +10,7 @@
 -- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module Converter.CNF2LP
+module Converter.SAT2LP
   ( ObjType (..)
   , convert 
   ) where

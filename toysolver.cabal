@@ -74,7 +74,7 @@ Library
      Algorithm.OmegaTest
      Algorithm.Simplex
      Algorithm.Simplex2
-     Converter.CNF2LP
+     Converter.SAT2LP
      Converter.ObjType
      Converter.PB2LP
      Converter.LP2SMT

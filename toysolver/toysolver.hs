@@ -52,7 +52,7 @@ import qualified Text.MPSFile as MPS
 import qualified Text.PBFile as PBFile
 import qualified Text.MaxSAT as MaxSAT
 import qualified Text.GurobiSol as GurobiSol
-import qualified Converter.CNF2LP as CNF2LP
+import qualified Converter.SAT2LP as SAT2LP
 import qualified Converter.PB2LP as PB2LP
 import qualified Converter.MaxSAT2LP as MaxSAT2LP
 import SAT.Printer
@@ -357,7 +357,7 @@ main = do
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
-              let (lp,mtrans) = CNF2LP.convert CNF2LP.ObjNone cnf
+              let (lp,mtrans) = SAT2LP.convert SAT2LP.ObjNone cnf
               run (getSolver o) o lp $ \m -> do
                 let m2 = mtrans m
                 satPrintModel stdout m2 0

@@ -27,7 +27,7 @@ import qualified Text.MaxSAT as MaxSAT
 import qualified Text.MPSFile as MPSFile
 import qualified Text.PBFile as PBFile
 import Converter.ObjType
-import qualified Converter.CNF2LP as CNF2LP
+import qualified Converter.SAT2LP as SAT2LP
 import qualified Converter.LP2SMT as LP2SMT
 import qualified Converter.MaxSAT2LP as MaxSAT2LP
 import qualified Converter.PB2LP as PB2LP
@@ -88,7 +88,7 @@ readLP o fname = do
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
-              let (lp, _) = CNF2LP.convert objType cnf
+              let (lp, _) = SAT2LP.convert objType cnf
               return lp
     ".wcnf" -> readWCNF
     ".opb"  -> do
