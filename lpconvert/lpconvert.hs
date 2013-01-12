@@ -123,7 +123,7 @@ readLP o fname = do
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
         Right wcnf -> do
-          let (lp, _) = MaxSAT2LP.convert wcnf
+          let (lp, _) = MaxSAT2LP.convert (IndicatorConstraint `elem` o) wcnf
           return lp
 
 writeLP :: [Flag] -> LPFile.LP -> IO ()

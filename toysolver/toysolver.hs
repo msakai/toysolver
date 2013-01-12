@@ -387,7 +387,7 @@ main = do
           case ret of
             Left err -> hPutStrLn stderr err >> exitFailure
             Right wcnf -> do
-              let (lp,mtrans) = MaxSAT2LP.convert wcnf
+              let (lp,mtrans) = MaxSAT2LP.convert False wcnf
               run (getSolver o) o lp $ \m -> do
                 let m2 = mtrans m
                 maxsatPrintModel stdout m2 0
