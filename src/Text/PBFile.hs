@@ -335,7 +335,7 @@ showWBO wbo@(top, cs) = size . part1 . part2
     size = showString (printf "* #variable= %d #constraint= %d\n" nv nc)
     part1 = 
       case top of
-        Nothing -> showString "soft: "
+        Nothing -> showString "soft: ;\n"
         Just t -> showString "soft: " . showsPrec 0 t . showString ";\n"
     part2 = foldr (.) id (map showSoftConstraint cs)
 
