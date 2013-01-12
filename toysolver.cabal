@@ -79,6 +79,7 @@ Library
      Converter.MaxSAT2LP
      Converter.MaxSAT2WBO
      Converter.PB2LP
+     Converter.PB2LSP
      Converter.PB2WBO
      Converter.SAT2PB
      Converter.SAT2LP

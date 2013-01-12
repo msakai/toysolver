@@ -30,6 +30,7 @@ import qualified Converter.SAT2PB as SAT2PB
 import qualified Converter.LP2SMT as LP2SMT
 import qualified Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified Converter.PB2LP as PB2LP
+import qualified Converter.PB2LSP as PB2LSP
 import qualified Converter.PB2WBO as PB2WBO
 import qualified Converter.WBO2PB as WBO2PB
 import Version
@@ -135,6 +136,7 @@ writePBFile o pb = do
       case map toLower (takeExtension fname) of
         ".opb" -> writeFile fname (PBFile.showOPB opb "")
         ".wbo" -> writeFile fname (PBFile.showWBO wbo "")
+        ".lsp" -> writeFile fname (PB2LSP.convert objType opb "")
         ".lp" -> do
           case LPFile.render lp of
             Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
