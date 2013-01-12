@@ -31,7 +31,7 @@ convert wbo@(top, cs) = ((Just obj, topConstr ++ concatMap f cm), mtrans)
     relax :: PBFile.Var -> PBFile.Constraint -> [PBFile.Constraint]
     relax i (lhs, PBFile.Ge, rhs) = [((d, [i]) : lhs, PBFile.Ge, rhs)]
       where
-        d = SAT.pbLowerBound [(c,1) | (c,_) <- lhs] - rhs
+        d = rhs - SAT.pbLowerBound [(c,1) | (c,_) <- lhs]
     relax i (lhs, PBFile.Eq, rhs) =
       relax i (lhs, PBFile.Ge, rhs) ++
       relax i ([(-c,ls) | (c,ls) <- lhs], PBFile.Ge, - rhs)
