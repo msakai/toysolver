@@ -9,6 +9,11 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
+-- References:
+--
+-- * Improving Unsatisfiability-based Algorithms for Boolean Optimization
+--   <http://sat.inesc-id.pt/~ruben/talks/sat10-talk.pdf>
+--
 -----------------------------------------------------------------------------
 module Converter.PB2WBO (convert) where
 
@@ -20,4 +25,9 @@ convert (obj, cs) = (Nothing, cs1 ++ cs2)
     cs1 = [(Nothing, c) | c <- cs]
     cs2 = case obj of
             Nothing -> []
-            Just e  -> [(Just w, ([(1,ls)], PBFile.Ge, 1)) | (w,ls) <- e]
+            Just e  ->
+              [ if w >= 0
+                then (Just w,       ([(-1,ls)], PBFile.Ge, 0))
+                else (Just (abs w), ([(1,ls)],  PBFile.Ge, 1))
+              | (w,ls) <- e
+              ]
