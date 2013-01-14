@@ -14,6 +14,7 @@
 -----------------------------------------------------------------------------
 module SAT.PBO where
 
+import Control.Exception
 import Control.Monad
 import Data.List
 import Data.Ord
@@ -24,8 +25,7 @@ import SAT.Types
 data SearchStrategy
   = LinearSearch
   | BinarySearch
--- 'nothaddock' is inserted not to confuse haddock
-  -- nothaddock | AdaptiveSearch
+  | AdaptiveSearch
 
 data Options
   = Options
@@ -58,8 +58,9 @@ minimize solver obj opt = do
      return Nothing
    else
      case optSearchStrategy opt of
-       LinearSearch -> liftM Just linSearch
-       BinarySearch -> liftM Just binSearch
+       LinearSearch   -> liftM Just linSearch
+       BinarySearch   -> liftM Just binSearch
+       AdaptiveSearch -> liftM Just adaptiveSearch
 
   where
    logIO :: String -> IO ()
@@ -126,3 +127,64 @@ minimize solver obj opt = do
              loop lb' ub m
 
      loop lb0 ub0 m0
+
+   -- adaptive search strategy from pbct-0.1.3 <http://www.residual.se/pbct/>
+   adaptiveSearch :: IO Model
+   adaptiveSearch = do
+     m0 <- model solver
+     let v0 = pbEval m0 obj
+     update m0 v0
+     let ub0 = v0 - 1
+         lb0 = pbLowerBound obj
+     addPBAtMost solver obj ub0
+
+     let loop lb ub _ m | ub < lb = return m
+         loop lb ub fraction m = do
+           let interval = ub - lb
+               mid = ub - floor (fromIntegral interval * fraction)
+           if ub == mid
+           then do
+             logIO $ printf "Adaptive Search: %d <= obj <= %d" lb ub
+             result <- solve solver
+             if result
+               then do
+                 m2 <- model solver
+                 let v = pbEval m2 obj
+                 update m2 v
+                 let ub'   = v - 1
+                     fraction' = min 0.5 (fraction + 0.1)
+                 loop lb ub' fraction' m2
+               else
+                 return m
+           else do
+             logIO $ printf "Adaptive Search: %d <= obj <= %d; guessing obj <= %d" lb ub mid
+             sel <- newVar solver
+             addPBAtMostSoft solver sel obj mid
+             setConfBudget solver (Just 1000)             
+             ret' <- try $ solveWith solver [sel]
+             case ret' of
+               Left BudgetExceeded -> do
+                 setConfBudget solver Nothing
+                 let fraction' = max 0 (fraction - 0.05)
+                 loop lb ub fraction' m
+               Right ret -> do
+                 setConfBudget solver Nothing
+                 addClause solver [-sel]
+                 let fraction' = min 0.5 (fraction + 0.1)
+                 if ret
+                 then do
+                   m2 <- model solver
+                   let v = pbEval m2 obj
+                   update m2 v
+                   let ub' = v - 1
+                   logIO $ printf "Adaptive Search: updating upper bound: %d -> %d" ub ub'
+                   addPBAtMost solver obj ub'
+                   loop lb ub' fraction' m2
+                 else do
+                   let lb' = mid + 1
+                   logIO $ printf "Adaptive Search: updating lower bound: %d -> %d" lb lb'
+                   addPBAtLeast solver obj lb'
+                   loop lb' ub fraction' m
+
+     loop lb0 ub0 (0::Rational) m0
+
