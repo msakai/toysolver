@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
-{-# LANGUAGE BangPatterns, DoAndIfThenElse, DoRec, ScopedTypeVariables, CPP #-}
+{-# LANGUAGE BangPatterns, DoAndIfThenElse, DoRec, ScopedTypeVariables, CPP, DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  SAT
@@ -54,6 +54,7 @@ module SAT
   -- * Solving
   , solve
   , solveWith
+  , BudgetExceeded (..)
 
   -- * Extract results
   , Model
@@ -83,6 +84,7 @@ module SAT
   , setRandomFreq
   , defaultRandomFreq
   , setRandomSeed
+  , setConfBudget
 
   -- * Read state
   , nVars
@@ -115,6 +117,7 @@ import qualified Data.Set as Set
 import qualified Data.IndexedPriorityQueue as PQ
 import qualified Data.SeqQueue as SQ
 import Data.Time
+import Data.Typeable
 import System.CPUTime
 import qualified System.Random as Rand
 import Text.Printf
@@ -287,6 +290,8 @@ data Solver
   , svRandomGen  :: !(IORef Rand.StdGen)
 
   , svFailedAssumptions :: !(IORef [Lit])
+
+  , svConfBudget :: !(IORef Int)
   }
 
 markBad :: Solver -> IO ()
@@ -529,6 +534,8 @@ newSolver = do
 
   failed <- newIORef []
 
+  confBudget <- newIORef (-1)
+
   let solver =
         Solver
         { svOk = ok
@@ -566,6 +573,7 @@ newSolver = do
         , svRandomFreq = randfreq
         , svRandomGen  = randgen
         , svFailedAssumptions = failed
+        , svConfBudget = confBudget
         }
  return solver
 
@@ -830,8 +838,9 @@ solve_ solver = do
           loop (conflict_lim:rs) = do
             ret <- search solver conflict_lim onConflict
             case ret of
-              Just x -> return x
-              Nothing -> do
+              SRFinished x -> return $ Just x
+              SRBudgetExceeded -> return Nothing
+              SRRestart -> do
                 modifyIORef' (svNRestart solver) (+1)
                 backtrackTo solver levelRoot
                 loop rs
@@ -842,7 +851,7 @@ solve_ solver = do
       endCPU <- getCPUTime
       endWC  <- getCurrentTime
 
-      when result $ do
+      when (result == Just True) $ do
         checkModel <- readIORef (svCheckModel solver)
         when checkModel $ checkSatisfied solver
         constructModel solver
@@ -858,12 +867,24 @@ solve_ solver = do
       (log solver . printf "#conflict = %d") =<< readIORef (svNConflict solver)
       (log solver . printf "#restart = %d")  =<< readIORef (svNRestart solver)
 
-      return result
+      case result of
+        Just x  -> return x
+        Nothing -> throw BudgetExceeded
 
-search :: Solver -> Int -> IO () -> IO (Maybe Bool)
+data BudgetExceeded = BudgetExceeded
+  deriving (Show, Typeable)
+
+instance Exception BudgetExceeded
+
+data SearchResult
+  = SRFinished Bool
+  | SRRestart
+  | SRBudgetExceeded
+
+search :: Solver -> Int -> IO () -> IO SearchResult
 search solver !conflict_lim onConflict = loop 0
   where
-    loop :: Int -> IO (Maybe Bool)
+    loop :: Int -> IO SearchResult
     loop !c = do
       sanityCheck solver
       conflict <- deduce solver
@@ -881,13 +902,13 @@ search solver !conflict_lim onConflict = loop 0
 
           r <- pickAssumption
           case r of
-            Nothing -> return (Just False)
+            Nothing -> return (SRFinished False)
             Just lit
               | lit /= litUndef -> decide solver lit >> loop c
               | otherwise -> do
                   lit2 <- pickBranchLit solver
                   if lit2 == litUndef
-                    then return (Just True)
+                    then return (SRFinished True)
                     else decide solver lit2 >> loop c
 
         Just constr -> do
@@ -902,15 +923,21 @@ search solver !conflict_lim onConflict = loop 0
             str <- showConstraint solver constr
             return $ printf "conflict(level=%d): %s" d str
 
+          modifyIORef' (svConfBudget solver) $ \confBudget ->
+            if confBudget > 0 then confBudget - 1 else confBudget
+          confBudget <- readIORef (svConfBudget solver)
+
           if d == levelRoot
-            then markBad solver >> return (Just False)
+            then markBad solver >> return (SRFinished False)
+            else if confBudget==0 then
+              return SRBudgetExceeded
             else if conflict_lim >= 0 && c+1 >= conflict_lim then
-              return Nothing
+              return SRRestart
             else do
               b <- handleConflict constr
               if b
                 then loop (c+1)
-                else markBad solver >> return (Just False)
+                else markBad solver >> return (SRFinished False)
 
     pickAssumption :: IO (Maybe Lit)
     pickAssumption = do
@@ -1103,6 +1130,10 @@ defaultRandomFreq = 0.005
 setRandomSeed :: Solver -> Int -> IO ()
 setRandomSeed solver seed = do
   writeIORef (svRandomGen solver) (Rand.mkStdGen seed)
+
+setConfBudget :: Solver -> Maybe Int -> IO ()
+setConfBudget solver (Just b) | b >= 0 = writeIORef (svConfBudget solver) b
+setConfBudget solver _ = writeIORef (svConfBudget solver) (-1)
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
