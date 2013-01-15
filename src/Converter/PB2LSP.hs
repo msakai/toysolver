@@ -29,10 +29,8 @@ convert objType formula@(obj, cs) =
   where
     nv = PBFile.pbNumVars formula
 
-    decls = foldr (.) id
-      [ showString "  x" . shows x . showString " <- bool();\n"
-      | x <- [1..nv]
-      ]
+    decls = showString $
+      "  for [i in 1.." ++ show nv ++ "] x[i] <- bool();\n"
 
     constrs = foldr (.) id
       [ showString "  constraint " .
@@ -55,8 +53,8 @@ convert objType formula@(obj, cs) =
 
     showLit l =
       if l < 0
-      then "!x" ++ show (abs l)
-      else "x" ++ show l
+      then "!x[" ++ show (abs l) ++ "]"
+      else "x[" ++ show l ++ "]"
 
     obj2 =
       case obj of
@@ -70,4 +68,4 @@ convert objType formula@(obj, cs) =
             ObjMaxZero  ->
               showString "minimize " . showString s . showString ";\n"
             where
-              s = sum' ["x" ++ show x | x<-[1..nv]]
+              s = sum' [showLit x | x<-[1..nv]]
