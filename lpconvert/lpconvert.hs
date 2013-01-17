@@ -50,7 +50,7 @@ options =
     [ Option ['h'] ["help"] (NoArg Help) "show help"
     , Option ['v'] ["version"] (NoArg Version)         "show version number"
     , Option ['o'] [] (ReqArg Output "FILE") "output filename"
-    , Option []    ["max-sat"]  (NoArg AsMaxSAT)  "treat *.cnf file as MAX-SAT problem"
+    , Option []    ["maxsat"]  (NoArg AsMaxSAT)  "treat *.cnf file as MAX-SAT problem"
     , Option []    ["obj"] (ReqArg (ObjType . parseObjType) "STRING") "objective function for SAT/PBS: none (default), max-one, max-zero"
     , Option []    ["indicator"] (NoArg IndicatorConstraint) "use indicator constraints in output LP file"
     , Option []    ["smt-optimize"] (NoArg Optimize)   "output optimiality condition which uses quantifiers"
