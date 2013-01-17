@@ -29,6 +29,7 @@ import Converter.ObjType
 import qualified Converter.SAT2PB as SAT2PB
 import qualified Converter.LP2SMT as LP2SMT
 import qualified Converter.MaxSAT2WBO as MaxSAT2WBO
+import qualified Converter.MaxSAT2NLPB as MaxSAT2NLPB
 import qualified Converter.PB2LP as PB2LP
 import qualified Converter.PB2LSP as PB2LSP
 import qualified Converter.PB2WBO as PB2WBO
@@ -45,6 +46,7 @@ data Flag
   | Optimize
   | NoCheck
   | NoProduceModel
+  | MaxSATNonLinear
   deriving Eq
 
 options :: [OptDescr Flag]
@@ -58,6 +60,7 @@ options =
     , Option []    ["smt-optimize"] (NoArg Optimize)   "output optimiality condition which uses quantifiers"
     , Option []    ["smt-no-check"] (NoArg NoCheck)    "do not output \"(check)\""
     , Option []    ["smt-no-produce-model"] (NoArg NoProduceModel) "do not output \"(set-option :produce-models true)\""    
+    , Option []    ["maxsat-nonlinear"] (NoArg MaxSATNonLinear) "use non-linear formulation of Max-SAT"
     ]
   where
     parseObjType s =
@@ -107,7 +110,9 @@ readPBFile o fname = do
       ret <- MaxSAT.parseWCNFFile fname
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
-        Right wcnf -> return $ Right $ MaxSAT2WBO.convert wcnf
+        Right wcnf
+          | MaxSATNonLinear `elem` o -> return $ Left $ MaxSAT2NLPB.convert wcnf
+          | otherwise -> return $ Right $ MaxSAT2WBO.convert wcnf
 
 writePBFile :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> IO ()
 writePBFile o pb = do

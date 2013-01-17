@@ -30,6 +30,7 @@ import Converter.ObjType
 import qualified Converter.SAT2LP as SAT2LP
 import qualified Converter.LP2SMT as LP2SMT
 import qualified Converter.MaxSAT2LP as MaxSAT2LP
+import qualified Converter.MaxSAT2NLPB as MaxSAT2NLPB
 import qualified Converter.PB2LP as PB2LP
 import Version
 
@@ -43,6 +44,7 @@ data Flag
   | Optimize
   | NoCheck
   | NoProduceModel
+  | MaxSATNonLinear
   deriving Eq
 
 options :: [OptDescr Flag]
@@ -56,6 +58,7 @@ options =
     , Option []    ["smt-optimize"] (NoArg Optimize)   "output optimiality condition which uses quantifiers"
     , Option []    ["smt-no-check"] (NoArg NoCheck)    "do not output \"(check)\""
     , Option []    ["smt-no-produce-model"] (NoArg NoProduceModel) "do not output \"(set-option :produce-models true)\""    
+    , Option []    ["maxsat-nonlinear"] (NoArg MaxSATNonLinear) "use non-linear formulation of Max-SAT"
     ]
   where
     parseObjType s =
@@ -79,7 +82,6 @@ header = unlines
 
 readLP :: [Flag] -> String -> IO LPFile.LP
 readLP o fname = do
-  let objType = last (ObjNone : [t | ObjType t <- o])
   case map toLower (takeExtension fname) of
     ".cnf"
       | AsMaxSAT `elem` o -> readWCNF
@@ -118,13 +120,20 @@ readLP o fname = do
     ext ->
       error $ "unknown file extension: " ++ show ext
   where
+    objType = last (ObjNone : [t | ObjType t <- o])
+
     readWCNF = do
       ret <- MaxSAT.parseWCNFFile fname
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
-        Right wcnf -> do
-          let (lp, _) = MaxSAT2LP.convert (IndicatorConstraint `elem` o) wcnf
-          return lp
+        Right wcnf
+          | MaxSATNonLinear `elem` o -> do
+              let pb = MaxSAT2NLPB.convert wcnf
+                  (lp, _) = PB2LP.convert objType pb
+              return lp
+          | otherwise -> do
+              let (lp, _) = MaxSAT2LP.convert (IndicatorConstraint `elem` o) wcnf
+              return lp
 
 writeLP :: [Flag] -> LPFile.LP -> IO ()
 writeLP o lp = do
