@@ -246,6 +246,9 @@ data Solver
   , svNConflict    :: !(IORef Int)
   , svNRestart     :: !(IORef Int)
   , svNAssigns     :: !(IORef Int)
+  , svNFixed       :: !(IORef Int)
+  , svNLearntGC    :: !(IORef Int)
+  , svNRemovedConstr :: !(IORef Int)
 
   -- | Inverse of the variable activity decay factor. (default 1 / 0.95)
   , svVarDecay     :: !(IORef Double)
@@ -283,6 +286,7 @@ data Solver
   , svLearningStrategy :: !(IORef LearningStrategy)
 
   , svLogger :: !(IORef (Maybe (String -> IO ())))
+  , svLastStatWC :: !(IORef UTCTime)
 
   , svCheckModel :: !(IORef Bool)
 
@@ -329,6 +333,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
 
       modifyIORef (svTrail solver) (lit:)
       modifyIORef' (svNAssigns solver) (+1)
+      when (lv == levelRoot) $ modifyIORef' (svNFixed solver) (+1)
       bcpEnqueue solver lit
 
       when debugMode $ logIO solver $ do
@@ -419,7 +424,7 @@ reduceDB solver = do
   let cs2 = zs2 ++ map fst ws
       n2 = length cs2
 
-  log solver $ printf "learnt constraints deletion: %d -> %d" n n2
+  -- log solver $ printf "learnt constraints deletion: %d -> %d" n n2
   writeIORef (svLearntDB solver) (n2,cs2)
 
 type VarActivity = Double
@@ -509,6 +514,9 @@ newSolver = do
   nconflict <- newIORef 0
   nrestart  <- newIORef 0
   nassigns  <- newIORef 0
+  nfixed    <- newIORef 0
+  nlearntgc <- newIORef 0
+  nremoved  <- newIORef 0
 
   claDecay <- newIORef (1 / 0.999)
   claInc   <- newIORef 1
@@ -528,6 +536,7 @@ newSolver = do
   learntLimSeq    <- newIORef undefined
 
   logger <- newIORef Nothing
+  lastStatWC <- newIORef undefined
 
   randfreq <- newIORef defaultRandomFreq
   randgen  <- newIORef =<< Rand.newStdGen
@@ -554,6 +563,9 @@ newSolver = do
         , svNConflict  = nconflict
         , svNRestart   = nrestart
         , svNAssigns   = nassigns
+        , svNFixed     = nfixed
+        , svNLearntGC  = nlearntgc
+        , svNRemovedConstr = nremoved
         , svVarDecay   = varDecay
         , svVarInc     = varInc
         , svClaDecay   = claDecay
@@ -569,6 +581,7 @@ newSolver = do
         , svLearntLimAdjCnt = learntLimAdjCnt
         , svLearntLimSeq    = learntLimSeq
         , svLogger = logger
+        , svLastStatWC = lastStatWC
         , svCheckModel = checkModel
         , svRandomFreq = randfreq
         , svRandomGen  = randgen
@@ -836,6 +849,9 @@ solve_ solver = do
 
       let loop [] = error "solve_: should not happen"
           loop (conflict_lim:rs) = do
+            nowWC <- getCurrentTime
+            printStat solver
+            writeIORef (svLastStatWC solver) nowWC
             ret <- search solver conflict_lim onConflict
             case ret of
               SRFinished x -> return $ Just x
@@ -845,11 +861,16 @@ solve_ solver = do
                 backtrackTo solver levelRoot
                 loop rs
 
+      printStatHeader solver
+
       startCPU <- getCPUTime
       startWC  <- getCurrentTime
       result <- loop restartSeq
       endCPU <- getCPUTime
       endWC  <- getCurrentTime
+      
+      printStat solver
+      writeIORef (svLastStatWC solver) endWC
 
       when (result == Just True) $ do
         checkModel <- readIORef (svCheckModel solver)
@@ -898,7 +919,9 @@ search solver !conflict_lim onConflict = loop 0
           n <- nLearnt solver
           m <- nAssigns solver
           learnt_lim <- readIORef (svLearntLim solver)
-          when (learnt_lim >= 0 && n - m > learnt_lim) $ reduceDB solver
+          when (learnt_lim >= 0 && n - m > learnt_lim) $ do
+            modifyIORef' (svNLearntGC solver) (+1)
+            reduceDB solver
 
           r <- pickAssumption
           case r of
@@ -922,6 +945,13 @@ search solver !conflict_lim onConflict = loop 0
           when debugMode $ logIO solver $ do
             str <- showConstraint solver constr
             return $ printf "conflict(level=%d): %s" d str
+
+          when (c `mod` 100 == 0) $ do
+            lastWC <- readIORef (svLastStatWC solver)
+            nowWC  <- getCurrentTime
+            when ((nowWC `diffUTCTime` lastWC) > 1) $ do
+              printStat solver
+              writeIORef (svLastStatWC solver) nowWC
 
           modifyIORef' (svConfBudget solver) $ \confBudget ->
             if confBudget > 0 then confBudget - 1 else confBudget
@@ -1042,8 +1072,7 @@ simplify solver = do
            loop ys rs (n+1)
          else loop ys (y:rs) n
   (ys,n) <- loop xs [] (0::Int)
-  when (n > 0) $ 
-    log solver $ printf "simplify: %d satisfied constraints are removed" n
+  modifyIORef' (svNRemovedConstr solver) (+n)
   writeIORef (svClauseDB solver) ys
 
 {--------------------------------------------------------------------
@@ -1545,6 +1574,25 @@ constrRescaleAllActivity solver = do
   xs <- learntConstraints solver
   forM_ xs $ \c -> constrRescaleActivity solver c
   modifyIORef' (svClaInc solver) (* 1e-20)
+
+printStatHeader :: Solver -> IO ()
+printStatHeader solver = do
+  log solver $ "============================[ Search Statistics ]============================"
+  log solver $ "| Restart | Decision | Conflict |      LEARNT     | Fixed    | Removed  |"
+  log solver $ "|         |          |          |    Limit     GC | Var      | Constra  |"
+  log solver $ "============================================================================="
+
+printStat :: Solver -> IO ()
+printStat solver = do
+  restart   <- readIORef (svNRestart solver)
+  dec       <- readIORef (svNDecision solver)
+  conflict  <- readIORef (svNConflict solver)
+  learntLim <- readIORef (svLearntLim solver)
+  learntGC  <- readIORef (svNLearntGC solver)
+  fixed     <- readIORef (svNFixed solver)
+  removed   <- readIORef (svNRemovedConstr solver)
+  log solver $ printf "| %7d | %8d | %8d | %8d %6d | %8d | %8d |"
+    restart dec conflict learntLim learntGC fixed removed
 
 {--------------------------------------------------------------------
   constraint implementation
