@@ -1061,7 +1061,6 @@ failedAssumptions solver = readIORef (svFailedAssumptions solver)
 -- | Simplify the clause database according to the current top-level assigment.
 simplify :: Solver -> IO ()
 simplify solver = do
-  xs <- readIORef (svClauseDB solver)
   let loop [] rs !n     = return (rs,n)
       loop (y:ys) rs !n = do
         b1 <- isSatisfied solver y
@@ -1071,9 +1070,19 @@ simplify solver = do
            detach solver y
            loop ys rs (n+1)
          else loop ys (y:rs) n
-  (ys,n) <- loop xs [] (0::Int)
-  modifyIORef' (svNRemovedConstr solver) (+n)
-  writeIORef (svClauseDB solver) ys
+
+  -- simplify original constraint DB
+  do
+    xs <- readIORef (svClauseDB solver)
+    (ys,n) <- loop xs [] (0::Int)
+    modifyIORef' (svNRemovedConstr solver) (+n)
+    writeIORef (svClauseDB solver) ys
+
+  -- simplify learnt constraint DB
+  do
+    (m,xs) <- readIORef (svLearntDB solver)
+    (ys,n) <- loop xs [] (0::Int)
+    writeIORef (svLearntDB solver) (m-n, ys)
 
 {--------------------------------------------------------------------
   Parameter settings.
