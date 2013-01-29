@@ -281,6 +281,19 @@ case_solveWith_2 = do
 
 ------------------------------------------------------------------------
 
+-- -4*(not x1) + 3*x1 + 10*(not x2)
+-- = -4*(1 - x1) + 3*x1 + 10*(not x2)
+-- = -4 + 4*x1 + 3*x1 + 10*(not x2)
+-- = 7*x1 + 10*(not x2) - 4
+case_normalizePBSum :: Assertion
+case_normalizePBSum = do
+  sort e @?= sort [(7,x1),(10,-x2)]
+  c @?= -4
+  where
+    x1 = 1
+    x2 = 2
+    (e,c) = normalizePBSum ([(-4,-x1),(3,x1),(10,-x2)], 0)
+
 -- -4*(not x1) + 3*x1 + 10*(not x2) >= 3
 -- ⇔ -4*(1 - x1) + 3*x1 + 10*(not x2) >= 3
 -- ⇔ -4 + 4*x1 + 3*x1 + 10*(not x2) >= 3
