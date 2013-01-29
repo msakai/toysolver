@@ -398,7 +398,7 @@ addToLearntDB solver c = do
 
 reduceDB :: Solver -> IO ()
 reduceDB solver = do
-  (n,cs) <- readIORef (svLearntDB solver)
+  (_,cs) <- readIORef (svLearntDB solver)
 
   xs <- forM cs $ \c -> do
     p <- constrIsProtected solver c
