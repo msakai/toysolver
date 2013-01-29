@@ -59,7 +59,8 @@ import qualified SAT.Integer
 import qualified SAT.TseitinEncoder as Tseitin
 import qualified SAT.MUS as MUS
 import qualified SAT.CAMUS as CAMUS
-import SAT.Types (pbEval)
+import qualified SAT.UnsatBasedWBO as UnsatBasedWBO
+import SAT.Types (pbEval, normalizePBSum)
 import SAT.Printer
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
@@ -89,6 +90,7 @@ data Options
   , optLinearizerPB  :: Bool
   , optSearchStrategy       :: PBO.SearchStrategy
   , optObjFunVarsHeuristics :: Bool
+  , optUnsatBasedMaxSAT     :: Bool
   , optAllMUSes :: Bool
   , optPrintRational :: Bool
   , optCheckModel  :: Bool
@@ -112,6 +114,7 @@ defaultOptions
   , optLinearizerPB  = False
   , optSearchStrategy       = PBO.optSearchStrategy PBO.defaultOptions
   , optObjFunVarsHeuristics = PBO.optObjFunVarsHeuristics PBO.defaultOptions
+  , optUnsatBasedMaxSAT     = False
   , optAllMUSes = False
   , optPrintRational = False  
   , optCheckModel = False
@@ -173,6 +176,9 @@ options =
     , Option [] ["no-objfun-heuristics"]
         (NoArg (\opt -> opt{ optObjFunVarsHeuristics = False }))
         "Disable heuristics for polarity/activity of variables in objective function"
+    , Option [] ["unsat-based"]
+        (NoArg (\opt -> opt{ optUnsatBasedMaxSAT = True }))
+        "Unsat-based algorithm for Max-SAT"
 
     , Option [] ["all-mus"]
         (NoArg (\opt -> opt{ optAllMUSes = True }))
@@ -530,6 +536,15 @@ pbConvSum enc = revMapM f
       return (w,l)
 
 minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
+minimize opt solver obj update | optUnsatBasedMaxSAT opt = do
+  let (obj',offset) = normalizePBSum (obj,0)
+  result <- UnsatBasedWBO.solve solver [(-v, c) | (c,v) <- obj'] $ \val -> do
+    putCommentLine $ printf "UnsatBasedWBO: lower bound undated to %d" (val + offset)
+  case result of
+    Nothing -> return Nothing
+    Just (m,cost) -> do
+      update m (cost + offset)
+      return $ Just m
 minimize opt solver obj update = do
   let opt2 =
         PBO.defaultOptions
