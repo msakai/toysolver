@@ -33,6 +33,7 @@ data Options
   , optUpdater              :: Model -> Integer -> IO ()
   , optObjFunVarsHeuristics :: Bool
   , optSearchStrategy       :: SearchStrategy
+  , optTrialLimitConf       :: Int
   }
 
 defaultOptions :: Options
@@ -42,6 +43,7 @@ defaultOptions
   , optUpdater              = \_ _ -> return ()
   , optObjFunVarsHeuristics = True
   , optSearchStrategy       = LinearSearch
+  , optTrialLimitConf       = 1000
   }
 
 minimize :: Solver -> [(Integer, Lit)] -> Options -> IO (Maybe Model)
@@ -110,16 +112,15 @@ minimize solver obj opt = do
              m2 <- model solver
              let v = pbEval m2 obj
              update m2 v
-             -- deactivating temporary constraint
-             -- FIXME: 本来は制約の削除をしたい
+             -- deleting temporary constraint
+             -- ただし、これに依存した補題を活かすためには残したほうが良い?
              addClause solver [-sel]
              let ub' = v - 1
              logIO $ printf "Binary Search: updating upper bound: %d -> %d" ub ub'
              addPBAtMost solver obj ub'
              loop lb ub' m2
            else do
-             -- deactivating temporary constraint
-             -- FIXME: 本来は制約の削除をしたい
+             -- deleting temporary constraint
              addClause solver [-sel]
              let lb' = mid + 1
              logIO $ printf "Binary Search: updating lower bound: %d -> %d" lb lb'
@@ -160,27 +161,30 @@ minimize solver obj opt = do
              logIO $ printf "Adaptive Search: %d <= obj <= %d; guessing obj <= %d" lb ub mid
              sel <- newVar solver
              addPBAtMostSoft solver sel obj mid
-             setConfBudget solver (Just 1000)             
+             setConfBudget solver $ Just (optTrialLimitConf opt)
              ret' <- try $ solveWith solver [sel]
+             setConfBudget solver Nothing
              case ret' of
                Left BudgetExceeded -> do
-                 setConfBudget solver Nothing
                  let fraction' = max 0 (fraction - 0.05)
                  loop lb ub fraction' m
                Right ret -> do
-                 setConfBudget solver Nothing
-                 addClause solver [-sel]
                  let fraction' = min 0.5 (fraction + 0.1)
                  if ret
                  then do
                    m2 <- model solver
                    let v = pbEval m2 obj
                    update m2 v
+                   -- deleting temporary constraint
+                   -- ただし、これに依存した補題を活かすためには残したほうが良い?
+                   addClause solver [-sel]
                    let ub' = v - 1
                    logIO $ printf "Adaptive Search: updating upper bound: %d -> %d" ub ub'
                    addPBAtMost solver obj ub'
                    loop lb ub' fraction' m2
                  else do
+                   -- deleting temporary constraint
+                   addClause solver [-sel]
                    let lb' = mid + 1
                    logIO $ printf "Adaptive Search: updating lower bound: %d -> %d" lb lb'
                    addPBAtLeast solver obj lb'
