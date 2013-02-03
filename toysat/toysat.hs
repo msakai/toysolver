@@ -539,7 +539,7 @@ minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (SAT.Model -> Integ
 minimize opt solver obj update | optUnsatBasedMaxSAT opt = do
   let (obj',offset) = normalizePBSum (obj,0)
   result <- UnsatBasedWBO.solve solver [(-v, c) | (c,v) <- obj'] $ \val -> do
-    putCommentLine $ printf "UnsatBasedWBO: lower bound undated to %d" (val + offset)
+    putCommentLine $ printf "UnsatBasedWBO: lower bound updated to %d" (val + offset)
   case result of
     Nothing -> return Nothing
     Just (m,cost) -> do
