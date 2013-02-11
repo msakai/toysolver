@@ -809,6 +809,7 @@ solveWith solver ls = do
 solve_ :: Solver -> IO Bool
 solve_ solver = do
   log solver "Solving starts ..."
+  resetStat solver
   writeIORef (svModel solver) Nothing
   writeIORef (svFailedAssumptions solver) []
 
@@ -1583,6 +1584,14 @@ constrRescaleAllActivity solver = do
   xs <- learntConstraints solver
   forM_ xs $ \c -> constrRescaleActivity solver c
   modifyIORef' (svClaInc solver) (* 1e-20)
+
+resetStat :: Solver -> IO ()
+resetStat solver = do
+  writeIORef (svNDecision solver) 0
+  writeIORef (svNRandomDecision solver) 0
+  writeIORef (svNConflict solver) 0
+  writeIORef (svNRestart solver) 0
+  writeIORef (svNLearntGC  solver) 0
 
 printStatHeader :: Solver -> IO ()
 printStatHeader solver = do
