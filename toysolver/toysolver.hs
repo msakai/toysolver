@@ -32,6 +32,7 @@ import System.Console.GetOpt
 import System.IO
 import Text.Printf
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
+import GHC.Conc (getNumProcessors, setNumCapabilities)
 
 import Data.Expr
 import Data.ArithRel
@@ -222,11 +223,17 @@ run solver opt lp printModel = do
       mip <- MIPSolver2.newSolver solver ivs2
       MIPSolver2.setShowRational mip printRat
       MIPSolver2.setLogger mip putCommentLine
-      ncap <- getNumCapabilities
-      MIPSolver2.setNThread mip $
+
+      procs <-
         if nthreads >= 1
-        then min ncap nthreads
-        else ncap
+        then return nthreads
+        else do
+          ncap  <- getNumCapabilities
+          procs <- getNumProcessors
+          return $ max (procs - 1) ncap
+      setNumCapabilities procs
+      MIPSolver2.setNThread mip procs
+
       let update m val = do
             putStrLn $ "o " ++ showValue val
       ret <- MIPSolver2.optimize mip update
