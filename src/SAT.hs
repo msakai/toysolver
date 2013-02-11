@@ -286,6 +286,7 @@ data Solver
   , svLearningStrategy :: !(IORef LearningStrategy)
 
   , svLogger :: !(IORef (Maybe (String -> IO ())))
+  , svStartWC    :: !(IORef UTCTime)
   , svLastStatWC :: !(IORef UTCTime)
 
   , svCheckModel :: !(IORef Bool)
@@ -536,6 +537,7 @@ newSolver = do
   learntLimSeq    <- newIORef undefined
 
   logger <- newIORef Nothing
+  startWC    <- newIORef undefined
   lastStatWC <- newIORef undefined
 
   randfreq <- newIORef defaultRandomFreq
@@ -581,6 +583,7 @@ newSolver = do
         , svLearntLimAdjCnt = learntLimAdjCnt
         , svLearntLimSeq    = learntLimSeq
         , svLogger = logger
+        , svStartWC    = startWC
         , svLastStatWC = lastStatWC
         , svCheckModel = checkModel
         , svRandomFreq = randfreq
@@ -850,9 +853,7 @@ solve_ solver = do
 
       let loop [] = error "solve_: should not happen"
           loop (conflict_lim:rs) = do
-            nowWC <- getCurrentTime
-            printStat solver
-            writeIORef (svLastStatWC solver) nowWC
+            printStat solver True
             ret <- search solver conflict_lim onConflict
             case ret of
               SRFinished x -> return $ Just x
@@ -866,12 +867,10 @@ solve_ solver = do
 
       startCPU <- getCPUTime
       startWC  <- getCurrentTime
+      writeIORef (svStartWC solver) startWC
       result <- loop restartSeq
       endCPU <- getCPUTime
       endWC  <- getCurrentTime
-      
-      printStat solver
-      writeIORef (svLastStatWC solver) endWC
 
       when (result == Just True) $ do
         checkModel <- readIORef (svCheckModel solver)
@@ -882,6 +881,7 @@ solve_ solver = do
 
       when debugMode $ dumpVarActivity solver
       when debugMode $ dumpClaActivity solver
+      printStat solver True
       (log solver . printf "#cpu_time = %.3fs") (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
       (log solver . printf "#wall_clock_time = %.3fs") (realToFrac (endWC `diffUTCTime` startWC) :: Double)
       (log solver . printf "#decision = %d") =<< readIORef (svNDecision solver)
@@ -948,11 +948,7 @@ search solver !conflict_lim onConflict = loop 0
             return $ printf "conflict(level=%d): %s" d str
 
           when (c `mod` 100 == 0) $ do
-            lastWC <- readIORef (svLastStatWC solver)
-            nowWC  <- getCurrentTime
-            when ((nowWC `diffUTCTime` lastWC) > 1) $ do
-              printStat solver
-              writeIORef (svLastStatWC solver) nowWC
+            printStat solver False
 
           modifyIORef' (svConfBudget solver) $ \confBudget ->
             if confBudget > 0 then confBudget - 1 else confBudget
@@ -1596,21 +1592,58 @@ resetStat solver = do
 printStatHeader :: Solver -> IO ()
 printStatHeader solver = do
   log solver $ "============================[ Search Statistics ]============================"
-  log solver $ "| Restart | Decision | Conflict |      LEARNT     | Fixed    | Removed  |"
-  log solver $ "|         |          |          |    Limit     GC | Var      | Constra  |"
+  log solver $ " Time | Restart | Decision | Conflict |      LEARNT     | Fixed    | Removed "
+  log solver $ "      |         |          |          |    Limit     GC | Var      | Constra "
   log solver $ "============================================================================="
 
-printStat :: Solver -> IO ()
-printStat solver = do
-  restart   <- readIORef (svNRestart solver)
-  dec       <- readIORef (svNDecision solver)
-  conflict  <- readIORef (svNConflict solver)
-  learntLim <- readIORef (svLearntLim solver)
-  learntGC  <- readIORef (svNLearntGC solver)
-  fixed     <- readIORef (svNFixed solver)
-  removed   <- readIORef (svNRemovedConstr solver)
-  log solver $ printf "| %7d | %8d | %8d | %8d %6d | %8d | %8d |"
-    restart dec conflict learntLim learntGC fixed removed
+printStat :: Solver -> Bool -> IO ()
+printStat solver force = do
+  nowWC <- getCurrentTime
+  b <- if force
+       then return True
+       else do
+         lastWC <- readIORef (svLastStatWC solver)
+         return $ (nowWC `diffUTCTime` lastWC) > 1
+  when b $ do
+    startWC   <- readIORef (svStartWC solver)
+    let tm = showTimeDiff $ nowWC `diffUTCTime` startWC
+    restart   <- readIORef (svNRestart solver)
+    dec       <- readIORef (svNDecision solver)
+    conflict  <- readIORef (svNConflict solver)
+    learntLim <- readIORef (svLearntLim solver)
+    learntGC  <- readIORef (svNLearntGC solver)
+    fixed     <- readIORef (svNFixed solver)
+    removed   <- readIORef (svNRemovedConstr solver)
+    log solver $ printf "%s | %7d | %8d | %8d | %8d %6d | %8d | %8d"
+      tm restart dec conflict learntLim learntGC fixed removed
+    writeIORef (svLastStatWC solver) nowWC
+
+showTimeDiff :: NominalDiffTime -> String
+showTimeDiff sec
+  | si <  100  = printf "%4.1fs" (fromRational s :: Double)
+  | si <= 9999 = printf "%4ds" si
+  | mi <  100  = printf "%4.1fm" (fromRational m :: Double)
+  | mi <= 9999 = printf "%4dm" mi
+  | hi <  100  = printf "%4.1fs" (fromRational h :: Double)
+  | otherwise  = printf "%4dh" hi
+  where
+    s :: Rational
+    s = realToFrac sec
+
+    si :: Integer
+    si = round s
+
+    m :: Rational
+    m = s / 60
+
+    mi :: Integer
+    mi = round m
+
+    h :: Rational
+    h = m / 60
+
+    hi :: Integer
+    hi = round h
 
 {--------------------------------------------------------------------
   constraint implementation
