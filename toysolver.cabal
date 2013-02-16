@@ -84,6 +84,7 @@ Library
      Converter.PB2LSP
      Converter.PB2WBO
      Converter.PBSetObj
+     Converter.PB2SMP
      Converter.SAT2PB
      Converter.SAT2LP
      Converter.WBO2PB

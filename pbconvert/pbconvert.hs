@@ -34,6 +34,7 @@ import qualified Converter.PB2LP as PB2LP
 import qualified Converter.PB2LSP as PB2LSP
 import qualified Converter.PB2WBO as PB2WBO
 import qualified Converter.PBSetObj as PBSetObj
+import qualified Converter.PB2SMP as PB2SMP
 import qualified Converter.WBO2PB as WBO2PB
 import Version
 
@@ -154,6 +155,8 @@ writePBFile o pb = do
           case LPFile.render lp of
             Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
             Just s -> writeFile fname s
+        ".smp" -> do
+          writeFile fname (PB2SMP.convert False opb "")
         ".smt2" -> do
           writeFile fname (LP2SMT.convert lp2smtOpt lp "")
         ".ys" -> do
