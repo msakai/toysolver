@@ -53,6 +53,7 @@ import qualified GHC.Stats as Stats
 
 import Data.ArithRel
 import Data.Linear
+import qualified Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified SAT
 import qualified SAT.PBO as PBO
 import qualified SAT.Integer
@@ -641,18 +642,8 @@ mainMaxSAT opt solver args = do
     Right wcnf -> solveMaxSAT opt solver wcnf
 
 solveMaxSAT :: Options -> SAT.Solver -> MaxSAT.WCNF -> IO ()
-solveMaxSAT opt solver
-  MaxSAT.WCNF
-  { MaxSAT.topCost = top
-  , MaxSAT.clauses = cs
-  } = do
-    solveWBO opt solver True
-             ( Nothing
-             , [ (if w >= top then Nothing else Just w
-               , ([(1,[lit]) | lit<-lits], PBFile.Ge, 1))
-               | (w,lits) <- cs
-               ]
-             )
+solveMaxSAT opt solver wcnf =
+  solveWBO opt solver True (MaxSAT2WBO.convert wcnf)
 
 -- ------------------------------------------------------------------------
 
