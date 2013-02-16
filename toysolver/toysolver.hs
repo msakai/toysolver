@@ -364,7 +364,7 @@ main = do
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
-              let (lp,mtrans) = SAT2LP.convert SAT2LP.ObjNone cnf
+              let (lp,mtrans) = SAT2LP.convert cnf
               run (getSolver o) o lp $ \m -> do
                 let m2 = mtrans m
                 satPrintModel stdout m2 0
@@ -374,7 +374,7 @@ main = do
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right pb -> do
-              let (lp,mtrans) = PB2LP.convert PB2LP.ObjNone pb
+              let (lp,mtrans) = PB2LP.convert pb
               run (getSolver o) o lp $ \m -> do
                 let m2 = mtrans m
                 pbPrintModel stdout m2 0

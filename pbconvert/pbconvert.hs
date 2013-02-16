@@ -33,6 +33,7 @@ import qualified Converter.MaxSAT2NLPB as MaxSAT2NLPB
 import qualified Converter.PB2LP as PB2LP
 import qualified Converter.PB2LSP as PB2LSP
 import qualified Converter.PB2WBO as PB2WBO
+import qualified Converter.PBSetObj as PBSetObj
 import qualified Converter.WBO2PB as WBO2PB
 import Version
 
@@ -114,9 +115,16 @@ readPBFile o fname = do
           | MaxSATNonLinear `elem` o -> return $ Left $ MaxSAT2NLPB.convert wcnf
           | otherwise -> return $ Right $ MaxSAT2WBO.convert wcnf
 
+transformPBFile :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> Either PBFile.Formula PBFile.SoftFormula
+transformPBFile o pb =
+  case pb of
+    Left opb@(Nothing,_) -> Left $ PBSetObj.setObj objType opb
+    _ -> pb
+  where
+    objType = last (ObjNone : [t | ObjType t <- o])
+
 writePBFile :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> IO ()
 writePBFile o pb = do
-  let objType = last (ObjNone : [t | ObjType t <- o])
   let lp2smtOpt =
         LP2SMT.defaultOptions
         { LP2SMT.optCheckSAT     = not (NoCheck `elem` o)
@@ -136,12 +144,12 @@ writePBFile o pb = do
                   Left opb  -> PB2WBO.convert opb
                   Right wbo -> wbo
           lp  = case pb of
-                  Left opb  -> fst $ PB2LP.convert objType opb
+                  Left opb  -> fst $ PB2LP.convert opb
                   Right wbo -> fst $ PB2LP.convertWBO (IndicatorConstraint `elem` o) wbo
       case map toLower (takeExtension fname) of
         ".opb" -> writeFile fname (PBFile.showOPB opb "")
         ".wbo" -> writeFile fname (PBFile.showWBO wbo "")
-        ".lsp" -> writeFile fname (PB2LSP.convert objType opb "")
+        ".lsp" -> writeFile fname (PB2LSP.convert opb "")
         ".lp" -> do
           case LPFile.render lp of
             Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
@@ -161,8 +169,9 @@ main = do
       | Help `elem` o    -> putStrLn (usageInfo header options)
       | Version `elem` o -> putStrLn (V.showVersion version)
     (o,[fname],[]) -> do
-      lp <- readPBFile o fname
-      writePBFile o lp
+      pb <- readPBFile o fname
+      let pb2 = transformPBFile o pb
+      writePBFile o pb2
     (_,_,errs) -> do
       hPutStrLn stderr $ concat errs ++ usageInfo header options
       exitFailure

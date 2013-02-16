@@ -27,11 +27,12 @@ import qualified Text.MaxSAT as MaxSAT
 import qualified Text.MPSFile as MPSFile
 import qualified Text.PBFile as PBFile
 import Converter.ObjType
-import qualified Converter.SAT2LP as SAT2LP
 import qualified Converter.LP2SMT as LP2SMT
 import qualified Converter.MaxSAT2LP as MaxSAT2LP
 import qualified Converter.MaxSAT2NLPB as MaxSAT2NLPB
 import qualified Converter.PB2LP as PB2LP
+import qualified Converter.PBSetObj as PBSetObj
+import qualified Converter.SAT2PB as SAT2PB
 import Version
 
 data Flag
@@ -90,7 +91,8 @@ readLP o fname = do
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
-              let (lp, _) = SAT2LP.convert objType cnf
+              let pb = transformPBFile o $ SAT2PB.convert cnf
+              let (lp, _) = PB2LP.convert pb
               return lp
     ".wcnf" -> readWCNF
     ".opb"  -> do
@@ -98,7 +100,8 @@ readLP o fname = do
       case ret of
         Left err -> hPrint stderr err >> exitFailure
         Right formula -> do
-          let (lp, _) = PB2LP.convert objType formula
+          let pb = transformPBFile o formula
+          let (lp, _) = PB2LP.convert pb
           return lp
     ".wbo"  -> do
       ret <- PBFile.parseWBOFile fname
@@ -120,20 +123,24 @@ readLP o fname = do
     ext ->
       error $ "unknown file extension: " ++ show ext
   where
-    objType = last (ObjNone : [t | ObjType t <- o])
-
     readWCNF = do
       ret <- MaxSAT.parseWCNFFile fname
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
         Right wcnf
           | MaxSATNonLinear `elem` o -> do
-              let pb = MaxSAT2NLPB.convert wcnf
-                  (lp, _) = PB2LP.convert objType pb
+              let pb = transformPBFile o $ MaxSAT2NLPB.convert wcnf
+                  (lp, _) = PB2LP.convert pb
               return lp
           | otherwise -> do
               let (lp, _) = MaxSAT2LP.convert (IndicatorConstraint `elem` o) wcnf
               return lp
+
+transformPBFile :: [Flag] -> PBFile.Formula -> PBFile.Formula
+transformPBFile o opb@(Nothing,_) = PBSetObj.setObj objType opb
+  where
+    objType = last (ObjNone : [t | ObjType t <- o])
+transformPBFile _ opb = opb
 
 writeLP :: [Flag] -> LPFile.LP -> IO ()
 writeLP o lp = do

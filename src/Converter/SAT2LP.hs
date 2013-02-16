@@ -11,8 +11,7 @@
 --
 -----------------------------------------------------------------------------
 module Converter.SAT2LP
-  ( ObjType (..)
-  , convert 
+  ( convert
   ) where
 
 import qualified Data.Map as Map
@@ -21,7 +20,6 @@ import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import qualified SAT.Types as SAT
 import qualified Converter.PB2LP as PB2LP
 import qualified Converter.SAT2PB as SAT2PB
-import Converter.ObjType
 
-convert :: ObjType -> DIMACS.CNF -> (LPFile.LP, Map.Map LPFile.Var Rational -> SAT.Model)
-convert objType cnf = PB2LP.convert objType (SAT2PB.convert cnf)
+convert :: DIMACS.CNF -> (LPFile.LP, Map.Map LPFile.Var Rational -> SAT.Model)
+convert cnf = PB2LP.convert (SAT2PB.convert cnf)

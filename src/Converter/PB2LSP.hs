@@ -11,16 +11,14 @@
 --
 -----------------------------------------------------------------------------
 module Converter.PB2LSP
-  ( ObjType (..)
-  , convert
+  ( convert
   ) where
 
 import Data.List
 import qualified Text.PBFile as PBFile
-import Converter.ObjType
 
-convert :: ObjType -> PBFile.Formula -> ShowS
-convert objType formula@(obj, cs) =
+convert :: PBFile.Formula -> ShowS
+convert formula@(obj, cs) =
   showString "function model() {\n" .
   decls .
   constrs .
@@ -58,14 +56,5 @@ convert objType formula@(obj, cs) =
 
     obj2 =
       case obj of
-        Just obj' ->
-          showString "  minimize " . showString (showSum obj') . showString ";\n"
-        Nothing ->
-          case objType of
-            ObjNone    -> id
-            ObjMaxOne  ->
-              showString "maximize " . showString s . showString ";\n"
-            ObjMaxZero  ->
-              showString "minimize " . showString s . showString ";\n"
-            where
-              s = sum' [showLit x | x<-[1..nv]]
+        Just obj' -> showString "  minimize " . showString (showSum obj') . showString ";\n"
+        Nothing -> id

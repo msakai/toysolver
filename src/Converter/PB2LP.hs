@@ -11,8 +11,7 @@
 --
 -----------------------------------------------------------------------------
 module Converter.PB2LP
-  ( ObjType (..)
-  , convert
+  ( convert
   , convertWBO
   ) where
 
@@ -25,10 +24,9 @@ import qualified Data.Map as Map
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
 import qualified SAT.Types as SAT
-import Converter.ObjType
 
-convert :: ObjType -> PBFile.Formula -> (LPFile.LP, Map.Map LPFile.Var Rational -> SAT.Model)
-convert objType formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
+convert :: PBFile.Formula -> (LPFile.LP, Map.Map LPFile.Var Rational -> SAT.Model)
+convert formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
   where
     lp = LPFile.LP
       { LPFile.variables = vs2
@@ -54,11 +52,8 @@ convert objType formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
     (dir,obj2) =
       case obj of
         Just obj' -> (LPFile.OptMin, convExpr obj')
-        Nothing ->
-          case objType of
-            ObjNone    -> (LPFile.OptMin, [LPFile.Term 0 (take 1 (Set.toList vs2 ++ ["x0"]))])
-            ObjMaxOne  -> (LPFile.OptMax, [LPFile.Term 1 [v] | v <- Set.toList vs2])
-            ObjMaxZero -> (LPFile.OptMin, [LPFile.Term 1 [v] | v <- Set.toList vs2])
+        Nothing   -> (LPFile.OptMin, convExpr [])
+
     cs2 = do
       (lhs,op,rhs) <- cs
       let op2 = case op of
@@ -75,7 +70,8 @@ convert objType formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
         }
 
 convExpr :: PBFile.Sum -> LPFile.Expr
-convExpr = concatMap g2
+convExpr [] = [LPFile.Term 0 ["x1"]]
+convExpr s = concatMap g2 s
   where
     g2 :: PBFile.WeightedTerm -> LPFile.Expr
     g2 (w, tm) = foldl' prodE [LPFile.Term (fromIntegral w) []] (map g3 tm)
