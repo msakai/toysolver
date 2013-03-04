@@ -42,6 +42,7 @@ import qualified Data.LA as LA
 import qualified Data.Polynomial as P
 import qualified Data.AlgebraicNumber as AReal
 import qualified Algorithm.OmegaTest as OmegaTest
+import qualified Algorithm.OmegaTest.Misc as OmegaTest
 import qualified Algorithm.Cooper as Cooper
 import qualified Algorithm.MIPSolverHL as MIPSolverHL
 import qualified Algorithm.Simplex2 as Simplex2
@@ -75,6 +76,7 @@ data Flag
     | NoMIP
     | PivotStrategy String
     | NThread !Int
+    | OmegaReal String
     | Mode !Mode
     deriving Eq
 
@@ -88,6 +90,8 @@ options =
 
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
     , Option [] ["threads"] (ReqArg (NThread . read) "INTEGER") "number of threads to use"
+
+    , Option [] ["omega-real"] (ReqArg OmegaReal "SOLVER") "fourier-motzkin (default), cad, simplex, none"
 
     , Option []    ["sat"]    (NoArg (Mode ModeSAT))    "solve boolean satisfiability problems in .cnf file"
     , Option []    ["pb"]     (NoArg (Mode ModePB))     "solve pseudo boolean problems in .pb file"
@@ -176,10 +180,23 @@ run solver opt lp printModel = do
               printModel m2
        where
          f = case solver of
-               "omega"      -> OmegaTest.solveQFLA
-               "omega-test" -> OmegaTest.solveQFLA
+               "omega"      -> OmegaTest.solveQFLA omegaOpt
+               "omega-test" -> OmegaTest.solveQFLA omegaOpt
                "cooper"     -> Cooper.solveQFLA
                _ -> error "unknown solver"
+
+         omegaOpt =
+           OmegaTest.defaultOptions
+           { OmegaTest.optCheckReal = realSolver
+           }         
+           where
+             realSolver =
+               case last ("fourier-motzkin" : [s | OmegaReal s <- opt]) of
+                 "fourier-motzkin" -> OmegaTest.checkRealByFM
+                 "cad"             -> OmegaTest.checkRealByCAD
+                 "simplex"         -> OmegaTest.checkRealBySimplex
+                 "none"            -> OmegaTest.checkRealNoCheck
+                 s                 -> error ("unknown solver: " ++ s)
 
     solveByMIP =
       case MIPSolverHL.optimize (LP.dir lp) obj (cs1 ++ cs2) ivs2 of

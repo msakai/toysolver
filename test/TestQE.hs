@@ -184,7 +184,7 @@ evalPAtom m (Rel lhs op rhs) =　evalOp op (evalP m lhs) (evalP m rhs)
 
 case_OmegaTest_test1 :: IO ()
 case_OmegaTest_test1 = 
-  case OmegaTest.solve test1' of
+  case OmegaTest.solve OmegaTest.defaultOptions test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
       forM_ test1' $ \a -> do
@@ -192,7 +192,7 @@ case_OmegaTest_test1 =
 
 case_OmegaTest_test2 :: IO ()
 case_OmegaTest_test2 = 
-  case OmegaTest.solve test2' of
+  case OmegaTest.solve OmegaTest.defaultOptions test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
 

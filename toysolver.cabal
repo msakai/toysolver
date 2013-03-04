@@ -72,6 +72,7 @@ Library
      Algorithm.MIPSolverHL
      Algorithm.MIPSolver2
      Algorithm.OmegaTest
+     Algorithm.OmegaTest.Misc
      Algorithm.Simplex
      Algorithm.Simplex2
      Converter.ObjType

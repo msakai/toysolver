@@ -29,6 +29,7 @@ module Algorithm.FourierMotzkin
     , termR
     , Rat
     , constraintsToDNF
+    , litToLAAtom
     ) where
 
 import Control.Monad

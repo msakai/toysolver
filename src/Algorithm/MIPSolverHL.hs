@@ -112,7 +112,7 @@ optimize' optdir obj cs ivs =
                  original problem is unbounded or unsatisfiable
                  when LP relaxation is unbounded.
             -}
-            case OmegaTest.solveQFLA (map conv cs) ivs of
+            case OmegaTest.solveQFLA OmegaTest.defaultOptions (map conv cs) ivs of
               Nothing -> OptUnsat
               Just _ -> Unbounded        
     Right (node0, ivs2) -> 

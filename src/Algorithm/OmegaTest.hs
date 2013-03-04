@@ -29,6 +29,10 @@ module Algorithm.OmegaTest
     ( Model
     , solve
     , solveQFLA
+    , Options (..)
+    , defaultOptions
+    , checkRealNoCheck
+    , checkRealByFM
     ) where
 
 import Control.Monad
@@ -46,6 +50,27 @@ import qualified Data.LA as LA
 import Util (combineMaybe)
 import qualified Algorithm.FourierMotzkin as FM
 import Algorithm.FourierMotzkin (Lit (..), Rat)
+
+-- ---------------------------------------------------------------------------
+
+data Options
+  = Options
+  { optCheckReal :: [Var] -> [LA.Atom Rational] -> Bool
+  }
+
+defaultOptions :: Options
+defaultOptions =
+  Options
+  { optCheckReal =
+      -- checkRealNoCheck
+      checkRealByFM
+  }
+
+checkRealNoCheck :: [Var] -> [LA.Atom Rational] -> Bool
+checkRealNoCheck _ _ = True
+
+checkRealByFM :: [Var] -> [LA.Atom Rational] -> Bool
+checkRealByFM _ as = isJust $ FM.solveConj as
 
 -- ---------------------------------------------------------------------------
 
@@ -112,12 +137,13 @@ collectBoundsZ v = foldr phi (([],[]),[])
 isExact :: BoundsZ -> Bool
 isExact (ls,us) = and [a==1 || b==1 | (_,a)<-ls , (_,b)<-us]
 
-solve' :: [Var] -> [Lit] -> Maybe (Model Integer)
-solve' vs2 xs = simplify xs >>= go vs2
+solve' :: Options -> [Var] -> [Lit] -> Maybe (Model Integer)
+solve' opt vs2 xs = simplify xs >>= go vs2
   where
     go :: [Var] -> [Lit] -> Maybe (Model Integer)
     go [] [] = return IM.empty
     go [] _  = mzero
+    go vs ys | not (optCheckReal opt vs (map FM.litToLAAtom ys)) = mzero
     go vs ys =
       if isExact bnd
         then case1
@@ -218,8 +244,8 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 
 -- ---------------------------------------------------------------------------
 
-solve :: [LA.Atom Rational] -> Maybe (Model Integer)
-solve cs = msum [solve' (IS.toList vs) lits | lits <- unDNF dnf]
+solve :: Options -> [LA.Atom Rational] -> Maybe (Model Integer)
+solve opt cs = msum [solve' opt (IS.toList vs) lits | lits <- unDNF dnf]
   where
     dnf = andB (map f cs)
     vs = vars cs
@@ -241,10 +267,10 @@ solve cs = msum [solve' (IS.toList vs) lits | lits <- unDNF dnf]
       where
         d = foldl' lcm 1 [denominator c | (c,_) <- LA.terms a]
 
-solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
-solveQFLA cs ivs = listToMaybe $ do
+solveQFLA :: Options -> [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
+solveQFLA opt cs ivs = listToMaybe $ do
   (cs2, mt) <- FM.projectN rvs cs
-  m <- maybeToList $ solve cs2
+  m <- maybeToList $ solve opt cs2
   return $ mt $ IM.map fromInteger m
   where
     rvs = vars cs `IS.difference` ivs
