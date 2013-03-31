@@ -86,8 +86,6 @@ options =
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
     , Option ['w'] [] (ReqArg WriteFile "<filename>")  "write solution to filename in Gurobi .sol format"
 
-    , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
-
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
     , Option [] ["threads"] (ReqArg (NThread . read) "INTEGER") "number of threads to use"
 
