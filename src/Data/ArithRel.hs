@@ -127,4 +127,7 @@ instance IsRel e (Rel e) where
 instance Variables e => Variables (Rel e) where
   vars (Rel a _ b) = vars a `IS.union` vars b
 
+instance Functor Rel where
+  fmap f (Rel a op b) = Rel (f a) op (f b)
+
 -- ---------------------------------------------------------------------------
