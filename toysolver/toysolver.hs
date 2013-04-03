@@ -161,6 +161,7 @@ run solver opt lp printModel = do
       | NoMIP `elem` opt = Set.empty
       | otherwise        = LP.integerVariables lp
 
+    vs2  = IM.keysSet varToName
     ivs2 = IS.fromList . map (nameToVar Map.!) . Set.toList $ ivs
 
     solveByQE =
@@ -169,7 +170,7 @@ run solver opt lp printModel = do
           putStrLn "s UNKNOWN"
           exitFailure
         Just cs ->
-          case f cs ivs2 of
+          case f vs2 cs ivs2 of
             Nothing -> do
               putStrLn "s UNSATISFIABLE"
               exitFailure
@@ -276,7 +277,8 @@ run solver opt lp printModel = do
           exitFailure
       | otherwise = do
           let cs = map g $ cs1 ++ cs2
-          case CAD.solve cs of
+              vs3 = Set.fromAscList $ IS.toAscList vs2
+          case CAD.solve vs3 cs of
             Nothing -> do
               putStrLn "s UNSATISFIABLE"
               exitFailure
@@ -317,7 +319,7 @@ run solver opt lp printModel = do
               putCommentLine "non-linear expressions are not supported by Conti-Traverso algorithm"
               exitFailure
             Just (linObj, linCon) -> do
-              case ContiTraverso.solve P.grlex (LP.dir lp) linObj linCon of
+              case ContiTraverso.solve P.grlex vs2 (LP.dir lp) linObj linCon of
                 Nothing -> do
                   putStrLn "s UNSATISFIABLE"
                   exitFailure

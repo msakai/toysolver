@@ -45,9 +45,9 @@ import Data.Polynomial
 import Data.Polynomial.GBase
 import qualified Algorithm.LPUtil as LPUtil
 
-solve :: MonomialOrder Var -> OptDir -> LA.Expr Rational -> [LA.Atom Rational] -> Maybe (Model Integer)
-solve cmp dir obj cs = do
-  m <- solve' cmp obj3 cs3
+solve :: MonomialOrder Var -> VarSet -> OptDir -> LA.Expr Rational -> [LA.Atom Rational] -> Maybe (Model Integer)
+solve cmp vs dir obj cs = do
+  m <- solve' cmp vs obj3 cs3
   return . IM.map round . mt . IM.map fromInteger $ m
   where
     ((obj2,cs2), mt) = LPUtil.toStandardForm (if dir == OptMin then obj else lnegate obj, cs)
@@ -61,8 +61,8 @@ solve cmp dir obj cs = do
         g = round . (c*)
         c = fromInteger $ foldl' lcm 1 [denominator c | (c,_) <- LA.terms lhs]
 
-solve' :: MonomialOrder Var -> LA.Expr Integer -> [(LA.Expr Integer, Integer)] -> Maybe (Model Integer)
-solve' cmp obj cs
+solve' :: MonomialOrder Var -> VarSet -> LA.Expr Integer -> [(LA.Expr Integer, Integer)] -> Maybe (Model Integer)
+solve' cmp vs' obj cs
   | or [c < 0 | (c,x) <- LA.terms obj, x /= LA.unitVar] = error "all coefficient of cost function should be non-negative"
   | otherwise =
   if IM.keysSet (IM.filter (/= 0) m) `IS.isSubsetOf` vs'
@@ -72,9 +72,6 @@ solve' cmp obj cs
   where
     vs :: [Var]
     vs = IS.toList vs'
-
-    vs' :: VarSet
-    vs' = vars $ obj : [lhs | (lhs,_) <- cs]
 
     v2 :: Var
     v2 = if IS.null vs' then 0 else IS.findMax vs' + 1

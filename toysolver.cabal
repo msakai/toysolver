@@ -66,6 +66,8 @@ Library
      Algorithm.Cooper
      Algorithm.FOLModelFinder
      Algorithm.FourierMotzkin
+     Algorithm.FourierMotzkin.Core
+     Algorithm.FourierMotzkin.FOL
      Algorithm.LPSolver
      Algorithm.LPSolverHL
      Algorithm.LPUtil
@@ -95,6 +97,7 @@ Library
      Data.Expr
      Data.Formula
      Data.LA
+     Data.LA.FOL
      Data.Lattice
      Data.LBool
      Data.Linear

@@ -49,13 +49,13 @@ import Data.Linear
 import qualified Data.LA as LA
 import Util (combineMaybe)
 import qualified Algorithm.FourierMotzkin as FM
-import Algorithm.FourierMotzkin (Lit (..), Rat)
+import Algorithm.FourierMotzkin.Core (Lit (..), Rat, toLAAtom)
 
 -- ---------------------------------------------------------------------------
 
 data Options
   = Options
-  { optCheckReal :: [Var] -> [LA.Atom Rational] -> Bool
+  { optCheckReal :: VarSet -> [LA.Atom Rational] -> Bool
   }
 
 defaultOptions :: Options
@@ -66,11 +66,11 @@ defaultOptions =
       checkRealByFM
   }
 
-checkRealNoCheck :: [Var] -> [LA.Atom Rational] -> Bool
+checkRealNoCheck :: VarSet -> [LA.Atom Rational] -> Bool
 checkRealNoCheck _ _ = True
 
-checkRealByFM :: [Var] -> [LA.Atom Rational] -> Bool
-checkRealByFM _ as = isJust $ FM.solveConj as
+checkRealByFM :: VarSet -> [LA.Atom Rational] -> Bool
+checkRealByFM vs as = isJust $ FM.solve vs as
 
 -- ---------------------------------------------------------------------------
 
@@ -143,7 +143,7 @@ solve' opt vs2 xs = simplify xs >>= go vs2
     go :: [Var] -> [Lit] -> Maybe (Model Integer)
     go [] [] = return IM.empty
     go [] _  = mzero
-    go vs ys | not (optCheckReal opt vs (map FM.litToLAAtom ys)) = mzero
+    go vs ys | not (optCheckReal opt (IS.fromList vs) (map toLAAtom ys)) = mzero
     go vs ys =
       if isExact bnd
         then case1
@@ -244,11 +244,10 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 
 -- ---------------------------------------------------------------------------
 
-solve :: Options -> [LA.Atom Rational] -> Maybe (Model Integer)
-solve opt cs = msum [solve' opt (IS.toList vs) lits | lits <- unDNF dnf]
+solve :: Options -> VarSet -> [LA.Atom Rational] -> Maybe (Model Integer)
+solve opt vs cs = msum [solve' opt (IS.toList vs) lits | lits <- unDNF dnf]
   where
     dnf = andB (map f cs)
-    vs = vars cs
     f (Rel lhs op rhs) =
       case op of
         Lt  -> DNF [[a `ltZ` b]]
@@ -267,13 +266,13 @@ solve opt cs = msum [solve' opt (IS.toList vs) lits | lits <- unDNF dnf]
       where
         d = foldl' lcm 1 [denominator c | (c,_) <- LA.terms a]
 
-solveQFLA :: Options -> [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
-solveQFLA opt cs ivs = listToMaybe $ do
+solveQFLA :: Options -> VarSet -> [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
+solveQFLA opt vs cs ivs = listToMaybe $ do
   (cs2, mt) <- FM.projectN rvs cs
-  m <- maybeToList $ solve opt cs2
+  m <- maybeToList $ solve opt ivs cs2
   return $ mt $ IM.map fromInteger m
   where
-    rvs = vars cs `IS.difference` ivs
+    rvs = vs `IS.difference` ivs
 
 -- ---------------------------------------------------------------------------
 

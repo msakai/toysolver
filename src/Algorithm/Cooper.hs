@@ -44,7 +44,7 @@ module Algorithm.Cooper
     -- * Constraint solving
     , solveFormula
     , solveQFFormula
-    , solveConj
+    , solve
     , solveQFLA
     ) where
 
@@ -53,33 +53,28 @@ import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
-import Data.Ratio
 
 import Data.ArithRel
 import Data.Expr
 import Data.Formula
 import Data.Linear
 import qualified Data.LA as LA
+import qualified Data.LA.FOL as LA
 import qualified Algorithm.FourierMotzkin as FM
+import qualified Algorithm.FourierMotzkin.Core as FM
 
 -- ---------------------------------------------------------------------------
 
 -- | Linear arithmetic expression over integers.
 type ExprZ = LA.Expr Integer
 
-atomZ :: RelOp -> Expr Rational -> Expr Rational -> Maybe QFFormula
-atomZ op a b = do
-  (e1,c1) <- FM.termR a
-  (e2,c2) <- FM.termR b
-  let a' = c2 .*. e1
-      b' = c1 .*. e2
-  case op of
-    Le -> return $ Lit $ a' `leZ` b'
-    Lt -> return $ Lit $ a' `ltZ` b'
-    Ge -> return $ Lit $ a' `geZ` b'
-    Gt -> return $ Lit $ a' `gtZ` b'
-    Eql -> return $ eqZ a' b'
-    NEq -> liftM notB (atomZ Eql a b)
+fromLAAtom :: LA.Atom Rational -> QFFormula
+fromLAAtom (Rel a op b) = rel op a' b'
+  where
+    (e1,c1) = FM.toRat a
+    (e2,c2) = FM.toRat b
+    a' = c2 .*. e1
+    b' = c1 .*. e2
 
 leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
 leZ e1 e2 = e1 `ltZ` (e2 .+. LA.constant 1)
@@ -196,10 +191,11 @@ simplifyLit (Pos e) =
       -- e > 0  <=>  e - 1 >= 0
       -- <=>  LA.mapCoeff (`div` d) (e - 1) >= 0
       -- <=>  LA.mapCoeff (`div` d) (e - 1) + 1 > 0
-      Lit $ Pos $ LA.mapCoeff (`div` d) (e .-. LA.constant 1) .+. LA.constant 1
+      Lit $ Pos $ LA.mapCoeff (`div` d) e1 .+. LA.constant 1
   where
-    d = if null cs then 1 else abs $ foldl1' gcd cs
-    cs = [c | (c,x) <- LA.terms e, x /= LA.unitVar]
+    e1 = e .-. LA.constant 1
+    d  = if null cs then 1 else abs $ foldl1' gcd cs
+    cs = [c | (c,x) <- LA.terms e1, x /= LA.unitVar]
 simplifyLit lit@(Divisible b c e)
   | LA.coeff LA.unitVar e `mod` d /= 0 = if b then false else true
   | c' == 1   = if b then true else false
@@ -364,7 +360,10 @@ eliminateQuantifiers = f
   where
     f T = return T'
     f F = return F'
-    f (Atom (Rel e1 op e2)) = atomZ op e1 e2
+    f (Atom (Rel a op b)) = do
+       a' <- LA.fromFOLExpr a
+       b' <- LA.fromFOLExpr b
+       return $ fromLAAtom (Rel a' op b')
     f (And a b) = liftM2 (.&&.) (f a) (f b)
     f (Or a b) = liftM2 (.||.) (f a) (f b)
     f (Not a) = f (pushNot a)
@@ -375,39 +374,34 @@ eliminateQuantifiers = f
 
 -- ---------------------------------------------------------------------------
 
-solveFormula :: Formula (Atom Rational) -> SatResult Integer
-solveFormula formula =
+solveFormula :: VarSet -> Formula (Atom Rational) -> SatResult Integer
+solveFormula vs formula =
   case eliminateQuantifiers formula of
     Nothing -> Unknown
     Just formula' ->
-       case solveQFFormula formula' of
+       case solveQFFormula vs formula' of
          Nothing -> Unsat
          Just m -> Sat m
 
-solveQFFormula :: QFFormula -> Maybe (Model Integer)
-solveQFFormula formula = listToMaybe $ do
-  (formula2, mt) <- projectCasesN (vars formula) formula
+solveQFFormula :: VarSet -> QFFormula -> Maybe (Model Integer)
+solveQFFormula vs formula = listToMaybe $ do
+  (formula2, mt) <- projectCasesN vs formula
   case formula2 of
     T' -> return $ mt IM.empty
     _  -> mzero
 
 -- | solve a (open) quantifier-free formula
-solveConj :: [LA.Atom Rational] -> Maybe (Model Integer)
-solveConj cs = solveQFFormula formula
-  where
-    formula = andB [rel op (f (lhs .-. rhs)) (LA.constant 0) | Rel lhs op rhs <- cs]
-    f e = LA.mapCoeff (round . (s*)) e
-      where
-        s = fromInteger $ foldl' lcm 1 [denominator c | (c,_) <- LA.terms e]
+solve :: VarSet -> [LA.Atom Rational] -> Maybe (Model Integer)
+solve vs cs = solveQFFormula vs $ andB $ map fromLAAtom cs
 
 -- | solve a (open) quantifier-free formula
-solveQFLA :: [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
-solveQFLA cs ivs = listToMaybe $ do
+solveQFLA :: VarSet -> [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
+solveQFLA vs cs ivs = listToMaybe $ do
   (cs2, mt) <- FM.projectN rvs cs
-  m <- maybeToList $ solveConj cs2
+  m <- maybeToList $ solve ivs cs2
   return $ mt $ IM.map fromInteger m
   where
-    rvs = vars cs `IS.difference` ivs
+    rvs = vs `IS.difference` ivs
 
 -- ---------------------------------------------------------------------------
 

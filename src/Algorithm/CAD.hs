@@ -409,9 +409,10 @@ evalPoint m (RootOf p n) =
 
 solve
   :: forall v. (Ord v, Show v, RenderVar v)
-  => [(Rel (Polynomial Rational v))]
+  => Set.Set v
+  -> [(Rel (Polynomial Rational v))]
   -> Maybe (Model v)
-solve cs0 = solve' (map f cs0)
+solve vs cs0 = solve' vs (map f cs0)
   where
     f (Rel lhs op rhs) = (lhs - rhs, g op)
     g Le  = [Zero, Neg]
@@ -423,12 +424,11 @@ solve cs0 = solve' (map f cs0)
 
 solve'
   :: forall v. (Ord v, Show v, RenderVar v)
-  => [(Polynomial Rational v, [Sign])]
+  => Set.Set v
+  -> [(Polynomial Rational v, [Sign])]
   -> Maybe (Model v)
-solve' cs0 = go vs0 cs0
+solve' vs0 cs0 = go (Set.toList vs0) cs0
   where
-    vs0 = Set.toList $ Set.unions [variables p | (p,_) <- cs0]
-
     go :: [v] -> [(Polynomial Rational v, [Sign])] -> Maybe (Model v)
     go [] cs =
       if and [signOfConst v `elem` ss | (p,ss) <- cs, let v = eval (\_ -> undefined) p]
@@ -504,14 +504,15 @@ test1a = mapM_ putStrLn $ showSignConf conf
     [(conf, _)] = runM $ buildSignConf ps
 
 test1b :: Bool
-test1b = isJust $ solve cs
+test1b = isJust $ solve vs cs
   where
     x = var ()
+    vs = Set.singleton ()
     cs = [x + 1 .>. 0, -2*x + 3 .>. 0, x .>. 0]
 
 test1c :: Bool
 test1c = isJust $ do
-  m <- solve' cs
+  m <- solve' (Set.singleton ()) cs
   guard $ and $ do
     (p, ss) <- cs
     let val = eval (m Map.!) (mapCoeff fromRational p)
@@ -529,9 +530,10 @@ test2a = mapM_ putStrLn $ showSignConf conf
     [(conf, _)] = runM $ buildSignConf ps
 
 test2b :: Bool
-test2b = isNothing $ solve cs
+test2b = isNothing $ solve vs cs
   where
     x = var ()
+    vs = Set.singleton ()
     cs = [x^(2::Int) .<. 0]
 
 test = and [test1b, test1c, test2b]
@@ -564,11 +566,12 @@ test_project_3_print =  dumpProjection $ project [(toUPolynomialOf p 0, [Neg])]
     p :: Polynomial Rational Int
     p = a^(2::Int) + b^(2::Int) + c^(2::Int) - 1
 
-test_solve = solve [p .<. 0]
+test_solve = solve vs [p .<. 0]
   where
     a = var 0
     b = var 1
     c = var 2
+    vs = Set.fromList [0,1,2]
     p :: Polynomial Rational Int
     p = a^(2::Int) + b^(2::Int) + c^(2::Int) - 1
 

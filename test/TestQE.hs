@@ -4,7 +4,9 @@ module Main (main) where
 import Control.Monad
 import Data.List
 import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
@@ -132,7 +134,7 @@ test2' =
 
 case_FourierMotzkin_test1 :: IO ()
 case_FourierMotzkin_test1 = 
-  case FourierMotzkin.solveConj test1' of
+  case FourierMotzkin.solve (IS.fromList [0,1,2]) test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
       forM_ test1' $ \a -> do
@@ -140,7 +142,7 @@ case_FourierMotzkin_test1 =
 
 case_FourierMotzkin_test2 :: IO ()
 case_FourierMotzkin_test2 = 
-  case FourierMotzkin.solveConj test2' of
+  case FourierMotzkin.solve (IS.fromList [0,1]) test2' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
       forM_ test2' $ \a -> do
@@ -150,7 +152,7 @@ case_FourierMotzkin_test2 =
 
 case_CAD_test1 :: IO ()
 case_CAD_test1 = 
-  case CAD.solve test1'' of
+  case CAD.solve (Set.fromList [0,1,2]) test1'' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
       forM_ test1'' $ \a -> do
@@ -160,7 +162,7 @@ case_CAD_test1 =
 
 case_CAD_test2 :: IO ()
 case_CAD_test2 = 
-  case CAD.solve test2'' of
+  case CAD.solve (Set.fromList [0,1]) test2'' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
       forM_ test2'' $ \a -> do
@@ -184,7 +186,7 @@ evalPAtom m (Rel lhs op rhs) =　evalOp op (evalP m lhs) (evalP m rhs)
 
 case_OmegaTest_test1 :: IO ()
 case_OmegaTest_test1 = 
-  case OmegaTest.solve OmegaTest.defaultOptions test1' of
+  case OmegaTest.solve OmegaTest.defaultOptions (IS.fromList [0,1,2]) test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
       forM_ test1' $ \a -> do
@@ -192,7 +194,7 @@ case_OmegaTest_test1 =
 
 case_OmegaTest_test2 :: IO ()
 case_OmegaTest_test2 = 
-  case OmegaTest.solve OmegaTest.defaultOptions test2' of
+  case OmegaTest.solve OmegaTest.defaultOptions (IS.fromList [0,1]) test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
 
@@ -200,7 +202,7 @@ case_OmegaTest_test2 =
 
 case_Cooper_test1 :: IO ()
 case_Cooper_test1 = 
-  case Cooper.solveConj test1' of
+  case Cooper.solve (IS.fromList [0,1,2]) test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
       forM_ test1' $ \a -> do
@@ -208,7 +210,7 @@ case_Cooper_test1 =
 
 case_Cooper_test2 :: IO ()
 case_Cooper_test2 = 
-  case Cooper.solveConj test2' of
+  case Cooper.solve (IS.fromList [0,1]) test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
 
@@ -236,7 +238,7 @@ case_Simplex2_test2 = do
 
 disabled_case_ContiTraverso_test1 :: IO ()
 disabled_case_ContiTraverso_test1 = 
-  case ContiTraverso.solve P.grlex OptMin (LA.constant 0) test1' of
+  case ContiTraverso.solve P.grlex (IS.fromList [0,1,2]) OptMin (LA.constant 0) test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
       forM_ test1' $ \a -> do
@@ -244,7 +246,7 @@ disabled_case_ContiTraverso_test1 =
 
 disabled_case_ContiTraverso_test2 :: IO ()
 disabled_case_ContiTraverso_test2 = 
-  case ContiTraverso.solve P.grlex OptMin (LA.constant 0) test2' of
+  case ContiTraverso.solve P.grlex (IS.fromList [0,1]) OptMin (LA.constant 0) test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
 
