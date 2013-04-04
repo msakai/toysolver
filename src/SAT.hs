@@ -137,6 +137,7 @@ levelRoot = -1
 data Assignment
   = Assignment
   { aValue  :: !Bool
+  , aIndex  :: {-# UNPACK #-} !Int
   , aLevel  :: {-# UNPACK #-} !Level
   , aReason :: !(Maybe SomeConstraint)
   , aBacktrackCBs :: !(IORef [IO ()])
@@ -226,6 +227,14 @@ varReason s !v = do
   case m of
     Nothing -> error ("varReason: unassigned var " ++ show v)
     Just a -> return (aReason a)
+
+varAssignNo :: Solver -> Var -> IO Int
+varAssignNo s !v = do
+  vd <- varData s v
+  m <- readIORef (vdAssignment vd)
+  case m of
+    Nothing -> error ("varAssignNo: unassigned var " ++ show v)
+    Just a -> return (aIndex a)
 
 -- | Solver instance
 data Solver
@@ -321,12 +330,14 @@ assign_ solver !lit reason = assert (validLit lit) $ do
   case m of
     Just a -> return $ litPolarity lit == aValue a
     Nothing -> do
+      idx <- readIORef (svNAssigns solver)
       lv <- readIORef (svLevel solver)
       bt <- newIORef []
 
-      writeIORef (vdAssignment vd) $ Just $
+      writeIORef (vdAssignment vd) $ Just $!
         Assignment
         { aValue  = litPolarity lit
+        , aIndex  = idx
         , aLevel  = lv
         , aReason = reason
         , aBacktrackCBs = bt
@@ -2100,7 +2111,6 @@ data PBAtLeastData
   , pbDegree :: !Integer
   , pbSlack  :: !(IORef Integer)
   , pbActivity :: !(IORef Double)
-  , pbReasons :: !(IORef (LitMap [(Lit, Integer)]))
   }
   deriving Eq
 
@@ -2110,8 +2120,7 @@ newPBAtLeastData ts degree learnt = do
       m = IM.fromList [(l,c) | (c,l) <- ts]
   s <- newIORef slack
   act <- newIORef $! (if learnt then 0 else -1)
-  rs <- newIORef IM.empty
-  return (PBAtLeastData m degree s act rs)
+  return (PBAtLeastData m degree s act)
 
 instance Constraint PBAtLeastData where
   toConstraint = ConstrPBAtLeast
@@ -2142,22 +2151,29 @@ instance Constraint PBAtLeastData where
     pbPropagate solver this2
 
   basicReasonOf solver this l = do
+    p <- case l of
+           Just lit -> do
+             idx0 <- varAssignNo solver (litVar lit)
+             -- PB制約の場合には複数回unitになる可能性があり、
+             -- litへの伝播以降に割り当てられたリテラルを含まないよう注意が必要
+             return $ \(l2,_) -> do
+               val <- litValue solver l2
+               if val /= lFalse then
+                 return False
+               else do
+                 idx <- varAssignNo solver (litVar l2)
+                 return $ idx < idx0
+           Nothing  -> do
+             -- 直接のコンフリクトの場合には、それ以降にリテラルに値が割り当てら
+             -- れることはないため、すべて含んでしまって問題ない
+             return $ \(l2,_) -> liftM (lFalse ==) (litValue solver l2)
     let m = pbTerms this
-    xs <-
-      case l of
-        Just lit -> do
-          -- 保存しておいたものを使わないと、
-          -- その後に割り当てられたものを含んでしまってまずいことがある。
-          rs <- readIORef (pbReasons this)
-          return $ sortBy (flip (comparing snd)) $ (rs IM.! lit)
-        Nothing -> do
-          -- 直接のコンフリクトの場合には現在のもので大丈夫なはず
-          tmp <- filterM (\(lit,_) -> liftM (lFalse ==) (litValue solver lit)) (IM.toList m)
-          return $ sortBy (flip (comparing snd)) $ tmp
+    xs <- liftM (sortBy (flip (comparing snd))) $ filterM p $ IM.toList m
     let max_slack = sum (map snd $ IM.toList m) - pbDegree this
     case l of
       Nothing -> return $ f max_slack xs
       Just lit -> return $ f (max_slack - (m IM.! lit)) xs
+
     where
       f :: Integer -> [(Lit,Integer)] -> [Lit]
       f s xs = go s xs []
@@ -2219,30 +2235,13 @@ pbPropagate solver this = do
   if s < 0
     then return False
     else do
-      ref <- newIORef Nothing
-      let m = do
-            x <- readIORef ref
-            case x of
-              Just r -> return r
-              Nothing -> do
-                let isFalse (l,_) = liftM (lFalse==) (litValue solver l)
-                r <- filterM isFalse $ IM.toAscList $ pbTerms this
-                writeIORef ref (Just r)
-                return r
-
       forM_ (IM.toList (pbTerms this)) $ \(l1,c1) -> do
         when (c1 > s) $ do
           v <- litValue solver l1
           when (v == lUndef) $ do
-            -- あとでbasicReasonOfで使うために、
-            -- その時点でfalseになっているリテラルを保存しておく
-            r <- m
-            modifyIORef (pbReasons this) (IM.insert l1 r)
-
             assignBy solver l1 this
             constrBumpActivity solver this
             return ()
-
       return True
 
 pbOverSAT :: Solver -> ([(Integer,Lit)],Integer) -> IO Bool
