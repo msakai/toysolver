@@ -30,7 +30,8 @@ data SearchStrategy
 data Options
   = Options
   { optLogger               :: String -> IO ()
-  , optUpdater              :: Model -> Integer -> IO ()
+  , optUpdateBest           :: Model -> Integer -> IO ()
+  , optUpdateLB             :: Integer -> IO ()
   , optObjFunVarsHeuristics :: Bool
   , optSearchStrategy       :: SearchStrategy
   , optTrialLimitConf       :: Int
@@ -40,7 +41,8 @@ defaultOptions :: Options
 defaultOptions
   = Options
   { optLogger               = \_ -> return ()
-  , optUpdater              = \_ _ -> return ()
+  , optUpdateBest           = \_ _ -> return ()
+  , optUpdateLB             = \_ -> return ()
   , optObjFunVarsHeuristics = True
   , optSearchStrategy       = LinearSearch
   , optTrialLimitConf       = 1000
@@ -55,6 +57,7 @@ minimize solver obj opt = do
     forM_ (zip [1..] (map snd (sortBy (comparing fst) [(abs c, l) | (c,l) <- obj]))) $ \(n,l) -> do
       replicateM n $ varBumpActivity solver (litVar l)
 
+  updateLB (pbLowerBound obj)
   result <- solve solver
   if not result then
      return Nothing
@@ -68,14 +71,17 @@ minimize solver obj opt = do
    logIO :: String -> IO ()
    logIO = optLogger opt
 
-   update :: Model -> Integer -> IO ()
-   update = optUpdater opt
+   updateBest :: Model -> Integer -> IO ()
+   updateBest = optUpdateBest opt
+
+   updateLB :: Integer -> IO ()
+   updateLB = optUpdateLB opt
 
    linSearch :: IO Model
    linSearch = do
      m <- model solver
      let v = pbEval m obj
-     update m v
+     updateBest m v
      addPBAtMost solver obj (v - 1)
      result <- solve solver
      if result
@@ -95,7 +101,7 @@ minimize solver obj opt = do
 -}
      m0 <- model solver
      let v0 = pbEval m0 obj
-     update m0 v0
+     updateBest m0 v0
      let ub0 = v0 - 1
          lb0 = pbLowerBound obj
      addPBAtMost solver obj ub0
@@ -111,7 +117,7 @@ minimize solver obj opt = do
            then do
              m2 <- model solver
              let v = pbEval m2 obj
-             update m2 v
+             updateBest m2 v
              -- deleting temporary constraint
              -- ただし、これに依存した補題を活かすためには残したほうが良い?
              addClause solver [-sel]
@@ -123,6 +129,7 @@ minimize solver obj opt = do
              -- deleting temporary constraint
              addClause solver [-sel]
              let lb' = mid + 1
+             updateLB lb'
              logIO $ printf "Binary Search: updating lower bound: %d -> %d" lb lb'
              addPBAtLeast solver obj lb'
              loop lb' ub m
@@ -134,7 +141,7 @@ minimize solver obj opt = do
    adaptiveSearch = do
      m0 <- model solver
      let v0 = pbEval m0 obj
-     update m0 v0
+     updateBest m0 v0
      let ub0 = v0 - 1
          lb0 = pbLowerBound obj
      addPBAtMost solver obj ub0
@@ -151,7 +158,7 @@ minimize solver obj opt = do
                then do
                  m2 <- model solver
                  let v = pbEval m2 obj
-                 update m2 v
+                 updateBest m2 v
                  let ub'   = v - 1
                      fraction' = min 0.5 (fraction + 0.1)
                  loop lb ub' fraction' m2
@@ -174,7 +181,7 @@ minimize solver obj opt = do
                  then do
                    m2 <- model solver
                    let v = pbEval m2 obj
-                   update m2 v
+                   updateBest m2 v
                    -- deleting temporary constraint
                    -- ただし、これに依存した補題を活かすためには残したほうが良い?
                    addClause solver [-sel]
@@ -186,9 +193,9 @@ minimize solver obj opt = do
                    -- deleting temporary constraint
                    addClause solver [-sel]
                    let lb' = mid + 1
+                   updateLB lb'
                    logIO $ printf "Adaptive Search: updating lower bound: %d -> %d" lb lb'
                    addPBAtLeast solver obj lb'
                    loop lb' ub fraction' m
 
      loop lb0 ub0 (0::Rational) m0
-

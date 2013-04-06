@@ -26,7 +26,7 @@ import SAT
 data Options
   = Options
   { optLogger     :: String -> IO ()
-  , optUpdater    :: [Lit] -> IO ()
+  , optUpdateBest :: [Lit] -> IO ()
   , optLitPrinter :: Lit -> String
   }
 
@@ -35,7 +35,7 @@ defaultOptions :: Options
 defaultOptions =
   Options
   { optLogger     = \_ -> return ()
-  , optUpdater    = \_ -> return ()
+  , optUpdateBest = \_ -> return ()
   , optLitPrinter = show
   }
 
@@ -58,7 +58,7 @@ findMUSAssumptions solver opt = do
     log = optLogger opt
 
     update :: [Lit] -> IO ()
-    update = optUpdater opt
+    update = optUpdateBest opt
 
     showLit :: Lit -> String
     showLit = optLitPrinter opt

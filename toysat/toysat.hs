@@ -551,8 +551,8 @@ minimize opt solver obj update = do
         PBO.defaultOptions
         { PBO.optObjFunVarsHeuristics = optObjFunVarsHeuristics opt
         , PBO.optSearchStrategy       = optSearchStrategy opt
-        , PBO.optLogger  = putCommentLine
-        , PBO.optUpdater = update
+        , PBO.optLogger     = putCommentLine
+        , PBO.optUpdateBest = update
         }
   PBO.minimize solver obj opt2
 
