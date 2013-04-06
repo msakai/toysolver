@@ -61,7 +61,7 @@ import qualified SAT.TseitinEncoder as Tseitin
 import qualified SAT.MUS as MUS
 import qualified SAT.CAMUS as CAMUS
 import qualified SAT.UnsatBasedWBO as UnsatBasedWBO
-import SAT.Types (pbEval, normalizePBSum)
+import SAT.Types (pbEval)
 import SAT.Printer
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
@@ -538,14 +538,14 @@ pbConvSum enc = revMapM f
 
 minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
 minimize opt solver obj update | optUnsatBasedMaxSAT opt = do
-  let (obj',offset) = normalizePBSum (obj,0)
-  result <- UnsatBasedWBO.solve solver [(-v, c) | (c,v) <- obj'] $ \val -> do
-    putCommentLine $ printf "UnsatBasedWBO: lower bound updated to %d" (val + offset)
-  case result of
-    Nothing -> return Nothing
-    Just (m,cost) -> do
-      update m (cost + offset)
-      return $ Just m
+  let opt2 =
+        UnsatBasedWBO.defaultOptions
+        { UnsatBasedWBO.optLogger     = putCommentLine
+        , UnsatBasedWBO.optUpdateBest = update
+        , UnsatBasedWBO.optUpdateLB   = \val -> do
+            putCommentLine $ printf "UnsatBasedWBO: lower bound updated to %d" val
+        }
+  UnsatBasedWBO.solvePBO solver obj opt2
 minimize opt solver obj update = do
   let opt2 =
         PBO.defaultOptions

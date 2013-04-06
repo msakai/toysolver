@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns, DoAndIfThenElse #-}
+{-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  SAT.UnsatBasedWBO
@@ -10,25 +11,60 @@
 -- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
-module SAT.UnsatBasedWBO (solve) where
+module SAT.UnsatBasedWBO
+  ( Options (..)
+  , defaultOptions
+  , solvePBO
+  , solveWBO
+  ) where
 
 import Control.Monad
 import qualified Data.IntMap as IM
 import qualified SAT as SAT
 import qualified SAT.Types as SAT
 
-solve :: SAT.Solver -> [(SAT.Lit, Integer)] -> (Integer -> IO ()) -> IO (Maybe (SAT.Model, Integer))
-solve solver sels updateLB = loop 0 (IM.fromList sels)
+data Options
+  = Options
+  { optLogger     :: String -> IO ()
+  , optUpdateBest :: SAT.Model -> Integer -> IO ()
+  , optUpdateLB   :: Integer -> IO ()
+  }
+
+defaultOptions :: Options
+defaultOptions
+  = Options
+  { optLogger     = \_ -> return ()
+  , optUpdateBest = \_ _ -> return ()
+  , optUpdateLB   = \_ -> return ()
+  }
+
+solvePBO :: SAT.Solver -> [(Integer, SAT.Lit)] -> Options -> IO (Maybe SAT.Model)
+solvePBO solver obj opt = do
+  result <- solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
+  case result of
+    Nothing -> return Nothing
+    Just (m,_) -> return (Just m)
+  where
+    (obj',offset) = SAT.normalizePBSum (obj,0)
+    opt' =
+      opt
+      { optUpdateBest = \m val -> optUpdateBest opt m (offset + val)
+      , optUpdateLB   = \val -> optUpdateLB opt (offset + val)
+      }
+
+solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe (SAT.Model, Integer))
+solveWBO solver sels0 opt = loop 0 (IM.fromList sels0)
   where
     loop :: Integer -> IM.IntMap Integer -> IO (Maybe (SAT.Model, Integer))
     loop !lb sels = do
-      updateLB lb
+      optUpdateLB opt lb
 
       ret <- SAT.solveWith solver (IM.keys sels)
       if ret
       then do
         m <- SAT.model solver
         -- 余計な変数を除去する?
+        optUpdateBest opt m lb
         return $ Just (m, lb)
       else do
         core <- SAT.failedAssumptions solver
