@@ -208,6 +208,7 @@ options =
         "binary"   -> PBO.BinarySearch
         "adaptive" -> PBO.AdaptiveSearch
         "unsat"    -> PBO.UnsatBased
+        "msu4"     -> PBO.MSU4
         _ -> error (printf "unknown search strategy %s" s)
 
     parseLS "clause" = SAT.LearningClause

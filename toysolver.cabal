@@ -112,6 +112,7 @@ Library
      SAT.MUS
      SAT.CAMUS
      SAT.PBO
+     SAT.PBO.MSU4
      SAT.PBO.UnsatBased
      SAT.TheorySolver
      SAT.TseitinEncoder

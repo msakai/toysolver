@@ -23,12 +23,14 @@ import Text.Printf
 import SAT
 import SAT.Types
 import qualified SAT.PBO.UnsatBased as UnsatBased
+import qualified SAT.PBO.MSU4 as MSU4
 
 data SearchStrategy
   = LinearSearch
   | BinarySearch
   | AdaptiveSearch
   | UnsatBased
+  | MSU4
 
 data Options
   = Options
@@ -63,6 +65,13 @@ minimize solver obj opt = do
                  , UnsatBased.optUpdateLB   = optUpdateLB opt
                  }
       UnsatBased.solve solver obj opt2
+    MSU4 -> do
+      let opt2 = MSU4.defaultOptions
+                 { MSU4.optLogger     = optLogger opt
+                 , MSU4.optUpdateBest = optUpdateBest opt
+                 , MSU4.optUpdateLB   = optUpdateLB opt
+                 }
+      MSU4.solve solver obj opt2
     _ -> do
       updateLB (pbLowerBound obj)
       result <- solve solver
