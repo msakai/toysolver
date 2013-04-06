@@ -3,7 +3,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  SAT.PBO
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -22,11 +22,13 @@ import Data.Ord
 import Text.Printf
 import SAT
 import SAT.Types
+import qualified SAT.PBO.UnsatBased as UnsatBased
 
 data SearchStrategy
   = LinearSearch
   | BinarySearch
   | AdaptiveSearch
+  | UnsatBased
 
 data Options
   = Options
@@ -53,15 +55,25 @@ minimize :: Solver -> [(Integer, Lit)] -> Options -> IO (Maybe Model)
 minimize solver obj opt = do
   when (optObjFunVarsHeuristics opt) $ tweakParams solver obj
 
-  updateLB (pbLowerBound obj)
-  result <- solve solver
-  if not result then
-    return Nothing
-  else
-    case optSearchStrategy opt of
-      LinearSearch   -> liftM Just linSearch
-      BinarySearch   -> liftM Just binSearch
-      AdaptiveSearch -> liftM Just adaptiveSearch
+  case optSearchStrategy opt of
+    UnsatBased -> do
+      let opt2 = UnsatBased.defaultOptions
+                 { UnsatBased.optLogger     = optLogger opt
+                 , UnsatBased.optUpdateBest = optUpdateBest opt
+                 , UnsatBased.optUpdateLB   = optUpdateLB opt
+                 }
+      UnsatBased.solve solver obj opt2
+    _ -> do
+      updateLB (pbLowerBound obj)
+      result <- solve solver
+      if not result then
+        return Nothing
+      else
+        case optSearchStrategy opt of
+          LinearSearch   -> liftM Just linSearch
+          BinarySearch   -> liftM Just binSearch
+          AdaptiveSearch -> liftM Just adaptiveSearch
+          _              -> error "SAT.PBO.minimize: should not happen"
 
   where
     logIO :: String -> IO ()

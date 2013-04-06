@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  SAT.UnsatBasedWBO
+-- Module      :  SAT.PBO.UnsatBased
 -- Copyright   :  (c) Masahiro Sakai 2013
 -- License     :  BSD-style
 -- 
@@ -11,10 +11,10 @@
 -- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
-module SAT.UnsatBasedWBO
+module SAT.PBO.UnsatBased
   ( Options (..)
   , defaultOptions
-  , solvePBO
+  , solve
   , solveWBO
   ) where
 
@@ -38,8 +38,8 @@ defaultOptions
   , optUpdateLB   = \_ -> return ()
   }
 
-solvePBO :: SAT.Solver -> [(Integer, SAT.Lit)] -> Options -> IO (Maybe SAT.Model)
-solvePBO solver obj opt = do
+solve :: SAT.Solver -> [(Integer, SAT.Lit)] -> Options -> IO (Maybe SAT.Model)
+solve solver obj opt = do
   result <- solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
   case result of
     Nothing -> return Nothing

@@ -60,7 +60,6 @@ import qualified SAT.Integer
 import qualified SAT.TseitinEncoder as Tseitin
 import qualified SAT.MUS as MUS
 import qualified SAT.CAMUS as CAMUS
-import qualified SAT.UnsatBasedWBO as UnsatBasedWBO
 import SAT.Types (pbEval)
 import SAT.Printer
 import qualified Text.PBFile as PBFile
@@ -91,7 +90,6 @@ data Options
   , optLinearizerPB  :: Bool
   , optSearchStrategy       :: PBO.SearchStrategy
   , optObjFunVarsHeuristics :: Bool
-  , optUnsatBasedMaxSAT     :: Bool
   , optAllMUSes :: Bool
   , optPrintRational :: Bool
   , optCheckModel  :: Bool
@@ -115,7 +113,6 @@ defaultOptions
   , optLinearizerPB  = False
   , optSearchStrategy       = PBO.optSearchStrategy PBO.defaultOptions
   , optObjFunVarsHeuristics = PBO.optObjFunVarsHeuristics PBO.defaultOptions
-  , optUnsatBasedMaxSAT     = False
   , optAllMUSes = False
   , optPrintRational = False  
   , optCheckModel = False
@@ -170,16 +167,13 @@ options =
 
     , Option [] ["search"]
         (ReqArg (\val opt -> opt{ optSearchStrategy = parseSearch val }) "<str>")
-        "Search algorithm used in optimization; linear (default), binary, adaptive"
+        "Search algorithm used in optimization; linear (default), binary, adaptive, unsat"
     , Option [] ["objfun-heuristics"]
         (NoArg (\opt -> opt{ optObjFunVarsHeuristics = True }))
         "Enable heuristics for polarity/activity of variables in objective function (default)"
     , Option [] ["no-objfun-heuristics"]
         (NoArg (\opt -> opt{ optObjFunVarsHeuristics = False }))
         "Disable heuristics for polarity/activity of variables in objective function"
-    , Option [] ["unsat-based"]
-        (NoArg (\opt -> opt{ optUnsatBasedMaxSAT = True }))
-        "Unsat-based algorithm for Max-SAT"
 
     , Option [] ["all-mus"]
         (NoArg (\opt -> opt{ optAllMUSes = True }))
@@ -213,6 +207,7 @@ options =
         "linear"   -> PBO.LinearSearch
         "binary"   -> PBO.BinarySearch
         "adaptive" -> PBO.AdaptiveSearch
+        "unsat"    -> PBO.UnsatBased
         _ -> error (printf "unknown search strategy %s" s)
 
     parseLS "clause" = SAT.LearningClause
@@ -537,15 +532,6 @@ pbConvSum enc = revMapM f
       return (w,l)
 
 minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
-minimize opt solver obj update | optUnsatBasedMaxSAT opt = do
-  let opt2 =
-        UnsatBasedWBO.defaultOptions
-        { UnsatBasedWBO.optLogger     = putCommentLine
-        , UnsatBasedWBO.optUpdateBest = update
-        , UnsatBasedWBO.optUpdateLB   = \val -> do
-            putCommentLine $ printf "UnsatBasedWBO: lower bound updated to %d" val
-        }
-  UnsatBasedWBO.solvePBO solver obj opt2
 minimize opt solver obj update = do
   let opt2 =
         PBO.defaultOptions
@@ -553,6 +539,7 @@ minimize opt solver obj update = do
         , PBO.optSearchStrategy       = optSearchStrategy opt
         , PBO.optLogger     = putCommentLine
         , PBO.optUpdateBest = update
+        , PBO.optUpdateLB   = \val -> putCommentLine $ printf "lower bound updated to %d" val
         }
   PBO.minimize solver obj opt2
 

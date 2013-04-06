@@ -112,10 +112,10 @@ Library
      SAT.MUS
      SAT.CAMUS
      SAT.PBO
+     SAT.PBO.UnsatBased
      SAT.TheorySolver
      SAT.TseitinEncoder
      SAT.Types
-     SAT.UnsatBasedWBO
      SAT.Printer
      Text.GCNF
      Text.GurobiSol
