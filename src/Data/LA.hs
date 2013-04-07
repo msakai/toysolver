@@ -53,8 +53,6 @@ module Data.LA
   -- * misc
   , BoundsEnv
   , computeInterval
-  , compileExpr
-  , compileAtom
   ) where
 
 import Control.Monad
@@ -63,12 +61,10 @@ import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
-import qualified Data.Expr as Expr
-import Data.Expr (Var, VarMap, VarSet, Variables, Model)
 import qualified Data.ArithRel as ArithRel
-import qualified Data.Formula as Formula
 import Data.Linear
 import Data.Interval
+import Data.Var
 
 -----------------------------------------------------------------------------
 
@@ -272,33 +268,10 @@ solveFor (ArithRel.Rel lhs op rhs) v = do
 
 -----------------------------------------------------------------------------
 
-type BoundsEnv r = Expr.VarMap (Interval r)
+type BoundsEnv r = VarMap (Interval r)
 
 -- | compute bounds for a @Expr@ with respect to @BoundsEnv@.
 computeInterval :: (Real r, Fractional r) => BoundsEnv r -> Expr r -> Interval r
 computeInterval b = lift1 (singleton 1) (b IM.!)
-
------------------------------------------------------------------------------
-
-compileExpr :: (Real r, Fractional r) => Expr.Expr r -> Maybe (Expr r)
-compileExpr (Expr.Const c) = return (constant c)
-compileExpr (Expr.Var c) = return (var c)
-compileExpr (a Expr.:+: b) = liftM2 (.+.) (compileExpr a) (compileExpr b)
-compileExpr (a Expr.:*: b) = do
-  x <- compileExpr a
-  y <- compileExpr b
-  msum [ do{ c <- asConst x; return (c .*. y) }
-       , do{ c <- asConst y; return (c .*. x) }
-       ]
-compileExpr (a Expr.:/: b) = do
-  x <- compileExpr a
-  c <- asConst =<< compileExpr b
-  return $ (1/c) .*. x
-
-compileAtom :: (Real r, Fractional r) => Formula.Atom r -> Maybe (Atom r)
-compileAtom (ArithRel.Rel a op b) = do
-  a' <- compileExpr a
-  b' <- compileExpr b
-  return $ ArithRel.rel op a' b'
 
 -----------------------------------------------------------------------------

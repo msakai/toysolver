@@ -63,7 +63,7 @@ import Text.Printf
 
 import Data.ArithRel
 import qualified Data.AlgebraicNumber as AReal
-import Data.Formula (DNF (..))
+import Data.DNF
 import Data.Polynomial
 
 import Debug.Trace

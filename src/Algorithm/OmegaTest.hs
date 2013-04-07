@@ -43,10 +43,12 @@ import Data.Ratio
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
-import Data.Expr
-import Data.Formula
+import Data.ArithRel
+import Data.DNF
+import Data.Lattice
 import Data.Linear
 import qualified Data.LA as LA
+import Data.Var
 import Util (combineMaybe)
 import qualified Algorithm.FourierMotzkin as FM
 import Algorithm.FourierMotzkin.Core (Lit (..), Rat, toLAAtom)

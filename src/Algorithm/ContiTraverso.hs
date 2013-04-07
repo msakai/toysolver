@@ -39,10 +39,10 @@ import Data.Ratio
 import Data.ArithRel
 import Data.Linear
 import qualified Data.LA as LA
-import Data.Expr (Var, VarSet, Variables (..), Model)
 import Data.OptDir
 import Data.Polynomial
 import Data.Polynomial.GBase
+import Data.Var
 import qualified Algorithm.LPUtil as LPUtil
 
 solve :: MonomialOrder Var -> VarSet -> OptDir -> LA.Expr Rational -> [LA.Atom Rational] -> Maybe (Model Integer)

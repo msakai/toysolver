@@ -1,8 +1,8 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Data.Formula
--- Copyright   :  (c) Masahiro Sakai 2011
+-- Module      :  Data.FOL.Formula
+-- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -12,30 +12,19 @@
 -- Formula of first order logic.
 -- 
 -----------------------------------------------------------------------------
-module Data.Formula
+module Data.FOL.Formula
   (
   -- * Overloaded operations for formula.
     module Data.Lattice
 
-  -- * Relational operators
-  , module Data.ArithRel
-
   -- * Concrete formula
-  , Atom (..)
   , Formula (..)
   , pushNot
-  , DNF (..)
   ) where
 
 import qualified Data.IntSet as IS
-import Data.Expr
 import Data.Lattice
-import Data.ArithRel
-
--- ---------------------------------------------------------------------------
-
--- | Atomic formula
-type Atom c = Rel (Expr c)
+import Data.Var
 
 -- ---------------------------------------------------------------------------
 
@@ -78,9 +67,6 @@ instance Boolean (Formula c) where
   (.=>.)  = Imply
   (.<=>.) = Equiv
 
-instance IsRel (Expr c) (Formula (Atom c)) where
-  rel op a b = Atom $ rel op a b
-
 -- | convert a formula into negation normal form
 pushNot :: Complement a => Formula a -> Formula a
 pushNot T = F
@@ -93,20 +79,3 @@ pushNot (Imply a b) = And a (pushNot b)
 pushNot (Equiv a b) = Or (And a (pushNot b)) (And b (pushNot a))
 pushNot (Forall v a) = Exists v (pushNot a)
 pushNot (Exists v a) = Forall v (pushNot a)
-
--- | Disjunctive normal form
-newtype DNF lit
-  = DNF
-  { unDNF :: [[lit]] -- ^ list of conjunction of literals
-  } deriving (Show)
-
-instance Complement lit => Complement (DNF lit) where
-  notB (DNF xs) = DNF . sequence . map (map notB) $ xs
-
-instance Complement lit => Lattice (DNF lit) where
-  top    = DNF [[]]
-  bottom = DNF []
-  DNF xs `meet` DNF ys = DNF [x++y | x<-xs, y<-ys]
-  DNF xs `join` DNF ys = DNF (xs++ys)
-
-instance Complement lit => Boolean (DNF lit)

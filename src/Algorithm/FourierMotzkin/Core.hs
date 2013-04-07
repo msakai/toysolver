@@ -43,11 +43,12 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
 import Data.ArithRel
-import Data.Expr
-import Data.Formula
+import Data.DNF
+import Data.Lattice
 import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Interval as Interval
+import Data.Var
 
 -- ---------------------------------------------------------------------------
 

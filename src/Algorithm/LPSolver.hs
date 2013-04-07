@@ -26,11 +26,11 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.OptDir
 
-import Data.Expr
 import Data.ArithRel
 import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Interval as Interval
+import Data.Var
 import qualified Algorithm.Simplex as Simplex
 import qualified Algorithm.BoundsInference as BI
 

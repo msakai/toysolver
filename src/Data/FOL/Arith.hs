@@ -1,55 +1,42 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Data.Expr
--- Copyright   :  (c) Masahiro Sakai 2011
+-- Module      :  Data.FOL.Arith
+-- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- Arithmetic expressions (not limited to linear ones).
+-- Arithmetic language (not limited to linear ones).
 -- 
 -----------------------------------------------------------------------------
-module Data.Expr
-  ( Var
-  , VarSet
-  , VarMap
-  , Variables (..)
-  , Model
-  , Expr (..)
+module Data.FOL.Arith
+  (
+  -- * Arithmetic expressions
+    Expr (..)
   , var
-  , eval
+  , evalExpr
 
-  -- FIXME: どこか違うモジュールへ?
+  -- * Atomic formula
+  , module Data.ArithRel
+  , Atom (..)
+  , evalAtom
+
+  -- * Arithmetic formula
+  , module Data.FOL.Formula  
+
+  -- * Misc
   , SatResult (..)
-  , OptResult (..)
   ) where
 
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Ratio
 
--- ---------------------------------------------------------------------------
-
--- | Variables are represented as non-negative integers
-type Var = Int
-
--- | Set of variables
-type VarSet = IS.IntSet
-
--- | Map from variables
-type VarMap = IM.IntMap
-
--- | collecting free variables
-class Variables a where
-  vars :: a -> VarSet
-
-instance Variables a => Variables [a] where
-  vars = IS.unions . map vars
-
--- | A @Model@ is a map from variables to values.
-type Model r = VarMap r
+import Data.ArithRel
+import Data.FOL.Formula
+import Data.Var
 
 -- ---------------------------------------------------------------------------
 
@@ -96,8 +83,8 @@ var :: Var -> Expr r
 var = Var
 
 -- | evaluate an 'Expr' with respect to a 'Model'
-eval :: Fractional r => Model r -> Expr r -> r
-eval m = f
+evalExpr :: Fractional r => Model r -> Expr r -> r
+evalExpr m = f
   where
     f (Const x) = x
     f (Var v) = m IM.! v
@@ -107,12 +94,19 @@ eval m = f
 
 -- ---------------------------------------------------------------------------
 
+-- | Atomic formula
+type Atom c = Rel (Expr c)
+
+evalAtom :: (Real r, Fractional r) => Model r -> Atom r -> Bool
+evalAtom m (Rel a op b) = evalOp op (evalExpr m a) (evalExpr m b)
+
+instance IsRel (Expr c) (Formula (Atom c)) where
+  rel op a b = Atom $ rel op a b
+
+-- ---------------------------------------------------------------------------
+
 -- | results of satisfiability checking
 data SatResult r = Unknown | Unsat | Sat (Model r)
-  deriving (Show, Eq, Ord)
-
--- | results of optimization
-data OptResult r = OptUnknown | OptUnsat | Unbounded | Optimum r (Model r)
   deriving (Show, Eq, Ord)
 
 -- ---------------------------------------------------------------------------

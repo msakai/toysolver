@@ -34,11 +34,11 @@ import Text.Printf
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import GHC.Conc (getNumProcessors, setNumCapabilities)
 
-import Data.Expr
 import Data.ArithRel
-import Data.Formula (Atom (..))
+import Data.FOL.Arith as FOL
 import Data.OptDir
 import qualified Data.LA as LA
+import qualified Data.LA.FOL as LAFOL
 import qualified Data.Polynomial as P
 import qualified Data.AlgebraicNumber as AReal
 import qualified Algorithm.OmegaTest as OmegaTest
@@ -165,7 +165,7 @@ run solver opt lp printModel = do
     ivs2 = IS.fromList . map (nameToVar Map.!) . Set.toList $ ivs
 
     solveByQE =
-      case mapM LA.compileAtom (cs1 ++ cs2) of
+      case mapM LAFOL.fromFOLAtom (cs1 ++ cs2) of
         Nothing -> do
           putStrLn "s UNKNOWN"
           exitFailure
@@ -175,7 +175,7 @@ run solver opt lp printModel = do
               putStrLn "s UNSATISFIABLE"
               exitFailure
             Just m -> do
-              putStrLn $ "o " ++ showValue (Data.Expr.eval m obj)
+              putStrLn $ "o " ++ showValue (FOL.evalExpr m obj)
               putStrLn "s SATISFIABLE"
               let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m2
@@ -199,22 +199,28 @@ run solver opt lp printModel = do
                  "none"            -> OmegaTest.checkRealNoCheck
                  s                 -> error ("unknown solver: " ++ s)
 
-    solveByMIP =
-      case MIPSolverHL.optimize (LP.dir lp) obj (cs1 ++ cs2) ivs2 of
-        OptUnknown -> do
+    solveByMIP = do
+      let m = do
+            cs'  <- mapM LAFOL.fromFOLAtom (cs1 ++ cs2)
+            obj' <- LAFOL.fromFOLExpr obj
+            return (cs',obj')
+      case m of
+        Nothing -> do
           putStrLn "s UNKNOWN"
           exitFailure
-        OptUnsat -> do
-          putStrLn "s UNSATISFIABLE"
-          exitFailure
-        Unbounded -> do
-          putStrLn "s UNBOUNDED"
-          exitFailure
-        Optimum r m -> do
-          putStrLn $ "o " ++ showValue r
-          putStrLn "s OPTIMUM FOUND"
-          let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
-          printModel m2
+        Just (cs',obj') ->
+          case MIPSolverHL.optimize (LP.dir lp) obj' cs' ivs2 of
+            MIPSolverHL.OptUnsat -> do
+              putStrLn "s UNSATISFIABLE"
+              exitFailure
+            MIPSolverHL.Unbounded -> do
+              putStrLn "s UNBOUNDED"
+              exitFailure
+            MIPSolverHL.Optimum r m -> do
+              putStrLn $ "o " ++ showValue r
+              putStrLn "s OPTIMUM FOUND"
+              let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+              printModel m2
 
     solveByMIP2 = do
       solver <- Simplex2.newSolver
@@ -230,10 +236,10 @@ run solver opt lp printModel = do
       Simplex2.setLogger solver putCommentLine
       replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
       Simplex2.setOptDir solver (LP.dir lp)
-      Simplex2.setObj solver $ fromJust (LA.compileExpr obj)
+      Simplex2.setObj solver $ fromJust (LAFOL.fromFOLExpr obj)
       putCommentLine "Loading constraints... "
       forM_ (cs1 ++ cs2) $ \c -> do
-        Simplex2.assertAtom solver $ fromJust (LA.compileAtom c)
+        Simplex2.assertAtom solver $ fromJust (LAFOL.fromFOLAtom c)
       putCommentLine "Loading constraints finished"
 
       mip <- MIPSolver2.newSolver solver ivs2
@@ -285,7 +291,7 @@ run solver opt lp printModel = do
             Just m -> do
               let m2 = IM.map (\x -> AReal.approx x (2^^(-64::Int))) $
                          IM.fromAscList $ Map.toAscList $ m
-              putStrLn $ "o " ++ showValue (Data.Expr.eval m2 obj)
+              putStrLn $ "o " ++ showValue (FOL.evalExpr m2 obj)
               putStrLn "s SATISFIABLE"
               let m3 = Map.fromAscList [(v, m2 IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m3
@@ -310,8 +316,8 @@ run solver opt lp printModel = do
           exitFailure
       | otherwise = do
           let tmp = do
-                linObj <- LA.compileExpr obj
-                linCon <- mapM LA.compileAtom (cs1 ++ cs2)
+                linObj <- LAFOL.fromFOLExpr obj
+                linCon <- mapM LAFOL.fromFOLAtom (cs1 ++ cs2)
                 return (linObj, linCon)
           case tmp of
             Nothing -> do
@@ -325,7 +331,7 @@ run solver opt lp printModel = do
                   exitFailure
                 Just m -> do
                   let m2 = IM.map fromInteger m
-                  putStrLn $ "o " ++ showValue (Data.Expr.eval m2 obj)
+                  putStrLn $ "o " ++ showValue (FOL.evalExpr m2 obj)
                   putStrLn "s OPTIMUM FOUND"
                   let m3 = Map.fromAscList [(v, m2 IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
                   printModel m3

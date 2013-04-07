@@ -64,6 +64,8 @@ Library
      Algorithm.CongruenceClosure
      Algorithm.ContiTraverso
      Algorithm.Cooper
+     Algorithm.Cooper.Core
+     Algorithm.Cooper.FOL
      Algorithm.FOLModelFinder
      Algorithm.FourierMotzkin
      Algorithm.FourierMotzkin.Core
@@ -94,8 +96,9 @@ Library
      Data.AlgebraicNumber.Root
      Data.ArithRel
      Data.Delta
-     Data.Expr
-     Data.Formula
+     Data.DNF
+     Data.FOL.Arith
+     Data.FOL.Formula
      Data.LA
      Data.LA.FOL
      Data.Lattice
@@ -107,6 +110,7 @@ Library
      Data.Polynomial.GBase
      Data.Polynomial.Lagrange
      Data.Polynomial.Sturm
+     Data.Var
      SAT
      SAT.Integer
      SAT.MUS

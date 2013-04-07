@@ -27,11 +27,11 @@ import qualified Data.Map as Map
 import Prelude hiding (null)
 
 import qualified Data.Interval as Interval
-import Data.Expr (Variables (..))
 import Data.ArithRel
 import qualified Data.LA as LA
 import Data.Linear
 import Data.Lattice
+import Data.Var
 
 type ExprR = LA.Expr Rational
 type ExprZ = LA.Expr Integer

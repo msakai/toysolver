@@ -11,9 +11,9 @@ import Data.Maybe
 import qualified Data.Set as Set
 import System.IO.Unsafe
 
-import Data.Expr
 import qualified Data.LA as LA
 import qualified Data.Polynomial as P
+import Data.Var
 import qualified Algorithm.CAD as CAD
 import qualified Algorithm.Simplex2 as Simplex2
 

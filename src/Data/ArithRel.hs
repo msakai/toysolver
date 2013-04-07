@@ -30,8 +30,8 @@ module Data.ArithRel
   ) where
 
 import qualified Data.IntSet as IS
-import Data.Expr (Variables (..))
 import Data.Lattice (Complement (..))
+import Data.Var
 
 infix 4 .<., .<=., .>=., .>., .==., ./=.
 

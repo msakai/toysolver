@@ -14,8 +14,7 @@ import Test.Framework.Providers.HUnit
 
 import Data.AlgebraicNumber
 import Data.ArithRel
-import Data.Expr
-import Data.Formula
+import Data.FOL.Arith
 import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Polynomial as P

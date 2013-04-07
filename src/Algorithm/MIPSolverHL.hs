@@ -26,13 +26,11 @@
 -----------------------------------------------------------------------------
 
 module Algorithm.MIPSolverHL
-  ( module Data.Expr
-  , module Data.Formula
-  , module Data.OptDir
+  ( module Data.OptDir
+  , OptResult (..)
   , minimize
   , maximize
   , optimize
---  , solve
   ) where
 
 import Control.Exception
@@ -42,40 +40,18 @@ import Data.Maybe
 import Data.List (maximumBy)
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
-import Data.Ratio
 import Data.OptDir
 
-import Data.Expr
 import Data.ArithRel
-import Data.Formula (Atom)
 import Data.Linear
+import Data.Var
 import qualified Data.LA as LA
 import qualified Algorithm.Simplex as Simplex
 import qualified Algorithm.LPSolver as LPSolver
 import Algorithm.LPSolver
+import Algorithm.LPSolverHL (OptResult (..))
 import qualified Algorithm.OmegaTest as OmegaTest
 import Util (isInteger, fracPart)
-
--- ---------------------------------------------------------------------------
-
-maximize :: RealFrac r => Expr r -> [Atom r] -> VarSet -> OptResult r
-maximize = optimize OptMax
-
-minimize :: RealFrac r => Expr r -> [Atom r] -> VarSet -> OptResult r
-minimize = optimize OptMin
-
-optimize :: RealFrac r => OptDir -> Expr r -> [Atom r] -> VarSet -> OptResult r
-optimize optdir obj2 cs2 ivs = fromMaybe OptUnknown $ do
-  obj <- LA.compileExpr obj2  
-  cs <- mapM LA.compileAtom cs2
-  return (optimize' optdir obj cs ivs)
-
-{-
-solve :: RealFrac r => [Atom r] -> VarSet -> SatResult r
-solve cs2 ivs = fromMaybe Unknown $ do
-  cs <- mapM compileAtom cs2
-  return (solve' cs ivs)
--}
 
 -- ---------------------------------------------------------------------------
 
@@ -94,8 +70,14 @@ ndLowerBound node = evalState (liftM Simplex.currentObjValue getTableau) (ndSolv
 
 data Err = ErrUnbounded | ErrUnsat deriving (Ord, Eq, Show, Enum, Bounded)
 
-optimize' :: RealFrac r => OptDir -> LA.Expr r -> [LA.Atom r] -> VarSet -> OptResult r
-optimize' optdir obj cs ivs = 
+maximize :: RealFrac r => LA.Expr r -> [LA.Atom r] -> VarSet -> OptResult r
+maximize = optimize OptMax
+
+minimize :: RealFrac r => LA.Expr r -> [LA.Atom r] -> VarSet -> OptResult r
+minimize = optimize OptMin
+
+optimize :: RealFrac r => OptDir -> LA.Expr r -> [LA.Atom r] -> VarSet -> OptResult r
+optimize optdir obj cs ivs = 
   case mkInitialNode optdir obj cs ivs of
     Left err ->
       case err of
@@ -263,7 +245,7 @@ test1 = result==expected
   where
     (optdir, obj, cs, ivs) = example1
     result, expected :: OptResult Rational
-    result = optimize' optdir obj cs ivs
+    result = optimize optdir obj cs ivs
     expected = Optimum (245/2) (IM.fromList [(1,40),(2,21/2),(3,39/2),(4,3)])
 
 test1' :: Bool
@@ -273,7 +255,7 @@ test1' = result==expected
     f OptMin = OptMax
     f OptMax = OptMin
     result, expected :: OptResult Rational
-    result = optimize' (f optdir) (lnegate obj) cs ivs
+    result = optimize (f optdir) (lnegate obj) cs ivs
     expected = Optimum (-245/2) (IM.fromList [(1,40),(2,21/2),(3,39/2),(4,3)])
 
 -- 『数理計画法の基礎』(坂和 正敏) p.109 例 3.8
@@ -297,7 +279,7 @@ test2 :: Bool
 test2 = result == expected
   where
     result, expected :: OptResult Rational
-    result = optimize' optdir obj cs ivs
+    result = optimize optdir obj cs ivs
     expected = Optimum (-37/2) (IM.fromList [(1,0),(2,2),(3,5/2)])
     (optdir, obj, cs, ivs) = example2
 
