@@ -26,6 +26,7 @@ module Text.MaxSAT
   ) where
 
 import qualified SAT.Types as SAT
+import Text.Util
 
 data WCNF
   = WCNF
@@ -83,16 +84,17 @@ isComment _ = False
 
 parseWCNFLine :: String -> WeightedClause
 parseWCNFLine s =
-  case map read (words s) of
+  case words s of
     (w:xs) ->
-        let ys = map fromIntegral $ init xs
-        in seq w $ seqList ys $ (w, ys)
+        let w' = readUnsignedInteger w
+            ys = map readInt $ init xs
+        in seq w' $ seqList ys $ (w', ys)
     _ -> error "parse error"
 
 parseCNFLine :: String -> WeightedClause
 parseCNFLine s = seq xs $ seqList xs $ (1, xs)
   where
-    xs = init (map read (words s))
+    xs = init (map readInt (words s))
 
 seqList :: [a] -> b -> b
 seqList [] b = b

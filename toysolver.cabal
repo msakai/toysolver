@@ -130,6 +130,7 @@ Library
   Other-Modules:
      Data.IndexedPriorityQueue
      Data.SeqQueue
+     Text.Util
      Paths_toysolver
   GHC-Prof-Options: -auto-all
 

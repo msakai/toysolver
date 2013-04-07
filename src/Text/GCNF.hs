@@ -27,6 +27,7 @@ module Text.GCNF
   ) where
 
 import qualified SAT.Types as SAT
+import Text.Util
 
 data GCNF
   = GCNF
@@ -77,15 +78,15 @@ parseLine :: String -> GClause
 parseLine s =
   case words s of
     (('{':w):xs) ->
-        let ys  = map read $ init xs
-            idx = read $ init w
+        let ys  = map readInt $ init xs
+            idx = readInt $ init w
         in seq idx $ seqList ys $ (idx, ys)
     _ -> error "parse error"
 
 parseCNFLine :: String -> SAT.Clause
 parseCNFLine s = seq xs $ seqList xs $ xs
   where
-    xs = init (map read (words s))
+    xs = init (map readInt (words s))
 
 seqList :: [a] -> b -> b
 seqList [] b = b
