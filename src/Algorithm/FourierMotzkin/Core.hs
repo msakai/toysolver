@@ -48,6 +48,7 @@ import Data.Lattice
 import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Interval as Interval
+import Data.Interval (Interval, EndPoint (..), (<=..<), (<..<=), (<..<))
 import Data.Var
 
 -- ---------------------------------------------------------------------------
@@ -211,13 +212,13 @@ solve' vs cs = listToMaybe $ do
   guard $ Just [] == simplify ys
   return $ mt IM.empty
 
-evalBounds :: Model Rational -> BoundsR -> Interval.Interval Rational
+evalBounds :: Model Rational -> BoundsR -> Interval Rational
 evalBounds model (ls1,ls2,us1,us2) =
   foldl' Interval.intersection Interval.univ $ 
-    [ Interval.interval (Just (True, evalRat model x)) Nothing  | x <- ls1 ] ++
-    [ Interval.interval (Just (False, evalRat model x)) Nothing | x <- ls2 ] ++
-    [ Interval.interval Nothing (Just (True, evalRat model x))  | x <- us1 ] ++
-    [ Interval.interval Nothing (Just (False, evalRat model x)) | x <- us2 ]
+    [ Finite (evalRat model x) <=..< PosInf | x <- ls1 ] ++
+    [ Finite (evalRat model x) <..<  PosInf | x <- ls2 ] ++
+    [ NegInf <..<= Finite (evalRat model x) | x <- us1 ] ++
+    [ NegInf <..<  Finite (evalRat model x) | x <- us2 ]
 
 -- ---------------------------------------------------------------------------
 

@@ -18,6 +18,7 @@ import Data.Polynomial.GBase
 import Data.Polynomial.Sturm
 import qualified Data.Polynomial.Lagrange as Lagrange
 import qualified Data.Interval as Interval
+import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<))
 
 {--------------------------------------------------------------------
   Polynomial type
@@ -477,11 +478,11 @@ case_sturmChain = sturmChain p0 @?= chain
 -- http://mathworld.wolfram.com/SturmFunction.html
 case_numRoots_1 =
   sequence_
-  [ numRoots p (Interval.closedInterval (-2) 0)        @?= 2
-  , numRoots p (Interval.closedInterval 0 2)           @?= 1
-  , numRoots p (Interval.closedInterval (-1.5) (-1.0)) @?= 1
-  , numRoots p (Interval.closedInterval (-0.5) 0)      @?= 1
-  , numRoots p (Interval.closedInterval 1 (1.5))       @?= 1
+  [ numRoots p (Finite (-2)   <=..<= Finite 0)      @?= 2
+  , numRoots p (Finite 0      <=..<= Finite 2)      @?= 1
+  , numRoots p (Finite (-1.5) <=..<= Finite (-1.0)) @?= 1
+  , numRoots p (Finite (-0.5) <=..<= Finite 0)      @?= 1
+  , numRoots p (Finite 1      <=..<= Finite (1.5))  @?= 1
   ]
   where
     x = var ()
@@ -490,10 +491,10 @@ case_numRoots_1 =
 -- check interpretation of intervals
 case_numRoots_2 =
   sequence_
-  [ numRoots p (Interval.interval (Just (False,2)) (Just (True,3)))  @?= 0
-  , numRoots p (Interval.interval (Just (True,2))  (Just (True,3)))  @?= 1
-  , numRoots p (Interval.interval (Just (False,1)) (Just (False,2))) @?= 0
-  , numRoots p (Interval.interval (Just (False,1)) (Just (True,2)))  @?= 1
+  [ numRoots p (Finite 2 <..<=  Finite 3) @?= 0
+  , numRoots p (Finite 2 <=..<= Finite 3) @?= 1
+  , numRoots p (Finite 1 <..<   Finite 2) @?= 0
+  , numRoots p (Finite 1 <..<=  Finite 2) @?= 1
   ]
   where
     x = var ()

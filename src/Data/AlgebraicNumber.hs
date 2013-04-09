@@ -47,7 +47,7 @@ import Data.Polynomial hiding (deg)
 import qualified Data.Polynomial as P
 import qualified Data.Polynomial.Sturm as Sturm
 import qualified Data.Polynomial.FactorZ as FactorZ
-import Data.Interval (Interval, (<!), (>!))
+import Data.Interval (Interval, EndPoint (..), (<=..<), (<..<=), (<..<), (<!), (>!))
 import qualified Data.Interval as Interval
 import Data.AlgebraicNumber.Root
 
@@ -114,8 +114,8 @@ instance Ord AReal where
     | otherwise = assert (Sturm.numRoots p ineg == 1) LT
     where
       c@(RealRoot p i3) = a - b
-      ipos = Interval.intersection i3 (Interval.interval (Just (False,0)) Nothing)
-      ineg = Interval.intersection i3 (Interval.interval Nothing (Just (False,0)))
+      ipos = Interval.intersection i3 (Finite 0 <..< PosInf)
+      ineg = Interval.intersection i3 (NegInf <..< Finite 0)
 
 instance Num AReal where
   RealRoot p1 i1 + RealRoot p2 i2 = realRoot p3 i3
@@ -229,32 +229,32 @@ round' x =
 -- | Same as 'ceiling'.
 ceiling' :: Integral b => AReal -> b
 ceiling' (RealRoot p i) =
-  if Sturm.numRoots' chain (Interval.intersection i2 i3) > 1
+  if Sturm.numRoots' chain (Interval.intersection i2 i3) >= 1
     then fromInteger ceiling_lb
     else fromInteger ceiling_ub
   where
     chain = Sturm.sturmChain p
     i2 = Sturm.narrow' chain i (1/2)
-    Just (inLB, lb) = Interval.lowerBound i2
-    Just (inUB, ub) = Interval.upperBound i2
+    (Finite lb, inLB) = Interval.lowerBound' i2
+    (Finite ub, inUB) = Interval.upperBound' i2
     ceiling_lb = ceiling lb
     ceiling_ub = ceiling ub
-    i3 = Interval.interval Nothing (Just (True, fromInteger ceiling_lb))
+    i3 = NegInf <..<= Finite (fromInteger ceiling_lb)
 
 -- | Same as 'floor'.
 floor' :: Integral b => AReal -> b
 floor' (RealRoot p i) =
-  if Sturm.numRoots' chain (Interval.intersection i2 i3) > 1
+  if Sturm.numRoots' chain (Interval.intersection i2 i3) >= 1
     then fromInteger floor_ub
     else fromInteger floor_lb
   where
     chain = Sturm.sturmChain p
     i2 = Sturm.narrow' chain i (1/2)
-    Just (inLB, lb) = Interval.lowerBound i2
-    Just (inUB, ub) = Interval.upperBound i2
+    (Finite lb, inLB) = Interval.lowerBound' i2
+    (Finite ub, inUB) = Interval.upperBound' i2
     floor_lb = floor lb
     floor_ub = floor ub
-    i3 = Interval.interval (Just (True, fromInteger floor_ub)) Nothing
+    i3 = Finite (fromInteger floor_ub) <=..< PosInf
 
 {--------------------------------------------------------------------
   Properties

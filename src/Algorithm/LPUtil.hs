@@ -55,11 +55,11 @@ toStandardForm' (obj, cs) = m
     m = flip evalState v1 $ do
       s <- liftM IM.unions $ forM (IM.toList bounds) $ \(v,i) -> do
         case Interval.lowerBound i of
-          Nothing -> do
+          Interval.NegInf -> do
             v1 <- gensym
             v2 <- gensym
             return $ IM.singleton v (LA.var v1 .-. LA.var v2)
-          Just (_,lb)
+          Interval.Finite lb
             | lb >= 0   -> return IM.empty
             | otherwise -> do
                 v1 <- gensym

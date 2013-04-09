@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
+import Control.Monad
 import Data.Maybe
 import Data.Ratio
 import Test.HUnit hiding (Test)
@@ -10,7 +11,7 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
 import Data.Linear
-import Data.Interval (Interval, (<!), (<=!), (==!), (>=!), (>!), (<?), (<=?), (==?), (>=?), (>?))
+import Data.Interval (Interval, EndPoint (..), (<=..<=), (<=..<), (<..<=), (<..<), (<!), (<=!), (==!), (>=!), (>!), (<?), (<=?), (==?), (>=?), (>?))
 import qualified Data.Interval as Interval
 
 {--------------------------------------------------------------------
@@ -196,68 +197,68 @@ case_pickup_univ =
 case_lt_all_1 = (a <! b) @?= False
   where
     a, b :: Interval Rational
-    a = Interval.interval Nothing (Just (True,0))
-    b = Interval.interval (Just (True,0)) Nothing
+    a = NegInf <..<= Finite 0
+    b = Finite 0 <=..< PosInf
 
 case_lt_all_2 = (a <! b) @?= True
   where
     a, b :: Interval Rational
-    a = Interval.interval Nothing (Just (False,0))
-    b = Interval.interval (Just (True,0)) Nothing
+    a = NegInf <..< Finite 0
+    b = Finite 0 <=..< PosInf
 
 case_lt_all_3 = (a <! b) @?= True
   where
     a, b :: Interval Rational
-    a = Interval.interval Nothing (Just (True,0))
-    b = Interval.interval (Just (False,0)) Nothing
+    a = NegInf <..<= Finite 0
+    b = Finite 0 <..< PosInf
 
 case_lt_all_4 = (a <! b) @?= False
   where
     a, b :: Interval Rational
-    a = Interval.interval (Just (True,0)) Nothing
-    b = Interval.interval (Just (True,1)) Nothing
+    a = Finite 0 <=..< PosInf
+    b = Finite 1 <=..< PosInf
 
 case_lt_some_1 = (a <? b) @?= False
   where
     a, b :: Interval Rational
-    a = Interval.interval (Just (True,0)) Nothing
-    b = Interval.interval Nothing (Just (True,0))
+    a = Finite 0 <=..< PosInf
+    b = NegInf <..<= Finite 0
 
 case_lt_some_2 = (a <? b) @?= False
   where
     a, b :: Interval Rational
-    a = Interval.interval (Just (False,0)) Nothing
-    b = Interval.interval Nothing (Just (True,0))
+    a = Finite 0 <..< PosInf
+    b = NegInf <..<= Finite 0
 
 case_lt_some_3 = (a <? b) @?= False
   where
     a, b :: Interval Rational
-    a = Interval.interval (Just (True,0)) Nothing
-    b = Interval.interval Nothing (Just (False,0))
+    a = Finite 0 <=..< PosInf
+    b = NegInf <..< Finite 0
 
 case_lt_some_4 = (a <! b) @?= False
   where
     a, b :: Interval Rational
-    a = Interval.interval (Just (True,0)) Nothing
-    b = Interval.interval (Just (True,1)) Nothing
+    a = Finite 0 <=..< PosInf
+    b = Finite 1 <=..< PosInf
 
 case_le_some_1 = (a <=? b) @?= True
   where
     a, b :: Interval Rational
-    a = Interval.interval (Just (True,0)) Nothing
-    b = Interval.interval Nothing (Just (True,0))
+    a = Finite 0 <=..< PosInf
+    b = NegInf <..<= Finite 0
 
 case_le_some_2 = (a <=? b) @?= False
   where
     a, b :: Interval Rational
-    a = Interval.interval (Just (False,0)) Nothing
-    b = Interval.interval Nothing (Just (True,0))
+    a = Finite 0 <..< PosInf
+    b = NegInf <..<= Finite 0
 
 case_le_some_3 = (a <=? b) @?= False
   where
     a, b :: Interval Rational
-    a = Interval.interval (Just (True,0)) Nothing
-    b = Interval.interval Nothing (Just (False,0))
+    a = Finite 0 <=..< PosInf
+    b = NegInf <..< Finite 0
 
 prop_lt_all_not_refl =
   forAll intervals $ \a -> not (Interval.null a) ==> not (a <! a)
@@ -384,39 +385,39 @@ prop_mult_member =
 
 case_mult_test1 = ival1 * ival2 @?= ival3
   where
-    ival1 = Interval.interval (Just (True,1)) (Just (True,2))
-    ival2 = Interval.interval (Just (True,1)) (Just (True,2))
-    ival3 = Interval.interval (Just (True,1)) (Just (True,4))
+    ival1 = Finite 1 <=..<= Finite 2
+    ival2 = Finite 1 <=..<= Finite 2
+    ival3 = Finite 1 <=..<= Finite 4
 
 case_mult_test2 = ival1 * ival2 @?= ival3
   where
-    ival1 = Interval.interval (Just (True,1)) (Just (True,2))
-    ival2 = Interval.interval (Just (False,1)) (Just (False,2))
-    ival3 = Interval.interval (Just (False,1)) (Just (False,4))
+    ival1 = Finite 1 <=..<= Finite 2
+    ival2 = Finite 1 <..< Finite 2
+    ival3 = Finite 1 <..< Finite 4
 
 case_mult_test3 = ival1 * ival2 @?= ival3
   where
-    ival1 = Interval.interval (Just (False,1)) (Just (False,2))
-    ival2 = Interval.interval (Just (False,1)) (Just (False,2))
-    ival3 = Interval.interval (Just (False,1)) (Just (False,4))
+    ival1 = Finite 1 <..< Finite 2
+    ival2 = Finite 1 <..< Finite 2
+    ival3 = Finite 1 <..< Finite 4
 
 case_mult_test4 = ival1 * ival2 @?= ival3
   where
-    ival1 = Interval.interval (Just (False,2)) Nothing
-    ival2 = Interval.interval (Just (False,3)) Nothing
-    ival3 = Interval.interval (Just (False,6)) Nothing
+    ival1 = Finite 2 <..< PosInf
+    ival2 = Finite 3 <..< PosInf
+    ival3 = Finite 6 <..< PosInf
 
 case_mult_test5 = ival1 * ival2 @?= ival3
   where
-    ival1 = Interval.interval Nothing (Just (False,-3))
-    ival2 = Interval.interval Nothing (Just (False,-2))
-    ival3 = Interval.interval (Just (False,6)) Nothing
+    ival1 = NegInf <..< Finite (-3)
+    ival2 = NegInf <..< Finite (-2)
+    ival3 = Finite 6 <..< PosInf
 
 case_mult_test6 = ival1 * ival2 @?= ival3
   where
-    ival1 = Interval.interval (Just (False,2)) Nothing
-    ival2 = Interval.interval Nothing (Just (False,-2))
-    ival3 = Interval.interval Nothing (Just (False,-4))
+    ival1 = Finite 2 <..< PosInf
+    ival2 = NegInf <..< Finite (-2)
+    ival3 = NegInf <..< Finite (-4)
 
 {--------------------------------------------------------------------
   Fractional
@@ -437,12 +438,20 @@ case_recip_neg =
 case_recip_test1 = recip i1 @?= i2
   where
     i1, i2 :: Interval Rational
-    i1 = Interval.interval (Just (True,2)) Nothing
-    i2 = Interval.interval (Just (False,0)) (Just (True,1/2))
+    i1 = Finite 2 <=..< PosInf
+    i2 = Finite 0 <..<= Finite (1/2)
 
 {--------------------------------------------------------------------
   Generators
 --------------------------------------------------------------------}
+
+instance Arbitrary r => Arbitrary (EndPoint r) where
+  arbitrary = 
+    oneof
+    [ return NegInf
+    , return PosInf
+    , liftM Finite arbitrary
+    ]
 
 intervals :: Gen (Interval Rational)
 intervals = do
@@ -451,16 +460,16 @@ intervals = do
   return $ Interval.interval lb ub
 
 pos :: Interval Rational
-pos = Interval.interval (Just (False,0)) Nothing
+pos = Finite 0 <..< PosInf
 
 neg :: Interval Rational
-neg = Interval.interval Nothing (Just (False,0))
+neg = NegInf <..< Finite 0
 
 nonpos :: Interval Rational
-nonpos = Interval.interval Nothing (Just (True,0))
+nonpos = NegInf <..<= Finite 0
 
 nonneg :: Interval Rational
-nonneg = Interval.interval (Just (True,0)) Nothing
+nonneg = Finite 0 <=..< PosInf
 
 ------------------------------------------------------------------------
 -- Test harness

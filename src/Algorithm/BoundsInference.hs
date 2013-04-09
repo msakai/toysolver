@@ -70,16 +70,15 @@ f :: (Real r, Fractional r) => LA.BoundsEnv r -> [C r] -> Interval r -> Interval
 f b cs i = foldr intersection i $ do
   (op, rhs) <- cs
   let i' = LA.computeInterval b rhs
-      lb = lowerBound i'
-      ub = upperBound i'
+      lb = lowerBound' i'
+      ub = upperBound' i'
   case op of
     Eql -> return i'
-    Le -> return $ interval Nothing ub
-    Ge -> return $ interval lb Nothing
-    Lt -> return $ interval Nothing (strict ub)
-    Gt -> return $ interval (strict lb) Nothing
+    Le -> return $ interval (NegInf, False) ub
+    Ge -> return $ interval lb (PosInf, False)
+    Lt -> return $ interval (NegInf, False) (strict ub)
+    Gt -> return $ interval (strict ub) (PosInf, False)
     NEq -> []
 
-strict :: EndPoint r -> EndPoint r
-strict Nothing = Nothing
-strict (Just (_,val)) = Just (False,val)
+strict :: (EndPoint r, Bool) -> (EndPoint r, Bool)
+strict (x, _) = (x, False)

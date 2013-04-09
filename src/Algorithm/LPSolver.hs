@@ -216,7 +216,7 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
     nonnegVars = IS.filter f vs
       where
         f v = case Interval.lowerBound (bounds IM.! v) of
-                Just (_, lb) | 0 <= lb -> True
+                Interval.Finite lb | 0 <= lb -> True
                 _ -> False
 
     isTriviallyTrue :: LA.Atom r -> Bool
@@ -224,26 +224,30 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
       case op of
         Le ->
           case ub of
-            Nothing -> False
-            Just (_, val) -> val <= 0
+            Interval.PosInf -> False
+            Interval.Finite val -> val <= 0
+            Interval.NegInf -> True -- should not happen
         Ge ->
           case lb of
-            Nothing -> False
-            Just (_, val) -> val >= 0
+            Interval.NegInf -> False
+            Interval.Finite val -> val >= 0
+            Interval.PosInf -> True -- should not happen
         Lt ->
           case ub of
-            Nothing -> False
-            Just (incl, val) -> val < 0 || (not incl && val <= 0)
+            Interval.PosInf -> False
+            Interval.Finite val -> val < 0 || (not inUB && val <= 0)
+            Interval.NegInf -> True -- should not happen
         Gt ->
           case lb of
-            Nothing -> False
-            Just (incl, val) -> val > 0 || (not incl && val >= 0)
+            Interval.NegInf -> False
+            Interval.Finite val -> val > 0 || (not inLB && val >= 0)
+            Interval.PosInf -> True -- should not happen
         Eql -> isTriviallyTrue (c .<=. lzero) && isTriviallyTrue (c .>=. lzero)
         NEq -> isTriviallyTrue (c .<. lzero) || isTriviallyTrue (c .>. lzero)
       where
         c = a .-. b
         i = LA.computeInterval bounds c
-        lb = Interval.lowerBound i
-        ub = Interval.upperBound i
+        (lb, inLB) = Interval.lowerBound' i
+        (ub, inUB) = Interval.upperBound' i
 
 -- ---------------------------------------------------------------------------

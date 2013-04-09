@@ -34,7 +34,7 @@ module Data.Polynomial.Sturm
 import Data.Maybe
 import Data.Polynomial
 import qualified Data.Interval as Interval
-import Data.Interval (Interval)
+import Data.Interval (Interval, EndPoint (..), (<..<=), (<=..<=))
 
 -- | Sturm's chain (Sturm's sequence)
 type SturmChain = [UPolynomial Rational]
@@ -67,10 +67,10 @@ numRoots' chain@(p:_) ival
   | Interval.null ival2 = 0
   | otherwise =
       case (Interval.lowerBound ival2, Interval.upperBound ival2) of
-        (Just (in1,lb), Just (in2,ub)) ->
+        (Finite lb, Finite ub) ->
           (if lb==ub then 0 else (n lb - n ub)) +
-          (if in1 && isRootOf lb p then 1 else 0) +
-          (if not in2 && isRootOf ub p then -1 else 0)
+          (if lb `Interval.member` ival2 && isRootOf lb p then 1 else 0) +
+          (if ub `Interval.notMember` ival2 && isRootOf ub p then -1 else 0)
         _ -> error "numRoots'': should not happen"
   where
     ival2 = boundInterval p ival
@@ -103,7 +103,7 @@ bounds p = (-m, m)
     (s,_) = leadingTerm grlex p
 
 boundInterval :: UPolynomial Rational -> Interval Rational -> Interval Rational
-boundInterval p ival = Interval.intersection ival (Interval.closedInterval lb ub)
+boundInterval p ival = Interval.intersection ival (Finite lb <=..<= Finite ub)
   where
     (lb,ub) = bounds p
 
@@ -128,7 +128,7 @@ separate' chain@(p:_) = f (bounds p)
     g (lb,ub) =
       case n lb - n ub of
         0 -> []
-        1 -> [Interval.interval (Just (False, lb)) (Just (True, ub))]
+        1 -> [Finite lb <..<= Finite ub]
         _ -> g (lb, mid) ++ g (mid, ub)
       where
         mid = (lb + ub) / 2
@@ -144,12 +144,12 @@ narrow' chain@(p:_) ival size = go (boundInterval p ival)
       | numRoots' chain ivalL > 0 = go ivalL
       | otherwise = go ivalR -- numRoots' chain ivalR > 0
       where
-        (_,lb) = fromJust $ Interval.lowerBound ival
-        (_,ub) = fromJust $ Interval.upperBound ival
+        Finite lb = Interval.lowerBound ival
+        Finite ub = Interval.upperBound ival
         s = ub - lb
         mid = (lb + ub) / 2
-        ivalL = Interval.interval (Interval.lowerBound ival) (Just (True,mid))
-        ivalR = Interval.interval (Just (False,mid)) (Interval.upperBound ival)
+        ivalL = Interval.interval (Interval.lowerBound' ival) (Finite mid, True)
+        ivalR = Interval.interval (Finite mid, False) (Interval.upperBound' ival)
 
 approx :: UPolynomial Rational -> Interval Rational -> Rational -> Rational
 approx p = approx' (sturmChain p)
