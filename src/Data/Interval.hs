@@ -2,14 +2,18 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Interval
--- Copyright   :  (c) Masahiro Sakai 2011
+-- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, DeriveDataTypeable)
 --
--- Interval datatype.
+-- Interval datatype and interval arithmetic.
+--
+-- Unlike the intervals package <http://hackage.haskell.org/package/intervals>,
+-- this module provides both open and closed intervals and intended to be used
+-- with @Rational@.
 -- 
 -----------------------------------------------------------------------------
 module Data.Interval
@@ -46,18 +50,18 @@ module Data.Interval
 
   -- * Combine
   , intersection
-  , join
+  , hull
 
   -- * Operations
   , pickup
   , tightenToInteger
   ) where
 
+import Control.Exception (assert)
 import Control.Monad hiding (join)
 import Data.List hiding (null)
 import Data.Maybe
 import Data.Monoid
-import Data.Linear
 import Data.Lattice
 import Data.Typeable
 import Util (combineMaybe, isInteger)
@@ -86,7 +90,7 @@ upperBound' (Interval _ ub) = ub
 instance (Ord r, Num r) => Lattice (Interval r) where
   top    = univ
   bottom = empty
-  join   = join'
+  join   = hull
   meet   = intersection
 
 instance (Num r, Ord r, Show r) => Show (Interval r) where
@@ -100,8 +104,8 @@ instance (Num r, Ord r, Show r) => Show (Interval r) where
 -- | smart constructor for 'Interval'
 interval
   :: (Ord r, Num r)
-  => (EndPoint r, Bool) -- ^ lower bound
-  -> (EndPoint r, Bool) -- ^ upper bound
+  => (EndPoint r, Bool) -- ^ lower bound and whether it is included 
+  -> (EndPoint r, Bool) -- ^ upper bound and whether it is included
   -> Interval r
 interval lb@(x1,in1) ub@(x2,in2) =
   case x1 `compare` x2 of
@@ -177,12 +181,12 @@ intersection (Interval l1 u1) (Interval l2 u2) = interval (maxLB l1 l2) (minUB u
           GT -> in2
       )
 
--- | join (least upperbound) of two intervals.
-join' :: forall r. (Ord r, Num r) => Interval r -> Interval r -> Interval r
-join' x1 x2
+-- | convex hull of two intervals
+hull :: forall r. (Ord r, Num r) => Interval r -> Interval r -> Interval r
+hull x1 x2
   | null x1 = x2
   | null x2 = x1
-join' (Interval l1 u1) (Interval l2 u2) = interval (minLB l1 l2) (maxUB u1 u2)
+hull (Interval l1 u1) (Interval l2 u2) = interval (minLB l1 l2) (maxUB u1 u2)
   where
     maxUB :: (EndPoint r, Bool) -> (EndPoint r, Bool) -> (EndPoint r, Bool)
     maxUB (x1,in1) (x2,in2) =
@@ -205,7 +209,7 @@ join' (Interval l1 u1) (Interval l2 u2) = interval (minLB l1 l2) (maxUB u1 u2)
 null :: Ord r => Interval r -> Bool
 null (Interval (x1,in1) (x2,in2)) = 
   case x1 `compare` x2 of
-    EQ -> not (in1 && in2)
+    EQ -> assert (in1 && in2) False
     LT -> False
     GT -> True
 
@@ -346,55 +350,47 @@ a ==? b = not $ null $ intersection a b
 (>?) :: Real r => Interval r -> Interval r -> Bool
 (>?) = flip (<?)
 
--- | Interval airthmetics.
--- Note that this instance does not satisfy algebraic laws of linear spaces.
-instance Real r => Module r (Interval r) where
-  lzero = singleton 0
-
-  a .+. b | null a || null b = empty
-  Interval lb1 ub1 .+. Interval lb2 ub2 = interval (f lb1 lb2) (g ub1 ub2)
-    where
-      f (Finite x1, in1) (Finite x2, in2) = (Finite (x1+x2), in1 && in2)
-      f (NegInf,_) _ = (NegInf, False)
-      f _ (NegInf,_) = (NegInf, False)
-      f _ _ = error "Interval.(.+.) should not happen"
-
-      g (Finite x1, in1) (Finite x2, in2) = (Finite (x1+x2), in1 && in2)
-      g (PosInf,_) _ = (PosInf, False)
-      g _ (PosInf,_) = (PosInf, False)
-      g _ _ = error "Interval.(.+.) should not happen"
-
-  _ .*. x | null x = empty
-  c .*. Interval lb ub =
-    case compare c 0 of
-      EQ -> singleton 0
-      LT -> interval (scaleInf' c ub) (scaleInf' c lb)
-      GT -> interval (scaleInf' c lb) (scaleInf' c ub)
-
-instance (Real r, Fractional r) => Linear r (Interval r)
-
 appPrec, appPrec1 :: Int
 appPrec = 10
 appPrec1 = appPrec + 1
 
+scaleInterval :: Real r => r -> Interval r -> Interval r
+scaleInterval _ x | null x = empty
+scaleInterval c (Interval lb ub) =
+  case compare c 0 of
+    EQ -> singleton 0
+    LT -> interval (scaleInf' c ub) (scaleInf' c lb)
+    GT -> interval (scaleInf' c lb) (scaleInf' c ub)
 
 instance forall r. (Real r, Fractional r) => Num (Interval r) where
-  a + b = a .+. b
-  a - b = a .-. b
-  negate a = (-1) .*. a
+  a + b | null a || null b = empty
+  Interval lb1 ub1 + Interval lb2 ub2 = interval (f lb1 lb2) (g ub1 ub2)
+    where
+      f (Finite x1, in1) (Finite x2, in2) = (Finite (x1+x2), in1 && in2)
+      f (NegInf,_) _ = (NegInf, False)
+      f _ (NegInf,_) = (NegInf, False)
+      f _ _ = error "Interval.(+) should not happen"
+
+      g (Finite x1, in1) (Finite x2, in2) = (Finite (x1+x2), in1 && in2)
+      g (PosInf,_) _ = (PosInf, False)
+      g _ (PosInf,_) = (PosInf, False)
+      g _ _ = error "Interval.(+) should not happen"
+
+  negate a = scaleInterval (-1) a
+
   fromInteger i = singleton (fromInteger i)
 
-  abs x = ((x `intersection` nonneg) `join` (negate x `intersection` nonneg))
+  abs x = ((x `intersection` nonneg) `hull` (negate x `intersection` nonneg))
     where
-      nonneg = interval (Finite 0, True) (PosInf, False)
+      nonneg = Finite 0 <=..< PosInf
 
-  signum x = zero `join` pos `join` neg
+  signum x = zero `hull` pos `hull` neg
     where
       zero = if member 0 x then singleton 0 else empty
-      pos = if null $ interval (Finite 0, False) (PosInf, False) `intersection` x
+      pos = if null $ (Finite 0 <..< PosInf) `intersection` x
             then empty
             else singleton 1
-      neg = if null $ interval (NegInf, False) (Finite 0, False) `intersection` x
+      neg = if null $ (NegInf <..< Finite 0) `intersection` x
             then empty
             else singleton (-1)
 
@@ -419,7 +415,11 @@ cmpUB, cmpLB :: Real r => (EndPoint r, Bool) -> (EndPoint r, Bool) -> Ordering
 cmpUB (x1,in1) (x2,in2) = compare x1 x2 `mappend` compare in1 in2
 cmpLB (x1,in1) (x2,in2) = compare x1 x2 `mappend` flip compare in1 in2
 
-data EndPoint r = NegInf | Finite !r | PosInf
+-- | Endpoints of intervals
+data EndPoint r
+  = NegInf    -- ^ negative infinity
+  | Finite !r -- ^ finite value
+  | PosInf    -- ^ positive infinity
   deriving (Ord, Eq, Show, Typeable)
 
 instance Bounded (EndPoint r) where

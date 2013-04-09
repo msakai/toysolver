@@ -10,7 +10,6 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
-import Data.Linear
 import Data.Interval (Interval, EndPoint (..), (<=..<=), (<=..<), (<..<=), (<..<), (<!), (<=!), (==!), (>=!), (>!), (<?), (<=?), (==?), (>=?), (>?))
 import qualified Data.Interval as Interval
 
@@ -106,42 +105,42 @@ prop_intersection_isSubsetOf_equiv =
     == Interval.isSubsetOf a b
 
 {--------------------------------------------------------------------
-  Join
+  Hull
 --------------------------------------------------------------------}
 
-prop_join_comm =
+prop_hull_comm =
   forAll intervals $ \a ->
   forAll intervals $ \b ->
-    Interval.join a b == Interval.join b a
+    Interval.hull a b == Interval.hull b a
 
-prop_join_assoc =
+prop_hull_assoc =
   forAll intervals $ \a ->
   forAll intervals $ \b ->
   forAll intervals $ \c ->
-    Interval.join a (Interval.join b c) ==
-    Interval.join (Interval.join a b) c
+    Interval.hull a (Interval.hull b c) ==
+    Interval.hull (Interval.hull a b) c
 
-prop_join_unitL =
+prop_hull_unitL =
   forAll intervals $ \a ->
-    Interval.join Interval.empty a == a
+    Interval.hull Interval.empty a == a
 
-prop_join_unitR =
+prop_hull_unitR =
   forAll intervals $ \a ->
-    Interval.join a Interval.empty == a
+    Interval.hull a Interval.empty == a
 
-prop_join_univ =
+prop_hull_univ =
   forAll intervals $ \a ->
-    Interval.join a Interval.univ == Interval.univ
+    Interval.hull a Interval.univ == Interval.univ
 
-prop_join_isSubsetOf =
-  forAll intervals $ \a ->
-  forAll intervals $ \b ->
-    Interval.isSubsetOf a (Interval.join a b)
-
-prop_join_isSubsetOf_equiv =
+prop_hull_isSubsetOf =
   forAll intervals $ \a ->
   forAll intervals $ \b ->
-    (Interval.join a b == b)
+    Interval.isSubsetOf a (Interval.hull a b)
+
+prop_hull_isSubsetOf_equiv =
+  forAll intervals $ \a ->
+  forAll intervals $ \b ->
+    (Interval.hull a b == b)
     == Interval.isSubsetOf a b
 
 {--------------------------------------------------------------------
@@ -308,7 +307,7 @@ prop_le_some_singleton_2 =
 
 prop_scale_empty =
   forAll arbitrary $ \r ->
-    (r::Rational) .*. Interval.empty == Interval.empty
+    Interval.singleton (r::Rational) * Interval.empty == Interval.empty
 
 prop_add_comm =
   forAll intervals $ \a ->
@@ -361,11 +360,6 @@ prop_mult_dist =
   forAll intervals $ \b ->
   forAll intervals $ \c ->
     (a * (b + c)) `Interval.isSubsetOf` (a * b + a * c)
-
-prop_mult_singleton =
-  forAll arbitrary $ \r ->
-  forAll intervals $ \a ->
-    Interval.singleton r * a == r .*. a
 
 prop_mult_empty =
   forAll intervals $ \a ->
