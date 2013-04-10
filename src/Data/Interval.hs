@@ -106,9 +106,20 @@ instance (Num r, Ord r, Show r) => Show (Interval r) where
   showsPrec p x | null x = showString "empty"
   showsPrec p x = showParen (p > appPrec) $
     showString "interval " .
-    showsPrec appPrec1 (lowerBound x) .
+    showsPrec appPrec1 (lowerBound' x) .
     showChar ' ' . 
-    showsPrec appPrec1 (upperBound x)
+    showsPrec appPrec1 (upperBound' x)
+
+instance (Num r, Ord r, Read r) => Read (Interval r) where
+  readsPrec p r =
+    (readParen (p > appPrec) $ \s0 -> do
+      ("interval",s1) <- lex s0
+      (lb,s2) <- readsPrec (appPrec+1) s1
+      (ub,s3) <- readsPrec (appPrec+1) s2
+      return (interval lb ub, s3)) r
+    ++
+    (do ("empty", s) <- lex r
+        return (empty, s))
 
 -- | smart constructor for 'Interval'
 interval
@@ -406,7 +417,7 @@ data EndPoint r
   = NegInf    -- ^ negative infinity (-∞)
   | Finite !r -- ^ finite value
   | PosInf    -- ^ positive infinity (+∞)
-  deriving (Ord, Eq, Show, Typeable)
+  deriving (Ord, Eq, Show, Read, Typeable)
 
 instance Bounded (EndPoint r) where
   minBound = NegInf
