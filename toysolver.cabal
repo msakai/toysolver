@@ -51,7 +51,7 @@ Library
      base >=4 && <5,
      containers >= 0.4.2, mtl, array, random, stm >=2.3, parsec, bytestring, filepath, deepseq, time, old-locale, primes,
      parse-dimacs, queue, heaps, unbounded-delays, lattices >=1.2.1.1,
-     OptDir
+     OptDir, data-interval >=0.1.0
   Extensions:
      MultiParamTypeClasses
      FlexibleInstances
@@ -104,7 +104,6 @@ Library
      Data.LA.FOL
      Data.LBool
      Data.Linear
-     Data.Interval
      Data.Polynomial
      Data.Polynomial.FactorZ
      Data.Polynomial.GBase
@@ -202,14 +201,7 @@ Test-suite TestPolynomial
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestPolynomial.hs
-  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
-  Extensions: TemplateHaskell, DoAndIfThenElse
-
-Test-suite TestInterval
-  Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    test
-  Main-is:           TestInterval.hs
-  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3, data-interval >=0.1.0
   Extensions: TemplateHaskell, DoAndIfThenElse
 
 Test-suite TestAReal
