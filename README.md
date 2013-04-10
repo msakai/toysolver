@@ -1,6 +1,8 @@
 toysolver
 =========
 
+Assorted decision procedures for SAT, Max-SAT, PB, MIP, etc.
+
 Installation
 ------------
 
@@ -75,6 +77,19 @@ Supported formats:
 
 * Input formats: lp, mps, cnf, wcnf, opb, wbo
 * Output formats: lp, smt2, ys
+
+### pbconvert
+
+Converter between SAT/PB-related formats
+
+Usage:
+
+    pbconvert -o <outputile> <inputfile>
+
+Supported formats:
+
+* Input formats: cnf, wcnf, opb, wbo
+* Output formats: opb wbo
 
 TODO
 ----
