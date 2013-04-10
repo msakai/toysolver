@@ -54,7 +54,6 @@ module Data.Interval
 
   -- * Operations
   , pickup
-  , tightenToInteger
   ) where
 
 import Control.Exception (assert)
@@ -271,29 +270,6 @@ pickup (Interval (Finite x1, in1) (Finite x2, in2)) =
     LT -> Just $ (x1+x2) / 2
     EQ -> if in1 && in2 then Just x1 else Nothing
 pickup x = Nothing
-
--- | tightening intervals by ceiling lower bounds and flooring upper bounds.
-tightenToInteger :: forall r. (RealFrac r) => Interval r -> Interval r
-tightenToInteger (Interval lb@(x1, in1) ub@(x2, in2)) = interval lb2 ub2
-  where
-    lb2 =
-      case x1 of
-        Finite x ->
-          ( if isInteger x && not in1
-            then Finite (x + 1)
-            else Finite (fromInteger (ceiling x))
-          , True
-          )
-        _ -> lb
-    ub2 =
-      case x2 of
-        Finite x ->
-          ( if isInteger x && not in2
-            then Finite (x - 1)
-            else Finite (fromInteger (floor x))
-          , True
-          )
-        _ -> ub
 
 -- | For all @x@ in @X@, @y@ in @Y@. @x '<' y@
 (<!) :: Real r => Interval r -> Interval r -> Bool

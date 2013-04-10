@@ -82,3 +82,28 @@ f b cs i = foldr intersection i $ do
 
 strict :: (EndPoint r, Bool) -> (EndPoint r, Bool)
 strict (x, _) = (x, False)
+
+-- | tightening intervals by ceiling lower bounds and flooring upper bounds.
+tightenToInteger :: forall r. (RealFrac r) => Interval r -> Interval r
+tightenToInteger ival = interval lb2 ub2
+  where
+    lb@(x1, in1) = lowerBound' ival
+    ub@(x2, in2) = upperBound' ival
+    lb2 =
+      case x1 of
+        Finite x ->
+          ( if isInteger x && not in1
+            then Finite (x + 1)
+            else Finite (fromInteger (ceiling x))
+          , True
+          )
+        _ -> lb
+    ub2 =
+      case x2 of
+        Finite x ->
+          ( if isInteger x && not in2
+            then Finite (x - 1)
+            else Finite (fromInteger (floor x))
+          , True
+          )
+        _ -> ub
