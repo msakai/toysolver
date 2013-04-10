@@ -417,14 +417,19 @@ cmpLB (x1,in1) (x2,in2) = compare x1 x2 `mappend` flip compare in1 in2
 
 -- | Endpoints of intervals
 data EndPoint r
-  = NegInf    -- ^ negative infinity
+  = NegInf    -- ^ negative infinity (+∞)
   | Finite !r -- ^ finite value
-  | PosInf    -- ^ positive infinity
+  | PosInf    -- ^ positive infinity (-∞)
   deriving (Ord, Eq, Show, Typeable)
 
 instance Bounded (EndPoint r) where
   minBound = NegInf
   maxBound = PosInf
+
+instance Functor EndPoint where
+  fmap f NegInf = NegInf
+  fmap f (Finite x) = Finite (f x)
+  fmap f PosInf = PosInf
 
 isFinite :: EndPoint r -> Bool
 isFinite (Finite _) = True
