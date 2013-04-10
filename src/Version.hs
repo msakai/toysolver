@@ -26,6 +26,9 @@ packageVersions = sort $ tail
 #ifdef VERSION_containers
   , ("containers",   VERSION_containers   )
 #endif
+#ifdef VERSION_data_interval
+  , ("data-interval",VERSION_data_interval)
+#endif
 #ifdef VERSION_deepseq
   , ("deepseq",      VERSION_deepseq      )
 #endif
