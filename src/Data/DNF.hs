@@ -15,7 +15,8 @@ module Data.DNF
   ( DNF (..)
   ) where
 
-import Data.Lattice
+import Algebra.Lattice
+import Algebra.Lattice.Boolean
 
 -- | Disjunctive normal form
 newtype DNF lit
@@ -26,10 +27,20 @@ newtype DNF lit
 instance Complement lit => Complement (DNF lit) where
   notB (DNF xs) = DNF . sequence . map (map notB) $ xs
 
-instance Complement lit => Lattice (DNF lit) where
-  top    = DNF [[]]
-  bottom = DNF []
-  DNF xs `meet` DNF ys = DNF [x++y | x<-xs, y<-ys]
+instance JoinSemiLattice (DNF lit) where
   DNF xs `join` DNF ys = DNF (xs++ys)
+
+instance MeetSemiLattice (DNF lit) where
+  DNF xs `meet` DNF ys = DNF [x++y | x<-xs, y<-ys]
+
+instance Lattice (DNF lit)
+
+instance BoundedJoinSemiLattice (DNF lit) where
+  bottom = DNF []
+
+instance BoundedMeetSemiLattice (DNF lit) where
+  top = DNF [[]]
+
+instance BoundedLattice (DNF lit)
 
 instance Complement lit => Boolean (DNF lit)

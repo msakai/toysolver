@@ -26,11 +26,12 @@ import qualified Data.IntSet as IS
 import qualified Data.Map as Map
 import Prelude hiding (null)
 
+import Algebra.Lattice
+
 import qualified Data.Interval as Interval
 import Data.ArithRel
 import qualified Data.LA as LA
 import Data.Linear
-import Data.Lattice
 import Data.Var
 
 type ExprR = LA.Expr Rational
@@ -50,14 +51,24 @@ instance Variables Polyhedron where
   vars (Polyhedron m) = IS.unions [vars e | e <- Map.keys m]
   vars Empty = IS.empty
 
-instance Lattice Polyhedron where
-  top    = univ
-  bottom = empty
-  meet   = intersection
+instance JoinSemiLattice Polyhedron where
   join Empty b = b
   join a Empty = a
   join (Polyhedron m1) (Polyhedron m2) =
     normalize $ Polyhedron (Map.intersectionWith Interval.join m1 m2)
+
+instance MeetSemiLattice Polyhedron where
+  meet = intersection
+
+instance Lattice Polyhedron
+
+instance BoundedJoinSemiLattice Polyhedron where
+  bottom = empty  
+
+instance BoundedMeetSemiLattice Polyhedron where
+  top = univ
+
+instance BoundedLattice Polyhedron
 
 normalize :: Polyhedron -> Polyhedron
 normalize (Polyhedron m) | any Interval.null (Map.elems m) = Empty

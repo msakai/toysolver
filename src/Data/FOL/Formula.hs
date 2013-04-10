@@ -15,15 +15,17 @@
 module Data.FOL.Formula
   (
   -- * Overloaded operations for formula.
-    module Data.Lattice
+    module Algebra.Lattice.Boolean
 
   -- * Concrete formula
   , Formula (..)
   , pushNot
   ) where
 
+import Algebra.Lattice
+import Algebra.Lattice.Boolean
+
 import qualified Data.IntSet as IS
-import Data.Lattice
 import Data.Var
 
 -- ---------------------------------------------------------------------------
@@ -57,11 +59,21 @@ instance Variables a => Variables (Formula a) where
 instance Complement (Formula a) where
   notB = Not
 
-instance Lattice (Formula c) where
-  top    = T
+instance JoinSemiLattice (Formula c) where
+  join = Or
+
+instance MeetSemiLattice (Formula c) where
+  meet = And
+
+instance Lattice (Formula c)
+
+instance BoundedJoinSemiLattice (Formula c) where
   bottom = F
-  meet   = And
-  join   = Or
+
+instance BoundedMeetSemiLattice (Formula c) where
+  top = T
+
+instance BoundedLattice (Formula c)
 
 instance Boolean (Formula c) where
   (.=>.)  = Imply

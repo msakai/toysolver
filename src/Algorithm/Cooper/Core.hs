@@ -52,8 +52,10 @@ import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
+import Algebra.Lattice
+import Algebra.Lattice.Boolean
+
 import Data.ArithRel
-import Data.Lattice
 import Data.Linear
 import qualified Data.LA as LA
 import Data.Var
@@ -118,11 +120,21 @@ instance Complement QFFormula where
   notB (Or' a b) = And' (notB a) (notB b)
   notB (Lit lit) = Lit (notB lit)
 
-instance Lattice QFFormula where
-  top    = T'
+instance JoinSemiLattice QFFormula where
+  join = Or'
+
+instance MeetSemiLattice QFFormula where
+  meet = And'
+
+instance Lattice QFFormula
+
+instance BoundedJoinSemiLattice QFFormula where
   bottom = F'
-  meet   = And'
-  join   = Or'
+
+instance BoundedMeetSemiLattice QFFormula where
+  top = T'
+
+instance BoundedLattice QFFormula
 
 instance Boolean QFFormula
 

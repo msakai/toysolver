@@ -9,11 +9,12 @@ module Algorithm.FourierMotzkin.FOL
 import Control.Monad
 import qualified Data.IntSet as IS
 
+import Algebra.Lattice.Boolean
+
 import Data.ArithRel
 import Data.DNF
 import qualified Data.FOL.Arith as FOL
 import qualified Data.LA.FOL as LAFOL
-import Data.Lattice
 import Data.Var
 
 import Algorithm.FourierMotzkin.Core

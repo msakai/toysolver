@@ -42,9 +42,10 @@ import Data.Ratio
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
+import Algebra.Lattice.Boolean
+
 import Data.ArithRel
 import Data.DNF
-import Data.Lattice
 import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Interval as Interval

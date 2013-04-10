@@ -29,8 +29,8 @@ module Data.ArithRel
   , (.<.), (.<=.), (.>=.), (.>.), (.==.), (./=.)
   ) where
 
+import Algebra.Lattice.Boolean (Complement (..))
 import qualified Data.IntSet as IS
-import Data.Lattice (Complement (..))
 import Data.Var
 
 infix 4 .<., .<=., .>=., .>., .==., ./=.

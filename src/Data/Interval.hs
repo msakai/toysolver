@@ -62,10 +62,10 @@ import Control.Monad hiding (join)
 import Data.List hiding (null)
 import Data.Maybe
 import Data.Monoid
-import Data.Lattice
 import Data.Typeable
 import Util (combineMaybe, isInteger)
 import Prelude hiding (null)
+import Algebra.Lattice
 
 -- | Interval
 data Interval r = Interval !(EndPoint r, Bool) !(EndPoint r, Bool)
@@ -87,11 +87,21 @@ lowerBound' (Interval lb _) = lb
 upperBound' :: Num r => Interval r -> (EndPoint r, Bool)
 upperBound' (Interval _ ub) = ub
 
-instance (Ord r, Num r) => Lattice (Interval r) where
-  top    = whole
+instance (Num r, Ord r) => JoinSemiLattice (Interval r) where
+  join = hull
+
+instance (Num r, Ord r) => MeetSemiLattice (Interval r) where
+  meet = hull
+
+instance (Num r, Ord r) => Lattice (Interval r)
+
+instance (Num r, Ord r) => BoundedJoinSemiLattice (Interval r) where
   bottom = empty
-  join   = hull
-  meet   = intersection
+
+instance (Num r, Ord r) => BoundedMeetSemiLattice (Interval r) where
+  top = whole
+
+instance (Num r, Ord r) => BoundedLattice (Interval r)
 
 instance (Num r, Ord r, Show r) => Show (Interval r) where
   showsPrec p x | null x = showString "empty"

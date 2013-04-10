@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Data.Lattice
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Module      :  Algebra.Lattice.Boolean
+-- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -12,13 +12,10 @@
 -- Type classes for lattices and boolean algebras.
 -- 
 -----------------------------------------------------------------------------
-module Data.Lattice
+module Algebra.Lattice.Boolean
   (
-  -- * Lattice
-    Lattice (..)
-  
   -- * Boolean algebra
-  , Complement (..)
+    Complement (..)
   , Boolean (..)
   , true
   , false
@@ -28,39 +25,18 @@ module Data.Lattice
   , orB
   ) where
 
+import Algebra.Lattice
+
 infixr 3 .&&.
 infixr 2 .||.
 infix 1 .=>., .<=>.
-
--- | Type class for lattice.
-class Lattice a where
-  -- | top element
-  top :: a
-
-  -- | bottom element
-  bottom :: a
-
-  -- | join
-  join :: a -> a -> a
-
-  -- | meet
-  meet :: a -> a -> a
-
-  -- | n-ary join
-  joinL :: [a] -> a
-
-  -- | n-ary meet
-  meetL :: [a] -> a
-
-  joinL = foldr join bottom
-  meetL = foldr meet top
 
 -- | types that can be negated.
 class Complement a where
   notB :: a -> a
 
 -- | types that can be combined with boolean operations.
-class (Lattice a, Complement a) => Boolean a where
+class (BoundedLattice a, Complement a) => Boolean a where
   (.=>.), (.<=>.) :: a -> a -> a
   x .=>. y = notB x .||. y
   x .<=>. y = (x .=>. y) .&&. (y .=>. x)
@@ -81,10 +57,10 @@ false = bottom
 (.||.) :: Boolean a => a -> a -> a
 (.||.) = join
 
--- | alias of 'meetL'
+-- | alias of 'meets'
 andB :: Boolean a => [a] -> a
-andB = meetL
+andB = meets
 
--- | alias of 'joinL'
+-- | alias of 'joins'
 orB :: Boolean a => [a] -> a
-orB = joinL
+orB = joins

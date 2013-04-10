@@ -17,9 +17,11 @@ module Algorithm.Cooper.FOL
 
 import Control.Monad
 
+import Algebra.Lattice
+import Algebra.Lattice.Boolean
+
 import Data.ArithRel
 import qualified Data.FOL.Arith as FOL
-import Data.Lattice
 import qualified Data.LA.FOL as LAFOL
 import Data.Var
 

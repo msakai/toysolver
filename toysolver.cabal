@@ -50,7 +50,7 @@ Library
   Build-Depends:
      base >=4 && <5,
      containers >= 0.4.2, mtl, array, random, stm >=2.3, parsec, bytestring, filepath, deepseq, time, old-locale, primes,
-     parse-dimacs, queue, heaps, unbounded-delays,
+     parse-dimacs, queue, heaps, unbounded-delays, lattices >=1.2.1.1,
      OptDir
   Extensions:
      MultiParamTypeClasses
@@ -59,6 +59,7 @@ Library
      DoAndIfThenElse
      CPP
   Exposed-Modules:
+     Algebra.Lattice.Boolean
      Algorithm.BoundsInference
      Algorithm.CAD
      Algorithm.CongruenceClosure
@@ -101,7 +102,6 @@ Library
      Data.FOL.Formula
      Data.LA
      Data.LA.FOL
-     Data.Lattice
      Data.LBool
      Data.Linear
      Data.Interval
