@@ -2340,10 +2340,14 @@ anyM p = go
         then return True
         else go xs
 
+#if !MIN_VERSION_base(4,6,0)
+
 modifyIORef' :: IORef a -> (a -> a) -> IO ()
 modifyIORef' ref f = do
   x <- readIORef ref
   writeIORef ref $! f x
+
+#endif
 
 shift :: IORef [a] -> IO a
 shift ref = do
