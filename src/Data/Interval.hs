@@ -11,8 +11,8 @@
 --
 -- Interval datatype and interval arithmetic.
 --
--- Unlike the intervals package <http://hackage.haskell.org/package/intervals>,
--- this module provides both open and closed intervals and intended to be used
+-- Unlike the intervals package (<http://hackage.haskell.org/package/intervals>),
+-- this module provides both open and closed intervals and is intended to be used
 -- with @Rational@.
 -- 
 -----------------------------------------------------------------------------
@@ -340,7 +340,7 @@ appPrec, appPrec1 :: Int
 appPrec = 10
 appPrec1 = appPrec + 1
 
-scaleInterval :: Real r => r -> Interval r -> Interval r
+scaleInterval :: (Num r, Ord r) => r -> Interval r -> Interval r
 scaleInterval _ x | null x = empty
 scaleInterval c (Interval lb ub) =
   case compare c 0 of
@@ -348,7 +348,7 @@ scaleInterval c (Interval lb ub) =
     LT -> interval (scaleInf' c ub) (scaleInf' c lb)
     GT -> interval (scaleInf' c lb) (scaleInf' c ub)
 
-instance forall r. (Real r, Fractional r) => Num (Interval r) where
+instance (Num r, Ord r) => Num (Interval r) where
   a + b | null a || null b = empty
   Interval lb1 ub1 + Interval lb2 ub2 = interval (f lb1 lb2) (g ub1 ub2)
     where
@@ -397,15 +397,15 @@ instance forall r. (Real r, Fractional r) => Fractional (Interval r) where
       lb3 = minimumBy cmpLB xs
       xs = [recipLB lb, recipUB ub]
 
-cmpUB, cmpLB :: Real r => (EndPoint r, Bool) -> (EndPoint r, Bool) -> Ordering
+cmpUB, cmpLB :: Ord r => (EndPoint r, Bool) -> (EndPoint r, Bool) -> Ordering
 cmpUB (x1,in1) (x2,in2) = compare x1 x2 `mappend` compare in1 in2
 cmpLB (x1,in1) (x2,in2) = compare x1 x2 `mappend` flip compare in1 in2
 
 -- | Endpoints of intervals
 data EndPoint r
-  = NegInf    -- ^ negative infinity (+∞)
+  = NegInf    -- ^ negative infinity (-∞)
   | Finite !r -- ^ finite value
-  | PosInf    -- ^ positive infinity (-∞)
+  | PosInf    -- ^ positive infinity (+∞)
   deriving (Ord, Eq, Show, Typeable)
 
 instance Bounded (EndPoint r) where
