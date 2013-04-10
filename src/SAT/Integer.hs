@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 module SAT.Integer
   ( Expr (..)
   , newVar
@@ -10,10 +10,10 @@ module SAT.Integer
 
 import Control.Monad
 import Data.Array.IArray
+import Data.VectorSpace
 import Text.Printf
 
 import Data.ArithRel
-import Data.Linear
 import qualified SAT
 import qualified SAT.TseitinEncoder as TseitinEncoder
 
@@ -29,10 +29,14 @@ newVar solver lo hi = do
   SAT.addPBAtMost solver xs hi'
   return $ Expr ((lo,[]) : [(c,[x]) | (c,x) <- xs])
 
-instance Module Integer Expr where
-  n .*. Expr xs = Expr [(n*m,lits) | (m,lits) <- xs]
-  Expr xs1 .+. Expr xs2 = Expr (xs1++xs2)
-  lzero = Expr []
+instance AdditiveGroup Expr where
+  Expr xs1 ^+^ Expr xs2 = Expr (xs1++xs2)
+  zeroV = Expr []
+  negateV = ((-1) *^)
+
+instance VectorSpace Expr where
+  type Scalar Expr = Integer
+  n *^ Expr xs = Expr [(n*m,lits) | (m,lits) <- xs]
 
 instance Num Expr where
   Expr xs1 + Expr xs2 = Expr (xs1++xs2)

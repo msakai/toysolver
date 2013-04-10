@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Algorithm.FourierMotzkin
@@ -8,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses, FunctionalDependencies)
+-- Portability :  portable
 --
 -- Naïve implementation of Fourier-Motzkin Variable Elimination
 -- 

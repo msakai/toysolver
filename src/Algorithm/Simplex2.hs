@@ -1,4 +1,4 @@
-{-# LANGUAGE DoAndIfThenElse, TypeSynonymInstances, FlexibleContexts, FlexibleInstances #-}
+{-# LANGUAGE DoAndIfThenElse, TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Algorithm.Simplex2
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (DoAndIfThenElse, TypeSynonymInstances, FlexibleContexts, FlexibleInstances)
+-- Portability :  non-portable (DoAndIfThenElse, TypeFamilies)
 --
 -- Naïve implementation of Simplex method
 -- 
@@ -103,12 +103,12 @@ import qualified Data.IntMap as IM
 import Text.Printf
 import Data.Time
 import Data.OptDir
+import Data.VectorSpace
 import System.CPUTime
 
 import qualified Data.LA as LA
 import Data.LA (Atom (..))
 import Data.ArithRel
-import Data.Linear
 import Data.Delta
 import Util (showRational)
 
@@ -143,10 +143,10 @@ objVar = -1
 
 newSolver :: SolverValue v => IO (GenericSolver v)
 newSolver = do
-  t <- newIORef (IM.singleton objVar lzero)
+  t <- newIORef (IM.singleton objVar zeroV)
   l <- newIORef IM.empty
   u <- newIORef IM.empty
-  m <- newIORef (IM.singleton objVar lzero)
+  m <- newIORef (IM.singleton objVar zeroV)
   v <- newIORef 0
   ok <- newIORef True
   dir <- newIORef OptMin
@@ -197,7 +197,7 @@ cloneSolver solver = do
     , svPivotStrategy = pivot
     }  
 
-class (Linear Rational v, Ord v) => SolverValue v where
+class (VectorSpace v, Scalar v ~ Rational, Ord v) => SolverValue v where
   toValue :: Rational -> v
   showValue :: Bool -> v -> String
   model :: GenericSolver v -> IO Model
@@ -250,7 +250,7 @@ newVar :: SolverValue v => GenericSolver v -> IO Var
 newVar solver = do
   v <- readIORef (svVCnt solver)
   writeIORef (svVCnt solver) $! v+1
-  modifyIORef (svModel solver) (IM.insert v lzero)
+  modifyIORef (svModel solver) (IM.insert v zeroV)
   return v
 
 assertAtom :: Solver -> LA.Atom Rational -> IO ()
@@ -271,8 +271,8 @@ assertAtomEx solver atom = do
   case op of
     Le  -> assertUpper solver v (toValue rhs')
     Ge  -> assertLower solver v (toValue rhs')
-    Lt  -> assertUpper solver v (toValue rhs' .-. delta)
-    Gt  -> assertLower solver v (toValue rhs' .+. delta)
+    Lt  -> assertUpper solver v (toValue rhs' ^-^ delta)
+    Gt  -> assertLower solver v (toValue rhs' ^+^ delta)
     Eql -> do
       assertLower solver v (toValue rhs')
       assertUpper solver v (toValue rhs')
@@ -281,7 +281,7 @@ assertAtomEx solver atom = do
 simplifyAtom :: SolverValue v => GenericSolver v -> LA.Atom Rational -> IO (Var, RelOp, Rational)
 simplifyAtom solver (Rel lhs op rhs) = do
   let (lhs',rhs') =
-        case LA.extract LA.unitVar (lhs .-. rhs) of
+        case LA.extract LA.unitVar (lhs ^-^ rhs) of
           (n,e) -> (e, -n)
   case LA.terms lhs' of
     [(1,v)] -> return (v, op, rhs')
@@ -289,7 +289,7 @@ simplifyAtom solver (Rel lhs op rhs) = do
     _ -> do
       defs <- readIORef (svDefDB solver)
       let (c,lhs'') = scale lhs' -- lhs' = lhs'' / c = rhs'
-          rhs'' = c .*. rhs'
+          rhs'' = c *^ rhs'
           op''  = if c < 0 then flipOp op else op
       case Map.lookup lhs'' defs of
         Just v -> do
@@ -301,7 +301,7 @@ simplifyAtom solver (Rel lhs op rhs) = do
           return (v,op'',rhs'')
   where
     scale :: LA.Expr Rational -> (Rational, LA.Expr Rational)
-    scale e = (c, c .*. e)
+    scale e = (c, c *^ e)
       where
         c = c1 * c2
         c1 = fromIntegral $ foldl' lcm 1 [denominator c | (c, _) <- LA.terms e]
@@ -454,8 +454,8 @@ selectViolatingBasicVariable solver = do
               li <- getLB solver xi
               ui <- getUB solver xi
               if not (testLB li vi)
-                then return (xi, fromJust li .-. vi)
-                else return (xi, vi .-. fromJust ui)
+                then return (xi, fromJust li ^-^ vi)
+                else return (xi, vi ^-^ fromJust ui)
           return $ Just $ fst $ maximumBy (comparing snd) xs2
 
 {--------------------------------------------------------------------
@@ -572,9 +572,9 @@ increaseNB solver xj = do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
-    return [ assert (theta >= lzero) ((xi,v2), theta)
+    return [ assert (theta >= zeroV) ((xi,v2), theta)
            | Just v2 <- [ui | aij > 0] ++ [li | aij < 0]
-           , let theta = (v2 .-. v1) ./. aij ]
+           , let theta = (v2 ^-^ v1) ^/ aij ]
 
   -- β(xj) := β(xj) + θ なので θ を大きく
   case ubs of
@@ -595,9 +595,9 @@ decreaseNB solver xj = do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
-    return [ assert (theta <= lzero) ((xi,v2), theta)
+    return [ assert (theta <= zeroV) ((xi,v2), theta)
            | Just v2 <- [li | aij > 0] ++ [ui | aij < 0]
-           , let theta = (v2 .-. v1) ./. aij ]
+           , let theta = (v2 ^-^ v1) ^/ aij ]
 
   -- β(xj) := β(xj) + θ なので θ を小さく
   case lbs of
@@ -653,12 +653,12 @@ dualRTest solver row isLBViolated = do
     return $
       case dir of
         OptMin -> def
-        OptMax -> lnegate def
+        OptMax -> negateV def
   -- normalize to the cases of lower bound violation
   let xi_def =
        if isLBViolated
        then row
-       else lnegate row
+       else negateV row
   ws <- do
     -- select non-basic variable xj such that
     -- (aij > 0 and β(xj) < uj) or (aij < 0 and β(xj) > lj)
@@ -714,12 +714,12 @@ update solver xj v = do
   -- dump solver
 
   v0 <- getValue solver xj
-  let diff = v .-. v0
+  let diff = v ^-^ v0
 
   aj <- getCol solver xj
   modifyIORef (svModel solver) $ \m ->
-    let m2 = IM.map (\aij -> aij .*. diff) aj
-    in IM.insert xj v $ IM.unionWith (.+.) m2 m
+    let m2 = IM.map (\aij -> aij *^ diff) aj
+    in IM.insert xj v $ IM.unionWith (^+^) m2 m
 
   -- log solver $ printf "after update x%d (%s)" xj (show v)
   -- dump solver
@@ -746,11 +746,11 @@ pivotAndUpdate solver xi xj v = do
 
   aj <- getCol solver xj
   let aij = aj IM.! xi
-  let theta = (v .-. (m IM.! xi)) ./. aij
+  let theta = (v ^-^ (m IM.! xi)) ^/ aij
 
   let m' = IM.fromList $
-           [(xi, v), (xj, (m IM.! xj) .+. theta)] ++
-           [(xk, (m IM.! xk) .+. (akj .*. theta)) | (xk, akj) <- IM.toList aj, xk /= xi]
+           [(xi, v), (xj, (m IM.! xj) ^+^ theta)] ++
+           [(xk, (m IM.! xk) ^+^ (akj *^ theta)) | (xk, akj) <- IM.toList aj, xk /= xi]
   writeIORef (svModel solver) (IM.union m' m) -- note that 'IM.union' is left biased.
 
   pivot solver xi xj

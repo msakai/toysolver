@@ -68,6 +68,9 @@ packageVersions = sort $ tail
 #ifdef VERSION_unbounded_delays
   , ("unbounded-delays", VERSION_unbounded_delays)
 #endif
+#ifdef VERSION_vector_space
+  , ("vector-space", VERSION_vector_space)
+#endif
 #ifdef VERSION_logic_TPTP
   , ("logic-TPTP",   VERSION_logic_TPTP   )
 #endif

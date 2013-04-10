@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.LA
@@ -7,16 +7,15 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances)
+-- Portability :  non-portable (TypeFamilies)
 --
 -- Some definition for Theory of Linear Arithmetics.
 -- 
 -----------------------------------------------------------------------------
 module Data.LA
-  ( module Data.Linear
-
+  (
   -- * Expression of linear arithmetics
-  , Expr
+    Expr
 
   -- ** Conversion
   , var
@@ -62,9 +61,9 @@ import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.ArithRel as ArithRel
-import Data.Linear
 import Data.Interval
 import Data.Var
+import Data.VectorSpace
 
 -----------------------------------------------------------------------------
 
@@ -141,16 +140,18 @@ mapCoeffWithVar f (Expr t) = Expr $ IM.mapMaybeWithKey g t
     g v c = if c' == 0 then Nothing else Just c'
       where c' = f c v
 
-instance (Num r, Eq r) => Module r (Expr r) where
-  Expr t .+. e2 | IM.null t = e2
-  e1 .+. Expr t | IM.null t = e1
-  e1 .+. e2 = normalizeExpr $ plus e1 e2
-  1 .*. e = e
-  0 .*. e = lzero
-  c .*. e = mapCoeff (c*) e
-  lzero = Expr $ IM.empty
+instance (Num r, Eq r) => AdditiveGroup (Expr r) where
+  Expr t ^+^ e2 | IM.null t = e2
+  e1 ^+^ Expr t | IM.null t = e1
+  e1 ^+^ e2 = normalizeExpr $ plus e1 e2
+  zeroV = Expr $ IM.empty
+  negateV = ((-1) *^)
 
-instance (Fractional r, Eq r) => Linear r (Expr r)
+instance (Num r, Eq r) => VectorSpace (Expr r) where
+  type Scalar (Expr r) = r
+  1 *^ e = e
+  0 *^ e = zeroV
+  c *^ e = mapCoeff (c*) e
 
 plus :: Num r => Expr r -> Expr r -> Expr r
 plus (Expr t1) (Expr t2) = Expr $ IM.unionWith (+) t1 t2
@@ -161,21 +162,21 @@ evalExpr m (Expr t) = sum [(m' IM.! v) * c | (v,c) <- IM.toList t]
   where m' = IM.insert unitVar 1 m
 
 -- | evaluate the expression under the model.
-evalLinear :: Linear r a => Model a -> a -> Expr r -> a
-evalLinear m u (Expr t) = lsum [c .*. (m' IM.! v) | (v,c) <- IM.toList t]
+evalLinear :: VectorSpace a => Model a -> a -> Expr (Scalar a) -> a
+evalLinear m u (Expr t) = sumV [c *^ (m' IM.! v) | (v,c) <- IM.toList t]
   where m' = IM.insert unitVar u m
 
-lift1 :: Linear r x => x -> (Var -> x) -> Expr r -> x
-lift1 unit f (Expr t) = lsum [c .*. (g v) | (v,c) <- IM.toList t]
+lift1 :: VectorSpace x => x -> (Var -> x) -> Expr (Scalar x) -> x
+lift1 unit f (Expr t) = sumV [c *^ (g v) | (v,c) <- IM.toList t]
   where
     g v
       | v==unitVar = unit
       | otherwise   = f v
 
 applySubst :: (Num r, Eq r) => VarMap (Expr r) -> Expr r -> Expr r
-applySubst s (Expr m) = lsum (map f (IM.toList m))
+applySubst s (Expr m) = sumV (map f (IM.toList m))
   where
-    f (v,c) = c .*. (
+    f (v,c) = c *^ (
       case IM.lookup v s of
         Just tm -> tm
         Nothing -> var v)
@@ -185,7 +186,7 @@ applySubst1 :: (Num r, Eq r) => Var -> Expr r -> Expr r -> Expr r
 applySubst1 x e e1 =
   case extractMaybe x e1 of
     Nothing -> e1
-    Just (c,e2) -> c .*. e .+. e2
+    Just (c,e2) -> c *^ e ^+^ e2
 
 -- | lookup a coefficient of the variable.
 -- @
@@ -202,7 +203,7 @@ coeff v (Expr m) = IM.findWithDefault 0 v m
 lookupCoeff :: Num r => Var -> Expr r -> Maybe r
 lookupCoeff v (Expr m) = IM.lookup v m  
 
--- | @extract v e@ returns @(c, e')@ such that @e == c .*. v .+. e'@
+-- | @extract v e@ returns @(c, e')@ such that @e == c *^ v ^+^ e'@
 extract :: Num r => Var -> Expr r -> (r, Expr r)
 extract v (Expr m) = (IM.findWithDefault 0 v m, Expr (IM.delete v m))
 {-
@@ -213,7 +214,7 @@ extract v (Expr m) =
     (Just c, m2) -> (c, Expr m2)
 -}
 
--- | @extractMaybe v e@ returns @Just (c, e')@ such that @e == c .*. v .+. e'@
+-- | @extractMaybe v e@ returns @Just (c, e')@ such that @e == c *^ v ^+^ e'@
 -- if @e@ contains v, and returns @Nothing@ otherwise.
 extractMaybe :: Num r => Var -> Expr r -> Maybe (r, Expr r)
 extractMaybe v (Expr m) =
@@ -261,9 +262,9 @@ evalAtom m (ArithRel.Rel lhs op rhs) = ArithRel.evalOp op (evalExpr m lhs) (eval
 -- is equivalent to @a@.
 solveFor :: (Real r, Fractional r) => Atom r -> Var -> Maybe (ArithRel.RelOp, Expr r)
 solveFor (ArithRel.Rel lhs op rhs) v = do
-  (c,e) <- extractMaybe v (lhs .-. rhs)
+  (c,e) <- extractMaybe v (lhs ^-^ rhs)
   return ( if c < 0 then ArithRel.flipOp op else op
-         , (1/c) .*. lnegate e
+         , (1/c) *^ negateV e
          )
 
 -----------------------------------------------------------------------------

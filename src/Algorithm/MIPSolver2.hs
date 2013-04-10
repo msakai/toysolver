@@ -67,6 +67,7 @@ import qualified Data.IntMap as IM
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Foldable as F
+import Data.VectorSpace
 import Data.Time
 import System.CPUTime
 import System.Timeout
@@ -76,7 +77,6 @@ import qualified Data.LA as LA
 import Data.ArithRel ((.<=.), (.>=.))
 import qualified Algorithm.Simplex2 as Simplex2
 import Algorithm.Simplex2 (OptResult (..), Var, Model)
-import Data.Linear
 import Util (isInteger, fracPart)
 
 data Solver
@@ -459,16 +459,16 @@ deriveGomoryCut lp ivs xi = do
     let c = if xj `IS.member` ivs
             then (if fj <= 1 - f0 then fj  / (1 - f0) else ((1 - fj) / f0))
             else (if aij > 0      then aij / (1 - f0) else (-aij     / f0))
-    return $ c .*. (LA.var xj .-. LA.constant lj)
+    return $ c *^ (LA.var xj ^-^ LA.constant lj)
   xs2 <- forM ks $ \(aij, xj) -> do
     let fj = fracPart aij
     Just uj <- Simplex2.getUB lp xj
     let c = if xj `IS.member` ivs
             then (if fj <= f0 then fj  / f0 else ((1 - fj) / (1 - f0)))
             else (if aij > 0  then aij / f0 else (-aij     / (1 - f0)))
-    return $ c .*. (LA.constant uj .-. LA.var xj)
+    return $ c *^ (LA.constant uj ^-^ LA.var xj)
 
-  return $ lsum xs1 .+. lsum xs2 .>=. LA.constant 1
+  return $ sumV xs1 ^+^ sumV xs2 .>=. LA.constant 1
 
 -- TODO: Simplex2をδに対応させたら、xi, xj がδを含まない有理数であるという条件も必要
 canDeriveGomoryCut :: Simplex2.Solver -> Var -> IO Bool

@@ -26,10 +26,10 @@ import Control.Monad.State
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.OptDir
+import Data.VectorSpace
 
 import Data.ArithRel
 import qualified Data.LA as LA
-import Data.Linear
 import Data.Var
 import qualified Algorithm.Simplex as Simplex
 import Algorithm.LPSolver
@@ -86,10 +86,10 @@ example_3_2 = (obj, cond)
     x1 = LA.var 1
     x2 = LA.var 2
     x3 = LA.var 3
-    obj = 3.*.x1 .+. 2.*.x2 .+. 3.*.x3
-    cond = [ 2.*.x1 .+.     x2 .+.     x3 .<=. LA.constant 2
-           ,     x1 .+. 2.*.x2 .+. 3.*.x3 .<=. LA.constant 5
-           , 2.*.x1 .+. 2.*.x2 .+.     x3 .<=. LA.constant 6
+    obj = 3*^x1 ^+^ 2*^x2 ^+^ 3*^x3
+    cond = [ 2*^x1 ^+^    x2 ^+^    x3 .<=. LA.constant 2
+           ,    x1 ^+^ 2*^x2 ^+^ 3*^x3 .<=. LA.constant 5
+           , 2*^x1 ^+^ 2*^x2 ^+^    x3 .<=. LA.constant 6
            , x1 .>=. LA.constant 0
            , x2 .>=. LA.constant 0
            , x3 .>=. LA.constant 0
@@ -108,10 +108,10 @@ example_3_5 = (obj, cond)
     x3 = LA.var 3
     x4 = LA.var 4
     x5 = LA.var 5
-    obj = (-2).*.x1 .+. 4.*.x2 .+. 7.*.x3 .+. x4 .+. 5.*.x5
-    cond = [ (-1).*.x1 .+.     x2 .+. 2.*.x3 .+.     x4 .+. 2.*.x5 .==. LA.constant 7
-           , (-1).*.x1 .+. 2.*.x2 .+. 3.*.x3 .+.     x4 .+.     x5 .==. LA.constant 6
-           , (-1).*.x1 .+.     x2 .+.     x3 .+. 2.*.x4 .+.     x5 .==. LA.constant 4
+    obj = (-2)*^x1 ^+^ 4*^x2 ^+^ 7*^x3 ^+^ x4 ^+^ 5*^x5
+    cond = [ (-1)*^x1 ^+^    x2 ^+^ 2*^x3 ^+^    x4 ^+^ 2*^x5 .==. LA.constant 7
+           , (-1)*^x1 ^+^ 2*^x2 ^+^ 3*^x3 ^+^    x4 ^+^    x5 .==. LA.constant 6
+           , (-1)*^x1 ^+^    x2 ^+^    x3 ^+^ 2*^x4 ^+^    x5 .==. LA.constant 4
            , x2 .>=. LA.constant 0
            , x3 .>=. LA.constant 0
            , x4 .>=. LA.constant 0
@@ -128,9 +128,9 @@ example_4_1 = (obj, cond)
   where
     x1 = LA.var 1
     x2 = LA.var 2
-    obj = 2.*.x1 .+. x2
-    cond = [ (-1).*.x1 .+. x2 .>=. LA.constant 2
-           ,        x1 .+. x2 .<=. LA.constant 1
+    obj = 2*^x1 ^+^ x2
+    cond = [ (-1)*^x1 ^+^ x2 .>=. LA.constant 2
+           ,       x1 ^+^ x2 .<=. LA.constant 1
            , x1 .>=. LA.constant 0
            , x2 .>=. LA.constant 0
            ]
@@ -145,9 +145,9 @@ example_4_2 = (obj, cond)
   where
     x1 = LA.var 1
     x2 = LA.var 2
-    obj = 2.*.x1 .+. x2
-    cond = [ (-1).*.x1 .-. x2 .<=. LA.constant 10
-           ,    2.*.x1 .-. x2 .<=. LA.constant 40
+    obj = 2*^x1 ^+^ x2
+    cond = [ (-1)*^x1 ^-^ x2 .<=. LA.constant 10
+           ,    2*^x1 ^-^ x2 .<=. LA.constant 40
            , x1 .>=. LA.constant 0
            , x2 .>=. LA.constant 0
            ]
@@ -162,8 +162,8 @@ example_4_3 = (obj, cond)
   where
     x1 = LA.var 1
     x2 = LA.var 2
-    obj = 6.*.x1 .-. 2.*.x2
-    cond = [ 2.*.x1 .-. x2 .<=. LA.constant 2
+    obj = 6*^x1 ^-^ 2*^x2
+    cond = [ 2*^x1 ^-^ x2 .<=. LA.constant 2
            , x1 .<=. LA.constant 4
            , x1 .>=. LA.constant 0
            , x2 .>=. LA.constant 0
@@ -179,10 +179,10 @@ example_4_5 = (obj, cond)
   where
     x1 = LA.var 1
     x2 = LA.var 2
-    obj = 2.*.x1 .+. x2
-    cond = [ 4.*.x1 .+. 3.*.x2 .<=. LA.constant 12
-           , 4.*.x1 .+.     x2 .<=. LA.constant 8
-           , 4.*.x1 .-.     x2 .<=. LA.constant 8
+    obj = 2*^x1 ^+^ x2
+    cond = [ 4*^x1 ^+^ 3*^x2 .<=. LA.constant 12
+           , 4*^x1 ^+^    x2 .<=. LA.constant 8
+           , 4*^x1 ^-^    x2 .<=. LA.constant 8
            , x1 .>=. LA.constant 0
            , x2 .>=. LA.constant 0
            ]
@@ -199,10 +199,10 @@ example_4_6 = (obj, cond)
     x2 = LA.var 2
     x3 = LA.var 3
     x4 = LA.var 4
-    obj = 20.*.x1 .+. (1/2).*.x2 .-. 6.*.x3 .+. (3/4).*.x4
-    cond = [      x1 .<=. LA.constant 2
-           ,  8.*.x1 .-.         x2 .+. 9.*.x3 .+. (1/4).*.x4 .<=. LA.constant 16
-           , 12.*.x1 .-. (1/2).*.x2 .+. 3.*.x3 .+. (1/2).*.x4 .<=. LA.constant 24
+    obj = 20*^x1 ^+^ (1/2)*^x2 ^-^ 6*^x3 ^+^ (3/4)*^x4
+    cond = [     x1 .<=. LA.constant 2
+           ,  8*^x1 ^-^        x2 ^+^ 9*^x3 ^+^ (1/4)*^x4 .<=. LA.constant 16
+           , 12*^x1 ^-^ (1/2)*^x2 ^+^ 3*^x3 ^+^ (1/2)*^x4 .<=. LA.constant 24
            , x2 .<=. LA.constant 1
            , x1 .>=. LA.constant 0
            , x2 .>=. LA.constant 0
@@ -222,11 +222,11 @@ example_4_7 = (obj, cond)
     x2 = LA.var 2
     x3 = LA.var 3
     x4 = LA.var 4
-    obj = x1 .+. 1.5.*.x2 .+. 5.*.x3 .+. 2.*.x4
-    cond = [ 3.*.x1 .+. 2.*.x2 .+.     x3 .+. 4.*.x4 .<=. LA.constant 6
-           , 2.*.x1 .+.     x2 .+. 5.*.x3 .+.     x4 .<=. LA.constant 4
-           , 2.*.x1 .+. 6.*.x2 .-. 4.*.x3 .+. 8.*.x4 .==. LA.constant 0
-           ,     x1 .+. 3.*.x2 .-. 2.*.x3 .+. 4.*.x4 .==. LA.constant 0
+    obj = x1 ^+^ 1.5*^x2 ^+^ 5*^x3 ^+^ 2*^x4
+    cond = [ 3*^x1 ^+^ 2*^x2 ^+^    x3 ^+^ 4*^x4 .<=. LA.constant 6
+           , 2*^x1 ^+^    x2 ^+^ 5*^x3 ^+^    x4 .<=. LA.constant 4
+           , 2*^x1 ^+^ 6*^x2 ^-^ 4*^x3 ^+^ 8*^x4 .==. LA.constant 0
+           ,    x1 ^+^ 3*^x2 ^-^ 2*^x3 ^+^ 4*^x4 .==. LA.constant 0
            , x1 .>=. LA.constant 0
            , x2 .>=. LA.constant 0
            , x3 .>=. LA.constant 0
@@ -243,10 +243,10 @@ kuhn_7_3 :: (LA.Expr Rational, [LA.Atom Rational])
 kuhn_7_3 = (obj, cond)
   where
     [x1,x2,x3,x4,x5,x6,x7] = map LA.var [1..7]
-    obj = (-2).*.x4 .+. (-3).*.x5 .+. x6 .+. 12.*.x7
-    cond = [ x1 .-.     2.*.x4 .-. 9.*.x5 .+.         x6 .+.   9.*.x7 .==. LA.constant 0
-           , x2 .+. (1/3).*.x4 .+.     x5 .-. (1/3).*.x6 .-.   2.*.x7 .==. LA.constant 0
-           , x3 .+.     2.*.x4 .+. 3.*.x5 .-.         x6 .-. 12.*. x7 .==. LA.constant 2
+    obj = (-2)*^x4 ^+^ (-3)*^x5 ^+^ x6 ^+^ 12*^x7
+    cond = [ x1 ^-^     2*^x4 ^-^ 9*^x5 ^+^        x6 ^+^   9*^x7 .==. LA.constant 0
+           , x2 ^+^ (1/3)*^x4 ^+^    x5 ^-^ (1/3)*^x6 ^-^   2*^x7 .==. LA.constant 0
+           , x3 ^+^     2*^x4 ^+^ 3*^x5 ^-^        x6 ^-^  12*^x7 .==. LA.constant 2
            , x1 .>=. LA.constant 0
            , x2 .>=. LA.constant 0
            , x3 .>=. LA.constant 0

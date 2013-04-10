@@ -1,13 +1,13 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Delta
--- Copyright   :  (c) Masahiro Sakai 2011
+-- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable (TypeFamilies)
 --
 -- Augmenting number types with infinitesimal parameter δ.
 --
@@ -41,7 +41,7 @@ module Data.Delta
   , isInteger'
   ) where
 
-import Data.Linear
+import Data.VectorSpace
 import Util (isInteger)
 
 -- | @Delta r k@ represents r + kδ for symbolic infinitesimal parameter δ.
@@ -63,12 +63,14 @@ realPart (Delta r _) = r
 deltaPart :: Delta r -> r
 deltaPart (Delta _ k) = k
 
-instance Num r => Module r (Delta r) where
-  Delta r1 k1 .+. Delta r2 k2 = Delta (r1+r2) (k1+k2)
-  c .*. Delta r k = Delta (c*r) (c*k)
-  lzero = Delta 0 0
+instance Num r => AdditiveGroup (Delta r) where
+  Delta r1 k1 ^+^ Delta r2 k2 = Delta (r1+r2) (k1+k2)
+  zeroV = Delta 0 0
+  negateV (Delta r k) = Delta (- r) (- k)
 
-instance Fractional r => Linear r (Delta r)
+instance Num r => VectorSpace (Delta r) where
+  type Scalar (Delta r) = r
+  c *^ Delta r k = Delta (c*r) (c*k)
 
 -- | 'Delta' version of 'floor'.
 -- @'floor'' x@ returns the greatest integer not greater than @x@

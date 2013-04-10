@@ -24,6 +24,7 @@ import Data.List
 import Data.Ratio
 import qualified Data.IntSet as IS
 import qualified Data.Map as Map
+import Data.VectorSpace
 import Prelude hiding (null)
 
 import Algebra.Lattice
@@ -31,7 +32,6 @@ import Algebra.Lattice
 import qualified Data.Interval as Interval
 import Data.ArithRel
 import qualified Data.LA as LA
-import Data.Linear
 import Data.Var
 
 type ExprR = LA.Expr Rational
@@ -105,7 +105,7 @@ fromAtom (Rel lhs op rhs) =
           let rhs1 = - c * fromIntegral d
               (lhs2,op2,rhs2) =
                 if p lhs1
-                then (lnegate lhs1, flipOp op, - rhs1)
+                then (negateV lhs1, flipOp op, - rhs1)
                 else (lhs1, op, rhs1)
               ival =
                 case op of

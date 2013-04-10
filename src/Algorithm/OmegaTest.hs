@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Algorithm.OmegaTest
@@ -8,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses, FunctionalDependencies)
+-- Portability :  portable
 --
 -- (incomplete) implementation of Omega Test
 --
@@ -42,12 +41,12 @@ import Data.Ord
 import Data.Ratio
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.VectorSpace
 
 import Algebra.Lattice.Boolean
 
 import Data.ArithRel
 import Data.DNF
-import Data.Linear
 import qualified Data.LA as LA
 import Data.Var
 import Util (combineMaybe)
@@ -100,20 +99,20 @@ leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
 -- Note that constants may be floored by division
 leZ e1 e2 = Nonneg (LA.mapCoeff (`div` d) e)
   where
-    e = e2 .-. e1
+    e = e2 ^-^ e1
     d = abs $ gcd' [c | (c,v) <- LA.terms e, v /= LA.unitVar]
-ltZ e1 e2 = (e1 .+. LA.constant 1) `leZ` e2
+ltZ e1 e2 = (e1 ^+^ LA.constant 1) `leZ` e2
 geZ = flip leZ
 gtZ = flip gtZ
 
 eqZ :: ExprZ -> ExprZ -> (DNF Lit)
 eqZ e1 e2
   = if LA.coeff LA.unitVar e3 `mod` d == 0
-    then DNF [[Nonneg e, Nonneg (lnegate e)]]
+    then DNF [[Nonneg e, Nonneg (negateV e)]]
     else false
   where
     e = LA.mapCoeff (`div` d) e3
-    e3 = e1 .-. e2
+    e3 = e1 ^-^ e2
     d = abs $ gcd' [c | (c,v) <- LA.terms e3, v /= LA.unitVar]
 
 -- ---------------------------------------------------------------------------
@@ -128,13 +127,13 @@ collectBoundsZ :: Var -> [Lit] -> (BoundsZ,[Lit])
 collectBoundsZ v = foldr phi (([],[]),[])
   where
     phi :: Lit -> (BoundsZ,[Lit]) -> (BoundsZ,[Lit])
-    phi (Pos t) x = phi (Nonneg (t .-. LA.constant 1)) x
+    phi (Pos t) x = phi (Nonneg (t ^-^ LA.constant 1)) x
     phi lit@(Nonneg t) ((ls,us),xs) =
       case LA.extract v t of
         (c,t') -> 
           case c `compare` 0 of
             EQ -> ((ls, us), lit : xs)
-            GT -> (((lnegate t', c) : ls, us), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
+            GT -> (((negateV t', c) : ls, us), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
             LT -> ((ls, (t', negate c) : us), xs)   -- 0 ≤ cx + M ⇔ x ≤ M/-c
 
 isExact :: BoundsZ -> Bool
@@ -155,7 +154,7 @@ solve' opt vs2 xs = simplify xs >>= go vs2
         (v,vs',bnd@(ls,us),rest) = chooseVariable vs ys
 
         case1 = do
-          let zs = [ LA.constant ((a-1)*(b-1)) `leZ` (a .*. d .-. b .*. c)
+          let zs = [ LA.constant ((a-1)*(b-1)) `leZ` (a *^ d ^-^ b *^ c)
                    | (c,a)<-ls , (d,b)<-us ]
           model <- go vs' =<< simplify (zs ++ rest)
           case pickupZ (evalBoundsZ model bnd) of
@@ -163,7 +162,7 @@ solve' opt vs2 xs = simplify xs >>= go vs2
             Just val -> return $ IM.insert v val model
 
         case2 = msum
-          [ do eq <- isZero $ a' .*. LA.var v .-. (c' .+. LA.constant k)
+          [ do eq <- isZero $ a' *^ LA.var v ^-^ (c' ^+^ LA.constant k)
                let (vs'', lits'', mt) = elimEq eq (v:vs') ys
                model <- go vs'' =<< simplify lits''
                return $ mt model
@@ -191,16 +190,16 @@ elimEq e vs lits =
     then
       case LA.extract xk e of
         (_, e') ->
-          let xk_def = signum ak .*. lnegate e'
+          let xk_def = signum ak *^ negateV e'
           in ( vs
              , [applySubst1Lit xk xk_def lit | lit <- lits]
              , \model -> IM.insert xk (LA.evalExpr model xk_def) model
              )
     else
       let m = abs ak + 1
-          xk_def = (- signum ak * m) .*. LA.var sigma .+.
+          xk_def = (- signum ak * m) *^ LA.var sigma ^+^
                      LA.fromTerms [(signum ak * (a `zmod` m), x) | (a,x) <- LA.terms e, x /= xk]
-          e2 = (- abs ak) .*. LA.var sigma .+. 
+          e2 = (- abs ak) *^ LA.var sigma ^+^ 
                   LA.fromTerms [((floor (a%m + 1/2) + (a `zmod` m)), x) | (a,x) <- LA.terms e, x /= xk]
                -- LA.applySubst1 xk xk_def e を normalize したもの
       in case elimEq e2 (sigma : vs) [applySubst1Lit xk xk_def lit | lit <- lits] of
@@ -262,8 +261,8 @@ solve opt vs cs = msum [solve' opt (IS.toList vs) lits | lits <- unDNF dnf]
       where
         (e1,c1) = g lhs
         (e2,c2) = g rhs
-        a = c2 .*. e1
-        b = c1 .*. e2
+        a = c2 *^ e1
+        b = c1 *^ e2
     g :: LA.Expr Rational -> (ExprZ, Integer)
     g a = (LA.mapCoeff (\c -> floor (c * fromInteger d)) a, d)
       where

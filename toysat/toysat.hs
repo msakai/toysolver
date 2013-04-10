@@ -29,6 +29,7 @@ import Data.List
 import Data.Maybe
 import Data.Ord
 import Data.Ratio
+import Data.VectorSpace
 import Data.Version
 import Data.Time
 import System.IO
@@ -52,7 +53,6 @@ import qualified GHC.Stats as Stats
 #endif
 
 import Data.ArithRel
-import Data.Linear
 import qualified Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified SAT
 import qualified SAT.PBO as PBO
@@ -686,7 +686,7 @@ solveLP opt solver lp = do
         let indicator      = LPFile.constrIndicator c
             (lhs, op, rhs) = LPFile.constrBody c
         let d = foldl' lcm 1 (map denominator  (rhs:[r | LPFile.Term r _ <- lhs]))
-            lhs' = lsum [asInteger (r * fromIntegral d) .*. product [vmap Map.! v | v <- vs] | LPFile.Term r vs <- lhs]
+            lhs' = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | LPFile.Term r vs <- lhs]
             rhs' = asInteger (rhs * fromIntegral d)
         case indicator of
           Nothing ->
@@ -718,7 +718,7 @@ solveLP opt solver lp = do
       let (_label,obj) = LPFile.objectiveFunction lp      
           d = foldl' lcm 1 [denominator r | LPFile.Term r _ <- obj] *
               (if LPFile.dir lp == LPFile.OptMin then 1 else -1)
-          obj2 = lsum [asInteger (r * fromIntegral d) .*. product [vmap Map.! v | v <- vs] | LPFile.Term r vs <- obj]
+          obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | LPFile.Term r vs <- obj]
       (obj3,obj3_c) <- SAT.Integer.linearize enc obj2
 
       modelRef <- newIORef Nothing

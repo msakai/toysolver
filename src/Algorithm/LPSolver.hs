@@ -25,9 +25,9 @@ import Control.Monad.State
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.OptDir
+import Data.VectorSpace
 
 import Data.ArithRel
-import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Interval as Interval
 import Data.Var
@@ -101,7 +101,7 @@ addConstraint c = do
     Ge -> do
       v1 <- gensym -- surplus variable
       v2 <- gensym -- artificial variable
-      putTableau $ Simplex.setRow v2 tbl (LA.coeffMap (e .-. LA.var v1), b)
+      putTableau $ Simplex.setRow v2 tbl (LA.coeffMap (e ^-^ LA.var v1), b)
       addArtificialVariable v2
     Eql -> do
       v <- gensym -- artificial variable
@@ -118,14 +118,14 @@ addConstraint2 :: Real r => LA.Atom r -> LP r ()
 addConstraint2 c = do
   Rel lhs rop rhs <- expandDefs' c
   let
-    (b', e) = LA.extract LA.unitVar (lhs .-. rhs)
+    (b', e) = LA.extract LA.unitVar (lhs ^-^ rhs)
     b = - b'
   case rop of
     Le -> f e b
-    Ge -> f (lnegate e) (negate b)
+    Ge -> f (negateV e) (negate b)
     Eql -> do
       f e b
-      f (lnegate e) (negate b)
+      f (negateV e) (negate b)
     _ -> error $ "addConstraint does not support " ++ show rop
   where
     -- -x≤b で -b≤0 なら追加しない。ad hoc なので一般化したい。
@@ -158,7 +158,7 @@ tableau cs = do
   forM_ (IS.toList fvs) $ \v -> do
     v1 <- gensym
     v2 <- gensym
-    define v (LA.var v1 .-. LA.var v2)
+    define v (LA.var v1 ^-^ LA.var v2)
   mapM_ addConstraint cs'
 
 getModel :: Fractional r => VarSet -> LP r (Model r)
@@ -200,10 +200,10 @@ dualSimplex optdir obj = do
 
 normalizeConstraint :: forall r. Real r => LA.Atom r -> (LA.Expr r, RelOp, r)
 normalizeConstraint (Rel a op b)
-  | rhs < 0   = (lnegate lhs, flipOp op, negate rhs)
+  | rhs < 0   = (negateV lhs, flipOp op, negate rhs)
   | otherwise = (lhs, op, rhs)
   where
-    (c, lhs) = LA.extract LA.unitVar (a .-. b)
+    (c, lhs) = LA.extract LA.unitVar (a ^-^ b)
     rhs = - c
 
 collectNonnegVars :: forall r. (RealFrac r) => [LA.Atom r] -> VarSet -> (VarSet, [LA.Atom r])
@@ -242,10 +242,10 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
             Interval.NegInf -> False
             Interval.Finite val -> val > 0 || (not inLB && val >= 0)
             Interval.PosInf -> True -- should not happen
-        Eql -> isTriviallyTrue (c .<=. lzero) && isTriviallyTrue (c .>=. lzero)
-        NEq -> isTriviallyTrue (c .<. lzero) || isTriviallyTrue (c .>. lzero)
+        Eql -> isTriviallyTrue (c .<=. zeroV) && isTriviallyTrue (c .>=. zeroV)
+        NEq -> isTriviallyTrue (c .<. zeroV) || isTriviallyTrue (c .>. zeroV)
       where
-        c = a .-. b
+        c = a ^-^ b
         i = LA.computeInterval bounds c
         (lb, inLB) = Interval.lowerBound' i
         (ub, inUB) = Interval.upperBound' i

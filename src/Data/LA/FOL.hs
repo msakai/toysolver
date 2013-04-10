@@ -10,7 +10,7 @@ import Control.Monad
 
 import Data.ArithRel
 import Data.FOL.Arith
-import Data.Linear
+import Data.VectorSpace
 
 import qualified Data.LA as LA
 
@@ -28,19 +28,19 @@ toFOLFormula r = Atom $ fmap toFOLExpr r
 fromFOLExpr :: (Real r, Fractional r) => Expr r -> Maybe (LA.Expr r)
 fromFOLExpr (Const c) = return (LA.constant c)
 fromFOLExpr (Var v)   = return (LA.var v)
-fromFOLExpr (a :+: b) = liftM2 (.+.) (fromFOLExpr a) (fromFOLExpr b)
+fromFOLExpr (a :+: b) = liftM2 (^+^) (fromFOLExpr a) (fromFOLExpr b)
 fromFOLExpr (a :*: b) = do
   a' <- fromFOLExpr a
   b' <- fromFOLExpr b
-  msum [ do{ c <- LA.asConst a'; return (c .*. b') }
-       , do{ c <- LA.asConst b'; return (c .*. a') }
+  msum [ do{ c <- LA.asConst a'; return (c *^ b') }
+       , do{ c <- LA.asConst b'; return (c *^ a') }
        ]
 fromFOLExpr (a :/: b) = do
   a' <- fromFOLExpr a
   b' <- fromFOLExpr b
   c <- LA.asConst b'
   guard $ c /= 0
-  return (a' ./. c)
+  return (a' ^/ c)
 
 toFOLExpr :: (Real r, Fractional r) => LA.Expr r -> Expr r
 toFOLExpr e =

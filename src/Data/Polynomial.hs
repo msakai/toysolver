@@ -1,13 +1,13 @@
-{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, TypeSynonymInstances #-}
+{-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Polynomial
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, TypeSynonymInstances)
+-- Portability :  non-portable (ScopedTypeVariables, TypeFamilies)
 --
 -- Polynomials
 --
@@ -122,8 +122,7 @@ import Data.Ratio
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.IntMap as IM
-
-import Data.Linear
+import Data.VectorSpace
 
 {--------------------------------------------------------------------
   Polynomial type
@@ -147,12 +146,14 @@ instance (Eq k, Num k, Ord v, Show v) => Num (Polynomial k v) where
   signum x = 1 -- OK?
   fromInteger x = constant (fromInteger x)
 
-instance (Eq k, Num k, Ord v, Show v) => Module k (Polynomial k v) where
-  k .*. p = constant k * p
-  p .+. q = p + q
-  lzero = 0
+instance (Eq k, Num k, Ord v, Show v) => AdditiveGroup (Polynomial k v) where
+  p ^+^ q = p + q
+  zeroV   = 0
+  negateV = negate
 
-instance (Eq k, Fractional k, Ord v, Show v) => Linear k (Polynomial k v)
+instance (Eq k, Num k, Ord v, Show v) => VectorSpace (Polynomial k v) where
+  type Scalar (Polynomial k v) = k
+  k *^ p = constant k * p
 
 instance (Show v, Ord v, Show k) => Show (Polynomial k v) where
   showsPrec d p  = showParen (d > 10) $

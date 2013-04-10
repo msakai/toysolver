@@ -35,9 +35,9 @@ import qualified Data.IntSet as IS
 import Data.List
 import Data.Monoid
 import Data.Ratio
+import Data.VectorSpace
 
 import Data.ArithRel
-import Data.Linear
 import qualified Data.LA as LA
 import Data.OptDir
 import Data.Polynomial
@@ -50,7 +50,7 @@ solve cmp vs dir obj cs = do
   m <- solve' cmp vs obj3 cs3
   return . IM.map round . mt . IM.map fromInteger $ m
   where
-    ((obj2,cs2), mt) = LPUtil.toStandardForm (if dir == OptMin then obj else lnegate obj, cs)
+    ((obj2,cs2), mt) = LPUtil.toStandardForm (if dir == OptMin then obj else negateV obj, cs)
     obj3 = LA.mapCoeff g obj2
       where
         g = round . (c*)

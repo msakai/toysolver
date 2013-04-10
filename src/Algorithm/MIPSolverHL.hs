@@ -41,9 +41,9 @@ import Data.List (maximumBy)
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.OptDir
+import Data.VectorSpace
 
 import Data.ArithRel
-import Data.Linear
 import Data.Var
 import qualified Data.LA as LA
 import qualified Algorithm.Simplex as Simplex
@@ -115,7 +115,7 @@ tableau' cs ivs = do
   ivs2 <- liftM IS.unions $ forM (IS.toList fvs) $ \v -> do
     v1 <- gensym
     v2 <- gensym
-    define v (LA.var v1 .-. LA.var v2)
+    define v (LA.var v1 ^-^ LA.var v2)
     return $ if v `IS.member` ivs then IS.fromList [v1,v2] else IS.empty
   mapM_ addConstraint cs'
   return ivs2
@@ -226,11 +226,11 @@ example1 = (optdir, obj, cs, ivs)
     x2 = LA.var 2
     x3 = LA.var 3
     x4 = LA.var 4
-    obj = x1 .+. 2 .*. x2 .+. 3 .*. x3 .+. x4
+    obj = x1 ^+^ 2 *^ x2 ^+^ 3 *^ x3 ^+^ x4
     cs =
-      [ (-1) .*. x1 .+. x2 .+. x3 .+. 10.*.x4 .<=. LA.constant 20
-      , x1 .-. 3 .*. x2 .+. x3 .<=. LA.constant 30
-      , x2 .-. 3.5 .*. x4 .==. LA.constant 0
+      [ (-1) *^ x1 ^+^ x2 ^+^ x3 ^+^ 10*^x4 .<=. LA.constant 20
+      , x1 ^-^ 3 *^ x2 ^+^ x3 .<=. LA.constant 30
+      , x2 ^-^ 3.5 *^ x4 .==. LA.constant 0
       , LA.constant 0 .<=. x1
       , x1 .<=. LA.constant 40
       , LA.constant 0 .<=. x2
@@ -255,7 +255,7 @@ test1' = result==expected
     f OptMin = OptMax
     f OptMax = OptMin
     result, expected :: OptResult Rational
-    result = optimize (f optdir) (lnegate obj) cs ivs
+    result = optimize (f optdir) (negateV obj) cs ivs
     expected = Optimum (-245/2) (IM.fromList [(1,40),(2,21/2),(3,39/2),(4,3)])
 
 -- 『数理計画法の基礎』(坂和 正敏) p.109 例 3.8
@@ -264,11 +264,11 @@ example2 = (optdir, obj, cs, ivs)
   where
     optdir = OptMin
     [x1,x2,x3] = map LA.var [1..3]
-    obj = (-1) .*. x1 .-. 3 .*. x2 .-. 5 .*. x3
+    obj = (-1) *^ x1 ^-^ 3 *^ x2 ^-^ 5 *^ x3
     cs =
-      [ 3 .*. x1 .+. 4 .*. x2 .<=. LA.constant 10
-      , 2 .*. x1 .+. x2 .+. x3 .<=. LA.constant 7
-      , 3.*.x1 .+. x2 .+. 4 .*. x3 .==. LA.constant 12
+      [ 3 *^ x1 ^+^ 4 *^ x2 .<=. LA.constant 10
+      , 2 *^ x1 ^+^ x2 ^+^ x3 .<=. LA.constant 7
+      , 3*^x1 ^+^ x2 ^+^ 4 *^ x3 .==. LA.constant 12
       , LA.constant 0 .<=. x1
       , LA.constant 0 .<=. x2
       , LA.constant 0 .<=. x3

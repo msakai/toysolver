@@ -21,9 +21,9 @@ module Algorithm.BoundsInference
 import Control.Monad
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.VectorSpace
 
 import Data.ArithRel
-import Data.Linear
 import Data.Interval
 import Data.LA (BoundsEnv)
 import qualified Data.LA as LA
@@ -44,11 +44,11 @@ inferBounds bounds constraints ivs limit = loop 0 bounds
     cs :: VarMap [C r]
     cs = IM.fromListWith (++) $ do
       Rel lhs op rhs <- constraints
-      let m = LA.coeffMap (lhs .-. rhs)
+      let m = LA.coeffMap (lhs ^-^ rhs)
       (v,c) <- IM.toList m
       guard $ v /= LA.unitVar
       let op' = if c < 0 then flipOp op else op
-          rhs' = (-1/c) .*. LA.fromCoeffMap (IM.delete v m)
+          rhs' = (-1/c) *^ LA.fromCoeffMap (IM.delete v m)
       return (v, [(op', rhs')])
 
     loop  :: Int -> LA.BoundsEnv r -> LA.BoundsEnv r

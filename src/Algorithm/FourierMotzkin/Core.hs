@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Algorithm.FourierMotzkin.Core
@@ -8,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses, FunctionalDependencies)
+-- Portability :  portable
 --
 -- Naïve implementation of Fourier-Motzkin Variable Elimination
 -- 
@@ -41,12 +40,12 @@ import Data.Maybe
 import Data.Ratio
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.VectorSpace hiding (project)
 
 import Algebra.Lattice.Boolean
 
 import Data.ArithRel
 import Data.DNF
-import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Interval as Interval
 import Data.Interval (Interval, EndPoint (..), (<=..<), (<..<=), (<..<))
@@ -87,8 +86,8 @@ instance Variables Lit where
   vars (Nonneg t) = vars t
 
 instance Complement Lit where
-  notB (Pos t) = Nonneg (lnegate t)
-  notB (Nonneg t) = Pos (lnegate t)
+  notB (Pos t) = Nonneg (negateV t)
+  notB (Nonneg t) = Pos (negateV t)
 
 -- 制約集合の単純化
 -- It returns Nothing when a inconsistency is detected.
@@ -128,8 +127,8 @@ atomR' op a b =
     NEq -> DNF [[a `ltR` b], [a `gtR` b]]
 
 leR, ltR, geR, gtR :: Rat -> Rat -> Lit
-leR (e1,c) (e2,d) = Nonneg $ normalizeExprR $ c .*. e2 .-. d .*. e1
-ltR (e1,c) (e2,d) = Pos $ normalizeExprR $ c .*. e2 .-. d .*. e1
+leR (e1,c) (e2,d) = Nonneg $ normalizeExprR $ c *^ e2 ^-^ d *^ e1
+ltR (e1,c) (e2,d) = Pos $ normalizeExprR $ c *^ e2 ^-^ d *^ e1
 geR = flip leR
 gtR = flip gtR
 
@@ -190,8 +189,8 @@ collectBounds v = foldr phi (([],[],[],[]),[])
             EQ -> (bnd, lit : xs)
             GT ->
               if strict
-              then ((ls1, (lnegate t', c) : ls2, us1, us2), xs) -- 0 < cx + M ⇔ -M/c <  x
-              else (((lnegate t', c) : ls1, ls2, us1, us2), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
+              then ((ls1, (negateV t', c) : ls2, us1, us2), xs) -- 0 < cx + M ⇔ -M/c <  x
+              else (((negateV t', c) : ls1, ls2, us1, us2), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
             LT ->
               if strict
               then ((ls1, ls2, us1, (t', negate c) : us2), xs) -- 0 < cx + M ⇔ x < M/-c

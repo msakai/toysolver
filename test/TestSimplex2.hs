@@ -4,13 +4,13 @@ module Main (main) where
 import Control.Monad
 import Data.List
 import Data.Ratio
+import Data.VectorSpace
 import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Text.Printf
 
-import Data.Linear
 import qualified Data.LA as LA
 import Algorithm.Simplex2
 

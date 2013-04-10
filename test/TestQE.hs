@@ -7,6 +7,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.VectorSpace
 import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
@@ -15,7 +16,6 @@ import Test.Framework.Providers.HUnit
 import Data.AlgebraicNumber
 import Data.ArithRel
 import Data.FOL.Arith
-import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Polynomial as P
 import Data.OptDir
@@ -80,8 +80,8 @@ test1' = [c1, c2] ++ c3 ++ c4
     x = LA.var 0
     y = LA.var 1
     z = LA.var 2
-    c1 = 7.*.x .+. 12.*.y .+. 31.*.z .==. LA.constant 17
-    c2 = 3.*.x .+. 5.*.y .+. 14.*.z .==. LA.constant 7
+    c1 = 7*^x ^+^ 12*^y ^+^ 31*^z .==. LA.constant 17
+    c2 = 3*^x ^+^ 5*^y ^+^ 14*^z .==. LA.constant 7
     c3 = [LA.constant 1 .<=. x, x .<=. LA.constant 40]
     c4 = [LA.constant (-50) .<=. y, y .<=. LA.constant 50]
 
@@ -126,8 +126,8 @@ test2' =
   where
     x = LA.var 0
     y = LA.var 1
-    t1 = 11.*.x .+. 13.*.y
-    t2 = 7.*.x .-. 9.*.y
+    t1 = 11*^x ^+^ 13*^y
+    t2 = 7*^x ^-^ 9*^y
 
 ------------------------------------------------------------------------
 

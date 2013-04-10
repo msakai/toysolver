@@ -78,6 +78,7 @@ solveWBO solver sels0 opt = loop 0 (IM.fromList sels0)
               r <- SAT.newVar solver
               return (sel, r)
             SAT.addAtMost solver (map snd xs) 1
+            SAT.addClause solver [-l | l <- core] -- optional constraint but sometimes useful
 
             ys <- liftM IM.unions $ forM xs $ \(sel, r) -> do
               s <- SAT.newVar solver

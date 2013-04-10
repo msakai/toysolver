@@ -41,9 +41,9 @@ import Data.List (intersperse, minimumBy, foldl')
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.OptDir
+import Data.VectorSpace
 import Control.Exception
 
-import Data.Linear
 import qualified Data.LA as LA
 import Data.Var
 
@@ -113,7 +113,7 @@ setObjFun tbl e = setRow objRow tbl row
   where
     row =
       case LA.extract LA.unitVar e of
-        (c, e') -> (LA.coeffMap (lnegate e'), c)
+        (c, e') -> (LA.coeffMap (negateV e'), c)
 
 copyObjRow :: (Num r, Eq r) => Tableau r -> Tableau r -> Tableau r
 copyObjRow from to =
@@ -225,7 +225,7 @@ phaseI tbl avs
   | otherwise = (True, copyObjRow tbl $ removeArtificialVariables avs $ tbl1')
   where
     optdir = OptMax
-    tbl1 = setObjFun tbl $ lnegate $ lsum [LA.var v | v <- IS.toList avs]
+    tbl1 = setObjFun tbl $ negateV $ sumV [LA.var v | v <- IS.toList avs]
     tbl1' = go tbl1
     go tbl2
       | currentObjValue tbl2 == 0 = tbl2

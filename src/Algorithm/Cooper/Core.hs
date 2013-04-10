@@ -51,12 +51,12 @@ import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.VectorSpace hiding (project)
 
 import Algebra.Lattice
 import Algebra.Lattice.Boolean
 
 import Data.ArithRel
-import Data.Linear
 import qualified Data.LA as LA
 import Data.Var
 import qualified Algorithm.FourierMotzkin as FM
@@ -72,12 +72,12 @@ fromLAAtom (Rel a op b) = rel op a' b'
   where
     (e1,c1) = FM.toRat a
     (e2,c2) = FM.toRat b
-    a' = c2 .*. e1
-    b' = c1 .*. e2
+    a' = c2 *^ e1
+    b' = c1 *^ e2
 
 leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
-leZ e1 e2 = e1 `ltZ` (e2 .+. LA.constant 1)
-ltZ e1 e2 = Pos $ (e2 .-. e1)
+leZ e1 e2 = e1 `ltZ` (e2 ^+^ LA.constant 1)
+ltZ e1 e2 = Pos $ (e2 ^-^ e1)
 geZ = flip leZ
 gtZ = flip gtZ
 
@@ -200,9 +200,9 @@ simplifyLit (Pos e) =
       -- e > 0  <=>  e - 1 >= 0
       -- <=>  LA.mapCoeff (`div` d) (e - 1) >= 0
       -- <=>  LA.mapCoeff (`div` d) (e - 1) + 1 > 0
-      Lit $ Pos $ LA.mapCoeff (`div` d) e1 .+. LA.constant 1
+      Lit $ Pos $ LA.mapCoeff (`div` d) e1 ^+^ LA.constant 1
   where
-    e1 = e .-. LA.constant 1
+    e1 = e ^-^ LA.constant 1
     d  = if null cs then 1 else abs $ foldl1' gcd cs
     cs = [c | (c,x) <- LA.terms e1, x /= LA.unitVar]
 simplifyLit lit@(Divisible b c e)
@@ -335,14 +335,14 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
         f (Lit (Pos e)) =
           case LA.extractMaybe x e of
             Nothing -> []
-            Just (1, e')  -> [lnegate e'] -- Pos e <=> (x + e' > 0) <=> (-e' < x)
+            Just (1, e')  -> [negateV e'] -- Pos e <=> (x + e' > 0) <=> (-e' < x)
             Just (-1, _) -> [] -- Pos e <=> (-x + e' > 0) <=> (x < e')
             _ -> error "should not happen"
 
     -- formula1を真にする最小のxが存在する場合
     case1 :: [(QFFormula, Witness)]
     case1 = [ (subst1 x e formula1, WCase1 c e)
-            | j <- [1..delta], t <- ts, let e = t .+. LA.constant j ]
+            | j <- [1..delta], t <- ts, let e = t ^+^ LA.constant j ]
 
     -- formula1のなかの x < t を真に t < x を偽に置き換えた論理式
     formula2 :: QFFormula
@@ -420,7 +420,7 @@ testHagiya :: QFFormula
 testHagiya = fst $ project 1 $ andB [c1, c2, c3]
   where
     [x,y,z] = map LA.var [1..3]
-    c1 = x .<. (y .+. y)
+    c1 = x .<. (y ^+^ y)
     c2 = z .<. x
     c3 = 3 .|. x
 
@@ -436,8 +436,8 @@ test3 = fst $ project 1 $ andB [p1,p2,p3,p4]
     x = LA.var 0
     y = LA.var 1
     p1 = LA.constant 0 .<. y
-    p2 = 2 .*. x .<. y
-    p3 = y .<. x .+. LA.constant 2
+    p2 = 2 *^ x .<. y
+    p3 = y .<. x ^+^ LA.constant 2
     p4 = 2 .|. y
 
 {-

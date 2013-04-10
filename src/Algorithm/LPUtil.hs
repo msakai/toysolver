@@ -9,9 +9,9 @@ import Control.Monad.State
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Maybe
+import Data.VectorSpace
 
 import Data.ArithRel
-import Data.Linear
 import qualified Data.LA as LA
 import qualified Data.Interval as Interval
 import Data.Var
@@ -58,32 +58,32 @@ toStandardForm' (obj, cs) = m
           Interval.NegInf -> do
             v1 <- gensym
             v2 <- gensym
-            return $ IM.singleton v (LA.var v1 .-. LA.var v2)
+            return $ IM.singleton v (LA.var v1 ^-^ LA.var v2)
           Interval.Finite lb
             | lb >= 0   -> return IM.empty
             | otherwise -> do
                 v1 <- gensym
-                return $ IM.singleton v (LA.var v1 .-. LA.constant lb)
+                return $ IM.singleton v (LA.var v1 ^-^ LA.constant lb)
       let obj2 = LA.applySubst s obj
 
       cs2 <- liftM concat $ forM cs $ \(Rel lhs op rhs) -> do
-        case LA.extract LA.unitVar (LA.applySubst s (lhs .-. rhs)) of
+        case LA.extract LA.unitVar (LA.applySubst s (lhs ^-^ rhs)) of
           (c,e) -> do
             let (lhs2,op2,rhs2) =
                   if -c >= 0
                   then (e,op,-c)
-                  else (lnegate e, flipOp op, c)
+                  else (negateV e, flipOp op, c)
             case op2 of
               Eql -> return [(lhs2,rhs2)]
               Le  -> do
                 v <- gensym
-                return [(lhs2 .+. LA.var v, rhs2)]
+                return [(lhs2 ^+^ LA.var v, rhs2)]
               Ge  -> do
                 case LA.terms lhs2 of
                   [(1,_)] | rhs2<=0 -> return []
                   _ -> do
                     v <- gensym
-                    return [(lhs2 .-. LA.var v, rhs2)]
+                    return [(lhs2 ^-^ LA.var v, rhs2)]
               _   -> error $ "LPUtil.toStandardForm: " ++ show op2 ++ " is not supported"
 
       assert (and [isNothing $ LA.lookupCoeff LA.unitVar c | (c,_) <- cs2]) $ return ()
