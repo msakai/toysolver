@@ -404,7 +404,7 @@ mainMUS opt solver args = do
 solveMUS :: Options -> SAT.Solver -> GCNF.GCNF -> IO ()
 solveMUS opt solver gcnf = do
   putCommentLine $ printf "#vars %d" (GCNF.numVars gcnf)
-  putCommentLine $ printf "#constraints %d" (length (GCNF.clauses gcnf))
+  putCommentLine $ printf "#constraints %d" (GCNF.numClauses gcnf)
   putCommentLine $ printf "#groups %d" (GCNF.lastGroupIndex gcnf)
 
   SAT.newVars_ solver (GCNF.numVars gcnf)
