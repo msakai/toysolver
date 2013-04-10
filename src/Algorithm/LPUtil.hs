@@ -43,7 +43,7 @@ toStandardForm' (obj, cs) = m
   where
     vs = vars obj `IS.union` vars cs
     v1 = if IS.null vs then 0 else IS.findMax vs + 1
-    initialBounds = IM.fromList [(v, Interval.univ) | v <- IS.toList vs]
+    initialBounds = IM.fromList [(v, Interval.whole) | v <- IS.toList vs]
     bounds = BI.inferBounds initialBounds cs IS.empty 10
 
     gensym :: M Var

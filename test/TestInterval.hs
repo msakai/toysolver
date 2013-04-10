@@ -29,15 +29,15 @@ case_null_empty =
   Interval.null (Interval.empty :: Interval Rational) @?= True
 
 {--------------------------------------------------------------------
-  univ
+  whole
 --------------------------------------------------------------------}
 
-prop_univ_is_top =
+prop_whole_is_top =
   forAll intervals $ \a ->
-    Interval.isSubsetOf a Interval.univ
+    Interval.isSubsetOf a Interval.whole
 
 case_nonnull_top =
-  Interval.null (Interval.univ :: Interval Rational) @?= False
+  Interval.null (Interval.whole :: Interval Rational) @?= False
 
 {--------------------------------------------------------------------
   singleton
@@ -83,11 +83,11 @@ prop_intersection_assoc =
 
 prop_intersection_unitL =
   forAll intervals $ \a ->
-    Interval.intersection Interval.univ a == a
+    Interval.intersection Interval.whole a == a
 
 prop_intersection_unitR =
   forAll intervals $ \a ->
-    Interval.intersection a Interval.univ == a
+    Interval.intersection a Interval.whole == a
 
 prop_intersection_empty =
   forAll intervals $ \a ->
@@ -128,9 +128,9 @@ prop_hull_unitR =
   forAll intervals $ \a ->
     Interval.hull a Interval.empty == a
 
-prop_hull_univ =
+prop_hull_whole =
   forAll intervals $ \a ->
-    Interval.hull a Interval.univ == Interval.univ
+    Interval.hull a Interval.whole == Interval.whole
 
 prop_hull_isSubsetOf =
   forAll intervals $ \a ->
@@ -186,8 +186,8 @@ prop_pickup_member_null =
 case_pickup_empty =
   Interval.pickup (Interval.empty :: Interval Rational) @?= Nothing
 
-case_pickup_univ =
-  isJust (Interval.pickup (Interval.univ :: Interval Rational)) @?= True
+case_pickup_whole =
+  isJust (Interval.pickup (Interval.whole :: Interval Rational)) @?= True
 
 {--------------------------------------------------------------------
   Comparison

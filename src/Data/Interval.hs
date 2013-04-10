@@ -28,7 +28,7 @@ module Data.Interval
   , (<..<=)
   , (<=..<)
   , (<..<)
-  , univ
+  , whole
   , empty
   , singleton
 
@@ -88,7 +88,7 @@ upperBound' :: Num r => Interval r -> (EndPoint r, Bool)
 upperBound' (Interval _ ub) = ub
 
 instance (Ord r, Num r) => Lattice (Interval r) where
-  top    = univ
+  top    = whole
   bottom = empty
   join   = hull
   meet   = intersection
@@ -148,9 +148,9 @@ interval lb@(x1,in1) ub@(x2,in2) =
   -> Interval r
 (<..<) lb ub = interval (lb, False) (ub, False)
 
--- | universal set (-∞, ∞)
-univ :: (Num r, Ord r) => Interval r
-univ = Interval (NegInf, False) (PosInf, False)
+-- | whole real number line (-∞, ∞)
+whole :: (Num r, Ord r) => Interval r
+whole = Interval (NegInf, False) (PosInf, False)
 
 -- | empty (contradicting) interval
 empty :: Num r => Interval r
@@ -404,7 +404,7 @@ instance forall r. (Real r, Fractional r) => Num (Interval r) where
 instance forall r. (Real r, Fractional r) => Fractional (Interval r) where
   fromRational r = singleton (fromRational r)
   recip a | null a = empty
-  recip i | 0 `member` i = univ -- should be error?
+  recip i | 0 `member` i = whole -- should be error?
   recip (Interval lb ub) = interval lb3 ub3
     where
       ub3 = maximumBy cmpUB xs

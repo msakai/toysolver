@@ -212,7 +212,7 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
     vs = vars cs
     bounds = BI.inferBounds initialBounds cs ivs 1000
       where
-        initialBounds = IM.fromList [(v, Interval.univ) | v <- IS.toList vs]
+        initialBounds = IM.fromList [(v, Interval.whole) | v <- IS.toList vs]
     nonnegVars = IS.filter f vs
       where
         f v = case Interval.lowerBound (bounds IM.! v) of

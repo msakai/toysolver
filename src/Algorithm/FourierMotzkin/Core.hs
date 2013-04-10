@@ -214,7 +214,7 @@ solve' vs cs = listToMaybe $ do
 
 evalBounds :: Model Rational -> BoundsR -> Interval Rational
 evalBounds model (ls1,ls2,us1,us2) =
-  foldl' Interval.intersection Interval.univ $ 
+  foldl' Interval.intersection Interval.whole $ 
     [ Finite (evalRat model x) <=..< PosInf | x <- ls1 ] ++
     [ Finite (evalRat model x) <..<  PosInf | x <- ls2 ] ++
     [ NegInf <..<= Finite (evalRat model x) | x <- us1 ] ++
