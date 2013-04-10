@@ -128,9 +128,9 @@ instance Num AReal where
           [] -> error "AReal.+: should not happen"
           [i5] -> i5
           is5 ->
-            go (Sturm.narrow p1 i1 (Interval.size i1 / 2))
-               (Sturm.narrow p2 i2 (Interval.size i2 / 2))
-               [Sturm.narrow p3 i5 (Interval.size i5 / 2) | i5 <- is5]
+            go (Sturm.narrow p1 i1 (Interval.width i1 / 2))
+               (Sturm.narrow p2 i2 (Interval.width i2 / 2))
+               [Sturm.narrow p3 i5 (Interval.width i5 / 2) | i5 <- is5]
         where
           i4 = i1 + i2
 
@@ -144,9 +144,9 @@ instance Num AReal where
           [] -> error "AReal.*: should not happen"
           [i5] -> i5
           is5 ->
-            go (Sturm.narrow p1 i1 (Interval.size i1 / 2))
-               (Sturm.narrow p2 i2 (Interval.size i2 / 2))
-               [Sturm.narrow p3 i5 (Interval.size i5 / 2) | i5 <- is5]
+            go (Sturm.narrow p1 i1 (Interval.width i1 / 2))
+               (Sturm.narrow p2 i2 (Interval.width i2 / 2))
+               [Sturm.narrow p3 i5 (Interval.width i5 / 2) | i5 <- is5]
         where
           i4 = i1 * i2
 

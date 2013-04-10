@@ -42,7 +42,7 @@ module Data.Interval
   , upperBound
   , lowerBound'
   , upperBound'
-  , size
+  , width
 
   -- * Comparison
   , (<!), (<=!), (==!), (>=!), (>!)
@@ -244,11 +244,11 @@ isSubsetOf (Interval lb1 ub1) (Interval lb2 ub2) = testLB lb1 lb2 && testUB ub1 
 isProperSubsetOf :: Ord r => Interval r -> Interval r -> Bool
 isProperSubsetOf i1 i2 = i1 /= i2 && i1 `isSubsetOf` i2
 
--- | Size of a interval. Size of an unbounded interval is @undefined@.
-size :: (Num r, Ord r) => Interval r -> r
-size x | null x = 0
-size (Interval (Finite l, _) (Finite u, _)) = u - l
-size _ = error "Data.Interval.size: unbounded interval"
+-- | Width of a interval. Width of an unbounded interval is @undefined@.
+width :: (Num r, Ord r) => Interval r -> r
+width x | null x = 0
+width (Interval (Finite l, _) (Finite u, _)) = u - l
+width _ = error "Data.Interval.width: unbounded interval"
 
 -- | pick up an element from the interval if the interval is not empty.
 pickup :: (Real r, Fractional r) => Interval r -> Maybe r
