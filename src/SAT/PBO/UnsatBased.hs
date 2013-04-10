@@ -63,7 +63,7 @@ solveWBO solver sels0 opt = loop 0 (IM.fromList sels0)
       if ret
       then do
         m <- SAT.model solver
-        -- 余計な変数を除去する?
+        -- モデルから余計な変数を除去する?
         optUpdateBest opt m lb
         return $ Just (m, lb)
       else do
@@ -77,16 +77,16 @@ solveWBO solver sels0 opt = loop 0 (IM.fromList sels0)
             xs <- forM core $ \sel -> do
               r <- SAT.newVar solver
               return (sel, r)
-            SAT.addAtMost solver (map snd xs) 1
+            SAT.addExactly solver (map snd xs) 1
             SAT.addClause solver [-l | l <- core] -- optional constraint but sometimes useful
 
             ys <- liftM IM.unions $ forM xs $ \(sel, r) -> do
-              s <- SAT.newVar solver
-              SAT.addClause solver [-s, r, sel]
+              sel' <- SAT.newVar solver
+              SAT.addClause solver [-sel', r, sel]
               let c = sels IM.! sel
               if c > min_c
-                then return $ IM.fromList [(s, min_c), (sel, c - min_c)]
-                else return $ IM.singleton s min_c
+                then return $ IM.fromList [(sel', min_c), (sel, c - min_c)]
+                else return $ IM.singleton sel' min_c
             let sels' = IM.union ys (IM.difference sels (IM.fromList [(sel, ()) | sel <- core]))
 
             loop lb' sels'

@@ -98,8 +98,10 @@ solveWBO solver sels opt = do
         if IS.null ls then do
           return best
         else do
-          SAT.addAtLeast solver [-l | l <- IS.toList ls] 1
-          let lb' = lb + minimum [weights IM.! l | l <- IS.toList ls]
+          SAT.addClause solver [-l | l <- core] -- optional constraint but sometimes useful
+          let min_weight = minimum [weights IM.! l | l <- IS.toList ls]
+              lb' = lb + min_weight
+          optLogger opt $ printf "MSU4: found a core: size = %d, minimal weight = %d" (length core) min_weight 
           optUpdateLB opt lb'
           cont (unrelaxed `IS.difference` ls)  (relaxed `IS.union` ls) lb' best
 
