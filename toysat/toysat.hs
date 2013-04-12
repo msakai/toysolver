@@ -302,7 +302,11 @@ main = do
           putCommentLine $ printf "  gcWallSeconds = %5.2f"       $ Stats.gcWallSeconds stat
           putCommentLine $ printf "  cpuSeconds = %5.2f"          $ Stats.cpuSeconds stat
           putCommentLine $ printf "  wallSeconds = %5.2f"         $ Stats.wallSeconds stat
+#if MIN_VERSION_base(4,6,0)
+          putCommentLine $ printf "  parTotBytesCopied = %d"      $ Stats.parTotBytesCopied stat
+#else
           putCommentLine $ printf "  parAvgBytesCopied = %d"      $ Stats.parAvgBytesCopied stat
+#endif
           putCommentLine $ printf "  parMaxBytesCopied = %d"      $ Stats.parMaxBytesCopied stat
 #endif
 
