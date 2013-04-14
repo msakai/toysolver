@@ -43,9 +43,8 @@ type SturmChain = [UPolynomial Rational]
 sturmChain :: UPolynomial Rational -> SturmChain
 sturmChain p = p0 : p1 : go p0 p1
   where
-    x = ()
     p0 = p
-    p1 = deriv p x
+    p1 = deriv p X
     go p q = if r==0 then [] else r : go q r
       where
         r = - (p `polyMod` q)
@@ -74,7 +73,7 @@ numRoots' chain@(p:_) ival
         _ -> error "numRoots'': should not happen"
   where
     ival2 = boundInterval p ival
-    n x = countSignChanges [eval (\() -> x) q | q <- chain]
+    n x = countSignChanges [eval (\X -> x) q | q <- chain]
 
 countSignChanges :: [Rational] -> Int
 countSignChanges rs = countChanges xs
@@ -118,7 +117,7 @@ separate p = separate' (sturmChain p)
 separate' :: SturmChain -> [Interval Rational]
 separate' chain@(p:_) = f (bounds p)
   where
-    n x = countSignChanges [eval (\() -> x) q | q <- chain]
+    n x = countSignChanges [eval (\X -> x) q | q <- chain]
 
     f (lb,ub) =
       if lb `isRootOf` p

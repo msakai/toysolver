@@ -166,12 +166,12 @@ instance Num AReal where
 
   fromInteger i = RealRoot (x - constant (fromInteger i)) (Interval.singleton (fromInteger i))
     where
-      x = var ()
+      x = var X
 
 instance Fractional AReal where
   fromRational r = RealRoot (x - constant r) (Interval.singleton r)
     where
-      x = var ()
+      x = var X
 
   recip a@(RealRoot p i)
     | isZero a  = error "AReal.recip: zero division"
@@ -181,7 +181,7 @@ instance Real AReal where
   toRational x
     | Data.AlgebraicNumber.deg x == 1 =
         let p = minimalPolynomial x
-            a = P.coeff (P.mmVar ()) p
+            a = P.coeff (P.mmVar X) p
             b = P.coeff P.mmOne p
         in - b / a
     | otherwise  = error "toRational: proper algebraic number"

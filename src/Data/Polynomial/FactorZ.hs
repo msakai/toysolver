@@ -40,7 +40,7 @@ factor' p =
     Just qs -> concatMap factor' qs
 
 factor2 :: UPolynomial Integer -> Maybe [UPolynomial Integer]
-factor2 p | p == var () = Nothing
+factor2 p | p == var X = Nothing
 factor2 p =
   case find (\(_,yi) -> yi==0) vs of
     Just (xi,_) ->
@@ -61,8 +61,8 @@ factor2 p =
   where
     n = (deg p `div` 2)
     xs = take (fromIntegral n + 1) xvalues
-    vs = [(x, eval (\() -> x) p) | x <- xs]
-    x = var ()
+    vs = [(x, eval (\X -> x) p) | x <- xs]
+    x = var X
     p' :: UPolynomial Rational
     p' = mapCoeff fromInteger p
 

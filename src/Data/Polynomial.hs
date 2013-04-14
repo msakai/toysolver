@@ -33,6 +33,7 @@ module Data.Polynomial
   -- * Polynomial type
     Polynomial
   , UPolynomial
+  , X (..)
 
   -- * Conversion
   , var
@@ -132,8 +133,11 @@ import Data.VectorSpace
 newtype Polynomial k v = Polynomial{ coeffMap :: Map.Map (MonicMonomial v) k }
   deriving (Eq, Ord)
 
+data X = X
+  deriving (Eq, Ord, Bounded, Enum, Show)
+
 -- | Univalent polynomials over commutative ring r
-type UPolynomial r = Polynomial r ()
+type UPolynomial r = Polynomial r X
 
 instance (Eq k, Num k, Ord v, Show v) => Num (Polynomial k v) where
   Polynomial m1 + Polynomial m2 = normalize $ Polynomial $ Map.unionWith (+) m1 m2
@@ -256,7 +260,7 @@ toUPolynomialOf p v = fromTerms $ do
   (c,mm) <- terms p
   let m = mmToMap mm
   return ( fromTerms [(c, mmFromMap (Map.delete v m))]
-         , mmFromList [((), Map.findWithDefault 0 v m)]
+         , mmFromList [(X, Map.findWithDefault 0 v m)]
          )
 
 -- | Multivariate division algorithm
@@ -353,7 +357,7 @@ class RenderVar v where
 instance RenderVar Int where
   renderVar prec n = showChar 'x' . showsPrec 0 n
 
-instance RenderVar () where
+instance RenderVar X where
   renderVar prec n = showChar 'x'
 
 {--------------------------------------------------------------------

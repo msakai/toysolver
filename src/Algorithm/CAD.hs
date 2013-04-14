@@ -160,7 +160,7 @@ mr p q
   | n >= m    = assert (constant (bm^(n-m+1)) * p == q * l + r && m > deg r) $ (bm, n-m+1, r)
   | otherwise = error "mr p q: not (deg p >= deg q)"
   where
-    x = var ()
+    x = var X
     n = deg p
     m = deg q
     (bm, _) = leadingTerm grlex q
@@ -179,7 +179,7 @@ mr p q
           in assert (n > deg p') $
              assert (constant (bm^(n-m+1)) * p == q*l + r && m > deg r) $ (l, r)
       where
-        an = coeff (mmFromList [((), n)]) p
+        an = coeff (mmFromList [(X, n)]) p
 
 test_mr_1 :: (Coeff Int, Integer, UPolynomial (Coeff Int))
 test_mr_1 = mr (toUPolynomialOf p 3) (toUPolynomialOf q 3)
@@ -268,7 +268,7 @@ collectPolynomials ps = go Set.empty (f ps)
     f = Set.filter (\p -> deg p > 0) 
     go result ps | Set.null ps = return result
     go result ps = do
-      let rs1 = filter (\p -> deg p > 0) [deriv p () | p <- Set.toList ps]
+      let rs1 = filter (\p -> deg p > 0) [deriv p X | p <- Set.toList ps]
       rs2 <- liftM (filter (\p -> deg p > 0) . map (\(_,_,r) -> r) . concat) $
         forM [(p1,p2) | p1 <- Set.toList ps, p2 <- Set.toList ps ++ Set.toList result, p1 /= p2] $ \(p1,p2) -> do
           ret1 <- zmod p1 p2
@@ -498,7 +498,7 @@ dumpSignConf x =
 test1a :: IO ()
 test1a = mapM_ putStrLn $ showSignConf conf
   where
-    x = var ()
+    x = var X
     ps :: [UPolynomial (Polynomial Rational Int)]
     ps = [x + 1, -2*x + 3, x]
     [(conf, _)] = runM $ buildSignConf ps
@@ -506,25 +506,25 @@ test1a = mapM_ putStrLn $ showSignConf conf
 test1b :: Bool
 test1b = isJust $ solve vs cs
   where
-    x = var ()
-    vs = Set.singleton ()
+    x = var X
+    vs = Set.singleton X
     cs = [x + 1 .>. 0, -2*x + 3 .>. 0, x .>. 0]
 
 test1c :: Bool
 test1c = isJust $ do
-  m <- solve' (Set.singleton ()) cs
+  m <- solve' (Set.singleton X) cs
   guard $ and $ do
     (p, ss) <- cs
     let val = eval (m Map.!) (mapCoeff fromRational p)
     return $ signOfConst val `elem` ss
   where
-    x = var ()
+    x = var X
     cs = [(x + 1, [Pos]), (-2*x + 3, [Pos]), (x, [Pos])]
 
 test2a :: IO ()
 test2a = mapM_ putStrLn $ showSignConf conf
   where
-    x = var ()
+    x = var X
     ps :: [UPolynomial (Polynomial Rational Int)]
     ps = [x^(2::Int)]
     [(conf, _)] = runM $ buildSignConf ps
@@ -532,8 +532,8 @@ test2a = mapM_ putStrLn $ showSignConf conf
 test2b :: Bool
 test2b = isNothing $ solve vs cs
   where
-    x = var ()
-    vs = Set.singleton ()
+    x = var X
+    vs = Set.singleton X
     cs = [x^(2::Int) .<. 0]
 
 test = and [test1b, test1c, test2b]
@@ -554,7 +554,7 @@ test_project_print = putStrLn $ showDNF $ test_project
 
 test_project_2 = project [(p, [Zero]), (x, [Pos])]
   where
-    x = var ()
+    x = var X
     p :: UPolynomial (Polynomial Rational Int)
     p = x^(2::Int) + 4*x - 10
 

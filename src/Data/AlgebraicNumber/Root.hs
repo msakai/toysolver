@@ -52,7 +52,7 @@ rootScale r p = fromTerms [(r^(d - mmDegree xs) * c, xs) | (c, xs) <- terms p]
     d = deg p
 
 rootRecip :: UPolynomial Rational -> UPolynomial Rational
-rootRecip p = fromTerms [(c, mmFromList [((), d - mmDegree xs)]) | (c, xs) <- terms p]
+rootRecip p = fromTerms [(c, mmFromList [(X, d - mmDegree xs)]) | (c, xs) <- terms p]
   where
     d = deg p
 
@@ -67,10 +67,10 @@ rootSimpPoly f p = findPoly (var 0) ps
     m = Map.fromDistinctAscList ys
 
     p' :: Polynomial Rational Var
-    p' = eval (\() -> var 0) (mapCoeff (\c -> var (m Map.! (f c))) p)
+    p' = eval (\X -> var 0) (mapCoeff (\c -> var (m Map.! (f c))) p)
 
     ps :: [Polynomial Rational Var]
-    ps = p' : [mapVar (\() -> x) q | (q, x) <- ys]
+    ps = p' : [mapVar (\X -> x) q | (q, x) <- ys]
 
 lift2 :: (forall a. Num a => a -> a -> a)
       -> UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
@@ -84,11 +84,11 @@ lift2 f p1 p2 = findPoly f_a_b gbase
     f_a_b = f (var a) (var b)
 
     gbase :: [Polynomial Rational Var]
-    gbase = [ mapVar (\() -> a) p1, mapVar (\() -> b) p2 ]              
+    gbase = [ mapVar (\X -> a) p1, mapVar (\X -> b) p2 ]              
 
 -- ps のもとで c を根とする多項式を求める
 findPoly :: Polynomial Rational Var -> [Polynomial Rational Var] -> UPolynomial Rational
-findPoly c ps = fromTerms [(coeff, mmFromList [((), n)]) | (n,coeff) <- zip [0..] coeffs]
+findPoly c ps = fromTerms [(coeff, mmFromList [(X, n)]) | (n,coeff) <- zip [0..] coeffs]
   where  
     vn :: Var
     vn = if Set.null vs then 0 else Set.findMax vs + 1

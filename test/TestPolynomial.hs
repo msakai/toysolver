@@ -103,7 +103,7 @@ prop_polyDivMod =
 case_polyDivMod_1 =  g*q + r @?= f
   where
     x :: UPolynomial Rational
-    x = var ()
+    x = var X
     f = x^3 + x^2 + x
     g = x^2 + 1
     (q,r) = f `polyDivMod` g
@@ -122,7 +122,7 @@ prop_polyGCD_comm =
 case_polyGCD_1 = polyGCD f1 f2 @?= 1
   where 
     x :: UPolynomial Rational
-    x = var ()
+    x = var X
     f1 = x^3 + x^2 + x
     f2 = x^2 + 1
 
@@ -142,13 +142,13 @@ prop_deriv_integral =
   forAll upolynomials $ \a ->
     deriv (integral a x) x == a
   where
-    x = ()
+    x = X
 
 prop_integral_deriv =
   forAll upolynomials $ \a ->
     deg (integral (deriv a x) x - a) == 0
   where
-    x = ()
+    x = X
 
 {--------------------------------------------------------------------
   Monomial
@@ -443,15 +443,15 @@ polynomials = do
   xs <- replicateM size monomials
   return $ sum $ map fromMonomial xs 
 
-umonicMonomials :: Gen (MonicMonomial ())
+umonicMonomials :: Gen (MonicMonomial X)
 umonicMonomials = do
   size <- choose (0, 3)
   xs <- replicateM size $ do
     e <- choose (1, 4)
-    return $ mmFromList [((),e)]
+    return $ mmFromList [(X,e)]
   return $ foldl mmProd mmOne xs
 
-umonomials :: Gen (Monomial Rational ())
+umonomials :: Gen (Monomial Rational X)
 umonomials = do
   m <- umonicMonomials
   c <- arbitrary
@@ -468,7 +468,7 @@ upolynomials = do
 -- http://mathworld.wolfram.com/SturmFunction.html
 case_sturmChain = sturmChain p0 @?= chain
   where
-    x = var ()
+    x = var X
     p0 = x^5 - 3*x - 1
     p1 = 5*x^4 - 3
     p2 = constant (1/5) * (12*x + 5)
@@ -485,7 +485,7 @@ case_numRoots_1 =
   , numRoots p (Finite 1      <=..<= Finite (1.5))  @?= 1
   ]
   where
-    x = var ()
+    x = var X
     p = x^5 - 3*x - 1
 
 -- check interpretation of intervals
@@ -497,7 +497,7 @@ case_numRoots_2 =
   , numRoots p (Finite 1 <..<=  Finite 2) @?= 1
   ]
   where
-    x = var ()
+    x = var X
     p = x^2 - 4
 
 case_separate = do
@@ -506,7 +506,7 @@ case_separate = do
     forM_ (filter (v/=) vals) $ \v2 -> do
       Interval.member v2 ival @?= False
   where
-    x = var ()
+    x = var X
     p = x^5 - 3*x - 1
     intervals = separate p
     vals = [-1.21465, -0.334734, 1.38879]
@@ -517,7 +517,7 @@ case_separate = do
 case_Lagrange_interpolation_1 = p @?= q
   where
     x :: UPolynomial Rational
-    x = var ()
+    x = var X
     p = Lagrange.interpolation
         [ (1, 1)
         , (2, 4)
@@ -529,7 +529,7 @@ case_Lagrange_interpolation_1 = p @?= q
 case_Lagrange_interpolation_2 = p @?= q
   where
     x :: UPolynomial Rational
-    x = var ()
+    x = var X
     p = Lagrange.interpolation
         [ (1, 1)
         , (2, 8)
