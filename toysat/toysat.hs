@@ -579,10 +579,19 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
           PBFile.Eq -> SAT.addPBExactly solver lhs' rhs
         return []
       Just cval -> do
-        sel <- SAT.newVar solver
-        case op of
-          PBFile.Ge -> SAT.addPBAtLeastSoft solver sel lhs' rhs
-          PBFile.Eq -> SAT.addPBExactlySoft solver sel lhs' rhs
+        sel <-
+          case op of
+            PBFile.Ge -> do
+              case lhs' of
+                [(1,l)] | rhs == 1 -> return l
+                _ -> do
+                  sel <- SAT.newVar solver
+                  SAT.addPBAtLeastSoft solver sel lhs' rhs
+                  return sel
+            PBFile.Eq -> do
+              sel <- SAT.newVar solver
+              SAT.addPBExactlySoft solver sel lhs' rhs
+              return sel
         return [(cval, SAT.litNot sel)]
 
   case tco of
