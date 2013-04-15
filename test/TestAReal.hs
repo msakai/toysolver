@@ -59,7 +59,7 @@ case_rootSub_sqrt2_sqrt3 = assertBool "" $ abs valP <= 0.0001
     x = var X
 
     p :: UPolynomial Rational
-    p = rootSub (x^2 - 2) (x^2 - 3)
+    p = rootAdd (x^2 - 2) (rootScale (-1) (x^2 - 3))
 
     valP :: Double
     valP = eval (\X -> sqrt 2 - sqrt 3) $ mapCoeff fromRational p
@@ -79,31 +79,38 @@ case_rootNegate_test1 = assertBool "" $ abs valP <= 0.0001
     x = var X
 
     p :: UPolynomial Rational
-    p = rootNegate (x^3 - 3)
+    p = rootScale (-1) (x^3 - 3)
 
     valP :: Double
     valP = eval (\X -> - (3 ** (1/3))) $ mapCoeff fromRational p
 
-case_rootNegate_test2 = rootNegate p @?= q
+case_rootNegate_test2 = rootScale (-1) p @?= normalizePoly q
   where
     x :: UPolynomial Rational
     x = var X
     p = x^3 - 3
     q = x^3 + 3
 
-case_rootNegate_test3 = rootNegate p @?= q
+case_rootNegate_test3 = rootScale (-1) p @?= normalizePoly q
   where
     x :: UPolynomial Rational
     x = var X
     p = (x-2)*(x-3)*(x-4)
     q = (x+2)*(x+3)*(x+4)
 
-case_rootScale = rootScale 2 p @?= q
+case_rootScale = rootScale 2 p @?= normalizePoly q
   where
     x :: UPolynomial Rational
     x = var X
     p = (x-2)*(x-3)*(x-4)
     q = (x-4)*(x-6)*(x-8)
+
+case_rootScale_zero = rootScale 0 p @?= normalizePoly q
+  where
+    x :: UPolynomial Rational
+    x = var X
+    p = (x-2)*(x-3)*(x-4)
+    q = x
 
 case_rootRecip = assertBool "" $ abs valP <= 0.0001
   where

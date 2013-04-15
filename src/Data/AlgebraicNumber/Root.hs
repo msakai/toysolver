@@ -32,27 +32,25 @@ type Var = Int
   Manipulation of polynomials
 --------------------------------------------------------------------}
 
+normalizePoly :: UPolynomial Rational -> UPolynomial Rational
+normalizePoly p
+  | c == 1    = p
+  | otherwise = mapCoeff (/ c) p
+  where
+    (c,_) = leadingTerm grlex p
+
 rootAdd :: UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
 rootAdd p1 p2 = lift2 (+) p1 p2
-
-rootSub :: UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
-rootSub p1 p2 = lift2 (flip subtract) p1 p2
 
 rootMul :: UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
 rootMul p1 p2 = lift2 (*) p1 p2
 
-rootNegate :: UPolynomial Rational -> UPolynomial Rational
-rootNegate p = fromTerms [(if (d - mmDegree xs) `mod` 2 == 0 then c else -c, xs) | (c, xs) <- terms p]
-  where
-    d = deg p
-
 rootScale :: Rational -> UPolynomial Rational -> UPolynomial Rational
-rootScale r p = fromTerms [(r^(d - mmDegree xs) * c, xs) | (c, xs) <- terms p]
-  where
-    d = deg p
+rootScale 0 p = var X
+rootScale r p = normalizePoly $ subst p (\X -> constant (recip r) * var X)
 
 rootRecip :: UPolynomial Rational -> UPolynomial Rational
-rootRecip p = fromTerms [(c, mmFromList [(X, d - mmDegree xs)]) | (c, xs) <- terms p]
+rootRecip p = normalizePoly $ fromTerms [(c, mmFromList [(X, d - mmDegree xs)]) | (c, xs) <- terms p]
   where
     d = deg p
 
@@ -88,7 +86,7 @@ lift2 f p1 p2 = findPoly f_a_b gbase
 
 -- ps のもとで c を根とする多項式を求める
 findPoly :: Polynomial Rational Var -> [Polynomial Rational Var] -> UPolynomial Rational
-findPoly c ps = fromTerms [(coeff, mmFromList [(X, n)]) | (n,coeff) <- zip [0..] coeffs]
+findPoly c ps = normalizePoly $ sum [constant coeff * (var X) ^ n | (n,coeff) <- zip [0..] coeffs]
   where  
     vn :: Var
     vn = if Set.null vs then 0 else Set.findMax vs + 1

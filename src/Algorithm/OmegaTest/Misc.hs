@@ -23,12 +23,10 @@ checkRealByCAD vs as = isJust $ CAD.solve vs2 (map (fmap f) as)
     vs2 = Set.fromAscList $ IS.toAscList vs
 
     f :: LA.Expr Rational -> P.Polynomial Rational Int
-    f t = P.fromTerms [(c, g x) | (c,x) <- LA.terms t]
-
-    g :: Int -> P.MonicMonomial Int
-    g x
-      | x == LA.unitVar = P.mmOne
-      | otherwise       = P.mmVar x
+    f t = sum [ if x == LA.unitVar
+                then P.constant c
+                else P.constant c * P.var x
+              | (c,x) <- LA.terms t ]
 
 checkRealBySimplex :: VarSet -> [LA.Atom Rational] -> Bool
 checkRealBySimplex vs as = unsafePerformIO $ do

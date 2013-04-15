@@ -90,12 +90,6 @@ realRoot p i =
 realRoot2 :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot2 p i = RealRoot (normalizePoly p) i
 
-normalizePoly :: UPolynomial Rational -> UPolynomial Rational
-normalizePoly p = mapCoeff f p
-  where
-    (c,_) = leadingTerm grlex p
-    f x = x / c
-
 minimalPolynomial :: AReal -> UPolynomial Rational
 minimalPolynomial (RealRoot p _) = p
 
@@ -150,7 +144,7 @@ instance Num AReal where
         where
           i4 = i1 * i2
 
-  negate (RealRoot p i) = realRoot2 (rootNegate p) (-i)
+  negate (RealRoot p i) = realRoot2 (rootScale (-1) p) (-i)
 
   abs a =
     case compare 0 a of
@@ -164,9 +158,7 @@ instance Num AReal where
       LT -> 1
       GT -> -1
 
-  fromInteger i = RealRoot (x - constant (fromInteger i)) (Interval.singleton (fromInteger i))
-    where
-      x = var X
+  fromInteger = fromRational . toRational
 
 instance Fractional AReal where
   fromRational r = RealRoot (x - constant r) (Interval.singleton r)

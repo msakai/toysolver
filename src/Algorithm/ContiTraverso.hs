@@ -116,4 +116,4 @@ costOrdering obj = compare `on` f
 elimOrdering :: IS.IntSet -> MonomialOrder Var
 elimOrdering xs = compare `on` f
   where
-    f ys = not (IS.null (xs `IS.intersection` IM.keysSet (mmToIntMap ys)))
+    f ys = not $ IS.null $ xs `IS.intersection` IM.keysSet (mmToIntMap ys)
