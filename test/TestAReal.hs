@@ -10,7 +10,7 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
 import Data.Polynomial hiding (deg)
-import Data.AlgebraicNumber
+import Data.AlgebraicNumber.Real
 import Data.AlgebraicNumber.Root
 
 import Control.Monad

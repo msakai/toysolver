@@ -13,7 +13,7 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 
-import Data.AlgebraicNumber
+import Data.AlgebraicNumber.Real
 import Data.ArithRel
 import Data.FOL.Arith
 import qualified Data.LA as LA

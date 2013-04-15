@@ -63,7 +63,7 @@ import Text.Printf
 import Text.PrettyPrint.HughesPJClass
 
 import Data.ArithRel
-import qualified Data.AlgebraicNumber as AReal
+import qualified Data.AlgebraicNumber.Real as AReal
 import Data.DNF
 import Data.Polynomial
 

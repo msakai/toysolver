@@ -9,8 +9,8 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (Rank2Types)
 --
--- Algebraic nubmers (work in progress).
---
+-- Manipulating polynomials for corresponding operations for algebraic numbers.
+-- 
 -- Reference:
 --
 -- * <http://www.dpmms.cam.ac.uk/~wtg10/galois.html>

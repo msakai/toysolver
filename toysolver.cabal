@@ -96,7 +96,7 @@ Library
      Converter.SAT2PB
      Converter.SAT2LP
      Converter.WBO2PB
-     Data.AlgebraicNumber
+     Data.AlgebraicNumber.Real
      Data.AlgebraicNumber.Root
      Data.ArithRel
      Data.Delta

@@ -10,7 +10,7 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
 import Data.Polynomial
-import Data.AlgebraicNumber
+import Data.AlgebraicNumber.Real
 
 import Control.Monad
 import System.IO

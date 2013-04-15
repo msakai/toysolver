@@ -40,7 +40,7 @@ import Data.OptDir
 import qualified Data.LA as LA
 import qualified Data.LA.FOL as LAFOL
 import qualified Data.Polynomial as P
-import qualified Data.AlgebraicNumber as AReal
+import qualified Data.AlgebraicNumber.Real as AReal
 import qualified Algorithm.OmegaTest as OmegaTest
 import qualified Algorithm.OmegaTest.Misc as OmegaTest
 import qualified Algorithm.Cooper as Cooper

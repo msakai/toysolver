@@ -1,22 +1,22 @@
 {-# LANGUAGE Rank2Types #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Data.AlgebraicNumber
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Module      :  Data.AlgebraicNumber.Real
+-- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable (Rank2Types)
 --
--- Algebraic nubmers (work in progress).
+-- Algebraic reals
 --
 -- Reference:
 --
 -- * <http://www.dpmms.cam.ac.uk/~wtg10/galois.html>
 -- 
 -----------------------------------------------------------------------------
-module Data.AlgebraicNumber
+module Data.AlgebraicNumber.Real
   (
   -- * Algebraic real type
     AReal
@@ -50,14 +50,6 @@ import qualified Data.Polynomial.FactorZ as FactorZ
 import Data.Interval (Interval, EndPoint (..), (<=..<), (<..<=), (<..<), (<!), (>!))
 import qualified Data.Interval as Interval
 import Data.AlgebraicNumber.Root
-
-{--------------------------------------------------------------------
-  Algebraic numbers
-
-以下の代数的実数の場合にはスツルムの定理による根の分離で色々できているけど、
-一般の代数的数の場合にどうすれば良いかはまだちゃんと理解できていない。
-なので、一旦色々削除した。
---------------------------------------------------------------------}
 
 {--------------------------------------------------------------------
   Algebraic reals
@@ -171,7 +163,7 @@ instance Fractional AReal where
 
 instance Real AReal where
   toRational x
-    | Data.AlgebraicNumber.deg x == 1 =
+    | Data.AlgebraicNumber.Real.deg x == 1 =
         let p = minimalPolynomial x
             a = P.coeff (P.mmVar X) p
             b = P.coeff P.mmOne p
