@@ -107,11 +107,10 @@ module Data.Polynomial
   , grlex
   , grevlex
 
-  -- * Utility functions
-  , render
+  -- * Pretty Printing
   , renderWith
-  , RenderCoeff (..)
-  , RenderVar (..)
+  , PrettyCoeff (..)
+  , PrettyVar (..)
   ) where
 
 import Prelude hiding (lex)
@@ -124,6 +123,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.IntMap as IM
 import Data.VectorSpace
+import qualified Text.PrettyPrint.HughesPJClass as PP
+import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
 
 {--------------------------------------------------------------------
   Polynomial type
@@ -302,63 +303,86 @@ reduce cmp p fs = go p
           return (g - fromMonomial (monomialDiv h a) * f)
 
 {--------------------------------------------------------------------
-  Rendering
+  Pretty printing
 --------------------------------------------------------------------}
 
-render
-  :: (Eq k, Ord k, Num k, Ord v, RenderCoeff k, RenderVar v)
-  => Polynomial k v -> String
-render = renderWith renderVar
+instance (Ord k, Num k, Ord v, PrettyCoeff k, PrettyVar v) => Pretty (Polynomial k v) where
+  pPrintPrec = renderWith pPrintVar
 
 renderWith
-  :: (Eq k, Ord k, Num k, Ord v, RenderCoeff k)
-  => (Int -> v -> ShowS)
-  -> Polynomial k v -> String
-renderWith s2 p =
-  case sortBy (flip grlex `on` snd) $ terms p of
-    [] -> "0"
-    (c,xs):ts -> f c xs ++ concat [if isNegativeCoeff c then " - " ++ (f (-c) xs) else " + " ++ f c xs | (c,xs) <- ts]
-  where
-    f c xs = (intercalate "*" ([renderCoeff 8 c "" | c /= 1 || null (mmToList xs)] ++ [g x e | (x,e) <- mmToList xs]))
-    g x 1 = s2 8 x ""
-    g x n = s2 9 x "" ++ "^" ++ show n
+  :: (Ord k, Num k, Ord v, PrettyCoeff k)
+  => (PrettyLevel -> Rational -> v -> Doc)
+  -> PrettyLevel -> Rational -> (Polynomial k v) -> Doc
+renderWith rv lv prec p =
+    case sortBy (flip grlex `on` snd) $ terms p of
+      [] -> PP.int 0
+      [t] -> renderLeadingTerm prec t
+      t:ts ->
+        prettyParen (prec > addPrec) $
+          PP.hcat (renderLeadingTerm addPrec t : map renderTrailingTerm ts)
+    where
+      renderLeadingTerm prec (c,xs) =
+        if isNegativeCoeff c
+        then prettyParen (prec > addPrec) $
+               PP.char '-' <> renderMonomial (addPrec+1) (-c) xs
+        else renderMonomial prec c xs
 
-class RenderCoeff a where
-  renderCoeff :: Int -> a -> ShowS
+      renderTrailingTerm (c,xs) =
+        if isNegativeCoeff c
+        then PP.space <> PP.char '-' <> PP.space <> renderMonomial (addPrec+1) (-c) xs
+        else PP.space <> PP.char '+' <> PP.space <> renderMonomial (addPrec+1) c xs
+
+      renderMonomial prec c xs
+        | len == 0  = pPrintCoeff lv prec c
+        | len == 1 && c == 1 = renderPow prec $ head (mmToList xs)
+        | otherwise =
+            prettyParen (prec > mulPrec) $
+              PP.hcat $ intersperse (PP.char '*') fs
+          where
+            len = length $ mmToList xs
+            fs  = [pPrintCoeff lv (mulPrec+1) c | c /= 1] ++ [renderPow (mulPrec+1) p | p <- mmToList xs]
+
+      renderPow prec (x,1) = rv lv prec x
+      renderPow prec (x,n) =
+        prettyParen (prec > expPrec) $
+          rv lv (expPrec+1) x <> PP.char '^' <> PP.integer n
+
+class PrettyCoeff a where
+  pPrintCoeff :: PrettyLevel -> Rational -> a -> Doc
   isNegativeCoeff :: a -> Bool
+  isNegativeCoeff _ = False
 
-instance RenderCoeff Integer where
-  renderCoeff = showsPrec
+instance PrettyCoeff Integer where
+  pPrintCoeff = pPrintPrec
   isNegativeCoeff = (0>)
 
-instance RenderCoeff Rational where
-  renderCoeff p r
-    | denominator r == 1 = showsPrec p (numerator r)
+instance (PrettyCoeff a, Integral a) => PrettyCoeff (Ratio a) where
+  pPrintCoeff lv p r
+    | denominator r == 1 = pPrintCoeff lv p (numerator r)
     | otherwise = 
-        showParen (p > ratioPrec) $
-        showsPrec ratioPrec1 (numerator r) .
-        showString "/" .
-        showsPrec ratioPrec1 (denominator r)
-    where
-      ratioPrec, ratioPrec1 :: Int
-      ratioPrec  = 7  -- Precedence of '/'
-      ratioPrec1 = ratioPrec + 1
-  isNegativeCoeff = (0>)
+        prettyParen (p > ratPrec) $
+          pPrintCoeff lv (ratPrec+1) (numerator r) <>
+          PP.char '/' <>
+          pPrintCoeff lv (ratPrec+1) (denominator r)
+  isNegativeCoeff x = isNegativeCoeff (numerator x)
 
-instance (Num c, Ord c, RenderCoeff c, Ord v, RenderVar v) => RenderCoeff (Polynomial c v) where
-  renderCoeff _prec c = showChar '(' . showString (render c) . showChar ')'
-  isNegativeCoeff p = isNegativeCoeff c
-    where
-      (c,_) = leadingTerm grlex p
+instance (Num c, Ord c, PrettyCoeff c, Ord v, PrettyVar v) => PrettyCoeff (Polynomial c v) where
+  pPrintCoeff = pPrintPrec
 
-class RenderVar v where
-  renderVar :: Int -> v -> ShowS
+class PrettyVar a where
+  pPrintVar :: PrettyLevel -> Rational -> a -> Doc
 
-instance RenderVar Int where
-  renderVar prec n = showChar 'x' . showsPrec 0 n
+instance PrettyVar Int where
+  pPrintVar _ _ n = PP.char 'x' <> PP.int n
 
-instance RenderVar X where
-  renderVar prec n = showChar 'x'
+instance PrettyVar X where
+  pPrintVar _ _ X = PP.char 'x'
+
+addPrec, mulPrec, ratPrec, expPrec :: Rational
+addPrec = 6 -- Precedence of '+'
+mulPrec = 7 -- Precedence of '*'
+ratPrec = 7 -- Precedence of '/'
+expPrec = 8 -- Precedence of '^'
 
 {--------------------------------------------------------------------
   Univalent polynomials

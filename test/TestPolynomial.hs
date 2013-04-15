@@ -12,6 +12,7 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
+import Text.PrettyPrint.HughesPJClass
 
 import Data.Polynomial
 import Data.Polynomial.GBase
@@ -88,6 +89,30 @@ prop_polyMDivMod =
       all (0/=) fs ==>
         let (qs, r) = polyMDivMod lex g fs
         in sum (zipWith (*) fs qs) + r == g
+
+case_prettyShow_test1 =
+  prettyShow p @?= "-x1^2*x2 + 3*x1 - 2*x2"
+  where
+    p :: Polynomial Rational Int
+    p = - (var 1)^2 * var 2 + 3 * var 1 - 2 * var 2
+
+case_prettyShow_test2 =
+  prettyShow p @?= "(x0 + 1)*x"
+  where
+    p :: UPolynomial (Polynomial Rational Int)
+    p = constant (var (0::Int) + 1) * var X
+
+case_prettyShow_test3 =
+  prettyShow p @?= "(-1)*x"
+  where
+    p :: UPolynomial (Polynomial Rational Int)
+    p = constant (-1) * var X
+
+case_prettyShow_test4 =
+  prettyShow p @?= "x^2 - 1/2"
+  where
+    p :: UPolynomial Rational
+    p = (var X)^2 - constant (1/2)
 
 {--------------------------------------------------------------------
   Univalent polynomials

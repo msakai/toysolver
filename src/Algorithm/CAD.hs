@@ -60,6 +60,7 @@ import Data.Ord
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Text.Printf
+import Text.PrettyPrint.HughesPJClass
 
 import Data.ArithRel
 import qualified Data.AlgebraicNumber as AReal
@@ -78,14 +79,14 @@ data Cell c
   | Interval (Point c) (Point c)
   deriving (Eq, Ord, Show)
 
-showCell :: (Num c, Ord c, RenderCoeff c) => Cell c -> String
+showCell :: (Num c, Ord c, PrettyCoeff c) => Cell c -> String
 showCell (Point pt) = showPoint pt
 showCell (Interval lb ub) = printf "(%s, %s)" (showPoint lb) (showPoint ub)
 
-showPoint :: (Num c, Ord c, RenderCoeff c) => Point c -> String
+showPoint :: (Num c, Ord c, PrettyCoeff c) => Point c -> String
 showPoint NegInf = "-inf"
 showPoint PosInf = "+inf"
-showPoint (RootOf p n) = "rootOf(" ++ render p ++ ", " ++ show n ++ ")"
+showPoint (RootOf p n) = "rootOf(" ++ prettyShow p ++ ", " ++ show n ++ ")"
 
 -- ---------------------------------------------------------------------------
 
@@ -133,7 +134,7 @@ emptySignConf =
   , (Point PosInf, Map.empty)
   ]
 
-showSignConf :: forall c. (Num c, Ord c, RenderCoeff c) => SignConf c -> [String]
+showSignConf :: forall c. (Num c, Ord c, PrettyCoeff c) => SignConf c -> [String]
 showSignConf = f
   where
     f :: SignConf c -> [String]
@@ -141,7 +142,7 @@ showSignConf = f
 
     g :: Map.Map (UPolynomial c) Sign -> [String]
     g m =
-      [printf "  %s: %s" (render p) (showSign s) | (p, s) <- Map.toList m]
+      [printf "  %s: %s" (prettyShow p) (showSign s) | (p, s) <- Map.toList m]
 
     showSign :: Sign -> String
     showSign Pos  = "+"
@@ -152,7 +153,7 @@ showSignConf = f
 
 -- modified reminder
 mr
-  :: forall k. (Ord k, Show k, Num k, RenderCoeff k)
+  :: forall k. (Ord k, Show k, Num k, PrettyCoeff k)
   => UPolynomial k
   -> UPolynomial k
   -> (k, Integer, UPolynomial k)
@@ -209,7 +210,7 @@ type M v = StateT (Map.Map (Polynomial Rational v) (Set.Set Sign)) []
 runM :: M v a -> [(a, Map.Map (Polynomial Rational v) (Set.Set Sign))]
 runM m = runStateT m Map.empty
 
-assume :: (Ord v, Show v, RenderVar v) => Polynomial Rational v -> [Sign] -> M v ()
+assume :: (Ord v, Show v, PrettyVar v) => Polynomial Rational v -> [Sign] -> M v ()
 assume p ss =
   if deg p == 0
     then do
@@ -225,7 +226,7 @@ assume p ss =
       put $ Map.insert p' ss2 m
 
 project
-  :: forall v. (Ord v, Show v, RenderVar v)
+  :: forall v. (Ord v, Show v, PrettyVar v)
   => [(UPolynomial (Polynomial Rational v), [Sign])]
   -> [([(Polynomial Rational v, [Sign])], [Cell (Polynomial Rational v)])]
 project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
@@ -251,7 +252,7 @@ project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
     guess2cond gs = [(p, Set.toList ss)  | (p, ss) <- Map.toList gs]
 
 buildSignConf
-  :: (Ord v, Show v, RenderVar v)
+  :: (Ord v, Show v, PrettyVar v)
   => [UPolynomial (Polynomial Rational v)]
   -> M v (SignConf (Polynomial Rational v))
 buildSignConf ps = do
@@ -260,7 +261,7 @@ buildSignConf ps = do
   foldM (flip refineSignConf) emptySignConf ts
 
 collectPolynomials
-  :: (Ord v, Show v, RenderVar v)
+  :: (Ord v, Show v, PrettyVar v)
   => Set.Set (UPolynomial (Polynomial Rational v))
   -> M v (Set.Set (UPolynomial (Polynomial Rational v)))
 collectPolynomials ps = go Set.empty (f ps)
@@ -278,7 +279,7 @@ collectPolynomials ps = go Set.empty (f ps)
       go (result `Set.union` ps) ps'
 
 getHighestNonzeroTerm
-  :: forall v. (Ord v, Show v, RenderVar v)
+  :: forall v. (Ord v, Show v, PrettyVar v)
   => UPolynomial (Polynomial Rational v)
   -> M v (Polynomial Rational v, Integer)
 getHighestNonzeroTerm p = go $ sortBy (flip (comparing snd)) cs
@@ -293,7 +294,7 @@ getHighestNonzeroTerm p = go $ sortBy (flip (comparing snd)) cs
         (assume c [Zero] >> go xs)
 
 zmod
-  :: forall v. (Ord v, Show v, RenderVar v)
+  :: forall v. (Ord v, Show v, PrettyVar v)
   => UPolynomial (Polynomial Rational v)
   -> UPolynomial (Polynomial Rational v)
   -> M v (Maybe (Polynomial Rational v, Integer, UPolynomial (Polynomial Rational v)))
@@ -308,7 +309,7 @@ zmod p q = do
       return $ Just $ mr p' q'
 
 refineSignConf
-  :: forall v. (Show v, Ord v, RenderVar v)
+  :: forall v. (Show v, Ord v, PrettyVar v)
   => UPolynomial (Polynomial Rational v)
   -> SignConf (Polynomial Rational v) 
   -> M v (SignConf (Polynomial Rational v))
@@ -408,7 +409,7 @@ evalPoint m (RootOf p n) =
 -- ---------------------------------------------------------------------------
 
 solve
-  :: forall v. (Ord v, Show v, RenderVar v)
+  :: forall v. (Ord v, Show v, PrettyVar v)
   => Set.Set v
   -> [(Rel (Polynomial Rational v))]
   -> Maybe (Model v)
@@ -423,7 +424,7 @@ solve vs cs0 = solve' vs (map f cs0)
     g NEq = [Pos,Neg]
 
 solve'
-  :: forall v. (Ord v, Show v, RenderVar v)
+  :: forall v. (Ord v, Show v, PrettyVar v)
   => Set.Set v
   -> [(Polynomial Rational v, [Sign])]
   -> Maybe (Model v)
@@ -444,11 +445,11 @@ solve' vs0 cs0 = go (Set.toList vs0) cs0
 
 -- ---------------------------------------------------------------------------
 
-showDNF :: (Ord v, Show v, RenderVar v) => DNF (Polynomial Rational v, [Sign]) -> String
+showDNF :: (Ord v, Show v, PrettyVar v) => DNF (Polynomial Rational v, [Sign]) -> String
 showDNF (DNF xss) = intercalate " | " [showConj xs | xs <- xss]
   where
     showConj xs = "(" ++ intercalate " & " [f p ss | (p,ss) <- xs] ++ ")"
-    f p ss = render p ++ g ss
+    f p ss = prettyShow p ++ g ss
     g [Zero] = " = 0"
     g [Pos]  = " > 0"
     g [Neg]  = " < 0"
@@ -459,7 +460,7 @@ showDNF (DNF xss) = intercalate " | " [showConj xs | xs <- xss]
       | otherwise = error "showDNF: should not happen"
 
 dumpProjection
-  :: (Ord v, Show v, RenderVar v)
+  :: (Ord v, Show v, PrettyVar v)
   => [([(Polynomial Rational v, [Sign])], [Cell (Polynomial Rational v)])]
   -> IO ()
 dumpProjection xs =
@@ -471,7 +472,7 @@ dumpProjection xs =
     forM_ cells $ \cell -> do
       putStrLn $ showCell cell
   where
-    f p ss = render p ++ g ss
+    f p ss = prettyShow p ++ g ss
     g [Zero] = " = 0"
     g [Pos]  = " > 0"
     g [Neg]  = " < 0"
@@ -483,7 +484,7 @@ dumpProjection xs =
 
 dumpSignConf
   :: forall v.
-     (Ord v, RenderVar v, Show v)
+     (Ord v, PrettyVar v, Show v)
   => [(SignConf (Polynomial Rational v), Map.Map (Polynomial Rational v) (Set.Set Sign))]
   -> IO ()
 dumpSignConf x = 
@@ -491,7 +492,7 @@ dumpSignConf x =
     putStrLn "============"
     mapM_ putStrLn $ showSignConf conf
     forM_  (Map.toList as) $ \(p, sign) ->
-      printf "%s %s\n" (render p) (show sign)
+      printf "%s %s\n" (prettyShow p) (show sign)
 
 -- ---------------------------------------------------------------------------
 
@@ -593,9 +594,9 @@ test_collectPolynomials_print :: IO ()
 test_collectPolynomials_print = do
   forM_ test_collectPolynomials $ \(ps,s) -> do
     putStrLn "============"
-    mapM_ (putStrLn . render) (Set.toList ps)
+    mapM_ (putStrLn . prettyShow) (Set.toList ps)
     forM_  (Map.toList s) $ \(p, sign) ->
-      printf "%s %s\n" (render p) (show sign)
+      printf "%s %s\n" (prettyShow p) (show sign)
 
 test_buildSignConf :: [(SignConf (Polynomial Rational Int), Map.Map (Polynomial Rational Int) (Set.Set Sign))]
 test_buildSignConf = runM $ buildSignConf [toUPolynomialOf p 3]
