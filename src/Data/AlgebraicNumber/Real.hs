@@ -42,6 +42,8 @@ import Control.Exception (assert)
 import Control.Monad
 import Data.List
 import Data.Ratio
+import qualified Text.PrettyPrint.HughesPJClass as PP
+import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
 
 import Data.Polynomial hiding (deg)
 import qualified Data.Polynomial as P
@@ -263,6 +265,18 @@ height x = maximum [ assert (denominator c' == 1) (abs (numerator c'))
   where
     p = minimalPolynomial x
     d = foldl' lcm 1 [denominator c | (c,_) <- terms p]
+
+{--------------------------------------------------------------------
+  Pretty printing
+--------------------------------------------------------------------}
+
+instance Pretty AReal where
+  pPrintPrec lv prec r@(RealRoot p i) =
+    prettyParen (prec > appPrec) $
+      PP.hsep [PP.text "Root", pPrintPrec lv (appPrec+1) p, PP.int idx]
+    where
+      idx = head [idx | (idx, s) <- zip [0..] (realRoots p), s == r]
+      appPrec = 10
 
 {--------------------------------------------------------------------
   Manipulation of polynomials
