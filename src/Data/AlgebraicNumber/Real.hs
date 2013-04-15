@@ -91,13 +91,14 @@ isZero :: AReal -> Bool
 isZero (RealRoot p i) = 0 `Interval.member` i && 0 `isRootOf` p
 
 instance Eq AReal where
-  a == b = (compare a b == EQ)
+  a@(RealRoot p1 i1) == b@(RealRoot p2 i2) =
+    p1==p2 && Sturm.numRoots p1 (Interval.intersection i1 i2) == 1
 
 instance Ord AReal where
-  compare a@(RealRoot _ i1) b@(RealRoot _ i2)
+  compare a@(RealRoot p1 i1) b@(RealRoot p2 i2)
     | i1 >! i2 = GT
     | i1 <! i2 = LT
-    | isZero c = EQ
+    | a == b   = EQ
     | Sturm.numRoots p ipos == 1 = GT
     | otherwise = assert (Sturm.numRoots p ineg == 1) LT
     where
