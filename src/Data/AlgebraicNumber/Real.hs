@@ -67,9 +67,14 @@ data AReal = RealRoot (UPolynomial Rational) (Interval Rational)
 realRoots :: UPolynomial Rational -> [AReal]
 realRoots p = sort $ do
   q <- FactorQ.factor p
-  guard $ P.deg q > 0
-  i <- Sturm.separate q
-  return $ realRoot2 q i
+  realRoots' q
+
+-- p must already be factored.
+realRoots' :: UPolynomial Rational -> [AReal]
+realRoots' p = sort $ do
+  guard $ P.deg p > 0
+  i <- Sturm.separate p
+  return $ realRoot' p i
 
 realRoot :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot p i = 
@@ -77,9 +82,9 @@ realRoot p i =
     p2:_ -> RealRoot (normalizePoly p2) i
     []   -> error "Data.AlgebraicNumber.realRoot: invalid interval"
 
--- p must be already factored.
-realRoot2 :: UPolynomial Rational -> Interval Rational -> AReal
-realRoot2 p i = RealRoot (normalizePoly p) i
+-- p must already be factored.
+realRoot' :: UPolynomial Rational -> Interval Rational -> AReal
+realRoot' p i = RealRoot (normalizePoly p) i
 
 -- | The polynomial of which the algebraic number is root.
 minimalPolynomial :: AReal -> UPolynomial Rational
@@ -137,7 +142,7 @@ instance Num AReal where
         where
           i4 = i1 * i2
 
-  negate (RealRoot p i) = realRoot2 (rootScale (-1) p) (-i)
+  negate (RealRoot p i) = realRoot' (rootScale (-1) p) (-i)
 
   abs a =
     case compare 0 a of
@@ -160,7 +165,7 @@ instance Fractional AReal where
 
   recip a@(RealRoot p i)
     | isZero a  = error "AReal.recip: zero division"
-    | otherwise = realRoot2 (rootRecip p) (recip i)
+    | otherwise = realRoot' (rootRecip p) (recip i)
 
 instance Real AReal where
   toRational x
@@ -282,11 +287,12 @@ height x = maximum [ assert (denominator c' == 1) (abs (numerator c'))
 --------------------------------------------------------------------}
 
 instance Pretty AReal where
-  pPrintPrec lv prec r@(RealRoot p i) =
+  pPrintPrec lv prec r =
     prettyParen (prec > appPrec) $
       PP.hsep [PP.text "RealRoot", pPrintPrec lv (appPrec+1) p, PP.int idx]
     where
-      idx = head [idx | (idx, s) <- zip [0..] (realRoots p), s == r]
+      p = minimalPolynomial r
+      Just idx = r `elemIndex`  sort (realRoots' p)
       appPrec = 10
 
 {--------------------------------------------------------------------
@@ -305,4 +311,4 @@ simpARealPoly p = rootSimpPoly (\(RealRoot q _) -> q) p
 goldenRatio :: AReal
 goldenRatio = (1 + root5) / 2
   where
-    [_, root5] = realRoots ((var X)^2 - 5)
+    [_, root5] = sort $ realRoots' ((var X)^2 - 5)
