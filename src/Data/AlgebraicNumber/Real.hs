@@ -79,7 +79,7 @@ realRoots' p = sort $ do
 realRoot :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot p i = 
   case [q | q <- FactorQ.factor p, P.deg q > 0, Sturm.numRoots q i == 1] of
-    p2:_ -> RealRoot (normalizePoly p2) i
+    p2:_ -> realRoot' p2 i
     []   -> error "Data.AlgebraicNumber.Real.realRoot: invalid interval"
 
 -- p must already be factored.
@@ -91,27 +91,40 @@ realRoot' p i = RealRoot (normalizePoly p) i
 --------------------------------------------------------------------}
 
 isZero :: AReal -> Bool
-isZero (RealRoot p i) = 0 `Interval.member` i && 0 `isRootOf` p
+isZero a = 0 `Interval.member` (interval a) && 0 `isRootOf` minimalPolynomial a
 
 scaleAReal :: Rational -> AReal -> AReal
-scaleAReal r (RealRoot p i) = realRoot' (rootScale r p) (Interval.singleton r * i)
+scaleAReal r a = realRoot' p2 i2
+  where
+    p2 = rootScale r (minimalPolynomial a)
+    i2 = Interval.singleton r * interval a
 
 shiftAReal :: Rational -> AReal -> AReal
-shiftAReal r (RealRoot p i) = realRoot' (rootShift r p) (Interval.singleton r + i)
+shiftAReal r a = realRoot' p2 i2
+  where
+    p2 = rootShift r (minimalPolynomial a)
+    i2 = Interval.singleton r + interval a
 
 instance Eq AReal where
-  a@(RealRoot p1 i1) == b@(RealRoot p2 i2) =
-    p1==p2 && Sturm.numRoots p1 (Interval.intersection i1 i2) == 1
+  a == b = p1==p2 && Sturm.numRoots' c (Interval.intersection i1 i2) == 1
+    where
+      p1 = minimalPolynomial a
+      p2 = minimalPolynomial b
+      i1 = interval a
+      i2 = interval b
+      c  = sturmChain a
 
 instance Ord AReal where
-  compare a@(RealRoot p1 i1) b@(RealRoot p2 i2)
+  compare a b
     | i1 >! i2  = GT
     | i1 <! i2  = LT
     | a == b    = EQ
     | otherwise = go i1 i2
     where
-      c1 = Sturm.sturmChain p1
-      c2 = Sturm.sturmChain p2
+      i1 = interval a
+      i2 = interval b
+      c1 = sturmChain a
+      c2 = sturmChain b
       go i1 i2
         | i1 >! i2 = GT
         | i1 <! i2 = LT
@@ -127,13 +140,13 @@ instance Num AReal where
   a + b
     | isRational a = shiftAReal (toRational a) b
     | isRational b = shiftAReal (toRational b) a
-  RealRoot p1 i1 + RealRoot p2 i2 = realRoot p3 i3
+    | otherwise    = realRoot p3 i3
     where
-      p3 = rootAdd p1 p2
-      c1 = Sturm.sturmChain p1
-      c2 = Sturm.sturmChain p2
+      p3 = rootAdd (minimalPolynomial a) (minimalPolynomial b)
+      c1 = sturmChain a
+      c2 = sturmChain b
       c3 = Sturm.sturmChain p3
-      i3 = go i1 i2 (Sturm.separate' c3)
+      i3 = go (interval a) (interval b) (Sturm.separate' c3)
 
       go i1 i2 is3 =
         case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots' c3 i5 > 0] of
@@ -149,13 +162,13 @@ instance Num AReal where
   a * b
     | isRational a = scaleAReal (toRational a) b
     | isRational b = scaleAReal (toRational b) a
-  RealRoot p1 i1 * RealRoot p2 i2 = realRoot p3 i3
+    | otherwise    = realRoot p3 i3
     where
-      p3 = rootMul p1 p2
-      c1 = Sturm.sturmChain p1
-      c2 = Sturm.sturmChain p2
+      p3 = rootMul (minimalPolynomial a) (minimalPolynomial b)
+      c1 = sturmChain a
+      c2 = sturmChain b
       c3 = Sturm.sturmChain p3
-      i3 = go i1 i2 (Sturm.separate' c3)
+      i3 = go (interval a) (interval b) (Sturm.separate' c3)
 
       go i1 i2 is3 =
         case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots' c3 i5 > 0] of
@@ -185,13 +198,16 @@ instance Num AReal where
   fromInteger = fromRational . toRational
 
 instance Fractional AReal where
-  fromRational r = RealRoot (x - constant r) (Interval.singleton r)
+  fromRational r = realRoot' (x - constant r) (Interval.singleton r)
     where
       x = var X
 
-  recip a@(RealRoot p i)
+  recip a
     | isZero a  = error "AReal.recip: zero division"
-    | otherwise = realRoot' (rootRecip p) (recip i)
+    | otherwise = realRoot' p2 i2
+      where
+        p2 = rootRecip (minimalPolynomial a)
+        i2 = recip (interval a)
 
 instance Real AReal where
   toRational x
@@ -209,15 +225,15 @@ instance RealFrac AReal where
   ceiling        = ceiling'
   floor          = floor'
 
--- | Returns approximate rational value such that @abs (x - approx x epsilon) <= epsilon@.
+-- | Returns approximate rational value such that @abs (a - approx a epsilon) <= epsilon@.
 approx
-  :: AReal    -- ^ x
+  :: AReal    -- ^ a
   -> Rational -- ^ epsilon
   -> Rational
-approx x@(RealRoot p i) epsilon =
-  if isRational x
-    then toRational x
-    else Sturm.approx p i epsilon
+approx a epsilon =
+  if isRational a
+    then toRational a
+    else Sturm.approx' (sturmChain a) (interval a) epsilon
 
 -- | Same as 'properFraction'.
 properFraction' :: Integral b => AReal -> (b, AReal)
@@ -248,13 +264,13 @@ round' x =
 
 -- | Same as 'ceiling'.
 ceiling' :: Integral b => AReal -> b
-ceiling' (RealRoot p i) =
+ceiling' a =
   if Sturm.numRoots' chain (Interval.intersection i2 i3) >= 1
     then fromInteger ceiling_lb
     else fromInteger ceiling_ub
   where
-    chain = Sturm.sturmChain p
-    i2 = Sturm.narrow' chain i (1/2)
+    chain = sturmChain a
+    i2 = Sturm.narrow' chain (interval a) (1/2)
     (Finite lb, inLB) = Interval.lowerBound' i2
     (Finite ub, inUB) = Interval.upperBound' i2
     ceiling_lb = ceiling lb
@@ -263,13 +279,13 @@ ceiling' (RealRoot p i) =
 
 -- | Same as 'floor'.
 floor' :: Integral b => AReal -> b
-floor' (RealRoot p i) =
+floor' a =
   if Sturm.numRoots' chain (Interval.intersection i2 i3) >= 1
     then fromInteger floor_ub
     else fromInteger floor_lb
   where
-    chain = Sturm.sturmChain p
-    i2 = Sturm.narrow' chain i (1/2)
+    chain = sturmChain a
+    i2 = Sturm.narrow' chain (interval a) (1/2)
     (Finite lb, inLB) = Interval.lowerBound' i2
     (Finite ub, inUB) = Interval.upperBound' i2
     floor_lb = floor lb
@@ -284,12 +300,18 @@ floor' (RealRoot p i) =
 minimalPolynomial :: AReal -> UPolynomial Rational
 minimalPolynomial (RealRoot p _) = p
 
+sturmChain :: AReal -> Sturm.SturmChain
+sturmChain a = Sturm.sturmChain (minimalPolynomial a)
+
+interval :: AReal -> Interval Rational
+interval (RealRoot _ i) = i
+
 -- | Degree of the algebraic number.
 -- 
 -- If the algebraic number's 'minimalPolynomial' has degree @n@,
 -- then the algebraic number is said to be degree @n@.
 deg :: AReal -> Integer
-deg (RealRoot p _) = P.deg p
+deg a = P.deg $ minimalPolynomial a
 
 -- | Whether the algebraic number is a rational.
 isRational :: AReal -> Bool
@@ -331,7 +353,7 @@ instance Pretty AReal where
 
 -- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
 simpARealPoly :: UPolynomial AReal -> UPolynomial Rational
-simpARealPoly p = rootSimpPoly (\(RealRoot q _) -> q) p
+simpARealPoly p = rootSimpPoly minimalPolynomial p
 
 {--------------------------------------------------------------------
   Misc
