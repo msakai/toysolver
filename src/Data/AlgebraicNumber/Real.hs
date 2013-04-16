@@ -105,15 +105,23 @@ instance Eq AReal where
 
 instance Ord AReal where
   compare a@(RealRoot p1 i1) b@(RealRoot p2 i2)
-    | i1 >! i2 = GT
-    | i1 <! i2 = LT
-    | a == b   = EQ
-    | Sturm.numRoots p ipos == 1 = GT
-    | otherwise = assert (Sturm.numRoots p ineg == 1) LT
+    | i1 >! i2  = GT
+    | i1 <! i2  = LT
+    | a == b    = EQ
+    | otherwise = go i1 i2
     where
-      c@(RealRoot p i3) = a - b
-      ipos = Interval.intersection i3 (Finite 0 <..< PosInf)
-      ineg = Interval.intersection i3 (NegInf <..< Finite 0)
+      c1 = Sturm.sturmChain p1
+      c2 = Sturm.sturmChain p2
+      go i1 i2
+        | i1 >! i2 = GT
+        | i1 <! i2 = LT
+        | otherwise =
+            if w1 > w2
+            then go (Sturm.narrow' c1 i1 (w1 / 2)) i2
+            else go i1 (Sturm.narrow' c2 i2 (w2 / 2))
+        where
+          w1 = Interval.width i1
+          w2 = Interval.width i2
 
 instance Num AReal where
   a + b
@@ -122,16 +130,19 @@ instance Num AReal where
   RealRoot p1 i1 + RealRoot p2 i2 = realRoot p3 i3
     where
       p3 = rootAdd p1 p2
-      i3 = go i1 i2 (Sturm.separate p3)
+      c1 = Sturm.sturmChain p1
+      c2 = Sturm.sturmChain p2
+      c3 = Sturm.sturmChain p3
+      i3 = go i1 i2 (Sturm.separate' c3)
 
       go i1 i2 is3 =
-        case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots p3 i5 > 0] of
+        case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots' c3 i5 > 0] of
           [] -> error "AReal.+: should not happen"
           [i5] -> i5
           is5 ->
-            go (Sturm.narrow p1 i1 (Interval.width i1 / 2))
-               (Sturm.narrow p2 i2 (Interval.width i2 / 2))
-               [Sturm.narrow p3 i5 (Interval.width i5 / 2) | i5 <- is5]
+            go (Sturm.narrow' c1 i1 (Interval.width i1 / 2))
+               (Sturm.narrow' c2 i2 (Interval.width i2 / 2))
+               [Sturm.narrow' c3 i5 (Interval.width i5 / 2) | i5 <- is5]
         where
           i4 = i1 + i2
 
@@ -141,16 +152,19 @@ instance Num AReal where
   RealRoot p1 i1 * RealRoot p2 i2 = realRoot p3 i3
     where
       p3 = rootMul p1 p2
-      i3 = go i1 i2 (Sturm.separate p3)
+      c1 = Sturm.sturmChain p1
+      c2 = Sturm.sturmChain p2
+      c3 = Sturm.sturmChain p3
+      i3 = go i1 i2 (Sturm.separate' c3)
 
       go i1 i2 is3 =
-        case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots p3 i5 > 0] of
+        case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots' c3 i5 > 0] of
           [] -> error "AReal.*: should not happen"
           [i5] -> i5
           is5 ->
-            go (Sturm.narrow p1 i1 (Interval.width i1 / 2))
-               (Sturm.narrow p2 i2 (Interval.width i2 / 2))
-               [Sturm.narrow p3 i5 (Interval.width i5 / 2) | i5 <- is5]
+            go (Sturm.narrow' c1 i1 (Interval.width i1 / 2))
+               (Sturm.narrow' c2 i2 (Interval.width i2 / 2))
+               [Sturm.narrow' c3 i5 (Interval.width i5 / 2) | i5 <- is5]
         where
           i4 = i1 * i2
 
@@ -181,7 +195,7 @@ instance Fractional AReal where
 
 instance Real AReal where
   toRational x
-    | Data.AlgebraicNumber.Real.deg x == 1 =
+    | isRational x =
         let p = minimalPolynomial x
             a = P.coeff (P.mmVar X) p
             b = P.coeff P.mmOne p
