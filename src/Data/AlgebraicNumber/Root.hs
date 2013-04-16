@@ -45,6 +45,10 @@ rootAdd p1 p2 = lift2 (+) p1 p2
 rootMul :: UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
 rootMul p1 p2 = lift2 (*) p1 p2
 
+rootShift :: Rational -> UPolynomial Rational -> UPolynomial Rational
+rootShift 0 p = p
+rootShift r p = normalizePoly $ subst p (\X -> var X - constant r)
+
 rootScale :: Rational -> UPolynomial Rational -> UPolynomial Rational
 rootScale 0 p = var X
 rootScale r p = normalizePoly $ subst p (\X -> constant (recip r) * var X)

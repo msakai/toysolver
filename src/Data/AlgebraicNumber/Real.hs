@@ -93,6 +93,12 @@ minimalPolynomial (RealRoot p _) = p
 isZero :: AReal -> Bool
 isZero (RealRoot p i) = 0 `Interval.member` i && 0 `isRootOf` p
 
+scaleAReal :: Rational -> AReal -> AReal
+scaleAReal r (RealRoot p i) = realRoot' (rootScale r p) (Interval.singleton r * i)
+
+shiftAReal :: Rational -> AReal -> AReal
+shiftAReal r (RealRoot p i) = realRoot' (rootShift r p) (Interval.singleton r + i)
+
 instance Eq AReal where
   a@(RealRoot p1 i1) == b@(RealRoot p2 i2) =
     p1==p2 && Sturm.numRoots p1 (Interval.intersection i1 i2) == 1
@@ -110,6 +116,9 @@ instance Ord AReal where
       ineg = Interval.intersection i3 (NegInf <..< Finite 0)
 
 instance Num AReal where
+  a + b
+    | isRational a = shiftAReal (toRational a) b
+    | isRational b = shiftAReal (toRational b) a
   RealRoot p1 i1 + RealRoot p2 i2 = realRoot p3 i3
     where
       p3 = rootAdd p1 p2
@@ -126,6 +135,9 @@ instance Num AReal where
         where
           i4 = i1 + i2
 
+  a * b
+    | isRational a = scaleAReal (toRational a) b
+    | isRational b = scaleAReal (toRational b) a
   RealRoot p1 i1 * RealRoot p2 i2 = realRoot p3 i3
     where
       p3 = rootMul p1 p2
@@ -142,7 +154,7 @@ instance Num AReal where
         where
           i4 = i1 * i2
 
-  negate (RealRoot p i) = realRoot' (rootScale (-1) p) (-i)
+  negate a = scaleAReal (-1) a
 
   abs a =
     case compare 0 a of
