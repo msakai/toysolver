@@ -13,7 +13,8 @@
 --
 -- Reference:
 --
--- * <http://www.dpmms.cam.ac.uk/~wtg10/galois.html>
+-- * Why the concept of a field extension is a natural one
+--   <http://www.dpmms.cam.ac.uk/~wtg10/galois.html>
 -- 
 -----------------------------------------------------------------------------
 module Data.AlgebraicNumber.Real
@@ -35,7 +36,8 @@ module Data.AlgebraicNumber.Real
   , approx
 
   -- * Misc
-  , simpARealPoly  
+  , simpARealPoly
+  , goldenRatio
   ) where
 
 import Control.Exception (assert)
@@ -79,6 +81,7 @@ realRoot p i =
 realRoot2 :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot2 p i = RealRoot (normalizePoly p) i
 
+-- | The polynomial of which the algebraic number is root.
 minimalPolynomial :: AReal -> UPolynomial Rational
 minimalPolynomial (RealRoot p _) = p
 
@@ -175,7 +178,11 @@ instance RealFrac AReal where
   ceiling        = ceiling'
   floor          = floor'
 
-approx :: AReal -> Rational -> Rational
+-- | Returns approximate rational value such that @abs (x - approx x epsilon) <= epsilon@.
+approx
+  :: AReal    -- ^ x
+  -> Rational -- ^ epsilon
+  -> Rational
 approx x@(RealRoot p i) epsilon =
   if isRational x
     then toRational x
@@ -242,12 +249,19 @@ floor' (RealRoot p i) =
   Properties
 --------------------------------------------------------------------}
 
+-- | Degree of the algebraic number.
+-- 
+-- If the algebraic number's 'minimalPolynomial' has degree @n@,
+-- then the algebraic number is said to be degree @n@.
 deg :: AReal -> Integer
 deg (RealRoot p _) = P.deg p
 
+-- | Whether the algebraic number is a rational.
 isRational :: AReal -> Bool
 isRational x = deg x == 1
 
+-- | Whether the algebraic number is a root of a polynomial with integer
+-- coefficients with leading coefficient @1@ (a monic polynomial).
 isAlgebraicInteger :: AReal -> Bool
 isAlgebraicInteger x = cn * fromIntegral d == 1
   where
@@ -255,6 +269,7 @@ isAlgebraicInteger x = cn * fromIntegral d == 1
     d = foldl' lcm 1 [denominator c | (c,_) <- terms p]
     (cn,_) = leadingTerm grlex p
 
+-- | Height of the algebraic number.
 height :: AReal -> Integer
 height x = maximum [ assert (denominator c' == 1) (abs (numerator c'))
                    | (c,_) <- terms p, let c' = c * fromInteger d ]
@@ -269,7 +284,7 @@ height x = maximum [ assert (denominator c' == 1) (abs (numerator c'))
 instance Pretty AReal where
   pPrintPrec lv prec r@(RealRoot p i) =
     prettyParen (prec > appPrec) $
-      PP.hsep [PP.text "Root", pPrintPrec lv (appPrec+1) p, PP.int idx]
+      PP.hsep [PP.text "RealRoot", pPrintPrec lv (appPrec+1) p, PP.int idx]
     where
       idx = head [idx | (idx, s) <- zip [0..] (realRoots p), s == r]
       appPrec = 10
@@ -281,3 +296,13 @@ instance Pretty AReal where
 -- 代数的数を係数とする多項式の根を、有理数係数多項式の根として表す
 simpARealPoly :: UPolynomial AReal -> UPolynomial Rational
 simpARealPoly p = rootSimpPoly (\(RealRoot q _) -> q) p
+
+{--------------------------------------------------------------------
+  Misc
+--------------------------------------------------------------------}
+
+-- | Golden ratio 
+goldenRatio :: AReal
+goldenRatio = (1 + root5) / 2
+  where
+    [_, root5] = realRoots ((var X)^2 - 5)
