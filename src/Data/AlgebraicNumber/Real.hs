@@ -56,7 +56,7 @@ import qualified Data.Interval as Interval
 import Data.AlgebraicNumber.Root
 
 {--------------------------------------------------------------------
-  Algebraic reals
+  Construction
 --------------------------------------------------------------------}
 
 -- | Algebraic real numbers.
@@ -80,15 +80,15 @@ realRoot :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot p i = 
   case [q | q <- FactorQ.factor p, P.deg q > 0, Sturm.numRoots q i == 1] of
     p2:_ -> RealRoot (normalizePoly p2) i
-    []   -> error "Data.AlgebraicNumber.realRoot: invalid interval"
+    []   -> error "Data.AlgebraicNumber.Real.realRoot: invalid interval"
 
 -- p must already be factored.
 realRoot' :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot' p i = RealRoot (normalizePoly p) i
 
--- | The polynomial of which the algebraic number is root.
-minimalPolynomial :: AReal -> UPolynomial Rational
-minimalPolynomial (RealRoot p _) = p
+{--------------------------------------------------------------------
+  Operations
+--------------------------------------------------------------------}
 
 isZero :: AReal -> Bool
 isZero (RealRoot p i) = 0 `Interval.member` i && 0 `isRootOf` p
@@ -265,6 +265,10 @@ floor' (RealRoot p i) =
 {--------------------------------------------------------------------
   Properties
 --------------------------------------------------------------------}
+
+-- | The polynomial of which the algebraic number is root.
+minimalPolynomial :: AReal -> UPolynomial Rational
+minimalPolynomial (RealRoot p _) = p
 
 -- | Degree of the algebraic number.
 -- 
