@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Data.Polynomial.Sturm
+-- Module      :  Data.Polynomial.RootSeparation.Sturm
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -18,7 +18,7 @@
 -- 
 -----------------------------------------------------------------------------
 
-module Data.Polynomial.Sturm
+module Data.Polynomial.RootSeparation.Sturm
   ( SturmChain
   , sturmChain
   , numRoots

@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 -- http://en.wikipedia.org/wiki/Polynomial_factorization
 -- Kronecker's method
-module Data.Polynomial.FactorZ
+module Data.Polynomial.Factorization.Integer
   ( factor
   ) where
 
@@ -9,7 +9,7 @@ import Data.List
 import Data.Numbers.Primes (primes)
 import Data.Ratio
 import Data.Polynomial
-import qualified Data.Polynomial.Lagrange as Lagrange
+import qualified Data.Polynomial.Interpolation.Lagrange as Interpolation
 import Util (isInteger)
 
 factor :: UPolynomial Integer -> [UPolynomial Integer]
@@ -51,7 +51,7 @@ factor2 p =
           q2 = p' `polyDiv` mapCoeff fromInteger q1
       in Just [q1, toZ q2]
     Nothing ->
-      let qs = map Lagrange.interpolation $
+      let qs = map Interpolation.interpolate $
                   sequence [[(fromInteger xi, fromInteger z) | z <- factors yi] | (xi,yi) <- vs]
           zs = [ (q1,q2)
                | q1 <- qs, deg q1 > 0, isUPolyZ q1

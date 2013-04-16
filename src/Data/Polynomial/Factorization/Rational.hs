@@ -1,10 +1,10 @@
-module Data.Polynomial.FactorQ
+module Data.Polynomial.Factorization.Rational
   ( factor
   ) where
 
 import Data.List (foldl')
 import Data.Polynomial
-import qualified Data.Polynomial.FactorZ as FactorZ
+import qualified Data.Polynomial.Factorization.Integer as FactorZ
 import Data.Ratio
 
 factor :: UPolynomial Rational -> [UPolynomial Rational]

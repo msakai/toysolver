@@ -49,8 +49,8 @@ import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyPare
 
 import Data.Polynomial hiding (deg)
 import qualified Data.Polynomial as P
-import qualified Data.Polynomial.Sturm as Sturm
-import qualified Data.Polynomial.FactorQ as FactorQ
+import qualified Data.Polynomial.Factorization.Rational as FactorQ
+import qualified Data.Polynomial.RootSeparation.Sturm as Sturm
 import Data.Interval (Interval, EndPoint (..), (<=..<), (<..<=), (<..<), (<!), (>!))
 import qualified Data.Interval as Interval
 import Data.AlgebraicNumber.Root

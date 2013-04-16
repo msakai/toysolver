@@ -16,10 +16,10 @@ import Text.PrettyPrint.HughesPJClass
 
 import Data.Polynomial
 import Data.Polynomial.GBase
-import Data.Polynomial.Sturm
-import qualified Data.Polynomial.FactorZ as FactorZ
-import qualified Data.Polynomial.FactorQ as FactorQ
-import qualified Data.Polynomial.Lagrange as Lagrange
+import Data.Polynomial.RootSeparation.Sturm
+import qualified Data.Polynomial.Factorization.Integer as FactorZ
+import qualified Data.Polynomial.Factorization.Rational as FactorQ
+import qualified Data.Polynomial.Interpolation.Lagrange as LagrangeInterpolation
 import qualified Data.Interval as Interval
 import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<))
 
@@ -597,7 +597,7 @@ case_Lagrange_interpolation_1 = p @?= q
   where
     x :: UPolynomial Rational
     x = var X
-    p = Lagrange.interpolation
+    p = LagrangeInterpolation.interpolate
         [ (1, 1)
         , (2, 4)
         , (3, 9)
@@ -609,7 +609,7 @@ case_Lagrange_interpolation_2 = p @?= q
   where
     x :: UPolynomial Rational
     x = var X
-    p = Lagrange.interpolation
+    p = LagrangeInterpolation.interpolate
         [ (1, 1)
         , (2, 8)
         , (3, 27)
