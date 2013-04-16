@@ -107,6 +107,7 @@ Library
      Data.LA.FOL
      Data.LBool
      Data.Polynomial
+     Data.Polynomial.FactorQ
      Data.Polynomial.FactorZ
      Data.Polynomial.GBase
      Data.Polynomial.Lagrange

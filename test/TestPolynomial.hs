@@ -17,6 +17,8 @@ import Text.PrettyPrint.HughesPJClass
 import Data.Polynomial
 import Data.Polynomial.GBase
 import Data.Polynomial.Sturm
+import qualified Data.Polynomial.FactorZ as FactorZ
+import qualified Data.Polynomial.FactorQ as FactorQ
 import qualified Data.Polynomial.Lagrange as Lagrange
 import qualified Data.Interval as Interval
 import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<))
@@ -535,6 +537,58 @@ case_separate = do
     p = x^5 - 3*x - 1
     intervals = separate p
     vals = [-1.21465, -0.334734, 1.38879]
+
+------------------------------------------------------------------------
+
+case_factorZ_zero = FactorZ.factor 0 @?= [0]
+case_factorZ_one  = FactorZ.factor 1 @?= []
+case_factorZ_two  = FactorZ.factor 2 @?= [2]
+
+-- http://en.wikipedia.org/wiki/Factorization_of_polynomials
+case_factorZ_test1 = do
+  sort (FactorZ.factor f) @?= sort [2,p,q]
+  product (FactorZ.factor f) @?= f
+  where
+    x :: UPolynomial Integer
+    x = var X   
+    f = 2*(x^5 + x^4 + x^2 + x + 2)
+    p = x^2 + x + 1
+    q = x^3 - x + 2
+
+case_factorZ_test2 = do
+  sort (FactorZ.factor f) @?= sort [-1,p,q]
+  product (FactorZ.factor f) @?= f
+  where
+    x :: UPolynomial Integer
+    x = var X   
+    f = - (x^5 + x^4 + x^2 + x + 2)
+    p = x^2 + x + 1
+    q = x^3 - x + 2
+
+case_factorQ_zero = FactorQ.factor 0 @?= [0]
+case_factorQ_one  = FactorQ.factor 1 @?= []
+case_factorQ_two  = FactorQ.factor 2 @?= [2]
+
+-- http://en.wikipedia.org/wiki/Factorization_of_polynomials
+case_factorQ_test1 = do
+  sort (FactorQ.factor f) @?= sort [2,p,q]
+  product (FactorQ.factor f) @?= f
+  where
+    x :: UPolynomial Rational
+    x = var X
+    f = 2*(x^5 + x^4 + x^2 + x + 2)
+    p = x^2 + x + 1
+    q = x^3 - x + 2
+
+case_factorQ_test2 = do
+  sort (FactorQ.factor f) @?= sort [-1,p,q]
+  product (FactorQ.factor f) @?= f
+  where
+    x :: UPolynomial Rational
+    x = var X
+    f = - (x^5 + x^4 + x^2 + x + 2)
+    p = x^2 + x + 1
+    q = x^3 - x + 2
 
 ------------------------------------------------------------------------
 

@@ -7,6 +7,7 @@ module Data.Polynomial.FactorZ
 
 import Data.List
 import Data.Numbers.Primes (primes)
+import Data.Ratio
 import Data.Polynomial
 import qualified Data.Polynomial.Lagrange as Lagrange
 import Util (isInteger)
@@ -15,8 +16,10 @@ factor :: UPolynomial Integer -> [UPolynomial Integer]
 factor p = normalize $ factor' p
 
 normalize :: [UPolynomial Integer] -> [UPolynomial Integer]
-normalize ps = [constant c | let c = product $ map fst xs, c /= 1] ++ sort (map snd xs)
+normalize ps = [constant c | c /= 1] ++ sort [q | q <- map snd xs, q /= 1]
   where
+    c = product $ map fst xs
+
     xs = map f ps
 
     f :: UPolynomial Integer -> (Integer, UPolynomial Integer)
@@ -27,7 +30,7 @@ normalize ps = [constant c | let c = product $ map fst xs, c /= 1] ++ sort (map 
                   d = foldl' gcd c cs
                   q2 = mapCoeff (`div` d) q
               in if fst (leadingTerm grlex q2) < 0
-                 then (-d,q2)
+                 then (-d,-q2)
                  else (d,q2)
 
 factor' :: UPolynomial Integer -> [UPolynomial Integer]
@@ -68,6 +71,11 @@ factor2 p =
 
 isUPolyZ :: UPolynomial Rational -> Bool
 isUPolyZ p = and [isInteger c | (c,_) <- terms p]
+
+toZ :: Ord v => Polynomial Rational v -> Polynomial Integer v
+toZ p = fromTerms [(numerator (c * fromInteger s), xs) | (c,xs) <- terms p]
+  where
+    s = foldl' lcm  1 [denominator c | (c,_) <- terms p]
 
 -- [0, 1, -1, 2, -2, 3, -3 ..]
 xvalues :: [Integer]

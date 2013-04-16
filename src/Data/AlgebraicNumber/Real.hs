@@ -48,7 +48,7 @@ import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyPare
 import Data.Polynomial hiding (deg)
 import qualified Data.Polynomial as P
 import qualified Data.Polynomial.Sturm as Sturm
-import qualified Data.Polynomial.FactorZ as FactorZ
+import qualified Data.Polynomial.FactorQ as FactorQ
 import Data.Interval (Interval, EndPoint (..), (<=..<), (<..<=), (<..<), (<!), (>!))
 import qualified Data.Interval as Interval
 import Data.AlgebraicNumber.Root
@@ -57,27 +57,22 @@ import Data.AlgebraicNumber.Root
   Algebraic reals
 --------------------------------------------------------------------}
 
+-- | Algebraic real numbers.
 data AReal = RealRoot (UPolynomial Rational) (Interval Rational)
   deriving Show
 
--- | Real roots of the rational coefficient polynomial.
+-- | Real roots of the polynomial in ascending order.
 realRoots :: UPolynomial Rational -> [AReal]
 realRoots p = sort $ do
-  q <- factor' p 
-  i <- Sturm.separate q
-  return $ RealRoot q i
-
-factor' :: UPolynomial Rational -> [UPolynomial Rational]
-factor' p = do
-  q <- FactorZ.factor $ toZ p
+  q <- FactorQ.factor p
   guard $ P.deg q > 0
-  let (c,_) = leadingTerm grlex q
-  return $ mapCoeff (% c) q
+  i <- Sturm.separate q
+  return $ realRoot2 q i
 
 realRoot :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot p i = 
-  case [q | q <- factor' p, Sturm.numRoots q i == 1] of
-    p2:_ -> RealRoot p2 i
+  case [q | q <- FactorQ.factor p, P.deg q > 0, Sturm.numRoots q i == 1] of
+    p2:_ -> RealRoot (normalizePoly p2) i
     []   -> error "Data.AlgebraicNumber.realRoot: invalid interval"
 
 -- p must be already factored.

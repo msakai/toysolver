@@ -61,7 +61,6 @@ module Data.Polynomial
   , mapVar
   , mapCoeff
   , toMonic
-  , toZ
   , toUPolynomialOf
   , polyDiv
   , polyMod
@@ -249,12 +248,6 @@ toMonic p
   | otherwise = mapCoeff (/c) p
   where
     (c,_) = leadingTerm grlex p
-
-toZ :: (Real r, Ord v) => Polynomial r v -> Polynomial Integer v
-toZ p = fromTerms [(numerator (c * fromInteger s), xs) | (c,xs) <- ts]
-  where
-    ts = [(toRational c, xs) | (c,xs) <- terms p]
-    s = foldl' lcm  1 (map (denominator . fst) ts)
 
 toUPolynomialOf :: (Eq k, Ord k, Num k, Ord v, Show v) => Polynomial k v -> v -> UPolynomial (Polynomial k v)
 toUPolynomialOf p v = fromTerms $ do
