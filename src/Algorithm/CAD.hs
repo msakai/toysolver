@@ -403,8 +403,9 @@ evalCell m (Interval pt1 pt2) = Interval (evalPoint m pt1) (evalPoint m pt2)
 evalPoint :: Ord v => Model v -> Point (Polynomial Rational v) -> Point Rational
 evalPoint _ NegInf = NegInf
 evalPoint _ PosInf = PosInf
-evalPoint m (RootOf p n) =
-  RootOf (AReal.simpARealPoly $ mapCoeff (eval (m Map.!) . mapCoeff fromRational) p) n
+evalPoint m (RootOf p n) = RootOf (AReal.minimalPolynomial a) (AReal.rootIndex a)
+  where
+    a = AReal.realRootsEx (mapCoeff (eval (m Map.!) . mapCoeff fromRational) p) !! n
 
 -- ---------------------------------------------------------------------------
 
