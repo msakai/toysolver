@@ -74,6 +74,9 @@ rootSimpPoly f p = findPoly (var 0) ps
     ps :: [Polynomial Rational Var]
     ps = p' : [mapVar (\X -> x) q | (q, x) <- ys]
 
+rootNthRoot :: Integer -> UPolynomial Rational -> UPolynomial Rational
+rootNthRoot n p = subst p (\X -> (var X)^n)
+
 lift2 :: (forall a. Num a => a -> a -> a)
       -> UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
 lift2 f p1 p2 = findPoly f_a_b gbase

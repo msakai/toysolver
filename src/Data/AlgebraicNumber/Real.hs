@@ -32,6 +32,9 @@ module Data.AlgebraicNumber.Real
   , isAlgebraicInteger
   , height
 
+  -- * Operations
+  , nthRoot
+
   -- * Approximation
   , approx
 
@@ -291,6 +294,47 @@ floor' a =
     floor_lb = floor lb
     floor_ub = floor ub
     i3 = Finite (fromInteger floor_ub) <=..< PosInf
+
+-- | The @n@th root of @a@
+nthRoot :: Integer -> AReal -> AReal
+nthRoot n a
+  | n <= 0 = error "Data.AlgebraicNumver.Root.nthRoot"
+  | even n =
+      if a < 0
+      then error "Data.AlgebraicNumver.Root.nthRoot: no real roots"
+      else assert (length bs == 2) (maximum bs) -- select positive root
+  | otherwise =
+      assert (length bs == 1) (head bs) -- select unique root
+  where
+    bs = nthRoots n a
+
+nthRoots :: Integer -> AReal -> [AReal]
+nthRoots n _ | n <= 0 = []
+nthRoots n a | even n && a < 0 = []
+nthRoots n a = filter check (realRoots p2)
+  where
+    p1 = minimalPolynomial a
+    p2 = rootNthRoot n p1
+    c1 = sturmChain a
+    ok0 = interval a
+    ng0 = map interval $ delete a $ realRoots p1
+
+    check :: AReal -> Bool
+    check b = loop ok0 ng0 (interval b)
+      where
+        c2 = sturmChain b
+        loop ok ng i
+          | Sturm.numRoots' c1 ok' == 0 = False
+          | null ng'  = True
+          | otherwise =
+              loop (Sturm.narrow' c1 ok' (Interval.width ok' / 2))
+                   (map (\i3 -> Sturm.narrow' c1 i3 (Interval.width i3 / 2)) ng')
+                   (Sturm.narrow' c2 i (Interval.width i / 2))
+          where
+            i2  = i ^ n
+            ok' = Interval.intersection i2 ok
+            ng' = filter (\i3 -> Sturm.numRoots' c1 i3 /= 0) $
+                    map (Interval.intersection i2) ng
 
 {--------------------------------------------------------------------
   Properties
