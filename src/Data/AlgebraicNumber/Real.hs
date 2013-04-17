@@ -24,6 +24,7 @@ module Data.AlgebraicNumber.Real
 
   -- * Construction
   , realRoots
+  , realRootsEx
 
   -- * Properties
   , minimalPolynomial
@@ -72,6 +73,12 @@ realRoots :: UPolynomial Rational -> [AReal]
 realRoots p = sort $ do
   q <- FactorQ.factor p
   realRoots' q
+
+-- | Real roots of the polynomial in ascending order.
+realRootsEx :: UPolynomial AReal -> [AReal]
+realRootsEx p
+  | and [isRational c | (c,_) <- terms p] = realRoots $ mapCoeff toRational p
+  | otherwise = [a | a <- realRoots (simpARealPoly p), a `isRootOf` p]
 
 -- p must already be factored.
 realRoots' :: UPolynomial Rational -> [AReal]
