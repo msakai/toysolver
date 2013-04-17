@@ -31,6 +31,7 @@ module Data.AlgebraicNumber.Real
   , isRational
   , isAlgebraicInteger
   , height
+  , rootIndex
 
   -- * Operations
   , nthRoot
@@ -378,6 +379,17 @@ height x = maximum [ assert (denominator c' == 1) (abs (numerator c'))
     p = minimalPolynomial x
     d = foldl' lcm 1 [denominator c | (c,_) <- terms p]
 
+-- | root index, satisfying
+--
+-- @
+-- 'realRoots' ('minimalPolynomial' a) !! rootIndex a == a
+-- @
+rootIndex :: AReal -> Int
+rootIndex a = idx
+  where
+    as = realRoots' (minimalPolynomial a)
+    Just idx = elemIndex a as
+
 {--------------------------------------------------------------------
   Pretty printing
 --------------------------------------------------------------------}
@@ -385,10 +397,9 @@ height x = maximum [ assert (denominator c' == 1) (abs (numerator c'))
 instance Pretty AReal where
   pPrintPrec lv prec r =
     prettyParen (prec > appPrec) $
-      PP.hsep [PP.text "RealRoot", pPrintPrec lv (appPrec+1) p, PP.int idx]
+      PP.hsep [PP.text "RealRoot", pPrintPrec lv (appPrec+1) p, PP.int (rootIndex r)]
     where
       p = minimalPolynomial r
-      Just idx = r `elemIndex`  sort (realRoots' p)
       appPrec = 10
 
 instance PrettyCoeff AReal where
