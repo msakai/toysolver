@@ -111,7 +111,7 @@ case_prettyShow_test3 =
     p = constant (-1) * var X
 
 case_prettyShow_test4 =
-  prettyShow p @?= "x^2 - 1/2"
+  prettyShow p @?= "x^2 - (1/2)"
   where
     p :: UPolynomial Rational
     p = (var X)^2 - constant (1/2)

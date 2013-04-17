@@ -326,14 +326,16 @@ renderWith rv lv prec p =
         else PP.space <> PP.char '+' <> PP.space <> renderMonomial (addPrec+1) c xs
 
       renderMonomial prec c xs
-        | len == 0  = pPrintCoeff lv prec c
+        | len == 0  = pPrintCoeff lv (appPrec+1) c
+          -- intentionally specify (appPrec+1) to parenthesize any composite expression
         | len == 1 && c == 1 = renderPow prec $ head (mmToList xs)
         | otherwise =
             prettyParen (prec > mulPrec) $
               PP.hcat $ intersperse (PP.char '*') fs
           where
             len = length $ mmToList xs
-            fs  = [pPrintCoeff lv (mulPrec+1) c | c /= 1] ++ [renderPow (mulPrec+1) p | p <- mmToList xs]
+            fs  = [pPrintCoeff lv (appPrec+1) c | c /= 1] ++ [renderPow (mulPrec+1) p | p <- mmToList xs]
+            -- intentionally specify (appPrec+1) to parenthesize any composite expression
 
       renderPow prec (x,1) = rv lv prec x
       renderPow prec (x,n) =
@@ -376,6 +378,7 @@ addPrec = 6 -- Precedence of '+'
 mulPrec = 7 -- Precedence of '*'
 ratPrec = 7 -- Precedence of '/'
 expPrec = 8 -- Precedence of '^'
+appPrec = 10 -- Precedence of function application
 
 {--------------------------------------------------------------------
   Univalent polynomials
