@@ -347,6 +347,10 @@ instance Pretty AReal where
       Just idx = r `elemIndex`  sort (realRoots' p)
       appPrec = 10
 
+instance PrettyCoeff AReal where
+  pPrintCoeff = pPrintPrec
+  isNegativeCoeff = (0>)
+
 {--------------------------------------------------------------------
   Manipulation of polynomials
 --------------------------------------------------------------------}
