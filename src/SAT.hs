@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
-{-# LANGUAGE BangPatterns, DoAndIfThenElse, DoRec, ScopedTypeVariables, CPP, DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns, DoRec, ScopedTypeVariables, CPP, DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  SAT
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, DoAndIfThenElse, DoRec, ScopedTypeVariables, CPP)
+-- Portability :  non-portable (BangPatterns, DoRec, ScopedTypeVariables, CPP, DeriveDataTypeable)
 --
 -- A CDCL SAT solver.
 --

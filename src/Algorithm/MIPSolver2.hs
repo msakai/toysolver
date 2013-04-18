@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable
+-- Portability :  non-portable (ScopedTypeVariables, Rank2Types)
 --
 -- Naïve implementation of MIP solver based on Simplex2 module
 -- 

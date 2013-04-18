@@ -6,7 +6,7 @@
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
--- Portability :  portable
+-- Portability :  non-portable (BangPatterns)
 --
 -- A parser library for .opb file and .wbo files used by PB Competition.
 -- 

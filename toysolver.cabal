@@ -5,7 +5,7 @@ License-File:	COPYING
 Author:		Masahiro Sakai (masahiro.sakai@gmail.com)
 Maintainer:	masahiro.sakai@gmail.com
 Category:	Algorithms, Optimisation, Optimization, Theorem Provers
-Cabal-Version:	>= 1.8
+Cabal-Version:	>= 1.10
 Synopsis:	Assorted decision procedures for SAT, Max-SAT, PB, MIP, etc
 Description:	Toy-level implementation of some decision procedures
 Bug-Reports:	https://github.com/msakai/toysolver/issues
@@ -54,13 +54,20 @@ Library
      parse-dimacs, queue, heaps, unbounded-delays, lattices >=1.2.1.1, vector-space >=0.8.6,
      prettyclass >=1.0.0,
      OptDir, data-interval >=0.2.0
-  Extensions:
-     TypeFamilies
-     MultiParamTypeClasses
-     FlexibleInstances
+  Default-Language: Haskell2010
+  Other-Extensions:
      BangPatterns
-     DoAndIfThenElse
      CPP
+     DeriveDataTypeable
+     DoRec
+     FlexibleInstances
+     FunctionalDependencies
+     GeneralizedNewtypeDeriving
+     MultiParamTypeClasses
+     Rank2Types
+     ScopedTypeVariables
+     TypeFamilies
+     TypeSynonymInstances
   Exposed-Modules:
      Algebra.Lattice.Boolean
      Algorithm.BoundsInference
@@ -144,6 +151,7 @@ Executable toysolver
   Main-is: toysolver.hs
   HS-Source-Dirs: toysolver
   Build-Depends: base >=4.4 && <5, containers, array, filepath, parsec, OptDir, parse-dimacs, toysolver
+  Default-Language: Haskell2010
   if impl(ghc)
     GHC-Options: -threaded
   if impl(ghc >= 7)
@@ -154,6 +162,8 @@ Executable toysat
   Main-is: toysat.hs
   HS-Source-Dirs: toysat
   Build-Depends: base >=4 && <5, containers >= 0.4.2, array, parsec, bytestring, filepath, parse-dimacs, time, old-locale, unbounded-delays, vector-space >=0.8.6, toysolver
+  Default-Language: Haskell2010
+  Other-Extensions: ScopedTypeVariables, CPP
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
   GHC-Prof-Options: -auto-all
@@ -165,6 +175,7 @@ Executable toyfmf
   Main-is: toyfmf.hs
   HS-Source-Dirs: toyfmf
   Build-Depends: base >=4 && <5, containers >= 0.4.2, toysolver, logic-TPTP
+  Default-Language: Haskell2010
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
   GHC-Prof-Options: -auto-all
@@ -173,91 +184,105 @@ Executable lpconvert
   Main-is: lpconvert.hs
   HS-Source-Dirs: lpconvert
   Build-Depends: base >=4 && <5, containers, filepath, parse-dimacs, toysolver
+  Default-Language: Haskell2010
 
 Executable pbconvert
   Main-is: pbconvert.hs
   HS-Source-Dirs: pbconvert
   Build-Depends: base >=4 && <5, containers, filepath, parse-dimacs, toysolver
+  Default-Language: Haskell2010
 
 Test-suite TestSAT
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestSAT.hs
   Build-depends:     base >=4 && <5, array, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,HUnit
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
 
 Test-suite TestSimplex2
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestSimplex2.hs
   Build-depends:     base >=4 && <5, containers, vector-space >=0.8.6, toysolver, test-framework,test-framework-th,test-framework-hunit,HUnit
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
 
 Test-suite TestMIPSolver2
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestMIPSolver2.hs
   Build-depends:     base >=4 && <5, containers, vector-space >=0.8.6, toysolver, test-framework, test-framework-th, test-framework-hunit, HUnit, OptDir, stm
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
 
 Test-suite TestPolynomial
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestPolynomial.hs
   Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3, data-interval >=0.2.0, prettyclass >=1.0.0
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
 
 Test-suite TestAReal
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestAReal.hs
   Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell, ScopedTypeVariables
 
 Test-suite TestQE
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestQE.hs
   Build-depends:     base >=4 && <5, containers, vector-space >=0.8.6, toysolver, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
 
 Test-suite TestContiTraverso
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestContiTraverso.hs
   Build-depends:     base >=4 && <5, containers, vector-space >=0.8.6, toysolver, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
 
 Test-suite TestLPFile
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestLPFile.hs
   Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
 
 Test-suite TestMPSFile
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestMPSFile.hs
   Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
 
 Test-suite TestPBFile
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestPBFile.hs
   Build-depends:     base >=4 && <5, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
 
 Test-suite TestUtil
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestUtil.hs
   Build-depends:     base >=4 && <5, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
-  Extensions: TemplateHaskell, DoAndIfThenElse
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
 
 Benchmark BenchmarkSATLIB
   type:             exitcode-stdio-1.0
   hs-source-dirs:   benchmarks
   main-is:          BenchmarkSATLIB.hs
   build-depends:    base >=4 && <5, array, containers, random, parse-dimacs, toysolver, criterion
+  Default-Language: Haskell2010

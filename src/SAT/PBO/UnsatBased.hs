@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, DoAndIfThenElse #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable
+-- Portability :  non-portable (BangPatterns)
 --
 -----------------------------------------------------------------------------
 module SAT.PBO.UnsatBased

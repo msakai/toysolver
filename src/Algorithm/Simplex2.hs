@@ -1,4 +1,4 @@
-{-# LANGUAGE DoAndIfThenElse, TypeFamilies, CPP #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, TypeFamilies, CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Algorithm.Simplex2
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (DoAndIfThenElse, TypeFamilies, CPP)
+-- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, TypeFamilies, CPP)
 --
 -- Naïve implementation of Simplex method
 -- 

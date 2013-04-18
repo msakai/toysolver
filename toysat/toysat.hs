@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, DoAndIfThenElse, CPP #-}
+{-# LANGUAGE ScopedTypeVariables, CPP #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (ScopedTypeVariables)
+-- Portability :  non-portable (ScopedTypeVariables, CPP)
 --
 -- A toy-level SAT solver based on CDCL.
 --
