@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
+{-# LANGUAGE PatternGuards, ScopedTypeVariables, TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Polynomial
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, TypeFamilies)
+-- Portability :  non-portable (PatternGuards, ScopedTypeVariables, TypeFamilies)
 --
 -- Polynomials
 --
@@ -141,6 +141,9 @@ type UPolynomial r = Polynomial r X
 
 instance (Eq k, Num k, Ord v, Show v) => Num (Polynomial k v) where
   Polynomial m1 + Polynomial m2 = normalize $ Polynomial $ Map.unionWith (+) m1 m2
+  a * b
+    | Just c <- asConstant a = scale c b
+    | Just c <- asConstant b = scale c a
   Polynomial m1 * Polynomial m2 = normalize $ Polynomial $ Map.fromListWith (+)
       [ (xs1 `mmProd` xs2, c1*c2)
       | (xs1,c1) <- Map.toList m1, (xs2,c2) <- Map.toList m2
@@ -157,7 +160,7 @@ instance (Eq k, Num k, Ord v, Show v) => AdditiveGroup (Polynomial k v) where
 
 instance (Eq k, Num k, Ord v, Show v) => VectorSpace (Polynomial k v) where
   type Scalar (Polynomial k v) = k
-  k *^ p = constant k * p
+  k *^ p = scale k p
 
 instance (Show v, Ord v, Show k) => Show (Polynomial k v) where
   showsPrec d p  = showParen (d > 10) $
@@ -165,6 +168,16 @@ instance (Show v, Ord v, Show k) => Show (Polynomial k v) where
 
 normalize :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
+
+asConstant :: Num k => Polynomial k v -> Maybe k
+asConstant p =
+  case terms p of
+    [] -> Just 0
+    [(c,xs)] | Map.null (mmToMap xs) -> Just c
+    _ -> Nothing
+
+scale :: (Eq k, Num k, Ord v, Show v) => k -> Polynomial k v -> Polynomial k v
+scale a (Polynomial m) = normalize $ Polynomial (Map.map (a*) m)
 
 -- | construct a polynomial from a variable
 var :: (Eq k, Num k, Ord v) => v -> Polynomial k v
