@@ -140,12 +140,9 @@ instance Ord AReal where
         | i1 >! i2 = GT
         | i1 <! i2 = LT
         | otherwise =
-            if w1 > w2
-            then go (Sturm.narrow' c1 i1 (w1 / 2)) i2
-            else go i1 (Sturm.narrow' c2 i2 (w2 / 2))
-        where
-          w1 = Interval.width i1
-          w2 = Interval.width i2
+            if Interval.width i1 > Interval.width i2
+            then go (Sturm.halve' c1 i1) i2
+            else go i1 (Sturm.halve' c2 i2)
 
 instance Num AReal where
   a + b
@@ -161,12 +158,9 @@ instance Num AReal where
 
       go i1 i2 is3 =
         case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots' c3 i5 > 0] of
-          [] -> error "AReal.+: should not happen"
+          []   -> error "AReal.+: should not happen"
           [i5] -> i5
-          is5 ->
-            go (Sturm.narrow' c1 i1 (Interval.width i1 / 2))
-               (Sturm.narrow' c2 i2 (Interval.width i2 / 2))
-               [Sturm.narrow' c3 i5 (Interval.width i5 / 2) | i5 <- is5]
+          is5  -> go (Sturm.halve' c1 i1) (Sturm.halve' c2 i2) [Sturm.halve' c3 i5 | i5 <- is5]
         where
           i4 = i1 + i2
 
@@ -183,12 +177,9 @@ instance Num AReal where
 
       go i1 i2 is3 =
         case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots' c3 i5 > 0] of
-          [] -> error "AReal.*: should not happen"
+          []   -> error "AReal.*: should not happen"
           [i5] -> i5
-          is5 ->
-            go (Sturm.narrow' c1 i1 (Interval.width i1 / 2))
-               (Sturm.narrow' c2 i2 (Interval.width i2 / 2))
-               [Sturm.narrow' c3 i5 (Interval.width i5 / 2) | i5 <- is5]
+          is5  -> go (Sturm.halve' c1 i1)　(Sturm.halve' c2 i2)　[Sturm.halve' c3 i5 | i5 <- is5]
         where
           i4 = i1 * i2
 
@@ -335,9 +326,9 @@ nthRoots n a = filter check (realRoots p2)
           | Sturm.numRoots' c1 ok' == 0 = False
           | null ng'  = True
           | otherwise =
-              loop (Sturm.narrow' c1 ok' (Interval.width ok' / 2))
-                   (map (\i3 -> Sturm.narrow' c1 i3 (Interval.width i3 / 2)) ng')
-                   (Sturm.narrow' c2 i (Interval.width i / 2))
+              loop (Sturm.halve' c1 ok')
+                   (map (\i3 -> Sturm.halve' c1 i3) ng')
+                   (Sturm.halve' c2 i)
           where
             i2  = i ^ n
             ok' = Interval.intersection i2 ok

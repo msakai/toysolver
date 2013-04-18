@@ -25,6 +25,8 @@ module Data.Polynomial.RootSeparation.Sturm
   , numRoots'
   , separate
   , separate'
+  , halve
+  , halve'
   , narrow
   , narrow'
   , approx
@@ -132,6 +134,21 @@ separate' chain@(p:_) = f (bounds p)
       where
         mid = (lb + ub) / 2
 
+halve :: UPolynomial Rational -> Interval Rational -> Interval Rational
+halve p ival = halve' (sturmChain p) ival
+
+halve' :: SturmChain -> Interval Rational -> Interval Rational
+halve' chain@(p:_) ival
+  | Interval.width ival == 0  = ival
+  | numRoots' chain ivalL > 0 = ivalL
+  | otherwise                 = ivalR -- numRoots' chain ivalR > 0
+  where
+    Finite lb = Interval.lowerBound ival
+    Finite ub = Interval.upperBound ival
+    mid = (lb + ub) / 2
+    ivalL = Interval.interval (Interval.lowerBound' ival) (Finite mid, True)
+    ivalR = Interval.interval (Finite mid, False) (Interval.upperBound' ival)
+
 narrow :: UPolynomial Rational -> Interval Rational -> Rational -> Interval Rational
 narrow p ival size = narrow' (sturmChain p) ival size
 
@@ -139,16 +156,8 @@ narrow' :: SturmChain -> Interval Rational -> Rational -> Interval Rational
 narrow' chain@(p:_) ival size = go (boundInterval p ival)
   where
     go ival
-      | s < size = ival
-      | numRoots' chain ivalL > 0 = go ivalL
-      | otherwise = go ivalR -- numRoots' chain ivalR > 0
-      where
-        Finite lb = Interval.lowerBound ival
-        Finite ub = Interval.upperBound ival
-        s = ub - lb
-        mid = (lb + ub) / 2
-        ivalL = Interval.interval (Interval.lowerBound' ival) (Finite mid, True)
-        ivalR = Interval.interval (Finite mid, False) (Interval.upperBound' ival)
+      | Interval.width ival < size  = ival
+      | otherwise = go (halve' chain ival)
 
 approx :: UPolynomial Rational -> Interval Rational -> Rational -> Rational
 approx p = approx' (sturmChain p)
