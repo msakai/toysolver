@@ -177,6 +177,32 @@ prop_integral_deriv =
   where
     x = X
 
+prop_pp_cont =
+  forAll polynomials $ \p ->
+    cont (pp p) == 1
+
+prop_cont_prod =
+  forAll polynomials $ \p ->
+    forAll polynomials $ \q ->
+      (p /= 0 && q /= 0) ==>
+        cont (p*q) == cont p * cont q
+
+case_cont_pp_Integer = do
+  cont p @?= 5
+  pp p   @?= (-2*x^2 + x + 1)
+  where
+    x = var X
+    p :: UPolynomial Integer
+    p = -10*x^2 + 5*x + 5
+
+case_cont_pp_Rational = do
+  cont p @?= 1/6
+  pp p   @?= (2*x^5 + 21*x^2 + 12*x + 6)
+  where
+    x = var X
+    p :: UPolynomial Rational
+    p = constant (1/3) * x^5 + constant (7/2) * x^2 + 2 * x + 1
+
 {--------------------------------------------------------------------
   Monomial
 --------------------------------------------------------------------}

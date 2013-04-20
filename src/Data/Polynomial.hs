@@ -52,6 +52,7 @@ module Data.Polynomial
   , variables
 
   -- * Operations
+  , ContPP (..)
   , deriv
   , integral
   , eval
@@ -113,6 +114,7 @@ module Data.Polynomial
   ) where
 
 import Prelude hiding (lex)
+import Control.Exception (assert)
 import Control.Monad
 import Data.Function
 import Data.List
@@ -221,6 +223,35 @@ lookupCoeff xs (Polynomial m) = Map.lookup xs m
 
 variables :: Ord v => Polynomial k v -> Set.Set v
 variables p = Set.unions $ [Map.keysSet (mmToMap mm) | (_, mm) <- terms p]  
+
+class ContPP k where
+  -- | Content of a polynomial  
+  cont :: (Ord v, Show v) => Polynomial k v -> k
+
+  -- | Primitive part of a polynomial
+  pp :: (Ord v, Show v) => Polynomial k v -> Polynomial k v
+
+instance ContPP Integer where
+  cont 0 = 1
+  cont p = foldl1' gcd [abs c | (c,_) <- terms p]
+
+  pp p = mapCoeff f p
+    where
+      c = cont p
+      f x = assert (x `mod` c == 0) $ x `div` c
+
+instance Integral r => ContPP (Ratio r) where
+  {-# SPECIALIZE instance ContPP (Ratio Integer) #-}
+
+  cont 0 = 1
+  cont p = foldl1' gcd ns % foldl' lcm 1 ds
+    where
+      ns = [abs (numerator c) | (c,_) <- terms p]
+      ds = [denominator c     | (c,_) <- terms p]  
+
+  pp p = mapCoeff (/ c) p
+    where
+      c = cont p
 
 -- | Formal derivative of polynomials
 deriv :: (Eq k, Num k, Ord v, Show v) => Polynomial k v -> v -> Polynomial k v
