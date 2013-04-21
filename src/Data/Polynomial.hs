@@ -146,26 +146,20 @@ data X = X
 -- | Univalent polynomials over commutative ring r
 type UPolynomial r = Polynomial r X
 
-instance (Eq k, Num k, Ord v, Show v) => Num (Polynomial k v) where
-  Polynomial m1 + Polynomial m2 = normalize $ Polynomial $ Map.unionWith (+) m1 m2
-  a * b
-    | Just c <- asConstant a = scale c b
-    | Just c <- asConstant b = scale c a
-  Polynomial m1 * Polynomial m2 = normalize $ Polynomial $ Map.fromListWith (+)
-      [ (xs1 `mmProd` xs2, c1*c2)
-      | (xs1,c1) <- Map.toList m1, (xs2,c2) <- Map.toList m2
-      ]
-  negate (Polynomial m) = Polynomial $ Map.map negate m
+instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
+  (+) = (^+^)
+  (*) = prod
+  negate = negateV
   abs x = x    -- OK?
   signum x = 1 -- OK?
   fromInteger x = constant (fromInteger x)
 
-instance (Eq k, Num k, Ord v, Show v) => AdditiveGroup (Polynomial k v) where
-  p ^+^ q = p + q
-  zeroV   = 0
-  negateV = negate
+instance (Eq k, Num k, Ord v) => AdditiveGroup (Polynomial k v) where
+  Polynomial m1 ^+^ Polynomial m2 = normalize $ Polynomial $ Map.unionWith (+) m1 m2
+  zeroV   = Polynomial $ Map.empty
+  negateV (Polynomial m) = Polynomial $ Map.map negate m
 
-instance (Eq k, Num k, Ord v, Show v) => VectorSpace (Polynomial k v) where
+instance (Eq k, Num k, Ord v) => VectorSpace (Polynomial k v) where
   type Scalar (Polynomial k v) = k
   k *^ p = scale k p
 
@@ -183,8 +177,17 @@ asConstant p =
     [(c,xs)] | Map.null (mmToMap xs) -> Just c
     _ -> Nothing
 
-scale :: (Eq k, Num k, Ord v, Show v) => k -> Polynomial k v -> Polynomial k v
+scale :: (Eq k, Num k, Ord v) => k -> Polynomial k v -> Polynomial k v
 scale a (Polynomial m) = normalize $ Polynomial (Map.map (a*) m)
+
+prod :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v -> Polynomial k v
+prod a b
+  | Just c <- asConstant a = scale c b
+  | Just c <- asConstant b = scale c a
+prod (Polynomial m1) (Polynomial m2) = normalize $ Polynomial $ Map.fromListWith (+)
+      [ (xs1 `mmProd` xs2, c1*c2)
+      | (xs1,c1) <- Map.toList m1, (xs2,c2) <- Map.toList m2
+      ]
 
 -- | construct a polynomial from a variable
 var :: (Eq k, Num k, Ord v) => v -> Polynomial k v
@@ -231,10 +234,10 @@ variables p = Set.unions $ [Map.keysSet (mmToMap mm) | (_, mm) <- terms p]
 
 class ContPP k where
   -- | Content of a polynomial  
-  cont :: (Ord v, Show v) => Polynomial k v -> k
+  cont :: (Ord v) => Polynomial k v -> k
 
   -- | Primitive part of a polynomial
-  pp :: (Ord v, Show v) => Polynomial k v -> Polynomial k v
+  pp :: (Ord v) => Polynomial k v -> Polynomial k v
 
 instance ContPP Integer where
   cont 0 = 1
@@ -259,12 +262,12 @@ instance Integral r => ContPP (Ratio r) where
       c = cont p
 
 -- | Formal derivative of polynomials
-deriv :: (Eq k, Num k, Ord v, Show v) => Polynomial k v -> v -> Polynomial k v
-deriv p x = sum [fromMonomial (monomialDeriv m x) | m <- terms p]
+deriv :: (Eq k, Num k, Ord v) => Polynomial k v -> v -> Polynomial k v
+deriv p x = sumV [fromMonomial (monomialDeriv m x) | m <- terms p]
 
 -- | Formal integral of polynomials
-integral :: (Eq k, Fractional k, Ord v, Show v) => Polynomial k v -> v -> Polynomial k v
-integral p x = sum [fromMonomial (monomialIntegral m x) | m <- terms p]
+integral :: (Eq k, Fractional k, Ord v) => Polynomial k v -> v -> Polynomial k v
+integral p x = sumV [fromMonomial (monomialIntegral m x) | m <- terms p]
 
 -- | Evaluation
 eval :: (Num k, Ord v) => (v -> k) -> Polynomial k v -> k
@@ -288,16 +291,16 @@ evalM env p = do
 
 -- | Substitution or bind
 subst
-  :: (Num k, Eq k, Ord v1, Ord v2, Show v2)
+  :: (Eq k, Num k, Ord v1, Ord v2)
   => Polynomial k v1 -> (v1 -> Polynomial k v2) -> Polynomial k v2
 subst p s =
-  sum [constant c * product [(s x)^e | (x,e) <- mmToList xs] | (c, xs) <- terms p]
+  sumV [constant c * product [(s x)^e | (x,e) <- mmToList xs] | (c, xs) <- terms p]
 
 -- | Substitution or bind
 substA
-  :: forall k v1 v2 f. (Num k, Eq k, Ord v1, Ord v2, Show v2, Applicative f)
+  :: forall k v1 v2 f. (Eq k, Num k, Ord v1, Ord v2, Applicative f)
   => Polynomial k v1 -> (v1 -> f (Polynomial k v2)) -> f (Polynomial k v2)
-substA p s = sum <$> traverse f (terms p)
+substA p s = sumV <$> traverse f (terms p)
   where
     f :: Monomial k v1 -> f (Polynomial k v2)
     f (c,xs) =  ((constant c *) . product) <$> g xs
@@ -306,29 +309,29 @@ substA p s = sum <$> traverse f (terms p)
 
 -- | Substitution or bind
 substM
-  :: (Num k, Eq k, Ord v1, Ord v2, Show v2, Monad m)
+  :: (Eq k, Num k, Ord v1, Ord v2, Monad m)
   => Polynomial k v1 -> (v1 -> m (Polynomial k v2)) -> m (Polynomial k v2)
 substM p s = liftM sum $ forM (terms p) $ \(c,xs) -> do
   xs <- forM (mmToList xs) $ \(x,e) -> liftM (^e) (s x)
   return $ constant c * product xs
 
-isRootOf :: (Num k, Eq k) => k -> UPolynomial k -> Bool
+isRootOf :: (Eq k, Num k) => k -> UPolynomial k -> Bool
 isRootOf x p = eval (\_ -> x) p == 0
 
-mapVar :: (Num k, Eq k, Ord v1, Ord v2) => (v1 -> v2) -> Polynomial k v1 -> Polynomial k v2
+mapVar :: (Eq k, Num k, Ord v1, Ord v2) => (v1 -> v2) -> Polynomial k v1 -> Polynomial k v2
 mapVar f (Polynomial m) = normalize $ Polynomial $ Map.mapKeysWith (+) (mmMapVar f) m
 
 mapCoeff :: (Eq k1, Num k1, Ord v) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
 mapCoeff f (Polynomial m) = normalize $ Polynomial $ Map.map f m
 
-associatedMonicPolynomial :: (Eq r, Ord v, Fractional r) => MonomialOrder v -> Polynomial r v -> Polynomial r v
+associatedMonicPolynomial :: (Eq r, Fractional r, Ord v) => MonomialOrder v -> Polynomial r v -> Polynomial r v
 associatedMonicPolynomial cmp p
   | c == 0 = p
   | otherwise = mapCoeff (/c) p
   where
     (c,_) = leadingTerm cmp p
 
-toUPolynomialOf :: (Eq k, Ord k, Num k, Ord v, Show v) => Polynomial k v -> v -> UPolynomial (Polynomial k v)
+toUPolynomialOf :: (Ord k, Num k, Ord v) => Polynomial k v -> v -> UPolynomial (Polynomial k v)
 toUPolynomialOf p v = fromTerms $ do
   (c,mm) <- terms p
   let m = mmToMap mm
@@ -338,7 +341,7 @@ toUPolynomialOf p v = fromTerms $ do
 
 -- | Multivariate division algorithm
 polyMDivMod
-  :: forall k v. (Eq k, Fractional k, Ord v, Show v)
+  :: forall k v. (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> ([Polynomial k v], Polynomial k v)
 polyMDivMod cmp p fs = go IM.empty p
   where
@@ -360,7 +363,7 @@ polyMDivMod cmp p fs = go IM.empty p
 
 -- | Multivariate division algorithm
 reduce
-  :: (Eq k, Fractional k, Ord v, Show v)
+  :: (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> Polynomial k v
 reduce cmp p fs = go p
   where
