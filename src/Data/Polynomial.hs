@@ -56,8 +56,11 @@ module Data.Polynomial
   , deriv
   , integral
   , eval
+  , evalA
   , evalM
   , subst
+  , substA
+  , substM
   , isRootOf
   , mapVar
   , mapCoeff
@@ -114,6 +117,7 @@ module Data.Polynomial
   ) where
 
 import Prelude hiding (lex)
+import Control.Applicative
 import Control.Exception (assert)
 import Control.Monad
 import Data.Function
@@ -123,6 +127,7 @@ import Data.Ratio
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.IntMap as IM
+import Data.Traversable (for, traverse)
 import Data.VectorSpace
 import qualified Text.PrettyPrint.HughesPJClass as PP
 import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
@@ -265,7 +270,16 @@ integral p x = sum [fromMonomial (monomialIntegral m x) | m <- terms p]
 eval :: (Num k, Ord v) => (v -> k) -> Polynomial k v -> k
 eval env p = sum [c * product [(env x) ^ e | (x,e) <- mmToList xs] | (c,xs) <- terms p]
 
--- | Monadic evaluation
+-- | Evaluation
+evalA :: forall k v f. (Num k, Ord v, Applicative f) => (v -> f k) -> Polynomial k v -> f k
+evalA env p = sum <$> traverse f (terms p)
+  where
+    f :: Monomial k v -> f k
+    f (c,xs) = ((c*) . product) <$> g xs
+    g :: MonicMonomial v -> f [k]
+    g xs = traverse (\(x,e) -> liftA (^ e) (env x)) (mmToList xs)
+
+-- | Evaluation
 evalM :: (Num k, Ord v, Monad m) => (v -> m k) -> Polynomial k v -> m k
 evalM env p = do
   liftM sum $ forM (terms p) $ \(c,xs) -> do
@@ -273,9 +287,30 @@ evalM env p = do
     return (c * product rs)
 
 -- | Substitution or bind
-subst :: (Num k, Eq k, Ord v1, Ord v2, Show v2) => Polynomial k v1 -> (v1 -> Polynomial k v2) -> Polynomial k v2
+subst
+  :: (Num k, Eq k, Ord v1, Ord v2, Show v2)
+  => Polynomial k v1 -> (v1 -> Polynomial k v2) -> Polynomial k v2
 subst p s =
   sum [constant c * product [(s x)^e | (x,e) <- mmToList xs] | (c, xs) <- terms p]
+
+-- | Substitution or bind
+substA
+  :: forall k v1 v2 f. (Num k, Eq k, Ord v1, Ord v2, Show v2, Applicative f)
+  => Polynomial k v1 -> (v1 -> f (Polynomial k v2)) -> f (Polynomial k v2)
+substA p s = sum <$> traverse f (terms p)
+  where
+    f :: Monomial k v1 -> f (Polynomial k v2)
+    f (c,xs) =  ((constant c *) . product) <$> g xs
+    g :: MonicMonomial v1 -> f [Polynomial k v2]
+    g xs = traverse (\(x,e) -> liftA (^ e) (s x)) (mmToList xs)
+
+-- | Substitution or bind
+substM
+  :: (Num k, Eq k, Ord v1, Ord v2, Show v2, Monad m)
+  => Polynomial k v1 -> (v1 -> m (Polynomial k v2)) -> m (Polynomial k v2)
+substM p s = liftM sum $ forM (terms p) $ \(c,xs) -> do
+  xs <- forM (mmToList xs) $ \(x,e) -> liftM (^e) (s x)
+  return $ constant c * product xs
 
 isRootOf :: (Num k, Eq k) => k -> UPolynomial k -> Bool
 isRootOf x p = eval (\_ -> x) p == 0
