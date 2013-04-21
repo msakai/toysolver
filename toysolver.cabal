@@ -118,6 +118,7 @@ Library
      Data.Polynomial.Factorization.Rational
      Data.Polynomial.GBase
      Data.Polynomial.Interpolation.Lagrange
+     Data.Polynomial.RootSeparation.Graeffe
      Data.Polynomial.RootSeparation.Sturm
      Data.Var
      SAT

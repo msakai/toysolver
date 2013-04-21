@@ -49,16 +49,16 @@ graeffesMethod p v = xs !! (v - 1)
 f :: UPolynomial Rational -> UPolynomial Rational
 f p = (-1) ^ (deg p) *
       fromTerms [ (c, mmFromList [assert (e `mod` 2 == 0) (x, e `div` 2) | (x,e) <- mmToList xs])
-                | (c,xs) <- terms (p * subst p (\_ -> - var ())) ]
+                | (c,xs) <- terms (p * subst p (\_ -> - var X)) ]
 
 f' :: UPolynomial Rational -> UPolynomial Rational
-f' p = fromTerms [(b k, mmFromList [((), n - k)]) | k <- [0..n]]
+f' p = fromTerms [(b k, mmFromList [(X, n - k)]) | k <- [0..n]]
   where
     n = deg p
 
     a :: Integer -> Rational
     a k
-      | n >= k    = coeff (mmFromList [((), n - k)]) p
+      | n >= k    = coeff (mmFromList [(X, n - k)]) p
       | otherwise = 0
 
     b :: Integer -> Rational
@@ -66,10 +66,10 @@ f' p = fromTerms [(b k, mmFromList [((), n - k)]) | k <- [0..n]]
 
 test v = graeffesMethod p v
   where
-    x = var ()
+    x = var X
     p = x^2 - 2
 
 test2 v = graeffesMethod p v
  where
-    x = var ()
+    x = var X
     p = x^5 - 3*x - 1
