@@ -33,7 +33,7 @@ data NthRoot = NthRoot !Integer !Rational
 graeffesMethod :: UPolynomial Rational -> Int -> [NthRoot]
 graeffesMethod p v = xs !! (v - 1)
   where
-    xs = map (uncurry g) $ zip [1..] (tail $ iterate f $ toMonic p)
+    xs = map (uncurry g) $ zip [1..] (tail $ iterate f $ associatedMonicPolynomial grlex p)
 
     n = deg p
 

@@ -61,7 +61,7 @@ module Data.Polynomial
   , isRootOf
   , mapVar
   , mapCoeff
-  , toMonic
+  , associatedMonicPolynomial
   , toUPolynomialOf
   , polyDiv
   , polyMod
@@ -286,12 +286,12 @@ mapVar f (Polynomial m) = normalize $ Polynomial $ Map.mapKeysWith (+) (mmMapVar
 mapCoeff :: (Eq k1, Num k1, Ord v) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
 mapCoeff f (Polynomial m) = normalize $ Polynomial $ Map.map f m
 
-toMonic :: (Real r, Fractional r, Ord v) => Polynomial r v -> Polynomial r v
-toMonic p
+associatedMonicPolynomial :: (Eq r, Ord v, Fractional r) => MonomialOrder v -> Polynomial r v -> Polynomial r v
+associatedMonicPolynomial cmp p
   | c == 0 = p
   | otherwise = mapCoeff (/c) p
   where
-    (c,_) = leadingTerm grlex p
+    (c,_) = leadingTerm cmp p
 
 toUPolynomialOf :: (Eq k, Ord k, Num k, Ord v, Show v) => Polynomial k v -> v -> UPolynomial (Polynomial k v)
 toUPolynomialOf p v = fromTerms $ do
@@ -450,21 +450,16 @@ polyDivMod f1 f2 = go f1
       where
         m1 = leadingTerm lex f1
 
-scaleLeadingTermToMonic :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k
-scaleLeadingTermToMonic f = if c==0 then f else constant (1/c) * f
-  where
-    (c,_) = leadingTerm lex f
-
 -- | GCD of univalent polynomials
 polyGCD :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
-polyGCD f1 0  = scaleLeadingTermToMonic f1
+polyGCD f1 0  = associatedMonicPolynomial grlex f1
 polyGCD f1 f2 = polyGCD f2 (f1 `polyMod` f2)
 
 -- | LCM of univalent polynomials
 polyLCM :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyLCM _ 0 = 0
 polyLCM 0 _ = 0
-polyLCM f1 f2 = scaleLeadingTermToMonic $ (f1 `polyMod` (polyGCD f1 f2)) * f2    
+polyLCM f1 f2 = associatedMonicPolynomial grlex $ (f1 `polyMod` (polyGCD f1 f2)) * f2
 
 {--------------------------------------------------------------------
   Monomial
