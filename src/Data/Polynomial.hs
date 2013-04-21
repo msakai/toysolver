@@ -120,9 +120,9 @@ import Data.Function
 import Data.List
 import Data.Monoid
 import Data.Ratio
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Data.IntMap as IM
+import qualified Data.IntMap.Strict as IM
 import Data.VectorSpace
 import qualified Text.PrettyPrint.HughesPJClass as PP
 import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)

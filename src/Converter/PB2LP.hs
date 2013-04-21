@@ -20,7 +20,7 @@ import Data.List
 import Data.Maybe
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
 import qualified SAT.Types as SAT

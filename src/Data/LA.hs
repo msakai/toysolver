@@ -58,7 +58,7 @@ import Control.Monad
 import Control.DeepSeq
 import Data.List
 import Data.Maybe
-import qualified Data.IntMap as IM
+import qualified Data.IntMap.Strict as IM
 import qualified Data.IntSet as IS
 import qualified Data.ArithRel as ArithRel
 import Data.Interval

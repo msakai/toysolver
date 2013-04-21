@@ -56,7 +56,7 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Ratio
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.OptDir
 import Text.ParserCombinators.Parsec hiding (label)

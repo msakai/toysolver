@@ -63,8 +63,8 @@ import Data.Ord
 import Data.IORef
 import Data.Maybe
 import qualified Data.IntSet as IS
-import qualified Data.IntMap as IM
-import qualified Data.Map as Map
+import qualified Data.IntMap.Strict as IM
+import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Foldable as F
 import Data.VectorSpace

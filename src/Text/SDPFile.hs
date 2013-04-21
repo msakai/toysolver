@@ -47,7 +47,7 @@ module Text.SDPFile
 import Control.Monad
 import Data.List (intersperse)
 import Data.Ratio
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import qualified Data.IntMap as IM
 import Text.ParserCombinators.Parsec
 

@@ -23,7 +23,7 @@ module Data.Polyhedron
 import Data.List
 import Data.Ratio
 import qualified Data.IntSet as IS
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import Data.VectorSpace
 import Prelude hiding (null)
 

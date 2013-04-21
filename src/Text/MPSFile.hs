@@ -30,7 +30,7 @@ module Text.MPSFile
 import Control.Monad
 import Data.Maybe
 import qualified Data.Set as Set
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import Data.Ratio
 
 import qualified Text.ParserCombinators.Parsec as P

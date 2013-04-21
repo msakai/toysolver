@@ -22,7 +22,7 @@ import Data.Ord
 import Data.List
 import Data.Ratio
 import qualified Data.Set as Set
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import System.IO
 import Text.Printf
 import qualified Text.LPFile as LP

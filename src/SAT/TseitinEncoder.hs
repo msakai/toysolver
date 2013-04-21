@@ -50,7 +50,7 @@ module SAT.TseitinEncoder
 
 import Control.Monad
 import Data.IORef
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import qualified Data.IntSet as IS
 import qualified SAT as SAT
 

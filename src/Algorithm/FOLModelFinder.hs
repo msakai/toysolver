@@ -50,7 +50,7 @@ import Data.Array.IArray
 import Data.IORef
 import Data.List
 import Data.Maybe
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Text.Printf
 

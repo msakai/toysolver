@@ -98,8 +98,8 @@ import Data.IORef
 import Data.List
 import Data.Maybe
 import Data.Ratio
-import qualified Data.Map as Map
-import qualified Data.IntMap as IM
+import qualified Data.Map.Strict as Map
+import qualified Data.IntMap.Strict as IM
 import Text.Printf
 import Data.Time
 import Data.OptDir
