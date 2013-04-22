@@ -132,7 +132,7 @@ newtype Polynomial k v = Polynomial{ coeffMap :: Map.Map (MonicMonomial v) k }
 data X = X
   deriving (Eq, Ord, Bounded, Enum, Show)
 
--- | Univalent polynomials over commutative ring r
+-- | Univariate polynomials over commutative ring r
 type UPolynomial r = Polynomial r X
 
 instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
@@ -477,18 +477,18 @@ expPrec = 8 -- Precedence of '^'
 appPrec = 10 -- Precedence of function application
 
 {--------------------------------------------------------------------
-  Univalent polynomials
+  Univariate polynomials
 --------------------------------------------------------------------}
 
--- | division of univalent polynomials
+-- | division of univariate polynomials
 polyDiv :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyDiv f1 f2 = fst (polyDivMod f1 f2)
 
--- | division of univalent polynomials
+-- | division of univariate polynomials
 polyMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyMod f1 f2 = snd (polyDivMod f1 f2)
 
--- | division of univalent polynomials
+-- | division of univariate polynomials
 polyDivMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> (UPolynomial k, UPolynomial k)
 polyDivMod f1 f2 = go f1
   where
@@ -502,12 +502,12 @@ polyDivMod f1 f2 = go f1
       where
         m1 = leadingTerm lex f1
 
--- | GCD of univalent polynomials
+-- | GCD of univariate polynomials
 polyGCD :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyGCD f1 0  = associatedMonicPolynomial grlex f1
 polyGCD f1 f2 = polyGCD f2 (f1 `polyMod` f2)
 
--- | LCM of univalent polynomials
+-- | LCM of univariate polynomials
 polyLCM :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyLCM _ 0 = 0
 polyLCM 0 _ = 0
