@@ -43,7 +43,7 @@ graeffesMethod p v = xs !! (v - 1)
       let yi = if i == 1 then - (b i) else - (b i / b (i-1))
       return $ NthRoot (2 ^ fromIntegral v) yi
       where
-        bs = IM.fromList [(fromInteger i, b) | (b,ys) <- terms p, let i = n - mmDegree ys, i /= 0]
+        bs = IM.fromList [(fromInteger i, b) | (b,ys) <- terms p, let i = n - deg ys, i /= 0]
         b i = IM.findWithDefault 0 i bs
 
 f :: UPolynomial Rational -> UPolynomial Rational

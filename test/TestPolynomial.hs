@@ -216,13 +216,13 @@ case_cont_pp_Rational = do
   Monic Monomial
 --------------------------------------------------------------------}
 
-prop_mmDegreeOfProduct =
+prop_degreeOfProduct =
   forAll monicMonomials $ \a -> 
   forAll monicMonomials $ \b -> 
-    mmDegree (a `mmProd` b) == mmDegree a + mmDegree b
+    deg (a `mmProd` b) == deg a + deg b
 
-prop_mmDegreeOfOne =
-  mmDegree mmOne == 0
+prop_degreeOfOne =
+  deg mmOne == 0
 
 prop_mmProd_unitL = 
   forAll monicMonomials $ \a -> 

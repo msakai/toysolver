@@ -238,7 +238,7 @@ getHighestNonzeroTerm
   -> M v (Polynomial Rational v, Integer)
 getHighestNonzeroTerm p = go $ sortBy (flip (comparing snd)) cs
   where
-    cs = [(c, mmDegree mm) | (c,mm) <- terms p]
+    cs = [(c, deg mm) | (c,mm) <- terms p]
 
     go :: [(Polynomial Rational v, Integer)] -> M v (Polynomial Rational v, Integer)
     go [] = return (0, -1)
@@ -258,8 +258,8 @@ zmod p q = do
   if not (d >= e) || 0 >= e
     then return Nothing
     else do
-      let p' = fromTerms [(pi, mm) | (pi, mm) <- terms p, mmDegree mm <= d]
-          q' = fromTerms [(qi, mm) | (qi, mm) <- terms q, mmDegree mm <= e]
+      let p' = fromTerms [(pi, mm) | (pi, mm) <- terms p, deg mm <= d]
+          q' = fromTerms [(qi, mm) | (qi, mm) <- terms q, deg mm <= e]
       return $ Just $ mr p' q'
 
 refineSignConf

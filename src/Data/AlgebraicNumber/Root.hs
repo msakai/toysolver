@@ -54,7 +54,7 @@ rootScale 0 p = var X
 rootScale r p = normalizePoly $ subst p (\X -> constant (recip r) * var X)
 
 rootRecip :: UPolynomial Rational -> UPolynomial Rational
-rootRecip p = normalizePoly $ fromTerms [(c, mmFromList [(X, d - mmDegree xs)]) | (c, xs) <- terms p]
+rootRecip p = normalizePoly $ fromTerms [(c, mmFromList [(X, d - deg xs)]) | (c, xs) <- terms p]
   where
     d = deg p
 
@@ -72,7 +72,7 @@ rootSimpPoly f p = findPoly (var 0) ps
     p' = eval (\X -> var 0) (mapCoeff (\c -> var (m Map.! (f c))) p)
 
     ps :: [Polynomial Rational Var]
-    ps = p' : [mapVar (\X -> x) q | (q, x) <- ys]
+    ps = p' : [subst q (\X -> var x) | (q, x) <- ys]
 
 rootNthRoot :: Integer -> UPolynomial Rational -> UPolynomial Rational
 rootNthRoot n p = subst p (\X -> (var X)^n)
@@ -89,7 +89,7 @@ lift2 f p1 p2 = findPoly f_a_b gbase
     f_a_b = f (var a) (var b)
 
     gbase :: [Polynomial Rational Var]
-    gbase = [ mapVar (\X -> a) p1, mapVar (\X -> b) p2 ]              
+    gbase = [ subst p1 (\X -> var a), subst p2 (\X -> var b) ]              
 
 -- ps のもとで c を根とする多項式を求める
 findPoly :: Polynomial Rational Var -> [Polynomial Rational Var] -> UPolynomial Rational

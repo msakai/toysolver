@@ -52,7 +52,7 @@ import Data.Ratio
 import qualified Text.PrettyPrint.HughesPJClass as PP
 import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
 
-import Data.Polynomial hiding (deg)
+import Data.Polynomial
 import qualified Data.Polynomial as P
 import qualified Data.Polynomial.Factorization.Rational as FactorQ
 import qualified Data.Polynomial.RootSeparation.Sturm as Sturm
@@ -83,13 +83,13 @@ realRootsEx p
 -- p must already be factored.
 realRoots' :: UPolynomial Rational -> [AReal]
 realRoots' p = sort $ do
-  guard $ P.deg p > 0
+  guard $ deg p > 0
   i <- Sturm.separate p
   return $ realRoot' p i
 
 realRoot :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot p i = 
-  case [q | q <- FactorQ.factor p, P.deg q > 0, Sturm.numRoots q i == 1] of
+  case [q | q <- FactorQ.factor p, deg q > 0, Sturm.numRoots q i == 1] of
     p2:_ -> realRoot' p2 i
     []   -> error "Data.AlgebraicNumber.Real.realRoot: invalid interval"
 
@@ -215,7 +215,7 @@ instance Real AReal where
   toRational x
     | isRational x =
         let p = minimalPolynomial x
-            a = P.coeff (P.mmVar X) p
+            a = P.coeff (P.var X) p
             b = P.coeff P.mmOne p
         in - b / a
     | otherwise  = error "toRational: proper algebraic number"
@@ -353,8 +353,8 @@ interval (RealRoot _ i) = i
 -- 
 -- If the algebraic number's 'minimalPolynomial' has degree @n@,
 -- then the algebraic number is said to be degree @n@.
-deg :: AReal -> Integer
-deg a = P.deg $ minimalPolynomial a
+instance Degree AReal where
+  deg a = deg $ minimalPolynomial a
 
 -- | Whether the algebraic number is a rational.
 isRational :: AReal -> Bool

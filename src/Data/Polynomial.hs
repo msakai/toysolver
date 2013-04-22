@@ -28,7 +28,7 @@ module Data.Polynomial
   , X (..)
 
   -- * Conversion
-  , var
+  , Variables (..)
   , constant
   , terms
   , fromTerms
@@ -37,11 +37,10 @@ module Data.Polynomial
   , fromMonomial
 
   -- * Query
+  , Degree (..)
   , leadingTerm
-  , deg
   , coeff
   , lookupCoeff
-  , variables
 
   -- * Operations
   , ContPP (..)
@@ -77,7 +76,6 @@ module Data.Polynomial
 
   -- * Monic monomial
   , MonicMonomial
-  , mmVar
   , mmOne
   , mmFromList
   , mmFromMap
@@ -85,7 +83,6 @@ module Data.Polynomial
   , mmToList
   , mmToMap
   , mmToIntMap
-  , mmDegree
   , mmProd
   , mmDivisible
   , mmDiv
@@ -195,9 +192,13 @@ prod (Polynomial m1) (Polynomial m2) = normalize $ Polynomial $ Map.fromListWith
 isZero :: Polynomial k v -> Bool
 isZero (Polynomial m) = Map.null m
 
--- | construct a polynomial from a variable
-var :: (Eq k, Num k, Ord v) => v -> Polynomial k v
-var x = fromMonomial (1, mmVar x)
+class Variables f where
+  var       :: Ord v => v -> f v
+  variables :: Ord v => f v -> Set.Set v
+
+instance (Eq k, Num k) => Variables (Polynomial k) where
+  var x       = fromMonomial (1, var x)
+  variables p = Set.unions $ [variables mm | (_, mm) <- terms p]
 
 -- | construct a polynomial from a constant
 constant :: (Eq k, Num k, Ord v) => k -> Polynomial k v
@@ -226,19 +227,19 @@ leadingTerm cmp p =
     ms -> maximumBy (cmp `on` snd) ms
 
 -- | total degree of a given polynomial
-deg :: Polynomial k v -> Integer
-deg p
-  | isZero p  = -1
-  | otherwise = maximum $ map monomialDegree $ terms p
+class Degree t where
+  deg :: t -> Integer
+
+instance Degree (Polynomial k v) where
+  deg p
+    | isZero p  = -1
+    | otherwise = maximum [deg mm | (_,mm) <- terms p]
 
 coeff :: (Num k, Ord v) => MonicMonomial v -> Polynomial k v -> k
 coeff xs (Polynomial m) = Map.findWithDefault 0 xs m
 
 lookupCoeff :: Ord v => MonicMonomial v -> Polynomial k v -> Maybe k
 lookupCoeff xs (Polynomial m) = Map.lookup xs m
-
-variables :: Ord v => Polynomial k v -> Set.Set v
-variables p = Set.unions $ [Map.keysSet (mmToMap mm) | (_, mm) <- terms p]  
 
 class ContPP k where
   -- | Content of a polynomial  
@@ -331,7 +332,11 @@ mapVar :: (Eq k, Num k, Ord v1, Ord v2) => (v1 -> v2) -> Polynomial k v1 -> Poly
 mapVar f (Polynomial m) = normalize $ Polynomial $ Map.mapKeysWith (+) (mmMapVar f) m
 
 mapCoeff :: (Eq k1, Num k1, Ord v) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
-mapCoeff f (Polynomial m) = normalize $ Polynomial $ Map.map f m
+mapCoeff f (Polynomial m) = Polynomial $ Map.mapMaybe g m
+  where
+    g x = if y == 0 then Nothing else Just y
+      where
+        y = f x
 
 associatedMonicPolynomial :: (Eq r, Fractional r, Ord v) => MonomialOrder v -> Polynomial r v -> Polynomial r v
 associatedMonicPolynomial cmp p
@@ -515,7 +520,7 @@ polyLCM f1 f2 = associatedMonicPolynomial grlex $ (f1 `polyMod` (polyGCD f1 f2))
 type Monomial k v = (k, MonicMonomial v)
 
 monomialDegree :: Monomial k v -> Integer
-monomialDegree (_,xs) = mmDegree xs
+monomialDegree (_,xs) = deg xs
 
 monomialProd :: (Num k, Ord v) => Monomial k v -> Monomial k v -> Monomial k v
 monomialProd (c1,xs1) (c2,xs2) = (c1*c2, xs1 `mmProd` xs2)
@@ -550,14 +555,15 @@ instance (Ord v, Show v) => Show (MonicMonomial v) where
   showsPrec d m  = showParen (d > 10) $
     showString "mmFromList " . shows (mmToList m)
 
+instance Degree (MonicMonomial v) where
+  deg (MonicMonomial m) = sum $ Map.elems m
+
+instance Variables MonicMonomial where
+  var x        = MonicMonomial $ Map.singleton x 1
+  variables mm = Map.keysSet (mmToMap mm)
+
 mmNormalize :: Ord v => MonicMonomial v -> MonicMonomial v
 mmNormalize (MonicMonomial m) = MonicMonomial $ Map.filter (>0) m
-
-mmDegree :: MonicMonomial v -> Integer
-mmDegree (MonicMonomial m) = sum $ Map.elems m
-
-mmVar :: Ord v => v -> MonicMonomial v
-mmVar x = MonicMonomial $ Map.singleton x 1
 
 mmOne :: MonicMonomial v
 mmOne = MonicMonomial $ Map.empty
@@ -655,8 +661,8 @@ revlex xs1 xs2 = go (reverse (mmToList xs1)) (reverse (mmToList xs2))
 
 -- | graded lexicographic order
 grlex :: Ord v => MonomialOrder v
-grlex = (compare `on` mmDegree) `mappend` lex
+grlex = (compare `on` deg) `mappend` lex
 
 -- | graded reverse lexicographic order
 grevlex :: Ord v => MonomialOrder v
-grevlex = (compare `on` mmDegree) `mappend` revlex
+grevlex = (compare `on` deg) `mappend` revlex
