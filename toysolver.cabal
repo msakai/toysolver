@@ -51,7 +51,7 @@ Library
   Build-Depends:
      base >=4 && <5,
      containers >= 0.4.2, mtl, array, random, stm >=2.3, parsec, bytestring, filepath, deepseq, time, old-locale, primes,
-     parse-dimacs, queue, heaps, unbounded-delays, lattices >=1.2.1.1, vector-space >=0.8.6,
+     parse-dimacs, queue, heaps, unbounded-delays, lattices >=1.2.1.1, vector-space >=0.8.6, multiset,
      prettyclass >=1.0.0,
      OptDir, data-interval >=0.2.0
   Default-Language: Haskell2010

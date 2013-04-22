@@ -1,11 +1,28 @@
 {-# LANGUAGE BangPatterns #-}
--- http://en.wikipedia.org/wiki/Polynomial_factorization
--- Kronecker's method
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Data.Polynomial.Factorization.Integer
+-- Copyright   :  (c) Masahiro Sakai 2012-2013
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable (BangPatterns)
+--
+-- Factoriation of integer-coefficient polynomial using Kronecker's method.
+--
+-- References:
+--
+-- * <http://en.wikipedia.org/wiki/Polynomial_factorization>
+--
+-----------------------------------------------------------------------------
 module Data.Polynomial.Factorization.Integer
   ( factor
   ) where
 
 import Data.List
+import Data.MultiSet (MultiSet)
+import qualified Data.MultiSet as MultiSet
 import Data.Numbers.Primes (primes)
 import Data.Ratio
 import Data.Polynomial
@@ -13,6 +30,9 @@ import qualified Data.Polynomial.Interpolation.Lagrange as Interpolation
 import Util (isInteger)
 
 factor :: UPolynomial Integer -> [UPolynomial Integer]
+factor 0 = [0]
+factor 1 = []
+factor p | deg p == 0 = [p]
 factor p = normalize $ factor' p
 
 normalize :: [UPolynomial Integer] -> [UPolynomial Integer]
@@ -34,9 +54,6 @@ normalize ps = [constant c | c /= 1] ++ sort [q | q <- map snd xs, q /= 1]
                  else (d,q2)
 
 factor' :: UPolynomial Integer -> [UPolynomial Integer]
-factor' 0 = [0]
-factor' 1 = []
-factor' p | deg p == 0 = [p]
 factor' p =
   case factor2 p of
     Nothing -> [p]
@@ -91,24 +108,23 @@ factors 0 = []
 factors x = xs ++ map negate xs
   where
     ps = primeFactors (abs x)
-    xs = map product $ sequence [[p^i | i <- [0..n]] | (p,n) <- ps]
+    xs = map product $ sequence [take (n+1) (iterate (p*) 1) | (p,n) <- MultiSet.toOccurList ps]
 
-primeFactors :: Integer -> [(Integer,Integer)]
-primeFactors 0 = []
-primeFactors n = f primes n
+primeFactors :: Integer -> MultiSet Integer
+primeFactors 0 = MultiSet.empty
+primeFactors n = go n primes MultiSet.empty
   where
-    f :: [Integer] -> Integer -> [(Integer,Integer)]
-    f !_ 1 = []
-    f (p:ps) n
-      | p*p > n   = [(n,1)]
+    go :: Integer -> [Integer] -> MultiSet Integer -> MultiSet Integer
+    go 1 !_ !result = result
+    go n (p:ps) !result
+      | p*p > n   = MultiSet.insert n result
       | otherwise =
-          case g p n of
-            (m,n') -> [(p,m) | m /= 0] ++ f ps n'
+          case f p n of
+            (m,n') -> go n' ps (MultiSet.insertMany p m result)
 
-    g :: Integer -> Integer -> (Integer, Integer)
-    g p = go 0
+    f :: Integer -> Integer -> (Int, Integer)
+    f p = go2 0
       where
-        go !m !n
-          | n `mod` p == 0 = go (m+1) (n `div` p)
+        go2 !m !n
+          | n `mod` p == 0 = go2 (m+1) (n `div` p)
           | otherwise = (m, n)
-          
