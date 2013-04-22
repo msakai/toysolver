@@ -35,6 +35,22 @@ data Sign = Neg | Zero | Pos
 
 instance NFData Sign
 
+instance Alg.Multiplicative Sign where
+  (*)   = signMul
+  pow1p = signPow
+
+instance Alg.Commutative Sign
+
+instance Alg.Unital Sign where
+  one = Pos
+  pow = signPow
+
+instance Alg.Division Sign where
+  recip = signRecip
+  (/)   = signDiv
+  (\\)  = flip signDiv
+  (^)   = signPow
+
 signNegate :: Sign -> Sign
 signNegate Neg  = Pos
 signNegate Zero = Zero
@@ -57,7 +73,7 @@ signDiv s Pos  = s
 signDiv _ Zero = error "signDiv: division by Zero"
 signDiv s Neg  = signNegate s
 
-signPow :: Sign -> Integer -> Sign
+signPow :: Integral x => Sign -> x -> Sign
 signPow _ 0    = Pos
 signPow Pos _  = Pos
 signPow Zero _ = Zero
