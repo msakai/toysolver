@@ -30,13 +30,15 @@ module Algorithm.CAD
     Point (..)
   , Cell (..)
 
-  -- * Algebra os Sign
+  -- * Algebra of Sign
   , Sign (..)
   , signNegate
   , signMul
+  , signRecip
   , signDiv
-  , signExp
-  , signOfConst
+  , signPow
+  , signOf
+  , showSign
 
   -- * Projection
   , project
@@ -91,7 +93,7 @@ showPoint (RootOf p n) = "rootOf(" ++ prettyShow p ++ ", " ++ show n ++ ")"
 -- ---------------------------------------------------------------------------
 
 data Sign = Neg | Zero | Pos
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 signNegate :: Sign -> Sign
 signNegate Neg  = Pos
@@ -105,23 +107,33 @@ signMul Neg s  = signNegate s
 signMul s Neg  = signNegate s
 signMul _ _    = Zero
 
+signRecip :: Sign -> Sign
+signRecip Pos  = Pos
+signRecip Zero = error "signRecip: division by Zero"
+signRecip Neg  = Neg
+
 signDiv :: Sign -> Sign -> Sign
 signDiv s Pos  = s
-signDiv _ Zero = error "signDiv: division by zero"
+signDiv _ Zero = error "signDiv: division by Zero"
 signDiv s Neg  = signNegate s
 
-signExp :: Sign -> Integer -> Sign
-signExp _ 0    = Pos
-signExp Pos _  = Pos
-signExp Zero _ = Zero
-signExp Neg n  = if even n then Pos else Neg
+signPow :: Sign -> Integer -> Sign
+signPow _ 0    = Pos
+signPow Pos _  = Pos
+signPow Zero _ = Zero
+signPow Neg n  = if even n then Pos else Neg
 
-signOfConst :: (Num a, Ord a) => a -> Sign
-signOfConst r =
+signOf :: Real a => a -> Sign
+signOf r =
   case r `compare` 0 of
     LT -> Neg
     EQ -> Zero
     GT -> Pos
+
+showSign :: Sign -> String
+showSign Pos  = "+"
+showSign Neg  = "-"
+showSign Zero = "0"
 
 -- ---------------------------------------------------------------------------
 
@@ -143,11 +155,6 @@ showSignConf = f
     g :: Map.Map (UPolynomial c) Sign -> [String]
     g m =
       [printf "  %s: %s" (prettyShow p) (showSign s) | (p, s) <- Map.toList m]
-
-    showSign :: Sign -> String
-    showSign Pos  = "+"
-    showSign Neg  = "-"
-    showSign Zero = "0"
 
 -- ---------------------------------------------------------------------------
 
@@ -215,13 +222,13 @@ assume p ss =
   if deg p == 0
     then do
       let c = coeff mmOne p
-      guard $ signOfConst c `elem` ss
+      guard $ signOf c `elem` ss
     else do      
       let (c,_) = leadingTerm grlex p
           p' = mapCoeff (/c) p
       m <- get
       let ss1 = Map.findWithDefault (Set.fromList [Neg, Zero, Pos]) p' m
-          ss2 = Set.intersection ss1 $ Set.fromList $ [s `signDiv` signOfConst c | s <- ss]
+          ss2 = Set.intersection ss1 $ Set.fromList $ [s `signDiv` signOf c | s <- ss]
       guard $ not $ Set.null ss2
       put $ Map.insert p' ss2 m
 
@@ -365,7 +372,7 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
         then return s1
         else do
           s2 <- signCoeff bm
-          return $ signDiv s1 (signExp s2 k)
+          return $ signDiv s1 (signPow s2 k)
 
     signCoeff :: Polynomial Rational v -> M v Sign
     signCoeff c =
@@ -433,7 +440,7 @@ solve' vs0 cs0 = go (Set.toList vs0) cs0
   where
     go :: [v] -> [(Polynomial Rational v, [Sign])] -> Maybe (Model v)
     go [] cs =
-      if and [signOfConst v `elem` ss | (p,ss) <- cs, let v = eval (\_ -> undefined) p]
+      if and [signOf v `elem` ss | (p,ss) <- cs, let v = eval (\_ -> undefined) p]
       then Just Map.empty
       else Nothing
     go (v:vs) cs = listToMaybe $ do
@@ -518,7 +525,7 @@ test1c = isJust $ do
   guard $ and $ do
     (p, ss) <- cs
     let val = eval (m Map.!) (mapCoeff fromRational p)
-    return $ signOfConst val `elem` ss
+    return $ signOf val `elem` ss
   where
     x = var X
     cs = [(x + 1, [Pos]), (-2*x + 3, [Pos]), (x, [Pos])]
