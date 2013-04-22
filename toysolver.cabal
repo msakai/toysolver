@@ -120,6 +120,7 @@ Library
      Data.Polynomial.Interpolation.Lagrange
      Data.Polynomial.RootSeparation.Graeffe
      Data.Polynomial.RootSeparation.Sturm
+     Data.Sign
      Data.Var
      SAT
      SAT.Integer
