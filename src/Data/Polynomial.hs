@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables, TypeFamilies, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Polynomial
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, TypeFamilies)
+-- Portability :  non-portable (ScopedTypeVariables, TypeFamilies, MultiParamTypeClasses)
 --
 -- Polynomials
 --
@@ -118,6 +118,7 @@ import qualified Data.Set as Set
 import qualified Data.IntMap as IM
 import Data.Traversable (for, traverse)
 import Data.VectorSpace
+import qualified Numeric.Algebra as Alg
 import qualified Text.PrettyPrint.HughesPJClass as PP
 import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
 
@@ -392,6 +393,51 @@ reduce cmp p fs = go p
           return (g - fromMonomial (monomialDiv h a) * f)
 
 {--------------------------------------------------------------------
+  Instances for 'algebra' package
+--------------------------------------------------------------------}
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.Multiplicative (Polynomial k v) where
+  (*) = prod
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.Commutative (Polynomial k v)
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.Unital (Polynomial k v) where
+  one = fromIntegral 1
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.Additive (Polynomial k v) where
+  (+) = (^+^)
+  sinnum1p n p = Alg.sinnum (n+1) p
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.LeftModule Alg.Natural (Polynomial k v) where
+  n .* p = scale (fromIntegral n) p
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.RightModule Alg.Natural (Polynomial k v) where
+  p *. n = scale (fromIntegral n) p
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.LeftModule Integer (Polynomial k v) where
+  n .* p = scale (fromInteger n) p
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.RightModule Integer (Polynomial k v) where
+  p *. n = scale (fromInteger n) p
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.Group (Polynomial k v) where
+  negate = negateV
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.Monoidal (Polynomial k v) where
+  zero = zero
+  sinnum n p = scale (fromIntegral n) p
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.Abelian (Polynomial k v)
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.Semiring (Polynomial k v)
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.Rig (Polynomial k v) where
+  fromNatural n = fromInteger (toInteger n)
+
+instance (Alg.Commutative k, Eq k, Num k, Ord v) => Alg.Ring (Polynomial k v) where
+  fromInteger = fromInteger
+
+{--------------------------------------------------------------------
   Pretty printing
 --------------------------------------------------------------------}
 
@@ -624,6 +670,14 @@ mmGCD (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ Map.intersectionWi
 
 mmMapVar :: (Ord v1, Ord v2) => (v1 -> v2) -> MonicMonomial v1 -> MonicMonomial v2
 mmMapVar f (MonicMonomial m) = MonicMonomial $ Map.mapKeysWith (+) f m
+
+instance (Ord v) => Alg.Multiplicative (MonicMonomial v) where
+  (*) = mmProd
+
+instance Ord v => Alg.Commutative (MonicMonomial v)
+
+instance Ord v => Alg.Unital (MonicMonomial v) where
+  one = mmOne
 
 {--------------------------------------------------------------------
   Monomial Order
