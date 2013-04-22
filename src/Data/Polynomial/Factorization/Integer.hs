@@ -33,31 +33,27 @@ factor :: UPolynomial Integer -> [UPolynomial Integer]
 factor 0 = [0]
 factor 1 = []
 factor p | deg p == 0 = [p]
-factor p = normalize $ factor' p
-
-normalize :: [UPolynomial Integer] -> [UPolynomial Integer]
-normalize ps = [constant c | c /= 1] ++ sort [q | q <- map snd xs, q /= 1]
+factor p = [constant c | c /= 1] ++ sort qs
   where
-    c = product $ map fst xs
+    (c,qs) = normalize (cont p, factor' (pp p))
 
-    xs = map f ps
-
-    f :: UPolynomial Integer -> (Integer, UPolynomial Integer)
-    f q = case [c | (c,_) <- terms q] of
-            [] -> (1,q)
-            (c:cs) ->
-              let d :: Integer
-                  d = foldl' gcd c cs
-                  q2 = mapCoeff (`div` d) q
-              in if fst (leadingTerm grlex q2) < 0
-                 then (-d,-q2)
-                 else (d,q2)
+normalize :: (Integer, [UPolynomial Integer]) -> (Integer, [UPolynomial Integer])
+normalize (c,ps) = go ps c []
+  where
+    go [] !c qs     = (c,qs)
+    go (p:ps) !c qs
+      | deg p == 0 = go ps (c * coeff (var X) p) qs
+      | fst (leadingTerm grlex p) < 0 = go ps (-c) (-p : qs)
+      | otherwise = go ps c (p : qs)
 
 factor' :: UPolynomial Integer -> [UPolynomial Integer]
-factor' p =
-  case factor2 p of
-    Nothing -> [p]
-    Just qs -> concatMap factor' qs
+factor' p = go [p] []
+  where
+    go [] ret     = ret
+    go (p:ps) ret =
+      case factor2 p of
+        Nothing -> go ps (p:ret)
+        Just qs -> go (qs ++ ps) ret
 
 factor2 :: UPolynomial Integer -> Maybe [UPolynomial Integer]
 factor2 p | p == var X = Nothing
