@@ -148,7 +148,7 @@ instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
 
 instance (Eq k, Num k, Ord v) => AdditiveGroup (Polynomial k v) where
   Polynomial m1 ^+^ Polynomial m2 = normalize $ Polynomial $ Map.unionWith (+) m1 m2
-  zeroV   = Polynomial $ Map.empty
+  zeroV = zero
   negateV (Polynomial m) = Polynomial $ Map.map negate m
 
 instance (Eq k, Num k, Ord v) => VectorSpace (Polynomial k v) where
@@ -170,7 +170,12 @@ asConstant p =
     _ -> Nothing
 
 scale :: (Eq k, Num k, Ord v) => k -> Polynomial k v -> Polynomial k v
+scale 0 _ = zero
+scale 1 p = p
 scale a (Polynomial m) = normalize $ Polynomial (Map.map (a*) m)
+
+zero :: (Eq k, Num k, Ord v) => Polynomial k v
+zero = Polynomial $ Map.empty
 
 prod :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v -> Polynomial k v
 prod a b
