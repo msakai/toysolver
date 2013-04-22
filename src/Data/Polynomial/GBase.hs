@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (ScopedTypeVariables)
 -- 
 -- Gröbner basis
 --
@@ -21,11 +21,7 @@
 --
 -- * Gröbner Bases and Buchberger’s Algorithm <http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf>
 --
--- * Polynomial class for Ruby <http://www.math.kobe-u.ac.jp/~kodama/tips-RubyPoly.html>
---
 -- * Docon <http://www.haskell.org/docon/>
---
--- * constructive-algebra package <http://hackage.haskell.org/package/constructive-algebra>
 -- 
 -----------------------------------------------------------------------------
 

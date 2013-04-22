@@ -14,16 +14,8 @@
 -- References:
 --
 -- * Monomial order <http://en.wikipedia.org/wiki/Monomial_order>
--- 
--- * Gröbner basis <http://en.wikipedia.org/wiki/Gr%C3%B6bner_basis>
---
--- * グレブナー基底 <http://d.hatena.ne.jp/keyword/%A5%B0%A5%EC%A5%D6%A5%CA%A1%BC%B4%F0%C4%EC>
---
--- * Gröbner Bases and Buchberger’s Algorithm <http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf>
 --
 -- * Polynomial class for Ruby <http://www.math.kobe-u.ac.jp/~kodama/tips-RubyPoly.html>
---
--- * Docon <http://www.haskell.org/docon/>
 --
 -- * constructive-algebra package <http://hackage.haskell.org/package/constructive-algebra>
 -- 
@@ -240,6 +232,7 @@ variables p = Set.unions $ [Map.keysSet (mmToMap mm) | (_, mm) <- terms p]
 class ContPP k where
   -- | Content of a polynomial  
   cont :: (Ord v) => Polynomial k v -> k
+  -- constructive-algebra-0.3.0 では cont 0 は error になる
 
   -- | Primitive part of a polynomial
   pp :: (Ord v) => Polynomial k v -> Polynomial k v
