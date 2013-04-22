@@ -189,6 +189,9 @@ prod (Polynomial m1) (Polynomial m2) = normalize $ Polynomial $ Map.fromListWith
       | (xs1,c1) <- Map.toList m1, (xs2,c2) <- Map.toList m2
       ]
 
+isZero :: Polynomial k v -> Bool
+isZero (Polynomial m) = Map.null m
+
 -- | construct a polynomial from a variable
 var :: (Eq k, Num k, Ord v) => v -> Polynomial k v
 var x = fromMonomial (1, mmVar x)
@@ -221,7 +224,9 @@ leadingTerm cmp p =
 
 -- | total degree of a given polynomial
 deg :: Polynomial k v -> Integer
-deg = maximum . (0:) . map monomialDegree . terms
+deg p
+  | isZero p  = -1
+  | otherwise = maximum $ map monomialDegree $ terms p
 
 coeff :: (Num k, Ord v) => MonicMonomial v -> Polynomial k v -> k
 coeff xs (Polynomial m) = Map.findWithDefault 0 xs m

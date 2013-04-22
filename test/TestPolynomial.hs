@@ -116,6 +116,11 @@ case_prettyShow_test4 =
     p :: UPolynomial Rational
     p = (var X)^2 - constant (1/2)
 
+case_deg_0 = assertBool "" $ (deg p < 0)
+  where
+    p :: UPolynomial Rational
+    p = 0
+
 {--------------------------------------------------------------------
   Univalent polynomials
 --------------------------------------------------------------------}
@@ -173,7 +178,7 @@ prop_deriv_integral =
 
 prop_integral_deriv =
   forAll upolynomials $ \a ->
-    deg (integral (deriv a x) x - a) == 0
+    deg (integral (deriv a x) x - a) <= 0
   where
     x = X
 
