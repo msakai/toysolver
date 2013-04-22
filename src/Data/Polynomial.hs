@@ -139,17 +139,17 @@ data X = X
 type UPolynomial r = Polynomial r X
 
 instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
-  (+) = (^+^)
-  (*) = prod
-  negate = negateV
-  abs x = x    -- OK?
+  (+)      = plus
+  (*)      = prod
+  negate   = neg
+  abs x    = x -- OK?
   signum x = 1 -- OK?
   fromInteger x = constant (fromInteger x)
 
 instance (Eq k, Num k, Ord v) => AdditiveGroup (Polynomial k v) where
-  Polynomial m1 ^+^ Polynomial m2 = normalize $ Polynomial $ Map.unionWith (+) m1 m2
-  zeroV = zero
-  negateV (Polynomial m) = Polynomial $ Map.map negate m
+  (^+^)   = plus
+  zeroV   = zero
+  negateV = neg
 
 instance (Eq k, Num k, Ord v) => VectorSpace (Polynomial k v) where
   type Scalar (Polynomial k v) = k
@@ -176,6 +176,12 @@ scale a (Polynomial m) = normalize $ Polynomial (Map.map (a*) m)
 
 zero :: (Eq k, Num k, Ord v) => Polynomial k v
 zero = Polynomial $ Map.empty
+
+plus :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v -> Polynomial k v
+plus (Polynomial m1) (Polynomial m2) = normalize $ Polynomial $ Map.unionWith (+) m1 m2
+
+neg :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v
+neg (Polynomial m) = Polynomial $ Map.map negate m
 
 prod :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v -> Polynomial k v
 prod a b
@@ -544,6 +550,9 @@ instance (Ord v, Show v) => Show (MonicMonomial v) where
   showsPrec d m  = showParen (d > 10) $
     showString "mmFromList " . shows (mmToList m)
 
+mmNormalize :: Ord v => MonicMonomial v -> MonicMonomial v
+mmNormalize (MonicMonomial m) = MonicMonomial $ Map.filter (>0) m
+
 mmDegree :: MonicMonomial v -> Integer
 mmDegree (MonicMonomial m) = sum $ Map.elems m
 
@@ -561,7 +570,7 @@ mmFromList xs
 mmFromMap :: Ord v => Map.Map v Integer -> MonicMonomial v
 mmFromMap m
   | any (\(x,e) -> 0>e) (Map.toList m) = error "mmFromFromMap: negative exponent"
-  | otherwise = MonicMonomial $ Map.filter (>0) m
+  | otherwise = mmNormalize $ MonicMonomial m
 
 mmFromIntMap :: IM.IntMap Integer -> MonicMonomial Int
 mmFromIntMap = mmFromMap . Map.fromDistinctAscList . IM.toAscList
@@ -573,7 +582,7 @@ mmToIntMap :: MonicMonomial Int -> IM.IntMap Integer
 mmToIntMap (MonicMonomial m) = IM.fromDistinctAscList $ Map.toAscList m
 
 mmProd :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
-mmProd (MonicMonomial xs1) (MonicMonomial xs2) = MonicMonomial $ Map.unionWith (+) xs1 xs2
+mmProd (MonicMonomial xs1) (MonicMonomial xs2) = mmNormalize $ MonicMonomial $ Map.unionWith (+) xs1 xs2
 
 mmDivisible :: Ord v => MonicMonomial v -> MonicMonomial v -> Bool
 mmDivisible (MonicMonomial xs1) (MonicMonomial xs2) = Map.isSubmapOfBy (<=) xs2 xs1
