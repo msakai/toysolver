@@ -49,6 +49,7 @@ import Control.Exception (assert)
 import Control.Monad
 import Data.List
 import Data.Ratio
+import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJClass as PP
 import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
 
@@ -70,7 +71,7 @@ data AReal = RealRoot (UPolynomial Rational) (Interval Rational)
 
 -- | Real roots of the polynomial in ascending order.
 realRoots :: UPolynomial Rational -> [AReal]
-realRoots p = sort $ do
+realRoots p = Set.toAscList $ Set.fromList $ do
   q <- FactorQ.factor p
   realRoots' q
 
@@ -82,7 +83,7 @@ realRootsEx p
 
 -- p must already be factored.
 realRoots' :: UPolynomial Rational -> [AReal]
-realRoots' p = sort $ do
+realRoots' p = do
   guard $ deg p > 0
   i <- Sturm.separate p
   return $ realRoot' p i

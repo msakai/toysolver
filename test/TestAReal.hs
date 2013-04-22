@@ -141,6 +141,10 @@ case_realRoots_two = length (realRoots (x^2 - 2)) @?= 2
   where
     x = var X
 
+case_realRoots_multipleRoots = length (realRoots (x^2 + 2*x + 1)) @?= 1
+  where
+    x = var X
+
 case_eq = sqrt2*sqrt2 - 2 @?= 0
 
 case_eq_refl = assertBool "" $ sqrt2 == sqrt2
