@@ -62,6 +62,8 @@ module Data.Polynomial
   , polyDivMod
   , polyGCD
   , polyLCM
+  , prem
+  , polyGCD'
   , polyMDivMod
   , reduce
 
@@ -241,6 +243,16 @@ coeff xs (Polynomial m) = Map.findWithDefault 0 xs m
 lookupCoeff :: Ord v => MonicMonomial v -> Polynomial k v -> Maybe k
 lookupCoeff xs (Polynomial m) = Map.lookup xs m
 
+contI :: (Integral r, Ord v) => Polynomial r v -> r
+contI 0 = 1
+contI p = foldl1' gcd [abs c | (c,_) <- terms p]
+
+ppI :: (Integral r, Ord v) => Polynomial r v -> Polynomial r v
+ppI p = mapCoeff f p
+  where
+    c = contI p
+    f x = assert (x `mod` c == 0) $ x `div` c
+
 class ContPP k where
   -- | Content of a polynomial  
   cont :: (Ord v) => Polynomial k v -> k
@@ -250,13 +262,8 @@ class ContPP k where
   pp :: (Ord v) => Polynomial k v -> Polynomial k v
 
 instance ContPP Integer where
-  cont 0 = 1
-  cont p = foldl1' gcd [abs c | (c,_) <- terms p]
-
-  pp p = mapCoeff f p
-    where
-      c = cont p
-      f x = assert (x `mod` c == 0) $ x `div` c
+  cont = contI
+  pp   = ppI
 
 instance Integral r => ContPP (Ratio r) where
   {-# SPECIALIZE instance ContPP (Ratio Integer) #-}
@@ -512,6 +519,28 @@ polyLCM :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial
 polyLCM _ 0 = 0
 polyLCM 0 _ = 0
 polyLCM f1 f2 = associatedMonicPolynomial grlex $ (f1 `polyMod` (polyGCD f1 f2)) * f2
+
+-- | pseudo reminder
+prem :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
+prem _ 0 = error "prem: division by 0"
+prem f g
+  | deg f < deg g = f
+  | otherwise     = go (scale (lc_g ^ (deg f - deg g + 1)) f)
+  where
+    (lc_g, lm_g) = leadingTerm lex g
+    deg_g    = deg g
+    go !f1
+      | deg_g > deg f1 = f1
+      | otherwise =
+          assert (lc_f1 `mod` lc_g == 0 && mmDivisible lm_f1 lm_g) $
+            go (f1 - fromMonomial (lc_f1 `div` lc_g, lm_f1 `mmDiv` lm_g) * g)
+          where
+            (lc_f1, lm_f1) = leadingTerm lex f1
+
+-- | GCD of univariate polynomials
+polyGCD' :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
+polyGCD' f1 0  = ppI f1
+polyGCD' f1 f2 = polyGCD' f2 (f1 `prem` f2)
 
 {--------------------------------------------------------------------
   Monomial

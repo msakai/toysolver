@@ -166,6 +166,32 @@ case_polyGCD_1 = polyGCD f1 f2 @?= 1
     f1 = x^3 + x^2 + x
     f2 = x^2 + 1
 
+eqUpToInvElem :: UPolynomial Integer -> UPolynomial Integer -> Bool
+eqUpToInvElem 0 0 = True
+eqUpToInvElem _ 0 = False
+eqUpToInvElem a b =
+  case mapCoeff fromInteger a `polyDivMod` mapCoeff fromInteger b of
+    (q,r) -> r == 0 && deg q <= 0
+
+prop_polyGCD'_comm = 
+  forAll upolynomialsZ $ \a ->
+  forAll upolynomialsZ $ \b ->
+    polyGCD' a b `eqUpToInvElem` polyGCD' b a
+
+prop_polyGCD'_euclid =
+  forAll upolynomialsZ $ \p ->
+  forAll upolynomialsZ $ \q ->
+  forAll upolynomialsZ $ \r ->
+    (p /= 0 && q /= 0 && r /= 0) ==>
+      polyGCD' p q `eqUpToInvElem` polyGCD' p (q + p*r)
+
+case_polyGCD'_1 = eqUpToInvElem (polyGCD' f1 f2) 1 @?= True
+  where 
+    x :: UPolynomial Integer
+    x = var X
+    f1 = x^3 + x^2 + x
+    f2 = x^2 + 1
+
 prop_polyLCM_divisible =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
@@ -527,6 +553,18 @@ upolynomials :: Gen (UPolynomial Rational)
 upolynomials = do
   size <- choose (0, 5)
   xs <- replicateM size umonomials
+  return $ sum $ map fromMonomial xs 
+
+umonomialsZ :: Gen (Monomial Integer X)
+umonomialsZ = do
+  m <- umonicMonomials
+  c <- arbitrary
+  return (c,m)
+
+upolynomialsZ :: Gen (UPolynomial Integer)
+upolynomialsZ = do
+  size <- choose (0, 5)
+  xs <- replicateM size umonomialsZ
   return $ sum $ map fromMonomial xs 
 
 ------------------------------------------------------------------------
