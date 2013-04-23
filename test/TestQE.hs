@@ -19,6 +19,7 @@ import Data.FOL.Arith
 import qualified Data.LA as LA
 import qualified Data.Polynomial as P
 import Data.OptDir
+import Data.Var
 
 import qualified Algorithm.FourierMotzkin as FourierMotzkin
 import qualified Algorithm.OmegaTest as OmegaTest
@@ -74,8 +75,8 @@ test1 = c1 .&&. c2 .&&. c3 .&&. c4
     c3 = 1 .<=. x .&&. x .<=. 40
     c4 = (-50) .<=. y .&&. y .<=. 50
 
-test1' :: [LA.Atom Rational]
-test1' = [c1, c2] ++ c3 ++ c4
+test1' :: (VarSet, [LA.Atom Rational])
+test1' = (IS.fromList [0,1,2], [c1, c2] ++ c3 ++ c4)
   where
     x = LA.var 0
     y = LA.var 1
@@ -116,13 +117,15 @@ test2 = c1 .&&. c2
     c1 = 27 .<=. t1 .&&. t1 .<=. 45
     c2 = (-10) .<=. t2 .&&. t2 .<=. 4
 
-test2' :: [LA.Atom Rational]
+test2' :: (VarSet, [LA.Atom Rational])
 test2' =
-  [ LA.constant 27 .<=. t1
-  , t1 .<=. LA.constant 45
-  , LA.constant (-10) .<=. t2
-  , t2 .<=. LA.constant 4
-  ]
+  ( IS.fromList [0,1]
+  , [ LA.constant 27 .<=. t1
+    , t1 .<=. LA.constant 45
+    , LA.constant (-10) .<=. t2
+    , t2 .<=. LA.constant 4
+    ]
+  )
   where
     x = LA.var 0
     y = LA.var 1
@@ -133,41 +136,43 @@ test2' =
 
 case_FourierMotzkin_test1 :: IO ()
 case_FourierMotzkin_test1 = 
-  case FourierMotzkin.solve (IS.fromList [0,1,2]) test1' of
+  case uncurry FourierMotzkin.solve test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
-      forM_ test1' $ \a -> do
+      forM_ (snd test1') $ \a -> do
         LA.evalAtom m a @?= True
 
 case_FourierMotzkin_test2 :: IO ()
 case_FourierMotzkin_test2 = 
-  case FourierMotzkin.solve (IS.fromList [0,1]) test2' of
+  case uncurry FourierMotzkin.solve test2' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
-      forM_ test2' $ \a -> do
+      forM_ (snd test2') $ \a -> do
         LA.evalAtom m a @?= True
 
 ------------------------------------------------------------------------
 
 case_CAD_test1 :: IO ()
 case_CAD_test1 = 
-  case CAD.solve (Set.fromList [0,1,2]) test1'' of
+  case CAD.solve vs cs of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
-      forM_ test1'' $ \a -> do
+      forM_ cs $ \a -> do
         evalPAtom m a @?= True
   where
-    test1'' = map toPRel test1'
+    vs = Set.fromAscList $ IS.toAscList $ fst test1'
+    cs = map toPRel $ snd test1'
 
 case_CAD_test2 :: IO ()
 case_CAD_test2 = 
-  case CAD.solve (Set.fromList [0,1]) test2'' of
+  case CAD.solve vs cs of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
-      forM_ test2'' $ \a -> do
+      forM_ cs $ \a -> do
         evalPAtom m a @?= True
   where
-    test2'' = map toPRel test2'
+    vs = Set.fromAscList $ IS.toAscList $ fst test2'
+    cs = map toPRel $ snd test2'
 
 toP :: LA.Expr Rational -> P.Polynomial Rational Int
 toP e = P.fromTerms [(c, if x == LA.unitVar then P.mmOne else P.var x) | (c,x) <- LA.terms e]
@@ -185,15 +190,15 @@ evalPAtom m (Rel lhs op rhs) =　evalOp op (evalP m lhs) (evalP m rhs)
 
 case_OmegaTest_test1 :: IO ()
 case_OmegaTest_test1 = 
-  case OmegaTest.solve OmegaTest.defaultOptions (IS.fromList [0,1,2]) test1' of
+  case uncurry (OmegaTest.solve OmegaTest.defaultOptions) test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
-      forM_ test1' $ \a -> do
+      forM_ (snd test1') $ \a -> do
         LA.evalAtom (IM.map fromInteger m) a @?= True
 
 case_OmegaTest_test2 :: IO ()
 case_OmegaTest_test2 = 
-  case OmegaTest.solve OmegaTest.defaultOptions (IS.fromList [0,1]) test2' of
+  case uncurry (OmegaTest.solve OmegaTest.defaultOptions) test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
 
@@ -201,15 +206,15 @@ case_OmegaTest_test2 =
 
 case_Cooper_test1 :: IO ()
 case_Cooper_test1 = 
-  case Cooper.solve (IS.fromList [0,1,2]) test1' of
+  case uncurry Cooper.solve test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
-      forM_ test1' $ \a -> do
+      forM_ (snd test1') $ \a -> do
         LA.evalAtom (IM.map fromInteger m) a @?= True
 
 case_Cooper_test2 :: IO ()
 case_Cooper_test2 = 
-  case Cooper.solve (IS.fromList [0,1]) test2' of
+  case uncurry Cooper.solve test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
 
@@ -218,16 +223,16 @@ case_Cooper_test2 =
 case_Simplex2_test1 :: IO ()
 case_Simplex2_test1 = do
   solver <- Simplex2.newSolver
-  replicateM 3 (Simplex2.newVar solver) -- XXX
-  mapM_ (Simplex2.assertAtomEx solver) test1'
+  forM_ (IS.toList (fst test1')) $ \_ -> Simplex2.newVar solver
+  mapM_ (Simplex2.assertAtomEx solver) (snd test1')
   ret <- Simplex2.check solver
   ret @?= True
 
 case_Simplex2_test2 :: IO ()
 case_Simplex2_test2 = do
   solver <- Simplex2.newSolver
-  replicateM 2 (Simplex2.newVar solver) -- XXX
-  mapM_ (Simplex2.assertAtomEx solver) test2'
+  forM_ (IS.toList (fst test2')) $ \_ -> Simplex2.newVar solver
+  mapM_ (Simplex2.assertAtomEx solver) (snd test2')
   ret <- Simplex2.check solver
   ret @?= True
 
@@ -237,15 +242,15 @@ case_Simplex2_test2 = do
 
 disabled_case_ContiTraverso_test1 :: IO ()
 disabled_case_ContiTraverso_test1 = 
-  case ContiTraverso.solve P.grlex (IS.fromList [0,1,2]) OptMin (LA.constant 0) test1' of
+  case ContiTraverso.solve P.grlex (fst test1') OptMin (LA.constant 0) (snd test1') of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
-      forM_ test1' $ \a -> do
+      forM_ (snd test1') $ \a -> do
         LA.evalAtom (IM.map fromInteger m) a @?= True
 
 disabled_case_ContiTraverso_test2 :: IO ()
 disabled_case_ContiTraverso_test2 = 
-  case ContiTraverso.solve P.grlex (IS.fromList [0,1]) OptMin (LA.constant 0) test2' of
+  case ContiTraverso.solve P.grlex (fst test2') OptMin (LA.constant 0) (snd test2') of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
 
