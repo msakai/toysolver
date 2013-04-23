@@ -41,6 +41,7 @@ module Data.Polynomial
   , leadingTerm
   , coeff
   , lookupCoeff
+  , isPrimitive
 
   -- * Operations
   , ContPP (..)
@@ -277,6 +278,9 @@ instance Integral r => ContPP (Ratio r) where
   pp p = mapCoeff (/ c) p
     where
       c = cont p
+
+isPrimitive :: (Eq k, Num k, ContPP k, Ord v) => Polynomial k v -> Bool
+isPrimitive p = isZero p || cont p == 1
 
 -- | Formal derivative of polynomials
 deriv :: (Eq k, Num k, Ord v) => Polynomial k v -> v -> Polynomial k v
