@@ -143,13 +143,21 @@ case_polyDivMod_1 =  g*q + r @?= f
 prop_polyGCD_divisible =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
-    let c = polyGCD a b
-    in a `polyMod` c == 0 && b `polyMod` c == 0
+    (a /= 0 && b /= 0) ==>
+      let c = polyGCD a b
+      in a `polyMod` c == 0 && b `polyMod` c == 0
 
 prop_polyGCD_comm = 
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
     polyGCD a b == polyGCD b a
+
+prop_polyGCD_euclid =
+  forAll upolynomials $ \p ->
+  forAll upolynomials $ \q ->
+  forAll upolynomials $ \r ->
+    (p /= 0 && q /= 0 && r /= 0) ==>
+      polyGCD p q == polyGCD p (q + p*r)
 
 case_polyGCD_1 = polyGCD f1 f2 @?= 1
   where 

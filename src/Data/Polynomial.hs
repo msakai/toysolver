@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables, TypeFamilies, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Polynomial
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, TypeFamilies)
+-- Portability :  non-portable (ScopedTypeVariables, TypeFamilies, BangPatterns)
 --
 -- Polynomials
 --
@@ -490,17 +490,17 @@ polyMod f1 f2 = snd (polyDivMod f1 f2)
 
 -- | division of univariate polynomials
 polyDivMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> (UPolynomial k, UPolynomial k)
-polyDivMod f1 f2 = go f1
+polyDivMod f g
+  | isZero g  = error "polyDivMod: division by zero"
+  | otherwise = go 0 f
   where
-    m2 = leadingTerm lex f2
-    go 0 = (0,0)
-    go f1
-      | m1 `monomialDivisible` m2 =
-          case go (f1 - fromMonomial (m1 `monomialDiv` m2) * f2) of
-            (q,r) -> (q + fromMonomial (m1 `monomialDiv` m2), r)
-      | otherwise = (0, f1)
-      where
-        m1 = leadingTerm lex f1
+    lt_g = leadingTerm lex g
+    go !q !r
+      | deg r < deg g = (q,r)
+      | otherwise     = go (q + t) (r - t * g)
+        where
+          lt_r = leadingTerm lex r
+          t    = fromMonomial $ lt_r `monomialDiv` lt_g
 
 -- | GCD of univariate polynomials
 polyGCD :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
