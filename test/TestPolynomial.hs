@@ -15,7 +15,7 @@ import Test.Framework.Providers.QuickCheck2
 import Text.PrettyPrint.HughesPJClass
 
 import Data.Polynomial
-import Data.Polynomial.GBase
+import qualified Data.Polynomial.GBasis as GB
 import Data.Polynomial.RootSeparation.Sturm
 import qualified Data.Polynomial.Factorization.Integer as FactorZ
 import qualified Data.Polynomial.Factorization.Rational as FactorQ
@@ -412,7 +412,7 @@ monomialOrderProp2 cmp =
 
 -- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
 -- Example 1
-case_spolynomial = spolynomial grlex f g @?= - x^3*y^3 - constant (1/3) * y^3 + x^2
+case_spolynomial = GB.spolynomial grlex f g @?= - x^3*y^3 - constant (1/3) * y^3 + x^2
   where
     x = var 1
     y = var 2
@@ -423,9 +423,9 @@ case_spolynomial = spolynomial grlex f g @?= - x^3*y^3 - constant (1/3) * y^3 + 
 
 -- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
 -- Exercise 1
-case_buchberger1 = Set.fromList gbase @?= Set.fromList expected
+case_buchberger1 = Set.fromList gb @?= Set.fromList expected
   where
-    gbase = buchberger lex [x^2-y, x^3-z]
+    gb = GB.basis lex [x^2-y, x^3-z]
     expected = [y^3 - z^2, x^2 - y, x*z - y^2, x*y - z]
 
     x :: Polynomial Rational Int
@@ -435,9 +435,9 @@ case_buchberger1 = Set.fromList gbase @?= Set.fromList expected
 
 -- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
 -- Exercise 2
-case_buchberger2 = Set.fromList gbase @?= Set.fromList expected
+case_buchberger2 = Set.fromList gb @?= Set.fromList expected
   where
-    gbase = buchberger grlex [x^3-2*x*y, x^2*y-2*y^2+x]
+    gb = GB.basis grlex [x^3-2*x*y, x^2*y-2*y^2+x]
     expected = [x^2, x*y, y^2 - constant (1/2) * x]
 
     x :: Polynomial Rational Int
@@ -445,9 +445,9 @@ case_buchberger2 = Set.fromList gbase @?= Set.fromList expected
     y = var 2
 
 -- http://www.iisdavinci.it/jeometry/buchberger.html
-case_buchberger3 = Set.fromList gbase @?= Set.fromList expected
+case_buchberger3 = Set.fromList gb @?= Set.fromList expected
   where
-    gbase = buchberger lex [x^2+2*x*y^2, x*y+2*y^3-1]
+    gb = GB.basis lex [x^2+2*x*y^2, x*y+2*y^3-1]
     expected = [x, y^3 - constant (1/2)]
     x :: Polynomial Rational Int
     x = var 1
@@ -455,16 +455,16 @@ case_buchberger3 = Set.fromList gbase @?= Set.fromList expected
 
 -- http://www.orcca.on.ca/~reid/NewWeb/DetResDes/node4.html
 -- 時間がかかるので自動実行されるテストケースには含めていない
-disabled_case_buchberger4 = Set.fromList gbase @?= Set.fromList expected                   
+disabled_case_buchberger4 = Set.fromList gb @?= Set.fromList expected                   
   where
     x :: Polynomial Rational Int
     x = var 1
     y = var 2
     z = var 3
 
-    gbase = buchberger lex [x^2+y*z-2, x*z+y^2-3, x*y+z^2-5]
+    gb = GB.basis lex [x^2+y*z-2, x*z+y^2-3, x*y+z^2-5]
 
-    expected = reduceGBase lex $
+    expected = GB.reduceGBasis lex $
       [ 8*z^8-100*z^6+438*z^4-760*z^2+361
       , 361*y+8*z^7+52*z^5-740*z^3+1425*z
       , 361*x-88*z^7+872*z^5-2690*z^3+2375*z
@@ -482,11 +482,11 @@ gr([x^2+y*z-2, x*z+y^2-3, x*y+z^2-5],[x,y,z], 2);
 
 -- Seven Trees in One
 -- http://arxiv.org/abs/math/9405205
-case_Seven_Trees_in_One = reduce lex (x^7 - x) gbase @?= 0
+case_Seven_Trees_in_One = reduce lex (x^7 - x) gb @?= 0
   where
     x :: Polynomial Rational Int
     x = var 1
-    gbase = buchberger lex [x-(x^2 + 1)]
+    gb = GB.basis lex [x-(x^2 + 1)]
 
 -- Non-linear loop invariant generation using Gröbner bases
 -- http://portal.acm.org/citation.cfm?id=964028
@@ -497,8 +497,8 @@ case_Seven_Trees_in_One = reduce lex (x^7 - x) gbase @?= 0
 -- x+z}. With this basis, every reduction of p : x^2 - y^2 will yield
 -- a normal form 0.
 case_sankaranarayanan04nonlinear = do
-  Set.fromList gbase @?= Set.fromList [f', g, h]
-  reduce lex (x^2 - y^2) gbase @?= 0
+  Set.fromList gb @?= Set.fromList [f', g, h]
+  reduce lex (x^2 - y^2) gb @?= 0
   where
     x :: Polynomial Rational Int
     x = var 1
@@ -508,7 +508,7 @@ case_sankaranarayanan04nonlinear = do
     g = y - z
     h = x + z
     f' = z^2 - z
-    gbase = buchberger lex [f, g, h]
+    gb = GB.basis lex [f, g, h]
 
 {--------------------------------------------------------------------
   Generators

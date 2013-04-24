@@ -24,7 +24,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Data.Polynomial
-import Data.Polynomial.GBase
+import qualified Data.Polynomial.GBasis as GB
 
 type Var = Int
 
@@ -104,7 +104,7 @@ findPoly c ps = normalizePoly $ sum [constant coeff * (var X) ^ n | (n,coeff) <-
     coeffs = head $ catMaybes $ [isLinearlyDependent cs2 | cs2 <- inits cs]
       where
         cmp = grlex
-        ps' = buchberger cmp ps
+        ps' = GB.basis cmp ps
         cs  = iterate (\p -> reduce cmp (c * p) ps') 1
 
     isLinearlyDependent :: [Polynomial Rational Var] -> Maybe [Rational]
@@ -113,7 +113,7 @@ findPoly c ps = normalizePoly $ sum [constant coeff * (var X) ^ n | (n,coeff) <-
         cs2 = zip [vn..] cs
         sol = map (\(l,_) -> eval (\_ -> 1) $ reduce cmp2 (var l) gbase2) cs2
         cmp2   = grlex
-        gbase2 = buchberger cmp2 es
+        gbase2 = GB.basis cmp2 es
         es = Map.elems $ Map.fromListWith (+) $ do
           (n,xs) <- terms $ sum [var ln * cn | (ln,cn) <- cs2]
           let xs' = mmToList xs

@@ -1,8 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Data.Polynomial.GBase
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Module      :  Data.Polynomial.GBasis
+-- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -25,27 +25,42 @@
 -- 
 -----------------------------------------------------------------------------
 
-module Data.Polynomial.GBase
+module Data.Polynomial.GBasis
   (
-  -- * Gröbner basis
-    buchberger
+  -- * Options
+    Options (..)
+  , Strategy (..)
+  , defaultOptions
+
+  -- * Gröbner basis computation
+  , basis
+  , basis'
   , spolynomial
-  , reduceGBase
+  , reduceGBasis
   ) where
 
 import qualified Data.Set as Set
 import qualified Data.Heap as H -- http://hackage.haskell.org/package/heaps
 import Data.Polynomial
 
-{-
+data Options
+  = Options
+  { optStrategy :: Strategy
+  }
+
+defaultOptions :: Options
+defaultOptions =
+  Options
+  { optStrategy = NormalStrategy
+  }
+
 data Strategy
   = NormalStrategy
-  | SugarStrategy
+  | SugarStrategy  -- ^ sugar strategy (not implemented yet)
   deriving (Eq, Ord, Show, Read, Bounded, Enum)
--}
 
 spolynomial
-  :: (Eq k, Fractional k, Ord v, Show v)
+  :: (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> Polynomial k v -> Polynomial k v
 spolynomial cmp f g =
       fromMonomial ((1,xs) `monomialDiv` (c1,xs1)) * f
@@ -55,10 +70,21 @@ spolynomial cmp f g =
     (c1, xs1) = leadingTerm cmp f
     (c2, xs2) = leadingTerm cmp g
 
-buchberger
-  :: forall k v. (Eq k, Fractional k, Ord k, Ord v, Show v)
-  => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
-buchberger cmp fs = reduceGBase cmp $ go fs (H.fromList [item cmp fi fj | (fi,fj) <- pairs fs, checkGCD fi fj])
+basis
+  :: forall k v. (Eq k, Fractional k, Ord k, Ord v)
+  => MonomialOrder v
+  -> [Polynomial k v]
+  -> [Polynomial k v]
+basis = basis' defaultOptions
+
+basis'
+  :: forall k v. (Eq k, Fractional k, Ord k, Ord v)
+  => Options
+  -> MonomialOrder v
+  -> [Polynomial k v]
+  -> [Polynomial k v]
+basis' opt cmp fs =
+  reduceGBasis cmp $ go fs (H.fromList [item cmp fi fj | (fi,fj) <- pairs fs, checkGCD fi fj])
   where
     go :: [Polynomial k v] -> H.Heap (Item k v) -> [Polynomial k v]
     go gs h | H.null h = gs
@@ -78,10 +104,10 @@ buchberger cmp fs = reduceGBase cmp $ go fs (H.fromList [item cmp fi fj | (fi,fj
         (_, mm1) = leadingTerm cmp fi
         (_, mm2) = leadingTerm cmp fj
 
-reduceGBase
-  :: forall k v. (Eq k, Ord k, Fractional k, Ord v, Show v)
+reduceGBasis
+  :: forall k v. (Eq k, Ord k, Fractional k, Ord v)
   => MonomialOrder v -> [Polynomial k v] -> [Polynomial k v]
-reduceGBase cmp ps = Set.toList $ Set.fromList $ go ps []
+reduceGBasis cmp ps = Set.toList $ Set.fromList $ go ps []
   where
     go [] qs = qs
     go (p:ps) qs

@@ -41,7 +41,7 @@ import Data.ArithRel
 import qualified Data.LA as LA
 import Data.OptDir
 import Data.Polynomial
-import Data.Polynomial.GBase
+import Data.Polynomial.GBasis as GB
 import Data.Var
 import qualified Algorithm.LPUtil as LPUtil
 
@@ -88,8 +88,8 @@ solve' cmp vs' obj cs
     cmp2 :: MonomialOrder Var
     cmp2 = elimOrdering (IS.fromList vs2) `mappend` elimOrdering (IS.singleton t) `mappend` costOrdering obj `mappend` cmp
 
-    gbase :: [Polynomial Rational Var]
-    gbase = buchberger cmp2 (product (map var (t:vs2)) - 1 : phi)
+    gb :: [Polynomial Rational Var]
+    gb = GB.basis' GB.defaultOptions cmp2 (product (map var (t:vs2)) - 1 : phi)
       where
         phi = do
           xj <- vs
@@ -99,7 +99,7 @@ solve' cmp vs' obj cs
 
     yb = product [var yi ^ bi | ((_,bi),yi) <- zip cs vs2]
 
-    [(_,z)] = terms (reduce cmp2 yb gbase)
+    [(_,z)] = terms (reduce cmp2 yb gb)
 
     m = mkModel (vs++vs2++[t]) z
 
