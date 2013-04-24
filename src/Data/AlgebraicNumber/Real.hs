@@ -39,6 +39,7 @@ module Data.AlgebraicNumber.Real
 
   -- * Approximation
   , approx
+  , approxInterval
 
   -- * Misc
   , simpARealPoly
@@ -237,6 +238,16 @@ approx a epsilon =
   if isRational a
     then toRational a
     else Sturm.approx' (sturmChain a) (interval a) epsilon
+
+-- | Returns approximate interval such that @width (approxInterval a epsilon) <= epsilon@.
+approxInterval
+  :: AReal    -- ^ a
+  -> Rational -- ^ epsilon
+  -> Interval Rational
+approxInterval a epsilon =
+  if isRational a
+    then Interval.singleton (toRational a)
+    else Sturm.narrow' (sturmChain a) (interval a) epsilon
 
 -- | Same as 'properFraction'.
 properFraction' :: Integral b => AReal -> (b, AReal)

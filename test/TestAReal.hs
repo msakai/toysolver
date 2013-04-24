@@ -9,9 +9,10 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
-import Data.Polynomial hiding (deg)
+import Data.Polynomial
 import Data.AlgebraicNumber.Real
 import Data.AlgebraicNumber.Root
+import qualified Data.Interval as Interval
 
 import Control.Monad
 import Control.Exception
@@ -217,6 +218,21 @@ case_isAlgebraicInteger_one_sqrt2 = isAlgebraicInteger (1 / sqrt2) @?= False
 case_height_sqrt2 = height sqrt2 @?= 2
 
 case_height_10 = height 10 @?= 10
+
+prop_approx_sqrt2 =
+  forAll epsilons $ \epsilon ->
+    abs (sqrt2 - fromRational (approx sqrt2 epsilon)) <= fromRational epsilon
+
+prop_approxInterval_sqrt2 =
+  forAll epsilons $ \epsilon ->
+    Interval.width (approxInterval sqrt2 epsilon) <= epsilon
+
+epsilons :: Gen Rational
+epsilons = do
+  r <- liftM abs $ arbitrary `suchThat` (0/=)
+  if r > 0
+     then return (1/r)
+     else return r
 
 ------------------------------------------------------------------------
 -- Test harness
