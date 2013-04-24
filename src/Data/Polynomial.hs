@@ -103,7 +103,9 @@ module Data.Polynomial
   , grevlex
 
   -- * Pretty Printing
-  , renderWith
+  , PrintOptions (..)
+  , defaultPrintOptions
+  , prettyPrint
   , PrettyCoeff (..)
   , PrettyVar (..)
   ) where
@@ -406,48 +408,67 @@ reduce cmp p fs = go p
   Pretty printing
 --------------------------------------------------------------------}
 
-instance (Ord k, Num k, Ord v, PrettyCoeff k, PrettyVar v) => Pretty (Polynomial k v) where
-  pPrintPrec = renderWith pPrintVar
+data PrintOptions k v
+  = PrintOptions
+  { pOptPrintVar        :: PrettyLevel -> Rational -> v -> Doc
+  , pOptPrintCoeff      :: PrettyLevel -> Rational -> k -> Doc
+  , pOptIsNegativeCoeff :: k -> Bool
+  }
 
-renderWith
-  :: (Ord k, Num k, Ord v, PrettyCoeff k)
-  => (PrettyLevel -> Rational -> v -> Doc)
-  -> PrettyLevel -> Rational -> (Polynomial k v) -> Doc
-renderWith rv lv prec p =
+defaultPrintOptions :: (PrettyCoeff k, PrettyVar v) => PrintOptions k v
+defaultPrintOptions
+  = PrintOptions
+  { pOptPrintVar        = pPrintVar
+  , pOptPrintCoeff      = pPrintCoeff
+  , pOptIsNegativeCoeff = isNegativeCoeff
+  }
+
+instance (Ord k, Num k, Ord v, PrettyCoeff k, PrettyVar v) => Pretty (Polynomial k v) where
+  pPrintPrec = prettyPrint defaultPrintOptions
+
+prettyPrint
+  :: (Ord k, Num k, Ord v)
+  => PrintOptions k v
+  -> PrettyLevel -> Rational -> Polynomial k v -> Doc
+prettyPrint opt lv prec p =
     case sortBy (flip grlex `on` snd) $ terms p of
       [] -> PP.int 0
-      [t] -> renderLeadingTerm prec t
+      [t] -> pLeadingTerm prec t
       t:ts ->
         prettyParen (prec > addPrec) $
-          PP.hcat (renderLeadingTerm addPrec t : map renderTrailingTerm ts)
+          PP.hcat (pLeadingTerm addPrec t : map pTrailingTerm ts)
     where
-      renderLeadingTerm prec (c,xs) =
-        if isNegativeCoeff c
+      pLeadingTerm prec (c,xs) =
+        if pOptIsNegativeCoeff opt c
         then prettyParen (prec > addPrec) $
-               PP.char '-' <> renderMonomial (addPrec+1) (-c) xs
-        else renderMonomial prec c xs
+               PP.char '-' <> prettyPrintMonomial opt lv (addPrec+1) (-c,xs)
+        else prettyPrintMonomial opt lv prec (c,xs)
 
-      renderTrailingTerm (c,xs) =
-        if isNegativeCoeff c
-        then PP.space <> PP.char '-' <> PP.space <> renderMonomial (addPrec+1) (-c) xs
-        else PP.space <> PP.char '+' <> PP.space <> renderMonomial (addPrec+1) c xs
+      pTrailingTerm (c,xs) =
+        if pOptIsNegativeCoeff opt c
+        then PP.space <> PP.char '-' <> PP.space <> prettyPrintMonomial opt lv (addPrec+1) (-c,xs)
+        else PP.space <> PP.char '+' <> PP.space <> prettyPrintMonomial opt lv (addPrec+1) (c,xs)
 
-      renderMonomial prec c xs
-        | len == 0  = pPrintCoeff lv (appPrec+1) c
-          -- intentionally specify (appPrec+1) to parenthesize any composite expression
-        | len == 1 && c == 1 = renderPow prec $ head (mmToList xs)
-        | otherwise =
-            prettyParen (prec > mulPrec) $
-              PP.hcat $ intersperse (PP.char '*') fs
-          where
-            len = length $ mmToList xs
-            fs  = [pPrintCoeff lv (appPrec+1) c | c /= 1] ++ [renderPow (mulPrec+1) p | p <- mmToList xs]
-            -- intentionally specify (appPrec+1) to parenthesize any composite expression
+prettyPrintMonomial
+  :: (Ord k, Num k, Ord v)
+  => PrintOptions k v
+  -> PrettyLevel -> Rational -> Monomial k v -> Doc
+prettyPrintMonomial opt lv prec (c,xs)
+  | len == 0  = pOptPrintCoeff opt lv (appPrec+1) c
+    -- intentionally specify (appPrec+1) to parenthesize any composite expression
+  | len == 1 && c == 1 = pPow prec $ head (mmToList xs)
+  | otherwise =
+      prettyParen (prec > mulPrec) $
+        PP.hcat $ intersperse (PP.char '*') fs
+    where
+      len = length $ mmToList xs
+      fs  = [pOptPrintCoeff opt lv (appPrec+1) c | c /= 1] ++ [pPow (mulPrec+1) p | p <- mmToList xs]
+      -- intentionally specify (appPrec+1) to parenthesize any composite expression
 
-      renderPow prec (x,1) = rv lv prec x
-      renderPow prec (x,n) =
+      pPow prec (x,1) = pOptPrintVar opt lv prec x
+      pPow prec (x,n) =
         prettyParen (prec > expPrec) $
-          rv lv (expPrec+1) x <> PP.char '^' <> PP.integer n
+          pOptPrintVar opt lv (expPrec+1) x <> PP.char '^' <> PP.integer n
 
 class PrettyCoeff a where
   pPrintCoeff :: PrettyLevel -> Rational -> a -> Doc
