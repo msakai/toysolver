@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeFamilies, BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables, TypeFamilies, BangPatterns, DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Polynomial
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, TypeFamilies, BangPatterns)
+-- Portability :  non-portable (ScopedTypeVariables, TypeFamilies, BangPatterns, DeriveDataTypeable)
 --
 -- Polynomials
 --
@@ -112,8 +112,10 @@ module Data.Polynomial
 
 import Prelude hiding (lex)
 import Control.Applicative
+import Control.DeepSeq
 import Control.Exception (assert)
 import Control.Monad
+import Data.Data
 import Data.Function
 import Data.List
 import Data.Monoid
@@ -122,9 +124,22 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.IntMap as IM
 import Data.Traversable (for, traverse)
+import Data.Typeable
 import Data.VectorSpace
 import qualified Text.PrettyPrint.HughesPJClass as PP
 import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
+
+{--------------------------------------------------------------------
+  Classes
+--------------------------------------------------------------------}
+
+class Variables f where
+  var       :: Ord v => v -> f v
+  variables :: Ord v => f v -> Set.Set v
+
+-- | total degree of a given polynomial
+class Degree t where
+  deg :: t -> Integer
 
 {--------------------------------------------------------------------
   Polynomial type
@@ -132,13 +147,7 @@ import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyPare
 
 -- | Polynomial over commutative ring r
 newtype Polynomial k v = Polynomial{ coeffMap :: Map.Map (MonicMonomial v) k }
-  deriving (Eq, Ord)
-
-data X = X
-  deriving (Eq, Ord, Bounded, Enum, Show)
-
--- | Univariate polynomials over commutative ring r
-type UPolynomial r = Polynomial r X
+  deriving (Eq, Ord, Typeable)
 
 instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
   (+)      = plus
@@ -160,6 +169,18 @@ instance (Eq k, Num k, Ord v) => VectorSpace (Polynomial k v) where
 instance (Show v, Ord v, Show k) => Show (Polynomial k v) where
   showsPrec d p  = showParen (d > 10) $
     showString "fromTerms " . shows (terms p)
+
+instance (NFData k, NFData v) => NFData (Polynomial k v) where
+  rnf (Polynomial m) = rnf m
+
+instance (Eq k, Num k) => Variables (Polynomial k) where
+  var x       = fromMonomial (1, var x)
+  variables p = Set.unions $ [variables mm | (_, mm) <- terms p]
+
+instance Degree (Polynomial k v) where
+  deg p
+    | isZero p  = -1
+    | otherwise = maximum [deg mm | (_,mm) <- terms p]
 
 normalize :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
@@ -197,14 +218,6 @@ prod (Polynomial m1) (Polynomial m2) = normalize $ Polynomial $ Map.fromListWith
 isZero :: Polynomial k v -> Bool
 isZero (Polynomial m) = Map.null m
 
-class Variables f where
-  var       :: Ord v => v -> f v
-  variables :: Ord v => f v -> Set.Set v
-
-instance (Eq k, Num k) => Variables (Polynomial k) where
-  var x       = fromMonomial (1, var x)
-  variables p = Set.unions $ [variables mm | (_, mm) <- terms p]
-
 -- | construct a polynomial from a constant
 constant :: (Eq k, Num k, Ord v) => k -> Polynomial k v
 constant c = fromMonomial (c, mmOne)
@@ -230,15 +243,6 @@ leadingTerm cmp p =
   case terms p of
     [] -> (0, mmOne) -- should be error?
     ms -> maximumBy (cmp `on` snd) ms
-
--- | total degree of a given polynomial
-class Degree t where
-  deg :: t -> Integer
-
-instance Degree (Polynomial k v) where
-  deg p
-    | isZero p  = -1
-    | otherwise = maximum [deg mm | (_,mm) <- terms p]
 
 coeff :: (Num k, Ord v) => MonicMonomial v -> Polynomial k v -> k
 coeff xs (Polynomial m) = Map.findWithDefault 0 xs m
@@ -512,6 +516,14 @@ appPrec = 10 -- Precedence of function application
   Univariate polynomials
 --------------------------------------------------------------------}
 
+-- | Univariate polynomials over commutative ring r
+type UPolynomial r = Polynomial r X
+
+data X = X
+  deriving (Eq, Ord, Bounded, Enum, Show, Read, Typeable, Data)
+
+instance NFData X
+
 -- | division of univariate polynomials
 polyDiv :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 polyDiv f1 f2 = fst (polyDivMod f1 f2)
@@ -603,11 +615,14 @@ monomialIntegral (c,xs) x =
 
 -- | Monic monomials
 newtype MonicMonomial v = MonicMonomial{ mmToMap :: Map.Map v Integer }
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Typeable)
 
 instance (Ord v, Show v) => Show (MonicMonomial v) where
   showsPrec d m  = showParen (d > 10) $
     showString "mmFromList " . shows (mmToList m)
+
+instance (NFData v) => NFData (MonicMonomial v) where
+  rnf (MonicMonomial m) = rnf m
 
 instance Degree (MonicMonomial v) where
   deg (MonicMonomial m) = sum $ Map.elems m
