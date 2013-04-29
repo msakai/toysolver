@@ -25,6 +25,7 @@ module Data.Sign
   , showSign
   ) where
 
+import Algebra.Enumerable (Enumerable (..)) -- from lattices package
 import Control.DeepSeq
 import Data.Typeable
 import Data.Data
@@ -34,6 +35,9 @@ data Sign = Neg | Zero | Pos
   deriving (Eq, Ord, Show, Read, Enum, Bounded, Typeable, Data)
 
 instance NFData Sign
+
+instance Enumerable Sign where
+  universe = [Neg .. Pos]
 
 instance Alg.Multiplicative Sign where
   (*)   = signMul
