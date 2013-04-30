@@ -116,6 +116,7 @@ import Control.DeepSeq
 import Control.Exception (assert)
 import Control.Monad
 import Data.Data
+import qualified Data.FiniteField as FF
 import Data.Function
 import Data.List
 import Data.Monoid
@@ -492,6 +493,10 @@ instance (PrettyCoeff a, Integral a) => PrettyCoeff (Ratio a) where
           PP.char '/' <>
           pPrintCoeff lv (ratPrec+1) (denominator r)
   isNegativeCoeff x = isNegativeCoeff (numerator x)
+
+instance PrettyCoeff (FF.PrimeField a) where
+  pPrintCoeff lv p a = pPrintCoeff lv p (FF.toInteger a)
+  isNegativeCoeff _  = False
 
 instance (Num c, Ord c, PrettyCoeff c, Ord v, PrettyVar v) => PrettyCoeff (Polynomial c v) where
   pPrintCoeff = pPrintPrec
