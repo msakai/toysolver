@@ -2,6 +2,7 @@
 
 import Prelude hiding (lex)
 import Control.Monad
+import qualified Data.FiniteField as FF
 import Data.List
 import Data.Ratio
 import qualified Data.Set as Set
@@ -17,6 +18,7 @@ import Text.PrettyPrint.HughesPJClass
 import Data.Polynomial
 import qualified Data.Polynomial.GBasis as GB
 import Data.Polynomial.RootSeparation.Sturm
+import qualified Data.Polynomial.Factorization.FiniteField as FactorFF
 import qualified Data.Polynomial.Factorization.Integer as FactorZ
 import qualified Data.Polynomial.Factorization.Rational as FactorQ
 import qualified Data.Polynomial.Interpolation.Lagrange as LagrangeInterpolation
@@ -666,6 +668,17 @@ case_factorQ_test2 = do
     f = - (x^5 + x^4 + x^2 + x + 2)
     p = x^2 + x + 1
     q = x^3 - x + 2
+
+-- http://en.wikipedia.org/wiki/Factorization_of_polynomials_over_a_finite_field_and_irreducibility_tests
+case_FF_sqfree_test1 = do
+  sort actual @?= sort expected
+  product [f^n | (f,n) <- actual] @?= f
+  where
+    x :: UPolynomial $(FF.primeField 3)
+    x = var X
+    f  = x^11 + 2*x^9 + 2*x^8 + x^6 + x^5 + 2*x^3 + 2*x^2 + 1
+    actual   = FactorFF.sqfree f
+    expected = [(x+1, 1), (x^2+1, 3), (x+2, 4)]
 
 ------------------------------------------------------------------------
 

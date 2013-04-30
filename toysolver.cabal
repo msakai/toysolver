@@ -114,6 +114,7 @@ Library
      Data.LA.FOL
      Data.LBool
      Data.Polynomial
+     Data.Polynomial.Factorization.FiniteField
      Data.Polynomial.Factorization.Integer
      Data.Polynomial.Factorization.Rational
      Data.Polynomial.Factorization.SquareFree
@@ -223,7 +224,7 @@ Test-suite TestPolynomial
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestPolynomial.hs
-  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3, data-interval >=0.2.0, prettyclass >=1.0.0
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3, data-interval >=0.2.0, finite-field >=0.5.0, prettyclass >=1.0.0
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
