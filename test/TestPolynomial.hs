@@ -685,6 +685,25 @@ from "Computational Commutative Algebra 1" (Martin Kreuzer and Lorenzo Robbiano)
 
 Risa/Asir
 > load("fff");
+> setmod_ff(5);
+> fctr_ff(x^100 - x^200);
+[[1*x+1,25],[1*x+3,25],[1*x+2,25],[1*x+4,25],[1*x,100]]
+-}
+case_FF_berlekamp_1 = do
+  sort actual @?= sort expected
+  product [g^n | (g,n) <- actual] @?= f
+  where
+    x :: UPolynomial $(FF.primeField 5)
+    x = var X
+    f = x^100 - x^200
+    actual   = FactorFF.factor f
+    expected = (4,1) : [(1*x+1,25), (1*x+3,25), (1*x+2,25), (1*x+4,25), (1*x,100)]
+
+{-
+from "Computational Commutative Algebra 1" (Martin Kreuzer and Lorenzo Robbiano) pp.40
+
+Risa/Asir
+> load("fff");
 > setmod_ff(2);
 > fctr_ff(1 + x + x^2 + x^6 + x^7 + x^8 + x^12);
 [[1*x^5+1*x^3+1*x^2+1*x+1,1],[1*x^7+1*x^5+1*x^4+1*x^3+1,1]]*/
@@ -737,7 +756,6 @@ case_FF_berlekamp_4 = do
     actual   = FactorFF.berlekamp f
     expected = [1*x+3, 1*x^3+8*x^2+4*x+12, 1*x^4+2*x^3+3*x^2+4*x+6]
 
-
 {-
 from "Computational Commutative Algebra 1" (Martin Kreuzer and Lorenzo Robbiano) pp.40
 
@@ -756,6 +774,43 @@ Risa/Asir
 --     f = 2 + x + x^2 + x^3 + x^4 + x^5
 --     actual   = FactorFF.berlekamp f
 --     expected = [1*x+13077, 1*x^4+18915*x^3+2958*x^2+27345*x+4834]
+
+
+case_basisOfBerlekampSubalgebra_1 = sequence_ [(g ^ (5::Int)) `polyMod` f @?= g | g <- basis]
+  where
+    x :: UPolynomial $(FF.primeField 5)
+    x = var X
+    f = associatedMonicPolynomial grlex $ x^100 - x^200
+    basis = FactorFF.basisOfBerlekampSubalgebra f
+
+case_basisOfBerlekampSubalgebra_2 = sequence_ [(g ^ (2::Int)) `polyMod` f @?= g | g <- basis]
+  where
+    x :: UPolynomial $(FF.primeField 2)
+    x = var X
+    f = 1 + x + x^2 + x^6 + x^7 + x^8 + x^12
+    basis = FactorFF.basisOfBerlekampSubalgebra f
+
+case_basisOfBerlekampSubalgebra_3 = sequence_ [(g ^ (2::Int)) `polyMod` f @?= g | g <- basis]
+  where
+    x :: UPolynomial $(FF.primeField 2)
+    x = var X
+    f = associatedMonicPolynomial grlex $ 1 - x^100
+    basis = FactorFF.basisOfBerlekampSubalgebra f
+
+
+case_basisOfBerlekampSubalgebra_4 = sequence_ [(g ^ (13::Int)) `polyMod` f @?= g | g <- basis]
+  where
+    x :: UPolynomial $(FF.primeField 13)
+    x = var X
+    f = 8 + 2*x + 8*x^2 + 10*x^3 + 10*x^4 + x^6 +x^8
+    basis = FactorFF.basisOfBerlekampSubalgebra f
+
+-- case_basisOfBerlekampSubalgebra_5 = sequence_ [(g ^ (31991::Int)) `polyMod` f @?= g | g <- basis]
+--   where
+--     x :: UPolynomial $(FF.primeField 31991)
+--     x = var X
+--     f = 2 + x + x^2 + x^3 + x^4 + x^5
+--     basis = FactorFF.basisOfBerlekampSubalgebra f
 
 ------------------------------------------------------------------------
 
