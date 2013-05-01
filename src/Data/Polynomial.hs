@@ -130,6 +130,8 @@ import Data.VectorSpace
 import qualified Text.PrettyPrint.HughesPJClass as PP
 import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
 
+infixl 7  `polyDiv`, `polyMod`
+
 {--------------------------------------------------------------------
   Classes
 --------------------------------------------------------------------}
