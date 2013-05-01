@@ -29,40 +29,47 @@ import Data.Polynomial
 import qualified Data.Polynomial.Interpolation.Lagrange as Interpolation
 import Util (isInteger)
 
-factor :: UPolynomial Integer -> [UPolynomial Integer]
-factor 0 = [0]
+factor :: UPolynomial Integer -> [(UPolynomial Integer, Integer)]
+factor 0 = [(0,1)]
 factor 1 = []
-factor p | deg p == 0 = [p]
-factor p = [constant c | c /= 1] ++ sort qs
+factor p | deg p == 0 = [(p,1)]
+factor p = [(constant c, 1) | c /= 1] ++ [(q, fromIntegral m) | (q,m) <- MultiSet.toOccurList qs]
   where
     (c,qs) = normalize (cont p, factor' (pp p))
 
-normalize :: (Integer, [UPolynomial Integer]) -> (Integer, [UPolynomial Integer])
-normalize (c,ps) = go ps c []
+normalize :: (Integer, MultiSet (UPolynomial Integer)) -> (Integer, MultiSet (UPolynomial Integer))
+normalize (c,ps) = go (MultiSet.toOccurList ps) c MultiSet.empty
   where
-    go [] !c qs     = (c,qs)
-    go (p:ps) !c qs
-      | deg p == 0 = go ps (c * coeff (var X) p) qs
-      | fst (leadingTerm grlex p) < 0 = go ps (-c) (-p : qs)
-      | otherwise = go ps c (p : qs)
+    go [] !c !qs = (c, qs)
+    go ((p,m) : ps) !c !qs
+      | deg p == 0 = go ps (c * (coeff (var X) p) ^ m) qs
+      | fst (leadingTerm grlex p) < 0 = go ps (c * (-1)^m) (MultiSet.insertMany (-p) m qs)
+      | otherwise = go ps c (MultiSet.insertMany p m qs)
 
-factor' :: UPolynomial Integer -> [UPolynomial Integer]
-factor' p = go [p] []
+factor' :: UPolynomial Integer -> MultiSet (UPolynomial Integer)
+factor' p = go (MultiSet.singleton p) MultiSet.empty
   where
-    go [] ret     = ret
-    go (p:ps) ret =
-      case factor2 p of
-        Nothing -> go ps (p:ret)
-        Just qs -> go (qs ++ ps) ret
+    go ps ret
+      | MultiSet.null ps = ret
+      | otherwise =
+          case factor2 p of
+            Nothing ->
+              go ps' (MultiSet.insertMany p m ret)
+            Just (q1,q2) ->
+              go (MultiSet.insertMany q1 m $ MultiSet.insertMany q2 m ps') ret
+          where
+            p   = MultiSet.findMin ps
+            m   = MultiSet.occur p ps
+            ps' = MultiSet.deleteAll p ps
 
-factor2 :: UPolynomial Integer -> Maybe [UPolynomial Integer]
+factor2 :: UPolynomial Integer -> Maybe (UPolynomial Integer, UPolynomial Integer)
 factor2 p | p == var X = Nothing
 factor2 p =
   case find (\(_,yi) -> yi==0) vs of
     Just (xi,_) ->
       let q1 = x - constant xi
           q2 = p' `polyDiv` mapCoeff fromInteger q1
-      in Just [q1, toZ q2]
+      in Just (q1, toZ q2)
     Nothing ->
       let qs = map Interpolation.interpolate $
                   sequence [[(fromInteger xi, fromInteger z) | z <- factors yi] | (xi,yi) <- vs]
@@ -73,7 +80,7 @@ factor2 p =
                ]
       in case zs of
            [] -> Nothing
-           (q1,q2):_ -> Just [toZ q1, toZ q2]
+           (q1,q2):_ -> Just (toZ q1, toZ q2)
   where
     n = (deg p `div` 2)
     xs = take (fromIntegral n + 1) xvalues

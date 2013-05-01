@@ -619,55 +619,55 @@ case_separate = do
 
 ------------------------------------------------------------------------
 
-case_factorZ_zero = FactorZ.factor 0 @?= [0]
+case_factorZ_zero = FactorZ.factor 0 @?= [(0,1)]
 case_factorZ_one  = FactorZ.factor 1 @?= []
-case_factorZ_two  = FactorZ.factor 2 @?= [2]
+case_factorZ_two  = FactorZ.factor 2 @?= [(2,1)]
 
 -- http://en.wikipedia.org/wiki/Factorization_of_polynomials
 case_factorZ_test1 = do
-  sort (FactorZ.factor f) @?= sort [2,p,q]
-  product (FactorZ.factor f) @?= f
+  sort actual @?= sort expected
+  product [g^n | (g,n) <- actual] @?= f
   where
     x :: UPolynomial Integer
     x = var X   
     f = 2*(x^5 + x^4 + x^2 + x + 2)
-    p = x^2 + x + 1
-    q = x^3 - x + 2
+    actual   = FactorZ.factor f
+    expected = [(2,1), (x^2+x+1,1), (x^3-x+2,1)]
 
 case_factorZ_test2 = do
-  sort (FactorZ.factor f) @?= sort [-1,p,q]
-  product (FactorZ.factor f) @?= f
+  sort actual @?= sort expected
+  product [g^n | (g,n) <- actual] @?= f
   where
     x :: UPolynomial Integer
     x = var X   
     f = - (x^5 + x^4 + x^2 + x + 2)
-    p = x^2 + x + 1
-    q = x^3 - x + 2
+    actual   = FactorZ.factor f
+    expected = [(-1,1), (x^2+x+1,1), (x^3-x+2,1)]
 
-case_factorQ_zero = FactorQ.factor 0 @?= [0]
+case_factorQ_zero = FactorQ.factor 0 @?= [(0,1)]
 case_factorQ_one  = FactorQ.factor 1 @?= []
-case_factorQ_two  = FactorQ.factor 2 @?= [2]
+case_factorQ_two  = FactorQ.factor 2 @?= [(2,1)]
 
 -- http://en.wikipedia.org/wiki/Factorization_of_polynomials
 case_factorQ_test1 = do
-  sort (FactorQ.factor f) @?= sort [2,p,q]
-  product (FactorQ.factor f) @?= f
+  sort actual @?= sort expected
+  product [g^n | (g,n) <- actual] @?= f
   where
     x :: UPolynomial Rational
     x = var X
     f = 2*(x^5 + x^4 + x^2 + x + 2)
-    p = x^2 + x + 1
-    q = x^3 - x + 2
+    actual   = FactorQ.factor f
+    expected = [(2, 1), (x^2+x+1, 1), (x^3-x+2, 1)]
 
 case_factorQ_test2 = do
-  sort (FactorQ.factor f) @?= sort [-1,p,q]
-  product (FactorQ.factor f) @?= f
+  sort actual @?= sort expected
+  product [g^n | (g,n) <- actual] @?= f
   where
     x :: UPolynomial Rational
     x = var X
     f = - (x^5 + x^4 + x^2 + x + 2)
-    p = x^2 + x + 1
-    q = x^3 - x + 2
+    actual   = FactorQ.factor f
+    expected = [(-1,1), (x^2+x+1,1), (x^3-x+2,1)]
 
 -- http://en.wikipedia.org/wiki/Factorization_of_polynomials_over_a_finite_field_and_irreducibility_tests
 case_FF_sqfree_test1 = do

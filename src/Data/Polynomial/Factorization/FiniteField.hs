@@ -32,13 +32,10 @@ import Control.Exception (assert)
 import Data.FiniteField
 import Data.Function (on)
 import Data.List
-import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Polynomial
 import qualified Data.Polynomial.GBasis as GB
-
-import Text.PrettyPrint.HughesPJClass hiding (char)
 
 factor :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]
 factor f = do
@@ -86,16 +83,16 @@ polyPthRoot f = assert (deriv f X == 0) $
   fromTerms [(pthRoot c, g mm) | (c,mm) <- terms f]
   where
     p = char (undefined :: k)
-    g mm = mmFromList [(X, (Map.findWithDefault 0 X (mmToMap mm)) `div` p)]
+    g mm = mmFromList [(X, deg mm `div` p)]
 
 -- | Berlekamp algorithm for polynomial factorization.
 --
--- Input polynomial are assumed to be monic and square-free.
+-- Input polynomial is assumed to be monic and square-free.
 berlekamp :: forall k. (Eq k, Ord k, FiniteField k) => UPolynomial k -> [UPolynomial k]
 berlekamp f = go (Set.singleton f) basis
   where
     go :: Set (UPolynomial k) -> [UPolynomial k] -> [UPolynomial k]
-    go fs [] = error $ "berlekamp: should not happen"
+    go _ [] = error $ "berlekamp: should not happen"
     go fs (b:bs)
       | Set.size fs == r = Set.toList fs
       | otherwise = go (Set.unions [func fi | fi <- Set.toList fs]) bs

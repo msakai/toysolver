@@ -73,7 +73,7 @@ data AReal = RealRoot (UPolynomial Rational) (Interval Rational)
 -- | Real roots of the polynomial in ascending order.
 realRoots :: UPolynomial Rational -> [AReal]
 realRoots p = Set.toAscList $ Set.fromList $ do
-  q <- FactorQ.factor p
+  (q,_) <- FactorQ.factor p
   realRoots' q
 
 -- | Real roots of the polynomial in ascending order.
@@ -91,7 +91,7 @@ realRoots' p = do
 
 realRoot :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot p i = 
-  case [q | q <- FactorQ.factor p, deg q > 0, Sturm.numRoots q i == 1] of
+  case [q | (q,_) <- FactorQ.factor p, deg q > 0, Sturm.numRoots q i == 1] of
     p2:_ -> realRoot' p2 i
     []   -> error "Data.AlgebraicNumber.Real.realRoot: invalid interval"
 
