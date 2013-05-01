@@ -420,14 +420,16 @@ data PrintOptions k v
   { pOptPrintVar        :: PrettyLevel -> Rational -> v -> Doc
   , pOptPrintCoeff      :: PrettyLevel -> Rational -> k -> Doc
   , pOptIsNegativeCoeff :: k -> Bool
+  , pOptMonomialOrder   :: MonomialOrder v
   }
 
-defaultPrintOptions :: (PrettyCoeff k, PrettyVar v) => PrintOptions k v
+defaultPrintOptions :: (PrettyCoeff k, PrettyVar v, Ord v) => PrintOptions k v
 defaultPrintOptions
   = PrintOptions
   { pOptPrintVar        = pPrintVar
   , pOptPrintCoeff      = pPrintCoeff
   , pOptIsNegativeCoeff = isNegativeCoeff
+  , pOptMonomialOrder   = grlex
   }
 
 instance (Ord k, Num k, Ord v, PrettyCoeff k, PrettyVar v) => Pretty (Polynomial k v) where
@@ -438,7 +440,7 @@ prettyPrint
   => PrintOptions k v
   -> PrettyLevel -> Rational -> Polynomial k v -> Doc
 prettyPrint opt lv prec p =
-    case sortBy (flip grlex `on` snd) $ terms p of
+    case sortBy (flip (pOptMonomialOrder opt) `on` snd) $ terms p of
       [] -> PP.int 0
       [t] -> pLeadingTerm prec t
       t:ts ->
