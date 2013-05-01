@@ -680,6 +680,83 @@ case_FF_sqfree_test1 = do
     actual   = FactorFF.sqfree f
     expected = [(x+1, 1), (x^2+1, 3), (x+2, 4)]
 
+{-
+from "Computational Commutative Algebra 1" (Martin Kreuzer and Lorenzo Robbiano) pp.40
+
+Risa/Asir
+> load("fff");
+> setmod_ff(2);
+> fctr_ff(1 + x + x^2 + x^6 + x^7 + x^8 + x^12);
+[[1*x^5+1*x^3+1*x^2+1*x+1,1],[1*x^7+1*x^5+1*x^4+1*x^3+1,1]]*/
+-}
+case_FF_berlekamp_2 = do
+  sort actual @?= sort expected
+  product actual @?= f
+  where
+    x :: UPolynomial $(FF.primeField 2)
+    x = var X
+    f = 1 + x + x^2 + x^6 + x^7 + x^8 + x^12
+    actual   = FactorFF.berlekamp f
+    expected = [1*x^5+1*x^3+1*x^2+1*x+1, 1*x^7+1*x^5+1*x^4+1*x^3+1]
+
+{-
+from "Computational Commutative Algebra 1" (Martin Kreuzer and Lorenzo Robbiano) pp.40
+
+Risa/Asir
+> load("fff");
+> setmod_ff(7);
+> fctr_ff(1 - x^100);
+[[1*x+1,1],[1*x+6,1],[1*x^2+1,1],[1*x^4+2*x^3+5*x^2+2*x+1,1],[1*x^4+5*x^3+5*x^2+5*x+1,1],[1*x^4+5*x^3+3*x^2+2*x+1,1],[1*x^4+2*x^3+3*x^2+5*x+1,1],[1*x^4+1*x^3+1*x^2+6*x+1,1],[1*x^4+1*x^3+5*x^2+1*x+1,1],[1*x^4+2*x^3+4*x^2+2*x+1,1],[1*x^4+3*x^3+6*x^2+4*x+1,1],[1*x^4+3*x^3+3*x+1,1],[1*x^4+5*x^3+2*x+1,1],[1*x^4+3*x^3+3*x^2+3*x+1,1],[1*x^4+6*x^3+5*x^2+6*x+1,1],[1*x^4+6*x^3+1*x^2+1*x+1,1],[1*x^4+4*x^3+3*x^2+4*x+1,1],[1*x^4+6*x^3+1*x^2+6*x+1,1],[1*x^4+4*x^3+4*x+1,1],[1*x^4+2*x^3+1*x^2+5*x+1,1],[1*x^4+5*x^3+4*x^2+5*x+1,1],[1*x^4+4*x^3+4*x^2+3*x+1,1],[1*x^4+5*x^3+1*x^2+2*x+1,1],[1*x^4+1*x^3+1*x^2+1*x+1,1],[1*x^4+3*x^3+4*x^2+4*x+1,1],[1*x^4+2*x^3+5*x+1,1],[1*x^4+4*x^3+6*x^2+3*x+1,1]]
+-}
+case_FF_berlekamp_3 = do
+  sort actual @?= sort expected
+  product [g^n | (g,n) <- actual] @?= f
+  where
+    x :: UPolynomial $(FF.primeField 7)
+    x = var X
+    f = 1 - x^100
+    actual   = FactorFF.factor f
+    expected = (6,1) : [(1*x+1,1), (1*x+6,1), (1*x^2+1,1), (1*x^4+2*x^3+5*x^2+2*x+1,1), (1*x^4+5*x^3+5*x^2+5*x+1,1), (1*x^4+5*x^3+3*x^2+2*x+1,1), (1*x^4+2*x^3+3*x^2+5*x+1,1), (1*x^4+1*x^3+1*x^2+6*x+1,1), (1*x^4+1*x^3+5*x^2+1*x+1,1), (1*x^4+2*x^3+4*x^2+2*x+1,1), (1*x^4+3*x^3+6*x^2+4*x+1,1), (1*x^4+3*x^3+3*x+1,1), (1*x^4+5*x^3+2*x+1,1), (1*x^4+3*x^3+3*x^2+3*x+1,1), (1*x^4+6*x^3+5*x^2+6*x+1,1), (1*x^4+6*x^3+1*x^2+1*x+1,1), (1*x^4+4*x^3+3*x^2+4*x+1,1), (1*x^4+6*x^3+1*x^2+6*x+1,1), (1*x^4+4*x^3+4*x+1,1), (1*x^4+2*x^3+1*x^2+5*x+1,1), (1*x^4+5*x^3+4*x^2+5*x+1,1), (1*x^4+4*x^3+4*x^2+3*x+1,1), (1*x^4+5*x^3+1*x^2+2*x+1,1), (1*x^4+1*x^3+1*x^2+1*x+1,1), (1*x^4+3*x^3+4*x^2+4*x+1,1), (1*x^4+2*x^3+5*x+1,1), (1*x^4+4*x^3+6*x^2+3*x+1,1)]
+
+{-
+from "Computational Commutative Algebra 1" (Martin Kreuzer and Lorenzo Robbiano) pp.40
+
+Risa/Asir
+> load("fff");
+> setmod_ff(13);
+> fctr_ff(8 + 2*x + 8*x^2 + 10*x^3 + 10*x^4 + x^6 +x^8);
+[[1*x+3,1],[1*x^3+8*x^2+4*x+12,1],[1*x^4+2*x^3+3*x^2+4*x+6,1]]
+-}
+case_FF_berlekamp_4 = do
+  sort actual @?= sort expected
+  product actual @?= f
+  where
+    x :: UPolynomial $(FF.primeField 13)
+    x = var X
+    f = 8 + 2*x + 8*x^2 + 10*x^3 + 10*x^4 + x^6 +x^8
+    actual   = FactorFF.berlekamp f
+    expected = [1*x+3, 1*x^3+8*x^2+4*x+12, 1*x^4+2*x^3+3*x^2+4*x+6]
+
+
+{-
+from "Computational Commutative Algebra 1" (Martin Kreuzer and Lorenzo Robbiano) pp.40
+
+Risa/Asir
+> load("fff");
+> setmod_ff(31991);
+> fctr_ff(2 + x + x^2 + x^3 + x^4 + x^5);
+[[1*x+13077,1],[1*x^4+18915*x^3+2958*x^2+27345*x+4834,1]]
+-}
+-- case_FF_berlekamp_5 = do
+--   sort actual @?= sort expected
+--   product actual @?= f
+--   where
+--     x :: UPolynomial $(FF.primeField 31991)
+--     x = var X
+--     f = 2 + x + x^2 + x^3 + x^4 + x^5
+--     actual   = FactorFF.berlekamp f
+--     expected = [1*x+13077, 1*x^4+18915*x^3+2958*x^2+27345*x+4834]
+
 ------------------------------------------------------------------------
 
 -- http://en.wikipedia.org/wiki/Lagrange_polynomial
