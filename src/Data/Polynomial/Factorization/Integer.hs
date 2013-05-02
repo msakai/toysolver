@@ -43,7 +43,7 @@ normalize (c,ps) = go (MultiSet.toOccurList ps) c MultiSet.empty
     go [] !c !qs = (c, qs)
     go ((p,m) : ps) !c !qs
       | deg p == 0 = go ps (c * (coeff (var X) p) ^ m) qs
-      | fst (leadingTerm grlex p) < 0 = go ps (c * (-1)^m) (MultiSet.insertMany (-p) m qs)
+      | lc grlex p < 0 = go ps (c * (-1)^m) (MultiSet.insertMany (-p) m qs)
       | otherwise = go ps c (MultiSet.insertMany p m qs)
 
 factor' :: UPolynomial Integer -> MultiSet (UPolynomial Integer)
@@ -68,14 +68,14 @@ factor2 p =
   case find (\(_,yi) -> yi==0) vs of
     Just (xi,_) ->
       let q1 = x - constant xi
-          q2 = p' `polyDiv` mapCoeff fromInteger q1
+          q2 = p' `pdiv` mapCoeff fromInteger q1
       in Just (q1, toZ q2)
     Nothing ->
       let qs = map Interpolation.interpolate $
                   sequence [[(fromInteger xi, fromInteger z) | z <- factors yi] | (xi,yi) <- vs]
           zs = [ (q1,q2)
                | q1 <- qs, deg q1 > 0, isUPolyZ q1
-               , let (q2,r) = p' `polyDivMod` q1
+               , let (q2,r) = p' `pdivMod` q1
                , r == 0, deg q2 > 0, isUPolyZ q2
                ]
       in case zs of

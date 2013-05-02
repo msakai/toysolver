@@ -33,11 +33,7 @@ type Var = Int
 --------------------------------------------------------------------}
 
 normalizePoly :: UPolynomial Rational -> UPolynomial Rational
-normalizePoly p
-  | c == 1    = p
-  | otherwise = mapCoeff (/ c) p
-  where
-    (c,_) = leadingTerm grlex p
+normalizePoly = toMonic grlex
 
 rootAdd :: UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
 rootAdd p1 p2 = lift2 (+) p1 p2
@@ -54,7 +50,7 @@ rootScale 0 p = var X
 rootScale r p = normalizePoly $ subst p (\X -> constant (recip r) * var X)
 
 rootRecip :: UPolynomial Rational -> UPolynomial Rational
-rootRecip p = normalizePoly $ fromTerms [(c, mmFromList [(X, d - deg xs)]) | (c, xs) <- terms p]
+rootRecip p = normalizePoly $ fromTerms [(c, var X `mpow` (d - deg xs)) | (c, xs) <- terms p]
   where
     d = deg p
 
@@ -98,7 +94,7 @@ findPoly c ps = normalizePoly $ sum [constant coeff * (var X) ^ n | (n,coeff) <-
     vn :: Var
     vn = if Set.null vs then 0 else Set.findMax vs + 1
       where
-        vs = Set.fromList [x | p <- (c:ps), (_,xs) <- terms p, (x,_) <- mmToList xs]
+        vs = Set.fromList [x | p <- (c:ps), (_,xs) <- terms p, (x,_) <- mindices xs]
 
     coeffs :: [Rational]
     coeffs = head $ catMaybes $ [isLinearlyDependent cs2 | cs2 <- inits cs]
@@ -116,7 +112,7 @@ findPoly c ps = normalizePoly $ sum [constant coeff * (var X) ^ n | (n,coeff) <-
         gbase2 = GB.basis cmp2 es
         es = Map.elems $ Map.fromListWith (+) $ do
           (n,xs) <- terms $ sum [var ln * cn | (ln,cn) <- cs2]
-          let xs' = mmToList xs
-              ys = mmFromList [(x,m) | (x,m) <- xs', x < vn]
-              zs = mmFromList [(x,m) | (x,m) <- xs', x >= vn]
-          return (ys, fromMonomial (n,zs))
+          let xs' = mindicesMap xs
+              ys = mfromIndicesMap $ Map.filterWithKey (\x _ -> x <  vn) xs'
+              zs = mfromIndicesMap $ Map.filterWithKey (\x _ -> x >= vn) xs'
+          return (ys, fromTerm (n,zs))

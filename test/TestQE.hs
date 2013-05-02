@@ -175,7 +175,7 @@ case_CAD_test2 =
     cs = map toPRel $ snd test2'
 
 toP :: LA.Expr Rational -> P.Polynomial Rational Int
-toP e = P.fromTerms [(c, if x == LA.unitVar then P.mmOne else P.var x) | (c,x) <- LA.terms e]
+toP e = P.fromTerms [(c, if x == LA.unitVar then P.munit else P.var x) | (c,x) <- LA.terms e]
 
 toPRel :: LA.Atom Rational -> Rel (P.Polynomial Rational Int)
 toPRel (Rel lhs op rhs) = Rel (toP lhs) op (toP rhs)  

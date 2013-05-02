@@ -218,7 +218,7 @@ instance Real AReal where
     | isRational x =
         let p = minimalPolynomial x
             a = P.coeff (P.var X) p
-            b = P.coeff P.mmOne p
+            b = P.coeff P.munit p
         in - b / a
     | otherwise  = error "toRational: proper algebraic number"
 
@@ -375,11 +375,7 @@ isRational x = deg x == 1
 -- | Whether the algebraic number is a root of a polynomial with integer
 -- coefficients with leading coefficient @1@ (a monic polynomial).
 isAlgebraicInteger :: AReal -> Bool
-isAlgebraicInteger x = cn * fromIntegral d == 1
-  where
-    p = minimalPolynomial x
-    d = foldl' lcm 1 [denominator c | (c,_) <- terms p]
-    (cn,_) = leadingTerm grlex p
+isAlgebraicInteger x = lc grlex (pp (minimalPolynomial x)) == 1
 
 -- | Height of the algebraic number.
 height :: AReal -> Integer

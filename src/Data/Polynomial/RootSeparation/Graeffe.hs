@@ -33,7 +33,7 @@ data NthRoot = NthRoot !Integer !Rational
 graeffesMethod :: UPolynomial Rational -> Int -> [NthRoot]
 graeffesMethod p v = xs !! (v - 1)
   where
-    xs = map (uncurry g) $ zip [1..] (tail $ iterate f $ associatedMonicPolynomial grlex p)
+    xs = map (uncurry g) $ zip [1..] (tail $ iterate f $ toMonic grlex p)
 
     n = deg p
 
@@ -48,17 +48,17 @@ graeffesMethod p v = xs !! (v - 1)
 
 f :: UPolynomial Rational -> UPolynomial Rational
 f p = (-1) ^ (deg p) *
-      fromTerms [ (c, mmFromList [assert (e `mod` 2 == 0) (x, e `div` 2) | (x,e) <- mmToList xs])
-                | (c,xs) <- terms (p * subst p (\_ -> - var X)) ]
+      fromTerms [ (c, assert (deg xs `mod` 2 == 0) (var X `mpow` (deg xs `div` 2)))
+                | (c, xs) <- terms (p * subst p (\X -> - var X)) ]
 
 f' :: UPolynomial Rational -> UPolynomial Rational
-f' p = fromTerms [(b k, mmFromList [(X, n - k)]) | k <- [0..n]]
+f' p = fromTerms [(b k, var X `mpow` (n - k)) | k <- [0..n]]
   where
     n = deg p
 
     a :: Integer -> Rational
     a k
-      | n >= k    = coeff (mmFromList [(X, n - k)]) p
+      | n >= k    = coeff (var X `mpow` (n - k)) p
       | otherwise = 0
 
     b :: Integer -> Rational

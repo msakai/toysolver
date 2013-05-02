@@ -49,7 +49,7 @@ sturmChain p = p0 : p1 : go p0 p1
     p1 = deriv p X
     go p q = if r==0 then [] else r : go q r
       where
-        r = - (p `polyMod` q)
+        r = - (p `pmod` q)
 
 -- | The number of distinct real roots of @p@ in a given interval
 numRoots
@@ -101,7 +101,7 @@ bounds p = (-m, m)
     m = if p==0
         then 0
         else max 1 (sum [abs (c/s) | (c,_) <- terms p] - 1)
-    (s,_) = leadingTerm grlex p
+    s = lc grlex p
 
 boundInterval :: UPolynomial Rational -> Interval Rational -> Interval Rational
 boundInterval p ival = Interval.intersection ival (Finite lb <=..<= Finite ub)

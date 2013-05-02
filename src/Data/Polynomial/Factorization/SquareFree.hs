@@ -28,13 +28,13 @@ sqfree :: (Eq k, Fractional k) => UPolynomial k -> [(UPolynomial k, Integer)]
 sqfree 0 = []
 sqfree p = assert (product [q^m | (q,m) <- result] == p) $ result
   where
-    result = go p (p `polyDiv` polyGCD p (deriv p X)) 0 []
+    result = go p (p `pdiv` pgcd p (deriv p X)) 0 []
     go p flat !m result
       | deg flat <= 0 = [(p,1) | p /= 1] ++ reverse result
-      | otherwise     = go p' flat' m' ((flat `polyDiv` flat', m') : result)
+      | otherwise     = go p' flat' m' ((flat `pdiv` flat', m') : result)
           where
             (p',n) = f p flat
-            flat'  = polyGCD p' flat
+            flat'  = pgcd p' flat
             m' = m + n
 
 f :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> (UPolynomial k, Integer)
@@ -42,6 +42,6 @@ f p1 p2 = assert (p1 == p2 ^ m * q) $ result
   where
     result@(q, m) = go 0 p1
     go !m p =
-      case p `polyDivMod` p2 of
+      case p `pdivMod` p2 of
         (q, 0) -> go (m+1) q
         _ -> (p, m)

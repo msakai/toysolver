@@ -34,66 +34,63 @@ module Data.Polynomial
   , fromTerms
   , coeffMap
   , fromCoeffMap
-  , fromMonomial
+  , fromTerm
 
   -- * Query
   , Degree (..)
-  , leadingTerm
+  , lt
+  , lc
+  , lm
   , coeff
   , lookupCoeff
   , isPrimitive
+  , isRootOf
 
   -- * Operations
   , ContPP (..)
   , deriv
   , integral
   , eval
-  , evalA
-  , evalM
   , subst
-  , substA
-  , substM
-  , isRootOf
-  , mapVar
   , mapCoeff
-  , associatedMonicPolynomial
+  , toMonic
   , toUPolynomialOf
-  , polyDiv
-  , polyMod
-  , polyDivMod
-  , polyGCD
-  , polyLCM
+  , pdiv
+  , pmod
+  , pdivMod
+  , pgcd
+  , plcm
   , prem
-  , polyGCD'
-  , polyMDivMod
+  , pgcd'
+  , divModMP
   , reduce
 
-  -- * Monomial
-  , Monomial
-  , monomialDegree
-  , monomialProd
-  , monomialDivisible
-  , monomialDiv
-  , monomialDeriv
-  , monomialIntegral
+  -- * Term
+  , Term
+  , UTerm
+  , tdeg
+  , tmult
+  , tdivides
+  , tdiv
+  , tderiv
+  , tintegral
 
   -- * Monic monomial
-  , MonicMonomial
-  , mmOne
-  , mmFromList
-  , mmFromMap
-  , mmFromIntMap
-  , mmToList
-  , mmToMap
-  , mmToIntMap
-  , mmProd
-  , mmDivisible
-  , mmDiv
-  , mmDeriv
-  , mmIntegral
-  , mmLCM
-  , mmGCD
-  , mmMapVar
+  , Monomial
+  , UMonomial
+  , munit
+  , mfromIndices
+  , mfromIndicesMap
+  , mindices
+  , mindicesMap
+  , mmult
+  , mpow
+  , mdivides
+  , mdiv
+  , mderiv
+  , mintegral
+  , mlcm
+  , mgcd
 
   -- * Monomial order
   , MonomialOrder
@@ -130,7 +127,7 @@ import Data.VectorSpace
 import qualified Text.PrettyPrint.HughesPJClass as PP
 import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
 
-infixl 7  `polyDiv`, `polyMod`
+infixl 7  `pdiv`, `pmod`
 
 {--------------------------------------------------------------------
   Classes
@@ -149,7 +146,7 @@ class Degree t where
 --------------------------------------------------------------------}
 
 -- | Polynomial over commutative ring r
-newtype Polynomial k v = Polynomial{ coeffMap :: Map.Map (MonicMonomial v) k }
+newtype Polynomial k v = Polynomial{ coeffMap :: Map.Map (Monomial v) k }
   deriving (Eq, Ord, Typeable)
 
 instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
@@ -177,7 +174,7 @@ instance (NFData k, NFData v) => NFData (Polynomial k v) where
   rnf (Polynomial m) = rnf m
 
 instance (Eq k, Num k) => Variables (Polynomial k) where
-  var x       = fromMonomial (1, var x)
+  var x       = fromTerm (1, var x)
   variables p = Set.unions $ [variables mm | (_, mm) <- terms p]
 
 instance Degree (Polynomial k v) where
@@ -192,7 +189,7 @@ asConstant :: Num k => Polynomial k v -> Maybe k
 asConstant p =
   case terms p of
     [] -> Just 0
-    [(c,xs)] | Map.null (mmToMap xs) -> Just c
+    [(c,xs)] | Map.null (mindicesMap xs) -> Just c
     _ -> Nothing
 
 scale :: (Eq k, Num k, Ord v) => k -> Polynomial k v -> Polynomial k v
@@ -214,7 +211,7 @@ prod a b
   | Just c <- asConstant a = scale c b
   | Just c <- asConstant b = scale c a
 prod (Polynomial m1) (Polynomial m2) = normalize $ Polynomial $ Map.fromListWith (+)
-      [ (xs1 `mmProd` xs2, c1*c2)
+      [ (xs1 `mmult` xs2, c1*c2)
       | (xs1,c1) <- Map.toList m1, (xs2,c2) <- Map.toList m2
       ]
 
@@ -223,34 +220,42 @@ isZero (Polynomial m) = Map.null m
 
 -- | construct a polynomial from a constant
 constant :: (Eq k, Num k, Ord v) => k -> Polynomial k v
-constant c = fromMonomial (c, mmOne)
+constant c = fromTerm (c, munit)
 
 -- | construct a polynomial from a list of monomials
-fromTerms :: (Eq k, Num k, Ord v) => [Monomial k v] -> Polynomial k v
+fromTerms :: (Eq k, Num k, Ord v) => [Term k v] -> Polynomial k v
 fromTerms = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
 
-fromCoeffMap :: (Eq k, Num k, Ord v) => Map.Map (MonicMonomial v) k -> Polynomial k v
+fromCoeffMap :: (Eq k, Num k, Ord v) => Map.Map (Monomial v) k -> Polynomial k v
 fromCoeffMap m = normalize $ Polynomial m
 
 -- | construct a polynomial from a monomial
-fromMonomial :: (Eq k, Num k, Ord v) => Monomial k v -> Polynomial k v
-fromMonomial (c,xs) = normalize $ Polynomial $ Map.singleton xs c
+fromTerm :: (Eq k, Num k, Ord v) => Term k v -> Polynomial k v
+fromTerm (c,xs) = normalize $ Polynomial $ Map.singleton xs c
 
 -- | list of monomials
-terms :: Polynomial k v -> [Monomial k v]
+terms :: Polynomial k v -> [Term k v]
 terms (Polynomial m) = [(c,xs) | (xs,c) <- Map.toList m]
 
 -- | leading term with respect to a given monomial order
-leadingTerm :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Monomial k v
-leadingTerm cmp p =
+lt :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Term k v
+lt cmp p =
   case terms p of
-    [] -> (0, mmOne) -- should be error?
+    [] -> (0, munit) -- should be error?
     ms -> maximumBy (cmp `on` snd) ms
 
-coeff :: (Num k, Ord v) => MonicMonomial v -> Polynomial k v -> k
+-- | leading coefficient with respect to a given monomial order
+lc :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> k
+lc cmp = fst . lt cmp
+
+-- | leading monomial with respect to a given monomial order
+lm :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Monomial v
+lm cmp = snd . lt cmp
+
+coeff :: (Num k, Ord v) => Monomial v -> Polynomial k v -> k
 coeff xs (Polynomial m) = Map.findWithDefault 0 xs m
 
-lookupCoeff :: Ord v => MonicMonomial v -> Polynomial k v -> Maybe k
+lookupCoeff :: Ord v => Monomial v -> Polynomial k v -> Maybe k
 lookupCoeff xs (Polynomial m) = Map.lookup xs m
 
 contI :: (Integral r, Ord v) => Polynomial r v -> r
@@ -293,63 +298,25 @@ isPrimitive p = isZero p || cont p == 1
 
 -- | Formal derivative of polynomials
 deriv :: (Eq k, Num k, Ord v) => Polynomial k v -> v -> Polynomial k v
-deriv p x = sumV [fromMonomial (monomialDeriv m x) | m <- terms p]
+deriv p x = sumV [fromTerm (tderiv m x) | m <- terms p]
 
 -- | Formal integral of polynomials
 integral :: (Eq k, Fractional k, Ord v) => Polynomial k v -> v -> Polynomial k v
-integral p x = sumV [fromMonomial (monomialIntegral m x) | m <- terms p]
+integral p x = sumV [fromTerm (tintegral m x) | m <- terms p]
 
 -- | Evaluation
 eval :: (Num k, Ord v) => (v -> k) -> Polynomial k v -> k
-eval env p = sum [c * product [(env x) ^ e | (x,e) <- mmToList xs] | (c,xs) <- terms p]
-
--- | Evaluation
-evalA :: forall k v f. (Num k, Ord v, Applicative f) => (v -> f k) -> Polynomial k v -> f k
-evalA env p = sum <$> traverse f (terms p)
-  where
-    f :: Monomial k v -> f k
-    f (c,xs) = ((c*) . product) <$> g xs
-    g :: MonicMonomial v -> f [k]
-    g xs = traverse (\(x,e) -> liftA (^ e) (env x)) (mmToList xs)
-
--- | Evaluation
-evalM :: (Num k, Ord v, Monad m) => (v -> m k) -> Polynomial k v -> m k
-evalM env p = do
-  liftM sum $ forM (terms p) $ \(c,xs) -> do
-    rs <- mapM (\(x,e) -> liftM (^ e) (env x)) (mmToList xs)
-    return (c * product rs)
+eval env p = sum [c * product [(env x) ^ e | (x,e) <- mindices xs] | (c,xs) <- terms p]
 
 -- | Substitution or bind
 subst
   :: (Eq k, Num k, Ord v1, Ord v2)
   => Polynomial k v1 -> (v1 -> Polynomial k v2) -> Polynomial k v2
 subst p s =
-  sumV [constant c * product [(s x)^e | (x,e) <- mmToList xs] | (c, xs) <- terms p]
-
--- | Substitution or bind
-substA
-  :: forall k v1 v2 f. (Eq k, Num k, Ord v1, Ord v2, Applicative f)
-  => Polynomial k v1 -> (v1 -> f (Polynomial k v2)) -> f (Polynomial k v2)
-substA p s = sumV <$> traverse f (terms p)
-  where
-    f :: Monomial k v1 -> f (Polynomial k v2)
-    f (c,xs) =  ((constant c *) . product) <$> g xs
-    g :: MonicMonomial v1 -> f [Polynomial k v2]
-    g xs = traverse (\(x,e) -> liftA (^ e) (s x)) (mmToList xs)
-
--- | Substitution or bind
-substM
-  :: (Eq k, Num k, Ord v1, Ord v2, Monad m)
-  => Polynomial k v1 -> (v1 -> m (Polynomial k v2)) -> m (Polynomial k v2)
-substM p s = liftM sum $ forM (terms p) $ \(c,xs) -> do
-  xs <- forM (mmToList xs) $ \(x,e) -> liftM (^e) (s x)
-  return $ constant c * product xs
+  sumV [constant c * product [(s x)^e | (x,e) <- mindices xs] | (c, xs) <- terms p]
 
 isRootOf :: (Eq k, Num k) => k -> UPolynomial k -> Bool
 isRootOf x p = eval (\_ -> x) p == 0
-
-mapVar :: (Eq k, Num k, Ord v1, Ord v2) => (v1 -> v2) -> Polynomial k v1 -> Polynomial k v2
-mapVar f (Polynomial m) = normalize $ Polynomial $ Map.mapKeysWith (+) (mmMapVar f) m
 
 mapCoeff :: (Eq k1, Num k1, Ord v) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
 mapCoeff f (Polynomial m) = Polynomial $ Map.mapMaybe g m
@@ -358,28 +325,28 @@ mapCoeff f (Polynomial m) = Polynomial $ Map.mapMaybe g m
       where
         y = f x
 
-associatedMonicPolynomial :: (Eq r, Fractional r, Ord v) => MonomialOrder v -> Polynomial r v -> Polynomial r v
-associatedMonicPolynomial cmp p
-  | c == 0 = p
+toMonic :: (Eq r, Fractional r, Ord v) => MonomialOrder v -> Polynomial r v -> Polynomial r v
+toMonic cmp p
+  | c == 0 || c == 1 = p
   | otherwise = mapCoeff (/c) p
   where
-    (c,_) = leadingTerm cmp p
+    c = lc cmp p
 
 toUPolynomialOf :: (Ord k, Num k, Ord v) => Polynomial k v -> v -> UPolynomial (Polynomial k v)
 toUPolynomialOf p v = fromTerms $ do
   (c,mm) <- terms p
-  let m = mmToMap mm
-  return ( fromTerms [(c, mmFromMap (Map.delete v m))]
-         , mmFromList [(X, Map.findWithDefault 0 v m)]
+  let m = mindicesMap mm
+  return ( fromTerms [(c, mfromIndicesMap (Map.delete v m))]
+         , var X `mpow` Map.findWithDefault 0 v m
          )
 
 -- | Multivariate division algorithm
-polyMDivMod
+divModMP
   :: forall k v. (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> ([Polynomial k v], Polynomial k v)
-polyMDivMod cmp p fs = go IM.empty p
+divModMP cmp p fs = go IM.empty p
   where
-    ls = [(leadingTerm cmp f, f) | f <- fs]
+    ls = [(lt cmp f, f) | f <- fs]
 
     go :: IM.IntMap (Polynomial k v) -> Polynomial k v -> ([Polynomial k v], Polynomial k v)
     go qs g =
@@ -391,8 +358,8 @@ polyMDivMod cmp p fs = go IM.empty p
         xs = do
           (i,(a,f)) <- zip [0..] ls
           h <- ms
-          guard $ monomialDivisible h a
-          let b = fromMonomial $ monomialDiv h a
+          guard $ a `tdivides` h
+          let b = fromTerm $ tdiv h a
           return (i, b, g - b * f)
 
 -- | Multivariate division algorithm
@@ -401,15 +368,15 @@ reduce
   => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> Polynomial k v
 reduce cmp p fs = go p
   where
-    ls = [(leadingTerm cmp f, f) | f <- fs]
+    ls = [(lt cmp f, f) | f <- fs]
     go g = if null xs then g else go (head xs)
       where
         ms = sortBy (flip cmp `on` snd) (terms g)
         xs = do
           (a,f) <- ls
           h <- ms
-          guard $ monomialDivisible h a
-          return (g - fromMonomial (monomialDiv h a) * f)
+          guard $ a `tdivides` h
+          return (g - fromTerm (tdiv h a) * f)
 
 {--------------------------------------------------------------------
   Pretty printing
@@ -450,28 +417,28 @@ prettyPrint opt lv prec p =
       pLeadingTerm prec (c,xs) =
         if pOptIsNegativeCoeff opt c
         then prettyParen (prec > addPrec) $
-               PP.char '-' <> prettyPrintMonomial opt lv (addPrec+1) (-c,xs)
-        else prettyPrintMonomial opt lv prec (c,xs)
+               PP.char '-' <> prettyPrintTerm opt lv (addPrec+1) (-c,xs)
+        else prettyPrintTerm opt lv prec (c,xs)
 
       pTrailingTerm (c,xs) =
         if pOptIsNegativeCoeff opt c
-        then PP.space <> PP.char '-' <> PP.space <> prettyPrintMonomial opt lv (addPrec+1) (-c,xs)
-        else PP.space <> PP.char '+' <> PP.space <> prettyPrintMonomial opt lv (addPrec+1) (c,xs)
+        then PP.space <> PP.char '-' <> PP.space <> prettyPrintTerm opt lv (addPrec+1) (-c,xs)
+        else PP.space <> PP.char '+' <> PP.space <> prettyPrintTerm opt lv (addPrec+1) (c,xs)
 
-prettyPrintMonomial
+prettyPrintTerm
   :: (Ord k, Num k, Ord v)
   => PrintOptions k v
-  -> PrettyLevel -> Rational -> Monomial k v -> Doc
-prettyPrintMonomial opt lv prec (c,xs)
+  -> PrettyLevel -> Rational -> Term k v -> Doc
+prettyPrintTerm opt lv prec (c,xs)
   | len == 0  = pOptPrintCoeff opt lv (appPrec+1) c
     -- intentionally specify (appPrec+1) to parenthesize any composite expression
-  | len == 1 && c == 1 = pPow prec $ head (mmToList xs)
+  | len == 1 && c == 1 = pPow prec $ head (mindices xs)
   | otherwise =
       prettyParen (prec > mulPrec) $
         PP.hcat $ intersperse (PP.char '*') fs
     where
-      len = length $ mmToList xs
-      fs  = [pOptPrintCoeff opt lv (appPrec+1) c | c /= 1] ++ [pPow (mulPrec+1) p | p <- mmToList xs]
+      len = Map.size $ mindicesMap xs
+      fs  = [pOptPrintCoeff opt lv (appPrec+1) c | c /= 1] ++ [pPow (mulPrec+1) p | p <- mindices xs]
       -- intentionally specify (appPrec+1) to parenthesize any composite expression
 
       pPow prec (x,1) = pOptPrintVar opt lv prec x
@@ -534,37 +501,37 @@ data X = X
 instance NFData X
 
 -- | division of univariate polynomials
-polyDiv :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
-polyDiv f1 f2 = fst (polyDivMod f1 f2)
+pdiv :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+pdiv f1 f2 = fst (pdivMod f1 f2)
 
 -- | division of univariate polynomials
-polyMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
-polyMod f1 f2 = snd (polyDivMod f1 f2)
+pmod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+pmod f1 f2 = snd (pdivMod f1 f2)
 
 -- | division of univariate polynomials
-polyDivMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> (UPolynomial k, UPolynomial k)
-polyDivMod f g
-  | isZero g  = error "polyDivMod: division by zero"
+pdivMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> (UPolynomial k, UPolynomial k)
+pdivMod f g
+  | isZero g  = error "pdivMod: division by zero"
   | otherwise = go 0 f
   where
-    lt_g = leadingTerm lex g
+    lt_g = lt lex g
     go !q !r
       | deg r < deg g = (q,r)
       | otherwise     = go (q + t) (r - t * g)
         where
-          lt_r = leadingTerm lex r
-          t    = fromMonomial $ lt_r `monomialDiv` lt_g
+          lt_r = lt lex r
+          t    = fromTerm $ lt_r `tdiv` lt_g
 
 -- | GCD of univariate polynomials
-polyGCD :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
-polyGCD f1 0  = associatedMonicPolynomial grlex f1
-polyGCD f1 f2 = polyGCD f2 (f1 `polyMod` f2)
+pgcd :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+pgcd f1 0  = toMonic grlex f1
+pgcd f1 f2 = pgcd f2 (f1 `pmod` f2)
 
 -- | LCM of univariate polynomials
-polyLCM :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
-polyLCM _ 0 = 0
-polyLCM 0 _ = 0
-polyLCM f1 f2 = associatedMonicPolynomial grlex $ (f1 `polyMod` (polyGCD f1 f2)) * f2
+plcm :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+plcm _ 0 = 0
+plcm 0 _ = 0
+plcm f1 f2 = toMonic grlex $ (f1 `pmod` (pgcd f1 f2)) * f2
 
 -- | pseudo reminder
 prem :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
@@ -573,47 +540,48 @@ prem f g
   | deg f < deg g = f
   | otherwise     = go (scale (lc_g ^ (deg f - deg g + 1)) f)
   where
-    (lc_g, lm_g) = leadingTerm lex g
+    (lc_g, lm_g) = lt lex g
     deg_g    = deg g
     go !f1
       | deg_g > deg f1 = f1
       | otherwise =
-          assert (lc_f1 `mod` lc_g == 0 && mmDivisible lm_f1 lm_g) $
-            go (f1 - fromMonomial (lc_f1 `div` lc_g, lm_f1 `mmDiv` lm_g) * g)
+          assert (lc_f1 `mod` lc_g == 0 && mdivides lm_g lm_f1) $
+            go (f1 - fromTerm (lc_f1 `div` lc_g, lm_f1 `mdiv` lm_g) * g)
           where
-            (lc_f1, lm_f1) = leadingTerm lex f1
+            (lc_f1, lm_f1) = lt lex f1
 
 -- | GCD of univariate polynomials
-polyGCD' :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
-polyGCD' f1 0  = ppI f1
-polyGCD' f1 f2 = polyGCD' f2 (f1 `prem` f2)
+pgcd' :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
+pgcd' f1 0  = ppI f1
+pgcd' f1 f2 = pgcd' f2 (f1 `prem` f2)
 
 {--------------------------------------------------------------------
-  Monomial
+  Term
 --------------------------------------------------------------------}
 
-type Monomial k v = (k, MonicMonomial v)
+type Term k v = (k, Monomial v)
+type UTerm k = Term k X
 
-monomialDegree :: Monomial k v -> Integer
-monomialDegree (_,xs) = deg xs
+tdeg :: Term k v -> Integer
+tdeg (_,xs) = deg xs
 
-monomialProd :: (Num k, Ord v) => Monomial k v -> Monomial k v -> Monomial k v
-monomialProd (c1,xs1) (c2,xs2) = (c1*c2, xs1 `mmProd` xs2)
+tmult :: (Num k, Ord v) => Term k v -> Term k v -> Term k v
+tmult (c1,xs1) (c2,xs2) = (c1*c2, xs1 `mmult` xs2)
 
-monomialDivisible :: (Fractional k, Ord v) => Monomial k v -> Monomial k v -> Bool
-monomialDivisible (c1,xs1) (c2,xs2) = mmDivisible xs1 xs2
+tdivides :: (Fractional k, Ord v) => Term k v -> Term k v -> Bool
+tdivides (c1,xs1) (c2,xs2) = xs1 `mdivides` xs2
 
-monomialDiv :: (Fractional k, Ord v) => Monomial k v -> Monomial k v -> Monomial k v
-monomialDiv (c1,xs1) (c2,xs2) = (c1 / c2, xs1 `mmDiv` xs2)
+tdiv :: (Fractional k, Ord v) => Term k v -> Term k v -> Term k v
+tdiv (c1,xs1) (c2,xs2) = (c1 / c2, xs1 `mdiv` xs2)
 
-monomialDeriv :: (Eq k, Num k, Ord v) => Monomial k v -> v -> Monomial k v
-monomialDeriv (c,xs) x =
-  case mmDeriv xs x of
+tderiv :: (Eq k, Num k, Ord v) => Term k v -> v -> Term k v
+tderiv (c,xs) x =
+  case mderiv xs x of
     (s,ys) -> (c * fromIntegral s, ys)
 
-monomialIntegral :: (Eq k, Fractional k, Ord v) => Monomial k v -> v -> Monomial k v
-monomialIntegral (c,xs) x =
-  case mmIntegral xs x of
+tintegral :: (Eq k, Fractional k, Ord v) => Term k v -> v -> Term k v
+tintegral (c,xs) x =
+  case mintegral xs x of
     (s,ys) -> (c * fromRational s, ys)
 
 {--------------------------------------------------------------------
@@ -623,95 +591,95 @@ monomialIntegral (c,xs) x =
 -- 本当は変数の型に応じて type family で表現を変えたい
 
 -- | Monic monomials
-newtype MonicMonomial v = MonicMonomial{ mmToMap :: Map.Map v Integer }
+newtype Monomial v = Monomial{ mindicesMap :: Map.Map v Integer }
   deriving (Eq, Ord, Typeable)
 
-instance (Ord v, Show v) => Show (MonicMonomial v) where
+type UMonomial = Monomial X
+
+instance (Ord v, Show v) => Show (Monomial v) where
   showsPrec d m  = showParen (d > 10) $
-    showString "mmFromList " . shows (mmToList m)
+    showString "mfromIndices " . shows (mindices m)
 
-instance (NFData v) => NFData (MonicMonomial v) where
-  rnf (MonicMonomial m) = rnf m
+instance (NFData v) => NFData (Monomial v) where
+  rnf (Monomial m) = rnf m
 
-instance Degree (MonicMonomial v) where
-  deg (MonicMonomial m) = sum $ Map.elems m
+instance Degree (Monomial v) where
+  deg (Monomial m) = sum $ Map.elems m
 
-instance Variables MonicMonomial where
-  var x        = MonicMonomial $ Map.singleton x 1
-  variables mm = Map.keysSet (mmToMap mm)
+instance Variables Monomial where
+  var x        = Monomial $ Map.singleton x 1
+  variables mm = Map.keysSet (mindicesMap mm)
 
-mmNormalize :: Ord v => MonicMonomial v -> MonicMonomial v
-mmNormalize (MonicMonomial m) = MonicMonomial $ Map.filter (>0) m
+mnormalize :: Ord v => Monomial v -> Monomial v
+mnormalize (Monomial m) = Monomial $ Map.filter (>0) m
 
-mmOne :: MonicMonomial v
-mmOne = MonicMonomial $ Map.empty
+munit :: Monomial v
+munit = Monomial $ Map.empty
 
-mmFromList :: Ord v => [(v, Integer)] -> MonicMonomial v
-mmFromList xs
-  | any (\(x,e) -> 0>e) xs = error "mmFromList: negative exponent"
-  | otherwise = MonicMonomial $ Map.fromListWith (+) [(x,e) | (x,e) <- xs, e > 0]
+mfromIndices :: Ord v => [(v, Integer)] -> Monomial v
+mfromIndices xs
+  | any (\(x,e) -> 0>e) xs = error "mfromIndices: negative exponent"
+  | otherwise = Monomial $ Map.fromListWith (+) [(x,e) | (x,e) <- xs, e > 0]
 
-mmFromMap :: Ord v => Map.Map v Integer -> MonicMonomial v
-mmFromMap m
-  | any (\(x,e) -> 0>e) (Map.toList m) = error "mmFromFromMap: negative exponent"
-  | otherwise = mmNormalize $ MonicMonomial m
+mfromIndicesMap :: Ord v => Map.Map v Integer -> Monomial v
+mfromIndicesMap m
+  | any (\(x,e) -> 0>e) (Map.toList m) = error "mfromIndicesMap: negative exponent"
+  | otherwise = mnormalize $ Monomial m
 
-mmFromIntMap :: IM.IntMap Integer -> MonicMonomial Int
-mmFromIntMap = mmFromMap . Map.fromDistinctAscList . IM.toAscList
+mindices :: Ord v => Monomial v -> [(v, Integer)]
+mindices = Map.toAscList . mindicesMap
 
-mmToList :: Ord v => MonicMonomial v -> [(v, Integer)]
-mmToList (MonicMonomial m) = Map.toAscList m
+mmult :: Ord v => Monomial v -> Monomial v -> Monomial v
+mmult (Monomial xs1) (Monomial xs2) = mnormalize $ Monomial $ Map.unionWith (+) xs1 xs2
 
-mmToIntMap :: MonicMonomial Int -> IM.IntMap Integer
-mmToIntMap (MonicMonomial m) = IM.fromDistinctAscList $ Map.toAscList m
+mpow :: Ord v => Monomial v -> Integer -> Monomial v
+mpow _ 0 = munit
+mpow m 1 = m
+mpow (Monomial xs) e
+  | 0 > e     = error "mpow: negative exponent"
+  | otherwise = Monomial $ Map.map (e*) xs
 
-mmProd :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
-mmProd (MonicMonomial xs1) (MonicMonomial xs2) = mmNormalize $ MonicMonomial $ Map.unionWith (+) xs1 xs2
+mdivides :: Ord v => Monomial v -> Monomial v -> Bool
+mdivides (Monomial xs1) (Monomial xs2) = Map.isSubmapOfBy (<=) xs1 xs2
 
-mmDivisible :: Ord v => MonicMonomial v -> MonicMonomial v -> Bool
-mmDivisible (MonicMonomial xs1) (MonicMonomial xs2) = Map.isSubmapOfBy (<=) xs2 xs1
-
-mmDiv :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
-mmDiv (MonicMonomial xs1) (MonicMonomial xs2) = MonicMonomial $ Map.differenceWith f xs1 xs2
+mdiv :: Ord v => Monomial v -> Monomial v -> Monomial v
+mdiv (Monomial xs1) (Monomial xs2) = Monomial $ Map.differenceWith f xs1 xs2
   where
     f m n
       | m <= n    = Nothing
       | otherwise = Just (m - n)
 
-mmDeriv :: Ord v => MonicMonomial v -> v -> (Integer, MonicMonomial v)
-mmDeriv (MonicMonomial xs) x
-  | n==0      = (0, mmOne)
-  | otherwise = (n, MonicMonomial $ Map.update f x xs)
+mderiv :: Ord v => Monomial v -> v -> (Integer, Monomial v)
+mderiv (Monomial xs) x
+  | n==0      = (0, munit)
+  | otherwise = (n, Monomial $ Map.update f x xs)
   where
     n = Map.findWithDefault 0 x xs
     f m
       | m <= 1    = Nothing
       | otherwise = Just $! m - 1
 
-mmIntegral :: Ord v => MonicMonomial v -> v -> (Rational, MonicMonomial v)
-mmIntegral (MonicMonomial xs) x =
-  (1 % fromIntegral (n + 1), MonicMonomial $ Map.insert x (n+1) xs)
+mintegral :: Ord v => Monomial v -> v -> (Rational, Monomial v)
+mintegral (Monomial xs) x =
+  (1 % fromIntegral (n + 1), Monomial $ Map.insert x (n+1) xs)
   where
     n = Map.findWithDefault 0 x xs
 
-mmLCM :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
-mmLCM (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ Map.unionWith max m1 m2
+mlcm :: Ord v => Monomial v -> Monomial v -> Monomial v
+mlcm (Monomial m1) (Monomial m2) = Monomial $ Map.unionWith max m1 m2
 
-mmGCD :: Ord v => MonicMonomial v -> MonicMonomial v -> MonicMonomial v
-mmGCD (MonicMonomial m1) (MonicMonomial m2) = MonicMonomial $ Map.intersectionWith min m1 m2
-
-mmMapVar :: (Ord v1, Ord v2) => (v1 -> v2) -> MonicMonomial v1 -> MonicMonomial v2
-mmMapVar f (MonicMonomial m) = MonicMonomial $ Map.mapKeysWith (+) f m
+mgcd :: Ord v => Monomial v -> Monomial v -> Monomial v
+mgcd (Monomial m1) (Monomial m2) = Monomial $ Map.intersectionWith min m1 m2
 
 {--------------------------------------------------------------------
   Monomial Order
 --------------------------------------------------------------------}
 
-type MonomialOrder v = MonicMonomial v -> MonicMonomial v -> Ordering
+type MonomialOrder v = Monomial v -> Monomial v -> Ordering
 
 -- | Lexicographic order
 lex :: Ord v => MonomialOrder v
-lex xs1 xs2 = go (mmToList xs1) (mmToList xs2)
+lex xs1 xs2 = go (mindices xs1) (mindices xs2)
   where
     go [] [] = EQ
     go [] _  = LT -- = cmpare 0 n2
@@ -724,8 +692,8 @@ lex xs1 xs2 = go (mmToList xs1) (mmToList xs2)
 
 -- | Reverse lexicographic order
 -- Note that revlex is NOT a monomial order.
-revlex :: Ord v => MonicMonomial v -> MonicMonomial v -> Ordering
-revlex xs1 xs2 = go (reverse (mmToList xs1)) (reverse (mmToList xs2))
+revlex :: Ord v => Monomial v -> Monomial v -> Ordering
+revlex xs1 xs2 = go (reverse (mindices xs1)) (reverse (mindices xs2))
   where
     go [] [] = EQ
     go [] _  = GT -- = cmp 0 n2

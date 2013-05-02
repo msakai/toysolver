@@ -63,12 +63,12 @@ spolynomial
   :: (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> Polynomial k v -> Polynomial k v
 spolynomial cmp f g =
-      fromMonomial ((1,xs) `monomialDiv` (c1,xs1)) * f
-    - fromMonomial ((1,xs) `monomialDiv` (c2,xs2)) * g
+      fromTerm ((1,xs) `tdiv` lt1) * f
+    - fromTerm ((1,xs) `tdiv` lt2) * g
   where
-    xs = mmLCM xs1 xs2
-    (c1, xs1) = leadingTerm cmp f
-    (c2, xs2) = leadingTerm cmp g
+    xs = mlcm xs1 xs2
+    lt1@(c1, xs1) = lt cmp f
+    lt2@(c2, xs2) = lt cmp g
 
 basis
   :: forall k v. (Eq k, Fractional k, Ord k, Ord v)
@@ -99,10 +99,7 @@ basis' opt cmp fs =
         r = reduce cmp spoly gs
 
     -- gcdが1となる組は選ばなくて良い
-    checkGCD fi fj = mmGCD mm1 mm2 /= mmOne
-      where
-        (_, mm1) = leadingTerm cmp fi
-        (_, mm2) = leadingTerm cmp fj
+    checkGCD fi fj = mgcd (lm cmp fi) (lm cmp fj) /= munit
 
 reduceGBasis
   :: forall k v. (Eq k, Ord k, Fractional k, Ord v)
@@ -112,10 +109,9 @@ reduceGBasis cmp ps = Set.toList $ Set.fromList $ go ps []
     go [] qs = qs
     go (p:ps) qs
       | q == 0    = go ps qs
-      | otherwise = go ps (constant (1/c) * q : qs)
+      | otherwise = go ps (toMonic cmp q : qs)
       where
         q = reduce cmp p (ps++qs)
-        (c,_) = leadingTerm cmp q
 
 {--------------------------------------------------------------------
   Item
@@ -126,14 +122,11 @@ data Item k v
   { iFst :: Polynomial k v
   , iSnd :: Polynomial k v
   , iCmp :: MonomialOrder v
-  , iLCM :: MonicMonomial v
+  , iLCM :: Monomial v
   }
 
 item :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Polynomial k v -> Item k v
-item cmp f g = Item f g cmp (mmLCM mm1 mm2)
-  where
-    (_, mm1) = leadingTerm cmp f
-    (_, mm2) = leadingTerm cmp g
+item cmp f g = Item f g cmp (mlcm (lm cmp f) (lm cmp g))
 
 instance Ord v => Ord (Item k v) where
   a `compare` b = iCmp a (iLCM a) (iLCM b)

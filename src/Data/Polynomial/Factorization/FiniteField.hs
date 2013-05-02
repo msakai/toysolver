@@ -53,7 +53,7 @@ sqfree f
   | c == 1    = sqfree' f
   | otherwise = (constant c, 1) : sqfree' (mapCoeff (/c) f)
   where
-    (c,_) = leadingTerm grlex f
+    c = lc grlex f
 
 sqfree' :: forall k. (Eq k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]
 sqfree' 0 = []
@@ -63,8 +63,8 @@ sqfree' f
   where
     p = char (undefined :: k)
     g = deriv f X
-    c0 = polyGCD f g
-    w0 = polyDiv f c0
+    c0 = pgcd f g
+    w0 = pdiv f c0
     go !i c w !result
       | w == 1    =
           if c == 1
@@ -72,9 +72,9 @@ sqfree' f
           else result ++ [(h, n*p) | (h,n) <- sqfree' (polyPthRoot c)]
       | otherwise = go (i+1) c' w' result'
           where
-            y  = polyGCD w c
-            z  = w `polyDiv` y            
-            c' = c `polyDiv` y
+            y  = pgcd w c
+            z  = w `pdiv` y            
+            c' = c `pdiv` y
             w' = y
             result' = [(z,i) | z /= 1] ++ result
 
@@ -83,7 +83,7 @@ polyPthRoot f = assert (deriv f X == 0) $
   fromTerms [(pthRoot c, g mm) | (c,mm) <- terms f]
   where
     p = char (undefined :: k)
-    g mm = mmFromList [(X, deg mm `div` p)]
+    g mm = var X `mpow` (deg mm `div` p)
 
 -- | Berlekamp algorithm for polynomial factorization.
 --
@@ -99,17 +99,17 @@ berlekamp f = go (Set.singleton f) basis
         where
           func fi = Set.fromList $ hs2 ++ hs1
             where
-              hs1 = [h | k <- allValues, let h = polyGCD fi (b - constant k), deg h > 0]
+              hs1 = [h | k <- allValues, let h = pgcd fi (b - constant k), deg h > 0]
               hs2 = if deg g > 0 then [g] else []
                 where
-                  g = fi `polyDiv` product hs1
+                  g = fi `pdiv` product hs1
     basis = basisOfBerlekampSubalgebra f
     r     = length basis
 
 basisOfBerlekampSubalgebra :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [UPolynomial k]
 basisOfBerlekampSubalgebra f =
   sortBy (flip compare `on` deg) $
-    map (associatedMonicPolynomial grlex) $
+    map (toMonic grlex) $
       basis
   where
     q    = order (undefined :: k)
@@ -117,7 +117,7 @@ basisOfBerlekampSubalgebra f =
     x    = var X
 
     qs :: [UPolynomial k]
-    qs = [(x^(q*i)) `polyMod` f | i <- [0 .. d - 1]]
+    qs = [(x^(q*i)) `pmod` f | i <- [0 .. d - 1]]
 
     gb = GB.basis grlex [p3 | (p3,_) <- terms p2]
 

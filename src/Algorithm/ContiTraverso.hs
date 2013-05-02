@@ -32,6 +32,7 @@ module Algorithm.ContiTraverso
 import Data.Function
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import qualified Data.Map as Map
 import Data.List
 import Data.Monoid
 import Data.Ratio
@@ -103,8 +104,8 @@ solve' cmp vs' obj cs
 
     m = mkModel (vs++vs2++[t]) z
 
-mkModel :: [Var] -> MonicMonomial Var -> Model Integer
-mkModel vs xs = mmToIntMap xs `IM.union` IM.fromList [(x, 0) | x <- vs] 
+mkModel :: [Var] -> Monomial Var -> Model Integer
+mkModel vs xs = IM.fromDistinctAscList (Map.toAscList (mindicesMap xs)) `IM.union` IM.fromList [(x, 0) | x <- vs]
 -- IM.union is left-biased
 
 costOrdering :: LA.Expr Integer -> MonomialOrder Var
@@ -116,4 +117,6 @@ costOrdering obj = compare `on` f
 elimOrdering :: IS.IntSet -> MonomialOrder Var
 elimOrdering xs = compare `on` f
   where
-    f ys = not $ IS.null $ xs `IS.intersection` IM.keysSet (mmToIntMap ys)
+    f ys = not $ IS.null $ xs `IS.intersection` ys'
+      where
+        ys' = IS.fromDistinctAscList [y | (y,_) <- Map.toAscList $ mindicesMap ys]

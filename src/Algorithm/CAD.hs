@@ -118,7 +118,7 @@ mr p q
     x = var X
     n = deg p
     m = deg q
-    (bm, _) = leadingTerm grlex q
+    bm = lc grlex q
     (l,r) = f p n
 
     f :: UPolynomial k -> Integer -> (UPolynomial k, UPolynomial k)
@@ -134,7 +134,7 @@ mr p q
           in assert (n > deg p') $
              assert (constant (bm^(n-m+1)) * p == q*l + r && m > deg r) $ (l, r)
       where
-        an = coeff (mmFromList [(X, n)]) p
+        an = coeff (var X `mpow` n) p
 
 test_mr_1 :: (Coeff Int, Integer, UPolynomial (Coeff Int))
 test_mr_1 = mr (toUPolynomialOf p 3) (toUPolynomialOf q 3)
@@ -166,13 +166,14 @@ runM m = runStateT m Map.empty
 
 assume :: (Ord v, Show v, PrettyVar v) => Polynomial Rational v -> [Sign] -> M v ()
 assume p ss =
-  if deg p == 0
+  if deg p <= 0
     then do
-      let c = coeff mmOne p
+      let c = coeff munit p
       guard $ signOf c `elem` ss
-    else do      
-      let (c,_) = leadingTerm grlex p
+    else do
+      let c  = lc grlex p
           p' = mapCoeff (/c) p
+      let p' = toMonic grlex p
       m <- get
       let ss1 = Map.findWithDefault (Set.fromList [Neg, Zero, Pos]) p' m
           ss2 = Set.intersection ss1 $ Set.fromList $ [s `signDiv` signOf c | s <- ss]
@@ -188,7 +189,7 @@ project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
     result :: [([Cell (Polynomial Rational v)], Map.Map (Polynomial Rational v) (Set.Set Sign))]
     result = runM $ do
       forM_ cs $ \(p,ss) -> do
-        when (1 > deg p) $ assume (coeff mmOne p) ss
+        when (1 > deg p) $ assume (coeff munit p) ss
       conf <- buildSignConf (map fst cs)
       let satCells = [cell | (cell, m) <- conf, cell /= Point NegInf, cell /= Point PosInf, ok m]
       guard $ not $ null satCells
@@ -313,7 +314,7 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
       Just (bm,k,r) <- zmod p q
       s1 <- if deg r > 0
             then return $ m Map.! r
-            else signCoeff $ coeff mmOne r
+            else signCoeff $ coeff munit r
       -- 場合分けを出来るだけ避ける
       if even k
         then return s1

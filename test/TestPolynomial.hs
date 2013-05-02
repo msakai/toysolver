@@ -87,11 +87,11 @@ prop_negate_involution =
   forAll polynomials $ \a ->
     negate (negate a) == a
 
-prop_polyMDivMod =
+prop_divModMP =
   forAll polynomials $ \g ->
     forAll (replicateM 3 polynomials) $ \fs ->
       all (0/=) fs ==>
-        let (qs, r) = polyMDivMod lex g fs
+        let (qs, r) = divModMP lex g fs
         in sum (zipWith (*) fs qs) + r == g
 
 case_prettyShow_test1 =
@@ -127,41 +127,41 @@ case_deg_0 = assertBool "" $ (deg p < 0)
   Univalent polynomials
 --------------------------------------------------------------------}
 
-prop_polyDivMod =
+prop_pdivMod =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
     b /= 0 ==> 
-      let (q,r) = polyDivMod a b
+      let (q,r) = pdivMod a b
       in a == q*b + r && (r==0 || deg b > deg r)
 
-case_polyDivMod_1 =  g*q + r @?= f
+case_pdivMod_1 =  g*q + r @?= f
   where
     x :: UPolynomial Rational
     x = var X
     f = x^3 + x^2 + x
     g = x^2 + 1
-    (q,r) = f `polyDivMod` g
+    (q,r) = f `pdivMod` g
 
-prop_polyGCD_divisible =
+prop_pgcd_divisible =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
     (a /= 0 && b /= 0) ==>
-      let c = polyGCD a b
-      in a `polyMod` c == 0 && b `polyMod` c == 0
+      let c = pgcd a b
+      in a `pmod` c == 0 && b `pmod` c == 0
 
-prop_polyGCD_comm = 
+prop_pgcd_comm = 
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
-    polyGCD a b == polyGCD b a
+    pgcd a b == pgcd b a
 
-prop_polyGCD_euclid =
+prop_pgcd_euclid =
   forAll upolynomials $ \p ->
   forAll upolynomials $ \q ->
   forAll upolynomials $ \r ->
     (p /= 0 && q /= 0 && r /= 0) ==>
-      polyGCD p q == polyGCD p (q + p*r)
+      pgcd p q == pgcd p (q + p*r)
 
-case_polyGCD_1 = polyGCD f1 f2 @?= 1
+case_pgcd_1 = pgcd f1 f2 @?= 1
   where 
     x :: UPolynomial Rational
     x = var X
@@ -172,39 +172,39 @@ eqUpToInvElem :: UPolynomial Integer -> UPolynomial Integer -> Bool
 eqUpToInvElem 0 0 = True
 eqUpToInvElem _ 0 = False
 eqUpToInvElem a b =
-  case mapCoeff fromInteger a `polyDivMod` mapCoeff fromInteger b of
+  case mapCoeff fromInteger a `pdivMod` mapCoeff fromInteger b of
     (q,r) -> r == 0 && deg q <= 0
 
-prop_polyGCD'_comm = 
+prop_pgcd'_comm = 
   forAll upolynomialsZ $ \a ->
   forAll upolynomialsZ $ \b ->
-    polyGCD' a b `eqUpToInvElem` polyGCD' b a
+    pgcd' a b `eqUpToInvElem` pgcd' b a
 
-prop_polyGCD'_euclid =
+prop_pgcd'_euclid =
   forAll upolynomialsZ $ \p ->
   forAll upolynomialsZ $ \q ->
   forAll upolynomialsZ $ \r ->
     (p /= 0 && q /= 0 && r /= 0) ==>
-      polyGCD' p q `eqUpToInvElem` polyGCD' p (q + p*r)
+      pgcd' p q `eqUpToInvElem` pgcd' p (q + p*r)
 
-case_polyGCD'_1 = eqUpToInvElem (polyGCD' f1 f2) 1 @?= True
+case_pgcd'_1 = eqUpToInvElem (pgcd' f1 f2) 1 @?= True
   where 
     x :: UPolynomial Integer
     x = var X
     f1 = x^3 + x^2 + x
     f2 = x^2 + 1
 
-prop_polyLCM_divisible =
+prop_plcm_divisible =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
     (a /= 0 && b /= 0) ==>
-      let c = polyLCM a b
-      in c `polyMod` a == 0 && c `polyMod` b == 0
+      let c = plcm a b
+      in c `pmod` a == 0 && c `pmod` b == 0
 
-prop_polyLCM_comm = 
+prop_plcm_comm = 
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
-    polyLCM a b == polyLCM b a
+    plcm a b == plcm b a
 
 prop_deriv_integral =
   forAll upolynomials $ \a ->
@@ -245,7 +245,7 @@ case_cont_pp_Rational = do
     p = constant (1/3) * x^5 + constant (7/2) * x^2 + 2 * x + 1
 
 {--------------------------------------------------------------------
-  Monomial
+  Term
 --------------------------------------------------------------------}
 
 {--------------------------------------------------------------------
@@ -255,70 +255,70 @@ case_cont_pp_Rational = do
 prop_degreeOfProduct =
   forAll monicMonomials $ \a -> 
   forAll monicMonomials $ \b -> 
-    deg (a `mmProd` b) == deg a + deg b
+    deg (a `mmult` b) == deg a + deg b
 
-prop_degreeOfOne =
-  deg mmOne == 0
+prop_degreeOfUnit =
+  deg munit == 0
 
-prop_mmProd_unitL = 
+prop_mmult_unitL = 
   forAll monicMonomials $ \a -> 
-    mmOne `mmProd` a == a
+    munit `mmult` a == a
 
-prop_mmProd_unitR = 
+prop_mmult_unitR = 
   forAll monicMonomials $ \a -> 
-    a `mmProd` mmOne == a
+    a `mmult` munit == a
 
-prop_mmProd_comm = 
+prop_mmult_comm = 
   forAll monicMonomials $ \a -> 
   forAll monicMonomials $ \b -> 
-    a `mmProd` b == b `mmProd` a
+    a `mmult` b == b `mmult` a
 
-prop_mmProd_assoc = 
+prop_mmult_assoc = 
   forAll monicMonomials $ \a ->
   forAll monicMonomials $ \b ->
   forAll monicMonomials $ \c ->
-    a `mmProd` (b `mmProd` c) == (a `mmProd` b) `mmProd` c
+    a `mmult` (b `mmult` c) == (a `mmult` b) `mmult` c
 
-prop_mmProd_Divisible = 
+prop_mmult_Divisible = 
   forAll monicMonomials $ \a -> 
   forAll monicMonomials $ \b -> 
-    let c = a `mmProd` b
-    in mmDivisible c a && mmDivisible c b
+    let c = a `mmult` b
+    in a `mdivides` c && b `mdivides` c
 
-prop_mmProd_Div = 
+prop_mmult_Div = 
   forAll monicMonomials $ \a -> 
   forAll monicMonomials $ \b -> 
-    let c = a `mmProd` b
-    in c `mmDiv` a == b && c `mmDiv` b == a
+    let c = a `mmult` b
+    in c `mdiv` a == b && c `mdiv` b == a
 
-case_mmDeriv = mmDeriv p 1 @?= (2, q)
+case_mderiv = mderiv p 1 @?= (2, q)
   where
-    p = mmFromList [(1,2),(2,4)]
-    q = mmFromList [(1,1),(2,4)]
+    p = mfromIndices [(1,2),(2,4)]
+    q = mfromIndices [(1,1),(2,4)]
 
 -- lcm (x1^2 * x2^4) (x1^3 * x2^1) = x1^3 * x2^4
-case_mmLCM = mmLCM p1 p2 @?= mmFromList [(1,3),(2,4)]
+case_mlcm = mlcm p1 p2 @?= mfromIndices [(1,3),(2,4)]
   where
-    p1 = mmFromList [(1,2),(2,4)]
-    p2 = mmFromList [(1,3),(2,1)]
+    p1 = mfromIndices [(1,2),(2,4)]
+    p2 = mfromIndices [(1,3),(2,1)]
 
 -- gcd (x1^2 * x2^4) (x2^1 * x3^2) = x2
-case_mmGCD = mmGCD p1 p2 @?= mmFromList [(2,1)]
+case_mgcd = mgcd p1 p2 @?= mfromIndices [(2,1)]
   where
-    p1 = mmFromList [(1,2),(2,4)]
-    p2 = mmFromList [(2,1),(3,2)]
+    p1 = mfromIndices [(1,2),(2,4)]
+    p2 = mfromIndices [(2,1),(3,2)]
 
-prop_mmLCM_divisible = 
+prop_mlcm_divisible = 
   forAll monicMonomials $ \a -> 
   forAll monicMonomials $ \b -> 
-    let c = mmLCM a b
-    in c `mmDivisible` a && c `mmDivisible` b
+    let c = mlcm a b
+    in a `mdivides` c && b `mdivides` c
 
-prop_mmGCD_divisible = 
+prop_mgcd_divisible = 
   forAll monicMonomials $ \a -> 
   forAll monicMonomials $ \b -> 
-    let c = mmGCD a b
-    in a `mmDivisible` c && b `mmDivisible` c
+    let c = mgcd a b
+    in c `mdivides` a && c `mdivides` b
 
 {--------------------------------------------------------------------
   Monomial Order
@@ -330,10 +330,10 @@ case_lex = sortBy lex [a,b,c,d] @?= [b,a,d,c]
     x = 1
     y = 2
     z = 3
-    a = mmFromList [(x,1),(y,2),(z,1)]
-    b = mmFromList [(z,2)]
-    c = mmFromList [(x,3)]
-    d = mmFromList [(x,2),(z,2)]
+    a = mfromIndices [(x,1),(y,2),(z,1)]
+    b = mfromIndices [(z,2)]
+    c = mfromIndices [(x,3)]
+    d = mfromIndices [(x,2),(z,2)]
 
 -- http://en.wikipedia.org/wiki/Monomial_order
 case_grlex = sortBy grlex [a,b,c,d] @?= [b,c,a,d]
@@ -341,10 +341,10 @@ case_grlex = sortBy grlex [a,b,c,d] @?= [b,c,a,d]
     x = 1
     y = 2
     z = 3
-    a = mmFromList [(x,1),(y,2),(z,1)]
-    b = mmFromList [(z,2)]
-    c = mmFromList [(x,3)]
-    d = mmFromList [(x,2),(z,2)]
+    a = mfromIndices [(x,1),(y,2),(z,1)]
+    b = mfromIndices [(z,2)]
+    c = mfromIndices [(x,3)]
+    d = mfromIndices [(x,2),(z,2)]
 
 -- http://en.wikipedia.org/wiki/Monomial_order
 case_grevlex = sortBy grevlex [a,b,c,d] @?= [b,c,d,a]
@@ -352,10 +352,10 @@ case_grevlex = sortBy grevlex [a,b,c,d] @?= [b,c,d,a]
     x = 1
     y = 2
     z = 3
-    a = mmFromList [(x,1),(y,2),(z,1)]
-    b = mmFromList [(z,2)]
-    c = mmFromList [(x,3)]
-    d = mmFromList [(x,2),(z,2)]
+    a = mfromIndices [(x,1),(y,2),(z,1)]
+    b = mfromIndices [(z,2)]
+    c = mfromIndices [(x,3)]
+    d = mfromIndices [(x,2),(z,2)]
 
 prop_refl_lex     = propRefl lex
 prop_refl_grlex   = propRefl grlex
@@ -402,11 +402,11 @@ monomialOrderProp1 cmp =
     let r = cmp a b
     in cmp a b /= EQ ==>
          forAll monicMonomials $ \c ->
-           cmp (a `mmProd` c) (b `mmProd` c) == r
+           cmp (a `mmult` c) (b `mmult` c) == r
 
 monomialOrderProp2 cmp =
   forAll monicMonomials $ \a ->
-    a /= mmOne ==> cmp mmOne a == LT
+    a /= munit ==> cmp munit a == LT
 
 {--------------------------------------------------------------------
   Gröbner basis
@@ -516,17 +516,17 @@ case_sankaranarayanan04nonlinear = do
   Generators
 --------------------------------------------------------------------}
 
-monicMonomials :: Gen (MonicMonomial Int)
+monicMonomials :: Gen (Monomial Int)
 monicMonomials = do
   size <- choose (0, 3)
   xs <- replicateM size $ do
     v <- choose (-5, 5)
     e <- liftM ((+1) . abs) arbitrary
-    return $ mmFromList [(v,e)]
-  return $ foldl mmProd mmOne xs
+    return $ var v `mpow` e
+  return $ foldl' mmult munit xs
 
-monomials :: Gen (Monomial Rational Int)
-monomials = do
+genTerms :: Gen (Term Rational Int)
+genTerms = do
   m <- monicMonomials
   c <- arbitrary
   return (c,m)
@@ -534,19 +534,19 @@ monomials = do
 polynomials :: Gen (Polynomial Rational Int)
 polynomials = do
   size <- choose (0, 5)
-  xs <- replicateM size monomials
-  return $ sum $ map fromMonomial xs 
+  xs <- replicateM size genTerms
+  return $ sum $ map fromTerm xs 
 
-umonicMonomials :: Gen (MonicMonomial X)
+umonicMonomials :: Gen UMonomial
 umonicMonomials = do
   size <- choose (0, 3)
   xs <- replicateM size $ do
     e <- choose (1, 4)
-    return $ mmFromList [(X,e)]
-  return $ foldl mmProd mmOne xs
+    return $ var X `mpow` e
+  return $ foldl' mmult munit xs
 
-umonomials :: Gen (Monomial Rational X)
-umonomials = do
+genUTerms :: Gen (UTerm Rational)
+genUTerms = do
   m <- umonicMonomials
   c <- arbitrary
   return (c,m)
@@ -554,11 +554,11 @@ umonomials = do
 upolynomials :: Gen (UPolynomial Rational)
 upolynomials = do
   size <- choose (0, 5)
-  xs <- replicateM size umonomials
-  return $ sum $ map fromMonomial xs 
+  xs <- replicateM size genUTerms
+  return $ sum $ map fromTerm xs 
 
-umonomialsZ :: Gen (Monomial Integer X)
-umonomialsZ = do
+genUTermsZ :: Gen (UTerm Integer)
+genUTermsZ = do
   m <- umonicMonomials
   c <- arbitrary
   return (c,m)
@@ -566,8 +566,8 @@ umonomialsZ = do
 upolynomialsZ :: Gen (UPolynomial Integer)
 upolynomialsZ = do
   size <- choose (0, 5)
-  xs <- replicateM size umonomialsZ
-  return $ sum $ map fromMonomial xs 
+  xs <- replicateM size genUTermsZ
+  return $ sum $ map fromTerm xs 
 
 ------------------------------------------------------------------------
 
@@ -776,36 +776,36 @@ Risa/Asir
 --     expected = [1*x+13077, 1*x^4+18915*x^3+2958*x^2+27345*x+4834]
 
 
-case_basisOfBerlekampSubalgebra_1 = sequence_ [(g ^ (5::Int)) `polyMod` f @?= g | g <- basis]
+case_basisOfBerlekampSubalgebra_1 = sequence_ [(g ^ (5::Int)) `pmod` f @?= g | g <- basis]
   where
     x :: UPolynomial $(FF.primeField 5)
     x = var X
-    f = associatedMonicPolynomial grlex $ x^100 - x^200
+    f = toMonic grlex $ x^100 - x^200
     basis = FactorFF.basisOfBerlekampSubalgebra f
 
-case_basisOfBerlekampSubalgebra_2 = sequence_ [(g ^ (2::Int)) `polyMod` f @?= g | g <- basis]
+case_basisOfBerlekampSubalgebra_2 = sequence_ [(g ^ (2::Int)) `pmod` f @?= g | g <- basis]
   where
     x :: UPolynomial $(FF.primeField 2)
     x = var X
     f = 1 + x + x^2 + x^6 + x^7 + x^8 + x^12
     basis = FactorFF.basisOfBerlekampSubalgebra f
 
-case_basisOfBerlekampSubalgebra_3 = sequence_ [(g ^ (2::Int)) `polyMod` f @?= g | g <- basis]
+case_basisOfBerlekampSubalgebra_3 = sequence_ [(g ^ (2::Int)) `pmod` f @?= g | g <- basis]
   where
     x :: UPolynomial $(FF.primeField 2)
     x = var X
-    f = associatedMonicPolynomial grlex $ 1 - x^100
+    f = toMonic grlex $ 1 - x^100
     basis = FactorFF.basisOfBerlekampSubalgebra f
 
 
-case_basisOfBerlekampSubalgebra_4 = sequence_ [(g ^ (13::Int)) `polyMod` f @?= g | g <- basis]
+case_basisOfBerlekampSubalgebra_4 = sequence_ [(g ^ (13::Int)) `pmod` f @?= g | g <- basis]
   where
     x :: UPolynomial $(FF.primeField 13)
     x = var X
     f = 8 + 2*x + 8*x^2 + 10*x^3 + 10*x^4 + x^6 +x^8
     basis = FactorFF.basisOfBerlekampSubalgebra f
 
--- case_basisOfBerlekampSubalgebra_5 = sequence_ [(g ^ (31991::Int)) `polyMod` f @?= g | g <- basis]
+-- case_basisOfBerlekampSubalgebra_5 = sequence_ [(g ^ (31991::Int)) `pmod` f @?= g | g <- basis]
 --   where
 --     x :: UPolynomial $(FF.primeField 31991)
 --     x = var X
