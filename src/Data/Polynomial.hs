@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, TypeFamilies, BangPatterns, DeriveDataTypeable #-}
+{-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Polynomial
@@ -60,7 +61,6 @@ module Data.Polynomial
   , pdivMod
   , pgcd
   , plcm
-  , prem
   , pgcd'
   , divModMP
   , reduce
@@ -108,7 +108,6 @@ module Data.Polynomial
   ) where
 
 import Prelude hiding (lex)
-import Control.Applicative
 import Control.DeepSeq
 import Control.Exception (assert)
 import Control.Monad
@@ -121,7 +120,6 @@ import Data.Ratio
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.IntMap as IM
-import Data.Traversable (for, traverse)
 import Data.Typeable
 import Data.VectorSpace
 import qualified Text.PrettyPrint.HughesPJClass as PP
@@ -151,10 +149,10 @@ newtype Polynomial k v = Polynomial{ coeffMap :: Map.Map (Monomial v) k }
 
 instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
   (+)      = plus
-  (*)      = prod
+  (*)      = mult
   negate   = neg
   abs x    = x -- OK?
-  signum x = 1 -- OK?
+  signum _ = 1 -- OK?
   fromInteger x = constant (fromInteger x)
 
 instance (Eq k, Num k, Ord v) => AdditiveGroup (Polynomial k v) where
@@ -206,11 +204,11 @@ plus (Polynomial m1) (Polynomial m2) = normalize $ Polynomial $ Map.unionWith (+
 neg :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v
 neg (Polynomial m) = Polynomial $ Map.map negate m
 
-prod :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v -> Polynomial k v
-prod a b
+mult :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v -> Polynomial k v
+mult a b
   | Just c <- asConstant a = scale c b
   | Just c <- asConstant b = scale c a
-prod (Polynomial m1) (Polynomial m2) = normalize $ Polynomial $ Map.fromListWith (+)
+mult (Polynomial m1) (Polynomial m2) = normalize $ Polynomial $ Map.fromListWith (+)
       [ (xs1 `mmult` xs2, c1*c2)
       | (xs1,c1) <- Map.toList m1, (xs2,c2) <- Map.toList m2
       ]
@@ -481,7 +479,7 @@ instance PrettyVar Int where
 instance PrettyVar X where
   pPrintVar _ _ X = PP.char 'x'
 
-addPrec, mulPrec, ratPrec, expPrec :: Rational
+addPrec, mulPrec, ratPrec, expPrec, appPrec :: Rational
 addPrec = 6 -- Precedence of '+'
 mulPrec = 7 -- Precedence of '*'
 ratPrec = 7 -- Precedence of '/'
@@ -569,7 +567,7 @@ tmult :: (Num k, Ord v) => Term k v -> Term k v -> Term k v
 tmult (c1,xs1) (c2,xs2) = (c1*c2, xs1 `mmult` xs2)
 
 tdivides :: (Fractional k, Ord v) => Term k v -> Term k v -> Bool
-tdivides (c1,xs1) (c2,xs2) = xs1 `mdivides` xs2
+tdivides (_,xs1) (_,xs2) = xs1 `mdivides` xs2
 
 tdiv :: (Fractional k, Ord v) => Term k v -> Term k v -> Term k v
 tdiv (c1,xs1) (c2,xs2) = (c1 / c2, xs1 `mdiv` xs2)
@@ -618,12 +616,12 @@ munit = Monomial $ Map.empty
 
 mfromIndices :: Ord v => [(v, Integer)] -> Monomial v
 mfromIndices xs
-  | any (\(x,e) -> 0>e) xs = error "mfromIndices: negative exponent"
+  | any (\(_,e) -> 0>e) xs = error "mfromIndices: negative exponent"
   | otherwise = Monomial $ Map.fromListWith (+) [(x,e) | (x,e) <- xs, e > 0]
 
 mfromIndicesMap :: Ord v => Map.Map v Integer -> Monomial v
 mfromIndicesMap m
-  | any (\(x,e) -> 0>e) (Map.toList m) = error "mfromIndicesMap: negative exponent"
+  | any (\(_,e) -> 0>e) (Map.toList m) = error "mfromIndicesMap: negative exponent"
   | otherwise = mnormalize $ Monomial m
 
 mindices :: Ord v => Monomial v -> [(v, Integer)]
@@ -682,8 +680,8 @@ lex :: Ord v => MonomialOrder v
 lex xs1 xs2 = go (mindices xs1) (mindices xs2)
   where
     go [] [] = EQ
-    go [] _  = LT -- = cmpare 0 n2
-    go _ []  = GT -- = cmpare n1 0
+    go [] _  = LT -- = compare 0 n2
+    go _ []  = GT -- = compare n1 0
     go ((x1,n1):xs1) ((x2,n2):xs2) =
       case compare x1 x2 of
         LT -> GT -- = compare n1 0
@@ -693,7 +691,7 @@ lex xs1 xs2 = go (mindices xs1) (mindices xs2)
 -- | Reverse lexicographic order
 -- Note that revlex is NOT a monomial order.
 revlex :: Ord v => Monomial v -> Monomial v -> Ordering
-revlex xs1 xs2 = go (reverse (mindices xs1)) (reverse (mindices xs2))
+revlex xs1 xs2 = go (Map.toDescList (mindicesMap xs1)) (Map.toDescList (mindicesMap xs2))
   where
     go [] [] = EQ
     go [] _  = GT -- = cmp 0 n2
