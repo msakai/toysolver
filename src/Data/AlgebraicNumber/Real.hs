@@ -211,7 +211,14 @@ instance Fractional AReal where
     | otherwise = realRoot' p2 i2
       where
         p2 = rootRecip (minimalPolynomial a)
-        i2 = recip (interval a)
+        c1 = sturmChain a
+        c2 = Sturm.sturmChain p2
+        i2 = go (interval a) (Sturm.separate' c2)
+        go i1 is2 =
+          case [i2 | i2 <- is2, Interval.member 1 (i1 * i2)] of
+            [] -> error "AReal.recip: should not happen"
+            [i2] -> i2
+            is2'  -> go (Sturm.halve' c1 i1) [Sturm.halve' c2 i2 | i2 <- is2']
 
 instance Real AReal where
   toRational x
