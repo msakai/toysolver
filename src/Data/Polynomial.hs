@@ -56,14 +56,16 @@ module Data.Polynomial
   , mapCoeff
   , toMonic
   , toUPolynomialOf
+  , divModMP
+  , reduce
+
+  -- * Operations for univariate polynomials
   , pdiv
   , pmod
   , pdivMod
   , pgcd
   , plcm
   , pgcd'
-  , divModMP
-  , reduce
 
   -- * Term
   , Term
