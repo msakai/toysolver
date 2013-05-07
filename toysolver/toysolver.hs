@@ -307,7 +307,7 @@ run solver opt lp printModel = do
           | otherwise   = P.mapCoeff (/ c) $ f e1 
           where
             p = f e2
-            c = P.coeff P.munit p
+            c = P.coeff P.mone p
 
     solveByContiTraverso
       | not (vs `Set.isSubsetOf` ivs) = do

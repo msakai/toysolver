@@ -80,7 +80,7 @@ module Data.Polynomial
   -- * Monic monomial
   , Monomial
   , UMonomial
-  , munit
+  , mone
   , mfromIndices
   , mfromIndicesMap
   , mindices
@@ -220,7 +220,7 @@ isZero (Polynomial m) = Map.null m
 
 -- | construct a polynomial from a constant
 constant :: (Eq k, Num k, Ord v) => k -> Polynomial k v
-constant c = fromTerm (c, munit)
+constant c = fromTerm (c, mone)
 
 -- | construct a polynomial from a list of monomials
 fromTerms :: (Eq k, Num k, Ord v) => [Term k v] -> Polynomial k v
@@ -241,7 +241,7 @@ terms (Polynomial m) = [(c,xs) | (xs,c) <- Map.toList m]
 lt :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Term k v
 lt cmp p =
   case terms p of
-    [] -> (0, munit) -- should be error?
+    [] -> (0, mone) -- should be error?
     ms -> maximumBy (cmp `on` snd) ms
 
 -- | leading coefficient with respect to a given monomial order
@@ -613,8 +613,8 @@ instance Variables Monomial where
 mnormalize :: Ord v => Monomial v -> Monomial v
 mnormalize (Monomial m) = Monomial $ Map.filter (>0) m
 
-munit :: Monomial v
-munit = Monomial $ Map.empty
+mone :: Monomial v
+mone = Monomial $ Map.empty
 
 mfromIndices :: Ord v => [(v, Integer)] -> Monomial v
 mfromIndices xs
@@ -633,7 +633,7 @@ mmult :: Ord v => Monomial v -> Monomial v -> Monomial v
 mmult (Monomial xs1) (Monomial xs2) = mnormalize $ Monomial $ Map.unionWith (+) xs1 xs2
 
 mpow :: Ord v => Monomial v -> Integer -> Monomial v
-mpow _ 0 = munit
+mpow _ 0 = mone
 mpow m 1 = m
 mpow (Monomial xs) e
   | 0 > e     = error "mpow: negative exponent"
@@ -651,7 +651,7 @@ mdiv (Monomial xs1) (Monomial xs2) = Monomial $ Map.differenceWith f xs1 xs2
 
 mderiv :: Ord v => Monomial v -> v -> (Integer, Monomial v)
 mderiv (Monomial xs) x
-  | n==0      = (0, munit)
+  | n==0      = (0, mone)
   | otherwise = (n, Monomial $ Map.update f x xs)
   where
     n = Map.findWithDefault 0 x xs

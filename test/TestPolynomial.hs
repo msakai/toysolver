@@ -258,15 +258,15 @@ prop_degreeOfProduct =
     deg (a `mmult` b) == deg a + deg b
 
 prop_degreeOfUnit =
-  deg munit == 0
+  deg mone == 0
 
 prop_mmult_unitL = 
   forAll monicMonomials $ \a -> 
-    munit `mmult` a == a
+    mone `mmult` a == a
 
 prop_mmult_unitR = 
   forAll monicMonomials $ \a -> 
-    a `mmult` munit == a
+    a `mmult` mone == a
 
 prop_mmult_comm = 
   forAll monicMonomials $ \a -> 
@@ -406,7 +406,7 @@ monomialOrderProp1 cmp =
 
 monomialOrderProp2 cmp =
   forAll monicMonomials $ \a ->
-    a /= munit ==> cmp munit a == LT
+    a /= mone ==> cmp mone a == LT
 
 {--------------------------------------------------------------------
   Gröbner basis
@@ -523,7 +523,7 @@ monicMonomials = do
     v <- choose (-5, 5)
     e <- liftM ((+1) . abs) arbitrary
     return $ var v `mpow` e
-  return $ foldl' mmult munit xs
+  return $ foldl' mmult mone xs
 
 genTerms :: Gen (Term Rational Int)
 genTerms = do
@@ -543,7 +543,7 @@ umonicMonomials = do
   xs <- replicateM size $ do
     e <- choose (1, 4)
     return $ var X `mpow` e
-  return $ foldl' mmult munit xs
+  return $ foldl' mmult mone xs
 
 genUTerms :: Gen (UTerm Rational)
 genUTerms = do

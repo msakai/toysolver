@@ -225,7 +225,7 @@ instance Real AReal where
     | isRational x =
         let p = minimalPolynomial x
             a = P.coeff (P.var X) p
-            b = P.coeff P.munit p
+            b = P.coeff P.mone p
         in - b / a
     | otherwise  = error "toRational: proper algebraic number"
 

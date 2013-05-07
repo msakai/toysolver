@@ -168,7 +168,7 @@ assume :: (Ord v, Show v, PrettyVar v) => Polynomial Rational v -> [Sign] -> M v
 assume p ss =
   if deg p <= 0
     then do
-      let c = coeff munit p
+      let c = coeff mone p
       guard $ signOf c `elem` ss
     else do
       let c  = lc grlex p
@@ -189,7 +189,7 @@ project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
     result :: [([Cell (Polynomial Rational v)], Map.Map (Polynomial Rational v) (Set.Set Sign))]
     result = runM $ do
       forM_ cs $ \(p,ss) -> do
-        when (1 > deg p) $ assume (coeff munit p) ss
+        when (1 > deg p) $ assume (coeff mone p) ss
       conf <- buildSignConf (map fst cs)
       let satCells = [cell | (cell, m) <- conf, cell /= Point NegInf, cell /= Point PosInf, ok m]
       guard $ not $ null satCells
@@ -314,7 +314,7 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
       Just (bm,k,r) <- zmod p q
       s1 <- if deg r > 0
             then return $ m Map.! r
-            else signCoeff $ coeff munit r
+            else signCoeff $ coeff mone r
       -- 場合分けを出来るだけ避ける
       if even k
         then return s1

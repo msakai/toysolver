@@ -15,4 +15,4 @@ factor p = [(constant c, 1) | c /= 1] ++ qs2
     p'  = mapCoeff (\c -> numerator (c * fromInteger s)) p
     qs  = FactorZ.factor p'
     qs2 = [(mapCoeff fromInteger q, m) | (q,m) <- qs, deg q > 0]
-    c   = toRational (product [(coeff munit q)^m | (q,m) <- qs, deg q == 0]) / toRational s
+    c   = toRational (product [(coeff mone q)^m | (q,m) <- qs, deg q == 0]) / toRational s

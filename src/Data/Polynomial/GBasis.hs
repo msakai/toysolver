@@ -99,7 +99,7 @@ basis' opt cmp fs =
         r = reduce cmp spoly gs
 
     -- gcdが1となる組は選ばなくて良い
-    checkGCD fi fj = mgcd (lm cmp fi) (lm cmp fj) /= munit
+    checkGCD fi fj = mgcd (lm cmp fi) (lm cmp fj) /= mone
 
 reduceGBasis
   :: forall k v. (Eq k, Ord k, Fractional k, Ord v)
