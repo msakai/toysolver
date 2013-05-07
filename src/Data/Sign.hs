@@ -16,15 +16,16 @@ module Data.Sign
   (
   -- * Algebra of Sign
     Sign (..)
-  , signNegate
-  , signMul
-  , signRecip
-  , signDiv
-  , signPow
+  , negate
+  , mult
+  , recip
+  , div
+  , pow
   , signOf
-  , showSign
+  , symbol
   ) where
 
+import Prelude hiding (negate, recip, div)
 import Algebra.Enumerable (Enumerable (..)) -- from lattices package
 import Control.DeepSeq
 import Data.Typeable
@@ -40,48 +41,48 @@ instance Enumerable Sign where
   universe = [Neg .. Pos]
 
 instance Alg.Multiplicative Sign where
-  (*)   = signMul
-  pow1p = signPow
+  (*)   = mult
+  pow1p = pow
 
 instance Alg.Commutative Sign
 
 instance Alg.Unital Sign where
   one = Pos
-  pow = signPow
+  pow = pow
 
 instance Alg.Division Sign where
-  recip = signRecip
-  (/)   = signDiv
-  (\\)  = flip signDiv
-  (^)   = signPow
+  recip = recip
+  (/)   = div
+  (\\)  = flip div
+  (^)   = pow
 
-signNegate :: Sign -> Sign
-signNegate Neg  = Pos
-signNegate Zero = Zero
-signNegate Pos  = Neg
+negate :: Sign -> Sign
+negate Neg  = Pos
+negate Zero = Zero
+negate Pos  = Neg
 
-signMul :: Sign -> Sign -> Sign
-signMul Pos s  = s
-signMul s Pos  = s
-signMul Neg s  = signNegate s
-signMul s Neg  = signNegate s
-signMul _ _    = Zero
+mult :: Sign -> Sign -> Sign
+mult Pos s  = s
+mult s Pos  = s
+mult Neg s  = negate s
+mult s Neg  = negate s
+mult _ _    = Zero
 
-signRecip :: Sign -> Sign
-signRecip Pos  = Pos
-signRecip Zero = error "signRecip: division by Zero"
-signRecip Neg  = Neg
+recip :: Sign -> Sign
+recip Pos  = Pos
+recip Zero = error "signRecip: division by Zero"
+recip Neg  = Neg
 
-signDiv :: Sign -> Sign -> Sign
-signDiv s Pos  = s
-signDiv _ Zero = error "signDiv: division by Zero"
-signDiv s Neg  = signNegate s
+div :: Sign -> Sign -> Sign
+div s Pos  = s
+div _ Zero = error "signDiv: division by Zero"
+div s Neg  = negate s
 
-signPow :: Integral x => Sign -> x -> Sign
-signPow _ 0    = Pos
-signPow Pos _  = Pos
-signPow Zero _ = Zero
-signPow Neg n  = if even n then Pos else Neg
+pow :: Integral x => Sign -> x -> Sign
+pow _ 0    = Pos
+pow Pos _  = Pos
+pow Zero _ = Zero
+pow Neg n  = if even n then Pos else Neg
 
 signOf :: Real a => a -> Sign
 signOf r =
@@ -90,8 +91,9 @@ signOf r =
     EQ -> Zero
     GT -> Pos
 
-showSign :: Sign -> String
-showSign Pos  = "+"
-showSign Neg  = "-"
-showSign Zero = "0"
+symbol :: Sign -> String
+symbol Pos  = "+"
+symbol Neg  = "-"
+symbol Zero = "0"
+
 

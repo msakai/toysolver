@@ -29,7 +29,6 @@ module Algorithm.CAD
   -- * Basic data structures
     Point (..)
   , Cell (..)
-  , module Data.Sign
 
   -- * Projection
   , project
@@ -59,7 +58,9 @@ import Data.ArithRel
 import qualified Data.AlgebraicNumber.Real as AReal
 import Data.DNF
 import Data.Polynomial
-import Data.Sign
+import Data.Sign (Sign (..))
+import qualified Data.Sign as Sign
+
 
 import Debug.Trace
 
@@ -101,7 +102,7 @@ showSignConf = f
 
     g :: Map.Map (UPolynomial c) Sign -> [String]
     g m =
-      [printf "  %s: %s" (prettyShow p) (showSign s) | (p, s) <- Map.toList m]
+      [printf "  %s: %s" (prettyShow p) (Sign.symbol s) | (p, s) <- Map.toList m]
 
 -- ---------------------------------------------------------------------------
 
@@ -169,14 +170,14 @@ assume p ss =
   if deg p <= 0
     then do
       let c = coeff mone p
-      guard $ signOf c `elem` ss
+      guard $ Sign.signOf c `elem` ss
     else do
       let c  = lc grlex p
           p' = mapCoeff (/c) p
       let p' = toMonic grlex p
       m <- get
       let ss1 = Map.findWithDefault (Set.fromList [Neg, Zero, Pos]) p' m
-          ss2 = Set.intersection ss1 $ Set.fromList $ [s `signDiv` signOf c | s <- ss]
+          ss2 = Set.intersection ss1 $ Set.fromList $ [s `Sign.div` Sign.signOf c | s <- ss]
       guard $ not $ Set.null ss2
       put $ Map.insert p' ss2 m
 
@@ -309,7 +310,7 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
       (c,d) <- getHighestNonzeroTerm p
       if even d
         then signCoeff c
-        else liftM signNegate $ signCoeff c
+        else liftM Sign.negate $ signCoeff c
     signAt (RootOf q _) m = do
       Just (bm,k,r) <- zmod p q
       s1 <- if deg r > 0
@@ -320,7 +321,7 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
         then return s1
         else do
           s2 <- signCoeff bm
-          return $ signDiv s1 (signPow s2 k)
+          return $ s1 `Sign.div` Sign.pow s2 k
 
     signCoeff :: Polynomial Rational v -> M v Sign
     signCoeff c =
@@ -388,7 +389,7 @@ solve' vs0 cs0 = go (Set.toList vs0) cs0
   where
     go :: [v] -> [(Polynomial Rational v, [Sign])] -> Maybe (Model v)
     go [] cs =
-      if and [signOf v `elem` ss | (p,ss) <- cs, let v = eval (\_ -> undefined) p]
+      if and [Sign.signOf v `elem` ss | (p,ss) <- cs, let v = eval (\_ -> undefined) p]
       then Just Map.empty
       else Nothing
     go (v:vs) cs = listToMaybe $ do
@@ -473,7 +474,7 @@ test1c = isJust $ do
   guard $ and $ do
     (p, ss) <- cs
     let val = eval (m Map.!) (mapCoeff fromRational p)
-    return $ signOf val `elem` ss
+    return $ Sign.signOf val `elem` ss
   where
     x = var X
     cs = [(x + 1, [Pos]), (-2*x + 3, [Pos]), (x, [Pos])]
