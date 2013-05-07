@@ -500,6 +500,9 @@ data X = X
 
 instance NFData X
 
+ucmp :: MonomialOrder X
+ucmp = grlex
+
 -- | division of univariate polynomials
 pdiv :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 pdiv f1 f2 = fst (pdivMod f1 f2)
@@ -514,24 +517,24 @@ pdivMod f g
   | isZero g  = error "pdivMod: division by zero"
   | otherwise = go 0 f
   where
-    lt_g = lt lex g
+    lt_g = lt ucmp g
     go !q !r
       | deg r < deg g = (q,r)
       | otherwise     = go (q + t) (r - t * g)
         where
-          lt_r = lt lex r
+          lt_r = lt ucmp r
           t    = fromTerm $ lt_r `tdiv` lt_g
 
 -- | GCD of univariate polynomials
 pgcd :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
-pgcd f1 0  = toMonic grlex f1
+pgcd f1 0  = toMonic ucmp f1
 pgcd f1 f2 = pgcd f2 (f1 `pmod` f2)
 
 -- | LCM of univariate polynomials
 plcm :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 plcm _ 0 = 0
 plcm 0 _ = 0
-plcm f1 f2 = toMonic grlex $ (f1 `pmod` (pgcd f1 f2)) * f2
+plcm f1 f2 = toMonic ucmp $ (f1 `pmod` (pgcd f1 f2)) * f2
 
 -- | pseudo reminder
 prem :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
@@ -540,7 +543,7 @@ prem f g
   | deg f < deg g = f
   | otherwise     = go (scale (lc_g ^ (deg f - deg g + 1)) f)
   where
-    (lc_g, lm_g) = lt lex g
+    (lc_g, lm_g) = lt ucmp g
     deg_g    = deg g
     go !f1
       | deg_g > deg f1 = f1
@@ -548,7 +551,7 @@ prem f g
           assert (lc_f1 `mod` lc_g == 0 && mdivides lm_g lm_f1) $
             go (f1 - fromTerm (lc_f1 `div` lc_g, lm_f1 `mdiv` lm_g) * g)
           where
-            (lc_f1, lm_f1) = lt lex f1
+            (lc_f1, lm_f1) = lt ucmp f1
 
 -- | GCD of univariate polynomials
 pgcd' :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
@@ -610,9 +613,6 @@ instance Variables Monomial where
   var x        = Monomial $ Map.singleton x 1
   variables mm = Map.keysSet (mindicesMap mm)
 
-mnormalize :: Ord v => Monomial v -> Monomial v
-mnormalize (Monomial m) = Monomial $ Map.filter (>0) m
-
 mone :: Monomial v
 mone = Monomial $ Map.empty
 
@@ -624,13 +624,16 @@ mfromIndices xs
 mfromIndicesMap :: Ord v => Map.Map v Integer -> Monomial v
 mfromIndicesMap m
   | any (\(_,e) -> 0>e) (Map.toList m) = error "mfromIndicesMap: negative exponent"
-  | otherwise = mnormalize $ Monomial m
+  | otherwise = mfromIndicesMap' m
+
+mfromIndicesMap' :: Ord v => Map.Map v Integer -> Monomial v
+mfromIndicesMap' m = Monomial $ Map.filter (>0) m
 
 mindices :: Ord v => Monomial v -> [(v, Integer)]
 mindices = Map.toAscList . mindicesMap
 
 mmult :: Ord v => Monomial v -> Monomial v -> Monomial v
-mmult (Monomial xs1) (Monomial xs2) = mnormalize $ Monomial $ Map.unionWith (+) xs1 xs2
+mmult (Monomial xs1) (Monomial xs2) = mfromIndicesMap' $ Map.unionWith (+) xs1 xs2
 
 mpow :: Ord v => Monomial v -> Integer -> Monomial v
 mpow _ 0 = mone

@@ -53,7 +53,7 @@ sqfree f
   | c == 1    = sqfree' f
   | otherwise = (constant c, 1) : sqfree' (mapCoeff (/c) f)
   where
-    c = lc grlex f
+    c = lc ucmp f
 
 sqfree' :: forall k. (Eq k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]
 sqfree' 0 = []
@@ -77,6 +77,9 @@ sqfree' f
             c' = c `pdiv` y
             w' = y
             result' = [(z,i) | z /= 1] ++ result
+
+ucmp :: MonomialOrder X
+ucmp = grlex
 
 polyPthRoot :: forall k. (Eq k, FiniteField k) => UPolynomial k -> UPolynomial k
 polyPthRoot f = assert (deriv f X == 0) $
@@ -109,7 +112,7 @@ berlekamp f = go (Set.singleton f) basis
 basisOfBerlekampSubalgebra :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [UPolynomial k]
 basisOfBerlekampSubalgebra f =
   sortBy (flip compare `on` deg) $
-    map (toMonic grlex) $
+    map (toMonic ucmp) $
       basis
   where
     q    = order (undefined :: k)
@@ -119,6 +122,7 @@ basisOfBerlekampSubalgebra f =
     qs :: [UPolynomial k]
     qs = [(x^(q*i)) `pmod` f | i <- [0 .. d - 1]]
 
+    gb :: [Polynomial k Int]
     gb = GB.basis grlex [p3 | (p3,_) <- terms p2]
 
     p1 :: Polynomial k Int
@@ -130,6 +134,7 @@ basisOfBerlekampSubalgebra f =
     vs1 = [i           | (i, gi_def) <- es, gi_def == var i]
     vs2 = [(i, gi_def) | (i, gi_def) <- es, gi_def /= var i]
 
+    basis :: [UPolynomial k]
     basis = [ x^i + sum [constant (eval (delta i) gj_def) * x^j | (j, gj_def) <- vs2] | i <- vs1 ]
       where
         delta i k
