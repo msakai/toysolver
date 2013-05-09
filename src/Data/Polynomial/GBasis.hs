@@ -90,7 +90,7 @@ basis' opt cmp fs =
     go gs h | H.null h = gs
     go gs h
       | r == 0    = go gs h'
-      | otherwise = go (r:gs) (H.union h' (H.fromList [item cmp r g | g <- gs, checkGCD fi fj]))
+      | otherwise = go (r:gs) (H.union h' (H.fromList [item cmp r g | g <- gs, checkGCD  r g]))
       where
         Just (i, h') = H.viewMin h
         fi = iFst i
@@ -99,7 +99,7 @@ basis' opt cmp fs =
         r = reduce cmp spoly gs
 
     -- gcdが1となる組は選ばなくて良い
-    checkGCD fi fj = mgcd (lm cmp fi) (lm cmp fj) /= mone
+    checkGCD fi fj = not $ mcoprime (lm cmp fi) (lm cmp fj)
 
 reduceGBasis
   :: forall k v. (Eq k, Ord k, Fractional k, Ord v)

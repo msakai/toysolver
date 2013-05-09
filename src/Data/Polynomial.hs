@@ -93,6 +93,7 @@ module Data.Polynomial
   , mintegral
   , mlcm
   , mgcd
+  , mcoprime
 
   -- * Monomial order
   , MonomialOrder
@@ -673,6 +674,9 @@ mlcm (Monomial m1) (Monomial m2) = Monomial $ Map.unionWith max m1 m2
 
 mgcd :: Ord v => Monomial v -> Monomial v -> Monomial v
 mgcd (Monomial m1) (Monomial m2) = Monomial $ Map.intersectionWith min m1 m2
+
+mcoprime :: Ord v => Monomial v -> Monomial v -> Bool
+mcoprime m1 m2 = mgcd m1 m2 == mone
 
 {--------------------------------------------------------------------
   Monomial Order

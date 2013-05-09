@@ -382,15 +382,15 @@ isRational x = deg x == 1
 -- | Whether the algebraic number is a root of a polynomial with integer
 -- coefficients with leading coefficient @1@ (a monic polynomial).
 isAlgebraicInteger :: AReal -> Bool
-isAlgebraicInteger x = lc grlex (pp (minimalPolynomial x)) == 1
+isAlgebraicInteger x = abs (lc grlex (pp (minimalPolynomial x))) == 1
 
 -- | Height of the algebraic number.
+--
+-- The height of an algebraic number is the greatest absolute value of the
+-- coefficients of the irreducible and primitive polynomial with integral
+-- rational coefficients.
 height :: AReal -> Integer
-height x = maximum [ assert (denominator c' == 1) (abs (numerator c'))
-                   | (c,_) <- terms p, let c' = c * fromInteger d ]
-  where
-    p = minimalPolynomial x
-    d = foldl' lcm 1 [denominator c | (c,_) <- terms p]
+height x = maximum [abs (numerator c) | (c,_) <- terms $ pp $ minimalPolynomial x]
 
 -- | root index, satisfying
 --

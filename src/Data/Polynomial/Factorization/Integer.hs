@@ -93,9 +93,7 @@ isUPolyZ :: UPolynomial Rational -> Bool
 isUPolyZ p = and [isInteger c | (c,_) <- terms p]
 
 toZ :: Ord v => Polynomial Rational v -> Polynomial Integer v
-toZ p = fromTerms [(numerator (c * fromInteger s), xs) | (c,xs) <- terms p]
-  where
-    s = foldl' lcm  1 [denominator c | (c,_) <- terms p]
+toZ = mapCoeff numerator . pp
 
 -- [0, 1, -1, 2, -2, 3, -3 ..]
 xvalues :: [Integer]
