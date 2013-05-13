@@ -343,6 +343,18 @@ putCommentLine s = do
   putStrLn s
   hFlush stdout
 
+putSLine :: String -> IO ()
+putSLine  s = do
+  putStr "s "
+  putStrLn s
+  hFlush stdout
+
+putOLine :: String -> IO ()
+putOLine  s = do
+  putStr "o "
+  putStrLn s
+  hFlush stdout
+
 newSolver :: Options -> IO SAT.Solver
 newSolver opts = do
   solver <- SAT.newSolver
@@ -380,8 +392,7 @@ solveSAT opt solver cnf = do
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
   result <- SAT.solve solver
-  putStrLn $ "s " ++ (if result then "SATISFIABLE" else "UNSATISFIABLE")
-  hFlush stdout
+  putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   when result $ do
     m <- SAT.model solver
     satPrintModel stdout m (DIMACS.numVars cnf)
@@ -428,8 +439,7 @@ solveMUS opt solver gcnf = do
     else SAT.addClause solver (- (idx2sel ! idx) : clause)
 
   result <- SAT.solveWith solver (map (idx2sel !) [1..GCNF.lastGroupIndex gcnf])
-  putStrLn $ "s " ++ (if result then "SATISFIABLE" else "UNSATISFIABLE")
-  hFlush stdout
+  putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   if result
     then do
       m <- SAT.model solver
@@ -489,8 +499,7 @@ solvePB opt solver formula@(obj, cs) = do
   case obj of
     Nothing -> do
       result <- SAT.solve solver
-      putStrLn $ "s " ++ (if result then "SATISFIABLE" else "UNSATISFIABLE")
-      hFlush stdout
+      putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
       when result $ do
         m <- SAT.model solver
         pbPrintModel stdout m n
@@ -503,16 +512,13 @@ solvePB opt solver formula@(obj, cs) = do
 
       result <- try $ minimize opt solver obj'' $ \m val -> do
         writeIORef modelRef (Just m)
-        putStrLn $ "o " ++ show val
-        hFlush stdout
+        putOLine (show val)
 
       case result of
         Right Nothing -> do
-          putStrLn $ "s " ++ "UNSATISFIABLE"
-          hFlush stdout
+          putSLine "UNSATISFIABLE"
         Right (Just m) -> do
-          putStrLn $ "s " ++ "OPTIMUM FOUND"
-          hFlush stdout
+          putSLine "OPTIMUM FOUND"
           pbPrintModel stdout m n
           let objval = pbEval m obj''
           writeSOLFile opt m (Just objval) n
@@ -520,10 +526,9 @@ solvePB opt solver formula@(obj, cs) = do
           r <- readIORef modelRef
           case r of
             Nothing -> do
-              putStrLn $ "s " ++ "UNKNOWN"
-              hFlush stdout
+              putSLine "UNKNOWN"
             Just m -> do
-              putStrLn $ "s " ++ "SATISFIABLE"
+              putSLine "SATISFIABLE"
               pbPrintModel stdout m n
               let objval = pbEval m obj''
               writeSOLFile opt m (Just objval) n
@@ -601,16 +606,13 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
   modelRef <- newIORef Nothing
   result <- try $ minimize opt solver obj $ \m val -> do
      writeIORef modelRef (Just m)
-     putStrLn $ "o " ++ show val
-     hFlush stdout
+     putOLine (show val)
 
   case result of
     Right Nothing -> do
-      putStrLn $ "s " ++ "UNSATISFIABLE"
-      hFlush stdout
+      putSLine "UNSATISFIABLE"
     Right (Just m) -> do
-      putStrLn $ "s " ++ "OPTIMUM FOUND"
-      hFlush stdout
+      putSLine "OPTIMUM FOUND"
       if isMaxSat
         then maxsatPrintModel stdout m nvar
         else pbPrintModel stdout m nvar
@@ -620,13 +622,12 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
       r <- readIORef modelRef
       case r of
         Just m | not isMaxSat -> do
-          putStrLn $ "s " ++ "SATISFIABLE"
+          putSLine "SATISFIABLE"
           pbPrintModel stdout m nvar
           let objval = pbEval m obj
           writeSOLFile opt m (Just objval) nvar
         _ -> do
-          putStrLn $ "s " ++ "UNKNOWN"
-          hFlush stdout
+          putSLine "UNKNOWN"
       throwIO e
 
 -- ------------------------------------------------------------------------
@@ -676,7 +677,7 @@ solveLP opt solver lp = do
   if not (Set.null nivs)
     then do
       putCommentLine $ "cannot handle non-integer variables: " ++ intercalate ", " (Set.toList nivs)
-      putStrLn "s UNKNOWN"
+      putSLine "UNKNOWN"
       exitFailure
     else do
       enc <- Tseitin.newEncoder solver
@@ -691,7 +692,7 @@ solveLP opt solver lp = do
             return (v,v2)
           _ -> do
             putCommentLine $ "cannot handle unbounded variable: " ++ v
-            putStrLn "s UNKNOWN"
+            putSLine "UNKNOWN"
             exitFailure
 
       putCommentLine "Loading constraints"
@@ -738,8 +739,7 @@ solveLP opt solver lp = do
 
       result <- try $ minimize opt solver obj3 $ \m val -> do
         writeIORef modelRef (Just m)
-        putStrLn $ "o " ++ showRational (optPrintRational opt) (fromIntegral (val + obj3_c) / fromIntegral d)
-        hFlush stdout
+        putOLine $ showRational (optPrintRational opt) (fromIntegral (val + obj3_c) / fromIntegral d)
 
       let printModel :: SAT.Model -> IO ()
           printModel m = do
@@ -762,20 +762,17 @@ solveLP opt solver lp = do
 
       case result of
         Right Nothing -> do
-          putStrLn $ "s " ++ "UNSATISFIABLE"
-          hFlush stdout
+          putSLine $ "UNSATISFIABLE"
         Right (Just m) -> do
-          putStrLn $ "s " ++ "OPTIMUM FOUND"
-          hFlush stdout
+          putSLine "OPTIMUM FOUND"
           printModel m
         Left (e :: SomeException) -> do
           r <- readIORef modelRef
           case r of
             Nothing -> do
-              putStrLn $ "s " ++ "UNKNOWN"
-              hFlush stdout
+              putSLine "UNKNOWN"
             Just m -> do
-              putStrLn $ "s " ++ "SATISFIABLE"
+              putSLine "SATISFIABLE"
               printModel m
           throwIO e
   where

@@ -167,16 +167,16 @@ run solver opt lp printModel = do
     solveByQE =
       case mapM LAFOL.fromFOLAtom (cs1 ++ cs2) of
         Nothing -> do
-          putStrLn "s UNKNOWN"
+          putSLine "UNKNOWN"
           exitFailure
         Just cs ->
           case f vs2 cs ivs2 of
             Nothing -> do
-              putStrLn "s UNSATISFIABLE"
+              putSLine "UNSATISFIABLE"
               exitFailure
             Just m -> do
-              putStrLn $ "o " ++ showValue (FOL.evalExpr m obj)
-              putStrLn "s SATISFIABLE"
+              putOLine $ showValue (FOL.evalExpr m obj)
+              putSLine "SATISFIABLE"
               let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m2
        where
@@ -206,19 +206,19 @@ run solver opt lp printModel = do
             return (cs',obj')
       case m of
         Nothing -> do
-          putStrLn "s UNKNOWN"
+          putSLine "UNKNOWN"
           exitFailure
         Just (cs',obj') ->
           case MIPSolverHL.optimize (LP.dir lp) obj' cs' ivs2 of
             MIPSolverHL.OptUnsat -> do
-              putStrLn "s UNSATISFIABLE"
+              putSLine "UNSATISFIABLE"
               exitFailure
             MIPSolverHL.Unbounded -> do
-              putStrLn "s UNBOUNDED"
+              putSLine "UNBOUNDED"
               exitFailure
             MIPSolverHL.Optimum r m -> do
-              putStrLn $ "o " ++ showValue r
-              putStrLn "s OPTIMUM FOUND"
+              putOLine $ showValue r
+              putSLine "OPTIMUM FOUND"
               let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m2
 
@@ -256,15 +256,14 @@ run solver opt lp printModel = do
       setNumCapabilities procs
       MIPSolver2.setNThread mip procs
 
-      let update m val = do
-            putStrLn $ "o " ++ showValue val
+      let update m val = putOLine $ showValue val
       ret <- MIPSolver2.optimize mip update
       case ret of
         Simplex2.Unsat -> do
-          putStrLn "s UNSATISFIABLE"
+          putSLine "UNSATISFIABLE"
           exitFailure
         Simplex2.Unbounded -> do
-          putStrLn "s UNBOUNDED"
+          putSLine "UNBOUNDED"
           m <- MIPSolver2.model mip
           let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2
@@ -272,13 +271,13 @@ run solver opt lp printModel = do
         Simplex2.Optimum -> do
           m <- MIPSolver2.model mip
           r <- MIPSolver2.getObjValue mip
-          putStrLn "s OPTIMUM FOUND"
+          putSLine "OPTIMUM FOUND"
           let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2
 
     solveByCAD
       | not (IS.null ivs2) = do
-          putStrLn "s UNKNOWN"
+          putSLine "UNKNOWN"
           putCommentLine "integer variables are not supported by CAD"
           exitFailure
       | otherwise = do
@@ -286,13 +285,13 @@ run solver opt lp printModel = do
               vs3 = Set.fromAscList $ IS.toAscList vs2
           case CAD.solve vs3 cs of
             Nothing -> do
-              putStrLn "s UNSATISFIABLE"
+              putSLine "UNSATISFIABLE"
               exitFailure
             Just m -> do
               let m2 = IM.map (\x -> AReal.approx x (2^^(-64::Int))) $
                          IM.fromAscList $ Map.toAscList $ m
-              putStrLn $ "o " ++ showValue (FOL.evalExpr m2 obj)
-              putStrLn "s SATISFIABLE"
+              putOLine $ showValue (FOL.evalExpr m2 obj)
+              putSLine "SATISFIABLE"
               let m3 = Map.fromAscList [(v, m2 IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m3
       where
@@ -311,7 +310,7 @@ run solver opt lp printModel = do
 
     solveByContiTraverso
       | not (vs `Set.isSubsetOf` ivs) = do
-          putStrLn "s UNKNOWN"
+          putSLine "UNKNOWN"
           putCommentLine "continuous variables are not supported by Conti-Traverso algorithm"
           exitFailure
       | otherwise = do
@@ -321,18 +320,18 @@ run solver opt lp printModel = do
                 return (linObj, linCon)
           case tmp of
             Nothing -> do
-              putStrLn "s UNKNOWN"
+              putSLine "UNKNOWN"
               putCommentLine "non-linear expressions are not supported by Conti-Traverso algorithm"
               exitFailure
             Just (linObj, linCon) -> do
               case ContiTraverso.solve P.grlex vs2 (LP.dir lp) linObj linCon of
                 Nothing -> do
-                  putStrLn "s UNSATISFIABLE"
+                  putSLine "UNSATISFIABLE"
                   exitFailure
                 Just m -> do
                   let m2 = IM.map fromInteger m
-                  putStrLn $ "o " ++ showValue (FOL.evalExpr m2 obj)
-                  putStrLn "s OPTIMUM FOUND"
+                  putOLine $ showValue (FOL.evalExpr m2 obj)
+                  putSLine "OPTIMUM FOUND"
                   let m3 = Map.fromAscList [(v, m2 IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
                   printModel m3
 
@@ -351,6 +350,18 @@ lpPrintModel h asRat m = do
 putCommentLine :: String -> IO ()
 putCommentLine s = do
   putStr "c "
+  putStrLn s
+  hFlush stdout
+
+putSLine :: String -> IO ()
+putSLine  s = do
+  putStr "s "
+  putStrLn s
+  hFlush stdout
+
+putOLine :: String -> IO ()
+putOLine  s = do
+  putStr "o "
   putStrLn s
   hFlush stdout
 
