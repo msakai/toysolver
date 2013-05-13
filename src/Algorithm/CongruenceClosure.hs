@@ -185,19 +185,3 @@ getRepresentative :: Solver -> Var -> IO Var
 getRepresentative solver c = do
   m <- readIORef $ svRepresentativeTable solver
   return $ m IM.! c
-
-{--------------------------------------------------------------------
-  Test
---------------------------------------------------------------------}
-
-test = do
-  solver <- newSolver
-  a <- newVar solver
-  b <- newVar solver
-  c <- newVar solver
-  d <- newVar solver
-  merge solver (FTConst a, c)
-  print =<< areCongruent solver (FTApp a b) (FTApp c d) -- False
-  merge solver (FTConst b, d)
-  print =<< areCongruent solver (FTApp a b) (FTApp c d) -- True
-
