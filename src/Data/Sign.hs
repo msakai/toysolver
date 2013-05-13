@@ -42,7 +42,7 @@ instance Enumerable Sign where
 
 instance Alg.Multiplicative Sign where
   (*)   = mult
-  pow1p = pow
+  pow1p s n = pow s (1+n)
 
 instance Alg.Commutative Sign
 
