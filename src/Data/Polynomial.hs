@@ -25,11 +25,9 @@ module Data.Polynomial
   (
   -- * Polynomial type
     Polynomial
-  , UPolynomial
-  , X (..)
 
   -- * Conversion
-  , Variables (..)
+  , Variable (..)
   , constant
   , terms
   , fromTerms
@@ -39,6 +37,7 @@ module Data.Polynomial
 
   -- * Query
   , Degree (..)
+  , Variables (..)
   , lt
   , lc
   , lm
@@ -59,7 +58,11 @@ module Data.Polynomial
   , divModMP
   , reduce
 
-  -- * Operations for univariate polynomials
+  -- * Univariate polynomials
+  , UPolynomial
+  , X (..)
+  , UTerm
+  , UMonomial
   , pdiv
   , pmod
   , pdivMod
@@ -69,7 +72,6 @@ module Data.Polynomial
 
   -- * Term
   , Term
-  , UTerm
   , tdeg
   , tmult
   , tdivides
@@ -79,7 +81,6 @@ module Data.Polynomial
 
   -- * Monic monomial
   , Monomial
-  , UMonomial
   , mone
   , mfromIndices
   , mfromIndicesMap
@@ -120,9 +121,12 @@ import Data.Function
 import Data.List
 import Data.Monoid
 import Data.Ratio
+import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified Data.IntMap as IM
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import Data.Typeable
 import Data.VectorSpace
 import qualified Text.PrettyPrint.HughesPJClass as PP
@@ -134,9 +138,11 @@ infixl 7  `pdiv`, `pmod`
   Classes
 --------------------------------------------------------------------}
 
+class Variable f where
+  var :: Ord v => v -> f v
+
 class Variables f where
-  var       :: Ord v => v -> f v
-  variables :: Ord v => f v -> Set.Set v
+  vars :: Ord v => f v -> Set v
 
 -- | total degree of a given polynomial
 class Degree t where
@@ -147,7 +153,7 @@ class Degree t where
 --------------------------------------------------------------------}
 
 -- | Polynomial over commutative ring r
-newtype Polynomial k v = Polynomial{ coeffMap :: Map.Map (Monomial v) k }
+newtype Polynomial r v = Polynomial{ coeffMap :: Map (Monomial v) r }
   deriving (Eq, Ord, Typeable)
 
 instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
@@ -174,9 +180,11 @@ instance (Show v, Ord v, Show k) => Show (Polynomial k v) where
 instance (NFData k, NFData v) => NFData (Polynomial k v) where
   rnf (Polynomial m) = rnf m
 
+instance (Eq k, Num k) => Variable (Polynomial k) where
+  var x = fromTerm (1, var x)
+
 instance (Eq k, Num k) => Variables (Polynomial k) where
-  var x       = fromTerm (1, var x)
-  variables p = Set.unions $ [variables mm | (_, mm) <- terms p]
+  vars p = Set.unions $ [vars mm | (_, mm) <- terms p]
 
 instance Degree (Polynomial k v) where
   deg p
@@ -227,7 +235,7 @@ constant c = fromTerm (c, mone)
 fromTerms :: (Eq k, Num k, Ord v) => [Term k v] -> Polynomial k v
 fromTerms = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
 
-fromCoeffMap :: (Eq k, Num k, Ord v) => Map.Map (Monomial v) k -> Polynomial k v
+fromCoeffMap :: (Eq k, Num k, Ord v) => Map (Monomial v) k -> Polynomial k v
 fromCoeffMap m = normalize $ Polynomial m
 
 -- | construct a polynomial from a monomial
@@ -345,15 +353,15 @@ toUPolynomialOf p v = fromTerms $ do
 divModMP
   :: forall k v. (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> ([Polynomial k v], Polynomial k v)
-divModMP cmp p fs = go IM.empty p
+divModMP cmp p fs = go IntMap.empty p
   where
     ls = [(lt cmp f, f) | f <- fs]
 
-    go :: IM.IntMap (Polynomial k v) -> Polynomial k v -> ([Polynomial k v], Polynomial k v)
+    go :: IntMap (Polynomial k v) -> Polynomial k v -> ([Polynomial k v], Polynomial k v)
     go qs g =
       case xs of
-        [] -> ([IM.findWithDefault 0 i qs | i <- [0 .. length fs - 1]], g)
-        (i, b, g') : _ -> go (IM.insertWith (+) i b qs) g'
+        [] -> ([IntMap.findWithDefault 0 i qs | i <- [0 .. length fs - 1]], g)
+        (i, b, g') : _ -> go (IntMap.insertWith (+) i b qs) g'
       where
         ms = sortBy (flip cmp `on` snd) (terms g)
         xs = do
@@ -595,7 +603,7 @@ tintegral (c,xs) x =
 -- 本当は変数の型に応じて type family で表現を変えたい
 
 -- | Monic monomials
-newtype Monomial v = Monomial{ mindicesMap :: Map.Map v Integer }
+newtype Monomial v = Monomial{ mindicesMap :: Map v Integer }
   deriving (Eq, Ord, Typeable)
 
 type UMonomial = Monomial X
@@ -610,9 +618,11 @@ instance (NFData v) => NFData (Monomial v) where
 instance Degree (Monomial v) where
   deg (Monomial m) = sum $ Map.elems m
 
+instance Variable Monomial where
+  var x = Monomial $ Map.singleton x 1
+
 instance Variables Monomial where
-  var x        = Monomial $ Map.singleton x 1
-  variables mm = Map.keysSet (mindicesMap mm)
+  vars mm = Map.keysSet (mindicesMap mm)
 
 mone :: Monomial v
 mone = Monomial $ Map.empty
@@ -622,12 +632,12 @@ mfromIndices xs
   | any (\(_,e) -> 0>e) xs = error "mfromIndices: negative exponent"
   | otherwise = Monomial $ Map.fromListWith (+) [(x,e) | (x,e) <- xs, e > 0]
 
-mfromIndicesMap :: Ord v => Map.Map v Integer -> Monomial v
+mfromIndicesMap :: Ord v => Map v Integer -> Monomial v
 mfromIndicesMap m
   | any (\(_,e) -> 0>e) (Map.toList m) = error "mfromIndicesMap: negative exponent"
   | otherwise = mfromIndicesMap' m
 
-mfromIndicesMap' :: Ord v => Map.Map v Integer -> Monomial v
+mfromIndicesMap' :: Ord v => Map v Integer -> Monomial v
 mfromIndicesMap' m = Monomial $ Map.filter (>0) m
 
 mindices :: Ord v => Monomial v -> [(v, Integer)]
@@ -697,7 +707,8 @@ lex xs1 xs2 = go (mindices xs1) (mindices xs2)
         GT -> LT -- = compare 0 n2
         EQ -> compare n1 n2 `mappend` go xs1 xs2
 
--- | Reverse lexicographic order
+-- | Reverse lexicographic order.
+-- 
 -- Note that revlex is NOT a monomial order.
 revlex :: Ord v => Monomial v -> Monomial v -> Ordering
 revlex xs1 xs2 = go (Map.toDescList (mindicesMap xs1)) (Map.toDescList (mindicesMap xs2))
@@ -712,10 +723,10 @@ revlex xs1 xs2 = go (Map.toDescList (mindicesMap xs1)) (Map.toDescList (mindices
         EQ -> cmp n1 n2 `mappend` go xs1 xs2
     cmp n1 n2 = compare n2 n1
 
--- | graded lexicographic order
+-- | Graded lexicographic order
 grlex :: Ord v => MonomialOrder v
 grlex = (compare `on` deg) `mappend` lex
 
--- | graded reverse lexicographic order
+-- | Graded reverse lexicographic order
 grevlex :: Ord v => MonomialOrder v
 grevlex = (compare `on` deg) `mappend` revlex

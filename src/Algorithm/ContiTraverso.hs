@@ -41,7 +41,7 @@ import Data.VectorSpace
 import Data.ArithRel
 import qualified Data.LA as LA
 import Data.OptDir
-import Data.Polynomial
+import Data.Polynomial hiding (vars)
 import Data.Polynomial.GBasis as GB
 import Data.Var
 import qualified Algorithm.LPUtil as LPUtil
