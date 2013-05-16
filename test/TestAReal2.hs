@@ -9,7 +9,8 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
-import Data.Polynomial
+import Data.Polynomial (UPolynomial, X (..))
+import qualified Data.Polynomial as P
 import Data.AlgebraicNumber.Real
 
 import Control.Monad
@@ -77,7 +78,7 @@ areals = oneof $ map return $ samples
 samples :: [AReal]
 samples = [0, 1, -1, 2, -2] ++ concatMap realRoots ps
   where
-    x = var ()
+    x = P.var X
     ps = [x^2 - 2, x^2 - 3 {- , x^3 - 2, x^6 + 6*x^3 - 2*x^2 + 9 -}]
 
 ------------------------------------------------------------------------

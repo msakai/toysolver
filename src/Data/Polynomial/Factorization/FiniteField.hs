@@ -34,13 +34,14 @@ import Data.Function (on)
 import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Polynomial
+import Data.Polynomial (Polynomial, UPolynomial, X (..), MonomialOrder)
+import qualified Data.Polynomial as P
 import qualified Data.Polynomial.GBasis as GB
 
 factor :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]
 factor f = do
   (g,n) <- sqfree f
-  if deg g > 0
+  if P.deg g > 0
     then do
       h <- berlekamp g
       return (h,n)
@@ -51,9 +52,9 @@ factor f = do
 sqfree :: forall k. (Eq k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]
 sqfree f
   | c == 1    = sqfree' f
-  | otherwise = (constant c, 1) : sqfree' (mapCoeff (/c) f)
+  | otherwise = (P.constant c, 1) : sqfree' (P.mapCoeff (/c) f)
   where
-    c = lc ucmp f
+    c = P.lc ucmp f
 
 sqfree' :: forall k. (Eq k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]
 sqfree' 0 = []
@@ -62,9 +63,9 @@ sqfree' f
   | otherwise = go 1 c0 w0 []
   where
     p = char (undefined :: k)
-    g = deriv f X
-    c0 = pgcd f g
-    w0 = pdiv f c0
+    g = P.deriv f X
+    c0 = P.pgcd f g
+    w0 = P.pdiv f c0
     go !i c w !result
       | w == 1    =
           if c == 1
@@ -72,21 +73,21 @@ sqfree' f
           else result ++ [(h, n*p) | (h,n) <- sqfree' (polyPthRoot c)]
       | otherwise = go (i+1) c' w' result'
           where
-            y  = pgcd w c
-            z  = w `pdiv` y            
-            c' = c `pdiv` y
+            y  = P.pgcd w c
+            z  = w `P.pdiv` y            
+            c' = c `P.pdiv` y
             w' = y
             result' = [(z,i) | z /= 1] ++ result
 
 ucmp :: MonomialOrder X
-ucmp = grlex
+ucmp = P.grlex
 
 polyPthRoot :: forall k. (Eq k, FiniteField k) => UPolynomial k -> UPolynomial k
-polyPthRoot f = assert (deriv f X == 0) $
-  fromTerms [(pthRoot c, g mm) | (c,mm) <- terms f]
+polyPthRoot f = assert (P.deriv f X == 0) $
+  P.fromTerms [(pthRoot c, g mm) | (c,mm) <- P.terms f]
   where
     p = char (undefined :: k)
-    g mm = var X `mpow` (deg mm `div` p)
+    g mm = P.var X `P.mpow` (P.deg mm `div` p)
 
 -- | Berlekamp algorithm for polynomial factorization.
 --
@@ -102,40 +103,40 @@ berlekamp f = go (Set.singleton f) basis
         where
           func fi = Set.fromList $ hs2 ++ hs1
             where
-              hs1 = [h | k <- allValues, let h = pgcd fi (b - constant k), deg h > 0]
-              hs2 = if deg g > 0 then [g] else []
+              hs1 = [h | k <- allValues, let h = P.pgcd fi (b - P.constant k), P.deg h > 0]
+              hs2 = if P.deg g > 0 then [g] else []
                 where
-                  g = fi `pdiv` product hs1
+                  g = fi `P.pdiv` product hs1
     basis = basisOfBerlekampSubalgebra f
     r     = length basis
 
 basisOfBerlekampSubalgebra :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [UPolynomial k]
 basisOfBerlekampSubalgebra f =
-  sortBy (flip compare `on` deg) $
-    map (toMonic ucmp) $
+  sortBy (flip compare `on` P.deg) $
+    map (P.toMonic ucmp) $
       basis
   where
     q    = order (undefined :: k)
-    d    = deg f
-    x    = var X
+    d    = P.deg f
+    x    = P.var X
 
     qs :: [UPolynomial k]
-    qs = [(x^(q*i)) `pmod` f | i <- [0 .. d - 1]]
+    qs = [(x^(q*i)) `P.pmod` f | i <- [0 .. d - 1]]
 
     gb :: [Polynomial k Int]
-    gb = GB.basis grlex [p3 | (p3,_) <- terms p2]
+    gb = GB.basis P.grlex [p3 | (p3,_) <- P.terms p2]
 
     p1 :: Polynomial k Int
-    p1 = sum [var i * (subst qi (\X -> var (-1)) - (var (-1) ^ i)) | (i, qi) <- zip [0..] qs]
+    p1 = sum [P.var i * (P.subst qi (\X -> P.var (-1)) - (P.var (-1) ^ i)) | (i, qi) <- zip [0..] qs]
     p2 :: UPolynomial (Polynomial k Int)
-    p2 = toUPolynomialOf p1 (-1)
+    p2 = P.toUPolynomialOf p1 (-1)
 
-    es  = [(i, reduce grlex (var i) gb) | i <- [0 .. fromIntegral d - 1]]
-    vs1 = [i           | (i, gi_def) <- es, gi_def == var i]
-    vs2 = [(i, gi_def) | (i, gi_def) <- es, gi_def /= var i]
+    es  = [(i, P.reduce P.grlex (P.var i) gb) | i <- [0 .. fromIntegral d - 1]]
+    vs1 = [i           | (i, gi_def) <- es, gi_def == P.var i]
+    vs2 = [(i, gi_def) | (i, gi_def) <- es, gi_def /= P.var i]
 
     basis :: [UPolynomial k]
-    basis = [ x^i + sum [constant (eval (delta i) gj_def) * x^j | (j, gj_def) <- vs2] | i <- vs1 ]
+    basis = [ x^i + sum [P.constant (P.eval (delta i) gj_def) * x^j | (j, gj_def) <- vs2] | i <- vs1 ]
       where
         delta i k
           | k==i      = 1

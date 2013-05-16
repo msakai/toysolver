@@ -57,7 +57,8 @@ import Text.PrettyPrint.HughesPJClass
 import Data.ArithRel
 import qualified Data.AlgebraicNumber.Real as AReal
 import Data.DNF
-import Data.Polynomial
+import Data.Polynomial (Polynomial, UPolynomial, X (..), PrettyVar, PrettyCoeff)
+import qualified Data.Polynomial as P
 import Data.Sign (Sign (..))
 import qualified Data.Sign as Sign
 
@@ -113,47 +114,47 @@ mr
   -> UPolynomial k
   -> (k, Integer, UPolynomial k)
 mr p q
-  | n >= m    = assert (constant (bm^(n-m+1)) * p == q * l + r && m > deg r) $ (bm, n-m+1, r)
+  | n >= m    = assert (P.constant (bm^(n-m+1)) * p == q * l + r && m > P.deg r) $ (bm, n-m+1, r)
   | otherwise = error "mr p q: not (deg p >= deg q)"
   where
-    x = var X
-    n = deg p
-    m = deg q
-    bm = lc grlex q
+    x = P.var X
+    n = P.deg p
+    m = P.deg q
+    bm = P.lc P.grlex q
     (l,r) = f p n
 
     f :: UPolynomial k -> Integer -> (UPolynomial k, UPolynomial k)
     f p n
       | n==m =
-          let l = constant an
-              r = constant bm * p - constant an * q
-          in assert (constant (bm^(n-m+1)) * p == q*l + r && m > deg r) $ (l, r)
+          let l = P.constant an
+              r = P.constant bm * p - P.constant an * q
+          in assert (P.constant (bm^(n-m+1)) * p == q*l + r && m > P.deg r) $ (l, r)
       | otherwise =
-          let p'     = (constant bm * p - constant an * x^(n-m) * q)
+          let p'     = (P.constant bm * p - P.constant an * x^(n-m) * q)
               (l',r) = f p' (n-1)
-              l      = l' + constant (an*bm^(n-m)) * x^(n-m)
-          in assert (n > deg p') $
-             assert (constant (bm^(n-m+1)) * p == q*l + r && m > deg r) $ (l, r)
+              l      = l' + P.constant (an*bm^(n-m)) * x^(n-m)
+          in assert (n > P.deg p') $
+             assert (P.constant (bm^(n-m+1)) * p == q*l + r && m > P.deg r) $ (l, r)
       where
-        an = coeff (var X `mpow` n) p
+        an = P.coeff (P.var X `P.mpow` n) p
 
 test_mr_1 :: (Coeff Int, Integer, UPolynomial (Coeff Int))
-test_mr_1 = mr (toUPolynomialOf p 3) (toUPolynomialOf q 3)
+test_mr_1 = mr (P.toUPolynomialOf p 3) (P.toUPolynomialOf q 3)
   where
-    a = var 0
-    b = var 1
-    c = var 2
-    x = var 3
+    a = P.var 0
+    b = P.var 1
+    c = P.var 2
+    x = P.var 3
     p = a*x^(2::Int) + b*x + c
     q = 2*a*x + b
 
 test_mr_2 :: (Coeff Int, Integer, UPolynomial (Coeff Int))
-test_mr_2 = mr (toUPolynomialOf p 3) (toUPolynomialOf p 3)
+test_mr_2 = mr (P.toUPolynomialOf p 3) (P.toUPolynomialOf p 3)
   where
-    a = var 0
-    b = var 1
-    c = var 2
-    x = var 3
+    a = P.var 0
+    b = P.var 1
+    c = P.var 2
+    x = P.var 3
     p = a*x^(2::Int) + b*x + c
 
 -- ---------------------------------------------------------------------------
@@ -167,14 +168,13 @@ runM m = runStateT m Map.empty
 
 assume :: (Ord v, Show v, PrettyVar v) => Polynomial Rational v -> [Sign] -> M v ()
 assume p ss =
-  if deg p <= 0
+  if P.deg p <= 0
     then do
-      let c = coeff mone p
+      let c = P.coeff P.mone p
       guard $ Sign.signOf c `elem` ss
     else do
-      let c  = lc grlex p
-          p' = mapCoeff (/c) p
-      let p' = toMonic grlex p
+      let c  = P.lc P.grlex p
+          p' = P.mapCoeff (/c) p
       m <- get
       let ss1 = Map.findWithDefault (Set.fromList [Neg, Zero, Pos]) p' m
           ss2 = Set.intersection ss1 $ Set.fromList $ [s `Sign.div` Sign.signOf c | s <- ss]
@@ -190,7 +190,7 @@ project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
     result :: [([Cell (Polynomial Rational v)], Map.Map (Polynomial Rational v) (Set.Set Sign))]
     result = runM $ do
       forM_ cs $ \(p,ss) -> do
-        when (1 > deg p) $ assume (coeff mone p) ss
+        when (1 > P.deg p) $ assume (P.coeff P.mone p) ss
       conf <- buildSignConf (map fst cs)
       let satCells = [cell | (cell, m) <- conf, cell /= Point NegInf, cell /= Point PosInf, ok m]
       guard $ not $ null satCells
@@ -200,7 +200,7 @@ project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
     ok m = and [checkSign m p ss | (p,ss) <- cs]
       where
         checkSign m p ss =
-          if 1 > deg p 
+          if 1 > P.deg p 
             then True -- already assumed
             else (m Map.! p) `elem` ss
 
@@ -213,7 +213,7 @@ buildSignConf
   -> M v (SignConf (Polynomial Rational v))
 buildSignConf ps = do
   ps2 <- collectPolynomials (Set.fromList ps)
-  let ts = sortBy (comparing deg) (Set.toList ps2)
+  let ts = sortBy (comparing P.deg) (Set.toList ps2)
   foldM (flip refineSignConf) emptySignConf ts
 
 collectPolynomials
@@ -222,11 +222,11 @@ collectPolynomials
   -> M v (Set.Set (UPolynomial (Polynomial Rational v)))
 collectPolynomials ps = go Set.empty (f ps)
   where
-    f = Set.filter (\p -> deg p > 0) 
+    f = Set.filter (\p -> P.deg p > 0) 
     go result ps | Set.null ps = return result
     go result ps = do
-      let rs1 = filter (\p -> deg p > 0) [deriv p X | p <- Set.toList ps]
-      rs2 <- liftM (filter (\p -> deg p > 0) . map (\(_,_,r) -> r) . concat) $
+      let rs1 = filter (\p -> P.deg p > 0) [P.deriv p X | p <- Set.toList ps]
+      rs2 <- liftM (filter (\p -> P.deg p > 0) . map (\(_,_,r) -> r) . concat) $
         forM [(p1,p2) | p1 <- Set.toList ps, p2 <- Set.toList ps ++ Set.toList result, p1 /= p2] $ \(p1,p2) -> do
           ret1 <- zmod p1 p2
           ret2 <- zmod p2 p1
@@ -240,7 +240,7 @@ getHighestNonzeroTerm
   -> M v (Polynomial Rational v, Integer)
 getHighestNonzeroTerm p = go $ sortBy (flip (comparing snd)) cs
   where
-    cs = [(c, deg mm) | (c,mm) <- terms p]
+    cs = [(c, P.deg mm) | (c,mm) <- P.terms p]
 
     go :: [(Polynomial Rational v, Integer)] -> M v (Polynomial Rational v, Integer)
     go [] = return (0, -1)
@@ -260,8 +260,8 @@ zmod p q = do
   if not (d >= e) || 0 >= e
     then return Nothing
     else do
-      let p' = fromTerms [(pi, mm) | (pi, mm) <- terms p, deg mm <= d]
-          q' = fromTerms [(qi, mm) | (qi, mm) <- terms q, deg mm <= e]
+      let p' = P.fromTerms [(pi, mm) | (pi, mm) <- P.terms p, P.deg mm <= d]
+          q' = P.fromTerms [(qi, mm) | (qi, mm) <- P.terms q, P.deg mm <= e]
       return $ Just $ mr p' q'
 
 refineSignConf
@@ -313,9 +313,9 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
         else liftM Sign.negate $ signCoeff c
     signAt (RootOf q _) m = do
       Just (bm,k,r) <- zmod p q
-      s1 <- if deg r > 0
+      s1 <- if P.deg r > 0
             then return $ m Map.! r
-            else signCoeff $ coeff mone r
+            else signCoeff $ P.coeff P.mone r
       -- 場合分けを出来るだけ避ける
       if even k
         then return s1
@@ -361,7 +361,7 @@ evalPoint _ NegInf = NegInf
 evalPoint _ PosInf = PosInf
 evalPoint m (RootOf p n) = RootOf (AReal.minimalPolynomial a) (AReal.rootIndex a)
   where
-    a = AReal.realRootsEx (mapCoeff (eval (m Map.!) . mapCoeff fromRational) p) !! n
+    a = AReal.realRootsEx (P.mapCoeff (P.eval (m Map.!) . P.mapCoeff fromRational) p) !! n
 
 -- ---------------------------------------------------------------------------
 
@@ -389,11 +389,11 @@ solve' vs0 cs0 = go (Set.toList vs0) cs0
   where
     go :: [v] -> [(Polynomial Rational v, [Sign])] -> Maybe (Model v)
     go [] cs =
-      if and [Sign.signOf v `elem` ss | (p,ss) <- cs, let v = eval (\_ -> undefined) p]
+      if and [Sign.signOf v `elem` ss | (p,ss) <- cs, let v = P.eval (\_ -> undefined) p]
       then Just Map.empty
       else Nothing
     go (v:vs) cs = listToMaybe $ do
-      (cs2, cell:_) <- project [(toUPolynomialOf p v, ss) | (p,ss) <- cs]
+      (cs2, cell:_) <- project [(P.toUPolynomialOf p v, ss) | (p,ss) <- cs]
       case go vs cs2 of
         Nothing -> mzero
         Just m -> do
@@ -456,7 +456,7 @@ dumpSignConf x =
 test1a :: IO ()
 test1a = mapM_ putStrLn $ showSignConf conf
   where
-    x = var X
+    x = P.var X
     ps :: [UPolynomial (Polynomial Rational Int)]
     ps = [x + 1, -2*x + 3, x]
     [(conf, _)] = runM $ buildSignConf ps
@@ -464,7 +464,7 @@ test1a = mapM_ putStrLn $ showSignConf conf
 test1b :: Bool
 test1b = isJust $ solve vs cs
   where
-    x = var X
+    x = P.var X
     vs = Set.singleton X
     cs = [x + 1 .>. 0, -2*x + 3 .>. 0, x .>. 0]
 
@@ -473,16 +473,16 @@ test1c = isJust $ do
   m <- solve' (Set.singleton X) cs
   guard $ and $ do
     (p, ss) <- cs
-    let val = eval (m Map.!) (mapCoeff fromRational p)
+    let val = P.eval (m Map.!) (P.mapCoeff fromRational p)
     return $ Sign.signOf val `elem` ss
   where
-    x = var X
+    x = P.var X
     cs = [(x + 1, [Pos]), (-2*x + 3, [Pos]), (x, [Pos])]
 
 test2a :: IO ()
 test2a = mapM_ putStrLn $ showSignConf conf
   where
-    x = var X
+    x = P.var X
     ps :: [UPolynomial (Polynomial Rational Int)]
     ps = [x^(2::Int)]
     [(conf, _)] = runM $ buildSignConf ps
@@ -490,7 +490,7 @@ test2a = mapM_ putStrLn $ showSignConf conf
 test2b :: Bool
 test2b = isNothing $ solve vs cs
   where
-    x = var X
+    x = P.var X
     vs = Set.singleton X
     cs = [x^(2::Int) .<. 0]
 
@@ -499,36 +499,36 @@ test = and [test1b, test1c, test2b]
 test_project :: DNF (Polynomial Rational Int, [Sign])
 test_project = DNF $ map fst $ project [(p', [Zero])]
   where
-    a = var 0
-    b = var 1
-    c = var 2
-    x = var 3
+    a = P.var 0
+    b = P.var 1
+    c = P.var 2
+    x = P.var 3
     p :: Polynomial Rational Int
     p = a*x^(2::Int) + b*x + c
-    p' = toUPolynomialOf p 3
+    p' = P.toUPolynomialOf p 3
 
 test_project_print :: IO ()
 test_project_print = putStrLn $ showDNF $ test_project
 
 test_project_2 = project [(p, [Zero]), (x, [Pos])]
   where
-    x = var X
+    x = P.var X
     p :: UPolynomial (Polynomial Rational Int)
     p = x^(2::Int) + 4*x - 10
 
-test_project_3_print =  dumpProjection $ project [(toUPolynomialOf p 0, [Neg])]
+test_project_3_print =  dumpProjection $ project [(P.toUPolynomialOf p 0, [Neg])]
   where
-    a = var 0
-    b = var 1
-    c = var 2
+    a = P.var 0
+    b = P.var 1
+    c = P.var 2
     p :: Polynomial Rational Int
     p = a^(2::Int) + b^(2::Int) + c^(2::Int) - 1
 
 test_solve = solve vs [p .<. 0]
   where
-    a = var 0
-    b = var 1
-    c = var 2
+    a = P.var 0
+    b = P.var 1
+    c = P.var 2
     vs = Set.fromList [0,1,2]
     p :: Polynomial Rational Int
     p = a^(2::Int) + b^(2::Int) + c^(2::Int) - 1
@@ -539,13 +539,13 @@ test_collectPolynomials
       )]
 test_collectPolynomials = runM $ collectPolynomials (Set.singleton p')
   where
-    a = var 0
-    b = var 1
-    c = var 2
-    x = var 3
+    a = P.var 0
+    b = P.var 1
+    c = P.var 2
+    x = P.var 3
     p :: Polynomial Rational Int
     p = a*x^(2::Int) + b*x + c
-    p' = toUPolynomialOf p 3
+    p' = P.toUPolynomialOf p 3
 
 test_collectPolynomials_print :: IO ()
 test_collectPolynomials_print = do
@@ -556,12 +556,12 @@ test_collectPolynomials_print = do
       printf "%s %s\n" (prettyShow p) (show sign)
 
 test_buildSignConf :: [(SignConf (Polynomial Rational Int), Map.Map (Polynomial Rational Int) (Set.Set Sign))]
-test_buildSignConf = runM $ buildSignConf [toUPolynomialOf p 3]
+test_buildSignConf = runM $ buildSignConf [P.toUPolynomialOf p 3]
   where
-    a = var 0
-    b = var 1
-    c = var 2
-    x = var 3
+    a = P.var 0
+    b = P.var 1
+    c = P.var 2
+    x = P.var 3
     p :: Polynomial Rational Int
     p = a*x^(2::Int) + b*x + c
 
@@ -569,9 +569,9 @@ test_buildSignConf_print :: IO ()
 test_buildSignConf_print = dumpSignConf test_buildSignConf
 
 test_buildSignConf_2 :: [(SignConf (Polynomial Rational Int), Map.Map (Polynomial Rational Int) (Set.Set Sign))]
-test_buildSignConf_2 = runM $ buildSignConf [toUPolynomialOf p 0 | p <- ps]
+test_buildSignConf_2 = runM $ buildSignConf [P.toUPolynomialOf p 0 | p <- ps]
   where
-    x = var 0
+    x = P.var 0
     ps :: [Polynomial Rational Int]
     ps = [x + 1, -2*x + 3, x]
 
@@ -579,9 +579,9 @@ test_buildSignConf_2_print :: IO ()
 test_buildSignConf_2_print = dumpSignConf test_buildSignConf_2
 
 test_buildSignConf_3 :: [(SignConf (Polynomial Rational Int), Map.Map (Polynomial Rational Int) (Set.Set Sign))]
-test_buildSignConf_3 = runM $ buildSignConf [toUPolynomialOf p 0 | p <- ps]
+test_buildSignConf_3 = runM $ buildSignConf [P.toUPolynomialOf p 0 | p <- ps]
   where
-    x = var 0
+    x = P.var 0
     ps :: [Polynomial Rational Int]
     ps = [x, 2*x]
 

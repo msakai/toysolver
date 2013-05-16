@@ -41,7 +41,8 @@ import Data.VectorSpace
 import Data.ArithRel
 import qualified Data.LA as LA
 import Data.OptDir
-import Data.Polynomial hiding (vars)
+import Data.Polynomial (Polynomial, UPolynomial, Monomial, MonomialOrder)
+import qualified Data.Polynomial as P
 import Data.Polynomial.GBasis as GB
 import Data.Var
 import qualified Algorithm.LPUtil as LPUtil
@@ -90,22 +91,22 @@ solve' cmp vs' obj cs
     cmp2 = elimOrdering (IS.fromList vs2) `mappend` elimOrdering (IS.singleton t) `mappend` costOrdering obj `mappend` cmp
 
     gb :: [Polynomial Rational Var]
-    gb = GB.basis' GB.defaultOptions cmp2 (product (map var (t:vs2)) - 1 : phi)
+    gb = GB.basis' GB.defaultOptions cmp2 (product (map P.var (t:vs2)) - 1 : phi)
       where
         phi = do
           xj <- vs
           let aj = [(yi, aij) | (yi,(ai,_)) <- zip vs2 cs, let aij = LA.coeff xj ai]
-          return $  product [var yi ^ aij    | (yi, aij) <- aj, aij > 0]
-                  - product [var yi ^ (-aij) | (yi, aij) <- aj, aij < 0] * var xj
+          return $  product [P.var yi ^ aij    | (yi, aij) <- aj, aij > 0]
+                  - product [P.var yi ^ (-aij) | (yi, aij) <- aj, aij < 0] * P.var xj
 
-    yb = product [var yi ^ bi | ((_,bi),yi) <- zip cs vs2]
+    yb = product [P.var yi ^ bi | ((_,bi),yi) <- zip cs vs2]
 
-    [(_,z)] = terms (reduce cmp2 yb gb)
+    [(_,z)] = P.terms (P.reduce cmp2 yb gb)
 
     m = mkModel (vs++vs2++[t]) z
 
 mkModel :: [Var] -> Monomial Var -> Model Integer
-mkModel vs xs = IM.fromDistinctAscList (Map.toAscList (mindicesMap xs)) `IM.union` IM.fromList [(x, 0) | x <- vs]
+mkModel vs xs = IM.fromDistinctAscList (Map.toAscList (P.mindicesMap xs)) `IM.union` IM.fromList [(x, 0) | x <- vs]
 -- IM.union is left-biased
 
 costOrdering :: LA.Expr Integer -> MonomialOrder Var
@@ -119,4 +120,4 @@ elimOrdering xs = compare `on` f
   where
     f ys = not $ IS.null $ xs `IS.intersection` ys'
       where
-        ys' = IS.fromDistinctAscList [y | (y,_) <- Map.toAscList $ mindicesMap ys]
+        ys' = IS.fromDistinctAscList [y | (y,_) <- Map.toAscList $ P.mindicesMap ys]

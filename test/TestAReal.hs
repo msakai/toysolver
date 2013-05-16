@@ -9,7 +9,8 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
-import Data.Polynomial
+import Data.Polynomial (UPolynomial, X (..))
+import qualified Data.Polynomial as P
 import Data.AlgebraicNumber.Real
 import Data.AlgebraicNumber.Root
 import qualified Data.Interval as Interval
@@ -26,13 +27,13 @@ import System.IO
 sqrt2 :: AReal
 [neg_sqrt2, sqrt2] = realRoots (x^2 - 2)
   where
-    x = var X
+    x = P.var X
 
 -- ±√3
 sqrt3 :: AReal
 [neg_sqrt3, sqrt3] = realRoots (x^2 - 3)
   where
-    x = var X
+    x = P.var X
 
 {--------------------------------------------------------------------
   root manipulation
@@ -40,88 +41,88 @@ sqrt3 :: AReal
 
 case_rootAdd_sqrt2_sqrt3 = assertBool "" $ abs valP <= 0.0001
   where
-    x = var X
+    x = P.var X
 
     p :: UPolynomial Rational
     p = rootAdd (x^2 - 2) (x^2 - 3)
 
     valP :: Double
-    valP = eval (\X -> sqrt 2 + sqrt 3) $ mapCoeff fromRational p
+    valP = P.eval (\X -> sqrt 2 + sqrt 3) $ P.mapCoeff fromRational p
 
 -- bug?
 sample_rootAdd = p
   where
-    x = var X    
+    x = P.var X    
     p :: UPolynomial Rational
     p = rootAdd (x^2 - 2) (x^6 + 6*x^3 - 2*x^2 + 9)
 
 case_rootSub_sqrt2_sqrt3 = assertBool "" $ abs valP <= 0.0001
   where
-    x = var X
+    x = P.var X
 
     p :: UPolynomial Rational
     p = rootAdd (x^2 - 2) (rootScale (-1) (x^2 - 3))
 
     valP :: Double
-    valP = eval (\X -> sqrt 2 - sqrt 3) $ mapCoeff fromRational p
+    valP = P.eval (\X -> sqrt 2 - sqrt 3) $ P.mapCoeff fromRational p
 
 case_rootMul_sqrt2_sqrt3 = assertBool "" $ abs valP <= 0.0001
   where
-    x = var X
+    x = P.var X
 
     p :: UPolynomial Rational
     p = rootMul (x^2 - 2) (x^2 - 3)
 
     valP :: Double
-    valP = eval (\X -> sqrt 2 * sqrt 3) $ mapCoeff fromRational p
+    valP = P.eval (\X -> sqrt 2 * sqrt 3) $ P.mapCoeff fromRational p
 
 case_rootNegate_test1 = assertBool "" $ abs valP <= 0.0001
   where
-    x = var X
+    x = P.var X
 
     p :: UPolynomial Rational
     p = rootScale (-1) (x^3 - 3)
 
     valP :: Double
-    valP = eval (\X -> - (3 ** (1/3))) $ mapCoeff fromRational p
+    valP = P.eval (\X -> - (3 ** (1/3))) $ P.mapCoeff fromRational p
 
 case_rootNegate_test2 = rootScale (-1) p @?= normalizePoly q
   where
     x :: UPolynomial Rational
-    x = var X
+    x = P.var X
     p = x^3 - 3
     q = x^3 + 3
 
 case_rootNegate_test3 = rootScale (-1) p @?= normalizePoly q
   where
     x :: UPolynomial Rational
-    x = var X
+    x = P.var X
     p = (x-2)*(x-3)*(x-4)
     q = (x+2)*(x+3)*(x+4)
 
 case_rootScale = rootScale 2 p @?= normalizePoly q
   where
     x :: UPolynomial Rational
-    x = var X
+    x = P.var X
     p = (x-2)*(x-3)*(x-4)
     q = (x-4)*(x-6)*(x-8)
 
 case_rootScale_zero = rootScale 0 p @?= normalizePoly q
   where
     x :: UPolynomial Rational
-    x = var X
+    x = P.var X
     p = (x-2)*(x-3)*(x-4)
     q = x
 
 case_rootRecip = assertBool "" $ abs valP <= 0.0001
   where
-    x = var X
+    x = P.var X
 
     p :: UPolynomial Rational
     p = rootRecip (x^3 - 3)
 
     valP :: Double
-    valP = eval (\X -> 1 / (3 ** (1/3))) $ mapCoeff fromRational p
+    valP = P.eval (\X -> 1 / (3 ** (1/3))) $ P.mapCoeff fromRational p
 
 {--------------------------------------------------------------------
   algebraic reals
@@ -132,19 +133,19 @@ case_realRoots_zero = realRoots (0 :: UPolynomial Rational) @?= []
 case_realRoots_nonminimal =
   realRoots ((x^2 - 1) * (x - 3)) @?= [-1,1,3]
   where
-    x = var X
+    x = P.var X
 
 case_realRoots_minus_one = realRoots (x^2 + 1) @?= []
   where
-    x = var X
+    x = P.var X
 
 case_realRoots_two = length (realRoots (x^2 - 2)) @?= 2
   where
-    x = var X
+    x = P.var X
 
 case_realRoots_multipleRoots = length (realRoots (x^2 + 2*x + 1)) @?= 1
   where
-    x = var X
+    x = P.var X
 
 case_eq = sqrt2*sqrt2 - 2 @?= 0
 
@@ -182,7 +183,7 @@ case_round_sqrt2 = round sqrt2 @?= 1
 
 case_toRational = toRational r @?= 3/2
   where
-    x = var X
+    x = P.var X
     [r] = realRoots (2*x - 3)
 
 case_toRational_error = do
@@ -195,17 +196,17 @@ case_toRational_error = do
 case_simpARealPoly = simpARealPoly p @?= q
   where
     x :: forall k. (Num k, Eq k) => UPolynomial k
-    x = var X
-    p = x^3 - constant sqrt2 * x + 3
+    x = P.var X
+    p = x^3 - P.constant sqrt2 * x + 3
     q = x^6 + 6*x^3 - 2*x^2 + 9
 
-case_deg_sqrt2 = deg sqrt2 @?= 2
+case_deg_sqrt2 = P.deg sqrt2 @?= 2
 
-case_deg_neg_sqrt2 = deg neg_sqrt2 @?= 2
+case_deg_neg_sqrt2 = P.deg neg_sqrt2 @?= 2
 
-case_deg_sqrt2_minus_sqrt2 = deg (sqrt2 - sqrt2) @?= 1
+case_deg_sqrt2_minus_sqrt2 = P.deg (sqrt2 - sqrt2) @?= 1
 
-case_deg_sqrt2_times_sqrt2 = deg (sqrt2 * sqrt2) @?= 1
+case_deg_sqrt2_times_sqrt2 = P.deg (sqrt2 * sqrt2) @?= 1
 
 case_isAlgebraicInteger_sqrt2 = isAlgebraicInteger sqrt2 @?= True
 

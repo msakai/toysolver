@@ -28,7 +28,6 @@ module Data.AlgebraicNumber.Real
 
   -- * Properties
   , minimalPolynomial
-  , deg
   , isRational
   , isAlgebraicInteger
   , height
@@ -54,7 +53,7 @@ import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJClass as PP
 import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
 
-import Data.Polynomial
+import Data.Polynomial (Polynomial, UPolynomial, X (..))
 import qualified Data.Polynomial as P
 import qualified Data.Polynomial.Factorization.Rational as FactorQ
 import qualified Data.Polynomial.RootSeparation.Sturm as Sturm
@@ -79,19 +78,19 @@ realRoots p = Set.toAscList $ Set.fromList $ do
 -- | Real roots of the polynomial in ascending order.
 realRootsEx :: UPolynomial AReal -> [AReal]
 realRootsEx p
-  | and [isRational c | (c,_) <- terms p] = realRoots $ mapCoeff toRational p
-  | otherwise = [a | a <- realRoots (simpARealPoly p), a `isRootOf` p]
+  | and [isRational c | (c,_) <- P.terms p] = realRoots $ P.mapCoeff toRational p
+  | otherwise = [a | a <- realRoots (simpARealPoly p), a `P.isRootOf` p]
 
 -- p must already be factored.
 realRoots' :: UPolynomial Rational -> [AReal]
 realRoots' p = do
-  guard $ deg p > 0
+  guard $ P.deg p > 0
   i <- Sturm.separate p
   return $ realRoot' p i
 
 realRoot :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot p i = 
-  case [q | (q,_) <- FactorQ.factor p, deg q > 0, Sturm.numRoots q i == 1] of
+  case [q | (q,_) <- FactorQ.factor p, P.deg q > 0, Sturm.numRoots q i == 1] of
     p2:_ -> realRoot' p2 i
     []   -> error "Data.AlgebraicNumber.Real.realRoot: invalid interval"
 
@@ -104,7 +103,7 @@ realRoot' p i = RealRoot (normalizePoly p) i
 --------------------------------------------------------------------}
 
 isZero :: AReal -> Bool
-isZero a = 0 `Interval.member` (interval a) && 0 `isRootOf` minimalPolynomial a
+isZero a = 0 `Interval.member` (interval a) && 0 `P.isRootOf` minimalPolynomial a
 
 scaleAReal :: Rational -> AReal -> AReal
 scaleAReal r a = realRoot' p2 i2
@@ -202,9 +201,9 @@ instance Num AReal where
   fromInteger = fromRational . toRational
 
 instance Fractional AReal where
-  fromRational r = realRoot' (x - constant r) (Interval.singleton r)
+  fromRational r = realRoot' (x - P.constant r) (Interval.singleton r)
     where
-      x = var X
+      x = P.var X
 
   recip a
     | isZero a  = error "AReal.recip: zero division"
@@ -372,17 +371,17 @@ interval (RealRoot _ i) = i
 -- 
 -- If the algebraic number's 'minimalPolynomial' has degree @n@,
 -- then the algebraic number is said to be degree @n@.
-instance Degree AReal where
-  deg a = deg $ minimalPolynomial a
+instance P.Degree AReal where
+  deg a = P.deg $ minimalPolynomial a
 
 -- | Whether the algebraic number is a rational.
 isRational :: AReal -> Bool
-isRational x = deg x == 1
+isRational x = P.deg x == 1
 
 -- | Whether the algebraic number is a root of a polynomial with integer
 -- coefficients with leading coefficient @1@ (a monic polynomial).
 isAlgebraicInteger :: AReal -> Bool
-isAlgebraicInteger x = abs (lc grlex (pp (minimalPolynomial x))) == 1
+isAlgebraicInteger x = abs (P.lc P.grlex (P.pp (minimalPolynomial x))) == 1
 
 -- | Height of the algebraic number.
 --
@@ -390,7 +389,7 @@ isAlgebraicInteger x = abs (lc grlex (pp (minimalPolynomial x))) == 1
 -- coefficients of the irreducible and primitive polynomial with integral
 -- rational coefficients.
 height :: AReal -> Integer
-height x = maximum [abs (numerator c) | (c,_) <- terms $ pp $ minimalPolynomial x]
+height x = maximum [abs (numerator c) | (c,_) <- P.terms $ P.pp $ minimalPolynomial x]
 
 -- | root index, satisfying
 --
@@ -415,7 +414,7 @@ instance Pretty AReal where
       p = minimalPolynomial r
       appPrec = 10
 
-instance PrettyCoeff AReal where
+instance P.PrettyCoeff AReal where
   pPrintCoeff = pPrintPrec
   isNegativeCoeff = (0>)
 
@@ -435,4 +434,4 @@ simpARealPoly p = rootSimpPoly minimalPolynomial p
 goldenRatio :: AReal
 goldenRatio = (1 + root5) / 2
   where
-    [_, root5] = sort $ realRoots' ((var X)^2 - 5)
+    [_, root5] = sort $ realRoots' ((P.var X)^2 - 5)

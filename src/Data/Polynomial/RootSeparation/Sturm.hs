@@ -34,7 +34,8 @@ module Data.Polynomial.RootSeparation.Sturm
   ) where
 
 import Data.Maybe
-import Data.Polynomial
+import Data.Polynomial (UPolynomial, X (..))
+import qualified Data.Polynomial as P
 import qualified Data.Interval as Interval
 import Data.Interval (Interval, EndPoint (..), (<..<=), (<=..<=))
 
@@ -46,10 +47,10 @@ sturmChain :: UPolynomial Rational -> SturmChain
 sturmChain p = p0 : p1 : go p0 p1
   where
     p0 = p
-    p1 = deriv p X
+    p1 = P.deriv p P.X
     go p q = if r==0 then [] else r : go q r
       where
-        r = - (p `pmod` q)
+        r = - (p `P.pmod` q)
 
 -- | The number of distinct real roots of @p@ in a given interval
 numRoots
@@ -70,12 +71,12 @@ numRoots' chain@(p:_) ival
       case (Interval.lowerBound ival2, Interval.upperBound ival2) of
         (Finite lb, Finite ub) ->
           (if lb==ub then 0 else (n lb - n ub)) +
-          (if lb `Interval.member` ival2 && isRootOf lb p then 1 else 0) +
-          (if ub `Interval.notMember` ival2 && isRootOf ub p then -1 else 0)
+          (if lb `Interval.member` ival2 && lb `P.isRootOf` p then 1 else 0) +
+          (if ub `Interval.notMember` ival2 && ub `P.isRootOf`  p then -1 else 0)
         _ -> error "numRoots'': should not happen"
   where
     ival2 = boundInterval p ival
-    n x = countSignChanges [eval (\X -> x) q | q <- chain]
+    n x = countSignChanges [P.eval (\X -> x) q | q <- chain]
 
 countSignChanges :: [Rational] -> Int
 countSignChanges rs = countChanges xs
@@ -100,8 +101,8 @@ bounds p = (-m, m)
   where
     m = if p==0
         then 0
-        else max 1 (sum [abs (c/s) | (c,_) <- terms p] - 1)
-    s = lc grlex p
+        else max 1 (sum [abs (c/s) | (c,_) <- P.terms p] - 1)
+    s = P.lc P.grlex p
 
 boundInterval :: UPolynomial Rational -> Interval Rational -> Interval Rational
 boundInterval p ival = Interval.intersection ival (Finite lb <=..<= Finite ub)
@@ -119,10 +120,10 @@ separate p = separate' (sturmChain p)
 separate' :: SturmChain -> [Interval Rational]
 separate' chain@(p:_) = f (bounds p)
   where
-    n x = countSignChanges [eval (\X -> x) q | q <- chain]
+    n x = countSignChanges [P.eval (\X -> x) q | q <- chain]
 
     f (lb,ub) =
-      if lb `isRootOf` p
+      if lb `P.isRootOf` p
       then Interval.singleton lb : g (lb,ub)
       else g (lb,ub)
     

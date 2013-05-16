@@ -41,7 +41,8 @@ module Data.Polynomial.GBasis
 
 import qualified Data.Set as Set
 import qualified Data.Heap as H -- http://hackage.haskell.org/package/heaps
-import Data.Polynomial
+import Data.Polynomial (Polynomial, Monomial, MonomialOrder)
+import qualified Data.Polynomial as P
 
 data Options
   = Options
@@ -63,12 +64,12 @@ spolynomial
   :: (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> Polynomial k v -> Polynomial k v
 spolynomial cmp f g =
-      fromTerm ((1,xs) `tdiv` lt1) * f
-    - fromTerm ((1,xs) `tdiv` lt2) * g
+      P.fromTerm ((1,xs) `P.tdiv` lt1) * f
+    - P.fromTerm ((1,xs) `P.tdiv` lt2) * g
   where
-    xs = mlcm xs1 xs2
-    lt1@(c1, xs1) = lt cmp f
-    lt2@(c2, xs2) = lt cmp g
+    xs = P.mlcm xs1 xs2
+    lt1@(c1, xs1) = P.lt cmp f
+    lt2@(c2, xs2) = P.lt cmp g
 
 basis
   :: forall k v. (Eq k, Fractional k, Ord k, Ord v)
@@ -96,10 +97,10 @@ basis' opt cmp fs =
         fi = iFst i
         fj = iSnd i
         spoly = spolynomial cmp fi fj
-        r = reduce cmp spoly gs
+        r = P.reduce cmp spoly gs
 
     -- gcdが1となる組は選ばなくて良い
-    checkGCD fi fj = not $ mcoprime (lm cmp fi) (lm cmp fj)
+    checkGCD fi fj = not $ P.mcoprime (P.lm cmp fi) (P.lm cmp fj)
 
 reduceGBasis
   :: forall k v. (Eq k, Ord k, Fractional k, Ord v)
@@ -109,9 +110,9 @@ reduceGBasis cmp ps = Set.toList $ Set.fromList $ go ps []
     go [] qs = qs
     go (p:ps) qs
       | q == 0    = go ps qs
-      | otherwise = go ps (toMonic cmp q : qs)
+      | otherwise = go ps (P.toMonic cmp q : qs)
       where
-        q = reduce cmp p (ps++qs)
+        q = P.reduce cmp p (ps++qs)
 
 {--------------------------------------------------------------------
   Item
@@ -126,7 +127,7 @@ data Item k v
   }
 
 item :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Polynomial k v -> Item k v
-item cmp f g = Item f g cmp (mlcm (lm cmp f) (lm cmp g))
+item cmp f g = Item f g cmp (P.mlcm (P.lm cmp f) (P.lm cmp g))
 
 instance Ord v => Ord (Item k v) where
   a `compare` b = iCmp a (iLCM a) (iLCM b)
