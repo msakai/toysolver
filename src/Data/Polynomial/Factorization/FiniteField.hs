@@ -64,8 +64,8 @@ sqfree' f
   where
     p = char (undefined :: k)
     g = P.deriv f X
-    c0 = P.pgcd f g
-    w0 = P.pdiv f c0
+    c0 = P.gcd f g
+    w0 = P.div f c0
     go !i c w !result
       | w == 1    =
           if c == 1
@@ -73,9 +73,9 @@ sqfree' f
           else result ++ [(h, n*p) | (h,n) <- sqfree' (polyPthRoot c)]
       | otherwise = go (i+1) c' w' result'
           where
-            y  = P.pgcd w c
-            z  = w `P.pdiv` y            
-            c' = c `P.pdiv` y
+            y  = P.gcd w c
+            z  = w `P.div` y            
+            c' = c `P.div` y
             w' = y
             result' = [(z,i) | z /= 1] ++ result
 
@@ -103,10 +103,10 @@ berlekamp f = go (Set.singleton f) basis
         where
           func fi = Set.fromList $ hs2 ++ hs1
             where
-              hs1 = [h | k <- allValues, let h = P.pgcd fi (b - P.constant k), P.deg h > 0]
+              hs1 = [h | k <- allValues, let h = P.gcd fi (b - P.constant k), P.deg h > 0]
               hs2 = if P.deg g > 0 then [g] else []
                 where
-                  g = fi `P.pdiv` product hs1
+                  g = fi `P.div` product hs1
     basis = basisOfBerlekampSubalgebra f
     r     = length basis
 
@@ -121,7 +121,7 @@ basisOfBerlekampSubalgebra f =
     x    = P.var X
 
     qs :: [UPolynomial k]
-    qs = [(x^(q*i)) `P.pmod` f | i <- [0 .. d - 1]]
+    qs = [(x^(q*i)) `P.mod` f | i <- [0 .. d - 1]]
 
     gb :: [Polynomial k Int]
     gb = GB.basis P.grlex [p3 | (p3,_) <- P.terms p2]

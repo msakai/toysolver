@@ -128,41 +128,41 @@ case_deg_0 = assertBool "" $ (P.deg p < 0)
   Univalent polynomials
 --------------------------------------------------------------------}
 
-prop_pdivMod =
+prop_divMod =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
     b /= 0 ==> 
-      let (q,r) = P.pdivMod a b
+      let (q,r) = P.divMod a b
       in a == q*b + r && (r==0 || P.deg b > P.deg r)
 
-case_pdivMod_1 =  g*q + r @?= f
+case_divMod_1 =  g*q + r @?= f
   where
     x :: UPolynomial Rational
     x = P.var X
     f = x^3 + x^2 + x
     g = x^2 + 1
-    (q,r) = f `P.pdivMod` g
+    (q,r) = f `P.divMod` g
 
-prop_pgcd_divisible =
+prop_gcd_divisible =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
     (a /= 0 && b /= 0) ==>
-      let c = P.pgcd a b
-      in a `P.pmod` c == 0 && b `P.pmod` c == 0
+      let c = P.gcd a b
+      in a `P.mod` c == 0 && b `P.mod` c == 0
 
-prop_pgcd_comm = 
+prop_gcd_comm = 
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
-    P.pgcd a b == P.pgcd b a
+    P.gcd a b == P.gcd b a
 
-prop_pgcd_euclid =
+prop_gcd_euclid =
   forAll upolynomials $ \p ->
   forAll upolynomials $ \q ->
   forAll upolynomials $ \r ->
     (p /= 0 && q /= 0 && r /= 0) ==>
-      P.pgcd p q == P.pgcd p (q + p*r)
+      P.gcd p q == P.gcd p (q + p*r)
 
-case_pgcd_1 = P.pgcd f1 f2 @?= 1
+case_gcd_1 = P.gcd f1 f2 @?= 1
   where 
     x :: UPolynomial Rational
     x = P.var X
@@ -173,39 +173,39 @@ eqUpToInvElem :: UPolynomial Integer -> UPolynomial Integer -> Bool
 eqUpToInvElem 0 0 = True
 eqUpToInvElem _ 0 = False
 eqUpToInvElem a b =
-  case P.mapCoeff fromInteger a `P.pdivMod` P.mapCoeff fromInteger b of
+  case P.mapCoeff fromInteger a `P.divMod` P.mapCoeff fromInteger b of
     (q,r) -> r == 0 && P.deg q <= 0
 
-prop_pgcd'_comm = 
+prop_gcd'_comm = 
   forAll upolynomialsZ $ \a ->
   forAll upolynomialsZ $ \b ->
-    P.pgcd' a b `eqUpToInvElem` P.pgcd' b a
+    P.gcd' a b `eqUpToInvElem` P.gcd' b a
 
-prop_pgcd'_euclid =
+prop_gcd'_euclid =
   forAll upolynomialsZ $ \p ->
   forAll upolynomialsZ $ \q ->
   forAll upolynomialsZ $ \r ->
     (p /= 0 && q /= 0 && r /= 0) ==>
-      P.pgcd' p q `eqUpToInvElem` P.pgcd' p (q + p*r)
+      P.gcd' p q `eqUpToInvElem` P.gcd' p (q + p*r)
 
-case_pgcd'_1 = eqUpToInvElem (P.pgcd' f1 f2) 1 @?= True
+case_gcd'_1 = eqUpToInvElem (P.gcd' f1 f2) 1 @?= True
   where 
     x :: UPolynomial Integer
     x = P.var X
     f1 = x^3 + x^2 + x
     f2 = x^2 + 1
 
-prop_plcm_divisible =
+prop_lcm_divisible =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
     (a /= 0 && b /= 0) ==>
-      let c = P.plcm a b
-      in c `P.pmod` a == 0 && c `P.pmod` b == 0
+      let c = P.lcm a b
+      in c `P.mod` a == 0 && c `P.mod` b == 0
 
-prop_plcm_comm = 
+prop_lcm_comm = 
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
-    P.plcm a b == P.plcm b a
+    P.lcm a b == P.lcm b a
 
 prop_deriv_integral =
   forAll upolynomials $ \a ->
@@ -777,21 +777,21 @@ Risa/Asir
 --     expected = [1*x+13077, 1*x^4+18915*x^3+2958*x^2+27345*x+4834]
 
 
-case_basisOfBerlekampSubalgebra_1 = sequence_ [(g ^ (5::Int)) `P.pmod` f @?= g | g <- basis]
+case_basisOfBerlekampSubalgebra_1 = sequence_ [(g ^ (5::Int)) `P.mod` f @?= g | g <- basis]
   where
     x :: UPolynomial $(FF.primeField 5)
     x = P.var X
     f = P.toMonic P.grlex $ x^100 - x^200
     basis = FactorFF.basisOfBerlekampSubalgebra f
 
-case_basisOfBerlekampSubalgebra_2 = sequence_ [(g ^ (2::Int)) `P.pmod` f @?= g | g <- basis]
+case_basisOfBerlekampSubalgebra_2 = sequence_ [(g ^ (2::Int)) `P.mod` f @?= g | g <- basis]
   where
     x :: UPolynomial $(FF.primeField 2)
     x = P.var X
     f = 1 + x + x^2 + x^6 + x^7 + x^8 + x^12
     basis = FactorFF.basisOfBerlekampSubalgebra f
 
-case_basisOfBerlekampSubalgebra_3 = sequence_ [(g ^ (2::Int)) `P.pmod` f @?= g | g <- basis]
+case_basisOfBerlekampSubalgebra_3 = sequence_ [(g ^ (2::Int)) `P.mod` f @?= g | g <- basis]
   where
     x :: UPolynomial $(FF.primeField 2)
     x = P.var X
@@ -799,14 +799,14 @@ case_basisOfBerlekampSubalgebra_3 = sequence_ [(g ^ (2::Int)) `P.pmod` f @?= g |
     basis = FactorFF.basisOfBerlekampSubalgebra f
 
 
-case_basisOfBerlekampSubalgebra_4 = sequence_ [(g ^ (13::Int)) `P.pmod` f @?= g | g <- basis]
+case_basisOfBerlekampSubalgebra_4 = sequence_ [(g ^ (13::Int)) `P.mod` f @?= g | g <- basis]
   where
     x :: UPolynomial $(FF.primeField 13)
     x = P.var X
     f = 8 + 2*x + 8*x^2 + 10*x^3 + 10*x^4 + x^6 +x^8
     basis = FactorFF.basisOfBerlekampSubalgebra f
 
--- case_basisOfBerlekampSubalgebra_5 = sequence_ [(g ^ (31991::Int)) `P.pmod` f @?= g | g <- basis]
+-- case_basisOfBerlekampSubalgebra_5 = sequence_ [(g ^ (31991::Int)) `P.mod` f @?= g | g <- basis]
 --   where
 --     x :: UPolynomial $(FF.primeField 31991)
 --     x = P.var X

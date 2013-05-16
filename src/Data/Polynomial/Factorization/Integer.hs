@@ -69,14 +69,14 @@ factor2 p =
   case find (\(_,yi) -> yi==0) vs of
     Just (xi,_) ->
       let q1 = x - P.constant xi
-          q2 = p' `P.pdiv` P.mapCoeff fromInteger q1
+          q2 = p' `P.div` P.mapCoeff fromInteger q1
       in Just (q1, toZ q2)
     Nothing ->
       let qs = map Interpolation.interpolate $
                   sequence [[(fromInteger xi, fromInteger z) | z <- factors yi] | (xi,yi) <- vs]
           zs = [ (q1,q2)
                | q1 <- qs, P.deg q1 > 0, isUPolyZ q1
-               , let (q2,r) = p' `P.pdivMod` q1
+               , let (q2,r) = p' `P.divMod` q1
                , r == 0, P.deg q2 > 0, isUPolyZ q2
                ]
       in case zs of

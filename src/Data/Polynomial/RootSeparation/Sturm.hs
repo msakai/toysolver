@@ -50,7 +50,7 @@ sturmChain p = p0 : p1 : go p0 p1
     p1 = P.deriv p P.X
     go p q = if r==0 then [] else r : go q r
       where
-        r = - (p `P.pmod` q)
+        r = - (p `P.mod` q)
 
 -- | The number of distinct real roots of @p@ in a given interval
 numRoots

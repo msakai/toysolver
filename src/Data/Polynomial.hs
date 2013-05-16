@@ -63,12 +63,12 @@ module Data.Polynomial
   , X (..)
   , UTerm
   , UMonomial
-  , pdiv
-  , pmod
-  , pdivMod
-  , pgcd
-  , plcm
-  , pgcd'
+  , div
+  , mod
+  , divMod
+  , gcd
+  , lcm
+  , gcd'
 
   -- * Term
   , Term
@@ -111,7 +111,8 @@ module Data.Polynomial
   , PrettyVar (..)
   ) where
 
-import Prelude hiding (lex)
+import Prelude hiding (lex, div, mod, divMod, gcd, lcm)
+import qualified Prelude
 import Control.DeepSeq
 import Control.Exception (assert)
 import Control.Monad
@@ -132,7 +133,7 @@ import Data.VectorSpace
 import qualified Text.PrettyPrint.HughesPJClass as PP
 import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
 
-infixl 7  `pdiv`, `pmod`
+infixl 7  `div`, `mod`
 
 {--------------------------------------------------------------------
   Classes
@@ -269,13 +270,13 @@ lookupCoeff xs (Polynomial m) = Map.lookup xs m
 
 contI :: (Integral r, Ord v) => Polynomial r v -> r
 contI 0 = 1
-contI p = foldl1' gcd [abs c | (c,_) <- terms p]
+contI p = foldl1' Prelude.gcd [abs c | (c,_) <- terms p]
 
 ppI :: (Integral r, Ord v) => Polynomial r v -> Polynomial r v
 ppI p = mapCoeff f p
   where
     c = contI p
-    f x = assert (x `mod` c == 0) $ x `div` c
+    f x = assert (x `Prelude.mod` c == 0) $ x `Prelude.div` c
 
 class ContPP k where
   -- | Content of a polynomial  
@@ -293,7 +294,7 @@ instance Integral r => ContPP (Ratio r) where
   {-# SPECIALIZE instance ContPP (Ratio Integer) #-}
 
   cont 0 = 1
-  cont p = foldl1' gcd ns % foldl' lcm 1 ds
+  cont p = foldl1' Prelude.gcd ns % foldl' Prelude.lcm 1 ds
     where
       ns = [abs (numerator c) | (c,_) <- terms p]
       ds = [denominator c     | (c,_) <- terms p]  
@@ -513,17 +514,17 @@ ucmp :: MonomialOrder X
 ucmp = grlex
 
 -- | division of univariate polynomials
-pdiv :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
-pdiv f1 f2 = fst (pdivMod f1 f2)
+div :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+div f1 f2 = fst (divMod f1 f2)
 
 -- | division of univariate polynomials
-pmod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
-pmod f1 f2 = snd (pdivMod f1 f2)
+mod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+mod f1 f2 = snd (divMod f1 f2)
 
 -- | division of univariate polynomials
-pdivMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> (UPolynomial k, UPolynomial k)
-pdivMod f g
-  | isZero g  = error "pdivMod: division by zero"
+divMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> (UPolynomial k, UPolynomial k)
+divMod f g
+  | isZero g  = error "divMod: division by zero"
   | otherwise = go 0 f
   where
     lt_g = lt ucmp g
@@ -535,15 +536,15 @@ pdivMod f g
           t    = fromTerm $ lt_r `tdiv` lt_g
 
 -- | GCD of univariate polynomials
-pgcd :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
-pgcd f1 0  = toMonic ucmp f1
-pgcd f1 f2 = pgcd f2 (f1 `pmod` f2)
+gcd :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+gcd f1 0  = toMonic ucmp f1
+gcd f1 f2 = gcd f2 (f1 `mod` f2)
 
 -- | LCM of univariate polynomials
-plcm :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
-plcm _ 0 = 0
-plcm 0 _ = 0
-plcm f1 f2 = toMonic ucmp $ (f1 `pmod` (pgcd f1 f2)) * f2
+lcm :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
+lcm _ 0 = 0
+lcm 0 _ = 0
+lcm f1 f2 = toMonic ucmp $ (f1 `mod` (gcd f1 f2)) * f2
 
 -- | pseudo reminder
 prem :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
@@ -557,15 +558,15 @@ prem f g
     go !f1
       | deg_g > deg f1 = f1
       | otherwise =
-          assert (lc_f1 `mod` lc_g == 0 && mdivides lm_g lm_f1) $
-            go (f1 - fromTerm (lc_f1 `div` lc_g, lm_f1 `mdiv` lm_g) * g)
+          assert (lc_f1 `Prelude.mod` lc_g == 0 && mdivides lm_g lm_f1) $
+            go (f1 - fromTerm (lc_f1 `Prelude.div` lc_g, lm_f1 `mdiv` lm_g) * g)
           where
             (lc_f1, lm_f1) = lt ucmp f1
 
 -- | GCD of univariate polynomials
-pgcd' :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
-pgcd' f1 0  = ppI f1
-pgcd' f1 f2 = pgcd' f2 (f1 `prem` f2)
+gcd' :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
+gcd' f1 0  = ppI f1
+gcd' f1 f2 = gcd' f2 (f1 `prem` f2)
 
 {--------------------------------------------------------------------
   Term
