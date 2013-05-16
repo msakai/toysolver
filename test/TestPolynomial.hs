@@ -169,6 +169,22 @@ case_gcd_1 = P.gcd f1 f2 @?= 1
     f1 = x^3 + x^2 + x
     f2 = x^2 + 1
 
+prop_exgcd = 
+  forAll upolynomials $ \a ->
+  forAll upolynomials $ \b ->
+    let (g,u,v) = P.exgcd a b
+    in a*u + b*v == g -- Bśzout's identity
+
+case_exgcd_1 = P.exgcd p q @?= (expected_g, expected_u, expected_v)
+  where
+    x :: UPolynomial Rational
+    x = P.var X
+    p = x^4 - 3*x^3 + x^2 - x + 1
+    q = 2*x^3 - x^2 + x + 3
+    expected_g = 1
+    expected_u = P.constant (94/2219) * x^2 + P.constant (9/317) * x + P.constant (404/2219)
+    expected_v = P.constant (-47/2219) * x^3 + P.constant (86/2219) * x^2 - P.constant (88/2219) * x + P.constant (605/2219)
+
 eqUpToInvElem :: UPolynomial Integer -> UPolynomial Integer -> Bool
 eqUpToInvElem 0 0 = True
 eqUpToInvElem _ 0 = False

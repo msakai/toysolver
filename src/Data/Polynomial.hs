@@ -68,6 +68,7 @@ module Data.Polynomial
   , divMod
   , gcd
   , lcm
+  , exgcd
   , gcd'
 
   -- * Term
@@ -545,6 +546,27 @@ lcm :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 lcm _ 0 = 0
 lcm 0 _ = 0
 lcm f1 f2 = toMonic ucmp $ (f1 `mod` (gcd f1 f2)) * f2
+
+-- | Extended GCD algorithm
+exgcd
+  :: (Eq k, Fractional k)
+  => UPolynomial k
+  -> UPolynomial k
+  -> (UPolynomial k, UPolynomial k, UPolynomial k)
+exgcd f1 f2 = f $ go f1 f2 1 0 0 1
+  where
+    go !r0 !r1 !s0 !s1 !t0 !t1
+      | r1 == 0   = (r0, s0, t0)
+      | otherwise = go r1 r2 s1 s2 t1 t2
+      where
+        (q, r2) = r0 `divMod` r1
+        s2 = s0 - q*s1
+        t2 = t0 - q*t1
+    f (g,u,v)
+      | lc_g == 0 = (g, u, v)
+      | otherwise = (mapCoeff (/lc_g) g, mapCoeff (/lc_g) u, mapCoeff (/lc_g) v)
+      where
+        lc_g = lc ucmp g
 
 -- | pseudo reminder
 prem :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
