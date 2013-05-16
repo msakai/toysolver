@@ -16,6 +16,7 @@ Extra-Source-Files:
    src/TseitinEncode.hs
    src/Data/Polyhedron.hs
    src/pbverify.hs
+   src/maxsatverify.hs
    src/pigeonhole.hs
    src/Algorithm/Wang.hs
    samples/gcnf/*.cnf
