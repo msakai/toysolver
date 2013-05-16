@@ -43,7 +43,7 @@ import qualified Data.LA as LA
 import Data.OptDir
 import Data.Polynomial (Polynomial, UPolynomial, Monomial, MonomialOrder)
 import qualified Data.Polynomial as P
-import Data.Polynomial.GBasis as GB
+import Data.Polynomial.GroebnerBasis as GB
 import Data.Var
 import qualified Algorithm.LPUtil as LPUtil
 

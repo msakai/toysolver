@@ -36,7 +36,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Polynomial (Polynomial, UPolynomial, X (..), MonomialOrder)
 import qualified Data.Polynomial as P
-import qualified Data.Polynomial.GBasis as GB
+import qualified Data.Polynomial.GroebnerBasis as GB
 
 factor :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]
 factor f = do

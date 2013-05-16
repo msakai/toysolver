@@ -25,7 +25,7 @@ import qualified Data.Set as Set
 
 import Data.Polynomial (Polynomial, UPolynomial, X (..))
 import qualified Data.Polynomial as P
-import qualified Data.Polynomial.GBasis as GB
+import qualified Data.Polynomial.GroebnerBasis as GB
 
 type Var = Int
 

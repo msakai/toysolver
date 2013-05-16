@@ -119,7 +119,7 @@ Library
      Data.Polynomial.Factorization.Integer
      Data.Polynomial.Factorization.Rational
      Data.Polynomial.Factorization.SquareFree
-     Data.Polynomial.GBasis
+     Data.Polynomial.GroebnerBasis
      Data.Polynomial.Interpolation.Lagrange
      Data.Polynomial.RootSeparation.Graeffe
      Data.Polynomial.RootSeparation.Sturm

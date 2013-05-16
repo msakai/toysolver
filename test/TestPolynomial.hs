@@ -17,7 +17,7 @@ import Text.PrettyPrint.HughesPJClass
 
 import Data.Polynomial (Polynomial, Term, Monomial, UPolynomial, UTerm, UMonomial, X (..))
 import qualified Data.Polynomial as P
-import qualified Data.Polynomial.GBasis as GB
+import qualified Data.Polynomial.GroebnerBasis as GB
 import Data.Polynomial.RootSeparation.Sturm
 import qualified Data.Polynomial.Factorization.FiniteField as FactorFF
 import qualified Data.Polynomial.Factorization.Integer as FactorZ

@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Data.Polynomial.GBasis
+-- Module      :  Data.Polynomial.GroebnerBasis
 -- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
 -- 
@@ -25,7 +25,7 @@
 -- 
 -----------------------------------------------------------------------------
 
-module Data.Polynomial.GBasis
+module Data.Polynomial.GroebnerBasis
   (
   -- * Options
     Options (..)
