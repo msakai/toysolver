@@ -66,10 +66,12 @@ module Data.Polynomial
   , div
   , mod
   , divMod
+  , divides
   , gcd
   , lcm
   , exgcd
   , gcd'
+  , isSquareFree
 
   -- * Term
   , Term
@@ -329,6 +331,9 @@ subst p s =
 isRootOf :: (Eq k, Num k) => k -> UPolynomial k -> Bool
 isRootOf x p = eval (\_ -> x) p == 0
 
+isSquareFree :: (Eq k, Fractional k) => UPolynomial k -> Bool
+isSquareFree p = gcd p (deriv p X) == 1
+
 mapCoeff :: (Eq k1, Num k1, Ord v) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
 mapCoeff f (Polynomial m) = Polynomial $ Map.mapMaybe g m
   where
@@ -535,6 +540,9 @@ divMod f g
         where
           lt_r = lt ucmp r
           t    = fromTerm $ lt_r `tdiv` lt_g
+
+divides :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> Bool
+divides f1 f2 = f2 `mod` f1 == 0
 
 -- | GCD of univariate polynomials
 gcd :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
