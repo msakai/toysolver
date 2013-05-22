@@ -32,8 +32,12 @@ import qualified TypeLevel.Number.Nat as TL
 hensel :: forall p. TL.Nat p => UPolynomial Integer -> [UPolynomial (PrimeField p)] -> Integer -> [UPolynomial Integer]
 hensel f fs1 k
   | k <= 0    = error "hensel; k <= 0"
-  | otherwise = go 1 (map (P.mapCoeff Data.FiniteField.toInteger) fs1)
+  | otherwise = assert precondition $ go 1 (map (P.mapCoeff Data.FiniteField.toInteger) fs1)
   where
+    precondition =
+      P.mapCoeff fromInteger f == product fs1 && 
+      P.deg f == P.deg (product fs1)
+
     p :: Integer
     p = TL.toInt (undefined :: p)
 
@@ -47,7 +51,7 @@ hensel f fs1 k
         and 
         [ P.mapCoeff (`mod` pk) f == P.mapCoeff (`mod` pk) (product fs)
         , fs1 == map (P.mapCoeff fromInteger) fs
-        , and [P.deg fi1 == P.deg fik | (fi1, fik) <- zip (map (P.mapCoeff Data.FiniteField.toInteger) fs1) fs]
+        , and [P.deg fi1 == P.deg fik | (fi1, fik) <- zip fs1 fs]
         ]
       where
         pk = p ^ k
@@ -60,8 +64,7 @@ hensel f fs1 k
 
         -- f ≡ product fs + p^k h  (mod p^(k+1))
         h :: UPolynomial Integer
-        h = P.mapCoeff (\c -> (c `mod` pk1) `div` pk) h0
-        h0 = (f - product fs)
+        h = P.mapCoeff (\c -> (c `mod` pk1) `div` pk) (f - product fs)
 
         hs :: [UPolynomial (PrimeField p)]
         hs = prop_5_11 (map (P.mapCoeff fromInteger) fs) (P.mapCoeff fromInteger h)
@@ -117,16 +120,22 @@ test_prop_5_10 = sum [ei * (product fs `P.div` fi) | (ei,fi) <- zip es fs] == 1
     es = prop_5_10 fs
 
 -- http://www.math.kobe-u.ac.jp/Asir/ca.pdf
-prop_5_11 :: forall k. (Num k, Fractional k, Eq k) => [UPolynomial k] -> UPolynomial k -> [UPolynomial k]
-prop_5_11 fs g = normalize $ map (g*) $ prop_5_10 fs
+prop_5_11 :: forall k. (Num k, Fractional k, Eq k, P.PrettyCoeff k, Ord k) => [UPolynomial k] -> UPolynomial k -> [UPolynomial k]
+prop_5_11 fs g =
+  assert (P.deg g <= P.deg (product fs)) $
+  assert (P.deg c <= 0) $
+  assert (check es2 fs g) $
+    es2
   where
-    check :: [UPolynomial k] -> [UPolynomial k] -> UPolynomial k -> Bool
-    check es fs g = sum [ei * (product fs `P.div` fi) | (ei,fi) <- zip es fs] == g
+    es  = map (g*) $ prop_5_10 fs
+    c   = sum [ei `P.div` fi | (ei,fi) <- zip es fs]
+    es2 = case zipWith P.mod es fs of
+            e2' : es2' -> e2' + c * head fs : es2'          
 
-    normalize :: [UPolynomial k] -> [UPolynomial k]
-    normalize es = assert (check es2 fs g) es2
-      where
-        es2 = zipWith P.mod es fs
+    check :: [UPolynomial k] -> [UPolynomial k] -> UPolynomial k -> Bool
+    check es fs g =
+      sum [ei * (product fs `P.div` fi) | (ei,fi) <- zip es fs] == g &&
+      and [P.deg ei <= P.deg fi | (ei,fi) <- zip es fs]
 
 test_prop_5_11 :: Bool
 test_prop_5_11 = sum [ei * (product fs `P.div` fi) | (ei,fi) <- zip es fs] == g
