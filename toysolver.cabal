@@ -118,8 +118,10 @@ Library
      Data.Polynomial.Factorization.FiniteField
      Data.Polynomial.Factorization.Hensel
      Data.Polynomial.Factorization.Integer
+     Data.Polynomial.Factorization.Kronecker
      Data.Polynomial.Factorization.Rational
      Data.Polynomial.Factorization.SquareFree
+     Data.Polynomial.Factorization.Zassenhaus
      Data.Polynomial.GroebnerBasis
      Data.Polynomial.Interpolation.Lagrange
      Data.Polynomial.RootSeparation.Graeffe
