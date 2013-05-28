@@ -261,6 +261,27 @@ case_cont_pp_Rational = do
     p :: UPolynomial Rational
     p = P.constant (1/3) * x^5 + P.constant (7/2) * x^2 + 2 * x + 1
 
+prop_pdivMod =
+  forAll upolynomialsZ $ \f ->
+  forAll upolynomialsZ $ \g ->
+    g /= 0 ==>
+      let (b,q,r) = f `P.pdivMod` g
+      in P.constant b * f == q*g + r && P.deg r < P.deg g
+
+prop_pdiv =
+  forAll upolynomialsZ $ \f ->
+  forAll upolynomialsZ $ \g ->
+    g /= 0 ==>
+      let (_,q,_) = f `P.pdivMod` g
+      in f `P.pdiv` g == q
+
+prop_pmod =
+  forAll upolynomialsZ $ \f ->
+  forAll upolynomialsZ $ \g ->
+    g /= 0 ==>
+      let (_,_,r) = f `P.pdivMod` g
+      in f `P.pmod` g == r
+
 {--------------------------------------------------------------------
   Term
 --------------------------------------------------------------------}
