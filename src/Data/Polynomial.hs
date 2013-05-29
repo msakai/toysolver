@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeFamilies, BangPatterns, DeriveDataTypeable #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, BangPatterns, DeriveDataTypeable #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, TypeFamilies, BangPatterns, DeriveDataTypeable)
+-- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, BangPatterns, DeriveDataTypeable)
 --
 -- Polynomials
 --
@@ -27,7 +27,7 @@ module Data.Polynomial
     Polynomial
 
   -- * Conversion
-  , Variable (..)
+  , Var (..)
   , constant
   , terms
   , fromTerms
@@ -37,7 +37,7 @@ module Data.Polynomial
 
   -- * Query
   , Degree (..)
-  , Variables (..)
+  , Vars (..)
   , lt
   , lc
   , lm
@@ -145,11 +145,11 @@ infixl 7  `div`, `mod`
   Classes
 --------------------------------------------------------------------}
 
-class Variable f where
-  var :: Ord v => v -> f v
+class Vars a v => Var a v | a -> v where
+  var :: v -> a
 
-class Variables f where
-  vars :: Ord v => f v -> Set v
+class Ord v => Vars a v | a -> v where
+  vars :: a -> Set v
 
 -- | total degree of a given polynomial
 class Degree t where
@@ -187,10 +187,10 @@ instance (Show v, Ord v, Show k) => Show (Polynomial k v) where
 instance (NFData k, NFData v) => NFData (Polynomial k v) where
   rnf (Polynomial m) = rnf m
 
-instance (Eq k, Num k) => Variable (Polynomial k) where
+instance (Eq k, Num k, Ord v) => Var (Polynomial k v) v where
   var x = fromTerm (1, var x)
 
-instance (Eq k, Num k) => Variables (Polynomial k) where
+instance (Eq k, Num k, Ord v) => Vars (Polynomial k v) v where
   vars p = Set.unions $ [vars mm | (_, mm) <- terms p]
 
 instance Degree (Polynomial k v) where
@@ -685,10 +685,10 @@ instance (NFData v) => NFData (Monomial v) where
 instance Degree (Monomial v) where
   deg (Monomial m) = sum $ Map.elems m
 
-instance Variable Monomial where
+instance Ord v => Var (Monomial v) v where
   var x = Monomial $ Map.singleton x 1
 
-instance Variables Monomial where
+instance Ord v => Vars (Monomial v) v where
   vars mm = Map.keysSet (mindicesMap mm)
 
 mone :: Monomial v
