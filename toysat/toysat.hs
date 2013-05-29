@@ -282,32 +282,43 @@ main = do
           endWC  <- getCurrentTime
           putCommentLine $ printf "total CPU time = %.3fs" (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
           putCommentLine $ printf "total wall clock time = %.3fs" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
+          printGCStat
 
+printGCStat :: IO ()
 #if defined(__GLASGOW_HASKELL__) && MIN_VERSION_base(4,5,0)
-          stat <- Stats.getGCStats
-          putCommentLine "GCStats:"
-          putCommentLine $ printf "  bytesAllocated = %d"         $ Stats.bytesAllocated stat
-          putCommentLine $ printf "  numGcs = %d"                 $ Stats.numGcs stat
-          putCommentLine $ printf "  maxBytesUsed = %d"           $ Stats.maxBytesUsed stat
-          putCommentLine $ printf "  numByteUsageSamples = %d"    $ Stats.numByteUsageSamples stat
-          putCommentLine $ printf "  cumulativeBytesUsed = %d"    $ Stats.cumulativeBytesUsed stat
-          putCommentLine $ printf "  bytesCopied = %d"            $ Stats.bytesCopied stat
-          putCommentLine $ printf "  currentBytesUsed = %d"       $ Stats.currentBytesUsed stat
-          putCommentLine $ printf "  currentBytesSlop = %d"       $ Stats.currentBytesSlop stat
-          putCommentLine $ printf "  maxBytesSlop = %d"           $ Stats.maxBytesSlop stat
-          putCommentLine $ printf "  peakMegabytesAllocated = %d" $ Stats.peakMegabytesAllocated stat
-          putCommentLine $ printf "  mutatorCpuSeconds = %5.2f"   $ Stats.mutatorCpuSeconds stat
-          putCommentLine $ printf "  mutatorWallSeconds = %5.2f"  $ Stats.mutatorWallSeconds stat
-          putCommentLine $ printf "  gcCpuSeconds = %5.2f"        $ Stats.gcCpuSeconds stat
-          putCommentLine $ printf "  gcWallSeconds = %5.2f"       $ Stats.gcWallSeconds stat
-          putCommentLine $ printf "  cpuSeconds = %5.2f"          $ Stats.cpuSeconds stat
-          putCommentLine $ printf "  wallSeconds = %5.2f"         $ Stats.wallSeconds stat
+printGCStat = do
 #if MIN_VERSION_base(4,6,0)
-          putCommentLine $ printf "  parTotBytesCopied = %d"      $ Stats.parTotBytesCopied stat
+  b <- Stats.getGCStatsEnabled
+  when b $ do
 #else
-          putCommentLine $ printf "  parAvgBytesCopied = %d"      $ Stats.parAvgBytesCopied stat
+  do
 #endif
-          putCommentLine $ printf "  parMaxBytesCopied = %d"      $ Stats.parMaxBytesCopied stat
+    stat <- Stats.getGCStats
+    putCommentLine "GCStats:"
+    putCommentLine $ printf "  bytesAllocated = %d"         $ Stats.bytesAllocated stat
+    putCommentLine $ printf "  numGcs = %d"                 $ Stats.numGcs stat
+    putCommentLine $ printf "  maxBytesUsed = %d"           $ Stats.maxBytesUsed stat
+    putCommentLine $ printf "  numByteUsageSamples = %d"    $ Stats.numByteUsageSamples stat
+    putCommentLine $ printf "  cumulativeBytesUsed = %d"    $ Stats.cumulativeBytesUsed stat
+    putCommentLine $ printf "  bytesCopied = %d"            $ Stats.bytesCopied stat
+    putCommentLine $ printf "  currentBytesUsed = %d"       $ Stats.currentBytesUsed stat
+    putCommentLine $ printf "  currentBytesSlop = %d"       $ Stats.currentBytesSlop stat
+    putCommentLine $ printf "  maxBytesSlop = %d"           $ Stats.maxBytesSlop stat
+    putCommentLine $ printf "  peakMegabytesAllocated = %d" $ Stats.peakMegabytesAllocated stat
+    putCommentLine $ printf "  mutatorCpuSeconds = %5.2f"   $ Stats.mutatorCpuSeconds stat
+    putCommentLine $ printf "  mutatorWallSeconds = %5.2f"  $ Stats.mutatorWallSeconds stat
+    putCommentLine $ printf "  gcCpuSeconds = %5.2f"        $ Stats.gcCpuSeconds stat
+    putCommentLine $ printf "  gcWallSeconds = %5.2f"       $ Stats.gcWallSeconds stat
+    putCommentLine $ printf "  cpuSeconds = %5.2f"          $ Stats.cpuSeconds stat
+    putCommentLine $ printf "  wallSeconds = %5.2f"         $ Stats.wallSeconds stat
+#if MIN_VERSION_base(4,6,0)
+    putCommentLine $ printf "  parTotBytesCopied = %d"      $ Stats.parTotBytesCopied stat
+#else
+    putCommentLine $ printf "  parAvgBytesCopied = %d"      $ Stats.parAvgBytesCopied stat
+#endif
+    putCommentLine $ printf "  parMaxBytesCopied = %d"      $ Stats.parMaxBytesCopied stat
+#else
+printGCStat = return ()
 #endif
 
 showHelp :: Handle -> IO ()
