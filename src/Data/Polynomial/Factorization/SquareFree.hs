@@ -21,8 +21,8 @@ module Data.Polynomial.Factorization.SquareFree
   ) where
 
 import Control.Exception
-import Data.Polynomial (UPolynomial, X (..))
-import qualified Data.Polynomial as P
+import Data.Polynomial.Base (UPolynomial, X (..))
+import qualified Data.Polynomial.Base as P
 
 -- | Square-free decomposition of univariate polynomials over a field of characteristic 0.
 sqfree :: (Eq k, Fractional k) => UPolynomial k -> [(UPolynomial k, Integer)]

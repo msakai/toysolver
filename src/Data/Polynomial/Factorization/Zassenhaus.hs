@@ -30,9 +30,9 @@ import Data.Numbers.Primes (primes)
 import Data.Ratio
 import Data.STRef
 
-import Data.Polynomial (UPolynomial, X (..))
-import qualified Data.Polynomial as P
-import qualified Data.Polynomial.Factorization.FiniteField as FF
+import Data.Polynomial.Base (UPolynomial, X (..))
+import qualified Data.Polynomial.Base as P
+import Data.Polynomial.Factorization.FiniteField ()
 import qualified Data.Polynomial.Factorization.Hensel as Hensel
 import qualified Data.Polynomial.Factorization.SquareFree as SQ
 
@@ -71,7 +71,7 @@ zassenhausWithP f p =
       guard $ P.deg f == P.deg f_mod_p -- 主係数を割り切らないことと同値
       guard $ P.isSquareFree f_mod_p
       let fs :: [UPolynomial (PrimeField p)]
-          fs = [assert (n==1) fi | (fi,n) <- FF.factor f_mod_p]
+          fs = [assert (n==1) fi | (fi,n) <- P.factor f_mod_p]
       return $ lift f fs
 
 {-

@@ -25,8 +25,8 @@ import Data.MultiSet (MultiSet)
 import qualified Data.MultiSet as MultiSet
 import Data.Numbers.Primes (primes)
 import Data.Ratio
-import Data.Polynomial (Polynomial, UPolynomial, X (..))
-import qualified Data.Polynomial as P
+import Data.Polynomial.Base (Polynomial, UPolynomial, X (..))
+import qualified Data.Polynomial.Base as P
 import qualified Data.Polynomial.Interpolation.Lagrange as Interpolation
 import Util (isInteger)
 

@@ -55,7 +55,6 @@ import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyPare
 
 import Data.Polynomial (Polynomial, UPolynomial, X (..))
 import qualified Data.Polynomial as P
-import qualified Data.Polynomial.Factorization.Rational as FactorQ
 import qualified Data.Polynomial.RootSeparation.Sturm as Sturm
 import Data.Interval (Interval, EndPoint (..), (<=..<), (<..<=), (<..<), (<!), (>!))
 import qualified Data.Interval as Interval
@@ -72,7 +71,7 @@ data AReal = RealRoot (UPolynomial Rational) (Interval Rational)
 -- | Real roots of the polynomial in ascending order.
 realRoots :: UPolynomial Rational -> [AReal]
 realRoots p = Set.toAscList $ Set.fromList $ do
-  (q,_) <- FactorQ.factor p
+  (q,_) <- P.factor p
   realRoots' q
 
 -- | Real roots of the polynomial in ascending order.
@@ -90,7 +89,7 @@ realRoots' p = do
 
 realRoot :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot p i = 
-  case [q | (q,_) <- FactorQ.factor p, P.deg q > 0, Sturm.numRoots q i == 1] of
+  case [q | (q,_) <- P.factor p, P.deg q > 0, Sturm.numRoots q i == 1] of
     p2:_ -> realRoot' p2 i
     []   -> error "Data.AlgebraicNumber.Real.realRoot: invalid interval"
 

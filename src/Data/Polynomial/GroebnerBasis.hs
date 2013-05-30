@@ -41,8 +41,8 @@ module Data.Polynomial.GroebnerBasis
 
 import qualified Data.Set as Set
 import qualified Data.Heap as H -- http://hackage.haskell.org/package/heaps
-import Data.Polynomial (Polynomial, Monomial, MonomialOrder)
-import qualified Data.Polynomial as P
+import Data.Polynomial.Base (Polynomial, Monomial, MonomialOrder)
+import qualified Data.Polynomial.Base as P
 
 data Options
   = Options

@@ -23,8 +23,8 @@ module Data.Polynomial.Factorization.Hensel
 
 import Control.Exception (assert)
 import Data.FiniteField
-import Data.Polynomial (UPolynomial, X (..))
-import qualified Data.Polynomial as P
+import Data.Polynomial.Base (UPolynomial, X (..))
+import qualified Data.Polynomial.Base as P
 import qualified TypeLevel.Number.Nat as TL
 
 -- import Text.PrettyPrint.HughesPJClass

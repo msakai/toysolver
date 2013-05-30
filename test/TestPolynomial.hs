@@ -20,8 +20,6 @@ import qualified Data.Polynomial as P
 import qualified Data.Polynomial.GroebnerBasis as GB
 import Data.Polynomial.RootSeparation.Sturm
 import qualified Data.Polynomial.Factorization.FiniteField as FactorFF
-import qualified Data.Polynomial.Factorization.Integer as FactorZ
-import qualified Data.Polynomial.Factorization.Rational as FactorQ
 import qualified Data.Polynomial.Interpolation.Lagrange as LagrangeInterpolation
 import qualified Data.Interval as Interval
 import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<))
@@ -657,9 +655,9 @@ case_separate = do
 
 ------------------------------------------------------------------------
 
-case_factorZ_zero = FactorZ.factor 0 @?= [(0,1)]
-case_factorZ_one  = FactorZ.factor 1 @?= []
-case_factorZ_two  = FactorZ.factor 2 @?= [(2,1)]
+case_factorZ_zero = P.factor (0::UPolynomial Integer) @?= [(0,1)]
+case_factorZ_one  = P.factor (1::UPolynomial Integer) @?= []
+case_factorZ_two  = P.factor (2::UPolynomial Integer) @?= [(2,1)]
 
 -- http://en.wikipedia.org/wiki/Factorization_of_polynomials
 case_factorZ_test1 = do
@@ -669,7 +667,7 @@ case_factorZ_test1 = do
     x :: UPolynomial Integer
     x = P.var X   
     f = 2*(x^5 + x^4 + x^2 + x + 2)
-    actual   = FactorZ.factor f
+    actual   = P.factor f
     expected = [(2,1), (x^2+x+1,1), (x^3-x+2,1)]
 
 case_factorZ_test2 = do
@@ -679,12 +677,12 @@ case_factorZ_test2 = do
     x :: UPolynomial Integer
     x = P.var X   
     f = - (x^5 + x^4 + x^2 + x + 2)
-    actual   = FactorZ.factor f
+    actual   = P.factor f
     expected = [(-1,1), (x^2+x+1,1), (x^3-x+2,1)]
 
-case_factorQ_zero = FactorQ.factor 0 @?= [(0,1)]
-case_factorQ_one  = FactorQ.factor 1 @?= []
-case_factorQ_two  = FactorQ.factor 2 @?= [(2,1)]
+case_factorQ_zero = P.factor (0::UPolynomial Rational) @?= [(0,1)]
+case_factorQ_one  = P.factor (1::UPolynomial Rational) @?= []
+case_factorQ_two  = P.factor (2::UPolynomial Rational) @?= [(2,1)]
 
 -- http://en.wikipedia.org/wiki/Factorization_of_polynomials
 case_factorQ_test1 = do
@@ -694,7 +692,7 @@ case_factorQ_test1 = do
     x :: UPolynomial Rational
     x = P.var X
     f = 2*(x^5 + x^4 + x^2 + x + 2)
-    actual   = FactorQ.factor f
+    actual   = P.factor f
     expected = [(2, 1), (x^2+x+1, 1), (x^3-x+2, 1)]
 
 case_factorQ_test2 = do
@@ -704,7 +702,7 @@ case_factorQ_test2 = do
     x :: UPolynomial Rational
     x = P.var X
     f = - (x^5 + x^4 + x^2 + x + 2)
-    actual   = FactorQ.factor f
+    actual   = P.factor f
     expected = [(-1,1), (x^2+x+1,1), (x^3-x+2,1)]
 
 -- http://en.wikipedia.org/wiki/Factorization_of_polynomials_over_a_finite_field_and_irreducibility_tests
@@ -734,7 +732,7 @@ case_FF_berlekamp_1 = do
     x :: UPolynomial $(FF.primeField 5)
     x = P.var X
     f = x^100 - x^200
-    actual   = FactorFF.factor f
+    actual   = P.factor f
     expected = (4,1) : [(1*x+1,25), (1*x+3,25), (1*x+2,25), (1*x+4,25), (1*x,100)]
 
 {-
@@ -772,7 +770,7 @@ case_FF_berlekamp_3 = do
     x :: UPolynomial $(FF.primeField 7)
     x = P.var X
     f = 1 - x^100
-    actual   = FactorFF.factor f
+    actual   = P.factor f
     expected = (6,1) : [(1*x+1,1), (1*x+6,1), (1*x^2+1,1), (1*x^4+2*x^3+5*x^2+2*x+1,1), (1*x^4+5*x^3+5*x^2+5*x+1,1), (1*x^4+5*x^3+3*x^2+2*x+1,1), (1*x^4+2*x^3+3*x^2+5*x+1,1), (1*x^4+1*x^3+1*x^2+6*x+1,1), (1*x^4+1*x^3+5*x^2+1*x+1,1), (1*x^4+2*x^3+4*x^2+2*x+1,1), (1*x^4+3*x^3+6*x^2+4*x+1,1), (1*x^4+3*x^3+3*x+1,1), (1*x^4+5*x^3+2*x+1,1), (1*x^4+3*x^3+3*x^2+3*x+1,1), (1*x^4+6*x^3+5*x^2+6*x+1,1), (1*x^4+6*x^3+1*x^2+1*x+1,1), (1*x^4+4*x^3+3*x^2+4*x+1,1), (1*x^4+6*x^3+1*x^2+6*x+1,1), (1*x^4+4*x^3+4*x+1,1), (1*x^4+2*x^3+1*x^2+5*x+1,1), (1*x^4+5*x^3+4*x^2+5*x+1,1), (1*x^4+4*x^3+4*x^2+3*x+1,1), (1*x^4+5*x^3+1*x^2+2*x+1,1), (1*x^4+1*x^3+1*x^2+1*x+1,1), (1*x^4+3*x^3+4*x^2+4*x+1,1), (1*x^4+2*x^3+5*x+1,1), (1*x^4+4*x^3+6*x^2+3*x+1,1)]
 
 {-

@@ -149,6 +149,7 @@ Library
      Util
      Version
   Other-Modules:
+     Data.Polynomial.Base
      Data.IndexedPriorityQueue
      Data.SeqQueue
      Text.Util

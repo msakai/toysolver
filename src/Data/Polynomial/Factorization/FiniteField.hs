@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns, TypeSynonymInstances, FlexibleInstances #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns)
+-- Portability :  non-portable (ScopedTypeVariables, BangPatterns, TypeSynonymInstances, FlexibleInstances)
 --
 -- Factoriation of polynomial over a finite field.
 --
@@ -34,9 +34,13 @@ import Data.Function (on)
 import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Polynomial (Polynomial, UPolynomial, X (..), MonomialOrder)
-import qualified Data.Polynomial as P
+import Data.Polynomial.Base (Polynomial, UPolynomial, X (..), MonomialOrder)
+import qualified Data.Polynomial.Base as P
 import qualified Data.Polynomial.GroebnerBasis as GB
+import qualified TypeLevel.Number.Nat as TL
+
+instance TL.Nat p => P.Factor (UPolynomial (PrimeField p)) where
+  factor = factor
 
 factor :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]
 factor f = do

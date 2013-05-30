@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Polynomial.Factorization.Integer
@@ -6,12 +7,14 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances)
 --
 -----------------------------------------------------------------------------
-module Data.Polynomial.Factorization.Integer
-  ( factor
-  ) where
+module Data.Polynomial.Factorization.Integer () where
 
 -- import Data.Polynomial.Factorization.Kronecker
-import Data.Polynomial.Factorization.Zassenhaus (factor)
+import qualified Data.Polynomial.Base as P
+import Data.Polynomial.Factorization.Zassenhaus
+
+instance P.Factor (P.UPolynomial Integer) where
+  factor = factor
