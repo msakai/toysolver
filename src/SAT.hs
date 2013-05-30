@@ -1,5 +1,10 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
-{-# LANGUAGE BangPatterns, RecursiveDo, ScopedTypeVariables, CPP, DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns, ScopedTypeVariables, CPP, DeriveDataTypeable #-}
+#if __GLASGOW_HASKELL__ < 706
+{-# LANGUAGE DoRec #-}
+#else
+{-# LANGUAGE RecursiveDo #-}
+#endif
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  SAT
