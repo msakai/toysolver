@@ -70,12 +70,12 @@ mult _ _    = Zero
 
 recip :: Sign -> Sign
 recip Pos  = Pos
-recip Zero = error "signRecip: division by Zero"
+recip Zero = error "Data.Sign.recip: division by Zero"
 recip Neg  = Neg
 
 div :: Sign -> Sign -> Sign
 div s Pos  = s
-div _ Zero = error "signDiv: division by Zero"
+div _ Zero = error "Data.Sign.div: division by Zero"
 div s Neg  = negate s
 
 pow :: Integral x => Sign -> x -> Sign
