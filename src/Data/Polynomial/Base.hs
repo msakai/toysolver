@@ -587,54 +587,43 @@ exgcd f1 f2 = f $ go f1 f2 1 0 0 1
         lc_g = lc ucmp g
 
 -- | pseudo division
---
--- TODO: weaken Integral to Num.
-pdivMod :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> (r, UPolynomial r, UPolynomial r)
+pdivMod :: (Eq r, Num r) => UPolynomial r -> UPolynomial r -> (r, UPolynomial r, UPolynomial r)
 pdivMod _ 0 = error "pdivMod: division by 0"
 pdivMod f g
   | deg f < deg g = (1, 0, f)
-  | otherwise     = go (scale b f) 0
+  | otherwise     = go (deg f - deg g + 1) f 0
   where
     (lc_g, lm_g) = lt ucmp g
-    b = lc_g ^ (deg f - deg g + 1)
+    b = lc_g ^ (deg f - deg_g + 1)
     deg_g = deg g
-    go !f1 !q
-      | deg_g > deg f1 = (b, q, f1)
-      | otherwise =
-          assert (lc_f1 `Prelude.mod` lc_g == 0 && mdivides lm_g lm_f1) $
-            go (f1 - s * g) (q + s)
+    go !n !f1 !q
+      | deg_g > deg f1 = (b, q, scale (lc_g ^ n) f1)
+      | otherwise      = go (n - 1) (scale lc_g f1 - s * g) (q + scale (lc_g ^ (n-1)) s)
           where
             (lc_f1, lm_f1) = lt ucmp f1
-            s = fromTerm (lc_f1 `Prelude.div` lc_g, lm_f1 `mdiv` lm_g)
+            s = fromTerm (lc_f1, lm_f1 `mdiv` lm_g)
 
 -- | pseudo quotient
---
--- TODO: weaken Integral to Num.
-pdiv :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
+pdiv :: (Eq r, Num r) => UPolynomial r -> UPolynomial r -> UPolynomial r
 pdiv f g =
   case f `pdivMod` g of
     (_, q, _) -> q
 
 -- | pseudo reminder
---
--- TODO: weaken Integral to Num.
-pmod :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
+pmod :: (Eq r, Num r) => UPolynomial r -> UPolynomial r -> UPolynomial r
 pmod _ 0 = error "pmod: division by 0"
 pmod f g
   | deg f < deg g = f
-  | otherwise     = go (scale b f)
+  | otherwise     = go (deg f - deg g + 1) f
   where
     (lc_g, lm_g) = lt ucmp g
-    b = lc_g ^ (deg f - deg g + 1)
     deg_g = deg g
-    go !f1
-      | deg_g > deg f1 = f1
-      | otherwise =
-          assert (lc_f1 `Prelude.mod` lc_g == 0 && mdivides lm_g lm_f1) $
-            go (f1 - s * g)
+    go !n !f1
+      | deg_g > deg f1 = scale (lc_g ^ n) f1
+      | otherwise      = go (n - 1) (scale lc_g f1 - s * g)
           where
             (lc_f1, lm_f1) = lt ucmp f1
-            s = fromTerm (lc_f1 `Prelude.div` lc_g, lm_f1 `mdiv` lm_g)
+            s = fromTerm (lc_f1, lm_f1 `mdiv` lm_g)
 
 -- | GCD of univariate polynomials
 gcd' :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
