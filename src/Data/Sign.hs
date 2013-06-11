@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances, DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Sign
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (DeriveDataTypeable)
+-- Portability :  non-portable (FlexibleInstances, DeriveDataTypeable)
 --
 -- Algebra of Signs.
 --
@@ -26,8 +26,11 @@ module Data.Sign
   ) where
 
 import Prelude hiding (negate, recip, div)
-import Algebra.Enumerable (Enumerable (..)) -- from lattices package
+import Algebra.Enumerable (Enumerable (..), universeBounded) -- from lattices package
+import qualified Algebra.Lattice as L -- from lattices package
 import Control.DeepSeq
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Typeable
 import Data.Data
 import qualified Numeric.Algebra as Alg
@@ -38,7 +41,7 @@ data Sign = Neg | Zero | Pos
 instance NFData Sign
 
 instance Enumerable Sign where
-  universe = [Neg .. Pos]
+  universe = universeBounded
 
 instance Alg.Multiplicative Sign where
   (*)   = mult
@@ -96,4 +99,12 @@ symbol Pos  = "+"
 symbol Neg  = "-"
 symbol Zero = "0"
 
+instance L.MeetSemiLattice (Set Sign) where
+  meet = Set.intersection
 
+instance L.Lattice (Set Sign)
+
+instance L.BoundedMeetSemiLattice (Set Sign) where
+  top = Set.fromList universe
+
+instance L.BoundedLattice (Set Sign)
