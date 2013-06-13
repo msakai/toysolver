@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances, DeriveDataTypeable, CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Sign
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleInstances, DeriveDataTypeable)
+-- Portability :  non-portable (FlexibleInstances, DeriveDataTypeable, CPP)
 --
 -- Algebra of Signs.
 --
@@ -29,6 +29,7 @@ import Prelude hiding (negate, recip, div)
 import Algebra.Enumerable (Enumerable (..), universeBounded) -- from lattices package
 import qualified Algebra.Lattice as L -- from lattices package
 import Control.DeepSeq
+import Data.Hashable
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Typeable
@@ -39,6 +40,8 @@ data Sign = Neg | Zero | Pos
   deriving (Eq, Ord, Show, Read, Enum, Bounded, Typeable, Data)
 
 instance NFData Sign
+
+instance Hashable Sign where hashWithSalt = hashUsing fromEnum
 
 instance Enumerable Sign where
   universe = universeBounded
@@ -108,3 +111,31 @@ instance L.BoundedMeetSemiLattice (Set Sign) where
   top = Set.fromList universe
 
 instance L.BoundedLattice (Set Sign)
+
+#if !MIN_VERSION_hashable(1,2,0)
+-- Copied from hashable-1.2.0.7:
+-- Copyright   :  (c) Milan Straka 2010
+--                (c) Johan Tibell 2011
+--                (c) Bryan O'Sullivan 2011, 2012
+
+-- | Transform a value into a 'Hashable' value, then hash the
+-- transformed value using the given salt.
+--
+-- This is a useful shorthand in cases where a type can easily be
+-- mapped to another type that is already an instance of 'Hashable'.
+-- Example:
+--
+-- > data Foo = Foo | Bar
+-- >          deriving (Enum)
+-- >
+-- > instance Hashable Foo where
+-- >     hashWithSalt = hashUsing fromEnum
+hashUsing :: (Hashable b) =>
+             (a -> b)           -- ^ Transformation function.
+          -> Int                -- ^ Salt.
+          -> a                  -- ^ Value to transform.
+          -> Int
+hashUsing f salt x = hashWithSalt salt (f x)
+{-# INLINE hashUsing #-}
+#endif
+
