@@ -47,6 +47,7 @@ module Data.Polynomial
 
   -- * Operations
   , Factor (..)
+  , SQFree (..)
   , ContPP (..)
   , deriv
   , integral

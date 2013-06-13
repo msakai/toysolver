@@ -713,7 +713,7 @@ case_FF_sqfree_test1 = do
     x :: UPolynomial $(FF.primeField 3)
     x = P.var X
     f  = x^11 + 2*x^9 + 2*x^8 + x^6 + x^5 + 2*x^3 + 2*x^2 + 1
-    actual   = FactorFF.sqfree f
+    actual   = P.sqfree f
     expected = [(x+1, 1), (x^2+1, 3), (x+2, 4)]
 
 {-
@@ -847,6 +847,21 @@ case_basisOfBerlekampSubalgebra_4 = sequence_ [(g ^ (13::Int)) `P.mod` f @?= g |
 --     x = P.var X
 --     f = 2 + x + x^2 + x^3 + x^4 + x^5
 --     basis = FactorFF.basisOfBerlekampSubalgebra f
+
+case_sqfree_Integer = actual @?= expected
+  where
+    x :: UPolynomial Integer
+    x = P.var X
+    actual   = P.sqfree (x^(2::Int) + 2*x + 1)
+    expected = [(x + 1, 2)]
+
+case_sqfree_Rational = actual @?= expected
+  where
+    x :: UPolynomial Rational
+    x = P.var X
+    actual   = P.sqfree (x^(2::Int) + 2*x + 1)
+    expected = [(x + 1, 2)]
+
 
 ------------------------------------------------------------------------
 

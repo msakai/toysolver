@@ -33,8 +33,8 @@ import Data.STRef
 import Data.Polynomial.Base (UPolynomial, X (..))
 import qualified Data.Polynomial.Base as P
 import Data.Polynomial.Factorization.FiniteField ()
+import Data.Polynomial.Factorization.SquareFree ()
 import qualified Data.Polynomial.Factorization.Hensel as Hensel
-import qualified Data.Polynomial.Factorization.SquareFree as SQ
 
 import qualified TypeLevel.Number.Nat as TL
 import Data.FiniteField
@@ -44,18 +44,7 @@ import qualified Data.FiniteField.SomeNat as SomeNat
 -- import Text.PrettyPrint.HughesPJClass
 
 factor :: UPolynomial Integer -> [(UPolynomial Integer, Integer)]
-factor f = [(h,n) | (g,n) <- sqfree' f, h <- if P.deg g > 0 then zassenhaus g else return g]
-
-sqfree' :: UPolynomial Integer -> [(UPolynomial Integer, Integer)]
-sqfree' 0 = [(0,1)]
-sqfree' f = go 1 [] (SQ.sqfree (P.mapCoeff fromIntegral f))
-  where
-    go !u ys [] =
-      assert (denominator u == 1) $
-        [(P.constant (numerator u), 1) | u /= 1] ++ ys
-    go !u ys ((g,n):xs)
-      | P.deg g <= 0 = go (u * P.coeff P.mone g) ys xs
-      | otherwise    = go (u * (P.cont g)^n) ((P.mapCoeff numerator (P.pp g), n) : ys) xs
+factor f = [(h,n) | (g,n) <- P.sqfree f, h <- if P.deg g > 0 then zassenhaus g else return g]
 
 zassenhaus :: UPolynomial Integer -> [UPolynomial Integer]
 zassenhaus f = head $ do
@@ -163,11 +152,6 @@ comb [] _     = []
 comb (x:xs) n = [x:ys | ys <- comb xs (n-1)] ++ comb xs n
 
 -- ---------------------------------------------------------------------------
-
-test_sqfree' :: [(UPolynomial Integer, Integer)]
-test_sqfree' = sqfree' $ x^(2::Int) + 2*x + 1
-  where
-    x = P.var X
 
 test_zassenhaus :: [UPolynomial Integer]
 test_zassenhaus = zassenhaus f

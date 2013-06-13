@@ -48,6 +48,7 @@ module Data.Polynomial.Base
 
   -- * Operations
   , Factor (..)
+  , SQFree (..)
   , ContPP (..)
   , deriv
   , integral
@@ -403,6 +404,12 @@ class Factor a where
   -- | factor a polynomial @p@ into @p1 ^ n1 + p2 ^ n2 + ..@ and
   -- return a list @[(p1,n1), (p2,n2), ..]@.
   factor :: a -> [(a, Integer)]
+
+-- | Square-free factorization of polynomials
+class SQFree a where
+  -- | factor a polynomial @p@ into @p1 ^ n1 + p2 ^ n2 + ..@ and
+  -- return a list @[(p1,n1), (p2,n2), ..]@.
+  sqfree :: a -> [(a, Integer)]
 
 {--------------------------------------------------------------------
   Pretty printing

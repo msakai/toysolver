@@ -42,6 +42,9 @@ import qualified TypeLevel.Number.Nat as TL
 instance TL.Nat p => P.Factor (UPolynomial (PrimeField p)) where
   factor = factor
 
+instance TL.Nat p => P.SQFree (UPolynomial (PrimeField p)) where
+  sqfree = sqfree
+
 factor :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]
 factor f = do
   (g,n) <- sqfree f
