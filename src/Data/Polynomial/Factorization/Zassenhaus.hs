@@ -38,8 +38,6 @@ import qualified Data.Polynomial.Factorization.Hensel as Hensel
 
 import qualified TypeLevel.Number.Nat as TL
 import Data.FiniteField
-import Data.FiniteField.SomeNat (SomeNat (..))
-import qualified Data.FiniteField.SomeNat as SomeNat
 
 -- import Text.PrettyPrint.HughesPJClass
 
@@ -47,14 +45,10 @@ factor :: UPolynomial Integer -> [(UPolynomial Integer, Integer)]
 factor f = [(h,n) | (g,n) <- P.sqfree f, h <- if P.deg g > 0 then zassenhaus g else return g]
 
 zassenhaus :: UPolynomial Integer -> [UPolynomial Integer]
-zassenhaus f = head $ do
-  p <- primes
-  maybeToList $ zassenhausWithP f p
-
-zassenhausWithP :: UPolynomial Integer -> Integer -> Maybe [UPolynomial Integer]
-zassenhausWithP f p =
-  case SomeNat.fromInteger p of
-    SomeNat (_ :: p) -> do
+zassenhaus f = fromJust $ msum [TL.withNat zassenhausWithP p | p <- primes]
+  where
+    zassenhausWithP :: forall p. TL.Nat p => p -> Maybe [UPolynomial Integer]
+    zassenhausWithP _ = do
       let f_mod_p :: UPolynomial (PrimeField p)
           f_mod_p = P.mapCoeff fromInteger f
       guard $ P.deg f == P.deg f_mod_p -- 主係数を割り切らないことと同値
@@ -155,12 +149,6 @@ comb (x:xs) n = [x:ys | ys <- comb xs (n-1)] ++ comb xs n
 
 test_zassenhaus :: [UPolynomial Integer]
 test_zassenhaus = zassenhaus f
-  where
-    x = P.var X
-    f = x^(4::Int) + 4
-
-test_zassenhausWithP :: Maybe [UPolynomial Integer]
-test_zassenhausWithP = zassenhausWithP f 7
   where
     x = P.var X
     f = x^(4::Int) + 4

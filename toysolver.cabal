@@ -53,8 +53,8 @@ Library
      base >=4 && <5,
      containers >= 0.4.2, mtl, array, random, stm >=2.3, parsec, bytestring, filepath, deepseq, time, old-locale, primes,
      parse-dimacs, queue, heaps, unbounded-delays, lattices >=1.2.1.1, vector-space >=0.8.6, multiset, algebra,
-     prettyclass >=1.0.0, type-level-numbers, hashable >=1.1.2.5 && <1.3.0.0,
-     OptDir, data-interval >=0.2.0, finite-field >=0.6.0
+     prettyclass >=1.0.0, type-level-numbers >=0.1.1.0 && <0.2.0.0, hashable >=1.1.2.5 && <1.3.0.0,
+     OptDir, data-interval >=0.2.0, finite-field >=0.7.0 && <1.0.0
   Default-Language: Haskell2010
   Other-Extensions:
      BangPatterns
@@ -229,7 +229,7 @@ Test-suite TestPolynomial
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestPolynomial.hs
-  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3, data-interval >=0.2.0, finite-field >=0.6.0, prettyclass >=1.0.0
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3, data-interval >=0.2.0, finite-field >=0.7.0 && <1.0.0, prettyclass >=1.0.0
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
