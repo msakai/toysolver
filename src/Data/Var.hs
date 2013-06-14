@@ -17,8 +17,9 @@ module Data.Var
   , Model
   ) where
 
-import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
+import Data.IntMap (IntMap)
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Ratio
 
 -- ---------------------------------------------------------------------------
@@ -27,17 +28,17 @@ import Data.Ratio
 type Var = Int
 
 -- | Set of variables
-type VarSet = IS.IntSet
+type VarSet = IntSet
 
 -- | Map from variables
-type VarMap = IM.IntMap
+type VarMap = IntMap
 
 -- | collecting free variables
 class Variables a where
   vars :: a -> VarSet
 
 instance Variables a => Variables [a] where
-  vars = IS.unions . map vars
+  vars = IntSet.unions . map vars
 
 -- | A @Model@ is a map from variables to values.
 type Model r = VarMap r

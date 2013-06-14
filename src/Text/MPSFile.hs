@@ -29,7 +29,9 @@ module Text.MPSFile
 
 import Control.Monad
 import Data.Maybe
+import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Ratio
 
@@ -359,12 +361,12 @@ rowsBody = many $ do
   newline'
   return (op, name)
 
-colsSection :: Parser (Map.Map Column (Map.Map Row Rational), Set.Set Column)
+colsSection :: Parser (Map Column (Map Row Rational), Set Column)
 colsSection = do
   try $ stringLn "COLUMNS"
   body False Map.empty Set.empty
   where
-    body :: Bool -> Map.Map Column (Map.Map Row Rational) -> Set.Set Column -> Parser (Map.Map Column (Map.Map Row Rational), Set.Set Column)
+    body :: Bool -> Map Column (Map Row Rational) -> Set Column -> Parser (Map Column (Map Row Rational), Set Column)
     body isInt rs ivs = msum
       [ do isInt' <- try intMarker
            body isInt' rs ivs
@@ -386,7 +388,7 @@ colsSection = do
       newline'
       return b
 
-    entry :: Parser (Column, Map.Map Row Rational)
+    entry :: Parser (Column, Map Row Rational)
     entry = do
       spaces1'
       col <- ident
@@ -397,13 +399,13 @@ colsSection = do
         Nothing -> return (col, rv1)
         Just rv2 ->  return (col, Map.union rv1 rv2)
 
-rowAndVal :: Parser (Map.Map Row Rational)
+rowAndVal :: Parser (Map Row Rational)
 rowAndVal = do
   row <- ident
   val <- number
   return $ Map.singleton row val
 
-rhsSection :: Parser (Map.Map Row Rational)
+rhsSection :: Parser (Map Row Rational)
 rhsSection = do
   try $ stringLn "RHS"
   liftM Map.unions $ many entry
@@ -418,7 +420,7 @@ rhsSection = do
         Nothing  -> return rv1
         Just rv2 -> return $ Map.union rv1 rv2
 
-rangesSection :: Parser (Map.Map Row Rational)
+rangesSection :: Parser (Map Row Rational)
 rangesSection = do
   try $ stringLn "RANGES"
   liftM Map.unions $ many entry
@@ -519,7 +521,7 @@ qcMatrixSection = do
       newline'
       return $ LPFile.Term val [col1, col2]
 
-indicatorsSection :: Parser (Map.Map Row (Column, Rational))
+indicatorsSection :: Parser (Map Row (Column, Rational))
 indicatorsSection = do
   try $ stringLn "INDICATORS"
   liftM Map.fromList $ many entry

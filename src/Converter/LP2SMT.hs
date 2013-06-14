@@ -22,6 +22,7 @@ import Data.Ord
 import Data.List
 import Data.Ratio
 import qualified Data.Set as Set
+import Data.Map (Map)
 import qualified Data.Map as Map
 import System.IO
 import Text.Printf
@@ -54,7 +55,7 @@ data Language
 -- ------------------------------------------------------------------------
 
 type Var = String
-type Env = Map.Map LP.Var Var
+type Env = Map LP.Var Var
 
 concatS :: [ShowS] -> ShowS
 concatS = foldr (.) id

@@ -50,7 +50,9 @@ import Data.Array.IArray
 import Data.IORef
 import Data.List
 import Data.Maybe
+import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Text.Printf
 
@@ -68,7 +70,7 @@ type FSym = String
 type PSym = String
 
 class Vars a where
-  vars :: a -> Set.Set Var
+  vars :: a -> Set Var
 
 instance Vars a => Vars [a] where
   vars = Set.unions . map vars
@@ -168,7 +170,7 @@ toNNF = f
 toSkolemNF :: forall m. Monad m => (String -> Int -> m FSym) -> Formula -> m [Clause]
 toSkolemNF skolem phi = f [] Map.empty (toNNF phi)
   where
-    f :: [Var] -> Map.Map Var Term -> Formula -> m [Clause]
+    f :: [Var] -> Map Var Term -> Formula -> m [Clause]
     f _ _ T = return []
     f _ _ F = return [[]]
     f _ s (Atom a) = return [[Pos (substAtom s a)]]
@@ -189,15 +191,15 @@ toSkolemNF skolem phi = f [] Map.empty (toNNF phi)
       f uvs (Map.insert v (TmApp fsym [TmVar v | v <- reverse uvs]) s) phi
     f _ _ _ = error "toSkolemNF: should not happen"
 
-    gensym :: String -> Set.Set Var -> Var
+    gensym :: String -> Set Var -> Var
     gensym template vs = head [name | name <- names, Set.notMember name vs]
       where
         names = template : [template ++ show n | n <-[1..]]
 
-    substAtom :: Map.Map Var Term -> Atom -> Atom
+    substAtom :: Map Var Term -> Atom -> Atom
     substAtom s (PApp p ts) = PApp p (map (substTerm s) ts)
 
-    substTerm :: Map.Map Var Term -> Term -> Term
+    substTerm :: Map Var Term -> Term -> Term
     substTerm s (TmVar v)    = fromMaybe (TmVar v) (Map.lookup v s)
     substTerm s (TmApp f ts) = TmApp f (map (substTerm s) ts)
 
@@ -255,7 +257,7 @@ instance Vars SAtom where
 
 -- ---------------------------------------------------------------------------
 
-type M = State (Set.Set Var, Int, [SLit])
+type M = State (Set Var, Int, [SLit])
 
 flatten :: Clause -> SClause
 flatten c =
@@ -359,9 +361,9 @@ type GroundAtom   = SGenAtom Entity
 type GroundLit    = GenLit GroundAtom
 type GroundClause = [GroundLit]
 
-type Subst = Map.Map Var Entity
+type Subst = Map Var Entity
 
-enumSubst :: Set.Set Var -> [Entity] -> [Subst]
+enumSubst :: Set Var -> [Entity] -> [Subst]
 enumSubst vs univ = do
   ps <- sequence [[(v,e) | e <- univ] | v <- Set.toList vs]
   return $ Map.fromList ps
@@ -391,25 +393,25 @@ simplifyGroundClause = liftM concat . mapM f
     f (Pos (SEq (STmVar x) y)) = if x==y then Nothing else return []
     f lit = return [lit]
 
-collectFSym :: SClause -> Set.Set (FSym, Int)
+collectFSym :: SClause -> Set (FSym, Int)
 collectFSym = Set.unions . map f
   where
-    f :: SLit -> Set.Set (FSym, Int)
+    f :: SLit -> Set (FSym, Int)
     f (Pos a) = g a
     f (Neg a) = g a
 
-    g :: SAtom -> Set.Set (FSym, Int)
+    g :: SAtom -> Set (FSym, Int)
     g (SEq (STmApp f xs) _) = Set.singleton (f, length xs)
     g _ = Set.empty
 
-collectPSym :: SClause -> Set.Set (PSym, Int)
+collectPSym :: SClause -> Set (PSym, Int)
 collectPSym = Set.unions . map f
   where
-    f :: SLit -> Set.Set (PSym, Int)
+    f :: SLit -> Set (PSym, Int)
     f (Pos a) = g a
     f (Neg a) = g a
 
-    g :: SAtom -> Set.Set (PSym, Int)
+    g :: SAtom -> Set (PSym, Int)
     g (SPApp p xs) = Set.singleton (p, length xs)
     g _ = Set.empty
 
@@ -418,8 +420,8 @@ collectPSym = Set.unions . map f
 data Model
   = Model
   { mUniverse  :: [Entity]
-  , mRelations :: Map.Map PSym [[Entity]]
-  , mFunctions :: Map.Map FSym [([Entity], Entity)]
+  , mRelations :: Map PSym [[Entity]]
+  , mFunctions :: Map FSym [([Entity], Entity)]
   }
 
 showModel :: Model -> [String]

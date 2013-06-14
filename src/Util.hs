@@ -17,6 +17,7 @@ module Util where
 
 import Control.Monad
 import Data.Ratio
+import Data.Set (Set)
 import qualified Data.Set as Set
 
 -- | Combining two @Maybe@ values using given function.
@@ -58,7 +59,7 @@ showRationalAsFiniteDecimal x = do
         else liftM ("." ++ ) $ loop Set.empty b
   return $ s1 ++ s2 ++ s3
   where
-    loop :: Set.Set Rational -> Rational -> Maybe String
+    loop :: Set Rational -> Rational -> Maybe String
     loop _ 0 = return ""
     loop rs r
       | r `Set.member` rs = mzero

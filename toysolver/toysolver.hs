@@ -22,9 +22,10 @@ import Data.Maybe
 import Data.Ratio
 import qualified Data.Version as V
 import qualified Data.Set as Set
+import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
+import qualified Data.IntMap as IntMap
+import qualified Data.IntSet as IntSet
 import System.Exit
 import System.Environment
 import System.FilePath
@@ -111,7 +112,7 @@ run
   :: String
   -> [Flag]
   -> LP.LP
-  -> (Map.Map String Rational -> IO ())
+  -> (Map String Rational -> IO ())
   -> IO ()
 run solver opt lp printModel = do
   unless (Set.null (LP.semiContinuousVariables lp)) $ do
@@ -127,7 +128,7 @@ run solver opt lp printModel = do
     vs = LP.variables lp
     vsAssoc = zip (Set.toList vs) [0..]
     nameToVar = Map.fromList vsAssoc
-    varToName = IM.fromList [(v,name) | (name,v) <- vsAssoc]
+    varToName = IntMap.fromList [(v,name) | (name,v) <- vsAssoc]
 
     compileE :: LP.Expr -> Expr Rational
     compileE = foldr (+) (Const 0) . map compileT
@@ -161,8 +162,8 @@ run solver opt lp printModel = do
       | NoMIP `elem` opt = Set.empty
       | otherwise        = LP.integerVariables lp
 
-    vs2  = IM.keysSet varToName
-    ivs2 = IS.fromList . map (nameToVar Map.!) . Set.toList $ ivs
+    vs2  = IntMap.keysSet varToName
+    ivs2 = IntSet.fromList . map (nameToVar Map.!) . Set.toList $ ivs
 
     solveByQE =
       case mapM LAFOL.fromFOLAtom (cs1 ++ cs2) of
@@ -177,7 +178,7 @@ run solver opt lp printModel = do
             Just m -> do
               putOLine $ showValue (FOL.evalExpr m obj)
               putSLine "SATISFIABLE"
-              let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+              let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m2
        where
          f = case solver of
@@ -219,7 +220,7 @@ run solver opt lp printModel = do
             MIPSolverHL.Optimum r m -> do
               putOLine $ showValue r
               putSLine "OPTIMUM FOUND"
-              let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+              let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m2
 
     solveByMIP2 = do
@@ -265,34 +266,34 @@ run solver opt lp printModel = do
         Simplex2.Unbounded -> do
           putSLine "UNBOUNDED"
           m <- MIPSolver2.model mip
-          let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+          let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2
           exitFailure
         Simplex2.Optimum -> do
           m <- MIPSolver2.model mip
           r <- MIPSolver2.getObjValue mip
           putSLine "OPTIMUM FOUND"
-          let m2 = Map.fromAscList [(v, m IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+          let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2
 
     solveByCAD
-      | not (IS.null ivs2) = do
+      | not (IntSet.null ivs2) = do
           putSLine "UNKNOWN"
           putCommentLine "integer variables are not supported by CAD"
           exitFailure
       | otherwise = do
           let cs = map g $ cs1 ++ cs2
-              vs3 = Set.fromAscList $ IS.toAscList vs2
+              vs3 = Set.fromAscList $ IntSet.toAscList vs2
           case CAD.solve vs3 cs of
             Nothing -> do
               putSLine "UNSATISFIABLE"
               exitFailure
             Just m -> do
-              let m2 = IM.map (\x -> AReal.approx x (2^^(-64::Int))) $
-                         IM.fromAscList $ Map.toAscList $ m
+              let m2 = IntMap.map (\x -> AReal.approx x (2^^(-64::Int))) $
+                         IntMap.fromAscList $ Map.toAscList $ m
               putOLine $ showValue (FOL.evalExpr m2 obj)
               putSLine "SATISFIABLE"
-              let m3 = Map.fromAscList [(v, m2 IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+              let m3 = Map.fromAscList [(v, m2 IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m3
       where
         g (Rel lhs rel rhs) = Rel (f lhs) rel (f rhs)
@@ -329,10 +330,10 @@ run solver opt lp printModel = do
                   putSLine "UNSATISFIABLE"
                   exitFailure
                 Just m -> do
-                  let m2 = IM.map fromInteger m
+                  let m2 = IntMap.map fromInteger m
                   putOLine $ showValue (FOL.evalExpr m2 obj)
                   putSLine "OPTIMUM FOUND"
-                  let m3 = Map.fromAscList [(v, m2 IM.! (nameToVar Map.! v)) | v <- Set.toList vs]
+                  let m3 = Map.fromAscList [(v, m2 IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
                   printModel m3
 
     printRat :: Bool
@@ -341,7 +342,7 @@ run solver opt lp printModel = do
     showValue :: Rational -> String
     showValue = showRational printRat
 
-lpPrintModel :: Handle -> Bool -> Map.Map String Rational -> IO ()
+lpPrintModel :: Handle -> Bool -> Map String Rational -> IO ()
 lpPrintModel h asRat m = do
   forM_ (Map.toList m) $ \(v, val) -> do
     printf "v %s = %s\n" v (showRational asRat val)
@@ -452,7 +453,7 @@ main = do
         hPutStrLn stderr $ concat errs ++ usageInfo header options
 
 -- FIXME: 目的関数値を表示するように
-writeSOLFileLP :: [Flag] -> Map.Map String Rational -> IO ()
+writeSOLFileLP :: [Flag] -> Map String Rational -> IO ()
 writeSOLFileLP opt m = do
   forM_ [fname | WriteFile fname <- opt ] $ \fname -> do
     let m2 = Map.map fromRational m

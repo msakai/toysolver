@@ -46,15 +46,16 @@ import Control.Exception
 import Data.Array.Unboxed
 import Data.Ord
 import Data.List
-import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
-import qualified Data.Set as Set
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 
 -- | Variable is represented as positive integers (DIMACS format).
 type Var = Int
 
-type VarSet = IS.IntSet
-type VarMap = IM.IntMap
+type VarSet = IntSet
+type VarMap = IntMap
 
 {-# INLINE validVar #-}
 validVar :: Var -> Bool
@@ -71,8 +72,8 @@ type Lit = Int
 litUndef :: Lit
 litUndef = 0
 
-type LitSet = IS.IntSet
-type LitMap = IM.IntMap
+type LitSet = IntSet
+type LitMap = IntMap
 
 {-# INLINE validLit #-}
 validLit :: Lit -> Bool
@@ -114,22 +115,22 @@ type Clause = [Lit]
 --
 -- 'Nothing' if the clause is trivially true.
 normalizeClause :: Clause -> Maybe Clause
-normalizeClause lits = assert (IS.size ys `mod` 2 == 0) $
-  if IS.null ys
-    then Just (IS.toList xs)
+normalizeClause lits = assert (IntSet.size ys `mod` 2 == 0) $
+  if IntSet.null ys
+    then Just (IntSet.toList xs)
     else Nothing
   where
-    xs = IS.fromList lits
-    ys = xs `IS.intersection` (IS.map litNot xs)
+    xs = IntSet.fromList lits
+    ys = xs `IntSet.intersection` (IntSet.map litNot xs)
 
 normalizeAtLeast :: ([Lit],Int) -> ([Lit],Int)
-normalizeAtLeast (lits,n) = assert (IS.size ys `mod` 2 == 0) $
-   (IS.toList lits', n')
+normalizeAtLeast (lits,n) = assert (IntSet.size ys `mod` 2 == 0) $
+   (IntSet.toList lits', n')
    where
-     xs = IS.fromList lits
-     ys = xs `IS.intersection` (IS.map litNot xs)
-     lits' = xs `IS.difference` ys
-     n' = n - (IS.size ys `div` 2)
+     xs = IntSet.fromList lits
+     ys = xs `IntSet.intersection` (IntSet.map litNot xs)
+     lits' = xs `IntSet.difference` ys
+     n' = n - (IntSet.size ys `div` 2)
 
 -- | normalizing PB term of the form /c1 x1 + c2 x2 ... cn xn + c/ into
 -- /d1 x1 + d2 x2 ... dm xm + d/ where d1,...,dm ≥ 1.
@@ -139,15 +140,15 @@ normalizePBSum = step2 . step1
     -- 同じ変数が複数回現れないように、一度全部 @v@ に統一。
     step1 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
     step1 (xs,n) =
-      case loop (IM.empty,n) xs of
-        (ys,n') -> ([(c,v) | (v,c) <- IM.toList ys], n')
+      case loop (IntMap.empty,n) xs of
+        (ys,n') -> ([(c,v) | (v,c) <- IntMap.toList ys], n')
       where
         loop :: (VarMap Integer, Integer) -> [(Integer,Lit)] -> (VarMap Integer, Integer)
         loop (ys,m) [] = (ys,m)
         loop (ys,m) ((c,l):zs) =
           if litPolarity l
-            then loop (IM.insertWith (+) l c ys, m) zs
-            else loop (IM.insertWith (+) (litNot l) (negate c) ys, m+c) zs
+            then loop (IntMap.insertWith (+) l c ys, m) zs
+            else loop (IntMap.insertWith (+) (litNot l) (negate c) ys, m+c) zs
 
     -- 係数が0のものも取り除き、係数が負のリテラルを反転することで、
     -- 係数が正になるようにする。

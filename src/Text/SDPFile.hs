@@ -47,8 +47,9 @@ module Text.SDPFile
 import Control.Monad
 import Data.List (intersperse)
 import Data.Ratio
+import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.IntMap as IM
+import qualified Data.IntMap as IntMap
 import Text.ParserCombinators.Parsec
 
 -- ---------------------------------------------------------------------------
@@ -65,7 +66,7 @@ data Problem
 
 type Matrix = [Block]
 
-type Block = Map.Map (Int,Int) Rational
+type Block = Map (Int,Int) Rational
 
 -- | the number of primal variables (mDim)
 mDim :: Problem -> Int
@@ -187,12 +188,12 @@ pDenseMatrices m bs = optional sep >> replicateM (fromIntegral m + 1) pDenceMatr
 pSparseMatrices :: Int -> [Int] -> Parser [Matrix]
 pSparseMatrices m bs = do
   xs <- many pLine
-  let t = IM.unionsWith (IM.unionWith Map.union)
-            [ IM.singleton matno (IM.singleton blkno (Map.fromList [((i,j),e),((j,i),e)]))
+  let t = IntMap.unionsWith (IntMap.unionWith Map.union)
+            [ IntMap.singleton matno (IntMap.singleton blkno (Map.fromList [((i,j),e),((j,i),e)]))
             | (matno,blkno,i,j,e) <- xs ]
   return $
-    [ [IM.findWithDefault Map.empty blkno mat | blkno <- [1 .. length bs]]
-    | matno <- [0..m], let mat = IM.findWithDefault IM.empty matno t
+    [ [IntMap.findWithDefault Map.empty blkno mat | blkno <- [1 .. length bs]]
+    | matno <- [0..m], let mat = IntMap.findWithDefault IntMap.empty matno t
     ]
 
   where

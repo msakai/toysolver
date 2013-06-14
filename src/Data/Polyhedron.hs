@@ -22,7 +22,8 @@ module Data.Polyhedron
 
 import Data.List
 import Data.Ratio
-import qualified Data.IntSet as IS
+import qualified Data.IntSet as IntSet
+import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.VectorSpace
 import Prelude hiding (null)
@@ -43,13 +44,13 @@ type IntervalR = Interval.Interval Rational
 
 -- | Intersection of half-spaces
 data Polyhedron
-  = Polyhedron (Map.Map ExprZ IntervalR)
+  = Polyhedron (Map ExprZ IntervalR)
   | Empty
   deriving (Eq)
 
 instance Variables Polyhedron where
-  vars (Polyhedron m) = IS.unions [vars e | e <- Map.keys m]
-  vars Empty = IS.empty
+  vars (Polyhedron m) = IntSet.unions [vars e | e <- Map.keys m]
+  vars Empty = IntSet.empty
 
 instance JoinSemiLattice Polyhedron where
   join Empty b = b

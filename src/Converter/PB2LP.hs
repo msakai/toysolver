@@ -18,14 +18,16 @@ module Converter.PB2LP
 import Data.Array.IArray
 import Data.List
 import Data.Maybe
-import qualified Data.IntSet as IS
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
+import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
 import qualified SAT.Types as SAT
 
-convert :: PBFile.Formula -> (LPFile.LP, Map.Map LPFile.Var Rational -> SAT.Model)
+convert :: PBFile.Formula -> (LPFile.LP, Map LPFile.Var Rational -> SAT.Model)
 convert formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
   where
     lp = LPFile.LP
@@ -47,7 +49,7 @@ convert formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
       }
 
     vs1 = collectVariables formula
-    vs2 = (Set.fromList . map convVar . IS.toList) $ vs1
+    vs2 = (Set.fromList . map convVar . IntSet.toList) $ vs1
 
     (dir,obj2) =
       case obj of
@@ -90,16 +92,16 @@ convExpr s = concatMap g2 s
 convVar :: PBFile.Var -> LPFile.Var
 convVar x = ("x" ++ show x)
 
-collectVariables :: PBFile.Formula -> IS.IntSet
-collectVariables (obj, cs) = IS.unions $ maybe IS.empty f obj : [f s | (s,_,_) <- cs]
+collectVariables :: PBFile.Formula -> IntSet
+collectVariables (obj, cs) = IntSet.unions $ maybe IntSet.empty f obj : [f s | (s,_,_) <- cs]
   where
-    f :: PBFile.Sum -> IS.IntSet
-    f xs = IS.fromList $ do
+    f :: PBFile.Sum -> IntSet
+    f xs = IntSet.fromList $ do
       (_,ts) <- xs
       lit <- ts
       return $ abs lit
 
-convertWBO :: Bool -> PBFile.SoftFormula -> (LPFile.LP, Map.Map LPFile.Var Rational -> SAT.Model)
+convertWBO :: Bool -> PBFile.SoftFormula -> (LPFile.LP, Map LPFile.Var Rational -> SAT.Model)
 convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formula))
   where
     lp = LPFile.LP
@@ -121,7 +123,7 @@ convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formu
       }
 
     vs1 = collectVariablesWBO formula
-    vs2 = ((Set.fromList . map convVar . IS.toList) $ vs1) `Set.union` vs3
+    vs2 = ((Set.fromList . map convVar . IntSet.toList) $ vs1) `Set.union` vs3
     vs3 = Set.fromList [v | (ts, _) <- cs2, (_, v) <- ts]
 
     obj2 = [LPFile.Term (fromIntegral w) [v] | (ts, _) <- cs2, (w, v) <- ts]
@@ -194,16 +196,16 @@ relaxLE v (lhs, rhs) = (LPFile.Term (rhs - lhs_ub) [v] : lhs, rhs)
   where
     lhs_ub = sum [max c 0 | LPFile.Term c _ <- lhs]
 
-collectVariablesWBO :: PBFile.SoftFormula -> IS.IntSet
-collectVariablesWBO (_top, cs) = IS.unions [f s | (_,(s,_,_)) <- cs]
+collectVariablesWBO :: PBFile.SoftFormula -> IntSet
+collectVariablesWBO (_top, cs) = IntSet.unions [f s | (_,(s,_,_)) <- cs]
   where
-    f :: PBFile.Sum -> IS.IntSet
-    f xs = IS.fromList $ do
+    f :: PBFile.Sum -> IntSet
+    f xs = IntSet.fromList $ do
       (_,ts) <- xs
       lit <- ts
       return $ abs lit
 
-mtrans :: Int -> Map.Map LPFile.Var Rational -> SAT.Model
+mtrans :: Int -> Map LPFile.Var Rational -> SAT.Model
 mtrans nvar m =
   array (1, nvar)
     [　(i, val)

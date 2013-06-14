@@ -98,8 +98,10 @@ import Data.IORef
 import Data.List
 import Data.Maybe
 import Data.Ratio
+import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.IntMap as IM
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import Text.Printf
 import Data.Time
 import Data.OptDir
@@ -120,15 +122,15 @@ type Var = Int
 
 data GenericSolver v
   = GenericSolver
-  { svTableau :: !(IORef (IM.IntMap (LA.Expr Rational)))
-  , svLB      :: !(IORef (IM.IntMap v))
-  , svUB      :: !(IORef (IM.IntMap v))
-  , svModel   :: !(IORef (IM.IntMap v))
+  { svTableau :: !(IORef (IntMap (LA.Expr Rational)))
+  , svLB      :: !(IORef (IntMap v))
+  , svUB      :: !(IORef (IntMap v))
+  , svModel   :: !(IORef (IntMap v))
   , svVCnt    :: !(IORef Int)
   , svOk      :: !(IORef Bool)
   , svOptDir  :: !(IORef OptDir)
 
-  , svDefDB  :: !(IORef (Map.Map (LA.Expr Rational) Var))
+  , svDefDB  :: !(IORef (Map (LA.Expr Rational) Var))
 
   , svLogger :: !(IORef (Maybe (String -> IO ())))
   , svPivotStrategy :: !(IORef PivotStrategy)
@@ -143,10 +145,10 @@ objVar = -1
 
 newSolver :: SolverValue v => IO (GenericSolver v)
 newSolver = do
-  t <- newIORef (IM.singleton objVar zeroV)
-  l <- newIORef IM.empty
-  u <- newIORef IM.empty
-  m <- newIORef (IM.singleton objVar zeroV)
+  t <- newIORef (IntMap.singleton objVar zeroV)
+  l <- newIORef IntMap.empty
+  u <- newIORef IntMap.empty
+  m <- newIORef (IntMap.singleton objVar zeroV)
   v <- newIORef 0
   ok <- newIORef True
   dir <- newIORef OptMin
@@ -223,7 +225,7 @@ instance SolverValue (Delta Rational) where
         delta0 = if null ys then 0.1 else minimum ys
         f :: Delta Rational -> Rational
         f (Delta r k) = r + k * delta0
-    liftM (IM.map f) $ readIORef (svModel solver)
+    liftM (IntMap.map f) $ readIORef (svModel solver)
 
 {-
 Largest coefficient rule: original rule suggested by G. Dantzig.
@@ -250,7 +252,7 @@ newVar :: SolverValue v => GenericSolver v -> IO Var
 newVar solver = do
   v <- readIORef (svVCnt solver)
   writeIORef (svVCnt solver) $! v+1
-  modifyIORef (svModel solver) (IM.insert v zeroV)
+  modifyIORef (svModel solver) (IntMap.insert v zeroV)
   return v
 
 assertAtom :: Solver -> LA.Atom Rational -> IO ()
@@ -315,7 +317,7 @@ assertLower solver x l = do
     (Just l0', _) | l <= l0' -> return ()
     (_, Just u0') | u0' < l -> markBad solver
     _ -> do
-      modifyIORef (svLB solver) (IM.insert x l)
+      modifyIORef (svLB solver) (IntMap.insert x l)
       b <- isNonBasicVariable solver x
       v <- getValue solver x
       when (b && not (l <= v)) $ update solver x l
@@ -329,7 +331,7 @@ assertUpper solver x u = do
     (_, Just u0') | u0' <= u -> return ()
     (Just l0', _) | u < l0' -> markBad solver
     _ -> do
-      modifyIORef (svUB solver) (IM.insert x u)
+      modifyIORef (svUB solver) (IntMap.insert x u)
       b <- isNonBasicVariable solver x
       v <- getValue solver x
       when (b && not (v <= u)) $ update solver x u
@@ -345,9 +347,9 @@ getObj solver = getRow solver objVar
 setRow :: SolverValue v => GenericSolver v -> Var -> LA.Expr Rational -> IO ()
 setRow solver v e = do
   modifyIORef (svTableau solver) $ \t ->
-    IM.insert v (LA.applySubst t e) t
+    IntMap.insert v (LA.applySubst t e) t
   modifyIORef (svModel solver) $ \m -> 
-    IM.insert v (LA.evalLinear m (toValue 1) e) m  
+    IntMap.insert v (LA.evalLinear m (toValue 1) e) m  
 
 setOptDir :: GenericSolver v -> OptDir -> IO ()
 setOptDir solver dir = writeIORef (svOptDir solver) dir
@@ -365,7 +367,7 @@ nVars solver = readIORef (svVCnt solver)
 isBasicVariable :: GenericSolver v -> Var -> IO Bool
 isBasicVariable solver v = do
   t <- readIORef (svTableau solver)
-  return $ v `IM.member` t
+  return $ v `IntMap.member` t
 
 isNonBasicVariable  :: GenericSolver v -> Var -> IO Bool
 isNonBasicVariable solver x = liftM not (isBasicVariable solver x)
@@ -568,7 +570,7 @@ increaseNB solver xj = do
 
   -- Upper bounds of θ
   -- NOTE: xj 自体の上限も考慮するのに注意
-  ubs <- liftM concat $ forM ((xj,1) : IM.toList col) $ \(xi,aij) -> do
+  ubs <- liftM concat $ forM ((xj,1) : IntMap.toList col) $ \(xi,aij) -> do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
@@ -591,7 +593,7 @@ decreaseNB solver xj = do
 
   -- Lower bounds of θ
   -- NOTE: xj 自体の下限も考慮するのに注意
-  lbs <- liftM concat $ forM ((xj,1) : IM.toList col) $ \(xi,aij) -> do
+  lbs <- liftM concat $ forM ((xj,1) : IntMap.toList col) $ \(xi,aij) -> do
     v1 <- getValue solver xi
     li <- getLB solver xi
     ui <- getUB solver xi
@@ -690,19 +692,19 @@ prune solver opt =
   Extract results
 --------------------------------------------------------------------}
 
-type RawModel v = IM.IntMap v
+type RawModel v = IntMap v
 
 rawModel :: GenericSolver v -> IO (RawModel v)
 rawModel solver = do
   xs <- variables solver
-  liftM IM.fromList $ forM xs $ \x -> do
+  liftM IntMap.fromList $ forM xs $ \x -> do
     val <- getValue solver x
     return (x,val)
 
 getObjValue :: GenericSolver v -> IO v
 getObjValue solver = getValue solver objVar  
 
-type Model = IM.IntMap Rational
+type Model = IntMap Rational
   
 {--------------------------------------------------------------------
   major function
@@ -718,8 +720,8 @@ update solver xj v = do
 
   aj <- getCol solver xj
   modifyIORef (svModel solver) $ \m ->
-    let m2 = IM.map (\aij -> aij *^ diff) aj
-    in IM.insert xj v $ IM.unionWith (^+^) m2 m
+    let m2 = IntMap.map (\aij -> aij *^ diff) aj
+    in IntMap.insert xj v $ IntMap.unionWith (^+^) m2 m
 
   -- log solver $ printf "after update x%d (%s)" xj (show v)
   -- dump solver
@@ -728,9 +730,9 @@ pivot :: SolverValue v => GenericSolver v -> Var -> Var -> IO ()
 pivot solver xi xj = do
   modifyIORef' (svNPivot solver) (+1)
   modifyIORef' (svTableau solver) $ \defs ->
-    case LA.solveFor (LA.var xi .==. (defs IM.! xi)) xj of
+    case LA.solveFor (LA.var xi .==. (defs IntMap.! xi)) xj of
       Just (Eql, xj_def) ->
-        IM.insert xj xj_def . IM.map (LA.applySubst1 xj xj_def) . IM.delete xi $ defs
+        IntMap.insert xj xj_def . IntMap.map (LA.applySubst1 xj xj_def) . IntMap.delete xi $ defs
       _ -> error "pivot: should not happen"
 
 pivotAndUpdate :: SolverValue v => GenericSolver v -> Var -> Var -> v -> IO ()
@@ -745,13 +747,13 @@ pivotAndUpdate solver xi xj v = do
   m <- readIORef (svModel solver)
 
   aj <- getCol solver xj
-  let aij = aj IM.! xi
-  let theta = (v ^-^ (m IM.! xi)) ^/ aij
+  let aij = aj IntMap.! xi
+  let theta = (v ^-^ (m IntMap.! xi)) ^/ aij
 
-  let m' = IM.fromList $
-           [(xi, v), (xj, (m IM.! xj) ^+^ theta)] ++
-           [(xk, (m IM.! xk) ^+^ (akj *^ theta)) | (xk, akj) <- IM.toList aj, xk /= xi]
-  writeIORef (svModel solver) (IM.union m' m) -- note that 'IM.union' is left biased.
+  let m' = IntMap.fromList $
+           [(xi, v), (xj, (m IntMap.! xj) ^+^ theta)] ++
+           [(xk, (m IntMap.! xk) ^+^ (akj *^ theta)) | (xk, akj) <- IntMap.toList aj, xk /= xi]
+  writeIORef (svModel solver) (IntMap.union m' m) -- note that 'IntMap.union' is left biased.
 
   pivot solver xi xj
 
@@ -761,34 +763,34 @@ pivotAndUpdate solver xi xj v = do
 getLB :: GenericSolver v -> Var -> IO (Maybe v)
 getLB solver x = do
   lb <- readIORef (svLB solver)
-  return $ IM.lookup x lb
+  return $ IntMap.lookup x lb
 
 getUB :: GenericSolver v -> Var -> IO (Maybe v)
 getUB solver x = do
   ub <- readIORef (svUB solver)
-  return $ IM.lookup x ub
+  return $ IntMap.lookup x ub
 
-getTableau :: GenericSolver v -> IO (IM.IntMap (LA.Expr Rational))
+getTableau :: GenericSolver v -> IO (IntMap (LA.Expr Rational))
 getTableau solver = do
   t <- readIORef (svTableau solver)
-  return $ IM.delete objVar t
+  return $ IntMap.delete objVar t
 
 getValue :: GenericSolver v -> Var -> IO v
 getValue solver x = do
   m <- readIORef (svModel solver)
-  return $ m IM.! x
+  return $ m IntMap.! x
 
 getRow :: GenericSolver v -> Var -> IO (LA.Expr Rational)
 getRow solver x = do
   -- x should be basic variable or 'objVar'
   t <- readIORef (svTableau solver)
-  return $! (t IM.! x)
+  return $! (t IntMap.! x)
 
 -- aijが非ゼロの列も全部探しているのは効率が悪い
-getCol :: SolverValue v => GenericSolver v -> Var -> IO (IM.IntMap Rational)
+getCol :: SolverValue v => GenericSolver v -> Var -> IO (IntMap Rational)
 getCol solver xj = do
   t <- readIORef (svTableau solver)
-  return $ IM.mapMaybe (LA.lookupCoeff xj) t
+  return $ IntMap.mapMaybe (LA.lookupCoeff xj) t
 
 getCoeff :: GenericSolver v -> Var -> Var -> IO Rational
 getCoeff solver xi xj = do
@@ -826,7 +828,7 @@ variables solver = do
 basicVariables :: GenericSolver v -> IO [Var]
 basicVariables solver = do
   t <- readIORef (svTableau solver)
-  return (IM.keys t)
+  return (IntMap.keys t)
 
 #if !MIN_VERSION_base(4,6,0)
 
@@ -900,9 +902,9 @@ test4 = do
   x0 <- newVar solver
   x1 <- newVar solver
 
-  writeIORef (svTableau solver) (IM.fromList [(x1, LA.var x0)])
-  writeIORef (svLB solver) (IM.fromList [(x0, toValue 0), (x1, toValue 0)])
-  writeIORef (svUB solver) (IM.fromList [(x0, toValue 2), (x1, toValue 3)])
+  writeIORef (svTableau solver) (IntMap.fromList [(x1, LA.var x0)])
+  writeIORef (svLB solver) (IntMap.fromList [(x0, toValue 0), (x1, toValue 0)])
+  writeIORef (svUB solver) (IntMap.fromList [(x0, toValue 2), (x1, toValue 3)])
   setObj solver (LA.fromTerms [(-1, x0)])
 
   ret <- optimize solver defaultOptions
@@ -916,9 +918,9 @@ test5 = do
   x0 <- newVar solver
   x1 <- newVar solver
 
-  writeIORef (svTableau solver) (IM.fromList [(x1, LA.var x0)])
-  writeIORef (svLB solver) (IM.fromList [(x0, toValue 0), (x1, toValue 0)])
-  writeIORef (svUB solver) (IM.fromList [(x0, toValue 2), (x1, toValue 0)])
+  writeIORef (svTableau solver) (IntMap.fromList [(x1, LA.var x0)])
+  writeIORef (svLB solver) (IntMap.fromList [(x0, toValue 0), (x1, toValue 0)])
+  writeIORef (svUB solver) (IntMap.fromList [(x0, toValue 2), (x1, toValue 0)])
   setObj solver (LA.fromTerms [(-1, x0)])
 
   checkFeasibility solver
@@ -946,10 +948,10 @@ test6 = do
 dumpSize :: SolverValue v => GenericSolver v -> IO ()
 dumpSize solver = do
   t <- readIORef (svTableau solver)
-  let nrows = IM.size t - 1 -- -1 is objVar
+  let nrows = IntMap.size t - 1 -- -1 is objVar
   xs <- variables solver
   let ncols = length xs - nrows
-  let nnz = sum [IM.size $ LA.coeffMap xi_def | (xi,xi_def) <- IM.toList t, xi /= objVar]
+  let nnz = sum [IntMap.size $ LA.coeffMap xi_def | (xi,xi_def) <- IntMap.toList t, xi /= objVar]
   log solver $ printf "%d rows, %d columns, %d non-zeros" nrows ncols nnz
 
 dump :: SolverValue v => GenericSolver v -> IO ()
@@ -958,8 +960,8 @@ dump solver = do
 
   log solver "Tableau:"
   t <- readIORef (svTableau solver)
-  log solver $ printf "obj = %s" (show (t IM.! objVar))
-  forM_ (IM.toList t) $ \(xi, e) -> do
+  log solver $ printf "obj = %s" (show (t IntMap.! objVar))
+  forM_ (IntMap.toList t) $ \(xi, e) -> do
     when (xi /= objVar) $ log solver $ printf "x%d = %s" xi (show e)
 
   log solver ""

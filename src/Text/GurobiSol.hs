@@ -3,10 +3,11 @@ module Text.GurobiSol
   , render
   ) where
 
+import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Ratio
 
-type Model = Map.Map String Double
+type Model = Map String Double
 
 render :: Model -> Maybe Double -> String
 render m obj = unlines $ ls1 ++ ls2

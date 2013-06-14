@@ -20,6 +20,7 @@ module Data.AlgebraicNumber.Root where
 
 import Data.List
 import Data.Maybe
+import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -62,7 +63,7 @@ rootSimpPoly f p = findPoly (P.var 0) ps
     ys :: [(UPolynomial Rational, Var)]
     ys = zip (Set.toAscList $ Set.fromList [f c | (c, _) <- P.terms p]) [1..]
 
-    m :: Map.Map (UPolynomial Rational) Var
+    m :: Map (UPolynomial Rational) Var
     m = Map.fromDistinctAscList ys
 
     p' :: Polynomial Rational Var

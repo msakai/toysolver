@@ -49,7 +49,9 @@ import Control.Monad.State
 import Data.List
 import Data.Maybe
 import Data.Ord
+import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Text.Printf
 import Text.PrettyPrint.HughesPJClass
@@ -86,7 +88,7 @@ showPoint (RootOf p n) = "rootOf(" ++ prettyShow p ++ ", " ++ show n ++ ")"
 
 -- ---------------------------------------------------------------------------
 
-type SignConf c = [(Cell c, Map.Map (UPolynomial c) Sign)]
+type SignConf c = [(Cell c, Map (UPolynomial c) Sign)]
 
 emptySignConf :: SignConf c
 emptySignConf =
@@ -101,7 +103,7 @@ showSignConf = f
     f :: SignConf c -> [String]
     f = concatMap $ \(cell, m) -> showCell cell : g m
 
-    g :: Map.Map (UPolynomial c) Sign -> [String]
+    g :: Map (UPolynomial c) Sign -> [String]
     g m =
       [printf "  %s: %s" (prettyShow p) (Sign.symbol s) | (p, s) <- Map.toList m]
 
@@ -161,9 +163,9 @@ test_mr_2 = mr (P.toUPolynomialOf p 3) (P.toUPolynomialOf p 3)
 
 type Coeff v = Polynomial Rational v
 
-type M v = StateT (Map.Map (Polynomial Rational v) (Set.Set Sign)) []
+type M v = StateT (Map (Polynomial Rational v) (Set Sign)) []
 
-runM :: M v a -> [(a, Map.Map (Polynomial Rational v) (Set.Set Sign))]
+runM :: M v a -> [(a, Map (Polynomial Rational v) (Set Sign))]
 runM m = runStateT m Map.empty
 
 assume :: (Ord v, Show v, PrettyVar v) => Polynomial Rational v -> [Sign] -> M v ()
@@ -187,7 +189,7 @@ project
   -> [([(Polynomial Rational v, [Sign])], [Cell (Polynomial Rational v)])]
 project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
   where
-    result :: [([Cell (Polynomial Rational v)], Map.Map (Polynomial Rational v) (Set.Set Sign))]
+    result :: [([Cell (Polynomial Rational v)], Map (Polynomial Rational v) (Set Sign))]
     result = runM $ do
       forM_ cs $ \(p,ss) -> do
         when (1 > P.deg p) $ assume (P.coeff P.mone p) ss
@@ -196,7 +198,7 @@ project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
       guard $ not $ null satCells
       return satCells
 
-    ok :: Map.Map (UPolynomial (Polynomial Rational v)) Sign -> Bool
+    ok :: Map (UPolynomial (Polynomial Rational v)) Sign -> Bool
     ok m = and [checkSign m p ss | (p,ss) <- cs]
       where
         checkSign m p ss =
@@ -204,7 +206,7 @@ project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
             then True -- already assumed
             else (m Map.! p) `elem` ss
 
-    guess2cond :: Map.Map (Polynomial Rational v) (Set.Set Sign) -> [(Polynomial Rational v, [Sign])]
+    guess2cond :: Map (Polynomial Rational v) (Set Sign) -> [(Polynomial Rational v, [Sign])]
     guess2cond gs = [(p, Set.toList ss)  | (p, ss) <- Map.toList gs]
 
 buildSignConf
@@ -218,8 +220,8 @@ buildSignConf ps = do
 
 collectPolynomials
   :: (Ord v, Show v, PrettyVar v)
-  => Set.Set (UPolynomial (Polynomial Rational v))
-  -> M v (Set.Set (UPolynomial (Polynomial Rational v)))
+  => Set (UPolynomial (Polynomial Rational v))
+  -> M v (Set (UPolynomial (Polynomial Rational v)))
 collectPolynomials ps = go Set.empty (f ps)
   where
     f = Set.filter (\p -> P.deg p > 0) 
@@ -272,8 +274,8 @@ refineSignConf
 refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
   where 
     extendPoint
-      :: (Cell (Polynomial Rational v), Map.Map (UPolynomial (Polynomial Rational v)) Sign)
-      -> M v (Cell (Polynomial Rational v), Map.Map (UPolynomial (Polynomial Rational v)) Sign)
+      :: (Cell (Polynomial Rational v), Map (UPolynomial (Polynomial Rational v)) Sign)
+      -> M v (Cell (Polynomial Rational v), Map (UPolynomial (Polynomial Rational v)) Sign)
     extendPoint (Point pt, m) = do
       s <- signAt pt m
       return (Point pt, Map.insert p s m)
@@ -281,8 +283,8 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
  
     extendIntervals
       :: Int
-      -> [(Cell (Polynomial Rational v), Map.Map (UPolynomial (Polynomial Rational v)) Sign)]
-      -> [(Cell (Polynomial Rational v), Map.Map (UPolynomial (Polynomial Rational v)) Sign)]
+      -> [(Cell (Polynomial Rational v), Map (UPolynomial (Polynomial Rational v)) Sign)]
+      -> [(Cell (Polynomial Rational v), Map (UPolynomial (Polynomial Rational v)) Sign)]
     extendIntervals !n (pt1@(Point _, m1) : (Interval lb ub, m) : pt2@(Point _, m2) : xs) =
       pt1 : ys ++ extendIntervals n2 (pt2 : xs)
       where
@@ -302,7 +304,7 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
                           )
     extendIntervals _ xs = xs
  
-    signAt :: Point (Polynomial Rational v) -> Map.Map (UPolynomial (Polynomial Rational v)) Sign -> M v Sign
+    signAt :: Point (Polynomial Rational v) -> Map (UPolynomial (Polynomial Rational v)) Sign -> M v Sign
     signAt PosInf _ = do
       (c,_) <- getHighestNonzeroTerm p
       signCoeff c
@@ -331,7 +333,7 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
 
 -- ---------------------------------------------------------------------------
 
-type Model v = Map.Map v AReal.AReal
+type Model v = Map v AReal.AReal
 
 findSample :: Ord v => Model v -> Cell (Polynomial Rational v) -> Maybe AReal.AReal
 findSample m cell =
@@ -367,7 +369,7 @@ evalPoint m (RootOf p n) = RootOf (AReal.minimalPolynomial a) (AReal.rootIndex a
 
 solve
   :: forall v. (Ord v, Show v, PrettyVar v)
-  => Set.Set v
+  => Set v
   -> [(Rel (Polynomial Rational v))]
   -> Maybe (Model v)
 solve vs cs0 = solve' vs (map f cs0)
@@ -382,7 +384,7 @@ solve vs cs0 = solve' vs (map f cs0)
 
 solve'
   :: forall v. (Ord v, Show v, PrettyVar v)
-  => Set.Set v
+  => Set v
   -> [(Polynomial Rational v, [Sign])]
   -> Maybe (Model v)
 solve' vs0 cs0 = go (Set.toList vs0) cs0
@@ -442,7 +444,7 @@ dumpProjection xs =
 dumpSignConf
   :: forall v.
      (Ord v, PrettyVar v, Show v)
-  => [(SignConf (Polynomial Rational v), Map.Map (Polynomial Rational v) (Set.Set Sign))]
+  => [(SignConf (Polynomial Rational v), Map (Polynomial Rational v) (Set Sign))]
   -> IO ()
 dumpSignConf x = 
   forM_ x $ \(conf, as) -> do
@@ -534,8 +536,8 @@ test_solve = solve vs [p .<. 0]
     p = a^(2::Int) + b^(2::Int) + c^(2::Int) - 1
 
 test_collectPolynomials
-  :: [( Set.Set (UPolynomial (Polynomial Rational Int))
-      , Map.Map (Polynomial Rational Int) (Set.Set Sign)
+  :: [( Set (UPolynomial (Polynomial Rational Int))
+      , Map (Polynomial Rational Int) (Set Sign)
       )]
 test_collectPolynomials = runM $ collectPolynomials (Set.singleton p')
   where
@@ -555,7 +557,7 @@ test_collectPolynomials_print = do
     forM_  (Map.toList s) $ \(p, sign) ->
       printf "%s %s\n" (prettyShow p) (show sign)
 
-test_buildSignConf :: [(SignConf (Polynomial Rational Int), Map.Map (Polynomial Rational Int) (Set.Set Sign))]
+test_buildSignConf :: [(SignConf (Polynomial Rational Int), Map (Polynomial Rational Int) (Set Sign))]
 test_buildSignConf = runM $ buildSignConf [P.toUPolynomialOf p 3]
   where
     a = P.var 0
@@ -568,7 +570,7 @@ test_buildSignConf = runM $ buildSignConf [P.toUPolynomialOf p 3]
 test_buildSignConf_print :: IO ()
 test_buildSignConf_print = dumpSignConf test_buildSignConf
 
-test_buildSignConf_2 :: [(SignConf (Polynomial Rational Int), Map.Map (Polynomial Rational Int) (Set.Set Sign))]
+test_buildSignConf_2 :: [(SignConf (Polynomial Rational Int), Map (Polynomial Rational Int) (Set Sign))]
 test_buildSignConf_2 = runM $ buildSignConf [P.toUPolynomialOf p 0 | p <- ps]
   where
     x = P.var 0
@@ -578,7 +580,7 @@ test_buildSignConf_2 = runM $ buildSignConf [P.toUPolynomialOf p 0 | p <- ps]
 test_buildSignConf_2_print :: IO ()
 test_buildSignConf_2_print = dumpSignConf test_buildSignConf_2
 
-test_buildSignConf_3 :: [(SignConf (Polynomial Rational Int), Map.Map (Polynomial Rational Int) (Set.Set Sign))]
+test_buildSignConf_3 :: [(SignConf (Polynomial Rational Int), Map (Polynomial Rational Int) (Set Sign))]
 test_buildSignConf_3 = runM $ buildSignConf [P.toUPolynomialOf p 0 | p <- ps]
   where
     x = P.var 0

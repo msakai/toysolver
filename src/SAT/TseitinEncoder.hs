@@ -50,8 +50,10 @@ module SAT.TseitinEncoder
 
 import Control.Monad
 import Data.IORef
+import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.IntSet as IS
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import qualified SAT as SAT
 
 -- | Arbitrary formula not restricted to CNF
@@ -69,7 +71,7 @@ data Encoder =
   Encoder
   { encSolver    :: SAT.Solver
   , encUsePB     :: IORef Bool
-  , encConjTable :: !(IORef (Map.Map IS.IntSet SAT.Lit))
+  , encConjTable :: !(IORef (Map IntSet SAT.Lit))
   }
 
 -- | Create a @Encoder@ instance.
@@ -161,7 +163,7 @@ encodeToLit encoder formula = do
 encodeConj :: Encoder -> [SAT.Lit] -> IO SAT.Lit
 encodeConj _ [l] =  return l
 encodeConj encoder ls =  do
-  let ls2 = IS.fromList ls
+  let ls2 = IntSet.fromList ls
   table <- readIORef (encConjTable encoder)
   case Map.lookup ls2 table of
     Just l -> return l

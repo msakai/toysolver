@@ -58,8 +58,9 @@ import Control.Monad
 import Control.DeepSeq
 import Data.List
 import Data.Maybe
-import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
+import qualified Data.IntSet as IntSet
 import qualified Data.ArithRel as ArithRel
 import Data.Interval
 import Data.Var
@@ -73,23 +74,23 @@ import Data.VectorSpace
 newtype Expr r
   = Expr
   { -- | a mapping from variables to coefficients
-    coeffMap :: IM.IntMap r
+    coeffMap :: IntMap r
   } deriving (Eq, Ord)
 
 -- | Create a @Expr@ from a mapping from variables to coefficients.
-fromCoeffMap :: (Num r, Eq r) => IM.IntMap r -> Expr r
+fromCoeffMap :: (Num r, Eq r) => IntMap r -> Expr r
 fromCoeffMap m = normalizeExpr (Expr m)
 
 -- | terms contained in the expression.
 terms :: Expr r -> [(r,Var)]
-terms (Expr m) = [(c,v) | (v,c) <- IM.toList m]
+terms (Expr m) = [(c,v) | (v,c) <- IntMap.toList m]
 
 -- | Create a @Expr@ from a list of terms.
 fromTerms :: (Num r, Eq r) => [(r,Var)] -> Expr r
-fromTerms ts = fromCoeffMap $ IM.fromListWith (+) [(x,c) | (c,x) <- ts]
+fromTerms ts = fromCoeffMap $ IntMap.fromListWith (+) [(x,c) | (c,x) <- ts]
 
 instance Variables (Expr r) where
-  vars (Expr m) = IS.delete unitVar (IM.keysSet m)
+  vars (Expr m) = IntSet.delete unitVar (IntMap.keysSet m)
 
 instance Show r => Show (Expr r) where
   showsPrec d m  = showParen (d > 10) $
@@ -110,41 +111,41 @@ unitVar = -1
 
 asConst :: Num r => Expr r -> Maybe r
 asConst (Expr m) =
-  case IM.toList m of
+  case IntMap.toList m of
     [] -> Just 0
     [(v,x)] | v==unitVar -> Just x
     _ -> Nothing
 
 normalizeExpr :: (Num r, Eq r) => Expr r -> Expr r
-normalizeExpr (Expr t) = Expr $ IM.filter (0/=) t
+normalizeExpr (Expr t) = Expr $ IntMap.filter (0/=) t
 
 -- | variable
 var :: Num r => Var -> Expr r
-var v = Expr $ IM.singleton v 1
+var v = Expr $ IntMap.singleton v 1
 
 -- | constant
 constant :: (Num r, Eq r) => r -> Expr r
-constant c = normalizeExpr $ Expr $ IM.singleton unitVar c
+constant c = normalizeExpr $ Expr $ IntMap.singleton unitVar c
 
 -- | map coefficients.
 mapCoeff :: (Num b, Eq b) => (a -> b) -> Expr a -> Expr b
-mapCoeff f (Expr t) = Expr $ IM.mapMaybe g t
+mapCoeff f (Expr t) = Expr $ IntMap.mapMaybe g t
   where
     g c = if c' == 0 then Nothing else Just c'
       where c' = f c
 
 -- | map coefficients.
 mapCoeffWithVar :: (Num b, Eq b) => (a -> Var -> b) -> Expr a -> Expr b
-mapCoeffWithVar f (Expr t) = Expr $ IM.mapMaybeWithKey g t
+mapCoeffWithVar f (Expr t) = Expr $ IntMap.mapMaybeWithKey g t
   where
     g v c = if c' == 0 then Nothing else Just c'
       where c' = f c v
 
 instance (Num r, Eq r) => AdditiveGroup (Expr r) where
-  Expr t ^+^ e2 | IM.null t = e2
-  e1 ^+^ Expr t | IM.null t = e1
+  Expr t ^+^ e2 | IntMap.null t = e2
+  e1 ^+^ Expr t | IntMap.null t = e1
   e1 ^+^ e2 = normalizeExpr $ plus e1 e2
-  zeroV = Expr $ IM.empty
+  zeroV = Expr $ IntMap.empty
   negateV = ((-1) *^)
 
 instance (Num r, Eq r) => VectorSpace (Expr r) where
@@ -154,30 +155,30 @@ instance (Num r, Eq r) => VectorSpace (Expr r) where
   c *^ e = mapCoeff (c*) e
 
 plus :: Num r => Expr r -> Expr r -> Expr r
-plus (Expr t1) (Expr t2) = Expr $ IM.unionWith (+) t1 t2
+plus (Expr t1) (Expr t2) = Expr $ IntMap.unionWith (+) t1 t2
 
 -- | evaluate the expression under the model.
 evalExpr :: Num r => Model r -> Expr r -> r
-evalExpr m (Expr t) = sum [(m' IM.! v) * c | (v,c) <- IM.toList t]
-  where m' = IM.insert unitVar 1 m
+evalExpr m (Expr t) = sum [(m' IntMap.! v) * c | (v,c) <- IntMap.toList t]
+  where m' = IntMap.insert unitVar 1 m
 
 -- | evaluate the expression under the model.
 evalLinear :: VectorSpace a => Model a -> a -> Expr (Scalar a) -> a
-evalLinear m u (Expr t) = sumV [c *^ (m' IM.! v) | (v,c) <- IM.toList t]
-  where m' = IM.insert unitVar u m
+evalLinear m u (Expr t) = sumV [c *^ (m' IntMap.! v) | (v,c) <- IntMap.toList t]
+  where m' = IntMap.insert unitVar u m
 
 lift1 :: VectorSpace x => x -> (Var -> x) -> Expr (Scalar x) -> x
-lift1 unit f (Expr t) = sumV [c *^ (g v) | (v,c) <- IM.toList t]
+lift1 unit f (Expr t) = sumV [c *^ (g v) | (v,c) <- IntMap.toList t]
   where
     g v
       | v==unitVar = unit
       | otherwise   = f v
 
 applySubst :: (Num r, Eq r) => VarMap (Expr r) -> Expr r -> Expr r
-applySubst s (Expr m) = sumV (map f (IM.toList m))
+applySubst s (Expr m) = sumV (map f (IntMap.toList m))
   where
     f (v,c) = c *^ (
-      case IM.lookup v s of
+      case IntMap.lookup v s of
         Just tm -> tm
         Nothing -> var v)
 
@@ -193,7 +194,7 @@ applySubst1 x e e1 =
 --   coeff v e == fst (extract v e)
 -- @
 coeff :: Num r => Var -> Expr r -> r
-coeff v (Expr m) = IM.findWithDefault 0 v m
+coeff v (Expr m) = IntMap.findWithDefault 0 v m
 
 -- | lookup a coefficient of the variable.
 -- It returns @Nothing@ if the expression does not contain @v@.
@@ -201,15 +202,15 @@ coeff v (Expr m) = IM.findWithDefault 0 v m
 --   lookupCoeff v e == fmap fst (extractMaybe v e)
 -- @
 lookupCoeff :: Num r => Var -> Expr r -> Maybe r
-lookupCoeff v (Expr m) = IM.lookup v m  
+lookupCoeff v (Expr m) = IntMap.lookup v m  
 
 -- | @extract v e@ returns @(c, e')@ such that @e == c *^ v ^+^ e'@
 extract :: Num r => Var -> Expr r -> (r, Expr r)
-extract v (Expr m) = (IM.findWithDefault 0 v m, Expr (IM.delete v m))
+extract v (Expr m) = (IntMap.findWithDefault 0 v m, Expr (IntMap.delete v m))
 {-
 -- Alternative implementation which may be faster but allocte more memory
 extract v (Expr m) = 
-  case IM.updateLookupWithKey (\_ _ -> Nothing) v m of
+  case IntMap.updateLookupWithKey (\_ _ -> Nothing) v m of
     (Nothing, _) -> (0, Expr m)
     (Just c, m2) -> (c, Expr m2)
 -}
@@ -218,13 +219,13 @@ extract v (Expr m) =
 -- if @e@ contains v, and returns @Nothing@ otherwise.
 extractMaybe :: Num r => Var -> Expr r -> Maybe (r, Expr r)
 extractMaybe v (Expr m) =
-  case IM.lookup v m of
+  case IntMap.lookup v m of
     Nothing -> Nothing
-    Just c -> Just (c, Expr (IM.delete v m))
+    Just c -> Just (c, Expr (IntMap.delete v m))
 {-
 -- Alternative implementation which may be faster but allocte more memory
 extractMaybe v (Expr m) =
-  case IM.updateLookupWithKey (\_ _ -> Nothing) v m of
+  case IntMap.updateLookupWithKey (\_ _ -> Nothing) v m of
     (Nothing, _) -> Nothing
     (Just c, m2) -> Just (c, Expr m2)
 -}
@@ -241,8 +242,8 @@ showExprWith env (Expr m) = foldr (.) id xs ""
     ts = [if c==1
             then showString (env x)
             else showsPrec 8 c . showString "*" . showString (env x)
-          | (x,c) <- IM.toList m, x /= unitVar] ++
-         [showsPrec 7 c | c <- maybeToList (IM.lookup unitVar m)]
+          | (x,c) <- IntMap.toList m, x /= unitVar] ++
+         [showsPrec 7 c | c <- maybeToList (IntMap.lookup unitVar m)]
 
 -----------------------------------------------------------------------------
 

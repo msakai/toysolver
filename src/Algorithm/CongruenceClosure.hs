@@ -31,7 +31,8 @@ import Prelude hiding (lookup)
 import Control.Monad
 import Data.IORef
 import Data.Maybe
-import qualified Data.IntMap as IM
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 
 type Var = Int
 
@@ -47,20 +48,20 @@ data Solver
   = Solver
   { svVarCounter           :: IORef Int
   , svPending              :: IORef [PendingEqn]
-  , svRepresentativeTable  :: IORef (IM.IntMap Var) -- 本当は配列が良い
-  , svClassList            :: IORef (IM.IntMap [Var])
-  , svUseList              :: IORef (IM.IntMap [Eqn1])
-  , svLookupTable          :: IORef (IM.IntMap (IM.IntMap Eqn1))
+  , svRepresentativeTable  :: IORef (IntMap Var) -- 本当は配列が良い
+  , svClassList            :: IORef (IntMap [Var])
+  , svUseList              :: IORef (IntMap [Eqn1])
+  , svLookupTable          :: IORef (IntMap (IntMap Eqn1))
   }
 
 newSolver :: IO Solver
 newSolver = do
   vcnt     <- newIORef 0
   pending  <- newIORef []
-  rep      <- newIORef IM.empty
-  classes  <- newIORef IM.empty
-  useList  <- newIORef IM.empty
-  lookup   <- newIORef IM.empty
+  rep      <- newIORef IntMap.empty
+  classes  <- newIORef IntMap.empty
+  useList  <- newIORef IntMap.empty
+  lookup   <- newIORef IntMap.empty
   return $
     Solver
     { svVarCounter          = vcnt
@@ -75,9 +76,9 @@ newVar :: Solver -> IO Var
 newVar solver = do
   v <- readIORef (svVarCounter solver)
   writeIORef (svVarCounter solver) $! v + 1
-  modifyIORef (svRepresentativeTable solver) (IM.insert v v)
-  modifyIORef (svClassList solver) (IM.insert v [v])
-  modifyIORef (svUseList solver) (IM.insert v [])
+  modifyIORef (svRepresentativeTable solver) (IntMap.insert v v)
+  modifyIORef (svClassList solver) (IntMap.insert v [v])
+  modifyIORef (svUseList solver) (IntMap.insert v [])
   return v
 
 merge :: Solver -> (FlatTerm, Var) -> IO ()
@@ -97,8 +98,8 @@ merge solver (s, a) = do
         Nothing -> do
           setLookup solver a1' a2' (FTApp a1 a2, a)
           modifyIORef (svUseList solver) $
-            IM.alter (Just . ((FTApp a1 a2, a) :) . fromMaybe []) a1' .
-            IM.alter (Just . ((FTApp a1 a2, a) :) . fromMaybe []) a2'
+            IntMap.alter (Just . ((FTApp a1 a2, a) :) . fromMaybe []) a1' .
+            IntMap.alter (Just . ((FTApp a1 a2, a) :) . fromMaybe []) a2'
 
 propagate :: Solver -> IO ()
 propagate solver = go
@@ -122,20 +123,20 @@ propagate solver = go
         then return ()
         else do
           clist <- readIORef (svClassList  solver)
-          let classA = clist IM.! a'
-              classB = clist IM.! b'
+          let classA = clist IntMap.! a'
+              classB = clist IntMap.! b'
           if length classA < length classB
             then update a' b' classA classB
             else update b' a' classB classA
 
     update a' b' classA classB = do
       modifyIORef (svRepresentativeTable solver) $ 
-        IM.union (IM.fromList [(c,b') | c <- classA])
+        IntMap.union (IntMap.fromList [(c,b') | c <- classA])
       modifyIORef (svClassList solver) $
-        IM.insert b' (classA ++ classB) . IM.delete a'
+        IntMap.insert b' (classA ++ classB) . IntMap.delete a'
 
       useList <- readIORef (svUseList solver)
-      forM_ (useList IM.! a') $ \(FTApp c1 c2, c) -> do -- FIXME: not exhaustive
+      forM_ (useList IntMap.! a') $ \(FTApp c1 c2, c) -> do -- FIXME: not exhaustive
         c1' <- getRepresentative solver c1
         c2' <- getRepresentative solver c2
         ret <- lookup solver c1' c2'
@@ -144,7 +145,7 @@ propagate solver = go
             addToPending solver $ Right ((FTApp c1 c2, c), (FTApp d1 d2, d))
           Nothing -> do
             return ()
-      writeIORef (svUseList solver) $ IM.delete a' useList        
+      writeIORef (svUseList solver) $ IntMap.delete a' useList        
 
 areCongruent :: Solver -> FlatTerm -> FlatTerm -> IO Bool
 areCongruent solver t1 t2 = do
@@ -170,13 +171,13 @@ lookup :: Solver -> Var -> Var -> IO (Maybe Eqn1)
 lookup solver c1 c2 = do
   tbl <- readIORef $ svLookupTable solver
   return $ do
-     m <- IM.lookup c1 tbl
-     IM.lookup c2 m
+     m <- IntMap.lookup c1 tbl
+     IntMap.lookup c2 m
 
 setLookup :: Solver -> Var -> Var -> Eqn1 -> IO ()
 setLookup solver a1 a2 eqn = do
   modifyIORef (svLookupTable solver) $
-    IM.insertWith IM.union a1 (IM.singleton a2 eqn)
+    IntMap.insertWith IntMap.union a1 (IntMap.singleton a2 eqn)
 
 addToPending :: Solver -> PendingEqn -> IO ()
 addToPending solver eqn = modifyIORef (svPending solver) (eqn :)
@@ -184,4 +185,4 @@ addToPending solver eqn = modifyIORef (svPending solver) (eqn :)
 getRepresentative :: Solver -> Var -> IO Var
 getRepresentative solver c = do
   m <- readIORef $ svRepresentativeTable solver
-  return $ m IM.! c
+  return $ m IntMap.! c

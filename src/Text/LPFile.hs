@@ -56,7 +56,9 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Ratio
+import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.OptDir
 import Text.ParserCombinators.Parsec hiding (label)
@@ -68,11 +70,11 @@ import Util (combineMaybe)
 -- | Problem
 data LP
   = LP
-  { variables :: Set.Set Var
+  { variables :: Set Var
   , dir :: OptDir
   , objectiveFunction :: ObjectiveFunction
   , constraints :: [Constraint]
-  , varInfo :: Map.Map Var VarInfo
+  , varInfo :: Map Var VarInfo
   , sos :: [SOS]
   }
   deriving (Show, Eq, Ord)
@@ -155,7 +157,7 @@ data SOSType
 type SOS = (Maybe Label, SOSType, [(Var, Rational)])
 
 class Variables a where
-  vars :: a -> Set.Set Var
+  vars :: a -> Set Var
 
 instance Variables a => Variables [a] where
   vars = Set.unions . map vars
@@ -199,12 +201,12 @@ getBounds lp v = varBounds $ getVarInfo lp v
 intersectBounds :: Bounds -> Bounds -> Bounds
 intersectBounds (lb1,ub1) (lb2,ub2) = (max lb1 lb2, min ub1 ub2)
 
-integerVariables :: LP -> Set.Set Var
+integerVariables :: LP -> Set Var
 integerVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
   where
     p VarInfo{ varType = vt } = vt == IntegerVariable
 
-semiContinuousVariables :: LP -> Set.Set Var
+semiContinuousVariables :: LP -> Set Var
 semiContinuousVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
   where
     p VarInfo{ varType = vt } = vt == SemiContinuousVariable
@@ -259,7 +261,7 @@ label = do
   tok $ char ':'
   return name
 
-reserved :: Set.Set String
+reserved :: Set String
 reserved = Set.fromList
   [ "bound", "bounds"
   , "gen", "general", "generals"
@@ -400,7 +402,7 @@ userCutsSection = do
 
 type Bounds2 = (Maybe BoundExpr, Maybe BoundExpr)
 
-boundsSection :: Parser (Map.Map Var Bounds)
+boundsSection :: Parser (Map Var Bounds)
 boundsSection = do
   tok $ string' "bound" >> optional (char' 's')
   liftM (Map.map g . Map.fromListWith f) $ many (try bound)
@@ -740,7 +742,7 @@ fill width str = go str 0
 -- ---------------------------------------------------------------------------
 
 {-
-compileExpr :: Expr -> Maybe (Map.Map Var Rational)
+compileExpr :: Expr -> Maybe (Map Var Rational)
 compileExpr e = do
   xs <- forM e $ \(Term c vs) ->
     case vs of
