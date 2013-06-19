@@ -106,6 +106,7 @@ Library
      Converter.WBO2PB
      Data.AlgebraicNumber.Real
      Data.AlgebraicNumber.Root
+     Data.AlgebraicNumber.Sturm
      Data.ArithRel
      Data.Delta
      Data.DNF
@@ -124,8 +125,6 @@ Library
      Data.Polynomial.Factorization.Zassenhaus
      Data.Polynomial.GroebnerBasis
      Data.Polynomial.Interpolation.Lagrange
-     Data.Polynomial.RootSeparation.Graeffe
-     Data.Polynomial.RootSeparation.Sturm
      Data.Sign
      Data.Var
      SAT
@@ -149,6 +148,7 @@ Library
      Util
      Version
   Other-Modules:
+     Data.AlgebraicNumber.Graeffe
      Data.Polynomial.Base
      Data.IndexedPriorityQueue
      Data.SeqQueue

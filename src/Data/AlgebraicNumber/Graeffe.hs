@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Data.Polynomial.RootSeparation.Graeffe
+-- Module      :  Data.AlgebraicNumber.Graeffe
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -18,7 +18,7 @@
 -- 
 -----------------------------------------------------------------------------
 
-module Data.Polynomial.RootSeparation.Graeffe
+module Data.AlgebraicNumber.Graeffe
   ( NthRoot (..)
   , graeffesMethod
   ) where

@@ -18,7 +18,6 @@ import Text.PrettyPrint.HughesPJClass
 import Data.Polynomial (Polynomial, Term, Monomial, UPolynomial, UTerm, UMonomial, X (..))
 import qualified Data.Polynomial as P
 import qualified Data.Polynomial.GroebnerBasis as GB
-import Data.Polynomial.RootSeparation.Sturm
 import qualified Data.Polynomial.Factorization.FiniteField as FactorFF
 import qualified Data.Polynomial.Interpolation.Lagrange as LagrangeInterpolation
 import qualified Data.Interval as Interval
@@ -604,54 +603,6 @@ upolynomialsZ = do
   size <- choose (0, 5)
   xs <- replicateM size genUTermsZ
   return $ sum $ map P.fromTerm xs 
-
-------------------------------------------------------------------------
-
--- http://mathworld.wolfram.com/SturmFunction.html
-case_sturmChain = sturmChain p0 @?= chain
-  where
-    x = P.var X
-    p0 = x^5 - 3*x - 1
-    p1 = 5*x^4 - 3
-    p2 = P.constant (1/5) * (12*x + 5)
-    p3 = P.constant (59083 / 20736)
-    chain = [p0, p1, p2, p3]
-
--- http://mathworld.wolfram.com/SturmFunction.html
-case_numRoots_1 =
-  sequence_
-  [ numRoots p (Finite (-2)   <=..<= Finite 0)      @?= 2
-  , numRoots p (Finite 0      <=..<= Finite 2)      @?= 1
-  , numRoots p (Finite (-1.5) <=..<= Finite (-1.0)) @?= 1
-  , numRoots p (Finite (-0.5) <=..<= Finite 0)      @?= 1
-  , numRoots p (Finite 1      <=..<= Finite (1.5))  @?= 1
-  ]
-  where
-    x = P.var X
-    p = x^5 - 3*x - 1
-
--- check interpretation of intervals
-case_numRoots_2 =
-  sequence_
-  [ numRoots p (Finite 2 <..<=  Finite 3) @?= 0
-  , numRoots p (Finite 2 <=..<= Finite 3) @?= 1
-  , numRoots p (Finite 1 <..<   Finite 2) @?= 0
-  , numRoots p (Finite 1 <..<=  Finite 2) @?= 1
-  ]
-  where
-    x = P.var X
-    p = x^2 - 4
-
-case_separate = do
-  forM_ (zip vals intervals) $ \(v,ival) -> do
-    Interval.member v ival @?= True
-    forM_ (filter (v/=) vals) $ \v2 -> do
-      Interval.member v2 ival @?= False
-  where
-    x = P.var X
-    p = x^5 - 3*x - 1
-    intervals = separate p
-    vals = [-1.21465, -0.334734, 1.38879]
 
 ------------------------------------------------------------------------
 

@@ -11,8 +11,10 @@ import Test.Framework.Providers.QuickCheck2
 
 import Data.Polynomial (UPolynomial, X (..))
 import qualified Data.Polynomial as P
+import qualified Data.AlgebraicNumber.Sturm as Sturm
 import Data.AlgebraicNumber.Real
 import Data.AlgebraicNumber.Root
+import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<))
 import qualified Data.Interval as Interval
 
 import Control.Monad
@@ -234,6 +236,54 @@ epsilons = do
   if r > 0
      then return (1/r)
      else return r
+
+------------------------------------------------------------------------
+
+-- http://mathworld.wolfram.com/SturmFunction.html
+case_sturmChain = Sturm.sturmChain p0 @?= chain
+  where
+    x = P.var X
+    p0 = x^5 - 3*x - 1
+    p1 = 5*x^4 - 3
+    p2 = P.constant (1/5) * (12*x + 5)
+    p3 = P.constant (59083 / 20736)
+    chain = [p0, p1, p2, p3]
+
+-- http://mathworld.wolfram.com/SturmFunction.html
+case_numRoots_1 =
+  sequence_
+  [ Sturm.numRoots p (Finite (-2)   <=..<= Finite 0)      @?= 2
+  , Sturm.numRoots p (Finite 0      <=..<= Finite 2)      @?= 1
+  , Sturm.numRoots p (Finite (-1.5) <=..<= Finite (-1.0)) @?= 1
+  , Sturm.numRoots p (Finite (-0.5) <=..<= Finite 0)      @?= 1
+  , Sturm.numRoots p (Finite 1      <=..<= Finite (1.5))  @?= 1
+  ]
+  where
+    x = P.var X
+    p = x^5 - 3*x - 1
+
+-- check interpretation of intervals
+case_numRoots_2 =
+  sequence_
+  [ Sturm.numRoots p (Finite 2 <..<=  Finite 3) @?= 0
+  , Sturm.numRoots p (Finite 2 <=..<= Finite 3) @?= 1
+  , Sturm.numRoots p (Finite 1 <..<   Finite 2) @?= 0
+  , Sturm.numRoots p (Finite 1 <..<=  Finite 2) @?= 1
+  ]
+  where
+    x = P.var X
+    p = x^2 - 4
+
+case_separate = do
+  forM_ (zip vals intervals) $ \(v,ival) -> do
+    Interval.member v ival @?= True
+    forM_ (filter (v/=) vals) $ \v2 -> do
+      Interval.member v2 ival @?= False
+  where
+    x = P.var X
+    p = x^5 - 3*x - 1
+    intervals = Sturm.separate p
+    vals = [-1.21465, -0.334734, 1.38879]
 
 ------------------------------------------------------------------------
 -- Test harness

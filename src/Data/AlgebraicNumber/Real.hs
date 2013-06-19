@@ -55,10 +55,10 @@ import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyPare
 
 import Data.Polynomial (Polynomial, UPolynomial, X (..))
 import qualified Data.Polynomial as P
-import qualified Data.Polynomial.RootSeparation.Sturm as Sturm
 import Data.Interval (Interval, EndPoint (..), (<=..<), (<..<=), (<..<), (<!), (>!))
 import qualified Data.Interval as Interval
 import Data.AlgebraicNumber.Root
+import qualified Data.AlgebraicNumber.Sturm as Sturm
 
 {--------------------------------------------------------------------
   Construction
