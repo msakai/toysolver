@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, BangPatterns, DeriveDataTypeable #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, BangPatterns, DeriveDataTypeable, CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, BangPatterns, DeriveDataTypeable)
+-- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, BangPatterns, DeriveDataTypeable, CPP)
 --
 -- Polynomials
 --
@@ -127,6 +127,7 @@ import Control.Monad
 import Data.Data
 import qualified Data.FiniteField as FF
 import Data.Function
+import Data.Hashable
 import Data.List
 import Data.Monoid
 import Data.Ratio
@@ -188,6 +189,9 @@ instance (Show v, Ord v, Show k) => Show (Polynomial k v) where
 
 instance (NFData k, NFData v) => NFData (Polynomial k v) where
   rnf (Polynomial m) = rnf m
+
+instance (Hashable k, Hashable v) => Hashable (Polynomial k v) where
+  hashWithSalt = hashUsing (Map.toList . coeffMap)
 
 instance (Eq k, Num k, Ord v) => Var (Polynomial k v) v where
   var x = fromTerm (1, var x)
@@ -533,6 +537,9 @@ data X = X
 
 instance NFData X
 
+instance Hashable X where
+  hashWithSalt = hashUsing fromEnum
+
 ucmp :: MonomialOrder X
 ucmp = grlex
 
@@ -694,6 +701,9 @@ instance Ord v => Var (Monomial v) v where
 instance Ord v => Vars (Monomial v) v where
   vars mm = Map.keysSet (mindicesMap mm)
 
+instance Hashable v => Hashable (Monomial v) where
+  hashWithSalt = hashUsing (Map.toList . mindicesMap)
+
 mone :: Monomial v
 mone = Monomial $ Map.empty
 
@@ -800,3 +810,34 @@ grlex = (compare `on` deg) `mappend` lex
 -- | Graded reverse lexicographic order
 grevlex :: Ord v => MonomialOrder v
 grevlex = (compare `on` deg) `mappend` revlex
+
+{--------------------------------------------------------------------
+  Helper
+--------------------------------------------------------------------}
+
+#if !MIN_VERSION_hashable(1,2,0)
+-- Copied from hashable-1.2.0.7:
+-- Copyright   :  (c) Milan Straka 2010
+--                (c) Johan Tibell 2011
+--                (c) Bryan O'Sullivan 2011, 2012
+
+-- | Transform a value into a 'Hashable' value, then hash the
+-- transformed value using the given salt.
+--
+-- This is a useful shorthand in cases where a type can easily be
+-- mapped to another type that is already an instance of 'Hashable'.
+-- Example:
+--
+-- > data Foo = Foo | Bar
+-- >          deriving (Enum)
+-- >
+-- > instance Hashable Foo where
+-- >     hashWithSalt = hashUsing fromEnum
+hashUsing :: (Hashable b) =>
+             (a -> b)           -- ^ Transformation function.
+          -> Int                -- ^ Salt.
+          -> a                  -- ^ Value to transform.
+          -> Int
+hashUsing f salt x = hashWithSalt salt (f x)
+{-# INLINE hashUsing #-}
+#endif
