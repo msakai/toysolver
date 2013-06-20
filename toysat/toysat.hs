@@ -68,8 +68,8 @@ import qualified Text.MPSFile as MPSFile
 import qualified Text.MaxSAT as MaxSAT
 import qualified Text.GCNF as GCNF
 import qualified Text.GurobiSol as GurobiSol
-import Version
-import Util (showRational, revMapM, revForM)
+import ToySolver.Version
+import ToySolver.Util (showRational, revMapM, revForM)
 
 -- ------------------------------------------------------------------------
 

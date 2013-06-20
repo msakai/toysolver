@@ -5,7 +5,7 @@ import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
-import Util
+import ToySolver.Util
 
 -- should be SAT
 case_showRationalAsDecimal :: IO ()

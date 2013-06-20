@@ -27,7 +27,7 @@ import qualified Data.Map as Map
 import System.IO
 import Text.Printf
 import qualified Text.LPFile as LP
-import Util (showRationalAsFiniteDecimal)
+import ToySolver.Util (showRationalAsFiniteDecimal)
 
 data Options
   = Options

@@ -51,7 +51,7 @@ import qualified Algorithm.LPSolver as LPSolver
 import Algorithm.LPSolver
 import Algorithm.LPSolverHL (OptResult (..))
 import qualified Algorithm.OmegaTest as OmegaTest
-import Util (isInteger, fracPart)
+import ToySolver.Util (isInteger, fracPart)
 
 -- ---------------------------------------------------------------------------
 

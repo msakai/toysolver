@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-module Version
+module ToySolver.Version
   ( version
   , packageVersions
   ) where

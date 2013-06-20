@@ -33,7 +33,7 @@ import qualified Converter.MaxSAT2NLPB as MaxSAT2NLPB
 import qualified Converter.PB2LP as PB2LP
 import qualified Converter.PBSetObj as PBSetObj
 import qualified Converter.SAT2PB as SAT2PB
-import Version
+import ToySolver.Version
 
 data Flag
   = Help

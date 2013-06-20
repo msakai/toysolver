@@ -60,8 +60,8 @@ import qualified Converter.PB2LP as PB2LP
 import qualified Converter.MaxSAT2LP as MaxSAT2LP
 import SAT.Printer
 import qualified SAT.Types as SAT
-import Version
-import Util
+import ToySolver.Version
+import ToySolver.Util
 
 -- ---------------------------------------------------------------------------
 

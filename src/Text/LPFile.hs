@@ -63,7 +63,7 @@ import qualified Data.Set as Set
 import Data.OptDir
 import Text.ParserCombinators.Parsec hiding (label)
 
-import Util (combineMaybe)
+import ToySolver.Util (combineMaybe)
 
 -- ---------------------------------------------------------------------------
 

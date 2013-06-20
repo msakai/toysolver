@@ -145,8 +145,8 @@ Library
      Text.MaxSAT
      Text.PBFile
      Text.SDPFile
-     Util
-     Version
+     ToySolver.Util
+     ToySolver.Version
   Other-Modules:
      Data.AlgebraicNumber.Graeffe
      Data.Polynomial.Base

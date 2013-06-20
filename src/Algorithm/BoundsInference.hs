@@ -28,7 +28,7 @@ import Data.Interval
 import Data.LA (BoundsEnv)
 import qualified Data.LA as LA
 import Data.Var
-import Util (isInteger)
+import ToySolver.Util (isInteger)
 
 type C r = (RelOp, LA.Expr r)
 

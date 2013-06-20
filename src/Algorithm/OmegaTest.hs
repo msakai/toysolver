@@ -49,7 +49,7 @@ import Data.ArithRel
 import Data.DNF
 import qualified Data.LA as LA
 import Data.Var
-import Util (combineMaybe)
+import ToySolver.Util (combineMaybe)
 import qualified Algorithm.FourierMotzkin as FM
 import Algorithm.FourierMotzkin.Core (Lit (..), Rat, toLAAtom)
 

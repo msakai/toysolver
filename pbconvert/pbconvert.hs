@@ -36,7 +36,7 @@ import qualified Converter.PB2WBO as PB2WBO
 import qualified Converter.PBSetObj as PBSetObj
 import qualified Converter.PB2SMP as PB2SMP
 import qualified Converter.WBO2PB as WBO2PB
-import Version
+import ToySolver.Version
 
 data Flag
   = Help

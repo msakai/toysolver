@@ -28,7 +28,7 @@ import Data.Ratio
 import Data.Polynomial.Base (Polynomial, UPolynomial, X (..))
 import qualified Data.Polynomial.Base as P
 import qualified Data.Polynomial.Interpolation.Lagrange as Interpolation
-import Util (isInteger)
+import ToySolver.Util (isInteger)
 
 factor :: UPolynomial Integer -> [(UPolynomial Integer, Integer)]
 factor 0 = [(0,1)]
