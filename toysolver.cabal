@@ -12,6 +12,7 @@ Bug-Reports:	https://github.com/msakai/toysolver/issues
 Extra-Source-Files:
    README.md
    COPYING
+   .ghci
    .travis.yml
    src/TseitinEncode.hs
    src/Data/Polyhedron.hs
