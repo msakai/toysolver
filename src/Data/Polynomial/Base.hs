@@ -44,7 +44,6 @@ module Data.Polynomial.Base
   , coeff
   , lookupCoeff
   , isPrimitive
-  , isRootOf
 
   -- * Operations
   , Factor (..)
@@ -76,6 +75,7 @@ module Data.Polynomial.Base
   , pdiv
   , pmod
   , gcd'
+  , isRootOf
   , isSquareFree
 
   -- * Term
@@ -336,12 +336,6 @@ subst
   => Polynomial k v1 -> (v1 -> Polynomial k v2) -> Polynomial k v2
 subst p s =
   sumV [constant c * product [(s x)^e | (x,e) <- mindices xs] | (c, xs) <- terms p]
-
-isRootOf :: (Eq k, Num k) => k -> UPolynomial k -> Bool
-isRootOf x p = eval (\_ -> x) p == 0
-
-isSquareFree :: (Eq k, Fractional k) => UPolynomial k -> Bool
-isSquareFree p = gcd p (deriv p X) == 1
 
 mapCoeff :: (Eq k1, Num k1, Ord v) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
 mapCoeff f (Polynomial m) = Polynomial $ Map.mapMaybe g m
@@ -643,6 +637,12 @@ pmod f g
 gcd' :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
 gcd' f1 0  = ppI f1
 gcd' f1 f2 = gcd' f2 (f1 `pmod` f2)
+
+isRootOf :: (Eq k, Num k) => k -> UPolynomial k -> Bool
+isRootOf x p = eval (\_ -> x) p == 0
+
+isSquareFree :: (Eq k, Fractional k) => UPolynomial k -> Bool
+isSquareFree p = gcd p (deriv p X) == 1
 
 {--------------------------------------------------------------------
   Term

@@ -43,7 +43,6 @@ module Data.Polynomial
   , coeff
   , lookupCoeff
   , isPrimitive
-  , isRootOf
 
   -- * Operations
   , Factor (..)
@@ -75,6 +74,7 @@ module Data.Polynomial
   , pdiv
   , pmod
   , gcd'
+  , isRootOf
   , isSquareFree
 
   -- * Term
