@@ -244,18 +244,18 @@ isZero (Polynomial m) = Map.null m
 constant :: (Eq k, Num k, Ord v) => k -> Polynomial k v
 constant c = fromTerm (c, mone)
 
--- | construct a polynomial from a list of monomials
+-- | construct a polynomial from a list of terms
 fromTerms :: (Eq k, Num k, Ord v) => [Term k v] -> Polynomial k v
 fromTerms = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
 
 fromCoeffMap :: (Eq k, Num k, Ord v) => Map (Monomial v) k -> Polynomial k v
 fromCoeffMap m = normalize $ Polynomial m
 
--- | construct a polynomial from a monomial
+-- | construct a polynomial from a singlet term
 fromTerm :: (Eq k, Num k, Ord v) => Term k v -> Polynomial k v
 fromTerm (c,xs) = normalize $ Polynomial $ Map.singleton xs c
 
--- | list of monomials
+-- | list of terms
 terms :: Polynomial k v -> [Term k v]
 terms (Polynomial m) = [(c,xs) | (xs,c) <- Map.toList m]
 
@@ -274,9 +274,13 @@ lc cmp = fst . lt cmp
 lm :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Monomial v
 lm cmp = snd . lt cmp
 
+-- | Look up a coefficient for a given monomial.
+-- If no such term exists, it returns @0@.
 coeff :: (Num k, Ord v) => Monomial v -> Polynomial k v -> k
 coeff xs (Polynomial m) = Map.findWithDefault 0 xs m
 
+-- | Look up a coefficient for a given monomial.
+-- If no such term exists, it returns @Nothing@.
 lookupCoeff :: Ord v => Monomial v -> Polynomial k v -> Maybe k
 lookupCoeff xs (Polynomial m) = Map.lookup xs m
 
@@ -315,6 +319,7 @@ instance Integral r => ContPP (Ratio r) where
     where
       c = cont p
 
+-- | a polynomial is called primitive if the greatest common divisor of its coefficients is 1.
 isPrimitive :: (Eq k, Num k, ContPP k, Ord v) => Polynomial k v -> Bool
 isPrimitive p = isZero p || cont p == 1
 
@@ -337,6 +342,7 @@ subst
 subst p s =
   sumV [constant c * product [(s x)^e | (x,e) <- mindices xs] | (c, xs) <- terms p]
 
+-- | Transform polynomial coefficients.
 mapCoeff :: (Eq k1, Num k1, Ord v) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
 mapCoeff f (Polynomial m) = Polynomial $ Map.mapMaybe g m
   where
@@ -344,6 +350,7 @@ mapCoeff f (Polynomial m) = Polynomial $ Map.mapMaybe g m
       where
         y = f x
 
+-- | Transform a polynomial into a monic polynomial with respect to the given monomial order.
 toMonic :: (Eq r, Fractional r, Ord v) => MonomialOrder v -> Polynomial r v -> Polynomial r v
 toMonic cmp p
   | c == 0 || c == 1 = p
@@ -351,6 +358,7 @@ toMonic cmp p
   where
     c = lc cmp p
 
+-- | Convert /K[x,x1,x2,…]/ into /K[x1,x2,…][x]/.
 toUPolynomialOf :: (Ord k, Num k, Ord v) => Polynomial k v -> v -> UPolynomial (Polynomial k v)
 toUPolynomialOf p v = fromTerms $ do
   (c,mm) <- terms p
@@ -360,6 +368,9 @@ toUPolynomialOf p v = fromTerms $ do
          )
 
 -- | Multivariate division algorithm
+--
+-- @divModMP cmp f [g1,g2,..]@ returns  @([q1,q2,…],r)@ where @f = g1*q1 + g2*q2*.. + r@ and
+-- @g1,g2,..@ do not divide @f@.
 divModMP
   :: forall k v. (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> ([Polynomial k v], Polynomial k v)
@@ -382,6 +393,8 @@ divModMP cmp p fs = go IntMap.empty p
           return (i, b, g - b * f)
 
 -- | Multivariate division algorithm
+--
+-- @reduce cmp f gs = snd (divModMP cmp f gs)@
 reduce
   :: (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> Polynomial k v
@@ -397,7 +410,7 @@ reduce cmp p fs = go p
           guard $ a `tdivides` h
           return (g - fromTerm (tdiv h a) * f)
 
--- | Factorization of polynomials
+-- | Prime factorization of polynomials
 class Factor a where
   -- | factor a polynomial @p@ into @p1 ^ n1 + p2 ^ n2 + ..@ and
   -- return a list @[(p1,n1), (p2,n2), ..]@.
@@ -526,6 +539,7 @@ appPrec = 10 -- Precedence of function application
 -- | Univariate polynomials over commutative ring r
 type UPolynomial r = Polynomial r X
 
+-- | Variable "x"
 data X = X
   deriving (Eq, Ord, Bounded, Enum, Show, Read, Typeable, Data)
 
@@ -638,9 +652,11 @@ gcd' :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
 gcd' f1 0  = ppI f1
 gcd' f1 f2 = gcd' f2 (f1 `pmod` f2)
 
+-- | Is the number a root of the polynomial?
 isRootOf :: (Eq k, Num k) => k -> UPolynomial k -> Bool
 isRootOf x p = eval (\_ -> x) p == 0
 
+-- | Is the polynomial square free?
 isSquareFree :: (Eq k, Fractional k) => UPolynomial k -> Bool
 isSquareFree p = gcd p (deriv p X) == 1
 
@@ -649,6 +665,7 @@ isSquareFree p = gcd p (deriv p X) == 1
 --------------------------------------------------------------------}
 
 type Term k v = (k, Monomial v)
+
 type UTerm k = Term k X
 
 tdeg :: Term k v -> Integer
@@ -789,7 +806,7 @@ lex xs1 xs2 = go (mindices xs1) (mindices xs2)
 
 -- | Reverse lexicographic order.
 -- 
--- Note that revlex is NOT a monomial order.
+-- Note that revlex is /NOT/ a monomial order.
 revlex :: Ord v => Monomial v -> Monomial v -> Ordering
 revlex xs1 xs2 = go (Map.toDescList (mindicesMap xs1)) (Map.toDescList (mindicesMap xs2))
   where
