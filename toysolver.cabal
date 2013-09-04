@@ -105,6 +105,7 @@ Library
      Converter.SAT2PB
      Converter.SAT2LP
      Converter.WBO2PB
+     Data.AlgebraicNumber.Complex
      Data.AlgebraicNumber.Real
      Data.AlgebraicNumber.Root
      Data.AlgebraicNumber.Sturm
