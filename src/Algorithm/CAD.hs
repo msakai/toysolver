@@ -194,17 +194,20 @@ project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
       forM_ cs $ \(p,ss) -> do
         when (1 > P.deg p) $ assume (P.coeff P.mone p) ss
       conf <- buildSignConf (map fst cs)
-      let satCells = [cell | (cell, m) <- conf, cell /= Point NegInf, cell /= Point PosInf, ok m]
+      -- normalizePoly前に次数が1以上で、normalizePoly結果の次数が0以下の時のための処理が必要なので注意
+      cs' <- liftM catMaybes $ forM cs $ \(p,ss) -> do
+        p' <- normalizePoly p
+        if (1 > P.deg p')
+          then assume (P.coeff P.mone p') ss >> return Nothing
+          else return $ Just (p',ss)
+      let satCells = [cell | (cell, m) <- conf, cell /= Point NegInf, cell /= Point PosInf, ok cs' m]
       guard $ not $ null satCells
       return satCells
 
-    ok :: Map (UPolynomial (Polynomial Rational v)) Sign -> Bool
-    ok m = and [checkSign m p ss | (p,ss) <- cs]
+    ok :: [(UPolynomial (Polynomial Rational v), [Sign])] -> Map (UPolynomial (Polynomial Rational v)) Sign -> Bool
+    ok cs m = and [checkSign m p ss | (p,ss) <- cs]
       where
-        checkSign m p ss =
-          if 1 > P.deg p 
-            then True -- already assumed
-            else (m Map.! p) `elem` ss
+        checkSign m p ss = (m Map.! p) `elem` ss
 
     guess2cond :: Map (Polynomial Rational v) (Set Sign) -> [(Polynomial Rational v, [Sign])]
     guess2cond gs = [(p, Set.toList ss)  | (p, ss) <- Map.toList gs]
@@ -215,6 +218,7 @@ buildSignConf
   -> M v (SignConf (Polynomial Rational v))
 buildSignConf ps = do
   ps2 <- collectPolynomials (Set.fromList ps)
+  -- normalizePoly後の多項式の次数でソートしておく必要があるので注意
   let ts = sortBy (comparing P.deg) (Set.toList ps2)
   foldM (flip refineSignConf) emptySignConf ts
 
@@ -222,49 +226,35 @@ collectPolynomials
   :: (Ord v, Show v, PrettyVar v)
   => Set (UPolynomial (Polynomial Rational v))
   -> M v (Set (UPolynomial (Polynomial Rational v)))
-collectPolynomials ps = go Set.empty (f ps)
+collectPolynomials ps = go Set.empty =<< f (Set.toList ps)
   where
-    f = Set.filter (\p -> P.deg p > 0) 
+    f ps = do
+      ps' <- mapM normalizePoly ps
+      return $ Set.fromList $ filter (\p -> P.deg p > 0) ps'
+
     go result ps | Set.null ps = return result
     go result ps = do
-      let rs1 = filter (\p -> P.deg p > 0) [P.deriv p X | p <- Set.toList ps]
-      rs2 <- liftM (filter (\p -> P.deg p > 0) . map (\(_,_,r) -> r) . concat) $
+      let rs = [P.deriv p X | p <- Set.toList ps]
+      rss <-
         forM [(p1,p2) | p1 <- Set.toList ps, p2 <- Set.toList ps ++ Set.toList result, p1 /= p2] $ \(p1,p2) -> do
-          ret1 <- zmod p1 p2
-          ret2 <- zmod p2 p1
-          return $ catMaybes [ret1,ret2]
-      let ps' = Set.unions [Set.fromList rs | rs <- [rs1,rs2]] `Set.difference` result
-      go (result `Set.union` ps) ps'
+          let d = P.deg p1
+              e = P.deg p2
+          return [r | (_,_,r) <- [mr p1 p2 | d >= e] ++ [mr p2 p1 | e >= d]]
+      ps' <- f (concat (rs:rss))
+      go (result `Set.union` ps) (ps' `Set.difference` result)
 
-getHighestNonzeroTerm
+-- ゼロであるような高次の項を消した多項式を返す
+normalizePoly
   :: forall v. (Ord v, Show v, PrettyVar v)
   => UPolynomial (Polynomial Rational v)
-  -> M v (Polynomial Rational v, Integer)
-getHighestNonzeroTerm p = go $ sortBy (flip (comparing snd)) cs
+  -> M v (UPolynomial (Polynomial Rational v))
+normalizePoly p = liftM P.fromTerms $ go $ sortBy (flip (comparing (P.deg . snd))) $ P.terms p
   where
-    cs = [(c, P.deg mm) | (c,mm) <- P.terms p]
-
-    go :: [(Polynomial Rational v, Integer)] -> M v (Polynomial Rational v, Integer)
-    go [] = return (0, -1)
-    go ((c,d):xs) =
+    go [] = return []
+    go xxs@((c,d):xs) =
       mplus
-        (assume c [Pos, Neg] >> return (c,d))
+        (assume c [Pos, Neg] >> return xxs)
         (assume c [Zero] >> go xs)
-
-zmod
-  :: forall v. (Ord v, Show v, PrettyVar v)
-  => UPolynomial (Polynomial Rational v)
-  -> UPolynomial (Polynomial Rational v)
-  -> M v (Maybe (Polynomial Rational v, Integer, UPolynomial (Polynomial Rational v)))
-zmod p q = do
-  (_, d) <- getHighestNonzeroTerm p
-  (_, e) <- getHighestNonzeroTerm q
-  if not (d >= e) || 0 >= e
-    then return Nothing
-    else do
-      let p' = P.fromTerms [(pi, mm) | (pi, mm) <- P.terms p, P.deg mm <= d]
-          q' = P.fromTerms [(qi, mm) | (qi, mm) <- P.terms q, P.deg mm <= e]
-      return $ Just $ mr p' q'
 
 refineSignConf
   :: forall v. (Show v, Ord v, PrettyVar v)
@@ -305,16 +295,15 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
     extendIntervals _ xs = xs
  
     signAt :: Point (Polynomial Rational v) -> Map (UPolynomial (Polynomial Rational v)) Sign -> M v Sign
-    signAt PosInf _ = do
-      (c,_) <- getHighestNonzeroTerm p
-      signCoeff c
+    signAt PosInf _ = signCoeff (P.lc P.grevlex p)
     signAt NegInf _ = do
-      (c,d) <- getHighestNonzeroTerm p
-      if even d
+      let (c,mm) = P.lt P.grevlex p
+      if even (P.deg mm)
         then signCoeff c
         else liftM Sign.negate $ signCoeff c
     signAt (RootOf q _) m = do
-      Just (bm,k,r) <- zmod p q
+      let (bm,k,r) = mr p q
+      r <- normalizePoly r
       s1 <- if P.deg r > 0
             then return $ m Map.! r
             else signCoeff $ P.coeff P.mone r

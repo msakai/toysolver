@@ -152,16 +152,16 @@ case_FourierMotzkin_test2 =
 
 ------------------------------------------------------------------------
 
-case_CAD_test1 :: IO ()
-case_CAD_test1 = 
-  case CAD.solve vs cs of
-    Nothing -> assertFailure "expected: Just\n but got: Nothing"
-    Just m  ->
-      forM_ cs $ \a -> do
-        evalPAtom m a @?= True
-  where
-    vs = Set.fromAscList $ IS.toAscList $ fst test1'
-    cs = map toPRel $ snd test1'
+-- case_CAD_test1 :: IO ()
+-- case_CAD_test1 = 
+--   case CAD.solve vs cs of
+--     Nothing -> assertFailure "expected: Just\n but got: Nothing"
+--     Just m  ->
+--       forM_ cs $ \a -> do
+--         evalPAtom m a @?= True
+--   where
+--     vs = Set.fromAscList $ IS.toAscList $ fst test1'
+--     cs = map toPRel $ snd test1'
 
 case_CAD_test2 :: IO ()
 case_CAD_test2 = 
@@ -173,6 +173,19 @@ case_CAD_test2 =
   where
     vs = Set.fromAscList $ IS.toAscList $ fst test2'
     cs = map toPRel $ snd test2'
+
+case_CAD_test_nonlinear_multivariate :: IO ()
+case_CAD_test_nonlinear_multivariate =
+  case CAD.solve vs cs of
+    Nothing -> assertFailure "expected: Just\n but got: Nothing"
+    Just m  ->
+      forM_ cs $ \a -> do
+        evalPAtom m a @?= True
+  where
+    vs = Set.fromList [0,1]
+    cs = [x^2 - y^2 - 2 .==. 0, 2*y*x .==. 0]
+    x = P.var (0::Int)
+    y = P.var 1
 
 toP :: LA.Expr Rational -> P.Polynomial Rational Int
 toP e = P.fromTerms [(c, if x == LA.unitVar then P.mone else P.var x) | (c,x) <- LA.terms e]
