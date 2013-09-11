@@ -26,11 +26,16 @@ module Data.AlgebraicNumber.Complex
     , conjugate         -- :: AComplex -> AComplex
     ) where
 
+import qualified Algorithm.CAD as CAD
+import Control.Monad
 import qualified Data.AlgebraicNumber.Real as AReal
 import Data.AlgebraicNumber.Real (AReal)
 import qualified Data.AlgebraicNumber.Root as Root
 import qualified Data.Polynomial as P
 import Data.Polynomial (Polynomial, UPolynomial, X (..))
+import qualified Data.Sign as Sign
+import qualified Data.Map as Map
+import Data.Maybe
 
 infix  6  :+
 
@@ -103,6 +108,33 @@ minimalPolynomial z@(x :+ y) =
 
 -- -----------------------------------------------------------------------------
 
+-- | Roots of the polynomial
+roots :: UPolynomial Rational -> [AComplex]
+roots f = do
+  let cs1 = [ (u, [Sign.Zero]), (v, [Sign.Zero]) ] 
+  (cs2, cells2) <- CAD.project [(P.toUPolynomialOf p 0, ss) | (p,ss) <- cs1]
+  let tmp2 = CAD.project [(P.toUPolynomialOf p 1, ss) | (p,ss) <- cs2]
+  (cs3, cells3) <- tmp2
+  guard $ and [Sign.signOf v `elem` ss | (p,ss) <- cs3, let v = P.eval (\_ -> undefined) p]
+
+  let m3 = Map.empty
+  yval <- catMaybes [CAD.findSample m3 cell | cell <- cells3]
+  let m2 = Map.insert 1 yval m3
+  xval <- catMaybes [CAD.findSample m2 cell | cell <- cells2]
+
+  return $ xval :+ yval
+
+  where
+
+    -- f(x + yi) = u(x,y) + v(x,y)i
+    f1 :: P.Polynomial Rational Int
+    f1 = P.subst f (\X -> P.var 0 + P.var 1 * P.var 2)
+    f2 = P.toUPolynomialOf (P.reduce P.grevlex f1 [P.var 2 * P.var 2 + 1]) 2 
+    u = P.coeff P.mone f2
+    v = P.coeff (P.var X) f2
+
+-- -----------------------------------------------------------------------------
+
 test1 = minimalPolynomial (sqrt2 :+ sqrt3)
   where
     sqrt2 = AReal.nthRoot 2 2
@@ -112,3 +144,18 @@ test2 = magnitude (sqrt2 :+ sqrt3)
   where
     sqrt2 = AReal.nthRoot 2 2
     sqrt3 = AReal.nthRoot 2 3
+
+test3 = roots p
+  where
+    x = P.var X
+    p = x - 2
+
+test4 = roots p
+  where
+    x = P.var X
+    p = x^2 - 2
+
+test5 = roots p
+  where
+    x = P.var X
+    p = x^4 + 2*x^2 + 25
