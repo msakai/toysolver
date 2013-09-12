@@ -163,33 +163,31 @@ test_mr_2 = mr (P.toUPolynomialOf p 3) (P.toUPolynomialOf p 3)
 
 type Coeff v = Polynomial Rational v
 
-type M v = StateT (Map (Polynomial Rational v) (Set Sign)) []
+type M v = StateT (Assumption v) []
 
-runM :: M v a -> [(a, Map (Polynomial Rational v) (Set Sign))]
-runM m = runStateT m Map.empty
+runM :: M v a -> [(a, Assumption v)]
+runM m = runStateT m emptyAssumption
 
 assume :: (Ord v, Show v, PrettyVar v) => Polynomial Rational v -> [Sign] -> M v ()
-assume p ss =
+assume p ss = do
+  m <- get
   if P.deg p <= 0
-    then do
-      let c = P.coeff P.mone p
-      guard $ Sign.signOf c `elem` ss
+    then guard $ Sign.signOf (P.coeff P.mone p) `elem` ss
     else do
-      let c  = P.lc P.grlex p
-          p' = P.mapCoeff (/c) p
-      m <- get
-      let ss1 = Map.findWithDefault (Set.fromList [Neg, Zero, Pos]) p' m
-          ss2 = Set.intersection ss1 $ Set.fromList $ [s `Sign.div` Sign.signOf c | s <- ss]
+      let c   = P.lc P.grlex p
+      (p,ss) <- return $ (P.mapCoeff (/c) p, [s `Sign.div` Sign.signOf c | s <- ss])
+      let ss1 = Map.findWithDefault (Set.fromList [Neg, Zero, Pos]) p m
+          ss2 = Set.intersection ss1 $ Set.fromList ss
       guard $ not $ Set.null ss2
-      put $ Map.insert p' ss2 m
+      put $ Map.insert p ss2 m
 
 project
   :: forall v. (Ord v, Show v, PrettyVar v)
   => [(UPolynomial (Polynomial Rational v), [Sign])]
   -> [([(Polynomial Rational v, [Sign])], [Cell (Polynomial Rational v)])]
-project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
+project cs = [ (assumption2cond gs, cells) | (cells, gs) <- result ]
   where
-    result :: [([Cell (Polynomial Rational v)], Map (Polynomial Rational v) (Set Sign))]
+    result :: [([Cell (Polynomial Rational v)], Assumption v)]
     result = runM $ do
       forM_ cs $ \(p,ss) -> do
         when (1 > P.deg p) $ assume (P.coeff P.mone p) ss
@@ -208,9 +206,6 @@ project cs = [ (guess2cond gs, cells) | (cells, gs) <- result ]
     ok cs m = and [checkSign m p ss | (p,ss) <- cs]
       where
         checkSign m p ss = (m Map.! p) `elem` ss
-
-    guess2cond :: Map (Polynomial Rational v) (Set Sign) -> [(Polynomial Rational v, [Sign])]
-    guess2cond gs = [(p, Set.toList ss)  | (p, ss) <- Map.toList gs]
 
 buildSignConf
   :: (Ord v, Show v, PrettyVar v)
@@ -319,6 +314,16 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
       msum [ assume c [s] >> return s
            | s <- [Neg, Zero, Pos]
            ]
+
+-- ---------------------------------------------------------------------------
+
+type Assumption v = (Map (Polynomial Rational v) (Set Sign))
+
+emptyAssumption :: Assumption v
+emptyAssumption = Map.empty
+
+assumption2cond :: Ord v => Assumption v -> [(Polynomial Rational v, [Sign])]
+assumption2cond m = [(p, Set.toList ss)  | (p, ss) <- Map.toList m]
 
 -- ---------------------------------------------------------------------------
 
@@ -433,14 +438,14 @@ dumpProjection xs =
 dumpSignConf
   :: forall v.
      (Ord v, PrettyVar v, Show v)
-  => [(SignConf (Polynomial Rational v), Map (Polynomial Rational v) (Set Sign))]
+  => [(SignConf (Polynomial Rational v), Assumption v)]
   -> IO ()
 dumpSignConf x = 
   forM_ x $ \(conf, as) -> do
     putStrLn "============"
     mapM_ putStrLn $ showSignConf conf
-    forM_  (Map.toList as) $ \(p, sign) ->
-      printf "%s %s\n" (prettyShow p) (show sign)
+    forM_  (assumption2cond as) $ \(p, ss) ->
+      printf "%s %s\n" (prettyShow p) (show ss)
 
 -- ---------------------------------------------------------------------------
 
@@ -526,7 +531,7 @@ test_solve = solve vs [p .<. 0]
 
 test_collectPolynomials
   :: [( Set (UPolynomial (Polynomial Rational Int))
-      , Map (Polynomial Rational Int) (Set Sign)
+      , Assumption Int
       )]
 test_collectPolynomials = runM $ collectPolynomials (Set.singleton p')
   where
@@ -540,13 +545,13 @@ test_collectPolynomials = runM $ collectPolynomials (Set.singleton p')
 
 test_collectPolynomials_print :: IO ()
 test_collectPolynomials_print = do
-  forM_ test_collectPolynomials $ \(ps,s) -> do
+  forM_ test_collectPolynomials $ \(ps,g) -> do
     putStrLn "============"
     mapM_ (putStrLn . prettyShow) (Set.toList ps)
-    forM_  (Map.toList s) $ \(p, sign) ->
-      printf "%s %s\n" (prettyShow p) (show sign)
+    forM_  (assumption2cond g) $ \(p, ss) ->
+      printf "%s %s\n" (prettyShow p) (show ss)
 
-test_buildSignConf :: [(SignConf (Polynomial Rational Int), Map (Polynomial Rational Int) (Set Sign))]
+test_buildSignConf :: [(SignConf (Polynomial Rational Int), Assumption Int)]
 test_buildSignConf = runM $ buildSignConf [P.toUPolynomialOf p 3]
   where
     a = P.var 0
@@ -559,7 +564,7 @@ test_buildSignConf = runM $ buildSignConf [P.toUPolynomialOf p 3]
 test_buildSignConf_print :: IO ()
 test_buildSignConf_print = dumpSignConf test_buildSignConf
 
-test_buildSignConf_2 :: [(SignConf (Polynomial Rational Int), Map (Polynomial Rational Int) (Set Sign))]
+test_buildSignConf_2 :: [(SignConf (Polynomial Rational Int), Assumption Int)]
 test_buildSignConf_2 = runM $ buildSignConf [P.toUPolynomialOf p 0 | p <- ps]
   where
     x = P.var 0
@@ -569,7 +574,7 @@ test_buildSignConf_2 = runM $ buildSignConf [P.toUPolynomialOf p 0 | p <- ps]
 test_buildSignConf_2_print :: IO ()
 test_buildSignConf_2_print = dumpSignConf test_buildSignConf_2
 
-test_buildSignConf_3 :: [(SignConf (Polynomial Rational Int), Map (Polynomial Rational Int) (Set Sign))]
+test_buildSignConf_3 :: [(SignConf (Polynomial Rational Int), Assumption Int)]
 test_buildSignConf_3 = runM $ buildSignConf [P.toUPolynomialOf p 0 | p <- ps]
   where
     x = P.var 0
