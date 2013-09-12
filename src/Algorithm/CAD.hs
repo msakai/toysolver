@@ -61,6 +61,7 @@ import qualified Data.AlgebraicNumber.Real as AReal
 import Data.DNF
 import Data.Polynomial (Polynomial, UPolynomial, X (..), PrettyVar, PrettyCoeff)
 import qualified Data.Polynomial as P
+import qualified Data.Polynomial.GroebnerBasis as GB
 import Data.Sign (Sign (..))
 import qualified Data.Sign as Sign
 
@@ -170,7 +171,8 @@ runM m = runStateT m emptyAssumption
 
 assume :: (Ord v, Show v, PrettyVar v) => Polynomial Rational v -> [Sign] -> M v ()
 assume p ss = do
-  m <- get
+  (m,gb) <- get
+  p <- return $ P.reduce P.grevlex p gb
   if P.deg p <= 0
     then guard $ Sign.signOf (P.coeff P.mone p) `elem` ss
     else do
@@ -179,7 +181,13 @@ assume p ss = do
       let ss1 = Map.findWithDefault (Set.fromList [Neg, Zero, Pos]) p m
           ss2 = Set.intersection ss1 $ Set.fromList ss
       guard $ not $ Set.null ss2
-      put $ Map.insert p ss2 m
+      if ss2 == Set.singleton Zero
+        then
+          case propagateZeros (m, GB.basis P.grevlex (p : gb)) of
+            Nothing -> mzero
+            Just (m', gb') -> put (m', gb')
+        else
+          put (Map.insert p ss2 m, gb)
 
 project
   :: forall v. (Ord v, Show v, PrettyVar v)
@@ -317,13 +325,30 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
 
 -- ---------------------------------------------------------------------------
 
-type Assumption v = (Map (Polynomial Rational v) (Set Sign))
+type Assumption v = (Map (Polynomial Rational v) (Set Sign), [Polynomial Rational v])
 
 emptyAssumption :: Assumption v
-emptyAssumption = Map.empty
+emptyAssumption = (Map.empty, [])
+
+propagateZeros :: Ord v => Assumption v -> Maybe (Assumption v)
+propagateZeros (m, gb) = do
+  let xs = [(P.reduce P.grevlex q gb, ss) | (q,ss) <- Map.toList m]
+  xs <- flip filterM xs $ \(q,ss) -> do
+    if P.deg q <= 0
+      then do
+        guard $ Sign.signOf (P.coeff P.mone q) `Set.member` ss
+        return False
+      else do
+        return True
+  let m' = Map.fromListWith Set.intersection xs
+  guard $ and [not (Set.null ss) | (q,ss) <- Map.toList m']
+  let (m0,m1) = Map.partition (Set.singleton Zero ==) m'
+  if Map.null m0
+    then return (m1, gb)
+    else propagateZeros (m1, GB.basis P.grevlex (Map.keys m0 ++ gb))
 
 assumption2cond :: Ord v => Assumption v -> [(Polynomial Rational v, [Sign])]
-assumption2cond m = [(p, Set.toList ss)  | (p, ss) <- Map.toList m]
+assumption2cond (m, gb) = [(p, Set.toList ss)  | (p, ss) <- Map.toList m] ++ [(p, [Zero]) | p <- gb]
 
 -- ---------------------------------------------------------------------------
 
