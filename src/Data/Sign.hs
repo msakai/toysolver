@@ -17,6 +17,7 @@ module Data.Sign
   -- * Algebra of Sign
     Sign (..)
   , negate
+  , abs
   , mult
   , recip
   , div
@@ -25,7 +26,7 @@ module Data.Sign
   , symbol
   ) where
 
-import Prelude hiding (negate, recip, div)
+import Prelude hiding (negate, abs, recip, div)
 import Algebra.Enumerable (Enumerable (..), universeBounded) -- from lattices package
 import qualified Algebra.Lattice as L -- from lattices package
 import Control.DeepSeq
@@ -66,6 +67,11 @@ negate :: Sign -> Sign
 negate Neg  = Pos
 negate Zero = Zero
 negate Pos  = Neg
+
+abs :: Sign -> Sign
+abs Neg  = Pos
+abs Zero = Zero
+abs Pos  = Pos
 
 mult :: Sign -> Sign -> Sign
 mult Pos s  = s
