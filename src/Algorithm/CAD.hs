@@ -173,21 +173,18 @@ assume :: (Ord v, Show v, PrettyVar v) => Polynomial Rational v -> [Sign] -> M v
 assume p ss = do
   (m,gb) <- get
   p <- return $ P.reduce P.grevlex p gb
-  if P.deg p <= 0
-    then guard $ Sign.signOf (P.coeff P.mone p) `elem` ss
-    else do
-      let c   = P.lc P.grlex p
-      (p,ss) <- return $ (P.mapCoeff (/c) p, [s `Sign.div` Sign.signOf c | s <- ss])
-      let ss1 = Map.findWithDefault (Set.fromList [Neg, Zero, Pos]) p m
-          ss2 = Set.intersection ss1 $ Set.fromList ss
-      guard $ not $ Set.null ss2
-      if ss2 == Set.singleton Zero
-        then
-          case propagateZeros (m, GB.basis P.grevlex (p : gb)) of
-            Nothing -> mzero
-            Just (m', gb') -> put (m', gb')
-        else
-          put (Map.insert p ss2 m, gb)
+  ss <- return $ Set.fromList ss
+  ss <- return $ ss `Set.intersection` computeSignSet m p
+  guard $ not $ Set.null ss
+  when (P.deg p > 0) $ do
+    let c = P.lc P.grlex p
+    (p,ss) <- return $ (P.mapCoeff (/c) p, Set.map (\s -> s `Sign.div` Sign.signOf c) ss)
+    let ss_orig = Map.findWithDefault (Set.fromList [Neg,Zero,Pos]) p m
+    ss <- return $ Set.intersection ss ss_orig
+    guard $ not $ Set.null ss
+    case propagate (Map.insertWith Set.intersection p ss m, gb) of
+      Nothing -> mzero
+      Just a -> put a
 
 project
   :: forall v. (Ord v, Show v, PrettyVar v)
@@ -330,25 +327,85 @@ type Assumption v = (Map (Polynomial Rational v) (Set Sign), [Polynomial Rationa
 emptyAssumption :: Assumption v
 emptyAssumption = (Map.empty, [])
 
-propagateZeros :: Ord v => Assumption v -> Maybe (Assumption v)
-propagateZeros (m, gb) = do
-  let xs = [(P.reduce P.grevlex q gb, ss) | (q,ss) <- Map.toList m]
-  xs <- flip filterM xs $ \(q,ss) -> do
-    if P.deg q <= 0
-      then do
-        guard $ Sign.signOf (P.coeff P.mone q) `Set.member` ss
-        return False
-      else do
-        return True
-  let m' = Map.fromListWith Set.intersection xs
-  guard $ and [not (Set.null ss) | (q,ss) <- Map.toList m']
-  let (m0,m1) = Map.partition (Set.singleton Zero ==) m'
-  if Map.null m0
-    then return (m1, gb)
-    else propagateZeros (m1, GB.basis P.grevlex (Map.keys m0 ++ gb))
+propagate :: Ord v => Assumption v -> Maybe (Assumption v)
+propagate = go 
+  where
+    go a = do
+      a1 <- propagateSign =<< propagateEq a
+      let a2 = dropConstants a1
+      if a == a2
+        then return a
+        else go a2
+
+propagateEq :: forall v. Ord v => Assumption v -> Maybe (Assumption v)
+propagateEq (m, gb)
+  | any (\(p,ss) -> Set.singleton Zero == ss) (Map.toList m) = do
+      (m', gb') <- f (m, gb)
+      propagateEq (m', gb')
+  | otherwise =
+      return (m, gb)
+  where
+    f :: Assumption v -> Maybe (Assumption v)
+    f (m, gb) = 
+      case Map.partition (Set.singleton Zero ==) m of
+        (m0, m) -> do
+          let gb' = GB.basis P.grevlex (Map.keys m0 ++ gb)
+              m'  = Map.fromListWith Set.intersection $ do
+                      (p,ss) <- Map.toList m
+                      let p'   = P.reduce P.grevlex p gb'
+                          c    = P.lc P.grlex p'
+                          (p'',ss')
+                            | c == 0    = (p', ss)
+                            | otherwise = (P.mapCoeff (/c) p', Set.map (\s -> s `Sign.div` Sign.signOf c) ss)
+                      return (p'', ss')
+          return $ (m', gb')
+
+propagateSign :: Ord v => Assumption v -> Maybe (Assumption v)
+propagateSign (m, gb) = go (m, gb)
+  where
+    go a@(m, gb)
+      | not (isOkay a) = Nothing
+      | m == m'   = Just (m, gb)
+      | otherwise = go (m', gb)
+      where
+        m' = Map.mapWithKey (\p ss -> Set.intersection ss (computeSignSet m p)) m
+
+isOkay :: Ord v => Assumption v -> Bool
+isOkay (m, gb) =
+  and [not (Set.null ss) | (_,ss) <- Map.toList m] &&
+  and [Set.member Zero (computeSignSet m p) | p <- gb]
+
+dropConstants :: Ord v => Assumption v -> Assumption v
+dropConstants (m, gb) = (Map.filterWithKey (\p _ -> P.deg p > 0) m, gb)
 
 assumption2cond :: Ord v => Assumption v -> [(Polynomial Rational v, [Sign])]
 assumption2cond (m, gb) = [(p, Set.toList ss)  | (p, ss) <- Map.toList m] ++ [(p, [Zero]) | p <- gb]
+
+-- ---------------------------------------------------------------------------
+
+computeSignSet :: Ord v => Map (Polynomial Rational v) (Set Sign) -> Polynomial Rational v -> Set Sign
+computeSignSet m p = unSignSet $ P.eval env (P.mapCoeff (SignSet . Set.singleton . Sign.signOf) p)
+  where
+    env v =
+      case Map.lookup (P.var v) m of
+        Just ss -> SignSet ss
+        Nothing -> SignSet $ Set.fromList [Neg,Zero,Pos]
+
+newtype SignSet = SignSet{ unSignSet :: Set Sign } deriving (Eq, Show)
+
+instance Num SignSet where
+  SignSet ss1 + SignSet ss2 = SignSet $ Set.unions [f s1 s2 | s1 <- Set.toList ss1, s2 <- Set.toList ss2]
+    where
+      f Zero s  = Set.singleton s
+      f s Zero  = Set.singleton s
+      f Pos Pos = Set.singleton Pos
+      f Neg Neg = Set.singleton Pos
+      f _ _     = Set.fromList [Neg,Zero,Pos]
+  SignSet ss1 * SignSet ss2 = SignSet $ Set.fromList [Sign.mult s1 s2 | s1 <- Set.toList ss1, s2 <- Set.toList ss2]
+  negate (SignSet ss) = SignSet $ Set.map Sign.negate ss
+  abs (SignSet ss)    = SignSet $ Set.map Sign.abs ss
+  signum              = id
+  fromInteger         = SignSet . Set.singleton . Sign.signOf
 
 -- ---------------------------------------------------------------------------
 
