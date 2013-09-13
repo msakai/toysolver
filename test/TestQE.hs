@@ -152,16 +152,16 @@ case_FourierMotzkin_test2 =
 
 ------------------------------------------------------------------------
 
--- case_CAD_test1 :: IO ()
--- case_CAD_test1 = 
---   case CAD.solve vs cs of
---     Nothing -> assertFailure "expected: Just\n but got: Nothing"
---     Just m  ->
---       forM_ cs $ \a -> do
---         evalPAtom m a @?= True
---   where
---     vs = Set.fromAscList $ IS.toAscList $ fst test1'
---     cs = map toPRel $ snd test1'
+case_CAD_test1 :: IO ()
+case_CAD_test1 = 
+  case CAD.solve vs cs of
+    Nothing -> assertFailure "expected: Just\n but got: Nothing"
+    Just m  ->
+      forM_ cs $ \a -> do
+        evalPAtom m a @?= True
+  where
+    vs = Set.fromAscList $ IS.toAscList $ fst test1'
+    cs = map toPRel $ snd test1'
 
 case_CAD_test2 :: IO ()
 case_CAD_test2 = 

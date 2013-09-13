@@ -108,6 +108,22 @@ showSignConf = f
     g m =
       [printf "  %s: %s" (prettyShow p) (Sign.symbol s) | (p, s) <- Map.toList m]
 
+normalizeSignConfKey :: Ord v => UPolynomial (Polynomial Rational v) -> UPolynomial (Polynomial Rational v)
+normalizeSignConfKey p
+  | p == 0    = 0
+  | otherwise = q
+  where
+    c = P.lc P.grevlex $ P.lc P.grevlex p
+    q = P.mapCoeff (P.mapCoeff (/ c)) p
+
+lookupSignConf :: Ord v => UPolynomial (Polynomial Rational v) -> Map (UPolynomial (Polynomial Rational v)) Sign -> Sign
+lookupSignConf p m
+  | p == 0    = Zero
+  | otherwise = Sign.signOf c `Sign.mult` (m Map.! q)
+  where
+    c = P.lc P.grevlex $ P.lc P.grevlex p
+    q = P.mapCoeff (P.mapCoeff (/ c)) p
+
 -- ---------------------------------------------------------------------------
 
 -- modified reminder
@@ -210,37 +226,38 @@ project cs = [ (assumption2cond gs, cells) | (cells, gs) <- result ]
     ok :: [(UPolynomial (Polynomial Rational v), [Sign])] -> Map (UPolynomial (Polynomial Rational v)) Sign -> Bool
     ok cs m = and [checkSign m p ss | (p,ss) <- cs]
       where
-        checkSign m p ss = (m Map.! p) `elem` ss
+        checkSign m p ss = lookupSignConf p m `elem` ss
 
 buildSignConf
   :: (Ord v, Show v, PrettyVar v)
   => [UPolynomial (Polynomial Rational v)]
   -> M v (SignConf (Polynomial Rational v))
 buildSignConf ps = do
-  ps2 <- collectPolynomials (Set.fromList ps)
+  ps2 <- collectPolynomials ps
   -- normalizePoly後の多項式の次数でソートしておく必要があるので注意
-  let ts = sortBy (comparing P.deg) (Set.toList ps2)
+  let ts = sortBy (comparing P.deg) ps2
+  --trace ("collected polynomials: " ++ prettyShow ts) $ return ()
   foldM (flip refineSignConf) emptySignConf ts
 
 collectPolynomials
   :: (Ord v, Show v, PrettyVar v)
-  => Set (UPolynomial (Polynomial Rational v))
-  -> M v (Set (UPolynomial (Polynomial Rational v)))
-collectPolynomials ps = go Set.empty =<< f (Set.toList ps)
+  => [UPolynomial (Polynomial Rational v)]
+  -> M v [UPolynomial (Polynomial Rational v)]
+collectPolynomials ps = go Set.empty =<< f ps
   where
     f ps = do
-      ps' <- mapM normalizePoly ps
-      return $ Set.fromList $ filter (\p -> P.deg p > 0) ps'
+      ps' <- mapM normalizePoly $ Set.toList $ Set.fromList $ [p | p <- ps, P.deg p > 0]
+      return $ Set.fromList $ map normalizeSignConfKey $ filter (\p -> P.deg p > 0) ps'
 
-    go result ps | Set.null ps = return result
+    go result ps | Set.null ps = return $ Set.toList result
     go result ps = do
-      let rs = [P.deriv p X | p <- Set.toList ps]
+      rs <- f [P.deriv p X | p <- Set.toList ps]
       rss <-
         forM [(p1,p2) | p1 <- Set.toList ps, p2 <- Set.toList ps ++ Set.toList result, p1 /= p2] $ \(p1,p2) -> do
           let d = P.deg p1
               e = P.deg p2
-          return [r | (_,_,r) <- [mr p1 p2 | d >= e] ++ [mr p2 p1 | e >= d]]
-      ps' <- f (concat (rs:rss))
+          f [r | (_,_,r) <- [mr p1 p2 | d >= e] ++ [mr p2 p1 | e >= d]]
+      let ps' = Set.unions (rs:rss)
       go (result `Set.union` ps) (ps' `Set.difference` result)
 
 -- ゼロであるような高次の項を消した多項式を返す
@@ -278,8 +295,8 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
     extendIntervals !n (pt1@(Point _, m1) : (Interval lb ub, m) : pt2@(Point _, m2) : xs) =
       pt1 : ys ++ extendIntervals n2 (pt2 : xs)
       where
-        s1 = m1 Map.! p
-        s2 = m2 Map.! p
+        s1 = lookupSignConf p m1
+        s2 = lookupSignConf p m2
         n1 = if s1 == Zero then n+1 else n
         root = RootOf p n1
         (ys, n2)
@@ -305,7 +322,7 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
       let (bm,k,r) = mr p q
       r <- normalizePoly r
       s1 <- if P.deg r > 0
-            then return $ m Map.! r
+            then return $ lookupSignConf r m
             else signCoeff $ P.coeff P.mone r
       -- 場合分けを出来るだけ避ける
       if even k
@@ -331,11 +348,11 @@ propagate :: Ord v => Assumption v -> Maybe (Assumption v)
 propagate = go 
   where
     go a = do
-      a1 <- propagateSign =<< propagateEq a
-      let a2 = dropConstants a1
-      if a == a2
+      a' <- f a
+      if a == a'
         then return a
-        else go a2
+        else go a'
+    f a = liftM dropConstants $ propagateSign =<< propagateEq a
 
 propagateEq :: forall v. Ord v => Assumption v -> Maybe (Assumption v)
 propagateEq (m, gb)
@@ -612,10 +629,10 @@ test_solve = solve vs [p .<. 0]
     p = a^(2::Int) + b^(2::Int) + c^(2::Int) - 1
 
 test_collectPolynomials
-  :: [( Set (UPolynomial (Polynomial Rational Int))
+  :: [( [UPolynomial (Polynomial Rational Int)]
       , Assumption Int
       )]
-test_collectPolynomials = runM $ collectPolynomials (Set.singleton p')
+test_collectPolynomials = runM $ collectPolynomials [p']
   where
     a = P.var 0
     b = P.var 1
@@ -629,7 +646,7 @@ test_collectPolynomials_print :: IO ()
 test_collectPolynomials_print = do
   forM_ test_collectPolynomials $ \(ps,g) -> do
     putStrLn "============"
-    mapM_ (putStrLn . prettyShow) (Set.toList ps)
+    mapM_ (putStrLn . prettyShow) ps
     forM_  (assumption2cond g) $ \(p, ss) ->
       printf "%s %s\n" (prettyShow p) (show ss)
 
