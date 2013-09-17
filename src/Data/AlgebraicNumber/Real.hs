@@ -179,7 +179,7 @@ instance Num AReal where
         case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots' c3 i5 > 0] of
           []   -> error "AReal.*: should not happen"
           [i5] -> i5
-          is5  -> go (Sturm.halve' c1 i1)　(Sturm.halve' c2 i2)　[Sturm.halve' c3 i5 | i5 <- is5]
+          is5  -> go (Sturm.halve' c1 i1) (Sturm.halve' c2 i2) [Sturm.halve' c3 i5 | i5 <- is5]
         where
           i4 = i1 * i2
 
