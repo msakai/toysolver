@@ -416,7 +416,7 @@ instance Num SignSet where
       f Zero s  = Set.singleton s
       f s Zero  = Set.singleton s
       f Pos Pos = Set.singleton Pos
-      f Neg Neg = Set.singleton Pos
+      f Neg Neg = Set.singleton Neg
       f _ _     = Set.fromList [Neg,Zero,Pos]
   SignSet ss1 * SignSet ss2 = SignSet $ Set.fromList [Sign.mult s1 s2 | s1 <- Set.toList ss1, s2 <- Set.toList ss2]
   negate (SignSet ss) = SignSet $ Set.map Sign.negate ss
