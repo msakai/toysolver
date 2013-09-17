@@ -26,6 +26,7 @@ module Data.Sign
   , symbol
   ) where
 
+import qualified Prelude as P
 import Prelude hiding (negate, abs, recip, div)
 import Algebra.Enumerable (Enumerable (..), universeBounded) -- from lattices package
 import qualified Algebra.Lattice as L -- from lattices package
@@ -117,6 +118,24 @@ instance L.BoundedMeetSemiLattice (Set Sign) where
   top = Set.fromList universe
 
 instance L.BoundedLattice (Set Sign)
+
+instance Num (Set Sign) where
+  ss1 + ss2 = Set.unions [f s1 s2 | s1 <- Set.toList ss1, s2 <- Set.toList ss2]
+    where
+      f Zero s  = Set.singleton s
+      f s Zero  = Set.singleton s
+      f Pos Pos = Set.singleton Pos
+      f Neg Neg = Set.singleton Neg
+      f _ _     = Set.fromList [Neg,Zero,Pos]
+  ss1 * ss2   = Set.fromList [mult s1 s2 | s1 <- Set.toList ss1, s2 <- Set.toList ss2]
+  negate      = Set.map negate
+  abs         = Set.map abs
+  signum      = id
+  fromInteger = Set.singleton . signOf
+
+instance Fractional (Set Sign) where
+  recip        = Set.map recip
+  fromRational = Set.singleton . signOf
 
 #if !MIN_VERSION_hashable(1,2,0)
 -- Copied from hashable-1.2.0.7:

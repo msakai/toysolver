@@ -401,28 +401,12 @@ assumption2cond (m, gb) = [(p, Set.toList ss)  | (p, ss) <- Map.toList m] ++ [(p
 -- ---------------------------------------------------------------------------
 
 computeSignSet :: Ord v => Map (Polynomial Rational v) (Set Sign) -> Polynomial Rational v -> Set Sign
-computeSignSet m p = unSignSet $ P.eval env (P.mapCoeff (SignSet . Set.singleton . Sign.signOf) p)
+computeSignSet m p = P.eval env (P.mapCoeff fromRational p)
   where
     env v =
       case Map.lookup (P.var v) m of
-        Just ss -> SignSet ss
-        Nothing -> SignSet $ Set.fromList [Neg,Zero,Pos]
-
-newtype SignSet = SignSet{ unSignSet :: Set Sign } deriving (Eq, Show)
-
-instance Num SignSet where
-  SignSet ss1 + SignSet ss2 = SignSet $ Set.unions [f s1 s2 | s1 <- Set.toList ss1, s2 <- Set.toList ss2]
-    where
-      f Zero s  = Set.singleton s
-      f s Zero  = Set.singleton s
-      f Pos Pos = Set.singleton Pos
-      f Neg Neg = Set.singleton Neg
-      f _ _     = Set.fromList [Neg,Zero,Pos]
-  SignSet ss1 * SignSet ss2 = SignSet $ Set.fromList [Sign.mult s1 s2 | s1 <- Set.toList ss1, s2 <- Set.toList ss2]
-  negate (SignSet ss) = SignSet $ Set.map Sign.negate ss
-  abs (SignSet ss)    = SignSet $ Set.map Sign.abs ss
-  signum              = id
-  fromInteger         = SignSet . Set.singleton . Sign.signOf
+        Just ss -> ss
+        Nothing -> Set.fromList [Neg,Zero,Pos]
 
 -- ---------------------------------------------------------------------------
 
