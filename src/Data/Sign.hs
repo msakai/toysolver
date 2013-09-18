@@ -137,6 +137,28 @@ instance Fractional (Set Sign) where
   recip        = Set.map recip
   fromRational = Set.singleton . signOf
 
+instance Alg.Multiplicative (Set Sign) where
+  (*) = (*)
+  pow1p s n = Alg.pow s (1+n)
+
+instance Alg.Commutative (Set Sign)
+
+instance Alg.Unital (Set Sign) where
+  one = Set.singleton Pos
+  pow = (Alg.^)
+
+instance Alg.Division (Set Sign) where
+  recip  = P.recip
+  (/)    = (/)
+  (\\)   = flip (/)
+  ss ^ n = Set.map (\s -> pow s n) ss
+
+instance Alg.Additive (Set Sign) where
+  (+)           = (+)
+  sinnum1p _ ss = ss
+
+instance Alg.Abelian (Set Sign)
+
 #if !MIN_VERSION_hashable(1,2,0)
 -- Copied from hashable-1.2.0.7:
 -- Copyright   :  (c) Milan Straka 2010
