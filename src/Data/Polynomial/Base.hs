@@ -77,6 +77,7 @@ module Data.Polynomial.Base
   , gcd'
   , isRootOf
   , isSquareFree
+  , umcmp
 
   -- * Term
   , Term
@@ -548,8 +549,11 @@ instance NFData X
 instance Hashable X where
   hashWithSalt = hashUsing fromEnum
 
-ucmp :: MonomialOrder X
-ucmp = grlex
+-- | comparison of monomials of univariate polynomials
+--
+-- TODO: we should find a better name.
+umcmp :: MonomialOrder X
+umcmp = compare `on` deg
 
 -- | division of univariate polynomials
 div :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
@@ -565,12 +569,12 @@ divMod f g
   | isZero g  = error "divMod: division by zero"
   | otherwise = go 0 f
   where
-    lt_g = lt ucmp g
+    lt_g = lt umcmp g
     go !q !r
       | deg r < deg g = (q,r)
       | otherwise     = go (q + t) (r - t * g)
         where
-          lt_r = lt ucmp r
+          lt_r = lt umcmp r
           t    = fromTerm $ lt_r `tdiv` lt_g
 
 divides :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> Bool
@@ -578,14 +582,14 @@ divides f1 f2 = f2 `mod` f1 == 0
 
 -- | GCD of univariate polynomials
 gcd :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
-gcd f1 0  = toMonic ucmp f1
+gcd f1 0  = toMonic umcmp f1
 gcd f1 f2 = gcd f2 (f1 `mod` f2)
 
 -- | LCM of univariate polynomials
 lcm :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> UPolynomial k
 lcm _ 0 = 0
 lcm 0 _ = 0
-lcm f1 f2 = toMonic ucmp $ (f1 `mod` (gcd f1 f2)) * f2
+lcm f1 f2 = toMonic umcmp $ (f1 `mod` (gcd f1 f2)) * f2
 
 -- | Extended GCD algorithm
 exgcd
@@ -606,7 +610,7 @@ exgcd f1 f2 = f $ go f1 f2 1 0 0 1
       | lc_g == 0 = (g, u, v)
       | otherwise = (mapCoeff (/lc_g) g, mapCoeff (/lc_g) u, mapCoeff (/lc_g) v)
       where
-        lc_g = lc ucmp g
+        lc_g = lc umcmp g
 
 -- | pseudo division
 pdivMod :: (Eq r, Num r) => UPolynomial r -> UPolynomial r -> (r, UPolynomial r, UPolynomial r)
@@ -615,14 +619,14 @@ pdivMod f g
   | deg f < deg g = (1, 0, f)
   | otherwise     = go (deg f - deg g + 1) f 0
   where
-    (lc_g, lm_g) = lt ucmp g
+    (lc_g, lm_g) = lt umcmp g
     b = lc_g ^ (deg f - deg_g + 1)
     deg_g = deg g
     go !n !f1 !q
       | deg_g > deg f1 = (b, q, scale (lc_g ^ n) f1)
       | otherwise      = go (n - 1) (scale lc_g f1 - s * g) (q + scale (lc_g ^ (n-1)) s)
           where
-            (lc_f1, lm_f1) = lt ucmp f1
+            (lc_f1, lm_f1) = lt umcmp f1
             s = fromTerm (lc_f1, lm_f1 `mdiv` lm_g)
 
 -- | pseudo quotient
@@ -638,13 +642,13 @@ pmod f g
   | deg f < deg g = f
   | otherwise     = go (deg f - deg g + 1) f
   where
-    (lc_g, lm_g) = lt ucmp g
+    (lc_g, lm_g) = lt umcmp g
     deg_g = deg g
     go !n !f1
       | deg_g > deg f1 = scale (lc_g ^ n) f1
       | otherwise      = go (n - 1) (scale lc_g f1 - s * g)
           where
-            (lc_f1, lm_f1) = lt ucmp f1
+            (lc_f1, lm_f1) = lt umcmp f1
             s = fromTerm (lc_f1, lm_f1 `mdiv` lm_g)
 
 -- | GCD of univariate polynomials

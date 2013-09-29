@@ -35,7 +35,7 @@ type Var = Int
 --------------------------------------------------------------------}
 
 normalizePoly :: UPolynomial Rational -> UPolynomial Rational
-normalizePoly = P.toMonic P.grlex
+normalizePoly = P.toMonic P.umcmp
 
 rootAdd :: UPolynomial Rational -> UPolynomial Rational -> UPolynomial Rational
 rootAdd p1 p2 = lift2 (+) p1 p2

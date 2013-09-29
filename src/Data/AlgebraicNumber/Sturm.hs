@@ -102,7 +102,7 @@ bounds p = (-m, m)
     m = if p==0
         then 0
         else max 1 (sum [abs (c/s) | (c,_) <- P.terms p] - 1)
-    s = P.lc P.grlex p
+    s = P.lc P.umcmp p
 
 boundInterval :: UPolynomial Rational -> Interval Rational -> Interval Rational
 boundInterval p ival = Interval.intersection ival (Finite lb <=..<= Finite ub)

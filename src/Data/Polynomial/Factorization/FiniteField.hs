@@ -61,7 +61,7 @@ sqfree f
   | c == 1    = sqfree' f
   | otherwise = (P.constant c, 1) : sqfree' (P.mapCoeff (/c) f)
   where
-    c = P.lc ucmp f
+    c = P.lc P.umcmp f
 
 sqfree' :: forall k. (Eq k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]
 sqfree' 0 = []
@@ -85,9 +85,6 @@ sqfree' f
             c' = c `P.div` y
             w' = y
             result' = [(z,i) | z /= 1] ++ result
-
-ucmp :: MonomialOrder X
-ucmp = P.grlex
 
 polyPthRoot :: forall k. (Eq k, FiniteField k) => UPolynomial k -> UPolynomial k
 polyPthRoot f = assert (P.deriv f X == 0) $
@@ -120,7 +117,7 @@ berlekamp f = go (Set.singleton f) basis
 basisOfBerlekampSubalgebra :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [UPolynomial k]
 basisOfBerlekampSubalgebra f =
   sortBy (flip compare `on` P.deg) $
-    map (P.toMonic ucmp) $
+    map (P.toMonic P.umcmp) $
       basis
   where
     q    = order (undefined :: k)

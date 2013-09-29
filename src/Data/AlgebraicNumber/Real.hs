@@ -380,7 +380,7 @@ isRational x = P.deg x == 1
 -- | Whether the algebraic number is a root of a polynomial with integer
 -- coefficients with leading coefficient @1@ (a monic polynomial).
 isAlgebraicInteger :: AReal -> Bool
-isAlgebraicInteger x = abs (P.lc P.grlex (P.pp (minimalPolynomial x))) == 1
+isAlgebraicInteger x = abs (P.lc P.umcmp (P.pp (minimalPolynomial x))) == 1
 
 -- | Height of the algebraic number.
 --

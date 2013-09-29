@@ -76,6 +76,7 @@ module Data.Polynomial
   , gcd'
   , isRootOf
   , isSquareFree
+  , umcmp
 
   -- * Term
   , Term

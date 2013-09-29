@@ -44,7 +44,7 @@ normalize (c,ps) = go (MultiSet.toOccurList ps) c MultiSet.empty
     go [] !c !qs = (c, qs)
     go ((p,m) : ps) !c !qs
       | P.deg p == 0 = go ps (c * (P.coeff (P.var X) p) ^ m) qs
-      | P.lc P.grlex p < 0 = go ps (c * (-1)^m) (MultiSet.insertMany (-p) m qs)
+      | P.lc P.umcmp p < 0 = go ps (c * (-1)^m) (MultiSet.insertMany (-p) m qs)
       | otherwise = go ps c (MultiSet.insertMany p m qs)
 
 factor' :: UPolynomial Integer -> MultiSet (UPolynomial Integer)
