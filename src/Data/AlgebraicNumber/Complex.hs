@@ -158,4 +158,9 @@ test4 = roots p
 test5 = roots p
   where
     x = P.var X
+    p = x^3 - 1
+
+test6 = roots p
+  where
+    x = P.var X
     p = x^4 + 2*x^2 + 25
