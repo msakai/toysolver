@@ -28,6 +28,7 @@ module Data.AlgebraicNumber.Real
 
   -- * Properties
   , minimalPolynomial
+  , isolatingInterval
   , isRational
   , isAlgebraicInteger
   , height
@@ -102,27 +103,27 @@ realRoot' p i = RealRoot (normalizePoly p) i
 --------------------------------------------------------------------}
 
 isZero :: AReal -> Bool
-isZero a = 0 `Interval.member` (interval a) && 0 `P.isRootOf` minimalPolynomial a
+isZero a = 0 `Interval.member` isolatingInterval a && 0 `P.isRootOf` minimalPolynomial a
 
 scaleAReal :: Rational -> AReal -> AReal
 scaleAReal r a = realRoot' p2 i2
   where
     p2 = rootScale r (minimalPolynomial a)
-    i2 = Interval.singleton r * interval a
+    i2 = Interval.singleton r * isolatingInterval a
 
 shiftAReal :: Rational -> AReal -> AReal
 shiftAReal r a = realRoot' p2 i2
   where
     p2 = rootShift r (minimalPolynomial a)
-    i2 = Interval.singleton r + interval a
+    i2 = Interval.singleton r + isolatingInterval a
 
 instance Eq AReal where
   a == b = p1==p2 && Sturm.numRoots' c (Interval.intersection i1 i2) == 1
     where
       p1 = minimalPolynomial a
       p2 = minimalPolynomial b
-      i1 = interval a
-      i2 = interval b
+      i1 = isolatingInterval a
+      i2 = isolatingInterval b
       c  = sturmChain a
 
 instance Ord AReal where
@@ -132,8 +133,8 @@ instance Ord AReal where
     | a == b    = EQ
     | otherwise = go i1 i2
     where
-      i1 = interval a
-      i2 = interval b
+      i1 = isolatingInterval a
+      i2 = isolatingInterval b
       c1 = sturmChain a
       c2 = sturmChain b
       go i1 i2
@@ -154,7 +155,7 @@ instance Num AReal where
       c1 = sturmChain a
       c2 = sturmChain b
       c3 = Sturm.sturmChain p3
-      i3 = go (interval a) (interval b) (Sturm.separate' c3)
+      i3 = go (isolatingInterval a) (isolatingInterval b) (Sturm.separate' c3)
 
       go i1 i2 is3 =
         case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots' c3 i5 > 0] of
@@ -173,7 +174,7 @@ instance Num AReal where
       c1 = sturmChain a
       c2 = sturmChain b
       c3 = Sturm.sturmChain p3
-      i3 = go (interval a) (interval b) (Sturm.separate' c3)
+      i3 = go (isolatingInterval a) (isolatingInterval b) (Sturm.separate' c3)
 
       go i1 i2 is3 =
         case [i5 | i3 <- is3, let i5 = Interval.intersection i3 i4, Sturm.numRoots' c3 i5 > 0] of
@@ -211,7 +212,7 @@ instance Fractional AReal where
         p2 = rootRecip (minimalPolynomial a)
         c1 = sturmChain a
         c2 = Sturm.sturmChain p2
-        i2 = go (interval a) (Sturm.separate' c2)
+        i2 = go (isolatingInterval a) (Sturm.separate' c2)
         go i1 is2 =
           case [i2 | i2 <- is2, Interval.member 1 (i1 * i2)] of
             [] -> error "AReal.recip: should not happen"
@@ -242,7 +243,7 @@ approx
 approx a epsilon =
   if isRational a
     then toRational a
-    else Sturm.approx' (sturmChain a) (interval a) epsilon
+    else Sturm.approx' (sturmChain a) (isolatingInterval a) epsilon
 
 -- | Returns approximate interval such that @width (approxInterval a epsilon) <= epsilon@.
 approxInterval
@@ -252,7 +253,7 @@ approxInterval
 approxInterval a epsilon =
   if isRational a
     then Interval.singleton (toRational a)
-    else Sturm.narrow' (sturmChain a) (interval a) epsilon
+    else Sturm.narrow' (sturmChain a) (isolatingInterval a) epsilon
 
 -- | Same as 'properFraction'.
 properFraction' :: Integral b => AReal -> (b, AReal)
@@ -289,7 +290,7 @@ ceiling' a =
     else fromInteger ceiling_ub
   where
     chain = sturmChain a
-    i2 = Sturm.narrow' chain (interval a) (1/2)
+    i2 = Sturm.narrow' chain (isolatingInterval a) (1/2)
     (Finite lb, inLB) = Interval.lowerBound' i2
     (Finite ub, inUB) = Interval.upperBound' i2
     ceiling_lb = ceiling lb
@@ -304,7 +305,7 @@ floor' a =
     else fromInteger floor_lb
   where
     chain = sturmChain a
-    i2 = Sturm.narrow' chain (interval a) (1/2)
+    i2 = Sturm.narrow' chain (isolatingInterval a) (1/2)
     (Finite lb, inLB) = Interval.lowerBound' i2
     (Finite ub, inUB) = Interval.upperBound' i2
     floor_lb = floor lb
@@ -332,11 +333,11 @@ nthRoots n a = filter check (realRoots p2)
     p1 = minimalPolynomial a
     p2 = rootNthRoot n p1
     c1 = sturmChain a
-    ok0 = interval a
-    ng0 = map interval $ delete a $ realRoots p1
+    ok0 = isolatingInterval a
+    ng0 = map isolatingInterval $ delete a $ realRoots p1
 
     check :: AReal -> Bool
-    check b = loop ok0 ng0 (interval b)
+    check b = loop ok0 ng0 (isolatingInterval b)
       where
         c2 = sturmChain b
         loop ok ng i
@@ -363,8 +364,9 @@ minimalPolynomial (RealRoot p _) = p
 sturmChain :: AReal -> Sturm.SturmChain
 sturmChain a = Sturm.sturmChain (minimalPolynomial a)
 
-interval :: AReal -> Interval Rational
-interval (RealRoot _ i) = i
+-- | Isolating interval that separate the number from other roots of 'minimalPolynomial' of it.
+isolatingInterval :: AReal -> Interval Rational
+isolatingInterval (RealRoot _ i) = i
 
 -- | Degree of the algebraic number.
 -- 
