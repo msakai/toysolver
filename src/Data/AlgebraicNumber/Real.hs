@@ -36,6 +36,7 @@ module Data.AlgebraicNumber.Real
 
   -- * Operations
   , nthRoot
+  , refineIsolatingInterval
 
   -- * Approximation
   , approx
@@ -352,6 +353,13 @@ nthRoots n a = filter check (realRoots p2)
             ok' = Interval.intersection i2 ok
             ng' = filter (\i3 -> Sturm.numRoots' c1 i3 /= 0) $
                     map (Interval.intersection i2) ng
+
+-- | Same algebraic real, but represented using finer grained 'isolatingInterval'.
+refineIsolatingInterval :: AReal -> AReal
+refineIsolatingInterval a@(RealRoot p i) =
+  if Interval.width i <= 0
+    then a
+    else RealRoot p (Sturm.halve p i)
 
 {--------------------------------------------------------------------
   Properties
