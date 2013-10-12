@@ -59,6 +59,7 @@ import Text.PrettyPrint.HughesPJClass
 import Data.ArithRel
 import qualified Data.AlgebraicNumber.Real as AReal
 import Data.DNF
+import qualified Data.Interval as I
 import Data.Polynomial (Polynomial, UPolynomial, X (..), PrettyVar, PrettyCoeff)
 import qualified Data.Polynomial as P
 import qualified Data.Polynomial.GroebnerBasis as GB
@@ -417,19 +418,15 @@ findSample m cell =
   case evalCell m cell of
     Point (RootOf p n) -> 
       Just $ AReal.realRoots p !! n
-    Interval NegInf PosInf ->
-      Just $ 0
-    Interval NegInf (RootOf p n) ->
-      Just $ fromInteger $ floor   ((AReal.realRoots p !! n) - 1)
-    Interval (RootOf p n) PosInf ->
-      Just $ fromInteger $ ceiling ((AReal.realRoots p !! n) + 1)
-    Interval (RootOf p1 n1) (RootOf p2 n2)
-      | (pt1 < pt2) -> Just $ (pt1 + pt2) / 2
-      | otherwise   -> Nothing
-      where
-        pt1 = AReal.realRoots p1 !! n1
-        pt2 = AReal.realRoots p2 !! n2
-    _ -> error $ "findSample: should not happen"
+    Interval lb ub ->
+      case I.simplestRationalWithin (f lb I.<..< f ub) of
+        Nothing -> error $ "Algorithm.CAD.findSample: should not happen"
+        Just r  -> Just $ fromRational r
+  where
+    f :: Point Rational -> I.EndPoint AReal.AReal
+    f NegInf       = I.NegInf
+    f PosInf       = I.PosInf
+    f (RootOf p n) = I.Finite (AReal.realRoots p !! n)
 
 evalCell :: Ord v => Model v -> Cell (Polynomial Rational v) -> Cell Rational
 evalCell m (Point pt)         = Point $ evalPoint m pt
