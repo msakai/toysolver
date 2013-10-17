@@ -81,7 +81,7 @@ lift f fs  = search pk f (Hensel.hensel f fs k)
 
 search :: Integer -> UPolynomial Integer -> [UPolynomial Integer] -> [UPolynomial Integer]
 search pk f0 fs0 = runST $ do
-  let a = P.lc P.umcmp f0
+  let a = P.lc P.nat f0
       m = length fs0
 
   fRef   <- newSTRef f0
@@ -102,7 +102,7 @@ search pk f0 fs0 = runST $ do
           conv :: Integer -> Rational
           conv b = b3
             where
-              b1  = (a % P.lc P.umcmp g0) * fromIntegral b
+              b1  = (a % P.lc P.nat g0) * fromIntegral b
               -- @b1 ≡ b2 (mod p^k)@ and @0 <= b2 < p^k@
               b2  = b1 - (fromIntegral (floor (b1 / pk') :: Integer) * pk')
               -- @b1 ≡ b2 ≡ b3 (mod p^k)@ and @-(p^k)/2 <= b3 <= (p^k)/2@
@@ -116,7 +116,7 @@ search pk f0 fs0 = runST $ do
         let g2 = P.mapCoeff numerator $ P.pp g1
             -- we choose leading coefficient to be positive.
             g :: UPolynomial Integer
-            g = if P.lc P.umcmp g2 < 0 then - g2 else g2
+            g = if P.lc P.nat g2 < 0 then - g2 else g2
         writeSTRef fRef $! f `div'` g
         modifySTRef retRef (g :)
         modifySTRef fsRef (\\ s)

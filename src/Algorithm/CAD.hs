@@ -114,7 +114,7 @@ normalizeSignConfKey p
   | p == 0    = 0
   | otherwise = q
   where
-    c = P.lc P.grevlex $ P.lc P.umcmp p
+    c = P.lc P.grevlex $ P.lc P.nat p
     q = P.mapCoeff (P.mapCoeff (/ c)) p
 
 lookupSignConf :: Ord v => UPolynomial (Polynomial Rational v) -> Map (UPolynomial (Polynomial Rational v)) Sign -> Sign
@@ -122,7 +122,7 @@ lookupSignConf p m
   | p == 0    = Zero
   | otherwise = Sign.signOf c `Sign.mult` (m Map.! q)
   where
-    c = P.lc P.grevlex $ P.lc P.umcmp p
+    c = P.lc P.grevlex $ P.lc P.nat p
     q = P.mapCoeff (P.mapCoeff (/ c)) p
 
 -- ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ mr p q
     x = P.var X
     n = P.deg p
     m = P.deg q
-    bm = P.lc P.umcmp q
+    bm = P.lc P.nat q
     (l,r) = f p n
 
     f :: UPolynomial k -> Integer -> (UPolynomial k, UPolynomial k)
@@ -313,9 +313,9 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
     extendIntervals _ xs = xs
  
     signAt :: Point (Polynomial Rational v) -> Map (UPolynomial (Polynomial Rational v)) Sign -> M v Sign
-    signAt PosInf _ = signCoeff (P.lc P.umcmp p)
+    signAt PosInf _ = signCoeff (P.lc P.nat p)
     signAt NegInf _ = do
-      let (c,mm) = P.lt P.umcmp p
+      let (c,mm) = P.lt P.nat p
       if even (P.deg mm)
         then signCoeff c
         else liftM Sign.negate $ signCoeff c

@@ -61,7 +61,7 @@ sqfree f
   | c == 1    = sqfree' f
   | otherwise = (P.constant c, 1) : sqfree' (P.mapCoeff (/c) f)
   where
-    c = P.lc P.umcmp f
+    c = P.lc P.nat f
 
 sqfree' :: forall k. (Eq k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]
 sqfree' 0 = []
@@ -117,7 +117,7 @@ berlekamp f = go (Set.singleton f) basis
 basisOfBerlekampSubalgebra :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [UPolynomial k]
 basisOfBerlekampSubalgebra f =
   sortBy (flip compare `on` P.deg) $
-    map (P.toMonic P.umcmp) $
+    map (P.toMonic P.nat) $
       basis
   where
     q    = order (undefined :: k)
