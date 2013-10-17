@@ -370,8 +370,11 @@ toUPolynomialOf p v = fromTerms $ do
 
 -- | Multivariate division algorithm
 --
--- @divModMP cmp f [g1,g2,..]@ returns  @([q1,q2,…],r)@ where @f = g1*q1 + g2*q2*.. + r@ and
--- @g1,g2,..@ do not divide @f@.
+-- @divModMP cmp f [g1,g2,..]@ returns a pair @([q1,q2,…],r)@ such that
+--
+--   * @f = g1*q1 + g2*q2 + .. + r@ and
+--
+--   * @g1, g2, ..@ do not divide @r@.
 divModMP
   :: forall k v. (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> ([Polynomial k v], Polynomial k v)
@@ -413,13 +416,13 @@ reduce cmp p fs = go p
 
 -- | Prime factorization of polynomials
 class Factor a where
-  -- | factor a polynomial @p@ into @p1 ^ n1 + p2 ^ n2 + ..@ and
+  -- | factor a polynomial @p@ into @p1 ^ n1 * p2 ^ n2 * ..@ and
   -- return a list @[(p1,n1), (p2,n2), ..]@.
   factor :: a -> [(a, Integer)]
 
 -- | Square-free factorization of polynomials
 class SQFree a where
-  -- | factor a polynomial @p@ into @p1 ^ n1 + p2 ^ n2 + ..@ and
+  -- | factor a polynomial @p@ into @p1 ^ n1 * p2 ^ n2 * ..@ and
   -- return a list @[(p1,n1), (p2,n2), ..]@.
   sqfree :: a -> [(a, Integer)]
 
