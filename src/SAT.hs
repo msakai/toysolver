@@ -115,6 +115,8 @@ import Data.Array.Unsafe (unsafeFreeze)
 import Data.Array.IO
 #endif
 import Data.Array.Base (unsafeRead, unsafeWrite)
+import Data.Array.IArray
+import Data.Function (on)
 import Data.IORef
 import Data.List
 import Data.Maybe
@@ -1816,6 +1818,7 @@ data SomeConstraint
   = ConstrClause !ClauseData
   | ConstrAtLeast !AtLeastData
   | ConstrPBAtLeast !PBAtLeastData
+  | ConstrPBAtLeastPueblo !PBHandlerPueblo
   deriving Eq
 
 instance Constraint SomeConstraint where
@@ -1824,46 +1827,57 @@ instance Constraint SomeConstraint where
   showConstraint s (ConstrClause c)    = showConstraint s c
   showConstraint s (ConstrAtLeast c)   = showConstraint s c
   showConstraint s (ConstrPBAtLeast c) = showConstraint s c
+  showConstraint s (ConstrPBAtLeastPueblo c) = showConstraint s c
 
   basicAttach s (ConstrClause c)    = basicAttach s c
   basicAttach s (ConstrAtLeast c)   = basicAttach s c
   basicAttach s (ConstrPBAtLeast c) = basicAttach s c
+  basicAttach s (ConstrPBAtLeastPueblo c) = basicAttach s c
 
   watchedLiterals s (ConstrClause c)    = watchedLiterals s c
   watchedLiterals s (ConstrAtLeast c)   = watchedLiterals s c
   watchedLiterals s (ConstrPBAtLeast c) = watchedLiterals s c
+  watchedLiterals s (ConstrPBAtLeastPueblo c) = watchedLiterals s c
 
   basicPropagate s this (ConstrClause c)  lit   = basicPropagate s this c lit
   basicPropagate s this (ConstrAtLeast c) lit   = basicPropagate s this c lit
   basicPropagate s this (ConstrPBAtLeast c) lit = basicPropagate s this c lit
+  basicPropagate s this (ConstrPBAtLeastPueblo c) lit = basicPropagate s this c lit
 
   basicReasonOf s (ConstrClause c)  l   = basicReasonOf s c l
   basicReasonOf s (ConstrAtLeast c) l   = basicReasonOf s c l
   basicReasonOf s (ConstrPBAtLeast c) l = basicReasonOf s c l
+  basicReasonOf s (ConstrPBAtLeastPueblo c) l = basicReasonOf s c l
 
   toPBAtLeast s (ConstrClause c)    = toPBAtLeast s c
   toPBAtLeast s (ConstrAtLeast c)   = toPBAtLeast s c
   toPBAtLeast s (ConstrPBAtLeast c) = toPBAtLeast s c
+  toPBAtLeast s (ConstrPBAtLeastPueblo c) = toPBAtLeast s c
 
   isSatisfied s (ConstrClause c)    = isSatisfied s c
   isSatisfied s (ConstrAtLeast c)   = isSatisfied s c
   isSatisfied s (ConstrPBAtLeast c) = isSatisfied s c
+  isSatisfied s (ConstrPBAtLeastPueblo c) = isSatisfied s c
 
   constrIsProtected s (ConstrClause c)    = constrIsProtected s c
   constrIsProtected s (ConstrAtLeast c)   = constrIsProtected s c
   constrIsProtected s (ConstrPBAtLeast c) = constrIsProtected s c
+  constrIsProtected s (ConstrPBAtLeastPueblo c) = constrIsProtected s c
 
   constrActivity s (ConstrClause c)    = constrActivity s c
   constrActivity s (ConstrAtLeast c)   = constrActivity s c
   constrActivity s (ConstrPBAtLeast c) = constrActivity s c
+  constrActivity s (ConstrPBAtLeastPueblo c) = constrActivity s c
 
   constrBumpActivity s (ConstrClause c)    = constrBumpActivity s c
   constrBumpActivity s (ConstrAtLeast c)   = constrBumpActivity s c
   constrBumpActivity s (ConstrPBAtLeast c) = constrBumpActivity s c
+  constrBumpActivity s (ConstrPBAtLeastPueblo c) = constrBumpActivity s c
 
   constrRescaleActivity s (ConstrClause c)    = constrRescaleActivity s c
   constrRescaleActivity s (ConstrAtLeast c)   = constrRescaleActivity s c
   constrRescaleActivity s (ConstrPBAtLeast c) = constrRescaleActivity s c
+  constrRescaleActivity s (ConstrPBAtLeastPueblo c) = constrRescaleActivity s c
 
 {--------------------------------------------------------------------
   Clause
@@ -2337,6 +2351,200 @@ pbOverSAT solver (lhs, rhs) = do
       then return c
       else return 0
   return $! sum ss > rhs
+
+{--------------------------------------------------------------------
+  Pseudo Boolean Constraint (Pueblo)
+--------------------------------------------------------------------}
+
+data PBHandlerPueblo
+  = PBHandlerPueblo
+  { puebloTerms     :: !(Array Int PuebloTerm)
+  , puebloDegree    :: !Integer
+  , puebloWatches   :: !(IORef LitSet)
+  , puebloWatchSum  :: !(IORef Integer)
+  , puebloActivity  :: !(IORef Double)
+  }
+  deriving Eq
+
+type PuebloTerm = (Integer, Lit)
+
+puebloAMax :: PBHandlerPueblo -> Integer
+puebloAMax this =
+  case puebloTerms this ! 0 of
+    (c,_) -> c
+
+newPBHandlerPueblo :: [(Integer,Lit)] -> Integer -> Bool -> IO PBHandlerPueblo
+newPBHandlerPueblo ts degree learnt = do
+  let ts' = sortBy (flip compare `on` fst) ts
+  ws   <- newIORef IS.empty
+  wsum <- newIORef 0
+  act  <- newIORef $! (if learnt then 0 else -1)
+  return $ PBHandlerPueblo (array (0, length ts' - 1) (zip [0..] ts')) degree ws wsum act
+
+puebloGetWatchSum :: PBHandlerPueblo -> IO Integer
+puebloGetWatchSum pb = readIORef (puebloWatchSum pb)
+
+puebloWatch :: Solver -> PBHandlerPueblo -> PuebloTerm -> IO ()
+puebloWatch solver !pb (c, lit) = do
+  watch solver lit pb
+  modifyIORef' (puebloWatches pb) (IS.insert lit)
+  modifyIORef' (puebloWatchSum pb) (+c)
+
+puebloUnwatch :: Solver -> PBHandlerPueblo -> PuebloTerm -> IO ()
+puebloUnwatch _solver pb (c, lit) = do
+  modifyIORef' (puebloWatches pb) (IS.delete lit)
+  modifyIORef' (puebloWatchSum pb) (subtract c)
+
+instance Constraint PBHandlerPueblo where
+  toConstraint = ConstrPBAtLeastPueblo
+
+  showConstraint _ this = do
+    return $ show (elems (puebloTerms this)) ++ " >= " ++ show (puebloDegree this)
+
+  basicAttach solver this = do
+    let f [] = return ()
+        f (t : ts) = do
+          watchsum <- puebloGetWatchSum this
+          when (watchsum < puebloDegree this + puebloAMax this) $
+            puebloWatch solver this t 
+          watchsum <- puebloGetWatchSum this
+          if watchsum >= puebloDegree this + puebloAMax this
+          then return ()
+          else f ts
+    f $ elems (puebloTerms this)
+    watchsum <- puebloGetWatchSum this
+    if watchsum < puebloDegree this then
+      return False
+    else do
+      let slack = sum [c | (c,_) <- elems (puebloTerms this)] - puebloDegree this
+      flip allM (elems (puebloTerms this)) $ \(c,l) -> do
+        if c > slack then
+          assignBy solver l this
+        else
+          return True
+
+  watchedLiterals _ this = liftM IS.toList $ readIORef (puebloWatches this)
+
+  basicPropagate solver _this this2 falsifiedLit = do
+    let t = find (\(_,l) -> l==falsifiedLit) (puebloTerms this2)
+    puebloUnwatch solver this2 t
+    updateWatchSum
+    ret <- puebloPropagate solver this2
+    unless ret $ puebloWatch solver this2 t
+    return ret
+    where
+      find :: (Num ix, Ix ix) => (a -> Bool) -> Array ix a -> a
+      find p arr = go lb
+        where
+          (lb,_ub) = bounds arr
+          go i
+            | p x       = x
+            | otherwise = go (i+1)
+            where
+              x = arr ! i
+      updateWatchSum = do
+        let f [] = return ()
+            f (t@(_,lit):ts) = do
+              watchSum <- puebloGetWatchSum this2
+              if watchSum >= puebloDegree this2 + puebloAMax this2 then
+                return ()
+              else do
+                val <- litValue solver lit
+                watched <- liftM (lit `IS.member`) $ readIORef (puebloWatches this2)
+                when (val /= lFalse && not watched) $ do
+                  puebloWatch solver this2 t
+                f ts
+        f (elems (puebloTerms this2))
+
+  basicReasonOf solver this l = do
+    p <- case l of
+           Just lit -> do
+             idx0 <- varAssignNo solver (litVar lit)
+             -- PB制約の場合には複数回unitになる可能性があり、
+             -- litへの伝播以降に割り当てられたリテラルを含まないよう注意が必要
+             return $ \(_,l2) -> do
+               val <- litValue solver l2
+               if val /= lFalse then
+                 return False
+               else do
+                 idx <- varAssignNo solver (litVar l2)
+                 return $ idx < idx0
+           Nothing  -> do
+             -- 直接のコンフリクトの場合には、それ以降にリテラルに値が割り当てら
+             -- れることはないため、すべて含んでしまって問題ない
+             return $ \(_,l2) -> liftM (lFalse ==) (litValue solver l2)
+    xs <- filterM p $ elems (puebloTerms this)
+    let max_slack = sum (map fst (elems (puebloTerms this))) - puebloDegree this
+    case l of
+      Nothing -> return $ f max_slack xs
+      Just lit -> do
+        let c = fst $ fromJust $ find (\(_,l) -> l == lit) (elems (puebloTerms this))
+        return $ f (max_slack - c) xs
+
+    where
+      f :: Integer -> [(Integer, Lit)] -> [Lit]
+      f s xs = go s xs []
+
+      go :: Integer -> [(Integer, Lit)] -> [Lit] -> [Lit]
+      go s _ ret | s < 0 = ret
+      go _ [] _ = error "PBAtLeastDataPeublo.basicReasonOf: should not happen"
+      go s ((c,lit):xs) ret = go (s - c) xs (lit:ret)
+
+  toPBAtLeast _ this = do
+    return (elems (puebloTerms this), puebloDegree this)
+
+  isSatisfied solver this = do
+    xs <- forM (elems (puebloTerms this)) $ \(c,l) -> do
+      v <- litValue solver l
+      if v == lTrue
+        then return c
+        else return 0
+    return $ sum xs >= puebloDegree this
+
+  constrActivity _ this = do
+    let act = puebloActivity this
+    readIORef act
+
+  constrBumpActivity solver this = do
+    let act = puebloActivity this
+    aval <- readIORef act
+    when (aval >= 0) $ do -- learnt clause
+      inc <- readIORef (svClaInc solver)
+      let aval2 = aval+inc
+      writeIORef act $! aval2
+      when (aval2 > 1e20) $
+        -- Rescale
+        constrRescaleAllActivity solver
+
+  constrRescaleActivity _ this = do
+    let act = puebloActivity this
+    aval <- readIORef act
+    when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
+
+puebloPropagate :: Solver -> PBHandlerPueblo -> IO Bool
+puebloPropagate solver this = do
+  watchsum <- puebloGetWatchSum this
+  if puebloDegree this + puebloAMax this <= watchsum then
+    return True
+  else if watchsum < puebloDegree this then do
+    -- CONFLICT
+    return False
+  else do -- puebloDegree this <= watchsum < puebloDegree this + puebloAMax this
+    -- UNIT PROPAGATION
+    let f [] = return True
+        f (t@(c,lit) : ts) = do
+          if watchsum - c >= puebloDegree this then
+            f ts
+          else do
+            val <- litValue solver lit
+            if val /= lUndef then f ts
+            else do
+              b <- assignBy solver lit this
+              if b then f ts
+              else do
+                puebloWatch solver this t
+                return False           
+    f $ elems (puebloTerms this)
 
 {--------------------------------------------------------------------
   Restart strategy
