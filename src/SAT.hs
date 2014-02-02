@@ -322,6 +322,12 @@ bcpEnqueue solver l = SQ.enqueue (svBCPQueue solver) l
 bcpDequeue :: Solver -> IO (Maybe Lit)
 bcpDequeue solver = SQ.dequeue (svBCPQueue solver)
 
+bcpCheckEmpty :: Solver -> IO ()
+bcpCheckEmpty solver = do
+  size <- SQ.queueSize (svBCPQueue solver)
+  unless (size == 0) $
+    error "BUG: BCP Queue should be empty at this point"
+
 assignBy :: Constraint c => Solver -> Lit -> c -> IO Bool
 assignBy solver lit c = assign_ solver lit (Just (toConstraint c))
 
@@ -669,8 +675,9 @@ addClause solver lits = do
         Just _ -> markBad solver
     Just lits3 -> do
       clause <- newClauseData lits3 False
-      attach solver clause
       addToDB solver clause
+      _ <- basicAttach solver clause
+      return ()
 
 -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
 addAtLeast :: Solver -- ^ The 'Solver' argument.
@@ -697,8 +704,9 @@ addAtLeast solver lits n = do
         Just _ -> markBad solver
     else do
       c <- newAtLeastData lits' n' False
-      attach solver c
       addToDB solver c
+      _ <- basicAttach solver c
+      return ()
 
 -- | Add a cardinality constraints /atmost({l1,l2,..},n)/.
 addAtMost :: Solver -- ^ The 'Solver' argument
@@ -739,9 +747,8 @@ addPBAtLeast solver ts n = do
       addAtLeast solver (map snd ts') (fromInteger ((degree+c-1) `div` c))
     else do
       c <- newPBAtLeastData ts' degree False
-      attach solver c
       addToDB solver c
-      ret <- pbPropagate solver c
+      ret <- attach solver c
       if not ret
        then do
          markBad solver
@@ -1021,8 +1028,8 @@ search solver !conflict_lim onConflict = loop 0
               return ()
             lit:_ -> do
               cl <- newClauseData learntClause True
-              attach solver cl
               addToLearntDB solver cl
+              basicAttach solver cl
               assignBy solver lit cl
               constrBumpActivity solver cl
           return True
@@ -1030,34 +1037,40 @@ search solver !conflict_lim onConflict = loop 0
           (learntClause, level, pb) <- analyzeConflictHybrid solver constr
           level2 <- pbBacktrackLevel solver pb
           let level3 = min level level2
-
-          pbdata <- newPBAtLeastData (fst pb) (snd pb) True
-          attach solver pbdata
-          addToLearntDB solver pbdata
-
           backtrackTo solver level3
-          slack <- readIORef (pbSlack pbdata)
-          if slack < 0
-            then do
-              if level3 == levelRoot
-               then return False
-               else handleConflict (toConstraint pbdata)
-            else do
-              case learntClause of
-                [] -> error "search(LearningHybrid): should not happen"
-                [lit] -> do
-                  ret <- assign solver lit
-                  assert ret $ return ()
-                  return ()
-                lit:_ -> do
-                  cl <- newClauseData learntClause True
-                  attach solver cl
-                  addToLearntDB solver cl
-                  when (level3 == level) $ do
-                    assignBy solver lit cl
-                    constrBumpActivity solver cl
-              pbPropagate solver pbdata
-              return True
+
+          ret <-
+            case learntClause of
+              [] -> error "search(LearningHybrid): should not happen"
+              [lit] -> do
+                _ <- assign solver lit -- This should always succeed.
+                deduce solver
+              lit:_ -> do
+                cl <- newClauseData learntClause True
+                addToLearntDB solver cl
+                basicAttach solver cl
+                if level3 == level then do
+                  constrBumpActivity solver cl
+                  _ <- assignBy solver lit cl -- This should always succeed.
+                  ret <- deduce solver
+                  return ret
+                else
+                  return Nothing
+
+          case ret of
+            Just c -> handleConflict c -- FIXME: should call onConflict, update statistics, etc.
+            Nothing -> do
+              pbdata <- newPBAtLeastData (fst pb) (snd pb) True
+              addToLearntDB solver pbdata
+              ret <- attach solver pbdata
+              when (level3 == level2) $ 
+                constrBumpActivity solver pbdata
+              if ret then
+                return True
+              else if level3 == levelRoot then
+                return False
+              else
+                handleConflict (toConstraint pbdata) -- FIXME: should call onConflict, update statistics, etc.
 
 -- | After 'solve' returns True, it returns the model.
 model :: Solver -> IO Model
@@ -1667,7 +1680,7 @@ class Constraint a where
 
   showConstraint :: Solver -> a -> IO String
 
-  attach :: Solver -> a -> IO ()
+  basicAttach :: Solver -> a -> IO Bool
 
   watchedLiterals :: Solver -> a -> IO [Lit]
 
@@ -1695,6 +1708,36 @@ class Constraint a where
 
   constrRescaleActivity :: Solver -> a -> IO ()
   constrRescaleActivity _ _ = return ()
+
+attach :: Constraint a => Solver -> a -> IO Bool
+attach solver c = do
+  -- BCP Queue should be empty at this point.
+  -- If not, duplicated propagation happens.
+  bcpCheckEmpty solver
+  ret <- basicAttach solver c
+  if ret then
+    propagateCurrentModel solver (toConstraint c)
+  else
+    return False
+
+propagateCurrentModel :: Solver -> SomeConstraint -> IO Bool
+propagateCurrentModel solver c = do
+  lits <- watchedLiterals solver c
+  let f :: IM.IntMap Lit -> Lit -> IO (IM.IntMap Lit)
+      f !m !lit = do
+        val <- litValue solver lit
+        if val /= lFalse then
+          return m
+        else do
+          lv <- varAssignNo solver (litVar lit)
+          return (IM.insert lv lit m)
+  -- falsified literals ordered by their assignments
+  falsifiedLits <- liftM IM.elems $ foldM f IM.empty lits
+  flip allM falsifiedLits $ \lit -> do
+    -- To emulate normal behavior of propagation, we need to remove watches before calling 'propagate'.
+    ld <- litData solver lit
+    modifyIORef (ldWatches ld) (delete c)
+    propagate solver c lit
 
 detach :: Constraint a => Solver -> a -> IO ()
 detach solver c = do
@@ -1757,9 +1800,9 @@ instance Constraint SomeConstraint where
   showConstraint s (ConstrAtLeast c)   = showConstraint s c
   showConstraint s (ConstrPBAtLeast c) = showConstraint s c
 
-  attach s (ConstrClause c)    = attach s c
-  attach s (ConstrAtLeast c)   = attach s c
-  attach s (ConstrPBAtLeast c) = attach s c
+  basicAttach s (ConstrClause c)    = basicAttach s c
+  basicAttach s (ConstrAtLeast c)   = basicAttach s c
+  basicAttach s (ConstrPBAtLeast c) = basicAttach s c
 
   watchedLiterals s (ConstrClause c)    = watchedLiterals s c
   watchedLiterals s (ConstrAtLeast c)   = watchedLiterals s c
@@ -1824,13 +1867,18 @@ instance Constraint ClauseData where
     lits <- getElems (claLits this)
     return (show lits)
 
-  attach solver this = do
+  basicAttach solver this = do
     lits <- getElems (claLits this)
     case lits of
+      [] -> do
+        markBad solver
+        return False
+      [l1] -> do
+        assignBy solver l1 this
       l1:l2:_ -> do
         watch solver l1 this
         watch solver l2 this
-      _ -> return ()
+        return True
 
   watchedLiterals _ this = do
     lits <- getElems (claLits this)
@@ -1969,11 +2017,18 @@ instance Constraint AtLeastData where
     lits <- getElems (atLeastLits this)
     return $ show lits ++ " >= " ++ show (atLeastNum this)
 
-  attach solver this = do
+  basicAttach solver this = do
     lits <- getElems (atLeastLits this)
-    let n = atLeastNum this
-    let ws = if length lits > n then take (n+1) lits else []
-    forM_ ws $ \l -> watch solver l this
+    let m = length lits
+        n = atLeastNum this
+    if m < n then do
+      markBad solver
+      return False
+    else if m == n then do
+      allM (\l -> assignBy solver l this) lits
+    else do -- m > n
+      forM_ (take (n+1) lits) $ \l -> watch solver l this
+      return True
 
   watchedLiterals _ this = do
     lits <- getElems (atLeastLits this)
@@ -2130,16 +2185,11 @@ instance Constraint PBAtLeastData where
   showConstraint _ this = do
     return $ show [(c,l) | (l,c) <- IM.toList (pbTerms this)] ++ " >= " ++ show (pbDegree this)
 
-  attach solver this = do
+  basicAttach solver this = do
     forM_ (IM.keys (pbTerms this)) $ \l -> watch solver l this
-    cs <- forM (IM.toList (pbTerms this)) $ \(l,c) -> do
-      v <- litValue solver l
-      if v == lFalse
-        then do
-          addBacktrackCB solver (litVar l) $ modifyIORef' (pbSlack this) (+ c)
-          return 0
-        else return c
-    writeIORef (pbSlack this) $! sum cs - pbDegree this
+    let max_slack = sum (IM.elems (pbTerms this)) - pbDegree this
+    writeIORef (pbSlack this) $! max_slack
+    return $! max_slack >= 0
 
   watchedLiterals _ this = do
     return $ IM.keys $ pbTerms this
@@ -2147,10 +2197,19 @@ instance Constraint PBAtLeastData where
   basicPropagate solver this this2 falsifiedLit = do
     watch solver falsifiedLit this
     let c = pbTerms this2 IM.! falsifiedLit
-    let slack = pbSlack this2
-    modifyIORef' slack (subtract c)
-    addBacktrackCB solver (litVar falsifiedLit) $ modifyIORef' slack (+ c)
-    pbPropagate solver this2
+    modifyIORef' (pbSlack this2) (subtract c)
+    addBacktrackCB solver (litVar falsifiedLit) $ modifyIORef' (pbSlack this2) (+ c)
+    s <- readIORef (pbSlack this2)
+    if s < 0 then
+      return False
+    else do
+      forM_ (IM.toList (pbTerms this2)) $ \(l1,c1) -> do
+        when (c1 > s) $ do
+          v <- litValue solver l1
+          when (v == lUndef) $ do
+            assignBy solver l1 this
+            return ()
+      return True
 
   basicReasonOf solver this l = do
     p <- case l of
@@ -2229,22 +2288,6 @@ instantiatePB solver (xs,n) = loop ([],n) xs
          loop (ys, m) ts
        else
          loop ((c,l):ys, m) ts
-
-pbPropagate :: Solver -> PBAtLeastData -> IO Bool
-pbPropagate solver this = do
-  let slack = pbSlack this
-  s <- readIORef slack
-  if s < 0
-    then return False
-    else do
-      forM_ (IM.toList (pbTerms this)) $ \(l1,c1) -> do
-        when (c1 > s) $ do
-          v <- litValue solver l1
-          when (v == lUndef) $ do
-            assignBy solver l1 this
-            constrBumpActivity solver this
-            return ()
-      return True
 
 pbOverSAT :: Solver -> ([(Integer,Lit)],Integer) -> IO Bool
 pbOverSAT solver (lhs, rhs) = do
