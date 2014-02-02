@@ -691,10 +691,10 @@ addAtLeast solver lits n = do
       forM_ lits' $ \l -> do
         ret <- assign solver l
         assert ret $ return ()
-        ret2 <- deduce solver
-        case ret2 of
-          Nothing -> return ()
-          Just _ -> markBad solver
+      ret2 <- deduce solver
+      case ret2 of
+        Nothing -> return ()
+        Just _ -> markBad solver
     else do
       c <- newAtLeastData lits' n' False
       attach solver c
