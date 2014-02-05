@@ -1455,30 +1455,27 @@ analyzeConflictHybrid solver constr = do
 pbBacktrackLevel :: Solver -> ([(Integer,Lit)],Integer) -> IO Level
 pbBacktrackLevel _ ([], rhs) = assert (rhs > 0) $ return levelRoot
 pbBacktrackLevel solver (lhs, rhs) = do
-  let go lvs lhs' s = 
-        case IS.minView lvs of
-          Nothing -> error "pbBacktrackLevel: should not happen"
-          Just (lv2, lvs2) -> do
-            let s2   = s - sum [c | (c,_,lv3) <- lhs', Just lv2 == lv3]
-                lhs2 = [x | x@(_,_,lv3) <- lhs', Just lv2 /= lv3]
-            if s2 < 0 then
-              return lv2 -- conflict
-            else if takeWhile (\(c,_,_) -> c > s) lhs2 /= [] then
-              return lv2 --unit
-            else
-              go lvs2 lhs2 s2
+  levelToLiterals <- liftM (IM.unionsWith IM.union) $ forM lhs $ \(_,lit) -> do
+    val <- litValue solver lit
+    if val /= lUndef then do
+      level <- litLevel solver lit
+      return $ IM.singleton level (IM.singleton lit val)
+    else
+      return $ IM.empty
 
-  lhs' <- forM (sortBy (flip (comparing fst)) lhs) $ \(c, lit) -> do
-    v <- litValue solver lit
-    if v /= lFalse
-      then return (c, lit, Nothing)
-      else do
-        lv <- litLevel solver lit
-        return (c, lit, Just lv)
+  let replay [] _ _ = error "pbBacktrackLevel: should not happen"
+      replay ((lv,lv_lits) : lvs) lhs slack = do
+        let slack_lv = slack - sum [c | (c,lit) <- lhs, IM.lookup lit lv_lits == Just lFalse]
+            lhs_lv   = [tm | tm@(_,lit) <- lhs, IM.notMember lit lv_lits]
+        if slack_lv < 0 then
+          return lv -- CONFLICT
+        else if any (\(c,_) -> c > slack_lv) lhs_lv then
+          return lv -- UNIT
+        else
+          replay lvs lhs_lv slack_lv
 
-  let lvs = IS.fromList [lv | (_,_,Just lv) <- lhs']
-      s0 = sum [c | (c,_) <- lhs] - rhs
-  go lvs lhs' s0
+  let initial_slack = sum [c | (c,_) <- lhs] - rhs
+  replay (IM.toList levelToLiterals) lhs initial_slack
 
 minimizeConflictClause :: Solver -> LitSet -> IO LitSet
 minimizeConflictClause solver lits = do
