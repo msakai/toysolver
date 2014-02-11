@@ -1282,12 +1282,12 @@ deduce solver = loop
 
     processLit :: Lit -> IO (Maybe SomeConstraint)
     processLit !lit = do
-      let lit2 = litNot lit
-      ld <- litData solver lit2
+      let falsifiedLit = litNot lit
+      ld <- litData solver falsifiedLit
       let wsref = ldWatches ld
       let loop2 [] = return Nothing
           loop2 (w:ws) = do
-            ok <- propagate solver w lit2
+            ok <- propagate solver w falsifiedLit
             if ok
               then loop2 ws
               else do
