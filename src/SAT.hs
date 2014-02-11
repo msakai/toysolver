@@ -2171,7 +2171,7 @@ instance Constraint PBAtLeastData where
              return $ \(l2,_) -> liftM (lFalse ==) (litValue solver l2)
     let m = pbTerms this
     xs <- liftM (sortBy (flip (comparing snd))) $ filterM p $ IM.toList m
-    let max_slack = sum (map snd $ IM.toList m) - pbDegree this
+    let max_slack = sum (IM.elems m) - pbDegree this
     case l of
       Nothing -> return $ f max_slack xs
       Just lit -> return $ f (max_slack - (m IM.! lit)) xs
