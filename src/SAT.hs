@@ -927,42 +927,45 @@ data SearchResult
   | SRBudgetExceeded
 
 search :: Solver -> Int -> IO () -> IO SearchResult
-search solver !conflict_lim onConflict = loop 0
-  where
-    loop :: Int -> IO SearchResult
-    loop !c = do
+search solver !conflict_lim onConflict = do
+  conflictCounter <- newIORef 0
+  let 
+    loop :: IO SearchResult
+    loop = do
       sanityCheck solver
       conflict <- deduce solver
       sanityCheck solver
-
       case conflict of
         Just constr -> do
-          ret <- handleConflict constr c
+          ret <- handleConflict conflictCounter constr
           case ret of
-            Left sr -> return sr
-            Right c -> loop c
-
+            Just sr -> return sr
+            Nothing -> loop
         Nothing -> do
           lv <- readIORef (svLevel solver)
           when (lv == levelRoot) $ simplify solver
-
-          n <- nLearnt solver
-          m <- nAssigns solver
-          learnt_lim <- readIORef (svLearntLim solver)
-          when (learnt_lim >= 0 && n - m > learnt_lim) $ do
-            modifyIORef' (svNLearntGC solver) (+1)
-            reduceDB solver
-
+          checkGC
           r <- pickAssumption
           case r of
             Nothing -> return (SRFinished False)
             Just lit
-              | lit /= litUndef -> decide solver lit >> loop c
+              | lit /= litUndef -> decide solver lit >> loop
               | otherwise -> do
                   lit2 <- pickBranchLit solver
                   if lit2 == litUndef
                     then return (SRFinished True)
-                    else decide solver lit2 >> loop c
+                    else decide solver lit2 >> loop
+  loop
+
+  where
+    checkGC :: IO ()
+    checkGC = do
+      n <- nLearnt solver
+      m <- nAssigns solver
+      learnt_lim <- readIORef (svLearntLim solver)
+      when (learnt_lim >= 0 && n - m > learnt_lim) $ do
+        modifyIORef' (svNLearntGC solver) (+1)
+        reduceDB solver
 
     pickAssumption :: IO (Maybe Lit)
     pickAssumption = do
@@ -988,8 +991,8 @@ search solver !conflict_lim onConflict = loop 0
                      return (Just l)
       go
 
-    handleConflict :: SomeConstraint -> Int -> IO (Either SearchResult Int)
-    handleConflict constr !c = do
+    handleConflict :: IORef Int -> SomeConstraint -> IO (Maybe SearchResult)
+    handleConflict conflictCounter constr = do
       varDecayActivity solver
       constrDecayActivity solver
       onConflict
@@ -1001,79 +1004,80 @@ search solver !conflict_lim onConflict = loop 0
         str <- showConstraint solver constr
         return $ printf "conflict(level=%d): %s" d str
 
-      when (c `mod` 100 == 0) $ do
-        printStat solver False
+      modifyIORef' conflictCounter (+1)
+      c <- readIORef conflictCounter
 
       modifyIORef' (svConfBudget solver) $ \confBudget ->
         if confBudget > 0 then confBudget - 1 else confBudget
       confBudget <- readIORef (svConfBudget solver)
 
+      when (c `mod` 100 == 0) $ do
+        printStat solver False
+
       if d == levelRoot then do
         markBad solver
-        return $ Left (SRFinished False)
+        return $ Just (SRFinished False)
       else if confBudget==0 then
-        return $ Left SRBudgetExceeded
-      else if conflict_lim >= 0 && c+1 >= conflict_lim then
-        return $ Left SRRestart
+        return $ Just SRBudgetExceeded
+      else if conflict_lim >= 0 && c >= conflict_lim then
+        return $ Just SRRestart
       else do
-        learnFromConflict constr (c+1)
+        strat <- readIORef (svLearningStrategy solver)
+        case strat of
+          LearningClause -> learnClause constr >> return Nothing
+          LearningHybrid -> learnHybrid conflictCounter constr
 
-    learnFromConflict :: SomeConstraint -> Int -> IO (Either SearchResult Int)
-    learnFromConflict constr !c = do
-      strat <- readIORef (svLearningStrategy solver)
-      case strat of
-        LearningClause -> do
-          (learntClause, level) <- analyzeConflict solver constr
-          backtrackTo solver level
-          case learntClause of
-            [] -> error "search(LearningClause): should not happen"
-            [lit] -> do
-              ret <- assign solver lit
-              assert ret $ return ()
-              return ()
-            lit:_ -> do
-              cl <- newClauseData learntClause True
-              addToLearntDB solver cl
-              basicAttach solver cl
-              assignBy solver lit cl
-              constrBumpActivity solver cl
-          return $ Right c
+    learnClause :: SomeConstraint -> IO ()
+    learnClause constr = do
+      (learntClause, level) <- analyzeConflict solver constr
+      backtrackTo solver level
+      case learntClause of
+        [] -> error "search(LearningClause): should not happen"
+        [lit] -> do
+          ret <- assign solver lit
+          assert ret $ return ()
+          return ()
+        lit:_ -> do
+          cl <- newClauseData learntClause True
+          addToLearntDB solver cl
+          basicAttach solver cl
+          assignBy solver lit cl
+          constrBumpActivity solver cl
 
-        LearningHybrid -> do
-          ((learntClause, clauseLevel), (pb, pbLevel)) <- analyzeConflictHybrid solver constr
-          let minLevel = min clauseLevel pbLevel
-          backtrackTo solver minLevel
+    learnHybrid :: IORef Int -> SomeConstraint -> IO (Maybe SearchResult)
+    learnHybrid conflictCounter constr = do
+      ((learntClause, clauseLevel), (pb, pbLevel)) <- analyzeConflictHybrid solver constr
+      let minLevel = min clauseLevel pbLevel
+      backtrackTo solver minLevel
 
-          ret <-
-            case learntClause of
-              [] -> error "search(LearningHybrid): should not happen"
-              [lit] -> do
-                _ <- assign solver lit -- This should always succeed.
-                deduce solver
-              lit:_ -> do
-                cl <- newClauseData learntClause True
-                addToLearntDB solver cl
-                basicAttach solver cl
-                constrBumpActivity solver cl
-                if minLevel == clauseLevel then do
-                  _ <- assignBy solver lit cl -- This should always succeed.
-                  deduce solver
-                else
-                  return Nothing
+      case learntClause of
+        [] -> error "search(LearningHybrid): should not happen"
+        [lit] -> do
+          _ <- assign solver lit -- This should always succeed.
+          return ()
+        lit:_ -> do
+          cl <- newClauseData learntClause True
+          addToLearntDB solver cl
+          basicAttach solver cl
+          constrBumpActivity solver cl
+          when (minLevel == clauseLevel) $ do
+            _ <- assignBy solver lit cl -- This should always succeed.
+            return ()
 
-          case ret of
-            Just constr -> do
-              handleConflict constr c
-              -- TODO: PB制約の学習もすべき?
-            Nothing -> do
-              pbdata <- newPBAtLeastData (fst pb) (snd pb) True
-              addToLearntDB solver pbdata
-              ret <- attach solver pbdata
-              constrBumpActivity solver pbdata
-              if ret then
-                return $ Right c
-              else
-                handleConflict (toConstraint pbdata) c
+      ret <- deduce solver
+      case ret of
+        Just constr -> do
+          handleConflict conflictCounter constr
+          -- TODO: should also learn the PB constraint?
+        Nothing -> do
+          pbdata <- newPBAtLeastData (fst pb) (snd pb) True
+          addToLearntDB solver pbdata
+          ret <- attach solver pbdata
+          constrBumpActivity solver pbdata
+          if ret then
+            return Nothing
+          else
+            handleConflict conflictCounter (toConstraint pbdata)
 
 -- | After 'solve' returns True, it returns the model.
 model :: Solver -> IO Model
