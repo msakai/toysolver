@@ -90,6 +90,9 @@ module SAT
   , defaultRandomFreq
   , setRandomSeed
   , setConfBudget
+  , PBHandlerType (..)
+  , setPBHandlerType
+  , defaultPBHandlerType
 
   -- * Read state
   , nVars
@@ -298,6 +301,8 @@ data Solver
   , svCCMin :: !(IORef Int)
 
   , svLearningStrategy :: !(IORef LearningStrategy)
+
+  , svPBHandlerType :: !(IORef PBHandlerType)
 
   , svLogger :: !(IORef (Maybe (String -> IO ())))
   , svStartWC    :: !(IORef UTCTime)
@@ -553,6 +558,7 @@ newSolver = do
   learntSizeInc <- newIORef defaultLearntSizeInc
   ccMin <- newIORef defaultCCMin
   checkModel <- newIORef False
+  pbHandlerType <- newIORef defaultPBHandlerType
 
   learntLim       <- newIORef undefined
   learntLimAdjCnt <- newIORef (-1)
@@ -601,6 +607,7 @@ newSolver = do
         , svLearntSizeFirst = learntSizeFirst
         , svLearntSizeInc = learntSizeInc
         , svCCMin = ccMin
+        , svPBHandlerType   = pbHandlerType
         , svLearntLim       = learntLim
         , svLearntLimAdjCnt = learntLimAdjCnt
         , svLearntLimSeq    = learntLimSeq
@@ -746,7 +753,7 @@ addPBAtLeast solver ts n = do
       let c = head cs
       addAtLeast solver (map snd ts') (fromInteger ((degree+c-1) `div` c))
     else do
-      c <- newPBAtLeastData ts' degree False
+      c <- newPBHandler solver ts' degree False
       addToDB solver c
       ret <- attach solver c
       if not ret
@@ -1070,7 +1077,7 @@ search solver !conflict_lim onConflict = do
           handleConflict conflictCounter constr
           -- TODO: should also learn the PB constraint?
         Nothing -> do
-          pbdata <- newPBAtLeastData (fst pb) (snd pb) True
+          pbdata <- newPBHandler solver (fst pb) (snd pb) True
           addToLearntDB solver pbdata
           ret <- attach solver pbdata
           constrBumpActivity solver pbdata
@@ -1205,6 +1212,16 @@ setRandomSeed solver seed = do
 setConfBudget :: Solver -> Maybe Int -> IO ()
 setConfBudget solver (Just b) | b >= 0 = writeIORef (svConfBudget solver) b
 setConfBudget solver _ = writeIORef (svConfBudget solver) (-1)
+
+data PBHandlerType = PBHandlerTypeCounter
+  deriving (Show, Eq, Ord)
+
+defaultPBHandlerType :: PBHandlerType
+defaultPBHandlerType = PBHandlerTypeCounter
+
+setPBHandlerType :: Solver -> PBHandlerType -> IO ()
+setPBHandlerType solver ht = do
+  writeIORef (svPBHandlerType solver) ht
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
@@ -2169,6 +2186,14 @@ instantiateAtLeast solver (xs,n) = loop ([],n) xs
 {--------------------------------------------------------------------
   Pseudo Boolean Constraint
 --------------------------------------------------------------------}
+
+newPBHandler :: Solver -> [(Integer,Lit)] -> Integer -> Bool -> IO SomeConstraint
+newPBHandler solver ts degree learnt = do
+  config <- readIORef (svPBHandlerType solver)
+  case config of
+    PBHandlerTypeCounter -> do
+      c <- newPBAtLeastData ts degree learnt
+      return (toConstraint c)
 
 data PBAtLeastData
   = PBAtLeastData
