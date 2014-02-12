@@ -936,6 +936,12 @@ search solver !conflict_lim onConflict = loop 0
       sanityCheck solver
 
       case conflict of
+        Just constr -> do
+          ret <- handleConflict constr c
+          case ret of
+            Left sr -> return sr
+            Right c -> loop c
+
         Nothing -> do
           lv <- readIORef (svLevel solver)
           when (lv == levelRoot) $ simplify solver
@@ -957,37 +963,6 @@ search solver !conflict_lim onConflict = loop 0
                   if lit2 == litUndef
                     then return (SRFinished True)
                     else decide solver lit2 >> loop c
-
-        Just constr -> do
-          varDecayActivity solver
-          constrDecayActivity solver
-          onConflict
-
-          modifyIORef' (svNConflict solver) (+1)
-          d <- readIORef (svLevel solver)
-
-          when debugMode $ logIO solver $ do
-            str <- showConstraint solver constr
-            return $ printf "conflict(level=%d): %s" d str
-
-          when (c `mod` 100 == 0) $ do
-            printStat solver False
-
-          modifyIORef' (svConfBudget solver) $ \confBudget ->
-            if confBudget > 0 then confBudget - 1 else confBudget
-          confBudget <- readIORef (svConfBudget solver)
-
-          if d == levelRoot
-            then markBad solver >> return (SRFinished False)
-            else if confBudget==0 then
-              return SRBudgetExceeded
-            else if conflict_lim >= 0 && c+1 >= conflict_lim then
-              return SRRestart
-            else do
-              b <- handleConflict constr
-              if b
-                then loop (c+1)
-                else markBad solver >> return (SRFinished False)
 
     pickAssumption :: IO (Maybe Lit)
     pickAssumption = do
@@ -1013,8 +988,38 @@ search solver !conflict_lim onConflict = loop 0
                      return (Just l)
       go
 
-    handleConflict :: SomeConstraint -> IO Bool
-    handleConflict constr = do
+    handleConflict :: SomeConstraint -> Int -> IO (Either SearchResult Int)
+    handleConflict constr !c = do
+      varDecayActivity solver
+      constrDecayActivity solver
+      onConflict
+
+      modifyIORef' (svNConflict solver) (+1)
+      d <- readIORef (svLevel solver)
+
+      when debugMode $ logIO solver $ do
+        str <- showConstraint solver constr
+        return $ printf "conflict(level=%d): %s" d str
+
+      when (c `mod` 100 == 0) $ do
+        printStat solver False
+
+      modifyIORef' (svConfBudget solver) $ \confBudget ->
+        if confBudget > 0 then confBudget - 1 else confBudget
+      confBudget <- readIORef (svConfBudget solver)
+
+      if d == levelRoot then do
+        markBad solver
+        return $ Left (SRFinished False)
+      else if confBudget==0 then
+        return $ Left SRBudgetExceeded
+      else if conflict_lim >= 0 && c+1 >= conflict_lim then
+        return $ Left SRRestart
+      else do
+        learnFromConflict constr (c+1)
+
+    learnFromConflict :: SomeConstraint -> Int -> IO (Either SearchResult Int)
+    learnFromConflict constr !c = do
       strat <- readIORef (svLearningStrategy solver)
       case strat of
         LearningClause -> do
@@ -1032,12 +1037,12 @@ search solver !conflict_lim onConflict = loop 0
               basicAttach solver cl
               assignBy solver lit cl
               constrBumpActivity solver cl
-          return True
+          return $ Right c
+
         LearningHybrid -> do
-          (learntClause, level, pb) <- analyzeConflictHybrid solver constr
-          level2 <- pbBacktrackLevel solver pb
-          let level3 = min level level2
-          backtrackTo solver level3
+          ((learntClause, clauseLevel), (pb, pbLevel)) <- analyzeConflictHybrid solver constr
+          let minLevel = min clauseLevel pbLevel
+          backtrackTo solver minLevel
 
           ret <-
             case learntClause of
@@ -1049,28 +1054,26 @@ search solver !conflict_lim onConflict = loop 0
                 cl <- newClauseData learntClause True
                 addToLearntDB solver cl
                 basicAttach solver cl
-                if level3 == level then do
-                  constrBumpActivity solver cl
+                constrBumpActivity solver cl
+                if minLevel == clauseLevel then do
                   _ <- assignBy solver lit cl -- This should always succeed.
-                  ret <- deduce solver
-                  return ret
+                  deduce solver
                 else
                   return Nothing
 
           case ret of
-            Just c -> handleConflict c -- FIXME: should call onConflict, update statistics, etc.
+            Just constr -> do
+              handleConflict constr c
+              -- TODO: PB制約の学習もすべき?
             Nothing -> do
               pbdata <- newPBAtLeastData (fst pb) (snd pb) True
               addToLearntDB solver pbdata
               ret <- attach solver pbdata
-              when (level3 == level2) $ 
-                constrBumpActivity solver pbdata
+              constrBumpActivity solver pbdata
               if ret then
-                return True
-              else if level3 == levelRoot then
-                return False
+                return $ Right c
               else
-                handleConflict (toConstraint pbdata) -- FIXME: should call onConflict, update statistics, etc.
+                handleConflict (toConstraint pbdata) c
 
 -- | After 'solve' returns True, it returns the model.
 model :: Solver -> IO Model
@@ -1388,7 +1391,7 @@ analyzeFinal solver p = do
            go ls seen result
   go lits (IS.singleton (litVar p)) [p]
 
-analyzeConflictHybrid :: Constraint c => Solver -> c -> IO (Clause, Level, ([(Integer,Lit)], Integer))
+analyzeConflictHybrid :: Constraint c => Solver -> c -> IO ((Clause, Level), (([(Integer,Lit)],Integer), Level))
 analyzeConflictHybrid solver constr = do
   d <- readIORef (svLevel solver)
 
@@ -1463,7 +1466,8 @@ analyzeConflictHybrid solver constr = do
                 [] -> error "analyzeConflict: should not happen"
                 [_] -> levelRoot
                 _:(_,lv):_ -> lv
-  return (map fst xs, level, pb)
+  pblevel <- pbBacktrackLevel solver pb
+  return ((map fst xs, level), (pb, pblevel))
 
 pbBacktrackLevel :: Solver -> ([(Integer,Lit)],Integer) -> IO Level
 pbBacktrackLevel _ ([], rhs) = assert (rhs > 0) $ return levelRoot
