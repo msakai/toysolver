@@ -88,6 +88,7 @@ data Options
   , optRandomFreq    :: Double
   , optRandomSeed    :: Int
   , optLinearizerPB  :: Bool
+  , optPBHandlerType :: SAT.PBHandlerType
   , optSearchStrategy       :: PBO.SearchStrategy
   , optObjFunVarsHeuristics :: Bool
   , optAllMUSes :: Bool
@@ -111,6 +112,7 @@ defaultOptions
   , optRandomFreq    = SAT.defaultRandomFreq
   , optRandomSeed    = 0
   , optLinearizerPB  = False
+  , optPBHandlerType = SAT.defaultPBHandlerType
   , optSearchStrategy       = PBO.optSearchStrategy PBO.defaultOptions
   , optObjFunVarsHeuristics = PBO.optObjFunVarsHeuristics PBO.defaultOptions
   , optAllMUSes = False
@@ -165,6 +167,10 @@ options =
         (NoArg (\opt -> opt{ optLinearizerPB = True }))
         "Use PB constraint in linearization."
 
+    , Option [] ["pb-handler"]
+        (ReqArg (\val opt -> opt{ optPBHandlerType = parsePBHandler val }) "<name>")
+        "PB constraint handler: counter (default), pueblo"
+
     , Option [] ["search"]
         (ReqArg (\val opt -> opt{ optSearchStrategy = parseSearch val }) "<str>")
         "Search algorithm used in optimization; linear (default), binary, adaptive, unsat"
@@ -216,6 +222,12 @@ options =
         "clause" -> SAT.LearningClause
         "hybrid" -> SAT.LearningHybrid
         _ -> error (printf "unknown learning strategy \"%s\"" s)
+
+    parsePBHandler s =
+      case map toLower s of
+        "counter" -> SAT.PBHandlerTypeCounter
+        "pueblo"  -> SAT.PBHandlerTypePueblo
+        _ -> error (printf "unknown PB constraint handler %s" s)
 
 main :: IO ()
 main = do
@@ -381,6 +393,7 @@ newSolver opts = do
   when (optRandomSeed opts /= 0) $ 
     SAT.setRandomSeed solver (optRandomSeed opts)
   SAT.setLearningStrategy solver (optLearningStrategy opts)
+  SAT.setPBHandlerType solver (optPBHandlerType opts)
   SAT.setLogger solver putCommentLine
   SAT.setCheckModel solver (optCheckModel opts)
   return solver

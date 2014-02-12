@@ -1215,7 +1215,7 @@ setConfBudget :: Solver -> Maybe Int -> IO ()
 setConfBudget solver (Just b) | b >= 0 = writeIORef (svConfBudget solver) b
 setConfBudget solver _ = writeIORef (svConfBudget solver) (-1)
 
-data PBHandlerType = PBHandlerTypeCounter
+data PBHandlerType = PBHandlerTypeCounter | PBHandlerTypePueblo
   deriving (Show, Eq, Ord)
 
 defaultPBHandlerType :: PBHandlerType
@@ -2208,6 +2208,13 @@ newPBHandler solver ts degree learnt = do
     PBHandlerTypeCounter -> do
       c <- newPBAtLeastData ts degree learnt
       return (toConstraint c)
+    PBHandlerTypePueblo -> do
+      c <- newPBHandlerPueblo ts degree learnt
+      return (toConstraint c)
+
+{--------------------------------------------------------------------
+  Pseudo Boolean Constraint (Counter)
+--------------------------------------------------------------------}   
 
 data PBAtLeastData
   = PBAtLeastData
