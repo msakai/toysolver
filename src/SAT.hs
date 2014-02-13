@@ -2212,6 +2212,29 @@ newPBHandler solver ts degree learnt = do
       c <- newPBHandlerPueblo ts degree learnt
       return (toConstraint c)
 
+instantiatePB :: Solver -> ([(Integer,Lit)],Integer) -> IO ([(Integer,Lit)],Integer)
+instantiatePB solver (xs,n) = loop ([],n) xs
+  where
+    loop :: ([(Integer,Lit)],Integer) -> [(Integer,Lit)] -> IO ([(Integer,Lit)],Integer)
+    loop ret [] = return ret
+    loop (ys,m) ((c,l):ts) = do
+      val <- litValue solver l
+      if val == lTrue then
+         loop (ys, m-c) ts
+       else if val == lFalse then
+         loop (ys, m) ts
+       else
+         loop ((c,l):ys, m) ts
+
+pbOverSAT :: Solver -> ([(Integer,Lit)],Integer) -> IO Bool
+pbOverSAT solver (lhs, rhs) = do
+  ss <- forM lhs $ \(c,l) -> do
+    v <- litValue solver l
+    if v /= lFalse
+      then return c
+      else return 0
+  return $! sum ss > rhs
+
 {--------------------------------------------------------------------
   Pseudo Boolean Constraint (Counter)
 --------------------------------------------------------------------}   
@@ -2335,29 +2358,6 @@ instance Constraint PBAtLeastData where
     let act = pbActivity this
     aval <- readIORef act
     when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
-
-instantiatePB :: Solver -> ([(Integer,Lit)],Integer) -> IO ([(Integer,Lit)],Integer)
-instantiatePB solver (xs,n) = loop ([],n) xs
-  where
-    loop :: ([(Integer,Lit)],Integer) -> [(Integer,Lit)] -> IO ([(Integer,Lit)],Integer)
-    loop ret [] = return ret
-    loop (ys,m) ((c,l):ts) = do
-      val <- litValue solver l
-      if val == lTrue then
-         loop (ys, m-c) ts
-       else if val == lFalse then
-         loop (ys, m) ts
-       else
-         loop ((c,l):ys, m) ts
-
-pbOverSAT :: Solver -> ([(Integer,Lit)],Integer) -> IO Bool
-pbOverSAT solver (lhs, rhs) = do
-  ss <- forM lhs $ \(c,l) -> do
-    v <- litValue solver l
-    if v /= lFalse
-      then return c
-      else return 0
-  return $! sum ss > rhs
 
 {--------------------------------------------------------------------
   Pseudo Boolean Constraint (Pueblo)
