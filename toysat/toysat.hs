@@ -143,7 +143,7 @@ options =
         (printf "The factor with which the restart limit is multiplied in each restart. (default %f)" SAT.defaultRestartInc)
     , Option [] ["learning"]
         (ReqArg (\val opt -> opt{ optLearningStrategy = parseLS val }) "<name>")
-        "Leaning scheme: clause (default)"
+        "Leaning scheme: clause (default), hybrid"
     , Option [] ["learnt-size-first"]
         (ReqArg (\val opt -> opt{ optLearntSizeFirst = read val }) "<int>")
         "The initial limit for learnt clauses."
@@ -200,7 +200,7 @@ options =
         "minisat" -> SAT.MiniSATRestarts
         "armin" -> SAT.ArminRestarts
         "luby" -> SAT.LubyRestarts
-        _ -> undefined
+        _ -> error (printf "unknown restart strategy \"%s\"" s)
 
     parseSearch s =
       case map toLower s of
@@ -209,11 +209,13 @@ options =
         "adaptive" -> PBO.AdaptiveSearch
         "unsat"    -> PBO.UnsatBased
         "msu4"     -> PBO.MSU4
-        _ -> error (printf "unknown search strategy %s" s)
+        _ -> error (printf "unknown search strategy \"%s\"" s)
 
-    parseLS "clause" = SAT.LearningClause
-    parseLS "hybrid" = SAT.LearningHybrid
-    parseLS s = error (printf "unknown learning strategy %s" s)
+    parseLS s =
+      case map toLower s of
+        "clause" -> SAT.LearningClause
+        "hybrid" -> SAT.LearningHybrid
+        _ -> error (printf "unknown learning strategy \"%s\"" s)
 
 main :: IO ()
 main = do
@@ -327,7 +329,7 @@ showHelp h = hPutStrLn h (usageInfo header options)
 header :: String
 header = unlines
   [ "Usage:"
-  , "  toysat [OPTION]... [file.cnf||-]"
+  , "  toysat [OPTION]... [file.cnf|-]"
   , "  toysat [OPTION]... --mus [file.gcnf|-]"
   , "  toysat [OPTION]... --pb [file.opb|-]"
   , "  toysat [OPTION]... --wbo [file.wbo|-]"
