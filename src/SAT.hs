@@ -2495,7 +2495,7 @@ instance Constraint PBHandlerPueblo where
 
       go :: Integer -> [(Integer, Lit)] -> [Lit] -> [Lit]
       go s _ ret | s < 0 = ret
-      go _ [] _ = error "PBAtLeastDataPeublo.basicReasonOf: should not happen"
+      go _ [] _ = error "PBHandlerPueblo.basicReasonOf: should not happen"
       go s ((c,lit):xs) ret = go (s - c) xs (lit:ret)
 
   toPBAtLeast _ this = do
