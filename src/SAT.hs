@@ -2550,8 +2550,9 @@ puebloPropagate solver this = do
     -- UNIT PROPAGATION
     let f [] = return True
         f (t@(c,lit) : ts) = do
+          watchsum <- puebloGetWatchSum this
           if watchsum - c >= puebloDegree this then
-            f ts
+            return True
           else do
             val <- litValue solver lit
             if val /= lUndef then f ts
