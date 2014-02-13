@@ -2447,7 +2447,10 @@ instance Constraint PBHandlerPueblo where
     puebloUnwatch solver this2 t
     updateWatchSum
     ret <- puebloPropagate solver this2
-    unless ret $ puebloWatch solver this2 t
+    unless ret $ do
+      watchSum <- puebloGetWatchSum this2
+      unless (watchSum >= puebloDegree this2 + puebloAMax this2) $
+        puebloWatch solver this2 t
     return ret
     where
       updateWatchSum = do
