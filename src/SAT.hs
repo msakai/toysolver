@@ -2222,7 +2222,14 @@ instance Constraint PBAtLeastData where
     forM_ (IM.keys (pbTerms this)) $ \l -> watch solver l this
     let max_slack = sum (IM.elems (pbTerms this)) - pbDegree this
     writeIORef (pbSlack this) $! max_slack
-    return $! max_slack >= 0
+    if max_slack < 0 then
+      return False
+    else do
+      flip allM (IM.toList (pbTerms this)) $ \(l1,c1) -> do
+        if c1 > max_slack then
+          assignBy solver l1 this
+        else
+          return True
 
   watchedLiterals _ this = do
     return $ IM.keys $ pbTerms this
