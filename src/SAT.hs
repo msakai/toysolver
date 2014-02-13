@@ -685,7 +685,7 @@ addClause solver lits = do
     Just lits3 -> do
       clause <- newClauseData lits3 False
       addToDB solver clause
-      _ <- basicAttach solver clause
+      _ <- basicAttachClause solver clause
       return ()
 
 -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
@@ -714,7 +714,7 @@ addAtLeast solver lits n = do
     else do
       c <- newAtLeastData lits' n' False
       addToDB solver c
-      _ <- basicAttach solver c
+      _ <- basicAttachAtLeast solver c
       return ()
 
 -- | Add a cardinality constraints /atmost({l1,l2,..},n)/.
@@ -1049,7 +1049,7 @@ search solver !conflict_lim onConflict = do
         lit:_ -> do
           cl <- newClauseData learntClause True
           addToLearntDB solver cl
-          basicAttach solver cl
+          basicAttachClause solver cl
           assignBy solver lit cl
           constrBumpActivity solver cl
 
@@ -1067,7 +1067,7 @@ search solver !conflict_lim onConflict = do
         lit:_ -> do
           cl <- newClauseData learntClause True
           addToLearntDB solver cl
-          basicAttach solver cl
+          basicAttachClause solver cl
           constrBumpActivity solver cl
           when (minLevel == clauseLevel) $ do
             _ <- assignBy solver lit cl -- This should always succeed.
@@ -1707,7 +1707,7 @@ class Constraint a where
 
   showConstraint :: Solver -> a -> IO String
 
-  basicAttach :: Solver -> a -> IO Bool
+  attach :: Solver -> a -> IO Bool
 
   watchedLiterals :: Solver -> a -> IO [Lit]
 
@@ -1735,17 +1735,6 @@ class Constraint a where
 
   constrRescaleActivity :: Solver -> a -> IO ()
   constrRescaleActivity _ _ = return ()
-
-attach :: Constraint a => Solver -> a -> IO Bool
-attach solver c = do
-  -- BCP Queue should be empty at this point.
-  -- If not, duplicated propagation happens.
-  bcpCheckEmpty solver
-  ret <- basicAttach solver c
-  if ret then
-    propagateCurrentModel solver (toConstraint c)
-  else
-    return False
 
 propagateCurrentModel :: Solver -> SomeConstraint -> IO Bool
 propagateCurrentModel solver c = do
@@ -1829,10 +1818,10 @@ instance Constraint SomeConstraint where
   showConstraint s (ConstrPBAtLeast c) = showConstraint s c
   showConstraint s (ConstrPBAtLeastPueblo c) = showConstraint s c
 
-  basicAttach s (ConstrClause c)    = basicAttach s c
-  basicAttach s (ConstrAtLeast c)   = basicAttach s c
-  basicAttach s (ConstrPBAtLeast c) = basicAttach s c
-  basicAttach s (ConstrPBAtLeastPueblo c) = basicAttach s c
+  attach s (ConstrClause c)    = attach s c
+  attach s (ConstrAtLeast c)   = attach s c
+  attach s (ConstrPBAtLeast c) = attach s c
+  attach s (ConstrPBAtLeastPueblo c) = attach s c
 
   watchedLiterals s (ConstrClause c)    = watchedLiterals s c
   watchedLiterals s (ConstrAtLeast c)   = watchedLiterals s c
@@ -1906,18 +1895,15 @@ instance Constraint ClauseData where
     lits <- getElems (claLits this)
     return (show lits)
 
-  basicAttach solver this = do
-    lits <- getElems (claLits this)
-    case lits of
-      [] -> do
-        markBad solver
-        return False
-      [l1] -> do
-        assignBy solver l1 this
-      l1:l2:_ -> do
-        watch solver l1 this
-        watch solver l2 this
-        return True
+  attach solver this = do
+    -- BCP Queue should be empty at this point.
+    -- If not, duplicated propagation happens.
+    bcpCheckEmpty solver
+    ret <- basicAttachClause solver this
+    if ret then
+      propagateCurrentModel solver (toConstraint this)
+    else
+      return False
 
   watchedLiterals _ this = do
     lits <- getElems (claLits this)
@@ -2030,6 +2016,20 @@ instantiateClause solver = loop []
        else
          loop (l : ret) ls
 
+basicAttachClause :: Solver -> ClauseData -> IO Bool
+basicAttachClause solver this = do
+  lits <- getElems (claLits this)
+  case lits of
+    [] -> do
+      markBad solver
+      return False
+    [l1] -> do
+      assignBy solver l1 this
+    l1:l2:_ -> do
+      watch solver l1 this
+      watch solver l2 this
+      return True
+
 {--------------------------------------------------------------------
   Cardinality Constraint
 --------------------------------------------------------------------}
@@ -2056,18 +2056,15 @@ instance Constraint AtLeastData where
     lits <- getElems (atLeastLits this)
     return $ show lits ++ " >= " ++ show (atLeastNum this)
 
-  basicAttach solver this = do
-    lits <- getElems (atLeastLits this)
-    let m = length lits
-        n = atLeastNum this
-    if m < n then do
-      markBad solver
+  attach solver this = do
+    -- BCP Queue should be empty at this point.
+    -- If not, duplicated propagation happens.
+    bcpCheckEmpty solver
+    ret <- basicAttachAtLeast solver this
+    if ret then
+      propagateCurrentModel solver (toConstraint this)
+    else
       return False
-    else if m == n then do
-      allM (\l -> assignBy solver l this) lits
-    else do -- m > n
-      forM_ (take (n+1) lits) $ \l -> watch solver l this
-      return True
 
   watchedLiterals _ this = do
     lits <- getElems (atLeastLits this)
@@ -2197,6 +2194,20 @@ instantiateAtLeast solver (xs,n) = loop ([],n) xs
        else
          loop (l:ys, m) ls
 
+basicAttachAtLeast :: Solver -> AtLeastData -> IO Bool
+basicAttachAtLeast solver this = do
+  lits <- getElems (atLeastLits this)
+  let m = length lits
+      n = atLeastNum this
+  if m < n then do
+    markBad solver
+    return False
+  else if m == n then do
+    allM (\l -> assignBy solver l this) lits
+  else do -- m > n
+    forM_ (take (n+1) lits) $ \l -> watch solver l this
+    return True
+
 {--------------------------------------------------------------------
   Pseudo Boolean Constraint
 --------------------------------------------------------------------}
@@ -2262,16 +2273,27 @@ instance Constraint PBAtLeastData where
   showConstraint _ this = do
     return $ show [(c,l) | (l,c) <- IM.toList (pbTerms this)] ++ " >= " ++ show (pbDegree this)
 
-  basicAttach solver this = do
-    forM_ (IM.keys (pbTerms this)) $ \l -> watch solver l this
-    let max_slack = sum (IM.elems (pbTerms this)) - pbDegree this
-    writeIORef (pbSlack this) $! max_slack
-    if max_slack < 0 then
+  attach solver this = do
+    -- BCP queue should be empty at this point.
+    -- It is important for calculating slack.
+    bcpCheckEmpty solver
+    s <- liftM sum $ forM (IM.toList (pbTerms this)) $ \(l,c) -> do
+      watch solver l this
+      val <- litValue solver l
+      if val == lFalse then do
+        addBacktrackCB solver (litVar l) $ modifyIORef' (pbSlack this) (+ c)
+        return 0
+      else do
+        return c
+    let slack = s - pbDegree this
+    writeIORef (pbSlack this) $! slack
+    if slack < 0 then
       return False
     else do
-      flip allM (IM.toList (pbTerms this)) $ \(l1,c1) -> do
-        if c1 > max_slack then
-          assignBy solver l1 this
+      flip allM (IM.toList (pbTerms this)) $ \(l,c) -> do
+        val <- litValue solver l
+        if c > slack && val == lUndef then do
+          assignBy solver l this
         else
           return True
 
@@ -2408,27 +2430,15 @@ instance Constraint PBHandlerPueblo where
   showConstraint _ this = do
     return $ show (elems (puebloTerms this)) ++ " >= " ++ show (puebloDegree this)
 
-  basicAttach solver this = do
-    let f [] = return ()
-        f (t : ts) = do
-          watchsum <- puebloGetWatchSum this
-          when (watchsum < puebloDegree this + puebloAMax this) $
-            puebloWatch solver this t 
-          watchsum <- puebloGetWatchSum this
-          if watchsum >= puebloDegree this + puebloAMax this
-          then return ()
-          else f ts
-    f $ elems (puebloTerms this)
-    watchsum <- puebloGetWatchSum this
-    if watchsum < puebloDegree this then
+  attach solver this = do
+    -- BCP Queue should be empty at this point.
+    -- If not, duplicated propagation happens.
+    bcpCheckEmpty solver
+    ret <- basicAttachPueblo solver this
+    if ret then
+      propagateCurrentModel solver (toConstraint this)
+    else
       return False
-    else do
-      let slack = sum [c | (c,_) <- elems (puebloTerms this)] - puebloDegree this
-      flip allM (elems (puebloTerms this)) $ \(c,l) -> do
-        if c > slack then
-          assignBy solver l this
-        else
-          return True
 
   watchedLiterals _ this = liftM IS.toList $ readIORef (puebloWatches this)
 
@@ -2552,6 +2562,29 @@ puebloPropagate solver this = do
                 puebloWatch solver this t
                 return False           
     f $ elems (puebloTerms this)
+
+basicAttachPueblo :: Solver -> PBHandlerPueblo -> IO Bool
+basicAttachPueblo solver this = do
+  let f [] = return ()
+      f (t : ts) = do
+        watchsum <- puebloGetWatchSum this
+        when (watchsum < puebloDegree this + puebloAMax this) $
+          puebloWatch solver this t 
+        watchsum <- puebloGetWatchSum this
+        if watchsum >= puebloDegree this + puebloAMax this
+        then return ()
+        else f ts
+  f $ elems (puebloTerms this)
+  watchsum <- puebloGetWatchSum this
+  if watchsum < puebloDegree this then
+    return False
+  else do
+    let slack = sum [c | (c,_) <- elems (puebloTerms this)] - puebloDegree this
+    flip allM (elems (puebloTerms this)) $ \(c,l) -> do
+      if c > slack then
+        assignBy solver l this
+      else
+        return True
 
 {--------------------------------------------------------------------
   Restart strategy
