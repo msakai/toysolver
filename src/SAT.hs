@@ -2133,22 +2133,34 @@ instance Constraint AtLeastHandler where
           else findForWatch (i+1) end
 
   basicReasonOf s this concl = do
-    lits <- getElems (atLeastLits this)
+    (lb,ub) <- getBounds (atLeastLits this)
+    assert (lb==0) $ return ()
     let n = atLeastNum this
+    falsifiedLits <- mapM (readArray (atLeastLits this)) [n..ub] -- drop first n elements
+    when debugMode $ do
+      forM_ falsifiedLits $ \lit -> do
+        val <- litValue s lit
+        unless (val == lFalse) $ do
+          error $ printf "AtLeastHandler.basicReasonOf: %d is %s (lFalse expected)" lit (show val)
     case concl of
       Nothing -> do
-        let f :: [Lit] -> IO Lit
-            f [] = error "AtLeastHandler.basicReasonOf: should not happen"
-            f (l:ls) = do
-              val <- litValue s l
-              if val == lFalse
-                then return l
-                else f ls
-        lit <- f (take n lits)
-        return $ lit : drop n lits
+        let go :: Int -> IO Lit
+            go i
+              | i >= n = error $ printf "AtLeastHandler.basicReasonOf: cannot find falsified literal in first %d elements" n
+              | otherwise = do
+                  lit <- readArray (atLeastLits this) i
+                  val <- litValue s lit
+                  if val == lFalse
+                  then return lit
+                  else go (i+1)
+        lit <- go lb
+        return $ lit : falsifiedLits
       Just lit -> do
-        assert (lit `elem` take n lits) $ return ()
-        return $ drop n lits
+        when debugMode $ do
+          es <- getElems (atLeastLits this)
+          unless (lit `elem` take n es) $
+            error $ printf "AtLeastHandler.basicReasonOf: cannot find %d in first %d elements" n
+        return falsifiedLits
 
   toPBAtLeast _ this = do
     lits <- getElems (atLeastLits this)
