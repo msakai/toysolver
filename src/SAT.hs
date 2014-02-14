@@ -2252,8 +2252,10 @@ pbOverSAT solver (lhs, rhs) = do
 data PBAtLeastData
   = PBAtLeastData
   { pbTerms  :: !(LitMap Integer)
-  , pbDegree :: !Integer
-  , pbSlack  :: !(IORef Integer)
+  , pbSortedTerms :: ![(Integer,Lit)]
+  , pbDegree   :: !Integer
+  , pbMaxSlack :: !Integer
+  , pbSlack    :: !(IORef Integer)
   , pbActivity :: !(IORef Double)
   }
   deriving Eq
@@ -2262,9 +2264,10 @@ newPBAtLeastData :: [(Integer,Lit)] -> Integer -> Bool -> IO PBAtLeastData
 newPBAtLeastData ts degree learnt = do
   let slack = sum (map fst ts) - degree
       m = IM.fromList [(l,c) | (c,l) <- ts]
+      ts' = sortBy (flip compare `on` fst) ts
   s <- newIORef slack
   act <- newIORef $! (if learnt then 0 else -1)
-  return (PBAtLeastData m degree s act)
+  return (PBAtLeastData m ts' degree slack s act)
 
 instance Constraint PBAtLeastData where
   toConstraint = ConstrPBAtLeast
@@ -2317,37 +2320,36 @@ instance Constraint PBAtLeastData where
       return True
 
   basicReasonOf solver this l = do
-    p <- case l of
-           Just lit -> do
-             idx0 <- varAssignNo solver (litVar lit)
-             -- PB制約の場合には複数回unitになる可能性があり、
-             -- litへの伝播以降に割り当てられたリテラルを含まないよう注意が必要
-             return $ \(l2,_) -> do
-               val <- litValue solver l2
-               if val /= lFalse then
-                 return False
-               else do
-                 idx <- varAssignNo solver (litVar l2)
-                 return $ idx < idx0
-           Nothing  -> do
-             -- 直接のコンフリクトの場合には、それ以降にリテラルに値が割り当てら
-             -- れることはないため、すべて含んでしまって問題ない
-             return $ \(l2,_) -> liftM (lFalse ==) (litValue solver l2)
-    let m = pbTerms this
-    xs <- liftM (sortBy (flip (comparing snd))) $ filterM p $ IM.toList m
-    let max_slack = sum (IM.elems m) - pbDegree this
     case l of
-      Nothing -> return $ f max_slack xs
-      Just lit -> return $ f (max_slack - (m IM.! lit)) xs
-
+      Nothing -> do
+        let p _ = return True
+        f p (pbMaxSlack this) (pbSortedTerms this)
+      Just lit -> do
+        idx <- varAssignNo solver (litVar lit)
+        -- PB制約の場合には複数回unitになる可能性があり、
+        -- litへの伝播以降に割り当てられたリテラルを含まないよう注意が必要
+        let p lit2 =do
+              idx2 <- varAssignNo solver (litVar lit2)
+              return $ idx2 < idx
+        let c = pbTerms this IM.! lit
+        f p (pbMaxSlack this - c) (pbSortedTerms this)
     where
-      f :: Integer -> [(Lit,Integer)] -> [Lit]
-      f s xs = go s xs []
-
-      go :: Integer -> [(Lit,Integer)] -> [Lit] -> [Lit]
-      go s _ ret | s < 0 = ret
-      go _ [] _ = error "PBAtLeastData.basicReasonOf: should not happen"
-      go s ((lit,c):xs) ret = go (s - c) xs (lit:ret)
+      {-# INLINE f #-}
+      f :: (Lit -> IO Bool) -> Integer -> [(Integer, Lit)] -> IO [Lit]
+      f p s xs = go s xs []
+        where
+          go :: Integer -> [(Integer, Lit)] -> [Lit] -> IO [Lit]
+          go s _ ret | s < 0 = return ret
+          go _ [] _ = error "PBAtLeastData.basicReasonOf: should not happen"
+          go s ((c,lit):xs) ret = do
+            val <- litValue solver lit
+            if val == lFalse then do
+              b <- p lit
+              if b
+              then go (s - c) xs (lit:ret)
+              else go s xs ret
+            else do
+              go s xs ret
 
   toPBAtLeast _ this = do
     return ([(c,l) | (l,c) <- IM.toList (pbTerms this)], pbDegree this)
