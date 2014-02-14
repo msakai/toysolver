@@ -682,9 +682,9 @@ addClause solver lits = do
         Nothing -> return ()
         Just _ -> markBad solver
     Just lits3 -> do
-      clause <- newClauseData lits3 False
+      clause <- newClauseHandler lits3 False
       addToDB solver clause
-      _ <- basicAttachClause solver clause
+      _ <- basicAttachClauseHandler solver clause
       return ()
 
 -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
@@ -711,9 +711,9 @@ addAtLeast solver lits n = do
         Nothing -> return ()
         Just _ -> markBad solver
     else do
-      c <- newAtLeastData lits' n' False
+      c <- newAtLeastHandler lits' n' False
       addToDB solver c
-      _ <- basicAttachAtLeast solver c
+      _ <- basicAttachAtLeastHandler solver c
       return ()
 
 -- | Add a cardinality constraints /atmost({l1,l2,..},n)/.
@@ -1046,9 +1046,9 @@ search solver !conflict_lim onConflict = do
           assert ret $ return ()
           return ()
         lit:_ -> do
-          cl <- newClauseData learntClause True
+          cl <- newClauseHandler learntClause True
           addToLearntDB solver cl
-          basicAttachClause solver cl
+          basicAttachClauseHandler solver cl
           assignBy solver lit cl
           constrBumpActivity solver cl
 
@@ -1064,9 +1064,9 @@ search solver !conflict_lim onConflict = do
           _ <- assign solver lit -- This should always succeed.
           return ()
         lit:_ -> do
-          cl <- newClauseData learntClause True
+          cl <- newClauseHandler learntClause True
           addToLearntDB solver cl
-          basicAttachClause solver cl
+          basicAttachClauseHandler solver cl
           constrBumpActivity solver cl
           when (minLevel == clauseLevel) $ do
             _ <- assignBy solver lit cl -- This should always succeed.
@@ -1413,7 +1413,7 @@ analyzeFinal solver p = do
            go ls seen result
   go lits (IS.singleton (litVar p)) [p]
 
-analyzeConflictHybrid :: Constraint c => Solver -> c -> IO ((Clause, Level), (([(Integer,Lit)],Integer), Level))
+analyzeConflictHybrid :: Constraint c => Solver -> c -> IO ((Clause, Level), ((PBSum,Integer), Level))
 analyzeConflictHybrid solver constr = do
   d <- readIORef (svLevel solver)
 
@@ -1430,7 +1430,7 @@ analyzeConflictHybrid solver constr = do
               else
                 go (xs, IS.insert l ys) ls
 
-  let loop :: LitSet -> LitSet -> ([(Integer,Lit)],Integer) -> IO (LitSet, ([(Integer,Lit)],Integer))
+  let loop :: LitSet -> LitSet -> (PBSum,Integer) -> IO (LitSet, (PBSum,Integer))
       loop lits1 lits2 pb
         | sz==1 = do
             return $ (lits1 `IS.union` lits2, pb)
@@ -1491,7 +1491,7 @@ analyzeConflictHybrid solver constr = do
   pblevel <- pbBacktrackLevel solver pb
   return ((map fst xs, level), (pb, pblevel))
 
-pbBacktrackLevel :: Solver -> ([(Integer,Lit)],Integer) -> IO Level
+pbBacktrackLevel :: Solver -> (PBSum,Integer) -> IO Level
 pbBacktrackLevel _ ([], rhs) = assert (rhs > 0) $ return levelRoot
 pbBacktrackLevel solver (lhs, rhs) = do
   levelToLiterals <- liftM (IM.unionsWith IM.union) $ forM lhs $ \(_,lit) -> do
@@ -1720,7 +1720,7 @@ class Constraint a where
   -- assignment.
   basicReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
-  toPBAtLeast :: Solver -> a -> IO ([(Integer,Lit)], Integer)
+  toPBAtLeast :: Solver -> a -> IO (PBSum, Integer)
 
   isSatisfied :: Solver -> a -> IO Bool
 
@@ -1803,10 +1803,10 @@ isLocked solver c = anyM p =<< watchedLiterals solver c
             Just c2 -> return $! c == c2
 
 data SomeConstraint
-  = ConstrClause !ClauseData
-  | ConstrAtLeast !AtLeastData
-  | ConstrPBAtLeast !PBAtLeastData
-  | ConstrPBAtLeastPueblo !PBHandlerPueblo
+  = ConstrClause !ClauseHandler
+  | ConstrAtLeast !AtLeastHandler
+  | ConstrPBCounter !PBHandlerCounter
+  | ConstrPBPueblo !PBHandlerPueblo
   deriving Eq
 
 instance Constraint SomeConstraint where
@@ -1814,80 +1814,80 @@ instance Constraint SomeConstraint where
 
   showConstraint s (ConstrClause c)    = showConstraint s c
   showConstraint s (ConstrAtLeast c)   = showConstraint s c
-  showConstraint s (ConstrPBAtLeast c) = showConstraint s c
-  showConstraint s (ConstrPBAtLeastPueblo c) = showConstraint s c
+  showConstraint s (ConstrPBCounter c) = showConstraint s c
+  showConstraint s (ConstrPBPueblo c)  = showConstraint s c
 
   attach s (ConstrClause c)    = attach s c
   attach s (ConstrAtLeast c)   = attach s c
-  attach s (ConstrPBAtLeast c) = attach s c
-  attach s (ConstrPBAtLeastPueblo c) = attach s c
+  attach s (ConstrPBCounter c) = attach s c
+  attach s (ConstrPBPueblo c)  = attach s c
 
   watchedLiterals s (ConstrClause c)    = watchedLiterals s c
   watchedLiterals s (ConstrAtLeast c)   = watchedLiterals s c
-  watchedLiterals s (ConstrPBAtLeast c) = watchedLiterals s c
-  watchedLiterals s (ConstrPBAtLeastPueblo c) = watchedLiterals s c
+  watchedLiterals s (ConstrPBCounter c) = watchedLiterals s c
+  watchedLiterals s (ConstrPBPueblo c)  = watchedLiterals s c
 
   basicPropagate s this (ConstrClause c)  lit   = basicPropagate s this c lit
   basicPropagate s this (ConstrAtLeast c) lit   = basicPropagate s this c lit
-  basicPropagate s this (ConstrPBAtLeast c) lit = basicPropagate s this c lit
-  basicPropagate s this (ConstrPBAtLeastPueblo c) lit = basicPropagate s this c lit
+  basicPropagate s this (ConstrPBCounter c) lit = basicPropagate s this c lit
+  basicPropagate s this (ConstrPBPueblo c) lit  = basicPropagate s this c lit
 
   basicReasonOf s (ConstrClause c)  l   = basicReasonOf s c l
   basicReasonOf s (ConstrAtLeast c) l   = basicReasonOf s c l
-  basicReasonOf s (ConstrPBAtLeast c) l = basicReasonOf s c l
-  basicReasonOf s (ConstrPBAtLeastPueblo c) l = basicReasonOf s c l
+  basicReasonOf s (ConstrPBCounter c) l = basicReasonOf s c l
+  basicReasonOf s (ConstrPBPueblo c) l  = basicReasonOf s c l
 
   toPBAtLeast s (ConstrClause c)    = toPBAtLeast s c
   toPBAtLeast s (ConstrAtLeast c)   = toPBAtLeast s c
-  toPBAtLeast s (ConstrPBAtLeast c) = toPBAtLeast s c
-  toPBAtLeast s (ConstrPBAtLeastPueblo c) = toPBAtLeast s c
+  toPBAtLeast s (ConstrPBCounter c) = toPBAtLeast s c
+  toPBAtLeast s (ConstrPBPueblo c)  = toPBAtLeast s c
 
   isSatisfied s (ConstrClause c)    = isSatisfied s c
   isSatisfied s (ConstrAtLeast c)   = isSatisfied s c
-  isSatisfied s (ConstrPBAtLeast c) = isSatisfied s c
-  isSatisfied s (ConstrPBAtLeastPueblo c) = isSatisfied s c
+  isSatisfied s (ConstrPBCounter c) = isSatisfied s c
+  isSatisfied s (ConstrPBPueblo c)  = isSatisfied s c
 
   constrIsProtected s (ConstrClause c)    = constrIsProtected s c
   constrIsProtected s (ConstrAtLeast c)   = constrIsProtected s c
-  constrIsProtected s (ConstrPBAtLeast c) = constrIsProtected s c
-  constrIsProtected s (ConstrPBAtLeastPueblo c) = constrIsProtected s c
+  constrIsProtected s (ConstrPBCounter c) = constrIsProtected s c
+  constrIsProtected s (ConstrPBPueblo c)  = constrIsProtected s c
 
   constrActivity s (ConstrClause c)    = constrActivity s c
   constrActivity s (ConstrAtLeast c)   = constrActivity s c
-  constrActivity s (ConstrPBAtLeast c) = constrActivity s c
-  constrActivity s (ConstrPBAtLeastPueblo c) = constrActivity s c
+  constrActivity s (ConstrPBCounter c) = constrActivity s c
+  constrActivity s (ConstrPBPueblo c)  = constrActivity s c
 
   constrBumpActivity s (ConstrClause c)    = constrBumpActivity s c
   constrBumpActivity s (ConstrAtLeast c)   = constrBumpActivity s c
-  constrBumpActivity s (ConstrPBAtLeast c) = constrBumpActivity s c
-  constrBumpActivity s (ConstrPBAtLeastPueblo c) = constrBumpActivity s c
+  constrBumpActivity s (ConstrPBCounter c) = constrBumpActivity s c
+  constrBumpActivity s (ConstrPBPueblo c)  = constrBumpActivity s c
 
   constrRescaleActivity s (ConstrClause c)    = constrRescaleActivity s c
   constrRescaleActivity s (ConstrAtLeast c)   = constrRescaleActivity s c
-  constrRescaleActivity s (ConstrPBAtLeast c) = constrRescaleActivity s c
-  constrRescaleActivity s (ConstrPBAtLeastPueblo c) = constrRescaleActivity s c
+  constrRescaleActivity s (ConstrPBCounter c) = constrRescaleActivity s c
+  constrRescaleActivity s (ConstrPBPueblo c)  = constrRescaleActivity s c
 
 {--------------------------------------------------------------------
   Clause
 --------------------------------------------------------------------}
 
-data ClauseData
-  = ClauseData
+data ClauseHandler
+  = ClauseHandler
   { claLits :: !(IOUArray Int Lit)
   , claActivity :: !(IORef Double)
   }
 
-instance Eq ClauseData where
+instance Eq ClauseHandler where
   c1 == c2 = claActivity c1 == claActivity c2
 
-newClauseData :: Clause -> Bool -> IO ClauseData
-newClauseData ls learnt = do
+newClauseHandler :: Clause -> Bool -> IO ClauseHandler
+newClauseHandler ls learnt = do
   let size = length ls
   a <- newListArray (0, size-1) ls
   act <- newIORef $! (if learnt then 0 else -1)
-  return (ClauseData a act)
+  return (ClauseHandler a act)
 
-instance Constraint ClauseData where
+instance Constraint ClauseHandler where
   toConstraint = ConstrClause
 
   showConstraint _ this = do
@@ -1898,7 +1898,7 @@ instance Constraint ClauseData where
     -- BCP Queue should be empty at this point.
     -- If not, duplicated propagation happens.
     bcpCheckEmpty solver
-    ret <- basicAttachClause solver this
+    ret <- basicAttachClauseHandler solver this
     if ret then
       propagateCurrentModel solver (toConstraint this)
     else
@@ -1968,7 +1968,7 @@ instance Constraint ClauseData where
         assert (lit == head lits) $ return ()
         return $ tail lits
 
-  toPBAtLeast _ (ClauseData a _) = do
+  toPBAtLeast _ (ClauseHandler a _) = do
     lits <- getElems a
     return ([(1,l) | l <- lits], 1)
 
@@ -2015,8 +2015,8 @@ instantiateClause solver = loop []
        else
          loop (l : ret) ls
 
-basicAttachClause :: Solver -> ClauseData -> IO Bool
-basicAttachClause solver this = do
+basicAttachClauseHandler :: Solver -> ClauseHandler -> IO Bool
+basicAttachClauseHandler solver this = do
   lits <- getElems (claLits this)
   case lits of
     [] -> do
@@ -2033,22 +2033,22 @@ basicAttachClause solver this = do
   Cardinality Constraint
 --------------------------------------------------------------------}
 
-data AtLeastData
-  = AtLeastData
+data AtLeastHandler
+  = AtLeastHandler
   { atLeastLits :: IOUArray Int Lit
   , atLeastNum :: !Int
   , atLeastActivity :: !(IORef Double)
   }
   deriving Eq
 
-newAtLeastData :: [Lit] -> Int -> Bool -> IO AtLeastData
-newAtLeastData ls n learnt = do
+newAtLeastHandler :: [Lit] -> Int -> Bool -> IO AtLeastHandler
+newAtLeastHandler ls n learnt = do
   let size = length ls
   a <- newListArray (0, size-1) ls
   act <- newIORef $! (if learnt then 0 else -1)
-  return (AtLeastData a n act)
+  return (AtLeastHandler a n act)
 
-instance Constraint AtLeastData where
+instance Constraint AtLeastHandler where
   toConstraint = ConstrAtLeast
 
   showConstraint _ this = do
@@ -2059,7 +2059,7 @@ instance Constraint AtLeastData where
     -- BCP Queue should be empty at this point.
     -- If not, duplicated propagation happens.
     bcpCheckEmpty solver
-    ret <- basicAttachAtLeast solver this
+    ret <- basicAttachAtLeastHandler solver this
     if ret then
       propagateCurrentModel solver (toConstraint this)
     else
@@ -2076,7 +2076,7 @@ instance Constraint AtLeastData where
 
     when debugMode $ do
       litn <- readArray a n
-      unless (litn == falsifiedLit) $ error "AtLeastData.basicPropagate: should not happen"
+      unless (litn == falsifiedLit) $ error "AtLeastHandler.basicPropagate: should not happen"
 
     (lb,ub) <- getBounds a
     assert (lb==0) $ return ()
@@ -2138,7 +2138,7 @@ instance Constraint AtLeastData where
     case concl of
       Nothing -> do
         let f :: [Lit] -> IO Lit
-            f [] = error "AtLeastData.basicReasonOf: should not happen"
+            f [] = error "AtLeastHandler.basicReasonOf: should not happen"
             f (l:ls) = do
               val <- litValue s l
               if val == lFalse
@@ -2193,8 +2193,8 @@ instantiateAtLeast solver (xs,n) = loop ([],n) xs
        else
          loop (l:ys, m) ls
 
-basicAttachAtLeast :: Solver -> AtLeastData -> IO Bool
-basicAttachAtLeast solver this = do
+basicAttachAtLeastHandler :: Solver -> AtLeastHandler -> IO Bool
+basicAttachAtLeastHandler solver this = do
   lits <- getElems (atLeastLits this)
   let m = length lits
       n = atLeastNum this
@@ -2211,21 +2211,24 @@ basicAttachAtLeast solver this = do
   Pseudo Boolean Constraint
 --------------------------------------------------------------------}
 
-newPBHandler :: Solver -> [(Integer,Lit)] -> Integer -> Bool -> IO SomeConstraint
+type PBTerm = (Integer, Lit)
+type PBSum = [PBTerm]
+
+newPBHandler :: Solver -> PBSum -> Integer -> Bool -> IO SomeConstraint
 newPBHandler solver ts degree learnt = do
   config <- readIORef (svPBHandlerType solver)
   case config of
     PBHandlerTypeCounter -> do
-      c <- newPBAtLeastData ts degree learnt
+      c <- newPBHandlerCounter ts degree learnt
       return (toConstraint c)
     PBHandlerTypePueblo -> do
       c <- newPBHandlerPueblo ts degree learnt
       return (toConstraint c)
 
-instantiatePB :: Solver -> ([(Integer,Lit)],Integer) -> IO ([(Integer,Lit)],Integer)
+instantiatePB :: Solver -> (PBSum,Integer) -> IO (PBSum,Integer)
 instantiatePB solver (xs,n) = loop ([],n) xs
   where
-    loop :: ([(Integer,Lit)],Integer) -> [(Integer,Lit)] -> IO ([(Integer,Lit)],Integer)
+    loop :: (PBSum,Integer) -> PBSum -> IO (PBSum,Integer)
     loop ret [] = return ret
     loop (ys,m) ((c,l):ts) = do
       val <- litValue solver l
@@ -2236,7 +2239,7 @@ instantiatePB solver (xs,n) = loop ([],n) xs
        else
          loop ((c,l):ys, m) ts
 
-pbOverSAT :: Solver -> ([(Integer,Lit)],Integer) -> IO Bool
+pbOverSAT :: Solver -> (PBSum,Integer) -> IO Bool
 pbOverSAT solver (lhs, rhs) = do
   ss <- forM lhs $ \(c,l) -> do
     v <- litValue solver l
@@ -2249,37 +2252,37 @@ pbOverSAT solver (lhs, rhs) = do
   Pseudo Boolean Constraint (Counter)
 --------------------------------------------------------------------}   
 
-data PBAtLeastData
-  = PBAtLeastData
-  { pbTerms  :: !(LitMap Integer)
-  , pbSortedTerms :: ![(Integer,Lit)]
+data PBHandlerCounter
+  = PBHandlerCounter
+  { pbTerms    :: !PBSum
   , pbDegree   :: !Integer
+  , pbCoeffMap :: !(LitMap Integer)
   , pbMaxSlack :: !Integer
   , pbSlack    :: !(IORef Integer)
   , pbActivity :: !(IORef Double)
   }
   deriving Eq
 
-newPBAtLeastData :: [(Integer,Lit)] -> Integer -> Bool -> IO PBAtLeastData
-newPBAtLeastData ts degree learnt = do
-  let slack = sum (map fst ts) - degree
+newPBHandlerCounter :: PBSum -> Integer -> Bool -> IO PBHandlerCounter
+newPBHandlerCounter ts degree learnt = do
+  let ts' = sortBy (flip compare `on` fst) ts
+      slack = sum (map fst ts) - degree      
       m = IM.fromList [(l,c) | (c,l) <- ts]
-      ts' = sortBy (flip compare `on` fst) ts
   s <- newIORef slack
   act <- newIORef $! (if learnt then 0 else -1)
-  return (PBAtLeastData m ts' degree slack s act)
+  return (PBHandlerCounter ts' degree m slack s act)
 
-instance Constraint PBAtLeastData where
-  toConstraint = ConstrPBAtLeast
+instance Constraint PBHandlerCounter where
+  toConstraint = ConstrPBCounter
 
   showConstraint _ this = do
-    return $ show [(c,l) | (l,c) <- IM.toList (pbTerms this)] ++ " >= " ++ show (pbDegree this)
+    return $ show (pbTerms this) ++ " >= " ++ show (pbDegree this)
 
   attach solver this = do
     -- BCP queue should be empty at this point.
     -- It is important for calculating slack.
     bcpCheckEmpty solver
-    s <- liftM sum $ forM (IM.toList (pbTerms this)) $ \(l,c) -> do
+    s <- liftM sum $ forM (pbTerms this) $ \(c,l) -> do
       watch solver l this
       val <- litValue solver l
       if val == lFalse then do
@@ -2292,7 +2295,7 @@ instance Constraint PBAtLeastData where
     if slack < 0 then
       return False
     else do
-      flip allM (IM.toList (pbTerms this)) $ \(l,c) -> do
+      flip allM (pbTerms this) $ \(c,l) -> do
         val <- litValue solver l
         if c > slack && val == lUndef then do
           assignBy solver l this
@@ -2300,18 +2303,18 @@ instance Constraint PBAtLeastData where
           return True
 
   watchedLiterals _ this = do
-    return $ IM.keys $ pbTerms this
+    return $ map snd $ pbTerms this
 
   basicPropagate solver this this2 falsifiedLit = do
     watch solver falsifiedLit this
-    let c = pbTerms this2 IM.! falsifiedLit
+    let c = pbCoeffMap this2 IM.! falsifiedLit
     modifyIORef' (pbSlack this2) (subtract c)
     addBacktrackCB solver (litVar falsifiedLit) $ modifyIORef' (pbSlack this2) (+ c)
     s <- readIORef (pbSlack this2)
     if s < 0 then
       return False
     else do
-      forM_ (IM.toList (pbTerms this2)) $ \(l1,c1) -> do
+      forM_ (pbTerms this2) $ \(c1,l1) -> do
         when (c1 > s) $ do
           v <- litValue solver l1
           when (v == lUndef) $ do
@@ -2323,7 +2326,7 @@ instance Constraint PBAtLeastData where
     case l of
       Nothing -> do
         let p _ = return True
-        f p (pbMaxSlack this) (pbSortedTerms this)
+        f p (pbMaxSlack this) (pbTerms this)
       Just lit -> do
         idx <- varAssignNo solver (litVar lit)
         -- PB制約の場合には複数回unitになる可能性があり、
@@ -2331,8 +2334,8 @@ instance Constraint PBAtLeastData where
         let p lit2 =do
               idx2 <- varAssignNo solver (litVar lit2)
               return $ idx2 < idx
-        let c = pbTerms this IM.! lit
-        f p (pbMaxSlack this - c) (pbSortedTerms this)
+        let c = pbCoeffMap this IM.! lit
+        f p (pbMaxSlack this - c) (pbTerms this)
     where
       {-# INLINE f #-}
       f :: (Lit -> IO Bool) -> Integer -> [(Integer, Lit)] -> IO [Lit]
@@ -2340,7 +2343,7 @@ instance Constraint PBAtLeastData where
         where
           go :: Integer -> [(Integer, Lit)] -> [Lit] -> IO [Lit]
           go s _ ret | s < 0 = return ret
-          go _ [] _ = error "PBAtLeastData.basicReasonOf: should not happen"
+          go _ [] _ = error "PBHandlerCounter.basicReasonOf: should not happen"
           go s ((c,lit):xs) ret = do
             val <- litValue solver lit
             if val == lFalse then do
@@ -2352,10 +2355,10 @@ instance Constraint PBAtLeastData where
               go s xs ret
 
   toPBAtLeast _ this = do
-    return ([(c,l) | (l,c) <- IM.toList (pbTerms this)], pbDegree this)
+    return (pbTerms this, pbDegree this)
 
   isSatisfied solver this = do
-    xs <- forM (IM.toList (pbTerms this)) $ \(l,c) -> do
+    xs <- forM (pbTerms this) $ \(c,l) -> do
       v <- litValue solver l
       if v == lTrue
         then return c
@@ -2388,7 +2391,7 @@ instance Constraint PBAtLeastData where
 
 data PBHandlerPueblo
   = PBHandlerPueblo
-  { puebloTerms     :: ![PuebloTerm]
+  { puebloTerms     :: !PBSum
   , puebloDegree    :: !Integer
   , puebloMaxSlack  :: !Integer
   , puebloWatches   :: !(IORef LitSet)
@@ -2397,15 +2400,13 @@ data PBHandlerPueblo
   }
   deriving Eq
 
-type PuebloTerm = (Integer, Lit)
-
 puebloAMax :: PBHandlerPueblo -> Integer
 puebloAMax this =
   case puebloTerms this of
     (c,_):_ -> c
     [] -> 0 -- should not happen?
 
-newPBHandlerPueblo :: [(Integer,Lit)] -> Integer -> Bool -> IO PBHandlerPueblo
+newPBHandlerPueblo :: PBSum -> Integer -> Bool -> IO PBHandlerPueblo
 newPBHandlerPueblo ts degree learnt = do
   let ts' = sortBy (flip compare `on` fst) ts
       slack = sum [c | (c,_) <- ts'] - degree
@@ -2417,19 +2418,19 @@ newPBHandlerPueblo ts degree learnt = do
 puebloGetWatchSum :: PBHandlerPueblo -> IO Integer
 puebloGetWatchSum pb = readIORef (puebloWatchSum pb)
 
-puebloWatch :: Solver -> PBHandlerPueblo -> PuebloTerm -> IO ()
+puebloWatch :: Solver -> PBHandlerPueblo -> PBTerm -> IO ()
 puebloWatch solver !pb (c, lit) = do
   watch solver lit pb
   modifyIORef' (puebloWatches pb) (IS.insert lit)
   modifyIORef' (puebloWatchSum pb) (+c)
 
-puebloUnwatch :: Solver -> PBHandlerPueblo -> PuebloTerm -> IO ()
+puebloUnwatch :: Solver -> PBHandlerPueblo -> PBTerm -> IO ()
 puebloUnwatch _solver pb (c, lit) = do
   modifyIORef' (puebloWatches pb) (IS.delete lit)
   modifyIORef' (puebloWatchSum pb) (subtract c)
 
 instance Constraint PBHandlerPueblo where
-  toConstraint = ConstrPBAtLeastPueblo
+  toConstraint = ConstrPBPueblo
 
   showConstraint _ this = do
     return $ show (puebloTerms this) ++ " >= " ++ show (puebloDegree this)
@@ -2438,7 +2439,7 @@ instance Constraint PBHandlerPueblo where
     -- BCP Queue should be empty at this point.
     -- If not, duplicated propagation happens.
     bcpCheckEmpty solver
-    ret <- basicAttachPueblo solver this
+    ret <- basicAttachPBHandlerPueblo solver this
     if ret then
       propagateCurrentModel solver (toConstraint this)
     else
@@ -2503,7 +2504,6 @@ instance Constraint PBHandlerPueblo where
             else do
               go s xs ret
 
-
   toPBAtLeast _ this = do
     return (puebloTerms this, puebloDegree this)
 
@@ -2561,8 +2561,8 @@ puebloPropagate solver this = do
                 return False           
     f $ puebloTerms this
 
-basicAttachPueblo :: Solver -> PBHandlerPueblo -> IO Bool
-basicAttachPueblo solver this = do
+basicAttachPBHandlerPueblo :: Solver -> PBHandlerPueblo -> IO Bool
+basicAttachPBHandlerPueblo solver this = do
   let f [] = return ()
       f (t : ts) = do
         watchsum <- puebloGetWatchSum this
@@ -2577,9 +2577,8 @@ basicAttachPueblo solver this = do
   if watchsum < puebloDegree this then
     return False
   else do
-    let slack = sum [c | (c,_) <- puebloTerms this] - puebloDegree this
     flip allM (puebloTerms this) $ \(c,l) -> do
-      if c > slack then
+      if c > puebloMaxSlack this then
         assignBy solver l this
       else
         return True
