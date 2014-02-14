@@ -2388,6 +2388,7 @@ data PBHandlerPueblo
   = PBHandlerPueblo
   { puebloTerms     :: ![PuebloTerm]
   , puebloDegree    :: !Integer
+  , puebloMaxSlack  :: !Integer
   , puebloWatches   :: !(IORef LitSet)
   , puebloWatchSum  :: !(IORef Integer)
   , puebloActivity  :: !(IORef Double)
@@ -2405,10 +2406,11 @@ puebloAMax this =
 newPBHandlerPueblo :: [(Integer,Lit)] -> Integer -> Bool -> IO PBHandlerPueblo
 newPBHandlerPueblo ts degree learnt = do
   let ts' = sortBy (flip compare `on` fst) ts
+      slack = sum [c | (c,_) <- ts'] - degree
   ws   <- newIORef IS.empty
   wsum <- newIORef 0
   act  <- newIORef $! (if learnt then 0 else -1)
-  return $ PBHandlerPueblo ts' degree ws wsum act
+  return $ PBHandlerPueblo ts' degree slack ws wsum act
 
 puebloGetWatchSum :: PBHandlerPueblo -> IO Integer
 puebloGetWatchSum pb = readIORef (puebloWatchSum pb)
@@ -2468,38 +2470,37 @@ instance Constraint PBHandlerPueblo where
         f (puebloTerms this2)
 
   basicReasonOf solver this l = do
-    p <- case l of
-           Just lit -> do
-             idx0 <- varAssignNo solver (litVar lit)
-             -- PB制約の場合には複数回unitになる可能性があり、
-             -- litへの伝播以降に割り当てられたリテラルを含まないよう注意が必要
-             return $ \(_,l2) -> do
-               val <- litValue solver l2
-               if val /= lFalse then
-                 return False
-               else do
-                 idx <- varAssignNo solver (litVar l2)
-                 return $ idx < idx0
-           Nothing  -> do
-             -- 直接のコンフリクトの場合には、それ以降にリテラルに値が割り当てら
-             -- れることはないため、すべて含んでしまって問題ない
-             return $ \(_,l2) -> liftM (lFalse ==) (litValue solver l2)
-    xs <- filterM p $ puebloTerms this
-    let max_slack = sum (map fst (puebloTerms this)) - puebloDegree this
     case l of
-      Nothing -> return $ f max_slack xs
+      Nothing -> do
+        let p _ = return True
+        f p (puebloMaxSlack this) (puebloTerms this)
       Just lit -> do
+        idx <- varAssignNo solver (litVar lit)
+        -- PB制約の場合には複数回unitになる可能性があり、
+        -- litへの伝播以降に割り当てられたリテラルを含まないよう注意が必要
+        let p lit2 =do
+              idx2 <- varAssignNo solver (litVar lit2)
+              return $ idx2 < idx
         let c = fst $ fromJust $ find (\(_,l) -> l == lit) (puebloTerms this)
-        return $ f (max_slack - c) xs
-
+        f p (puebloMaxSlack this - c) (puebloTerms this)
     where
-      f :: Integer -> [(Integer, Lit)] -> [Lit]
-      f s xs = go s xs []
+      {-# INLINE f #-}
+      f :: (Lit -> IO Bool) -> Integer -> [(Integer, Lit)] -> IO [Lit]
+      f p s xs = go s xs []
+        where
+          go :: Integer -> [(Integer, Lit)] -> [Lit] -> IO [Lit]
+          go s _ ret | s < 0 = return ret
+          go _ [] _ = error "PBHandlerPueblo.basicReasonOf: should not happen"
+          go s ((c,lit):xs) ret = do
+            val <- litValue solver lit
+            if val == lFalse then do
+              b <- p lit
+              if b
+              then go (s - c) xs (lit:ret)
+              else go s xs ret
+            else do
+              go s xs ret
 
-      go :: Integer -> [(Integer, Lit)] -> [Lit] -> [Lit]
-      go s _ ret | s < 0 = ret
-      go _ [] _ = error "PBHandlerPueblo.basicReasonOf: should not happen"
-      go s ((c,lit):xs) ret = go (s - c) xs (lit:ret)
 
   toPBAtLeast _ this = do
     return (puebloTerms this, puebloDegree this)
