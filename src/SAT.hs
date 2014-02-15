@@ -1455,13 +1455,13 @@ analyzeConflictHybrid solver constr = do
                         (ys,zs) <- split xs
                         return  (IS.delete (litNot l) lits1 `IS.union` ys, lits2 `IS.union` zs)
 
-                    pb2 <- toPBAtLeast solver constr2
-                    o <- pbOverSAT solver pb2
-                    let pb3 = if o then ([(1,l2) | l2 <- l:xs],1) else pb2
-                    let pb' =
-                           if any (\(_,l2) -> litNot l == l2) (fst pb)
-                           then cutResolve pb pb3 (litVar l)
-                           else pb
+                    pb' <- if any (\(_,l2) -> litNot l == l2) (fst pb)
+                           then do
+                             pb2 <- toPBAtLeast solver constr2
+                             o <- pbOverSAT solver pb2
+                             let pb3 = if o then ([(1,l2) | l2 <- l:xs],1) else pb2
+                             return $ cutResolve pb pb3 (litVar l)
+                           else return pb
 
                     unassign solver (litVar l)
                     loop lits1' lits2' pb'
