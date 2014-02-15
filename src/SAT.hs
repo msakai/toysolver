@@ -2430,9 +2430,9 @@ newPBHandlerPueblo ts degree learnt = do
 puebloGetWatchSum :: PBHandlerPueblo -> IO Integer
 puebloGetWatchSum pb = readIORef (puebloWatchSum pb)
 
-puebloWatch :: Solver -> PBHandlerPueblo -> PBTerm -> IO ()
-puebloWatch solver !pb (c, lit) = do
-  watch solver lit pb
+puebloWatch :: Solver -> SomeConstraint -> PBHandlerPueblo -> PBTerm -> IO ()
+puebloWatch solver constr !pb (c, lit) = do
+  watch solver lit constr
   modifyIORef' (puebloWatches pb) (IS.insert lit)
   modifyIORef' (puebloWatchSum pb) (+c)
 
@@ -2448,41 +2448,41 @@ instance Constraint PBHandlerPueblo where
     return $ show (puebloTerms this) ++ " >= " ++ show (puebloDegree this)
 
   attach solver this = do
-    -- BCP Queue should be empty at this point.
-    -- If not, duplicated propagation happens.
     bcpCheckEmpty solver
-    ret <- basicAttachPBHandlerPueblo solver this
-    if ret then
-      propagateCurrentModel solver (toConstraint this)
-    else
-      return False
+    let constr = toConstraint this
+    ret <- puebloPropagate solver constr this
+
+    -- register to watch recently falsified literals to recover
+    -- "WatchSum >= puebloDegree this + puebloAMax this" when backtrack is performed.
+    wsum <- puebloGetWatchSum this
+    unless (wsum >= puebloDegree this + puebloAMax this) $ do
+      let f m tm@(c,lit) = do
+            val <- litValue solver lit
+            if val == lFalse then do
+              idx <- varAssignNo solver (litVar lit)
+              return (IM.insert idx tm m)
+            else
+              return m
+      xs <- liftM (map snd . IM.toDescList) $ foldM f IM.empty (puebloTerms this)
+      let g !s [] = return ()
+          g !s (t@(c,l):ts) = do
+            addBacktrackCB solver (litVar l) $ puebloWatch solver constr this t
+            if s+c >= puebloDegree this + puebloAMax this then return ()
+            else g (s+c) ts
+      g wsum xs
+
+    return ret
 
   watchedLiterals _ this = liftM IS.toList $ readIORef (puebloWatches this)
 
-  basicPropagate solver _this this2 falsifiedLit = do
+  basicPropagate solver this this2 falsifiedLit = do
     let t = fromJust $ find (\(_,l) -> l==falsifiedLit) (puebloTerms this2)
     puebloUnwatch solver this2 t
-    updateWatchSum
-    ret <- puebloPropagate solver this2
-    unless ret $ do
-      watchSum <- puebloGetWatchSum this2
-      unless (watchSum >= puebloDegree this2 + puebloAMax this2) $
-        puebloWatch solver this2 t
+    ret <- puebloPropagate solver this this2
+    wsum <- puebloGetWatchSum this2
+    unless (wsum >= puebloDegree this2 + puebloAMax this2) $
+      addBacktrackCB solver (litVar falsifiedLit) $ puebloWatch solver this this2 t
     return ret
-    where
-      updateWatchSum = do
-        let f [] = return ()
-            f (t@(_,lit):ts) = do
-              watchSum <- puebloGetWatchSum this2
-              if watchSum >= puebloDegree this2 + puebloAMax this2 then
-                return ()
-              else do
-                val <- litValue solver lit
-                watched <- liftM (lit `IS.member`) $ readIORef (puebloWatches this2)
-                when (val /= lFalse && not watched) $ do
-                  puebloWatch solver this2 t
-                f ts
-        f (puebloTerms this2)
 
   basicReasonOf solver this l = do
     case l of
@@ -2547,8 +2547,9 @@ instance Constraint PBHandlerPueblo where
     aval <- readIORef act
     when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
 
-puebloPropagate :: Solver -> PBHandlerPueblo -> IO Bool
-puebloPropagate solver this = do
+puebloPropagate :: Solver -> SomeConstraint -> PBHandlerPueblo -> IO Bool
+puebloPropagate solver constr this = do
+  puebloUpdateWatchSum solver constr this
   watchsum <- puebloGetWatchSum this
   if puebloDegree this + puebloAMax this <= watchsum then
     return True
@@ -2564,36 +2565,26 @@ puebloPropagate solver this = do
             return True
           else do
             val <- litValue solver lit
-            if val /= lUndef then f ts
-            else do
+            when (val == lUndef) $ do
               b <- assignBy solver lit this
-              if b then f ts
-              else do
-                puebloWatch solver this t
-                return False           
+              assert b $ return ()
+            f ts
     f $ puebloTerms this
 
-basicAttachPBHandlerPueblo :: Solver -> PBHandlerPueblo -> IO Bool
-basicAttachPBHandlerPueblo solver this = do
+puebloUpdateWatchSum :: Solver -> SomeConstraint -> PBHandlerPueblo -> IO ()
+puebloUpdateWatchSum solver constr this = do
   let f [] = return ()
-      f (t : ts) = do
-        watchsum <- puebloGetWatchSum this
-        when (watchsum < puebloDegree this + puebloAMax this) $
-          puebloWatch solver this t 
-        watchsum <- puebloGetWatchSum this
-        if watchsum >= puebloDegree this + puebloAMax this
-        then return ()
-        else f ts
-  f $ puebloTerms this
-  watchsum <- puebloGetWatchSum this
-  if watchsum < puebloDegree this then
-    return False
-  else do
-    flip allM (puebloTerms this) $ \(c,l) -> do
-      if c > puebloMaxSlack this then
-        assignBy solver l this
-      else
-        return True
+      f (t@(_,lit):ts) = do
+        watchSum <- puebloGetWatchSum this
+        if watchSum >= puebloDegree this + puebloAMax this then
+          return ()
+        else do
+          val <- litValue solver lit
+          watched <- liftM (lit `IS.member`) $ readIORef (puebloWatches this)
+          when (val /= lFalse && not watched) $ do
+            puebloWatch solver constr this t
+          f ts
+  f (puebloTerms this)
 
 {--------------------------------------------------------------------
   Restart strategy
