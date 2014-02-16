@@ -2080,9 +2080,9 @@ instance Constraint AtLeastHandler where
 
     (lb,ub) <- getBounds a
     assert (lb==0) $ return ()
-    ret <- findForWatch (n+1) ub
-    case ret of
-      Nothing -> do
+    i <- findForWatch (n+1) ub
+    case i of
+      -1 -> do
         when debugMode $ logIO s $ do
           str <- showConstraint s this
           return $ printf "basicPropagate: %s is unit" str
@@ -2091,17 +2091,17 @@ instance Constraint AtLeastHandler where
             loop i
               | i >= n = return True
               | otherwise = do
-                  liti <- readArray a i
+                  liti <- unsafeRead a i
                   ret2 <- assignBy s liti this
                   if ret2
                     then loop (i+1)
                     else return False
         loop 0
-      Just i  -> do
-        liti <- readArray a i
-        litn <- readArray a n
-        writeArray a i litn
-        writeArray a n liti
+      _ -> do
+        liti <- unsafeRead a i
+        litn <- unsafeRead a n
+        unsafeWrite a i litn
+        unsafeWrite a n liti
         watch s liti this
         return True
 
@@ -2116,20 +2116,22 @@ instance Constraint AtLeastHandler where
           loop i
             | i >= n = return ()
             | otherwise = do
-              li <- readArray a i
+              li <- unsafeRead a i
               if (li /= falsifiedLit)
                 then loop (i+1)
                 else do
-                  ln <- readArray a n
-                  writeArray a n li
-                  writeArray a i ln
+                  ln <- unsafeRead a n
+                  unsafeWrite a n li
+                  unsafeWrite a i ln
 
-      findForWatch :: Int -> Int -> IO (Maybe Int)
-      findForWatch i end | i > end = return Nothing
+      -- Maybe を heap allocation するのを避けるために、
+      -- 見つからなかったときは -1 を返すことに。
+      findForWatch :: Int -> Int -> IO Int
+      findForWatch i end | i > end = return (-1)
       findForWatch i end = do
-        val <- litValue s =<< readArray a i
+        val <- litValue s =<< unsafeRead a i
         if val /= lFalse
-          then return (Just i)
+          then return i
           else findForWatch (i+1) end
 
   basicReasonOf s this concl = do
