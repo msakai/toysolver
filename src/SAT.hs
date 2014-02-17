@@ -1086,14 +1086,21 @@ search solver !conflict_lim onConflict = do
           handleConflict conflictCounter constr
           -- TODO: should also learn the PB constraint?
         Nothing -> do
-          pbdata <- newPBHandler solver (fst pb) (snd pb) True
-          addToLearntDB solver pbdata
-          ret <- attach solver pbdata
-          constrBumpActivity solver pbdata
-          if ret then
-            return Nothing
-          else
-            handleConflict conflictCounter (toConstraint pbdata)
+          let (lhs,rhs) = pb
+          h <- newPBHandlerPromoted solver lhs rhs True
+          case h of
+            ConstrClause _ -> do
+              {- We don't want to add additional clause,
+                 since it would be subsumed by already added one. -}
+              return Nothing
+            _ -> do
+              addToLearntDB solver h
+              ret <- attach solver h
+              constrBumpActivity solver h
+              if ret then
+                return Nothing
+              else
+                handleConflict conflictCounter h
 
 -- | After 'solve' returns True, it returns the model.
 model :: Solver -> IO Model
@@ -2394,6 +2401,18 @@ newPBHandler solver ts degree learnt = do
     PBHandlerTypePueblo -> do
       c <- newPBHandlerPueblo ts degree learnt
       return (toConstraint c)
+
+newPBHandlerPromoted :: Solver -> PBSum -> Integer -> Bool -> IO SomeConstraint
+newPBHandlerPromoted solver lhs rhs learnt = do
+  case pbToAtLeast (lhs,rhs) of
+    Nothing -> newPBHandler solver lhs rhs learnt
+    Just (lhs2, rhs2) -> do
+      if rhs2 /= 1 then do
+        h <- newAtLeastHandler lhs2 rhs2 learnt
+        return $ toConstraint h
+      else do
+        h <- newClauseHandler lhs2 learnt
+        return $ toConstraint h
 
 instantiatePB :: Solver -> (PBSum,Integer) -> IO (PBSum,Integer)
 instantiatePB solver (xs,n) = loop ([],n) xs
