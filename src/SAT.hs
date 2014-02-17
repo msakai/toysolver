@@ -1941,11 +1941,70 @@ instance Constraint ClauseHandler where
     -- BCP Queue should be empty at this point.
     -- If not, duplicated propagation happens.
     bcpCheckEmpty solver
-    ret <- basicAttachClauseHandler solver this
-    if ret then
-      propagateCurrentModel solver (toConstraint this)
-    else
+
+    (lb,ub) <- getBounds (claLits this)
+    assert (lb == 0) $ return ()
+    let size = ub-lb+1
+
+    if size == 0 then do
+      markBad solver
       return False
+    else if size == 1 then do
+      lit0 <- unsafeRead (claLits this) 0
+      assignBy solver lit0 this
+    else do
+      ref <- newIORef 1
+      let f i = do
+            lit_i <- unsafeRead (claLits this) i
+            val_i <- litValue solver lit_i
+            if val_i /= lFalse then
+              return True
+            else do
+              j <- readIORef ref
+              k <- findForWatch solver (claLits this) j ub
+              case k of
+                -1 -> do
+                  return False
+                _ -> do
+                  lit_k <- unsafeRead (claLits this) k
+                  unsafeWrite (claLits this) i lit_k
+                  unsafeWrite (claLits this) k lit_i
+                  writeIORef ref $! (k+1)
+                  return True
+
+      b <- f 0
+      if b then do
+        lit0 <- unsafeRead (claLits this) 0
+        watch solver lit0 this
+        b2 <- f 1
+        if b2 then do
+          lit1 <- unsafeRead (claLits this) 1
+          watch solver lit1 this
+          return True
+        else do -- UNIT
+          -- We need to watch the most recently falsified literal
+          (i,_) <- liftM (maximumBy (comparing snd)) $ forM [1..ub] $ \l -> do
+            lit <- unsafeRead (claLits this) l
+            lv <- litLevel solver lit
+            return (l,lv)
+          lit1 <- unsafeRead (claLits this) 1
+          liti <- unsafeRead (claLits this) i
+          unsafeWrite (claLits this) 1 liti
+          unsafeWrite (claLits this) i lit1
+          watch solver liti this
+          assignBy solver lit0 this -- should always succeed
+      else do -- CONFLICT
+        ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [lb..ub] $ \l -> do
+          lit <- unsafeRead (claLits this) l
+          lv <- litLevel solver lit
+          return (l,lv)
+        forM_ (zip [0..] ls) $ \(i,lit) -> do
+          unsafeWrite (claLits this) i lit
+        lit0 <- unsafeRead (claLits this) 0
+        lit1 <- unsafeRead (claLits this) 1
+        watch solver lit0 this
+        watch solver lit1 this
+        return False
 
   watchedLiterals _ this = do
     lits <- getElems (claLits this)
