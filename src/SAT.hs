@@ -2092,11 +2092,85 @@ instance Constraint AtLeastHandler where
     -- BCP Queue should be empty at this point.
     -- If not, duplicated propagation happens.
     bcpCheckEmpty solver
-    ret <- basicAttachAtLeastHandler solver this
-    if ret then
-      propagateCurrentModel solver (toConstraint this)
-    else
+
+    let a = atLeastLits this
+    (lb,ub) <- getBounds a
+    assert (lb == 0) $ return ()
+    let m = ub - lb + 1
+        n = atLeastNum this
+
+    if m < n then do
+      markBad solver
       return False
+    else if m == n then do
+      let f i = do
+            lit <- unsafeRead a i
+            assignBy solver lit this
+      allM f [0..n-1]
+    else do -- m > n
+      let f !i !j
+            | i == n = do
+                -- NOT VIOLATED
+                k <- findForWatch solver a j ub
+                if k /= -1 then do
+                  -- NOT UNIT
+                  lit_i <- unsafeRead a i
+                  lit_k <- unsafeRead a k
+                  unsafeWrite a i lit_k
+                  unsafeWrite a k lit_i
+                  watch solver lit_k this
+                else do
+                  -- UNIT
+                  forM_ [0..n-1] $ \l -> do
+                    lit <- unsafeRead a l
+                    _ <- assignBy solver lit this -- should always succeed
+                    return ()
+                  -- We need to watch the most recently falsified literal
+                  (l,_) <- liftM (maximumBy (comparing snd)) $ forM [n..ub] $ \l -> do
+                    lit <- unsafeRead a l
+                    lv <- litLevel solver lit
+                    when debugMode $ do
+                      val <- litValue solver lit
+                      unless (val == lFalse) $ error "AtLeastHandler.attach: should not happen"
+                    return (l,lv)
+                  lit_n <- unsafeRead a n
+                  lit_l <- unsafeRead a l
+                  unsafeWrite a n lit_l
+                  unsafeWrite a l lit_n
+                  watch solver lit_l this
+                return True
+            | otherwise = do
+                lit_i <- unsafeRead a i
+                val_i <- litValue solver lit_i
+                if val_i /= lFalse then do
+                  watch solver lit_i this
+                  f (i+1) j
+                else do
+                  k <- findForWatch solver a j ub
+                  if k /= -1 then do
+                    lit_k <- unsafeRead a k
+                    unsafeWrite a i lit_k
+                    unsafeWrite a k lit_i
+                    watch solver lit_k this
+                    f (i+1) (k+1)
+                  else do
+                    -- CONFLICT
+                    -- We need to watch unassigned literals or most recently falsified literals.
+                    do xs <- liftM (sortBy (flip (comparing snd))) $ forM [i..ub] $ \l -> do
+                         lit <- readArray a l
+                         val <- litValue solver lit
+                         if val == lFalse then do
+                           lv <- litLevel solver lit
+                           return (lit, lv)
+                         else do
+                           return (lit, maxBound)
+                       forM_ (zip [i..ub] xs) $ \(l,(lit,_lv)) -> do
+                         writeArray a l lit
+                    forM_ [i..n+1] $ \l -> do
+                      lit_l <- readArray a l
+                      watch solver lit_l this
+                    return False
+      f 0 n
 
   watchedLiterals _ this = do
     lits <- getElems (atLeastLits this)
