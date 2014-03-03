@@ -753,26 +753,26 @@ addPBAtLeast solver ts n = do
   assert (d == levelRoot) $ return ()
 
   (ts',degree) <- liftM normalizePBAtLeast $ instantiatePB solver (ts,n)
-  let cs = map fst ts'
-      slack = sum cs - degree
 
-  if degree <= 0 then return ()
-    else if slack < 0 then markBad solver
-    else if Set.size (Set.fromList cs) == 1 then do
-      let c = head cs
-      addAtLeast solver (map snd ts') (fromInteger ((degree+c-1) `div` c))
-    else do
-      c <- newPBHandler solver ts' degree False
-      addToDB solver c
-      ret <- attach solver c
-      if not ret
-       then do
-         markBad solver
-       else do
-         ret2 <- deduce solver
-         case ret2 of
-           Nothing -> return ()
-           Just _ -> markBad solver
+  case pbToAtLeast (ts',degree) of
+    Just (lhs',rhs') -> addAtLeast solver lhs' rhs'
+    Nothing -> do
+      let cs = map fst ts'
+          slack = sum cs - degree
+      if degree <= 0 then return ()
+      else if slack < 0 then markBad solver
+      else do
+        c <- newPBHandler solver ts' degree False
+        addToDB solver c
+        ret <- attach solver c
+        if not ret
+         then do
+           markBad solver
+         else do
+           ret2 <- deduce solver
+           case ret2 of
+             Nothing -> return ()
+             Just _ -> markBad solver
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMost :: Solver          -- ^ The 'Solver' argument.
@@ -2417,6 +2417,13 @@ pbOverSAT solver (lhs, rhs) = do
       then return c
       else return 0
   return $! sum ss > rhs
+
+pbToAtLeast :: (PBSum,Integer) -> Maybe ([Lit], Int)
+pbToAtLeast (lhs, rhs) = do
+  let cs = [c | (c,_) <- lhs]
+  guard $ Set.size (Set.fromList cs) == 1
+  let c = head cs
+  return $ (map snd lhs, fromInteger ((rhs+c-1) `div` c))
 
 {--------------------------------------------------------------------
   Pseudo Boolean Constraint (Counter)
