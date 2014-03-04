@@ -439,7 +439,7 @@ reduceDB solver = do
 
   xs <- forM cs $ \c -> do
     p <- constrIsProtected solver c
-    actval <- constrActivity solver c
+    actval <- constrReadActivity c
     return (c, (p, actval))
 
   -- Note that False <= True
@@ -1642,10 +1642,24 @@ constrDecayActivity solver = do
   d <- readIORef (svClaDecay solver)
   modifyIORef' (svClaInc solver) (d*)
 
+constrBumpActivity :: ConstraintHandler a => Solver -> a -> IO ()
+constrBumpActivity solver this = do
+  aval <- constrReadActivity this
+  when (aval >= 0) $ do -- learnt clause
+    inc <- readIORef (svClaInc solver)
+    let aval2 = aval+inc
+    constrWriteActivity this $! aval2
+    when (aval2 > 1e20) $
+      -- Rescale
+      constrRescaleAllActivity solver
+
 constrRescaleAllActivity :: Solver -> IO ()
 constrRescaleAllActivity solver = do
   xs <- learntConstraints solver
-  forM_ xs $ \c -> constrRescaleActivity solver c
+  forM_ xs $ \c -> do
+    aval <- constrReadActivity c
+    when (aval >= 0) $
+      constrWriteActivity c $! (aval * 1e-20)
   modifyIORef' (svClaInc solver) (* 1e-20)
 
 resetStat :: Solver -> IO ()
@@ -1742,13 +1756,9 @@ class ConstraintHandler a where
   constrIsProtected :: Solver -> a -> IO Bool
   constrIsProtected _ _ = return False
 
-  constrActivity :: Solver -> a -> IO Double
+  constrReadActivity :: a -> IO Double
 
-  constrBumpActivity :: Solver -> a -> IO ()
-  constrBumpActivity _ _ = return ()
-
-  constrRescaleActivity :: Solver -> a -> IO ()
-  constrRescaleActivity _ _ = return ()
+  constrWriteActivity :: a -> Double -> IO ()
 
 propagateCurrentModel :: Solver -> SomeConstraintHandler -> IO Bool
 propagateCurrentModel solver c = do
@@ -1867,20 +1877,15 @@ instance ConstraintHandler SomeConstraintHandler where
   constrIsProtected s (CHPBCounter c) = constrIsProtected s c
   constrIsProtected s (CHPBPueblo c)  = constrIsProtected s c
 
-  constrActivity s (CHClause c)    = constrActivity s c
-  constrActivity s (CHAtLeast c)   = constrActivity s c
-  constrActivity s (CHPBCounter c) = constrActivity s c
-  constrActivity s (CHPBPueblo c)  = constrActivity s c
+  constrReadActivity (CHClause c)    = constrReadActivity c
+  constrReadActivity (CHAtLeast c)   = constrReadActivity c
+  constrReadActivity (CHPBCounter c) = constrReadActivity c
+  constrReadActivity (CHPBPueblo c)  = constrReadActivity c
 
-  constrBumpActivity s (CHClause c)    = constrBumpActivity s c
-  constrBumpActivity s (CHAtLeast c)   = constrBumpActivity s c
-  constrBumpActivity s (CHPBCounter c) = constrBumpActivity s c
-  constrBumpActivity s (CHPBPueblo c)  = constrBumpActivity s c
-
-  constrRescaleActivity s (CHClause c)    = constrRescaleActivity s c
-  constrRescaleActivity s (CHAtLeast c)   = constrRescaleActivity s c
-  constrRescaleActivity s (CHPBCounter c) = constrRescaleActivity s c
-  constrRescaleActivity s (CHPBPueblo c)  = constrRescaleActivity s c
+  constrWriteActivity (CHClause c)    aval = constrWriteActivity c aval
+  constrWriteActivity (CHAtLeast c)   aval = constrWriteActivity c aval
+  constrWriteActivity (CHPBCounter c) aval = constrWriteActivity c aval
+  constrWriteActivity (CHPBPueblo c)  aval = constrWriteActivity c aval
 
 -- To avoid heap-allocation Maybe value, it returns -1 when not found.
 findForWatch :: Solver -> IOUArray Int Lit -> Int -> Int -> IO Int
@@ -2080,25 +2085,9 @@ instance ConstraintHandler ClauseHandler where
     size <- liftM rangeSize (getBounds (claLits this))
     return $! size <= 2
 
-  constrActivity _ this = do
-    let act = claActivity this
-    readIORef act
+  constrReadActivity this = readIORef (claActivity this)
 
-  constrBumpActivity solver this = do
-    let act = claActivity this
-    aval <- readIORef act
-    when (aval >= 0) $ do -- learnt clause
-      inc <- readIORef (svClaInc solver)
-      let aval2 = aval+inc
-      writeIORef act $! aval2
-      when (aval2 > 1e20) $
-        -- Rescale
-        constrRescaleAllActivity solver
-
-  constrRescaleActivity _ this = do
-    let act = claActivity this
-    aval <- readIORef act
-    when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
+  constrWriteActivity this aval = writeIORef (claActivity this) $! aval
 
 instantiateClause :: Solver -> Clause -> IO (Maybe Clause)
 instantiateClause solver = loop []
@@ -2336,25 +2325,9 @@ instance ConstraintHandler AtLeastHandler where
     vals <- mapM (litValue solver) lits
     return $ length [v | v <- vals, v == lTrue] >= atLeastNum this
 
-  constrActivity _ this = do
-    let act = atLeastActivity this
-    readIORef act
+  constrReadActivity this = readIORef (atLeastActivity this)
 
-  constrBumpActivity solver this = do
-    let act = atLeastActivity this
-    aval <- readIORef act
-    when (aval >= 0) $ do -- learnt clause
-      inc <- readIORef (svClaInc solver)
-      let aval2 = aval+inc
-      writeIORef act $! aval2
-      when (aval2 > 1e20) $
-        -- Rescale
-        constrRescaleAllActivity solver
-
-  constrRescaleActivity _ this = do
-    let act = atLeastActivity this
-    aval <- readIORef act
-    when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
+  constrWriteActivity this aval = writeIORef (atLeastActivity this) $! aval
 
 instantiateAtLeast :: Solver -> ([Lit],Int) -> IO ([Lit],Int)
 instantiateAtLeast solver (xs,n) = loop ([],n) xs
@@ -2561,25 +2534,9 @@ instance ConstraintHandler PBHandlerCounter where
         else return 0
     return $ sum xs >= pbDegree this
 
-  constrActivity _ this = do
-    let act = pbActivity this
-    readIORef act
+  constrReadActivity this = readIORef (pbActivity this)
 
-  constrBumpActivity solver this = do
-    let act = pbActivity this
-    aval <- readIORef act
-    when (aval >= 0) $ do -- learnt clause
-      inc <- readIORef (svClaInc solver)
-      let aval2 = aval+inc
-      writeIORef act $! aval2
-      when (aval2 > 1e20) $
-        -- Rescale
-        constrRescaleAllActivity solver
-
-  constrRescaleActivity _ this = do
-    let act = pbActivity this
-    aval <- readIORef act
-    when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
+  constrWriteActivity this aval = writeIORef (pbActivity this) $! aval
 
 {--------------------------------------------------------------------
   Pseudo Boolean Constraint (Pueblo)
@@ -2711,25 +2668,9 @@ instance ConstraintHandler PBHandlerPueblo where
         else return 0
     return $ sum xs >= puebloDegree this
 
-  constrActivity _ this = do
-    let act = puebloActivity this
-    readIORef act
+  constrReadActivity this = readIORef (puebloActivity this)
 
-  constrBumpActivity solver this = do
-    let act = puebloActivity this
-    aval <- readIORef act
-    when (aval >= 0) $ do -- learnt clause
-      inc <- readIORef (svClaInc solver)
-      let aval2 = aval+inc
-      writeIORef act $! aval2
-      when (aval2 > 1e20) $
-        -- Rescale
-        constrRescaleAllActivity solver
-
-  constrRescaleActivity _ this = do
-    let act = puebloActivity this
-    aval <- readIORef act
-    when (aval >= 0) $ writeIORef act $! (aval * 1e-20)
+  constrWriteActivity this aval = writeIORef (puebloActivity this) $! aval
 
 puebloPropagate :: Solver -> SomeConstraintHandler -> PBHandlerPueblo -> IO Bool
 puebloPropagate solver constr this = do
@@ -2920,7 +2861,7 @@ dumpClaActivity solver = do
   xs <- learntConstraints solver
   forM_ xs $ \c -> do
     s <- showConstraintHandler solver c
-    aval <- constrActivity solver c
+    aval <- constrReadActivity c
     log solver $ printf "activity(%s) = %f" s aval
 
 -- | set callback function for receiving messages.
