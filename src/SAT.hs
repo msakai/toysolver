@@ -100,7 +100,7 @@ module SAT
   -- * Read state
   , nVars
   , nAssigns
-  , nClauses
+  , nConstraints
   , nLearnt
 
   -- * Internal API
@@ -261,7 +261,7 @@ data Solver
   , svTrail        :: !(IORef [Lit])
   , svVarCounter   :: !(IORef Int)
   , svVarData      :: !(IORef (IOArray Int VarData))
-  , svClauseDB     :: !(IORef [SomeConstraintHandler])
+  , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
   , svAssumptions  :: !(IORef (IOUArray Int Lit))
   , svLevel        :: !(IORef Level)
@@ -282,11 +282,11 @@ data Solver
   -- | Amount to bump next variable with.
   , svVarInc       :: !(IORef Double)
 
-  -- | Inverse of the clause activity decay factor. (1 / 0.999)
-  , svClaDecay     :: !(IORef Double)
+  -- | Inverse of the constraint activity decay factor. (1 / 0.999)
+  , svConstrDecay  :: !(IORef Double)
 
-  -- | Amount to bump next clause with.
-  , svClaInc       :: !(IORef Double)
+  -- | Amount to bump next constraint with.
+  , svConstrInc    :: !(IORef Double)
 
   , svRestartStrategy :: !(IORef RestartStrategy)
 
@@ -419,7 +419,7 @@ watches solver !lit = do
 
 addToDB :: ConstraintHandler c => Solver -> c -> IO ()
 addToDB solver c = do
-  modifyIORef (svClauseDB solver) (toConstraintHandler c : )
+  modifyIORef (svConstrDB solver) (toConstraintHandler c : )
   when debugMode $ logIO solver $ do
     str <- showConstraintHandler solver c
     return $ printf "constraint %s is added" str
@@ -510,10 +510,10 @@ nVars solver = do
 nAssigns :: Solver -> IO Int
 nAssigns solver = readIORef (svNAssigns solver)
 
--- | number of clauses.
-nClauses :: Solver -> IO Int
-nClauses solver = do
-  xs <- readIORef (svClauseDB solver)
+-- | number of constraints.
+nConstraints :: Solver -> IO Int
+nConstraints solver = do
+  xs <- readIORef (svConstrDB solver)
   return $ length xs
 
 -- | number of learnt constrints.
@@ -555,8 +555,8 @@ newSolver = do
   nlearntgc <- newIORef 0
   nremoved  <- newIORef 0
 
-  claDecay <- newIORef (1 / 0.999)
-  claInc   <- newIORef 1
+  constrDecay <- newIORef (1 / 0.999)
+  constrInc   <- newIORef 1
   varDecay <- newIORef (1 / 0.95)
   varInc   <- newIORef 1
   restartStrat <- newIORef defaultRestartStrategy
@@ -591,7 +591,7 @@ newSolver = do
         , svVarQueue   = vqueue
         , svTrail      = trail
         , svVarData    = vars
-        , svClauseDB   = db
+        , svConstrDB   = db
         , svLearntDB   = db2
         , svAssumptions = as
         , svLevel      = lv
@@ -605,10 +605,10 @@ newSolver = do
         , svNFixed     = nfixed
         , svNLearntGC  = nlearntgc
         , svNRemovedConstr = nremoved
-        , svVarDecay   = varDecay
-        , svVarInc     = varInc
-        , svClaDecay   = claDecay
-        , svClaInc     = claInc
+        , svVarDecay    = varDecay
+        , svVarInc      = varInc
+        , svConstrDecay = constrDecay
+        , svConstrInc   = constrInc
         , svRestartStrategy = restartStrat
         , svRestartFirst = restartFirst
         , svRestartInc   = restartInc
@@ -882,7 +882,7 @@ solve_ solver = do
       when (cnt == -1) $ do
         learntSizeFirst <- readIORef (svLearntSizeFirst solver)
         learntSizeInc   <- readIORef (svLearntSizeInc solver)
-        nc <- nClauses solver
+        nc <- nConstraints solver
         nv <- nVars solver
         let initialLearntLim = if learntSizeFirst > 0 then learntSizeFirst else max ((nc + nv) `div` 3) 16
             learntSizeSeq    = iterate (ceiling . (learntSizeInc*) . fromIntegral) initialLearntLim
@@ -919,7 +919,7 @@ solve_ solver = do
       backtrackTo solver levelRoot
 
       when debugMode $ dumpVarActivity solver
-      when debugMode $ dumpClaActivity solver
+      when debugMode $ dumpConstrActivity solver
       printStat solver True
       (log solver . printf "#cpu_time = %.3fs") (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
       (log solver . printf "#wall_clock_time = %.3fs") (realToFrac (endWC `diffUTCTime` startWC) :: Double)
@@ -1129,10 +1129,10 @@ simplify solver = do
 
   -- simplify original constraint DB
   do
-    xs <- readIORef (svClauseDB solver)
+    xs <- readIORef (svConstrDB solver)
     (ys,n) <- loop xs [] (0::Int)
     modifyIORef' (svNRemovedConstr solver) (+n)
-    writeIORef (svClauseDB solver) ys
+    writeIORef (svConstrDB solver) ys
 
   -- simplify learnt constraint DB
   do
@@ -1639,14 +1639,14 @@ constructModel solver = do
 
 constrDecayActivity :: Solver -> IO ()
 constrDecayActivity solver = do
-  d <- readIORef (svClaDecay solver)
-  modifyIORef' (svClaInc solver) (d*)
+  d <- readIORef (svConstrDecay solver)
+  modifyIORef' (svConstrInc solver) (d*)
 
 constrBumpActivity :: ConstraintHandler a => Solver -> a -> IO ()
 constrBumpActivity solver this = do
   aval <- constrReadActivity this
   when (aval >= 0) $ do -- learnt clause
-    inc <- readIORef (svClaInc solver)
+    inc <- readIORef (svConstrInc solver)
     let aval2 = aval+inc
     constrWriteActivity this $! aval2
     when (aval2 > 1e20) $
@@ -1660,7 +1660,7 @@ constrRescaleAllActivity solver = do
     aval <- constrReadActivity c
     when (aval >= 0) $
       constrWriteActivity c $! (aval * 1e-20)
-  modifyIORef' (svClaInc solver) (* 1e-20)
+  modifyIORef' (svConstrInc solver) (* 1e-20)
 
 resetStat :: Solver -> IO ()
 resetStat solver = do
@@ -2821,7 +2821,7 @@ debugMode = False
 
 checkSatisfied :: Solver -> IO ()
 checkSatisfied solver = do
-  cls <- readIORef (svClauseDB solver)
+  cls <- readIORef (svConstrDB solver)
   forM_ cls $ \c -> do
     b <- isSatisfied solver c
     unless b $ do
@@ -2831,7 +2831,7 @@ checkSatisfied solver = do
 sanityCheck :: Solver -> IO ()
 sanityCheck _ | not debugMode = return ()
 sanityCheck solver = do
-  cls <- readIORef (svClauseDB solver)
+  cls <- readIORef (svConstrDB solver)
   forM_ cls $ \constr -> do
     lits <- watchedLiterals solver constr
     forM_ lits $ \l -> do
@@ -2855,9 +2855,9 @@ dumpVarActivity solver = do
     activity <- varActivity solver v
     log solver $ printf "activity(%d) = %d" v activity
 
-dumpClaActivity :: Solver -> IO ()
-dumpClaActivity solver = do
-  log solver "Learnt clause activity:"
+dumpConstrActivity :: Solver -> IO ()
+dumpConstrActivity solver = do
+  log solver "Learnt constraints activity:"
   xs <- learntConstraints solver
   forM_ xs $ \c -> do
     s <- showConstraintHandler solver c
