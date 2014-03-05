@@ -27,9 +27,14 @@ module SAT.Types
   , normalizeClause
 
   -- * Cardinality Constraint
+  , AtLeast
   , normalizeAtLeast
 
   -- * Pseudo Boolean Constraint
+  , PBLinTerm
+  , PBLinSum
+  , PBLinAtLeast
+  , PBLinExactly
   , normalizePBSum
   , normalizePBAtLeast
   , normalizePBExactly
@@ -123,7 +128,9 @@ normalizeClause lits = assert (IntSet.size ys `mod` 2 == 0) $
     xs = IntSet.fromList lits
     ys = xs `IntSet.intersection` (IntSet.map litNot xs)
 
-normalizeAtLeast :: ([Lit],Int) -> ([Lit],Int)
+type AtLeast = ([Lit], Int)
+
+normalizeAtLeast :: AtLeast -> AtLeast
 normalizeAtLeast (lits,n) = assert (IntSet.size ys `mod` 2 == 0) $
    (IntSet.toList lits', n')
    where
@@ -132,18 +139,23 @@ normalizeAtLeast (lits,n) = assert (IntSet.size ys `mod` 2 == 0) $
      lits' = xs `IntSet.difference` ys
      n' = n - (IntSet.size ys `div` 2)
 
+type PBLinTerm = (Integer, Lit)
+type PBLinSum = [PBLinTerm]
+type PBLinAtLeast = (PBLinSum, Integer)
+type PBLinExactly = (PBLinSum, Integer)
+
 -- | normalizing PB term of the form /c1 x1 + c2 x2 ... cn xn + c/ into
 -- /d1 x1 + d2 x2 ... dm xm + d/ where d1,...,dm ≥ 1.
-normalizePBSum :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+normalizePBSum :: (PBLinSum, Integer) -> (PBLinSum, Integer)
 normalizePBSum = step2 . step1
   where
     -- 同じ変数が複数回現れないように、一度全部 @v@ に統一。
-    step1 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step1 :: (PBLinSum, Integer) -> (PBLinSum, Integer)
     step1 (xs,n) =
       case loop (IntMap.empty,n) xs of
         (ys,n') -> ([(c,v) | (v,c) <- IntMap.toList ys], n')
       where
-        loop :: (VarMap Integer, Integer) -> [(Integer,Lit)] -> (VarMap Integer, Integer)
+        loop :: (VarMap Integer, Integer) -> PBLinSum -> (VarMap Integer, Integer)
         loop (ys,m) [] = (ys,m)
         loop (ys,m) ((c,l):zs) =
           if litPolarity l
@@ -152,7 +164,7 @@ normalizePBSum = step2 . step1
 
     -- 係数が0のものも取り除き、係数が負のリテラルを反転することで、
     -- 係数が正になるようにする。
-    step2 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step2 :: (PBLinSum, Integer) -> (PBLinSum, Integer)
     step2 (xs,n) = loop ([],n) xs
       where
         loop (ys,m) [] = (ys,m)
@@ -162,44 +174,44 @@ normalizePBSum = step2 . step1
           | otherwise = loop (t:ys,m) zs
 
 -- | normalizing PB constraint of the form /c1 x1 + c2 cn ... cn xn >= b/.
-normalizePBAtLeast :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+normalizePBAtLeast :: PBLinAtLeast -> PBLinAtLeast
 normalizePBAtLeast a =
 　case step1 a of
     (xs,n)
       | n > 0     -> step3 (saturate n xs, n)
       | otherwise -> ([], 0) -- trivially true
   where
-    step1 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step1 :: PBLinAtLeast -> PBLinAtLeast
     step1 (xs,n) =
       case normalizePBSum (xs,-n) of
         (ys,m) -> (ys, -m)
 
     -- degree以上の係数はそこで抑える。
-    saturate :: Integer -> [(Integer,Lit)] -> [(Integer,Lit)]
+    saturate :: Integer -> PBLinSum -> PBLinSum
     saturate n xs = [assert (c>0) (min n c, l) | (c,l) <- xs]
 
     -- omega test と同様の係数の gcd による単純化
-    step3 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step3 :: PBLinAtLeast -> PBLinAtLeast
     step3 ([],n) = ([],n)
     step3 (xs,n) = ([(c `div` d, l) | (c,l) <- xs], (n+d-1) `div` d)
       where
         d = foldl1' gcd [c | (c,_) <- xs]
 
 -- | normalizing PB constraint of the form /c1 x1 + c2 cn ... cn xn = b/.
-normalizePBExactly :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+normalizePBExactly :: PBLinExactly -> PBLinExactly
 normalizePBExactly a =
 　case step1 $ a of
     (xs,n)
       | n >= 0    -> step2 (xs, n)
       | otherwise -> ([], 1) -- false
   where
-    step1 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step1 :: PBLinExactly -> PBLinExactly
     step1 (xs,n) =
       case normalizePBSum (xs,-n) of
         (ys,m) -> (ys, -m)
 
     -- omega test と同様の係数の gcd による単純化
-    step2 :: ([(Integer,Lit)], Integer) -> ([(Integer,Lit)], Integer)
+    step2 :: PBLinExactly -> PBLinExactly
     step2 ([],n) = ([],n)
     step2 (xs,n)
       | n `mod` d == 0 = ([(c `div` d, l) | (c,l) <- xs], n `div` d)
@@ -207,7 +219,7 @@ normalizePBExactly a =
       where
         d = foldl1' gcd [c | (c,_) <- xs]
 
-cutResolve :: ([(Integer,Lit)],Integer) -> ([(Integer,Lit)],Integer) -> Var -> ([(Integer,Lit)],Integer)
+cutResolve :: PBLinAtLeast -> PBLinAtLeast -> Var -> PBLinAtLeast
 cutResolve (lhs1,rhs1) (lhs2,rhs2) v = assert (l1 == litNot l2) $ normalizePBAtLeast pb
   where
     (c1,l1) = head [(c,l) | (c,l) <- lhs1, litVar l == v]
@@ -217,7 +229,7 @@ cutResolve (lhs1,rhs1) (lhs2,rhs2) v = assert (l1 == litNot l2) $ normalizePBAtL
     s2 = c1 `div` g
     pb = ([(s1*c,l) | (c,l) <- lhs1] ++ [(s2*c,l) | (c,l) <- lhs2], s1*rhs1 + s2 * rhs2)
 
-cardinalityReduction :: ([(Integer,Lit)],Integer) -> ([Lit],Int)
+cardinalityReduction :: PBLinAtLeast -> AtLeast
 cardinalityReduction (lhs,rhs) = (ls, rhs')
   where
     rhs' = go1 0 0 (sortBy (flip (comparing fst)) lhs)
@@ -234,14 +246,14 @@ cardinalityReduction (lhs,rhs) = (ls, rhs')
       | otherwise      = map snd ts
     go2 _ [] = error "cardinalityReduction: should not happen"
 
-negatePBAtLeast :: ([(Integer, Lit)], Integer) -> ([(Integer, Lit)], Integer)
+negatePBAtLeast :: PBLinAtLeast -> PBLinAtLeast
 negatePBAtLeast (xs, rhs) = ([(-c,lit) | (c,lit)<-xs] , -rhs + 1)
 
-pbEval :: Model -> [(Integer, Lit)] -> Integer
+pbEval :: Model -> PBLinSum -> Integer
 pbEval m xs = sum [c | (c,lit) <- xs, evalLit m lit]
 
-pbLowerBound :: [(Integer, Lit)] -> Integer
+pbLowerBound :: PBLinSum -> Integer
 pbLowerBound xs = sum [if c < 0 then c else 0 | (c,_) <- xs]
 
-pbUpperBound :: [(Integer, Lit)] -> Integer
+pbUpperBound :: PBLinSum -> Integer
 pbUpperBound xs = sum [if c > 0 then c else 0 | (c,_) <- xs]

@@ -1428,7 +1428,7 @@ analyzeFinal solver p = do
            go ls seen result
   go lits (IS.singleton (litVar p)) [p]
 
-analyzeConflictHybrid :: ConstraintHandler c => Solver -> c -> IO ((Clause, Level), ((PBSum,Integer), Level))
+analyzeConflictHybrid :: ConstraintHandler c => Solver -> c -> IO ((Clause, Level), (PBLinAtLeast, Level))
 analyzeConflictHybrid solver constr = do
   d <- readIORef (svLevel solver)
 
@@ -1445,7 +1445,7 @@ analyzeConflictHybrid solver constr = do
               else
                 go (xs, IS.insert l ys) ls
 
-  let loop :: LitSet -> LitSet -> (PBSum,Integer) -> IO (LitSet, (PBSum,Integer))
+  let loop :: LitSet -> LitSet -> PBLinAtLeast -> IO (LitSet, PBLinAtLeast)
       loop lits1 lits2 pb
         | sz==1 = do
             return $ (lits1 `IS.union` lits2, pb)
@@ -1506,7 +1506,7 @@ analyzeConflictHybrid solver constr = do
   pblevel <- pbBacktrackLevel solver pb
   return ((map fst xs, level), (pb, pblevel))
 
-pbBacktrackLevel :: Solver -> (PBSum,Integer) -> IO Level
+pbBacktrackLevel :: Solver -> PBLinAtLeast -> IO Level
 pbBacktrackLevel _ ([], rhs) = assert (rhs > 0) $ return levelRoot
 pbBacktrackLevel solver (lhs, rhs) = do
   levelToLiterals <- liftM (IM.unionsWith IM.union) $ forM lhs $ \(_,lit) -> do
@@ -1749,7 +1749,7 @@ class ConstraintHandler a where
   -- assignment.
   basicReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
-  toPBAtLeast :: Solver -> a -> IO (PBSum, Integer)
+  toPBAtLeast :: Solver -> a -> IO PBLinAtLeast
 
   isSatisfied :: Solver -> a -> IO Bool
 
@@ -2329,10 +2329,10 @@ instance ConstraintHandler AtLeastHandler where
 
   constrWriteActivity this aval = writeIORef (atLeastActivity this) $! aval
 
-instantiateAtLeast :: Solver -> ([Lit],Int) -> IO ([Lit],Int)
+instantiateAtLeast :: Solver -> AtLeast -> IO AtLeast
 instantiateAtLeast solver (xs,n) = loop ([],n) xs
   where
-    loop :: ([Lit],Int) -> [Lit] -> IO ([Lit],Int)
+    loop :: AtLeast -> [Lit] -> IO AtLeast
     loop ret [] = return ret
     loop (ys,m) (l:ls) = do
       val <- litValue solver l
@@ -2361,10 +2361,7 @@ basicAttachAtLeastHandler solver this = do
   Pseudo Boolean Constraint
 --------------------------------------------------------------------}
 
-type PBTerm = (Integer, Lit)
-type PBSum = [PBTerm]
-
-newPBHandler :: Solver -> PBSum -> Integer -> Bool -> IO SomeConstraintHandler
+newPBHandler :: Solver -> PBLinSum -> Integer -> Bool -> IO SomeConstraintHandler
 newPBHandler solver ts degree learnt = do
   config <- readIORef (svPBHandlerType solver)
   case config of
@@ -2375,7 +2372,7 @@ newPBHandler solver ts degree learnt = do
       c <- newPBHandlerPueblo ts degree learnt
       return (toConstraintHandler c)
 
-newPBHandlerPromoted :: Solver -> PBSum -> Integer -> Bool -> IO SomeConstraintHandler
+newPBHandlerPromoted :: Solver -> PBLinSum -> Integer -> Bool -> IO SomeConstraintHandler
 newPBHandlerPromoted solver lhs rhs learnt = do
   case pbToAtLeast (lhs,rhs) of
     Nothing -> newPBHandler solver lhs rhs learnt
@@ -2387,10 +2384,10 @@ newPBHandlerPromoted solver lhs rhs learnt = do
         h <- newClauseHandler lhs2 learnt
         return $ toConstraintHandler h
 
-instantiatePB :: Solver -> (PBSum,Integer) -> IO (PBSum,Integer)
+instantiatePB :: Solver -> PBLinAtLeast -> IO PBLinAtLeast
 instantiatePB solver (xs,n) = loop ([],n) xs
   where
-    loop :: (PBSum,Integer) -> PBSum -> IO (PBSum,Integer)
+    loop :: PBLinAtLeast -> PBLinSum -> IO PBLinAtLeast
     loop ret [] = return ret
     loop (ys,m) ((c,l):ts) = do
       val <- litValue solver l
@@ -2401,7 +2398,7 @@ instantiatePB solver (xs,n) = loop ([],n) xs
        else
          loop ((c,l):ys, m) ts
 
-pbOverSAT :: Solver -> (PBSum,Integer) -> IO Bool
+pbOverSAT :: Solver -> PBLinAtLeast -> IO Bool
 pbOverSAT solver (lhs, rhs) = do
   ss <- forM lhs $ \(c,l) -> do
     v <- litValue solver l
@@ -2410,7 +2407,7 @@ pbOverSAT solver (lhs, rhs) = do
       else return 0
   return $! sum ss > rhs
 
-pbToAtLeast :: (PBSum,Integer) -> Maybe ([Lit], Int)
+pbToAtLeast :: PBLinAtLeast -> Maybe AtLeast
 pbToAtLeast (lhs, rhs) = do
   let cs = [c | (c,_) <- lhs]
   guard $ Set.size (Set.fromList cs) == 1
@@ -2423,7 +2420,7 @@ pbToAtLeast (lhs, rhs) = do
 
 data PBHandlerCounter
   = PBHandlerCounter
-  { pbTerms    :: !PBSum
+  { pbTerms    :: !PBLinSum
   , pbDegree   :: !Integer
   , pbCoeffMap :: !(LitMap Integer)
   , pbMaxSlack :: !Integer
@@ -2432,7 +2429,7 @@ data PBHandlerCounter
   }
   deriving Eq
 
-newPBHandlerCounter :: PBSum -> Integer -> Bool -> IO PBHandlerCounter
+newPBHandlerCounter :: PBLinSum -> Integer -> Bool -> IO PBHandlerCounter
 newPBHandlerCounter ts degree learnt = do
   let ts' = sortBy (flip compare `on` fst) ts
       slack = sum (map fst ts) - degree      
@@ -2507,10 +2504,10 @@ instance ConstraintHandler PBHandlerCounter where
         f p (pbMaxSlack this - c) (pbTerms this)
     where
       {-# INLINE f #-}
-      f :: (Lit -> IO Bool) -> Integer -> [(Integer, Lit)] -> IO [Lit]
+      f :: (Lit -> IO Bool) -> Integer -> PBLinSum -> IO [Lit]
       f p s xs = go s xs []
         where
-          go :: Integer -> [(Integer, Lit)] -> [Lit] -> IO [Lit]
+          go :: Integer -> PBLinSum -> [Lit] -> IO [Lit]
           go s _ ret | s < 0 = return ret
           go _ [] _ = error "PBHandlerCounter.basicReasonOf: should not happen"
           go s ((c,lit):xs) ret = do
@@ -2544,7 +2541,7 @@ instance ConstraintHandler PBHandlerCounter where
 
 data PBHandlerPueblo
   = PBHandlerPueblo
-  { puebloTerms     :: !PBSum
+  { puebloTerms     :: !PBLinSum
   , puebloDegree    :: !Integer
   , puebloMaxSlack  :: !Integer
   , puebloWatches   :: !(IORef LitSet)
@@ -2559,7 +2556,7 @@ puebloAMax this =
     (c,_):_ -> c
     [] -> 0 -- should not happen?
 
-newPBHandlerPueblo :: PBSum -> Integer -> Bool -> IO PBHandlerPueblo
+newPBHandlerPueblo :: PBLinSum -> Integer -> Bool -> IO PBHandlerPueblo
 newPBHandlerPueblo ts degree learnt = do
   let ts' = sortBy (flip compare `on` fst) ts
       slack = sum [c | (c,_) <- ts'] - degree
@@ -2571,13 +2568,13 @@ newPBHandlerPueblo ts degree learnt = do
 puebloGetWatchSum :: PBHandlerPueblo -> IO Integer
 puebloGetWatchSum pb = readIORef (puebloWatchSum pb)
 
-puebloWatch :: Solver -> SomeConstraintHandler -> PBHandlerPueblo -> PBTerm -> IO ()
+puebloWatch :: Solver -> SomeConstraintHandler -> PBHandlerPueblo -> PBLinTerm -> IO ()
 puebloWatch solver constr !pb (c, lit) = do
   watch solver lit constr
   modifyIORef' (puebloWatches pb) (IS.insert lit)
   modifyIORef' (puebloWatchSum pb) (+c)
 
-puebloUnwatch :: Solver -> PBHandlerPueblo -> PBTerm -> IO ()
+puebloUnwatch :: Solver -> PBHandlerPueblo -> PBLinTerm -> IO ()
 puebloUnwatch _solver pb (c, lit) = do
   modifyIORef' (puebloWatches pb) (IS.delete lit)
   modifyIORef' (puebloWatchSum pb) (subtract c)
@@ -2641,10 +2638,10 @@ instance ConstraintHandler PBHandlerPueblo where
         f p (puebloMaxSlack this - c) (puebloTerms this)
     where
       {-# INLINE f #-}
-      f :: (Lit -> IO Bool) -> Integer -> [(Integer, Lit)] -> IO [Lit]
+      f :: (Lit -> IO Bool) -> Integer -> PBLinSum -> IO [Lit]
       f p s xs = go s xs []
         where
-          go :: Integer -> [(Integer, Lit)] -> [Lit] -> IO [Lit]
+          go :: Integer -> PBLinSum -> [Lit] -> IO [Lit]
           go s _ ret | s < 0 = return ret
           go _ [] _ = error "PBHandlerPueblo.basicReasonOf: should not happen"
           go s ((c,lit):xs) ret = do
