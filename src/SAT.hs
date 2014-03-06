@@ -2143,6 +2143,7 @@ instance ConstraintHandler AtLeastHandler where
     lits <- getElems (atLeastLits this)
     return $ show lits ++ " >= " ++ show (atLeastNum this)
 
+  -- FIXME: simplify implementation
   attach solver this = do
     -- BCP Queue should be empty at this point.
     -- If not, duplicated propagation happens.
@@ -2165,15 +2166,16 @@ instance ConstraintHandler AtLeastHandler where
     else do -- m > n
       let f !i !j
             | i == n = do
-                -- NOT VIOLATED
+                -- NOT VIOLATED: n literals (0 .. n-1) are watched
                 k <- findForWatch solver a j ub
                 if k /= -1 then do
                   -- NOT UNIT
-                  lit_i <- unsafeRead a i
+                  lit_n <- unsafeRead a n
                   lit_k <- unsafeRead a k
-                  unsafeWrite a i lit_k
-                  unsafeWrite a k lit_i
+                  unsafeWrite a n lit_k
+                  unsafeWrite a k lit_n
                   watch solver lit_k this
+                  -- n+1 literals (0 .. n) are watched.
                 else do
                   -- UNIT
                   forM_ [0..n-1] $ \l -> do
@@ -2193,8 +2195,10 @@ instance ConstraintHandler AtLeastHandler where
                   unsafeWrite a n lit_l
                   unsafeWrite a l lit_n
                   watch solver lit_l this
+                  -- n+1 literals (0 .. n) are watched.
                 return True
             | otherwise = do
+                assert (i < n && n <= j) $ return ()
                 lit_i <- unsafeRead a i
                 val_i <- litValue solver lit_i
                 if val_i /= lFalse then do
@@ -2221,9 +2225,10 @@ instance ConstraintHandler AtLeastHandler where
                            return (lit, maxBound)
                        forM_ (zip [i..ub] xs) $ \(l,(lit,_lv)) -> do
                          writeArray a l lit
-                    forM_ [i..n+1] $ \l -> do
+                    forM_ [i..n] $ \l -> do
                       lit_l <- readArray a l
                       watch solver lit_l this
+                    -- n+1 literals (0 .. n) are watched.
                     return False
       f 0 n
 
