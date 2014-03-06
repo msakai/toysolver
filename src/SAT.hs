@@ -11,12 +11,12 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  SAT
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, RecursiveDo, ScopedTypeVariables, CPP, DeriveDataTypeable)
+-- Portability :  non-portable (BangPatterns, ScopedTypeVariables, CPP, DeriveDataTypeable, RecursiveDo)
 --
 -- A CDCL SAT solver.
 --
@@ -190,26 +190,26 @@ newLitData = do
   return $ LitData ws
 
 varData :: Solver -> Var -> IO VarData
-varData s !v = do
-  a <- readIORef (svVarData s)
+varData solver !v = do
+  a <- readIORef (svVarData solver)
   unsafeRead a (v-1)
 
 litData :: Solver -> Lit -> IO LitData
-litData s !l =
+litData solver !l =
   -- litVar による heap allocation を避けるために、
   -- litPolarityによる分岐後にvarDataを呼ぶ。
   if litPolarity l
     then do
-      vd <- varData s l
+      vd <- varData solver l
       return $ vdPosLitData vd
     else do
-      vd <- varData s (negate l)
+      vd <- varData solver (negate l)
       return $ vdNegLitData vd
 
 {-# INLINE varValue #-}
 varValue :: Solver -> Var -> IO LBool
-varValue s !v = do
-  vd <- varData s v
+varValue solver !v = do
+  vd <- varData solver v
   m <- readIORef (vdAssignment vd)
   case m of
     Nothing -> return lUndef
@@ -217,37 +217,37 @@ varValue s !v = do
 
 {-# INLINE litValue #-}
 litValue :: Solver -> Lit -> IO LBool
-litValue s !l = do
+litValue solver !l = do
   -- litVar による heap allocation を避けるために、
   -- litPolarityによる分岐後にvarDataを呼ぶ。
   if litPolarity l
-    then varValue s l
+    then varValue solver l
     else do
-      m <- varValue s (negate l)
+      m <- varValue solver (negate l)
       return $! lnot m
 
 varLevel :: Solver -> Var -> IO Level
-varLevel s !v = do
-  vd <- varData s v
+varLevel solver !v = do
+  vd <- varData solver v
   m <- readIORef (vdAssignment vd)
   case m of
     Nothing -> error ("varLevel: unassigned var " ++ show v)
     Just a -> return (aLevel a)
 
 litLevel :: Solver -> Lit -> IO Level
-litLevel s l = varLevel s (litVar l)
+litLevel solver l = varLevel solver (litVar l)
 
 varReason :: Solver -> Var -> IO (Maybe SomeConstraintHandler)
-varReason s !v = do
-  vd <- varData s v
+varReason solver !v = do
+  vd <- varData solver v
   m <- readIORef (vdAssignment vd)
   case m of
     Nothing -> error ("varReason: unassigned var " ++ show v)
     Just a -> return (aReason a)
 
 varAssignNo :: Solver -> Var -> IO Int
-varAssignNo s !v = do
-  vd <- varData s v
+varAssignNo solver !v = do
+  vd <- varData solver v
   m <- readIORef (vdAssignment vd)
   case m of
     Nothing -> error ("varAssignNo: unassigned var " ++ show v)
@@ -296,17 +296,17 @@ data Solver
   -- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
   , svRestartInc :: !(IORef Double)
 
-  -- | The initial limit for learnt clauses.
+  -- | The initial limit for learnt constraints.
   , svLearntSizeFirst :: !(IORef Int)
 
-  -- | The limit for learnt clauses is multiplied with this factor periodically. (default 1.1)
+  -- | The limit for learnt constraints is multiplied with this factor periodically. (default 1.1)
   , svLearntSizeInc :: !(IORef Double)
 
   , svLearntLim       :: !(IORef Int)
   , svLearntLimAdjCnt :: !(IORef Int)
   , svLearntLimSeq    :: !(IORef [(Int,Int)])
 
-  -- | Controls conflict clause minimization (0=none, 1=local, 2=recursive)
+  -- | Controls conflict constraint minimization (0=none, 1=local, 2=recursive)
   , svCCMin :: !(IORef Int)
 
   , svLearningStrategy :: !(IORef LearningStrategy)
@@ -643,12 +643,12 @@ ltVar solver v1 v2 = do
 
 -- |Add a new variable
 newVar :: Solver -> IO Var
-newVar s = do
-  v <- readIORef (svVarCounter s)
-  writeIORef (svVarCounter s) (v+1)
+newVar solver = do
+  v <- readIORef (svVarCounter solver)
+  writeIORef (svVarCounter solver) (v+1)
   vd <- newVarData
 
-  a <- readIORef (svVarData s)
+  a <- readIORef (svVarData solver)
   (_,ub) <- getBounds a
   if v <= ub
     then writeArray a v vd
@@ -659,18 +659,18 @@ newVar s = do
         vd2 <- readArray a v2
         writeArray a' v2 vd2
       writeArray a' v vd
-      writeIORef (svVarData s) a'
+      writeIORef (svVarData solver) a'
 
-  PQ.enqueue (svVarQueue s) v
+  PQ.enqueue (svVarQueue solver) v
   return v
 
 -- |Add variables. @newVars solver n = replicateM n (newVar solver)@
 newVars :: Solver -> Int -> IO [Var]
-newVars s n = replicateM n (newVar s)
+newVars solver n = replicateM n (newVar solver)
 
 -- |Add variables. @newVars_ solver n >> return () = newVars_ solver n@
 newVars_ :: Solver -> Int -> IO ()
-newVars_ s n = replicateM_ n (newVar s)
+newVars_ solver n = replicateM_ n (newVar solver)
 
 -- |Add a clause to the solver.
 addClause :: Solver -> Clause -> IO ()
@@ -1082,8 +1082,8 @@ search solver !conflict_lim onConflict = do
 
       ret <- deduce solver
       case ret of
-        Just constr -> do
-          handleConflict conflictCounter constr
+        Just conflicted -> do
+          handleConflict conflictCounter conflicted
           -- TODO: should also learn the PB constraint?
         Nothing -> do
           let (lhs,rhs) = pb
@@ -1095,9 +1095,9 @@ search solver !conflict_lim onConflict = do
               return Nothing
             _ -> do
               addToLearntDB solver h
-              ret <- attach solver h
+              ret2 <- attach solver h
               constrBumpActivity solver h
-              if ret then
+              if ret2 then
                 return Nothing
               else
                 handleConflict conflictCounter h
@@ -1760,25 +1760,6 @@ class ConstraintHandler a where
 
   constrWriteActivity :: a -> Double -> IO ()
 
-propagateCurrentModel :: Solver -> SomeConstraintHandler -> IO Bool
-propagateCurrentModel solver c = do
-  lits <- watchedLiterals solver c
-  let f :: IM.IntMap Lit -> Lit -> IO (IM.IntMap Lit)
-      f !m !lit = do
-        val <- litValue solver lit
-        if val /= lFalse then
-          return m
-        else do
-          lv <- varAssignNo solver (litVar lit)
-          return (IM.insert lv lit m)
-  -- falsified literals ordered by their assignments
-  falsifiedLits <- liftM IM.elems $ foldM f IM.empty lits
-  flip allM falsifiedLits $ \lit -> do
-    -- To emulate normal behavior of propagation, we need to remove watches before calling 'propagate'.
-    ld <- litData solver lit
-    modifyIORef (ldWatches ld) (delete c)
-    propagate solver c lit
-
 detach :: ConstraintHandler a => Solver -> a -> IO ()
 detach solver c = do
   let c2 = toConstraintHandler c
@@ -1837,45 +1818,45 @@ data SomeConstraintHandler
 instance ConstraintHandler SomeConstraintHandler where
   toConstraintHandler = id
 
-  showConstraintHandler s (CHClause c)    = showConstraintHandler s c
-  showConstraintHandler s (CHAtLeast c)   = showConstraintHandler s c
-  showConstraintHandler s (CHPBCounter c) = showConstraintHandler s c
-  showConstraintHandler s (CHPBPueblo c)  = showConstraintHandler s c
+  showConstraintHandler solver (CHClause c)    = showConstraintHandler solver c
+  showConstraintHandler solver (CHAtLeast c)   = showConstraintHandler solver c
+  showConstraintHandler solver (CHPBCounter c) = showConstraintHandler solver c
+  showConstraintHandler solver (CHPBPueblo c)  = showConstraintHandler solver c
 
-  attach s (CHClause c)    = attach s c
-  attach s (CHAtLeast c)   = attach s c
-  attach s (CHPBCounter c) = attach s c
-  attach s (CHPBPueblo c)  = attach s c
+  attach solver (CHClause c)    = attach solver c
+  attach solver (CHAtLeast c)   = attach solver c
+  attach solver (CHPBCounter c) = attach solver c
+  attach solver (CHPBPueblo c)  = attach solver c
 
-  watchedLiterals s (CHClause c)    = watchedLiterals s c
-  watchedLiterals s (CHAtLeast c)   = watchedLiterals s c
-  watchedLiterals s (CHPBCounter c) = watchedLiterals s c
-  watchedLiterals s (CHPBPueblo c)  = watchedLiterals s c
+  watchedLiterals solver (CHClause c)    = watchedLiterals solver c
+  watchedLiterals solver (CHAtLeast c)   = watchedLiterals solver c
+  watchedLiterals solver (CHPBCounter c) = watchedLiterals solver c
+  watchedLiterals solver (CHPBPueblo c)  = watchedLiterals solver c
 
-  basicPropagate s this (CHClause c)  lit   = basicPropagate s this c lit
-  basicPropagate s this (CHAtLeast c) lit   = basicPropagate s this c lit
-  basicPropagate s this (CHPBCounter c) lit = basicPropagate s this c lit
-  basicPropagate s this (CHPBPueblo c) lit  = basicPropagate s this c lit
+  basicPropagate solver this (CHClause c)  lit   = basicPropagate solver this c lit
+  basicPropagate solver this (CHAtLeast c) lit   = basicPropagate solver this c lit
+  basicPropagate solver this (CHPBCounter c) lit = basicPropagate solver this c lit
+  basicPropagate solver this (CHPBPueblo c) lit  = basicPropagate solver this c lit
 
-  basicReasonOf s (CHClause c)  l   = basicReasonOf s c l
-  basicReasonOf s (CHAtLeast c) l   = basicReasonOf s c l
-  basicReasonOf s (CHPBCounter c) l = basicReasonOf s c l
-  basicReasonOf s (CHPBPueblo c) l  = basicReasonOf s c l
+  basicReasonOf solver (CHClause c)  l   = basicReasonOf solver c l
+  basicReasonOf solver (CHAtLeast c) l   = basicReasonOf solver c l
+  basicReasonOf solver (CHPBCounter c) l = basicReasonOf solver c l
+  basicReasonOf solver (CHPBPueblo c) l  = basicReasonOf solver c l
 
-  toPBAtLeast s (CHClause c)    = toPBAtLeast s c
-  toPBAtLeast s (CHAtLeast c)   = toPBAtLeast s c
-  toPBAtLeast s (CHPBCounter c) = toPBAtLeast s c
-  toPBAtLeast s (CHPBPueblo c)  = toPBAtLeast s c
+  toPBAtLeast solver (CHClause c)    = toPBAtLeast solver c
+  toPBAtLeast solver (CHAtLeast c)   = toPBAtLeast solver c
+  toPBAtLeast solver (CHPBCounter c) = toPBAtLeast solver c
+  toPBAtLeast solver (CHPBPueblo c)  = toPBAtLeast solver c
 
-  isSatisfied s (CHClause c)    = isSatisfied s c
-  isSatisfied s (CHAtLeast c)   = isSatisfied s c
-  isSatisfied s (CHPBCounter c) = isSatisfied s c
-  isSatisfied s (CHPBPueblo c)  = isSatisfied s c
+  isSatisfied solver (CHClause c)    = isSatisfied solver c
+  isSatisfied solver (CHAtLeast c)   = isSatisfied solver c
+  isSatisfied solver (CHPBCounter c) = isSatisfied solver c
+  isSatisfied solver (CHPBPueblo c)  = isSatisfied solver c
 
-  constrIsProtected s (CHClause c)    = constrIsProtected s c
-  constrIsProtected s (CHAtLeast c)   = constrIsProtected s c
-  constrIsProtected s (CHPBCounter c) = constrIsProtected s c
-  constrIsProtected s (CHPBPueblo c)  = constrIsProtected s c
+  constrIsProtected solver (CHClause c)    = constrIsProtected solver c
+  constrIsProtected solver (CHAtLeast c)   = constrIsProtected solver c
+  constrIsProtected solver (CHPBCounter c) = constrIsProtected solver c
+  constrIsProtected solver (CHPBPueblo c)  = constrIsProtected solver c
 
   constrReadActivity (CHClause c)    = constrReadActivity c
   constrReadActivity (CHAtLeast c)   = constrReadActivity c
@@ -1889,9 +1870,9 @@ instance ConstraintHandler SomeConstraintHandler where
 
 -- To avoid heap-allocation Maybe value, it returns -1 when not found.
 findForWatch :: Solver -> IOUArray Int Lit -> Int -> Int -> IO Int
-findForWatch solver a i end = go i end
-  where
 #ifndef __GLASGOW_HASKELL__
+findForWatch solver a beg end = go beg end
+  where
     go :: Int -> Int -> IO Int
     go i end | i > end = return (-1)
     go i end = do
@@ -1900,26 +1881,25 @@ findForWatch solver a i end = go i end
         then return i
         else go (i+1) end
 #else
-   {- We performed worker-wrapper transfomation manually, since the worker
-      generated by GHC has type
-      "Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int #)",
-      not "Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)".
-      We want latter one to avoid heap-allocating Int value. -}
-   go :: Int -> Int -> IO Int
-   go (I# i) (I# end) = IO $ \w ->
-     case go# i end w of
-       (# w2, ret #) -> (# w2, I# ret #)
+{- We performed worker-wrapper transfomation manually, since the worker
+   generated by GHC has type
+   "Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int #)",
+   not "Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)".
+   We want latter one to avoid heap-allocating Int value. -}
+findForWatch solver a (I# beg) (I# end) = IO $ \w ->
+  case go# beg end w of
+    (# w2, ret #) -> (# w2, I# ret #)
+  where
+    go# :: Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)
+    go# i end w | i ># end = (# w, -1# #)
+    go# i end w =
+      case unIO (litValue solver =<< unsafeRead a (I# i)) w of
+        (# w2, val #) ->
+          if val /= lFalse
+            then (# w2, i #)
+            else go# (i +# 1#) end w2
 
-   go# :: Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)
-   go# i end w | i ># end = (# w, -1# #)
-   go# i end w =
-     case unIO (litValue solver =<< unsafeRead a (I# i)) w of
-       (# w2, val #) ->
-         if val /= lFalse
-           then (# w2, i #)
-           else go# (i +# 1#) end w2
-
-   unIO (IO f) = f
+    unIO (IO f) = f
 #endif
 
 {--------------------------------------------------------------------
@@ -2024,32 +2004,32 @@ instance ConstraintHandler ClauseHandler where
       l1:l2:_ -> return [l1, l2]
       _ -> return []
 
-  basicPropagate !s this this2 !falsifiedLit = do
+  basicPropagate !solver this this2 !falsifiedLit = do
     preprocess
 
     !lit0 <- unsafeRead a 0
-    !val0 <- litValue s lit0
+    !val0 <- litValue solver lit0
     if val0 == lTrue
       then do
-        watch s falsifiedLit this
+        watch solver falsifiedLit this
         return True
       else do
         (!lb,!ub) <- getBounds a
         assert (lb==0) $ return ()
-        i <- findForWatch s a 2 ub
+        i <- findForWatch solver a 2 ub
         case i of
           -1 -> do
-            when debugMode $ logIO s $ do
-               str <- showConstraintHandler s this
+            when debugMode $ logIO solver $ do
+               str <- showConstraintHandler solver this
                return $ printf "basicPropagate: %s is unit" str
-            watch s falsifiedLit this
-            assignBy s lit0 this
+            watch solver falsifiedLit this
+            assignBy solver lit0 this
           _  -> do
             !lit1 <- unsafeRead a 1
             !liti <- unsafeRead a i
             unsafeWrite a 1 liti
             unsafeWrite a i lit1
-            watch s liti this
+            watch solver liti this
             return True
 
     where
@@ -2238,7 +2218,7 @@ instance ConstraintHandler AtLeastHandler where
     let ws = if length lits > n then take (n+1) lits else []
     return ws
 
-  basicPropagate s this this2 falsifiedLit = do
+  basicPropagate solver this this2 falsifiedLit = do
     preprocess
 
     when debugMode $ do
@@ -2247,19 +2227,19 @@ instance ConstraintHandler AtLeastHandler where
 
     (lb,ub) <- getBounds a
     assert (lb==0) $ return ()
-    i <- findForWatch s a (n+1) ub
+    i <- findForWatch solver a (n+1) ub
     case i of
       -1 -> do
-        when debugMode $ logIO s $ do
-          str <- showConstraintHandler s this
+        when debugMode $ logIO solver $ do
+          str <- showConstraintHandler solver this
           return $ printf "basicPropagate: %s is unit" str
-        watch s falsifiedLit this
+        watch solver falsifiedLit this
         let loop :: Int -> IO Bool
             loop i
               | i >= n = return True
               | otherwise = do
                   liti <- unsafeRead a i
-                  ret2 <- assignBy s liti this
+                  ret2 <- assignBy solver liti this
                   if ret2
                     then loop (i+1)
                     else return False
@@ -2269,7 +2249,7 @@ instance ConstraintHandler AtLeastHandler where
         litn <- unsafeRead a n
         unsafeWrite a i litn
         unsafeWrite a n liti
-        watch s liti this
+        watch solver liti this
         return True
 
     where
@@ -2291,14 +2271,14 @@ instance ConstraintHandler AtLeastHandler where
                   unsafeWrite a n li
                   unsafeWrite a i ln
 
-  basicReasonOf s this concl = do
+  basicReasonOf solver this concl = do
     (lb,ub) <- getBounds (atLeastLits this)
     assert (lb==0) $ return ()
     let n = atLeastNum this
     falsifiedLits <- mapM (readArray (atLeastLits this)) [n..ub] -- drop first n elements
     when debugMode $ do
       forM_ falsifiedLits $ \lit -> do
-        val <- litValue s lit
+        val <- litValue solver lit
         unless (val == lFalse) $ do
           error $ printf "AtLeastHandler.basicReasonOf: %d is %s (lFalse expected)" lit (show val)
     case concl of
@@ -2308,7 +2288,7 @@ instance ConstraintHandler AtLeastHandler where
               | i >= n = error $ printf "AtLeastHandler.basicReasonOf: cannot find falsified literal in first %d elements" n
               | otherwise = do
                   lit <- readArray (atLeastLits this) i
-                  val <- litValue s lit
+                  val <- litValue solver lit
                   if val == lFalse
                   then return lit
                   else go (i+1)
@@ -2599,7 +2579,7 @@ instance ConstraintHandler PBHandlerPueblo where
     -- "WatchSum >= puebloDegree this + puebloAMax this" when backtrack is performed.
     wsum <- puebloGetWatchSum this
     unless (wsum >= puebloDegree this + puebloAMax this) $ do
-      let f m tm@(c,lit) = do
+      let f m tm@(_,lit) = do
             val <- litValue solver lit
             if val == lFalse then do
               idx <- varAssignNo solver (litVar lit)
@@ -2607,7 +2587,7 @@ instance ConstraintHandler PBHandlerPueblo where
             else
               return m
       xs <- liftM (map snd . IM.toDescList) $ foldM f IM.empty (puebloTerms this)
-      let g !s [] = return ()
+      let g !_ [] = return ()
           g !s (t@(c,l):ts) = do
             addBacktrackCB solver (litVar l) $ puebloWatch solver constr this t
             if s+c >= puebloDegree this + puebloAMax this then return ()
@@ -2686,7 +2666,7 @@ puebloPropagate solver constr this = do
   else do -- puebloDegree this <= watchsum < puebloDegree this + puebloAMax this
     -- UNIT PROPAGATION
     let f [] = return True
-        f (t@(c,lit) : ts) = do
+        f ((c,lit) : ts) = do
           watchsum <- puebloGetWatchSum this
           if watchsum - c >= puebloDegree this then
             return True
