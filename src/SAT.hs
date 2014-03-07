@@ -91,7 +91,8 @@ module SAT
   , setCheckModel
   , setRandomFreq
   , defaultRandomFreq
-  , setRandomSeed
+  , setRandomGen
+  , getRandomGen
   , setConfBudget
   , PBHandlerType (..)
   , setPBHandlerType
@@ -1220,10 +1221,13 @@ setRandomFreq solver r = do
 defaultRandomFreq :: Double
 defaultRandomFreq = 0.005
 
--- | Used by the random variable selection
-setRandomSeed :: Solver -> Int -> IO ()
-setRandomSeed solver seed = do
-  writeIORef (svRandomGen solver) (Rand.mkStdGen seed)
+-- | Set random generator used by the random variable selection
+setRandomGen :: Solver -> Rand.StdGen -> IO ()
+setRandomGen solver = writeIORef (svRandomGen solver)
+
+-- | Get random generator used by the random variable selection
+getRandomGen :: Solver -> IO Rand.StdGen
+getRandomGen solver = readIORef (svRandomGen solver)
 
 setConfBudget :: Solver -> Maybe Int -> IO ()
 setConfBudget solver (Just b) | b >= 0 = writeIORef (svConfBudget solver) b

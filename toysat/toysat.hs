@@ -40,6 +40,7 @@ import System.Console.GetOpt
 import System.CPUTime
 import System.FilePath
 import qualified System.Info as SysInfo
+import qualified System.Random as Rand
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import Text.Printf
 #ifdef __GLASGOW_HASKELL__
@@ -86,7 +87,7 @@ data Options
   , optLearntSizeInc    :: Double
   , optCCMin         :: Int
   , optRandomFreq    :: Double
-  , optRandomSeed    :: Int
+  , optRandomGen     :: Maybe Rand.StdGen
   , optLinearizerPB  :: Bool
   , optPBHandlerType :: SAT.PBHandlerType
   , optSearchStrategy       :: PBO.SearchStrategy
@@ -110,7 +111,7 @@ defaultOptions
   , optLearntSizeInc    = SAT.defaultLearntSizeInc
   , optCCMin         = SAT.defaultCCMin
   , optRandomFreq    = SAT.defaultRandomFreq
-  , optRandomSeed    = 0
+  , optRandomGen     = Nothing
   , optLinearizerPB  = False
   , optPBHandlerType = SAT.defaultPBHandlerType
   , optSearchStrategy       = PBO.optSearchStrategy PBO.defaultOptions
@@ -160,8 +161,11 @@ options =
         (ReqArg (\val opt -> opt{ optRandomFreq = read val }) "<0..1>")
         (printf "The frequency with which the decision heuristic tries to choose a random variable (default %f)" SAT.defaultRandomFreq)
     , Option [] ["random-seed"]
-        (ReqArg (\val opt -> opt{ optRandomSeed = read val }) "<int>")
-        "Used by the random variable selection"
+        (ReqArg (\val opt -> opt{ optRandomGen = Just (Rand.mkStdGen (read val)) }) "<int>")
+        "random seed used by the random variable selection"
+    , Option [] ["random-gen"]
+        (ReqArg (\val opt -> opt{ optRandomGen = Just (read val) }) "<str>")
+        "another way of specifying random seed used by the random variable selection"
 
     , Option [] ["linearizer-pb"]
         (NoArg (\opt -> opt{ optLinearizerPB = True }))
@@ -390,8 +394,11 @@ newSolver opts = do
   SAT.setLearntSizeInc   solver (optLearntSizeInc opts)
   SAT.setCCMin           solver (optCCMin opts)
   SAT.setRandomFreq      solver (optRandomFreq opts)
-  when (optRandomSeed opts /= 0) $ 
-    SAT.setRandomSeed solver (optRandomSeed opts)
+  case optRandomGen opts of
+    Nothing -> return ()
+    Just gen -> SAT.setRandomGen solver gen
+  do gen <- SAT.getRandomGen solver
+     putCommentLine $ "use --random-gen=" ++ show (show gen) ++ " option to reproduce the execution"
   SAT.setLearningStrategy solver (optLearningStrategy opts)
   SAT.setPBHandlerType solver (optPBHandlerType opts)
   SAT.setLogger solver putCommentLine
