@@ -344,7 +344,12 @@ bcpCheckEmpty solver = do
     error "BUG: BCP Queue should be empty at this point"
 
 assignBy :: ConstraintHandler c => Solver -> Lit -> c -> IO Bool
-assignBy solver lit c = assign_ solver lit (Just (toConstraintHandler c))
+assignBy solver lit c = do
+  lv <- readIORef (svLevel solver)
+  let !c2 = if lv == levelRoot
+            then Nothing
+            else Just $! toConstraintHandler c
+  assign_ solver lit c2
 
 assign :: Solver -> Lit -> IO Bool
 assign solver lit = assign_ solver lit Nothing
