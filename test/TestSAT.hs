@@ -349,6 +349,17 @@ case_cardinalityReduction = (sort lhs, rhs) @?= ([1,2,3,4,5],4)
   where
     (lhs, rhs) = cardinalityReduction ([(6,1),(5,2),(4,3),(3,4),(2,5),(1,6)], 17)
 
+case_pbSubsume_clause :: Assertion
+case_pbSubsume_clause = pbSubsume ([(1,1),(1,-3)],1) ([(1,1),(1,2),(1,-3),(1,4)],1) @?= True
+
+case_pbSubsume_1 :: Assertion
+case_pbSubsume_1 = pbSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)],1) @?= True
+
+case_pbSubsume_2 :: Assertion
+case_pbSubsume_2 = pbSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)],3) @?= False
+
+------------------------------------------------------------------------
+
 -- from "Pueblo: A Hybrid Pseudo-Boolean SAT Solver"
 -- clauseがunitになるレベルで、PB制約が違反状態のままという例。
 case_hybridLearning_1 :: IO ()

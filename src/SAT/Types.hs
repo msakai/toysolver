@@ -25,6 +25,7 @@ module SAT.Types
   -- * Clause
   , Clause
   , normalizeClause
+  , clauseSubsume
 
   -- * Cardinality Constraint
   , AtLeast
@@ -44,6 +45,7 @@ module SAT.Types
   , pbEval
   , pbLowerBound
   , pbUpperBound
+  , pbSubsume
   ) where
 
 import Control.Monad
@@ -127,6 +129,12 @@ normalizeClause lits = assert (IntSet.size ys `mod` 2 == 0) $
   where
     xs = IntSet.fromList lits
     ys = xs `IntSet.intersection` (IntSet.map litNot xs)
+
+clauseSubsume :: Clause -> Clause -> Bool
+clauseSubsume cl1 cl2 = cl1' `IntSet.isSubsetOf` cl2'
+  where
+    cl1' = IntSet.fromList cl1
+    cl2' = IntSet.fromList cl2
 
 type AtLeast = ([Lit], Int)
 
@@ -257,3 +265,10 @@ pbLowerBound xs = sum [if c < 0 then c else 0 | (c,_) <- xs]
 
 pbUpperBound :: PBLinSum -> Integer
 pbUpperBound xs = sum [if c > 0 then c else 0 | (c,_) <- xs]
+
+-- (Σi ci li ≥ rhs1) subsumes (Σi di li ≥ rhs2) iff rhs1≥rhs2 and di≥ci for all i.
+pbSubsume :: PBLinAtLeast -> PBLinAtLeast -> Bool
+pbSubsume (lhs1,rhs1) (lhs2,rhs2) =
+  rhs1 >= rhs2 && and [di >= ci | (ci,li) <- lhs1, let di = IntMap.findWithDefault 0 li lhs2']
+  where
+    lhs2' = IntMap.fromList [(l,c) | (c,l) <- lhs2]
