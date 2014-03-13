@@ -62,6 +62,7 @@ import qualified SAT.TseitinEncoder as Tseitin
 import qualified SAT.MUS as MUS
 import qualified SAT.CAMUS as CAMUS
 import SAT.Types (pbEval)
+import qualified SAT.Types as SAT
 import SAT.Printer
 import qualified Text.PBFile as PBFile
 import qualified Text.LPFile as LPFile
@@ -567,14 +568,14 @@ solvePB opt solver formula@(obj, cs) = do
               writeSOLFile opt m (Just objval) n
           throwIO e
 
-pbConvSum :: Tseitin.Encoder -> PBFile.Sum -> IO [(Integer, SAT.Lit)]
+pbConvSum :: Tseitin.Encoder -> PBFile.Sum -> IO SAT.PBLinSum
 pbConvSum enc = revMapM f
   where
     f (w,ls) = do
       l <- Tseitin.encodeConj enc ls
       return (w,l)
 
-minimize :: Options -> SAT.Solver -> [(Integer, SAT.Lit)] -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
+minimize :: Options -> SAT.Solver -> SAT.PBLinSum -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
 minimize opt solver obj update = do
   let opt2 =
         PBO.defaultOptions

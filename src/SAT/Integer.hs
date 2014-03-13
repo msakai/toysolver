@@ -15,6 +15,7 @@ import Text.Printf
 
 import Data.ArithRel
 import qualified SAT
+import qualified SAT.Types as SAT
 import qualified SAT.TseitinEncoder as TseitinEncoder
 
 data Expr = Expr [(Integer, [SAT.Lit])]
@@ -46,7 +47,7 @@ instance Num Expr where
   signum _ = 1
   fromInteger c = Expr [(c,[])]
 
-linearize :: TseitinEncoder.Encoder -> Expr -> IO ([(Integer,SAT.Lit)], Integer)
+linearize :: TseitinEncoder.Encoder -> Expr -> IO (SAT.PBLinSum, Integer)
 linearize enc (Expr xs) = do
   let ys = [(c,lits) | (c,lits@(_:_)) <- xs]
       c  = sum [c | (c,[]) <- xs]

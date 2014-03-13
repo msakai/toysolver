@@ -52,7 +52,7 @@ defaultOptions
   , optTrialLimitConf       = 1000
   }
 
-minimize :: Solver -> [(Integer, Lit)] -> Options -> IO (Maybe Model)
+minimize :: Solver -> PBLinSum -> Options -> IO (Maybe Model)
 minimize solver obj opt = do
   when (optObjFunVarsHeuristics opt) $ tweakParams solver obj
 
@@ -201,7 +201,7 @@ minimize solver obj opt = do
                   addPBAtLeast solver obj lb'
                   loop lb' ub fraction' m
 
-tweakParams :: Solver -> [(Integer, Lit)] -> IO ()
+tweakParams :: Solver -> PBLinSum -> IO ()
 tweakParams solver obj = do
   forM_ obj $ \(c,l) -> do
     let p = if c > 0 then not (litPolarity l) else litPolarity l
