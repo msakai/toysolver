@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
@@ -62,6 +63,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Interned (intern, unintern)
+import Data.Interned.String
 import Data.OptDir
 import Text.ParserCombinators.Parsec hiding (label)
 
@@ -139,7 +142,7 @@ type Bounds = (BoundExpr, BoundExpr)
 type Label = String
 
 -- | variable
-type Var = String
+type Var = InternedString
 
 -- | type for representing lower/upper bound of variables
 data BoundExpr = NegInf | Finite Rational | PosInf
@@ -190,11 +193,11 @@ defaultUB = PosInf
 
 -- | convert a string into a variable
 toVar :: String -> Var
-toVar = id
+toVar = intern
 
 -- | convert a variable into a string
 fromVar :: Var -> String
-fromVar = id
+fromVar = unintern
 
 -- | looking up attributes for a variable
 getVarInfo :: LP -> Var -> VarInfo
@@ -266,7 +269,7 @@ ident = tok $ do
     syms2 = '.' : syms1
 
 variable :: Parser Var
-variable = ident
+variable = liftM intern ident
 
 label :: Parser Label
 label = do
