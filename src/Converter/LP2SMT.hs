@@ -231,10 +231,10 @@ convert opt lp =
         YICES   -> "int"
     ts = [(v, realType) | v <- Set.toList real_vs] ++ [(v, intType) | v <- Set.toList int_vs]
     obj = snd (LP.objectiveFunction lp)
-    env = Map.fromList [(v, encode opt v) | v <- Set.toList vs]
+    env = Map.fromList [(v, encode opt (LP.fromVar v)) | v <- Set.toList vs]
     -- Note that identifiers of LPFile does not contain '-'.
     -- So that there are no name crash.
-    env2 = Map.fromList [(v, encode opt (v ++ "-2")) | v <- Set.toList vs]
+    env2 = Map.fromList [(v, encode opt (LP.fromVar v ++ "-2")) | v <- Set.toList vs]
 
     defs = do
       (v,t) <- ts
@@ -242,7 +242,7 @@ convert opt lp =
       return $ showString $
         case optLanguage opt of
           SMTLIB2 -> printf "(declare-fun %s () %s)" v2 t
-          YICES   -> printf "(define %s::%s) ; %s"  v2 t v
+          YICES   -> printf "(define %s::%s) ; %s"  v2 t (LP.fromVar v)
 
     optimality = list [showString "forall", decl, body]
       where

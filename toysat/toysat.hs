@@ -710,7 +710,7 @@ solveLP :: Options -> SAT.Solver -> LPFile.LP -> IO ()
 solveLP opt solver lp = do
   if not (Set.null nivs)
     then do
-      putCommentLine $ "cannot handle non-integer variables: " ++ intercalate ", " (Set.toList nivs)
+      putCommentLine $ "cannot handle non-integer variables: " ++ intercalate ", " (map LPFile.fromVar (Set.toList nivs))
       putSLine "UNKNOWN"
       exitFailure
     else do
@@ -725,7 +725,7 @@ solveLP opt solver lp = do
             v2 <- SAT.Integer.newVar solver (ceiling lb') (floor ub')
             return (v,v2)
           _ -> do
-            putCommentLine $ "cannot handle unbounded variable: " ++ v
+            putCommentLine $ "cannot handle unbounded variable: " ++ LPFile.fromVar v
             putSLine "UNKNOWN"
             exitFailure
 
@@ -779,7 +779,7 @@ solveLP opt solver lp = do
           printModel m = do
             forM_ (Set.toList ivs) $ \v -> do
               let val = SAT.Integer.eval m (vmap Map.! v)
-              printf "v %s = %d\n" v val
+              printf "v %s = %d\n" (LPFile.fromVar v) val
             hFlush stdout
             writeSol m
 
@@ -788,7 +788,7 @@ solveLP opt solver lp = do
             case optWriteFile opt of
               Nothing -> return ()
               Just fname -> do
-                let m2 = Map.fromList [ (v, fromInteger val)     
+                let m2 = Map.fromList [ (LPFile.fromVar v, fromInteger val)
                                       | v <- Set.toList ivs
                                       , let val = SAT.Integer.eval m (vmap Map.! v) ]
                     o  = fromInteger $ SAT.Integer.eval m obj2

@@ -112,7 +112,7 @@ run
   :: String
   -> [Flag]
   -> LP.LP
-  -> (Map String Rational -> IO ())
+  -> (Map LP.Var Rational -> IO ())
   -> IO ()
 run solver opt lp printModel = do
   unless (Set.null (LP.semiContinuousVariables lp)) $ do
@@ -342,10 +342,10 @@ run solver opt lp printModel = do
     showValue :: Rational -> String
     showValue = showRational printRat
 
-lpPrintModel :: Handle -> Bool -> Map String Rational -> IO ()
+lpPrintModel :: Handle -> Bool -> Map LP.Var Rational -> IO ()
 lpPrintModel h asRat m = do
   forM_ (Map.toList m) $ \(v, val) -> do
-    printf "v %s = %s\n" v (showRational asRat val)
+    printf "v %s = %s\n" (LP.fromVar v) (showRational asRat val)
 
 
 putCommentLine :: String -> IO ()
@@ -453,14 +453,19 @@ main = do
         hPutStrLn stderr $ concat errs ++ usageInfo header options
 
 -- FIXME: 目的関数値を表示するように
-writeSOLFileLP :: [Flag] -> Map String Rational -> IO ()
+writeSOLFileLP :: [Flag] -> Map LP.Var Rational -> IO ()
 writeSOLFileLP opt m = do
-  forM_ [fname | WriteFile fname <- opt ] $ \fname -> do
-    let m2 = Map.map fromRational m
-    writeFile fname (GurobiSol.render m2 Nothing)
+  let m2 = Map.fromList [(LP.fromVar v, fromRational val) | (v,val) <- Map.toList m]
+  writeSOLFileRaw opt m2
 
 -- FIXME: 目的関数値を表示するように
 writeSOLFileSAT :: [Flag] -> SAT.Model -> IO ()
 writeSOLFileSAT opt m = do
   let m2 = Map.fromList [("x" ++ show x, if b then 1 else 0) | (x,b) <- assocs m]
-  writeSOLFileLP opt m2
+  writeSOLFileRaw opt m2
+
+writeSOLFileRaw :: [Flag] -> Map String Rational -> IO ()
+writeSOLFileRaw opt m = do
+  forM_ [fname | WriteFile fname <- opt ] $ \fname -> do
+    let m2 = Map.map fromRational m
+    writeFile fname (GurobiSol.render m2 Nothing)

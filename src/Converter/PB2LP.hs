@@ -72,7 +72,7 @@ convert formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
         }
 
 convExpr :: PBFile.Sum -> LPFile.Expr
-convExpr [] = [LPFile.Term 0 ["x1"]]
+convExpr [] = [LPFile.Term 0 [LPFile.toVar "x1"]]
 convExpr s = concatMap g2 s
   where
     g2 :: PBFile.WeightedTerm -> LPFile.Expr
@@ -90,7 +90,7 @@ convExpr s = concatMap g2 s
     prodT (LPFile.Term c1 vs1) (LPFile.Term c2 vs2) = LPFile.Term (c1*c2) (vs1++vs2)
 
 convVar :: PBFile.Var -> LPFile.Var
-convVar x = ("x" ++ show x)
+convVar x = LPFile.toVar ("x" ++ show x)
 
 collectVariables :: PBFile.Formula -> IntSet
 collectVariables (obj, cs) = IntSet.unions $ maybe IntSet.empty f obj : [f s | (s,_,_) <- cs]
@@ -148,11 +148,11 @@ convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formu
           lhs2 = convExpr lhs
           lhs3 = [t | t@(LPFile.Term _ (_:_)) <- lhs2]
           rhs3 = fromIntegral rhs - sum [c | LPFile.Term c [] <- lhs2]
-          v = "r" ++ show n
+          v = LPFile.toVar ("r" ++ show n)
           (ts,ind) =
             case w of
               Nothing -> ([], Nothing)
-              Just w2 -> ([(w2, v)], Just (v,0))
+              Just w2 -> ([(w2,v)], Just (v,0))
       if isNothing w || useIndicator then do
          let op2 =
                case op of

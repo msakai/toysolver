@@ -40,6 +40,8 @@ module Text.LPFile
   , defaultBounds
   , defaultLB
   , defaultUB
+  , toVar
+  , fromVar
   , getVarInfo
   , getVarType
   , getBounds
@@ -186,6 +188,14 @@ defaultLB = Finite 0
 defaultUB :: BoundExpr
 defaultUB = PosInf
 
+-- | convert a string into a variable
+toVar :: String -> Var
+toVar = id
+
+-- | convert a variable into a string
+fromVar :: Var -> String
+fromVar = id
+
 -- | looking up attributes for a variable
 getVarInfo :: LP -> Var -> VarInfo
 getVarInfo lp v = Map.findWithDefault defaultVarInfo v (varInfo lp)
@@ -254,6 +264,9 @@ ident = tok $ do
   where
     syms1 = "!\"#$%&()/,;?@_`'{}|~"
     syms2 = '.' : syms1
+
+variable :: Parser Var
+variable = ident
 
 label :: Parser Label
 label = do
@@ -360,7 +373,7 @@ constraint t = do
   name <- optionMaybe (try label)
 
   g <- optionMaybe $ try $ do
-    var <- ident
+    var <- variable
     tok (char '=')
     val <- tok ((char '0' >> return 0) <|> (char '1' >> return 1))
     tok $ string "->"
@@ -415,7 +428,7 @@ boundsSection = do
 bound :: Parser (Var, Bounds2)
 bound = msum
   [ try $ do
-      v <- try ident
+      v <- try variable
       msum
         [ do
             op <- relOp
@@ -435,7 +448,7 @@ bound = msum
       b1 <- liftM Just boundExpr
       op1 <- relOp
       guard $ op1 == Le
-      v <- ident
+      v <- variable
       b2 <- option Nothing $ do
         op2 <- relOp
         guard $ op2 == Le
@@ -461,17 +474,17 @@ inf = tok (string "inf" >> optional (string "inity"))
 generalSection :: Parser [Var]
 generalSection = do
   tok $ string' "gen" >> optional (string' "eral" >> optional (string' "s"))
-  many (try ident)
+  many (try variable)
 
 binarySection :: Parser [Var]
 binarySection = do
   tok $ string' "bin" >> optional (string' "ar" >> (string' "y" <|> string' "ies"))
-  many (try ident)
+  many (try variable)
 
 semiSection :: Parser [Var]
 semiSection = do
   tok $ string' "semi" >> optional (string' "-continuous" <|> string' "s")
-  many (try ident)
+  many (try variable)
 
 sosSection :: Parser [SOS]
 sosSection = do
@@ -480,7 +493,7 @@ sosSection = do
     (l,t) <- try (do{ l <- label; t <- typ; return (Just l, t) })
           <|> (do{ t <- typ; return (Nothing, t) })
     xs <- many $ try $ do
-      v <- ident
+      v <- variable
       tok $ char ':'
       w <- number
       return (v,w)
@@ -509,7 +522,7 @@ term :: Bool -> Parser Expr
 term flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
-  e <- liftM (\s' -> [Term 1 [s']]) ident <|> qexpr
+  e <- liftM (\s' -> [Term 1 [s']]) variable <|> qexpr
   return $ case combineMaybe (*) s c of
     Nothing -> e
     Just d -> [Term (d*c') vs | Term c' vs <- e]
@@ -536,7 +549,7 @@ qterm flag = do
 
 qfactor :: Parser [Var]
 qfactor = do
-  v <- ident
+  v <- variable
   msum [ tok (char '^') >> tok (char '2') >> return [v,v]
        , return [v]
        ]
@@ -617,7 +630,7 @@ render' lp = do
     unless (v `Set.member` bins) $ do
       renderBoundExpr lb
       tell $ showString " <= "
-      tell $ showString v
+      tell $ showVar v
       tell $ showString " <= "
       renderBoundExpr ub
       tell $ showChar '\n'
@@ -642,7 +655,7 @@ render' lp = do
       tell $ showString " ::"
       forM_ xs $ \(v, r) -> do
         tell $ showString "  "
-        tell $ showString v
+        tell $ showVar v
         tell $ showString " : "
         tell $ showValue r
       tell $ showChar '\n'
@@ -667,13 +680,16 @@ renderExpr isObj e = fill 80 (ts1 ++ ts2)
 
     f :: Term -> String
     f (Term c [])  = showConstTerm c ""
-    f (Term c [v]) = showCoeff c v
+    f (Term c [v]) = showCoeff c . showVar v $ ""
     f _ = error "should not happen"
 
     g :: Term -> String
     g (Term c vs) = 
       (if isObj then showCoeff (2*c) else showCoeff c)
-      (intercalate " * " vs)
+      (intercalate " * " (map fromVar vs))
+
+showVar :: Var -> ShowS
+showVar = showString . fromVar
 
 showValue :: Rational -> ShowS
 showValue c =
@@ -711,7 +727,7 @@ renderConstraint c@Constraint{ constrBody = (e,op,val) }  = do
   case constrIndicator c of
     Nothing -> return ()
     Just (v,vval) -> do
-      tell $ showString v . showString " = "
+      tell $ showVar v . showString " = "
       tell $ showValue vval
       tell $ showString " -> "
 
@@ -727,7 +743,7 @@ renderBoundExpr NegInf = tell $ showString "-inf"
 renderBoundExpr PosInf = tell $ showString "+inf"
 
 renderVariableList :: [Var] -> WriterT ShowS Maybe ()
-renderVariableList vs = fill 80 vs >> tell (showChar '\n')
+renderVariableList vs = fill 80 (map fromVar vs) >> tell (showChar '\n')
 
 fill :: Int -> [String] -> WriterT ShowS Maybe ()
 fill width str = go str 0

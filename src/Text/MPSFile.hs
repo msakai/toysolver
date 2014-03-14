@@ -41,7 +41,7 @@ import Text.ParserCombinators.Parsec hiding (spaces, newline, Column)
 import Data.OptDir
 import qualified Text.LPFile as LPFile
 
-type Column = String
+type Column = LPFile.Var
 type Row = String
 
 data BoundType
@@ -97,6 +97,9 @@ tok p = do
   x <- p
   msum [spaces1', lookAhead (try (char '\n' >> return ())), eof]
   return x
+
+column :: Parser Column
+column = liftM LPFile.toVar ident
 
 ident :: Parser String
 ident = tok $ many1 $ noneOf [' ', '\t', '\n']
@@ -391,7 +394,7 @@ colsSection = do
     entry :: Parser (Column, Map Row Rational)
     entry = do
       spaces1'
-      col <- ident
+      col <- column
       rv1 <- rowAndVal
       opt <- optionMaybe rowAndVal
       newline'
@@ -444,7 +447,7 @@ boundsSection = do
       spaces1'
       typ   <- boundType
       _name <- ident
-      col   <- ident
+      col   <- column
       val   <- if typ `elem` [FR, BV, MI, PL]
                then return 0
                else number
@@ -471,13 +474,13 @@ sosSection = do
       xs <- many (try identAndVal)
       return (Just name, typ, xs)
 
-    identAndVal :: Parser (Row, Rational)
+    identAndVal :: Parser (Column, Rational)
     identAndVal = do
       spaces1'
-      row <- ident
+      col <- column
       val <- number
       newline'
-      return (row, val)
+      return (col, val)
 
 quadObjSection :: Parser [LPFile.Term]
 quadObjSection = do
@@ -486,8 +489,8 @@ quadObjSection = do
   where
     entry = do
       spaces1'
-      col1 <- ident
-      col2 <- ident
+      col1 <- column
+      col2 <- column
       val  <- number
       newline'
       return $ LPFile.Term (if col1 /= col2 then val else val / 2) [col1, col2]
@@ -499,8 +502,8 @@ qMatrixSection = do
   where
     entry = do
       spaces1'
-      col1 <- ident
-      col2 <- ident
+      col1 <- column
+      col2 <- column
       val  <- number
       newline'
       return $ LPFile.Term (val / 2) [col1, col2]
@@ -515,8 +518,8 @@ qcMatrixSection = do
   where
     entry = do
       spaces1'
-      col1 <- ident
-      col2 <- ident
+      col1 <- column
+      col2 <- column
       val  <- number
       newline'
       return $ LPFile.Term val [col1, col2]
@@ -531,7 +534,7 @@ indicatorsSection = do
       string "IF"
       spaces1'
       row <- ident
-      var <- ident
+      var <- column
       val <- number
       newline'
       return (row, (var, val))
