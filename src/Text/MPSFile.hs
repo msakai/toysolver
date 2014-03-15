@@ -34,6 +34,8 @@ import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Ratio
+import Data.Interned
+import Data.Interned.String
 
 import qualified Text.ParserCombinators.Parsec as P
 import Text.ParserCombinators.Parsec hiding (spaces, newline, Column)
@@ -42,7 +44,7 @@ import Data.OptDir
 import qualified Text.LPFile as LPFile
 
 type Column = LPFile.Var
-type Row = String
+type Row = InternedString
 
 data BoundType
   = LO	-- lower bound
@@ -97,6 +99,9 @@ tok p = do
   x <- p
   msum [spaces1', lookAhead (try (char '\n' >> return ())), eof]
   return x
+
+row :: Parser Row
+row = liftM intern ident
 
 column :: Parser Column
 column = liftM LPFile.toVar ident
@@ -186,8 +191,8 @@ mpsfile = do
 
   let objrow =
         case objname of
-          Nothing -> head [row | (Nothing, row) <- rows] -- XXX
-          Just r  -> r
+          Nothing -> head [r | (Nothing, r) <- rows] -- XXX
+          Just r  -> intern r
       objdir =
         case objsense of
           Nothing -> OptMin
@@ -277,7 +282,7 @@ mpsfile = do
                   else [(LPFile.Ge, rhs), (LPFile.Le, rhs + rng)]
         return $
           LPFile.Constraint
-          { LPFile.constrLabel     = Just row
+          { LPFile.constrLabel     = Just $ unintern row
           , LPFile.constrIndicator = Map.lookup row inds
           , LPFile.constrIsLazy    = isLazy
           , LPFile.constrBody      = (lhs, op2, rhs2)
@@ -288,7 +293,7 @@ mpsfile = do
         { LPFile.variables               = vs
         , LPFile.dir                     = objdir
         , LPFile.objectiveFunction       =
-            ( Just objrow
+            ( Just (unintern objrow)
             , [LPFile.Term c [col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
             )
         , LPFile.constraints           = concatMap (f False) rows ++ concatMap (f True) lazycons
@@ -362,7 +367,7 @@ rowsBody = many $ do
         , char 'E' >> return (Just LPFile.Eql)
         ]
   spaces1'
-  name <- ident
+  name <- row
   newline'
   return (op, name)
 
@@ -406,9 +411,9 @@ colsSection = do
 
 rowAndVal :: Parser (Map Row Rational)
 rowAndVal = do
-  row <- ident
+  r <- row
   val <- number
-  return $ Map.singleton row val
+  return $ Map.singleton r val
 
 rhsSection :: Parser (Map Row Rational)
 rhsSection = do
@@ -514,9 +519,9 @@ qcMatrixSection :: Parser (Row, [LPFile.Term])
 qcMatrixSection = do
   try $ stringLn "QCMATRIX"
   spaces1'
-  row <- ident
+  r <- row
   xs <- many entry
-  return (row, xs)
+  return (r, xs)
   where
     entry = do
       spaces1'
@@ -535,8 +540,8 @@ indicatorsSection = do
       spaces1'
       string "IF"
       spaces1'
-      row <- ident
+      r <- row
       var <- column
       val <- number
       newline'
-      return (row, (var, val))
+      return (r, (var, val))
