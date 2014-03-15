@@ -77,10 +77,10 @@ space' :: Parser Char
 space' = oneOf [' ', '\t']
 
 spaces' :: Parser ()
-spaces' = skipMany space' >> return ()
+spaces' = skipMany space'
 
 spaces1' :: Parser ()
-spaces1' = skipMany1 space' >> return ()
+spaces1' = skipMany1 space'
 
 commentline :: Parser ()
 commentline = do
