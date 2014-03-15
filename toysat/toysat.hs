@@ -755,7 +755,7 @@ solveLP opt solver lp = do
               _ -> return ()
 
       putCommentLine "Loading SOS constraints"
-      forM_ (LPFile.sos lp) $ \(_label, typ, xs) -> do
+      forM_ (LPFile.sosConstraints lp) $ \LPFile.SOSConstraint{ LPFile.sosType = typ, LPFile.sosBody = xs } -> do
         case typ of
           LPFile.S1 -> SAT.addAtMost solver (map (asBin . (vmap Map.!) . fst) xs) 1
           LPFile.S2 -> do

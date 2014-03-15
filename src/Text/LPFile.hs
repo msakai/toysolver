@@ -37,7 +37,7 @@ module Text.LPFile
   , BoundExpr (..)
   , RelOp (..)
   , SOSType (..)
-  , SOS
+  , SOSConstraint (..)
   , defaultBounds
   , defaultLB
   , defaultUB
@@ -79,8 +79,9 @@ data LP
   , dir :: OptDir
   , objectiveFunction :: ObjectiveFunction
   , constraints :: [Constraint]
+  , sosConstraints :: [SOSConstraint]
+  , userCuts :: [Constraint]
   , varInfo :: Map Var VarInfo
-  , sos :: [SOS]
   }
   deriving (Show, Eq, Ord)
 
@@ -103,10 +104,10 @@ data ConstraintType
 -- | constraint
 data Constraint
   = Constraint
-  { constrType      :: ConstraintType
-  , constrLabel     :: Maybe Label
+  { constrLabel     :: Maybe Label
   , constrIndicator :: Maybe (Var, Rational)
   , constrBody      :: (Expr, RelOp, Rational)
+  , constrIsLazy    :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -159,13 +160,23 @@ data SOSType
     deriving (Eq, Ord, Enum, Show, Read)
 
 -- | SOS (special ordered sets) constraints
-type SOS = (Maybe Label, SOSType, [(Var, Rational)])
+data SOSConstraint
+  = SOSConstraint
+  { sosLabel :: Maybe Label
+  , sosType  :: SOSType
+  , sosBody  :: [(Var, Rational)]
+  }
+  deriving (Eq, Ord, Show)
 
 class Variables a where
   vars :: a -> Set Var
 
 instance Variables a => Variables [a] where
   vars = Set.unions . map vars
+
+instance (Variables a, Variables b) => Variables (Either a b) where
+  vars (Left a)  = vars a
+  vars (Right b) = vars b
 
 instance Variables LP where
   vars = variables
@@ -178,6 +189,9 @@ instance Variables Constraint where
     vars lhs `Set.union` vs2
     where
       vs2 = maybe Set.empty (Set.singleton . fst) ind
+
+instance Variables SOSConstraint where
+  vars SOSConstraint{ sosBody = xs } = Set.fromList (map fst xs)
 
 -- | default bounds
 defaultBounds :: Bounds
@@ -296,9 +310,9 @@ lpfile = do
   (flag, obj) <- problem
 
   cs <- liftM concat $ many $ msum $
-    [ constraintSection
-    , lazyConstraintsSection
-    , userCutsSection
+    [ liftM (map Left) constraintSection
+    , liftM (map Left) lazyConstraintsSection
+    , liftM (map Right) userCutsSection
     ]
 
   bnds <- option Map.empty (try boundsSection)
@@ -317,15 +331,16 @@ lpfile = do
            , bins
            , scs
            , vars (snd obj)
-           ] ++
-           [Set.fromList (map fst xs) | (_,_,xs) <- ss]
+           , vars ss
+           ]
   return $
     LP
     { variables         = vs
     , dir               = flag
     , objectiveFunction = obj
-    , constraints       = cs
-    , sos               = ss
+    , constraints       = [c | Left c <- cs]
+    , userCuts          = [c | Right c <- cs]
+    , sosConstraints    = ss
     , varInfo           =
         Map.fromAscList
         [ ( v
@@ -360,7 +375,7 @@ end = tok $ string' "end"
 -- ---------------------------------------------------------------------------
 
 constraintSection :: Parser [Constraint]
-constraintSection = subjectTo >> many (try (constraint NormalConstraint))
+constraintSection = subjectTo >> many (try (constraint False))
 
 subjectTo :: Parser ()
 subjectTo = msum
@@ -371,8 +386,8 @@ subjectTo = msum
         >> tok (char '.') >> return ()
   ]
 
-constraint :: ConstraintType -> Parser Constraint
-constraint t = do
+constraint :: Bool -> Parser Constraint
+constraint isLazy = do
   name <- optionMaybe (try label)
 
   g <- optionMaybe $ try $ do
@@ -388,10 +403,10 @@ constraint t = do
   s <- option 1 sign
   rhs <- number
   return $ Constraint
-    { constrType      = t
-    , constrLabel     = name
+    { constrLabel     = name
     , constrIndicator = g
     , constrBody      = (e, op, s*rhs)
+    , constrIsLazy    = isLazy
     }
 
 relOp :: Parser RelOp
@@ -408,13 +423,13 @@ lazyConstraintsSection :: Parser [Constraint]
 lazyConstraintsSection = do
   tok $ string' "lazy"
   tok $ string' "constraints"
-  many $ try $ constraint LazyConstraint
+  many $ try $ constraint True
 
 userCutsSection :: Parser [Constraint]
 userCutsSection = do
   tok $ string' "user"
   tok $ string' "cuts"
-  many $ try $ constraint $ UserDefinedCut
+  many $ try $ constraint False
 
 type Bounds2 = (Maybe BoundExpr, Maybe BoundExpr)
 
@@ -489,7 +504,7 @@ semiSection = do
   tok $ string' "semi" >> optional (string' "-continuous" <|> string' "s")
   many (try variable)
 
-sosSection :: Parser [SOS]
+sosSection :: Parser [SOSConstraint]
 sosSection = do
   tok $ string' "sos"
   many $ try $ do
@@ -500,7 +515,7 @@ sosSection = do
       tok $ char ':'
       w <- number
       return (v,w)
-    return (l,t,xs)
+    return $ SOSConstraint l t xs
   where
     typ = do
       t <- tok $ (char' 's' >> ((char '1' >> return S1) <|> (char '2' >> return S2)))
@@ -606,18 +621,18 @@ render' lp = do
 
   tell $ showString "SUBJECT TO\n"
   forM_ (constraints lp) $ \c -> do
-    when (constrType c == NormalConstraint) $ do
+    unless (constrIsLazy c) $ do
       renderConstraint c
       tell $ showChar '\n'
 
-  let lcs = [c | c <- constraints lp, constrType c == LazyConstraint]
+  let lcs = [c | c <- constraints lp, constrIsLazy c]
   unless (null lcs) $ do
     tell $ showString "LAZY CONSTRAINTS\n"
     forM_ lcs $ \c -> do
       renderConstraint c
       tell $ showChar '\n'
 
-  let cuts = [c | c <- constraints lp, constrType c == UserDefinedCut]
+  let cuts = [c | c <- userCuts lp]
   unless (null cuts) $ do
     tell $ showString "USER CUTS\n"
     forM_ cuts $ \c -> do
@@ -650,9 +665,9 @@ render' lp = do
     tell $ showString "SEMI-CONTINUOUS\n"
     renderVariableList $ Set.toList scs
 
-  unless (null (sos lp)) $ do
+  unless (null (sosConstraints lp)) $ do
     tell $ showString "SOS\n"
-    forM_ (sos lp) $ \(l, typ, xs) -> do
+    forM_ (sosConstraints lp) $ \(SOSConstraint l typ xs) -> do
       renderLabel l
       tell $ shows typ
       tell $ showString " ::"

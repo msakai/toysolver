@@ -182,8 +182,8 @@ conditions opt q env lp = bnds ++ cs ++ ss
              then or' [list [showString "=", showString v2, realNum opt 0], c0]
              else c0
     cs = map (constraint opt q env lp) (LP.constraints lp)
-    ss = concatMap sos (LP.sos lp)
-    sos (label, typ, xs) = do
+    ss = concatMap sos (LP.sosConstraints lp)
+    sos (LP.SOSConstraint label typ xs) = do
       (x1,x2) <- case typ of
                     LP.S1 -> pairs $ map fst xs
                     LP.S2 -> nonAdjacentPairs $ map fst $ sortBy (comparing snd) $ xs

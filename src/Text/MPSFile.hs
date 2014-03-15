@@ -258,6 +258,31 @@ mpsfile = do
               (v, (fromMaybe (LPFile.Finite 0) lb, fromMaybe LPFile.PosInf ub))
         | v <- Set.toList vs ]
 
+  let f :: Bool -> (Maybe LPFile.RelOp, Row) -> [LPFile.Constraint]
+      f _isLazy (Nothing, _row) = mzero
+      f isLazy (Just op, row) = do
+        let lhs = [LPFile.Term c　[col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup row m)]
+                  ++ Map.findWithDefault [] row qterms
+        let rhs = Map.findWithDefault 0 row rhss
+        (op2,rhs2) <-
+          case Map.lookup row rngs of
+            Nothing  -> return (op, rhs)
+            Just rng ->
+              case op of
+                LPFile.Ge  -> [(LPFile.Ge, rhs), (LPFile.Le, rhs + abs rng)]
+                LPFile.Le  -> [(LPFile.Ge, rhs - abs rng), (LPFile.Le, rhs)]
+                LPFile.Eql ->
+                  if rng < 0
+                  then [(LPFile.Ge, rhs + rng), (LPFile.Le, rhs)]
+                  else [(LPFile.Ge, rhs), (LPFile.Le, rhs + rng)]
+        return $
+          LPFile.Constraint
+          { LPFile.constrLabel     = Just row
+          , LPFile.constrIndicator = Map.lookup row inds
+          , LPFile.constrIsLazy    = isLazy
+          , LPFile.constrBody      = (lhs, op2, rhs2)
+          }
+
   let lp =
         LPFile.LP
         { LPFile.variables               = vs
@@ -266,32 +291,10 @@ mpsfile = do
             ( Just objrow
             , [LPFile.Term c [col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
             )
-        , LPFile.constraints             =
-            [ LPFile.Constraint
-              { LPFile.constrType      = typ
-              , LPFile.constrLabel     = Just row
-              , LPFile.constrIndicator = Map.lookup row inds
-              , LPFile.constrBody      = (lhs, op2, rhs2)
-              }
-            | (typ, (Just op, row)) <- zip (repeat LPFile.NormalConstraint) rows ++
-                                       zip (repeat LPFile.UserDefinedCut) usercuts ++
-                                       zip (repeat LPFile.LazyConstraint) lazycons
-            , let lhs = [LPFile.Term c　[col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup row m)]
-                        ++ Map.findWithDefault [] row qterms
-            , let rhs = Map.findWithDefault 0 row rhss
-            , (op2,rhs2) <-
-                case Map.lookup row rngs of
-                  Nothing  -> return (op, rhs)
-                  Just rng ->
-                    case op of
-                      LPFile.Ge  -> [(LPFile.Ge, rhs), (LPFile.Le, rhs + abs rng)]
-                      LPFile.Le  -> [(LPFile.Ge, rhs - abs rng), (LPFile.Le, rhs)]
-                      LPFile.Eql ->
-                        if rng < 0
-                        then [(LPFile.Ge, rhs + rng), (LPFile.Le, rhs)]
-                        else [(LPFile.Ge, rhs), (LPFile.Le, rhs + rng)]
-            ]
-        , LPFile.varInfo                 =
+        , LPFile.constraints           = concatMap (f False) rows ++ concatMap (f True) lazycons
+        , LPFile.sosConstraints        = sos
+        , LPFile.userCuts              = concatMap (f False) usercuts
+        , LPFile.varInfo               =
             Map.fromAscList
             [ ( v
               , LPFile.VarInfo
@@ -305,7 +308,6 @@ mpsfile = do
               )
             | v <- Set.toAscList vs
             ]
-        , LPFile.sos                     = sos
         }
 
   return lp
@@ -459,7 +461,7 @@ boundType = tok $ do
   let ks = ["LO", "UP", "FX", "FR", "MI", "PL", "BV", "LI", "UI", "SC"]
   msum [try (string k) >> return (read k) | k <- ks]
 
-sosSection :: Parser [(Maybe String, LPFile.SOSType, [(Column, Rational)])]
+sosSection :: Parser [LPFile.SOSConstraint]
 sosSection = do
   try $ stringLn "SOS"
   many entry
@@ -472,7 +474,7 @@ sosSection = do
       name <- ident
       newline'
       xs <- many (try identAndVal)
-      return (Just name, typ, xs)
+      return $ LPFile.SOSConstraint{ LPFile.sosLabel = Just name, LPFile.sosType = typ, LPFile.sosBody = xs }
 
     identAndVal :: Parser (Column, Rational)
     identAndVal = do

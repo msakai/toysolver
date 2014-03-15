@@ -35,6 +35,8 @@ convert formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
       , LPFile.dir = dir
       , LPFile.objectiveFunction = (Nothing, obj2)
       , LPFile.constraints = cs2
+      , LPFile.sosConstraints = []
+      , LPFile.userCuts = []
       , LPFile.varInfo = Map.fromAscList
           [ ( v
             , LPFile.VarInfo
@@ -45,7 +47,6 @@ convert formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
             )
           | v <- Set.toAscList vs2
           ]
-      , LPFile.sos = []
       }
 
     vs1 = collectVariables formula
@@ -65,9 +66,9 @@ convert formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
           lhs3a = [t | t@(LPFile.Term _ (_:_)) <- lhs2]
           lhs3b = sum [c | LPFile.Term c [] <- lhs2]
       return $ LPFile.Constraint
-        { LPFile.constrType      = LPFile.NormalConstraint
-        , LPFile.constrLabel     = Nothing
+        { LPFile.constrLabel     = Nothing
         , LPFile.constrIndicator = Nothing
+        , LPFile.constrIsLazy    = False
         , LPFile.constrBody      = (lhs3a, op2, fromIntegral rhs - lhs3b)
         }
 
@@ -109,6 +110,8 @@ convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formu
       , LPFile.dir = LPFile.OptMin
       , LPFile.objectiveFunction = (Nothing, obj2)
       , LPFile.constraints = topConstr ++ map snd cs2
+      , LPFile.sosConstraints = []
+      , LPFile.userCuts = []
       , LPFile.varInfo = Map.fromAscList
           [ ( v
             , LPFile.VarInfo
@@ -119,7 +122,6 @@ convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formu
             )
           | v <- Set.toAscList vs2
           ]
-      , LPFile.sos = []
       }
 
     vs1 = collectVariablesWBO formula
@@ -134,9 +136,9 @@ convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formu
        Nothing -> []
        Just t ->
           [ LPFile.Constraint
-            { LPFile.constrType      = LPFile.NormalConstraint
-            , LPFile.constrLabel     = Nothing
+            { LPFile.constrLabel     = Nothing
             , LPFile.constrIndicator = Nothing
+            , LPFile.constrIsLazy    = False
             , LPFile.constrBody      = (obj2, LPFile.Le, fromInteger t - 1)
             }
           ]
@@ -159,18 +161,18 @@ convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formu
                  PBFile.Ge -> LPFile.Ge
                  PBFile.Eq -> LPFile.Eql
              c = LPFile.Constraint
-                 { LPFile.constrType      = LPFile.NormalConstraint
-                 , LPFile.constrLabel     = Nothing
+                 { LPFile.constrLabel     = Nothing
                  , LPFile.constrIndicator = ind
+                 , LPFile.constrIsLazy    = False
                  , LPFile.constrBody      = (lhs3, op2, rhs3)
                  }
          return (ts, c)
        else do
          let (lhsGE,rhsGE) = relaxGE v (lhs3,rhs3)
              c1 = LPFile.Constraint
-                  { LPFile.constrType      = LPFile.NormalConstraint
-                  , LPFile.constrLabel     = Nothing
+                  { LPFile.constrLabel     = Nothing
                   , LPFile.constrIndicator = Nothing
+                  , LPFile.constrIsLazy    = False
                   , LPFile.constrBody      = (lhsGE, LPFile.Ge, rhsGE)
                   }
          case op of
@@ -179,9 +181,9 @@ convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formu
            PBFile.Eq -> do
              let (lhsLE,rhsLE) = relaxLE v (lhs3,rhs3)
                  c2 = LPFile.Constraint
-                      { LPFile.constrType      = LPFile.NormalConstraint
-                      , LPFile.constrLabel     = Nothing
+                      { LPFile.constrLabel     = Nothing
                       , LPFile.constrIndicator = Nothing
+                      , LPFile.constrIsLazy    = False
                       , LPFile.constrBody      = (lhsLE, LPFile.Le, rhsLE)
                       }
              [ (ts, c1), ([], c2) ]
