@@ -1922,7 +1922,7 @@ data ClauseHandler
   }
 
 instance Eq ClauseHandler where
-  c1 == c2 = claActivity c1 == claActivity c2
+  (==) = (==) `on` claLits
 
 newClauseHandler :: Clause -> Bool -> IO ClauseHandler
 newClauseHandler ls learnt = do
@@ -2116,7 +2116,9 @@ data AtLeastHandler
   , atLeastNum :: !Int
   , atLeastActivity :: !(IORef Double)
   }
-  deriving Eq
+
+instance Eq AtLeastHandler where
+  (==) = (==) `on` atLeastLits
 
 newAtLeastHandler :: [Lit] -> Int -> Bool -> IO AtLeastHandler
 newAtLeastHandler ls n learnt = do
@@ -2421,7 +2423,9 @@ data PBHandlerCounter
   , pbSlack    :: !(IORef Integer)
   , pbActivity :: !(IORef Double)
   }
-  deriving Eq
+
+instance Eq PBHandlerCounter where
+  (==) = (==) `on` pbSlack
 
 newPBHandlerCounter :: PBLinSum -> Integer -> Bool -> IO PBHandlerCounter
 newPBHandlerCounter ts degree learnt = do
@@ -2542,7 +2546,9 @@ data PBHandlerPueblo
   , puebloWatchSum  :: !(IORef Integer)
   , puebloActivity  :: !(IORef Double)
   }
-  deriving Eq
+
+instance Eq PBHandlerPueblo where
+  (==) = (==) `on` puebloWatchSum
 
 puebloAMax :: PBHandlerPueblo -> Integer
 puebloAMax this =
