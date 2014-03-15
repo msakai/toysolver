@@ -445,8 +445,9 @@ reduceDB solver = do
 
   xs <- forM cs $ \c -> do
     p <- constrIsProtected solver c
+    w <- constrWeight solver c
     actval <- constrReadActivity c
-    return (c, (p, actval))
+    return (c, (p, w*actval))
 
   -- Note that False <= True
   let ys = sortBy (comparing snd) xs
@@ -1765,6 +1766,9 @@ class ConstraintHandler a where
   constrIsProtected :: Solver -> a -> IO Bool
   constrIsProtected _ _ = return False
 
+  constrWeight :: Solver -> a -> IO Double
+  constrWeight _ _ = return 1.0
+
   constrReadActivity :: a -> IO Double
 
   constrWriteActivity :: a -> Double -> IO ()
@@ -2529,6 +2533,8 @@ instance ConstraintHandler PBHandlerCounter where
         else return 0
     return $ sum xs >= pbDegree this
 
+  constrWeight _ _ = return 0.5
+
   constrReadActivity this = readIORef (pbActivity this)
 
   constrWriteActivity this aval = writeIORef (pbActivity this) $! aval
@@ -2664,6 +2670,8 @@ instance ConstraintHandler PBHandlerPueblo where
         then return c
         else return 0
     return $ sum xs >= puebloDegree this
+
+  constrWeight _ _ = return 0.5
 
   constrReadActivity this = readIORef (puebloActivity this)
 
