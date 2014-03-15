@@ -263,10 +263,13 @@ mpsfile = do
               (v, (fromMaybe (LPFile.Finite 0) lb, fromMaybe LPFile.PosInf ub))
         | v <- Set.toList vs ]
 
+  let rowCoeffs :: Map Row (Map Column Rational)
+      rowCoeffs = Map.fromListWith Map.union [(row, Map.singleton col coeff) | (col,m) <- Map.toList cols, (row,coeff) <- Map.toList m]
+
   let f :: Bool -> (Maybe LPFile.RelOp, Row) -> [LPFile.Constraint]
       f _isLazy (Nothing, _row) = mzero
       f isLazy (Just op, row) = do
-        let lhs = [LPFile.Term c　[col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup row m)]
+        let lhs = [LPFile.Term c　[col] | (col,c) <- Map.toList (Map.findWithDefault Map.empty row rowCoeffs)]
                   ++ Map.findWithDefault [] row qterms
         let rhs = Map.findWithDefault 0 row rhss
         (op2,rhs2) <-
