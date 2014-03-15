@@ -42,6 +42,7 @@ import Text.ParserCombinators.Parsec hiding (spaces, newline, Column)
 
 import Data.OptDir
 import qualified Text.LPFile as LPFile
+import Text.Util (readUnsignedInteger)
 
 type Column = LPFile.Var
 type Row = InternedString
@@ -125,13 +126,13 @@ number = tok $ do
     digits = many1 digit
 
     nat :: Parser Integer
-    nat = liftM read digits
+    nat = liftM readUnsignedInteger digits
 
     frac :: Parser Rational
     frac = do
       char '.'
       s <- digits
-      return (read s % 10^(length s))
+      return (readUnsignedInteger s % 10^(length s))
 
     e :: Parser Integer
     e = do
