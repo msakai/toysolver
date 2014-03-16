@@ -307,8 +307,7 @@ mpsfile = do
             Map.fromAscList
             [ ( v
               , LPFile.VarInfo
-                { LPFile.varName   = v
-                , LPFile.varBounds = Map.findWithDefault LPFile.defaultBounds v bounds
+                { LPFile.varBounds = Map.findWithDefault LPFile.defaultBounds v bounds
                 , LPFile.varType   =
                     if v `Set.member` intvs1 || v `Set.member` intvs2 then LPFile.IntegerVariable
                     else if v `Set.member` scvs then LPFile.SemiContinuousVariable

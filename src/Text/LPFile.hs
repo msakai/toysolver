@@ -123,8 +123,7 @@ data VarType
 
 data VarInfo
   = VarInfo
-  { varName   :: Var
-  , varType   :: VarType
+  { varType   :: VarType
   , varBounds :: Bounds
   }
  deriving (Eq, Ord, Show)
@@ -132,8 +131,7 @@ data VarInfo
 defaultVarInfo :: VarInfo
 defaultVarInfo
   = VarInfo
-  { varName   = ""
-  , varType   = ContinuousVariable
+  { varType   = ContinuousVariable
   , varBounds = defaultBounds
   }
 
@@ -346,8 +344,7 @@ lpfile = do
         Map.fromAscList
         [ ( v
           , VarInfo
-            { varName   = v
-            , varBounds = Map.findWithDefault defaultBounds v bnds2
+            { varBounds = Map.findWithDefault defaultBounds v bnds2
             , varType   =
                 if v `Set.member` ints || v `Set.member` bins then IntegerVariable
                 else if v `Set.member` scs then SemiContinuousVariable

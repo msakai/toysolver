@@ -40,8 +40,7 @@ convert formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
       , LPFile.varInfo = Map.fromAscList
           [ ( v
             , LPFile.VarInfo
-              { LPFile.varName   = v
-              , LPFile.varType   = LPFile.IntegerVariable
+              { LPFile.varType   = LPFile.IntegerVariable
               , LPFile.varBounds = (LPFile.Finite 0, LPFile.Finite 1)
               }
             )
@@ -115,8 +114,7 @@ convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formu
       , LPFile.varInfo = Map.fromAscList
           [ ( v
             , LPFile.VarInfo
-              { LPFile.varName   = v
-              , LPFile.varType   = LPFile.IntegerVariable
+              { LPFile.varType   = LPFile.IntegerVariable
               , LPFile.varBounds = (LPFile.Finite 0, LPFile.Finite 1)
               }
             )
