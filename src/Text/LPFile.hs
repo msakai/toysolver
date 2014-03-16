@@ -27,7 +27,6 @@ module Text.LPFile
   , Term (..)
   , OptDir (..)
   , ObjectiveFunction
-  , ConstraintType (..)
   , Constraint (..)
   , Bounds
   , Label
@@ -95,12 +94,6 @@ data Term = Term Rational [Var]
 
 -- | objective function
 type ObjectiveFunction = (Maybe Label, Expr)
-
-data ConstraintType
-  = NormalConstraint
-  | LazyConstraint
-  | UserDefinedCut
-  deriving (Eq, Ord, Bounded, Enum, Show)
 
 -- | constraint
 data Constraint
