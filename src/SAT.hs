@@ -2065,8 +2065,8 @@ instance ConstraintHandler ClauseHandler where
         assert (lit == head lits) $ return ()
         return $ tail lits
 
-  toPBAtLeast _ (ClauseHandler a _) = do
-    lits <- getElems a
+  toPBAtLeast _ this = do
+    lits <- getElems (claLits this)
     return ([(1,l) | l <- lits], 1)
 
   isSatisfied solver this = do
