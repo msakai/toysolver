@@ -119,7 +119,11 @@ import Data.Array.Unsafe (unsafeFreeze)
 import Data.Array.IO
 #endif
 import Data.Array.Base (unsafeRead, unsafeWrite)
+#if MIN_VERSION_hashable(1,2,0)
+import Data.Bits (xor) -- for defining 'combine' function
+#endif
 import Data.Function (on)
+import Data.Hashable
 import Data.IORef
 import Data.List
 import Data.Maybe
@@ -1740,7 +1744,7 @@ showTimeDiff sec
   constraint implementation
 --------------------------------------------------------------------}
 
-class ConstraintHandler a where
+class (Eq a, Hashable a) => ConstraintHandler a where
   toConstraintHandler :: a -> SomeConstraintHandler
 
   showConstraintHandler :: Solver -> a -> IO String
@@ -1827,6 +1831,12 @@ data SomeConstraintHandler
   | CHPBCounter !PBHandlerCounter
   | CHPBPueblo !PBHandlerPueblo
   deriving Eq
+
+instance Hashable SomeConstraintHandler where
+  hashWithSalt s (CHClause c)    = s `hashWithSalt` (0::Int) `hashWithSalt` c
+  hashWithSalt s (CHAtLeast c)   = s `hashWithSalt` (1::Int) `hashWithSalt` c
+  hashWithSalt s (CHPBCounter c) = s `hashWithSalt` (2::Int) `hashWithSalt` c
+  hashWithSalt s (CHPBPueblo c)  = s `hashWithSalt` (3::Int) `hashWithSalt` c
 
 instance ConstraintHandler SomeConstraintHandler where
   toConstraintHandler = id
@@ -1923,17 +1933,22 @@ data ClauseHandler
   = ClauseHandler
   { claLits :: !(IOUArray Int Lit)
   , claActivity :: !(IORef Double)
+  , claHash :: !Int
   }
 
 instance Eq ClauseHandler where
   (==) = (==) `on` claLits
+
+instance Hashable ClauseHandler where
+  hash = claHash
+  hashWithSalt = defaultHashWithSalt
 
 newClauseHandler :: Clause -> Bool -> IO ClauseHandler
 newClauseHandler ls learnt = do
   let size = length ls
   a <- newListArray (0, size-1) ls
   act <- newIORef $! (if learnt then 0 else -1)
-  return (ClauseHandler a act)
+  return (ClauseHandler a act (hash ls))
 
 instance ConstraintHandler ClauseHandler where
   toConstraintHandler = CHClause
@@ -2119,17 +2134,22 @@ data AtLeastHandler
   { atLeastLits :: IOUArray Int Lit
   , atLeastNum :: !Int
   , atLeastActivity :: !(IORef Double)
+  , atLeastHash :: !Int
   }
 
 instance Eq AtLeastHandler where
   (==) = (==) `on` atLeastLits
+
+instance Hashable AtLeastHandler where
+  hash = atLeastHash
+  hashWithSalt = defaultHashWithSalt
 
 newAtLeastHandler :: [Lit] -> Int -> Bool -> IO AtLeastHandler
 newAtLeastHandler ls n learnt = do
   let size = length ls
   a <- newListArray (0, size-1) ls
   act <- newIORef $! (if learnt then 0 else -1)
-  return (AtLeastHandler a n act)
+  return (AtLeastHandler a n act (hash (ls,n)))
 
 instance ConstraintHandler AtLeastHandler where
   toConstraintHandler = CHAtLeast
@@ -2426,10 +2446,15 @@ data PBHandlerCounter
   , pbMaxSlack :: !Integer
   , pbSlack    :: !(IORef Integer)
   , pbActivity :: !(IORef Double)
+  , pbHash     :: !Int
   }
 
 instance Eq PBHandlerCounter where
   (==) = (==) `on` pbSlack
+
+instance Hashable PBHandlerCounter where
+  hash = pbHash
+  hashWithSalt = defaultHashWithSalt
 
 newPBHandlerCounter :: PBLinSum -> Integer -> Bool -> IO PBHandlerCounter
 newPBHandlerCounter ts degree learnt = do
@@ -2438,7 +2463,7 @@ newPBHandlerCounter ts degree learnt = do
       m = IM.fromList [(l,c) | (c,l) <- ts]
   s <- newIORef slack
   act <- newIORef $! (if learnt then 0 else -1)
-  return (PBHandlerCounter ts' degree m slack s act)
+  return (PBHandlerCounter ts' degree m slack s act (hash (ts,degree)))
 
 instance ConstraintHandler PBHandlerCounter where
   toConstraintHandler = CHPBCounter
@@ -2551,10 +2576,15 @@ data PBHandlerPueblo
   , puebloWatches   :: !(IORef LitSet)
   , puebloWatchSum  :: !(IORef Integer)
   , puebloActivity  :: !(IORef Double)
+  , puebloHash      :: !Int
   }
 
 instance Eq PBHandlerPueblo where
   (==) = (==) `on` puebloWatchSum
+
+instance Hashable PBHandlerPueblo where
+  hash = puebloHash
+  hashWithSalt = defaultHashWithSalt
 
 puebloAMax :: PBHandlerPueblo -> Integer
 puebloAMax this =
@@ -2569,7 +2599,7 @@ newPBHandlerPueblo ts degree learnt = do
   ws   <- newIORef IS.empty
   wsum <- newIORef 0
   act  <- newIORef $! (if learnt then 0 else -1)
-  return $ PBHandlerPueblo ts' degree slack ws wsum act
+  return $ PBHandlerPueblo ts' degree slack ws wsum act (hash (ts,degree))
 
 puebloGetWatchSum :: PBHandlerPueblo -> IO Integer
 puebloGetWatchSum pb = readIORef (puebloWatchSum pb)
@@ -2815,7 +2845,15 @@ shift :: IORef [a] -> IO a
 shift ref = do
   (x:xs) <- readIORef ref
   writeIORef ref xs
-  return x    
+  return x
+
+defaultHashWithSalt :: Hashable a => Int -> a -> Int
+defaultHashWithSalt salt x = salt `combine` hash x
+#if MIN_VERSION_hashable(1,2,0)
+  where
+    combine :: Int -> Int -> Int
+    combine h1 h2 = (h1 * 16777619) `xor` h2
+#endif
 
 {--------------------------------------------------------------------
   debug
