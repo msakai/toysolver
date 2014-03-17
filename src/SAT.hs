@@ -89,6 +89,9 @@ module SAT
   , setEnablePhaseSaving
   , getEnablePhaseSaving
   , defaultEnablePhaseSaving
+  , setEnableForwardSubsumptionRemoval
+  , getEnableForwardSubsumptionRemoval
+  , defaultEnableForwardSubsumptionRemoval
   , setVarPolarity
   , setLogger
   , setCheckModel
@@ -314,6 +317,7 @@ data Solver
   , svCCMin :: !(IORef Int)
 
   , svEnablePhaseSaving :: !(IORef Bool)
+  , svEnableForwardSubsumptionRemoval :: !(IORef Bool)
 
   , svLearningStrategy :: !(IORef LearningStrategy)
 
@@ -582,6 +586,7 @@ newSolver = do
   checkModel <- newIORef False
   pbHandlerType <- newIORef defaultPBHandlerType
   enablePhaseSaving <- newIORef defaultEnablePhaseSaving
+  enableForwardSubsumptionRemoval <- newIORef defaultEnableForwardSubsumptionRemoval
 
   learntLim       <- newIORef undefined
   learntLimAdjCnt <- newIORef (-1)
@@ -631,6 +636,7 @@ newSolver = do
         , svLearntSizeInc = learntSizeInc
         , svCCMin = ccMin
         , svEnablePhaseSaving = enablePhaseSaving
+        , svEnableForwardSubsumptionRemoval = enableForwardSubsumptionRemoval
         , svPBHandlerType   = pbHandlerType
         , svLearntLim       = learntLim
         , svLearntLimAdjCnt = learntLimAdjCnt
@@ -705,10 +711,12 @@ addClause solver lits = do
         Nothing -> return ()
         Just _ -> markBad solver
     Just lits3 -> do
-      clause <- newClauseHandler lits3 False
-      addToDB solver clause
-      _ <- basicAttachClauseHandler solver clause
-      return ()
+      subsumed <- checkForwardSubsumption solver lits
+      unless subsumed $ do
+        clause <- newClauseHandler lits3 False
+        addToDB solver clause
+        _ <- basicAttachClauseHandler solver clause
+        return ()
 
 -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
 addAtLeast :: Solver -- ^ The 'Solver' argument.
@@ -1155,6 +1163,26 @@ simplify solver = do
     (ys,n) <- loop xs [] (0::Int)
     writeIORef (svLearntDB solver) (m-n, ys)
 
+{-
+References:
+L. Zhang, "On subsumption removal and On-the-Fly CNF simplification,"
+Theory and Applications of Satisfiability Testing (2005), pp. 482-489.
+-}
+checkForwardSubsumption :: Solver -> Clause -> IO Bool
+checkForwardSubsumption solver lits = do
+  flag <- getEnableForwardSubsumptionRemoval solver
+  if not flag then
+    return False
+  else do
+    old <- getEnablePhaseSaving solver
+    setEnablePhaseSaving solver False
+    modifyIORef' (svLevel solver) (+1)
+    b <- allM (\lit -> assign solver (litNot lit)) lits
+    ret <- if b then liftM isJust (deduce solver) else return True
+    backtrackTo solver levelRoot
+    setEnablePhaseSaving solver old
+    return ret
+
 {--------------------------------------------------------------------
   Parameter settings.
 --------------------------------------------------------------------}
@@ -1267,6 +1295,17 @@ getEnablePhaseSaving solver = do
 
 defaultEnablePhaseSaving :: Bool
 defaultEnablePhaseSaving = True
+
+setEnableForwardSubsumptionRemoval :: Solver -> Bool -> IO ()
+setEnableForwardSubsumptionRemoval solver flag = do
+  writeIORef (svEnableForwardSubsumptionRemoval solver) flag
+
+getEnableForwardSubsumptionRemoval :: Solver -> IO Bool
+getEnableForwardSubsumptionRemoval solver = do
+  readIORef (svEnableForwardSubsumptionRemoval solver)
+
+defaultEnableForwardSubsumptionRemoval :: Bool
+defaultEnableForwardSubsumptionRemoval = False
 
 {--------------------------------------------------------------------
   API for implementation of @solve@

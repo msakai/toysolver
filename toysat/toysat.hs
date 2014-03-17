@@ -88,6 +88,7 @@ data Options
   , optLearntSizeInc    :: Double
   , optCCMin         :: Int
   , optEnablePhaseSaving :: Bool
+  , optEnableForwardSubsumptionRemoval :: Bool
   , optRandomFreq    :: Double
   , optRandomGen     :: Maybe Rand.StdGen
   , optLinearizerPB  :: Bool
@@ -113,6 +114,7 @@ defaultOptions
   , optLearntSizeInc    = SAT.defaultLearntSizeInc
   , optCCMin         = SAT.defaultCCMin
   , optEnablePhaseSaving = SAT.defaultEnablePhaseSaving
+  , optEnableForwardSubsumptionRemoval = SAT.defaultEnableForwardSubsumptionRemoval
   , optRandomFreq    = SAT.defaultRandomFreq
   , optRandomGen     = Nothing
   , optLinearizerPB  = False
@@ -165,6 +167,12 @@ options =
     , Option [] ["disable-phase-saving"]
         (NoArg (\opt -> opt{ optEnablePhaseSaving = False }))
         ("Disable phase saving" ++ (if SAT.defaultEnablePhaseSaving then "" else " (default)"))
+    , Option [] ["enable-forward-subsumption-removal"]
+        (NoArg (\opt -> opt{ optEnableForwardSubsumptionRemoval = True }))
+        ("Enable forward subumption removal (clauses only)" ++ (if SAT.defaultEnableForwardSubsumptionRemoval then " (default)" else ""))
+    , Option [] ["disable-forward-subsumption-removal"]
+        (NoArg (\opt -> opt{ optEnableForwardSubsumptionRemoval = False }))
+        ("Disable forward subsumption removal (clauses only)" ++ (if SAT.defaultEnableForwardSubsumptionRemoval then "" else " (default)"))
 
     , Option [] ["random-freq"]
         (ReqArg (\val opt -> opt{ optRandomFreq = read val }) "<0..1>")
@@ -410,6 +418,7 @@ newSolver opts = do
      putCommentLine $ "use --random-gen=" ++ show (show gen) ++ " option to reproduce the execution"
   SAT.setLearningStrategy solver (optLearningStrategy opts)
   SAT.setEnablePhaseSaving solver (optEnablePhaseSaving opts)
+  SAT.setEnableForwardSubsumptionRemoval solver (optEnableForwardSubsumptionRemoval opts)
   SAT.setPBHandlerType solver (optPBHandlerType opts)
   SAT.setLogger solver putCommentLine
   SAT.setCheckModel solver (optCheckModel opts)
