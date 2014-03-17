@@ -124,6 +124,8 @@ import Data.Bits (xor) -- for defining 'combine' function
 #endif
 import Data.Function (on)
 import Data.Hashable
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HashSet
 import Data.IORef
 import Data.List
 import Data.Maybe
@@ -174,10 +176,11 @@ data VarData
   , vdActivity   :: !(IORef VarActivity)
   }
 
-newtype LitData
+data LitData
   = LitData
   { -- | will be invoked when this literal is falsified
-    ldWatches :: IORef [SomeConstraintHandler]
+    ldWatches   :: !(IORef [SomeConstraintHandler])
+  , ldOccurList :: !(IORef (HashSet SomeConstraintHandler))
   }
 
 newVarData :: IO VarData
@@ -192,7 +195,8 @@ newVarData = do
 newLitData :: IO LitData
 newLitData = do
   ws <- newIORef []
-  return $ LitData ws
+  occ <- newIORef HashSet.empty
+  return $ LitData ws occ
 
 varData :: Solver -> Var -> IO VarData
 varData solver !v = do
@@ -429,10 +433,17 @@ watches solver !lit = do
 
 addToDB :: ConstraintHandler c => Solver -> c -> IO ()
 addToDB solver c = do
-  modifyIORef (svConstrDB solver) (toConstraintHandler c : )
+  let c2 = toConstraintHandler c
+  modifyIORef (svConstrDB solver) (c2 : )
   when debugMode $ logIO solver $ do
     str <- showConstraintHandler solver c
     return $ printf "constraint %s is added" str
+
+  (lhs,_) <- toPBAtLeast solver c
+  forM_ lhs $ \(_,lit) -> do
+     ld <- litData solver lit
+     modifyIORef' (ldOccurList ld) (HashSet.insert c2)
+
   sanityCheck solver
 
 addToLearntDB :: ConstraintHandler c => Solver -> c -> IO ()
@@ -1784,6 +1795,10 @@ detach solver c = do
   forM_ lits $ \lit -> do
     ld <- litData solver lit
     modifyIORef' (ldWatches ld) (delete c2)
+  (lhs,_) <- toPBAtLeast solver c
+  forM_ lhs $ \(_,lit) -> do
+    ld <- litData solver lit
+    modifyIORef' (ldOccurList ld) (HashSet.delete c2)
 
 -- | invoked with the watched literal when the literal is falsified.
 propagate :: Solver -> SomeConstraintHandler -> Lit -> IO Bool
