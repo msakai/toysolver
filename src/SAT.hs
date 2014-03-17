@@ -86,6 +86,9 @@ module SAT
   , LearningStrategy (..)
   , setLearningStrategy
   , defaultLearningStrategy
+  , setEnablePhaseSaving
+  , getEnablePhaseSaving
+  , defaultEnablePhaseSaving
   , setVarPolarity
   , setLogger
   , setCheckModel
@@ -310,6 +313,8 @@ data Solver
   -- | Controls conflict constraint minimization (0=none, 1=local, 2=recursive)
   , svCCMin :: !(IORef Int)
 
+  , svEnablePhaseSaving :: !(IORef Bool)
+
   , svLearningStrategy :: !(IORef LearningStrategy)
 
   , svPBHandlerType :: !(IORef PBHandlerType)
@@ -394,7 +399,8 @@ unassign solver !v = assert (validVar v) $ do
   case m of
     Nothing -> error "unassign: should not happen"
     Just a -> do
-      writeIORef (vdPolarity vd) (aValue a)
+      flag <- getEnablePhaseSaving solver
+      when flag $ writeIORef (vdPolarity vd) (aValue a)
       readIORef (aBacktrackCBs a) >>= sequence_
   writeIORef (vdAssignment vd) Nothing
   modifyIORef' (svNAssigns solver) (subtract 1)
@@ -575,6 +581,7 @@ newSolver = do
   ccMin <- newIORef defaultCCMin
   checkModel <- newIORef False
   pbHandlerType <- newIORef defaultPBHandlerType
+  enablePhaseSaving <- newIORef defaultEnablePhaseSaving
 
   learntLim       <- newIORef undefined
   learntLimAdjCnt <- newIORef (-1)
@@ -623,6 +630,7 @@ newSolver = do
         , svLearntSizeFirst = learntSizeFirst
         , svLearntSizeInc = learntSizeInc
         , svCCMin = ccMin
+        , svEnablePhaseSaving = enablePhaseSaving
         , svPBHandlerType   = pbHandlerType
         , svLearntLim       = learntLim
         , svLearntLimAdjCnt = learntLimAdjCnt
@@ -1248,6 +1256,17 @@ defaultPBHandlerType = PBHandlerTypeCounter
 setPBHandlerType :: Solver -> PBHandlerType -> IO ()
 setPBHandlerType solver ht = do
   writeIORef (svPBHandlerType solver) ht
+
+setEnablePhaseSaving :: Solver -> Bool -> IO ()
+setEnablePhaseSaving solver flag = do
+  writeIORef (svEnablePhaseSaving solver) flag
+
+getEnablePhaseSaving :: Solver -> IO Bool
+getEnablePhaseSaving solver = do
+  readIORef (svEnablePhaseSaving solver)
+
+defaultEnablePhaseSaving :: Bool
+defaultEnablePhaseSaving = True
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
