@@ -89,6 +89,7 @@ data Options
   , optCCMin         :: Int
   , optEnablePhaseSaving :: Bool
   , optEnableForwardSubsumptionRemoval :: Bool
+  , optEnableBackwardSubsumptionRemoval :: Bool
   , optRandomFreq    :: Double
   , optRandomGen     :: Maybe Rand.StdGen
   , optLinearizerPB  :: Bool
@@ -119,6 +120,7 @@ defaultOptions
   , optRandomGen     = Nothing
   , optLinearizerPB  = False
   , optPBHandlerType = SAT.defaultPBHandlerType
+  , optEnableBackwardSubsumptionRemoval = SAT.defaultEnableBackwardSubsumptionRemoval
   , optSearchStrategy       = PBO.optSearchStrategy PBO.defaultOptions
   , optObjFunVarsHeuristics = PBO.optObjFunVarsHeuristics PBO.defaultOptions
   , optAllMUSes = False
@@ -173,6 +175,12 @@ options =
     , Option [] ["disable-forward-subsumption-removal"]
         (NoArg (\opt -> opt{ optEnableForwardSubsumptionRemoval = False }))
         ("Disable forward subsumption removal (clauses only)" ++ (if SAT.defaultEnableForwardSubsumptionRemoval then "" else " (default)"))
+    , Option [] ["enable-backward-subsumption-removal"]
+        (NoArg (\opt -> opt{ optEnableBackwardSubsumptionRemoval = True }))
+        ("Enable backward subsumption removal." ++ (if SAT.defaultEnableBackwardSubsumptionRemoval then " (default)" else ""))
+    , Option [] ["disable-backward-subsumption-removal"]
+        (NoArg (\opt -> opt{ optEnableBackwardSubsumptionRemoval = False }))
+        ("Disable backward subsumption removal." ++ (if SAT.defaultEnableBackwardSubsumptionRemoval then "" else " (default)"))
 
     , Option [] ["random-freq"]
         (ReqArg (\val opt -> opt{ optRandomFreq = read val }) "<0..1>")
@@ -419,6 +427,7 @@ newSolver opts = do
   SAT.setLearningStrategy solver (optLearningStrategy opts)
   SAT.setEnablePhaseSaving solver (optEnablePhaseSaving opts)
   SAT.setEnableForwardSubsumptionRemoval solver (optEnableForwardSubsumptionRemoval opts)
+  SAT.setEnableBackwardSubsumptionRemoval solver (optEnableBackwardSubsumptionRemoval opts)
   SAT.setPBHandlerType solver (optPBHandlerType opts)
   SAT.setLogger solver putCommentLine
   SAT.setCheckModel solver (optCheckModel opts)

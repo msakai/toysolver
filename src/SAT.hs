@@ -92,6 +92,9 @@ module SAT
   , setEnableForwardSubsumptionRemoval
   , getEnableForwardSubsumptionRemoval
   , defaultEnableForwardSubsumptionRemoval
+  , setEnableBackwardSubsumptionRemoval
+  , getEnableBackwardSubsumptionRemoval
+  , defaultEnableBackwardSubsumptionRemoval
   , setVarPolarity
   , setLogger
   , setCheckModel
@@ -125,7 +128,13 @@ import Data.Array.Unsafe (unsafeFreeze)
 import Data.Array.IO
 #endif
 import Data.Array.Base (unsafeRead, unsafeWrite)
+#if MIN_VERSION_hashable(1,2,0)
+import Data.Bits (xor) -- for defining 'combine' function
+#endif
 import Data.Function (on)
+import Data.Hashable
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HashSet
 import Data.IORef
 import Data.List
 import Data.Maybe
@@ -176,10 +185,11 @@ data VarData
   , vdActivity   :: !(IORef VarActivity)
   }
 
-newtype LitData
+data LitData
   = LitData
   { -- | will be invoked when this literal is falsified
-    ldWatches :: IORef [SomeConstraintHandler]
+    ldWatches   :: !(IORef [SomeConstraintHandler])
+  , ldOccurList :: !(IORef (HashSet SomeConstraintHandler))
   }
 
 newVarData :: IO VarData
@@ -194,7 +204,8 @@ newVarData = do
 newLitData :: IO LitData
 newLitData = do
   ws <- newIORef []
-  return $ LitData ws
+  occ <- newIORef HashSet.empty
+  return $ LitData ws occ
 
 varData :: Solver -> Var -> IO VarData
 varData solver !v = do
@@ -323,6 +334,8 @@ data Solver
 
   , svPBHandlerType :: !(IORef PBHandlerType)
 
+  , svEnableBackwardSubsumptionRemoval :: !(IORef Bool)
+
   , svLogger :: !(IORef (Maybe (String -> IO ())))
   , svStartWC    :: !(IORef UTCTime)
   , svLastStatWC :: !(IORef UTCTime)
@@ -435,10 +448,17 @@ watches solver !lit = do
 
 addToDB :: ConstraintHandler c => Solver -> c -> IO ()
 addToDB solver c = do
-  modifyIORef (svConstrDB solver) (toConstraintHandler c : )
+  let c2 = toConstraintHandler c
+  modifyIORef (svConstrDB solver) (c2 : )
   when debugMode $ logIO solver $ do
     str <- showConstraintHandler solver c
     return $ printf "constraint %s is added" str
+
+  (lhs,_) <- toPBAtLeast solver c
+  forM_ lhs $ \(_,lit) -> do
+     ld <- litData solver lit
+     modifyIORef' (ldOccurList ld) (HashSet.insert c2)
+
   sanityCheck solver
 
 addToLearntDB :: ConstraintHandler c => Solver -> c -> IO ()
@@ -587,6 +607,7 @@ newSolver = do
   pbHandlerType <- newIORef defaultPBHandlerType
   enablePhaseSaving <- newIORef defaultEnablePhaseSaving
   enableForwardSubsumptionRemoval <- newIORef defaultEnableForwardSubsumptionRemoval
+  enableBackwardSubsumptionRemoval <- newIORef defaultEnableBackwardSubsumptionRemoval
 
   learntLim       <- newIORef undefined
   learntLimAdjCnt <- newIORef (-1)
@@ -638,6 +659,7 @@ newSolver = do
         , svEnablePhaseSaving = enablePhaseSaving
         , svEnableForwardSubsumptionRemoval = enableForwardSubsumptionRemoval
         , svPBHandlerType   = pbHandlerType
+        , svEnableBackwardSubsumptionRemoval = enableBackwardSubsumptionRemoval
         , svLearntLim       = learntLim
         , svLearntLimAdjCnt = learntLimAdjCnt
         , svLearntLimSeq    = learntLimSeq
@@ -704,6 +726,7 @@ addClause solver lits = do
     Nothing -> return ()
     Just [] -> markBad solver
     Just [lit] -> do
+      removeBackwardSubsumedByWhenEnabled solver ([(1,lit)],1)
       ret <- assign solver lit
       assert ret $ return ()
       ret2 <- deduce solver
@@ -713,6 +736,7 @@ addClause solver lits = do
     Just lits3 -> do
       subsumed <- checkForwardSubsumption solver lits
       unless subsumed $ do
+        removeBackwardSubsumedByWhenEnabled solver ([(1,lit) | lit <- lits3], 1)
         clause <- newClauseHandler lits3 False
         addToDB solver clause
         _ <- basicAttachClauseHandler solver clause
@@ -734,6 +758,7 @@ addAtLeast solver lits n = do
     else if n' > len then markBad solver
     else if n' == 1 then addClause solver lits'
     else if n' == len then do
+      removeBackwardSubsumedByWhenEnabled solver ([(1,lit) | lit <- lits'], fromIntegral n')
       forM_ lits' $ \l -> do
         ret <- assign solver l
         assert ret $ return ()
@@ -742,6 +767,7 @@ addAtLeast solver lits n = do
         Nothing -> return ()
         Just _ -> markBad solver
     else do
+      removeBackwardSubsumedByWhenEnabled solver ([(1,lit) | lit <- lits'], fromIntegral n')
       c <- newAtLeastHandler lits' n' False
       addToDB solver c
       _ <- basicAttachAtLeastHandler solver c
@@ -785,6 +811,7 @@ addPBAtLeast solver ts n = do
       if degree <= 0 then return ()
       else if slack < 0 then markBad solver
       else do
+        removeBackwardSubsumedByWhenEnabled solver (ts', degree)
         c <- newPBHandler solver ts' degree False
         addToDB solver c
         ret <- attach solver c
@@ -1137,6 +1164,10 @@ model solver = do
 failedAssumptions :: Solver -> IO [Lit]
 failedAssumptions solver = readIORef (svFailedAssumptions solver)
 
+{--------------------------------------------------------------------
+  Simplification
+--------------------------------------------------------------------}
+
 -- | Simplify the clause database according to the current top-level assigment.
 simplify :: Solver -> IO ()
 simplify solver = do
@@ -1182,6 +1213,34 @@ checkForwardSubsumption solver lits = do
     backtrackTo solver levelRoot
     setEnablePhaseSaving solver old
     return ret
+
+removeBackwardSubsumedByWhenEnabled :: Solver -> PBLinAtLeast -> IO ()
+removeBackwardSubsumedByWhenEnabled solver pb = do
+  flag <- getEnableBackwardSubsumptionRemoval solver
+  when flag $ removeBackwardSubsumedBy solver pb
+
+removeBackwardSubsumedBy :: Solver -> PBLinAtLeast -> IO ()
+removeBackwardSubsumedBy solver pb@(lhs,rhs) = do
+  xs <- forM lhs $ \(_,lit) -> do
+    ld <- litData solver lit
+    readIORef (ldOccurList ld)
+  case xs of
+    [] -> return ()
+    s:ss -> do
+      let candidates = foldl' HashSet.intersection s ss
+      unless (HashSet.null candidates) $ do
+        let loop [] rs !n     = return (rs,n)
+            loop (y:ys) rs !n = do
+              pb2 <- instantiatePB solver =<< toPBAtLeast solver y
+              if y `HashSet.member` candidates && pbSubsume pb pb2
+               then do
+                 detach solver y
+                 loop ys rs (n+1)
+               else loop ys (y:rs) n
+        xs <- readIORef (svConstrDB solver)
+        (ys,n) <- loop xs [] (0::Int)
+        modifyIORef' (svNRemovedConstr solver) (+n)
+        writeIORef (svConstrDB solver) ys
 
 {--------------------------------------------------------------------
   Parameter settings.
@@ -1306,6 +1365,17 @@ getEnableForwardSubsumptionRemoval solver = do
 
 defaultEnableForwardSubsumptionRemoval :: Bool
 defaultEnableForwardSubsumptionRemoval = False
+
+setEnableBackwardSubsumptionRemoval :: Solver -> Bool -> IO ()
+setEnableBackwardSubsumptionRemoval solver flag = do
+  writeIORef (svEnableBackwardSubsumptionRemoval solver) flag
+
+getEnableBackwardSubsumptionRemoval :: Solver -> IO Bool
+getEnableBackwardSubsumptionRemoval solver = do
+  readIORef (svEnableBackwardSubsumptionRemoval solver)
+
+defaultEnableBackwardSubsumptionRemoval :: Bool
+defaultEnableBackwardSubsumptionRemoval = False
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
@@ -1798,7 +1868,7 @@ showTimeDiff sec
   constraint implementation
 --------------------------------------------------------------------}
 
-class ConstraintHandler a where
+class (Eq a, Hashable a) => ConstraintHandler a where
   toConstraintHandler :: a -> SomeConstraintHandler
 
   showConstraintHandler :: Solver -> a -> IO String
@@ -1838,6 +1908,10 @@ detach solver c = do
   forM_ lits $ \lit -> do
     ld <- litData solver lit
     modifyIORef' (ldWatches ld) (delete c2)
+  (lhs,_) <- toPBAtLeast solver c
+  forM_ lhs $ \(_,lit) -> do
+    ld <- litData solver lit
+    modifyIORef' (ldOccurList ld) (HashSet.delete c2)
 
 -- | invoked with the watched literal when the literal is falsified.
 propagate :: Solver -> SomeConstraintHandler -> Lit -> IO Bool
@@ -1885,6 +1959,12 @@ data SomeConstraintHandler
   | CHPBCounter !PBHandlerCounter
   | CHPBPueblo !PBHandlerPueblo
   deriving Eq
+
+instance Hashable SomeConstraintHandler where
+  hashWithSalt s (CHClause c)    = s `hashWithSalt` (0::Int) `hashWithSalt` c
+  hashWithSalt s (CHAtLeast c)   = s `hashWithSalt` (1::Int) `hashWithSalt` c
+  hashWithSalt s (CHPBCounter c) = s `hashWithSalt` (2::Int) `hashWithSalt` c
+  hashWithSalt s (CHPBPueblo c)  = s `hashWithSalt` (3::Int) `hashWithSalt` c
 
 instance ConstraintHandler SomeConstraintHandler where
   toConstraintHandler = id
@@ -1981,17 +2061,22 @@ data ClauseHandler
   = ClauseHandler
   { claLits :: !(IOUArray Int Lit)
   , claActivity :: !(IORef Double)
+  , claHash :: !Int
   }
 
 instance Eq ClauseHandler where
   (==) = (==) `on` claLits
+
+instance Hashable ClauseHandler where
+  hash = claHash
+  hashWithSalt = defaultHashWithSalt
 
 newClauseHandler :: Clause -> Bool -> IO ClauseHandler
 newClauseHandler ls learnt = do
   let size = length ls
   a <- newListArray (0, size-1) ls
   act <- newIORef $! (if learnt then 0 else -1)
-  return (ClauseHandler a act)
+  return (ClauseHandler a act (hash ls))
 
 instance ConstraintHandler ClauseHandler where
   toConstraintHandler = CHClause
@@ -2177,17 +2262,22 @@ data AtLeastHandler
   { atLeastLits :: IOUArray Int Lit
   , atLeastNum :: !Int
   , atLeastActivity :: !(IORef Double)
+  , atLeastHash :: !Int
   }
 
 instance Eq AtLeastHandler where
   (==) = (==) `on` atLeastLits
+
+instance Hashable AtLeastHandler where
+  hash = atLeastHash
+  hashWithSalt = defaultHashWithSalt
 
 newAtLeastHandler :: [Lit] -> Int -> Bool -> IO AtLeastHandler
 newAtLeastHandler ls n learnt = do
   let size = length ls
   a <- newListArray (0, size-1) ls
   act <- newIORef $! (if learnt then 0 else -1)
-  return (AtLeastHandler a n act)
+  return (AtLeastHandler a n act (hash (ls,n)))
 
 instance ConstraintHandler AtLeastHandler where
   toConstraintHandler = CHAtLeast
@@ -2484,10 +2574,15 @@ data PBHandlerCounter
   , pbMaxSlack :: !Integer
   , pbSlack    :: !(IORef Integer)
   , pbActivity :: !(IORef Double)
+  , pbHash     :: !Int
   }
 
 instance Eq PBHandlerCounter where
   (==) = (==) `on` pbSlack
+
+instance Hashable PBHandlerCounter where
+  hash = pbHash
+  hashWithSalt = defaultHashWithSalt
 
 newPBHandlerCounter :: PBLinSum -> Integer -> Bool -> IO PBHandlerCounter
 newPBHandlerCounter ts degree learnt = do
@@ -2496,7 +2591,7 @@ newPBHandlerCounter ts degree learnt = do
       m = IM.fromList [(l,c) | (c,l) <- ts]
   s <- newIORef slack
   act <- newIORef $! (if learnt then 0 else -1)
-  return (PBHandlerCounter ts' degree m slack s act)
+  return (PBHandlerCounter ts' degree m slack s act (hash (ts,degree)))
 
 instance ConstraintHandler PBHandlerCounter where
   toConstraintHandler = CHPBCounter
@@ -2609,10 +2704,15 @@ data PBHandlerPueblo
   , puebloWatches   :: !(IORef LitSet)
   , puebloWatchSum  :: !(IORef Integer)
   , puebloActivity  :: !(IORef Double)
+  , puebloHash      :: !Int
   }
 
 instance Eq PBHandlerPueblo where
   (==) = (==) `on` puebloWatchSum
+
+instance Hashable PBHandlerPueblo where
+  hash = puebloHash
+  hashWithSalt = defaultHashWithSalt
 
 puebloAMax :: PBHandlerPueblo -> Integer
 puebloAMax this =
@@ -2627,7 +2727,7 @@ newPBHandlerPueblo ts degree learnt = do
   ws   <- newIORef IS.empty
   wsum <- newIORef 0
   act  <- newIORef $! (if learnt then 0 else -1)
-  return $ PBHandlerPueblo ts' degree slack ws wsum act
+  return $ PBHandlerPueblo ts' degree slack ws wsum act (hash (ts,degree))
 
 puebloGetWatchSum :: PBHandlerPueblo -> IO Integer
 puebloGetWatchSum pb = readIORef (puebloWatchSum pb)
@@ -2873,7 +2973,15 @@ shift :: IORef [a] -> IO a
 shift ref = do
   (x:xs) <- readIORef ref
   writeIORef ref xs
-  return x    
+  return x
+
+defaultHashWithSalt :: Hashable a => Int -> a -> Int
+defaultHashWithSalt salt x = salt `combine` hash x
+#if MIN_VERSION_hashable(1,2,0)
+  where
+    combine :: Int -> Int -> Int
+    combine h1 h2 = (h1 * 16777619) `xor` h2
+#endif
 
 {--------------------------------------------------------------------
   debug
