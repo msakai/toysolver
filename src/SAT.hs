@@ -726,7 +726,8 @@ addClause solver lits = do
     Nothing -> return ()
     Just [] -> markBad solver
     Just [lit] -> do
-      removeBackwardSubsumedByWhenEnabled solver ([(1,lit)],1)
+      {- We do not call 'removeBackwardSubsumedBy' here,
+         because subsumed constraints will be removed by 'simplify'. -}
       ret <- assign solver lit
       assert ret $ return ()
       ret2 <- deduce solver
@@ -736,7 +737,7 @@ addClause solver lits = do
     Just lits3 -> do
       subsumed <- checkForwardSubsumption solver lits
       unless subsumed $ do
-        removeBackwardSubsumedByWhenEnabled solver ([(1,lit) | lit <- lits3], 1)
+        removeBackwardSubsumedBy solver ([(1,lit) | lit <- lits3], 1)
         clause <- newClauseHandler lits3 False
         addToDB solver clause
         _ <- basicAttachClauseHandler solver clause
@@ -758,7 +759,8 @@ addAtLeast solver lits n = do
     else if n' > len then markBad solver
     else if n' == 1 then addClause solver lits'
     else if n' == len then do
-      removeBackwardSubsumedByWhenEnabled solver ([(1,lit) | lit <- lits'], fromIntegral n')
+      {- We do not call 'removeBackwardSubsumedBy' here,
+         because subsumed constraints will be removed by 'simplify'. -}
       forM_ lits' $ \l -> do
         ret <- assign solver l
         assert ret $ return ()
@@ -767,7 +769,7 @@ addAtLeast solver lits n = do
         Nothing -> return ()
         Just _ -> markBad solver
     else do
-      removeBackwardSubsumedByWhenEnabled solver ([(1,lit) | lit <- lits'], fromIntegral n')
+      removeBackwardSubsumedBy solver ([(1,lit) | lit <- lits'], fromIntegral n')
       c <- newAtLeastHandler lits' n' False
       addToDB solver c
       _ <- basicAttachAtLeastHandler solver c
@@ -811,7 +813,7 @@ addPBAtLeast solver ts n = do
       if degree <= 0 then return ()
       else if slack < 0 then markBad solver
       else do
-        removeBackwardSubsumedByWhenEnabled solver (ts', degree)
+        removeBackwardSubsumedBy solver (ts', degree)
         c <- newPBHandler solver ts' degree False
         addToDB solver c
         ret <- attach solver c
@@ -1168,7 +1170,7 @@ failedAssumptions solver = readIORef (svFailedAssumptions solver)
   Simplification
 --------------------------------------------------------------------}
 
--- | Simplify the clause database according to the current top-level assigment.
+-- | Simplify the constraint database according to the current top-level assigment.
 simplify :: Solver -> IO ()
 simplify solver = do
   let loop [] rs !n     = return (rs,n)
@@ -1199,48 +1201,71 @@ References:
 L. Zhang, "On subsumption removal and On-the-Fly CNF simplification,"
 Theory and Applications of Satisfiability Testing (2005), pp. 482-489.
 -}
+
 checkForwardSubsumption :: Solver -> Clause -> IO Bool
 checkForwardSubsumption solver lits = do
   flag <- getEnableForwardSubsumptionRemoval solver
   if not flag then
     return False
   else do
-    old <- getEnablePhaseSaving solver
-    setEnablePhaseSaving solver False
-    modifyIORef' (svLevel solver) (+1)
-    b <- allM (\lit -> assign solver (litNot lit)) lits
-    ret <- if b then liftM isJust (deduce solver) else return True
-    backtrackTo solver levelRoot
-    setEnablePhaseSaving solver old
-    return ret
-
-removeBackwardSubsumedByWhenEnabled :: Solver -> PBLinAtLeast -> IO ()
-removeBackwardSubsumedByWhenEnabled solver pb = do
-  flag <- getEnableBackwardSubsumptionRemoval solver
-  when flag $ removeBackwardSubsumedBy solver pb
+    withEnablePhaseSaving solver False $ do
+      bracket_
+        (modifyIORef' (svLevel solver) (+1))
+        (backtrackTo solver levelRoot) $ do
+          b <- allM (\lit -> assign solver (litNot lit)) lits
+          if b then
+            liftM isJust (deduce solver)
+          else do
+            when debugMode $ log solver ("forward subsumption: " ++ show lits)
+            return True
+  where
+    withEnablePhaseSaving solver flag m =
+      bracket
+        (getEnablePhaseSaving solver)
+        (setEnablePhaseSaving solver)
+        (const m)
 
 removeBackwardSubsumedBy :: Solver -> PBLinAtLeast -> IO ()
-removeBackwardSubsumedBy solver pb@(lhs,rhs) = do
+removeBackwardSubsumedBy solver pb = do
+  flag <- getEnableBackwardSubsumptionRemoval solver
+  when flag $ do
+    xs <- backwardSubsumedBy solver pb
+    when debugMode $ do
+      forM_ (HashSet.toList xs) $ \c -> do
+        s <- showConstraintHandler solver c
+        log solver (printf "backward subsumption: %s is subsumed by %s\n" s (show pb))
+    removeConstraintHandlers solver xs
+
+backwardSubsumedBy :: Solver -> PBLinAtLeast -> IO (HashSet SomeConstraintHandler)
+backwardSubsumedBy solver pb@(lhs,_) = do
   xs <- forM lhs $ \(_,lit) -> do
     ld <- litData solver lit
     readIORef (ldOccurList ld)
   case xs of
-    [] -> return ()
+    [] -> return HashSet.empty
     s:ss -> do
-      let candidates = foldl' HashSet.intersection s ss
-      unless (HashSet.null candidates) $ do
-        let loop [] rs !n     = return (rs,n)
-            loop (y:ys) rs !n = do
-              pb2 <- instantiatePB solver =<< toPBAtLeast solver y
-              if y `HashSet.member` candidates && pbSubsume pb pb2
-               then do
-                 detach solver y
-                 loop ys rs (n+1)
-               else loop ys (y:rs) n
-        xs <- readIORef (svConstrDB solver)
-        (ys,n) <- loop xs [] (0::Int)
-        modifyIORef' (svNRemovedConstr solver) (+n)
-        writeIORef (svConstrDB solver) ys
+      let p c = do
+            pb2 <- instantiatePB solver =<< toPBAtLeast solver c
+            return $ pbSubsume pb pb2
+      liftM HashSet.fromList
+        $ filterM p
+        $ HashSet.toList
+        $ foldl' HashSet.intersection s ss
+
+removeConstraintHandlers :: Solver -> HashSet SomeConstraintHandler -> IO ()
+removeConstraintHandlers _ zs | HashSet.null zs = return ()
+removeConstraintHandlers solver zs = do
+  let loop [] rs !n     = return (rs,n)
+      loop (c:cs) rs !n = do
+        if c `HashSet.member` zs
+         then do
+           detach solver c
+           loop cs rs (n+1)
+         else loop cs (c:rs) n
+  xs <- readIORef (svConstrDB solver)
+  (ys,n) <- loop xs [] (0::Int)
+  modifyIORef' (svNRemovedConstr solver) (+n)
+  writeIORef (svConstrDB solver) ys
 
 {--------------------------------------------------------------------
   Parameter settings.
