@@ -87,6 +87,7 @@ data Options
   , optLearntSizeFirst  :: Int
   , optLearntSizeInc    :: Double
   , optCCMin         :: Int
+  , optEnableBackwardSubsumptionRemoval :: Bool
   , optRandomFreq    :: Double
   , optRandomGen     :: Maybe Rand.StdGen
   , optLinearizerPB  :: Bool
@@ -115,6 +116,7 @@ defaultOptions
   , optRandomGen     = Nothing
   , optLinearizerPB  = False
   , optPBHandlerType = SAT.defaultPBHandlerType
+  , optEnableBackwardSubsumptionRemoval = SAT.defaultEnableBackwardSubsumptionRemoval
   , optSearchStrategy       = PBO.optSearchStrategy PBO.defaultOptions
   , optObjFunVarsHeuristics = PBO.optObjFunVarsHeuristics PBO.defaultOptions
   , optAllMUSes = False
@@ -157,6 +159,12 @@ options =
     , Option [] ["ccmin"]
         (ReqArg (\val opt -> opt{ optCCMin = read val }) "<int>")
         (printf "Conflict clause minimization (0=none, 1=local, 2=recursive; default %d)" SAT.defaultCCMin)
+    , Option [] ["enable-backward-subsumption-removal"]
+        (NoArg (\opt -> opt{ optEnableBackwardSubsumptionRemoval = True }))
+        ("Enable backward subsumption removal." ++ (if SAT.defaultEnableBackwardSubsumptionRemoval then " (default)" else ""))
+    , Option [] ["disable-backward-subsumption-removal"]
+        (NoArg (\opt -> opt{ optEnableBackwardSubsumptionRemoval = False }))
+        ("Disable backward subsumption removal." ++ (if SAT.defaultEnableBackwardSubsumptionRemoval then "" else " (default)"))
 
     , Option [] ["random-freq"]
         (ReqArg (\val opt -> opt{ optRandomFreq = read val }) "<0..1>")
@@ -401,6 +409,7 @@ newSolver opts = do
   do gen <- SAT.getRandomGen solver
      putCommentLine $ "use --random-gen=" ++ show (show gen) ++ " option to reproduce the execution"
   SAT.setLearningStrategy solver (optLearningStrategy opts)
+  SAT.setEnableBackwardSubsumptionRemoval solver (optEnableBackwardSubsumptionRemoval opts)
   SAT.setPBHandlerType solver (optPBHandlerType opts)
   SAT.setLogger solver putCommentLine
   SAT.setCheckModel solver (optCheckModel opts)

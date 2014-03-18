@@ -86,6 +86,9 @@ module SAT
   , LearningStrategy (..)
   , setLearningStrategy
   , defaultLearningStrategy
+  , setEnableBackwardSubsumptionRemoval
+  , getEnableBackwardSubsumptionRemoval
+  , defaultEnableBackwardSubsumptionRemoval
   , setVarPolarity
   , setLogger
   , setCheckModel
@@ -321,6 +324,8 @@ data Solver
   , svLearningStrategy :: !(IORef LearningStrategy)
 
   , svPBHandlerType :: !(IORef PBHandlerType)
+
+  , svEnableBackwardSubsumptionRemoval :: !(IORef Bool)
 
   , svLogger :: !(IORef (Maybe (String -> IO ())))
   , svStartWC    :: !(IORef UTCTime)
@@ -590,6 +595,7 @@ newSolver = do
   ccMin <- newIORef defaultCCMin
   checkModel <- newIORef False
   pbHandlerType <- newIORef defaultPBHandlerType
+  enableBackwardSubsumptionRemoval <- newIORef defaultEnableBackwardSubsumptionRemoval
 
   learntLim       <- newIORef undefined
   learntLimAdjCnt <- newIORef (-1)
@@ -639,6 +645,7 @@ newSolver = do
         , svLearntSizeInc = learntSizeInc
         , svCCMin = ccMin
         , svPBHandlerType   = pbHandlerType
+        , svEnableBackwardSubsumptionRemoval = enableBackwardSubsumptionRemoval
         , svLearntLim       = learntLim
         , svLearntLimAdjCnt = learntLimAdjCnt
         , svLearntLimSeq    = learntLimSeq
@@ -705,6 +712,7 @@ addClause solver lits = do
     Nothing -> return ()
     Just [] -> markBad solver
     Just [lit] -> do
+      removeBackwardSubsumedByWhenEnabled solver ([(1,lit)],1)
       ret <- assign solver lit
       assert ret $ return ()
       ret2 <- deduce solver
@@ -712,6 +720,7 @@ addClause solver lits = do
         Nothing -> return ()
         Just _ -> markBad solver
     Just lits3 -> do
+      removeBackwardSubsumedByWhenEnabled solver ([(1,lit) | lit <- lits3], 1)
       clause <- newClauseHandler lits3 False
       addToDB solver clause
       _ <- basicAttachClauseHandler solver clause
@@ -733,6 +742,7 @@ addAtLeast solver lits n = do
     else if n' > len then markBad solver
     else if n' == 1 then addClause solver lits'
     else if n' == len then do
+      removeBackwardSubsumedByWhenEnabled solver ([(1,lit) | lit <- lits'], fromIntegral n')
       forM_ lits' $ \l -> do
         ret <- assign solver l
         assert ret $ return ()
@@ -741,6 +751,7 @@ addAtLeast solver lits n = do
         Nothing -> return ()
         Just _ -> markBad solver
     else do
+      removeBackwardSubsumedByWhenEnabled solver ([(1,lit) | lit <- lits'], fromIntegral n')
       c <- newAtLeastHandler lits' n' False
       addToDB solver c
       _ <- basicAttachAtLeastHandler solver c
@@ -784,6 +795,7 @@ addPBAtLeast solver ts n = do
       if degree <= 0 then return ()
       else if slack < 0 then markBad solver
       else do
+        removeBackwardSubsumedByWhenEnabled solver (ts', degree)
         c <- newPBHandler solver ts' degree False
         addToDB solver c
         ret <- attach solver c
@@ -1162,6 +1174,39 @@ simplify solver = do
     (ys,n) <- loop xs [] (0::Int)
     writeIORef (svLearntDB solver) (m-n, ys)
 
+removeBackwardSubsumedByWhenEnabled :: Solver -> PBLinAtLeast -> IO ()
+removeBackwardSubsumedByWhenEnabled solver pb = do
+  flag <- getEnableBackwardSubsumptionRemoval solver
+  when flag $ removeBackwardSubsumedBy solver pb
+
+{-
+References:
+L. Zhang, "On subsumption removal and On-the-Fly CNF simplification,"
+Theory and Applications of Satisfiability Testing (2005), pp. 482-489.
+-}
+removeBackwardSubsumedBy :: Solver -> PBLinAtLeast -> IO ()
+removeBackwardSubsumedBy solver pb@(lhs,rhs) = do
+  xs <- forM lhs $ \(_,lit) -> do
+    ld <- litData solver lit
+    readIORef (ldOccurList ld)
+  case xs of
+    [] -> return ()
+    s:ss -> do
+      let candidates = foldl' HashSet.intersection s ss
+      unless (HashSet.null candidates) $ do
+        let loop [] rs !n     = return (rs,n)
+            loop (y:ys) rs !n = do
+              pb2 <- instantiatePB solver =<< toPBAtLeast solver y
+              if y `HashSet.member` candidates && pbSubsume pb pb2
+               then do
+                 detach solver y
+                 loop ys rs (n+1)
+               else loop ys (y:rs) n
+        xs <- readIORef (svConstrDB solver)
+        (ys,n) <- loop xs [] (0::Int)
+        modifyIORef' (svNRemovedConstr solver) (+n)
+        writeIORef (svConstrDB solver) ys
+
 {--------------------------------------------------------------------
   Parameter settings.
 --------------------------------------------------------------------}
@@ -1263,6 +1308,17 @@ defaultPBHandlerType = PBHandlerTypeCounter
 setPBHandlerType :: Solver -> PBHandlerType -> IO ()
 setPBHandlerType solver ht = do
   writeIORef (svPBHandlerType solver) ht
+
+setEnableBackwardSubsumptionRemoval :: Solver -> Bool -> IO ()
+setEnableBackwardSubsumptionRemoval solver flag = do
+  writeIORef (svEnableBackwardSubsumptionRemoval solver) flag
+
+getEnableBackwardSubsumptionRemoval :: Solver -> IO Bool
+getEnableBackwardSubsumptionRemoval solver = do
+  readIORef (svEnableBackwardSubsumptionRemoval solver)
+
+defaultEnableBackwardSubsumptionRemoval :: Bool
+defaultEnableBackwardSubsumptionRemoval = False
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
