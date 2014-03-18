@@ -54,7 +54,9 @@ solve solver obj opt = do
       }
 
 solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe (SAT.Model, Integer))
-solveWBO solver sels0 opt = loop 0 (IntMap.fromList sels0)
+solveWBO solver sels0 opt = do
+  SAT.setEnableBackwardSubsumptionRemoval solver True
+  loop 0 (IntMap.fromList sels0)
   where
     loop :: Integer -> IntMap Integer -> IO (Maybe (SAT.Model, Integer))
     loop !lb sels = do

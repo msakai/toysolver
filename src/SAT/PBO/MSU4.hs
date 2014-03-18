@@ -65,6 +65,7 @@ solve solver obj opt = do
 
 solveWBO :: SAT.Solver -> [(Lit, Integer)] -> Options -> IO (Maybe (SAT.Model, Integer))
 solveWBO solver sels opt = do
+  SAT.setEnableBackwardSubsumptionRemoval solver True
   optUpdateLB opt 0
   loop (IM.keysSet weights) IS.empty 0 Nothing
 

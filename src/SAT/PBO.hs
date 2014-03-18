@@ -72,6 +72,7 @@ minimize solver obj opt = do
                  }
       MSU4.solve solver obj opt2
     _ -> do
+      SAT.setEnableBackwardSubsumptionRemoval solver True
       updateLB (pbLowerBound obj)
       result <- solve solver
       if not result then
