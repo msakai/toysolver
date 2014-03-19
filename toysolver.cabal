@@ -140,6 +140,7 @@ Library
      SAT.CAMUS
      SAT.PBO
      SAT.PBO.BC
+     SAT.PBO.BCD
      SAT.PBO.MSU4
      SAT.PBO.UnsatBased
      SAT.TheorySolver
