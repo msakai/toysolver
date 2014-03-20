@@ -21,6 +21,7 @@ import Data.Ord
 import Text.Printf
 import SAT
 import SAT.Types
+import qualified SAT.PBO.BC as BC
 import qualified SAT.PBO.UnsatBased as UnsatBased
 import qualified SAT.PBO.MSU4 as MSU4
 
@@ -30,6 +31,7 @@ data SearchStrategy
   | AdaptiveSearch
   | UnsatBased
   | MSU4
+  | BC
 
 data Options
   = Options
@@ -71,6 +73,13 @@ minimize solver obj opt = do
                  , MSU4.optUpdateLB   = optUpdateLB opt
                  }
       MSU4.solve solver obj opt2
+    BC -> do
+      let opt2 = BC.defaultOptions
+                 { BC.optLogger     = optLogger opt
+                 , BC.optUpdateBest = optUpdateBest opt
+                 , BC.optUpdateLB   = optUpdateLB opt
+                 }
+      BC.solve solver obj opt2
     _ -> do
       SAT.setEnableBackwardSubsumptionRemoval solver True
       updateLB (pbLowerBound obj)

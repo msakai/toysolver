@@ -136,6 +136,7 @@ Library
      SAT.MUS
      SAT.CAMUS
      SAT.PBO
+     SAT.PBO.BC
      SAT.PBO.MSU4
      SAT.PBO.UnsatBased
      SAT.TheorySolver
