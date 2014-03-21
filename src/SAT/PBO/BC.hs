@@ -52,7 +52,7 @@ solve solver obj opt = solveWBO solver [(c,-lit) | (c,lit) <- obj] opt
 solveWBO :: SAT.Solver -> [(Integer, SAT.Lit)] -> Options -> IO (Maybe SAT.Model)
 solveWBO solver weights opt = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
-  loop (IntSet.fromList [lit | (_,lit) <- weights], IntSet.empty) (0, sum [c | (c,_) <- weights] + 1) Nothing
+  loop (IntSet.fromList [lit | (_,lit) <- weights], IntSet.empty) (0, SAT.pbUpperBound obj) Nothing
 
   where
     weightsMap :: SAT.LitMap Integer
@@ -63,7 +63,7 @@ solveWBO solver weights opt = do
 
     loop :: (SAT.LitSet, SAT.LitSet) -> (Integer, Integer) -> Maybe SAT.Model -> IO (Maybe SAT.Model)
     loop (unrelaxed, relaxed) (lb, ub) lastModel
-      | lb >= ub = return lastModel
+      | lb > ub = return lastModel
       | otherwise = do
           let mid = (lb + ub) `div` 2
           logIO $ printf "BC: %d <= obj <= %d; guessing obj <= %d" lb ub mid
@@ -74,11 +74,12 @@ solveWBO solver weights opt = do
             m <- SAT.model solver
             let val = SAT.pbEval m obj
             optUpdateBest opt m val
-            logIO $ printf "BC: updating upper bound: %d -> %d" ub val
+            let ub' = val - 1
+            logIO $ printf "BC: updating upper bound: %d -> %d" ub ub'
             -- Following constraints must be added in this order for backward subsumption removal.
             SAT.addClause solver [sel]
-            SAT.addPBAtMost solver [(weightsMap IntMap.! lit, -lit) | lit <- IntSet.toList relaxed] (val - 1)
-            loop (unrelaxed, relaxed) (lb, val) (Just m)
+            SAT.addPBAtMost solver [(weightsMap IntMap.! lit, -lit) | lit <- IntSet.toList relaxed] ub'
+            loop (unrelaxed, relaxed) (lb, ub') (Just m)
           else do
             core <- SAT.failedAssumptions solver
             SAT.addClause solver [-sel] -- delete temporary constraint
