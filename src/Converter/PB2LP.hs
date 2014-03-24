@@ -18,8 +18,6 @@ module Converter.PB2LP
 import Data.Array.IArray
 import Data.List
 import Data.Maybe
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -31,25 +29,24 @@ convert :: PBFile.Formula -> (LPFile.LP, Map LPFile.Var Rational -> SAT.Model)
 convert formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
   where
     lp = LPFile.LP
-      { LPFile.variables = vs2
+      { LPFile.variables = Set.fromList vs
       , LPFile.dir = dir
       , LPFile.objectiveFunction = (Nothing, obj2)
       , LPFile.constraints = cs2
       , LPFile.sosConstraints = []
       , LPFile.userCuts = []
-      , LPFile.varInfo = Map.fromAscList
+      , LPFile.varInfo = Map.fromList
           [ ( v
             , LPFile.VarInfo
               { LPFile.varType   = LPFile.IntegerVariable
               , LPFile.varBounds = (LPFile.Finite 0, LPFile.Finite 1)
               }
             )
-          | v <- Set.toAscList vs2
+          | v <- vs
           ]
       }
 
-    vs1 = collectVariables formula
-    vs2 = (Set.fromList . map convVar . IntSet.toList) $ vs1
+    vs = [convVar v | v <- [1..PBFile.pbNumVars formula]]
 
     (dir,obj2) =
       case obj of
@@ -92,39 +89,28 @@ convExpr s = concatMap g2 s
 convVar :: PBFile.Var -> LPFile.Var
 convVar x = LPFile.toVar ("x" ++ show x)
 
-collectVariables :: PBFile.Formula -> IntSet
-collectVariables (obj, cs) = IntSet.unions $ maybe IntSet.empty f obj : [f s | (s,_,_) <- cs]
-  where
-    f :: PBFile.Sum -> IntSet
-    f xs = IntSet.fromList $ do
-      (_,ts) <- xs
-      lit <- ts
-      return $ abs lit
-
 convertWBO :: Bool -> PBFile.SoftFormula -> (LPFile.LP, Map LPFile.Var Rational -> SAT.Model)
 convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formula))
   where
     lp = LPFile.LP
-      { LPFile.variables = vs2
+      { LPFile.variables = Set.fromList vs
       , LPFile.dir = LPFile.OptMin
       , LPFile.objectiveFunction = (Nothing, obj2)
       , LPFile.constraints = topConstr ++ map snd cs2
       , LPFile.sosConstraints = []
       , LPFile.userCuts = []
-      , LPFile.varInfo = Map.fromAscList
+      , LPFile.varInfo = Map.fromList
           [ ( v
             , LPFile.VarInfo
               { LPFile.varType   = LPFile.IntegerVariable
               , LPFile.varBounds = (LPFile.Finite 0, LPFile.Finite 1)
               }
             )
-          | v <- Set.toAscList vs2
+          | v <- vs
           ]
       }
 
-    vs1 = collectVariablesWBO formula
-    vs2 = ((Set.fromList . map convVar . IntSet.toList) $ vs1) `Set.union` vs3
-    vs3 = Set.fromList [v | (ts, _) <- cs2, (_, v) <- ts]
+    vs = [convVar v | v <- [1..PBFile.wboNumVars formula]] ++ [v | (ts, _) <- cs2, (_, v) <- ts]
 
     obj2 = [LPFile.Term (fromIntegral w) [v] | (ts, _) <- cs2, (w, v) <- ts]
 
@@ -196,22 +182,13 @@ relaxLE v (lhs, rhs) = (LPFile.Term (rhs - lhs_ub) [v] : lhs, rhs)
   where
     lhs_ub = sum [max c 0 | LPFile.Term c _ <- lhs]
 
-collectVariablesWBO :: PBFile.SoftFormula -> IntSet
-collectVariablesWBO (_top, cs) = IntSet.unions [f s | (_,(s,_,_)) <- cs]
-  where
-    f :: PBFile.Sum -> IntSet
-    f xs = IntSet.fromList $ do
-      (_,ts) <- xs
-      lit <- ts
-      return $ abs lit
-
 mtrans :: Int -> Map LPFile.Var Rational -> SAT.Model
 mtrans nvar m =
   array (1, nvar)
     [　(i, val)
     | i <- [1 .. nvar]
     , let val =
-            case m Map.! (convVar i) of
+            case Map.findWithDefault 0 (convVar i) m of
               0  -> False
               1  -> True
               v0 -> error (show v0 ++ " is neither 0 nor 1")
