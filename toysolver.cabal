@@ -236,7 +236,7 @@ Test-suite TestPolynomial
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestPolynomial.hs
-  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3, data-interval >=0.2.0, finite-field >=0.7.0 && <1.0.0, prettyclass >=1.0.0
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3, data-interval >=0.2.0, finite-field >=0.7.0 && <1.0.0, prettyclass >=1.0.0
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
@@ -244,7 +244,7 @@ Test-suite TestAReal
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestAReal.hs
-  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3, data-interval
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3, data-interval
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell, ScopedTypeVariables
 
@@ -252,7 +252,7 @@ Test-suite TestQE
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestQE.hs
-  Build-depends:     base >=4 && <5, containers, vector-space >=0.8.6, toysolver, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, vector-space >=0.8.6, toysolver, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
@@ -260,7 +260,7 @@ Test-suite TestContiTraverso
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestContiTraverso.hs
-  Build-depends:     base >=4 && <5, containers, vector-space >=0.8.6, toysolver, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, vector-space >=0.8.6, toysolver, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
@@ -268,7 +268,7 @@ Test-suite TestCongruenceClosure
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestCongruenceClosure.hs
-  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
@@ -276,7 +276,7 @@ Test-suite TestLPFile
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestLPFile.hs
-  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
@@ -284,7 +284,7 @@ Test-suite TestMPSFile
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestMPSFile.hs
-  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
@@ -292,7 +292,7 @@ Test-suite TestPBFile
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestPBFile.hs
-  Build-depends:     base >=4 && <5, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
@@ -300,7 +300,7 @@ Test-suite TestUtil
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestUtil.hs
-  Build-depends:     base >=4 && <5, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2,HUnit,QuickCheck >=2 && <3
+  Build-depends:     base >=4 && <5, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
