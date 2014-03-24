@@ -1,6 +1,8 @@
 toysolver
 =========
 
+[![Build Status](https://secure.travis-ci.org/msakai/toysolver.png?branch=master)](http://travis-ci.org/msakai/toysolver)
+
 Assorted decision procedures for SAT, Max-SAT, PB, MIP, etc.
 
 Installation
