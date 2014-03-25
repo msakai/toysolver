@@ -76,9 +76,9 @@ solveWBO solver weights opt = do
             optUpdateBest opt m val
             let ub' = val - 1
             logIO $ printf "BC: updating upper bound: %d -> %d" ub ub'
-            -- Following constraints must be added in this order for backward subsumption removal.
             SAT.addClause solver [sel]
-            SAT.addPBAtMost solver [(weightsMap IntMap.! lit, -lit) | lit <- IntSet.toList relaxed] ub'
+            -- FIXME: improve backward subsumption removal to delete the old upper bound constraint of 
+            SAT.addPBAtMost solver obj ub'
             loop (unrelaxed, relaxed) (lb, ub') (Just m)
           else do
             core <- SAT.failedAssumptions solver
