@@ -47,19 +47,27 @@ defaultOptions
   }
 
 solve :: SAT.Solver -> SAT.PBLinSum -> Options -> IO (Maybe SAT.Model)
-solve solver obj opt = solveWBO solver [(c,-lit) | (c,lit) <- obj] opt
+solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
+  where
+    (obj',offset) = SAT.normalizePBSum (obj,0)
+    opt' =
+      opt
+      { optUpdateBest = \m val -> optUpdateBest opt m (offset + val)
+      , optUpdateLB   = \val -> optUpdateLB opt (offset + val)
+      }
 
-solveWBO :: SAT.Solver -> [(Integer, SAT.Lit)] -> Options -> IO (Maybe SAT.Model)
-solveWBO solver weights opt = do
+solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
+solveWBO solver sels opt = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
-  loop (IntSet.fromList [lit | (_,lit) <- weights], IntSet.empty) (0, SAT.pbUpperBound obj) Nothing
+  optUpdateLB opt 0
+  loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty) (0, SAT.pbUpperBound obj) Nothing
 
   where
-    weightsMap :: SAT.LitMap Integer
-    weightsMap = IntMap.fromList [(lit,w) | (w,lit) <- weights]
+    weights :: SAT.LitMap Integer
+    weights = IntMap.fromList sels
 
     obj :: SAT.PBLinSum
-    obj = [(w, -lit) | (w,lit) <- weights]
+    obj = [(w, -lit) | (lit,w) <- sels]
 
     loop :: (SAT.LitSet, SAT.LitSet) -> (Integer, Integer) -> Maybe SAT.Model -> IO (Maybe SAT.Model)
     loop (unrelaxed, relaxed) (lb, ub) lastModel
@@ -68,7 +76,7 @@ solveWBO solver weights opt = do
           let mid = (lb + ub) `div` 2
           logIO $ printf "BC: %d <= obj <= %d; guessing obj <= %d" lb ub mid
           sel <- SAT.newVar solver
-          SAT.addPBAtMostSoft solver sel [(weightsMap IntMap.! lit, -lit) | lit <- IntSet.toList relaxed] mid
+          SAT.addPBAtMostSoft solver sel [(weights IntMap.! lit, -lit) | lit <- IntSet.toList relaxed] mid
           ret <- SAT.solveWith solver (sel : IntSet.toList unrelaxed)
           if ret then do
             m <- SAT.model solver

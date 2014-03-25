@@ -15,11 +15,9 @@ module SAT.PBO.UnsatBased
   ( Options (..)
   , defaultOptions
   , solve
-  , solveWBO
   ) where
 
 import Control.Monad
-import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified SAT as SAT
 import qualified SAT.Types as SAT
@@ -40,11 +38,7 @@ defaultOptions
   }
 
 solve :: SAT.Solver -> [(Integer, SAT.Lit)] -> Options -> IO (Maybe SAT.Model)
-solve solver obj opt = do
-  result <- solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
-  case result of
-    Nothing -> return Nothing
-    Just (m,_) -> return (Just m)
+solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
   where
     (obj',offset) = SAT.normalizePBSum (obj,0)
     opt' =
@@ -53,22 +47,21 @@ solve solver obj opt = do
       , optUpdateLB   = \val -> optUpdateLB opt (offset + val)
       }
 
-solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe (SAT.Model, Integer))
+solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
 solveWBO solver sels0 opt = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
   loop 0 (IntMap.fromList sels0)
   where
-    loop :: Integer -> IntMap Integer -> IO (Maybe (SAT.Model, Integer))
+    loop :: Integer -> SAT.LitMap Integer -> IO (Maybe SAT.Model)
     loop !lb sels = do
       optUpdateLB opt lb
 
       ret <- SAT.solveWith solver (IntMap.keys sels)
-      if ret
-      then do
+      if ret then do
         m <- SAT.model solver
         -- モデルから余計な変数を除去する?
         optUpdateBest opt m lb
-        return $ Just (m, lb)
+        return $ Just m
       else do
         core <- SAT.failedAssumptions solver
         case core of
