@@ -202,7 +202,7 @@ options =
 
     , Option [] ["search"]
         (ReqArg (\val opt -> opt{ optSearchStrategy = parseSearch val }) "<str>")
-        "Search algorithm used in optimization; linear (default), binary, adaptive, unsat, msu4, bc, bcd"
+        "Search algorithm used in optimization; linear (default), binary, adaptive, unsat, msu4, bc, bcd, bcd2"
     , Option [] ["objfun-heuristics"]
         (NoArg (\opt -> opt{ optObjFunVarsHeuristics = True }))
         "Enable heuristics for polarity/activity of variables in objective function (default)"
@@ -246,6 +246,7 @@ options =
         "msu4"     -> PBO.MSU4
         "bc"       -> PBO.BC
         "bcd"      -> PBO.BCD
+        "bcd2"     -> PBO.BCD2
         _ -> error (printf "unknown search strategy \"%s\"" s)
 
     parseLS s =

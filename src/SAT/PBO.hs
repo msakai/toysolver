@@ -23,6 +23,7 @@ import SAT
 import SAT.Types
 import qualified SAT.PBO.BC as BC
 import qualified SAT.PBO.BCD as BCD
+import qualified SAT.PBO.BCD2 as BCD2
 import qualified SAT.PBO.UnsatBased as UnsatBased
 import qualified SAT.PBO.MSU4 as MSU4
 
@@ -34,6 +35,7 @@ data SearchStrategy
   | MSU4
   | BC
   | BCD
+  | BCD2
 
 data Options
   = Options
@@ -89,6 +91,13 @@ minimize solver obj opt = do
                  , BCD.optUpdateLB   = optUpdateLB opt
                  }
       BCD.solve solver obj opt2
+    BCD2 -> do
+      let opt2 = BCD2.defaultOptions
+                 { BCD2.optLogger     = optLogger opt
+                 , BCD2.optUpdateBest = optUpdateBest opt
+                 , BCD2.optUpdateLB   = optUpdateLB opt
+                 }
+      BCD2.solve solver obj opt2
     _ -> do
       SAT.setEnableBackwardSubsumptionRemoval solver True
       updateLB (pbLowerBound obj)
