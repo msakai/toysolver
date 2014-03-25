@@ -144,11 +144,10 @@ minimize solver obj opt = do
             m2 <- model solver
             let v = pbEval m2 obj
             updateBest m2 v
-            -- deleting temporary constraint
-            -- ただし、これに依存した補題を活かすためには残したほうが良い?
-            addClause solver [-sel]
             let ub' = v - 1
             logIO $ printf "Binary Search: updating upper bound: %d -> %d" ub ub'
+            -- old upper bound constraints will be removed by backward subsumption removal
+            addClause solver [sel]
             addPBAtMost solver obj ub'
             loop lb ub' m2
           else do
@@ -204,11 +203,10 @@ minimize solver obj opt = do
                   m2 <- model solver
                   let v = pbEval m2 obj
                   updateBest m2 v
-                  -- deleting temporary constraint
-                  -- ただし、これに依存した補題を活かすためには残したほうが良い?
-                  addClause solver [-sel]
                   let ub' = v - 1
                   logIO $ printf "Adaptive Search: updating upper bound: %d -> %d" ub ub'
+                  -- old upper bound constraints will be removed by backward subsumption removal
+                  addClause solver [sel]
                   addPBAtMost solver obj ub'
                   loop lb ub' fraction' m2
                 else do
