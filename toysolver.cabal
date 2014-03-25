@@ -16,9 +16,6 @@ Extra-Source-Files:
    .travis.yml
    src/TseitinEncode.hs
    src/Data/Polyhedron.hs
-   src/pbverify.hs
-   src/maxsatverify.hs
-   src/pigeonhole.hs
    src/Algorithm/Wang.hs
    samples/gcnf/*.cnf
    samples/gcnf/*.gcnf
@@ -41,6 +38,10 @@ Build-Type: Simple
 
 Flag ForceChar8
   Description: set default encoding to char8 (not to use iconv)
+  Default: False
+
+Flag BuildMiscPrograms
+  Description: build misc programs
   Default: False
 
 source-repository head
@@ -206,6 +207,30 @@ Executable pbconvert
   Main-is: pbconvert.hs
   HS-Source-Dirs: pbconvert
   Build-Depends: base >=4 && <5, containers, filepath, parse-dimacs, toysolver
+  Default-Language: Haskell2010
+
+Executable pigeonhole
+  If !flag(BuildMiscPrograms)
+    Buildable: False
+  Main-is: pigeonhole.hs
+  HS-Source-Dirs: pigeonhole
+  Build-Depends: base >=4 && <5, containers, filepath, toysolver
+  Default-Language: Haskell2010
+
+Executable maxsatverify
+  If !flag(BuildMiscPrograms)
+    Buildable: False
+  Main-is: maxsatverify.hs
+  HS-Source-Dirs: maxsatverify
+  Build-Depends: base >=4 && <5, array, containers, filepath, toysolver
+  Default-Language: Haskell2010
+
+Executable pbverify
+  If !flag(BuildMiscPrograms)
+    Buildable: False
+  Main-is: pbverify.hs
+  HS-Source-Dirs: pbverify
+  Build-Depends: base >=4 && <5, array, containers, filepath, toysolver
   Default-Language: Haskell2010
 
 Test-suite TestSAT
