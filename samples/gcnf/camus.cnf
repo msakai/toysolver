@@ -1,5 +1,5 @@
 c http://sun.iwu.edu/~mliffito/publications/jar_liffiton_CAMUS.pdf
-c￼φ= (x1) ∧ (¬x1) ∧ (¬x1∨x2) ∧ (¬x2) ∧ (¬x1∨x3) ∧ (¬x3)
+c φ= (x1) ∧ (¬x1) ∧ (¬x1∨x2) ∧ (¬x2) ∧ (¬x1∨x3) ∧ (¬x3)
 c MUSes(φ) = {{C1, C2}, {C1, C3, C4}, {C1, C5, C6}}
 c MCSes(φ) = {{C1}, {C2, C3, C5}, {C2, C3, C6}, {C2, C4, C5}, {C2, C4, C6}}
 p cnf 3 6
