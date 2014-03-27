@@ -94,11 +94,11 @@ options =
 
     , Option [] ["omega-real"] (ReqArg OmegaReal "SOLVER") "fourier-motzkin (default), cad, simplex, none"
 
-    , Option []    ["sat"]    (NoArg (Mode ModeSAT))    "solve boolean satisfiability problems in .cnf file"
-    , Option []    ["pb"]     (NoArg (Mode ModePB))     "solve pseudo boolean problems in .pb file"
-    , Option []    ["wbo"]    (NoArg (Mode ModeWBO))    "solve weighted boolean optimization problem in .opb file"
+    , Option []    ["sat"]    (NoArg (Mode ModeSAT))    "solve boolean satisfiability problem in .cnf file"
+    , Option []    ["pb"]     (NoArg (Mode ModePB))     "solve pseudo boolean problem in .opb file"
+    , Option []    ["wbo"]    (NoArg (Mode ModeWBO))    "solve weighted boolean optimization problem in .wbo file"
     , Option []    ["maxsat"] (NoArg (Mode ModeMaxSAT)) "solve MaxSAT problem in .cnf or .wcnf file"
-    , Option []    ["lp"]     (NoArg (Mode ModeLP))     "solve binary integer programming problem in .lp or .mps file (default)"
+    , Option []    ["lp"]     (NoArg (Mode ModeLP))     "solve LP/MIP problem in .lp or .mps file (default)"
 
     , Option [] ["nomip"] (NoArg NoMIP)                 "consider all integer variables as continuous"
     ]
