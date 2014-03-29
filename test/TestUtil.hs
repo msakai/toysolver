@@ -6,8 +6,8 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import ToySolver.Util
+import qualified Algorithm.Knapsack as Knapsack
 
--- should be SAT
 case_showRationalAsDecimal :: IO ()
 case_showRationalAsDecimal = do
   showRationalAsFiniteDecimal 0      @?= Just "0.0"
@@ -21,6 +21,12 @@ case_showRationalAsDecimal = do
   showRationalAsFiniteDecimal (-5/4) @?= Just "-1.25"
   showRationalAsFiniteDecimal (4/3)  @?= Nothing
   showRationalAsFiniteDecimal (-4/3) @?= Nothing
+
+case_knapsack_1 :: IO ()
+case_knapsack_1 = Knapsack.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
+
+case_knapsack_2 :: IO ()
+case_knapsack_2 = Knapsack.solve [(16,2), (19,3), (23,4), (28,5)] 7 @?= (44, 7, [True,False,False,True])
 
 ------------------------------------------------------------------------
 -- Test harness
