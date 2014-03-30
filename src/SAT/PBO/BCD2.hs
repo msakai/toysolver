@@ -118,8 +118,10 @@ solveWBO solver sels opt = do
           [] -> return lastModel
           [sel] | Just info <- IntMap.lookup sel sels -> do
             let newLB  = refine [weights IntMap.! lit | lit <- IntSet.toList (coreLits info)] (coreMidValue info)
-                cores' = IntMap.elems $ IntMap.insert sel info{ coreLB = newLB } sels
+                info'  = info{ coreLB = newLB }
+                cores' = IntMap.elems $ IntMap.insert sel info' sels
             optLogger opt $ printf "BCD2: updating lower bound of a core"
+            SAT.addPBAtLeast solver (coreCostFun info') (coreLB info') -- redundant, but useful for direct search
             cont (unrelaxed, relaxed) cores' ub lastModel
           _ -> do
             let coreSet     = IntSet.fromList core
@@ -143,6 +145,7 @@ solveWBO solver sels opt = do
               optLogger opt $ printf "BCD2: found a new core of size %d" (IntSet.size torelax)              
             else do
               optLogger opt $ printf "BCD2: merging cores"
+            SAT.addPBAtLeast solver (coreCostFun mergedCore) (coreLB mergedCore) -- redundant, but useful for direct search
             forM_ (IntMap.keys sels) $ \sel -> SAT.addClause solver [-sel] -- delete temporary constraints
             cont (unrelaxed', relaxed') cores' ub lastModel
 
