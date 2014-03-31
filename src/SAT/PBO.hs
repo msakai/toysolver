@@ -16,8 +16,8 @@ module SAT.PBO where
 
 import Control.Exception
 import Control.Monad
-import Data.List
-import Data.Ord
+import qualified Data.Set as Set
+import qualified Data.Map as Map
 import Text.Printf
 import SAT
 import SAT.Types
@@ -232,5 +232,8 @@ tweakParams solver obj = do
   forM_ obj $ \(c,l) -> do
     let p = if c > 0 then not (litPolarity l) else litPolarity l
     setVarPolarity solver (litVar l) p
-  forM_ (zip [1..] (map snd (sortBy (comparing fst) [(abs c, l) | (c,l) <- obj]))) $ \(n,l) -> do
-    replicateM n $ varBumpActivity solver (litVar l)
+  let cs = Set.fromList [abs c | (c,_) <- obj]
+      ws = Map.fromAscList $ zip (Set.toAscList cs) [1..]
+  forM_ obj $ \(c,l) -> do
+    let w = ws Map.! abs c
+    replicateM w $ varBumpActivity solver (litVar l)
