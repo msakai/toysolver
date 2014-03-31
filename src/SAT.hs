@@ -48,6 +48,7 @@ module SAT
   , newVar
   , newVars
   , newVars_
+  , resizeVarCapacity
   , addClause
   , addAtLeast
   , addAtMost
@@ -709,11 +710,23 @@ newVar solver = do
 
 -- |Add variables. @newVars solver n = replicateM n (newVar solver)@
 newVars :: Solver -> Int -> IO [Var]
-newVars solver n = replicateM n (newVar solver)
+newVars solver n = do
+  nv <- nVars solver
+  resizeVarCapacity solver (nv+n)
+  replicateM n (newVar solver)
 
--- |Add variables. @newVars_ solver n >> return () = newVars_ solver n@
+-- |Add variables. @newVars_ solver n = newVars solver n >> return ()@
 newVars_ :: Solver -> Int -> IO ()
-newVars_ solver n = replicateM_ n (newVar solver)
+newVars_ solver n = do
+  nv <- nVars solver
+  resizeVarCapacity solver (nv+n)
+  replicateM_ n (newVar solver)
+
+-- |Pre-allocate internal buffer for @n@ variables.
+resizeVarCapacity :: Solver -> Int -> IO ()
+resizeVarCapacity solver n = do
+  PQ.resizeHeapCapacity (svVarQueue solver) n
+  PQ.resizeTableCapacity (svVarQueue solver) (n+1)
 
 -- |Add a clause to the solver.
 addClause :: Solver -> Clause -> IO ()

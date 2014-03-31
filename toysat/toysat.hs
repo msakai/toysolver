@@ -486,6 +486,7 @@ solveMUS opt solver gcnf = do
   putCommentLine $ printf "#constraints %d" (GCNF.numClauses gcnf)
   putCommentLine $ printf "#groups %d" (GCNF.lastGroupIndex gcnf)
 
+  SAT.resizeVarCapacity solver (GCNF.numVars gcnf + GCNF.lastGroupIndex gcnf)
   SAT.newVars_ solver (GCNF.numVars gcnf)
 
   tbl <- forM [1 .. GCNF.lastGroupIndex gcnf] $ \i -> do
@@ -635,6 +636,7 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
   putCommentLine $ printf "#vars %d" nvar
   putCommentLine $ printf "#constraints %d" (length cs)
 
+  SAT.resizeVarCapacity solver (nvar + length [() | (Just _, _) <- cs])
   SAT.newVars_ solver nvar
   enc <- Tseitin.newEncoder solver
   Tseitin.setUsePB enc (optLinearizerPB opt)

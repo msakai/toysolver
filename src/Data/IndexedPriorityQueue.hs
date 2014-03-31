@@ -35,6 +35,10 @@ module Data.IndexedPriorityQueue
   , member
   , update
   , getHeapArray
+
+  -- * Misc operations
+  , resizeHeapCapacity
+  , resizeTableCapacity
   ) where
 
 import Control.Monad
@@ -66,7 +70,7 @@ newPriorityQueueBy cmp = do
   ref <- newIORef (0,h)
   idx <- A.newArray_ (0,-1)
   ref2 <- newIORef idx
-  return $ PriorityQueue{ lt = cmp, heap = ref, table =ref2 }
+  return $ PriorityQueue{ lt = cmp, heap = ref, table = ref2 }
 
 -- | Return a list of all the elements of a priority queue. (not sorted)
 getElems :: PriorityQueue -> IO [Value]
@@ -236,6 +240,27 @@ down q !i = do
 -- | Get the internal representation of a given priority queue.
 getHeapArray :: PriorityQueue -> IO (A.IOUArray Index Value)
 getHeapArray q = liftM snd $ readIORef (heap q)
+
+-- | Pre-allocate internal buffer for @n@ elements.
+resizeHeapCapacity :: PriorityQueue -> Int -> IO ()
+resizeHeapCapacity q capa = do
+  (n,arr) <- readIORef (heap q)
+  capa0 <- liftM rangeSize $ A.getBounds arr
+  when (capa0 < capa) $ do
+    arr' <- A.newArray_ (0, capa-1)
+    copyTo arr arr' (0, n-1)
+    writeIORef (heap q) (n,arr')
+
+-- | Pre-allocate internal buffer for @[0..n-1]@ values.
+resizeTableCapacity :: PriorityQueue -> Int -> IO ()
+resizeTableCapacity q capa = do
+  idx <- readIORef (table q)
+  capa0 <- liftM rangeSize $ A.getBounds idx
+  when (capa0 < capa) $ do
+    idx' <- A.newArray_ (0, capa-1)
+    copyTo idx idx' (0, capa0-1)
+    forM_ [capa0..capa-1] $ \i -> A.unsafeWrite idx' i (-1)
+    writeIORef (table q) idx'
 
 {--------------------------------------------------------------------
   Index "traversal" functions
