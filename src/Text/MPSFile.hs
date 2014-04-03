@@ -292,7 +292,7 @@ mpsfile = do
           , MIP.constrBody      = (lhs, op2, rhs2)
           }
 
-  let lp =
+  let mip =
         MIP.Problem
         { MIP.dir                     = objdir
         , MIP.objectiveFunction       =
@@ -317,7 +317,7 @@ mpsfile = do
             ]
         }
 
-  return lp
+  return mip
 
 nameSection :: Parser (Maybe String)
 nameSection = do

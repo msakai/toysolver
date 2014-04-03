@@ -56,9 +56,9 @@ import qualified Text.MPSFile as MPSFile
 import qualified Text.PBFile as PBFile
 import qualified Text.MaxSAT as MaxSAT
 import qualified Text.GurobiSol as GurobiSol
-import qualified Converter.SAT2LP as SAT2LP
-import qualified Converter.PB2LP as PB2LP
-import qualified Converter.MaxSAT2LP as MaxSAT2LP
+import qualified Converter.SAT2IP as SAT2IP
+import qualified Converter.PB2IP as PB2IP
+import qualified Converter.MaxSAT2IP as MaxSAT2IP
 import SAT.Printer
 import qualified SAT.Types as SAT
 import ToySolver.Version
@@ -66,7 +66,7 @@ import ToySolver.Util
 
 -- ---------------------------------------------------------------------------
 
-data Mode = ModeSAT | ModePB | ModeWBO | ModeMaxSAT | ModeLP
+data Mode = ModeSAT | ModePB | ModeWBO | ModeMaxSAT | ModeMIP
   deriving (Eq, Ord)
 
 data Flag
@@ -99,7 +99,7 @@ options =
     , Option []    ["pb"]     (NoArg (Mode ModePB))     "solve pseudo boolean problem in .opb file"
     , Option []    ["wbo"]    (NoArg (Mode ModeWBO))    "solve weighted boolean optimization problem in .wbo file"
     , Option []    ["maxsat"] (NoArg (Mode ModeMaxSAT)) "solve MaxSAT problem in .cnf or .wcnf file"
-    , Option []    ["lp"]     (NoArg (Mode ModeLP))     "solve LP/MIP problem in .lp or .mps file (default)"
+    , Option []    ["lp"]     (NoArg (Mode ModeMIP))    "solve LP/MIP problem in .lp or .mps file (default)"
 
     , Option [] ["nomip"] (NoArg NoMIP)                 "consider all integer variables as continuous"
     ]
@@ -115,8 +115,8 @@ run
   -> MIP.Problem
   -> (Map MIP.Var Rational -> IO ())
   -> IO ()
-run solver opt lp printModel = do
-  unless (Set.null (MIP.semiContinuousVariables lp)) $ do
+run solver opt mip printModel = do
+  unless (Set.null (MIP.semiContinuousVariables mip)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure  
   case map toLower solver of
@@ -126,7 +126,7 @@ run solver opt lp printModel = do
     s | s `elem` ["ct", "conti-traverso"] -> solveByContiTraverso
     _ -> solveByMIP2
   where
-    vs = MIP.variables lp
+    vs = MIP.variables mip
     vsAssoc = zip (Set.toList vs) [0..]
     nameToVar = Map.fromList vsAssoc
     varToName = IntMap.fromList [(v,name) | (name,v) <- vsAssoc]
@@ -138,19 +138,19 @@ run solver opt lp printModel = do
     compileT (MIP.Term c vs) =
       foldr (*) (Const c) [Var (nameToVar Map.! v) | v <- vs]
 
-    obj = compileE $ snd $ MIP.objectiveFunction lp
+    obj = compileE $ snd $ MIP.objectiveFunction mip
 
     cs1 = do
       v <- Set.toList vs
       let v2 = Var (nameToVar Map.! v)
-      let (l,u) = MIP.getBounds lp v
+      let (l,u) = MIP.getBounds mip v
       [Const x .<=. v2 | MIP.Finite x <- return l] ++
         [v2 .<=. Const x | MIP.Finite x <- return u]
     cs2 = do
       MIP.Constraint
         { MIP.constrIndicator = ind
         , MIP.constrBody = (lhs, rel, rhs)
-        } <- MIP.constraints lp
+        } <- MIP.constraints mip
       let rel2 = case rel of
                   MIP.Ge  -> Ge
                   MIP.Le  -> Le
@@ -161,7 +161,7 @@ run solver opt lp printModel = do
 
     ivs
       | NoMIP `elem` opt = Set.empty
-      | otherwise        = MIP.integerVariables lp
+      | otherwise        = MIP.integerVariables mip
 
     vs2  = IntMap.keysSet varToName
     ivs2 = IntSet.fromList . map (nameToVar Map.!) . Set.toList $ ivs
@@ -211,7 +211,7 @@ run solver opt lp printModel = do
           putSLine "UNKNOWN"
           exitFailure
         Just (cs',obj') ->
-          case MIPSolverHL.optimize (MIP.dir lp) obj' cs' ivs2 of
+          case MIPSolverHL.optimize (MIP.dir mip) obj' cs' ivs2 of
             MIPSolverHL.OptUnsat -> do
               putSLine "UNSATISFIABLE"
               exitFailure
@@ -237,7 +237,7 @@ run solver opt lp printModel = do
 
       Simplex2.setLogger solver putCommentLine
       replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
-      Simplex2.setOptDir solver (MIP.dir lp)
+      Simplex2.setOptDir solver (MIP.dir mip)
       Simplex2.setObj solver $ fromJust (LAFOL.fromFOLExpr obj)
       putCommentLine "Loading constraints... "
       forM_ (cs1 ++ cs2) $ \c -> do
@@ -326,7 +326,7 @@ run solver opt lp printModel = do
               putCommentLine "non-linear expressions are not supported by Conti-Traverso algorithm"
               exitFailure
             Just (linObj, linCon) -> do
-              case ContiTraverso.solve P.grlex vs2 (MIP.dir lp) linObj linCon of
+              case ContiTraverso.solve P.grlex vs2 (MIP.dir mip) linObj linCon of
                 Nothing -> do
                   putSLine "UNSATISFIABLE"
                   exitFailure
@@ -343,8 +343,8 @@ run solver opt lp printModel = do
     showValue :: Rational -> String
     showValue = showRational printRat
 
-lpPrintModel :: Handle -> Bool -> Map MIP.Var Rational -> IO ()
-lpPrintModel h asRat m = do
+mipPrintModel :: Handle -> Bool -> Map MIP.Var Rational -> IO ()
+mipPrintModel h asRat m = do
   forM_ (Map.toList m) $ \(v, val) -> do
     printf "v %s = %s\n" (MIP.fromVar v) (showRational asRat val)
 
@@ -390,9 +390,9 @@ main = do
                   ".opb"  -> ModePB
                   ".wbo"  -> ModeWBO
                   ".wcnf" -> ModeMaxSAT
-                  ".lp"   -> ModeLP
-                  ".mps"  -> ModeLP
-                  _ -> ModeLP
+                  ".lp"   -> ModeMIP
+                  ".mps"  -> ModeMIP
+                  _ -> ModeMIP
 
       case mode of
         ModeSAT -> do
@@ -400,8 +400,8 @@ main = do
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
-              let (lp,mtrans) = SAT2LP.convert cnf
-              run (getSolver o) o lp $ \m -> do
+              let (mip,mtrans) = SAT2IP.convert cnf
+              run (getSolver o) o mip $ \m -> do
                 let m2 = mtrans m
                 satPrintModel stdout m2 0
                 writeSOLFileSAT o m2
@@ -410,8 +410,8 @@ main = do
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right pb -> do
-              let (lp,mtrans) = PB2LP.convert pb
-              run (getSolver o) o lp $ \m -> do
+              let (mip,mtrans) = PB2IP.convert pb
+              run (getSolver o) o mip $ \m -> do
                 let m2 = mtrans m
                 pbPrintModel stdout m2 0
                 writeSOLFileSAT o m2
@@ -420,8 +420,8 @@ main = do
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right wbo -> do
-              let (lp,mtrans) = PB2LP.convertWBO False wbo
-              run (getSolver o) o lp $ \m -> do
+              let (mip,mtrans) = PB2IP.convertWBO False wbo
+              run (getSolver o) o mip $ \m -> do
                 let m2 = mtrans m
                 pbPrintModel stdout m2 0
                 writeSOLFileSAT o m2
@@ -430,32 +430,32 @@ main = do
           case ret of
             Left err -> hPutStrLn stderr err >> exitFailure
             Right wcnf -> do
-              let (lp,mtrans) = MaxSAT2LP.convert False wcnf
-              run (getSolver o) o lp $ \m -> do
+              let (mip,mtrans) = MaxSAT2IP.convert False wcnf
+              run (getSolver o) o mip $ \m -> do
                 let m2 = mtrans m
                 maxsatPrintModel stdout m2 0
                 writeSOLFileSAT o m2
-        ModeLP -> do
+        ModeMIP -> do
           ret <- LPFile.parseFile fname
-          lp <- case ret of
-                  Right lp -> return lp
+          mip <- case ret of
+                  Right mip -> return mip
                   Left err -> do
                     ret <- MPSFile.parseFile fname
                     case ret of
-                      Right lp -> return lp
+                      Right mip -> return mip
                       Left err2 -> do
                         hPrint stderr err
                         hPrint stderr err2
                         exitFailure
-          run (getSolver o) o lp $ \m -> do
-            lpPrintModel stdout (PrintRational `elem` o) m
-            writeSOLFileLP o m
+          run (getSolver o) o mip $ \m -> do
+            mipPrintModel stdout (PrintRational `elem` o) m
+            writeSOLFileMIP o m
     (_,_,errs) ->
         hPutStrLn stderr $ concat errs ++ usageInfo header options
 
 -- FIXME: 目的関数値を表示するように
-writeSOLFileLP :: [Flag] -> Map MIP.Var Rational -> IO ()
-writeSOLFileLP opt m = do
+writeSOLFileMIP :: [Flag] -> Map MIP.Var Rational -> IO ()
+writeSOLFileMIP opt m = do
   let m2 = Map.fromList [(MIP.fromVar v, fromRational val) | (v,val) <- Map.toList m]
   writeSOLFileRaw opt m2
 

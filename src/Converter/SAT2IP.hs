@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Converter.MaxSAT2LP
+-- Module      :  Converter.SAT2IP
 -- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
 -- 
@@ -10,16 +10,16 @@
 -- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module Converter.MaxSAT2LP
+module Converter.SAT2IP
   ( convert
   ) where
 
 import Data.Map (Map)
 import qualified Data.MIP as MIP
-import qualified Text.MaxSAT as MaxSAT
-import SAT.Types
-import qualified Converter.MaxSAT2WBO as MaxSAT2WBO
-import qualified Converter.PB2LP as PB2LP
+import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
+import qualified SAT.Types as SAT
+import qualified Converter.PB2IP as PB2IP
+import qualified Converter.SAT2PB as SAT2PB
 
-convert :: Bool -> MaxSAT.WCNF -> (MIP.Problem, Map MIP.Var Rational -> Model)
-convert useIndicator wcnf = PB2LP.convertWBO useIndicator (MaxSAT2WBO.convert wcnf)
+convert :: DIMACS.CNF -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
+convert cnf = PB2IP.convert (SAT2PB.convert cnf)

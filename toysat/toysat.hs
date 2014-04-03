@@ -76,7 +76,7 @@ import ToySolver.Util (showRational, revMapM, revForM)
 
 -- ------------------------------------------------------------------------
 
-data Mode = ModeHelp | ModeVersion | ModeSAT | ModeMUS | ModePB | ModeWBO | ModeMaxSAT | ModeLP
+data Mode = ModeHelp | ModeVersion | ModeSAT | ModeMUS | ModePB | ModeWBO | ModeMaxSAT | ModeMIP
 
 data Options
   = Options
@@ -141,7 +141,7 @@ options =
     , Option []    ["pb"]     (NoArg (\opt -> opt{ optMode = Just ModePB     })) "solve pseudo boolean problem in .opb file"
     , Option []    ["wbo"]    (NoArg (\opt -> opt{ optMode = Just ModeWBO    })) "solve weighted boolean optimization problem in .wbo file"
     , Option []    ["maxsat"] (NoArg (\opt -> opt{ optMode = Just ModeMaxSAT })) "solve MaxSAT problem in .cnf or .wcnf file"
-    , Option []    ["lp"]     (NoArg (\opt -> opt{ optMode = Just ModeLP     })) "solve bounded integer programming problem in .lp or .mps file"
+    , Option []    ["lp"]     (NoArg (\opt -> opt{ optMode = Just ModeMIP    })) "solve bounded integer programming problem in .lp or .mps file"
 
     , Option [] ["restart"]
         (ReqArg (\val opt -> opt{ optRestartStrategy = parseRestartStrategy val }) "<str>")
@@ -293,8 +293,8 @@ main = do
                       ".opb"  -> ModePB
                       ".wbo"  -> ModeWBO
                       ".wcnf" -> ModeMaxSAT
-                      ".lp"   -> ModeLP
-                      ".mps"  -> ModeLP
+                      ".lp"   -> ModeMIP
+                      ".mps"  -> ModeMIP
                       _ -> ModeSAT
 
       case mode of
@@ -321,7 +321,7 @@ main = do
                ModePB      -> mainPB opt solver args2
                ModeWBO     -> mainWBO opt solver args2
                ModeMaxSAT  -> mainMaxSAT opt solver args2
-               ModeLP      -> mainLP opt solver args2
+               ModeMIP     -> mainMIP opt solver args2
     
           when (isNothing ret) $ do
             putCommentLine "TIMEOUT"
@@ -716,8 +716,8 @@ solveMaxSAT opt solver wcnf =
 
 -- ------------------------------------------------------------------------
 
-mainLP :: Options -> SAT.Solver -> [String] -> IO ()
-mainLP opt solver args = do
+mainMIP :: Options -> SAT.Solver -> [String] -> IO ()
+mainMIP opt solver args = do
   (fname,s) <-
     case args of
       ["-"]   -> do
@@ -727,20 +727,20 @@ mainLP opt solver args = do
         s <- readFile fname
         return (fname, s)
       _ -> showHelp stderr >> exitFailure
-  lp <-
+  mip <-
     case LPFile.parseString fname s of
-      Right lp -> return lp
+      Right mip -> return mip
       Left err ->
         case MPSFile.parseString fname s of
-          Right lp -> return lp
+          Right mip -> return mip
           Left err2 -> do
             hPrint stderr err
             hPrint stderr err2
             exitFailure
-  solveLP opt solver lp
+  solveMIP opt solver mip
 
-solveLP :: Options -> SAT.Solver -> MIP.Problem -> IO ()
-solveLP opt solver lp = do
+solveMIP :: Options -> SAT.Solver -> MIP.Problem -> IO ()
+solveMIP opt solver mip = do
   if not (Set.null nivs)
     then do
       putCommentLine $ "cannot handle non-integer variables: " ++ intercalate ", " (map MIP.fromVar (Set.toList nivs))
@@ -752,7 +752,7 @@ solveLP opt solver lp = do
 
       putCommentLine $ "Loading variables and bounds"
       vmap <- liftM Map.fromList $ revForM (Set.toList ivs) $ \v -> do
-        let (lb,ub) = MIP.getBounds lp v
+        let (lb,ub) = MIP.getBounds mip v
         case (lb,ub) of
           (MIP.Finite lb', MIP.Finite ub') -> do
             v2 <- SAT.Integer.newVar solver (ceiling lb') (floor ub')
@@ -763,7 +763,7 @@ solveLP opt solver lp = do
             exitFailure
 
       putCommentLine "Loading constraints"
-      forM_ (MIP.constraints lp) $ \c -> do
+      forM_ (MIP.constraints mip) $ \c -> do
         let indicator      = MIP.constrIndicator c
             (lhs, op, rhs) = MIP.constrBody c
         let d = foldl' lcm 1 (map denominator  (rhs:[r | MIP.Term r _ <- lhs]))
@@ -788,7 +788,7 @@ solveLP opt solver lp = do
               _ -> return ()
 
       putCommentLine "Loading SOS constraints"
-      forM_ (MIP.sosConstraints lp) $ \MIP.SOSConstraint{ MIP.sosType = typ, MIP.sosBody = xs } -> do
+      forM_ (MIP.sosConstraints mip) $ \MIP.SOSConstraint{ MIP.sosType = typ, MIP.sosBody = xs } -> do
         case typ of
           MIP.S1 -> SAT.addAtMost solver (map (asBin . (vmap Map.!) . fst) xs) 1
           MIP.S2 -> do
@@ -796,9 +796,9 @@ solveLP opt solver lp = do
             forM_ ps $ \(x1,x2) -> do
               SAT.addClause solver [SAT.litNot $ asBin $ vmap Map.! v | v <- [x1,x2]]
 
-      let (_label,obj) = MIP.objectiveFunction lp      
+      let (_label,obj) = MIP.objectiveFunction mip      
           d = foldl' lcm 1 [denominator r | MIP.Term r _ <- obj] *
-              (if MIP.dir lp == MIP.OptMin then 1 else -1)
+              (if MIP.dir mip == MIP.OptMin then 1 else -1)
           obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- obj]
       (obj3,obj3_c) <- SAT.Integer.linearize enc obj2
 
@@ -843,8 +843,8 @@ solveLP opt solver lp = do
               printModel m
           throwIO e
   where
-    ivs = MIP.integerVariables lp
-    nivs = MIP.variables lp `Set.difference` ivs
+    ivs = MIP.integerVariables mip
+    nivs = MIP.variables mip `Set.difference` ivs
 
     asInteger :: Rational -> Integer
     asInteger r

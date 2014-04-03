@@ -27,10 +27,10 @@ import qualified Text.MaxSAT as MaxSAT
 import qualified Text.PBFile as PBFile
 import Converter.ObjType
 import qualified Converter.SAT2PB as SAT2PB
-import qualified Converter.LP2SMT as LP2SMT
+import qualified Converter.MIP2SMT as MIP2SMT
 import qualified Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified Converter.MaxSAT2NLPB as MaxSAT2NLPB
-import qualified Converter.PB2LP as PB2LP
+import qualified Converter.PB2IP as PB2IP
 import qualified Converter.PB2LSP as PB2LSP
 import qualified Converter.PB2WBO as PB2WBO
 import qualified Converter.PBSetObj as PBSetObj
@@ -127,10 +127,10 @@ transformPBFile o pb =
 writePBFile :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> IO ()
 writePBFile o pb = do
   let lp2smtOpt =
-        LP2SMT.defaultOptions
-        { LP2SMT.optCheckSAT     = not (NoCheck `elem` o)
-        , LP2SMT.optProduceModel = not (NoProduceModel `elem` o)
-        , LP2SMT.optOptimize     = Optimize `elem` o
+        MIP2SMT.defaultOptions
+        { MIP2SMT.optCheckSAT     = not (NoCheck `elem` o)
+        , MIP2SMT.optProduceModel = not (NoProduceModel `elem` o)
+        , MIP2SMT.optOptimize     = Optimize `elem` o
         }
   case head ([Just fname | Output fname <- o] ++ [Nothing]) of
     Nothing -> do
@@ -145,8 +145,8 @@ writePBFile o pb = do
                   Left opb  -> PB2WBO.convert opb
                   Right wbo -> wbo
           lp  = case pb of
-                  Left opb  -> fst $ PB2LP.convert opb
-                  Right wbo -> fst $ PB2LP.convertWBO (IndicatorConstraint `elem` o) wbo
+                  Left opb  -> fst $ PB2IP.convert opb
+                  Right wbo -> fst $ PB2IP.convertWBO (IndicatorConstraint `elem` o) wbo
       case map toLower (takeExtension fname) of
         ".opb" -> writeFile fname (PBFile.showOPB opb "")
         ".wbo" -> writeFile fname (PBFile.showWBO wbo "")
@@ -158,9 +158,9 @@ writePBFile o pb = do
         ".smp" -> do
           writeFile fname (PB2SMP.convert False opb "")
         ".smt2" -> do
-          writeFile fname (LP2SMT.convert lp2smtOpt lp "")
+          writeFile fname (MIP2SMT.convert lp2smtOpt lp "")
         ".ys" -> do
-          writeFile fname (LP2SMT.convert lp2smtOpt{ LP2SMT.optLanguage = LP2SMT.YICES } lp "")
+          writeFile fname (MIP2SMT.convert lp2smtOpt{ MIP2SMT.optLanguage = MIP2SMT.YICES } lp "")
         ext -> do
           error $ "unknown file extension: " ++ show ext
           

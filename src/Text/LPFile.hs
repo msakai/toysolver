@@ -407,48 +407,48 @@ number = tok $ do
 
 -- | Render a problem into a string.
 render :: MIP.Problem -> Maybe String
-render lp = fmap ($ "") $ execWriterT (render' lp)
+render mip = fmap ($ "") $ execWriterT (render' mip)
 
 render' :: MIP.Problem -> WriterT ShowS Maybe ()
-render' lp = do
+render' mip = do
   tell $ showString $
-    case MIP.dir lp of
+    case MIP.dir mip of
       OptMin -> "MINIMIZE"
       OptMax -> "MAXIMIZE"
   tell $ showChar '\n'
 
   do
-    let (l, obj) = MIP.objectiveFunction lp
+    let (l, obj) = MIP.objectiveFunction mip
     renderLabel l
     renderExpr True obj
     tell $ showChar '\n'
 
   tell $ showString "SUBJECT TO\n"
-  forM_ (MIP.constraints lp) $ \c -> do
+  forM_ (MIP.constraints mip) $ \c -> do
     unless (MIP.constrIsLazy c) $ do
       renderConstraint c
       tell $ showChar '\n'
 
-  let lcs = [c | c <- MIP.constraints lp, MIP.constrIsLazy c]
+  let lcs = [c | c <- MIP.constraints mip, MIP.constrIsLazy c]
   unless (null lcs) $ do
     tell $ showString "LAZY CONSTRAINTS\n"
     forM_ lcs $ \c -> do
       renderConstraint c
       tell $ showChar '\n'
 
-  let cuts = [c | c <- MIP.userCuts lp]
+  let cuts = [c | c <- MIP.userCuts mip]
   unless (null cuts) $ do
     tell $ showString "USER CUTS\n"
     forM_ cuts $ \c -> do
       renderConstraint c
       tell $ showChar '\n'
 
-  let ivs = MIP.integerVariables lp
-      (bins,gens) = Set.partition (\v -> MIP.getBounds lp v == (MIP.Finite 0, MIP.Finite 1)) ivs
-      scs = MIP.semiContinuousVariables lp
+  let ivs = MIP.integerVariables mip
+      (bins,gens) = Set.partition (\v -> MIP.getBounds mip v == (MIP.Finite 0, MIP.Finite 1)) ivs
+      scs = MIP.semiContinuousVariables mip
 
   tell $ showString "BOUNDS\n"
-  forM_ (Map.toAscList (MIP.varInfo lp)) $ \(v, MIP.VarInfo{ MIP.varBounds = (lb,ub) }) -> do
+  forM_ (Map.toAscList (MIP.varInfo mip)) $ \(v, MIP.VarInfo{ MIP.varBounds = (lb,ub) }) -> do
     unless (v `Set.member` bins) $ do
       renderBoundExpr lb
       tell $ showString " <= "
@@ -469,9 +469,9 @@ render' lp = do
     tell $ showString "SEMI-CONTINUOUS\n"
     renderVariableList $ Set.toList scs
 
-  unless (null (MIP.sosConstraints lp)) $ do
+  unless (null (MIP.sosConstraints mip)) $ do
     tell $ showString "SOS\n"
-    forM_ (MIP.sosConstraints lp) $ \(MIP.SOSConstraint l typ xs) -> do
+    forM_ (MIP.sosConstraints mip) $ \(MIP.SOSConstraint l typ xs) -> do
       renderLabel l
       tell $ shows typ
       tell $ showString " ::"

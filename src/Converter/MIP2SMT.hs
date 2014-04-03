@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Converter.LP2SMT
+-- Module      :  Converter.MIP2SMT
 -- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
 -- 
@@ -10,7 +10,7 @@
 -- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module Converter.LP2SMT
+module Converter.MIP2SMT
   ( convert
   , Options (..)
   , defaultOptions
@@ -81,7 +81,7 @@ not' :: ShowS -> ShowS
 not' x = list [showString "not", x]
 
 expr :: Options -> Env -> MIP.Problem -> MIP.Expr -> ShowS
-expr opt env lp e =
+expr opt env mip e =
   case e of
     [] -> showChar '0'
     _ -> list (showChar '+' : map f e)
@@ -97,7 +97,7 @@ expr opt env lp e =
              [ v3
              | v <- vs
              , let v2 = env Map.! v
-             , let v3 = if MIP.getVarType lp v == MIP.IntegerVariable
+             , let v3 = if MIP.getVarType mip v == MIP.IntegerVariable
                         then toReal opt (showString v2)
                         else showString v2
              ]
@@ -142,34 +142,34 @@ assert opt (x, label) = list [showString "assert", x']
            _ -> x
 
 constraint :: Options -> Bool -> Env -> MIP.Problem -> MIP.Constraint -> (ShowS, Maybe String)
-constraint opt q env lp
+constraint opt q env mip
   MIP.Constraint
   { MIP.constrLabel     = label
   , MIP.constrIndicator = g
   , MIP.constrBody      = (e, op, b)
   } = (c1, label)
   where
-    c0 = rel q op (expr opt env lp e) (realNum opt b)
+    c0 = rel q op (expr opt env mip e) (realNum opt b)
     c1 = case g of
            Nothing -> c0
            Just (var,val) ->
              list [ showString "=>"
-                  , rel q MIP.Eql (expr opt env lp [MIP.Term 1 [var]]) (realNum opt val)
+                  , rel q MIP.Eql (expr opt env mip [MIP.Term 1 [var]]) (realNum opt val)
                   , c0
                   ]
 
 conditions :: Options -> Bool -> Env -> MIP.Problem -> [(ShowS, Maybe String)]
-conditions opt q env lp = bnds ++ cs ++ ss
+conditions opt q env mip = bnds ++ cs ++ ss
   where
-    vs = MIP.variables lp
+    vs = MIP.variables mip
     bnds = map bnd (Set.toList vs)
     bnd v = (c1, Nothing)
       where
         v2 = env Map.! v
-        v3 = if MIP.getVarType lp v == MIP.IntegerVariable
+        v3 = if MIP.getVarType mip v == MIP.IntegerVariable
              then toReal opt (showString v2)
              else showString v2
-        (lb,ub) = MIP.getBounds lp v
+        (lb,ub) = MIP.getBounds mip v
         s1 = case lb of
                MIP.NegInf -> []
                MIP.PosInf -> [showString "false"]
@@ -179,11 +179,11 @@ conditions opt q env lp = bnds ++ cs ++ ss
                MIP.PosInf -> []
                MIP.Finite x -> [list [showString "<=", v3, realNum opt x]]
         c0 = and' (s1 ++ s2)
-        c1 = if MIP.getVarType lp v == MIP.SemiContinuousVariable
+        c1 = if MIP.getVarType mip v == MIP.SemiContinuousVariable
              then or' [list [showString "=", showString v2, realNum opt 0], c0]
              else c0
-    cs = map (constraint opt q env lp) (MIP.constraints lp)
-    ss = concatMap sos (MIP.sosConstraints lp)
+    cs = map (constraint opt q env mip) (MIP.constraints mip)
+    ss = concatMap sos (MIP.sosConstraints mip)
     sos (MIP.SOSConstraint label typ xs) = do
       (x1,x2) <- case typ of
                     MIP.S1 -> pairs $ map fst xs
@@ -192,7 +192,7 @@ conditions opt q env lp = bnds ++ cs ++ ss
             [ list [showString "/=", v3, realNum opt 0]
             | v<-[x1,x2]
             , let v2 = env Map.! v
-            , let v3 = if MIP.getVarType lp v == MIP.IntegerVariable
+            , let v3 = if MIP.getVarType mip v == MIP.IntegerVariable
                        then toReal opt (showString v2)
                        else showString v2
             ]
@@ -207,8 +207,8 @@ nonAdjacentPairs (x1:x2:xs) = [(x1,x3) | x3 <- xs] ++ nonAdjacentPairs (x2:xs)
 nonAdjacentPairs _ = []
 
 convert :: Options -> MIP.Problem -> ShowS
-convert opt lp =
-  unlinesS $ defs ++ map (assert opt) (conditions opt False env lp)
+convert opt mip =
+  unlinesS $ defs ++ map (assert opt) (conditions opt False env mip)
              ++ [ assert opt (optimality, Nothing) | optOptimize opt ]
              ++ [ case optLanguage opt of
                     SMTLIB2 -> list [showString "set-option", showString ":produce-models", showString "true"]
@@ -219,9 +219,9 @@ convert opt lp =
                     YICES   -> list [showString "check"]
                 | optCheckSAT opt ]
   where
-    vs = MIP.variables lp
+    vs = MIP.variables mip
     real_vs = vs `Set.difference` int_vs
-    int_vs = MIP.integerVariables lp
+    int_vs = MIP.integerVariables mip
     realType =
       case optLanguage opt of
         SMTLIB2 -> "Real"
@@ -231,7 +231,7 @@ convert opt lp =
         SMTLIB2 -> "Int"
         YICES   -> "int"
     ts = [(v, realType) | v <- Set.toList real_vs] ++ [(v, intType) | v <- Set.toList int_vs]
-    obj = snd (MIP.objectiveFunction lp)
+    obj = snd (MIP.objectiveFunction mip)
     env = Map.fromList [(v, encode opt (MIP.fromVar v)) | v <- Set.toList vs]
     -- Note that identifiers of LPFile does not contain '-'.
     -- So that there are no name crash.
@@ -252,9 +252,9 @@ convert opt lp =
             SMTLIB2 -> list [list [showString (env2 Map.! v), showString t] | (v,t) <- ts]
             YICES   -> list [showString $ printf "%s::%s" (env2 Map.! v) t | (v,t) <- ts]
         body = list [showString "=>"
-                    , and' (map fst (conditions opt True env2 lp))
-                    , list [ showString $ if MIP.dir lp == MIP.OptMin then "<=" else ">="
-                           , expr opt env lp obj, expr opt env2 lp obj
+                    , and' (map fst (conditions opt True env2 mip))
+                    , list [ showString $ if MIP.dir mip == MIP.OptMin then "<=" else ">="
+                           , expr opt env mip obj, expr opt env2 mip obj
                            ]
                     ]
 
@@ -282,7 +282,7 @@ testFile :: FilePath -> IO ()
 testFile fname = do
   result <- LPFile.parseFile fname
   case result of
-    Right lp -> putStrLn $ convert defaultOptions lp ""
+    Right mip -> putStrLn $ convert defaultOptions mip ""
     Left err -> hPrint stderr err
 
 test :: IO ()

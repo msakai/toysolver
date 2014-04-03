@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Converter.PB2LP
+-- Module      :  Converter.PB2IP
 -- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
 -- 
@@ -10,7 +10,7 @@
 -- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module Converter.PB2LP
+module Converter.PB2IP
   ( convert
   , convertWBO
   ) where
@@ -22,13 +22,12 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.MIP as MIP
 import qualified Text.PBFile as PBFile
-import qualified Text.LPFile as LPFile
 import qualified SAT.Types as SAT
 
 convert :: PBFile.Formula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
-convert formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
+convert formula@(obj, cs) = (mip, mtrans (PBFile.pbNumVars formula))
   where
-    lp = MIP.Problem
+    mip = MIP.Problem
       { MIP.dir = dir
       , MIP.objectiveFunction = (Nothing, obj2)
       , MIP.constraints = cs2
@@ -89,9 +88,9 @@ convVar :: PBFile.Var -> MIP.Var
 convVar x = MIP.toVar ("x" ++ show x)
 
 convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
-convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formula))
+convertWBO useIndicator formula@(top, cs) = (mip, mtrans (PBFile.wboNumVars formula))
   where
-    lp = MIP.Problem
+    mip = MIP.Problem
       { MIP.dir = MIP.OptMin
       , MIP.objectiveFunction = (Nothing, obj2)
       , MIP.constraints = topConstr ++ map snd cs2

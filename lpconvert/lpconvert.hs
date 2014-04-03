@@ -28,10 +28,10 @@ import qualified Text.MaxSAT as MaxSAT
 import qualified Text.MPSFile as MPSFile
 import qualified Text.PBFile as PBFile
 import Converter.ObjType
-import qualified Converter.LP2SMT as LP2SMT
-import qualified Converter.MaxSAT2LP as MaxSAT2LP
+import qualified Converter.MIP2SMT as MIP2SMT
+import qualified Converter.MaxSAT2IP as MaxSAT2IP
 import qualified Converter.MaxSAT2NLPB as MaxSAT2NLPB
-import qualified Converter.PB2LP as PB2LP
+import qualified Converter.PB2IP as PB2IP
 import qualified Converter.PBSetObj as PBSetObj
 import qualified Converter.SAT2PB as SAT2PB
 import ToySolver.Version
@@ -93,8 +93,8 @@ readLP o fname = do
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
               let pb = transformPBFile o $ SAT2PB.convert cnf
-              let (lp, _) = PB2LP.convert pb
-              return lp
+              let (mip, _) = PB2IP.convert pb
+              return mip
     ".wcnf" -> readWCNF
     ".opb"  -> do
       ret <- PBFile.parseOPBFile fname
@@ -102,25 +102,25 @@ readLP o fname = do
         Left err -> hPrint stderr err >> exitFailure
         Right formula -> do
           let pb = transformPBFile o formula
-          let (lp, _) = PB2LP.convert pb
-          return lp
+          let (mip, _) = PB2IP.convert pb
+          return mip
     ".wbo"  -> do
       ret <- PBFile.parseWBOFile fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
         Right formula -> do
-          let (lp, _) = PB2LP.convertWBO (IndicatorConstraint `elem` o) formula
-          return lp
+          let (mip, _) = PB2IP.convertWBO (IndicatorConstraint `elem` o) formula
+          return mip
     ".lp"   -> do
       ret <- LPFile.parseFile fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
-        Right lp -> return lp
+        Right mip -> return mip
     ".mps"  -> do
       ret <- MPSFile.parseFile fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
-        Right lp -> return lp
+        Right mip -> return mip
     ext ->
       error $ "unknown file extension: " ++ show ext
   where
@@ -131,11 +131,11 @@ readLP o fname = do
         Right wcnf
           | MaxSATNonLinear `elem` o -> do
               let pb = transformPBFile o $ MaxSAT2NLPB.convert wcnf
-                  (lp, _) = PB2LP.convert pb
-              return lp
+                  (mip, _) = PB2IP.convert pb
+              return mip
           | otherwise -> do
-              let (lp, _) = MaxSAT2LP.convert (IndicatorConstraint `elem` o) wcnf
-              return lp
+              let (mip, _) = MaxSAT2IP.convert (IndicatorConstraint `elem` o) wcnf
+              return mip
 
 transformPBFile :: [Flag] -> PBFile.Formula -> PBFile.Formula
 transformPBFile o opb@(Nothing,_) = PBSetObj.setObj objType opb
@@ -144,29 +144,29 @@ transformPBFile o opb@(Nothing,_) = PBSetObj.setObj objType opb
 transformPBFile _ opb = opb
 
 writeLP :: [Flag] -> MIP.Problem -> IO ()
-writeLP o lp = do
-  let lp2smtOpt =
-        LP2SMT.defaultOptions
-        { LP2SMT.optCheckSAT     = not (NoCheck `elem` o)
-        , LP2SMT.optProduceModel = not (NoProduceModel `elem` o)
-        , LP2SMT.optOptimize     = Optimize `elem` o
+writeLP o mip = do
+  let mip2smtOpt =
+        MIP2SMT.defaultOptions
+        { MIP2SMT.optCheckSAT     = not (NoCheck `elem` o)
+        , MIP2SMT.optProduceModel = not (NoProduceModel `elem` o)
+        , MIP2SMT.optOptimize     = Optimize `elem` o
         }
 
   case head ([Just fname | Output fname <- o] ++ [Nothing]) of
     Nothing -> do
-      case LPFile.render lp of
+      case LPFile.render mip of
         Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
         Just s -> putStr s
     Just fname -> do
       case map toLower (takeExtension fname) of
         ".lp" -> do
-          case LPFile.render lp of
+          case LPFile.render mip of
             Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
             Just s -> writeFile fname s
         ".smt2" -> do
-          writeFile fname (LP2SMT.convert lp2smtOpt lp "")
+          writeFile fname (MIP2SMT.convert mip2smtOpt mip "")
         ".ys" -> do
-          writeFile fname (LP2SMT.convert lp2smtOpt{ LP2SMT.optLanguage = LP2SMT.YICES } lp "")
+          writeFile fname (MIP2SMT.convert mip2smtOpt{ MIP2SMT.optLanguage = MIP2SMT.YICES } mip "")
         ext -> do
           error $ "unknown file extension: " ++ show ext
           
@@ -178,8 +178,8 @@ main = do
       | Help `elem` o    -> putStrLn (usageInfo header options)
       | Version `elem` o -> putStrLn (V.showVersion version)
     (o,[fname],[]) -> do
-      lp <- readLP o fname
-      writeLP o lp
+      mip <- readLP o fname
+      writeLP o mip
     (_,_,errs) -> do
       hPutStrLn stderr $ concat errs ++ usageInfo header options
       exitFailure
