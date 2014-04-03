@@ -727,6 +727,14 @@ resizeVarCapacity :: Solver -> Int -> IO ()
 resizeVarCapacity solver n = do
   PQ.resizeHeapCapacity (svVarQueue solver) n
   PQ.resizeTableCapacity (svVarQueue solver) (n+1)
+  a <- readIORef (svVarData solver)
+  (_,ub) <- getBounds a
+  when (ub < n) $ do
+    a' <- newArray_ (1,n)
+    forM_ [1..ub] $ \v -> do
+      vd <- readArray a v
+      writeArray a' v vd
+    writeIORef (svVarData solver) a'
 
 -- |Add a clause to the solver.
 addClause :: Solver -> Clause -> IO ()
