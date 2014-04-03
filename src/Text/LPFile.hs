@@ -45,6 +45,7 @@ module Text.LPFile
   , getVarInfo
   , getVarType
   , getBounds
+  , variables
   , integerVariables
   , semiContinuousVariables
   , parseString
@@ -75,8 +76,7 @@ import Text.Util (readUnsignedInteger)
 -- | Problem
 data LP
   = LP
-  { variables :: Set Var
-  , dir :: OptDir
+  { dir :: OptDir
   , objectiveFunction :: ObjectiveFunction
   , constraints :: [Constraint]
   , sosConstraints :: [SOSConstraint]
@@ -220,6 +220,9 @@ getBounds lp v = varBounds $ getVarInfo lp v
 intersectBounds :: Bounds -> Bounds -> Bounds
 intersectBounds (lb1,ub1) (lb2,ub2) = (max lb1 lb2, min ub1 ub2)
 
+variables :: LP -> Set Var
+variables lp = Map.keysSet $ varInfo lp
+
 integerVariables :: LP -> Set Var
 integerVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
   where
@@ -327,8 +330,7 @@ lpfile = do
            ]
   return $
     LP
-    { variables         = vs
-    , dir               = flag
+    { dir               = flag
     , objectiveFunction = obj
     , constraints       = [c | Left c <- cs]
     , userCuts          = [c | Right c <- cs]

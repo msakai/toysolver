@@ -18,7 +18,6 @@ module Converter.PB2LP
 import Data.Array.IArray
 import Data.List
 import Data.Maybe
-import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Text.PBFile as PBFile
@@ -29,8 +28,7 @@ convert :: PBFile.Formula -> (LPFile.LP, Map LPFile.Var Rational -> SAT.Model)
 convert formula@(obj, cs) = (lp, mtrans (PBFile.pbNumVars formula))
   where
     lp = LPFile.LP
-      { LPFile.variables = Set.fromList vs
-      , LPFile.dir = dir
+      { LPFile.dir = dir
       , LPFile.objectiveFunction = (Nothing, obj2)
       , LPFile.constraints = cs2
       , LPFile.sosConstraints = []
@@ -93,8 +91,7 @@ convertWBO :: Bool -> PBFile.SoftFormula -> (LPFile.LP, Map LPFile.Var Rational 
 convertWBO useIndicator formula@(top, cs) = (lp, mtrans (PBFile.wboNumVars formula))
   where
     lp = LPFile.LP
-      { LPFile.variables = Set.fromList vs
-      , LPFile.dir = LPFile.OptMin
+      { LPFile.dir = LPFile.OptMin
       , LPFile.objectiveFunction = (Nothing, obj2)
       , LPFile.constraints = topConstr ++ map snd cs2
       , LPFile.sosConstraints = []

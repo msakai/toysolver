@@ -294,8 +294,7 @@ mpsfile = do
 
   let lp =
         LPFile.LP
-        { LPFile.variables               = vs
-        , LPFile.dir                     = objdir
+        { LPFile.dir                     = objdir
         , LPFile.objectiveFunction       =
             ( Just (unintern objrow)
             , [LPFile.Term c [col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
