@@ -2,7 +2,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Converter.MaxSAT2LP
--- Copyright   :  (c) Masahiro Sakai 2011-2012
+-- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -15,11 +15,11 @@ module Converter.MaxSAT2LP
   ) where
 
 import Data.Map (Map)
-import qualified Text.LPFile as LPFile
+import qualified Data.MIP as MIP
 import qualified Text.MaxSAT as MaxSAT
 import SAT.Types
 import qualified Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified Converter.PB2LP as PB2LP
 
-convert :: Bool -> MaxSAT.WCNF -> (LPFile.LP, Map LPFile.Var Rational -> Model)
+convert :: Bool -> MaxSAT.WCNF -> (MIP.Problem, Map MIP.Var Rational -> Model)
 convert useIndicator wcnf = PB2LP.convertWBO useIndicator (MaxSAT2WBO.convert wcnf)

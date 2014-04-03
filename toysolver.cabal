@@ -124,6 +124,7 @@ Library
      Data.LA
      Data.LA.FOL
      Data.LBool
+     Data.MIP
      Data.Polynomial
      Data.Polynomial.Factorization.FiniteField
      Data.Polynomial.Factorization.Hensel

@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toysolver
--- Copyright   :  (c) Masahiro Sakai 2011
+-- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -42,6 +42,7 @@ import qualified Data.LA as LA
 import qualified Data.LA.FOL as LAFOL
 import qualified Data.Polynomial as P
 import qualified Data.AlgebraicNumber.Real as AReal
+import qualified Data.MIP as MIP
 import qualified Algorithm.OmegaTest as OmegaTest
 import qualified Algorithm.OmegaTest.Misc as OmegaTest
 import qualified Algorithm.Cooper as Cooper
@@ -50,8 +51,8 @@ import qualified Algorithm.Simplex2 as Simplex2
 import qualified Algorithm.MIPSolver2 as MIPSolver2
 import qualified Algorithm.CAD as CAD
 import qualified Algorithm.ContiTraverso as ContiTraverso
-import qualified Text.LPFile as LP
-import qualified Text.MPSFile as MPS
+import qualified Text.LPFile as LPFile
+import qualified Text.MPSFile as MPSFile
 import qualified Text.PBFile as PBFile
 import qualified Text.MaxSAT as MaxSAT
 import qualified Text.GurobiSol as GurobiSol
@@ -111,11 +112,11 @@ header = "Usage: toysolver [OPTION]... file"
 run
   :: String
   -> [Flag]
-  -> LP.LP
-  -> (Map LP.Var Rational -> IO ())
+  -> MIP.Problem
+  -> (Map MIP.Var Rational -> IO ())
   -> IO ()
 run solver opt lp printModel = do
-  unless (Set.null (LP.semiContinuousVariables lp)) $ do
+  unless (Set.null (MIP.semiContinuousVariables lp)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure  
   case map toLower solver of
@@ -125,42 +126,42 @@ run solver opt lp printModel = do
     s | s `elem` ["ct", "conti-traverso"] -> solveByContiTraverso
     _ -> solveByMIP2
   where
-    vs = LP.variables lp
+    vs = MIP.variables lp
     vsAssoc = zip (Set.toList vs) [0..]
     nameToVar = Map.fromList vsAssoc
     varToName = IntMap.fromList [(v,name) | (name,v) <- vsAssoc]
 
-    compileE :: LP.Expr -> Expr Rational
+    compileE :: MIP.Expr -> Expr Rational
     compileE = foldr (+) (Const 0) . map compileT
 
-    compileT :: LP.Term -> Expr Rational
-    compileT (LP.Term c vs) =
+    compileT :: MIP.Term -> Expr Rational
+    compileT (MIP.Term c vs) =
       foldr (*) (Const c) [Var (nameToVar Map.! v) | v <- vs]
 
-    obj = compileE $ snd $ LP.objectiveFunction lp
+    obj = compileE $ snd $ MIP.objectiveFunction lp
 
     cs1 = do
       v <- Set.toList vs
       let v2 = Var (nameToVar Map.! v)
-      let (l,u) = LP.getBounds lp v
-      [Const x .<=. v2 | LP.Finite x <- return l] ++
-        [v2 .<=. Const x | LP.Finite x <- return u]
+      let (l,u) = MIP.getBounds lp v
+      [Const x .<=. v2 | MIP.Finite x <- return l] ++
+        [v2 .<=. Const x | MIP.Finite x <- return u]
     cs2 = do
-      LP.Constraint
-        { LP.constrIndicator = ind
-        , LP.constrBody = (lhs, rel, rhs)
-        } <- LP.constraints lp
+      MIP.Constraint
+        { MIP.constrIndicator = ind
+        , MIP.constrBody = (lhs, rel, rhs)
+        } <- MIP.constraints lp
       let rel2 = case rel of
-                  LP.Ge  -> Ge
-                  LP.Le  -> Le
-                  LP.Eql -> Eql
+                  MIP.Ge  -> Ge
+                  MIP.Le  -> Le
+                  MIP.Eql -> Eql
       case ind of
         Nothing -> return (Rel (compileE lhs) rel2 (Const rhs))
         Just _ -> error "indicator constraint is not supported yet"
 
     ivs
       | NoMIP `elem` opt = Set.empty
-      | otherwise        = LP.integerVariables lp
+      | otherwise        = MIP.integerVariables lp
 
     vs2  = IntMap.keysSet varToName
     ivs2 = IntSet.fromList . map (nameToVar Map.!) . Set.toList $ ivs
@@ -210,7 +211,7 @@ run solver opt lp printModel = do
           putSLine "UNKNOWN"
           exitFailure
         Just (cs',obj') ->
-          case MIPSolverHL.optimize (LP.dir lp) obj' cs' ivs2 of
+          case MIPSolverHL.optimize (MIP.dir lp) obj' cs' ivs2 of
             MIPSolverHL.OptUnsat -> do
               putSLine "UNSATISFIABLE"
               exitFailure
@@ -236,7 +237,7 @@ run solver opt lp printModel = do
 
       Simplex2.setLogger solver putCommentLine
       replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
-      Simplex2.setOptDir solver (LP.dir lp)
+      Simplex2.setOptDir solver (MIP.dir lp)
       Simplex2.setObj solver $ fromJust (LAFOL.fromFOLExpr obj)
       putCommentLine "Loading constraints... "
       forM_ (cs1 ++ cs2) $ \c -> do
@@ -325,7 +326,7 @@ run solver opt lp printModel = do
               putCommentLine "non-linear expressions are not supported by Conti-Traverso algorithm"
               exitFailure
             Just (linObj, linCon) -> do
-              case ContiTraverso.solve P.grlex vs2 (LP.dir lp) linObj linCon of
+              case ContiTraverso.solve P.grlex vs2 (MIP.dir lp) linObj linCon of
                 Nothing -> do
                   putSLine "UNSATISFIABLE"
                   exitFailure
@@ -342,10 +343,10 @@ run solver opt lp printModel = do
     showValue :: Rational -> String
     showValue = showRational printRat
 
-lpPrintModel :: Handle -> Bool -> Map LP.Var Rational -> IO ()
+lpPrintModel :: Handle -> Bool -> Map MIP.Var Rational -> IO ()
 lpPrintModel h asRat m = do
   forM_ (Map.toList m) $ \(v, val) -> do
-    printf "v %s = %s\n" (LP.fromVar v) (showRational asRat val)
+    printf "v %s = %s\n" (MIP.fromVar v) (showRational asRat val)
 
 
 putCommentLine :: String -> IO ()
@@ -435,11 +436,11 @@ main = do
                 maxsatPrintModel stdout m2 0
                 writeSOLFileSAT o m2
         ModeLP -> do
-          ret <- LP.parseFile fname
+          ret <- LPFile.parseFile fname
           lp <- case ret of
                   Right lp -> return lp
                   Left err -> do
-                    ret <- MPS.parseFile fname
+                    ret <- MPSFile.parseFile fname
                     case ret of
                       Right lp -> return lp
                       Left err2 -> do
@@ -453,9 +454,9 @@ main = do
         hPutStrLn stderr $ concat errs ++ usageInfo header options
 
 -- FIXME: 目的関数値を表示するように
-writeSOLFileLP :: [Flag] -> Map LP.Var Rational -> IO ()
+writeSOLFileLP :: [Flag] -> Map MIP.Var Rational -> IO ()
 writeSOLFileLP opt m = do
-  let m2 = Map.fromList [(LP.fromVar v, fromRational val) | (v,val) <- Map.toList m]
+  let m2 = Map.fromList [(MIP.fromVar v, fromRational val) | (v,val) <- Map.toList m]
   writeSOLFileRaw opt m2
 
 -- FIXME: 目的関数値を表示するように

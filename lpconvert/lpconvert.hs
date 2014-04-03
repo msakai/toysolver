@@ -2,7 +2,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  lpconvert
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -22,6 +22,7 @@ import System.FilePath
 import System.Console.GetOpt
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
+import qualified Data.MIP as MIP
 import qualified Text.LPFile as LPFile
 import qualified Text.MaxSAT as MaxSAT
 import qualified Text.MPSFile as MPSFile
@@ -81,7 +82,7 @@ header = unlines
   , "Options:"
   ]
 
-readLP :: [Flag] -> String -> IO LPFile.LP
+readLP :: [Flag] -> String -> IO MIP.Problem
 readLP o fname = do
   case map toLower (takeExtension fname) of
     ".cnf"
@@ -142,7 +143,7 @@ transformPBFile o opb@(Nothing,_) = PBSetObj.setObj objType opb
     objType = last (ObjNone : [t | ObjType t <- o])
 transformPBFile _ opb = opb
 
-writeLP :: [Flag] -> LPFile.LP -> IO ()
+writeLP :: [Flag] -> MIP.Problem -> IO ()
 writeLP o lp = do
   let lp2smtOpt =
         LP2SMT.defaultOptions

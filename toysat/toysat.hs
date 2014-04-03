@@ -3,7 +3,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toysat
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -54,6 +54,7 @@ import qualified GHC.Stats as Stats
 #endif
 
 import Data.ArithRel
+import qualified Data.MIP as MIP
 import qualified Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified SAT
 import qualified SAT.PBO as PBO
@@ -738,11 +739,11 @@ mainLP opt solver args = do
             exitFailure
   solveLP opt solver lp
 
-solveLP :: Options -> SAT.Solver -> LPFile.LP -> IO ()
+solveLP :: Options -> SAT.Solver -> MIP.Problem -> IO ()
 solveLP opt solver lp = do
   if not (Set.null nivs)
     then do
-      putCommentLine $ "cannot handle non-integer variables: " ++ intercalate ", " (map LPFile.fromVar (Set.toList nivs))
+      putCommentLine $ "cannot handle non-integer variables: " ++ intercalate ", " (map MIP.fromVar (Set.toList nivs))
       putSLine "UNKNOWN"
       exitFailure
     else do
@@ -751,54 +752,54 @@ solveLP opt solver lp = do
 
       putCommentLine $ "Loading variables and bounds"
       vmap <- liftM Map.fromList $ revForM (Set.toList ivs) $ \v -> do
-        let (lb,ub) = LPFile.getBounds lp v
+        let (lb,ub) = MIP.getBounds lp v
         case (lb,ub) of
-          (LPFile.Finite lb', LPFile.Finite ub') -> do
+          (MIP.Finite lb', MIP.Finite ub') -> do
             v2 <- SAT.Integer.newVar solver (ceiling lb') (floor ub')
             return (v,v2)
           _ -> do
-            putCommentLine $ "cannot handle unbounded variable: " ++ LPFile.fromVar v
+            putCommentLine $ "cannot handle unbounded variable: " ++ MIP.fromVar v
             putSLine "UNKNOWN"
             exitFailure
 
       putCommentLine "Loading constraints"
-      forM_ (LPFile.constraints lp) $ \c -> do
-        let indicator      = LPFile.constrIndicator c
-            (lhs, op, rhs) = LPFile.constrBody c
-        let d = foldl' lcm 1 (map denominator  (rhs:[r | LPFile.Term r _ <- lhs]))
-            lhs' = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | LPFile.Term r vs <- lhs]
+      forM_ (MIP.constraints lp) $ \c -> do
+        let indicator      = MIP.constrIndicator c
+            (lhs, op, rhs) = MIP.constrBody c
+        let d = foldl' lcm 1 (map denominator  (rhs:[r | MIP.Term r _ <- lhs]))
+            lhs' = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- lhs]
             rhs' = asInteger (rhs * fromIntegral d)
         case indicator of
           Nothing ->
             case op of
-              LPFile.Le  -> SAT.Integer.addConstraint enc $ lhs' .<=. fromInteger rhs'
-              LPFile.Ge  -> SAT.Integer.addConstraint enc $ lhs' .>=. fromInteger rhs'
-              LPFile.Eql -> SAT.Integer.addConstraint enc $ lhs' .==. fromInteger rhs'
+              MIP.Le  -> SAT.Integer.addConstraint enc $ lhs' .<=. fromInteger rhs'
+              MIP.Ge  -> SAT.Integer.addConstraint enc $ lhs' .>=. fromInteger rhs'
+              MIP.Eql -> SAT.Integer.addConstraint enc $ lhs' .==. fromInteger rhs'
           Just (var, val) -> do
             let var' = asBin (vmap Map.! var)
                 f sel = do
                   case op of
-                    LPFile.Le  -> SAT.Integer.addConstraintSoft enc sel $ lhs' .<=. fromInteger rhs'
-                    LPFile.Ge  -> SAT.Integer.addConstraintSoft enc sel $ lhs' .>=. fromInteger rhs'
-                    LPFile.Eql -> SAT.Integer.addConstraintSoft enc sel $ lhs' .==. fromInteger rhs'
+                    MIP.Le  -> SAT.Integer.addConstraintSoft enc sel $ lhs' .<=. fromInteger rhs'
+                    MIP.Ge  -> SAT.Integer.addConstraintSoft enc sel $ lhs' .>=. fromInteger rhs'
+                    MIP.Eql -> SAT.Integer.addConstraintSoft enc sel $ lhs' .==. fromInteger rhs'
             case val of
               1 -> f var'
               0 -> f (SAT.litNot var')
               _ -> return ()
 
       putCommentLine "Loading SOS constraints"
-      forM_ (LPFile.sosConstraints lp) $ \LPFile.SOSConstraint{ LPFile.sosType = typ, LPFile.sosBody = xs } -> do
+      forM_ (MIP.sosConstraints lp) $ \MIP.SOSConstraint{ MIP.sosType = typ, MIP.sosBody = xs } -> do
         case typ of
-          LPFile.S1 -> SAT.addAtMost solver (map (asBin . (vmap Map.!) . fst) xs) 1
-          LPFile.S2 -> do
+          MIP.S1 -> SAT.addAtMost solver (map (asBin . (vmap Map.!) . fst) xs) 1
+          MIP.S2 -> do
             let ps = nonAdjacentPairs $ map fst $ sortBy (comparing snd) $ xs
             forM_ ps $ \(x1,x2) -> do
               SAT.addClause solver [SAT.litNot $ asBin $ vmap Map.! v | v <- [x1,x2]]
 
-      let (_label,obj) = LPFile.objectiveFunction lp      
-          d = foldl' lcm 1 [denominator r | LPFile.Term r _ <- obj] *
-              (if LPFile.dir lp == LPFile.OptMin then 1 else -1)
-          obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | LPFile.Term r vs <- obj]
+      let (_label,obj) = MIP.objectiveFunction lp      
+          d = foldl' lcm 1 [denominator r | MIP.Term r _ <- obj] *
+              (if MIP.dir lp == MIP.OptMin then 1 else -1)
+          obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- obj]
       (obj3,obj3_c) <- SAT.Integer.linearize enc obj2
 
       modelRef <- newIORef Nothing
@@ -811,7 +812,7 @@ solveLP opt solver lp = do
           printModel m = do
             forM_ (Set.toList ivs) $ \v -> do
               let val = SAT.Integer.eval m (vmap Map.! v)
-              printf "v %s = %d\n" (LPFile.fromVar v) val
+              printf "v %s = %d\n" (MIP.fromVar v) val
             hFlush stdout
             writeSol m
 
@@ -820,7 +821,7 @@ solveLP opt solver lp = do
             case optWriteFile opt of
               Nothing -> return ()
               Just fname -> do
-                let m2 = Map.fromList [ (LPFile.fromVar v, fromInteger val)
+                let m2 = Map.fromList [ (MIP.fromVar v, fromInteger val)
                                       | v <- Set.toList ivs
                                       , let val = SAT.Integer.eval m (vmap Map.! v) ]
                     o  = fromInteger $ SAT.Integer.eval m obj2
@@ -842,8 +843,8 @@ solveLP opt solver lp = do
               printModel m
           throwIO e
   where
-    ivs = LPFile.integerVariables lp
-    nivs = LPFile.variables lp `Set.difference` ivs
+    ivs = MIP.integerVariables lp
+    nivs = MIP.variables lp `Set.difference` ivs
 
     asInteger :: Rational -> Integer
     asInteger r

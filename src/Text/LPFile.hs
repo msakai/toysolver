@@ -3,7 +3,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Text.LPFile
--- Copyright   :  (c) Masahiro Sakai 2011
+-- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -22,33 +22,7 @@
 --
 -----------------------------------------------------------------------------
 module Text.LPFile
-  ( LP (..)
-  , Expr
-  , Term (..)
-  , OptDir (..)
-  , ObjectiveFunction
-  , Constraint (..)
-  , Bounds
-  , Label
-  , Var
-  , VarType (..)
-  , VarInfo (..)
-  , BoundExpr (..)
-  , RelOp (..)
-  , SOSType (..)
-  , SOSConstraint (..)
-  , defaultBounds
-  , defaultLB
-  , defaultUB
-  , toVar
-  , fromVar
-  , getVarInfo
-  , getVarType
-  , getBounds
-  , variables
-  , integerVariables
-  , semiContinuousVariables
-  , parseString
+  ( parseString
   , parseFile
   , render
   ) where
@@ -63,9 +37,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Interned (intern, unintern)
-import Data.Interned.String
 import Data.OptDir
+import qualified Data.MIP as MIP
 import Text.ParserCombinators.Parsec hiding (label)
 
 import ToySolver.Util (combineMaybe)
@@ -73,175 +46,13 @@ import Text.Util (readUnsignedInteger)
 
 -- ---------------------------------------------------------------------------
 
--- | Problem
-data LP
-  = LP
-  { dir :: OptDir
-  , objectiveFunction :: ObjectiveFunction
-  , constraints :: [Constraint]
-  , sosConstraints :: [SOSConstraint]
-  , userCuts :: [Constraint]
-  , varInfo :: Map Var VarInfo
-  }
-  deriving (Show, Eq, Ord)
-
--- | expressions
-type Expr = [Term]
-
--- | terms
-data Term = Term Rational [Var]
-  deriving (Eq, Ord, Show)
-
--- | objective function
-type ObjectiveFunction = (Maybe Label, Expr)
-
--- | constraint
-data Constraint
-  = Constraint
-  { constrLabel     :: Maybe Label
-  , constrIndicator :: Maybe (Var, Rational)
-  , constrBody      :: (Expr, RelOp, Rational)
-  , constrIsLazy    :: Bool
-  }
-  deriving (Eq, Ord, Show)
-
-data VarType
-  = ContinuousVariable
-  | IntegerVariable
--- 'nothaddock' is inserted not to confuse haddock
-  -- nothaddock | BinaryVariable
-  | SemiContinuousVariable
-  -- nothaddock | SemiIntegerVariable
-  deriving (Eq, Ord, Show)
-
-data VarInfo
-  = VarInfo
-  { varType   :: VarType
-  , varBounds :: Bounds
-  }
- deriving (Eq, Ord, Show)
-
-defaultVarInfo :: VarInfo
-defaultVarInfo
-  = VarInfo
-  { varType   = ContinuousVariable
-  , varBounds = defaultBounds
-  }
-
--- | type for representing lower/upper bound of variables
-type Bounds = (BoundExpr, BoundExpr)
-
--- | label
-type Label = String
-
--- | variable
-type Var = InternedString
-
--- | type for representing lower/upper bound of variables
-data BoundExpr = NegInf | Finite Rational | PosInf
-    deriving (Eq, Ord, Show)
-
--- | relational operators
-data RelOp = Le | Ge | Eql
-    deriving (Eq, Ord, Enum, Show)
-
--- | types of SOS (special ordered sets) constraints
-data SOSType
-  = S1 -- ^ Type 1 SOS constraint
-  | S2 -- ^ Type 2 SOS constraint
-    deriving (Eq, Ord, Enum, Show, Read)
-
--- | SOS (special ordered sets) constraints
-data SOSConstraint
-  = SOSConstraint
-  { sosLabel :: Maybe Label
-  , sosType  :: SOSType
-  , sosBody  :: [(Var, Rational)]
-  }
-  deriving (Eq, Ord, Show)
-
-class Variables a where
-  vars :: a -> Set Var
-
-instance Variables a => Variables [a] where
-  vars = Set.unions . map vars
-
-instance (Variables a, Variables b) => Variables (Either a b) where
-  vars (Left a)  = vars a
-  vars (Right b) = vars b
-
-instance Variables LP where
-  vars = variables
-
-instance Variables Term where
-  vars (Term _ xs) = Set.fromList xs
-
-instance Variables Constraint where
-  vars Constraint{ constrIndicator = ind, constrBody = (lhs, _, _) } =
-    vars lhs `Set.union` vs2
-    where
-      vs2 = maybe Set.empty (Set.singleton . fst) ind
-
-instance Variables SOSConstraint where
-  vars SOSConstraint{ sosBody = xs } = Set.fromList (map fst xs)
-
--- | default bounds
-defaultBounds :: Bounds
-defaultBounds = (defaultLB, defaultUB)
-
--- | default lower bound (0)
-defaultLB :: BoundExpr
-defaultLB = Finite 0
-
--- | default upper bound (+∞)
-defaultUB :: BoundExpr
-defaultUB = PosInf
-
--- | convert a string into a variable
-toVar :: String -> Var
-toVar = intern
-
--- | convert a variable into a string
-fromVar :: Var -> String
-fromVar = unintern
-
--- | looking up attributes for a variable
-getVarInfo :: LP -> Var -> VarInfo
-getVarInfo lp v = Map.findWithDefault defaultVarInfo v (varInfo lp)
-
--- | looking up bounds for a variable
-getVarType :: LP -> Var -> VarType
-getVarType lp v = varType $ getVarInfo lp v
-
--- | looking up bounds for a variable
-getBounds :: LP -> Var -> Bounds
-getBounds lp v = varBounds $ getVarInfo lp v
-
-intersectBounds :: Bounds -> Bounds -> Bounds
-intersectBounds (lb1,ub1) (lb2,ub2) = (max lb1 lb2, min ub1 ub2)
-
-variables :: LP -> Set Var
-variables lp = Map.keysSet $ varInfo lp
-
-integerVariables :: LP -> Set Var
-integerVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
-  where
-    p VarInfo{ varType = vt } = vt == IntegerVariable
-
-semiContinuousVariables :: LP -> Set Var
-semiContinuousVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
-  where
-    p VarInfo{ varType = vt } = vt == SemiContinuousVariable
-
--- ---------------------------------------------------------------------------
-
 -- | Parse a string containing LP file data.
 -- The source name is only | used in error messages and may be the empty string.
-parseString :: SourceName -> String -> Either ParseError LP
+parseString :: SourceName -> String -> Either ParseError MIP.Problem
 parseString = parse lpfile
 
 -- | Parse a file containing LP file data.
-parseFile :: FilePath -> IO (Either ParseError LP)
+parseFile :: FilePath -> IO (Either ParseError MIP.Problem)
 parseFile = parseFromFile lpfile
 
 -- ---------------------------------------------------------------------------
@@ -277,10 +88,10 @@ ident = tok $ do
     syms1 = "!\"#$%&()/,;?@_`'{}|~"
     syms2 = '.' : syms1
 
-variable :: Parser Var
-variable = liftM intern ident
+variable :: Parser MIP.Var
+variable = liftM MIP.toVar ident
 
-label :: Parser Label
+label :: Parser MIP.Label
 label = do
   name <- ident
   tok $ char ':'
@@ -299,7 +110,7 @@ reserved = Set.fromList
 
 -- ---------------------------------------------------------------------------
 
-lpfile :: Parser LP
+lpfile :: Parser MIP.Problem
 lpfile = do
   sep
   (flag, obj) <- problem
@@ -314,43 +125,43 @@ lpfile = do
   exvs <- many (liftM Left generalSection <|> liftM Right binarySection)
   let ints = Set.fromList $ concat [x | Left  x <- exvs]
       bins = Set.fromList $ concat [x | Right x <- exvs]
-  bnds2 <- return $ Map.unionWith intersectBounds
-            bnds (Map.fromAscList [(v, (Finite 0, Finite 1)) | v <- Set.toAscList bins])
+  bnds2 <- return $ Map.unionWith MIP.intersectBounds
+            bnds (Map.fromAscList [(v, (MIP.Finite 0, MIP.Finite 1)) | v <- Set.toAscList bins])
   scs <- liftM Set.fromList $ option [] (try semiSection)
 
   ss <- option [] (try sosSection)
   end
-  let vs = Set.unions $ map vars cs ++
+  let vs = Set.unions $ map MIP.vars cs ++
            [ Map.keysSet bnds2
            , ints
            , bins
            , scs
-           , vars (snd obj)
-           , vars ss
+           , MIP.vars (snd obj)
+           , MIP.vars ss
            ]
   return $
-    LP
-    { dir               = flag
-    , objectiveFunction = obj
-    , constraints       = [c | Left c <- cs]
-    , userCuts          = [c | Right c <- cs]
-    , sosConstraints    = ss
-    , varInfo           =
+    MIP.Problem
+    { MIP.dir               = flag
+    , MIP.objectiveFunction = obj
+    , MIP.constraints       = [c | Left c <- cs]
+    , MIP.userCuts          = [c | Right c <- cs]
+    , MIP.sosConstraints    = ss
+    , MIP.varInfo           =
         Map.fromAscList
         [ ( v
-          , VarInfo
-            { varBounds = Map.findWithDefault defaultBounds v bnds2
-            , varType   =
-                if v `Set.member` ints || v `Set.member` bins then IntegerVariable
-                else if v `Set.member` scs then SemiContinuousVariable
-                else ContinuousVariable
+          , MIP.VarInfo
+            { MIP.varBounds = Map.findWithDefault MIP.defaultBounds v bnds2
+            , MIP.varType   =
+                if v `Set.member` ints || v `Set.member` bins then MIP.IntegerVariable
+                else if v `Set.member` scs then MIP.SemiContinuousVariable
+                else MIP.ContinuousVariable
             }
           )
         | v <- Set.toAscList vs
         ]
     }
 
-problem :: Parser (OptDir, ObjectiveFunction)
+problem :: Parser (OptDir, MIP.ObjectiveFunction)
 problem = do
   flag <-  (try minimize >> return OptMin)
        <|> (try maximize >> return OptMax)
@@ -367,7 +178,7 @@ end = tok $ string' "end"
 
 -- ---------------------------------------------------------------------------
 
-constraintSection :: Parser [Constraint]
+constraintSection :: Parser [MIP.Constraint]
 constraintSection = subjectTo >> many (try (constraint False))
 
 subjectTo :: Parser ()
@@ -379,7 +190,7 @@ subjectTo = msum
         >> tok (char '.') >> return ()
   ]
 
-constraint :: Bool -> Parser Constraint
+constraint :: Bool -> Parser MIP.Constraint
 constraint isLazy = do
   name <- optionMaybe (try label)
 
@@ -395,48 +206,48 @@ constraint isLazy = do
   op <- relOp
   s <- option 1 sign
   rhs <- number
-  return $ Constraint
-    { constrLabel     = name
-    , constrIndicator = g
-    , constrBody      = (e, op, s*rhs)
-    , constrIsLazy    = isLazy
+  return $ MIP.Constraint
+    { MIP.constrLabel     = name
+    , MIP.constrIndicator = g
+    , MIP.constrBody      = (e, op, s*rhs)
+    , MIP.constrIsLazy    = isLazy
     }
 
-relOp :: Parser RelOp
+relOp :: Parser MIP.RelOp
 relOp = tok $ msum
-  [ char '<' >> optional (char '=') >> return Le
-  , char '>' >> optional (char '=') >> return Ge
-  , char '=' >> msum [ char '<' >> return Le
-                     , char '>' >> return Ge
-                     , return Eql
+  [ char '<' >> optional (char '=') >> return MIP.Le
+  , char '>' >> optional (char '=') >> return MIP.Ge
+  , char '=' >> msum [ char '<' >> return MIP.Le
+                     , char '>' >> return MIP.Ge
+                     , return MIP.Eql
                      ]
   ]
 
-lazyConstraintsSection :: Parser [Constraint]
+lazyConstraintsSection :: Parser [MIP.Constraint]
 lazyConstraintsSection = do
   tok $ string' "lazy"
   tok $ string' "constraints"
   many $ try $ constraint True
 
-userCutsSection :: Parser [Constraint]
+userCutsSection :: Parser [MIP.Constraint]
 userCutsSection = do
   tok $ string' "user"
   tok $ string' "cuts"
   many $ try $ constraint False
 
-type Bounds2 = (Maybe BoundExpr, Maybe BoundExpr)
+type Bounds2 = (Maybe MIP.BoundExpr, Maybe MIP.BoundExpr)
 
-boundsSection :: Parser (Map Var Bounds)
+boundsSection :: Parser (Map MIP.Var MIP.Bounds)
 boundsSection = do
   tok $ string' "bound" >> optional (char' 's')
   liftM (Map.map g . Map.fromListWith f) $ many (try bound)
   where
     f (lb1,ub1) (lb2,ub2) = (combineMaybe max lb1 lb2, combineMaybe min ub1 ub2)
-    g (lb, ub) = ( fromMaybe defaultLB lb
-                 , fromMaybe defaultUB ub
+    g (lb, ub) = ( fromMaybe MIP.defaultLB lb
+                 , fromMaybe MIP.defaultUB ub
                  )
 
-bound :: Parser (Var, Bounds2)
+bound :: Parser (MIP.Var, Bounds2)
 bound = msum
   [ try $ do
       v <- try variable
@@ -447,34 +258,34 @@ bound = msum
             return
               ( v
               , case op of
-                  Le -> (Nothing, Just b)
-                  Ge -> (Just b, Nothing)
-                  Eql -> (Just b, Just b)
+                  MIP.Le -> (Nothing, Just b)
+                  MIP.Ge -> (Just b, Nothing)
+                  MIP.Eql -> (Just b, Just b)
               )
         , do
             tok $ string' "free"
-            return (v, (Just NegInf, Just PosInf))
+            return (v, (Just MIP.NegInf, Just MIP.PosInf))
         ]
   , do
       b1 <- liftM Just boundExpr
       op1 <- relOp
-      guard $ op1 == Le
+      guard $ op1 == MIP.Le
       v <- variable
       b2 <- option Nothing $ do
         op2 <- relOp
-        guard $ op2 == Le
+        guard $ op2 == MIP.Le
         liftM Just boundExpr
       return (v, (b1, b2))
   ]
 
-boundExpr :: Parser BoundExpr
+boundExpr :: Parser MIP.BoundExpr
 boundExpr = msum 
-  [ try (tok (char '+') >> inf >> return PosInf)
-  , try (tok (char '-') >> inf >> return NegInf)
+  [ try (tok (char '+') >> inf >> return MIP.PosInf)
+  , try (tok (char '-') >> inf >> return MIP.NegInf)
   , do
       s <- option 1 sign
       x <- number
-      return $ Finite (s*x)
+      return $ MIP.Finite (s*x)
   ]
 
 inf :: Parser ()
@@ -482,22 +293,22 @@ inf = tok (string "inf" >> optional (string "inity"))
 
 -- ---------------------------------------------------------------------------
 
-generalSection :: Parser [Var]
+generalSection :: Parser [MIP.Var]
 generalSection = do
   tok $ string' "gen" >> optional (string' "eral" >> optional (string' "s"))
   many (try variable)
 
-binarySection :: Parser [Var]
+binarySection :: Parser [MIP.Var]
 binarySection = do
   tok $ string' "bin" >> optional (string' "ar" >> (string' "y" <|> string' "ies"))
   many (try variable)
 
-semiSection :: Parser [Var]
+semiSection :: Parser [MIP.Var]
 semiSection = do
   tok $ string' "semi" >> optional (string' "-continuous" <|> string' "s")
   many (try variable)
 
-sosSection :: Parser [SOSConstraint]
+sosSection :: Parser [MIP.SOSConstraint]
 sosSection = do
   tok $ string' "sos"
   many $ try $ do
@@ -508,19 +319,19 @@ sosSection = do
       tok $ char ':'
       w <- number
       return (v,w)
-    return $ SOSConstraint l t xs
+    return $ MIP.SOSConstraint l t xs
   where
     typ = do
-      t <- tok $ (char' 's' >> ((char '1' >> return S1) <|> (char '2' >> return S2)))
+      t <- tok $ (char' 's' >> ((char '1' >> return MIP.S1) <|> (char '2' >> return MIP.S2)))
       tok (string "::")
       return t
 
 -- ---------------------------------------------------------------------------
 
-expr :: Parser Expr
+expr :: Parser MIP.Expr
 expr = try expr1 <|> return []
   where
-    expr1 :: Parser Expr
+    expr1 :: Parser MIP.Expr
     expr1 = do
       t <- term True
       ts <- many (term False)
@@ -529,16 +340,16 @@ expr = try expr1 <|> return []
 sign :: Num a => Parser a
 sign = tok ((char '+' >> return 1) <|> (char '-' >> return (-1)))
 
-term :: Bool -> Parser Expr
+term :: Bool -> Parser MIP.Expr
 term flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
-  e <- liftM (\s' -> [Term 1 [s']]) variable <|> qexpr
+  e <- liftM (\s' -> [MIP.Term 1 [s']]) variable <|> qexpr
   return $ case combineMaybe (*) s c of
     Nothing -> e
-    Just d -> [Term (d*c') vs | Term c' vs <- e]
+    Just d -> [MIP.Term (d*c') vs | MIP.Term c' vs <- e]
 
-qexpr :: Parser Expr
+qexpr :: Parser MIP.Expr
 qexpr = do
   tok (char '[')
   t <- qterm True
@@ -546,19 +357,19 @@ qexpr = do
   tok (char ']')
   -- Gurobi allows ommiting "/2"
   (do mapM_ (tok . char) "/2"
-      return [Term (r / 2) vs | Term r vs <- t:ts])
+      return [MIP.Term (r / 2) vs | MIP.Term r vs <- t:ts])
    <|> return (t:ts)
 
-qterm :: Bool -> Parser Term
+qterm :: Bool -> Parser MIP.Term
 qterm flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
   es <- qfactor `chainl1`  (tok (char '*') >> return (++))
   return $ case combineMaybe (*) s c of
-    Nothing -> Term 1 es
-    Just d -> Term d es
+    Nothing -> MIP.Term 1 es
+    Just d -> MIP.Term d es
 
-qfactor :: Parser [Var]
+qfactor :: Parser [MIP.Var]
 qfactor = do
   v <- variable
   msum [ tok (char '^') >> tok (char '2') >> return [v,v]
@@ -595,49 +406,49 @@ number = tok $ do
 -- ---------------------------------------------------------------------------
 
 -- | Render a problem into a string.
-render :: LP -> Maybe String
+render :: MIP.Problem -> Maybe String
 render lp = fmap ($ "") $ execWriterT (render' lp)
 
-render' :: LP -> WriterT ShowS Maybe ()
+render' :: MIP.Problem -> WriterT ShowS Maybe ()
 render' lp = do
   tell $ showString $
-    case dir lp of
+    case MIP.dir lp of
       OptMin -> "MINIMIZE"
       OptMax -> "MAXIMIZE"
   tell $ showChar '\n'
 
   do
-    let (l, obj) = objectiveFunction lp
+    let (l, obj) = MIP.objectiveFunction lp
     renderLabel l
     renderExpr True obj
     tell $ showChar '\n'
 
   tell $ showString "SUBJECT TO\n"
-  forM_ (constraints lp) $ \c -> do
-    unless (constrIsLazy c) $ do
+  forM_ (MIP.constraints lp) $ \c -> do
+    unless (MIP.constrIsLazy c) $ do
       renderConstraint c
       tell $ showChar '\n'
 
-  let lcs = [c | c <- constraints lp, constrIsLazy c]
+  let lcs = [c | c <- MIP.constraints lp, MIP.constrIsLazy c]
   unless (null lcs) $ do
     tell $ showString "LAZY CONSTRAINTS\n"
     forM_ lcs $ \c -> do
       renderConstraint c
       tell $ showChar '\n'
 
-  let cuts = [c | c <- userCuts lp]
+  let cuts = [c | c <- MIP.userCuts lp]
   unless (null cuts) $ do
     tell $ showString "USER CUTS\n"
     forM_ cuts $ \c -> do
       renderConstraint c
       tell $ showChar '\n'
 
-  let ivs = integerVariables lp
-      (bins,gens) = Set.partition (\v -> getBounds lp v == (Finite 0, Finite 1)) ivs
-      scs = semiContinuousVariables lp
+  let ivs = MIP.integerVariables lp
+      (bins,gens) = Set.partition (\v -> MIP.getBounds lp v == (MIP.Finite 0, MIP.Finite 1)) ivs
+      scs = MIP.semiContinuousVariables lp
 
   tell $ showString "BOUNDS\n"
-  forM_ (Map.toAscList (varInfo lp)) $ \(v, VarInfo{ varBounds = (lb,ub) }) -> do
+  forM_ (Map.toAscList (MIP.varInfo lp)) $ \(v, MIP.VarInfo{ MIP.varBounds = (lb,ub) }) -> do
     unless (v `Set.member` bins) $ do
       renderBoundExpr lb
       tell $ showString " <= "
@@ -658,9 +469,9 @@ render' lp = do
     tell $ showString "SEMI-CONTINUOUS\n"
     renderVariableList $ Set.toList scs
 
-  unless (null (sosConstraints lp)) $ do
+  unless (null (MIP.sosConstraints lp)) $ do
     tell $ showString "SOS\n"
-    forM_ (sosConstraints lp) $ \(SOSConstraint l typ xs) -> do
+    forM_ (MIP.sosConstraints lp) $ \(MIP.SOSConstraint l typ xs) -> do
       renderLabel l
       tell $ shows typ
       tell $ showString " ::"
@@ -674,12 +485,12 @@ render' lp = do
   tell $ showString "END\n"
 
 -- FIXME: Gurobi は quadratic term が最後に一つある形式でないとダメっぽい
-renderExpr :: Bool -> Expr -> WriterT ShowS Maybe ()
+renderExpr :: Bool -> MIP.Expr -> WriterT ShowS Maybe ()
 renderExpr isObj e = fill 80 (ts1 ++ ts2)
   where
     (ts,qts) = partition isLin e 
-    isLin (Term _ [])  = True
-    isLin (Term _ [_]) = True
+    isLin (MIP.Term _ [])  = True
+    isLin (MIP.Term _ [_]) = True
     isLin _ = False
 
     ts1 = map f ts
@@ -689,18 +500,18 @@ renderExpr isObj e = fill 80 (ts1 ++ ts2)
         -- マイナスで始めるとSCIP 2.1.1 は「cannot have '-' in front of quadratic part ('[')」というエラーを出す
         ["+ ["] ++ map g qts ++ [if isObj then "] / 2" else "]"]
 
-    f :: Term -> String
-    f (Term c [])  = showConstTerm c ""
-    f (Term c [v]) = showCoeff c . showVar v $ ""
+    f :: MIP.Term -> String
+    f (MIP.Term c [])  = showConstTerm c ""
+    f (MIP.Term c [v]) = showCoeff c . showVar v $ ""
     f _ = error "should not happen"
 
-    g :: Term -> String
-    g (Term c vs) = 
+    g :: MIP.Term -> String
+    g (MIP.Term c vs) = 
       (if isObj then showCoeff (2*c) else showCoeff c)
-      (intercalate " * " (map fromVar vs))
+      (intercalate " * " (map MIP.fromVar vs))
 
-showVar :: Var -> ShowS
-showVar = showString . fromVar
+showVar :: MIP.Var -> ShowS
+showVar = showString . MIP.fromVar
 
 showValue :: Rational -> ShowS
 showValue c =
@@ -721,21 +532,21 @@ showConstTerm c = s . v
     s = showString (if c >= 0 then "+ " else "- ")
     v = showValue (abs c)
 
-renderLabel :: Maybe Label -> WriterT ShowS Maybe ()
+renderLabel :: Maybe MIP.Label -> WriterT ShowS Maybe ()
 renderLabel l =
   case l of
     Nothing -> return ()
     Just s -> tell $ showString s . showString ": "
 
-renderOp :: RelOp -> WriterT ShowS Maybe ()
-renderOp Le = tell $ showString "<="
-renderOp Ge = tell $ showString ">="
-renderOp Eql = tell $ showString "="
+renderOp :: MIP.RelOp -> WriterT ShowS Maybe ()
+renderOp MIP.Le = tell $ showString "<="
+renderOp MIP.Ge = tell $ showString ">="
+renderOp MIP.Eql = tell $ showString "="
 
-renderConstraint :: Constraint -> WriterT ShowS Maybe ()
-renderConstraint c@Constraint{ constrBody = (e,op,val) }  = do
-  renderLabel (constrLabel c)
-  case constrIndicator c of
+renderConstraint :: MIP.Constraint -> WriterT ShowS Maybe ()
+renderConstraint c@MIP.Constraint{ MIP.constrBody = (e,op,val) }  = do
+  renderLabel (MIP.constrLabel c)
+  case MIP.constrIndicator c of
     Nothing -> return ()
     Just (v,vval) -> do
       tell $ showVar v . showString " = "
@@ -748,13 +559,13 @@ renderConstraint c@Constraint{ constrBody = (e,op,val) }  = do
   tell $ showChar ' '
   tell $ showValue val
 
-renderBoundExpr :: BoundExpr -> WriterT ShowS Maybe ()
-renderBoundExpr (Finite r) = tell $ showValue r
-renderBoundExpr NegInf = tell $ showString "-inf"
-renderBoundExpr PosInf = tell $ showString "+inf"
+renderBoundExpr :: MIP.BoundExpr -> WriterT ShowS Maybe ()
+renderBoundExpr (MIP.Finite r) = tell $ showValue r
+renderBoundExpr MIP.NegInf = tell $ showString "-inf"
+renderBoundExpr MIP.PosInf = tell $ showString "+inf"
 
-renderVariableList :: [Var] -> WriterT ShowS Maybe ()
-renderVariableList vs = fill 80 (map fromVar vs) >> tell (showChar '\n')
+renderVariableList :: [MIP.Var] -> WriterT ShowS Maybe ()
+renderVariableList vs = fill 80 (map MIP.fromVar vs) >> tell (showChar '\n')
 
 fill :: Int -> [String] -> WriterT ShowS Maybe ()
 fill width str = go str 0
