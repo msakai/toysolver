@@ -208,12 +208,8 @@ nonAdjacentPairs _ = []
 
 convert :: Options -> MIP.Problem -> ShowS
 convert opt mip =
-  unlinesS $ defs ++ map (assert opt) (conditions opt False env mip)
+  unlinesS $ options ++ defs ++ map (assert opt) (conditions opt False env mip)
              ++ [ assert opt (optimality, Nothing) | optOptimize opt ]
-             ++ [ case optLanguage opt of
-                    SMTLIB2 -> list [showString "set-option", showString ":produce-models", showString "true"]
-                    YICES   -> list [showString "set-evidence!", showString "true"]
-                | optProduceModel opt ]
              ++ [ case optLanguage opt of
                     SMTLIB2 -> list [showString "check-sat"]
                     YICES   -> list [showString "check"]
@@ -236,6 +232,12 @@ convert opt mip =
     -- Note that identifiers of LPFile does not contain '-'.
     -- So that there are no name crash.
     env2 = Map.fromList [(v, encode opt (MIP.fromVar v ++ "-2")) | v <- Set.toList vs]
+
+    options =
+      [ case optLanguage opt of
+          SMTLIB2 -> list [showString "set-option", showString ":produce-models", showString "true"]
+          YICES   -> list [showString "set-evidence!", showString "true"]
+      | optProduceModel opt ]
 
     defs = do
       (v,t) <- ts
