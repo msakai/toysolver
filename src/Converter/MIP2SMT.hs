@@ -28,7 +28,7 @@ import qualified Data.MIP as MIP
 import System.IO
 import Text.Printf
 import qualified Text.LPFile as LPFile
-import ToySolver.Util (showRationalAsFiniteDecimal)
+import ToySolver.Util (showRationalAsFiniteDecimal, isInteger)
 
 data Options
   = Options
@@ -80,10 +80,28 @@ or' xs = list (showString "or" : xs)
 not' :: ShowS -> ShowS
 not' x = list [showString "not", x]
 
-expr :: Options -> Env -> MIP.Problem -> MIP.Expr -> ShowS
-expr opt env mip e =
+intExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> ShowS
+intExpr opt env mip e =
   case e of
-    [] -> showChar '0'
+    [] -> intNum opt 0
+    _ -> list (showChar '+' : map f e)
+  where
+    f (MIP.Term c _) | not (isInteger c) =
+      error ("Converter.MIP2SMT.intExpr: fractional coefficient: " ++ show c)
+    f (MIP.Term c []) = intNum opt (floor c)
+    f (MIP.Term c vs) =
+      case xs of
+        [] -> intNum opt 1
+        [x] -> x
+        _ -> list (showChar '*' : xs)
+      where
+        xs = [intNum opt (floor c) | c /= 1] ++
+             [showString (env Map.! v) | v <- vs]
+
+realExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> ShowS
+realExpr opt env mip e =
+  case e of
+    [] -> realNum opt 0
     _ -> list (showChar '+' : map f e)
   where
     f (MIP.Term c []) = realNum opt c
@@ -102,6 +120,14 @@ expr opt env mip e =
                         else showString v2
              ]
 
+intNum :: Options -> Integer -> ShowS
+intNum opt x =
+  case optLanguage opt of
+    SMTLIB2
+      | x < 0     -> list [showChar '-', shows (negate x)]
+      | otherwise -> shows x
+    YICES -> shows x
+
 realNum :: Options -> Rational -> ShowS
 realNum opt r =
   case optLanguage opt of
@@ -117,11 +143,19 @@ realNum opt r =
             Just s  -> showString s
             Nothing -> list [showChar '/', shows (numerator r) . showString ".0", shows (denominator r) . showString ".0"]
 
-rel :: Bool -> MIP.RelOp -> ShowS -> ShowS -> ShowS
-rel True MIP.Eql x y = and' [rel False MIP.Le x y, rel False MIP.Ge x y]
-rel _ MIP.Eql x y = list [showString "=", x, y]
-rel _ MIP.Le x y = list [showString "<=", x, y]
-rel _ MIP.Ge x y = list [showString ">=", x, y]
+rel :: Options -> Env -> MIP.Problem -> Bool -> MIP.RelOp -> MIP.Expr -> Rational -> ShowS
+rel opt env mip q op lhs rhs
+  | and [MIP.getVarType mip v == MIP.IntegerVariable | v <- Set.toList (MIP.vars lhs)] &&
+    and [isInteger c | MIP.Term c _ <- lhs] && isInteger rhs =
+      f q op (intExpr opt env mip lhs) (intNum opt (floor rhs))
+  | otherwise =
+      f q op (realExpr opt env mip lhs) (realNum opt rhs)
+  where
+    f :: Bool -> MIP.RelOp -> ShowS -> ShowS -> ShowS
+    f True MIP.Eql x y = and' [f False MIP.Le x y, f False MIP.Ge x y]
+    f _ MIP.Eql x y = list [showString "=", x, y]
+    f _ MIP.Le x y = list [showString "<=", x, y]
+    f _ MIP.Ge x y = list [showString ">=", x, y]
 
 toReal :: Options -> ShowS -> ShowS
 toReal opt x =
@@ -149,12 +183,12 @@ constraint opt q env mip
   , MIP.constrBody      = (e, op, b)
   } = (c1, label)
   where
-    c0 = rel q op (expr opt env mip e) (realNum opt b)
+    c0 = rel opt env mip q op e b
     c1 = case g of
            Nothing -> c0
            Just (var,val) ->
              list [ showString "=>"
-                  , rel q MIP.Eql (expr opt env mip [MIP.Term 1 [var]]) (realNum opt val)
+                  , rel opt env mip q MIP.Eql [MIP.Term 1 [var]] val
                   , c0
                   ]
 
@@ -173,11 +207,17 @@ conditions opt q env mip = bnds ++ cs ++ ss
         s1 = case lb of
                MIP.NegInf -> []
                MIP.PosInf -> [showString "false"]
-               MIP.Finite x -> [list [showString "<=", realNum opt x, v3]]
+               MIP.Finite x ->
+                 if MIP.getVarType mip v == MIP.IntegerVariable
+                 then [list [showString "<=", intNum opt (ceiling x), showString v2]]
+                 else [list [showString "<=", realNum opt x, v3]]
         s2 = case ub of
                MIP.NegInf -> [showString "false"]
                MIP.PosInf -> []
-               MIP.Finite x -> [list [showString "<=", v3, realNum opt x]]
+               MIP.Finite x ->
+                 if MIP.getVarType mip v == MIP.IntegerVariable
+                 then [list [showString "<=", showString v2, intNum opt (floor x)]]
+                 else [list [showString "<=", v3, realNum opt x]]
         c0 = and' (s1 ++ s2)
         c1 = if MIP.getVarType mip v == MIP.SemiContinuousVariable
              then or' [list [showString "=", showString v2, realNum opt 0], c0]
@@ -256,7 +296,7 @@ convert opt mip =
         body = list [showString "=>"
                     , and' (map fst (conditions opt True env2 mip))
                     , list [ showString $ if MIP.dir mip == MIP.OptMin then "<=" else ">="
-                           , expr opt env mip obj, expr opt env2 mip obj
+                           , realExpr opt env mip obj, realExpr opt env2 mip obj
                            ]
                     ]
 
