@@ -38,7 +38,7 @@ data WCNF
 
 type WeightedClause = (Weight, SAT.Clause)
 
--- | should be able to represent 2^63
+-- | Weigths must be greater than or equal to 1, and smaller than 2^63.
 type Weight = Integer
 
 parseWCNFString :: String -> Either String WCNF
@@ -57,7 +57,8 @@ parseWCNFString s =
         WCNF
         { numVars    = read nvar
         , numClauses = read nclause
-        , topCost    = 2^(63::Int)
+          -- top must be greater than the sum of the weights of violated soft clauses.
+        , topCost    = fromInteger $ 2^(63::Int) - 1
         , clauses    = map parseWCNFLine ls
         }
     (["p","cnf", nvar, nclause]) ->
@@ -65,7 +66,8 @@ parseWCNFString s =
         WCNF
         { numVars    = read nvar
         , numClauses = read nclause
-        , topCost    = 2
+          -- top must be greater than the sum of the weights of violated soft clauses.
+        , topCost    = fromInteger $ 2^(63::Int) - 1
         , clauses    = map parseCNFLine ls
         }
     _ ->
