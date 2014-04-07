@@ -86,11 +86,13 @@ intExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> ShowS
 intExpr opt env mip e =
   case e of
     [] -> intNum opt 0
+    [t] -> f t
     _ -> list (showChar '+' : map f e)
   where
     f (MIP.Term c _) | not (isInteger c) =
       error ("Converter.MIP2SMT.intExpr: fractional coefficient: " ++ show c)
     f (MIP.Term c []) = intNum opt (floor c)
+    f (MIP.Term (-1) vs) = list [showChar '-', f (MIP.Term 1 vs)]
     f (MIP.Term c vs) =
       case xs of
         [] -> intNum opt 1
@@ -104,9 +106,11 @@ realExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> ShowS
 realExpr opt env mip e =
   case e of
     [] -> realNum opt 0
+    [t] -> f t
     _ -> list (showChar '+' : map f e)
   where
     f (MIP.Term c []) = realNum opt c
+    f (MIP.Term (-1) vs) = list [showChar '-', f (MIP.Term 1 vs)]
     f (MIP.Term c vs) =
       case xs of
         [] -> realNum opt 1
