@@ -26,10 +26,12 @@ module SAT.Types
   , Clause
   , normalizeClause
   , clauseSubsume
+  , evalClause
 
   -- * Cardinality Constraint
   , AtLeast
   , normalizeAtLeast
+  , evalAtLeast
 
   -- * Pseudo Boolean Constraint
   , PBLinTerm
@@ -43,6 +45,8 @@ module SAT.Types
   , cardinalityReduction
   , negatePBAtLeast
   , pbEval
+  , evalPBAtLeast
+  , evalPBExactly
   , pbLowerBound
   , pbUpperBound
   , pbSubsume
@@ -136,6 +140,9 @@ clauseSubsume cl1 cl2 = cl1' `IntSet.isSubsetOf` cl2'
     cl1' = IntSet.fromList cl1
     cl2' = IntSet.fromList cl2
 
+evalClause :: Model -> Clause -> Bool
+evalClause m cl = any (evalLit m) cl
+
 type AtLeast = ([Lit], Int)
 
 normalizeAtLeast :: AtLeast -> AtLeast
@@ -146,6 +153,9 @@ normalizeAtLeast (lits,n) = assert (IntSet.size ys `mod` 2 == 0) $
      ys = xs `IntSet.intersection` (IntSet.map litNot xs)
      lits' = xs `IntSet.difference` ys
      n' = n - (IntSet.size ys `div` 2)
+
+evalAtLeast :: Model -> AtLeast -> Bool
+evalAtLeast m (lits,n) = sum [1 | lit <- lits, evalLit m lit] >= n
 
 type PBLinTerm = (Integer, Lit)
 type PBLinSum = [PBLinTerm]
@@ -259,6 +269,12 @@ negatePBAtLeast (xs, rhs) = ([(-c,lit) | (c,lit)<-xs] , -rhs + 1)
 
 pbEval :: Model -> PBLinSum -> Integer
 pbEval m xs = sum [c | (c,lit) <- xs, evalLit m lit]
+
+evalPBAtLeast :: Model -> PBLinAtLeast -> Bool
+evalPBAtLeast m (lhs,rhs) = pbEval m lhs >= rhs
+
+evalPBExactly :: Model -> PBLinAtLeast -> Bool
+evalPBExactly m (lhs,rhs) = pbEval m lhs == rhs
 
 pbLowerBound :: PBLinSum -> Integer
 pbLowerBound xs = sum [if c < 0 then c else 0 | (c,_) <- xs]
