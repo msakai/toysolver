@@ -33,6 +33,7 @@ import ToySolver.Util (showRationalAsFiniteDecimal, isInteger)
 data Options
   = Options
   { optLanguage     :: Language
+  , optSetLogic     :: Maybe String
   , optCheckSAT     :: Bool
   , optProduceModel :: Bool
   , optOptimize     :: Bool
@@ -43,6 +44,7 @@ defaultOptions :: Options
 defaultOptions
   = Options
   { optLanguage     = SMTLIB2
+  , optSetLogic     = Nothing
   , optCheckSAT     = True
   , optProduceModel = True
   , optOptimize     = False
@@ -248,7 +250,7 @@ nonAdjacentPairs _ = []
 
 convert :: Options -> MIP.Problem -> ShowS
 convert opt mip =
-  unlinesS $ options ++ defs ++ map (assert opt) (conditions opt False env mip)
+  unlinesS $ options ++ set_logic ++ defs ++ map (assert opt) (conditions opt False env mip)
              ++ [ assert opt (optimality, Nothing) | optOptimize opt ]
              ++ [ case optLanguage opt of
                     SMTLIB2 -> list [showString "check-sat"]
@@ -278,6 +280,11 @@ convert opt mip =
           SMTLIB2 -> list [showString "set-option", showString ":produce-models", showString "true"]
           YICES   -> list [showString "set-evidence!", showString "true"]
       | optProduceModel opt ]
+
+    set_logic =
+      case optSetLogic opt of
+        Just logic | optLanguage opt == SMTLIB2 -> [list [showString "set-logic", showString logic]]
+        _ -> []
 
     defs = do
       (v,t) <- ts

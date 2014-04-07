@@ -14,6 +14,7 @@
 module Main where
 
 import Data.Char
+import Data.Maybe
 import qualified Data.Version as V
 import System.Environment
 import System.IO
@@ -43,9 +44,10 @@ data Flag
   | AsMaxSAT
   | ObjType ObjType
   | IndicatorConstraint
-  | Optimize
-  | NoCheck
-  | NoProduceModel
+  | SMTSetLogic String
+  | SMTOptimize
+  | SMTNoCheck
+  | SMTNoProduceModel
   | MaxSATNonLinear
   deriving Eq
 
@@ -57,9 +59,10 @@ options =
     , Option []    ["maxsat"]  (NoArg AsMaxSAT)  "treat *.cnf file as MAX-SAT problem"
     , Option []    ["obj"] (ReqArg (ObjType . parseObjType) "STRING") "objective function for SAT/PBS: none (default), max-one, max-zero"
     , Option []    ["indicator"] (NoArg IndicatorConstraint) "use indicator constraints in output LP file"
-    , Option []    ["smt-optimize"] (NoArg Optimize)   "output optimiality condition which uses quantifiers"
-    , Option []    ["smt-no-check"] (NoArg NoCheck)    "do not output \"(check)\""
-    , Option []    ["smt-no-produce-model"] (NoArg NoProduceModel) "do not output \"(set-option :produce-models true)\""    
+    , Option []    ["smt-set-logic"] (ReqArg SMTSetLogic "STRING")　"output \"(set-logic STRING)\""
+    , Option []    ["smt-optimize"] (NoArg SMTOptimize)   "output optimiality condition which uses quantifiers"
+    , Option []    ["smt-no-check"] (NoArg SMTNoCheck)    "do not output \"(check)\""
+    , Option []    ["smt-no-produce-model"] (NoArg SMTNoProduceModel) "do not output \"(set-option :produce-models true)\""    
     , Option []    ["maxsat-nonlinear"] (NoArg MaxSATNonLinear) "use non-linear formulation of Max-SAT"
     ]
   where
@@ -147,9 +150,10 @@ writeLP :: [Flag] -> MIP.Problem -> IO ()
 writeLP o mip = do
   let mip2smtOpt =
         MIP2SMT.defaultOptions
-        { MIP2SMT.optCheckSAT     = not (NoCheck `elem` o)
-        , MIP2SMT.optProduceModel = not (NoProduceModel `elem` o)
-        , MIP2SMT.optOptimize     = Optimize `elem` o
+        { MIP2SMT.optSetLogic     = listToMaybe [logic | SMTSetLogic logic <- o]
+        , MIP2SMT.optCheckSAT     = not (SMTNoCheck `elem` o)
+        , MIP2SMT.optProduceModel = not (SMTNoProduceModel `elem` o)
+        , MIP2SMT.optOptimize     = SMTOptimize `elem` o
         }
 
   case head ([Just fname | Output fname <- o] ++ [Nothing]) of
