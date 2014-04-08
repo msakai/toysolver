@@ -341,7 +341,7 @@ pbNumVars (m, cs) = maximum (0 : vs)
       return $ abs lit
 
 wboNumVars :: SoftFormula -> Int
-wboNumVars (_, cs) = maximum vs
+wboNumVars (_, cs) = maximum (0 : vs)
   where
     vs = do
       s <- [s | (_, (s,_,_)) <- cs]
