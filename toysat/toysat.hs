@@ -62,7 +62,6 @@ import qualified SAT.Integer
 import qualified SAT.TseitinEncoder as Tseitin
 import qualified SAT.MUS as MUS
 import qualified SAT.CAMUS as CAMUS
-import SAT.Types (pbEval)
 import qualified SAT.Types as SAT
 import SAT.Printer
 import qualified Text.PBFile as PBFile
@@ -586,7 +585,7 @@ solvePB opt solver formula@(obj, cs) = do
         Right (Just m) -> do
           putSLine "OPTIMUM FOUND"
           pbPrintModel stdout m n
-          let objval = pbEval m obj''
+          let objval = SAT.evalPBSum m obj''
           writeSOLFile opt m (Just objval) n
         Left (e :: SomeException) -> do
           r <- readIORef modelRef
@@ -596,7 +595,7 @@ solvePB opt solver formula@(obj, cs) = do
             Just m -> do
               putSLine "SATISFIABLE"
               pbPrintModel stdout m n
-              let objval = pbEval m obj''
+              let objval = SAT.evalPBSum m obj''
               writeSOLFile opt m (Just objval) n
           throwIO e
 
@@ -683,7 +682,7 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
       if isMaxSat
         then maxsatPrintModel stdout m nvar
         else pbPrintModel stdout m nvar
-      let objval = pbEval m obj
+      let objval = SAT.evalPBSum m obj
       writeSOLFile opt m (Just objval) nvar
     Left (e :: SomeException) -> do
       r <- readIORef modelRef
@@ -691,7 +690,7 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
         Just m | not isMaxSat -> do
           putSLine "SATISFIABLE"
           pbPrintModel stdout m nvar
-          let objval = pbEval m obj
+          let objval = SAT.evalPBSum m obj
           writeSOLFile opt m (Just objval) nvar
         _ -> do
           putSLine "UNKNOWN"

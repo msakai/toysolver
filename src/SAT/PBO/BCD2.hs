@@ -105,12 +105,12 @@ solveWBO solver sels opt = do
 
       if ret then do
         m <- SAT.model solver
-        let val = SAT.pbEval m obj
+        let val = SAT.evalPBSum m obj
         optUpdateBest opt m val
         let ub' = val - 1
         optLogger opt $ printf "BCD2: updating upper bound: %d -> %d" ub ub'
         SAT.addPBAtMost solver obj ub'
-        let cores' = map (\info -> info{ coreEP = SAT.pbEval m (coreCostFun info) }) cores
+        let cores' = map (\info -> info{ coreEP = SAT.evalPBSum m (coreCostFun info) }) cores
         cont (unrelaxed, relaxed) cores' ub' (Just m)
       else do
         core <- SAT.failedAssumptions solver
@@ -138,7 +138,7 @@ solveWBO solver sels opt = do
                               , coreLB = refine [weights IntMap.! lit | lit <- IntSet.toList relaxed'] (sum [coreLB info | info <- intersected] + delta - 1)
                               , coreEP = case lastModel of
                                            Nothing -> sum [weights IntMap.! lit | lit <- IntSet.toList newLits]
-                                           Just m  -> SAT.pbEval m [(weights IntMap.! lit, -lit) | lit <- IntSet.toList newLits]
+                                           Just m  -> SAT.evalPBSum m [(weights IntMap.! lit, -lit) | lit <- IntSet.toList newLits]
                               }
                 cores'      = mergedCore : rest
             if null intersected then do

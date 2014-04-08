@@ -124,7 +124,7 @@ minimize solver obj opt = do
     linSearch :: IO Model
     linSearch = do
       m <- model solver
-      let v = pbEval m obj
+      let v = evalPBSum m obj
       updateBest m v
       addPBAtMost solver obj (v - 1)
       result <- solve solver
@@ -135,7 +135,7 @@ minimize solver obj opt = do
     binSearch :: IO Model
     binSearch = do
       m0 <- model solver
-      let v0 = pbEval m0 obj
+      let v0 = evalPBSum m0 obj
       updateBest m0 v0
       let ub0 = v0 - 1
           lb0 = pbLowerBound obj
@@ -151,7 +151,7 @@ minimize solver obj opt = do
           ret <- solveWith solver [sel]
           if ret then do
             m2 <- model solver
-            let v = pbEval m2 obj
+            let v = evalPBSum m2 obj
             updateBest m2 v
             let ub' = v - 1
             logIO $ printf "Binary Search: updating upper bound: %d -> %d" ub ub'
@@ -172,7 +172,7 @@ minimize solver obj opt = do
     adaptiveSearch :: IO Model
     adaptiveSearch = do
       m0 <- model solver
-      let v0 = pbEval m0 obj
+      let v0 = evalPBSum m0 obj
       updateBest m0 v0
       let ub0 = v0 - 1
           lb0 = pbLowerBound obj
@@ -188,7 +188,7 @@ minimize solver obj opt = do
             result <- solve solver
             if result then do
               m2 <- model solver
-              let v = pbEval m2 obj
+              let v = evalPBSum m2 obj
               updateBest m2 v
               let ub'   = v - 1
                   fraction' = min 0.5 (fraction + 0.1)
@@ -210,7 +210,7 @@ minimize solver obj opt = do
                 let fraction' = min 0.5 (fraction + 0.1)
                 if ret then do
                   m2 <- model solver
-                  let v = pbEval m2 obj
+                  let v = evalPBSum m2 obj
                   updateBest m2 v
                   let ub' = v - 1
                   logIO $ printf "Adaptive Search: updating upper bound: %d -> %d" ub ub'

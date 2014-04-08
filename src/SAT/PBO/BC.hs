@@ -80,7 +80,7 @@ solveWBO solver sels opt = do
           ret <- SAT.solveWith solver (sel : IntSet.toList unrelaxed)
           if ret then do
             m <- SAT.model solver
-            let val = SAT.pbEval m obj
+            let val = SAT.evalPBSum m obj
             optUpdateBest opt m val
             let ub' = val - 1
             logIO $ printf "BC: updating upper bound: %d -> %d" ub ub'

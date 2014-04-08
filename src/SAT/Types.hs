@@ -44,7 +44,7 @@ module SAT.Types
   , cutResolve
   , cardinalityReduction
   , negatePBAtLeast
-  , pbEval
+  , evalPBSum
   , evalPBAtLeast
   , evalPBExactly
   , pbLowerBound
@@ -267,14 +267,14 @@ cardinalityReduction (lhs,rhs) = (ls, rhs')
 negatePBAtLeast :: PBLinAtLeast -> PBLinAtLeast
 negatePBAtLeast (xs, rhs) = ([(-c,lit) | (c,lit)<-xs] , -rhs + 1)
 
-pbEval :: Model -> PBLinSum -> Integer
-pbEval m xs = sum [c | (c,lit) <- xs, evalLit m lit]
+evalPBSum :: Model -> PBLinSum -> Integer
+evalPBSum m xs = sum [c | (c,lit) <- xs, evalLit m lit]
 
 evalPBAtLeast :: Model -> PBLinAtLeast -> Bool
-evalPBAtLeast m (lhs,rhs) = pbEval m lhs >= rhs
+evalPBAtLeast m (lhs,rhs) = evalPBSum m lhs >= rhs
 
 evalPBExactly :: Model -> PBLinAtLeast -> Bool
-evalPBExactly m (lhs,rhs) = pbEval m lhs == rhs
+evalPBExactly m (lhs,rhs) = evalPBSum m lhs == rhs
 
 pbLowerBound :: PBLinSum -> Integer
 pbLowerBound xs = sum [if c < 0 then c else 0 | (c,_) <- xs]
