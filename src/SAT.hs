@@ -352,7 +352,9 @@ data Solver
   }
 
 markBad :: Solver -> IO ()
-markBad solver = writeIORef (svOk solver) False
+markBad solver = do
+  writeIORef (svOk solver) False
+  SQ.clear (svBCPQueue solver)
 
 bcpEnqueue :: Solver -> Lit -> IO ()
 bcpEnqueue solver l = SQ.enqueue (svBCPQueue solver) l
@@ -742,27 +744,29 @@ addClause solver lits = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
-  lits2 <- instantiateClause solver lits
-  case normalizeClause =<< lits2 of
-    Nothing -> return ()
-    Just [] -> markBad solver
-    Just [lit] -> do
-      {- We do not call 'removeBackwardSubsumedBy' here,
-         because subsumed constraints will be removed by 'simplify'. -}
-      ret <- assign solver lit
-      assert ret $ return ()
-      ret2 <- deduce solver
-      case ret2 of
-        Nothing -> return ()
-        Just _ -> markBad solver
-    Just lits3 -> do
-      subsumed <- checkForwardSubsumption solver lits
-      unless subsumed $ do
-        removeBackwardSubsumedBy solver ([(1,lit) | lit <- lits3], 1)
-        clause <- newClauseHandler lits3 False
-        addToDB solver clause
-        _ <- basicAttachClauseHandler solver clause
-        return ()
+  ok <- readIORef (svOk solver)
+  when ok $ do
+    lits2 <- instantiateClause solver lits
+    case normalizeClause =<< lits2 of
+      Nothing -> return ()
+      Just [] -> markBad solver
+      Just [lit] -> do
+        {- We do not call 'removeBackwardSubsumedBy' here,
+           because subsumed constraints will be removed by 'simplify'. -}
+        ret <- assign solver lit
+        assert ret $ return ()
+        ret2 <- deduce solver
+        case ret2 of
+          Nothing -> return ()
+          Just _ -> markBad solver
+      Just lits3 -> do
+        subsumed <- checkForwardSubsumption solver lits
+        unless subsumed $ do
+          removeBackwardSubsumedBy solver ([(1,lit) | lit <- lits3], 1)
+          clause <- newClauseHandler lits3 False
+          addToDB solver clause
+          _ <- basicAttachClauseHandler solver clause
+          return ()
 
 -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
 addAtLeast :: Solver -- ^ The 'Solver' argument.
@@ -773,10 +777,12 @@ addAtLeast solver lits n = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
-  (lits',n') <- liftM normalizeAtLeast $ instantiateAtLeast solver (lits,n)
-  let len = length lits'
+  ok <- readIORef (svOk solver)
+  when ok $ do
+    (lits',n') <- liftM normalizeAtLeast $ instantiateAtLeast solver (lits,n)
+    let len = length lits'
 
-  if n' <= 0 then return ()
+    if n' <= 0 then return ()
     else if n' > len then markBad solver
     else if n' == 1 then addClause solver lits'
     else if n' == len then do
@@ -824,28 +830,30 @@ addPBAtLeast solver ts n = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
-  (ts',degree) <- liftM normalizePBAtLeast $ instantiatePB solver (ts,n)
-
-  case pbToAtLeast (ts',degree) of
-    Just (lhs',rhs') -> addAtLeast solver lhs' rhs'
-    Nothing -> do
-      let cs = map fst ts'
-          slack = sum cs - degree
-      if degree <= 0 then return ()
-      else if slack < 0 then markBad solver
-      else do
-        removeBackwardSubsumedBy solver (ts', degree)
-        c <- newPBHandler solver ts' degree False
-        addToDB solver c
-        ret <- attach solver c
-        if not ret
-         then do
-           markBad solver
-         else do
-           ret2 <- deduce solver
-           case ret2 of
-             Nothing -> return ()
-             Just _ -> markBad solver
+  ok <- readIORef (svOk solver)
+  when ok $ do
+    (ts',degree) <- liftM normalizePBAtLeast $ instantiatePB solver (ts,n)
+  
+    case pbToAtLeast (ts',degree) of
+      Just (lhs',rhs') -> addAtLeast solver lhs' rhs'
+      Nothing -> do
+        let cs = map fst ts'
+            slack = sum cs - degree
+        if degree <= 0 then return ()
+        else if slack < 0 then markBad solver
+        else do
+          removeBackwardSubsumedBy solver (ts', degree)
+          c <- newPBHandler solver ts' degree False
+          addToDB solver c
+          ret <- attach solver c
+          if not ret
+           then do
+             markBad solver
+           else do
+             ret2 <- deduce solver
+             case ret2 of
+               Nothing -> return ()
+               Just _ -> markBad solver
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMost :: Solver          -- ^ The 'Solver' argument.
