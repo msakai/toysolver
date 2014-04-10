@@ -44,6 +44,7 @@ data Options
   { optLogger      :: String -> IO ()
   , optUpdateBest  :: SAT.Model -> Integer -> IO ()
   , optUpdateLB    :: Integer -> IO ()
+  , optEnableHardening :: Bool
   }
 
 defaultOptions :: Options
@@ -52,6 +53,7 @@ defaultOptions
   { optLogger     = \_ -> return ()
   , optUpdateBest = \_ _ -> return ()
   , optUpdateLB   = \_ -> return ()
+  , optEnableHardening = True
   }
 
 data CoreInfo
@@ -77,7 +79,7 @@ solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
 solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
 solveWBO solver sels opt = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
-  loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty) [] (SAT.pbUpperBound obj) Nothing
+  loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty, IntSet.empty) weights [] (SAT.pbUpperBound obj) Nothing
 
   where
     weights :: SAT.LitMap Integer
@@ -89,12 +91,15 @@ solveWBO solver sels opt = do
     coreCostFun :: CoreInfo -> SAT.PBLinSum
     coreCostFun c = [(weights IntMap.! lit, -lit) | lit <- IntSet.toList (coreLits c)]
 
-    loop :: (SAT.LitSet, SAT.LitSet) -> [CoreInfo] -> Integer -> Maybe SAT.Model -> IO (Maybe SAT.Model)
-    loop (unrelaxed, relaxed) cores ub lastModel = do
-      let lb = sum [coreLB info | info <- cores]
+    computeLB :: [CoreInfo] -> Integer
+    computeLB cores = sum [coreLB info | info <- cores]
+
+    loop :: (SAT.LitSet, SAT.LitSet, SAT.LitSet) -> SAT.LitMap Integer -> [CoreInfo] -> Integer -> Maybe SAT.Model -> IO (Maybe SAT.Model)
+    loop (unrelaxed, relaxed, hardened) deductedWeight cores ub lastModel = do
+      let lb = computeLB cores
       optLogger opt $ printf "BCD2: %d <= obj <= %d" lb ub
-      optLogger opt $ printf "BCD2: #cores=%d, #unrelaxed=%d, #relaxed=%d"
-        (length cores) (IntSet.size unrelaxed) (IntSet.size relaxed)
+      optLogger opt $ printf "BCD2: #cores=%d, #unrelaxed=%d, #relaxed=%d, #hardened=%d" 
+        (length cores) (IntSet.size unrelaxed) (IntSet.size relaxed) (IntSet.size hardened)
 
       sels <- liftM IntMap.fromList $ forM cores $ \info -> do
         sel <- SAT.newVar solver
@@ -111,7 +116,7 @@ solveWBO solver sels opt = do
         optLogger opt $ printf "BCD2: updating upper bound: %d -> %d" ub ub'
         SAT.addPBAtMost solver obj ub'
         let cores' = map (\info -> info{ coreEP = SAT.evalPBSum m (coreCostFun info) }) cores
-        cont (unrelaxed, relaxed) cores' ub' (Just m)
+        cont (unrelaxed, relaxed, hardened) deductedWeight cores' ub' (Just m)
       else do
         core <- SAT.failedAssumptions solver
         case core of
@@ -120,9 +125,11 @@ solveWBO solver sels opt = do
             let newLB  = refine [weights IntMap.! lit | lit <- IntSet.toList (coreLits info)] (coreMidValue info)
                 info'  = info{ coreLB = newLB }
                 cores' = IntMap.elems $ IntMap.insert sel info' sels
+                lb'    = computeLB cores'
+                deductedWeight' = IntMap.unionWith (+) deductedWeight (IntMap.fromList [(lit, - d)  | let d = lb' - lb, d /= 0, lit <- IntSet.toList (coreLits info)])
             optLogger opt $ printf "BCD2: updating lower bound of a core"
             SAT.addPBAtLeast solver (coreCostFun info') (coreLB info') -- redundant, but useful for direct search
-            cont (unrelaxed, relaxed) cores' ub lastModel
+            cont (unrelaxed, relaxed, hardened) deductedWeight' cores' ub lastModel
           _ -> do
             let coreSet     = IntSet.fromList core
                 torelax     = unrelaxed `IntSet.intersection` coreSet
@@ -141,18 +148,31 @@ solveWBO solver sels opt = do
                                            Just m  -> SAT.evalPBSum m [(weights IntMap.! lit, -lit) | lit <- IntSet.toList newLits]
                               }
                 cores'      = mergedCore : rest
+                lb'         = computeLB cores'
+                deductedWeight' = IntMap.unionWith (+) deductedWeight (IntMap.fromList [(lit, - d)  | let d = lb' - lb, d /= 0, lit <- IntSet.toList newLits])
             if null intersected then do
               optLogger opt $ printf "BCD2: found a new core of size %d" (IntSet.size torelax)              
             else do
               optLogger opt $ printf "BCD2: merging cores"
             SAT.addPBAtLeast solver (coreCostFun mergedCore) (coreLB mergedCore) -- redundant, but useful for direct search
             forM_ (IntMap.keys sels) $ \sel -> SAT.addClause solver [-sel] -- delete temporary constraints
-            cont (unrelaxed', relaxed') cores' ub lastModel
+            cont (unrelaxed', relaxed', hardened) deductedWeight' cores' ub lastModel
 
-    cont :: (SAT.LitSet, SAT.LitSet) -> [CoreInfo] -> Integer -> Maybe SAT.Model -> IO (Maybe SAT.Model)
-    cont (unrelaxed, relaxed) cores ub lastModel
-      | sum [coreLB info | info <- cores] > ub = return lastModel
-      | otherwise = loop (unrelaxed, relaxed) cores ub lastModel
+    cont :: (SAT.LitSet, SAT.LitSet, SAT.LitSet) -> SAT.LitMap Integer -> [CoreInfo] -> Integer -> Maybe SAT.Model -> IO (Maybe SAT.Model)
+    cont (unrelaxed, relaxed, hardened) deductedWeight cores ub lastModel
+      | lb > ub = return lastModel
+      | optEnableHardening opt = do
+          let lits = IntMap.keysSet $ IntMap.filter (\w -> lb + w > ub) deductedWeight
+          forM_ (IntSet.toList lits) $ \lit -> SAT.addClause solver [lit]
+          let unrelaxed' = unrelaxed `IntSet.difference` lits
+              relaxed'   = relaxed   `IntSet.difference` lits
+              hardened'  = hardened  `IntSet.union` lits
+              cores'     = map (\core -> core{ coreLits = coreLits core `IntSet.difference` lits }) cores
+          loop (unrelaxed', relaxed', hardened') deductedWeight cores' ub lastModel
+      | otherwise = 
+          loop (unrelaxed, relaxed, hardened) deductedWeight cores ub lastModel
+      where
+        lb = computeLB cores
 
 -- | The smallest integer greater than @n@ that can be obtained by summing a subset of @ws@.
 refine
