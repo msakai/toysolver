@@ -45,6 +45,7 @@ data Options
   , optObjFunVarsHeuristics :: Bool
   , optSearchStrategy       :: SearchStrategy
   , optTrialLimitConf       :: Int
+  , optInitialModel         :: Maybe SAT.Model
   }
 
 defaultOptions :: Options
@@ -56,11 +57,21 @@ defaultOptions
   , optObjFunVarsHeuristics = True
   , optSearchStrategy       = LinearSearch
   , optTrialLimitConf       = 1000
+  , optInitialModel         = Nothing
   }
 
 minimize :: Solver -> PBLinSum -> Options -> IO (Maybe Model)
 minimize solver obj opt = do
   when (optObjFunVarsHeuristics opt) $ tweakParams solver obj
+
+  updateLB (pbLowerBound obj)
+  case optInitialModel opt of
+    Just m -> do
+      let val = evalPBSum m obj
+      updateBest m val
+      addPBAtMost solver obj (val - 1)
+    Nothing -> do
+      return ()
 
   case optSearchStrategy opt of
     UnsatBased -> do
@@ -75,6 +86,7 @@ minimize solver obj opt = do
                  { MSU4.optLogger     = optLogger opt
                  , MSU4.optUpdateBest = optUpdateBest opt
                  , MSU4.optUpdateLB   = optUpdateLB opt
+                 , MSU4.optInitialModel = optInitialModel opt
                  }
       MSU4.solve solver obj opt2
     BC -> do
@@ -82,6 +94,7 @@ minimize solver obj opt = do
                  { BC.optLogger     = optLogger opt
                  , BC.optUpdateBest = optUpdateBest opt
                  , BC.optUpdateLB   = optUpdateLB opt
+                 , BC.optInitialModel = optInitialModel opt
                  }
       BC.solve solver obj opt2
     BCD -> do
@@ -89,6 +102,7 @@ minimize solver obj opt = do
                  { BCD.optLogger     = optLogger opt
                  , BCD.optUpdateBest = optUpdateBest opt
                  , BCD.optUpdateLB   = optUpdateLB opt
+                 , BCD.optInitialModel = optInitialModel opt
                  }
       BCD.solve solver obj opt2
     BCD2 -> do
@@ -96,20 +110,25 @@ minimize solver obj opt = do
                  { BCD2.optLogger     = optLogger opt
                  , BCD2.optUpdateBest = optUpdateBest opt
                  , BCD2.optUpdateLB   = optUpdateLB opt
+                 , BCD2.optInitialModel = optInitialModel opt
                  }
       BCD2.solve solver obj opt2
     _ -> do
       SAT.setEnableBackwardSubsumptionRemoval solver True
-      updateLB (pbLowerBound obj)
-      result <- solve solver
-      if not result then
-        return Nothing
-      else
-        case optSearchStrategy opt of
-          LinearSearch   -> liftM Just linSearch
-          BinarySearch   -> liftM Just binSearch
-          AdaptiveSearch -> liftM Just adaptiveSearch
-          _              -> error "SAT.PBO.minimize: should not happen"
+      let f m0 = case optSearchStrategy opt of
+                   LinearSearch   -> liftM Just $ linSearch m0
+                   BinarySearch   -> liftM Just $ binSearch m0
+                   AdaptiveSearch -> liftM Just $ adaptiveSearch m0
+                   _              -> error "SAT.PBO.minimize: should not happen"
+      case optInitialModel opt of
+        Just m0 -> f m0
+        Nothing -> do
+          result <- solve solver
+          if not result then
+            return Nothing
+          else do
+            m0 <- model solver
+            f m0
 
   where
     logIO :: String -> IO ()
@@ -121,25 +140,22 @@ minimize solver obj opt = do
     updateLB :: Integer -> IO ()
     updateLB = optUpdateLB opt
 
-    linSearch :: IO Model
-    linSearch = do
-      m <- model solver
-      let v = evalPBSum m obj
-      updateBest m v
-      addPBAtMost solver obj (v - 1)
+    linSearch :: Model -> IO Model
+    linSearch m0 = do
       result <- solve solver
-      if result
-        then linSearch
-        else return m
+      if result then do
+        m <- model solver
+        let v = evalPBSum m obj
+        updateBest m v
+        addPBAtMost solver obj (v - 1)
+        linSearch m
+      else
+        return m0
 
-    binSearch :: IO Model
-    binSearch = do
-      m0 <- model solver
-      let v0 = evalPBSum m0 obj
-      updateBest m0 v0
-      let ub0 = v0 - 1
+    binSearch :: Model -> IO Model
+    binSearch m0 = do
+      let ub0 = evalPBSum m0 obj - 1
           lb0 = pbLowerBound obj
-      addPBAtMost solver obj ub0
       loop lb0 ub0 m0
       where
         loop lb ub m | ub < lb = return m
@@ -169,14 +185,10 @@ minimize solver obj opt = do
             loop lb' ub m
 
     -- adaptive search strategy from pbct-0.1.3 <http://www.residual.se/pbct/>
-    adaptiveSearch :: IO Model
-    adaptiveSearch = do
-      m0 <- model solver
-      let v0 = evalPBSum m0 obj
-      updateBest m0 v0
-      let ub0 = v0 - 1
+    adaptiveSearch :: Model -> IO Model
+    adaptiveSearch m0 = do
+      let ub0 = evalPBSum m0 obj - 1
           lb0 = pbLowerBound obj
-      addPBAtMost solver obj ub0
       loop lb0 ub0 (0::Rational) m0
       where
         loop lb ub _ m | ub < lb = return m

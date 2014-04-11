@@ -45,6 +45,7 @@ data Options
   , optUpdateBest  :: SAT.Model -> Integer -> IO ()
   , optUpdateLB    :: Integer -> IO ()
   , optEnableHardening :: Bool
+  , optInitialModel :: Maybe SAT.Model
   }
 
 defaultOptions :: Options
@@ -54,6 +55,7 @@ defaultOptions
   , optUpdateBest = \_ _ -> return ()
   , optUpdateLB   = \_ -> return ()
   , optEnableHardening = True
+  , optInitialModel = Nothing
   }
 
 data CoreInfo
@@ -79,7 +81,11 @@ solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
 solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
 solveWBO solver sels opt = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
-  loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty, IntSet.empty) weights [] (SAT.pbUpperBound obj) Nothing
+  case optInitialModel opt of
+    Just m -> do
+      loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty, IntSet.empty) weights [] (SAT.evalPBSum m obj - 1) (Just m)
+    Nothing -> do
+      loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty, IntSet.empty) weights [] (SAT.pbUpperBound obj) Nothing
 
   where
     weights :: SAT.LitMap Integer

@@ -542,10 +542,10 @@ mainPB opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right formula -> solvePB opt solver formula
+    Right formula -> solvePB opt solver formula Nothing
 
-solvePB :: Options -> SAT.Solver -> PBFile.Formula -> IO ()
-solvePB opt solver formula = do
+solvePB :: Options -> SAT.Solver -> PBFile.Formula -> Maybe SAT.Model -> IO ()
+solvePB opt solver formula initialModel = do
   let nv = PBFile.pbNumVars formula
       nc = PBFile.pbNumConstraints formula
   putCommentLine $ printf "#vars %d" nv
@@ -575,7 +575,7 @@ solvePB opt solver formula = do
 
       modelRef <- newIORef Nothing
 
-      result <- try $ minimize opt solver obj'' $ \m val -> do
+      result <- try $ minimize opt solver obj'' initialModel $ \m val -> do
         writeIORef modelRef (Just m)
         putOLine (show val)
 
@@ -606,8 +606,16 @@ pbConvSum enc = revMapM f
       l <- Tseitin.encodeConj enc ls
       return (w,l)
 
-minimize :: Options -> SAT.Solver -> SAT.PBLinSum -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
-minimize opt solver obj update = do
+evalPBConstraint :: SAT.Model -> PBFile.Constraint -> Bool
+evalPBConstraint m (lhs,op,rhs) = op' lhs' rhs
+  where
+    op' = case op of
+            PBFile.Ge -> (>=)
+            PBFile.Eq -> (==)
+    lhs' = sum [if and [SAT.evalLit m lit | lit <- tm] then c else 0 | (c,tm) <- lhs]
+
+minimize :: Options -> SAT.Solver -> SAT.PBLinSum -> Maybe SAT.Model -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
+minimize opt solver obj initialModel update = do
   let opt2 =
         PBO.defaultOptions
         { PBO.optObjFunVarsHeuristics = optObjFunVarsHeuristics opt
@@ -615,6 +623,7 @@ minimize opt solver obj update = do
         , PBO.optLogger     = putCommentLine
         , PBO.optUpdateBest = update
         , PBO.optUpdateLB   = \val -> putCommentLine $ printf "lower bound updated to %d" val
+        , PBO.optInitialModel = initialModel
         }
   PBO.minimize solver obj opt2
 
@@ -628,10 +637,10 @@ mainWBO opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right formula -> solveWBO opt solver False formula
+    Right formula -> solveWBO opt solver False formula Nothing
 
-solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
-solveWBO opt solver isMaxSat formula = do
+solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> Maybe SAT.Model -> IO ()
+solveWBO opt solver isMaxSat formula initialModel = do
   let nv = PBFile.wboNumVars formula
       nc = PBFile.wboNumConstraints formula
   putCommentLine $ printf "#vars %d" nv
@@ -642,7 +651,9 @@ solveWBO opt solver isMaxSat formula = do
   enc <- Tseitin.newEncoder solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
 
-  obj <- liftM concat $ revForM (PBFile.wboConstraints formula) $ \(cost, (lhs, op, rhs)) -> do
+  defsRef <- newIORef []
+
+  obj <- liftM concat $ revForM (PBFile.wboConstraints formula) $ \(cost, constr@(lhs, op, rhs)) -> do
     lhs' <- pbConvSum enc lhs
     case cost of
       Nothing -> do
@@ -659,10 +670,12 @@ solveWBO opt solver isMaxSat formula = do
                 _ -> do
                   sel <- SAT.newVar solver
                   SAT.addPBAtLeastSoft solver sel lhs' rhs
+                  modifyIORef defsRef ((sel, constr) : )
                   return sel
             PBFile.Eq -> do
               sel <- SAT.newVar solver
               SAT.addPBExactlySoft solver sel lhs' rhs
+              modifyIORef defsRef ((sel, constr) : )
               return sel
         return [(cval, SAT.litNot sel)]
 
@@ -670,8 +683,15 @@ solveWBO opt solver isMaxSat formula = do
     Nothing -> return ()
     Just c -> SAT.addPBAtMost solver obj (c-1)
 
+  nv' <- SAT.nVars solver
+  defs  <- readIORef defsRef
+  let extendModel :: SAT.Model -> SAT.Model
+      extendModel m = array (1,nv') ([(v, m ! v) | v <- [1..nv]] ++ [(v, evalPBConstraint m constr) | (v, constr) <- defs])
+
+  let initialModel' = fmap extendModel initialModel
+
   modelRef <- newIORef Nothing
-  result <- try $ minimize opt solver obj $ \m val -> do
+  result <- try $ minimize opt solver obj initialModel' $ \m val -> do
      writeIORef modelRef (Just m)
      putOLine (show val)
 
@@ -707,11 +727,11 @@ mainMaxSAT opt solver args = do
            _ -> showHelp stderr  >> exitFailure
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
-    Right wcnf -> solveMaxSAT opt solver wcnf
+    Right wcnf -> solveMaxSAT opt solver wcnf Nothing
 
-solveMaxSAT :: Options -> SAT.Solver -> MaxSAT.WCNF -> IO ()
-solveMaxSAT opt solver wcnf =
-  solveWBO opt solver True (MaxSAT2WBO.convert wcnf)
+solveMaxSAT :: Options -> SAT.Solver -> MaxSAT.WCNF -> Maybe SAT.Model -> IO ()
+solveMaxSAT opt solver wcnf initialModel =
+  solveWBO opt solver True (MaxSAT2WBO.convert wcnf) initialModel
 
 -- ------------------------------------------------------------------------
 
@@ -803,7 +823,7 @@ solveMIP opt solver mip = do
 
       modelRef <- newIORef Nothing
 
-      result <- try $ minimize opt solver obj3 $ \m val -> do
+      result <- try $ minimize opt solver obj3 Nothing $ \m val -> do
         writeIORef modelRef (Just m)
         putOLine $ showRational (optPrintRational opt) (fromIntegral (val + obj3_c) / fromIntegral d)
 

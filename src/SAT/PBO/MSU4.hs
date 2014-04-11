@@ -38,6 +38,7 @@ data Options
   { optLogger      :: String -> IO ()
   , optUpdateBest  :: SAT.Model -> Integer -> IO ()
   , optUpdateLB    :: Integer -> IO ()
+  , optInitialModel :: Maybe SAT.Model
   }
 
 defaultOptions :: Options
@@ -46,6 +47,7 @@ defaultOptions
   { optLogger     = \_ -> return ()
   , optUpdateBest = \_ _ -> return ()
   , optUpdateLB   = \_ -> return ()
+  , optInitialModel = Nothing
   }
 
 solve :: SAT.Solver -> [(Integer, SAT.Lit)] -> Options -> IO (Maybe SAT.Model)
@@ -61,12 +63,19 @@ solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
 solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
 solveWBO solver sels opt = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
-  optUpdateLB opt 0
-  loop (IM.keysSet weights, IS.empty) 0 Nothing
+  case optInitialModel opt of
+    Just m -> do
+      loop (IM.keysSet weights, IS.empty) 0 (Just (m, SAT.evalPBSum m obj))
+    Nothing -> do
+      loop (IM.keysSet weights, IS.empty) 0 Nothing
 
   where
+    weights :: SAT.LitMap Integer
     weights = IM.fromList sels
-    
+
+    obj :: SAT.PBLinSum
+    obj = [(w, -lit) | (lit,w) <- sels]
+ 
     loop :: (SAT.LitSet, SAT.LitSet) -> Integer -> Maybe (SAT.Model, Integer) -> IO (Maybe SAT.Model)
     loop (unrelaxed, relaxed) lb best = do
       ret <- SAT.solveWith solver (IS.toList unrelaxed)
