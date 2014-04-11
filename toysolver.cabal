@@ -181,8 +181,9 @@ Executable toysolver
 
 Executable toysat
   Main-is: toysat.hs
+  Other-Modules: UBCSAT
   HS-Source-Dirs: toysat
-  Build-Depends: base >=4 && <5, random, containers >= 0.4.2, array, parsec, bytestring, filepath, parse-dimacs, time, old-locale, unbounded-delays, vector-space >=0.8.6, toysolver
+  Build-Depends: base >=4 && <5, random, containers >= 0.4.2, array, process >=1.1.0.2, parsec, bytestring, filepath, parse-dimacs, time, old-locale, unbounded-delays, vector-space >=0.8.6, toysolver
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
   if impl(ghc >= 7)

@@ -45,6 +45,7 @@ data Options
   , optUpdateBest  :: SAT.Model -> Integer -> IO ()
   , optUpdateLB    :: Integer -> IO ()
   , optEnableHardening :: Bool
+  , optInitialModel :: Maybe SAT.Model
   }
 
 defaultOptions :: Options
@@ -54,6 +55,7 @@ defaultOptions
   , optUpdateBest = \_ _ -> return ()
   , optUpdateLB   = \_ -> return ()
   , optEnableHardening = True
+  , optInitialModel = Nothing
   }
 
 data CoreInfo
@@ -79,7 +81,17 @@ solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
 solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
 solveWBO solver sels opt = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
-  loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty, IntSet.empty) weights [] (SAT.pbUpperBound obj) Nothing
+  case optInitialModel opt of
+    Just m -> do
+      let val = SAT.evalPBSum m obj
+      optUpdateBest opt m val
+      let ub  = SAT.pbUpperBound obj
+          ub' = val - 1
+      optLogger opt $ printf "BCD2: updating upper bound: %d -> %d" ub ub'
+      SAT.addPBAtMost solver obj ub'
+      loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty, IntSet.empty) weights [] ub' (optInitialModel opt)
+    Nothing -> do
+      loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty, IntSet.empty) weights [] (SAT.pbUpperBound obj) Nothing
 
   where
     weights :: SAT.LitMap Integer

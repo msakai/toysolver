@@ -45,6 +45,7 @@ data Options
   , optObjFunVarsHeuristics :: Bool
   , optSearchStrategy       :: SearchStrategy
   , optTrialLimitConf       :: Int
+  , optInitialModel         :: Maybe SAT.Model
   }
 
 defaultOptions :: Options
@@ -56,6 +57,7 @@ defaultOptions
   , optObjFunVarsHeuristics = True
   , optSearchStrategy       = LinearSearch
   , optTrialLimitConf       = 1000
+  , optInitialModel         = Nothing
   }
 
 minimize :: Solver -> PBLinSum -> Options -> IO (Maybe Model)
@@ -96,6 +98,7 @@ minimize solver obj opt = do
                  { BCD2.optLogger     = optLogger opt
                  , BCD2.optUpdateBest = optUpdateBest opt
                  , BCD2.optUpdateLB   = optUpdateLB opt
+                 , BCD2.optInitialModel = optInitialModel opt
                  }
       BCD2.solve solver obj opt2
     _ -> do
