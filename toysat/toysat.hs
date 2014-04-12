@@ -73,6 +73,8 @@ import qualified Text.GurobiSol as GurobiSol
 import ToySolver.Version
 import ToySolver.Util (showRational, revMapM, revForM)
 
+import UBCSAT
+
 -- ------------------------------------------------------------------------
 
 data Mode = ModeHelp | ModeVersion | ModeSAT | ModeMUS | ModePB | ModeWBO | ModeMaxSAT | ModeMIP
@@ -96,11 +98,13 @@ data Options
   , optPBHandlerType :: SAT.PBHandlerType
   , optSearchStrategy       :: PBO.SearchStrategy
   , optObjFunVarsHeuristics :: Bool
+  , optLocalSearchInitial   :: Bool
   , optAllMUSes :: Bool
   , optPrintRational :: Bool
   , optCheckModel  :: Bool
   , optTimeout :: Integer
   , optWriteFile :: Maybe FilePath
+  , optUBCSAT :: FilePath
   }
 
 defaultOptions :: Options
@@ -123,11 +127,13 @@ defaultOptions
   , optEnableBackwardSubsumptionRemoval = SAT.defaultEnableBackwardSubsumptionRemoval
   , optSearchStrategy       = PBO.optSearchStrategy PBO.defaultOptions
   , optObjFunVarsHeuristics = PBO.optObjFunVarsHeuristics PBO.defaultOptions
+  , optLocalSearchInitial   = False
   , optAllMUSes = False
   , optPrintRational = False  
   , optCheckModel = False
   , optTimeout = 0
   , optWriteFile = Nothing
+  , optUBCSAT = "ubcsat"
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -209,6 +215,9 @@ options =
     , Option [] ["no-objfun-heuristics"]
         (NoArg (\opt -> opt{ optObjFunVarsHeuristics = False }))
         "Disable heuristics for polarity/activity of variables in objective function"
+    , Option [] ["ls-initial"]
+        (NoArg (\opt -> opt{ optLocalSearchInitial = True }))
+        "Use local search (currently UBCSAT) for finding initial solution"
 
     , Option [] ["all-mus"]
         (NoArg (\opt -> opt{ optAllMUSes = True }))
@@ -228,6 +237,10 @@ options =
     , Option [] ["timeout"]
         (ReqArg (\val opt -> opt{ optTimeout = read val }) "<int>")
         "Kill toysat after given number of seconds (default 0 (no limit))"
+
+    , Option [] ["with-ubcsat"]
+        (ReqArg (\val opt -> opt{ optUBCSAT = val }) "<PATH>")
+        "give the path to the UBCSAT command"
     ]
   where
     parseRestartStrategy s =
@@ -727,7 +740,13 @@ mainMaxSAT opt solver args = do
            _ -> showHelp stderr  >> exitFailure
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
-    Right wcnf -> solveMaxSAT opt solver wcnf Nothing
+    Right wcnf -> do
+      initialModel <-
+        case args of
+          [fname] | optLocalSearchInitial opt && or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"] ] ->
+            UBCSAT.ubcsat (optUBCSAT opt) fname wcnf
+          _ -> return Nothing
+      solveMaxSAT opt solver wcnf initialModel
 
 solveMaxSAT :: Options -> SAT.Solver -> MaxSAT.WCNF -> Maybe SAT.Model -> IO ()
 solveMaxSAT opt solver wcnf initialModel =
