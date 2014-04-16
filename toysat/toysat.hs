@@ -700,11 +700,10 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
 
 mainMaxSAT :: Options -> SAT.Solver -> [String] -> IO ()
 mainMaxSAT opt solver args = do
-  s <- case args of
-         ["-"]   -> getContents
-         [fname] -> readFile fname
-         _ -> showHelp stderr  >> exitFailure
-  let ret = MaxSAT.parseWCNFString s
+  ret <- case args of
+           ["-"]   -> liftM MaxSAT.parseByteString BS.getContents
+           [fname] -> MaxSAT.parseFile fname
+           _ -> showHelp stderr  >> exitFailure
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right wcnf -> solveMaxSAT opt solver wcnf

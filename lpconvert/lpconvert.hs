@@ -128,7 +128,7 @@ readLP o fname = do
       error $ "unknown file extension: " ++ show ext
   where
     readWCNF = do
-      ret <- MaxSAT.parseWCNFFile fname
+      ret <- MaxSAT.parseFile fname
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
         Right wcnf

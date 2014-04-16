@@ -426,7 +426,7 @@ main = do
                 pbPrintModel stdout m2 0
                 writeSOLFileSAT o m2
         ModeMaxSAT -> do
-          ret <- MaxSAT.parseWCNFFile fname
+          ret <- MaxSAT.parseFile fname
           case ret of
             Left err -> hPutStrLn stderr err >> exitFailure
             Right wcnf -> do

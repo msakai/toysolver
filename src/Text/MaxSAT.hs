@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -21,10 +22,13 @@ module Text.MaxSAT
   , Weight
 
   -- * Parsing .cnf/.wcnf files
-  , parseWCNFString
-  , parseWCNFFile
+  , parseFile
+  , parseString
+  , parseByteString
   ) where
 
+import qualified Data.ByteString.Lazy.Char8 as BS
+import Data.Char
 import qualified SAT.Types as SAT
 import Text.Util
 
@@ -41,8 +45,17 @@ type WeightedClause = (Weight, SAT.Clause)
 -- | Weigths must be greater than or equal to 1, and smaller than 2^63.
 type Weight = Integer
 
-parseWCNFString :: String -> Either String WCNF
-parseWCNFString s =
+parseFile :: FilePath -> IO (Either String WCNF)
+parseFile filename = do
+{-
+  s <- readFile filename
+  return $ parseString s
+-}
+  s <- BS.readFile filename
+  return $ parseByteString s
+
+parseString :: String -> Either String WCNF
+parseString s =
   case words l of
     (["p","wcnf", nvar, nclause, top]) ->
       Right $
@@ -75,11 +88,6 @@ parseWCNFString s =
   where
     (l:ls) = filter (not . isComment) (lines s)
 
-parseWCNFFile :: FilePath -> IO (Either String WCNF)
-parseWCNFFile filename = do
-  s <- readFile filename
-  return $ parseWCNFString s
-
 isComment :: String -> Bool
 isComment ('c':_) = True
 isComment _ = False
@@ -94,9 +102,74 @@ parseWCNFLine s =
     _ -> error "parse error"
 
 parseCNFLine :: String -> WeightedClause
-parseCNFLine s = seq xs $ seqList xs $ (1, xs)
+parseCNFLine s = seqList xs $ (1, xs)
   where
     xs = init (map readInt (words s))
+
+parseByteString :: BS.ByteString -> Either String WCNF
+parseByteString s =
+  case BS.words l of
+    (["p","wcnf", nvar, nclause, top]) ->
+      Right $
+        WCNF
+        { numVars    = read $ BS.unpack nvar
+        , numClauses = read $ BS.unpack nclause
+        , topCost    = read $ BS.unpack top
+        , clauses    = map parseWCNFLineBS ls
+        }
+    (["p","wcnf", nvar, nclause]) ->
+      Right $
+        WCNF
+        { numVars    = read $ BS.unpack nvar
+        , numClauses = read $ BS.unpack nclause
+          -- top must be greater than the sum of the weights of violated soft clauses.
+        , topCost    = fromInteger $ 2^(63::Int) - 1
+        , clauses    = map parseWCNFLineBS ls
+        }
+    (["p","cnf", nvar, nclause]) ->
+      Right $
+        WCNF
+        { numVars    = read $ BS.unpack nvar
+        , numClauses = read $ BS.unpack nclause
+          -- top must be greater than the sum of the weights of violated soft clauses.
+        , topCost    = fromInteger $ 2^(63::Int) - 1
+        , clauses    = map parseCNFLineBS ls
+        }
+    _ ->
+      Left "cannot find wcnf/cnf header"
+  where
+    l :: BS.ByteString
+    ls :: [BS.ByteString]
+    (l:ls) = filter (not . isCommentBS) (BS.lines s)
+
+parseWCNFLineBS :: BS.ByteString -> WeightedClause
+parseWCNFLineBS s =
+  case BS.readInteger (BS.dropWhile isSpace s) of
+    Nothing -> error "no weight"
+    Just (w, s') -> seq w $ seq xs $ (w, xs)
+      where
+        xs = parseClauseBS s'
+
+parseCNFLineBS :: BS.ByteString -> WeightedClause
+parseCNFLineBS s = seq xs $ (1, xs)
+  where
+    xs = parseClauseBS s
+
+parseClauseBS :: BS.ByteString -> SAT.Clause
+parseClauseBS s = seqList xs $ xs
+  where
+    xs = go s
+    go s =
+      case BS.readInt (BS.dropWhile isSpace s) of
+        Nothing -> []
+        Just (0,_) -> []
+        Just (i,s') -> i : go s'
+
+isCommentBS :: BS.ByteString -> Bool
+isCommentBS s =
+  case BS.uncons s of
+    Just ('c',_) ->  True
+    _ -> False
 
 seqList :: [a] -> b -> b
 seqList [] b = b
