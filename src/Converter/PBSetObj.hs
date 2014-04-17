@@ -19,7 +19,7 @@ import qualified Text.PBFile as PBFile
 import Converter.ObjType
 
 setObj :: ObjType -> PBFile.Formula -> PBFile.Formula
-setObj objType formula@(_, cs) = (Just obj2, cs)
+setObj objType formula = formula{ PBFile.pbObjectiveFunction = Just obj2 }
   where
     obj2 = genObj objType formula
 

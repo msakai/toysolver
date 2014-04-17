@@ -18,7 +18,7 @@ import Data.List
 import qualified Text.PBFile as PBFile
 
 convert :: PBFile.Formula -> ShowS
-convert formula@(obj, cs) =
+convert formula =
   showString "function model() {\n" .
   decls .
   constrs .
@@ -36,7 +36,7 @@ convert formula@(obj, cs) =
         showString op2 .
         shows rhs .
         showString ";\n"
-      | (lhs, op, rhs) <- cs
+      | (lhs, op, rhs) <- PBFile.pbConstraints formula
       , let op2 = case op of
                     PBFile.Ge -> " >= "
                     PBFile.Eq -> " == "
@@ -55,6 +55,6 @@ convert formula@(obj, cs) =
       else "x[" ++ show l ++ "]"
 
     obj2 =
-      case obj of
+      case PBFile.pbObjectiveFunction formula of
         Just obj' -> showString "  minimize " . showString (showSum obj') . showString ";\n"
         Nothing -> id

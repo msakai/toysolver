@@ -141,7 +141,7 @@ readLP o fname = do
               return mip
 
 transformPBFile :: [Flag] -> PBFile.Formula -> PBFile.Formula
-transformPBFile o opb@(Nothing,_) = PBSetObj.setObj objType opb
+transformPBFile o opb | isNothing (PBFile.pbObjectiveFunction opb) = PBSetObj.setObj objType opb
   where
     objType = last (ObjNone : [t | ObjType t <- o])
 transformPBFile _ opb = opb

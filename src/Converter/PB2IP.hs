@@ -25,7 +25,7 @@ import qualified Text.PBFile as PBFile
 import qualified SAT.Types as SAT
 
 convert :: PBFile.Formula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
-convert formula@(obj, cs) = (mip, mtrans (PBFile.pbNumVars formula))
+convert formula = (mip, mtrans (PBFile.pbNumVars formula))
   where
     mip = MIP.Problem
       { MIP.dir = dir
@@ -47,12 +47,12 @@ convert formula@(obj, cs) = (mip, mtrans (PBFile.pbNumVars formula))
     vs = [convVar v | v <- [1..PBFile.pbNumVars formula]]
 
     (dir,obj2) =
-      case obj of
+      case PBFile.pbObjectiveFunction formula of
         Just obj' -> (MIP.OptMin, convExpr obj')
         Nothing   -> (MIP.OptMin, convExpr [])
 
     cs2 = do
-      (lhs,op,rhs) <- cs
+      (lhs,op,rhs) <- PBFile.pbConstraints formula
       let op2 = case op of
                   PBFile.Ge -> MIP.Ge
                   PBFile.Eq -> MIP.Eql
@@ -88,7 +88,7 @@ convVar :: PBFile.Var -> MIP.Var
 convVar x = MIP.toVar ("x" ++ show x)
 
 convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
-convertWBO useIndicator formula@(top, cs) = (mip, mtrans (PBFile.wboNumVars formula))
+convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
   where
     mip = MIP.Problem
       { MIP.dir = MIP.OptMin
@@ -113,7 +113,7 @@ convertWBO useIndicator formula@(top, cs) = (mip, mtrans (PBFile.wboNumVars form
 
     topConstr :: [MIP.Constraint]
     topConstr = 
-     case top of
+     case PBFile.wboTopCost formula of
        Nothing -> []
        Just t ->
           [ MIP.Constraint
@@ -126,7 +126,7 @@ convertWBO useIndicator formula@(top, cs) = (mip, mtrans (PBFile.wboNumVars form
 
     cs2 :: [([(Integer, MIP.Var)], MIP.Constraint)]
     cs2 = do
-      (n, (w, (lhs,op,rhs))) <- zip [(0::Int)..] cs
+      (n, (w, (lhs,op,rhs))) <- zip [(0::Int)..] (PBFile.wboConstraints formula)
       let 
           lhs2 = convExpr lhs
           lhs3 = [t | t@(MIP.Term _ (_:_)) <- lhs2]

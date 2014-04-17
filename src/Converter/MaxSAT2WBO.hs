@@ -22,7 +22,15 @@ convert
   MaxSAT.WCNF
   { MaxSAT.topCost = top
   , MaxSAT.clauses = cs
-  } = (Nothing, map f cs)
+  , MaxSAT.numVars = nv
+  , MaxSAT.numClauses = nc
+  } =
+  PBFile.SoftFormula
+  { PBFile.wboTopCost = Nothing
+  , PBFile.wboConstraints = map f cs
+  , PBFile.wboNumVars = nv
+  , PBFile.wboNumConstraints = nc
+  }
   where
     f (w,ls)
      | w>=top    = (Nothing, p) -- hard constraint

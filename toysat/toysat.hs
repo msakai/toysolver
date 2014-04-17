@@ -451,7 +451,7 @@ mainSAT opt solver args = do
 solveSAT :: Options -> SAT.Solver -> DIMACS.CNF -> IO ()
 solveSAT opt solver cnf = do
   putCommentLine $ printf "#vars %d" (DIMACS.numVars cnf)
-  putCommentLine $ printf "#constraints %d" (length (DIMACS.clauses cnf))
+  putCommentLine $ printf "#constraints %d" (DIMACS.numClauses cnf)
   SAT.newVars_ solver (DIMACS.numVars cnf)
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
@@ -545,30 +545,30 @@ mainPB opt solver args = do
     Right formula -> solvePB opt solver formula
 
 solvePB :: Options -> SAT.Solver -> PBFile.Formula -> IO ()
-solvePB opt solver formula@(obj, cs) = do
-  let n = PBFile.pbNumVars formula
+solvePB opt solver formula = do
+  let nv = PBFile.pbNumVars formula
+      nc = PBFile.pbNumConstraints formula
+  putCommentLine $ printf "#vars %d" nv
+  putCommentLine $ printf "#constraints %d" nc
 
-  putCommentLine $ printf "#vars %d" n
-  putCommentLine $ printf "#constraints %d" (length cs)
-
-  SAT.newVars_ solver n
+  SAT.newVars_ solver nv
   enc <- Tseitin.newEncoder solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
 
-  forM_ cs $ \(lhs, op, rhs) -> do
+  forM_ (PBFile.pbConstraints formula) $ \(lhs, op, rhs) -> do
     lhs' <- pbConvSum enc lhs
     case op of
       PBFile.Ge -> SAT.addPBAtLeast solver lhs' rhs
       PBFile.Eq -> SAT.addPBExactly solver lhs' rhs
 
-  case obj of
+  case PBFile.pbObjectiveFunction formula of
     Nothing -> do
       result <- SAT.solve solver
       putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
       when result $ do
         m <- SAT.model solver
-        pbPrintModel stdout m n
-        writeSOLFile opt m Nothing n
+        pbPrintModel stdout m nv
+        writeSOLFile opt m Nothing nv
 
     Just obj' -> do
       obj'' <- pbConvSum enc obj'
@@ -584,9 +584,9 @@ solvePB opt solver formula@(obj, cs) = do
           putSLine "UNSATISFIABLE"
         Right (Just m) -> do
           putSLine "OPTIMUM FOUND"
-          pbPrintModel stdout m n
+          pbPrintModel stdout m nv
           let objval = SAT.evalPBSum m obj''
-          writeSOLFile opt m (Just objval) n
+          writeSOLFile opt m (Just objval) nv
         Left (e :: SomeException) -> do
           r <- readIORef modelRef
           case r of
@@ -594,9 +594,9 @@ solvePB opt solver formula@(obj, cs) = do
               putSLine "UNKNOWN"
             Just m -> do
               putSLine "SATISFIABLE"
-              pbPrintModel stdout m n
+              pbPrintModel stdout m nv
               let objval = SAT.evalPBSum m obj''
-              writeSOLFile opt m (Just objval) n
+              writeSOLFile opt m (Just objval) nv
           throwIO e
 
 pbConvSum :: Tseitin.Encoder -> PBFile.Sum -> IO SAT.PBLinSum
@@ -631,17 +631,18 @@ mainWBO opt solver args = do
     Right formula -> solveWBO opt solver False formula
 
 solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
-solveWBO opt solver isMaxSat formula@(tco, cs) = do
-  let nvar = PBFile.wboNumVars formula
-  putCommentLine $ printf "#vars %d" nvar
-  putCommentLine $ printf "#constraints %d" (length cs)
+solveWBO opt solver isMaxSat formula = do
+  let nv = PBFile.wboNumVars formula
+      nc = PBFile.wboNumConstraints formula
+  putCommentLine $ printf "#vars %d" nv
+  putCommentLine $ printf "#constraints %d" nc
 
-  SAT.resizeVarCapacity solver (nvar + length [() | (Just _, _) <- cs])
-  SAT.newVars_ solver nvar
+  SAT.resizeVarCapacity solver (nv + length [() | (Just _, _) <- PBFile.wboConstraints formula])
+  SAT.newVars_ solver nv
   enc <- Tseitin.newEncoder solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
 
-  obj <- liftM concat $ revForM cs $ \(cost, (lhs, op, rhs)) -> do
+  obj <- liftM concat $ revForM (PBFile.wboConstraints formula) $ \(cost, (lhs, op, rhs)) -> do
     lhs' <- pbConvSum enc lhs
     case cost of
       Nothing -> do
@@ -665,7 +666,7 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
               return sel
         return [(cval, SAT.litNot sel)]
 
-  case tco of
+  case PBFile.wboTopCost formula of
     Nothing -> return ()
     Just c -> SAT.addPBAtMost solver obj (c-1)
 
@@ -680,18 +681,18 @@ solveWBO opt solver isMaxSat formula@(tco, cs) = do
     Right (Just m) -> do
       putSLine "OPTIMUM FOUND"
       if isMaxSat
-        then maxsatPrintModel stdout m nvar
-        else pbPrintModel stdout m nvar
+        then maxsatPrintModel stdout m nv
+        else pbPrintModel stdout m nv
       let objval = SAT.evalPBSum m obj
-      writeSOLFile opt m (Just objval) nvar
+      writeSOLFile opt m (Just objval) nv
     Left (e :: SomeException) -> do
       r <- readIORef modelRef
       case r of
         Just m | not isMaxSat -> do
           putSLine "SATISFIABLE"
-          pbPrintModel stdout m nvar
+          pbPrintModel stdout m nv
           let objval = SAT.evalPBSum m obj
-          writeSOLFile opt m (Just objval) nvar
+          writeSOLFile opt m (Just objval) nv
         _ -> do
           putSLine "UNKNOWN"
       throwIO e

@@ -22,7 +22,14 @@ convert
   MaxSAT.WCNF
   { MaxSAT.topCost = top
   , MaxSAT.clauses = cs
-  } = (Just obj, cs2)
+  , MaxSAT.numVars = nv
+  } =
+  PBFile.Formula
+  { PBFile.pbObjectiveFunction = Just obj
+  , PBFile.pbConstraints = cs2
+  , PBFile.pbNumVars = nv
+  , PBFile.pbNumConstraints = length cs2
+  }
   where
     obj = [(w, [-l | l <- ls]) | (w,ls) <- cs, w /= top]
     cs2 = [([(1,[l]) | l <- ls], PBFile.Ge, 1) | (w,ls) <- cs, w == top]

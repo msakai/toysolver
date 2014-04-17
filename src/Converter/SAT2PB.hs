@@ -19,6 +19,12 @@ import qualified Text.PBFile as PBFile
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 convert :: DIMACS.CNF -> PBFile.Formula
-convert cnf = (Nothing, map f (DIMACS.clauses cnf))
+convert cnf
+  = PBFile.Formula
+  { PBFile.pbObjectiveFunction = Nothing
+  , PBFile.pbConstraints = map f (DIMACS.clauses cnf)
+  , PBFile.pbNumVars = DIMACS.numVars cnf
+  , PBFile.pbNumConstraints = DIMACS.numClauses cnf
+  }
   where
     f clause = ([(1,[l]) | l <- elems clause], PBFile.Ge, 1)

@@ -17,11 +17,11 @@ import qualified SAT.Types as SAT
 import qualified Text.PBFile as PBFile
 
 convert :: PBFile.SoftFormula -> (PBFile.Formula, SAT.Model -> SAT.Model)
-convert wbo@(top, cs) = ((Just obj, topConstr ++ concatMap f cm), mtrans)
+convert wbo = (formula, mtrans)
   where
     nv = PBFile.wboNumVars wbo
 
-    cm  = zip [nv+1..] cs
+    cm  = zip [nv+1..] (PBFile.wboConstraints wbo)
     obj = [(w, [i]) | (i, (Just w,_)) <- cm]
 
     f :: (PBFile.Var, PBFile.SoftConstraint) -> [PBFile.Constraint]
@@ -38,9 +38,19 @@ convert wbo@(top, cs) = ((Just obj, topConstr ++ concatMap f cm), mtrans)
 
     topConstr :: [PBFile.Constraint]
     topConstr = 
-     case top of
+     case PBFile.wboTopCost wbo of
        Nothing -> []
        Just t -> [([(-c,ls) | (c,ls) <- obj], PBFile.Ge, - (t - 1))]
+
+    formula =
+      PBFile.Formula
+      { PBFile.pbObjectiveFunction = Just obj
+      , PBFile.pbConstraints = cs
+      , PBFile.pbNumVars = nv + PBFile.wboNumConstraints wbo
+      , PBFile.pbNumConstraints = length cs
+      }
+      where
+        cs = topConstr ++ concatMap f cm
 
     mtrans :: SAT.Model -> SAT.Model
     mtrans m = 

@@ -14,6 +14,7 @@
 module Main where
 
 import Data.Char
+import Data.Maybe
 import qualified Data.Version as V
 import System.Environment
 import System.IO
@@ -119,7 +120,7 @@ readPBFile o fname = do
 transformPBFile :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> Either PBFile.Formula PBFile.SoftFormula
 transformPBFile o pb =
   case pb of
-    Left opb@(Nothing,_) -> Left $ PBSetObj.setObj objType opb
+    Left opb | isNothing (PBFile.pbObjectiveFunction opb) -> Left $ PBSetObj.setObj objType opb
     _ -> pb
   where
     objType = last (ObjNone : [t | ObjType t <- o])

@@ -18,7 +18,7 @@ import Data.List
 import qualified Text.PBFile as PBFile
 
 convert :: Bool -> PBFile.Formula -> ShowS
-convert isUnix formula@(obj, cs) =
+convert isUnix formula =
   header .
   decls .
   showString "\n" .
@@ -55,7 +55,7 @@ convert isUnix formula@(obj, cs) =
         showString op2 .
         shows rhs .
         showString ";\n"
-      | (lhs, op, rhs) <- cs
+      | (lhs, op, rhs) <- PBFile.pbConstraints formula
       , let op2 = case op of
                     PBFile.Ge -> " >= "
                     PBFile.Eq -> " == "
@@ -78,7 +78,7 @@ convert isUnix formula@(obj, cs) =
       else "x[" ++ show l ++ "]"
 
     obj2 =
-      case obj of
+      case PBFile.pbObjectiveFunction formula of
         Just obj' ->
           showString "Objective cost(type=minimize);\n" .
           showString "cost = " . showString (showSum obj') . showString ";\n"

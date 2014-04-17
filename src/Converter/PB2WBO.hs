@@ -20,10 +20,16 @@ module Converter.PB2WBO (convert) where
 import qualified Text.PBFile as PBFile
 
 convert :: PBFile.Formula -> PBFile.SoftFormula
-convert (obj, cs) = (Nothing, cs1 ++ cs2)
+convert formula
+  = PBFile.SoftFormula
+  { PBFile.wboTopCost = Nothing
+  , PBFile.wboConstraints = cs1 ++ cs2
+  , PBFile.wboNumVars = PBFile.pbNumVars formula
+  , PBFile.wboNumConstraints = PBFile.pbNumConstraints formula + length cs2
+  }
   where
-    cs1 = [(Nothing, c) | c <- cs]
-    cs2 = case obj of
+    cs1 = [(Nothing, c) | c <- PBFile.pbConstraints formula]
+    cs2 = case PBFile.pbObjectiveFunction formula of
             Nothing -> []
             Just e  ->
               [ if w >= 0

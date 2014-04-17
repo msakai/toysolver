@@ -21,10 +21,10 @@
 module Text.PBFile
   (
   -- * Abstract Syntax
-    Formula
+    Formula (..)
   , Constraint
   , Op (..)
-  , SoftFormula
+  , SoftFormula (..)
   , SoftConstraint
   , Sum
   , WeightedTerm
@@ -45,10 +45,6 @@ module Text.PBFile
 
   -- * Show .wbo files
   , showWBO
-
-  -- * Utility
-  , pbNumVars
-  , wboNumVars
   ) where
 
 import Prelude hiding (sum)
@@ -62,7 +58,14 @@ import Text.Printf
 import Text.Util
 
 -- | Pair of /objective function/ and a list of constraints.
-type Formula = (Maybe Sum, [Constraint])
+data Formula
+  = Formula
+  { pbObjectiveFunction :: Maybe Sum
+  , pbConstraints :: [Constraint]
+  , pbNumVars :: !Int
+  , pbNumConstraints :: !Int
+  }
+  deriving (Eq, Ord, Show)
 
 -- | Lhs, relational operator and rhs.
 type Constraint = (Sum, Op, Integer)
@@ -74,7 +77,14 @@ data Op
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | A pair of /top cost/ and a list of soft constraints.
-type SoftFormula = (Maybe Integer, [SoftConstraint])
+data SoftFormula
+  = SoftFormula
+  { wboTopCost :: Maybe Integer
+  , wboConstraints :: [SoftConstraint]
+  , wboNumVars :: !Int
+  , wboNumConstraints :: !Int
+  }
+  deriving (Eq, Ord, Show)
 
 -- | A pair of weight and constraint.
 type SoftConstraint = (Maybe Integer, Constraint)
@@ -97,14 +107,35 @@ type Var = Int
 -- <formula>::= <sequence_of_comments> [<objective>] <sequence_of_comments_or_constraints>
 formula :: Parser Formula
 formula = do
+  h <- optionMaybe hint
   sequence_of_comments
   obj <- optionMaybe objective
   cs <- sequence_of_comments_or_constraints
-  return (obj, cs)
+  return $
+    Formula
+    { pbObjectiveFunction = obj
+    , pbConstraints = cs
+    , pbNumVars = fromMaybe (pbComputeNumVars obj cs) (fmap fst h)
+    , pbNumConstraints = fromMaybe (length cs) (fmap snd h)
+    }
+
+hint :: Parser (Int,Int)
+hint = try $ do
+  _ <- char '*'
+  zeroOrMoreSpace
+  string "#variable="
+  zeroOrMoreSpace
+  nv <- unsigned_integer
+  oneOrMoreSpace  
+  string "#constraint="
+  zeroOrMoreSpace
+  nc <- unsigned_integer
+  _ <- manyTill anyChar eol
+  return (fromIntegral nv, fromIntegral nc)
 
 -- <sequence_of_comments>::= <comment> [<sequence_of_comments>]
 sequence_of_comments :: Parser ()
-sequence_of_comments = skipMany1 comment
+sequence_of_comments = skipMany comment -- XXX: we allow empty sequence
 
 -- <comment>::= "*" <any_sequence_of_characters_other_than_EOL> <EOL>
 comment :: Parser ()
@@ -232,10 +263,17 @@ parseOPBFile = parseFromFile formula
 -- <softformula>::= <sequence_of_comments> <softheader> <sequence_of_comments_or_constraints>
 softformula :: Parser SoftFormula
 softformula = do
+  h <- optionMaybe hint
   sequence_of_comments
   top <- softheader
   cs <- wbo_sequence_of_comments_or_constraints
-  return (top, cs)
+  return $
+    SoftFormula
+    { wboTopCost = top
+    , wboConstraints = cs
+    , wboNumVars = fromMaybe (wboComputeNumVars cs) (fmap fst h)
+    , wboNumConstraints = fromMaybe (length cs) (fmap snd h)
+    }
 
 -- <softheader>::= "soft:" [<unsigned_integer>] ";"
 softheader :: Parser (Maybe Integer)
@@ -281,28 +319,28 @@ parseWBOFile = parseFromFile softformula
 
 
 showOPB :: Formula -> ShowS
-showOPB opb@(obj, cs) = (size . part1 . part2)
+showOPB opb = (size . part1 . part2)
   where
     nv = pbNumVars opb
-    nc = length cs
+    nc = pbNumConstraints opb
     size = showString (printf "* #variable= %d #constraint= %d\n" nv nc)
     part1 = 
-      case obj of
+      case pbObjectiveFunction opb of
         Nothing -> id
         Just o -> showString "min: " . showSum o . showString ";\n"
-    part2 = foldr (.) id (map showConstraint cs)
+    part2 = foldr (.) id (map showConstraint (pbConstraints opb))
 
 showWBO :: SoftFormula -> ShowS
-showWBO wbo@(top, cs) = size . part1 . part2
+showWBO wbo = size . part1 . part2
   where
     nv = wboNumVars wbo
-    nc = length cs
+    nc = wboNumConstraints wbo
     size = showString (printf "* #variable= %d #constraint= %d\n" nv nc)
     part1 = 
-      case top of
+      case wboTopCost wbo of
         Nothing -> showString "soft: ;\n"
         Just t -> showString "soft: " . showsPrec 0 t . showString ";\n"
-    part2 = foldr (.) id (map showSoftConstraint cs)
+    part2 = foldr (.) id (map showSoftConstraint (wboConstraints wbo))
 
 showSum :: Sum -> ShowS
 showSum = foldr (.) id . map showWeightedTerm
@@ -331,17 +369,17 @@ showSoftConstraint (cost, constr) =
     Nothing -> showConstraint constr
     Just c -> showChar '[' . showsPrec 0 c . showChar ']' . showChar ' ' . showConstraint constr
 
-pbNumVars :: Formula -> Int
-pbNumVars (m, cs) = maximum (0 : vs)
+pbComputeNumVars :: Maybe Sum -> [Constraint] -> Int
+pbComputeNumVars obj cs = maximum (0 : vs)
   where
     vs = do
-      s <- maybeToList m ++ [s | (s,_,_) <- cs]
+      s <- maybeToList obj ++ [s | (s,_,_) <- cs]
       (_, tm) <- s
       lit <- tm
       return $ abs lit
 
-wboNumVars :: SoftFormula -> Int
-wboNumVars (_, cs) = maximum (0 : vs)
+wboComputeNumVars :: [SoftConstraint] -> Int
+wboComputeNumVars cs = maximum (0 : vs)
   where
     vs = do
       s <- [s | (_, (s,_,_)) <- cs]
