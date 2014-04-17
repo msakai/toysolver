@@ -10,9 +10,9 @@ import SAT.Types
 main :: IO ()
 main = do
   [problemFile, modelFile] <- getArgs
-  Right formula@(obj, cs) <- PBFile.parseOPBFile problemFile
+  Right formula <- PBFile.parseOPBFile problemFile
   model <- liftM readModel (readFile modelFile)
-  forM_ cs $ \c ->
+  forM_ (PBFile.pbConstraints formula) $ \c ->
     unless (eval model c) $
       printf "violated: %s\n" (show c)
 

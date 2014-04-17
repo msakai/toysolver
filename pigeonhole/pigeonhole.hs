@@ -9,7 +9,13 @@ import System.IO
 import Text.PBFile as PBFile
 
 pigeonHole :: Integer -> Integer -> Formula
-pigeonHole p h = (Nothing, cs1 ++ cs2)
+pigeonHole p h =
+  Formula
+  { pbObjectiveFunction = Nothing
+  , pbConstraints = cs1 ++ cs2
+  , pbNumVars = fromIntegral $ p*h
+  , pbNumConstraints = fromIntegral $ p+h
+  }
   where
     vs :: Map (Integer,Integer) Int
     vs = Map.fromList $ zip [(i,j) | i<-[1..p], j<-[1..h]] [1..]

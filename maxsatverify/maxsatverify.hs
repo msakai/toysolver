@@ -11,7 +11,7 @@ import SAT.Types
 main :: IO ()
 main = do
   [problemFile, modelFile] <- getArgs
-  Right wcnf <- MaxSAT.parseWCNFFile problemFile
+  Right wcnf <- MaxSAT.parseFile problemFile
   model <- liftM readModel (readFile modelFile)
   costRef <- newIORef 0
   forM_ (MaxSAT.clauses wcnf) $ \(w,c) ->
