@@ -55,6 +55,7 @@ import qualified Data.Map as Map
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified SAT as SAT
+import qualified SAT.Types as SAT
 
 -- | Arbitrary formula not restricted to CNF
 data Formula
@@ -71,7 +72,7 @@ data Encoder =
   Encoder
   { encSolver    :: SAT.Solver
   , encUsePB     :: IORef Bool
-  , encConjTable :: !(IORef (Map IntSet SAT.Lit))
+  , encConjTable :: !(IORef (Map SAT.LitSet SAT.Lit))
   }
 
 -- | Create a @Encoder@ instance.
@@ -132,22 +133,11 @@ encodeToClause encoder formula =
 
 encodeToLit :: Encoder -> Formula -> IO SAT.Lit
 encodeToLit encoder formula = do
-  let solver = encSolver encoder
   case formula of
     Var v -> return v
-    And xs -> do
-      v <- SAT.newVar solver
-      ls <- mapM (encodeToLit encoder) xs
-      addIsConjOf encoder v ls
-      return v
-    Or xs -> do
-      v <- SAT.newVar solver
-      ls <- mapM (encodeToLit encoder) xs
-      addIsDisjOf encoder v ls
-      return v
-    Not x -> do
-      lit <- encodeToLit encoder x
-      return $ SAT.litNot lit
+    And xs -> encodeConj encoder =<< mapM (encodeToLit encoder) xs
+    Or xs  -> encodeDisj encoder =<< mapM (encodeToLit encoder) xs
+    Not x -> liftM SAT.litNot $ encodeToLit encoder x
     Imply x y -> do
       encodeToLit encoder (Or [Not x, y])
     Equiv x y -> do
@@ -171,7 +161,6 @@ encodeConj encoder ls =  do
       let sat = encSolver encoder
       v <- SAT.newVar sat
       addIsConjOf encoder v ls
-      writeIORef (encConjTable encoder) (Map.insert ls2 v table)
       return v
 
 -- | Return an literal which is equivalent to a given disjunction.
@@ -197,7 +186,4 @@ addIsConjOf encoder l ls = do
        SAT.addClause solver [SAT.litNot l, li]
   -- ((l1 ∧ l2 ∧ … ∧ ln) → l)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ l)
   SAT.addClause solver (l : map SAT.litNot ls)
-
-addIsDisjOf :: Encoder -> SAT.Lit -> [SAT.Lit] -> IO ()
-addIsDisjOf encoder l ls =
-  addIsConjOf encoder (SAT.litNot l) [SAT.litNot li | li <- ls]
+  modifyIORef (encConjTable encoder) (Map.insert (IntSet.fromList ls) l)
