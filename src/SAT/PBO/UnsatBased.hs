@@ -36,6 +36,7 @@ data Options
   { optLogger     :: String -> IO ()
   , optUpdateBest :: SAT.Model -> Integer -> IO ()
   , optUpdateLB   :: Integer -> IO ()
+  , optInitialModel :: Maybe SAT.Model
   }
 
 defaultOptions :: Options
@@ -44,6 +45,7 @@ defaultOptions
   { optLogger     = \_ -> return ()
   , optUpdateBest = \_ _ -> return ()
   , optUpdateLB   = \_ -> return ()
+  , optInitialModel = Nothing
   }
 
 solve :: SAT.Solver -> [(Integer, SAT.Lit)] -> Options -> IO (Maybe SAT.Model)
@@ -74,7 +76,7 @@ solveWBO solver sels0 opt = do
       else do
         core <- SAT.failedAssumptions solver
         case core of
-          [] -> return Nothing
+          [] -> return (optInitialModel opt)
           _  -> do
             let !min_c = minimum [sels IntMap.! sel | sel <- core]
                 !lb' = lb + min_c

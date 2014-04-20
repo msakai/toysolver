@@ -79,6 +79,7 @@ minimize solver obj opt = do
                  { UnsatBased.optLogger     = optLogger opt
                  , UnsatBased.optUpdateBest = optUpdateBest opt
                  , UnsatBased.optUpdateLB   = optUpdateLB opt
+                 , UnsatBased.optInitialModel = optInitialModel opt
                  }
       UnsatBased.solve solver obj opt2
     MSU4 -> do
