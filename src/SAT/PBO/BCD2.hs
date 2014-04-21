@@ -44,8 +44,9 @@ data Options
   { optLogger      :: String -> IO ()
   , optUpdateBest  :: SAT.Model -> Integer -> IO ()
   , optUpdateLB    :: Integer -> IO ()
-  , optEnableHardening :: Bool
   , optInitialModel :: Maybe SAT.Model
+  , optEnableHardening :: Bool
+  , optSolvingNormalFirst :: Bool
   }
 
 defaultOptions :: Options
@@ -54,8 +55,9 @@ defaultOptions
   { optLogger     = \_ -> return ()
   , optUpdateBest = \_ _ -> return ()
   , optUpdateLB   = \_ -> return ()
-  , optEnableHardening = True
   , optInitialModel = Nothing
+  , optEnableHardening = True
+  , optSolvingNormalFirst = True
   }
 
 data CoreInfo
@@ -81,12 +83,27 @@ solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
 solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
 solveWBO solver sels opt = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
+  let unrelaxed = IntSet.fromList [lit | (lit,_) <- sels]
+      relaxed   = IntSet.empty
+      hardened  = IntSet.empty
   case optInitialModel opt of
     Just m -> do
-      loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty, IntSet.empty) weights [] (SAT.evalPBSum m obj - 1) (Just m)
-    Nothing -> do
-      loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty, IntSet.empty) weights [] (SAT.pbUpperBound obj) Nothing
-
+      loop (unrelaxed, relaxed, hardened) weights [] (SAT.evalPBSum m obj - 1) (Just m)
+    Nothing
+      | optSolvingNormalFirst opt -> do
+          ret <- SAT.solve solver
+          if ret then do
+            m <- SAT.model solver
+            let val = SAT.evalPBSum m obj
+            optUpdateBest opt m val
+            let ub' = val - 1
+            optLogger opt $ printf "BCD2: updating upper bound: %d -> %d" (SAT.pbUpperBound obj) ub'
+            SAT.addPBAtMost solver obj ub'
+            loop (unrelaxed, relaxed, hardened) weights [] ub' (Just m)
+          else
+            return Nothing
+      | otherwise -> do
+          loop (unrelaxed, relaxed, hardened) weights [] (SAT.pbUpperBound obj) Nothing
   where
     weights :: SAT.LitMap Integer
     weights = IntMap.fromList sels
