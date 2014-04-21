@@ -67,7 +67,6 @@ data CoreInfo
   = CoreInfo
   { coreLits :: SAT.LitSet
   , coreLB   :: !Integer
-  , coreEP   :: !Integer
   }
 
 solve :: SAT.Solver -> SAT.PBLinSum -> Options -> IO (Maybe SAT.Model)
@@ -130,9 +129,12 @@ solveWBO solver sels opt = do
 
       sels <- liftM IntMap.fromList $ forM cores $ \info -> do
         sel <- SAT.newVar solver
-        let mid
-              | optEnableBiasedSearch opt = coreLB info + (coreEP info - coreLB info) * nunsat `div` (nunsat + nsat)
-              | otherwise = (coreLB info + coreEP info) `div` 2
+        let ep = case lastModel of
+                   Nothing -> sum [weights IntMap.! lit | lit <- IntSet.toList (coreLits info)]
+                   Just m  -> SAT.evalPBSum m (coreCostFun info)
+            mid
+              | optEnableBiasedSearch opt = coreLB info + (ep - coreLB info) * nunsat `div` (nunsat + nsat)
+              | otherwise = (coreLB info + ep) `div` 2
         SAT.addPBAtMostSoft solver sel (coreCostFun info) mid
         return (sel, (info,mid))
 
@@ -145,8 +147,7 @@ solveWBO solver sels opt = do
         let ub' = val - 1
         optLogger opt $ printf "BCD2: updating upper bound: %d -> %d" ub ub'
         SAT.addPBAtMost solver obj ub'
-        let cores' = map (\info -> info{ coreEP = SAT.evalPBSum m (coreCostFun info) }) cores
-        cont (unrelaxed, relaxed, hardened) deductedWeight cores' ub' (Just m) (nsat+1,nunsat)
+        cont (unrelaxed, relaxed, hardened) deductedWeight cores ub' (Just m) (nsat+1,nunsat)
       else do
         core <- SAT.failedAssumptions solver
         case core of
@@ -173,9 +174,6 @@ solveWBO solver sels opt = do
                 mergedCore  = CoreInfo
                               { coreLits = newLits
                               , coreLB = refine [weights IntMap.! lit | lit <- IntSet.toList relaxed'] (sum [coreLB info | (info,_) <- intersected] + delta - 1)
-                              , coreEP = case lastModel of
-                                           Nothing -> sum [weights IntMap.! lit | lit <- IntSet.toList newLits]
-                                           Just m  -> SAT.evalPBSum m [(weights IntMap.! lit, -lit) | lit <- IntSet.toList newLits]
                               }
                 cores'      = mergedCore : rest
                 lb'         = computeLB cores'
