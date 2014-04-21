@@ -39,10 +39,12 @@ Build-Type: Simple
 Flag ForceChar8
   Description: set default encoding to char8 (not to use iconv)
   Default: False
+  Manual: True
 
 Flag BuildMiscPrograms
   Description: build misc programs
   Default: False
+  Manual: True
 
 source-repository head
   type:     git

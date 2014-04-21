@@ -15,6 +15,7 @@ import qualified SAT.TseitinEncoder as Tseitin
 import SAT.TseitinEncoder (Formula (..))
 import qualified SAT.MUS as MUS
 import qualified SAT.CAMUS as CAMUS
+import qualified SAT.PBO as PBO
 
 -- should be SAT
 case_solve_SAT :: IO ()

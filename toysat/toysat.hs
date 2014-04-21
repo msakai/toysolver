@@ -586,8 +586,16 @@ solvePB opt solver formula initialModel = do
     Just obj' -> do
       obj'' <- pbConvSum enc obj'
 
-      modelRef <- newIORef Nothing
+{-
+      nv' <- SAT.nVars solver
+      dvs <- Tseitin.getDefinedVariables enc
+      dvs' <- forM dvs $ \var -> do
+                val <- Tseitin.evalDefinedVariable enc initialModel var
+                return (var,val)
+      let initialModel' = array (1,nv') ([(v, initialModel ! v) | v <- [1..nv]] ++ dvs')
+-}
 
+      modelRef <- newIORef Nothing
       result <- try $ minimize opt solver obj'' initialModel $ \m val -> do
         writeIORef modelRef (Just m)
         putOLine (show val)
