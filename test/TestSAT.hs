@@ -573,6 +573,78 @@ case_camus_hittingSetDual = actual' @?= expected'
     expected  = [[1,2], [1,3,4], [1,5,6]]
     expected' = Set.fromList $ map IS.fromList expected
 
+{-
+Boosting a Complete Technique to Find MSS and MUS thanks to a Local Search Oracle
+http://www.cril.univ-artois.fr/~piette/IJCAI07_HYCAM.pdf
+Example 3.
+C0  : (d)
+C1  : (b ∨ c)
+C2  : (a ∨ b)
+C3  : (a ∨ ¬c)
+C4  : (¬b ∨ ¬e)
+C5  : (¬a ∨ ¬b)
+C6  : (a ∨ e)
+C7  : (¬a ∨ ¬e)
+C8  : (b ∨ e)
+C9  : (¬a ∨ b ∨ ¬c)
+C10 : (¬a ∨ b ∨ ¬d)
+C11 : (a ∨ ¬b ∨ c)
+C12 : (a ∨ ¬b ∨ ¬d)
+-}
+case_camus_allMUSAssumptions_2 = do
+  solver <- newSolver
+  [a,b,c,d,e] <- newVars solver 5
+  sels@[y0,y1,y2,y3,y4,y5,y6,y7,y8,y9,y10,y11,y12] <- newVars solver 13
+  addClause solver [-y0, d]
+  addClause solver [-y1, b, c]
+  addClause solver [-y2, a, b]
+  addClause solver [-y3, a, -c]
+  addClause solver [-y4, -b, -e]
+  addClause solver [-y5, -a, -b]
+  addClause solver [-y6, a, e]
+  addClause solver [-y7, -a, -e]
+  addClause solver [-y8, b, e]
+  addClause solver [-y9, -a, b, -c]
+  addClause solver [-y10, -a, b, -d]
+  addClause solver [-y11, a, -b, c]
+  addClause solver [-y12, a, -b, -d]
+
+  -- Only three of the MUSes (marked with asterisks) are on the paper.
+  let cores =
+        [ [y0,y1,y2,y5,y9,y12]
+        , [y0,y1,y3,y4,y5,y6,y10]
+        , [y0,y1,y3,y5,y7,y8,y12]
+        , [y0,y1,y3,y5,y9,y12]
+        , [y0,y1,y3,y5,y10,y11]
+        , [y0,y1,y3,y5,y10,y12]
+        , [y0,y2,y3,y5,y10,y11]
+        , [y0,y2,y4,y5,y6,y10]
+        , [y0,y2,y5,y7,y8,y12]
+        , [y0,y2,y5,y10,y12]   -- (*)
+        , [y1,y2,y4,y5,y6,y9]
+        , [y1,y3,y4,y5,y6,y7,y8]
+        , [y1,y3,y4,y5,y6,y9]
+        , [y1,y3,y5,y7,y8,y11]
+        , [y1,y3,y5,y9,y11]    -- (*)
+        , [y2,y3,y5,y7,y8,y11]
+        , [y2,y4,y5,y6,y7,y8]  -- (*)
+        ]
+
+  let remove1 :: [a] -> [[a]]
+      remove1 [] = []
+      remove1 (x:xs) = xs : [x : ys | ys <- remove1 xs]
+  forM_ cores $ \core -> do
+    ret <- solveWith solver core
+    assertBool (show core ++ " should be a core") (not ret)
+    forM (remove1 core) $ \xs -> do
+      ret <- solveWith solver xs
+      assertBool (show core ++ " should be satisfiable") ret
+
+  actual <- CAMUS.allMUSAssumptions solver sels CAMUS.defaultOptions
+  let actual'   = Set.fromList $ map IS.fromList actual
+      expected' = Set.fromList $ map IS.fromList cores
+  actual' @?= expected'
+
 ------------------------------------------------------------------------
 -- Test harness
 
