@@ -645,6 +645,78 @@ case_camus_allMUSAssumptions_2 = do
       expected' = Set.fromList $ map IS.fromList cores
   actual' @?= expected'
 
+case_HYCAM_allMUSAssumptions = do
+  solver <- newSolver
+  [a,b,c,d,e] <- newVars solver 5
+  sels@[y0,y1,y2,y3,y4,y5,y6,y7,y8,y9,y10,y11,y12] <- newVars solver 13
+  addClause solver [-y0, d]
+  addClause solver [-y1, b, c]
+  addClause solver [-y2, a, b]
+  addClause solver [-y3, a, -c]
+  addClause solver [-y4, -b, -e]
+  addClause solver [-y5, -a, -b]
+  addClause solver [-y6, a, e]
+  addClause solver [-y7, -a, -e]
+  addClause solver [-y8, b, e]
+  addClause solver [-y9, -a, b, -c]
+  addClause solver [-y10, -a, b, -d]
+  addClause solver [-y11, a, -b, c]
+  addClause solver [-y12, a, -b, -d]
+
+  -- Only three of the MUSes (marked with asterisks) are on the paper.
+  let cores =
+        [ [y0,y1,y2,y5,y9,y12]
+        , [y0,y1,y3,y4,y5,y6,y10]
+        , [y0,y1,y3,y5,y7,y8,y12]
+        , [y0,y1,y3,y5,y9,y12]
+        , [y0,y1,y3,y5,y10,y11]
+        , [y0,y1,y3,y5,y10,y12]
+        , [y0,y2,y3,y5,y10,y11]
+        , [y0,y2,y4,y5,y6,y10]
+        , [y0,y2,y5,y7,y8,y12]
+        , [y0,y2,y5,y10,y12]   -- (*)
+        , [y1,y2,y4,y5,y6,y9]
+        , [y1,y3,y4,y5,y6,y7,y8]
+        , [y1,y3,y4,y5,y6,y9]
+        , [y1,y3,y5,y7,y8,y11]
+        , [y1,y3,y5,y9,y11]    -- (*)
+        , [y2,y3,y5,y7,y8,y11]
+        , [y2,y4,y5,y6,y7,y8]  -- (*)
+        ]
+      mcses =
+        [ [y0,y1,y7]
+        , [y0,y1,y8]
+        , [y0,y3,y4]
+        , [y0,y3,y6]
+        , [y0,y4,y11]
+        , [y0,y6,y11]
+        , [y0,y7,y9]
+        , [y0,y8,y9]
+        , [y1,y2]
+        , [y1,y7,y10]
+        , [y1,y8,y10]
+        , [y2,y3]
+        , [y3,y4,y12]
+        , [y3,y6,y12]
+        , [y4,y11,y12]
+        , [y5]
+        , [y6,y11,y12]
+        , [y7,y9,y10]
+        , [y8,y9,y10]
+        ]
+
+  -- HYCAM paper wrongly treated {C3,C8,C10} as a candidate MCS (CoMSS).
+  -- Its complement {C0,C1,C2,C4,C5,C6,C7,C9,C11,C12} is unsatisfiable
+  -- and hence not MSS.
+  ret <- solveWith solver [y0,y1,y2,y4,y5,y6,y7,y9,y11,y12]
+  assertBool "failed to prove the bug of HYCAM paper" (not ret)
+  
+  let cand = [[y5], [y3,y2], [y0,y1,y2]]
+  actual <- CAMUS.allMUSAssumptions solver sels CAMUS.defaultOptions{ CAMUS.optMCSCandidates = cand }
+  let actual'   = Set.fromList $ map IS.fromList actual
+      expected' = Set.fromList $ map IS.fromList cores
+  actual' @?= expected'
+
 ------------------------------------------------------------------------
 -- Test harness
 
