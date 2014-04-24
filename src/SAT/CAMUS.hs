@@ -120,7 +120,7 @@ allMCSAssumptions solver sels opt = do
   enumMCSAssumptions solver sels opt2
   readIORef ref
 
-allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MCS]
+allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MUS]
 allMUSAssumptions solver sels opt = do
   log "CAMUS: MCS enumeration begins"
   mcses <- allMCSAssumptions solver sels opt
