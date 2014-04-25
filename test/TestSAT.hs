@@ -573,6 +573,14 @@ case_camus_hittingSetDual = actual' @?= expected'
     expected  = [[1,2], [1,3,4], [1,5,6]]
     expected' = Set.fromList $ map IS.fromList expected
 
+-- an example from http://kuma-san.net/htcbdd.html
+case_camus_hittingSetDual_2 = actual' @?= expected'
+  where
+    actual    = CAMUS.hittingSetDual [[2,4,7], [7,8], [9], [9,10]]
+    actual'   = Set.fromList $ map IS.fromList actual
+    expected  = [[7,9], [4,8,9], [2,8,9]]
+    expected' = Set.fromList $ map IS.fromList expected
+
 {-
 Boosting a Complete Technique to Find MSS and MUS thanks to a Local Search Oracle
 http://www.cril.univ-artois.fr/~piette/IJCAI07_HYCAM.pdf
