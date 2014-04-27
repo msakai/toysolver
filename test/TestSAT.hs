@@ -9,6 +9,7 @@ import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
+import Algorithm.HittingSet as HittingSet
 import SAT
 import SAT.Types
 import qualified SAT.TseitinEncoder as Tseitin
@@ -566,17 +567,17 @@ case_camus_allMUSAssumptions = do
       expected' = Set.fromList $ map (IS.fromList . map (+3)) expected
   actual' @?= expected'
 
-case_camus_hittingSetDual = actual' @?= expected'
+case_minimalHittingSets_1 = actual' @?= expected'
   where
-    actual    = CAMUS.hittingSetDual [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
+    actual    = HittingSet.minimalHittingSets [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
     actual'   = Set.fromList $ map IS.fromList actual
     expected  = [[1,2], [1,3,4], [1,5,6]]
     expected' = Set.fromList $ map IS.fromList expected
 
 -- an example from http://kuma-san.net/htcbdd.html
-case_camus_hittingSetDual_2 = actual' @?= expected'
+case_minimalHittingSets_2 = actual' @?= expected'
   where
-    actual    = CAMUS.hittingSetDual [[2,4,7], [7,8], [9], [9,10]]
+    actual    = HittingSet.minimalHittingSets [[2,4,7], [7,8], [9], [9,10]]
     actual'   = Set.fromList $ map IS.fromList actual
     expected  = [[7,9], [4,8,9], [2,8,9]]
     expected' = Set.fromList $ map IS.fromList expected

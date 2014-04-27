@@ -91,6 +91,7 @@ Library
      Algorithm.FourierMotzkin
      Algorithm.FourierMotzkin.Core
      Algorithm.FourierMotzkin.FOL
+     Algorithm.HittingSet
      Algorithm.Knapsack
      Algorithm.LPSolver
      Algorithm.LPSolverHL

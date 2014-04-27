@@ -29,7 +29,6 @@ module SAT.CAMUS
   , allMCSAssumptions
   , allMUSAssumptions
   , enumMCSAssumptions
-  , hittingSetDual
   ) where
 
 import Control.Monad
@@ -37,6 +36,7 @@ import Data.Array.IArray
 import qualified Data.IntSet as IS
 import Data.List
 import Data.IORef
+import qualified Algorithm.HittingSet as HittingSet
 import SAT
 import SAT.Types
 
@@ -125,36 +125,7 @@ allMUSAssumptions solver sels opt = do
   log "CAMUS: MCS enumeration begins"
   mcses <- allMCSAssumptions solver sels opt
   log "CAMUS: MCS enumeration done"
-  return $ hittingSetDual mcses
+  return $ HittingSet.minimalHittingSets mcses
   where
     log :: String -> IO ()
     log = optLogger opt
-
--- FIXME: remove nub
-hittingSetDual :: [MCS] -> [MUS]
-hittingSetDual mcses = nub $ f (map IS.fromList mcses) []
-  where
-    f :: [IS.IntSet] -> [Int] -> [MUS]
-    f [] mus = return mus
-    f mcses mus = do
-      sel <- IS.toList $ IS.unions mcses
-      let mus' = sel:mus
-      mcs <- mcses
-      guard $ sel `IS.member` mcs
-      let mcses' = propagateChoice mcses sel mcs
-      f mcses' mus'
-
-propagateChoice :: [IS.IntSet] -> Lit -> IS.IntSet -> [IS.IntSet]
-propagateChoice mcses sel mcs = zs
-  where
-    xs = filter (sel `IS.notMember`) mcses
-    ys = map (IS.filter (sel <) . (`IS.difference` mcs)) xs
-    zs = maintainNoSupersets ys
-
-maintainNoSupersets :: [IS.IntSet] -> [IS.IntSet]
-maintainNoSupersets xss = go [] xss
-  where
-    go yss [] = yss
-    go yss (xs:xss) = go (xs : filter p yss) (filter p xss)
-      where
-        p zs = not (xs `IS.isSubsetOf` zs)
