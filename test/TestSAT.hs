@@ -6,9 +6,11 @@ import Data.List
 import qualified Data.Set as Set
 import qualified Data.IntSet as IS
 import Test.HUnit hiding (Test)
+import Test.QuickCheck
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
+import Test.Framework.Providers.QuickCheck2
 import Algorithm.HittingSet as HittingSet
 import SAT
 import SAT.Types
@@ -581,6 +583,22 @@ case_minimalHittingSets_2 = actual' @?= expected'
     actual'   = Set.fromList $ map IS.fromList actual
     expected  = [[7,9], [4,8,9], [2,8,9]]
     expected' = Set.fromList $ map IS.fromList expected
+
+prop_minimalHittingSets_duality =
+  forAll hyperGraph $ \g ->
+    let h = HittingSet.minimalHittingSets g
+    in normalize h == normalize (HittingSet.minimalHittingSets (HittingSet.minimalHittingSets h))
+  where
+    hyperGraph :: Gen [[Int]]
+    hyperGraph = do
+      nv <- choose (0, 10)
+      ne <- choose (0, 20)
+      replicateM ne $ do
+        n <- choose (1,nv)
+        liftM (IS.toList . IS.fromList) $ replicateM n $ choose (1, nv)
+
+    normalize :: [[Int]] -> Set.Set IS.IntSet
+    normalize = Set.fromList . map IS.fromList
 
 {-
 Boosting a Complete Technique to Find MSS and MUS thanks to a Local Search Oracle

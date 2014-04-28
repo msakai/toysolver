@@ -245,7 +245,7 @@ Test-suite TestSAT
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestSAT.hs
-  Build-depends:     base >=4 && <5, array, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,HUnit
+  Build-depends:     base >=4 && <5, array, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
