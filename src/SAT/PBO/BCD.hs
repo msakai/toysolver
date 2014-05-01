@@ -25,35 +25,18 @@
 -- 
 -----------------------------------------------------------------------------
 module SAT.PBO.BCD
-  ( Options (..)
-  , defaultOptions
-  , solve
+  ( solve
   ) where
 
+import Control.Concurrent.STM
 import Control.Monad
 import qualified Data.IntSet as IntSet
 import qualified Data.IntMap as IntMap
 import Data.List
 import qualified SAT as SAT
 import qualified SAT.Types as SAT
+import qualified SAT.PBO.Context as C
 import Text.Printf
-
-data Options
-  = Options
-  { optLogger      :: String -> IO ()
-  , optUpdateBest  :: SAT.Model -> Integer -> IO ()
-  , optUpdateLB    :: Integer -> IO ()
-  , optInitialModel :: Maybe SAT.Model
-  }
-
-defaultOptions :: Options
-defaultOptions
-  = Options
-  { optLogger     = \_ -> return ()
-  , optUpdateBest = \_ _ -> return ()
-  , optUpdateLB   = \_ -> return ()
-  , optInitialModel = Nothing
-  }
 
 data CoreInfo
   = CoreInfo
@@ -73,31 +56,24 @@ coreUnion c1 c2
   , coreUB = coreUB c1 + coreUB c2
   }
 
-solve :: SAT.Solver -> SAT.PBLinSum -> Options -> IO (Maybe SAT.Model)
-solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
-  where
-    (obj',offset) = SAT.normalizePBSum (obj,0)
-    opt' =
-      opt
-      { optUpdateBest = \m val -> optUpdateBest opt m (offset + val)
-      , optUpdateLB   = \val -> optUpdateLB opt (offset + val)
-      }
+solve :: C.Context cxt => cxt -> SAT.Solver -> IO ()
+solve cxt solver = solveWBO (C.normalize cxt) solver
 
-solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
-solveWBO solver sels opt = do
+solveWBO :: C.Context cxt => cxt -> SAT.Solver -> IO ()
+solveWBO cxt solver = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
-  case optInitialModel opt of
-    Just m -> do
-      loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty) [] (SAT.evalPBSum m obj - 1) (Just m)
-    Nothing -> do
-      loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty) [] (SAT.pbUpperBound obj) Nothing
+  ub <- atomically $ C.getSearchUpperBound cxt
+  loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty) [] ub
 
   where
+    obj :: SAT.PBLinSum
+    obj = C.getObjectiveFunction cxt
+
+    sels :: [(SAT.Lit, Integer)]
+    sels = [(-lit, w) | (w,lit) <- obj]
+
     weights :: SAT.LitMap Integer
     weights = IntMap.fromList sels
-
-    obj :: SAT.PBLinSum
-    obj = [(w,-lit) | (lit,w) <- sels]
 
     coreNew :: SAT.LitSet -> CoreInfo
     coreNew cs = CoreInfo{ coreLits = cs, coreLB = 0, coreUB = sum [weights IntMap.! lit | lit <- IntSet.toList cs] }
@@ -105,11 +81,11 @@ solveWBO solver sels opt = do
     coreCostFun :: CoreInfo -> SAT.PBLinSum
     coreCostFun c = [(weights IntMap.! lit, -lit) | lit <- IntSet.toList (coreLits c)]
 
-    loop :: (SAT.LitSet, SAT.LitSet) -> [CoreInfo] -> Integer -> Maybe SAT.Model -> IO (Maybe SAT.Model)
-    loop (unrelaxed, relaxed) cores ub lastModel = do
+    loop :: (SAT.LitSet, SAT.LitSet) -> [CoreInfo] -> Integer -> IO ()
+    loop (unrelaxed, relaxed) cores ub = do
       let lb = sum [coreLB info | info <- cores]
-      optLogger opt $ printf "BCD: %d <= obj <= %d" lb ub
-      optLogger opt $ printf "BCD: #cores=%d, #unrelaxed=%d, #relaxed=%d"
+      C.logMessage cxt $ printf "BCD: %d <= obj <= %d" lb ub
+      C.logMessage cxt $ printf "BCD: #cores=%d, #unrelaxed=%d, #relaxed=%d"
         (length cores) (IntSet.size unrelaxed) (IntSet.size relaxed)
 
       sels <- liftM IntMap.fromList $ forM cores $ \info -> do
@@ -122,22 +98,22 @@ solveWBO solver sels opt = do
       if ret then do
         m <- SAT.model solver
         let val = SAT.evalPBSum m obj
-        optUpdateBest opt m val
         let ub' = val - 1
-        optLogger opt $ printf "BCD: updating upper bound: %d -> %d" ub ub'
+        C.logMessage cxt $ printf "BCD: updating upper bound: %d -> %d" ub ub'
+        C.addSolution cxt m
         SAT.addPBAtMost solver obj ub'
         let cores' = map (\info -> info{ coreUB = SAT.evalPBSum m (coreCostFun info) }) cores
-        cont (unrelaxed, relaxed) cores' ub' (Just m)
+        cont (unrelaxed, relaxed) cores' ub'
       else do
         core <- SAT.failedAssumptions solver
         case core of
-          [] -> return lastModel
+          [] -> return ()
           [sel] | Just info <- IntMap.lookup sel sels -> do
             let info'  = info{ coreLB = coreMidValue info + 1 }
                 cores' = IntMap.elems $ IntMap.insert sel info' sels
-            optLogger opt $ printf "BCD: updating lower bound of a core"
+            C.logMessage cxt $ printf "BCD: updating lower bound of a core"
             SAT.addPBAtLeast solver (coreCostFun info') (coreLB info') -- redundant, but useful for direct search
-            cont (unrelaxed, relaxed) cores' ub lastModel
+            cont (unrelaxed, relaxed) cores' ub
           _ -> do
             let coreSet     = IntSet.fromList core
                 torelax     = unrelaxed `IntSet.intersection` coreSet
@@ -148,14 +124,14 @@ solveWBO solver sels opt = do
                 relaxed'    = relaxed `IntSet.union` torelax
                 cores'      = mergedCore : rest
             if null intersected then do
-              optLogger opt $ printf "BCD: found a new core of size %d" (IntSet.size torelax)              
+              C.logMessage cxt $ printf "BCD: found a new core of size %d" (IntSet.size torelax)              
             else do
-              optLogger opt $ printf "BCD: merging cores"
+              C.logMessage cxt $ printf "BCD: merging cores"
             SAT.addPBAtLeast solver (coreCostFun mergedCore) (coreLB mergedCore) -- redundant, but useful for direct search
             forM_ (IntMap.keys sels) $ \sel -> SAT.addClause solver [-sel] -- delete temporary constraints
-            cont (unrelaxed', relaxed') cores' ub lastModel
+            cont (unrelaxed', relaxed') cores' ub
 
-    cont :: (SAT.LitSet, SAT.LitSet) -> [CoreInfo] -> Integer -> Maybe SAT.Model -> IO (Maybe SAT.Model)
-    cont (unrelaxed, relaxed) cores ub lastModel
-      | all (\info -> coreLB info > coreUB info) cores = return lastModel
-      | otherwise = loop (unrelaxed, relaxed) cores ub lastModel
+    cont :: (SAT.LitSet, SAT.LitSet) -> [CoreInfo] -> Integer -> IO ()
+    cont (unrelaxed, relaxed) cores ub
+      | all (\info -> coreLB info > coreUB info) cores = C.setFinished cxt
+      | otherwise = loop (unrelaxed, relaxed) cores ub

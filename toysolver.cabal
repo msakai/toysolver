@@ -155,6 +155,7 @@ Library
      SAT.MUS
      SAT.CAMUS
      SAT.PBO
+     SAT.PBO.Context
      SAT.PBO.BC
      SAT.PBO.BCD
      SAT.PBO.BCD2

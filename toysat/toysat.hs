@@ -22,6 +22,7 @@ import Control.Exception
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Set as Set
+import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Char
 import Data.IORef
@@ -125,8 +126,8 @@ defaultOptions
   , optLinearizerPB  = False
   , optPBHandlerType = SAT.defaultPBHandlerType
   , optEnableBackwardSubsumptionRemoval = SAT.defaultEnableBackwardSubsumptionRemoval
-  , optSearchStrategy       = PBO.optSearchStrategy PBO.defaultOptions
-  , optObjFunVarsHeuristics = PBO.optObjFunVarsHeuristics PBO.defaultOptions
+  , optSearchStrategy       = PBO.defaultSearchStrategy
+  , optObjFunVarsHeuristics = PBO.defaultEnableObjFunVarsHeuristics
   , optLocalSearchInitial   = False
   , optAllMUSes = False
   , optPrintRational = False  
@@ -595,30 +596,31 @@ solvePB opt solver formula initialModel = do
       let initialModel' = array (1,nv') ([(v, initialModel ! v) | v <- [1..nv]] ++ dvs')
 -}
 
-      modelRef <- newIORef Nothing
-      result <- try $ minimize opt solver obj'' initialModel $ \m val -> do
-        writeIORef modelRef (Just m)
-        putOLine (show val)
+      pbo <- PBO.newOptimizer solver obj''
+      setupOptimizer pbo opt
+      PBO.setOnUpdateBestSolution pbo $ \val _ -> putOLine (show val)
+      PBO.setOnUpdateLowerBound pbo $ \lb -> do
+        putCommentLine $ printf "lower bound updated to %d" lb
 
-      case result of
-        Right Nothing -> do
-          putSLine "UNSATISFIABLE"
-        Right (Just m) -> do
-          putSLine "OPTIMUM FOUND"
-          pbPrintModel stdout m nv
-          let objval = SAT.evalPBSum m obj''
-          writeSOLFile opt m (Just objval) nv
-        Left (e :: SomeException) -> do
-          r <- readIORef modelRef
-          case r of
-            Nothing -> do
-              putSLine "UNKNOWN"
-            Just m -> do
-              putSLine "SATISFIABLE"
-              pbPrintModel stdout m nv
-              let objval = SAT.evalPBSum m obj''
-              writeSOLFile opt m (Just objval) nv
-          throwIO e
+      case initialModel of
+        Nothing -> return ()
+        Just m -> PBO.addSolution pbo m
+
+      finally (PBO.optimize pbo) $ do
+        ret <- PBO.getBestSolution pbo
+        case ret of
+          Nothing -> do
+            b <- PBO.isUnsat pbo
+            if b
+              then putSLine "UNSATISFIABLE"
+              else putSLine "UNKNOWN"
+          Just (m, val) -> do
+            b <- PBO.isOptimum pbo
+            if b
+              then putSLine "OPTIMUM FOUND"
+              else putSLine "SATISFIABLE"
+            pbPrintModel stdout m nv
+            writeSOLFile opt m (Just val) nv
 
 pbConvSum :: Tseitin.Encoder -> PBFile.Sum -> IO SAT.PBLinSum
 pbConvSum enc = revMapM f
@@ -635,18 +637,11 @@ evalPBConstraint m (lhs,op,rhs) = op' lhs' rhs
             PBFile.Eq -> (==)
     lhs' = sum [if and [SAT.evalLit m lit | lit <- tm] then c else 0 | (c,tm) <- lhs]
 
-minimize :: Options -> SAT.Solver -> SAT.PBLinSum -> Maybe SAT.Model -> (SAT.Model -> Integer -> IO ()) -> IO (Maybe SAT.Model)
-minimize opt solver obj initialModel update = do
-  let opt2 =
-        PBO.defaultOptions
-        { PBO.optObjFunVarsHeuristics = optObjFunVarsHeuristics opt
-        , PBO.optSearchStrategy       = optSearchStrategy opt
-        , PBO.optLogger     = putCommentLine
-        , PBO.optUpdateBest = update
-        , PBO.optUpdateLB   = \val -> putCommentLine $ printf "lower bound updated to %d" val
-        , PBO.optInitialModel = initialModel
-        }
-  PBO.minimize solver obj opt2
+setupOptimizer :: PBO.Optimizer -> Options -> IO ()
+setupOptimizer pbo opt = do
+  PBO.setEnableObjFunVarsHeuristics pbo $ optObjFunVarsHeuristics opt
+  PBO.setSearchStrategy pbo $ optSearchStrategy opt
+  PBO.setLogger pbo putCommentLine
 
 -- ------------------------------------------------------------------------
 
@@ -709,34 +704,36 @@ solveWBO opt solver isMaxSat formula initialModel = do
   let extendModel :: SAT.Model -> SAT.Model
       extendModel m = array (1,nv') ([(v, m ! v) | v <- [1..nv]] ++ [(v, evalPBConstraint m constr) | (v, constr) <- defs])
 
-  let initialModel' = fmap extendModel initialModel
+  pbo <- PBO.newOptimizer solver obj
+  setupOptimizer pbo opt
+  PBO.setOnUpdateBestSolution pbo $ \val _ -> putOLine (show val)
+  PBO.setOnUpdateLowerBound pbo $ \lb -> do
+    putCommentLine $ printf "lower bound updated to %d" lb
 
-  modelRef <- newIORef Nothing
-  result <- try $ minimize opt solver obj initialModel' $ \m val -> do
-     writeIORef modelRef (Just m)
-     putOLine (show val)
+  case initialModel of
+    Nothing -> return ()
+    Just m -> PBO.addSolution pbo (extendModel m)
 
-  case result of
-    Right Nothing -> do
-      putSLine "UNSATISFIABLE"
-    Right (Just m) -> do
-      putSLine "OPTIMUM FOUND"
-      if isMaxSat
-        then maxsatPrintModel stdout m nv
-        else pbPrintModel stdout m nv
-      let objval = SAT.evalPBSum m obj
-      writeSOLFile opt m (Just objval) nv
-    Left (e :: SomeException) -> do
-      r <- readIORef modelRef
-      case r of
-        Just m | not isMaxSat -> do
+  finally (PBO.optimize pbo) $ do
+    ret <- PBO.getBestSolution pbo
+    case ret of
+      Nothing -> do
+        b <- PBO.isUnsat pbo
+        if b
+          then putSLine "UNSATISFIABLE"
+          else putSLine "UNKNOWN"
+      Just (m, val) -> do
+        b <- PBO.isOptimum pbo
+        if b then do
+          putSLine "OPTIMUM FOUND"
+          pbPrintModel stdout m nv
+          writeSOLFile opt m (Just val) nv
+        else if not isMaxSat then do
           putSLine "SATISFIABLE"
           pbPrintModel stdout m nv
-          let objval = SAT.evalPBSum m obj
-          writeSOLFile opt m (Just objval) nv
-        _ -> do
+          writeSOLFile opt m (Just val) nv
+        else 
           putSLine "UNKNOWN"
-      throwIO e
 
 -- ------------------------------------------------------------------------
 
@@ -848,46 +845,49 @@ solveMIP opt solver mip = do
           obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- obj]
       (obj3,obj3_c) <- SAT.Integer.linearize enc obj2
 
-      modelRef <- newIORef Nothing
+      let transformObjVal :: Integer -> Rational
+          transformObjVal val = fromIntegral (val + obj3_c) / fromIntegral d
 
-      result <- try $ minimize opt solver obj3 Nothing $ \m val -> do
-        writeIORef modelRef (Just m)
-        putOLine $ showRational (optPrintRational opt) (fromIntegral (val + obj3_c) / fromIntegral d)
+          transformModel :: SAT.Model -> Map String Integer
+          transformModel m = Map.fromList
+            [ (MIP.fromVar v, SAT.Integer.eval m (vmap Map.! v)) | v <- Set.toList ivs ]
 
-      let printModel :: SAT.Model -> IO ()
+          printModel :: Map String Integer -> IO ()
           printModel m = do
-            forM_ (Set.toList ivs) $ \v -> do
-              let val = SAT.Integer.eval m (vmap Map.! v)
-              printf "v %s = %d\n" (MIP.fromVar v) val
+            forM_ (Map.toList m) $ \(v, val) -> do
+              printf "v %s = %d\n" v val
             hFlush stdout
-            writeSol m
 
-          writeSol :: SAT.Model -> IO ()
-          writeSol m = do
+          writeSol :: Map String Integer -> Rational -> IO ()
+          writeSol m val = do
             case optWriteFile opt of
               Nothing -> return ()
               Just fname -> do
-                let m2 = Map.fromList [ (MIP.fromVar v, fromInteger val)
-                                      | v <- Set.toList ivs
-                                      , let val = SAT.Integer.eval m (vmap Map.! v) ]
-                    o  = fromInteger $ SAT.Integer.eval m obj2
-                writeFile fname (GurobiSol.render m2 (Just o))
+                writeFile fname (GurobiSol.render (fmap fromInteger m) (Just (fromRational val)))
 
-      case result of
-        Right Nothing -> do
-          putSLine $ "UNSATISFIABLE"
-        Right (Just m) -> do
-          putSLine "OPTIMUM FOUND"
-          printModel m
-        Left (e :: SomeException) -> do
-          r <- readIORef modelRef
-          case r of
-            Nothing -> do
-              putSLine "UNKNOWN"
-            Just m -> do
-              putSLine "SATISFIABLE"
-              printModel m
-          throwIO e
+      pbo <- PBO.newOptimizer solver obj3
+      setupOptimizer pbo opt
+      PBO.setOnUpdateBestSolution pbo $ \_ val -> do
+        putOLine $ showRational (optPrintRational opt) (transformObjVal val)
+
+      finally (PBO.optimize pbo) $ do
+        ret <- PBO.getBestSolution pbo
+        case ret of
+          Nothing -> do
+            b <- PBO.isUnsat pbo
+            if b
+              then putSLine "UNSATISFIABLE"
+              else putSLine "UNKNOWN"
+          Just (m,val) -> do
+            b <- PBO.isOptimum pbo
+            if b
+              then putSLine "OPTIMUM FOUND"
+              else putSLine "SATISFIABLE"
+            let m2   = transformModel m
+                val2 = transformObjVal val
+            printModel m2
+            writeSol m2 val2
+
   where
     ivs = MIP.integerVariables mip
     nivs = MIP.variables mip `Set.difference` ivs

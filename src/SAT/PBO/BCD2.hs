@@ -32,21 +32,19 @@ module SAT.PBO.BCD2
   ) where
 
 import qualified Algorithm.Knapsack as Knapsack
+import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
 import qualified Data.IntSet as IntSet
 import qualified Data.IntMap as IntMap
 import qualified SAT as SAT
 import qualified SAT.Types as SAT
+import qualified SAT.PBO.Context as C
 import Text.Printf
 
 data Options
   = Options
-  { optLogger      :: String -> IO ()
-  , optUpdateBest  :: SAT.Model -> Integer -> IO ()
-  , optUpdateLB    :: Integer -> IO ()
-  , optInitialModel :: Maybe SAT.Model
-  , optEnableHardening :: Bool
+  { optEnableHardening :: Bool
   , optEnableBiasedSearch :: Bool
   , optSolvingNormalFirst :: Bool
   }
@@ -54,11 +52,7 @@ data Options
 defaultOptions :: Options
 defaultOptions
   = Options
-  { optLogger     = \_ -> return ()
-  , optUpdateBest = \_ _ -> return ()
-  , optUpdateLB   = \_ -> return ()
-  , optInitialModel = Nothing
-  , optEnableHardening = True
+  { optEnableHardening = True
   , optEnableBiasedSearch = True
   , optSolvingNormalFirst = True
   }
@@ -69,24 +63,18 @@ data CoreInfo
   , coreLB   :: !Integer
   }
 
-solve :: SAT.Solver -> SAT.PBLinSum -> Options -> IO (Maybe SAT.Model)
-solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
-  where
-    (obj',offset) = SAT.normalizePBSum (obj,0)
-    opt' =
-      opt
-      { optUpdateBest = \m val -> optUpdateBest opt m (offset + val)
-      , optUpdateLB   = \val -> optUpdateLB opt (offset + val)
-      }
+solve :: C.Context cxt => cxt -> SAT.Solver -> Options -> IO ()
+solve cxt solver opt = solveWBO (C.normalize cxt) solver opt
 
-solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
-solveWBO solver sels opt = do
+solveWBO :: C.Context cxt => cxt -> SAT.Solver -> Options -> IO ()
+solveWBO cxt solver opt = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
   let unrelaxed = IntSet.fromList [lit | (lit,_) <- sels]
       relaxed   = IntSet.empty
       hardened  = IntSet.empty
       cnt = (1,1)
-  case optInitialModel opt of
+  best <- atomically $ C.getBestModel cxt
+  case best of
     Just m -> do
       loop (unrelaxed, relaxed, hardened) weights [] (SAT.evalPBSum m obj - 1) (Just m) cnt
     Nothing
@@ -95,21 +83,24 @@ solveWBO solver sels opt = do
           if ret then do
             m <- SAT.model solver
             let val = SAT.evalPBSum m obj
-            optUpdateBest opt m val
             let ub' = val - 1
-            optLogger opt $ printf "BCD2: updating upper bound: %d -> %d" (SAT.pbUpperBound obj) ub'
+            C.logMessage cxt $ printf "BCD2: updating upper bound: %d -> %d" (SAT.pbUpperBound obj) ub'
+            C.addSolution cxt m
             SAT.addPBAtMost solver obj ub'
             loop (unrelaxed, relaxed, hardened) weights [] ub' (Just m) cnt
           else
-            return Nothing
+            C.setFinished cxt
       | otherwise -> do
           loop (unrelaxed, relaxed, hardened) weights [] (SAT.pbUpperBound obj) Nothing cnt
   where
+    obj :: SAT.PBLinSum
+    obj = C.getObjectiveFunction cxt
+
+    sels :: [(SAT.Lit, Integer)]
+    sels = [(-lit, w) | (w,lit) <- obj]
+
     weights :: SAT.LitMap Integer
     weights = IntMap.fromList sels
-
-    obj :: SAT.PBLinSum
-    obj = [(w,-lit) | (lit,w) <- sels]
 
     coreCostFun :: CoreInfo -> SAT.PBLinSum
     coreCostFun c = [(weights IntMap.! lit, -lit) | lit <- IntSet.toList (coreLits c)]
@@ -117,15 +108,15 @@ solveWBO solver sels opt = do
     computeLB :: [CoreInfo] -> Integer
     computeLB cores = sum [coreLB info | info <- cores]
 
-    loop :: (SAT.LitSet, SAT.LitSet, SAT.LitSet) -> SAT.LitMap Integer -> [CoreInfo] -> Integer -> Maybe SAT.Model -> (Integer,Integer) -> IO (Maybe SAT.Model)
+    loop :: (SAT.LitSet, SAT.LitSet, SAT.LitSet) -> SAT.LitMap Integer -> [CoreInfo] -> Integer -> Maybe SAT.Model -> (Integer,Integer) -> IO ()
     loop (unrelaxed, relaxed, hardened) deductedWeight cores ub lastModel (!nsat,!nunsat) = do
       let lb = computeLB cores
-      optLogger opt $ printf "BCD2: %d <= obj <= %d" lb ub
-      optLogger opt $ printf "BCD2: #cores=%d, #unrelaxed=%d, #relaxed=%d, #hardened=%d" 
+      C.logMessage cxt $ printf "BCD2: %d <= obj <= %d" lb ub
+      C.logMessage cxt $ printf "BCD2: #cores=%d, #unrelaxed=%d, #relaxed=%d, #hardened=%d" 
         (length cores) (IntSet.size unrelaxed) (IntSet.size relaxed) (IntSet.size hardened)
 
       when (optEnableBiasedSearch opt) $ do
-        optLogger opt $ printf "BCD2: bias = %d/%d" nunsat (nunsat + nsat)
+        C.logMessage cxt $ printf "BCD2: bias = %d/%d" nunsat (nunsat + nsat)
 
       sels <- liftM IntMap.fromList $ forM cores $ \info -> do
         sel <- SAT.newVar solver
@@ -143,22 +134,22 @@ solveWBO solver sels opt = do
       if ret then do
         m <- SAT.model solver
         let val = SAT.evalPBSum m obj
-        optUpdateBest opt m val
         let ub' = val - 1
-        optLogger opt $ printf "BCD2: updating upper bound: %d -> %d" ub ub'
+        C.logMessage cxt $ printf "BCD2: updating upper bound: %d -> %d" ub ub'
+        C.addSolution cxt m
         SAT.addPBAtMost solver obj ub'
         cont (unrelaxed, relaxed, hardened) deductedWeight cores ub' (Just m) (nsat+1,nunsat)
       else do
         core <- SAT.failedAssumptions solver
         case core of
-          [] -> return lastModel
+          [] -> C.setFinished cxt
           [sel] | Just (info,mid) <- IntMap.lookup sel sels -> do
             let newLB  = refine [weights IntMap.! lit | lit <- IntSet.toList (coreLits info)] mid
                 info'  = info{ coreLB = newLB }
                 cores' = IntMap.elems $ IntMap.insert sel info' $ IntMap.map fst sels
                 lb'    = computeLB cores'
                 deductedWeight' = IntMap.unionWith (+) deductedWeight (IntMap.fromList [(lit, - d)  | let d = lb' - lb, d /= 0, lit <- IntSet.toList (coreLits info)])
-            optLogger opt $ printf "BCD2: updating lower bound of a core"
+            C.logMessage cxt $ printf "BCD2: updating lower bound of a core"
             SAT.addPBAtLeast solver (coreCostFun info') (coreLB info') -- redundant, but useful for direct search
             cont (unrelaxed, relaxed, hardened) deductedWeight' cores' ub lastModel (nsat,nunsat+1)
           _ -> do
@@ -179,16 +170,16 @@ solveWBO solver sels opt = do
                 lb'         = computeLB cores'
                 deductedWeight' = IntMap.unionWith (+) deductedWeight (IntMap.fromList [(lit, - d)  | let d = lb' - lb, d /= 0, lit <- IntSet.toList newLits])
             if null intersected then do
-              optLogger opt $ printf "BCD2: found a new core of size %d" (IntSet.size torelax)              
+              C.logMessage cxt $ printf "BCD2: found a new core of size %d" (IntSet.size torelax)              
             else do
-              optLogger opt $ printf "BCD2: merging cores"
+              C.logMessage cxt $ printf "BCD2: merging cores"
             SAT.addPBAtLeast solver (coreCostFun mergedCore) (coreLB mergedCore) -- redundant, but useful for direct search
             forM_ (IntMap.keys sels) $ \sel -> SAT.addClause solver [-sel] -- delete temporary constraints
             cont (unrelaxed', relaxed', hardened) deductedWeight' cores' ub lastModel (nsat,nunsat+1)
 
-    cont :: (SAT.LitSet, SAT.LitSet, SAT.LitSet) -> SAT.LitMap Integer -> [CoreInfo] -> Integer -> Maybe SAT.Model -> (Integer,Integer) -> IO (Maybe SAT.Model)
+    cont :: (SAT.LitSet, SAT.LitSet, SAT.LitSet) -> SAT.LitMap Integer -> [CoreInfo] -> Integer -> Maybe SAT.Model -> (Integer,Integer) -> IO ()
     cont (unrelaxed, relaxed, hardened) deductedWeight cores ub lastModel (!nsat,!nunsat)
-      | lb > ub = return lastModel
+      | lb > ub = C.setFinished cxt
       | optEnableHardening opt = do
           let lits = IntMap.keysSet $ IntMap.filter (\w -> lb + w > ub) deductedWeight
           forM_ (IntSet.toList lits) $ \lit -> SAT.addClause solver [lit]

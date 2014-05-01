@@ -21,62 +21,38 @@
 --
 -----------------------------------------------------------------------------
 module SAT.PBO.UnsatBased
-  ( Options (..)
-  , defaultOptions
-  , solve
+  ( solve
   ) where
 
 import Control.Monad
 import qualified Data.IntMap as IntMap
 import qualified SAT as SAT
 import qualified SAT.Types as SAT
+import qualified SAT.PBO.Context as C
 
-data Options
-  = Options
-  { optLogger     :: String -> IO ()
-  , optUpdateBest :: SAT.Model -> Integer -> IO ()
-  , optUpdateLB   :: Integer -> IO ()
-  , optInitialModel :: Maybe SAT.Model
-  }
+solve :: C.Context cxt => cxt -> SAT.Solver -> IO ()
+solve cxt solver = solveWBO (C.normalize cxt) solver
 
-defaultOptions :: Options
-defaultOptions
-  = Options
-  { optLogger     = \_ -> return ()
-  , optUpdateBest = \_ _ -> return ()
-  , optUpdateLB   = \_ -> return ()
-  , optInitialModel = Nothing
-  }
-
-solve :: SAT.Solver -> [(Integer, SAT.Lit)] -> Options -> IO (Maybe SAT.Model)
-solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
-  where
-    (obj',offset) = SAT.normalizePBSum (obj,0)
-    opt' =
-      opt
-      { optUpdateBest = \m val -> optUpdateBest opt m (offset + val)
-      , optUpdateLB   = \val -> optUpdateLB opt (offset + val)
-      }
-
-solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
-solveWBO solver sels0 opt = do
+solveWBO :: C.Context cxt => cxt -> SAT.Solver -> IO ()
+solveWBO cxt solver = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
+  let sels0 = [(-v, c) | (c,v) <- C.getObjectiveFunction cxt]
   loop 0 (IntMap.fromList sels0)
   where
-    loop :: Integer -> SAT.LitMap Integer -> IO (Maybe SAT.Model)
+    loop :: Integer -> SAT.LitMap Integer -> IO ()
     loop !lb sels = do
-      optUpdateLB opt lb
+      C.addLowerBound cxt lb
 
       ret <- SAT.solveWith solver (IntMap.keys sels)
       if ret then do
         m <- SAT.model solver
         -- モデルから余計な変数を除去する?
-        optUpdateBest opt m lb
-        return $ Just m
+        C.addSolution cxt m
+        return ()
       else do
         core <- SAT.failedAssumptions solver
         case core of
-          [] -> return (optInitialModel opt)
+          [] -> C.setFinished cxt
           _  -> do
             let !min_c = minimum [sels IntMap.! sel | sel <- core]
                 !lb' = lb + min_c

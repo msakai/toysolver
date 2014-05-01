@@ -12,15 +12,47 @@
 -- Pseudo-Boolean Optimization (PBO) Solver
 --
 -----------------------------------------------------------------------------
-module SAT.PBO where
+module SAT.PBO
+  ( Optimizer
+  , newOptimizer
+  , optimize
 
+  , SearchStrategy (..)
+  , defaultSearchStrategy
+  , getSearchStrategy
+  , setSearchStrategy
+
+  , defaultEnableObjFunVarsHeuristics
+  , getEnableObjFunVarsHeuristics
+  , setEnableObjFunVarsHeuristics
+
+  , defaultTrialLimitConf
+  , getTrialLimitConf
+  , setTrialLimitConf
+
+  , setOnUpdateBestSolution
+  , setOnUpdateLowerBound
+  , setLogger
+
+  , addSolution
+  , getBestSolution
+  , getBestValue
+  , getBestModel
+  , isUnsat
+  , isOptimum
+  , isFinished
+  ) where
+
+import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
+import Data.IORef
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Text.Printf
-import SAT
-import SAT.Types
+import qualified SAT as SAT
+import qualified SAT.Types as SAT
+import qualified SAT.PBO.Context as C
 import qualified SAT.PBO.BC as BC
 import qualified SAT.PBO.BCD as BCD
 import qualified SAT.PBO.BCD2 as BCD2
@@ -37,216 +69,263 @@ data SearchStrategy
   | BCD
   | BCD2
 
-data Options
-  = Options
-  { optLogger               :: String -> IO ()
-  , optUpdateBest           :: Model -> Integer -> IO ()
-  , optUpdateLB             :: Integer -> IO ()
-  , optObjFunVarsHeuristics :: Bool
-  , optSearchStrategy       :: SearchStrategy
-  , optTrialLimitConf       :: Int
-  , optInitialModel         :: Maybe SAT.Model
+defaultSearchStrategy :: SearchStrategy
+defaultSearchStrategy = LinearSearch
+
+data Optimizer
+  = Optimizer
+  { optContext :: C.SimpleContext
+  , optSolver  :: SAT.Solver
+  , optSearchStrategyRef :: IORef SearchStrategy
+  , optEnableObjFunVarsHeuristicsRef :: IORef Bool
+  , optTrialLimitConfRef :: IORef Int
   }
 
-defaultOptions :: Options
-defaultOptions
-  = Options
-  { optLogger               = \_ -> return ()
-  , optUpdateBest           = \_ _ -> return ()
-  , optUpdateLB             = \_ -> return ()
-  , optObjFunVarsHeuristics = True
-  , optSearchStrategy       = LinearSearch
-  , optTrialLimitConf       = 1000
-  , optInitialModel         = Nothing
-  }
+newOptimizer :: SAT.Solver -> SAT.PBLinSum -> IO Optimizer
+newOptimizer solver obj = do
+  cxt <- C.newSimpleContext obj
+  strategyRef   <- newIORef defaultSearchStrategy
+  heuristicsRef <- newIORef defaultEnableObjFunVarsHeuristics
+  trialLimitRef <- newIORef defaultTrialLimitConf
+  return $
+    Optimizer
+    { optContext = cxt
+    , optSolver = solver
+    , optSearchStrategyRef = strategyRef
+    , optEnableObjFunVarsHeuristicsRef = heuristicsRef
+    , optTrialLimitConfRef = trialLimitRef
+    }
 
-minimize :: Solver -> PBLinSum -> Options -> IO (Maybe Model)
-minimize solver obj opt = do
-  when (optObjFunVarsHeuristics opt) $ tweakParams solver obj
+optimize :: Optimizer -> IO ()
+optimize opt = do
+  let cxt = optContext opt
+  let obj = C.getObjectiveFunction cxt
+  let solver = optSolver opt
 
-  updateLB (pbLowerBound obj)
-  case optInitialModel opt of
-    Just m -> do
-      let val = evalPBSum m obj
-      updateBest m val
-      addPBAtMost solver obj (val - 1)
-    Nothing -> do
-      return ()
+  getEnableObjFunVarsHeuristics opt >>= \b ->
+    when b $ tweakParams solver obj
 
-  case optSearchStrategy opt of
-    UnsatBased -> do
-      let opt2 = UnsatBased.defaultOptions
-                 { UnsatBased.optLogger     = optLogger opt
-                 , UnsatBased.optUpdateBest = optUpdateBest opt
-                 , UnsatBased.optUpdateLB   = optUpdateLB opt
-                 , UnsatBased.optInitialModel = optInitialModel opt
-                 }
-      UnsatBased.solve solver obj opt2
-    MSU4 -> do
-      let opt2 = MSU4.defaultOptions
-                 { MSU4.optLogger     = optLogger opt
-                 , MSU4.optUpdateBest = optUpdateBest opt
-                 , MSU4.optUpdateLB   = optUpdateLB opt
-                 , MSU4.optInitialModel = optInitialModel opt
-                 }
-      MSU4.solve solver obj opt2
-    BC -> do
-      let opt2 = BC.defaultOptions
-                 { BC.optLogger     = optLogger opt
-                 , BC.optUpdateBest = optUpdateBest opt
-                 , BC.optUpdateLB   = optUpdateLB opt
-                 , BC.optInitialModel = optInitialModel opt
-                 }
-      BC.solve solver obj opt2
-    BCD -> do
-      let opt2 = BCD.defaultOptions
-                 { BCD.optLogger     = optLogger opt
-                 , BCD.optUpdateBest = optUpdateBest opt
-                 , BCD.optUpdateLB   = optUpdateLB opt
-                 , BCD.optInitialModel = optInitialModel opt
-                 }
-      BCD.solve solver obj opt2
+  strategy <- getSearchStrategy opt
+  case strategy of
+    UnsatBased -> UnsatBased.solve cxt solver
+    MSU4 -> MSU4.solve cxt solver
+    BC   -> BC.solve cxt solver
+    BCD  -> BCD.solve cxt solver
     BCD2 -> do
       let opt2 = BCD2.defaultOptions
-                 { BCD2.optLogger     = optLogger opt
-                 , BCD2.optUpdateBest = optUpdateBest opt
-                 , BCD2.optUpdateLB   = optUpdateLB opt
-                 , BCD2.optInitialModel = optInitialModel opt
-                 }
-      BCD2.solve solver obj opt2
+      BCD2.solve cxt solver opt2
     _ -> do
       SAT.setEnableBackwardSubsumptionRemoval solver True
-      let f m0 = case optSearchStrategy opt of
-                   LinearSearch   -> liftM Just $ linSearch m0
-                   BinarySearch   -> liftM Just $ binSearch m0
-                   AdaptiveSearch -> liftM Just $ adaptiveSearch m0
-                   _              -> error "SAT.PBO.minimize: should not happen"
-      case optInitialModel opt of
-        Just m0 -> f m0
-        Nothing -> do
-          result <- solve solver
-          if not result then
-            return Nothing
-          else do
-            m0 <- model solver
-            f m0
 
+      join $ atomically $ do
+        ret <- C.getBestValue cxt
+        case ret of
+          Just _ -> return $ return ()
+          Nothing -> return $ do
+            result <- SAT.solve solver
+            if not result then
+              C.setFinished cxt
+            else do
+              m <- SAT.model solver
+              C.addSolution cxt m
+
+      join $ atomically $ do
+        ret <- C.getBestValue cxt
+        case ret of
+          Nothing  -> return $ return ()
+          Just val -> return $ do
+            let ub = val - 1
+            SAT.addPBAtMost solver obj ub
+
+      case strategy of
+        LinearSearch   -> linSearch cxt solver
+        BinarySearch   -> binSearch cxt solver
+        AdaptiveSearch -> do
+          lim <- getTrialLimitConf opt
+          adaptiveSearch cxt solver lim
+        _              -> error "SAT.PBO.minimize: should not happen"  
+
+getSearchStrategy :: Optimizer -> IO SearchStrategy
+getSearchStrategy opt = readIORef (optSearchStrategyRef opt)
+
+setSearchStrategy :: Optimizer -> SearchStrategy -> IO ()
+setSearchStrategy opt val = writeIORef (optSearchStrategyRef opt) val
+
+defaultEnableObjFunVarsHeuristics :: Bool
+defaultEnableObjFunVarsHeuristics = False
+
+getEnableObjFunVarsHeuristics :: Optimizer -> IO Bool
+getEnableObjFunVarsHeuristics opt = readIORef (optEnableObjFunVarsHeuristicsRef opt)
+
+setEnableObjFunVarsHeuristics :: Optimizer -> Bool -> IO ()
+setEnableObjFunVarsHeuristics opt val = writeIORef (optEnableObjFunVarsHeuristicsRef opt) val
+
+defaultTrialLimitConf :: Int
+defaultTrialLimitConf = 1000
+
+getTrialLimitConf :: Optimizer -> IO Int
+getTrialLimitConf opt = readIORef (optTrialLimitConfRef opt)
+
+setTrialLimitConf :: Optimizer -> Int -> IO ()
+setTrialLimitConf opt val = writeIORef (optTrialLimitConfRef opt) val
+
+
+setOnUpdateBestSolution :: Optimizer -> (SAT.Model -> Integer -> IO ()) -> IO ()
+setOnUpdateBestSolution opt cb = C.setOnUpdateBestSolution (optContext opt) cb
+
+setOnUpdateLowerBound :: Optimizer -> (Integer -> IO ()) -> IO ()
+setOnUpdateLowerBound opt cb = C.setOnUpdateLowerBound (optContext opt) cb
+
+setLogger :: Optimizer -> (String -> IO ()) -> IO ()
+setLogger opt cb = C.setLogger (optContext opt) cb
+
+
+addSolution :: Optimizer -> SAT.Model -> IO ()
+addSolution opt m = C.addSolution (optContext opt) m
+
+getBestSolution :: Optimizer -> IO (Maybe (SAT.Model, Integer))
+getBestSolution opt = atomically $ C.getBestSolution (optContext opt)
+
+getBestValue :: Optimizer -> IO (Maybe Integer)
+getBestValue opt = atomically $ C.getBestValue (optContext opt)
+
+getBestModel :: Optimizer -> IO (Maybe SAT.Model)
+getBestModel opt = atomically $ C.getBestModel (optContext opt)
+
+isUnsat :: Optimizer -> IO Bool
+isUnsat opt = atomically $ C.isUnsat (optContext opt)
+
+isOptimum :: Optimizer -> IO Bool
+isOptimum opt = atomically $ C.isOptimum (optContext opt)
+
+isFinished :: Optimizer -> IO Bool
+isFinished opt = atomically $ C.isFinished (optContext opt)
+
+
+linSearch :: C.Context cxt => cxt -> SAT.Solver -> IO ()
+linSearch cxt solver = loop
   where
-    logIO :: String -> IO ()
-    logIO = optLogger opt
+    obj = C.getObjectiveFunction cxt
 
-    updateBest :: Model -> Integer -> IO ()
-    updateBest = optUpdateBest opt
-
-    updateLB :: Integer -> IO ()
-    updateLB = optUpdateLB opt
-
-    linSearch :: Model -> IO Model
-    linSearch m0 = do
-      result <- solve solver
+    loop :: IO ()
+    loop = do
+      result <- SAT.solve solver
       if result then do
-        m <- model solver
-        let v = evalPBSum m obj
-        updateBest m v
-        addPBAtMost solver obj (v - 1)
-        linSearch m
-      else
-        return m0
+        m <- SAT.model solver
+        let val = SAT.evalPBSum m obj
+        let ub = val - 1
+        C.addSolution cxt m
+        SAT.addPBAtMost solver obj ub
+        loop
+      else do
+        C.setFinished cxt
+        return ()
 
-    binSearch :: Model -> IO Model
-    binSearch m0 = do
-      let ub0 = evalPBSum m0 obj - 1
-          lb0 = pbLowerBound obj
-      loop lb0 ub0 m0
-      where
-        loop lb ub m | ub < lb = return m
-        loop lb ub m = do
+binSearch :: C.Context cxt => cxt -> SAT.Solver -> IO ()
+binSearch cxt solver = loop
+  where
+    obj = C.getObjectiveFunction cxt
+
+    loop :: IO ()
+    loop = join $ atomically $ do
+      ub <- C.getSearchUpperBound cxt
+      lb <- C.getLowerBound cxt
+      if ub < lb then do
+        return $ C.setFinished cxt
+      else
+        return $ do
           let mid = (lb + ub) `div` 2
-          logIO $ printf "Binary Search: %d <= obj <= %d; guessing obj <= %d" lb ub mid
-          sel <- newVar solver
-          addPBAtMostSoft solver sel obj mid
-          ret <- solveWith solver [sel]
+          C.logMessage cxt $ printf "Binary Search: %d <= obj <= %d; guessing obj <= %d" lb ub mid
+          sel <- SAT.newVar solver
+          SAT.addPBAtMostSoft solver sel obj mid
+          ret <- SAT.solveWith solver [sel]
           if ret then do
-            m2 <- model solver
-            let v = evalPBSum m2 obj
-            updateBest m2 v
+            m <- SAT.model solver
+            let v = SAT.evalPBSum m obj
             let ub' = v - 1
-            logIO $ printf "Binary Search: updating upper bound: %d -> %d" ub ub'
+            C.logMessage cxt $ printf "Binary Search: updating upper bound: %d -> %d" ub ub'
+            C.addSolution cxt m
             -- old upper bound constraints will be removed by backward subsumption removal
-            addClause solver [sel]
-            addPBAtMost solver obj ub'
-            loop lb ub' m2
+            SAT.addClause solver [sel]
+            SAT.addPBAtMost solver obj ub'
+            loop
           else do
             -- deleting temporary constraint
-            addClause solver [-sel]
+            SAT.addClause solver [-sel]
             let lb' = mid + 1
-            updateLB lb'
-            logIO $ printf "Binary Search: updating lower bound: %d -> %d" lb lb'
-            addPBAtLeast solver obj lb'
-            loop lb' ub m
+            C.logMessage cxt $ printf "Binary Search: updating lower bound: %d -> %d" lb lb'
+            C.addLowerBound cxt lb'
+            SAT.addPBAtLeast solver obj lb'
+            loop
 
-    -- adaptive search strategy from pbct-0.1.3 <http://www.residual.se/pbct/>
-    adaptiveSearch :: Model -> IO Model
-    adaptiveSearch m0 = do
-      let ub0 = evalPBSum m0 obj - 1
-          lb0 = pbLowerBound obj
-      loop lb0 ub0 (0::Rational) m0
-      where
-        loop lb ub _ m | ub < lb = return m
-        loop lb ub fraction m = do
+-- adaptive search strategy from pbct-0.1.3 <http://www.residual.se/pbct/>
+adaptiveSearch :: C.Context cxt => cxt -> SAT.Solver -> Int -> IO ()
+adaptiveSearch cxt solver trialLimitConf = loop 0
+  where
+    obj = C.getObjectiveFunction cxt
+
+    loop :: Rational -> IO ()
+    loop fraction = join $ atomically $ do
+      ub <- C.getSearchUpperBound cxt
+      lb <- C.getLowerBound cxt
+      if ub < lb then
+        return $ C.setFinished cxt
+      else
+        return $ do
           let interval = ub - lb
               mid = ub - floor (fromIntegral interval * fraction)
           if ub == mid then do
-            logIO $ printf "Adaptive Search: %d <= obj <= %d" lb ub
-            result <- solve solver
+            C.logMessage cxt $ printf "Adaptive Search: %d <= obj <= %d" lb ub
+            result <- SAT.solve solver
             if result then do
-              m2 <- model solver
-              let v = evalPBSum m2 obj
-              updateBest m2 v
-              let ub'   = v - 1
-                  fraction' = min 0.5 (fraction + 0.1)
-              loop lb ub' fraction' m2
+              m <- SAT.model solver
+              let v = SAT.evalPBSum m obj
+              let ub' = v - 1
+              C.addSolution cxt m
+              SAT.addPBAtMost solver obj ub'
+              let fraction' = min 0.5 (fraction + 0.1)
+              loop fraction'
             else
-              return m
+              C.setFinished cxt
           else do
-            logIO $ printf "Adaptive Search: %d <= obj <= %d; guessing obj <= %d" lb ub mid
-            sel <- newVar solver
-            addPBAtMostSoft solver sel obj mid
-            setConfBudget solver $ Just (optTrialLimitConf opt)
-            ret' <- try $ solveWith solver [sel]
-            setConfBudget solver Nothing
+            C.logMessage cxt $ printf "Adaptive Search: %d <= obj <= %d; guessing obj <= %d" lb ub mid
+            sel <- SAT.newVar solver
+            SAT.addPBAtMostSoft solver sel obj mid
+            SAT.setConfBudget solver $ Just trialLimitConf
+            ret' <- try $ SAT.solveWith solver [sel]
+            SAT.setConfBudget solver Nothing
             case ret' of
-              Left BudgetExceeded -> do
+              Left SAT.BudgetExceeded -> do
                 let fraction' = max 0 (fraction - 0.05)
-                loop lb ub fraction' m
+                loop fraction'
               Right ret -> do
                 let fraction' = min 0.5 (fraction + 0.1)
                 if ret then do
-                  m2 <- model solver
-                  let v = evalPBSum m2 obj
-                  updateBest m2 v
+                  m <- SAT.model solver
+                  let v = SAT.evalPBSum m obj
                   let ub' = v - 1
-                  logIO $ printf "Adaptive Search: updating upper bound: %d -> %d" ub ub'
+                  C.logMessage cxt $ printf "Adaptive Search: updating upper bound: %d -> %d" ub ub'
+                  C.addSolution cxt m
                   -- old upper bound constraints will be removed by backward subsumption removal
-                  addClause solver [sel]
-                  addPBAtMost solver obj ub'
-                  loop lb ub' fraction' m2
+                  SAT.addClause solver [sel]
+                  SAT.addPBAtMost solver obj ub'
+                  loop fraction'
                 else do
                   -- deleting temporary constraint
-                  addClause solver [-sel]
+                  SAT.addClause solver [-sel]
                   let lb' = mid + 1
-                  updateLB lb'
-                  logIO $ printf "Adaptive Search: updating lower bound: %d -> %d" lb lb'
-                  addPBAtLeast solver obj lb'
-                  loop lb' ub fraction' m
+                  C.logMessage cxt $ printf "Adaptive Search: updating lower bound: %d -> %d" lb lb'
+                  C.addLowerBound cxt lb'
+                  SAT.addPBAtLeast solver obj lb'
+                  loop fraction'
 
-tweakParams :: Solver -> PBLinSum -> IO ()
+tweakParams :: SAT.Solver -> SAT.PBLinSum -> IO ()
 tweakParams solver obj = do
   forM_ obj $ \(c,l) -> do
-    let p = if c > 0 then not (litPolarity l) else litPolarity l
-    setVarPolarity solver (litVar l) p
+    let p = if c > 0 then not (SAT.litPolarity l) else SAT.litPolarity l
+    SAT.setVarPolarity solver (SAT.litVar l) p
   let cs = Set.fromList [abs c | (c,_) <- obj]
       ws = Map.fromAscList $ zip (Set.toAscList cs) [1..]
   forM_ obj $ \(c,l) -> do
     let w = ws Map.! abs c
-    replicateM w $ varBumpActivity solver (litVar l)
+    replicateM w $ SAT.varBumpActivity solver (SAT.litVar l)

@@ -21,94 +21,61 @@
 --
 -----------------------------------------------------------------------------
 module SAT.PBO.MSU4
-  ( Options (..)
-  , defaultOptions
-  , solve
+  ( solve
   ) where
 
+import Control.Concurrent.STM
+import Control.Monad
 import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
 import qualified SAT as SAT
 import qualified SAT.Types as SAT
-
+import qualified SAT.PBO.Context as C
 import Text.Printf
 
-data Options
-  = Options
-  { optLogger      :: String -> IO ()
-  , optUpdateBest  :: SAT.Model -> Integer -> IO ()
-  , optUpdateLB    :: Integer -> IO ()
-  , optInitialModel :: Maybe SAT.Model
-  }
+solve :: C.Context cxt => cxt -> SAT.Solver -> IO ()
+solve cxt solver = solveWBO (C.normalize cxt) solver
 
-defaultOptions :: Options
-defaultOptions
-  = Options
-  { optLogger     = \_ -> return ()
-  , optUpdateBest = \_ _ -> return ()
-  , optUpdateLB   = \_ -> return ()
-  , optInitialModel = Nothing
-  }
-
-solve :: SAT.Solver -> [(Integer, SAT.Lit)] -> Options -> IO (Maybe SAT.Model)
-solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
-  where
-    (obj',offset) = SAT.normalizePBSum (obj,0)
-    opt' =
-      opt
-      { optUpdateBest = \m val -> optUpdateBest opt m (offset + val)
-      , optUpdateLB   = \val -> optUpdateLB opt (offset + val)
-      }
-
-solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
-solveWBO solver sels opt = do
+solveWBO :: C.Context cxt => cxt -> SAT.Solver -> IO ()
+solveWBO cxt solver = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
-  case optInitialModel opt of
-    Just m -> do
-      loop (IM.keysSet weights, IS.empty) 0 (Just (m, SAT.evalPBSum m obj))
-    Nothing -> do
-      loop (IM.keysSet weights, IS.empty) 0 Nothing
+  loop (IM.keysSet weights, IS.empty) 0
 
   where
+    obj :: SAT.PBLinSum
+    obj = C.getObjectiveFunction cxt
+
+    sels :: [(SAT.Lit, Integer)]
+    sels = [(-lit, w) | (w,lit) <- obj]
+
     weights :: SAT.LitMap Integer
     weights = IM.fromList sels
-
-    obj :: SAT.PBLinSum
-    obj = [(w, -lit) | (lit,w) <- sels]
  
-    loop :: (SAT.LitSet, SAT.LitSet) -> Integer -> Maybe (SAT.Model, Integer) -> IO (Maybe SAT.Model)
-    loop (unrelaxed, relaxed) lb best = do
+    loop :: (SAT.LitSet, SAT.LitSet) -> Integer -> IO ()
+    loop (unrelaxed, relaxed) lb = do
       ret <- SAT.solveWith solver (IS.toList unrelaxed)
       if ret then do
         currModel <- SAT.model solver
+        C.addSolution cxt currModel
         let violated = [weights IM.! l | l <- IS.toList relaxed, SAT.evalLit currModel l == False]
             currVal = sum violated
-        best' <-
-          case best of
-            Just (_, bestVal)
-              | currVal < bestVal -> do
-                  optUpdateBest opt currModel currVal
-                  return $ Just (currModel, currVal)
-              | otherwise -> do
-                  return best
-            Nothing -> do
-              optUpdateBest opt currModel currVal
-              return $ Just (currModel, currVal)
         SAT.addPBAtMost solver [(c,-l) | (l,c) <- sels] (currVal - 1)
-        cont (unrelaxed, relaxed) lb best'
+        cont (unrelaxed, relaxed) lb
       else do
         core <- SAT.failedAssumptions solver
         let ls = IS.fromList core `IS.intersection` unrelaxed
         if IS.null ls then do
-          return (fmap fst best)
+          C.setFinished cxt
         else do
           SAT.addClause solver [-l | l <- core] -- optional constraint but sometimes useful
           let min_weight = minimum [weights IM.! l | l <- IS.toList ls]
               lb' = lb + min_weight
-          optLogger opt $ printf "MSU4: found a core: size = %d, minimal weight = %d" (length core) min_weight 
-          optUpdateLB opt lb'
-          cont (unrelaxed `IS.difference` ls, relaxed `IS.union` ls) lb' best
+          C.logMessage cxt $ printf "MSU4: found a core: size = %d, minimal weight = %d" (length core) min_weight 
+          C.addLowerBound cxt lb'
+          cont (unrelaxed `IS.difference` ls, relaxed `IS.union` ls) lb'
 
-    cont :: (SAT.LitSet, SAT.LitSet) -> Integer -> Maybe (SAT.Model, Integer) -> IO (Maybe SAT.Model)
-    cont _ lb (Just (bestModel, bestVal)) | lb == bestVal  = return (Just bestModel)
-    cont (unrelaxed, relaxed) lb best = loop (unrelaxed, relaxed) lb best
+    cont :: (SAT.LitSet, SAT.LitSet) -> Integer -> IO ()
+    cont (unrelaxed, relaxed) lb = do
+      join $ atomically $ do
+        b <- C.isFinished cxt
+        return $ if b then return () else loop (unrelaxed, relaxed) lb

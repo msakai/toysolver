@@ -20,92 +20,64 @@
 -- 
 -----------------------------------------------------------------------------
 module SAT.PBO.BC
-  ( Options (..)
-  , defaultOptions
-  , solve
+  ( solve
   ) where
 
+import Control.Concurrent.STM
 import qualified Data.IntSet as IntSet
 import qualified Data.IntMap as IntMap
 import qualified SAT as SAT
 import qualified SAT.Types as SAT
+import qualified SAT.PBO.Context as C
 import Text.Printf
 
-data Options
-  = Options
-  { optLogger      :: String -> IO ()
-  , optUpdateBest  :: SAT.Model -> Integer -> IO ()
-  , optUpdateLB    :: Integer -> IO ()
-  , optInitialModel :: Maybe SAT.Model
-  }
+solve :: C.Context cxt => cxt -> SAT.Solver -> IO ()
+solve cxt solver = solveWBO (C.normalize cxt) solver
 
-defaultOptions :: Options
-defaultOptions
-  = Options
-  { optLogger     = \_ -> return ()
-  , optUpdateBest = \_ _ -> return ()
-  , optUpdateLB   = \_ -> return ()
-  , optInitialModel = Nothing
-  }
-
-solve :: SAT.Solver -> SAT.PBLinSum -> Options -> IO (Maybe SAT.Model)
-solve solver obj opt = solveWBO solver [(-v, c) | (c,v) <- obj'] opt'
-  where
-    (obj',offset) = SAT.normalizePBSum (obj,0)
-    opt' =
-      opt
-      { optUpdateBest = \m val -> optUpdateBest opt m (offset + val)
-      , optUpdateLB   = \val -> optUpdateLB opt (offset + val)
-      }
-
-solveWBO :: SAT.Solver -> [(SAT.Lit, Integer)] -> Options -> IO (Maybe SAT.Model)
-solveWBO solver sels opt = do
+solveWBO :: C.Context cxt => cxt -> SAT.Solver -> IO ()
+solveWBO cxt solver = do
   SAT.setEnableBackwardSubsumptionRemoval solver True
-  case optInitialModel opt of
-    Just m -> do
-      loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty) (0, SAT.evalPBSum m obj - 1) (Just m)
-    Nothing -> do
-      loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty) (0, SAT.pbUpperBound obj) Nothing
+  ub <- atomically $ C.getSearchUpperBound cxt
+  loop (IntSet.fromList [lit | (lit,_) <- sels], IntSet.empty) (0, ub)
 
   where
+    obj :: SAT.PBLinSum
+    obj = C.getObjectiveFunction cxt
+
+    sels :: [(SAT.Lit, Integer)]
+    sels = [(-lit, w) | (w,lit) <- obj]
+
     weights :: SAT.LitMap Integer
     weights = IntMap.fromList sels
 
-    obj :: SAT.PBLinSum
-    obj = [(w, -lit) | (lit,w) <- sels]
-
-    loop :: (SAT.LitSet, SAT.LitSet) -> (Integer, Integer) -> Maybe SAT.Model -> IO (Maybe SAT.Model)
-    loop (unrelaxed, relaxed) (lb, ub) lastModel
-      | lb > ub = return lastModel
+    loop :: (SAT.LitSet, SAT.LitSet) -> (Integer, Integer) -> IO ()
+    loop (unrelaxed, relaxed) (lb, ub)
+      | lb > ub = C.setFinished cxt
       | otherwise = do
           let mid = (lb + ub) `div` 2
-          logIO $ printf "BC: %d <= obj <= %d; guessing obj <= %d" lb ub mid
+          C.logMessage cxt $ printf "BC: %d <= obj <= %d; guessing obj <= %d" lb ub mid
           sel <- SAT.newVar solver
           SAT.addPBAtMostSoft solver sel [(weights IntMap.! lit, -lit) | lit <- IntSet.toList relaxed] mid
           ret <- SAT.solveWith solver (sel : IntSet.toList unrelaxed)
           if ret then do
             m <- SAT.model solver
             let val = SAT.evalPBSum m obj
-            optUpdateBest opt m val
             let ub' = val - 1
-            logIO $ printf "BC: updating upper bound: %d -> %d" ub ub'
+            C.logMessage cxt $ printf "BC: updating upper bound: %d -> %d" ub ub'
+            C.addSolution cxt m
             SAT.addClause solver [sel]
-            -- FIXME: improve backward subsumption removal to delete the old upper bound constraint of 
             SAT.addPBAtMost solver obj ub'
-            loop (unrelaxed, relaxed) (lb, ub') (Just m)
+            loop (unrelaxed, relaxed) (lb, ub')
           else do
             core <- SAT.failedAssumptions solver
             SAT.addClause solver [-sel] -- delete temporary constraint
             let core2 = IntSet.fromList core `IntSet.intersection` unrelaxed
             if IntSet.null core2 then do
-              logIO $ printf "BC: updating lower bound: %d -> %d" lb (mid+1)
-              optUpdateLB opt (mid+1)
-              loop (unrelaxed, relaxed) (mid+1, ub) lastModel
+              C.logMessage cxt $ printf "BC: updating lower bound: %d -> %d" lb (mid+1)
+              C.addLowerBound cxt (mid+1)
+              loop (unrelaxed, relaxed) (mid+1, ub)
             else do
               let unrelaxed' = unrelaxed `IntSet.difference` core2
                   relaxed'   = relaxed `IntSet.union` core2
-              logIO $ printf "BC: #unrelaxed=%d, #relaxed=%d" (IntSet.size unrelaxed') (IntSet.size relaxed')
-              loop (unrelaxed', relaxed') (lb, ub) lastModel
-
-    logIO :: String -> IO ()
-    logIO = optLogger opt
+              C.logMessage cxt $ printf "BC: #unrelaxed=%d, #relaxed=%d" (IntSet.size unrelaxed') (IntSet.size relaxed')
+              loop (unrelaxed', relaxed') (lb, ub)
