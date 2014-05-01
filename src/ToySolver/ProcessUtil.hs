@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -7,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (CPP)
 --
 -----------------------------------------------------------------------------
 module ToySolver.ProcessUtil
@@ -16,21 +17,27 @@ module ToySolver.ProcessUtil
 
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Exception (SomeException, try, mask)
+import Control.Exception (SomeException, try, mask, throwIO)
 import qualified Control.Exception as C
 import Control.Monad
+import Foreign.C
 import System.Exit
 import System.IO
 import System.IO.Error
 import System.Process
 
+#ifdef __GLASGOW_HASKELL__
+import GHC.IO.Exception ( IOErrorType(..), IOException(..) )
+#endif
+
 runProcessWithOutputCallback
   :: FilePath -- ^ Filename of the executable (see 'proc' for details)
   -> [String] -- ^ any arguments
+  -> String   -- ^ standard input
   -> (String -> IO ()) -- ^ callback function which is called when a line is read from stdout
   -> (String -> IO ()) -- ^ callback function which is called when a line is read from stderr
   -> IO ExitCode
-runProcessWithOutputCallback cmd args putMsg putErr = do
+runProcessWithOutputCallback cmd args input putMsg putErr = do
   (Just inh, Just outh, Just errh, processh) <- createProcess
     (proc cmd args)
     { std_in  = CreatePipe
@@ -45,7 +52,12 @@ runProcessWithOutputCallback cmd args putMsg putErr = do
            `catchIOError` (\e -> if isEOFError e then return () else ioError e)
   withForkWait m1 $ \waitOut -> do
     withForkWait m2 $ \waitErr -> do
-      hClose inh
+      -- now write any input
+      unless (null input) $
+        ignoreSigPipe $ hPutStr inh input
+      -- hClose performs implicit hFlush, and thus may trigger a SIGPIPE
+      ignoreSigPipe $ hClose inh
+
       hSetBuffering outh LineBuffering
       hSetBuffering errh LineBuffering
       let loop = join $ atomically $ msum $
@@ -68,3 +80,14 @@ withForkWait async body = do
     tid <- forkIO $ try (restore async) >>= \v -> atomically (putTMVar waitVar v)
     let wait = takeTMVar waitVar >>= either throwSTM return
     restore (body wait) `C.onException` killThread tid
+
+ignoreSigPipe :: IO () -> IO ()
+#if defined(__GLASGOW_HASKELL__)
+ignoreSigPipe = C.handle $ \e -> case e of
+                                   IOError { ioe_type  = ResourceVanished
+                                           , ioe_errno = Just ioe }
+                                     | Errno ioe == ePIPE -> return ()
+                                   _ -> throwIO e
+#else
+ignoreSigPipe = id
+#endif

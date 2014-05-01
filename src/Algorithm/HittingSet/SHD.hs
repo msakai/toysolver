@@ -88,7 +88,7 @@ minimalHittingSets opt es = do
 execSHD :: Options -> FilePath -> FilePath -> IO ()
 execSHD opt inputFile outputFile = do
   let args = optSHDArgs opt ++ [inputFile, outputFile]
-  exitcode <- runProcessWithOutputCallback (optSHDCommand opt) args (optOnGetLine opt) (optOnGetErrorLine opt)
+  exitcode <- runProcessWithOutputCallback (optSHDCommand opt) args "" (optOnGetLine opt) (optOnGetErrorLine opt)
   case exitcode of
     ExitFailure n -> throwIO $ Failure n
     ExitSuccess -> return ()

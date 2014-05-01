@@ -94,7 +94,7 @@ minimalHittingSets opt es = do
 execHTCBDD :: Options -> FilePath -> FilePath -> IO ()
 execHTCBDD opt inputFile outputFile = do
   let args = ["-k" | optMethod opt == MethodKnuth] ++ [inputFile, outputFile]
-  exitcode <- runProcessWithOutputCallback (optHTCBDDCommand opt) args (optOnGetLine opt) (optOnGetErrorLine opt)
+  exitcode <- runProcessWithOutputCallback (optHTCBDDCommand opt) args "" (optOnGetLine opt) (optOnGetErrorLine opt)
   case exitcode of
     ExitFailure n -> throwIO $ Failure n
     ExitSuccess -> return ()
