@@ -8,7 +8,12 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (DeriveDataTypeable)
+-- 
+-- Wrapper for shd command.
+--
+-- * Hypergraph Dualization Repository
+--   <http://research.nii.ac.jp/~uno/dualization.html>
 --
 -----------------------------------------------------------------------------
 module Algorithm.HittingSet.SHD

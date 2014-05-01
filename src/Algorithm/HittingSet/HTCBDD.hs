@@ -8,7 +8,12 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (DeriveDataTypeable)
+--
+-- Wrapper for htcbdd command.
+--
+-- * HTC-BDD: Hypergraph Transversal Computation with Binary Decision Diagrams
+--   <http://kuma-san.net/htcbdd.html>
 --
 -----------------------------------------------------------------------------
 module Algorithm.HittingSet.HTCBDD
