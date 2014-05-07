@@ -1252,7 +1252,7 @@ checkForwardSubsumption solver lits = do
       bracket
         (getEnablePhaseSaving solver)
         (setEnablePhaseSaving solver)
-        (const m)
+        (\_ -> setEnablePhaseSaving solver flag >> m)
 
 removeBackwardSubsumedBy :: Solver -> PBLinAtLeast -> IO ()
 removeBackwardSubsumedBy solver pb = do
