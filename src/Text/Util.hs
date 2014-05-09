@@ -1,8 +1,8 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Text.Util
--- Copyright   :  (c) Masahiro Sakai 2012-2013
+-- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -14,6 +14,8 @@ module Text.Util
   ( readInt
   , readUnsignedInteger
   ) where
+
+#include "MachDeps.h"
 
 import Control.Exception
 import Data.Word
@@ -54,7 +56,12 @@ readUnsignedInteger str = assert (result == read str) $ result
     result = go 0 str
 
     lim :: Word
+#if !MIN_VERSION_base(4,6,1) && WORD_SIZE_IN_BITS == 32
+    {- To avoid a bug of maxBound <https://ghc.haskell.org/trac/ghc/ticket/8072> -}
+    lim = 0xFFFFFFFF `div` 10
+#else
     lim = maxBound `div` 10
+#endif
   
     go :: Integer -> [Char] -> Integer 
     go !r [] = r
