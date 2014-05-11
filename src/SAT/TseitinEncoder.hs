@@ -43,6 +43,7 @@ module SAT.TseitinEncoder
 
   -- * Encoding of boolean formula
   , Formula (..)
+  , evalFormula
   , addFormula
   , encodeConj
   , encodeDisj
@@ -66,6 +67,16 @@ data Formula
   | Imply Formula Formula
   | Equiv Formula Formula
   deriving (Show, Eq, Ord)
+
+evalFormula :: SAT.Model -> Formula -> Bool
+evalFormula m = e
+  where
+    e (Lit l)  = SAT.evalLit m l
+    e (And fs) = and (map e fs)
+    e (Or fs)  = or (map e fs)
+    e (Not f)  = not (e f)
+    e (Imply f1 f2) = not (e f1) || e f2
+    e (Equiv f1 f2) = e f1 == e f2
 
 -- | Encoder instance
 data Encoder =

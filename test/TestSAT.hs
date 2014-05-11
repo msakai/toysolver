@@ -2,6 +2,7 @@
 module Main (main) where
 
 import Control.Monad
+import Data.Array.IArray
 import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -501,6 +502,20 @@ case_encodeDisj = do
   evalLit m x1 @?= False
   evalLit m x2 @?= False
   evalLit m x3 @?= False
+
+case_evalFormula = do
+  solver <- newSolver
+  xs <- newVars solver 5
+  let f = Or [Imply x1 (And [x3,x4]), Imply x2 (And [x3,x5])]
+        where
+          [x1,x2,x3,x4,x5] = map Tseitin.Lit xs
+      g m = (not x1 || (x3 && x4)) || (not x2 || (x3 && x5))
+        where
+          [x1,x2,x3,x4,x5] = elems m
+  let ms :: [Model]
+      ms = liftM (array (1,5)) $ sequence [[(x,val) | val <- [False,True]] | x <- xs]
+  forM_ ms $ \m -> do
+    Tseitin.evalFormula m f @?= g m
 
 ------------------------------------------------------------------------
 
