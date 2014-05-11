@@ -47,6 +47,7 @@ module SAT.TseitinEncoder
   , addFormula
   , encodeConj
   , encodeDisj
+  , getDefinitions
   ) where
 
 import Control.Monad
@@ -197,3 +198,8 @@ addIsConjOf encoder l ls = do
   -- ((l1 ∧ l2 ∧ … ∧ ln) → l)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ l)
   SAT.addClause solver (l : map SAT.litNot ls)
   modifyIORef (encConjTable encoder) (Map.insert (IntSet.fromList ls) l)
+
+getDefinitions :: Encoder -> IO [(SAT.Lit, Formula)]
+getDefinitions encoder = do
+  t <- readIORef (encConjTable encoder)
+  return $ [(l, And [Lit l1 | l1 <- IntSet.toList ls]) | (ls, l) <- Map.toList t]
