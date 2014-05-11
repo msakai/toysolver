@@ -13,34 +13,37 @@
 --
 -----------------------------------------------------------------------------
 module SAT.PBO
-  ( Optimizer
+  (
+  -- * The @Optimizer@ type
+    Optimizer
   , newOptimizer
+
+  -- * Solving
   , optimize
-
-  , SearchStrategy (..)
-  , defaultSearchStrategy
-  , getSearchStrategy
-  , setSearchStrategy
-
-  , defaultEnableObjFunVarsHeuristics
-  , getEnableObjFunVarsHeuristics
-  , setEnableObjFunVarsHeuristics
-
-  , defaultTrialLimitConf
-  , getTrialLimitConf
-  , setTrialLimitConf
-
-  , setOnUpdateBestSolution
-  , setOnUpdateLowerBound
-  , setLogger
-
   , addSolution
+
+  -- * Extract results
   , getBestSolution
   , getBestValue
   , getBestModel
   , isUnsat
   , isOptimum
   , isFinished
+
+  -- * Configulation
+  , SearchStrategy (..)
+  , defaultSearchStrategy
+  , getSearchStrategy
+  , setSearchStrategy
+  , defaultEnableObjFunVarsHeuristics
+  , getEnableObjFunVarsHeuristics
+  , setEnableObjFunVarsHeuristics
+  , defaultTrialLimitConf
+  , getTrialLimitConf
+  , setTrialLimitConf
+  , setOnUpdateBestSolution
+  , setOnUpdateLowerBound
+  , setLogger
   ) where
 
 import Control.Concurrent.STM

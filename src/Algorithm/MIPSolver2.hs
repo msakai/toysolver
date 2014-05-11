@@ -42,12 +42,14 @@ module Algorithm.MIPSolver2
   , optimize
 
   -- * Extract results
-  , model
-  , getObjValue
+  , getBestSolution
+  , getBestValue
+  , getBestModel
 
   -- * Configulation
   , setNThread
   , setLogger
+  , setOnUpdateBestSolution
   , setShowRational
   ) where
 
@@ -87,6 +89,7 @@ data Solver
 
   , mipNThread :: IORef Int
   , mipLogger  :: IORef (Maybe (String -> IO ()))
+  , mipOnUpdateBestSolution :: IORef (Model -> Rational -> IO ())
   , mipShowRational :: IORef Bool
   }
 
@@ -118,6 +121,7 @@ newSolver lp ivs = do
   nthreadRef <- newIORef 0
   logRef  <- newIORef Nothing
   showRef <- newIORef False
+  updateRef <- newIORef (\_ _ -> return ())
 
   return $
     MIP
@@ -127,12 +131,14 @@ newSolver lp ivs = do
 
     , mipNThread = nthreadRef
     , mipLogger = logRef
+    , mipOnUpdateBestSolution = updateRef
     , mipShowRational = showRef
     }
 
-optimize :: Solver -> (Model -> Rational -> IO ()) -> IO OptResult
-optimize solver update = do
+optimize :: Solver -> IO OptResult
+optimize solver = do
   let lp = mipRootLP solver
+  update <- readIORef (mipOnUpdateBestSolution solver)
   log solver "MIP: Solving LP relaxation..."
   ret <- Simplex2.check lp
   if not ret
@@ -364,19 +370,20 @@ branchAndBound solver rootLP update = do
 
     loop
 
-model :: Solver -> IO Model
-model solver = do
-  m <- readTVarIO (mipBest solver)
-  case m of
-    Nothing -> error "no model"
-    Just node -> Simplex2.model (ndLP node)
+getBestSolution :: Solver -> IO (Maybe (Model, Rational))
+getBestSolution solver = do
+  ret <- readTVarIO (mipBest solver)
+  case ret of
+    Nothing -> return Nothing
+    Just node -> do
+      m <- Simplex2.model (ndLP node)
+      return $ Just (m, ndValue node)
 
-getObjValue :: Solver -> IO Rational
-getObjValue solver = do
-  m <- readTVarIO (mipBest solver)
-  case m of
-    Nothing -> error "no model"
-    Just node -> return $ ndValue node
+getBestModel :: Solver -> IO (Maybe Model)
+getBestModel solver = liftM (fmap fst) $ getBestSolution solver
+
+getBestValue :: Solver -> IO (Maybe Rational)
+getBestValue solver = liftM (fmap snd) $ getBestSolution solver
 
 violated :: Node -> IS.IntSet -> IO [(Var, Rational)]
 violated node ivs = do
@@ -412,6 +419,10 @@ setNThread solver = writeIORef (mipNThread solver)
 setLogger :: Solver -> (String -> IO ()) -> IO ()
 setLogger solver logger = do
   writeIORef (mipLogger solver) (Just logger)
+
+setOnUpdateBestSolution :: Solver -> (Model -> Rational -> IO ()) -> IO ()
+setOnUpdateBestSolution solver cb = do
+  writeIORef (mipOnUpdateBestSolution solver) cb
 
 log :: Solver -> String -> IO ()
 log solver msg = logIO solver (return msg)

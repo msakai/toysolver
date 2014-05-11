@@ -247,6 +247,7 @@ run solver opt mip printModel = do
       mip <- MIPSolver2.newSolver solver ivs2
       MIPSolver2.setShowRational mip printRat
       MIPSolver2.setLogger mip putCommentLine
+      MIPSolver2.setOnUpdateBestSolution mip $ \m val -> putOLine (showValue val)
 
       procs <-
         if nthreads >= 1
@@ -258,21 +259,19 @@ run solver opt mip printModel = do
       setNumCapabilities procs
       MIPSolver2.setNThread mip procs
 
-      let update m val = putOLine $ showValue val
-      ret <- MIPSolver2.optimize mip update
+      ret <- MIPSolver2.optimize mip
       case ret of
         Simplex2.Unsat -> do
           putSLine "UNSATISFIABLE"
           exitFailure
         Simplex2.Unbounded -> do
           putSLine "UNBOUNDED"
-          m <- MIPSolver2.model mip
+          Just m <- MIPSolver2.getBestModel mip
           let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2
           exitFailure
         Simplex2.Optimum -> do
-          m <- MIPSolver2.model mip
-          r <- MIPSolver2.getObjValue mip
+          Just m <- MIPSolver2.getBestModel mip
           putSLine "OPTIMUM FOUND"
           let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2

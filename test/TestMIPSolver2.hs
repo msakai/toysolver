@@ -50,15 +50,15 @@ case_test1 = do
   setObj lp obj
   mapM_ (Simplex2.assertAtom lp) cs
   mip <- MIPSolver2.newSolver lp ivs
-  ret <- MIPSolver2.optimize mip (\_ _ -> return ())
+  ret <- MIPSolver2.optimize mip
   
   ret @?= Simplex2.Optimum
 
-  m <- MIPSolver2.model mip
+  Just m <- MIPSolver2.getBestModel mip
   forM_ [(1,40),(2,21/2),(3,39/2),(4,3)] $ \(var, val) ->
     m IM.! var @?= val
 
-  v <- MIPSolver2.getObjValue mip
+  Just v <- MIPSolver2.getBestValue mip
   v @?= 245/2
 
 case_test1' = do
@@ -69,15 +69,15 @@ case_test1' = do
   setObj lp (negateV obj)
   mapM_ (Simplex2.assertAtom lp) cs
   mip <- MIPSolver2.newSolver lp ivs
-  ret <- MIPSolver2.optimize mip (\_ _ -> return ())
+  ret <- MIPSolver2.optimize mip
   
   ret @?= Simplex2.Optimum
 
-  m <- MIPSolver2.model mip
+  Just m <- MIPSolver2.getBestModel mip
   forM_ [(1,40),(2,21/2),(3,39/2),(4,3)] $ \(var, val) ->
     m IM.! var @?= val
 
-  v <- MIPSolver2.getObjValue mip
+  Just v <- MIPSolver2.getBestValue mip
   v @?= -245/2
 
   where
@@ -108,15 +108,15 @@ case_test2 = do
   setObj lp obj
   mapM_ (Simplex2.assertAtom lp) cs
   mip <- MIPSolver2.newSolver lp ivs
-  ret <- MIPSolver2.optimize mip (\_ _ -> return ())
+  ret <- MIPSolver2.optimize mip
   
   ret @?= Simplex2.Optimum
 
-  m <- MIPSolver2.model mip
+  Just m <- MIPSolver2.getBestModel mip
   forM_ [(1,0),(2,2),(3,5/2)] $ \(var, val) ->
     m IM.! var @?= val
 
-  v <- MIPSolver2.getObjValue mip
+  Just v <- MIPSolver2.getBestValue mip
   v @?= -37/2
 
 ------------------------------------------------------------------------
