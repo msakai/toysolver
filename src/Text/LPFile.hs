@@ -407,7 +407,7 @@ number = tok $ do
 
 -- | Render a problem into a string.
 render :: MIP.Problem -> Maybe String
-render mip = fmap ($ "") $ execWriterT (render' mip)
+render mip = fmap ($ "") $ execWriterT $ render' $ removeEmptyExpr mip
 
 render' :: MIP.Problem -> WriterT ShowS Maybe ()
 render' mip = do
@@ -590,3 +590,23 @@ compileExpr e = do
 -}
 
 -- ---------------------------------------------------------------------------
+
+removeEmptyExpr :: MIP.Problem -> MIP.Problem
+removeEmptyExpr prob =
+  prob
+  { MIP.objectiveFunction =
+      case MIP.objectiveFunction prob of
+        (label, e) -> (label, convertExpr e)
+  , MIP.constraints = map convertConstr $ MIP.constraints prob
+  , MIP.userCuts    = map convertConstr $ MIP.userCuts prob
+  }
+  where
+    convertExpr [] = [MIP.Term 0 [MIP.toVar "x0"]]
+    convertExpr e = e
+
+    convertConstr constr =
+      constr
+      { MIP.constrBody =
+          case MIP.constrBody constr of
+            (lhs,op,rhs) -> (convertExpr lhs, op, rhs)
+      }

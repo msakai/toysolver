@@ -67,7 +67,6 @@ convert formula = (mip, mtrans (PBFile.pbNumVars formula))
         }
 
 convExpr :: PBFile.Sum -> MIP.Expr
-convExpr [] = [MIP.Term 0 [MIP.toVar "x1"]]
 convExpr s = concatMap g2 s
   where
     g2 :: PBFile.WeightedTerm -> MIP.Expr
