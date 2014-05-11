@@ -437,7 +437,7 @@ case_addFormula = do
   solver <- newSolver
   enc <- Tseitin.newEncoder solver
 
-  [x1,x2,x3,x4,x5] <- replicateM 5 $ liftM Var $ newVar solver
+  [x1,x2,x3,x4,x5] <- replicateM 5 $ liftM Lit $ newVar solver
   Tseitin.addFormula enc $ Or [Imply x1 (And [x3,x4]), Imply x2 (And [x3,x5])]
   -- x6 = x3 ∧ x4
   -- x7 = x3 ∧ x5

@@ -59,7 +59,7 @@ import qualified SAT.Types as SAT
 
 -- | Arbitrary formula not restricted to CNF
 data Formula
-  = Var SAT.Var
+  = Lit SAT.Lit
   | And [Formula]
   | Or [Formula]
   | Not Formula
@@ -134,7 +134,7 @@ encodeToClause encoder formula =
 encodeToLit :: Encoder -> Formula -> IO SAT.Lit
 encodeToLit encoder formula = do
   case formula of
-    Var v -> return v
+    Lit l -> return l
     And xs -> encodeConj encoder =<< mapM (encodeToLit encoder) xs
     Or xs  -> encodeDisj encoder =<< mapM (encodeToLit encoder) xs
     Not x -> liftM SAT.litNot $ encodeToLit encoder x
@@ -144,10 +144,9 @@ encodeToLit encoder formula = do
       lit1 <- encodeToLit encoder x
       lit2 <- encodeToLit encoder y
       encodeToLit encoder $
-        And [ Imply (Var lit1) (Var lit2)
-            , Imply (Var lit2) (Var lit1)
+        And [ Imply (Lit lit1) (Lit lit2)
+            , Imply (Lit lit2) (Lit lit1)
             ]
-        -- Varにリテラルを渡しているのは少し気持ち悪い
 
 -- | Return an literal which is equivalent to a given conjunction.
 encodeConj :: Encoder -> [SAT.Lit] -> IO SAT.Lit
