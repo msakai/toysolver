@@ -90,5 +90,5 @@ addConstraintSoft enc sel (Rel lhs op rhs) = do
       SAT.addPBAtLeastSoft solver sel3 lhs2 (rhs2+1)
       SAT.addPBAtMostSoft  solver sel4 lhs2 (rhs2-1)
 
-eval :: SAT.Model -> Expr -> Integer
-eval m (Expr ts) = sum [if and [m ! SAT.litVar lit == SAT.litPolarity lit | lit <- lits] then n else 0 | (n,lits) <- ts]
+eval :: SAT.IModel m => m -> Expr -> Integer
+eval m (Expr ts) = sum [if and [SAT.evalLit m lit | lit <- lits] then n else 0 | (n,lits) <- ts]

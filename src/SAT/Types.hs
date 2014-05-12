@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, FlexibleInstances #-}
 module SAT.Types
   (
   -- * Variable
@@ -8,6 +8,7 @@ module SAT.Types
   , validVar
 
   -- * Model
+  , IModel (..)
   , Model
 
   -- * Literal
@@ -72,8 +73,20 @@ type VarMap = IntMap
 validVar :: Var -> Bool
 validVar v = v > 0
 
+class IModel a where
+  evalVar :: a -> Var -> Bool
+
 -- | A model is represented as a mapping from variables to its values.
 type Model = UArray Var Bool
+
+instance IModel (UArray Var Bool) where
+  evalVar m v = m ! v
+
+instance IModel (Array Var Bool) where
+  evalVar m v = m ! v
+
+instance IModel (Var -> Bool) where
+  evalVar m v = m v
 
 -- | Positive (resp. negative) literals are represented as positive (resp.
 -- negative) integers. (DIMACS format).
@@ -115,9 +128,10 @@ litVar l = assert (validLit l) $ abs l
 litPolarity :: Lit -> Bool
 litPolarity l = assert (validLit l) $ l > 0
 
-{-# INLINE evalLit #-}
-evalLit :: Model -> Lit -> Bool
-evalLit m l = if l > 0 then m ! l else not (m ! abs l)
+{-# INLINEABLE evalLit #-}
+{-# SPECIALIZE evalLit :: Model -> Lit -> Bool #-}
+evalLit :: IModel m => m -> Lit -> Bool
+evalLit m l = if l > 0 then evalVar m l else not (evalVar m (abs l))
 
 -- | Disjunction of 'Lit'.
 type Clause = [Lit]
@@ -140,7 +154,7 @@ clauseSubsume cl1 cl2 = cl1' `IntSet.isSubsetOf` cl2'
     cl1' = IntSet.fromList cl1
     cl2' = IntSet.fromList cl2
 
-evalClause :: Model -> Clause -> Bool
+evalClause :: IModel m => m -> Clause -> Bool
 evalClause m cl = any (evalLit m) cl
 
 type AtLeast = ([Lit], Int)
@@ -154,7 +168,7 @@ normalizeAtLeast (lits,n) = assert (IntSet.size ys `mod` 2 == 0) $
      lits' = xs `IntSet.difference` ys
      n' = n - (IntSet.size ys `div` 2)
 
-evalAtLeast :: Model -> AtLeast -> Bool
+evalAtLeast :: IModel m => m -> AtLeast -> Bool
 evalAtLeast m (lits,n) = sum [1 | lit <- lits, evalLit m lit] >= n
 
 type PBLinTerm = (Integer, Lit)
@@ -267,13 +281,13 @@ cardinalityReduction (lhs,rhs) = (ls, rhs')
 negatePBAtLeast :: PBLinAtLeast -> PBLinAtLeast
 negatePBAtLeast (xs, rhs) = ([(-c,lit) | (c,lit)<-xs] , -rhs + 1)
 
-evalPBSum :: Model -> PBLinSum -> Integer
+evalPBSum :: IModel m => m -> PBLinSum -> Integer
 evalPBSum m xs = sum [c | (c,lit) <- xs, evalLit m lit]
 
-evalPBAtLeast :: Model -> PBLinAtLeast -> Bool
+evalPBAtLeast :: IModel m => m -> PBLinAtLeast -> Bool
 evalPBAtLeast m (lhs,rhs) = evalPBSum m lhs >= rhs
 
-evalPBExactly :: Model -> PBLinAtLeast -> Bool
+evalPBExactly :: IModel m => m -> PBLinAtLeast -> Bool
 evalPBExactly m (lhs,rhs) = evalPBSum m lhs == rhs
 
 pbLowerBound :: PBLinSum -> Integer

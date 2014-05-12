@@ -69,7 +69,7 @@ data Formula
   | Equiv Formula Formula
   deriving (Show, Eq, Ord)
 
-evalFormula :: SAT.Model -> Formula -> Bool
+evalFormula :: SAT.IModel m => m -> Formula -> Bool
 evalFormula m = e
   where
     e (Lit l)  = SAT.evalLit m l
