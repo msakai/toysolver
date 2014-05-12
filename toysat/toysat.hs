@@ -587,14 +587,14 @@ solvePB opt solver formula initialModel = do
     Just obj' -> do
       obj'' <- pbConvSum enc obj'
 
-{-
       nv' <- SAT.nVars solver
-      dvs <- Tseitin.getDefinedVariables enc
-      dvs' <- forM dvs $ \var -> do
-                val <- Tseitin.evalDefinedVariable enc initialModel var
-                return (var,val)
-      let initialModel' = array (1,nv') ([(v, initialModel ! v) | v <- [1..nv]] ++ dvs')
--}
+      defs <- Tseitin.getDefinitions enc
+      let extendModel :: SAT.Model -> SAT.Model
+          extendModel m = array (1,nv') (assocs a)
+            where
+              -- Use BOXED array to tie the knot
+              a :: Array SAT.Var Bool
+              a = array (1,nv') $ assocs m ++ [(v, Tseitin.evalFormula a phi) | (v,phi) <- defs]
 
       pbo <- PBO.newOptimizer solver obj''
       setupOptimizer pbo opt
@@ -604,7 +604,7 @@ solvePB opt solver formula initialModel = do
 
       case initialModel of
         Nothing -> return ()
-        Just m -> PBO.addSolution pbo m
+        Just m -> PBO.addSolution pbo (extendModel m)
 
       finally (PBO.optimize pbo) $ do
         ret <- PBO.getBestSolution pbo
@@ -629,7 +629,7 @@ pbConvSum enc = revMapM f
       l <- Tseitin.encodeConj enc ls
       return (w,l)
 
-evalPBConstraint :: SAT.Model -> PBFile.Constraint -> Bool
+evalPBConstraint :: SAT.IModel m => m -> PBFile.Constraint -> Bool
 evalPBConstraint m (lhs,op,rhs) = op' lhs' rhs
   where
     op' = case op of
@@ -700,9 +700,17 @@ solveWBO opt solver isMaxSat formula initialModel = do
     Just c -> SAT.addPBAtMost solver obj (c-1)
 
   nv' <- SAT.nVars solver
-  defs  <- readIORef defsRef
+  defs1 <- Tseitin.getDefinitions enc
+  defs2 <- readIORef defsRef
   let extendModel :: SAT.Model -> SAT.Model
-      extendModel m = array (1,nv') ([(v, m ! v) | v <- [1..nv]] ++ [(v, evalPBConstraint m constr) | (v, constr) <- defs])
+      extendModel m = array (1,nv') (assocs a)
+        where
+          -- Use BOXED array to tie the knot
+          a :: Array SAT.Var Bool
+          a = array (1,nv') $
+                assocs m ++
+                [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs1] ++
+                [(v, evalPBConstraint a constr) | (v, constr) <- defs2]
 
   pbo <- PBO.newOptimizer solver obj
   setupOptimizer pbo opt
