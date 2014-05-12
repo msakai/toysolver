@@ -832,7 +832,7 @@ addPBAtLeast solver ts n = do
 
   ok <- readIORef (svOk solver)
   when ok $ do
-    (ts',degree) <- liftM normalizePBAtLeast $ instantiatePB solver (ts,n)
+    (ts',degree) <- liftM normalizePBLinAtLeast $ instantiatePB solver (ts,n)
   
     case pbToAtLeast (ts',degree) of
       Just (lhs',rhs') -> addAtLeast solver lhs' rhs'
@@ -868,7 +868,7 @@ addPBExactly :: Solver          -- ^ The 'Solver' argument.
              -> Integer         -- ^ /n/
              -> IO ()
 addPBExactly solver ts n = do
-  (ts2,n2) <- liftM normalizePBExactly $ instantiatePB solver (ts,n)
+  (ts2,n2) <- liftM normalizePBLinExactly $ instantiatePB solver (ts,n)
   addPBAtLeast solver ts2 n2
   addPBAtMost solver ts2 n2
 
@@ -880,7 +880,7 @@ addPBAtLeastSoft
   -> Integer         -- ^ /n/
   -> IO ()
 addPBAtLeastSoft solver sel lhs rhs = do
-  (lhs', rhs') <- liftM normalizePBAtLeast $ instantiatePB solver (lhs,rhs)
+  (lhs', rhs') <- liftM normalizePBLinAtLeast $ instantiatePB solver (lhs,rhs)
   addPBAtLeast solver ((rhs', litNot sel) : lhs') rhs'
 
 -- | Add a soft pseudo boolean constraints /lit ⇒ c1*l1 + c2*l2 + … ≤ n/.
@@ -901,7 +901,7 @@ addPBExactlySoft
   -> Integer         -- ^ /n/
   -> IO ()
 addPBExactlySoft solver sel lhs rhs = do
-  (lhs2, rhs2) <- liftM normalizePBExactly $ instantiatePB solver (lhs,rhs)
+  (lhs2, rhs2) <- liftM normalizePBLinExactly $ instantiatePB solver (lhs,rhs)
   addPBAtLeastSoft solver sel lhs2 rhs2
   addPBAtMostSoft solver sel lhs2 rhs2
 

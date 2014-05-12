@@ -39,12 +39,12 @@ module SAT.Types
   , PBLinSum
   , PBLinAtLeast
   , PBLinExactly
-  , normalizePBSum
-  , normalizePBAtLeast
-  , normalizePBExactly
+  , normalizePBLinSum
+  , normalizePBLinAtLeast
+  , normalizePBLinExactly
   , cutResolve
   , cardinalityReduction
-  , negatePBAtLeast
+  , negatePBLinAtLeast
   , evalPBLinSum
   , evalPBLinAtLeast
   , evalPBLinExactly
@@ -178,8 +178,8 @@ type PBLinExactly = (PBLinSum, Integer)
 
 -- | normalizing PB term of the form /c1 x1 + c2 x2 ... cn xn + c/ into
 -- /d1 x1 + d2 x2 ... dm xm + d/ where d1,...,dm ≥ 1.
-normalizePBSum :: (PBLinSum, Integer) -> (PBLinSum, Integer)
-normalizePBSum = step2 . step1
+normalizePBLinSum :: (PBLinSum, Integer) -> (PBLinSum, Integer)
+normalizePBLinSum = step2 . step1
   where
     -- 同じ変数が複数回現れないように、一度全部 @v@ に統一。
     step1 :: (PBLinSum, Integer) -> (PBLinSum, Integer)
@@ -206,8 +206,8 @@ normalizePBSum = step2 . step1
           | otherwise = loop (t:ys,m) zs
 
 -- | normalizing PB constraint of the form /c1 x1 + c2 cn ... cn xn >= b/.
-normalizePBAtLeast :: PBLinAtLeast -> PBLinAtLeast
-normalizePBAtLeast a =
+normalizePBLinAtLeast :: PBLinAtLeast -> PBLinAtLeast
+normalizePBLinAtLeast a =
 　case step1 a of
     (xs,n)
       | n > 0     -> step3 (saturate n xs, n)
@@ -215,7 +215,7 @@ normalizePBAtLeast a =
   where
     step1 :: PBLinAtLeast -> PBLinAtLeast
     step1 (xs,n) =
-      case normalizePBSum (xs,-n) of
+      case normalizePBLinSum (xs,-n) of
         (ys,m) -> (ys, -m)
 
     -- degree以上の係数はそこで抑える。
@@ -230,8 +230,8 @@ normalizePBAtLeast a =
         d = foldl1' gcd [c | (c,_) <- xs]
 
 -- | normalizing PB constraint of the form /c1 x1 + c2 cn ... cn xn = b/.
-normalizePBExactly :: PBLinExactly -> PBLinExactly
-normalizePBExactly a =
+normalizePBLinExactly :: PBLinExactly -> PBLinExactly
+normalizePBLinExactly a =
 　case step1 $ a of
     (xs,n)
       | n >= 0    -> step2 (xs, n)
@@ -239,7 +239,7 @@ normalizePBExactly a =
   where
     step1 :: PBLinExactly -> PBLinExactly
     step1 (xs,n) =
-      case normalizePBSum (xs,-n) of
+      case normalizePBLinSum (xs,-n) of
         (ys,m) -> (ys, -m)
 
     -- omega test と同様の係数の gcd による単純化
@@ -252,7 +252,7 @@ normalizePBExactly a =
         d = foldl1' gcd [c | (c,_) <- xs]
 
 cutResolve :: PBLinAtLeast -> PBLinAtLeast -> Var -> PBLinAtLeast
-cutResolve (lhs1,rhs1) (lhs2,rhs2) v = assert (l1 == litNot l2) $ normalizePBAtLeast pb
+cutResolve (lhs1,rhs1) (lhs2,rhs2) v = assert (l1 == litNot l2) $ normalizePBLinAtLeast pb
   where
     (c1,l1) = head [(c,l) | (c,l) <- lhs1, litVar l == v]
     (c2,l2) = head [(c,l) | (c,l) <- lhs2, litVar l == v]
@@ -278,8 +278,8 @@ cardinalityReduction (lhs,rhs) = (ls, rhs')
       | otherwise      = map snd ts
     go2 _ [] = error "cardinalityReduction: should not happen"
 
-negatePBAtLeast :: PBLinAtLeast -> PBLinAtLeast
-negatePBAtLeast (xs, rhs) = ([(-c,lit) | (c,lit)<-xs] , -rhs + 1)
+negatePBLinAtLeast :: PBLinAtLeast -> PBLinAtLeast
+negatePBLinAtLeast (xs, rhs) = ([(-c,lit) | (c,lit)<-xs] , -rhs + 1)
 
 evalPBLinSum :: IModel m => m -> PBLinSum -> Integer
 evalPBLinSum m xs = sum [c | (c,lit) <- xs, evalLit m lit]

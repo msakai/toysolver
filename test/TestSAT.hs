@@ -292,14 +292,14 @@ case_solveWith_2 = do
 -- = -4*(1 - x1) + 3*x1 + 10*(not x2)
 -- = -4 + 4*x1 + 3*x1 + 10*(not x2)
 -- = 7*x1 + 10*(not x2) - 4
-case_normalizePBSum :: Assertion
-case_normalizePBSum = do
+case_normalizePBLinSum :: Assertion
+case_normalizePBLinSum = do
   sort e @?= sort [(7,x1),(10,-x2)]
   c @?= -4
   where
     x1 = 1
     x2 = 2
-    (e,c) = normalizePBSum ([(-4,-x1),(3,x1),(10,-x2)], 0)
+    (e,c) = normalizePBLinSum ([(-4,-x1),(3,x1),(10,-x2)], 0)
 
 -- -4*(not x1) + 3*x1 + 10*(not x2) >= 3
 -- ⇔ -4*(1 - x1) + 3*x1 + 10*(not x2) >= 3
@@ -307,27 +307,27 @@ case_normalizePBSum = do
 -- ⇔ 7*x1 + 10*(not x2) >= 7
 -- ⇔ 7*x1 + 7*(not x2) >= 7
 -- ⇔ x1 + (not x2) >= 1
-case_normalizePBAtLeast :: Assertion
-case_normalizePBAtLeast = (sort lhs, rhs) @?= (sort [(1,x1),(1,-x2)], 1)
+case_normalizePBLinAtLeast :: Assertion
+case_normalizePBLinAtLeast = (sort lhs, rhs) @?= (sort [(1,x1),(1,-x2)], 1)
   where
     x1 = 1
     x2 = 2
-    (lhs,rhs) = normalizePBAtLeast ([(-4,-x1),(3,x1),(10,-x2)], 3)
+    (lhs,rhs) = normalizePBLinAtLeast ([(-4,-x1),(3,x1),(10,-x2)], 3)
 
-case_normalizePBExactly_1 :: Assertion
-case_normalizePBExactly_1 = (sort lhs, rhs) @?= (sort [(3,x1),(2,x2)], 1)
+case_normalizePBLinExactly_1 :: Assertion
+case_normalizePBLinExactly_1 = (sort lhs, rhs) @?= (sort [(3,x1),(2,x2)], 1)
   where
     x1 = 1
     x2 = 2
-    (lhs,rhs) = normalizePBExactly ([(6,x1),(4,x2)], 2)
+    (lhs,rhs) = normalizePBLinExactly ([(6,x1),(4,x2)], 2)
 
-case_normalizePBExactly_2 :: Assertion
-case_normalizePBExactly_2 = (sort lhs, rhs) @?= ([], 1)
+case_normalizePBLinExactly_2 :: Assertion
+case_normalizePBLinExactly_2 = (sort lhs, rhs) @?= ([], 1)
   where
     x1 = 1
     x2 = 2
     x3 = 3
-    (lhs,rhs) = normalizePBExactly ([(2,x1),(2,x2),(2,x3)], 3)
+    (lhs,rhs) = normalizePBLinExactly ([(2,x1),(2,x2),(2,x3)], 3)
 
 case_cutResolve_1 :: Assertion
 case_cutResolve_1 = (sort lhs, rhs) @?= (sort [(1,x3),(1,x4)], 1)

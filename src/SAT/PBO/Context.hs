@@ -206,5 +206,5 @@ normalize :: Context a => a -> Normalized a
 normalize cxt = Normalized cxt obj' offset
   where
     obj = getObjectiveFunction cxt
-    (obj',offset) = SAT.normalizePBSum (obj, 0)
+    (obj',offset) = SAT.normalizePBLinSum (obj, 0)
 
