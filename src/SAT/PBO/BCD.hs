@@ -97,12 +97,12 @@ solveWBO cxt solver = do
 
       if ret then do
         m <- SAT.model solver
-        let val = SAT.evalPBSum m obj
+        let val = SAT.evalPBLinSum m obj
         let ub' = val - 1
         C.logMessage cxt $ printf "BCD: updating upper bound: %d -> %d" ub ub'
         C.addSolution cxt m
         SAT.addPBAtMost solver obj ub'
-        let cores' = map (\info -> info{ coreUB = SAT.evalPBSum m (coreCostFun info) }) cores
+        let cores' = map (\info -> info{ coreUB = SAT.evalPBLinSum m (coreCostFun info) }) cores
         cont (unrelaxed, relaxed) cores' ub'
       else do
         core <- SAT.failedAssumptions solver

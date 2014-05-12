@@ -45,9 +45,9 @@ module SAT.Types
   , cutResolve
   , cardinalityReduction
   , negatePBAtLeast
-  , evalPBSum
-  , evalPBAtLeast
-  , evalPBExactly
+  , evalPBLinSum
+  , evalPBLinAtLeast
+  , evalPBLinExactly
   , pbLowerBound
   , pbUpperBound
   , pbSubsume
@@ -281,14 +281,14 @@ cardinalityReduction (lhs,rhs) = (ls, rhs')
 negatePBAtLeast :: PBLinAtLeast -> PBLinAtLeast
 negatePBAtLeast (xs, rhs) = ([(-c,lit) | (c,lit)<-xs] , -rhs + 1)
 
-evalPBSum :: IModel m => m -> PBLinSum -> Integer
-evalPBSum m xs = sum [c | (c,lit) <- xs, evalLit m lit]
+evalPBLinSum :: IModel m => m -> PBLinSum -> Integer
+evalPBLinSum m xs = sum [c | (c,lit) <- xs, evalLit m lit]
 
-evalPBAtLeast :: IModel m => m -> PBLinAtLeast -> Bool
-evalPBAtLeast m (lhs,rhs) = evalPBSum m lhs >= rhs
+evalPBLinAtLeast :: IModel m => m -> PBLinAtLeast -> Bool
+evalPBLinAtLeast m (lhs,rhs) = evalPBLinSum m lhs >= rhs
 
-evalPBExactly :: IModel m => m -> PBLinAtLeast -> Bool
-evalPBExactly m (lhs,rhs) = evalPBSum m lhs == rhs
+evalPBLinExactly :: IModel m => m -> PBLinAtLeast -> Bool
+evalPBLinExactly m (lhs,rhs) = evalPBLinSum m lhs == rhs
 
 pbLowerBound :: PBLinSum -> Integer
 pbLowerBound xs = sum [if c < 0 then c else 0 | (c,_) <- xs]

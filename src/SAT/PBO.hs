@@ -215,7 +215,7 @@ linSearch cxt solver = loop
       result <- SAT.solve solver
       if result then do
         m <- SAT.model solver
-        let val = SAT.evalPBSum m obj
+        let val = SAT.evalPBLinSum m obj
         let ub = val - 1
         C.addSolution cxt m
         SAT.addPBAtMost solver obj ub
@@ -244,7 +244,7 @@ binSearch cxt solver = loop
           ret <- SAT.solveWith solver [sel]
           if ret then do
             m <- SAT.model solver
-            let v = SAT.evalPBSum m obj
+            let v = SAT.evalPBLinSum m obj
             let ub' = v - 1
             C.logMessage cxt $ printf "Binary Search: updating upper bound: %d -> %d" ub ub'
             C.addSolution cxt m
@@ -282,7 +282,7 @@ adaptiveSearch cxt solver trialLimitConf = loop 0
             result <- SAT.solve solver
             if result then do
               m <- SAT.model solver
-              let v = SAT.evalPBSum m obj
+              let v = SAT.evalPBLinSum m obj
               let ub' = v - 1
               C.addSolution cxt m
               SAT.addPBAtMost solver obj ub'
@@ -305,7 +305,7 @@ adaptiveSearch cxt solver trialLimitConf = loop 0
                 let fraction' = min 0.5 (fraction + 0.1)
                 if ret then do
                   m <- SAT.model solver
-                  let v = SAT.evalPBSum m obj
+                  let v = SAT.evalPBLinSum m obj
                   let ub' = v - 1
                   C.logMessage cxt $ printf "Adaptive Search: updating upper bound: %d -> %d" ub ub'
                   C.addSolution cxt m

@@ -105,7 +105,7 @@ instance Context SimpleContext where
       writeTVar (scUnsatRef sc) True
 
   addSolution sc m = do
-    let !val = SAT.evalPBSum m (getObjectiveFunction sc)
+    let !val = SAT.evalPBLinSum m (getObjectiveFunction sc)
     join $ atomically $ do
       unsat <- isUnsat sc
       when unsat $ error "addSolution: already marked as unsatisfiable" -- FIXME: use throwSTM?
