@@ -598,7 +598,7 @@ solvePB opt solver formula initialModel = do
 
       pbo <- PBO.newOptimizer solver obj''
       setupOptimizer pbo opt
-      PBO.setOnUpdateBestSolution pbo $ \val _ -> putOLine (show val)
+      PBO.setOnUpdateBestSolution pbo $ \_ val -> putOLine (show val)
       PBO.setOnUpdateLowerBound pbo $ \lb -> do
         putCommentLine $ printf "lower bound updated to %d" lb
 
@@ -706,7 +706,7 @@ solveWBO opt solver isMaxSat formula initialModel = do
 
   pbo <- PBO.newOptimizer solver obj
   setupOptimizer pbo opt
-  PBO.setOnUpdateBestSolution pbo $ \val _ -> putOLine (show val)
+  PBO.setOnUpdateBestSolution pbo $ \_ val -> putOLine (show val)
   PBO.setOnUpdateLowerBound pbo $ \lb -> do
     putCommentLine $ printf "lower bound updated to %d" lb
 
