@@ -41,6 +41,11 @@ Flag ForceChar8
   Default: False
   Manual: True
 
+Flag BuildToyFMF
+  Description: build toyfmf command
+  Default: False
+  Manual: True
+
 Flag BuildMiscPrograms
   Description: build misc programs
   Default: False
@@ -208,6 +213,8 @@ Executable toysat
     CPP-OPtions: "-DFORCE_CHAR8"
 
 Executable toyfmf
+  If !flag(BuildToyFMF)
+    Buildable: False
   Main-is: toyfmf.hs
   HS-Source-Dirs: toyfmf
   Build-Depends: base >=4 && <5, containers >= 0.4.2, toysolver, logic-TPTP
