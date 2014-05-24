@@ -218,7 +218,7 @@ Executable toyfmf
   Main-is: toyfmf.hs
   HS-Source-Dirs: toyfmf
   If flag(BuildToyFMF)
-    Build-Depends: base >=4 && <5, containers >= 0.4.2, toysolver, logic-TPTP
+    Build-Depends: base >=4 && <5, containers >= 0.4.2, toysolver, logic-TPTP >=0.4.1
   Default-Language: Haskell2010
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
