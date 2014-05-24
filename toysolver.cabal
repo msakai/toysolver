@@ -217,7 +217,8 @@ Executable toyfmf
     Buildable: False
   Main-is: toyfmf.hs
   HS-Source-Dirs: toyfmf
-  Build-Depends: base >=4 && <5, containers >= 0.4.2, toysolver, logic-TPTP
+  If flag(BuildToyFMF)
+    Build-Depends: base >=4 && <5, containers >= 0.4.2, toysolver, logic-TPTP
   Default-Language: Haskell2010
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
@@ -252,8 +253,6 @@ Executable maxsatverify
   Default-Language: Haskell2010
 
 Executable pbverify
-  If !flag(BuildMiscPrograms)
-    Buildable: False
   Main-is: pbverify.hs
   HS-Source-Dirs: pbverify
   Build-Depends: base >=4 && <5, array, containers, filepath, toysolver
