@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns, TemplateHaskell)
+-- Portability :  non-portable (ScopedTypeVariables, BangPatterns)
 --
 -- References:
 --
