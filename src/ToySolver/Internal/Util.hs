@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Util
+-- Module      :  ToySolver.Internal.Util
 -- Copyright   :  (c) Masahiro Sakai 2011-2012
 -- License     :  BSD-style
 -- 
@@ -13,7 +13,7 @@
 -- 
 -----------------------------------------------------------------------------
 
-module ToySolver.Util where
+module ToySolver.Internal.Util where
 
 import Control.Monad
 import Data.Ratio

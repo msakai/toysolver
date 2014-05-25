@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.ProcessUtil
+-- Module      :  ToySolver.Internal.ProcessUtil
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
 -- 
@@ -11,7 +11,7 @@
 -- Portability :  non-portable (CPP)
 --
 -----------------------------------------------------------------------------
-module ToySolver.ProcessUtil
+module ToySolver.Internal.ProcessUtil
   ( runProcessWithOutputCallback
   ) where
 

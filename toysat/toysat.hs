@@ -72,7 +72,7 @@ import qualified Text.MaxSAT as MaxSAT
 import qualified Text.GCNF as GCNF
 import qualified Text.GurobiSol as GurobiSol
 import ToySolver.Version
-import ToySolver.Util (showRational, revMapM, revForM)
+import ToySolver.Internal.Util (showRational, revMapM, revForM)
 
 import UBCSAT
 

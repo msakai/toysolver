@@ -41,7 +41,7 @@ import Data.OptDir
 import qualified Data.MIP as MIP
 import Text.ParserCombinators.Parsec hiding (label)
 
-import ToySolver.Util (combineMaybe)
+import ToySolver.Internal.Util (combineMaybe)
 import Text.Util (readUnsignedInteger)
 
 -- ---------------------------------------------------------------------------

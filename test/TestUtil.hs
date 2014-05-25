@@ -5,7 +5,7 @@ import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
-import ToySolver.Util
+import ToySolver.Internal.Util
 import qualified Algorithm.Knapsack as Knapsack
 
 case_showRationalAsDecimal :: IO ()

@@ -79,7 +79,7 @@ import qualified Data.LA as LA
 import Data.ArithRel ((.<=.), (.>=.))
 import qualified Algorithm.Simplex2 as Simplex2
 import Algorithm.Simplex2 (OptResult (..), Var, Model)
-import ToySolver.Util (isInteger, fracPart)
+import ToySolver.Internal.Util (isInteger, fracPart)
 
 data Solver
   = MIP

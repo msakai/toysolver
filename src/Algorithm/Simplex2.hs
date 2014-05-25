@@ -112,7 +112,7 @@ import qualified Data.LA as LA
 import Data.LA (Atom (..))
 import Data.ArithRel
 import Data.Delta
-import ToySolver.Util (showRational)
+import ToySolver.Internal.Util (showRational)
 
 {--------------------------------------------------------------------
   The @Solver@ type

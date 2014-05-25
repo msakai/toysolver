@@ -42,7 +42,7 @@ module Data.Delta
   ) where
 
 import Data.VectorSpace
-import ToySolver.Util (isInteger)
+import ToySolver.Internal.Util (isInteger)
 
 -- | @Delta r k@ represents r + kδ for symbolic infinitesimal parameter δ.
 data Delta r = Delta !r !r deriving (Ord, Eq, Show)

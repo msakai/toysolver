@@ -28,7 +28,7 @@ import qualified Data.MIP as MIP
 import System.IO
 import Text.Printf
 import qualified Text.LPFile as LPFile
-import ToySolver.Util (showRationalAsFiniteDecimal, isInteger)
+import ToySolver.Internal.Util (showRationalAsFiniteDecimal, isInteger)
 
 data Options
   = Options

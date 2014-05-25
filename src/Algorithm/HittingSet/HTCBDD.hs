@@ -36,7 +36,7 @@ import Data.Typeable
 import System.Exit
 import System.IO
 import System.IO.Temp
-import ToySolver.ProcessUtil (runProcessWithOutputCallback)
+import ToySolver.Internal.ProcessUtil (runProcessWithOutputCallback)
 
 type Vertex = Int
 type HyperEdge = [Vertex]

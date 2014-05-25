@@ -62,7 +62,7 @@ import qualified Converter.MaxSAT2IP as MaxSAT2IP
 import SAT.Printer
 import qualified SAT.Types as SAT
 import ToySolver.Version
-import ToySolver.Util
+import ToySolver.Internal.Util
 
 -- ---------------------------------------------------------------------------
 

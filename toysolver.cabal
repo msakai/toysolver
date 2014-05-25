@@ -175,7 +175,8 @@ Library
      Text.MaxSAT
      Text.PBFile
      Text.SDPFile
-     ToySolver.Util
+     ToySolver.Internal.ProcessUtil
+     ToySolver.Internal.Util
      ToySolver.Version
   Other-Modules:
      Data.AlgebraicNumber.Graeffe
@@ -183,7 +184,6 @@ Library
      Data.IndexedPriorityQueue
      Data.SeqQueue
      Text.Util
-     ToySolver.ProcessUtil
      Paths_toysolver
   GHC-Prof-Options: -auto-all
 
