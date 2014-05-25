@@ -45,7 +45,7 @@ factor :: UPolynomial Integer -> [(UPolynomial Integer, Integer)]
 factor f = [(h,n) | (g,n) <- P.sqfree f, h <- if P.deg g > 0 then zassenhaus g else return g]
 
 zassenhaus :: UPolynomial Integer -> [UPolynomial Integer]
-zassenhaus f = fromJust $ msum [TL.withNat zassenhausWithP p | p <- primes]
+zassenhaus f = fromJust $ msum [TL.withNat zassenhausWithP p | p <- primes :: [Integer]]
   where
     zassenhausWithP :: forall p. TL.Nat p => p -> Maybe [UPolynomial Integer]
     zassenhausWithP _ = do
@@ -165,6 +165,7 @@ test_foo = actual
     x :: UPolynomial Integer
     x = P.var X   
     f = - (x^(5::Int) + x^(4::Int) + x^(2::Int) + x + 2)
+    actual, expected :: [(UPolynomial Integer, Integer)]
     actual   = factor f
     expected = [(-1,1), (x^(2::Int)+x+1,1), (x^(3::Int)-x+2,1)]
 

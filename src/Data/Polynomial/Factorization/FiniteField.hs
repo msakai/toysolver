@@ -34,7 +34,7 @@ import Data.Function (on)
 import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Polynomial.Base (Polynomial, UPolynomial, X (..), MonomialOrder)
+import Data.Polynomial.Base (Polynomial, UPolynomial, X (..))
 import qualified Data.Polynomial.Base as P
 import qualified Data.Polynomial.GroebnerBasis as GB
 import qualified TypeLevel.Number.Nat as TL
