@@ -23,7 +23,11 @@ import Control.Monad
 import Foreign.C
 import System.Exit
 import System.IO
+#if MIN_VERSION_base(4,6,0)
 import System.IO.Error
+#else
+import System.IO.Error hiding (try)
+#endif
 import System.Process
 
 #ifdef __GLASGOW_HASKELL__
