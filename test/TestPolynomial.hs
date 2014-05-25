@@ -1,6 +1,7 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 
 import Prelude hiding (lex)
+import qualified Control.Exception as E
 import Control.Monad
 import qualified Data.FiniteField as FF
 import Data.List
@@ -19,6 +20,7 @@ import Data.Polynomial (Polynomial, Term, Monomial, UPolynomial, UTerm, UMonomia
 import qualified Data.Polynomial as P
 import qualified Data.Polynomial.GroebnerBasis as GB
 import qualified Data.Polynomial.Factorization.FiniteField as FactorFF
+import qualified Data.Polynomial.Factorization.Hensel.Internal as Hensel
 import qualified Data.Polynomial.Interpolation.Lagrange as LagrangeInterpolation
 import qualified Data.Interval as Interval
 import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<))
@@ -813,6 +815,40 @@ case_sqfree_Rational = actual @?= expected
     actual   = P.sqfree (x^(2::Int) + 2*x + 1)
     expected = [(x + 1, 2)]
 
+------------------------------------------------------------------------
+
+-- http://www14.in.tum.de/konferenzen/Jass07/courses/1/Bulwahn/Buhlwahn_Paper.pdf
+case_Hensel_Lifting :: IO ()
+case_Hensel_Lifting = do
+  Hensel.hensel f fs 2 @?= [x^(2::Int) + 5*x + 18, x + 5]
+  Hensel.hensel f fs 3 @?= [x^(2::Int) + 105*x + 43, x + 30]
+  Hensel.hensel f fs 4 @?= [x^(2::Int) + 605*x + 168, x + 30]
+  where
+    x :: forall k. (Eq k, Num k) => UPolynomial k
+    x  = P.var X
+    f :: UPolynomial Integer
+    f  = x^(3::Int) + 10*x^(2::Int) - 432*x + 5040
+    fs :: [UPolynomial $(FF.primeField 5)]
+    fs = [x^(2::Int)+3, x]
+
+case_cabook_proposition_5_10 :: IO ()
+case_cabook_proposition_5_10 =
+  sum [ei * (product fs `P.div` fi) | (ei,fi) <- zip es fs] @?= 1
+  where
+    x :: UPolynomial Rational
+    x = P.var P.X
+    fs = [x, x+1, x+2]
+    es = Hensel.cabook_proposition_5_10 fs
+
+case_cabook_proposition_5_11 :: IO ()
+case_cabook_proposition_5_11 =
+  sum [ei * (product fs `P.div` fi) | (ei,fi) <- zip es fs] @?= g
+  where
+    x :: UPolynomial Rational
+    x = P.var P.X
+    fs = [x, x+1, x+2]
+    g  = x^(2::Int) + 1
+    es = Hensel.cabook_proposition_5_11 fs g
 
 ------------------------------------------------------------------------
 

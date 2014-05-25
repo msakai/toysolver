@@ -148,6 +148,7 @@ Library
      Data.Polynomial
      Data.Polynomial.Factorization.FiniteField
      Data.Polynomial.Factorization.Hensel
+     Data.Polynomial.Factorization.Hensel.Internal
      Data.Polynomial.Factorization.Integer
      Data.Polynomial.Factorization.Kronecker
      Data.Polynomial.Factorization.Rational
