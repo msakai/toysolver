@@ -42,7 +42,7 @@ import Text.ParserCombinators.Parsec hiding (spaces, newline, Column)
 
 import Data.OptDir
 import qualified Data.MIP as MIP
-import Text.Util (readUnsignedInteger)
+import ToySolver.Internal.TextUtil (readUnsignedInteger)
 
 type Column = MIP.Var
 type Row = InternedString

@@ -27,7 +27,7 @@ module Text.GCNF
   ) where
 
 import qualified SAT.Types as SAT
-import Text.Util
+import ToySolver.Internal.TextUtil
 
 data GCNF
   = GCNF

@@ -42,7 +42,7 @@ import qualified Data.MIP as MIP
 import Text.ParserCombinators.Parsec hiding (label)
 
 import ToySolver.Internal.Util (combineMaybe)
-import Text.Util (readUnsignedInteger)
+import ToySolver.Internal.TextUtil (readUnsignedInteger)
 
 -- ---------------------------------------------------------------------------
 

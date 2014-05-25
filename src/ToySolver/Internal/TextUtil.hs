@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns, CPP #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Text.Util
+-- Module      :  ToySolver.Internal.TextUtil
 -- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
 -- 
@@ -10,7 +10,7 @@
 -- Portability :  non-portable (BangPatterns)
 --
 -----------------------------------------------------------------------------
-module Text.Util
+module ToySolver.Internal.TextUtil
   ( readInt
   , readUnsignedInteger
   ) where

@@ -176,6 +176,7 @@ Library
      Text.PBFile
      Text.SDPFile
      ToySolver.Internal.ProcessUtil
+     ToySolver.Internal.TextUtil
      ToySolver.Internal.Util
      ToySolver.Version
   Other-Modules:
@@ -183,7 +184,6 @@ Library
      Data.Polynomial.Base
      Data.IndexedPriorityQueue
      Data.SeqQueue
-     Text.Util
      Paths_toysolver
   GHC-Prof-Options: -auto-all
 

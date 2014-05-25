@@ -55,7 +55,7 @@ import Text.ParserCombinators.Parsec
 import Data.Word
 import Control.Exception (assert)
 import Text.Printf
-import Text.Util
+import ToySolver.Internal.TextUtil
 
 -- | Pair of /objective function/ and a list of constraints.
 data Formula

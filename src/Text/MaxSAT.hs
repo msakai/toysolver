@@ -30,7 +30,7 @@ module Text.MaxSAT
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.Char
 import qualified SAT.Types as SAT
-import Text.Util
+import ToySolver.Internal.TextUtil
 
 data WCNF
   = WCNF
