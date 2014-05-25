@@ -19,6 +19,7 @@
 -----------------------------------------------------------------------------
 module Data.Polynomial.Factorization.Zassenhaus
   ( factor
+  , zassenhaus
   ) where
 
 import Control.Monad
@@ -30,7 +31,7 @@ import Data.Numbers.Primes (primes)
 import Data.Ratio
 import Data.STRef
 
-import Data.Polynomial.Base (UPolynomial, X (..))
+import Data.Polynomial.Base (UPolynomial)
 import qualified Data.Polynomial.Base as P
 import Data.Polynomial.Factorization.FiniteField ()
 import Data.Polynomial.Factorization.SquareFree ()
@@ -144,29 +145,5 @@ comb :: [a] -> Int -> [[a]]
 comb _ 0      = [[]]
 comb [] _     = []
 comb (x:xs) n = [x:ys | ys <- comb xs (n-1)] ++ comb xs n
-
--- ---------------------------------------------------------------------------
-
-test_zassenhaus :: [UPolynomial Integer]
-test_zassenhaus = zassenhaus f
-  where
-    x = P.var X
-    f = x^(4::Int) + 4
-
-test_zassenhaus2 :: [UPolynomial Integer]
-test_zassenhaus2 = zassenhaus f
-  where
-    x = P.var X
-    f = x^(9::Int) - 15*x^(6::Int) - 87*x^(3::Int) - 125
-
-test_foo :: [(UPolynomial Integer, Integer)]
-test_foo = actual
-  where
-    x :: UPolynomial Integer
-    x = P.var X   
-    f = - (x^(5::Int) + x^(4::Int) + x^(2::Int) + x + 2)
-    actual, expected :: [(UPolynomial Integer, Integer)]
-    actual   = factor f
-    expected = [(-1,1), (x^(2::Int)+x+1,1), (x^(3::Int)-x+2,1)]
 
 -- ---------------------------------------------------------------------------

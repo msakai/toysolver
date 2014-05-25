@@ -21,6 +21,7 @@ import qualified Data.Polynomial as P
 import qualified Data.Polynomial.GroebnerBasis as GB
 import qualified Data.Polynomial.Factorization.FiniteField as FactorFF
 import qualified Data.Polynomial.Factorization.Hensel.Internal as Hensel
+import qualified Data.Polynomial.Factorization.Zassenhaus as Zassenhaus
 import qualified Data.Polynomial.Interpolation.Lagrange as LagrangeInterpolation
 import qualified Data.Interval as Interval
 import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<))
@@ -849,6 +850,36 @@ case_cabook_proposition_5_11 =
     fs = [x, x+1, x+2]
     g  = x^(2::Int) + 1
     es = Hensel.cabook_proposition_5_11 fs g
+
+------------------------------------------------------------------------
+
+case_Zassenhaus_factor :: IO ()
+case_Zassenhaus_factor = actual @?= expected
+  where
+    x :: UPolynomial Integer
+    x = P.var X   
+    f = - (x^(5::Int) + x^(4::Int) + x^(2::Int) + x + 2)
+    actual, expected :: [(UPolynomial Integer, Integer)]
+    actual   = sort $ Zassenhaus.factor f
+    expected = sort $ [(-1,1), (x^(2::Int)+x+1,1), (x^(3::Int)-x+2,1)]
+
+case_Zassenhaus_zassenhaus_1 :: IO ()
+case_Zassenhaus_zassenhaus_1 = actual @?= expected
+  where
+    x = P.var X
+    f = x^(4::Int) + 4
+    actual, expected :: [UPolynomial Integer]
+    actual   = sort $ Zassenhaus.zassenhaus f
+    expected = sort $ [x^(2::Int)+2*x+2, x^(2::Int)-2*x+2]
+
+case_Zassenhaus_zassenhaus_2 :: IO ()
+case_Zassenhaus_zassenhaus_2 = actual @?= expected
+  where
+    x = P.var X
+    f = x^(9::Int) - 15*x^(6::Int) - 87*x^(3::Int) - 125
+    actual, expected :: [UPolynomial Integer]
+    actual   = sort $ Zassenhaus.zassenhaus f
+    expected = sort $ [f]
 
 ------------------------------------------------------------------------
 
