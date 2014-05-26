@@ -95,16 +95,21 @@ isComment _ = False
 parseWCNFLine :: String -> WeightedClause
 parseWCNFLine s =
   case words s of
-    (w:xs) ->
-        let w' = readUnsignedInteger w
-            ys = map readInt $ init xs
-        in seq w' $ seqList ys $ (w', ys)
+    (w:xs)
+      | last xs == "0" -> seq w' $ seqList ys $ (w', ys)
+      | otherwise -> error "parse error"
+      where
+        w' = readUnsignedInteger w
+        ys = map readInt $ init xs
     _ -> error "parse error"
 
 parseCNFLine :: String -> WeightedClause
-parseCNFLine s = seqList xs $ (1, xs)
+parseCNFLine s
+  | null xs || last xs /= 0 = error "parse error"
+  | otherwise = seqList ys $ (1, ys)
   where
-    xs = init (map readInt (words s))
+    xs = map readInt (words s)
+    ys = init xs
 
 parseByteString :: BS.ByteString -> Either String WCNF
 parseByteString s =
@@ -161,7 +166,7 @@ parseClauseBS s = seqList xs $ xs
     xs = go s
     go s =
       case BS.readInt (BS.dropWhile isSpace s) of
-        Nothing -> []
+        Nothing -> error "parse error"
         Just (0,_) -> []
         Just (i,s') -> i : go s'
 
