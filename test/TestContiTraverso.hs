@@ -12,13 +12,14 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 
-import Algorithm.ContiTraverso
-
-import Data.ArithRel
-import qualified Data.LA as LA
 import Data.OptDir
-import Data.Polynomial (Polynomial)
-import qualified Data.Polynomial as P
+
+import ToySolver.ContiTraverso
+
+import ToySolver.Data.ArithRel
+import qualified ToySolver.Data.LA as LA
+import ToySolver.Data.Polynomial (Polynomial)
+import qualified ToySolver.Data.Polynomial as P
 
 -- http://madscientist.jp/~ikegami/articles/IntroSequencePolynomial.html
 -- optimum is (3,2,0)

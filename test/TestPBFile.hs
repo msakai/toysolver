@@ -8,7 +8,7 @@ import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
-import Text.PBFile
+import ToySolver.Text.PBFile
 
 case_exampleLIN  = checkOPBString "exampleLIN"  exampleLIN
 case_exampleNLC1 = checkOPBString "exampleNLC1" exampleNLC1

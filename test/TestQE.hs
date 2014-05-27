@@ -13,20 +13,21 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 
-import Data.AlgebraicNumber.Real
-import Data.ArithRel
-import Data.FOL.Arith
-import qualified Data.LA as LA
-import qualified Data.Polynomial as P
 import Data.OptDir
-import Data.Var
 
-import qualified Algorithm.FourierMotzkin as FourierMotzkin
-import qualified Algorithm.OmegaTest as OmegaTest
-import qualified Algorithm.Cooper as Cooper
-import qualified Algorithm.CAD as CAD
-import qualified Algorithm.Simplex2 as Simplex2
-import qualified Algorithm.ContiTraverso as ContiTraverso
+import ToySolver.Data.AlgebraicNumber.Real
+import ToySolver.Data.ArithRel
+import ToySolver.Data.FOL.Arith
+import qualified ToySolver.Data.LA as LA
+import qualified ToySolver.Data.Polynomial as P
+import ToySolver.Data.Var
+
+import qualified ToySolver.FourierMotzkin as FourierMotzkin
+import qualified ToySolver.OmegaTest as OmegaTest
+import qualified ToySolver.Cooper as Cooper
+import qualified ToySolver.CAD as CAD
+import qualified ToySolver.Simplex2 as Simplex2
+import qualified ToySolver.ContiTraverso as ContiTraverso
 
 ------------------------------------------------------------------------
 

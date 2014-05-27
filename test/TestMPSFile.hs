@@ -8,7 +8,7 @@ import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
-import Text.MPSFile
+import ToySolver.Text.MPSFile
 
 case_testdata = checkString "testdata" testdata
 case_example2 = checkFile "samples/mps/example2.mps"

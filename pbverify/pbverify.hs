@@ -4,8 +4,8 @@ import Control.Monad
 import Data.Array.IArray
 import System.Environment
 import Text.Printf
-import qualified Text.PBFile as PBFile
-import SAT.Types
+import qualified ToySolver.Text.PBFile as PBFile
+import ToySolver.SAT.Types
 
 main :: IO ()
 main = do

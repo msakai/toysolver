@@ -8,7 +8,7 @@ import Test.HUnit hiding (Test)
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
-import Text.LPFile
+import ToySolver.Text.LPFile
 
 case_testdata       = checkString "testdata" testdata
 case_test_indicator = checkFile "samples/lp/test-indicator.lp"

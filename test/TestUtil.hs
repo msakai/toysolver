@@ -9,7 +9,7 @@ import Test.Framework.Providers.QuickCheck2
 import Test.Framework.Providers.HUnit
 import ToySolver.Internal.Util
 import ToySolver.Internal.TextUtil
-import qualified Algorithm.Knapsack as Knapsack
+import qualified ToySolver.Knapsack as Knapsack
 
 case_showRationalAsDecimal :: IO ()
 case_showRationalAsDecimal = do

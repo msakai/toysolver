@@ -9,11 +9,12 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
-import Data.Polynomial (UPolynomial, X (..))
-import qualified Data.Polynomial as P
-import qualified Data.AlgebraicNumber.Sturm as Sturm
-import Data.AlgebraicNumber.Real
-import Data.AlgebraicNumber.Root
+import ToySolver.Data.Polynomial (UPolynomial, X (..))
+import qualified ToySolver.Data.Polynomial as P
+import qualified ToySolver.Data.AlgebraicNumber.Sturm as Sturm
+import ToySolver.Data.AlgebraicNumber.Real
+import ToySolver.Data.AlgebraicNumber.Root
+
 import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<))
 import qualified Data.Interval as Interval
 

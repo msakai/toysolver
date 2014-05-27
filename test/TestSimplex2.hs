@@ -11,8 +11,8 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Text.Printf
 
-import qualified Data.LA as LA
-import Algorithm.Simplex2
+import qualified ToySolver.Data.LA as LA
+import ToySolver.Simplex2
 
 case_test1 :: IO ()
 case_test1 = do

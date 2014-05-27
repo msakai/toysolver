@@ -35,32 +35,33 @@ import Text.Printf
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import GHC.Conc (getNumProcessors, setNumCapabilities)
 
-import Data.ArithRel
-import Data.FOL.Arith as FOL
 import Data.OptDir
-import qualified Data.LA as LA
-import qualified Data.LA.FOL as LAFOL
-import qualified Data.Polynomial as P
-import qualified Data.AlgebraicNumber.Real as AReal
-import qualified Data.MIP as MIP
-import qualified Algorithm.OmegaTest as OmegaTest
-import qualified Algorithm.OmegaTest.Misc as OmegaTest
-import qualified Algorithm.Cooper as Cooper
-import qualified Algorithm.MIPSolverHL as MIPSolverHL
-import qualified Algorithm.Simplex2 as Simplex2
-import qualified Algorithm.MIPSolver2 as MIPSolver2
-import qualified Algorithm.CAD as CAD
-import qualified Algorithm.ContiTraverso as ContiTraverso
-import qualified Text.LPFile as LPFile
-import qualified Text.MPSFile as MPSFile
-import qualified Text.PBFile as PBFile
-import qualified Text.MaxSAT as MaxSAT
-import qualified Text.GurobiSol as GurobiSol
-import qualified Converter.SAT2IP as SAT2IP
-import qualified Converter.PB2IP as PB2IP
-import qualified Converter.MaxSAT2IP as MaxSAT2IP
-import SAT.Printer
-import qualified SAT.Types as SAT
+
+import ToySolver.Data.ArithRel
+import ToySolver.Data.FOL.Arith as FOL
+import qualified ToySolver.Data.LA as LA
+import qualified ToySolver.Data.LA.FOL as LAFOL
+import qualified ToySolver.Data.Polynomial as P
+import qualified ToySolver.Data.AlgebraicNumber.Real as AReal
+import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.OmegaTest as OmegaTest
+import qualified ToySolver.OmegaTest.Misc as OmegaTest
+import qualified ToySolver.Cooper as Cooper
+import qualified ToySolver.MIPSolverHL as MIPSolverHL
+import qualified ToySolver.Simplex2 as Simplex2
+import qualified ToySolver.MIPSolver2 as MIPSolver2
+import qualified ToySolver.CAD as CAD
+import qualified ToySolver.ContiTraverso as ContiTraverso
+import qualified ToySolver.Text.LPFile as LPFile
+import qualified ToySolver.Text.MPSFile as MPSFile
+import qualified ToySolver.Text.PBFile as PBFile
+import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.GurobiSol as GurobiSol
+import qualified ToySolver.Converter.SAT2IP as SAT2IP
+import qualified ToySolver.Converter.PB2IP as PB2IP
+import qualified ToySolver.Converter.MaxSAT2IP as MaxSAT2IP
+import ToySolver.SAT.Printer
+import qualified ToySolver.SAT.Types as SAT
 import ToySolver.Version
 import ToySolver.Internal.Util
 

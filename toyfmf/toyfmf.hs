@@ -20,7 +20,7 @@ import Data.Ratio
 import System.Environment
 import System.IO
 import qualified Codec.TPTP as TPTP
-import qualified Algorithm.FOLModelFinder as MF
+import qualified ToySolver.FOLModelFinder as MF
 
 main :: IO ()
 main = do

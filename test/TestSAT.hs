@@ -14,14 +14,15 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
-import Algorithm.HittingSet as HittingSet
-import SAT
-import SAT.Types
-import qualified SAT.TseitinEncoder as Tseitin
-import SAT.TseitinEncoder (Formula (..))
-import qualified SAT.MUS as MUS
-import qualified SAT.CAMUS as CAMUS
-import qualified SAT.PBO as PBO
+
+import ToySolver.HittingSet as HittingSet
+import ToySolver.SAT
+import ToySolver.SAT.Types
+import qualified ToySolver.SAT.TseitinEncoder as Tseitin
+import ToySolver.SAT.TseitinEncoder (Formula (..))
+import qualified ToySolver.SAT.MUS as MUS
+import qualified ToySolver.SAT.CAMUS as CAMUS
+import qualified ToySolver.SAT.PBO as PBO
 
 -- should be SAT
 case_solve_SAT :: IO ()

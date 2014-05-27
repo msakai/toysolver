@@ -6,7 +6,7 @@ import Test.HUnit hiding (Test)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 
-import Algorithm.CongruenceClosure
+import ToySolver.CongruenceClosure
 
 ------------------------------------------------------------------------
 -- Test cases

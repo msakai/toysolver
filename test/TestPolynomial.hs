@@ -16,13 +16,14 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 import Text.PrettyPrint.HughesPJClass
 
-import Data.Polynomial (Polynomial, Term, Monomial, UPolynomial, UTerm, UMonomial, X (..))
-import qualified Data.Polynomial as P
-import qualified Data.Polynomial.GroebnerBasis as GB
-import qualified Data.Polynomial.Factorization.FiniteField as FactorFF
-import qualified Data.Polynomial.Factorization.Hensel.Internal as Hensel
-import qualified Data.Polynomial.Factorization.Zassenhaus as Zassenhaus
-import qualified Data.Polynomial.Interpolation.Lagrange as LagrangeInterpolation
+import ToySolver.Data.Polynomial (Polynomial, Term, Monomial, UPolynomial, UTerm, UMonomial, X (..))
+import qualified ToySolver.Data.Polynomial as P
+import qualified ToySolver.Data.Polynomial.GroebnerBasis as GB
+import qualified ToySolver.Data.Polynomial.Factorization.FiniteField as FactorFF
+import qualified ToySolver.Data.Polynomial.Factorization.Hensel.Internal as Hensel
+import qualified ToySolver.Data.Polynomial.Factorization.Zassenhaus as Zassenhaus
+import qualified ToySolver.Data.Polynomial.Interpolation.Lagrange as LagrangeInterpolation
+
 import qualified Data.Interval as Interval
 import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<))
 

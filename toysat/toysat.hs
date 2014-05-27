@@ -54,23 +54,23 @@ import GHC.IO.Encoding
 import qualified GHC.Stats as Stats
 #endif
 
-import Data.ArithRel
-import qualified Data.MIP as MIP
-import qualified Converter.MaxSAT2WBO as MaxSAT2WBO
-import qualified SAT
-import qualified SAT.PBO as PBO
-import qualified SAT.Integer
-import qualified SAT.TseitinEncoder as Tseitin
-import qualified SAT.MUS as MUS
-import qualified SAT.CAMUS as CAMUS
-import qualified SAT.Types as SAT
-import SAT.Printer
-import qualified Text.PBFile as PBFile
-import qualified Text.LPFile as LPFile
-import qualified Text.MPSFile as MPSFile
-import qualified Text.MaxSAT as MaxSAT
-import qualified Text.GCNF as GCNF
-import qualified Text.GurobiSol as GurobiSol
+import ToySolver.Data.ArithRel
+import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
+import qualified ToySolver.SAT as SAT
+import qualified ToySolver.SAT.Types as SAT
+import qualified ToySolver.SAT.PBO as PBO
+import qualified ToySolver.SAT.Integer as Integer
+import qualified ToySolver.SAT.TseitinEncoder as Tseitin
+import qualified ToySolver.SAT.MUS as MUS
+import qualified ToySolver.SAT.CAMUS as CAMUS
+import ToySolver.SAT.Printer
+import qualified ToySolver.Text.PBFile as PBFile
+import qualified ToySolver.Text.LPFile as LPFile
+import qualified ToySolver.Text.MPSFile as MPSFile
+import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.GCNF as GCNF
+import qualified ToySolver.Text.GurobiSol as GurobiSol
 import ToySolver.Version
 import ToySolver.Internal.Util (showRational, revMapM, revForM)
 
@@ -806,7 +806,7 @@ solveMIP opt solver mip = do
         let (lb,ub) = MIP.getBounds mip v
         case (lb,ub) of
           (MIP.Finite lb', MIP.Finite ub') -> do
-            v2 <- SAT.Integer.newVar solver (ceiling lb') (floor ub')
+            v2 <- Integer.newVar solver (ceiling lb') (floor ub')
             return (v,v2)
           _ -> do
             putCommentLine $ "cannot handle unbounded variable: " ++ MIP.fromVar v
@@ -823,16 +823,16 @@ solveMIP opt solver mip = do
         case indicator of
           Nothing ->
             case op of
-              MIP.Le  -> SAT.Integer.addConstraint enc $ lhs' .<=. fromInteger rhs'
-              MIP.Ge  -> SAT.Integer.addConstraint enc $ lhs' .>=. fromInteger rhs'
-              MIP.Eql -> SAT.Integer.addConstraint enc $ lhs' .==. fromInteger rhs'
+              MIP.Le  -> Integer.addConstraint enc $ lhs' .<=. fromInteger rhs'
+              MIP.Ge  -> Integer.addConstraint enc $ lhs' .>=. fromInteger rhs'
+              MIP.Eql -> Integer.addConstraint enc $ lhs' .==. fromInteger rhs'
           Just (var, val) -> do
             let var' = asBin (vmap Map.! var)
                 f sel = do
                   case op of
-                    MIP.Le  -> SAT.Integer.addConstraintSoft enc sel $ lhs' .<=. fromInteger rhs'
-                    MIP.Ge  -> SAT.Integer.addConstraintSoft enc sel $ lhs' .>=. fromInteger rhs'
-                    MIP.Eql -> SAT.Integer.addConstraintSoft enc sel $ lhs' .==. fromInteger rhs'
+                    MIP.Le  -> Integer.addConstraintSoft enc sel $ lhs' .<=. fromInteger rhs'
+                    MIP.Ge  -> Integer.addConstraintSoft enc sel $ lhs' .>=. fromInteger rhs'
+                    MIP.Eql -> Integer.addConstraintSoft enc sel $ lhs' .==. fromInteger rhs'
             case val of
               1 -> f var'
               0 -> f (SAT.litNot var')
@@ -851,14 +851,14 @@ solveMIP opt solver mip = do
           d = foldl' lcm 1 [denominator r | MIP.Term r _ <- obj] *
               (if MIP.dir mip == MIP.OptMin then 1 else -1)
           obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- obj]
-      (obj3,obj3_c) <- SAT.Integer.linearize enc obj2
+      (obj3,obj3_c) <- Integer.linearize enc obj2
 
       let transformObjVal :: Integer -> Rational
           transformObjVal val = fromIntegral (val + obj3_c) / fromIntegral d
 
           transformModel :: SAT.Model -> Map String Integer
           transformModel m = Map.fromList
-            [ (MIP.fromVar v, SAT.Integer.eval m (vmap Map.! v)) | v <- Set.toList ivs ]
+            [ (MIP.fromVar v, Integer.eval m (vmap Map.! v)) | v <- Set.toList ivs ]
 
           printModel :: Map String Integer -> IO ()
           printModel m = do
@@ -909,8 +909,8 @@ solveMIP opt solver mip = do
     nonAdjacentPairs (x1:x2:xs) = [(x1,x3) | x3 <- xs] ++ nonAdjacentPairs (x2:xs)
     nonAdjacentPairs _ = []
 
-    asBin :: SAT.Integer.Expr -> SAT.Lit
-    asBin (SAT.Integer.Expr [(1,[lit])]) = lit
+    asBin :: Integer.Expr -> SAT.Lit
+    asBin (Integer.Expr [(1,[lit])]) = lit
     asBin _ = error "asBin: failure"
 
 -- ------------------------------------------------------------------------

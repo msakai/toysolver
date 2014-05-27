@@ -12,8 +12,8 @@ import Data.List
 import System.Process
 import Text.ParserCombinators.Parsec hiding (try)
 
-import qualified SAT.Types as SAT
-import qualified Text.MaxSAT as MaxSAT
+import qualified ToySolver.SAT.Types as SAT
+import qualified ToySolver.Text.MaxSAT as MaxSAT
 
 ubcsat :: FilePath -> FilePath -> MaxSAT.WCNF -> IO (Maybe SAT.Model)
 ubcsat cmd fname wcnf = do

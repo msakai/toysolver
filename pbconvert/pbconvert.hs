@@ -23,20 +23,20 @@ import System.FilePath
 import System.Console.GetOpt
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
-import qualified Text.LPFile as LPFile
-import qualified Text.MaxSAT as MaxSAT
-import qualified Text.PBFile as PBFile
-import Converter.ObjType
-import qualified Converter.SAT2PB as SAT2PB
-import qualified Converter.MIP2SMT as MIP2SMT
-import qualified Converter.MaxSAT2WBO as MaxSAT2WBO
-import qualified Converter.MaxSAT2NLPB as MaxSAT2NLPB
-import qualified Converter.PB2IP as PB2IP
-import qualified Converter.PB2LSP as PB2LSP
-import qualified Converter.PB2WBO as PB2WBO
-import qualified Converter.PBSetObj as PBSetObj
-import qualified Converter.PB2SMP as PB2SMP
-import qualified Converter.WBO2PB as WBO2PB
+import qualified ToySolver.Text.LPFile as LPFile
+import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.PBFile as PBFile
+import ToySolver.Converter.ObjType
+import qualified ToySolver.Converter.SAT2PB as SAT2PB
+import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
+import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
+import qualified ToySolver.Converter.MaxSAT2NLPB as MaxSAT2NLPB
+import qualified ToySolver.Converter.PB2IP as PB2IP
+import qualified ToySolver.Converter.PB2LSP as PB2LSP
+import qualified ToySolver.Converter.PB2WBO as PB2WBO
+import qualified ToySolver.Converter.PBSetObj as PBSetObj
+import qualified ToySolver.Converter.PB2SMP as PB2SMP
+import qualified ToySolver.Converter.WBO2PB as WBO2PB
 import ToySolver.Version
 
 data Flag
