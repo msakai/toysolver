@@ -64,7 +64,7 @@ source-repository head
   location: git://github.com/msakai/toysolver.git
 
 Library
-  Exposed: False
+  Exposed: True
   Hs-source-dirs: src
   Build-Depends:
      base >=4 && <5,
