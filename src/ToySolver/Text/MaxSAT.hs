@@ -97,15 +97,15 @@ parseWCNFLine s =
   case words s of
     (w:xs)
       | last xs == "0" -> seq w' $ seqList ys $ (w', ys)
-      | otherwise -> error "parse error"
+      | otherwise -> error "ToySolver.Text.MaxSAT: parse error"
       where
         w' = readUnsignedInteger w
         ys = map readInt $ init xs
-    _ -> error "parse error"
+    _ -> error "ToySolver.Text.MaxSAT: parse error"
 
 parseCNFLine :: String -> WeightedClause
 parseCNFLine s
-  | null xs || last xs /= 0 = error "parse error"
+  | null xs || last xs /= 0 = error "ToySolver.Text.MaxSAT: parse error"
   | otherwise = seqList ys $ (1, ys)
   where
     xs = map readInt (words s)
@@ -150,7 +150,7 @@ parseByteString s =
 parseWCNFLineBS :: BS.ByteString -> WeightedClause
 parseWCNFLineBS s =
   case BS.readInteger (BS.dropWhile isSpace s) of
-    Nothing -> error "no weight"
+    Nothing -> error "ToySolver.Text.MaxSAT: no weight"
     Just (w, s') -> seq w $ seq xs $ (w, xs)
       where
         xs = parseClauseBS s'
@@ -166,7 +166,7 @@ parseClauseBS s = seqList xs $ xs
     xs = go s
     go s =
       case BS.readInt (BS.dropWhile isSpace s) of
-        Nothing -> error "parse error"
+        Nothing -> error "ToySolver.Text.MaxSAT: parse error"
         Just (0,_) -> []
         Just (i,s') -> i : go s'
 

@@ -158,7 +158,7 @@ solve' opt vs2 xs = simplify xs >>= go vs2
                    | (c,a)<-ls , (d,b)<-us ]
           model <- go vs' =<< simplify (zs ++ rest)
           case pickupZ (evalBoundsZ model bnd) of
-            Nothing  -> error "solve': should not happen"
+            Nothing  -> error "ToySolver.OmegaTest.solve': should not happen"
             Just val -> return $ IM.insert v val model
 
         case2 = msum

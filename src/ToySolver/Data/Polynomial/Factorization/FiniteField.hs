@@ -101,7 +101,7 @@ berlekamp :: forall k. (Eq k, Ord k, FiniteField k) => UPolynomial k -> [UPolyno
 berlekamp f = go (Set.singleton f) basis
   where
     go :: Set (UPolynomial k) -> [UPolynomial k] -> [UPolynomial k]
-    go _ [] = error $ "berlekamp: should not happen"
+    go _ [] = error $ "ToySolver.Data.Polynomial.Factorization.FiniteField.berlekamp: should not happen"
     go fs (b:bs)
       | Set.size fs == r = Set.toList fs
       | otherwise = go (Set.unions [func fi | fi <- Set.toList fs]) bs

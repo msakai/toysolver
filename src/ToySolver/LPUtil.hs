@@ -85,7 +85,7 @@ toStandardForm' (obj, cs) = m
                   _ -> do
                     v <- gensym
                     return [(lhs2 ^-^ LA.var v, rhs2)]
-              _   -> error $ "LPUtil.toStandardForm: " ++ show op2 ++ " is not supported"
+              _   -> error $ "ToySolver.LPUtil.toStandardForm: " ++ show op2 ++ " is not supported"
 
       assert (and [isNothing $ LA.lookupCoeff LA.unitVar c | (c,_) <- cs2]) $ return ()
 

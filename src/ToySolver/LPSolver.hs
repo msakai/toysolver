@@ -108,7 +108,7 @@ addConstraint c = do
       v <- gensym -- artificial variable
       putTableau $ Simplex.setRow v tbl (LA.coeffMap e, b)
       addArtificialVariable v
-    _ -> error $ "addConstraint does not support " ++ show rop
+    _ -> error $ "ToySolver.LPSolver.addConstraint does not support " ++ show rop
   where
     isSingleVar e =
       case LA.terms e of
@@ -127,7 +127,7 @@ addConstraint2 c = do
     Eql -> do
       f e b
       f (negateV e) (negate b)
-    _ -> error $ "addConstraint does not support " ++ show rop
+    _ -> error $ "ToySolver.LPSolver.addConstraint2 does not support " ++ show rop
   where
     -- -x≤b で -b≤0 なら追加しない。ad hoc なので一般化したい。
     f e b  | isSingleNegatedVar e && -b <= 0 = return ()

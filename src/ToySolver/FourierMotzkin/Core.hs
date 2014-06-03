@@ -152,7 +152,7 @@ project' v xs = do
       cond <- unDNF $ boundConditions bnd
       let mt m =
            case Interval.pickup (evalBounds m bnd) of
-             Nothing  -> error "FourierMotzkin.project: should not happen"
+             Nothing  -> error "ToySolver.FourierMotzkin.project: should not happen"
              Just val -> IM.insert v val m
       return (rest ++ cond, mt)
 

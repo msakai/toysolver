@@ -269,14 +269,14 @@ cardinalityReduction (lhs,rhs) = (ls, rhs')
     go1 !s !k ((a,_):ts)
       | s < rhs   = go1 (s+a) (k+1) ts
       | otherwise = k
-    go1 _ _ [] = error "cardinalityReduction: should not happen"
+    go1 _ _ [] = error "ToySolver.SAT.Types.cardinalityReduction: should not happen"
 
     ls = go2 (minimum (rhs : map (subtract 1 . fst) lhs)) (sortBy (comparing fst) lhs)
 
     go2 !guard' ((a,_) : ts)
       | a - 1 < guard' = go2 (guard' - a) ts
       | otherwise      = map snd ts
-    go2 _ [] = error "cardinalityReduction: should not happen"
+    go2 _ [] = error "ToySolver.SAT.Types.cardinalityReduction: should not happen"
 
 negatePBLinAtLeast :: PBLinAtLeast -> PBLinAtLeast
 negatePBLinAtLeast (xs, rhs) = ([(-c,lit) | (c,lit)<-xs] , -rhs + 1)

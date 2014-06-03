@@ -250,7 +250,7 @@ varLevel solver !v = do
   vd <- varData solver v
   m <- readIORef (vdAssignment vd)
   case m of
-    Nothing -> error ("varLevel: unassigned var " ++ show v)
+    Nothing -> error ("ToySolver.SAT.varLevel: unassigned var " ++ show v)
     Just a -> return (aLevel a)
 
 litLevel :: Solver -> Lit -> IO Level
@@ -261,7 +261,7 @@ varReason solver !v = do
   vd <- varData solver v
   m <- readIORef (vdAssignment vd)
   case m of
-    Nothing -> error ("varReason: unassigned var " ++ show v)
+    Nothing -> error ("ToySolver.SAT.varReason: unassigned var " ++ show v)
     Just a -> return (aReason a)
 
 varAssignNo :: Solver -> Var -> IO Int
@@ -269,7 +269,7 @@ varAssignNo solver !v = do
   vd <- varData solver v
   m <- readIORef (vdAssignment vd)
   case m of
-    Nothing -> error ("varAssignNo: unassigned var " ++ show v)
+    Nothing -> error ("ToySolver.SAT.varAssignNo: unassigned var " ++ show v)
     Just a -> return (aIndex a)
 
 -- | Solver instance

@@ -34,7 +34,7 @@ import qualified ToySolver.Data.Polynomial.Base as P
 
 hensel :: forall p. TL.Nat p => UPolynomial Integer -> [UPolynomial (PrimeField p)] -> Integer -> [UPolynomial Integer]
 hensel f fs1 k
-  | k <= 0    = error "hensel; k <= 0"
+  | k <= 0    = error "ToySolver.Data.Polynomial.Factorization.Hensel.hensel: k <= 0"
   | otherwise = assert precondition $ go 1 (map (P.mapCoeff Data.FiniteField.toInteger) fs1)
   where
     precondition =

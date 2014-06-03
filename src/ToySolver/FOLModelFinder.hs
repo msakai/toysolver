@@ -189,7 +189,7 @@ toSkolemNF skolem phi = f [] Map.empty (toNNF phi)
     f uvs s (Exists v phi) = do
       fsym <- skolem v (length uvs)
       f uvs (Map.insert v (TmApp fsym [TmVar v | v <- reverse uvs]) s) phi
-    f _ _ _ = error "toSkolemNF: should not happen"
+    f _ _ _ = error "ToySolver.FOLModelFinder.toSkolemNF: should not happen"
 
     gensym :: String -> Set Var -> Var
     gensym template vs = head [name | name <- names, Set.notMember name vs]

@@ -94,7 +94,7 @@ realRoot :: UPolynomial Rational -> Interval Rational -> AReal
 realRoot p i = 
   case [q | (q,_) <- P.factor p, P.deg q > 0, Sturm.numRoots q i == 1] of
     p2:_ -> realRoot' p2 i
-    []   -> error "Data.AlgebraicNumber.Real.realRoot: invalid interval"
+    []   -> error "ToySolver.Data.AlgebraicNumber.Real.realRoot: invalid interval"
 
 -- p must already be factored.
 realRoot' :: UPolynomial Rational -> Interval Rational -> AReal
@@ -228,7 +228,7 @@ instance Real AReal where
             a = P.coeff (P.var X) p
             b = P.coeff P.mone p
         in - b / a
-    | otherwise  = error "toRational: proper algebraic number"
+    | otherwise  = error "AReal.toRational: proper algebraic number"
 
 instance RealFrac AReal where
   properFraction = properFraction'
@@ -317,10 +317,10 @@ floor' a =
 -- | The @n@th root of @a@
 nthRoot :: Integer -> AReal -> AReal
 nthRoot n a
-  | n <= 0 = error "Data.AlgebraicNumver.Root.nthRoot"
+  | n <= 0 = error "ToySolver.Data.AlgebraicNumver.Root.nthRoot"
   | even n =
       if a < 0
-      then error "Data.AlgebraicNumver.Root.nthRoot: no real roots"
+      then error "ToySolver.Data.AlgebraicNumver.Root.nthRoot: no real roots"
       else assert (length bs == 2) (maximum bs) -- select positive root
   | otherwise =
       assert (length bs == 1) (head bs) -- select unique root

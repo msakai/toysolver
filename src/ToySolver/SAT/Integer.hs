@@ -22,7 +22,7 @@ data Expr = Expr [(Integer, [SAT.Lit])]
 
 newVar :: SAT.Solver -> Integer -> Integer -> IO Expr
 newVar solver lo hi = do
-  when (lo > hi) $ error $ printf "SAT.Integer.newVar: inconsistent bounds given [%d, %d]" lo hi
+  when (lo > hi) $ error $ printf "ToySolver.SAT.Integer.newVar: inconsistent bounds given [%d, %d]" lo hi
   let hi' = hi - lo
       bitWidth = head $ [w | w <- [1..], let mx = 2 ^ w - 1, hi' <= mx]
   vs <- SAT.newVars solver bitWidth

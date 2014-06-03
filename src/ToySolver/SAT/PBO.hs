@@ -146,7 +146,7 @@ optimize opt = do
         AdaptiveSearch -> do
           lim <- getTrialLimitConf opt
           adaptiveSearch cxt solver lim
-        _              -> error "SAT.PBO.minimize: should not happen"  
+        _              -> error "ToySolver.SAT.PBO.minimize: should not happen"  
 
 getSearchStrategy :: Optimizer -> IO SearchStrategy
 getSearchStrategy opt = readIORef (optSearchStrategyRef opt)

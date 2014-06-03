@@ -91,7 +91,7 @@ intExpr opt env mip e =
     _ -> list (showChar '+' : map f e)
   where
     f (MIP.Term c _) | not (isInteger c) =
-      error ("Converter.MIP2SMT.intExpr: fractional coefficient: " ++ show c)
+      error ("ToySolver.Converter.MIP2SMT.intExpr: fractional coefficient: " ++ show c)
     f (MIP.Term c []) = intNum opt (floor c)
     f (MIP.Term (-1) vs) = list [showChar '-', f (MIP.Term 1 vs)]
     f (MIP.Term c vs) =

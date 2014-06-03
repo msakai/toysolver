@@ -568,7 +568,7 @@ mod f1 f2 = snd (divMod f1 f2)
 -- | division of univariate polynomials
 divMod :: (Eq k, Fractional k) => UPolynomial k -> UPolynomial k -> (UPolynomial k, UPolynomial k)
 divMod f g
-  | isZero g  = error "divMod: division by zero"
+  | isZero g  = error "ToySolver.Data.Polynomial.divMod: division by zero"
   | otherwise = go 0 f
   where
     lt_g = lt nat g
@@ -616,7 +616,7 @@ exgcd f1 f2 = f $ go f1 f2 1 0 0 1
 
 -- | pseudo division
 pdivMod :: (Eq r, Num r) => UPolynomial r -> UPolynomial r -> (r, UPolynomial r, UPolynomial r)
-pdivMod _ 0 = error "pdivMod: division by 0"
+pdivMod _ 0 = error "ToySolver.Data.Polynomial.pdivMod: division by 0"
 pdivMod f g
   | deg f < deg g = (1, 0, f)
   | otherwise     = go (deg f - deg g + 1) f 0
@@ -639,7 +639,7 @@ pdiv f g =
 
 -- | pseudo reminder
 pmod :: (Eq r, Num r) => UPolynomial r -> UPolynomial r -> UPolynomial r
-pmod _ 0 = error "pmod: division by 0"
+pmod _ 0 = error "ToySolver.Data.Polynomial.pmod: division by 0"
 pmod f g
   | deg f < deg g = f
   | otherwise     = go (deg f - deg g + 1) f
@@ -732,12 +732,12 @@ mone = Monomial $ Map.empty
 
 mfromIndices :: Ord v => [(v, Integer)] -> Monomial v
 mfromIndices xs
-  | any (\(_,e) -> 0>e) xs = error "mfromIndices: negative exponent"
+  | any (\(_,e) -> 0>e) xs = error "ToySolver.Data.Polynomial.mfromIndices: negative exponent"
   | otherwise = Monomial $ Map.fromListWith (+) [(x,e) | (x,e) <- xs, e > 0]
 
 mfromIndicesMap :: Ord v => Map v Integer -> Monomial v
 mfromIndicesMap m
-  | any (\(_,e) -> 0>e) (Map.toList m) = error "mfromIndicesMap: negative exponent"
+  | any (\(_,e) -> 0>e) (Map.toList m) = error "ToySolver.Data.Polynomial.mfromIndicesMap: negative exponent"
   | otherwise = mfromIndicesMap' m
 
 mfromIndicesMap' :: Ord v => Map v Integer -> Monomial v
@@ -753,7 +753,7 @@ mpow :: Ord v => Monomial v -> Integer -> Monomial v
 mpow _ 0 = mone
 mpow m 1 = m
 mpow (Monomial xs) e
-  | 0 > e     = error "mpow: negative exponent"
+  | 0 > e     = error "ToySolver.Data.Polynomial.mpow: negative exponent"
   | otherwise = Monomial $ Map.map (e*) xs
 
 mdivides :: Ord v => Monomial v -> Monomial v -> Bool

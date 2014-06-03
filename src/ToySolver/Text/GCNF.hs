@@ -81,7 +81,7 @@ parseLine s =
         let ys  = map readInt $ init xs
             idx = readInt $ init w
         in seq idx $ seqList ys $ (idx, ys)
-    _ -> error "parse error"
+    _ -> error "ToySolver.Text.GCNF: parse error"
 
 parseCNFLine :: String -> SAT.Clause
 parseCNFLine s = seq xs $ seqList xs $ xs
