@@ -132,6 +132,7 @@ import Data.Hashable
 import Data.List
 import Data.Monoid
 import Data.Ratio
+import Data.String (IsString (..))
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -174,6 +175,9 @@ instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
   abs x    = x -- OK?
   signum _ = 1 -- OK?
   fromInteger x = constant (fromInteger x)
+
+instance (Eq k, Num k, Ord v, IsString v) => IsString (Polynomial k v) where
+  fromString s = var (fromString s)
 
 instance (Eq k, Num k, Ord v) => AdditiveGroup (Polynomial k v) where
   (^+^)   = plus
@@ -711,6 +715,9 @@ type UMonomial = Monomial X
 instance (Ord v, Show v) => Show (Monomial v) where
   showsPrec d m  = showParen (d > 10) $
     showString "mfromIndices " . shows (mindices m)
+
+instance (Ord v, IsString v) => IsString (Monomial v) where
+  fromString s = var (fromString s)
 
 instance (NFData v) => NFData (Monomial v) where
   rnf (Monomial m) = rnf m
