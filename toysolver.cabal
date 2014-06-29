@@ -351,6 +351,14 @@ Test-suite TestPBFile
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
+Test-suite TestSDPFile
+  Type:              exitcode-stdio-1.0
+  HS-Source-Dirs:    test
+  Main-is:           TestSDPFile.hs
+  Build-depends:     base >=4 && <5, toysolver, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
+
 Test-suite TestUtil
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
