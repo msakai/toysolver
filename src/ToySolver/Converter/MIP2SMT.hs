@@ -221,25 +221,50 @@ conditions opt q env mip = bnds ++ cs ++ ss
     bnd v = (c1, Nothing)
       where
         v2 = env Map.! v
-        v3 = if isInt mip v
-             then toReal opt (showString v2)
-             else showString v2
         (lb,ub) = MIP.getBounds mip v
-        s1 = case lb of
-               MIP.NegInf -> []
-               MIP.PosInf -> [showString "false"]
-               MIP.Finite x ->
-                 if isInt mip v
-                 then [list [showString "<=", intNum opt (ceiling x), showString v2]]
-                 else [list [showString "<=", realNum opt x, v3]]
-        s2 = case ub of
-               MIP.NegInf -> [showString "false"]
-               MIP.PosInf -> []
-               MIP.Finite x ->
-                 if isInt mip v
-                 then [list [showString "<=", showString v2, intNum opt (floor x)]]
-                 else [list [showString "<=", v3, realNum opt x]]
-        c0 = and' (s1 ++ s2)
+
+        c0 =
+          case optLanguage opt of
+            -- In SMT-LIB2 format, inequalities can be chained.
+            -- For example, "(<= 0 x 10)" is equivalent to "(and (<= 0 x) (<= x 10))".
+            -- 
+            -- Supported solvers: cvc4-1.1, yices-2.2.1, z3-4.3.0
+            -- Unsupported solvers: z3-4.0
+            SMTLIB2
+              | lb == MIP.PosInf || ub == MIP.NegInf -> showString "false"
+              | length args >= 2 -> list (showString "<=" : args)
+              | otherwise -> showString "true"
+                  where
+                    args = lb2 ++ [showString v2] ++ ub2
+                    lb2 = case lb of
+                            MIP.NegInf -> []
+                            MIP.PosInf -> error "should not happen"
+                            MIP.Finite x 
+                              | isInt mip v -> [intNum opt (ceiling x)]
+                              | otherwise -> [realNum opt x]
+                    ub2 = case ub of 
+                            MIP.NegInf -> error "should not happen"
+                            MIP.PosInf -> []
+                            MIP.Finite x
+                              | isInt mip v -> [intNum opt (floor x)]
+                              | otherwise -> [realNum opt x]
+            YICES _ -> and' (s1 ++ s2)
+              where
+                s1 = case lb of
+                       MIP.NegInf -> []
+                       MIP.PosInf -> [showString "false"]
+                       MIP.Finite x ->
+                         if isInt mip v
+                         then [list [showString "<=", intNum opt (ceiling x), showString v2]]
+                         else [list [showString "<=", realNum opt x, showString v2]]
+                s2 = case ub of
+                       MIP.NegInf -> [showString "false"]
+                       MIP.PosInf -> []
+                       MIP.Finite x ->
+                         if isInt mip v
+                         then [list [showString "<=", showString v2, intNum opt (floor x)]]
+                         else [list [showString "<=", showString v2, realNum opt x]]
+
         c1 = case MIP.getVarType mip v of
                MIP.SemiContinuousVariable ->
                  or' [list [showString "=", showString v2, realNum opt 0], c0]
@@ -247,6 +272,7 @@ conditions opt q env mip = bnds ++ cs ++ ss
                  or' [list [showString "=", showString v2, intNum opt 0], c0]
                _ ->
                  c0
+
     cs = map (constraint opt q env mip) (MIP.constraints mip)
     ss = concatMap sos (MIP.sosConstraints mip)
     sos (MIP.SOSConstraint label typ xs) = do
