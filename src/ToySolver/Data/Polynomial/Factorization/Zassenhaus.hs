@@ -76,7 +76,7 @@ lift :: forall p. TL.Nat p => UPolynomial Integer -> [UPolynomial (PrimeField p)
 lift f [_] = [f]
 lift f fs  = search pk f (Hensel.hensel f fs k)
   where
-    p = TL.toInt (undefined :: p)
+    p = char (undefined :: PrimeField p)
     k, pk :: Integer
     (k,pk) = head [(k,pk) | k <- [1,2..], let pk = p^k, pk^(2::Int) > (2^(P.deg f + 1))^(2::Int) * norm2sq f]
 
