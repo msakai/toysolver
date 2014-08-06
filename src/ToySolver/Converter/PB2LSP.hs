@@ -2,7 +2,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB2LSP
--- Copyright   :  (c) Masahiro Sakai 2013
+-- Copyright   :  (c) Masahiro Sakai 2013-2014
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -12,6 +12,7 @@
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2LSP
   ( convert
+  , convertWBO
   ) where
 
 import Data.List
@@ -32,29 +33,71 @@ convert formula =
 
     constrs = foldr (.) id
       [ showString "  constraint " .
-        showString (showSum lhs) .
-        showString op2 .
-        shows rhs .
+        showString (showConstr c) .
         showString ";\n"
-      | (lhs, op, rhs) <- PBFile.pbConstraints formula
-      , let op2 = case op of
-                    PBFile.Ge -> " >= "
-                    PBFile.Eq -> " == "
+      | c <- PBFile.pbConstraints formula
       ]
-
-    sum' :: [String] -> String
-    sum' xs = "sum(" ++ intercalate ", " xs ++ ")"
-
-    showSum = sum' . map showTerm
-
-    showTerm (n,ls) = intercalate "*" $ [show n | n /= 1] ++ [showLit l | l<-ls]
-
-    showLit l =
-      if l < 0
-      then "!x[" ++ show (abs l) ++ "]"
-      else "x[" ++ show l ++ "]"
 
     obj2 =
       case PBFile.pbObjectiveFunction formula of
         Just obj' -> showString "  minimize " . showString (showSum obj') . showString ";\n"
         Nothing -> id
+
+convertWBO :: PBFile.SoftFormula -> ShowS
+convertWBO softFormula =
+  showString "function model() {\n" .
+  decls .
+  constrs .
+  costDef .
+  topConstr .
+  showString "  minimize cost;\n" .
+  showString "}\n"
+  where
+    nv = PBFile.wboNumVars softFormula
+
+    decls = showString $
+      "  for [i in 1.." ++ show nv ++ "] x[i] <- bool();\n"
+
+    constrs = foldr (.) id
+      [ showString "  constraint " .
+        showString (showConstr c) .
+        showString ";\n"
+      | (Nothing, c) <- PBFile.wboConstraints softFormula
+      ]
+
+    costDef = showString "  cost <- sum(\n" . s . showString ");\n"
+      where
+        s = foldr (.) id . intersperse (showString ",\n") . map showString $ xs
+        xs = ["    " ++ show w ++ "*!(" ++ showConstr c ++ ")" | (Just w, c) <- PBFile.wboConstraints softFormula]
+
+    topConstr =
+      case PBFile.wboTopCost softFormula of
+        Nothing -> id
+        Just t -> showString $ "  constraint cost <= " ++ show t ++ ";\n"
+
+showConstr :: PBFile.Constraint -> String
+showConstr (lhs, PBFile.Ge, 1) | and [c==1 | (c,_) <- lhs] =
+  "or(" ++ intercalate "," (map (f . snd) lhs) ++ ")"
+  where
+    f [l] = showLit l
+    f ls  = "and(" ++ intercalate "," (map showLit ls) ++ ")"
+showConstr (lhs, op, rhs) = showSum lhs  ++ op2 ++ show rhs
+  where
+    op2 = case op of
+            PBFile.Ge -> " >= "
+            PBFile.Eq -> " == "
+
+sum' :: [String] -> String
+sum' xs = "sum(" ++ intercalate ", " xs ++ ")"
+
+showSum :: PBFile.Sum -> String
+showSum = sum' . map showTerm
+
+showTerm :: PBFile.WeightedTerm -> String
+showTerm (n,ls) = intercalate "*" $ [show n | n /= 1] ++ [showLit l | l<-ls]
+
+showLit :: PBFile.Lit -> String
+showLit l =
+  if l < 0
+  then "!x[" ++ show (abs l) ++ "]"
+  else "x[" ++ show l ++ "]"
