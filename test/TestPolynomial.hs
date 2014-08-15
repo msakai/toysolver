@@ -448,7 +448,7 @@ monomialOrderProp2 cmp =
     a /= P.mone ==> cmp P.mone a == LT
 
 {--------------------------------------------------------------------
-  Gröbner basis
+-- Gröbner basis
 --------------------------------------------------------------------}
 
 -- http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf
