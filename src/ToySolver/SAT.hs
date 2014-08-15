@@ -2626,7 +2626,7 @@ pbToAtLeast (lhs, rhs) = do
 
 data PBHandlerCounter
   = PBHandlerCounter
-  { pbTerms    :: !PBLinSum
+  { pbTerms    :: !PBLinSum -- sorted in the decending order on coefficients.
   , pbDegree   :: !Integer
   , pbCoeffMap :: !(LitMap Integer)
   , pbMaxSlack :: !Integer
@@ -2693,12 +2693,11 @@ instance ConstraintHandler PBHandlerCounter where
     if s < 0 then
       return False
     else do
-      forM_ (pbTerms this2) $ \(c1,l1) -> do
-        when (c1 > s) $ do
-          v <- litValue solver l1
-          when (v == lUndef) $ do
-            assignBy solver l1 this
-            return ()
+      forM_ (takeWhile (\(c1,_) -> c1 > s) (pbTerms this2)) $ \(_,l1) -> do
+        v <- litValue solver l1
+        when (v == lUndef) $ do
+          assignBy solver l1 this
+          return ()
       return True
 
   basicReasonOf solver this l = do
