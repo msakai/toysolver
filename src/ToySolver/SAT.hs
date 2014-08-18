@@ -122,7 +122,10 @@ module ToySolver.SAT
 import Prelude hiding (log)
 import Control.Monad
 import Control.Exception
-#if MIN_VERSION_array(0,4,0)
+#if MIN_VERSION_array(0,5,0)
+import Data.Array.IO
+import Data.Array.Unsafe (unsafeFreeze)
+#elif MIN_VERSION_array(0,4,0)
 import Data.Array.IO hiding (unsafeFreeze)
 import Data.Array.Unsafe (unsafeFreeze)
 #else
