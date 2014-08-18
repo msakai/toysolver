@@ -120,6 +120,7 @@ module ToySolver.SAT
   ) where
 
 import Prelude hiding (log)
+import Control.Loop
 import Control.Monad
 import Control.Exception
 #if MIN_VERSION_array(0,5,0)
@@ -704,7 +705,7 @@ newVar solver = do
     else do
       let ub' = max 2 (ub * 3 `div` 2)
       a' <- newArray_ (1,ub')
-      forM_ [1..ub] $ \v2 -> do
+      forLoop 1 (<=ub) (+1) $ \v2 -> do
         vd2 <- readArray a v2
         writeArray a' v2 vd2
       writeArray a' v vd
@@ -736,7 +737,7 @@ resizeVarCapacity solver n = do
   (_,ub) <- getBounds a
   when (ub < n) $ do
     a' <- newArray_ (1,n)
-    forM_ [1..ub] $ \v -> do
+    forLoop 1 (<=ub) (+1) $ \v -> do
       vd <- readArray a v
       writeArray a' v vd
     writeIORef (svVarData solver) a'
@@ -1825,7 +1826,7 @@ constructModel :: Solver -> IO ()
 constructModel solver = do
   n <- nVars solver
   (marr::IOUArray Var Bool) <- newArray_ (1,n)
-  forM_ [1..n] $ \v -> do
+  forLoop 1 (<=n) (+1) $ \v -> do
     vd <- varData solver v
     a <- readIORef (vdAssignment vd)
     writeArray marr v (aValue (fromJust a))
@@ -2382,7 +2383,7 @@ instance ConstraintHandler AtLeastHandler where
                   -- n+1 literals (0 .. n) are watched.
                 else do
                   -- UNIT
-                  forM_ [0..n-1] $ \l -> do
+                  forLoop 0 (<n) (+1) $ \l -> do
                     lit <- unsafeRead a l
                     _ <- assignBy solver lit this -- should always succeed
                     return ()
@@ -2429,7 +2430,7 @@ instance ConstraintHandler AtLeastHandler where
                            return (lit, maxBound)
                        forM_ (zip [i..ub] xs) $ \(l,(lit,_lv)) -> do
                          writeArray a l lit
-                    forM_ [i..n] $ \l -> do
+                    forLoop i (<=n) (+1) $ \l -> do
                       lit_l <- readArray a l
                       watch solver lit_l this
                     -- n+1 literals (0 .. n) are watched.
