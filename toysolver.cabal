@@ -188,6 +188,7 @@ Library
      ToySolver.Data.AlgebraicNumber.Graeffe
      ToySolver.Data.Polynomial.Base
      ToySolver.Data.IndexedPriorityQueue
+     ToySolver.Data.PriorityQueue
      ToySolver.Data.SeqQueue
      Paths_toysolver
   GHC-Prof-Options: -auto-all

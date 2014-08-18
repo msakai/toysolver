@@ -17,6 +17,7 @@ module ToySolver.Data.PriorityQueue
   (
   -- * PriorityQueue type
     PriorityQueue
+  , Index
 
   -- * Constructors
   , newPriorityQueue
@@ -30,6 +31,10 @@ module ToySolver.Data.PriorityQueue
   , Enqueue (..)
   , Dequeue (..)
   , QueueSize (..)
+  , getHeapArray
+
+  -- * Misc operations
+  , resizeHeapCapacity
   ) where
 
 import Control.Monad
@@ -39,19 +44,21 @@ import qualified Data.Array.IO as A
 import Data.IORef
 import Data.Queue.Classes
 
+type Index = Int
+
 -- | Priority queue implemented as array-based binary heap.
 data PriorityQueue a
   = PriorityQueue
-  { lt 　:: !(a -> a -> Bool)
+  { lt   :: !(a -> a -> IO Bool)
   , heap :: !(IORef (Int, A.IOArray Int a))
   }
 
 -- | Build a priority queue with default ordering ('(<)' of 'Ord' class)
 newPriorityQueue :: Ord a => IO (PriorityQueue a)
-newPriorityQueue = newPriorityQueueBy (<)
+newPriorityQueue = newPriorityQueueBy (\a b -> return (a < b))
 
 -- | Build a priority queue with a given /less than/ operator.
-newPriorityQueueBy :: (a -> a -> Bool) -> IO (PriorityQueue a)
+newPriorityQueueBy :: (a -> a -> IO Bool) -> IO (PriorityQueue a)
 newPriorityQueueBy cmp = do
   h <- A.newArray_ (0,-1)
   ref <- newIORef (0,h)
@@ -73,11 +80,7 @@ clear q = do
 clone :: PriorityQueue a -> IO (PriorityQueue a)
 clone q = do
   (n,arr) <- readIORef (heap q)
-  b <- A.getBounds arr
-  arr' <- A.newArray_ b
-  forM_ [0..(n-1)] $ \i -> do
-    val <- A.unsafeRead arr i
-    A.unsafeWrite arr' i val
+  arr' <- cloneArray arr
   ref <- newIORef (n,arr')
   return $ PriorityQueue{ lt = lt q, heap = ref }
 
@@ -88,16 +91,14 @@ instance Enqueue (PriorityQueue a) IO a where
   enqueue q val = do
     (n,arr) <- readIORef (heap q)
     c <- liftM rangeSize $ A.getBounds arr
-    if (n < c)
+    if (n+1 < c)
       then do
         A.unsafeWrite arr n val
         writeIORef (heap q) (n+1,arr)
       else do
         let c' = max 2 (c * 3 `div` 2)
         arr' <- A.newArray_ (0, c'-1)
-        forM_ [0..n-1] $ \i -> do
-          val_i <- A.unsafeRead arr i
-          A.unsafeWrite arr' i val_i
+        copyTo arr arr' (0, n-1)
         A.unsafeWrite arr' n val
         writeIORef (heap q) (n+1,arr')
     up q n
@@ -106,7 +107,8 @@ instance Dequeue (PriorityQueue a) IO a where
   dequeue q = do
     (n,arr) <- readIORef (heap q)
     case n of
-      0 -> return Nothing
+      0 ->
+        return Nothing
       _ -> do
         val <- A.unsafeRead arr 0
         writeIORef (heap q) (n-1, arr)
@@ -129,7 +131,7 @@ instance QueueSize (PriorityQueue a) IO where
     (n,_) <- readIORef (heap q)
     return n
 
-up :: PriorityQueue a -> Int -> IO ()
+up :: PriorityQueue a -> Index -> IO ()
 up q !i = do
   (_,arr) <- readIORef (heap q)
   val <- A.unsafeRead arr i
@@ -137,13 +139,16 @@ up q !i = do
       loop j = do
         let p = parent j
         val_p <- A.unsafeRead arr p
-        if lt q val val_p
-          then A.unsafeWrite arr j val_p >> loop p
+        b <- lt q val val_p
+        if b
+          then do
+            A.unsafeWrite arr j val_p
+            loop p
           else return j
   j <- loop i
   A.unsafeWrite arr j val
 
-down :: PriorityQueue a -> Int -> IO ()
+down :: PriorityQueue a -> Index -> IO ()
 down q !i = do
   (!n,arr) <- readIORef (heap q)
   val <- A.unsafeRead arr i
@@ -159,11 +164,13 @@ down q !i = do
               else do
                 val_l <- A.unsafeRead arr l
                 val_r <- A.unsafeRead arr r
-                if lt q val_r val_l
+                b <- lt q val_r val_l
+                if b
                   then return r
                   else return l
            val_child <- A.unsafeRead arr child
-           if not (lt q val_child val)
+           b <- lt q val_child val
+           if not b
              then return j
              else do
                A.unsafeWrite arr j val_child
@@ -171,21 +178,52 @@ down q !i = do
   j <- loop i
   A.unsafeWrite arr j val
 
+-- | Get the internal representation of a given priority queue.
+getHeapArray :: PriorityQueue a -> IO (A.IOArray Index a)
+getHeapArray q = liftM snd $ readIORef (heap q)
+
+-- | Pre-allocate internal buffer for @n@ elements.
+resizeHeapCapacity :: PriorityQueue a -> Int -> IO ()
+resizeHeapCapacity q capa = do
+  (n,arr) <- readIORef (heap q)
+  capa0 <- liftM rangeSize $ A.getBounds arr
+  when (capa0 < capa) $ do
+    arr' <- A.newArray_ (0, capa-1)
+    copyTo arr arr' (0, n-1)
+    writeIORef (heap q) (n,arr')
+
 {--------------------------------------------------------------------
   Index "traversal" functions
 --------------------------------------------------------------------}
 
 {-# INLINE left #-}
-left :: Int -> Int
+left :: Index -> Index
 left i = i*2 + 1
 
 {-# INLINE right #-}
-right :: Int -> Int
+right :: Index -> Index
 right i = (i+1)*2;
 
 {-# INLINE parent #-}
-parent :: Int -> Int
+parent :: Index -> Index
 parent i = (i-1) `div` 2
+
+{--------------------------------------------------------------------
+  utility
+--------------------------------------------------------------------}
+
+cloneArray :: (A.MArray a e m) => a Index e -> m (a Index e)
+cloneArray arr = do
+  b <- A.getBounds arr
+  arr' <- A.newArray_ b
+  copyTo arr arr' b
+  return arr'
+
+copyTo :: (A.MArray a e m) => a Index e -> a Index e -> (Index,Index) -> m ()
+copyTo fromArr toArr b = do
+  forM_ (range b) $ \i -> do
+    val_i <- A.unsafeRead fromArr i
+    A.unsafeWrite toArr i val_i
 
 {--------------------------------------------------------------------
   test
@@ -196,11 +234,12 @@ checkHeapProperty :: String -> PriorityQueue a -> IO ()
 checkHeapProperty str q = do 
   (n,arr) <- readIORef (heap q)
   let go i = do
-        val <- A.unsafeRead arr i
+        val <- A.readArray arr i
         forM_ [left i, right i] $ \j ->
           when (j < n) $ do
-            val2 <- A.unsafeRead arr j
-            when (lt q val2 val) $ do
+            val2 <- A.readArray arr j
+            b <- lt q val2 val
+            when b $ do
               error (str ++ ": invalid heap " ++ show j)
             go j
   when (n > 0) $ go 0

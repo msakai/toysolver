@@ -64,7 +64,7 @@ newPriorityQueue :: IO PriorityQueue
 newPriorityQueue = newPriorityQueueBy (\a b -> return (a < b))
 
 -- | Build a priority queue with a given /less than/ operator.
-newPriorityQueueBy :: (Value -> Value -> IO Bool) -> IO (PriorityQueue)
+newPriorityQueueBy :: (Value -> Value -> IO Bool) -> IO PriorityQueue
 newPriorityQueueBy cmp = do
   h <- A.newArray_ (0,-1)
   ref <- newIORef (0,h)
@@ -76,7 +76,7 @@ newPriorityQueueBy cmp = do
 getElems :: PriorityQueue -> IO [Value]
 getElems q = do
   (n,arr) <- readIORef (heap q)
-  forM [0..n-1] $ \i -> A.readArray arr i
+  forM [0..n-1] $ \i -> A.unsafeRead arr i
 
 -- | Remove all elements from a priority queue.
 clear :: PriorityQueue -> IO ()
@@ -104,7 +104,10 @@ clone q = do
 
   return $ PriorityQueue{ lt = lt q, heap = ref, table = ref2 }
 
-instance Enqueue (PriorityQueue) IO Value where
+instance NewFifo PriorityQueue IO where
+  newFifo = newPriorityQueue
+
+instance Enqueue PriorityQueue IO Value where
   enqueue q val = do
     m <- member q val
     unless m $ do
@@ -135,19 +138,19 @@ instance Enqueue (PriorityQueue) IO Value where
   
       up q n
 
-instance Dequeue (PriorityQueue) IO Value where
+instance Dequeue PriorityQueue IO Value where
   dequeue q = do
     (n,arr) <- readIORef (heap q)
     idx <- readIORef (table q)
     case n of
-      0 -> do
+      0 ->
         return Nothing
       _ -> do
-        val <- A.readArray arr 0
+        val <- A.unsafeRead arr 0
         A.unsafeWrite idx val (-1)
         writeIORef (heap q) (n-1, arr)
         when (n > 1) $ do
-          val1 <- A.readArray arr (n-1)
+          val1 <- A.unsafeRead arr (n-1)
           A.unsafeWrite arr 0 val1
           A.unsafeWrite idx val1 0
           down q 0
@@ -161,7 +164,7 @@ instance Dequeue (PriorityQueue) IO Value where
           Nothing -> return (reverse xs)
           Just x -> go (x:xs)
 
-instance QueueSize (PriorityQueue) IO where
+instance QueueSize PriorityQueue IO where
   queueSize q = do
     (n,_) <- readIORef (heap q)
     return n
@@ -179,7 +182,7 @@ member q v = do
 update :: PriorityQueue -> Value -> IO ()
 update q v = do
   idx <- readIORef (table q)
-  i <- A.readArray idx v
+  i <- A.unsafeRead idx v
   unless (i == -1) $ do
     up q i
     down q i
@@ -188,11 +191,11 @@ up :: PriorityQueue -> Index -> IO ()
 up q !i = do
   (_,arr) <- readIORef (heap q)
   idx <- readIORef (table q)
-  val <- A.readArray arr i
+  val <- A.unsafeRead arr i
   let loop 0 = return 0
       loop j = do
         let p = parent j
-        val_p <- A.readArray arr p
+        val_p <- A.unsafeRead arr p
         b <- lt q val val_p
         if b
           then do
@@ -208,7 +211,7 @@ down :: PriorityQueue -> Index -> IO ()
 down q !i = do
   (!n,arr) <- readIORef (heap q)
   idx <- readIORef (table q)
-  val <- A.readArray arr i
+  val <- A.unsafeRead arr i
   let loop !j = do
         let !l = left j
             !r = right j
@@ -219,13 +222,13 @@ down q !i = do
              if r >= n
               then return l
               else do
-                val_l <- A.readArray arr l
-                val_r <- A.readArray arr r
+                val_l <- A.unsafeRead arr l
+                val_r <- A.unsafeRead arr r
                 b <- lt q val_r val_l
                 if b
                   then return r
                   else return l
-           val_child <- A.readArray arr child
+           val_child <- A.unsafeRead arr child
            b <- lt q val_child val
            if not b
              then return j
@@ -292,7 +295,7 @@ cloneArray arr = do
 copyTo :: (A.MArray a e m) => a Index e -> a Index e -> (Index,Index) -> m ()
 copyTo fromArr toArr b = do
   forM_ (range b) $ \i -> do
-    val_i <- A.readArray fromArr i
+    val_i <- A.unsafeRead fromArr i
     A.unsafeWrite toArr i val_i
 
 {--------------------------------------------------------------------
