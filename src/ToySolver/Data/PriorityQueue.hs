@@ -37,6 +37,7 @@ module ToySolver.Data.PriorityQueue
   , resizeHeapCapacity
   ) where
 
+import Control.Loop
 import Control.Monad
 import Data.Ix
 import qualified Data.Array.Base as A
@@ -220,8 +221,8 @@ cloneArray arr = do
   return arr'
 
 copyTo :: (A.MArray a e m) => a Index e -> a Index e -> (Index,Index) -> m ()
-copyTo fromArr toArr b = do
-  forM_ (range b) $ \i -> do
+copyTo fromArr toArr (!lb,!ub) = do
+  forLoop lb (<=ub) (+1) $ \i -> do
     val_i <- A.unsafeRead fromArr i
     A.unsafeWrite toArr i val_i
 

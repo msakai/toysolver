@@ -41,6 +41,7 @@ module ToySolver.Data.IndexedPriorityQueue
   , resizeTableCapacity
   ) where
 
+import Control.Loop
 import Control.Monad
 import Data.Ix
 import qualified Data.Array.Base as A
@@ -86,10 +87,8 @@ clear q = do
 
   idx <- readIORef (table q)
   (!lb,!ub) <- A.getBounds idx
-  let go i
-        | i > ub    = return ()
-        | otherwise = A.unsafeWrite idx i (-1) >> go (i+1)
-  go lb
+  forLoop lb (<=ub) (+1) $ \i -> do
+    A.unsafeWrite idx i (-1)
 
 -- | Create a copy of a priority queue.
 clone :: PriorityQueue -> IO PriorityQueue
@@ -132,7 +131,7 @@ instance Enqueue PriorityQueue IO Value where
           let c2' = max 2 (c2 * 3 `div` 2)
           idx' <- A.newArray_ (0, c2'-1)
           copyTo idx idx' (0, c2-1)
-          forM_ [c2..c2'-1] $ \i -> A.unsafeWrite idx' i (-1)
+          forLoop c2 (<c2') (+1) $ \i -> A.unsafeWrite idx' i (-1)
           A.unsafeWrite idx' val n
           writeIORef (table q) idx'
   
@@ -262,7 +261,7 @@ resizeTableCapacity q capa = do
   when (capa0 < capa) $ do
     idx' <- A.newArray_ (0, capa-1)
     copyTo idx idx' (0, capa0-1)
-    forM_ [capa0..capa-1] $ \i -> A.unsafeWrite idx' i (-1)
+    forLoop capa0 (<capa) (+1) $ \i -> A.unsafeWrite idx' i (-1)
     writeIORef (table q) idx'
 
 {--------------------------------------------------------------------
@@ -293,8 +292,8 @@ cloneArray arr = do
   return arr'
 
 copyTo :: (A.MArray a e m) => a Index e -> a Index e -> (Index,Index) -> m ()
-copyTo fromArr toArr b = do
-  forM_ (range b) $ \i -> do
+copyTo fromArr toArr (!lb,!ub) = do
+  forLoop lb (<=ub) (+1) $ \i -> do
     val_i <- A.unsafeRead fromArr i
     A.unsafeWrite toArr i val_i
 
