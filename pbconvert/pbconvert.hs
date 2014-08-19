@@ -148,10 +148,13 @@ writePBFile o pb = do
           lp  = case pb of
                   Left opb  -> fst $ PB2IP.convert opb
                   Right wbo -> fst $ PB2IP.convertWBO (IndicatorConstraint `elem` o) wbo
+          lsp = case pb of
+                  Left opb  -> PB2LSP.convert opb
+                  Right wbo -> PB2LSP.convertWBO wbo
       case map toLower (takeExtension fname) of
         ".opb" -> writeFile fname (PBFile.showOPB opb "")
         ".wbo" -> writeFile fname (PBFile.showWBO wbo "")
-        ".lsp" -> writeFile fname (PB2LSP.convert opb "")
+        ".lsp" -> writeFile fname (lsp "")
         ".lp" -> do
           case LPFile.render lp of
             Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
