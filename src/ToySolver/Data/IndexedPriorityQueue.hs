@@ -55,7 +55,7 @@ type Value = Int
 -- | Priority queue implemented as array-based binary heap.
 data PriorityQueue
   = PriorityQueue
-  { lt 　:: !(Value -> Value -> IO Bool)
+  { lt   :: !(Value -> Value -> IO Bool)
   , heap :: !(IORef (Int, A.IOUArray Index Value))
   , table  :: !(IORef (A.IOUArray Value Index))
   }
