@@ -42,12 +42,8 @@ module ToySolver.Data.IndexedPriorityQueue
   , resizeTableCapacity
   ) where
 
-import Control.Loop
 import Control.Monad
-import Data.Ix
-import qualified Data.Array.Base as A
 import qualified Data.Array.IO as A
-import Data.IORef
 import Data.Queue.Classes
 import qualified ToySolver.Data.Vec as Vec
 
@@ -59,7 +55,7 @@ data PriorityQueue
   = PriorityQueue
   { lt   :: !(Value -> Value -> IO Bool)
   , heap :: !(Vec.UVec Value)
-  , table  :: !(IORef (A.IOUArray Value Index))
+  , table  :: !(Vec.UVec Index)
   }
 
 -- | Build a priority queue with default ordering ('(<)' of 'Ord' class)
@@ -70,9 +66,8 @@ newPriorityQueue = newPriorityQueueBy (\a b -> return (a < b))
 newPriorityQueueBy :: (Value -> Value -> IO Bool) -> IO PriorityQueue
 newPriorityQueueBy cmp = do
   vec <- Vec.new
-  idx <- A.newArray_ (0,-1)
-  ref2 <- newIORef idx
-  return $ PriorityQueue{ lt = cmp, heap = vec, table = ref2 }
+  idx <- Vec.new
+  return $ PriorityQueue{ lt = cmp, heap = vec, table = idx }
 
 -- | Return a list of all the elements of a priority queue. (not sorted)
 getElems :: PriorityQueue -> IO [Value]
@@ -82,21 +77,14 @@ getElems q = Vec.getElems (heap q)
 clear :: PriorityQueue -> IO ()
 clear q = do
   Vec.clear (heap q)
-  idx <- readIORef (table q)
-  (!lb,!ub) <- A.getBounds idx
-  forLoop lb (<=ub) (+1) $ \i -> do
-    A.unsafeWrite idx i (-1)
+  Vec.clear (table q)
 
 -- | Create a copy of a priority queue.
 clone :: PriorityQueue -> IO PriorityQueue
 clone q = do
   h2 <- Vec.clone (heap q)
-
-  idx <- readIORef (table q)
-  idx' <- cloneArray idx
-  ref2 <- newIORef idx'
-
-  return $ PriorityQueue{ lt = lt q, heap = h2, table = ref2 }
+  t2 <- Vec.clone (table q)
+  return $ PriorityQueue{ lt = lt q, heap = h2, table = t2 }
 
 instance NewFifo PriorityQueue IO where
   newFifo = newPriorityQueue
@@ -107,37 +95,25 @@ instance Enqueue PriorityQueue IO Value where
     unless m $ do
       n <- Vec.getSize (heap q)
       Vec.push (heap q) val
-
-      idx <- readIORef (table q)
-      c2 <- liftM rangeSize $ A.getBounds idx
-      if val < c2
-        then A.unsafeWrite idx val n
-        else do
-          let c2' = max 2 (c2 * 3 `div` 2)
-          idx' <- A.newArray_ (0, c2'-1)
-          copyTo idx idx' (0, c2-1)
-          forLoop c2 (<c2') (+1) $ \i -> A.unsafeWrite idx' i (-1)
-          A.unsafeWrite idx' val n
-          writeIORef (table q) idx'
-  
+      Vec.growTo (table q) (val+1)
+      Vec.unsafeWrite (table q) val n  
       up q n
 
 instance Dequeue PriorityQueue IO Value where
   dequeue q = do
     n <- Vec.getSize (heap q)
-    idx <- readIORef (table q)
     case n of
       0 ->
         return Nothing
       _ -> do
         val <- Vec.unsafeRead (heap q) 0
-        A.unsafeWrite idx val (-1)
+        Vec.unsafeWrite (table q) val (-1)
         if n == 1 then do
           Vec.resize (heap q) (n-1)
         else do
           val1 <- Vec.unsafeRead (heap q) (n-1)
           Vec.unsafeWrite (heap q) 0 val1
-          A.unsafeWrite idx val1 0
+          Vec.unsafeWrite (table q) val1 0
           Vec.resize (heap q) (n-1)
           down q 0
         return (Just val)
@@ -155,25 +131,22 @@ instance QueueSize PriorityQueue IO where
 
 member :: PriorityQueue -> Value -> IO Bool
 member q v = do
-  idx <- readIORef (table q)
-  r <- A.getBounds idx
-  if not (inRange r v) then
+  n <- Vec.getSize (table q)
+  if n <= v then
     return False
   else do
-    i <- A.unsafeRead idx v
+    i <- Vec.unsafeRead (table q) v
     return $! i /= -1
 
 update :: PriorityQueue -> Value -> IO ()
 update q v = do
-  idx <- readIORef (table q)
-  i <- A.unsafeRead idx v
+  i <- Vec.unsafeRead (table q) v
   unless (i == -1) $ do
     up q i
     down q i
 
 up :: PriorityQueue -> Index -> IO ()
 up q !i = do
-  idx <- readIORef (table q)
   val <- Vec.unsafeRead (heap q) i
   let loop 0 = return 0
       loop j = do
@@ -183,17 +156,16 @@ up q !i = do
         if b
           then do
             Vec.unsafeWrite (heap q) j val_p
-            A.unsafeWrite idx val_p j
+            Vec.unsafeWrite (table q) val_p j
             loop p
           else return j
   j <- loop i
   Vec.unsafeWrite (heap q) j val
-  A.unsafeWrite idx val j
+  Vec.unsafeWrite (table q) val j
 
 down :: PriorityQueue -> Index -> IO ()
 down q !i = do
   n <- Vec.getSize (heap q)
-  idx <- readIORef (table q)
   val <- Vec.unsafeRead (heap q) i
   let loop !j = do
         let !l = left j
@@ -217,11 +189,11 @@ down q !i = do
              then return j
              else do
                Vec.unsafeWrite (heap q) j val_child
-               A.unsafeWrite idx val_child j
+               Vec.unsafeWrite (table q) val_child j
                loop child
   j <- loop i
   Vec.unsafeWrite (heap q) j val
-  A.unsafeWrite idx val j
+  Vec.unsafeWrite (table q) val j
 
 -- | Get the internal representation of a given priority queue.
 getHeapArray :: PriorityQueue -> IO (A.IOUArray Index Value)
@@ -237,14 +209,7 @@ resizeHeapCapacity q capa = Vec.resizeCapacity (heap q) capa
 
 -- | Pre-allocate internal buffer for @[0..n-1]@ values.
 resizeTableCapacity :: PriorityQueue -> Int -> IO ()
-resizeTableCapacity q capa = do
-  idx <- readIORef (table q)
-  capa0 <- liftM rangeSize $ A.getBounds idx
-  when (capa0 < capa) $ do
-    idx' <- A.newArray_ (0, capa-1)
-    copyTo idx idx' (0, capa0-1)
-    forLoop capa0 (<capa) (+1) $ \i -> A.unsafeWrite idx' i (-1)
-    writeIORef (table q) idx'
+resizeTableCapacity q capa = Vec.resizeCapacity (table q) capa
 
 {--------------------------------------------------------------------
   Index "traversal" functions
@@ -261,23 +226,6 @@ right i = (i+1)*2;
 {-# INLINE parent #-}
 parent :: Index -> Index
 parent i = (i-1) `div` 2
-
-{--------------------------------------------------------------------
-  utility
---------------------------------------------------------------------}
-
-cloneArray :: (A.MArray a e m) => a Index e -> m (a Index e)
-cloneArray arr = do
-  b <- A.getBounds arr
-  arr' <- A.newArray_ b
-  copyTo arr arr' b
-  return arr'
-
-copyTo :: (A.MArray a e m) => a Index e -> a Index e -> (Index,Index) -> m ()
-copyTo fromArr toArr (!lb,!ub) = do
-  forLoop lb (<=ub) (+1) $ \i -> do
-    val_i <- A.unsafeRead fromArr i
-    A.unsafeWrite toArr i val_i
 
 {--------------------------------------------------------------------
   test
