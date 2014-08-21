@@ -35,6 +35,7 @@ module ToySolver.Data.IndexedPriorityQueue
   , member
   , update
   , getHeapArray
+  , getHeapVec
 
   -- * Misc operations
   , resizeHeapCapacity
@@ -48,6 +49,7 @@ import qualified Data.Array.Base as A
 import qualified Data.Array.IO as A
 import Data.IORef
 import Data.Queue.Classes
+import qualified ToySolver.Data.Vec as Vec
 
 type Index = Int
 type Value = Int
@@ -56,7 +58,7 @@ type Value = Int
 data PriorityQueue
   = PriorityQueue
   { lt   :: !(Value -> Value -> IO Bool)
-  , heap :: !(IORef (Int, A.IOUArray Index Value))
+  , heap :: !(Vec.UVec Value)
   , table  :: !(IORef (A.IOUArray Value Index))
   }
 
@@ -67,24 +69,19 @@ newPriorityQueue = newPriorityQueueBy (\a b -> return (a < b))
 -- | Build a priority queue with a given /less than/ operator.
 newPriorityQueueBy :: (Value -> Value -> IO Bool) -> IO PriorityQueue
 newPriorityQueueBy cmp = do
-  h <- A.newArray_ (0,-1)
-  ref <- newIORef (0,h)
+  vec <- Vec.new
   idx <- A.newArray_ (0,-1)
   ref2 <- newIORef idx
-  return $ PriorityQueue{ lt = cmp, heap = ref, table = ref2 }
+  return $ PriorityQueue{ lt = cmp, heap = vec, table = ref2 }
 
 -- | Return a list of all the elements of a priority queue. (not sorted)
 getElems :: PriorityQueue -> IO [Value]
-getElems q = do
-  (n,arr) <- readIORef (heap q)
-  forM [0..n-1] $ \i -> A.unsafeRead arr i
+getElems q = Vec.getElems (heap q)
 
 -- | Remove all elements from a priority queue.
 clear :: PriorityQueue -> IO ()
 clear q = do
-  (_,arr) <- readIORef (heap q)
-  writeIORef (heap q) (0,arr)
-
+  Vec.clear (heap q)
   idx <- readIORef (table q)
   (!lb,!ub) <- A.getBounds idx
   forLoop lb (<=ub) (+1) $ \i -> do
@@ -93,15 +90,13 @@ clear q = do
 -- | Create a copy of a priority queue.
 clone :: PriorityQueue -> IO PriorityQueue
 clone q = do
-  (n,arr) <- readIORef (heap q)
-  arr' <- cloneArray arr
-  ref <- newIORef (n,arr')
+  h2 <- Vec.clone (heap q)
 
   idx <- readIORef (table q)
   idx' <- cloneArray idx
   ref2 <- newIORef idx'
 
-  return $ PriorityQueue{ lt = lt q, heap = ref, table = ref2 }
+  return $ PriorityQueue{ lt = lt q, heap = h2, table = ref2 }
 
 instance NewFifo PriorityQueue IO where
   newFifo = newPriorityQueue
@@ -110,18 +105,8 @@ instance Enqueue PriorityQueue IO Value where
   enqueue q val = do
     m <- member q val
     unless m $ do
-      (n,arr) <- readIORef (heap q)  
-      c <- liftM rangeSize $ A.getBounds arr
-      if (n+1 < c)
-        then do
-          A.unsafeWrite arr n val
-          writeIORef (heap q) (n+1,arr)
-        else do
-          let c' = max 2 (c * 3 `div` 2)
-          arr' <- A.newArray_ (0, c'-1)
-          copyTo arr arr' (0, n-1)
-          A.unsafeWrite arr' n val
-          writeIORef (heap q) (n+1,arr')
+      n <- Vec.getSize (heap q)
+      Vec.push (heap q) val
 
       idx <- readIORef (table q)
       c2 <- liftM rangeSize $ A.getBounds idx
@@ -139,19 +124,21 @@ instance Enqueue PriorityQueue IO Value where
 
 instance Dequeue PriorityQueue IO Value where
   dequeue q = do
-    (n,arr) <- readIORef (heap q)
+    n <- Vec.getSize (heap q)
     idx <- readIORef (table q)
     case n of
       0 ->
         return Nothing
       _ -> do
-        val <- A.unsafeRead arr 0
+        val <- Vec.unsafeRead (heap q) 0
         A.unsafeWrite idx val (-1)
-        writeIORef (heap q) (n-1, arr)
-        when (n > 1) $ do
-          val1 <- A.unsafeRead arr (n-1)
-          A.unsafeWrite arr 0 val1
+        if n == 1 then do
+          Vec.resize (heap q) (n-1)
+        else do
+          val1 <- Vec.unsafeRead (heap q) (n-1)
+          Vec.unsafeWrite (heap q) 0 val1
           A.unsafeWrite idx val1 0
+          Vec.resize (heap q) (n-1)
           down q 0
         return (Just val)
 
@@ -164,9 +151,7 @@ instance Dequeue PriorityQueue IO Value where
           Just x -> go (x:xs)
 
 instance QueueSize PriorityQueue IO where
-  queueSize q = do
-    (n,_) <- readIORef (heap q)
-    return n
+  queueSize q = Vec.getSize (heap q)
 
 member :: PriorityQueue -> Value -> IO Bool
 member q v = do
@@ -188,29 +173,28 @@ update q v = do
 
 up :: PriorityQueue -> Index -> IO ()
 up q !i = do
-  (_,arr) <- readIORef (heap q)
   idx <- readIORef (table q)
-  val <- A.unsafeRead arr i
+  val <- Vec.unsafeRead (heap q) i
   let loop 0 = return 0
       loop j = do
         let p = parent j
-        val_p <- A.unsafeRead arr p
+        val_p <- Vec.unsafeRead (heap q) p
         b <- lt q val val_p
         if b
           then do
-            A.unsafeWrite arr j val_p
+            Vec.unsafeWrite (heap q) j val_p
             A.unsafeWrite idx val_p j
             loop p
           else return j
   j <- loop i
-  A.unsafeWrite arr j val
+  Vec.unsafeWrite (heap q) j val
   A.unsafeWrite idx val j
 
 down :: PriorityQueue -> Index -> IO ()
 down q !i = do
-  (!n,arr) <- readIORef (heap q)
+  n <- Vec.getSize (heap q)
   idx <- readIORef (table q)
-  val <- A.unsafeRead arr i
+  val <- Vec.unsafeRead (heap q) i
   let loop !j = do
         let !l = left j
             !r = right j
@@ -221,37 +205,35 @@ down q !i = do
              if r >= n
               then return l
               else do
-                val_l <- A.unsafeRead arr l
-                val_r <- A.unsafeRead arr r
+                val_l <- Vec.unsafeRead (heap q) l
+                val_r <- Vec.unsafeRead (heap q) r
                 b <- lt q val_r val_l
                 if b
                   then return r
                   else return l
-           val_child <- A.unsafeRead arr child
+           val_child <- Vec.unsafeRead (heap q) child
            b <- lt q val_child val
            if not b
              then return j
              else do
-               A.unsafeWrite arr j val_child
+               Vec.unsafeWrite (heap q) j val_child
                A.unsafeWrite idx val_child j
                loop child
   j <- loop i
-  A.unsafeWrite arr j val
+  Vec.unsafeWrite (heap q) j val
   A.unsafeWrite idx val j
 
 -- | Get the internal representation of a given priority queue.
 getHeapArray :: PriorityQueue -> IO (A.IOUArray Index Value)
-getHeapArray q = liftM snd $ readIORef (heap q)
+getHeapArray q = Vec.getArray (heap q)
+
+-- | Get the internal representation of a given priority queue.
+getHeapVec :: PriorityQueue -> IO (Vec.UVec Value)
+getHeapVec q = return (heap q)
 
 -- | Pre-allocate internal buffer for @n@ elements.
 resizeHeapCapacity :: PriorityQueue -> Int -> IO ()
-resizeHeapCapacity q capa = do
-  (n,arr) <- readIORef (heap q)
-  capa0 <- liftM rangeSize $ A.getBounds arr
-  when (capa0 < capa) $ do
-    arr' <- A.newArray_ (0, capa-1)
-    copyTo arr arr' (0, n-1)
-    writeIORef (heap q) (n,arr')
+resizeHeapCapacity q capa = Vec.resizeCapacity (heap q) capa
 
 -- | Pre-allocate internal buffer for @[0..n-1]@ values.
 resizeTableCapacity :: PriorityQueue -> Int -> IO ()
