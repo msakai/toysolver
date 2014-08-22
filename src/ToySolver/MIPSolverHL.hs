@@ -113,8 +113,8 @@ tableau' cs ivs = do
   let (nonnegVars, cs') = collectNonnegVars cs ivs
       fvs = vars cs `IS.difference` nonnegVars
   ivs2 <- liftM IS.unions $ forM (IS.toList fvs) $ \v -> do
-    v1 <- gensym
-    v2 <- gensym
+    v1 <- newVar
+    v2 <- newVar
     define v (LA.var v1 ^-^ LA.var v2)
     return $ if v `IS.member` ivs then IS.fromList [v1,v2] else IS.empty
   mapM_ addConstraint cs'
@@ -182,7 +182,7 @@ traverse optdir obj ivs node0 = loop [node0] Nothing
           let
             (f0, m0) = maximumBy (comparing fst) [(fracPart val, m) | (_,m,val) <- xs]
             sv = flip execState (ndSolver node) $ do
-                   s <- gensym
+                   s <- newVar
                    let g j x = assert (a >= 0) a
                          where
                            a | j `IS.member` ivs =

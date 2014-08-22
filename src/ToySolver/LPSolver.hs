@@ -18,8 +18,37 @@
 --
 -----------------------------------------------------------------------------
 
-module ToySolver.LPSolver where
+module ToySolver.LPSolver
+  (
+  -- * Solver type
+    Solver
+  , emptySolver
 
+  -- * LP monad
+  , LP
+  , getTableau
+  , putTableau
+
+  -- * Problem specification
+  , newVar
+  , addConstraint
+  , addConstraint2
+  , tableau
+  , define
+
+  -- * Solving
+  , phaseI
+  , simplex
+  , dualSimplex
+
+  -- * Extract results
+  , getModel
+
+  -- * Utilities
+  , collectNonnegVars
+  ) where
+
+import Control.Exception (assert)
 import Control.Monad
 import Control.Monad.State
 import qualified Data.IntMap as IM
@@ -44,8 +73,9 @@ type LP r = State (Solver r)
 emptySolver :: VarSet -> Solver r
 emptySolver vs = (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty)
 
-gensym :: LP r Var
-gensym = do
+-- | Allocate a new /non-negative/ variable.
+newVar :: LP r Var
+newVar = do
   (x,tbl,avs,defs) <- get
   put (x+1,tbl,avs,defs)
   return x
@@ -87,34 +117,34 @@ getDefs = do
 
 -- ---------------------------------------------------------------------------
 
+-- | Note that @addConstraint@ maintains feasbility by introducing artificial variables
 addConstraint :: Real r => LA.Atom r -> LP r ()
 addConstraint c = do
   c2 <- expandDefs' c
   let (e, rop, b) = normalizeConstraint c2
+  assert (b >= 0) $ return ()
   tbl <- getTableau
   case rop of
-    -- x≥b で b≤0 なら追加しない。ad hoc なので一般化したい。
-    Ge | isSingleVar e && b<=0 -> return ()
+    -- x≥0 is trivially true, since x is non-negative.
+    Ge | b==0 && isSingleVar e -> return ()
+    -- -x≤0 is trivially true, since x is non-negative.
+    Le | b==0 && isSingleNegatedVar e -> return ()
 
     Le -> do
-      v <- gensym -- slack variable
+      v <- newVar -- slack variable
       putTableau $ Simplex.setRow v tbl (LA.coeffMap e, b)
     Ge -> do
-      v1 <- gensym -- surplus variable
-      v2 <- gensym -- artificial variable
+      v1 <- newVar -- surplus variable
+      v2 <- newVar -- artificial variable
       putTableau $ Simplex.setRow v2 tbl (LA.coeffMap (e ^-^ LA.var v1), b)
       addArtificialVariable v2
     Eql -> do
-      v <- gensym -- artificial variable
+      v <- newVar -- artificial variable
       putTableau $ Simplex.setRow v tbl (LA.coeffMap e, b)
       addArtificialVariable v
     _ -> error $ "ToySolver.LPSolver.addConstraint does not support " ++ show rop
-  where
-    isSingleVar e =
-      case LA.terms e of
-        [(1,_)] -> True
-        _ -> False
 
+-- | Unlike @addConstraint@, @addConstraint2@ does not maintain feasibility.
 addConstraint2 :: Real r => LA.Atom r -> LP r ()
 addConstraint2 c = do
   Rel lhs rop rhs <- expandDefs' c
@@ -125,21 +155,29 @@ addConstraint2 c = do
     Le -> f e b
     Ge -> f (negateV e) (negate b)
     Eql -> do
+      -- Unlike addConstraint, an equality constraint becomes two rows.
       f e b
       f (negateV e) (negate b)
     _ -> error $ "ToySolver.LPSolver.addConstraint2 does not support " ++ show rop
   where
-    -- -x≤b で -b≤0 なら追加しない。ad hoc なので一般化したい。
-    f e b  | isSingleNegatedVar e && -b <= 0 = return ()
+    -- -x≤b with b≥0 is trivially true.
+    f e b | isSingleNegatedVar e && 0 <= b = return ()
     f e b = do
       tbl <- getTableau
-      v <- gensym -- slack variable
+      v <- newVar -- slack variable
       putTableau $ Simplex.setRow v tbl (LA.coeffMap e, b)
 
-    isSingleNegatedVar e =
-      case LA.terms e of
-        [(-1,_)] -> True
-        _ -> False
+isSingleVar :: Real r => LA.Expr r -> Bool
+isSingleVar e =
+  case LA.terms e of
+    [(1,_)] -> True
+    _ -> False
+
+isSingleNegatedVar :: Real r => LA.Expr r -> Bool
+isSingleNegatedVar e =
+  case LA.terms e of
+    [(-1,_)] -> True
+    _ -> False
 
 expandDefs :: (Num r, Eq r) => LA.Expr r -> LP r (LA.Expr r)
 expandDefs e = do
@@ -157,8 +195,8 @@ tableau cs = do
   let (nonnegVars, cs') = collectNonnegVars cs IS.empty
       fvs = vars cs `IS.difference` nonnegVars
   forM_ (IS.toList fvs) $ \v -> do
-    v1 <- gensym
-    v2 <- gensym
+    v1 <- newVar
+    v2 <- newVar
     define v (LA.var v1 ^-^ LA.var v2)
   mapM_ addConstraint cs'
 
@@ -199,6 +237,7 @@ dualSimplex optdir obj = do
 
 -- ---------------------------------------------------------------------------
 
+-- convert right hand side to be non-negative
 normalizeConstraint :: forall r. Real r => LA.Atom r -> (LA.Expr r, RelOp, r)
 normalizeConstraint (Rel a op b)
   | rhs < 0   = (negateV lhs, flipOp op, negate rhs)
