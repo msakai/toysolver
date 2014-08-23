@@ -33,6 +33,9 @@ module ToySolver.Simplex
   , simplex
   , dualSimplex
   , phaseI
+
+  -- * For debugging
+  , validTableau
   , toCSV
   ) where
 

@@ -274,6 +274,14 @@ Test-suite TestSAT
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
+Test-suite TestSimplex
+  Type:              exitcode-stdio-1.0
+  HS-Source-Dirs:    test
+  Main-is:           TestSimplex.hs
+  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,HUnit
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
+
 Test-suite TestSimplex2
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
