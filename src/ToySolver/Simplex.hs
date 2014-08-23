@@ -70,10 +70,10 @@ tbl ! v == (m, val)
 var v .+. m .==. constant val
 -}
 
--- | Non-basic variables
+-- | Basic variables
 type RowIndex = Int
 
--- | Basic variables
+-- | Non-basic variables
 type ColIndex = Int
 
 type Row r = (VarMap r, r)
@@ -110,7 +110,7 @@ pivot r s tbl =
     row_r_val' = row_r_val / a_rs
     row_s = (row_r', row_r_val')
 
--- | Lookup a row by non-basic variable
+-- | Lookup a row by basic variable
 lookupRow :: RowIndex -> Tableau r -> Row r
 lookupRow r m = m IM.! r
 
