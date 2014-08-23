@@ -71,7 +71,7 @@ type Solver r = (Var, Simplex.Tableau r, VarSet, VarMap (LA.Expr r))
 type LP r = State (Solver r)
 
 emptySolver :: VarSet -> Solver r
-emptySolver vs = (1 + maximum ((-1) : IS.toList vs), IM.empty, IS.empty, IM.empty)
+emptySolver vs = (1 + maximum ((-1) : IS.toList vs), Simplex.emptyTableau, IS.empty, IM.empty)
 
 -- | Allocate a new /non-negative/ variable.
 newVar :: LP r Var
@@ -132,15 +132,15 @@ addConstraint c = do
 
     Le -> do
       v <- newVar -- slack variable
-      putTableau $ Simplex.setRow v tbl (LA.coeffMap e, b)
+      putTableau $ Simplex.addRow tbl v (LA.coeffMap e, b)
     Ge -> do
       v1 <- newVar -- surplus variable
       v2 <- newVar -- artificial variable
-      putTableau $ Simplex.setRow v2 tbl (LA.coeffMap (e ^-^ LA.var v1), b)
+      putTableau $ Simplex.addRow tbl v2 (LA.coeffMap (e ^-^ LA.var v1), b)
       addArtificialVariable v2
     Eql -> do
       v <- newVar -- artificial variable
-      putTableau $ Simplex.setRow v tbl (LA.coeffMap e, b)
+      putTableau $ Simplex.addRow tbl v (LA.coeffMap e, b)
       addArtificialVariable v
     _ -> error $ "ToySolver.LPSolver.addConstraint does not support " ++ show rop
 
@@ -165,7 +165,7 @@ addConstraint2 c = do
     f e b = do
       tbl <- getTableau
       v <- newVar -- slack variable
-      putTableau $ Simplex.setRow v tbl (LA.coeffMap e, b)
+      putTableau $ Simplex.addRow tbl v (LA.coeffMap e, b)
 
 isSingleVar :: Real r => LA.Expr r -> Bool
 isSingleVar e =
@@ -204,10 +204,8 @@ getModel :: Fractional r => VarSet -> LP r (Model r)
 getModel vs = do
   tbl <- getTableau
   defs <- getDefs
-  let bs = IM.map snd (IM.delete Simplex.objRow tbl)
-      vs' = vs `IS.union` IS.fromList [v | e <- IM.elems defs, v <- IS.toList (vars e)]
-      -- Note that IM.union is left-biased
-      m0 = bs `IM.union` IM.fromList [(v,0) | v <- IS.toList vs']
+  let vs' = (vs `IS.difference` IM.keysSet defs) `IS.union` IS.unions [vars e | e <- IM.elems defs]
+      m0 = IM.fromAscList [(v, Simplex.currentValue tbl v) | v <- IS.toAscList vs']
   return $ IM.filterWithKey (\k _ -> k `IS.member` vs) $ IM.map (LA.evalExpr m0) defs `IM.union` m0
 
 phaseI :: (Fractional r, Real r) => LP r Bool

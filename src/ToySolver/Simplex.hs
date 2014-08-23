@@ -18,24 +18,35 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Simplex
-  ( module Data.OptDir
-  , Tableau
+  (
+  -- * The @Tableau@ type
+    Tableau
   , RowIndex
   , ColIndex
   , Row
-  , PivotResult
-  , objRow
+  , emptyTableau
+  , objRowIndex
   , pivot
   , lookupRow
-  , setRow
+  , addRow
   , setObjFun
+
+  -- * Optimization direction
+  , module Data.OptDir
+
+  -- * Reading status
+  , currentValue
   , currentObjValue
+  , isFeasible
+  , isOptimal
+
+  -- * High-level solving functions
   , simplex
   , dualSimplex
   , phaseI
 
   -- * For debugging
-  , validTableau
+  , isValidTableau
   , toCSV
   ) where
 
@@ -59,22 +70,30 @@ tbl ! v == (m, val)
 var v .+. m .==. constant val
 -}
 
+-- | Non-basic variables
 type RowIndex = Int
+
+-- | Basic variables
 type ColIndex = Int
+
 type Row r = (VarMap r, r)
+
 data PivotResult r = PivotUnbounded | PivotFinished | PivotSuccess (Tableau r)
   deriving (Show, Eq, Ord)
 
-objRow :: RowIndex
-objRow = -1
+emptyTableau :: Tableau r
+emptyTableau = IM.empty
+
+objRowIndex :: RowIndex
+objRowIndex = -1
 
 pivot :: (Fractional r, Eq r) => RowIndex -> ColIndex -> Tableau r -> Tableau r
 {-# INLINE pivot #-}
 {-# SPECIALIZE pivot :: RowIndex -> ColIndex -> Tableau Rational -> Tableau Rational #-}
 {-# SPECIALIZE pivot :: RowIndex -> ColIndex -> Tableau Double -> Tableau Double #-}
 pivot r s tbl =
-    assert (validTableau tbl) $  -- precondition
-    assert (validTableau tbl') $ -- postcondition
+    assert (isValidTableau tbl) $  -- precondition
+    assert (isValidTableau tbl') $ -- postcondition
       tbl'
   where
     tbl' = IM.insert s row_s $ IM.map f $ IM.delete r $ tbl
@@ -91,6 +110,7 @@ pivot r s tbl =
     row_r_val' = row_r_val / a_rs
     row_s = (row_r', row_r_val')
 
+-- | Lookup a row by non-basic variable
 lookupRow :: RowIndex -> Tableau r -> Row r
 lookupRow r m = m IM.! r
 
@@ -106,13 +126,16 @@ normalizeRow a (row0,val0) = obj'
     f (m1,v1) (m2,v2) = (IM.unionWith (+) m1 m2, v1+v2)
     g (m,v) = (IM.filter (0/=) m, v)
 
-setRow :: (Num r, Eq r) => RowIndex -> Tableau r -> Row r -> Tableau r
-setRow i tbl row = assert (validTableau tbl) $ assert (validTableau tbl') $ tbl'
+setRow :: (Num r, Eq r) => Tableau r -> RowIndex -> Row r -> Tableau r
+setRow tbl i row = assert (isValidTableau tbl) $ assert (isValidTableau tbl') $ tbl'
   where
     tbl' = IM.insert i (normalizeRow tbl row) tbl
 
+addRow :: (Num r, Eq r) => Tableau r -> RowIndex -> Row r -> Tableau r
+addRow tbl i row = assert (i `IM.notMember` tbl) $ setRow tbl i row
+
 setObjFun :: (Num r, Eq r) => Tableau r -> LA.Expr r -> Tableau r
-setObjFun tbl e = setRow objRow tbl row
+setObjFun tbl e = addRow tbl objRowIndex row
   where
     row =
       case LA.extract LA.unitVar e of
@@ -120,28 +143,34 @@ setObjFun tbl e = setRow objRow tbl row
 
 copyObjRow :: (Num r, Eq r) => Tableau r -> Tableau r -> Tableau r
 copyObjRow from to =
-  case IM.lookup objRow from of
-    Nothing -> IM.delete objRow to
-    Just row -> setRow objRow to row
+  case IM.lookup objRowIndex from of
+    Nothing -> IM.delete objRowIndex to
+    Just row -> addRow to objRowIndex row
 
-currentObjValue :: (Num r, Eq r) => Tableau r -> r
-currentObjValue = snd . lookupRow objRow
+currentValue :: Num r => Tableau r -> Var -> r
+currentValue tbl v =
+  case IM.lookup v tbl of
+    Nothing -> 0
+    Just (_, val) -> val
 
-validTableau :: Tableau r -> Bool
-validTableau tbl =
-  and [v `IM.notMember` m | (v, (m,_)) <- IM.toList tbl, v /= objRow] &&
+currentObjValue :: Num r => Tableau r -> r
+currentObjValue = snd . lookupRow objRowIndex
+
+isValidTableau :: Tableau r -> Bool
+isValidTableau tbl =
+  and [v `IM.notMember` m | (v, (m,_)) <- IM.toList tbl, v /= objRowIndex] &&
   and [IS.null (IM.keysSet m `IS.intersection` vs) | (m,_) <- IM.elems tbl']
   where
-    tbl' = IM.delete objRow tbl
+    tbl' = IM.delete objRowIndex tbl
     vs = IM.keysSet tbl' 
 
 isFeasible :: Real r => Tableau r -> Bool
 isFeasible tbl = 
-  and [val >= 0 | (v, (_,val)) <- IM.toList tbl, v /= objRow]
+  and [val >= 0 | (v, (_,val)) <- IM.toList tbl, v /= objRowIndex]
 
 isOptimal :: Real r => OptDir -> Tableau r -> Bool
 isOptimal optdir tbl =
-  and [not (cmp cj) | cj <- IM.elems (fst (lookupRow objRow tbl))]
+  and [not (cmp cj) | cj <- IM.elems (fst (lookupRow objRowIndex tbl))]
   where
     cmp = case optdir of
             OptMin -> (0<)
@@ -175,13 +204,13 @@ primalPivot optdir tbl
     cmp = case optdir of
             OptMin -> (0<)
             OptMax -> (0>)
-    cs = [(j,cj) | (j,cj) <- IM.toList (fst (lookupRow objRow tbl)), cmp cj]
+    cs = [(j,cj) | (j,cj) <- IM.toList (fst (lookupRow objRowIndex tbl)), cmp cj]
     -- smallest subscript rule
     s = fst $ head cs
     -- classical rule
     --s = fst $ (if optdir==OptMin then maximumBy else minimumBy) (compare `on` snd) cs
     rs = [ (i, y_i0 / y_is)
-         | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRow
+         | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRowIndex
          , let y_is = IM.findWithDefault 0 s row_i, y_is > 0
          ]
     r = fst $ minimumBy (comparing snd) rs
@@ -207,7 +236,7 @@ dualPivot optdir tbl
   | null cs   = PivotUnbounded
   | otherwise = PivotSuccess (pivot r s tbl)
   where
-    rs = [(i, row_i) | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRow, 0 > y_i0]
+    rs = [(i, row_i) | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRowIndex, 0 > y_i0]
     (r, row_r) = head rs
     cs = [ (j, if optdir==OptMin then y_0j / y_rj else - y_0j / y_rj)
          | (j, y_rj) <- IM.toList row_r
@@ -215,7 +244,7 @@ dualPivot optdir tbl
          , let y_0j = IM.findWithDefault 0 j obj
          ]
     s = fst $ minimumBy (comparing snd) cs
-    (obj,_) = lookupRow objRow tbl
+    (obj,_) = lookupRow objRowIndex tbl
 
 -- ---------------------------------------------------------------------------
 -- phase I of the two-phased method
@@ -243,7 +272,7 @@ phaseI tbl avs
 removeArtificialVariables :: (Real r, Fractional r) => VarSet -> Tableau r -> Tableau r
 removeArtificialVariables avs tbl0 = tbl2
   where
-    tbl1 = foldl' f (IM.delete objRow tbl0) (IS.toList avs)
+    tbl1 = foldl' f (IM.delete objRowIndex tbl0) (IS.toList avs)
     tbl2 = IM.map (\(row,val) ->  (IM.filterWithKey (\j _ -> j `IS.notMember` avs) row, val)) tbl1
     f tbl i =
       case IM.lookup i tbl of
@@ -266,7 +295,7 @@ toCSV showCell tbl = unlines . map (concat . intersperse ",") $ header : body
     body = [showRow i (lookupRow i tbl) | i <- rows]
 
     rows :: [RowIndex]
-    rows = IM.keys (IM.delete objRow tbl) ++ [objRow]
+    rows = IM.keys (IM.delete objRowIndex tbl) ++ [objRowIndex]
 
     cols :: [ColIndex]
     cols = [0..colMax]
@@ -274,39 +303,12 @@ toCSV showCell tbl = unlines . map (concat . intersperse ",") $ header : body
         colMax = maximum (-1 : [c | (row, _) <- IM.elems tbl, c <- IM.keys row])
 
     rowName :: RowIndex -> String
-    rowName i = if i==objRow then "obj" else "x" ++ show i
+    rowName i = if i==objRowIndex then "obj" else "x" ++ show i
 
     colName :: ColIndex -> String
     colName j = "x" ++ show j
 
     showRow i (row, row_val) = rowName i : [showCell (IM.findWithDefault 0 j row') | j <- cols] ++ [showCell row_val]
       where row' = IM.insert i 1 row
-
--- ---------------------------------------------------------------------------
-
--- 退化して巡回の起こるKuhnの7変数3制約の例
-
-kuhn_7_3 :: Tableau Rational
-kuhn_7_3 = IM.fromList
-  [ (1, (IM.fromList [(4,-2), (5,-9), (6,1), (7,9)],       0))
-  , (2, (IM.fromList [(4,1/3), (5,1), (6,-1/3), (7,-2)],   0))
-  , (3, (IM.fromList [(4,2), (5,3), (6,-1), (7,-12)],      2))
-  , (objRow, (IM.fromList [(4,2), (5,3), (6,-1), (7,-12)], 0))
-  ]
-
-test_kuhn_7_3 :: (Bool, Tableau Rational)
-test_kuhn_7_3 = simplex OptMin kuhn_7_3
-
--- from http://www.math.cuhk.edu.hk/~wei/lpch5.pdf
-example_5_7 :: Tableau Rational
-example_5_7 = IM.fromList
-  [ (4, (IM.fromList [(1,-1), (2,-2), (3,-3)], -5))
-  , (5, (IM.fromList [(1,-2), (2,-2), (3,-1)], -6))
-  , (objRow, (IM.fromList [(1,3),(2,4),(3,5)], 0))
-  ]
-
-test_example_5_7 :: (Bool, Tableau Rational)
-test_example_5_7 = dualSimplex OptMax example_5_7
--- optimal value should be -11
 
 -- ---------------------------------------------------------------------------

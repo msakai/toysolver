@@ -21,13 +21,13 @@ kuhn_7_3 = IntMap.fromList
   [ (1, (IntMap.fromList [(4,-2), (5,-9), (6,1), (7,9)],       0))
   , (2, (IntMap.fromList [(4,1/3), (5,1), (6,-1/3), (7,-2)],   0))
   , (3, (IntMap.fromList [(4,2), (5,3), (6,-1), (7,-12)],      2))
-  , (objRow, (IntMap.fromList [(4,2), (5,3), (6,-1), (7,-12)], 0))
+  , (objRowIndex, (IntMap.fromList [(4,2), (5,3), (6,-1), (7,-12)], 0))
   ]
 
 case_kuhn_7_3 :: IO ()
 case_kuhn_7_3 = do
   assertBool "simplex failed" ret
-  assertBool "invalid tableau" (validTableau result)
+  assertBool "invalid tableau" (isValidTableau result)
   currentObjValue result @?= -2
   where
     ret :: Bool
@@ -39,13 +39,13 @@ example_5_7 :: Tableau Rational
 example_5_7 = IntMap.fromList
   [ (4, (IntMap.fromList [(1,-1), (2,-2), (3,-3)], -5))
   , (5, (IntMap.fromList [(1,-2), (2,-2), (3,-1)], -6))
-  , (objRow, (IntMap.fromList [(1,3),(2,4),(3,5)], 0))
+  , (objRowIndex, (IntMap.fromList [(1,3),(2,4),(3,5)], 0))
   ]
 
 case_example_5_7 :: IO ()
 case_example_5_7 = do
   assertBool "dual simplex failed" ret
-  assertBool "invalid tableau" (validTableau result)
+  assertBool "invalid tableau" (isValidTableau result)
   currentObjValue result @?= -11
   where
     ret :: Bool
