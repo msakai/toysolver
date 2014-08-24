@@ -48,6 +48,7 @@ module ToySolver.Data.LA
   , showAtom
   , evalAtom
   , solveFor
+  , module ToySolver.Data.ArithRel
 
   -- * misc
   , BoundsEnv
@@ -65,6 +66,7 @@ import Data.Interval
 import Data.VectorSpace
 
 import qualified ToySolver.Data.ArithRel as ArithRel
+import ToySolver.Data.ArithRel
 import ToySolver.Data.Var
 
 -----------------------------------------------------------------------------
@@ -249,23 +251,23 @@ showExprWith env (Expr m) = foldr (.) id xs ""
 -----------------------------------------------------------------------------
 
 -- | Atomic Formula of Linear Arithmetics
-type Atom r = ArithRel.Rel (Expr r)
+type Atom r = Rel (Expr r)
 
 showAtom :: (Num r, Eq r, Show r) => Atom r -> String
-showAtom (ArithRel.Rel lhs op rhs) = showExpr lhs ++ ArithRel.showOp op ++ showExpr rhs
+showAtom (Rel lhs op rhs) = showExpr lhs ++ showOp op ++ showExpr rhs
 
 -- | evaluate the formula under the model.
 evalAtom :: (Num r, Ord r) => Model r -> Atom r -> Bool
-evalAtom m (ArithRel.Rel lhs op rhs) = ArithRel.evalOp op (evalExpr m lhs) (evalExpr m rhs)
+evalAtom m (Rel lhs op rhs) = evalOp op (evalExpr m lhs) (evalExpr m rhs)
 
 -- | Solve linear (in)equation for the given variable.
 --
 -- @solveFor a v@ returns @Just (op, e)@ such that @Atom v op e@
 -- is equivalent to @a@.
-solveFor :: (Real r, Fractional r) => Atom r -> Var -> Maybe (ArithRel.RelOp, Expr r)
-solveFor (ArithRel.Rel lhs op rhs) v = do
+solveFor :: (Real r, Fractional r) => Atom r -> Var -> Maybe (RelOp, Expr r)
+solveFor (Rel lhs op rhs) v = do
   (c,e) <- extractMaybe v (lhs ^-^ rhs)
-  return ( if c < 0 then ArithRel.flipOp op else op
+  return ( if c < 0 then flipOp op else op
          , (1/c) *^ negateV e
          )
 
