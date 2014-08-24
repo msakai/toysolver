@@ -65,13 +65,17 @@ import qualified ToySolver.Simplex as Simplex
 import qualified ToySolver.BoundsInference as BI
 
 -- ---------------------------------------------------------------------------
--- LP Monad
+-- Solver type
 
 type Solver r = (Var, Simplex.Tableau r, VarSet, VarMap (LA.Expr r))
-type LP r = State (Solver r)
 
 emptySolver :: VarSet -> Solver r
 emptySolver vs = (1 + maximum ((-1) : IS.toList vs), Simplex.emptyTableau, IS.empty, IM.empty)
+
+-- ---------------------------------------------------------------------------
+-- LP Monad
+
+type LP r = State (Solver r)
 
 -- | Allocate a new /non-negative/ variable.
 newVar :: LP r Var
