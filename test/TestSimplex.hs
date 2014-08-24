@@ -2,6 +2,7 @@
 module Main (main) where
 
 import Control.Monad
+import Control.Monad.State
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
@@ -14,7 +15,10 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Text.Printf
 
+import qualified ToySolver.Data.LA as LA
+import ToySolver.Data.LA ((.<=.))
 import ToySolver.Simplex
+import qualified ToySolver.LPSolver as LP
 
 -- from http://www.math.cuhk.edu.hk/~wei/lpch5.pdf
 exampe_5_3_phase1 :: Tableau Rational
@@ -66,6 +70,31 @@ case_example_5_7 = do
     ret :: Bool
     result :: Tableau Rational
     (ret,result) = dualSimplex OptMax example_5_7
+
+------------------------------------------------------------------------
+
+case_lp_example_5_7 :: IO ()
+case_lp_example_5_7 = do  
+  ret @?= LP.Optimum
+  oval @?= -11
+  assertBool "invalid tableau" (isValidTableau tbl)
+  assertBool "infeasible tableau" (isFeasible tbl)
+  assertBool "non-optimal tableau" (isOptimal OptMax tbl)
+  where
+    oval :: Rational
+    ((ret,tbl,oval),result) = flip runState (LP.emptySolver IntSet.empty) $ do
+      _ <- LP.newVar
+      x1 <- LP.newVar 
+      x2 <- LP.newVar
+      x3 <- LP.newVar
+      LP.addConstraint (LA.fromTerms [(-1,x1),(-2,x2),(-3,x3)] .<=. LA.constant (-5))
+      LP.addConstraint (LA.fromTerms [(-2,x1),(-2,x2),(-1,x3)] .<=. LA.constant (-6))
+      let obj = LA.fromTerms [(-3,x1), (-4,x2),(-5,x3)]
+      ret <- LP.twoPhaseSimplex OptMax obj
+      tbl <- LP.getTableau
+      m <- LP.getModel (IntSet.fromList [x1,x2,x3])
+      let oval = LA.evalExpr m obj
+      return (ret,tbl,oval)
 
 ------------------------------------------------------------------------
 -- Test harness

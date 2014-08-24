@@ -287,7 +287,7 @@ Test-suite TestSimplex
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestSimplex.hs
-  Build-depends:     base >=4 && <5, containers, toysolver, test-framework,test-framework-th,test-framework-hunit,HUnit
+  Build-depends:     base >=4 && <5, containers, mtl, toysolver, test-framework,test-framework-th,test-framework-hunit,HUnit
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 

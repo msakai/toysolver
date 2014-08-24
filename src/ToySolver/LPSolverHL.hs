@@ -32,7 +32,8 @@ import ToySolver.Data.ArithRel
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
 import qualified ToySolver.Simplex as Simplex
-import ToySolver.LPSolver
+import qualified ToySolver.LPSolver as LPSolver
+import ToySolver.LPSolver hiding (OptResult (..))
 
 -- ---------------------------------------------------------------------------
 
@@ -63,17 +64,14 @@ optimize :: (RealFrac r) => OptDir -> LA.Expr r -> [LA.Atom r] -> OptResult r
 optimize optdir obj cs =
   flip evalState (emptySolver vs) $ do
     tableau cs
-    ret <- phaseI
-    if not ret
-      then return OptUnsat
-      else do
-        ret2 <- simplex optdir obj
-        if not ret2
-          then return Unbounded
-          else do
-             m <- getModel vs
-             tbl <- getTableau 
-             return $ Optimum (Simplex.currentObjValue tbl) m
+    ret <- LPSolver.twoPhaseSimplex optdir obj
+    case ret of
+      LPSolver.Unsat -> return OptUnsat
+      LPSolver.Unbounded -> return Unbounded
+      LPSolver.Optimum -> do
+        m <- getModel vs
+        tbl <- getTableau 
+        return $ Optimum (Simplex.currentObjValue tbl) m
   where
     vs = vars cs `IS.union` vars obj
 

@@ -48,7 +48,7 @@ import ToySolver.Data.Var
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Simplex as Simplex
 import qualified ToySolver.LPSolver as LPSolver
-import ToySolver.LPSolver
+import ToySolver.LPSolver hiding (OptResult (..))
 import ToySolver.LPSolverHL (OptResult (..))
 import qualified ToySolver.OmegaTest as OmegaTest
 import ToySolver.Internal.Util (isInteger, fracPart)
@@ -129,22 +129,19 @@ mkInitialNode :: RealFrac r => OptDir -> LA.Expr r -> [LA.Atom r] -> VarSet -> E
 mkInitialNode optdir obj cs ivs =
   flip evalState (emptySolver vs) $ do
     ivs2 <- tableau' cs ivs
-    ret <- phaseI
-    if not ret
-      then return (Left ErrUnsat)
-      else do
-        ret2 <- simplex optdir obj
-        if ret2
-          then do
-            solver <- get
-            return $ Right $
-              ( Node{ ndSolver = solver
-                    , ndDepth = 0
---                    , ndCutSlackVariables = IS.empty
-                    }
-              , ivs `IS.union` ivs2
-              )
-          else return (Left ErrUnbounded)
+    ret <- LPSolver.twoPhaseSimplex optdir obj
+    case ret of
+      LPSolver.Unsat -> return (Left ErrUnsat)
+      LPSolver.Unbounded -> return (Left ErrUnbounded)
+      LPSolver.Optimum -> do
+        solver <- get
+        return $ Right $
+          ( Node{ ndSolver = solver
+                , ndDepth = 0
+--                , ndCutSlackVariables = IS.empty
+                }
+          , ivs `IS.union` ivs2
+          )
   where
     vs = vars cs `IS.union` vars obj
 
