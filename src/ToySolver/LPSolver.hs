@@ -32,7 +32,7 @@ module ToySolver.LPSolver
   -- * Problem specification
   , newVar
   , addConstraint
-  , addConstraint2
+  , addConstraintWithArtificialVariable
   , tableau
   , define
 
@@ -123,9 +123,9 @@ getDefs = do
 
 -- ---------------------------------------------------------------------------
 
--- | Note that @addConstraint@ maintains feasbility by introducing artificial variables
-addConstraint :: Real r => LA.Atom r -> LP r ()
-addConstraint c = do
+-- | Note that @addConstraintWithArtificialVariable@ maintains feasbility by introducing artificial variables
+addConstraintWithArtificialVariable :: Real r => LA.Atom r -> LP r ()
+addConstraintWithArtificialVariable c = do
   c2 <- expandDefs' c
   let (e, rop, b) = normalizeConstraint c2
   assert (b >= 0) $ return ()
@@ -148,11 +148,11 @@ addConstraint c = do
       v <- newVar -- artificial variable
       putTableau $ Simplex.addRow tbl v (LA.coeffMap e, b)
       addArtificialVariable v
-    _ -> error $ "ToySolver.LPSolver.addConstraint does not support " ++ show rop
+    _ -> error $ "ToySolver.LPSolver.addConstraintWithArtificialVariable does not support " ++ show rop
 
--- | Unlike @addConstraint@, @addConstraint2@ does not maintain feasibility.
-addConstraint2 :: Real r => LA.Atom r -> LP r ()
-addConstraint2 c = do
+-- | Unlike @addConstraintWithArtificialVariable@, @addConstraint@ does not maintain feasibility.
+addConstraint :: Real r => LA.Atom r -> LP r ()
+addConstraint c = do
   Rel lhs rop rhs <- expandDefs' c
   let
     (b', e) = LA.extract LA.unitVar (lhs ^-^ rhs)
@@ -161,10 +161,10 @@ addConstraint2 c = do
     Le -> f e b
     Ge -> f (negateV e) (negate b)
     Eql -> do
-      -- Unlike addConstraint, an equality constraint becomes two rows.
+      -- Unlike addConstraintWithArtificialVariable, an equality constraint becomes two rows.
       f e b
       f (negateV e) (negate b)
-    _ -> error $ "ToySolver.LPSolver.addConstraint2 does not support " ++ show rop
+    _ -> error $ "ToySolver.LPSolver.addConstraint does not support " ++ show rop
   where
     -- -x≤b with b≥0 is trivially true.
     f e b | isSingleNegatedVar e && 0 <= b = return ()
@@ -204,7 +204,7 @@ tableau cs = do
     v1 <- newVar
     v2 <- newVar
     define v (LA.var v1 ^-^ LA.var v2)
-  mapM_ addConstraint cs'
+  mapM_ addConstraintWithArtificialVariable cs'
 
 getModel :: Fractional r => VarSet -> LP r (Model r)
 getModel vs = do
