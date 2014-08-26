@@ -87,8 +87,8 @@ case_lp_example_5_7 = do
       x1 <- LP.newVar 
       x2 <- LP.newVar
       x3 <- LP.newVar
-      LP.addConstraintWithArtificialVariable (LA.fromTerms [(-1,x1),(-2,x2),(-3,x3)] .<=. LA.constant (-5))
-      LP.addConstraintWithArtificialVariable (LA.fromTerms [(-2,x1),(-2,x2),(-1,x3)] .<=. LA.constant (-6))
+      LP.addConstraint (LA.fromTerms [(-1,x1),(-2,x2),(-3,x3)] .<=. LA.constant (-5))
+      LP.addConstraint (LA.fromTerms [(-2,x1),(-2,x2),(-1,x3)] .<=. LA.constant (-6))
       let obj = LA.fromTerms [(-3,x1), (-4,x2),(-5,x3)]
       ret <- LP.twoPhaseSimplex OptMax obj
       tbl <- LP.getTableau

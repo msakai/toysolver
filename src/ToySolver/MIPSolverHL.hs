@@ -117,7 +117,7 @@ tableau' cs ivs = do
     v2 <- newVar
     define v (LA.var v1 ^-^ LA.var v2)
     return $ if v `IS.member` ivs then IS.fromList [v1,v2] else IS.empty
-  mapM_ addConstraintWithArtificialVariable cs'
+  mapM_ addConstraint cs'
   return ivs2
 
 conv :: RealFrac r => LA.Atom r -> LA.Atom Rational

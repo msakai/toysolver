@@ -214,7 +214,7 @@ tableau cs = do
     v1 <- newVar
     v2 <- newVar
     define v (LA.var v1 ^-^ LA.var v2)
-  mapM_ addConstraintWithArtificialVariable cs'
+  mapM_ addConstraint cs'
 
 getModel :: Fractional r => VarSet -> LP r (Model r)
 getModel vs = do
