@@ -226,12 +226,25 @@ getModel vs = do
 
 phaseI :: (Fractional r, Real r) => LP r Bool
 phaseI = do
+  introduceArtificialVariables
   tbl <- getTableau
   avs <- getArtificialVariables
   let (ret, tbl') = Simplex.phaseI tbl avs
   putTableau tbl'
   when ret clearArtificialVariables
   return ret
+
+introduceArtificialVariables :: (Real r) => LP r ()
+introduceArtificialVariables = do
+  tbl <- getTableau
+  tbl' <- liftM IM.fromList $ forM (IM.toList tbl) $ \(v,(e,rhs)) -> do
+    if rhs >= 0 then do
+      return (v,(e,rhs)) -- v + e == rhs
+    else do
+      a <- newVar
+      addArtificialVariable a
+      return (a, (IM.insert v (-1) (IM.map negate e), -rhs)) -- a - (v + e) == -rhs
+  putTableau tbl'
 
 simplex :: (Fractional r, Real r) => OptDir -> LA.Expr r -> LP r Bool
 simplex optdir obj = do
