@@ -123,7 +123,12 @@ getDefs = do
 
 -- ---------------------------------------------------------------------------
 
--- | Note that @addConstraintWithArtificialVariable@ maintains feasbility by introducing artificial variables
+-- | Add a contraint and maintain feasibility condition by introducing artificial variable (if necessary).
+--
+-- * Disequality is not supported.
+-- 
+-- * Unlike 'addConstraint', an equality contstraint becomes one row with an artificial variable.
+-- 
 addConstraintWithArtificialVariable :: Real r => LA.Atom r -> LP r ()
 addConstraintWithArtificialVariable c = do
   c2 <- expandDefs' c
@@ -150,7 +155,12 @@ addConstraintWithArtificialVariable c = do
       addArtificialVariable v
     _ -> error $ "ToySolver.LPSolver.addConstraintWithArtificialVariable does not support " ++ show rop
 
--- | Unlike @addConstraintWithArtificialVariable@, @addConstraint@ does not maintain feasibility.
+-- | Add a contraint, without maintaining feasibilty condition of tableaus.
+--
+-- * Disequality is not supported.
+--
+-- * Unlike 'addConstraintWithArtificialVariable', an equality constraint becomes two rows.
+-- 
 addConstraint :: Real r => LA.Atom r -> LP r ()
 addConstraint c = do
   Rel lhs rop rhs <- expandDefs' c
