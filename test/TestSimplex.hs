@@ -20,6 +20,38 @@ import ToySolver.Data.LA ((.<=.))
 import ToySolver.Simplex
 import qualified ToySolver.LPSolver as LP
 
+example_3_2 :: Tableau Rational
+example_3_2 = IntMap.fromList
+  [ (4, (IntMap.fromList [(1,2), (2,1), (3,1)], 2))
+  , (5, (IntMap.fromList [(1,1), (2,2), (3,3)], 5))
+  , (6, (IntMap.fromList [(1,2), (2,2), (3,1)], 6))
+  , (objRowIndex, (IntMap.fromList [(1,-3), (2,-2), (3,-3)], 0))
+  ]
+
+case_example_3_2_simplex :: IO ()
+case_example_3_2_simplex = do
+  assertBool "simplex failed" ret
+  assertBool "invalid tableau" (isValidTableau result)
+  assertBool "infeasible tableau" (isFeasible result)
+  assertBool "unoptimal tableau" (isOptimal OptMax result)
+  currentObjValue result @?= 27/5
+  where
+    ret :: Bool
+    result :: Tableau Rational
+    (ret,result) = simplex OptMax example_3_2
+
+case_example_3_2_primalDualSimplex :: IO ()
+case_example_3_2_primalDualSimplex = do
+  assertBool "simplex failed" ret
+  assertBool "invalid tableau" (isValidTableau result)
+  assertBool "infeasible tableau" (isFeasible result)
+  assertBool "unoptimal tableau" (isOptimal OptMax result)
+  currentObjValue result @?= 27/5
+  where
+    ret :: Bool
+    result :: Tableau Rational
+    (ret,result) = primalDualSimplex OptMax example_3_2
+
 -- from http://www.math.cuhk.edu.hk/~wei/lpch5.pdf
 exampe_5_3_phase1 :: Tableau Rational
 exampe_5_3_phase1 = IntMap.fromList
@@ -53,6 +85,16 @@ case_kuhn_7_3 = do
     result :: Tableau Rational
     (ret,result) = simplex OptMin kuhn_7_3
 
+-- case_pd_kuhn_7_3 :: IO ()
+-- case_pd_kuhn_7_3 = do
+--   assertBool "simplex failed" ret
+--   assertBool "invalid tableau" (isValidTableau result)
+--   currentObjValue result @?= -2
+--   where
+--     ret :: Bool
+--     result :: Tableau Rational
+--     (ret,result) = primalDualSimplex OptMin kuhn_7_3
+
 -- from http://www.math.cuhk.edu.hk/~wei/lpch5.pdf
 example_5_7 :: Tableau Rational
 example_5_7 = IntMap.fromList
@@ -71,10 +113,20 @@ case_example_5_7 = do
     result :: Tableau Rational
     (ret,result) = dualSimplex OptMax example_5_7
 
+case_pd_example_5_7 :: IO ()
+case_pd_example_5_7 = do
+  assertBool "dual simplex failed" ret
+  assertBool "invalid tableau" (isValidTableau result)
+  currentObjValue result @?= -11
+  where
+    ret :: Bool
+    result :: Tableau Rational
+    (ret,result) = primalDualSimplex OptMax example_5_7
+
 ------------------------------------------------------------------------
 
-case_lp_example_5_7 :: IO ()
-case_lp_example_5_7 = do  
+case_lp_example_5_7_twoPhaseSimplex :: IO ()
+case_lp_example_5_7_twoPhaseSimplex = do  
   ret @?= LP.Optimum
   oval @?= -11
   assertBool "invalid tableau" (isValidTableau tbl)
@@ -91,6 +143,29 @@ case_lp_example_5_7 = do
       LP.addConstraint (LA.fromTerms [(-2,x1),(-2,x2),(-1,x3)] .<=. LA.constant (-6))
       let obj = LA.fromTerms [(-3,x1), (-4,x2),(-5,x3)]
       ret <- LP.twoPhaseSimplex OptMax obj
+      tbl <- LP.getTableau
+      m <- LP.getModel (IntSet.fromList [x1,x2,x3])
+      let oval = LA.evalExpr m obj
+      return (ret,tbl,oval)
+
+case_lp_example_5_7_primalDualSimplex :: IO ()
+case_lp_example_5_7_primalDualSimplex = do  
+  ret @?= LP.Optimum
+  oval @?= -11
+  assertBool "invalid tableau" (isValidTableau tbl)
+  assertBool "infeasible tableau" (isFeasible tbl)
+  assertBool "non-optimal tableau" (isOptimal OptMax tbl)
+  where
+    oval :: Rational
+    ((ret,tbl,oval),result) = flip runState (LP.emptySolver IntSet.empty) $ do
+      _ <- LP.newVar
+      x1 <- LP.newVar 
+      x2 <- LP.newVar
+      x3 <- LP.newVar
+      LP.addConstraint (LA.fromTerms [(-1,x1),(-2,x2),(-3,x3)] .<=. LA.constant (-5))
+      LP.addConstraint (LA.fromTerms [(-2,x1),(-2,x2),(-1,x3)] .<=. LA.constant (-6))
+      let obj = LA.fromTerms [(-3,x1), (-4,x2),(-5,x3)]
+      ret <- LP.primalDualSimplex OptMax obj
       tbl <- LP.getTableau
       m <- LP.getModel (IntSet.fromList [x1,x2,x3])
       let oval = LA.evalExpr m obj

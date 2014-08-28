@@ -44,6 +44,7 @@ module ToySolver.Simplex
   , simplex
   , dualSimplex
   , phaseI
+  , primalDualSimplex
 
   -- * For debugging
   , isValidTableau
@@ -51,7 +52,7 @@ module ToySolver.Simplex
   ) where
 
 import Data.Ord
-import Data.List (intersperse, minimumBy, foldl')
+import Data.List
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.OptDir
@@ -282,6 +283,57 @@ removeArtificialVariables avs tbl0 = tbl2
             [] -> IM.delete i tbl
             j:_ -> pivot i j tbl
 
+-- ---------------------------------------------------------------------------
+-- primal-dual simplex
+
+data PDResult = PDUnsat | PDOptimal | PDUnbounded
+
+primalDualSimplex :: (Real r, Fractional r) => OptDir -> Tableau r -> (Bool, Tableau r)
+{-# SPECIALIZE primalDualSimplex :: OptDir -> Tableau Rational -> (Bool, Tableau Rational) #-}
+{-# SPECIALIZE primalDualSimplex :: OptDir -> Tableau Double -> (Bool, Tableau Double) #-}
+primalDualSimplex optdir = go
+  where
+    go tbl =
+      case pdPivot optdir tbl of
+        Left PDOptimal   -> assert (isFeasible tbl) $ assert (isOptimal optdir tbl) $ (True, tbl)
+        Left PDUnsat     -> assert (not (isFeasible tbl)) $ (False, tbl)
+        Left PDUnbounded -> assert (not (isOptimal optdir tbl)) $ (False, tbl)
+        Right tbl' -> go tbl'
+
+pdPivot :: (Real r, Fractional r) => OptDir -> Tableau r -> Either PDResult (Tableau r)
+pdPivot optdir tbl
+  | null ps && null qs = Left PDOptimal -- optimal
+  | otherwise =
+      case ret of
+        Left p -> -- primal update
+          let rs = [ (i, (bi - t) / y_ip)
+                   | (i, (row_i, bi)) <- IM.toList tbl, i /= objRowIndex
+                   , let y_ip = IM.findWithDefault 0 p row_i, y_ip > 0
+                   ]
+              q = fst $ minimumBy (comparing snd) rs
+          in if null rs
+             then Left PDUnsat
+             else Right (pivot q p tbl)
+        Right q -> -- dual update
+          let (row_q, _bq) = (tbl IM.! q)
+              cs = [ (j, (cj'-t) / (-y_qj))
+                   | (j, y_qj) <- IM.toList row_q
+                   , y_qj < 0
+                   , let cj  = IM.findWithDefault 0 j obj
+                   , let cj' = if optdir==OptMax then cj else -cj
+                   ]
+              p = fst $ maximumBy (comparing snd) cs
+              (obj,_) = lookupRow objRowIndex tbl
+          in if null cs
+             then Left PDUnbounded -- dual infeasible
+             else Right (pivot q p tbl)
+  where
+    qs = [ (Right i, bi) | (i, (row_i, bi)) <- IM.toList tbl, i /= objRowIndex, 0 > bi ]
+    ps = [ (Left j, cj')
+         | (j,cj) <- IM.toList (fst (lookupRow objRowIndex tbl))
+         , let cj' = if optdir==OptMax then cj else -cj
+         , 0 > cj' ]
+    (ret, t) = minimumBy (comparing snd) (qs ++ ps)
 
 -- ---------------------------------------------------------------------------
 

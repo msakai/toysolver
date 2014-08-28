@@ -42,6 +42,7 @@ module ToySolver.LPSolver
   , dualSimplex
   , OptResult (..)
   , twoPhaseSimplex
+  , primalDualSimplex
 
   -- * Extract results
   , getModel
@@ -277,6 +278,19 @@ twoPhaseSimplex optdir obj = do
       return Optimum
     else
       return Unbounded
+
+primalDualSimplex :: (Fractional r, Real r) => OptDir -> LA.Expr r -> LP r OptResult
+primalDualSimplex optdir obj = do
+  tbl <- getTableau
+  defs <- getDefs
+  let (ret, tbl') = Simplex.primalDualSimplex optdir (Simplex.setObjFun tbl (LA.applySubst defs obj))
+  putTableau tbl'
+  if ret then
+    return Optimum
+  else if not (Simplex.isFeasible tbl') then
+    return Unsat
+  else
+    return Unbounded
 
 -- ---------------------------------------------------------------------------
 
