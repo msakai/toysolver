@@ -8,6 +8,7 @@ module ToySolver.FourierMotzkin.FOL
 
 import Control.Monad
 import qualified Data.IntSet as IS
+import Data.Maybe
 
 import ToySolver.Algebra.Lattice.Boolean
 
@@ -54,6 +55,6 @@ eliminateQuantifiers' = f
       return (notB dnf)
     f (FOL.Exists v a) = do
       dnf <- f a
-      return $ orB [DNF $ map fst $ project' v xs | xs <- unDNF dnf]
+      return $ orB [DNF $ maybeToList $ fmap fst $ project' v xs | xs <- unDNF dnf]
 
 -- ---------------------------------------------------------------------------

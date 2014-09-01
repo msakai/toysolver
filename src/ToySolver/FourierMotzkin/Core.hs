@@ -23,8 +23,17 @@ module ToySolver.FourierMotzkin.Core
     , fromRat
 
     , Lit (..)
+    , leR, ltR, geR, gtR
+    , simplify
+
     , fromLAAtom
     , toLAAtom
+    , constraintsToDNF
+
+    , BoundsR
+    , collectBounds
+    , boundsToLits
+    , evalBounds
 
     , project
     , project'
@@ -88,6 +97,12 @@ instance Complement Lit where
   notB (Pos t) = Nonneg (negateV t)
   notB (Nonneg t) = Pos (negateV t)
 
+leR, ltR, geR, gtR :: Rat -> Rat -> Lit
+leR (e1,c) (e2,d) = Nonneg $ normalizeExprR $ c *^ e2 ^-^ d *^ e1
+ltR (e1,c) (e2,d) = Pos $ normalizeExprR $ c *^ e2 ^-^ d *^ e1
+geR = flip leR
+gtR = flip gtR
+
 -- 制約集合の単純化
 -- It returns Nothing when a inconsistency is detected.
 simplify :: [Lit] -> Maybe [Lit]
@@ -125,12 +140,6 @@ atomR' op a b =
     Eql -> DNF [[a `leR` b, a `geR` b]]
     NEq -> DNF [[a `ltR` b], [a `gtR` b]]
 
-leR, ltR, geR, gtR :: Rat -> Rat -> Lit
-leR (e1,c) (e2,d) = Nonneg $ normalizeExprR $ c *^ e2 ^-^ d *^ e1
-ltR (e1,c) (e2,d) = Pos $ normalizeExprR $ c *^ e2 ^-^ d *^ e1
-geR = flip leR
-gtR = flip gtR
-
 -- ---------------------------------------------------------------------------
 
 {-
@@ -142,27 +151,27 @@ type BoundsR = ([Rat], [Rat], [Rat], [Rat])
 project :: Var -> [LA.Atom Rational] -> [([LA.Atom Rational], Model Rational -> Model Rational)]
 project v xs = do
   ys <- unDNF $ constraintsToDNF xs
-  (zs, mt) <- project' v ys
+  (zs, mt) <- maybeToList $ project' v ys
   return (map toLAAtom zs, mt)
 
-project' :: Var -> [Lit] -> [([Lit], Model Rational -> Model Rational)]
+project' :: Var -> [Lit] -> Maybe ([Lit], Model Rational -> Model Rational)
 project' v xs = do
   case collectBounds v xs of
     (bnd, rest) -> do
-      cond <- unDNF $ boundConditions bnd
+      cond <- boundsToLits bnd
       let mt m =
            case Interval.pickup (evalBounds m bnd) of
-             Nothing  -> error "ToySolver.FourierMotzkin.project: should not happen"
+             Nothing  -> error "ToySolver.FourierMotzkin.project': should not happen"
              Just val -> IM.insert v val m
       return (rest ++ cond, mt)
 
 projectN :: VarSet -> [LA.Atom Rational] -> [([LA.Atom Rational], Model Rational -> Model Rational)]
 projectN vs xs = do
   ys <- unDNF $ constraintsToDNF xs
-  (zs, mt) <- projectN' vs ys
+  (zs, mt) <- maybeToList $ projectN' vs ys
   return (map toLAAtom zs, mt)
 
-projectN' :: VarSet -> [Lit] -> [([Lit], Model Rational -> Model Rational)]
+projectN' :: VarSet -> [Lit] -> Maybe ([Lit], Model Rational -> Model Rational)
 projectN' vs2 xs2 = do
   (zs, mt) <- f (IS.toList vs2) xs2
   return (zs, mt)
@@ -195,8 +204,8 @@ collectBounds v = foldr phi (([],[],[],[]),[])
               then ((ls1, ls2, us1, (t', negate c) : us2), xs) -- 0 < cx + M ⇔ x < M/-c
               else ((ls1, ls2, (t', negate c) : us1, us2), xs) -- 0 ≤ cx + M ⇔ x ≤ M/-c
 
-boundConditions :: BoundsR -> DNF Lit
-boundConditions  (ls1, ls2, us1, us2) = DNF $ maybeToList $ simplify $ 
+boundsToLits :: BoundsR -> Maybe [Lit]
+boundsToLits  (ls1, ls2, us1, us2) = simplify $ 
   [ x `leR` y | x <- ls1, y <- us1 ] ++
   [ x `ltR` y | x <- ls1, y <- us2 ] ++ 
   [ x `ltR` y | x <- ls2, y <- us1 ] ++
@@ -206,8 +215,8 @@ solve :: VarSet -> [LA.Atom Rational] -> Maybe (Model Rational)
 solve vs cs = msum [solve' vs cs2 | cs2 <- unDNF (constraintsToDNF cs)]
 
 solve' :: VarSet -> [Lit] -> Maybe (Model Rational)
-solve' vs cs = listToMaybe $ do
-  (ys,mt) <- projectN' vs =<< maybeToList (simplify cs)
+solve' vs cs = do
+  (ys,mt) <- projectN' vs =<< simplify cs
   guard $ Just [] == simplify ys
   return $ mt IM.empty
 
