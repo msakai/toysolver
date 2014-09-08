@@ -24,6 +24,7 @@ import System.Console.GetOpt
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 import qualified ToySolver.Text.LPFile as LPFile
+import qualified ToySolver.Text.MPSFile as MPSFile
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.PBFile as PBFile
 import ToySolver.Converter.ObjType
@@ -157,6 +158,10 @@ writePBFile o pb = do
         ".lsp" -> writeFile fname (lsp "")
         ".lp" -> do
           case LPFile.render lp of
+            Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
+            Just s -> writeFile fname s
+        ".mps" -> do
+          case MPSFile.render lp of
             Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
             Just s -> writeFile fname s
         ".smp" -> do

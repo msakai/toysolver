@@ -25,9 +25,11 @@
 module ToySolver.Text.MPSFile
   ( parseString
   , parseFile
+  , render
   ) where
 
 import Control.Monad
+import Control.Monad.Writer
 import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -39,6 +41,7 @@ import Data.Interned.String
 
 import qualified Text.ParserCombinators.Parsec as P
 import Text.ParserCombinators.Parsec hiding (spaces, newline, Column)
+import Text.Printf
 
 import Data.OptDir
 import qualified ToySolver.Data.MIP as MIP
@@ -547,3 +550,264 @@ indicatorsSection = do
       val <- number
       newline'
       return (r, (var, val))
+
+-- ---------------------------------------------------------------------------
+
+render :: MIP.Problem -> Maybe String
+render mip = fmap ($ "") $ execWriterT $ do
+  guard $ checkQuad mip
+  render' $ nameRows $ mip
+
+render' :: MIP.Problem -> WriterT ShowS Maybe ()
+render' mip = do
+  let probName = ""
+
+  -- NAME section
+  -- The name starts in column 12 in fixed formats.
+  writeSectionHeader $ "NAME" ++ replicate 10 ' ' ++ probName
+
+  -- OBJSENSE section
+  -- Note: GLPK-4.48 does not support this section.
+  writeSectionHeader "OBJSENSE"
+  case MIP.dir mip of
+    OptMin -> writeFields ["MIN"]
+    OptMax -> writeFields ["MAX"]
+
+  let (Just objName, obj) = MIP.objectiveFunction mip
+
+{-
+  -- OBJNAME section
+  -- Note: GLPK-4.48 does not support this section.
+  writeSectionHeader "OBJNAME"
+  writeFields [objName]
+-}
+
+  let renderRows cs = do
+        forM_ cs $ \c -> do
+          let (_,op,_) = MIP.constrBody c
+          let s = case op of
+                    MIP.Le  -> "L"
+                    MIP.Ge  -> "G"
+                    MIP.Eql -> "E"
+          writeFields [s, fromJust $ MIP.constrLabel c]
+
+  -- ROWS section
+  writeSectionHeader "ROWS"
+  writeFields ["N", objName]
+  renderRows [c | c <- MIP.constraints mip, not (MIP.constrIsLazy c)]
+
+  -- USERCUTS section
+  unless (null (MIP.userCuts mip)) $ do
+    writeSectionHeader "USERCUTS"
+    renderRows (MIP.userCuts mip)
+
+  -- LAZYCONS section
+  let lcs = [c | c <- MIP.constraints mip, MIP.constrIsLazy c]
+  unless (null lcs) $ do
+    writeSectionHeader "LAZYCONS"
+    renderRows lcs
+
+  -- COLUMNS section
+  writeSectionHeader "COLUMNS"
+  let cols :: Map Column (Map String Rational)
+      cols = Map.fromListWith Map.union
+             [ (v, Map.singleton l d)
+             | (Just l, xs) <-
+                 MIP.objectiveFunction mip :
+                 [(MIP.constrLabel c, lhs) | c <- MIP.constraints mip ++ MIP.userCuts mip, let (lhs,_,_) = MIP.constrBody c]
+             , MIP.Term d [v] <- xs
+             ]
+      f col xs =
+        forM_ (Map.toList xs) $ \(row, d) -> do
+          writeFields ["", unintern col, row, showValue d]
+      ivs = MIP.integerVariables mip
+  forM_ (Map.toList (Map.filterWithKey (\col _ -> col `Set.notMember` ivs) cols)) $ \(col, xs) -> f col xs
+  unless (Set.null ivs) $ do
+    writeFields ["", "MARK0000", "'MARKER'", "", "'INTORG'"]
+    forM_ (Map.toList (Map.filterWithKey (\col _ -> col `Set.member` ivs) cols)) $ \(col, xs) -> f col xs
+    writeFields ["", "MARK0001", "'MARKER'", "", "'INTEND'"]
+
+  -- RHS section
+  let rs = [(fromJust $ MIP.constrLabel c, rhs) | c <- MIP.constraints mip ++ MIP.userCuts mip, let (_,_,rhs) = MIP.constrBody c, rhs /= 0]
+  writeSectionHeader "RHS"
+  forM_ rs $ \(name, val) -> do
+    writeFields ["", "rhs", name, showValue val]
+
+  -- BOUNDS section
+  writeSectionHeader "BOUNDS"
+  forM_ (Map.keys cols) $ \col -> do
+    let (lb,ub) = MIP.getBounds mip col
+        vt = MIP.getVarType mip col
+    case (lb,ub) of
+      (MIP.NegInf, MIP.PosInf) -> do
+        -- free variable (no lower or upper bound)
+        writeFields ["FR", "bound", unintern col]
+                  
+      (MIP.Finite 0, MIP.Finite 1) | vt == MIP.IntegerVariable -> do
+        -- variable is binary (equal 0 or 1)
+        writeFields ["BV", "bound", unintern col] 
+
+      (MIP.Finite a, MIP.Finite b) | a == b -> do
+        -- variable is fixed at the specified value
+        writeFields ["FX", "bound", unintern col, showValue a]
+
+      _ -> do
+        case lb of
+          MIP.PosInf -> error "should not happen"
+          MIP.NegInf -> do
+            -- Minus infinity
+            writeFields ["MI", "bound", unintern col]
+          MIP.Finite 0 | vt == MIP.ContinuousVariable -> return ()
+          MIP.Finite a -> do
+            let t = case vt of
+                      MIP.IntegerVariable -> "LI" -- lower bound for integer variable
+                      _ -> "LO" -- Lower bound
+            writeFields [t, "bound", unintern col, showValue a]
+
+        case ub of
+          MIP.NegInf -> error "should not happen"
+          MIP.PosInf | vt == MIP.ContinuousVariable -> return ()
+          MIP.PosInf -> do
+            when (vt == MIP.SemiContinuousVariable) $
+              error "cannot express +inf upper bound of semi-continuous variable"
+            writeFields ["PL", "bound", unintern col] -- Plus infinity
+          MIP.Finite a -> do
+            let t = case vt of
+                      MIP.SemiContinuousVariable -> "SC" -- Upper bound for semi-continuous variable
+                      MIP.IntegerVariable -> "UI" -- Upper bound for integer variable
+                      _ -> "UP" -- Upper bound
+            writeFields [t, "bound", unintern col, showValue a]
+
+  -- QMATRIX section
+  -- Gurobiは対称行列になっていないと "qmatrix isn't symmetric" というエラーを発生させる
+  let qt = [(d,v1,v2) | MIP.Term d [v1,v2] <- obj]
+  unless (null qt) $ do
+    writeSectionHeader "QMATRIX"
+    forM_ qt $ \(val,v1,v2) -> do
+      writeFields ["", unintern v1, unintern v2, showValue (2*val)]
+
+  -- SOS section
+  unless (null (MIP.sosConstraints mip)) $ do
+    writeSectionHeader "SOS"
+    forM_ (MIP.sosConstraints mip) $ \sos -> do
+      let t = case MIP.sosType sos of
+                MIP.S1 -> "S1"
+                MIP.S2 -> "S2"
+      writeFields $ t : maybeToList (MIP.sosLabel sos)
+      forM_ (MIP.sosBody sos) $ \(var,val) -> do
+        writeFields ["", unintern var, showValue val]
+
+  -- QCMATRIX section
+  let xs = [ (fromJust $ MIP.constrLabel c, qts)
+           | c <- MIP.constraints mip ++ MIP.userCuts mip
+           , let (lhs,_,_) = MIP.constrBody c
+           , let qts = [(d,v1,v2) | MIP.Term d [v1,v2] <- lhs]
+           , not (null qts) ]
+  unless (null xs) $ do
+    forM_ xs $ \(row, qts) -> do
+      -- The name starts in column 12 in fixed formats.
+      writeSectionHeader $ "QCMATRIX" ++ replicate 3 ' ' ++ row
+      forM_ qts $ \(val, v1, v2) -> do
+        writeFields ["", unintern v1, unintern v2, showValue val]
+
+  -- INDICATORS section
+  -- Note: Gurobi-5.6.3 does not support this section.
+  let ics = [c | c <- MIP.constraints mip, isJust $ MIP.constrIndicator c]
+  unless (null ics) $ do
+    writeSectionHeader "INDICATORS"
+    forM_ ics $ \c -> do
+      let Just (var,val) = MIP.constrIndicator c
+      writeFields ["IF", fromJust (MIP.constrLabel c), unintern var, showValue val]
+
+  -- ENDATA section
+  writeSectionHeader "ENDATA"
+
+writeSectionHeader :: String -> WriterT ShowS Maybe ()
+writeSectionHeader s = tell $ showString s . showChar '\n'
+
+-- Fields start in column 2, 5, 15, 25, 40 and 50
+writeFields :: [String] -> WriterT ShowS Maybe ()
+writeFields xs = f1 xs >> tell (showChar '\n')
+  where
+    -- columns 1-4
+    f1 [] = return ()
+    f1 [x] = tell $ showString (' ' : x)
+    f1 (x:xs) = do
+      tell $ showString $ printf " %-2s " x
+      f2 xs
+
+    -- columns 5-14
+    f2 [] = return ()
+    f2 [x] = tell $ showString x
+    f2 (x:xs) = do
+      tell $ showString $ printf "%-9s " x
+      f3 xs
+
+    -- columns 15-24
+    f3 [] = return ()
+    f3 [x] = tell $ showString x
+    f3 (x:xs) = do
+      tell $ showString $ printf "%-9s " x
+      f4 xs
+
+    -- columns 25-39
+    f4 [] = return ()
+    f4 [x] = tell $ showString x
+    f4 (x:xs) = do
+      tell $ showString $ printf "%-14s " x
+      f5 xs
+
+    -- columns 40-49
+    f5 [] = return ()
+    f5 [x] = tell $ showString x
+    f5 (x:xs) = do
+      tell $ showString $ printf "%-19s " x
+      f6 xs
+
+    -- columns 50-
+    f6 [] = return ()
+    f6 [x] = tell $ showString x
+    f6 _ = mzero
+
+showValue :: Rational -> String
+showValue c =
+  if denominator c == 1
+    then show (numerator c)
+    else show (fromRational c :: Double)
+ 
+nameRows :: MIP.Problem -> MIP.Problem
+nameRows mip
+  = mip
+  { MIP.objectiveFunction = (Just objName', obj)
+  , MIP.constraints = f (MIP.constraints mip) ["row" ++ show n | n <- [(1::Int)..]]
+  , MIP.userCuts = f (MIP.userCuts mip) ["usercut" ++ show n | n <- [(1::Int)..]]
+  , MIP.sosConstraints = g (MIP.sosConstraints mip) ["sos" ++ show n | n <- [(1::Int)..]]
+  }
+  where
+    (objName, obj) = MIP.objectiveFunction mip
+    used = Set.fromList $ catMaybes $ objName : [MIP.constrLabel c | c <- MIP.constraints mip ++ MIP.userCuts mip] ++ [MIP.sosLabel c | c <- MIP.sosConstraints mip]
+    objName' = fromMaybe (head [name | n <- [(1::Int)..], let name = "obj" ++ show n, name `Set.notMember` used]) objName
+
+    f [] _ = []
+    f (c:cs) (name:names)
+      | isJust (MIP.constrLabel c) = c : f cs (name:names)
+      | name `Set.notMember` used = c{ MIP.constrLabel = Just name } : f cs names
+      | otherwise = f (c:cs) names
+
+    g [] _ = []
+    g (c:cs) (name:names)
+      | isJust (MIP.sosLabel c) = c : g cs (name:names)
+      | name `Set.notMember` used = c{ MIP.sosLabel = Just name } : g cs names
+      | otherwise = g (c:cs) names
+
+checkQuad :: MIP.Problem -> Bool
+checkQuad mip =  all (all f) es
+  where
+    es = snd (MIP.objectiveFunction mip) :
+         [lhs | c <- MIP.constraints mip ++ MIP.userCuts mip, let (lhs,_,_) = MIP.constrBody c]
+    f :: MIP.Term -> Bool
+    f (MIP.Term _ [_]) = True
+    f (MIP.Term _ [_,_]) = True
+    f _ = False
+
+-- ---------------------------------------------------------------------------

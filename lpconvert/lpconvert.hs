@@ -80,7 +80,7 @@ header = unlines
   , ""
   , "Supported formats:"
   , "    input: .lp .mps .cnf .wcnf .opb .wbo"
-  , "    output: .lp .smt2 .ys"
+  , "    output: .lp .mps .smt2 .ys"
   , ""
   , "Options:"
   ]
@@ -165,6 +165,10 @@ writeLP o mip = do
       case map toLower (takeExtension fname) of
         ".lp" -> do
           case LPFile.render mip of
+            Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
+            Just s -> writeFile fname s
+        ".mps" -> do
+          case MPSFile.render mip of
             Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
             Just s -> writeFile fname s
         ".smt2" -> do
