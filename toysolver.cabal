@@ -191,6 +191,9 @@ Library
      ToySolver.Text.MaxSAT
      ToySolver.Text.PBFile
      ToySolver.Text.SDPFile
+     ToySolver.Internal.Data.IndexedPriorityQueue
+     ToySolver.Internal.Data.PriorityQueue
+     ToySolver.Internal.Data.SeqQueue
      ToySolver.Internal.ProcessUtil
      ToySolver.Internal.TextUtil
      ToySolver.Internal.Util
@@ -198,9 +201,6 @@ Library
   Other-Modules:
      ToySolver.Data.AlgebraicNumber.Graeffe
      ToySolver.Data.Polynomial.Base
-     ToySolver.Data.IndexedPriorityQueue
-     ToySolver.Data.PriorityQueue
-     ToySolver.Data.SeqQueue
      Paths_toysolver
   GHC-Prof-Options: -auto-all
 

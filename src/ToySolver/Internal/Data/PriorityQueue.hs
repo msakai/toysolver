@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Data.PriorityQueue
+-- Module      :  ToySolver.Internal.Data.PriorityQueue
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -13,7 +13,7 @@
 -- Priority queue implemented as array-based binary heap.
 --
 -----------------------------------------------------------------------------
-module ToySolver.Data.PriorityQueue
+module ToySolver.Internal.Data.PriorityQueue
   (
   -- * PriorityQueue type
     PriorityQueue

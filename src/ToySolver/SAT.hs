@@ -147,8 +147,8 @@ import Data.Ord
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
-import qualified ToySolver.Data.IndexedPriorityQueue as PQ
-import qualified ToySolver.Data.SeqQueue as SQ
+import qualified ToySolver.Internal.Data.IndexedPriorityQueue as PQ
+import qualified ToySolver.Internal.Data.SeqQueue as SQ
 import Data.Time
 import Data.Typeable
 import System.CPUTime

@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Data.SeqQueue
+-- Module      :  ToySolver.Internal.Data.SeqQueue
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -12,7 +12,7 @@
 -- Queue implemented using IORef and Sequence.
 -- 
 -----------------------------------------------------------------------------
-module ToySolver.Data.SeqQueue
+module ToySolver.Internal.Data.SeqQueue
   (
   -- * SeqQueue type
     SeqQueue
