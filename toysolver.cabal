@@ -4,7 +4,7 @@ License:	BSD3
 License-File:	COPYING
 Author:		Masahiro Sakai (masahiro.sakai@gmail.com)
 Maintainer:	masahiro.sakai@gmail.com
-Category:	Algorithms, Optimisation, Optimization, Theorem Provers
+Category:	Algorithms, Optimisation, Optimization, Theorem Provers, Constraints
 Cabal-Version:	>= 1.10
 Synopsis:	Assorted decision procedures for SAT, Max-SAT, PB, MIP, etc
 Description:	Toy-level implementation of some decision procedures
