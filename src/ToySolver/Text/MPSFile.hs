@@ -522,9 +522,10 @@ qMatrixSection = do
 
 qcMatrixSection :: Parser (Row, [MIP.Term])
 qcMatrixSection = do
-  try $ stringLn "QCMATRIX"
+  try $ string "QCMATRIX"
   spaces1'
   r <- row
+  newline'
   xs <- many entry
   return (r, xs)
   where

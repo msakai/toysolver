@@ -27,6 +27,7 @@ Extra-Source-Files:
    samples/lp/error/*.lp
    samples/maxsat/*.cnf
    samples/maxsat/*.wcnf
+   samples/mps/*.mps
    samples/pbo/*.opb
    samples/pbs/*.opb
    samples/sat/*.cnf
