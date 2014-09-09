@@ -15,8 +15,7 @@ module ToySolver.Data.DNF
   ( DNF (..)
   ) where
 
-import Algebra.Lattice
-import ToySolver.Algebra.Lattice.Boolean
+import ToySolver.Data.Boolean
 
 -- | Disjunctive normal form
 newtype DNF lit
@@ -27,20 +26,8 @@ newtype DNF lit
 instance Complement lit => Complement (DNF lit) where
   notB (DNF xs) = DNF . sequence . map (map notB) $ xs
 
-instance JoinSemiLattice (DNF lit) where
-  DNF xs `join` DNF ys = DNF (xs++ys)
-
-instance MeetSemiLattice (DNF lit) where
-  DNF xs `meet` DNF ys = DNF [x++y | x<-xs, y<-ys]
-
-instance Lattice (DNF lit)
-
-instance BoundedJoinSemiLattice (DNF lit) where
-  bottom = DNF []
-
-instance BoundedMeetSemiLattice (DNF lit) where
-  top = DNF [[]]
-
-instance BoundedLattice (DNF lit)
-
-instance Complement lit => Boolean (DNF lit)
+instance Complement lit => Boolean (DNF lit) where
+  true  = DNF [[]]
+  false = DNF []
+  DNF xs .||. DNF ys = DNF (xs++ys)
+  DNF xs .&&. DNF ys = DNF [x++y | x<-xs, y<-ys]

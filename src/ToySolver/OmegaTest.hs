@@ -43,9 +43,8 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.VectorSpace
 
-import ToySolver.Algebra.Lattice.Boolean
-
 import ToySolver.Data.ArithRel
+import ToySolver.Data.Boolean
 import ToySolver.Data.DNF
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var

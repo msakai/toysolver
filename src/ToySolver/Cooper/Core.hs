@@ -53,10 +53,8 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.VectorSpace hiding (project)
 
-import Algebra.Lattice
-import ToySolver.Algebra.Lattice.Boolean
-
 import ToySolver.Data.ArithRel
+import ToySolver.Data.Boolean
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
 import qualified ToySolver.FourierMotzkin as FM
@@ -120,23 +118,11 @@ instance Complement QFFormula where
   notB (Or' a b) = And' (notB a) (notB b)
   notB (Lit lit) = Lit (notB lit)
 
-instance JoinSemiLattice QFFormula where
-  join = Or'
-
-instance MeetSemiLattice QFFormula where
-  meet = And'
-
-instance Lattice QFFormula
-
-instance BoundedJoinSemiLattice QFFormula where
-  bottom = F'
-
-instance BoundedMeetSemiLattice QFFormula where
-  top = T'
-
-instance BoundedLattice QFFormula
-
-instance Boolean QFFormula
+instance Boolean QFFormula where
+  true  = T'
+  false = F'
+  (.&&.) = And'
+  (.||.) = Or'
 
 instance Variables QFFormula where
   vars T' = IS.empty

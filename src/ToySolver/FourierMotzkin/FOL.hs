@@ -10,9 +10,8 @@ import Control.Monad
 import qualified Data.IntSet as IS
 import Data.Maybe
 
-import ToySolver.Algebra.Lattice.Boolean
-
 import ToySolver.Data.ArithRel
+import ToySolver.Data.Boolean
 import ToySolver.Data.DNF
 import qualified ToySolver.Data.FOL.Arith as FOL
 import qualified ToySolver.Data.LA.FOL as LAFOL

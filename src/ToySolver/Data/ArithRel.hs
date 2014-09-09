@@ -31,7 +31,7 @@ module ToySolver.Data.ArithRel
 
 import qualified Data.IntSet as IS
 
-import ToySolver.Algebra.Lattice.Boolean (Complement (..))
+import ToySolver.Data.Boolean
 import ToySolver.Data.Var
 
 infix 4 .<., .<=., .>=., .>., .==., ./=.

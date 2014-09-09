@@ -14,17 +14,16 @@
 module ToySolver.Data.FOL.Formula
   (
   -- * Overloaded operations for formula.
-    module ToySolver.Algebra.Lattice.Boolean
+    module ToySolver.Data.Boolean
 
   -- * Concrete formula
   , Formula (..)
   , pushNot
   ) where
 
-import Algebra.Lattice
 import qualified Data.IntSet as IS
 
-import ToySolver.Algebra.Lattice.Boolean
+import ToySolver.Data.Boolean
 import ToySolver.Data.Var
 
 -- ---------------------------------------------------------------------------
@@ -58,23 +57,11 @@ instance Variables a => Variables (Formula a) where
 instance Complement (Formula a) where
   notB = Not
 
-instance JoinSemiLattice (Formula c) where
-  join = Or
-
-instance MeetSemiLattice (Formula c) where
-  meet = And
-
-instance Lattice (Formula c)
-
-instance BoundedJoinSemiLattice (Formula c) where
-  bottom = F
-
-instance BoundedMeetSemiLattice (Formula c) where
-  top = T
-
-instance BoundedLattice (Formula c)
-
 instance Boolean (Formula c) where
+  true  = T
+  false = F
+  (.&&.) = And
+  (.||.) = Or
   (.=>.)  = Imply
   (.<=>.) = Equiv
 

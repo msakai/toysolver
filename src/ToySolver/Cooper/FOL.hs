@@ -17,8 +17,8 @@ module ToySolver.Cooper.FOL
 
 import Control.Monad
 
-import ToySolver.Algebra.Lattice.Boolean
 import ToySolver.Data.ArithRel
+import ToySolver.Data.Boolean
 import qualified ToySolver.Data.FOL.Arith as FOL
 import qualified ToySolver.Data.LA.FOL as LAFOL
 import ToySolver.Data.Var

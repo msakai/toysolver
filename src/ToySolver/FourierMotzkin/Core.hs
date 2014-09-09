@@ -53,8 +53,8 @@ import Data.VectorSpace hiding (project)
 import qualified Data.Interval as Interval
 import Data.Interval (Interval, EndPoint (..), (<=..<), (<..<=), (<..<))
 
-import ToySolver.Algebra.Lattice.Boolean
 import ToySolver.Data.ArithRel
+import ToySolver.Data.Boolean
 import ToySolver.Data.DNF
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
