@@ -325,7 +325,7 @@ mpsfile = do
 nameSection :: Parser (Maybe String)
 nameSection = do
   string "NAME"
-  n <- optionMaybe $ do
+  n <- optionMaybe $ try $ do
     spaces1'
     ident
   newline'
