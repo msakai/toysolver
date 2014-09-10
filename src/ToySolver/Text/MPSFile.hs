@@ -695,11 +695,11 @@ render' mip = do
 
   -- QMATRIX section
   -- Gurobiは対称行列になっていないと "qmatrix isn't symmetric" というエラーを発生させる
-  let qt = [(d,v1,v2) | MIP.Term d [v1,v2] <- obj]
-  unless (null qt) $ do
+  let qm = Map.map (2*) $ quadMatrix obj
+  unless (Map.null qm) $ do
     writeSectionHeader "QMATRIX"
-    forM_ qt $ \(val,v1,v2) -> do
-      writeFields ["", unintern v1, unintern v2, showValue (2*val)]
+    forM_ (Map.toList qm) $ \(((v1,v2), val)) -> do
+      writeFields ["", unintern v1, unintern v2, showValue val]
 
   -- SOS section
   unless (null (MIP.sosConstraints mip)) $ do
@@ -713,16 +713,16 @@ render' mip = do
         writeFields ["", unintern var, showValue val]
 
   -- QCMATRIX section
-  let xs = [ (fromJust $ MIP.constrLabel c, qts)
+  let xs = [ (fromJust $ MIP.constrLabel c, qm)
            | c <- MIP.constraints mip ++ MIP.userCuts mip
            , let (lhs,_,_) = MIP.constrBody c
-           , let qts = [(d,v1,v2) | MIP.Term d [v1,v2] <- lhs]
-           , not (null qts) ]
+           , let qm = quadMatrix lhs
+           , not (Map.null qm) ]
   unless (null xs) $ do
-    forM_ xs $ \(row, qts) -> do
+    forM_ xs $ \(row, qm) -> do
       -- The name starts in column 12 in fixed formats.
       writeSectionHeader $ "QCMATRIX" ++ replicate 3 ' ' ++ row
-      forM_ qts $ \(val, v1, v2) -> do
+      forM_ (Map.toList qm) $ \((v1,v2), val) -> do
         writeFields ["", unintern v1, unintern v2, showValue val]
 
   -- INDICATORS section
@@ -820,6 +820,15 @@ nameRows mip
       | isJust (MIP.sosLabel c) = c : g cs (name:names)
       | name `Set.notMember` used = c{ MIP.sosLabel = Just name } : g cs names
       | otherwise = g (c:cs) names
+
+quadMatrix :: MIP.Expr -> Map (MIP.Var, MIP.Var) Rational
+quadMatrix e = Map.fromList $ do
+  let m = Map.fromListWith (+) [(if v1<=v2 then (v1,v2) else (v2,v1), c) | MIP.Term c [v1,v2] <- e]
+  ((v1,v2),c) <- Map.toList m
+  if v1==v2 then
+    [((v1,v2), c)]
+  else
+    [((v1,v2), c/2), ((v2,v1), c/2)]
 
 checkQuad :: MIP.Problem -> Bool
 checkQuad mip =  all (all f) es
