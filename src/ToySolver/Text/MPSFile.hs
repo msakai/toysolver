@@ -568,7 +568,9 @@ render mip = fmap ($ "") $ execWriterT $ do
   guard $ checkQuad mip
   render' $ nameRows $ mip
 
-render' :: MIP.Problem -> WriterT ShowS Maybe ()
+type M a = WriterT ShowS Maybe a
+
+render' :: MIP.Problem -> M ()
 render' mip = do
   let probName = ""
 
@@ -735,51 +737,57 @@ render' mip = do
   -- ENDATA section
   writeSectionHeader "ENDATA"
 
-writeSectionHeader :: String -> WriterT ShowS Maybe ()
-writeSectionHeader s = tell $ showString s . showChar '\n'
+writeString :: String -> M ()
+writeString s = tell $ showString s
+
+writeChar :: Char -> M ()
+writeChar c = tell $ showChar c
+
+writeSectionHeader :: String -> M ()
+writeSectionHeader s = writeString s >> writeChar '\n'
 
 -- Fields start in column 2, 5, 15, 25, 40 and 50
-writeFields :: [String] -> WriterT ShowS Maybe ()
-writeFields xs = f1 xs >> tell (showChar '\n')
+writeFields :: [String] -> M ()
+writeFields xs = f1 xs >> writeChar '\n'
   where
     -- columns 1-4
     f1 [] = return ()
-    f1 [x] = tell $ showString (' ' : x)
+    f1 [x] = writeString (' ' : x)
     f1 (x:xs) = do
-      tell $ showString $ printf " %-2s " x
+      writeString $ printf " %-2s " x
       f2 xs
 
     -- columns 5-14
     f2 [] = return ()
-    f2 [x] = tell $ showString x
+    f2 [x] = writeString x
     f2 (x:xs) = do
-      tell $ showString $ printf "%-9s " x
+      writeString $ printf "%-9s " x
       f3 xs
 
     -- columns 15-24
     f3 [] = return ()
-    f3 [x] = tell $ showString x
+    f3 [x] = writeString x
     f3 (x:xs) = do
-      tell $ showString $ printf "%-9s " x
+      writeString $ printf "%-9s " x
       f4 xs
 
     -- columns 25-39
     f4 [] = return ()
-    f4 [x] = tell $ showString x
+    f4 [x] = writeString x
     f4 (x:xs) = do
-      tell $ showString $ printf "%-14s " x
+      writeString $ printf "%-14s " x
       f5 xs
 
     -- columns 40-49
     f5 [] = return ()
-    f5 [x] = tell $ showString x
+    f5 [x] = writeString x
     f5 (x:xs) = do
-      tell $ showString $ printf "%-19s " x
+      writeString $ printf "%-19s " x
       f6 xs
 
     -- columns 50-
     f6 [] = return ()
-    f6 [x] = tell $ showString x
+    f6 [x] = writeString x
     f6 _ = mzero
 
 showValue :: Rational -> String

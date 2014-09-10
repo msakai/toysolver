@@ -414,83 +414,94 @@ number = tok $ do
 render :: MIP.Problem -> Maybe String
 render mip = fmap ($ "") $ execWriterT $ render' $ removeEmptyExpr mip
 
-render' :: MIP.Problem -> WriterT ShowS Maybe ()
+type M a = WriterT ShowS Maybe a
+
+writeString :: String -> M ()
+writeString s = tell $ showString s
+
+writeChar :: Char -> M ()
+writeChar c = tell $ showChar c
+
+writeVar :: MIP.Var -> M ()
+writeVar v = writeString $ MIP.fromVar v
+
+render' :: MIP.Problem -> M ()
 render' mip = do
-  tell $ showString $
+  writeString $
     case MIP.dir mip of
       OptMin -> "MINIMIZE"
       OptMax -> "MAXIMIZE"
-  tell $ showChar '\n'
+  writeChar '\n'
 
   do
     let (l, obj) = MIP.objectiveFunction mip
     renderLabel l
     renderExpr True obj
-    tell $ showChar '\n'
+    writeChar '\n'
 
-  tell $ showString "SUBJECT TO\n"
+  writeString "SUBJECT TO\n"
   forM_ (MIP.constraints mip) $ \c -> do
     unless (MIP.constrIsLazy c) $ do
       renderConstraint c
-      tell $ showChar '\n'
+      writeChar '\n'
 
   let lcs = [c | c <- MIP.constraints mip, MIP.constrIsLazy c]
   unless (null lcs) $ do
-    tell $ showString "LAZY CONSTRAINTS\n"
+    writeString "LAZY CONSTRAINTS\n"
     forM_ lcs $ \c -> do
       renderConstraint c
-      tell $ showChar '\n'
+      writeChar '\n'
 
   let cuts = [c | c <- MIP.userCuts mip]
   unless (null cuts) $ do
-    tell $ showString "USER CUTS\n"
+    writeString "USER CUTS\n"
     forM_ cuts $ \c -> do
       renderConstraint c
-      tell $ showChar '\n'
+      writeChar '\n'
 
   let ivs = MIP.integerVariables mip `Set.union` MIP.semiIntegerVariables mip
       (bins,gens) = Set.partition (\v -> MIP.getBounds mip v == (MIP.Finite 0, MIP.Finite 1)) ivs
       scs = MIP.semiContinuousVariables mip `Set.union` MIP.semiIntegerVariables mip
 
-  tell $ showString "BOUNDS\n"
+  writeString "BOUNDS\n"
   forM_ (Map.toAscList (MIP.varInfo mip)) $ \(v, MIP.VarInfo{ MIP.varBounds = (lb,ub) }) -> do
     unless (v `Set.member` bins) $ do
       renderBoundExpr lb
-      tell $ showString " <= "
-      tell $ showVar v
-      tell $ showString " <= "
+      writeString " <= "
+      writeVar v
+      writeString " <= "
       renderBoundExpr ub
-      tell $ showChar '\n'
+      writeChar '\n'
 
   unless (Set.null gens) $ do
-    tell $ showString "GENERALS\n"
+    writeString "GENERALS\n"
     renderVariableList $ Set.toList gens
 
   unless (Set.null bins) $ do
-    tell $ showString "BINARIES\n"
+    writeString "BINARIES\n"
     renderVariableList $ Set.toList bins
 
   unless (Set.null scs) $ do
-    tell $ showString "SEMI-CONTINUOUS\n"
+    writeString "SEMI-CONTINUOUS\n"
     renderVariableList $ Set.toList scs
 
   unless (null (MIP.sosConstraints mip)) $ do
-    tell $ showString "SOS\n"
+    writeString "SOS\n"
     forM_ (MIP.sosConstraints mip) $ \(MIP.SOSConstraint l typ xs) -> do
       renderLabel l
-      tell $ shows typ
-      tell $ showString " ::"
+      writeString $ show typ
+      writeString " ::"
       forM_ xs $ \(v, r) -> do
-        tell $ showString "  "
-        tell $ showVar v
-        tell $ showString " : "
-        tell $ showValue r
-      tell $ showChar '\n'
+        writeString "  "
+        writeVar v
+        writeString " : "
+        writeString $ showValue r
+      writeChar '\n'
 
-  tell $ showString "END\n"
+  writeString "END\n"
 
 -- FIXME: Gurobi は quadratic term が最後に一つある形式でないとダメっぽい
-renderExpr :: Bool -> MIP.Expr -> WriterT ShowS Maybe ()
+renderExpr :: Bool -> MIP.Expr -> M ()
 renderExpr isObj e = fill 80 (ts1 ++ ts2)
   where
     (ts,qts) = partition isLin e 
@@ -506,81 +517,81 @@ renderExpr isObj e = fill 80 (ts1 ++ ts2)
         ["+ ["] ++ map g qts ++ [if isObj then "] / 2" else "]"]
 
     f :: MIP.Term -> String
-    f (MIP.Term c [])  = showConstTerm c ""
-    f (MIP.Term c [v]) = showCoeff c . showVar v $ ""
+    f (MIP.Term c [])  = showConstTerm c
+    f (MIP.Term c [v]) = showCoeff c ++ MIP.fromVar v
     f _ = error "should not happen"
 
     g :: MIP.Term -> String
     g (MIP.Term c vs) = 
-      (if isObj then showCoeff (2*c) else showCoeff c)
-      (intercalate " * " (map MIP.fromVar vs))
+      (if isObj then showCoeff (2*c) else showCoeff c) ++
+      intercalate " * " (map MIP.fromVar vs)
 
-showVar :: MIP.Var -> ShowS
-showVar = showString . MIP.fromVar
-
-showValue :: Rational -> ShowS
+showValue :: Rational -> String
 showValue c =
   if denominator c == 1
-    then shows (numerator c)
-    else shows (fromRational c :: Double)
+    then show (numerator c)
+    else show (fromRational c :: Double)
 
-showCoeff :: Rational -> ShowS
-showCoeff c = s . v
+showCoeff :: Rational -> String
+showCoeff c =
+  if c' == 1
+    then s
+    else s ++ showValue c' ++ " "
   where
     c' = abs c
-    s = showString (if c >= 0 then "+ " else "- ")
-    v = (if c' /= 1 then showValue c' . showChar ' ' else id)
+    s = if c >= 0 then "+ " else "- "
 
-showConstTerm :: Rational -> ShowS
-showConstTerm c = s . v
+showConstTerm :: Rational -> String
+showConstTerm c = s ++ v
   where
-    s = showString (if c >= 0 then "+ " else "- ")
+    s = if c >= 0 then "+ " else "- "
     v = showValue (abs c)
 
-renderLabel :: Maybe MIP.Label -> WriterT ShowS Maybe ()
+renderLabel :: Maybe MIP.Label -> M ()
 renderLabel l =
   case l of
     Nothing -> return ()
-    Just s -> tell $ showString s . showString ": "
+    Just s -> writeString s >> writeString ": "
 
-renderOp :: MIP.RelOp -> WriterT ShowS Maybe ()
-renderOp MIP.Le = tell $ showString "<="
-renderOp MIP.Ge = tell $ showString ">="
-renderOp MIP.Eql = tell $ showString "="
+renderOp :: MIP.RelOp -> M ()
+renderOp MIP.Le = writeString "<="
+renderOp MIP.Ge = writeString ">="
+renderOp MIP.Eql = writeString "="
 
-renderConstraint :: MIP.Constraint -> WriterT ShowS Maybe ()
+renderConstraint :: MIP.Constraint -> M ()
 renderConstraint c@MIP.Constraint{ MIP.constrBody = (e,op,val) }  = do
   renderLabel (MIP.constrLabel c)
   case MIP.constrIndicator c of
     Nothing -> return ()
     Just (v,vval) -> do
-      tell $ showVar v . showString " = "
-      tell $ showValue vval
-      tell $ showString " -> "
+      writeVar v
+      writeString " = "
+      writeString $ showValue vval
+      writeString " -> "
 
   renderExpr False e
-  tell $ showChar ' '
+  writeChar ' '
   renderOp op
-  tell $ showChar ' '
-  tell $ showValue val
+  writeChar ' '
+  writeString $ showValue val
 
-renderBoundExpr :: MIP.BoundExpr -> WriterT ShowS Maybe ()
-renderBoundExpr (MIP.Finite r) = tell $ showValue r
-renderBoundExpr MIP.NegInf = tell $ showString "-inf"
-renderBoundExpr MIP.PosInf = tell $ showString "+inf"
+renderBoundExpr :: MIP.BoundExpr -> M ()
+renderBoundExpr (MIP.Finite r) = writeString $ showValue r
+renderBoundExpr MIP.NegInf = writeString "-inf"
+renderBoundExpr MIP.PosInf = writeString "+inf"
 
-renderVariableList :: [MIP.Var] -> WriterT ShowS Maybe ()
-renderVariableList vs = fill 80 (map MIP.fromVar vs) >> tell (showChar '\n')
+renderVariableList :: [MIP.Var] -> M ()
+renderVariableList vs = fill 80 (map MIP.fromVar vs) >> writeChar '\n'
 
-fill :: Int -> [String] -> WriterT ShowS Maybe ()
+fill :: Int -> [String] -> M ()
 fill width str = go str 0
   where
     go [] _ = return ()
-    go (x:xs) 0 = tell (showString x) >> go xs (length x)
+    go (x:xs) 0 = writeString x >> go xs (length x)
     go (x:xs) w =
       if w + 1 + length x <= width
-        then tell (showChar ' ' . showString x) >> go xs (w + 1 + length x)
-        else tell (showChar '\n') >> go (x:xs) 0
+        then writeChar ' ' >> writeString x >> go xs (w + 1 + length x)
+        else writeChar '\n' >> go (x:xs) 0
 
 -- ---------------------------------------------------------------------------
 
