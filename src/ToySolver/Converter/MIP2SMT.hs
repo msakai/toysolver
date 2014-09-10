@@ -122,7 +122,7 @@ realExpr opt env mip e =
              [ v3
              | v <- vs
              , let v2 = env Map.! v
-             , let v3 = if MIP.getVarType mip v == MIP.IntegerVariable
+             , let v3 = if isInt mip v
                         then toReal opt (showString v2)
                         else showString v2
              ]
@@ -152,7 +152,7 @@ realNum opt r =
 
 rel :: Options -> Env -> MIP.Problem -> Bool -> MIP.RelOp -> MIP.Expr -> Rational -> ShowS
 rel opt env mip q op lhs rhs
-  | and [MIP.getVarType mip v == MIP.IntegerVariable | v <- Set.toList (MIP.vars lhs)] &&
+  | and [isInt mip v | v <- Set.toList (MIP.vars lhs)] &&
     and [isInteger c | MIP.Term c _ <- lhs] && isInteger rhs =
       f q op (intExpr opt env mip lhs) (intNum opt (floor rhs))
   | otherwise =
@@ -207,7 +207,7 @@ conditions opt q env mip = bnds ++ cs ++ ss
     bnd v = (c1, Nothing)
       where
         v2 = env Map.! v
-        v3 = if MIP.getVarType mip v == MIP.IntegerVariable
+        v3 = if isInt mip v
              then toReal opt (showString v2)
              else showString v2
         (lb,ub) = MIP.getBounds mip v
@@ -215,20 +215,24 @@ conditions opt q env mip = bnds ++ cs ++ ss
                MIP.NegInf -> []
                MIP.PosInf -> [showString "false"]
                MIP.Finite x ->
-                 if MIP.getVarType mip v == MIP.IntegerVariable
+                 if isInt mip v
                  then [list [showString "<=", intNum opt (ceiling x), showString v2]]
                  else [list [showString "<=", realNum opt x, v3]]
         s2 = case ub of
                MIP.NegInf -> [showString "false"]
                MIP.PosInf -> []
                MIP.Finite x ->
-                 if MIP.getVarType mip v == MIP.IntegerVariable
+                 if isInt mip v
                  then [list [showString "<=", showString v2, intNum opt (floor x)]]
                  else [list [showString "<=", v3, realNum opt x]]
         c0 = and' (s1 ++ s2)
-        c1 = if MIP.getVarType mip v == MIP.SemiContinuousVariable
-             then or' [list [showString "=", showString v2, realNum opt 0], c0]
-             else c0
+        c1 = case MIP.getVarType mip v of
+               MIP.SemiContinuousVariable ->
+                 or' [list [showString "=", showString v2, realNum opt 0], c0]
+               MIP.SemiIntegerVariable ->
+                 or' [list [showString "=", showString v2, intNum opt 0], c0]
+               _ ->
+                 c0
     cs = map (constraint opt q env mip) (MIP.constraints mip)
     ss = concatMap sos (MIP.sosConstraints mip)
     sos (MIP.SOSConstraint label typ xs) = do
@@ -239,7 +243,7 @@ conditions opt q env mip = bnds ++ cs ++ ss
             [ list [showString "/=", v3, realNum opt 0]
             | v<-[x1,x2]
             , let v2 = env Map.! v
-            , let v3 = if MIP.getVarType mip v == MIP.IntegerVariable
+            , let v3 = if isInt mip v
                        then toReal opt (showString v2)
                        else showString v2
             ]
@@ -264,7 +268,7 @@ convert opt mip =
   where
     vs = MIP.variables mip
     real_vs = vs `Set.difference` int_vs
-    int_vs = MIP.integerVariables mip
+    int_vs = MIP.integerVariables mip `Set.union` MIP.semiIntegerVariables mip
     realType =
       case optLanguage opt of
         SMTLIB2 -> "Real"
@@ -329,6 +333,11 @@ encode opt s =
     f ')' = "]"
     f c | c `elem` "/\";" = printf "\\x%02d" (fromEnum c :: Int)
     f c = [c]
+
+isInt :: MIP.Problem -> MIP.Var -> Bool
+isInt mip v = vt == MIP.IntegerVariable || vt == MIP.SemiIntegerVariable
+  where
+    vt = MIP.getVarType mip v
 
 -- ------------------------------------------------------------------------
 

@@ -61,6 +61,7 @@ data BoundType
   | LI	-- lower bound for integer variable
   | UI	-- upper bound for integer variable
   | SC	-- upper bound for semi-continuous variable
+  | SI	-- upper bound for semi-integer variable
   deriving (Eq, Ord, Show, Read)
 
 -- ---------------------------------------------------------------------------
@@ -204,6 +205,7 @@ mpsfile = do
       vs     = Map.keysSet cols
       intvs2 = Set.fromList [col | (t,col,_) <- bnds, t `elem` [BV,LI,UI]]
       scvs   = Set.fromList [col | (SC,col,_) <- bnds]
+      sivs   = Set.fromList [col | (SI,col,_) <- bnds]
 
   let explicitBounds = Map.fromListWith f
         [ case typ of
@@ -217,6 +219,7 @@ mpsfile = do
             LI -> (col, (Just (MIP.Finite val), Nothing))
             UI -> (col, (Nothing, Just (MIP.Finite val)))
             SC -> (col, (Nothing, Just (MIP.Finite val)))
+            SI -> (col, (Nothing, Just (MIP.Finite val)))
         | (typ,col,val) <- bnds ]
         where
           f (a1,b1) (a2,b2) = (g a1 a2, g b1 b2)
@@ -311,9 +314,16 @@ mpsfile = do
               , MIP.VarInfo
                 { MIP.varBounds = Map.findWithDefault MIP.defaultBounds v bounds
                 , MIP.varType   =
-                    if v `Set.member` intvs1 || v `Set.member` intvs2 then MIP.IntegerVariable
-                    else if v `Set.member` scvs then MIP.SemiContinuousVariable
-                    else MIP.ContinuousVariable
+                    if v `Set.member` sivs then
+                      MIP.SemiIntegerVariable
+                    else if v `Set.member` intvs1 && v `Set.member` scvs then
+                      MIP.SemiIntegerVariable
+                    else if v `Set.member` intvs1 || v `Set.member` intvs2 then
+                      MIP.IntegerVariable
+                    else if v `Set.member` scvs then
+                      MIP.SemiContinuousVariable
+                    else
+                      MIP.ContinuousVariable
                 }
               )
             | v <- Set.toAscList vs
@@ -468,7 +478,7 @@ boundsSection = do
 
 boundType :: Parser BoundType
 boundType = tok $ do
-  let ks = ["LO", "UP", "FX", "FR", "MI", "PL", "BV", "LI", "UI", "SC"]
+  let ks = ["LO", "UP", "FX", "FR", "MI", "PL", "BV", "LI", "UI", "SC", "SI"]
   msum [try (string k) >> return (read k) | k <- ks]
 
 sosSection :: Parser [MIP.SOSConstraint]
@@ -621,7 +631,7 @@ render' mip = do
       f col xs =
         forM_ (Map.toList xs) $ \(row, d) -> do
           writeFields ["", unintern col, row, showValue d]
-      ivs = MIP.integerVariables mip
+      ivs = MIP.integerVariables mip `Set.union` MIP.semiIntegerVariables mip
   forM_ (Map.toList (Map.filterWithKey (\col _ -> col `Set.notMember` ivs) cols)) $ \(col, xs) -> f col xs
   unless (Set.null ivs) $ do
     writeFields ["", "MARK0000", "'MARKER'", "", "'INTORG'"]
@@ -669,12 +679,15 @@ render' mip = do
           MIP.NegInf -> error "should not happen"
           MIP.PosInf | vt == MIP.ContinuousVariable -> return ()
           MIP.PosInf -> do
-            when (vt == MIP.SemiContinuousVariable) $
-              error "cannot express +inf upper bound of semi-continuous variable"
+            when (vt == MIP.SemiContinuousVariable || vt == MIP.SemiIntegerVariable) $
+              error "cannot express +inf upper bound of semi-continuous or semi-integer variable"
             writeFields ["PL", "bound", unintern col] -- Plus infinity
           MIP.Finite a -> do
             let t = case vt of
                       MIP.SemiContinuousVariable -> "SC" -- Upper bound for semi-continuous variable
+                      MIP.SemiIntegerVariable ->
+                        -- Gurobi uses "SC" while lpsolve uses "SI" for upper bound of semi-integer variable
+                        "SC"
                       MIP.IntegerVariable -> "UI" -- Upper bound for integer variable
                       _ -> "UP" -- Upper bound
             writeFields [t, "bound", unintern col, showValue a]

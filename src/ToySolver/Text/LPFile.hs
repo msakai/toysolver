@@ -139,6 +139,8 @@ lpfile = do
            , MIP.vars (snd obj)
            , MIP.vars ss
            ]
+      isInt v  = v `Set.member` ints || v `Set.member` bins
+      isSemi v = v `Set.member` scs
   return $
     MIP.Problem
     { MIP.dir               = flag
@@ -152,9 +154,12 @@ lpfile = do
           , MIP.VarInfo
             { MIP.varBounds = Map.findWithDefault MIP.defaultBounds v bnds2
             , MIP.varType   =
-                if v `Set.member` ints || v `Set.member` bins then MIP.IntegerVariable
-                else if v `Set.member` scs then MIP.SemiContinuousVariable
-                else MIP.ContinuousVariable
+                if isInt v then
+                  if isSemi v then MIP.SemiIntegerVariable
+                  else MIP.IntegerVariable
+                else
+                  if isSemi v then MIP.SemiContinuousVariable
+                  else MIP.ContinuousVariable
             }
           )
         | v <- Set.toAscList vs
@@ -443,9 +448,9 @@ render' mip = do
       renderConstraint c
       tell $ showChar '\n'
 
-  let ivs = MIP.integerVariables mip
+  let ivs = MIP.integerVariables mip `Set.union` MIP.semiIntegerVariables mip
       (bins,gens) = Set.partition (\v -> MIP.getBounds mip v == (MIP.Finite 0, MIP.Finite 1)) ivs
-      scs = MIP.semiContinuousVariables mip
+      scs = MIP.semiContinuousVariables mip `Set.union` MIP.semiIntegerVariables mip
 
   tell $ showString "BOUNDS\n"
   forM_ (Map.toAscList (MIP.varInfo mip)) $ \(v, MIP.VarInfo{ MIP.varBounds = (lb,ub) }) -> do

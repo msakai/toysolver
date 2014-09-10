@@ -39,6 +39,7 @@ module ToySolver.Data.MIP
   , variables
   , integerVariables
   , semiContinuousVariables
+  , semiIntegerVariables
 
   -- * Utilities
   , Variables (..)
@@ -93,7 +94,7 @@ data VarType
 -- 'nothaddock' is inserted not to confuse haddock
   -- nothaddock | BinaryVariable
   | SemiContinuousVariable
-  -- nothaddock | SemiIntegerVariable
+  | SemiIntegerVariable
   deriving (Eq, Ord, Show)
 
 data VarInfo
@@ -214,3 +215,8 @@ semiContinuousVariables :: Problem -> Set Var
 semiContinuousVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
   where
     p VarInfo{ varType = vt } = vt == SemiContinuousVariable
+
+semiIntegerVariables :: Problem -> Set Var
+semiIntegerVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
+  where
+    p VarInfo{ varType = vt } = vt == SemiIntegerVariable
