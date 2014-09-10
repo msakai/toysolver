@@ -104,31 +104,31 @@ instance Complement Lit where
 
 -- | quantifier-free negation normal form
 data QFFormula
-    = T'
-    | F'
-    | And' QFFormula QFFormula
-    | Or' QFFormula QFFormula
+    = T
+    | F
+    | And QFFormula QFFormula
+    | Or QFFormula QFFormula
     | Lit Lit
     deriving (Show, Eq, Ord)
 
 instance Complement QFFormula where
-  notB T' = F'
-  notB F' = T'
-  notB (And' a b) = Or' (notB a) (notB b)
-  notB (Or' a b) = And' (notB a) (notB b)
+  notB T = F
+  notB F = T
+  notB (And a b) = Or (notB a) (notB b)
+  notB (Or a b) = And (notB a) (notB b)
   notB (Lit lit) = Lit (notB lit)
 
 instance Boolean QFFormula where
-  true  = T'
-  false = F'
-  (.&&.) = And'
-  (.||.) = Or'
+  true  = T
+  false = F
+  (.&&.) = And
+  (.||.) = Or
 
 instance Variables QFFormula where
-  vars T' = IS.empty
-  vars F' = IS.empty
-  vars (And' a b) = vars a `IS.union` vars b
-  vars (Or' a b)  = vars a `IS.union` vars b
+  vars T = IS.empty
+  vars F = IS.empty
+  vars (And a b) = vars a `IS.union` vars b
+  vars (Or a b)  = vars a `IS.union` vars b
   vars (Lit l)    = vars l
 
 instance IsRel (LA.Expr Integer) QFFormula where
@@ -147,34 +147,34 @@ n .|. e = Lit $ Divisible True n e
 subst1 :: Var -> ExprZ -> QFFormula -> QFFormula
 subst1 x e = go
   where
-    go T' = T'
-    go F' = F'
-    go (And' a b) = And' (go a) (go b)
-    go (Or' a b) = Or' (go a) (go b)
+    go T = T
+    go F = F
+    go (And a b) = And (go a) (go b)
+    go (Or a b) = Or (go a) (go b)
     go (Lit (Divisible b c e1)) = Lit $ Divisible b c $ LA.applySubst1 x e e1
     go (Lit (Pos e1)) = Lit $ Pos $ LA.applySubst1 x e e1
 
 simplify :: QFFormula -> QFFormula
-simplify (And' a b) = simplify1 $ And' (simplify a) (simplify b)
-simplify (Or' a b)  = simplify1 $ Or' (simplify a) (simplify b)
+simplify (And a b) = simplify1 $ And (simplify a) (simplify b)
+simplify (Or a b)  = simplify1 $ Or (simplify a) (simplify b)
 simplify formula    = simplify1 formula
 
 simplify1 :: QFFormula -> QFFormula
-simplify1 T' = T'
-simplify1 F' = F'
-simplify1 (And' a b) =
+simplify1 T = T
+simplify1 F = F
+simplify1 (And a b) =
   case (a, b) of
-    (T', b') -> b'
-    (a', T') -> a'
-    (F', _) -> false
-    (_, F') -> false
+    (T, b') -> b'
+    (a', T) -> a'
+    (F, _) -> false
+    (_, F) -> false
     (a',b') -> a' .&&. b'
-simplify1 (Or' a b) =
+simplify1 (Or a b) =
   case (a, b) of
-    (F', b') -> b'
-    (a', F') -> a'
-    (T', _) -> true
-    (_, T') -> true
+    (F, b') -> b'
+    (a', F) -> a'
+    (T, _) -> true
+    (_, T) -> true
     (a',b') -> a' .||. b'
 simplify1 (Lit lit) = simplifyLit lit
 
@@ -204,10 +204,10 @@ simplifyLit lit@(Divisible b c e)
 evalQFFormula :: Model Integer -> QFFormula -> Bool
 evalQFFormula m = f
   where
-    f T' = True
-    f F' = False
-    f (And' x1 x2) = f x1 && f x2
-    f (Or'  x1 x2) = f x1 || f x2
+    f T = True
+    f F = False
+    f (And x1 x2) = f x1 && f x2
+    f (Or  x1 x2) = f x1 || f x2
     f (Lit lit)    = evalLit m lit
 
 evalLit :: Model Integer -> Lit -> Bool
@@ -234,7 +234,7 @@ project :: Var -> QFFormula -> (QFFormula, Model Integer -> Model Integer)
 project x formula = (formula', mt)
   where
     xs = projectCases x formula
-    formula' = simplify $ orB [phi | (phi,_) <- xs, phi /= F']
+    formula' = simplify $ orB [phi | (phi,_) <- xs, phi /= F]
     mt m = head $ do
       (phi, mt') <- xs
       guard $ evalQFFormula m phi
@@ -263,10 +263,10 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
     c = f formula
       where
          f :: QFFormula -> Integer
-         f T' = 1
-         f F' = 1
-         f (And' a b) = lcm (f a) (f b)
-         f (Or' a b) = lcm (f a) (f b)
+         f T = 1
+         f F = 1
+         f (And a b) = lcm (f a) (f b)
+         f (Or a b) = lcm (f a) (f b)
          f (Lit (Pos e)) = fromMaybe 1 (LA.lookupCoeff x e)
          f (Lit (Divisible _ _ e)) = fromMaybe 1 (LA.lookupCoeff x e)
     
@@ -276,10 +276,10 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
     formula1 = simplify $ f formula .&&. Lit (Divisible True c (LA.var x))
       where
         f :: QFFormula -> QFFormula
-        f T' = T'
-        f F' = F'
-        f (And' a b) = f a .&&. f b
-        f (Or' a b) = f a .||. f b
+        f T = T
+        f F = F
+        f (And a b) = f a .&&. f b
+        f (Or a b) = f a .||. f b
         f lit@(Lit (Pos e)) =
           case LA.lookupCoeff x e of
             Nothing -> lit
@@ -301,10 +301,10 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
     delta = f formula1
       where
         f :: QFFormula -> Integer
-        f T' = 1
-        f F' = 1
-        f (And' a b) = lcm (f a) (f b)
-        f (Or' a b)  = lcm (f a) (f b)
+        f T = 1
+        f F = 1
+        f (And a b) = lcm (f a) (f b)
+        f (Or a b)  = lcm (f a) (f b)
         f (Lit (Divisible _ d _)) = d
         f (Lit (Pos _)) = 1
 
@@ -313,10 +313,10 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
     ts = f formula1
       where
         f :: QFFormula -> [ExprZ]
-        f T' = []
-        f F' = []
-        f (And' a b) = f a ++ f b
-        f (Or' a b) = f a ++ f b
+        f T = []
+        f F = []
+        f (And a b) = f a ++ f b
+        f (Or a b) = f a ++ f b
         f (Lit (Divisible _ _ _)) = []
         f (Lit (Pos e)) =
           case LA.extractMaybe x e of
@@ -335,15 +335,15 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
     formula2 = simplify $ f formula1
       where        
         f :: QFFormula -> QFFormula
-        f T' = T'
-        f F' = F'
-        f (And' a b) = f a .&&. f b
-        f (Or' a b) = f a .||. f b
+        f T = T
+        f F = F
+        f (And a b) = f a .&&. f b
+        f (Or a b) = f a .||. f b
         f lit@(Lit (Pos e)) =
           case LA.lookupCoeff x e of
             Nothing -> lit
-            Just 1    -> F' -- Pos e <=> ( x + e' > 0) <=> -e' < x
-            Just (-1) -> T' -- Pos e <=> (-x + e' > 0) <=>  x  < e'
+            Just 1    -> F -- Pos e <=> ( x + e' > 0) <=> -e' < x
+            Just (-1) -> T -- Pos e <=> (-x + e' > 0) <=>  x  < e'
             _ -> error "should not happen"
         f lit@(Lit (Divisible _ _ _)) = lit
 
@@ -352,10 +352,10 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
     us = f formula1
       where
         f :: QFFormula -> [ExprZ]
-        f T' = []
-        f F' = []
-        f (And' a b) = f a ++ f b
-        f (Or' a b) = f a ++ f b
+        f T = []
+        f F = []
+        f (And a b) = f a ++ f b
+        f (Or a b) = f a ++ f b
         f (Lit (Pos e)) =
           case LA.extractMaybe x e of
             Nothing -> []
@@ -384,7 +384,7 @@ solveQFFormula :: VarSet -> QFFormula -> Maybe (Model Integer)
 solveQFFormula vs formula = listToMaybe $ do
   (formula2, mt) <- projectCasesN vs formula
   case formula2 of
-    T' -> return $ mt IM.empty
+    T -> return $ mt IM.empty
     _  -> mzero
 
 -- | solve a (open) quantifier-free formula

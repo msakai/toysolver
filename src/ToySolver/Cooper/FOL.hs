@@ -28,8 +28,8 @@ import ToySolver.Cooper.Core
 eliminateQuantifiers :: FOL.Formula (FOL.Atom Rational) -> Maybe QFFormula
 eliminateQuantifiers = f
   where
-    f FOL.T = return T'
-    f FOL.F = return F'
+    f FOL.T = return T
+    f FOL.F = return F
     f (FOL.Atom (Rel a op b)) = do
        a' <- LAFOL.fromFOLExpr a
        b' <- LAFOL.fromFOLExpr b
