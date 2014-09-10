@@ -565,7 +565,7 @@ indicatorsSection = do
 
 render :: MIP.Problem -> Maybe String
 render mip = fmap ($ "") $ execWriterT $ do
-  guard $ checkQuad mip
+  guard $ checkAtMostQuadratic mip
   render' $ nameRows $ mip
 
 type M a = WriterT ShowS Maybe a
@@ -575,7 +575,7 @@ render' mip = do
   let probName = ""
 
   -- NAME section
-  -- The name starts in column 12 in fixed formats.
+  -- The name starts in column 15 in fixed formats.
   writeSectionHeader $ "NAME" ++ replicate 10 ' ' ++ probName
 
   -- OBJSENSE section
@@ -830,8 +830,8 @@ quadMatrix e = Map.fromList $ do
   else
     [((v1,v2), c/2), ((v2,v1), c/2)]
 
-checkQuad :: MIP.Problem -> Bool
-checkQuad mip =  all (all f) es
+checkAtMostQuadratic :: MIP.Problem -> Bool
+checkAtMostQuadratic mip =  all (all f) es
   where
     es = snd (MIP.objectiveFunction mip) :
          [lhs | c <- MIP.constraints mip ++ MIP.userCuts mip, let (lhs,_,_) = MIP.constrBody c]
