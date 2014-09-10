@@ -62,7 +62,7 @@ data BoundType
   | UI	-- upper bound for integer variable
   | SC	-- upper bound for semi-continuous variable
   | SI	-- upper bound for semi-integer variable
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 -- ---------------------------------------------------------------------------
 
@@ -478,8 +478,7 @@ boundsSection = do
 
 boundType :: Parser BoundType
 boundType = tok $ do
-  let ks = ["LO", "UP", "FX", "FR", "MI", "PL", "BV", "LI", "UI", "SC", "SI"]
-  msum [try (string k) >> return (read k) | k <- ks]
+  msum [try (string (show k)) >> return k | k <- [minBound..maxBound]]
 
 sosSection :: Parser [MIP.SOSConstraint]
 sosSection = do
