@@ -15,6 +15,7 @@ module ToySolver.Converter.MIP2SMT
   , Options (..)
   , defaultOptions
   , Language (..)
+  , YicesVersion (..)
   ) where
 
 import Data.Char
@@ -53,8 +54,13 @@ defaultOptions
 
 data Language
   = SMTLIB2
-  | YICES
-  deriving (Show, Eq, Ord, Enum)
+  | YICES YicesVersion
+  deriving (Show, Eq, Ord)
+
+data YicesVersion
+  = Yices1
+  | Yices2
+  deriving (Show, Eq, Ord, Enum, Bounded)
 
 -- ------------------------------------------------------------------------
 
@@ -133,7 +139,7 @@ intNum opt x =
     SMTLIB2
       | x < 0     -> list [showChar '-', shows (negate x)]
       | otherwise -> shows x
-    YICES -> shows x
+    YICES _ -> shows x
 
 realNum :: Options -> Rational -> ShowS
 realNum opt r =
@@ -141,10 +147,14 @@ realNum opt r =
     SMTLIB2
       | r < 0     -> list [showChar '-', f (negate r)]
       | otherwise -> f r
-    YICES ->
+    YICES Yices1 ->
       if denominator r == 1
         then shows (numerator r)
         else shows (numerator r) . showChar '/' . shows (denominator r)
+    YICES Yices2 ->
+      case showRationalAsFiniteDecimal r of
+        Just s  -> showString s
+        Nothing -> shows (numerator r) . showChar '/' . shows (denominator r)
   where
     f r = case showRationalAsFiniteDecimal r of
             Just s  -> showString s
@@ -168,7 +178,7 @@ toReal :: Options -> ShowS -> ShowS
 toReal opt x =
   case optLanguage opt of
     SMTLIB2 -> list [showString "to_real", x]
-    YICES   -> x
+    YICES _ -> x
 
 assert :: Options -> (ShowS, Maybe String) -> ShowS
 assert opt (x, label) = list [showString "assert", x']
@@ -263,7 +273,7 @@ convert opt mip =
              ++ [ assert opt (optimality, Nothing) | optOptimize opt ]
              ++ [ case optLanguage opt of
                     SMTLIB2 -> list [showString "check-sat"]
-                    YICES   -> list [showString "check"]
+                    YICES _ -> list [showString "check"]
                 | optCheckSAT opt ]
   where
     vs = MIP.variables mip
@@ -272,11 +282,11 @@ convert opt mip =
     realType =
       case optLanguage opt of
         SMTLIB2 -> "Real"
-        YICES   -> "real"
+        YICES _ -> "real"
     intType  =
       case optLanguage opt of
         SMTLIB2 -> "Int"
-        YICES   -> "int"
+        YICES _ -> "int"
     ts = [(v, realType) | v <- Set.toList real_vs] ++ [(v, intType) | v <- Set.toList int_vs]
     obj = snd (MIP.objectiveFunction mip)
     env = Map.fromList [(v, encode opt (MIP.fromVar v)) | v <- Set.toList vs]
@@ -287,8 +297,9 @@ convert opt mip =
     options =
       [ case optLanguage opt of
           SMTLIB2 -> list [showString "set-option", showString ":produce-models", showString "true"]
-          YICES   -> list [showString "set-evidence!", showString "true"]
-      | optProduceModel opt ]
+          YICES _ -> list [showString "set-evidence!", showString "true"]
+      | optProduceModel opt && optLanguage opt /= YICES Yices2
+      ]
 
     set_logic =
       case optSetLogic opt of
@@ -301,14 +312,14 @@ convert opt mip =
       return $ showString $
         case optLanguage opt of
           SMTLIB2 -> printf "(declare-fun %s () %s)" v2 t
-          YICES   -> printf "(define %s::%s) ; %s"  v2 t (MIP.fromVar v)
+          YICES _ -> printf "(define %s::%s) ; %s"  v2 t (MIP.fromVar v)
 
     optimality = list [showString "forall", decl, body]
       where
         decl =
           case optLanguage opt of
             SMTLIB2 -> list [list [showString (env2 Map.! v), showString t] | (v,t) <- ts]
-            YICES   -> list [showString $ printf "%s::%s" (env2 Map.! v) t | (v,t) <- ts]
+            YICES _ -> list [showString $ printf "%s::%s" (env2 Map.! v) t | (v,t) <- ts]
         body = list [showString "=>"
                     , and' (map fst (conditions opt True env2 mip))
                     , list [ showString $ if MIP.dir mip == MIP.OptMin then "<=" else ">="
@@ -323,7 +334,7 @@ encode opt s =
      | all p s   -> s
      | any q s   -> error $ "cannot encode " ++ show s
      | otherwise -> "|" ++ s ++ "|"
-    YICES   -> concatMap f s
+    YICES _ -> concatMap f s
   where
     p c = isAscii c && (isAlpha c || isDigit c || c `elem` "~!@$%^&*_-+=<>.?/")
     q c = c == '|' && c == '\\'

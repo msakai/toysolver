@@ -35,6 +35,7 @@ Extra-Source-Files:
    samples/sdp/*.dat
    samples/sdp/*.dat-s
    samples/smt/*.smt2
+   samples/smt/*.ys
    samples/qbf/*.qdimacs
    test/TestAReal2.hs
    benchmarks/UF250.1065.100/*.cnf

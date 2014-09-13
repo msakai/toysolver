@@ -1,0 +1,9 @@
+; Yices 1 does not accept floating point notation, but Yices 2 accept it.
+(define x::int)
+(assert (< -0.5 x))
+(assert (< x 1.8))
+(assert (<= 2e-2 x))
+(assert (<= 2.0e-2 x))
+(assert (<= x 3e10))
+(assert (<= x 3.0e10))
+(check)

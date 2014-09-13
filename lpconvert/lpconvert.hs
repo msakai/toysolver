@@ -49,6 +49,7 @@ data Flag
   | SMTNoCheck
   | SMTNoProduceModel
   | MaxSATNonLinear
+  | Yices2
   deriving Eq
 
 options :: [OptDescr Flag]
@@ -64,6 +65,7 @@ options =
     , Option []    ["smt-no-check"] (NoArg SMTNoCheck)    "do not output \"(check)\""
     , Option []    ["smt-no-produce-model"] (NoArg SMTNoProduceModel) "do not output \"(set-option :produce-models true)\""    
     , Option []    ["maxsat-nonlinear"] (NoArg MaxSATNonLinear) "use non-linear formulation of Max-SAT"
+    , Option []    ["yices2"] (NoArg Yices2) "output for yices2 rather than yices1"
     ]
   where
     parseObjType s =
@@ -174,10 +176,11 @@ writeLP o mip = do
         ".smt2" -> do
           writeFile fname (MIP2SMT.convert mip2smtOpt mip "")
         ".ys" -> do
-          writeFile fname (MIP2SMT.convert mip2smtOpt{ MIP2SMT.optLanguage = MIP2SMT.YICES } mip "")
+          let lang = MIP2SMT.YICES (if Yices2 `elem` o then MIP2SMT.Yices2 else MIP2SMT.Yices1)
+          writeFile fname (MIP2SMT.convert mip2smtOpt{ MIP2SMT.optLanguage = lang } mip "")
         ext -> do
           error $ "unknown file extension: " ++ show ext
-          
+
 main :: IO ()
 main = do
   args <- getArgs
