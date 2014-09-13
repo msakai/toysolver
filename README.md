@@ -91,7 +91,7 @@ Usage:
 Supported formats:
 
 * Input formats: cnf, wcnf, opb, wbo
-* Output formats: opb wbo
+* Output formats: opb, wbo, lsp, lp, mps, smp, smt2, ys
 
 TODO
 ----
