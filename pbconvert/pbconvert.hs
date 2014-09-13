@@ -47,9 +47,10 @@ data Flag
   | AsMaxSAT
   | ObjType ObjType
   | IndicatorConstraint
-  | Optimize
-  | NoCheck
-  | NoProduceModel
+  | SMTSetLogic String
+  | SMTOptimize
+  | SMTNoCheck
+  | SMTNoProduceModel
   | MaxSATNonLinear
   | Yices2
   deriving Eq
@@ -62,9 +63,10 @@ options =
     , Option []    ["maxsat"]  (NoArg AsMaxSAT)  "treat *.cnf file as MAX-SAT problem"
     , Option []    ["obj"] (ReqArg (ObjType . parseObjType) "STRING") "objective function for SAT/PBS: none (default), max-one, max-zero"
     , Option []    ["indicator"] (NoArg IndicatorConstraint) "use indicator constraints in output LP file"
-    , Option []    ["smt-optimize"] (NoArg Optimize)   "output optimiality condition which uses quantifiers"
-    , Option []    ["smt-no-check"] (NoArg NoCheck)    "do not output \"(check)\""
-    , Option []    ["smt-no-produce-model"] (NoArg NoProduceModel) "do not output \"(set-option :produce-models true)\""    
+    , Option []    ["smt-set-logic"] (ReqArg SMTSetLogic "STRING")　"output \"(set-logic STRING)\""
+    , Option []    ["smt-optimize"] (NoArg SMTOptimize)   "output optimiality condition which uses quantifiers"
+    , Option []    ["smt-no-check"] (NoArg SMTNoCheck)    "do not output \"(check)\""
+    , Option []    ["smt-no-produce-model"] (NoArg SMTNoProduceModel) "do not output \"(set-option :produce-models true)\""    
     , Option []    ["maxsat-nonlinear"] (NoArg MaxSATNonLinear) "use non-linear formulation of Max-SAT"
     , Option []    ["yices2"] (NoArg Yices2) "output for yices2 rather than yices1"
     ]
@@ -130,11 +132,12 @@ transformPBFile o pb =
 
 writePBFile :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> IO ()
 writePBFile o pb = do
-  let lp2smtOpt =
+  let mip2smtOpt =
         MIP2SMT.defaultOptions
-        { MIP2SMT.optCheckSAT     = not (NoCheck `elem` o)
-        , MIP2SMT.optProduceModel = not (NoProduceModel `elem` o)
-        , MIP2SMT.optOptimize     = Optimize `elem` o
+        { MIP2SMT.optSetLogic     = listToMaybe [logic | SMTSetLogic logic <- o]
+        , MIP2SMT.optCheckSAT     = not (SMTNoCheck `elem` o)
+        , MIP2SMT.optProduceModel = not (SMTNoProduceModel `elem` o)
+        , MIP2SMT.optOptimize     = SMTOptimize `elem` o
         }
   case head ([Just fname | Output fname <- o] ++ [Nothing]) of
     Nothing -> do
@@ -169,10 +172,10 @@ writePBFile o pb = do
         ".smp" -> do
           writeFile fname (PB2SMP.convert False opb "")
         ".smt2" -> do
-          writeFile fname (MIP2SMT.convert lp2smtOpt lp "")
+          writeFile fname (MIP2SMT.convert mip2smtOpt lp "")
         ".ys" -> do
           let lang = MIP2SMT.YICES (if Yices2 `elem` o then MIP2SMT.Yices2 else MIP2SMT.Yices1)
-          writeFile fname (MIP2SMT.convert lp2smtOpt{ MIP2SMT.optLanguage = lang } lp "")
+          writeFile fname (MIP2SMT.convert mip2smtOpt{ MIP2SMT.optLanguage = lang } lp "")
         ext -> do
           error $ "unknown file extension: " ++ show ext
           
