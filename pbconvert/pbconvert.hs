@@ -142,8 +142,8 @@ writePBFile o pb = do
   case head ([Just fname | Output fname <- o] ++ [Nothing]) of
     Nothing -> do
       case pb of
-        Left opb  -> putStr $ PBFile.showOPB opb ""
-        Right wbo -> putStr $ PBFile.showWBO wbo ""
+        Left opb  -> putStr $ PBFile.renderOPB opb
+        Right wbo -> putStr $ PBFile.renderWBO wbo
     Just fname -> do
       let opb = case pb of
                   Left opb  -> opb
@@ -158,8 +158,8 @@ writePBFile o pb = do
                   Left opb  -> PB2LSP.convert opb
                   Right wbo -> PB2LSP.convertWBO wbo
       case map toLower (takeExtension fname) of
-        ".opb" -> writeFile fname (PBFile.showOPB opb "")
-        ".wbo" -> writeFile fname (PBFile.showWBO wbo "")
+        ".opb" -> writeFile fname $ PBFile.renderOPB opb
+        ".wbo" -> writeFile fname $ PBFile.renderWBO wbo
         ".lsp" -> writeFile fname (lsp "")
         ".lp" -> do
           case LPFile.render lp of

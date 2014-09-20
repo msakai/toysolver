@@ -129,15 +129,13 @@ testOPB :: String -> Bool
 testOPB s = sf == sf2
   where
     Right sf  = parseOPBString "-" s
-    s2 = showOPB sf ""
-    Right sf2 = parseOPBString "-" s2
+    Right sf2 = parseOPBString "-" (renderOPB sf)
 
 testWBO :: String -> Bool
 testWBO s = sf == sf2
   where
     Right sf  = parseWBOString "-" s
-    s2 = showWBO sf ""
-    Right sf2 = parseWBOString "-" s2
+    Right sf2 = parseWBOString "-" (renderWBO sf)
 
 ------------------------------------------------------------------------
 -- Test harness

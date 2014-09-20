@@ -41,10 +41,10 @@ module ToySolver.Text.PBFile
   , parseWBOFile
 
   -- * Show .opb files
-  , showOPB
+  , renderOPB
 
   -- * Show .wbo files
-  , showWBO
+  , renderWBO
   ) where
 
 import Prelude hiding (sum)
@@ -317,6 +317,12 @@ parseWBOString = parse softformula
 parseWBOFile :: FilePath -> IO (Either ParseError SoftFormula)
 parseWBOFile = parseFromFile softformula
 
+
+renderOPB :: Formula -> String
+renderOPB opb = showOPB opb ""
+
+renderWBO :: SoftFormula -> String
+renderWBO wbo = showWBO wbo ""
 
 showOPB :: Formula -> ShowS
 showOPB opb = (size . part1 . part2)
