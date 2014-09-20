@@ -48,13 +48,13 @@ module ToySolver.Text.PBFile
   ) where
 
 import Prelude hiding (sum)
+import Control.Exception (assert)
 import Control.Monad
-import Data.Maybe
 import Data.List hiding (sum)
+import Data.Maybe
+import Data.Word
 import Text.Parsec
 import Text.Parsec.String
-import Data.Word
-import Control.Exception (assert)
 import Text.Printf
 import ToySolver.Internal.TextUtil
 
