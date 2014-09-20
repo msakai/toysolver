@@ -50,7 +50,8 @@ import Data.Ratio
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
-import Text.ParserCombinators.Parsec
+import Text.Parsec
+import Text.Parsec.String
 
 -- ---------------------------------------------------------------------------
 -- problem description

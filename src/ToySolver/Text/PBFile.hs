@@ -51,7 +51,8 @@ import Prelude hiding (sum)
 import Control.Monad
 import Data.Maybe
 import Data.List hiding (sum)
-import Text.ParserCombinators.Parsec
+import Text.Parsec
+import Text.Parsec.String
 import Data.Word
 import Control.Exception (assert)
 import Text.Printf

@@ -39,8 +39,9 @@ import Data.Ratio
 import Data.Interned
 import Data.Interned.String
 
-import qualified Text.ParserCombinators.Parsec as P
-import Text.ParserCombinators.Parsec hiding (spaces, newline, Column)
+import qualified Text.Parsec as P
+import Text.Parsec hiding (spaces, newline, Column)
+import Text.Parsec.String
 import Text.Printf
 
 import Data.OptDir

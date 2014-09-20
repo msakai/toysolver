@@ -38,7 +38,8 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.OptDir
-import Text.ParserCombinators.Parsec hiding (label)
+import Text.Parsec hiding (label)
+import Text.Parsec.String
 
 import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Internal.Util (combineMaybe)
