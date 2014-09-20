@@ -35,7 +35,7 @@ module ToySolver.Data.AlgebraicNumber.Sturm
 
 import Data.Maybe
 import qualified Data.Interval as Interval
-import Data.Interval (Interval, EndPoint (..), (<..<=), (<=..<=))
+import Data.Interval (Interval, Extended (..), (<..<=), (<=..<=))
 
 import ToySolver.Data.Polynomial (UPolynomial, X (..))
 import qualified ToySolver.Data.Polynomial as P

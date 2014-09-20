@@ -55,7 +55,7 @@ import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJClass as PP
 import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
 
-import Data.Interval (Interval, EndPoint (..), (<=..<), (<..<=), (<..<), (<!), (>!))
+import Data.Interval (Interval, Extended (..), (<=..<), (<..<=), (<..<), (<!), (>!))
 import qualified Data.Interval as Interval
 
 import ToySolver.Data.Polynomial (Polynomial, UPolynomial, X (..))
@@ -297,7 +297,7 @@ ceiling' a =
     (Finite ub, inUB) = Interval.upperBound' i2
     ceiling_lb = ceiling lb
     ceiling_ub = ceiling ub
-    i3 = NegInf <..<= Finite (fromInteger ceiling_lb)
+    i3 = NegInf <..<= fromInteger ceiling_lb
 
 -- | Same as 'floor'.
 floor' :: Integral b => AReal -> b
@@ -312,7 +312,7 @@ floor' a =
     (Finite ub, inUB) = Interval.upperBound' i2
     floor_lb = floor lb
     floor_ub = floor ub
-    i3 = Finite (fromInteger floor_ub) <=..< PosInf
+    i3 = fromInteger floor_ub <=..< PosInf
 
 -- | The @n@th root of @a@
 nthRoot :: Integer -> AReal -> AReal

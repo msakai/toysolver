@@ -24,7 +24,8 @@ module ToySolver.Data.MIP
   , Var
   , VarType (..)
   , VarInfo (..)
-  , BoundExpr (..)
+  , BoundExpr
+  , Extended (..)
   , RelOp (..)
   , SOSType (..)
   , SOSConstraint (..)
@@ -52,6 +53,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Interned (intern, unintern)
 import Data.Interned.String
+import Data.ExtendedReal
 import Data.OptDir
 
 -- ---------------------------------------------------------------------------
@@ -121,8 +123,7 @@ type Label = String
 type Var = InternedString
 
 -- | type for representing lower/upper bound of variables
-data BoundExpr = NegInf | Finite Rational | PosInf
-    deriving (Eq, Ord, Show)
+type BoundExpr = Extended Rational
 
 -- | relational operators
 data RelOp = Le | Ge | Eql
@@ -174,7 +175,7 @@ defaultBounds = (defaultLB, defaultUB)
 
 -- | default lower bound (0)
 defaultLB :: BoundExpr
-defaultLB = Finite 0
+defaultLB = 0
 
 -- | default upper bound (+∞)
 defaultUB :: BoundExpr

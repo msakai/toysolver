@@ -38,7 +38,7 @@ convert formula = (mip, mtrans (PBFile.pbNumVars formula))
           [ ( v
             , MIP.VarInfo
               { MIP.varType   = MIP.IntegerVariable
-              , MIP.varBounds = (MIP.Finite 0, MIP.Finite 1)
+              , MIP.varBounds = (0, 1)
               }
             )
           | v <- vs
@@ -100,7 +100,7 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
           [ ( v
             , MIP.VarInfo
               { MIP.varType   = MIP.IntegerVariable
-              , MIP.varBounds = (MIP.Finite 0, MIP.Finite 1)
+              , MIP.varBounds = (0, 1)
               }
             )
           | v <- vs

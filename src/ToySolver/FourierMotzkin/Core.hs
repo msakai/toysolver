@@ -51,7 +51,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.VectorSpace hiding (project)
 import qualified Data.Interval as Interval
-import Data.Interval (Interval, EndPoint (..), (<=..<), (<..<=), (<..<))
+import Data.Interval (Interval, Extended (..), (<=..<), (<..<=), (<..<))
 
 import ToySolver.Data.ArithRel
 import ToySolver.Data.Boolean

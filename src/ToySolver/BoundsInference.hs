@@ -80,7 +80,7 @@ f b cs i = foldr intersection i $ do
     Gt -> return $ interval (strict ub) (PosInf, False)
     NEq -> []
 
-strict :: (EndPoint r, Bool) -> (EndPoint r, Bool)
+strict :: (Extended r, Bool) -> (Extended r, Bool)
 strict (x, _) = (x, False)
 
 -- | tightening intervals by ceiling lower bounds and flooring upper bounds.

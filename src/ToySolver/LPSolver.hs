@@ -59,6 +59,7 @@ import qualified Data.IntSet as IS
 import Data.OptDir
 import Data.VectorSpace
 
+import Data.Interval ((<=!), (>=!), (==!), (<!), (>!))
 import qualified Data.Interval as Interval
 
 import ToySolver.Data.ArithRel
@@ -309,42 +310,19 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
     vs = vars cs
     bounds = BI.inferBounds initialBounds cs ivs 1000
       where
-        initialBounds = IM.fromList [(v, Interval.whole) | v <- IS.toList vs]
-    nonnegVars = IS.filter f vs
-      where
-        f v = case Interval.lowerBound (bounds IM.! v) of
-                Interval.Finite lb | 0 <= lb -> True
-                _ -> False
+        initialBounds = IM.fromAscList [(v, Interval.whole) | v <- IS.toAscList vs]
+    nonnegVars = IS.filter (\v -> 0 <=! (bounds IM.! v)) vs
 
     isTriviallyTrue :: LA.Atom r -> Bool
     isTriviallyTrue (Rel a op b) =
       case op of
-        Le ->
-          case ub of
-            Interval.PosInf -> False
-            Interval.Finite val -> val <= 0
-            Interval.NegInf -> True -- should not happen
-        Ge ->
-          case lb of
-            Interval.NegInf -> False
-            Interval.Finite val -> val >= 0
-            Interval.PosInf -> True -- should not happen
-        Lt ->
-          case ub of
-            Interval.PosInf -> False
-            Interval.Finite val -> val < 0 || (not inUB && val <= 0)
-            Interval.NegInf -> True -- should not happen
-        Gt ->
-          case lb of
-            Interval.NegInf -> False
-            Interval.Finite val -> val > 0 || (not inLB && val >= 0)
-            Interval.PosInf -> True -- should not happen
-        Eql -> isTriviallyTrue (c .<=. zeroV) && isTriviallyTrue (c .>=. zeroV)
-        NEq -> isTriviallyTrue (c .<. zeroV) || isTriviallyTrue (c .>. zeroV)
+        Le -> i <=! 0
+        Ge -> i >=! 0
+        Lt -> i <! 0
+        Gt -> i >! 0
+        Eql -> i ==! 0
+        NEq -> i <! 0 || i >! 0
       where
-        c = a ^-^ b
-        i = LA.computeInterval bounds c
-        (lb, inLB) = Interval.lowerBound' i
-        (ub, inUB) = Interval.upperBound' i
+        i = LA.computeInterval bounds (a ^-^ b)
 
 -- ---------------------------------------------------------------------------

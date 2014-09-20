@@ -15,7 +15,7 @@ import qualified ToySolver.Data.AlgebraicNumber.Sturm as Sturm
 import ToySolver.Data.AlgebraicNumber.Real
 import ToySolver.Data.AlgebraicNumber.Root
 
-import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<))
+import Data.Interval (Interval, Extended (..), (<=..<=), (<..<=), (<=..<), (<..<))
 import qualified Data.Interval as Interval
 
 import Control.Monad
