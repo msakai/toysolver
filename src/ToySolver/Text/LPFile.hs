@@ -410,17 +410,22 @@ number = tok $ do
 
 -- ---------------------------------------------------------------------------
 
--- | Render a problem into a string.
-render :: MIP.Problem -> Maybe String
-render mip = fmap ($ "") $ execWriterT $ render' $ removeEmptyExpr mip
+type M a = Writer ShowS a
 
-type M a = WriterT ShowS Maybe a
+execM :: M a -> String
+execM m = execWriter m ""
 
 writeString :: String -> M ()
 writeString s = tell $ showString s
 
 writeChar :: Char -> M ()
 writeChar c = tell $ showChar c
+
+-- ---------------------------------------------------------------------------
+
+-- | Render a problem into a string.
+render :: MIP.Problem -> Maybe String
+render mip = Just $ execM $ render' $ removeEmptyExpr mip
 
 writeVar :: MIP.Var -> M ()
 writeVar v = writeString $ MIP.fromVar v

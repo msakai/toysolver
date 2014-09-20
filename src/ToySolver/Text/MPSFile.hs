@@ -274,7 +274,7 @@ mpsfile = do
       rowCoeffs = Map.fromListWith Map.union [(row, Map.singleton col coeff) | (col,m) <- Map.toList cols, (row,coeff) <- Map.toList m]
 
   let f :: Bool -> (Maybe MIP.RelOp, Row) -> [MIP.Constraint]
-      f _isLazy (Nothing, _row) = mzero
+      f _isLazy (Nothing, _row) = error "MPSFile: row must be named (this should not happen)"
       f isLazy (Just op, row) = do
         let lhs = [MIP.Term c　[col] | (col,c) <- Map.toList (Map.findWithDefault Map.empty row rowCoeffs)]
                   ++ Map.findWithDefault [] row qterms
@@ -563,12 +563,22 @@ indicatorsSection = do
 
 -- ---------------------------------------------------------------------------
 
-render :: MIP.Problem -> Maybe String
-render mip = fmap ($ "") $ execWriterT $ do
-  guard $ checkAtMostQuadratic mip
-  render' $ nameRows $ mip
+type M a = Writer ShowS a
 
-type M a = WriterT ShowS Maybe a
+execM :: M a -> String
+execM m = execWriter m ""
+
+writeString :: String -> M ()
+writeString s = tell $ showString s
+
+writeChar :: Char -> M ()
+writeChar c = tell $ showChar c
+
+-- ---------------------------------------------------------------------------
+
+render :: MIP.Problem -> Maybe String
+render mip | not (checkAtMostQuadratic mip) = Nothing
+render mip = Just $ execM $ render' $ nameRows mip
 
 render' :: MIP.Problem -> M ()
 render' mip = do
@@ -737,12 +747,6 @@ render' mip = do
   -- ENDATA section
   writeSectionHeader "ENDATA"
 
-writeString :: String -> M ()
-writeString s = tell $ showString s
-
-writeChar :: Char -> M ()
-writeChar c = tell $ showChar c
-
 writeSectionHeader :: String -> M ()
 writeSectionHeader s = writeString s >> writeChar '\n'
 
@@ -788,7 +792,7 @@ writeFields xs = f1 xs >> writeChar '\n'
     -- columns 50-
     f6 [] = return ()
     f6 [x] = writeString x
-    f6 _ = mzero
+    f6 _ = error "MPSFile: >6 fields (this should not happen)"
 
 showValue :: Rational -> String
 showValue c =
