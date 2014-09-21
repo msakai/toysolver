@@ -202,7 +202,7 @@ mpsfile = do
         case objsense of
           Nothing -> OptMin
           Just d  -> d
-      vs     = Map.keysSet cols
+      vs     = Map.keysSet cols `Set.union` Set.fromList [col | (_,col,_) <- bnds]
       intvs2 = Set.fromList [col | (t,col,_) <- bnds, t `elem` [BV,LI,UI]]
       scvs   = Set.fromList [col | (SC,col,_) <- bnds]
       sivs   = Set.fromList [col | (SI,col,_) <- bnds]
@@ -657,9 +657,9 @@ render' mip = do
 
   -- BOUNDS section
   writeSectionHeader "BOUNDS"
-  forM_ (Map.keys cols) $ \col -> do
-    let (lb,ub) = MIP.getBounds mip col
-        vt = MIP.getVarType mip col
+  forM_ (Map.toList (MIP.varInfo mip)) $ \(col, vinfo) -> do
+    let (lb,ub) = MIP.varBounds vinfo
+        vt = MIP.varType vinfo
     case (lb,ub) of
       (MIP.NegInf, MIP.PosInf) -> do
         -- free variable (no lower or upper bound)
