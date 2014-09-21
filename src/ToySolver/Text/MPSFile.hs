@@ -274,7 +274,7 @@ mpsfile = do
       rowCoeffs = Map.fromListWith Map.union [(row, Map.singleton col coeff) | (col,m) <- Map.toList cols, (row,coeff) <- Map.toList m]
 
   let f :: Bool -> (Maybe MIP.RelOp, Row) -> [MIP.Constraint]
-      f _isLazy (Nothing, _row) = error "MPSFile: row must be named (this should not happen)"
+      f _isLazy (Nothing, _row) = []
       f isLazy (Just op, row) = do
         let lhs = [MIP.Term c　[col] | (col,c) <- Map.toList (Map.findWithDefault Map.empty row rowCoeffs)]
                   ++ Map.findWithDefault [] row qterms
