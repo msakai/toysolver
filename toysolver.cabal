@@ -158,6 +158,7 @@ Library
      ToySolver.Data.LA.FOL
      ToySolver.Data.LBool
      ToySolver.Data.MIP
+     ToySolver.Data.MIP.Base
      ToySolver.Data.Polynomial
      ToySolver.Data.Polynomial.Factorization.FiniteField
      ToySolver.Data.Polynomial.Factorization.Hensel

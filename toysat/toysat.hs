@@ -769,25 +769,25 @@ solveMaxSAT opt solver wcnf initialModel =
 
 mainMIP :: Options -> SAT.Solver -> [String] -> IO ()
 mainMIP opt solver args = do
-  (fname,s) <-
-    case args of
-      ["-"]   -> do
-        s <- hGetContents stdin
-        return ("-", s)
-      [fname] -> do
-        s <- readFile fname
-        return (fname, s)
-      _ -> showHelp stderr >> exitFailure
   mip <-
-    case LPFile.parseString fname s of
-      Right mip -> return mip
-      Left err ->
-        case MPSFile.parseString fname s of
+    case args of
+      [fname@"-"]   -> do
+        s <- hGetContents stdin
+        case LPFile.parseString fname s of
           Right mip -> return mip
-          Left err2 -> do
-            hPrint stderr err
-            hPrint stderr err2
-            exitFailure
+          Left err ->
+            case MPSFile.parseString fname s of
+              Right mip -> return mip
+              Left err2 -> do
+                hPrint stderr err
+                hPrint stderr err2
+                exitFailure
+      [fname] -> do
+        ret <- MIP.readFile fname
+        case ret of
+          Left err -> hPrint stderr err >> exitFailure
+          Right mip -> return mip
+      _ -> showHelp stderr >> exitFailure
   solveMIP opt solver mip
 
 solveMIP :: Options -> SAT.Solver -> MIP.Problem -> IO ()

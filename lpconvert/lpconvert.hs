@@ -26,7 +26,6 @@ import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Text.LPFile as LPFile
 import qualified ToySolver.Text.MaxSAT as MaxSAT
-import qualified ToySolver.Text.MPSFile as MPSFile
 import qualified ToySolver.Text.PBFile as PBFile
 import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
@@ -117,12 +116,12 @@ readLP o fname = do
           let (mip, _) = PB2IP.convertWBO (IndicatorConstraint `elem` o) formula
           return mip
     ".lp"   -> do
-      ret <- LPFile.parseFile fname
+      ret <- MIP.readLPFile fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
         Right mip -> return mip
     ".mps"  -> do
-      ret <- MPSFile.parseFile fname
+      ret <- MIP.readMPSFile fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
         Right mip -> return mip
@@ -159,20 +158,14 @@ writeLP o mip = do
         }
 
   case head ([Just fname | Output fname <- o] ++ [Nothing]) of
-    Nothing -> do
+    Nothing -> 
       case LPFile.render mip of
         Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
         Right s -> putStr s
     Just fname -> do
       case map toLower (takeExtension fname) of
-        ".lp" -> do
-          case LPFile.render mip of
-            Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
-            Right s -> writeFile fname s
-        ".mps" -> do
-          case MPSFile.render mip of
-            Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
-            Right s -> writeFile fname s
+        ".lp" -> MIP.writeLPFile fname mip
+        ".mps" -> MIP.writeMPSFile fname mip
         ".smt2" -> do
           writeFile fname (MIP2SMT.convert mip2smtOpt mip "")
         ".ys" -> do

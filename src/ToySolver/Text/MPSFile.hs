@@ -46,7 +46,7 @@ import Text.Parsec.String
 import Text.Printf
 
 import Data.OptDir
-import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.Data.MIP.Base as MIP
 import ToySolver.Internal.TextUtil (readUnsignedInteger)
 
 type Column = MIP.Var

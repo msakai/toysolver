@@ -52,8 +52,6 @@ import qualified ToySolver.Simplex2 as Simplex2
 import qualified ToySolver.MIPSolver2 as MIPSolver2
 import qualified ToySolver.CAD as CAD
 import qualified ToySolver.ContiTraverso as ContiTraverso
-import qualified ToySolver.Text.LPFile as LPFile
-import qualified ToySolver.Text.MPSFile as MPSFile
 import qualified ToySolver.Text.PBFile as PBFile
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GurobiSol as GurobiSol
@@ -436,17 +434,10 @@ main = do
                 maxsatPrintModel stdout m2 0
                 writeSOLFileSAT o m2
         ModeMIP -> do
-          ret <- LPFile.parseFile fname
+          ret <- MIP.readFile fname
           mip <- case ret of
                   Right mip -> return mip
-                  Left err -> do
-                    ret <- MPSFile.parseFile fname
-                    case ret of
-                      Right mip -> return mip
-                      Left err2 -> do
-                        hPrint stderr err
-                        hPrint stderr err2
-                        exitFailure
+                  Left err -> hPrint stderr err >> exitFailure
           run (getSolver o) o mip $ \m -> do
             mipPrintModel stdout (PrintRational `elem` o) m
             writeSOLFileMIP o m

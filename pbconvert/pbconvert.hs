@@ -23,8 +23,7 @@ import System.FilePath
 import System.Console.GetOpt
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
-import qualified ToySolver.Text.LPFile as LPFile
-import qualified ToySolver.Text.MPSFile as MPSFile
+import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.PBFile as PBFile
 import ToySolver.Converter.ObjType
@@ -161,14 +160,8 @@ writePBFile o pb = do
         ".opb" -> writeFile fname $ PBFile.renderOPB opb
         ".wbo" -> writeFile fname $ PBFile.renderWBO wbo
         ".lsp" -> writeFile fname (lsp "")
-        ".lp" -> do
-          case LPFile.render lp of
-            Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
-            Right s -> writeFile fname s
-        ".mps" -> do
-          case MPSFile.render lp of
-            Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
-            Right s -> writeFile fname s
+        ".lp" -> MIP.writeLPFile fname lp
+        ".mps" -> MIP.writeMPSFile fname lp
         ".smp" -> do
           writeFile fname (PB2SMP.convert False opb "")
         ".smt2" -> do

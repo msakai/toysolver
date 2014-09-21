@@ -42,7 +42,7 @@ import Data.OptDir
 import Text.Parsec hiding (label)
 import Text.Parsec.String
 
-import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.Data.MIP.Base as MIP
 import ToySolver.Internal.Util (combineMaybe)
 import ToySolver.Internal.TextUtil (readUnsignedInteger)
 
