@@ -25,6 +25,7 @@
 module ToySolver.Text.MPSFile
   ( parseString
   , parseFile
+  , parser
   , render
   ) where
 
@@ -67,14 +68,14 @@ data BoundType
 
 -- ---------------------------------------------------------------------------
 
--- | Parse a string containing LP file data.
+-- | Parse a string containing MPS file data.
 -- The source name is only | used in error messages and may be the empty string.
 parseString :: SourceName -> String -> Either ParseError MIP.Problem
-parseString = parse mpsfile
+parseString = parse parser
 
--- | Parse a file containing LP file data.
+-- | Parse a file containing MPS file data.
 parseFile :: FilePath -> IO (Either ParseError MIP.Problem)
-parseFile = parseFromFile mpsfile
+parseFile = parseFromFile parser
 
 -- ---------------------------------------------------------------------------
 
@@ -150,8 +151,9 @@ number = tok $ do
 
 -- ---------------------------------------------------------------------------
 
-mpsfile :: Parser MIP.Problem
-mpsfile = do
+-- | MPS file parser
+parser :: Parser MIP.Problem
+parser = do
   many commentline
 
   _name <- nameSection

@@ -24,6 +24,7 @@
 module ToySolver.Text.LPFile
   ( parseString
   , parseFile
+  , parser
   , render
   ) where
 
@@ -50,11 +51,11 @@ import ToySolver.Internal.TextUtil (readUnsignedInteger)
 -- | Parse a string containing LP file data.
 -- The source name is only | used in error messages and may be the empty string.
 parseString :: SourceName -> String -> Either ParseError MIP.Problem
-parseString = parse lpfile
+parseString = parse parser
 
 -- | Parse a file containing LP file data.
 parseFile :: FilePath -> IO (Either ParseError MIP.Problem)
-parseFile = parseFromFile lpfile
+parseFile = parseFromFile parser
 
 -- ---------------------------------------------------------------------------
 
@@ -111,8 +112,9 @@ reserved = Set.fromList
 
 -- ---------------------------------------------------------------------------
 
-lpfile :: Parser MIP.Problem
-lpfile = do
+-- | LP file parser
+parser :: Parser MIP.Problem
+parser = do
   sep
   (flag, obj) <- problem
 
