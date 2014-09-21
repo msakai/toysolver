@@ -47,8 +47,8 @@ checkFile fname = do
     Left err -> assertFailure $ show err
     Right lp ->
       case render lp of
-        Nothing -> assertFailure "render failure"
-        Just _ -> return ()
+        Left err -> assertFailure ("render failure: " ++ err)
+        Right _ -> return ()
 
 checkString :: String -> String -> IO ()
 checkString name str = do
@@ -56,8 +56,8 @@ checkString name str = do
     Left err -> assertFailure $ show err
     Right lp ->
       case render lp of
-        Nothing -> assertFailure "render failure"
-        Just _ -> return ()
+        Left err -> assertFailure ("render failure: " ++ err)
+        Right _ -> return ()
 
 ------------------------------------------------------------------------
 -- Test harness

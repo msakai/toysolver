@@ -427,8 +427,8 @@ writeChar c = tell $ showChar c
 -- ---------------------------------------------------------------------------
 
 -- | Render a problem into a string.
-render :: MIP.Problem -> Maybe String
-render mip = Just $ execM $ render' $ removeEmptyExpr mip
+render :: MIP.Problem -> Either String String
+render mip = Right $ execM $ render' $ removeEmptyExpr mip
 
 writeVar :: MIP.Var -> M ()
 writeVar v = writeString $ MIP.fromVar v

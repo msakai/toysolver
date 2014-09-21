@@ -579,9 +579,9 @@ writeChar c = tell $ showChar c
 
 -- ---------------------------------------------------------------------------
 
-render :: MIP.Problem -> Maybe String
-render mip | not (checkAtMostQuadratic mip) = Nothing
-render mip = Just $ execM $ render' $ nameRows mip
+render :: MIP.Problem -> Either String String
+render mip | not (checkAtMostQuadratic mip) = Left "Expression must be atmost quadratic"
+render mip = Right $ execM $ render' $ nameRows mip
 
 render' :: MIP.Problem -> M ()
 render' mip = do

@@ -161,18 +161,18 @@ writeLP o mip = do
   case head ([Just fname | Output fname <- o] ++ [Nothing]) of
     Nothing -> do
       case LPFile.render mip of
-        Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
-        Just s -> putStr s
+        Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
+        Right s -> putStr s
     Just fname -> do
       case map toLower (takeExtension fname) of
         ".lp" -> do
           case LPFile.render mip of
-            Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
-            Just s -> writeFile fname s
+            Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
+            Right s -> writeFile fname s
         ".mps" -> do
           case MPSFile.render mip of
-            Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
-            Just s -> writeFile fname s
+            Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
+            Right s -> writeFile fname s
         ".smt2" -> do
           writeFile fname (MIP2SMT.convert mip2smtOpt mip "")
         ".ys" -> do

@@ -163,12 +163,12 @@ writePBFile o pb = do
         ".lsp" -> writeFile fname (lsp "")
         ".lp" -> do
           case LPFile.render lp of
-            Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
-            Just s -> writeFile fname s
+            Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
+            Right s -> writeFile fname s
         ".mps" -> do
           case MPSFile.render lp of
-            Nothing -> hPutStrLn stderr "conversion failure" >> exitFailure
-            Just s -> writeFile fname s
+            Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
+            Right s -> writeFile fname s
         ".smp" -> do
           writeFile fname (PB2SMP.convert False opb "")
         ".smt2" -> do
