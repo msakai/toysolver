@@ -47,6 +47,8 @@ module ToySolver.Data.LA
   , Atom (..)
   , showAtom
   , evalAtom
+  , applySubstAtom
+  , applySubst1Atom
   , solveFor
   , module ToySolver.Data.ArithRel
 
@@ -259,6 +261,13 @@ showAtom (Rel lhs op rhs) = showExpr lhs ++ showOp op ++ showExpr rhs
 -- | evaluate the formula under the model.
 evalAtom :: (Num r, Ord r) => Model r -> Atom r -> Bool
 evalAtom m (Rel lhs op rhs) = evalOp op (evalExpr m lhs) (evalExpr m rhs)
+
+applySubstAtom :: (Num r, Eq r) => VarMap (Expr r) -> Atom r -> Atom r
+applySubstAtom s (Rel lhs op rhs) = Rel (applySubst s lhs) op (applySubst s rhs)
+
+-- | applySubst1 x e phi == phi[e/x]
+applySubst1Atom :: (Num r, Eq r) => Var -> Expr r -> Atom r -> Atom r
+applySubst1Atom x e (Rel lhs op rhs) = Rel (applySubst1 x e lhs) op (applySubst1 x e rhs)
 
 -- | Solve linear (in)equation for the given variable.
 --
