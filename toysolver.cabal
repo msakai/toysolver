@@ -131,6 +131,7 @@ Library
      ToySolver.OmegaTest.Misc
      ToySolver.Simplex
      ToySolver.Simplex2
+     ToySolver.VirtualSubstitution
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.MaxSAT2IP

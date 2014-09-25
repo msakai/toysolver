@@ -28,6 +28,7 @@ import qualified ToySolver.Cooper as Cooper
 import qualified ToySolver.CAD as CAD
 import qualified ToySolver.Simplex2 as Simplex2
 import qualified ToySolver.ContiTraverso as ContiTraverso
+import qualified ToySolver.VirtualSubstitution as VirtualSubstitution
 
 ------------------------------------------------------------------------
 
@@ -146,6 +147,24 @@ case_FourierMotzkin_test1 =
 case_FourierMotzkin_test2 :: IO ()
 case_FourierMotzkin_test2 = 
   case uncurry FourierMotzkin.solve test2' of
+    Nothing -> assertFailure "expected: Just\n but got: Nothing"
+    Just m  ->
+      forM_ (snd test2') $ \a -> do
+        LA.evalAtom m a @?= True
+
+------------------------------------------------------------------------
+
+case_VirtualSubstitution_test1 :: IO ()
+case_VirtualSubstitution_test1 = 
+  case uncurry VirtualSubstitution.solve test1' of
+    Nothing -> assertFailure "expected: Just\n but got: Nothing"
+    Just m  ->
+      forM_ (snd test1') $ \a -> do
+        LA.evalAtom m a @?= True
+
+case_VirtualSubstitution_test2 :: IO ()
+case_VirtualSubstitution_test2 = 
+  case uncurry VirtualSubstitution.solve test2' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
       forM_ (snd test2') $ \a -> do
