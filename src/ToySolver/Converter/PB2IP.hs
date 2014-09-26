@@ -54,17 +54,18 @@ convert formula = (mip, mtrans (PBFile.pbNumVars formula))
 
     cs2 = do
       (lhs,op,rhs) <- PBFile.pbConstraints formula
-      let op2 = case op of
-                  PBFile.Ge -> MIP.Ge
-                  PBFile.Eq -> MIP.Eql
-          lhs2 = convExpr lhs
+      let lhs2 = convExpr lhs
           lhs3a = [t | t@(MIP.Term _ (_:_)) <- lhs2]
           lhs3b = sum [c | MIP.Term c [] <- lhs2]
       return $ MIP.Constraint
         { MIP.constrLabel     = Nothing
         , MIP.constrIndicator = Nothing
         , MIP.constrIsLazy    = False
-        , MIP.constrBody      = (lhs3a, op2, fromIntegral rhs - lhs3b)
+        , MIP.constrExpr      = lhs3a
+        , MIP.constrBounds    =
+            case op of
+              PBFile.Ge -> (MIP.Finite (fromIntegral rhs - lhs3b), MIP.PosInf)
+              PBFile.Eq -> (MIP.Finite (fromIntegral rhs - lhs3b), MIP.Finite (fromIntegral rhs - lhs3b))
         }
 
 convExpr :: PBFile.Sum -> MIP.Expr
@@ -120,7 +121,8 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
             { MIP.constrLabel     = Nothing
             , MIP.constrIndicator = Nothing
             , MIP.constrIsLazy    = False
-            , MIP.constrBody      = (obj2, MIP.Le, fromInteger t - 1)
+            , MIP.constrExpr      = obj2
+            , MIP.constrBounds    = (MIP.NegInf, MIP.Finite (fromInteger t - 1))
             }
           ]
 
@@ -137,15 +139,15 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
               Nothing -> ([], Nothing)
               Just w2 -> ([(w2,v)], Just (v,0))
       if isNothing w || useIndicator then do
-         let op2 =
-               case op of
-                 PBFile.Ge -> MIP.Ge
-                 PBFile.Eq -> MIP.Eql
-             c = MIP.Constraint
+         let c = MIP.Constraint
                  { MIP.constrLabel     = Nothing
                  , MIP.constrIndicator = ind
                  , MIP.constrIsLazy    = False
-                 , MIP.constrBody      = (lhs3, op2, rhs3)
+                 , MIP.constrExpr      = lhs3
+                 , MIP.constrBounds    =
+                     case op of
+                       PBFile.Ge -> (MIP.Finite rhs3, MIP.PosInf)
+                       PBFile.Eq -> (MIP.Finite rhs3, MIP.Finite rhs3)
                  }
          return (ts, c)
        else do
@@ -154,7 +156,8 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
                   { MIP.constrLabel     = Nothing
                   , MIP.constrIndicator = Nothing
                   , MIP.constrIsLazy    = False
-                  , MIP.constrBody      = (lhsGE, MIP.Ge, rhsGE)
+                  , MIP.constrExpr      = lhsGE
+                  , MIP.constrBounds    = (MIP.Finite rhsGE, MIP.PosInf)
                   }
          case op of
            PBFile.Ge -> do
@@ -165,7 +168,8 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
                       { MIP.constrLabel     = Nothing
                       , MIP.constrIndicator = Nothing
                       , MIP.constrIsLazy    = False
-                      , MIP.constrBody      = (lhsLE, MIP.Le, rhsLE)
+                      , MIP.constrExpr      = lhsLE
+                      , MIP.constrBounds    = (MIP.NegInf, MIP.Finite rhsLE)
                       }
              [ (ts, c1), ([], c2) ]
 

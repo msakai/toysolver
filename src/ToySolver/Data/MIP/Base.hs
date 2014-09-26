@@ -85,7 +85,8 @@ data Constraint
   = Constraint
   { constrLabel     :: Maybe Label
   , constrIndicator :: Maybe (Var, Rational)
-  , constrBody      :: (Expr, RelOp, Rational)
+  , constrExpr      :: Expr
+  , constrBounds    :: Bounds
   , constrIsLazy    :: Bool
   }
   deriving (Eq, Ord, Show)
@@ -161,8 +162,8 @@ instance Variables Term where
   vars (Term _ xs) = Set.fromList xs
 
 instance Variables Constraint where
-  vars Constraint{ constrIndicator = ind, constrBody = (lhs, _, _) } =
-    vars lhs `Set.union` vs2
+  vars Constraint{ constrIndicator = ind, constrExpr = e } =
+    vars e `Set.union` vs2
     where
       vs2 = maybe Set.empty (Set.singleton . fst) ind
 

@@ -30,6 +30,7 @@ module ToySolver.Text.LPFile
 
 import Control.Monad
 import Control.Monad.Writer
+import Control.Monad.State
 import Data.Char
 import Data.List
 import Data.Maybe
@@ -39,7 +40,7 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.OptDir
-import Text.Parsec hiding (label)
+import Text.Parsec hiding (label, State (..))
 import Text.Parsec.String
 
 import qualified ToySolver.Data.MIP.Base as MIP
@@ -213,11 +214,17 @@ constraint isLazy = do
   e <- expr
   op <- relOp
   s <- option 1 sign
-  rhs <- number
+  rhs <- liftM (s*) number
+  let b = case op of
+            MIP.Le  -> (MIP.NegInf, MIP.Finite rhs)
+            MIP.Ge  -> (MIP.Finite rhs, MIP.PosInf)
+            MIP.Eql -> (MIP.Finite rhs, MIP.Finite rhs)
+
   return $ MIP.Constraint
     { MIP.constrLabel     = name
     , MIP.constrIndicator = g
-    , MIP.constrBody      = (e, op, s*rhs)
+    , MIP.constrExpr      = e
+    , MIP.constrBounds    = b
     , MIP.constrIsLazy    = isLazy
     }
 
@@ -428,7 +435,7 @@ writeChar c = tell $ showChar c
 
 -- | Render a problem into a string.
 render :: MIP.Problem -> Either String String
-render mip = Right $ execM $ render' $ removeEmptyExpr mip
+render mip = Right $ execM $ render' $ removeEmptyExpr $ removeRangeConstraints mip
 
 writeVar :: MIP.Var -> M ()
 writeVar v = writeString $ MIP.fromVar v
@@ -567,8 +574,9 @@ renderOp MIP.Ge = writeString ">="
 renderOp MIP.Eql = writeString "="
 
 renderConstraint :: MIP.Constraint -> M ()
-renderConstraint c@MIP.Constraint{ MIP.constrBody = (e,op,val) }  = do
+renderConstraint c = do
   renderLabel (MIP.constrLabel c)
+
   case MIP.constrIndicator c of
     Nothing -> return ()
     Just (v,vval) -> do
@@ -577,7 +585,14 @@ renderConstraint c@MIP.Constraint{ MIP.constrBody = (e,op,val) }  = do
       writeString $ showValue vval
       writeString " -> "
 
-  renderExpr False e
+  let (op,val) =
+        case MIP.constrBounds c of
+          (MIP.NegInf, MIP.Finite v) -> (MIP.Le, v)
+          (MIP.Finite v, MIP.PosInf) -> (MIP.Ge, v)
+          (MIP.Finite lb, MIP.Finite ub) | lb == ub -> (MIP.Eql, lb)
+          _ -> error "renderConstraint: should not happen"
+
+  renderExpr False (MIP.constrExpr c)
   writeChar ' '
   renderOp op
   writeChar ' '
@@ -630,7 +645,39 @@ removeEmptyExpr prob =
 
     convertConstr constr =
       constr
-      { MIP.constrBody =
-          case MIP.constrBody constr of
-            (lhs,op,rhs) -> (convertExpr lhs, op, rhs)
+      { MIP.constrExpr = convertExpr (MIP.constrExpr constr)
       }
+
+removeRangeConstraints :: MIP.Problem -> MIP.Problem
+removeRangeConstraints prob = flip evalState (0, Map.empty) $ do
+      constraints' <- mapM f $ MIP.constraints prob
+      userCuts' <- mapM f $ MIP.userCuts prob
+      (_, vis) <- get
+      return $ prob
+        { MIP.constraints = constraints'
+        , MIP.userCuts    = userCuts'
+        , MIP.varInfo = Map.union (MIP.varInfo prob) vis
+        }
+  where
+    vs  = MIP.vars prob
+
+    gensym :: State (Int, Map MIP.Var MIP.VarInfo) MIP.Var
+    gensym = do
+      let f i = do      
+            let v = MIP.toVar ("~r" ++ show i)
+            if v `Set.member` vs then
+              f (i+1)
+            else do
+              modify (\(_, vis) -> (i+1, vis))
+              return v
+      (i,_) <- get
+      f i
+
+    f :: MIP.Constraint -> State (Int, Map MIP.Var MIP.VarInfo) MIP.Constraint
+    f c =
+      case MIP.constrBounds c of
+        (MIP.Finite lb, MIP.Finite ub) | lb /= ub -> do
+          r <- gensym 
+          modify $ \(i, vis) -> (i, Map.insert r MIP.VarInfo{ MIP.varType = MIP.ContinuousVariable, MIP.varBounds = (MIP.Finite 0, MIP.Finite (ub - lb)) } vis)
+          return $ c{ MIP.constrExpr = MIP.Term (-1) [r] : MIP.constrExpr c, MIP.constrBounds = (MIP.Finite lb, MIP.Finite lb) }
+        _ -> return c

@@ -197,10 +197,18 @@ constraint opt q env mip
   MIP.Constraint
   { MIP.constrLabel     = label
   , MIP.constrIndicator = g
-  , MIP.constrBody      = (e, op, b)
+  , MIP.constrExpr      = e
+  , MIP.constrBounds    = b
   } = (c1, label)
   where
-    c0 = rel opt env mip q op e b
+    c0 = case b of
+           (MIP.NegInf, MIP.PosInf) -> and' []
+           (MIP.Finite lb, MIP.PosInf) -> rel opt env mip q MIP.Ge e lb
+           (MIP.NegInf, MIP.Finite ub) -> rel opt env mip q MIP.Le e ub
+           (MIP.Finite lb, MIP.Finite ub)
+             | lb == ub  -> rel opt env mip q MIP.Eql e lb
+             | otherwise -> and' [rel opt env mip q MIP.Ge e lb, rel opt env mip q MIP.Le e ub]
+           _ -> or' []
     c1 = case g of
            Nothing -> c0
            Just (var,val) ->

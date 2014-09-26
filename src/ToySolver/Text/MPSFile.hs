@@ -282,23 +282,27 @@ parser = do
         let lhs = [MIP.Term c　[col] | (col,c) <- Map.toList (Map.findWithDefault Map.empty row rowCoeffs)]
                   ++ Map.findWithDefault [] row qterms
         let rhs = Map.findWithDefault 0 row rhss
-        (op2,rhs2) <-
-          case Map.lookup row rngs of
-            Nothing  -> return (op, rhs)
-            Just rng ->
-              case op of
-                MIP.Ge  -> [(MIP.Ge, rhs), (MIP.Le, rhs + abs rng)]
-                MIP.Le  -> [(MIP.Ge, rhs - abs rng), (MIP.Le, rhs)]
-                MIP.Eql ->
-                  if rng < 0
-                  then [(MIP.Ge, rhs + rng), (MIP.Le, rhs)]
-                  else [(MIP.Ge, rhs), (MIP.Le, rhs + rng)]
         return $
           MIP.Constraint
           { MIP.constrLabel     = Just $ unintern row
           , MIP.constrIndicator = Map.lookup row inds
           , MIP.constrIsLazy    = isLazy
-          , MIP.constrBody      = (lhs, op2, rhs2)
+          , MIP.constrExpr      = lhs
+          , MIP.constrBounds    =
+              case Map.lookup row rngs of
+                Nothing  ->
+                  case op of
+                    MIP.Ge  -> (MIP.Finite rhs, MIP.PosInf)
+                    MIP.Le  -> (MIP.NegInf, MIP.Finite rhs)
+                    MIP.Eql -> (MIP.Finite rhs, MIP.Finite rhs)
+                Just rng ->
+                  case op of
+                    MIP.Ge  -> (MIP.Finite rhs, MIP.Finite (rhs + abs rng))
+                    MIP.Le  -> (MIP.Finite (rhs - abs rng), MIP.Finite rhs)
+                    MIP.Eql ->
+                      if rng < 0
+                      then (MIP.Finite (rhs + rng), MIP.Finite rhs)
+                      else (MIP.Finite rhs, MIP.Finite (rhs + rng))
           }
 
   let mip =
@@ -607,14 +611,21 @@ render' mip = do
   writeFields [objName]
 -}
 
+  let processRow c = 
+        case MIP.constrBounds c of
+          (MIP.NegInf, MIP.PosInf) -> Nothing
+          (MIP.NegInf, MIP.Finite ub) -> Just ("L", ub, Nothing)
+          (MIP.Finite lb, MIP.PosInf) -> Just ("G", lb, Nothing)
+          (MIP.Finite lb, MIP.Finite ub)
+            | lb == ub  -> Just ("E", lb, Nothing)
+            | lb < ub   -> Just ("E", lb, Just (ub - lb))
+          _ -> error "inconsistent bounds" -- FIXME
+
   let renderRows cs = do
         forM_ cs $ \c -> do
-          let (_,op,_) = MIP.constrBody c
-          let s = case op of
-                    MIP.Le  -> "L"
-                    MIP.Ge  -> "G"
-                    MIP.Eql -> "E"
-          writeFields [s, fromJust $ MIP.constrLabel c]
+          case processRow c of
+            Just (op, _, _) -> writeFields [op, fromJust $ MIP.constrLabel c]
+            Nothing -> return ()
 
   -- ROWS section
   writeSectionHeader "ROWS"
@@ -639,7 +650,7 @@ render' mip = do
              [ (v, Map.singleton l d)
              | (Just l, xs) <-
                  MIP.objectiveFunction mip :
-                 [(MIP.constrLabel c, lhs) | c <- MIP.constraints mip ++ MIP.userCuts mip, let (lhs,_,_) = MIP.constrBody c]
+                 [(MIP.constrLabel c, MIP.constrExpr c) | c <- MIP.constraints mip ++ MIP.userCuts mip]
              , MIP.Term d [v] <- xs
              ]
       f col xs =
@@ -653,10 +664,17 @@ render' mip = do
     writeFields ["", "MARK0001", "'MARKER'", "", "'INTEND'"]
 
   -- RHS section
-  let rs = [(fromJust $ MIP.constrLabel c, rhs) | c <- MIP.constraints mip ++ MIP.userCuts mip, let (_,_,rhs) = MIP.constrBody c, rhs /= 0]
+  let rs = [(fromJust $ MIP.constrLabel c, rhs) | c <- MIP.constraints mip ++ MIP.userCuts mip, (_,rhs,_) <- maybeToList (processRow c), rhs /= 0]
   writeSectionHeader "RHS"
   forM_ rs $ \(name, val) -> do
     writeFields ["", "rhs", name, showValue val]
+
+  -- RANGES section
+  let rs = [(fromJust $ MIP.constrLabel c, val) | c <- MIP.constraints mip ++ MIP.userCuts mip, (_,_,Just val) <- maybeToList (processRow c)]
+  unless (null rs) $ do
+    writeSectionHeader "RANGES"
+    forM_ rs $ \(name, val) -> do
+      writeFields ["", "rhs", name, showValue val]
 
   -- BOUNDS section
   writeSectionHeader "BOUNDS"
@@ -728,8 +746,7 @@ render' mip = do
   -- QCMATRIX section
   let xs = [ (fromJust $ MIP.constrLabel c, qm)
            | c <- MIP.constraints mip ++ MIP.userCuts mip
-           , let (lhs,_,_) = MIP.constrBody c
-           , let qm = quadMatrix lhs
+           , let qm = quadMatrix (MIP.constrExpr c)
            , not (Map.null qm) ]
   unless (null xs) $ do
     forM_ xs $ \(row, qm) -> do
@@ -840,8 +857,7 @@ quadMatrix e = Map.fromList $ do
 checkAtMostQuadratic :: MIP.Problem -> Bool
 checkAtMostQuadratic mip =  all (all f) es
   where
-    es = snd (MIP.objectiveFunction mip) :
-         [lhs | c <- MIP.constraints mip ++ MIP.userCuts mip, let (lhs,_,_) = MIP.constrBody c]
+    es = snd (MIP.objectiveFunction mip) : [MIP.constrExpr c | c <- MIP.constraints mip ++ MIP.userCuts mip]
     f :: MIP.Term -> Bool
     f (MIP.Term _ [_]) = True
     f (MIP.Term _ [_,_]) = True
