@@ -57,10 +57,10 @@ project :: Var -> QFFormula -> [(QFFormula, Model Rational -> Model Rational)]
 project v phi = [(psi, \m -> IM.insert v (LA.evalExpr m t) m) | (psi, t) <- project' v phi]
 
 {-
-ÎxƒÓ(x) Ì É_{t¸S} ƒÓ(t)
+âˆƒxÏ†(x) â‡” âˆ¨_{tâˆˆS} Ï†(t)
   where
-    ƒµ = {a_i x - b_i ƒÏ_i 0 | i ¸ I, ƒÏ_i ¸ {=, ‚, …, <}} the set of atomic subformulas in ƒÓ(x)
-    S = {b_i / a_i, b_i / a_i + 1, b_i / a_i - 1 | i¸I } ¾ {1/2 (b_i / a_i + b_j / a_j) | i,j¸I, i‚j}
+    Î¨ = {a_i x - b_i Ï_i 0 | i âˆˆ I, Ï_i âˆˆ {=, â‰ , â‰¦, <}} the set of atomic subformulas in Ï†(x)
+    S = {b_i / a_i, b_i / a_i + 1, b_i / a_i - 1 | iâˆˆI } âˆª {1/2 (b_i / a_i + b_j / a_j) | i,jâˆˆI, iâ‰ j}
 -}
 project' :: Var -> QFFormula -> [(QFFormula, LA.Expr Rational)]
 project' v phi = [(applySubst1 v t phi, t) | t <- Set.toList s]
