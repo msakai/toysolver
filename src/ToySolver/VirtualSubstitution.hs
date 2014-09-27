@@ -1,3 +1,25 @@
+{-# OPTIONS_GHC -Wall #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.VirtualSubstitution
+-- Copyright   :  (c) Masahiro Sakai 2014
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-- Naive implementation of virtual substitution
+--
+-- Reference:
+-- 
+-- * V. Weispfenning. The complexity of linear problems in fields.
+--   Journal of Symbolic Computation, 5(1-2): 3-27, Feb.–Apr. 1988.
+-- 
+-- * Hirokazu Anai, Shinji Hara. Parametric Robust Control by Quantifier Elimination.
+--   J.JSSAC, Vol. 10, No. 1, pp. 41-51, 2003.
+--
+-----------------------------------------------------------------------------
 module ToySolver.VirtualSubstitution
   ( QFFormula (..)
   , evalQFFormula
