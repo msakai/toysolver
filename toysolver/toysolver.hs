@@ -143,19 +143,21 @@ run solver opt mip printModel = do
       v <- Set.toList vs
       let v2 = Var (nameToVar Map.! v)
       let (l,u) = MIP.getBounds mip v
+      -- FIXME: handle inconsistent bounds?
       [Const x .<=. v2 | MIP.Finite x <- return l] ++
         [v2 .<=. Const x | MIP.Finite x <- return u]
     cs2 = do
       MIP.Constraint
         { MIP.constrIndicator = ind
-        , MIP.constrBody = (lhs, rel, rhs)
+        , MIP.constrExpr = e
+        , MIP.constrBounds = (l,u)
         } <- MIP.constraints mip
-      let rel2 = case rel of
-                  MIP.Ge  -> Ge
-                  MIP.Le  -> Le
-                  MIP.Eql -> Eql
+      let e2 = compileE e
       case ind of
-        Nothing -> return (Rel (compileE lhs) rel2 (Const rhs))
+        Nothing ->
+          -- FIXME: handle inconsistent bounds?
+          [Const x .<=. e2 | MIP.Finite x <- return l] ++
+            [e2 .<=. Const x | MIP.Finite x <- return u]
         Just _ -> error "indicator constraint is not supported yet"
 
     ivs

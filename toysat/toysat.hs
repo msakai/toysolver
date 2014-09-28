@@ -815,28 +815,35 @@ solveMIP opt solver mip = do
 
       putCommentLine "Loading constraints"
       forM_ (MIP.constraints mip) $ \c -> do
-        let indicator      = MIP.constrIndicator c
-            (lhs, op, rhs) = MIP.constrBody c
-        let d = foldl' lcm 1 (map denominator  (rhs:[r | MIP.Term r _ <- lhs]))
-            lhs' = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- lhs]
-            rhs' = asInteger (rhs * fromIntegral d)
-        case indicator of
-          Nothing ->
-            case op of
-              MIP.Le  -> Integer.addConstraint enc $ lhs' .<=. fromInteger rhs'
-              MIP.Ge  -> Integer.addConstraint enc $ lhs' .>=. fromInteger rhs'
-              MIP.Eql -> Integer.addConstraint enc $ lhs' .==. fromInteger rhs'
-          Just (var, val) -> do
-            let var' = asBin (vmap Map.! var)
-                f sel = do
-                  case op of
-                    MIP.Le  -> Integer.addConstraintSoft enc sel $ lhs' .<=. fromInteger rhs'
-                    MIP.Ge  -> Integer.addConstraintSoft enc sel $ lhs' .>=. fromInteger rhs'
-                    MIP.Eql -> Integer.addConstraintSoft enc sel $ lhs' .==. fromInteger rhs'
-            case val of
-              1 -> f var'
-              0 -> f (SAT.litNot var')
-              _ -> return ()
+        let d = foldl' lcm 1 (map denominator [r | MIP.Term r _ <- MIP.constrExpr c])
+            e = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.constrExpr c]
+            g c2 =
+              case MIP.constrIndicator c of
+                Nothing -> Integer.addConstraint enc c2
+                Just (var, val) -> do
+                  let var' = asBin (vmap Map.! var)
+                      sel = case val of
+                              1 -> var'
+                              0 -> SAT.litNot var'
+                              _ -> error "invalid indicator"
+                  Integer.addConstraintSoft enc sel c2
+        case MIP.constrBounds c of
+          (MIP.NegInf, MIP.PosInf) -> return ()
+          (_, MIP.NegInf) ->
+            error "invalid constraint bounds"
+          (MIP.PosInf, _) ->
+            error "invalid constraint bounds"
+          (MIP.NegInf, MIP.Finite u) ->
+            g (e .<=. fromInteger (floor (u * fromInteger d)))
+          (MIP.Finite l, MIP.PosInf) ->
+            g (fromInteger (ceiling (l * fromInteger d)) .<=. e)
+          (MIP.Finite l, MIP.Finite u)
+            | l == u -> do
+                let v = l * fromInteger d
+                g (denominator v *^ e .==. fromInteger (numerator v))
+            | otherwise -> do
+                g (fromInteger (ceiling (l * fromInteger d)) .<=. e)
+                g (e .<=. fromInteger (floor (u * fromInteger d)))
 
       putCommentLine "Loading SOS constraints"
       forM_ (MIP.sosConstraints mip) $ \MIP.SOSConstraint{ MIP.sosType = typ, MIP.sosBody = xs } -> do
