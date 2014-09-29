@@ -171,7 +171,6 @@ Library
      ToySolver.Data.Polynomial.Factorization.Zassenhaus
      ToySolver.Data.Polynomial.GroebnerBasis
      ToySolver.Data.Polynomial.Interpolation.Lagrange
-     ToySolver.Data.Vec
      ToySolver.Data.Var
      ToySolver.SAT
      ToySolver.SAT.Integer
@@ -198,6 +197,7 @@ Library
      ToySolver.Internal.Data.IndexedPriorityQueue
      ToySolver.Internal.Data.PriorityQueue
      ToySolver.Internal.Data.SeqQueue
+     ToySolver.Internal.Data.Vec
      ToySolver.Internal.ProcessUtil
      ToySolver.Internal.TextUtil
      ToySolver.Internal.Util

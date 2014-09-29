@@ -41,7 +41,7 @@ module ToySolver.Internal.Data.PriorityQueue
 import Control.Monad
 import qualified Data.Array.IO as A
 import Data.Queue.Classes
-import qualified ToySolver.Data.Vec as Vec
+import qualified ToySolver.Internal.Data.Vec as Vec
 
 type Index = Int
 

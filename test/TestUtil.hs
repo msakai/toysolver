@@ -8,7 +8,7 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.QuickCheck2
 import Test.Framework.Providers.HUnit
-import qualified ToySolver.Data.Vec as Vec
+import qualified ToySolver.Internal.Data.Vec as Vec
 import ToySolver.Internal.Util
 import ToySolver.Internal.TextUtil
 import qualified ToySolver.Knapsack as Knapsack

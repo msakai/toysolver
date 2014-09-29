@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Data.Vec
+-- Module      :  ToySolver.Internal.Data.Vec
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
 -- 
@@ -13,7 +13,7 @@
 -- Simple 1-dimentional resizable array
 --
 -----------------------------------------------------------------------------
-module ToySolver.Data.Vec
+module ToySolver.Internal.Data.Vec
   (
   -- * Vec type
     GenericVec
