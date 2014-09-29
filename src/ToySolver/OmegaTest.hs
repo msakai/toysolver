@@ -35,6 +35,7 @@ module ToySolver.OmegaTest
     ) where
 
 import Control.Monad
+import Data.Default.Class
 import Data.List
 import Data.Maybe
 import Data.Ord
@@ -58,6 +59,9 @@ data Options
   = Options
   { optCheckReal :: VarSet -> [LA.Atom Rational] -> Bool
   }
+
+instance Default Options where
+  def = defaultOptions
 
 defaultOptions :: Options
 defaultOptions =

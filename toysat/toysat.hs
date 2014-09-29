@@ -21,6 +21,7 @@ import Control.Monad
 import Control.Exception
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy as BS
+import Data.Default.Class
 import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -107,6 +108,9 @@ data Options
   , optWriteFile :: Maybe FilePath
   , optUBCSAT :: FilePath
   }
+
+instance Default Options where
+  def = defaultOptions
 
 defaultOptions :: Options
 defaultOptions
@@ -292,7 +296,7 @@ main = do
       exitFailure
 
     (o,args2,[]) -> do
-      let opt = foldl (flip id) defaultOptions o      
+      let opt = foldl (flip id) def o      
           mode =
             case optMode opt of
               Just m  -> m
@@ -527,7 +531,7 @@ solveMUS opt solver gcnf = do
     else do
       if not (optAllMUSes opt)
         then do
-          let opt2 = MUS.defaultOptions
+          let opt2 = def
                      { MUS.optLogger = putCommentLine
                      , MUS.optLitPrinter = \lit ->
                          show (sel2idx ! lit)
@@ -535,7 +539,7 @@ solveMUS opt solver gcnf = do
           mus <- MUS.findMUSAssumptions solver opt2
           musPrintSol stdout (map (sel2idx !) mus)
         else do
-          let opt2 = CAMUS.defaultOptions
+          let opt2 = def
                      { CAMUS.optLogger = putCommentLine
                      , CAMUS.optCallback = \mcs -> do
                          let mcs2 = sort $ map (sel2idx !) mcs

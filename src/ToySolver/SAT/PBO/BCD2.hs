@@ -34,6 +34,7 @@ module ToySolver.SAT.PBO.BCD2
 import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
+import Data.Default.Class
 import qualified Data.IntSet as IntSet
 import qualified Data.IntMap as IntMap
 import qualified ToySolver.SAT as SAT
@@ -48,6 +49,9 @@ data Options
   , optEnableBiasedSearch :: Bool
   , optSolvingNormalFirst :: Bool
   }
+
+instance Default Options where
+  def = defaultOptions
 
 defaultOptions :: Options
 defaultOptions

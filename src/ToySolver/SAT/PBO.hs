@@ -49,6 +49,7 @@ module ToySolver.SAT.PBO
 import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
+import Data.Default.Class
 import Data.IORef
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -72,6 +73,9 @@ data SearchStrategy
   | BCD
   | BCD2
 
+instance Default SearchStrategy where
+  def = defaultSearchStrategy
+
 defaultSearchStrategy :: SearchStrategy
 defaultSearchStrategy = LinearSearch
 
@@ -87,7 +91,7 @@ data Optimizer
 newOptimizer :: SAT.Solver -> SAT.PBLinSum -> IO Optimizer
 newOptimizer solver obj = do
   cxt <- C.newSimpleContext obj
-  strategyRef   <- newIORef defaultSearchStrategy
+  strategyRef   <- newIORef def
   heuristicsRef <- newIORef defaultEnableObjFunVarsHeuristics
   trialLimitRef <- newIORef defaultTrialLimitConf
   return $
@@ -115,7 +119,7 @@ optimize opt = do
     BC   -> BC.solve cxt solver
     BCD  -> BCD.solve cxt solver
     BCD2 -> do
-      let opt2 = BCD2.defaultOptions
+      let opt2 = def
       BCD2.solve cxt solver opt2
     _ -> do
       SAT.setEnableBackwardSubsumptionRemoval solver True

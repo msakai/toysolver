@@ -39,6 +39,7 @@ module ToySolver.Data.Polynomial.GroebnerBasis
   , reduceGBasis
   ) where
 
+import Data.Default.Class
 import qualified Data.Set as Set
 import qualified Data.Heap as H -- http://hackage.haskell.org/package/heaps
 import ToySolver.Data.Polynomial.Base (Polynomial, Monomial, MonomialOrder)
@@ -48,6 +49,9 @@ data Options
   = Options
   { optStrategy :: Strategy
   }
+
+instance Default Options where
+  def = defaultOptions
 
 defaultOptions :: Options
 defaultOptions =
@@ -76,7 +80,7 @@ basis
   => MonomialOrder v
   -> [Polynomial k v]
   -> [Polynomial k v]
-basis = basis' defaultOptions
+basis = basis' def
 
 basis'
   :: forall k v. (Eq k, Fractional k, Ord k, Ord v)

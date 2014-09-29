@@ -33,6 +33,7 @@ module ToySolver.SAT.CAMUS
 
 import Control.Monad
 import Data.Array.IArray
+import Data.Default.Class
 import qualified Data.IntSet as IS
 import Data.List
 import Data.IORef
@@ -55,6 +56,9 @@ data Options
     -- ^ MCS candidates (see HYCAM paper for details).
     -- A MCS candidate must be a superset of real MCS.
   }
+
+instance Default Options where
+  def = defaultOptions
 
 -- | default 'Options' value
 defaultOptions :: Options

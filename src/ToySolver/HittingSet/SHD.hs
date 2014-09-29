@@ -26,6 +26,7 @@ module ToySolver.HittingSet.SHD
 import Control.Exception (Exception, throwIO)
 import Control.Monad
 import Data.Array.Unboxed
+import Data.Default.Class
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.IntMap (IntMap)
@@ -48,6 +49,9 @@ data Options
   , optOnGetLine      :: String -> IO ()
   , optOnGetErrorLine :: String -> IO ()
   }
+
+instance Default Options where
+  def = defaultOptions
 
 defaultOptions :: Options
 defaultOptions =

@@ -29,6 +29,7 @@ module ToySolver.ContiTraverso
   , solve'
   ) where
 
+import Data.Default.Class
 import Data.Function
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
@@ -92,7 +93,7 @@ solve' cmp vs' obj cs
     cmp2 = elimOrdering (IS.fromList vs2) `mappend` elimOrdering (IS.singleton t) `mappend` costOrdering obj `mappend` cmp
 
     gb :: [Polynomial Rational Var]
-    gb = GB.basis' GB.defaultOptions cmp2 (product (map P.var (t:vs2)) - 1 : phi)
+    gb = GB.basis' def cmp2 (product (map P.var (t:vs2)) - 1 : phi)
       where
         phi = do
           xj <- vs

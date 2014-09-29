@@ -47,6 +47,7 @@ module ToySolver.Data.MIP.Base
   , intersectBounds
   ) where
 
+import Data.Default.Class
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -70,6 +71,16 @@ data Problem
   }
   deriving (Show, Eq, Ord)
 
+instance Default Problem where
+  def = Problem
+        { dir = OptMin
+        , objectiveFunction = (Nothing, [])
+        , constraints = []
+        , sosConstraints = []
+        , userCuts = []
+        , varInfo = Map.empty
+        }
+
 -- | expressions
 type Expr = [Term]
 
@@ -90,6 +101,14 @@ data Constraint
   }
   deriving (Eq, Ord, Show)
 
+instance Default Constraint where
+  def = Constraint
+        { constrLabel = Nothing
+        , constrIndicator = Nothing
+        , constrBody = ([], Le, 0)
+        , constrIsLazy = False
+        }
+
 data VarType
   = ContinuousVariable
   | IntegerVariable
@@ -99,12 +118,18 @@ data VarType
   | SemiIntegerVariable
   deriving (Eq, Ord, Show)
 
+instance Default VarType where
+  def = ContinuousVariable
+
 data VarInfo
   = VarInfo
   { varType   :: VarType
   , varBounds :: Bounds
   }
  deriving (Eq, Ord, Show)
+
+instance Default VarInfo where
+  def = defaultVarInfo
 
 defaultVarInfo :: VarInfo
 defaultVarInfo

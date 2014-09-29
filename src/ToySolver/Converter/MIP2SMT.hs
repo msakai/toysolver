@@ -19,6 +19,7 @@ module ToySolver.Converter.MIP2SMT
   ) where
 
 import Data.Char
+import Data.Default.Class
 import Data.Ord
 import Data.List
 import Data.Ratio
@@ -41,6 +42,9 @@ data Options
   , optOptimize     :: Bool
   }
   deriving (Show, Eq, Ord)
+
+instance Default Options where
+  def = defaultOptions
 
 defaultOptions :: Options
 defaultOptions
@@ -356,11 +360,11 @@ testFile :: FilePath -> IO ()
 testFile fname = do
   result <- LPFile.parseFile fname
   case result of
-    Right mip -> putStrLn $ convert defaultOptions mip ""
+    Right mip -> putStrLn $ convert def mip ""
     Left err -> hPrint stderr err
 
 test :: IO ()
-test = putStrLn $ convert defaultOptions testdata ""
+test = putStrLn $ convert def testdata ""
 
 testdata :: MIP.Problem
 Right testdata = LPFile.parseString "test" $ unlines

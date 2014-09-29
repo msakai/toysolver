@@ -93,6 +93,7 @@ module ToySolver.Simplex2
 import Prelude hiding (log)
 import Control.Exception
 import Control.Monad
+import Data.Default.Class
 import Data.Ord
 import Data.IORef
 import Data.List
@@ -473,6 +474,9 @@ data Options
   { objLimit :: Maybe Rational
   }
   deriving (Show, Eq, Ord)
+
+instance Default Options where
+  def = defaultOptions
 
 defaultOptions :: Options
 defaultOptions
@@ -907,7 +911,7 @@ test4 = do
   writeIORef (svUB solver) (IntMap.fromList [(x0, toValue 2), (x1, toValue 3)])
   setObj solver (LA.fromTerms [(-1, x0)])
 
-  ret <- optimize solver defaultOptions
+  ret <- optimize solver def
   print ret
   dump solver
 
@@ -925,7 +929,7 @@ test5 = do
 
   checkFeasibility solver
 
-  ret <- optimize solver defaultOptions
+  ret <- optimize solver def
   print ret
   dump solver
 

@@ -18,6 +18,7 @@ module ToySolver.SAT.MUS
   ) where
 
 import Control.Monad
+import Data.Default.Class
 import Data.List
 import qualified Data.IntSet as IS
 import qualified ToySolver.SAT as SAT
@@ -30,6 +31,9 @@ data Options
   , optUpdateBest :: [Lit] -> IO ()
   , optLitPrinter :: Lit -> String
   }
+
+instance Default Options where
+  def = defaultOptions
 
 -- | default 'Options' value
 defaultOptions :: Options

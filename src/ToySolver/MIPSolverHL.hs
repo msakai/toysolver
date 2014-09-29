@@ -35,6 +35,7 @@ module ToySolver.MIPSolverHL
 
 import Control.Exception
 import Control.Monad.State
+import Data.Default.Class
 import Data.Ord
 import Data.Maybe
 import Data.List (maximumBy)
@@ -94,7 +95,7 @@ optimize optdir obj cs ivs =
                  original problem is unbounded or unsatisfiable
                  when LP relaxation is unbounded.
             -}
-            case OmegaTest.solveQFLA OmegaTest.defaultOptions (vars cs `IS.union` ivs) (map conv cs) ivs of
+            case OmegaTest.solveQFLA def (vars cs `IS.union` ivs) (map conv cs) ivs of
               Nothing -> OptUnsat
               Just _ -> Unbounded        
     Right (node0, ivs2) -> 

@@ -26,6 +26,7 @@ module ToySolver.HittingSet.HTCBDD
 
 import Control.Exception (Exception, throwIO)
 import Control.Monad
+import Data.Default.Class
 import Data.Array.Unboxed
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
@@ -55,11 +56,17 @@ data Method
   | MethodKnuth
   deriving (Eq, Ord, Show)
 
+instance Default Method where
+  def = MethodToda
+
+instance Default Options where
+  def = defaultOptions
+
 defaultOptions :: Options
 defaultOptions =
   Options
   { optHTCBDDCommand  = "htcbdd"
-  , optMethod         = MethodToda
+  , optMethod         = def
   , optOnGetLine      = \_ -> return ()
   , optOnGetErrorLine = \_ -> return ()
   }

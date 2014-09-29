@@ -17,6 +17,7 @@ import Control.Monad
 import Control.Concurrent
 import Data.Array.IArray
 import Data.Char
+import Data.Default.Class
 import Data.List
 import Data.Maybe
 import Data.Ratio
@@ -188,7 +189,7 @@ run solver opt mip printModel = do
                _ -> error "unknown solver"
 
          omegaOpt =
-           OmegaTest.defaultOptions
+           def
            { OmegaTest.optCheckReal = realSolver
            }         
            where

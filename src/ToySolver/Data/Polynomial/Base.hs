@@ -125,6 +125,7 @@ import qualified Prelude
 import Control.DeepSeq
 import Control.Exception (assert)
 import Control.Monad
+import Data.Default.Class
 import Data.Data
 import qualified Data.FiniteField as FF
 import Data.Function
@@ -442,6 +443,9 @@ data PrintOptions k v
   , pOptMonomialOrder   :: MonomialOrder v
   }
 
+instance (PrettyCoeff k, PrettyVar v, Ord v) => Default (PrintOptions k v) where
+  def = defaultPrintOptions
+
 defaultPrintOptions :: (PrettyCoeff k, PrettyVar v, Ord v) => PrintOptions k v
 defaultPrintOptions
   = PrintOptions
@@ -452,7 +456,7 @@ defaultPrintOptions
   }
 
 instance (Ord k, Num k, Ord v, PrettyCoeff k, PrettyVar v) => Pretty (Polynomial k v) where
-  pPrintPrec = prettyPrint defaultPrintOptions
+  pPrintPrec = prettyPrint def
 
 prettyPrint
   :: (Ord k, Num k, Ord v)
