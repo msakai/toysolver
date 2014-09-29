@@ -34,6 +34,7 @@ module ToySolver.Data.Vec
   , resize
   , growTo
   , push
+  , unsafePop
   , clear
   , getElems
 
@@ -143,6 +144,17 @@ push v e = do
   s <- getSize v
   resize v (s+1)
   unsafeWrite v s e
+
+{-# SPECIALIZE unsafePop :: Vec e -> IO e #-}
+{-# SPECIALIZE unsafePop :: UVec Int -> IO Int #-}
+{-# SPECIALIZE unsafePop :: UVec Double -> IO Double #-}
+{-# SPECIALIZE unsafePop :: UVec Bool -> IO Bool #-}
+unsafePop :: A.MArray a e IO => GenericVec a e -> IO e
+unsafePop v = do
+  s <- getSize v
+  e <- unsafeRead v (s-1)
+  resize v (s-1)
+  return e
 
 clear :: A.MArray a e IO => GenericVec a e -> IO ()
 clear v = resize v 0

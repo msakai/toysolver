@@ -96,9 +96,8 @@ instance Dequeue (PriorityQueue a) IO a where
         if n == 1 then do
           Vec.resize (heap q) (n-1)
         else do
-          val1 <- Vec.unsafeRead (heap q) (n-1)
+          val1 <- Vec.unsafePop (heap q)
           Vec.unsafeWrite (heap q) 0 val1
-          Vec.resize (heap q) (n-1)
           down q 0
         return (Just val)
 

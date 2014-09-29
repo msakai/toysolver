@@ -60,6 +60,13 @@ case_Vec = do
   ws <- Vec.getElems v
   ws @?= take 4 xs ++ [1,2,3]
 
+  x3 <- Vec.unsafePop v
+  x3 @?= 3
+  s <- Vec.getSize v
+  s @?= 6
+  ws <- Vec.getElems v
+  ws @?= take 4 xs ++ [1,2]
+
 case_Vec_clone :: IO ()
 case_Vec_clone = do
   (v::Vec.UVec Int) <- Vec.new  
