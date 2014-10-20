@@ -15,7 +15,8 @@
 module ToySolver.Data.Boolean
   (
   -- * Boolean algebra
-    Complement (..)
+    MonotoneBoolean (..)
+  , Complement (..)
   , Boolean (..)
   , andB
   , orB
@@ -25,31 +26,35 @@ infixr 3 .&&.
 infixr 2 .||.
 infix 1 .=>., .<=>.
 
+class MonotoneBoolean a where
+  true, false :: a
+  (.&&.) :: a -> a -> a
+  (.||.) :: a -> a -> a
+
 -- | types that can be negated.
 class Complement a where
   notB :: a -> a
 
 -- | types that can be combined with boolean operations.
-class Complement a => Boolean a where
-  true, false :: a
-  (.&&.) :: a -> a -> a
-  (.||.) :: a -> a -> a
-
+class (MonotoneBoolean a, Complement a) => Boolean a where
   (.=>.), (.<=>.) :: a -> a -> a
   x .=>. y = notB x .||. y
   x .<=>. y = (x .=>. y) .&&. (y .=>. x)
 
-andB :: Boolean a => [a] -> a
+andB :: MonotoneBoolean a => [a] -> a
 andB = foldr (.&&.) true
 
-orB :: Boolean a => [a] -> a
+orB :: MonotoneBoolean a => [a] -> a
 orB = foldr (.||.) false
 
 instance Complement Bool where
   notB = not
 
-instance Boolean Bool where
+instance MonotoneBoolean Bool where
   true  = True
   false = False
   (.&&.) = (&&)
   (.||.) = (||)
+
+instance Boolean Bool where
+  (.<=>.) = (==)

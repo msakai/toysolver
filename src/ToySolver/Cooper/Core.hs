@@ -118,11 +118,13 @@ instance Complement QFFormula where
   notB (Or a b) = And (notB a) (notB b)
   notB (Lit lit) = Lit (notB lit)
 
-instance Boolean QFFormula where
+instance MonotoneBoolean QFFormula where
   true  = T
   false = F
   (.&&.) = And
   (.||.) = Or
+
+instance Boolean QFFormula
 
 instance Variables QFFormula where
   vars T = IS.empty

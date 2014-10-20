@@ -57,11 +57,15 @@ instance Complement QFFormula where
   notB (Not a) = a
   notB a = Not a
 
-instance Boolean QFFormula where
+instance MonotoneBoolean QFFormula where
   true  = T
   false = F
   (.&&.) = And
   (.||.) = Or
+
+instance Boolean QFFormula where
+  (.=>.) = Imply
+  (.<=>.) = Equiv
 
 evalQFFormula :: Model Rational -> QFFormula -> Bool
 evalQFFormula m = f

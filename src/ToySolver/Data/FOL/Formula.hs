@@ -57,11 +57,13 @@ instance Variables a => Variables (Formula a) where
 instance Complement (Formula a) where
   notB = Not
 
-instance Boolean (Formula c) where
+instance MonotoneBoolean (Formula c) where
   true  = T
   false = F
   (.&&.) = And
   (.||.) = Or
+
+instance Boolean (Formula c) where
   (.=>.)  = Imply
   (.<=>.) = Equiv
 
