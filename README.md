@@ -78,7 +78,7 @@ Usage:
 Supported formats:
 
 * Input formats: lp, mps, cnf, wcnf, opb, wbo
-* Output formats: lp, smt2, ys
+* Output formats: lp, .mps, smt2, ys
 
 ### pbconvert
 
