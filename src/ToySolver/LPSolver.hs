@@ -59,7 +59,7 @@ import qualified Data.IntSet as IS
 import Data.OptDir
 import Data.VectorSpace
 
-import Data.Interval ((<=!), (>=!), (==!), (<!), (>!))
+import Data.Interval ((<=!), (>=!), (==!), (<!), (>!), (/=!))
 import qualified Data.Interval as Interval
 
 import ToySolver.Data.ArithRel
@@ -321,7 +321,7 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
         Lt -> i <! 0
         Gt -> i >! 0
         Eql -> i ==! 0
-        NEq -> i <! 0 || i >! 0
+        NEq -> i /=! 0
       where
         i = LA.computeInterval bounds (a ^-^ b)
 
