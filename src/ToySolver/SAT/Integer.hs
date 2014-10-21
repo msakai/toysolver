@@ -21,14 +21,18 @@ import qualified ToySolver.SAT.TseitinEncoder as TseitinEncoder
 data Expr = Expr [(Integer, [SAT.Lit])]
 
 newVar :: SAT.Solver -> Integer -> Integer -> IO Expr
-newVar solver lo hi = do
-  when (lo > hi) $ error $ printf "ToySolver.SAT.Integer.newVar: inconsistent bounds given [%d, %d]" lo hi
-  let hi' = hi - lo
-      bitWidth = head $ [w | w <- [1..], let mx = 2 ^ w - 1, hi' <= mx]
-  vs <- SAT.newVars solver bitWidth
-  let xs = zip (iterate (2*) 1) vs
-  SAT.addPBAtMost solver xs hi'
-  return $ Expr ((lo,[]) : [(c,[x]) | (c,x) <- xs])
+newVar solver lo hi
+  | lo > hi = do
+      SAT.addClause solver [] -- assert inconsistency
+      return 0
+  | lo == hi = return $ fromInteger lo
+  | otherwise = do
+      let hi' = hi - lo
+          bitWidth = head $ [w | w <- [1..], let mx = 2 ^ w - 1, hi' <= mx]
+      vs <- SAT.newVars solver bitWidth
+      let xs = zip (iterate (2*) 1) vs
+      SAT.addPBAtMost solver xs hi'
+      return $ Expr ((lo,[]) : [(c,[x]) | (c,x) <- xs])
 
 instance AdditiveGroup Expr where
   Expr xs1 ^+^ Expr xs2 = Expr (xs1++xs2)
