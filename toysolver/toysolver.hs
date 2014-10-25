@@ -93,7 +93,7 @@ options =
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
     , Option [] ["threads"] (ReqArg (NThread . read) "INTEGER") "number of threads to use"
 
-    , Option [] ["omega-real"] (ReqArg OmegaReal "SOLVER") "fourier-motzkin (default), cad, simplex, none"
+    , Option [] ["omega-real"] (ReqArg OmegaReal "SOLVER") "fourier-motzkin (default), virtual-substitution (or vs), cad, simplex, none"
 
     , Option []    ["sat"]    (NoArg (Mode ModeSAT))    "solve boolean satisfiability problem in .cnf file"
     , Option []    ["pb"]     (NoArg (Mode ModePB))     "solve pseudo boolean problem in .opb file"
@@ -196,6 +196,8 @@ run solver opt mip printModel = do
              realSolver =
                case last ("fourier-motzkin" : [s | OmegaReal s <- opt]) of
                  "fourier-motzkin" -> OmegaTest.checkRealByFM
+                 "virtual-substitution" -> OmegaTest.checkRealByVS
+                 "vs"              -> OmegaTest.checkRealByVS
                  "cad"             -> OmegaTest.checkRealByCAD
                  "simplex"         -> OmegaTest.checkRealBySimplex
                  "none"            -> OmegaTest.checkRealNoCheck

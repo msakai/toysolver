@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 module ToySolver.OmegaTest.Misc
   ( checkRealByCAD
+  , checkRealByVS
   , checkRealBySimplex
   ) where
 
@@ -16,6 +17,7 @@ import qualified ToySolver.Data.Polynomial as P
 import ToySolver.Data.Var
 import qualified ToySolver.CAD as CAD
 import qualified ToySolver.Simplex2 as Simplex2
+import qualified ToySolver.VirtualSubstitution as VS
 
 checkRealByCAD :: VarSet -> [LA.Atom Rational] -> Bool
 checkRealByCAD vs as = isJust $ CAD.solve vs2 (map (fmap f) as)
@@ -27,6 +29,9 @@ checkRealByCAD vs as = isJust $ CAD.solve vs2 (map (fmap f) as)
                 then P.constant c
                 else P.constant c * P.var x
               | (c,x) <- LA.terms t ]
+
+checkRealByVS :: VarSet -> [LA.Atom Rational] -> Bool
+checkRealByVS vs as = isJust $ VS.solve vs as
 
 checkRealBySimplex :: VarSet -> [LA.Atom Rational] -> Bool
 checkRealBySimplex vs as = unsafePerformIO $ do
