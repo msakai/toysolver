@@ -18,8 +18,6 @@ module ToySolver.Data.Boolean
     MonotoneBoolean (..)
   , Complement (..)
   , Boolean (..)
-  , andB
-  , orB
   ) where
 
 infixr 3 .&&.
@@ -30,6 +28,17 @@ class MonotoneBoolean a where
   true, false :: a
   (.&&.) :: a -> a -> a
   (.||.) :: a -> a -> a
+  andB :: [a] -> a
+  orB :: [a] -> a
+
+  true = andB []
+  false = orB []
+  a .&&. b = andB [a,b]
+  a .||. b = orB [a,b]
+  andB = foldr (.&&.) true  
+  orB = foldr (.||.) false
+
+  {-# MINIMAL ((true, (.&&.)) | andB), ((false, (.||.)) | orB) #-}
 
 -- | types that can be negated.
 class Complement a where
@@ -40,12 +49,6 @@ class (MonotoneBoolean a, Complement a) => Boolean a where
   (.=>.), (.<=>.) :: a -> a -> a
   x .=>. y = notB x .||. y
   x .<=>. y = (x .=>. y) .&&. (y .=>. x)
-
-andB :: MonotoneBoolean a => [a] -> a
-andB = foldr (.&&.) true
-
-orB :: MonotoneBoolean a => [a] -> a
-orB = foldr (.||.) false
 
 instance Complement Bool where
   notB = not
