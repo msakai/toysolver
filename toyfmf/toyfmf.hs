@@ -20,6 +20,7 @@ import Data.Ratio
 import System.Environment
 import System.IO
 import qualified Codec.TPTP as TPTP
+import ToySolver.Data.Boolean
 import qualified ToySolver.FOLModelFinder as MF
 
 main :: IO ()
@@ -70,7 +71,7 @@ translateProblem inputs = do
 translateFormula :: TPTP.Formula -> MF.Formula
 translateFormula = TPTP.foldF neg quant binop eq rel
   where
-    neg phi = MF.Not $ translateFormula phi
+    neg phi = notB $ translateFormula phi
     quant q vs phi = foldr q' (translateFormula phi) [v | TPTP.V v <- vs]
       where
         q' =
@@ -83,14 +84,14 @@ translateFormula = TPTP.foldF neg quant binop eq rel
         psi' = translateFormula psi
         op' =
           case op of
-            (TPTP.:<=>:)  -> MF.Equiv
-            (TPTP.:=>:)   -> MF.Imply
-            (TPTP.:<=:)   -> flip MF.Imply
-            (TPTP.:&:)    -> MF.And
-            (TPTP.:|:)    -> MF.Or
-            (TPTP.:~&:)   -> \a b -> MF.Not (a `MF.And` b)
-            (TPTP.:~|:)   -> \a b -> MF.Not (a `MF.Or` b)
-            (TPTP.:<~>:)  -> \a b -> MF.Not (a `MF.Equiv` b)
+            (TPTP.:<=>:)  -> (.<=>.)
+            (TPTP.:=>:)   -> (.=>.)
+            (TPTP.:<=:)   -> flip (.=>.)
+            (TPTP.:&:)    -> (.&&.)
+            (TPTP.:|:)    -> (.||.)
+            (TPTP.:~&:)   -> \a b -> notB (a .&&. b)
+            (TPTP.:~|:)   -> \a b -> notB (a .||. b)
+            (TPTP.:<~>:)  -> \a b -> notB (a .<=>. b)
     eq lhs op rhs =
       case op of
         (TPTP.:=:)  -> MF.Atom $ MF.PApp "=" [lhs', rhs']

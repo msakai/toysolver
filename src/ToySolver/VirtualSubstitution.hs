@@ -127,13 +127,13 @@ applySubst1 :: Var -> LA.Expr Rational -> QFFormula -> QFFormula
 applySubst1 v t = f
   where
     f (Atom rel) = Atom (LA.applySubst1Atom v t rel)
-    f T = T
-    f F = F
-    f (Not a) = Not (f a)
-    f (And a b) = And (f a) (f b)
-    f (Or a b)  = Or (f a) (f b)
-    f (Imply a b) = Imply (f a) (f b)
-    f (Equiv a b) = Equiv (f a) (f b)
+    f T = true
+    f F = false
+    f (Not a) = notB (f a)
+    f (And a b) = f a .&&. f b
+    f (Or a b)  = f a .||. f b
+    f (Imply a b) = f a .=>. f b
+    f (Equiv a b) = f a .<=>. f b
 
 pairs :: [a] -> [(a,a)]
 pairs [] = []

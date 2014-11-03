@@ -47,8 +47,8 @@ eliminateQuantifiers' = f
     f (FOL.And a b) = liftM2 (.&&.) (f a) (f b)
     f (FOL.Or a b) = liftM2 (.||.) (f a) (f b)
     f (FOL.Not a) = f (FOL.pushNot a)
-    f (FOL.Imply a b) = f (FOL.Or (FOL.Not a) b)
-    f (FOL.Equiv a b) = f (FOL.And (FOL.Imply a b) (FOL.Imply b a))
+    f (FOL.Imply a b) = f (notB a .||.  b)
+    f (FOL.Equiv a b) = f ((a .=>. b) .&&. (b .=>.a))
     f (FOL.Forall v a) = do
       dnf <- f (FOL.Exists v (FOL.pushNot a))
       return (notB dnf)

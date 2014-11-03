@@ -56,6 +56,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import ToySolver.Data.Boolean
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 
@@ -68,6 +69,17 @@ data Formula
   | Imply Formula Formula
   | Equiv Formula Formula
   deriving (Show, Eq, Ord)
+
+instance MonotoneBoolean Formula where
+  andB = And
+  orB = Or
+
+instance Complement Formula where
+  notB = Not
+
+instance Boolean Formula where
+  (.=>.) = Imply
+  (.<=>.) = Equiv
 
 evalFormula :: SAT.IModel m => m -> Formula -> Bool
 evalFormula m = e
@@ -116,8 +128,8 @@ addFormula encoder formula = do
       SAT.addClause solver [SAT.litNot lit1, lit2] -- a→b
       SAT.addClause solver [SAT.litNot lit2, lit1] -- b→a
     Not (Not a)     -> addFormula encoder a
-    Not (Or xs)     -> addFormula encoder (And (map Not xs))
-    Not (Imply a b) -> addFormula encoder (And [a, Not b])
+    Not (Or xs)     -> addFormula encoder (andB (map notB xs))
+    Not (Imply a b) -> addFormula encoder (a .&&. notB b)
     Not (Equiv a b) -> do
       lit1 <- encodeToLit encoder a
       lit2 <- encodeToLit encoder b
@@ -136,9 +148,9 @@ encodeToClause encoder formula =
       return $ concat cs
     Not (Not x)  -> encodeToClause encoder x
     Not (And xs) -> do
-      encodeToClause encoder (Or (map Not xs))
+      encodeToClause encoder (orB (map notB xs))
     Imply a b -> do
-      encodeToClause encoder (Or [Not a, b])
+      encodeToClause encoder (notB a .||. b)
     _ -> do
       l <- encodeToLit encoder formula
       return [l]
@@ -151,14 +163,12 @@ encodeToLit encoder formula = do
     Or xs  -> encodeDisj encoder =<< mapM (encodeToLit encoder) xs
     Not x -> liftM SAT.litNot $ encodeToLit encoder x
     Imply x y -> do
-      encodeToLit encoder (Or [Not x, y])
+      encodeToLit encoder (notB x .||. y)
     Equiv x y -> do
       lit1 <- encodeToLit encoder x
       lit2 <- encodeToLit encoder y
       encodeToLit encoder $
-        And [ Imply (Lit lit1) (Lit lit2)
-            , Imply (Lit lit2) (Lit lit1)
-            ]
+        (Lit lit1 .=>. Lit lit2) .&&. (Lit lit2 .=>. Lit lit1)
 
 -- | Return an literal which is equivalent to a given conjunction.
 encodeConj :: Encoder -> [SAT.Lit] -> IO SAT.Lit
@@ -202,4 +212,4 @@ addIsConjOf encoder l ls = do
 getDefinitions :: Encoder -> IO [(SAT.Lit, Formula)]
 getDefinitions encoder = do
   t <- readIORef (encConjTable encoder)
-  return $ [(l, And [Lit l1 | l1 <- IntSet.toList ls]) | (ls, l) <- Map.toList t]
+  return $ [(l, andB [Lit l1 | l1 <- IntSet.toList ls]) | (ls, l) <- Map.toList t]

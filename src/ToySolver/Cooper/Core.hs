@@ -112,10 +112,10 @@ data QFFormula
     deriving (Show, Eq, Ord)
 
 instance Complement QFFormula where
-  notB T = F
-  notB F = T
-  notB (And a b) = Or (notB a) (notB b)
-  notB (Or a b) = And (notB a) (notB b)
+  notB T = false
+  notB F = true
+  notB (And a b) = notB a .||. notB b
+  notB (Or a b) = notB a .&&. notB b
   notB (Lit lit) = Lit (notB lit)
 
 instance MonotoneBoolean QFFormula where
@@ -149,21 +149,21 @@ n .|. e = Lit $ Divisible True n e
 subst1 :: Var -> ExprZ -> QFFormula -> QFFormula
 subst1 x e = go
   where
-    go T = T
-    go F = F
-    go (And a b) = And (go a) (go b)
-    go (Or a b) = Or (go a) (go b)
+    go T = true
+    go F = false
+    go (And a b) =  go a .&&. go b
+    go (Or a b) = go a .||. go b
     go (Lit (Divisible b c e1)) = Lit $ Divisible b c $ LA.applySubst1 x e e1
     go (Lit (Pos e1)) = Lit $ Pos $ LA.applySubst1 x e e1
 
 simplify :: QFFormula -> QFFormula
-simplify (And a b) = simplify1 $ And (simplify a) (simplify b)
-simplify (Or a b)  = simplify1 $ Or (simplify a) (simplify b)
-simplify formula    = simplify1 formula
+simplify (And a b) = simplify1 $ simplify a .&&. simplify b
+simplify (Or a b)  = simplify1 $ simplify a .||. simplify b
+simplify formula   = simplify1 formula
 
 simplify1 :: QFFormula -> QFFormula
-simplify1 T = T
-simplify1 F = F
+simplify1 T = true
+simplify1 F = false
 simplify1 (And a b) =
   case (a, b) of
     (T, b') -> b'

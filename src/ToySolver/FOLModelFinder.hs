@@ -56,6 +56,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Text.Printf
 
+import ToySolver.Data.Boolean
 import qualified ToySolver.SAT as SAT
 
 -- ---------------------------------------------------------------------------
@@ -80,6 +81,10 @@ data GenLit a
   = Pos a
   | Neg a
   deriving (Show, Eq, Ord)
+
+instance Complement (GenLit a) where
+  notB (Pos a) = Neg a
+  notB (Neg a) = Pos a
 
 instance Vars a => Vars (GenLit a) where
   vars (Pos a) = vars a
@@ -126,6 +131,19 @@ data GenFormula a
   | Exists Var (GenFormula a)
   deriving (Show, Eq, Ord)
 
+instance MonotoneBoolean (GenFormula a) where
+  true = T
+  false = F
+  (.&&.) = And
+  (.||.) = Or
+
+instance Complement (GenFormula a) where
+  notB = Not
+
+instance Boolean (GenFormula a) where
+  (.=>.) = Imply
+  (.<=>.) = Equiv
+
 instance Vars a => Vars (GenFormula a) where
   vars T               = Set.empty
   vars F               = Set.empty
@@ -141,11 +159,11 @@ instance Vars a => Vars (GenFormula a) where
 toNNF :: Formula -> Formula
 toNNF = f
   where 
-    f (And phi psi)   = f phi `And` f psi
-    f (Or phi psi)    = f phi `Or` f psi
+    f (And phi psi)   = f phi .&&. f psi
+    f (Or phi psi)    = f phi .||. f psi
     f (Not phi)       = g phi
-    f (Imply phi psi) = g phi `Or` f psi
-    f (Equiv phi psi) = f (And (Imply phi psi) (Imply psi phi))
+    f (Imply phi psi) = g phi .||. f psi
+    f (Equiv phi psi) = f ((phi .=>. psi) .&&.  (psi .=>. phi))
     f (Forall v phi)  = Forall v (f phi)
     f (Exists v phi)  = Exists v (f phi)
     f phi = phi
@@ -153,14 +171,14 @@ toNNF = f
     g :: Formula -> Formula
     g T = F
     g F = T
-    g (And phi psi)   = g phi `Or` g psi
-    g (Or phi psi)    = g phi `And` g psi
+    g (And phi psi)   = g phi .||. g psi
+    g (Or phi psi)    = g phi .&&. g psi
     g (Not phi)       = f phi
-    g (Imply phi psi) = f phi `And` g psi
-    g (Equiv phi psi) = g (And (Imply phi psi) (Imply psi phi))
+    g (Imply phi psi) = f phi .&&. g psi
+    g (Equiv phi psi) = g ((phi .=>. psi) .&&. (psi .=>. phi))
     g (Forall v phi)  = Exists v (g phi)
     g (Exists v phi)  = Forall v (g phi)
-    g (Atom a)        = Not (Atom a)
+    g (Atom a)        = notB (Atom a)
 
 -- | normalize a formula into a skolem normal form.
 -- 
@@ -213,11 +231,10 @@ test_toSkolemNF = do
 
   -- ∀x. animal(a) → (∃y. heart(y) ∧ has(x,y))
   let phi = Forall "x" $
-              Imply
-                (Atom (PApp "animal" [TmVar "x"]))
+                Atom (PApp "animal" [TmVar "x"]) .=>.
                 (Exists "y" $
-                   And (Atom (PApp "heart" [TmVar "y"]))
-                       (Atom (PApp "has" [TmVar "x", TmVar "y"])))
+                   Atom (PApp "heart" [TmVar "y"]) .&&.
+                   Atom (PApp "has" [TmVar "x", TmVar "y"]))
 
   phi' <- toSkolemNF skolem phi
 
@@ -534,8 +551,8 @@ test = do
 
 test2 = do
   let phi = Forall "x" $ Exists "y" $
-              And (Not (Atom (PApp "=" [TmVar "x", TmVar "y"])))
-                  (Atom (PApp "=" [TmApp "f" [TmVar "y"], TmVar "x"]))
+              notB (Atom (PApp "=" [TmVar "x", TmVar "y"])) .&&.
+              Atom (PApp "=" [TmApp "f" [TmVar "y"], TmVar "x"])
 
   ref <- newIORef 0
   let skolem name _ = do
