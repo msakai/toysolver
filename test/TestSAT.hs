@@ -9,12 +9,13 @@ import qualified Data.Set as Set
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Test.HUnit hiding (Test)
-import Test.QuickCheck
+import Test.QuickCheck hiding ((.&&.), (.||.))
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
+import ToySolver.Data.Boolean
 import ToySolver.HittingSet as HittingSet
 import ToySolver.SAT
 import ToySolver.SAT.Types
@@ -440,27 +441,27 @@ case_addFormula = do
   enc <- Tseitin.newEncoder solver
 
   [x1,x2,x3,x4,x5] <- replicateM 5 $ liftM Lit $ newVar solver
-  Tseitin.addFormula enc $ Or [Imply x1 (And [x3,x4]), Imply x2 (And [x3,x5])]
+  Tseitin.addFormula enc $ orB [x1 .=>. x3 .&&. x4, x2 .=>. x3 .&&. x5]
   -- x6 = x3 ∧ x4
   -- x7 = x3 ∧ x5
-  Tseitin.addFormula enc $ Or [x1, x2]
-  Tseitin.addFormula enc $ Imply x4 (Not x5)
+  Tseitin.addFormula enc $ x1 .||. x2
+  Tseitin.addFormula enc $ x4 .=>. notB x5
   ret <- solve solver
   ret @?= True
 
-  Tseitin.addFormula enc $ Equiv x2 x4
+  Tseitin.addFormula enc $ x2 .<=>. x4
   ret <- solve solver
   ret @?= True
 
-  Tseitin.addFormula enc $ Equiv x1 x5
+  Tseitin.addFormula enc $ x1 .<=>. x5
   ret <- solve solver
   ret @?= True
 
-  Tseitin.addFormula enc $ Imply (Not x1) (And [x3,x5])
+  Tseitin.addFormula enc $ notB x1 .=>. x3 .&&. x5
   ret <- solve solver
   ret @?= True
 
-  Tseitin.addFormula enc $ Imply (Not x2) (And [x3,x4])
+  Tseitin.addFormula enc $ notB x2 .=>. x3 .&&. x4
   ret <- solve solver
   ret @?= False
 
@@ -507,7 +508,7 @@ case_encodeDisj = do
 case_evalFormula = do
   solver <- newSolver
   xs <- newVars solver 5
-  let f = Or [Imply x1 (And [x3,x4]), Imply x2 (And [x3,x5])]
+  let f = (x1 .=>. x3 .&&. x4) .||. (x2 .=>. x3 .&&. x5)
         where
           [x1,x2,x3,x4,x5] = map Tseitin.Lit xs
       g m = (not x1 || (x3 && x4)) || (not x2 || (x3 && x5))
