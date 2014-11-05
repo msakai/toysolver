@@ -151,6 +151,7 @@ Library
      ToySolver.Data.AlgebraicNumber.Sturm
      ToySolver.Data.ArithRel
      ToySolver.Data.Boolean
+     ToySolver.Data.BoolExpr
      ToySolver.Data.Delta
      ToySolver.Data.DNF
      ToySolver.Data.FOL.Arith
