@@ -35,8 +35,14 @@ class MonotoneBoolean a where
   false = orB []
   a .&&. b = andB [a,b]
   a .||. b = orB [a,b]
-  andB = foldr (.&&.) true  
-  orB = foldr (.||.) false
+
+  andB [] = true
+  andB [a] = a
+  andB xs = foldr1 (.&&.) xs
+
+  orB [] = false
+  orB [a] = a
+  orB xs = foldr1 (.||.) xs
 
   {-# MINIMAL ((true, (.&&.)) | andB), ((false, (.||.)) | orB) #-}
 
