@@ -1,13 +1,16 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Main (main) where
 
+import Control.Applicative
 import Control.Monad
 import Test.HUnit hiding (Test)
 import Test.QuickCheck
+import Test.QuickCheck.Function
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.QuickCheck2
 import Test.Framework.Providers.HUnit
+import ToySolver.Data.BoolExpr
 import qualified ToySolver.Internal.Data.Vec as Vec
 import ToySolver.Internal.Util
 import ToySolver.Internal.TextUtil
@@ -79,6 +82,47 @@ case_Vec_clone = do
 
   b <- Vec.read v2 0
   b @?= 1
+
+-- ---------------------------------------------------------------------
+-- BoolExpr
+
+instance Arbitrary a => Arbitrary (BoolExpr a) where
+  arbitrary = sized $ \n -> resize (n-1) $
+    oneof
+    [ Atom <$> arbitrary
+    , And <$> arbitrary
+    , Not <$> arbitrary
+    , Imply <$> arbitrary <*> arbitrary
+    , Equiv <$> arbitrary <*> arbitrary
+    ]
+
+{-
+prop_BoolExpr_fmap_id =
+  forAll arbitrary $ \(b :: BoolExpr Int) ->
+    fmap id b == b
+
+prop_BoolExpr_fmap_comp =
+  forAll arbitrary $ \(b :: BoolExpr Int) ->
+    forAll arbitrary $ \(f :: Fun Int Int) ->
+      forAll arbitrary $ \(g :: Fun Int Int) ->
+        fmap (apply f . apply g) b == fmap (apply f) (fmap (apply g) b)
+
+prop_BoolExpr_bind_left_id =
+  forAll arbitrary $ \(b :: BoolExpr Int) ->
+    forAll arbitrary $ \(f :: Fun Int (BoolExpr Int)) ->
+        (b >>= (\x -> return x >>= apply f)) == (b >>= apply f)
+
+prop_BoolExpr_bind_right_id =
+  forAll arbitrary $ \(b :: BoolExpr Int) ->
+    forAll arbitrary $ \(f :: Fun Int (BoolExpr Int)) ->
+        (b >>= (\x -> apply f x >>= return)) == (b >>= apply f)
+
+prop_BoolExpr_bind_assoc =
+  forAll arbitrary $ \(b :: BoolExpr Int) ->
+    forAll arbitrary $ \(f :: Fun Int (BoolExpr Int)) ->
+      forAll arbitrary $ \(g :: Fun Int (BoolExpr Int)) ->
+        (b >>= apply f >>= apply g) == (b >>= (\x -> apply f x >>= apply g))
+-}
 
 ------------------------------------------------------------------------
 -- Test harness
