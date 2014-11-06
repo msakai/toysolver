@@ -29,6 +29,7 @@ module ToySolver.VirtualSubstitution
   ) where
 
 import Control.Monad
+import qualified Data.Foldable as Foldable
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Set (Set)
@@ -38,46 +39,17 @@ import Data.VectorSpace hiding (project)
 
 import ToySolver.Data.ArithRel
 import ToySolver.Data.Boolean
+import ToySolver.Data.BoolExpr
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
 
 -- | quantifier-free formula
-data QFFormula
-    = T
-    | F
-    | Not QFFormula
-    | And QFFormula QFFormula
-    | Or QFFormula QFFormula
-    | Imply QFFormula QFFormula
-    | Equiv QFFormula QFFormula
-    | Atom (LA.Atom Rational)
-    deriving (Show, Eq, Ord)
-
-instance Complement QFFormula where
-  notB (Not a) = a
-  notB a = Not a
-
-instance MonotoneBoolean QFFormula where
-  true  = T
-  false = F
-  (.&&.) = And
-  (.||.) = Or
-
-instance Boolean QFFormula where
-  (.=>.) = Imply
-  (.<=>.) = Equiv
+type QFFormula = BoolExpr (LA.Atom Rational)
 
 evalQFFormula :: Model Rational -> QFFormula -> Bool
-evalQFFormula m = f
+evalQFFormula m = fold f
   where
-    f T = True
-    f F = False
-    f (Not a) = not (f a)
-    f (And a b) = f a && f b
-    f (Or a b) = f a || f b
-    f (Imply a b) = not (f a) || f b
-    f (Equiv a b) = f a ==  f b
-    f (Atom (Rel lhs op rhs)) = evalOp op (LA.evalExpr m lhs) (LA.evalExpr m rhs)
+    f (Rel lhs op rhs) = evalOp op (LA.evalExpr m lhs) (LA.evalExpr m rhs)
 
 project :: Var -> QFFormula -> [(QFFormula, Model Rational -> Model Rational)]
 project v phi = [(psi, \m -> IM.insert v (LA.evalExpr m t) m) | (psi, t) <- project' v phi]
@@ -109,31 +81,17 @@ projectN vs = f (IS.toList vs)
       return (phi3, mt1 . mt2)
 
 collect :: Var -> QFFormula -> Set (LA.Expr Rational)
-collect v = f
+collect v = Foldable.foldMap f
   where
-    f (Atom (Rel lhs op rhs)) =
+    f (Rel lhs op rhs) =
       case LA.extractMaybe v (lhs ^-^ rhs) of
         Nothing -> Set.empty
         Just (a,b) -> Set.singleton (negateV (b ^/ a))
-    f T = Set.empty
-    f F = Set.empty
-    f (Not a) = f a
-    f (And a b) = Set.union (f a) (f b)
-    f (Or a b)  = Set.union (f a) (f b)
-    f (Imply a b) = Set.union (f a) (f b)
-    f (Equiv a b) = Set.union (f a) (f b)
 
 applySubst1 :: Var -> LA.Expr Rational -> QFFormula -> QFFormula
-applySubst1 v t = f
+applySubst1 v t = fold f
   where
-    f (Atom rel) = Atom (LA.applySubst1Atom v t rel)
-    f T = true
-    f F = false
-    f (Not a) = notB (f a)
-    f (And a b) = f a .&&. f b
-    f (Or a b)  = f a .||. f b
-    f (Imply a b) = f a .=>. f b
-    f (Equiv a b) = f a .<=>. f b
+    f rel = Atom (LA.applySubst1Atom v t rel)
 
 pairs :: [a] -> [(a,a)]
 pairs [] = []
