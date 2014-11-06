@@ -14,7 +14,7 @@
 -- Reference:
 -- 
 -- * V. Weispfenning. The complexity of linear problems in fields.
---   Journal of Symbolic Computation, 5(1-2): 3-27, Feb.–Apr. 1988.
+--   Journal of Symbolic Computation, 5(1-2): 3-27, Feb.-Apr. 1988.
 -- 
 -- * Hirokazu Anai, Shinji Hara. Parametric Robust Control by Quantifier Elimination.
 --   J.JSSAC, Vol. 10, No. 1, pp. 41-51, 2003.
