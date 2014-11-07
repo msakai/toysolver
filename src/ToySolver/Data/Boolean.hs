@@ -20,6 +20,8 @@ module ToySolver.Data.Boolean
   , Boolean (..)
   ) where
 
+import Control.Arrow
+
 infixr 3 .&&.
 infixr 2 .||.
 infix 1 .=>., .<=>.
@@ -55,6 +57,39 @@ class (MonotoneBoolean a, Complement a) => Boolean a where
   (.=>.), (.<=>.) :: a -> a -> a
   x .=>. y = notB x .||. y
   x .<=>. y = (x .=>. y) .&&. (y .=>. x)
+
+
+instance (Complement a, Complement b) => Complement (a, b) where
+  notB (a,b) = (notB a, notB b)
+
+instance (MonotoneBoolean a, MonotoneBoolean b) => MonotoneBoolean (a, b) where
+  true = (true, true)
+  false = (false, false)
+  (xs1,ys1) .&&. (xs2,ys2) = (xs1 .&&. xs2, ys1 .&&. ys2)
+  (xs1,ys1) .||. (xs2,ys2) = (xs1 .||. xs2, ys1 .||. ys2)
+  andB = (andB *** andB) . unzip
+  orB  = (orB *** orB) . unzip
+
+instance (Boolean a, Boolean b) => Boolean (a, b) where
+  (xs1,ys1) .=>. (xs2,ys2) = (xs1 .=>. xs2, ys1 .=>. ys2)
+  (xs1,ys1) .<=>. (xs2,ys2) = (xs1 .<=>. xs2, ys1 .<=>. ys2)
+
+
+instance Complement a => Complement (b -> a) where
+  notB f = \x -> notB (f x)
+
+instance MonotoneBoolean a => MonotoneBoolean (b -> a) where
+  true = const true
+  false = const false
+  f .&&. g = \x -> f x .&&. g x
+  f .||. g = \x -> f x .||. g x
+  andB fs = \x -> andB [f x | f <- fs]
+  orB fs = \x -> orB [f x | f <- fs]
+
+instance (Boolean a) => Boolean (b -> a) where
+  f .=>. g = \x -> f x .=>. g x
+  f .<=>. g = \x -> f x .<=>. g x
+
 
 instance Complement Bool where
   notB = not
