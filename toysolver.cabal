@@ -20,7 +20,6 @@ Extra-Source-Files:
    .travis.yml
    src/TseitinEncode.hs
    src/ToySolver/Data/Polyhedron.hs
-   src/ToySolver/Wang.hs
    samples/gcnf/*.cnf
    samples/gcnf/*.gcnf
    samples/lp/*.lp
@@ -202,6 +201,7 @@ Library
      ToySolver.Internal.ProcessUtil
      ToySolver.Internal.TextUtil
      ToySolver.Internal.Util
+     ToySolver.Wang
      ToySolver.Version
   Other-Modules:
      ToySolver.Data.AlgebraicNumber.Graeffe

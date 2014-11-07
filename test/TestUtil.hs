@@ -4,7 +4,7 @@ module Main (main) where
 import Control.Applicative
 import Control.Monad
 import Test.HUnit hiding (Test)
-import Test.QuickCheck
+import Test.QuickCheck hiding ((.&&.), (.||.))
 import Test.QuickCheck.Function
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
@@ -16,6 +16,7 @@ import qualified ToySolver.Internal.Data.Vec as Vec
 import ToySolver.Internal.Util
 import ToySolver.Internal.TextUtil
 import qualified ToySolver.Knapsack as Knapsack
+import qualified ToySolver.Wang as Wang
 
 case_showRationalAsDecimal :: IO ()
 case_showRationalAsDecimal = do
@@ -162,6 +163,47 @@ prop_BoolExpr_Monad_bind_associativity =
     forAll arbitrary $ \(f :: Fun Int (BoolExpr Int)) ->
       forAll arbitrary $ \(g :: Fun Int (BoolExpr Int)) ->
         (b >>= apply f >>= apply g) == (b >>= (\x -> apply f x >>= apply g))
+
+
+-- ---------------------------------------------------------------------
+-- Wang
+
+-- (x1 ∨ x2) ∧ (x1 ∨ ¬x2) ∧ (¬x1 ∨ ¬x2) is satisfiable
+-- ¬((x1 ∨ x2) ∧ (x1 ∨ ¬x2) ∧ (¬x1 ∨ ¬x2)) is invalid
+case_Wang_1 =
+  Wang.isValid ([], [phi]) @?= False
+  where
+    phi = notB $ andB [x1 .||. x2, x1 .||. notB x2, notB x1 .||. notB x2]
+    x1 = Atom 1
+    x2 = Atom 2
+
+-- (x1 ∨ x2) ∧ (¬x1 ∨ x2) ∧ (x1 ∨ ¬x2) ∧ (¬x1 ∨ ¬x2) is unsatisfiable
+-- ¬((x1 ∨ x2) ∧ (¬x1 ∨ x2) ∧ (x1 ∨ ¬x2) ∧ (¬x1 ∨ ¬x2)) is valid
+case_Wang_2 =
+  Wang.isValid ([], [phi]) @?= True
+  where
+    phi = notB $ andB [x1 .||. x2, notB x1 .||. x2, x1 .||. notB x2, notB x1 .||. notB x2]
+    x1 = Atom 1
+    x2 = Atom 2
+
+case_Wang_EM =
+  Wang.isValid ([], [phi]) @?= True
+  where
+    phi = x1 .||. notB x1
+    x1 = Atom 1
+
+case_Wang_DNE =
+  Wang.isValid ([], [phi]) @?= True
+  where
+    phi = notB (notB x1) .<=>. x1
+    x1 = Atom 1
+
+case_Wang_Peirces_Law =
+  Wang.isValid ([], [phi]) @?= True
+  where
+    phi = ((x1 .=>. x2) .=>. x1) .=>. x1
+    x1 = Atom 1
+    x2 = Atom 2
 
 ------------------------------------------------------------------------
 -- Test harness
