@@ -15,12 +15,12 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
+import ToySolver.Data.BoolExpr
 import ToySolver.Data.Boolean
 import ToySolver.HittingSet as HittingSet
 import ToySolver.SAT
 import ToySolver.SAT.Types
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
-import ToySolver.SAT.TseitinEncoder (Formula (..))
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.CAMUS as CAMUS
 import qualified ToySolver.SAT.PBO as PBO
@@ -440,7 +440,7 @@ case_addFormula = do
   solver <- newSolver
   enc <- Tseitin.newEncoder solver
 
-  [x1,x2,x3,x4,x5] <- replicateM 5 $ liftM Lit $ newVar solver
+  [x1,x2,x3,x4,x5] <- replicateM 5 $ liftM Atom $ newVar solver
   Tseitin.addFormula enc $ orB [x1 .=>. x3 .&&. x4, x2 .=>. x3 .&&. x5]
   -- x6 = x3 ∧ x4
   -- x7 = x3 ∧ x5
@@ -510,7 +510,7 @@ case_evalFormula = do
   xs <- newVars solver 5
   let f = (x1 .=>. x3 .&&. x4) .||. (x2 .=>. x3 .&&. x5)
         where
-          [x1,x2,x3,x4,x5] = map Tseitin.Lit xs
+          [x1,x2,x3,x4,x5] = map Atom xs
       g m = (not x1 || (x3 && x4)) || (not x2 || (x3 && x5))
         where
           [x1,x2,x3,x4,x5] = elems m

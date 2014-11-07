@@ -42,7 +42,7 @@ module ToySolver.SAT.TseitinEncoder
   , encSolver
 
   -- * Encoding of boolean formula
-  , Formula (..)
+  , Formula
   , evalFormula
   , addFormula
   , encodeConj
@@ -57,39 +57,15 @@ import qualified Data.Map as Map
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import ToySolver.Data.Boolean
+import ToySolver.Data.BoolExpr
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 
 -- | Arbitrary formula not restricted to CNF
-data Formula
-  = Lit SAT.Lit
-  | And [Formula]
-  | Or [Formula]
-  | Not Formula
-  | Imply Formula Formula
-  | Equiv Formula Formula
-  deriving (Show, Eq, Ord)
-
-instance MonotoneBoolean Formula where
-  andB = And
-  orB = Or
-
-instance Complement Formula where
-  notB = Not
-
-instance Boolean Formula where
-  (.=>.) = Imply
-  (.<=>.) = Equiv
+type Formula = BoolExpr SAT.Lit
 
 evalFormula :: SAT.IModel m => m -> Formula -> Bool
-evalFormula m = e
-  where
-    e (Lit l)  = SAT.evalLit m l
-    e (And fs) = and (map e fs)
-    e (Or fs)  = or (map e fs)
-    e (Not f)  = not (e f)
-    e (Imply f1 f2) = not (e f1) || e f2
-    e (Equiv f1 f2) = e f1 == e f2
+evalFormula m = fold (SAT.evalLit m)
 
 -- | Encoder instance
 data Encoder =
@@ -158,7 +134,7 @@ encodeToClause encoder formula =
 encodeToLit :: Encoder -> Formula -> IO SAT.Lit
 encodeToLit encoder formula = do
   case formula of
-    Lit l -> return l
+    Atom l -> return l
     And xs -> encodeConj encoder =<< mapM (encodeToLit encoder) xs
     Or xs  -> encodeDisj encoder =<< mapM (encodeToLit encoder) xs
     Not x -> liftM SAT.litNot $ encodeToLit encoder x
@@ -168,7 +144,7 @@ encodeToLit encoder formula = do
       lit1 <- encodeToLit encoder x
       lit2 <- encodeToLit encoder y
       encodeToLit encoder $
-        (Lit lit1 .=>. Lit lit2) .&&. (Lit lit2 .=>. Lit lit1)
+        (Atom lit1 .=>. Atom lit2) .&&. (Atom lit2 .=>. Atom lit1)
 
 -- | Return an literal which is equivalent to a given conjunction.
 encodeConj :: Encoder -> [SAT.Lit] -> IO SAT.Lit
@@ -212,4 +188,4 @@ addIsConjOf encoder l ls = do
 getDefinitions :: Encoder -> IO [(SAT.Lit, Formula)]
 getDefinitions encoder = do
   t <- readIORef (encConjTable encoder)
-  return $ [(l, andB [Lit l1 | l1 <- IntSet.toList ls]) | (ls, l) <- Map.toList t]
+  return $ [(l, andB [Atom l1 | l1 <- IntSet.toList ls]) | (ls, l) <- Map.toList t]
