@@ -210,8 +210,8 @@ case_CAD_test_nonlinear_multivariate =
 toP :: LA.Expr Rational -> P.Polynomial Rational Int
 toP e = P.fromTerms [(c, if x == LA.unitVar then P.mone else P.var x) | (c,x) <- LA.terms e]
 
-toPRel :: LA.Atom Rational -> Rel (P.Polynomial Rational Int)
-toPRel (Rel lhs op rhs) = Rel (toP lhs) op (toP rhs)  
+toPRel :: LA.Atom Rational -> ArithRel (P.Polynomial Rational Int)
+toPRel = fmap toP
 
 evalP :: Map.Map Int AReal -> P.Polynomial Rational Int -> AReal
 evalP m p = P.eval (m Map.!) $ P.mapCoeff fromRational p

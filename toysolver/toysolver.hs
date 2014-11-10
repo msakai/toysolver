@@ -284,7 +284,7 @@ run solver opt mip printModel = do
           putCommentLine "integer variables are not supported by CAD"
           exitFailure
       | otherwise = do
-          let cs = map g $ cs1 ++ cs2
+          let cs = map (fmap f) $ cs1 ++ cs2
               vs3 = Set.fromAscList $ IntSet.toAscList vs2
           case CAD.solve vs3 cs of
             Nothing -> do
@@ -298,8 +298,6 @@ run solver opt mip printModel = do
               let m3 = Map.fromAscList [(v, m2 IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m3
       where
-        g (Rel lhs rel rhs) = Rel (f lhs) rel (f rhs)
-
         f (Const r)   = P.constant r
         f (Var v)     = P.var v
         f (e1 :+: e2) = f e1 + f e2

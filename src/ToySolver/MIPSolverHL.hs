@@ -122,9 +122,7 @@ tableau' cs ivs = do
   return ivs2
 
 conv :: RealFrac r => LA.Atom r -> LA.Atom Rational
-conv (Rel a op b) = Rel (f a) op (f b)
-  where
-    f = LA.mapCoeff toRational
+conv = fmap (LA.mapCoeff toRational)
 
 mkInitialNode :: RealFrac r => OptDir -> LA.Expr r -> [LA.Atom r] -> VarSet -> Either Err (Node r, VarSet)
 mkInitialNode optdir obj cs ivs =
