@@ -30,10 +30,10 @@ eliminateQuantifiers = f
   where
     f FOL.T = return T
     f FOL.F = return F
-    f (FOL.Atom (Rel a op b)) = do
+    f (FOL.Atom (ArithRel a op b)) = do
        a' <- LAFOL.fromFOLExpr a
        b' <- LAFOL.fromFOLExpr b
-       return $ fromLAAtom (Rel a' op b')
+       return $ fromLAAtom (ArithRel a' op b')
     f (FOL.And a b) = liftM2 (.&&.) (f a) (f b)
     f (FOL.Or a b) = liftM2 (.||.) (f a) (f b)
     f (FOL.Not a) = f (FOL.pushNot a)

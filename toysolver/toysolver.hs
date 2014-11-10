@@ -156,7 +156,7 @@ run solver opt mip printModel = do
                   MIP.Le  -> Le
                   MIP.Eql -> Eql
       case ind of
-        Nothing -> return (Rel (compileE lhs) rel2 (Const rhs))
+        Nothing -> return (ArithRel (compileE lhs) rel2 (Const rhs))
         Just _ -> error "indicator constraint is not supported yet"
 
     ivs

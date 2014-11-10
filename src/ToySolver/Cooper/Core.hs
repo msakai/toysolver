@@ -66,7 +66,7 @@ import qualified ToySolver.FourierMotzkin.Core as FM
 type ExprZ = LA.Expr Integer
 
 fromLAAtom :: LA.Atom Rational -> QFFormula
-fromLAAtom (Rel a op b) = rel op a' b'
+fromLAAtom (ArithRel a op b) = arithRel op a' b'
   where
     (e1,c1) = FM.toRat a
     (e2,c2) = FM.toRat b
@@ -133,15 +133,15 @@ instance Variables QFFormula where
   vars (Or a b)  = vars a `IS.union` vars b
   vars (Lit l)    = vars l
 
-instance IsRel (LA.Expr Integer) QFFormula where
-  rel op lhs rhs =
+instance IsArithRel (LA.Expr Integer) QFFormula where
+  arithRel op lhs rhs =
     case op of
       Le  -> Lit $ leZ lhs rhs
       Ge  -> Lit $ geZ lhs rhs
       Lt  -> Lit $ ltZ lhs rhs
       Gt  -> Lit $ gtZ lhs rhs
       Eql -> eqZ lhs rhs
-      NEq -> notB $ rel Eql lhs rhs
+      NEq -> notB $ arithRel Eql lhs rhs
 
 (.|.) :: Integer -> ExprZ -> QFFormula
 n .|. e = Lit $ Divisible True n e

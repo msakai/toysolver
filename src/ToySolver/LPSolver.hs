@@ -165,7 +165,7 @@ addConstraintWithArtificialVariable c = do
 -- 
 addConstraint :: Real r => LA.Atom r -> LP r ()
 addConstraint c = do
-  Rel lhs rop rhs <- expandDefs' c
+  ArithRel lhs rop rhs <- expandDefs' c
   let
     (b', e) = LA.extract LA.unitVar (lhs ^-^ rhs)
     b = - b'
@@ -203,10 +203,10 @@ expandDefs e = do
   return $ LA.applySubst defs e
 
 expandDefs' :: (Num r, Eq r) => LA.Atom r -> LP r (LA.Atom r)
-expandDefs' (Rel lhs op rhs) = do
+expandDefs' (ArithRel lhs op rhs) = do
   lhs' <- expandDefs lhs
   rhs' <- expandDefs rhs
-  return $ Rel lhs' op rhs'
+  return $ ArithRel lhs' op rhs'
 
 tableau :: (RealFrac r) => [LA.Atom r] -> LP r ()
 tableau cs = do
@@ -297,7 +297,7 @@ primalDualSimplex optdir obj = do
 
 -- convert right hand side to be non-negative
 normalizeConstraint :: forall r. Real r => LA.Atom r -> (LA.Expr r, RelOp, r)
-normalizeConstraint (Rel a op b)
+normalizeConstraint (ArithRel a op b)
   | rhs < 0   = (negateV lhs, flipOp op, negate rhs)
   | otherwise = (lhs, op, rhs)
   where
@@ -314,7 +314,7 @@ collectNonnegVars cs ivs = (nonnegVars, cs)
     nonnegVars = IS.filter (\v -> 0 <=! (bounds IM.! v)) vs
 
     isTriviallyTrue :: LA.Atom r -> Bool
-    isTriviallyTrue (Rel a op b) =
+    isTriviallyTrue (ArithRel a op b) =
       case op of
         Le -> i <=! 0
         Ge -> i >=! 0

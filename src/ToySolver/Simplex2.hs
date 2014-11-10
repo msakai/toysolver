@@ -282,7 +282,7 @@ assertAtomEx solver atom = do
   return ()
 
 simplifyAtom :: SolverValue v => GenericSolver v -> LA.Atom Rational -> IO (Var, RelOp, Rational)
-simplifyAtom solver (Rel lhs op rhs) = do
+simplifyAtom solver (ArithRel lhs op rhs) = do
   let (lhs',rhs') =
         case LA.extract LA.unitVar (lhs ^-^ rhs) of
           (n,e) -> (e, -n)

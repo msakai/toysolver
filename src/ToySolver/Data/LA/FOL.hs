@@ -16,10 +16,10 @@ import qualified ToySolver.Data.LA as LA
 -- ---------------------------------------------------------------------------
 
 fromFOLAtom :: (Real r, Fractional r) => Atom r -> Maybe (LA.Atom r)
-fromFOLAtom (Rel a op b) = do
+fromFOLAtom (ArithRel a op b) = do
   a' <- fromFOLExpr a
   b' <- fromFOLExpr b
-  return $ rel op a' b'
+  return $ arithRel op a' b'
 
 toFOLFormula :: (Real r, Fractional r) => LA.Atom r -> Formula (Atom r)
 toFOLFormula r = Atom $ fmap toFOLExpr r

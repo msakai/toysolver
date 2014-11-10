@@ -253,7 +253,7 @@ solve :: Options -> VarSet -> [LA.Atom Rational] -> Maybe (Model Integer)
 solve opt vs cs = msum [solve' opt (IS.toList vs) lits | lits <- unDNF dnf]
   where
     dnf = andB (map f cs)
-    f (Rel lhs op rhs) =
+    f (ArithRel lhs op rhs) =
       case op of
         Lt  -> DNF [[a `ltZ` b]]
         Le  -> DNF [[a `leZ` b]]

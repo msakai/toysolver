@@ -22,10 +22,10 @@ module ToySolver.Data.ArithRel
   , evalOp
 
   -- * Relation
-  , Rel (..)
+  , ArithRel (..)
 
   -- * DSL
-  , IsRel (..)
+  , IsArithRel (..)
   , (.<.), (.<=.), (.>=.), (.>.), (.==.), (./=.)
   ) where
 
@@ -86,49 +86,49 @@ evalOp NEq = (/=)
 -- ---------------------------------------------------------------------------
 
 -- | type class for constructing relational formula
-class IsRel e r | r -> e where
-  rel :: RelOp -> e -> e -> r
+class IsArithRel e r | r -> e where
+  arithRel :: RelOp -> e -> e -> r
 
 -- | constructing relational formula
-(.<.) :: IsRel e r => e -> e -> r
-a .<. b  = rel Lt  a b
+(.<.) :: IsArithRel e r => e -> e -> r
+a .<. b  = arithRel Lt a b
 
 -- | constructing relational formula
-(.<=.) :: IsRel e r => e -> e -> r
-a .<=. b = rel Le  a b
+(.<=.) :: IsArithRel e r => e -> e -> r
+a .<=. b = arithRel Le a b
 
 -- | constructing relational formula
-(.>.) :: IsRel e r => e -> e -> r
-a .>. b  = rel Gt  a b
+(.>.) :: IsArithRel e r => e -> e -> r
+a .>. b  = arithRel Gt a b
 
 -- | constructing relational formula
-(.>=.) :: IsRel e r => e -> e -> r
-a .>=. b = rel Ge  a b
+(.>=.) :: IsArithRel e r => e -> e -> r
+a .>=. b = arithRel Ge a b
 
 -- | constructing relational formula
-(.==.) :: IsRel e r => e -> e -> r
-a .==. b = rel Eql a b
+(.==.) :: IsArithRel e r => e -> e -> r
+a .==. b = arithRel Eql a b
 
 -- | constructing relational formula
-(./=.) :: IsRel e r => e -> e -> r
-a ./=. b = rel NEq a b
+(./=.) :: IsArithRel e r => e -> e -> r
+a ./=. b = arithRel NEq a b
 
 -- ---------------------------------------------------------------------------
 
 -- | Atomic formula
-data Rel e = Rel e RelOp e
+data ArithRel e = ArithRel e RelOp e
     deriving (Show, Eq, Ord)
 
-instance Complement (Rel c) where
-  notB (Rel lhs op rhs) = Rel lhs (negOp op) rhs
+instance Complement (ArithRel c) where
+  notB (ArithRel lhs op rhs) = ArithRel lhs (negOp op) rhs
 
-instance IsRel e (Rel e) where
-  rel op a b = Rel a op b
+instance IsArithRel e (ArithRel e) where
+  arithRel op a b = ArithRel a op b
 
-instance Variables e => Variables (Rel e) where
-  vars (Rel a _ b) = vars a `IS.union` vars b
+instance Variables e => Variables (ArithRel e) where
+  vars (ArithRel a _ b) = vars a `IS.union` vars b
 
-instance Functor Rel where
-  fmap f (Rel a op b) = Rel (f a) op (f b)
+instance Functor ArithRel where
+  fmap f (ArithRel a op b) = ArithRel (f a) op (f b)
 
 -- ---------------------------------------------------------------------------

@@ -216,8 +216,8 @@ toPRel = fmap toP
 evalP :: Map.Map Int AReal -> P.Polynomial Rational Int -> AReal
 evalP m p = P.eval (m Map.!) $ P.mapCoeff fromRational p
 
-evalPAtom :: Map.Map Int AReal -> Rel (P.Polynomial Rational Int) -> Bool
-evalPAtom m (Rel lhs op rhs) =　evalOp op (evalP m lhs) (evalP m rhs)
+evalPAtom :: Map.Map Int AReal -> ArithRel (P.Polynomial Rational Int) -> Bool
+evalPAtom m (ArithRel lhs op rhs) =　evalOp op (evalP m lhs) (evalP m rhs)
 
 ------------------------------------------------------------------------
 

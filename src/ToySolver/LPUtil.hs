@@ -19,7 +19,7 @@ import ToySolver.Data.Var
 import qualified ToySolver.BoundsInference as BI
 
 toStandardForm
-  :: (LA.Expr Rational, [Rel (LA.Expr Rational)])
+  :: (LA.Expr Rational, [ArithRel (LA.Expr Rational)])
   -> ( (LA.Expr Rational, [(LA.Expr Rational, Rational)])
      , Model Rational -> Model Rational
      )
@@ -36,7 +36,7 @@ toStandardForm prob1@(obj, cs) = (prob2, mt)
 type M = State Var
 
 toStandardForm'
-  :: (LA.Expr Rational, [Rel (LA.Expr Rational)])
+  :: (LA.Expr Rational, [ArithRel (LA.Expr Rational)])
   -> ( (LA.Expr Rational, [(LA.Expr Rational, Rational)])
      , VarMap (LA.Expr Rational)
      )
@@ -67,7 +67,7 @@ toStandardForm' (obj, cs) = m
                 return $ IM.singleton v (LA.var v1 ^-^ LA.constant lb)
       let obj2 = LA.applySubst s obj
 
-      cs2 <- liftM concat $ forM cs $ \(Rel lhs op rhs) -> do
+      cs2 <- liftM concat $ forM cs $ \(ArithRel lhs op rhs) -> do
         case LA.extract LA.unitVar (LA.applySubst s (lhs ^-^ rhs)) of
           (c,e) -> do
             let (lhs2,op2,rhs2) =

@@ -444,11 +444,11 @@ evalPoint m (RootOf p n) = RootOf (AReal.minimalPolynomial a) (AReal.rootIndex a
 solve
   :: forall v. (Ord v, Show v, PrettyVar v)
   => Set v
-  -> [(Rel (Polynomial Rational v))]
+  -> [(ArithRel (Polynomial Rational v))]
   -> Maybe (Model v)
 solve vs cs0 = solve' vs (map f cs0)
   where
-    f (Rel lhs op rhs) = (lhs - rhs, g op)
+    f (ArithRel lhs op rhs) = (lhs - rhs, g op)
     g Le  = [Zero, Neg]
     g Ge  = [Zero, Pos]
     g Lt  = [Neg]

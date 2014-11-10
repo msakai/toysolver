@@ -121,7 +121,7 @@ simplify = fmap concat . mapM f
 -- ---------------------------------------------------------------------------
 
 fromLAAtom :: LA.Atom Rational -> DNF Lit
-fromLAAtom (Rel a op b) = atomR' op (toRat a) (toRat b)
+fromLAAtom (ArithRel a op b) = atomR' op (toRat a) (toRat b)
 
 toLAAtom :: Lit -> LA.Atom Rational
 toLAAtom (Nonneg e) = LA.mapCoeff fromInteger e .>=. LA.constant 0

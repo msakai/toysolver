@@ -49,7 +49,7 @@ type QFFormula = BoolExpr (LA.Atom Rational)
 evalQFFormula :: Model Rational -> QFFormula -> Bool
 evalQFFormula m = fold f
   where
-    f (Rel lhs op rhs) = evalOp op (LA.evalExpr m lhs) (LA.evalExpr m rhs)
+    f (ArithRel lhs op rhs) = evalOp op (LA.evalExpr m lhs) (LA.evalExpr m rhs)
 
 project :: Var -> QFFormula -> [(QFFormula, Model Rational -> Model Rational)]
 project v phi = [(psi, \m -> IM.insert v (LA.evalExpr m t) m) | (psi, t) <- project' v phi]
@@ -83,7 +83,7 @@ projectN vs = f (IS.toList vs)
 collect :: Var -> QFFormula -> Set (LA.Expr Rational)
 collect v = Foldable.foldMap f
   where
-    f (Rel lhs op rhs) =
+    f (ArithRel lhs op rhs) =
       case LA.extractMaybe v (lhs ^-^ rhs) of
         Nothing -> Set.empty
         Just (a,b) -> Set.singleton (negateV (b ^/ a))

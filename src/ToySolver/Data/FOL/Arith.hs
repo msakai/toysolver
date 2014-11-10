@@ -96,13 +96,13 @@ evalExpr m = f
 -- ---------------------------------------------------------------------------
 
 -- | Atomic formula
-type Atom c = Rel (Expr c)
+type Atom c = ArithRel (Expr c)
 
 evalAtom :: (Real r, Fractional r) => Model r -> Atom r -> Bool
-evalAtom m (Rel a op b) = evalOp op (evalExpr m a) (evalExpr m b)
+evalAtom m (ArithRel a op b) = evalOp op (evalExpr m a) (evalExpr m b)
 
-instance IsRel (Expr c) (Formula (Atom c)) where
-  rel op a b = Atom $ rel op a b
+instance IsArithRel (Expr c) (Formula (Atom c)) where
+  arithRel op a b = Atom (arithRel op a b)
 
 -- ---------------------------------------------------------------------------
 

@@ -60,8 +60,8 @@ linearize enc (Expr xs) = do
     return (c,l)
   return (zs, c)
 
-addConstraint :: TseitinEncoder.Encoder -> Rel Expr -> IO ()
-addConstraint enc (Rel lhs op rhs) = do
+addConstraint :: TseitinEncoder.Encoder -> ArithRel Expr -> IO ()
+addConstraint enc (ArithRel lhs op rhs) = do
   let solver = TseitinEncoder.encSolver enc
   (lhs2,c) <- linearize enc (lhs - rhs)
   let rhs2 = -c
@@ -76,8 +76,8 @@ addConstraint enc (Rel lhs op rhs) = do
       SAT.addPBAtLeastSoft solver sel lhs2 (rhs2+1)
       SAT.addPBAtMostSoft  solver (-sel) lhs2 (rhs2-1)
 
-addConstraintSoft :: TseitinEncoder.Encoder -> SAT.Lit -> Rel Expr -> IO ()
-addConstraintSoft enc sel (Rel lhs op rhs) = do
+addConstraintSoft :: TseitinEncoder.Encoder -> SAT.Lit -> ArithRel Expr -> IO ()
+addConstraintSoft enc sel (ArithRel lhs op rhs) = do
   let solver = TseitinEncoder.encSolver enc
   (lhs2,c) <- linearize enc (lhs - rhs)
   let rhs2 = -c
