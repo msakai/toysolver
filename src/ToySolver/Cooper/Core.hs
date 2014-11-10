@@ -51,6 +51,8 @@ import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.VectorSpace hiding (project)
 
 import ToySolver.Data.ArithRel
@@ -219,16 +221,16 @@ evalLit m (Divisible False n e) = LA.evalExpr m e `mod` n /= 0
 
 -- ---------------------------------------------------------------------------
 
-data Witness = WCase1 Integer ExprZ | WCase2 Integer Integer Integer [ExprZ]
+data Witness = WCase1 Integer ExprZ | WCase2 Integer Integer Integer (Set ExprZ)
 
 evalWitness :: Model Integer -> Witness -> Integer
 evalWitness model (WCase1 c e) = LA.evalExpr model e `div` c
 evalWitness model (WCase2 c j delta us)
-  | null us'  = j `div` c
+  | Set.null us' = j `div` c
   | otherwise = (j + (((u - delta - 1) `div` delta) * delta)) `div` c
   where
-    us' = map (LA.evalExpr model) us
-    u = minimum us'
+    us' = Set.map (LA.evalExpr model) us
+    u = Set.findMin us'
 
 -- ---------------------------------------------------------------------------
 
@@ -311,26 +313,26 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
         f (Lit (Pos _)) = 1
 
     -- ts = {t | t < x は formula1 に現れる原子論理式}
-    ts :: [ExprZ]
+    ts :: Set ExprZ
     ts = f formula1
       where
-        f :: QFFormula -> [ExprZ]
-        f T = []
-        f F = []
-        f (And a b) = f a ++ f b
-        f (Or a b) = f a ++ f b
-        f (Lit (Divisible _ _ _)) = []
+        f :: QFFormula -> Set ExprZ
+        f T = Set.empty
+        f F = Set.empty
+        f (And a b) = f a `Set.union` f b
+        f (Or a b) = f a `Set.union` f b
+        f (Lit (Divisible _ _ _)) = Set.empty
         f (Lit (Pos e)) =
           case LA.extractMaybe x e of
-            Nothing -> []
-            Just (1, e')  -> [negateV e'] -- Pos e <=> (x + e' > 0) <=> (-e' < x)
-            Just (-1, _) -> [] -- Pos e <=> (-x + e' > 0) <=> (x < e')
+            Nothing -> Set.empty
+            Just (1, e') -> Set.singleton (negateV e') -- Pos e <=> (x + e' > 0) <=> (-e' < x)
+            Just (-1, _) -> Set.empty -- Pos e <=> (-x + e' > 0) <=> (x < e')
             _ -> error "should not happen"
 
     -- formula1を真にする最小のxが存在する場合
     case1 :: [(QFFormula, Witness)]
     case1 = [ (subst1 x e formula1, WCase1 c e)
-            | j <- [1..delta], t <- ts, let e = t ^+^ LA.constant j ]
+            | j <- [1..delta], t <- Set.toList ts, let e = t ^+^ LA.constant j ]
 
     -- formula1のなかの x < t を真に t < x を偽に置き換えた論理式
     formula2 :: QFFormula
@@ -350,21 +352,21 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
         f lit@(Lit (Divisible _ _ _)) = lit
 
     -- us = {u | x < u は formula1 に現れる原子論理式}
-    us :: [ExprZ]
+    us :: Set ExprZ
     us = f formula1
       where
-        f :: QFFormula -> [ExprZ]
-        f T = []
-        f F = []
-        f (And a b) = f a ++ f b
-        f (Or a b) = f a ++ f b
+        f :: QFFormula -> Set ExprZ
+        f T = Set.empty
+        f F = Set.empty
+        f (And a b) = f a `Set.union` f b
+        f (Or a b) = f a `Set.union` f b
         f (Lit (Pos e)) =
           case LA.extractMaybe x e of
-            Nothing -> []
-            Just (1, _)   -> []   -- Pos e <=> ( x + e' > 0) <=> -e' < x
-            Just (-1, e') -> [e'] -- Pos e <=> (-x + e' > 0) <=>  x  < e'
+            Nothing -> Set.empty
+            Just (1, _)   -> Set.empty -- Pos e <=> (x + e' > 0) <=> -e' < x
+            Just (-1, e') -> Set.singleton e' -- Pos e <=> (-x + e' > 0) <=>  x  < e'
             _ -> error "should not happen"
-        f (Lit (Divisible _ _ _)) = []
+        f (Lit (Divisible _ _ _)) = Set.empty
 
     -- formula1を真にする最小のxが存在しない場合
     case2 :: [(QFFormula, Witness)]
