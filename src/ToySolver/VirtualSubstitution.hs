@@ -21,7 +21,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.VirtualSubstitution
-  ( QFFormula (..)
+  ( QFFormula
   , evalQFFormula
   , project
   , project'
