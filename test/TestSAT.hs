@@ -465,6 +465,14 @@ case_addFormula = do
   ret <- solve solver
   ret @?= False
 
+case_addFormula_Peirces_Law = do
+  solver <- newSolver
+  enc <- Tseitin.newEncoder solver
+  [x1,x2] <- replicateM 5 $ liftM Atom $ newVar solver
+  Tseitin.addFormula enc $ notB $ ((x1 .=>. x2) .=>. x1) .=>. x1
+  ret <- solve solver
+  ret @?= False
+
 case_encodeConj = do
   solver <- newSolver
   enc <- Tseitin.newEncoder solver
