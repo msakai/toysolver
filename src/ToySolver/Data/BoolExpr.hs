@@ -20,13 +20,14 @@ module ToySolver.Data.BoolExpr
 
   -- * Operations
   , fold
+  , simplify
   ) where
 
 import Control.Applicative
 import Control.DeepSeq
 import Control.Monad
 import Data.Data
-import Data.Foldable hiding (fold)
+import Data.Foldable hiding (fold, concat, any)
 import Data.Hashable
 import Data.Traversable
 import ToySolver.Data.Boolean
@@ -105,3 +106,47 @@ fold f = g
     g (Imply x y) = g x .=>. g y
     g (Equiv x y) = g x .<=>. g y
 
+{-# RULES
+  "fold/fmap"    forall f g e.  fold f (fmap g e) = fold (f.g) e
+ #-}
+
+simplify :: BoolExpr a -> BoolExpr a
+simplify = runSimplify . fold (Simplify . Atom)
+
+newtype Simplify a = Simplify{ runSimplify :: BoolExpr a }
+
+instance Complement (Simplify a) where
+  notB (Simplify (Not x)) = Simplify x
+  notB (Simplify x) = Simplify (Not x)
+
+instance MonotoneBoolean (Simplify a) where
+  orB xs
+    | any isTrue ys = Simplify true
+    | otherwise = Simplify $ Or ys
+    where
+      ys = concat [f x | Simplify x <- xs]
+      f (Or zs) = zs
+      f z = [z]
+  andB xs 
+    | any isFalse ys = Simplify false
+    | otherwise = Simplify $ And ys
+    where
+      ys = concat [f x | Simplify x <- xs]
+      f (And zs) = zs
+      f z = [z]
+
+instance Boolean (Simplify a) where
+  Simplify x .=>. Simplify y
+    | isFalse x = true
+    | isTrue y  = true
+    | isTrue x  = Simplify y
+    | isFalse y = notB (Simplify x)
+    | otherwise = Simplify (x .=>. y)
+
+isTrue :: BoolExpr a -> Bool
+isTrue (And []) = True
+isTrue _ = False
+
+isFalse :: BoolExpr a -> Bool
+isFalse (Or []) = True
+isFalse _ = False
