@@ -30,6 +30,7 @@ import Data.Foldable hiding (fold)
 import Data.Hashable
 import Data.Traversable
 import ToySolver.Data.Boolean
+import ToySolver.Data.Var
 
 -- | Boolean expression over a given type of atoms
 data BoolExpr a
@@ -89,6 +90,10 @@ instance MonotoneBoolean (BoolExpr a) where
 instance Boolean (BoolExpr a) where
   (.=>.) = Imply
   (.<=>.) = Equiv
+
+instance Variables a => Variables (BoolExpr a) where
+  vars = foldMap vars
+
 
 fold :: Boolean b => (atom -> b) -> BoolExpr atom -> b
 fold f = g
