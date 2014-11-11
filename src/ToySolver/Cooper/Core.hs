@@ -29,7 +29,7 @@ module ToySolver.Cooper.Core
       ExprZ
     , Lit (..)
     , evalLit
-    , QFFormula (..)
+    , QFFormula
     , fromLAAtom
     , (.|.)
     , evalQFFormula
@@ -47,16 +47,20 @@ module ToySolver.Cooper.Core
     ) where
 
 import Control.Monad
+import qualified Data.Foldable as Foldable
 import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.Monoid
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.VectorSpace hiding (project)
 
 import ToySolver.Data.ArithRel
 import ToySolver.Data.Boolean
+import ToySolver.Data.BoolExpr (BoolExpr (..))
+import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
 import qualified ToySolver.FourierMotzkin as FM
@@ -82,7 +86,7 @@ geZ = flip leZ
 gtZ = flip gtZ
 
 eqZ :: ExprZ -> ExprZ -> QFFormula
-eqZ e1 e2 = Lit (e1 `leZ` e2) .&&. Lit (e1 `geZ` e2)
+eqZ e1 e2 = Atom (e1 `leZ` e2) .&&. Atom (e1 `geZ` e2)
 
 -- | Literal
 -- 
@@ -105,82 +109,29 @@ instance Complement Lit where
   notB (Divisible b c e) = Divisible (not b) c e
 
 -- | quantifier-free negation normal form
-data QFFormula
-    = T
-    | F
-    | And QFFormula QFFormula
-    | Or QFFormula QFFormula
-    | Lit Lit
-    deriving (Show, Eq, Ord)
-
-instance Complement QFFormula where
-  notB T = false
-  notB F = true
-  notB (And a b) = notB a .||. notB b
-  notB (Or a b) = notB a .&&. notB b
-  notB (Lit lit) = Lit (notB lit)
-
-instance MonotoneBoolean QFFormula where
-  true  = T
-  false = F
-  (.&&.) = And
-  (.||.) = Or
-
-instance Boolean QFFormula
-
-instance Variables QFFormula where
-  vars T = IS.empty
-  vars F = IS.empty
-  vars (And a b) = vars a `IS.union` vars b
-  vars (Or a b)  = vars a `IS.union` vars b
-  vars (Lit l)    = vars l
+type QFFormula = BoolExpr Lit
 
 instance IsArithRel (LA.Expr Integer) QFFormula where
   arithRel op lhs rhs =
     case op of
-      Le  -> Lit $ leZ lhs rhs
-      Ge  -> Lit $ geZ lhs rhs
-      Lt  -> Lit $ ltZ lhs rhs
-      Gt  -> Lit $ gtZ lhs rhs
+      Le  -> Atom $ leZ lhs rhs
+      Ge  -> Atom $ geZ lhs rhs
+      Lt  -> Atom $ ltZ lhs rhs
+      Gt  -> Atom $ gtZ lhs rhs
       Eql -> eqZ lhs rhs
       NEq -> notB $ arithRel Eql lhs rhs
 
 (.|.) :: Integer -> ExprZ -> QFFormula
-n .|. e = Lit $ Divisible True n e
+n .|. e = Atom $ Divisible True n e
 
 subst1 :: Var -> ExprZ -> QFFormula -> QFFormula
-subst1 x e = go
+subst1 x e = fmap f
   where
-    go T = true
-    go F = false
-    go (And a b) =  go a .&&. go b
-    go (Or a b) = go a .||. go b
-    go (Lit (Divisible b c e1)) = Lit $ Divisible b c $ LA.applySubst1 x e e1
-    go (Lit (Pos e1)) = Lit $ Pos $ LA.applySubst1 x e e1
+    f (Divisible b c e1) = Divisible b c $ LA.applySubst1 x e e1
+    f (Pos e1) = Pos $ LA.applySubst1 x e e1
 
 simplify :: QFFormula -> QFFormula
-simplify (And a b) = simplify1 $ simplify a .&&. simplify b
-simplify (Or a b)  = simplify1 $ simplify a .||. simplify b
-simplify formula   = simplify1 formula
-
-simplify1 :: QFFormula -> QFFormula
-simplify1 T = true
-simplify1 F = false
-simplify1 (And a b) =
-  case (a, b) of
-    (T, b') -> b'
-    (a', T) -> a'
-    (F, _) -> false
-    (_, F) -> false
-    (a',b') -> a' .&&. b'
-simplify1 (Or a b) =
-  case (a, b) of
-    (F, b') -> b'
-    (a', F) -> a'
-    (T, _) -> true
-    (_, T) -> true
-    (a',b') -> a' .||. b'
-simplify1 (Lit lit) = simplifyLit lit
+simplify = BoolExpr.simplify . BoolExpr.fold simplifyLit
 
 simplifyLit :: Lit -> QFFormula
 simplifyLit (Pos e) =
@@ -190,7 +141,7 @@ simplifyLit (Pos e) =
       -- e > 0  <=>  e - 1 >= 0
       -- <=>  LA.mapCoeff (`div` d) (e - 1) >= 0
       -- <=>  LA.mapCoeff (`div` d) (e - 1) + 1 > 0
-      Lit $ Pos $ LA.mapCoeff (`div` d) e1 ^+^ LA.constant 1
+      Atom $ Pos $ LA.mapCoeff (`div` d) e1 ^+^ LA.constant 1
   where
     e1 = e ^-^ LA.constant 1
     d  = if null cs then 1 else abs $ foldl1' gcd cs
@@ -198,21 +149,15 @@ simplifyLit (Pos e) =
 simplifyLit lit@(Divisible b c e)
   | LA.coeff LA.unitVar e `mod` d /= 0 = if b then false else true
   | c' == 1   = if b then true else false
-  | d  == 1   = Lit lit
-  | otherwise = Lit $ Divisible b c' e'
+  | d  == 1   = Atom lit
+  | otherwise = Atom $ Divisible b c' e'
   where
     d  = abs $ foldl' gcd c [c2 | (c2,x) <- LA.terms e, x /= LA.unitVar]
     c' = c `div` d
     e' = LA.mapCoeff (`div` d) e
 
 evalQFFormula :: Model Integer -> QFFormula -> Bool
-evalQFFormula m = f
-  where
-    f T = True
-    f F = False
-    f (And x1 x2) = f x1 && f x2
-    f (Or  x1 x2) = f x1 || f x2
-    f (Lit lit)    = evalLit m lit
+evalQFFormula m = BoolExpr.fold (evalLit m)
 
 evalLit :: Model Integer -> Lit -> Bool
 evalLit m (Pos e) = LA.evalExpr m e > 0
@@ -238,7 +183,7 @@ project :: Var -> QFFormula -> (QFFormula, Model Integer -> Model Integer)
 project x formula = (formula', mt)
   where
     xs = projectCases x formula
-    formula' = simplify $ orB [phi | (phi,_) <- xs, phi /= F]
+    formula' = simplify $ orB [phi | (phi,_) <- xs, phi /= false]
     mt m = head $ do
       (phi, mt') <- xs
       guard $ evalQFFormula m phi
@@ -262,67 +207,65 @@ projectCases x formula = do
 projectCases' :: Var -> QFFormula -> [(QFFormula, Witness)]
 projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
   where
+    -- eliminate Not, Imply and Equiv.
+    formula0 :: QFFormula
+    formula0 = pos formula
+      where
+        pos (Atom a) = Atom a
+        pos (And xs) = And (map pos xs)
+        pos (Or xs) = Or (map pos xs)
+        pos (Not x) = neg x
+        pos (Imply x y) = neg x .||. pos y
+        pos (Equiv x y) = pos ((x .=>. y) .&&. (y .=>. x))
+
+        neg (Atom a) = Atom (notB a)
+        neg (And xs) = Or (map neg xs)
+        neg (Or xs) = And (map neg xs)
+        neg (Not x) = pos x
+        neg (Imply x y) = pos x .&&. neg y
+        neg (Equiv x y) = neg ((x .=>. y) .&&. (y .=>. x))
+
     -- xの係数の最小公倍数
     c :: Integer
-    c = f formula
+    c = getLCM $ Foldable.foldMap f formula0
       where
-         f :: QFFormula -> Integer
-         f T = 1
-         f F = 1
-         f (And a b) = lcm (f a) (f b)
-         f (Or a b) = lcm (f a) (f b)
-         f (Lit (Pos e)) = fromMaybe 1 (LA.lookupCoeff x e)
-         f (Lit (Divisible _ _ e)) = fromMaybe 1 (LA.lookupCoeff x e)
-    
+         f (Pos e) = LCM $ fromMaybe 1 (LA.lookupCoeff x e)
+         f (Divisible _ _ e) = LCM $ fromMaybe 1 (LA.lookupCoeff x e)
+
     -- 式をスケールしてxの係数の絶対値をcへと変換し、その後cxをxで置き換え、
     -- xがcで割り切れるという制約を追加した論理式
     formula1 :: QFFormula
-    formula1 = simplify $ f formula .&&. Lit (Divisible True c (LA.var x))
+    formula1 = simplify $ fmap f formula0 .&&. (c .|. LA.var x)
       where
-        f :: QFFormula -> QFFormula
-        f T = T
-        f F = F
-        f (And a b) = f a .&&. f b
-        f (Or a b) = f a .||. f b
-        f lit@(Lit (Pos e)) =
+        f lit@(Pos e) =
           case LA.lookupCoeff x e of
             Nothing -> lit
             Just a ->
               let s = abs (c `div` a)
-              in Lit $ Pos $ g s e
-        f lit@(Lit (Divisible b d e)) =
+              in Pos $ g s e
+        f lit@(Divisible b d e) =
           case LA.lookupCoeff x e of
             Nothing -> lit
             Just a ->
               let s = abs (c `div` a)
-              in Lit $ Divisible b (s*d) $ g s e
+              in Divisible b (s*d) $ g s e
 
         g :: Integer -> ExprZ -> ExprZ
         g s = LA.mapCoeffWithVar (\c' x' -> if x==x' then signum c' else s*c')
 
     -- d|x+t という形の論理式の d の最小公倍数
     delta :: Integer
-    delta = f formula1
+    delta = getLCM $ Foldable.foldMap f formula1
       where
-        f :: QFFormula -> Integer
-        f T = 1
-        f F = 1
-        f (And a b) = lcm (f a) (f b)
-        f (Or a b)  = lcm (f a) (f b)
-        f (Lit (Divisible _ d _)) = d
-        f (Lit (Pos _)) = 1
+        f (Divisible _ d _) = LCM d
+        f (Pos _) = LCM 1
 
     -- ts = {t | t < x は formula1 に現れる原子論理式}
     ts :: Set ExprZ
-    ts = f formula1
+    ts = Foldable.foldMap f formula1
       where
-        f :: QFFormula -> Set ExprZ
-        f T = Set.empty
-        f F = Set.empty
-        f (And a b) = f a `Set.union` f b
-        f (Or a b) = f a `Set.union` f b
-        f (Lit (Divisible _ _ _)) = Set.empty
-        f (Lit (Pos e)) =
+        f (Divisible _ _ _) = Set.empty
+        f (Pos e) =
           case LA.extractMaybe x e of
             Nothing -> Set.empty
             Just (1, e') -> Set.singleton (negateV e') -- Pos e <=> (x + e' > 0) <=> (-e' < x)
@@ -336,37 +279,27 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
 
     -- formula1のなかの x < t を真に t < x を偽に置き換えた論理式
     formula2 :: QFFormula
-    formula2 = simplify $ f formula1
+    formula2 = simplify $ BoolExpr.fold f formula1
       where        
-        f :: QFFormula -> QFFormula
-        f T = T
-        f F = F
-        f (And a b) = f a .&&. f b
-        f (Or a b) = f a .||. f b
-        f lit@(Lit (Pos e)) =
+        f lit@(Pos e) =
           case LA.lookupCoeff x e of
-            Nothing -> lit
-            Just 1    -> F -- Pos e <=> ( x + e' > 0) <=> -e' < x
-            Just (-1) -> T -- Pos e <=> (-x + e' > 0) <=>  x  < e'
+            Nothing -> Atom lit
+            Just 1    -> false -- Pos e <=> ( x + e' > 0) <=> -e' < x
+            Just (-1) -> true  -- Pos e <=> (-x + e' > 0) <=>  x  < e'
             _ -> error "should not happen"
-        f lit@(Lit (Divisible _ _ _)) = lit
+        f lit@(Divisible _ _ _) = Atom lit
 
     -- us = {u | x < u は formula1 に現れる原子論理式}
     us :: Set ExprZ
-    us = f formula1
+    us = Foldable.foldMap f formula1
       where
-        f :: QFFormula -> Set ExprZ
-        f T = Set.empty
-        f F = Set.empty
-        f (And a b) = f a `Set.union` f b
-        f (Or a b) = f a `Set.union` f b
-        f (Lit (Pos e)) =
+        f (Pos e) =
           case LA.extractMaybe x e of
             Nothing -> Set.empty
             Just (1, _)   -> Set.empty -- Pos e <=> (x + e' > 0) <=> -e' < x
             Just (-1, e') -> Set.singleton e' -- Pos e <=> (-x + e' > 0) <=>  x  < e'
             _ -> error "should not happen"
-        f (Lit (Divisible _ _ _)) = Set.empty
+        f (Divisible _ _ _) = Set.empty
 
     -- formula1を真にする最小のxが存在しない場合
     case2 :: [(QFFormula, Witness)]
@@ -384,12 +317,20 @@ projectCasesN vs2 = f (IS.toList vs2)
 
 -- ---------------------------------------------------------------------------
 
+newtype LCM a = LCM{ getLCM :: a }
+
+instance Integral a => Monoid (LCM a) where
+  mempty = LCM 1
+  LCM a `mappend` LCM b = LCM $ lcm a b
+
+-- ---------------------------------------------------------------------------
+
 solveQFFormula :: VarSet -> QFFormula -> Maybe (Model Integer)
 solveQFFormula vs formula = listToMaybe $ do
   (formula2, mt) <- projectCasesN vs formula
-  case formula2 of
-    T -> return $ mt IM.empty
-    _  -> mzero
+  let m = IM.empty
+  guard $ evalQFFormula m formula2
+  return $ mt m
 
 -- | solve a (open) quantifier-free formula
 solve :: VarSet -> [LA.Atom Rational] -> Maybe (Model Integer)

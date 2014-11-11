@@ -27,7 +27,7 @@ module ToySolver.Cooper
     -- * Language of presburger arithmetics
       ExprZ
     , Lit (..)
-    , QFFormula (..)
+    , QFFormula
     , fromLAAtom
     , (.|.)
 

@@ -28,17 +28,17 @@ import ToySolver.Cooper.Core
 eliminateQuantifiers :: FOL.Formula (FOL.Atom Rational) -> Maybe QFFormula
 eliminateQuantifiers = f
   where
-    f FOL.T = return T
-    f FOL.F = return F
+    f FOL.T = return true
+    f FOL.F = return false
     f (FOL.Atom (ArithRel a op b)) = do
        a' <- LAFOL.fromFOLExpr a
        b' <- LAFOL.fromFOLExpr b
        return $ fromLAAtom (ArithRel a' op b')
     f (FOL.And a b) = liftM2 (.&&.) (f a) (f b)
     f (FOL.Or a b) = liftM2 (.||.) (f a) (f b)
-    f (FOL.Not a) = f (FOL.pushNot a)
-    f (FOL.Imply a b) = f $ FOL.Or (FOL.Not a) b
-    f (FOL.Equiv a b) = f $ FOL.And (FOL.Imply a b) (FOL.Imply b a)
+    f (FOL.Not a) = liftM notB (f a)
+    f (FOL.Imply a b) = liftM2 (.=>.) (f a) (f b)
+    f (FOL.Equiv a b) = liftM2 (.<=>.) (f a) (f b)
     f (FOL.Forall x body) = liftM notB $ f $ FOL.Exists x $ FOL.Not body
     f (FOL.Exists x body) = liftM (fst . project x) (f body)
 
