@@ -1,4 +1,10 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, BangPatterns, TypeSynonymInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, BangPatterns, TypeSynonymInstances, CPP #-}
+#ifdef __GLASGOW_HASKELL__
+#define UNBOXED_COMPARISON_ARGUMENTS
+#endif
+#ifdef UNBOXED_COMPARISON_ARGUMENTS
+{-# LANGUAGE MagicHash #-}
+#endif
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -46,6 +52,9 @@ import Control.Monad
 import qualified Data.Array.IO as A
 import Data.Queue.Classes
 import qualified ToySolver.Internal.Data.Vec as Vec
+#ifdef UNBOXED_COMPARISON_ARGUMENTS
+import GHC.Exts
+#endif
 
 type Index = Int
 type Value = Int
@@ -53,7 +62,11 @@ type Value = Int
 -- | Priority queue implemented as array-based binary heap.
 data PriorityQueue
   = PriorityQueue
+#ifdef UNBOXED_COMPARISON_ARGUMENTS
+  { lt#  :: !(Int# -> Int# -> IO Bool)
+#else
   { lt   :: !(Value -> Value -> IO Bool)
+#endif
   , heap :: !(Vec.UVec Value)
   , table  :: !(Vec.UVec Index)
   }
@@ -62,12 +75,36 @@ data PriorityQueue
 newPriorityQueue :: IO PriorityQueue
 newPriorityQueue = newPriorityQueueBy (\a b -> return (a < b))
 
+#ifdef UNBOXED_COMPARISON_ARGUMENTS
+
+{-# INLINE newPriorityQueueBy #-}
+-- | Build a priority queue with a given /less than/ operator.
+newPriorityQueueBy :: (Value -> Value -> IO Bool) -> IO PriorityQueue
+newPriorityQueueBy cmp = newPriorityQueueBy# cmp#
+  where
+    cmp# a b = cmp (I# a) (I# b)
+
+-- | Build a priority queue with a given /less than/ operator.
+newPriorityQueueBy# :: (Int# -> Int# -> IO Bool) -> IO PriorityQueue
+newPriorityQueueBy# cmp# = do
+  vec <- Vec.new
+  idx <- Vec.new
+  return $ PriorityQueue{ lt# = cmp#, heap = vec, table = idx }
+
+{-# INLINE lt #-}
+lt :: PriorityQueue -> Value -> Value -> IO Bool
+lt q (I# a) (I# b) = lt# q a b
+
+#else
+
 -- | Build a priority queue with a given /less than/ operator.
 newPriorityQueueBy :: (Value -> Value -> IO Bool) -> IO PriorityQueue
 newPriorityQueueBy cmp = do
   vec <- Vec.new
   idx <- Vec.new
   return $ PriorityQueue{ lt = cmp, heap = vec, table = idx }
+
+#endif
 
 -- | Return a list of all the elements of a priority queue. (not sorted)
 getElems :: PriorityQueue -> IO [Value]
@@ -84,7 +121,7 @@ clone :: PriorityQueue -> IO PriorityQueue
 clone q = do
   h2 <- Vec.clone (heap q)
   t2 <- Vec.clone (table q)
-  return $ PriorityQueue{ lt = lt q, heap = h2, table = t2 }
+  return $ q{ heap = h2, table = t2 }
 
 instance NewFifo PriorityQueue IO where
   newFifo = newPriorityQueue
