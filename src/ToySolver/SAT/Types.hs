@@ -51,6 +51,11 @@ module ToySolver.SAT.Types
   , pbLowerBound
   , pbUpperBound
   , pbSubsume
+
+  -- * XOR Clause
+  , XORClause
+  , normalizeXORClause
+  , evalXORClause
   ) where
 
 import Control.Monad
@@ -302,3 +307,32 @@ pbSubsume (lhs1,rhs1) (lhs2,rhs2) =
   rhs1 >= rhs2 && and [di >= ci | (ci,li) <- lhs1, let di = IntMap.findWithDefault 0 li lhs2']
   where
     lhs2' = IntMap.fromList [(l,c) | (c,l) <- lhs2]
+
+
+-- | XOR clause
+--
+-- '[l1,l2..ln]' means l1⊕l2⊕⋯⊕ln.
+--
+-- We specially treat literal '0' as a constant 'True'.
+type XORClause = [Lit]
+
+-- | Normalize XOR clause
+--
+-- 'Nothing' if the clause is trivially true.
+normalizeXORClause :: XORClause -> XORClause
+normalizeXORClause lits = [x | (x, True) <- IntMap.toList (IntMap.unionsWith xor [f lit | lit <- lits])]
+  where         
+    xor = (/=)
+
+    f 0 = IntMap.singleton 0 True
+    f lit =
+      if litPolarity lit
+      then IntMap.singleton lit True
+      else IntMap.fromList [(litVar lit, True), (0, True)]  -- ¬x = x⊕1
+
+evalXORClause :: IModel m => m -> XORClause -> Bool
+evalXORClause m lits = foldl' xor False (map f lits)
+  where
+    xor = (/=)
+    f 0 = True
+    f lit = evalLit m lit

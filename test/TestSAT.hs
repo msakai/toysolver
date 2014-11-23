@@ -369,6 +369,28 @@ case_pbSubsume_2 = pbSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)
 
 ------------------------------------------------------------------------
 
+case_normalizeXORClause_False =
+  normalizeXORClause [] @?= []
+
+case_normalizeXORClause_True =
+  normalizeXORClause [0] @?= [0]
+
+-- x ⊕ y ⊕ x = x
+case_normalizeXORClause_case1 =
+  normalizeXORClause [1,2,1] @?= [2]
+
+-- x ⊕ ¬x = x ⊕ x ⊕ 1 = 1
+case_normalizeXORClause_case2 =
+  normalizeXORClause [1,-1] @?= [0]
+
+case_evalXORClause_case1 =
+  evalXORClause (array (1,2) [(1,True),(2,True)] :: Array Int Bool) [0,1,2] @?= True
+
+case_evalXORClause_case2 =
+  evalXORClause (array (1,2) [(1,False),(2,True)] :: Array Int Bool) [0,1,2] @?= False
+
+------------------------------------------------------------------------
+
 -- from "Pueblo: A Hybrid Pseudo-Boolean SAT Solver"
 -- clauseがunitになるレベルで、PB制約が違反状態のままという例。
 case_hybridLearning_1 :: IO ()
