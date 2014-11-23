@@ -217,13 +217,12 @@ litData :: Solver -> Lit -> IO LitData
 litData solver !l =
   -- litVar による heap allocation を避けるために、
   -- litPolarityによる分岐後にvarDataを呼ぶ。
-  if litPolarity l
-    then do
-      vd <- varData solver l
-      return $ vdPosLitData vd
-    else do
-      vd <- varData solver (negate l)
-      return $ vdNegLitData vd
+  if litPolarity l then do
+    vd <- varData solver l
+    return $ vdPosLitData vd
+  else do
+    vd <- varData solver (negate l)
+    return $ vdNegLitData vd
 
 {-# INLINE varValue #-}
 varValue :: Solver -> Var -> IO LBool
@@ -239,11 +238,11 @@ litValue :: Solver -> Lit -> IO LBool
 litValue solver !l = do
   -- litVar による heap allocation を避けるために、
   -- litPolarityによる分岐後にvarDataを呼ぶ。
-  if litPolarity l
-    then varValue solver l
-    else do
-      m <- varValue solver (negate l)
-      return $! lnot m
+  if litPolarity l then
+    varValue solver l
+  else do
+    m <- varValue solver (negate l)
+    return $! lnot m
 
 varLevel :: Solver -> Var -> IO Level
 varLevel solver !v = do
@@ -490,11 +489,11 @@ reduceDB solver = do
         flag <- if isShort
                 then return True
                 else isLocked solver c
-        if flag
-          then loop rest (c:ret)
-          else do
-            detach solver c
-            loop rest ret
+        if flag then
+          loop rest (c:ret)
+        else do
+          detach solver c
+          loop rest ret
   zs2 <- loop zs []
 
   let cs2 = zs2 ++ map fst ws
@@ -821,14 +820,13 @@ addPBAtLeast solver ts n = do
           c <- newPBHandler solver ts' degree False
           addToDB solver c
           ret <- attach solver c
-          if not ret
-           then do
-             markBad solver
-           else do
-             ret2 <- deduce solver
-             case ret2 of
-               Nothing -> return ()
-               Just _ -> markBad solver
+          if not ret then do
+            markBad solver
+          else do
+            ret2 <- deduce solver
+            case ret2 of
+              Nothing -> return ()
+              Just _ -> markBad solver
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMost :: Solver          -- ^ The 'Solver' argument.
@@ -912,81 +910,81 @@ solve_ solver = do
   writeIORef (svFailedAssumptions solver) []
 
   ok <- readIORef (svOk solver)
-  if not ok
-    then return False
-    else do
-      when debugMode $ dumpVarActivity solver
-      d <- readIORef (svLevel solver)
-      assert (d == levelRoot) $ return ()
+  if not ok then
+    return False
+  else do
+    when debugMode $ dumpVarActivity solver
+    d <- readIORef (svLevel solver)
+    assert (d == levelRoot) $ return ()
 
-      restartStrategy <- readIORef (svRestartStrategy solver)
-      restartFirst  <- readIORef (svRestartFirst solver)
-      restartInc    <- readIORef (svRestartInc solver)
-      let restartSeq = mkRestartSeq restartStrategy restartFirst restartInc
+    restartStrategy <- readIORef (svRestartStrategy solver)
+    restartFirst  <- readIORef (svRestartFirst solver)
+    restartInc    <- readIORef (svRestartInc solver)
+    let restartSeq = mkRestartSeq restartStrategy restartFirst restartInc
 
-      let learntSizeAdj = do
-            (size,adj) <- shift (svLearntLimSeq solver)
-            writeIORef (svLearntLim solver) size
-            writeIORef (svLearntLimAdjCnt solver) adj
-          onConflict = do
-            cnt <- readIORef (svLearntLimAdjCnt solver)
-            if (cnt==0)
-            then learntSizeAdj
-            else writeIORef (svLearntLimAdjCnt solver) $! cnt-1
+    let learntSizeAdj = do
+          (size,adj) <- shift (svLearntLimSeq solver)
+          writeIORef (svLearntLim solver) size
+          writeIORef (svLearntLimAdjCnt solver) adj
+        onConflict = do
+          cnt <- readIORef (svLearntLimAdjCnt solver)
+          if (cnt==0)
+          then learntSizeAdj
+          else writeIORef (svLearntLimAdjCnt solver) $! cnt-1
 
-      cnt <- readIORef (svLearntLimAdjCnt solver)
-      when (cnt == -1) $ do
-        learntSizeFirst <- readIORef (svLearntSizeFirst solver)
-        learntSizeInc   <- readIORef (svLearntSizeInc solver)
-        nc <- nConstraints solver
-        nv <- nVars solver
-        let initialLearntLim = if learntSizeFirst > 0 then learntSizeFirst else max ((nc + nv) `div` 3) 16
-            learntSizeSeq    = iterate (ceiling . (learntSizeInc*) . fromIntegral) initialLearntLim
-            learntSizeAdjSeq = iterate (\x -> (x * 3) `div` 2) (100::Int)
-        writeIORef (svLearntLimSeq solver) (zip learntSizeSeq learntSizeAdjSeq)
-        learntSizeAdj
+    cnt <- readIORef (svLearntLimAdjCnt solver)
+    when (cnt == -1) $ do
+      learntSizeFirst <- readIORef (svLearntSizeFirst solver)
+      learntSizeInc   <- readIORef (svLearntSizeInc solver)
+      nc <- nConstraints solver
+      nv <- nVars solver
+      let initialLearntLim = if learntSizeFirst > 0 then learntSizeFirst else max ((nc + nv) `div` 3) 16
+          learntSizeSeq    = iterate (ceiling . (learntSizeInc*) . fromIntegral) initialLearntLim
+          learntSizeAdjSeq = iterate (\x -> (x * 3) `div` 2) (100::Int)
+      writeIORef (svLearntLimSeq solver) (zip learntSizeSeq learntSizeAdjSeq)
+      learntSizeAdj
 
-      let loop [] = error "solve_: should not happen"
-          loop (conflict_lim:rs) = do
-            printStat solver True
-            ret <- search solver conflict_lim onConflict
-            case ret of
-              SRFinished x -> return $ Just x
-              SRBudgetExceeded -> return Nothing
-              SRRestart -> do
-                modifyIORef' (svNRestart solver) (+1)
-                backtrackTo solver levelRoot
-                loop rs
+    let loop [] = error "solve_: should not happen"
+        loop (conflict_lim:rs) = do
+          printStat solver True
+          ret <- search solver conflict_lim onConflict
+          case ret of
+            SRFinished x -> return $ Just x
+            SRBudgetExceeded -> return Nothing
+            SRRestart -> do
+              modifyIORef' (svNRestart solver) (+1)
+              backtrackTo solver levelRoot
+              loop rs
 
-      printStatHeader solver
+    printStatHeader solver
 
-      startCPU <- getCPUTime
-      startWC  <- getCurrentTime
-      writeIORef (svStartWC solver) startWC
-      result <- loop restartSeq
-      endCPU <- getCPUTime
-      endWC  <- getCurrentTime
+    startCPU <- getCPUTime
+    startWC  <- getCurrentTime
+    writeIORef (svStartWC solver) startWC
+    result <- loop restartSeq
+    endCPU <- getCPUTime
+    endWC  <- getCurrentTime
 
-      when (result == Just True) $ do
-        checkModel <- readIORef (svCheckModel solver)
-        when checkModel $ checkSatisfied solver
-        constructModel solver
+    when (result == Just True) $ do
+      checkModel <- readIORef (svCheckModel solver)
+      when checkModel $ checkSatisfied solver
+      constructModel solver
 
-      backtrackTo solver levelRoot
+    backtrackTo solver levelRoot
 
-      when debugMode $ dumpVarActivity solver
-      when debugMode $ dumpConstrActivity solver
-      printStat solver True
-      (log solver . printf "#cpu_time = %.3fs") (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
-      (log solver . printf "#wall_clock_time = %.3fs") (realToFrac (endWC `diffUTCTime` startWC) :: Double)
-      (log solver . printf "#decision = %d") =<< readIORef (svNDecision solver)
-      (log solver . printf "#random_decision = %d") =<< readIORef (svNRandomDecision solver)
-      (log solver . printf "#conflict = %d") =<< readIORef (svNConflict solver)
-      (log solver . printf "#restart = %d")  =<< readIORef (svNRestart solver)
+    when debugMode $ dumpVarActivity solver
+    when debugMode $ dumpConstrActivity solver
+    printStat solver True
+    (log solver . printf "#cpu_time = %.3fs") (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
+    (log solver . printf "#wall_clock_time = %.3fs") (realToFrac (endWC `diffUTCTime` startWC) :: Double)
+    (log solver . printf "#decision = %d") =<< readIORef (svNDecision solver)
+    (log solver . printf "#random_decision = %d") =<< readIORef (svNRandomDecision solver)
+    (log solver . printf "#conflict = %d") =<< readIORef (svNConflict solver)
+    (log solver . printf "#restart = %d")  =<< readIORef (svNRestart solver)
 
-      case result of
-        Just x  -> return x
-        Nothing -> throw BudgetExceeded
+    case result of
+      Just x  -> return x
+      Nothing -> throw BudgetExceeded
 
 data BudgetExceeded = BudgetExceeded
   deriving (Show, Typeable)
@@ -1045,22 +1043,22 @@ search solver !conflict_lim onConflict = do
       !b <- getBounds as
       let go = do
               d <- readIORef (svLevel solver)
-              if not (inRange b (d+1))
-                then return (Just litUndef)
-                else do
-                  l <- readArray as (d+1)
-                  val <- litValue solver l
-                  if val == lTrue then do
-                     -- dummy decision level
-                     modifyIORef' (svLevel solver) (+1)
-                     go
-                   else if val == lFalse then do
-                     -- conflict with assumption
-                     core <- analyzeFinal solver l
-                     writeIORef (svFailedAssumptions solver) core
-                     return Nothing
-                   else
-                     return (Just l)
+              if not (inRange b (d+1)) then
+                return (Just litUndef)
+              else do
+                l <- readArray as (d+1)
+                val <- litValue solver l
+                if val == lTrue then do
+                  -- dummy decision level
+                  modifyIORef' (svLevel solver) (+1)
+                  go
+                else if val == lFalse then do
+                  -- conflict with assumption
+                  core <- analyzeFinal solver l
+                  writeIORef (svFailedAssumptions solver) core
+                  return Nothing
+                else
+                  return (Just l)
       go
 
     handleConflict :: IORef Int -> SomeConstraintHandler -> IO (Maybe SearchResult)
@@ -1181,11 +1179,10 @@ simplify solver = do
       loop (y:ys) rs !n = do
         b1 <- isSatisfied solver y
         b2 <- isLocked solver y
-        if b1 && not b2
-         then do
-           detach solver y
-           loop ys rs (n+1)
-         else loop ys (y:rs) n
+        if b1 && not b2 then do
+          detach solver y
+          loop ys rs (n+1)
+        else loop ys (y:rs) n
 
   -- simplify original constraint DB
   do
@@ -1261,11 +1258,10 @@ removeConstraintHandlers _ zs | HashSet.null zs = return ()
 removeConstraintHandlers solver zs = do
   let loop [] rs !n     = return (rs,n)
       loop (c:cs) rs !n = do
-        if c `HashSet.member` zs
-         then do
-           detach solver c
-           loop cs rs (n+1)
-         else loop cs (c:rs) n
+        if c `HashSet.member` zs then do
+          detach solver c
+          loop cs rs (n+1)
+        else loop cs (c:rs) n
   xs <- readIORef (svConstrDB solver)
   (ys,n) <- loop xs [] (0::Int)
   modifyIORef' (svNRemovedConstr solver) (+n)
@@ -1425,17 +1421,15 @@ pickBranchLit !solver = do
   !size <- PQ.queueSize vqueue
   !r <- withRandGen Rand.random
   var <-
-    if (r < randfreq && size >= 2)
-    then do
+    if (r < randfreq && size >= 2) then do
       a <- PQ.getHeapArray vqueue
       i <- withRandGen $ Rand.randomR (0, size-1)
       var <- readArray a i
       val <- varValue solver var
-      if val == lUndef
-       then do
-         modifyIORef' (svNRandomDecision solver) (1+)
-         return var
-       else return litUndef
+      if val == lUndef then do
+        modifyIORef' (svNRandomDecision solver) (1+)
+        return var
+      else return litUndef
     else
       return litUndef
 
@@ -1455,13 +1449,13 @@ pickBranchLit !solver = do
     then loop
     else return var
 
-  if var2==litUndef
-    then return litUndef
-    else do
-      vd <- varData solver var2
-      -- TODO: random polarity
-      p <- readIORef (vdPolarity vd)
-      return $! literal var2 p
+  if var2==litUndef then
+    return litUndef
+  else do
+    vd <- varData solver var2
+    -- TODO: random polarity
+    p <- readIORef (vdPolarity vd)
+    return $! literal var2 p
 
 decide :: Solver -> Lit -> IO ()
 decide solver !lit = do
@@ -1495,11 +1489,11 @@ deduce solver = loop
       let loop2 [] = return Nothing
           loop2 (w:ws) = do
             ok <- propagate solver w falsifiedLit
-            if ok
-              then loop2 ws
-              else do
-                modifyIORef wsref (++ws)
-                return (Just w)
+            if ok then
+              loop2 ws
+            else do
+              modifyIORef wsref (++ws)
+              return (Just w)
       ws <- readIORef wsref
       writeIORef wsref []
       loop2 ws
@@ -1515,11 +1509,11 @@ analyzeConflict solver constr = do
           go (xs,ys) (l:ls) = do
             lv <- litLevel solver l
             if lv == levelRoot then
-                go (xs,ys) ls
-              else if lv >= d then
-                go (IS.insert l xs, ys) ls
-              else
-                go (xs, IS.insert l ys) ls
+              go (xs,ys) ls
+            else if lv >= d then
+              go (IS.insert l xs, ys) ls
+            else
+              go (xs, IS.insert l ys) ls
 
   let loop :: LitSet -> LitSet -> IO LitSet
       loop lits1 lits2
@@ -1574,19 +1568,19 @@ analyzeFinal solver p = do
       go (l:ls) seen result = do
         lv <- litLevel solver l
         if lv == levelRoot then
-           return result
-         else if litVar l `IS.member` seen then do
-           r <- varReason solver (litVar l)
-           case r of
-             Nothing -> do
-               let seen' = IS.delete (litVar l) seen
-               go ls seen' (l : result)
-             Just constr  -> do
-               c <- reasonOf solver constr (Just l)
-               let seen' = IS.delete (litVar l) seen `IS.union` IS.fromList [litVar l2 | l2 <- c]
-               go ls seen' result
-         else
-           go ls seen result
+          return result
+        else if litVar l `IS.member` seen then do
+          r <- varReason solver (litVar l)
+          case r of
+            Nothing -> do
+              let seen' = IS.delete (litVar l) seen
+              go ls seen' (l : result)
+            Just constr  -> do
+              c <- reasonOf solver constr (Just l)
+              let seen' = IS.delete (litVar l) seen `IS.union` IS.fromList [litVar l2 | l2 <- c]
+              go ls seen' result
+        else
+          go ls seen result
   go lits (IS.singleton (litVar p)) [p]
 
 analyzeConflictHybrid :: ConstraintHandler c => Solver -> c -> IO ((Clause, Level), (PBLinAtLeast, Level))
@@ -1600,11 +1594,11 @@ analyzeConflictHybrid solver constr = do
           go (xs,ys) (l:ls) = do
             lv <- litLevel solver l
             if lv == levelRoot then
-                go (xs,ys) ls
-              else if lv >= d then
-                go (IS.insert l xs, ys) ls
-              else
-                go (xs, IS.insert l ys) ls
+              go (xs,ys) ls
+            else if lv >= d then
+              go (IS.insert l xs, ys) ls
+            else
+              go (xs, IS.insert l ys) ls
 
   let loop :: LitSet -> LitSet -> PBLinAtLeast -> IO (LitSet, PBLinAtLeast)
       loop lits1 lits2 pb
@@ -1691,11 +1685,11 @@ minimizeConflictClause :: Solver -> LitSet -> IO LitSet
 minimizeConflictClause solver lits = do
   ccmin <- readIORef (svCCMin solver)
   if ccmin >= 2 then
-     minimizeConflictClauseRecursive solver lits
-   else if ccmin >= 1 then
-     minimizeConflictClauseLocal solver lits
-   else
-     return lits
+    minimizeConflictClauseRecursive solver lits
+  else if ccmin >= 1 then
+    minimizeConflictClauseLocal solver lits
+  else
+    return lits
 
 minimizeConflictClauseLocal :: Solver -> LitSet -> IO LitSet
 minimizeConflictClauseLocal solver lits = do
@@ -1738,15 +1732,15 @@ minimizeConflictClauseRecursive solver lits = do
     go [] _ = return True
     go (lit : ls) seen = do
       lv <- litLevel solver lit
-      if lv == levelRoot || lit `IS.member` lits || lit `IS.member` seen
-        then go ls seen
-        else do
-          c <- varReason solver (litVar lit)
-          case c of
-            Nothing -> return False
-            Just c2 -> do
-              ls2 <- reasonOf solver c2 (Just (litNot lit))
-              go (ls2 ++ ls) (IS.insert lit seen)
+      if lv == levelRoot || lit `IS.member` lits || lit `IS.member` seen then
+        go ls seen
+      else do
+        c <- varReason solver (litVar lit)
+        case c of
+          Nothing -> return False
+          Just c2 -> do
+            ls2 <- reasonOf solver c2 (Just (litNot lit))
+            go (ls2 ++ ls) (IS.insert lit seen)
 
   let xs = IS.toAscList lits
   ys <- filterM (liftM not . isRedundant) xs
@@ -1963,13 +1957,12 @@ isLocked solver c = anyM p =<< watchedLiterals solver c
     p :: Lit -> IO Bool
     p lit = do
       val <- litValue solver lit
-      if val /= lTrue
-        then return False
-        else do
-          m <- varReason solver (litVar lit)
-          case m of
-            Nothing -> return False
-            Just c2 -> return $! c == c2
+      if val /= lTrue then return False
+      else do
+        m <- varReason solver (litVar lit)
+        case m of
+          Nothing -> return False
+          Just c2 -> return $! c == c2
 
 data SomeConstraintHandler
   = CHClause !ClauseHandler
@@ -2187,28 +2180,27 @@ instance ConstraintHandler ClauseHandler where
 
     !lit0 <- unsafeRead a 0
     !val0 <- litValue solver lit0
-    if val0 == lTrue
-      then do
-        watch solver falsifiedLit this
-        return True
-      else do
-        (!lb,!ub) <- getBounds a
-        assert (lb==0) $ return ()
-        i <- findForWatch solver a 2 ub
-        case i of
-          -1 -> do
-            when debugMode $ logIO solver $ do
-               str <- showConstraintHandler solver this
-               return $ printf "basicPropagate: %s is unit" str
-            watch solver falsifiedLit this
-            assignBy solver lit0 this
-          _  -> do
-            !lit1 <- unsafeRead a 1
-            !liti <- unsafeRead a i
-            unsafeWrite a 1 liti
-            unsafeWrite a i lit1
-            watch solver liti this
-            return True
+    if val0 == lTrue then do
+      watch solver falsifiedLit this
+      return True
+    else do
+      (!lb,!ub) <- getBounds a
+      assert (lb==0) $ return ()
+      i <- findForWatch solver a 2 ub
+      case i of
+        -1 -> do
+          when debugMode $ logIO solver $ do
+             str <- showConstraintHandler solver this
+             return $ printf "basicPropagate: %s is unit" str
+          watch solver falsifiedLit this
+          assignBy solver lit0 this
+        _  -> do
+          !lit1 <- unsafeRead a 1
+          !liti <- unsafeRead a i
+          unsafeWrite a 1 liti
+          unsafeWrite a i lit1
+          watch solver liti this
+          return True
 
     where
       a = claLits this2
@@ -2255,11 +2247,11 @@ instantiateClause solver = loop []
     loop ret (l:ls) = do
       val <- litValue solver l
       if val==lTrue then
-         return Nothing
-       else if val==lFalse then
-         loop ret ls
-       else
-         loop (l : ret) ls
+        return Nothing
+      else if val==lFalse then
+        loop ret ls
+      else
+        loop (l : ret) ls
 
 basicAttachClauseHandler :: Solver -> ClauseHandler -> IO Bool
 basicAttachClauseHandler solver this = do
@@ -2449,12 +2441,12 @@ instance ConstraintHandler AtLeastHandler where
             | i >= n = return ()
             | otherwise = do
               li <- unsafeRead a i
-              if (li /= falsifiedLit)
-                then loop (i+1)
-                else do
-                  ln <- unsafeRead a n
-                  unsafeWrite a n li
-                  unsafeWrite a i ln
+              if (li /= falsifiedLit) then
+                loop (i+1)
+              else do
+                ln <- unsafeRead a n
+                unsafeWrite a n li
+                unsafeWrite a i ln
 
   basicReasonOf solver this concl = do
     (lb,ub) <- getBounds (atLeastLits this)
@@ -2507,11 +2499,11 @@ instantiateAtLeast solver (xs,n) = loop ([],n) xs
     loop (ys,m) (l:ls) = do
       val <- litValue solver l
       if val == lTrue then
-         loop (ys, m-1) ls
-       else if val == lFalse then
-         loop (ys, m) ls
-       else
-         loop (l:ys, m) ls
+        loop (ys, m-1) ls
+      else if val == lFalse then
+        loop (ys, m) ls
+      else
+        loop (l:ys, m) ls
 
 basicAttachAtLeastHandler :: Solver -> AtLeastHandler -> IO Bool
 basicAttachAtLeastHandler solver this = do
@@ -2562,11 +2554,11 @@ instantiatePB solver (xs,n) = loop ([],n) xs
     loop (ys,m) ((c,l):ts) = do
       val <- litValue solver l
       if val == lTrue then
-         loop (ys, m-c) ts
-       else if val == lFalse then
-         loop (ys, m) ts
-       else
-         loop ((c,l):ys, m) ts
+        loop (ys, m-c) ts
+      else if val == lFalse then
+        loop (ys, m) ts
+      else
+        loop ((c,l):ys, m) ts
 
 pbOverSAT :: Solver -> PBLinAtLeast -> IO Bool
 pbOverSAT solver (lhs, rhs) = do
