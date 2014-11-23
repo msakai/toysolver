@@ -149,6 +149,7 @@ import qualified Data.IntSet as IS
 import qualified Data.Set as Set
 import qualified ToySolver.Internal.Data.IndexedPriorityQueue as PQ
 import qualified ToySolver.Internal.Data.SeqQueue as SQ
+import qualified ToySolver.Internal.Data.Vec as Vec
 import Data.Time
 import Data.Typeable
 import System.CPUTime
@@ -213,9 +214,7 @@ newLitData = do
   return $ LitData ws occ
 
 varData :: Solver -> Var -> IO VarData
-varData solver !v = do
-  a <- readIORef (svVarData solver)
-  unsafeRead a (v-1)
+varData solver !v = Vec.unsafeRead (svVarData solver) (v-1)
 
 litData :: Solver -> Lit -> IO LitData
 litData solver !l =
@@ -282,8 +281,7 @@ data Solver
   { svOk           :: !(IORef Bool)
   , svVarQueue     :: !PQ.PriorityQueue
   , svTrail        :: !(IORef [Lit])
-  , svVarCounter   :: !(IORef Int)
-  , svVarData      :: !(IORef (IOArray Int VarData))
+  , svVarData      :: !(Vec.Vec VarData)
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
   , svAssumptions  :: !(IORef (IOUArray Int Lit))
@@ -546,9 +544,7 @@ variables solver = do
 
 -- | number of variables of the problem.
 nVars :: Solver -> IO Int
-nVars solver = do
-  vcnt <- readIORef (svVarCounter solver)
-  return $! (vcnt-1)
+nVars solver = Vec.getSize (svVarData solver)
 
 -- | number of assigned variables.
 nAssigns :: Solver -> IO Int
@@ -580,9 +576,8 @@ newSolver :: IO Solver
 newSolver = do
  rec
   ok   <- newIORef True
-  vcnt <- newIORef 1
   trail <- newIORef []
-  vars <- newIORef =<< newArray_ (1,0)
+  vars <- Vec.new
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
   db2 <- newIORef (0,[])
@@ -634,7 +629,6 @@ newSolver = do
   let solver =
         Solver
         { svOk = ok
-        , svVarCounter = vcnt
         , svVarQueue   = vqueue
         , svTrail      = trail
         , svVarData    = vars
@@ -694,23 +688,10 @@ ltVar solver v1 v2 = do
 -- |Add a new variable
 newVar :: Solver -> IO Var
 newVar solver = do
-  v <- readIORef (svVarCounter solver)
-  writeIORef (svVarCounter solver) (v+1)
+  n <- Vec.getSize (svVarData solver)
+  let v = n + 1
   vd <- newVarData
-
-  a <- readIORef (svVarData solver)
-  (_,ub) <- getBounds a
-  if v <= ub
-    then writeArray a v vd
-    else do
-      let ub' = max 2 (ub * 3 `div` 2)
-      a' <- newArray_ (1,ub')
-      forLoop 1 (<=ub) (+1) $ \v2 -> do
-        vd2 <- readArray a v2
-        writeArray a' v2 vd2
-      writeArray a' v vd
-      writeIORef (svVarData solver) a'
-
+  Vec.push (svVarData solver) vd
   PQ.enqueue (svVarQueue solver) v
   return v
 
@@ -731,16 +712,9 @@ newVars_ solver n = do
 -- |Pre-allocate internal buffer for @n@ variables.
 resizeVarCapacity :: Solver -> Int -> IO ()
 resizeVarCapacity solver n = do
+  Vec.resizeCapacity (svVarData solver) n
   PQ.resizeHeapCapacity (svVarQueue solver) n
   PQ.resizeTableCapacity (svVarQueue solver) (n+1)
-  a <- readIORef (svVarData solver)
-  (_,ub) <- getBounds a
-  when (ub < n) $ do
-    a' <- newArray_ (1,n)
-    forLoop 1 (<=ub) (+1) $ \v -> do
-      vd <- readArray a v
-      writeArray a' v vd
-    writeIORef (svVarData solver) a'
 
 -- |Add a clause to the solver.
 addClause :: Solver -> Clause -> IO ()
