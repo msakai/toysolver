@@ -455,7 +455,7 @@ addToDB solver c = do
     str <- showConstraintHandler solver c
     return $ printf "constraint %s is added" str
 
-  (lhs,_) <- toPBAtLeast solver c
+  (lhs,_) <- toPBLinAtLeast solver c
   forM_ lhs $ \(_,lit) -> do
      ld <- litData solver lit
      modifyIORef' (ldOccurList ld) (HashSet.insert c2)
@@ -1246,7 +1246,7 @@ backwardSubsumedBy solver pb@(lhs,_) = do
     [] -> return HashSet.empty
     s:ss -> do
       let p c = do
-            pb2 <- instantiatePB solver =<< toPBAtLeast solver c
+            pb2 <- instantiatePB solver =<< toPBLinAtLeast solver c
             return $ pbSubsume pb pb2
       liftM HashSet.fromList
         $ filterM p
@@ -1622,7 +1622,7 @@ analyzeConflictHybrid solver constr = do
 
                 pb' <- if any (\(_,l2) -> litNot l == l2) (fst pb)
                        then do
-                         pb2 <- toPBAtLeast solver constr2
+                         pb2 <- toPBLinAtLeast solver constr2
                          o <- pbOverSAT solver pb2
                          let pb3 = if o then ([(1,l2) | l2 <- l:xs],1) else pb2
                          return $ cutResolve pb pb3 (litVar l)
@@ -1637,7 +1637,7 @@ analyzeConflictHybrid solver constr = do
 
   constrBumpActivity solver constr
   conflictClause <- reasonOf solver constr Nothing
-  pbConfl <- toPBAtLeast solver constr
+  pbConfl <- toPBLinAtLeast solver constr
   forM_ conflictClause $ \lit -> varBumpActivity solver (litVar lit)
   (ys,zs) <- split conflictClause
   (lits, pb) <- loop ys zs pbConfl
@@ -1899,7 +1899,7 @@ class (Eq a, Hashable a) => ConstraintHandler a where
   -- assignment.
   basicReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
-  toPBAtLeast :: Solver -> a -> IO PBLinAtLeast
+  toPBLinAtLeast :: Solver -> a -> IO PBLinAtLeast
 
   isSatisfied :: Solver -> a -> IO Bool
 
@@ -1920,7 +1920,7 @@ detach solver c = do
   forM_ lits $ \lit -> do
     ld <- litData solver lit
     modifyIORef' (ldWatches ld) (delete c2)
-  (lhs,_) <- toPBAtLeast solver c
+  (lhs,_) <- toPBLinAtLeast solver c
   forM_ lhs $ \(_,lit) -> do
     ld <- litData solver lit
     modifyIORef' (ldOccurList ld) (HashSet.delete c2)
@@ -2005,10 +2005,10 @@ instance ConstraintHandler SomeConstraintHandler where
   basicReasonOf solver (CHPBCounter c) l = basicReasonOf solver c l
   basicReasonOf solver (CHPBPueblo c) l  = basicReasonOf solver c l
 
-  toPBAtLeast solver (CHClause c)    = toPBAtLeast solver c
-  toPBAtLeast solver (CHAtLeast c)   = toPBAtLeast solver c
-  toPBAtLeast solver (CHPBCounter c) = toPBAtLeast solver c
-  toPBAtLeast solver (CHPBPueblo c)  = toPBAtLeast solver c
+  toPBLinAtLeast solver (CHClause c)    = toPBLinAtLeast solver c
+  toPBLinAtLeast solver (CHAtLeast c)   = toPBLinAtLeast solver c
+  toPBLinAtLeast solver (CHPBCounter c) = toPBLinAtLeast solver c
+  toPBLinAtLeast solver (CHPBPueblo c)  = toPBLinAtLeast solver c
 
   isSatisfied solver (CHClause c)    = isSatisfied solver c
   isSatisfied solver (CHAtLeast c)   = isSatisfied solver c
@@ -2222,7 +2222,7 @@ instance ConstraintHandler ClauseHandler where
         assert (lit == head lits) $ return ()
         return $ tail lits
 
-  toPBAtLeast _ this = do
+  toPBLinAtLeast _ this = do
     lits <- getElems (claLits this)
     return ([(1,l) | l <- lits], 1)
 
@@ -2478,7 +2478,7 @@ instance ConstraintHandler AtLeastHandler where
             error $ printf "AtLeastHandler.basicReasonOf: cannot find %d in first %d elements" n
         return falsifiedLits
 
-  toPBAtLeast _ this = do
+  toPBLinAtLeast _ this = do
     lits <- getElems (atLeastLits this)
     return ([(1,l) | l <- lits], fromIntegral (atLeastNum this))
 
@@ -2688,7 +2688,7 @@ instance ConstraintHandler PBHandlerCounter where
             else do
               go s xs ret
 
-  toPBAtLeast _ this = do
+  toPBLinAtLeast _ this = do
     return (pbTerms this, pbDegree this)
 
   isSatisfied solver this = do
@@ -2835,7 +2835,7 @@ instance ConstraintHandler PBHandlerPueblo where
             else do
               go s xs ret
 
-  toPBAtLeast _ this = do
+  toPBLinAtLeast _ this = do
     return (puebloTerms this, puebloDegree this)
 
   isSatisfied solver this = do
