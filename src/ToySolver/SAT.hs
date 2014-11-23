@@ -1529,28 +1529,22 @@ analyzeConflict solver constr = do
         | sz==1 = do
             return $ lits1 `IS.union` lits2
         | sz>=2 = do
-            ret <- popTrail solver
-            case ret of
-              Nothing -> do
-                error $ printf "analyzeConflict: should not happen: empty trail: loop %s %s"
-                               (show lits1) (show lits2)
-              Just l -> do
-                if litNot l `IS.notMember` lits1
-                 then do
-                   unassign solver (litVar l)
-                   loop lits1 lits2
-                 else do
-                  m <- varReason solver (litVar l)
-                  case m of
-                    Nothing -> error "analyzeConflict: should not happen"
-                    Just constr2 -> do
-                      constrBumpActivity solver constr2
-                      xs <- reasonOf solver constr2 (Just l)
-                      forM_ xs $ \lit -> varBumpActivity solver (litVar lit)
-                      unassign solver (litVar l)
-                      (ys,zs) <- split xs
-                      loop (IS.delete (litNot l) lits1 `IS.union` ys)
-                           (lits2 `IS.union` zs)
+            l <- popTrail solver
+            if litNot l `IS.notMember` lits1 then do
+              unassign solver (litVar l)
+              loop lits1 lits2
+            else do
+              m <- varReason solver (litVar l)
+              case m of
+                Nothing -> error "analyzeConflict: should not happen"
+                Just constr2 -> do
+                  constrBumpActivity solver constr2
+                  xs <- reasonOf solver constr2 (Just l)
+                  forM_ xs $ \lit -> varBumpActivity solver (litVar lit)
+                  unassign solver (litVar l)
+                  (ys,zs) <- split xs
+                  loop (IS.delete (litNot l) lits1 `IS.union` ys)
+                       (lits2 `IS.union` zs)
         | otherwise = error "analyzeConflict: should not happen: reason of current level is empty"
         where
           sz = IS.size lits1
@@ -1620,36 +1614,31 @@ analyzeConflictHybrid solver constr = do
         | sz==1 = do
             return $ (lits1 `IS.union` lits2, pb)
         | sz>=2 = do
-            ret <- popTrail solver
-            case ret of
-              Nothing -> do
-                error $ printf "analyzeConflictHybrid: should not happen: empty trail: loop %s %s"
-                               (show lits1) (show lits2)
-              Just l -> do
-                m <- varReason solver (litVar l)
-                case m of
-                  Nothing -> error "analyzeConflictHybrid: should not happen"
-                  Just constr2 -> do
-                    xs <- reasonOf solver constr2 (Just l)
-                    (lits1',lits2') <-
-                      if litNot l `IS.notMember` lits1
-                      then return (lits1,lits2)
-                      else do
-                        constrBumpActivity solver constr2
-                        forM_ xs $ \lit -> varBumpActivity solver (litVar lit)
-                        (ys,zs) <- split xs
-                        return  (IS.delete (litNot l) lits1 `IS.union` ys, lits2 `IS.union` zs)
+            l <- popTrail solver
+            m <- varReason solver (litVar l)
+            case m of
+              Nothing -> error "analyzeConflictHybrid: should not happen"
+              Just constr2 -> do
+                xs <- reasonOf solver constr2 (Just l)
+                (lits1',lits2') <-
+                  if litNot l `IS.notMember` lits1 then
+                    return (lits1,lits2)
+                  else do
+                    constrBumpActivity solver constr2
+                    forM_ xs $ \lit -> varBumpActivity solver (litVar lit)
+                    (ys,zs) <- split xs
+                    return  (IS.delete (litNot l) lits1 `IS.union` ys, lits2 `IS.union` zs)
 
-                    pb' <- if any (\(_,l2) -> litNot l == l2) (fst pb)
-                           then do
-                             pb2 <- toPBAtLeast solver constr2
-                             o <- pbOverSAT solver pb2
-                             let pb3 = if o then ([(1,l2) | l2 <- l:xs],1) else pb2
-                             return $ cutResolve pb pb3 (litVar l)
-                           else return pb
+                pb' <- if any (\(_,l2) -> litNot l == l2) (fst pb)
+                       then do
+                         pb2 <- toPBAtLeast solver constr2
+                         o <- pbOverSAT solver pb2
+                         let pb3 = if o then ([(1,l2) | l2 <- l:xs],1) else pb2
+                         return $ cutResolve pb pb3 (litVar l)
+                       else return pb
 
-                    unassign solver (litVar l)
-                    loop lits1' lits2' pb'
+                unassign solver (litVar l)
+                loop lits1' lits2' pb'
 
         | otherwise = error "analyzeConflictHybrid: should not happen: reason of current level is empty"
         where
@@ -1770,14 +1759,14 @@ minimizeConflictClauseRecursive solver lits = do
     log solver $ show ys
   return $ IS.fromAscList $ ys
 
-popTrail :: Solver -> IO (Maybe Lit)
+popTrail :: Solver -> IO Lit
 popTrail solver = do
   m <- readIORef (svTrail solver)
   case m of
-    []   -> return Nothing
+    []   -> error "ToySolver.SAT.popTrail: empty trail"
     l:ls -> do
       writeIORef (svTrail solver) ls
-      return $ Just l
+      return l
 
 -- | Revert to the state at given level
 -- (keeping all assignment at @level@ but not beyond).
