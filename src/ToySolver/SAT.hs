@@ -455,10 +455,12 @@ addToDB solver c = do
     str <- showConstraintHandler solver c
     return $ printf "constraint %s is added" str
 
-  (lhs,_) <- toPBLinAtLeast solver c
-  forM_ lhs $ \(_,lit) -> do
-     ld <- litData solver lit
-     modifyIORef' (ldOccurList ld) (HashSet.insert c2)
+  b <- isPBRepresentable solver c
+  when b $ do
+    (lhs,_) <- toPBLinAtLeast solver c
+    forM_ lhs $ \(_,lit) -> do
+       ld <- litData solver lit
+       modifyIORef' (ldOccurList ld) (HashSet.insert c2)
 
   sanityCheck solver
 
@@ -1246,6 +1248,9 @@ backwardSubsumedBy solver pb@(lhs,_) = do
     [] -> return HashSet.empty
     s:ss -> do
       let p c = do
+            -- Note that @isPBRepresentable c@ is always True here,
+            -- because only such constraints are added to occur list.
+            -- See 'addToDB'.
             pb2 <- instantiatePB solver =<< toPBLinAtLeast solver c
             return $ pbSubsume pb pb2
       liftM HashSet.fromList
@@ -1622,10 +1627,18 @@ analyzeConflictHybrid solver constr = do
 
                 pb' <- if any (\(_,l2) -> litNot l == l2) (fst pb)
                        then do
-                         pb2 <- toPBLinAtLeast solver constr2
-                         o <- pbOverSAT solver pb2
-                         let pb3 = if o then ([(1,l2) | l2 <- l:xs],1) else pb2
-                         return $ cutResolve pb pb3 (litVar l)
+                         pb2 <- do
+                           b <- isPBRepresentable solver constr2
+                           if not b then do
+                             return $ clauseToPBLinAtLeast (l:xs)
+                           else do
+                             pb2 <- toPBLinAtLeast solver constr2
+                             o <- pbOverSAT solver pb2
+                             if o then
+                               return $ clauseToPBLinAtLeast (l:xs)
+                             else
+                               return pb2
+                         return $ cutResolve pb pb2 (litVar l)
                        else return pb
 
                 unassign solver (litVar l)
@@ -1637,7 +1650,12 @@ analyzeConflictHybrid solver constr = do
 
   constrBumpActivity solver constr
   conflictClause <- reasonOf solver constr Nothing
-  pbConfl <- toPBLinAtLeast solver constr
+  pbConfl <- do
+    b <- isPBRepresentable solver constr
+    if b then
+      toPBLinAtLeast solver constr
+    else
+      return (clauseToPBLinAtLeast conflictClause)
   forM_ conflictClause $ \lit -> varBumpActivity solver (litVar lit)
   (ys,zs) <- split conflictClause
   (lits, pb) <- loop ys zs pbConfl
@@ -1899,6 +1917,7 @@ class (Eq a, Hashable a) => ConstraintHandler a where
   -- assignment.
   basicReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
+  isPBRepresentable :: Solver -> a -> IO Bool
   toPBLinAtLeast :: Solver -> a -> IO PBLinAtLeast
 
   isSatisfied :: Solver -> a -> IO Bool
@@ -1920,10 +1939,13 @@ detach solver c = do
   forM_ lits $ \lit -> do
     ld <- litData solver lit
     modifyIORef' (ldWatches ld) (delete c2)
-  (lhs,_) <- toPBLinAtLeast solver c
-  forM_ lhs $ \(_,lit) -> do
-    ld <- litData solver lit
-    modifyIORef' (ldOccurList ld) (HashSet.delete c2)
+
+  b <- isPBRepresentable solver c
+  when b $ do
+    (lhs,_) <- toPBLinAtLeast solver c
+    forM_ lhs $ \(_,lit) -> do
+      ld <- litData solver lit
+      modifyIORef' (ldOccurList ld) (HashSet.delete c2)
 
 -- | invoked with the watched literal when the literal is falsified.
 propagate :: Solver -> SomeConstraintHandler -> Lit -> IO Bool
@@ -2004,6 +2026,11 @@ instance ConstraintHandler SomeConstraintHandler where
   basicReasonOf solver (CHAtLeast c) l   = basicReasonOf solver c l
   basicReasonOf solver (CHPBCounter c) l = basicReasonOf solver c l
   basicReasonOf solver (CHPBPueblo c) l  = basicReasonOf solver c l
+
+  isPBRepresentable solver (CHClause c)    = isPBRepresentable solver c
+  isPBRepresentable solver (CHAtLeast c)   = isPBRepresentable solver c
+  isPBRepresentable solver (CHPBCounter c) = isPBRepresentable solver c
+  isPBRepresentable solver (CHPBPueblo c)  = isPBRepresentable solver c
 
   toPBLinAtLeast solver (CHClause c)    = toPBLinAtLeast solver c
   toPBLinAtLeast solver (CHAtLeast c)   = toPBLinAtLeast solver c
@@ -2221,6 +2248,8 @@ instance ConstraintHandler ClauseHandler where
       Just lit -> do
         assert (lit == head lits) $ return ()
         return $ tail lits
+
+  isPBRepresentable _ _ = return True
 
   toPBLinAtLeast _ this = do
     lits <- getElems (claLits this)
@@ -2478,6 +2507,8 @@ instance ConstraintHandler AtLeastHandler where
             error $ printf "AtLeastHandler.basicReasonOf: cannot find %d in first %d elements" n
         return falsifiedLits
 
+  isPBRepresentable _ _ = return True
+
   toPBLinAtLeast _ this = do
     lits <- getElems (atLeastLits this)
     return ([(1,l) | l <- lits], fromIntegral (atLeastNum this))
@@ -2688,6 +2719,8 @@ instance ConstraintHandler PBHandlerCounter where
             else do
               go s xs ret
 
+  isPBRepresentable _ _ = return True
+
   toPBLinAtLeast _ this = do
     return (pbTerms this, pbDegree this)
 
@@ -2834,6 +2867,8 @@ instance ConstraintHandler PBHandlerPueblo where
               else go s xs ret
             else do
               go s xs ret
+
+  isPBRepresentable _ _ = return True
 
   toPBLinAtLeast _ this = do
     return (puebloTerms this, puebloDegree this)

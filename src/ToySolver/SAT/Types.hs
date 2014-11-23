@@ -28,6 +28,7 @@ module ToySolver.SAT.Types
   , normalizeClause
   , clauseSubsume
   , evalClause
+  , clauseToPBLinAtLeast
 
   -- * Cardinality Constraint
   , AtLeast
@@ -161,6 +162,9 @@ clauseSubsume cl1 cl2 = cl1' `IntSet.isSubsetOf` cl2'
 
 evalClause :: IModel m => m -> Clause -> Bool
 evalClause m cl = any (evalLit m) cl
+
+clauseToPBLinAtLeast :: Clause -> PBLinAtLeast
+clauseToPBLinAtLeast xs = ([(1,l) | l <- xs], 1)
 
 type AtLeast = ([Lit], Int)
 
