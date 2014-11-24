@@ -3181,7 +3181,7 @@ instance ConstraintHandler XORClauseHandler where
   watchedVariables _ this = do
     lits <- getElems (xorLits this)
     case lits of
-      l1:l2:_ -> return [l1, l2]
+      l1:l2:_ -> return [litVar l1, litVar l2]
       _ -> return []
 
   -- FIXME: 伝播した変数から再度呼ばれて、再び伝播処理が起こってしまう
@@ -3223,8 +3223,8 @@ instance ConstraintHandler XORClauseHandler where
       preprocess = do
         !l0 <- unsafeRead a 0
         !l1 <- unsafeRead a 1
-        assert (l0==v || l1==v) $ return ()
-        when (l0==v) $ do
+        assert (litVar l0 == v || litVar l1 == v) $ return ()
+        when (litVar l0 == v) $ do
           unsafeWrite a 0 l1
           unsafeWrite a 1 l0
 
