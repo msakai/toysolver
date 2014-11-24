@@ -435,8 +435,8 @@ addBacktrackCB solver !v callback = do
     Just a -> modifyIORef (aBacktrackCBs a) (callback :)
 
 -- | Register the constraint to be notified when the literal becames false.
-watch :: ConstraintHandler c => Solver -> Lit -> c -> IO ()
-watch solver !lit c = do
+watchLit :: ConstraintHandler c => Solver -> Lit -> c -> IO ()
+watchLit solver !lit c = do
   when debugMode $ do
     lits <- watchedLiterals solver c
     unless (lit `elem` lits) $ error "watch: should not happen"
@@ -2296,11 +2296,11 @@ instance ConstraintHandler ClauseHandler where
       b <- f 0
       if b then do
         lit0 <- unsafeRead (claLits this) 0
-        watch solver lit0 this
+        watchLit solver lit0 this
         b2 <- f 1
         if b2 then do
           lit1 <- unsafeRead (claLits this) 1
-          watch solver lit1 this
+          watchLit solver lit1 this
           return True
         else do -- UNIT
           -- We need to watch the most recently falsified literal
@@ -2312,7 +2312,7 @@ instance ConstraintHandler ClauseHandler where
           liti <- unsafeRead (claLits this) i
           unsafeWrite (claLits this) 1 liti
           unsafeWrite (claLits this) i lit1
-          watch solver liti this
+          watchLit solver liti this
           assignBy solver lit0 this -- should always succeed
       else do -- CONFLICT
         ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [lb..ub] $ \l -> do
@@ -2323,8 +2323,8 @@ instance ConstraintHandler ClauseHandler where
           unsafeWrite (claLits this) i lit
         lit0 <- unsafeRead (claLits this) 0
         lit1 <- unsafeRead (claLits this) 1
-        watch solver lit0 this
-        watch solver lit1 this
+        watchLit solver lit0 this
+        watchLit solver lit1 this
         return False
 
   watchedLiterals _ this = do
@@ -2341,7 +2341,7 @@ instance ConstraintHandler ClauseHandler where
     !lit0 <- unsafeRead a 0
     !val0 <- litValue solver lit0
     if val0 == lTrue then do
-      watch solver falsifiedLit this
+      watchLit solver falsifiedLit this
       return True
     else do
       (!lb,!ub) <- getBounds a
@@ -2352,14 +2352,14 @@ instance ConstraintHandler ClauseHandler where
           when debugMode $ logIO solver $ do
              str <- showConstraintHandler solver this
              return $ printf "basicPropagate: %s is unit" str
-          watch solver falsifiedLit this
+          watchLit solver falsifiedLit this
           assignBy solver lit0 this
         _  -> do
           !lit1 <- unsafeRead a 1
           !liti <- unsafeRead a i
           unsafeWrite a 1 liti
           unsafeWrite a i lit1
-          watch solver liti this
+          watchLit solver liti this
           return True
 
     where
@@ -2425,8 +2425,8 @@ basicAttachClauseHandler solver this = do
     [l1] -> do
       assignBy solver l1 this
     l1:l2:_ -> do
-      watch solver l1 this
-      watch solver l2 this
+      watchLit solver l1 this
+      watchLit solver l2 this
       return True
 
 {--------------------------------------------------------------------
@@ -2493,7 +2493,7 @@ instance ConstraintHandler AtLeastHandler where
                   lit_k <- unsafeRead a k
                   unsafeWrite a n lit_k
                   unsafeWrite a k lit_n
-                  watch solver lit_k this
+                  watchLit solver lit_k this
                   -- n+1 literals (0 .. n) are watched.
                 else do
                   -- UNIT
@@ -2513,7 +2513,7 @@ instance ConstraintHandler AtLeastHandler where
                   lit_l <- unsafeRead a l
                   unsafeWrite a n lit_l
                   unsafeWrite a l lit_n
-                  watch solver lit_l this
+                  watchLit solver lit_l this
                   -- n+1 literals (0 .. n) are watched.
                 return True
             | otherwise = do
@@ -2521,7 +2521,7 @@ instance ConstraintHandler AtLeastHandler where
                 lit_i <- unsafeRead a i
                 val_i <- litValue solver lit_i
                 if val_i /= lFalse then do
-                  watch solver lit_i this
+                  watchLit solver lit_i this
                   f (i+1) j
                 else do
                   k <- findForWatch solver a j ub
@@ -2529,7 +2529,7 @@ instance ConstraintHandler AtLeastHandler where
                     lit_k <- unsafeRead a k
                     unsafeWrite a i lit_k
                     unsafeWrite a k lit_i
-                    watch solver lit_k this
+                    watchLit solver lit_k this
                     f (i+1) (k+1)
                   else do
                     -- CONFLICT
@@ -2546,7 +2546,7 @@ instance ConstraintHandler AtLeastHandler where
                          writeArray a l lit
                     forLoop i (<=n) (+1) $ \l -> do
                       lit_l <- readArray a l
-                      watch solver lit_l this
+                      watchLit solver lit_l this
                     -- n+1 literals (0 .. n) are watched.
                     return False
       f 0 n
@@ -2574,7 +2574,7 @@ instance ConstraintHandler AtLeastHandler where
         when debugMode $ logIO solver $ do
           str <- showConstraintHandler solver this
           return $ printf "basicPropagate: %s is unit" str
-        watch solver falsifiedLit this
+        watchLit solver falsifiedLit this
         let loop :: Int -> IO Bool
             loop i
               | i >= n = return True
@@ -2590,7 +2590,7 @@ instance ConstraintHandler AtLeastHandler where
         litn <- unsafeRead a n
         unsafeWrite a i litn
         unsafeWrite a n liti
-        watch solver liti this
+        watchLit solver liti this
         return True
 
     where
@@ -2682,7 +2682,7 @@ basicAttachAtLeastHandler solver this = do
   else if m == n then do
     allM (\l -> assignBy solver l this) lits
   else do -- m > n
-    forM_ (take (n+1) lits) $ \l -> watch solver l this
+    forM_ (take (n+1) lits) $ \l -> watchLit solver l this
     return True
 
 {--------------------------------------------------------------------
@@ -2784,7 +2784,7 @@ instance ConstraintHandler PBHandlerCounter where
     -- It is important for calculating slack.
     bcpCheckEmpty solver
     s <- liftM sum $ forM (pbTerms this) $ \(c,l) -> do
-      watch solver l this
+      watchLit solver l this
       val <- litValue solver l
       if val == lFalse then do
         addBacktrackCB solver (litVar l) $ modifyIORef' (pbSlack this) (+ c)
@@ -2809,7 +2809,7 @@ instance ConstraintHandler PBHandlerCounter where
   watchedVariables _ _ = return []
 
   basicPropagate solver this this2 falsifiedLit = do
-    watch solver falsifiedLit this
+    watchLit solver falsifiedLit this
     let c = pbCoeffMap this2 IM.! falsifiedLit
     modifyIORef' (pbSlack this2) (subtract c)
     addBacktrackCB solver (litVar falsifiedLit) $ modifyIORef' (pbSlack this2) (+ c)
@@ -2917,7 +2917,7 @@ puebloGetWatchSum pb = readIORef (puebloWatchSum pb)
 
 puebloWatch :: Solver -> SomeConstraintHandler -> PBHandlerPueblo -> PBLinTerm -> IO ()
 puebloWatch solver constr !pb (c, lit) = do
-  watch solver lit constr
+  watchLit solver lit constr
   modifyIORef' (puebloWatches pb) (IS.insert lit)
   modifyIORef' (puebloWatchSum pb) (+c)
 
