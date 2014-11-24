@@ -3086,7 +3086,6 @@ instance Hashable XORClauseHandler where
 
 newXORClauseHandler :: XORClause -> Bool -> IO XORClauseHandler
 newXORClauseHandler ls learnt = do
-  putStrLn $ "newXORClauseHandler: " ++ show ls
   let size = length ls
   a <- newListArray (0, size-1) ls
   act <- newIORef $! (if learnt then 0 else -1)
@@ -3207,9 +3206,6 @@ instance ConstraintHandler XORClauseHandler where
             val_j <- litValue solver lit_j
             modifyIORef' ref (/= fromJust (unliftBool val_j))
           readIORef ref
-        do
-          str <- showConstraintHandler solver this
-          printf "foo %s: %d\n" str (if y then litNot lit0 else lit0)
         assignBy solver (if y then litNot lit0 else lit0) this
       _  -> do
         !lit1 <- unsafeRead a 1
@@ -3244,7 +3240,6 @@ instance ConstraintHandler XORClauseHandler where
              | litVar lit == litVar l1 -> mapM f (l2 : ls)
              | litVar lit == litVar l2 -> mapM f (l1 : ls)
            _ -> error "XORClauseHandler.basicReasonOf: should not happen"
-    printf "basicReasonOf: %s %s\n" (show l) (show xs)
     return xs
     where
       f :: Lit -> IO Lit
