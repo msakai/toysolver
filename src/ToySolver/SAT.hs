@@ -1990,24 +1990,23 @@ class (Eq a, Hashable a) => ConstraintHandler a where
 
   constrWriteActivity :: a -> Double -> IO ()
 
-detach :: ConstraintHandler a => Solver -> a -> IO ()
+detach :: Solver -> SomeConstraintHandler -> IO ()
 detach solver c = do
-  let c2 = toConstraintHandler c
   lits <- watchedLiterals solver c
   forM_ lits $ \lit -> do
     ld <- litData solver lit
-    modifyIORef' (ldWatches ld) (delete c2)
+    modifyIORef' (ldWatches ld) (delete c)
   vs <- watchedVariables solver c
   forM_ vs $ \v -> do
     vd <- varData solver v
-    modifyIORef' (vdWatches vd) (delete c2)
+    modifyIORef' (vdWatches vd) (delete c)
 
   b <- isPBRepresentable solver c
   when b $ do
     (lhs,_) <- toPBLinAtLeast solver c
     forM_ lhs $ \(_,lit) -> do
       ld <- litData solver lit
-      modifyIORef' (ldOccurList ld) (HashSet.delete c2)
+      modifyIORef' (ldOccurList ld) (HashSet.delete c)
 
 -- | invoked with the watched literal when the literal is falsified.
 propagate :: Solver -> SomeConstraintHandler -> Lit -> IO Bool
