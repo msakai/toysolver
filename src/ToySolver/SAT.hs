@@ -893,26 +893,20 @@ addPBExactlySoft solver sel lhs rhs = do
   addPBAtLeastSoft solver sel lhs2 rhs2
   addPBAtMostSoft solver sel lhs2 rhs2
 
-addXORClause :: Solver -> XORClause -> IO ()
-addXORClause solver lits = do
+addXORClause :: Solver -> [Lit] -> Bool -> IO ()
+addXORClause solver lits rhs = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
   ok <- readIORef (svOk solver)
   when ok $ do
-    lits2 <- instantiateXORClause solver lits
-    case normalizeXORClause lits2 of
-      [] -> markBad solver
-      [0] -> return ()
-      [lit] -> do
-        ret <- assign solver lit
-        assert ret $ return ()
-        ret2 <- deduce solver
-        case ret2 of
-          Nothing -> return ()
-          Just _ -> markBad solver
-      lits3 -> do
-        c <- newXORClauseHandler lits3 False
+    xcl <- instantiateXORClause solver (lits,rhs)
+    case normalizeXORClause xcl of
+      ([], True) -> markBad solver
+      ([], False) -> return ()
+      ([l], b) -> addClause solver [if b then l else litNot l]
+      (l:ls, b) -> do
+        c <- newXORClauseHandler ((if b then l else litNot l) : ls) False
         addToDB solver c
         _ <- basicAttachXORClauseHandler solver c
         return ()
@@ -3084,7 +3078,7 @@ instance Hashable XORClauseHandler where
   hash = xorHash
   hashWithSalt = defaultHashWithSalt
 
-newXORClauseHandler :: XORClause -> Bool -> IO XORClauseHandler
+newXORClauseHandler :: [Lit] -> Bool -> IO XORClauseHandler
 newXORClauseHandler ls learnt = do
   let size = length ls
   a <- newListArray (0, size-1) ls
@@ -3154,7 +3148,7 @@ instance ConstraintHandler XORClauseHandler where
           unsafeWrite a 1 liti
           unsafeWrite a i lit1
           watchVar solver (litVar liti) this
-          -- lit0 ⊕ y
+          -- lit0 \oplus y
           y <- do
             ref <- newIORef False
             forLoop 1 (<=ub) (+1) $ \j -> do
@@ -3198,7 +3192,7 @@ instance ConstraintHandler XORClauseHandler where
            str <- showConstraintHandler solver this
            return $ printf "basicPropagate: %s is unit" str
         watchVar solver v this
-        -- lit0 ⊕ y
+        -- lit0 \oplus y
         y <- do
           ref <- newIORef False
           forLoop 1 (<=ub) (+1) $ \j -> do
@@ -3269,18 +3263,18 @@ instance ConstraintHandler XORClauseHandler where
   constrWriteActivity this aval = writeIORef (xorActivity this) $! aval
 
 instantiateXORClause :: Solver -> XORClause -> IO XORClause
-instantiateXORClause solver = loop []
+instantiateXORClause solver (ls,b) = loop [] b ls
   where
-    loop :: [Lit] -> [Lit] -> IO XORClause
-    loop ret [] = return ret
-    loop ret (l:ls) = do
+    loop :: [Lit] -> Bool -> [Lit] -> IO XORClause
+    loop lhs !rhs [] = return (lhs, rhs)
+    loop lhs !rhs (l:ls) = do
       val <- litValue solver l
       if val==lTrue then
-        loop (0 : ret) ls
+        loop lhs (not rhs) ls
       else if val==lFalse then
-        loop ret ls
+        loop lhs rhs ls
       else
-        loop (l : ret) ls
+        loop (l : lhs) rhs ls
 
 basicAttachXORClauseHandler :: Solver -> XORClauseHandler -> IO Bool
 basicAttachXORClauseHandler solver this = do

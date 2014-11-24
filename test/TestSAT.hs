@@ -370,24 +370,24 @@ case_pbSubsume_2 = pbSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)
 ------------------------------------------------------------------------
 
 case_normalizeXORClause_False =
-  normalizeXORClause [] @?= []
+  normalizeXORClause ([],True) @?= ([],True)
 
 case_normalizeXORClause_True =
-  normalizeXORClause [0] @?= [0]
+  normalizeXORClause ([],False) @?= ([],False)
 
--- x ⊕ y ⊕ x = x
+-- x ⊕ y ⊕ x = y
 case_normalizeXORClause_case1 =
-  normalizeXORClause [1,2,1] @?= [2]
+  normalizeXORClause ([1,2,1],True) @?= ([2],True)
 
 -- x ⊕ ¬x = x ⊕ x ⊕ 1 = 1
 case_normalizeXORClause_case2 =
-  normalizeXORClause [1,-1] @?= [0]
+  normalizeXORClause ([1,-1],True) @?= ([],False)
 
 case_evalXORClause_case1 =
-  evalXORClause (array (1,2) [(1,True),(2,True)] :: Array Int Bool) [0,1,2] @?= True
+  evalXORClause (array (1,2) [(1,True),(2,True)] :: Array Int Bool) ([1,2], True) @?= False
 
 case_evalXORClause_case2 =
-  evalXORClause (array (1,2) [(1,False),(2,True)] :: Array Int Bool) [0,1,2] @?= False
+  evalXORClause (array (1,2) [(1,False),(2,True)] :: Array Int Bool) ([1,2], True) @?= True
 
 case_xor_case1 = do
   solver <- newSolver
@@ -395,9 +395,9 @@ case_xor_case1 = do
   x1 <- newVar solver
   x2 <- newVar solver
   x3 <- newVar solver
-  addXORClause solver [x1, x2] -- x1 ⊕ x2
-  addXORClause solver [x2, x3] -- x2 ⊕ x3
-  addXORClause solver [x3, x1] -- x3 ⊕ x1
+  addXORClause solver [x1, x2] True -- x1 ⊕ x2 = True
+  addXORClause solver [x2, x3] True -- x2 ⊕ x3 = True
+  addXORClause solver [x3, x1] True -- x3 ⊕ x1 = True
   ret <- solve solver
   ret @?= False
 
@@ -407,8 +407,8 @@ case_xor_case2 = do
   x1 <- newVar solver
   x2 <- newVar solver
   x3 <- newVar solver
-  addXORClause solver [x1, x2] -- x1 ⊕ x2
-  addXORClause solver [x1, x3] -- x1 ⊕ x3
+  addXORClause solver [x1, x2] True -- x1 ⊕ x2 = True
+  addXORClause solver [x1, x3] True -- x1 ⊕ x3 = True
   addClause solver [x2]
 
   ret <- solve solver
@@ -425,7 +425,7 @@ case_xor_case3 = do
   x2 <- newVar solver
   x3 <- newVar solver
   x4 <- newVar solver
-  addXORClause solver [x1,x2,x3,x4]
+  addXORClause solver [x1,x2,x3,x4] True
   addAtLeast solver [x1,x2,x3,x4] 2
   ret <- solve solver
   ret @?= True

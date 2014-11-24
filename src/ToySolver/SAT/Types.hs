@@ -315,18 +315,22 @@ pbSubsume (lhs1,rhs1) (lhs2,rhs2) =
 
 -- | XOR clause
 --
--- '[l1,l2..ln]' means l1⊕l2⊕⋯⊕ln.
+-- '([l1,l2..ln], b)' means l1 ⊕ l2 ⊕ ⋯ ⊕ ln = b.
 --
--- We specially treat literal '0' as a constant 'True'.
-type XORClause = [Lit]
+-- Note that:
+--
+-- * True can be represented as ([], False)
+--
+-- * False can be represented as ([], True)
+--
+type XORClause = ([Lit], Bool)
 
 -- | Normalize XOR clause
 normalizeXORClause :: XORClause -> XORClause
-normalizeXORClause lits =
+normalizeXORClause (lits, b) =
   case IntMap.keys m of
-    [0] -> [0]
-    0:x:xs -> -x : xs
-    xs -> xs
+    0:xs -> (xs, not b)
+    xs -> (xs, b)
   where
     m = IntMap.filter id $ IntMap.unionsWith xor [f lit | lit <- lits]
     xor = (/=)
@@ -335,10 +339,10 @@ normalizeXORClause lits =
     f lit =
       if litPolarity lit
       then IntMap.singleton lit True
-      else IntMap.fromList [(litVar lit, True), (0, True)]  -- ¬x = x⊕1
+      else IntMap.fromList [(litVar lit, True), (0, True)]  -- ¬x = x ⊕ 1
 
 evalXORClause :: IModel m => m -> XORClause -> Bool
-evalXORClause m lits = foldl' xor False (map f lits)
+evalXORClause m (lits, rhs) = foldl' xor False (map f lits) == rhs
   where
     xor = (/=)
     f 0 = True
