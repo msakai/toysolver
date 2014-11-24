@@ -131,9 +131,7 @@ import Data.Array.IO hiding (unsafeFreeze)
 #endif
 import Data.Array.Unsafe (unsafeFreeze)
 import Data.Array.Base (unsafeRead, unsafeWrite)
-#if MIN_VERSION_hashable(1,2,0)
-import Data.Bits (xor) -- for defining 'combine' function
-#endif
+import Data.Bits (xor)
 import Data.Function (on)
 import Data.Hashable
 import Data.HashSet (HashSet)
@@ -3162,7 +3160,7 @@ instance ConstraintHandler XORClauseHandler where
             forLoop 1 (<=ub) (+1) $ \j -> do
               lit_j <- unsafeRead a j
               val_j <- litValue solver lit_j
-              modifyIORef' ref (/= fromJust (unliftBool val_j))
+              modifyIORef' ref (`xor` fromJust (unliftBool val_j))
             readIORef ref
           assignBy solver (if y then litNot lit0 else lit0) this -- should always succeed
       else do
@@ -3206,7 +3204,7 @@ instance ConstraintHandler XORClauseHandler where
           forLoop 1 (<=ub) (+1) $ \j -> do
             lit_j <- unsafeRead a j
             val_j <- litValue solver lit_j
-            modifyIORef' ref (/= fromJust (unliftBool val_j))
+            modifyIORef' ref (`xor` fromJust (unliftBool val_j))
           readIORef ref
         do
           str <- showConstraintHandler solver this
@@ -3263,7 +3261,7 @@ instance ConstraintHandler XORClauseHandler where
     vals <- mapM (litValue solver) lits
     let f x y
           | x == lUndef || y == lUndef = lUndef
-          | otherwise = liftBool (x /= y)
+          | otherwise = liftBool (x /= y) -- xor
     return $ foldl' f lFalse vals == lTrue
 
   constrIsProtected _ this = do

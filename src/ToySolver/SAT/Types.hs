@@ -62,6 +62,7 @@ module ToySolver.SAT.Types
 import Control.Monad
 import Control.Exception
 import Data.Array.Unboxed
+import Data.Bits (xor)
 import Data.Ord
 import Data.List
 import Data.IntMap (IntMap)
@@ -329,7 +330,6 @@ normalizeXORClause lits =
     xs -> xs
   where
     m = IntMap.filter id $ IntMap.unionsWith xor [f lit | lit <- lits]
-    xor = (/=)
 
     f 0 = IntMap.singleton 0 True
     f lit =
@@ -340,6 +340,5 @@ normalizeXORClause lits =
 evalXORClause :: IModel m => m -> XORClause -> Bool
 evalXORClause m lits = foldl' xor False (map f lits)
   where
-    xor = (/=)
     f 0 = True
     f lit = evalLit m lit
