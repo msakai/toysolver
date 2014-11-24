@@ -59,6 +59,7 @@ module ToySolver.SAT
   , addPBAtLeastSoft
   , addPBAtMostSoft
   , addPBExactlySoft
+  , addXORClause
 
   -- * Solving
   , solve
@@ -891,6 +892,30 @@ addPBExactlySoft solver sel lhs rhs = do
   (lhs2, rhs2) <- liftM normalizePBLinExactly $ instantiatePB solver (lhs,rhs)
   addPBAtLeastSoft solver sel lhs2 rhs2
   addPBAtMostSoft solver sel lhs2 rhs2
+
+addXORClause :: Solver -> XORClause -> IO ()
+addXORClause solver lits = do
+  d <- readIORef (svLevel solver)
+  assert (d == levelRoot) $ return ()
+
+  ok <- readIORef (svOk solver)
+  when ok $ do
+    lits2 <- instantiateXORClause solver lits
+    case normalizeXORClause lits2 of
+      [] -> markBad solver
+      [0] -> return ()
+      [lit] -> do
+        ret <- assign solver lit
+        assert ret $ return ()
+        ret2 <- deduce solver
+        case ret2 of
+          Nothing -> return ()
+          Just _ -> markBad solver
+      lits3 -> do
+        c <- newXORClauseHandler lits3 False
+        addToDB solver c
+        _ <- basicAttachXORClauseHandler solver c
+        return ()
 
 {--------------------------------------------------------------------
   Problem solving
@@ -2042,6 +2067,7 @@ data SomeConstraintHandler
   | CHAtLeast !AtLeastHandler
   | CHPBCounter !PBHandlerCounter
   | CHPBPueblo !PBHandlerPueblo
+  | CHXORClause !XORClauseHandler
   deriving Eq
 
 instance Hashable SomeConstraintHandler where
@@ -2049,6 +2075,7 @@ instance Hashable SomeConstraintHandler where
   hashWithSalt s (CHAtLeast c)   = s `hashWithSalt` (1::Int) `hashWithSalt` c
   hashWithSalt s (CHPBCounter c) = s `hashWithSalt` (2::Int) `hashWithSalt` c
   hashWithSalt s (CHPBPueblo c)  = s `hashWithSalt` (3::Int) `hashWithSalt` c
+  hashWithSalt s (CHXORClause c) = s `hashWithSalt` (4::Int) `hashWithSalt` c
 
 instance ConstraintHandler SomeConstraintHandler where
   toConstraintHandler = id
@@ -2057,61 +2084,73 @@ instance ConstraintHandler SomeConstraintHandler where
   showConstraintHandler solver (CHAtLeast c)   = showConstraintHandler solver c
   showConstraintHandler solver (CHPBCounter c) = showConstraintHandler solver c
   showConstraintHandler solver (CHPBPueblo c)  = showConstraintHandler solver c
+  showConstraintHandler solver (CHXORClause c) = showConstraintHandler solver c
 
   attach solver (CHClause c)    = attach solver c
   attach solver (CHAtLeast c)   = attach solver c
   attach solver (CHPBCounter c) = attach solver c
   attach solver (CHPBPueblo c)  = attach solver c
+  attach solver (CHXORClause c) = attach solver c
 
   watchedLiterals solver (CHClause c)    = watchedLiterals solver c
   watchedLiterals solver (CHAtLeast c)   = watchedLiterals solver c
   watchedLiterals solver (CHPBCounter c) = watchedLiterals solver c
   watchedLiterals solver (CHPBPueblo c)  = watchedLiterals solver c
+  watchedLiterals solver (CHXORClause c) = watchedLiterals solver c
 
   watchedVariables solver (CHClause c)    = watchedVariables solver c
   watchedVariables solver (CHAtLeast c)   = watchedVariables solver c
   watchedVariables solver (CHPBCounter c) = watchedVariables solver c
   watchedVariables solver (CHPBPueblo c)  = watchedVariables solver c
+  watchedVariables solver (CHXORClause c) = watchedVariables solver c
 
   basicPropagate solver this (CHClause c)  lit   = basicPropagate solver this c lit
   basicPropagate solver this (CHAtLeast c) lit   = basicPropagate solver this c lit
   basicPropagate solver this (CHPBCounter c) lit = basicPropagate solver this c lit
   basicPropagate solver this (CHPBPueblo c) lit  = basicPropagate solver this c lit
+  basicPropagate solver this (CHXORClause c) lit = basicPropagate solver this c lit
 
   basicReasonOf solver (CHClause c)  l   = basicReasonOf solver c l
   basicReasonOf solver (CHAtLeast c) l   = basicReasonOf solver c l
   basicReasonOf solver (CHPBCounter c) l = basicReasonOf solver c l
   basicReasonOf solver (CHPBPueblo c) l  = basicReasonOf solver c l
+  basicReasonOf solver (CHXORClause c) l = basicReasonOf solver c l
 
   isPBRepresentable solver (CHClause c)    = isPBRepresentable solver c
   isPBRepresentable solver (CHAtLeast c)   = isPBRepresentable solver c
   isPBRepresentable solver (CHPBCounter c) = isPBRepresentable solver c
   isPBRepresentable solver (CHPBPueblo c)  = isPBRepresentable solver c
+  isPBRepresentable solver (CHXORClause c) = isPBRepresentable solver c
 
   toPBLinAtLeast solver (CHClause c)    = toPBLinAtLeast solver c
   toPBLinAtLeast solver (CHAtLeast c)   = toPBLinAtLeast solver c
   toPBLinAtLeast solver (CHPBCounter c) = toPBLinAtLeast solver c
   toPBLinAtLeast solver (CHPBPueblo c)  = toPBLinAtLeast solver c
+  toPBLinAtLeast solver (CHXORClause c) = toPBLinAtLeast solver c
 
   isSatisfied solver (CHClause c)    = isSatisfied solver c
   isSatisfied solver (CHAtLeast c)   = isSatisfied solver c
   isSatisfied solver (CHPBCounter c) = isSatisfied solver c
   isSatisfied solver (CHPBPueblo c)  = isSatisfied solver c
+  isSatisfied solver (CHXORClause c) = isSatisfied solver c
 
   constrIsProtected solver (CHClause c)    = constrIsProtected solver c
   constrIsProtected solver (CHAtLeast c)   = constrIsProtected solver c
   constrIsProtected solver (CHPBCounter c) = constrIsProtected solver c
   constrIsProtected solver (CHPBPueblo c)  = constrIsProtected solver c
+  constrIsProtected solver (CHXORClause c) = constrIsProtected solver c
 
   constrReadActivity (CHClause c)    = constrReadActivity c
   constrReadActivity (CHAtLeast c)   = constrReadActivity c
   constrReadActivity (CHPBCounter c) = constrReadActivity c
   constrReadActivity (CHPBPueblo c)  = constrReadActivity c
+  constrReadActivity (CHXORClause c) = constrReadActivity c
 
   constrWriteActivity (CHClause c)    aval = constrWriteActivity c aval
   constrWriteActivity (CHAtLeast c)   aval = constrWriteActivity c aval
   constrWriteActivity (CHPBCounter c) aval = constrWriteActivity c aval
   constrWriteActivity (CHPBPueblo c)  aval = constrWriteActivity c aval
+  constrWriteActivity (CHXORClause c) aval = constrWriteActivity c aval
 
 -- To avoid heap-allocation Maybe value, it returns -1 when not found.
 findForWatch :: Solver -> IOUArray Int Lit -> Int -> Int -> IO Int
@@ -2145,6 +2184,44 @@ findForWatch solver a (I# beg) (I# end) = IO $ \w ->
       case unIO (litValue solver =<< unsafeRead a (I# i)) w of
         (# w2, val #) ->
           if val /= lFalse
+            then (# w2, i #)
+            else go# (i +# 1#) end w2
+
+    unIO (IO f) = f
+#endif
+
+-- To avoid heap-allocating Maybe value, it returns -1 when not found.
+findForWatch2 :: Solver -> IOUArray Int Lit -> Int -> Int -> IO Int
+#ifndef __GLASGOW_HASKELL__
+findForWatch2 solver a beg end = go beg end
+  where
+    go :: Int -> Int -> IO Int
+    go i end | i > end = return (-1)
+    go i end = do
+      val <- litValue s =<< unsafeRead a i
+      if val == lUndef
+        then return i
+        else go (i+1) end
+#else
+{- We performed worker-wrapper transfomation manually, since the worker
+   generated by GHC has type
+   "Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int #)",
+   not "Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)".
+   We want latter one to avoid heap-allocating Int value. -}
+findForWatch2 solver a (I# beg) (I# end) = IO $ \w ->
+  case go# beg end w of
+    (# w2, ret #) -> (# w2, I# ret #)
+  where
+    go# :: Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)
+#if __GLASGOW_HASKELL__ < 708
+    go# i end w | i ># end = (# w, -1# #)
+#else
+    go# i end w | isTrue# (i ># end) = (# w, -1# #)
+#endif
+    go# i end w =
+      case unIO (litValue solver =<< unsafeRead a (I# i)) w of
+        (# w2, val #) ->
+          if val == lUndef
             then (# w2, i #)
             else go# (i +# 1#) end w2
 
@@ -2989,6 +3066,241 @@ puebloUpdateWatchSum solver constr this = do
             puebloWatch solver constr this t
           f ts
   f (puebloTerms this)
+
+{--------------------------------------------------------------------
+  XOR Clause
+--------------------------------------------------------------------}
+
+data XORClauseHandler
+  = XORClauseHandler
+  { xorLits :: !(IOUArray Int Lit)
+  , xorActivity :: !(IORef Double)
+  , xorHash :: !Int
+  }
+
+instance Eq XORClauseHandler where
+  (==) = (==) `on` xorLits
+
+instance Hashable XORClauseHandler where
+  hash = xorHash
+  hashWithSalt = defaultHashWithSalt
+
+newXORClauseHandler :: XORClause -> Bool -> IO XORClauseHandler
+newXORClauseHandler ls learnt = do
+  putStrLn $ "newXORClauseHandler: " ++ show ls
+  let size = length ls
+  a <- newListArray (0, size-1) ls
+  act <- newIORef $! (if learnt then 0 else -1)
+  return (XORClauseHandler a act (hash ls))
+
+instance ConstraintHandler XORClauseHandler where
+  toConstraintHandler = CHXORClause
+
+  showConstraintHandler _ this = do
+    lits <- getElems (xorLits this)
+    return ("XOR " ++ show lits)
+
+  attach solver this = do
+    -- BCP Queue should be empty at this point.
+    -- If not, duplicated propagation happens.
+    bcpCheckEmpty solver
+
+    let a = xorLits this
+    (lb,ub) <- getBounds a
+    assert (lb == 0) $ return ()
+    let size = ub-lb+1
+
+    if size == 0 then do
+      markBad solver
+      return False
+    else if size == 1 then do
+      lit0 <- unsafeRead a 0
+      assignBy solver lit0 this
+    else do
+      ref <- newIORef 1
+      let f i = do
+            lit_i <- unsafeRead a i
+            val_i <- litValue solver lit_i
+            if val_i == lUndef then
+              return True
+            else do
+              j <- readIORef ref
+              k <- findForWatch2 solver a j ub
+              case k of
+                -1 -> do
+                  return False
+                _ -> do
+                  lit_k <- unsafeRead a k
+                  unsafeWrite a i lit_k
+                  unsafeWrite a k lit_i
+                  writeIORef ref $! (k+1)
+                  return True
+
+      b <- f 0
+      if b then do
+        lit0 <- unsafeRead a 0
+        watchVar solver (litVar lit0) this
+        b2 <- f 1
+        if b2 then do
+          lit1 <- unsafeRead a 1
+          watchVar solver (litVar lit1) this
+          return True
+        else do -- UNIT
+          -- We need to watch the most recently falsified literal
+          (i,_) <- liftM (maximumBy (comparing snd)) $ forM [1..ub] $ \l -> do
+            lit <- unsafeRead a l
+            lv <- litLevel solver lit
+            return (l,lv)
+          lit1 <- unsafeRead a 1
+          liti <- unsafeRead a i
+          unsafeWrite a 1 liti
+          unsafeWrite a i lit1
+          watchVar solver (litVar liti) this
+          -- lit0 ⊕ y
+          y <- do
+            ref <- newIORef False
+            forLoop 1 (<=ub) (+1) $ \j -> do
+              lit_j <- unsafeRead a j
+              val_j <- litValue solver lit_j
+              modifyIORef' ref (/= fromJust (unliftBool val_j))
+            readIORef ref
+          assignBy solver (if y then litNot lit0 else lit0) this -- should always succeed
+      else do
+        ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [lb..ub] $ \l -> do
+          lit <- unsafeRead a l
+          lv <- litLevel solver lit
+          return (l,lv)
+        forM_ (zip [0..] ls) $ \(i,lit) -> do
+          unsafeWrite a i lit
+        lit0 <- unsafeRead a 0
+        lit1 <- unsafeRead a 1
+        watchVar solver (litVar lit0) this
+        watchVar solver (litVar lit1) this
+        isSatisfied solver this
+
+  watchedLiterals _ _ = return []
+
+  watchedVariables _ this = do
+    lits <- getElems (xorLits this)
+    case lits of
+      l1:l2:_ -> return [l1, l2]
+      _ -> return []
+
+  -- FIXME: 伝播した変数から再度呼ばれて、再び伝播処理が起こってしまう
+  basicPropagate !solver this this2 !falsifiedLit = do
+    preprocess
+
+    !lit0 <- unsafeRead a 0
+    (!lb,!ub) <- getBounds a
+    assert (lb==0) $ return ()
+    i <- findForWatch2 solver a 2 ub
+    case i of
+      -1 -> do
+        when debugMode $ logIO solver $ do
+           str <- showConstraintHandler solver this
+           return $ printf "basicPropagate: %s is unit" str
+        watchVar solver v this
+        -- lit0 ⊕ y
+        y <- do
+          ref <- newIORef False
+          forLoop 1 (<=ub) (+1) $ \j -> do
+            lit_j <- unsafeRead a j
+            val_j <- litValue solver lit_j
+            modifyIORef' ref (/= fromJust (unliftBool val_j))
+          readIORef ref
+        do
+          str <- showConstraintHandler solver this
+          printf "foo %s: %d\n" str (if y then litNot lit0 else lit0)
+        assignBy solver (if y then litNot lit0 else lit0) this
+      _  -> do
+        !lit1 <- unsafeRead a 1
+        !liti <- unsafeRead a i
+        unsafeWrite a 1 liti
+        unsafeWrite a i lit1
+        watchVar solver (litVar liti) this
+        return True
+
+    where
+      v = litVar falsifiedLit
+      a = xorLits this2
+
+      preprocess :: IO ()
+      preprocess = do
+        !l0 <- unsafeRead a 0
+        !l1 <- unsafeRead a 1
+        assert (l0==v || l1==v) $ return ()
+        when (l0==v) $ do
+          unsafeWrite a 0 l1
+          unsafeWrite a 1 l0
+
+  basicReasonOf solver this l = do
+    lits <- getElems (xorLits this)
+    xs <-
+      case l of
+        Nothing -> mapM f lits
+        Just lit -> do
+         -- FIXME: 伝播処理が二回起こってしまうせいで、伝播結果のリテラルが先頭とは限らない
+         case lits of
+           l1:l2:ls
+             | litVar lit == litVar l1 -> mapM f (l2 : ls)
+             | litVar lit == litVar l2 -> mapM f (l1 : ls)
+           _ -> error "XORClauseHandler.basicReasonOf: should not happen"
+    printf "basicReasonOf: %s %s\n" (show l) (show xs)
+    return xs
+    where
+      f :: Lit -> IO Lit
+      f lit = do
+        let v = litVar lit
+        val <- varValue solver v
+        return $ literal v (not (fromJust (unliftBool val)))
+
+  isPBRepresentable _ _ = return False
+
+  toPBLinAtLeast _ _ = error "XORClauseHandler does not support toPBLinAtLeast"
+
+  isSatisfied solver this = do
+    lits <- getElems (xorLits this)
+    vals <- mapM (litValue solver) lits
+    let f x y
+          | x == lUndef || y == lUndef = lUndef
+          | otherwise = liftBool (x /= y)
+    return $ foldl' f lFalse vals == lTrue
+
+  constrIsProtected _ this = do
+    size <- liftM rangeSize (getBounds (xorLits this))
+    return $! size <= 2
+
+  constrReadActivity this = readIORef (xorActivity this)
+
+  constrWriteActivity this aval = writeIORef (xorActivity this) $! aval
+
+instantiateXORClause :: Solver -> XORClause -> IO XORClause
+instantiateXORClause solver = loop []
+  where
+    loop :: [Lit] -> [Lit] -> IO XORClause
+    loop ret [] = return ret
+    loop ret (l:ls) = do
+      val <- litValue solver l
+      if val==lTrue then
+        loop (0 : ret) ls
+      else if val==lFalse then
+        loop ret ls
+      else
+        loop (l : ret) ls
+
+basicAttachXORClauseHandler :: Solver -> XORClauseHandler -> IO Bool
+basicAttachXORClauseHandler solver this = do
+  lits <- getElems (xorLits this)
+  case lits of
+    [] -> do
+      markBad solver
+      return False
+    [l1] -> do
+      assignBy solver l1 this
+    l1:l2:_ -> do
+      watchVar solver (litVar l1) this
+      watchVar solver (litVar l2) this
+      return True
 
 {--------------------------------------------------------------------
   Restart strategy

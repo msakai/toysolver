@@ -389,6 +389,47 @@ case_evalXORClause_case1 =
 case_evalXORClause_case2 =
   evalXORClause (array (1,2) [(1,False),(2,True)] :: Array Int Bool) [0,1,2] @?= False
 
+case_xor_case1 = do
+  solver <- newSolver
+  setCheckModel solver True
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- newVar solver
+  addXORClause solver [x1, x2] -- x1 ⊕ x2
+  addXORClause solver [x2, x3] -- x2 ⊕ x3
+  addXORClause solver [x3, x1] -- x3 ⊕ x1
+  ret <- solve solver
+  ret @?= False
+
+case_xor_case2 = do
+  solver <- newSolver
+  setCheckModel solver True
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- newVar solver
+  addXORClause solver [x1, x2] -- x1 ⊕ x2
+  addXORClause solver [x1, x3] -- x1 ⊕ x3
+  addClause solver [x2]
+
+  ret <- solve solver
+  ret @?= True
+  m <- model solver
+  m ! x1 @?= False
+  m ! x2 @?= True
+  m ! x3 @?= True
+
+case_xor_case3 = do
+  solver <- newSolver
+  setCheckModel solver True
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- newVar solver
+  x4 <- newVar solver
+  addXORClause solver [x1,x2,x3,x4]
+  addAtLeast solver [x1,x2,x3,x4] 2
+  ret <- solve solver
+  ret @?= True
+
 ------------------------------------------------------------------------
 
 -- from "Pueblo: A Hybrid Pseudo-Boolean SAT Solver"
