@@ -321,11 +321,14 @@ pbSubsume (lhs1,rhs1) (lhs2,rhs2) =
 type XORClause = [Lit]
 
 -- | Normalize XOR clause
---
--- 'Nothing' if the clause is trivially true.
 normalizeXORClause :: XORClause -> XORClause
-normalizeXORClause lits = [x | (x, True) <- IntMap.toList (IntMap.unionsWith xor [f lit | lit <- lits])]
-  where         
+normalizeXORClause lits =
+  case IntMap.keys m of
+    [0] -> [0]
+    0:x:xs -> -x : xs
+    xs -> xs
+  where
+    m = IntMap.filter id $ IntMap.unionsWith xor [f lit | lit <- lits]
     xor = (/=)
 
     f 0 = IntMap.singleton 0 True
