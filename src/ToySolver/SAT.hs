@@ -185,6 +185,8 @@ data VarData
   , vdPolarity   :: !(IORef Bool)
   , vdPosLitData :: !LitData
   , vdNegLitData :: !LitData
+  -- | will be invoked when the variable is assigned
+  , vdWatches    :: !(IORef [SomeConstraintHandler])
   , vdActivity   :: !(IORef VarActivity)
   }
 
@@ -201,8 +203,9 @@ newVarData = do
   polarity <- newIORef True
   pos <- newLitData
   neg <- newLitData
+  watches <- newIORef []
   activity <- newIORef 0
-  return $ VarData ainfo polarity pos neg activity
+  return $ VarData ainfo polarity pos neg watches activity
 
 newLitData :: IO LitData
 newLitData = do
@@ -440,6 +443,15 @@ watch solver !lit c = do
     unless (lit `elem` lits) $ error "watch: should not happen"
   ld <- litData solver lit
   modifyIORef (ldWatches ld) (toConstraintHandler c : )
+
+-- | Register the constraint to be notified when the variable is assigned.
+watchVar :: ConstraintHandler c => Solver -> Var -> c -> IO ()
+watchVar solver !var c = do
+  when debugMode $ do
+    vs <- watchedVariables solver c
+    unless (var `elem` vs) $ error "watchVar: should not happen"
+  vd <- varData solver var
+  modifyIORef (vdWatches vd) (toConstraintHandler c : )
 
 -- | Returns list of constraints that are watching the literal.
 watches :: Solver -> Lit -> IO [SomeConstraintHandler]
@@ -1484,7 +1496,11 @@ deduce solver = loop
           ret <- processLit lit
           case ret of
             Just _ -> return ret
-            Nothing -> loop
+            Nothing -> do
+              ret <- processVar (litVar lit)
+              case ret of
+                Just _ -> return ret
+                Nothing -> loop
 
     processLit :: Lit -> IO (Maybe SomeConstraintHandler)
     processLit !lit = do
@@ -1499,6 +1515,23 @@ deduce solver = loop
             else do
               modifyIORef wsref (++ws)
               return (Just w)
+      ws <- readIORef wsref
+      writeIORef wsref []
+      loop2 ws
+
+    processVar :: Lit -> IO (Maybe SomeConstraintHandler)
+    processVar !lit = do
+      let falsifiedLit = litNot lit
+      vd <- varData solver (litVar lit)
+      let wsref = vdWatches vd
+      let loop2 [] = return Nothing
+          loop2 (w:ws) = do
+            ok <- propagate solver w falsifiedLit
+            if ok
+              then loop2 ws
+              else do
+                modifyIORef wsref (++ws)
+                return (Just w)
       ws <- readIORef wsref
       writeIORef wsref []
       loop2 ws
@@ -1907,6 +1940,8 @@ class (Eq a, Hashable a) => ConstraintHandler a where
 
   watchedLiterals :: Solver -> a -> IO [Lit]
 
+  watchedVariables :: Solver -> a -> IO [Var]
+
   -- | invoked with the watched literal when the literal is falsified.
   -- 'watch' で 'toConstraint' を呼び出して heap allocation が発生するのを
   -- 避けるために、元の 'SomeConstraintHandler' も渡しておく。
@@ -1939,6 +1974,10 @@ detach solver c = do
   forM_ lits $ \lit -> do
     ld <- litData solver lit
     modifyIORef' (ldWatches ld) (delete c2)
+  vs <- watchedVariables solver c
+  forM_ vs $ \v -> do
+    vd <- varData solver v
+    modifyIORef' (vdWatches vd) (delete c2)
 
   b <- isPBRepresentable solver c
   when b $ do
@@ -1974,14 +2013,26 @@ reasonOf solver c x = do
   return cl
 
 isLocked :: Solver -> SomeConstraintHandler -> IO Bool
-isLocked solver c = anyM p =<< watchedLiterals solver c
+isLocked solver c = do
+    b1 <- anyM p1 =<< watchedLiterals solver c
+    b2 <- anyM p2 =<< watchedVariables solver c
+    return $ b1 || b2
   where
-    p :: Lit -> IO Bool
-    p lit = do
+    p1 :: Lit -> IO Bool
+    p1 lit = do
       val <- litValue solver lit
       if val /= lTrue then return False
       else do
         m <- varReason solver (litVar lit)
+        case m of
+          Nothing -> return False
+          Just c2 -> return $! c == c2
+    p2 :: Var -> IO Bool
+    p2 var = do
+      val <- varValue solver var
+      if val == lUndef then return False
+      else do
+        m <- varReason solver var
         case m of
           Nothing -> return False
           Just c2 -> return $! c == c2
@@ -2016,6 +2067,11 @@ instance ConstraintHandler SomeConstraintHandler where
   watchedLiterals solver (CHAtLeast c)   = watchedLiterals solver c
   watchedLiterals solver (CHPBCounter c) = watchedLiterals solver c
   watchedLiterals solver (CHPBPueblo c)  = watchedLiterals solver c
+
+  watchedVariables solver (CHClause c)    = watchedVariables solver c
+  watchedVariables solver (CHAtLeast c)   = watchedVariables solver c
+  watchedVariables solver (CHPBCounter c) = watchedVariables solver c
+  watchedVariables solver (CHPBPueblo c)  = watchedVariables solver c
 
   basicPropagate solver this (CHClause c)  lit   = basicPropagate solver this c lit
   basicPropagate solver this (CHAtLeast c) lit   = basicPropagate solver this c lit
@@ -2201,6 +2257,8 @@ instance ConstraintHandler ClauseHandler where
     case lits of
       l1:l2:_ -> return [l1, l2]
       _ -> return []
+
+  watchedVariables _ _ = return []
 
   basicPropagate !solver this this2 !falsifiedLit = do
     preprocess
@@ -2423,6 +2481,8 @@ instance ConstraintHandler AtLeastHandler where
     let n = atLeastNum this
     let ws = if length lits > n then take (n+1) lits else []
     return ws
+
+  watchedVariables _ _ = return []
 
   basicPropagate solver this this2 falsifiedLit = do
     preprocess
@@ -2671,6 +2731,8 @@ instance ConstraintHandler PBHandlerCounter where
   watchedLiterals _ this = do
     return $ map snd $ pbTerms this
 
+  watchedVariables _ _ = return []
+
   basicPropagate solver this this2 falsifiedLit = do
     watch solver falsifiedLit this
     let c = pbCoeffMap this2 IM.! falsifiedLit
@@ -2826,6 +2888,8 @@ instance ConstraintHandler PBHandlerPueblo where
     return ret
 
   watchedLiterals _ this = liftM IS.toList $ readIORef (puebloWatches this)
+
+  watchedVariables _ _ = return []
 
   basicPropagate solver this this2 falsifiedLit = do
     let t = fromJust $ find (\(_,l) -> l==falsifiedLit) (puebloTerms this2)
