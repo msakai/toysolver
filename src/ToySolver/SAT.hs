@@ -893,7 +893,12 @@ addPBExactlySoft solver sel lhs rhs = do
   addPBAtLeastSoft solver sel lhs2 rhs2
   addPBAtMostSoft solver sel lhs2 rhs2
 
-addXORClause :: Solver -> [Lit] -> Bool -> IO ()
+-- | Add a parity constraint /l1 ⊕ l2 ⊕ … ⊕ ln = rhs/
+addXORClause
+  :: Solver -- ^ The 'Solver' argument.
+  -> [Lit]  -- ^ literals @[l1, l2, …, ln]@
+  -> Bool   -- ^ /rhs/
+  -> IO ()
 addXORClause solver lits rhs = do
   d <- readIORef (svLevel solver)
   assert (d == levelRoot) $ return ()
@@ -3148,7 +3153,7 @@ instance ConstraintHandler XORClauseHandler where
           unsafeWrite a 1 liti
           unsafeWrite a i lit1
           watchVar solver (litVar liti) this
-          -- lit0 \oplus y
+          -- lit0 ⊕ y
           y <- do
             ref <- newIORef False
             forLoop 1 (<=ub) (+1) $ \j -> do
@@ -3192,7 +3197,7 @@ instance ConstraintHandler XORClauseHandler where
            str <- showConstraintHandler solver this
            return $ printf "basicPropagate: %s is unit" str
         watchVar solver v this
-        -- lit0 \oplus y
+        -- lit0 ⊕ y
         y <- do
           ref <- newIORef False
           forLoop 1 (<=ub) (+1) $ \j -> do
