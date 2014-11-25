@@ -195,6 +195,7 @@ Library
      ToySolver.Text.PBFile
      ToySolver.Text.SDPFile
      ToySolver.Internal.Data.IndexedPriorityQueue
+     ToySolver.Internal.Data.IOURef
      ToySolver.Internal.Data.PriorityQueue
      ToySolver.Internal.Data.SeqQueue
      ToySolver.Internal.Data.Vec
