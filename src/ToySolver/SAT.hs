@@ -60,6 +60,7 @@ module ToySolver.SAT
   , addPBAtMostSoft
   , addPBExactlySoft
   , addXORClause
+  , addXORClauseSoft
 
   -- * Solving
   , solve
@@ -915,6 +916,18 @@ addXORClause solver lits rhs = do
         addToDB solver c
         _ <- basicAttachXORClauseHandler solver c
         return ()
+
+-- | Add a soft parity constraint /lit ⇒ l1 ⊕ l2 ⊕ … ⊕ ln = rhs/
+addXORClauseSoft
+  :: Solver -- ^ The 'Solver' argument.
+  -> Lit    -- ^ indicator @lit@
+  -> [Lit]  -- ^ literals @[l1, l2, …, ln]@
+  -> Bool   -- ^ /rhs/
+  -> IO ()
+addXORClauseSoft solver ind lits rhs = do
+  reified <- newVar solver
+  addXORClause solver (litNot reified : lits) rhs
+  addClause solver [litNot ind, reified] -- ind ⇒ reified
 
 {--------------------------------------------------------------------
   Problem solving
