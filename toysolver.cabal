@@ -36,6 +36,7 @@ Extra-Source-Files:
    samples/smt/*.smt2
    samples/smt/*.ys
    samples/qbf/*.qdimacs
+   samples/programs/sudoku/*.sdk
    test/TestAReal2.hs
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
@@ -48,6 +49,11 @@ Flag ForceChar8
 
 Flag BuildToyFMF
   Description: build toyfmf command
+  Default: False
+  Manual: True
+
+Flag BuildSamplePrograms
+  Description: build sample programs
   Default: False
   Manual: True
 
@@ -259,6 +265,16 @@ Executable pbconvert
   Build-Depends: base >=4 && <5, containers, filepath, parse-dimacs, toysolver
   Default-Language: Haskell2010
 
+-- Sample Programs
+
+Executable sudoku
+  If !flag(BuildSamplePrograms)
+    Buildable: False
+  Main-is: sudoku.hs
+  HS-Source-Dirs: samples/programs/sudoku
+  Build-Depends: base, array, toysolver
+  Default-Language: Haskell2010
+
 Executable pigeonhole
   If !flag(BuildMiscPrograms)
     Buildable: False
@@ -266,6 +282,8 @@ Executable pigeonhole
   HS-Source-Dirs: pigeonhole
   Build-Depends: base >=4 && <5, containers, filepath, toysolver
   Default-Language: Haskell2010
+
+-- Misc Programs
 
 Executable maxsatverify
   If !flag(BuildMiscPrograms)
