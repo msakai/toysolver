@@ -279,7 +279,7 @@ parser = do
   let f :: Bool -> (Maybe MIP.RelOp, Row) -> [MIP.Constraint]
       f _isLazy (Nothing, _row) = []
       f isLazy (Just op, row) = do
-        let lhs = [MIP.Term c　[col] | (col,c) <- Map.toList (Map.findWithDefault Map.empty row rowCoeffs)]
+        let lhs = [MIP.Term c [col] | (col,c) <- Map.toList (Map.findWithDefault Map.empty row rowCoeffs)]
                   ++ Map.findWithDefault [] row qterms
         let rhs = Map.findWithDefault 0 row rhss
         (op2,rhs2) <-

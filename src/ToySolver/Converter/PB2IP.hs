@@ -182,7 +182,7 @@ relaxLE v (lhs, rhs) = (MIP.Term (rhs - lhs_ub) [v] : lhs, rhs)
 mtrans :: Int -> Map MIP.Var Rational -> SAT.Model
 mtrans nvar m =
   array (1, nvar)
-    [　(i, val)
+    [ (i, val)
     | i <- [1 .. nvar]
     , let val =
             case Map.findWithDefault 0 (convVar i) m of

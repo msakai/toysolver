@@ -217,7 +217,7 @@ normalizePBLinSum = step2 . step1
 -- | normalizing PB constraint of the form /c1 x1 + c2 cn ... cn xn >= b/.
 normalizePBLinAtLeast :: PBLinAtLeast -> PBLinAtLeast
 normalizePBLinAtLeast a =
-　case step1 a of
+  case step1 a of
     (xs,n)
       | n > 0     -> step3 (saturate n xs, n)
       | otherwise -> ([], 0) -- trivially true
