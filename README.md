@@ -22,10 +22,27 @@ This package includes several commands.
 Arithmetic solver for the following problems:
 
 * Mixed Integer Liner Programming (MILP or MIP)
+* Boolean SATisfiability problem (SAT)
+* PB
+    * Pseudo Boolean Satisfaction (PBS)
+    * Pseudo Boolean Optimization (PBO)
+    * Weighted Boolean Optimization (WBO)
+* Max-SAT families
+    * Max-SAT
+    * Partial Max-SAT
+    * Weighted Max-SAT
+    * Weighted Partial Max-SAT
 * Real Closed Field
 * LA(Q), LA(Z) (NOT IMPLEMENTED YET)
 
-Usage: toysolver [OPTION...] file.lp
+Usage:
+
+    toysolver [OPTION...] [file.lp|file.mps]
+    toysolver --lp [OPTION...] [file.lp|file.mps]
+    toysolver --sat [OPTION...] [file.cnf]
+    toysolver --pb [OPTION...] [file.opb]
+    toysolver --wbo [OPTION...] [file.wbo]
+    toysolver --maxsat [OPTION...] [file.cnf|file.wcnf]
 
     -h  --help           show help
     -v  --version        show version number
@@ -36,17 +53,24 @@ Usage: toysolver [OPTION...] file.lp
 SAT-based solver for the following problems:
 
 * SAT
+    * Boolean SATisfiability problem (SAT)
     * Minimally Unsatisfiable Subset (MUS)
+    * Group-Oriented MUS (GMUS)
 * PB
     * Pseudo Boolean Satisfaction (PBS)
     * Pseudo Boolean Optimization (PBO)
     * Weighted Boolean Optimization (WBO)
-* Max-SAT
+* Max-SAT families
+    * Max-SAT
+    * Partial Max-SAT
+    * Weighted Max-SAT
+    * Weighted Partial Max-SAT
 * Integer Programming (all variables must be bounded)
 
 Usage:
 
     toysat [file.cnf|-]
+    toysat --sat [file.cnf|-]
     toysat --mus [file.gcnf|file.cnf|-]
     toysat --pb [file.opb|-]
     toysat --wbo [file.wbo|-]
@@ -65,7 +89,7 @@ SAT-based finite model finder for first order logic (FOL).
 
 Usage:
 
-    toyfmf file.tptp size
+    toyfmf [file.tptp] [size]
 
 ### lpconvert
 
@@ -73,7 +97,7 @@ Converter between LP/MIP/SAT-related formats
 
 Usage:
 
-    lpconvert -o <outputile> <inputfile>
+    lpconvert -o [outputfile] [inputfile]
 
 Supported formats:
 
@@ -86,7 +110,7 @@ Converter between SAT/PB-related formats
 
 Usage:
 
-    pbconvert -o <outputile> <inputfile>
+    pbconvert -o [outputfile] [inputfile]
 
 Supported formats:
 
