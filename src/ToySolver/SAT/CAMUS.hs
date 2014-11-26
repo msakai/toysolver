@@ -51,10 +51,11 @@ type MCS = [Lit]
 data Options
   = Options
   { optLogger     :: String -> IO ()
-  , optCallback   :: MCS -> IO ()
+  , optOnMCSFound :: MCS -> IO ()
+  , optOnMUSFound :: MUS -> IO ()
   , optMCSCandidates :: [MCS]
     -- ^ MCS candidates (see HYCAM paper for details).
-    -- A MCS candidate must be a superset of real MCS.
+    -- A MCS candidate must be a superset of a real MCS.
   }
 
 instance Default Options where
@@ -65,7 +66,8 @@ defaultOptions :: Options
 defaultOptions =
   Options
   { optLogger     = \_ -> return ()
-  , optCallback   = \_ -> return ()
+  , optOnMCSFound = \_ -> return ()
+  , optOnMUSFound = \_ -> return ()
   , optMCSCandidates = []
   }
 
@@ -80,7 +82,7 @@ enumMCSAssumptions solver sels opt = do
 
     mcsFound :: MCS -> IO ()
     mcsFound mcs = do
-      optCallback opt mcs
+      optOnMCSFound opt mcs
       SAT.addClause solver mcs
 
     loop :: IORef [(Int, LitSet)] -> Int -> IO ()
@@ -117,9 +119,9 @@ allMCSAssumptions solver sels opt = do
   ref <- newIORef []  
   let opt2 =
         opt
-        { optCallback = \mcs -> do
+        { optOnMCSFound = \mcs -> do
             modifyIORef ref (mcs:)
-            optCallback opt mcs
+            optOnMCSFound opt mcs
         }
   enumMCSAssumptions solver sels opt2
   readIORef ref
@@ -129,7 +131,9 @@ allMUSAssumptions solver sels opt = do
   log "CAMUS: MCS enumeration begins"
   mcses <- allMCSAssumptions solver sels opt
   log "CAMUS: MCS enumeration done"
-  return $ HittingSet.minimalHittingSets mcses
+  let muses = HittingSet.minimalHittingSets mcses
+  mapM_ (optOnMUSFound opt) muses
+  return $ muses
   where
     log :: String -> IO ()
     log = optLogger opt

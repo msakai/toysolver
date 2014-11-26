@@ -541,7 +541,7 @@ solveMUS opt solver gcnf = do
         else do
           let opt2 = def
                      { CAMUS.optLogger = putCommentLine
-                     , CAMUS.optCallback = \mcs -> do
+                     , CAMUS.optOnMCSFound = \mcs -> do
                          let mcs2 = sort $ map (sel2idx !) mcs
                          putCommentLine $ "MCS found: " ++ show mcs2
                      }
