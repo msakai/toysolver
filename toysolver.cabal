@@ -182,6 +182,7 @@ Library
      ToySolver.SAT.Integer
      ToySolver.SAT.MUS
      ToySolver.SAT.CAMUS
+     ToySolver.SAT.DAA
      ToySolver.SAT.PBO
      ToySolver.SAT.PBO.Context
      ToySolver.SAT.PBO.BC
