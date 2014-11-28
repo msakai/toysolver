@@ -8,6 +8,10 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
+-- In this module, we assume each soft constraint /C_i/ is represented as a literal.
+-- If a constraint /C_i/ is not a literal, we can represent it as a fresh variable /v/
+-- together with a hard constraint /v ⇒ C_i/.
+--
 -- References:
 --
 -- * [CAMUS] M. Liffiton and K. Sakallah, Algorithms for computing minimal
@@ -25,8 +29,8 @@
 -----------------------------------------------------------------------------
 module ToySolver.SAT.CAMUS
   ( MUS
-  , MSS
   , MCS
+  , MSS
   , Options (..)
   , defaultOptions
   , allMCSAssumptions
@@ -46,18 +50,18 @@ import ToySolver.SAT.Types
 
 -- | Minimal Unsatisfiable Subset of constraints (MUS).
 --
--- A subset U ⊆ C is an MUS if U is unsatisfiable and ∀Ci ∈ U, U\{Ci} is satisfiable [CAMUS]. 
+-- A subset U ⊆ C is an MUS if U is unsatisfiable and ∀C_i ∈ U, U\\{C_i} is satisfiable [CAMUS]. 
 type MUS = [Lit]
 
 -- | Minimal Correction Subset of constraints (MCS).
 --
--- A subset M ⊆ C is an MCS if C\\M is satisfiable and ∀Ci ∈ M, C\\(M\\{Ci}) is unsatisfiable [CAMUS].
--- MSS is also known as CoMSS.
+-- A subset M ⊆ C is an MCS if C\\M is satisfiable and ∀C_i ∈ M, C\\(M\\{C_i}) is unsatisfiable [CAMUS].
+-- A MCS is the complement of an MSS and also known as a CoMSS.
 type MCS = [Lit]
 
 -- | Maximal Satisfiable Subset (MSS).
 --
--- A subset U ⊆ C is an MSS if U is unsatisfiable and ∀C_i ∈ U, U\{C_i} is satisfiable [CAMUS].
+-- A subset S ⊆ C is an MSS if S is satisfiable and ∀C_i ∈ U\\S, S∪{C_i} is unsatisfiable [CAMUS].
 type MSS = [Lit]
 
 -- | Options for 'enumMCSAssumptions', 'allMCSAssumptions', 'allMUSAssumptions'
