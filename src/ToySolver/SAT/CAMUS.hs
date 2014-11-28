@@ -8,6 +8,8 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
+-- References:
+--
 -- * [CAMUS] M. Liffiton and K. Sakallah, Algorithms for computing minimal
 --   unsatisfiable subsets of constraints, Journal of Automated Reasoning,
 --   vol. 40, no. 1, pp. 1-33, Jan. 2008. 
@@ -23,6 +25,7 @@
 -----------------------------------------------------------------------------
 module ToySolver.SAT.CAMUS
   ( MUS
+  , MSS
   , MCS
   , Options (..)
   , defaultOptions
@@ -41,11 +44,21 @@ import qualified ToySolver.HittingSet as HittingSet
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types
 
--- | Minimal Unsatisfiable Subset of constraints.
+-- | Minimal Unsatisfiable Subset of constraints (MUS).
+--
+-- A subset U ⊆ C is an MUS if U is unsatisfiable and ∀Ci ∈ U, U\{Ci} is satisfiable [CAMUS]. 
 type MUS = [Lit]
 
--- | Minimal Correction Subset of constraints.
+-- | Minimal Correction Subset of constraints (MCS).
+--
+-- A subset M ⊆ C is an MCS if C\\M is satisfiable and ∀Ci ∈ M, C\\(M\\{Ci}) is unsatisfiable [CAMUS].
+-- MSS is also known as CoMSS.
 type MCS = [Lit]
+
+-- | Maximal Satisfiable Subset (MSS).
+--
+-- A subset U ⊆ C is an MSS if U is unsatisfiable and ∀C_i ∈ U, U\{C_i} is satisfiable [CAMUS].
+type MSS = [Lit]
 
 -- | Options for 'enumMCSAssumptions', 'allMCSAssumptions', 'allMUSAssumptions'
 data Options
