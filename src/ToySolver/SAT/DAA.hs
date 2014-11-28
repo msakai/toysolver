@@ -48,13 +48,13 @@ allMUSAssumptions solver sels opt = do
   (muses, _) <- daa solver sels opt
   return $ map IntSet.toList $ Set.toList muses
 
-daa :: SAT.Solver -> [Lit] -> Options -> IO (Set IntSet, Set IntSet)
+daa :: SAT.Solver -> [Lit] -> Options -> IO (Set LitSet, Set LitSet)
 daa solver sels opt = loop Set.empty Set.empty
   where
-    selsSet :: IntSet
+    selsSet :: LitSet
     selsSet = IntSet.fromList sels
 
-    loop :: Set IntSet -> Set IntSet -> IO (Set IntSet, Set IntSet)
+    loop :: Set LitSet -> Set LitSet -> IO (Set LitSet, Set LitSet)
     loop muses mcses = do
       let f muses [] = return (muses, mcses)
           f muses (xs:xss) = do
@@ -71,12 +71,12 @@ daa solver sels opt = loop Set.empty Set.empty
                 f (Set.insert mus muses) xss
       f muses (Set.toList (hst mcses `Set.difference` muses))
 
-    hst :: Set IntSet -> Set IntSet
+    hst :: Set LitSet -> Set LitSet
     hst = Set.fromList . map IntSet.fromList
         . HittingSet.minimalHittingSets
         . map IntSet.toList . Set.toList
 
-    findMSS :: IntSet -> IO (Maybe IntSet)
+    findMSS :: LitSet -> IO (Maybe LitSet)
     findMSS xs = do
       b <- SAT.solveWith solver (IntSet.toList xs)
       if b then do
@@ -85,7 +85,7 @@ daa solver sels opt = loop Set.empty Set.empty
       else
         return Nothing
 
-    grow :: IntSet -> IO IntSet
+    grow :: LitSet -> IO LitSet
     grow xs = loop xs (selsSet `IntSet.difference` xs)
       where
         loop xs ys =
