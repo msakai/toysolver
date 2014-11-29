@@ -12,7 +12,8 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.SAT.MUS
-  ( Options (..)
+  ( module ToySolver.SAT.MUS.Types
+  , Options (..)
   , defaultOptions
   , findMUSAssumptions
   ) where
@@ -23,6 +24,7 @@ import Data.List
 import qualified Data.IntSet as IS
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types
+import ToySolver.SAT.MUS.Types
 
 -- | Options for 'findMUSAssumptions' function
 data Options
@@ -49,7 +51,7 @@ defaultOptions =
 findMUSAssumptions
   :: SAT.Solver
   -> Options
-  -> IO [Lit]
+  -> IO MUS
 findMUSAssumptions solver opt = do
   log "computing a minimal unsatisfiable core"
   core <- liftM IS.fromList $ SAT.failedAssumptions solver

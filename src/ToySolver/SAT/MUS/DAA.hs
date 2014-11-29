@@ -2,7 +2,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.DAA
+-- Module      :  ToySolver.SAT.MUS.DAA
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
 -- 
@@ -18,9 +18,8 @@
 --   <http://ww2.cs.mu.oz.au/~pjs/papers/padl05.pdf>
 --
 -----------------------------------------------------------------------------
-module ToySolver.SAT.DAA
-  ( MUS
-  , MCS
+module ToySolver.SAT.MUS.DAA
+  ( module ToySolver.SAT.MUS.Types
   , Options (..)
   , defaultOptions
   , allMCSAssumptions
@@ -36,7 +35,8 @@ import qualified Data.Set as Set
 import qualified ToySolver.HittingSet as HittingSet
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types
-import ToySolver.SAT.CAMUS (Options (..), defaultOptions, MUS, MCS)
+import ToySolver.SAT.MUS.Types
+import ToySolver.SAT.MUS.CAMUS (Options (..), defaultOptions)
 
 allMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MCS]
 allMCSAssumptions solver sels opt = do

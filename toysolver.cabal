@@ -181,8 +181,9 @@ Library
      ToySolver.SAT
      ToySolver.SAT.Integer
      ToySolver.SAT.MUS
-     ToySolver.SAT.CAMUS
-     ToySolver.SAT.DAA
+     ToySolver.SAT.MUS.CAMUS
+     ToySolver.SAT.MUS.DAA
+     ToySolver.SAT.MUS.Types
      ToySolver.SAT.PBO
      ToySolver.SAT.PBO.Context
      ToySolver.SAT.PBO.BC

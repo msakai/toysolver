@@ -64,7 +64,7 @@ import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Integer as Integer
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
 import qualified ToySolver.SAT.MUS as MUS
-import qualified ToySolver.SAT.CAMUS as CAMUS
+import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import ToySolver.SAT.Printer
 import qualified ToySolver.Text.PBFile as PBFile
 import qualified ToySolver.Text.LPFile as LPFile

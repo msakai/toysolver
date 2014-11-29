@@ -22,8 +22,8 @@ import ToySolver.SAT
 import ToySolver.SAT.Types
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
 import qualified ToySolver.SAT.MUS as MUS
-import qualified ToySolver.SAT.CAMUS as CAMUS
-import qualified ToySolver.SAT.DAA as DAA
+import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
+import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
 
 -- should be SAT
