@@ -3,12 +3,12 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Cooper.Core
--- Copyright   :  (c) Masahiro Sakai 2011-2013
+-- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleInstances)
+-- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances)
 --
 -- Naive implementation of Cooper's algorithm
 --
@@ -153,8 +153,8 @@ simplifyLit lit@(Divisible b c e)
   | otherwise = Atom $ Divisible b c' e'
   where
     d  = abs $ foldl' gcd c [c2 | (c2,x) <- LA.terms e, x /= LA.unitVar]
-    c' = c `div` d
-    e' = LA.mapCoeff (`div` d) e
+    c' = c `checkedDiv` d
+    e' = LA.mapCoeff (`checkedDiv` d) e
 
 evalQFFormula :: Model Integer -> QFFormula -> Bool
 evalQFFormula m = BoolExpr.fold (evalLit m)
@@ -169,10 +169,10 @@ evalLit m (Divisible False n e) = LA.evalExpr m e `mod` n /= 0
 data Witness = WCase1 Integer ExprZ | WCase2 Integer Integer Integer (Set ExprZ)
 
 evalWitness :: Model Integer -> Witness -> Integer
-evalWitness model (WCase1 c e) = LA.evalExpr model e `div` c
+evalWitness model (WCase1 c e) = LA.evalExpr model e `checkedDiv` c
 evalWitness model (WCase2 c j delta us)
-  | Set.null us' = j `div` c
-  | otherwise = (j + (((u - delta - 1) `div` delta) * delta)) `div` c
+  | Set.null us' = j `checkedDiv` c
+  | otherwise = (j + (((u - delta - 1) `div` delta) * delta)) `checkedDiv` c
   where
     us' = Set.map (LA.evalExpr model) us
     u = Set.findMin us'
@@ -241,13 +241,13 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
           case LA.lookupCoeff x e of
             Nothing -> lit
             Just a ->
-              let s = abs (c `div` a)
+              let s = abs (c `checkedDiv` a)
               in Pos $ g s e
         f lit@(Divisible b d e) =
           case LA.lookupCoeff x e of
             Nothing -> lit
             Just a ->
-              let s = abs (c `div` a)
+              let s = abs (c `checkedDiv` a)
               in Divisible b (s*d) $ g s e
 
         g :: Integer -> ExprZ -> ExprZ
@@ -322,6 +322,12 @@ newtype LCM a = LCM{ getLCM :: a }
 instance Integral a => Monoid (LCM a) where
   mempty = LCM 1
   LCM a `mappend` LCM b = LCM $ lcm a b
+
+checkedDiv :: Integer -> Integer -> Integer
+checkedDiv a b =
+  case a `divMod` b of
+    (q,0) -> q
+    _ -> error "ToySolver.Cooper.checkedDiv: should not happen"
 
 -- ---------------------------------------------------------------------------
 
