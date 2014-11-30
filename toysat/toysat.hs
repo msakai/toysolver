@@ -556,7 +556,7 @@ solveMUS opt solver gcnf = do
                      , CAMUS.optOnMUSFound = \mus -> do
                          i <- readIORef counter
                          modifyIORef' counter (+1)
-                         putCommentLine $ "MUS #" ++ show i
+                         putCommentLine $ "MUS #" ++ show (i :: Int)
                          let mus2 = sort $ map (sel2idx !) mus
                          musPrintSol stdout mus2
                      }
