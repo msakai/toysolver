@@ -99,7 +99,7 @@ enumMCSAssumptions solver sels opt = do
         forM_ cand $ \(size,cs) -> do
           when (size == k) $ do
             -- If a candidate MCS is not superset of already obtained MCS,
-            -- we are sure that they are real MCS.
+            -- we are sure that it is actually an MCS.
             mcsFound (IS.toList cs)
         writeIORef candRef [(size,cs) | (size,cs) <- cand, size /= k]
 
