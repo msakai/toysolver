@@ -65,6 +65,7 @@ import qualified ToySolver.SAT.Integer as Integer
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
+import qualified ToySolver.SAT.MUS.DAA as DAA
 import ToySolver.SAT.Printer
 import qualified ToySolver.Text.PBFile as PBFile
 import qualified ToySolver.Text.LPFile as LPFile
@@ -80,6 +81,8 @@ import UBCSAT
 -- ------------------------------------------------------------------------
 
 data Mode = ModeHelp | ModeVersion | ModeSAT | ModeMUS | ModePB | ModeWBO | ModeMaxSAT | ModeMIP
+
+data AllMUSMethod = AllMUSCAMUS | AllMUSDAA
 
 data Options
   = Options
@@ -102,6 +105,7 @@ data Options
   , optObjFunVarsHeuristics :: Bool
   , optLocalSearchInitial   :: Bool
   , optAllMUSes :: Bool
+  , optAllMUSMethod :: AllMUSMethod
   , optPrintRational :: Bool
   , optCheckModel  :: Bool
   , optTimeout :: Integer
@@ -134,6 +138,7 @@ defaultOptions
   , optObjFunVarsHeuristics = PBO.defaultEnableObjFunVarsHeuristics
   , optLocalSearchInitial   = False
   , optAllMUSes = False
+  , optAllMUSMethod = AllMUSCAMUS
   , optPrintRational = False  
   , optCheckModel = False
   , optTimeout = 0
@@ -227,6 +232,9 @@ options =
     , Option [] ["all-mus"]
         (NoArg (\opt -> opt{ optAllMUSes = True }))
         "enumerate all MUSes"
+    , Option [] ["all-mus-daa"]
+        (NoArg (\opt -> opt{ optAllMUSes = True, optAllMUSMethod = AllMUSDAA }))
+        "enumerate all MUSes using DAA instead of CAMUS (experimental option)"
 
     , Option [] ["print-rational"]
         (NoArg (\opt -> opt{ optPrintRational = True }))
@@ -539,16 +547,23 @@ solveMUS opt solver gcnf = do
           mus <- MUS.findMUSAssumptions solver opt2
           musPrintSol stdout (map (sel2idx !) mus)
         else do
+          counter <- newIORef 1
           let opt2 = def
                      { CAMUS.optLogger = putCommentLine
                      , CAMUS.optOnMCSFound = \mcs -> do
                          let mcs2 = sort $ map (sel2idx !) mcs
                          putCommentLine $ "MCS found: " ++ show mcs2
+                     , CAMUS.optOnMUSFound = \mus -> do
+                         i <- readIORef counter
+                         modifyIORef' counter (+1)
+                         putCommentLine $ "MUS #" ++ show i
+                         let mus2 = sort $ map (sel2idx !) mus
+                         musPrintSol stdout mus2
                      }
-          muses <- CAMUS.allMUSAssumptions solver (map snd tbl) opt2
-          forM_ (zip [(1::Int)..] muses) $ \(i, mus) -> do
-            putCommentLine $ "MUS #" ++ show i
-            musPrintSol stdout (sort (map (sel2idx !) mus))
+          case optAllMUSMethod opt of
+            AllMUSCAMUS -> CAMUS.allMUSAssumptions solver (map snd tbl) opt2
+            AllMUSDAA   -> DAA.allMUSAssumptions solver (map snd tbl) opt2
+          return ()
 
 -- ------------------------------------------------------------------------
 
