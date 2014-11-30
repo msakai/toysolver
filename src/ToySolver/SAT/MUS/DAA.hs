@@ -80,6 +80,8 @@ daa solver sels opt =
 
     findMSS :: LitSet -> IO (Maybe LitSet)
     findMSS xs = do
+      forM_ sels $ \l -> do
+        SAT.setVarPolarity solver (litVar l) (litPolarity l)
       b <- SAT.solveWith solver (IntSet.toList xs)
       if b then do
         m <- SAT.model solver
@@ -99,7 +101,9 @@ daa solver sels opt =
                 m <- SAT.model solver
                 let cs = IntSet.fromList [l | l <- sels, evalLit m l]
                 loop (xs `IntSet.union` cs) (ys' `IntSet.difference` cs)
-              else
+              else do
+                zs <- SAT.failedAssumptions solver
+                SAT.addClause solver [-l | l <- zs] -- lemma
                 loop xs ys'
 
 {-
