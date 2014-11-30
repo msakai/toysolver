@@ -941,3 +941,13 @@ writeSOLFile opt m obj nbvar = do
     Just fname -> do
       let m2 = Map.fromList [("x" ++ show x, if b then 1 else 0) | (x,b) <- assocs m, x <= nbvar]
       writeFile fname (GurobiSol.render (Map.map fromInteger m2) (fmap fromInteger obj))
+
+
+#if !MIN_VERSION_base(4,6,0)
+
+modifyIORef' :: IORef a -> (a -> a) -> IO ()
+modifyIORef' ref f = do
+  x <- readIORef ref
+  writeIORef ref $! f x
+
+#endif
