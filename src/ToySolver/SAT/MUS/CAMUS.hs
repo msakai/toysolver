@@ -53,6 +53,8 @@ data Options
   { optLogger     :: String -> IO ()
   , optOnMCSFound :: MCS -> IO ()
   , optOnMUSFound :: MUS -> IO ()
+  , optKnownMCSes :: [MCS]
+  , optKnownMUSes :: [MUS]
   , optMCSCandidates :: [MCS]
     -- ^ MCS candidates (see HYCAM paper for details).
     -- A MCS candidate must be a superset of a real MCS.
@@ -68,6 +70,8 @@ defaultOptions =
   { optLogger     = \_ -> return ()
   , optOnMCSFound = \_ -> return ()
   , optOnMUSFound = \_ -> return ()
+  , optKnownMCSes = []
+  , optKnownMUSes = []
   , optMCSCandidates = []
   }
 

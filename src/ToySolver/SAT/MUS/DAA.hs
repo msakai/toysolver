@@ -49,7 +49,9 @@ allMUSAssumptions solver sels opt = do
   return $ map IntSet.toList $ Set.toList muses
 
 daa :: SAT.Solver -> [Lit] -> Options -> IO (Set LitSet, Set LitSet)
-daa solver sels opt = loop Set.empty Set.empty
+daa solver sels opt =
+  loop (Set.fromList (map IntSet.fromList (optKnownMUSes opt)))
+       (Set.fromList (map IntSet.fromList (optKnownMCSes opt)))
   where
     selsSet :: LitSet
     selsSet = IntSet.fromList sels
