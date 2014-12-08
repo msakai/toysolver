@@ -34,6 +34,7 @@ module ToySolver.SAT.MUS.CAMUS
   , allMCSAssumptions
   , allMUSAssumptions
   , enumMCSAssumptions
+  , camus
   ) where
 
 import Control.Monad
@@ -131,12 +132,17 @@ allMCSAssumptions solver sels opt = do
 
 allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MUS]
 allMUSAssumptions solver sels opt = do
+  (muses, _mcses) <- camus solver sels opt
+  return $ muses
+
+camus :: SAT.Solver -> [Lit] -> Options -> IO ([MUS], [MCS])
+camus solver sels opt = do
   log "CAMUS: MCS enumeration begins"
   mcses <- allMCSAssumptions solver sels opt
   log "CAMUS: MCS enumeration done"
   let muses = HittingSet.minimalHittingSets mcses
   mapM_ (optOnMUSFound opt) muses
-  return $ muses
+  return (muses, mcses)
   where
     log :: String -> IO ()
     log = optLogger opt

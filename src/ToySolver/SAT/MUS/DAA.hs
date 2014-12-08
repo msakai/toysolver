@@ -41,23 +41,23 @@ import ToySolver.SAT.MUS.CAMUS (Options (..), defaultOptions)
 allMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MCS]
 allMCSAssumptions solver sels opt = do
   (_, mcses) <- daa solver sels opt
-  return $ Set.toList mcses
+  return mcses
 
 allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MUS]
 allMUSAssumptions solver sels opt = do
   (muses, _) <- daa solver sels opt
-  return $ Set.toList muses
+  return muses
 
-daa :: SAT.Solver -> [Lit] -> Options -> IO (Set LitSet, Set LitSet)
+daa :: SAT.Solver -> [Lit] -> Options -> IO ([MUS], [MCS])
 daa solver sels opt =
   loop (Set.fromList (optKnownMUSes opt)) (Set.fromList (optKnownMCSes opt))
   where
     selsSet :: LitSet
     selsSet = IntSet.fromList sels
 
-    loop :: Set LitSet -> Set LitSet -> IO (Set LitSet, Set LitSet)
+    loop :: Set LitSet -> Set LitSet -> IO ([MUS], [MCS])
     loop muses mcses = do
-      let f muses [] = return (muses, mcses)
+      let f muses [] = return (Set.toList muses, Set.toList mcses)
           f muses (xs:xss) = do
             ret <- findMSS xs
             case ret of
