@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.FourierMotzkin
+-- Module      :  ToySolver.Arith.FourierMotzkin
 -- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
 -- 
@@ -16,7 +16,7 @@
 -- * <http://users.cecs.anu.edu.au/~michaeln/pubs/arithmetic-dps.pdf>
 --
 -----------------------------------------------------------------------------
-module ToySolver.FourierMotzkin
+module ToySolver.Arith.FourierMotzkin
     ( Lit (..)
     , project
     , projectN
@@ -25,5 +25,5 @@ module ToySolver.FourierMotzkin
     , solve
     ) where
 
-import ToySolver.FourierMotzkin.Core
-import ToySolver.FourierMotzkin.FOL
+import ToySolver.Arith.FourierMotzkin.Core
+import ToySolver.Arith.FourierMotzkin.FOL

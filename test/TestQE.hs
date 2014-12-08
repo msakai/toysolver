@@ -22,13 +22,13 @@ import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Data.Polynomial as P
 import ToySolver.Data.Var
 
-import qualified ToySolver.FourierMotzkin as FourierMotzkin
-import qualified ToySolver.OmegaTest as OmegaTest
-import qualified ToySolver.Cooper as Cooper
-import qualified ToySolver.CAD as CAD
-import qualified ToySolver.Simplex2 as Simplex2
-import qualified ToySolver.ContiTraverso as ContiTraverso
-import qualified ToySolver.VirtualSubstitution as VirtualSubstitution
+import qualified ToySolver.Arith.FourierMotzkin as FourierMotzkin
+import qualified ToySolver.Arith.OmegaTest as OmegaTest
+import qualified ToySolver.Arith.Cooper as Cooper
+import qualified ToySolver.Arith.CAD as CAD
+import qualified ToySolver.Arith.Simplex2 as Simplex2
+import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
+import qualified ToySolver.Arith.VirtualSubstitution as VirtualSubstitution
 
 ------------------------------------------------------------------------
 

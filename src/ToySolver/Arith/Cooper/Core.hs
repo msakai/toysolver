@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Cooper.Core
+-- Module      :  ToySolver.Arith.Cooper.Core
 -- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
 -- 
@@ -23,7 +23,7 @@
 -- * <http://hackage.haskell.org/package/presburger>
 --
 -----------------------------------------------------------------------------
-module ToySolver.Cooper.Core
+module ToySolver.Arith.Cooper.Core
     (
     -- * Language of presburger arithmetics
       ExprZ
@@ -63,8 +63,8 @@ import ToySolver.Data.BoolExpr (BoolExpr (..))
 import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
-import qualified ToySolver.FourierMotzkin as FM
-import qualified ToySolver.FourierMotzkin.Core as FM
+import qualified ToySolver.Arith.FourierMotzkin as FM
+import qualified ToySolver.Arith.FourierMotzkin.Core as FM
 
 -- ---------------------------------------------------------------------------
 

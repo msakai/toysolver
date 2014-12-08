@@ -1,4 +1,4 @@
-module ToySolver.LPUtil
+module ToySolver.Arith.LPUtil
   ( toStandardForm
   , toStandardForm'
   ) where
@@ -16,7 +16,7 @@ import qualified Data.Interval as Interval
 import ToySolver.Data.ArithRel
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
-import qualified ToySolver.BoundsInference as BI
+import qualified ToySolver.Arith.BoundsInference as BI
 
 toStandardForm
   :: (LA.Expr Rational, [ArithRel (LA.Expr Rational)])

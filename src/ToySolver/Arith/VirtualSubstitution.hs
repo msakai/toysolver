@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.VirtualSubstitution
+-- Module      :  ToySolver.Arith.VirtualSubstitution
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
 -- 
@@ -20,7 +20,7 @@
 --   J.JSSAC, Vol. 10, No. 1, pp. 41-51, 2003.
 --
 -----------------------------------------------------------------------------
-module ToySolver.VirtualSubstitution
+module ToySolver.Arith.VirtualSubstitution
   ( QFFormula
   , evalQFFormula
   , project

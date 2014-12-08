@@ -17,8 +17,8 @@ import Text.Printf
 
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.LA ((.<=.))
-import ToySolver.Simplex
-import qualified ToySolver.LPSolver as LP
+import ToySolver.Arith.Simplex
+import qualified ToySolver.Arith.LPSolver as LP
 
 example_3_2 :: Tableau Rational
 example_3_2 = IntMap.fromList

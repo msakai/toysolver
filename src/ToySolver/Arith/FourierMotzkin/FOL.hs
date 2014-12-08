@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-module ToySolver.FourierMotzkin.FOL
+module ToySolver.Arith.FourierMotzkin.FOL
     ( solveFormula
     , eliminateQuantifiers
     , eliminateQuantifiers'
@@ -17,7 +17,7 @@ import qualified ToySolver.Data.FOL.Arith as FOL
 import qualified ToySolver.Data.LA.FOL as LAFOL
 import ToySolver.Data.Var
 
-import ToySolver.FourierMotzkin.Core
+import ToySolver.Arith.FourierMotzkin.Core
 
 -- ---------------------------------------------------------------------------
 

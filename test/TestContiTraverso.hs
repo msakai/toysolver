@@ -14,7 +14,7 @@ import Test.Framework.Providers.HUnit
 
 import Data.OptDir
 
-import ToySolver.ContiTraverso
+import ToySolver.Arith.ContiTraverso
 
 import ToySolver.Data.ArithRel
 import qualified ToySolver.Data.LA as LA

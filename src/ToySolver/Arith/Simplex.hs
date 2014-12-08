@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Simplex
+-- Module      :  ToySolver.Arith.Simplex
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -17,7 +17,7 @@
 -- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
 --
 -----------------------------------------------------------------------------
-module ToySolver.Simplex
+module ToySolver.Arith.Simplex
   (
   -- * The @Tableau@ type
     Tableau

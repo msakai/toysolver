@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.FourierMotzkin.Core
+-- Module      :  ToySolver.Arith.FourierMotzkin.Core
 -- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
 -- 
@@ -16,7 +16,7 @@
 -- * <http://users.cecs.anu.edu.au/~michaeln/pubs/arithmetic-dps.pdf>
 --
 -----------------------------------------------------------------------------
-module ToySolver.FourierMotzkin.Core
+module ToySolver.Arith.FourierMotzkin.Core
     ( ExprZ
     , Rat
     , toRat

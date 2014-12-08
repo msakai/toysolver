@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Cooper
+-- Module      :  ToySolver.Arith.Cooper
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -22,7 +22,7 @@
 -- * <http://hackage.haskell.org/package/presburger>
 --
 -----------------------------------------------------------------------------
-module ToySolver.Cooper
+module ToySolver.Arith.Cooper
     (
     -- * Language of presburger arithmetics
       ExprZ
@@ -46,5 +46,5 @@ module ToySolver.Cooper
     , solveQFLA
     ) where
 
-import ToySolver.Cooper.Core
-import ToySolver.Cooper.FOL
+import ToySolver.Arith.Cooper.Core
+import ToySolver.Arith.Cooper.FOL

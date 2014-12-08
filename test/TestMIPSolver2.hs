@@ -14,9 +14,9 @@ import Test.Framework.Providers.HUnit
 import Text.Printf
 
 import qualified ToySolver.Data.LA as LA
-import qualified ToySolver.Simplex2 as Simplex2
-import ToySolver.Simplex2
-import qualified ToySolver.MIPSolver2 as MIPSolver2
+import qualified ToySolver.Arith.Simplex2 as Simplex2
+import ToySolver.Arith.Simplex2
+import qualified ToySolver.Arith.MIPSolver2 as MIPSolver2
 
 ------------------------------------------------------------------------
 

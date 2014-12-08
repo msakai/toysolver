@@ -112,31 +112,31 @@ Library
      TypeSynonymInstances
      OverloadedStrings
   Exposed-Modules:
-     ToySolver.BoundsInference
-     ToySolver.CAD
+     ToySolver.Arith.BoundsInference
+     ToySolver.Arith.CAD
+     ToySolver.Arith.ContiTraverso
+     ToySolver.Arith.Cooper
+     ToySolver.Arith.Cooper.Core
+     ToySolver.Arith.Cooper.FOL
+     ToySolver.Arith.FourierMotzkin
+     ToySolver.Arith.FourierMotzkin.Core
+     ToySolver.Arith.FourierMotzkin.FOL
+     ToySolver.Arith.LPSolver
+     ToySolver.Arith.LPSolverHL
+     ToySolver.Arith.LPUtil
+     ToySolver.Arith.MIPSolverHL
+     ToySolver.Arith.MIPSolver2
+     ToySolver.Arith.OmegaTest
+     ToySolver.Arith.OmegaTest.Misc
+     ToySolver.Arith.Simplex
+     ToySolver.Arith.Simplex2
+     ToySolver.Arith.VirtualSubstitution
      ToySolver.CongruenceClosure
-     ToySolver.ContiTraverso
-     ToySolver.Cooper
-     ToySolver.Cooper.Core
-     ToySolver.Cooper.FOL
      ToySolver.FOLModelFinder
-     ToySolver.FourierMotzkin
-     ToySolver.FourierMotzkin.Core
-     ToySolver.FourierMotzkin.FOL
      ToySolver.HittingSet
      ToySolver.HittingSet.HTCBDD
      ToySolver.HittingSet.SHD
      ToySolver.Knapsack
-     ToySolver.LPSolver
-     ToySolver.LPSolverHL
-     ToySolver.LPUtil
-     ToySolver.MIPSolverHL
-     ToySolver.MIPSolver2
-     ToySolver.OmegaTest
-     ToySolver.OmegaTest.Misc
-     ToySolver.Simplex
-     ToySolver.Simplex2
-     ToySolver.VirtualSubstitution
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.MaxSAT2IP

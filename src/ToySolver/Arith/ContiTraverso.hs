@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.ContiTraverso
+-- Module      :  ToySolver.Arith.ContiTraverso
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -24,7 +24,7 @@
 -- 
 --
 -----------------------------------------------------------------------------
-module ToySolver.ContiTraverso
+module ToySolver.Arith.ContiTraverso
   ( solve
   , solve'
   ) where
@@ -47,7 +47,7 @@ import ToySolver.Data.Polynomial (Polynomial, UPolynomial, Monomial, MonomialOrd
 import qualified ToySolver.Data.Polynomial as P
 import ToySolver.Data.Polynomial.GroebnerBasis as GB
 import ToySolver.Data.Var
-import qualified ToySolver.LPUtil as LPUtil
+import qualified ToySolver.Arith.LPUtil as LPUtil
 
 solve :: MonomialOrder Var -> VarSet -> OptDir -> LA.Expr Rational -> [LA.Atom Rational] -> Maybe (Model Integer)
 solve cmp vs dir obj cs = do

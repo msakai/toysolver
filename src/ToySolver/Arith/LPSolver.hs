@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.LPSolver
+-- Module      :  ToySolver.Arith.LPSolver
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -18,7 +18,7 @@
 --
 -----------------------------------------------------------------------------
 
-module ToySolver.LPSolver
+module ToySolver.Arith.LPSolver
   (
   -- * Solver type
     Solver
@@ -65,8 +65,8 @@ import qualified Data.Interval as Interval
 import ToySolver.Data.ArithRel
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
-import qualified ToySolver.Simplex as Simplex
-import qualified ToySolver.BoundsInference as BI
+import qualified ToySolver.Arith.Simplex as Simplex
+import qualified ToySolver.Arith.BoundsInference as BI
 
 -- ---------------------------------------------------------------------------
 -- Solver type

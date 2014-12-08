@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, TypeFamilies, CPP #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Simplex2
+-- Module      :  ToySolver.Arith.Simplex2
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -26,7 +26,7 @@
 --   <http://yices.csl.sri.com/sri-csl-06-01.pdf>
 --
 -----------------------------------------------------------------------------
-module ToySolver.Simplex2
+module ToySolver.Arith.Simplex2
   (
   -- * The @Solver@ type
     Solver

@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.LPSolverHL
+-- Module      :  ToySolver.Arith.LPSolverHL
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -14,7 +14,7 @@
 --
 -----------------------------------------------------------------------------
 
-module ToySolver.LPSolverHL
+module ToySolver.Arith.LPSolverHL
   ( OptResult (..)
   , minimize
   , maximize
@@ -31,9 +31,9 @@ import Data.VectorSpace
 import ToySolver.Data.ArithRel
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
-import qualified ToySolver.Simplex as Simplex
-import qualified ToySolver.LPSolver as LPSolver
-import ToySolver.LPSolver hiding (OptResult (..))
+import qualified ToySolver.Arith.Simplex as Simplex
+import qualified ToySolver.Arith.LPSolver as LPSolver
+import ToySolver.Arith.LPSolver hiding (OptResult (..))
 
 -- ---------------------------------------------------------------------------
 

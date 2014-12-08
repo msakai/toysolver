@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.BoundsInference
+-- Module      :  ToySolver.Arith.BoundsInference
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -12,7 +12,7 @@
 -- Tightening variable bounds by constraint propagation.
 -- 
 -----------------------------------------------------------------------------
-module ToySolver.BoundsInference
+module ToySolver.Arith.BoundsInference
   ( BoundsEnv
   , inferBounds
   , LA.computeInterval

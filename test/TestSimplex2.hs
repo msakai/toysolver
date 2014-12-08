@@ -12,7 +12,7 @@ import Test.Framework.Providers.HUnit
 import Text.Printf
 
 import qualified ToySolver.Data.LA as LA
-import ToySolver.Simplex2
+import ToySolver.Arith.Simplex2
 
 case_test1 :: IO ()
 case_test1 = do

@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.CAD
+-- Module      :  ToySolver.Arith.CAD
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -24,7 +24,7 @@
 --    <http://cstheory.blogoverflow.com/2012/02/something-you-should-know-about-quantifier-elimination-part-ii/>
 --
 -----------------------------------------------------------------------------
-module ToySolver.CAD
+module ToySolver.Arith.CAD
   (
   -- * Basic data structures
     Point (..)

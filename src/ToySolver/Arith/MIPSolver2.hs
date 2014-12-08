@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.MIPSolver2
+-- Module      :  ToySolver.Arith.MIPSolver2
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -32,7 +32,7 @@
 --   <http://www.jstor.org/stable/3009435>
 -- 
 -----------------------------------------------------------------------------
-module ToySolver.MIPSolver2
+module ToySolver.Arith.MIPSolver2
   (
   -- * The @Solver@ type
     Solver
@@ -78,8 +78,8 @@ import Text.Printf
 
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.ArithRel ((.<=.), (.>=.))
-import qualified ToySolver.Simplex2 as Simplex2
-import ToySolver.Simplex2 (OptResult (..), Var, Model)
+import qualified ToySolver.Arith.Simplex2 as Simplex2
+import ToySolver.Arith.Simplex2 (OptResult (..), Var, Model)
 import ToySolver.Internal.Util (isInteger, fracPart)
 
 data Solver

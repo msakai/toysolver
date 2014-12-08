@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Cooper.FOL
+-- Module      :  ToySolver.Arith.Cooper.FOL
 -- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
 -- 
@@ -10,7 +10,7 @@
 -- Portability :  portable
 -- 
 -----------------------------------------------------------------------------
-module ToySolver.Cooper.FOL
+module ToySolver.Arith.Cooper.FOL
     ( eliminateQuantifiers
     , solveFormula
     ) where
@@ -22,7 +22,7 @@ import ToySolver.Data.Boolean
 import qualified ToySolver.Data.FOL.Arith as FOL
 import qualified ToySolver.Data.LA.FOL as LAFOL
 import ToySolver.Data.Var
-import ToySolver.Cooper.Core
+import ToySolver.Arith.Cooper.Core
 
 -- | eliminate quantifiers and returns equivalent quantifier-free formula.
 eliminateQuantifiers :: FOL.Formula (FOL.Atom Rational) -> Maybe QFFormula

@@ -31,7 +31,7 @@ import qualified Data.Sign as Sign
 import qualified Data.Map as Map
 import Data.Maybe
 
-import qualified ToySolver.CAD as CAD
+import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Data.AlgebraicNumber.Real as AReal
 import ToySolver.Data.AlgebraicNumber.Real (AReal)
 import qualified ToySolver.Data.AlgebraicNumber.Root as Root
