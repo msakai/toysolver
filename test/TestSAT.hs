@@ -694,34 +694,34 @@ case_DAA_allMUSAssumptions = do
 
 case_minimalHittingSets_1 = actual' @?= expected'
   where
-    actual    = HittingSet.minimalHittingSets [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
-    actual'   = Set.fromList $ map IntSet.fromList actual
-    expected  = [[1,2], [1,3,4], [1,5,6]]
-    expected' = Set.fromList $ map IntSet.fromList expected
+    actual    = HittingSet.minimalHittingSets $ map IntSet.fromList [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
+    actual'   = Set.fromList actual
+    expected  = map IntSet.fromList [[1,2], [1,3,4], [1,5,6]]
+    expected' = Set.fromList expected
 
 -- an example from http://kuma-san.net/htcbdd.html
 case_minimalHittingSets_2 = actual' @?= expected'
   where
-    actual    = HittingSet.minimalHittingSets [[2,4,7], [7,8], [9], [9,10]]
-    actual'   = Set.fromList $ map IntSet.fromList actual
-    expected  = [[7,9], [4,8,9], [2,8,9]]
-    expected' = Set.fromList $ map IntSet.fromList expected
+    actual    = HittingSet.minimalHittingSets $ map IntSet.fromList [[2,4,7], [7,8], [9], [9,10]]
+    actual'   = Set.fromList actual
+    expected  = map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
+    expected' = Set.fromList expected
 
 prop_minimalHittingSets_duality =
   forAll hyperGraph $ \g ->
     let h = HittingSet.minimalHittingSets g
     in normalize h == normalize (HittingSet.minimalHittingSets (HittingSet.minimalHittingSets h))
   where
-    hyperGraph :: Gen [[Int]]
+    hyperGraph :: Gen [IntSet]
     hyperGraph = do
       nv <- choose (0, 10)
       ne <- choose (0, 20)
       replicateM ne $ do
         n <- choose (1,nv)
-        liftM (IntSet.toList . IntSet.fromList) $ replicateM n $ choose (1, nv)
+        liftM IntSet.fromList $ replicateM n $ choose (1, nv)
 
-    normalize :: [[Int]] -> Set IntSet
-    normalize = Set.fromList . map IntSet.fromList
+    normalize :: [IntSet] -> Set IntSet
+    normalize = Set.fromList
 
 {-
 Boosting a Complete Technique to Find MSS and MUS thanks to a Local Search Oracle

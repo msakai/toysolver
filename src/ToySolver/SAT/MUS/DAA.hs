@@ -73,9 +73,7 @@ daa solver sels opt =
       f muses (Set.toList (hst mcses `Set.difference` muses))
 
     hst :: Set LitSet -> Set LitSet
-    hst = Set.fromList . map IntSet.fromList
-        . HittingSet.minimalHittingSets
-        . map IntSet.toList . Set.toList
+    hst = Set.fromList . HittingSet.minimalHittingSets . Set.toList
 
     findMSS :: LitSet -> IO (Maybe LitSet)
     findMSS xs = do

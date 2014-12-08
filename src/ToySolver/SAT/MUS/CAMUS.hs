@@ -134,7 +134,7 @@ allMUSAssumptions solver sels opt = do
   log "CAMUS: MCS enumeration begins"
   mcses <- allMCSAssumptions solver sels opt
   log "CAMUS: MCS enumeration done"
-  let muses = map IS.fromList . HittingSet.minimalHittingSets . map IS.toList $ mcses
+  let muses = HittingSet.minimalHittingSets mcses
   mapM_ (optOnMUSFound opt) muses
   return $ muses
   where
