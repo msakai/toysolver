@@ -31,15 +31,15 @@ import ToySolver.SAT.Types
 -- | Minimal Unsatisfiable Subset of constraints (MUS).
 --
 -- A subset U ⊆ C is an MUS if U is unsatisfiable and ∀C_i ∈ U, U\\{C_i} is satisfiable [CAMUS]. 
-type MUS = [Lit]
+type MUS = LitSet
 
 -- | Minimal Correction Subset of constraints (MCS).
 --
 -- A subset M ⊆ C is an MCS if C\\M is satisfiable and ∀C_i ∈ M, C\\(M\\{C_i}) is unsatisfiable [CAMUS].
 -- A MCS is the complement of an MSS and also known as a CoMSS.
-type MCS = [Lit]
+type MCS = LitSet
 
 -- | Maximal Satisfiable Subset (MSS).
 --
 -- A subset S ⊆ C is an MSS if S is satisfiable and ∀C_i ∈ U\\S, S∪{C_i} is unsatisfiable [CAMUS].
-type MSS = [Lit]
+type MSS = LitSet

@@ -77,7 +77,7 @@ defaultOptions =
 
 enumMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ()
 enumMCSAssumptions solver sels opt = do
-  candRef <- newIORef [(IS.size s, s) | mcs <- optMCSCandidates opt, let s = IS.fromList mcs]
+  candRef <- newIORef [(IS.size cs, cs) | cs <- optMCSCandidates opt]
   loop candRef 1
 
   where
@@ -87,7 +87,7 @@ enumMCSAssumptions solver sels opt = do
     mcsFound :: MCS -> IO ()
     mcsFound mcs = do
       optOnMCSFound opt mcs
-      SAT.addClause solver mcs
+      SAT.addClause solver (IS.toList mcs)
 
     loop :: IORef [(Int, LitSet)] -> Int -> IO ()
     loop candRef k = do
@@ -100,7 +100,7 @@ enumMCSAssumptions solver sels opt = do
           when (size == k) $ do
             -- If a candidate MCS is not superset of already obtained MCS,
             -- we are sure that it is actually an MCS.
-            mcsFound (IS.toList cs)
+            mcsFound cs
         writeIORef candRef [(size,cs) | (size,cs) <- cand, size /= k]
 
         vk <- SAT.newVar solver
@@ -109,10 +109,9 @@ enumMCSAssumptions solver sels opt = do
               ret2 <- SAT.solveWith solver [vk]
               when ret2 $ do
                 m <- SAT.model solver
-                let mcs = [sel | sel <- sels, not (evalLit m sel)]
-                    mcs' = IS.fromList mcs
+                let mcs = IS.fromList [sel | sel <- sels, not (evalLit m sel)]
                 mcsFound mcs
-                modifyIORef candRef (filter (\(_,cs) -> not (mcs' `IS.isSubsetOf` cs)))
+                modifyIORef candRef (filter (\(_,cs) -> not (mcs `IS.isSubsetOf` cs)))
                 loop2
         loop2
         SAT.addClause solver [-vk]
@@ -135,7 +134,7 @@ allMUSAssumptions solver sels opt = do
   log "CAMUS: MCS enumeration begins"
   mcses <- allMCSAssumptions solver sels opt
   log "CAMUS: MCS enumeration done"
-  let muses = HittingSet.minimalHittingSets mcses
+  let muses = map IS.fromList . HittingSet.minimalHittingSets . map IS.toList $ mcses
   mapM_ (optOnMUSFound opt) muses
   return $ muses
   where

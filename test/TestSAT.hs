@@ -608,7 +608,7 @@ case_MUS = do
   ret @?= False
 
   actual <- MUS.findMUSAssumptions solver MUS.defaultOptions
-  let actual'  = IntSet.fromList $ map (\x -> x-3) actual
+  let actual'  = IntSet.map (\x -> x-3) actual
       expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
   actual' `elem` expected @?= True
 
@@ -639,9 +639,9 @@ case_camus_allMCSAssumptions = do
   addClause solver [-y5, -x1, x3]
   addClause solver [-y6, -x3]
   actual <- CAMUS.allMCSAssumptions solver sels CAMUS.defaultOptions
-  let actual'   = Set.fromList $ map IntSet.fromList actual
-      expected  = [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
-      expected' = Set.fromList $ map (IntSet.fromList . map (+3)) expected
+  let actual'   = Set.fromList actual
+      expected  = map (IntSet.fromList . map (+3)) [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
+      expected' = Set.fromList expected
   actual' @?= expected'
 
 case_DAA_allMCSAssumptions = do
@@ -655,9 +655,9 @@ case_DAA_allMCSAssumptions = do
   addClause solver [-y5, -x1, x3]
   addClause solver [-y6, -x3]
   actual <- DAA.allMCSAssumptions solver sels DAA.defaultOptions
-  let actual'   = Set.fromList $ map IntSet.fromList actual
-      expected  = [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
-      expected' = Set.fromList $ map (IntSet.fromList . map (+3)) expected
+  let actual'   = Set.fromList $ actual
+      expected  = map (IntSet.fromList . map (+3)) [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
+      expected' = Set.fromList $ expected
   actual' @?= expected'
 
 case_camus_allMUSAssumptions = do
@@ -671,9 +671,9 @@ case_camus_allMUSAssumptions = do
   addClause solver [-y5, -x1, x3]
   addClause solver [-y6, -x3]
   actual <- CAMUS.allMUSAssumptions solver sels CAMUS.defaultOptions
-  let actual'   = Set.fromList $ map IntSet.fromList actual
-      expected  = [[1,2], [1,3,4], [1,5,6]]
-      expected' = Set.fromList $ map (IntSet.fromList . map (+3)) expected
+  let actual'   = Set.fromList $ actual
+      expected  = map (IntSet.fromList . map (+3)) [[1,2], [1,3,4], [1,5,6]]
+      expected' = Set.fromList $ expected
   actual' @?= expected'
 
 case_DAA_allMUSAssumptions = do
@@ -687,9 +687,9 @@ case_DAA_allMUSAssumptions = do
   addClause solver [-y5, -x1, x3]
   addClause solver [-y6, -x3]
   actual <- DAA.allMUSAssumptions solver sels DAA.defaultOptions
-  let actual'   = Set.fromList $ map IntSet.fromList actual
-      expected  = [[1,2], [1,3,4], [1,5,6]]
-      expected' = Set.fromList $ map (IntSet.fromList . map (+3)) expected
+  let actual'   = Set.fromList $ actual
+      expected  = map (IntSet.fromList . map (+3)) [[1,2], [1,3,4], [1,5,6]]
+      expected' = Set.fromList $ expected
   actual' @?= expected'
 
 case_minimalHittingSets_1 = actual' @?= expected'
@@ -791,8 +791,8 @@ case_camus_allMUSAssumptions_2 = do
       assertBool (show core ++ " should be satisfiable") ret
 
   actual <- CAMUS.allMUSAssumptions solver sels CAMUS.defaultOptions
-  let actual'   = Set.fromList $ map IntSet.fromList actual
-      expected' = Set.fromList $ map IntSet.fromList cores
+  let actual'   = Set.fromList actual
+      expected' = Set.fromList $ map IntSet.fromList $ cores
   actual' @?= expected'
 
 case_HYCAM_allMUSAssumptions = do
@@ -861,9 +861,9 @@ case_HYCAM_allMUSAssumptions = do
   ret <- solveWith solver [y0,y1,y2,y4,y5,y6,y7,y9,y11,y12]
   assertBool "failed to prove the bug of HYCAM paper" (not ret)
   
-  let cand = [[y5], [y3,y2], [y0,y1,y2]]
+  let cand = map IntSet.fromList [[y5], [y3,y2], [y0,y1,y2]]
   actual <- CAMUS.allMUSAssumptions solver sels CAMUS.defaultOptions{ CAMUS.optMCSCandidates = cand }
-  let actual'   = Set.fromList $ map IntSet.fromList actual
+  let actual'   = Set.fromList $ actual
       expected' = Set.fromList $ map IntSet.fromList cores
   actual' @?= expected'
 
@@ -917,7 +917,7 @@ case_DAA_allMUSAssumptions_2 = do
       assertBool (show core ++ " should be satisfiable") ret
 
   actual <- DAA.allMUSAssumptions solver sels DAA.defaultOptions
-  let actual'   = Set.fromList $ map IntSet.fromList actual
+  let actual'   = Set.fromList actual
       expected' = Set.fromList $ map IntSet.fromList cores
   actual' @?= expected'
 

@@ -57,8 +57,7 @@ findMUSAssumptions solver opt = do
   core <- liftM IS.fromList $ SAT.failedAssumptions solver
   update $ IS.toList core
   log $ "core = " ++ showLits core
-  mus <- loop core IS.empty
-  return $ IS.toList mus
+  loop core IS.empty
 
   where
     log :: String -> IO ()
@@ -73,7 +72,7 @@ findMUSAssumptions solver opt = do
     showLits :: IS.IntSet -> String
     showLits ls = "{" ++ intercalate ", " (map showLit (IS.toList ls)) ++ "}"
 
-    loop :: IS.IntSet -> IS.IntSet -> IO IS.IntSet
+    loop :: IS.IntSet -> IS.IntSet -> IO MUS
     loop ls1 fixed = do
       case IS.minView ls1 of
         Nothing -> do

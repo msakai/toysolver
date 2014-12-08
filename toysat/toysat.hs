@@ -23,6 +23,7 @@ import Data.Array.IArray
 import qualified Data.ByteString.Lazy as BS
 import Data.Default.Class
 import qualified Data.Set as Set
+import qualified Data.IntSet as IntSet
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Char
@@ -545,19 +546,20 @@ solveMUS opt solver gcnf = do
                          show (sel2idx ! lit)
                      }
           mus <- MUS.findMUSAssumptions solver opt2
-          musPrintSol stdout (map (sel2idx !) mus)
+          let mus2 = sort $ map (sel2idx !) $ IntSet.toList mus
+          musPrintSol stdout mus2
         else do
           counter <- newIORef 1
           let opt2 = def
                      { CAMUS.optLogger = putCommentLine
                      , CAMUS.optOnMCSFound = \mcs -> do
-                         let mcs2 = sort $ map (sel2idx !) mcs
+                         let mcs2 = sort $ map (sel2idx !) $ IntSet.toList mcs
                          putCommentLine $ "MCS found: " ++ show mcs2
                      , CAMUS.optOnMUSFound = \mus -> do
                          i <- readIORef counter
                          modifyIORef' counter (+1)
                          putCommentLine $ "MUS #" ++ show (i :: Int)
-                         let mus2 = sort $ map (sel2idx !) mus
+                         let mus2 = sort $ map (sel2idx !) $ IntSet.toList mus
                          musPrintSol stdout mus2
                      }
           case optAllMUSMethod opt of

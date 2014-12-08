@@ -41,17 +41,16 @@ import ToySolver.SAT.MUS.CAMUS (Options (..), defaultOptions)
 allMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MCS]
 allMCSAssumptions solver sels opt = do
   (_, mcses) <- daa solver sels opt
-  return $ map IntSet.toList $ Set.toList mcses
+  return $ Set.toList mcses
 
 allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MUS]
 allMUSAssumptions solver sels opt = do
   (muses, _) <- daa solver sels opt
-  return $ map IntSet.toList $ Set.toList muses
+  return $ Set.toList muses
 
 daa :: SAT.Solver -> [Lit] -> Options -> IO (Set LitSet, Set LitSet)
 daa solver sels opt =
-  loop (Set.fromList (map IntSet.fromList (optKnownMUSes opt)))
-       (Set.fromList (map IntSet.fromList (optKnownMCSes opt)))
+  loop (Set.fromList (optKnownMUSes opt)) (Set.fromList (optKnownMCSes opt))
   where
     selsSet :: LitSet
     selsSet = IntSet.fromList sels
@@ -64,11 +63,11 @@ daa solver sels opt =
             case ret of
               Just mss -> do
                 let mcs = selsSet `IntSet.difference` mss
-                optOnMCSFound opt (IntSet.toList mcs)
+                optOnMCSFound opt mcs
                 loop muses (Set.insert mcs mcses)
               Nothing -> do
                 let mus = xs
-                optOnMUSFound opt (IntSet.toList mus)
+                optOnMUSFound opt mus
                 SAT.addClause solver [-l | l <- IntSet.toList mus] -- lemma
                 f (Set.insert mus muses) xss
       f muses (Set.toList (hst mcses `Set.difference` muses))
