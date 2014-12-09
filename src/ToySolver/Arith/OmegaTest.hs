@@ -106,7 +106,7 @@ leZ e1 e2 = Nonneg (LA.mapCoeff (`div` d) e)
     d = abs $ gcd' [c | (c,v) <- LA.terms e, v /= LA.unitVar]
 ltZ e1 e2 = (e1 ^+^ LA.constant 1) `leZ` e2
 geZ = flip leZ
-gtZ = flip gtZ
+gtZ = flip ltZ
 
 eqZ :: ExprZ -> ExprZ -> (DNF Lit)
 eqZ e1 e2
@@ -222,6 +222,7 @@ elimEq e vs lits =
     sigma = maximum (-1 : vs) + 1
 
 applySubst1Lit :: Var -> ExprZ -> Lit -> Lit
+applySubst1Lit v e (Pos e2) = LA.applySubst1 v e e2 `gtZ` LA.constant 0
 applySubst1Lit v e (Nonneg e2) = LA.applySubst1 v e e2 `geZ` LA.constant 0
 
 evalLit :: Model Integer -> Lit -> Bool
