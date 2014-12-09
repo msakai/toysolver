@@ -34,6 +34,7 @@ module ToySolver.Arith.OmegaTest
     , checkRealByFM
     ) where
 
+import Control.Exception (assert)
 import Control.Monad
 import Data.Default.Class
 import Data.List
@@ -170,7 +171,7 @@ solve' opt vs2 xs = simplify xs >>= go vs2
 
         case2 = msum
           [ do eq <- isZero $ a' *^ LA.var v ^-^ (c' ^+^ LA.constant k)
-               let (vs'', lits'', mt) = elimEq eq (v:vs') ys
+               (vs'', lits'', mt) <- elimEq eq (v:vs') ys
                model <- go vs'' =<< simplify lits''
                return $ mt model
           | let m = maximum [b | (_,b)<-us]
@@ -191,35 +192,43 @@ evalBoundsZ model (ls,us) =
     [ (Just (ceiling (LA.evalExpr model x % c)), Nothing) | (x,c) <- ls ] ++ 
     [ (Nothing, Just (floor (LA.evalExpr model x % c))) | (x,c) <- us ]
 
-elimEq :: ExprZ -> [Var] -> [Lit] -> ([Var], [Lit], Model Integer -> Model Integer)
-elimEq e vs lits = 
-  if abs ak == 1
-    then
-      case LA.extract xk e of
-        (_, e') ->
-          let xk_def = signum ak *^ negateV e'
-          in ( vs
-             , [applySubst1Lit xk xk_def lit | lit <- lits]
-             , \model -> IM.insert xk (LA.evalExpr model xk_def) model
-             )
-    else
-      let m = abs ak + 1
-          xk_def = (- signum ak * m) *^ LA.var sigma ^+^
-                     LA.fromTerms [(signum ak * (a `zmod` m), x) | (a,x) <- LA.terms e, x /= xk]
-          e2 = (- abs ak) *^ LA.var sigma ^+^ 
-                  LA.fromTerms [((floor (a%m + 1/2) + (a `zmod` m)), x) | (a,x) <- LA.terms e, x /= xk]
-               -- LA.applySubst1 xk xk_def e を normalize したもの
-      in case elimEq e2 (sigma : vs) [applySubst1Lit xk xk_def lit | lit <- lits] of
-           (vs2, lits2, mt) ->
-             ( vs2
-             , lits2
-             , \model ->
-                  let model2 = mt model
-                  in IM.delete sigma $ IM.insert xk (LA.evalExpr model2 xk_def) model2
-             )
-  where
-    (ak,xk) = minimumBy (comparing (abs . fst)) [(a,x) | (a,x) <- LA.terms e, x /= LA.unitVar]
-    sigma = maximum (-1 : vs) + 1
+-- Eliminate the equality (e == 0).
+elimEq :: ExprZ -> [Var] -> [Lit] -> Maybe ([Var], [Lit], Model Integer -> Model Integer)
+elimEq e vs lits = do
+  let (ak,xk) = minimumBy (comparing (abs . fst)) [(a,x) | (a,x) <- LA.terms e, x /= LA.unitVar]
+  if abs ak == 1 then
+    case LA.extract xk e of
+      (_, e') -> do
+        let xk_def = signum ak *^ negateV e'
+        return $
+           ( vs
+           , [applySubst1Lit xk xk_def lit | lit <- lits]
+           , \model -> IM.insert xk (LA.evalExpr model xk_def) model
+           )
+  else do
+    let m = abs ak + 1
+    assert (ak `zmod` m == - signum ak) $ return ()
+    let -- sigma is a fresh variable
+        sigma = maximum (-1 : vs) + 1
+        -- m *^ LA.var sigma == LA.fromTerms [(a `zmod` m, x) | (a,x) <- LA.terms e]
+        -- m *^ LA.var sigma == LA.fromTerms [(a `zmod` m, x) | (a,x) <- LA.terms e, x /= xk] ^+^ (ak `zmod` m) *^ LA.var xk
+        -- m *^ LA.var sigma == LA.fromTerms [(a `zmod` m, x) | (a,x) <- LA.terms e, x /= xk] ^+^ (- signum ak) *^ LA.var xk
+        -- LA.var xk == (- signum ak * m) *^ LA.var sigma ^+^ LA.fromTerms [(signum ak * (a `zmod` m), x) | (a,x) <- LA.terms e, x /= xk]
+        xk_def = (- signum ak * m) *^ LA.var sigma ^+^
+                   LA.fromTerms [(signum ak * (a `zmod` m), x) | (a,x) <- LA.terms e, x /= xk]
+        -- e2 is normalized version of (LA.applySubst1 xk xk_def e).
+        e2 = (- abs ak) *^ LA.var sigma ^+^ 
+                LA.fromTerms [((floor (a%m + 1/2) + (a `zmod` m)), x) | (a,x) <- LA.terms e, x /= xk]
+    assert (m *^ e2 == LA.applySubst1 xk xk_def e) $ return ()      
+    e3 <- isZero e2
+    (vs2, lits2, mt) <- elimEq e3 (sigma : vs) [applySubst1Lit xk xk_def lit | lit <- lits]
+    return $
+        ( vs2
+        , lits2
+        , \model ->
+             let model2 = mt model
+             in IM.delete sigma $ IM.insert xk (LA.evalExpr model2 xk_def) model2
+        )    
 
 applySubst1Lit :: Var -> ExprZ -> Lit -> Lit
 applySubst1Lit v e (Pos e2) = LA.applySubst1 v e e2 `gtZ` LA.constant 0
