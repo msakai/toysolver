@@ -146,13 +146,17 @@ solve' :: Options -> [Var] -> [Lit] -> Maybe (Model Integer)
 solve' opt vs2 xs = simplify xs >>= go vs2
   where
     go :: [Var] -> [Lit] -> Maybe (Model Integer)
-    go [] [] = return IM.empty
-    go [] _  = mzero
-    go vs ys | not (optCheckReal opt (IS.fromList vs) (map toLAAtom ys)) = mzero
-    go vs ys =
-      if isExact bnd
-        then case1
-        else case1 `mplus` case2
+    go [] ys = do
+      let m = IM.empty
+      guard $ all (evalLit m) ys
+      return m
+    go vs ys = do
+      guard $ optCheckReal opt (IS.fromList vs) (map toLAAtom ys)
+      if isExact bnd then
+        case1
+      else
+        case1 `mplus` case2
+
       where
         (v,vs',bnd@(ls,us),rest) = chooseVariable vs ys
 
@@ -219,6 +223,10 @@ elimEq e vs lits =
 
 applySubst1Lit :: Var -> ExprZ -> Lit -> Lit
 applySubst1Lit v e (Nonneg e2) = LA.applySubst1 v e e2 `geZ` LA.constant 0
+
+evalLit :: Model Integer -> Lit -> Bool
+evalLit m (Pos t) = LA.evalExpr m t > 0
+evalLit m (Nonneg t) = LA.evalExpr m t >= 0
 
 -- ---------------------------------------------------------------------------
 
