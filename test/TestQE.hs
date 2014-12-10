@@ -9,9 +9,11 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.VectorSpace
 import Test.HUnit hiding (Test)
+import Test.QuickCheck hiding ((.&&.), (.||.))
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
+import Test.Framework.Providers.QuickCheck2
 
 import Data.OptDir
 
@@ -24,6 +26,7 @@ import ToySolver.Data.Var
 
 import qualified ToySolver.Arith.FourierMotzkin as FourierMotzkin
 import qualified ToySolver.Arith.OmegaTest as OmegaTest
+import qualified ToySolver.Arith.OmegaTest.Core as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.Simplex2 as Simplex2
@@ -234,6 +237,13 @@ case_OmegaTest_test2 =
   case uncurry (OmegaTest.solve OmegaTest.defaultOptions) test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
+
+prop_OmegaTest_zmod =
+  forAll arbitrary $ \a ->
+  forAll arbitrary $ \b ->
+    b /= 0 ==>
+      let c = a `OmegaTest.zmod` b
+      in (a - c) `mod` b == 0 && abs c <= abs b `div` 2
 
 ------------------------------------------------------------------------
 

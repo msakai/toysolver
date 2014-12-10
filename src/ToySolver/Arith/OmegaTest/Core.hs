@@ -32,6 +32,9 @@ module ToySolver.Arith.OmegaTest.Core
     , defaultOptions
     , checkRealNoCheck
     , checkRealByFM
+
+    -- * Exported just for testing
+    , zmod
     ) where
 
 import Control.Exception (assert)
