@@ -87,10 +87,10 @@ Library
   -- NOTE: temporary-1.2.0.2 does not work with exceptions-0.6
   if flag(Exceptions06)
      Build-Depends: temporary >1.2.0.2, exceptions >=0.6
-  if !flag(Exceptions06)
+  else
      Build-Depends: temporary >=1.2, exceptions ==0.5
+  -- NOTE: random-1.0.1.3 uses atomicModifyIORef' which is provided by base >=4.6.0.0.
   if flag(Random1013)
-     -- NOTE: random-1.0.1.3 uses atomicModifyIORef' which is provided by base >=4.6.0.0.
      Build-Depends: base >=4.6.0.0, random >=1.0.1.3
   else
      Build-Depends: random <1.0.1.3
@@ -255,6 +255,8 @@ Executable toyfmf
     GHC-Options: -rtsopts
   GHC-Prof-Options: -auto-all
 
+-- Converters
+
 Executable lpconvert
   Main-is: lpconvert.hs
   HS-Source-Dirs: lpconvert
@@ -277,6 +279,8 @@ Executable sudoku
   Build-Depends: base, array, toysolver
   Default-Language: Haskell2010
 
+-- Misc Programs
+
 Executable pigeonhole
   If !flag(BuildMiscPrograms)
     Buildable: False
@@ -284,8 +288,6 @@ Executable pigeonhole
   HS-Source-Dirs: pigeonhole
   Build-Depends: base >=4 && <5, containers, filepath, toysolver
   Default-Language: Haskell2010
-
--- Misc Programs
 
 Executable maxsatverify
   If !flag(BuildMiscPrograms)
@@ -300,6 +302,8 @@ Executable pbverify
   HS-Source-Dirs: pbverify
   Build-Depends: base >=4 && <5, array, containers, filepath, toysolver
   Default-Language: Haskell2010
+
+-- Test suites and benchmarks
 
 Test-suite TestSAT
   Type:              exitcode-stdio-1.0
