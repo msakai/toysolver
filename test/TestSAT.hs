@@ -862,7 +862,7 @@ case_HYCAM_allMUSAssumptions = do
   assertBool "failed to prove the bug of HYCAM paper" (not ret)
   
   let cand = map IntSet.fromList [[y5], [y3,y2], [y0,y1,y2]]
-  actual <- CAMUS.allMUSAssumptions solver sels CAMUS.defaultOptions{ CAMUS.optMCSCandidates = cand }
+  actual <- CAMUS.allMUSAssumptions solver sels CAMUS.defaultOptions{ CAMUS.optKnownCSes = cand }
   let actual'   = Set.fromList $ actual
       expected' = Set.fromList $ map IntSet.fromList cores
   actual' @?= expected'

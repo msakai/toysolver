@@ -56,7 +56,7 @@ data Options
   , optOnMUSFound :: MUS -> IO ()
   , optKnownMCSes :: [MCS]
   , optKnownMUSes :: [MUS]
-  , optMCSCandidates :: [MCS]
+  , optKnownCSes  :: [CS]
     -- ^ MCS candidates (see HYCAM paper for details).
     -- A MCS candidate must be a superset of a real MCS.
   }
@@ -73,12 +73,12 @@ defaultOptions =
   , optOnMUSFound = \_ -> return ()
   , optKnownMCSes = []
   , optKnownMUSes = []
-  , optMCSCandidates = []
+  , optKnownCSes = []
   }
 
 enumMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ()
 enumMCSAssumptions solver sels opt = do
-  candRef <- newIORef [(IS.size cs, cs) | cs <- optMCSCandidates opt]
+  candRef <- newIORef [(IS.size cs, cs) | cs <- optKnownCSes opt]
   loop candRef 1
 
   where
