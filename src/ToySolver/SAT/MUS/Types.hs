@@ -21,25 +21,46 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.SAT.MUS.Types
-  ( MUS
+  ( US
+  , MUS
+  , CS
   , MCS
+  , SS
   , MSS
   ) where
 
 import ToySolver.SAT.Types
+
+-- | Unsatisfiable Subset of constraints (US).
+--
+-- A subset U ⊆ C is an US if U is unsatisfiable. 
+type US = LitSet
 
 -- | Minimal Unsatisfiable Subset of constraints (MUS).
 --
 -- A subset U ⊆ C is an MUS if U is unsatisfiable and ∀C_i ∈ U, U\\{C_i} is satisfiable [CAMUS]. 
 type MUS = LitSet
 
+-- | Correction Subset of constraints (CS).
+--
+-- A subset M ⊆ C is a CS if C\\M is satisfiable.
+-- A CS is the complement of a 'SS'.
+type CS = LitSet
+
 -- | Minimal Correction Subset of constraints (MCS).
 --
 -- A subset M ⊆ C is an MCS if C\\M is satisfiable and ∀C_i ∈ M, C\\(M\\{C_i}) is unsatisfiable [CAMUS].
--- A MCS is the complement of an MSS and also known as a CoMSS.
+-- A MCS is the complement of an 'MSS' and also known as a CoMSS.
 type MCS = LitSet
+
+-- | Satisfiable Subset (SS).
+--
+-- A subset S ⊆ C is a SS if S is satisfiable.
+-- A SS is the complement of a 'CS'.
+type SS = LitSet
 
 -- | Maximal Satisfiable Subset (MSS).
 --
 -- A subset S ⊆ C is an MSS if S is satisfiable and ∀C_i ∈ U\\S, S∪{C_i} is unsatisfiable [CAMUS].
+-- A MSS is the complement of an 'MCS'.
 type MSS = LitSet
