@@ -127,7 +127,7 @@ Library
      ToySolver.Arith.MIPSolverHL
      ToySolver.Arith.MIPSolver2
      ToySolver.Arith.OmegaTest
-     ToySolver.Arith.OmegaTest.Misc
+     ToySolver.Arith.OmegaTest.Core
      ToySolver.Arith.Simplex
      ToySolver.Arith.Simplex2
      ToySolver.Arith.VirtualSubstitution

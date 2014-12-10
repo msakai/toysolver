@@ -46,7 +46,6 @@ import qualified ToySolver.Data.Polynomial as P
 import qualified ToySolver.Data.AlgebraicNumber.Real as AReal
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Arith.OmegaTest as OmegaTest
-import qualified ToySolver.Arith.OmegaTest.Misc as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
 import qualified ToySolver.Arith.MIPSolverHL as MIPSolverHL
 import qualified ToySolver.Arith.Simplex2 as Simplex2
