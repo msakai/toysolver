@@ -15,6 +15,7 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
+import ToySolver.Data.LBool
 import ToySolver.Data.BoolExpr
 import ToySolver.Data.Boolean
 import ToySolver.HittingSet as HittingSet
@@ -288,6 +289,27 @@ case_solveWith_2 = do
 
   ret <- solveWith solver [-x2]
   ret @?= False
+
+case_getVarFixed :: IO ()
+case_getVarFixed = do
+  solver <- newSolver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  addClause solver [x1,x2]
+
+  ret <- getVarFixed solver x1
+  ret @?= lUndef
+
+  addClause solver [-x1]
+  
+  ret <- getVarFixed solver x1
+  ret @?= lFalse
+
+  ret <- getLitFixed solver (-x1)
+  ret @?= lTrue
+
+  ret <- getLitFixed solver x2
+  ret @?= lTrue
 
 ------------------------------------------------------------------------
 

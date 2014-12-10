@@ -115,6 +115,8 @@ module ToySolver.SAT
   , nAssigns
   , nConstraints
   , nLearnt
+  , getVarFixed
+  , getLitFixed
 
   -- * Internal API
   , varBumpActivity
@@ -247,6 +249,24 @@ litValue solver !l = do
     varValue solver l
   else do
     m <- varValue solver (negate l)
+    return $! lnot m
+
+getVarFixed :: Solver -> Var -> IO LBool
+getVarFixed solver !v = do
+  vd <- varData solver v
+  m <- readIORef (vdAssignment vd)
+  case m of
+    Just x | aLevel x == levelRoot -> return $! (liftBool $! aValue x)
+    _ -> return lUndef
+
+getLitFixed :: Solver -> Var -> IO LBool
+getLitFixed solver !l = do
+  -- litVar による heap allocation を避けるために、
+  -- litPolarityによる分岐後にvarDataを呼ぶ。
+  if litPolarity l then
+    getVarFixed solver l
+  else do
+    m <- getVarFixed solver (negate l)
     return $! lnot m
 
 varLevel :: Solver -> Var -> IO Level
