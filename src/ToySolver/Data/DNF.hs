@@ -26,7 +26,7 @@ newtype DNF lit
 instance Complement lit => Complement (DNF lit) where
   notB (DNF xs) = DNF . sequence . map (map notB) $ xs
 
-instance Complement lit => MonotoneBoolean (DNF lit) where
+instance MonotoneBoolean (DNF lit) where
   true  = DNF [[]]
   false = DNF []
   DNF xs .||. DNF ys = DNF (xs++ys)
