@@ -160,7 +160,7 @@ project' v xs = do
     (bnd, rest) -> do
       cond <- boundsToLits bnd
       let mt m =
-           case Interval.pickup (evalBounds m bnd) of
+           case Interval.simplestRationalWithin (evalBounds m bnd) of
              Nothing  -> error "ToySolver.FourierMotzkin.project': should not happen"
              Just val -> IM.insert v val m
       return (rest ++ cond, mt)
