@@ -22,12 +22,12 @@ import ToySolver.Arith.FourierMotzkin.Core
 
 -- ---------------------------------------------------------------------------
 
-solveFormula :: [Var] -> FOL.Formula (FOL.Atom Rational) -> FOL.SatResult Rational
+solveFormula :: VarSet -> FOL.Formula (FOL.Atom Rational) -> FOL.SatResult Rational
 solveFormula vs formula =
   case eliminateQuantifiers' formula of
     Nothing -> FOL.Unknown
     Just dnf ->
-      case msum [solve' (IS.fromList vs) xs | xs <- unDNF dnf] of
+      case msum [solve' vs xs | xs <- unDNF dnf] of
         Nothing -> FOL.Unsat
         Just m -> FOL.Sat m
 
