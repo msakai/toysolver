@@ -53,6 +53,7 @@ import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Monoid
+import Data.Ratio
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.VectorSpace hiding (project)
@@ -64,7 +65,6 @@ import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
 import qualified ToySolver.Arith.FourierMotzkin as FM
-import qualified ToySolver.Arith.FourierMotzkin.Core as FM
 
 -- ---------------------------------------------------------------------------
 
@@ -74,10 +74,19 @@ type ExprZ = LA.Expr Integer
 fromLAAtom :: LA.Atom Rational -> QFFormula
 fromLAAtom (ArithRel a op b) = arithRel op a' b'
   where
-    (e1,c1) = FM.toRat a
-    (e2,c2) = FM.toRat b
+    (e1,c1) = toRat a
+    (e2,c2) = toRat b
     a' = c2 *^ e1
     b' = c1 *^ e2
+
+-- | (t,c) represents t/c, and c must be >0.
+type Rat = (ExprZ, Integer)
+
+toRat :: LA.Expr Rational -> Rat
+toRat e = seq m $ (LA.mapCoeff f e, m)
+  where
+    f x = numerator (fromInteger m * x)
+    m = foldl' lcm 1 [denominator c | (c,_) <- LA.terms e]
 
 leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
 leZ e1 e2 = e1 `ltZ` (e2 ^+^ LA.constant 1)
