@@ -176,6 +176,7 @@ evalLit m (Divisible False n e) = LA.evalExpr m e `mod` n /= 0
 -- ---------------------------------------------------------------------------
 
 data Witness = WCase1 Integer ExprZ | WCase2 Integer Integer Integer (Set ExprZ)
+  deriving (Show)
 
 evalWitness :: Model Integer -> Witness -> Integer
 evalWitness model (WCase1 c e) = LA.evalExpr model e `checkedDiv` c
@@ -371,9 +372,9 @@ testHagiya = fst $ project 1 $ andB [c1, c2, c3]
     c3 = 3 .|. x
 
 {-
-∃ x. 0 < y+y ∧ z<x ∧ 3|x
+∃ x. x < y+y ∧ z<x ∧ 3|x
 ⇔
-(2y-z > 0 ∧ 3|z+1) ∨ (2y-z > -2 ∧ 3|z+2) ∨ (2y-z > -3 ∧ 3|z+3)
+(2y>z+1 ∧ 3|z+1) ∨ (2y>z+2 ∧ 3|z+2) ∨ (2y>z+3 ∧ 3|z+3)
 -}
 
 test3 :: QFFormula

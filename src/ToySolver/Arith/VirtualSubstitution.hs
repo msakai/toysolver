@@ -84,7 +84,7 @@ projectCases v phi = [(psi, \m -> IM.insert v (LA.evalExpr m t) m) | (psi, t) <-
 {-
 ∃xφ(x) ⇔ ∨_{t∈S} φ(t)
   where
-    Ψ = {a_i x - b_i ρ_i 0 | i ∈ I, ρ_i ∈ {=, ≠, ≦, <}} the set of atomic subformulas in φ(x)
+    Ψ = {a_i x - b_i ρ_i 0 | i ∈ I, ρ_i ∈ {=, ≠, ≤, <}} the set of atomic subformulas in φ(x)
     S = {b_i / a_i, b_i / a_i + 1, b_i / a_i - 1 | i∈I } ∪ {1/2 (b_i / a_i + b_j / a_j) | i,j∈I, i≠j}
 -}
 projectCases' :: Var -> QFFormula -> [(QFFormula, LA.Expr Rational)]
@@ -133,8 +133,4 @@ solveQFFormula vs formula = listToMaybe $ do
 
 -- | solve a (open) quantifier-free formula
 solve :: VarSet -> [LA.Atom Rational] -> Maybe (Model Rational)
-solve vs cs = listToMaybe $ do
-  (psi, mt) <- projectCasesN vs (andB [Atom c | c <- cs])
-  let m = IM.empty
-  guard $ evalQFFormula m psi
-  return $ mt m
+solve vs cs = solveQFFormula vs (andB [Atom c | c <- cs])
