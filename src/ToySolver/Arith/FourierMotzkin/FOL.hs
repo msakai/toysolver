@@ -9,6 +9,7 @@ module ToySolver.Arith.FourierMotzkin.FOL
 import Control.Monad
 import qualified Data.IntSet as IS
 import Data.Maybe
+import Data.VectorSpace hiding (project)
 
 import ToySolver.Data.ArithRel
 import ToySolver.Data.Boolean
@@ -35,7 +36,7 @@ eliminateQuantifiers phi = do
   dnf <- eliminateQuantifiers' phi
   return $ orB $ map (andB . map (LAFOL.toFOLFormula . toLAAtom)) $ unDNF dnf
 
-eliminateQuantifiers' :: FOL.Formula (FOL.Atom Rational) -> Maybe (DNF Lit)
+eliminateQuantifiers' :: FOL.Formula (FOL.Atom Rational) -> Maybe (DNF Constr)
 eliminateQuantifiers' = f
   where
     f FOL.T = return true
@@ -51,9 +52,17 @@ eliminateQuantifiers' = f
     f (FOL.Equiv a b) = f ((a .=>. b) .&&. (b .=>.a))
     f (FOL.Forall v a) = do
       dnf <- f (FOL.Exists v (FOL.pushNot a))
-      return (notB dnf)
+      return (negateDNFConstr dnf)
     f (FOL.Exists v a) = do
       dnf <- f a
       return $ orB [DNF $ maybeToList $ fmap fst $ project' v xs | xs <- unDNF dnf]
+
+negateDNFConstr :: DNF Constr -> DNF Constr
+negateDNFConstr (DNF xs) = orB . map (andB . map f) $ xs
+  where
+    f :: Constr -> DNF Constr
+    f (IsPos t)    = DNF [[IsNonneg (negateV t)]]
+    f (IsNonneg t) = DNF [[IsPos (negateV t)]]
+    f (IsZero t)   = DNF [[IsPos t], [IsPos (negateV t)]]
 
 -- ---------------------------------------------------------------------------

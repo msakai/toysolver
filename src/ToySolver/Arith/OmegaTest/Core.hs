@@ -55,7 +55,7 @@ import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
 import ToySolver.Internal.Util (combineMaybe)
 import qualified ToySolver.Arith.FourierMotzkin as FM
-import ToySolver.Arith.FourierMotzkin.Core (Lit (..), Rat, toLAAtom)
+import ToySolver.Arith.FourierMotzkin.Core (Constr (..), toLAAtom)
 
 -- ---------------------------------------------------------------------------
 
@@ -87,42 +87,56 @@ type ExprZ = LA.Expr Integer
 
 -- 制約集合の単純化
 -- It returns Nothing when a inconsistency is detected.
-simplify :: [Lit] -> Maybe [Lit]
+simplify :: [Constr] -> Maybe [Constr]
 simplify = fmap concat . mapM f
   where
-    f :: Lit -> Maybe [Lit]
-    f lit@(Pos e) =
-      case LA.asConst e of
-        Just x -> guard (x > 0) >> return []
-        Nothing -> return [lit]
-    f lit@(Nonneg e) =
+    f :: Constr -> Maybe [Constr]
+    f (IsPos e) = f (IsNonneg (e ^-^ LA.constant 1))
+    f constr@(IsNonneg e) =
       case LA.asConst e of
         Just x -> guard (x >= 0) >> return []
-        Nothing -> return [lit]
+        Nothing -> return [constr]
+    f constr@(IsZero e) =
+      case LA.asConst e of
+        Just x -> guard (x == 0) >> return []
+        Nothing -> return [constr]
 
--- ---------------------------------------------------------------------------
-
-leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
+leZ, ltZ, geZ, gtZ, eqZ :: ExprZ -> ExprZ -> Constr
 -- Note that constants may be floored by division
-leZ e1 e2 = Nonneg (LA.mapCoeff (`div` d) e)
+leZ e1 e2 = IsNonneg (LA.mapCoeff (`div` d) e)
   where
     e = e2 ^-^ e1
     d = abs $ gcd' [c | (c,v) <- LA.terms e, v /= LA.unitVar]
 ltZ e1 e2 = (e1 ^+^ LA.constant 1) `leZ` e2
 geZ = flip leZ
 gtZ = flip ltZ
+eqZ e1 e2 =
+  case isZero (e1 ^-^ e2) of
+    Just c -> c
+    Nothing -> IsZero (LA.constant 1) -- unsatisfiable
 
-eqZ :: ExprZ -> ExprZ -> (DNF Lit)
-eqZ e1 e2
-  = if LA.coeff LA.unitVar e3 `mod` d == 0
-    then DNF [[Nonneg e, Nonneg (negateV e)]]
-    else false
+isZero :: ExprZ -> Maybe Constr
+isZero e
+  = if LA.coeff LA.unitVar e `mod` d == 0
+    then Just $ IsZero $ LA.mapCoeff (`div` d) e
+    else Nothing
   where
-    e = LA.mapCoeff (`div` d) e3
-    e3 = e1 ^-^ e2
-    d = abs $ gcd' [c | (c,v) <- LA.terms e3, v /= LA.unitVar]
+    d = abs $ gcd' [c | (c,v) <- LA.terms e, v /= LA.unitVar]
+
+applySubst1Constr :: Var -> ExprZ -> Constr -> Constr
+applySubst1Constr v e (IsPos e2)    = LA.applySubst1 v e e2 `gtZ` LA.constant 0
+applySubst1Constr v e (IsNonneg e2) = LA.applySubst1 v e e2 `geZ` LA.constant 0
+applySubst1Constr v e (IsZero e2)   = LA.applySubst1 v e e2 `eqZ` LA.constant 0
+
+evalConstr :: Model Integer -> Constr -> Bool
+evalConstr m (IsPos t)    = LA.evalExpr m t > 0
+evalConstr m (IsNonneg t) = LA.evalExpr m t >= 0
+evalConstr m (IsZero t)   = LA.evalExpr m t == 0
 
 -- ---------------------------------------------------------------------------
+
+-- | (t,c) represents t/c, and c must be >0.
+type Rat = (ExprZ, Integer)
 
 {-
 (ls,us) represents
@@ -130,39 +144,49 @@ eqZ e1 e2
 -}
 type BoundsZ = ([Rat],[Rat])
 
-collectBoundsZ :: Var -> [Lit] -> (BoundsZ,[Lit])
+evalBoundsZ :: Model Integer -> BoundsZ -> IntervalZ
+evalBoundsZ model (ls,us) =
+  foldl' intersectZ univZ $ 
+    [ (Just (ceiling (LA.evalExpr model x % c)), Nothing) | (x,c) <- ls ] ++ 
+    [ (Nothing, Just (floor (LA.evalExpr model x % c))) | (x,c) <- us ]
+
+collectBoundsZ :: Var -> [Constr] -> (BoundsZ, [Constr])
 collectBoundsZ v = foldr phi (([],[]),[])
   where
-    phi :: Lit -> (BoundsZ,[Lit]) -> (BoundsZ,[Lit])
-    phi (Pos t) x = phi (Nonneg (t ^-^ LA.constant 1)) x
-    phi lit@(Nonneg t) ((ls,us),xs) =
+    phi :: Constr -> (BoundsZ,[Constr]) -> (BoundsZ,[Constr])
+    phi (IsPos t) x = phi (IsNonneg (t ^-^ LA.constant 1)) x
+    phi constr@(IsNonneg t) ((ls,us),xs) =
       case LA.extract v t of
         (c,t') -> 
           case c `compare` 0 of
-            EQ -> ((ls, us), lit : xs)
+            EQ -> ((ls, us), constr : xs)
             GT -> (((negateV t', c) : ls, us), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
             LT -> ((ls, (t', negate c) : us), xs)   -- 0 ≤ cx + M ⇔ x ≤ M/-c
+    phi constr@(IsZero _) (bnd,xs) = (bnd, constr : xs) -- we assume v does not appear in constr
 
-isExact :: BoundsZ -> Bool
-isExact (ls,us) = and [a==1 || b==1 | (_,a)<-ls , (_,b)<-us]
+-- ---------------------------------------------------------------------------
 
-solve' :: Options -> [Var] -> [Lit] -> Maybe (Model Integer)
+solve' :: Options -> VarSet -> [Constr] -> Maybe (Model Integer)
 solve' opt vs2 xs = simplify xs >>= go vs2
   where
-    go :: [Var] -> [Lit] -> Maybe (Model Integer)
-    go [] ys = do
+    go :: VarSet -> [Constr] -> Maybe (Model Integer)
+    go vs cs | IS.null vs = do
       let m = IM.empty
-      guard $ all (evalLit m) ys
+      guard $ all (evalConstr m) cs
       return m
-    go vs ys = do
-      guard $ optCheckReal opt (IS.fromList vs) (map toLAAtom ys)
+    go vs cs | Just (e,cs2) <- extractEq cs = do
+      (vs',cs3, mt) <- eliminateEq e vs cs2
+      m <- go vs' =<< simplify cs3
+      return (mt m)
+    go vs cs = do
+      guard $ optCheckReal opt vs (map toLAAtom cs)
       if isExact bnd then
         case1
       else
         case1 `mplus` case2
 
       where
-        (v,vs',bnd@(ls,us),rest) = chooseVariable vs ys
+        (v,vs',bnd@(ls,us),rest) = chooseVariable vs cs
 
         case1 = do
           let zs = [ LA.constant ((a-1)*(b-1)) `leZ` (a *^ d ^-^ b *^ c)
@@ -173,46 +197,51 @@ solve' opt vs2 xs = simplify xs >>= go vs2
             Just val -> return $ IM.insert v val model
 
         case2 = msum
-          [ do eq <- isZero $ a' *^ LA.var v ^-^ (c' ^+^ LA.constant k)
-               (vs'', lits'', mt) <- elimEq eq (v:vs') ys
-               model <- go vs'' =<< simplify lits''
-               return $ mt model
+          [ do c <- isZero $ a' *^ LA.var v ^-^ (c' ^+^ LA.constant k)
+               model <- go vs (c : cs)
+               return model
           | let m = maximum [b | (_,b)<-us]
-          ,  (c',a') <- ls
+          , (c',a') <- ls
           , k <- [0 .. (m*a'-a'-m) `div` m]
           ]
 
-chooseVariable :: [Var] -> [Lit] -> (Var, [Var], BoundsZ, [Lit])
+isExact :: BoundsZ -> Bool
+isExact (ls,us) = and [a==1 || b==1 | (_,a)<-ls , (_,b)<-us]
+
+chooseVariable :: VarSet -> [Constr] -> (Var, VarSet, BoundsZ, [Constr])
 chooseVariable vs xs = head $ [e | e@(_,_,bnd,_) <- table, isExact bnd] ++ table
   where
-    table = [ (v, vs', bnd, rest)
-            | (v,vs') <- pickup vs, let (bnd, rest) = collectBoundsZ v xs
+    table = [ (v, IS.fromAscList vs', bnd, rest)
+            | (v,vs') <- pickup (IS.toAscList vs), let (bnd, rest) = collectBoundsZ v xs
             ]
 
-evalBoundsZ :: Model Integer -> BoundsZ -> IntervalZ
-evalBoundsZ model (ls,us) =
-  foldl' intersectZ univZ $ 
-    [ (Just (ceiling (LA.evalExpr model x % c)), Nothing) | (x,c) <- ls ] ++ 
-    [ (Nothing, Just (floor (LA.evalExpr model x % c))) | (x,c) <- us ]
+-- Find an equality constraint (e==0) and extract e with rest of constraints.
+extractEq :: [Constr] -> Maybe (ExprZ, [Constr])
+extractEq = msum . map f . pickup
+  where
+    f :: (Constr, [Constr]) -> Maybe (ExprZ, [Constr])
+    f (IsZero e, ls) = Just (e, ls)
+    f _ = Nothing
 
--- Eliminate the equality (e == 0).
-elimEq :: ExprZ -> [Var] -> [Lit] -> Maybe ([Var], [Lit], Model Integer -> Model Integer)
-elimEq e vs lits = do
+-- Eliminate an equality equality constraint (e==0).
+eliminateEq :: ExprZ -> VarSet -> [Constr] -> Maybe (VarSet, [Constr], Model Integer -> Model Integer)
+eliminateEq e vs cs | Just c <- LA.asConst e = guard (c==0) >> return (vs, cs, id)
+eliminateEq e vs cs = do
   let (ak,xk) = minimumBy (comparing (abs . fst)) [(a,x) | (a,x) <- LA.terms e, x /= LA.unitVar]
   if abs ak == 1 then
     case LA.extract xk e of
       (_, e') -> do
         let xk_def = signum ak *^ negateV e'
         return $
-           ( vs
-           , [applySubst1Lit xk xk_def lit | lit <- lits]
+           ( IS.delete xk vs
+           , [applySubst1Constr xk xk_def c | c <- cs]
            , \model -> IM.insert xk (LA.evalExpr model xk_def) model
            )
   else do
     let m = abs ak + 1
     assert (ak `zmod` m == - signum ak) $ return ()
     let -- sigma is a fresh variable
-        sigma = maximum (-1 : vs) + 1
+        sigma = if IS.null vs then 0 else IS.findMax vs + 1
         -- m *^ LA.var sigma == LA.fromTerms [(a `zmod` m, x) | (a,x) <- LA.terms e]
         -- m *^ LA.var sigma == LA.fromTerms [(a `zmod` m, x) | (a,x) <- LA.terms e, x /= xk] ^+^ (ak `zmod` m) *^ LA.var xk
         -- m *^ LA.var sigma == LA.fromTerms [(a `zmod` m, x) | (a,x) <- LA.terms e, x /= xk] ^+^ (- signum ak) *^ LA.var xk
@@ -222,35 +251,10 @@ elimEq e vs lits = do
         -- e2 is normalized version of (LA.applySubst1 xk xk_def e).
         e2 = (- abs ak) *^ LA.var sigma ^+^ 
                 LA.fromTerms [((floor (a%m + 1/2) + (a `zmod` m)), x) | (a,x) <- LA.terms e, x /= xk]
-    assert (m *^ e2 == LA.applySubst1 xk xk_def e) $ return ()      
-    e3 <- isZero e2
-    (vs2, lits2, mt) <- elimEq e3 (sigma : vs) [applySubst1Lit xk xk_def lit | lit <- lits]
-    return $
-        ( vs2
-        , lits2
-        , \model ->
-             let model2 = mt model
-             in IM.delete sigma $ IM.insert xk (LA.evalExpr model2 xk_def) model2
-        )    
-
-applySubst1Lit :: Var -> ExprZ -> Lit -> Lit
-applySubst1Lit v e (Pos e2) = LA.applySubst1 v e e2 `gtZ` LA.constant 0
-applySubst1Lit v e (Nonneg e2) = LA.applySubst1 v e e2 `geZ` LA.constant 0
-
-evalLit :: Model Integer -> Lit -> Bool
-evalLit m (Pos t) = LA.evalExpr m t > 0
-evalLit m (Nonneg t) = LA.evalExpr m t >= 0
-
--- ---------------------------------------------------------------------------
-
-isZero :: ExprZ -> Maybe ExprZ
-isZero e
-  = if LA.coeff LA.unitVar e `mod` d == 0
-    then Just $ e2
-    else Nothing
-  where
-    e2 = LA.mapCoeff (`div` d) e
-    d = abs $ gcd' [c | (c,v) <- LA.terms e, v /= LA.unitVar]
+    assert (m *^ e2 == LA.applySubst1 xk xk_def e) $ return ()
+    let mt model = IM.delete sigma $ IM.insert xk (LA.evalExpr model xk_def) model
+    c <- isZero e2
+    return (IS.insert sigma (IS.delete xk vs), c : [applySubst1Constr xk xk_def c | c <- cs], mt)
 
 -- ---------------------------------------------------------------------------
 
@@ -271,7 +275,7 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 -- ---------------------------------------------------------------------------
 
 solve :: Options -> VarSet -> [LA.Atom Rational] -> Maybe (Model Integer)
-solve opt vs cs = msum [solve' opt (IS.toList vs) lits | lits <- unDNF dnf]
+solve opt vs cs = msum [solve' opt vs cs | cs <- unDNF dnf]
   where
     dnf = andB (map f cs)
     f (ArithRel lhs op rhs) =
@@ -280,7 +284,7 @@ solve opt vs cs = msum [solve' opt (IS.toList vs) lits | lits <- unDNF dnf]
         Le  -> DNF [[a `leZ` b]]
         Gt  -> DNF [[a `gtZ` b]]
         Ge  -> DNF [[a `geZ` b]]
-        Eql -> eqZ a b
+        Eql -> DNF [[a `eqZ` b]]
         NEq -> DNF [[a `ltZ` b], [a `gtZ` b]]
       where
         (e1,c1) = g lhs

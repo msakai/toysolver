@@ -17,7 +17,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Arith.FourierMotzkin
-    ( Lit (..)
+    ( Constr (..)
     , project
     , projectN
     , eliminateQuantifiers

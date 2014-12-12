@@ -17,30 +17,27 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Arith.FourierMotzkin.Core
-    ( ExprZ
-    , Rat
-    , toRat
-    , fromRat
-
-    , Lit (..)
-    , leR, ltR, geR, gtR
-    , simplify
-
+    (
+    -- * Primitive constraints
+      Constr (..)
+    , ExprZ
     , fromLAAtom
     , toLAAtom
     , constraintsToDNF
 
-    , BoundsR
-    , collectBounds
-    , boundsToLits
-    , evalBounds
-
+    -- * Projection
     , project
     , project'
     , projectN
     , projectN'
+
+    -- * Solving
     , solve
     , solve'
+
+    -- * Utilities used by other modules
+    , Rat
+    , toRat
     ) where
 
 import Control.Monad
@@ -63,12 +60,6 @@ import ToySolver.Data.Var
 
 type ExprZ = LA.Expr Integer
 
-normalizeExprR :: ExprZ -> ExprZ
-normalizeExprR e = LA.mapCoeff (`div` d) e
-  where d = abs $ gcd' $ map fst $ LA.terms e
-
--- ---------------------------------------------------------------------------
-
 -- | (t,c) represents t/c, and c must be >0.
 type Rat = (ExprZ, Integer)
 
@@ -86,59 +77,86 @@ evalRat model (e, d) = LA.lift1 1 (model IM.!) (LA.mapCoeff fromIntegral e) / (f
 
 -- ---------------------------------------------------------------------------
 
--- | Literal
-data Lit = Nonneg ExprZ | Pos ExprZ deriving (Show, Eq, Ord)
+-- | Atomic constraint
+data Constr
+  = IsNonneg ExprZ
+  | IsPos ExprZ
+  | IsZero ExprZ
+  deriving (Show, Eq, Ord)
 
-instance Variables Lit where
-  vars (Pos t) = vars t
-  vars (Nonneg t) = vars t
+instance Variables Constr where
+  vars (IsPos t) = vars t
+  vars (IsNonneg t) = vars t
+  vars (IsZero t) = vars t
 
-instance Complement Lit where
-  notB (Pos t) = Nonneg (negateV t)
-  notB (Nonneg t) = Pos (negateV t)
-
-leR, ltR, geR, gtR :: Rat -> Rat -> Lit
-leR (e1,c) (e2,d) = Nonneg $ normalizeExprR $ c *^ e2 ^-^ d *^ e1
-ltR (e1,c) (e2,d) = Pos $ normalizeExprR $ c *^ e2 ^-^ d *^ e1
+leR, ltR, geR, gtR, eqR :: Rat -> Rat -> Constr
+leR (e1,c) (e2,d) = IsNonneg $ normalizeExpr $ c *^ e2 ^-^ d *^ e1
+ltR (e1,c) (e2,d) = IsPos $ normalizeExpr $ c *^ e2 ^-^ d *^ e1
 geR = flip leR
 gtR = flip gtR
+eqR (e1,c) (e2,d) = IsZero $ normalizeExpr $ c *^ e2 ^-^ d *^ e1
+
+normalizeExpr :: ExprZ -> ExprZ
+normalizeExpr e = LA.mapCoeff (`div` d) e
+  where d = abs $ gcd' $ map fst $ LA.terms e
+
+-- "subst1Constr x t c" computes c[t/x]
+subst1Constr :: Var -> LA.Expr Rational -> Constr -> Constr
+subst1Constr x t c =
+  case c of
+    IsPos e    -> IsPos (f e)
+    IsNonneg e -> IsNonneg (f e)
+    IsZero e   -> IsZero (f e)
+  where
+    f :: ExprZ -> ExprZ
+    f = normalizeExpr . fst . toRat . LA.applySubst1 x t . LA.mapCoeff fromInteger
 
 -- 制約集合の単純化
 -- It returns Nothing when a inconsistency is detected.
-simplify :: [Lit] -> Maybe [Lit]
+simplify :: [Constr] -> Maybe [Constr]
 simplify = fmap concat . mapM f
   where
-    f :: Lit -> Maybe [Lit]
-    f lit@(Pos e) =
+    f :: Constr -> Maybe [Constr]
+    f c@(IsPos e) =
       case LA.asConst e of
         Just x -> guard (x > 0) >> return []
-        Nothing -> return [lit]
-    f lit@(Nonneg e) =
+        Nothing -> return [c]
+    f c@(IsNonneg e) =
       case LA.asConst e of
         Just x -> guard (x >= 0) >> return []
-        Nothing -> return [lit]
+        Nothing -> return [c]
+    f c@(IsZero e) =
+      case LA.asConst e of
+        Just x -> guard (x == 0) >> return []
+        Nothing -> return [c]
+
+evalConstr :: Model Rational -> Constr -> Bool
+evalConstr m (IsPos t)    = LA.evalExpr m (LA.mapCoeff fromInteger t) > 0
+evalConstr m (IsNonneg t) = LA.evalExpr m (LA.mapCoeff fromInteger t) >= 0
+evalConstr m (IsZero t)   = LA.evalExpr m (LA.mapCoeff fromInteger t) == 0
 
 -- ---------------------------------------------------------------------------
 
-fromLAAtom :: LA.Atom Rational -> DNF Lit
+fromLAAtom :: LA.Atom Rational -> DNF Constr
 fromLAAtom (ArithRel a op b) = atomR' op (toRat a) (toRat b)
+  where
+    atomR' :: RelOp -> Rat -> Rat -> DNF Constr
+    atomR' op a b = 
+      case op of
+        Le -> DNF [[a `leR` b]]
+        Lt -> DNF [[a `ltR` b]]
+        Ge -> DNF [[a `geR` b]]
+        Gt -> DNF [[a `gtR` b]]
+        Eql -> DNF [[a `eqR` b]]
+        NEq -> DNF [[a `ltR` b], [a `gtR` b]]
 
-toLAAtom :: Lit -> LA.Atom Rational
-toLAAtom (Nonneg e) = LA.mapCoeff fromInteger e .>=. LA.constant 0
-toLAAtom (Pos e)    = LA.mapCoeff fromInteger e .>. LA.constant 0
+toLAAtom :: Constr -> LA.Atom Rational
+toLAAtom (IsNonneg e) = LA.mapCoeff fromInteger e .>=. LA.constant 0
+toLAAtom (IsPos e)    = LA.mapCoeff fromInteger e .>.  LA.constant 0
+toLAAtom (IsZero e)   = LA.mapCoeff fromInteger e .==. LA.constant 0
 
-constraintsToDNF :: [LA.Atom Rational] -> DNF Lit
+constraintsToDNF :: [LA.Atom Rational] -> DNF Constr
 constraintsToDNF = andB . map fromLAAtom
-
-atomR' :: RelOp -> Rat -> Rat -> DNF Lit
-atomR' op a b = 
-  case op of
-    Le -> DNF [[a `leR` b]]
-    Lt -> DNF [[a `ltR` b]]
-    Ge -> DNF [[a `geR` b]]
-    Gt -> DNF [[a `gtR` b]]
-    Eql -> DNF [[a `leR` b, a `geR` b]]
-    NEq -> DNF [[a `ltR` b], [a `gtR` b]]
 
 -- ---------------------------------------------------------------------------
 
@@ -148,17 +166,60 @@ atomR' op a b =
 -}
 type BoundsR = ([Rat], [Rat], [Rat], [Rat])
 
+evalBounds :: Model Rational -> BoundsR -> Interval Rational
+evalBounds model (ls1,ls2,us1,us2) =
+  Interval.intersections $
+    [ Finite (evalRat model x) <=..< PosInf | x <- ls1 ] ++
+    [ Finite (evalRat model x) <..<  PosInf | x <- ls2 ] ++
+    [ NegInf <..<= Finite (evalRat model x) | x <- us1 ] ++
+    [ NegInf <..<  Finite (evalRat model x) | x <- us2 ]
+
+boundsToConstrs :: BoundsR -> Maybe [Constr]
+boundsToConstrs  (ls1, ls2, us1, us2) = simplify $ 
+  [ x `leR` y | x <- ls1, y <- us1 ] ++
+  [ x `ltR` y | x <- ls1, y <- us2 ] ++ 
+  [ x `ltR` y | x <- ls2, y <- us1 ] ++
+  [ x `ltR` y | x <- ls2, y <- us2 ]
+
+collectBounds :: Var -> [Constr] -> (BoundsR, [Constr])
+collectBounds v = foldr phi (([],[],[],[]),[])
+  where
+    phi :: Constr -> (BoundsR, [Constr]) -> (BoundsR, [Constr])
+    phi constr@(IsNonneg t) x = f False constr t x
+    phi constr@(IsPos t) x = f True constr t x
+    phi constr@(IsZero _) (bnd, xs) = (bnd, constr : xs) -- XXX: we assume v does not appear in constr
+
+    f :: Bool -> Constr -> ExprZ -> (BoundsR, [Constr]) -> (BoundsR, [Constr])
+    f strict constr t (bnd@(ls1,ls2,us1,us2), xs) =
+      case LA.extract v t of
+        (c,t') ->
+          case c `compare` 0 of
+            EQ -> (bnd, constr : xs)
+            GT ->
+              if strict
+              then ((ls1, (negateV t', c) : ls2, us1, us2), xs) -- 0 < cx + M ⇔ -M/c <  x
+              else (((negateV t', c) : ls1, ls2, us1, us2), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
+            LT ->
+              if strict
+              then ((ls1, ls2, us1, (t', negate c) : us2), xs) -- 0 < cx + M ⇔ x < M/-c
+              else ((ls1, ls2, (t', negate c) : us1, us2), xs) -- 0 ≤ cx + M ⇔ x ≤ M/-c
+
+-- ---------------------------------------------------------------------------
+
 project :: Var -> [LA.Atom Rational] -> [([LA.Atom Rational], Model Rational -> Model Rational)]
 project v xs = do
   ys <- unDNF $ constraintsToDNF xs
   (zs, mt) <- maybeToList $ project' v ys
   return (map toLAAtom zs, mt)
 
-project' :: Var -> [Lit] -> Maybe ([Lit], Model Rational -> Model Rational)
+project' :: Var -> [Constr] -> Maybe ([Constr], Model Rational -> Model Rational)
+project' v cs | Just (vdef,cs') <- findEq v cs = do
+  let mt m = IM.insert v (evalRat m vdef) m
+  return ([subst1Constr v (fromRat vdef) c | c <- cs'], mt)
 project' v xs = do
   case collectBounds v xs of
     (bnd, rest) -> do
-      cond <- boundsToLits bnd
+      cond <- boundsToConstrs bnd
       let mt m =
            case Interval.simplestRationalWithin (evalBounds m bnd) of
              Nothing  -> error "ToySolver.FourierMotzkin.project': should not happen"
@@ -171,7 +232,7 @@ projectN vs xs = do
   (zs, mt) <- maybeToList $ projectN' vs ys
   return (map toLAAtom zs, mt)
 
-projectN' :: VarSet -> [Lit] -> Maybe ([Lit], Model Rational -> Model Rational)
+projectN' :: VarSet -> [Constr] -> Maybe ([Constr], Model Rational -> Model Rational)
 projectN' vs2 xs2 = do
   (zs, mt) <- f (IS.toList vs2) xs2
   return (zs, mt)
@@ -182,51 +243,28 @@ projectN' vs2 xs2 = do
       (zs, mt2) <- f vs ys
       return (zs, mt1 . mt2)
 
-collectBounds :: Var -> [Lit] -> (BoundsR, [Lit])
-collectBounds v = foldr phi (([],[],[],[]),[])
+findEq :: Var -> [Constr] -> Maybe (Rat, [Constr])
+findEq v = msum . map f . pickup
   where
-    phi :: Lit -> (BoundsR, [Lit]) -> (BoundsR, [Lit])
-    phi lit@(Nonneg t) x = f False lit t x
-    phi lit@(Pos t) x = f True lit t x
+    pickup :: [a] -> [(a,[a])]
+    pickup [] = []
+    pickup (x:xs) = (x,xs) : [(y,x:ys) | (y,ys) <- pickup xs]
 
-    f :: Bool -> Lit -> ExprZ -> (BoundsR, [Lit]) -> (BoundsR, [Lit])
-    f strict lit t (bnd@(ls1,ls2,us1,us2), xs) =
-      case LA.extract v t of
-        (c,t') ->
-          case c `compare` 0 of
-            EQ -> (bnd, lit : xs)
-            GT ->
-              if strict
-              then ((ls1, (negateV t', c) : ls2, us1, us2), xs) -- 0 < cx + M ⇔ -M/c <  x
-              else (((negateV t', c) : ls1, ls2, us1, us2), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
-            LT ->
-              if strict
-              then ((ls1, ls2, us1, (t', negate c) : us2), xs) -- 0 < cx + M ⇔ x < M/-c
-              else ((ls1, ls2, (t', negate c) : us1, us2), xs) -- 0 ≤ cx + M ⇔ x ≤ M/-c
-
-boundsToLits :: BoundsR -> Maybe [Lit]
-boundsToLits  (ls1, ls2, us1, us2) = simplify $ 
-  [ x `leR` y | x <- ls1, y <- us1 ] ++
-  [ x `ltR` y | x <- ls1, y <- us2 ] ++ 
-  [ x `ltR` y | x <- ls2, y <- us1 ] ++
-  [ x `ltR` y | x <- ls2, y <- us2 ]
+    f :: (Constr, [Constr]) -> Maybe (Rat, [Constr])
+    f (IsZero e, cs) = do
+      (c, e') <- LA.extractMaybe v e
+      return ((negateV e', c), cs)
+    f _ = Nothing
 
 solve :: VarSet -> [LA.Atom Rational] -> Maybe (Model Rational)
 solve vs cs = msum [solve' vs cs2 | cs2 <- unDNF (constraintsToDNF cs)]
 
-solve' :: VarSet -> [Lit] -> Maybe (Model Rational)
+solve' :: VarSet -> [Constr] -> Maybe (Model Rational)
 solve' vs cs = do
-  (ys,mt) <- projectN' vs =<< simplify cs
-  guard $ Just [] == simplify ys
-  return $ mt IM.empty
-
-evalBounds :: Model Rational -> BoundsR -> Interval Rational
-evalBounds model (ls1,ls2,us1,us2) =
-  Interval.intersections $
-    [ Finite (evalRat model x) <=..< PosInf | x <- ls1 ] ++
-    [ Finite (evalRat model x) <..<  PosInf | x <- ls2 ] ++
-    [ NegInf <..<= Finite (evalRat model x) | x <- us1 ] ++
-    [ NegInf <..<  Finite (evalRat model x) | x <- us2 ]
+  (cs2,mt) <- projectN' vs =<< simplify cs
+  let m = IM.empty
+  guard $ all (evalConstr m) cs2
+  return $ mt m
 
 -- ---------------------------------------------------------------------------
 
