@@ -23,7 +23,7 @@ module ToySolver.Arith.FourierMotzkin
     -- * Projection
     , project
     , projectN
-    -- Quantifier elimination
+    -- * Quantifier elimination
     , eliminateQuantifiers
     -- * Constraint solving
     , solveFormula
