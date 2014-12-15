@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Knapsack
+-- Module      :  ToySolver.Knapsack.BB
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
 -- 
@@ -12,7 +12,7 @@
 -- Simple 0-1 knapsack problem solver that uses branch-and-bound with LP-relaxation based upper bound.
 --
 -----------------------------------------------------------------------------
-module ToySolver.Knapsack
+module ToySolver.Knapsack.BB
   ( Weight
   , Value
   , solve

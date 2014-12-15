@@ -136,7 +136,7 @@ Library
      ToySolver.HittingSet
      ToySolver.HittingSet.HTCBDD
      ToySolver.HittingSet.SHD
-     ToySolver.Knapsack
+     ToySolver.Knapsack.BB
      ToySolver.Knapsack.DP
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2SMT
