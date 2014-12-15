@@ -17,10 +17,15 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Arith.FourierMotzkin
-    ( Constr (..)
+    (
+    -- * Primitive constraints
+      Constr (..)
+    -- * Projection
     , project
     , projectN
+    -- Quantifier elimination
     , eliminateQuantifiers
+    -- * Constraint solving
     , solveFormula
     , solve
     ) where

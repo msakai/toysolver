@@ -22,6 +22,14 @@ import ToySolver.Arith.FourierMotzkin.Core
 
 -- ---------------------------------------------------------------------------
 
+-- | 
+--
+-- * @'solveFormula' {x1,…,xm} φ@ returns @'Sat' M@ such that @M ⊧_LRA φ@ when such @M@ exists,
+--
+-- * returns @'Unsat'@ when such @M@ does not exists, and
+--
+-- * returns @'Unknown'@ when @φ@ is beyond LRA.
+-- 
 solveFormula :: VarSet -> FOL.Formula (FOL.Atom Rational) -> FOL.SatResult Rational
 solveFormula vs formula =
   case eliminateQuantifiers' formula of
@@ -31,6 +39,16 @@ solveFormula vs formula =
         Nothing -> FOL.Unsat
         Just m -> FOL.Sat m
 
+-- | Eliminate quantifiers and returns equivalent quantifier-free formula.
+--
+-- @'eliminateQuantifiers' φ@ returns @(ψ, lift)@ such that:
+-- 
+-- * ψ is a quantifier-free formula and @LRA ⊢ ∀y1, …, yn. φ ↔ ψ@ where @{y1, …, yn} = FV(φ) ⊇ FV(ψ)@, and
+-- 
+-- * if @M ⊧_LRA ψ@ then @lift M ⊧_LRA φ@.
+--
+-- φ may or may not be a closed formula.
+--
 eliminateQuantifiers :: FOL.Formula (FOL.Atom Rational) -> Maybe (FOL.Formula (FOL.Atom Rational))
 eliminateQuantifiers phi = do
   dnf <- eliminateQuantifiers' phi

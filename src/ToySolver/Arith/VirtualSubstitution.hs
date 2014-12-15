@@ -50,14 +50,21 @@ import ToySolver.Data.BoolExpr
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
 
--- | quantifier-free formula
+-- | Quantifier-free formula of LRA
 type QFFormula = BoolExpr (LA.Atom Rational)
 
+-- | @'evalQFFormula' M φ@ returns whether @M ⊧_LRA φ@ or not.
 evalQFFormula :: Model Rational -> QFFormula -> Bool
 evalQFFormula m = fold f
   where
     f (ArithRel lhs op rhs) = evalOp op (LA.evalExpr m lhs) (LA.evalExpr m rhs)
 
+{-| @'project' x φ@ returns @(ψ, lift)@ such that:
+
+* @⊢_LRA ∀y1, …, yn. (∃x. φ) ↔ ψ@ where @{y1, …, yn} = FV(φ) \\ {x}@, and
+
+* if @M ⊧_LRA ψ@ then @lift M ⊧ φ@.
+-}
 project :: Var -> QFFormula -> (QFFormula, Model Rational -> Model Rational)
 project x formula = (formula', mt)
   where
@@ -68,6 +75,12 @@ project x formula = (formula', mt)
       guard $ evalQFFormula m phi
       return $ mt' m
 
+{-| @'projectN' {x1,…,xm} φ@ returns @(ψ, lift)@ such that:
+
+* @⊢_LRA ∀y1, …, yn. (∃x1, …, xm. φ) ↔ ψ@ where @{y1, …, yn} = FV(φ) \\ {x1,…,xm}@, and
+
+* if @M ⊧_LRA ψ@ then @lift M ⊧_LRA φ@.
+-}
 projectN :: VarSet -> QFFormula -> (QFFormula, Model Rational -> Model Rational)
 projectN vs2 = f (IS.toList vs2)
   where
@@ -78,14 +91,28 @@ projectN vs2 = f (IS.toList vs2)
         (formula2, mt1) = project v formula
         (formula3, mt2) = f vs formula2
 
+{-| @'projectCases' x φ@ returns @[(ψ_1, lift_1), …, (ψ_m, lift_m)]@ such that:
+
+* @⊢_LRA ∀y1, …, yn. (∃x. φ) ↔ (ψ_1 ∨ … ∨ φ_m)@ where @{y1, …, yn} = FV(φ) \\ {x}@, and
+
+* if @M ⊧_LRA ψ_i@ then @lift_i M ⊧_LRA φ@.
+-}
 projectCases :: Var -> QFFormula -> [(QFFormula, Model Rational -> Model Rational)]
 projectCases v phi = [(psi, \m -> IM.insert v (LA.evalExpr m t) m) | (psi, t) <- projectCases' v phi]
 
-{-
-∃xφ(x) ⇔ ∨_{t∈S} φ(t)
-  where
-    Ψ = {a_i x - b_i ρ_i 0 | i ∈ I, ρ_i ∈ {=, ≠, ≤, <}} the set of atomic subformulas in φ(x)
-    S = {b_i / a_i, b_i / a_i + 1, b_i / a_i - 1 | i∈I } ∪ {1/2 (b_i / a_i + b_j / a_j) | i,j∈I, i≠j}
+
+{-| @'projectCases' x φ@ returns @[(ψ_1, lift_1), …, (ψ_m, lift_m)]@ such that:
+
+* @⊢_LRA ∀y1, …, yn. (∃x. φ) ↔ (ψ_1 ∨ … ∨ φ_m)@ where @{y1, …, yn} = FV(φ) \\ {x}@, and
+
+* if @M ⊧_LRA ψ_i@ then @lift_i M ⊧_LRA φ@.
+
+Note that
+
+> (∃x. φ(x)) ⇔ ∨_{t∈S} φ(t)
+>   where
+>     Ψ = {a_i x - b_i ρ_i 0 | i ∈ I, ρ_i ∈ {=, ≠, ≤, <}} the set of atomic subformulas in φ(x)
+>     S = { b_i / a_i, b_i / a_i + 1, b_i / a_i - 1 | i∈I } ∪ {1/2 (b_i / a_i + b_j / a_j) | i,j∈I, i≠j}
 -}
 projectCases' :: Var -> QFFormula -> [(QFFormula, LA.Expr Rational)]
 projectCases' v phi = [(applySubst1 v t phi, t) | t <- Set.toList s]
@@ -98,6 +125,12 @@ projectCases' v phi = [(applySubst1 v t phi, t) | t <- Set.toList s]
         , Set.fromList [(e1 ^+^ e2) ^/ 2 | (e1,e2) <- pairs (Set.toList xs)]
         ]
 
+{-| @'projectCasesN' {x1,…,xm} φ@ returns @[(ψ_1, lift_1), …, (ψ_n, lift_n)]@ such that:
+
+* @⊢_LRA ∀y1, …, yp. (∃x. φ) ↔ (ψ_1 ∨ … ∨ φ_n)@ where @{y1, …, yp} = FV(φ) \\ {x1,…,xm}@, and
+
+* if @M ⊧_LRA ψ_i@ then @lift_i M ⊧_LRA φ@.
+-}
 projectCasesN :: VarSet -> QFFormula -> [(QFFormula, Model Rational -> Model Rational)]
 projectCasesN vs = f (IS.toList vs) 
   where
@@ -124,6 +157,11 @@ pairs :: [a] -> [(a,a)]
 pairs [] = []
 pairs (x:xs) = [(x,x2) | x2 <- xs] ++ pairs xs
 
+-- | @'solveQFFormula' {x1,…,xn} φ@ returns @Just M@ such that @M ⊧_LRA φ@ when
+-- such @M@ exists, returns @Nothing@ otherwise.
+--
+-- @FV(φ)@ must be a subset of @{x1,…,xn}@.
+-- 
 solveQFFormula :: VarSet -> QFFormula -> Maybe (Model Rational)
 solveQFFormula vs formula = listToMaybe $ do
   (formula2, mt) <- projectCasesN vs formula
@@ -131,6 +169,10 @@ solveQFFormula vs formula = listToMaybe $ do
   guard $ evalQFFormula m formula2
   return $ mt m
 
--- | solve a (open) quantifier-free formula
+-- | @'solve' {x1,…,xn} φ@ returns @Just M@ such that @M ⊧_LRA φ@ when
+-- such @M@ exists, returns @Nothing@ otherwise.
+--
+-- @FV(φ)@ must be a subset of @{x1,…,xn}@.
+-- 
 solve :: VarSet -> [LA.Atom Rational] -> Maybe (Model Rational)
 solve vs cs = solveQFFormula vs (andB [Atom c | c <- cs])

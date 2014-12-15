@@ -33,6 +33,7 @@ module ToySolver.Arith.Cooper.Core
     , fromLAAtom
     , (.|.)
     , evalQFFormula
+    , Model
 
     -- * Projection
     , project
@@ -97,16 +98,14 @@ gtZ = flip gtZ
 eqZ :: ExprZ -> ExprZ -> QFFormula
 eqZ e1 e2 = Atom (e1 `leZ` e2) .&&. Atom (e1 `geZ` e2)
 
--- | Literal
--- 
--- * @Pos e@ means @e > 0@
--- 
--- * @Divisible True d e@ means @e@ can be divided by @d@ (i.e. @d|e@)
--- 
--- * @Divisible False d e@ means @e@ can not be divided by @d@ (i.e. @¬(d|e)@)
+-- | Literals of Presburger arithmetic.
 data Lit
     = Pos ExprZ
+    -- ^ @Pos e@ means @e > 0@
     | Divisible Bool Integer ExprZ
+    -- ^
+    -- * @Divisible True d e@ means @e@ can be divided by @d@ (i.e. @d | e@)
+    -- * @Divisible False d e@ means @e@ can not be divided by @d@ (i.e. @¬(d | e)@)
     deriving (Show, Eq, Ord)
 
 instance Variables Lit where
@@ -117,7 +116,7 @@ instance Complement Lit where
   notB (Pos e) = e `leZ` LA.constant 0
   notB (Divisible b c e) = Divisible (not b) c e
 
--- | quantifier-free negation normal form
+-- | Quantifier-free formula of Presburger arithmetic.
 type QFFormula = BoolExpr Lit
 
 instance IsArithRel (LA.Expr Integer) QFFormula where
@@ -130,6 +129,7 @@ instance IsArithRel (LA.Expr Integer) QFFormula where
       Eql -> eqZ lhs rhs
       NEq -> notB $ arithRel Eql lhs rhs
 
+-- | @d | e@ means @e@ can be divided by @d@.
 (.|.) :: Integer -> ExprZ -> QFFormula
 n .|. e = Atom $ Divisible True n e
 
@@ -165,6 +165,7 @@ simplifyLit lit@(Divisible b c e)
     c' = c `checkedDiv` d
     e' = LA.mapCoeff (`checkedDiv` d) e
 
+-- | @'evalQFFormula' M φ@ returns whether @M ⊧_LIA φ@ or not.
 evalQFFormula :: Model Integer -> QFFormula -> Bool
 evalQFFormula m = BoolExpr.fold (evalLit m)
 
@@ -189,6 +190,12 @@ evalWitness model (WCase2 c j delta us)
 
 -- ---------------------------------------------------------------------------
 
+{-| @'project' x φ@ returns @(ψ, lift)@ such that:
+
+* @⊢_LIA ∀y1, …, yn. (∃x. φ) ↔ ψ@ where @{y1, …, yn} = FV(φ) \\ {x}@, and
+
+* if @M ⊧_LIA ψ@ then @lift M ⊧_LIA φ@.
+-}
 project :: Var -> QFFormula -> (QFFormula, Model Integer -> Model Integer)
 project x formula = (formula', mt)
   where
@@ -199,6 +206,12 @@ project x formula = (formula', mt)
       guard $ evalQFFormula m phi
       return $ mt' m
 
+{-| @'projectN' {x1,…,xm} φ@ returns @(ψ, lift)@ such that:
+
+* @⊢_LIA ∀y1, …, yn. (∃x1, …, xm. φ) ↔ ψ@ where @{y1, …, yn} = FV(φ) \\ {x1,…,xm}@, and
+
+* if @M ⊧_LIA ψ@ then @lift M ⊧_LIA φ@.
+-}
 projectN :: VarSet -> QFFormula -> (QFFormula, Model Integer -> Model Integer)
 projectN vs2 = f (IS.toList vs2)
   where
@@ -209,6 +222,12 @@ projectN vs2 = f (IS.toList vs2)
         (formula2, mt1) = project v formula
         (formula3, mt2) = f vs formula2
 
+{-| @'projectCases' x φ@ returns @[(ψ_1, lift_1), …, (ψ_m, lift_m)]@ such that:
+
+* @⊢_LIA ∀y1, …, yn. (∃x. φ) ↔ (ψ_1 ∨ … ∨ φ_m)@ where @{y1, …, yn} = FV(φ) \\ {x}@, and
+
+* if @M ⊧_LIA ψ_i@ then @lift_i M ⊧_LIA φ@.
+-}
 projectCases :: Var -> QFFormula -> [(QFFormula, Model Integer -> Model Integer)]
 projectCases x formula = do
   (phi, wit) <- projectCases' x formula
@@ -315,6 +334,12 @@ projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
     case2 :: [(QFFormula, Witness)]
     case2 = [(subst1 x (LA.constant j) formula2, WCase2 c j delta us) | j <- [1..delta]]
 
+{-| @'projectCasesN' {x1,…,xm} φ@ returns @[(ψ_1, lift_1), …, (ψ_n, lift_n)]@ such that:
+
+* @⊢_LIA ∀y1, …, yp. (∃x. φ) ↔ (ψ_1 ∨ … ∨ φ_n)@ where @{y1, …, yp} = FV(φ) \\ {x1,…,xm}@, and
+
+* if @M ⊧_LIA ψ_i@ then @lift_i M ⊧_LIA φ@.
+-}
 projectCasesN :: VarSet -> QFFormula -> [(QFFormula, Model Integer -> Model Integer)]
 projectCasesN vs2 = f (IS.toList vs2)
   where
@@ -341,6 +366,11 @@ checkedDiv a b =
 
 -- ---------------------------------------------------------------------------
 
+-- | @'solveQFFormula' {x1,…,xn} φ@ returns @Just M@ that @M ⊧_LIA φ@ when
+-- such @M@ exists, returns @Nothing@ otherwise.
+--
+-- @FV(φ)@ must be a subset of @{x1,…,xn}@.
+-- 
 solveQFFormula :: VarSet -> QFFormula -> Maybe (Model Integer)
 solveQFFormula vs formula = listToMaybe $ do
   (formula2, mt) <- projectCasesN vs formula
@@ -348,11 +378,21 @@ solveQFFormula vs formula = listToMaybe $ do
   guard $ evalQFFormula m formula2
   return $ mt m
 
--- | solve a (open) quantifier-free formula
+-- | @'solve' {x1,…,xn} φ@ returns @Just M@ that @M ⊧_LIA φ@ when
+-- such @M@ exists, returns @Nothing@ otherwise.
+--
+-- @FV(φ)@ must be a subset of @{x1,…,xn}@.
+-- 
 solve :: VarSet -> [LA.Atom Rational] -> Maybe (Model Integer)
 solve vs cs = solveQFFormula vs $ andB $ map fromLAAtom cs
 
--- | solve a (open) quantifier-free formula
+-- | @'solveQFLA' {x1,…,xn} φ I@ returns @Just M@ that @M ⊧_LIRA φ@ when
+-- such @M@ exists, returns @Nothing@ otherwise.
+--
+-- * @FV(φ)@ must be a subset of @{x1,…,xn}@.
+--
+-- * @I@ is a set of integer variables and must be a subset of @{x1,…,xn}@.
+-- 
 solveQFLA :: VarSet -> [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
 solveQFLA vs cs ivs = listToMaybe $ do
   (cs2, mt) <- FM.projectN rvs cs

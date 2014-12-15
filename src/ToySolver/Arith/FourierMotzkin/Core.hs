@@ -80,8 +80,11 @@ evalRat model (e, d) = LA.lift1 1 (model IM.!) (LA.mapCoeff fromIntegral e) / (f
 -- | Atomic constraint
 data Constr
   = IsNonneg ExprZ
+  -- ^ e ≥ 0
   | IsPos ExprZ
+  -- ^ e > 0
   | IsZero ExprZ
+  -- ^ e = 0
   deriving (Show, Eq, Ord)
 
 instance Variables Constr where
@@ -206,6 +209,12 @@ collectBounds v = foldr phi (([],[],[],[]),[])
 
 -- ---------------------------------------------------------------------------
 
+{-| @'project' x φ@ returns @[(ψ_1, lift_1), …, (ψ_m, lift_m)]@ such that:
+
+* @⊢_LRA ∀y1, …, yn. (∃x. φ) ↔ (ψ_1 ∨ … ∨ φ_m)@ where @{y1, …, yn} = FV(φ) \\ {x}@, and
+
+* if @M ⊧_LRA ψ_i@ then @lift_i M ⊧_LRA φ@.
+-}
 project :: Var -> [LA.Atom Rational] -> [([LA.Atom Rational], Model Rational -> Model Rational)]
 project v xs = do
   ys <- unDNF $ constraintsToDNF xs
@@ -226,6 +235,12 @@ project' v xs = do
              Just val -> IM.insert v val m
       return (rest ++ cond, mt)
 
+{-| @'projectN' {x1,…,xm} φ@ returns @[(ψ_1, lift_1), …, (ψ_n, lift_n)]@ such that:
+
+* @⊢_LRA ∀y1, …, yp. (∃x. φ) ↔ (ψ_1 ∨ … ∨ φ_n)@ where @{y1, …, yp} = FV(φ) \\ {x1,…,xm}@, and
+
+* if @M ⊧_LRA ψ_i@ then @lift_i M ⊧_LRA φ@.
+-}
 projectN :: VarSet -> [LA.Atom Rational] -> [([LA.Atom Rational], Model Rational -> Model Rational)]
 projectN vs xs = do
   ys <- unDNF $ constraintsToDNF xs
@@ -256,6 +271,11 @@ findEq v = msum . map f . pickup
       return ((negateV e', c), cs)
     f _ = Nothing
 
+-- | @'solve' {x1,…,xn} φ@ returns @Just M@ that @M ⊧_LRA φ@ when
+-- such @M@ exists, returns @Nothing@ otherwise.
+--
+-- @FV(φ)@ must be a subset of @{x1,…,xn}@.
+-- 
 solve :: VarSet -> [LA.Atom Rational] -> Maybe (Model Rational)
 solve vs cs = msum [solve' vs cs2 | cs2 <- unDNF (constraintsToDNF cs)]
 

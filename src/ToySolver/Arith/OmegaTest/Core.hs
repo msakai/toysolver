@@ -62,6 +62,11 @@ import ToySolver.Arith.FourierMotzkin.Core (Constr (..), toLAAtom)
 data Options
   = Options
   { optCheckReal :: VarSet -> [LA.Atom Rational] -> Bool
+  -- ^ optCheckReal is used for checking whether real shadow is satisfiable.
+  --
+  -- * If it returns @True@, the real shadow may or may not be satisfiable.
+  -- 
+  -- * If it returns @False@, the real shadow must be unsatisfiable
   }
 
 instance Default Options where
@@ -274,6 +279,11 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 
 -- ---------------------------------------------------------------------------
 
+-- | @'solve' opt {x1,…,xn} φ@ returns @Just M@ that @M ⊧_LIA φ@ when
+-- such @M@ exists, returns @Nothing@ otherwise.
+--
+-- @FV(φ)@ must be a subset of @{x1,…,xn}@.
+-- 
 solve :: Options -> VarSet -> [LA.Atom Rational] -> Maybe (Model Integer)
 solve opt vs cs = msum [solve' opt vs cs | cs <- unDNF dnf]
   where
@@ -296,6 +306,13 @@ solve opt vs cs = msum [solve' opt vs cs | cs <- unDNF dnf]
       where
         d = foldl' lcm 1 [denominator c | (c,_) <- LA.terms a]
 
+-- | @'solveQFLA' {x1,…,xn} φ I@ returns @Just M@ that @M ⊧_LIRA φ@ when
+-- such @M@ exists, returns @Nothing@ otherwise.
+--
+-- * @FV(φ)@ must be a subset of @{x1,…,xn}@.
+--
+-- * @I@ is a set of integer variables and must be a subset of @{x1,…,xn}@.
+-- 
 solveQFLA :: Options -> VarSet -> [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
 solveQFLA opt vs cs ivs = listToMaybe $ do
   (cs2, mt) <- FM.projectN rvs cs

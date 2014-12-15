@@ -25,9 +25,12 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Arith.OmegaTest
-    ( Model
+    ( 
+    -- * Solving
+      Model
     , solve
     , solveQFLA
+    -- * Options for solving
     , Options (..)
     , defaultOptions
     , checkRealNoCheck

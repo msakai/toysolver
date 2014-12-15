@@ -30,9 +30,12 @@ module ToySolver.Arith.Cooper
     , QFFormula
     , fromLAAtom
     , (.|.)
+    , evalQFFormula
+    , Model
 
     -- * Projection
     , project
+    , projectN
     , projectCases
     , projectCasesN
 
