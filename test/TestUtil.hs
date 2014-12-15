@@ -16,6 +16,7 @@ import qualified ToySolver.Internal.Data.Vec as Vec
 import ToySolver.Internal.Util
 import ToySolver.Internal.TextUtil
 import qualified ToySolver.Knapsack as Knapsack
+import qualified ToySolver.Knapsack.DP as KnapsackDP
 import qualified ToySolver.Wang as Wang
 
 case_showRationalAsDecimal :: IO ()
@@ -45,6 +46,12 @@ case_knapsack_1 = Knapsack.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,
 
 case_knapsack_2 :: IO ()
 case_knapsack_2 = Knapsack.solve [(16,2), (19,3), (23,4), (28,5)] 7 @?= (44, 7, [True,False,False,True])
+
+case_knapsack_DP_1 :: IO ()
+case_knapsack_DP_1 = KnapsackDP.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
+
+case_knapsack_DP_2 :: IO ()
+case_knapsack_DP_2 = KnapsackDP.solve [(16,2), (19,3), (23,4), (28,5)] 7 @?= (44, 7, [True,False,False,True])
 
 case_Vec :: IO ()
 case_Vec = do

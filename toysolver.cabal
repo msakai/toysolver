@@ -137,6 +137,7 @@ Library
      ToySolver.HittingSet.HTCBDD
      ToySolver.HittingSet.SHD
      ToySolver.Knapsack
+     ToySolver.Knapsack.DP
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.MaxSAT2IP
