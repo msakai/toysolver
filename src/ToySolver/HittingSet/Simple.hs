@@ -18,14 +18,14 @@ import Control.Monad
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.List
+import qualified Data.Set as Set
 
 type Vertex = Int
 type HyperEdge = IntSet
 type HittingSet = IntSet
 
--- FIXME: remove nub
 minimalHittingSets :: [HyperEdge] -> [HittingSet]
-minimalHittingSets es = nub $ f es IntSet.empty
+minimalHittingSets es = nubOrd $ f es IntSet.empty
   where
     f :: [HyperEdge] -> HittingSet -> [HittingSet]
     f [] hs = return hs
@@ -51,3 +51,11 @@ maintainNoSupersets xss = go [] xss
     go yss (xs:xss) = go (xs : filter p yss) (filter p xss)
       where
         p zs = not (xs `IntSet.isSubsetOf` zs)
+
+nubOrd :: Ord a => [a] -> [a]
+nubOrd = go Set.empty
+  where
+    go occurred (x:xs)
+      | x `Set.member` occurred = go occurred xs
+      | otherwise = x : go (Set.insert x occurred) xs
+    go _ [] = []
