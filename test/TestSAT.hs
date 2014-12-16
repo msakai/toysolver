@@ -10,6 +10,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Test.HUnit hiding (Test)
 import Test.QuickCheck hiding ((.&&.), (.||.))
+import qualified Test.QuickCheck.Monadic as QM
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
@@ -26,6 +27,132 @@ import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
+
+prop_solveCNF :: Property
+prop_solveCNF = QM.monadicIO $ do
+  cnf@(nv,_) <- QM.pick arbitraryCNF
+  ret <- QM.run $ solveCNF cnf
+  case ret of
+    Just m -> QM.assert $ evalCNF m cnf == True
+    Nothing -> do
+      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
+        QM.assert $ evalCNF m cnf == False
+
+solveCNF :: (Int,[Clause]) -> IO (Maybe Model)
+solveCNF (nv,cs) = do
+  solver <- newSolver
+  setCheckModel solver True
+  newVars_ solver nv
+  forM_ cs $ \c -> addClause solver c
+  ret <- solve solver
+  if ret then do
+    m <- model solver
+    return (Just m)
+  else do
+    return Nothing
+
+arbitraryCNF :: Gen (Int,[Clause])
+arbitraryCNF = do
+  nv <- choose (0,10)
+  nc <- choose (0,50)
+  cs <- replicateM nc $ do
+    len <- choose (0,10)
+    if nv == 0 then
+      return []
+    else
+      replicateM len $ choose (-nv, nv) `suchThat` (/= 0)
+  return (nv, cs)
+
+evalCNF :: Model -> (Int,[Clause]) -> Bool
+evalCNF m (_,cs) = all (evalClause m) cs
+
+
+prop_solvePB :: Property
+prop_solvePB = QM.monadicIO $ do
+  prob@(nv,_) <- QM.pick arbitraryPB
+  ret <- QM.run $ solvePB prob
+  case ret of
+    Just m -> QM.assert $ evalPB m prob == True
+    Nothing -> do
+      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
+        QM.assert $ evalPB m prob == False
+
+solvePB :: (Int,[PBLinAtLeast]) -> IO (Maybe Model)
+solvePB (nv,cs) = do
+  solver <- newSolver
+  setCheckModel solver True
+  newVars_ solver nv
+  forM_ cs $ \c -> addPBAtLeast solver (fst c) (snd c)
+  ret <- solve solver
+  if ret then do
+    m <- model solver
+    return (Just m)
+  else do
+    return Nothing
+
+arbitraryPB :: Gen (Int,[PBLinAtLeast])
+arbitraryPB = do
+  nv <- choose (0,10)
+  nc <- choose (0,50)
+  cs <- replicateM nc $ do
+    len <- choose (0,10)    
+    lhs <-
+      if nv == 0 then
+        return []
+      else
+        replicateM len $ do
+          l <- choose (-nv, nv) `suchThat` (/= 0)
+          c <- arbitrary
+          return (c,l)
+    rhs <- arbitrary
+    return (lhs,rhs)
+  return (nv, cs)
+
+evalPB :: Model -> (Int,[PBLinAtLeast]) -> Bool
+evalPB m (_,cs) = all (evalPBLinAtLeast m) cs
+
+
+prop_solveXOR :: Property
+prop_solveXOR = QM.monadicIO $ do
+  prob@(nv,_) <- QM.pick arbitraryXOR
+  ret <- QM.run $ solveXOR prob
+  case ret of
+    Just m -> QM.assert $ evalXOR m prob == True
+    Nothing -> do
+      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
+        QM.assert $ evalXOR m prob == False
+
+solveXOR :: (Int,[XORClause]) -> IO (Maybe Model)
+solveXOR (nv,cs) = do
+  solver <- newSolver
+  setCheckModel solver True
+  newVars_ solver nv
+  forM_ cs $ \c -> addXORClause solver (fst c) (snd c)
+  ret <- solve solver
+  if ret then do
+    m <- model solver
+    return (Just m)
+  else do
+    return Nothing
+
+arbitraryXOR :: Gen (Int,[XORClause])
+arbitraryXOR = do
+  nv <- choose (0,10)
+  nc <- choose (0,50)
+  cs <- replicateM nc $ do
+    len <- choose (0,10)    
+    lhs <-
+      if nv == 0 then
+        return []
+      else
+        replicateM len $ choose (-nv, nv) `suchThat` (/= 0)
+    rhs <- arbitrary
+    return (lhs,rhs)
+  return (nv, cs)
+
+evalXOR :: Model -> (Int,[XORClause]) -> Bool
+evalXOR m (_,cs) = all (evalXORClause m) cs
+
 
 -- should be SAT
 case_solve_SAT :: IO ()

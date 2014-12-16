@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import Data.VectorSpace
 import Test.HUnit hiding (Test)
 import Test.QuickCheck hiding ((.&&.), (.||.))
+import qualified Test.QuickCheck.Monadic as QM
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
@@ -136,8 +137,37 @@ test2' =
     y = LA.var 1
     t1 = 11*^x ^+^ 13*^y
     t2 = 7*^x ^-^ 9*^y
+    
+
+genLAExpr :: [Var] -> Gen (LA.Expr Rational)
+genLAExpr vs = do
+  size <- choose (0,3)
+  liftM LA.fromTerms $ replicateM size $ do
+    x <- elements (LA.unitVar : vs)
+    c <- arbitrary
+    return (c,x)
+
+genQFLAConj :: Gen (VarSet, [LA.Atom Rational])
+genQFLAConj = do
+  nv <- choose (0, 5)
+  nc <- choose (0, 5)
+  let vs = IS.fromList [1..nv]
+  cs <- replicateM nc $ do
+    op  <- elements [Lt, Le, Ge, Gt, Eql] -- , NEq
+    lhs <- genLAExpr [1..nv]
+    rhs <- genLAExpr [1..nv]
+    return $ arithRel op lhs rhs
+  return (vs, cs)
 
 ------------------------------------------------------------------------
+ 
+-- too slow
+disabled_prop_FourierMotzkin_solve :: Property
+disabled_prop_FourierMotzkin_solve =
+  forAll genQFLAConj $ \(vs,cs) ->
+    case FourierMotzkin.solve vs cs of
+      Nothing -> True
+      Just m  -> all (LA.evalAtom m) cs
 
 case_FourierMotzkin_test1 :: IO ()
 case_FourierMotzkin_test1 = 
@@ -156,6 +186,13 @@ case_FourierMotzkin_test2 =
         LA.evalAtom m a @?= True
 
 ------------------------------------------------------------------------
+        
+prop_VirtualSubstitution_solve :: Property
+prop_VirtualSubstitution_solve =
+   forAll genQFLAConj $ \(vs,cs) ->
+     case VirtualSubstitution.solve vs cs of
+       Nothing -> True
+       Just m  -> all (LA.evalAtom m) cs
 
 case_VirtualSubstitution_test1 :: IO ()
 case_VirtualSubstitution_test1 = 
@@ -174,6 +211,16 @@ case_VirtualSubstitution_test2 =
         LA.evalAtom m a @?= True
 
 ------------------------------------------------------------------------
+        
+-- too slow
+disabled_prop_CAD_solve :: Property
+disabled_prop_CAD_solve =
+   forAll genQFLAConj $ \(vs,cs) ->
+     let vs' = Set.fromAscList $ IS.toAscList vs
+         cs' = map toPRel cs
+     in case CAD.solve vs' cs' of
+          Nothing -> True
+          Just m  -> all (evalPAtom m) cs'
 
 case_CAD_test1 :: IO ()
 case_CAD_test1 = 
@@ -224,6 +271,14 @@ evalPAtom m (ArithRel lhs op rhs) =　evalOp op (evalP m lhs) (evalP m rhs)
 
 ------------------------------------------------------------------------
 
+-- sometimes too slow
+disable_prop_OmegaTest_solve :: Property
+disable_prop_OmegaTest_solve =
+   forAll genQFLAConj $ \(vs,cs) ->
+     case OmegaTest.solve OmegaTest.defaultOptions vs cs of
+       Nothing -> True
+       Just m  -> all (LA.evalAtom (fmap fromInteger m)) cs
+
 case_OmegaTest_test1 :: IO ()
 case_OmegaTest_test1 = 
   case uncurry (OmegaTest.solve OmegaTest.defaultOptions) test1' of
@@ -247,6 +302,14 @@ prop_OmegaTest_zmod =
 
 ------------------------------------------------------------------------
 
+-- too slow
+disabled_prop_Cooper_solve :: Property
+disabled_prop_Cooper_solve =
+   forAll genQFLAConj $ \(vs,cs) ->
+     case Cooper.solve vs cs of
+       Nothing -> True
+       Just m  -> all (LA.evalAtom (fmap fromInteger m)) cs
+
 case_Cooper_test1 :: IO ()
 case_Cooper_test1 = 
   case uncurry Cooper.solve test1' of
@@ -262,6 +325,24 @@ case_Cooper_test2 =
     Nothing -> return ()
 
 ------------------------------------------------------------------------
+    
+prop_Simplex2_solve :: Property
+prop_Simplex2_solve = QM.monadicIO $ do
+   (vs,cs) <- QM.pick genQFLAConj
+   join $ QM.run $ do
+     solver <- Simplex2.newSolver
+     m <- liftM IM.fromList $ forM (IS.toList vs) $ \v -> do
+       v2 <- Simplex2.newVar solver
+       return (v, LA.var v2)
+     let cs' = map (LA.applySubstAtom m) cs
+     forM_ cs' $ \c -> do
+       Simplex2.assertAtomEx solver c
+     ret <- Simplex2.check solver
+     if ret then do
+       m <- Simplex2.model solver
+       return $ forM_ cs' $ \c -> QM.assert (LA.evalAtom m c)
+     else do
+       return $ return ()
 
 case_Simplex2_test1 :: IO ()
 case_Simplex2_test1 = do
