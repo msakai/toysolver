@@ -81,6 +81,7 @@ module ToySolver.Data.Polynomial
   -- * Term
   , Term
   , tdeg
+  , tscale
   , tmult
   , tdivides
   , tdiv

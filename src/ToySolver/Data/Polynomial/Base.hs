@@ -82,6 +82,7 @@ module ToySolver.Data.Polynomial.Base
   -- * Term
   , Term
   , tdeg
+  , tscale
   , tmult
   , tdivides
   , tdiv
@@ -684,6 +685,9 @@ type UTerm k = Term k X
 
 tdeg :: Term k v -> Integer
 tdeg (_,xs) = deg xs
+
+tscale :: (Num k, Ord v) => k -> Term k v -> Term k v
+tscale a (c, xs) = (a*c, xs)
 
 tmult :: (Num k, Ord v) => Term k v -> Term k v -> Term k v
 tmult (c1,xs1) (c2,xs2) = (c1*c2, xs1 `mmult` xs2)
