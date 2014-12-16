@@ -182,9 +182,9 @@ run solver opt mip printModel = do
               printModel m2
        where
          f = case solver of
-               "omega"      -> OmegaTest.solveQFLA omegaOpt
-               "omega-test" -> OmegaTest.solveQFLA omegaOpt
-               "cooper"     -> Cooper.solveQFLA
+               "omega"      -> OmegaTest.solveQFLIRAConj omegaOpt
+               "omega-test" -> OmegaTest.solveQFLIRAConj omegaOpt
+               "cooper"     -> Cooper.solveQFLIRAConj
                _ -> error "unknown solver"
 
          omegaOpt =

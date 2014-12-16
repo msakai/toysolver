@@ -27,7 +27,7 @@
 module ToySolver.Arith.OmegaTest.Core
     ( Model
     , solve
-    , solveQFLA
+    , solveQFLIRAConj
     , Options (..)
     , defaultOptions
     , checkRealNoCheck
@@ -306,15 +306,15 @@ solve opt vs cs = msum [solve' opt vs cs | cs <- unDNF dnf]
       where
         d = foldl' lcm 1 [denominator c | (c,_) <- LA.terms a]
 
--- | @'solveQFLA' {x1,…,xn} φ I@ returns @Just M@ that @M ⊧_LIRA φ@ when
+-- | @'solveQFLIRAConj' {x1,…,xn} φ I@ returns @Just M@ that @M ⊧_LIRA φ@ when
 -- such @M@ exists, returns @Nothing@ otherwise.
 --
 -- * @FV(φ)@ must be a subset of @{x1,…,xn}@.
 --
 -- * @I@ is a set of integer variables and must be a subset of @{x1,…,xn}@.
 -- 
-solveQFLA :: Options -> VarSet -> [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
-solveQFLA opt vs cs ivs = listToMaybe $ do
+solveQFLIRAConj :: Options -> VarSet -> [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
+solveQFLIRAConj opt vs cs ivs = listToMaybe $ do
   (cs2, mt) <- FM.projectN rvs cs
   m <- maybeToList $ solve opt ivs cs2
   return $ mt $ IM.map fromInteger m

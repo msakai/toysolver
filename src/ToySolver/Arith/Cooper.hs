@@ -46,7 +46,7 @@ module ToySolver.Arith.Cooper
     , solve
     , solveQFFormula
     , solveFormula
-    , solveQFLA
+    , solveQFLIRAConj
     ) where
 
 import ToySolver.Arith.Cooper.Core

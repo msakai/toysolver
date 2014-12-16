@@ -29,7 +29,7 @@ module ToySolver.Arith.OmegaTest
     -- * Solving
       Model
     , solve
-    , solveQFLA
+    , solveQFLIRAConj
     -- * Options for solving
     , Options (..)
     , defaultOptions

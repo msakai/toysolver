@@ -44,7 +44,7 @@ module ToySolver.Arith.Cooper.Core
     -- * Constraint solving
     , solve
     , solveQFFormula
-    , solveQFLA
+    , solveQFLIRAConj
     ) where
 
 import Control.Monad
@@ -386,15 +386,15 @@ solveQFFormula vs formula = listToMaybe $ do
 solve :: VarSet -> [LA.Atom Rational] -> Maybe (Model Integer)
 solve vs cs = solveQFFormula vs $ andB $ map fromLAAtom cs
 
--- | @'solveQFLA' {x1,…,xn} φ I@ returns @Just M@ that @M ⊧_LIRA φ@ when
+-- | @'solveQFLIRAConj' {x1,…,xn} φ I@ returns @Just M@ that @M ⊧_LIRA φ@ when
 -- such @M@ exists, returns @Nothing@ otherwise.
 --
 -- * @FV(φ)@ must be a subset of @{x1,…,xn}@.
 --
 -- * @I@ is a set of integer variables and must be a subset of @{x1,…,xn}@.
 -- 
-solveQFLA :: VarSet -> [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
-solveQFLA vs cs ivs = listToMaybe $ do
+solveQFLIRAConj :: VarSet -> [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
+solveQFLIRAConj vs cs ivs = listToMaybe $ do
   (cs2, mt) <- FM.projectN rvs cs
   m <- maybeToList $ solve ivs cs2
   return $ mt $ IM.map fromInteger m
