@@ -43,7 +43,7 @@ import Data.Default.Class
 import qualified Data.IntSet as IS
 import Data.List
 import Data.IORef
-import qualified ToySolver.HittingSet as HittingSet
+import qualified ToySolver.HittingSet.Simple as HittingSet
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types
 import ToySolver.SAT.MUS.Types

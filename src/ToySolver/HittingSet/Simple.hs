@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.HittingSet
+-- Module      :  ToySolver.HittingSet.Simple
 -- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
 -- 
@@ -10,7 +10,7 @@
 -- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module ToySolver.HittingSet
+module ToySolver.HittingSet.Simple
   ( minimalHittingSets
   ) where
 

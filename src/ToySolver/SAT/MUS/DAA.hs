@@ -32,7 +32,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified ToySolver.HittingSet as HittingSet
+import qualified ToySolver.HittingSet.Simple as HittingSet
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types
 import ToySolver.SAT.MUS.Types

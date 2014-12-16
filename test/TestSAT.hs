@@ -18,7 +18,7 @@ import Test.Framework.Providers.QuickCheck2
 import ToySolver.Data.LBool
 import ToySolver.Data.BoolExpr
 import ToySolver.Data.Boolean
-import ToySolver.HittingSet as HittingSet
+import ToySolver.HittingSet.Simple as HittingSet
 import ToySolver.SAT
 import ToySolver.SAT.Types
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin

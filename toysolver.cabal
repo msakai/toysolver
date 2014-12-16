@@ -133,7 +133,7 @@ Library
      ToySolver.Arith.VirtualSubstitution
      ToySolver.CongruenceClosure
      ToySolver.FOLModelFinder
-     ToySolver.HittingSet
+     ToySolver.HittingSet.Simple
      ToySolver.HittingSet.HTCBDD
      ToySolver.HittingSet.SHD
      ToySolver.Knapsack.BB
