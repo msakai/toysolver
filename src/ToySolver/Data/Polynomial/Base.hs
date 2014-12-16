@@ -384,23 +384,37 @@ toUPolynomialOf p v = fromTerms $ do
 divModMP
   :: forall k v. (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> ([Polynomial k v], Polynomial k v)
-divModMP cmp p fs = go IntMap.empty p
+divModMP cmp p fs = go IntMap.empty (terms' p)
   where
-    ls = [(lt cmp f, f) | f <- fs]
+    terms' :: Polynomial k v -> [Term k v]
+    terms' g = sortBy (flip cmp `on` snd) (terms g)
 
-    go :: IntMap (Polynomial k v) -> Polynomial k v -> ([Polynomial k v], Polynomial k v)
+    merge :: [Term k v] -> [Term k v] -> [Term k v]
+    merge [] ys = ys
+    merge xs [] = xs
+    merge xxs@(x:xs) yys@(y:ys) =
+      case cmp (snd x) (snd y) of
+        GT -> x : merge xs yys
+        LT -> y : merge xxs ys
+        EQ ->
+          case fst x + fst y of
+            0 -> merge xs ys
+            c -> (c, snd x) : merge xs ys
+
+    ls = zip [0..] [(lt cmp f, terms' f) | f <- fs]
+
+    go :: IntMap (Polynomial k v) -> [Term k v] -> ([Polynomial k v], Polynomial k v)
     go qs g =
       case xs of
-        [] -> ([IntMap.findWithDefault 0 i qs | i <- [0 .. length fs - 1]], g)
+        [] -> ([IntMap.findWithDefault 0 i qs | i <- [0 .. length fs - 1]], fromTerms g)
         (i, b, g') : _ -> go (IntMap.insertWith (+) i b qs) g'
       where
-        ms = sortBy (flip cmp `on` snd) (terms g)
         xs = do
-          (i,(a,f)) <- zip [0..] ls
-          h <- ms
+          (i,(a,f)) <- ls
+          h <- g
           guard $ a `tdivides` h
-          let b = fromTerm $ tdiv h a
-          return (i, b, g - b * f)
+          let b = tdiv h a
+          return (i, fromTerm b, merge g [(tscale (-1) b `tmult` m) | m <- f])
 
 -- | Multivariate division algorithm
 --
