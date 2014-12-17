@@ -93,7 +93,7 @@ leZ, ltZ, geZ, gtZ :: ExprZ -> ExprZ -> Lit
 leZ e1 e2 = e1 `ltZ` (e2 ^+^ LA.constant 1)
 ltZ e1 e2 = Pos $ (e2 ^-^ e1)
 geZ = flip leZ
-gtZ = flip gtZ
+gtZ = flip ltZ
 
 eqZ :: ExprZ -> ExprZ -> QFFormula
 eqZ e1 e2 = Atom (e1 `leZ` e2) .&&. Atom (e1 `geZ` e2)

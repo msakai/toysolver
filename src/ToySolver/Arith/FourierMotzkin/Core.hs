@@ -96,7 +96,7 @@ leR, ltR, geR, gtR, eqR :: Rat -> Rat -> Constr
 leR (e1,c) (e2,d) = IsNonneg $ normalizeExpr $ c *^ e2 ^-^ d *^ e1
 ltR (e1,c) (e2,d) = IsPos $ normalizeExpr $ c *^ e2 ^-^ d *^ e1
 geR = flip leR
-gtR = flip gtR
+gtR = flip ltR
 eqR (e1,c) (e2,d) = IsZero $ normalizeExpr $ c *^ e2 ^-^ d *^ e1
 
 normalizeExpr :: ExprZ -> ExprZ

@@ -162,8 +162,8 @@ genQFLAConj = do
 ------------------------------------------------------------------------
  
 -- too slow
-disabled_prop_FourierMotzkin_solve :: Property
-disabled_prop_FourierMotzkin_solve =
+prop_FourierMotzkin_solve :: Property
+prop_FourierMotzkin_solve =
   forAll genQFLAConj $ \(vs,cs) ->
     case FourierMotzkin.solve vs cs of
       Nothing -> True
