@@ -146,6 +146,14 @@ genLAExpr vs = do
     x <- elements (LA.unitVar : vs)
     c <- arbitrary
     return (c,x)
+    
+genLAExprSmallInt :: [Var] -> Gen (LA.Expr Rational)
+genLAExprSmallInt vs = do
+  size <- choose (0,3)
+  liftM LA.fromTerms $ replicateM size $ do
+    x <- elements (LA.unitVar : vs)
+    c <- choose (-10,10)
+    return (fromInteger c,x)
 
 genQFLAConj :: Gen (VarSet, [LA.Atom Rational])
 genQFLAConj = do
@@ -156,6 +164,18 @@ genQFLAConj = do
     op  <- elements [Lt, Le, Ge, Gt, Eql] -- , NEq
     lhs <- genLAExpr [1..nv]
     rhs <- genLAExpr [1..nv]
+    return $ arithRel op lhs rhs
+  return (vs, cs)
+  
+genQFLAConjSmallInt :: Gen (VarSet, [LA.Atom Rational])
+genQFLAConjSmallInt = do
+  nv <- choose (0, 5)
+  nc <- choose (0, 5)
+  let vs = IS.fromList [1..nv]
+  cs <- replicateM nc $ do
+    op  <- elements [Lt, Le, Ge, Gt, Eql] -- , NEq
+    lhs <- genLAExprSmallInt [1..nv]
+    rhs <- genLAExprSmallInt [1..nv]
     return $ arithRel op lhs rhs
   return (vs, cs)
 
@@ -279,10 +299,9 @@ evalPAtom m (ArithRel lhs op rhs) =　evalOp op (evalP m lhs) (evalP m rhs)
 
 ------------------------------------------------------------------------
 
--- sometimes too slow
-disable_prop_OmegaTest_solve :: Property
-disable_prop_OmegaTest_solve =
-   forAll genQFLAConj $ \(vs,cs) ->
+prop_OmegaTest_solve :: Property
+prop_OmegaTest_solve =
+   forAll genQFLAConjSmallInt $ \(vs,cs) ->
      case OmegaTest.solve OmegaTest.defaultOptions vs cs of
        Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom (fmap fromInteger m)) cs == False
        Just m  -> property $ all (LA.evalAtom (fmap fromInteger m)) cs
@@ -313,7 +332,7 @@ prop_OmegaTest_zmod =
 -- too slow
 disabled_prop_Cooper_solve :: Property
 disabled_prop_Cooper_solve =
-   forAll genQFLAConj $ \(vs,cs) ->
+   forAll genQFLAConjSmallInt $ \(vs,cs) ->
      case Cooper.solve vs cs of
        Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom (fmap fromInteger m)) cs == False
        Just m  -> property $ all (LA.evalAtom (fmap fromInteger m)) cs
