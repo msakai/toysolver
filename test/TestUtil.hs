@@ -3,6 +3,10 @@ module Main (main) where
 
 import Control.Applicative
 import Control.Monad
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Test.HUnit hiding (Test)
 import Test.QuickCheck hiding ((.&&.), (.||.))
 import Test.QuickCheck.Function
@@ -17,6 +21,7 @@ import ToySolver.Internal.Util
 import ToySolver.Internal.TextUtil
 import qualified ToySolver.Knapsack.BB as KnapsackBB
 import qualified ToySolver.Knapsack.DP as KnapsackDP
+import qualified ToySolver.HittingSet.Simple as HittingSet
 import qualified ToySolver.Wang as Wang
 
 case_showRationalAsDecimal :: IO ()
@@ -40,6 +45,9 @@ case_readUnsignedInteger_maxBound_bug =
 prop_readUnsignedInteger = 
   forAll (choose (0, 2^128)) $ \i -> 
     readUnsignedInteger (show i) == i
+
+-- ---------------------------------------------------------------------
+-- Knapsack problems
 
 case_knapsack_1 :: IO ()
 case_knapsack_1 = KnapsackBB.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
@@ -69,6 +77,62 @@ knapsackProblems = do
     w <- choose (1,30)
     return (v,w)
   return (items, lim)
+
+-- ---------------------------------------------------------------------
+-- Hitting sets
+
+case_minimalHittingSets_1 = actual' @?= expected'
+  where
+    actual    = HittingSet.minimalHittingSets $ map IntSet.fromList [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
+    actual'   = Set.fromList actual
+    expected  = map IntSet.fromList [[1,2], [1,3,4], [1,5,6]]
+    expected' = Set.fromList expected
+
+-- an example from http://kuma-san.net/htcbdd.html
+case_minimalHittingSets_2 = actual' @?= expected'
+  where
+    actual    = HittingSet.minimalHittingSets $ map IntSet.fromList [[2,4,7], [7,8], [9], [9,10]]
+    actual'   = Set.fromList actual
+    expected  = map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
+    expected' = Set.fromList expected
+
+hyperGraph :: Gen [IntSet]
+hyperGraph = do
+  nv <- choose (0, 10)
+  ne <- if nv==0 then return 0 else choose (0, 20)
+  replicateM ne $ do
+    n <- choose (1,nv)
+    liftM IntSet.fromList $ replicateM n $ choose (1, nv)
+
+prop_minimalHittingSets_duality =
+  forAll hyperGraph $ \g ->
+    let h = HittingSet.minimalHittingSets g
+    in normalize h == normalize (HittingSet.minimalHittingSets (HittingSet.minimalHittingSets h))
+  where
+    normalize :: [IntSet] -> Set IntSet
+    normalize = Set.fromList
+
+prop_minimalHittingSets_hits =
+  forAll hyperGraph $ \g ->
+    let h = HittingSet.minimalHittingSets g
+    in all (\s -> hitAll s g) h
+  where
+    hitAll s g = all (\e -> not (IntSet.null (s `IntSet.intersection` e))) g
+
+prop_minimalHittingSets_minimality =
+  forAll hyperGraph $ \g ->
+    let h = HittingSet.minimalHittingSets g
+    in forAll (elements h) $ \s ->
+         if IntSet.null s then
+           property True
+         else
+           forAll (elements (IntSet.toList s)) $ \v ->
+             not $ hitAll (IntSet.delete v s) g
+  where
+    hitAll s g = all (\e -> not (IntSet.null (s `IntSet.intersection` e))) g
+
+-- ---------------------------------------------------------------------
+-- Vec
 
 case_Vec :: IO ()
 case_Vec = do
