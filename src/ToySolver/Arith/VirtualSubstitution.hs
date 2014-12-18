@@ -35,6 +35,7 @@ module ToySolver.Arith.VirtualSubstitution
   , solveQFFormula
   ) where
 
+import Control.Exception
 import Control.Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.IntMap as IM
@@ -115,10 +116,12 @@ Note that
 >     S = { b_i / a_i, b_i / a_i + 1, b_i / a_i - 1 | i∈I } ∪ {1/2 (b_i / a_i + b_j / a_j) | i,j∈I, i≠j}
 -}
 projectCases' :: Var -> QFFormula -> [(QFFormula, LA.Expr Rational)]
-projectCases' v phi | not (v `IS.member` vars phi) = [(phi, LA.constant 0)]
-projectCases' v phi = [(applySubst1 v t phi, t) | t <- Set.toList s]
+projectCases' v phi
+  | Set.null xs = [(phi', LA.constant 0)]
+  | otherwise   = [(applySubst1 v t phi', t) | t <- Set.toList s]
   where
-    xs = collect v phi
+    phi' = fmap (\(ArithRel lhs op rhs) -> ArithRel (lhs ^-^ rhs) op (LA.constant 0)) phi
+    xs = collect v phi'
     s = Set.unions
         [ xs
         , Set.fromList [e ^+^ LA.constant 1 | e <- Set.toList xs]
@@ -144,8 +147,8 @@ projectCasesN vs = f (IS.toList vs)
 collect :: Var -> QFFormula -> Set (LA.Expr Rational)
 collect v = Foldable.foldMap f
   where
-    f (ArithRel lhs _ rhs) =
-      case LA.extractMaybe v (lhs ^-^ rhs) of
+    f (ArithRel lhs _ rhs) = assert (rhs == LA.constant 0) $
+      case LA.extractMaybe v lhs of
         Nothing -> Set.empty
         Just (a,b) -> Set.singleton (negateV (b ^/ a))
 
