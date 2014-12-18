@@ -159,15 +159,20 @@ genQFLAConj = do
     return $ arithRel op lhs rhs
   return (vs, cs)
 
+genModel :: Arbitrary a => VarSet -> Gen (Model a)
+genModel xs = do
+  liftM IM.fromList $ forM (IS.toList xs) $ \x -> do
+    val <- arbitrary
+    return (x,val)
+
 ------------------------------------------------------------------------
  
--- too slow
 prop_FourierMotzkin_solve :: Property
 prop_FourierMotzkin_solve =
   forAll genQFLAConj $ \(vs,cs) ->
     case FourierMotzkin.solve vs cs of
-      Nothing -> True
-      Just m  -> all (LA.evalAtom m) cs
+      Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom m) cs == False
+      Just m  -> property $ all (LA.evalAtom m) cs
 
 case_FourierMotzkin_test1 :: IO ()
 case_FourierMotzkin_test1 = 
@@ -191,8 +196,8 @@ prop_VirtualSubstitution_solve :: Property
 prop_VirtualSubstitution_solve =
    forAll genQFLAConj $ \(vs,cs) ->
      case VirtualSubstitution.solve vs cs of
-       Nothing -> True
-       Just m  -> all (LA.evalAtom m) cs
+       Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom m) cs == False
+       Just m  -> property $ all (LA.evalAtom m) cs
 
 case_VirtualSubstitution_test1 :: IO ()
 case_VirtualSubstitution_test1 = 
@@ -219,8 +224,11 @@ disabled_prop_CAD_solve =
      let vs' = Set.fromAscList $ IS.toAscList vs
          cs' = map toPRel cs
      in case CAD.solve vs' cs' of
-          Nothing -> True
-          Just m  -> all (evalPAtom m) cs'
+          Nothing ->
+            forAll (genModel vs) $ \m ->
+              let m' = Map.fromAscList [(x, fromRational v) | (x,v) <- IM.toAscList m]
+              in all (evalPAtom m') cs' == False
+          Just m  -> property $ all (evalPAtom m) cs'
 
 case_CAD_test1 :: IO ()
 case_CAD_test1 = 
@@ -276,8 +284,8 @@ disable_prop_OmegaTest_solve :: Property
 disable_prop_OmegaTest_solve =
    forAll genQFLAConj $ \(vs,cs) ->
      case OmegaTest.solve OmegaTest.defaultOptions vs cs of
-       Nothing -> True
-       Just m  -> all (LA.evalAtom (fmap fromInteger m)) cs
+       Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom (fmap fromInteger m)) cs == False
+       Just m  -> property $ all (LA.evalAtom (fmap fromInteger m)) cs
 
 case_OmegaTest_test1 :: IO ()
 case_OmegaTest_test1 = 
@@ -307,8 +315,8 @@ disabled_prop_Cooper_solve :: Property
 disabled_prop_Cooper_solve =
    forAll genQFLAConj $ \(vs,cs) ->
      case Cooper.solve vs cs of
-       Nothing -> True
-       Just m  -> all (LA.evalAtom (fmap fromInteger m)) cs
+       Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom (fmap fromInteger m)) cs == False
+       Just m  -> property $ all (LA.evalAtom (fmap fromInteger m)) cs
 
 case_Cooper_test1 :: IO ()
 case_Cooper_test1 = 
