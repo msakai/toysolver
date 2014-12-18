@@ -115,6 +115,7 @@ Note that
 >     S = { b_i / a_i, b_i / a_i + 1, b_i / a_i - 1 | i∈I } ∪ {1/2 (b_i / a_i + b_j / a_j) | i,j∈I, i≠j}
 -}
 projectCases' :: Var -> QFFormula -> [(QFFormula, LA.Expr Rational)]
+projectCases' v phi | not (v `IS.member` vars phi) = [(phi, LA.constant 0)]
 projectCases' v phi = [(applySubst1 v t phi, t) | t <- Set.toList s]
   where
     xs = collect v phi
