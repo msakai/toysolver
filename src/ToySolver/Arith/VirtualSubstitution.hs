@@ -144,7 +144,7 @@ projectCasesN vs = f (IS.toList vs)
 collect :: Var -> QFFormula -> Set (LA.Expr Rational)
 collect v = Foldable.foldMap f
   where
-    f (ArithRel lhs op rhs) =
+    f (ArithRel lhs _ rhs) =
       case LA.extractMaybe v (lhs ^-^ rhs) of
         Nothing -> Set.empty
         Just (a,b) -> Set.singleton (negateV (b ^/ a))
