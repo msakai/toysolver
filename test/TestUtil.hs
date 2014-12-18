@@ -104,6 +104,9 @@ hyperGraph = do
     n <- choose (1,nv)
     liftM IntSet.fromList $ replicateM n $ choose (1, nv)
 
+isHittingSetOf :: IntSet -> [IntSet] -> Bool
+isHittingSetOf s g = all (\e -> not (IntSet.null (s `IntSet.intersection` e))) g
+
 prop_minimalHittingSets_duality =
   forAll hyperGraph $ \g ->
     let h = HittingSet.minimalHittingSets g
@@ -112,24 +115,18 @@ prop_minimalHittingSets_duality =
     normalize :: [IntSet] -> Set IntSet
     normalize = Set.fromList
 
-prop_minimalHittingSets_hits =
+prop_minimalHittingSets_isHittingSet =
   forAll hyperGraph $ \g ->
-    let h = HittingSet.minimalHittingSets g
-    in all (\s -> hitAll s g) h
-  where
-    hitAll s g = all (\e -> not (IntSet.null (s `IntSet.intersection` e))) g
+    and [s `isHittingSetOf` g | s <- HittingSet.minimalHittingSets g]
 
 prop_minimalHittingSets_minimality =
   forAll hyperGraph $ \g ->
-    let h = HittingSet.minimalHittingSets g
-    in forAll (elements h) $ \s ->
-         if IntSet.null s then
-           property True
-         else
-           forAll (elements (IntSet.toList s)) $ \v ->
-             not $ hitAll (IntSet.delete v s) g
-  where
-    hitAll s g = all (\e -> not (IntSet.null (s `IntSet.intersection` e))) g
+    forAll (elements (HittingSet.minimalHittingSets g)) $ \s ->
+      if IntSet.null s then
+        property True
+      else
+        forAll (elements (IntSet.toList s)) $ \v ->
+          not $ IntSet.delete v s `isHittingSetOf` g
 
 -- ---------------------------------------------------------------------
 -- Vec
