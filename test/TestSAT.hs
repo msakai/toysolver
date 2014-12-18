@@ -856,21 +856,40 @@ case_minimalHittingSets_2 = actual' @?= expected'
     expected  = map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
     expected' = Set.fromList expected
 
+hyperGraph :: Gen [IntSet]
+hyperGraph = do
+  nv <- choose (0, 10)
+  ne <- choose (0, 20)
+  replicateM ne $ do
+    n <- choose (1,nv)
+    liftM IntSet.fromList $ replicateM n $ choose (1, nv)
+
 prop_minimalHittingSets_duality =
   forAll hyperGraph $ \g ->
     let h = HittingSet.minimalHittingSets g
     in normalize h == normalize (HittingSet.minimalHittingSets (HittingSet.minimalHittingSets h))
   where
-    hyperGraph :: Gen [IntSet]
-    hyperGraph = do
-      nv <- choose (0, 10)
-      ne <- choose (0, 20)
-      replicateM ne $ do
-        n <- choose (1,nv)
-        liftM IntSet.fromList $ replicateM n $ choose (1, nv)
-
     normalize :: [IntSet] -> Set IntSet
     normalize = Set.fromList
+
+prop_minimalHittingSets_hits =
+  forAll hyperGraph $ \g ->
+    let h = HittingSet.minimalHittingSets g
+    in all (\s -> hitAll s g) h
+  where
+    hitAll s g = all (\e -> not (IntSet.null (s `IntSet.intersection` e))) g
+
+prop_minimalHittingSets_minimality =
+  forAll hyperGraph $ \g ->
+    let h = HittingSet.minimalHittingSets g
+    in forAll (elements h) $ \s ->
+         if IntSet.null s then
+           property True
+         else
+           forAll (elements (IntSet.toList s)) $ \v ->
+             not $ hitAll (IntSet.delete v s) g
+  where
+    hitAll s g = all (\e -> not (IntSet.null (s `IntSet.intersection` e))) g
 
 {-
 Boosting a Complete Technique to Find MSS and MUS thanks to a Local Search Oracle
