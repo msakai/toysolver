@@ -23,6 +23,7 @@ module ToySolver.Data.ArithRel
 
   -- * Relation
   , ArithRel (..)
+  , fromArithRel
 
   -- * DSL
   , IsArithRel (..)
@@ -130,5 +131,8 @@ instance Variables e => Variables (ArithRel e) where
 
 instance Functor ArithRel where
   fmap f (ArithRel a op b) = ArithRel (f a) op (f b)
+
+fromArithRel :: IsArithRel e r => ArithRel e -> r
+fromArithRel (ArithRel a op b) = arithRel op a b
 
 -- ---------------------------------------------------------------------------
