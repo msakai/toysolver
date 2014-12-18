@@ -859,7 +859,7 @@ case_minimalHittingSets_2 = actual' @?= expected'
 hyperGraph :: Gen [IntSet]
 hyperGraph = do
   nv <- choose (0, 10)
-  ne <- choose (0, 20)
+  ne <- if nv==0 then return 0 else choose (0, 20)
   replicateM ne $ do
     n <- choose (1,nv)
     liftM IntSet.fromList $ replicateM n $ choose (1, nv)
