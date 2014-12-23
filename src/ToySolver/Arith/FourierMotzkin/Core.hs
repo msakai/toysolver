@@ -222,18 +222,7 @@ project v xs = do
   return (map toLAAtom zs, mt)
 
 project' :: Var -> [Constr] -> Maybe ([Constr], Model Rational -> Model Rational)
-project' v cs | Just (vdef,cs') <- findEq v cs = do
-  let mt m = IM.insert v (evalRat m vdef) m
-  return ([subst1Constr v (fromRat vdef) c | c <- cs'], mt)
-project' v xs = do
-  case collectBounds v xs of
-    (bnd, rest) -> do
-      cond <- boundsToConstrs bnd
-      let mt m =
-           case Interval.simplestRationalWithin (evalBounds m bnd) of
-             Nothing  -> error "ToySolver.FourierMotzkin.project': should not happen"
-             Just val -> IM.insert v val m
-      return (rest ++ cond, mt)
+project' v cs = projectN' (IS.singleton v) cs
 
 {-| @'projectN' {x1,…,xm} φ@ returns @[(ψ_1, lift_1), …, (ψ_n, lift_n)]@ such that:
 
@@ -248,27 +237,42 @@ projectN vs xs = do
   return (map toLAAtom zs, mt)
 
 projectN' :: VarSet -> [Constr] -> Maybe ([Constr], Model Rational -> Model Rational)
-projectN' vs2 xs2 = do
-  (zs, mt) <- f (IS.toList vs2) xs2
-  return (zs, mt)
+projectN' = f
   where
-    f [] xs     = return (xs, id)
-    f (v:vs) xs = do
-      (ys, mt1) <- project' v xs
-      (zs, mt2) <- f vs ys
-      return (zs, mt1 . mt2)
+    f vs xs
+      | IS.null vs = return (xs, id)
+      | Just (v,vdef,ys) <- findEq vs xs = do
+          let mt1 m = IM.insert v (evalRat m vdef) m
+          (zs, mt2) <- f (IS.delete v vs) [subst1Constr v (fromRat vdef) c | c <- ys]
+          return (zs, mt1 . mt2)
+      | otherwise = 
+          case IS.minView vs of
+            Nothing -> return (xs, id) -- should not happen
+            Just (v,vs') -> 
+              case collectBounds v xs of
+                (bnd, rest) -> do
+                  cond <- boundsToConstrs bnd
+                  let mt1 m =
+                       case Interval.simplestRationalWithin (evalBounds m bnd) of
+                         Nothing  -> error "ToySolver.FourierMotzkin.project': should not happen"
+                         Just val -> IM.insert v val m
+                  (ys, mt2) <- f vs' (rest ++ cond)
+                  return (ys, mt1 . mt2)
 
-findEq :: Var -> [Constr] -> Maybe (Rat, [Constr])
-findEq v = msum . map f . pickup
+findEq :: VarSet -> [Constr] -> Maybe (Var, Rat, [Constr])
+findEq vs = msum . map f . pickup
   where
     pickup :: [a] -> [(a,[a])]
     pickup [] = []
     pickup (x:xs) = (x,xs) : [(y,x:ys) | (y,ys) <- pickup xs]
 
-    f :: (Constr, [Constr]) -> Maybe (Rat, [Constr])
+    f :: (Constr, [Constr]) -> Maybe (Var, Rat, [Constr])
     f (IsZero e, cs) = do
-      (c, e') <- LA.extractMaybe v e
-      return ((negateV e', c), cs)
+      let vs2 = IS.intersection vs (vars e)
+      guard $ not $ IS.null vs2
+      let v = IS.findMin vs2
+          (c, e') = LA.extract v e
+      return (v, (negateV e', c), cs)
     f _ = Nothing
 
 -- | @'solve' {x1,…,xn} φ@ returns @Just M@ that @M ⊧_LRA φ@ when
