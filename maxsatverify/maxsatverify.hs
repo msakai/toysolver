@@ -5,8 +5,8 @@ import Data.Array.IArray
 import Data.IORef
 import System.Environment
 import Text.Printf
-import qualified Text.MaxSAT as MaxSAT
-import SAT.Types
+import qualified ToySolver.Text.MaxSAT as MaxSAT
+import ToySolver.SAT.Types
 
 main :: IO ()
 main = do

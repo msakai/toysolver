@@ -6,7 +6,7 @@ import Data.Map (Map)
 import System.Environment
 import System.Exit
 import System.IO
-import Text.PBFile as PBFile
+import ToySolver.Text.PBFile as PBFile
 
 pigeonHole :: Integer -> Integer -> Formula
 pigeonHole p h =
@@ -35,7 +35,7 @@ main = do
   case xs of
     [p,h] -> do
       let opb = pigeonHole (read p) (read h)
-      putStr $ showOPB opb ""
+      putStr $ renderOPB opb
     _ -> do
       hPutStrLn stderr "Usage: pigeonhole number_of_pigeons number_of_holes"
       exitFailure
