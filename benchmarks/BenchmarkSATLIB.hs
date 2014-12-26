@@ -5,7 +5,7 @@ import Data.Array.IArray
 import Text.Printf
 import Criterion.Main
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
-import qualified SAT
+import qualified ToySolver.SAT as SAT
 
 solve :: FilePath -> IO ()
 solve fname = do
@@ -25,13 +25,13 @@ main :: IO ()
 main = do
   Criterion.Main.defaultMain
     [ bgroup "uf250-1065"
-        [ bench fname (solve path)
+        [ bench fname $ whnfIO (solve path)
         | i <- [(1::Int)..100]
         , let fname = printf "uf250-0%d.cnf" i
         , let path = "benchmarks/UF250.1065.100/" ++ fname
         ]
     , bgroup "uuf250-1065"
-        [ bench fname (solve path)
+        [ bench fname $ whnfIO (solve path)
         | i <- [(1::Int)..100]
         , let fname = printf "uuf250-0%d.cnf" i
         , let path = "benchmarks/UUF250.1065.100/" ++ fname

@@ -422,5 +422,5 @@ Benchmark BenchmarkSATLIB
   type:             exitcode-stdio-1.0
   hs-source-dirs:   benchmarks
   main-is:          BenchmarkSATLIB.hs
-  build-depends:    base >=4 && <5, array, containers, random, parse-dimacs, toysolver, criterion
+  build-depends:    base >=4 && <5, array, containers, random, parse-dimacs, toysolver, criterion >=1.0 && <1.1
   Default-Language: Haskell2010
