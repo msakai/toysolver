@@ -42,7 +42,7 @@ install:
  - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
  - travis_retry cabal update
- - cabal install --only-dependencies --enable-tests --enable-benchmarks -v2 --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms # -v2 provides useful information for debugging
+ - cabal install --only-dependencies --enable-tests --enable-benchmarks --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
 
 # Here starts the actual work to be performed for the package under test; any command which exits with a non-zero exit code causes the build to fail.
 script:
