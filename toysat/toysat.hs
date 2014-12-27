@@ -38,7 +38,9 @@ import Data.Time
 import System.IO
 import System.Environment
 import System.Exit
-import System.Locale
+#if !MIN_VERSION_time(1,5,0)
+import System.Locale (defaultTimeLocale)
+#endif
 import System.Console.GetOpt
 import System.CPUTime
 import System.FilePath
