@@ -37,6 +37,8 @@ Extra-Source-Files:
    samples/smt/*.ys
    samples/qbf/*.qdimacs
    samples/programs/sudoku/*.sdk
+   samples/programs/knapsack/README.md
+   samples/programs/knapsack/*.txt
    test/TestAReal2.hs
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
@@ -285,6 +287,14 @@ Executable sudoku
     Buildable: False
   Main-is: sudoku.hs
   HS-Source-Dirs: samples/programs/sudoku
+  Build-Depends: base, array, toysolver
+  Default-Language: Haskell2010
+
+Executable knapsack
+  If !flag(BuildSamplePrograms)
+    Buildable: False
+  Main-is: knapsack.hs
+  HS-Source-Dirs: samples/programs/knapsack
   Build-Depends: base, array, toysolver
   Default-Language: Haskell2010
 
