@@ -290,6 +290,14 @@ Executable sudoku
   Build-Depends: base, array, toysolver
   Default-Language: Haskell2010
 
+Executable nqueens
+  If !flag(BuildSamplePrograms)
+    Buildable: False
+  Main-is: nqueens.hs
+  HS-Source-Dirs: samples/programs/nqueens
+  Build-Depends: base, array, toysolver
+  Default-Language: Haskell2010
+
 Executable knapsack
   If !flag(BuildSamplePrograms)
     Buildable: False
