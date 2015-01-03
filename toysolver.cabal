@@ -39,6 +39,8 @@ Extra-Source-Files:
    samples/programs/sudoku/*.sdk
    samples/programs/knapsack/README.md
    samples/programs/knapsack/*.txt
+   samples/programs/htc/test1.dat
+   samples/programs/htc/test2.dat
    test/TestAReal2.hs
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
@@ -304,6 +306,14 @@ Executable knapsack
   Main-is: knapsack.hs
   HS-Source-Dirs: samples/programs/knapsack
   Build-Depends: base, array, toysolver
+  Default-Language: Haskell2010
+
+Executable htc
+  If !flag(BuildSamplePrograms)
+    Buildable: False
+  Main-is: htc.hs
+  HS-Source-Dirs: samples/programs/htc
+  Build-Depends: base, containers, toysolver
   Default-Language: Haskell2010
 
 -- Misc Programs
