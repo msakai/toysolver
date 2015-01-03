@@ -16,6 +16,7 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
+import qualified Data.Interval as Interval
 import Data.OptDir
 
 import ToySolver.Data.AlgebraicNumber.Real
@@ -26,6 +27,7 @@ import qualified ToySolver.Data.Polynomial as P
 import ToySolver.Data.Var
 
 import qualified ToySolver.Arith.FourierMotzkin as FourierMotzkin
+import qualified ToySolver.Arith.FourierMotzkin.Optimization as FMOpt
 import qualified ToySolver.Arith.OmegaTest as OmegaTest
 import qualified ToySolver.Arith.OmegaTest.Core as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
@@ -209,6 +211,39 @@ case_FourierMotzkin_test2 =
     Just m  ->
       forM_ (snd test2') $ \a -> do
         LA.evalAtom m a @?= True
+
+{-
+Maximize
+ obj: x1 + 2 x2 + 3 x3 + x4
+Subject To
+ c1: - x1 + x2 + x3 + 10 x4 <= 20
+ c2: x1 - 3 x2 + x3 <= 30
+ c3: x2 - 3.5 x4 = 0
+Bounds
+ 0 <= x1 <= 40
+ 2 <= x4 <= 3
+End
+-}
+case_FourierMotzkinOptimization_test1 :: IO ()
+case_FourierMotzkinOptimization_test1 = do
+  Interval.upperBound' i @?= (3005/24, True)
+  and [LA.evalAtom m c | c <- cs] @?= True
+  where
+    (i, f) = FMOpt.optimize (IS.fromList vs) OptMax obj cs
+    m = f (3005/24)
+
+    vs@[x1,x2,x3,x4] = [1..4]
+    obj = LA.fromTerms [(1,x1), (2,x2), (3,x3), (1,x4)]
+    cs = [ LA.fromTerms [(-1,x1), (1,x2), (1,x3), (10,x4)] .<=. LA.constant 20
+         , LA.fromTerms [(1,x1), (-3,x2), (1,x3)] .<=. LA.constant 30
+         , LA.fromTerms [(1,x2), (-3.5,x4)] .==. LA.constant 0
+         , LA.fromTerms [(1,x1)] .>=. LA.constant 0
+         , LA.fromTerms [(1,x1)] .<=. LA.constant 40
+         , LA.fromTerms [(1,x2)] .>=. LA.constant 0
+         , LA.fromTerms [(1,x3)] .>=. LA.constant 0
+         , LA.fromTerms [(1,x4)] .>=. LA.constant 2
+         , LA.fromTerms [(1,x4)] .<=. LA.constant 3
+         ]
 
 ------------------------------------------------------------------------
         

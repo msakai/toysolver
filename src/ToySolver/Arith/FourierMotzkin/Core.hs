@@ -20,10 +20,18 @@ module ToySolver.Arith.FourierMotzkin.Core
     (
     -- * Primitive constraints
       Constr (..)
+    , eqR
     , ExprZ
     , fromLAAtom
     , toLAAtom
     , constraintsToDNF
+    , simplify
+
+    -- * Bounds
+    , Bounds
+    , evalBounds
+    , boundsToConstrs
+    , collectBounds
 
     -- * Projection
     , project
@@ -114,8 +122,8 @@ subst1Constr x t c =
     f :: ExprZ -> ExprZ
     f = normalizeExpr . fst . toRat . LA.applySubst1 x t . LA.mapCoeff fromInteger
 
--- 制約集合の単純化
--- It returns Nothing when a inconsistency is detected.
+-- | Simplify conjunction of 'Constr's.
+-- It returns 'Nothing' when a inconsistency is detected.
 simplify :: [Constr] -> Maybe [Constr]
 simplify = fmap concat . mapM f
   where

@@ -129,6 +129,7 @@ Library
      ToySolver.Arith.FourierMotzkin
      ToySolver.Arith.FourierMotzkin.Core
      ToySolver.Arith.FourierMotzkin.FOL
+     ToySolver.Arith.FourierMotzkin.Optimization
      ToySolver.Arith.LPSolver
      ToySolver.Arith.LPSolverHL
      ToySolver.Arith.LPUtil
@@ -394,7 +395,7 @@ Test-suite TestArith
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
   Main-is:           TestArith.hs
-  Build-depends:     base >=4 && <5, containers, vector-space >=0.8.6, toysolver, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3
+  Build-depends:     base >=4 && <5, containers, vector-space >=0.8.6, toysolver, data-interval, OptDir, test-framework,test-framework-th,test-framework-hunit,test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,HUnit,QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
