@@ -167,9 +167,9 @@ constraintsToDNF = andB . map fromLAAtom
 (ls1,ls2,us1,us2) represents
 { x | ∀(M,c)∈ls1. M/c≤x, ∀(M,c)∈ls2. M/c<x, ∀(M,c)∈us1. x≤M/c, ∀(M,c)∈us2. x<M/c }
 -}
-type BoundsR = ([Rat], [Rat], [Rat], [Rat])
+type Bounds = ([Rat], [Rat], [Rat], [Rat])
 
-evalBounds :: Model Rational -> BoundsR -> Interval Rational
+evalBounds :: Model Rational -> Bounds -> Interval Rational
 evalBounds model (ls1,ls2,us1,us2) =
   Interval.intersections $
     [ Finite (evalRat model x) <=..< PosInf | x <- ls1 ] ++
@@ -177,22 +177,22 @@ evalBounds model (ls1,ls2,us1,us2) =
     [ NegInf <..<= Finite (evalRat model x) | x <- us1 ] ++
     [ NegInf <..<  Finite (evalRat model x) | x <- us2 ]
 
-boundsToConstrs :: BoundsR -> Maybe [Constr]
+boundsToConstrs :: Bounds -> Maybe [Constr]
 boundsToConstrs  (ls1, ls2, us1, us2) = simplify $ 
   [ x `leR` y | x <- ls1, y <- us1 ] ++
   [ x `ltR` y | x <- ls1, y <- us2 ] ++ 
   [ x `ltR` y | x <- ls2, y <- us1 ] ++
   [ x `ltR` y | x <- ls2, y <- us2 ]
 
-collectBounds :: Var -> [Constr] -> (BoundsR, [Constr])
+collectBounds :: Var -> [Constr] -> (Bounds, [Constr])
 collectBounds v = foldr phi (([],[],[],[]),[])
   where
-    phi :: Constr -> (BoundsR, [Constr]) -> (BoundsR, [Constr])
+    phi :: Constr -> (Bounds, [Constr]) -> (Bounds, [Constr])
     phi constr@(IsNonneg t) x = f False constr t x
     phi constr@(IsPos t) x = f True constr t x
     phi constr@(IsZero _) (bnd, xs) = (bnd, constr : xs) -- XXX: we assume v does not appear in constr
 
-    f :: Bool -> Constr -> ExprZ -> (BoundsR, [Constr]) -> (BoundsR, [Constr])
+    f :: Bool -> Constr -> ExprZ -> (Bounds, [Constr]) -> (Bounds, [Constr])
     f strict constr t (bnd@(ls1,ls2,us1,us2), xs) =
       case LA.extract v t of
         (c,t') ->

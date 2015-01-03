@@ -61,6 +61,7 @@ import Data.Sign (Sign (..))
 import qualified Data.Sign as Sign
 
 import ToySolver.Data.ArithRel
+import ToySolver.Data.AlgebraicNumber.Real (AReal)
 import qualified ToySolver.Data.AlgebraicNumber.Real as AReal
 import ToySolver.Data.DNF
 import ToySolver.Data.Polynomial (Polynomial, UPolynomial, X (..), PrettyVar, PrettyCoeff)
@@ -411,9 +412,9 @@ computeSignSet m p = P.eval env (P.mapCoeff fromRational p)
 
 -- ---------------------------------------------------------------------------
 
-type Model v = Map v AReal.AReal
+type Model v = Map v AReal
 
-findSample :: Ord v => Model v -> Cell (Polynomial Rational v) -> Maybe AReal.AReal
+findSample :: Ord v => Model v -> Cell (Polynomial Rational v) -> Maybe AReal
 findSample m cell =
   case evalCell m cell of
     Point (RootOf p n) -> 
@@ -423,7 +424,7 @@ findSample m cell =
         Nothing -> error $ "ToySolver.CAD.findSample: should not happen"
         Just r  -> Just $ fromRational r
   where
-    f :: Point Rational -> I.EndPoint AReal.AReal
+    f :: Point Rational -> I.Extended AReal
     f NegInf       = I.NegInf
     f PosInf       = I.PosInf
     f (RootOf p n) = I.Finite (AReal.realRoots p !! n)
