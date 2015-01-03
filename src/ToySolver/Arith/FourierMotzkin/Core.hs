@@ -190,7 +190,12 @@ collectBounds v = foldr phi (([],[],[],[]),[])
     phi :: Constr -> (Bounds, [Constr]) -> (Bounds, [Constr])
     phi constr@(IsNonneg t) x = f False constr t x
     phi constr@(IsPos t) x = f True constr t x
-    phi constr@(IsZero _) (bnd, xs) = (bnd, constr : xs) -- XXX: we assume v does not appear in constr
+    phi constr@(IsZero t) (bnd@(ls1,ls2,us1,us2), xs) =
+      case LA.extractMaybe v t of
+        Nothing -> (bnd, constr : xs)
+        Just (c,t') -> ((t'' : ls1, ls2, t'' : us1, us2), xs)
+          where
+            t'' = (signum c *^ negateV t', abs c)
 
     f :: Bool -> Constr -> ExprZ -> (Bounds, [Constr]) -> (Bounds, [Constr])
     f strict constr t (bnd@(ls1,ls2,us1,us2), xs) =
