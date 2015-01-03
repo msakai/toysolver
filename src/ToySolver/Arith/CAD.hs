@@ -32,6 +32,9 @@ module ToySolver.Arith.CAD
 
   -- * Projection
   , project
+  , project'
+  , projectN
+  , projectN'
 
   -- * Solving
   , solve
@@ -204,11 +207,11 @@ assume p ss = do
       Nothing -> mzero
       Just a -> put a
 
-project
+project'
   :: forall v. (Ord v, Show v, PrettyVar v)
   => [(UPolynomial (Polynomial Rational v), [Sign])]
   -> [([(Polynomial Rational v, [Sign])], [Cell (Polynomial Rational v)])]
-project cs = [ (assumption2cond gs, cells) | (cells, gs) <- result ]
+project' cs = [ (assumption2cond gs, cells) | (cells, gs) <- result ]
   where
     result :: [([Cell (Polynomial Rational v)], Assumption v)]
     result = runM $ do
@@ -442,6 +445,60 @@ evalPoint m (RootOf p n) = RootOf (AReal.minimalPolynomial a) (AReal.rootIndex a
 
 -- ---------------------------------------------------------------------------
 
+project
+  :: (Ord v, Show v, PrettyVar v)
+  => v
+  -> [ArithRel (Polynomial Rational v)]
+  -> [([ArithRel (Polynomial Rational v)], Model v -> Model v)]
+project v cs = projectN (Set.singleton v) cs
+
+projectN
+  :: (Ord v, Show v, PrettyVar v)
+  => Set v
+  -> [ArithRel (Polynomial Rational v)]
+  -> [([ArithRel (Polynomial Rational v)], Model v -> Model v)]
+projectN vs cs = do
+  (cs', mt) <- projectN' vs (map f cs)
+  return (map g cs', mt)
+  where  
+    f (ArithRel lhs op rhs) = (lhs - rhs, h op)
+      where
+        h Le  = [Zero, Neg]
+        h Ge  = [Zero, Pos]
+        h Lt  = [Neg]
+        h Gt  = [Pos]
+        h Eql = [Zero]
+        h NEq = [Pos,Neg]
+    g (p,ss) = (ArithRel p op 0)
+      where
+        ss' = Set.fromList ss
+        op
+          | ss' == Set.fromList [Zero, Neg] = Le
+          | ss' == Set.fromList [Zero, Pos] = Ge
+          | ss' == Set.fromList [Neg]       = Lt
+          | ss' == Set.fromList [Pos]       = Gt
+          | ss' == Set.fromList [Zero]      = Eql
+          | ss' == Set.fromList [Pos,Neg]   = NEq
+          | otherwise = error "should not happen"
+
+projectN'
+  :: (Ord v, Show v, PrettyVar v)
+  => Set v
+  -> [(Polynomial Rational v, [Sign])]
+  -> [([(Polynomial Rational v, [Sign])], Model v -> Model v)]
+projectN' vs = loop (Set.toList vs)
+  where
+    loop [] cs = return (cs, id)
+    loop (v:vs) cs = do
+      (cs2, cell:_) <- project' [(P.toUPolynomialOf p v, ss) | (p, ss) <- cs]
+      let mt1 m = 
+            let Just val = findSample m cell
+            in seq val $ Map.insert v val m
+      (cs3, mt2) <- loop vs cs2
+      return (cs3, mt1 . mt2)
+
+-- ---------------------------------------------------------------------------
+
 solve
   :: forall v. (Ord v, Show v, PrettyVar v)
   => Set v
@@ -462,20 +519,11 @@ solve'
   => Set v
   -> [(Polynomial Rational v, [Sign])]
   -> Maybe (Model v)
-solve' vs0 cs0 = go (Set.toList vs0) cs0
-  where
-    go :: [v] -> [(Polynomial Rational v, [Sign])] -> Maybe (Model v)
-    go [] cs =
-      if and [Sign.signOf v `elem` ss | (p,ss) <- cs, let v = P.eval (\_ -> undefined) p]
-      then Just Map.empty
-      else Nothing
-    go (v:vs) cs = listToMaybe $ do
-      (cs2, cell:_) <- project [(P.toUPolynomialOf p v, ss) | (p,ss) <- cs]
-      case go vs cs2 of
-        Nothing -> mzero
-        Just m -> do
-          let Just val = findSample m cell
-          seq val $ return $ Map.insert v val m
+solve' vs cs0 = listToMaybe $ do
+  (cs,mt) <- projectN' vs cs0
+  let m = Map.empty
+  guard $ and [Sign.signOf v `elem` ss | (p,ss) <- cs, let v = P.eval (m Map.!) p]
+  return $ mt m
 
 -- ---------------------------------------------------------------------------
 
@@ -574,7 +622,7 @@ test2b = isNothing $ solve vs cs
 test = and [test1b, test1c, test2b]
 
 test_project :: DNF (Polynomial Rational Int, [Sign])
-test_project = DNF $ map fst $ project [(p', [Zero])]
+test_project = DNF $ map fst $ project' [(p', [Zero])]
   where
     a = P.var 0
     b = P.var 1
@@ -587,13 +635,13 @@ test_project = DNF $ map fst $ project [(p', [Zero])]
 test_project_print :: IO ()
 test_project_print = putStrLn $ showDNF $ test_project
 
-test_project_2 = project [(p, [Zero]), (x, [Pos])]
+test_project_2 = project' [(p, [Zero]), (x, [Pos])]
   where
     x = P.var X
     p :: UPolynomial (Polynomial Rational Int)
     p = x^(2::Int) + 4*x - 10
 
-test_project_3_print =  dumpProjection $ project [(P.toUPolynomialOf p 0, [Neg])]
+test_project_3_print =  dumpProjection $ project' [(P.toUPolynomialOf p 0, [Neg])]
   where
     a = P.var 0
     b = P.var 1

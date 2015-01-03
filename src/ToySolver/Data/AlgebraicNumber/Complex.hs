@@ -113,9 +113,8 @@ minimalPolynomial z@(x :+ y) =
 roots :: UPolynomial Rational -> [AComplex]
 roots f = do
   let cs1 = [ (u, [Sign.Zero]), (v, [Sign.Zero]) ] 
-  (cs2, cells2) <- CAD.project [(P.toUPolynomialOf p 0, ss) | (p,ss) <- cs1]
-  let tmp2 = CAD.project [(P.toUPolynomialOf p 1, ss) | (p,ss) <- cs2]
-  (cs3, cells3) <- tmp2
+  (cs2, cells2) <- CAD.project' [(P.toUPolynomialOf p 0, ss) | (p,ss) <- cs1]
+  (cs3, cells3) <- CAD.project' [(P.toUPolynomialOf p 1, ss) | (p,ss) <- cs2]
   guard $ and [Sign.signOf v `elem` ss | (p,ss) <- cs3, let v = P.eval (\_ -> undefined) p]
 
   let m3 = Map.empty
