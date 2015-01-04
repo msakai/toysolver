@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import Data.VectorSpace
 import Test.HUnit hiding (Test)
 import Test.QuickCheck hiding ((.&&.), (.||.))
+import qualified Test.QuickCheck as QC
 import qualified Test.QuickCheck.Monadic as QM
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.TH
@@ -171,8 +172,8 @@ genQFLAConj = do
   
 genQFLAConjSmallInt :: Gen (VarSet, [LA.Atom Rational])
 genQFLAConjSmallInt = do
-  nv <- choose (0, 5)
-  nc <- choose (0, 5)
+  nv <- choose (0, 3)
+  nc <- choose (0, 3)
   let vs = IS.fromList [1..nv]
   cs <- replicateM nc $ do
     op  <- elements [Lt, Le, Ge, Gt, Eql] -- , NEq
@@ -364,12 +365,13 @@ prop_OmegaTest_zmod =
 
 ------------------------------------------------------------------------
 
--- too slow
-disabled_prop_Cooper_solve :: Property
-disabled_prop_Cooper_solve =
+prop_Cooper_solve :: Property
+prop_Cooper_solve =
    forAll genQFLAConjSmallInt $ \(vs,cs) ->
      case Cooper.solve vs cs of
-       Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom (fmap fromInteger m)) cs == False
+       Nothing ->
+         (forAll (genModel vs) $ \m -> all (LA.evalAtom (fmap fromInteger m)) cs == False) QC..&&.
+         property (OmegaTest.solve OmegaTest.defaultOptions vs cs == Nothing)
        Just m  -> property $ all (LA.evalAtom (fmap fromInteger m)) cs
 
 case_Cooper_test1 :: IO ()
