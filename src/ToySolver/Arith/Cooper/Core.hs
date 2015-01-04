@@ -201,11 +201,15 @@ project :: Var -> QFFormula -> (QFFormula, Model Integer -> Model Integer)
 project x formula = (formula', mt)
   where
     xs = projectCases x formula
-    formula' = simplify $ orB [phi | (phi,_) <- xs, phi /= false]
+    formula' = orB' [phi | (phi,_) <- xs]
     mt m = head $ do
       (phi, mt') <- xs
       guard $ evalQFFormula m phi
       return $ mt' m
+    orB' = orB . concatMap f
+      where
+        f (Or xs) = concatMap f xs
+        f x = [x]
 
 {-| @'projectN' {x1,…,xm} φ@ returns @(ψ, lift)@ such that:
 
