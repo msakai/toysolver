@@ -156,14 +156,15 @@ simplifyLit (Pos e) =
     d  = if null cs then 1 else abs $ foldl1' gcd cs
     cs = [c | (c,x) <- LA.terms e1, x /= LA.unitVar]
 simplifyLit lit@(Divisible b c e)
-  | LA.coeff LA.unitVar e `mod` d /= 0 = if b then false else true
+  | LA.coeff LA.unitVar e2 `mod` d /= 0 = if b then false else true
   | c' == 1   = if b then true else false
   | d  == 1   = Atom lit
   | otherwise = Atom $ Divisible b c' e'
   where
-    d  = abs $ foldl' gcd c [c2 | (c2,x) <- LA.terms e, x /= LA.unitVar]
+    e2 = LA.mapCoeff (`mod` c) e
+    d  = abs $ foldl' gcd c [c2 | (c2,x) <- LA.terms e2, x /= LA.unitVar]
     c' = c `checkedDiv` d
-    e' = LA.mapCoeff (`checkedDiv` d) e
+    e' = LA.mapCoeff (`checkedDiv` d) e2
 
 -- | @'evalQFFormula' M φ@ returns whether @M ⊧_LIA φ@ or not.
 evalQFFormula :: Model Integer -> QFFormula -> Bool
