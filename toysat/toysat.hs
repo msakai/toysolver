@@ -487,7 +487,7 @@ solveSAT opt solver cnf = do
   result <- SAT.solve solver
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   when result $ do
-    m <- SAT.model solver
+    m <- SAT.getModel solver
     satPrintModel stdout m (DIMACS.numVars cnf)
     writeSOLFile opt m Nothing (DIMACS.numVars cnf)
 
@@ -536,7 +536,7 @@ solveMUS opt solver gcnf = do
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   if result
     then do
-      m <- SAT.model solver
+      m <- SAT.getModel solver
       satPrintModel stdout m (GCNF.numVars gcnf)
       writeSOLFile opt m Nothing (GCNF.numVars gcnf)
     else do
@@ -603,7 +603,7 @@ solvePB opt solver formula initialModel = do
       result <- SAT.solve solver
       putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
       when result $ do
-        m <- SAT.model solver
+        m <- SAT.getModel solver
         pbPrintModel stdout m nv
         writeSOLFile opt m Nothing nv
 

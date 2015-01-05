@@ -47,14 +47,14 @@ defaultOptions =
   }
 
 -- | Find a minimal set of assumptions that causes a conflict.
--- Initial set of assumptions is taken from 'SAT.failedAssumptions'.
+-- Initial set of assumptions is taken from 'SAT.getFailedAssumptions'.
 findMUSAssumptions
   :: SAT.Solver
   -> Options
   -> IO MUS
 findMUSAssumptions solver opt = do
   log "computing a minimal unsatisfiable core"
-  core <- liftM IS.fromList $ SAT.failedAssumptions solver
+  core <- liftM IS.fromList $ SAT.getFailedAssumptions solver
   update $ IS.toList core
   log $ "core = " ++ showLits core
   loop core IS.empty
@@ -83,7 +83,7 @@ findMUSAssumptions solver opt = do
           ret <- SAT.solveWith solver (IS.toList ls)
           if not ret
             then do
-              ls2 <- liftM IS.fromList $ SAT.failedAssumptions solver
+              ls2 <- liftM IS.fromList $ SAT.getFailedAssumptions solver
               let removed = ls1 `IS.difference` ls2
               log $ "successed to remove " ++ showLits removed
               log $ "new core = " ++ showLits (ls2 `IS.union` fixed)

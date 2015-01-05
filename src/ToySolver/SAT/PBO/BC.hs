@@ -60,7 +60,7 @@ solveWBO cxt solver = do
           SAT.addPBAtMostSoft solver sel [(weights IntMap.! lit, -lit) | lit <- IntSet.toList relaxed] mid
           ret <- SAT.solveWith solver (sel : IntSet.toList unrelaxed)
           if ret then do
-            m <- SAT.model solver
+            m <- SAT.getModel solver
             let val = SAT.evalPBLinSum m obj
             let ub' = val - 1
             C.logMessage cxt $ printf "BC: updating upper bound: %d -> %d" ub ub'
@@ -69,7 +69,7 @@ solveWBO cxt solver = do
             SAT.addPBAtMost solver obj ub'
             loop (unrelaxed, relaxed) (lb, ub')
           else do
-            core <- SAT.failedAssumptions solver
+            core <- SAT.getFailedAssumptions solver
             SAT.addClause solver [-sel] -- delete temporary constraint
             let core2 = IntSet.fromList core `IntSet.intersection` unrelaxed
             if IntSet.null core2 then do

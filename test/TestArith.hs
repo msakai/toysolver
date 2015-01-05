@@ -403,7 +403,7 @@ prop_Simplex2_solve = QM.monadicIO $ do
        Simplex2.assertAtomEx solver c
      ret <- Simplex2.check solver
      if ret then do
-       m <- Simplex2.model solver
+       m <- Simplex2.getModel solver
        return $ forM_ cs' $ \c -> QM.assert (LA.evalAtom m c)
      else do
        return $ return ()

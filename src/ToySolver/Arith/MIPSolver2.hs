@@ -174,7 +174,7 @@ optimize solver = do
             best <- readTVarIO (mipBest solver)
             case best of
               Just nd -> do
-                m <- Simplex2.model (ndLP nd)
+                m <- Simplex2.getModel (ndLP nd)
                 atomically $ writeTVar (mipBest solver) $ Just nd{ ndValue = LA.evalExpr m origObj }
                 return Unbounded
               Nothing -> return Unsat
@@ -347,7 +347,7 @@ branchAndBound solver rootLP update = do
                  return $ do
                    when ret $ do
                      let lp = ndLP node
-                     m <- Simplex2.model lp
+                     m <- Simplex2.getModel lp
                      update m (ndValue node)
                    loop
             , do b <- isCompleted
@@ -377,7 +377,7 @@ getBestSolution solver = do
   case ret of
     Nothing -> return Nothing
     Just node -> do
-      m <- Simplex2.model (ndLP node)
+      m <- Simplex2.getModel (ndLP node)
       return $ Just (m, ndValue node)
 
 getBestModel :: Solver -> IO (Maybe Model)
@@ -388,7 +388,7 @@ getBestValue solver = liftM (fmap snd) $ getBestSolution solver
 
 violated :: Node -> IS.IntSet -> IO [(Var, Rational)]
 violated node ivs = do
-  m <- Simplex2.model (ndLP node)
+  m <- Simplex2.getModel (ndLP node)
   let p (v,val) = v `IS.member` ivs && not (isInteger val)
   return $ filter p (IM.toList m)
 

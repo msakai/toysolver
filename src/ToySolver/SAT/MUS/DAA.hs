@@ -81,7 +81,7 @@ daa solver sels opt =
         SAT.setVarPolarity solver (litVar l) (litPolarity l)
       b <- SAT.solveWith solver (IntSet.toList xs)
       if b then do
-        m <- SAT.model solver
+        m <- SAT.getModel solver
         liftM Just $ grow $ IntSet.fromList [l | l <- sels, evalLit m l]
       else
         return Nothing
@@ -95,11 +95,11 @@ daa solver sels opt =
             Just (c, ys') -> do
               b <- SAT.solveWith solver (c : IntSet.toList xs)
               if b then do
-                m <- SAT.model solver
+                m <- SAT.getModel solver
                 let cs = IntSet.fromList [l | l <- sels, evalLit m l]
                 loop (xs `IntSet.union` cs) (ys' `IntSet.difference` cs)
               else do
-                zs <- SAT.failedAssumptions solver
+                zs <- SAT.getFailedAssumptions solver
                 SAT.addClause solver [-l | l <- zs] -- lemma
                 loop xs ys'
 

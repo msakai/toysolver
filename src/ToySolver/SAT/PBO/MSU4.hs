@@ -55,14 +55,14 @@ solveWBO cxt solver = do
     loop (unrelaxed, relaxed) lb = do
       ret <- SAT.solveWith solver (IS.toList unrelaxed)
       if ret then do
-        currModel <- SAT.model solver
+        currModel <- SAT.getModel solver
         C.addSolution cxt currModel
         let violated = [weights IM.! l | l <- IS.toList relaxed, SAT.evalLit currModel l == False]
             currVal = sum violated
         SAT.addPBAtMost solver [(c,-l) | (l,c) <- sels] (currVal - 1)
         cont (unrelaxed, relaxed) lb
       else do
-        core <- SAT.failedAssumptions solver
+        core <- SAT.getFailedAssumptions solver
         let ls = IS.fromList core `IS.intersection` unrelaxed
         if IS.null ls then do
           C.setFinished cxt

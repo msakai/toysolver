@@ -74,7 +74,7 @@ solve board = do
 
   ret <- SAT.solve solver
   if ret then do
-    m <- SAT.model solver
+    m <- SAT.getModel solver
     return $ Just $ array ((1,1),(9,9)) [((i,j),k) | ((i,j,k),v) <- assocs vs, m ! v]
   else
     return Nothing

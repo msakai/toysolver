@@ -45,12 +45,12 @@ solveWBO cxt solver = do
 
       ret <- SAT.solveWith solver (IntMap.keys sels)
       if ret then do
-        m <- SAT.model solver
+        m <- SAT.getModel solver
         -- モデルから余計な変数を除去する?
         C.addSolution cxt m
         return ()
       else do
-        core <- SAT.failedAssumptions solver
+        core <- SAT.getFailedAssumptions solver
         case core of
           [] -> C.setFinished cxt
           _  -> do

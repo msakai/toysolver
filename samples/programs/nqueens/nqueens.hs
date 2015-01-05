@@ -43,7 +43,7 @@ solve n = do
 
   ret <- SAT.solve solver
   if ret then do
-    m <- SAT.model solver
+    m <- SAT.getModel solver
     return $ Just $ fmap (SAT.evalLit m) a
   else
     return Nothing

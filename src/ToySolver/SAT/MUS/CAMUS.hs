@@ -109,7 +109,7 @@ enumMCSAssumptions solver sels opt = do
         let loop2 = do
               ret2 <- SAT.solveWith solver [vk]
               when ret2 $ do
-                m <- SAT.model solver
+                m <- SAT.getModel solver
                 let mcs = IS.fromList [sel | sel <- sels, not (evalLit m sel)]
                 mcsFound mcs
                 modifyIORef candRef (filter (\(_,cs) -> not (mcs `IS.isSubsetOf` cs)))

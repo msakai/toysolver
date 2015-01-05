@@ -510,7 +510,7 @@ findModel size cs = do
   ret <- SAT.solve solver
   if ret
     then do
-      bmodel <- SAT.model solver
+      bmodel <- SAT.getModel solver
       m <- readIORef ref
 
       let rels = Map.fromList $ do

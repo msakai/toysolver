@@ -61,9 +61,9 @@ module ToySolver.Arith.Simplex2
 
   -- * Extract results
   , Model
-  , model
+  , getModel
   , RawModel
-  , rawModel
+  , getRawModel
   , getValue
   , getObjValue
 
@@ -203,17 +203,17 @@ cloneSolver solver = do
 class (VectorSpace v, Scalar v ~ Rational, Ord v) => SolverValue v where
   toValue :: Rational -> v
   showValue :: Bool -> v -> String
-  model :: GenericSolver v -> IO Model
+  getModel :: GenericSolver v -> IO Model
 
 instance SolverValue Rational where
   toValue = id
   showValue = showRational
-  model = rawModel
+  getModel = getRawModel
 
 instance SolverValue (Delta Rational) where
   toValue = fromReal
   showValue = showDelta
-  model solver = do
+  getModel solver = do
     xs <- variables solver
     ys <- liftM concat $ forM xs $ \x -> do
       Delta p q  <- getValue solver x
@@ -698,8 +698,8 @@ prune solver opt =
 
 type RawModel v = IntMap v
 
-rawModel :: GenericSolver v -> IO (RawModel v)
-rawModel solver = do
+getRawModel :: GenericSolver v -> IO (RawModel v)
+getRawModel solver = do
   xs <- variables solver
   liftM IntMap.fromList $ forM xs $ \x -> do
     val <- getValue solver x
@@ -946,7 +946,7 @@ test6 = do
   print ret
   dump solver
 
-  m <- model solver
+  m <- getModel solver
   print m
 
 dumpSize :: SolverValue v => GenericSolver v -> IO ()

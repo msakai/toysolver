@@ -96,7 +96,7 @@ solveWBO cxt solver = do
       ret <- SAT.solveWith solver (IntMap.keys sels ++ IntSet.toList unrelaxed)
 
       if ret then do
-        m <- SAT.model solver
+        m <- SAT.getModel solver
         let val = SAT.evalPBLinSum m obj
         let ub' = val - 1
         C.logMessage cxt $ printf "BCD: updating upper bound: %d -> %d" ub ub'
@@ -105,7 +105,7 @@ solveWBO cxt solver = do
         let cores' = map (\info -> info{ coreUB = SAT.evalPBLinSum m (coreCostFun info) }) cores
         cont (unrelaxed, relaxed) cores' ub'
       else do
-        core <- SAT.failedAssumptions solver
+        core <- SAT.getFailedAssumptions solver
         case core of
           [] -> return ()
           [sel] | Just info <- IntMap.lookup sel sels -> do

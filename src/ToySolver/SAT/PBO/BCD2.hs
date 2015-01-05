@@ -85,7 +85,7 @@ solveWBO cxt solver opt = do
       | optSolvingNormalFirst opt -> do
           ret <- SAT.solve solver
           if ret then do
-            m <- SAT.model solver
+            m <- SAT.getModel solver
             let val = SAT.evalPBLinSum m obj
             let ub' = val - 1
             C.logMessage cxt $ printf "BCD2: updating upper bound: %d -> %d" (SAT.pbUpperBound obj) ub'
@@ -136,7 +136,7 @@ solveWBO cxt solver opt = do
       ret <- SAT.solveWith solver (IntMap.keys sels ++ IntSet.toList unrelaxed)
 
       if ret then do
-        m <- SAT.model solver
+        m <- SAT.getModel solver
         let val = SAT.evalPBLinSum m obj
         let ub' = val - 1
         C.logMessage cxt $ printf "BCD2: updating upper bound: %d -> %d" ub ub'
@@ -144,7 +144,7 @@ solveWBO cxt solver opt = do
         SAT.addPBAtMost solver obj ub'
         cont (unrelaxed, relaxed, hardened) deductedWeight cores ub' (Just m) (nsat+1,nunsat)
       else do
-        core <- SAT.failedAssumptions solver
+        core <- SAT.getFailedAssumptions solver
         case core of
           [] -> C.setFinished cxt
           [sel] | Just (info,mid) <- IntMap.lookup sel sels -> do

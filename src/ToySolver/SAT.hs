@@ -69,8 +69,8 @@ module ToySolver.SAT
 
   -- * Extract results
   , Model
-  , model
-  , failedAssumptions
+  , getModel
+  , getFailedAssumptions
 
   -- * Solver configulation
   , RestartStrategy (..)
@@ -1227,17 +1227,17 @@ search solver !conflict_lim onConflict = do
               else
                 handleConflict conflictCounter h
 
--- | After 'solve' returns True, it returns the model.
-model :: Solver -> IO Model
-model solver = do
+-- | After 'solve' returns True, it returns an satisfying assignment.
+getModel :: Solver -> IO Model
+getModel solver = do
   m <- readIORef (svModel solver)
   return (fromJust m)
 
 -- | After 'solveWith' returns False, it returns a set of assumptions
 -- that leads to contradiction. In particular, if it returns an empty
 -- set, the problem is unsatisiable without any assumptions.
-failedAssumptions :: Solver -> IO [Lit]
-failedAssumptions solver = readIORef (svFailedAssumptions solver)
+getFailedAssumptions :: Solver -> IO [Lit]
+getFailedAssumptions solver = readIORef (svFailedAssumptions solver)
 
 {--------------------------------------------------------------------
   Simplification

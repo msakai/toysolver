@@ -45,7 +45,7 @@ solveCNF (nv,cs) = do
   forM_ cs $ \c -> addClause solver c
   ret <- solve solver
   if ret then do
-    m <- model solver
+    m <- getModel solver
     return (Just m)
   else do
     return Nothing
@@ -84,7 +84,7 @@ solvePB (nv,cs) = do
   forM_ cs $ \c -> addPBAtLeast solver (fst c) (snd c)
   ret <- solve solver
   if ret then do
-    m <- model solver
+    m <- getModel solver
     return (Just m)
   else do
     return Nothing
@@ -129,7 +129,7 @@ solveXOR (nv,cs) = do
   forM_ cs $ \c -> addXORClause solver (fst c) (snd c)
   ret <- solve solver
   if ret then do
-    m <- model solver
+    m <- getModel solver
     return (Just m)
   else do
     return Nothing
@@ -562,7 +562,7 @@ case_xor_case2 = do
 
   ret <- solve solver
   ret @?= True
-  m <- model solver
+  m <- getModel solver
   m ! x1 @?= False
   m ! x2 @?= True
   m ! x3 @?= True
@@ -694,14 +694,14 @@ case_encodeConj = do
 
   ret <- solveWith solver [x3]
   ret @?= True
-  m <- model solver
+  m <- getModel solver
   evalLit m x1 @?= True
   evalLit m x2 @?= True
   evalLit m x3 @?= True
 
   ret <- solveWith solver [-x3]
   ret @?= True
-  m <- model solver
+  m <- getModel solver
   (evalLit m x1 && evalLit m x2) @?= False
   evalLit m x3 @?= False
 
@@ -714,13 +714,13 @@ case_encodeDisj = do
 
   ret <- solveWith solver [x3]
   ret @?= True
-  m <- model solver
+  m <- getModel solver
   (evalLit m x1 || evalLit m x2) @?= True
   evalLit m x3 @?= True
 
   ret <- solveWith solver [-x3]
   ret @?= True
-  m <- model solver
+  m <- getModel solver
   evalLit m x1 @?= False
   evalLit m x2 @?= False
   evalLit m x3 @?= False
