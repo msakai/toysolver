@@ -239,7 +239,7 @@ projectCases x formula = do
   return (phi, \m -> IM.insert x (evalWitness m wit) m)
 
 projectCases' :: Var -> QFFormula -> [(QFFormula, Witness)]
-projectCases' x formula = [(simplify phi, w) | (phi,w) <- case1 ++ case2]
+projectCases' x formula = [(phi', w) | (phi,w) <- case1 ++ case2, let phi' = simplify phi, phi' /= false]
   where
     -- eliminate Not, Imply and Equiv.
     formula0 :: QFFormula
