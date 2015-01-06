@@ -486,12 +486,12 @@ addToDB solver c = do
   let c2 = toConstraintHandler c
   modifyIORef (svConstrDB solver) (c2 : )
   when debugMode $ logIO solver $ do
-    str <- showConstraintHandler solver c
+    str <- showConstraintHandler c
     return $ printf "constraint %s is added" str
 
-  b <- isPBRepresentable solver c
+  b <- isPBRepresentable c
   when b $ do
-    (lhs,_) <- toPBLinAtLeast solver c
+    (lhs,_) <- toPBLinAtLeast c
     forM_ lhs $ \(_,lit) -> do
        ld <- litData solver lit
        modifyIORef' (ldOccurList ld) (HashSet.insert c2)
@@ -502,7 +502,7 @@ addToLearntDB :: ConstraintHandler c => Solver -> c -> IO ()
 addToLearntDB solver c = do
   modifyIORef (svLearntDB solver) $ \(n,xs) -> (n+1, toConstraintHandler c : xs)
   when debugMode $ logIO solver $ do
-    str <- showConstraintHandler solver c
+    str <- showConstraintHandler c
     return $ printf "constraint %s is added" str
   sanityCheck solver
 
@@ -1142,7 +1142,7 @@ search solver !conflict_lim onConflict = do
       d <- readIORef (svLevel solver)
 
       when debugMode $ logIO solver $ do
-        str <- showConstraintHandler solver constr
+        str <- showConstraintHandler constr
         return $ printf "conflict(level=%d): %s" d str
 
       modifyIORef' conflictCounter (+1)
@@ -1304,7 +1304,7 @@ removeBackwardSubsumedBy solver pb = do
     xs <- backwardSubsumedBy solver pb
     when debugMode $ do
       forM_ (HashSet.toList xs) $ \c -> do
-        s <- showConstraintHandler solver c
+        s <- showConstraintHandler c
         log solver (printf "backward subsumption: %s is subsumed by %s\n" s (show pb))
     removeConstraintHandlers solver xs
 
@@ -1320,7 +1320,7 @@ backwardSubsumedBy solver pb@(lhs,_) = do
             -- Note that @isPBRepresentable c@ is always True here,
             -- because only such constraints are added to occur list.
             -- See 'addToDB'.
-            pb2 <- instantiatePB solver =<< toPBLinAtLeast solver c
+            pb2 <- instantiatePB solver =<< toPBLinAtLeast c
             return $ pbSubsume pb pb2
       liftM HashSet.fromList
         $ filterM p
@@ -1718,11 +1718,11 @@ analyzeConflictHybrid solver constr = do
                 pb' <- if any (\(_,l2) -> litNot l == l2) (fst pb)
                        then do
                          pb2 <- do
-                           b <- isPBRepresentable solver constr2
+                           b <- isPBRepresentable constr2
                            if not b then do
                              return $ clauseToPBLinAtLeast (l:xs)
                            else do
-                             pb2 <- toPBLinAtLeast solver constr2
+                             pb2 <- toPBLinAtLeast constr2
                              o <- pbOverSAT solver pb2
                              if o then
                                return $ clauseToPBLinAtLeast (l:xs)
@@ -1741,9 +1741,9 @@ analyzeConflictHybrid solver constr = do
   constrBumpActivity solver constr
   conflictClause <- reasonOf solver constr Nothing
   pbConfl <- do
-    b <- isPBRepresentable solver constr
+    b <- isPBRepresentable constr
     if b then
-      toPBLinAtLeast solver constr
+      toPBLinAtLeast constr
     else
       return (clauseToPBLinAtLeast conflictClause)
   forM_ conflictClause $ \lit -> varBumpActivity solver (litVar lit)
@@ -1991,7 +1991,7 @@ showTimeDiff sec
 class (Eq a, Hashable a) => ConstraintHandler a where
   toConstraintHandler :: a -> SomeConstraintHandler
 
-  showConstraintHandler :: Solver -> a -> IO String
+  showConstraintHandler :: a -> IO String
 
   attach :: Solver -> a -> IO Bool
 
@@ -2009,8 +2009,8 @@ class (Eq a, Hashable a) => ConstraintHandler a where
   -- assignment.
   basicReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
-  isPBRepresentable :: Solver -> a -> IO Bool
-  toPBLinAtLeast :: Solver -> a -> IO PBLinAtLeast
+  isPBRepresentable :: a -> IO Bool
+  toPBLinAtLeast :: a -> IO PBLinAtLeast
 
   isSatisfied :: Solver -> a -> IO Bool
 
@@ -2035,9 +2035,9 @@ detach solver c = do
     vd <- varData solver v
     modifyIORef' (vdWatches vd) (delete c)
 
-  b <- isPBRepresentable solver c
+  b <- isPBRepresentable c
   when b $ do
-    (lhs,_) <- toPBLinAtLeast solver c
+    (lhs,_) <- toPBLinAtLeast c
     forM_ lhs $ \(_,lit) -> do
       ld <- litData solver lit
       modifyIORef' (ldOccurList ld) (HashSet.delete c)
@@ -2057,14 +2057,14 @@ reasonOf solver c x = do
       Just lit -> do
         val <- litValue solver lit
         unless (lTrue == val) $ do
-          str <- showConstraintHandler solver c
+          str <- showConstraintHandler c
           error (printf "reasonOf: value of literal %d should be True but %s (basicReasonOf %s %s)" lit (show val) str (show x))
   cl <- basicReasonOf solver c x
   when debugMode $ do
     forM_ cl $ \lit -> do
       val <- litValue solver lit
       unless (lFalse == val) $ do
-        str <- showConstraintHandler solver c
+        str <- showConstraintHandler c
         error (printf "reasonOf: value of literal %d should be False but %s (basicReasonOf %s %s)" lit (show val) str (show x))
   return cl
 
@@ -2111,11 +2111,11 @@ instance Hashable SomeConstraintHandler where
 instance ConstraintHandler SomeConstraintHandler where
   toConstraintHandler = id
 
-  showConstraintHandler solver (CHClause c)    = showConstraintHandler solver c
-  showConstraintHandler solver (CHAtLeast c)   = showConstraintHandler solver c
-  showConstraintHandler solver (CHPBCounter c) = showConstraintHandler solver c
-  showConstraintHandler solver (CHPBPueblo c)  = showConstraintHandler solver c
-  showConstraintHandler solver (CHXORClause c) = showConstraintHandler solver c
+  showConstraintHandler (CHClause c)    = showConstraintHandler c
+  showConstraintHandler (CHAtLeast c)   = showConstraintHandler c
+  showConstraintHandler (CHPBCounter c) = showConstraintHandler c
+  showConstraintHandler (CHPBPueblo c)  = showConstraintHandler c
+  showConstraintHandler (CHXORClause c) = showConstraintHandler c
 
   attach solver (CHClause c)    = attach solver c
   attach solver (CHAtLeast c)   = attach solver c
@@ -2147,17 +2147,17 @@ instance ConstraintHandler SomeConstraintHandler where
   basicReasonOf solver (CHPBPueblo c) l  = basicReasonOf solver c l
   basicReasonOf solver (CHXORClause c) l = basicReasonOf solver c l
 
-  isPBRepresentable solver (CHClause c)    = isPBRepresentable solver c
-  isPBRepresentable solver (CHAtLeast c)   = isPBRepresentable solver c
-  isPBRepresentable solver (CHPBCounter c) = isPBRepresentable solver c
-  isPBRepresentable solver (CHPBPueblo c)  = isPBRepresentable solver c
-  isPBRepresentable solver (CHXORClause c) = isPBRepresentable solver c
+  isPBRepresentable (CHClause c)    = isPBRepresentable c
+  isPBRepresentable (CHAtLeast c)   = isPBRepresentable c
+  isPBRepresentable (CHPBCounter c) = isPBRepresentable c
+  isPBRepresentable (CHPBPueblo c)  = isPBRepresentable c
+  isPBRepresentable (CHXORClause c) = isPBRepresentable c
 
-  toPBLinAtLeast solver (CHClause c)    = toPBLinAtLeast solver c
-  toPBLinAtLeast solver (CHAtLeast c)   = toPBLinAtLeast solver c
-  toPBLinAtLeast solver (CHPBCounter c) = toPBLinAtLeast solver c
-  toPBLinAtLeast solver (CHPBPueblo c)  = toPBLinAtLeast solver c
-  toPBLinAtLeast solver (CHXORClause c) = toPBLinAtLeast solver c
+  toPBLinAtLeast (CHClause c)    = toPBLinAtLeast c
+  toPBLinAtLeast (CHAtLeast c)   = toPBLinAtLeast c
+  toPBLinAtLeast (CHPBCounter c) = toPBLinAtLeast c
+  toPBLinAtLeast (CHPBPueblo c)  = toPBLinAtLeast c
+  toPBLinAtLeast (CHXORClause c) = toPBLinAtLeast c
 
   isSatisfied solver (CHClause c)    = isSatisfied solver c
   isSatisfied solver (CHAtLeast c)   = isSatisfied solver c
@@ -2287,7 +2287,7 @@ newClauseHandler ls learnt = do
 instance ConstraintHandler ClauseHandler where
   toConstraintHandler = CHClause
 
-  showConstraintHandler _ this = do
+  showConstraintHandler this = do
     lits <- getElems (claLits this)
     return (show lits)
 
@@ -2383,7 +2383,7 @@ instance ConstraintHandler ClauseHandler where
       case i of
         -1 -> do
           when debugMode $ logIO solver $ do
-             str <- showConstraintHandler solver this
+             str <- showConstraintHandler this
              return $ printf "basicPropagate: %s is unit" str
           watchLit solver falsifiedLit this
           assignBy solver lit0 this
@@ -2415,9 +2415,9 @@ instance ConstraintHandler ClauseHandler where
         assert (lit == head lits) $ return ()
         return $ tail lits
 
-  isPBRepresentable _ _ = return True
+  isPBRepresentable _ = return True
 
-  toPBLinAtLeast _ this = do
+  toPBLinAtLeast this = do
     lits <- getElems (claLits this)
     return ([(1,l) | l <- lits], 1)
 
@@ -2491,7 +2491,7 @@ newAtLeastHandler ls n learnt = do
 instance ConstraintHandler AtLeastHandler where
   toConstraintHandler = CHAtLeast
 
-  showConstraintHandler _ this = do
+  showConstraintHandler this = do
     lits <- getElems (atLeastLits this)
     return $ show lits ++ " >= " ++ show (atLeastNum this)
 
@@ -2605,7 +2605,7 @@ instance ConstraintHandler AtLeastHandler where
     case i of
       -1 -> do
         when debugMode $ logIO solver $ do
-          str <- showConstraintHandler solver this
+          str <- showConstraintHandler this
           return $ printf "basicPropagate: %s is unit" str
         watchLit solver falsifiedLit this
         let loop :: Int -> IO Bool
@@ -2675,9 +2675,9 @@ instance ConstraintHandler AtLeastHandler where
             error $ printf "AtLeastHandler.basicReasonOf: cannot find %d in first %d elements" n
         return falsifiedLits
 
-  isPBRepresentable _ _ = return True
+  isPBRepresentable _ = return True
 
-  toPBLinAtLeast _ this = do
+  toPBLinAtLeast this = do
     lits <- getElems (atLeastLits this)
     return ([(1,l) | l <- lits], fromIntegral (atLeastNum this))
 
@@ -2809,7 +2809,7 @@ newPBHandlerCounter ts degree learnt = do
 instance ConstraintHandler PBHandlerCounter where
   toConstraintHandler = CHPBCounter
 
-  showConstraintHandler _ this = do
+  showConstraintHandler this = do
     return $ show (pbTerms this) ++ " >= " ++ show (pbDegree this)
 
   attach solver this = do
@@ -2889,9 +2889,9 @@ instance ConstraintHandler PBHandlerCounter where
             else do
               go s xs ret
 
-  isPBRepresentable _ _ = return True
+  isPBRepresentable _ = return True
 
-  toPBLinAtLeast _ this = do
+  toPBLinAtLeast this = do
     return (pbTerms this, pbDegree this)
 
   isSatisfied solver this = do
@@ -2962,7 +2962,7 @@ puebloUnwatch _solver pb (c, lit) = do
 instance ConstraintHandler PBHandlerPueblo where
   toConstraintHandler = CHPBPueblo
 
-  showConstraintHandler _ this = do
+  showConstraintHandler this = do
     return $ show (puebloTerms this) ++ " >= " ++ show (puebloDegree this)
 
   attach solver this = do
@@ -3040,9 +3040,9 @@ instance ConstraintHandler PBHandlerPueblo where
             else do
               go s xs ret
 
-  isPBRepresentable _ _ = return True
+  isPBRepresentable _ = return True
 
-  toPBLinAtLeast _ this = do
+  toPBLinAtLeast this = do
     return (puebloTerms this, puebloDegree this)
 
   isSatisfied solver this = do
@@ -3126,7 +3126,7 @@ newXORClauseHandler ls learnt = do
 instance ConstraintHandler XORClauseHandler where
   toConstraintHandler = CHXORClause
 
-  showConstraintHandler _ this = do
+  showConstraintHandler this = do
     lits <- getElems (xorLits this)
     return ("XOR " ++ show lits)
 
@@ -3227,7 +3227,7 @@ instance ConstraintHandler XORClauseHandler where
     case i of
       -1 -> do
         when debugMode $ logIO solver $ do
-           str <- showConstraintHandler solver this
+           str <- showConstraintHandler this
            return $ printf "basicPropagate: %s is unit" str
         watchVar solver v this
         -- lit0 ⊕ y
@@ -3280,9 +3280,9 @@ instance ConstraintHandler XORClauseHandler where
         val <- varValue solver v
         return $ literal v (not (fromJust (unliftBool val)))
 
-  isPBRepresentable _ _ = return False
+  isPBRepresentable _ = return False
 
-  toPBLinAtLeast _ _ = error "XORClauseHandler does not support toPBLinAtLeast"
+  toPBLinAtLeast _ = error "XORClauseHandler does not support toPBLinAtLeast"
 
   isSatisfied solver this = do
     lits <- getElems (xorLits this)
@@ -3450,7 +3450,7 @@ checkSatisfied solver = do
   forM_ cls $ \c -> do
     b <- isSatisfied solver c
     unless b $ do
-      s <- showConstraintHandler solver c
+      s <- showConstraintHandler c
       log solver $ "BUG: " ++ s ++ " is violated"
 
 sanityCheck :: Solver -> IO ()
@@ -3485,7 +3485,7 @@ dumpConstrActivity solver = do
   log solver "Learnt constraints activity:"
   xs <- learntConstraints solver
   forM_ xs $ \c -> do
-    s <- showConstraintHandler solver c
+    s <- showConstraintHandler c
     aval <- constrReadActivity c
     log solver $ printf "activity(%s) = %f" s aval
 
