@@ -47,7 +47,8 @@ import Data.VectorSpace hiding (project)
 
 import ToySolver.Data.ArithRel
 import ToySolver.Data.Boolean
-import ToySolver.Data.BoolExpr
+import ToySolver.Data.BoolExpr (BoolExpr (..))
+import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
 
@@ -56,7 +57,7 @@ type QFFormula = BoolExpr (LA.Atom Rational)
 
 -- | @'evalQFFormula' M φ@ returns whether @M ⊧_LRA φ@ or not.
 evalQFFormula :: Model Rational -> QFFormula -> Bool
-evalQFFormula m = fold f
+evalQFFormula m = BoolExpr.fold f
   where
     f (ArithRel lhs op rhs) = evalOp op (LA.evalExpr m lhs) (LA.evalExpr m rhs)
 
@@ -105,7 +106,6 @@ projectN vs2 = f (IS.toList vs2)
 projectCases :: Var -> QFFormula -> [(QFFormula, Model Rational -> Model Rational)]
 projectCases v phi = [(psi, \m -> IM.insert v (LA.evalExpr m t) m) | (psi, t) <- projectCases' v phi]
 
-
 {-| @'projectCases' x φ@ returns @[(ψ_1, lift_1), …, (ψ_m, lift_m)]@ such that:
 
 * @⊢_LRA ∀y1, …, yn. (∃x. φ) ↔ (ψ_1 ∨ … ∨ φ_m)@ where @{y1, …, yn} = FV(φ) \\ {x}@, and
@@ -121,10 +121,11 @@ Note that
 -}
 projectCases' :: Var -> QFFormula -> [(QFFormula, LA.Expr Rational)]
 projectCases' v phi
+  | phi' == false = []
   | Set.null xs = [(phi', LA.constant 0)]
-  | otherwise   = [(applySubst1 v t phi', t) | t <- Set.toList s]
+  | otherwise   = [(phi'', t) | t <- Set.toList s, let phi'' = applySubst1 v t phi', phi'' /= false]
   where
-    phi' = fmap (\(ArithRel lhs op rhs) -> ArithRel (lhs ^-^ rhs) op (LA.constant 0)) phi
+    phi' = simplify phi
     xs = collect v phi'
     s = Set.unions
         [ xs
@@ -148,6 +149,17 @@ projectCasesN vs = f (IS.toList vs)
       (phi3, mt2) <- f vs phi2
       return (phi3, mt1 . mt2)
 
+simplify :: QFFormula -> QFFormula
+simplify = BoolExpr.simplify . BoolExpr.fold simplifyLit
+
+simplifyLit :: LA.Atom Rational -> QFFormula
+simplifyLit (ArithRel lhs op rhs) =
+  case LA.asConst e of
+    Just c -> if evalOp op c 0 then true else false
+    Nothing -> Atom (ArithRel e op (LA.constant 0))
+  where
+    e = lhs ^-^ rhs
+
 collect :: Var -> QFFormula -> Set (LA.Expr Rational)
 collect v = Foldable.foldMap f
   where
@@ -157,7 +169,7 @@ collect v = Foldable.foldMap f
         Just (a,b) -> Set.singleton (negateV (b ^/ a))
 
 applySubst1 :: Var -> LA.Expr Rational -> QFFormula -> QFFormula
-applySubst1 v t = fold f
+applySubst1 v t = BoolExpr.fold f
   where
     f rel = Atom (LA.applySubst1Atom v t rel)
 
