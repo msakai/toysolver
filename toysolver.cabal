@@ -142,11 +142,11 @@ Library
      ToySolver.Arith.VirtualSubstitution
      ToySolver.CongruenceClosure
      ToySolver.FOLModelFinder
-     ToySolver.HittingSet.Simple
-     ToySolver.HittingSet.HTCBDD
-     ToySolver.HittingSet.SHD
-     ToySolver.Knapsack.BB
-     ToySolver.Knapsack.DP
+     ToySolver.Combinatorial.HittingSet.Simple
+     ToySolver.Combinatorial.HittingSet.HTCBDD
+     ToySolver.Combinatorial.HittingSet.SHD
+     ToySolver.Combinatorial.Knapsack.BB
+     ToySolver.Combinatorial.Knapsack.DP
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.MaxSAT2IP

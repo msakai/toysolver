@@ -2,23 +2,22 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.HittingSet.HTCBDD
+-- Module      :  ToySolver.Combinatorial.HittingSet.SHD
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable (DeriveDataTypeable)
+-- 
+-- Wrapper for shd command.
 --
--- Wrapper for htcbdd command.
---
--- * HTC-BDD: Hypergraph Transversal Computation with Binary Decision Diagrams
---   <http://kuma-san.net/htcbdd.html>
+-- * Hypergraph Dualization Repository
+--   <http://research.nii.ac.jp/~uno/dualization.html>
 --
 -----------------------------------------------------------------------------
-module ToySolver.HittingSet.HTCBDD
+module ToySolver.Combinatorial.HittingSet.SHD
   ( Options (..)
-  , Method (..)
   , Failure (..)
   , defaultOptions
   , minimalHittingSets
@@ -26,8 +25,8 @@ module ToySolver.HittingSet.HTCBDD
 
 import Control.Exception (Exception, throwIO)
 import Control.Monad
-import Data.Default.Class
 import Data.Array.Unboxed
+import Data.Default.Class
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.IntMap (IntMap)
@@ -45,19 +44,11 @@ type HittingSet = IntSet
 
 data Options
   = Options
-  { optHTCBDDCommand  :: FilePath
-  , optMethod         :: Method
+  { optSHDCommand     :: FilePath
+  , optSHDArgs        :: [String]
   , optOnGetLine      :: String -> IO ()
   , optOnGetErrorLine :: String -> IO ()
   }
-
-data Method
-  = MethodToda
-  | MethodKnuth
-  deriving (Eq, Ord, Show)
-
-instance Default Method where
-  def = MethodToda
 
 instance Default Options where
   def = defaultOptions
@@ -65,8 +56,8 @@ instance Default Options where
 defaultOptions :: Options
 defaultOptions =
   Options
-  { optHTCBDDCommand  = "htcbdd"
-  , optMethod         = def
+  { optSHDCommand     = "shd"
+  , optSHDArgs        = ["0"]
   , optOnGetLine      = \_ -> return ()
   , optOnGetErrorLine = \_ -> return ()
   }
@@ -78,13 +69,13 @@ instance Exception Failure
 
 minimalHittingSets :: Options -> [HyperEdge] -> IO [HittingSet]
 minimalHittingSets opt es = do
-  withSystemTempFile "htcbdd-input.dat" $ \fname1 h1 -> do
+  withSystemTempFile "shd-input.dat" $ \fname1 h1 -> do
     forM_ es $ \e -> do
       hPutStrLn h1 $ intercalate " " [show (encTable IntMap.! v) | v <- IntSet.toList e]
     hClose h1
-    withSystemTempFile "htcbdd-out.dat" $ \fname2 h2 -> do
+    withSystemTempFile "shd-out.dat" $ \fname2 h2 -> do
       hClose h2
-      execHTCBDD opt fname1 fname2
+      execSHD opt fname1 fname2
       s <- readFile fname2
       return $ map (IntSet.fromList . map ((decTable !) . read) . words) $ lines s
   where
@@ -95,15 +86,15 @@ minimalHittingSets opt es = do
     nv = IntSet.size vs
 
     encTable :: IntMap Int
-    encTable = IntMap.fromList (zip (IntSet.toList vs) [1..nv])
+    encTable = IntMap.fromList (zip (IntSet.toList vs) [0..nv-1])
 
     decTable :: UArray Int Int
-    decTable = array (1,nv) (zip [1..nv] (IntSet.toList vs))
+    decTable = array (0,nv-1) (zip [0..nv-1] (IntSet.toList vs))
 
-execHTCBDD :: Options -> FilePath -> FilePath -> IO ()
-execHTCBDD opt inputFile outputFile = do
-  let args = ["-k" | optMethod opt == MethodKnuth] ++ [inputFile, outputFile]
-  exitcode <- runProcessWithOutputCallback (optHTCBDDCommand opt) args "" (optOnGetLine opt) (optOnGetErrorLine opt)
+execSHD :: Options -> FilePath -> FilePath -> IO ()
+execSHD opt inputFile outputFile = do
+  let args = optSHDArgs opt ++ [inputFile, outputFile]
+  exitcode <- runProcessWithOutputCallback (optSHDCommand opt) args "" (optOnGetLine opt) (optOnGetErrorLine opt)
   case exitcode of
     ExitFailure n -> throwIO $ Failure n
     ExitSuccess -> return ()

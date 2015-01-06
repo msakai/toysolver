@@ -7,7 +7,7 @@ import Data.List
 import System.Environment
 import System.IO
 import Text.Printf
-import qualified ToySolver.Knapsack.BB as Knapsack
+import qualified ToySolver.Combinatorial.Knapsack.BB as Knapsack
 
 type Value = Integer
 type Weight = Integer

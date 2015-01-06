@@ -19,9 +19,9 @@ import ToySolver.Data.BoolExpr
 import qualified ToySolver.Internal.Data.Vec as Vec
 import ToySolver.Internal.Util
 import ToySolver.Internal.TextUtil
-import qualified ToySolver.Knapsack.BB as KnapsackBB
-import qualified ToySolver.Knapsack.DP as KnapsackDP
-import qualified ToySolver.HittingSet.Simple as HittingSet
+import qualified ToySolver.Combinatorial.Knapsack.BB as KnapsackBB
+import qualified ToySolver.Combinatorial.Knapsack.DP as KnapsackDP
+import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.Wang as Wang
 
 case_showRationalAsDecimal :: IO ()

@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Knapsack.DP
+-- Module      :  ToySolver.Combinatorial.Knapsack.DP
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
 -- 
@@ -11,7 +11,7 @@
 -- Simple 0-1 knapsack problem solver that uses DP.
 --
 -----------------------------------------------------------------------------
-module ToySolver.Knapsack.DP
+module ToySolver.Combinatorial.Knapsack.DP
   ( Weight
   , Value
   , solve

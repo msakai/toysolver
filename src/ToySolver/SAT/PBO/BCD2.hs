@@ -40,7 +40,7 @@ import qualified Data.IntMap as IntMap
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO.Context as C
-import qualified ToySolver.Knapsack.BB as Knapsack
+import qualified ToySolver.Combinatorial.Knapsack.BB as Knapsack
 import Text.Printf
 
 data Options

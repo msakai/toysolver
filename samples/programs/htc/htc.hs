@@ -6,7 +6,7 @@ import Control.Monad
 import Data.List
 import qualified Data.IntSet as IntSet
 import System.Environment
-import qualified ToySolver.HittingSet.Simple as HittingSet
+import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 
 main :: IO ()
 main = do
