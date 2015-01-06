@@ -22,7 +22,7 @@ import ToySolver.Data.Boolean
 import qualified ToySolver.Data.FOL.Arith as FOL
 import qualified ToySolver.Data.LA.FOL as LAFOL
 import ToySolver.Data.Var
-import ToySolver.Arith.Cooper.Core
+import ToySolver.Arith.Cooper.Base
 
 -- | Eliminate quantifiers and returns equivalent quantifier-free formula.
 --

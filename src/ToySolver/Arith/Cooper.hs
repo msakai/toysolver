@@ -49,5 +49,5 @@ module ToySolver.Arith.Cooper
     , solveQFLIRAConj
     ) where
 
-import ToySolver.Arith.Cooper.Core
+import ToySolver.Arith.Cooper.Base
 import ToySolver.Arith.Cooper.FOL

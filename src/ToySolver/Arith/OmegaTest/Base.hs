@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Arith.OmegaTest.Core
+-- Module      :  ToySolver.Arith.OmegaTest.Base
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -24,7 +24,7 @@
 -- * <http://hackage.haskell.org/package/Omega>
 --
 -----------------------------------------------------------------------------
-module ToySolver.Arith.OmegaTest.Core
+module ToySolver.Arith.OmegaTest.Base
     ( Model
     , solve
     , solveQFLIRAConj
@@ -55,7 +55,7 @@ import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
 import ToySolver.Internal.Util (combineMaybe)
 import qualified ToySolver.Arith.FourierMotzkin as FM
-import ToySolver.Arith.FourierMotzkin.Core (Constr (..), toLAAtom)
+import ToySolver.Arith.FourierMotzkin.Base (Constr (..), toLAAtom)
 
 -- ---------------------------------------------------------------------------
 

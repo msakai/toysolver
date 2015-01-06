@@ -124,10 +124,10 @@ Library
      ToySolver.Arith.CAD
      ToySolver.Arith.ContiTraverso
      ToySolver.Arith.Cooper
-     ToySolver.Arith.Cooper.Core
+     ToySolver.Arith.Cooper.Base
      ToySolver.Arith.Cooper.FOL
      ToySolver.Arith.FourierMotzkin
-     ToySolver.Arith.FourierMotzkin.Core
+     ToySolver.Arith.FourierMotzkin.Base
      ToySolver.Arith.FourierMotzkin.FOL
      ToySolver.Arith.FourierMotzkin.Optimization
      ToySolver.Arith.LPSolver
@@ -136,7 +136,7 @@ Library
      ToySolver.Arith.MIPSolverHL
      ToySolver.Arith.MIPSolver2
      ToySolver.Arith.OmegaTest
-     ToySolver.Arith.OmegaTest.Core
+     ToySolver.Arith.OmegaTest.Base
      ToySolver.Arith.Simplex
      ToySolver.Arith.Simplex2
      ToySolver.Arith.VirtualSubstitution

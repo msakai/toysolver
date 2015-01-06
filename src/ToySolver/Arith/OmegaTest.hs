@@ -53,7 +53,7 @@ import ToySolver.Data.Var
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.Simplex2 as Simplex2
 import qualified ToySolver.Arith.VirtualSubstitution as VS
-import ToySolver.Arith.OmegaTest.Core
+import ToySolver.Arith.OmegaTest.Base
 
 checkRealByCAD :: VarSet -> [LA.Atom Rational] -> Bool
 checkRealByCAD vs as = isJust $ CAD.solve vs2 (map (fmap f) as)

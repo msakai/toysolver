@@ -33,7 +33,7 @@ import Data.OptDir
 import ToySolver.Data.DNF
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
-import ToySolver.Arith.FourierMotzkin.Core
+import ToySolver.Arith.FourierMotzkin.Base
 
 -- | @optimize dir obj φ@ returns @(I, lift)@ where
 --

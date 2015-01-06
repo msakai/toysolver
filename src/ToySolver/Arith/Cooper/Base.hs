@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Arith.Cooper.Core
+-- Module      :  ToySolver.Arith.Cooper.Base
 -- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
 -- 
@@ -23,7 +23,7 @@
 -- * <http://hackage.haskell.org/package/presburger>
 --
 -----------------------------------------------------------------------------
-module ToySolver.Arith.Cooper.Core
+module ToySolver.Arith.Cooper.Base
     (
     -- * Language of presburger arithmetics
       ExprZ

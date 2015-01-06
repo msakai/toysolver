@@ -30,5 +30,5 @@ module ToySolver.Arith.FourierMotzkin
     , solve
     ) where
 
-import ToySolver.Arith.FourierMotzkin.Core
+import ToySolver.Arith.FourierMotzkin.Base
 import ToySolver.Arith.FourierMotzkin.FOL

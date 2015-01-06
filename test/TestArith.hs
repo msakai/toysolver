@@ -30,7 +30,7 @@ import ToySolver.Data.Var
 import qualified ToySolver.Arith.FourierMotzkin as FourierMotzkin
 import qualified ToySolver.Arith.FourierMotzkin.Optimization as FMOpt
 import qualified ToySolver.Arith.OmegaTest as OmegaTest
-import qualified ToySolver.Arith.OmegaTest.Core as OmegaTest
+import qualified ToySolver.Arith.OmegaTest.Base as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.Simplex2 as Simplex2

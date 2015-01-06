@@ -18,7 +18,7 @@ import qualified ToySolver.Data.FOL.Arith as FOL
 import qualified ToySolver.Data.LA.FOL as LAFOL
 import ToySolver.Data.Var
 
-import ToySolver.Arith.FourierMotzkin.Core
+import ToySolver.Arith.FourierMotzkin.Base
 
 -- ---------------------------------------------------------------------------
 
