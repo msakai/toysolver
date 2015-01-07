@@ -68,7 +68,6 @@ daa solver sels opt =
               Nothing -> do
                 let mus = xs
                 optOnMUSFound opt mus
-                SAT.addClause solver [-l | l <- IntSet.toList mus] -- lemma
                 f (Set.insert mus muses) xss
       f muses (Set.toList (hst mcses `Set.difference` muses))
 
@@ -83,7 +82,8 @@ daa solver sels opt =
       if b then do
         m <- SAT.getModel solver
         liftM Just $ grow $ IntSet.fromList [l | l <- sels, evalLit m l]
-      else
+      else do
+        SAT.addClause solver [-l | l <- IntSet.toList xs] -- lemma
         return Nothing
 
     grow :: LitSet -> IO LitSet
