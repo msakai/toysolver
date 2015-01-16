@@ -42,20 +42,27 @@ module ToySolver.Text.PBFile
 
   -- * Show .opb files
   , renderOPB
+  , writeOPBFile
+  , hPutOPB
 
   -- * Show .wbo files
   , renderWBO
+  , writeWBOFile
+  , hPutWBO
   ) where
 
 import Prelude hiding (sum)
 import Control.Exception (assert)
 import Control.Monad
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as Builder
 import qualified Data.DList as DList
 import Data.List hiding (sum)
 import Data.Maybe
 import Data.Monoid hiding (Sum (..))
 import Data.Word
 import Data.String
+import System.IO
 import Text.Parsec
 import Text.Parsec.String
 import Text.Printf
@@ -396,3 +403,24 @@ wboComputeNumVars cs = maximum (0 : vs)
       (_, tm) <- s
       lit <- tm
       return $ abs lit
+
+writeOPBFile :: FilePath -> Formula -> IO ()
+writeOPBFile filepath opb = withBinaryFile filepath WriteMode $ \h -> do
+  hSetBuffering h (BlockBuffering Nothing)
+  hPutOPB h opb
+
+writeWBOFile :: FilePath -> SoftFormula -> IO ()
+writeWBOFile filepath wbo = withBinaryFile filepath WriteMode $ \h -> do
+  hSetBuffering h (BlockBuffering Nothing)
+  hPutWBO h wbo
+
+-- It is recommended that the 'Handle' is set to binary and
+-- 'BlockBuffering' mode. See 'hSetBinaryMode' and 'hSetBuffering'.
+hPutOPB :: Handle -> Formula -> IO ()
+hPutOPB h opb = Builder.hPutBuilder h (showOPB opb)
+
+-- It is recommended that the 'Handle' is set to binary and
+-- 'BlockBuffering' mode. See 'hSetBinaryMode' and 'hSetBuffering'.
+hPutWBO :: Handle -> SoftFormula -> IO ()
+hPutWBO h wbo = Builder.hPutBuilder h (showWBO wbo)
+

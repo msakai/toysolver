@@ -157,8 +157,8 @@ writePBFile o pb = do
                   Left opb  -> PB2LSP.convert opb
                   Right wbo -> PB2LSP.convertWBO wbo
       case map toLower (takeExtension fname) of
-        ".opb" -> writeFile fname $ PBFile.renderOPB opb
-        ".wbo" -> writeFile fname $ PBFile.renderWBO wbo
+        ".opb" -> PBFile.writeOPBFile fname opb
+        ".wbo" -> PBFile.writeWBOFile fname wbo
         ".lsp" -> writeFile fname (lsp "")
         ".lp" -> MIP.writeLPFile fname lp
         ".mps" -> MIP.writeMPSFile fname lp
