@@ -50,9 +50,12 @@ module ToySolver.Text.PBFile
 import Prelude hiding (sum)
 import Control.Exception (assert)
 import Control.Monad
+import qualified Data.DList as DList
 import Data.List hiding (sum)
 import Data.Maybe
+import Data.Monoid hiding (Sum (..))
 import Data.Word
+import Data.String
 import Text.Parsec
 import Text.Parsec.String
 import Text.Printf
@@ -320,61 +323,61 @@ parseWBOFile = parseFromFile softformula
 
 
 renderOPB :: Formula -> String
-renderOPB opb = showOPB opb ""
+renderOPB opb = DList.apply (showOPB opb) ""
 
 renderWBO :: SoftFormula -> String
-renderWBO wbo = showWBO wbo ""
+renderWBO wbo = DList.apply (showWBO wbo) ""
 
-showOPB :: Formula -> ShowS
-showOPB opb = (size . part1 . part2)
+showOPB :: (Monoid a, IsString a) => Formula -> a
+showOPB opb = (size <> part1 <> part2)
   where
     nv = pbNumVars opb
     nc = pbNumConstraints opb
-    size = showString (printf "* #variable= %d #constraint= %d\n" nv nc)
+    size = fromString (printf "* #variable= %d #constraint= %d\n" nv nc)
     part1 = 
       case pbObjectiveFunction opb of
-        Nothing -> id
-        Just o -> showString "min: " . showSum o . showString ";\n"
-    part2 = foldr (.) id (map showConstraint (pbConstraints opb))
+        Nothing -> mempty
+        Just o -> fromString "min: " <> showSum o <> fromString ";\n"
+    part2 = mconcat $ map showConstraint (pbConstraints opb)
 
-showWBO :: SoftFormula -> ShowS
-showWBO wbo = size . part1 . part2
+showWBO :: (Monoid a, IsString a) => SoftFormula -> a
+showWBO wbo = size <> part1 <> part2
   where
     nv = wboNumVars wbo
     nc = wboNumConstraints wbo
-    size = showString (printf "* #variable= %d #constraint= %d\n" nv nc)
+    size = fromString (printf "* #variable= %d #constraint= %d\n" nv nc)
     part1 = 
       case wboTopCost wbo of
-        Nothing -> showString "soft: ;\n"
-        Just t -> showString "soft: " . showsPrec 0 t . showString ";\n"
-    part2 = foldr (.) id (map showSoftConstraint (wboConstraints wbo))
+        Nothing -> fromString "soft: ;\n"
+        Just t -> fromString "soft: " <> fromString (show t) <> fromString ";\n"
+    part2 = mconcat $ map showSoftConstraint (wboConstraints wbo)
 
-showSum :: Sum -> ShowS
-showSum = foldr (.) id . map showWeightedTerm
+showSum :: (Monoid a, IsString a) => Sum -> a
+showSum = mconcat . map showWeightedTerm
 
-showWeightedTerm :: WeightedTerm -> ShowS
-showWeightedTerm (c, lits) = foldr (\f g -> f . showChar ' ' . g) id (x:xs)
+showWeightedTerm :: (Monoid a, IsString a) => WeightedTerm -> a
+showWeightedTerm (c, lits) = foldr (\f g -> f <> fromString " " <> g) mempty (x:xs)
   where
-    x = if c >= 0 then showChar '+' . showsPrec 0 c else showsPrec 0 c
+    x = if c >= 0 then fromString "+" <> fromString (show c) else fromString (show c)
     xs = map showLit lits
 
-showLit :: Lit -> ShowS
-showLit lit =   if lit > 0 then v else showChar '~' . v
+showLit :: (Monoid a, IsString a) => Lit -> a
+showLit lit = if lit > 0 then v else fromString "~" <> v
   where
-    v = showChar 'x' . showsPrec 0 (abs lit)
+    v = fromString "x" <> fromString (show (abs lit))
 
-showConstraint :: Constraint -> ShowS
+showConstraint :: (Monoid a, IsString a) => Constraint -> a
 showConstraint (lhs, op, rhs) =
-  showSum lhs . f op .  showChar ' ' . showsPrec 0 rhs . showString ";\n"
+  showSum lhs <> f op <>  fromString " " <> fromString (show rhs) <> fromString ";\n"
   where
-    f Eq = showString "="
-    f Ge = showString ">="
+    f Eq = fromString "="
+    f Ge = fromString ">="
 
-showSoftConstraint :: SoftConstraint -> ShowS
+showSoftConstraint :: (Monoid a, IsString a) => SoftConstraint -> a
 showSoftConstraint (cost, constr) =
   case cost of
     Nothing -> showConstraint constr
-    Just c -> showChar '[' . showsPrec 0 c . showChar ']' . showChar ' ' . showConstraint constr
+    Just c -> fromString "[" <> fromString (show c) <> fromString "] " <> showConstraint constr
 
 pbComputeNumVars :: Maybe Sum -> [Constraint] -> Int
 pbComputeNumVars obj cs = maximum (0 : vs)
