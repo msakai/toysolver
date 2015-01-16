@@ -55,7 +55,6 @@ import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
 import ToySolver.Internal.Util (combineMaybe)
 import qualified ToySolver.Arith.FourierMotzkin as FM
-import ToySolver.Arith.FourierMotzkin.Base (Constr (..), toLAAtom)
 
 -- ---------------------------------------------------------------------------
 
@@ -90,13 +89,24 @@ checkRealByFM vs as = isJust $ FM.solve vs as
 
 type ExprZ = LA.Expr Integer
 
+-- | Atomic constraint
+data Constr
+  = IsNonneg ExprZ
+  -- ^ e ≥ 0
+  | IsZero ExprZ
+  -- ^ e = 0
+  deriving (Show, Eq, Ord)
+
+instance Variables Constr where
+  vars (IsNonneg t) = vars t
+  vars (IsZero t) = vars t
+
 -- 制約集合の単純化
 -- It returns Nothing when a inconsistency is detected.
 simplify :: [Constr] -> Maybe [Constr]
 simplify = fmap concat . mapM f
   where
     f :: Constr -> Maybe [Constr]
-    f (IsPos e) = f (IsNonneg (e ^-^ LA.constant 1))
     f constr@(IsNonneg e) =
       case LA.asConst e of
         Just x -> guard (x >= 0) >> return []
@@ -129,12 +139,10 @@ isZero e
     d = abs $ gcd' [c | (c,v) <- LA.terms e, v /= LA.unitVar]
 
 applySubst1Constr :: Var -> ExprZ -> Constr -> Constr
-applySubst1Constr v e (IsPos e2)    = LA.applySubst1 v e e2 `gtZ` LA.constant 0
 applySubst1Constr v e (IsNonneg e2) = LA.applySubst1 v e e2 `geZ` LA.constant 0
 applySubst1Constr v e (IsZero e2)   = LA.applySubst1 v e e2 `eqZ` LA.constant 0
 
 evalConstr :: Model Integer -> Constr -> Bool
-evalConstr m (IsPos t)    = LA.evalExpr m t > 0
 evalConstr m (IsNonneg t) = LA.evalExpr m t >= 0
 evalConstr m (IsZero t)   = LA.evalExpr m t == 0
 
@@ -159,7 +167,6 @@ collectBoundsZ :: Var -> [Constr] -> (BoundsZ, [Constr])
 collectBoundsZ v = foldr phi (([],[]),[])
   where
     phi :: Constr -> (BoundsZ,[Constr]) -> (BoundsZ,[Constr])
-    phi (IsPos t) x = phi (IsNonneg (t ^-^ LA.constant 1)) x
     phi constr@(IsNonneg t) ((ls,us),xs) =
       case LA.extract v t of
         (c,t') -> 
@@ -212,6 +219,10 @@ solve' opt vs2 xs = simplify xs >>= go vs2
 
 isExact :: BoundsZ -> Bool
 isExact (ls,us) = and [a==1 || b==1 | (_,a)<-ls , (_,b)<-us]
+
+toLAAtom :: Constr -> LA.Atom Rational
+toLAAtom (IsNonneg e) = LA.mapCoeff fromInteger e .>=. LA.constant 0
+toLAAtom (IsZero e)   = LA.mapCoeff fromInteger e .==. LA.constant 0
 
 chooseVariable :: VarSet -> [Constr] -> (Var, VarSet, BoundsZ, [Constr])
 chooseVariable vs xs = head $ [e | e@(_,_,bnd,_) <- table, isExact bnd] ++ table
