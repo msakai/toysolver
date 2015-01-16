@@ -225,6 +225,8 @@ Library
   Other-Modules:
      ToySolver.Data.AlgebraicNumber.Graeffe
      ToySolver.Data.Polynomial.Base
+     ToySolver.Text.PBFile.Types
+     ToySolver.Text.PBFile.Parsec
      Paths_toysolver
   GHC-Prof-Options: -auto-all
 
