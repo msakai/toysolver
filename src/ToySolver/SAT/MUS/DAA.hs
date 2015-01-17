@@ -69,10 +69,7 @@ daa solver sels opt =
                 let mus = xs
                 optOnMUSFound opt mus
                 f (Set.insert mus muses) xss
-      f muses (Set.toList (hst mcses `Set.difference` muses))
-
-    hst :: Set LitSet -> Set LitSet
-    hst = Set.fromList . HittingSet.minimalHittingSets . Set.toList
+      f muses (Set.toList (HittingSet.minimalHittingSets mcses `Set.difference` muses))
 
     findMSS :: LitSet -> IO (Maybe LitSet)
     findMSS xs = do

@@ -1,8 +1,11 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Main (main) where
 
+import Prelude hiding (all)
+
 import Control.Applicative
 import Control.Monad
+import Data.Foldable (all)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Set (Set)
@@ -81,47 +84,40 @@ knapsackProblems = do
 -- ---------------------------------------------------------------------
 -- Hitting sets
 
-case_minimalHittingSets_1 = actual' @?= expected'
+case_minimalHittingSets_1 = actual @?= expected
   where
-    actual    = HittingSet.minimalHittingSets $ map IntSet.fromList [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
-    actual'   = Set.fromList actual
-    expected  = map IntSet.fromList [[1,2], [1,3,4], [1,5,6]]
-    expected' = Set.fromList expected
+    actual    = HittingSet.minimalHittingSets $ Set.fromList $ map IntSet.fromList [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
+    expected  = Set.fromList $ map IntSet.fromList [[1,2], [1,3,4], [1,5,6]]
 
 -- an example from http://kuma-san.net/htcbdd.html
-case_minimalHittingSets_2 = actual' @?= expected'
+case_minimalHittingSets_2 = actual @?= expected
   where
-    actual    = HittingSet.minimalHittingSets $ map IntSet.fromList [[2,4,7], [7,8], [9], [9,10]]
-    actual'   = Set.fromList actual
-    expected  = map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
-    expected' = Set.fromList expected
+    actual    = HittingSet.minimalHittingSets $ Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9], [9,10]]
+    expected  = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
 
-hyperGraph :: Gen [IntSet]
+hyperGraph :: Gen (Set IntSet)
 hyperGraph = do
   nv <- choose (0, 10)
   ne <- if nv==0 then return 0 else choose (0, 20)
-  replicateM ne $ do
+  liftM Set.fromList $ replicateM ne $ do
     n <- choose (1,nv)
     liftM IntSet.fromList $ replicateM n $ choose (1, nv)
 
-isHittingSetOf :: IntSet -> [IntSet] -> Bool
+isHittingSetOf :: IntSet -> Set IntSet -> Bool
 isHittingSetOf s g = all (\e -> not (IntSet.null (s `IntSet.intersection` e))) g
 
 prop_minimalHittingSets_duality =
   forAll hyperGraph $ \g ->
     let h = HittingSet.minimalHittingSets g
-    in normalize h == normalize (HittingSet.minimalHittingSets (HittingSet.minimalHittingSets h))
-  where
-    normalize :: [IntSet] -> Set IntSet
-    normalize = Set.fromList
+    in h == HittingSet.minimalHittingSets (HittingSet.minimalHittingSets h)
 
 prop_minimalHittingSets_isHittingSet =
   forAll hyperGraph $ \g ->
-    and [s `isHittingSetOf` g | s <- HittingSet.minimalHittingSets g]
+    all (`isHittingSetOf` g) (HittingSet.minimalHittingSets g)
 
 prop_minimalHittingSets_minimality =
   forAll hyperGraph $ \g ->
-    forAll (elements (HittingSet.minimalHittingSets g)) $ \s ->
+    forAll (elements (Set.toList (HittingSet.minimalHittingSets g))) $ \s ->
       if IntSet.null s then
         property True
       else

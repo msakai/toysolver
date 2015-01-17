@@ -12,22 +12,26 @@
 -----------------------------------------------------------------------------
 module ToySolver.Combinatorial.HittingSet.Simple
   ( minimalHittingSets
+  , enumMinimalHittingSets
   ) where
 
 import Control.Monad
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.List
+import Data.Set (Set)
 import qualified Data.Set as Set
 
-type Vertex = Int
-type HyperEdge = IntSet
-type HittingSet = IntSet
+minimalHittingSets :: Set IntSet -> Set IntSet
+minimalHittingSets = Set.fromList . minimalHittingSets' . Set.toList
 
-minimalHittingSets :: [HyperEdge] -> [HittingSet]
-minimalHittingSets es = nubOrd $ f es IntSet.empty
+enumMinimalHittingSets :: Set IntSet -> [IntSet]
+enumMinimalHittingSets = nubOrd . minimalHittingSets' . Set.toList
+
+minimalHittingSets' :: [IntSet] -> [IntSet]
+minimalHittingSets' es = f es IntSet.empty
   where
-    f :: [HyperEdge] -> HittingSet -> [HittingSet]
+    f :: [IntSet] -> IntSet -> [IntSet]
     f [] hs = return hs
     f es hs = do
       v <- IntSet.toList $ IntSet.unions es
@@ -37,7 +41,7 @@ minimalHittingSets es = nubOrd $ f es IntSet.empty
       let es' = propagateChoice es v e
       f es' hs'
 
-propagateChoice :: [HyperEdge] -> Vertex -> HyperEdge -> [HyperEdge]
+propagateChoice :: [IntSet] -> Int -> IntSet -> [IntSet]
 propagateChoice es v e = zs
   where
     xs = filter (v `IntSet.notMember`) es

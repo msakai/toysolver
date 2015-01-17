@@ -32,15 +32,13 @@ import qualified Data.IntSet as IntSet
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.List
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Typeable
 import System.Exit
 import System.IO
 import System.IO.Temp
 import ToySolver.Internal.ProcessUtil (runProcessWithOutputCallback)
-
-type Vertex = Int
-type HyperEdge = IntSet
-type HittingSet = IntSet
 
 data Options
   = Options
@@ -67,20 +65,20 @@ data Failure = Failure !Int
 
 instance Exception Failure
 
-minimalHittingSets :: Options -> [HyperEdge] -> IO [HittingSet]
+minimalHittingSets :: Options -> Set IntSet -> IO (Set IntSet)
 minimalHittingSets opt es = do
   withSystemTempFile "shd-input.dat" $ \fname1 h1 -> do
-    forM_ es $ \e -> do
+    forM_ (Set.toList es) $ \e -> do
       hPutStrLn h1 $ intercalate " " [show (encTable IntMap.! v) | v <- IntSet.toList e]
     hClose h1
     withSystemTempFile "shd-out.dat" $ \fname2 h2 -> do
       hClose h2
       execSHD opt fname1 fname2
       s <- readFile fname2
-      return $ map (IntSet.fromList . map ((decTable !) . read) . words) $ lines s
+      return $ Set.fromList $ map (IntSet.fromList . map ((decTable !) . read) . words) $ lines s
   where
     vs :: IntSet
-    vs = IntSet.unions es
+    vs = IntSet.unions (Set.toList es)
 
     nv :: Int
     nv = IntSet.size vs

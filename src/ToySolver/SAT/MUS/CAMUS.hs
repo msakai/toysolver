@@ -43,6 +43,8 @@ import Data.Default.Class
 import qualified Data.IntSet as IS
 import Data.List
 import Data.IORef
+import Data.Set (Set)
+import qualified Data.Set as Set
 import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types
@@ -140,7 +142,7 @@ camus solver sels opt = do
   log "CAMUS: MCS enumeration begins"
   mcses <- allMCSAssumptions solver sels opt
   log "CAMUS: MCS enumeration done"
-  let muses = HittingSet.minimalHittingSets mcses
+  let muses = HittingSet.enumMinimalHittingSets $ Set.fromList mcses
   mapM_ (optOnMUSFound opt) muses
   return (muses, mcses)
   where
