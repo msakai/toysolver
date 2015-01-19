@@ -4,10 +4,12 @@ module Main (main) where
 import Prelude hiding (all)
 
 import Control.Applicative
+import Control.Arrow
 import Control.Monad
 import Data.Foldable (all)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Ratio
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Test.HUnit hiding (Test)
@@ -25,6 +27,7 @@ import ToySolver.Internal.TextUtil
 import qualified ToySolver.Combinatorial.Knapsack.BB as KnapsackBB
 import qualified ToySolver.Combinatorial.Knapsack.DP as KnapsackDP
 import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
+import qualified ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996 as FredmanKhachiyan1996
 import qualified ToySolver.Wang as Wang
 
 case_showRationalAsDecimal :: IO ()
@@ -123,6 +126,110 @@ prop_minimalHittingSets_minimality =
       else
         forAll (elements (IntSet.toList s)) $ \v ->
           not $ IntSet.delete v s `isHittingSetOf` g
+
+mutuallyDualHypergraphs :: Gen (Set IntSet, Set IntSet)
+mutuallyDualHypergraphs = do
+  g <- liftM HittingSet.minimalHittingSets hyperGraph
+  let f = HittingSet.minimalHittingSets g
+  return (f,g)
+
+mutuallyDualDNFs :: Gen (Set IntSet, Set IntSet)
+mutuallyDualDNFs = do
+  (f,g) <- mutuallyDualHypergraphs
+  let xs = IntSet.unions $ Set.toList $ f `Set.union` g
+  if IntSet.null xs then
+    return (f,g)
+  else do
+    let xs' = IntSet.toList xs
+    let mutate h = liftM Set.unions $ do
+          forM (Set.toList h) $ \is -> oneof $
+            [ return $ Set.singleton is
+            , do i <- elements xs'
+                 return $ Set.fromList [is, IntSet.insert i is]
+            ]
+    f' <- mutate f
+    g' <- mutate g
+    return (f',g')
+
+-- Pair of DNFs that are nearly dual.
+pairOfDNFs :: Gen (Set IntSet, Set IntSet)
+pairOfDNFs = do
+  (f,g) <- mutuallyDualDNFs
+  let mutate h = liftM Set.unions $ do
+        forM (Set.toList h) $ \is -> oneof $
+          [return Set.empty, return (Set.singleton is)] ++
+          [ do x <- elements (IntSet.toList is)
+               return $ Set.singleton $ IntSet.delete x is
+          | not (IntSet.null is)
+          ]
+  return (f,g)
+
+prop_FredmanKhachiyan1996_checkDualityA_prop1 =
+  forAll mutuallyDualDNFs $ \(f,g) ->
+    FredmanKhachiyan1996.checkDualityA f g == Nothing
+
+prop_FredmanKhachiyan1996_checkDualityA_prop2 =
+  forAll pairOfDNFs $ \(f,g) ->
+    case FredmanKhachiyan1996.checkDualityA f g of
+      Nothing -> True
+      Just xs -> xs `FredmanKhachiyan1996.isCounterExampleOf` (f,g)
+
+prop_FredmanKhachiyan1996_checkDualityB_prop1 =
+  forAll mutuallyDualDNFs $ \(f,g) ->
+    FredmanKhachiyan1996.checkDualityA f g == Nothing
+
+prop_FredmanKhachiyan1996_checkDualityB_prop2 =
+  forAll pairOfDNFs $ \(f,g) ->
+    case FredmanKhachiyan1996.checkDualityB f g of
+      Nothing -> True
+      Just xs -> xs `FredmanKhachiyan1996.isCounterExampleOf` (f,g)
+
+prop_FredmanKhachiyan1996_lemma_1 =
+  forAll mutuallyDualHypergraphs $ \(f,g) ->
+    let e :: Rational
+        e = sum [1 % (2 ^ IntSet.size i) | i <- Set.toList f] +
+            sum [1 % (2 ^ IntSet.size j) | j <- Set.toList g]
+    in e >= 1
+
+prop_FredmanKhachiyan1996_corollary_1 =
+  forAll mutuallyDualHypergraphs $ \(f,g) ->
+    let n = Set.size f + Set.size g
+        m = minimum [IntSet.size is | is <- Set.toList (f `Set.union` g)]
+    in fromIntegral m <= logBase 2 (fromIntegral n)
+
+prop_FredmanKhachiyan1996_lemma_2 =
+  forAll mutuallyDualHypergraphs $ \(f,g) ->
+    let n = Set.size f + Set.size g
+        epsilon :: Double
+        epsilon = 1 / logBase 2 (fromIntegral n)
+        vs = IntSet.unions $ Set.toList $ f `Set.union` g
+    in (Set.size f * Set.size g >= 1)
+       ==> any (\v -> FredmanKhachiyan1996.occurFreq v f >= epsilon || FredmanKhachiyan1996.occurFreq v g >= epsilon) (IntSet.toList vs)
+
+prop_FredmanKhachiyan1996_lemma_3_a =
+  forAll mutuallyDualHypergraphs $ \(f,g) ->
+    let vs = IntSet.unions $ Set.toList $ f `Set.union` g
+        x = IntSet.findMin vs
+        -- f = x f0 ∨ f1
+        (f0, f1) = Set.map (IntSet.delete x) *** id $ Set.partition (x `IntSet.member`) f
+        -- g = x g0 ∨ g1
+        (g0, g1) = Set.map (IntSet.delete x) *** id $ Set.partition (x `IntSet.member`) g
+    in not (IntSet.null vs)
+       ==>
+         HittingSet.minimalHittingSets f1 == FredmanKhachiyan1996.deleteRedundancy (g0 `Set.union` g1) &&
+         HittingSet.minimalHittingSets g1 == FredmanKhachiyan1996.deleteRedundancy (f0 `Set.union` f1)
+
+prop_FredmanKhachiyan1996_to_selfDuality =
+  forAll mutuallyDualHypergraphs $ \(f,g) ->
+    let vs = IntSet.unions $ Set.toList $ f `Set.union` g
+        y = if IntSet.null vs then 0 else IntSet.findMax vs + 1
+        z = y + 1
+        h = FredmanKhachiyan1996.deleteRedundancy $ Set.unions
+              [ Set.map (IntSet.insert y) f
+              , Set.map (IntSet.insert z) g
+              , Set.singleton (IntSet.fromList [y,z])
+              ] 
+    in HittingSet.minimalHittingSets h == h
 
 -- ---------------------------------------------------------------------
 -- Vec
