@@ -313,41 +313,47 @@ checkDualityB' f g
           epsilon_x_g = occurFreq x g
       in if epsilon_x_f <= epsilon_v then
            msum
-           [ {- If x=0 then f(xs)=g(¬xs) ⇔ f1(xs) = g0(¬xs) ∨ g1(¬xs). -}
+           [ {- f(xs ∪ {x↦0})=g(¬xs ∪ {x↦1}) ⇔ f1(xs) = g0(¬xs) ∨ g1(¬xs). -}
              checkDualityB' f1 (deleteRedundancy (g0 `Set.union` g1))
-           , {- If x=1 then f(xs)=g(¬xs) ⇔ f0(xs) ∨ f1(xs) = g1(¬xs).
-                f(¬xs)=g(xs)
-                ⇔ f0(¬xs) ∨ f1(¬xs) = g1(xs)  {- assuming x=1 -}
+           , {- f(¬xs ∪ {x↦1}) = g(xs ∪ {x↦0})
+                ⇔ f0(¬xs) ∨ f1(¬xs) = g1(xs)
                 ⇔ f0(¬xs) ∨ (¬g0(xs)∧¬g1(xs)) = g1(xs) {- duality of f1 and g0∨g1 -}
                 ⇔ f0(¬xs) = g1(xs) and g0(xs) = 1
                    {- g0(xs)=0 is impossible, because
                       it implies f0(¬xs)∨¬g1(xs)=g1(xs) and then
                       f0(¬xs)=g1(xs)=1 which contradicts condition (1.1) -}
               -}
-             liftM (xs `IntSet.difference`) $ msum $ do
+             msum $ do
                js <- Set.toList g0
                let f' = Set.filter (js `disjoint`) f0
                    g' = Set.map (`IntSet.difference` js) g1
-               return $ checkDualityB' (deleteRedundancy g') (deleteRedundancy f')
+               return $ do
+                 ys <- checkDualityB' (deleteRedundancy g') (deleteRedundancy f')
+                 let ys2 = IntSet.insert x $ xs `IntSet.difference` (js `IntSet.union` ys)
+                 assert (ys2 `isCounterExampleOf` (f,g)) $ return ()
+                 return ys2
            ]
          else if epsilon_x_g <= epsilon_v then
            msum
-           [ {- If x=1 then f(xs)=g(¬xs) ⇔ f0(xs) ∨ f1(xs) = g1(¬xs). -}
+           [ {- f(xs ∪ {x↦1}) = g(¬xs ∪ {x↦0})) ⇔ f0(xs) ∨ f1(xs) = g1(¬xs). -}
              liftM (IntSet.insert x) $ checkDualityB' (deleteRedundancy (f0 `Set.union` f1)) g1
-           , {- If x=0 then f(xs)=g(¬xs) ⇔ f1(xs) = g0(¬xs) ∨ g1(¬xs).
-                f(xs)=g(¬xs)
-                ⇔ f1(¬xs) = g0(xs) ∨ g1(xs)  {- assuming x=0 -}
-                ⇔ f1(¬xs) = g0(xs) ∨ (¬f0(¬xs)∧¬f1(¬xs))  {- duality of g1 and f0∨f1 -}
-                ⇔ f1(¬xs) = g0(xs) and f0(xs) = 1
-                   {- f0(¬xs)=0 is impossible, because
-                      it implies f1(¬xs)=g0(xs)∨¬f1(¬xs) and then
-                      f1(¬xs)=g0(xs)=1 which contradicts condition (1.1) -}
+           , {- f(xs ∪ {x↦0}) = g(¬xs ∪ {x↦1})
+                ⇔ f1(xs) = g0(¬xs) ∨ g1(¬xs)
+                ⇔ f1(xs) = g0(¬xs) ∨ (¬f0(xs)∧¬f1(xs))  {- duality of g1 and f0∨f1 -}
+                ⇔ f1(xs) = g0(¬xs) and f0(xs) = 1
+                   {- f0(xs)=0 is impossible, because
+                      it implies f1(xs)=g0(¬xs)∨¬f1(xs) and then
+                      f1(xs)=g0(¬xs)=1 which contradicts condition (1.1) -}
               -}
-             liftM (xs `IntSet.difference`) $ msum $ do
+             msum $ do
                is <- Set.toList f0
                let f' = Set.map (`IntSet.difference` is) f1
                    g' = Set.filter (is `disjoint`) g0
-               return $ checkDualityB' (deleteRedundancy g') (deleteRedundancy f')
+               return $ do
+                 ys <- checkDualityB' (deleteRedundancy f') (deleteRedundancy g')
+                 let ys2 = is `IntSet.union` ys
+                 assert (ys2 `isCounterExampleOf` (f,g)) $ return ()
+                 return ys2
            ]
          else -- epsilon_v < min epsilon_x_f epsilon_x_g
            msum
@@ -421,7 +427,7 @@ test_checkDualityA = checkDualityA f g == Nothing
     f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
     g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
 
-test_checkDualityB = checkDualityA f g == Nothing
+test_checkDualityB = checkDualityB f g == Nothing
   where
     f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
     g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]

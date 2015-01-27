@@ -52,7 +52,7 @@ findImplicateOrImplicant
   -> Set IntSet -- ^ Subset /D'/ of prime implicants /D/ of /f/
   -> Maybe (Either IntSet IntSet)
 findImplicateOrImplicant vs f cs ds = do
-  xs <- FredmanKhachiyan1996.checkDualityA ds cs
+  xs <- FredmanKhachiyan1996.checkDuality ds cs
   if f xs then do
     let loop :: [Int] -> IntSet -> IntSet
         loop [] !ret = ret
