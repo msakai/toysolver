@@ -28,6 +28,7 @@ import qualified ToySolver.Combinatorial.Knapsack.BB as KnapsackBB
 import qualified ToySolver.Combinatorial.Knapsack.DP as KnapsackDP
 import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996 as FredmanKhachiyan1996
+import qualified ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999 as GurvichKhachiyan1999
 import qualified ToySolver.Wang as Wang
 
 case_showRationalAsDecimal :: IO ()
@@ -230,6 +231,25 @@ prop_FredmanKhachiyan1996_to_selfDuality =
               , Set.singleton (IntSet.fromList [y,z])
               ] 
     in HittingSet.minimalHittingSets h == h
+
+
+prop_GurvichKhachiyan1999_minimalHittingSets_duality =
+  forAll hyperGraph $ \g ->
+    let h = GurvichKhachiyan1999.minimalHittingSets g
+    in h == GurvichKhachiyan1999.minimalHittingSets (GurvichKhachiyan1999.minimalHittingSets h)
+
+prop_GurvichKhachiyan1999_minimalHittingSets_isHittingSet =
+  forAll hyperGraph $ \g ->
+    all (`isHittingSetOf` g) (GurvichKhachiyan1999.minimalHittingSets g)
+
+prop_GurvichKhachiyan1999_minimalHittingSets_minimality =
+  forAll hyperGraph $ \g ->
+    forAll (elements (Set.toList (GurvichKhachiyan1999.minimalHittingSets g))) $ \s ->
+      if IntSet.null s then
+        property True
+      else
+        forAll (elements (IntSet.toList s)) $ \v ->
+          not $ IntSet.delete v s `isHittingSetOf` g
 
 -- ---------------------------------------------------------------------
 -- Vec

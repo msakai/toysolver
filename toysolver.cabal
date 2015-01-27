@@ -146,6 +146,7 @@ Library
      ToySolver.Combinatorial.HittingSet.HTCBDD
      ToySolver.Combinatorial.HittingSet.SHD
      ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996
+     ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999
      ToySolver.Combinatorial.Knapsack.BB
      ToySolver.Combinatorial.Knapsack.DP
      ToySolver.Converter.ObjType
