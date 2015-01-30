@@ -232,6 +232,18 @@ prop_FredmanKhachiyan1996_to_selfDuality =
               ] 
     in HittingSet.minimalHittingSets h == h
 
+prop_GurvichKhachiyan1999_generateCNFAndDNF =
+  forAll hyperGraph $ \g ->
+    let vs = IntSet.unions $ Set.toList g
+        f xs = any (\is -> not $ IntSet.null $ xs `IntSet.intersection` is) (Set.toList g)
+        dual f is = not $ f (vs `IntSet.difference` is)
+        is `isImplicantOf` f = f is
+        is `isImplicateOf` f = is `isImplicantOf` dual f
+        is `isPrimeImplicantOf` f = is `isImplicantOf` f && all (\i -> not (IntSet.delete i is `isImplicantOf` f)) (IntSet.toList is)
+        is `isPrimeImplicateOf` f = is `isImplicateOf` f && all (\i -> not (IntSet.delete i is `isImplicateOf` f)) (IntSet.toList is)
+        (cnf,dnf) = GurvichKhachiyan1999.generateCNFAndDNF vs f Set.empty Set.empty
+    in all (`isPrimeImplicantOf` f) (Set.toList dnf) &&
+       all (`isPrimeImplicateOf` f) (Set.toList cnf)
 
 prop_GurvichKhachiyan1999_minimalHittingSets_duality =
   forAll hyperGraph $ \g ->
