@@ -1,7 +1,7 @@
 toysolver
 =========
 
-[![Build Status](https://secure.travis-ci.org/msakai/toysolver.png?branch=master)](http://travis-ci.org/msakai/toysolver) [![Hackage](https://budueba.com/hackage/toysolver)](https://hackage.haskell.org/package/toysolver)
+[![Build Status](https://secure.travis-ci.org/msakai/toysolver.png?branch=master)](http://travis-ci.org/msakai/toysolver) [![Coverage Status](https://coveralls.io/repos/msakai/toysolver/badge.svg)](https://coveralls.io/r/msakai/toysolver) [![Hackage](https://budueba.com/hackage/toysolver)](https://hackage.haskell.org/package/toysolver)
 
 Assorted decision procedures for SAT, Max-SAT, PB, MIP, etc.
 
