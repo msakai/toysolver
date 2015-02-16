@@ -43,16 +43,19 @@ module ToySolver.Text.PBFile
 
   -- * Show .opb files
   , renderOPB
+  , renderOPBByteString
   , writeOPBFile
   , hPutOPB
 
   -- * Show .wbo files
   , renderWBO
+  , renderWBOByteString
   , writeWBOFile
   , hPutWBO
   ) where
 
 import Prelude hiding (sum)
+import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.DList as DList
 import Data.Monoid hiding (Sum (..))
@@ -67,6 +70,12 @@ renderOPB opb = DList.apply (showOPB opb) ""
 
 renderWBO :: SoftFormula -> String
 renderWBO wbo = DList.apply (showWBO wbo) ""
+
+renderOPBByteString :: Formula -> BS.ByteString
+renderOPBByteString opb = Builder.toLazyByteString (showOPB opb)
+
+renderWBOByteString :: SoftFormula -> BS.ByteString
+renderWBOByteString wbo = Builder.toLazyByteString (showWBO wbo)
 
 showOPB :: (Monoid a, IsString a) => Formula -> a
 showOPB opb = (size <> part1 <> part2)
