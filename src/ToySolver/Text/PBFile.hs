@@ -35,10 +35,12 @@ module ToySolver.Text.PBFile
 
   -- * Parsing .opb files
   , parseOPBString
+  , parseOPBByteString
   , parseOPBFile
 
   -- * Parsing .wbo files
   , parseWBOString
+  , parseWBOByteString
   , parseWBOFile
 
   -- * Show .opb files
@@ -63,6 +65,7 @@ import Data.String
 import System.IO
 import Text.Printf
 import ToySolver.Text.PBFile.Parsec
+import ToySolver.Text.PBFile.Attoparsec hiding (parseOPBFile, parseWBOFile)
 import ToySolver.Text.PBFile.Types
 
 renderOPB :: Formula -> String
