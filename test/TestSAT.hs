@@ -1057,6 +1057,7 @@ arbitrarySolver = do
   forwardSubsumptionRemoval <- QM.pick arbitrary
   backwardSubsumptionRemoval <- QM.pick arbitrary
   randomFreq <- QM.pick $ choose (0,1)
+  splitClausePart <- QM.pick arbitrary
   QM.run $ do
     solver <- newSolver
     setCheckModel solver True
@@ -1068,6 +1069,7 @@ arbitrarySolver = do
     setEnableForwardSubsumptionRemoval solver forwardSubsumptionRemoval
     setEnableBackwardSubsumptionRemoval solver backwardSubsumptionRemoval
     setRandomFreq solver randomFreq
+    setPBSplitClausePart solver splitClausePart
     return solver
 
 ------------------------------------------------------------------------

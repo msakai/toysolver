@@ -104,6 +104,7 @@ data Options
   , optRandomGen     :: Maybe Rand.StdGen
   , optLinearizerPB  :: Bool
   , optPBHandlerType :: SAT.PBHandlerType
+  , optPBSplitClausePart :: Bool
   , optSearchStrategy       :: PBO.SearchStrategy
   , optObjFunVarsHeuristics :: Bool
   , optLocalSearchInitial   :: Bool
@@ -136,6 +137,7 @@ defaultOptions
   , optRandomGen     = Nothing
   , optLinearizerPB  = False
   , optPBHandlerType = SAT.defaultPBHandlerType
+  , optPBSplitClausePart = SAT.defaultPBSplitClausePart
   , optEnableBackwardSubsumptionRemoval = SAT.defaultEnableBackwardSubsumptionRemoval
   , optSearchStrategy       = PBO.defaultSearchStrategy
   , optObjFunVarsHeuristics = PBO.defaultEnableObjFunVarsHeuristics
@@ -218,6 +220,12 @@ options =
     , Option [] ["pb-handler"]
         (ReqArg (\val opt -> opt{ optPBHandlerType = parsePBHandler val }) "<name>")
         "PB constraint handler: counter (default), pueblo"
+    , Option [] ["pb-split-clause-part"]
+        (NoArg (\opt -> opt{ optPBSplitClausePart = True }))
+        ("Split clause part of PB constraints." ++ (if SAT.defaultPBSplitClausePart then " (default)" else ""))
+    , Option [] ["no-pb-split-clause-part"]
+        (NoArg (\opt -> opt{ optPBSplitClausePart = False }))
+        ("Do not split clause part of PB constraints." ++ (if SAT.defaultPBSplitClausePart then "" else " (default)"))
 
     , Option [] ["search"]
         (ReqArg (\val opt -> opt{ optSearchStrategy = parseSearch val }) "<str>")
@@ -461,6 +469,7 @@ newSolver opts = do
   SAT.setEnableForwardSubsumptionRemoval solver (optEnableForwardSubsumptionRemoval opts)
   SAT.setEnableBackwardSubsumptionRemoval solver (optEnableBackwardSubsumptionRemoval opts)
   SAT.setPBHandlerType solver (optPBHandlerType opts)
+  SAT.setPBSplitClausePart solver (optPBSplitClausePart opts)
   SAT.setLogger solver putCommentLine
   SAT.setCheckModel solver (optCheckModel opts)
   return solver

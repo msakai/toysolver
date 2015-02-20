@@ -109,6 +109,9 @@ module ToySolver.SAT
   , PBHandlerType (..)
   , setPBHandlerType
   , defaultPBHandlerType
+  , setPBSplitClausePart
+  , getPBSplitClausePart
+  , defaultPBSplitClausePart
 
   -- * Read state
   , nVars
@@ -357,6 +360,7 @@ data Solver
   , svLearningStrategy :: !(IORef LearningStrategy)
 
   , svPBHandlerType :: !(IORef PBHandlerType)
+  , svPBSplitClausePart :: !(IORef Bool)
 
   , svEnableBackwardSubsumptionRemoval :: !(IORef Bool)
 
@@ -639,6 +643,7 @@ newSolver = do
   ccMin <- newIORef defaultCCMin
   checkModel <- newIORef False
   pbHandlerType <- newIORef defaultPBHandlerType
+  pbSplitClausePart <- newIORef defaultPBSplitClausePart
   enablePhaseSaving <- newIORef defaultEnablePhaseSaving
   enableForwardSubsumptionRemoval <- newIORef defaultEnableForwardSubsumptionRemoval
   enableBackwardSubsumptionRemoval <- newIORef defaultEnableBackwardSubsumptionRemoval
@@ -692,6 +697,7 @@ newSolver = do
         , svEnablePhaseSaving = enablePhaseSaving
         , svEnableForwardSubsumptionRemoval = enableForwardSubsumptionRemoval
         , svPBHandlerType   = pbHandlerType
+        , svPBSplitClausePart = pbSplitClausePart
         , svEnableBackwardSubsumptionRemoval = enableBackwardSubsumptionRemoval
         , svLearntLim       = learntLim
         , svLearntLimAdjCnt = learntLimAdjCnt
@@ -852,7 +858,13 @@ addPBAtLeast solver ts n = do
         if degree <= 0 then return ()
         else if slack < 0 then markBad solver
         else do
-          removeBackwardSubsumedBy solver (ts', degree)
+          removeBackwardSubsumedBy solver (ts', degree)          
+          (ts',degree) <- do
+            b <- getPBSplitClausePart solver
+            if b
+            then pbSplitClausePart solver (ts',degree)
+            else return (ts',degree)
+
           c <- newPBHandler solver ts' degree False
           addToDB solver c
           ret <- attach solver c
@@ -863,6 +875,17 @@ addPBAtLeast solver ts n = do
             case ret2 of
               Nothing -> return ()
               Just _ -> markBad solver
+
+-- | See documentation of 'setPBSplitClausePart'.
+pbSplitClausePart :: Solver -> ([(Integer,Lit)], Integer) -> IO ([(Integer,Lit)], Integer)
+pbSplitClausePart solver (lhs,rhs) = do
+  let (ts1,ts2) = partition (\(c,l) -> c >= rhs) lhs
+  if length ts1 < 2 then
+    return (lhs,rhs)    
+  else do
+    sel <- newVar solver
+    addClause solver $ -sel : [l | (_,l) <- ts1]
+    return ((rhs,sel) : ts2, rhs)
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMost :: Solver          -- ^ The 'Solver' argument.
@@ -1443,6 +1466,36 @@ defaultPBHandlerType = PBHandlerTypeCounter
 setPBHandlerType :: Solver -> PBHandlerType -> IO ()
 setPBHandlerType solver ht = do
   writeIORef (svPBHandlerType solver) ht
+
+-- | Split PB-constraints into a PB part and a clause part.
+--
+-- Example from minisat+ paper:
+--
+-- * 4 x1 + 4 x2 + 4 x3 + 4 x4 + 2y1 + y2 + y3 ≥ 4
+-- 
+-- would be split into
+--
+-- * x1 + x2 + x3 + x4 + ¬z ≥ 1 (clause part)
+--
+-- * 2 y1 + y2 + y3 + 4 z ≥ 4 (PB part)
+--
+-- where z is a newly introduced variable, not present in any other constraint.
+-- 
+-- Reference:
+-- 
+-- * N . Eéen and N. Sörensson. Translating Pseudo-Boolean Constraints into SAT. JSAT 2:1–26, 2006.
+-- 
+setPBSplitClausePart :: Solver -> Bool -> IO ()
+setPBSplitClausePart solver b =
+  writeIORef (svPBSplitClausePart solver) b
+
+-- | See documentation of 'setPBSplitClausePart'.
+getPBSplitClausePart :: Solver -> IO Bool
+getPBSplitClausePart solver = readIORef (svPBSplitClausePart solver)
+
+-- | See documentation of 'setPBSplitClausePart'.
+defaultPBSplitClausePart :: Bool
+defaultPBSplitClausePart = False
 
 setEnablePhaseSaving :: Solver -> Bool -> IO ()
 setEnablePhaseSaving solver flag = do
