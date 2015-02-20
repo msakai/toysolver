@@ -30,17 +30,16 @@ import qualified ToySolver.SAT.PBO as PBO
 prop_solveCNF :: Property
 prop_solveCNF = QM.monadicIO $ do
   cnf@(nv,_) <- QM.pick arbitraryCNF
-  ret <- QM.run $ solveCNF cnf
+  solver <- arbitrarySolver
+  ret <- QM.run $ solveCNF solver cnf
   case ret of
     Just m -> QM.assert $ evalCNF m cnf == True
     Nothing -> do
       forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
         QM.assert $ evalCNF m cnf == False
 
-solveCNF :: (Int,[Clause]) -> IO (Maybe Model)
-solveCNF (nv,cs) = do
-  solver <- newSolver
-  setCheckModel solver True
+solveCNF :: Solver -> (Int,[Clause]) -> IO (Maybe Model)
+solveCNF solver (nv,cs) = do
   newVars_ solver nv
   forM_ cs $ \c -> addClause solver c
   ret <- solve solver
@@ -69,17 +68,16 @@ evalCNF m (_,cs) = all (evalClause m) cs
 prop_solvePB :: Property
 prop_solvePB = QM.monadicIO $ do
   prob@(nv,_) <- QM.pick arbitraryPB
-  ret <- QM.run $ solvePB prob
+  solver <- arbitrarySolver
+  ret <- QM.run $ solvePB solver prob
   case ret of
     Just m -> QM.assert $ evalPB m prob == True
     Nothing -> do
       forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
         QM.assert $ evalPB m prob == False
 
-solvePB :: (Int,[PBLinAtLeast]) -> IO (Maybe Model)
-solvePB (nv,cs) = do
-  solver <- newSolver
-  setCheckModel solver True
+solvePB :: Solver -> (Int,[PBLinAtLeast]) -> IO (Maybe Model)
+solvePB solver (nv,cs) = do
   newVars_ solver nv
   forM_ cs $ \c -> addPBAtLeast solver (fst c) (snd c)
   ret <- solve solver
@@ -114,16 +112,16 @@ evalPB m (_,cs) = all (evalPBLinAtLeast m) cs
 prop_solveXOR :: Property
 prop_solveXOR = QM.monadicIO $ do
   prob@(nv,_) <- QM.pick arbitraryXOR
-  ret <- QM.run $ solveXOR prob
+  solver <- arbitrarySolver
+  ret <- QM.run $ solveXOR solver prob
   case ret of
     Just m -> QM.assert $ evalXOR m prob == True
     Nothing -> do
       forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
         QM.assert $ evalXOR m prob == False
 
-solveXOR :: (Int,[XORClause]) -> IO (Maybe Model)
-solveXOR (nv,cs) = do
-  solver <- newSolver
+solveXOR :: Solver -> (Int,[XORClause]) -> IO (Maybe Model)
+solveXOR solver (nv,cs) = do
   setCheckModel solver True
   newVars_ solver nv
   forM_ cs $ \c -> addXORClause solver (fst c) (snd c)
@@ -1037,6 +1035,40 @@ case_DAA_allMUSAssumptions_2 = do
   let actual'   = Set.fromList actual
       expected' = Set.fromList $ map IntSet.fromList cores
   actual' @?= expected'
+
+------------------------------------------------------------------------
+
+instance Arbitrary LearningStrategy where
+  arbitrary = arbitraryBoundedEnum
+
+instance Arbitrary RestartStrategy where
+  arbitrary = arbitraryBoundedEnum
+
+instance Arbitrary PBHandlerType where
+  arbitrary = arbitraryBoundedEnum
+
+arbitrarySolver :: QM.PropertyM IO Solver
+arbitrarySolver = do
+  learningStrategy <- QM.pick arbitrary
+  restartStrategy <- QM.pick arbitrary
+  pbhandler <- QM.pick arbitrary
+  ccmin <- QM.pick $ choose (0,2)
+  phaseSaving <- QM.pick arbitrary
+  forwardSubsumptionRemoval <- QM.pick arbitrary
+  backwardSubsumptionRemoval <- QM.pick arbitrary
+  randomFreq <- QM.pick $ choose (0,1)
+  QM.run $ do
+    solver <- newSolver
+    setCheckModel solver True
+    setLearningStrategy solver learningStrategy
+    setRestartStrategy solver restartStrategy
+    setPBHandlerType solver pbhandler
+    setCCMin solver ccmin
+    setEnablePhaseSaving solver phaseSaving
+    setEnableForwardSubsumptionRemoval solver forwardSubsumptionRemoval
+    setEnableBackwardSubsumptionRemoval solver backwardSubsumptionRemoval
+    setRandomFreq solver randomFreq
+    return solver
 
 ------------------------------------------------------------------------
 -- Test harness
