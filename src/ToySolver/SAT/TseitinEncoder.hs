@@ -32,6 +32,14 @@
 -- * [BM84b] E. Balas and J. B. Mazzola. Nonlinear 0-1 programming:
 --   II. Dominance relations and algorithms. Mathematical Programming,
 --   30(1):22-45, 1984.
+--
+-- * [PG86] D. Plaisted and S. Greenbaum. A Structure-preserving
+--    Clause Form Translation. In Journal on Symbolic Computation,
+--    volume 2, 1986.
+--
+-- * [ES06] N . Eéen and N. Sörensson. Translating Pseudo-Boolean
+--   Constraints into SAT. JSAT 2:1–26, 2006.
+--
 -----------------------------------------------------------------------------
 module ToySolver.SAT.TseitinEncoder
   (
@@ -41,12 +49,26 @@ module ToySolver.SAT.TseitinEncoder
   , setUsePB
   , encSolver
 
-  -- * Encoding of boolean formula
+  -- * Polarity
+  , Polarity (..)
+  , negatePolarity
+  , polarityPos
+  , polarityNeg
+  , polarityBoth
+  , polarityNone
+
+  -- * Boolean formula type
   , Formula
   , evalFormula
+
+  -- * Encoding of boolean formulas
   , addFormula
   , encodeConj
+  , encodeConjWithPolarity
   , encodeDisj
+  , encodeDisjWithPolarity
+
+  -- * Retrieving definitions
   , getDefinitions
   ) where
 
@@ -72,7 +94,7 @@ data Encoder =
   Encoder
   { encSolver    :: SAT.Solver
   , encUsePB     :: IORef Bool
-  , encConjTable :: !(IORef (Map SAT.LitSet SAT.Lit))
+  , encConjTable :: !(IORef (Map SAT.LitSet (SAT.Lit, Bool, Bool)))
   }
 
 -- | Create a @Encoder@ instance.
@@ -128,64 +150,119 @@ encodeToClause encoder formula =
     Imply a b -> do
       encodeToClause encoder (notB a .||. b)
     _ -> do
-      l <- encodeToLit encoder formula
+      l <- encodeToLitWithPolarity encoder polarityPos formula
       return [l]
 
 encodeToLit :: Encoder -> Formula -> IO SAT.Lit
-encodeToLit encoder formula = do
+encodeToLit encoder = encodeToLitWithPolarity encoder polarityBoth
+
+encodeToLitWithPolarity :: Encoder -> Polarity -> Formula -> IO SAT.Lit
+encodeToLitWithPolarity encoder p formula = do
   case formula of
     Atom l -> return l
-    And xs -> encodeConj encoder =<< mapM (encodeToLit encoder) xs
-    Or xs  -> encodeDisj encoder =<< mapM (encodeToLit encoder) xs
-    Not x -> liftM SAT.litNot $ encodeToLit encoder x
+    And xs -> encodeConjWithPolarity encoder p =<< mapM (encodeToLit encoder) xs
+    Or xs  -> encodeDisjWithPolarity encoder p =<< mapM (encodeToLit encoder) xs
+    Not x -> liftM SAT.litNot $ encodeToLitWithPolarity encoder (negatePolarity p) x
     Imply x y -> do
-      encodeToLit encoder (notB x .||. y)
+      encodeToLitWithPolarity encoder p (notB x .||. y)
     Equiv x y -> do
-      lit1 <- encodeToLit encoder x
-      lit2 <- encodeToLit encoder y
-      encodeToLit encoder $
+      lit1 <- encodeToLitWithPolarity encoder polarityBoth x
+      lit2 <- encodeToLitWithPolarity encoder polarityBoth y
+      encodeToLitWithPolarity encoder p $
         (Atom lit1 .=>. Atom lit2) .&&. (Atom lit2 .=>. Atom lit1)
 
 -- | Return an literal which is equivalent to a given conjunction.
+--
+-- @
+--   encodeConj encoder = 'encodeConjWithPolarity' encoder 'polarityBoth'
+-- @
 encodeConj :: Encoder -> [SAT.Lit] -> IO SAT.Lit
-encodeConj _ [l] =  return l
-encodeConj encoder ls =  do
+encodeConj encoder = encodeConjWithPolarity encoder polarityBoth
+
+-- | Return an literal which is equivalent to a given conjunction which occurs only in specified polarity.
+encodeConjWithPolarity :: Encoder -> Polarity -> [SAT.Lit] -> IO SAT.Lit
+encodeConjWithPolarity _ _ [l] =  return l
+encodeConjWithPolarity encoder (Polarity pos neg) ls = do
   let ls2 = IntSet.fromList ls
-  table <- readIORef (encConjTable encoder)
-  case Map.lookup ls2 table of
-    Just l -> return l
-    Nothing -> do
-      let sat = encSolver encoder
-      v <- SAT.newVar sat
-      addIsConjOf encoder v ls
-      return v
-
--- | Return an literal which is equivalent to a given disjunction.
-encodeDisj :: Encoder -> [SAT.Lit] -> IO SAT.Lit
-encodeDisj _ [l] =  return l
-encodeDisj encoder ls = do
-  -- ¬l ⇔ ¬(¬l1 ∧ … ∧ ¬ln) ⇔ (l1 ∨ … ∨ ln)
-  l <- encodeConj encoder [SAT.litNot li | li <- ls]
-  return $ SAT.litNot l
-
-addIsConjOf :: Encoder -> SAT.Lit -> [SAT.Lit] -> IO ()
-addIsConjOf encoder l ls = do
   let solver = encSolver encoder
   usePB <- readIORef (encUsePB encoder)
-  if usePB
-   then do
-     -- ∀i.(l → li) ⇔ Σli >= n*l ⇔ Σli - n*l >= 0
-     let n = length ls
-     SAT.addPBAtLeast solver ((- fromIntegral n, l) : [(1,li) | li <- ls]) 0
-   else do
-     forM_ ls $ \li -> do
-       -- (l → li)  ⇔  (¬l ∨ li)
-       SAT.addClause solver [SAT.litNot l, li]
-  -- ((l1 ∧ l2 ∧ … ∧ ln) → l)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ l)
-  SAT.addClause solver (l : map SAT.litNot ls)
-  modifyIORef (encConjTable encoder) (Map.insert (IntSet.fromList ls) l)
+  table <- readIORef (encConjTable encoder)
+
+  let -- If F is monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x → A∧B)
+      definePos :: SAT.Lit -> IO ()
+      definePos l = do
+        if usePB then do
+          -- ∀i.(l → li) ⇔ Σli >= n*l ⇔ Σli - n*l >= 0
+          let n = IntSet.size ls2
+          SAT.addPBAtLeast solver ((- fromIntegral n, l) : [(1,li) | li <- IntSet.toList ls2]) 0
+        else do
+          forM_ (IntSet.toList ls2) $ \li -> do
+            -- (l → li)  ⇔  (¬l ∨ li)
+            SAT.addClause solver [SAT.litNot l, li]
+
+      -- If F is anti-monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x ← A∧B) ⇔ ∃x. F(x) ∧ (x∨¬A∨¬B).
+      defineNeg :: SAT.Lit -> IO ()
+      defineNeg l = do
+        let solver = encSolver encoder
+        -- ((l1 ∧ l2 ∧ … ∧ ln) → l)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ l)
+        SAT.addClause solver (l : map SAT.litNot (IntSet.toList ls2))
+
+  case Map.lookup ls2 table of
+    Just (l, posDefined, negDefined) -> do
+      when (pos && not posDefined) $ definePos l
+      when (neg && not negDefined) $ defineNeg l
+      when (posDefined < pos || negDefined < neg) $
+        modifyIORef (encConjTable encoder) (Map.insert ls2 (l, (max posDefined pos), (max negDefined neg)))
+      return l
+    Nothing -> do
+      let sat = encSolver encoder
+      l <- SAT.newVar sat
+      when pos $ definePos l
+      when neg $ defineNeg l
+      modifyIORef (encConjTable encoder) (Map.insert ls2 (l, pos, neg))
+      return l
+
+-- | Return an literal which is equivalent to a given disjunction.
+--
+-- @
+--   encodeDisj encoder = 'encodeDisjWithPolarity' encoder 'polarityBoth'
+-- @
+encodeDisj :: Encoder -> [SAT.Lit] -> IO SAT.Lit
+encodeDisj encoder = encodeDisjWithPolarity encoder polarityBoth
+
+-- | Return an literal which is equivalent to a given disjunction which occurs only in specified polarity.
+encodeDisjWithPolarity :: Encoder -> Polarity -> [SAT.Lit] -> IO SAT.Lit
+encodeDisjWithPolarity _ _ [l] =  return l
+encodeDisjWithPolarity encoder p ls = do
+  -- ¬l ⇔ ¬(¬l1 ∧ … ∧ ¬ln) ⇔ (l1 ∨ … ∨ ln)
+  l <- encodeConjWithPolarity encoder (negatePolarity p) [SAT.litNot li | li <- ls]
+  return $ SAT.litNot l
 
 getDefinitions :: Encoder -> IO [(SAT.Lit, Formula)]
 getDefinitions encoder = do
   t <- readIORef (encConjTable encoder)
-  return $ [(l, andB [Atom l1 | l1 <- IntSet.toList ls]) | (ls, l) <- Map.toList t]
+  return $ [(l, andB [Atom l1 | l1 <- IntSet.toList ls]) | (ls, (l, _, _)) <- Map.toList t]
+
+
+data Polarity
+  = Polarity
+  { polarityPosOccurs :: Bool
+  , polarityNegOccurs :: Bool
+  }
+  deriving (Eq, Show)
+
+negatePolarity :: Polarity -> Polarity
+negatePolarity (Polarity pos neg) = (Polarity neg pos)
+
+polarityPos :: Polarity
+polarityPos = Polarity True False
+
+polarityNeg :: Polarity
+polarityNeg = Polarity False True
+
+polarityBoth :: Polarity
+polarityBoth = Polarity True True
+
+polarityNone :: Polarity
+polarityNone = Polarity False False
+
