@@ -1372,6 +1372,7 @@ defaultRestartInc = 1.5
 data LearningStrategy
   = LearningClause
   | LearningHybrid
+  deriving (Show, Eq, Ord, Enum, Bounded)
 
 setLearningStrategy :: Solver -> LearningStrategy -> IO ()
 setLearningStrategy solver l = writeIORef (svLearningStrategy solver) $! l
@@ -1434,7 +1435,7 @@ setConfBudget solver (Just b) | b >= 0 = writeIORef (svConfBudget solver) b
 setConfBudget solver _ = writeIORef (svConfBudget solver) (-1)
 
 data PBHandlerType = PBHandlerTypeCounter | PBHandlerTypePueblo
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Enum, Bounded)
 
 defaultPBHandlerType :: PBHandlerType
 defaultPBHandlerType = PBHandlerTypeCounter
@@ -3333,7 +3334,7 @@ basicAttachXORClauseHandler solver this = do
 --------------------------------------------------------------------}
 
 data RestartStrategy = MiniSATRestarts | ArminRestarts | LubyRestarts
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Enum, Bounded)
 
 mkRestartSeq :: RestartStrategy -> Int -> Double -> [Int]
 mkRestartSeq MiniSATRestarts = miniSatRestartSeq
