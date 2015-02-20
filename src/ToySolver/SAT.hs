@@ -1396,7 +1396,7 @@ setLearntSizeInc solver !r = writeIORef (svLearntSizeInc solver) r
 defaultLearntSizeInc :: Double
 defaultLearntSizeInc = 1.1
 
--- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
+-- | Controls conflict clause minimization (0=none, 1=basic, 2=deep)
 setCCMin :: Solver -> Int -> IO ()
 setCCMin solver !v = writeIORef (svCCMin solver) v
 
