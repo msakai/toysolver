@@ -108,12 +108,12 @@ newSolver lp ivs = do
   forM_ (IS.toList ivs) $ \v -> do
     lb <- Simplex2.getLB lp2 v
     case lb of
-      Just l | not (isInteger l) ->
+      Just (l,_) | not (isInteger l) ->
         Simplex2.assertLower lp2 v (fromInteger (ceiling l))
       _ -> return ()
     ub <- Simplex2.getUB lp2 v
     case ub of
-      Just u | not (isInteger u) ->
+      Just (u,_) | not (isInteger u) ->
         Simplex2.assertLower lp2 v (fromInteger (floor u))
       _ -> return ()
 
@@ -459,22 +459,22 @@ deriveGomoryCut lp ivs xi = do
   js <- flip filterM ns $ \(_, xj) -> do
     vj <- Simplex2.getValue lp xj
     lb <- Simplex2.getLB lp xj
-    return $ Just vj == lb
+    return $ Just vj == Simplex2.boundValue lb
   ks <- flip filterM ns $ \(_, xj) -> do
     vj <- Simplex2.getValue lp xj
     ub <- Simplex2.getUB lp xj
-    return $ Just vj == ub
+    return $ Just vj == Simplex2.boundValue ub
 
   xs1 <- forM js $ \(aij, xj) -> do
     let fj = fracPart aij
-    Just lj <- Simplex2.getLB lp xj
+    Just (lj,_) <- Simplex2.getLB lp xj
     let c = if xj `IS.member` ivs
             then (if fj <= 1 - f0 then fj  / (1 - f0) else ((1 - fj) / f0))
             else (if aij > 0      then aij / (1 - f0) else (-aij     / f0))
     return $ c *^ (LA.var xj ^-^ LA.constant lj)
   xs2 <- forM ks $ \(aij, xj) -> do
     let fj = fracPart aij
-    Just uj <- Simplex2.getUB lp xj
+    Just (uj, _) <- Simplex2.getUB lp xj
     let c = if xj `IS.member` ivs
             then (if fj <= f0 then fj  / f0 else ((1 - fj) / (1 - f0)))
             else (if aij > 0  then aij / f0 else (-aij     / (1 - f0)))
@@ -498,5 +498,5 @@ canDeriveGomoryCut lp xi = do
             vj <- Simplex2.getValue lp xj
             lb <- Simplex2.getLB lp xj
             ub <- Simplex2.getUB lp xj
-            return $ Just vj == lb || Just vj == ub
+            return $ Just vj == Simplex2.boundValue lb || Just vj == Simplex2.boundValue ub
           return (and ys)
