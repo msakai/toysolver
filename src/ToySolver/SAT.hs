@@ -762,7 +762,7 @@ addClause solver lits = do
 
   ok <- readIORef (svOk solver)
   when ok $ do
-    lits2 <- instantiateClause solver lits
+    lits2 <- instantiateClause (getLitFixed solver) lits
     case normalizeClause =<< lits2 of
       Nothing -> return ()
       Just [] -> markBad solver
@@ -795,7 +795,7 @@ addAtLeast solver lits n = do
 
   ok <- readIORef (svOk solver)
   when ok $ do
-    (lits',n') <- liftM normalizeAtLeast $ instantiateAtLeast solver (lits,n)
+    (lits',n') <- liftM normalizeAtLeast $ instantiateAtLeast (getLitFixed solver) (lits,n)
     let len = length lits'
 
     if n' <= 0 then return ()
@@ -848,7 +848,7 @@ addPBAtLeast solver ts n = do
 
   ok <- readIORef (svOk solver)
   when ok $ do
-    (ts',degree) <- liftM normalizePBLinAtLeast $ instantiatePB solver (ts,n)
+    (ts',degree) <- liftM normalizePBLinAtLeast $ instantiatePBLinAtLeast (getLitFixed solver) (ts,n)
   
     case pbToAtLeast (ts',degree) of
       Just (lhs',rhs') -> addAtLeast solver lhs' rhs'
@@ -900,7 +900,7 @@ addPBExactly :: Solver          -- ^ The 'Solver' argument.
              -> Integer         -- ^ /n/
              -> IO ()
 addPBExactly solver ts n = do
-  (ts2,n2) <- liftM normalizePBLinExactly $ instantiatePB solver (ts,n)
+  (ts2,n2) <- liftM normalizePBLinExactly $ instantiatePBLinExactly (getLitFixed solver) (ts,n)
   addPBAtLeast solver ts2 n2
   addPBAtMost solver ts2 n2
 
@@ -912,7 +912,7 @@ addPBAtLeastSoft
   -> Integer         -- ^ /n/
   -> IO ()
 addPBAtLeastSoft solver sel lhs rhs = do
-  (lhs', rhs') <- liftM normalizePBLinAtLeast $ instantiatePB solver (lhs,rhs)
+  (lhs', rhs') <- liftM normalizePBLinAtLeast $ instantiatePBLinAtLeast (getLitFixed solver) (lhs,rhs)
   addPBAtLeast solver ((rhs', litNot sel) : lhs') rhs'
 
 -- | Add a soft pseudo boolean constraints /lit ⇒ c1*l1 + c2*l2 + … ≤ n/.
@@ -933,7 +933,7 @@ addPBExactlySoft
   -> Integer         -- ^ /n/
   -> IO ()
 addPBExactlySoft solver sel lhs rhs = do
-  (lhs2, rhs2) <- liftM normalizePBLinExactly $ instantiatePB solver (lhs,rhs)
+  (lhs2, rhs2) <- liftM normalizePBLinExactly $ instantiatePBLinExactly (getLitFixed solver) (lhs,rhs)
   addPBAtLeastSoft solver sel lhs2 rhs2
   addPBAtMostSoft solver sel lhs2 rhs2
 
@@ -949,7 +949,7 @@ addXORClause solver lits rhs = do
 
   ok <- readIORef (svOk solver)
   when ok $ do
-    xcl <- instantiateXORClause solver (lits,rhs)
+    xcl <- instantiateXORClause (getLitFixed solver) (lits,rhs)
     case normalizeXORClause xcl of
       ([], True) -> markBad solver
       ([], False) -> return ()
@@ -1343,7 +1343,7 @@ backwardSubsumedBy solver pb@(lhs,_) = do
             -- Note that @isPBRepresentable c@ is always True here,
             -- because only such constraints are added to occur list.
             -- See 'addToDB'.
-            pb2 <- instantiatePB solver =<< toPBLinAtLeast c
+            pb2 <- instantiatePBLinAtLeast (getLitFixed solver) =<< toPBLinAtLeast c
             return $ pbSubsume pb pb2
       liftM HashSet.fromList
         $ filterM p
@@ -2488,20 +2488,6 @@ instance ConstraintHandler ClauseHandler where
 
   constrWriteActivity this aval = writeIORef (claActivity this) $! aval
 
-instantiateClause :: Solver -> Clause -> IO (Maybe Clause)
-instantiateClause solver = loop []
-  where
-    loop :: [Lit] -> [Lit] -> IO (Maybe Clause)
-    loop ret [] = return $ Just ret
-    loop ret (l:ls) = do
-      val <- litValue solver l
-      if val==lTrue then
-        return Nothing
-      else if val==lFalse then
-        loop ret ls
-      else
-        loop (l : ret) ls
-
 basicAttachClauseHandler :: Solver -> ClauseHandler -> IO Bool
 basicAttachClauseHandler solver this = do
   lits <- getElems (claLits this)
@@ -2744,20 +2730,6 @@ instance ConstraintHandler AtLeastHandler where
 
   constrWriteActivity this aval = writeIORef (atLeastActivity this) $! aval
 
-instantiateAtLeast :: Solver -> AtLeast -> IO AtLeast
-instantiateAtLeast solver (xs,n) = loop ([],n) xs
-  where
-    loop :: AtLeast -> [Lit] -> IO AtLeast
-    loop ret [] = return ret
-    loop (ys,m) (l:ls) = do
-      val <- litValue solver l
-      if val == lTrue then
-        loop (ys, m-1) ls
-      else if val == lFalse then
-        loop (ys, m) ls
-      else
-        loop (l:ys, m) ls
-
 basicAttachAtLeastHandler :: Solver -> AtLeastHandler -> IO Bool
 basicAttachAtLeastHandler solver this = do
   lits <- getElems (atLeastLits this)
@@ -2798,20 +2770,6 @@ newPBHandlerPromoted solver lhs rhs learnt = do
       else do
         h <- newClauseHandler lhs2 learnt
         return $ toConstraintHandler h
-
-instantiatePB :: Solver -> PBLinAtLeast -> IO PBLinAtLeast
-instantiatePB solver (xs,n) = loop ([],n) xs
-  where
-    loop :: PBLinAtLeast -> PBLinSum -> IO PBLinAtLeast
-    loop ret [] = return ret
-    loop (ys,m) ((c,l):ts) = do
-      val <- litValue solver l
-      if val == lTrue then
-        loop (ys, m-c) ts
-      else if val == lFalse then
-        loop (ys, m) ts
-      else
-        loop ((c,l):ys, m) ts
 
 pbOverSAT :: Solver -> PBLinAtLeast -> IO Bool
 pbOverSAT solver (lhs, rhs) = do
@@ -3353,20 +3311,6 @@ instance ConstraintHandler XORClauseHandler where
   constrReadActivity this = readIORef (xorActivity this)
 
   constrWriteActivity this aval = writeIORef (xorActivity this) $! aval
-
-instantiateXORClause :: Solver -> XORClause -> IO XORClause
-instantiateXORClause solver (ls,b) = loop [] b ls
-  where
-    loop :: [Lit] -> Bool -> [Lit] -> IO XORClause
-    loop lhs !rhs [] = return (lhs, rhs)
-    loop lhs !rhs (l:ls) = do
-      val <- litValue solver l
-      if val==lTrue then
-        loop lhs (not rhs) ls
-      else if val==lFalse then
-        loop lhs rhs ls
-      else
-        loop (l : lhs) rhs ls
 
 basicAttachXORClauseHandler :: Solver -> XORClauseHandler -> IO Bool
 basicAttachXORClauseHandler solver this = do

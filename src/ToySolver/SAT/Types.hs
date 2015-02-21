@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns, FlexibleInstances #-}
 module ToySolver.SAT.Types
   (
   -- * Variable
@@ -26,6 +26,7 @@ module ToySolver.SAT.Types
   -- * Clause
   , Clause
   , normalizeClause
+  , instantiateClause
   , clauseSubsume
   , evalClause
   , clauseToPBLinAtLeast
@@ -33,6 +34,7 @@ module ToySolver.SAT.Types
   -- * Cardinality Constraint
   , AtLeast
   , normalizeAtLeast
+  , instantiateAtLeast
   , evalAtLeast
 
   -- * Pseudo Boolean Constraint
@@ -43,6 +45,8 @@ module ToySolver.SAT.Types
   , normalizePBLinSum
   , normalizePBLinAtLeast
   , normalizePBLinExactly
+  , instantiatePBLinAtLeast
+  , instantiatePBLinExactly
   , cutResolve
   , cardinalityReduction
   , negatePBLinAtLeast
@@ -56,6 +60,7 @@ module ToySolver.SAT.Types
   -- * XOR Clause
   , XORClause
   , normalizeXORClause
+  , instantiateXORClause
   , evalXORClause
   ) where
 
@@ -68,6 +73,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import ToySolver.Data.LBool
 
 -- | Variable is represented as positive integers (DIMACS format).
 type Var = Int
@@ -154,6 +160,21 @@ normalizeClause lits = assert (IntSet.size ys `mod` 2 == 0) $
     xs = IntSet.fromList lits
     ys = xs `IntSet.intersection` (IntSet.map litNot xs)
 
+{-# SPECIALIZE instantiateClause :: (Lit -> IO LBool) -> Clause -> IO (Maybe Clause) #-}
+instantiateClause :: forall m. Monad m => (Lit -> m LBool) -> Clause -> m (Maybe Clause)
+instantiateClause evalLitM = loop []
+  where
+    loop :: [Lit] -> [Lit] -> m (Maybe Clause)
+    loop ret [] = return $ Just ret
+    loop ret (l:ls) = do
+      val <- evalLitM l
+      if val==lTrue then
+        return Nothing
+      else if val==lFalse then
+        loop ret ls
+      else
+        loop (l : ret) ls
+
 clauseSubsume :: Clause -> Clause -> Bool
 clauseSubsume cl1 cl2 = cl1' `IntSet.isSubsetOf` cl2'
   where
@@ -176,6 +197,21 @@ normalizeAtLeast (lits,n) = assert (IntSet.size ys `mod` 2 == 0) $
      ys = xs `IntSet.intersection` (IntSet.map litNot xs)
      lits' = xs `IntSet.difference` ys
      n' = n - (IntSet.size ys `div` 2)
+
+{-# SPECIALIZE instantiateAtLeast :: (Lit -> IO LBool) -> AtLeast -> IO AtLeast #-}
+instantiateAtLeast :: forall m. Monad m => (Lit -> m LBool) -> AtLeast -> m AtLeast
+instantiateAtLeast evalLitM (xs,n) = loop ([],n) xs
+  where
+    loop :: AtLeast -> [Lit] -> m AtLeast
+    loop ret [] = return ret
+    loop (ys,m) (l:ls) = do
+      val <- evalLitM l
+      if val == lTrue then
+        loop (ys, m-1) ls
+      else if val == lFalse then
+        loop (ys, m) ls
+      else
+        loop (l:ys, m) ls
 
 evalAtLeast :: IModel m => m -> AtLeast -> Bool
 evalAtLeast m (lits,n) = sum [1 | lit <- lits, evalLit m lit] >= n
@@ -260,6 +296,25 @@ normalizePBLinExactly a =
       where
         d = foldl1' gcd [c | (c,_) <- xs]
 
+{-# SPECIALIZE instantiatePBLinAtLeast :: (Lit -> IO LBool) -> PBLinAtLeast -> IO PBLinAtLeast #-}
+instantiatePBLinAtLeast :: forall m. Monad m => (Lit -> m LBool) -> PBLinAtLeast -> m PBLinAtLeast
+instantiatePBLinAtLeast evalLitM (xs,n) = loop ([],n) xs
+  where
+    loop :: PBLinAtLeast -> PBLinSum -> m PBLinAtLeast
+    loop ret [] = return ret
+    loop (ys,m) ((c,l):ts) = do
+      val <- evalLitM l
+      if val == lTrue then
+        loop (ys, m-c) ts
+      else if val == lFalse then
+        loop (ys, m) ts
+      else
+        loop ((c,l):ys, m) ts
+
+{-# SPECIALIZE instantiatePBLinExactly :: (Lit -> IO LBool) -> PBLinExactly -> IO PBLinExactly #-}
+instantiatePBLinExactly :: Monad m => (Lit -> m LBool) -> PBLinExactly -> m PBLinExactly
+instantiatePBLinExactly = instantiatePBLinAtLeast
+
 cutResolve :: PBLinAtLeast -> PBLinAtLeast -> Var -> PBLinAtLeast
 cutResolve (lhs1,rhs1) (lhs2,rhs2) v = assert (l1 == litNot l2) $ normalizePBLinAtLeast pb
   where
@@ -340,6 +395,21 @@ normalizeXORClause (lits, b) =
       if litPolarity lit
       then IntMap.singleton lit True
       else IntMap.fromList [(litVar lit, True), (0, True)]  -- ¬x = x ⊕ 1
+
+{-# SPECIALIZE instantiateXORClause :: (Lit -> IO LBool) -> XORClause -> IO XORClause #-}
+instantiateXORClause :: forall m. Monad m => (Lit -> m LBool) -> XORClause -> m XORClause
+instantiateXORClause evalLitM (ls,b) = loop [] b ls
+  where
+    loop :: [Lit] -> Bool -> [Lit] -> m XORClause
+    loop lhs !rhs [] = return (lhs, rhs)
+    loop lhs !rhs (l:ls) = do
+      val <- evalLitM l
+      if val==lTrue then
+        loop lhs (not rhs) ls
+      else if val==lFalse then
+        loop lhs rhs ls
+      else
+        loop (l : lhs) rhs ls
 
 evalXORClause :: IModel m => m -> XORClause -> Bool
 evalXORClause m (lits, rhs) = foldl' xor False (map f lits) == rhs
