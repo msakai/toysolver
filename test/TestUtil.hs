@@ -311,7 +311,8 @@ case_Vec_clone = do
 instance Arbitrary a => Arbitrary (BoolExpr a) where
   arbitrary = sized f
     where
-      f n =        
+      f n | n <= 0 = Atom <$> arbitrary
+      f n =
         oneof
         [ Atom <$> arbitrary
         , And <$> list (n-1)
