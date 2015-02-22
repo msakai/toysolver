@@ -183,7 +183,7 @@ data Assignment
   , aIndex  :: {-# UNPACK #-} !Int
   , aLevel  :: {-# UNPACK #-} !Level
   , aReason :: !(Maybe SomeConstraintHandler)
-  , aBacktrackCBs :: !(IORef [IO ()])
+  , aOnUnassigned :: !(IORef [SomeConstraintHandler])
   }
 
 data VarData
@@ -423,7 +423,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
         , aIndex  = idx
         , aLevel  = lv
         , aReason = reason
-        , aBacktrackCBs = bt
+        , aOnUnassigned = bt
         }
 
       modifyIORef (svTrail solver) (lit:)
@@ -448,18 +448,22 @@ unassign solver !v = assert (validVar v) $ do
     Just a -> do
       flag <- getEnablePhaseSaving solver
       when flag $ writeIORef (vdPolarity vd) (aValue a)
-      readIORef (aBacktrackCBs a) >>= sequence_
+      let !l = if aValue a then v else -v
+      cs <- readIORef (aOnUnassigned a)
+      forM_ cs $ \c ->
+        constrOnUnassigned solver c c l
+      
   writeIORef (vdAssignment vd) Nothing
   modifyIORef' (svNAssigns solver) (subtract 1)
   PQ.enqueue (svVarQueue solver) v
 
-addBacktrackCB :: Solver -> Var -> IO () -> IO ()
-addBacktrackCB solver !v callback = do
-  vd <- varData solver v
+addOnUnassigned :: Solver -> SomeConstraintHandler -> Lit -> IO ()
+addOnUnassigned solver constr !l = do
+  vd <- varData solver (litVar l)
   m <- readIORef (vdAssignment vd)
   case m of
-    Nothing -> error "addBacktrackCB: should not happen"
-    Just a -> modifyIORef (aBacktrackCBs a) (callback :)
+    Nothing -> error "addOnUnassigned: should not happen"
+    Just a -> modifyIORef (aOnUnassigned a) (constr :)  
 
 -- | Register the constraint to be notified when the literal becames false.
 watchLit :: ConstraintHandler c => Solver -> Lit -> c -> IO ()
@@ -2063,6 +2067,8 @@ class (Eq a, Hashable a) => ConstraintHandler a where
   -- assignment.
   basicReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
+  constrOnUnassigned :: Solver -> SomeConstraintHandler -> a -> Lit -> IO ()
+
   isPBRepresentable :: a -> IO Bool
   toPBLinAtLeast :: a -> IO PBLinAtLeast
 
@@ -2200,6 +2206,12 @@ instance ConstraintHandler SomeConstraintHandler where
   basicReasonOf solver (CHPBCounter c) l = basicReasonOf solver c l
   basicReasonOf solver (CHPBPueblo c) l  = basicReasonOf solver c l
   basicReasonOf solver (CHXORClause c) l = basicReasonOf solver c l
+
+  constrOnUnassigned solver this (CHClause c)  l   = constrOnUnassigned solver this c l
+  constrOnUnassigned solver this (CHAtLeast c) l   = constrOnUnassigned solver this c l
+  constrOnUnassigned solver this (CHPBCounter c) l = constrOnUnassigned solver this c l
+  constrOnUnassigned solver this (CHPBPueblo c) l  = constrOnUnassigned solver this c l
+  constrOnUnassigned solver this (CHXORClause c) l = constrOnUnassigned solver this c l
 
   isPBRepresentable (CHClause c)    = isPBRepresentable c
   isPBRepresentable (CHAtLeast c)   = isPBRepresentable c
@@ -2469,6 +2481,8 @@ instance ConstraintHandler ClauseHandler where
         assert (lit == head lits) $ return ()
         return $ tail lits
 
+  constrOnUnassigned _solver _this _this2 lit = return ()
+
   isPBRepresentable _ = return True
 
   toPBLinAtLeast this = do
@@ -2715,6 +2729,8 @@ instance ConstraintHandler AtLeastHandler where
             error $ printf "AtLeastHandler.basicReasonOf: cannot find %d in first %d elements" n
         return falsifiedLits
 
+  constrOnUnassigned _solver _this _this2 lit = return ()
+
   isPBRepresentable _ = return True
 
   toPBLinAtLeast this = do
@@ -2828,11 +2844,12 @@ instance ConstraintHandler PBHandlerCounter where
     -- BCP queue should be empty at this point.
     -- It is important for calculating slack.
     bcpCheckEmpty solver
+    let constr = toConstraintHandler this
     s <- liftM sum $ forM (pbTerms this) $ \(c,l) -> do
       watchLit solver l this
       val <- litValue solver l
       if val == lFalse then do
-        addBacktrackCB solver (litVar l) $ modifyIORef' (pbSlack this) (+ c)
+        addOnUnassigned solver constr l
         return 0
       else do
         return c
@@ -2857,7 +2874,7 @@ instance ConstraintHandler PBHandlerCounter where
     watchLit solver falsifiedLit this
     let c = pbCoeffMap this2 IM.! falsifiedLit
     modifyIORef' (pbSlack this2) (subtract c)
-    addBacktrackCB solver (litVar falsifiedLit) $ modifyIORef' (pbSlack this2) (+ c)
+    addOnUnassigned solver this falsifiedLit
     s <- readIORef (pbSlack this2)
     if s < 0 then
       return False
@@ -2900,6 +2917,10 @@ instance ConstraintHandler PBHandlerCounter where
               else go s xs ret
             else do
               go s xs ret
+
+  constrOnUnassigned solver this this2 lit = do
+    let c = pbCoeffMap this2 IM.! (- lit)
+    modifyIORef' (pbSlack this2) (+ c)
 
   isPBRepresentable _ = return True
 
@@ -3000,7 +3021,7 @@ instance ConstraintHandler PBHandlerPueblo where
 #endif
       let g !_ [] = return ()
           g !s (t@(c,l):ts) = do
-            addBacktrackCB solver (litVar l) $ puebloWatch solver constr this t
+            addOnUnassigned solver constr l
             if s+c >= puebloDegree this + puebloAMax this then return ()
             else g (s+c) ts
       g wsum xs
@@ -3017,7 +3038,7 @@ instance ConstraintHandler PBHandlerPueblo where
     ret <- puebloPropagate solver this this2
     wsum <- puebloGetWatchSum this2
     unless (wsum >= puebloDegree this2 + puebloAMax this2) $
-      addBacktrackCB solver (litVar falsifiedLit) $ puebloWatch solver this this2 t
+      addOnUnassigned solver this falsifiedLit
     return ret
 
   basicReasonOf solver this l = do
@@ -3051,6 +3072,10 @@ instance ConstraintHandler PBHandlerPueblo where
               else go s xs ret
             else do
               go s xs ret
+
+  constrOnUnassigned solver this this2 lit = do
+    let t = fromJust $ find (\(_,l) -> l == - lit) (puebloTerms this2)
+    puebloWatch solver this this2 t
 
   isPBRepresentable _ = return True
 
@@ -3291,6 +3316,8 @@ instance ConstraintHandler XORClauseHandler where
         let v = litVar lit
         val <- varValue solver v
         return $ literal v (not (fromJust (unliftBool val)))
+
+  constrOnUnassigned _solver _this _this2 lit = return ()
 
   isPBRepresentable _ = return False
 
