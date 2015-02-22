@@ -320,7 +320,9 @@ instance Arbitrary a => Arbitrary (BoolExpr a) where
         , Not <$> (f (n-1))
         , uncurry Imply <$> pair (n-1)
         , uncurry Equiv <$> pair (n-1)
+        , triple (n-1) >>= \(c,t,e) -> return (ITE c t e)
         ]
+
       pair n | n <= 0 = do
         a <- f 0
         b <- f 0
@@ -330,6 +332,20 @@ instance Arbitrary a => Arbitrary (BoolExpr a) where
         a <- f m
         b <- f (n-m)
         return (a,b)
+
+      triple n | n <= 0 = do
+        a <- f 0
+        b <- f 0
+        c <- f 0
+        return (a,b,c)
+      triple n = do
+        m <- choose (0, n)
+        o <- choose (0, n-m)
+        a <- f m
+        b <- f o
+        c <- f (n - m - o)
+        return (a,b,c)
+
       list n | n <= 0 = return []
       list n = oneof $
         [ return []

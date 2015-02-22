@@ -41,6 +41,7 @@ data BoolExpr a
   | Not (BoolExpr a)
   | Imply (BoolExpr a) (BoolExpr a)
   | Equiv (BoolExpr a) (BoolExpr a)
+  | ITE (BoolExpr a) (BoolExpr a) (BoolExpr a)
   deriving (Eq, Ord, Show, Read, Typeable, Data)
 
 instance Functor BoolExpr where
@@ -64,6 +65,7 @@ instance Traversable BoolExpr where
   traverse f (Not x) = Not <$> traverse f x
   traverse f (Imply x y) = Imply <$> traverse f x <*> traverse f y
   traverse f (Equiv x y) = Equiv <$> traverse f x <*> traverse f y
+  traverse f (ITE c t e) = ITE <$> traverse f c <*> traverse f t <*> traverse f e
 
 instance NFData a => NFData (BoolExpr a) where
   rnf (Atom a) = rnf a
@@ -72,6 +74,7 @@ instance NFData a => NFData (BoolExpr a) where
   rnf (Not x) = rnf x
   rnf (Imply x y) = rnf x `seq` rnf y
   rnf (Equiv x y) = rnf x `seq` rnf y
+  rnf (ITE c t e) = rnf c `seq` rnf t `seq` rnf e
 
 instance Hashable a => Hashable (BoolExpr a) where
   hashWithSalt s (Atom a) = s `hashWithSalt` (0::Int) `hashWithSalt` a
@@ -80,6 +83,7 @@ instance Hashable a => Hashable (BoolExpr a) where
   hashWithSalt s (Not x)  = s `hashWithSalt` (3::Int) `hashWithSalt` x
   hashWithSalt s (Imply x y) = s `hashWithSalt` (4::Int) `hashWithSalt` x `hashWithSalt` y
   hashWithSalt s (Equiv x y) = s `hashWithSalt` (5::Int) `hashWithSalt` x `hashWithSalt` y
+  hashWithSalt s (ITE c t e) = s `hashWithSalt` (6::Int) `hashWithSalt` c `hashWithSalt` t `hashWithSalt` e
 
 instance Complement (BoolExpr a) where
   notB = Not
@@ -91,6 +95,7 @@ instance MonotoneBoolean (BoolExpr a) where
 instance Boolean (BoolExpr a) where
   (.=>.) = Imply
   (.<=>.) = Equiv
+  ite = ITE
 
 instance Variables a => Variables (BoolExpr a) where
   vars = foldMap vars
@@ -105,6 +110,7 @@ fold f = g
     g (Not x) = notB (g x)
     g (Imply x y) = g x .=>. g y
     g (Equiv x y) = g x .<=>. g y
+    g (ITE c t e) = ite (g c) (g t) (g e)
 
 {-# RULES
   "fold/fmap"    forall f g e.  fold f (fmap g e) = fold (f.g) e
@@ -142,6 +148,10 @@ instance Boolean (Simplify a) where
     | isTrue x  = Simplify y
     | isFalse y = notB (Simplify x)
     | otherwise = Simplify (x .=>. y)
+  ite (Simplify c) (Simplify t) (Simplify e)
+    | isTrue c  = Simplify t
+    | isFalse c = Simplify e
+    | otherwise = Simplify (ITE c t e)
 
 isTrue :: BoolExpr a -> Bool
 isTrue (And []) = True

@@ -55,8 +55,11 @@ class Complement a where
 -- | types that can be combined with boolean operations.
 class (MonotoneBoolean a, Complement a) => Boolean a where
   (.=>.), (.<=>.) :: a -> a -> a
+  ite :: a -> a -> a -> a
+
   x .=>. y = notB x .||. y
   x .<=>. y = (x .=>. y) .&&. (y .=>. x)
+  ite c t e = (c .&&. t) .||. (notB c .&&. e)
 
 
 instance (Complement a, Complement b) => Complement (a, b) where
@@ -73,7 +76,7 @@ instance (MonotoneBoolean a, MonotoneBoolean b) => MonotoneBoolean (a, b) where
 instance (Boolean a, Boolean b) => Boolean (a, b) where
   (xs1,ys1) .=>. (xs2,ys2) = (xs1 .=>. xs2, ys1 .=>. ys2)
   (xs1,ys1) .<=>. (xs2,ys2) = (xs1 .<=>. xs2, ys1 .<=>. ys2)
-
+  ite (c1,c2) (t1,t2) (e1,e2) = (ite c1 t1 e1, ite c2 t2 e2)
 
 instance Complement a => Complement (b -> a) where
   notB f = \x -> notB (f x)
@@ -89,6 +92,7 @@ instance MonotoneBoolean a => MonotoneBoolean (b -> a) where
 instance (Boolean a) => Boolean (b -> a) where
   f .=>. g = \x -> f x .=>. g x
   f .<=>. g = \x -> f x .<=>. g x
+  ite c t e = \x -> ite (c x) (t x) (e x)
 
 
 instance Complement Bool where
@@ -102,3 +106,5 @@ instance MonotoneBoolean Bool where
 
 instance Boolean Bool where
   (.<=>.) = (==)
+  ite c t e = if c then t else e
+
