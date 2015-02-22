@@ -424,6 +424,30 @@ case_Simplex2_test2 = do
   ret <- Simplex2.check solver
   ret @?= True
 
+prop_Simplex2_backtrack :: Property
+prop_Simplex2_backtrack = QM.monadicIO $ do
+   (vs,cs) <- QM.pick genQFLAConj
+   (vs2,cs2) <- QM.pick genQFLAConj
+
+   join $ QM.run $ do
+     solver <- Simplex2.newSolver
+     m <- liftM IM.fromList $ forM (IS.toList (vs `IS.union` vs2)) $ \v -> do
+       v2 <- Simplex2.newVar solver
+       return (v, LA.var v2)
+     forM_ cs $ \c -> do
+       Simplex2.assertAtomEx solver (LA.applySubstAtom m c)
+     ret <- Simplex2.check solver
+     if ret then do
+       Simplex2.pushBacktrackPoint solver
+       forM_ cs2 $ \c -> do
+         Simplex2.assertAtomEx solver (LA.applySubstAtom m c)
+       _ <- Simplex2.check solver
+       Simplex2.popBacktrackPoint solver
+       ret2 <- Simplex2.check solver
+       return $ QM.assert ret2
+     else do
+       return $ return ()
+
 ------------------------------------------------------------------------
 
 -- Too slow

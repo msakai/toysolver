@@ -53,6 +53,8 @@ module ToySolver.Arith.Simplex2
 
   -- * Solving
   , check
+  , pushBacktrackPoint
+  , popBacktrackPoint
   , Options (..)
   , defaultOptions
   , OptResult (..)
@@ -136,6 +138,8 @@ data GenericSolver v
   , svLogger :: !(IORef (Maybe (String -> IO ())))
   , svPivotStrategy :: !(IORef PivotStrategy)
   , svNPivot  :: !(IORef Int)
+
+  , svBacktrackPoints :: !(IORef [BacktrackPoint v])
   }
 
 type Solver = GenericSolver Rational
@@ -157,6 +161,7 @@ newSolver = do
   logger <- newIORef Nothing
   pivot <- newIORef PivotStrategyBlandRule
   npivot <- newIORef 0
+  bps <- newIORef []
   return $
     GenericSolver
     { svTableau = t
@@ -170,6 +175,7 @@ newSolver = do
     , svLogger  = logger
     , svNPivot  = npivot
     , svPivotStrategy = pivot
+    , svBacktrackPoints = bps
     }
 
 cloneSolver :: GenericSolver v -> IO (GenericSolver v)
@@ -185,6 +191,7 @@ cloneSolver solver = do
   logger <- newIORef =<< readIORef (svLogger solver)
   pivot  <- newIORef =<< readIORef (svPivotStrategy solver)
   npivot <- newIORef =<< readIORef (svNPivot solver)
+  bps    <- newIORef =<< mapM cloneBacktrackPoint =<< readIORef (svBacktrackPoints solver)
   return $
     GenericSolver
     { svTableau = t
@@ -198,6 +205,7 @@ cloneSolver solver = do
     , svLogger  = logger
     , svNPivot  = npivot
     , svPivotStrategy = pivot
+    , svBacktrackPoints = bps
     }  
 
 class (VectorSpace v, Scalar v ~ Rational, Ord v) => SolverValue v where
@@ -244,6 +252,76 @@ data PivotStrategy
 
 setPivotStrategy :: GenericSolver v -> PivotStrategy -> IO ()
 setPivotStrategy solver ps = writeIORef (svPivotStrategy solver) ps
+
+{--------------------------------------------------------------------
+  problem description
+--------------------------------------------------------------------}
+
+data BacktrackPoint v
+  = BacktrackPoint
+  { bpSavedLB :: !(IORef (IntMap (Maybe v)))
+  , bpSavedUB :: !(IORef (IntMap (Maybe v)))
+  }
+
+cloneBacktrackPoint :: BacktrackPoint v -> IO (BacktrackPoint v)
+cloneBacktrackPoint bp = do
+  lbs <- newIORef =<< readIORef (bpSavedLB bp)
+  ubs <- newIORef =<< readIORef (bpSavedUB bp)
+  return $ BacktrackPoint lbs ubs
+
+pushBacktrackPoint :: GenericSolver v -> IO ()
+pushBacktrackPoint solver = do
+  savedLBs <- newIORef IntMap.empty
+  savedUBs <- newIORef IntMap.empty
+  lbs <- readIORef (svLB solver)
+  ubs <- readIORef (svUB solver)
+  modifyIORef (svBacktrackPoints solver) (BacktrackPoint savedLBs savedUBs :)
+
+popBacktrackPoint :: GenericSolver v -> IO ()
+popBacktrackPoint solver = do
+  bps <- readIORef (svBacktrackPoints solver)
+  case bps of
+    [] -> error "popBacktrackPoint: empty backtrack points"
+    bp : bps' -> do
+      lbs <- readIORef (svLB solver)
+      savedLBs <- readIORef (bpSavedLB bp)
+      writeIORef (svLB solver) $ IntMap.mergeWithKey (\_ _curr saved -> saved) id (const IntMap.empty) lbs savedLBs
+
+      ubs <- readIORef (svUB solver)
+      savedUBs <- readIORef (bpSavedUB bp)
+      writeIORef (svUB solver) $ IntMap.mergeWithKey (\_ _curr saved -> saved) id (const IntMap.empty) ubs savedUBs
+
+      writeIORef (svBacktrackPoints solver) bps'
+      writeIORef (svOk solver) True
+
+withBacktrackpoint :: GenericSolver v -> (BacktrackPoint v -> IO ()) -> IO ()
+withBacktrackpoint solver f = do
+  bps <- readIORef (svBacktrackPoints solver)
+  case bps of
+    [] -> return ()
+    bp : _ -> f bp
+
+bpSaveLB :: GenericSolver v -> Var -> IO ()
+bpSaveLB solver v = do
+  withBacktrackpoint solver $ \bp -> do
+    saved <- readIORef (bpSavedLB bp)
+    if v `IntMap.member` saved then
+      return ()
+    else do
+      lb <- readIORef (svLB solver)
+      let old = IntMap.lookup v lb
+      seq old $ writeIORef (bpSavedLB bp) (IntMap.insert v old saved)
+
+bpSaveUB :: GenericSolver v -> Var -> IO ()
+bpSaveUB solver v = do
+  withBacktrackpoint solver $ \bp -> do
+    saved <- readIORef (bpSavedUB bp)
+    if v `IntMap.member` saved then
+      return ()
+    else do
+      ub <- readIORef (svUB solver)
+      let old = IntMap.lookup v ub
+      seq old $ writeIORef (bpSavedUB bp) (IntMap.insert v old saved)
 
 {--------------------------------------------------------------------
   problem description
@@ -318,6 +396,7 @@ assertLower solver x l = do
     (Just l0', _) | l <= l0' -> return ()
     (_, Just u0') | u0' < l -> markBad solver
     _ -> do
+      bpSaveLB solver x
       modifyIORef (svLB solver) (IntMap.insert x l)
       b <- isNonBasicVariable solver x
       v <- getValue solver x
@@ -332,6 +411,7 @@ assertUpper solver x u = do
     (_, Just u0') | u0' <= u -> return ()
     (Just l0', _) | u < l0' -> markBad solver
     _ -> do
+      bpSaveUB solver x
       modifyIORef (svUB solver) (IntMap.insert x u)
       b <- isNonBasicVariable solver x
       v <- getValue solver x
