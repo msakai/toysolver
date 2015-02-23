@@ -766,8 +766,8 @@ addClause solver lits = do
 
   ok <- readIORef (svOk solver)
   when ok $ do
-    lits2 <- instantiateClause (getLitFixed solver) lits
-    case normalizeClause =<< lits2 of
+    m <- instantiateClause (getLitFixed solver) lits
+    case normalizeClause =<< m of
       Nothing -> return ()
       Just [] -> markBad solver
       Just [lit] -> do
@@ -779,11 +779,11 @@ addClause solver lits = do
         case ret2 of
           Nothing -> return ()
           Just _ -> markBad solver
-      Just lits3 -> do
+      Just lits2 -> do
         subsumed <- checkForwardSubsumption solver lits
         unless subsumed $ do
-          removeBackwardSubsumedBy solver ([(1,lit) | lit <- lits3], 1)
-          clause <- newClauseHandler lits3 False
+          removeBackwardSubsumedBy solver ([(1,lit) | lit <- lits2], 1)
+          clause <- newClauseHandler lits2 False
           addToDB solver clause
           _ <- basicAttachClauseHandler solver clause
           return ()
@@ -815,7 +815,7 @@ addAtLeast solver lits n = do
       case ret2 of
         Nothing -> return ()
         Just _ -> markBad solver
-    else do
+    else do -- n' < len
       removeBackwardSubsumedBy solver ([(1,lit) | lit <- lits'], fromIntegral n')
       c <- newAtLeastHandler lits' n' False
       addToDB solver c
@@ -827,10 +827,8 @@ addAtMost :: Solver -- ^ The 'Solver' argument
           -> [Lit]  -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)
           -> Int    -- ^ /n/
           -> IO ()
-addAtMost solver lits n = addAtLeast solver lits' (len-n)
-  where
-    len   = length lits
-    lits' = map litNot lits
+addAtMost solver lits n =
+  addAtLeast solver (map litNot lits) (length lits - n)
 
 -- | Add a cardinality constraints /exactly({l1,l2,..},n)/.
 addExactly :: Solver -- ^ The 'Solver' argument
@@ -852,24 +850,24 @@ addPBAtLeast solver ts n = do
 
   ok <- readIORef (svOk solver)
   when ok $ do
-    (ts',degree) <- liftM normalizePBLinAtLeast $ instantiatePBLinAtLeast (getLitFixed solver) (ts,n)
+    (ts',n') <- liftM normalizePBLinAtLeast $ instantiatePBLinAtLeast (getLitFixed solver) (ts,n)
   
-    case pbToAtLeast (ts',degree) of
+    case pbToAtLeast (ts',n') of
       Just (lhs',rhs') -> addAtLeast solver lhs' rhs'
       Nothing -> do
         let cs = map fst ts'
-            slack = sum cs - degree
-        if degree <= 0 then return ()
+            slack = sum cs - n'
+        if n' <= 0 then return ()
         else if slack < 0 then markBad solver
         else do
-          removeBackwardSubsumedBy solver (ts', degree)          
-          (ts',degree) <- do
+          removeBackwardSubsumedBy solver (ts', n')          
+          (ts'',n'') <- do
             b <- getPBSplitClausePart solver
             if b
-            then pbSplitClausePart solver (ts',degree)
-            else return (ts',degree)
+            then pbSplitClausePart solver (ts',n')
+            else return (ts',n')
 
-          c <- newPBHandler solver ts' degree False
+          c <- newPBHandler solver ts'' n'' False
           addToDB solver c
           ret <- attach solver c
           if not ret then do
@@ -971,10 +969,10 @@ addXORClauseSoft
   -> [Lit]  -- ^ literals @[l1, l2, …, ln]@
   -> Bool   -- ^ /rhs/
   -> IO ()
-addXORClauseSoft solver ind lits rhs = do
+addXORClauseSoft solver sel lits rhs = do
   reified <- newVar solver
   addXORClause solver (litNot reified : lits) rhs
-  addClause solver [litNot ind, reified] -- ind ⇒ reified
+  addClause solver [litNot sel, reified] -- ind ⇒ reified
 
 {--------------------------------------------------------------------
   Problem solving
@@ -3317,7 +3315,7 @@ instance ConstraintHandler XORClauseHandler where
         val <- varValue solver v
         return $ literal v (not (fromJust (unliftBool val)))
 
-  constrOnUnassigned _solver _this _this2 lit = return ()
+  constrOnUnassigned _solver _this _this2 _lit = return ()
 
   isPBRepresentable _ = return False
 
