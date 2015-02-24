@@ -449,10 +449,10 @@ Test-suite TestSAT
     array,
     containers,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
-    test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
     HUnit,
     QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
@@ -467,9 +467,9 @@ Test-suite TestSimplex
     containers,
     mtl,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-th,
     HUnit
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
@@ -483,9 +483,9 @@ Test-suite TestSimplex2
     containers,
     vector-space >=0.8.6,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-th,
     HUnit
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
@@ -499,9 +499,9 @@ Test-suite TestMIPSolver2
     containers,
     vector-space >=0.8.6,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-th,
     HUnit,
     OptDir,
     stm
@@ -516,10 +516,10 @@ Test-suite TestPolynomial
     base >=4 && <5,
     containers,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
-    test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
     HUnit,
     QuickCheck >=2.5 && <3,
     data-interval,
@@ -536,10 +536,10 @@ Test-suite TestAReal
     base >=4 && <5,
     containers,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
-    test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
     HUnit,
     QuickCheck >=2.5 && <3,
     data-interval
@@ -557,10 +557,10 @@ Test-suite TestArith
     toysolver,
     data-interval,
     OptDir,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
-    test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
     HUnit,
     QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
@@ -576,10 +576,10 @@ Test-suite TestContiTraverso
     vector-space >=0.8.6,
     toysolver,
     OptDir,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
-    test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
     HUnit,
     QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
@@ -593,10 +593,10 @@ Test-suite TestCongruenceClosure
     base >=4 && <5,
     containers,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
-    test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
     HUnit,
     QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
@@ -610,10 +610,10 @@ Test-suite TestLPFile
     base >=4 && <5,
     containers,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
-    test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
     HUnit,
     QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
@@ -627,10 +627,10 @@ Test-suite TestMPSFile
     base >=4 && <5,
     containers,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
-    test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
     HUnit,
     QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
@@ -643,10 +643,10 @@ Test-suite TestPBFile
   Build-depends:
     base >=4 && <5,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
-    test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
     HUnit,
     QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
@@ -659,10 +659,10 @@ Test-suite TestSDPFile
   Build-depends:
     base >=4 && <5,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
-    test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
     HUnit,
     QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
@@ -676,10 +676,10 @@ Test-suite TestUtil
     base >=4 && <5,
     containers,
     toysolver,
-    test-framework,
-    test-framework-th,
-    test-framework-hunit,
-    test-framework-quickcheck2 >=0.2.12.3 && <0.4.0,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
     HUnit,
     QuickCheck >=2.5 && <3
   Default-Language: Haskell2010

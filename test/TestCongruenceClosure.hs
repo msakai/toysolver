@@ -2,9 +2,9 @@
 {-# OPTIONS_GHC -Wall #-}
 module Main (main) where
 
-import Test.HUnit hiding (Test)
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
+import Test.Tasty
+import Test.Tasty.HUnit
+import Test.Tasty.TH
 
 import ToySolver.CongruenceClosure
 

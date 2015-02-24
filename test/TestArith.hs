@@ -8,14 +8,13 @@ import qualified Data.IntSet as IS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.VectorSpace
-import Test.HUnit hiding (Test)
-import Test.QuickCheck hiding ((.&&.), (.||.))
+
+import Test.Tasty
+import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
+import Test.Tasty.HUnit
+import Test.Tasty.TH
 import qualified Test.QuickCheck as QC
 import qualified Test.QuickCheck.Monadic as QM
-import Test.Framework (Test, defaultMain, testGroup)
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2
 
 import qualified Data.Interval as Interval
 import Data.OptDir

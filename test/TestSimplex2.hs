@@ -5,12 +5,10 @@ import Control.Monad
 import Data.List
 import Data.Ratio
 import Data.VectorSpace
-import Test.HUnit hiding (Test)
-import Test.Framework (Test, defaultMain, testGroup)
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
+import Test.Tasty
+import Test.Tasty.HUnit
+import Test.Tasty.TH
 import Text.Printf
-
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Arith.Simplex2
 

@@ -8,13 +8,11 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Test.HUnit hiding (Test)
-import Test.QuickCheck hiding ((.&&.), (.||.))
+import Test.Tasty
+import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
+import Test.Tasty.HUnit
+import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
-import Test.Framework (Test, defaultMain, testGroup)
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2
 
 import ToySolver.Data.LBool
 import ToySolver.Data.BoolExpr

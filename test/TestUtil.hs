@@ -12,13 +12,11 @@ import qualified Data.IntSet as IntSet
 import Data.Ratio
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Test.HUnit hiding (Test)
-import Test.QuickCheck hiding ((.&&.), (.||.))
 import Test.QuickCheck.Function
-import Test.Framework (Test, defaultMain, testGroup)
-import Test.Framework.TH
-import Test.Framework.Providers.QuickCheck2
-import Test.Framework.Providers.HUnit
+import Test.Tasty
+import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
+import Test.Tasty.HUnit
+import Test.Tasty.TH
 import ToySolver.Data.Boolean
 import ToySolver.Data.BoolExpr
 import qualified ToySolver.Internal.Data.Vec as Vec

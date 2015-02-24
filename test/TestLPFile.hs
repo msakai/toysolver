@@ -4,10 +4,10 @@ module Main (main) where
 import Control.Monad
 import Data.List
 import Data.Maybe
-import Test.HUnit hiding (Test)
-import Test.Framework (Test, defaultMain, testGroup)
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
+import Test.Tasty
+import Test.Tasty.QuickCheck
+import Test.Tasty.HUnit
+import Test.Tasty.TH
 import ToySolver.Text.LPFile
 
 case_testdata       = checkString "testdata" testdata

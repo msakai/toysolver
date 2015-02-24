@@ -7,10 +7,11 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Map as Map
 import Data.VectorSpace
-import Test.HUnit hiding (Test)
-import Test.Framework (Test, defaultMain, testGroup)
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
+
+import Test.Tasty
+import Test.Tasty.QuickCheck
+import Test.Tasty.HUnit
+import Test.Tasty.TH
 
 import Data.OptDir
 

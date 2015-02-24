@@ -7,10 +7,9 @@ import Data.Ratio
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.VectorSpace
-import Test.HUnit hiding (Test)
-import Test.Framework (Test, defaultMain, testGroup)
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
+import Test.Tasty
+import Test.Tasty.HUnit
+import Test.Tasty.TH
 import Text.Printf
 
 import qualified ToySolver.Data.LA as LA
