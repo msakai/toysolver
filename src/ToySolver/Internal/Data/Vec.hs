@@ -52,8 +52,9 @@ import Data.Ix
 import qualified Data.Array.Base as A
 import qualified Data.Array.IO as A
 import Data.IORef
+import ToySolver.Internal.Data.IOURef
 
-newtype GenericVec a e = GenericVec (IORef (Int, a Index e))
+data GenericVec a e = GenericVec {-# UNPACKED #-} !(IOURef Int) {-# UNPACKED #-} !(IORef (a Index e))
   deriving Eq
 
 type Vec e = GenericVec A.IOArray e
@@ -63,14 +64,14 @@ type Index = Int
 
 new :: A.MArray a e IO => IO (GenericVec a e)
 new = do
-  a <- A.newArray_ (0,-1)
-  ref <- newIORef (0,a)
-  return $ GenericVec ref
+  sizeRef <- newIOURef 0
+  arrayRef <- newIORef =<< A.newArray_ (0,-1)
+  return $ GenericVec sizeRef arrayRef
 
 {- INLINE getSize #-}
 -- | Get the internal representation array
 getSize :: A.MArray a e IO => GenericVec a e -> IO Int
-getSize (GenericVec ref) = liftM fst $ readIORef ref
+getSize (GenericVec sizeRef _) = readIOURef sizeRef
 
 {-# SPECIALIZE read :: Vec e -> Int -> IO e #-}
 {-# SPECIALIZE read :: UVec Int -> Int -> IO Int #-}
@@ -115,16 +116,15 @@ unsafeWrite !v !i e = do
 {-# SPECIALIZE resize :: UVec Double -> Int -> IO () #-}
 {-# SPECIALIZE resize :: UVec Bool -> Int -> IO () #-}
 resize :: A.MArray a e IO => GenericVec a e -> Int -> IO ()
-resize v@(GenericVec ref) !n = do
+resize v@(GenericVec sizeRef arrayRef) !n = do
   a <- getArray v
   capa <- getCapacity v
-  if n <= capa then do
-    writeIORef ref (n,a)
-  else do
+  unless (n <= capa) $ do
     let capa' = max 2 (capa * 3 `div` 2)
     a' <- A.newArray_ (0, capa'-1)
     copyTo a a' (0,capa-1)
-    writeIORef ref (n,a')
+    writeIORef arrayRef a'
+  writeIOURef sizeRef n
 
 {-# SPECIALIZE growTo :: Vec e -> Int -> IO () #-}
 {-# SPECIALIZE growTo :: UVec Int -> Int -> IO () #-}
@@ -169,10 +169,11 @@ getElems v = do
 {-# SPECIALIZE clone :: UVec Double -> IO (UVec Double) #-}
 {-# SPECIALIZE clone :: UVec Bool -> IO (UVec Bool) #-}
 clone :: A.MArray a e IO => GenericVec a e -> IO (GenericVec a e)
-clone (GenericVec ref) = do
-  (n,a) <- readIORef ref
-  a' <- cloneArray a
-  liftM GenericVec $ newIORef (n,a')
+clone (GenericVec sizeRef arrayRef) = do
+  a <- readIORef arrayRef
+  arrayRef' <- newIORef =<< cloneArray a
+  sizeRef'  <- newIOURef =<< readIOURef sizeRef
+  return $ GenericVec sizeRef' arrayRef'
 
 {--------------------------------------------------------------------
 
@@ -181,7 +182,7 @@ clone (GenericVec ref) = do
 {-# INLINE getArray #-}
 -- | Get the internal representation array
 getArray :: GenericVec a e -> IO (a Index e)
-getArray (GenericVec ref) = liftM snd $ readIORef ref
+getArray (GenericVec _ arrayRef) = readIORef arrayRef
 
 {-# INLINE getCapacity #-}
 -- | Get the internal representation array
@@ -194,13 +195,14 @@ getCapacity vec = liftM rangeSize $ A.getBounds =<< getArray vec
 {-# SPECIALIZE resizeCapacity :: UVec Bool -> Int -> IO () #-}
 -- | Pre-allocate internal buffer for @n@ elements.
 resizeCapacity :: A.MArray a e IO => GenericVec a e -> Int -> IO ()
-resizeCapacity (GenericVec ref) capa = do
-  (n,arr) <- readIORef ref
+resizeCapacity (GenericVec sizeRef arrayRef) capa = do
+  n <- readIOURef sizeRef
+  arr <- readIORef arrayRef
   capa0 <- liftM rangeSize $ A.getBounds arr
   when (capa0 < capa) $ do
     arr' <- A.newArray_ (0, capa-1)
     copyTo arr arr' (0, n-1)
-    writeIORef ref (n,arr')
+    writeIORef arrayRef arr'
 
 {--------------------------------------------------------------------
   utility
