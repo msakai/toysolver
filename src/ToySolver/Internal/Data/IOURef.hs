@@ -24,7 +24,7 @@ module ToySolver.Internal.Data.IOURef
 import Data.Array.Base
 import Data.Array.IO
 
-newtype IOURef a = IOURef (IOUArray Int a)
+newtype IOURef a = IOURef (IOUArray Int a) deriving (Eq)
 
 {-# INLINEABLE newIOURef #-}
 newIOURef :: (MArray IOUArray a IO) => a -> IO (IOURef a)
