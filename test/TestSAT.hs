@@ -8,6 +8,8 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import qualified System.Random as Rand
+
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
 import Test.Tasty.HUnit
@@ -1113,8 +1115,13 @@ instance Arbitrary PBHandlerType where
 
 arbitrarySolver :: QM.PropertyM IO Solver
 arbitrarySolver = do
+  seed <- QM.pick arbitrary
   learningStrategy <- QM.pick arbitrary
   restartStrategy <- QM.pick arbitrary
+  restartFirst <- QM.pick arbitrary
+  restartInc <- QM.pick arbitrary
+  learntSizeFirst <- QM.pick arbitrary
+  learntSizeInc <- QM.pick arbitrary
   pbhandler <- QM.pick arbitrary
   ccmin <- QM.pick $ choose (0,2)
   phaseSaving <- QM.pick arbitrary
@@ -1124,9 +1131,14 @@ arbitrarySolver = do
   splitClausePart <- QM.pick arbitrary
   QM.run $ do
     solver <- newSolver
+    setRandomGen solver (Rand.mkStdGen seed)
     setCheckModel solver True
     setLearningStrategy solver learningStrategy
     setRestartStrategy solver restartStrategy
+    setRestartFirst solver restartFirst
+    setRestartInc solver restartInc
+    setLearntSizeFirst solver learntSizeFirst
+    setLearntSizeInc solver learntSizeInc
     setPBHandlerType solver pbhandler
     setCCMin solver ccmin
     setEnablePhaseSaving solver phaseSaving

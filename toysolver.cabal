@@ -448,6 +448,7 @@ Test-suite TestSAT
     base >=4 && <5,
     array,
     containers,
+    random,
     toysolver,
     tasty >=0.10.1,
     tasty-hunit ==0.9.*,
