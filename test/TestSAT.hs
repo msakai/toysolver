@@ -23,6 +23,7 @@ import ToySolver.SAT
 import ToySolver.SAT.Types
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
 import qualified ToySolver.SAT.MUS as MUS
+import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
@@ -820,6 +821,25 @@ case_MUS = do
   ret @?= False
 
   actual <- MUS.findMUSAssumptions solver MUS.defaultOptions
+  let actual'  = IntSet.map (\x -> x-3) actual
+      expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
+  actual' `elem` expected @?= True
+
+case_MUS_QuickXplain = do
+  solver <- newSolver
+  [x1,x2,x3] <- newVars solver 3
+  sels@[y1,y2,y3,y4,y5,y6] <- newVars solver 6
+  addClause solver [-y1, x1]
+  addClause solver [-y2, -x1]
+  addClause solver [-y3, -x1, x2]
+  addClause solver [-y4, -x2]
+  addClause solver [-y5, -x1, x3]
+  addClause solver [-y6, -x3]
+
+  ret <- solveWith solver sels
+  ret @?= False
+
+  actual <- QuickXplain.findMUSAssumptions solver QuickXplain.defaultOptions
   let actual'  = IntSet.map (\x -> x-3) actual
       expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
   actual' `elem` expected @?= True
