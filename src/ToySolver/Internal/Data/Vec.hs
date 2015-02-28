@@ -54,7 +54,7 @@ import qualified Data.Array.IO as A
 import Data.IORef
 import ToySolver.Internal.Data.IOURef
 
-data GenericVec a e = GenericVec {-# UNPACKED #-} !(IOURef Int) {-# UNPACKED #-} !(IORef (a Index e))
+data GenericVec a e = GenericVec {-# UNPACK #-} !(IOURef Int) {-# UNPACK #-} !(IORef (a Index e))
   deriving Eq
 
 type Vec e = GenericVec A.IOArray e
