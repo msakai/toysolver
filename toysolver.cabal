@@ -10,7 +10,6 @@ Synopsis:	Assorted decision procedures for SAT, Max-SAT, PB, MIP, etc
 Description:	Toy-level implementation of some decision procedures
 Bug-Reports:	https://github.com/msakai/toysolver/issues
 Tested-With:
-   GHC ==7.4.2
    GHC ==7.6.3
    GHC ==7.8.2
 Extra-Source-Files:
