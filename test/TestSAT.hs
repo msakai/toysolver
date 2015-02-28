@@ -74,10 +74,24 @@ prop_solvePB = QM.monadicIO $ do
       forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
         QM.assert $ evalPB m prob == False
 
-solvePB :: Solver -> (Int,[PBLinAtLeast]) -> IO (Maybe Model)
+data PBRel = PBRelGE | PBRelEQ | PBRelLE deriving (Eq, Ord, Enum, Bounded, Show)
+
+instance Arbitrary PBRel where
+  arbitrary = arbitraryBoundedEnum  
+
+evalPBRel :: Ord a => PBRel -> a -> a -> Bool
+evalPBRel PBRelGE = (>=)
+evalPBRel PBRelLE = (<=)
+evalPBRel PBRelEQ = (==)
+
+solvePB :: Solver -> (Int,[(PBRel,PBLinSum,Integer)]) -> IO (Maybe Model)
 solvePB solver (nv,cs) = do
   newVars_ solver nv
-  forM_ cs $ \c -> addPBAtLeast solver (fst c) (snd c)
+  forM_ cs $ \(o,lhs,rhs) -> do
+    case o of
+      PBRelGE -> addPBAtLeast solver lhs rhs
+      PBRelLE -> addPBAtMost solver lhs rhs
+      PBRelEQ -> addPBExactly solver lhs rhs
   ret <- solve solver
   if ret then do
     m <- getModel solver
@@ -85,12 +99,13 @@ solvePB solver (nv,cs) = do
   else do
     return Nothing
 
-arbitraryPB :: Gen (Int,[PBLinAtLeast])
+arbitraryPB :: Gen (Int,[(PBRel,PBLinSum,Integer)])
 arbitraryPB = do
   nv <- choose (0,10)
   nc <- choose (0,50)
   cs <- replicateM nc $ do
-    len <- choose (0,10)    
+    rel <- arbitrary
+    len <- choose (0,10)
     lhs <-
       if nv == 0 then
         return []
@@ -100,11 +115,11 @@ arbitraryPB = do
           c <- arbitrary
           return (c,l)
     rhs <- arbitrary
-    return (lhs,rhs)
+    return $ (rel,lhs,rhs)
   return (nv, cs)
 
-evalPB :: Model -> (Int,[PBLinAtLeast]) -> Bool
-evalPB m (_,cs) = all (evalPBLinAtLeast m) cs
+evalPB :: Model -> (Int,[(PBRel,PBLinSum,Integer)]) -> Bool
+evalPB m (_,cs) = all (\(o,lhs,rhs) -> evalPBRel o (evalPBLinSum m lhs) rhs) cs
 
 
 prop_solveXOR :: Property
