@@ -162,7 +162,7 @@ arbitraryPBNLC = do
         return []
       else
         replicateM len $ do
-          ls <- listOf1 $ choose (-nv, nv) `suchThat` (/= 0)
+          ls <- listOf $ choose (-nv, nv) `suchThat` (/= 0)
           c <- arbitrary
           return (c,ls)
     rhs <- arbitrary
