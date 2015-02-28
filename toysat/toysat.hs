@@ -66,6 +66,7 @@ import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Integer as Integer
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
+import qualified ToySolver.SAT.PBNLC as PBNLC
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
@@ -77,7 +78,7 @@ import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GCNF as GCNF
 import qualified ToySolver.Text.GurobiSol as GurobiSol
 import ToySolver.Version
-import ToySolver.Internal.Util (showRational, revMapM, revForM)
+import ToySolver.Internal.Util (showRational, revForM)
 
 import UBCSAT
 
@@ -602,10 +603,9 @@ solvePB opt solver formula initialModel = do
   Tseitin.setUsePB enc (optLinearizerPB opt)
 
   forM_ (PBFile.pbConstraints formula) $ \(lhs, op, rhs) -> do
-    lhs' <- pbConvSum enc lhs
     case op of
-      PBFile.Ge -> SAT.addPBAtLeast solver lhs' rhs
-      PBFile.Eq -> SAT.addPBExactly solver lhs' rhs
+      PBFile.Ge -> PBNLC.addPBAtLeast enc lhs rhs
+      PBFile.Eq -> PBNLC.addPBExactly enc lhs rhs
 
   case PBFile.pbObjectiveFunction formula of
     Nothing -> do
@@ -617,7 +617,8 @@ solvePB opt solver formula initialModel = do
         writeSOLFile opt m Nothing nv
 
     Just obj' -> do
-      obj'' <- pbConvSum enc obj'
+      -- TODO: consider polarity
+      obj'' <- PBNLC.linearizePBSum enc obj'
 
       nv' <- SAT.nVars solver
       defs <- Tseitin.getDefinitions enc
@@ -653,13 +654,6 @@ solvePB opt solver formula initialModel = do
               else putSLine "SATISFIABLE"
             pbPrintModel stdout m nv
             writeSOLFile opt m (Just val) nv
-
-pbConvSum :: Tseitin.Encoder -> PBFile.Sum -> IO SAT.PBLinSum
-pbConvSum enc = revMapM f
-  where
-    f (w,ls) = do
-      l <- Tseitin.encodeConj enc ls
-      return (w,l)
 
 evalPBConstraint :: SAT.IModel m => m -> PBFile.Constraint -> Bool
 evalPBConstraint m (lhs,op,rhs) = op' lhs' rhs
@@ -702,27 +696,28 @@ solveWBO opt solver isMaxSat formula initialModel = do
   defsRef <- newIORef []
 
   obj <- liftM concat $ revForM (PBFile.wboConstraints formula) $ \(cost, constr@(lhs, op, rhs)) -> do
-    lhs' <- pbConvSum enc lhs
     case cost of
       Nothing -> do
         case op of
-          PBFile.Ge -> SAT.addPBAtLeast solver lhs' rhs
-          PBFile.Eq -> SAT.addPBExactly solver lhs' rhs
+          PBFile.Ge -> PBNLC.addPBAtLeast enc lhs rhs
+          PBFile.Eq -> PBNLC.addPBExactly enc lhs rhs
         return []
       Just cval -> do
         sel <-
           case op of
             PBFile.Ge -> do
-              case lhs' of
-                [(1,l)] | rhs == 1 -> return l
+              case lhs of
+                [(1,ls)] | rhs == 1 ->
+                  -- TODO: consider polarity
+                  Tseitin.encodeConj enc ls
                 _ -> do
                   sel <- SAT.newVar solver
-                  SAT.addPBAtLeastSoft solver sel lhs' rhs
+                  PBNLC.addPBAtLeastSoft enc sel lhs rhs
                   modifyIORef defsRef ((sel, constr) : )
                   return sel
             PBFile.Eq -> do
               sel <- SAT.newVar solver
-              SAT.addPBExactlySoft solver sel lhs' rhs
+              PBNLC.addPBExactlySoft enc sel lhs rhs
               modifyIORef defsRef ((sel, constr) : )
               return sel
         return [(cval, SAT.litNot sel)]

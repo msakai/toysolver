@@ -223,6 +223,7 @@ Library
      ToySolver.SAT.MUS.CAMUS
      ToySolver.SAT.MUS.DAA
      ToySolver.SAT.MUS.Types
+     ToySolver.SAT.PBNLC
      ToySolver.SAT.PBO
      ToySolver.SAT.PBO.Context
      ToySolver.SAT.PBO.BC

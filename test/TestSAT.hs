@@ -24,6 +24,7 @@ import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
+import qualified ToySolver.SAT.PBNLC as PBNLC
 
 prop_solveCNF :: Property
 prop_solveCNF = QM.monadicIO $ do
@@ -120,6 +121,56 @@ arbitraryPB = do
 
 evalPB :: Model -> (Int,[(PBRel,PBLinSum,Integer)]) -> Bool
 evalPB m (_,cs) = all (\(o,lhs,rhs) -> evalPBRel o (evalPBLinSum m lhs) rhs) cs
+
+
+prop_solvePBNLC :: Property
+prop_solvePBNLC = QM.monadicIO $ do
+  prob@(nv,_) <- QM.pick arbitraryPBNLC
+  solver <- arbitrarySolver
+  ret <- QM.run $ solvePBNLC solver prob
+  case ret of
+    Just m -> QM.assert $ evalPBNLC m prob == True
+    Nothing -> do
+      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
+        QM.assert $ evalPBNLC m prob == False
+
+solvePBNLC :: Solver -> (Int,[(PBRel,PBNLC.PBSum,Integer)]) -> IO (Maybe Model)
+solvePBNLC solver (nv,cs) = do
+  newVars_ solver nv
+  enc <- Tseitin.newEncoder solver
+  forM_ cs $ \(o,lhs,rhs) -> do
+    case o of
+      PBRelGE -> PBNLC.addPBAtLeast enc lhs rhs
+      PBRelLE -> PBNLC.addPBAtMost enc lhs rhs
+      PBRelEQ -> PBNLC.addPBExactly enc lhs rhs
+  ret <- solve solver
+  if ret then do
+    m <- getModel solver
+    return (Just m)
+  else do
+    return Nothing
+
+arbitraryPBNLC :: Gen (Int,[(PBRel,PBNLC.PBSum,Integer)])
+arbitraryPBNLC = do
+  nv <- choose (0,10)
+  nc <- choose (0,50)
+  cs <- replicateM nc $ do
+    rel <- arbitrary
+    len <- choose (0,10)
+    lhs <-
+      if nv == 0 then
+        return []
+      else
+        replicateM len $ do
+          ls <- listOf1 $ choose (-nv, nv) `suchThat` (/= 0)
+          c <- arbitrary
+          return (c,ls)
+    rhs <- arbitrary
+    return $ (rel,lhs,rhs)
+  return (nv, cs)
+
+evalPBNLC :: Model -> (Int,[(PBRel,PBNLC.PBSum,Integer)]) -> Bool
+evalPBNLC m (_,cs) = all (\(o,lhs,rhs) -> evalPBRel o (PBNLC.evalPBSum m lhs) rhs) cs
 
 
 prop_solveXOR :: Property
