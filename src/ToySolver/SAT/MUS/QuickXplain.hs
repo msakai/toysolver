@@ -62,6 +62,14 @@ findMUSAssumptions solver opt = do
     showLits :: IS.IntSet -> String
     showLits ls = "{" ++ intercalate ", " (map showLit (IS.toList ls)) ++ "}"
 
+    split :: IS.IntSet -> (IS.IntSet, IS.IntSet)
+    split cs = (cs1, cs2)
+      where
+        s = IS.size cs
+        cs' = IS.toAscList cs
+        cs1 = IS.fromAscList $ take (s `div` 2) cs'
+        cs2 = IS.fromAscList $ drop (s `div` 2) cs'
+
     -- Precondition:
     -- * bs∪cs is unsatisfiable
     -- * ¬hasDelta ⇒ bs is satisfiable
@@ -83,13 +91,10 @@ findMUSAssumptions solver opt = do
         return IS.empty
       else do
         log $ showLits bs ++ " is satisfiable"
-        let s = IS.size cs
-        if s == 1 then do
+        if IS.size cs == 1 then do
           return cs
         else do
-          let cs' = IS.toAscList cs
-              cs1 = IS.fromAscList $ take (s `div` 2) cs'
-              cs2 = IS.fromAscList $ drop (s `div` 2) cs'
+          let (cs1,cs2) = split cs
           log $ "splitting " ++ showLits cs ++ " into " ++ showLits cs1 ++ " and " ++ showLits cs2
           ds2 <- f (bs `IS.union` cs1) (not (IS.null cs1)) cs2
           ds1 <- f (bs `IS.union` ds2) (not (IS.null ds2)) cs1
