@@ -68,6 +68,7 @@ import qualified ToySolver.SAT.Integer as Integer
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
 import qualified ToySolver.SAT.PBNLC as PBNLC
 import qualified ToySolver.SAT.MUS as MUS
+import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import ToySolver.SAT.Printer
@@ -85,6 +86,8 @@ import UBCSAT
 -- ------------------------------------------------------------------------
 
 data Mode = ModeHelp | ModeVersion | ModeSAT | ModeMUS | ModePB | ModeWBO | ModeMaxSAT | ModeMIP
+
+data MUSMethod = MUSLinear | MUSQuickXplain
 
 data AllMUSMethod = AllMUSCAMUS | AllMUSDAA
 
@@ -109,6 +112,7 @@ data Options
   , optSearchStrategy       :: PBO.SearchStrategy
   , optObjFunVarsHeuristics :: Bool
   , optLocalSearchInitial   :: Bool
+  , optMUSMethod :: MUSMethod
   , optAllMUSes :: Bool
   , optAllMUSMethod :: AllMUSMethod
   , optPrintRational :: Bool
@@ -143,6 +147,7 @@ defaultOptions
   , optSearchStrategy       = PBO.defaultSearchStrategy
   , optObjFunVarsHeuristics = PBO.defaultEnableObjFunVarsHeuristics
   , optLocalSearchInitial   = False
+  , optMUSMethod = MUSLinear
   , optAllMUSes = False
   , optAllMUSMethod = AllMUSCAMUS
   , optPrintRational = False  
@@ -244,6 +249,9 @@ options =
     , Option [] ["all-mus"]
         (NoArg (\opt -> opt{ optMode = Just ModeMUS, optAllMUSes = True }))
         "enumerate all MUSes"
+    , Option [] ["mus-method"]
+        (ReqArg (\val opt -> opt{ optMUSMethod = parseMUSMethod val }) "<str>")
+        "MUS computation method: linear (default), QuickXplain"
     , Option [] ["all-mus-method"]
         (ReqArg (\val opt -> opt{ optAllMUSMethod = parseAllMUSMethod val }) "<str>")
         "MUS enumeration method: camus (default), daa"
@@ -286,6 +294,12 @@ options =
         "bcd"      -> PBO.BCD
         "bcd2"     -> PBO.BCD2
         _ -> error (printf "unknown search strategy \"%s\"" s)
+
+    parseMUSMethod s =
+      case map toLower s of
+        "linear"      -> MUSLinear
+        "quickxplain" -> MUSQuickXplain
+        _ -> error (printf "unknown MUS finding method \"%s\"" s)
 
     parseAllMUSMethod s =
       case map toLower s of
@@ -557,16 +571,19 @@ solveMUS opt solver gcnf = do
       writeSOLFile opt m Nothing (GCNF.numVars gcnf)
     else do
       if not (optAllMUSes opt)
-        then do
+      then do
           let opt2 = def
                      { MUS.optLogger = putCommentLine
                      , MUS.optLitPrinter = \lit ->
                          show (sel2idx ! lit)
                      }
-          mus <- MUS.findMUSAssumptions solver opt2
+          mus <-
+            case optMUSMethod opt of
+              MUSLinear -> MUS.findMUSAssumptions solver opt2
+              MUSQuickXplain -> QuickXplain.findMUSAssumptions solver opt2
           let mus2 = sort $ map (sel2idx !) $ IntSet.toList mus
           musPrintSol stdout mus2
-        else do
+      else do
           counter <- newIORef 1
           let opt2 = def
                      { CAMUS.optLogger = putCommentLine
