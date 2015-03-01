@@ -242,11 +242,11 @@ options =
         "Use local search (currently UBCSAT) for finding initial solution"
 
     , Option [] ["all-mus"]
-        (NoArg (\opt -> opt{ optAllMUSes = True }))
+        (NoArg (\opt -> opt{ optMode = Just ModeMUS, optAllMUSes = True }))
         "enumerate all MUSes"
-    , Option [] ["all-mus-daa"]
-        (NoArg (\opt -> opt{ optAllMUSes = True, optAllMUSMethod = AllMUSDAA }))
-        "enumerate all MUSes using DAA instead of CAMUS (experimental option)"
+    , Option [] ["all-mus-method"]
+        (ReqArg (\val opt -> opt{ optAllMUSMethod = parseAllMUSMethod val }) "<str>")
+        "MUS enumeration method: camus (default), daa"
 
     , Option [] ["print-rational"]
         (NoArg (\opt -> opt{ optPrintRational = True }))
@@ -286,6 +286,12 @@ options =
         "bcd"      -> PBO.BCD
         "bcd2"     -> PBO.BCD2
         _ -> error (printf "unknown search strategy \"%s\"" s)
+
+    parseAllMUSMethod s =
+      case map toLower s of
+        "camus"    -> AllMUSCAMUS
+        "daa"      -> AllMUSDAA
+        _ -> error (printf "unknown MUS enumeration method \"%s\"" s)
 
     parseLS s =
       case map toLower s of
