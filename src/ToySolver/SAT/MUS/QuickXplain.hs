@@ -47,7 +47,7 @@ findMUSAssumptions solver opt = do
   if IS.null core then
     return core
   else
-    f IS.empty core
+    f IS.empty False core
 
   where
     log :: String -> IO ()
@@ -62,26 +62,37 @@ findMUSAssumptions solver opt = do
     showLits :: IS.IntSet -> String
     showLits ls = "{" ++ intercalate ", " (map showLit (IS.toList ls)) ++ "}"
 
-    -- precondition : ds∪cs is unsatisfiable
-    -- returns : minimal subset of S⊆cs such that ds∪S is unsatisfiable
-    f :: IS.IntSet -> IS.IntSet -> IO MUS
-    f ds cs = do
-      b <- if IS.null ds then
-             return True
-           else
-             SAT.solveWith solver (IS.toList ds)
-      if not b then
+    -- Precondition:
+    -- * bs∪cs is unsatisfiable
+    -- * ¬hasDelta ⇒ bs is satisfiable
+    --
+    -- Returns:
+    -- * minimal subset S⊆cs such that bs∪S is unsatisfiable
+    -- 
+    f :: IS.IntSet -> Bool -> IS.IntSet -> IO IS.IntSet
+    f bs hasDelta cs = do
+      log $ "checking satisfiability of " ++ showLits bs
+      ret <- if not hasDelta then do
+               return True
+             else
+               SAT.solveWith solver (IS.toList bs)
+      if not ret then do
+        log $ showLits bs ++ " is unsatisfiable"
+        log $ "new core = " ++ showLits bs
+        update $ IS.toList bs
         return IS.empty
       else do
+        log $ showLits bs ++ " is satisfiable"
         let s = IS.size cs
-        if s == 1 then
+        if s == 1 then do
           return cs
         else do
           let cs' = IS.toAscList cs
               cs1 = IS.fromAscList $ take (s `div` 2) cs'
               cs2 = IS.fromAscList $ drop (s `div` 2) cs'
-          ds2 <- f cs1 cs2
-          ds1 <- f ds2 cs1
+          log $ "splitting " ++ showLits cs ++ " into " ++ showLits cs1 ++ " and " ++ showLits cs2
+          ds2 <- f (bs `IS.union` cs1) (not (IS.null cs1)) cs2
+          ds1 <- f (bs `IS.union` ds2) (not (IS.null ds2)) cs1
           return (ds1 `IS.union` ds2)
 
 {-
