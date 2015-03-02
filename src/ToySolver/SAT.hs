@@ -304,7 +304,7 @@ data Solver
   = Solver
   { svOk           :: !(IORef Bool)
   , svVarQueue     :: !PQ.PriorityQueue
-  , svTrail        :: !(IORef [Lit])
+  , svTrail        :: !(Vec.UVec Lit)
   , svVarData      :: !(Vec.Vec VarData)
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
@@ -316,7 +316,6 @@ data Solver
   , svNRandomDecision :: !(IORef Int)
   , svNConflict    :: !(IORef Int)
   , svNRestart     :: !(IORef Int)
-  , svNAssigns     :: !(IORef Int)
   , svNFixed       :: !(IORef Int)
   , svNLearntGC    :: !(IORef Int)
   , svNRemovedConstr :: !(IORef Int)
@@ -413,7 +412,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
   case m of
     Just a -> return $ litPolarity lit == aValue a
     Nothing -> do
-      idx <- readIORef (svNAssigns solver)
+      idx <- nAssigns solver
       lv <- readIORef (svLevel solver)
       bt <- newIORef []
 
@@ -426,8 +425,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
         , aOnUnassigned = bt
         }
 
-      modifyIORef (svTrail solver) (lit:)
-      modifyIORef' (svNAssigns solver) (+1)
+      Vec.push (svTrail solver) lit
       when (lv == levelRoot) $ modifyIORef' (svNFixed solver) (+1)
       bcpEnqueue solver lit
 
@@ -454,7 +452,6 @@ unassign solver !v = assert (validVar v) $ do
         constrOnUnassigned solver c c l
       
   writeIORef (vdAssignment vd) Nothing
-  modifyIORef' (svNAssigns solver) (subtract 1)
   PQ.enqueue (svVarQueue solver) v
 
 addOnUnassigned :: Solver -> SomeConstraintHandler -> Lit -> IO ()
@@ -588,7 +585,7 @@ nVars solver = Vec.getSize (svVarData solver)
 
 -- | number of assigned variables.
 nAssigns :: Solver -> IO Int
-nAssigns solver = readIORef (svNAssigns solver)
+nAssigns solver = Vec.getSize (svTrail solver)
 
 -- | number of constraints.
 nConstraints :: Solver -> IO Int
@@ -616,7 +613,7 @@ newSolver :: IO Solver
 newSolver = do
  rec
   ok   <- newIORef True
-  trail <- newIORef []
+  trail <- Vec.new
   vars <- Vec.new
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
@@ -629,7 +626,6 @@ newSolver = do
   nranddec  <- newIORef 0
   nconflict <- newIORef 0
   nrestart  <- newIORef 0
-  nassigns  <- newIORef 0
   nfixed    <- newIORef 0
   nlearntgc <- newIORef 0
   nremoved  <- newIORef 0
@@ -683,7 +679,6 @@ newSolver = do
         , svNRandomDecision = nranddec
         , svNConflict  = nconflict
         , svNRestart   = nrestart
-        , svNAssigns   = nassigns
         , svNFixed     = nfixed
         , svNLearntGC  = nlearntgc
         , svNRemovedConstr = nremoved
@@ -1013,6 +1008,9 @@ solve_ solver = do
     d <- readIORef (svLevel solver)
     assert (d == levelRoot) $ return ()
 
+    nv <- nVars solver
+    Vec.resizeCapacity (svTrail solver) nv
+
     restartStrategy <- readIORef (svRestartStrategy solver)
     restartFirst  <- readIORef (svRestartFirst solver)
     restartInc    <- readIORef (svRestartInc solver)
@@ -1033,7 +1031,6 @@ solve_ solver = do
       learntSizeFirst <- readIORef (svLearntSizeFirst solver)
       learntSizeInc   <- readIORef (svLearntSizeInc solver)
       nc <- nConstraints solver
-      nv <- nVars solver
       let initialLearntLim = if learntSizeFirst > 0 then learntSizeFirst else max ((nc + nv) `div` 3) 16
           learntSizeSeq    = iterate (ceiling . (learntSizeInc*) . fromIntegral) initialLearntLim
           learntSizeAdjSeq = iterate (\x -> (x * 3) `div` 2) (100::Int)
@@ -1713,26 +1710,28 @@ analyzeConflict solver constr = do
 -- { p } ∪ { pにfalseを割り当てる原因のassumption }
 analyzeFinal :: Solver -> Lit -> IO [Lit]
 analyzeFinal solver p = do
-  lits <- readIORef (svTrail solver)
-  let go :: [Lit] -> VarSet -> [Lit] -> IO [Lit]
-      go [] _ result = return result
-      go (l:ls) seen result = do
-        lv <- litLevel solver l
-        if lv == levelRoot then
-          return result
-        else if litVar l `IS.member` seen then do
-          r <- varReason solver (litVar l)
-          case r of
-            Nothing -> do
-              let seen' = IS.delete (litVar l) seen
-              go ls seen' (l : result)
-            Just constr  -> do
-              c <- reasonOf solver constr (Just l)
-              let seen' = IS.delete (litVar l) seen `IS.union` IS.fromList [litVar l2 | l2 <- c]
-              go ls seen' result
-        else
-          go ls seen result
-  go lits (IS.singleton (litVar p)) [p]
+  let go :: Int -> VarSet -> [Lit] -> IO [Lit]
+      go i seen result
+        | i < 0 = return result
+        | otherwise = do
+            l <- Vec.unsafeRead (svTrail solver) i
+            lv <- litLevel solver l
+            if lv == levelRoot then
+              return result
+            else if litVar l `IS.member` seen then do
+              r <- varReason solver (litVar l)
+              case r of
+                Nothing -> do
+                  let seen' = IS.delete (litVar l) seen
+                  go (i-1) seen' (l : result)
+                Just constr  -> do
+                  c <- reasonOf solver constr (Just l)
+                  let seen' = IS.delete (litVar l) seen `IS.union` IS.fromList [litVar l2 | l2 <- c]
+                  go (i-1) seen' result
+            else
+              go (i-1) seen result
+  n <- Vec.getSize (svTrail solver)
+  go (n-1) (IS.singleton (litVar p)) [p]
 
 analyzeConflictHybrid :: ConstraintHandler c => Solver -> c -> IO ((Clause, Level), (PBLinAtLeast, Level))
 analyzeConflictHybrid solver constr = do
@@ -1916,20 +1915,14 @@ minimizeConflictClauseRecursive solver lits = do
 
 peekTrail :: Solver -> IO Lit
 peekTrail solver = do
-  m <- readIORef (svTrail solver)
-  case m of
-    []   -> error "ToySolver.SAT.peekTrail: empty trail"
-    l:_ -> return l
+  n <- Vec.getSize (svTrail solver)
+  Vec.unsafeRead (svTrail solver) (n-1)
 
 popTrail :: Solver -> IO Lit
 popTrail solver = do
-  m <- readIORef (svTrail solver)
-  case m of
-    []   -> error "ToySolver.SAT.popTrail: empty trail"
-    l:ls -> do
-      unassign solver (litVar l)
-      writeIORef (svTrail solver) ls
-      return l
+  l <- Vec.unsafePop (svTrail solver)
+  unassign solver (litVar l)
+  return l
 
 -- | Revert to the state at given level
 -- (keeping all assignment at @level@ but not beyond).
