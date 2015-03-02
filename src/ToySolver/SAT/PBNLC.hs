@@ -70,10 +70,10 @@ addPBExactly enc lhs rhs = do
   lhs' <- linearizePBSum enc [(c,ls) | (c,ls) <- lhs, not (null ls)]
   SAT.addPBExactly (encSolver enc) lhs' (rhs - c)
 
--- | Add a soft non-linear pseudo boolean constraints /lit ⇒ c1*ls1 + c2*ls2 + … ≥ n/.
+-- | Add a soft non-linear pseudo boolean constraints /sel ⇒ c1*ls1 + c2*ls2 + … ≥ n/.
 addPBAtLeastSoft
   :: Encoder
-  -> Lit     -- ^ indicator @lit@
+  -> Lit     -- ^ Selector literal @sel@
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
   -> IO ()
@@ -82,10 +82,10 @@ addPBAtLeastSoft enc sel lhs rhs = do
   lhs' <- linearizePBSumWithPolarity enc polarityPos [(c,ls) | (c,ls) <- lhs, not (null ls)]
   SAT.addPBAtLeastSoft (encSolver enc) sel lhs' (rhs - c)
 
--- | Add a soft non-linear pseudo boolean constraints /lit ⇒ c1*ls1 + c2*ls2 + … ≤ n/.
+-- | Add a soft non-linear pseudo boolean constraints /sel ⇒ c1*ls1 + c2*ls2 + … ≤ n/.
 addPBAtMostSoft
   :: Encoder
-  -> Lit     -- ^ indicator @lit@
+  -> Lit     -- ^ Selector literal @sel@
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
   -> IO ()

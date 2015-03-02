@@ -906,10 +906,10 @@ addPBExactly solver ts n = do
   addPBAtLeast solver ts2 n2
   addPBAtMost solver ts2 n2
 
--- | Add a soft pseudo boolean constraints /lit ⇒ c1*l1 + c2*l2 + … ≥ n/.
+-- | Add a soft pseudo boolean constraints /sel ⇒ c1*l1 + c2*l2 + … ≥ n/.
 addPBAtLeastSoft
   :: Solver          -- ^ The 'Solver' argument.
-  -> Lit             -- ^ indicator @lit@
+  -> Lit             -- ^ Selector literal @sel@
   -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
   -> Integer         -- ^ /n/
   -> IO ()
@@ -917,20 +917,20 @@ addPBAtLeastSoft solver sel lhs rhs = do
   (lhs', rhs') <- liftM normalizePBLinAtLeast $ instantiatePBLinAtLeast (getLitFixed solver) (lhs,rhs)
   addPBAtLeast solver ((rhs', litNot sel) : lhs') rhs'
 
--- | Add a soft pseudo boolean constraints /lit ⇒ c1*l1 + c2*l2 + … ≤ n/.
+-- | Add a soft pseudo boolean constraints /sel ⇒ c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMostSoft
   :: Solver          -- ^ The 'Solver' argument.
-  -> Lit             -- ^ indicator @lit@
+  -> Lit             -- ^ Selector literal @sel@
   -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
   -> Integer         -- ^ /n/
   -> IO ()
 addPBAtMostSoft solver sel lhs rhs =
   addPBAtLeastSoft solver sel [(negate c, lit) | (c,lit) <- lhs] (negate rhs)
 
--- | Add a soft pseudo boolean constraints /lit ⇒ c1*l1 + c2*l2 + … = n/.
+-- | Add a soft pseudo boolean constraints /sel ⇒ c1*l1 + c2*l2 + … = n/.
 addPBExactlySoft
   :: Solver          -- ^ The 'Solver' argument.
-  -> Lit             -- ^ indicator @lit@
+  -> Lit             -- ^ Selector literal @sel@
   -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
   -> Integer         -- ^ /n/
   -> IO ()
@@ -962,17 +962,17 @@ addXORClause solver lits rhs = do
         _ <- basicAttachXORClauseHandler solver c
         return ()
 
--- | Add a soft parity constraint /lit ⇒ l1 ⊕ l2 ⊕ … ⊕ ln = rhs/
+-- | Add a soft parity constraint /sel ⇒ l1 ⊕ l2 ⊕ … ⊕ ln = rhs/
 addXORClauseSoft
   :: Solver -- ^ The 'Solver' argument.
-  -> Lit    -- ^ indicator @lit@
+  -> Lit    -- ^ Selector literal @sel@
   -> [Lit]  -- ^ literals @[l1, l2, …, ln]@
   -> Bool   -- ^ /rhs/
   -> IO ()
 addXORClauseSoft solver sel lits rhs = do
   reified <- newVar solver
   addXORClause solver (litNot reified : lits) rhs
-  addClause solver [litNot sel, reified] -- ind ⇒ reified
+  addClause solver [litNot sel, reified] -- sel ⇒ reified
 
 {--------------------------------------------------------------------
   Problem solving
