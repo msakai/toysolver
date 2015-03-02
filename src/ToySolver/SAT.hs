@@ -1671,9 +1671,9 @@ analyzeConflict solver constr = do
         | sz==1 = do
             return $ lits1 `IS.union` lits2
         | sz>=2 = do
-            l <- popTrail solver
+            l <- peekTrail solver
             if litNot l `IS.notMember` lits1 then do
-              unassign solver (litVar l)
+              popTrail solver
               loop lits1 lits2
             else do
               m <- varReason solver (litVar l)
@@ -1683,7 +1683,7 @@ analyzeConflict solver constr = do
                   constrBumpActivity solver constr2
                   xs <- reasonOf solver constr2 (Just l)
                   forM_ xs $ \lit -> varBumpActivity solver (litVar lit)
-                  unassign solver (litVar l)
+                  popTrail solver
                   (ys,zs) <- split xs
                   loop (IS.delete (litNot l) lits1 `IS.union` ys)
                        (lits2 `IS.union` zs)
@@ -1756,7 +1756,7 @@ analyzeConflictHybrid solver constr = do
         | sz==1 = do
             return $ (lits1 `IS.union` lits2, pb)
         | sz>=2 = do
-            l <- popTrail solver
+            l <- peekTrail solver
             m <- varReason solver (litVar l)
             case m of
               Nothing -> error "analyzeConflictHybrid: should not happen"
@@ -1787,7 +1787,7 @@ analyzeConflictHybrid solver constr = do
                          return $ cutResolve pb pb2 (litVar l)
                        else return pb
 
-                unassign solver (litVar l)
+                popTrail solver
                 loop lits1' lits2' pb'
 
         | otherwise = error "analyzeConflictHybrid: should not happen: reason of current level is empty"
@@ -1914,12 +1914,20 @@ minimizeConflictClauseRecursive solver lits = do
     log solver $ show ys
   return $ IS.fromAscList $ ys
 
+peekTrail :: Solver -> IO Lit
+peekTrail solver = do
+  m <- readIORef (svTrail solver)
+  case m of
+    []   -> error "ToySolver.SAT.peekTrail: empty trail"
+    l:_ -> return l
+
 popTrail :: Solver -> IO Lit
 popTrail solver = do
   m <- readIORef (svTrail solver)
   case m of
     []   -> error "ToySolver.SAT.popTrail: empty trail"
     l:ls -> do
+      unassign solver (litVar l)
       writeIORef (svTrail solver) ls
       return l
 
@@ -1928,17 +1936,19 @@ popTrail solver = do
 backtrackTo :: Solver -> Int -> IO ()
 backtrackTo solver level = do
   when debugMode $ log solver $ printf "backtrackTo: %d" level
-  writeIORef (svTrail solver) =<< loop =<< readIORef (svTrail solver)
+  loop
   SQ.clear (svBCPQueue solver)
   writeIORef (svLevel solver) level
   where
-    loop :: [Lit] -> IO [Lit]
-    loop [] = return []
-    loop lls@(l:ls) = do
-      lv <- litLevel solver l
-      if lv <= level
-        then return lls
-        else unassign solver (litVar l) >> loop ls
+    loop :: IO ()
+    loop = do
+      m <- nAssigns solver
+      when (m > 0) $ do
+        l <- peekTrail solver
+        lv <- litLevel solver l
+        when (lv > level) $ do
+          popTrail solver
+          loop
 
 constructModel :: Solver -> IO ()
 constructModel solver = do
