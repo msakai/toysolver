@@ -900,7 +900,7 @@ addPBAtLeast solver ts n = do
 -- | See documentation of 'setPBSplitClausePart'.
 pbSplitClausePart :: Solver -> ([(Integer,Lit)], Integer) -> IO ([(Integer,Lit)], Integer)
 pbSplitClausePart solver (lhs,rhs) = do
-  let (ts1,ts2) = partition (\(c,l) -> c >= rhs) lhs
+  let (ts1,ts2) = partition (\(c,_) -> c >= rhs) lhs
   if length ts1 < 2 then
     return (lhs,rhs)    
   else do
@@ -2506,7 +2506,7 @@ instance ConstraintHandler ClauseHandler where
         assert (lit == head lits) $ return ()
         return $ tail lits
 
-  constrOnUnassigned _solver _this _this2 lit = return ()
+  constrOnUnassigned _solver _this _this2 _lit = return ()
 
   isPBRepresentable _ = return True
 
@@ -2754,7 +2754,7 @@ instance ConstraintHandler AtLeastHandler where
             error $ printf "AtLeastHandler.basicReasonOf: cannot find %d in first %d elements" n
         return falsifiedLits
 
-  constrOnUnassigned _solver _this _this2 lit = return ()
+  constrOnUnassigned _solver _this _this2 _lit = return ()
 
   isPBRepresentable _ = return True
 
@@ -2943,7 +2943,7 @@ instance ConstraintHandler PBHandlerCounter where
             else do
               go s xs ret
 
-  constrOnUnassigned solver this this2 lit = do
+  constrOnUnassigned _solver _this this2 lit = do
     let c = pbCoeffMap this2 IM.! (- lit)
     modifyIORef' (pbSlack this2) (+ c)
 
@@ -3045,7 +3045,7 @@ instance ConstraintHandler PBHandlerPueblo where
       xs <- liftM (reverse . map snd . IM.toAscList) $ foldM f IM.empty (puebloTerms this)
 #endif
       let g !_ [] = return ()
-          g !s (t@(c,l):ts) = do
+          g !s ((c,l):ts) = do
             addOnUnassigned solver constr l
             if s+c >= puebloDegree this + puebloAMax this then return ()
             else g (s+c) ts
