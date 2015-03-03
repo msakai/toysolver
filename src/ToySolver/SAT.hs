@@ -114,12 +114,17 @@ module ToySolver.SAT
   , defaultPBSplitClausePart
 
   -- * Read state
+  , getNVars
+  , getNConstraints
+  , getNLearntConstraints
+  , getVarFixed
+  , getLitFixed
+
+  -- * Read state (deprecated)
   , nVars
   , nAssigns
   , nConstraints
-  , nLearnt
-  , getVarFixed
-  , getLitFixed
+  , nLearnt  
 
   -- * Internal API
   , varBumpActivity
@@ -412,7 +417,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
   if val0 /= lUndef then do    
     return $ val == val0
   else do
-    idx <- nAssigns solver
+    idx <- Vec.getSize (svTrail solver)
     lv <- readIORef (svLevel solver)
 
     writeIORef (vdValue vd) val
@@ -579,24 +584,44 @@ variables solver = do
   return [1 .. n]
 
 -- | number of variables of the problem.
-nVars :: Solver -> IO Int
-nVars solver = Vec.getSize (svVarData solver)
+getNVars :: Solver -> IO Int
+getNVars solver = Vec.getSize (svVarData solver)
 
+{-# DEPRECATED nVars "Use getNVars instead" #-}
+-- | number of variables of the problem.
+nVars :: Solver -> IO Int
+nVars = getNVars
+
+-- | number of assigned 
+getNAssigned :: Solver -> IO Int
+getNAssigned solver = Vec.getSize (svTrail solver)
+
+{-# DEPRECATED nAssigns "nAssigns is deprecated" #-}
 -- | number of assigned variables.
 nAssigns :: Solver -> IO Int
-nAssigns solver = Vec.getSize (svTrail solver)
+nAssigns = getNAssigned
 
 -- | number of constraints.
-nConstraints :: Solver -> IO Int
-nConstraints solver = do
+getNConstraints :: Solver -> IO Int
+getNConstraints solver = do
   xs <- readIORef (svConstrDB solver)
   return $ length xs
 
+{-# DEPRECATED nConstraints "Use getNConstraints instead" #-}
+-- | number of constraints.
+nConstraints :: Solver -> IO Int
+nConstraints = getNConstraints
+
 -- | number of learnt constrints.
-nLearnt :: Solver -> IO Int
-nLearnt solver = do
+getNLearntConstraints :: Solver -> IO Int
+getNLearntConstraints solver = do
   (n,_) <- readIORef (svLearntDB solver)
   return n
+
+{-# DEPRECATED nLearnt "Use getNLearntConstraints instead" #-}
+-- | number of learnt constrints.
+nLearnt :: Solver -> IO Int
+nLearnt = getNLearntConstraints
 
 learntConstraints :: Solver -> IO [SomeConstraintHandler]
 learntConstraints solver = do
@@ -1123,7 +1148,7 @@ search solver !conflict_lim onConflict = do
     checkGC :: IO ()
     checkGC = do
       n <- nLearnt solver
-      m <- nAssigns solver
+      m <- getNAssigned solver
       learnt_lim <- readIORef (svLearntLim solver)
       when (learnt_lim >= 0 && n - m > learnt_lim) $ do
         modifyIORef' (svNLearntGC solver) (+1)
@@ -1934,7 +1959,7 @@ backtrackTo solver level = do
   where
     loop :: IO ()
     loop = do
-      m <- nAssigns solver
+      m <- Vec.getSize (svTrail solver)
       when (m > 0) $ do
         l <- peekTrail solver
         lv <- litLevel solver l

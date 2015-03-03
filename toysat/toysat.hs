@@ -643,7 +643,7 @@ solvePB opt solver formula initialModel = do
       -- TODO: consider polarity
       obj'' <- PBNLC.linearizePBSum enc obj'
 
-      nv' <- SAT.nVars solver
+      nv' <- SAT.getNVars solver
       defs <- Tseitin.getDefinitions enc
       let extendModel :: SAT.Model -> SAT.Model
           extendModel m = array (1,nv') (assocs a)
@@ -749,7 +749,7 @@ solveWBO opt solver isMaxSat formula initialModel = do
     Nothing -> return ()
     Just c -> SAT.addPBAtMost solver obj (c-1)
 
-  nv' <- SAT.nVars solver
+  nv' <- SAT.getNVars solver
   defs1 <- Tseitin.getDefinitions enc
   defs2 <- readIORef defsRef
   let extendModel :: SAT.Model -> SAT.Model
