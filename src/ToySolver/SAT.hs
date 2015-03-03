@@ -151,6 +151,7 @@ import Data.Ord
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
+import ToySolver.Internal.Data.IOURef
 import qualified ToySolver.Internal.Data.IndexedPriorityQueue as PQ
 import qualified ToySolver.Internal.Data.SeqQueue as SQ
 import qualified ToySolver.Internal.Data.Vec as Vec
@@ -177,24 +178,20 @@ type Level = Int
 levelRoot :: Level
 levelRoot = -1
 
-data Assignment
-  = Assignment
-  { aValue  :: !Bool
-  , aIndex  :: {-# UNPACK #-} !Int
-  , aLevel  :: {-# UNPACK #-} !Level
-  , aReason :: !(Maybe SomeConstraintHandler)
-  , aOnUnassigned :: !(IORef [SomeConstraintHandler])
-  }
-
 data VarData
   = VarData
-  { vdAssignment :: !(IORef (Maybe Assignment))
-  , vdPolarity   :: !(IORef Bool)
+  { vdPolarity   :: !(IORef Bool)
   , vdPosLitData :: !LitData
   , vdNegLitData :: !LitData
   -- | will be invoked when the variable is assigned
   , vdWatches    :: !(IORef [SomeConstraintHandler])
   , vdActivity   :: !(IORef VarActivity)
+
+  , vdValue :: !(IORef LBool)
+  , vdTrailIndex :: !(IOURef Int)
+  , vdLevel :: !(IOURef Level)
+  , vdReason :: !(IORef (Maybe SomeConstraintHandler))
+  , vdOnUnassigned :: !(IORef [SomeConstraintHandler])
   }
 
 data LitData
@@ -206,13 +203,19 @@ data LitData
 
 newVarData :: IO VarData
 newVarData = do
-  ainfo <- newIORef Nothing
   polarity <- newIORef True
   pos <- newLitData
   neg <- newLitData
   watches <- newIORef []
   activity <- newIORef 0
-  return $ VarData ainfo polarity pos neg watches activity
+
+  val <- newIORef lUndef
+  idx <- newIOURef maxBound
+  lv <- newIOURef maxBound
+  reason <- newIORef Nothing
+  onUnassigned <- newIORef []
+
+  return $ VarData polarity pos neg watches activity val idx lv reason onUnassigned
 
 newLitData :: IO LitData
 newLitData = do
@@ -238,10 +241,7 @@ litData solver !l =
 varValue :: Solver -> Var -> IO LBool
 varValue solver !v = do
   vd <- varData solver v
-  m <- readIORef (vdAssignment vd)
-  case m of
-    Nothing -> return lUndef
-    Just x -> return $! (liftBool $! aValue x)
+  readIORef (vdValue vd)
 
 {-# INLINE litValue #-}
 litValue :: Solver -> Lit -> IO LBool
@@ -257,10 +257,11 @@ litValue solver !l = do
 getVarFixed :: Solver -> Var -> IO LBool
 getVarFixed solver !v = do
   vd <- varData solver v
-  m <- readIORef (vdAssignment vd)
-  case m of
-    Just x | aLevel x == levelRoot -> return $! (liftBool $! aValue x)
-    _ -> return lUndef
+  lv <- readIOURef (vdLevel vd)
+  if lv == levelRoot then
+    readIORef (vdValue vd)
+  else
+    return lUndef
 
 getLitFixed :: Solver -> Var -> IO LBool
 getLitFixed solver !l = do
@@ -275,10 +276,9 @@ getLitFixed solver !l = do
 varLevel :: Solver -> Var -> IO Level
 varLevel solver !v = do
   vd <- varData solver v
-  m <- readIORef (vdAssignment vd)
-  case m of
-    Nothing -> error ("ToySolver.SAT.varLevel: unassigned var " ++ show v)
-    Just a -> return (aLevel a)
+  val <- readIORef (vdValue vd)
+  when (val == lUndef) $ error ("ToySolver.SAT.varLevel: unassigned var " ++ show v)
+  readIOURef (vdLevel vd)
 
 litLevel :: Solver -> Lit -> IO Level
 litLevel solver l = varLevel solver (litVar l)
@@ -286,18 +286,16 @@ litLevel solver l = varLevel solver (litVar l)
 varReason :: Solver -> Var -> IO (Maybe SomeConstraintHandler)
 varReason solver !v = do
   vd <- varData solver v
-  m <- readIORef (vdAssignment vd)
-  case m of
-    Nothing -> error ("ToySolver.SAT.varReason: unassigned var " ++ show v)
-    Just a -> return (aReason a)
+  val <- readIORef (vdValue vd)
+  when (val == lUndef) $ error ("ToySolver.SAT.varReason: unassigned var " ++ show v)
+  readIORef (vdReason vd)
 
 varAssignNo :: Solver -> Var -> IO Int
 varAssignNo solver !v = do
   vd <- varData solver v
-  m <- readIORef (vdAssignment vd)
-  case m of
-    Nothing -> error ("ToySolver.SAT.varAssignNo: unassigned var " ++ show v)
-    Just a -> return (aIndex a)
+  val <- readIORef (vdValue vd)
+  when (val == lUndef) $ error ("ToySolver.SAT.varAssignNo: unassigned var " ++ show v)
+  readIOURef (vdTrailIndex vd)
 
 -- | Solver instance
 data Solver
@@ -408,59 +406,60 @@ assign solver lit = assign_ solver lit Nothing
 assign_ :: Solver -> Lit -> Maybe SomeConstraintHandler -> IO Bool
 assign_ solver !lit reason = assert (validLit lit) $ do
   vd <- varData solver (litVar lit)
-  m <- readIORef (vdAssignment vd)
-  case m of
-    Just a -> return $ litPolarity lit == aValue a
-    Nothing -> do
-      idx <- nAssigns solver
-      lv <- readIORef (svLevel solver)
-      bt <- newIORef []
+  let val = liftBool (litPolarity lit)
 
-      writeIORef (vdAssignment vd) $ Just $!
-        Assignment
-        { aValue  = litPolarity lit
-        , aIndex  = idx
-        , aLevel  = lv
-        , aReason = reason
-        , aOnUnassigned = bt
-        }
+  val0 <- readIORef (vdValue vd)
+  if val0 /= lUndef then do    
+    return $ val == val0
+  else do
+    idx <- nAssigns solver
+    lv <- readIORef (svLevel solver)
 
-      Vec.push (svTrail solver) lit
-      when (lv == levelRoot) $ modifyIORef' (svNFixed solver) (+1)
-      bcpEnqueue solver lit
+    writeIORef (vdValue vd) val
+    writeIOURef (vdTrailIndex vd) idx
+    writeIOURef (vdLevel vd) lv
+    writeIORef (vdReason vd) reason
 
-      when debugMode $ logIO solver $ do
-        let r = case reason of
-                  Nothing -> ""
-                  Just _ -> " by propagation"
-        return $ printf "assign(level=%d): %d%s" lv lit r
+    Vec.push (svTrail solver) lit
+    when (lv == levelRoot) $ modifyIORef' (svNFixed solver) (+1)
+    bcpEnqueue solver lit
 
-      return True
+    when debugMode $ logIO solver $ do
+      let r = case reason of
+                Nothing -> ""
+                Just _ -> " by propagation"
+      return $ printf "assign(level=%d): %d%s" lv lit r
+
+    return True
 
 unassign :: Solver -> Var -> IO ()
 unassign solver !v = assert (validVar v) $ do
   vd <- varData solver v
-  m <- readIORef (vdAssignment vd)
-  case m of
-    Nothing -> error "unassign: should not happen"
-    Just a -> do
-      flag <- getEnablePhaseSaving solver
-      when flag $ writeIORef (vdPolarity vd) (aValue a)
-      let !l = if aValue a then v else -v
-      cs <- readIORef (aOnUnassigned a)
-      forM_ cs $ \c ->
-        constrOnUnassigned solver c c l
-      
-  writeIORef (vdAssignment vd) Nothing
+  val <- readIORef (vdValue vd)
+  when (val == lUndef) $ error "unassign: should not happen"
+
+  flag <- getEnablePhaseSaving solver
+  when flag $ writeIORef (vdPolarity vd) $! fromJust (unliftBool val)
+
+  writeIORef (vdValue vd) lUndef
+  writeIOURef (vdTrailIndex vd) maxBound
+  writeIOURef (vdLevel vd) maxBound
+  writeIORef (vdReason vd) Nothing
+
+  let !l = if val == lTrue then v else -v
+  cs <- readIORef (vdOnUnassigned vd)
+  writeIORef (vdOnUnassigned vd) []
+  forM_ cs $ \c ->
+    constrOnUnassigned solver c c l
+
   PQ.enqueue (svVarQueue solver) v
 
 addOnUnassigned :: Solver -> SomeConstraintHandler -> Lit -> IO ()
 addOnUnassigned solver constr !l = do
   vd <- varData solver (litVar l)
-  m <- readIORef (vdAssignment vd)
-  case m of
-    Nothing -> error "addOnUnassigned: should not happen"
-    Just a -> modifyIORef (aOnUnassigned a) (constr :)  
+  val <- readIORef (vdValue vd)
+  when (val == lUndef) $ error "addOnUnassigned: should not happen"
+  modifyIORef (vdOnUnassigned vd) (constr :)
 
 -- | Register the constraint to be notified when the literal becames false.
 watchLit :: ConstraintHandler c => Solver -> Lit -> c -> IO ()
@@ -1949,8 +1948,8 @@ constructModel solver = do
   (marr::IOUArray Var Bool) <- newArray_ (1,n)
   forLoop 1 (<=n) (+1) $ \v -> do
     vd <- varData solver v
-    a <- readIORef (vdAssignment vd)
-    writeArray marr v (aValue (fromJust a))
+    val <- readIORef (vdValue vd)
+    writeArray marr v (fromJust (unliftBool val))
   m <- unsafeFreeze marr
   writeIORef (svModel solver) (Just m)
 
