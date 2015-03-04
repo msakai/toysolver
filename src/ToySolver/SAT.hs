@@ -489,22 +489,22 @@ addOnUnassigned solver constr !l = do
   modifyIORef (vdOnUnassigned vd) (constr :)
 
 -- | Register the constraint to be notified when the literal becames false.
-watchLit :: ConstraintHandler c => Solver -> Lit -> c -> IO ()
+watchLit :: Solver -> Lit -> SomeConstraintHandler -> IO ()
 watchLit solver !lit c = do
   when debugMode $ do
     lits <- watchedLiterals solver c
     unless (lit `elem` lits) $ error "watch: should not happen"
   ld <- litData solver lit
-  modifyIORef (ldWatches ld) (toConstraintHandler c : )
+  modifyIORef (ldWatches ld) (c : )
 
 -- | Register the constraint to be notified when the variable is assigned.
-watchVar :: ConstraintHandler c => Solver -> Var -> c -> IO ()
+watchVar :: Solver -> Var -> SomeConstraintHandler -> IO ()
 watchVar solver !var c = do
   when debugMode $ do
     vs <- watchedVariables solver c
     unless (var `elem` vs) $ error "watchVar: should not happen"
   vd <- varData solver var
-  modifyIORef (vdWatches vd) (toConstraintHandler c : )
+  modifyIORef (vdWatches vd) (c : )
 
 -- | Returns list of constraints that are watching the literal.
 watches :: Solver -> Lit -> IO [SomeConstraintHandler]
@@ -919,8 +919,9 @@ addPBAtLeast solver ts n = do
             else return (ts',n')
 
           c <- newPBHandler solver ts'' n'' False
-          addToDB solver c
-          ret <- attach solver c
+          let constr = toConstraintHandler c
+          addToDB solver constr
+          ret <- attach solver constr
           if not ret then do
             markBad solver
           else do
@@ -2108,7 +2109,7 @@ class (Eq a, Hashable a) => ConstraintHandler a where
 
   showConstraintHandler :: a -> IO String
 
-  attach :: Solver -> a -> IO Bool
+  constrAttach :: Solver -> SomeConstraintHandler -> a -> IO Bool
 
   watchedLiterals :: Solver -> a -> IO [Lit]
 
@@ -2140,6 +2141,9 @@ class (Eq a, Hashable a) => ConstraintHandler a where
   constrReadActivity :: a -> IO Double
 
   constrWriteActivity :: a -> Double -> IO ()
+
+attach :: Solver -> SomeConstraintHandler -> IO Bool
+attach solver c = constrAttach solver c c
 
 detach :: Solver -> SomeConstraintHandler -> IO ()
 detach solver c = do
@@ -2234,11 +2238,11 @@ instance ConstraintHandler SomeConstraintHandler where
   showConstraintHandler (CHPBPueblo c)  = showConstraintHandler c
   showConstraintHandler (CHXORClause c) = showConstraintHandler c
 
-  attach solver (CHClause c)    = attach solver c
-  attach solver (CHAtLeast c)   = attach solver c
-  attach solver (CHPBCounter c) = attach solver c
-  attach solver (CHPBPueblo c)  = attach solver c
-  attach solver (CHXORClause c) = attach solver c
+  constrAttach solver this (CHClause c)    = constrAttach solver this c
+  constrAttach solver this (CHAtLeast c)   = constrAttach solver this c
+  constrAttach solver this (CHPBCounter c) = constrAttach solver this c
+  constrAttach solver this (CHPBPueblo c)  = constrAttach solver this c
+  constrAttach solver this (CHXORClause c) = constrAttach solver this c
 
   watchedLiterals solver (CHClause c)    = watchedLiterals solver c
   watchedLiterals solver (CHAtLeast c)   = watchedLiterals solver c
@@ -2414,12 +2418,12 @@ instance ConstraintHandler ClauseHandler where
     lits <- getElems (claLits this)
     return (show lits)
 
-  attach solver this = do
+  constrAttach solver this this2 = do
     -- BCP Queue should be empty at this point.
     -- If not, duplicated propagation happens.
     bcpCheckEmpty solver
 
-    (lb,ub) <- getBounds (claLits this)
+    (lb,ub) <- getBounds (claLits this2)
     assert (lb == 0) $ return ()
     let size = ub-lb+1
 
@@ -2427,58 +2431,58 @@ instance ConstraintHandler ClauseHandler where
       markBad solver
       return False
     else if size == 1 then do
-      lit0 <- unsafeRead (claLits this) 0
+      lit0 <- unsafeRead (claLits this2) 0
       assignBy solver lit0 this
     else do
       ref <- newIORef 1
       let f i = do
-            lit_i <- unsafeRead (claLits this) i
+            lit_i <- unsafeRead (claLits this2) i
             val_i <- litValue solver lit_i
             if val_i /= lFalse then
               return True
             else do
               j <- readIORef ref
-              k <- findForWatch solver (claLits this) j ub
+              k <- findForWatch solver (claLits this2) j ub
               case k of
                 -1 -> do
                   return False
                 _ -> do
-                  lit_k <- unsafeRead (claLits this) k
-                  unsafeWrite (claLits this) i lit_k
-                  unsafeWrite (claLits this) k lit_i
+                  lit_k <- unsafeRead (claLits this2) k
+                  unsafeWrite (claLits this2) i lit_k
+                  unsafeWrite (claLits this2) k lit_i
                   writeIORef ref $! (k+1)
                   return True
 
       b <- f 0
       if b then do
-        lit0 <- unsafeRead (claLits this) 0
+        lit0 <- unsafeRead (claLits this2) 0
         watchLit solver lit0 this
         b2 <- f 1
         if b2 then do
-          lit1 <- unsafeRead (claLits this) 1
+          lit1 <- unsafeRead (claLits this2) 1
           watchLit solver lit1 this
           return True
         else do -- UNIT
           -- We need to watch the most recently falsified literal
           (i,_) <- liftM (maximumBy (comparing snd)) $ forM [1..ub] $ \l -> do
-            lit <- unsafeRead (claLits this) l
+            lit <- unsafeRead (claLits this2) l
             lv <- litLevel solver lit
             return (l,lv)
-          lit1 <- unsafeRead (claLits this) 1
-          liti <- unsafeRead (claLits this) i
-          unsafeWrite (claLits this) 1 liti
-          unsafeWrite (claLits this) i lit1
+          lit1 <- unsafeRead (claLits this2) 1
+          liti <- unsafeRead (claLits this2) i
+          unsafeWrite (claLits this2) 1 liti
+          unsafeWrite (claLits this2) i lit1
           watchLit solver liti this
           assignBy solver lit0 this -- should always succeed
       else do -- CONFLICT
         ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [lb..ub] $ \l -> do
-          lit <- unsafeRead (claLits this) l
+          lit <- unsafeRead (claLits this2) l
           lv <- litLevel solver lit
           return (l,lv)
         forM_ (zip [0..] ls) $ \(i,lit) -> do
-          unsafeWrite (claLits this) i lit
-        lit0 <- unsafeRead (claLits this) 0
-        lit1 <- unsafeRead (claLits this) 1
+          unsafeWrite (claLits this2) i lit
+        lit0 <- unsafeRead (claLits this2) 0
+        lit1 <- unsafeRead (claLits this2) 1
         watchLit solver lit0 this
         watchLit solver lit1 this
         return False
@@ -2561,16 +2565,17 @@ instance ConstraintHandler ClauseHandler where
 
 basicAttachClauseHandler :: Solver -> ClauseHandler -> IO Bool
 basicAttachClauseHandler solver this = do
+  let constr = toConstraintHandler this
   lits <- getElems (claLits this)
   case lits of
     [] -> do
       markBad solver
       return False
     [l1] -> do
-      assignBy solver l1 this
+      assignBy solver l1 constr
     l1:l2:_ -> do
-      watchLit solver l1 this
-      watchLit solver l2 this
+      watchLit solver l1 constr
+      watchLit solver l2 constr
       return True
 
 {--------------------------------------------------------------------
@@ -2607,16 +2612,16 @@ instance ConstraintHandler AtLeastHandler where
     return $ show lits ++ " >= " ++ show (atLeastNum this)
 
   -- FIXME: simplify implementation
-  attach solver this = do
+  constrAttach solver this this2 = do
     -- BCP Queue should be empty at this point.
     -- If not, duplicated propagation happens.
     bcpCheckEmpty solver
 
-    let a = atLeastLits this
+    let a = atLeastLits this2
     (lb,ub) <- getBounds a
     assert (lb == 0) $ return ()
     let m = ub - lb + 1
-        n = atLeastNum this
+        n = atLeastNum this2
 
     if m < n then do
       markBad solver
@@ -2808,13 +2813,14 @@ basicAttachAtLeastHandler solver this = do
   lits <- getElems (atLeastLits this)
   let m = length lits
       n = atLeastNum this
+      constr = toConstraintHandler this
   if m < n then do
     markBad solver
     return False
   else if m == n then do
-    allM (\l -> assignBy solver l this) lits
+    allM (\l -> assignBy solver l constr) lits
   else do -- m > n
-    forM_ (take (n+1) lits) $ \l -> watchLit solver l this
+    forM_ (take (n+1) lits) $ \l -> watchLit solver l constr
     return True
 
 {--------------------------------------------------------------------
@@ -2897,25 +2903,24 @@ instance ConstraintHandler PBHandlerCounter where
   showConstraintHandler this = do
     return $ show (pbTerms this) ++ " >= " ++ show (pbDegree this)
 
-  attach solver this = do
+  constrAttach solver this this2 = do
     -- BCP queue should be empty at this point.
     -- It is important for calculating slack.
     bcpCheckEmpty solver
-    let constr = toConstraintHandler this
-    s <- liftM sum $ forM (pbTerms this) $ \(c,l) -> do
+    s <- liftM sum $ forM (pbTerms this2) $ \(c,l) -> do
       watchLit solver l this
       val <- litValue solver l
       if val == lFalse then do
-        addOnUnassigned solver constr l
+        addOnUnassigned solver this l
         return 0
       else do
         return c
-    let slack = s - pbDegree this
-    writeIORef (pbSlack this) $! slack
+    let slack = s - pbDegree this2
+    writeIORef (pbSlack this2) $! slack
     if slack < 0 then
       return False
     else do
-      flip allM (pbTerms this) $ \(c,l) -> do
+      flip allM (pbTerms this2) $ \(c,l) -> do
         val <- litValue solver l
         if c > slack && val == lUndef then do
           assignBy solver l this
@@ -3055,15 +3060,14 @@ instance ConstraintHandler PBHandlerPueblo where
   showConstraintHandler this = do
     return $ show (puebloTerms this) ++ " >= " ++ show (puebloDegree this)
 
-  attach solver this = do
+  constrAttach solver this this2 = do
     bcpCheckEmpty solver
-    let constr = toConstraintHandler this
-    ret <- puebloPropagate solver constr this
+    ret <- puebloPropagate solver this this2
 
     -- register to watch recently falsified literals to recover
     -- "WatchSum >= puebloDegree this + puebloAMax this" when backtrack is performed.
-    wsum <- puebloGetWatchSum this
-    unless (wsum >= puebloDegree this + puebloAMax this) $ do
+    wsum <- puebloGetWatchSum this2
+    unless (wsum >= puebloDegree this2 + puebloAMax this2) $ do
       let f m tm@(_,lit) = do
             val <- litValue solver lit
             if val == lFalse then do
@@ -3072,14 +3076,14 @@ instance ConstraintHandler PBHandlerPueblo where
             else
               return m
 #if MIN_VERSION_containers(0,5,0)
-      xs <- liftM (map snd . IM.toDescList) $ foldM f IM.empty (puebloTerms this)
+      xs <- liftM (map snd . IM.toDescList) $ foldM f IM.empty (puebloTerms this2)
 #else
-      xs <- liftM (reverse . map snd . IM.toAscList) $ foldM f IM.empty (puebloTerms this)
+      xs <- liftM (reverse . map snd . IM.toAscList) $ foldM f IM.empty (puebloTerms this2)
 #endif
       let g !_ [] = return ()
           g !s ((c,l):ts) = do
-            addOnUnassigned solver constr l
-            if s+c >= puebloDegree this + puebloAMax this then return ()
+            addOnUnassigned solver this l
+            if s+c >= puebloDegree this2 + puebloAMax this2 then return ()
             else g (s+c) ts
       g wsum xs
 
@@ -3224,12 +3228,12 @@ instance ConstraintHandler XORClauseHandler where
     lits <- getElems (xorLits this)
     return ("XOR " ++ show lits)
 
-  attach solver this = do
+  constrAttach solver this this2 = do
     -- BCP Queue should be empty at this point.
     -- If not, duplicated propagation happens.
     bcpCheckEmpty solver
 
-    let a = xorLits this
+    let a = xorLits this2
     (lb,ub) <- getBounds a
     assert (lb == 0) $ return ()
     let size = ub-lb+1
@@ -3239,7 +3243,7 @@ instance ConstraintHandler XORClauseHandler where
       return False
     else if size == 1 then do
       lit0 <- unsafeRead a 0
-      assignBy solver lit0 this
+      assignBy solver lit0 this2
     else do
       ref <- newIORef 1
       let f i = do
@@ -3300,7 +3304,7 @@ instance ConstraintHandler XORClauseHandler where
         lit1 <- unsafeRead a 1
         watchVar solver (litVar lit0) this
         watchVar solver (litVar lit1) this
-        isSatisfied solver this
+        isSatisfied solver this2
 
   watchedLiterals _ _ = return []
 
@@ -3399,15 +3403,16 @@ instance ConstraintHandler XORClauseHandler where
 basicAttachXORClauseHandler :: Solver -> XORClauseHandler -> IO Bool
 basicAttachXORClauseHandler solver this = do
   lits <- getElems (xorLits this)
+  let constr = toConstraintHandler this
   case lits of
     [] -> do
       markBad solver
       return False
     [l1] -> do
-      assignBy solver l1 this
+      assignBy solver l1 constr
     l1:l2:_ -> do
-      watchVar solver (litVar l1) this
-      watchVar solver (litVar l2) this
+      watchVar solver (litVar l1) constr
+      watchVar solver (litVar l2) constr
       return True
 
 {--------------------------------------------------------------------
