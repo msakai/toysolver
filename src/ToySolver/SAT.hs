@@ -188,10 +188,9 @@ data VarData
   { vdPolarity   :: !(IORef Bool)
   , vdPosLitData :: !LitData
   , vdNegLitData :: !LitData
-  -- | will be invoked when the variable is assigned
+  -- | will be invoked once when the variable is assigned
   , vdWatches    :: !(IORef [SomeConstraintHandler])
   , vdActivity   :: !(IORef VarActivity)
-
   , vdValue :: !(IORef LBool)
   , vdTrailIndex :: !(IOURef Int)
   , vdLevel :: !(IOURef Level)
@@ -220,7 +219,19 @@ newVarData = do
   reason <- newIORef Nothing
   onUnassigned <- newIORef []
 
-  return $ VarData polarity pos neg watches activity val idx lv reason onUnassigned
+  return $
+    VarData
+    { vdPolarity = polarity
+    , vdPosLitData = pos
+    , vdNegLitData = neg
+    , vdWatches = watches
+    , vdActivity = activity
+    , vdValue = val
+    , vdTrailIndex = idx
+    , vdLevel = lv
+    , vdReason = reason
+    , vdOnUnassigned = onUnassigned
+    }
 
 newLitData :: IO LitData
 newLitData = do
@@ -306,15 +317,22 @@ varAssignNo solver !v = do
 data Solver
   = Solver
   { svOk           :: !(IORef Bool)
+
   , svVarQueue     :: !PQ.PriorityQueue
   , svTrail        :: !(Vec.UVec Lit)
+
   , svVarData      :: !(Vec.Vec VarData)
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
-  , svAssumptions  :: !(IORef (IOUArray Int Lit))
+
   , svLevel        :: !(IORef Level)
   , svBCPQueue     :: !(SQ.SeqQueue Lit)
+
+  -- * Result
   , svModel        :: !(IORef (Maybe Model))
+  , svFailedAssumptions :: !(IORef [Lit])
+
+  -- * Statistics
   , svNDecision    :: !(IORef Int)
   , svNRandomDecision :: !(IORef Int)
   , svNConflict    :: !(IORef Int)
@@ -322,6 +340,8 @@ data Solver
   , svNFixed       :: !(IORef Int)
   , svNLearntGC    :: !(IORef Int)
   , svNRemovedConstr :: !(IORef Int)
+
+  -- * Configulation
 
   -- | Inverse of the variable activity decay factor. (default 1 / 0.95)
   , svVarDecay     :: !(IORef Double)
@@ -349,10 +369,6 @@ data Solver
   -- | The limit for learnt constraints is multiplied with this factor periodically. (default 1.1)
   , svLearntSizeInc :: !(IORef Double)
 
-  , svLearntLim       :: !(IORef Int)
-  , svLearntLimAdjCnt :: !(IORef Int)
-  , svLearntLimSeq    :: !(IORef [(Int,Int)])
-
   -- | Controls conflict constraint minimization (0=none, 1=local, 2=recursive)
   , svCCMin :: !(IORef Int)
 
@@ -366,18 +382,24 @@ data Solver
 
   , svEnableBackwardSubsumptionRemoval :: !(IORef Bool)
 
+  , svCheckModel :: !(IORef Bool)
+
+  , svRandomFreq :: !(IORef Double)
+
+  , svRandomGen  :: !(IORef Rand.StdGen)
+
+  , svConfBudget :: !(IORef Int)
+
+  -- * Logging
   , svLogger :: !(IORef (Maybe (String -> IO ())))
   , svStartWC    :: !(IORef UTCTime)
   , svLastStatWC :: !(IORef UTCTime)
 
-  , svCheckModel :: !(IORef Bool)
-
-  , svRandomFreq :: !(IORef Double)
-  , svRandomGen  :: !(IORef Rand.StdGen)
-
-  , svFailedAssumptions :: !(IORef [Lit])
-
-  , svConfBudget :: !(IORef Int)
+  -- * Working spaces
+  , svAssumptions     :: !(IORef (IOUArray Int Lit))
+  , svLearntLim       :: !(IORef Int)
+  , svLearntLimAdjCnt :: !(IORef Int)
+  , svLearntLimSeq    :: !(IORef [(Int,Int)])
   }
 
 markBad :: Solver -> IO ()
@@ -580,7 +602,7 @@ varRescaleAllActivity solver = do
 
 variables :: Solver -> IO [Var]
 variables solver = do
-  n <- nVars solver
+  n <- getNVars solver
   return [1 .. n]
 
 -- | number of variables of the problem.
@@ -695,10 +717,14 @@ newSolver = do
         , svVarData    = vars
         , svConstrDB   = db
         , svLearntDB   = db2
-        , svAssumptions = as
         , svLevel      = lv
         , svBCPQueue   = q
+
+        -- * Result
         , svModel      = m
+        , svFailedAssumptions = failed
+
+        -- * Statistics        
         , svNDecision  = ndecision
         , svNRandomDecision = nranddec
         , svNConflict  = nconflict
@@ -706,6 +732,8 @@ newSolver = do
         , svNFixed     = nfixed
         , svNLearntGC  = nlearntgc
         , svNRemovedConstr = nremoved
+
+        -- * Configulation
         , svVarDecay    = varDecay
         , svVarInc      = varInc
         , svConstrDecay = constrDecay
@@ -722,17 +750,21 @@ newSolver = do
         , svPBHandlerType   = pbHandlerType
         , svPBSplitClausePart = pbSplitClausePart
         , svEnableBackwardSubsumptionRemoval = enableBackwardSubsumptionRemoval
-        , svLearntLim       = learntLim
-        , svLearntLimAdjCnt = learntLimAdjCnt
-        , svLearntLimSeq    = learntLimSeq
-        , svLogger = logger
-        , svStartWC    = startWC
-        , svLastStatWC = lastStatWC
         , svCheckModel = checkModel
         , svRandomFreq = randfreq
         , svRandomGen  = randgen
-        , svFailedAssumptions = failed
         , svConfBudget = confBudget
+
+        -- * Logging
+        , svLogger = logger
+        , svStartWC    = startWC
+        , svLastStatWC = lastStatWC
+
+        -- * Working space
+        , svAssumptions     = as
+        , svLearntLim       = learntLim
+        , svLearntLimAdjCnt = learntLimAdjCnt
+        , svLearntLimSeq    = learntLimSeq
         }
  return solver
 
@@ -759,14 +791,14 @@ newVar solver = do
 -- |Add variables. @newVars solver n = replicateM n (newVar solver)@
 newVars :: Solver -> Int -> IO [Var]
 newVars solver n = do
-  nv <- nVars solver
+  nv <- getNVars solver
   resizeVarCapacity solver (nv+n)
   replicateM n (newVar solver)
 
 -- |Add variables. @newVars_ solver n = newVars solver n >> return ()@
 newVars_ :: Solver -> Int -> IO ()
 newVars_ solver n = do
-  nv <- nVars solver
+  nv <- getNVars solver
   resizeVarCapacity solver (nv+n)
   replicateM_ n (newVar solver)
 
@@ -1032,7 +1064,7 @@ solve_ solver = do
     d <- readIORef (svLevel solver)
     assert (d == levelRoot) $ return ()
 
-    nv <- nVars solver
+    nv <- getNVars solver
     Vec.resizeCapacity (svTrail solver) nv
 
     restartStrategy <- readIORef (svRestartStrategy solver)
@@ -1054,7 +1086,7 @@ solve_ solver = do
     when (cnt == -1) $ do
       learntSizeFirst <- readIORef (svLearntSizeFirst solver)
       learntSizeInc   <- readIORef (svLearntSizeInc solver)
-      nc <- nConstraints solver
+      nc <- getNConstraints solver
       let initialLearntLim = if learntSizeFirst > 0 then learntSizeFirst else max ((nc + nv) `div` 3) 16
           learntSizeSeq    = iterate (ceiling . (learntSizeInc*) . fromIntegral) initialLearntLim
           learntSizeAdjSeq = iterate (\x -> (x * 3) `div` 2) (100::Int)
@@ -1969,7 +2001,7 @@ backtrackTo solver level = do
 
 constructModel :: Solver -> IO ()
 constructModel solver = do
-  n <- nVars solver
+  n <- getNVars solver
   (marr::IOUArray Var Bool) <- newArray_ (1,n)
   forLoop 1 (<=n) (+1) $ \v -> do
     vd <- varData solver v
