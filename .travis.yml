@@ -67,6 +67,4 @@ script:
    cd ..
 
 after_script:
- - travis_retry sudo apt-get install tree
- - tree dist/ # temporarily needed to investigate issue with hpc-coveralls
  - "[ -n \"$COVERAGE\" ] && hpc-coveralls TestSAT TestSimplex TestSimplex2 TestMIPSolver2 TestPolynomial TestAReal TestArith TestContiTraverso TestCongruenceClosure TestLPFile TestMPSFile TestPBFile TestSDPFile TestUtil --exclude-dir=test || true"
