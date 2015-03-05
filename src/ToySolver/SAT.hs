@@ -419,12 +419,12 @@ bcpCheckEmpty solver = do
   unless (size == 0) $
     error "BUG: BCP Queue should be empty at this point"
 
-assignBy :: ConstraintHandler c => Solver -> Lit -> c -> IO Bool
+assignBy :: Solver -> Lit -> SomeConstraintHandler -> IO Bool
 assignBy solver lit c = do
   lv <- readIORef (svLevel solver)
   let !c2 = if lv == levelRoot
             then Nothing
-            else Just $! toConstraintHandler c
+            else Just c
   assign_ solver lit c2
 
 assign :: Solver -> Lit -> IO Bool
@@ -1259,10 +1259,11 @@ search solver !conflict_lim onConflict = do
           return ()
         lit:_ -> do
           cl <- newClauseHandler learntClause True
-          addToLearntDB solver cl
+          let constr = toConstraintHandler cl
+          addToLearntDB solver constr
           basicAttachClauseHandler solver cl
-          assignBy solver lit cl
-          constrBumpActivity solver cl
+          assignBy solver lit constr
+          constrBumpActivity solver constr
 
     learnHybrid :: IORef Int -> SomeConstraintHandler -> IO (Maybe SearchResult)
     learnHybrid conflictCounter constr = do
@@ -1277,11 +1278,12 @@ search solver !conflict_lim onConflict = do
           return ()
         lit:_ -> do
           cl <- newClauseHandler learntClause True
-          addToLearntDB solver cl
+          let constr = toConstraintHandler cl
+          addToLearntDB solver constr
           basicAttachClauseHandler solver cl
-          constrBumpActivity solver cl
+          constrBumpActivity solver constr
           when (minLevel == clauseLevel) $ do
-            _ <- assignBy solver lit cl -- This should always succeed.
+            _ <- assignBy solver lit constr -- This should always succeed.
             return ()
 
       ret <- deduce solver
@@ -2118,12 +2120,12 @@ class (Eq a, Hashable a) => ConstraintHandler a where
   -- | invoked with the watched literal when the literal is falsified.
   -- 'watch' で 'toConstraint' を呼び出して heap allocation が発生するのを
   -- 避けるために、元の 'SomeConstraintHandler' も渡しておく。
-  basicPropagate :: Solver -> SomeConstraintHandler -> a -> Lit -> IO Bool
+  constrPropagate :: Solver -> SomeConstraintHandler -> a -> Lit -> IO Bool
 
   -- | deduce a clause C∨l from the constraint and return C.
   -- C and l should be false and true respectively under the current
   -- assignment.
-  basicReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
+  constrReasonOf :: Solver -> a -> Maybe Lit -> IO Clause
 
   constrOnUnassigned :: Solver -> SomeConstraintHandler -> a -> Lit -> IO ()
 
@@ -2165,7 +2167,7 @@ detach solver c = do
 
 -- | invoked with the watched literal when the literal is falsified.
 propagate :: Solver -> SomeConstraintHandler -> Lit -> IO Bool
-propagate solver c l = basicPropagate solver c c l
+propagate solver c l = constrPropagate solver c c l
 
 -- | deduce a clause C∨l from the constraint and return C.
 -- C and l should be false and true respectively under the current
@@ -2179,14 +2181,14 @@ reasonOf solver c x = do
         val <- litValue solver lit
         unless (lTrue == val) $ do
           str <- showConstraintHandler c
-          error (printf "reasonOf: value of literal %d should be True but %s (basicReasonOf %s %s)" lit (show val) str (show x))
-  cl <- basicReasonOf solver c x
+          error (printf "reasonOf: value of literal %d should be True but %s (constrReasonOf %s %s)" lit (show val) str (show x))
+  cl <- constrReasonOf solver c x
   when debugMode $ do
     forM_ cl $ \lit -> do
       val <- litValue solver lit
       unless (lFalse == val) $ do
         str <- showConstraintHandler c
-        error (printf "reasonOf: value of literal %d should be False but %s (basicReasonOf %s %s)" lit (show val) str (show x))
+        error (printf "reasonOf: value of literal %d should be False but %s (constrReasonOf %s %s)" lit (show val) str (show x))
   return cl
 
 isLocked :: Solver -> SomeConstraintHandler -> IO Bool
@@ -2256,17 +2258,17 @@ instance ConstraintHandler SomeConstraintHandler where
   watchedVariables solver (CHPBPueblo c)  = watchedVariables solver c
   watchedVariables solver (CHXORClause c) = watchedVariables solver c
 
-  basicPropagate solver this (CHClause c)  lit   = basicPropagate solver this c lit
-  basicPropagate solver this (CHAtLeast c) lit   = basicPropagate solver this c lit
-  basicPropagate solver this (CHPBCounter c) lit = basicPropagate solver this c lit
-  basicPropagate solver this (CHPBPueblo c) lit  = basicPropagate solver this c lit
-  basicPropagate solver this (CHXORClause c) lit = basicPropagate solver this c lit
+  constrPropagate solver this (CHClause c)  lit   = constrPropagate solver this c lit
+  constrPropagate solver this (CHAtLeast c) lit   = constrPropagate solver this c lit
+  constrPropagate solver this (CHPBCounter c) lit = constrPropagate solver this c lit
+  constrPropagate solver this (CHPBPueblo c) lit  = constrPropagate solver this c lit
+  constrPropagate solver this (CHXORClause c) lit = constrPropagate solver this c lit
 
-  basicReasonOf solver (CHClause c)  l   = basicReasonOf solver c l
-  basicReasonOf solver (CHAtLeast c) l   = basicReasonOf solver c l
-  basicReasonOf solver (CHPBCounter c) l = basicReasonOf solver c l
-  basicReasonOf solver (CHPBPueblo c) l  = basicReasonOf solver c l
-  basicReasonOf solver (CHXORClause c) l = basicReasonOf solver c l
+  constrReasonOf solver (CHClause c)  l   = constrReasonOf solver c l
+  constrReasonOf solver (CHAtLeast c) l   = constrReasonOf solver c l
+  constrReasonOf solver (CHPBCounter c) l = constrReasonOf solver c l
+  constrReasonOf solver (CHPBPueblo c) l  = constrReasonOf solver c l
+  constrReasonOf solver (CHXORClause c) l = constrReasonOf solver c l
 
   constrOnUnassigned solver this (CHClause c)  l   = constrOnUnassigned solver this c l
   constrOnUnassigned solver this (CHAtLeast c) l   = constrOnUnassigned solver this c l
@@ -2495,7 +2497,7 @@ instance ConstraintHandler ClauseHandler where
 
   watchedVariables _ _ = return []
 
-  basicPropagate !solver this this2 !falsifiedLit = do
+  constrPropagate !solver this this2 !falsifiedLit = do
     preprocess
 
     !lit0 <- unsafeRead a 0
@@ -2511,7 +2513,7 @@ instance ConstraintHandler ClauseHandler where
         -1 -> do
           when debugMode $ logIO solver $ do
              str <- showConstraintHandler this
-             return $ printf "basicPropagate: %s is unit" str
+             return $ printf "constrPropagate: %s is unit" str
           watchLit solver falsifiedLit this
           assignBy solver lit0 this
         _  -> do
@@ -2534,7 +2536,7 @@ instance ConstraintHandler ClauseHandler where
           unsafeWrite a 0 l1
           unsafeWrite a 1 l0
 
-  basicReasonOf _ this l = do
+  constrReasonOf _ this l = do
     lits <- getElems (claLits this)
     case l of
       Nothing -> return lits
@@ -2708,12 +2710,12 @@ instance ConstraintHandler AtLeastHandler where
 
   watchedVariables _ _ = return []
 
-  basicPropagate solver this this2 falsifiedLit = do
+  constrPropagate solver this this2 falsifiedLit = do
     preprocess
 
     when debugMode $ do
       litn <- readArray a n
-      unless (litn == falsifiedLit) $ error "AtLeastHandler.basicPropagate: should not happen"
+      unless (litn == falsifiedLit) $ error "AtLeastHandler.constrPropagate: should not happen"
 
     (lb,ub) <- getBounds a
     assert (lb==0) $ return ()
@@ -2722,7 +2724,7 @@ instance ConstraintHandler AtLeastHandler where
       -1 -> do
         when debugMode $ logIO solver $ do
           str <- showConstraintHandler this
-          return $ printf "basicPropagate: %s is unit" str
+          return $ printf "constrPropagate: %s is unit" str
         watchLit solver falsifiedLit this
         let loop :: Int -> IO Bool
             loop i
@@ -2761,7 +2763,7 @@ instance ConstraintHandler AtLeastHandler where
                 unsafeWrite a n li
                 unsafeWrite a i ln
 
-  basicReasonOf solver this concl = do
+  constrReasonOf solver this concl = do
     (lb,ub) <- getBounds (atLeastLits this)
     assert (lb==0) $ return ()
     let n = atLeastNum this
@@ -2770,12 +2772,12 @@ instance ConstraintHandler AtLeastHandler where
       forM_ falsifiedLits $ \lit -> do
         val <- litValue solver lit
         unless (val == lFalse) $ do
-          error $ printf "AtLeastHandler.basicReasonOf: %d is %s (lFalse expected)" lit (show val)
+          error $ printf "AtLeastHandler.constrReasonOf: %d is %s (lFalse expected)" lit (show val)
     case concl of
       Nothing -> do
         let go :: Int -> IO Lit
             go i
-              | i >= n = error $ printf "AtLeastHandler.basicReasonOf: cannot find falsified literal in first %d elements" n
+              | i >= n = error $ printf "AtLeastHandler.constrReasonOf: cannot find falsified literal in first %d elements" n
               | otherwise = do
                   lit <- readArray (atLeastLits this) i
                   val <- litValue solver lit
@@ -2788,7 +2790,7 @@ instance ConstraintHandler AtLeastHandler where
         when debugMode $ do
           es <- getElems (atLeastLits this)
           unless (lit `elem` take n es) $
-            error $ printf "AtLeastHandler.basicReasonOf: cannot find %d in first %d elements" n
+            error $ printf "AtLeastHandler.constrReasonOf: cannot find %d in first %d elements" n
         return falsifiedLits
 
   constrOnUnassigned _solver _this _this2 _lit = return ()
@@ -2932,7 +2934,7 @@ instance ConstraintHandler PBHandlerCounter where
 
   watchedVariables _ _ = return []
 
-  basicPropagate solver this this2 falsifiedLit = do
+  constrPropagate solver this this2 falsifiedLit = do
     watchLit solver falsifiedLit this
     let c = pbCoeffMap this2 IM.! falsifiedLit
     modifyIORef' (pbSlack this2) (subtract c)
@@ -2948,7 +2950,7 @@ instance ConstraintHandler PBHandlerCounter where
           return ()
       return True
 
-  basicReasonOf solver this l = do
+  constrReasonOf solver this l = do
     case l of
       Nothing -> do
         let p _ = return True
@@ -2969,7 +2971,7 @@ instance ConstraintHandler PBHandlerCounter where
         where
           go :: Integer -> PBLinSum -> [Lit] -> IO [Lit]
           go s _ ret | s < 0 = return ret
-          go _ [] _ = error "PBHandlerCounter.basicReasonOf: should not happen"
+          go _ [] _ = error "PBHandlerCounter.constrReasonOf: should not happen"
           go s ((c,lit):xs) ret = do
             val <- litValue solver lit
             if val == lFalse then do
@@ -3093,7 +3095,7 @@ instance ConstraintHandler PBHandlerPueblo where
 
   watchedVariables _ _ = return []
 
-  basicPropagate solver this this2 falsifiedLit = do
+  constrPropagate solver this this2 falsifiedLit = do
     let t = fromJust $ find (\(_,l) -> l==falsifiedLit) (puebloTerms this2)
     puebloUnwatch solver this2 t
     ret <- puebloPropagate solver this this2
@@ -3102,7 +3104,7 @@ instance ConstraintHandler PBHandlerPueblo where
       addOnUnassigned solver this falsifiedLit
     return ret
 
-  basicReasonOf solver this l = do
+  constrReasonOf solver this l = do
     case l of
       Nothing -> do
         let p _ = return True
@@ -3123,7 +3125,7 @@ instance ConstraintHandler PBHandlerPueblo where
         where
           go :: Integer -> PBLinSum -> [Lit] -> IO [Lit]
           go s _ ret | s < 0 = return ret
-          go _ [] _ = error "PBHandlerPueblo.basicReasonOf: should not happen"
+          go _ [] _ = error "PBHandlerPueblo.constrReasonOf: should not happen"
           go s ((c,lit):xs) ret = do
             val <- litValue solver lit
             if val == lFalse then do
@@ -3176,7 +3178,7 @@ puebloPropagate solver constr this = do
           else do
             val <- litValue solver lit
             when (val == lUndef) $ do
-              b <- assignBy solver lit this
+              b <- assignBy solver lit constr
               assert b $ return ()
             f ts
     f $ puebloTerms this
@@ -3243,7 +3245,7 @@ instance ConstraintHandler XORClauseHandler where
       return False
     else if size == 1 then do
       lit0 <- unsafeRead a 0
-      assignBy solver lit0 this2
+      assignBy solver lit0 this
     else do
       ref <- newIORef 1
       let f i = do
@@ -3315,7 +3317,7 @@ instance ConstraintHandler XORClauseHandler where
       _ -> return []
 
   -- FIXME: 伝播した変数から再度呼ばれて、再び伝播処理が起こってしまう
-  basicPropagate !solver this this2 !falsifiedLit = do
+  constrPropagate !solver this this2 !falsifiedLit = do
     preprocess
 
     !lit0 <- unsafeRead a 0
@@ -3326,7 +3328,7 @@ instance ConstraintHandler XORClauseHandler where
       -1 -> do
         when debugMode $ logIO solver $ do
            str <- showConstraintHandler this
-           return $ printf "basicPropagate: %s is unit" str
+           return $ printf "constrPropagate: %s is unit" str
         watchVar solver v this
         -- lit0 ⊕ y
         y <- do
@@ -3358,7 +3360,7 @@ instance ConstraintHandler XORClauseHandler where
           unsafeWrite a 0 l1
           unsafeWrite a 1 l0
 
-  basicReasonOf solver this l = do
+  constrReasonOf solver this l = do
     lits <- getElems (xorLits this)
     xs <-
       case l of
@@ -3369,7 +3371,7 @@ instance ConstraintHandler XORClauseHandler where
            l1:l2:ls
              | litVar lit == litVar l1 -> mapM f (l2 : ls)
              | litVar lit == litVar l2 -> mapM f (l1 : ls)
-           _ -> error "XORClauseHandler.basicReasonOf: should not happen"
+           _ -> error "XORClauseHandler.constrReasonOf: should not happen"
     return xs
     where
       f :: Lit -> IO Lit
