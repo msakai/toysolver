@@ -47,7 +47,7 @@ findMUSAssumptions solver opt = do
   if IS.null core then
     return core
   else
-    f IS.empty False core
+    liftM fst $ f IS.empty False core
 
   where
     log :: String -> IO ()
@@ -75,9 +75,9 @@ findMUSAssumptions solver opt = do
     -- * ¬hasDelta ⇒ bs is satisfiable
     --
     -- Returns:
-    -- * minimal subset S⊆cs such that bs∪S is unsatisfiable
-    -- 
-    f :: IS.IntSet -> Bool -> IS.IntSet -> IO IS.IntSet
+    -- * minimal subset cs'⊆cs such that bs∪cs' is unsatisfiable
+    -- * (not necessarily minimal) subset bs'⊆bs such that bs'∪cs' is unsatisfiable.
+    f :: IS.IntSet -> Bool -> IS.IntSet -> IO (IS.IntSet, IS.IntSet)
     f bs hasDelta cs = do
       log $ "checking satisfiability of " ++ showLits bs
       ret <- if not hasDelta then do
@@ -86,19 +86,22 @@ findMUSAssumptions solver opt = do
                SAT.solveWith solver (IS.toList bs)
       if not ret then do
         log $ showLits bs ++ " is unsatisfiable"
-        log $ "new core = " ++ showLits bs
-        update $ IS.toList bs
-        return IS.empty
+        bs' <- liftM IS.fromList $ SAT.getFailedAssumptions solver
+        log $ "new core = " ++ showLits bs'
+        update $ IS.toList bs'
+        return (IS.empty, bs')
       else do
         log $ showLits bs ++ " is satisfiable"
         if IS.size cs == 1 then do
-          return cs
+          return (cs, bs)
         else do
           let (cs1,cs2) = split cs
           log $ "splitting " ++ showLits cs ++ " into " ++ showLits cs1 ++ " and " ++ showLits cs2
-          ds2 <- f (bs `IS.union` cs1) (not (IS.null cs1)) cs2
-          ds1 <- f (bs `IS.union` ds2) (not (IS.null ds2)) cs1
-          return (ds1 `IS.union` ds2)
+          (ds2, es2) <- f (bs `IS.union` cs1) (not (IS.null cs1)) cs2
+          let bs'  = bs `IS.intersection` es2
+              cs1' = cs1 `IS.intersection` es2
+          (ds1, es1) <- f (bs' `IS.union` ds2) (not (IS.null ds2)) cs1'
+          return (ds1 `IS.union` ds2, bs `IS.intersection` (es1 `IS.union` es2))
 
 {-
 Algorithm QUICKXPLAIN(B, C, ≺)
