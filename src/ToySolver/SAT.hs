@@ -396,7 +396,7 @@ data Solver
   , svLastStatWC :: !(IORef UTCTime)
 
   -- * Working spaces
-  , svAssumptions     :: !(IORef (IOUArray Int Lit))
+  , svAssumptions     :: !(Vec.UVec Lit)
   , svLearntLim       :: !(IORef Int)
   , svLearntLimAdjCnt :: !(IORef Int)
   , svLearntLimSeq    :: !(IORef [(Int,Int)])
@@ -664,7 +664,7 @@ newSolver = do
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
   db2 <- newIORef (0,[])
-  as  <- newIORef =<< newArray_ (0,-1)
+  as  <- Vec.new
   lv  <- newIORef levelRoot
   q   <- SQ.newFifo
   m   <- newIORef Nothing
@@ -1035,8 +1035,7 @@ addXORClauseSoft solver sel lits rhs = do
 -- Returns 'False' if the problem is UNSATISFIABLE.
 solve :: Solver -> IO Bool
 solve solver = do
-  as <- newArray_ (0,-1)
-  writeIORef (svAssumptions solver) as
+  Vec.clear (svAssumptions solver)
   solve_ solver
 
 -- | Solve constraints under assuptions.
@@ -1046,8 +1045,8 @@ solveWith :: Solver
           -> [Lit]    -- ^ Assumptions
           -> IO Bool
 solveWith solver ls = do
-  as <- newListArray (0, length ls -1) ls
-  writeIORef (svAssumptions solver) as
+  Vec.clear (svAssumptions solver)
+  mapM_ (Vec.push (svAssumptions solver)) ls
   solve_ solver
 
 solve_ :: Solver -> IO Bool
@@ -1189,14 +1188,13 @@ search solver !conflict_lim onConflict = do
 
     pickAssumption :: IO (Maybe Lit)
     pickAssumption = do
-      !as <- readIORef (svAssumptions solver)
-      !b <- getBounds as
+      s <- Vec.getSize (svAssumptions solver)
       let go = do
               d <- readIORef (svLevel solver)
-              if not (inRange b (d+1)) then
+              if s <= d+1 then
                 return (Just litUndef)
               else do
-                l <- readArray as (d+1)
+                l <- Vec.unsafeRead (svAssumptions solver) (d+1)
                 val <- litValue solver l
                 if val == lTrue then do
                   -- dummy decision level
