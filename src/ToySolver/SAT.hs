@@ -190,7 +190,7 @@ data VarData
   , vdNegLitData :: !LitData
   -- | will be invoked once when the variable is assigned
   , vdWatches    :: !(IORef [SomeConstraintHandler])
-  , vdActivity   :: !(IORef VarActivity)
+  , vdActivity   :: !(IOURef VarActivity)
   , vdValue :: !(IORef LBool)
   , vdTrailIndex :: !(IOURef Int)
   , vdLevel :: !(IOURef Level)
@@ -211,7 +211,7 @@ newVarData = do
   pos <- newLitData
   neg <- newLitData
   watches <- newIORef []
-  activity <- newIORef 0
+  activity <- newIOURef 0
 
   val <- newIORef lUndef
   idx <- newIOURef maxBound
@@ -325,7 +325,7 @@ data Solver
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
 
-  , svLevel        :: !(IORef Level)
+  , svLevel        :: !(IOURef Level)
   , svBCPQueue     :: !(SQ.SeqQueue Lit)
 
   -- * Result
@@ -333,27 +333,27 @@ data Solver
   , svFailedAssumptions :: !(IORef [Lit])
 
   -- * Statistics
-  , svNDecision    :: !(IORef Int)
-  , svNRandomDecision :: !(IORef Int)
-  , svNConflict    :: !(IORef Int)
-  , svNRestart     :: !(IORef Int)
-  , svNFixed       :: !(IORef Int)
-  , svNLearntGC    :: !(IORef Int)
-  , svNRemovedConstr :: !(IORef Int)
+  , svNDecision    :: !(IOURef Int)
+  , svNRandomDecision :: !(IOURef Int)
+  , svNConflict    :: !(IOURef Int)
+  , svNRestart     :: !(IOURef Int)
+  , svNFixed       :: !(IOURef Int)
+  , svNLearntGC    :: !(IOURef Int)
+  , svNRemovedConstr :: !(IOURef Int)
 
   -- * Configulation
 
   -- | Inverse of the variable activity decay factor. (default 1 / 0.95)
-  , svVarDecay     :: !(IORef Double)
+  , svVarDecay     :: !(IOURef Double)
 
   -- | Amount to bump next variable with.
-  , svVarInc       :: !(IORef Double)
+  , svVarInc       :: !(IOURef Double)
 
   -- | Inverse of the constraint activity decay factor. (1 / 0.999)
-  , svConstrDecay  :: !(IORef Double)
+  , svConstrDecay  :: !(IOURef Double)
 
   -- | Amount to bump next constraint with.
-  , svConstrInc    :: !(IORef Double)
+  , svConstrInc    :: !(IOURef Double)
 
   , svRestartStrategy :: !(IORef RestartStrategy)
 
@@ -388,7 +388,7 @@ data Solver
 
   , svRandomGen  :: !(IORef Rand.StdGen)
 
-  , svConfBudget :: !(IORef Int)
+  , svConfBudget :: !(IOURef Int)
 
   -- * Logging
   , svLogger :: !(IORef (Maybe (String -> IO ())))
@@ -421,7 +421,7 @@ bcpCheckEmpty solver = do
 
 assignBy :: Solver -> Lit -> SomeConstraintHandler -> IO Bool
 assignBy solver lit c = do
-  lv <- readIORef (svLevel solver)
+  lv <- readIOURef (svLevel solver)
   let !c2 = if lv == levelRoot
             then Nothing
             else Just c
@@ -440,7 +440,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
     return $ val == val0
   else do
     idx <- Vec.getSize (svTrail solver)
-    lv <- readIORef (svLevel solver)
+    lv <- readIOURef (svLevel solver)
 
     writeIORef (vdValue vd) val
     writeIOURef (vdTrailIndex vd) idx
@@ -448,7 +448,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
     writeIORef (vdReason vd) reason
 
     Vec.push (svTrail solver) lit
-    when (lv == levelRoot) $ modifyIORef' (svNFixed solver) (+1)
+    when (lv == levelRoot) $ modifyIOURef (svNFixed solver) (+1)
     bcpEnqueue solver lit
 
     when debugMode $ logIO solver $ do
@@ -574,20 +574,20 @@ type VarActivity = Double
 varActivity :: Solver -> Var -> IO VarActivity
 varActivity solver !v = do
   vd <- varData solver v
-  readIORef (vdActivity vd)
+  readIOURef (vdActivity vd)
 
 varDecayActivity :: Solver -> IO ()
 varDecayActivity solver = do
-  d <- readIORef (svVarDecay solver)
-  modifyIORef' (svVarInc solver) (d*)
+  d <- readIOURef (svVarDecay solver)
+  modifyIOURef (svVarInc solver) (d*)
 
 varBumpActivity :: Solver -> Var -> IO ()
 varBumpActivity solver !v = do
-  inc <- readIORef (svVarInc solver)
+  inc <- readIOURef (svVarInc solver)
   vd <- varData solver v
-  modifyIORef' (vdActivity vd) (+inc)
+  modifyIOURef (vdActivity vd) (+inc)
   PQ.update (svVarQueue solver) v
-  aval <- readIORef (vdActivity vd)
+  aval <- readIOURef (vdActivity vd)
   when (aval > 1e20) $
     -- Rescale
     varRescaleAllActivity solver
@@ -597,8 +597,8 @@ varRescaleAllActivity solver = do
   vs <- variables solver
   forM_ vs $ \v -> do
     vd <- varData solver v
-    modifyIORef' (vdActivity vd) (* 1e-20)
-  modifyIORef' (svVarInc solver) (* 1e-20)
+    modifyIOURef (vdActivity vd) (* 1e-20)
+  modifyIOURef (svVarInc solver) (* 1e-20)
 
 variables :: Solver -> IO [Var]
 variables solver = do
@@ -665,21 +665,21 @@ newSolver = do
   db  <- newIORef []
   db2 <- newIORef (0,[])
   as  <- Vec.new
-  lv  <- newIORef levelRoot
+  lv  <- newIOURef levelRoot
   q   <- SQ.newFifo
   m   <- newIORef Nothing
-  ndecision <- newIORef 0
-  nranddec  <- newIORef 0
-  nconflict <- newIORef 0
-  nrestart  <- newIORef 0
-  nfixed    <- newIORef 0
-  nlearntgc <- newIORef 0
-  nremoved  <- newIORef 0
+  ndecision <- newIOURef 0
+  nranddec  <- newIOURef 0
+  nconflict <- newIOURef 0
+  nrestart  <- newIOURef 0
+  nfixed    <- newIOURef 0
+  nlearntgc <- newIOURef 0
+  nremoved  <- newIOURef 0
 
-  constrDecay <- newIORef (1 / 0.999)
-  constrInc   <- newIORef 1
-  varDecay <- newIORef (1 / 0.95)
-  varInc   <- newIORef 1
+  constrDecay <- newIOURef (1 / 0.999)
+  constrInc   <- newIOURef 1
+  varDecay <- newIOURef (1 / 0.95)
+  varInc   <- newIOURef 1
   restartStrat <- newIORef defaultRestartStrategy
   restartFirst <- newIORef defaultRestartFirst
   restartInc <- newIORef defaultRestartInc
@@ -707,7 +707,7 @@ newSolver = do
 
   failed <- newIORef []
 
-  confBudget <- newIORef (-1)
+  confBudget <- newIOURef (-1)
 
   let solver =
         Solver
@@ -812,7 +812,7 @@ resizeVarCapacity solver n = do
 -- |Add a clause to the solver.
 addClause :: Solver -> Clause -> IO ()
 addClause solver lits = do
-  d <- readIORef (svLevel solver)
+  d <- readIOURef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
   ok <- readIORef (svOk solver)
@@ -845,7 +845,7 @@ addAtLeast :: Solver -- ^ The 'Solver' argument.
            -> Int    -- ^ /n/.
            -> IO ()
 addAtLeast solver lits n = do
-  d <- readIORef (svLevel solver)
+  d <- readIOURef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
   ok <- readIORef (svOk solver)
@@ -896,7 +896,7 @@ addPBAtLeast :: Solver          -- ^ The 'Solver' argument.
              -> Integer         -- ^ /n/
              -> IO ()
 addPBAtLeast solver ts n = do
-  d <- readIORef (svLevel solver)
+  d <- readIOURef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
   ok <- readIORef (svOk solver)
@@ -998,7 +998,7 @@ addXORClause
   -> Bool   -- ^ /rhs/
   -> IO ()
 addXORClause solver lits rhs = do
-  d <- readIORef (svLevel solver)
+  d <- readIOURef (svLevel solver)
   assert (d == levelRoot) $ return ()
 
   ok <- readIORef (svOk solver)
@@ -1061,7 +1061,7 @@ solve_ solver = do
     return False
   else do
     when debugMode $ dumpVarActivity solver
-    d <- readIORef (svLevel solver)
+    d <- readIOURef (svLevel solver)
     assert (d == levelRoot) $ return ()
 
     nv <- getNVars solver
@@ -1101,7 +1101,7 @@ solve_ solver = do
             SRFinished x -> return $ Just x
             SRBudgetExceeded -> return Nothing
             SRRestart -> do
-              modifyIORef' (svNRestart solver) (+1)
+              modifyIOURef (svNRestart solver) (+1)
               backtrackTo solver levelRoot
               loop rs
 
@@ -1126,10 +1126,10 @@ solve_ solver = do
     printStat solver True
     (log solver . printf "#cpu_time = %.3fs") (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
     (log solver . printf "#wall_clock_time = %.3fs") (realToFrac (endWC `diffUTCTime` startWC) :: Double)
-    (log solver . printf "#decision = %d") =<< readIORef (svNDecision solver)
-    (log solver . printf "#random_decision = %d") =<< readIORef (svNRandomDecision solver)
-    (log solver . printf "#conflict = %d") =<< readIORef (svNConflict solver)
-    (log solver . printf "#restart = %d")  =<< readIORef (svNRestart solver)
+    (log solver . printf "#decision = %d") =<< readIOURef (svNDecision solver)
+    (log solver . printf "#random_decision = %d") =<< readIOURef (svNRandomDecision solver)
+    (log solver . printf "#conflict = %d") =<< readIOURef (svNConflict solver)
+    (log solver . printf "#restart = %d")  =<< readIOURef (svNRestart solver)
 
     case result of
       Just x  -> return x
@@ -1161,7 +1161,7 @@ search solver !conflict_lim onConflict = do
             Just sr -> return sr
             Nothing -> loop
         Nothing -> do
-          lv <- readIORef (svLevel solver)
+          lv <- readIOURef (svLevel solver)
           when (lv == levelRoot) $ simplify solver
           checkGC
           r <- pickAssumption
@@ -1183,14 +1183,14 @@ search solver !conflict_lim onConflict = do
       m <- getNAssigned solver
       learnt_lim <- readIORef (svLearntLim solver)
       when (learnt_lim >= 0 && n - m > learnt_lim) $ do
-        modifyIORef' (svNLearntGC solver) (+1)
+        modifyIOURef (svNLearntGC solver) (+1)
         reduceDB solver
 
     pickAssumption :: IO (Maybe Lit)
     pickAssumption = do
       s <- Vec.getSize (svAssumptions solver)
       let go = do
-              d <- readIORef (svLevel solver)
+              d <- readIOURef (svLevel solver)
               if s <= d+1 then
                 return (Just litUndef)
               else do
@@ -1198,7 +1198,7 @@ search solver !conflict_lim onConflict = do
                 val <- litValue solver l
                 if val == lTrue then do
                   -- dummy decision level
-                  modifyIORef' (svLevel solver) (+1)
+                  modifyIOURef (svLevel solver) (+1)
                   go
                 else if val == lFalse then do
                   -- conflict with assumption
@@ -1215,8 +1215,8 @@ search solver !conflict_lim onConflict = do
       constrDecayActivity solver
       onConflict
 
-      modifyIORef' (svNConflict solver) (+1)
-      d <- readIORef (svLevel solver)
+      modifyIOURef (svNConflict solver) (+1)
+      d <- readIOURef (svLevel solver)
 
       when debugMode $ logIO solver $ do
         str <- showConstraintHandler constr
@@ -1225,9 +1225,9 @@ search solver !conflict_lim onConflict = do
       modifyIORef' conflictCounter (+1)
       c <- readIORef conflictCounter
 
-      modifyIORef' (svConfBudget solver) $ \confBudget ->
+      modifyIOURef (svConfBudget solver) $ \confBudget ->
         if confBudget > 0 then confBudget - 1 else confBudget
-      confBudget <- readIORef (svConfBudget solver)
+      confBudget <- readIOURef (svConfBudget solver)
 
       when (c `mod` 100 == 0) $ do
         printStat solver False
@@ -1338,7 +1338,7 @@ simplify solver = do
   do
     xs <- readIORef (svConstrDB solver)
     (ys,n) <- loop xs [] (0::Int)
-    modifyIORef' (svNRemovedConstr solver) (+n)
+    modifyIOURef (svNRemovedConstr solver) (+n)
     writeIORef (svConstrDB solver) ys
 
   -- simplify learnt constraint DB
@@ -1361,7 +1361,7 @@ checkForwardSubsumption solver lits = do
   else do
     withEnablePhaseSaving solver False $ do
       bracket_
-        (modifyIORef' (svLevel solver) (+1))
+        (modifyIOURef (svLevel solver) (+1))
         (backtrackTo solver levelRoot) $ do
           b <- allM (\lit -> assign solver (litNot lit)) lits
           if b then
@@ -1417,7 +1417,7 @@ removeConstraintHandlers solver zs = do
         else loop cs (c:rs) n
   xs <- readIORef (svConstrDB solver)
   (ys,n) <- loop xs [] (0::Int)
-  modifyIORef' (svNRemovedConstr solver) (+n)
+  modifyIOURef (svNRemovedConstr solver) (+n)
   writeIORef (svConstrDB solver) ys
 
 {--------------------------------------------------------------------
@@ -1510,8 +1510,8 @@ getRandomGen :: Solver -> IO Rand.StdGen
 getRandomGen solver = readIORef (svRandomGen solver)
 
 setConfBudget :: Solver -> Maybe Int -> IO ()
-setConfBudget solver (Just b) | b >= 0 = writeIORef (svConfBudget solver) b
-setConfBudget solver _ = writeIORef (svConfBudget solver) (-1)
+setConfBudget solver (Just b) | b >= 0 = writeIOURef (svConfBudget solver) b
+setConfBudget solver _ = writeIOURef (svConfBudget solver) (-1)
 
 data PBHandlerType = PBHandlerTypeCounter | PBHandlerTypePueblo
   deriving (Show, Eq, Ord, Enum, Bounded)
@@ -1611,7 +1611,7 @@ pickBranchLit !solver = do
       var <- readArray a i
       val <- varValue solver var
       if val == lUndef then do
-        modifyIORef' (svNRandomDecision solver) (1+)
+        modifyIOURef (svNRandomDecision solver) (1+)
         return var
       else return litUndef
     else
@@ -1643,8 +1643,8 @@ pickBranchLit !solver = do
 
 decide :: Solver -> Lit -> IO ()
 decide solver !lit = do
-  modifyIORef' (svNDecision solver) (+1)
-  modifyIORef' (svLevel solver) (+1)
+  modifyIOURef (svNDecision solver) (+1)
+  modifyIOURef (svLevel solver) (+1)
   when debugMode $ do
     val <- litValue solver lit
     when (val /= lUndef) $ error "decide: should not happen"
@@ -1705,7 +1705,7 @@ deduce solver = loop
 
 analyzeConflict :: ConstraintHandler c => Solver -> c -> IO (Clause, Level)
 analyzeConflict solver constr = do
-  d <- readIORef (svLevel solver)
+  d <- readIOURef (svLevel solver)
 
   let split :: [Lit] -> IO (LitSet, LitSet)
       split = go (IS.empty, IS.empty)
@@ -1792,7 +1792,7 @@ analyzeFinal solver p = do
 
 analyzeConflictHybrid :: ConstraintHandler c => Solver -> c -> IO ((Clause, Level), (PBLinAtLeast, Level))
 analyzeConflictHybrid solver constr = do
-  d <- readIORef (svLevel solver)
+  d <- readIOURef (svLevel solver)
 
   let split :: [Lit] -> IO (LitSet, LitSet)
       split = go (IS.empty, IS.empty)
@@ -1988,7 +1988,7 @@ backtrackTo solver level = do
   when debugMode $ log solver $ printf "backtrackTo: %d" level
   loop
   SQ.clear (svBCPQueue solver)
-  writeIORef (svLevel solver) level
+  writeIOURef (svLevel solver) level
   where
     loop :: IO ()
     loop = do
@@ -2013,14 +2013,14 @@ constructModel solver = do
 
 constrDecayActivity :: Solver -> IO ()
 constrDecayActivity solver = do
-  d <- readIORef (svConstrDecay solver)
-  modifyIORef' (svConstrInc solver) (d*)
+  d <- readIOURef (svConstrDecay solver)
+  modifyIOURef (svConstrInc solver) (d*)
 
 constrBumpActivity :: ConstraintHandler a => Solver -> a -> IO ()
 constrBumpActivity solver this = do
   aval <- constrReadActivity this
   when (aval >= 0) $ do -- learnt clause
-    inc <- readIORef (svConstrInc solver)
+    inc <- readIOURef (svConstrInc solver)
     let aval2 = aval+inc
     constrWriteActivity this $! aval2
     when (aval2 > 1e20) $
@@ -2034,15 +2034,15 @@ constrRescaleAllActivity solver = do
     aval <- constrReadActivity c
     when (aval >= 0) $
       constrWriteActivity c $! (aval * 1e-20)
-  modifyIORef' (svConstrInc solver) (* 1e-20)
+  modifyIOURef (svConstrInc solver) (* 1e-20)
 
 resetStat :: Solver -> IO ()
 resetStat solver = do
-  writeIORef (svNDecision solver) 0
-  writeIORef (svNRandomDecision solver) 0
-  writeIORef (svNConflict solver) 0
-  writeIORef (svNRestart solver) 0
-  writeIORef (svNLearntGC  solver) 0
+  writeIOURef (svNDecision solver) 0
+  writeIOURef (svNRandomDecision solver) 0
+  writeIOURef (svNConflict solver) 0
+  writeIOURef (svNRestart solver) 0
+  writeIOURef (svNLearntGC solver) 0
 
 printStatHeader :: Solver -> IO ()
 printStatHeader solver = do
@@ -2062,13 +2062,13 @@ printStat solver force = do
   when b $ do
     startWC   <- readIORef (svStartWC solver)
     let tm = showTimeDiff $ nowWC `diffUTCTime` startWC
-    restart   <- readIORef (svNRestart solver)
-    dec       <- readIORef (svNDecision solver)
-    conflict  <- readIORef (svNConflict solver)
+    restart   <- readIOURef (svNRestart solver)
+    dec       <- readIOURef (svNDecision solver)
+    conflict  <- readIOURef (svNConflict solver)
     learntLim <- readIORef (svLearntLim solver)
-    learntGC  <- readIORef (svNLearntGC solver)
-    fixed     <- readIORef (svNFixed solver)
-    removed   <- readIORef (svNRemovedConstr solver)
+    learntGC  <- readIOURef (svNLearntGC solver)
+    fixed     <- readIOURef (svNFixed solver)
+    removed   <- readIOURef (svNRemovedConstr solver)
     log solver $ printf "%s | %7d | %8d | %8d | %8d %6d | %8d | %8d"
       tm restart dec conflict learntLim learntGC fixed removed
     writeIORef (svLastStatWC solver) nowWC
