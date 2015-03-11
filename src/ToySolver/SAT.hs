@@ -1179,7 +1179,7 @@ search solver !conflict_lim onConflict = do
   where
     checkGC :: IO ()
     checkGC = do
-      n <- nLearnt solver
+      n <- getNLearntConstraints solver
       m <- getNAssigned solver
       learnt_lim <- readIORef (svLearntLim solver)
       when (learnt_lim >= 0 && n - m > learnt_lim) $ do
