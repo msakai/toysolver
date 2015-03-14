@@ -2137,6 +2137,8 @@ class (Eq a, Hashable a) => ConstraintHandler a where
 
   constrDetach :: Solver -> SomeConstraintHandler -> a -> IO ()
 
+  constrIsLocked :: Solver -> SomeConstraintHandler -> a -> IO Bool
+
   watchedLiterals :: Solver -> a -> IO [Lit]
 
   watchedVariables :: Solver -> a -> IO [Var]
@@ -2208,29 +2210,7 @@ reasonOf solver c x = do
   return cl
 
 isLocked :: Solver -> SomeConstraintHandler -> IO Bool
-isLocked solver c = do
-    b1 <- anyM p1 =<< watchedLiterals solver c
-    b2 <- anyM p2 =<< watchedVariables solver c
-    return $ b1 || b2
-  where
-    p1 :: Lit -> IO Bool
-    p1 lit = do
-      val <- litValue solver lit
-      if val /= lTrue then return False
-      else do
-        m <- varReason solver (litVar lit)
-        case m of
-          Nothing -> return False
-          Just c2 -> return $! c == c2
-    p2 :: Var -> IO Bool
-    p2 var = do
-      val <- varValue solver var
-      if val == lUndef then return False
-      else do
-        m <- varReason solver var
-        case m of
-          Nothing -> return False
-          Just c2 -> return $! c == c2
+isLocked solver c = constrIsLocked solver c c
 
 data SomeConstraintHandler
   = CHClause !ClauseHandler
@@ -2267,6 +2247,12 @@ instance ConstraintHandler SomeConstraintHandler where
   constrDetach solver this (CHPBCounter c) = constrDetach solver this c
   constrDetach solver this (CHPBPueblo c)  = constrDetach solver this c
   constrDetach solver this (CHXORClause c) = constrDetach solver this c
+
+  constrIsLocked solver this (CHClause c)    = constrIsLocked solver this c
+  constrIsLocked solver this (CHAtLeast c)   = constrIsLocked solver this c
+  constrIsLocked solver this (CHPBCounter c) = constrIsLocked solver this c
+  constrIsLocked solver this (CHPBPueblo c)  = constrIsLocked solver this c
+  constrIsLocked solver this (CHXORClause c) = constrIsLocked solver this c
 
   watchedLiterals solver (CHClause c)    = watchedLiterals solver c
   watchedLiterals solver (CHAtLeast c)   = watchedLiterals solver c
@@ -2333,6 +2319,17 @@ instance ConstraintHandler SomeConstraintHandler where
   constrWriteActivity (CHPBCounter c) aval = constrWriteActivity c aval
   constrWriteActivity (CHPBPueblo c)  aval = constrWriteActivity c aval
   constrWriteActivity (CHXORClause c) aval = constrWriteActivity c aval
+
+isReasonOf :: Solver -> SomeConstraintHandler -> Lit -> IO Bool
+isReasonOf solver c lit = do
+  val <- litValue solver lit
+  if val == lUndef then
+    return False
+  else do
+    m <- varReason solver (litVar lit)
+    case m of
+      Nothing -> return False
+      Just c2  -> return $! c == c2
 
 -- To avoid heap-allocation Maybe value, it returns -1 when not found.
 findForWatch :: Solver -> IOUArray Int Lit -> Int -> Int -> IO Int
@@ -2519,6 +2516,15 @@ instance ConstraintHandler ClauseHandler where
       lit1 <- unsafeRead (claLits this2) 1
       unwatchLit solver lit0 this
       unwatchLit solver lit1 this
+
+  constrIsLocked solver this this2 = do
+    (lb,ub) <- getBounds (claLits this2)
+    let size = ub-lb+1
+    if size == 0 then
+      return False
+    else do
+      lit <- unsafeRead (claLits this2) 0
+      isReasonOf solver this lit
 
   watchedLiterals _ this = do
     lits <- getElems (claLits this)
@@ -2740,6 +2746,21 @@ instance ConstraintHandler AtLeastHandler where
       forLoop 0 (<=n) (+1) $ \i -> do
         lit <- unsafeRead (atLeastLits this2) i
         unwatchLit solver lit this
+
+  constrIsLocked solver this this2 = do
+    (lb,ub) <- getBounds (atLeastLits this2)
+    let size = ub - lb + 1
+        n = atLeastNum this2
+        loop i
+          | i > n = return False
+          | otherwise = do
+              l <- unsafeRead (atLeastLits this2) i
+              b <- isReasonOf solver this l
+              if b then return True else loop (i+1)
+    if size >= n+1 then
+      loop 0
+    else
+      return False
 
   watchedLiterals _ this = do
     lits <- getElems (atLeastLits this)
@@ -2972,6 +2993,9 @@ instance ConstraintHandler PBHandlerCounter where
     forM_ (pbTerms this2) $ \(_,l) -> do
       unwatchLit solver l this
 
+  constrIsLocked solver this this2 = do
+    anyM (\(_,l) -> isReasonOf solver this l) (pbTerms this2)
+
   watchedLiterals _ this = do
     return $ map snd $ pbTerms this
 
@@ -3138,6 +3162,9 @@ instance ConstraintHandler PBHandlerPueblo where
     ws <- readIORef (puebloWatches this2)
     forM_ (IS.toList ws) $ \l -> do
       unwatchLit solver l this
+
+  constrIsLocked solver this this2 = do
+    anyM (\(_,l) -> isReasonOf solver this l) (puebloTerms this2)
 
   watchedLiterals _ this = liftM IS.toList $ readIORef (puebloWatches this)
 
@@ -3364,6 +3391,13 @@ instance ConstraintHandler XORClauseHandler where
       lit1 <- unsafeRead (xorLits this2) 1
       unwatchVar solver (litVar lit0) this
       unwatchVar solver (litVar lit1) this
+
+  constrIsLocked solver this this2 = do
+    lit0 <- unsafeRead (xorLits this2) 0
+    lit1 <- unsafeRead (xorLits this2) 1
+    b0 <- isReasonOf solver this lit0
+    b1 <- isReasonOf solver this lit1
+    return $ b0 || b1
 
   watchedLiterals _ _ = return []
 
