@@ -3407,36 +3407,39 @@ instance ConstraintHandler XORClauseHandler where
       l1:l2:_ -> return [litVar l1, litVar l2]
       _ -> return []
 
-  -- FIXME: 伝播した変数から再度呼ばれて、再び伝播処理が起こってしまう
   constrPropagate !solver this this2 !falsifiedLit = do
-    preprocess
-
-    !lit0 <- unsafeRead a 0
-    (!lb,!ub) <- getBounds a
-    assert (lb==0) $ return ()
-    i <- findForWatch2 solver a 2 ub
-    case i of
-      -1 -> do
-        when debugMode $ logIO solver $ do
-           str <- showConstraintHandler this
-           return $ printf "constrPropagate: %s is unit" str
-        watchVar solver v this
-        -- lit0 ⊕ y
-        y <- do
-          ref <- newIORef False
-          forLoop 1 (<=ub) (+1) $ \j -> do
-            lit_j <- unsafeRead a j
-            val_j <- litValue solver lit_j
-            modifyIORef' ref (/= fromJust (unliftBool val_j))
-          readIORef ref
-        assignBy solver (if y then litNot lit0 else lit0) this
-      _  -> do
-        !lit1 <- unsafeRead a 1
-        !liti <- unsafeRead a i
-        unsafeWrite a 1 liti
-        unsafeWrite a i lit1
-        watchVar solver (litVar liti) this
-        return True
+    b <- constrIsLocked solver this this2
+    if b then
+      return True
+    else do
+      preprocess
+  
+      !lit0 <- unsafeRead a 0
+      (!lb,!ub) <- getBounds a
+      assert (lb==0) $ return ()
+      i <- findForWatch2 solver a 2 ub
+      case i of
+        -1 -> do
+          when debugMode $ logIO solver $ do
+             str <- showConstraintHandler this
+             return $ printf "constrPropagate: %s is unit" str
+          watchVar solver v this
+          -- lit0 ⊕ y
+          y <- do
+            ref <- newIORef False
+            forLoop 1 (<=ub) (+1) $ \j -> do
+              lit_j <- unsafeRead a j
+              val_j <- litValue solver lit_j
+              modifyIORef' ref (/= fromJust (unliftBool val_j))
+            readIORef ref
+          assignBy solver (if y then litNot lit0 else lit0) this
+        _  -> do
+          !lit1 <- unsafeRead a 1
+          !liti <- unsafeRead a i
+          unsafeWrite a 1 liti
+          unsafeWrite a i lit1
+          watchVar solver (litVar liti) this
+          return True
 
     where
       v = litVar falsifiedLit
@@ -3456,12 +3459,11 @@ instance ConstraintHandler XORClauseHandler where
     xs <-
       case l of
         Nothing -> mapM f lits
-        Just lit -> do
-         -- FIXME: 伝播処理が二回起こってしまうせいで、伝播結果のリテラルが先頭とは限らない
+        Just lit -> do          
          case lits of
-           l1:l2:ls
-             | litVar lit == litVar l1 -> mapM f (l2 : ls)
-             | litVar lit == litVar l2 -> mapM f (l1 : ls)
+           l1:ls -> do
+             assert (litVar lit == litVar l1) $ return ()
+             mapM f ls
            _ -> error "XORClauseHandler.constrReasonOf: should not happen"
     return xs
     where
