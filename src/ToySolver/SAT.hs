@@ -421,7 +421,7 @@ bcpCheckEmpty solver = do
 
 assignBy :: Solver -> Lit -> SomeConstraintHandler -> IO Bool
 assignBy solver lit c = do
-  lv <- readIOURef (svLevel solver)
+  lv <- getDecisionLevel solver
   let !c2 = if lv == levelRoot
             then Nothing
             else Just c
@@ -440,7 +440,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
     return $ val == val0
   else do
     idx <- Vec.getSize (svTrail solver)
-    lv <- readIOURef (svLevel solver)
+    lv <- getDecisionLevel solver
 
     writeIORef (vdValue vd) val
     writeIOURef (vdTrailIndex vd) idx
@@ -812,7 +812,7 @@ resizeVarCapacity solver n = do
 -- |Add a clause to the solver.
 addClause :: Solver -> Clause -> IO ()
 addClause solver lits = do
-  d <- readIOURef (svLevel solver)
+  d <- getDecisionLevel solver
   assert (d == levelRoot) $ return ()
 
   ok <- readIORef (svOk solver)
@@ -845,7 +845,7 @@ addAtLeast :: Solver -- ^ The 'Solver' argument.
            -> Int    -- ^ /n/.
            -> IO ()
 addAtLeast solver lits n = do
-  d <- readIOURef (svLevel solver)
+  d <- getDecisionLevel solver
   assert (d == levelRoot) $ return ()
 
   ok <- readIORef (svOk solver)
@@ -896,7 +896,7 @@ addPBAtLeast :: Solver          -- ^ The 'Solver' argument.
              -> Integer         -- ^ /n/
              -> IO ()
 addPBAtLeast solver ts n = do
-  d <- readIOURef (svLevel solver)
+  d <- getDecisionLevel solver
   assert (d == levelRoot) $ return ()
 
   ok <- readIORef (svOk solver)
@@ -998,7 +998,7 @@ addXORClause
   -> Bool   -- ^ /rhs/
   -> IO ()
 addXORClause solver lits rhs = do
-  d <- readIOURef (svLevel solver)
+  d <- getDecisionLevel solver
   assert (d == levelRoot) $ return ()
 
   ok <- readIORef (svOk solver)
@@ -1061,7 +1061,7 @@ solve_ solver = do
     return False
   else do
     when debugMode $ dumpVarActivity solver
-    d <- readIOURef (svLevel solver)
+    d <- getDecisionLevel solver
     assert (d == levelRoot) $ return ()
 
     nv <- getNVars solver
@@ -1161,7 +1161,7 @@ search solver !conflict_lim onConflict = do
             Just sr -> return sr
             Nothing -> loop
         Nothing -> do
-          lv <- readIOURef (svLevel solver)
+          lv <- getDecisionLevel solver
           when (lv == levelRoot) $ simplify solver
           checkGC
           r <- pickAssumption
@@ -1190,7 +1190,7 @@ search solver !conflict_lim onConflict = do
     pickAssumption = do
       s <- Vec.getSize (svAssumptions solver)
       let go = do
-              d <- readIOURef (svLevel solver)
+              d <- getDecisionLevel solver
               if s <= d+1 then
                 return (Just litUndef)
               else do
@@ -1198,7 +1198,7 @@ search solver !conflict_lim onConflict = do
                 val <- litValue solver l
                 if val == lTrue then do
                   -- dummy decision level
-                  modifyIOURef (svLevel solver) (+1)
+                  pushDecisionLevel solver
                   go
                 else if val == lFalse then do
                   -- conflict with assumption
@@ -1216,7 +1216,7 @@ search solver !conflict_lim onConflict = do
       onConflict
 
       modifyIOURef (svNConflict solver) (+1)
-      d <- readIOURef (svLevel solver)
+      d <- getDecisionLevel solver
 
       when debugMode $ logIO solver $ do
         str <- showConstraintHandler constr
@@ -1361,7 +1361,7 @@ checkForwardSubsumption solver lits = do
   else do
     withEnablePhaseSaving solver False $ do
       bracket_
-        (modifyIOURef (svLevel solver) (+1))
+        (pushDecisionLevel solver)
         (backtrackTo solver levelRoot) $ do
           b <- allM (\lit -> assign solver (litNot lit)) lits
           if b then
@@ -1644,7 +1644,7 @@ pickBranchLit !solver = do
 decide :: Solver -> Lit -> IO ()
 decide solver !lit = do
   modifyIOURef (svNDecision solver) (+1)
-  modifyIOURef (svLevel solver) (+1)
+  pushDecisionLevel solver
   when debugMode $ do
     val <- litValue solver lit
     when (val /= lUndef) $ error "decide: should not happen"
@@ -1705,7 +1705,7 @@ deduce solver = loop
 
 analyzeConflict :: ConstraintHandler c => Solver -> c -> IO (Clause, Level)
 analyzeConflict solver constr = do
-  d <- readIOURef (svLevel solver)
+  d <- getDecisionLevel solver
 
   let split :: [Lit] -> IO (LitSet, LitSet)
       split = go (IS.empty, IS.empty)
@@ -1792,7 +1792,7 @@ analyzeFinal solver p = do
 
 analyzeConflictHybrid :: ConstraintHandler c => Solver -> c -> IO ((Clause, Level), (PBLinAtLeast, Level))
 analyzeConflictHybrid solver constr = do
-  d <- readIOURef (svLevel solver)
+  d <- getDecisionLevel solver
 
   let split :: [Lit] -> IO (LitSet, LitSet)
       split = go (IS.empty, IS.empty)
@@ -1980,6 +1980,12 @@ popTrail solver = do
   l <- Vec.unsafePop (svTrail solver)
   unassign solver (litVar l)
   return l
+
+getDecisionLevel ::Solver -> IO Int
+getDecisionLevel solver = readIOURef (svLevel solver)
+
+pushDecisionLevel :: Solver -> IO ()
+pushDecisionLevel solver = modifyIOURef (svLevel solver) (+1)
 
 -- | Revert to the state at given level
 -- (keeping all assignment at @level@ but not beyond).
