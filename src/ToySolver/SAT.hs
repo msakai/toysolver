@@ -289,6 +289,14 @@ getLitFixed solver !l = do
     m <- getVarFixed solver (negate l)
     return $! lnot m
 
+getNFixed :: Solver -> IO Int
+getNFixed solver = do
+  lv <- getDecisionLevel solver
+  if lv == levelRoot then
+    Vec.getSize (svTrail solver)
+  else
+    Vec.unsafeRead (svTrailLimit solver) 0
+
 varLevel :: Solver -> Var -> IO Level
 varLevel solver !v = do
   vd <- varData solver v
@@ -337,7 +345,6 @@ data Solver
   , svNRandomDecision :: !(IOURef Int)
   , svNConflict    :: !(IOURef Int)
   , svNRestart     :: !(IOURef Int)
-  , svNFixed       :: !(IOURef Int)
   , svNLearntGC    :: !(IOURef Int)
   , svNRemovedConstr :: !(IOURef Int)
 
@@ -448,7 +455,6 @@ assign_ solver !lit reason = assert (validLit lit) $ do
     writeIORef (vdReason vd) reason
 
     Vec.push (svTrail solver) lit
-    when (lv == levelRoot) $ modifyIOURef (svNFixed solver) (+1)
     bcpEnqueue solver lit
 
     when debugMode $ logIO solver $ do
@@ -672,7 +678,6 @@ newSolver = do
   nranddec  <- newIOURef 0
   nconflict <- newIOURef 0
   nrestart  <- newIOURef 0
-  nfixed    <- newIOURef 0
   nlearntgc <- newIOURef 0
   nremoved  <- newIOURef 0
 
@@ -729,7 +734,6 @@ newSolver = do
         , svNRandomDecision = nranddec
         , svNConflict  = nconflict
         , svNRestart   = nrestart
-        , svNFixed     = nfixed
         , svNLearntGC  = nlearntgc
         , svNRemovedConstr = nremoved
 
@@ -2077,7 +2081,7 @@ printStat solver force = do
     conflict  <- readIOURef (svNConflict solver)
     learntLim <- readIORef (svLearntLim solver)
     learntGC  <- readIOURef (svNLearntGC solver)
-    fixed     <- readIOURef (svNFixed solver)
+    fixed     <- getNFixed solver
     removed   <- readIOURef (svNRemovedConstr solver)
     log solver $ printf "%s | %7d | %8d | %8d | %8d %6d | %8d | %8d"
       tm restart dec conflict learntLim learntGC fixed removed
