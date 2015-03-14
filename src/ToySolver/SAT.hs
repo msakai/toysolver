@@ -181,7 +181,7 @@ import ToySolver.SAT.Types
 type Level = Int
 
 levelRoot :: Level
-levelRoot = -1
+levelRoot = 0
 
 data VarData
   = VarData
@@ -320,12 +320,12 @@ data Solver
 
   , svVarQueue     :: !PQ.PriorityQueue
   , svTrail        :: !(Vec.UVec Lit)
+  , svTrailLimit   :: !(Vec.UVec Lit)
 
   , svVarData      :: !(Vec.Vec VarData)
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
 
-  , svLevel        :: !(IOURef Level)
   , svBCPQueue     :: !(SQ.SeqQueue Lit)
 
   -- * Result
@@ -660,12 +660,12 @@ newSolver = do
  rec
   ok   <- newIORef True
   trail <- Vec.new
+  trail_lim <- Vec.new
   vars <- Vec.new
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
   db2 <- newIORef (0,[])
   as  <- Vec.new
-  lv  <- newIOURef levelRoot
   q   <- SQ.newFifo
   m   <- newIORef Nothing
   ndecision <- newIOURef 0
@@ -714,10 +714,10 @@ newSolver = do
         { svOk = ok
         , svVarQueue   = vqueue
         , svTrail      = trail
+        , svTrailLimit = trail_lim
         , svVarData    = vars
         , svConstrDB   = db
         , svLearntDB   = db2
-        , svLevel      = lv
         , svBCPQueue   = q
 
         -- * Result
@@ -1191,10 +1191,10 @@ search solver !conflict_lim onConflict = do
       s <- Vec.getSize (svAssumptions solver)
       let go = do
               d <- getDecisionLevel solver
-              if s <= d+1 then
+              if not (d < s) then
                 return (Just litUndef)
               else do
-                l <- Vec.unsafeRead (svAssumptions solver) (d+1)
+                l <- Vec.unsafeRead (svAssumptions solver) d
                 val <- litValue solver l
                 if val == lTrue then do
                   -- dummy decision level
@@ -1982,10 +1982,10 @@ popTrail solver = do
   return l
 
 getDecisionLevel ::Solver -> IO Int
-getDecisionLevel solver = readIOURef (svLevel solver)
+getDecisionLevel solver = Vec.getSize (svTrailLimit solver)
 
 pushDecisionLevel :: Solver -> IO ()
-pushDecisionLevel solver = modifyIOURef (svLevel solver) (+1)
+pushDecisionLevel solver = Vec.push (svTrailLimit solver) =<< Vec.getSize (svTrail solver)
 
 -- | Revert to the state at given level
 -- (keeping all assignment at @level@ but not beyond).
@@ -1994,17 +1994,21 @@ backtrackTo solver level = do
   when debugMode $ log solver $ printf "backtrackTo: %d" level
   loop
   SQ.clear (svBCPQueue solver)
-  writeIOURef (svLevel solver) level
   where
     loop :: IO ()
     loop = do
-      m <- Vec.getSize (svTrail solver)
-      when (m > 0) $ do
-        l <- peekTrail solver
-        lv <- litLevel solver l
-        when (lv > level) $ do
-          popTrail solver
-          loop
+      lv <- getDecisionLevel solver
+      when (lv > level) $ do
+        n <- Vec.unsafePop (svTrailLimit solver)
+        let loop2 = do
+              m <- Vec.getSize (svTrail solver)
+              when (m > n) $ do
+                popTrail solver
+                loop2
+        loop2
+        s <- Vec.getSize (svTrail solver)
+        
+        loop
 
 constructModel :: Solver -> IO ()
 constructModel solver = do
