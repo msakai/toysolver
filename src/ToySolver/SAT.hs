@@ -512,6 +512,16 @@ watchVar solver !var c = do
   vd <- varData solver var
   modifyIORef (vdWatches vd) (c : )
 
+unwatchLit :: Solver -> Lit -> SomeConstraintHandler -> IO ()
+unwatchLit solver !lit c = do
+  ld <- litData solver lit
+  modifyIORef (ldWatches ld) (delete c)
+
+unwatchVar :: Solver -> Lit -> SomeConstraintHandler -> IO ()
+unwatchVar solver !lit c = do
+  vd <- varData solver lit
+  modifyIORef (vdWatches vd) (delete c)
+
 -- | Returns list of constraints that are watching the literal.
 watches :: Solver -> Lit -> IO [SomeConstraintHandler]
 watches solver !lit = do
@@ -2125,6 +2135,8 @@ class (Eq a, Hashable a) => ConstraintHandler a where
 
   constrAttach :: Solver -> SomeConstraintHandler -> a -> IO Bool
 
+  constrDetach :: Solver -> SomeConstraintHandler -> a -> IO ()
+
   watchedLiterals :: Solver -> a -> IO [Lit]
 
   watchedVariables :: Solver -> a -> IO [Var]
@@ -2161,15 +2173,7 @@ attach solver c = constrAttach solver c c
 
 detach :: Solver -> SomeConstraintHandler -> IO ()
 detach solver c = do
-  lits <- watchedLiterals solver c
-  forM_ lits $ \lit -> do
-    ld <- litData solver lit
-    modifyIORef' (ldWatches ld) (delete c)
-  vs <- watchedVariables solver c
-  forM_ vs $ \v -> do
-    vd <- varData solver v
-    modifyIORef' (vdWatches vd) (delete c)
-
+  constrDetach solver c c
   b <- isPBRepresentable c
   when b $ do
     (lhs,_) <- toPBLinAtLeast c
@@ -2257,6 +2261,12 @@ instance ConstraintHandler SomeConstraintHandler where
   constrAttach solver this (CHPBCounter c) = constrAttach solver this c
   constrAttach solver this (CHPBPueblo c)  = constrAttach solver this c
   constrAttach solver this (CHXORClause c) = constrAttach solver this c
+
+  constrDetach solver this (CHClause c)    = constrDetach solver this c
+  constrDetach solver this (CHAtLeast c)   = constrDetach solver this c
+  constrDetach solver this (CHPBCounter c) = constrDetach solver this c
+  constrDetach solver this (CHPBPueblo c)  = constrDetach solver this c
+  constrDetach solver this (CHXORClause c) = constrDetach solver this c
 
   watchedLiterals solver (CHClause c)    = watchedLiterals solver c
   watchedLiterals solver (CHAtLeast c)   = watchedLiterals solver c
@@ -2501,6 +2511,15 @@ instance ConstraintHandler ClauseHandler where
         watchLit solver lit1 this
         return False
 
+  constrDetach solver this this2 = do
+    (lb,ub) <- getBounds (claLits this2)
+    let size = ub-lb+1
+    when (size >= 2) $ do
+      lit0 <- unsafeRead (claLits this2) 0
+      lit1 <- unsafeRead (claLits this2) 1
+      unwatchLit solver lit0 this
+      unwatchLit solver lit1 this
+
   watchedLiterals _ this = do
     lits <- getElems (claLits this)
     case lits of
@@ -2713,6 +2732,14 @@ instance ConstraintHandler AtLeastHandler where
                     -- n+1 literals (0 .. n) are watched.
                     return False
       f 0 n
+
+  constrDetach solver this this2 = do
+    lits <- getElems (atLeastLits this2)
+    let n = atLeastNum this2
+    when (length lits > n) $ do
+      forLoop 0 (<=n) (+1) $ \i -> do
+        lit <- unsafeRead (atLeastLits this2) i
+        unwatchLit solver lit this
 
   watchedLiterals _ this = do
     lits <- getElems (atLeastLits this)
@@ -2941,6 +2968,10 @@ instance ConstraintHandler PBHandlerCounter where
         else
           return True
 
+  constrDetach solver this this2 = do
+    forM_ (pbTerms this2) $ \(_,l) -> do
+      unwatchLit solver l this
+
   watchedLiterals _ this = do
     return $ map snd $ pbTerms this
 
@@ -3102,6 +3133,11 @@ instance ConstraintHandler PBHandlerPueblo where
       g wsum xs
 
     return ret
+
+  constrDetach solver this this2 = do
+    ws <- readIORef (puebloWatches this2)
+    forM_ (IS.toList ws) $ \l -> do
+      unwatchLit solver l this
 
   watchedLiterals _ this = liftM IS.toList $ readIORef (puebloWatches this)
 
@@ -3319,6 +3355,15 @@ instance ConstraintHandler XORClauseHandler where
         watchVar solver (litVar lit0) this
         watchVar solver (litVar lit1) this
         isSatisfied solver this2
+
+  constrDetach solver this this2 = do
+    (lb,ub) <- getBounds (xorLits this2)
+    let size = ub-lb+1
+    when (size >= 2) $ do
+      lit0 <- unsafeRead (xorLits this2) 0
+      lit1 <- unsafeRead (xorLits this2) 1
+      unwatchVar solver (litVar lit0) this
+      unwatchVar solver (litVar lit1) this
 
   watchedLiterals _ _ = return []
 
