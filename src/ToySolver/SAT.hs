@@ -158,7 +158,6 @@ import qualified Data.IntSet as IS
 import qualified Data.Set as Set
 import ToySolver.Internal.Data.IOURef
 import qualified ToySolver.Internal.Data.IndexedPriorityQueue as PQ
-import qualified ToySolver.Internal.Data.SeqQueue as SQ
 import qualified ToySolver.Internal.Data.Vec as Vec
 import Data.Time
 import Data.Typeable
@@ -329,12 +328,11 @@ data Solver
   , svVarQueue     :: !PQ.PriorityQueue
   , svTrail        :: !(Vec.UVec Lit)
   , svTrailLimit   :: !(Vec.UVec Lit)
+  , svTrailNPropagated :: !(IOURef Int)
 
   , svVarData      :: !(Vec.Vec VarData)
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
-
-  , svBCPQueue     :: !(SQ.SeqQueue Lit)
 
   -- * Result
   , svModel        :: !(IORef (Maybe Model))
@@ -412,19 +410,31 @@ data Solver
 markBad :: Solver -> IO ()
 markBad solver = do
   writeIORef (svOk solver) False
-  SQ.clear (svBCPQueue solver)
-
-bcpEnqueue :: Solver -> Lit -> IO ()
-bcpEnqueue solver l = SQ.enqueue (svBCPQueue solver) l
+  bcpClear solver
 
 bcpDequeue :: Solver -> IO (Maybe Lit)
-bcpDequeue solver = SQ.dequeue (svBCPQueue solver)
+bcpDequeue solver = do
+  n <- Vec.getSize (svTrail solver)
+  m <- readIOURef (svTrailNPropagated solver)
+  if m==n then
+    return Nothing
+  else do
+    -- m < n
+    lit <- Vec.unsafeRead (svTrail solver) m
+    modifyIOURef (svTrailNPropagated solver) (+1)
+    return (Just lit)
 
 bcpCheckEmpty :: Solver -> IO ()
 bcpCheckEmpty solver = do
-  size <- SQ.queueSize (svBCPQueue solver)
-  unless (size == 0) $
+  p <- readIOURef (svTrailNPropagated solver)
+  n <- Vec.getSize (svTrail solver)
+  unless (n == p) $
     error "BUG: BCP Queue should be empty at this point"
+
+bcpClear :: Solver -> IO ()
+bcpClear solver = do
+  m <- Vec.getSize (svTrail solver)
+  writeIOURef (svTrailNPropagated solver) m
 
 assignBy :: Solver -> Lit -> SomeConstraintHandler -> IO Bool
 assignBy solver lit c = do
@@ -455,7 +465,6 @@ assign_ solver !lit reason = assert (validLit lit) $ do
     writeIORef (vdReason vd) reason
 
     Vec.push (svTrail solver) lit
-    bcpEnqueue solver lit
 
     when debugMode $ logIO solver $ do
       let r = case reason of
@@ -677,12 +686,12 @@ newSolver = do
   ok   <- newIORef True
   trail <- Vec.new
   trail_lim <- Vec.new
+  trail_nprop <- newIOURef 0
   vars <- Vec.new
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
   db2 <- newIORef (0,[])
   as  <- Vec.new
-  q   <- SQ.newFifo
   m   <- newIORef Nothing
   ndecision <- newIOURef 0
   nranddec  <- newIOURef 0
@@ -730,10 +739,10 @@ newSolver = do
         , svVarQueue   = vqueue
         , svTrail      = trail
         , svTrailLimit = trail_lim
+        , svTrailNPropagated = trail_nprop
         , svVarData    = vars
         , svConstrDB   = db
         , svLearntDB   = db2
-        , svBCPQueue   = q
 
         -- * Result
         , svModel      = m
@@ -2007,7 +2016,7 @@ backtrackTo :: Solver -> Int -> IO ()
 backtrackTo solver level = do
   when debugMode $ log solver $ printf "backtrackTo: %d" level
   loop
-  SQ.clear (svBCPQueue solver)
+  bcpClear solver
   where
     loop :: IO ()
     loop = do
