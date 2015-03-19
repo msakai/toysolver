@@ -2427,6 +2427,12 @@ data ClauseHandler
   , claHash :: !Int
   }
 
+claGetSize :: ClauseHandler -> IO Int
+claGetSize cla = do
+  (lb,ub) <- getBounds (claLits cla)
+  assert (lb == 0) $ return ()
+  return $! ub-lb+1
+
 instance Eq ClauseHandler where
   (==) = (==) `on` claLits
 
@@ -2453,10 +2459,7 @@ instance ConstraintHandler ClauseHandler where
     -- If not, duplicated propagation happens.
     bcpCheckEmpty solver
 
-    (lb,ub) <- getBounds (claLits this2)
-    assert (lb == 0) $ return ()
-    let size = ub-lb+1
-
+    size <- claGetSize this2
     if size == 0 then do
       markBad solver
       return False
@@ -2472,7 +2475,7 @@ instance ConstraintHandler ClauseHandler where
               return True
             else do
               j <- readIORef ref
-              k <- findForWatch solver (claLits this2) j ub
+              k <- findForWatch solver (claLits this2) j (size - 1)
               case k of
                 -1 -> do
                   return False
@@ -2494,7 +2497,7 @@ instance ConstraintHandler ClauseHandler where
           return True
         else do -- UNIT
           -- We need to watch the most recently falsified literal
-          (i,_) <- liftM (maximumBy (comparing snd)) $ forM [1..ub] $ \l -> do
+          (i,_) <- liftM (maximumBy (comparing snd)) $ forM [1..size-1] $ \l -> do
             lit <- unsafeRead (claLits this2) l
             lv <- litLevel solver lit
             return (l,lv)
@@ -2505,7 +2508,7 @@ instance ConstraintHandler ClauseHandler where
           watchLit solver liti this
           assignBy solver lit0 this -- should always succeed
       else do -- CONFLICT
-        ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [lb..ub] $ \l -> do
+        ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [0..size-1] $ \l -> do
           lit <- unsafeRead (claLits this2) l
           lv <- litLevel solver lit
           return (l,lv)
@@ -2518,8 +2521,7 @@ instance ConstraintHandler ClauseHandler where
         return False
 
   constrDetach solver this this2 = do
-    (lb,ub) <- getBounds (claLits this2)
-    let size = ub-lb+1
+    size <- claGetSize this2
     when (size >= 2) $ do
       lit0 <- unsafeRead (claLits this2) 0
       lit1 <- unsafeRead (claLits this2) 1
@@ -2527,9 +2529,8 @@ instance ConstraintHandler ClauseHandler where
       unwatchLit solver lit1 this
 
   constrIsLocked solver this this2 = do
-    (lb,ub) <- getBounds (claLits this2)
-    let size = ub-lb+1
-    if size == 0 then
+    size <- claGetSize this2
+    if size < 2 then
       return False
     else do
       lit <- unsafeRead (claLits this2) 0
@@ -2552,9 +2553,8 @@ instance ConstraintHandler ClauseHandler where
       watchLit solver falsifiedLit this
       return True
     else do
-      (!lb,!ub) <- getBounds a
-      assert (lb==0) $ return ()
-      i <- findForWatch solver a 2 ub
+      size <- claGetSize this2
+      i <- findForWatch solver a 2 (size - 1)
       case i of
         -1 -> do
           when debugMode $ logIO solver $ do
@@ -2604,7 +2604,7 @@ instance ConstraintHandler ClauseHandler where
     return $ lTrue `elem` vals
 
   constrIsProtected _ this = do
-    size <- liftM rangeSize (getBounds (claLits this))
+    size <- claGetSize this
     return $! size <= 2
 
   constrReadActivity this = readIORef (claActivity this)
