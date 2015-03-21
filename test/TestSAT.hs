@@ -3,6 +3,7 @@ module Main (main) where
 
 import Control.Monad
 import Data.Array.IArray
+import Data.IORef
 import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -21,6 +22,7 @@ import ToySolver.Data.BoolExpr
 import ToySolver.Data.Boolean
 import ToySolver.SAT
 import ToySolver.SAT.Types
+import ToySolver.SAT.TheorySolver
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
@@ -217,6 +219,67 @@ arbitraryXOR = do
 evalXOR :: Model -> (Int,[XORClause]) -> Bool
 evalXOR m (_,cs) = all (evalXORClause m) cs
 
+
+newTheorySolver :: (Int, [Clause]) -> IO TheorySolver
+newTheorySolver cnf@(nv,cs) = do
+  solver <- newSolver
+  newVars_ solver nv
+  forM_ cs $ \c -> addClause solver c
+  
+  ref <- newIORef []
+  let tsolver =
+        TheorySolver
+        { thAssertLit = \_ l -> do
+            if abs l > nv then
+              return True
+            else do
+              m <- readIORef ref
+              case m of
+                [] -> addClause solver [l]
+                xs : xss -> writeIORef ref ((l : xs) : xss)
+              return True
+        , thCheck = \_ -> do
+            xs <- liftM concat $ readIORef ref
+            solveWith solver xs
+        , thExplain = \m -> do
+            case m of
+              Nothing -> do
+                ls <- getFailedAssumptions solver
+                return [-l | l <- ls]
+              Just _ -> return []
+        , thPushBacktrackPoint = modifyIORef ref ([] :)
+        , thPopBacktrackPoint = modifyIORef ref tail
+        }
+  return tsolver
+
+prop_solveCNF_using_BooleanTheory :: Property
+prop_solveCNF_using_BooleanTheory = QM.monadicIO $ do
+  cnf@(nv,cs) <- QM.pick arbitraryCNF
+  let cnf1 = (nv, [c | (i,c) <- zip [0..] cs, i `mod` 2 == 0])
+      cnf2 = (nv, [c | (i,c) <- zip [0..] cs, i `mod` 2 /= 0])
+
+  solver <- arbitrarySolver
+
+  ret <- QM.run $ do
+    newVars_ solver nv
+
+    tsolver <- newTheorySolver cnf1
+    setTheory solver tsolver
+
+    forM_ (snd cnf2) $ \c -> addClause solver c
+    ret <- solve solver
+    if ret then do
+      m <- getModel solver
+      return (Just m)
+    else do
+      return Nothing
+
+  QM.run $ print ret
+  case ret of
+    Just m -> QM.assert $ evalCNF m cnf == True
+    Nothing -> do
+      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
+        QM.assert $ evalCNF m cnf == False
 
 -- should be SAT
 case_solve_SAT :: IO ()

@@ -61,6 +61,7 @@ module ToySolver.SAT
   , addPBExactlySoft
   , addXORClause
   , addXORClauseSoft
+  , setTheory
 
   -- * Solving
   , solve
@@ -172,6 +173,7 @@ import GHC.Exts hiding (Constraint)
 
 import ToySolver.Data.LBool
 import ToySolver.SAT.Types
+import ToySolver.SAT.TheorySolver
 
 {--------------------------------------------------------------------
   internal data structures
@@ -334,6 +336,10 @@ data Solver
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
 
+  -- * Theory
+  , svTheorySolver  :: !(IORef (Maybe TheorySolver))
+  , svTheoryChecked :: !(IOURef Int)
+
   -- * Result
   , svModel        :: !(IORef (Maybe Model))
   , svFailedAssumptions :: !(IORef [Lit])
@@ -424,11 +430,16 @@ bcpDequeue solver = do
     modifyIOURef (svTrailNPropagated solver) (+1)
     return (Just lit)
 
-bcpCheckEmpty :: Solver -> IO ()
-bcpCheckEmpty solver = do
+bcpIsEmpty :: Solver -> IO Bool
+bcpIsEmpty solver = do
   p <- readIOURef (svTrailNPropagated solver)
   n <- Vec.getSize (svTrail solver)
-  unless (n == p) $
+  return $! n == p
+
+bcpCheckEmpty :: Solver -> IO ()
+bcpCheckEmpty solver = do
+  empty <- bcpIsEmpty solver
+  unless empty $
     error "BUG: BCP Queue should be empty at this point"
 
 bcpClear :: Solver -> IO ()
@@ -724,6 +735,9 @@ newSolver = do
 
   confBudget <- newIOURef (-1)
 
+  tsolver <- newIORef Nothing
+  tchecked <- newIOURef 0
+
   let solver =
         Solver
         { svOk = ok
@@ -734,6 +748,10 @@ newSolver = do
         , svVarData    = vars
         , svConstrDB   = db
         , svLearntDB   = db2
+
+        -- * Theory
+        , svTheorySolver  = tsolver
+        , svTheoryChecked = tchecked
 
         -- * Result
         , svModel      = m
@@ -1664,7 +1682,23 @@ decide solver !lit = do
   return ()
 
 deduce :: Solver -> IO (Maybe SomeConstraintHandler)
-deduce solver = loop
+deduce solver = do
+  m <- deduceB solver
+  case m of
+    Just _ -> return m
+    Nothing -> do
+      m2 <- deduceT solver
+      case m2 of
+        Just _ -> return m2
+        Nothing -> do
+          empty <- bcpIsEmpty solver
+          if empty then
+            return Nothing
+          else
+            deduce solver
+
+deduceB :: Solver -> IO (Maybe SomeConstraintHandler)
+deduceB solver = loop
   where
     loop :: IO (Maybe SomeConstraintHandler)
     loop = do
@@ -1997,7 +2031,12 @@ getDecisionLevel ::Solver -> IO Int
 getDecisionLevel solver = Vec.getSize (svTrailLimit solver)
 
 pushDecisionLevel :: Solver -> IO ()
-pushDecisionLevel solver = Vec.push (svTrailLimit solver) =<< Vec.getSize (svTrail solver)
+pushDecisionLevel solver = do
+  Vec.push (svTrailLimit solver) =<< Vec.getSize (svTrail solver)
+  mt <- getTheory solver
+  case mt of
+    Nothing -> return ()
+    Just t -> thPushBacktrackPoint t
 
 popDecisionLevel :: Solver -> IO ()
 popDecisionLevel solver = do
@@ -2008,6 +2047,10 @@ popDecisionLevel solver = do
           popTrail solver
           loop
   loop
+  mt <- getTheory solver
+  case mt of
+    Nothing -> return ()
+    Just t -> thPopBacktrackPoint t
 
 -- | Revert to the state at given level
 -- (keeping all assignment at @level@ but not beyond).
@@ -2016,6 +2059,12 @@ backtrackTo solver level = do
   when debugMode $ log solver $ printf "backtrackTo: %d" level
   loop
   bcpClear solver
+  mt <- getTheory solver
+  case mt of
+    Nothing -> return ()
+    Just _ -> do
+      n <- Vec.getSize (svTrail solver)
+      writeIOURef (svTheoryChecked solver) n
   where
     loop :: IO ()
     loop = do
@@ -2214,6 +2263,7 @@ data SomeConstraintHandler
   | CHPBCounter !PBHandlerCounter
   | CHPBPueblo !PBHandlerPueblo
   | CHXORClause !XORClauseHandler
+  | CHTheory !TheoryHandler
   deriving Eq
 
 instance Hashable SomeConstraintHandler where
@@ -2222,6 +2272,7 @@ instance Hashable SomeConstraintHandler where
   hashWithSalt s (CHPBCounter c) = s `hashWithSalt` (2::Int) `hashWithSalt` c
   hashWithSalt s (CHPBPueblo c)  = s `hashWithSalt` (3::Int) `hashWithSalt` c
   hashWithSalt s (CHXORClause c) = s `hashWithSalt` (4::Int) `hashWithSalt` c
+  hashWithSalt s (CHTheory c)    = s `hashWithSalt` (5::Int) `hashWithSalt` c
 
 instance ConstraintHandler SomeConstraintHandler where
   toConstraintHandler = id
@@ -2231,78 +2282,91 @@ instance ConstraintHandler SomeConstraintHandler where
   showConstraintHandler (CHPBCounter c) = showConstraintHandler c
   showConstraintHandler (CHPBPueblo c)  = showConstraintHandler c
   showConstraintHandler (CHXORClause c) = showConstraintHandler c
+  showConstraintHandler (CHTheory c)    = showConstraintHandler c
 
   constrAttach solver this (CHClause c)    = constrAttach solver this c
   constrAttach solver this (CHAtLeast c)   = constrAttach solver this c
   constrAttach solver this (CHPBCounter c) = constrAttach solver this c
   constrAttach solver this (CHPBPueblo c)  = constrAttach solver this c
   constrAttach solver this (CHXORClause c) = constrAttach solver this c
+  constrAttach solver this (CHTheory c)    = constrAttach solver this c
 
   constrDetach solver this (CHClause c)    = constrDetach solver this c
   constrDetach solver this (CHAtLeast c)   = constrDetach solver this c
   constrDetach solver this (CHPBCounter c) = constrDetach solver this c
   constrDetach solver this (CHPBPueblo c)  = constrDetach solver this c
   constrDetach solver this (CHXORClause c) = constrDetach solver this c
+  constrDetach solver this (CHTheory c)    = constrDetach solver this c
 
   constrIsLocked solver this (CHClause c)    = constrIsLocked solver this c
   constrIsLocked solver this (CHAtLeast c)   = constrIsLocked solver this c
   constrIsLocked solver this (CHPBCounter c) = constrIsLocked solver this c
   constrIsLocked solver this (CHPBPueblo c)  = constrIsLocked solver this c
   constrIsLocked solver this (CHXORClause c) = constrIsLocked solver this c
+  constrIsLocked solver this (CHTheory c)    = constrIsLocked solver this c
 
   constrPropagate solver this (CHClause c)  lit   = constrPropagate solver this c lit
   constrPropagate solver this (CHAtLeast c) lit   = constrPropagate solver this c lit
   constrPropagate solver this (CHPBCounter c) lit = constrPropagate solver this c lit
   constrPropagate solver this (CHPBPueblo c) lit  = constrPropagate solver this c lit
   constrPropagate solver this (CHXORClause c) lit = constrPropagate solver this c lit
+  constrPropagate solver this (CHTheory c) lit    = constrPropagate solver this c lit
 
   constrReasonOf solver (CHClause c)  l   = constrReasonOf solver c l
   constrReasonOf solver (CHAtLeast c) l   = constrReasonOf solver c l
   constrReasonOf solver (CHPBCounter c) l = constrReasonOf solver c l
   constrReasonOf solver (CHPBPueblo c) l  = constrReasonOf solver c l
   constrReasonOf solver (CHXORClause c) l = constrReasonOf solver c l
+  constrReasonOf solver (CHTheory c) l    = constrReasonOf solver c l
 
   constrOnUnassigned solver this (CHClause c)  l   = constrOnUnassigned solver this c l
   constrOnUnassigned solver this (CHAtLeast c) l   = constrOnUnassigned solver this c l
   constrOnUnassigned solver this (CHPBCounter c) l = constrOnUnassigned solver this c l
   constrOnUnassigned solver this (CHPBPueblo c) l  = constrOnUnassigned solver this c l
   constrOnUnassigned solver this (CHXORClause c) l = constrOnUnassigned solver this c l
+  constrOnUnassigned solver this (CHTheory c) l    = constrOnUnassigned solver this c l
 
   isPBRepresentable (CHClause c)    = isPBRepresentable c
   isPBRepresentable (CHAtLeast c)   = isPBRepresentable c
   isPBRepresentable (CHPBCounter c) = isPBRepresentable c
   isPBRepresentable (CHPBPueblo c)  = isPBRepresentable c
   isPBRepresentable (CHXORClause c) = isPBRepresentable c
+  isPBRepresentable (CHTheory c)    = isPBRepresentable c
 
   toPBLinAtLeast (CHClause c)    = toPBLinAtLeast c
   toPBLinAtLeast (CHAtLeast c)   = toPBLinAtLeast c
   toPBLinAtLeast (CHPBCounter c) = toPBLinAtLeast c
   toPBLinAtLeast (CHPBPueblo c)  = toPBLinAtLeast c
   toPBLinAtLeast (CHXORClause c) = toPBLinAtLeast c
+  toPBLinAtLeast (CHTheory c)    = toPBLinAtLeast c
 
   isSatisfied solver (CHClause c)    = isSatisfied solver c
   isSatisfied solver (CHAtLeast c)   = isSatisfied solver c
   isSatisfied solver (CHPBCounter c) = isSatisfied solver c
   isSatisfied solver (CHPBPueblo c)  = isSatisfied solver c
   isSatisfied solver (CHXORClause c) = isSatisfied solver c
+  isSatisfied solver (CHTheory c)    = isSatisfied solver c
 
   constrIsProtected solver (CHClause c)    = constrIsProtected solver c
   constrIsProtected solver (CHAtLeast c)   = constrIsProtected solver c
   constrIsProtected solver (CHPBCounter c) = constrIsProtected solver c
   constrIsProtected solver (CHPBPueblo c)  = constrIsProtected solver c
   constrIsProtected solver (CHXORClause c) = constrIsProtected solver c
+  constrIsProtected solver (CHTheory c)    = constrIsProtected solver c
 
   constrReadActivity (CHClause c)    = constrReadActivity c
   constrReadActivity (CHAtLeast c)   = constrReadActivity c
   constrReadActivity (CHPBCounter c) = constrReadActivity c
   constrReadActivity (CHPBPueblo c)  = constrReadActivity c
   constrReadActivity (CHXORClause c) = constrReadActivity c
+  constrReadActivity (CHTheory c)    = constrReadActivity c
 
   constrWriteActivity (CHClause c)    aval = constrWriteActivity c aval
   constrWriteActivity (CHAtLeast c)   aval = constrWriteActivity c aval
   constrWriteActivity (CHPBCounter c) aval = constrWriteActivity c aval
   constrWriteActivity (CHPBPueblo c)  aval = constrWriteActivity c aval
   constrWriteActivity (CHXORClause c) aval = constrWriteActivity c aval
+  constrWriteActivity (CHTheory c)    aval = constrWriteActivity c aval
 
 isReasonOf :: Solver -> SomeConstraintHandler -> Lit -> IO Bool
 isReasonOf solver c lit = do
@@ -3460,6 +3524,96 @@ basicAttachXORClauseHandler solver this = do
       watchVar solver (litVar l1) constr
       watchVar solver (litVar l2) constr
       return True
+
+{--------------------------------------------------------------------
+  Arbitrary Boolean Theory
+--------------------------------------------------------------------}
+
+setTheory :: Solver -> TheorySolver -> IO ()
+setTheory solver tsolver = do
+  d <- getDecisionLevel solver
+  assert (d == levelRoot) $ return ()
+
+  m <- readIORef (svTheorySolver solver)
+  case m of
+    Just _ -> do
+      error $ "ToySolver.SAT.setTheory: cannot replace TheorySolver"
+    Nothing -> do
+      writeIORef (svTheorySolver solver) (Just tsolver)
+      ret <- deduce solver
+      case ret of
+        Nothing -> return ()
+        Just _ -> markBad solver
+
+getTheory :: Solver -> IO (Maybe TheorySolver)
+getTheory solver = readIORef (svTheorySolver solver)
+
+deduceT :: Solver -> IO (Maybe SomeConstraintHandler)
+deduceT solver = do
+  mt <- readIORef (svTheorySolver solver)
+  case mt of
+    Nothing -> return Nothing
+    Just t -> do
+      n <- Vec.getSize (svTrail solver)
+      let h = CHTheory TheoryHandler
+          callback l = assignBy solver l h
+          loop i = do
+            if i < n then do
+              l <- Vec.unsafeRead (svTrail solver) i
+              ok <- thAssertLit t callback l
+              if ok then
+                loop (i+1)
+              else
+                return False
+            else do
+              return True
+      b <- loop =<< readIOURef (svTheoryChecked solver)
+      if not b then
+        return (Just h)
+      else do
+        b2 <- thCheck t callback
+        if b2 then do
+          writeIOURef (svTheoryChecked solver) n
+          return Nothing
+        else
+          return (Just h)
+
+data TheoryHandler = TheoryHandler deriving (Eq)
+
+instance Hashable TheoryHandler where
+  hash _ = hash ()
+  hashWithSalt = defaultHashWithSalt
+
+instance ConstraintHandler TheoryHandler where
+  toConstraintHandler = CHTheory
+
+  showConstraintHandler _this = return "TheoryHandler"
+
+  constrAttach _solver _this _this2 = error "TheoryHandler.constrAttach"
+
+  constrDetach _solver _this _this2 = return ()
+
+  constrIsLocked _solver _this _this2 = return True
+
+  constrPropagate _solver _this _this2 _falsifiedLit =  error "TheoryHandler.constrPropagate"
+
+  constrReasonOf solver _this l = do
+    Just t <- readIORef (svTheorySolver solver)
+    thExplain t l
+
+  constrOnUnassigned _solver _this _this2 _lit = return ()
+
+  isPBRepresentable _this = return False
+
+  toPBLinAtLeast _this = error "TheoryHandler.toPBLinAtLeast"
+
+  isSatisfied _solver _this = error "TheoryHandler.isSatisfied"
+
+  constrIsProtected _solver _this = error "TheoryHandler.constrIsProtected"
+
+  constrReadActivity _this = return 0
+
+  constrWriteActivity _this _aval = return ()
 
 {--------------------------------------------------------------------
   Restart strategy
