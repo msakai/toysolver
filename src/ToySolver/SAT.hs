@@ -506,18 +506,12 @@ addOnUnassigned solver constr !l = do
 -- | Register the constraint to be notified when the literal becames false.
 watchLit :: Solver -> Lit -> SomeConstraintHandler -> IO ()
 watchLit solver !lit c = do
-  when debugMode $ do
-    lits <- watchedLiterals solver c
-    unless (lit `elem` lits) $ error "watch: should not happen"
   ld <- litData solver lit
   modifyIORef (ldWatches ld) (c : )
 
 -- | Register the constraint to be notified when the variable is assigned.
 watchVar :: Solver -> Var -> SomeConstraintHandler -> IO ()
 watchVar solver !var c = do
-  when debugMode $ do
-    vs <- watchedVariables solver c
-    unless (var `elem` vs) $ error "watchVar: should not happen"
   vd <- varData solver var
   modifyIORef (vdWatches vd) (c : )
 
@@ -552,15 +546,12 @@ addToDB solver c = do
        ld <- litData solver lit
        modifyIORef' (ldOccurList ld) (HashSet.insert c2)
 
-  sanityCheck solver
-
 addToLearntDB :: ConstraintHandler c => Solver -> c -> IO ()
 addToLearntDB solver c = do
   modifyIORef (svLearntDB solver) $ \(n,xs) -> (n+1, toConstraintHandler c : xs)
   when debugMode $ logIO solver $ do
     str <- showConstraintHandler c
     return $ printf "constraint %s is added" str
-  sanityCheck solver
 
 reduceDB :: Solver -> IO ()
 reduceDB solver = do
@@ -1174,9 +1165,7 @@ search solver !conflict_lim onConflict = do
   let 
     loop :: IO SearchResult
     loop = do
-      sanityCheck solver
       conflict <- deduce solver
-      sanityCheck solver
       case conflict of
         Just constr -> do
           ret <- handleConflict conflictCounter constr
@@ -2150,10 +2139,6 @@ class (Eq a, Hashable a) => ConstraintHandler a where
 
   constrIsLocked :: Solver -> SomeConstraintHandler -> a -> IO Bool
 
-  watchedLiterals :: Solver -> a -> IO [Lit]
-
-  watchedVariables :: Solver -> a -> IO [Var]
-
   -- | invoked with the watched literal when the literal is falsified.
   -- 'watch' で 'toConstraint' を呼び出して heap allocation が発生するのを
   -- 避けるために、元の 'SomeConstraintHandler' も渡しておく。
@@ -2264,18 +2249,6 @@ instance ConstraintHandler SomeConstraintHandler where
   constrIsLocked solver this (CHPBCounter c) = constrIsLocked solver this c
   constrIsLocked solver this (CHPBPueblo c)  = constrIsLocked solver this c
   constrIsLocked solver this (CHXORClause c) = constrIsLocked solver this c
-
-  watchedLiterals solver (CHClause c)    = watchedLiterals solver c
-  watchedLiterals solver (CHAtLeast c)   = watchedLiterals solver c
-  watchedLiterals solver (CHPBCounter c) = watchedLiterals solver c
-  watchedLiterals solver (CHPBPueblo c)  = watchedLiterals solver c
-  watchedLiterals solver (CHXORClause c) = watchedLiterals solver c
-
-  watchedVariables solver (CHClause c)    = watchedVariables solver c
-  watchedVariables solver (CHAtLeast c)   = watchedVariables solver c
-  watchedVariables solver (CHPBCounter c) = watchedVariables solver c
-  watchedVariables solver (CHPBPueblo c)  = watchedVariables solver c
-  watchedVariables solver (CHXORClause c) = watchedVariables solver c
 
   constrPropagate solver this (CHClause c)  lit   = constrPropagate solver this c lit
   constrPropagate solver this (CHAtLeast c) lit   = constrPropagate solver this c lit
@@ -2538,14 +2511,6 @@ instance ConstraintHandler ClauseHandler where
       lit <- unsafeRead (claLits this2) 0
       isReasonOf solver this lit
 
-  watchedLiterals _ this = do
-    lits <- getElems (claLits this)
-    case lits of
-      l1:l2:_ -> return [l1, l2]
-      _ -> return []
-
-  watchedVariables _ _ = return []
-
   constrPropagate !solver this this2 !falsifiedLit = do
     preprocess
 
@@ -2773,14 +2738,6 @@ instance ConstraintHandler AtLeastHandler where
     else
       return False
 
-  watchedLiterals _ this = do
-    lits <- getElems (atLeastLits this)
-    let n = atLeastNum this
-    let ws = if length lits > n then take (n+1) lits else []
-    return ws
-
-  watchedVariables _ _ = return []
-
   constrPropagate solver this this2 falsifiedLit = do
     preprocess
 
@@ -3007,11 +2964,6 @@ instance ConstraintHandler PBHandlerCounter where
   constrIsLocked solver this this2 = do
     anyM (\(_,l) -> isReasonOf solver this l) (pbTerms this2)
 
-  watchedLiterals _ this = do
-    return $ map snd $ pbTerms this
-
-  watchedVariables _ _ = return []
-
   constrPropagate solver this this2 falsifiedLit = do
     watchLit solver falsifiedLit this
     let c = pbCoeffMap this2 IM.! falsifiedLit
@@ -3176,10 +3128,6 @@ instance ConstraintHandler PBHandlerPueblo where
 
   constrIsLocked solver this this2 = do
     anyM (\(_,l) -> isReasonOf solver this l) (puebloTerms this2)
-
-  watchedLiterals _ this = liftM IS.toList $ readIORef (puebloWatches this)
-
-  watchedVariables _ _ = return []
 
   constrPropagate solver this this2 falsifiedLit = do
     let t = fromJust $ find (\(_,l) -> l==falsifiedLit) (puebloTerms this2)
@@ -3410,14 +3358,6 @@ instance ConstraintHandler XORClauseHandler where
     b1 <- isReasonOf solver this lit1
     return $ b0 || b1
 
-  watchedLiterals _ _ = return []
-
-  watchedVariables _ this = do
-    lits <- getElems (xorLits this)
-    case lits of
-      l1:l2:_ -> return [litVar l1, litVar l2]
-      _ -> return []
-
   constrPropagate !solver this this2 !falsifiedLit = do
     b <- constrIsLocked solver this this2
     if b then
@@ -3645,25 +3585,6 @@ checkSatisfied solver = do
     unless b $ do
       s <- showConstraintHandler c
       log solver $ "BUG: " ++ s ++ " is violated"
-
-sanityCheck :: Solver -> IO ()
-sanityCheck _ | not debugMode = return ()
-sanityCheck solver = do
-  cls <- readIORef (svConstrDB solver)
-  forM_ cls $ \constr -> do
-    lits <- watchedLiterals solver constr
-    forM_ lits $ \l -> do
-      ws <- watches solver l
-      unless (constr `elem` ws) $ error $ printf "sanityCheck:A:%s" (show lits)
-
-  vs <- variables solver
-  let lits = [l | v <- vs, l <- [literal v True, literal v False]]
-  forM_ lits $ \l -> do
-    cs <- watches solver l
-    forM_ cs $ \constr -> do
-      lits2 <- watchedLiterals solver constr
-      unless (l `elem` lits2) $ do
-        error $ printf "sanityCheck:C:%d %s" l (show lits2)
 
 dumpVarActivity :: Solver -> IO ()
 dumpVarActivity solver = do
