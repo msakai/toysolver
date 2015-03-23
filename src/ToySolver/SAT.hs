@@ -2010,6 +2010,16 @@ getDecisionLevel solver = Vec.getSize (svTrailLimit solver)
 pushDecisionLevel :: Solver -> IO ()
 pushDecisionLevel solver = Vec.push (svTrailLimit solver) =<< Vec.getSize (svTrail solver)
 
+popDecisionLevel :: Solver -> IO ()
+popDecisionLevel solver = do
+  n <- Vec.unsafePop (svTrailLimit solver)
+  let loop = do
+        m <- Vec.getSize (svTrail solver)
+        when (m > n) $ do
+          popTrail solver
+          loop
+  loop
+
 -- | Revert to the state at given level
 -- (keeping all assignment at @level@ but not beyond).
 backtrackTo :: Solver -> Int -> IO ()
@@ -2022,15 +2032,7 @@ backtrackTo solver level = do
     loop = do
       lv <- getDecisionLevel solver
       when (lv > level) $ do
-        n <- Vec.unsafePop (svTrailLimit solver)
-        let loop2 = do
-              m <- Vec.getSize (svTrail solver)
-              when (m > n) $ do
-                popTrail solver
-                loop2
-        loop2
-        s <- Vec.getSize (svTrail solver)
-        
+        popDecisionLevel solver        
         loop
 
 constructModel :: Solver -> IO ()
