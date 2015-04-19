@@ -336,15 +336,15 @@ data Solver
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
 
-  -- * Theory
+  -- Theory
   , svTheorySolver  :: !(IORef (Maybe TheorySolver))
   , svTheoryChecked :: !(IOURef Int)
 
-  -- * Result
+  -- Result
   , svModel        :: !(IORef (Maybe Model))
   , svFailedAssumptions :: !(IORef [Lit])
 
-  -- * Statistics
+  -- Statistics
   , svNDecision    :: !(IOURef Int)
   , svNRandomDecision :: !(IOURef Int)
   , svNConflict    :: !(IOURef Int)
@@ -352,7 +352,7 @@ data Solver
   , svNLearntGC    :: !(IOURef Int)
   , svNRemovedConstr :: !(IOURef Int)
 
-  -- * Configulation
+  -- Configulation
 
   -- | Inverse of the variable activity decay factor. (default 1 / 0.95)
   , svVarDecay     :: !(IOURef Double)
@@ -401,12 +401,12 @@ data Solver
 
   , svConfBudget :: !(IOURef Int)
 
-  -- * Logging
+  -- Logging
   , svLogger :: !(IORef (Maybe (String -> IO ())))
   , svStartWC    :: !(IORef UTCTime)
   , svLastStatWC :: !(IORef UTCTime)
 
-  -- * Working spaces
+  -- Working spaces
   , svAssumptions     :: !(Vec.UVec Lit)
   , svLearntLim       :: !(IORef Int)
   , svLearntLimAdjCnt :: !(IORef Int)
@@ -749,15 +749,15 @@ newSolver = do
         , svConstrDB   = db
         , svLearntDB   = db2
 
-        -- * Theory
+        -- Theory
         , svTheorySolver  = tsolver
         , svTheoryChecked = tchecked
 
-        -- * Result
+        -- Result
         , svModel      = m
         , svFailedAssumptions = failed
 
-        -- * Statistics        
+        -- Statistics        
         , svNDecision  = ndecision
         , svNRandomDecision = nranddec
         , svNConflict  = nconflict
@@ -765,7 +765,7 @@ newSolver = do
         , svNLearntGC  = nlearntgc
         , svNRemovedConstr = nremoved
 
-        -- * Configulation
+        -- Configulation
         , svVarDecay    = varDecay
         , svVarInc      = varInc
         , svConstrDecay = constrDecay
@@ -787,12 +787,12 @@ newSolver = do
         , svRandomGen  = randgen
         , svConfBudget = confBudget
 
-        -- * Logging
+        -- Logging
         , svLogger = logger
         , svStartWC    = startWC
         , svLastStatWC = lastStatWC
 
-        -- * Working space
+        -- Working space
         , svAssumptions     = as
         , svLearntLim       = learntLim
         , svLearntLimAdjCnt = learntLimAdjCnt
