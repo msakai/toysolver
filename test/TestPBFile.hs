@@ -4,11 +4,14 @@ module Main (main) where
 import Control.Monad
 import Data.List
 import Data.Maybe
+import qualified Data.ByteString.Lazy.Char8 as BSChar8
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
 import Test.Tasty.TH
 import ToySolver.Text.PBFile
+import ToySolver.Text.PBFile.Builder
+import qualified ToySolver.Text.PBFile.ByteStringBuilder as ByteStringBuilder
 
 case_exampleLIN  = checkOPBString "exampleLIN"  exampleLIN
 case_exampleNLC1 = checkOPBString "exampleNLC1" exampleNLC1
@@ -110,7 +113,16 @@ checkOPBString :: String -> String -> IO ()
 checkOPBString name str = do
   case parseOPBString name str of
     Left err -> assertFailure $ show err
-    Right _  -> return ()
+    Right opb -> do
+      let s = renderOPB opb
+          bs = renderOPBByteString opb
+      BSChar8.unpack bs @?= s
+      case parseOPBString name s of
+        Left err -> assertFailure $ show err
+        Right opb2 -> opb2 @?= opb
+      case parseOPBByteString bs of
+        Left err -> assertFailure err
+        Right opb2 -> opb2 @?= opb
 
 checkWBOFile :: FilePath -> IO ()
 checkWBOFile fname = do
@@ -123,7 +135,16 @@ checkWBOString :: String -> String -> IO ()
 checkWBOString name str = do
   case parseWBOString name str of
     Left err -> assertFailure $ show err
-    Right _  -> return ()
+    Right wbo -> do
+      let s = renderWBO wbo
+          bs = renderWBOByteString wbo
+      BSChar8.unpack bs @?= s
+      case parseWBOString name s of
+        Left err -> assertFailure $ show err
+        Right wbo2 -> wbo2 @?= wbo
+      case parseWBOByteString bs of
+        Left err -> assertFailure err
+        Right wbo2 -> wbo2 @?= wbo
 
 testOPB :: String -> Bool
 testOPB s = sf == sf2

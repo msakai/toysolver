@@ -242,6 +242,8 @@ Library
      ToySolver.Text.MPSFile
      ToySolver.Text.MaxSAT
      ToySolver.Text.PBFile
+     ToySolver.Text.PBFile.Builder
+     ToySolver.Text.PBFile.ByteStringBuilder
      ToySolver.Text.PBFile.Parsec
      ToySolver.Text.PBFile.Attoparsec
      ToySolver.Text.SDPFile
@@ -644,6 +646,7 @@ Test-suite TestPBFile
   Main-is:           TestPBFile.hs
   Build-depends:
     base >=4 && <5,
+    bytestring,
     toysolver,
     tasty >=0.10.1,
     tasty-hunit ==0.9.*,
