@@ -141,8 +141,8 @@ writePBFile o pb = do
   case head ([Just fname | Output fname <- o] ++ [Nothing]) of
     Nothing -> do
       case pb of
-        Left opb  -> putStr $ PBFile.renderOPB opb
-        Right wbo -> putStr $ PBFile.renderWBO wbo
+        Left opb  -> putStr $ PBFile.toOPBString opb
+        Right wbo -> putStr $ PBFile.toWBOString wbo
     Just fname -> do
       let opb = case pb of
                   Left opb  -> opb

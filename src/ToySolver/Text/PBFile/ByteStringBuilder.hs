@@ -13,8 +13,8 @@
 module ToySolver.Text.PBFile.ByteStringBuilder
   ( opbBuilder
   , wboBuilder
-  , renderOPBByteString
-  , renderWBOByteString
+  , toOPBByteString
+  , toWBOByteString
   , writeOPBFile
   , writeWBOFile
   , hPutOPB
@@ -82,11 +82,11 @@ showSoftConstraint (cost, constr) =
 
 
 
-renderOPBByteString :: Formula -> BS.ByteString
-renderOPBByteString opb = toLazyByteString (opbBuilder opb)
+toOPBByteString :: Formula -> BS.ByteString
+toOPBByteString opb = toLazyByteString (opbBuilder opb)
 
-renderWBOByteString :: SoftFormula -> BS.ByteString
-renderWBOByteString wbo = toLazyByteString (wboBuilder wbo)
+toWBOByteString :: SoftFormula -> BS.ByteString
+toWBOByteString wbo = toLazyByteString (wboBuilder wbo)
 
 writeOPBFile :: FilePath -> Formula -> IO ()
 writeOPBFile filepath opb = withBinaryFile filepath WriteMode $ \h -> do

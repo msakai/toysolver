@@ -44,14 +44,14 @@ module ToySolver.Text.PBFile
   , parseWBOFile
 
   -- * Show .opb files
-  , renderOPB
-  , renderOPBByteString
+  , toOPBString
+  , toOPBByteString
   , writeOPBFile
   , hPutOPB
 
   -- * Show .wbo files
-  , renderWBO
-  , renderWBOByteString
+  , toWBOString
+  , toWBOByteString
   , writeWBOFile
   , hPutWBO
   ) where

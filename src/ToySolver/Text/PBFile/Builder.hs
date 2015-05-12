@@ -13,8 +13,8 @@
 module ToySolver.Text.PBFile.Builder
   ( opbBuilder
   , wboBuilder
-  , renderOPB
-  , renderWBO
+  , toOPBString
+  , toWBOString
   ) where
 
 import Prelude hiding (sum)
@@ -76,8 +76,8 @@ showSoftConstraint (cost, constr) =
     Just c -> fromString "[" <> fromString (show c) <> fromString "] " <> showConstraint constr
 
 
-renderOPB :: Formula -> String
-renderOPB opb = DList.apply (opbBuilder opb) ""
+toOPBString :: Formula -> String
+toOPBString opb = DList.apply (opbBuilder opb) ""
 
-renderWBO :: SoftFormula -> String
-renderWBO wbo = DList.apply (wboBuilder wbo) ""
+toWBOString :: SoftFormula -> String
+toWBOString wbo = DList.apply (wboBuilder wbo) ""

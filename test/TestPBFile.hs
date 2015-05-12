@@ -114,8 +114,8 @@ checkOPBString name str = do
   case parseOPBString name str of
     Left err -> assertFailure $ show err
     Right opb -> do
-      let s = renderOPB opb
-          bs = renderOPBByteString opb
+      let s = toOPBString opb
+          bs = toOPBByteString opb
       BSChar8.unpack bs @?= s
       case parseOPBString name s of
         Left err -> assertFailure $ show err
@@ -136,8 +136,8 @@ checkWBOString name str = do
   case parseWBOString name str of
     Left err -> assertFailure $ show err
     Right wbo -> do
-      let s = renderWBO wbo
-          bs = renderWBOByteString wbo
+      let s = toWBOString wbo
+          bs = toWBOByteString wbo
       BSChar8.unpack bs @?= s
       case parseWBOString name s of
         Left err -> assertFailure $ show err
@@ -150,13 +150,13 @@ testOPB :: String -> Bool
 testOPB s = sf == sf2
   where
     Right sf  = parseOPBString "-" s
-    Right sf2 = parseOPBString "-" (renderOPB sf)
+    Right sf2 = parseOPBString "-" (toOPBString sf)
 
 testWBO :: String -> Bool
 testWBO s = sf == sf2
   where
     Right sf  = parseWBOString "-" s
-    Right sf2 = parseWBOString "-" (renderWBO sf)
+    Right sf2 = parseWBOString "-" (toWBOString sf)
 
 ------------------------------------------------------------------------
 -- Test harness
