@@ -22,10 +22,12 @@
 module ToySolver.Text.PBFile.Parsec
   (
   -- * Parsing .opb files
-    parseOPBString
+    opbParser
+  , parseOPBString
   , parseOPBFile
 
   -- * Parsing .wbo files
+  , wboParser
   , parseWBOString
   , parseWBOFile
   ) where
@@ -37,6 +39,12 @@ import Text.Parsec
 import Text.Parsec.String
 import ToySolver.Text.PBFile.Types
 import ToySolver.Internal.TextUtil
+
+opbParser :: Parser Formula
+opbParser = formula
+
+wboParser :: Parser SoftFormula
+wboParser = softformula
 
 -- <formula>::= <sequence_of_comments> [<objective>] <sequence_of_comments_or_constraints>
 formula :: Parser Formula

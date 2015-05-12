@@ -22,10 +22,12 @@
 module ToySolver.Text.PBFile.Attoparsec
   (
   -- * Parsing .opb files
-    parseOPBByteString
+    opbParser
+  , parseOPBByteString
   , parseOPBFile
 
   -- * Parsing .wbo files
+  , wboParser
   , parseWBOByteString
   , parseWBOFile
   ) where
@@ -41,6 +43,12 @@ import Data.Char
 import Data.Maybe
 import ToySolver.Text.PBFile.Types
 import ToySolver.Internal.TextUtil
+
+opbParser :: Parser Formula
+opbParser = formula
+
+wboParser :: Parser SoftFormula
+wboParser = softformula
 
 -- <formula>::= <sequence_of_comments> [<objective>] <sequence_of_comments_or_constraints>
 formula :: Parser Formula
