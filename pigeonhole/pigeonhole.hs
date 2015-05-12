@@ -35,7 +35,7 @@ main = do
   case xs of
     [p,h] -> do
       let opb = pigeonHole (read p) (read h)
-      putStr $ renderOPB opb
+      hPutOPB stdout opb
     _ -> do
       hPutStrLn stderr "Usage: pigeonhole number_of_pigeons number_of_holes"
       exitFailure
