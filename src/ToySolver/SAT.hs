@@ -1102,7 +1102,10 @@ solve_ solver = do
     restartStrategy <- readIORef (svRestartStrategy solver)
     restartFirst  <- readIORef (svRestartFirst solver)
     restartInc    <- readIORef (svRestartInc solver)
-    let restartSeq = mkRestartSeq restartStrategy restartFirst restartInc
+    let restartSeq =
+          if restartFirst > 0
+          then mkRestartSeq restartStrategy restartFirst restartInc
+          else repeat 0
 
     let learntSizeAdj = do
           (size,adj) <- shift (svLearntLimSeq solver)
@@ -1267,7 +1270,7 @@ search solver !conflict_lim onConflict = do
         return $ Just (SRFinished False)
       else if confBudget==0 then
         return $ Just SRBudgetExceeded
-      else if conflict_lim >= 0 && c >= conflict_lim then
+      else if conflict_lim > 0 && c >= conflict_lim then
         return $ Just SRRestart
       else do
         strat <- readIORef (svLearningStrategy solver)
@@ -1462,7 +1465,7 @@ defaultRestartStrategy :: RestartStrategy
 defaultRestartStrategy = MiniSATRestarts
 
 -- | The initial restart limit. (default 100)
--- Negative value is used to disable restart.
+-- Zero and negative values are used to disable restart.
 setRestartFirst :: Solver -> Int -> IO ()
 setRestartFirst solver !n = writeIORef (svRestartFirst solver) n
 
@@ -1471,8 +1474,12 @@ defaultRestartFirst :: Int
 defaultRestartFirst = 100
 
 -- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
+-- 
+-- This must be @>1@.
 setRestartInc :: Solver -> Double -> IO ()
-setRestartInc solver !r = writeIORef (svRestartInc solver) r
+setRestartInc solver !r
+  | r > 1 = writeIORef (svRestartInc solver) r
+  | otherwise = error "setRestartInc: RestartInc must be >1"
 
 -- | default value for @RestartInc@.
 defaultRestartInc :: Double
@@ -1490,6 +1497,8 @@ defaultLearningStrategy :: LearningStrategy
 defaultLearningStrategy = LearningClause
 
 -- | The initial limit for learnt clauses.
+-- 
+-- Negative value means computing default value from problem instance.
 setLearntSizeFirst :: Solver -> Int -> IO ()
 setLearntSizeFirst solver !x = writeIORef (svLearntSizeFirst solver) x
 
@@ -1498,8 +1507,12 @@ defaultLearntSizeFirst :: Int
 defaultLearntSizeFirst = -1
 
 -- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
+-- 
+-- This must be @>1@.
 setLearntSizeInc :: Solver -> Double -> IO ()
-setLearntSizeInc solver !r = writeIORef (svLearntSizeInc solver) r
+setLearntSizeInc solver !r
+  | r > 1 = writeIORef (svLearntSizeInc solver) r
+  | otherwise = error "setLearntSizeInc: LearntSizeInc must be >1"
 
 -- | default value for @LearntSizeInc@.
 defaultLearntSizeInc :: Double

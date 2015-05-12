@@ -274,7 +274,6 @@ prop_solveCNF_using_BooleanTheory = QM.monadicIO $ do
     else do
       return Nothing
 
-  QM.run $ print ret
   case ret of
     Just m -> QM.assert $ evalCNF m cnf == True
     Nothing -> do
@@ -1202,9 +1201,9 @@ arbitrarySolver = do
   learningStrategy <- QM.pick arbitrary
   restartStrategy <- QM.pick arbitrary
   restartFirst <- QM.pick arbitrary
-  restartInc <- QM.pick arbitrary
+  restartInc <- QM.pick $ liftM ((1.01 +) . abs) arbitrary
   learntSizeFirst <- QM.pick arbitrary
-  learntSizeInc <- QM.pick arbitrary
+  learntSizeInc <- QM.pick $ liftM ((1.01 +) . abs) arbitrary
   pbhandler <- QM.pick arbitrary
   ccmin <- QM.pick $ choose (0,2)
   phaseSaving <- QM.pick arbitrary
