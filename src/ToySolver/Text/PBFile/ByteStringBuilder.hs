@@ -13,11 +13,19 @@
 module ToySolver.Text.PBFile.ByteStringBuilder
   ( opbBuilder
   , wboBuilder
+  , renderOPBByteString
+  , renderWBOByteString
+  , writeOPBFile
+  , writeWBOFile
+  , hPutOPB
+  , hPutWBO
   ) where
 
 import Prelude hiding (sum)
 import Data.Monoid hiding (Sum (..))
-import Data.ByteString.Builder (Builder, intDec, integerDec, char7, string7)
+import qualified Data.ByteString.Lazy as BS
+import Data.ByteString.Builder (Builder, intDec, integerDec, char7, string7, hPutBuilder, toLazyByteString)
+import System.IO
 import ToySolver.Text.PBFile.Types
 
 opbBuilder :: Formula -> Builder
@@ -70,3 +78,32 @@ showSoftConstraint (cost, constr) =
   case cost of
     Nothing -> showConstraint constr
     Just c -> char7 '[' <> integerDec c <> string7 "] " <> showConstraint constr
+
+
+
+
+renderOPBByteString :: Formula -> BS.ByteString
+renderOPBByteString opb = toLazyByteString (opbBuilder opb)
+
+renderWBOByteString :: SoftFormula -> BS.ByteString
+renderWBOByteString wbo = toLazyByteString (wboBuilder wbo)
+
+writeOPBFile :: FilePath -> Formula -> IO ()
+writeOPBFile filepath opb = withBinaryFile filepath WriteMode $ \h -> do
+  hSetBuffering h (BlockBuffering Nothing)
+  hPutOPB h opb
+
+writeWBOFile :: FilePath -> SoftFormula -> IO ()
+writeWBOFile filepath wbo = withBinaryFile filepath WriteMode $ \h -> do
+  hSetBuffering h (BlockBuffering Nothing)
+  hPutWBO h wbo
+
+-- It is recommended that the 'Handle' is set to binary and
+-- 'BlockBuffering' mode. See 'hSetBinaryMode' and 'hSetBuffering'.
+hPutOPB :: Handle -> Formula -> IO ()
+hPutOPB h opb = hPutBuilder h (opbBuilder opb)
+
+-- It is recommended that the 'Handle' is set to binary and
+-- 'BlockBuffering' mode. See 'hSetBinaryMode' and 'hSetBuffering'.
+hPutWBO :: Handle -> SoftFormula -> IO ()
+hPutWBO h wbo = hPutBuilder h (wboBuilder wbo)

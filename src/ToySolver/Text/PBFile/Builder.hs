@@ -13,9 +13,12 @@
 module ToySolver.Text.PBFile.Builder
   ( opbBuilder
   , wboBuilder
+  , renderOPB
+  , renderWBO
   ) where
 
 import Prelude hiding (sum)
+import qualified Data.DList as DList
 import Data.Monoid hiding (Sum (..))
 import Data.String
 import Text.Printf
@@ -71,3 +74,10 @@ showSoftConstraint (cost, constr) =
   case cost of
     Nothing -> showConstraint constr
     Just c -> fromString "[" <> fromString (show c) <> fromString "] " <> showConstraint constr
+
+
+renderOPB :: Formula -> String
+renderOPB opb = DList.apply (opbBuilder opb) ""
+
+renderWBO :: SoftFormula -> String
+renderWBO wbo = DList.apply (wboBuilder wbo) ""

@@ -57,45 +57,8 @@ module ToySolver.Text.PBFile
   ) where
 
 import Prelude hiding (sum)
-import qualified Data.ByteString.Lazy as BS
-import qualified Data.ByteString.Builder as Builder
-import qualified Data.DList as DList
-import System.IO
 import ToySolver.Text.PBFile.Parsec
 import ToySolver.Text.PBFile.Attoparsec hiding (parseOPBFile, parseWBOFile)
 import ToySolver.Text.PBFile.Types
 import ToySolver.Text.PBFile.Builder
-import qualified ToySolver.Text.PBFile.ByteStringBuilder as ByteStringBuilder
-
-renderOPB :: Formula -> String
-renderOPB opb = DList.apply (opbBuilder opb) ""
-
-renderWBO :: SoftFormula -> String
-renderWBO wbo = DList.apply (wboBuilder wbo) ""
-
-renderOPBByteString :: Formula -> BS.ByteString
-renderOPBByteString opb = Builder.toLazyByteString (ByteStringBuilder.opbBuilder opb)
-
-renderWBOByteString :: SoftFormula -> BS.ByteString
-renderWBOByteString wbo = Builder.toLazyByteString (ByteStringBuilder.wboBuilder wbo)
-
-writeOPBFile :: FilePath -> Formula -> IO ()
-writeOPBFile filepath opb = withBinaryFile filepath WriteMode $ \h -> do
-  hSetBuffering h (BlockBuffering Nothing)
-  hPutOPB h opb
-
-writeWBOFile :: FilePath -> SoftFormula -> IO ()
-writeWBOFile filepath wbo = withBinaryFile filepath WriteMode $ \h -> do
-  hSetBuffering h (BlockBuffering Nothing)
-  hPutWBO h wbo
-
--- It is recommended that the 'Handle' is set to binary and
--- 'BlockBuffering' mode. See 'hSetBinaryMode' and 'hSetBuffering'.
-hPutOPB :: Handle -> Formula -> IO ()
-hPutOPB h opb = Builder.hPutBuilder h (opbBuilder opb)
-
--- It is recommended that the 'Handle' is set to binary and
--- 'BlockBuffering' mode. See 'hSetBinaryMode' and 'hSetBuffering'.
-hPutWBO :: Handle -> SoftFormula -> IO ()
-hPutWBO h wbo = Builder.hPutBuilder h (wboBuilder wbo)
-
+import ToySolver.Text.PBFile.ByteStringBuilder as ByteStringBuilder
