@@ -57,7 +57,7 @@ module ToySolver.Text.PBFile
   ) where
 
 import Prelude hiding (sum)
-import ToySolver.Text.PBFile.Parsec
+import ToySolver.Text.PBFile.Parsec hiding (parseOPBByteString, parseWBOByteString)
 import ToySolver.Text.PBFile.Attoparsec hiding (parseOPBFile, parseWBOFile)
 import ToySolver.Text.PBFile.Types
 import ToySolver.Text.PBFile.Builder

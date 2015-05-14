@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, FlexibleContexts #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -7,7 +7,7 @@
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
--- Portability :  non-portable (BangPatterns)
+-- Portability :  non-portable (BangPatterns, FlexibleContexts)
 --
 -- A parser library for .opb file and .wbo files used by PB Competition.
 -- 
@@ -24,30 +24,33 @@ module ToySolver.Text.PBFile.Parsec
   -- * Parsing .opb files
     opbParser
   , parseOPBString
+  , parseOPBByteString
   , parseOPBFile
 
   -- * Parsing .wbo files
   , wboParser
   , parseWBOString
+  , parseWBOByteString
   , parseWBOFile
   ) where
 
 import Prelude hiding (sum)
 import Control.Monad
+import Data.ByteString.Lazy (ByteString)
 import Data.Maybe
 import Text.Parsec
-import Text.Parsec.String
+import qualified Text.Parsec.ByteString.Lazy as ParsecBS
 import ToySolver.Text.PBFile.Types
 import ToySolver.Internal.TextUtil
 
-opbParser :: Parser Formula
+opbParser :: Stream s m Char => ParsecT s u m Formula
 opbParser = formula
 
-wboParser :: Parser SoftFormula
+wboParser :: Stream s m Char => ParsecT s u m SoftFormula
 wboParser = softformula
 
 -- <formula>::= <sequence_of_comments> [<objective>] <sequence_of_comments_or_constraints>
-formula :: Parser Formula
+formula :: Stream s m Char => ParsecT s u m Formula
 formula = do
   h <- optionMaybe hint
   sequence_of_comments
@@ -61,7 +64,7 @@ formula = do
     , pbNumConstraints = fromMaybe (length cs) (fmap snd h)
     }
 
-hint :: Parser (Int,Int)
+hint :: Stream s m Char => ParsecT s u m (Int,Int)
 hint = try $ do
   _ <- char '*'
   zeroOrMoreSpace
@@ -76,29 +79,29 @@ hint = try $ do
   return (fromIntegral nv, fromIntegral nc)
 
 -- <sequence_of_comments>::= <comment> [<sequence_of_comments>]
-sequence_of_comments :: Parser ()
+sequence_of_comments :: Stream s m Char => ParsecT s u m ()
 sequence_of_comments = skipMany comment -- XXX: we allow empty sequence
 
 -- <comment>::= "*" <any_sequence_of_characters_other_than_EOL> <EOL>
-comment :: Parser ()
+comment :: Stream s m Char => ParsecT s u m ()
 comment = do
   _ <- char '*' 
   _ <- manyTill anyChar eol
   return ()
 
 -- <sequence_of_comments_or_constraints>::= <comment_or_constraint> [<sequence_of_comments_or_constraints>]
-sequence_of_comments_or_constraints :: Parser [Constraint]
+sequence_of_comments_or_constraints :: Stream s m Char => ParsecT s u m [Constraint]
 sequence_of_comments_or_constraints = do
   xs <- many1 comment_or_constraint
   return $ catMaybes xs
 
 -- <comment_or_constraint>::= <comment>|<constraint>
-comment_or_constraint :: Parser (Maybe Constraint)
+comment_or_constraint :: Stream s m Char => ParsecT s u m (Maybe Constraint)
 comment_or_constraint =
   (comment >> return Nothing) <|> (liftM Just constraint)
 
 -- <objective>::= "min:" <zeroOrMoreSpace> <sum> ";"
-objective :: Parser Sum
+objective :: Stream s m Char => ParsecT s u m Sum
 objective = do
   _ <- string "min:"
   zeroOrMoreSpace
@@ -108,7 +111,7 @@ objective = do
   return obj
 
 -- <constraint>::= <sum> <relational_operator> <zeroOrMoreSpace> <integer> <zeroOrMoreSpace> ";"
-constraint :: Parser Constraint
+constraint :: Stream s m Char => ParsecT s u m Constraint
 constraint = do
   lhs <- sum
   op <- relational_operator
@@ -119,11 +122,11 @@ constraint = do
   return (lhs, op, rhs)
 
 -- <sum>::= <weightedterm> | <weightedterm> <sum>
-sum :: Parser Sum
+sum :: Stream s m Char => ParsecT s u m Sum
 sum = many1 weightedterm
 
 -- <weightedterm>::= <integer> <oneOrMoreSpace> <term> <oneOrMoreSpace>
-weightedterm :: Parser WeightedTerm
+weightedterm :: Stream s m Char => ParsecT s u m WeightedTerm
 weightedterm = do
   w <- integer
   oneOrMoreSpace
@@ -132,7 +135,7 @@ weightedterm = do
   return (w,t)
 
 -- <integer>::= <unsigned_integer> | "+" <unsigned_integer> | "-" <unsigned_integer>
-integer :: Parser Integer
+integer :: Stream s m Char => ParsecT s u m Integer
 integer = msum
   [ unsigned_integer
   , char '+' >> unsigned_integer
@@ -140,34 +143,34 @@ integer = msum
   ]
 
 -- <unsigned_integer>::= <digit> | <digit><unsigned_integer>
-unsigned_integer :: Parser Integer
+unsigned_integer :: Stream s m Char => ParsecT s u m Integer
 unsigned_integer = do
   ds <- many1 digit
   return $! readUnsignedInteger ds
 
 -- <relational_operator>::= ">=" | "="
-relational_operator :: Parser Op
+relational_operator :: Stream s m Char => ParsecT s u m Op
 relational_operator = (string ">=" >> return Ge) <|> (string "=" >> return Eq)
 
 -- <variablename>::= "x" <unsigned_integer>
-variablename :: Parser Var
+variablename :: Stream s m Char => ParsecT s u m Var
 variablename = do
   _ <- char 'x'
   i <- unsigned_integer
   return $! fromIntegral i
 
 -- <oneOrMoreSpace>::= " " [<oneOrMoreSpace>]
-oneOrMoreSpace :: Parser ()
+oneOrMoreSpace :: Stream s m Char => ParsecT s u m ()
 oneOrMoreSpace  = skipMany1 (char ' ')
 
 -- <zeroOrMoreSpace>::= [" " <zeroOrMoreSpace>]
-zeroOrMoreSpace :: Parser ()
+zeroOrMoreSpace :: Stream s m Char => ParsecT s u m ()
 zeroOrMoreSpace = skipMany (char ' ')
 
-eol :: Parser ()
+eol :: Stream s m Char => ParsecT s u m ()
 eol = char '\n' >> return ()
 
-semi :: Parser ()
+semi :: Stream s m Char => ParsecT s u m ()
 semi = char ';' >> eol
 
 {-
@@ -177,11 +180,11 @@ For linear pseudo-Boolean instances, <term> is defined as
 For non-linear instances, <term> is defined as
 <term>::= <oneOrMoreLiterals>
 -}
-term :: Parser Term
+term :: Stream s m Char => ParsecT s u m Term
 term = oneOrMoreLiterals
 
 -- <oneOrMoreLiterals>::= <literal> | <literal> <oneOrMoreSpace> <oneOrMoreLiterals>
-oneOrMoreLiterals :: Parser [Lit]
+oneOrMoreLiterals :: Stream s m Char => ParsecT s u m [Lit]
 oneOrMoreLiterals = do
   l <- literal
   mplus (try $ oneOrMoreSpace >> liftM (l:) (oneOrMoreLiterals)) (return [l])
@@ -190,20 +193,24 @@ oneOrMoreLiterals = do
 -- But it's not the case here.
 
 -- <literal>::= <variablename> | "~"<variablename>
-literal :: Parser Lit
+literal :: Stream s m Char => ParsecT s u m Lit
 literal = variablename <|> (char '~' >> liftM negate variablename)
 
--- | Parse a .opb file containing pseudo boolean problem.
+-- | Parse a .opb format string containing pseudo boolean problem.
 parseOPBString :: SourceName -> String -> Either ParseError Formula
 parseOPBString = parse formula
 
--- | Parse a .opb format string containing pseudo boolean problem.
+-- | Parse a .opb format lazy bytestring containing pseudo boolean problem.
+parseOPBByteString :: SourceName -> ByteString -> Either ParseError Formula
+parseOPBByteString = parse formula
+
+-- | Parse a .opb file containing pseudo boolean problem.
 parseOPBFile :: FilePath -> IO (Either ParseError Formula)
-parseOPBFile = parseFromFile formula
+parseOPBFile = ParsecBS.parseFromFile formula
 
 
 -- <softformula>::= <sequence_of_comments> <softheader> <sequence_of_comments_or_constraints>
-softformula :: Parser SoftFormula
+softformula :: Stream s m Char => ParsecT s u m SoftFormula
 softformula = do
   h <- optionMaybe hint
   sequence_of_comments
@@ -218,7 +225,7 @@ softformula = do
     }
 
 -- <softheader>::= "soft:" [<unsigned_integer>] ";"
-softheader :: Parser (Maybe Integer)
+softheader :: Stream s m Char => ParsecT s u m (Maybe Integer)
 softheader = do
   _ <- string "soft:"
   zeroOrMoreSpace -- XXX
@@ -228,19 +235,19 @@ softheader = do
   return top
 
 -- <sequence_of_comments_or_constraints>::= <comment_or_constraint> [<sequence_of_comments_or_constraints>]
-wbo_sequence_of_comments_or_constraints :: Parser [SoftConstraint]
+wbo_sequence_of_comments_or_constraints :: Stream s m Char => ParsecT s u m [SoftConstraint]
 wbo_sequence_of_comments_or_constraints = do
   xs <- many1 wbo_comment_or_constraint
   return $ catMaybes xs
 
 -- <comment_or_constraint>::= <comment>|<constraint>|<softconstraint>
-wbo_comment_or_constraint :: Parser (Maybe SoftConstraint)
+wbo_comment_or_constraint :: Stream s m Char => ParsecT s u m (Maybe SoftConstraint)
 wbo_comment_or_constraint = (comment >> return Nothing) <|> m
   where
     m = liftM Just $ (constraint >>= \c -> return (Nothing, c)) <|> softconstraint
 
 -- <softconstraint>::= "[" <zeroOrMoreSpace> <unsigned_integer> <zeroOrMoreSpace> "]" <constraint>
-softconstraint :: Parser SoftConstraint
+softconstraint :: Stream s m Char => ParsecT s u m SoftConstraint
 softconstraint = do
   _ <- char '['
   zeroOrMoreSpace
@@ -251,10 +258,14 @@ softconstraint = do
   c <- constraint
   return (Just cost, c)
 
--- | Parse a .wbo file containing weighted boolean optimization problem.
+-- | Parse a .wbo format string containing weighted boolean optimization problem.
 parseWBOString :: SourceName -> String -> Either ParseError SoftFormula
 parseWBOString = parse softformula
 
--- | Parse a .wbo format string containing weighted boolean optimization problem.
+-- | Parse a .wbo format lazy bytestring containing pseudo boolean problem.
+parseWBOByteString :: SourceName -> ByteString -> Either ParseError SoftFormula
+parseWBOByteString = parse softformula
+
+-- | Parse a .wbo file containing weighted boolean optimization problem.
 parseWBOFile :: FilePath -> IO (Either ParseError SoftFormula)
-parseWBOFile = parseFromFile softformula
+parseWBOFile = ParsecBS.parseFromFile softformula
