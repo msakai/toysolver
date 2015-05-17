@@ -11,8 +11,12 @@
 -----------------------------------------------------------------------------
 
 module ToySolver.Text.PBFile.Builder
-  ( opbBuilder
+  (
+  -- * Builder for String-like Monoid
+    opbBuilder
   , wboBuilder
+
+  -- * String generation
   , toOPBString
   , toWBOString
   ) where
@@ -24,6 +28,7 @@ import Data.String
 import Text.Printf
 import ToySolver.Text.PBFile.Types
 
+-- | A builder which renders a OPB format in any String-like 'Monoid'.
 opbBuilder :: (Monoid a, IsString a) => Formula -> a
 opbBuilder opb = (size <> part1 <> part2)
   where
@@ -36,6 +41,7 @@ opbBuilder opb = (size <> part1 <> part2)
         Just o -> fromString "min: " <> showSum o <> fromString ";\n"
     part2 = mconcat $ map showConstraint (pbConstraints opb)
 
+-- | A builder which renders a WBO format in any String-like 'Monoid'.
 wboBuilder :: (Monoid a, IsString a) => SoftFormula -> a
 wboBuilder wbo = size <> part1 <> part2
   where
@@ -76,8 +82,10 @@ showSoftConstraint (cost, constr) =
     Just c -> fromString "[" <> fromString (show c) <> fromString "] " <> showConstraint constr
 
 
+-- | Generate a OPB format string containing pseudo boolean problem.
 toOPBString :: Formula -> String
 toOPBString opb = DList.apply (opbBuilder opb) ""
 
+-- | Generate a WBO format string containing weighted boolean optimization problem.
 toWBOString :: SoftFormula -> String
 toWBOString wbo = DList.apply (wboBuilder wbo) ""

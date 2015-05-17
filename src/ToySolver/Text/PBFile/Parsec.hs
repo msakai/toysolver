@@ -9,7 +9,7 @@
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Portability :  non-portable (BangPatterns, FlexibleContexts)
 --
--- A parser library for .opb file and .wbo files used by PB Competition.
+-- A parser library for OPB file and WBO files used in pseudo boolean competition.
 -- 
 -- References:
 --
@@ -21,13 +21,13 @@
 
 module ToySolver.Text.PBFile.Parsec
   (
-  -- * Parsing .opb files
+  -- * Parsing OPB files
     opbParser
   , parseOPBString
   , parseOPBByteString
   , parseOPBFile
 
-  -- * Parsing .wbo files
+  -- * Parsing WBO files
   , wboParser
   , parseWBOString
   , parseWBOByteString
@@ -196,15 +196,15 @@ oneOrMoreLiterals = do
 literal :: Stream s m Char => ParsecT s u m Lit
 literal = variablename <|> (char '~' >> liftM negate variablename)
 
--- | Parse a .opb format string containing pseudo boolean problem.
+-- | Parse a OPB format string containing pseudo boolean problem.
 parseOPBString :: SourceName -> String -> Either ParseError Formula
 parseOPBString = parse formula
 
--- | Parse a .opb format lazy bytestring containing pseudo boolean problem.
+-- | Parse a OPB format lazy bytestring containing pseudo boolean problem.
 parseOPBByteString :: SourceName -> ByteString -> Either ParseError Formula
 parseOPBByteString = parse formula
 
--- | Parse a .opb file containing pseudo boolean problem.
+-- | Parse a OPB file containing pseudo boolean problem.
 parseOPBFile :: FilePath -> IO (Either ParseError Formula)
 parseOPBFile = ParsecBS.parseFromFile formula
 
@@ -258,14 +258,14 @@ softconstraint = do
   c <- constraint
   return (Just cost, c)
 
--- | Parse a .wbo format string containing weighted boolean optimization problem.
+-- | Parse a WBO format string containing weighted boolean optimization problem.
 parseWBOString :: SourceName -> String -> Either ParseError SoftFormula
 parseWBOString = parse softformula
 
--- | Parse a .wbo format lazy bytestring containing pseudo boolean problem.
+-- | Parse a WBO format lazy bytestring containing pseudo boolean problem.
 parseWBOByteString :: SourceName -> ByteString -> Either ParseError SoftFormula
 parseWBOByteString = parse softformula
 
--- | Parse a .wbo file containing weighted boolean optimization problem.
+-- | Parse a WBO file containing weighted boolean optimization problem.
 parseWBOFile :: FilePath -> IO (Either ParseError SoftFormula)
 parseWBOFile = ParsecBS.parseFromFile softformula

@@ -1,17 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wall #-}
 module Main (main) where
 
-import Control.Monad
-import Data.List
-import Data.Maybe
 import qualified Data.ByteString.Lazy.Char8 as BSChar8
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
 import Test.Tasty.TH
 import ToySolver.Text.PBFile
-import ToySolver.Text.PBFile.Builder
-import qualified ToySolver.Text.PBFile.ByteStringBuilder as ByteStringBuilder
+import qualified ToySolver.Text.PBFile.Attoparsec as A
 
 case_exampleLIN  = checkOPBString "exampleLIN"  exampleLIN
 case_exampleNLC1 = checkOPBString "exampleNLC1" exampleNLC1
@@ -120,7 +117,10 @@ checkOPBString name str = do
       case parseOPBString name s of
         Left err -> assertFailure $ show err
         Right opb2 -> opb2 @?= opb
-      case parseOPBByteString bs of
+      case parseOPBByteString name bs of
+        Left err -> assertFailure $ show err
+        Right opb2 -> opb2 @?= opb
+      case A.parseOPBByteString bs of
         Left err -> assertFailure err
         Right opb2 -> opb2 @?= opb
 
@@ -142,7 +142,10 @@ checkWBOString name str = do
       case parseWBOString name s of
         Left err -> assertFailure $ show err
         Right wbo2 -> wbo2 @?= wbo
-      case parseWBOByteString bs of
+      case parseWBOByteString name bs of
+        Left err -> assertFailure $ show err
+        Right wbo2 -> wbo2 @?= wbo
+      case A.parseWBOByteString bs of
         Left err -> assertFailure err
         Right wbo2 -> wbo2 @?= wbo
 

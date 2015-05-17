@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, DeriveDataTypeable, DeriveGeneric #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -7,9 +7,7 @@
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
--- Portability :  non-portable (BangPatterns)
---
--- A parser library for .opb file and .wbo files used by PB Competition.
+-- Portability :  non-portable (BangPatterns, DeriveDataTypeable, DeriveGeneric)
 -- 
 -- References:
 --
@@ -38,6 +36,10 @@ module ToySolver.Text.PBFile.Types
   , wboComputeNumVars
   ) where
 
+import GHC.Generics (Generic)
+import Control.DeepSeq
+import Data.Data
+import Data.Hashable
 import Data.Maybe
 
 -- | Pair of /objective function/ and a list of constraints.
@@ -48,7 +50,10 @@ data Formula
   , pbNumVars :: !Int
   , pbNumConstraints :: !Int
   }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Typeable, Data, Generic)
+
+instance NFData Formula
+instance Hashable Formula
 
 -- | Lhs, relational operator and rhs.
 type Constraint = (Sum, Op, Integer)
@@ -57,7 +62,10 @@ type Constraint = (Sum, Op, Integer)
 data Op
   = Ge -- ^ /greater than or equal/
   | Eq -- ^ /equal/
-  deriving (Eq, Ord, Show, Enum, Bounded)
+  deriving (Eq, Ord, Show, Enum, Bounded, Typeable, Data, Generic)
+
+instance NFData Op
+instance Hashable Op
 
 -- | A pair of /top cost/ and a list of soft constraints.
 data SoftFormula
@@ -67,7 +75,10 @@ data SoftFormula
   , wboNumVars :: !Int
   , wboNumConstraints :: !Int
   }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Typeable, Data, Generic)
+
+instance NFData SoftFormula
+instance Hashable SoftFormula
 
 -- | A pair of weight and constraint.
 type SoftConstraint = (Maybe Integer, Constraint)

@@ -7,9 +7,9 @@
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
--- Portability :  non-portable (BangPatterns)
+-- Portability :  non-portable (BangPatterns, OverloadedStrings)
 --
--- A parser library for .opb file and .wbo files used by PB Competition.
+-- A parser library for OPB\/WBO files used in pseudo boolean competition.
 -- 
 -- References:
 --
@@ -21,12 +21,12 @@
 
 module ToySolver.Text.PBFile.Attoparsec
   (
-  -- * Parsing .opb files
+  -- * Parsing OPB files
     opbParser
   , parseOPBByteString
   , parseOPBFile
 
-  -- * Parsing .wbo files
+  -- * Parsing WBO files
   , wboParser
   , parseWBOByteString
   , parseWBOFile
@@ -44,9 +44,11 @@ import Data.Maybe
 import ToySolver.Text.PBFile.Types
 import ToySolver.Internal.TextUtil
 
+-- | Parser for OPB files
 opbParser :: Parser Formula
 opbParser = formula
 
+-- | Parser for WBO files
 wboParser :: Parser SoftFormula
 wboParser = softformula
 
@@ -197,11 +199,11 @@ oneOrMoreLiterals = do
 literal :: Parser Lit
 literal = variablename <|> (char '~' >> liftM negate variablename)
 
--- | Parse a .opb format string containing pseudo boolean problem.
+-- | Parse a OPB format string containing pseudo boolean problem.
 parseOPBByteString :: BSLazy.ByteString -> Either String Formula
 parseOPBByteString s = L.eitherResult $ L.parse formula s
 
--- | Parse a .opb file containing pseudo boolean problem.
+-- | Parse a OPB file containing pseudo boolean problem.
 parseOPBFile :: FilePath -> IO (Either String Formula)
 parseOPBFile fname = do
   s <- BSLazy.readFile fname
@@ -256,11 +258,11 @@ softconstraint = do
   c <- constraint
   return (Just cost, c)
 
--- | Parse a .wbo format string containing weighted boolean optimization problem.
+-- | Parse a WBO format string containing weighted boolean optimization problem.
 parseWBOByteString :: BSLazy.ByteString -> Either String SoftFormula
 parseWBOByteString s = L.eitherResult $ L.parse softformula s
 
--- | Parse a .wbo file containing weighted boolean optimization problem.
+-- | Parse a WBO file containing weighted boolean optimization problem.
 parseWBOFile :: FilePath -> IO (Either String SoftFormula)
 parseWBOFile fname = do
   s <- BSLazy.readFile fname

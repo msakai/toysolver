@@ -140,9 +140,11 @@ writePBFile o pb = do
         }
   case head ([Just fname | Output fname <- o] ++ [Nothing]) of
     Nothing -> do
+      hSetBinaryMode stdout True
+      hSetBuffering stdout (BlockBuffering Nothing)
       case pb of
-        Left opb  -> putStr $ PBFile.toOPBString opb
-        Right wbo -> putStr $ PBFile.toWBOString wbo
+        Left opb  -> PBFile.hPutOPB stdout opb
+        Right wbo -> PBFile.hPutWBO stdout wbo
     Just fname -> do
       let opb = case pb of
                   Left opb  -> opb

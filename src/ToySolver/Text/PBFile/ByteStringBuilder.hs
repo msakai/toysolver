@@ -11,10 +11,16 @@
 -----------------------------------------------------------------------------
 
 module ToySolver.Text.PBFile.ByteStringBuilder
-  ( opbBuilder
+  (
+  -- * Builder for (Lazy) ByteString generation
+    opbBuilder
   , wboBuilder
+
+  -- * Lazy ByteString generation
   , toOPBByteString
   , toWBOByteString
+
+  -- * File I/O
   , writeOPBFile
   , writeWBOFile
   , hPutOPB
@@ -28,6 +34,7 @@ import Data.ByteString.Builder (Builder, intDec, integerDec, char7, string7, hPu
 import System.IO
 import ToySolver.Text.PBFile.Types
 
+-- | A ByteString Builder which renders a OPB format byte-string containing pseudo boolean problem.
 opbBuilder :: Formula -> Builder
 opbBuilder opb = (size <> part1 <> part2)
   where
@@ -40,6 +47,7 @@ opbBuilder opb = (size <> part1 <> part2)
         Just o -> string7 "min: " <> showSum o <> string7 ";\n"
     part2 = mconcat $ map showConstraint (pbConstraints opb)
 
+-- | A ByteString Builder which renders a WBO format byte-string containing weighted boolean optimization problem.
 wboBuilder :: SoftFormula -> Builder
 wboBuilder wbo = size <> part1 <> part2
   where
@@ -81,29 +89,43 @@ showSoftConstraint (cost, constr) =
 
 
 
-
+-- | Generate a OPB format byte-string containing pseudo boolean problem.
 toOPBByteString :: Formula -> BS.ByteString
 toOPBByteString opb = toLazyByteString (opbBuilder opb)
 
+-- | Generate a WBO format byte-string containing weighted boolean optimization problem.
 toWBOByteString :: SoftFormula -> BS.ByteString
 toWBOByteString wbo = toLazyByteString (wboBuilder wbo)
 
+-- | Output a OPB file containing pseudo boolean problem.
 writeOPBFile :: FilePath -> Formula -> IO ()
 writeOPBFile filepath opb = withBinaryFile filepath WriteMode $ \h -> do
   hSetBuffering h (BlockBuffering Nothing)
   hPutOPB h opb
 
+-- | Output a WBO file containing weighted boolean optimization problem.
 writeWBOFile :: FilePath -> SoftFormula -> IO ()
 writeWBOFile filepath wbo = withBinaryFile filepath WriteMode $ \h -> do
   hSetBuffering h (BlockBuffering Nothing)
   hPutWBO h wbo
 
+-- | Output a OPB file to a 'Handle' using 'hPutBuilder'.
+--
 -- It is recommended that the 'Handle' is set to binary and
 -- 'BlockBuffering' mode. See 'hSetBinaryMode' and 'hSetBuffering'.
+--
+-- This function is more efficient than 'hPut' . 'toOPBByteString'
+-- because in many cases no buffer allocation has to be done.
 hPutOPB :: Handle -> Formula -> IO ()
 hPutOPB h opb = hPutBuilder h (opbBuilder opb)
 
+
+-- | Output a WBO file to a 'Handle' using 'hPutBuilder'.
+--
 -- It is recommended that the 'Handle' is set to binary and
 -- 'BlockBuffering' mode. See 'hSetBinaryMode' and 'hSetBuffering'.
+--
+-- This function is more efficient than 'hPut' . 'toWBOByteString'
+-- because in many cases no buffer allocation has to be done.
 hPutWBO :: Handle -> SoftFormula -> IO ()
 hPutWBO h wbo = hPutBuilder h (wboBuilder wbo)

@@ -500,7 +500,7 @@ newSolver opts = do
 mainSAT :: Options -> SAT.Solver -> [String] -> IO ()
 mainSAT opt solver args = do
   ret <- case args of
-           ["-"]   -> fmap (DIMACS.parseByteString "-") $ BS.hGetContents stdin
+           ["-"]   -> liftM (DIMACS.parseByteString "-") $ BS.hGetContents stdin
            [fname] -> DIMACS.parseFile fname
            _ -> showHelp stderr >> exitFailure
   case ret of
@@ -607,7 +607,7 @@ solveMUS opt solver gcnf = do
 mainPB :: Options -> SAT.Solver -> [String] -> IO ()
 mainPB opt solver args = do
   ret <- case args of
-           ["-"]   -> fmap (PBFile.parseOPBString "-") $ hGetContents stdin
+           ["-"]   -> liftM (PBFile.parseOPBByteString "-") $ BS.hGetContents stdin
            [fname] -> PBFile.parseOPBFile fname
            _ -> showHelp stderr >> exitFailure
   case ret of
@@ -697,7 +697,7 @@ setupOptimizer pbo opt = do
 mainWBO :: Options -> SAT.Solver -> [String] -> IO ()
 mainWBO opt solver args = do
   ret <- case args of
-           ["-"]   -> fmap (PBFile.parseWBOString "-") $ hGetContents stdin
+           ["-"]   -> liftM (PBFile.parseWBOByteString "-") $ BS.hGetContents stdin
            [fname] -> PBFile.parseWBOFile fname
            _ -> showHelp stderr >> exitFailure
   case ret of

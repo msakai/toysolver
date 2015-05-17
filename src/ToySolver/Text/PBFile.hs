@@ -9,7 +9,7 @@
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Portability :  non-portable (BangPatterns)
 --
--- A parser library for .opb file and .wbo files used by PB Competition.
+-- A library for parsing\/generating OPB\/WBO files used in pseudo boolean competition.
 -- 
 -- References:
 --
@@ -33,32 +33,30 @@ module ToySolver.Text.PBFile
   , Lit
   , Var
 
-  -- * Parsing .opb files
+  -- * Parsing OPB files
   , parseOPBString
   , parseOPBByteString
   , parseOPBFile
 
-  -- * Parsing .wbo files
+  -- * Parsing WBO files
   , parseWBOString
   , parseWBOByteString
   , parseWBOFile
 
-  -- * Show .opb files
+  -- * Generating OPB files
   , toOPBString
   , toOPBByteString
   , writeOPBFile
   , hPutOPB
 
-  -- * Show .wbo files
+  -- * Generating WBO files
   , toWBOString
   , toWBOByteString
   , writeWBOFile
   , hPutWBO
   ) where
 
-import Prelude hiding (sum)
-import ToySolver.Text.PBFile.Parsec hiding (parseOPBByteString, parseWBOByteString)
-import ToySolver.Text.PBFile.Attoparsec hiding (parseOPBFile, parseWBOFile)
+import ToySolver.Text.PBFile.Parsec
 import ToySolver.Text.PBFile.Types
 import ToySolver.Text.PBFile.Builder
 import ToySolver.Text.PBFile.ByteStringBuilder as ByteStringBuilder
