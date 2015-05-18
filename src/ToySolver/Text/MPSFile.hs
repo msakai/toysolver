@@ -54,17 +54,17 @@ type Column = MIP.Var
 type Row = InternedString
 
 data BoundType
-  = LO	-- lower bound
-  | UP	-- upper bound
-  | FX	-- variable is fixed at the specified value
-  | FR	-- free variable (no lower or upper bound)
-  | MI	-- infinite lower bound
-  | PL	-- infinite upper bound
-  | BV	-- variable is binary (equal 0 or 1)
-  | LI	-- lower bound for integer variable
-  | UI	-- upper bound for integer variable
-  | SC	-- upper bound for semi-continuous variable
-  | SI	-- upper bound for semi-integer variable
+  = LO  -- lower bound
+  | UP  -- upper bound
+  | FX  -- variable is fixed at the specified value
+  | FR  -- free variable (no lower or upper bound)
+  | MI  -- infinite lower bound
+  | PL  -- infinite upper bound
+  | BV  -- variable is binary (equal 0 or 1)
+  | LI  -- lower bound for integer variable
+  | UI  -- upper bound for integer variable
+  | SC  -- upper bound for semi-continuous variable
+  | SI  -- upper bound for semi-integer variable
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 -- ---------------------------------------------------------------------------
