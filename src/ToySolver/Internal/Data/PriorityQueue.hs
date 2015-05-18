@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, BangPatterns #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, BangPatterns, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, BangPatterns)
+-- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, BangPatterns, ScopedTypeVariables)
 --
 -- Priority queue implemented as array-based binary heap.
 --
@@ -103,6 +103,7 @@ instance Dequeue (PriorityQueue a) IO a where
 
   dequeueBatch q = go []
     where
+      go :: [a] -> IO [a]
       go xs = do
         r <- dequeue q
         case r of

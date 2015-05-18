@@ -284,7 +284,8 @@ flatten c =
     gensym :: M Var
     gensym = do
       (vs, n, ls) <- get
-      let go m = do
+      let go :: Int -> M Var
+          go m = do
             let v = "#" ++ show m
             if v `Set.member` vs
               then go (m+1)

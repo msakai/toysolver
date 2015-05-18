@@ -570,7 +570,8 @@ type UPolynomial r = Polynomial r X
 data X = X
   deriving (Eq, Ord, Bounded, Enum, Show, Read, Typeable, Data)
 
-instance NFData X
+instance NFData X where
+   rnf a = a `seq` ()
 
 instance Hashable X where
   hashWithSalt = hashUsing fromEnum

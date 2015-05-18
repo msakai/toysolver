@@ -156,6 +156,7 @@ instance Dequeue PriorityQueue IO Value where
 
   dequeueBatch q = go []
     where
+      go :: [Value] -> IO [Value]
       go xs = do
         r <- dequeue q
         case r of

@@ -99,7 +99,7 @@ optimize optdir obj cs ivs =
               Nothing -> OptUnsat
               Just _ -> Unbounded        
     Right (node0, ivs2) -> 
-      case traverse optdir obj ivs2 node0 of
+      case traverseBBTree optdir obj ivs2 node0 of
         Left ErrUnbounded -> error "shoud not happen"
         Left ErrUnsat -> OptUnsat
         Right node -> flip evalState (ndSolver node) $ do
@@ -147,8 +147,8 @@ mkInitialNode optdir obj cs ivs =
 isStrictlyBetter :: RealFrac r => OptDir -> r -> r -> Bool
 isStrictlyBetter optdir = if optdir==OptMin then (<) else (>)
 
-traverse :: forall r. RealFrac r => OptDir -> LA.Expr r -> VarSet -> Node r -> Either Err (Node r)
-traverse optdir obj ivs node0 = loop [node0] Nothing
+traverseBBTree :: forall r. RealFrac r => OptDir -> LA.Expr r -> VarSet -> Node r -> Either Err (Node r)
+traverseBBTree optdir obj ivs node0 = loop [node0] Nothing
   where
     loop :: [Node r] -> Maybe (Node r) -> Either Err (Node r)
     loop [] (Just best) = Right best

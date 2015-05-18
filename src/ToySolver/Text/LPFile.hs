@@ -364,7 +364,7 @@ qexpr = do
   ts <- many (qterm False)
   tok (char ']')
   -- Gurobi allows ommiting "/2"
-  (do mapM_ (tok . char) "/2"
+  (do mapM_ (tok . char) ("/2" :: String) -- Explicit type signature is necessary because the type of mapM_ in GHC-7.10 is generalized for arbitrary Foldable
       return [MIP.Term (r / 2) vs | MIP.Term r vs <- t:ts])
    <|> return (t:ts)
 

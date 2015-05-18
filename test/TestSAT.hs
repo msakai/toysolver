@@ -858,6 +858,7 @@ case_evalFormula = do
   let f = (x1 .=>. x3 .&&. x4) .||. (x2 .=>. x3 .&&. x5)
         where
           [x1,x2,x3,x4,x5] = map Atom xs
+      g :: Model -> Bool
       g m = (not x1 || (x3 && x4)) || (not x2 || (x3 && x5))
         where
           [x1,x2,x3,x4,x5] = elems m
