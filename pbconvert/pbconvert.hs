@@ -26,6 +26,7 @@ import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.PBFile as PBFile
+import qualified ToySolver.Text.PBFile.Attoparsec as PBFileAttoparsec
 import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.SAT2PB as SAT2PB
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
@@ -101,14 +102,14 @@ readPBFile o fname = do
             Right cnf -> return $ Left $ SAT2PB.convert cnf
     ".wcnf" -> readWCNF
     ".opb"  -> do
-      ret <- PBFile.parseOPBFile fname
+      ret <- PBFileAttoparsec.parseOPBFile fname
       case ret of
-        Left err -> hPrint stderr err >> exitFailure
+        Left err -> hPutStrLn stderr err >> exitFailure
         Right opb -> return $ Left opb
     ".wbo"  -> do
-      ret <- PBFile.parseWBOFile fname
+      ret <- PBFileAttoparsec.parseWBOFile fname
       case ret of
-        Left err -> hPrint stderr err >> exitFailure
+        Left err -> hPutStrLn stderr err >> exitFailure
         Right wbo -> return $ Right wbo
     ext ->
       error $ "unknown file extension: " ++ show ext

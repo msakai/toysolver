@@ -5,12 +5,13 @@ import Data.Array.IArray
 import System.Environment
 import Text.Printf
 import qualified ToySolver.Text.PBFile as PBFile
+import qualified ToySolver.Text.PBFile.Attoparsec as PBFileAttoparsec
 import ToySolver.SAT.Types
 
 main :: IO ()
 main = do
   [problemFile, modelFile] <- getArgs
-  Right formula <- PBFile.parseOPBFile problemFile
+  Right formula <- PBFileAttoparsec.parseOPBFile problemFile
   model <- liftM readModel (readFile modelFile)
   forM_ (PBFile.pbConstraints formula) $ \c ->
     unless (eval model c) $

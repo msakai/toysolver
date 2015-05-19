@@ -53,6 +53,7 @@ import qualified ToySolver.Arith.MIPSolver2 as MIPSolver2
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
 import qualified ToySolver.Text.PBFile as PBFile
+import qualified ToySolver.Text.PBFile.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GurobiSol as GurobiSol
 import qualified ToySolver.Converter.SAT2IP as SAT2IP
@@ -404,9 +405,9 @@ main = do
                 satPrintModel stdout m2 0
                 writeSOLFileSAT o m2
         ModePB -> do
-          ret <- PBFile.parseOPBFile fname
+          ret <- PBFileAttoparsec.parseOPBFile fname
           case ret of
-            Left err -> hPrint stderr err >> exitFailure
+            Left err -> hPutStrLn stderr err >> exitFailure
             Right pb -> do
               let (mip,mtrans) = PB2IP.convert pb
               run (getSolver o) o mip $ \m -> do
@@ -414,9 +415,9 @@ main = do
                 pbPrintModel stdout m2 0
                 writeSOLFileSAT o m2
         ModeWBO -> do
-          ret <- PBFile.parseWBOFile fname
+          ret <- PBFileAttoparsec.parseWBOFile fname
           case ret of
-            Left err -> hPrint stderr err >> exitFailure
+            Left err -> hPutStrLn stderr err >> exitFailure
             Right wbo -> do
               let (mip,mtrans) = PB2IP.convertWBO False wbo
               run (getSolver o) o mip $ \m -> do
