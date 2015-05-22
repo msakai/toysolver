@@ -30,7 +30,6 @@ import System.IO
 import Text.Printf
 
 import qualified ToySolver.Data.MIP as MIP
-import qualified ToySolver.Text.LPFile as LPFile
 import ToySolver.Internal.Util (showRationalAsFiniteDecimal, isInteger)
 
 data Options
@@ -384,7 +383,7 @@ isInt mip v = vt == MIP.IntegerVariable || vt == MIP.SemiIntegerVariable
 
 testFile :: FilePath -> IO ()
 testFile fname = do
-  result <- LPFile.parseFile fname
+  result <- MIP.readLPFile fname
   case result of
     Right mip -> putStrLn $ convert def mip ""
     Left err -> hPrint stderr err
@@ -393,7 +392,7 @@ test :: IO ()
 test = putStrLn $ convert def testdata ""
 
 testdata :: MIP.Problem
-Right testdata = LPFile.parseString "test" $ unlines
+Right testdata = MIP.parseLPString "test" $ unlines
   [ "Maximize"
   , " obj: x1 + 2 x2 + 3 x3 + x4"
   , "Subject To"

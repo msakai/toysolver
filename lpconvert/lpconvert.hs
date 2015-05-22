@@ -24,7 +24,6 @@ import System.Console.GetOpt
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 import qualified ToySolver.Data.MIP as MIP
-import qualified ToySolver.Text.LPFile as LPFile
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.PBFile as PBFile
 import ToySolver.Converter.ObjType
@@ -159,7 +158,7 @@ writeLP o mip = do
 
   case head ([Just fname | Output fname <- o] ++ [Nothing]) of
     Nothing -> 
-      case LPFile.render mip of
+      case MIP.toLPString mip of
         Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
         Right s -> putStr s
     Just fname -> do

@@ -74,8 +74,6 @@ import qualified ToySolver.SAT.MUS.DAA as DAA
 import ToySolver.SAT.Printer
 import qualified ToySolver.Text.PBFile as PBFile
 import qualified ToySolver.Text.PBFile.Attoparsec as PBFileAttoparsec
-import qualified ToySolver.Text.LPFile as LPFile
-import qualified ToySolver.Text.MPSFile as MPSFile
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GCNF as GCNF
 import qualified ToySolver.Text.GurobiSol as GurobiSol
@@ -824,10 +822,10 @@ mainMIP opt solver args = do
     case args of
       [fname@"-"]   -> do
         s <- hGetContents stdin
-        case LPFile.parseString fname s of
+        case MIP.parseLPString fname s of
           Right mip -> return mip
           Left err ->
-            case MPSFile.parseString fname s of
+            case MIP.parseMPSString fname s of
               Right mip -> return mip
               Left err2 -> do
                 hPrint stderr err

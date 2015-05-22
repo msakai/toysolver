@@ -17,9 +17,13 @@ module ToySolver.Data.MIP
   , readFile
   , readLPFile
   , readMPSFile
+  , parseLPString
+  , parseMPSString
   , writeFile
   , writeLPFile
   , writeMPSFile
+  , toLPString
+  , toMPSString
   ) where
 
 import Prelude hiding (readFile, writeFile)
@@ -48,6 +52,14 @@ readLPFile = LPFile.parseFile
 readMPSFile :: FilePath -> IO (Either ParseError Problem)
 readMPSFile = MPSFile.parseFile
 
+-- | Parse a string containing LP file data.
+parseLPString :: SourceName -> String -> Either ParseError Problem
+parseLPString = LPFile.parseString
+
+-- | Parse a string containing MPS file data.
+parseMPSString :: SourceName -> String -> Either ParseError Problem
+parseMPSString = MPSFile.parseString
+
 writeFile :: FilePath -> Problem -> IO ()
 writeFile fname prob =
   case map toLower (takeExtension fname) of
@@ -66,3 +78,9 @@ writeMPSFile fname prob =
   case MPSFile.render prob of
     Left err -> ioError $ userError err
     Right s -> P.writeFile fname s
+
+toLPString :: Problem -> Either String String
+toLPString = LPFile.render
+
+toMPSString :: Problem -> Either String String
+toMPSString = MPSFile.render
