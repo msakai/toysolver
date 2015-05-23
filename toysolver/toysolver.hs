@@ -45,6 +45,8 @@ import qualified ToySolver.Data.LA.FOL as LAFOL
 import qualified ToySolver.Data.Polynomial as P
 import qualified ToySolver.Data.AlgebraicNumber.Real as AReal
 import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.Data.PseudoBoolean as PBFile
+import qualified ToySolver.Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Arith.OmegaTest as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
 import qualified ToySolver.Arith.MIPSolverHL as MIPSolverHL
@@ -52,8 +54,6 @@ import qualified ToySolver.Arith.Simplex2 as Simplex2
 import qualified ToySolver.Arith.MIPSolver2 as MIPSolver2
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
-import qualified ToySolver.Text.PBFile as PBFile
-import qualified ToySolver.Text.PBFile.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GurobiSol as GurobiSol
 import qualified ToySolver.Converter.SAT2IP as SAT2IP

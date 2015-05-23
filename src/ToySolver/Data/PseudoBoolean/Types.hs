@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Text.PBFile.Types
+-- Module      :  ToySolver.Data.PseudoBoolean.Types
 -- Copyright   :  (c) Masahiro Sakai 2011-2015
 -- License     :  BSD-style
 -- 
@@ -17,7 +17,7 @@
 --
 -----------------------------------------------------------------------------
 
-module ToySolver.Text.PBFile.Types
+module ToySolver.Data.PseudoBoolean.Types
   (
   -- * Abstract Syntax
     Formula (..)

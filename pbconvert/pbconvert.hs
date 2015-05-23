@@ -24,9 +24,9 @@ import System.Console.GetOpt
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.Data.PseudoBoolean as PBFile
+import qualified ToySolver.Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Text.MaxSAT as MaxSAT
-import qualified ToySolver.Text.PBFile as PBFile
-import qualified ToySolver.Text.PBFile.Attoparsec as PBFileAttoparsec
 import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.SAT2PB as SAT2PB
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT

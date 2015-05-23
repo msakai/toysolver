@@ -14,7 +14,7 @@ module ToySolver.Converter.MaxSAT2NLPB
   ( convert
   ) where
 
-import qualified ToySolver.Text.PBFile as PBFile
+import qualified ToySolver.Data.PseudoBoolean as PBFile
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 
 convert :: MaxSAT.WCNF -> PBFile.Formula

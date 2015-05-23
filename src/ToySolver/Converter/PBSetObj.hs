@@ -15,7 +15,7 @@ module ToySolver.Converter.PBSetObj
   , setObj
   ) where
 
-import qualified ToySolver.Text.PBFile as PBFile
+import qualified ToySolver.Data.PseudoBoolean as PBFile
 import ToySolver.Converter.ObjType
 
 setObj :: ObjType -> PBFile.Formula -> PBFile.Formula

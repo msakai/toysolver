@@ -219,6 +219,11 @@ Library
      ToySolver.Data.Polynomial.Factorization.Zassenhaus
      ToySolver.Data.Polynomial.GroebnerBasis
      ToySolver.Data.Polynomial.Interpolation.Lagrange
+     ToySolver.Data.PseudoBoolean
+     ToySolver.Data.PseudoBoolean.Builder
+     ToySolver.Data.PseudoBoolean.ByteStringBuilder
+     ToySolver.Data.PseudoBoolean.Parsec
+     ToySolver.Data.PseudoBoolean.Attoparsec
      ToySolver.Data.Var
      ToySolver.SAT
      ToySolver.SAT.Integer
@@ -242,11 +247,6 @@ Library
      ToySolver.Text.GCNF
      ToySolver.Text.GurobiSol
      ToySolver.Text.MaxSAT
-     ToySolver.Text.PBFile
-     ToySolver.Text.PBFile.Builder
-     ToySolver.Text.PBFile.ByteStringBuilder
-     ToySolver.Text.PBFile.Parsec
-     ToySolver.Text.PBFile.Attoparsec
      ToySolver.Text.SDPFile
      ToySolver.Internal.Data.IndexedPriorityQueue
      ToySolver.Internal.Data.IOURef
@@ -261,7 +261,7 @@ Library
   Other-Modules:
      ToySolver.Data.AlgebraicNumber.Graeffe
      ToySolver.Data.Polynomial.Base
-     ToySolver.Text.PBFile.Types
+     ToySolver.Data.PseudoBoolean.Types
      Paths_toysolver
   -- GHC-Prof-Options: -auto-all
 

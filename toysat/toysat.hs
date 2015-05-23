@@ -60,6 +60,8 @@ import qualified GHC.Stats as Stats
 
 import ToySolver.Data.ArithRel
 import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.Data.PseudoBoolean as PBFile
+import qualified ToySolver.Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
@@ -72,8 +74,6 @@ import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import ToySolver.SAT.Printer
-import qualified ToySolver.Text.PBFile as PBFile
-import qualified ToySolver.Text.PBFile.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GCNF as GCNF
 import qualified ToySolver.Text.GurobiSol as GurobiSol

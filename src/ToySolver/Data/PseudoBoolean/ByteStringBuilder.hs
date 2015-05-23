@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Text.PBFile.ByteStringBuilder
+-- Module      :  ToySolver.Data.PseudoBoolean.ByteStringBuilder
 -- Copyright   :  (c) Masahiro Sakai 2011-2015
 -- License     :  BSD-style
 -- 
@@ -10,7 +10,7 @@
 --
 -----------------------------------------------------------------------------
 
-module ToySolver.Text.PBFile.ByteStringBuilder
+module ToySolver.Data.PseudoBoolean.ByteStringBuilder
   (
   -- * Builder for (Lazy) ByteString generation
     opbBuilder
@@ -32,7 +32,7 @@ import Data.Monoid hiding (Sum (..))
 import qualified Data.ByteString.Lazy as BS
 import Data.ByteString.Builder (Builder, intDec, integerDec, char7, string7, hPutBuilder, toLazyByteString)
 import System.IO
-import ToySolver.Text.PBFile.Types
+import ToySolver.Data.PseudoBoolean.Types
 
 -- | A ByteString Builder which renders a OPB format byte-string containing pseudo boolean problem.
 opbBuilder :: Formula -> Builder

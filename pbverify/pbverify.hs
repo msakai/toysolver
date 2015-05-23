@@ -4,8 +4,8 @@ import Control.Monad
 import Data.Array.IArray
 import System.Environment
 import Text.Printf
-import qualified ToySolver.Text.PBFile as PBFile
-import qualified ToySolver.Text.PBFile.Attoparsec as PBFileAttoparsec
+import qualified ToySolver.Data.PseudoBoolean as PBFile
+import qualified ToySolver.Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import ToySolver.SAT.Types
 
 main :: IO ()

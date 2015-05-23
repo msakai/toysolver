@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Text.PBFile.Builder
+-- Module      :  ToySolver.Data.PseudoBoolean.Builder
 -- Copyright   :  (c) Masahiro Sakai 2011-2015
 -- License     :  BSD-style
 -- 
@@ -10,7 +10,7 @@
 --
 -----------------------------------------------------------------------------
 
-module ToySolver.Text.PBFile.Builder
+module ToySolver.Data.PseudoBoolean.Builder
   (
   -- * Builder for String-like Monoid
     opbBuilder
@@ -26,7 +26,7 @@ import qualified Data.DList as DList
 import Data.Monoid hiding (Sum (..))
 import Data.String
 import Text.Printf
-import ToySolver.Text.PBFile.Types
+import ToySolver.Data.PseudoBoolean.Types
 
 -- | A builder which renders a OPB format in any String-like 'Monoid'.
 opbBuilder :: (Monoid a, IsString a) => Formula -> a

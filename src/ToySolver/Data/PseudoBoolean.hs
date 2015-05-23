@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Text.PBFile
+-- Module      :  ToySolver.Data.PseudoBoolean
 -- Copyright   :  (c) Masahiro Sakai 2011-2015
 -- License     :  BSD-style
 -- 
@@ -19,7 +19,7 @@
 --
 -----------------------------------------------------------------------------
 
-module ToySolver.Text.PBFile
+module ToySolver.Data.PseudoBoolean
   (
   -- * Abstract Syntax
     Formula (..)
@@ -56,7 +56,7 @@ module ToySolver.Text.PBFile
   , hPutWBO
   ) where
 
-import ToySolver.Text.PBFile.Parsec
-import ToySolver.Text.PBFile.Types
-import ToySolver.Text.PBFile.Builder
-import ToySolver.Text.PBFile.ByteStringBuilder as ByteStringBuilder
+import ToySolver.Data.PseudoBoolean.Parsec
+import ToySolver.Data.PseudoBoolean.Types
+import ToySolver.Data.PseudoBoolean.Builder
+import ToySolver.Data.PseudoBoolean.ByteStringBuilder as ByteStringBuilder

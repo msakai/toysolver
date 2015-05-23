@@ -7,8 +7,8 @@ import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
 import Test.Tasty.TH
-import ToySolver.Text.PBFile
-import qualified ToySolver.Text.PBFile.Attoparsec as A
+import ToySolver.Data.PseudoBoolean
+import qualified ToySolver.Data.PseudoBoolean.Attoparsec as A
 
 case_exampleLIN  = checkOPBString "exampleLIN"  exampleLIN
 case_exampleNLC1 = checkOPBString "exampleNLC1" exampleNLC1

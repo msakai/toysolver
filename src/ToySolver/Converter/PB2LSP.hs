@@ -16,7 +16,7 @@ module ToySolver.Converter.PB2LSP
   ) where
 
 import Data.List
-import qualified ToySolver.Text.PBFile as PBFile
+import qualified ToySolver.Data.PseudoBoolean as PBFile
 
 convert :: PBFile.Formula -> ShowS
 convert formula =
