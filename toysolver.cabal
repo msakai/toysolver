@@ -138,6 +138,7 @@ Library
      DeriveDataTypeable
      DeriveGeneric
      DoRec
+     FlexibleContexts
      FlexibleInstances
      FunctionalDependencies
      GeneralizedNewtypeDeriving
