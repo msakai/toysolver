@@ -95,9 +95,10 @@ type Term = [Lit]
 -- | Positive (resp. negative) literals are represented as positive (resp. negative) integers.
 type Lit = Int
 
--- | Variable are repserented positive integers.
+-- | Variable are repserented as positive integers.
 type Var = Int
 
+-- | Utility function for computing number of variables in given objective function and constraints.
 pbComputeNumVars :: Maybe Sum -> [Constraint] -> Int
 pbComputeNumVars obj cs = maximum (0 : vs)
   where
@@ -107,6 +108,7 @@ pbComputeNumVars obj cs = maximum (0 : vs)
       lit <- tm
       return $ abs lit
 
+-- | Utility function for computing number of variables in given objective function and constraints.
 wboComputeNumVars :: [SoftConstraint] -> Int
 wboComputeNumVars cs = maximum (0 : vs)
   where

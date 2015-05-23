@@ -43,9 +43,11 @@ import qualified Text.Parsec.ByteString.Lazy as ParsecBS
 import ToySolver.Data.PseudoBoolean.Types
 import ToySolver.Internal.TextUtil
 
+-- | Parser for OPB files
 opbParser :: Stream s m Char => ParsecT s u m Formula
 opbParser = formula
 
+-- | Parser for WBO files
 wboParser :: Stream s m Char => ParsecT s u m SoftFormula
 wboParser = softformula
 

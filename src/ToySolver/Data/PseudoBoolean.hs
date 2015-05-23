@@ -34,11 +34,13 @@ module ToySolver.Data.PseudoBoolean
   , Var
 
   -- * Parsing OPB files
+  -- $ParsingOPB
   , parseOPBString
   , parseOPBByteString
   , parseOPBFile
 
   -- * Parsing WBO files
+  -- $ParsingWBO
   , parseWBOString
   , parseWBOByteString
   , parseWBOFile
@@ -60,3 +62,11 @@ import ToySolver.Data.PseudoBoolean.Parsec
 import ToySolver.Data.PseudoBoolean.Types
 import ToySolver.Data.PseudoBoolean.Builder
 import ToySolver.Data.PseudoBoolean.ByteStringBuilder as ByteStringBuilder
+
+-- $ParsingOPB
+-- These functions are based on Parsec.
+-- If you want faster parser, you can also use "ToySolver.Data.PseudoBoolean.Attoparsec" module.
+
+-- $ParsingWBO
+-- These functions are based on Parsec. 
+-- If you want faster parser, you can also use "ToySolver.Data.PseudoBoolean.Attoparsec" module.
