@@ -48,7 +48,7 @@ case_readUnsignedInteger_maxBound_bug =
   readUnsignedInteger "006666666666666667" @?= 6666666666666667
 
 prop_readUnsignedInteger = 
-  forAll (choose (0, 2^128)) $ \i -> 
+  forAll (choose (0, 2^(128::Int))) $ \i -> 
     readUnsignedInteger (show i) == i
 
 -- ---------------------------------------------------------------------
