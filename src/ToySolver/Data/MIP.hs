@@ -33,8 +33,8 @@ import System.FilePath (takeExtension)
 import Text.Parsec
 
 import ToySolver.Data.MIP.Base
-import qualified ToySolver.Text.LPFile as LPFile
-import qualified ToySolver.Text.MPSFile as MPSFile
+import qualified ToySolver.Data.MIP.LPFile as LPFile
+import qualified ToySolver.Data.MIP.MPSFile as MPSFile
 
 -- | Parse .lp or .mps file based on file extension
 readFile :: FilePath -> IO (Either ParseError Problem)

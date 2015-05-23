@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Text.MPSFile
+-- Module      :  ToySolver.Data.MIP.MPSFile
 -- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
 -- 
@@ -23,7 +23,7 @@
 -- * <http://en.wikipedia.org/wiki/MPS_(format)>
 --
 -----------------------------------------------------------------------------
-module ToySolver.Text.MPSFile
+module ToySolver.Data.MIP.MPSFile
   ( parseString
   , parseFile
   , parser

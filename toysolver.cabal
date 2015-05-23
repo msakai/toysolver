@@ -206,6 +206,8 @@ Library
      ToySolver.Data.LBool
      ToySolver.Data.MIP
      ToySolver.Data.MIP.Base
+     ToySolver.Data.MIP.LPFile
+     ToySolver.Data.MIP.MPSFile
      ToySolver.Data.Polynomial
      ToySolver.Data.Polynomial.Factorization.FiniteField
      ToySolver.Data.Polynomial.Factorization.Hensel
@@ -239,8 +241,6 @@ Library
      ToySolver.SAT.Printer
      ToySolver.Text.GCNF
      ToySolver.Text.GurobiSol
-     ToySolver.Text.LPFile
-     ToySolver.Text.MPSFile
      ToySolver.Text.MaxSAT
      ToySolver.Text.PBFile
      ToySolver.Text.PBFile.Builder
