@@ -17,7 +17,7 @@ module ToySolver.Converter.SAT2PB
 import Data.Array.IArray
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
-import qualified ToySolver.Data.PseudoBoolean as PBFile
+import qualified Data.PseudoBoolean as PBFile
 
 convert :: DIMACS.CNF -> PBFile.Formula
 convert cnf

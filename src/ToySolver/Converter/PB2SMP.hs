@@ -15,7 +15,7 @@ module ToySolver.Converter.PB2SMP
   ) where
 
 import Data.List
-import qualified ToySolver.Data.PseudoBoolean as PBFile
+import qualified Data.PseudoBoolean as PBFile
 
 convert :: Bool -> PBFile.Formula -> ShowS
 convert isUnix formula =

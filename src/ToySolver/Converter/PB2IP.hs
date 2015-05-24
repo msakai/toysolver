@@ -21,8 +21,8 @@ import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
 
+import qualified Data.PseudoBoolean as PBFile
 import qualified ToySolver.Data.MIP as MIP
-import qualified ToySolver.Data.PseudoBoolean as PBFile
 import qualified ToySolver.SAT.Types as SAT
 
 convert :: PBFile.Formula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)

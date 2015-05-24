@@ -14,7 +14,7 @@ module ToySolver.Converter.WBO2PB (convert) where
 
 import Data.Array.IArray
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Data.PseudoBoolean as PBFile
+import qualified Data.PseudoBoolean as PBFile
 
 convert :: PBFile.SoftFormula -> (PBFile.Formula, SAT.Model -> SAT.Model)
 convert wbo = (formula, mtrans)

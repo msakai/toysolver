@@ -6,7 +6,7 @@ import Data.Map (Map)
 import System.Environment
 import System.Exit
 import System.IO
-import ToySolver.Data.PseudoBoolean as PBFile
+import Data.PseudoBoolean as PBFile
 
 pigeonHole :: Integer -> Integer -> Formula
 pigeonHole p h =

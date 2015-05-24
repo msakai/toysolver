@@ -37,6 +37,8 @@ import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import GHC.Conc (getNumProcessors, setNumCapabilities)
 
 import Data.OptDir
+import qualified Data.PseudoBoolean as PBFile
+import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
 import ToySolver.Data.ArithRel
 import ToySolver.Data.FOL.Arith as FOL
@@ -45,8 +47,6 @@ import qualified ToySolver.Data.LA.FOL as LAFOL
 import qualified ToySolver.Data.Polynomial as P
 import qualified ToySolver.Data.AlgebraicNumber.Real as AReal
 import qualified ToySolver.Data.MIP as MIP
-import qualified ToySolver.Data.PseudoBoolean as PBFile
-import qualified ToySolver.Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Arith.OmegaTest as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
 import qualified ToySolver.Arith.MIPSolverHL as MIPSolverHL

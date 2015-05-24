@@ -58,10 +58,10 @@ import GHC.IO.Encoding
 import qualified GHC.Stats as Stats
 #endif
 
+import qualified Data.PseudoBoolean as PBFile
+import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import ToySolver.Data.ArithRel
 import qualified ToySolver.Data.MIP as MIP
-import qualified ToySolver.Data.PseudoBoolean as PBFile
-import qualified ToySolver.Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT

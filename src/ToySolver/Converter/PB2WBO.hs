@@ -17,7 +17,7 @@
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2WBO (convert) where
 
-import qualified ToySolver.Data.PseudoBoolean as PBFile
+import qualified Data.PseudoBoolean as PBFile
 
 convert :: PBFile.Formula -> PBFile.SoftFormula
 convert formula
