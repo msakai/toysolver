@@ -17,6 +17,7 @@ Extra-Source-Files:
    COPYING
    .ghci
    .travis.yml
+   build_bdist_linux-x86_64.sh
    src/TseitinEncode.hs
    src/ToySolver/Data/Polyhedron.hs
    samples/gcnf/*.cnf
