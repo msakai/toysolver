@@ -19,6 +19,7 @@ Extra-Source-Files:
    .travis.yml
    build_bdist_linux-i386.sh
    build_bdist_linux-x86_64.sh
+   build_bdist_win32.sh
    src/TseitinEncode.hs
    src/ToySolver/Data/Polyhedron.hs
    samples/gcnf/*.cnf
