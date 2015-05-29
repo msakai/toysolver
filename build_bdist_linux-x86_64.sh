@@ -11,6 +11,7 @@ export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:~/.cabal/bin:$PATH
 sudo apt-get install happy-1.19.4 alex-3.1.3
 export PATH=/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:$PATH
 
+cabal sandbox init
 cabal update
 cabal install --only-dependencies --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
 cabal configure --disable-shared --ghc-options="-static -optl-static -optl-pthread" --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
