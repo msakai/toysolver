@@ -1,6 +1,6 @@
 #!/bin/bash
 export CABALVER=1.18
-export GHCVER=7.8.3
+export GHCVER=7.8.4
 
 sudo add-apt-repository -y ppa:hvr/ghc
 sudo apt-get update
