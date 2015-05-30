@@ -14,9 +14,6 @@ packageVersions = sort $ tail
 #ifdef VERSION_OptDir
   , ("OptDir",       VERSION_OptDir       )
 #endif
-#ifdef VERSION_algebra
-  , ("algebra",      VERSION_algebra      )
-#endif
 #ifdef VERSION_array
   , ("array",        VERSION_array        )
 #endif
@@ -26,14 +23,26 @@ packageVersions = sort $ tail
 #ifdef VERSION_bytestring
   , ("bytestring",   VERSION_bytestring   )
 #endif
+#ifdef VERSION_bytestring_builder
+  , ("bytestring-builder",   VERSION_bytestring_builder   )
+#endif
 #ifdef VERSION_containers
   , ("containers",   VERSION_containers   )
 #endif
 #ifdef VERSION_data_interval
-  , ("data-interval",VERSION_data_interval)
+  , ("data-interval", VERSION_data_interval)
+#endif
+#ifdef VERSION_data_default_class
+  , ("data-default-class", VERSION_data_default_class)
 #endif
 #ifdef VERSION_deepseq
   , ("deepseq",      VERSION_deepseq      )
+#endif
+#ifdef VERSION_exceptions
+  , ("exceptions",   VERSION_exceptions   )
+#endif
+#ifdef VERSION_extended_reals
+  , ("extended-reals", VERSION_extended_reals)
 #endif
 #ifdef VERSION_filepath
   , ("filepath",     VERSION_filepath     )
@@ -50,8 +59,8 @@ packageVersions = sort $ tail
 #ifdef VERSION_intern
   , ("intern",       VERSION_intern       )
 #endif
-#ifdef VERSION_lattices
-  , ("lattices",     VERSION_lattices     )
+#ifdef VERSION_loop
+  , ("loop",         VERSION_loop         )
 #endif
 #ifdef VERSION_mtl
   , ("mtl",          VERSION_mtl          )
@@ -74,6 +83,12 @@ packageVersions = sort $ tail
 #ifdef VERSION_primes
   , ("primes",       VERSION_primes       )
 #endif
+#ifdef VERSION_process
+  , ("process",      VERSION_process      )
+#endif
+#ifdef VERSION_pseudo_boolean
+  , ("pseudo-boolean", VERSION_pseudo_boolean)
+#endif
 #ifdef VERSION_queue
   , ("queue",        VERSION_queue        )
 #endif
@@ -85,6 +100,9 @@ packageVersions = sort $ tail
 #endif
 #ifdef VERSION_stm
   , ("stm",          VERSION_stm          )
+#endif
+#ifdef VERSION_temporary
+  , ("temporary",    VERSION_time         )
 #endif
 #ifdef VERSION_time
   , ("time",         VERSION_time         )
