@@ -15,11 +15,11 @@ wine cabal install --only-dependencies --flag=BuildToyFMF --flag=BuildSampleProg
 wine cabal configure --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
 wine cabal build
 
-VER=`wine ghc -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version System.IO" -e "SetBinaryMode stdout True" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
+VER=`wine ghc -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version System.IO" -e "hSetBinaryMode stdout True" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
 
 PKG=toysolver-$VER-win32
 
 rm -r $PKG
 mkdir $PKG
 cp dist/build/htc/htc.exe dist/build/knapsack/knapsack.exe dist/build/lpconvert/lpconvert.exe dist/build/nqueens/nqueens.exe dist/build/pbconvert/pbconvert.exe dist/build/sudoku/sudoku.exe dist/build/toyfmf/toyfmf.exe dist/build/toysat/toysat.exe dist/build/ToySolver/toysolver.exe $PKG/
-zip $PKG.zip $PKG
+zip -r $PKG.zip $PKG
