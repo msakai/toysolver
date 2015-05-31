@@ -26,13 +26,17 @@ Extra-Source-Files:
    src/ToySolver/Data/Polyhedron.hs
    samples/gcnf/*.cnf
    samples/gcnf/*.gcnf
+   samples/gcnf/edn_20403_8.cnf_0.03000000.unsat.gcnf
    samples/lp/*.lp
    samples/lp/error/*.lp
    samples/maxsat/*.cnf
+   samples/maxsat/t3pm3-5555.spn.cnf
    samples/maxsat/*.wcnf
+   samples/maxsat/ram_k3_n10.ra1.wcnf
    samples/mps/*.mps
    samples/pbo/*.opb
    samples/pbs/*.opb
+   samples/pbs/normalized-1096.cudf.paranoid.opb
    samples/sat/*.cnf
    samples/wbo/*.wbo
    samples/sdp/*.dat
