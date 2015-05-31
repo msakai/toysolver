@@ -11,7 +11,8 @@ Description:	Toy-level implementation of some decision procedures
 Bug-Reports:	https://github.com/msakai/toysolver/issues
 Tested-With:
    GHC ==7.6.3
-   GHC ==7.8.2
+   GHC ==7.8.3
+   GHC ==7.10.1
 Extra-Source-Files:
    README.md
    COPYING
