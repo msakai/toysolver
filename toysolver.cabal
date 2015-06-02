@@ -16,6 +16,7 @@ Tested-With:
 Extra-Source-Files:
    README.md
    COPYING
+   COPYING-GPL
    .ghci
    .travis.yml
    build_bdist_linux-i386.sh
