@@ -1,25 +1,36 @@
 #!/bin/bash
+HPVER=2014.2.0.0
+HPARCH=x86_64
+export WINEPREFIX=~/.wine-hp-$HPARCH
+GHC_PATH=$WINEPREFIX/drive_c/Program\ Files/Haskell\ Platform/$HPVER/bin/ghc.exe
+ARCH=win64
+BUILDDIR=dist-$ARCH
+
 sudo apt-get update
 sudo apt-get install wine wget cabal-install
 
-wget https://www.haskell.org/platform/download/2014.2.0.0/HaskellPlatform-2014.2.0.0-x86_64-setup.exe
-wine HaskellPlatform-2014.2.0.0-x86_64-setup.exe
+if [ ! -f "$GHC_PATH" ]; then
+  wget -c https://www.haskell.org/platform/download/$HPVER/HaskellPlatform-$HPVER-$HPARCH-setup.exe
+  wine HaskellPlatform-$HPVER-$HPARCH-setup.exe
+fi
 
 # https://plus.google.com/+MasahiroSakai/posts/RTXUt5MkVPt
 #wine cabal update
 cabal update
-cp -a ~/.cabal/packages ~/.wine/drive_c/users/`whoami`/Application\ Data/cabal/
+mkdir -p $WINEPREFIX/drive_c/users/`whoami`/Application\ Data/cabal
+cp -a ~/.cabal/packages $WINEPREFIX/drive_c/users/`whoami`/Application\ Data/cabal/
 
 wine cabal sandbox init
 wine cabal install --only-dependencies --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
-wine cabal configure --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
-wine cabal build
+wine cabal clean --builddir=$BUILDDIR
+wine cabal configure --builddir=$BUILDDIR --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
+wine cabal build --builddir=$BUILDDIR
 
 VER=`wine ghc -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version System.IO" -e "hSetBinaryMode stdout True" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
 
-PKG=toysolver-$VER-win64
+PKG=toysolver-$VER-$ARCH
 
 rm -r $PKG
 mkdir $PKG
-cp dist/build/htc/htc.exe dist/build/knapsack/knapsack.exe dist/build/lpconvert/lpconvert.exe dist/build/nqueens/nqueens.exe dist/build/pbconvert/pbconvert.exe dist/build/sudoku/sudoku.exe dist/build/toyfmf/toyfmf.exe dist/build/toysat/toysat.exe dist/build/ToySolver/toysolver.exe $PKG/
+cp $BUILDDIR/build/htc/htc.exe $BUILDDIR/build/knapsack/knapsack.exe $BUILDDIR/build/lpconvert/lpconvert.exe $BUILDDIR/build/nqueens/nqueens.exe $BUILDDIR/build/pbconvert/pbconvert.exe $BUILDDIR/build/sudoku/sudoku.exe $BUILDDIR/build/toyfmf/toyfmf.exe $BUILDDIR/build/toysat/toysat.exe $BUILDDIR/build/ToySolver/toysolver.exe $PKG/
 zip -r $PKG.zip $PKG
