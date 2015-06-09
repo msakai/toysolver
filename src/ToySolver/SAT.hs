@@ -72,6 +72,7 @@ module ToySolver.SAT
   , Model
   , getModel
   , getFailedAssumptions
+  , getAssumptionsImplications
 
   -- * Solver configulation
   , RestartStrategy (..)
@@ -300,6 +301,12 @@ getNFixed solver = do
   else
     Vec.unsafeRead (svTrailLimit solver) 0
 
+-- | it returns a set of literals that are fixed without any assumptions.
+getFixedLiterals :: Solver -> IO [Lit]
+getFixedLiterals solver = do
+  n <- getNFixed solver
+  revMapM (Vec.unsafeRead (svTrail solver)) [0..n-1]
+
 varLevel :: Solver -> Var -> IO Level
 varLevel solver !v = do
   vd <- varData solver v
@@ -345,6 +352,7 @@ data Solver
   -- Result
   , svModel        :: !(IORef (Maybe Model))
   , svFailedAssumptions :: !(IORef [Lit])
+  , svAssumptionsImplications :: !(IORef LitSet)
 
   -- Statistics
   , svNDecision    :: !(IOURef Int)
@@ -734,6 +742,7 @@ newSolver = do
   randgen  <- newIORef =<< Rand.newStdGen
 
   failed <- newIORef []
+  implied <- newIORef IS.empty
 
   confBudget <- newIOURef (-1)
 
@@ -758,6 +767,7 @@ newSolver = do
         -- Result
         , svModel      = m
         , svFailedAssumptions = failed
+        , svAssumptionsImplications = implied
 
         -- Statistics        
         , svNDecision  = ndecision
@@ -1085,6 +1095,8 @@ solveWith solver ls = do
 
 solve_ :: Solver -> IO Bool
 solve_ solver = do
+  writeIORef (svAssumptionsImplications solver) IS.empty
+
   log solver "Solving starts ..."
   resetStat solver
   writeIORef (svModel solver) Nothing
@@ -1155,6 +1167,8 @@ solve_ solver = do
       checkModel <- readIORef (svCheckModel solver)
       when checkModel $ checkSatisfied solver
       constructModel solver
+    unless (result == Just False) $ do
+      saveAssumptionsImplications solver
 
     backtrackTo solver levelRoot
 
@@ -1352,6 +1366,11 @@ getModel solver = do
 -- set, the problem is unsatisiable without any assumptions.
 getFailedAssumptions :: Solver -> IO [Lit]
 getFailedAssumptions solver = readIORef (svFailedAssumptions solver)
+
+-- | __EXPERIMENTAL API__: After 'solveWith' returns True or failed with 'BudgetExceeded' exception,
+-- it returns a set of literals that are implied by assumptions.
+getAssumptionsImplications :: Solver -> IO [Lit]
+getAssumptionsImplications solver = liftM IS.toList $ readIORef (svAssumptionsImplications solver)
 
 {--------------------------------------------------------------------
   Simplification
@@ -2098,6 +2117,30 @@ constructModel solver = do
     writeArray marr v (fromJust (unliftBool val))
   m <- unsafeFreeze marr
   writeIORef (svModel solver) (Just m)
+
+saveAssumptionsImplications :: Solver -> IO ()
+saveAssumptionsImplications solver = do
+  n <- Vec.getSize (svAssumptions solver)
+  lv <- getDecisionLevel solver
+
+  lim_beg <-
+    if lv == 0 then
+      return 0
+    else
+      Vec.read (svTrailLimit solver) 0
+  lim_end <-
+    if lv > n then
+       Vec.read (svTrailLimit solver) n
+    else
+       Vec.getSize (svTrail solver)
+
+  let ref = svAssumptionsImplications solver
+  forM_ [lim_beg .. lim_end-1] $ \i -> do
+    lit <- Vec.read (svTrail solver) i
+    modifyIORef' ref (IS.insert lit)
+  forM_ [0..n-1] $ \i -> do
+    lit <- Vec.read (svAssumptions solver) i
+    modifyIORef' ref (IS.delete lit)  
 
 constrDecayActivity :: Solver -> IO ()
 constrDecayActivity solver = do

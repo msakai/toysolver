@@ -564,6 +564,35 @@ case_getVarFixed = do
   ret <- getLitFixed solver x2
   ret @?= lTrue
 
+case_getAssumptionsImplications_case1 :: IO ()
+case_getAssumptionsImplications_case1 = do
+  solver <- newSolver
+  x1 <- newVar solver
+  x2 <- newVar solver
+  x3 <- newVar solver
+  addClause solver [x1,x2,x3]
+
+  addClause solver [-x1]
+  ret <- solveWith solver [-x2]
+  ret @?= True
+  xs <- getAssumptionsImplications solver
+  xs @?= [x3]
+
+prop_getAssumptionsImplications :: Property
+prop_getAssumptionsImplications = QM.monadicIO $ do
+  cnf@(nv,cs) <- QM.pick arbitraryCNF
+  solver <- arbitrarySolver
+  ls <- QM.pick $ liftM concat $ mapM (\v -> elements [[],[-v],[v]]) [1..nv]
+  ret <- QM.run $ do
+    newVars_ solver nv
+    forM_ cs $ \c -> addClause solver c
+    solveWith solver ls
+  when ret $ do
+    xs <- QM.run $ getAssumptionsImplications solver
+    forM_ xs $ \x -> do
+      ret2 <- QM.run $ solveWith solver (-x : ls)
+      QM.assert $ ret2 == False
+
 ------------------------------------------------------------------------
 
 -- -4*(not x1) + 3*x1 + 10*(not x2)
