@@ -120,6 +120,7 @@ module ToySolver.SAT
   , getNLearntConstraints
   , getVarFixed
   , getLitFixed
+  , getFixedLiterals
 
   -- * Read state (deprecated)
   , nVars
@@ -174,6 +175,7 @@ import GHC.Exts hiding (Constraint)
 import ToySolver.Data.LBool
 import ToySolver.SAT.Types
 import ToySolver.SAT.TheorySolver
+import ToySolver.Internal.Util (revMapM)
 
 {--------------------------------------------------------------------
   internal data structures
