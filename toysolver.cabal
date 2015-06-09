@@ -15,6 +15,7 @@ Tested-With:
    GHC ==7.10.1
 Extra-Source-Files:
    README.md
+   CHANGELOG.markdown
    COPYING
    COPYING-GPL
    .ghci
