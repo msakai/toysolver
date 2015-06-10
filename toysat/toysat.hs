@@ -32,6 +32,8 @@ import Data.List
 import Data.Maybe
 import Data.Ord
 import Data.Ratio
+import Data.Word
+import qualified Data.Vector.Unboxed as V
 import Data.VectorSpace
 import Data.Version
 import Data.Time
@@ -45,7 +47,7 @@ import System.Console.GetOpt
 import System.CPUTime
 import System.FilePath
 import qualified System.Info as SysInfo
-import qualified System.Random as Rand
+import qualified System.Random.MWC as Rand
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import Text.Printf
 #ifdef __GLASGOW_HASKELL__
@@ -104,7 +106,7 @@ data Options
   , optEnableForwardSubsumptionRemoval :: Bool
   , optEnableBackwardSubsumptionRemoval :: Bool
   , optRandomFreq    :: Double
-  , optRandomGen     :: Maybe Rand.StdGen
+  , optRandomSeed    :: Maybe Rand.Seed
   , optLinearizerPB  :: Bool
   , optPBHandlerType :: SAT.PBHandlerType
   , optPBSplitClausePart :: Bool
@@ -138,7 +140,7 @@ defaultOptions
   , optEnablePhaseSaving = SAT.defaultEnablePhaseSaving
   , optEnableForwardSubsumptionRemoval = SAT.defaultEnableForwardSubsumptionRemoval
   , optRandomFreq    = SAT.defaultRandomFreq
-  , optRandomGen     = Nothing
+  , optRandomSeed    = Nothing
   , optLinearizerPB  = False
   , optPBHandlerType = SAT.defaultPBHandlerType
   , optPBSplitClausePart = SAT.defaultPBSplitClausePart
@@ -212,10 +214,10 @@ options =
         (ReqArg (\val opt -> opt{ optRandomFreq = read val }) "<0..1>")
         (printf "The frequency with which the decision heuristic tries to choose a random variable (default %f)" SAT.defaultRandomFreq)
     , Option [] ["random-seed"]
-        (ReqArg (\val opt -> opt{ optRandomGen = Just (Rand.mkStdGen (read val)) }) "<int>")
+        (ReqArg (\val opt -> opt{ optRandomSeed = Just (Rand.toSeed (V.singleton (read val) :: V.Vector Word32)) }) "<int>")
         "random seed used by the random variable selection"
     , Option [] ["random-gen"]
-        (ReqArg (\val opt -> opt{ optRandomGen = Just (read val) }) "<str>")
+        (ReqArg (\val opt -> opt{ optRandomSeed = Just (Rand.toSeed (V.fromList (map read $ words $ val) :: V.Vector Word32)) }) "<str>")
         "another way of specifying random seed used by the random variable selection"
 
     , Option [] ["linearizer-pb"]
@@ -479,11 +481,12 @@ newSolver opts = do
   SAT.setLearntSizeInc   solver (optLearntSizeInc opts)
   SAT.setCCMin           solver (optCCMin opts)
   SAT.setRandomFreq      solver (optRandomFreq opts)
-  case optRandomGen opts of
+  case optRandomSeed opts of
     Nothing -> return ()
-    Just gen -> SAT.setRandomGen solver gen
+    Just s -> SAT.setRandomGen solver =<< Rand.initialize (Rand.fromSeed s)
   do gen <- SAT.getRandomGen solver
-     putCommentLine $ "use --random-gen=" ++ show (show gen) ++ " option to reproduce the execution"
+     s <- Rand.save gen
+     putCommentLine $ "use --random-gen=" ++ show (unwords . map show . V.toList . Rand.fromSeed $ s) ++ " option to reproduce the execution"
   SAT.setLearningStrategy solver (optLearningStrategy opts)
   SAT.setEnablePhaseSaving solver (optEnablePhaseSaving opts)
   SAT.setEnableForwardSubsumptionRemoval solver (optEnableForwardSubsumptionRemoval opts)

@@ -9,7 +9,8 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import qualified System.Random as Rand
+import qualified Data.Vector as V
+import qualified System.Random.MWC as Rand
 
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
@@ -1243,7 +1244,7 @@ arbitrarySolver = do
   splitClausePart <- QM.pick arbitrary
   QM.run $ do
     solver <- newSolver
-    setRandomGen solver (Rand.mkStdGen seed)
+    setRandomGen solver =<< Rand.initialize (V.singleton seed)
     setCheckModel solver True
     setLearningStrategy solver learningStrategy
     setRestartStrategy solver restartStrategy

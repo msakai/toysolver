@@ -68,6 +68,9 @@ packageVersions = sort $ tail
 #ifdef VERSION_multiset
   , ("multiset",     VERSION_multiset     )
 #endif
+#ifdef VERSION_mwc_random
+  , ("mwc-random",   VERSION_mwc_random   )
+#endif
 #ifdef VERSION_old_locale
   , ("old_locale",   VERSION_old_locale   )
 #endif
@@ -91,9 +94,6 @@ packageVersions = sort $ tail
 #endif
 #ifdef VERSION_queue
   , ("queue",        VERSION_queue        )
-#endif
-#ifdef VERSION_random
-  , ("random",       VERSION_random       )
 #endif
 #ifdef VERSION_sign
   , ("sign",         VERSION_sign         )

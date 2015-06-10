@@ -165,7 +165,7 @@ import qualified ToySolver.Internal.Data.Vec as Vec
 import Data.Time
 import Data.Typeable
 import System.CPUTime
-import qualified System.Random as Rand
+import qualified System.Random.MWC as Rand
 import Text.Printf
 
 #ifdef __GLASGOW_HASKELL__
@@ -407,7 +407,7 @@ data Solver
 
   , svRandomFreq :: !(IORef Double)
 
-  , svRandomGen  :: !(IORef Rand.StdGen)
+  , svRandomGen  :: !(IORef Rand.GenIO)
 
   , svConfBudget :: !(IOURef Int)
 
@@ -739,7 +739,7 @@ newSolver = do
   lastStatWC <- newIORef undefined
 
   randfreq <- newIORef defaultRandomFreq
-  randgen  <- newIORef =<< Rand.newStdGen
+  randgen  <- newIORef =<< Rand.createSystemRandom
 
   failed <- newIORef []
   implied <- newIORef IS.empty
@@ -1566,11 +1566,11 @@ defaultRandomFreq :: Double
 defaultRandomFreq = 0.005
 
 -- | Set random generator used by the random variable selection
-setRandomGen :: Solver -> Rand.StdGen -> IO ()
+setRandomGen :: Solver -> Rand.GenIO -> IO ()
 setRandomGen solver = writeIORef (svRandomGen solver)
 
 -- | Get random generator used by the random variable selection
-getRandomGen :: Solver -> IO Rand.StdGen
+getRandomGen :: Solver -> IO Rand.GenIO
 getRandomGen solver = readIORef (svRandomGen solver)
 
 setConfBudget :: Solver -> Maybe Int -> IO ()
@@ -1656,22 +1656,16 @@ defaultEnableBackwardSubsumptionRemoval = False
 
 pickBranchLit :: Solver -> IO Lit
 pickBranchLit !solver = do
+  gen <- readIORef (svRandomGen solver)
   let vqueue = svVarQueue solver
-
-  -- Random decision
-  let withRandGen :: (Rand.StdGen -> (a, Rand.StdGen)) -> IO a
-      withRandGen f = do
-        randgen  <- readIORef (svRandomGen solver)
-        let (r, randgen') = f randgen
-        writeIORef (svRandomGen solver) randgen'
-        return r
   !randfreq <- readIORef (svRandomFreq solver)
   !size <- PQ.queueSize vqueue
-  !r <- withRandGen Rand.random
+  -- System.Random.random produces [0,1), but System.Random.MWC.uniform produces (0,1]
+  !r <- liftM (1 -) $ Rand.uniform gen
   var <-
     if (r < randfreq && size >= 2) then do
       a <- PQ.getHeapArray vqueue
-      i <- withRandGen $ Rand.randomR (0, size-1)
+      i <- Rand.uniformR (0, size-1) gen
       var <- readArray a i
       val <- varValue solver var
       if val == lUndef then do
