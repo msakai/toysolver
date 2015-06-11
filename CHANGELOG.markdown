@@ -2,6 +2,7 @@
 -----
 * add experimental getAssumptionsImplications functions to ToySolver.SAT module.
 * add getFixedLiterals to ToySolver.SAT module.
+* use 'mwc-random' package instead of 'random' package.
 
 0.3.0
 -----
