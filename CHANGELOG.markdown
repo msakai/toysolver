@@ -1,4 +1,4 @@
-0.3.1
+0.4.0
 -----
 * add experimental getAssumptionsImplications functions to ToySolver.SAT module.
 * add getFixedLiterals to ToySolver.SAT module.
