@@ -38,10 +38,11 @@ solve items limit =
   )
   where
     items' :: [(Value, Weight, Int)]
-    items' = map fst $ sortBy (flip compare `on` snd) [((v, w, n), (v / w, v)) | (n, (v, w)) <- zip [0..] items]
+    items' = map fst $ sortBy (flip compare `on` snd) [((v, w, n), (v / w, v)) | (n, (v, w)) <- zip [0..] items, w > 0, v > 0]
 
     sol :: IntSet
-    sol = IntSet.fromList $ fst $ execState (f items' limit ([],0)) ([],0)
+    sol = IntSet.fromList [n | (n, (v, w)) <- zip [0..] items, w == 0, v > 0] `IntSet.union`
+          IntSet.fromList (fst $ execState (f items' limit ([],0)) ([],0))
 
     f :: [(Value, Weight, Int)] -> Weight -> ([Int],Value) -> State ([Int],Value) ()
     f items !slack (is, !value) = do

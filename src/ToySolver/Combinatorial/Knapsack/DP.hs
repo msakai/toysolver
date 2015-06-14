@@ -36,10 +36,9 @@ solve items limit = (val, sum [w | (b,(_,w)) <- zip bs items, b], bs)
     n = length items
     m = array ((-1, 0), (n-1, limit)) $
           [((-1,w), ([],0)) | w <- [0 .. limit]] ++
-          [((i,0), ([],0)) | i <- [0 .. n-1]] ++
           [((i,w), best) 
               | (i,(vi,wi)) <- zip [0..] items
-              , w <- [1..limit]
+              , w <- [0..limit]
               , let s1 = [(False:bs,v) | let (bs,v) = m!(i-1, w)]
               , let s2 = [(True:as,v+vi) | w >= wi, let (as,v) = m!(i-1, w-wi)]
               , let best = maximumBy (compare `on` snd) (s1 ++ s2)
