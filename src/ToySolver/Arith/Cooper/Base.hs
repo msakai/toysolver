@@ -251,6 +251,7 @@ projectCases' x formula = [(phi', w) | (phi,w) <- case1 ++ case2, let phi' = sim
         pos (Not x) = neg x
         pos (Imply x y) = neg x .||. pos y
         pos (Equiv x y) = pos ((x .=>. y) .&&. (y .=>. x))
+        pos (ITE c t e) = pos ((c .=>. t) .&&. (Not c .=>. e))
 
         neg (Atom a) = Atom (notB a)
         neg (And xs) = Or (map neg xs)
@@ -258,6 +259,7 @@ projectCases' x formula = [(phi', w) | (phi,w) <- case1 ++ case2, let phi' = sim
         neg (Not x) = pos x
         neg (Imply x y) = pos x .&&. neg y
         neg (Equiv x y) = neg ((x .=>. y) .&&. (y .=>. x))
+        neg (ITE c t e) = neg ((c .=>. t) .&&. (Not c .=>. e))
 
     -- xの係数の最小公倍数
     c :: Integer
