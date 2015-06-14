@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
@@ -40,8 +40,7 @@ import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Ratio
-import Data.Interned
-import Data.Interned.String
+import Data.String
 import System.IO
 import qualified Text.Parsec as P
 import Text.Parsec hiding (spaces, newline, Column)
@@ -51,9 +50,6 @@ import Text.Printf
 import Data.OptDir
 import qualified ToySolver.Data.MIP.Base as MIP
 import ToySolver.Internal.TextUtil (readUnsignedInteger)
-
-type Column = MIP.Var
-type Row = InternedString
 
 data BoundType
   = LO  -- lower bound
@@ -73,11 +69,11 @@ data BoundType
 
 -- | Parse a string containing MPS file data.
 -- The source name is only | used in error messages and may be the empty string.
-parseString :: MIP.FileOptions -> SourceName -> String -> Either ParseError MIP.Problem
+parseString :: (MIP.IsVar v, RealFrac c) => MIP.FileOptions -> SourceName -> String -> Either ParseError (MIP.Problem v c)
 parseString _ = parse (parser <* eof)
 
 -- | Parse a file containing MPS file data.
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError MIP.Problem)
+parseFile :: (MIP.IsVar v, RealFrac c) => MIP.FileOptions -> FilePath -> IO (Either ParseError (MIP.Problem v c))
 parseFile opt fname = do
   h <- openFile fname ReadMode
   case MIP.optFileEncoding opt of
@@ -115,11 +111,15 @@ tok p = do
   msum [spaces1', lookAhead (try (char '\n' >> return ())), eof]
   return x
 
-row :: Parser Row
-row = liftM intern ident
+row :: MIP.IsVar v => Parser v
+row = do
+  s <- ident
+  return $! fromString s
 
-column :: Parser Column
-column = liftM MIP.toVar ident
+column :: MIP.IsVar v => Parser v
+column = do
+  s <- ident
+  return $! fromString s
 
 ident :: Parser String
 ident = tok $ many1 $ noneOf [' ', '\t', '\n']
@@ -130,12 +130,12 @@ stringLn s = string s >> newline'
 sign :: Num a => Parser a
 sign = (char '+' >> return 1) <|> (char '-' >> return (-1))
 
-number :: Parser Rational
+number :: RealFrac c => Parser c
 number = tok $ do
   b <- (do{ s <- option 1 sign; x <- nat; y <- option 0 frac; return (s * (fromInteger x + y)) })
     <|> frac
   c <- option 0 e
-  return (b*10^^c)
+  return $! fromRational (b*10^^c)
   where
     digits = many1 digit
 
@@ -160,7 +160,7 @@ number = tok $ do
 -- ---------------------------------------------------------------------------
 
 -- | MPS file parser
-parser :: Parser MIP.Problem
+parser :: forall v c. (MIP.IsVar v, RealFrac c) => Parser (MIP.Problem v c)
 parser = do
   many commentline
 
@@ -209,7 +209,7 @@ parser = do
   let objrow =
         case objname of
           Nothing -> head [r | (Nothing, r) <- rows] -- XXX
-          Just r  -> intern r
+          Just r  -> fromString r
       objdir =
         case objsense of
           Nothing -> OptMin
@@ -282,10 +282,10 @@ parser = do
               (v, (fromMaybe (MIP.Finite 0) lb, fromMaybe MIP.PosInf ub))
         | v <- Set.toList vs ]
 
-  let rowCoeffs :: Map Row (Map Column Rational)
+  let rowCoeffs :: Map v (Map v c)
       rowCoeffs = Map.fromListWith Map.union [(row, Map.singleton col coeff) | (col,m) <- Map.toList cols, (row,coeff) <- Map.toList m]
 
-  let f :: Bool -> (Maybe MIP.RelOp, Row) -> [MIP.Constraint]
+  let f :: Bool -> (Maybe MIP.RelOp, v) -> [MIP.Constraint v c]
       f _isLazy (Nothing, _row) = []
       f isLazy (Just op, row) = do
         let lhs = [MIP.Term c [col] | (col,c) <- Map.toList (Map.findWithDefault Map.empty row rowCoeffs)]
@@ -308,7 +308,7 @@ parser = do
                       else (MIP.Finite rhs, MIP.Finite (rhs + rng))
         return $
           MIP.Constraint
-          { MIP.constrLabel     = Just $ unintern row
+          { MIP.constrLabel     = Just row
           , MIP.constrIndicator = Map.lookup row inds
           , MIP.constrIsLazy    = isLazy
           , MIP.constrExpr      = MIP.Expr lhs
@@ -321,7 +321,7 @@ parser = do
         { MIP.name                  = name
         , MIP.objectiveFunction     = def
             { MIP.objDir = objdir
-            , MIP.objLabel = Just (unintern objrow)
+            , MIP.objLabel = Just objrow
             , MIP.objExpr = MIP.Expr $ [MIP.Term c [col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
             }
         , MIP.constraints           = concatMap (f False) rows ++ concatMap (f True) lazycons
@@ -371,22 +371,22 @@ objNameSection = do
   newline'
   return name
 
-rowsSection :: Parser [(Maybe MIP.RelOp, Row)]
+rowsSection :: (MIP.IsVar row) => Parser [(Maybe MIP.RelOp, row)]
 rowsSection = do
   try $ stringLn "ROWS"
   rowsBody
 
-userCutsSection :: Parser [(Maybe MIP.RelOp, Row)]
+userCutsSection :: (MIP.IsVar row) => Parser [(Maybe MIP.RelOp, row)]
 userCutsSection = do
   try $ stringLn "USERCUTS"
   rowsBody
 
-lazyConsSection :: Parser [(Maybe MIP.RelOp, Row)]
+lazyConsSection :: (MIP.IsVar row) => Parser [(Maybe MIP.RelOp, row)]
 lazyConsSection = do
   try $ stringLn "LAZYCONS"
   rowsBody
 
-rowsBody :: Parser [(Maybe MIP.RelOp, Row)]
+rowsBody :: (MIP.IsVar row) => Parser [(Maybe MIP.RelOp, row)]
 rowsBody = many $ do
   spaces1'
   op <- msum
@@ -400,12 +400,12 @@ rowsBody = many $ do
   newline'
   return (op, name)
 
-colsSection :: Parser (Map Column (Map Row Rational), Set Column)
+colsSection :: forall v c. (MIP.IsVar v, RealFrac c) => Parser (Map v (Map v c), Set v)
 colsSection = do
   try $ stringLn "COLUMNS"
   body False Map.empty Set.empty
   where
-    body :: Bool -> Map Column (Map Row Rational) -> Set Column -> Parser (Map Column (Map Row Rational), Set Column)
+    body :: Bool -> Map v (Map v c) -> Set v -> Parser (Map v (Map v c), Set v)
     body isInt rs ivs = msum
       [ do isInt' <- try intMarker
            body isInt' rs ivs
@@ -427,7 +427,7 @@ colsSection = do
       newline'
       return b
 
-    entry :: Parser (Column, Map Row Rational)
+    entry :: (MIP.IsVar v, RealFrac c) => Parser (v, Map v c)
     entry = do
       spaces1'
       col <- column
@@ -438,13 +438,13 @@ colsSection = do
         Nothing -> return (col, rv1)
         Just rv2 ->  return (col, Map.union rv1 rv2)
 
-rowAndVal :: Parser (Map Row Rational)
+rowAndVal :: (MIP.IsVar v, RealFrac c) => Parser (Map v c)
 rowAndVal = do
   r <- row
   val <- number
   return $ Map.singleton r val
 
-rhsSection :: Parser (Map Row Rational)
+rhsSection :: (MIP.IsVar v, RealFrac c) => Parser (Map v c)
 rhsSection = do
   try $ stringLn "RHS"
   liftM Map.unions $ many entry
@@ -459,7 +459,7 @@ rhsSection = do
         Nothing  -> return rv1
         Just rv2 -> return $ Map.union rv1 rv2
 
-rangesSection :: Parser (Map Row Rational)
+rangesSection :: (MIP.IsVar v, RealFrac c) => Parser (Map v c)
 rangesSection = do
   try $ stringLn "RANGES"
   liftM Map.unions $ many entry
@@ -474,7 +474,7 @@ rangesSection = do
         Nothing  -> return rv1
         Just rv2 -> return $ Map.union rv1 rv2
 
-boundsSection :: Parser [(BoundType, Column, Rational)]
+boundsSection :: (MIP.IsVar v, RealFrac c) => Parser [(BoundType, v, c)]
 boundsSection = do
   try $ stringLn "BOUNDS"
   many entry
@@ -494,7 +494,7 @@ boundType :: Parser BoundType
 boundType = tok $ do
   msum [try (string (show k)) >> return k | k <- [minBound..maxBound]]
 
-sosSection :: Parser [MIP.SOSConstraint]
+sosSection :: forall v c. (MIP.IsVar v, RealFrac c) => Parser [MIP.SOSConstraint v c]
 sosSection = do
   try $ stringLn "SOS"
   many entry
@@ -507,9 +507,9 @@ sosSection = do
       name <- ident
       newline'
       xs <- many (try identAndVal)
-      return $ MIP.SOSConstraint{ MIP.sosLabel = Just name, MIP.sosType = typ, MIP.sosBody = xs }
+      return $ MIP.SOSConstraint{ MIP.sosLabel = Just (fromString name), MIP.sosType = typ, MIP.sosBody = xs }
 
-    identAndVal :: Parser (Column, Rational)
+    identAndVal :: (MIP.IsVar v, RealFrac c) => Parser (v, c)
     identAndVal = do
       spaces1'
       col <- column
@@ -517,7 +517,7 @@ sosSection = do
       newline'
       return (col, val)
 
-quadObjSection :: Parser [MIP.Term]
+quadObjSection :: (MIP.IsVar v, RealFrac c) => Parser [MIP.Term v c]
 quadObjSection = do
   try $ stringLn "QUADOBJ"
   many entry
@@ -530,7 +530,7 @@ quadObjSection = do
       newline'
       return $ MIP.Term (if col1 /= col2 then val else val / 2) [col1, col2]
 
-qMatrixSection :: Parser [MIP.Term]
+qMatrixSection :: (MIP.IsVar v, RealFrac c) => Parser [MIP.Term v c]
 qMatrixSection = do
   try $ stringLn "QMATRIX"
   many entry
@@ -543,7 +543,7 @@ qMatrixSection = do
       newline'
       return $ MIP.Term (val / 2) [col1, col2]
 
-qcMatrixSection :: Parser (Row, [MIP.Term])
+qcMatrixSection :: (MIP.IsVar v, RealFrac c) => Parser (v, [MIP.Term v c])
 qcMatrixSection = do
   try $ string "QCMATRIX"
   spaces1'
@@ -560,7 +560,7 @@ qcMatrixSection = do
       newline'
       return $ MIP.Term val [col1, col2]
 
-indicatorsSection :: Parser (Map Row (Column, Rational))
+indicatorsSection :: (MIP.IsVar v, RealFrac c) => Parser (Map v (v, c))
 indicatorsSection = do
   try $ stringLn "INDICATORS"
   liftM Map.fromList $ many entry
@@ -590,11 +590,11 @@ writeChar c = tell $ showChar c
 
 -- ---------------------------------------------------------------------------
 
-render :: MIP.FileOptions -> MIP.Problem -> Either String String
+render :: (MIP.IsVar v, RealFrac c) => MIP.FileOptions -> MIP.Problem v c -> Either String String
 render _ mip | not (checkAtMostQuadratic mip) = Left "Expression must be atmost quadratic"
 render _ mip = Right $ execM $ render' $ nameRows mip
 
-render' :: MIP.Problem -> M ()
+render' :: forall v c. (MIP.IsVar v, RealFrac c) => MIP.Problem v c -> M ()
 render' mip = do
   let probName = fromMaybe "" (MIP.name mip)
 
@@ -638,11 +638,11 @@ render' mip = do
                     MIP.Le  -> "L"
                     MIP.Ge  -> "G"
                     MIP.Eql -> "E"
-          writeFields [s, fromJust $ MIP.constrLabel c]
+          writeFields [s, MIP.fromVar $ fromJust $ MIP.constrLabel c]
 
   -- ROWS section
   writeSectionHeader "ROWS"
-  writeFields ["N", objName]
+  writeFields ["N", MIP.fromVar objName]
   renderRows [c | c <- MIP.constraints mip, not (MIP.constrIsLazy c)]
 
   -- USERCUTS section
@@ -658,7 +658,7 @@ render' mip = do
 
   -- COLUMNS section
   writeSectionHeader "COLUMNS"
-  let cols :: Map Column (Map String Rational)
+  let cols :: Map v (Map v c)
       cols = Map.fromListWith Map.union
              [ (v, Map.singleton l d)
              | (Just l, xs) <-
@@ -668,7 +668,7 @@ render' mip = do
              ]
       f col xs =
         forM_ (Map.toList xs) $ \(row, d) -> do
-          writeFields ["", unintern col, row, showValue d]
+          writeFields ["", MIP.fromVar col, MIP.fromVar row, showValue d]
       ivs = MIP.integerVariables mip `Set.union` MIP.semiIntegerVariables mip
   forM_ (Map.toList (Map.filterWithKey (\col _ -> col `Set.notMember` ivs) cols)) $ \(col, xs) -> f col xs
   unless (Set.null ivs) $ do
@@ -680,14 +680,14 @@ render' mip = do
   let rs = [(fromJust $ MIP.constrLabel c, rhs) | c <- MIP.constraints mip ++ MIP.userCuts mip, let ((_,rhs),_) = splitRange c, rhs /= 0]
   writeSectionHeader "RHS"
   forM_ rs $ \(name, val) -> do
-    writeFields ["", "rhs", name, showValue val]
+    writeFields ["", "rhs", MIP.fromVar name, showValue val]
 
   -- RANGES section
   let rngs = [(fromJust $ MIP.constrLabel c, fromJust rng) | c <- MIP.constraints mip ++ MIP.userCuts mip, let ((_,_), rng) = splitRange c, isJust rng]
   unless (null rngs) $ do
     writeSectionHeader "RANGES"
     forM_ rngs $ \(name, val) -> do
-      writeFields ["", "rhs", name, showValue val]
+      writeFields ["", "rhs", MIP.fromVar name, showValue val]
 
   -- BOUNDS section
   writeSectionHeader "BOUNDS"
@@ -696,28 +696,28 @@ render' mip = do
     case (lb,ub)  of
       (MIP.NegInf, MIP.PosInf) -> do
         -- free variable (no lower or upper bound)
-        writeFields ["FR", "bound", unintern col]
+        writeFields ["FR", "bound", MIP.fromVar col]
                   
       (MIP.Finite 0, MIP.Finite 1) | vt == MIP.IntegerVariable -> do
         -- variable is binary (equal 0 or 1)
-        writeFields ["BV", "bound", unintern col] 
+        writeFields ["BV", "bound", MIP.fromVar col] 
 
       (MIP.Finite a, MIP.Finite b) | a == b -> do
         -- variable is fixed at the specified value
-        writeFields ["FX", "bound", unintern col, showValue a]
+        writeFields ["FX", "bound", MIP.fromVar col, showValue a]
 
       _ -> do
         case lb of
           MIP.PosInf -> error "should not happen"
           MIP.NegInf -> do
             -- Minus infinity
-            writeFields ["MI", "bound", unintern col]
+            writeFields ["MI", "bound", MIP.fromVar col]
           MIP.Finite 0 | vt == MIP.ContinuousVariable -> return ()
           MIP.Finite a -> do
             let t = case vt of
                       MIP.IntegerVariable -> "LI" -- lower bound for integer variable
                       _ -> "LO" -- Lower bound
-            writeFields [t, "bound", unintern col, showValue a]
+            writeFields [t, "bound", MIP.fromVar col, showValue a]
 
         case ub of
           MIP.NegInf -> error "should not happen"
@@ -725,7 +725,7 @@ render' mip = do
           MIP.PosInf -> do
             when (vt == MIP.SemiContinuousVariable || vt == MIP.SemiIntegerVariable) $
               error "cannot express +inf upper bound of semi-continuous or semi-integer variable"
-            writeFields ["PL", "bound", unintern col] -- Plus infinity
+            writeFields ["PL", "bound", MIP.fromVar col] -- Plus infinity
           MIP.Finite a -> do
             let t = case vt of
                       MIP.SemiContinuousVariable -> "SC" -- Upper bound for semi-continuous variable
@@ -734,7 +734,7 @@ render' mip = do
                         "SC"
                       MIP.IntegerVariable -> "UI" -- Upper bound for integer variable
                       _ -> "UP" -- Upper bound
-            writeFields [t, "bound", unintern col, showValue a]
+            writeFields [t, "bound", MIP.fromVar col, showValue a]
 
   -- QMATRIX section
   -- Gurobiは対称行列になっていないと "qmatrix isn't symmetric" というエラーを発生させる
@@ -742,7 +742,7 @@ render' mip = do
   unless (Map.null qm) $ do
     writeSectionHeader "QMATRIX"
     forM_ (Map.toList qm) $ \(((v1,v2), val)) -> do
-      writeFields ["", unintern v1, unintern v2, showValue val]
+      writeFields ["", MIP.fromVar v1, MIP.fromVar v2, showValue val]
 
   -- SOS section
   unless (null (MIP.sosConstraints mip)) $ do
@@ -751,9 +751,9 @@ render' mip = do
       let t = case MIP.sosType sos of
                 MIP.S1 -> "S1"
                 MIP.S2 -> "S2"
-      writeFields $ t : maybeToList (MIP.sosLabel sos)
+      writeFields $ t : maybeToList (fmap MIP.fromVar (MIP.sosLabel sos))
       forM_ (MIP.sosBody sos) $ \(var,val) -> do
-        writeFields ["", unintern var, showValue val]
+        writeFields ["", MIP.fromVar var, showValue val]
 
   -- QCMATRIX section
   let xs = [ (fromJust $ MIP.constrLabel c, qm)
@@ -764,9 +764,9 @@ render' mip = do
   unless (null xs) $ do
     forM_ xs $ \(row, qm) -> do
       -- The name starts in column 12 in fixed formats.
-      writeSectionHeader $ "QCMATRIX" ++ replicate 3 ' ' ++ row
+      writeSectionHeader $ "QCMATRIX" ++ replicate 3 ' ' ++ MIP.fromVar row
       forM_ (Map.toList qm) $ \((v1,v2), val) -> do
-        writeFields ["", unintern v1, unintern v2, showValue val]
+        writeFields ["", MIP.fromVar v1, MIP.fromVar v2, showValue val]
 
   -- INDICATORS section
   -- Note: Gurobi-5.6.3 does not support this section.
@@ -775,7 +775,7 @@ render' mip = do
     writeSectionHeader "INDICATORS"
     forM_ ics $ \c -> do
       let Just (var,val) = MIP.constrIndicator c
-      writeFields ["IF", fromJust (MIP.constrLabel c), unintern var, showValue val]
+      writeFields ["IF", MIP.fromVar $ fromJust (MIP.constrLabel c), MIP.fromVar var, showValue val]
 
   -- ENDATA section
   writeSectionHeader "ENDATA"
@@ -827,24 +827,26 @@ writeFields xs = f1 xs >> writeChar '\n'
     f6 [x] = writeString x
     f6 _ = error "MPSFile: >6 fields (this should not happen)"
 
-showValue :: Rational -> String
-showValue c =
+showValue :: (RealFrac c) => c -> String
+showValue x =
   if denominator c == 1
     then show (numerator c)
     else show (fromRational c :: Double)
- 
-nameRows :: MIP.Problem -> MIP.Problem
+  where
+    c = realToFrac x
+
+nameRows :: (MIP.IsVar v, RealFrac c) => MIP.Problem v c -> MIP.Problem v c
 nameRows mip
   = mip
   { MIP.objectiveFunction = (MIP.objectiveFunction mip){ MIP.objLabel = Just objName' }
-  , MIP.constraints = f (MIP.constraints mip) ["row" ++ show n | n <- [(1::Int)..]]
-  , MIP.userCuts = f (MIP.userCuts mip) ["usercut" ++ show n | n <- [(1::Int)..]]
-  , MIP.sosConstraints = g (MIP.sosConstraints mip) ["sos" ++ show n | n <- [(1::Int)..]]
+  , MIP.constraints = f (MIP.constraints mip) [fromString $ "row" ++ show n | n <- [(1::Int)..]]
+  , MIP.userCuts = f (MIP.userCuts mip) [fromString $ "usercut" ++ show n | n <- [(1::Int)..]]
+  , MIP.sosConstraints = g (MIP.sosConstraints mip) [fromString $ "sos" ++ show n | n <- [(1::Int)..]]
   }
   where
     objName = MIP.objLabel $ MIP.objectiveFunction mip
     used = Set.fromList $ catMaybes $ objName : [MIP.constrLabel c | c <- MIP.constraints mip ++ MIP.userCuts mip] ++ [MIP.sosLabel c | c <- MIP.sosConstraints mip]
-    objName' = fromMaybe (head [name | n <- [(1::Int)..], let name = "obj" ++ show n, name `Set.notMember` used]) objName
+    objName' = fromMaybe (head [name | n <- [(1::Int)..], let name = fromString ("obj" ++ show n), name `Set.notMember` used]) objName
 
     f [] _ = []
     f (c:cs) (name:names)
@@ -858,7 +860,7 @@ nameRows mip
       | name `Set.notMember` used = c{ MIP.sosLabel = Just name } : g cs names
       | otherwise = g (c:cs) names
 
-quadMatrix :: MIP.Expr -> Map (MIP.Var, MIP.Var) Rational
+quadMatrix :: (MIP.IsVar v, RealFrac c) => MIP.Expr v c -> Map (v, v) c
 quadMatrix e = Map.fromList $ do
   let m = Map.fromListWith (+) [(if v1<=v2 then (v1,v2) else (v2,v1), c) | MIP.Term c [v1,v2] <- MIP.terms e]
   ((v1,v2),c) <- Map.toList m
@@ -867,12 +869,12 @@ quadMatrix e = Map.fromList $ do
   else
     [((v1,v2), c/2), ((v2,v1), c/2)]
 
-checkAtMostQuadratic :: MIP.Problem -> Bool
+checkAtMostQuadratic :: forall v c. (MIP.IsVar v, RealFrac c) => MIP.Problem v c -> Bool
 checkAtMostQuadratic mip =  all (all f . MIP.terms) es
   where
     es = MIP.objExpr (MIP.objectiveFunction mip) :
          [lhs | c <- MIP.constraints mip ++ MIP.userCuts mip, let lhs = MIP.constrExpr c]
-    f :: MIP.Term -> Bool
+    f :: MIP.Term v c -> Bool
     f (MIP.Term _ [_]) = True
     f (MIP.Term _ [_,_]) = True
     f _ = False

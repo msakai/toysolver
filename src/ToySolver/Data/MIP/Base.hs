@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -14,6 +15,7 @@
 -----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Base
   ( Problem (..)
+  , IsVar (..)
   , Expr (..)
   , varExpr
   , constExpr
@@ -26,8 +28,6 @@ module ToySolver.Data.MIP.Base
   , (.<=.)
   , (.>=.)
   , Bounds
-  , Label
-  , Var
   , VarType (..)
   , BoundExpr
   , Extended (..)
@@ -37,8 +37,6 @@ module ToySolver.Data.MIP.Base
   , defaultBounds
   , defaultLB
   , defaultUB
-  , toVar
-  , fromVar
   , getVarType
   , getBounds
   , variables
@@ -59,30 +57,36 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Interned (intern, unintern)
-import Data.Interned.String
+import Data.String
 import Data.ExtendedReal
 import Data.OptDir
 import System.IO (TextEncoding)
+
+import Data.Interned
+import qualified Data.Text as T
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.Interned.String as IS
+import qualified Data.Interned.Text as IT
+import qualified Data.Interned.ByteString as IBS
 
 infix 4 .<=., .>=., .==.
 
 -- ---------------------------------------------------------------------------
 
 -- | Problem
-data Problem
+data Problem v c
   = Problem
   { name :: Maybe String
-  , objectiveFunction :: ObjectiveFunction
-  , constraints :: [Constraint]
-  , sosConstraints :: [SOSConstraint]
-  , userCuts :: [Constraint]
-  , varType :: Map Var VarType
-  , varBounds :: Map Var Bounds
+  , objectiveFunction :: ObjectiveFunction v c
+  , constraints :: [Constraint v c]
+  , sosConstraints :: [SOSConstraint v c]
+  , userCuts :: [Constraint v c]
+  , varType :: Map v VarType
+  , varBounds :: Map v (Bounds c)
   }
   deriving (Show, Eq, Ord)
 
-instance Default Problem where
+instance Num c => Default (Problem v c) where
   def = Problem
         { name = Nothing
         , objectiveFunction = def
@@ -93,21 +97,42 @@ instance Default Problem where
         , varBounds = Map.empty
         }
 
+class (Ord v, IsString v) => IsVar v where
+  fromVar :: v -> String
+  
+instance IsVar String where
+  fromVar = id
+  
+instance IsVar BS.ByteString where
+  fromVar = BS.unpack
+  
+instance IsVar T.Text where
+  fromVar = T.unpack
+
+instance IsVar IS.InternedString where
+  fromVar = unintern
+
+instance IsVar IBS.InternedByteString where
+  fromVar = fromVar . unintern
+  
+instance IsVar IT.InternedText where
+  fromVar = fromVar . unintern
+
 -- | expressions
-newtype Expr = Expr [Term]
+newtype Expr v c = Expr [Term v c]
   deriving (Eq, Ord, Show)
 
-varExpr :: Var -> Expr
+varExpr :: Num c => v -> Expr v c
 varExpr v = Expr [Term 1 [v]]
 
-constExpr :: Rational -> Expr
+constExpr :: (Num c, Eq c) => c -> Expr v c
 constExpr 0 = Expr []
 constExpr c = Expr [Term c []]
            
-terms :: Expr -> [Term]
+terms :: Expr v c -> [Term v c]
 terms (Expr ts) = ts
 
-instance Num Expr where
+instance Num c => Num (Expr v c) where
   Expr e1 + Expr e2 = Expr (e1 ++ e2)
   Expr e1 * Expr e2 = Expr [Term (c1*c2) (vs1 ++ vs2) | Term c1 vs1 <- e1, Term c2 vs2 <- e2]
   negate (Expr e) = Expr [Term (-c) vs | Term c vs <- e]
@@ -117,60 +142,60 @@ instance Num Expr where
   fromInteger c = Expr [Term (fromInteger c) []]
 
 -- | terms
-data Term = Term Rational [Var]
+data Term v c = Term c [v]
   deriving (Eq, Ord, Show)
 
 -- | objective function
-data ObjectiveFunction
+data ObjectiveFunction v c
   = ObjectiveFunction
-  { objLabel :: Maybe Label
+  { objLabel :: Maybe v
   , objDir :: OptDir
-  , objExpr :: Expr
+  , objExpr :: Expr v c
   }
   deriving (Eq, Ord, Show)
 
-instance Default ObjectiveFunction where
+instance Default (ObjectiveFunction v c) where
   def =
     ObjectiveFunction
     { objLabel = Nothing
     , objDir = OptMin
-    , objExpr = 0
+    , objExpr = Expr [] -- 0
     }
 
 -- | constraint
-data Constraint
+data Constraint v c
   = Constraint
-  { constrLabel     :: Maybe Label
-  , constrIndicator :: Maybe (Var, Rational)
-  , constrExpr      :: Expr
-  , constrLB        :: BoundExpr
-  , constrUB        :: BoundExpr
+  { constrLabel     :: Maybe v
+  , constrIndicator :: Maybe (v, c)
+  , constrExpr      :: Expr v c
+  , constrLB        :: BoundExpr c
+  , constrUB        :: BoundExpr c
   , constrIsLazy    :: Bool
   }
   deriving (Eq, Ord, Show)
 
-(.==.) :: Expr -> Expr -> Constraint
+(.==.) :: Real c => Expr v c -> Expr v c -> Constraint v c
 lhs .==. rhs =
   case splitConst (lhs - rhs) of
     (e, c) -> def{ constrExpr = e, constrLB = Finite (- c), constrUB = Finite (- c) }
 
-(.<=.) :: Expr -> Expr -> Constraint
+(.<=.) :: Real c => Expr v c -> Expr v c -> Constraint v c
 lhs .<=. rhs =
   case splitConst (lhs - rhs) of
     (e, c) -> def{ constrExpr = e, constrUB = Finite (- c) }
 
-(.>=.) :: Expr -> Expr -> Constraint
+(.>=.) :: Real c => Expr v c -> Expr v c -> Constraint v c
 lhs .>=. rhs =
   case splitConst (lhs - rhs) of
     (e, c) -> def{ constrExpr = e, constrLB = Finite (- c) }
 
-splitConst :: Expr -> (Expr, Rational)
+splitConst :: Num c => Expr v c -> (Expr v c, c)
 splitConst e = (e2, c)
   where
     e2 = Expr [t | t@(Term _ (_:_)) <- terms e]
     c = sum [c | Term c [] <- terms e]
     
-instance Default Constraint where
+instance Real c => Default (Constraint v c) where
   def = Constraint
         { constrLabel = Nothing
         , constrIndicator = Nothing
@@ -193,16 +218,10 @@ instance Default VarType where
   def = ContinuousVariable
 
 -- | type for representing lower/upper bound of variables
-type Bounds = (BoundExpr, BoundExpr)
-
--- | label
-type Label = String
-
--- | variable
-type Var = InternedString
+type Bounds c = (BoundExpr c, BoundExpr c)
 
 -- | type for representing lower/upper bound of variables
-type BoundExpr = Extended Rational
+type BoundExpr c = Extended c
 
 -- | relational operators
 data RelOp = Le | Ge | Eql
@@ -215,85 +234,77 @@ data SOSType
     deriving (Eq, Ord, Enum, Show, Read)
 
 -- | SOS (special ordered sets) constraints
-data SOSConstraint
+data SOSConstraint v c
   = SOSConstraint
-  { sosLabel :: Maybe Label
+  { sosLabel :: Maybe v
   , sosType  :: SOSType
-  , sosBody  :: [(Var, Rational)]
+  , sosBody  :: [(v, c)]
   }
   deriving (Eq, Ord, Show)
 
-class Variables a where
-  vars :: a -> Set Var
+class IsVar v => Variables v a where
+  vars :: a -> Set v
 
-instance Variables a => Variables [a] where
+instance Variables v a => Variables v [a] where
   vars = Set.unions . map vars
 
-instance (Variables a, Variables b) => Variables (Either a b) where
+instance (Variables v a, Variables v b) => Variables v (Either a b) where
   vars (Left a)  = vars a
   vars (Right b) = vars b
 
-instance Variables Problem where
+instance IsVar v => Variables v (Problem v c) where
   vars = variables
 
-instance Variables Expr where
+instance IsVar v => Variables v (Expr v c) where
   vars (Expr e) = vars e
 
-instance Variables Term where
+instance IsVar v => Variables v (Term v c) where
   vars (Term _ xs) = Set.fromList xs
 
-instance Variables ObjectiveFunction where
+instance IsVar v => Variables v (ObjectiveFunction v c) where
   vars ObjectiveFunction{ objExpr = e } = vars e
 
-instance Variables Constraint where
+instance IsVar v => Variables v (Constraint v c) where
   vars Constraint{ constrIndicator = ind, constrExpr = e } = Set.union (vars e) vs2
     where
       vs2 = maybe Set.empty (Set.singleton . fst) ind
 
-instance Variables SOSConstraint where
+instance IsVar v => Variables v (SOSConstraint v c) where
   vars SOSConstraint{ sosBody = xs } = Set.fromList (map fst xs)
 
 -- | default bounds
-defaultBounds :: Bounds
+defaultBounds :: Real c => Bounds c
 defaultBounds = (defaultLB, defaultUB)
 
 -- | default lower bound (0)
-defaultLB :: BoundExpr
+defaultLB :: Real c => BoundExpr c
 defaultLB = 0
 
 -- | default upper bound (+∞)
-defaultUB :: BoundExpr
+defaultUB :: Real c => BoundExpr c
 defaultUB = PosInf
 
--- | convert a string into a variable
-toVar :: String -> Var
-toVar = intern
-
--- | convert a variable into a string
-fromVar :: Var -> String
-fromVar = unintern
-
 -- | looking up bounds for a variable
-getVarType :: Problem -> Var -> VarType
+getVarType :: Ord v => Problem v c -> v -> VarType
 getVarType mip v = Map.findWithDefault def v (varType mip)
 
 -- | looking up bounds for a variable
-getBounds :: Problem -> Var -> Bounds
+getBounds :: (Ord v, Real c) => Problem v c -> v -> Bounds c
 getBounds mip v = Map.findWithDefault defaultBounds v (varBounds mip)
 
-intersectBounds :: Bounds -> Bounds -> Bounds
+intersectBounds :: Ord c => Bounds c -> Bounds c -> Bounds c
 intersectBounds (lb1,ub1) (lb2,ub2) = (max lb1 lb2, min ub1 ub2)
 
-variables :: Problem -> Set Var
+variables :: IsVar v => Problem v c -> Set v
 variables mip = Map.keysSet $ varType mip
 
-integerVariables :: Problem -> Set Var
+integerVariables :: IsVar v => Problem v c -> Set v
 integerVariables mip = Map.keysSet $ Map.filter (IntegerVariable ==) (varType mip)
 
-semiContinuousVariables :: Problem -> Set Var
+semiContinuousVariables :: IsVar v => Problem v c -> Set v
 semiContinuousVariables mip = Map.keysSet $ Map.filter (SemiContinuousVariable ==) (varType mip)
 
-semiIntegerVariables :: Problem -> Set Var
+semiIntegerVariables :: IsVar v => Problem v c -> Set v
 semiIntegerVariables mip = Map.keysSet $ Map.filter (SemiIntegerVariable ==) (varType mip)
 
 data FileOptions

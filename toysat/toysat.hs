@@ -32,10 +32,12 @@ import qualified Data.Map as Map
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 import Data.Char
+import Data.Interned.Text
 import Data.IORef
 import Data.List
 import Data.Maybe
 import Data.Ord
+import Data.Ratio
 import Data.Word
 import qualified Data.Vector.Unboxed as V
 import Data.Version
@@ -923,7 +925,7 @@ mainMIP opt solver args = do
       _ -> showHelp stderr >> exitFailure
   solveMIP opt solver mip
 
-solveMIP :: Options -> SAT.Solver -> MIP.Problem -> IO ()
+solveMIP :: Options -> SAT.Solver -> MIP.Problem InternedText Rational -> IO ()
 solveMIP opt solver mip = do
   enc <- Tseitin.newEncoderWithPBLin solver
   Tseitin.setUsePB enc (optLinearizerPB opt)

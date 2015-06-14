@@ -37,7 +37,7 @@ import qualified ToySolver.Data.MIP.LPFile as LPFile
 import qualified ToySolver.Data.MIP.MPSFile as MPSFile
 
 -- | Parse .lp or .mps file based on file extension
-readFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+readFile :: (IsVar v, RealFrac c) => FileOptions -> FilePath -> IO (Either ParseError (Problem v c))
 readFile opt fname =
   case map toLower (takeExtension fname) of
     ".lp"  -> readLPFile opt fname
@@ -45,29 +45,29 @@ readFile opt fname =
     ext -> ioError $ userError $ "unknown extension: " ++ ext
 
 -- | Parse a file containing LP file data.
-readLPFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+readLPFile :: (IsVar v, RealFrac c) => FileOptions -> FilePath -> IO (Either ParseError (Problem v c))
 readLPFile = LPFile.parseFile
 
 -- | Parse a file containing MPS file data.
-readMPSFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+readMPSFile :: (IsVar v, RealFrac c) => FileOptions -> FilePath -> IO (Either ParseError (Problem v c))
 readMPSFile = MPSFile.parseFile
 
 -- | Parse a string containing LP file data.
-parseLPString :: FileOptions -> SourceName -> String -> Either ParseError Problem
+parseLPString :: (IsVar v, RealFrac c) => FileOptions -> SourceName -> String -> Either ParseError (Problem v c)
 parseLPString = LPFile.parseString
 
 -- | Parse a string containing MPS file data.
-parseMPSString :: FileOptions -> SourceName -> String -> Either ParseError Problem
+parseMPSString :: (IsVar v, RealFrac c) => FileOptions -> SourceName -> String -> Either ParseError (Problem v c)
 parseMPSString = MPSFile.parseString
 
-writeFile :: FileOptions -> FilePath -> Problem -> IO ()
+writeFile :: (IsVar v, RealFrac c) => FileOptions -> FilePath -> Problem v c -> IO ()
 writeFile opt fname prob =
   case map toLower (takeExtension fname) of
     ".lp"  -> writeLPFile opt fname prob
     ".mps" -> writeMPSFile opt fname prob
     ext -> ioError $ userError $ "unknown extension: " ++ ext
 
-writeLPFile :: FileOptions -> FilePath -> Problem -> IO ()
+writeLPFile :: (IsVar v, RealFrac c) => FileOptions -> FilePath -> Problem v c -> IO ()
 writeLPFile opt fname prob =
   case LPFile.render opt prob of
     Left err -> ioError $ userError err
@@ -78,7 +78,7 @@ writeLPFile opt fname prob =
           Just enc -> hSetEncoding h enc
         hPutStr h s
 
-writeMPSFile :: FileOptions -> FilePath -> Problem -> IO ()
+writeMPSFile :: (IsVar v, RealFrac c) => FileOptions -> FilePath -> Problem v c -> IO ()
 writeMPSFile opt fname prob = 
   case MPSFile.render opt prob of
     Left err -> ioError $ userError err
@@ -89,8 +89,8 @@ writeMPSFile opt fname prob =
           Just enc -> hSetEncoding h enc
         hPutStr h s
 
-toLPString :: FileOptions -> Problem -> Either String String
+toLPString :: (IsVar v, RealFrac c) => FileOptions -> Problem v c -> Either String String
 toLPString = LPFile.render
 
-toMPSString :: FileOptions -> Problem -> Either String String
+toMPSString :: (IsVar v, RealFrac c) => FileOptions -> Problem v c -> Either String String
 toMPSString = MPSFile.render

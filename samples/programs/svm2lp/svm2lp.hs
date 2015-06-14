@@ -9,6 +9,8 @@ import Data.Maybe
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
+import Data.String
+import Data.Interned.Text
 import ToySolver.Data.MIP ((.==.), (.>=.))
 import qualified ToySolver.Data.MIP as MIP
 import System.Console.GetOpt
@@ -30,7 +32,7 @@ loadFile fname = do
       case words s of
         (y : xs) -> (read (dropWhile ('+'==) y), IntMap.fromList [(read v, read val) | x <- xs, let [v,val] = splitOn ":" x])
 
-primal :: Maybe Double -> Problem -> MIP.Problem
+primal :: Maybe Double -> Problem -> MIP.Problem InternedText Rational
 primal c prob
   = def
   { MIP.objectiveFunction = def
@@ -55,15 +57,15 @@ primal c prob
   where
     m = length prob
     n = fst $ IntMap.findMax $ IntMap.unions (map snd prob)
-    w = IntMap.fromList [(j, MIP.toVar ("w_" ++ show j)) | j <- [1..n]]
-    b = MIP.toVar "b"
-    xi = [MIP.toVar ("xi_" ++ show i) | i <- [1..m]]
+    w = IntMap.fromList [(j, fromString ("w_" ++ show j)) | j <- [1..n]]
+    b = fromString "b"
+    xi = [fromString ("xi_" ++ show i) | i <- [1..m]]
 
 dual
   :: Maybe Double
   -> (IntMap Double -> IntMap Double -> Double)
   -> Problem
-  -> MIP.Problem
+  -> MIP.Problem InternedText Rational
 dual c kernel prob
   = def
   { MIP.objectiveFunction = def
@@ -82,7 +84,7 @@ dual c kernel prob
   }
   where
     m = length prob
-    a = [MIP.toVar ("a_" ++ show i) | i <- [1..m]]
+    a = [fromString ("a_" ++ show i) | i <- [1..m]]
 
 dot :: Num a => IntMap a -> IntMap a -> a
 dot a b = sum $ IntMap.elems $ IntMap.intersectionWith (*) a b

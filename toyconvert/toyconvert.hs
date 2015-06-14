@@ -19,6 +19,7 @@ import Data.Char
 import Data.Default.Class
 import Data.Maybe
 import qualified Data.Foldable as F
+import Data.Interned.Text
 import qualified Data.Text.Lazy.Builder as TextBuilder
 import qualified Data.Text.Lazy.IO as TLIO
 import qualified Data.Traversable as T
@@ -115,7 +116,7 @@ header = unlines
 data Problem
   = ProbOPB PBFile.Formula
   | ProbWBO PBFile.SoftFormula
-  | ProbMIP MIP.Problem
+  | ProbMIP (MIP.Problem InternedText Rational)
 
 readProblem :: [Flag] -> String -> IO Problem
 readProblem o fname = do

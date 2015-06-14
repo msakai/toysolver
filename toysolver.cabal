@@ -146,6 +146,7 @@ Library
      multiset,
      -- createSystemRandom requires mwc-random >=0.13.1.0
      mwc-random >=0.13.1 && <0.14,
+     text,
      OptDir,
      parse-dimacs,
      parsec >=3.1.2 && <4,
@@ -375,6 +376,7 @@ Executable toysat
     data-default-class,
     directory,
     filepath,
+    intern,
     mwc-random,
     parsec,
     parse-dimacs,
@@ -489,6 +491,7 @@ Executable toyconvert
     bytestring-builder,
     data-default-class,
     filepath,
+    intern,
     parse-dimacs,
     pseudo-boolean,
     text,
@@ -610,6 +613,7 @@ Executable svm2lp
     base,
     containers,
     data-default-class,
+    intern,
     split,
     toysolver
   Default-Language: Haskell2010

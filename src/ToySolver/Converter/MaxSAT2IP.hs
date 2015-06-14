@@ -21,5 +21,5 @@ import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.PB2IP as PB2IP
 
-convert :: Bool -> MaxSAT.WCNF -> (MIP.Problem, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
+convert :: MIP.IsVar v => Bool -> MaxSAT.WCNF -> (MIP.Problem v Rational, SAT.Model -> Map v Rational, Map v Rational -> SAT.Model)
 convert useIndicator wcnf = PB2IP.convertWBO useIndicator (MaxSAT2WBO.convert wcnf)

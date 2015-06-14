@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, BangPatterns #-}
+{-# LANGUAGE OverloadedStrings, BangPatterns, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
@@ -42,6 +42,7 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.STRef
+import Data.String
 import Data.OptDir
 import System.IO
 import Text.Parsec hiding (label)
@@ -55,11 +56,11 @@ import ToySolver.Internal.TextUtil (readUnsignedInteger)
 
 -- | Parse a string containing LP file data.
 -- The source name is only | used in error messages and may be the empty string.
-parseString :: MIP.FileOptions -> SourceName -> String -> Either ParseError MIP.Problem
+parseString :: (MIP.IsVar v, RealFrac c) => MIP.FileOptions -> SourceName -> String -> Either ParseError (MIP.Problem v c)
 parseString _ = parse (parser <* eof)
 
 -- | Parse a file containing LP file data.
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError MIP.Problem)
+parseFile :: (MIP.IsVar v, RealFrac c) => MIP.FileOptions -> FilePath -> IO (Either ParseError (MIP.Problem v c))
 parseFile opt fname = do
   h <- openFile fname ReadMode
   case MIP.optFileEncoding opt of
@@ -100,14 +101,16 @@ ident = tok $ do
     syms1 = "!\"#$%&()/,;?@_`'{}|~"
     syms2 = '.' : syms1
 
-variable :: Parser MIP.Var
-variable = liftM MIP.toVar ident
+variable :: IsString s => Parser s
+variable = do
+  s <- ident
+  return $! fromString s
 
-label :: Parser MIP.Label
+label :: IsString s => Parser s
 label = do
   name <- ident
   tok $ char ':'
-  return name
+  return $! fromString name
 
 reserved :: Set String
 reserved = Set.fromList
@@ -123,7 +126,7 @@ reserved = Set.fromList
 -- ---------------------------------------------------------------------------
 
 -- | LP file parser
-parser :: Parser MIP.Problem
+parser :: (MIP.IsVar v, RealFrac c) => Parser (MIP.Problem v c)
 parser = do
   name <- optionMaybe $ try $ do
     spaces
@@ -178,7 +181,7 @@ parser = do
     , MIP.varBounds         = Map.fromAscList [ (v, Map.findWithDefault MIP.defaultBounds v bnds2) | v <- Set.toAscList vs]
     }
 
-problem :: Parser MIP.ObjectiveFunction
+problem :: (MIP.IsVar v, RealFrac c) => Parser (MIP.ObjectiveFunction v c)
 problem = do
   flag <-  (try minimize >> return OptMin)
        <|> (try maximize >> return OptMax)
@@ -195,7 +198,7 @@ end = tok $ string' "end"
 
 -- ---------------------------------------------------------------------------
 
-constraintSection :: Parser [MIP.Constraint]
+constraintSection :: (MIP.IsVar v, RealFrac c) => Parser [MIP.Constraint v c]
 constraintSection = subjectTo >> many (try (constraint False))
 
 subjectTo :: Parser ()
@@ -207,7 +210,7 @@ subjectTo = msum
         >> tok (char '.') >> return ()
   ]
 
-constraint :: Bool -> Parser MIP.Constraint
+constraint :: (MIP.IsVar v, RealFrac c) => Bool -> Parser (MIP.Constraint v c)
 constraint isLazy = do
   name <- optionMaybe (try label)
 
@@ -249,21 +252,21 @@ relOp = tok $ msum
                      ]
   ]
 
-lazyConstraintsSection :: Parser [MIP.Constraint]
+lazyConstraintsSection :: (MIP.IsVar v, RealFrac c) => Parser [MIP.Constraint v c]
 lazyConstraintsSection = do
   tok $ string' "lazy"
   tok $ string' "constraints"
   many $ try $ constraint True
 
-userCutsSection :: Parser [MIP.Constraint]
+userCutsSection :: (MIP.IsVar v, RealFrac c) => Parser [MIP.Constraint v c]
 userCutsSection = do
   tok $ string' "user"
   tok $ string' "cuts"
   many $ try $ constraint False
 
-type Bounds2 = (Maybe MIP.BoundExpr, Maybe MIP.BoundExpr)
+type Bounds2 c = (Maybe (MIP.BoundExpr c), Maybe (MIP.BoundExpr c))
 
-boundsSection :: Parser (Map MIP.Var MIP.Bounds)
+boundsSection :: (MIP.IsVar v, RealFrac c) => Parser (Map v (MIP.Bounds c))
 boundsSection = do
   tok $ string' "bound" >> optional (char' 's')
   liftM (Map.map g . Map.fromListWith f) $ many (try bound)
@@ -273,7 +276,7 @@ boundsSection = do
                  , fromMaybe MIP.defaultUB ub
                  )
 
-bound :: Parser (MIP.Var, Bounds2)
+bound :: (MIP.IsVar v, RealFrac c) => Parser (v, Bounds2 c)
 bound = msum
   [ try $ do
       v <- try variable
@@ -304,7 +307,7 @@ bound = msum
       return (v, (b1, b2))
   ]
 
-boundExpr :: Parser MIP.BoundExpr
+boundExpr :: (RealFrac c) => Parser (MIP.BoundExpr c)
 boundExpr = msum 
   [ try (tok (char '+') >> inf >> return MIP.PosInf)
   , try (tok (char '-') >> inf >> return MIP.NegInf)
@@ -319,22 +322,22 @@ inf = tok (string "inf" >> optional (string "inity"))
 
 -- ---------------------------------------------------------------------------
 
-generalSection :: Parser [MIP.Var]
+generalSection :: MIP.IsVar v => Parser [v]
 generalSection = do
   tok $ string' "gen" >> optional (string' "eral" >> optional (string' "s"))
   many (try variable)
 
-binarySection :: Parser [MIP.Var]
+binarySection :: MIP.IsVar v => Parser [v]
 binarySection = do
   tok $ string' "bin" >> optional (string' "ar" >> (string' "y" <|> string' "ies"))
   many (try variable)
 
-semiSection :: Parser [MIP.Var]
+semiSection :: MIP.IsVar v => Parser [v]
 semiSection = do
   tok $ string' "semi" >> optional (string' "-continuous" <|> string' "s")
   many (try variable)
 
-sosSection :: Parser [MIP.SOSConstraint]
+sosSection :: (MIP.IsVar v, RealFrac c) => Parser [MIP.SOSConstraint v c]
 sosSection = do
   tok $ string' "sos"
   many $ try $ do
@@ -354,10 +357,10 @@ sosSection = do
 
 -- ---------------------------------------------------------------------------
 
-expr :: Parser MIP.Expr
+expr :: forall v c. (MIP.IsVar v, RealFrac c) => Parser (MIP.Expr v c)
 expr = try expr1 <|> return 0
   where
-    expr1 :: Parser MIP.Expr
+    expr1 :: Parser (MIP.Expr v c)
     expr1 = do
       t <- term True
       ts <- many (term False)
@@ -366,7 +369,7 @@ expr = try expr1 <|> return 0
 sign :: Num a => Parser a
 sign = tok ((char '+' >> return 1) <|> (char '-' >> return (-1)))
 
-term :: Bool -> Parser MIP.Expr
+term :: (MIP.IsVar v, RealFrac c) => Bool -> Parser (MIP.Expr v c)
 term flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
@@ -375,7 +378,7 @@ term flag = do
     Nothing -> e
     Just d -> MIP.constExpr d * e
 
-qexpr :: Parser MIP.Expr
+qexpr :: (MIP.IsVar v, RealFrac c) => Parser (MIP.Expr v c)
 qexpr = do
   tok (char '[')
   t <- qterm True
@@ -387,7 +390,7 @@ qexpr = do
       return $ MIP.constExpr (1/2) * e)
    <|> return e
 
-qterm :: Bool -> Parser MIP.Term
+qterm :: (MIP.IsVar v, RealFrac c) => Bool -> Parser (MIP.Term v c)
 qterm flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
@@ -396,19 +399,19 @@ qterm flag = do
     Nothing -> MIP.Term 1 es
     Just d -> MIP.Term d es
 
-qfactor :: Parser [MIP.Var]
+qfactor :: (MIP.IsVar v) => Parser [v]
 qfactor = do
   v <- variable
   msum [ tok (char '^') >> tok (char '2') >> return [v,v]
        , return [v]
        ]
 
-number :: Parser Rational
+number :: RealFrac c => Parser c
 number = tok $ do
   b <- (do{ x <- nat; y <- option 0 frac; return (fromInteger x + y) })
     <|> frac
   c <- option 0 e
-  return (b*10^^c)
+  return $ fromRational (b*10^^c)
   where
     digits = many1 digit
 
@@ -446,13 +449,13 @@ writeChar c = tell $ showChar c
 -- ---------------------------------------------------------------------------
 
 -- | Render a problem into a string.
-render :: MIP.FileOptions -> MIP.Problem -> Either String String
+render :: (MIP.IsVar v, RealFrac c) => MIP.FileOptions -> MIP.Problem v c -> Either String String
 render _ mip = Right $ execM $ render' $ normalize mip
 
-writeVar :: MIP.Var -> M ()
+writeVar :: MIP.IsVar v => v -> M ()
 writeVar v = writeString $ MIP.fromVar v
 
-render' :: MIP.Problem -> M ()
+render' :: (MIP.IsVar v, RealFrac c) => MIP.Problem v c -> M ()
 render' mip = do
   case MIP.name mip of
     Just name -> writeString $ "\\* Problem: " ++ name ++ " *\\\n"
@@ -532,7 +535,7 @@ render' mip = do
   writeString "END\n"
 
 -- FIXME: Gurobi は quadratic term が最後に一つある形式でないとダメっぽい
-renderExpr :: Bool -> MIP.Expr -> M ()
+renderExpr :: forall v c. (MIP.IsVar v, RealFrac c) => Bool -> MIP.Expr v c -> M ()
 renderExpr isObj e = fill 80 (ts1 ++ ts2)
   where
     (ts,qts) = partition isLin (MIP.terms e)
@@ -548,23 +551,25 @@ renderExpr isObj e = fill 80 (ts1 ++ ts2)
         -- SCIP-3.1.0 does not allow spaces between '/' and '2'.
         ["+ ["] ++ map g qts ++ [if isObj then "] /2" else "]"]
 
-    f :: MIP.Term -> String
+    f :: MIP.Term v c -> String
     f (MIP.Term c [])  = showConstTerm c
     f (MIP.Term c [v]) = showCoeff c ++ MIP.fromVar v
     f _ = error "should not happen"
 
-    g :: MIP.Term -> String
+    g :: MIP.Term v c -> String
     g (MIP.Term c vs) = 
       (if isObj then showCoeff (2*c) else showCoeff c) ++
       intercalate " * " (map MIP.fromVar vs)
 
-showValue :: Rational -> String
-showValue c =
+showValue :: (RealFrac c) => c -> String
+showValue x =
   if denominator c == 1
     then show (numerator c)
     else show (fromRational c :: Double)
+  where
+    c = realToFrac x
 
-showCoeff :: Rational -> String
+showCoeff :: (RealFrac c) => c -> String
 showCoeff c =
   if c' == 1
     then s
@@ -573,24 +578,24 @@ showCoeff c =
     c' = abs c
     s = if c >= 0 then "+ " else "- "
 
-showConstTerm :: Rational -> String
+showConstTerm :: (RealFrac c) => c -> String
 showConstTerm c = s ++ v
   where
     s = if c >= 0 then "+ " else "- "
     v = showValue (abs c)
 
-renderLabel :: Maybe MIP.Label -> M ()
+renderLabel :: MIP.IsVar v => Maybe v -> M ()
 renderLabel l =
   case l of
     Nothing -> return ()
-    Just s -> writeString s >> writeString ": "
+    Just s -> writeString (MIP.fromVar s) >> writeString ": "
 
 renderOp :: MIP.RelOp -> M ()
 renderOp MIP.Le = writeString "<="
 renderOp MIP.Ge = writeString ">="
 renderOp MIP.Eql = writeString "="
 
-renderConstraint :: MIP.Constraint -> M ()
+renderConstraint :: (MIP.IsVar v, RealFrac c) => MIP.Constraint v c -> M ()
 renderConstraint c@MIP.Constraint{ MIP.constrExpr = e, MIP.constrLB = lb, MIP.constrUB = ub } = do
   renderLabel (MIP.constrLabel c)
   case MIP.constrIndicator c of
@@ -613,12 +618,12 @@ renderConstraint c@MIP.Constraint{ MIP.constrExpr = e, MIP.constrLB = lb, MIP.co
   writeChar ' '
   writeString $ showValue val
 
-renderBoundExpr :: MIP.BoundExpr -> M ()
+renderBoundExpr :: (RealFrac c) => MIP.BoundExpr c -> M ()
 renderBoundExpr (MIP.Finite r) = writeString $ showValue r
 renderBoundExpr MIP.NegInf = writeString "-inf"
 renderBoundExpr MIP.PosInf = writeString "+inf"
 
-renderVariableList :: [MIP.Var] -> M ()
+renderVariableList :: (MIP.IsVar v) => [v] -> M ()
 renderVariableList vs = fill 80 (map MIP.fromVar vs) >> writeChar '\n'
 
 fill :: Int -> [String] -> M ()
@@ -645,10 +650,10 @@ compileExpr e = do
 
 -- ---------------------------------------------------------------------------
 
-normalize :: MIP.Problem -> MIP.Problem
+normalize :: (MIP.IsVar v, RealFrac c) => MIP.Problem v c -> MIP.Problem v c
 normalize = removeEmptyExpr . removeRangeConstraints
 
-removeRangeConstraints :: MIP.Problem -> MIP.Problem
+removeRangeConstraints :: (MIP.IsVar v, Real c) => MIP.Problem v c -> MIP.Problem v c
 removeRangeConstraints prob = runST $ do
   vsRef <- newSTRef $ MIP.variables prob
   cntRef <- newSTRef (0::Int)
@@ -657,7 +662,7 @@ removeRangeConstraints prob = runST $ do
   let gensym = do
         vs <- readSTRef vsRef
         let loop !c = do
-              let v = MIP.toVar ("~r_" ++ show c)
+              let v = fromString ("~r_" ++ show c)
               if v `Set.member` vs then
                 loop (c+1)
               else do
@@ -689,7 +694,7 @@ removeRangeConstraints prob = runST $ do
     , MIP.varBounds = MIP.varBounds prob `Map.union` (Map.fromList newvs)
     }
           
-removeEmptyExpr :: MIP.Problem -> MIP.Problem
+removeEmptyExpr :: (MIP.IsVar v, RealFrac c) => MIP.Problem v c -> MIP.Problem v c
 removeEmptyExpr prob =
   prob
   { MIP.objectiveFunction = obj{ MIP.objExpr = convertExpr (MIP.objExpr obj) }
@@ -699,7 +704,7 @@ removeEmptyExpr prob =
   where
     obj = MIP.objectiveFunction prob
     
-    convertExpr (MIP.Expr []) = MIP.Expr [MIP.Term 0 [MIP.toVar "x0"]]
+    convertExpr (MIP.Expr []) = MIP.Expr [MIP.Term 0 [fromString "x0"]]
     convertExpr e = e
 
     convertConstr constr =

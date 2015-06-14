@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.MIP2PB
@@ -8,7 +8,7 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (MultiParamTypeClasses)
+-- Portability :  non-portable (MultiParamTypeClasses, ScopedTypeVariables)
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.MIP2PB
@@ -38,10 +38,10 @@ import ToySolver.Internal.Util (revForM)
 
 -- -----------------------------------------------------------------------------
 
-convert :: MIP.Problem -> Either String (PBFile.Formula, Integer -> Rational, SAT.Model -> Map MIP.Var Integer)
+convert :: forall v. (MIP.IsVar v) => MIP.Problem v Rational -> Either String (PBFile.Formula, Integer -> Rational, SAT.Model -> Map v Integer)
 convert mip = runST $ runExceptT $ m
   where
-    m :: ExceptT String (ST s) (PBFile.Formula, Integer -> Rational, SAT.Model -> Map MIP.Var Integer)
+    m :: ExceptT String (ST s) (PBFile.Formula, Integer -> Rational, SAT.Model -> Map v Integer)
     m = do
       db <- lift $ newPBStore
       (Integer.Expr obj, otrans, mtrans) <- addMIP' db mip
@@ -50,10 +50,10 @@ convert mip = runST $ runExceptT $ m
 
 -- -----------------------------------------------------------------------------
 
-addMIP :: SAT.AddPBNL m enc => enc -> MIP.Problem -> m (Either String (Integer.Expr, Integer -> Rational, SAT.Model -> Map MIP.Var Integer))
+addMIP :: forall m enc v. (SAT.AddPBNL m enc, MIP.IsVar v) => enc -> MIP.Problem v Rational -> m (Either String (Integer.Expr, Integer -> Rational, SAT.Model -> Map v Integer))
 addMIP enc mip = runExceptT $ addMIP' enc mip
 
-addMIP' :: SAT.AddPBNL m enc => enc -> MIP.Problem -> ExceptT String m (Integer.Expr, Integer -> Rational, SAT.Model -> Map MIP.Var Integer)
+addMIP' :: forall m enc v. (SAT.AddPBNL m enc, MIP.IsVar v) => enc -> MIP.Problem v Rational -> ExceptT String m (Integer.Expr, Integer -> Rational, SAT.Model -> Map v Integer)
 addMIP' enc mip = do
   if not (Set.null nivs) then do
     throwE $ "cannot handle non-integer variables: " ++ intercalate ", " (map MIP.fromVar (Set.toList nivs))
@@ -111,7 +111,7 @@ addMIP' enc mip = do
     let transformObjVal :: Integer -> Rational
         transformObjVal val = fromIntegral val / fromIntegral d
 
-        transformModel :: SAT.Model -> Map MIP.Var Integer
+        transformModel :: SAT.Model -> Map v Integer
         transformModel m = Map.fromList
           [ (v, Integer.eval m (vmap Map.! v)) | v <- Set.toList ivs ]
 
