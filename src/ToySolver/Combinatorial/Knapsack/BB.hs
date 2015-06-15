@@ -52,7 +52,8 @@ solve items limit =
           [] -> put (is,value)
           (v,w,i):items -> do
             when (slack >= w) $ f items (slack - w) (i : is, v + value)
-            f items slack (is, value)
+            -- Drop all indistingushable items for symmetry breaking
+            f (dropWhile (\(v',w',_) -> v==v' && w==w') items) slack (is, value)
 
     computeUB :: [(Value, Weight, Int)] -> Weight -> Value -> Value
     computeUB items slack value = go items slack value
