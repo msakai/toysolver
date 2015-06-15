@@ -266,18 +266,21 @@ prop_GurvichKhachiyan1999_minimalHittingSets_minimality =
 -- ---------------------------------------------------------------------
 -- SubsetSum
 
-prop_SubsetSum_solve_isValid =
+prop_maxSubsetSum_isValid =
   forAll (liftM abs arbitrary) $ \c ->
     forAll (liftM (map abs) arbitrary) $ \ws ->
       let (obj, bs) = SubsetSum.maxSubsetSum (VU.fromList ws) c
       in obj == sum [w | (w,b) <- zip ws (VU.toList bs), b] && obj <= c
 
-prop_SubsetSum_solve_isEqualToKnapsackBBSolver =
+prop_maxSubsetSum_isEqualToKnapsackBBSolver =
   forAll (liftM abs arbitrary) $ \c ->
     forAll (liftM (map abs) arbitrary) $ \ws ->
       let (obj1, bs1) = SubsetSum.maxSubsetSum (VU.fromList ws) c
           (obj2, _, bs2) = KnapsackBB.solve [(fromIntegral w, fromIntegral w) | w <- ws] (fromIntegral c)
       in fromIntegral obj1 == obj2
+
+case_maxSubsetSum_regression_test_1 =
+  SubsetSum.maxSubsetSum (VU.fromList [4,28,5,6,18]) 25 @?= (24, VU.fromList [False,False,False,True,True])
 
 -- ---------------------------------------------------------------------
 -- Vec

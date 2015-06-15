@@ -110,8 +110,8 @@ maxSubsetSum' w !c
     m = do
       (f_buff :: STUArray s Weight Weight) <- newArray_ f_range
       (g_buff :: STUArray s Weight Weight) <- newArray_ g_range
-      (f_hist :: STUArray s Weight Int) <- newArray f_range (-1)
-      (g_hist :: STUArray s Weight Int) <- newArray g_range (-1)
+      (f_hist :: STArray s Weight [Int]) <- newArray f_range []
+      (g_hist :: STArray s Weight [Int]) <- newArray g_range []
 
       -- Initialize f_buff with f_{b-1}
       forM_ (range f_range) $ \c' -> writeArray f_buff c' 0
@@ -131,8 +131,9 @@ maxSubsetSum' w !c
                 obj1 <- readArray f_buff c'
                 obj2 <- readArray f_buff (c' - wt)
                 when (obj1 < obj2 + wt) $ do
+                  hist2 <- readArray f_hist (c' - wt)
                   writeArray f_buff c' (obj2 + wt)
-                  writeArray f_hist c' t
+                  writeArray f_hist c' (t : hist2)
 
           -- Given g_{s+1} in g_buff and s, compute g_s and update g_buff with it.
           update_gs !s = do
@@ -142,26 +143,19 @@ maxSubsetSum' w !c
                 obj1 <- readArray g_buff c'
                 obj2 <- readArray g_buff (c' + ws)
                 when (obj1 < 0 || obj1 < obj2 - ws) $ do
+                  hist2 <- readArray g_hist (c' + ws)
                   writeArray g_buff c' (max (-1) (obj2 - ws))
-                  writeArray g_hist c' s
+                  writeArray g_hist c' (s : hist2)
 
           build :: Int -> ST s (VU.Vector Bool)
           build !c' = do
             bs <- VM.new n
             forM_ [0..b-1] $ \i -> VM.write bs i True
             forM_ [b..n-1] $ \i -> VM.write bs i False
-            let rem_loop !c'' = do
-                  i <- readArray g_hist c''
-                  unless (i == -1) $ do
-                    VM.write bs i False
-                    rem_loop (c'' + (w ! i))
-            let add_loop !c'' = do
-                  i <- readArray f_hist c''
-                  unless (i == -1) $ do
-                    VM.write bs i True
-                    add_loop (c'' - (w ! i))
-            rem_loop (c - c')
-            add_loop c'
+            added <- readArray f_hist c'
+            removed <- readArray g_hist (c - c')
+            forM_ added $ \i -> VM.write bs i True
+            forM_ removed $ \i -> VM.write bs i False
             V.unsafeFreeze bs
 
       zRef <- newSTRef (-1)
