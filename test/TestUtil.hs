@@ -81,7 +81,7 @@ knapsackProblems = do
   lim <- choose (0,30)
   items <- listOf $ do
     v <- liftM abs arbitrary
-    w <- choose (1,30)
+    w <- choose (0,30)
     return (v,w)
   return (items, lim)
 
