@@ -32,15 +32,15 @@ module ToySolver.SAT.PBO.BCD2
   ) where
 
 import Control.Concurrent.STM
-import Control.Exception
 import Control.Monad
 import Data.Default.Class
 import qualified Data.IntSet as IntSet
 import qualified Data.IntMap as IntMap
+import qualified Data.Vector.Unboxed as VU
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO.Context as C
-import qualified ToySolver.Combinatorial.Knapsack.BB as Knapsack
+import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
 import Text.Printf
 
 data Options
@@ -142,19 +142,23 @@ solveWBO cxt solver opt = do
         C.logMessage cxt $ printf "BCD2: updating upper bound: %d -> %d" ub ub'
         C.addSolution cxt m
         SAT.addPBAtMost solver obj ub'
+        forM_ (IntMap.keys sels) $ \sel -> SAT.addClause solver [-sel] -- delete temporary constraints
         cont (unrelaxed, relaxed, hardened) deductedWeight cores ub' (Just m) (nsat+1,nunsat)
       else do
         core <- SAT.getFailedAssumptions solver
         case core of
           [] -> C.setFinished cxt
           [sel] | Just (info,mid) <- IntMap.lookup sel sels -> do
-            let newLB  = refine [weights IntMap.! lit | lit <- IntSet.toList (coreLits info)] mid
+            let newLB  = refine [weights IntMap.! lit | lit <- IntSet.toList (coreLits info)] (mid + 1)
                 info'  = info{ coreLB = newLB }
                 cores' = IntMap.elems $ IntMap.insert sel info' $ IntMap.map fst sels
                 lb'    = computeLB cores'
-                deductedWeight' = IntMap.unionWith (+) deductedWeight (IntMap.fromList [(lit, - d)  | let d = lb' - lb, d /= 0, lit <- IntSet.toList (coreLits info)])
+                deductedWeight' = IntMap.unionWith (+) deductedWeight $
+                  IntMap.fromList [(lit, - d)  | let d = lb' - lb, d /= 0, lit <- IntSet.toList (coreLits info)]
             C.logMessage cxt $ printf "BCD2: updating lower bound of a core"
+            C.logMessage cxt $ printf "BCD2: refine %d -> %d" (mid + 1) newLB
             SAT.addPBAtLeast solver (coreCostFun info') (coreLB info') -- redundant, but useful for direct search
+            forM_ (IntMap.keys sels) $ \sel -> SAT.addClause solver [-sel] -- delete temporary constraints
             cont (unrelaxed, relaxed, hardened) deductedWeight' cores' ub lastModel (nsat,nunsat+1)
           _ -> do
             let coreSet     = IntSet.fromList core
@@ -166,17 +170,20 @@ solveWBO cxt solver opt = do
                 delta       = minimum $ [mid - coreLB info + 1 | (info,mid) <- intersected] ++ 
                                         [weights IntMap.! lit | lit <- IntSet.toList torelax]
                 newLits     = IntSet.unions $ torelax : [coreLits info | (info,_) <- intersected]
+                mergedLB    = sum [coreLB info | (info,_) <- intersected] + delta
                 mergedCore  = CoreInfo
                               { coreLits = newLits
-                              , coreLB = refine [weights IntMap.! lit | lit <- IntSet.toList relaxed'] (sum [coreLB info | (info,_) <- intersected] + delta - 1)
+                              , coreLB = refine [weights IntMap.! lit | lit <- IntSet.toList relaxed'] mergedLB
                               }
                 cores'      = mergedCore : rest
                 lb'         = computeLB cores'
-                deductedWeight' = IntMap.unionWith (+) deductedWeight (IntMap.fromList [(lit, - d)  | let d = lb' - lb, d /= 0, lit <- IntSet.toList newLits])
+                deductedWeight' = IntMap.unionWith (+) deductedWeight $
+                                    IntMap.fromList [(lit, - d) | let d = lb' - lb, d /= 0, lit <- IntSet.toList newLits]
             if null intersected then do
               C.logMessage cxt $ printf "BCD2: found a new core of size %d" (IntSet.size torelax)              
             else do
               C.logMessage cxt $ printf "BCD2: merging cores"
+            C.logMessage cxt $ printf "BCD2: refine %d -> %d" mergedLB (coreLB mergedCore)
             SAT.addPBAtLeast solver (coreCostFun mergedCore) (coreLB mergedCore) -- redundant, but useful for direct search
             forM_ (IntMap.keys sels) $ \sel -> SAT.addClause solver [-sel] -- delete temporary constraints
             cont (unrelaxed', relaxed', hardened) deductedWeight' cores' ub lastModel (nsat,nunsat+1)
@@ -197,29 +204,15 @@ solveWBO cxt solver opt = do
       where
         lb = computeLB cores
 
--- | The smallest integer greater than @n@ that can be obtained by summing a subset of @ws@.
+-- | The smallest integer greater-than or equal-to @n@ that can be obtained by summing a subset of @ws@.
+-- Note that the definition is different from the one in Morgado et al.
 refine
   :: [Integer] -- ^ @ws@
   -> Integer   -- ^ @n@
   -> Integer
-refine ws n = n+1
-{-
-refine ws n = assert (n+1 <= result) $ result
-  where
-    sum_ws = sum ws
-    (v,_,_) = Knapsack.solve [(fromInteger w, fromInteger w) | w <- ws] (fromInteger (sum_ws - n - 1))
-    result = sum_ws - floor v
--}
-{-
-minimize Σ wi xi = Σ wi (1 - ¬xi) = Σ wi - (Σ wi ¬xi)
-subject to Σ wi xi > n
-
-maximize Σ wi ¬xi
-subject to Σ wi ¬xi ≤ (Σ wi) - n - 1
-
-Σ wi xi > n
-Σ wi (1 - ¬xi) > n
-(Σ wi) - (Σ wi ¬xi) > n
-(Σ wi ¬xi) < (Σ wi) - n
-(Σ wi ¬xi) ≤ (Σ wi) - n - 1
--}
+refine ws n
+  | sum ws <= fromIntegral (maxBound :: Int) && n <= fromIntegral (maxBound :: Int) =
+      case SubsetSum.minSubsetSum (VU.fromList (map fromIntegral ws)) (fromIntegral n) of
+        Nothing -> n
+        Just (obj, _) -> fromIntegral obj
+  | otherwise = n

@@ -183,6 +183,7 @@ Library
      ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999
      ToySolver.Combinatorial.Knapsack.BB
      ToySolver.Combinatorial.Knapsack.DP
+     ToySolver.Combinatorial.SubsetSum
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.MaxSAT2IP
@@ -672,6 +673,7 @@ Test-suite TestUtil
   Build-depends:
     base >=4 && <5,
     containers,
+    vector,
     toysolver,
     tasty >=0.10.1,
     tasty-hunit ==0.9.*,

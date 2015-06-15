@@ -12,6 +12,7 @@ import qualified Data.IntSet as IntSet
 import Data.Ratio
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Vector.Unboxed as VU
 import Test.QuickCheck.Function
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
@@ -27,6 +28,7 @@ import qualified ToySolver.Combinatorial.Knapsack.DP as KnapsackDP
 import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996 as FredmanKhachiyan1996
 import qualified ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999 as GurvichKhachiyan1999
+import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
 import qualified ToySolver.Wang as Wang
 
 case_showRationalAsDecimal :: IO ()
@@ -260,6 +262,22 @@ prop_GurvichKhachiyan1999_minimalHittingSets_minimality =
       else
         forAll (elements (IntSet.toList s)) $ \v ->
           not $ IntSet.delete v s `isHittingSetOf` g
+
+-- ---------------------------------------------------------------------
+-- SubsetSum
+
+prop_SubsetSum_solve_isValid =
+  forAll (liftM abs arbitrary) $ \c ->
+    forAll (liftM (map abs) arbitrary) $ \ws ->
+      let (obj, bs) = SubsetSum.maxSubsetSum (VU.fromList ws) c
+      in obj == sum [w | (w,b) <- zip ws (VU.toList bs), b] && obj <= c
+
+prop_SubsetSum_solve_isEqualToKnapsackBBSolver =
+  forAll (liftM abs arbitrary) $ \c ->
+    forAll (liftM (map abs) arbitrary) $ \ws ->
+      let (obj1, bs1) = SubsetSum.maxSubsetSum (VU.fromList ws) c
+          (obj2, _, bs2) = KnapsackBB.solve [(fromIntegral w, fromIntegral w) | w <- ws] (fromIntegral c)
+      in fromIntegral obj1 == obj2
 
 -- ---------------------------------------------------------------------
 -- Vec
