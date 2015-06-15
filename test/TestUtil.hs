@@ -274,7 +274,7 @@ prop_SubsetSum_solve_isValid =
 
 prop_SubsetSum_solve_isEqualToKnapsackBBSolver =
   forAll (liftM abs arbitrary) $ \c ->
-    forAll (liftM (map ((1+) . abs)) arbitrary) $ \ws ->
+    forAll (liftM (map abs) arbitrary) $ \ws ->
       let (obj1, bs1) = SubsetSum.solve (VU.fromList ws) c
           (obj2, _, bs2) = KnapsackBB.solve [(fromIntegral w, fromIntegral w) | w <- ws] (fromIntegral c)
       in fromIntegral obj1 == obj2
