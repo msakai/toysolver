@@ -255,7 +255,7 @@ normalizePBLinAtLeast :: PBLinAtLeast -> PBLinAtLeast
 normalizePBLinAtLeast a =
   case step1 a of
     (xs,n)
-      | n > 0     -> step3 (saturate n xs, n)
+      | n > 0     -> step3 (xs,n)
       | otherwise -> ([], 0) -- trivially true
   where
     step1 :: PBLinAtLeast -> PBLinAtLeast
@@ -263,16 +263,15 @@ normalizePBLinAtLeast a =
       case normalizePBLinSum (xs,-n) of
         (ys,m) -> (ys, -m)
 
-    -- degree以上の係数はそこで抑える。
-    saturate :: Integer -> PBLinSum -> PBLinSum
-    saturate n xs = [assert (c>0) (min n c, l) | (c,l) <- xs]
-
-    -- omega test と同様の係数の gcd による単純化
+    -- saturation + gcd reduction
     step3 :: PBLinAtLeast -> PBLinAtLeast
-    step3 ([],n) = ([],n)
-    step3 (xs,n) = ([(c `div` d, l) | (c,l) <- xs], (n+d-1) `div` d)
-      where
-        d = foldl1' gcd [c | (c,_) <- xs]
+    step3 (xs,n) =
+      case [c | (c,_) <- xs, assert (c>0) (c < n)] of
+        [] -> ([(1,l) | (c,l) <- xs], 1)
+        cs ->
+          let d = foldl1' gcd cs
+              m = (n+d-1) `div` d
+          in ([(if c >= n then m else c `div` d, l) | (c,l) <- xs], m)
 
 -- | normalizing PB constraint of the form /c1 x1 + c2 cn ... cn xn = b/.
 normalizePBLinExactly :: PBLinExactly -> PBLinExactly
