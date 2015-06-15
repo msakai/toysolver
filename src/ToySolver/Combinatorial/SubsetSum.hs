@@ -21,7 +21,8 @@
 -----------------------------------------------------------------------------
 module ToySolver.Combinatorial.SubsetSum
   ( Weight
-  , solve
+  , maxSubsetSum
+  , minSubsetSum
   ) where
 
 import Control.Exception (assert)
@@ -40,7 +41,7 @@ type Weight = Int
 -- | Maximize Σ_{i=1}^n wi xi subject to Σ_{i=1}^n wi xi ≤ c and xi ∈ {0,1}.
 --
 -- Note: 0 (resp. 1) is identified with False (resp. True) in the assignment.
-solve
+maxSubsetSum
   :: V.Vector v Weight
   => v Weight -- ^ weights @[w1, w2 .. wn]@
   -> Weight -- ^ capacity @c@
@@ -49,11 +50,11 @@ solve
   -- * the objective value Σ_{i=1}^n wi xi, and
   --
   -- * the assignment @[x1, x2 .. xn]@, identifying 0 (resp. 1) with @False@ (resp. @True@).
-solve w c
-  | c < 0 = error $ "SubsetSum.solve: capacity " ++ show c ++ " should be non-negative"
-  | Just x <- V.find (<0) w = error $ "ToySolver.Combinatorial.SubsetSum.solve: weight " ++ show x ++ " should be non-negative"
+maxSubsetSum w c
+  | c < 0 = error $ "SubsetSum.maxSubsetSum: capacity " ++ show c ++ " should be non-negative"
+  | Just x <- V.find (<0) w = error $ "ToySolver.Combinatorial.SubsetSum.maxSubsetSum: weight " ++ show x ++ " should be non-negative"
   | Just _ <- V.find (>c) w =
-      let (obj,bs) = solve' (V.filter (<=c) w) c
+      let (obj,bs) = maxSubsetSum' (V.filter (<=c) w) c
           bs2 = VU.create $ do
             v <- VM.new (V.length w)
             let loop !i !j =
@@ -67,10 +68,10 @@ solve w c
             loop 0 0
             return v
       in (obj, bs2)
-  | otherwise = solve' w c
+  | otherwise = maxSubsetSum' w c
 
-solve' :: V.Vector v Weight => v Weight -> Weight -> (Weight, VU.Vector Bool)
-solve' w !c
+maxSubsetSum' :: V.Vector v Weight => v Weight -> Weight -> (Weight, VU.Vector Bool)
+maxSubsetSum' w !c
   | wsum <= fromIntegral c = (fromIntegral wsum, V.replicate n True)
   | otherwise = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST m
   where
@@ -196,3 +197,41 @@ solve' w !c
               else -- t /= n-1
                 m2
       loop b (b-1) True
+
+
+-- | Minimize Σ_{i=1}^n wi xi subject to Σ_{i=1}^n wi x≥ l and xi ∈ {0,1}.
+--
+-- Note: 0 (resp. 1) is identified with False (resp. True) in the assignment.
+minSubsetSum
+  :: V.Vector v Weight
+  => v Weight -- ^ weights @[w1, w2 .. wn]@
+  -> Weight -- ^ @l@
+  -> Maybe (Weight, VU.Vector Bool)
+  -- ^
+  -- * the objective value Σ_{i=1}^n wi xi, and
+  --
+  -- * the assignment @[x1, x2 .. xn]@, identifying 0 (resp. 1) with @False@ (resp. @True@).
+minSubsetSum w l
+  | wsum < fromIntegral l = Nothing
+  | fromIntegral (maxBound :: Int) < wsum =
+      error $ "SubsetSum.minSubsetSum: sum of weights " ++ show wsum ++ " is too big to be fitted in Int"
+  | otherwise =
+      case maxSubsetSum w (fromIntegral wsum - l) of
+        (obj, bs) -> Just (fromIntegral wsum - obj, V.map not bs)
+  where
+    -- Integer is used to avoid integer overflow
+    wsum :: Integer
+    wsum = V.foldl' (\r x -> r + fromIntegral x) 0 w
+  
+{-
+minimize Σ wi xi = Σ wi (1 - ¬xi) = Σ wi - (Σ wi ¬xi)
+subject to Σ wi xi ≥ n
+
+maximize Σ wi ¬xi
+subject to Σ wi ¬xi ≤ (Σ wi) - n
+
+Σ wi xi ≥ n
+Σ wi (1 - ¬xi) ≥ n
+(Σ wi) - (Σ wi ¬xi) ≥ n
+(Σ wi ¬xi) ≤ (Σ wi) - n
+-}
