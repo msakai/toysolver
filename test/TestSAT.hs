@@ -600,14 +600,30 @@ prop_getAssumptionsImplications = QM.monadicIO $ do
 -- = -4*(1 - x1) + 3*x1 + 10*(not x2)
 -- = -4 + 4*x1 + 3*x1 + 10*(not x2)
 -- = 7*x1 + 10*(not x2) - 4
-case_normalizePBLinSum :: Assertion
-case_normalizePBLinSum = do
+case_normalizePBLinSum_1 :: Assertion
+case_normalizePBLinSum_1 = do
   sort e @?= sort [(7,x1),(10,-x2)]
   c @?= -4
   where
     x1 = 1
     x2 = 2
     (e,c) = normalizePBLinSum ([(-4,-x1),(3,x1),(10,-x2)], 0)
+
+prop_normalizePBLinSum :: Property
+prop_normalizePBLinSum = forAll g $ \(nv, (s,n)) ->
+    let (s2,n2) = normalizePBLinSum (s,n)
+    in flip all [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \(m :: Model) ->
+         evalPBLinSum m s + n == evalPBLinSum m s2 + n2
+  where
+    g :: Gen (Int, (PBLinSum, Integer))
+    g = do
+      nv <- choose (0, 10)
+      s <- forM [1..nv] $ \x -> do
+        c <- arbitrary
+        p <- arbitrary
+        return (c, literal x p)
+      n <- arbitrary
+      return (nv, (s,n))
 
 -- -4*(not x1) + 3*x1 + 10*(not x2) >= 3
 -- ⇔ -4*(1 - x1) + 3*x1 + 10*(not x2) >= 3
@@ -628,7 +644,7 @@ prop_normalizePBLinAtLeast = forAll g $ \(nv, c) ->
     in flip all [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \(m :: Model) ->
          evalPBLinAtLeast m c == evalPBLinAtLeast m c2
   where
-    g :: Gen (Int, (PBLinSum, Integer))
+    g :: Gen (Int, PBLinAtLeast)
     g = do
       nv <- choose (0, 10)
       lhs <- forM [1..nv] $ \x -> do
@@ -653,6 +669,22 @@ case_normalizePBLinExactly_2 = (sort lhs, rhs) @?= ([], 1)
     x3 = 3
     (lhs,rhs) = normalizePBLinExactly ([(2,x1),(2,x2),(2,x3)], 3)
 
+prop_normalizePBLinExactly :: Property
+prop_normalizePBLinExactly = forAll g $ \(nv, c) ->
+    let c2 = normalizePBLinExactly c
+    in flip all [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \(m :: Model) ->
+         evalPBLinExactly m c == evalPBLinExactly m c2
+  where
+    g :: Gen (Int, PBLinExactly)
+    g = do
+      nv <- choose (0, 10)
+      lhs <- forM [1..nv] $ \x -> do
+        c <- arbitrary
+        p <- arbitrary
+        return (c, literal x p)
+      rhs <- arbitrary
+      return (nv, (lhs,rhs))
+
 case_cutResolve_1 :: Assertion
 case_cutResolve_1 = (sort lhs, rhs) @?= (sort [(1,x3),(1,x4)], 1)
   where
@@ -674,7 +706,7 @@ case_cutResolve_2 = (sort lhs, rhs) @?= (sort lhs2, rhs2)
     pb1 = ([(3,x1), (2,-x2), (1,x3), (1,x4)], 3)
     pb2 = ([(1,-x3), (1,x4)], 1)
     (lhs,rhs) = cutResolve pb1 pb2 x3
-    (lhs2,rhs2) = ([(1,-2),(1,4),(2,1)],2) -- ([(3,x1),(2,-x2),(2,x4)], 3)
+    (lhs2,rhs2) = ([(2,x1),(1,-x2),(1,x4)],2) -- ([(3,x1),(2,-x2),(2,x4)], 3)
 
 case_cardinalityReduction :: Assertion
 case_cardinalityReduction = (sort lhs, rhs) @?= ([1,2,3,4,5],4)
@@ -705,6 +737,20 @@ case_normalizeXORClause_case1 =
 -- x ⊕ ¬x = x ⊕ x ⊕ 1 = 1
 case_normalizeXORClause_case2 =
   normalizeXORClause ([1,-1],True) @?= ([],False)
+
+prop_normalizeXORClause :: Property
+prop_normalizeXORClause = forAll g $ \(nv, c) ->
+    let c2 = normalizeXORClause c
+    in flip all [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \(m :: Model) ->
+         evalXORClause m c == evalXORClause m c2
+  where
+    g :: Gen (Int, XORClause)
+    g = do
+      nv <- choose (0, 10)
+      len <- choose (0, nv)
+      lhs <- replicateM len $ choose (-nv, nv) `suchThat` (/= 0)
+      rhs <- arbitrary
+      return (nv, (lhs,rhs))
 
 case_evalXORClause_case1 =
   evalXORClause (array (1,2) [(1,True),(2,True)] :: Array Int Bool) ([1,2], True) @?= False
