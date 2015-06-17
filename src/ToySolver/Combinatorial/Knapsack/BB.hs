@@ -18,7 +18,7 @@ module ToySolver.Combinatorial.Knapsack.BB
   , solve
   ) where
 
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Data.Function (on)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
