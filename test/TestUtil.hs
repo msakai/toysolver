@@ -282,6 +282,13 @@ prop_maxSubsetSum_isEqualToKnapsackBBSolver =
 case_maxSubsetSum_regression_test_1 =
   SubsetSum.maxSubsetSum (VU.fromList [4,28,5,6,18]) 25 @?= (24, VU.fromList [False,False,False,True,True])
 
+prop_subsetSum_isValid =
+  forAll arbitrary $ \c ->
+    forAll arbitrary $ \ws ->
+      case SubsetSum.subsetSum (VU.fromList ws) c of
+        Just bs -> sum [w | (w,b) <- zip ws (VU.toList bs), b] == c
+        Nothing -> True
+
 -- ---------------------------------------------------------------------
 -- Vec
 

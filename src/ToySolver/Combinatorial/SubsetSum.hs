@@ -21,6 +21,7 @@
 -----------------------------------------------------------------------------
 module ToySolver.Combinatorial.SubsetSum
   ( Weight
+  , subsetSum
   , maxSubsetSum
   , minSubsetSum
   ) where
@@ -31,6 +32,8 @@ import Control.Monad
 import Control.Monad.ST
 import Data.STRef
 import Data.Array.ST
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import Data.Vector.Generic ((!))
 import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Generic.Mutable as VM
@@ -229,3 +232,53 @@ subject to Σ wi ¬xi ≤ (Σ wi) - n
 (Σ wi) - (Σ wi ¬xi) ≥ n
 (Σ wi ¬xi) ≤ (Σ wi) - n
 -}
+
+-- | Solve Σ_{i=1}^n wi x = c and xi ∈ {0,1}.
+--
+-- Note that this is different from usual definition of the subset sum problem,
+-- as this definition allows all xi to be zero.
+-- 
+-- Note: 0 (resp. 1) is identified with False (resp. True) in the assignment.
+subsetSum
+  :: V.Vector v Weight
+  => v Weight -- ^ weights @[w1, w2 .. wn]@
+  -> Weight -- ^ @l@
+  -> Maybe (VU.Vector Bool)
+  -- ^
+  -- the assignment @[x1, x2 .. xn]@, identifying 0 (resp. 1) with @False@ (resp. @True@).
+subsetSum w c
+  | c' < 0 = Nothing
+  | otherwise = assert (c' < fromIntegral (maxBound :: Weight)) $
+      fmap (VU.imap (\i x -> if (w V.! i) < 0 then not x else x)) $ subsetSum' w' (fromIntegral c')
+{-
+      case maxSubsetSum w' (fromIntegral c') of 
+        (obj,xs')
+          | obj /= fromIntegral c' -> Nothing
+          | otherwise -> Just $! VU.imap (\i x -> if (w V.! i) < 0 then not x else x) xs'
+-}
+  where
+    w' = VU.generate (V.length w) (\i -> abs (w V.! i))
+    offset :: Integer
+    offset = V.foldl' (\a b -> if b < 0 then a + fromIntegral b else a) 0 w
+    c' :: Integer
+    c' = fromIntegral c - offset
+
+subsetSum'
+  :: VU.Vector Weight
+  -> Weight
+  -> Maybe (VU.Vector Bool)
+subsetSum' w c = go 0 (IntMap.singleton 0 [])
+  where
+    go :: Int -> IntMap [Int] -> Maybe (VU.Vector Bool)
+    go !i !m =
+      case IntMap.lookup c m of
+        Just sol -> Just $! VU.create $ do
+          xs <- VM.replicate (V.length w) False
+          forM_ sol $ \i -> VM.write xs i True
+          return xs
+        Nothing
+          | i >= V.length w -> Nothing
+          | otherwise ->
+              let wi = w V.! i
+                  m' = m `IntMap.union` IntMap.fromDistinctAscList [(x', i:sol) | (x,sol) <- IntMap.toAscList m, let x' = x + wi, 0 <= x', x' <= c]
+              in go (i+1) m'
