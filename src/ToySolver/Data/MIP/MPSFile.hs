@@ -30,6 +30,7 @@ module ToySolver.Data.MIP.MPSFile
   , render
   ) where
 
+import Control.Applicative ((<*))
 import Control.Monad
 import Control.Monad.Writer
 import Data.Maybe
@@ -72,11 +73,11 @@ data BoundType
 -- | Parse a string containing MPS file data.
 -- The source name is only | used in error messages and may be the empty string.
 parseString :: SourceName -> String -> Either ParseError MIP.Problem
-parseString = parse parser
+parseString = parse (parser <* eof)
 
 -- | Parse a file containing MPS file data.
 parseFile :: FilePath -> IO (Either ParseError MIP.Problem)
-parseFile = parseFromFile parser
+parseFile = parseFromFile (parser <* eof)
 
 -- ---------------------------------------------------------------------------
 
@@ -197,6 +198,7 @@ parser = do
   inds <- option Map.empty indicatorsSection
 
   string "ENDATA"
+  P.spaces
 
   let objrow =
         case objname of

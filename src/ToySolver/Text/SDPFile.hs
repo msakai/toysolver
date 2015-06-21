@@ -44,6 +44,7 @@ module ToySolver.Text.SDPFile
   , parseSparseDataFile
   ) where
 
+import Control.Applicative ((<*))
 import Control.Monad
 import Data.List (intersperse)
 import Data.Ratio
@@ -103,19 +104,19 @@ diagBlock xs = Map.fromList [((i,i),x) | (i,x) <- zip [1..] xs]
 
 -- | Parse a SDPA format (.dat) string.
 parseDataString :: SourceName -> String -> Either ParseError Problem
-parseDataString = parse pDataFile
+parseDataString = parse (pDataFile <* eof)
 
 -- | Parse a SDPA format file (.dat).
 parseDataFile :: FilePath -> IO (Either ParseError Problem)
-parseDataFile = parseFromFile pDataFile
+parseDataFile = parseFromFile (pDataFile <* eof)
 
 -- | Parse a SDPA sparse format (.dat-s) string.
 parseSparseDataString :: SourceName -> String -> Either ParseError Problem
-parseSparseDataString = parse pSparseDataFile
+parseSparseDataString = parse (pSparseDataFile <* eof)
 
 -- | Parse a SDPA sparse format file (.dat-s).
 parseSparseDataFile :: FilePath -> IO (Either ParseError Problem)
-parseSparseDataFile = parseFromFile pSparseDataFile
+parseSparseDataFile = parseFromFile (pSparseDataFile <* eof)
 
 pDataFile :: Parser Problem
 pDataFile = do
@@ -125,6 +126,7 @@ pDataFile = do
   bs <- pBlockStruct -- bLOCKsTRUCT
   cs <- pCosts
   ms <- pDenseMatrices (fromIntegral m) bs
+  spaces
   return $
     Problem
     { blockStruct = bs
@@ -140,6 +142,7 @@ pSparseDataFile = do
   bs <- pBlockStruct -- bLOCKsTRUCT
   cs <- pCosts
   ms <- pSparseMatrices (fromIntegral m) bs
+  spaces
   return $
     Problem
     { blockStruct = bs

@@ -28,6 +28,7 @@ module ToySolver.Data.MIP.LPFile
   , render
   ) where
 
+import Control.Applicative ((<*))
 import Control.Monad
 import Control.Monad.Writer
 import Data.Char
@@ -51,11 +52,11 @@ import ToySolver.Internal.TextUtil (readUnsignedInteger)
 -- | Parse a string containing LP file data.
 -- The source name is only | used in error messages and may be the empty string.
 parseString :: SourceName -> String -> Either ParseError MIP.Problem
-parseString = parse parser
+parseString = parse (parser <* eof)
 
 -- | Parse a file containing LP file data.
 parseFile :: FilePath -> IO (Either ParseError MIP.Problem)
-parseFile = parseFromFile parser
+parseFile = parseFromFile (parser <* eof)
 
 -- ---------------------------------------------------------------------------
 
