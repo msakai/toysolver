@@ -61,7 +61,7 @@ solveWBO cxt solver = do
           ret <- SAT.solveWith solver (sel : IntSet.toList unrelaxed)
           if ret then do
             m <- SAT.getModel solver
-            let val = SAT.evalPBLinSum m obj
+            let val = C.evalObjectiveFunction cxt m
             let ub' = val - 1
             C.logMessage cxt $ printf "BC: updating upper bound: %d -> %d" ub ub'
             C.addSolution cxt m

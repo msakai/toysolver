@@ -17,6 +17,7 @@ module ToySolver.SAT.PBO
   -- * The @Optimizer@ type
     Optimizer
   , newOptimizer
+  , newOptimizer2
 
   -- * Solving
   , optimize
@@ -89,8 +90,11 @@ data Optimizer
   }
 
 newOptimizer :: SAT.Solver -> SAT.PBLinSum -> IO Optimizer
-newOptimizer solver obj = do
-  cxt <- C.newSimpleContext obj
+newOptimizer solver obj = newOptimizer2 solver obj (\m -> SAT.evalPBLinSum m obj)
+
+newOptimizer2 :: SAT.Solver -> SAT.PBLinSum -> (SAT.Model -> Integer) -> IO Optimizer
+newOptimizer2 solver obj obj2 = do
+  cxt <- C.newSimpleContext2 obj obj2
   strategyRef   <- newIORef def
   heuristicsRef <- newIORef defaultEnableObjFunVarsHeuristics
   trialLimitRef <- newIORef defaultTrialLimitConf
@@ -218,8 +222,8 @@ linSearch cxt solver = loop
     loop = do
       result <- SAT.solve solver
       if result then do
-        m <- SAT.getModel solver
-        let val = SAT.evalPBLinSum m obj
+        m <- SAT.getModel solver        
+        let val = C.evalObjectiveFunction cxt m
         let ub = val - 1
         C.addSolution cxt m
         SAT.addPBAtMost solver obj ub
@@ -248,7 +252,7 @@ binSearch cxt solver = loop
           ret <- SAT.solveWith solver [sel]
           if ret then do
             m <- SAT.getModel solver
-            let v = SAT.evalPBLinSum m obj
+            let v = C.evalObjectiveFunction cxt m
             let ub' = v - 1
             C.logMessage cxt $ printf "Binary Search: updating upper bound: %d -> %d" ub ub'
             C.addSolution cxt m
@@ -286,7 +290,7 @@ adaptiveSearch cxt solver trialLimitConf = loop 0
             result <- SAT.solve solver
             if result then do
               m <- SAT.getModel solver
-              let v = SAT.evalPBLinSum m obj
+              let v = C.evalObjectiveFunction cxt m
               let ub' = v - 1
               C.addSolution cxt m
               SAT.addPBAtMost solver obj ub'
@@ -309,7 +313,7 @@ adaptiveSearch cxt solver trialLimitConf = loop 0
                 let fraction' = min 0.5 (fraction + 0.1)
                 if ret then do
                   m <- SAT.getModel solver
-                  let v = SAT.evalPBLinSum m obj
+                  let v = C.evalObjectiveFunction cxt m
                   let ub' = v - 1
                   C.logMessage cxt $ printf "Adaptive Search: updating upper bound: %d -> %d" ub ub'
                   C.addSolution cxt m

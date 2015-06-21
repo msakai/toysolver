@@ -11,6 +11,7 @@ module ToySolver.SAT.PBO.Context
 
   , SimpleContext
   , newSimpleContext
+  , newSimpleContext2
   , setOnUpdateBestSolution
   , setOnUpdateLowerBound
   , setLogger
@@ -31,6 +32,7 @@ import qualified ToySolver.SAT.Types as SAT
 
 class Context a where
   getObjectiveFunction :: a -> SAT.PBLinSum
+  evalObjectiveFunction :: a -> SAT.Model -> Integer
 
   isUnsat         :: a -> STM Bool
   getBestSolution :: a -> STM (Maybe (SAT.Model, Integer))
@@ -40,6 +42,8 @@ class Context a where
   addSolution   :: a -> SAT.Model -> IO ()
   addLowerBound :: a -> Integer -> IO ()
   logMessage    :: a -> String -> IO ()
+
+  evalObjectiveFunction c m = SAT.evalPBLinSum m (getObjectiveFunction c)
 
 getBestValue :: Context a => a -> STM (Maybe Integer)
 getBestValue cxt = liftM (fmap snd) $ getBestSolution cxt
@@ -81,6 +85,7 @@ setFinished cxt = do
 data SimpleContext
   = SimpleContext
   { scGetObjectiveFunction :: SAT.PBLinSum
+  , scEvalObjectiveFunction :: SAT.Model -> Integer
 
   , scUnsatRef        :: TVar Bool
   , scBestSolutionRef :: TVar (Maybe (SAT.Model, Integer))
@@ -93,6 +98,7 @@ data SimpleContext
 
 instance Context SimpleContext where
   getObjectiveFunction = scGetObjectiveFunction
+  evalObjectiveFunction = scEvalObjectiveFunction
 
   isUnsat sc = readTVar (scUnsatRef sc)
   getBestSolution sc = readTVar (scBestSolutionRef sc)
@@ -105,7 +111,7 @@ instance Context SimpleContext where
       writeTVar (scUnsatRef sc) True
 
   addSolution sc m = do
-    let !val = SAT.evalPBLinSum m (getObjectiveFunction sc)
+    let !val = evalObjectiveFunction sc m
     join $ atomically $ do
       unsat <- isUnsat sc
       when unsat $ error "addSolution: already marked as unsatisfiable" -- FIXME: use throwSTM?
@@ -135,7 +141,10 @@ instance Context SimpleContext where
     h msg
 
 newSimpleContext :: SAT.PBLinSum -> IO SimpleContext
-newSimpleContext obj = do
+newSimpleContext obj = newSimpleContext2 obj (\m -> SAT.evalPBLinSum m obj)
+
+newSimpleContext2 :: SAT.PBLinSum -> (SAT.Model -> Integer) -> IO SimpleContext
+newSimpleContext2 obj obj2 = do
   unsatRef <- newTVarIO False
   bestsolRef <- newTVarIO Nothing
   lbRef <- newTVarIO $! SAT.pbLowerBound obj
@@ -147,6 +156,7 @@ newSimpleContext obj = do
   return $
     SimpleContext
     { scGetObjectiveFunction = obj
+    , scEvalObjectiveFunction = obj2
 
     , scUnsatRef        = unsatRef
     , scBestSolutionRef = bestsolRef
@@ -179,6 +189,8 @@ data Normalized a
 
 instance Context a => Context (Normalized a) where
   getObjectiveFunction = nObjectiveFunction
+
+  evalObjectiveFunction cxt m = evalObjectiveFunction (nBase cxt) m - nOffset cxt
 
   isUnsat cxt = isUnsat (nBase cxt)
 

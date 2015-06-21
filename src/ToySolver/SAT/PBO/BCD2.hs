@@ -80,13 +80,13 @@ solveWBO cxt solver opt = do
   best <- atomically $ C.getBestModel cxt
   case best of
     Just m -> do
-      loop (unrelaxed, relaxed, hardened) weights [] (SAT.evalPBLinSum m obj - 1) (Just m) cnt
+      loop (unrelaxed, relaxed, hardened) weights [] (C.evalObjectiveFunction cxt m - 1) (Just m) cnt
     Nothing
       | optSolvingNormalFirst opt -> do
           ret <- SAT.solve solver
           if ret then do
             m <- SAT.getModel solver
-            let val = SAT.evalPBLinSum m obj
+            let val = C.evalObjectiveFunction cxt m
             let ub' = val - 1
             C.logMessage cxt $ printf "BCD2: updating upper bound: %d -> %d" (SAT.pbUpperBound obj) ub'
             C.addSolution cxt m
@@ -137,7 +137,7 @@ solveWBO cxt solver opt = do
 
       if ret then do
         m <- SAT.getModel solver
-        let val = SAT.evalPBLinSum m obj
+        let val = C.evalObjectiveFunction cxt m
         let ub' = val - 1
         C.logMessage cxt $ printf "BCD2: updating upper bound: %d -> %d" ub ub'
         C.addSolution cxt m
