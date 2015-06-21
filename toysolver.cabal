@@ -128,7 +128,7 @@ Library
      data-interval >=1.0.1 && <1.3.0,
      finite-field >=0.7.0 && <1.0.0,
      sign >=0.2.0 && <1.0.0,
-     pseudo-boolean >=0.1.0.0 && <0.1.1.0
+     pseudo-boolean >=0.1.1.0 && <0.2.0.0
   -- NOTE: temporary-1.2.0.2 does not work with exceptions-0.6
   if flag(Exceptions06)
      Build-Depends: temporary >1.2.0.2, exceptions >=0.6
