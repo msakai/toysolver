@@ -1,0 +1,2 @@
+#!/bin/sh
+./toysat_main +RTS -H1G -K1G -RTS --maxsat --search=bcd2 --with-ubcsat=./ubcsat --ls-initial $@

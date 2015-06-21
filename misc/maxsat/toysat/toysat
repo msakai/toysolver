@@ -1,0 +1,2 @@
+#!/bin/sh
+./toysat_main +RTS -H1G -K1G -RTS --search=bcd2 --maxsat $@
