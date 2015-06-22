@@ -735,8 +735,7 @@ solveWBO opt solver isMaxSat formula initialModel = do
             PBFile.Ge -> do
               case lhs of
                 [(1,ls)] | rhs == 1 ->
-                  -- TODO: consider polarity
-                  Tseitin.encodeConj enc ls
+                  Tseitin.encodeConjWithPolarity enc Tseitin.polarityPos ls
                 _ -> do
                   sel <- SAT.newVar solver
                   PBNLC.addPBAtLeastSoft enc sel lhs rhs
