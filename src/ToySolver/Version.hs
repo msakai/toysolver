@@ -1,11 +1,13 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TemplateHaskell #-}
 module ToySolver.Version
   ( version
   , packageVersions
+  , gitHash
   ) where
 
 import Data.List
 import Data.Version
+import qualified ToySolver.Internal.GitHash as GitHash
 import Paths_toysolver
 
 packageVersions :: [(String, String)]
@@ -123,3 +125,6 @@ packageVersions = sort $ tail
   , ("logic-TPTP",   VERSION_logic_TPTP   )
 #endif
   ]
+
+gitHash :: Maybe String
+gitHash = $(GitHash.gitHashQ)

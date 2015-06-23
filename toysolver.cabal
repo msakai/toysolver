@@ -99,6 +99,7 @@ Library
   Hs-source-dirs: src
   Build-Depends:
      base >=4 && <5,
+     template-haskell,
      -- mergeWithKey requires containers >=0.5.0
      containers >=0.5.0,
      unordered-containers >=0.2.3 && <0.3.0,
@@ -158,6 +159,7 @@ Library
      TypeFamilies
      TypeSynonymInstances
      OverloadedStrings
+     TemplateHaskell
   Exposed-Modules:
      ToySolver.Arith.BoundsInference
      ToySolver.Arith.CAD
@@ -268,6 +270,7 @@ Library
   Other-Modules:
      ToySolver.Data.AlgebraicNumber.Graeffe
      ToySolver.Data.Polynomial.Base
+     ToySolver.Internal.GitHash
      Paths_toysolver
   -- GHC-Prof-Options: -auto-all
 
