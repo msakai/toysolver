@@ -446,6 +446,8 @@ printSysInfo :: IO ()
 printSysInfo = do
   tm <- getZonedTime
   putCommentLine $ printf "%s" (formatTime defaultTimeLocale "%FT%X%z" tm)
+  putCommentLine $ printf "version = %s" (showVersion version)
+  putCommentLine $ printf "githash = %s" (fromMaybe "<unknown>" gitHash)
   putCommentLine $ printf "arch = %s" SysInfo.arch
   putCommentLine $ printf "os = %s" SysInfo.os
   putCommentLine $ printf "compiler = %s %s" SysInfo.compilerName (showVersion SysInfo.compilerVersion)
