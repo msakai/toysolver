@@ -117,6 +117,12 @@ Supported formats:
 * Input formats: cnf, wcnf, opb, wbo
 * Output formats: opb, wbo, lsp, lp, mps, smp, smt2, ys
 
+Bindings
+--------
+
+* [ersatz-toysat](http://hackage.haskell.org/package/ersatz-toysat) -  toysat backend driver for [ersatz](http://hackage.haskell.org/package/ersatz)
+* [satchmo-toysat](http://hackage.haskell.org/package/satchmo-toysat) - toysat backend driver for [satchmo](http://hackage.haskell.org/package/satchmo)
+
 TODO
 ----
 
