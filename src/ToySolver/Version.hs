@@ -3,9 +3,11 @@ module ToySolver.Version
   ( version
   , packageVersions
   , gitHash
+  , compilationTime
   ) where
 
 import Data.List
+import Data.Time
 import Data.Version
 import ToySolver.Version.TH
 import Paths_toysolver
@@ -128,3 +130,6 @@ packageVersions = sort $ tail
 
 gitHash :: Maybe String
 gitHash = $(gitHashQ)
+
+compilationTime :: UTCTime
+compilationTime = $(compilationTimeQ)

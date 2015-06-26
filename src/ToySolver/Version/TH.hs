@@ -1,9 +1,13 @@
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell #-}
 {-# OPTIONS_GHC -Wall #-}
-module ToySolver.Version.TH (gitHashQ) where
+module ToySolver.Version.TH
+  ( gitHashQ
+  , compilationTimeQ
+  ) where
 
 import Control.Exception
 import Control.Monad
+import Data.Time
 import System.Process
 import Language.Haskell.TH    
 
@@ -18,3 +22,8 @@ gitHashQ = do
   case m of
     Nothing -> [| Nothing |]
     Just s -> [| Just |] `appE` litE (stringL s)
+
+compilationTimeQ :: ExpQ
+compilationTimeQ = do
+  tm <- runIO getCurrentTime
+  [| read $(litE (stringL (show tm))) :: UTCTime |] 
