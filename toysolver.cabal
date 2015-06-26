@@ -270,7 +270,7 @@ Library
   Other-Modules:
      ToySolver.Data.AlgebraicNumber.Graeffe
      ToySolver.Data.Polynomial.Base
-     ToySolver.Internal.GitHash
+     ToySolver.Version.TH
      Paths_toysolver
   -- GHC-Prof-Options: -auto-all
 

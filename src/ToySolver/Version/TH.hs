@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell #-}
 {-# OPTIONS_GHC -Wall #-}
-module ToySolver.Internal.GitHash (gitHashQ) where
+module ToySolver.Version.TH (gitHashQ) where
 
 import Control.Exception
 import Control.Monad

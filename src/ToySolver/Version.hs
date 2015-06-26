@@ -7,7 +7,7 @@ module ToySolver.Version
 
 import Data.List
 import Data.Version
-import qualified ToySolver.Internal.GitHash as GitHash
+import ToySolver.Version.TH
 import Paths_toysolver
 
 packageVersions :: [(String, String)]
@@ -127,4 +127,4 @@ packageVersions = sort $ tail
   ]
 
 gitHash :: Maybe String
-gitHash = $(GitHash.gitHashQ)
+gitHash = $(gitHashQ)
