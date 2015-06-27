@@ -796,7 +796,10 @@ solveWBO opt solver isMaxSat formula initialModel = do
         b <- PBO.isOptimum pbo
         if b then do
           putSLine "OPTIMUM FOUND"
-          pbPrintModel stdout m nv
+          if isMaxSat then
+            satPrintModel stdout m nv
+          else
+            pbPrintModel stdout m nv
           writeSOLFile opt m (Just val) nv
         else if not isMaxSat then do
           putSLine "SATISFIABLE"
