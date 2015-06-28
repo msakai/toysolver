@@ -33,16 +33,19 @@ import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.PBNLC as PBNLC
 
+allAssignments :: Int -> [Model]
+allAssignments nv = [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]]
+
 prop_solveCNF :: Property
 prop_solveCNF = QM.monadicIO $ do
   cnf@(nv,_) <- QM.pick arbitraryCNF
   solver <- arbitrarySolver
   ret <- QM.run $ solveCNF solver cnf
   case ret of
-    Just m -> QM.assert $ evalCNF m cnf == True
+    Just m -> QM.assert $ evalCNF m cnf
     Nothing -> do
-      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
-        QM.assert $ evalCNF m cnf == False
+      forM_ (allAssignments nv) $ \m -> do
+        QM.assert $ not (evalCNF m cnf)
 
 solveCNF :: Solver -> (Int,[Clause]) -> IO (Maybe Model)
 solveCNF solver (nv,cs) = do
@@ -77,10 +80,10 @@ prop_solvePB = QM.monadicIO $ do
   solver <- arbitrarySolver
   ret <- QM.run $ solvePB solver prob
   case ret of
-    Just m -> QM.assert $ evalPB m prob == True
+    Just m -> QM.assert $ evalPB m prob
     Nothing -> do
-      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
-        QM.assert $ evalPB m prob == False
+      forM_ (allAssignments nv) $ \m -> do
+        QM.assert $ not (evalPB m prob)
 
 data PBRel = PBRelGE | PBRelEQ | PBRelLE deriving (Eq, Ord, Enum, Bounded, Show)
 
@@ -141,13 +144,13 @@ prop_optimizePBO = QM.monadicIO $ do
   ret <- QM.run $ optimizePBO solver opt prob
   case ret of
     Just (m, v) -> do
-      QM.assert $ evalPB m prob == True
+      QM.assert $ evalPB m prob
       QM.assert $ evalPBLinSum m obj == v
-      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \(m2 :: Model) -> do
+      forM_ (allAssignments nv) $ \m2 -> do
         QM.assert $ not (evalPB m2 prob) || evalPBLinSum m obj <= evalPBLinSum m2 obj
     Nothing -> do
-      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
-        QM.assert $ evalPB m prob == False
+      forM_ (allAssignments nv) $ \m -> do
+        QM.assert $ not (evalPB m prob)
            
 optimizePBO :: Solver -> PBO.Optimizer -> (Int,[(PBRel,PBLinSum,Integer)]) -> IO (Maybe (Model, Integer))
 optimizePBO solver opt (nv,cs) = do
@@ -167,10 +170,10 @@ prop_solvePBNLC = QM.monadicIO $ do
   solver <- arbitrarySolver
   ret <- QM.run $ solvePBNLC solver prob
   case ret of
-    Just m -> QM.assert $ evalPBNLC m prob == True
+    Just m -> QM.assert $ evalPBNLC m prob
     Nothing -> do
-      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
-        QM.assert $ evalPBNLC m prob == False
+      forM_ (allAssignments nv) $ \m -> do
+        QM.assert $ not (evalPBNLC m prob)
 
 solvePBNLC :: Solver -> (Int,[(PBRel,PBNLC.PBSum,Integer)]) -> IO (Maybe Model)
 solvePBNLC solver (nv,cs) = do
@@ -217,10 +220,10 @@ prop_solveXOR = QM.monadicIO $ do
   solver <- arbitrarySolver
   ret <- QM.run $ solveXOR solver prob
   case ret of
-    Just m -> QM.assert $ evalXOR m prob == True
+    Just m -> QM.assert $ evalXOR m prob
     Nothing -> do
-      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
-        QM.assert $ evalXOR m prob == False
+      forM_ (allAssignments nv) $ \m -> do
+        QM.assert $ not (evalXOR m prob)
 
 solveXOR :: Solver -> (Int,[XORClause]) -> IO (Maybe Model)
 solveXOR solver (nv,cs) = do
@@ -308,10 +311,10 @@ prop_solveCNF_using_BooleanTheory = QM.monadicIO $ do
       return Nothing
 
   case ret of
-    Just m -> QM.assert $ evalCNF m cnf == True
+    Just m -> QM.assert $ evalCNF m cnf
     Nothing -> do
-      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
-        QM.assert $ evalCNF m cnf == False
+      forM_ (allAssignments nv) $ \m -> do
+        QM.assert $ not (evalCNF m cnf)
 
 -- should be SAT
 case_solve_SAT :: IO ()
@@ -624,7 +627,7 @@ prop_getAssumptionsImplications = QM.monadicIO $ do
     xs <- QM.run $ getAssumptionsImplications solver
     forM_ xs $ \x -> do
       ret2 <- QM.run $ solveWith solver (-x : ls)
-      QM.assert $ ret2 == False
+      QM.assert $ not ret2
 
 ------------------------------------------------------------------------
 
@@ -644,7 +647,7 @@ case_normalizePBLinSum_1 = do
 prop_normalizePBLinSum :: Property
 prop_normalizePBLinSum = forAll g $ \(nv, (s,n)) ->
     let (s2,n2) = normalizePBLinSum (s,n)
-    in flip all [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \(m :: Model) ->
+    in flip all (allAssignments nv) $ \m ->
          evalPBLinSum m s + n == evalPBLinSum m s2 + n2
   where
     g :: Gen (Int, (PBLinSum, Integer))
@@ -673,7 +676,7 @@ case_normalizePBLinAtLeast_1 = (sort lhs, rhs) @?= (sort [(1,x1),(1,-x2)], 1)
 prop_normalizePBLinAtLeast :: Property
 prop_normalizePBLinAtLeast = forAll g $ \(nv, c) ->
     let c2 = normalizePBLinAtLeast c
-    in flip all [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \(m :: Model) ->
+    in flip all (allAssignments nv) $ \m ->
          evalPBLinAtLeast m c == evalPBLinAtLeast m c2
   where
     g :: Gen (Int, PBLinAtLeast)
@@ -704,7 +707,7 @@ case_normalizePBLinExactly_2 = (sort lhs, rhs) @?= ([], 1)
 prop_normalizePBLinExactly :: Property
 prop_normalizePBLinExactly = forAll g $ \(nv, c) ->
     let c2 = normalizePBLinExactly c
-    in flip all [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \(m :: Model) ->
+    in flip all (allAssignments nv) $ \m ->
          evalPBLinExactly m c == evalPBLinExactly m c2
   where
     g :: Gen (Int, PBLinExactly)
@@ -773,7 +776,7 @@ case_normalizeXORClause_case2 =
 prop_normalizeXORClause :: Property
 prop_normalizeXORClause = forAll g $ \(nv, c) ->
     let c2 = normalizeXORClause c
-    in flip all [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \(m :: Model) ->
+    in flip all (allAssignments nv) $ \m ->
          evalXORClause m c == evalXORClause m c2
   where
     g :: Gen (Int, XORClause)
