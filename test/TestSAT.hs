@@ -144,7 +144,7 @@ prop_optimizePBO = QM.monadicIO $ do
       QM.assert $ evalPB m prob == True
       QM.assert $ evalPBLinSum m obj == v
       forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \(m2 :: Model) -> do
-        QM.assert $ evalPBLinSum m obj <= evalPBLinSum m2 obj
+        QM.assert $ not (evalPB m2 prob) || evalPBLinSum m obj <= evalPBLinSum m2 obj
     Nothing -> do
       forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
         QM.assert $ evalPB m prob == False
