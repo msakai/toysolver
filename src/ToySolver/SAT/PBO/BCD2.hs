@@ -36,6 +36,8 @@ import Data.IORef
 import Data.Default.Class
 import qualified Data.IntSet as IntSet
 import qualified Data.IntMap as IntMap
+import Data.Map (Map)
+import qualified Data.Map as Map
 import qualified Data.Vector.Unboxed as VU
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
@@ -65,10 +67,29 @@ data CoreInfo
   = CoreInfo
   { coreLits :: SAT.LitSet
   , coreLBRef :: !(IORef Integer)
+  , coreUBSelectors :: !(IORef (Map Integer SAT.Lit))
   }
 
+newCoreInfo :: SAT.LitSet -> Integer -> IO CoreInfo
+newCoreInfo lits lb = do
+  lbRef <- newIORef lb
+  selsRef <- newIORef Map.empty
+  return
+    CoreInfo
+    { coreLits = lits
+    , coreLBRef = lbRef
+    , coreUBSelectors = selsRef
+    }
+
+deleteCoreInfo :: SAT.Solver -> CoreInfo -> IO ()
+deleteCoreInfo solver core = do
+  m <- readIORef (coreUBSelectors core)
+  -- Delete constraints by fixing selector variables
+  forM_ (Map.elems m) $ \sel ->
+    SAT.addClause solver [-sel]
+
 getCoreLB :: CoreInfo -> IO Integer
-getCoreLB = readIORef . coreLBRef
+getCoreLB = readIORef . coreLBRef            
 
 solve :: C.Context cxt => cxt -> SAT.Solver -> Options -> IO ()
 solve cxt solver opt = solveWBO (C.normalize cxt) solver opt
@@ -145,7 +166,7 @@ solveWBO cxt solver opt = do
               -- Note: we have detected unsatisfiability
               C.logMessage cxt $ printf "BCD2: coreLB (%d) exceeds coreUB (%d)" coreLB coreUB
               SAT.addClause solver []
-              sel <- SAT.newVar solver
+              sel <- getCoreUBAssumption core coreUB
               return (sel, (core, coreUB))
             else do
               let estimated =
@@ -159,8 +180,7 @@ solveWBO cxt solver opt = do
                     if optEnableBiasedSearch opt
                     then coreLB + (estimated - coreLB) * nunsat `div` (nunsat + nsat)
                     else (coreLB + estimated) `div` 2
-              sel <- SAT.newVar solver
-              SAT.addPBAtMostSoft solver sel (coreCostFun core) mid
+              sel <- getCoreUBAssumption core mid
               return (sel, (core,mid))
 
           ret <- SAT.solveWith solver (IntMap.keys sels ++ IntSet.toList unrelaxed)
@@ -168,12 +188,10 @@ solveWBO cxt solver opt = do
           if ret then do
             modifyIORef' nsatRef (+1)
             C.addSolution cxt =<< SAT.getModel solver
-            forM_ (IntMap.keys sels) $ \sel -> SAT.addClause solver [-sel] -- delete temporary constraints
             loop
           else do
             modifyIORef' nunsatRef (+1)
             failed <- SAT.getFailedAssumptions solver
-            forM_ (IntMap.keys sels) $ \sel -> SAT.addClause solver [-sel] -- delete temporary constraints
 
             case failed of
               [] -> C.setFinished cxt
@@ -202,12 +220,9 @@ solveWBO cxt solver opt = do
                 let mergedCoreLits = IntSet.unions $ torelax : [coreLits core | (core,_) <- intersected]
                 mergedCoreLB <- liftM ((delta +) . sum) $ mapM (getCoreLB . fst) intersected
                 let mergedCoreLB' = refine [weights IntMap.! lit | lit <- IntSet.toList mergedCoreLits] mergedCoreLB
-                mergedCoreLBRef <- newIORef mergedCoreLB'
-                let mergedCore = CoreInfo
-                                 { coreLits  = mergedCoreLits
-                                 , coreLBRef = mergedCoreLBRef
-                                 }
+                mergedCore <- newCoreInfo mergedCoreLits mergedCoreLB'
                 writeIORef coresRef (mergedCore : disjoint)
+                forM_ intersected $ \(core, _) -> deleteCoreInfo solver core
 
                 if null intersected then
                   C.logMessage cxt $ printf "BCD2: found a new core of size %d: cost of the new core is >=%d"
@@ -243,6 +258,22 @@ solveWBO cxt solver opt = do
 
     coreCostFun :: CoreInfo -> SAT.PBLinSum
     coreCostFun c = [(weights IntMap.! lit, -lit) | lit <- IntSet.toList (coreLits c)]
+
+    getCoreUBAssumption :: CoreInfo -> Integer -> IO SAT.Lit
+    getCoreUBAssumption core ub = do
+      m <- readIORef (coreUBSelectors core)
+      case Map.splitLookup ub m of
+        (_, Just sel, _) -> return sel
+        (lo, Nothing, hi)  -> do
+          sel <- SAT.newVar solver
+          SAT.addPBAtMostSoft solver sel (coreCostFun core) ub
+          writeIORef (coreUBSelectors core) (Map.insert ub sel m)
+          unless (Map.null lo) $
+            SAT.addClause solver [- snd (Map.findMax lo), sel] -- snd (Map.findMax lo) → sel
+          unless (Map.null hi) $
+            SAT.addClause solver [- sel, snd (Map.findMin hi)] -- sel → Map.findMin hi
+          return sel
+
 
 -- | The smallest integer greater-than or equal-to @n@ that can be obtained by summing a subset of @ws@.
 -- Note that the definition is different from the one in Morgado et al.
