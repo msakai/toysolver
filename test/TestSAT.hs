@@ -113,21 +113,52 @@ arbitraryPB = do
   nc <- choose (0,50)
   cs <- replicateM nc $ do
     rel <- arbitrary
-    len <- choose (0,10)
-    lhs <-
-      if nv == 0 then
-        return []
-      else
-        replicateM len $ do
-          l <- choose (-nv, nv) `suchThat` (/= 0)
-          c <- arbitrary
-          return (c,l)
+    lhs <- arbitraryPBLinSum nv
     rhs <- arbitrary
     return $ (rel,lhs,rhs)
   return (nv, cs)
 
+arbitraryPBLinSum :: Int -> Gen PBLinSum
+arbitraryPBLinSum nv = do
+  len <- choose (0,10)
+  if nv == 0 then
+    return []
+  else
+    replicateM len $ do
+      l <- choose (-nv, nv) `suchThat` (/= 0)
+      c <- arbitrary
+      return (c,l)
+
 evalPB :: Model -> (Int,[(PBRel,PBLinSum,Integer)]) -> Bool
 evalPB m (_,cs) = all (\(o,lhs,rhs) -> evalPBRel o (evalPBLinSum m lhs) rhs) cs
+
+prop_optimizePBO :: Property
+prop_optimizePBO = QM.monadicIO $ do
+  prob@(nv,_) <- QM.pick arbitraryPB
+  obj <- QM.pick $ arbitraryPBLinSum nv
+  solver <- arbitrarySolver
+  opt <- arbitraryOptimizer solver obj
+  ret <- QM.run $ optimizePBO solver opt prob
+  case ret of
+    Just (m, v) -> do
+      QM.assert $ evalPB m prob == True
+      QM.assert $ evalPBLinSum m obj == v
+      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \(m2 :: Model) -> do
+        QM.assert $ evalPBLinSum m obj <= evalPBLinSum m2 obj
+    Nothing -> do
+      forM_ [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]] $ \m -> do
+        QM.assert $ evalPB m prob == False
+           
+optimizePBO :: Solver -> PBO.Optimizer -> (Int,[(PBRel,PBLinSum,Integer)]) -> IO (Maybe (Model, Integer))
+optimizePBO solver opt (nv,cs) = do
+  newVars_ solver nv
+  forM_ cs $ \(o,lhs,rhs) -> do
+    case o of
+      PBRelGE -> addPBAtLeast solver lhs rhs
+      PBRelLE -> addPBAtMost solver lhs rhs
+      PBRelEQ -> addPBExactly solver lhs rhs
+  PBO.optimize opt
+  PBO.getBestSolution opt
 
 
 prop_solvePBNLC :: Property
@@ -1324,6 +1355,17 @@ arbitrarySolver = do
     setRandomFreq solver randomFreq
     setPBSplitClausePart solver splitClausePart
     return solver
+
+arbitraryOptimizer :: Solver -> PBLinSum -> QM.PropertyM IO PBO.Optimizer
+arbitraryOptimizer solver obj = do
+  strategy <- QM.pick arbitrary
+  QM.run $ do
+    opt <- PBO.newOptimizer solver obj
+    PBO.setSearchStrategy opt strategy
+    return opt
+
+instance Arbitrary PBO.SearchStrategy where
+  arbitrary = arbitraryBoundedEnum
 
 ------------------------------------------------------------------------
 -- Test harness
