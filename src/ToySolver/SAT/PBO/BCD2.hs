@@ -142,9 +142,9 @@ solveWBO cxt solver opt = do
             coreLB <- getCoreLB core
             let coreUB = SAT.pbUpperBound (coreCostFun core)
             if coreUB < coreLB then do
-              -- Note: we have finished the search, don't we?
+              -- Note: we have detected unsatisfiability
               C.logMessage cxt $ printf "BCD2: coreLB (%d) exceeds coreUB (%d)" coreLB coreUB
-              C.setFinished cxt
+              SAT.addClause solver []
               sel <- SAT.newVar solver
               return (sel, (core, coreUB))
             else do
