@@ -33,7 +33,6 @@ module ToySolver.SAT.PBO
 
   -- * Configulation
   , SearchStrategy (..)
-  , defaultSearchStrategy
   , getSearchStrategy
   , setSearchStrategy
   , defaultEnableObjFunVarsHeuristics
@@ -64,6 +63,9 @@ import qualified ToySolver.SAT.PBO.BCD2 as BCD2
 import qualified ToySolver.SAT.PBO.UnsatBased as UnsatBased
 import qualified ToySolver.SAT.PBO.MSU4 as MSU4
 
+-- | Optimization strategy
+--
+-- The default value can be obtained by 'def'.
 data SearchStrategy
   = LinearSearch
   | BinarySearch
@@ -75,10 +77,7 @@ data SearchStrategy
   | BCD2
 
 instance Default SearchStrategy where
-  def = defaultSearchStrategy
-
-defaultSearchStrategy :: SearchStrategy
-defaultSearchStrategy = LinearSearch
+  def = LinearSearch
 
 data Optimizer
   = Optimizer

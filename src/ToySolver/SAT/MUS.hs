@@ -14,7 +14,6 @@
 module ToySolver.SAT.MUS
   ( module ToySolver.SAT.MUS.Types
   , Options (..)
-  , defaultOptions
   , findMUSAssumptions
   ) where
 
@@ -27,6 +26,8 @@ import ToySolver.SAT.Types
 import ToySolver.SAT.MUS.Types
 
 -- | Options for 'findMUSAssumptions' function
+--
+-- The default value can be obtained by 'def'.
 data Options
   = Options
   { optLogger     :: String -> IO ()
@@ -35,16 +36,12 @@ data Options
   }
 
 instance Default Options where
-  def = defaultOptions
-
--- | default 'Options' value
-defaultOptions :: Options
-defaultOptions =
-  Options
-  { optLogger     = \_ -> return ()
-  , optUpdateBest = \_ -> return ()
-  , optLitPrinter = show
-  }
+  def =
+    Options
+    { optLogger     = \_ -> return ()
+    , optUpdateBest = \_ -> return ()
+    , optLitPrinter = show
+    }
 
 -- | Find a minimal set of assumptions that causes a conflict.
 -- Initial set of assumptions is taken from 'SAT.getFailedAssumptions'.

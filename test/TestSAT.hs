@@ -3,6 +3,7 @@ module Main (main) where
 
 import Control.Monad
 import Data.Array.IArray
+import Data.Default.Class
 import Data.IORef
 import Data.List
 import Data.Set (Set)
@@ -976,7 +977,7 @@ case_MUS = do
   ret <- solveWith solver sels
   ret @?= False
 
-  actual <- MUS.findMUSAssumptions solver MUS.defaultOptions
+  actual <- MUS.findMUSAssumptions solver def
   let actual'  = IntSet.map (\x -> x-3) actual
       expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
   actual' `elem` expected @?= True
@@ -995,7 +996,7 @@ case_MUS_QuickXplain = do
   ret <- solveWith solver sels
   ret @?= False
 
-  actual <- QuickXplain.findMUSAssumptions solver QuickXplain.defaultOptions
+  actual <- QuickXplain.findMUSAssumptions solver def
   let actual'  = IntSet.map (\x -> x-3) actual
       expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
   actual' `elem` expected @?= True
@@ -1026,7 +1027,7 @@ case_camus_allMCSAssumptions = do
   addClause solver [-y4, -x2]
   addClause solver [-y5, -x1, x3]
   addClause solver [-y6, -x3]
-  actual <- CAMUS.allMCSAssumptions solver sels CAMUS.defaultOptions
+  actual <- CAMUS.allMCSAssumptions solver sels def
   let actual'   = Set.fromList actual
       expected  = map (IntSet.fromList . map (+3)) [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
       expected' = Set.fromList expected
@@ -1042,7 +1043,7 @@ case_DAA_allMCSAssumptions = do
   addClause solver [-y4, -x2]
   addClause solver [-y5, -x1, x3]
   addClause solver [-y6, -x3]
-  actual <- DAA.allMCSAssumptions solver sels DAA.defaultOptions
+  actual <- DAA.allMCSAssumptions solver sels def
   let actual'   = Set.fromList $ actual
       expected  = map (IntSet.fromList . map (+3)) [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
       expected' = Set.fromList $ expected
@@ -1058,7 +1059,7 @@ case_camus_allMUSAssumptions = do
   addClause solver [-y4, -x2]
   addClause solver [-y5, -x1, x3]
   addClause solver [-y6, -x3]
-  actual <- CAMUS.allMUSAssumptions solver sels CAMUS.defaultOptions
+  actual <- CAMUS.allMUSAssumptions solver sels def
   let actual'   = Set.fromList $ actual
       expected  = map (IntSet.fromList . map (+3)) [[1,2], [1,3,4], [1,5,6]]
       expected' = Set.fromList $ expected
@@ -1074,7 +1075,7 @@ case_DAA_allMUSAssumptions = do
   addClause solver [-y4, -x2]
   addClause solver [-y5, -x1, x3]
   addClause solver [-y6, -x3]
-  actual <- DAA.allMUSAssumptions solver sels DAA.defaultOptions
+  actual <- DAA.allMUSAssumptions solver sels def
   let actual'   = Set.fromList $ actual
       expected  = map (IntSet.fromList . map (+3)) [[1,2], [1,3,4], [1,5,6]]
       expected' = Set.fromList $ expected
@@ -1147,7 +1148,7 @@ case_camus_allMUSAssumptions_2 = do
       ret <- solveWith solver xs
       assertBool (show core ++ " should be satisfiable") ret
 
-  actual <- CAMUS.allMUSAssumptions solver sels CAMUS.defaultOptions
+  actual <- CAMUS.allMUSAssumptions solver sels def
   let actual'   = Set.fromList actual
       expected' = Set.fromList $ map IntSet.fromList $ cores
   actual' @?= expected'
@@ -1219,7 +1220,7 @@ case_HYCAM_allMUSAssumptions = do
   assertBool "failed to prove the bug of HYCAM paper" (not ret)
   
   let cand = map IntSet.fromList [[y5], [y3,y2], [y0,y1,y2]]
-  actual <- CAMUS.allMUSAssumptions solver sels CAMUS.defaultOptions{ CAMUS.optKnownCSes = cand }
+  actual <- CAMUS.allMUSAssumptions solver sels def{ CAMUS.optKnownCSes = cand }
   let actual'   = Set.fromList $ actual
       expected' = Set.fromList $ map IntSet.fromList cores
   actual' @?= expected'
@@ -1273,7 +1274,7 @@ case_DAA_allMUSAssumptions_2 = do
       ret <- solveWith solver xs
       assertBool (show core ++ " should be satisfiable") ret
 
-  actual <- DAA.allMUSAssumptions solver sels DAA.defaultOptions
+  actual <- DAA.allMUSAssumptions solver sels def
   let actual'   = Set.fromList actual
       expected' = Set.fromList $ map IntSet.fromList cores
   actual' @?= expected'

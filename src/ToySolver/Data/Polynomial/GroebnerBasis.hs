@@ -30,7 +30,6 @@ module ToySolver.Data.Polynomial.GroebnerBasis
   -- * Options
     Options (..)
   , Strategy (..)
-  , defaultOptions
 
   -- * Gröbner basis computation
   , basis
@@ -45,19 +44,19 @@ import qualified Data.Heap as H -- http://hackage.haskell.org/package/heaps
 import ToySolver.Data.Polynomial.Base (Polynomial, Monomial, MonomialOrder)
 import qualified ToySolver.Data.Polynomial.Base as P
 
+-- | Options for Gröbner Basis computation.
+--
+-- The default option can be obtained by 'def'.
 data Options
   = Options
   { optStrategy :: Strategy
   }
 
 instance Default Options where
-  def = defaultOptions
-
-defaultOptions :: Options
-defaultOptions =
-  Options
-  { optStrategy = NormalStrategy
-  }
+  def =
+    Options
+    { optStrategy = NormalStrategy
+    }
 
 data Strategy
   = NormalStrategy

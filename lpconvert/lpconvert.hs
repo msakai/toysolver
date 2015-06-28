@@ -14,6 +14,7 @@
 module Main where
 
 import Data.Char
+import Data.Default.Class
 import Data.Maybe
 import qualified Data.Version as V
 import System.Environment
@@ -150,7 +151,7 @@ transformPBFile _ opb = opb
 writeLP :: [Flag] -> MIP.Problem -> IO ()
 writeLP o mip = do
   let mip2smtOpt =
-        MIP2SMT.defaultOptions
+        def
         { MIP2SMT.optSetLogic     = listToMaybe [logic | SMTSetLogic logic <- o]
         , MIP2SMT.optCheckSAT     = not (SMTNoCheck `elem` o)
         , MIP2SMT.optProduceModel = not (SMTNoProduceModel `elem` o)

@@ -13,7 +13,6 @@
 module ToySolver.Converter.MIP2SMT
   ( convert
   , Options (..)
-  , defaultOptions
   , Language (..)
   , YicesVersion (..)
   ) where
@@ -32,6 +31,9 @@ import Text.Printf
 import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Internal.Util (showRationalAsFiniteDecimal, isInteger)
 
+-- | Translation options.
+--
+-- The default option can be obtained by 'def'.
 data Options
   = Options
   { optLanguage     :: Language
@@ -43,17 +45,14 @@ data Options
   deriving (Show, Eq, Ord)
 
 instance Default Options where
-  def = defaultOptions
-
-defaultOptions :: Options
-defaultOptions
-  = Options
-  { optLanguage     = SMTLIB2
-  , optSetLogic     = Nothing
-  , optCheckSAT     = True
-  , optProduceModel = True
-  , optOptimize     = False
-  }
+  def =
+    Options
+    { optLanguage     = SMTLIB2
+    , optSetLogic     = Nothing
+    , optCheckSAT     = True
+    , optProduceModel = True
+    , optOptimize     = False
+    }
 
 data Language
   = SMTLIB2

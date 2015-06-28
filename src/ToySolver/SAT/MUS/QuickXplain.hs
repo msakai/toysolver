@@ -20,7 +20,6 @@
 module ToySolver.SAT.MUS.QuickXplain
   ( module ToySolver.SAT.MUS.Types
   , Options (..)
-  , defaultOptions
   , findMUSAssumptions
   ) where
 

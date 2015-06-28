@@ -2,6 +2,7 @@
 module Main (main) where
 
 import Control.Monad
+import Data.Default.Class
 import Data.List
 import Data.Ratio
 import Data.VectorSpace
@@ -99,7 +100,7 @@ case_test3 = do
   ret1 <- check solver
   ret1 @?= True
 
-  ret2 <- optimize solver defaultOptions
+  ret2 <- optimize solver def
   ret2 @?= Optimum
 
 {-
@@ -133,7 +134,7 @@ case_test6 = do
   b <- isOptimal solver
   assertBool "should be optimal" $ b
 
-  ret <- dualSimplex solver defaultOptions
+  ret <- dualSimplex solver def
   ret @?= Optimum
 
   val <- getObjValue solver
@@ -170,7 +171,7 @@ case_test7 = do
   b <- isOptimal solver
   assertBool "should be optimal" $ b
 
-  ret <- dualSimplex solver defaultOptions
+  ret <- dualSimplex solver def
   ret @?= Optimum
 
   val <- getObjValue solver
@@ -218,7 +219,7 @@ case_example_3_2 = do
     , LA.var x3 .>=. LA.constant 0
     ]
 
-  ret <- optimize solver defaultOptions
+  ret <- optimize solver def
   ret @?= Optimum
   val <- getObjValue solver
   val @?= 27/5
@@ -242,7 +243,7 @@ case_example_3_5 = do
     , LA.var x5 .>=. LA.constant 0
     ]
 
-  ret <- optimize solver defaultOptions
+  ret <- optimize solver def
   ret @?= Optimum
   val <- getObjValue solver
   val @?= 19
@@ -262,7 +263,7 @@ case_example_4_1 = do
     , LA.var x1 .>=. LA.constant 0
     , LA.var x2 .>=. LA.constant 0
     ]
-  ret <- optimize solver defaultOptions
+  ret <- optimize solver def
   ret @?= Unsat
 
 case_example_4_2 = do
@@ -276,7 +277,7 @@ case_example_4_2 = do
     , LA.var x1 .>=. LA.constant 0
     , LA.var x2 .>=. LA.constant 0
     ]
-  ret <- optimize solver defaultOptions
+  ret <- optimize solver def
   ret @?= Unbounded
 
 case_example_4_3 = do
@@ -291,7 +292,7 @@ case_example_4_3 = do
     , LA.var x2 .>=. LA.constant 0
     ]
 
-  ret <- optimize solver defaultOptions
+  ret <- optimize solver def
   ret @?= Optimum
   val <- getObjValue solver
   val @?= 12
@@ -313,7 +314,7 @@ case_example_4_5 = do
     , LA.var x2 .>=. LA.constant 0
     ]
 
-  ret <- optimize solver defaultOptions
+  ret <- optimize solver def
   ret @?= Optimum
   val <- getObjValue solver
   val @?= 5
@@ -338,7 +339,7 @@ case_example_4_6 = do
     , LA.var x4 .>=. LA.constant 0
     ]
 
-  ret <- optimize solver defaultOptions
+  ret <- optimize solver def
   ret @?= Optimum
   val <- getObjValue solver
   val @?= 165/4
@@ -363,7 +364,7 @@ case_example_4_7 = do
     , LA.var x4 .>=. LA.constant 0
     ]
 
-  ret <- optimize solver defaultOptions
+  ret <- optimize solver def
   ret @?= Optimum
   val <- getObjValue solver
   val @?= 48/11
@@ -391,7 +392,7 @@ case_kuhn_7_3 = do
     , LA.var x7 .>=. LA.constant 0
     ]
 
-  ret <- optimize solver defaultOptions
+  ret <- optimize solver def
   ret @?= Optimum
   val <- getObjValue solver
   val @?= -2

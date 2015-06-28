@@ -20,7 +20,6 @@ module ToySolver.Combinatorial.HittingSet.HTCBDD
   ( Options (..)
   , Method (..)
   , Failure (..)
-  , defaultOptions
   , minimalHittingSets
   ) where
 
@@ -41,6 +40,9 @@ import System.IO
 import System.IO.Temp
 import ToySolver.Internal.ProcessUtil (runProcessWithOutputCallback)
 
+-- | Options for solving.
+--
+-- The default option can be obtained by 'def'.
 data Options
   = Options
   { optHTCBDDCommand  :: FilePath
@@ -58,16 +60,13 @@ instance Default Method where
   def = MethodToda
 
 instance Default Options where
-  def = defaultOptions
-
-defaultOptions :: Options
-defaultOptions =
-  Options
-  { optHTCBDDCommand  = "htcbdd"
-  , optMethod         = def
-  , optOnGetLine      = \_ -> return ()
-  , optOnGetErrorLine = \_ -> return ()
-  }
+  def =
+    Options
+    { optHTCBDDCommand  = "htcbdd"
+    , optMethod         = def
+    , optOnGetLine      = \_ -> return ()
+    , optOnGetErrorLine = \_ -> return ()
+    }
 
 data Failure = Failure !Int
   deriving (Show, Typeable)

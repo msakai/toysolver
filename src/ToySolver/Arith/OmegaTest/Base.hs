@@ -29,7 +29,6 @@ module ToySolver.Arith.OmegaTest.Base
     , solve
     , solveQFLIRAConj
     , Options (..)
-    , defaultOptions
     , checkRealNoCheck
     , checkRealByFM
 
@@ -58,6 +57,9 @@ import qualified ToySolver.Arith.FourierMotzkin as FM
 
 -- ---------------------------------------------------------------------------
 
+-- | Options for solving.
+--
+-- The default option can be obtained by 'def'.
 data Options
   = Options
   { optCheckReal :: VarSet -> [LA.Atom Rational] -> Bool
@@ -69,15 +71,12 @@ data Options
   }
 
 instance Default Options where
-  def = defaultOptions
-
-defaultOptions :: Options
-defaultOptions =
-  Options
-  { optCheckReal =
-      -- checkRealNoCheck
-      checkRealByFM
-  }
+  def =
+    Options
+    { optCheckReal =
+        -- checkRealNoCheck
+        checkRealByFM
+    }
 
 checkRealNoCheck :: VarSet -> [LA.Atom Rational] -> Bool
 checkRealNoCheck _ _ = True

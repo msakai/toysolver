@@ -56,7 +56,6 @@ module ToySolver.Arith.Simplex2
   , pushBacktrackPoint
   , popBacktrackPoint
   , Options (..)
-  , defaultOptions
   , OptResult (..)
   , optimize
   , dualSimplex
@@ -549,6 +548,9 @@ selectViolatingBasicVariable solver = do
 data OptResult = Optimum | Unsat | Unbounded | ObjLimit
   deriving (Show, Eq, Ord)
 
+-- | Options for solving.
+--
+-- The default option can be obtained by 'def'.
 data Options
   = Options
   { objLimit :: Maybe Rational
@@ -556,13 +558,10 @@ data Options
   deriving (Show, Eq, Ord)
 
 instance Default Options where
-  def = defaultOptions
-
-defaultOptions :: Options
-defaultOptions
-  = Options
-  { objLimit = Nothing
-  }
+  def =
+    Options
+    { objLimit = Nothing
+    }
 
 optimize :: Solver -> Options -> IO OptResult
 optimize solver opt = do

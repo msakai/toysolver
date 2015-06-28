@@ -27,7 +27,6 @@
 -----------------------------------------------------------------------------
 module ToySolver.SAT.PBO.BCD2
   ( Options (..)
-  , defaultOptions
   , solve
   ) where
 
@@ -44,6 +43,9 @@ import qualified ToySolver.SAT.PBO.Context as C
 import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
 import Text.Printf
 
+-- | Options for BCD2 algorithm.
+--
+-- The default value can be obtained by 'def'.
 data Options
   = Options
   { optEnableHardening :: Bool
@@ -52,15 +54,12 @@ data Options
   }
 
 instance Default Options where
-  def = defaultOptions
-
-defaultOptions :: Options
-defaultOptions
-  = Options
-  { optEnableHardening = True
-  , optEnableBiasedSearch = True
-  , optSolvingNormalFirst = True
-  }
+  def =
+    Options
+    { optEnableHardening = True
+    , optEnableBiasedSearch = True
+    , optSolvingNormalFirst = True
+    }
 
 data CoreInfo
   = CoreInfo

@@ -115,7 +115,6 @@ module ToySolver.Data.Polynomial.Base
 
   -- * Pretty Printing
   , PrintOptions (..)
-  , defaultPrintOptions
   , prettyPrint
   , PrettyCoeff (..)
   , PrettyVar (..)
@@ -450,6 +449,9 @@ class SQFree a where
   Pretty printing
 --------------------------------------------------------------------}
 
+-- | Options for pretty printing polynomials
+--
+-- The default value can be obtained by 'def'.
 data PrintOptions k v
   = PrintOptions
   { pOptPrintVar        :: PrettyLevel -> Rational -> v -> Doc
@@ -459,16 +461,13 @@ data PrintOptions k v
   }
 
 instance (PrettyCoeff k, PrettyVar v, Ord v) => Default (PrintOptions k v) where
-  def = defaultPrintOptions
-
-defaultPrintOptions :: (PrettyCoeff k, PrettyVar v, Ord v) => PrintOptions k v
-defaultPrintOptions
-  = PrintOptions
-  { pOptPrintVar        = pPrintVar
-  , pOptPrintCoeff      = pPrintCoeff
-  , pOptIsNegativeCoeff = isNegativeCoeff
-  , pOptMonomialOrder   = grlex
-  }
+  def =
+    PrintOptions
+    { pOptPrintVar        = pPrintVar
+    , pOptPrintCoeff      = pPrintCoeff
+    , pOptIsNegativeCoeff = isNegativeCoeff
+    , pOptMonomialOrder   = grlex
+    }
 
 instance (Ord k, Num k, Ord v, PrettyCoeff k, PrettyVar v) => Pretty (Polynomial k v) where
   pPrintPrec = prettyPrint def

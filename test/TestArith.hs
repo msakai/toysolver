@@ -3,6 +3,7 @@ module Main (main) where
 
 import Control.Monad
 import Data.List
+import Data.Default.Class
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Map as Map
@@ -337,13 +338,13 @@ evalPAtom m (ArithRel lhs op rhs) =　evalOp op (evalP m lhs) (evalP m rhs)
 prop_OmegaTest_solve :: Property
 prop_OmegaTest_solve =
    forAll genQFLAConjSmallInt $ \(vs,cs) ->
-     case OmegaTest.solve OmegaTest.defaultOptions vs cs of
+     case OmegaTest.solve def vs cs of
        Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom (fmap fromInteger m)) cs == False
        Just m  -> property $ all (LA.evalAtom (fmap fromInteger m)) cs
 
 case_OmegaTest_test1 :: IO ()
 case_OmegaTest_test1 = 
-  case uncurry (OmegaTest.solve OmegaTest.defaultOptions) test1' of
+  case uncurry (OmegaTest.solve def) test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
       forM_ (snd test1') $ \a -> do
@@ -351,7 +352,7 @@ case_OmegaTest_test1 =
 
 case_OmegaTest_test2 :: IO ()
 case_OmegaTest_test2 = 
-  case uncurry (OmegaTest.solve OmegaTest.defaultOptions) test2' of
+  case uncurry (OmegaTest.solve def) test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
 
@@ -370,7 +371,7 @@ prop_Cooper_solve =
      case Cooper.solve vs cs of
        Nothing ->
          (forAll (genModel vs) $ \m -> all (LA.evalAtom (fmap fromInteger m)) cs == False) QC..&&.
-         property (OmegaTest.solve OmegaTest.defaultOptions vs cs == Nothing)
+         property (OmegaTest.solve def vs cs == Nothing)
        Just m  -> property $ all (LA.evalAtom (fmap fromInteger m)) cs
 
 case_Cooper_test1 :: IO ()

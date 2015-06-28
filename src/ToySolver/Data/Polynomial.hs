@@ -114,7 +114,6 @@ module ToySolver.Data.Polynomial
 
   -- * Pretty Printing
   , PrintOptions (..)
-  , defaultPrintOptions
   , prettyPrint
   , PrettyCoeff (..)
   , PrettyVar (..)

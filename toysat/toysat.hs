@@ -124,39 +124,36 @@ data Options
   }
 
 instance Default Options where
-  def = defaultOptions
-
-defaultOptions :: Options
-defaultOptions
-  = Options
-  { optMode          = Nothing
-  , optRestartStrategy = SAT.defaultRestartStrategy
-  , optRestartFirst  = SAT.defaultRestartFirst
-  , optRestartInc    = SAT.defaultRestartInc
-  , optLearningStrategy = SAT.defaultLearningStrategy
-  , optLearntSizeFirst  = SAT.defaultLearntSizeFirst
-  , optLearntSizeInc    = SAT.defaultLearntSizeInc
-  , optCCMin         = SAT.defaultCCMin
-  , optEnablePhaseSaving = SAT.defaultEnablePhaseSaving
-  , optEnableForwardSubsumptionRemoval = SAT.defaultEnableForwardSubsumptionRemoval
-  , optRandomFreq    = SAT.defaultRandomFreq
-  , optRandomSeed    = Nothing
-  , optLinearizerPB  = False
-  , optPBHandlerType = SAT.defaultPBHandlerType
-  , optPBSplitClausePart = SAT.defaultPBSplitClausePart
-  , optEnableBackwardSubsumptionRemoval = SAT.defaultEnableBackwardSubsumptionRemoval
-  , optSearchStrategy       = PBO.defaultSearchStrategy
-  , optObjFunVarsHeuristics = PBO.defaultEnableObjFunVarsHeuristics
-  , optLocalSearchInitial   = False
-  , optMUSMethod = MUSLinear
-  , optAllMUSes = False
-  , optAllMUSMethod = AllMUSCAMUS
-  , optPrintRational = False  
-  , optCheckModel = False
-  , optTimeout = 0
-  , optWriteFile = Nothing
-  , optUBCSAT = "ubcsat"
-  }
+  def =
+    Options
+    { optMode          = Nothing
+    , optRestartStrategy = def
+    , optRestartFirst  = SAT.defaultRestartFirst
+    , optRestartInc    = SAT.defaultRestartInc
+    , optLearningStrategy = def
+    , optLearntSizeFirst  = SAT.defaultLearntSizeFirst
+    , optLearntSizeInc    = SAT.defaultLearntSizeInc
+    , optCCMin         = SAT.defaultCCMin
+    , optEnablePhaseSaving = SAT.defaultEnablePhaseSaving
+    , optEnableForwardSubsumptionRemoval = SAT.defaultEnableForwardSubsumptionRemoval
+    , optRandomFreq    = SAT.defaultRandomFreq
+    , optRandomSeed    = Nothing
+    , optLinearizerPB  = False
+    , optPBHandlerType = def
+    , optPBSplitClausePart = SAT.defaultPBSplitClausePart
+    , optEnableBackwardSubsumptionRemoval = SAT.defaultEnableBackwardSubsumptionRemoval
+    , optSearchStrategy       = def
+    , optObjFunVarsHeuristics = PBO.defaultEnableObjFunVarsHeuristics
+    , optLocalSearchInitial   = False
+    , optMUSMethod = MUSLinear
+    , optAllMUSes = False
+    , optAllMUSMethod = AllMUSCAMUS
+    , optPrintRational = False  
+    , optCheckModel = False
+    , optTimeout = 0
+    , optWriteFile = Nothing
+    , optUBCSAT = "ubcsat"
+    }
 
 options :: [OptDescr (Options -> Options)]
 options =

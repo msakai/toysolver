@@ -21,7 +21,6 @@
 module ToySolver.SAT.MUS.DAA
   ( module ToySolver.SAT.MUS.Types
   , Options (..)
-  , defaultOptions
   , allMCSAssumptions
   , allMUSAssumptions
   , daa
@@ -36,7 +35,7 @@ import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types
 import ToySolver.SAT.MUS.Types
-import ToySolver.SAT.MUS.CAMUS (Options (..), defaultOptions)
+import ToySolver.SAT.MUS.CAMUS (Options (..))
 
 allMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MCS]
 allMCSAssumptions solver sels opt = do

@@ -30,7 +30,6 @@
 module ToySolver.SAT.MUS.CAMUS
   ( module ToySolver.SAT.MUS.Types
   , Options (..)
-  , defaultOptions
   , allMCSAssumptions
   , allMUSAssumptions
   , enumMCSAssumptions
@@ -51,6 +50,8 @@ import ToySolver.SAT.Types
 import ToySolver.SAT.MUS.Types
 
 -- | Options for 'enumMCSAssumptions', 'allMCSAssumptions', 'allMUSAssumptions'
+--
+-- The default value can be obtained by 'def'.
 data Options
   = Options
   { optLogger     :: String -> IO ()
@@ -64,19 +65,15 @@ data Options
   }
 
 instance Default Options where
-  def = defaultOptions
-
--- | default 'Options' value
-defaultOptions :: Options
-defaultOptions =
-  Options
-  { optLogger     = \_ -> return ()
-  , optOnMCSFound = \_ -> return ()
-  , optOnMUSFound = \_ -> return ()
-  , optKnownMCSes = []
-  , optKnownMUSes = []
-  , optKnownCSes = []
-  }
+  def =
+    Options
+    { optLogger     = \_ -> return ()
+    , optOnMCSFound = \_ -> return ()
+    , optOnMUSFound = \_ -> return ()
+    , optKnownMCSes = []
+    , optKnownMUSes = []
+    , optKnownCSes = []
+    }
 
 enumMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ()
 enumMCSAssumptions solver sels opt = do

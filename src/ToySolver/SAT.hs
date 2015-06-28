@@ -77,7 +77,6 @@ module ToySolver.SAT
   -- * Solver configulation
   , RestartStrategy (..)
   , setRestartStrategy
-  , defaultRestartStrategy
   , setRestartFirst
   , defaultRestartFirst
   , setRestartInc
@@ -90,7 +89,6 @@ module ToySolver.SAT
   , defaultCCMin
   , LearningStrategy (..)
   , setLearningStrategy
-  , defaultLearningStrategy
   , setEnablePhaseSaving
   , getEnablePhaseSaving
   , defaultEnablePhaseSaving
@@ -110,7 +108,6 @@ module ToySolver.SAT
   , setConfBudget
   , PBHandlerType (..)
   , setPBHandlerType
-  , defaultPBHandlerType
   , setPBSplitClausePart
   , getPBSplitClausePart
   , defaultPBSplitClausePart
@@ -148,6 +145,7 @@ import Data.Array.Base (unsafeRead, unsafeWrite)
 #if MIN_VERSION_hashable(1,2,0)
 import Data.Bits (xor) -- for defining 'combine' function
 #endif
+import Data.Default.Class
 import Data.Function (on)
 import Data.Hashable
 import Data.HashSet (HashSet)
@@ -716,15 +714,15 @@ newSolver = do
   constrInc   <- newIOURef 1
   varDecay <- newIOURef (1 / 0.95)
   varInc   <- newIOURef 1
-  restartStrat <- newIORef defaultRestartStrategy
+  restartStrat <- newIORef def
   restartFirst <- newIORef defaultRestartFirst
   restartInc <- newIORef defaultRestartInc
-  learning <- newIORef defaultLearningStrategy
+  learning <- newIORef def
   learntSizeFirst <- newIORef defaultLearntSizeFirst
   learntSizeInc <- newIORef defaultLearntSizeInc
   ccMin <- newIORef defaultCCMin
   checkModel <- newIORef False
-  pbHandlerType <- newIORef defaultPBHandlerType
+  pbHandlerType <- newIORef def
   pbSplitClausePart <- newIORef defaultPBSplitClausePart
   enablePhaseSaving <- newIORef defaultEnablePhaseSaving
   enableForwardSubsumptionRemoval <- newIORef defaultEnableForwardSubsumptionRemoval
@@ -1481,10 +1479,6 @@ removeConstraintHandlers solver zs = do
 setRestartStrategy :: Solver -> RestartStrategy -> IO ()
 setRestartStrategy solver s = writeIORef (svRestartStrategy solver) s
 
--- | default value for @RestartStrategy@.
-defaultRestartStrategy :: RestartStrategy
-defaultRestartStrategy = MiniSATRestarts
-
 -- | The initial restart limit. (default 100)
 -- Zero and negative values are used to disable restart.
 setRestartFirst :: Solver -> Int -> IO ()
@@ -1506,16 +1500,19 @@ setRestartInc solver !r
 defaultRestartInc :: Double
 defaultRestartInc = 1.5
 
+-- | Learning strategy.
+--
+-- The default value can be obtained by 'def'.
 data LearningStrategy
   = LearningClause
   | LearningHybrid
   deriving (Show, Eq, Ord, Enum, Bounded)
 
+instance Default LearningStrategy where
+  def = LearningClause
+
 setLearningStrategy :: Solver -> LearningStrategy -> IO ()
 setLearningStrategy solver l = writeIORef (svLearningStrategy solver) $! l
-
-defaultLearningStrategy :: LearningStrategy
-defaultLearningStrategy = LearningClause
 
 -- | The initial limit for learnt clauses.
 -- 
@@ -1577,11 +1574,14 @@ setConfBudget :: Solver -> Maybe Int -> IO ()
 setConfBudget solver (Just b) | b >= 0 = writeIOURef (svConfBudget solver) b
 setConfBudget solver _ = writeIOURef (svConfBudget solver) (-1)
 
+-- | Pseudo boolean constraint handler implimentation.
+--
+-- The default value can be obtained by 'def'.
 data PBHandlerType = PBHandlerTypeCounter | PBHandlerTypePueblo
   deriving (Show, Eq, Ord, Enum, Bounded)
 
-defaultPBHandlerType :: PBHandlerType
-defaultPBHandlerType = PBHandlerTypeCounter
+instance Default PBHandlerType where
+  def = PBHandlerTypeCounter
 
 setPBHandlerType :: Solver -> PBHandlerType -> IO ()
 setPBHandlerType solver ht = do
@@ -3671,8 +3671,14 @@ instance ConstraintHandler TheoryHandler where
   Restart strategy
 --------------------------------------------------------------------}
 
+-- | Restart strategy.
+--
+-- The default value can be obtained by 'def'.
 data RestartStrategy = MiniSATRestarts | ArminRestarts | LubyRestarts
   deriving (Show, Eq, Ord, Enum, Bounded)
+
+instance Default RestartStrategy where
+  def = MiniSATRestarts
 
 mkRestartSeq :: RestartStrategy -> Int -> Double -> [Int]
 mkRestartSeq MiniSATRestarts = miniSatRestartSeq

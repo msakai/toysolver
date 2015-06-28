@@ -32,7 +32,6 @@ module ToySolver.Arith.OmegaTest
     , solveQFLIRAConj
     -- * Options for solving
     , Options (..)
-    , defaultOptions
     , checkRealNoCheck
     , checkRealByFM
     , checkRealByCAD

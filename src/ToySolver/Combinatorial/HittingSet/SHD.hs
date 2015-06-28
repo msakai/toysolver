@@ -19,7 +19,6 @@
 module ToySolver.Combinatorial.HittingSet.SHD
   ( Options (..)
   , Failure (..)
-  , defaultOptions
   , minimalHittingSets
   ) where
 
@@ -40,6 +39,9 @@ import System.IO
 import System.IO.Temp
 import ToySolver.Internal.ProcessUtil (runProcessWithOutputCallback)
 
+-- | Options for solving.
+--
+-- The default option can be obtained by 'def'.
 data Options
   = Options
   { optSHDCommand     :: FilePath
@@ -49,16 +51,13 @@ data Options
   }
 
 instance Default Options where
-  def = defaultOptions
-
-defaultOptions :: Options
-defaultOptions =
-  Options
-  { optSHDCommand     = "shd"
-  , optSHDArgs        = ["0"]
-  , optOnGetLine      = \_ -> return ()
-  , optOnGetErrorLine = \_ -> return ()
-  }
+  def =
+    Options
+    { optSHDCommand     = "shd"
+    , optSHDArgs        = ["0"]
+    , optOnGetLine      = \_ -> return ()
+    , optOnGetErrorLine = \_ -> return ()
+    }
 
 data Failure = Failure !Int
   deriving (Show, Typeable)
