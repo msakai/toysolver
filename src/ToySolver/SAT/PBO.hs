@@ -75,6 +75,7 @@ data SearchStrategy
   | BC
   | BCD
   | BCD2
+  deriving (Eq, Ord, Show, Enum, Bounded)
 
 instance Default SearchStrategy where
   def = LinearSearch
