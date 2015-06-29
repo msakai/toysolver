@@ -55,7 +55,11 @@ isOptimum :: Context a => a -> STM Bool
 isOptimum cxt = do
   ub <- getBestValue cxt
   lb <- getLowerBound cxt
-  return $ ub == Just lb
+  case ub of
+    Nothing -> return False
+    Just val -> return $ val <= lb
+    -- Note that solving with the assumption 'obj < val' can yield
+    -- a lower bound that is higher than val!
 
 isFinished :: Context a => a -> STM Bool
 isFinished cxt = do
