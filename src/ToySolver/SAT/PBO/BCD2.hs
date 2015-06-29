@@ -125,11 +125,18 @@ solveWBO cxt solver opt = do
         SAT.addPBAtLeast solver (coreCostFun core) =<< getCoreLB core -- redundant, but useful for direct search
 
   let loop = do
+        lb <- getLB
+        ub <- do
+          ub1 <- atomically $ C.getSearchUpperBound cxt
+          -- FIXME: The refinement should be done in Context.addSolution,
+          -- for generality and to avoid duplicated computation.
+          let ub2 = refineUB (map fst obj) ub1
+          when (ub1 /= ub2) $ C.logMessage cxt $ printf "BCD2: refineUB: %d -> %d" ub1 ub2
+          return ub2
+        when (ub < lb) $ C.setFinished cxt
+
         fin <- atomically $ C.isFinished cxt
         unless fin $ do
-          ub0 <- readIORef lastUBRef
-          lb <- getLB
-          ub <- atomically $ C.getSearchUpperBound cxt
                
           when (optEnableHardening opt) $ do
             deductedWeight <- readIORef deductedWeightRef
@@ -142,6 +149,7 @@ solveWBO cxt solver opt = do
               modifyIORef relaxedRef   (`IntSet.difference` lits)
               modifyIORef hardenedRef  (`IntSet.union` lits)
   
+          ub0 <- readIORef lastUBRef  
           when (ub < ub0) $ do
             C.logMessage cxt $ printf "BCD2: updating upper bound: %d -> %d" ub0 ub
             SAT.addPBAtMost solver obj ub
@@ -198,9 +206,9 @@ solveWBO cxt solver opt = do
               [sel] | Just (core,mid) <- IntMap.lookup sel sels -> do
                 C.logMessage cxt $ printf "BCD2: updating lower bound of a core"
                 let newCoreLB  = mid + 1
-                    newCoreLB' = refine [weights IntMap.! lit | lit <- IntSet.toList (coreLits core)] newCoreLB
+                    newCoreLB' = refineLB [weights IntMap.! lit | lit <- IntSet.toList (coreLits core)] newCoreLB
                 when (newCoreLB /= newCoreLB') $ C.logMessage cxt $
-                  printf "BCD2: refine %d -> %d" newCoreLB newCoreLB'
+                  printf "BCD2: refineLB: %d -> %d" newCoreLB newCoreLB'
                 writeIORef (coreLBRef core) newCoreLB'
                 updateLB lb core
                 loop
@@ -219,7 +227,7 @@ solveWBO cxt solver opt = do
                   return $! minimum (xs1 ++ xs2)
                 let mergedCoreLits = IntSet.unions $ torelax : [coreLits core | (core,_) <- intersected]
                 mergedCoreLB <- liftM ((delta +) . sum) $ mapM (getCoreLB . fst) intersected
-                let mergedCoreLB' = refine [weights IntMap.! lit | lit <- IntSet.toList mergedCoreLits] mergedCoreLB
+                let mergedCoreLB' = refineLB [weights IntMap.! lit | lit <- IntSet.toList mergedCoreLits] mergedCoreLB
                 mergedCore <- newCoreInfo mergedCoreLits mergedCoreLB'
                 writeIORef coresRef (mergedCore : disjoint)
                 forM_ intersected $ \(core, _) -> deleteCoreInfo solver core
@@ -231,7 +239,7 @@ solveWBO cxt solver opt = do
                   C.logMessage cxt $ printf "BCD2: relaxing %d and merging with %d cores into a new core of size %d: cost of the new core is >=%d"
                     (IntSet.size torelax) (length intersected) (IntSet.size mergedCoreLits) mergedCoreLB'
                 when (mergedCoreLB /= mergedCoreLB') $ 
-                  C.logMessage cxt $ printf "BCD2: refine %d -> %d" mergedCoreLB mergedCoreLB'
+                  C.logMessage cxt $ printf "BCD2: refineLB: %d -> %d" mergedCoreLB mergedCoreLB'
                 updateLB lb mergedCore
                 loop
 
@@ -274,16 +282,30 @@ solveWBO cxt solver opt = do
             SAT.addClause solver [- sel, snd (Map.findMin hi)] -- sel → Map.findMin hi
           return sel
 
+refineLim :: Integer
+refineLim = 65536
 
 -- | The smallest integer greater-than or equal-to @n@ that can be obtained by summing a subset of @ws@.
 -- Note that the definition is different from the one in Morgado et al.
-refine
+refineLB
   :: [Integer] -- ^ @ws@
   -> Integer   -- ^ @n@
   -> Integer
-refine ws n
-  | sum ws <= fromIntegral (maxBound :: Int) && n <= fromIntegral (maxBound :: Int) =
+refineLB ws n
+  | sum ws <= refineLim && n <= refineLim =
       case SubsetSum.minSubsetSum (VU.fromList (map fromIntegral ws)) (fromIntegral n) of
         Nothing -> n
         Just (obj, _) -> fromIntegral obj
+  | otherwise = n
+
+-- | The greatest integer lesser-than or equal-to @n@ that can be obtained by summing a subset of @ws@.
+refineUB
+  :: [Integer] -- ^ @ws@
+  -> Integer   -- ^ @n@
+  -> Integer
+refineUB ws n
+  | n < 0 = n
+  | sum ws <= refineLim && n <= refineLim =
+      case SubsetSum.maxSubsetSum (VU.fromList (map fromIntegral ws)) (fromIntegral n) of
+        (obj, _) -> fromIntegral obj
   | otherwise = n
