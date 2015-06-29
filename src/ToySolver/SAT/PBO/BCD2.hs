@@ -84,7 +84,7 @@ newCoreInfo lits lb = do
 deleteCoreInfo :: SAT.Solver -> CoreInfo -> IO ()
 deleteCoreInfo solver core = do
   m <- readIORef (coreUBSelectors core)
-  -- Delete constraints by fixing selector variables
+  -- Delete soft upperbound constraints by fixing selector variables
   forM_ (Map.elems m) $ \sel ->
     SAT.addClause solver [-sel]
 
@@ -210,6 +210,7 @@ solveWBO cxt solver opt = do
                 when (newCoreLB /= newCoreLB') $ C.logMessage cxt $
                   printf "BCD2: refineLB: %d -> %d" newCoreLB newCoreLB'
                 writeIORef (coreLBRef core) newCoreLB'
+                SAT.addClause solver [-sel] -- Delete soft upperbound constraint(s) by fixing a selector variable
                 updateLB lb core
                 loop
               _ -> do
