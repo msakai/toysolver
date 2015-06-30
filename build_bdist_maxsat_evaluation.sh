@@ -14,7 +14,7 @@ export PATH=/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:$PATH
 cabal sandbox init
 cabal update
 cabal install --only-dependencies
-cabal configure --disable-shared --ghc-options="-static -optl-static -optl-pthread"
+cabal configure --enable-static --disable-shared --ghc-options="-static -optl-static -optl-pthread"
 cabal build
 
 PKG=toysat-maxsat`date +%Y`-`date +%Y%m%d`
@@ -24,7 +24,9 @@ cp dist/build/toysat/toysat $PKG/toysat_main
 cp misc/maxsat/toysat/README.md misc/maxsat/toysat/toysat $PKG/
 tar Jcf $PKG.tar.xz $PKG --owner=sakai --group=sakai
 
-wget -c http://ubcsat.dtompkins.com/downloads/ubcsat-beta-12-b18.tar.gz
+if [ ! -f ubcsat-beta-12-b18.tar.gz ]; then
+  wget http://ubcsat.dtompkins.com/downloads/ubcsat-beta-12-b18.tar.gz
+fi
 rm -r ubcsat-beta-12-b18
 mkdir ubcsat-beta-12-b18
 cd ubcsat-beta-12-b18
