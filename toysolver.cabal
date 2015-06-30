@@ -30,6 +30,7 @@ Extra-Source-Files:
    misc/maxsat/toysat/toysat
    misc/maxsat/toysat_ls/README.md
    misc/maxsat/toysat_ls/toysat_ls
+   misc/pb/README.md
    src/TseitinEncode.hs
    src/ToySolver/Data/Polyhedron.hs
    samples/gcnf/*.cnf
