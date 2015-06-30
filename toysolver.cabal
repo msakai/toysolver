@@ -26,6 +26,7 @@ Extra-Source-Files:
    build_bdist_win32.sh
    build_bdist_win64.sh
    build_bdist_maxsat_evaluation.sh
+   build_bdist_pb_evaluation.sh
    misc/maxsat/toysat/README.md
    misc/maxsat/toysat/toysat
    misc/maxsat/toysat_ls/README.md
