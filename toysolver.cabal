@@ -68,6 +68,11 @@ Flag ForceChar8
   Default: False
   Manual: True
 
+Flag LinuxStatic
+  Description: build statically linked binaries
+  Default: False
+  Manual: True
+
 Flag BuildToyFMF
   Description: build toyfmf command
   Default: False
@@ -294,6 +299,8 @@ Executable toysolver
     GHC-Options: -threaded
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
   -- GHC-Prof-Options: -auto-all
 
 Executable toysat
@@ -328,6 +335,8 @@ Executable toysat
   if flag(ForceChar8) && impl(ghc)
     Build-Depends: base >=4.5
     CPP-OPtions: "-DFORCE_CHAR8"
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
 
 Executable toyfmf
   If !flag(BuildToyFMF)
@@ -343,6 +352,8 @@ Executable toyfmf
   Default-Language: Haskell2010
   if impl(ghc >= 7)
     GHC-Options: -rtsopts
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
   -- GHC-Prof-Options: -auto-all
 
 -- Converters
@@ -359,6 +370,8 @@ Executable lpconvert
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
 
 Executable pbconvert
   Main-is: pbconvert.hs
@@ -372,6 +385,8 @@ Executable pbconvert
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
 
 -- Sample Programs
 
@@ -385,6 +400,8 @@ Executable sudoku
     array,
     toysolver
   Default-Language: Haskell2010
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
 
 Executable nqueens
   If !flag(BuildSamplePrograms)
@@ -396,6 +413,8 @@ Executable nqueens
     array,
     toysolver
   Default-Language: Haskell2010
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
 
 Executable knapsack
   If !flag(BuildSamplePrograms)
@@ -407,6 +426,8 @@ Executable knapsack
     array,
     toysolver
   Default-Language: Haskell2010
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
 
 Executable htc
   If !flag(BuildSamplePrograms)
@@ -418,6 +439,8 @@ Executable htc
     containers,
     toysolver
   Default-Language: Haskell2010
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
 
 -- Misc Programs
 
@@ -433,6 +456,8 @@ Executable pigeonhole
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
 
 Executable maxsatverify
   If !flag(BuildMiscPrograms)
@@ -446,6 +471,8 @@ Executable maxsatverify
     filepath,
     toysolver
   Default-Language: Haskell2010
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
 
 Executable pbverify
   Main-is: pbverify.hs
@@ -460,6 +487,8 @@ Executable pbverify
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
 
 -- Test suites and benchmarks
 

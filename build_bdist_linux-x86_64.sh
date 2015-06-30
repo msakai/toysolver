@@ -14,7 +14,8 @@ export PATH=/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:$PATH
 cabal sandbox init
 cabal update
 cabal install --only-dependencies --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
-cabal configure --disable-shared --ghc-options="-static -optl-static -optl-pthread" --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
+#cabal configure --disable-shared --ghc-options="-static -optl-static -optl-pthread" --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
+cabal configure -fLinuxStatic --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
 cabal build
 
 VER=`ghc -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`

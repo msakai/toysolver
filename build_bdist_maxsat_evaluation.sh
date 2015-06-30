@@ -14,10 +14,11 @@ export PATH=/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:$PATH
 cabal sandbox init
 cabal update
 cabal install --only-dependencies
-cabal configure --enable-static --disable-shared --ghc-options="-static -optl-static -optl-pthread"
+#cabal configure --disable-shared --ghc-options="-static -optl-static -optl-pthread"
+cabal configure -fLinuxStatic
 cabal build
 
-PKG=toysat-maxsat`date +%Y`-`date +%Y%m%d`
+PKG=toysat-maxsat`date +%Y`-`date +%Y%m%d`-`git rev-parse --short HEAD`
 rm -r $PKG
 mkdir $PKG
 cp dist/build/toysat/toysat $PKG/toysat_main
@@ -34,7 +35,7 @@ tar zxf ../ubcsat-beta-12-b18.tar.gz
 gcc -Wall -O3 -static -o ubcsat src/adaptnovelty.c src/algorithms.c src/ddfw.c src/derandomized.c src/g2wsat.c src/gsat-tabu.c src/gsat.c src/gwsat.c src/hsat.c src/hwsat.c src/irots.c src/jack.c src/mt19937ar.c src/mylocal.c src/novelty+p.c src/novelty.c src/parameters.c src/paws.c src/random.c src/reports.c src/rgsat.c src/rnovelty.c src/rots.c src/samd.c src/saps.c src/sparrow.c src/ubcsat-help.c src/ubcsat-internal.c src/ubcsat-io.c src/ubcsat-mem.c src/ubcsat-reports.c src/ubcsat-time.c src/ubcsat-triggers.c src/ubcsat-version.c src/ubcsat.c src/vw.c src/walksat-tabu.c src/walksat.c src/weighted.c -lm
 cd ..
 
-PKG=toysat_ls-maxsat`date +%Y`-`date +%Y%m%d`
+PKG=toysat_ls-maxsat`date +%Y`-`date +%Y%m%d`-`git rev-parse --short HEAD`
 rm -r $PKG
 mkdir $PKG
 cp dist/build/toysat/toysat $PKG/toysat_main
