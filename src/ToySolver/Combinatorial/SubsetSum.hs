@@ -48,30 +48,65 @@ maxSubsetSum
   :: V.Vector v Weight
   => v Weight -- ^ weights @[w1, w2 .. wn]@
   -> Weight -- ^ capacity @c@
-  -> (Weight, VU.Vector Bool)
+  -> Maybe (Weight, VU.Vector Bool)
   -- ^
   -- * the objective value Σ_{i=1}^n wi xi, and
   --
   -- * the assignment @[x1, x2 .. xn]@, identifying 0 (resp. 1) with @False@ (resp. @True@).
-maxSubsetSum w c
-  | c < 0 = error $ "SubsetSum.maxSubsetSum: capacity " ++ show c ++ " should be non-negative"
-  | Just x <- V.find (<0) w = error $ "ToySolver.Combinatorial.SubsetSum.maxSubsetSum: weight " ++ show x ++ " should be non-negative"
-  | Just _ <- V.find (>c) w =
-      let (obj,bs) = maxSubsetSum' (V.filter (<=c) w) c
-          bs2 = VU.create $ do
-            v <- VM.new (V.length w)
-            let loop !i !j =
-                  when (i < V.length w) $ do
-                    if w ! i <= c then do
-                      VM.write v i (bs ! j)
-                      loop (i+1) (j+1)
-                    else do
-                      VM.write v i False
-                      loop (i+1) j
-            loop 0 0
-            return v
-      in (obj, bs2)
-  | otherwise = maxSubsetSum' w c
+maxSubsetSum w c =
+  case normalizeWeightsToPositive (w,c) of
+    (w2, c2, trans)
+      | c2 < 0 -> Nothing
+      | otherwise -> Just $ trans $ step2 w2 c2
+  where
+    step2 :: VU.Vector Weight -> Weight -> (Weight, VU.Vector Bool)
+    step2 w c
+      | V.all (<=c) w = maxSubsetSum' w c
+      | otherwise =
+          let (obj,bs) = maxSubsetSum' (V.filter (<=c) w) c
+              bs2 = VU.create $ do
+                v <- VM.new (V.length w)
+                let loop !i !j =
+                      when (i < V.length w) $ do
+                        if w ! i <= c then do
+                          VM.write v i (bs ! j)
+                          loop (i+1) (j+1)
+                        else do
+                          VM.write v i False
+                          loop (i+1) j
+                loop 0 0
+                return v
+          in (obj, bs2)
+
+normalizeWeightsToPositive
+  :: V.Vector v Weight
+  => (v Weight, Weight)
+  -> (VU.Vector Weight, Weight, (Weight, VU.Vector Bool) -> (Weight, VU.Vector Bool))
+normalizeWeightsToPositive (w,c)
+  | V.all (>=0) w = (V.convert w, c, id)
+  | otherwise = runST $ do
+      w2 <- VM.new (V.length w)
+      let loop !i !offset
+            | i >= V.length w = return offset
+            | otherwise = do
+                let wi = w ! i
+                if wi == minBound then
+                  error ("ToySolver.Combinatorial.SubsetSum: cannot negate " ++ show wi)
+                else if wi < 0 then do
+                  VM.write w2 i (- wi)
+                  loop (i+1) (offset + fromIntegral wi)
+                else do
+                  VM.write w2 i wi
+                  loop (i+1) offset
+      w2 <- V.unsafeFreeze w2
+      offset <- loop 0 (0::Integer)
+                
+      when (fromIntegral (maxBound :: Weight) < fromIntegral c - offset) $
+        error ("ToySolver.Combinatorial.SubsetSum: overflow")
+      let trans (obj, bs) = (obj + fromIntegral offset, bs2)
+            where
+              bs2 = VU.imap (\i bi -> if w ! i < 0 then not bi else bi) bs
+      return (w2, c - fromIntegral offset, trans)
 
 maxSubsetSum' :: V.Vector v Weight => v Weight -> Weight -> (Weight, VU.Vector Bool)
 maxSubsetSum' w !c
@@ -209,12 +244,12 @@ minSubsetSum
   --
   -- * the assignment @[x1, x2 .. xn]@, identifying 0 (resp. 1) with @False@ (resp. @True@).
 minSubsetSum w l
-  | wsum < fromIntegral l = Nothing
-  | fromIntegral (maxBound :: Int) < wsum =
-      error $ "SubsetSum.minSubsetSum: sum of weights " ++ show wsum ++ " is too big to be fitted in Int"
+  | wsum < fromIntegral (minBound :: Int) || fromIntegral (maxBound :: Int) < wsum =
+      error $ "SubsetSum.minSubsetSum: sum of weights " ++ show wsum ++ " do not fit into Int"
   | otherwise =
       case maxSubsetSum w (fromIntegral wsum - l) of
-        (obj, bs) -> Just (fromIntegral wsum - obj, V.map not bs)
+        Nothing -> Nothing
+        Just (obj, bs) -> Just (fromIntegral wsum - obj, V.map not bs)
   where
     -- Integer is used to avoid integer overflow
     wsum :: Integer
@@ -248,8 +283,8 @@ subsetSum
   -- the assignment @[x1, x2 .. xn]@, identifying 0 (resp. 1) with @False@ (resp. @True@).
 subsetSum w c
   | c' < 0 = Nothing
-  | otherwise = assert (c' < fromIntegral (maxBound :: Weight)) $
-      fmap (VU.imap (\i x -> if (w V.! i) < 0 then not x else x)) $ subsetSum' w' (fromIntegral c')
+  | fromIntegral (maxBound :: Weight) < c' = error ("ToySolver.Combinatorial.SubsetSum: overflow")
+  | otherwise = fmap (VU.imap (\i x -> if (w V.! i) < 0 then not x else x)) $ subsetSum' w' (fromIntegral c')
 {-
       case maxSubsetSum w' (fromIntegral c') of 
         (obj,xs')

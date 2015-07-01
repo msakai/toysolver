@@ -308,5 +308,6 @@ refineUB ws n
   | n < 0 = n
   | sum ws <= refineLim && n <= refineLim =
       case SubsetSum.maxSubsetSum (VU.fromList (map fromIntegral ws)) (fromIntegral n) of
-        (obj, _) -> fromIntegral obj
+        Nothing -> n
+        Just (obj, _) -> fromIntegral obj
   | otherwise = n
