@@ -25,6 +25,7 @@ import ToySolver.Internal.Util
 import ToySolver.Internal.TextUtil
 import qualified ToySolver.Combinatorial.Knapsack.BB as KnapsackBB
 import qualified ToySolver.Combinatorial.Knapsack.DP as KnapsackDP
+import qualified ToySolver.Combinatorial.Knapsack.DP2 as KnapsackDP2
 import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996 as FredmanKhachiyan1996
 import qualified ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999 as GurvichKhachiyan1999
@@ -74,6 +75,20 @@ prop_knapsack_DP_equals_BB =
         lim' = fromIntegral lim
         (v1,_,_) = KnapsackBB.solve items' lim'
         (v2,_,_) = KnapsackDP.solve items lim
+    in v1 == v2
+      
+case_knapsack_DP2_1 :: IO ()
+case_knapsack_DP2_1 = KnapsackDP2.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
+
+case_knapsack_DP2_2 :: IO ()
+case_knapsack_DP2_2 = KnapsackDP2.solve [(16,2), (19,3), (23,4), (28,5)] 7 @?= (44, 7, [True,False,False,True])
+
+prop_knapsack_DP2_equals_BB =
+  forAll knapsackProblems $ \(items,lim) ->
+    let -- items' :: Num a => [(Rational, a)]
+        items' = [(v, fromIntegral w) | (v,w) <- items]
+        (v1,_,_) = KnapsackBB.solve items' (fromIntegral lim)
+        (v2,_,_) = KnapsackDP2.solve items' (fromIntegral lim)
     in v1 == v2
 
 knapsackProblems :: Gen ([(KnapsackDP.Value, KnapsackDP.Weight)], KnapsackDP.Weight)

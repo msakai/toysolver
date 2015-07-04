@@ -197,6 +197,7 @@ Library
      ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999
      ToySolver.Combinatorial.Knapsack.BB
      ToySolver.Combinatorial.Knapsack.DP
+     ToySolver.Combinatorial.Knapsack.DP2
      ToySolver.Combinatorial.SubsetSum
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2SMT
