@@ -14,33 +14,29 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Combinatorial.Knapsack.DP2
-  ( Weight
-  , Value
-  , solve
+  ( solve
   ) where
 
 import Data.List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 
-type Weight = Rational
-type Value = Rational
-
 solve
-  :: [(Value, Weight)]
-  -> Weight
-  -> (Value, Weight, [Bool])
+  :: forall value weight. (Real value, Real weight)
+  => [(value, weight)]
+  -> weight
+  -> (value, weight, [Bool])
 solve items limit =
   case Map.findMax table of
     (w, (v, sol)) -> (v, w, reverse sol)
   where
-    table :: Map Weight (Value, [Bool])
+    table :: Map weight (value, [Bool])
     table = foldl' f empty items
 
-    empty :: Map Weight (Value, [Bool])
+    empty :: Map weight (value, [Bool])
     empty = Map.singleton 0 (0,[])
 
-    f :: Map Weight (Value, [Bool]) -> (Value, Weight) -> Map Weight (Value, [Bool])
+    f :: Map weight (value, [Bool]) -> (value, weight) -> Map weight (value, [Bool])
     f m (vi,wi)
       | wi < 0  = error "negative weight"
       | vi <= 0 = m0
@@ -51,7 +47,7 @@ solve items limit =
         m1 = splitLE limit $ Map.mapKeysMonotonic (+wi) $ Map.map (\(v,sol) -> (v+vi, True : sol)) $ m
         m2 = Map.unionWith (\a@(v1,_) b@(v2,_) -> if v1 < v2 then b else a) m0 m1
 
-    removeDominated :: Map Weight (Value, [Bool]) -> Map Weight (Value, [Bool])
+    removeDominated :: Map weight (value, [Bool]) -> Map weight (value, [Bool])
     removeDominated m = m2
       where
         m2 = Map.fromDistinctAscList . loop (-1) . Map.toAscList $ m
