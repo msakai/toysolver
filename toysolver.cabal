@@ -199,6 +199,7 @@ Library
      ToySolver.Combinatorial.Knapsack.DP
      ToySolver.Combinatorial.Knapsack.DP2
      ToySolver.Combinatorial.SubsetSum
+     ToySolver.Combinatorial.SubsetSum2
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.MaxSAT2IP

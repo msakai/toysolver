@@ -30,6 +30,7 @@ import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996 as FredmanKhachiyan1996
 import qualified ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999 as GurvichKhachiyan1999
 import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
+import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum2
 import qualified ToySolver.Wang as Wang
 
 case_showRationalAsDecimal :: IO ()
@@ -311,6 +312,20 @@ prop_subsetSum_isValid =
       case SubsetSum.subsetSum (VU.fromList ws) c of
         Just bs -> sum [w | (w,b) <- zip ws (VU.toList bs), b] == c
         Nothing -> True
+
+prop_maxSubsetSum2_isValid =
+  forAll arbitrary $ \c ->
+    forAll arbitrary $ \ws ->
+      case SubsetSum2.maxSubsetSum (VU.fromList ws) c of
+        Just (obj, bs) -> obj == sum [w | (w,b) <- zip ws (VU.toList bs), b] && obj <= c
+        Nothing -> True
+
+prop_maxSubsetSum2_isEqualTomaxSubsetSum =
+  forAll (liftM abs arbitrary) $ \c ->
+    forAll (liftM (map abs) arbitrary) $ \ws ->
+      let Just (obj1, bs1) = SubsetSum.maxSubsetSum (VU.fromList ws) c
+          Just (obj2, bs2) = SubsetSum2.maxSubsetSum (VU.fromList ws) c
+      in fromIntegral obj1 == obj2
 
 -- ---------------------------------------------------------------------
 -- Vec
