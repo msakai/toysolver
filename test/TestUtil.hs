@@ -24,8 +24,8 @@ import qualified ToySolver.Internal.Data.Vec as Vec
 import ToySolver.Internal.Util
 import ToySolver.Internal.TextUtil
 import qualified ToySolver.Combinatorial.Knapsack.BB as KnapsackBB
-import qualified ToySolver.Combinatorial.Knapsack.DP as KnapsackDP
-import qualified ToySolver.Combinatorial.Knapsack.DP2 as KnapsackDP2
+import qualified ToySolver.Combinatorial.Knapsack.DPDense as KnapsackDPDense
+import qualified ToySolver.Combinatorial.Knapsack.DPSparse as KnapsackDPSparse
 import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996 as FredmanKhachiyan1996
 import qualified ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999 as GurvichKhachiyan1999
@@ -64,35 +64,35 @@ case_knapsack_1 = KnapsackBB.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,Tru
 case_knapsack_2 :: IO ()
 case_knapsack_2 = KnapsackBB.solve [(16,2), (19,3), (23,4), (28,5)] 7 @?= (44, 7, [True,False,False,True])
 
-case_knapsack_DP_1 :: IO ()
-case_knapsack_DP_1 = KnapsackDP.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
+case_knapsack_DPDense_1 :: IO ()
+case_knapsack_DPDense_1 = KnapsackDPDense.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
 
-case_knapsack_DP_2 :: IO ()
-case_knapsack_DP_2 = KnapsackDP.solve [(16,2), (19,3), (23,4), (28,5)] 7 @?= (44, 7, [True,False,False,True])
+case_knapsack_DPDense_2 :: IO ()
+case_knapsack_DPDense_2 = KnapsackDPDense.solve [(16,2), (19,3), (23,4), (28,5)] 7 @?= (44, 7, [True,False,False,True])
 
-prop_knapsack_DP_equals_BB =
+prop_knapsack_DPDense_equals_BB =
   forAll knapsackProblems $ \(items,lim) ->
     let items' = [(v, fromIntegral w) | (v,w) <- items]
         lim' = fromIntegral lim
         (v1,_,_) = KnapsackBB.solve items' lim'
-        (v2,_,_) = KnapsackDP.solve items lim
+        (v2,_,_) = KnapsackDPDense.solve items lim
     in v1 == v2
       
-case_knapsack_DP2_1 :: IO ()
-case_knapsack_DP2_1 = KnapsackDP2.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
+case_knapsack_DPSparse_1 :: IO ()
+case_knapsack_DPSparse_1 = KnapsackDPSparse.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
 
-case_knapsack_DP2_2 :: IO ()
-case_knapsack_DP2_2 = KnapsackDP2.solve [(16,2), (19,3), (23,4), (28,5)] 7 @?= (44, 7, [True,False,False,True])
+case_knapsack_DPSparse_2 :: IO ()
+case_knapsack_DPSparse_2 = KnapsackDPSparse.solve [(16,2), (19,3), (23,4), (28,5)] 7 @?= (44, 7, [True,False,False,True])
 
-prop_knapsack_DP2_equals_BB =
+prop_knapsack_DPSparse_equals_BB =
   forAll knapsackProblems $ \(items,lim) ->
     let -- items' :: Num a => [(Rational, a)]
         items' = [(v, fromIntegral w) | (v,w) <- items]
         (v1,_,_) = KnapsackBB.solve items' (fromIntegral lim)
-        (v2,_,_) = KnapsackDP2.solve items' (fromIntegral lim)
+        (v2,_,_) = KnapsackDPSparse.solve items' (fromIntegral lim)
     in v1 == v2
 
-knapsackProblems :: Gen ([(KnapsackDP.Value, KnapsackDP.Weight)], KnapsackDP.Weight)
+knapsackProblems :: Gen ([(KnapsackDPDense.Value, KnapsackDPDense.Weight)], KnapsackDPDense.Weight)
 knapsackProblems = do
   lim <- choose (0,30)
   items <- listOf $ do

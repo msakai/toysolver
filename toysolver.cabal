@@ -196,8 +196,8 @@ Library
      ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996
      ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999
      ToySolver.Combinatorial.Knapsack.BB
-     ToySolver.Combinatorial.Knapsack.DP
-     ToySolver.Combinatorial.Knapsack.DP2
+     ToySolver.Combinatorial.Knapsack.DPDense
+     ToySolver.Combinatorial.Knapsack.DPSparse
      ToySolver.Combinatorial.SubsetSum
      ToySolver.Combinatorial.SubsetSum2
      ToySolver.Converter.ObjType

@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Combinatorial.Knapsack.DP2
+-- Module      :  ToySolver.Combinatorial.Knapsack.DPSparse
 -- Copyright   :  (c) Masahiro Sakai 2015
 -- License     :  BSD-style
 --
@@ -13,7 +13,7 @@
 -- Simple 0-1 knapsack problem solver that uses DP.
 --
 -----------------------------------------------------------------------------
-module ToySolver.Combinatorial.Knapsack.DP2
+module ToySolver.Combinatorial.Knapsack.DPSparse
   ( solve
   , solveInt
   , solveInteger

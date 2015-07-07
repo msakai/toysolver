@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Combinatorial.Knapsack.DP
+-- Module      :  ToySolver.Combinatorial.Knapsack.DPDense
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
 -- 
@@ -12,7 +12,7 @@
 -- Simple 0-1 knapsack problem solver that uses DP.
 --
 -----------------------------------------------------------------------------
-module ToySolver.Combinatorial.Knapsack.DP
+module ToySolver.Combinatorial.Knapsack.DPDense
   ( Weight
   , Value
   , solve
