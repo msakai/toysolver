@@ -17,6 +17,7 @@ module ToySolver.Combinatorial.Knapsack.DPSparse
   ( solve
   , solveInt
   , solveInteger
+  , solveGeneric
   ) where
 
 import Data.List

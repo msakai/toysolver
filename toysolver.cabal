@@ -742,3 +742,13 @@ Benchmark BenchmarkSATLIB
     toysolver,
     criterion >=1.0 && <1.1
   Default-Language: Haskell2010
+
+Benchmark BenchmarkKnapsack
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   benchmarks
+  main-is:          BenchmarkKnapsack.hs
+  build-depends:
+    base >=4 && <5,
+    toysolver,
+    criterion >=1.0 && <1.1
+  Default-Language: Haskell2010
