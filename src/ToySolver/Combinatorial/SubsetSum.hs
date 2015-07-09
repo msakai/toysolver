@@ -111,7 +111,7 @@ normalizeWeightsToPositive (w,c)
 maxSubsetSum' :: V.Vector v Weight => v Weight -> Weight -> (Weight, VU.Vector Bool)
 maxSubsetSum' w !c
   | wsum <= fromIntegral c = (fromIntegral wsum, V.replicate n True)
-  | otherwise = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST m
+  | otherwise = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ body b (b-1) gs_init ft_init True
   where
     n = V.length w
 
@@ -144,92 +144,75 @@ maxSubsetSum' w !c
     g_range :: (Weight, Weight)
     g_range = if v < fromIntegral c then (c - fromIntegral v, c) else (0, c)
 
-    m :: forall s. ST s (Weight, VU.Vector Bool)
-    m = do
-      (f_buff :: STUArray s Weight Weight) <- newArray_ f_range
-      (g_buff :: STUArray s Weight Weight) <- newArray_ g_range
-      (f_hist :: STArray s Weight [Int]) <- newArray f_range []
-      (g_hist :: STArray s Weight [Int]) <- newArray g_range []
+    -- f_{b-1}
+    ft_init :: IntMap [Int]
+    ft_init = IntMap.singleton 0 []
 
-      -- Initialize f_buff with f_{b-1}
-      forM_ (range f_range) $ \c' -> writeArray f_buff c' 0
+    -- g_{b}
+    gs_init :: IntMap [Int]
+    gs_init = IntMap.singleton wbar []
 
-      -- Initialize g_buff with g_b
-      forM_ (range g_range) $ \c' ->
-        if c' >= wbar then 
-          writeArray g_buff c' wbar
-        else
-          writeArray g_buff c' (-1) -- INFEASIBLE
+    -- Given t and f_{t-1}, compute f_t.
+    ft_update :: Int -> IntMap [Int] -> IntMap [Int]
+    ft_update t ft = ft `IntMap.union` m
+      where
+        wt = w ! t
+        m = splitLE (snd f_range) $ IntMap.mapKeysMonotonic (+wt) $ IntMap.map (t :) ft
 
-      let -- Given f_{t-1} in f_buff and t, compute f_t and update f_buff with it.
-          update_ft !t = do
-            let wt = w ! t
-            forLoop (snd f_range) (>= fst f_range) (subtract 1) $ \c' -> do
-              when (c' >= wt) $ do
-                obj1 <- readArray f_buff c'
-                obj2 <- readArray f_buff (c' - wt)
-                when (obj1 < obj2 + wt) $ do
-                  hist2 <- readArray f_hist (c' - wt)
-                  writeArray f_buff c' (obj2 + wt)
-                  writeArray f_hist c' (t : hist2)
+    -- Given s and g_{s+1}, compute g_s.
+    gs_update :: Int -> IntMap [Int] -> IntMap [Int]
+    gs_update s gs = gs `IntMap.union` m2
+      where
+        ws = w ! s
+        m1 = IntMap.mapKeysMonotonic (subtract ws) $  IntMap.map (s :) gs
+        m2 =
+          case IntMap.splitLookup (fst g_range) m1 of
+            (_, Just v, hi) -> IntMap.insert (fst g_range) v m1
+            (lo, Nothing, hi)
+              | IntMap.null lo -> hi
+              | otherwise ->
+                  case IntMap.findMax lo of
+                    (k,v) -> IntMap.insert k v hi
 
-          -- Given g_{s+1} in g_buff and s, compute g_s and update g_buff with it.
-          update_gs !s = do
-            let ws = w ! s
-            forLoop (fst g_range) (<= snd g_range) (+1) $ \c' -> do
-              when (c' + ws <= c) $ do
-                obj1 <- readArray g_buff c'
-                obj2 <- readArray g_buff (c' + ws)
-                when (obj1 < 0 || obj1 < obj2 - ws) $ do
-                  hist2 <- readArray g_hist (c' + ws)
-                  writeArray g_buff c' (max (-1) (obj2 - ws))
-                  writeArray g_hist c' (s : hist2)
+    compute_best :: IntMap [Int] -> IntMap [Int] -> (Int, [Int], [Int])
+    compute_best gs ft = runST $ do
+      objRef <- newSTRef (-1, undefined, undefined)
+      let loop [] _ = return ()
+          loop _ [] = return ()
+          loop xxs@((gobj,gsol):xs) yys@((fobj,fsol):ys)
+            | c < gobj + fobj = loop xs yys
+            | otherwise = do
+                (curr, _, _) <- readSTRef objRef
+                when (curr < gobj + fobj) $ writeSTRef objRef (gobj + fobj, gsol, fsol)
+                loop xxs ys
+      loop (IntMap.toDescList gs) (IntMap.toAscList ft)
+      readSTRef objRef
 
-          build :: Int -> ST s (VU.Vector Bool)
-          build !c' = do
-            bs <- VM.new n
-            forM_ [0..b-1] $ \i -> VM.write bs i True
-            forM_ [b..n-1] $ \i -> VM.write bs i False
-            added <- readArray f_hist c'
-            removed <- readArray g_hist (c - c')
-            forM_ added $ \i -> VM.write bs i True
-            forM_ removed $ \i -> VM.write bs i False
-            V.unsafeFreeze bs
+    build :: [Int] -> [Int] -> VU.Vector Bool
+    build gsol fsol = V.create $ do
+      bs <- VM.new n
+      forM_ [0..b-1] $ \i -> VM.write bs i True
+      forM_ [b..n-1] $ \i -> VM.write bs i False
+      forM_ fsol $ \i -> VM.write bs i True
+      forM_ gsol $ \i -> VM.write bs i False
+      return bs
 
-      zRef <- newSTRef (-1)
-      cRef <- newSTRef (-1)
-      let compute_best = do
-            writeSTRef zRef (-1)
-            writeSTRef cRef (-1)
-            forM_ (range f_range) $ \c' -> do
-              obj_g <- readArray g_buff (c - c')
-              when (obj_g >= 0) $ do
-                obj_f <- readArray f_buff c'
-                let obj = obj_f + obj_g
-                obj_curr <- readSTRef zRef
-                when (obj > obj_curr) $ do
-                  writeSTRef zRef obj
-                  writeSTRef cRef c'
-            z <- readSTRef zRef
-            c' <- readSTRef cRef
-            return (z,c')      
+    body :: Int -> Int -> IntMap [Int] -> IntMap [Int] -> Bool -> (Weight, VU.Vector Bool)
+    body !s !t !gs !ft !flag
+      | obj == c || (s == 0 && t == n-1) = (obj, build gsol fsol)
+      | s == 0   = b1
+      | t == n-1 = b2
+      | otherwise = if flag then b2 else b1
+      where
+        (obj, gsol, fsol) = compute_best gs ft
+        b1 = body s (t+1) gs (ft_update (t+1) ft) (not flag)
+        b2 = body (s-1) t (gs_update (s-1) gs) ft (not flag)      
 
-      let loop !s !t !flag = do
-            (obj, c') <- compute_best
-            if obj == c || (s == 0 && t == n-1) then do
-              bs <- build c'
-              return (obj, bs)
-            else do
-              let m1 = update_gs (s-1) >> loop (s-1) t (not flag)
-                  m2 = update_ft (t+1) >> loop s (t+1) (not flag)
-              if s /= 0 && t /= n-1 then
-                if flag then m1 else m2
-              else if s /= 0 then
-                m1
-              else -- t /= n-1
-                m2
-      loop b (b-1) True
-
+splitLE :: Int -> IntMap v -> IntMap v
+splitLE k m =
+  case IntMap.splitLookup k m of
+    (lo, Nothing, _) -> lo
+    (lo, Just v, _) -> IntMap.insert k v lo
 
 -- | Minimize Σ_{i=1}^n wi xi subject to Σ_{i=1}^n wi x≥ l and xi ∈ {0,1}.
 --
