@@ -161,10 +161,18 @@ maxSubsetSum' w !c
 
     -- Given s and g_{s+1}, compute g_s.
     gs_update :: Int -> IntMap [Int] -> IntMap [Int]
-    gs_update s gs = gs `IntMap.union` m
+    gs_update s gs = gs `IntMap.union` m2
       where
         ws = w ! s
-        m = splitGE (fst g_range) $ IntMap.mapKeysMonotonic (subtract ws) $  IntMap.map (s :) gs
+        m1 = IntMap.mapKeysMonotonic (subtract ws) $  IntMap.map (s :) gs
+        m2 =
+          case IntMap.splitLookup (fst g_range) m1 of
+            (_, Just v, hi) -> IntMap.insert (fst g_range) v m1
+            (lo, Nothing, hi)
+              | IntMap.null lo -> hi
+              | otherwise ->
+                  case IntMap.findMax lo of
+                    (k,v) -> IntMap.insert k v hi
 
     compute_best :: IntMap [Int] -> IntMap [Int] -> (Int, [Int], [Int])
     compute_best gs ft = runST $ do
@@ -193,7 +201,7 @@ maxSubsetSum' w !c
     body !s !t !gs !ft !flag
       | obj == c || (s == 0 && t == n-1) = (obj, build gsol fsol)
       | s == 0   = b1
-      | s == n-1 = b2
+      | t == n-1 = b2
       | otherwise = if flag then b2 else b1
       where
         (obj, gsol, fsol) = compute_best gs ft
@@ -205,13 +213,6 @@ splitLE k m =
   case IntMap.splitLookup k m of
     (lo, Nothing, _) -> lo
     (lo, Just v, _) -> IntMap.insert k v lo
-
-splitGE :: Int -> IntMap v -> IntMap v
-splitGE k m =
-  case IntMap.splitLookup k m of
-    (_, Nothing, hi) -> hi
-    (_, Just v, hi) -> IntMap.insert k v hi
-
 
 -- | Minimize Σ_{i=1}^n wi xi subject to Σ_{i=1}^n wi x≥ l and xi ∈ {0,1}.
 --

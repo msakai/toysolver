@@ -30,7 +30,7 @@ import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996 as FredmanKhachiyan1996
 import qualified ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999 as GurvichKhachiyan1999
 import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
-import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum2
+import qualified ToySolver.Combinatorial.SubsetSum2 as SubsetSum2
 import qualified ToySolver.Wang as Wang
 
 case_showRationalAsDecimal :: IO ()
@@ -326,6 +326,9 @@ prop_maxSubsetSum2_isEqualTomaxSubsetSum =
       let Just (obj1, bs1) = SubsetSum.maxSubsetSum (VU.fromList ws) c
           Just (obj2, bs2) = SubsetSum2.maxSubsetSum (VU.fromList ws) c
       in fromIntegral obj1 == obj2
+
+case_maxSubsetSum2_regression_test_1 =
+  SubsetSum.maxSubsetSum (VU.fromList [10,15]) 18 @?= Just (15, VU.fromList [False,True])
 
 -- ---------------------------------------------------------------------
 -- Vec
