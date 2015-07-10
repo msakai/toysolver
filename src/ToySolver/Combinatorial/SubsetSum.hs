@@ -135,14 +135,11 @@ maxSubsetSum' w !c
           | j == b = ret
           | otherwise = loop (j+1) (ret + (w ! j))
 
-    v :: Integer
-    v = wsum - fromIntegral wbar
+    max_ft :: Integer
+    max_ft = wsum - fromIntegral wbar
 
-    f_range :: (Weight, Weight)
-    f_range = if v < fromIntegral c then (0, fromIntegral v) else (0, c)
-
-    g_range :: (Weight, Weight)
-    g_range = if v < fromIntegral c then (c - fromIntegral v, c) else (0, c)
+    min_gs :: Weight
+    min_gs = if max_ft < fromIntegral c then c - fromIntegral max_ft else 0
 
     -- f_{b-1}
     ft_init :: IntMap [Int]
@@ -157,7 +154,7 @@ maxSubsetSum' w !c
     ft_update t ft = ft `IntMap.union` m
       where
         wt = w ! t
-        m = splitLE (snd f_range) $ IntMap.mapKeysMonotonic (+wt) $ IntMap.map (t :) ft
+        m = splitLE c $ IntMap.mapKeysMonotonic (+wt) $ IntMap.map (t :) ft
 
     -- Given s and g_{s+1}, compute g_s.
     gs_update :: Int -> IntMap [Int] -> IntMap [Int]
@@ -166,8 +163,8 @@ maxSubsetSum' w !c
         ws = w ! s
         m1 = IntMap.mapKeysMonotonic (subtract ws) $  IntMap.map (s :) gs
         m2 =
-          case IntMap.splitLookup (fst g_range) m1 of
-            (_, Just v, hi) -> IntMap.insert (fst g_range) v m1
+          case IntMap.splitLookup min_gs m1 of
+            (_, Just v, hi) -> IntMap.insert min_gs v m1
             (lo, Nothing, hi)
               | IntMap.null lo -> hi
               | otherwise ->
