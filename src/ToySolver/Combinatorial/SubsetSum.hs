@@ -27,11 +27,9 @@ module ToySolver.Combinatorial.SubsetSum
   ) where
 
 import Control.Exception (assert)
-import Control.Loop -- loop package
 import Control.Monad
 import Control.Monad.ST
 import Data.STRef
-import Data.Array.ST
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Vector.Generic ((!))
@@ -111,7 +109,7 @@ normalizeWeightsToPositive (w,c)
 maxSubsetSum' :: V.Vector v Weight => v Weight -> Weight -> (Weight, VU.Vector Bool)
 maxSubsetSum' w !c
   | wsum <= fromIntegral c = (fromIntegral wsum, V.replicate n True)
-  | otherwise = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ body b (b-1) gs_init ft_init True
+  | otherwise = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST m
   where
     n = V.length w
 
@@ -135,75 +133,77 @@ maxSubsetSum' w !c
           | j == b = ret
           | otherwise = loop (j+1) (ret + (w ! j))
 
-    max_ft :: Integer
-    max_ft = wsum - fromIntegral wbar
+    max_f :: Integer
+    max_f = wsum - fromIntegral wbar
 
-    min_gs :: Weight
-    min_gs = if max_ft < fromIntegral c then c - fromIntegral max_ft else 0
+    min_g :: Weight
+    min_g = if max_f < fromIntegral c then c - fromIntegral max_f else 0
 
-    -- f_{b-1}
-    ft_init :: IntMap [Int]
-    ft_init = IntMap.singleton 0 []
+    g_drop :: IntMap [Int] -> IntMap [Int]
+    g_drop g =
+      case IntMap.splitLookup min_g g of
+        (lo, _, _) | IntMap.null lo -> g
+        (_, Just v, hi) -> IntMap.insert min_g v hi
+        (lo, Nothing, hi) ->
+          case IntMap.findMax lo of
+            (k,v) -> IntMap.insert k v hi
 
-    -- g_{b}
-    gs_init :: IntMap [Int]
-    gs_init = IntMap.singleton wbar []
+    m :: forall s. ST s (Weight, VU.Vector Bool)
+    m = do
+      objRef <- newSTRef (wbar, [], [])
+      let updateObj gs ft = do
+            let loop [] _ = return ()
+                loop _ [] = return ()
+                loop xxs@((gobj,gsol):xs) yys@((fobj,fsol):ys)
+                  | c < gobj + fobj = loop xs yys
+                  | otherwise = do
+                      (curr, _, _) <- readSTRef objRef
+                      when (curr < gobj + fobj) $ writeSTRef objRef (gobj + fobj, gsol, fsol)
+                      loop xxs ys
+            loop (IntMap.toDescList gs) (IntMap.toAscList ft)
 
-    -- Given t and f_{t-1}, compute f_t.
-    ft_update :: Int -> IntMap [Int] -> IntMap [Int]
-    ft_update t ft = ft `IntMap.union` m
-      where
-        wt = w ! t
-        m = splitLE c $ IntMap.mapKeysMonotonic (+wt) $ IntMap.map (t :) ft
+      let loop !s !t !gs !ft !flag = do
+            (obj, gsol, fsol) <- readSTRef objRef
+            if obj == c || (s == 0 && t == n-1) then do
+              let sol = V.create $ do
+                    bs <- VM.new n
+                    forM_ [0..b-1] $ \i -> VM.write bs i True
+                    forM_ [b..n-1] $ \i -> VM.write bs i False
+                    forM_ fsol $ \i -> VM.write bs i True
+                    forM_ gsol $ \i -> VM.write bs i False
+                    return bs
+              return (obj, sol)
+            else do
+              let updateF = do
+                    -- Compute f_{t+1} from f_t
+                    let t' = t + 1
+                        wt' = w ! t'
+                        m = IntMap.mapKeysMonotonic (+ wt') $ IntMap.map (t' :) $ splitLE (c - wt') ft
+                        ft' = ft `IntMap.union` m
+                    updateObj gs m
+                    loop s t' gs ft' (not flag)
+                  updateG = do
+                    -- Compute g_{s-1} from g_s
+                    let s' = s - 1
+                        ws = w ! s'
+                        m = IntMap.map (s' :) $ g_drop $ IntMap.mapKeysMonotonic (subtract ws) $ gs
+                        gs' = gs `IntMap.union` m
+                    updateObj m ft
+                    loop s' t gs' ft (not flag)
+              if s == 0 then
+                updateF
+              else if t == n-1 then
+                updateG
+              else
+                if flag then updateG else updateF
 
-    -- Given s and g_{s+1}, compute g_s.
-    gs_update :: Int -> IntMap [Int] -> IntMap [Int]
-    gs_update s gs = gs `IntMap.union` m2
-      where
-        ws = w ! s
-        m1 = IntMap.mapKeysMonotonic (subtract ws) $  IntMap.map (s :) gs
-        m2 =
-          case IntMap.splitLookup min_gs m1 of
-            (_, Just v, hi) -> IntMap.insert min_gs v m1
-            (lo, Nothing, hi)
-              | IntMap.null lo -> hi
-              | otherwise ->
-                  case IntMap.findMax lo of
-                    (k,v) -> IntMap.insert k v hi
-
-    compute_best :: IntMap [Int] -> IntMap [Int] -> (Int, [Int], [Int])
-    compute_best gs ft = runST $ do
-      objRef <- newSTRef (-1, undefined, undefined)
-      let loop [] _ = return ()
-          loop _ [] = return ()
-          loop xxs@((gobj,gsol):xs) yys@((fobj,fsol):ys)
-            | c < gobj + fobj = loop xs yys
-            | otherwise = do
-                (curr, _, _) <- readSTRef objRef
-                when (curr < gobj + fobj) $ writeSTRef objRef (gobj + fobj, gsol, fsol)
-                loop xxs ys
-      loop (IntMap.toDescList gs) (IntMap.toAscList ft)
-      readSTRef objRef
-
-    build :: [Int] -> [Int] -> VU.Vector Bool
-    build gsol fsol = V.create $ do
-      bs <- VM.new n
-      forM_ [0..b-1] $ \i -> VM.write bs i True
-      forM_ [b..n-1] $ \i -> VM.write bs i False
-      forM_ fsol $ \i -> VM.write bs i True
-      forM_ gsol $ \i -> VM.write bs i False
-      return bs
-
-    body :: Int -> Int -> IntMap [Int] -> IntMap [Int] -> Bool -> (Weight, VU.Vector Bool)
-    body !s !t !gs !ft !flag
-      | obj == c || (s == 0 && t == n-1) = (obj, build gsol fsol)
-      | s == 0   = b1
-      | t == n-1 = b2
-      | otherwise = if flag then b2 else b1
-      where
-        (obj, gsol, fsol) = compute_best gs ft
-        b1 = body s (t+1) gs (ft_update (t+1) ft) (not flag)
-        b2 = body (s-1) t (gs_update (s-1) gs) ft (not flag)      
+      let -- f_{b-1}
+          fb' :: IntMap [Int]
+          fb' = IntMap.singleton 0 []
+          -- g_{b}
+          gb :: IntMap [Int]
+          gb = IntMap.singleton wbar []
+      loop b (b-1) gb fb' True
 
 splitLE :: Int -> IntMap v -> IntMap v
 splitLE k m =
