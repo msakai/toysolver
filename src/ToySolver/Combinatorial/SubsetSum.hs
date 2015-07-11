@@ -53,28 +53,12 @@ maxSubsetSum
   -- * the assignment @[x1, x2 .. xn]@, identifying 0 (resp. 1) with @False@ (resp. @True@).
 maxSubsetSum w c =
   case normalizeWeightsToPositive (w,c) of
-    (w2, c2, trans)
+    (w2, c2, trans2)
       | c2 < 0 -> Nothing
-      | otherwise -> Just $ trans $ step2 w2 c2
-  where
-    step2 :: VU.Vector Weight -> Weight -> (Weight, VU.Vector Bool)
-    step2 w c
-      | V.all (<=c) w = maxSubsetSum' w c
-      | otherwise =
-          let (obj,bs) = maxSubsetSum' (V.filter (<=c) w) c
-              bs2 = VU.create $ do
-                v <- VM.new (V.length w)
-                let loop !i !j =
-                      when (i < V.length w) $ do
-                        if w ! i <= c then do
-                          VM.write v i (bs ! j)
-                          loop (i+1) (j+1)
-                        else do
-                          VM.write v i False
-                          loop (i+1) j
-                loop 0 0
-                return v
-          in (obj, bs2)
+      | otherwise ->
+          case normalize2 (w2, c2) of
+            (w3, c3, trans3) ->
+              Just $ trans2 $ trans3 $ maxSubsetSum' w3 c3
 
 normalizeWeightsToPositive
   :: V.Vector v Weight
@@ -106,50 +90,32 @@ normalizeWeightsToPositive (w,c)
               bs2 = VU.imap (\i bi -> if w ! i < 0 then not bi else bi) bs
       return (w2, c - fromIntegral offset, trans)
 
+normalize2
+  :: (VU.Vector Weight, Weight)
+  -> (VU.Vector Weight, Weight, (Weight, VU.Vector Bool) -> (Weight, VU.Vector Bool))
+normalize2 (w,c) 
+  | V.all (<=c) w = (w, c, id)
+  | otherwise = (V.filter (<=c) w, c, trans)
+  where
+    trans (obj, bs) = (obj, bs2)
+      where
+        bs2 = VU.create $ do
+          v <- VM.new (V.length w)
+          let loop !i !j =
+                when (i < V.length w) $ do
+                  if w ! i <= c then do
+                    VM.write v i (bs ! j)
+                    loop (i+1) (j+1)
+                  else do
+                    VM.write v i False
+                    loop (i+1) j
+          loop 0 0
+          return v
+
 maxSubsetSum' :: V.Vector v Weight => v Weight -> Weight -> (Weight, VU.Vector Bool)
 maxSubsetSum' w !c
   | wsum <= fromIntegral c = (fromIntegral wsum, V.replicate n True)
-  | otherwise = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST m
-  where
-    n = V.length w
-
-    b :: Int
-    b = loop (-1) 0
-      where
-        loop :: Int -> Integer -> Int
-        loop !i !s
-          | s > fromIntegral c = i
-          | otherwise = loop (i+1) (s + fromIntegral (w ! (i+1)))
-
-    -- Integer is used to avoid integer overflow
-    wsum :: Integer
-    wsum = V.foldl' (\r x -> r + fromIntegral x) 0 w
-
-    wbar :: Weight
-    -- wbar = sum [wA ! j | j <- [0..b-1]]
-    wbar = loop 0 0
-      where
-        loop !j !ret
-          | j == b = ret
-          | otherwise = loop (j+1) (ret + (w ! j))
-
-    max_f :: Integer
-    max_f = wsum - fromIntegral wbar
-
-    min_g :: Weight
-    min_g = if max_f < fromIntegral c then c - fromIntegral max_f else 0
-
-    g_drop :: IntMap [Int] -> IntMap [Int]
-    g_drop g =
-      case IntMap.splitLookup min_g g of
-        (lo, _, _) | IntMap.null lo -> g
-        (_, Just v, hi) -> IntMap.insert min_g v hi
-        (lo, Nothing, hi) ->
-          case IntMap.findMax lo of
-            (k,v) -> IntMap.insert k v hi
-
-    m :: forall s. ST s (Weight, VU.Vector Bool)
-    m = do
+  | otherwise = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST $ do
       objRef <- newSTRef (wbar, [], [])
       let updateObj gs ft = do
             let loop [] _ = return ()
@@ -205,11 +171,44 @@ maxSubsetSum' w !c
           gb = IntMap.singleton wbar []
       loop b (b-1) gb fb' True
 
-splitLE :: Int -> IntMap v -> IntMap v
-splitLE k m =
-  case IntMap.splitLookup k m of
-    (lo, Nothing, _) -> lo
-    (lo, Just v, _) -> IntMap.insert k v lo
+  where
+    n = V.length w
+
+    b :: Int
+    b = loop (-1) 0
+      where
+        loop :: Int -> Integer -> Int
+        loop !i !s
+          | s > fromIntegral c = i
+          | otherwise = loop (i+1) (s + fromIntegral (w ! (i+1)))
+
+    -- Integer is used to avoid integer overflow
+    wsum :: Integer
+    wsum = V.foldl' (\r x -> r + fromIntegral x) 0 w
+
+    wbar :: Weight
+    wbar = V.sum $ V.slice 0 b w
+
+    max_f :: Integer
+    max_f = wsum - fromIntegral wbar
+
+    min_g :: Weight
+    min_g = if max_f < fromIntegral c then c - fromIntegral max_f else 0
+
+    g_drop :: IntMap [Int] -> IntMap [Int]
+    g_drop g =
+      case IntMap.splitLookup min_g g of
+        (lo, _, _) | IntMap.null lo -> g
+        (_, Just v, hi) -> IntMap.insert min_g v hi
+        (lo, Nothing, hi) ->
+          case IntMap.findMax lo of
+            (k,v) -> IntMap.insert k v hi
+
+    splitLE :: Int -> IntMap v -> IntMap v
+    splitLE k m =
+      case IntMap.splitLookup k m of
+        (lo, Nothing, _) -> lo
+        (lo, Just v, _) -> IntMap.insert k v lo
 
 -- | Minimize Σ_{i=1}^n wi xi subject to Σ_{i=1}^n wi x≥ l and xi ∈ {0,1}.
 --
@@ -261,39 +260,7 @@ subsetSum
   -> Maybe (VU.Vector Bool)
   -- ^
   -- the assignment @[x1, x2 .. xn]@, identifying 0 (resp. 1) with @False@ (resp. @True@).
-subsetSum w c
-  | c' < 0 = Nothing
-  | fromIntegral (maxBound :: Weight) < c' = error ("ToySolver.Combinatorial.SubsetSum: overflow")
-  | otherwise = fmap (VU.imap (\i x -> if (w V.! i) < 0 then not x else x)) $ subsetSum' w' (fromIntegral c')
-{-
-      case maxSubsetSum w' (fromIntegral c') of 
-        (obj,xs')
-          | obj /= fromIntegral c' -> Nothing
-          | otherwise -> Just $! VU.imap (\i x -> if (w V.! i) < 0 then not x else x) xs'
--}
-  where
-    w' = VU.generate (V.length w) (\i -> abs (w V.! i))
-    offset :: Integer
-    offset = V.foldl' (\a b -> if b < 0 then a + fromIntegral b else a) 0 w
-    c' :: Integer
-    c' = fromIntegral c - offset
-
-subsetSum'
-  :: VU.Vector Weight
-  -> Weight
-  -> Maybe (VU.Vector Bool)
-subsetSum' w c = go 0 (IntMap.singleton 0 [])
-  where
-    go :: Int -> IntMap [Int] -> Maybe (VU.Vector Bool)
-    go !i !m =
-      case IntMap.lookup c m of
-        Just sol -> Just $! VU.create $ do
-          xs <- VM.replicate (V.length w) False
-          forM_ sol $ \i -> VM.write xs i True
-          return xs
-        Nothing
-          | i >= V.length w -> Nothing
-          | otherwise ->
-              let wi = w V.! i
-                  m' = m `IntMap.union` IntMap.fromDistinctAscList [(x', i:sol) | (x,sol) <- IntMap.toAscList m, let x' = x + wi, 0 <= x', x' <= c]
-              in go (i+1) m'
+subsetSum w c = do
+  (obj, sol) <- maxSubsetSum w c
+  guard $ obj == c
+  return sol
