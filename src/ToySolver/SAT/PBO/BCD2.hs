@@ -283,21 +283,16 @@ solveWBO cxt solver opt = do
             SAT.addClause solver [- sel, snd (Map.findMin hi)] -- sel → Map.findMin hi
           return sel
 
-refineLim :: Integer
-refineLim = 65536
-
 -- | The smallest integer greater-than or equal-to @n@ that can be obtained by summing a subset of @ws@.
 -- Note that the definition is different from the one in Morgado et al.
 refineLB
   :: [Integer] -- ^ @ws@
   -> Integer   -- ^ @n@
   -> Integer
-refineLB ws n
-  | sum ws <= refineLim && n <= refineLim =
-      case SubsetSum.minSubsetSum (V.fromList ws) n of
-        Nothing -> n
-        Just (obj, _) -> obj
-  | otherwise = n
+refineLB ws n =
+  case SubsetSum.minSubsetSum (V.fromList ws) n of
+    Nothing -> n
+    Just (obj, _) -> obj
 
 -- | The greatest integer lesser-than or equal-to @n@ that can be obtained by summing a subset of @ws@.
 refineUB
@@ -306,8 +301,7 @@ refineUB
   -> Integer
 refineUB ws n
   | n < 0 = n
-  | sum ws <= refineLim && n <= refineLim =
+  | otherwise =
       case SubsetSum.maxSubsetSum (V.fromList ws) n of
         Nothing -> n
         Just (obj, _) -> obj
-  | otherwise = n
