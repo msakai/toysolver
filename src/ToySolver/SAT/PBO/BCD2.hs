@@ -291,7 +291,7 @@ refineLB
   -> Integer
 refineLB ws n =
   case SubsetSum.minSubsetSum (V.fromList ws) n of
-    Nothing -> n
+    Nothing -> sum [w | w <- ws, w > 0] + 1
     Just (obj, _) -> obj
 
 -- | The greatest integer lesser-than or equal-to @n@ that can be obtained by summing a subset of @ws@.
@@ -303,5 +303,5 @@ refineUB ws n
   | n < 0 = n
   | otherwise =
       case SubsetSum.maxSubsetSum (V.fromList ws) n of
-        Nothing -> n
+        Nothing -> sum [w | w <- ws, w < 0] - 1
         Just (obj, _) -> obj
