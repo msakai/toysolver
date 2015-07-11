@@ -32,18 +32,21 @@ import Control.Monad.ST
 import Data.STRef
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Vector.Generic ((!))
-import qualified Data.Vector.Generic as V
+import qualified Data.Vector as V
+import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VM
 import qualified Data.Vector.Unboxed as VU
 
-type Weight = Int
+type Weight = Integer
 
 -- | Maximize Σ_{i=1}^n wi xi subject to Σ_{i=1}^n wi xi ≤ c and xi ∈ {0,1}.
 --
 -- Note: 0 (resp. 1) is identified with False (resp. True) in the assignment.
 maxSubsetSum
-  :: V.Vector v Weight
+  :: VG.Vector v Weight
   => v Weight -- ^ weights @[w1, w2 .. wn]@
   -> Weight -- ^ capacity @c@
   -> Maybe (Weight, VU.Vector Bool)
@@ -53,57 +56,59 @@ maxSubsetSum
   -- * the assignment @[x1, x2 .. xn]@, identifying 0 (resp. 1) with @False@ (resp. @True@).
 maxSubsetSum w c =
   case normalizeWeightsToPositive (w,c) of
-    (w2, c2, trans2)
-      | c2 < 0 -> Nothing
+    (w1, c1, trans1)
+      | c1 < 0 -> Nothing
       | otherwise ->
-          case normalize2 (w2, c2) of
-            (w3, c3, trans3) ->
-              Just $ trans2 $ trans3 $ maxSubsetSum' w3 c3
+          case normalize2 (w1, c1) of
+            (w2, c2, trans2) ->
+              case normalize3 (w2, c2) of
+                (w3, c3, trans3) ->
+                  Just $ trans1 $ trans2 $ trans3 $
+                    if c3 <= fromIntegral (maxBound :: Int) then
+                      maxSubsetSumInt' (VG.generate (VG.length w3) (\i -> fromIntegral (w3 VG.! i))) (fromIntegral c3)
+                    else
+                      maxSubsetSum' w3 c3
 
 normalizeWeightsToPositive
-  :: V.Vector v Weight
+  :: VG.Vector v Weight
   => (v Weight, Weight)
-  -> (VU.Vector Weight, Weight, (Weight, VU.Vector Bool) -> (Weight, VU.Vector Bool))
+  -> (V.Vector Weight, Weight, (Weight, VU.Vector Bool) -> (Weight, VU.Vector Bool))
 normalizeWeightsToPositive (w,c)
-  | V.all (>=0) w = (V.convert w, c, id)
+  | VG.all (>=0) w = (VG.convert w, c, id)
   | otherwise = runST $ do
-      w2 <- VM.new (V.length w)
+      w2 <- VM.new (VG.length w)
       let loop !i !offset
-            | i >= V.length w = return offset
+            | i >= VG.length w = return offset
             | otherwise = do
                 let wi = w ! i
-                if wi == minBound then
-                  error ("ToySolver.Combinatorial.SubsetSum: cannot negate " ++ show wi)
-                else if wi < 0 then do
+                if wi < 0 then do
                   VM.write w2 i (- wi)
-                  loop (i+1) (offset + fromIntegral wi)
+                  loop (i+1) (offset + wi)
                 else do
                   VM.write w2 i wi
                   loop (i+1) offset
-      w2 <- V.unsafeFreeze w2
+      w2 <- VG.unsafeFreeze w2
       offset <- loop 0 (0::Integer)
-                
-      when (fromIntegral (maxBound :: Weight) < fromIntegral c - offset) $
-        error ("ToySolver.Combinatorial.SubsetSum: overflow")
-      let trans (obj, bs) = (obj + fromIntegral offset, bs2)
+      let trans (obj, bs) = (obj + offset, bs2)
             where
               bs2 = VU.imap (\i bi -> if w ! i < 0 then not bi else bi) bs
-      return (w2, c - fromIntegral offset, trans)
+      return (w2, c - offset, trans)
 
 normalize2
-  :: (VU.Vector Weight, Weight)
-  -> (VU.Vector Weight, Weight, (Weight, VU.Vector Bool) -> (Weight, VU.Vector Bool))
-normalize2 (w,c) 
-  | V.all (<=c) w = (w, c, id)
-  | otherwise = (V.filter (<=c) w, c, trans)
+  :: (V.Vector Weight, Weight)
+  -> (V.Vector Weight, Weight, (Weight, VU.Vector Bool) -> (Weight, VU.Vector Bool))
+normalize2 (w,c)
+  | VG.all (\wi -> 0<wi && wi<=c) w = (w, c, id)
+  | otherwise = (VG.filter (\wi -> 0<wi && wi<=c) w, c, trans)
   where
     trans (obj, bs) = (obj, bs2)
       where
         bs2 = VU.create $ do
-          v <- VM.new (V.length w)
+          v <- VM.new (VG.length w)
           let loop !i !j =
-                when (i < V.length w) $ do
-                  if w ! i <= c then do
+                when (i < VG.length w) $ do
+                  let wi = w ! i
+                  if 0 < wi && wi <= c then do
                     VM.write v i (bs ! j)
                     loop (i+1) (j+1)
                   else do
@@ -112,9 +117,116 @@ normalize2 (w,c)
           loop 0 0
           return v
 
-maxSubsetSum' :: V.Vector v Weight => v Weight -> Weight -> (Weight, VU.Vector Bool)
+normalize3
+  :: (V.Vector Weight, Weight)
+  -> (V.Vector Weight, Weight, (Weight, VU.Vector Bool) -> (Weight, VU.Vector Bool))
+normalize3 (w,c)
+  | VG.null w || d == 1 = (w, c, id)
+  | otherwise = (VG.map (`div` d) w, c `div` d, trans)
+  where
+    d = VG.foldl1' gcd w
+    trans (obj, bs) = (obj * d, bs)
+
+maxSubsetSum' :: V.Vector Weight -> Weight -> (Weight, VU.Vector Bool)
 maxSubsetSum' w !c
-  | wsum <= fromIntegral c = (fromIntegral wsum, V.replicate n True)
+  | wsum <= c = (wsum, VG.replicate n True)
+  | otherwise = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST $ do
+      objRef <- newSTRef (wbar, [], [])
+      let updateObj gs ft = do
+            let loop [] _ = return ()
+                loop _ [] = return ()
+                loop xxs@((gobj,gsol):xs) yys@((fobj,fsol):ys)
+                  | c < gobj + fobj = loop xs yys
+                  | otherwise = do
+                      (curr, _, _) <- readSTRef objRef
+                      when (curr < gobj + fobj) $ writeSTRef objRef (gobj + fobj, gsol, fsol)
+                      loop xxs ys
+            loop (Map.toDescList gs) (Map.toAscList ft)
+
+      let loop !s !t !gs !ft !flag = do
+            (obj, gsol, fsol) <- readSTRef objRef
+            if obj == c || (s == 0 && t == n-1) then do
+              let sol = VG.create $ do
+                    bs <- VM.new n
+                    forM_ [0..b-1] $ \i -> VM.write bs i True
+                    forM_ [b..n-1] $ \i -> VM.write bs i False
+                    forM_ fsol $ \i -> VM.write bs i True
+                    forM_ gsol $ \i -> VM.write bs i False
+                    return bs
+              return (obj, sol)
+            else do
+              let updateF = do
+                    -- Compute f_{t+1} from f_t
+                    let t' = t + 1
+                        wt' = w ! t'
+                        m = Map.mapKeysMonotonic (+ wt') $ Map.map (t' :) $ splitLE (c - wt') ft
+                        ft' = ft `Map.union` m
+                    updateObj gs m
+                    loop s t' gs ft' (not flag)
+                  updateG = do
+                    -- Compute g_{s-1} from g_s
+                    let s' = s - 1
+                        ws = w ! s'
+                        m = Map.map (s' :) $ g_drop $ Map.mapKeysMonotonic (subtract ws) $ gs
+                        gs' = gs `Map.union` m
+                    updateObj m ft
+                    loop s' t gs' ft (not flag)
+              if s == 0 then
+                updateF
+              else if t == n-1 then
+                updateG
+              else
+                if flag then updateG else updateF
+
+      let -- f_{b-1}
+          fb' :: Map Integer [Int]
+          fb' = Map.singleton 0 []
+          -- g_{b}
+          gb :: Map Integer [Int]
+          gb = Map.singleton wbar []
+      loop b (b-1) gb fb' True
+
+  where
+    n = VG.length w
+
+    b :: Int
+    b = loop (-1) 0
+      where
+        loop :: Int -> Integer -> Int
+        loop !i !s
+          | s > c = i
+          | otherwise = loop (i+1) (s + (w ! (i+1)))
+
+    wsum :: Integer
+    wsum = VG.sum w
+
+    wbar :: Weight
+    wbar = VG.sum $ VG.slice 0 b w
+
+    max_f :: Weight
+    max_f = wsum - fromIntegral wbar
+
+    min_g :: Weight
+    min_g = 0 `max` (c - max_f)
+
+    g_drop :: Map Integer [Int] -> Map Integer [Int]
+    g_drop g =
+      case Map.splitLookup min_g g of
+        (lo, _, _) | Map.null lo -> g
+        (_, Just v, hi) -> Map.insert min_g v hi
+        (lo, Nothing, hi) ->
+          case Map.findMax lo of
+            (k,v) -> Map.insert k v hi
+
+    splitLE :: Ord k => k -> Map k v -> Map k v
+    splitLE k m =
+      case Map.splitLookup k m of
+        (lo, Nothing, _) -> lo
+        (lo, Just v, _) -> Map.insert k v lo
+
+maxSubsetSumInt' :: VU.Vector Int -> Int -> (Weight, VU.Vector Bool)
+maxSubsetSumInt' w !c
+  | wsum <= fromIntegral c = (fromIntegral wsum, VG.replicate n True)
   | otherwise = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST $ do
       objRef <- newSTRef (wbar, [], [])
       let updateObj gs ft = do
@@ -131,14 +243,14 @@ maxSubsetSum' w !c
       let loop !s !t !gs !ft !flag = do
             (obj, gsol, fsol) <- readSTRef objRef
             if obj == c || (s == 0 && t == n-1) then do
-              let sol = V.create $ do
+              let sol = VG.create $ do
                     bs <- VM.new n
                     forM_ [0..b-1] $ \i -> VM.write bs i True
                     forM_ [b..n-1] $ \i -> VM.write bs i False
                     forM_ fsol $ \i -> VM.write bs i True
                     forM_ gsol $ \i -> VM.write bs i False
                     return bs
-              return (obj, sol)
+              return (fromIntegral obj, sol)
             else do
               let updateF = do
                     -- Compute f_{t+1} from f_t
@@ -172,7 +284,7 @@ maxSubsetSum' w !c
       loop b (b-1) gb fb' True
 
   where
-    n = V.length w
+    n = VG.length w
 
     b :: Int
     b = loop (-1) 0
@@ -184,15 +296,15 @@ maxSubsetSum' w !c
 
     -- Integer is used to avoid integer overflow
     wsum :: Integer
-    wsum = V.foldl' (\r x -> r + fromIntegral x) 0 w
+    wsum = VG.foldl' (\r x -> r + fromIntegral x) 0 w
 
-    wbar :: Weight
-    wbar = V.sum $ V.slice 0 b w
+    wbar :: Int
+    wbar = VG.sum $ VG.slice 0 b w
 
     max_f :: Integer
     max_f = wsum - fromIntegral wbar
 
-    min_g :: Weight
+    min_g :: Int
     min_g = if max_f < fromIntegral c then c - fromIntegral max_f else 0
 
     g_drop :: IntMap [Int] -> IntMap [Int]
@@ -209,12 +321,12 @@ maxSubsetSum' w !c
       case IntMap.splitLookup k m of
         (lo, Nothing, _) -> lo
         (lo, Just v, _) -> IntMap.insert k v lo
-
+                           
 -- | Minimize Σ_{i=1}^n wi xi subject to Σ_{i=1}^n wi x≥ l and xi ∈ {0,1}.
 --
 -- Note: 0 (resp. 1) is identified with False (resp. True) in the assignment.
 minSubsetSum
-  :: V.Vector v Weight
+  :: VG.Vector v Weight
   => v Weight -- ^ weights @[w1, w2 .. wn]@
   -> Weight -- ^ @l@
   -> Maybe (Weight, VU.Vector Bool)
@@ -222,17 +334,12 @@ minSubsetSum
   -- * the objective value Σ_{i=1}^n wi xi, and
   --
   -- * the assignment @[x1, x2 .. xn]@, identifying 0 (resp. 1) with @False@ (resp. @True@).
-minSubsetSum w l
-  | wsum < fromIntegral (minBound :: Int) || fromIntegral (maxBound :: Int) < wsum =
-      error $ "SubsetSum.minSubsetSum: sum of weights " ++ show wsum ++ " do not fit into Int"
-  | otherwise =
-      case maxSubsetSum w (fromIntegral wsum - l) of
-        Nothing -> Nothing
-        Just (obj, bs) -> Just (fromIntegral wsum - obj, V.map not bs)
+minSubsetSum w l =
+  case maxSubsetSum w (wsum - l) of
+    Nothing -> Nothing
+    Just (obj, bs) -> Just (wsum - obj, VG.map not bs)
   where
-    -- Integer is used to avoid integer overflow
-    wsum :: Integer
-    wsum = V.foldl' (\r x -> r + fromIntegral x) 0 w
+    wsum = VG.sum w
   
 {-
 minimize Σ wi xi = Σ wi (1 - ¬xi) = Σ wi - (Σ wi ¬xi)
@@ -254,7 +361,7 @@ subject to Σ wi ¬xi ≤ (Σ wi) - n
 -- 
 -- Note: 0 (resp. 1) is identified with False (resp. True) in the assignment.
 subsetSum
-  :: V.Vector v Weight
+  :: VG.Vector v Weight
   => v Weight -- ^ weights @[w1, w2 .. wn]@
   -> Weight -- ^ @l@
   -> Maybe (VU.Vector Bool)

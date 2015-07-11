@@ -12,6 +12,7 @@ import qualified Data.IntSet as IntSet
 import Data.Ratio
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import Test.QuickCheck.Function
 import Test.Tasty
@@ -284,34 +285,34 @@ prop_GurvichKhachiyan1999_minimalHittingSets_minimality =
 prop_maxSubsetSum_isValid =
   forAll arbitrary $ \c ->
     forAll arbitrary $ \ws ->
-      case SubsetSum.maxSubsetSum (VU.fromList ws) c of
+      case SubsetSum.maxSubsetSum (V.fromList ws) c of
         Just (obj, bs) -> obj == sum [w | (w,b) <- zip ws (VU.toList bs), b] && obj <= c
         Nothing -> True
 
 prop_maxSubsetSum_isEqualToKnapsackBBSolver =
   forAll (liftM abs arbitrary) $ \c ->
     forAll (liftM (map abs) arbitrary) $ \ws ->
-      let Just (obj1, bs1) = SubsetSum.maxSubsetSum (VU.fromList ws) c
+      let Just (obj1, bs1) = SubsetSum.maxSubsetSum (V.fromList ws) c
           (obj2, _, bs2) = KnapsackBB.solve [(fromIntegral w, fromIntegral w) | w <- ws] (fromIntegral c)
       in fromIntegral obj1 == obj2
 
 case_maxSubsetSum_regression_test_1 =
-  SubsetSum.maxSubsetSum (VU.fromList [4,28,5,6,18]) 25 @?= Just (24, VU.fromList [False,False,False,True,True])
+  SubsetSum.maxSubsetSum (V.fromList [4,28,5,6,18]) 25 @?= Just (24, VU.fromList [False,False,False,True,True])
 
 case_maxSubsetSum_regression_test_2 =
-  SubsetSum.maxSubsetSum (VU.fromList [10,15]) 18 @?= Just (15, VU.fromList [False,True])
+  SubsetSum.maxSubsetSum (V.fromList [10,15]) 18 @?= Just (15, VU.fromList [False,True])
 
 prop_minSubsetSum_isValid =
   forAll arbitrary $ \c ->
     forAll arbitrary $ \ws ->
-      case SubsetSum.minSubsetSum (VU.fromList ws) c of
+      case SubsetSum.minSubsetSum (V.fromList ws) c of
         Just (obj, bs) -> obj == sum [w | (w,b) <- zip ws (VU.toList bs), b] && c <= obj
         Nothing -> True
 
 prop_subsetSum_isValid =
   forAll arbitrary $ \c ->
     forAll arbitrary $ \ws ->
-      case SubsetSum.subsetSum (VU.fromList ws) c of
+      case SubsetSum.subsetSum (V.fromList ws) c of
         Just bs -> sum [w | (w,b) <- zip ws (VU.toList bs), b] == c
         Nothing -> True
 

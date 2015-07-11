@@ -5,6 +5,7 @@ import qualified ToySolver.Combinatorial.Knapsack.BB as KnapsackBB
 import qualified ToySolver.Combinatorial.Knapsack.DPDense as KnapsackDPDense
 import qualified ToySolver.Combinatorial.Knapsack.DPSparse as KnapsackDPSparse
 import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 
 main :: IO ()
@@ -14,7 +15,7 @@ main = Criterion.Main.defaultMain $
       , bench "KnapsackDPDense" $ nf (\(lhs,rhs) -> KnapsackDPDense.solve [(fromIntegral x, x) | x <- lhs] rhs) problem1
       , bench "KnapsackDPSparse" $ nf (\(lhs,rhs) -> KnapsackDPSparse.solveGeneric [(x, x) | x <- lhs] rhs) problem1
       , bench "KnapsackDPSparseInt" $ nf (\(lhs,rhs) -> KnapsackDPSparse.solveInt [(x, x) | x <- lhs] rhs) problem1
-      , bench "SubsetSum" $ nf (\(lhs,rhs) -> SubsetSum.maxSubsetSum (VU.fromList lhs) rhs) problem1
+      , bench "SubsetSum" $ nf (\(lhs,rhs) -> SubsetSum.maxSubsetSum (V.fromList (map fromIntegral lhs)) (fromIntegral rhs)) problem1
       ]
   ] ++
   [ bgroup ("problem2_" ++ show rhs) $
@@ -28,12 +29,12 @@ main = Criterion.Main.defaultMain $
        else
          [])
       ++
-      [ bench "SubsetSum" $ nf (\lhs -> SubsetSum.maxSubsetSum (VU.fromList lhs) rhs) problem2_items ]
+      [ bench "SubsetSum" $ nf (\lhs -> SubsetSum.maxSubsetSum (V.fromList (map fromIntegral lhs)) (fromIntegral rhs)) problem2_items ]
   | rhs <- [50 :: Int, 100, 200, 500, 1000, 2000, 5000, 10000, 50000, 100000, 150000]
   ] ++ 
   [ bgroup ("problem3_" ++ show rhs) $
       [ bench "KnapsackBB" $ nf (\lhs -> KnapsackBB.solve [(fromIntegral x, fromIntegral x) | x <- lhs] (fromIntegral rhs)) problem3_items
-      , bench "SubsetSum" $ nf (\lhs -> SubsetSum.maxSubsetSum (VU.fromList lhs) rhs) problem3_items
+      , bench "SubsetSum" $ nf (\lhs -> SubsetSum.maxSubsetSum (V.fromList (map fromIntegral lhs)) (fromIntegral rhs)) problem3_items
       ]
   | rhs <- [3000000, 5000000, 10000000, 50000000, 100000000, 1000000000]
   ]

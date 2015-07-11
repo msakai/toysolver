@@ -38,7 +38,7 @@ import qualified Data.IntSet as IntSet
 import qualified Data.IntMap as IntMap
 import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.Vector.Unboxed as VU
+import qualified Data.Vector as V
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO.Context as C
@@ -294,9 +294,9 @@ refineLB
   -> Integer
 refineLB ws n
   | sum ws <= refineLim && n <= refineLim =
-      case SubsetSum.minSubsetSum (VU.fromList (map fromIntegral ws)) (fromIntegral n) of
+      case SubsetSum.minSubsetSum (V.fromList ws) n of
         Nothing -> n
-        Just (obj, _) -> fromIntegral obj
+        Just (obj, _) -> obj
   | otherwise = n
 
 -- | The greatest integer lesser-than or equal-to @n@ that can be obtained by summing a subset of @ws@.
@@ -307,7 +307,7 @@ refineUB
 refineUB ws n
   | n < 0 = n
   | sum ws <= refineLim && n <= refineLim =
-      case SubsetSum.maxSubsetSum (VU.fromList (map fromIntegral ws)) (fromIntegral n) of
+      case SubsetSum.maxSubsetSum (V.fromList ws) n of
         Nothing -> n
-        Just (obj, _) -> fromIntegral obj
+        Just (obj, _) -> obj
   | otherwise = n
