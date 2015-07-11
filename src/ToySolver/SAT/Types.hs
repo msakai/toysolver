@@ -73,7 +73,9 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import qualified Data.Vector as V
 import ToySolver.Data.LBool
+import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
 
 -- | Variable is represented as positive integers (DIMACS format).
 type Var = Int
@@ -255,7 +257,7 @@ normalizePBLinAtLeast :: PBLinAtLeast -> PBLinAtLeast
 normalizePBLinAtLeast a =
   case step1 a of
     (xs,n)
-      | n > 0     -> step3 (xs,n)
+      | n > 0     -> step4 $ step3 (xs,n)
       | otherwise -> ([], 0) -- trivially true
   where
     step1 :: PBLinAtLeast -> PBLinAtLeast
@@ -273,12 +275,19 @@ normalizePBLinAtLeast a =
               m = (n+d-1) `div` d
           in ([(if c >= n then m else c `div` d, l) | (c,l) <- xs], m)
 
+    -- subset sum
+    step4 :: PBLinAtLeast -> PBLinAtLeast
+    step4 (xs,n) =
+      case SubsetSum.minSubsetSum (V.fromList [c | (c,_) <- xs]) n of
+        Just (m, _) -> (xs, m)
+        Nothing -> ([], 1) -- false
+
 -- | normalizing PB constraint of the form /c1 x1 + c2 cn ... cn xn = b/.
 normalizePBLinExactly :: PBLinExactly -> PBLinExactly
 normalizePBLinExactly a =
 　case step1 $ a of
     (xs,n)
-      | n >= 0    -> step2 (xs, n)
+      | n >= 0    -> step3 $ step2 (xs, n)
       | otherwise -> ([], 1) -- false
   where
     step1 :: PBLinExactly -> PBLinExactly
@@ -294,6 +303,13 @@ normalizePBLinExactly a =
       | otherwise      = ([], 1) -- false
       where
         d = foldl1' gcd [c | (c,_) <- xs]
+
+    -- subset sum
+    step3 :: PBLinExactly -> PBLinExactly
+    step3 constr@(xs,n) =
+      case SubsetSum.subsetSum (V.fromList [c | (c,_) <- xs]) n of
+        Just _ -> constr        
+        Nothing -> ([], 1) -- false
 
 {-# SPECIALIZE instantiatePBLinAtLeast :: (Lit -> IO LBool) -> PBLinAtLeast -> IO PBLinAtLeast #-}
 instantiatePBLinAtLeast :: forall m. Monad m => (Lit -> m LBool) -> PBLinAtLeast -> m PBLinAtLeast

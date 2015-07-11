@@ -690,7 +690,7 @@ prop_normalizePBLinAtLeast = forAll g $ \(nv, c) ->
       return (nv, (lhs,rhs))
 
 case_normalizePBLinExactly_1 :: Assertion
-case_normalizePBLinExactly_1 = (sort lhs, rhs) @?= (sort [(3,x1),(2,x2)], 1)
+case_normalizePBLinExactly_1 = (sort lhs, rhs) @?= ([], 1)
   where
     x1 = 1
     x2 = 2
