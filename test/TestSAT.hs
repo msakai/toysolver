@@ -720,6 +720,28 @@ prop_normalizePBLinExactly = forAll g $ \(nv, c) ->
       rhs <- arbitrary
       return (nv, (lhs,rhs))
 
+prop_cutResolve :: Property
+prop_cutResolve =
+  forAll (choose (1, 10)) $ \nv ->
+    forAll (g nv True) $ \c1 ->
+      forAll (g nv False) $ \c2 ->
+        let c3 = cutResolve c1 c2 1
+        in flip all (allAssignments nv) $ \m ->
+             not (evalPBLinExactly m c1 && evalPBLinExactly m c2) || evalPBLinExactly m c3
+  where
+    g :: Int -> Bool -> Gen PBLinExactly
+    g nv b = do
+      lhs <- forM [1..nv] $ \x -> do
+        if x==1 then do
+          c <- liftM ((1+) . abs) arbitrary
+          return (c, literal x b)
+        else do
+          c <- arbitrary
+          p <- arbitrary
+          return (c, literal x p)
+      rhs <- arbitrary
+      return (lhs, rhs)
+
 case_cutResolve_1 :: Assertion
 case_cutResolve_1 = (sort lhs, rhs) @?= (sort [(1,x3),(1,x4)], 1)
   where
