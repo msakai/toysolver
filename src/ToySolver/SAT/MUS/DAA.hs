@@ -27,7 +27,6 @@ module ToySolver.SAT.MUS.DAA
   ) where
 
 import Control.Monad
-import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Set (Set)
 import qualified Data.Set as Set

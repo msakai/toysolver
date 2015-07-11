@@ -38,7 +38,6 @@ module ToySolver.Internal.Data.PriorityQueue
   , resizeHeapCapacity
   ) where
 
-import Control.Monad
 import qualified Data.Array.IO as A
 import Data.Queue.Classes
 import qualified ToySolver.Internal.Data.Vec as Vec

@@ -25,7 +25,6 @@ module ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999
   , enumMinimalHittingSets
   ) where
 
-import Control.Monad
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Set (Set)

@@ -544,12 +544,6 @@ unwatchVar solver !lit c = do
   vd <- varData solver lit
   modifyIORef (vdWatches vd) (delete c)
 
--- | Returns list of constraints that are watching the literal.
-watches :: Solver -> Lit -> IO [SomeConstraintHandler]
-watches solver !lit = do
-  ld <- litData solver lit
-  readIORef (ldWatches ld)
-
 addToDB :: ConstraintHandler c => Solver -> c -> IO ()
 addToDB solver c = do
   let c2 = toConstraintHandler c

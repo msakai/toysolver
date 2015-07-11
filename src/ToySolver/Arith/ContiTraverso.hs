@@ -83,9 +83,6 @@ solve' cmp vs' obj cs
     vs2 :: [Var]
     vs2 = [v2 .. v2 + length cs - 1]
 
-    vs2' :: IS.IntSet
-    vs2' = IS.fromList vs2
-
     t :: Var
     t = v2 + length cs
 

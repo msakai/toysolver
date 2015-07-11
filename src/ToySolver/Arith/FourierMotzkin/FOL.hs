@@ -7,7 +7,6 @@ module ToySolver.Arith.FourierMotzkin.FOL
     where
 
 import Control.Monad
-import qualified Data.IntSet as IS
 import Data.Maybe
 import Data.VectorSpace hiding (project)
 

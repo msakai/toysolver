@@ -8,8 +8,6 @@ module ToySolver.Wang
 import Control.Monad (guard,msum)
 import Data.List (intersect)
 import Data.Maybe (isJust, listToMaybe)
-
-import ToySolver.Data.Boolean
 import ToySolver.Data.BoolExpr
 
 type Formula a = BoolExpr a

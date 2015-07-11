@@ -78,7 +78,6 @@ import Control.Monad
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import ToySolver.Data.Boolean
 import ToySolver.Data.BoolExpr
