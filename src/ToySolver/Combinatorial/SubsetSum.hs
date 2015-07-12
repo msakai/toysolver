@@ -61,13 +61,9 @@ maxSubsetSum w c =
       | otherwise ->
           case normalize2 (w1, c1) of
             (w2, c2, trans2) ->
-              case normalize3 (w2, c2) of
+              case normalizeGCDLe (w2, c2) of
                 (w3, c3, trans3) ->
-                  Just $ trans1 $ trans2 $ trans3 $
-                    if c3 <= fromIntegral (maxBound :: Int) then
-                      maxSubsetSumInt' (VG.generate (VG.length w3) (\i -> fromIntegral (w3 VG.! i))) (fromIntegral c3)
-                    else
-                      maxSubsetSum' w3 c3
+                  Just $ trans1 $ trans2 $ trans3 $ maxSubsetSum' w3 c3
 
 normalizeWeightsToPositive
   :: VG.Vector v Weight
@@ -87,8 +83,8 @@ normalizeWeightsToPositive (w,c)
                 else do
                   VM.write w2 i wi
                   loop (i+1) offset
-      w2 <- VG.unsafeFreeze w2
       offset <- loop 0 (0::Integer)
+      w2 <- VG.unsafeFreeze w2
       let trans (obj, bs) = (obj + offset, bs2)
             where
               bs2 = VU.imap (\i bi -> if w ! i < 0 then not bi else bi) bs
@@ -117,74 +113,93 @@ normalize2 (w,c)
           loop 0 0
           return v
 
-normalize3
+normalizeGCDLe
   :: (V.Vector Weight, Weight)
   -> (V.Vector Weight, Weight, (Weight, VU.Vector Bool) -> (Weight, VU.Vector Bool))
-normalize3 (w,c)
+normalizeGCDLe (w,c)
   | VG.null w || d == 1 = (w, c, id)
   | otherwise = (VG.map (`div` d) w, c `div` d, trans)
   where
     d = VG.foldl1' gcd w
     trans (obj, bs) = (obj * d, bs)
 
+normalizeGCDEq
+  :: (V.Vector Weight, Weight)
+  -> Maybe (V.Vector Weight, Weight, (Weight, VU.Vector Bool) -> (Weight, VU.Vector Bool))
+normalizeGCDEq (w,c)
+  | VG.null w || d == 1 = Just (w, c, id)
+  | c `mod` d == 0 = Just (VG.map (`div` d) w, c `div` d, trans)
+  | otherwise = Nothing
+  where
+    d = VG.foldl1' gcd w
+    trans (obj, bs) = (obj * d, bs)
+
 maxSubsetSum' :: V.Vector Weight -> Weight -> (Weight, VU.Vector Bool)
-maxSubsetSum' w !c
-  | wsum <= c = (wsum, VG.replicate n True)
-  | otherwise = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST $ do
-      objRef <- newSTRef (wbar, [], [])
-      let updateObj gs ft = do
-            let loop [] _ = return ()
-                loop _ [] = return ()
-                loop xxs@((gobj,gsol):xs) yys@((fobj,fsol):ys)
-                  | c < gobj + fobj = loop xs yys
-                  | otherwise = do
-                      (curr, _, _) <- readSTRef objRef
-                      when (curr < gobj + fobj) $ writeSTRef objRef (gobj + fobj, gsol, fsol)
-                      loop xxs ys
-            loop (Map.toDescList gs) (Map.toAscList ft)
+maxSubsetSum' !w !c
+  | wsum <= c = (wsum, VG.replicate (VG.length w) True)
+  | c <= fromIntegral (maxBound :: Int) =
+      maxSubsetSumInt' (VG.generate (VG.length w) (\i -> fromIntegral (w VG.! i))) (fromIntegral c) wsum
+  | otherwise =
+      maxSubsetSumInteger' w c wsum
+  where
+    wsum = VG.sum w
+                      
+maxSubsetSumInteger' :: V.Vector Weight -> Weight -> Weight -> (Weight, VU.Vector Bool)
+maxSubsetSumInteger' w !c wsum = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST $ do
+  objRef <- newSTRef (wbar, [], [])
+  let updateObj gs ft = do
+        let loop [] _ = return ()
+            loop _ [] = return ()
+            loop xxs@((gobj,gsol):xs) yys@((fobj,fsol):ys)
+              | c < gobj + fobj = loop xs yys
+              | otherwise = do
+                  (curr, _, _) <- readSTRef objRef
+                  when (curr < gobj + fobj) $ writeSTRef objRef (gobj + fobj, gsol, fsol)
+                  loop xxs ys
+        loop (Map.toDescList gs) (Map.toAscList ft)
 
-      let loop !s !t !gs !ft !flag = do
-            (obj, gsol, fsol) <- readSTRef objRef
-            if obj == c || (s == 0 && t == n-1) then do
-              let sol = VG.create $ do
-                    bs <- VM.new n
-                    forM_ [0..b-1] $ \i -> VM.write bs i True
-                    forM_ [b..n-1] $ \i -> VM.write bs i False
-                    forM_ fsol $ \i -> VM.write bs i True
-                    forM_ gsol $ \i -> VM.write bs i False
-                    return bs
-              return (obj, sol)
-            else do
-              let updateF = do
-                    -- Compute f_{t+1} from f_t
-                    let t' = t + 1
-                        wt' = w ! t'
-                        m = Map.mapKeysMonotonic (+ wt') $ Map.map (t' :) $ splitLE (c - wt') ft
-                        ft' = ft `Map.union` m
-                    updateObj gs m
-                    loop s t' gs ft' (not flag)
-                  updateG = do
-                    -- Compute g_{s-1} from g_s
-                    let s' = s - 1
-                        ws = w ! s'
-                        m = Map.map (s' :) $ g_drop $ Map.mapKeysMonotonic (subtract ws) $ gs
-                        gs' = gs `Map.union` m
-                    updateObj m ft
-                    loop s' t gs' ft (not flag)
-              if s == 0 then
-                updateF
-              else if t == n-1 then
-                updateG
-              else
-                if flag then updateG else updateF
+  let loop !s !t !gs !ft !flag = do
+        (obj, gsol, fsol) <- readSTRef objRef
+        if obj == c || (s == 0 && t == n-1) then do
+          let sol = VG.create $ do
+                bs <- VM.new n
+                forM_ [0..b-1] $ \i -> VM.write bs i True
+                forM_ [b..n-1] $ \i -> VM.write bs i False
+                forM_ fsol $ \i -> VM.write bs i True
+                forM_ gsol $ \i -> VM.write bs i False
+                return bs
+          return (obj, sol)
+        else do
+          let updateF = do
+                -- Compute f_{t+1} from f_t
+                let t' = t + 1
+                    wt' = w ! t'
+                    m = Map.mapKeysMonotonic (+ wt') $ Map.map (t' :) $ splitLE (c - wt') ft
+                    ft' = ft `Map.union` m
+                updateObj gs m
+                loop s t' gs ft' (not flag)
+              updateG = do
+                -- Compute g_{s-1} from g_s
+                let s' = s - 1
+                    ws = w ! s'
+                    m = Map.map (s' :) $ g_drop $ Map.mapKeysMonotonic (subtract ws) $ gs
+                    gs' = gs `Map.union` m
+                updateObj m ft
+                loop s' t gs' ft (not flag)
+          if s == 0 then
+            updateF
+          else if t == n-1 then
+            updateG
+          else
+            if flag then updateG else updateF
 
-      let -- f_{b-1}
-          fb' :: Map Integer [Int]
-          fb' = Map.singleton 0 []
-          -- g_{b}
-          gb :: Map Integer [Int]
-          gb = Map.singleton wbar []
-      loop b (b-1) gb fb' True
+  let -- f_{b-1}
+      fb' :: Map Integer [Int]
+      fb' = Map.singleton 0 []
+      -- g_{b}
+      gb :: Map Integer [Int]
+      gb = Map.singleton wbar []
+  loop b (b-1) gb fb' True
 
   where
     n = VG.length w
@@ -196,9 +211,6 @@ maxSubsetSum' w !c
         loop !i !s
           | s > c = i
           | otherwise = loop (i+1) (s + (w ! (i+1)))
-
-    wsum :: Integer
-    wsum = VG.sum w
 
     wbar :: Weight
     wbar = VG.sum $ VG.slice 0 b w
@@ -224,64 +236,62 @@ maxSubsetSum' w !c
         (lo, Nothing, _) -> lo
         (lo, Just v, _) -> Map.insert k v lo
 
-maxSubsetSumInt' :: VU.Vector Int -> Int -> (Weight, VU.Vector Bool)
-maxSubsetSumInt' w !c
-  | wsum <= fromIntegral c = (fromIntegral wsum, VG.replicate n True)
-  | otherwise = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST $ do
-      objRef <- newSTRef (wbar, [], [])
-      let updateObj gs ft = do
-            let loop [] _ = return ()
-                loop _ [] = return ()
-                loop xxs@((gobj,gsol):xs) yys@((fobj,fsol):ys)
-                  | c < gobj + fobj = loop xs yys
-                  | otherwise = do
-                      (curr, _, _) <- readSTRef objRef
-                      when (curr < gobj + fobj) $ writeSTRef objRef (gobj + fobj, gsol, fsol)
-                      loop xxs ys
-            loop (IntMap.toDescList gs) (IntMap.toAscList ft)
+maxSubsetSumInt' :: VU.Vector Int -> Int -> Weight -> (Weight, VU.Vector Bool)
+maxSubsetSumInt' w !c wsum = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST $ do
+  objRef <- newSTRef (wbar, [], [])
+  let updateObj gs ft = do
+        let loop [] _ = return ()
+            loop _ [] = return ()
+            loop xxs@((gobj,gsol):xs) yys@((fobj,fsol):ys)
+              | c < gobj + fobj = loop xs yys
+              | otherwise = do
+                  (curr, _, _) <- readSTRef objRef
+                  when (curr < gobj + fobj) $ writeSTRef objRef (gobj + fobj, gsol, fsol)
+                  loop xxs ys
+        loop (IntMap.toDescList gs) (IntMap.toAscList ft)
 
-      let loop !s !t !gs !ft !flag = do
-            (obj, gsol, fsol) <- readSTRef objRef
-            if obj == c || (s == 0 && t == n-1) then do
-              let sol = VG.create $ do
-                    bs <- VM.new n
-                    forM_ [0..b-1] $ \i -> VM.write bs i True
-                    forM_ [b..n-1] $ \i -> VM.write bs i False
-                    forM_ fsol $ \i -> VM.write bs i True
-                    forM_ gsol $ \i -> VM.write bs i False
-                    return bs
-              return (fromIntegral obj, sol)
-            else do
-              let updateF = do
-                    -- Compute f_{t+1} from f_t
-                    let t' = t + 1
-                        wt' = w ! t'
-                        m = IntMap.mapKeysMonotonic (+ wt') $ IntMap.map (t' :) $ splitLE (c - wt') ft
-                        ft' = ft `IntMap.union` m
-                    updateObj gs m
-                    loop s t' gs ft' (not flag)
-                  updateG = do
-                    -- Compute g_{s-1} from g_s
-                    let s' = s - 1
-                        ws = w ! s'
-                        m = IntMap.map (s' :) $ g_drop $ IntMap.mapKeysMonotonic (subtract ws) $ gs
-                        gs' = gs `IntMap.union` m
-                    updateObj m ft
-                    loop s' t gs' ft (not flag)
-              if s == 0 then
-                updateF
-              else if t == n-1 then
-                updateG
-              else
-                if flag then updateG else updateF
+  let loop !s !t !gs !ft !flag = do
+        (obj, gsol, fsol) <- readSTRef objRef
+        if obj == c || (s == 0 && t == n-1) then do
+          let sol = VG.create $ do
+                bs <- VM.new n
+                forM_ [0..b-1] $ \i -> VM.write bs i True
+                forM_ [b..n-1] $ \i -> VM.write bs i False
+                forM_ fsol $ \i -> VM.write bs i True
+                forM_ gsol $ \i -> VM.write bs i False
+                return bs
+          return (fromIntegral obj, sol)
+        else do
+          let updateF = do
+                -- Compute f_{t+1} from f_t
+                let t' = t + 1
+                    wt' = w ! t'
+                    m = IntMap.mapKeysMonotonic (+ wt') $ IntMap.map (t' :) $ splitLE (c - wt') ft
+                    ft' = ft `IntMap.union` m
+                updateObj gs m
+                loop s t' gs ft' (not flag)
+              updateG = do
+                -- Compute g_{s-1} from g_s
+                let s' = s - 1
+                    ws = w ! s'
+                    m = IntMap.map (s' :) $ g_drop $ IntMap.mapKeysMonotonic (subtract ws) $ gs
+                    gs' = gs `IntMap.union` m
+                updateObj m ft
+                loop s' t gs' ft (not flag)
+          if s == 0 then
+            updateF
+          else if t == n-1 then
+            updateG
+          else
+            if flag then updateG else updateF
 
-      let -- f_{b-1}
-          fb' :: IntMap [Int]
-          fb' = IntMap.singleton 0 []
-          -- g_{b}
-          gb :: IntMap [Int]
-          gb = IntMap.singleton wbar []
-      loop b (b-1) gb fb' True
+  let -- f_{b-1}
+      fb' :: IntMap [Int]
+      fb' = IntMap.singleton 0 []
+      -- g_{b}
+      gb :: IntMap [Int]
+      gb = IntMap.singleton wbar []
+  loop b (b-1) gb fb' True
 
   where
     n = VG.length w
@@ -293,10 +303,6 @@ maxSubsetSumInt' w !c
         loop !i !s
           | s > fromIntegral c = i
           | otherwise = loop (i+1) (s + fromIntegral (w ! (i+1)))
-
-    -- Integer is used to avoid integer overflow
-    wsum :: Integer
-    wsum = VG.foldl' (\r x -> r + fromIntegral x) 0 w
 
     wbar :: Int
     wbar = VG.sum $ VG.slice 0 b w
@@ -367,7 +373,14 @@ subsetSum
   -> Maybe (VU.Vector Bool)
   -- ^
   -- the assignment @[x1, x2 .. xn]@, identifying 0 (resp. 1) with @False@ (resp. @True@).
-subsetSum w c = do
-  (obj, sol) <- maxSubsetSum w c
-  guard $ obj == c
-  return sol
+subsetSum w c =
+  case normalizeWeightsToPositive (w,c) of
+    (w1, c1, trans1)
+      | c1 < 0 -> Nothing
+      | otherwise ->
+          case normalize2 (w1, c1) of
+            (w2, c2, trans2) -> do
+              (w3, c3, trans3) <- normalizeGCDEq (w2,c2)
+              let (obj, sol) = maxSubsetSum' w3 c3
+              guard $ obj == c3
+              return $ snd $ trans1 $ trans2 $ trans3 (obj, sol)
