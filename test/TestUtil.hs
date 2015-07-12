@@ -282,12 +282,26 @@ prop_GurvichKhachiyan1999_minimalHittingSets_minimality =
 -- ---------------------------------------------------------------------
 -- SubsetSum
 
-prop_maxSubsetSum_isValid =
+evalSubsetSum :: [Integer] -> [Bool] -> Integer
+evalSubsetSum ws bs = sum [w | (w,b) <- zip ws bs, b]
+
+prop_maxSubsetSum_soundness =
   forAll arbitrary $ \c ->
     forAll arbitrary $ \ws ->
       case SubsetSum.maxSubsetSum (V.fromList ws) c of
-        Just (obj, bs) -> obj == sum [w | (w,b) <- zip ws (VU.toList bs), b] && obj <= c
+        Just (obj, bs) -> obj == evalSubsetSum ws (VU.toList bs) && obj <= c
         Nothing -> True
+
+prop_maxSubsetSum_completeness =
+  forAll arbitrary $ \c ->
+    forAll g $ \ws ->
+      case SubsetSum.maxSubsetSum (V.fromList ws) c of
+        Just (obj, bs) -> VU.length bs == length ws && obj == evalSubsetSum ws (VU.toList bs) && obj <= c
+        Nothing -> and [c < evalSubsetSum ws bs | bs <- replicateM (length ws) [False,True]]
+  where
+    g = do
+      n <- choose (0,10)
+      replicateM n arbitrary
 
 prop_maxSubsetSum_isEqualToKnapsackBBSolver =
   forAll (liftM abs arbitrary) $ \c ->
@@ -302,19 +316,41 @@ case_maxSubsetSum_regression_test_1 =
 case_maxSubsetSum_regression_test_2 =
   SubsetSum.maxSubsetSum (V.fromList [10,15]) 18 @?= Just (15, VU.fromList [False,True])
 
-prop_minSubsetSum_isValid =
+prop_minSubsetSum_soundness =
   forAll arbitrary $ \c ->
     forAll arbitrary $ \ws ->
       case SubsetSum.minSubsetSum (V.fromList ws) c of
-        Just (obj, bs) -> obj == sum [w | (w,b) <- zip ws (VU.toList bs), b] && c <= obj
+        Just (obj, bs) -> obj == evalSubsetSum ws (VU.toList bs) && c <= obj
         Nothing -> True
 
-prop_subsetSum_isValid =
+prop_minSubsetSum_completeness =
+  forAll arbitrary $ \c ->
+    forAll g $ \ws ->
+      case SubsetSum.minSubsetSum (V.fromList ws) c of
+        Just (obj, bs) -> VU.length bs == length ws && obj == evalSubsetSum ws (VU.toList bs) && c <= obj
+        Nothing -> and [evalSubsetSum ws bs < c | bs <- replicateM (length ws) [False,True]]
+  where
+    g = do
+      n <- choose (0,10)
+      replicateM n arbitrary
+
+prop_subsetSum_soundness =
   forAll arbitrary $ \c ->
     forAll arbitrary $ \ws ->
       case SubsetSum.subsetSum (V.fromList ws) c of
-        Just bs -> sum [w | (w,b) <- zip ws (VU.toList bs), b] == c
+        Just bs -> VU.length bs == length ws && evalSubsetSum ws (VU.toList bs) == c
         Nothing -> True
+
+prop_subsetSum_completeness =
+  forAll arbitrary $ \c ->
+    forAll g $ \ws ->
+      case SubsetSum.subsetSum (V.fromList ws) c of
+        Just bs -> VU.length bs == length ws && evalSubsetSum ws (VU.toList bs) == c
+        Nothing -> and [c /= evalSubsetSum ws bs | bs <- replicateM (length ws) [False,True]]
+  where
+    g = do
+      n <- choose (0,10)
+      replicateM n arbitrary
 
 -- ---------------------------------------------------------------------
 -- Vec
