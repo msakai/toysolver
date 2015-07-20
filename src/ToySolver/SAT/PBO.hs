@@ -49,6 +49,7 @@ module ToySolver.SAT.PBO
 import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
+import Data.Array.IArray
 import Data.Default.Class
 import Data.IORef
 import qualified Data.Set as Set
@@ -115,6 +116,13 @@ optimize opt = do
 
   getEnableObjFunVarsHeuristics opt >>= \b ->
     when b $ tweakParams solver obj
+
+  m <- getBestModel opt
+  case m of
+    Nothing -> return ()
+    Just m -> do
+      forM_ (assocs m) $ \(v, val) -> do
+        SAT.setVarPolarity solver v val
 
   strategy <- getSearchStrategy opt
   case strategy of
