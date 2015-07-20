@@ -3217,11 +3217,7 @@ instance ConstraintHandler PBHandlerPueblo where
               return (IM.insert idx tm m)
             else
               return m
-#if MIN_VERSION_containers(0,5,0)
       xs <- liftM (map snd . IM.toDescList) $ foldM f IM.empty (puebloTerms this2)
-#else
-      xs <- liftM (reverse . map snd . IM.toAscList) $ foldM f IM.empty (puebloTerms this2)
-#endif
       let g !_ [] = return ()
           g !s ((c,l):ts) = do
             addOnUnassigned solver this l
