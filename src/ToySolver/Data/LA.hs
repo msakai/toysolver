@@ -61,8 +61,8 @@ import Control.Monad
 import Control.DeepSeq
 import Data.List
 import Data.Maybe
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Interval
 import Data.VectorSpace

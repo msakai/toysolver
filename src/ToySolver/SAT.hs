@@ -154,7 +154,7 @@ import Data.IORef
 import Data.List
 import Data.Maybe
 import Data.Ord
-import qualified Data.IntMap as IM
+import qualified Data.IntMap.Strict as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
 import ToySolver.Internal.Data.IOURef

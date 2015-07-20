@@ -69,8 +69,8 @@ import Control.Exception
 import Data.Array.Unboxed
 import Data.Ord
 import Data.List
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Vector as V
