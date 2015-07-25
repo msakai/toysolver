@@ -1957,27 +1957,26 @@ analyzeConflictHybrid solver constr = do
 pbBacktrackLevel :: Solver -> PBLinAtLeast -> IO Level
 pbBacktrackLevel _ ([], rhs) = assert (rhs > 0) $ return levelRoot
 pbBacktrackLevel solver (lhs, rhs) = do
-  levelToLiterals <- liftM (IM.unionsWith IM.union) $ forM lhs $ \(_,lit) -> do
+  levelToLiterals <- liftM (IM.unionsWith IM.union) $ forM lhs $ \(c,lit) -> do
     val <- litValue solver lit
     if val /= lUndef then do
       level <- litLevel solver lit
-      return $ IM.singleton level (IM.singleton lit val)
+      return $ IM.singleton level (IM.singleton lit (c,val))
     else
-      return $ IM.empty
+      return $ IM.singleton maxBound (IM.singleton lit (c,val))
 
-  let replay [] _ _ = error "pbBacktrackLevel: should not happen"
-      replay ((lv,lv_lits) : lvs) lhs slack = do
-        let slack_lv = slack - sum [c | (c,lit) <- lhs, IM.lookup lit lv_lits == Just lFalse]
-            lhs_lv   = [tm | tm@(_,lit) <- lhs, IM.notMember lit lv_lits]
+  let replay [] !_ = error "pbBacktrackLevel: should not happen"
+      replay ((lv,lv_lits) : lvs) !slack = do
+        let slack_lv = slack - sum [c | (lit,(c,val)) <- IM.toList lv_lits, val == lFalse]
         if slack_lv < 0 then
           return lv -- CONFLICT
-        else if any (\(c,_) -> c > slack_lv) lhs_lv then
+        else if any (\(_, lits2) -> any (\(c,_) -> c > slack_lv) (IM.elems lits2)) lvs then
           return lv -- UNIT
         else
-          replay lvs lhs_lv slack_lv
+          replay lvs slack_lv
 
   let initial_slack = sum [c | (c,_) <- lhs] - rhs
-  replay (IM.toList levelToLiterals) lhs initial_slack
+  replay (IM.toList levelToLiterals) initial_slack
 
 minimizeConflictClause :: Solver -> LitSet -> IO LitSet
 minimizeConflictClause solver lits = do
