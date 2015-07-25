@@ -3,7 +3,9 @@ toysolver
 
 [![Build Status](https://secure.travis-ci.org/msakai/toysolver.png?branch=master)](http://travis-ci.org/msakai/toysolver) [![Coverage Status](https://coveralls.io/repos/msakai/toysolver/badge.svg)](https://coveralls.io/r/msakai/toysolver) [![Hackage](https://budueba.com/hackage/toysolver)](https://hackage.haskell.org/package/toysolver)
 
-Assorted decision procedures for SAT, Max-SAT, PB, MIP, etc.
+It provides solver implementations of various problems including SAT, Max-SAT, PBS (Pseudo Boolean Satisfaction), PBO (Pseudo Boolean Optimization), MILP (Mixed Integer Linear Programming) and non-linear real arithmetic.
+
+In particular it contains moderately-fast pure-Haskell SAT solver 'toysat'.
 
 Installation
 ------------
