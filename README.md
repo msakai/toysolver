@@ -129,4 +129,4 @@ TODO
 ----
 
 * Local search
-* Suvery propagation
+* Survey propagation
