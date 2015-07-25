@@ -1306,8 +1306,11 @@ search solver !conflict_lim onConflict = do
 
     learnHybrid :: IORef Int -> SomeConstraintHandler -> IO (Maybe SearchResult)
     learnHybrid conflictCounter constr = do
-      ((learntClause, clauseLevel), (pb, pbLevel)) <- analyzeConflictHybrid solver constr
-      let minLevel = min clauseLevel pbLevel
+      ((learntClause, clauseLevel), pb) <- analyzeConflictHybrid solver constr
+      let minLevel =
+            case pb of
+              Nothing -> clauseLevel
+              Just (_, pbLevel) -> min clauseLevel pbLevel
       backtrackTo solver minLevel
 
       case learntClause of
@@ -1331,21 +1334,23 @@ search solver !conflict_lim onConflict = do
           handleConflict conflictCounter conflicted
           -- TODO: should also learn the PB constraint?
         Nothing -> do
-          let (lhs,rhs) = pb
-          h <- newPBHandlerPromoted solver lhs rhs True
-          case h of
-            CHClause _ -> do
-              {- We don't want to add additional clause,
-                 since it would be subsumed by already added one. -}
-              return Nothing
-            _ -> do
-              addToLearntDB solver h
-              ret2 <- attach solver h
-              constrBumpActivity solver h
-              if ret2 then
-                return Nothing
-              else
-                handleConflict conflictCounter h
+          case pb of
+            Nothing -> return Nothing
+            Just ((lhs,rhs), pbLevel) -> do
+              h <- newPBHandlerPromoted solver lhs rhs True
+              case h of
+                CHClause _ -> do
+                  {- We don't want to add additional clause,
+                     since it would be subsumed by already added one. -}
+                  return Nothing
+                _ -> do
+                  addToLearntDB solver h
+                  ret2 <- attach solver h
+                  constrBumpActivity solver h
+                  if ret2 then
+                    return Nothing
+                  else
+                    handleConflict conflictCounter h
 
 -- | After 'solve' returns True, it returns an satisfying assignment.
 getModel :: Solver -> IO Model
@@ -1858,7 +1863,7 @@ analyzeFinal solver p = do
   n <- Vec.getSize (svTrail solver)
   go (n-1) (IS.singleton (litVar p)) [p]
 
-analyzeConflictHybrid :: ConstraintHandler c => Solver -> c -> IO ((Clause, Level), (PBLinAtLeast, Level))
+analyzeConflictHybrid :: ConstraintHandler c => Solver -> c -> IO ((Clause, Level), Maybe (PBLinAtLeast, Level))
 analyzeConflictHybrid solver constr = do
   d <- getDecisionLevel solver
 
@@ -1941,8 +1946,13 @@ analyzeConflictHybrid solver constr = do
                 [] -> error "analyzeConflict: should not happen"
                 [_] -> levelRoot
                 _:(_,lv):_ -> lv
-  pblevel <- pbBacktrackLevel solver pb
-  return ((map fst xs, level), (pb, pblevel))
+
+  case pbToClause pb of
+    Nothing -> do  
+      pblevel <- pbBacktrackLevel solver pb
+      return ((map fst xs, level), Just (pb, pblevel))
+    Just _ -> do
+      return ((map fst xs, level), Nothing)
 
 pbBacktrackLevel :: Solver -> PBLinAtLeast -> IO Level
 pbBacktrackLevel _ ([], rhs) = assert (rhs > 0) $ return levelRoot
@@ -3005,6 +3015,12 @@ pbToAtLeast (lhs, rhs) = do
   guard $ Set.size (Set.fromList cs) == 1
   let c = head cs
   return $ (map snd lhs, fromInteger ((rhs+c-1) `div` c))
+
+pbToClause :: PBLinAtLeast -> Maybe Clause
+pbToClause pb = do
+  (lhs, rhs) <- pbToAtLeast pb
+  guard $ rhs == 1
+  return lhs
 
 {--------------------------------------------------------------------
   Pseudo Boolean Constraint (Counter)
