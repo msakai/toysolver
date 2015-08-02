@@ -523,7 +523,8 @@ renderExpr isObj e = fill 80 (ts1 ++ ts2)
       | null qts  = []
       | otherwise =
         -- マイナスで始めるとSCIP 2.1.1 は「cannot have '-' in front of quadratic part ('[')」というエラーを出す
-        ["+ ["] ++ map g qts ++ [if isObj then "] / 2" else "]"]
+        -- SCIP-3.1.0 does not allow spaces between '/' and '2'.
+        ["+ ["] ++ map g qts ++ [if isObj then "] /2" else "]"]
 
     f :: MIP.Term -> String
     f (MIP.Term c [])  = showConstTerm c
