@@ -23,7 +23,6 @@ module ToySolver.Data.MIP.Base
   , Label
   , Var
   , VarType (..)
-  , VarInfo (..)
   , BoundExpr
   , Extended (..)
   , RelOp (..)
@@ -34,7 +33,6 @@ module ToySolver.Data.MIP.Base
   , defaultUB
   , toVar
   , fromVar
-  , getVarInfo
   , getVarType
   , getBounds
   , variables
@@ -67,7 +65,8 @@ data Problem
   , constraints :: [Constraint]
   , sosConstraints :: [SOSConstraint]
   , userCuts :: [Constraint]
-  , varInfo :: Map Var VarInfo
+  , varType :: Map Var VarType
+  , varBounds :: Map Var Bounds
   }
   deriving (Show, Eq, Ord)
 
@@ -78,7 +77,8 @@ instance Default Problem where
         , constraints = []
         , sosConstraints = []
         , userCuts = []
-        , varInfo = Map.empty
+        , varType = Map.empty
+        , varBounds = Map.empty
         }
 
 -- | expressions
@@ -120,23 +120,6 @@ data VarType
 
 instance Default VarType where
   def = ContinuousVariable
-
-data VarInfo
-  = VarInfo
-  { varType   :: VarType
-  , varBounds :: Bounds
-  }
- deriving (Eq, Ord, Show)
-
-instance Default VarInfo where
-  def = defaultVarInfo
-
-defaultVarInfo :: VarInfo
-defaultVarInfo
-  = VarInfo
-  { varType   = ContinuousVariable
-  , varBounds = defaultBounds
-  }
 
 -- | type for representing lower/upper bound of variables
 type Bounds = (BoundExpr, BoundExpr)
@@ -214,35 +197,25 @@ toVar = intern
 fromVar :: Var -> String
 fromVar = unintern
 
--- | looking up attributes for a variable
-getVarInfo :: Problem -> Var -> VarInfo
-getVarInfo lp v = Map.findWithDefault defaultVarInfo v (varInfo lp)
-
 -- | looking up bounds for a variable
 getVarType :: Problem -> Var -> VarType
-getVarType lp v = varType $ getVarInfo lp v
+getVarType lp v = Map.findWithDefault def v (varType lp)
 
 -- | looking up bounds for a variable
 getBounds :: Problem -> Var -> Bounds
-getBounds lp v = varBounds $ getVarInfo lp v
+getBounds lp v = Map.findWithDefault defaultBounds v (varBounds lp)
 
 intersectBounds :: Bounds -> Bounds -> Bounds
 intersectBounds (lb1,ub1) (lb2,ub2) = (max lb1 lb2, min ub1 ub2)
 
 variables :: Problem -> Set Var
-variables lp = Map.keysSet $ varInfo lp
+variables lp = Map.keysSet $ varType lp
 
 integerVariables :: Problem -> Set Var
-integerVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
-  where
-    p VarInfo{ varType = vt } = vt == IntegerVariable
+integerVariables lp = Map.keysSet $ Map.filter (IntegerVariable ==) (varType lp)
 
 semiContinuousVariables :: Problem -> Set Var
-semiContinuousVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
-  where
-    p VarInfo{ varType = vt } = vt == SemiContinuousVariable
+semiContinuousVariables lp = Map.keysSet $ Map.filter (SemiContinuousVariable ==) (varType lp)
 
 semiIntegerVariables :: Problem -> Set Var
-semiIntegerVariables lp = Map.keysSet $ Map.filter p (varInfo lp)
-  where
-    p VarInfo{ varType = vt } = vt == SemiIntegerVariable
+semiIntegerVariables lp = Map.keysSet $ Map.filter (SemiIntegerVariable ==) (varType lp)

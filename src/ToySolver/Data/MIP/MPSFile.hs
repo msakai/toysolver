@@ -314,26 +314,21 @@ parser = do
         , MIP.constraints           = concatMap (f False) rows ++ concatMap (f True) lazycons
         , MIP.sosConstraints        = sos
         , MIP.userCuts              = concatMap (f False) usercuts
-        , MIP.varInfo               =
-            Map.fromAscList
+        , MIP.varType               = Map.fromAscList
             [ ( v
-              , MIP.VarInfo
-                { MIP.varBounds = Map.findWithDefault MIP.defaultBounds v bounds
-                , MIP.varType   =
-                    if v `Set.member` sivs then
-                      MIP.SemiIntegerVariable
-                    else if v `Set.member` intvs1 && v `Set.member` scvs then
-                      MIP.SemiIntegerVariable
-                    else if v `Set.member` intvs1 || v `Set.member` intvs2 then
-                      MIP.IntegerVariable
-                    else if v `Set.member` scvs then
-                      MIP.SemiContinuousVariable
-                    else
-                      MIP.ContinuousVariable
-                }
+              , if v `Set.member` sivs then
+                  MIP.SemiIntegerVariable
+                else if v `Set.member` intvs1 && v `Set.member` scvs then
+                  MIP.SemiIntegerVariable
+                else if v `Set.member` intvs1 || v `Set.member` intvs2 then
+                  MIP.IntegerVariable
+                else if v `Set.member` scvs then
+                  MIP.SemiContinuousVariable
+                else
+                  MIP.ContinuousVariable
               )
-            | v <- Set.toAscList vs
-            ]
+            | v <- Set.toAscList vs ]
+        , MIP.varBounds             = Map.fromAscList [(v, Map.findWithDefault MIP.defaultBounds v bounds) | v <- Set.toAscList vs]
         }
 
   return mip
@@ -663,10 +658,9 @@ render' mip = do
 
   -- BOUNDS section
   writeSectionHeader "BOUNDS"
-  forM_ (Map.toList (MIP.varInfo mip)) $ \(col, vinfo) -> do
-    let (lb,ub) = MIP.varBounds vinfo
-        vt = MIP.varType vinfo
-    case (lb,ub) of
+  forM_ (Map.toList (MIP.varType mip)) $ \(col, vt) -> do
+    let (lb,ub) = MIP.getBounds mip col
+    case (lb,ub)  of
       (MIP.NegInf, MIP.PosInf) -> do
         -- free variable (no lower or upper bound)
         writeFields ["FR", "bound", unintern col]

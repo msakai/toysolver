@@ -34,15 +34,8 @@ convert formula = (mip, mtrans (PBFile.pbNumVars formula))
       , MIP.constraints = cs2
       , MIP.sosConstraints = []
       , MIP.userCuts = []
-      , MIP.varInfo = Map.fromList
-          [ ( v
-            , MIP.VarInfo
-              { MIP.varType   = MIP.IntegerVariable
-              , MIP.varBounds = (0, 1)
-              }
-            )
-          | v <- vs
-          ]
+      , MIP.varType = Map.fromList [(v, MIP.IntegerVariable) | v <- vs]
+      , MIP.varBounds = Map.fromList [(v, (0,1)) | v <- vs]
       }
 
     vs = [convVar v | v <- [1..PBFile.pbNumVars formula]]
@@ -96,15 +89,8 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
       , MIP.constraints = topConstr ++ map snd cs2
       , MIP.sosConstraints = []
       , MIP.userCuts = []
-      , MIP.varInfo = Map.fromList
-          [ ( v
-            , MIP.VarInfo
-              { MIP.varType   = MIP.IntegerVariable
-              , MIP.varBounds = (0, 1)
-              }
-            )
-          | v <- vs
-          ]
+      , MIP.varType = Map.fromList [(v, MIP.IntegerVariable) | v <- vs]
+      , MIP.varBounds = Map.fromList [(v, (0,1)) | v <- vs]
       }
 
     vs = [convVar v | v <- [1..PBFile.wboNumVars formula]] ++ [v | (ts, _) <- cs2, (_, v) <- ts]

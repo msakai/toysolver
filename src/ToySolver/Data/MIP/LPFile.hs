@@ -152,22 +152,17 @@ parser = do
     , MIP.constraints       = [c | Left c <- cs]
     , MIP.userCuts          = [c | Right c <- cs]
     , MIP.sosConstraints    = ss
-    , MIP.varInfo           =
-        Map.fromAscList
-        [ ( v
-          , MIP.VarInfo
-            { MIP.varBounds = Map.findWithDefault MIP.defaultBounds v bnds2
-            , MIP.varType   =
-                if isInt v then
-                  if isSemi v then MIP.SemiIntegerVariable
-                  else MIP.IntegerVariable
-                else
-                  if isSemi v then MIP.SemiContinuousVariable
-                  else MIP.ContinuousVariable
-            }
-          )
-        | v <- Set.toAscList vs
-        ]
+    , MIP.varType           = Map.fromAscList
+       [ ( v
+         , if isInt v then
+             if isSemi v then MIP.SemiIntegerVariable
+             else MIP.IntegerVariable
+           else
+             if isSemi v then MIP.SemiContinuousVariable
+             else MIP.ContinuousVariable
+         )
+       | v <- Set.toAscList vs ]
+    , MIP.varBounds         = Map.fromAscList [ (v, Map.findWithDefault MIP.defaultBounds v bnds2) | v <- Set.toAscList vs]
     }
 
 problem :: Parser (OptDir, MIP.ObjectiveFunction)
@@ -473,7 +468,7 @@ render' mip = do
       scs = MIP.semiContinuousVariables mip `Set.union` MIP.semiIntegerVariables mip
 
   writeString "BOUNDS\n"
-  forM_ (Map.toAscList (MIP.varInfo mip)) $ \(v, MIP.VarInfo{ MIP.varBounds = (lb,ub) }) -> do
+  forM_ (Map.toAscList (MIP.varBounds mip)) $ \(v, (lb,ub)) -> do
     unless (v `Set.member` bins) $ do
       renderBoundExpr lb
       writeString " <= "
