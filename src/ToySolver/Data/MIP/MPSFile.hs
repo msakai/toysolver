@@ -301,7 +301,7 @@ parser = do
           { MIP.constrLabel     = Just $ unintern row
           , MIP.constrIndicator = Map.lookup row inds
           , MIP.constrIsLazy    = isLazy
-          , MIP.constrBody      = (lhs, op2, rhs2)
+          , MIP.constrBody      = (MIP.Expr lhs, op2, rhs2)
           }
 
   let mip =
@@ -309,7 +309,7 @@ parser = do
         { MIP.dir                     = objdir
         , MIP.objectiveFunction       =
             ( Just (unintern objrow)
-            , [MIP.Term c [col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
+            , MIP.Expr $ [MIP.Term c [col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
             )
         , MIP.constraints           = concatMap (f False) rows ++ concatMap (f True) lazycons
         , MIP.sosConstraints        = sos
@@ -638,7 +638,7 @@ render' mip = do
              | (Just l, xs) <-
                  MIP.objectiveFunction mip :
                  [(MIP.constrLabel c, lhs) | c <- MIP.constraints mip ++ MIP.userCuts mip, let (lhs,_,_) = MIP.constrBody c]
-             , MIP.Term d [v] <- xs
+             , MIP.Term d [v] <- MIP.terms xs
              ]
       f col xs =
         forM_ (Map.toList xs) $ \(row, d) -> do
@@ -827,7 +827,7 @@ nameRows mip
 
 quadMatrix :: MIP.Expr -> Map (MIP.Var, MIP.Var) Rational
 quadMatrix e = Map.fromList $ do
-  let m = Map.fromListWith (+) [(if v1<=v2 then (v1,v2) else (v2,v1), c) | MIP.Term c [v1,v2] <- e]
+  let m = Map.fromListWith (+) [(if v1<=v2 then (v1,v2) else (v2,v1), c) | MIP.Term c [v1,v2] <- MIP.terms e]
   ((v1,v2),c) <- Map.toList m
   if v1==v2 then
     [((v1,v2), c)]
@@ -835,7 +835,7 @@ quadMatrix e = Map.fromList $ do
     [((v1,v2), c/2), ((v2,v1), c/2)]
 
 checkAtMostQuadratic :: MIP.Problem -> Bool
-checkAtMostQuadratic mip =  all (all f) es
+checkAtMostQuadratic mip =  all (all f . MIP.terms) es
   where
     es = snd (MIP.objectiveFunction mip) :
          [lhs | c <- MIP.constraints mip ++ MIP.userCuts mip, let (lhs,_,_) = MIP.constrBody c]

@@ -132,7 +132,7 @@ run solver opt mip printModel = do
     varToName = IntMap.fromList [(v,name) | (name,v) <- vsAssoc]
 
     compileE :: MIP.Expr -> Expr Rational
-    compileE = foldr (+) (Const 0) . map compileT
+    compileE = foldr (+) (Const 0) . map compileT . MIP.terms
 
     compileT :: MIP.Term -> Expr Rational
     compileT (MIP.Term c vs) =

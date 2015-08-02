@@ -51,8 +51,8 @@ convert formula = (mip, mtrans (PBFile.pbNumVars formula))
                   PBFile.Ge -> MIP.Ge
                   PBFile.Eq -> MIP.Eql
           lhs2 = convExpr lhs
-          lhs3a = [t | t@(MIP.Term _ (_:_)) <- lhs2]
-          lhs3b = sum [c | MIP.Term c [] <- lhs2]
+          lhs3a = MIP.Expr [t | t@(MIP.Term _ (_:_)) <- MIP.terms lhs2]
+          lhs3b = sum [c | MIP.Term c [] <- MIP.terms lhs2]
       return $ MIP.Constraint
         { MIP.constrLabel     = Nothing
         , MIP.constrIndicator = Nothing
@@ -61,21 +61,12 @@ convert formula = (mip, mtrans (PBFile.pbNumVars formula))
         }
 
 convExpr :: PBFile.Sum -> MIP.Expr
-convExpr s = concatMap g2 s
+convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
   where
-    g2 :: PBFile.WeightedTerm -> MIP.Expr
-    g2 (w, tm) = foldl' prodE [MIP.Term (fromIntegral w) []] (map g3 tm)
-
-    g3 :: PBFile.Lit -> MIP.Expr
-    g3 x
-      | x > 0     = [MIP.Term 1 [convVar x]]
-      | otherwise = [MIP.Term 1 [], MIP.Term (-1) [convVar (abs x)]]
-
-    prodE :: MIP.Expr -> MIP.Expr -> MIP.Expr
-    prodE e1 e2 = [prodT t1 t2 | t1 <- e1, t2 <- e2]
-
-    prodT :: MIP.Term -> MIP.Term -> MIP.Term
-    prodT (MIP.Term c1 vs1) (MIP.Term c2 vs2) = MIP.Term (c1*c2) (vs1++vs2)
+    f :: PBFile.Lit -> MIP.Expr
+    f x
+      | x > 0     = MIP.varExpr (convVar x)
+      | otherwise = 1 - MIP.varExpr (convVar (abs x))
 
 convVar :: PBFile.Var -> MIP.Var
 convVar x = MIP.toVar ("x" ++ show x)
@@ -95,7 +86,7 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
 
     vs = [convVar v | v <- [1..PBFile.wboNumVars formula]] ++ [v | (ts, _) <- cs2, (_, v) <- ts]
 
-    obj2 = [MIP.Term (fromIntegral w) [v] | (ts, _) <- cs2, (w, v) <- ts]
+    obj2 = MIP.Expr [MIP.Term (fromIntegral w) [v] | (ts, _) <- cs2, (w, v) <- ts]
 
     topConstr :: [MIP.Constraint]
     topConstr = 
@@ -115,8 +106,8 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
       (n, (w, (lhs,op,rhs))) <- zip [(0::Int)..] (PBFile.wboConstraints formula)
       let 
           lhs2 = convExpr lhs
-          lhs3 = [t | t@(MIP.Term _ (_:_)) <- lhs2]
-          rhs3 = fromIntegral rhs - sum [c | MIP.Term c [] <- lhs2]
+          lhs3 = MIP.Expr [t | t@(MIP.Term _ (_:_)) <- MIP.terms lhs2]
+          rhs3 = fromIntegral rhs - sum [c | MIP.Term c [] <- MIP.terms lhs2]
           v = MIP.toVar ("r" ++ show n)
           (ts,ind) =
             case w of
@@ -156,14 +147,14 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
              [ (ts, c1), ([], c2) ]
 
 relaxGE :: MIP.Var -> (MIP.Expr, Rational) -> (MIP.Expr, Rational)
-relaxGE v (lhs, rhs) = (MIP.Term (rhs - lhs_lb) [v] : lhs, rhs)
+relaxGE v (lhs, rhs) = (MIP.constExpr (rhs - lhs_lb) * MIP.varExpr v + lhs, rhs)
   where
-    lhs_lb = sum [min c 0 | MIP.Term c _ <- lhs]
+    lhs_lb = sum [min c 0 | MIP.Term c _ <- MIP.terms lhs]
 
 relaxLE :: MIP.Var -> (MIP.Expr, Rational) -> (MIP.Expr, Rational)
-relaxLE v (lhs, rhs) = (MIP.Term (rhs - lhs_ub) [v] : lhs, rhs)
+relaxLE v (lhs, rhs) = (MIP.constExpr (rhs - lhs_ub) * MIP.varExpr v + lhs, rhs)
   where
-    lhs_ub = sum [max c 0 | MIP.Term c _ <- lhs]
+    lhs_ub = sum [max c 0 | MIP.Term c _ <- MIP.terms lhs]
 
 mtrans :: Int -> Map MIP.Var Rational -> SAT.Model
 mtrans nvar m =

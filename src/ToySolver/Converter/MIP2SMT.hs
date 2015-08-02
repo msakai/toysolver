@@ -93,10 +93,10 @@ not' x = list [showString "not", x]
 
 intExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> ShowS
 intExpr opt env mip e =
-  case e of
+  case MIP.terms e of
     [] -> intNum opt 0
     [t] -> f t
-    _ -> list (showChar '+' : map f e)
+    ts -> list (showChar '+' : map f ts)
   where
     f (MIP.Term c _) | not (isInteger c) =
       error ("ToySolver.Converter.MIP2SMT.intExpr: fractional coefficient: " ++ show c)
@@ -113,10 +113,10 @@ intExpr opt env mip e =
 
 realExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> ShowS
 realExpr opt env mip e =
-  case e of
+  case MIP.terms e of
     [] -> realNum opt 0
     [t] -> f t
-    _ -> list (showChar '+' : map f e)
+    ts -> list (showChar '+' : map f ts)
   where
     f (MIP.Term c []) = realNum opt c
     f (MIP.Term (-1) vs) = list [showChar '-', f (MIP.Term 1 vs)]
@@ -165,7 +165,7 @@ realNum opt r =
 rel :: Options -> Env -> MIP.Problem -> Bool -> MIP.RelOp -> MIP.Expr -> Rational -> ShowS
 rel opt env mip q op lhs rhs
   | and [isInt mip v | v <- Set.toList (MIP.vars lhs)] &&
-    and [isInteger c | MIP.Term c _ <- lhs] && isInteger rhs =
+    and [isInteger c | MIP.Term c _ <- MIP.terms lhs] && isInteger rhs =
       f q op (intExpr opt env mip lhs) (intNum opt (floor rhs))
   | otherwise =
       f q op (realExpr opt env mip lhs) (realNum opt rhs)
@@ -207,7 +207,7 @@ constraint opt q env mip
            Nothing -> c0
            Just (var,val) ->
              list [ showString "=>"
-                  , rel opt env mip q MIP.Eql [MIP.Term 1 [var]] val
+                  , rel opt env mip q MIP.Eql (MIP.varExpr var) val
                   , c0
                   ]
 

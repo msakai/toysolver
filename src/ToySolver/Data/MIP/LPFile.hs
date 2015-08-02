@@ -333,13 +333,13 @@ sosSection = do
 -- ---------------------------------------------------------------------------
 
 expr :: Parser MIP.Expr
-expr = try expr1 <|> return []
+expr = try expr1 <|> return 0
   where
     expr1 :: Parser MIP.Expr
     expr1 = do
       t <- term True
       ts <- many (term False)
-      return $ concat (t : ts)
+      return $ sum (t : ts)
 
 sign :: Num a => Parser a
 sign = tok ((char '+' >> return 1) <|> (char '-' >> return (-1)))
@@ -348,21 +348,22 @@ term :: Bool -> Parser MIP.Expr
 term flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
-  e <- liftM (\s' -> [MIP.Term 1 [s']]) variable <|> qexpr
+  e <- liftM MIP.varExpr variable <|> qexpr
   return $ case combineMaybe (*) s c of
     Nothing -> e
-    Just d -> [MIP.Term (d*c') vs | MIP.Term c' vs <- e]
+    Just d -> MIP.constExpr d * e
 
 qexpr :: Parser MIP.Expr
 qexpr = do
   tok (char '[')
   t <- qterm True
   ts <- many (qterm False)
+  let e = MIP.Expr (t:ts)
   tok (char ']')
   -- Gurobi allows ommiting "/2"
   (do mapM_ (tok . char) ("/2" :: String) -- Explicit type signature is necessary because the type of mapM_ in GHC-7.10 is generalized for arbitrary Foldable
-      return [MIP.Term (r / 2) vs | MIP.Term r vs <- t:ts])
-   <|> return (t:ts)
+      return $ MIP.constExpr (1/2) * e)
+   <|> return e
 
 qterm :: Bool -> Parser MIP.Term
 qterm flag = do
@@ -508,7 +509,7 @@ render' mip = do
 renderExpr :: Bool -> MIP.Expr -> M ()
 renderExpr isObj e = fill 80 (ts1 ++ ts2)
   where
-    (ts,qts) = partition isLin e 
+    (ts,qts) = partition isLin (MIP.terms e)
     isLin (MIP.Term _ [])  = True
     isLin (MIP.Term _ [_]) = True
     isLin _ = False
@@ -622,7 +623,7 @@ removeEmptyExpr prob =
   , MIP.userCuts    = map convertConstr $ MIP.userCuts prob
   }
   where
-    convertExpr [] = [MIP.Term 0 [MIP.toVar "x0"]]
+    convertExpr (MIP.Expr []) = MIP.Expr [MIP.Term 0 [MIP.toVar "x0"]]
     convertExpr e = e
 
     convertConstr constr =

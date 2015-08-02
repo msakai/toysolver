@@ -14,7 +14,10 @@
 -----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Base
   ( Problem (..)
-  , Expr
+  , Expr (..)
+  , varExpr
+  , constExpr
+  , terms
   , Term (..)
   , OptDir (..)
   , ObjectiveFunction
@@ -73,7 +76,7 @@ data Problem
 instance Default Problem where
   def = Problem
         { dir = OptMin
-        , objectiveFunction = (Nothing, [])
+        , objectiveFunction = (Nothing, 0)
         , constraints = []
         , sosConstraints = []
         , userCuts = []
@@ -82,7 +85,25 @@ instance Default Problem where
         }
 
 -- | expressions
-type Expr = [Term]
+newtype Expr = Expr [Term]
+  deriving (Eq, Ord, Show)
+
+varExpr :: Var -> Expr
+varExpr v = Expr [Term 1 [v]]
+
+constExpr :: Rational -> Expr
+constExpr c = Expr [Term c []]
+           
+terms :: Expr -> [Term]
+terms (Expr ts) = ts
+
+instance Num Expr where
+  Expr e1 + Expr e2 = Expr (e1 ++ e2)
+  Expr e1 * Expr e2 = Expr [Term (c1*c2) (vs1 ++ vs2) | Term c1 vs1 <- e1, Term c2 vs2 <- e2]
+  negate (Expr e) = Expr [Term (-c) vs | Term c vs <- e]
+  abs = id
+  signum _ = 1
+  fromInteger c = Expr [Term (fromInteger c) []]
 
 -- | terms
 data Term = Term Rational [Var]
@@ -105,7 +126,7 @@ instance Default Constraint where
   def = Constraint
         { constrLabel = Nothing
         , constrIndicator = Nothing
-        , constrBody = ([], Le, 0)
+        , constrBody = (0, Le, 0)
         , constrIsLazy = False
         }
 
@@ -164,6 +185,9 @@ instance (Variables a, Variables b) => Variables (Either a b) where
 
 instance Variables Problem where
   vars = variables
+
+instance Variables Expr where
+  vars (Expr e) = vars e
 
 instance Variables Term where
   vars (Term _ xs) = Set.fromList xs
