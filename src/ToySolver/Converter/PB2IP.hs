@@ -2,7 +2,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB2IP
--- Copyright   :  (c) Masahiro Sakai 2011-2014
+-- Copyright   :  (c) Masahiro Sakai 2011-2015
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -16,7 +16,7 @@ module ToySolver.Converter.PB2IP
   ) where
 
 import Data.Array.IArray
-import Data.List
+import Data.Default.Class
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -28,12 +28,10 @@ import qualified ToySolver.SAT.Types as SAT
 convert :: PBFile.Formula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
 convert formula = (mip, mtrans (PBFile.pbNumVars formula))
   where
-    mip = MIP.Problem
+    mip = def
       { MIP.dir = dir
       , MIP.objectiveFunction = (Nothing, obj2)
       , MIP.constraints = cs2
-      , MIP.sosConstraints = []
-      , MIP.userCuts = []
       , MIP.varType = Map.fromList [(v, MIP.IntegerVariable) | v <- vs]
       , MIP.varBounds = Map.fromList [(v, (0,1)) | v <- vs]
       }
@@ -43,22 +41,16 @@ convert formula = (mip, mtrans (PBFile.pbNumVars formula))
     (dir,obj2) =
       case PBFile.pbObjectiveFunction formula of
         Just obj' -> (MIP.OptMin, convExpr obj')
-        Nothing   -> (MIP.OptMin, convExpr [])
+        Nothing   -> (MIP.OptMin, 0)
 
     cs2 = do
       (lhs,op,rhs) <- PBFile.pbConstraints formula
       let op2 = case op of
                   PBFile.Ge -> MIP.Ge
                   PBFile.Eq -> MIP.Eql
-          lhs2 = convExpr lhs
-          lhs3a = MIP.Expr [t | t@(MIP.Term _ (_:_)) <- MIP.terms lhs2]
-          lhs3b = sum [c | MIP.Term c [] <- MIP.terms lhs2]
-      return $ MIP.Constraint
-        { MIP.constrLabel     = Nothing
-        , MIP.constrIndicator = Nothing
-        , MIP.constrIsLazy    = False
-        , MIP.constrBody      = (lhs3a, op2, fromIntegral rhs - lhs3b)
-        }
+          (lhs2,c) = splitConst $ convExpr lhs
+          rhs2 = fromIntegral rhs - c
+      return $ def{ MIP.constrBody = (lhs2, op2, rhs2) }
 
 convExpr :: PBFile.Sum -> MIP.Expr
 convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
@@ -74,12 +66,10 @@ convVar x = MIP.toVar ("x" ++ show x)
 convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
 convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
   where
-    mip = MIP.Problem
+    mip = def
       { MIP.dir = MIP.OptMin
       , MIP.objectiveFunction = (Nothing, obj2)
       , MIP.constraints = topConstr ++ map snd cs2
-      , MIP.sosConstraints = []
-      , MIP.userCuts = []
       , MIP.varType = Map.fromList [(v, MIP.IntegerVariable) | v <- vs]
       , MIP.varBounds = Map.fromList [(v, (0,1)) | v <- vs]
       }
@@ -93,21 +83,13 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
      case PBFile.wboTopCost formula of
        Nothing -> []
        Just t ->
-          [ MIP.Constraint
-            { MIP.constrLabel     = Nothing
-            , MIP.constrIndicator = Nothing
-            , MIP.constrIsLazy    = False
-            , MIP.constrBody      = (obj2, MIP.Le, fromInteger t - 1)
-            }
-          ]
+          [ def{ MIP.constrBody = (obj2, MIP.Le, fromInteger t - 1) } ]
 
     cs2 :: [([(Integer, MIP.Var)], MIP.Constraint)]
     cs2 = do
       (n, (w, (lhs,op,rhs))) <- zip [(0::Int)..] (PBFile.wboConstraints formula)
-      let 
-          lhs2 = convExpr lhs
-          lhs3 = MIP.Expr [t | t@(MIP.Term _ (_:_)) <- MIP.terms lhs2]
-          rhs3 = fromIntegral rhs - sum [c | MIP.Term c [] <- MIP.terms lhs2]
+      let (lhs2,c) = splitConst $ convExpr lhs
+          rhs2 = fromIntegral rhs - c
           v = MIP.toVar ("r" ++ show n)
           (ts,ind) =
             case w of
@@ -118,34 +100,28 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
                case op of
                  PBFile.Ge -> MIP.Ge
                  PBFile.Eq -> MIP.Eql
-             c = MIP.Constraint
-                 { MIP.constrLabel     = Nothing
-                 , MIP.constrIndicator = ind
-                 , MIP.constrIsLazy    = False
-                 , MIP.constrBody      = (lhs3, op2, rhs3)
+             c = def
+                 { MIP.constrIndicator = ind
+                 , MIP.constrBody      = (lhs2, op2, rhs2)
                  }
          return (ts, c)
-       else do
-         let (lhsGE,rhsGE) = relaxGE v (lhs3,rhs3)
-             c1 = MIP.Constraint
-                  { MIP.constrLabel     = Nothing
-                  , MIP.constrIndicator = Nothing
-                  , MIP.constrIsLazy    = False
-                  , MIP.constrBody      = (lhsGE, MIP.Ge, rhsGE)
-                  }
+      else do
+         let (lhsGE,rhsGE) = relaxGE v (lhs2,rhs2)
+             c1 = def{ MIP.constrBody = (lhsGE, MIP.Ge, rhsGE) }
          case op of
            PBFile.Ge -> do
              return (ts, c1)
            PBFile.Eq -> do
-             let (lhsLE,rhsLE) = relaxLE v (lhs3,rhs3)
-                 c2 = MIP.Constraint
-                      { MIP.constrLabel     = Nothing
-                      , MIP.constrIndicator = Nothing
-                      , MIP.constrIsLazy    = False
-                      , MIP.constrBody      = (lhsLE, MIP.Le, rhsLE)
-                      }
+             let (lhsLE,rhsLE) = relaxLE v (lhs2,rhs2)
+                 c2 = def{ MIP.constrBody = (lhsLE, MIP.Le, rhsLE) }
              [ (ts, c1), ([], c2) ]
 
+splitConst :: MIP.Expr -> (MIP.Expr, Rational)
+splitConst e = (e2, c)
+  where
+    e2 = MIP.Expr [t | t@(MIP.Term _ (_:_)) <- MIP.terms e]
+    c = sum [c | MIP.Term c [] <- MIP.terms e]
+             
 relaxGE :: MIP.Var -> (MIP.Expr, Rational) -> (MIP.Expr, Rational)
 relaxGE v (lhs, rhs) = (MIP.constExpr (rhs - lhs_lb) * MIP.varExpr v + lhs, rhs)
   where
