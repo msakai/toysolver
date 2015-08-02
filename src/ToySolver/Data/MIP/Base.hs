@@ -199,23 +199,23 @@ fromVar = unintern
 
 -- | looking up bounds for a variable
 getVarType :: Problem -> Var -> VarType
-getVarType lp v = Map.findWithDefault def v (varType lp)
+getVarType mip v = Map.findWithDefault def v (varType mip)
 
 -- | looking up bounds for a variable
 getBounds :: Problem -> Var -> Bounds
-getBounds lp v = Map.findWithDefault defaultBounds v (varBounds lp)
+getBounds mip v = Map.findWithDefault defaultBounds v (varBounds mip)
 
 intersectBounds :: Bounds -> Bounds -> Bounds
 intersectBounds (lb1,ub1) (lb2,ub2) = (max lb1 lb2, min ub1 ub2)
 
 variables :: Problem -> Set Var
-variables lp = Map.keysSet $ varType lp
+variables mip = Map.keysSet $ varType mip
 
 integerVariables :: Problem -> Set Var
-integerVariables lp = Map.keysSet $ Map.filter (IntegerVariable ==) (varType lp)
+integerVariables mip = Map.keysSet $ Map.filter (IntegerVariable ==) (varType mip)
 
 semiContinuousVariables :: Problem -> Set Var
-semiContinuousVariables lp = Map.keysSet $ Map.filter (SemiContinuousVariable ==) (varType lp)
+semiContinuousVariables mip = Map.keysSet $ Map.filter (SemiContinuousVariable ==) (varType mip)
 
 semiIntegerVariables :: Problem -> Set Var
-semiIntegerVariables lp = Map.keysSet $ Map.filter (SemiIntegerVariable ==) (varType lp)
+semiIntegerVariables mip = Map.keysSet $ Map.filter (SemiIntegerVariable ==) (varType mip)
