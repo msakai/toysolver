@@ -76,7 +76,7 @@ packageVersions = sort $ tail
   , ("mwc-random",   VERSION_mwc_random   )
 #endif
 #ifdef VERSION_old_locale
-  , ("old_locale",   VERSION_old_locale   )
+  , ("old-locale",   VERSION_old_locale   )
 #endif
 #ifdef VERSION_parse_dimacs
   , ("parse_dimacs", VERSION_parse_dimacs )
