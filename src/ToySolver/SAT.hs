@@ -731,7 +731,7 @@ newSolver = do
   lastStatWC <- newIORef undefined
 
   randfreq <- newIORef defaultRandomFreq
-  randgen  <- newIORef =<< Rand.createSystemRandom
+  randgen  <- newIORef =<< Rand.create
 
   failed <- newIORef []
   implied <- newIORef IS.empty

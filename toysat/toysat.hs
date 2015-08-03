@@ -482,7 +482,7 @@ newSolver opts = do
   SAT.setCCMin           solver (optCCMin opts)
   SAT.setRandomFreq      solver (optRandomFreq opts)
   case optRandomSeed opts of
-    Nothing -> return ()
+    Nothing -> SAT.setRandomGen solver =<< Rand.createSystemRandom
     Just s -> SAT.setRandomGen solver =<< Rand.initialize (Rand.fromSeed s)
   do gen <- SAT.getRandomGen solver
      s <- Rand.save gen
