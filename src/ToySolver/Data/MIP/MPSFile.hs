@@ -33,6 +33,7 @@ module ToySolver.Data.MIP.MPSFile
 import Control.Applicative ((<*))
 import Control.Monad
 import Control.Monad.Writer
+import Data.Default.Class
 import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -306,11 +307,11 @@ parser = do
 
   let mip =
         MIP.Problem
-        { MIP.dir                     = objdir
-        , MIP.objectiveFunction       =
-            ( Just (unintern objrow)
-            , MIP.Expr $ [MIP.Term c [col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
-            )
+        { MIP.objectiveFunction     = def
+            { MIP.objDir = objdir
+            , MIP.objLabel = Just (unintern objrow)
+            , MIP.objExpr = MIP.Expr $ [MIP.Term c [col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
+            }
         , MIP.constraints           = concatMap (f False) rows ++ concatMap (f True) lazycons
         , MIP.sosConstraints        = sos
         , MIP.userCuts              = concatMap (f False) usercuts
@@ -588,15 +589,19 @@ render' mip = do
   -- NAME section
   -- The name starts in column 15 in fixed formats.
   writeSectionHeader $ "NAME" ++ replicate 10 ' ' ++ probName
+  
+  let MIP.ObjectiveFunction
+       { MIP.objLabel = Just objName
+       , MIP.objDir = dir
+       , MIP.objExpr = obj
+       } = MIP.objectiveFunction mip
 
   -- OBJSENSE section
   -- Note: GLPK-4.48 does not support this section.
   writeSectionHeader "OBJSENSE"
-  case MIP.dir mip of
+  case dir of
     OptMin -> writeFields ["MIN"]
     OptMax -> writeFields ["MAX"]
-
-  let (Just objName, obj) = MIP.objectiveFunction mip
 
 {-
   -- OBJNAME section
@@ -636,7 +641,7 @@ render' mip = do
       cols = Map.fromListWith Map.union
              [ (v, Map.singleton l d)
              | (Just l, xs) <-
-                 MIP.objectiveFunction mip :
+                 (Just objName, obj) :
                  [(MIP.constrLabel c, lhs) | c <- MIP.constraints mip ++ MIP.userCuts mip, let (lhs,_,_) = MIP.constrBody c]
              , MIP.Term d [v] <- MIP.terms xs
              ]
@@ -803,13 +808,13 @@ showValue c =
 nameRows :: MIP.Problem -> MIP.Problem
 nameRows mip
   = mip
-  { MIP.objectiveFunction = (Just objName', obj)
+  { MIP.objectiveFunction = (MIP.objectiveFunction mip){ MIP.objLabel = Just objName' }
   , MIP.constraints = f (MIP.constraints mip) ["row" ++ show n | n <- [(1::Int)..]]
   , MIP.userCuts = f (MIP.userCuts mip) ["usercut" ++ show n | n <- [(1::Int)..]]
   , MIP.sosConstraints = g (MIP.sosConstraints mip) ["sos" ++ show n | n <- [(1::Int)..]]
   }
   where
-    (objName, obj) = MIP.objectiveFunction mip
+    objName = MIP.objLabel $ MIP.objectiveFunction mip
     used = Set.fromList $ catMaybes $ objName : [MIP.constrLabel c | c <- MIP.constraints mip ++ MIP.userCuts mip] ++ [MIP.sosLabel c | c <- MIP.sosConstraints mip]
     objName' = fromMaybe (head [name | n <- [(1::Int)..], let name = "obj" ++ show n, name `Set.notMember` used]) objName
 
@@ -837,7 +842,7 @@ quadMatrix e = Map.fromList $ do
 checkAtMostQuadratic :: MIP.Problem -> Bool
 checkAtMostQuadratic mip =  all (all f . MIP.terms) es
   where
-    es = snd (MIP.objectiveFunction mip) :
+    es = MIP.objExpr (MIP.objectiveFunction mip) :
          [lhs | c <- MIP.constraints mip ++ MIP.userCuts mip, let (lhs,_,_) = MIP.constrBody c]
     f :: MIP.Term -> Bool
     f (MIP.Term _ [_]) = True

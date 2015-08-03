@@ -32,6 +32,7 @@ import Control.Applicative ((<*))
 import Control.Monad
 import Control.Monad.Writer
 import Data.Char
+import Data.Default.Class
 import Data.List
 import Data.Maybe
 import Data.Ratio
@@ -117,7 +118,7 @@ reserved = Set.fromList
 parser :: Parser MIP.Problem
 parser = do
   sep
-  (flag, obj) <- problem
+  obj <- problem
 
   cs <- liftM concat $ many $ msum $
     [ liftM (map Left) constraintSection
@@ -140,15 +141,14 @@ parser = do
            , ints
            , bins
            , scs
-           , MIP.vars (snd obj)
+           , MIP.vars obj
            , MIP.vars ss
            ]
       isInt v  = v `Set.member` ints || v `Set.member` bins
       isSemi v = v `Set.member` scs
   return $
     MIP.Problem
-    { MIP.dir               = flag
-    , MIP.objectiveFunction = obj
+    { MIP.objectiveFunction = obj
     , MIP.constraints       = [c | Left c <- cs]
     , MIP.userCuts          = [c | Right c <- cs]
     , MIP.sosConstraints    = ss
@@ -165,13 +165,13 @@ parser = do
     , MIP.varBounds         = Map.fromAscList [ (v, Map.findWithDefault MIP.defaultBounds v bnds2) | v <- Set.toAscList vs]
     }
 
-problem :: Parser (OptDir, MIP.ObjectiveFunction)
+problem :: Parser MIP.ObjectiveFunction
 problem = do
   flag <-  (try minimize >> return OptMin)
        <|> (try maximize >> return OptMax)
   name <- optionMaybe (try label)
   obj <- expr
-  return (flag, (name, obj))
+  return def{ MIP.objLabel = name, MIP.objDir = flag, MIP.objExpr = obj }
 
 minimize, maximize :: Parser ()
 minimize = tok $ string' "min" >> optional (string' "imize")
@@ -432,17 +432,17 @@ writeVar v = writeString $ MIP.fromVar v
 
 render' :: MIP.Problem -> M ()
 render' mip = do
+  let obj = MIP.objectiveFunction mip   
+  
   writeString $
-    case MIP.dir mip of
+    case MIP.objDir obj of
       OptMin -> "MINIMIZE"
       OptMax -> "MAXIMIZE"
   writeChar '\n'
 
-  do
-    let (l, obj) = MIP.objectiveFunction mip
-    renderLabel l
-    renderExpr True obj
-    writeChar '\n'
+  renderLabel (MIP.objLabel obj)
+  renderExpr True (MIP.objExpr obj)
+  writeChar '\n'
 
   writeString "SUBJECT TO\n"
   forM_ (MIP.constraints mip) $ \c -> do
@@ -616,13 +616,13 @@ compileExpr e = do
 removeEmptyExpr :: MIP.Problem -> MIP.Problem
 removeEmptyExpr prob =
   prob
-  { MIP.objectiveFunction =
-      case MIP.objectiveFunction prob of
-        (label, e) -> (label, convertExpr e)
+  { MIP.objectiveFunction = obj{ MIP.objExpr = convertExpr (MIP.objExpr obj) }
   , MIP.constraints = map convertConstr $ MIP.constraints prob
   , MIP.userCuts    = map convertConstr $ MIP.userCuts prob
   }
   where
+    obj = MIP.objectiveFunction prob
+    
     convertExpr (MIP.Expr []) = MIP.Expr [MIP.Term 0 [MIP.toVar "x0"]]
     convertExpr e = e
 

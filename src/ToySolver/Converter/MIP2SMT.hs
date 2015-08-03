@@ -316,7 +316,7 @@ convert opt mip =
         SMTLIB2 -> "Int"
         YICES _ -> "int"
     ts = [(v, realType) | v <- Set.toList real_vs] ++ [(v, intType) | v <- Set.toList int_vs]
-    obj = snd (MIP.objectiveFunction mip)
+    obj = MIP.objectiveFunction mip
     env = Map.fromList [(v, encode opt (MIP.fromVar v)) | v <- Set.toList vs]
     -- Note that identifiers of LPFile does not contain '-'.
     -- So that there are no name crash.
@@ -350,8 +350,8 @@ convert opt mip =
             YICES _ -> list [showString $ printf "%s::%s" (env2 Map.! v) t | (v,t) <- ts]
         body = list [showString "=>"
                     , and' (map fst (conditions opt True env2 mip))
-                    , list [ showString $ if MIP.dir mip == MIP.OptMin then "<=" else ">="
-                           , realExpr opt env mip obj, realExpr opt env2 mip obj
+                    , list [ showString $ if MIP.objDir obj == MIP.OptMin then "<=" else ">="
+                           , realExpr opt env mip (MIP.objExpr obj), realExpr opt env2 mip (MIP.objExpr obj)
                            ]
                     ]
 

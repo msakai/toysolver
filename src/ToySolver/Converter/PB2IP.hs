@@ -29,8 +29,7 @@ convert :: PBFile.Formula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
 convert formula = (mip, mtrans (PBFile.pbNumVars formula))
   where
     mip = def
-      { MIP.dir = dir
-      , MIP.objectiveFunction = (Nothing, obj2)
+      { MIP.objectiveFunction = obj2
       , MIP.constraints = cs2
       , MIP.varType = Map.fromList [(v, MIP.IntegerVariable) | v <- vs]
       , MIP.varBounds = Map.fromList [(v, (0,1)) | v <- vs]
@@ -38,10 +37,10 @@ convert formula = (mip, mtrans (PBFile.pbNumVars formula))
 
     vs = [convVar v | v <- [1..PBFile.pbNumVars formula]]
 
-    (dir,obj2) =
+    obj2 =
       case PBFile.pbObjectiveFunction formula of
-        Just obj' -> (MIP.OptMin, convExpr obj')
-        Nothing   -> (MIP.OptMin, 0)
+        Just obj' -> def{ MIP.objDir = MIP.OptMin, MIP.objExpr = convExpr obj' }
+        Nothing   -> def{ MIP.objDir = MIP.OptMin, MIP.objExpr = 0 }
 
     cs2 = do
       (lhs,op,rhs) <- PBFile.pbConstraints formula
@@ -67,8 +66,7 @@ convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem, Map MIP.Var Rational -
 convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
   where
     mip = def
-      { MIP.dir = MIP.OptMin
-      , MIP.objectiveFunction = (Nothing, obj2)
+      { MIP.objectiveFunction = obj2
       , MIP.constraints = topConstr ++ map snd cs2
       , MIP.varType = Map.fromList [(v, MIP.IntegerVariable) | v <- vs]
       , MIP.varBounds = Map.fromList [(v, (0,1)) | v <- vs]
@@ -76,14 +74,17 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
 
     vs = [convVar v | v <- [1..PBFile.wboNumVars formula]] ++ [v | (ts, _) <- cs2, (_, v) <- ts]
 
-    obj2 = MIP.Expr [MIP.Term (fromIntegral w) [v] | (ts, _) <- cs2, (w, v) <- ts]
+    obj2 = def
+      { MIP.objDir = MIP.OptMin
+      , MIP.objExpr = MIP.Expr [MIP.Term (fromIntegral w) [v] | (ts, _) <- cs2, (w, v) <- ts]
+      }
 
     topConstr :: [MIP.Constraint]
     topConstr = 
      case PBFile.wboTopCost formula of
        Nothing -> []
        Just t ->
-          [ def{ MIP.constrBody = (obj2, MIP.Le, fromInteger t - 1) } ]
+          [ def{ MIP.constrBody = (MIP.objExpr obj2, MIP.Le, fromInteger t - 1) } ]
 
     cs2 :: [([(Integer, MIP.Var)], MIP.Constraint)]
     cs2 = do

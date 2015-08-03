@@ -20,7 +20,7 @@ module ToySolver.Data.MIP.Base
   , terms
   , Term (..)
   , OptDir (..)
-  , ObjectiveFunction
+  , ObjectiveFunction (..)
   , Constraint (..)
   , Bounds
   , Label
@@ -63,8 +63,7 @@ import Data.OptDir
 -- | Problem
 data Problem
   = Problem
-  { dir :: OptDir
-  , objectiveFunction :: ObjectiveFunction
+  { objectiveFunction :: ObjectiveFunction
   , constraints :: [Constraint]
   , sosConstraints :: [SOSConstraint]
   , userCuts :: [Constraint]
@@ -75,8 +74,7 @@ data Problem
 
 instance Default Problem where
   def = Problem
-        { dir = OptMin
-        , objectiveFunction = (Nothing, 0)
+        { objectiveFunction = def
         , constraints = []
         , sosConstraints = []
         , userCuts = []
@@ -110,7 +108,21 @@ data Term = Term Rational [Var]
   deriving (Eq, Ord, Show)
 
 -- | objective function
-type ObjectiveFunction = (Maybe Label, Expr)
+data ObjectiveFunction
+  = ObjectiveFunction
+  { objLabel :: Maybe Label
+  , objDir :: OptDir
+  , objExpr :: Expr
+  }
+  deriving (Eq, Ord, Show)
+
+instance Default ObjectiveFunction where
+  def =
+    ObjectiveFunction
+    { objLabel = Nothing
+    , objDir = OptMin
+    , objExpr = 0
+    }
 
 -- | constraint
 data Constraint
@@ -191,6 +203,9 @@ instance Variables Expr where
 
 instance Variables Term where
   vars (Term _ xs) = Set.fromList xs
+
+instance Variables ObjectiveFunction where
+  vars ObjectiveFunction{ objExpr = e } = vars e
 
 instance Variables Constraint where
   vars Constraint{ constrIndicator = ind, constrBody = (lhs, _, _) } =

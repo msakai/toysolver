@@ -1967,7 +1967,7 @@ pbBacktrackLevel solver (lhs, rhs) = do
 
   let replay [] !_ = error "pbBacktrackLevel: should not happen"
       replay ((lv,lv_lits) : lvs) !slack = do
-        let slack_lv = slack - sum [c | (lit,(c,val)) <- IM.toList lv_lits, val == lFalse]
+        let slack_lv = slack - sum [c | (_,(c,val)) <- IM.toList lv_lits, val == lFalse]
         if slack_lv < 0 then
           return lv -- CONFLICT
         else if any (\(_, lits2) -> any (\(c,_) -> c > slack_lv) (IM.elems lits2)) lvs then

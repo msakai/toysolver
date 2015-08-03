@@ -138,7 +138,7 @@ run solver opt mip printModel = do
     compileT (MIP.Term c vs) =
       foldr (*) (Const c) [Var (nameToVar Map.! v) | v <- vs]
 
-    obj = compileE $ snd $ MIP.objectiveFunction mip
+    obj = compileE $ MIP.objExpr $ MIP.objectiveFunction mip
 
     cs1 = do
       v <- Set.toList vs
@@ -213,7 +213,7 @@ run solver opt mip printModel = do
           putSLine "UNKNOWN"
           exitFailure
         Just (cs',obj') ->
-          case MIPSolverHL.optimize (MIP.dir mip) obj' cs' ivs2 of
+          case MIPSolverHL.optimize (MIP.objDir $ MIP.objectiveFunction mip) obj' cs' ivs2 of
             MIPSolverHL.OptUnsat -> do
               putSLine "UNSATISFIABLE"
               exitFailure
@@ -239,7 +239,7 @@ run solver opt mip printModel = do
 
       Simplex2.setLogger solver putCommentLine
       replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
-      Simplex2.setOptDir solver (MIP.dir mip)
+      Simplex2.setOptDir solver $ MIP.objDir $ MIP.objectiveFunction mip
       Simplex2.setObj solver $ fromJust (LAFOL.fromFOLExpr obj)
       putCommentLine "Loading constraints... "
       forM_ (cs1 ++ cs2) $ \c -> do
@@ -325,7 +325,7 @@ run solver opt mip printModel = do
               putCommentLine "non-linear expressions are not supported by Conti-Traverso algorithm"
               exitFailure
             Just (linObj, linCon) -> do
-              case ContiTraverso.solve P.grlex vs2 (MIP.dir mip) linObj linCon of
+              case ContiTraverso.solve P.grlex vs2 (MIP.objDir $ MIP.objectiveFunction mip) linObj linCon of
                 Nothing -> do
                   putSLine "UNSATISFIABLE"
                   exitFailure

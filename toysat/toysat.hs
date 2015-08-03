@@ -907,10 +907,10 @@ solveMIP opt solver mip = do
           forM_ ps $ \(x1,x2) -> do
             SAT.addClause solver [SAT.litNot $ asBin $ vmap Map.! v | v <- [x1,x2]]
 
-    let (_label, obj) = MIP.objectiveFunction mip
-        d = foldl' lcm 1 [denominator r | MIP.Term r _ <- MIP.terms obj] *
-            (if MIP.dir mip == MIP.OptMin then 1 else -1)
-        obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms obj]
+    let obj = MIP.objectiveFunction mip
+        d = foldl' lcm 1 [denominator r | MIP.Term r _ <- MIP.terms (MIP.objExpr obj)] *
+            (if MIP.objDir obj == MIP.OptMin then 1 else -1)
+        obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms (MIP.objExpr obj)]
     (obj3,obj3_c) <- Integer.linearize enc obj2
 
     let transformObjVal :: Integer -> Rational
