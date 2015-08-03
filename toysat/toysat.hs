@@ -441,8 +441,10 @@ header = unlines
 
 printSysInfo :: IO ()
 printSysInfo = do
-  tm <- getZonedTime
-  putCommentLine $ printf "%s" (formatTime defaultTimeLocale "%FT%X%z" tm)
+  -- tm <- getZonedTime
+  -- putCommentLine $ printf "%s" (formatTime defaultTimeLocale "%FT%X%z" tm)
+  tm <- getCurrentTime
+  putCommentLine $ printf "current time = %s" (show tm)
   putCommentLine $ printf "version = %s" (showVersion version)
   putCommentLine $ printf "githash = %s" (fromMaybe "<unknown>" gitHash)
   putCommentLine $ printf "compilationtime = %s" (show compilationTime)
