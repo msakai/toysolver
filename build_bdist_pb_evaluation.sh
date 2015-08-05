@@ -15,7 +15,7 @@ cabal sandbox init
 cabal update
 cabal install --only-dependencies
 #cabal configure --disable-shared --ghc-options="-static -optl-static -optl-pthread"
-cabal configure -fLinuxStatic
+cabal configure -fLinuxStatic -fForceChar8
 cabal build
 
 PKG=toysat-pb`date +%Y`-`date +%Y%m%d`-`git rev-parse --short HEAD`
