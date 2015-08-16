@@ -33,9 +33,11 @@ module ToySolver.SAT.Types
 
   -- * Cardinality Constraint
   , AtLeast
+  , Exactly
   , normalizeAtLeast
   , instantiateAtLeast
   , evalAtLeast
+  , evalExactly
 
   -- * Pseudo Boolean Constraint
   , PBLinTerm
@@ -190,6 +192,7 @@ clauseToPBLinAtLeast :: Clause -> PBLinAtLeast
 clauseToPBLinAtLeast xs = ([(1,l) | l <- xs], 1)
 
 type AtLeast = ([Lit], Int)
+type Exactly = ([Lit], Int)
 
 normalizeAtLeast :: AtLeast -> AtLeast
 normalizeAtLeast (lits,n) = assert (IntSet.size ys `mod` 2 == 0) $
@@ -217,6 +220,9 @@ instantiateAtLeast evalLitM (xs,n) = loop ([],n) xs
 
 evalAtLeast :: IModel m => m -> AtLeast -> Bool
 evalAtLeast m (lits,n) = sum [1 | lit <- lits, evalLit m lit] >= n
+
+evalExactly :: IModel m => m -> Exactly -> Bool
+evalExactly m (lits,n) = sum [1 | lit <- lits, evalLit m lit] == n
 
 type PBLinTerm = (Integer, Lit)
 type PBLinSum = [PBLinTerm]

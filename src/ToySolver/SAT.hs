@@ -42,25 +42,46 @@ module ToySolver.SAT
   , litNot
   , litVar
   , litPolarity
-  , Clause
+  , evalLit
 
   -- * Problem specification
   , newVar
   , newVars
   , newVars_
   , resizeVarCapacity
+  -- ** Clauses
   , addClause
+  , Clause
+  , evalClause
+  -- ** Cardinality constraints
   , addAtLeast
   , addAtMost
   , addExactly
+  , AtLeast
+  , Exactly
+  , evalAtLeast
+  , evalExactly
+
+  -- ** (Linear) pseudo-boolean constraints
   , addPBAtLeast
   , addPBAtMost
   , addPBExactly
   , addPBAtLeastSoft
   , addPBAtMostSoft
   , addPBExactlySoft
+  , PBLinTerm
+  , PBLinSum
+  , PBLinAtLeast
+  , PBLinExactly
+  , evalPBLinSum
+  , evalPBLinAtLeast
+  , evalPBLinExactly
+  -- ** XOR clauses
   , addXORClause
   , addXORClauseSoft
+  , XORClause
+  , evalXORClause
+  -- ** Thery
   , setTheory
 
   -- * Solving
@@ -69,6 +90,7 @@ module ToySolver.SAT
   , BudgetExceeded (..)
 
   -- * Extract results
+  , IModel (..)
   , Model
   , getModel
   , getFailedAssumptions
@@ -928,7 +950,7 @@ addExactly solver lits n = do
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≥ n/.
 addPBAtLeast :: Solver          -- ^ The 'Solver' argument.
-             -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
+             -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
              -> Integer         -- ^ /n/
              -> IO ()
 addPBAtLeast solver ts n = do
@@ -967,7 +989,7 @@ addPBAtLeast solver ts n = do
               Just _ -> markBad solver
 
 -- | See documentation of 'setPBSplitClausePart'.
-pbSplitClausePart :: Solver -> ([(Integer,Lit)], Integer) -> IO ([(Integer,Lit)], Integer)
+pbSplitClausePart :: Solver -> PBLinAtLeast -> IO PBLinAtLeast
 pbSplitClausePart solver (lhs,rhs) = do
   let (ts1,ts2) = partition (\(c,_) -> c >= rhs) lhs
   if length ts1 < 2 then
@@ -979,14 +1001,14 @@ pbSplitClausePart solver (lhs,rhs) = do
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
 addPBAtMost :: Solver          -- ^ The 'Solver' argument.
-            -> [(Integer,Lit)] -- ^ list of @[(c1,l1),(c2,l2),…]@
+            -> PBLinSum        -- ^ list of @[(c1,l1),(c2,l2),…]@
             -> Integer         -- ^ /n/
             -> IO ()
 addPBAtMost solver ts n = addPBAtLeast solver [(-c,l) | (c,l) <- ts] (negate n)
 
 -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … = n/.
 addPBExactly :: Solver          -- ^ The 'Solver' argument.
-             -> [(Integer,Lit)] -- ^ list of terms @[(c1,l1),(c2,l2),…]@
+             -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
              -> Integer         -- ^ /n/
              -> IO ()
 addPBExactly solver ts n = do
@@ -998,7 +1020,7 @@ addPBExactly solver ts n = do
 addPBAtLeastSoft
   :: Solver          -- ^ The 'Solver' argument.
   -> Lit             -- ^ Selector literal @sel@
-  -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
+  -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
   -> Integer         -- ^ /n/
   -> IO ()
 addPBAtLeastSoft solver sel lhs rhs = do
@@ -1009,7 +1031,7 @@ addPBAtLeastSoft solver sel lhs rhs = do
 addPBAtMostSoft
   :: Solver          -- ^ The 'Solver' argument.
   -> Lit             -- ^ Selector literal @sel@
-  -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
+  -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
   -> Integer         -- ^ /n/
   -> IO ()
 addPBAtMostSoft solver sel lhs rhs =
@@ -1019,7 +1041,7 @@ addPBAtMostSoft solver sel lhs rhs =
 addPBExactlySoft
   :: Solver          -- ^ The 'Solver' argument.
   -> Lit             -- ^ Selector literal @sel@
-  -> [(Integer,Lit)] -- ^ set of terms @[(c1,l1),(c2,l2),…]@
+  -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
   -> Integer         -- ^ /n/
   -> IO ()
 addPBExactlySoft solver sel lhs rhs = do

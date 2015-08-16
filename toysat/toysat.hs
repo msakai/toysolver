@@ -66,7 +66,6 @@ import ToySolver.Data.ArithRel
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.SAT as SAT
-import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Integer as Integer
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
