@@ -90,6 +90,7 @@ varExpr :: Var -> Expr
 varExpr v = Expr [Term 1 [v]]
 
 constExpr :: Rational -> Expr
+constExpr 0 = Expr []
 constExpr c = Expr [Term c []]
            
 terms :: Expr -> [Term]
@@ -101,6 +102,7 @@ instance Num Expr where
   negate (Expr e) = Expr [Term (-c) vs | Term c vs <- e]
   abs = id
   signum _ = 1
+  fromInteger 0 = Expr []
   fromInteger c = Expr [Term (fromInteger c) []]
 
 -- | terms
