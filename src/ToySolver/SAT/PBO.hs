@@ -56,7 +56,6 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Text.Printf
 import qualified ToySolver.SAT as SAT
-import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO.Context as C
 import qualified ToySolver.SAT.PBO.BC as BC
 import qualified ToySolver.SAT.PBO.BCD as BCD
@@ -134,7 +133,7 @@ optimize opt = do
       let opt2 = def
       BCD2.solve cxt solver opt2
     _ -> do
-      SAT.setEnableBackwardSubsumptionRemoval solver True
+      SAT.modifyConfig solver $ \config -> config{ SAT.configEnableBackwardSubsumptionRemoval = True }
 
       join $ atomically $ do
         ret <- C.getBestValue cxt

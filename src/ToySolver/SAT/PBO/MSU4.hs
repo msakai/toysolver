@@ -38,7 +38,7 @@ solve cxt solver = solveWBO (C.normalize cxt) solver
 
 solveWBO :: C.Context cxt => cxt -> SAT.Solver -> IO ()
 solveWBO cxt solver = do
-  SAT.setEnableBackwardSubsumptionRemoval solver True
+  SAT.modifyConfig solver $ \config -> config{ SAT.configEnableBackwardSubsumptionRemoval = True }
   loop (IM.keysSet weights, IS.empty) 0
 
   where

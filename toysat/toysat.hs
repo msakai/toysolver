@@ -94,21 +94,9 @@ data AllMUSMethod = AllMUSCAMUS | AllMUSDAA
 data Options
   = Options
   { optMode          :: Maybe Mode
-  , optRestartStrategy :: SAT.RestartStrategy
-  , optRestartFirst  :: Int
-  , optRestartInc    :: Double
-  , optLearningStrategy :: SAT.LearningStrategy
-  , optLearntSizeFirst  :: Int
-  , optLearntSizeInc    :: Double
-  , optCCMin         :: Int
-  , optEnablePhaseSaving :: Bool
-  , optEnableForwardSubsumptionRemoval :: Bool
-  , optEnableBackwardSubsumptionRemoval :: Bool
-  , optRandomFreq    :: Double
+  , optSATConfig     :: SAT.Config
   , optRandomSeed    :: Maybe Rand.Seed
   , optLinearizerPB  :: Bool
-  , optPBHandlerType :: SAT.PBHandlerType
-  , optPBSplitClausePart :: Bool
   , optSearchStrategy       :: PBO.SearchStrategy
   , optObjFunVarsHeuristics :: Bool
   , optLocalSearchInitial   :: Bool
@@ -116,7 +104,6 @@ data Options
   , optAllMUSes :: Bool
   , optAllMUSMethod :: AllMUSMethod
   , optPrintRational :: Bool
-  , optCheckModel  :: Bool
   , optTimeout :: Integer
   , optWriteFile :: Maybe FilePath
   , optUBCSAT :: FilePath
@@ -126,29 +113,16 @@ instance Default Options where
   def =
     Options
     { optMode          = Nothing
-    , optRestartStrategy = def
-    , optRestartFirst  = SAT.defaultRestartFirst
-    , optRestartInc    = SAT.defaultRestartInc
-    , optLearningStrategy = def
-    , optLearntSizeFirst  = SAT.defaultLearntSizeFirst
-    , optLearntSizeInc    = SAT.defaultLearntSizeInc
-    , optCCMin         = SAT.defaultCCMin
-    , optEnablePhaseSaving = SAT.defaultEnablePhaseSaving
-    , optEnableForwardSubsumptionRemoval = SAT.defaultEnableForwardSubsumptionRemoval
-    , optRandomFreq    = SAT.defaultRandomFreq
+    , optSATConfig     = def
     , optRandomSeed    = Nothing
     , optLinearizerPB  = False
-    , optPBHandlerType = def
-    , optPBSplitClausePart = SAT.defaultPBSplitClausePart
-    , optEnableBackwardSubsumptionRemoval = SAT.defaultEnableBackwardSubsumptionRemoval
     , optSearchStrategy       = def
     , optObjFunVarsHeuristics = PBO.defaultEnableObjFunVarsHeuristics
     , optLocalSearchInitial   = False
     , optMUSMethod = MUSLinear
     , optAllMUSes = False
     , optAllMUSMethod = AllMUSCAMUS
-    , optPrintRational = False  
-    , optCheckModel = False
+    , optPrintRational = False
     , optTimeout = 0
     , optWriteFile = Nothing
     , optUBCSAT = "ubcsat"
@@ -167,48 +141,48 @@ options =
     , Option []    ["lp"]     (NoArg (\opt -> opt{ optMode = Just ModeMIP    })) "solve bounded integer programming problem in .lp or .mps file"
 
     , Option [] ["restart"]
-        (ReqArg (\val opt -> opt{ optRestartStrategy = parseRestartStrategy val }) "<str>")
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRestartStrategy = parseRestartStrategy val } }) "<str>")
         "Restart startegy: MiniSAT (default), Armin, Luby."
     , Option [] ["restart-first"]
-        (ReqArg (\val opt -> opt{ optRestartFirst = read val }) "<integer>")
-        (printf "The initial restart limit. (default %d)" SAT.defaultRestartFirst)
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRestartFirst = read val } }) "<integer>")
+        (printf "The initial restart limit. (default %d)" (SAT.configRestartFirst def))
     , Option [] ["restart-inc"]
-        (ReqArg (\val opt -> opt{ optRestartInc = read val }) "<real>")
-        (printf "The factor with which the restart limit is multiplied in each restart. (default %f)" SAT.defaultRestartInc)
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRestartInc = read val } }) "<real>")
+        (printf "The factor with which the restart limit is multiplied in each restart. (default %f)" (SAT.configRestartInc def))
     , Option [] ["learning"]
-        (ReqArg (\val opt -> opt{ optLearningStrategy = parseLS val }) "<name>")
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configLearningStrategy = parseLS val } }) "<name>")
         "Leaning scheme: clause (default), hybrid"
     , Option [] ["learnt-size-first"]
-        (ReqArg (\val opt -> opt{ optLearntSizeFirst = read val }) "<int>")
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configLearntSizeFirst = read val } }) "<int>")
         "The initial limit for learnt clauses."
     , Option [] ["learnt-size-inc"]
-        (ReqArg (\val opt -> opt{ optLearntSizeInc = read val }) "<real>")
-        (printf "The limit for learnt clauses is multiplied with this factor periodically. (default %f)" SAT.defaultLearntSizeInc)
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configLearntSizeInc = read val } }) "<real>")
+        (printf "The limit for learnt clauses is multiplied with this factor periodically. (default %f)" (SAT.configLearntSizeInc def))
     , Option [] ["ccmin"]
-        (ReqArg (\val opt -> opt{ optCCMin = read val }) "<int>")
-        (printf "Conflict clause minimization (0=none, 1=local, 2=recursive; default %d)" SAT.defaultCCMin)
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configCCMin = read val } }) "<int>")
+        (printf "Conflict clause minimization (0=none, 1=local, 2=recursive; default %d)" (SAT.configCCMin def))
     , Option [] ["enable-phase-saving"]
-        (NoArg (\opt -> opt{ optEnablePhaseSaving = True }))
-        ("Enable phase saving" ++ (if SAT.defaultEnablePhaseSaving then " (default)" else ""))
+        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnablePhaseSaving = True } }))
+        ("Enable phase saving" ++ (if SAT.configEnablePhaseSaving def then " (default)" else ""))
     , Option [] ["disable-phase-saving"]
-        (NoArg (\opt -> opt{ optEnablePhaseSaving = False }))
-        ("Disable phase saving" ++ (if SAT.defaultEnablePhaseSaving then "" else " (default)"))
+        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnablePhaseSaving = False } }))
+        ("Disable phase saving" ++ (if SAT.configEnablePhaseSaving def then "" else " (default)"))
     , Option [] ["enable-forward-subsumption-removal"]
-        (NoArg (\opt -> opt{ optEnableForwardSubsumptionRemoval = True }))
-        ("Enable forward subumption removal (clauses only)" ++ (if SAT.defaultEnableForwardSubsumptionRemoval then " (default)" else ""))
+        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnableForwardSubsumptionRemoval = True } }))
+        ("Enable forward subumption removal (clauses only)" ++ (if SAT.configEnableForwardSubsumptionRemoval def then " (default)" else ""))
     , Option [] ["disable-forward-subsumption-removal"]
-        (NoArg (\opt -> opt{ optEnableForwardSubsumptionRemoval = False }))
-        ("Disable forward subsumption removal (clauses only)" ++ (if SAT.defaultEnableForwardSubsumptionRemoval then "" else " (default)"))
+        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnableForwardSubsumptionRemoval = False } }))
+        ("Disable forward subsumption removal (clauses only)" ++ (if SAT.configEnableForwardSubsumptionRemoval def then "" else " (default)"))
     , Option [] ["enable-backward-subsumption-removal"]
-        (NoArg (\opt -> opt{ optEnableBackwardSubsumptionRemoval = True }))
-        ("Enable backward subsumption removal." ++ (if SAT.defaultEnableBackwardSubsumptionRemoval then " (default)" else ""))
+        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnableBackwardSubsumptionRemoval = True } }))
+        ("Enable backward subsumption removal." ++ (if SAT.configEnableBackwardSubsumptionRemoval def then " (default)" else ""))
     , Option [] ["disable-backward-subsumption-removal"]
-        (NoArg (\opt -> opt{ optEnableBackwardSubsumptionRemoval = False }))
-        ("Disable backward subsumption removal." ++ (if SAT.defaultEnableBackwardSubsumptionRemoval then "" else " (default)"))
+        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnableBackwardSubsumptionRemoval = False } }))
+        ("Disable backward subsumption removal." ++ (if SAT.configEnableBackwardSubsumptionRemoval def then "" else " (default)"))
 
     , Option [] ["random-freq"]
-        (ReqArg (\val opt -> opt{ optRandomFreq = read val }) "<0..1>")
-        (printf "The frequency with which the decision heuristic tries to choose a random variable (default %f)" SAT.defaultRandomFreq)
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRandomFreq = read val } }) "<0..1>")
+        (printf "The frequency with which the decision heuristic tries to choose a random variable (default %f)" (SAT.configRandomFreq def))
     , Option [] ["random-seed"]
         (ReqArg (\val opt -> opt{ optRandomSeed = Just (Rand.toSeed (V.singleton (read val) :: V.Vector Word32)) }) "<int>")
         "random seed used by the random variable selection"
@@ -221,14 +195,14 @@ options =
         "Use PB constraint in linearization."
 
     , Option [] ["pb-handler"]
-        (ReqArg (\val opt -> opt{ optPBHandlerType = parsePBHandler val }) "<name>")
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configPBHandlerType = parsePBHandler val } }) "<name>")
         "PB constraint handler: counter (default), pueblo"
     , Option [] ["pb-split-clause-part"]
-        (NoArg (\opt -> opt{ optPBSplitClausePart = True }))
-        ("Split clause part of PB constraints." ++ (if SAT.defaultPBSplitClausePart then " (default)" else ""))
+        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnablePBSplitClausePart = True } }))
+        ("Split clause part of PB constraints." ++ (if SAT.configEnablePBSplitClausePart def then " (default)" else ""))
     , Option [] ["no-pb-split-clause-part"]
-        (NoArg (\opt -> opt{ optPBSplitClausePart = False }))
-        ("Do not split clause part of PB constraints." ++ (if SAT.defaultPBSplitClausePart then "" else " (default)"))
+        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnablePBSplitClausePart = False } }))
+        ("Do not split clause part of PB constraints." ++ (if SAT.configEnablePBSplitClausePart def then "" else " (default)"))
 
     , Option [] ["search"]
         (ReqArg (\val opt -> opt{ optSearchStrategy = parseSearch val }) "<str>")
@@ -261,7 +235,7 @@ options =
         "write model to filename in Gurobi .sol format"
 
     , Option [] ["check-model"]
-        (NoArg (\opt -> opt{ optCheckModel = True }))
+        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configCheckModel = True } }))
         "check model for debug"
 
     , Option [] ["timeout"]
@@ -473,27 +447,14 @@ putOLine  s = do
 newSolver :: Options -> IO SAT.Solver
 newSolver opts = do
   solver <- SAT.newSolver
-  SAT.setRestartStrategy solver (optRestartStrategy opts)
-  SAT.setRestartFirst    solver (optRestartFirst opts)
-  SAT.setRestartInc      solver (optRestartInc opts)
-  SAT.setLearntSizeFirst solver (optLearntSizeFirst opts)
-  SAT.setLearntSizeInc   solver (optLearntSizeInc opts)
-  SAT.setCCMin           solver (optCCMin opts)
-  SAT.setRandomFreq      solver (optRandomFreq opts)
+  SAT.setConfig solver (optSATConfig opts)
+  SAT.setLogger solver putCommentLine
   case optRandomSeed opts of
     Nothing -> SAT.setRandomGen solver =<< Rand.createSystemRandom
     Just s -> SAT.setRandomGen solver =<< Rand.initialize (Rand.fromSeed s)
   do gen <- SAT.getRandomGen solver
      s <- Rand.save gen
      putCommentLine $ "use --random-gen=" ++ show (unwords . map show . V.toList . Rand.fromSeed $ s) ++ " option to reproduce the execution"
-  SAT.setLearningStrategy solver (optLearningStrategy opts)
-  SAT.setEnablePhaseSaving solver (optEnablePhaseSaving opts)
-  SAT.setEnableForwardSubsumptionRemoval solver (optEnableForwardSubsumptionRemoval opts)
-  SAT.setEnableBackwardSubsumptionRemoval solver (optEnableBackwardSubsumptionRemoval opts)
-  SAT.setPBHandlerType solver (optPBHandlerType opts)
-  SAT.setPBSplitClausePart solver (optPBSplitClausePart opts)
-  SAT.setLogger solver putCommentLine
-  SAT.setCheckModel solver (optCheckModel opts)
   return solver
 
 -- ------------------------------------------------------------------------

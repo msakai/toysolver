@@ -227,7 +227,7 @@ prop_solveXOR = QM.monadicIO $ do
 
 solveXOR :: Solver -> (Int,[XORClause]) -> IO (Maybe Model)
 solveXOR solver (nv,cs) = do
-  setCheckModel solver True
+  modifyConfig solver $ \config -> config{ configCheckModel = True }
   newVars_ solver nv
   forM_ cs $ \c -> addXORClause solver (fst c) (snd c)
   ret <- solve solver
@@ -817,7 +817,7 @@ case_evalXORClause_case2 =
 
 case_xor_case1 = do
   solver <- newSolver
-  setCheckModel solver True
+  modifyConfig solver $ \config -> config{ configCheckModel = True }
   x1 <- newVar solver
   x2 <- newVar solver
   x3 <- newVar solver
@@ -829,7 +829,7 @@ case_xor_case1 = do
 
 case_xor_case2 = do
   solver <- newSolver
-  setCheckModel solver True
+  modifyConfig solver $ \config -> config{ configCheckModel = True }
   x1 <- newVar solver
   x2 <- newVar solver
   x3 <- newVar solver
@@ -846,7 +846,7 @@ case_xor_case2 = do
 
 case_xor_case3 = do
   solver <- newSolver
-  setCheckModel solver True
+  modifyConfig solver $ \config -> config{ configCheckModel = True }
   x1 <- newVar solver
   x2 <- newVar solver
   x3 <- newVar solver
@@ -882,7 +882,7 @@ case_hybridLearning_1 = do
 
   setVarPolarity solver x1 True
 
-  setLearningStrategy solver LearningHybrid
+  modifyConfig solver $ \config -> config{ configLearningStrategy = LearningHybrid }
   ret <- solve solver
   ret @?= True
 
@@ -907,7 +907,7 @@ case_hybridLearning_2 = do
   varBumpActivity solver x12
   setVarPolarity solver x12 False
 
-  setLearningStrategy solver LearningHybrid
+  modifyConfig solver $ \config -> config{ configLearningStrategy = LearningHybrid }
   ret <- solve solver
   ret @?= True
 
@@ -1346,39 +1346,45 @@ instance Arbitrary RestartStrategy where
 instance Arbitrary PBHandlerType where
   arbitrary = arbitraryBoundedEnum
 
+instance Arbitrary Config where
+  arbitrary = do
+    restartStrategy <- arbitrary
+    restartFirst <- arbitrary
+    restartInc <- liftM ((1.01 +) . abs) arbitrary
+    learningStrategy <- arbitrary
+    learntSizeFirst <- arbitrary
+    learntSizeInc <- liftM ((1.01 +) . abs) arbitrary
+    pbhandler <- arbitrary
+    ccmin <- choose (0,2)
+    phaseSaving <- arbitrary
+    forwardSubsumptionRemoval <- arbitrary
+    backwardSubsumptionRemoval <- arbitrary
+    randomFreq <- choose (0,1)
+    splitClausePart <- arbitrary
+    return $ def
+      { configRestartStrategy = restartStrategy
+      , configRestartFirst = restartFirst
+      , configRestartInc = restartInc
+      , configLearningStrategy = learningStrategy
+      , configLearntSizeFirst = learntSizeFirst
+      , configLearntSizeInc = learntSizeInc
+      , configPBHandlerType = pbhandler
+      , configCCMin = ccmin
+      , configEnablePhaseSaving = phaseSaving
+      , configEnableForwardSubsumptionRemoval = forwardSubsumptionRemoval
+      , configEnableBackwardSubsumptionRemoval = backwardSubsumptionRemoval
+      , configRandomFreq = randomFreq
+      , configEnablePBSplitClausePart = splitClausePart
+      }
+
 arbitrarySolver :: QM.PropertyM IO Solver
 arbitrarySolver = do
   seed <- QM.pick arbitrary
-  learningStrategy <- QM.pick arbitrary
-  restartStrategy <- QM.pick arbitrary
-  restartFirst <- QM.pick arbitrary
-  restartInc <- QM.pick $ liftM ((1.01 +) . abs) arbitrary
-  learntSizeFirst <- QM.pick arbitrary
-  learntSizeInc <- QM.pick $ liftM ((1.01 +) . abs) arbitrary
-  pbhandler <- QM.pick arbitrary
-  ccmin <- QM.pick $ choose (0,2)
-  phaseSaving <- QM.pick arbitrary
-  forwardSubsumptionRemoval <- QM.pick arbitrary
-  backwardSubsumptionRemoval <- QM.pick arbitrary
-  randomFreq <- QM.pick $ choose (0,1)
-  splitClausePart <- QM.pick arbitrary
+  config <- QM.pick arbitrary
   QM.run $ do
     solver <- newSolver
+    setConfig solver config{ configCheckModel = True }
     setRandomGen solver =<< Rand.initialize (V.singleton seed)
-    setCheckModel solver True
-    setLearningStrategy solver learningStrategy
-    setRestartStrategy solver restartStrategy
-    setRestartFirst solver restartFirst
-    setRestartInc solver restartInc
-    setLearntSizeFirst solver learntSizeFirst
-    setLearntSizeInc solver learntSizeInc
-    setPBHandlerType solver pbhandler
-    setCCMin solver ccmin
-    setEnablePhaseSaving solver phaseSaving
-    setEnableForwardSubsumptionRemoval solver forwardSubsumptionRemoval
-    setEnableBackwardSubsumptionRemoval solver backwardSubsumptionRemoval
-    setRandomFreq solver randomFreq
-    setPBSplitClausePart solver splitClausePart
     return solver
 
 arbitraryOptimizer :: Solver -> PBLinSum -> QM.PropertyM IO PBO.Optimizer
