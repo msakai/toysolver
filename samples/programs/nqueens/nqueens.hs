@@ -6,7 +6,6 @@ import Control.Monad
 import Data.Array.IArray
 import System.Environment
 import qualified ToySolver.SAT as SAT
-import qualified ToySolver.SAT.Types as SAT
 
 main :: IO ()
 main = do
