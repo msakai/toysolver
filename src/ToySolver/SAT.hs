@@ -100,6 +100,7 @@ module ToySolver.SAT
   , Config (..)
   , getConfig
   , setConfig
+  , modifyConfig
   , RestartStrategy (..)
   , LearningStrategy (..)
   , setVarPolarity
@@ -1518,6 +1519,9 @@ getConfig solver = readIORef $ svConfig solver
 
 setConfig :: Solver -> Config -> IO ()
 setConfig solver = writeIORef (svConfig solver)
+
+modifyConfig :: Solver -> (Config -> Config) -> IO ()
+modifyConfig solver = modifyIORef' (svConfig solver)
 
 {-# DEPRECATED setRestartStrategy "Use setConfig" #-}
 setRestartStrategy :: Solver -> RestartStrategy -> IO ()
