@@ -2,6 +2,7 @@ module Main where
 
 import Control.Monad
 import Data.Array.IArray
+import Data.Default.Class
 import Text.Printf
 import Criterion.Main
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
@@ -13,8 +14,7 @@ solve fname = do
   case ret of
     Left err  -> error $ show err
     Right cnf -> do
-      solver <- SAT.newSolver
-      SAT.setRandomFreq solver 0
+      solver <- SAT.newSolverWithConfig def{ SAT.configRandomFreq = 0 }
       _ <- replicateM (DIMACS.numVars cnf) (SAT.newVar solver)
       forM_ (DIMACS.clauses cnf) $ \clause ->
         SAT.addClause solver (elems clause)

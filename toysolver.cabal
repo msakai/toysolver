@@ -737,6 +737,7 @@ Benchmark BenchmarkSATLIB
     base >=4 && <5,
     array,
     containers,
+    data-default-class,
     parse-dimacs,
     toysolver,
     criterion >=1.0 && <1.1
