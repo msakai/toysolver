@@ -98,8 +98,8 @@ solveWBO :: C.Context cxt => cxt -> SAT.Solver -> Options -> IO ()
 solveWBO cxt solver opt = do
   C.logMessage cxt $ printf "BCD2: Hardening is %s." (if optEnableHardening opt then "enabled" else "disabled")
   C.logMessage cxt $ printf "BCD2: BiasedSearch is %s." (if optEnableBiasedSearch opt then "enabled" else "disabled")
-  
-  SAT.setEnableBackwardSubsumptionRemoval solver True
+
+  SAT.modifyConfig solver $ \config -> config{ SAT.configEnableBackwardSubsumptionRemoval = True }
 
   unrelaxedRef <- newIORef $ IntSet.fromList [lit | (lit,_) <- sels]
   relaxedRef   <- newIORef IntSet.empty

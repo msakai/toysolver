@@ -34,6 +34,7 @@ module ToySolver.SAT
   -- * The @Solver@ type
     Solver
   , newSolver
+  , newSolverWithConfig
 
   -- * Basic data structures
   , Var
@@ -97,7 +98,20 @@ module ToySolver.SAT
   , getAssumptionsImplications
 
   -- * Solver configulation
+  , Config (..)
+  , getConfig
+  , setConfig
+  , modifyConfig
   , RestartStrategy (..)
+  , LearningStrategy (..)
+  , setVarPolarity
+  , setLogger
+  , setRandomGen
+  , getRandomGen
+  , setConfBudget
+  , PBHandlerType (..)
+
+  -- ** Deprecated
   , setRestartStrategy
   , setRestartFirst
   , defaultRestartFirst
@@ -109,7 +123,6 @@ module ToySolver.SAT
   , defaultLearntSizeInc
   , setCCMin
   , defaultCCMin
-  , LearningStrategy (..)
   , setLearningStrategy
   , setEnablePhaseSaving
   , getEnablePhaseSaving
@@ -120,15 +133,9 @@ module ToySolver.SAT
   , setEnableBackwardSubsumptionRemoval
   , getEnableBackwardSubsumptionRemoval
   , defaultEnableBackwardSubsumptionRemoval
-  , setVarPolarity
-  , setLogger
   , setCheckModel
   , setRandomFreq
   , defaultRandomFreq
-  , setRandomGen
-  , getRandomGen
-  , setConfBudget
-  , PBHandlerType (..)
   , setPBHandlerType
   , setPBSplitClausePart
   , getPBSplitClausePart
@@ -154,6 +161,7 @@ module ToySolver.SAT
   ) where
 
 import Prelude hiding (log)
+import Control.Applicative hiding (empty)
 import Control.Loop
 import Control.Monad
 import Control.Exception
@@ -383,52 +391,8 @@ data Solver
   , svNRemovedConstr :: !(IOURef Int)
 
   -- Configulation
-
-  -- | Inverse of the variable activity decay factor. (default 1 / 0.95)
-  , svVarDecay     :: !(IOURef Double)
-
-  -- | Amount to bump next variable with.
-  , svVarInc       :: !(IOURef Double)
-
-  -- | Inverse of the constraint activity decay factor. (1 / 0.999)
-  , svConstrDecay  :: !(IOURef Double)
-
-  -- | Amount to bump next constraint with.
-  , svConstrInc    :: !(IOURef Double)
-
-  , svRestartStrategy :: !(IORef RestartStrategy)
-
-  -- | The initial restart limit. (default 100)
-  , svRestartFirst :: !(IORef Int)
-
-  -- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
-  , svRestartInc :: !(IORef Double)
-
-  -- | The initial limit for learnt constraints.
-  , svLearntSizeFirst :: !(IORef Int)
-
-  -- | The limit for learnt constraints is multiplied with this factor periodically. (default 1.1)
-  , svLearntSizeInc :: !(IORef Double)
-
-  -- | Controls conflict constraint minimization (0=none, 1=local, 2=recursive)
-  , svCCMin :: !(IORef Int)
-
-  , svEnablePhaseSaving :: !(IORef Bool)
-  , svEnableForwardSubsumptionRemoval :: !(IORef Bool)
-
-  , svLearningStrategy :: !(IORef LearningStrategy)
-
-  , svPBHandlerType :: !(IORef PBHandlerType)
-  , svPBSplitClausePart :: !(IORef Bool)
-
-  , svEnableBackwardSubsumptionRemoval :: !(IORef Bool)
-
-  , svCheckModel :: !(IORef Bool)
-
-  , svRandomFreq :: !(IORef Double)
-
+  , svConfig :: !(IORef Config)
   , svRandomGen  :: !(IORef Rand.GenIO)
-
   , svConfBudget :: !(IOURef Int)
 
   -- Logging
@@ -441,6 +405,12 @@ data Solver
   , svLearntLim       :: !(IORef Int)
   , svLearntLimAdjCnt :: !(IORef Int)
   , svLearntLimSeq    :: !(IORef [(Int,Int)])
+
+  -- | Amount to bump next variable with.
+  , svVarInc       :: !(IOURef Double)
+
+  -- | Amount to bump next constraint with.
+  , svConstrInc    :: !(IOURef Double)
   }
 
 markBad :: Solver -> IO ()
@@ -629,7 +599,7 @@ varActivity solver !v = do
 
 varDecayActivity :: Solver -> IO ()
 varDecayActivity solver = do
-  d <- readIOURef (svVarDecay solver)
+  d <- configVarDecay <$> getConfig solver
   modifyIOURef (svVarInc solver) (d*)
 
 varBumpActivity :: Solver -> Var -> IO ()
@@ -705,9 +675,13 @@ learntConstraints solver = do
   Solver
 --------------------------------------------------------------------}
 
--- | Create a new Solver instance.
+-- | Create a new 'Solver' instance.
 newSolver :: IO Solver
-newSolver = do
+newSolver = newSolverWithConfig def
+
+-- | Create a new 'Solver' instance with a given configulation.
+newSolverWithConfig :: Config -> IO Solver
+newSolverWithConfig config = do
  rec
   ok   <- newIORef True
   trail <- Vec.new
@@ -726,23 +700,10 @@ newSolver = do
   nlearntgc <- newIOURef 0
   nremoved  <- newIOURef 0
 
-  constrDecay <- newIOURef (1 / 0.999)
   constrInc   <- newIOURef 1
-  varDecay <- newIOURef (1 / 0.95)
   varInc   <- newIOURef 1
-  restartStrat <- newIORef def
-  restartFirst <- newIORef defaultRestartFirst
-  restartInc <- newIORef defaultRestartInc
-  learning <- newIORef def
-  learntSizeFirst <- newIORef defaultLearntSizeFirst
-  learntSizeInc <- newIORef defaultLearntSizeInc
-  ccMin <- newIORef defaultCCMin
-  checkModel <- newIORef False
-  pbHandlerType <- newIORef def
-  pbSplitClausePart <- newIORef defaultPBSplitClausePart
-  enablePhaseSaving <- newIORef defaultEnablePhaseSaving
-  enableForwardSubsumptionRemoval <- newIORef defaultEnableForwardSubsumptionRemoval
-  enableBackwardSubsumptionRemoval <- newIORef defaultEnableBackwardSubsumptionRemoval
+
+  configRef <- newIORef config
 
   learntLim       <- newIORef undefined
   learntLimAdjCnt <- newIORef (-1)
@@ -752,7 +713,6 @@ newSolver = do
   startWC    <- newIORef undefined
   lastStatWC <- newIORef undefined
 
-  randfreq <- newIORef defaultRandomFreq
   randgen  <- newIORef =<< Rand.create
 
   failed <- newIORef []
@@ -792,24 +752,7 @@ newSolver = do
         , svNRemovedConstr = nremoved
 
         -- Configulation
-        , svVarDecay    = varDecay
-        , svVarInc      = varInc
-        , svConstrDecay = constrDecay
-        , svConstrInc   = constrInc
-        , svRestartStrategy = restartStrat
-        , svRestartFirst = restartFirst
-        , svRestartInc   = restartInc
-        , svLearningStrategy = learning
-        , svLearntSizeFirst = learntSizeFirst
-        , svLearntSizeInc = learntSizeInc
-        , svCCMin = ccMin
-        , svEnablePhaseSaving = enablePhaseSaving
-        , svEnableForwardSubsumptionRemoval = enableForwardSubsumptionRemoval
-        , svPBHandlerType   = pbHandlerType
-        , svPBSplitClausePart = pbSplitClausePart
-        , svEnableBackwardSubsumptionRemoval = enableBackwardSubsumptionRemoval
-        , svCheckModel = checkModel
-        , svRandomFreq = randfreq
+        , svConfig     = configRef
         , svRandomGen  = randgen
         , svConfBudget = confBudget
 
@@ -823,6 +766,8 @@ newSolver = do
         , svLearntLim       = learntLim
         , svLearntLimAdjCnt = learntLimAdjCnt
         , svLearntLimSeq    = learntLimSeq
+        , svVarInc      = varInc
+        , svConstrInc   = constrInc
         }
  return solver
 
@@ -1109,6 +1054,7 @@ solveWith solver ls = do
 
 solve_ :: Solver -> IO Bool
 solve_ solver = do
+  config <- getConfig solver
   writeIORef (svAssumptionsImplications solver) IS.empty
 
   log solver "Solving starts ..."
@@ -1127,9 +1073,10 @@ solve_ solver = do
     nv <- getNVars solver
     Vec.resizeCapacity (svTrail solver) nv
 
-    restartStrategy <- readIORef (svRestartStrategy solver)
-    restartFirst  <- readIORef (svRestartFirst solver)
-    restartInc    <- readIORef (svRestartInc solver)
+    restartStrategy <- configRestartStrategy <$> getConfig solver
+    restartFirst  <- configRestartFirst <$> getConfig solver
+    restartInc    <- configRestartInc <$> getConfig solver
+    unless (restartInc > 1) $ error "restartInc must be >1"
     let restartSeq =
           if restartFirst > 0
           then mkRestartSeq restartStrategy restartFirst restartInc
@@ -1147,8 +1094,9 @@ solve_ solver = do
 
     cnt <- readIORef (svLearntLimAdjCnt solver)
     when (cnt == -1) $ do
-      learntSizeFirst <- readIORef (svLearntSizeFirst solver)
-      learntSizeInc   <- readIORef (svLearntSizeInc solver)
+      learntSizeFirst <- configLearntSizeFirst <$> getConfig solver
+      learntSizeInc   <- configLearntSizeInc <$> getConfig solver
+      unless (learntSizeInc > 1) $ error "learntSizeInc must be >1"
       nc <- getNConstraints solver
       let initialLearntLim = if learntSizeFirst > 0 then learntSizeFirst else max ((nc + nv) `div` 3) 16
           learntSizeSeq    = iterate (ceiling . (learntSizeInc*) . fromIntegral) initialLearntLim
@@ -1178,8 +1126,7 @@ solve_ solver = do
     endWC  <- getCurrentTime
 
     when (result == Just True) $ do
-      checkModel <- readIORef (svCheckModel solver)
-      when checkModel $ checkSatisfied solver
+      when (configCheckModel config) $ checkSatisfied solver
       constructModel solver
     unless (result == Just False) $ do
       saveAssumptionsImplications solver
@@ -1303,7 +1250,7 @@ search solver !conflict_lim onConflict = do
       else if conflict_lim > 0 && c >= conflict_lim then
         return $ Just SRRestart
       else do
-        strat <- readIORef (svLearningStrategy solver)
+        strat <- configLearningStrategy <$> getConfig solver
         case strat of
           LearningClause -> learnClause constr >> return Nothing
           LearningHybrid -> learnHybrid conflictCounter constr
@@ -1497,27 +1444,116 @@ removeConstraintHandlers solver zs = do
   Parameter settings.
 --------------------------------------------------------------------}
 
+{--------------------------------------------------------------------
+  Configulation
+--------------------------------------------------------------------}
+         
+data Config
+  = Config
+  { configRestartStrategy :: !RestartStrategy
+  , configRestartFirst :: !Int
+    -- ^ The initial restart limit. (default 100)
+    -- Zero and negative values are used to disable restart.
+  , configRestartInc :: !Double
+    -- ^ The factor with which the restart limit is multiplied in each restart. (default 1.5)
+    -- This must be @>1@.
+  , configLearningStrategy :: !LearningStrategy
+  , configLearntSizeFirst :: !Int
+    -- ^ The initial limit for learnt constraints.
+    -- Negative value means computing default value from problem instance.
+  , configLearntSizeInc :: !Double
+    -- ^ The limit for learnt constraints is multiplied with this factor periodically. (default 1.1)
+    -- This must be @>1@.                     
+  , configCCMin :: !Int
+    -- ^ Controls conflict constraint minimization (0=none, 1=local, 2=recursive)
+  , configEnablePhaseSaving :: !Bool
+  , configEnableForwardSubsumptionRemoval :: !Bool
+  , configEnableBackwardSubsumptionRemoval :: !Bool
+  , configRandomFreq :: !Double
+    -- ^ The frequency with which the decision heuristic tries to choose a random variable
+  , configPBHandlerType :: !PBHandlerType
+  , configEnablePBSplitClausePart :: !Bool
+    -- ^ Split PB-constraints into a PB part and a clause part.
+    --
+    -- Example from minisat+ paper:
+    --
+    -- * 4 x1 + 4 x2 + 4 x3 + 4 x4 + 2y1 + y2 + y3 ≥ 4
+    -- 
+    -- would be split into
+    --
+    -- * x1 + x2 + x3 + x4 + ¬z ≥ 1 (clause part)
+    --
+    -- * 2 y1 + y2 + y3 + 4 z ≥ 4 (PB part)
+    --
+    -- where z is a newly introduced variable, not present in any other constraint.
+    -- 
+    -- Reference:
+    -- 
+    -- * N . Eéen and N. Sörensson. Translating Pseudo-Boolean Constraints into SAT. JSAT 2:1–26, 2006.
+    --                               
+  , configCheckModel :: !Bool
+  , configVarDecay :: !Double
+    -- ^ Inverse of the variable activity decay factor. (default 1 / 0.95)
+  , configConstrDecay :: !Double
+    -- ^ Inverse of the constraint activity decay factor. (1 / 0.999)
+  } deriving (Show, Eq, Ord)
+
+instance Default Config where
+  def =
+    Config
+    { configRestartStrategy = def
+    , configRestartFirst = defaultRestartFirst
+    , configRestartInc = defaultRestartInc
+    , configLearningStrategy = def
+    , configLearntSizeFirst = defaultLearntSizeFirst
+    , configLearntSizeInc = defaultLearntSizeInc
+    , configCCMin = defaultCCMin
+    , configEnablePhaseSaving = defaultEnablePhaseSaving
+    , configEnableForwardSubsumptionRemoval = defaultEnableForwardSubsumptionRemoval
+    , configEnableBackwardSubsumptionRemoval = defaultEnableBackwardSubsumptionRemoval
+    , configRandomFreq = defaultRandomFreq
+    , configPBHandlerType = def
+    , configEnablePBSplitClausePart = defaultPBSplitClausePart
+    , configCheckModel = False
+    , configVarDecay = 1 / 0.95
+    , configConstrDecay = 1 / 0.999
+    }
+
+getConfig :: Solver -> IO Config
+getConfig solver = readIORef $ svConfig solver
+
+setConfig :: Solver -> Config -> IO ()
+setConfig solver = writeIORef (svConfig solver)
+
+modifyConfig :: Solver -> (Config -> Config) -> IO ()
+modifyConfig solver = modifyIORef' (svConfig solver)
+
+{-# DEPRECATED setRestartStrategy "Use setConfig" #-}
 setRestartStrategy :: Solver -> RestartStrategy -> IO ()
-setRestartStrategy solver s = writeIORef (svRestartStrategy solver) s
+setRestartStrategy solver s = modifyIORef' (svConfig solver) $ \config -> config{ configRestartStrategy = s }
 
 -- | The initial restart limit. (default 100)
 -- Zero and negative values are used to disable restart.
+{-# DEPRECATED setRestartFirst "Use setConfig" #-}
 setRestartFirst :: Solver -> Int -> IO ()
-setRestartFirst solver !n = writeIORef (svRestartFirst solver) n
+setRestartFirst solver !n = modifyIORef' (svConfig solver) $ \config -> config{ configRestartFirst = n }
 
 -- | default value for @RestartFirst@.
+{-# DEPRECATED defaultRestartFirst "Use configRestartFirst def" #-}
 defaultRestartFirst :: Int
 defaultRestartFirst = 100
 
 -- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
 -- 
 -- This must be @>1@.
+{-# DEPRECATED setRestartInc "Use setConfig" #-}
 setRestartInc :: Solver -> Double -> IO ()
 setRestartInc solver !r
-  | r > 1 = writeIORef (svRestartInc solver) r
+  | r > 1 = modifyIORef' (svConfig solver) $ \config -> config{ configRestartInc = r }
   | otherwise = error "setRestartInc: RestartInc must be >1"
 
 -- | default value for @RestartInc@.
+{-# DEPRECATED defaultRestartInc "Use configRestartInc def" #-}
 defaultRestartInc :: Double
 defaultRestartInc = 1.5
 
@@ -1532,36 +1568,43 @@ data LearningStrategy
 instance Default LearningStrategy where
   def = LearningClause
 
+{-# DEPRECATED setLearningStrategy "Use setConfig" #-}
 setLearningStrategy :: Solver -> LearningStrategy -> IO ()
-setLearningStrategy solver l = writeIORef (svLearningStrategy solver) $! l
+setLearningStrategy solver l = modifyIORef' (svConfig solver) $ \config -> config{ configLearningStrategy = l }
 
 -- | The initial limit for learnt clauses.
 -- 
 -- Negative value means computing default value from problem instance.
+{-# DEPRECATED setLearntSizeFirst "Use setConfig" #-}
 setLearntSizeFirst :: Solver -> Int -> IO ()
-setLearntSizeFirst solver !x = writeIORef (svLearntSizeFirst solver) x
+setLearntSizeFirst solver !x = modifyIORef' (svConfig solver) $ \config -> config{ configLearntSizeFirst = x }
 
 -- | default value for @LearntSizeFirst@.
+{-# DEPRECATED defaultLearntSizeFirst "Use learntSizeFirst def" #-}
 defaultLearntSizeFirst :: Int
 defaultLearntSizeFirst = -1
 
 -- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
 -- 
 -- This must be @>1@.
+{-# DEPRECATED setLearntSizeInc "Use setConfig" #-}
 setLearntSizeInc :: Solver -> Double -> IO ()
 setLearntSizeInc solver !r
-  | r > 1 = writeIORef (svLearntSizeInc solver) r
+  | r > 1 = modifyIORef' (svConfig solver) $ \config -> config{ configLearntSizeInc = r }
   | otherwise = error "setLearntSizeInc: LearntSizeInc must be >1"
 
 -- | default value for @LearntSizeInc@.
+{-# DEPRECATED defaultLearntSizeInc "Use learntSizeInc def" #-}
 defaultLearntSizeInc :: Double
 defaultLearntSizeInc = 1.1
 
 -- | Controls conflict clause minimization (0=none, 1=basic, 2=deep)
+{-# DEPRECATED setCCMin "Use setConfig" #-}
 setCCMin :: Solver -> Int -> IO ()
-setCCMin solver !v = writeIORef (svCCMin solver) v
+setCCMin solver !v = modifyIORef' (svConfig solver) $ \config -> config{ configCCMin = v }
 
 -- | default value for @CCMin@.
+{-# DEPRECATED defaultCCMin "Use ccMin def" #-}
 defaultCCMin :: Int
 defaultCCMin = 2
 
@@ -1571,15 +1614,18 @@ setVarPolarity solver v val = do
   vd <- varData solver v
   writeIORef (vdPolarity vd) val
 
+{-# DEPRECATED setCheckModel "Use setConfig" #-}
 setCheckModel :: Solver -> Bool -> IO ()
 setCheckModel solver flag = do
-  writeIORef (svCheckModel solver) flag
+  modifyIORef' (svConfig solver) $ \config -> config{ configCheckModel = flag }
 
 -- | The frequency with which the decision heuristic tries to choose a random variable
+{-# DEPRECATED setRandomFreq "Use setConfig" #-}
 setRandomFreq :: Solver -> Double -> IO ()
-setRandomFreq solver r = do
-  writeIORef (svRandomFreq solver) r
+setRandomFreq solver r =
+  modifyIORef' (svConfig solver) $ \config -> config{ configRandomFreq = r }
 
+{-# DEPRECATED defaultRandomFreq "Use configRandomFreq def" #-}
 defaultRandomFreq :: Double
 defaultRandomFreq = 0.005
 
@@ -1604,9 +1650,10 @@ data PBHandlerType = PBHandlerTypeCounter | PBHandlerTypePueblo
 instance Default PBHandlerType where
   def = PBHandlerTypeCounter
 
+{-# DEPRECATED setPBHandlerType "Use setConfig" #-}
 setPBHandlerType :: Solver -> PBHandlerType -> IO ()
 setPBHandlerType solver ht = do
-  writeIORef (svPBHandlerType solver) ht
+  modifyIORef' (svConfig solver) $ \config -> config{ configPBHandlerType = ht }
 
 -- | Split PB-constraints into a PB part and a clause part.
 --
@@ -1625,49 +1672,61 @@ setPBHandlerType solver ht = do
 -- Reference:
 -- 
 -- * N . Eéen and N. Sörensson. Translating Pseudo-Boolean Constraints into SAT. JSAT 2:1–26, 2006.
--- 
+--
+{-# DEPRECATED setPBSplitClausePart "Use setConfig" #-}
 setPBSplitClausePart :: Solver -> Bool -> IO ()
 setPBSplitClausePart solver b =
-  writeIORef (svPBSplitClausePart solver) b
+  modifyIORef' (svConfig solver) $ \config -> config{ configEnablePBSplitClausePart = b }
 
 -- | See documentation of 'setPBSplitClausePart'.
 getPBSplitClausePart :: Solver -> IO Bool
-getPBSplitClausePart solver = readIORef (svPBSplitClausePart solver)
+getPBSplitClausePart solver =
+  configEnablePBSplitClausePart <$> getConfig solver
 
 -- | See documentation of 'setPBSplitClausePart'.
+{-# DEPRECATED defaultPBSplitClausePart "Use configEnablePBSplitClausePart def" #-}
 defaultPBSplitClausePart :: Bool
 defaultPBSplitClausePart = False
 
+{-# DEPRECATED setEnablePhaseSaving "Use setConfig" #-}
 setEnablePhaseSaving :: Solver -> Bool -> IO ()
 setEnablePhaseSaving solver flag = do
-  writeIORef (svEnablePhaseSaving solver) flag
+  modifyIORef' (svConfig solver) $ \config -> config{ configEnablePhaseSaving = flag }
 
+{-# DEPRECATED getEnablePhaseSaving "Use getConfig" #-}
 getEnablePhaseSaving :: Solver -> IO Bool
 getEnablePhaseSaving solver = do
-  readIORef (svEnablePhaseSaving solver)
+  configEnablePhaseSaving <$> getConfig solver
 
+{-# DEPRECATED defaultEnablePhaseSaving "Use configEnablePhaseSaving def" #-}
 defaultEnablePhaseSaving :: Bool
 defaultEnablePhaseSaving = True
 
+{-# DEPRECATED setEnableForwardSubsumptionRemoval "Use setConfig" #-}
 setEnableForwardSubsumptionRemoval :: Solver -> Bool -> IO ()
 setEnableForwardSubsumptionRemoval solver flag = do
-  writeIORef (svEnableForwardSubsumptionRemoval solver) flag
+  modifyIORef' (svConfig solver) $ \config -> config{ configEnableForwardSubsumptionRemoval = flag }
 
+{-# DEPRECATED getEnableForwardSubsumptionRemoval "Use getConfig" #-}
 getEnableForwardSubsumptionRemoval :: Solver -> IO Bool
 getEnableForwardSubsumptionRemoval solver = do
-  readIORef (svEnableForwardSubsumptionRemoval solver)
+  configEnableForwardSubsumptionRemoval <$> getConfig solver
 
+{-# DEPRECATED defaultEnableForwardSubsumptionRemoval "Use configEnableForwardSubsumptionRemoval def" #-}
 defaultEnableForwardSubsumptionRemoval :: Bool
 defaultEnableForwardSubsumptionRemoval = False
 
+{-# DEPRECATED setEnableBackwardSubsumptionRemoval "Use setConfig" #-}
 setEnableBackwardSubsumptionRemoval :: Solver -> Bool -> IO ()
 setEnableBackwardSubsumptionRemoval solver flag = do
-  writeIORef (svEnableBackwardSubsumptionRemoval solver) flag
+  modifyIORef' (svConfig solver) $ \config -> config{ configEnableBackwardSubsumptionRemoval = flag }
 
+{-# DEPRECATED getEnableBackwardSubsumptionRemoval "Use getConfig" #-}
 getEnableBackwardSubsumptionRemoval :: Solver -> IO Bool
 getEnableBackwardSubsumptionRemoval solver = do
-  readIORef (svEnableBackwardSubsumptionRemoval solver)
+  configEnableBackwardSubsumptionRemoval <$> getConfig solver
 
+{-# DEPRECATED defaultEnableBackwardSubsumptionRemoval "Use configEnableBackwardSubsumptionRemoval def" #-}
 defaultEnableBackwardSubsumptionRemoval :: Bool
 defaultEnableBackwardSubsumptionRemoval = False
 
@@ -1679,7 +1738,7 @@ pickBranchLit :: Solver -> IO Lit
 pickBranchLit !solver = do
   gen <- readIORef (svRandomGen solver)
   let vqueue = svVarQueue solver
-  !randfreq <- readIORef (svRandomFreq solver)
+  !randfreq <- configRandomFreq <$> getConfig solver
   !size <- PQ.queueSize vqueue
   -- System.Random.random produces [0,1), but System.Random.MWC.uniform produces (0,1]
   !r <- liftM (1 -) $ Rand.uniform gen
@@ -2002,7 +2061,7 @@ pbBacktrackLevel solver (lhs, rhs) = do
 
 minimizeConflictClause :: Solver -> LitSet -> IO LitSet
 minimizeConflictClause solver lits = do
-  ccmin <- readIORef (svCCMin solver)
+  ccmin <- configCCMin <$> getConfig solver
   if ccmin >= 2 then
     minimizeConflictClauseRecursive solver lits
   else if ccmin >= 1 then
@@ -2163,7 +2222,7 @@ saveAssumptionsImplications solver = do
 
 constrDecayActivity :: Solver -> IO ()
 constrDecayActivity solver = do
-  d <- readIOURef (svConstrDecay solver)
+  d <- configConstrDecay <$> getConfig solver
   modifyIOURef (svConstrInc solver) (d*)
 
 constrBumpActivity :: ConstraintHandler a => Solver -> a -> IO ()
@@ -3000,7 +3059,7 @@ basicAttachAtLeastHandler solver this = do
 
 newPBHandler :: Solver -> PBLinSum -> Integer -> Bool -> IO SomeConstraintHandler
 newPBHandler solver ts degree learnt = do
-  config <- readIORef (svPBHandlerType solver)
+  config <- configPBHandlerType <$> getConfig solver
   case config of
     PBHandlerTypeCounter -> do
       c <- newPBHandlerCounter ts degree learnt

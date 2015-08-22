@@ -35,7 +35,7 @@ solve cxt solver = solveWBO (C.normalize cxt) solver
 
 solveWBO :: C.Context cxt => cxt -> SAT.Solver -> IO ()
 solveWBO cxt solver = do
-  SAT.setEnableBackwardSubsumptionRemoval solver True
+  SAT.modifyConfig solver $ \config -> config{ SAT.configEnableBackwardSubsumptionRemoval = True }
   let sels0 = [(-v, c) | (c,v) <- C.getObjectiveFunction cxt]
   loop 0 (IntMap.fromList sels0)
   where
