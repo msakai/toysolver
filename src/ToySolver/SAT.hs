@@ -34,6 +34,7 @@ module ToySolver.SAT
   -- * The @Solver@ type
     Solver
   , newSolver
+  , newSolverWithConfig
 
   -- * Basic data structures
   , Var
@@ -674,9 +675,13 @@ learntConstraints solver = do
   Solver
 --------------------------------------------------------------------}
 
--- | Create a new Solver instance.
+-- | Create a new 'Solver' instance.
 newSolver :: IO Solver
-newSolver = do
+newSolver = newSolverWithConfig def
+
+-- | Create a new 'Solver' instance with a given configulation.
+newSolverWithConfig :: Config -> IO Solver
+newSolverWithConfig config = do
  rec
   ok   <- newIORef True
   trail <- Vec.new
@@ -698,7 +703,7 @@ newSolver = do
   constrInc   <- newIOURef 1
   varInc   <- newIOURef 1
 
-  configRef <- newIORef def
+  configRef <- newIORef config
 
   learntLim       <- newIORef undefined
   learntLimAdjCnt <- newIORef (-1)

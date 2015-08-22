@@ -446,8 +446,7 @@ putOLine  s = do
 
 newSolver :: Options -> IO SAT.Solver
 newSolver opts = do
-  solver <- SAT.newSolver
-  SAT.setConfig solver (optSATConfig opts)
+  solver <- SAT.newSolverWithConfig (optSATConfig opts)
   SAT.setLogger solver putCommentLine
   case optRandomSeed opts of
     Nothing -> SAT.setRandomGen solver =<< Rand.createSystemRandom

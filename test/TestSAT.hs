@@ -1382,8 +1382,7 @@ arbitrarySolver = do
   seed <- QM.pick arbitrary
   config <- QM.pick arbitrary
   QM.run $ do
-    solver <- newSolver
-    setConfig solver config{ configCheckModel = True }
+    solver <- newSolverWithConfig config{ configCheckModel = True }
     setRandomGen solver =<< Rand.initialize (V.singleton seed)
     return solver
 
