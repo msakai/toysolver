@@ -59,6 +59,7 @@ Extra-Source-Files:
    samples/programs/knapsack/*.txt
    samples/programs/htc/test1.dat
    samples/programs/htc/test2.dat
+   samples/programs/svm2lp/a1a
    test/TestAReal2.hs
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
@@ -439,6 +440,21 @@ Executable htc
   Build-Depends:
     base,
     containers,
+    toysolver
+  Default-Language: Haskell2010
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
+
+Executable svm2lp
+  If !flag(BuildSamplePrograms)
+    Buildable: False
+  Main-is: svm2lp.hs
+  HS-Source-Dirs: samples/programs/svm2lp
+  Build-Depends:
+    base,
+    containers,
+    data-default-class,
+    split,
     toysolver
   Default-Language: Haskell2010
   if flag(LinuxStatic)
