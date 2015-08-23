@@ -159,7 +159,7 @@ parser :: Parser MIP.Problem
 parser = do
   many commentline
 
-  _name <- nameSection
+  name <- nameSection
 
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_objsen.html
   -- CPLEX extends the MPS standard by allowing two additional sections: OBJSEN and OBJNAME.
@@ -313,7 +313,8 @@ parser = do
 
   let mip =
         MIP.Problem
-        { MIP.objectiveFunction     = def
+        { MIP.name                  = name
+        , MIP.objectiveFunction     = def
             { MIP.objDir = objdir
             , MIP.objLabel = Just (unintern objrow)
             , MIP.objExpr = MIP.Expr $ [MIP.Term c [col] | (col,m) <- Map.toList cols, c <- maybeToList (Map.lookup objrow m)] ++ qobj
@@ -590,7 +591,7 @@ render mip = Right $ execM $ render' $ nameRows mip
 
 render' :: MIP.Problem -> M ()
 render' mip = do
-  let probName = ""
+  let probName = fromMaybe "" (MIP.name mip)
 
   -- NAME section
   -- The name starts in column 15 in fixed formats.

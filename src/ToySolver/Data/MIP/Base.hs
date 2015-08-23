@@ -63,7 +63,8 @@ import Data.OptDir
 -- | Problem
 data Problem
   = Problem
-  { objectiveFunction :: ObjectiveFunction
+  { name :: Maybe String
+  , objectiveFunction :: ObjectiveFunction
   , constraints :: [Constraint]
   , sosConstraints :: [SOSConstraint]
   , userCuts :: [Constraint]
@@ -74,7 +75,8 @@ data Problem
 
 instance Default Problem where
   def = Problem
-        { objectiveFunction = def
+        { name = Nothing
+        , objectiveFunction = def
         , constraints = []
         , sosConstraints = []
         , userCuts = []

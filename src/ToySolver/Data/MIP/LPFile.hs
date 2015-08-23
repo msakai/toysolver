@@ -119,6 +119,10 @@ reserved = Set.fromList
 -- | LP file parser
 parser :: Parser MIP.Problem
 parser = do
+  name <- optionMaybe $ try $ do
+    spaces
+    string' "\\* Problem: " 
+    manyTill anyChar (try (string " *\\\n"))
   sep
   obj <- problem
 
@@ -150,7 +154,8 @@ parser = do
       isSemi v = v `Set.member` scs
   return $
     MIP.Problem
-    { MIP.objectiveFunction = obj
+    { MIP.name              = name
+    , MIP.objectiveFunction = obj
     , MIP.constraints       = [c | Left c <- cs]
     , MIP.userCuts          = [c | Right c <- cs]
     , MIP.sosConstraints    = ss
@@ -443,6 +448,10 @@ writeVar v = writeString $ MIP.fromVar v
 
 render' :: MIP.Problem -> M ()
 render' mip = do
+  case MIP.name mip of
+    Just name -> writeString $ "\\* Problem: " ++ name ++ " *\\\n"
+    Nothing -> return ()
+
   let obj = MIP.objectiveFunction mip   
   
   writeString $
