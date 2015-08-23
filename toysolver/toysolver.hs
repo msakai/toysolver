@@ -149,14 +149,23 @@ run solver opt mip printModel = do
     cs2 = do
       MIP.Constraint
         { MIP.constrIndicator = ind
-        , MIP.constrBody = (lhs, rel, rhs)
+        , MIP.constrExpr = e
+        , MIP.constrLB = lb
+        , MIP.constrUB = ub
         } <- MIP.constraints mip
-      let rel2 = case rel of
-                  MIP.Ge  -> Ge
-                  MIP.Le  -> Le
-                  MIP.Eql -> Eql
       case ind of
-        Nothing -> return (ArithRel (compileE lhs) rel2 (Const rhs))
+        Nothing -> do
+          let e2 = compileE e
+          msum
+            [ case lb of
+                MIP.NegInf -> []
+                MIP.PosInf -> [ArithRel 1 Le 0] -- False
+                MIP.Finite x -> [ArithRel e2 Ge (Const x)]
+            , case ub of
+                MIP.NegInf -> [ArithRel 1 Le 0] -- False
+                MIP.PosInf -> []
+                MIP.Finite x -> [ArithRel e2 Le (Const x)]
+            ]
         Just _ -> error "indicator constraint is not supported yet"
 
     ivs

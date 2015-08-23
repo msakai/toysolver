@@ -131,7 +131,9 @@ data Constraint
   = Constraint
   { constrLabel     :: Maybe Label
   , constrIndicator :: Maybe (Var, Rational)
-  , constrBody      :: (Expr, RelOp, Rational)
+  , constrExpr      :: Expr
+  , constrLB        :: BoundExpr
+  , constrUB        :: BoundExpr
   , constrIsLazy    :: Bool
   }
   deriving (Eq, Ord, Show)
@@ -140,7 +142,9 @@ instance Default Constraint where
   def = Constraint
         { constrLabel = Nothing
         , constrIndicator = Nothing
-        , constrBody = (0, Le, 0)
+        , constrExpr = 0
+        , constrLB = -inf
+        , constrUB = inf
         , constrIsLazy = False
         }
 
@@ -210,8 +214,7 @@ instance Variables ObjectiveFunction where
   vars ObjectiveFunction{ objExpr = e } = vars e
 
 instance Variables Constraint where
-  vars Constraint{ constrIndicator = ind, constrBody = (lhs, _, _) } =
-    vars lhs `Set.union` vs2
+  vars Constraint{ constrIndicator = ind, constrExpr = e } = Set.union (vars e) vs2
     where
       vs2 = maybe Set.empty (Set.singleton . fst) ind
 

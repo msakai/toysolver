@@ -834,28 +834,34 @@ solveMIP opt solver mip = do
 
     putCommentLine "Loading constraints"
     forM_ (MIP.constraints mip) $ \c -> do
-      let indicator      = MIP.constrIndicator c
-          (lhs, op, rhs) = MIP.constrBody c
-      let d = foldl' lcm 1 (map denominator  (rhs:[r | MIP.Term r _ <- MIP.terms lhs]))
-          lhs' = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms lhs]
-          rhs' = asInteger (rhs * fromIntegral d)
-      case indicator of
-        Nothing ->
-          case op of
-            MIP.Le  -> Integer.addConstraint enc $ lhs' .<=. fromInteger rhs'
-            MIP.Ge  -> Integer.addConstraint enc $ lhs' .>=. fromInteger rhs'
-            MIP.Eql -> Integer.addConstraint enc $ lhs' .==. fromInteger rhs'
-        Just (var, val) -> do
-          let var' = asBin (vmap Map.! var)
-              f sel = do
-                case op of
-                  MIP.Le  -> Integer.addConstraintSoft enc sel $ lhs' .<=. fromInteger rhs'
-                  MIP.Ge  -> Integer.addConstraintSoft enc sel $ lhs' .>=. fromInteger rhs'
-                  MIP.Eql -> Integer.addConstraintSoft enc sel $ lhs' .==. fromInteger rhs'
-          case val of
-            1 -> f var'
-            0 -> f (SAT.litNot var')
-            _ -> return ()
+      let lhs = MIP.constrExpr c                            
+      let f op rhs = do
+            let d = foldl' lcm 1 (map denominator  (rhs:[r | MIP.Term r _ <- MIP.terms lhs]))
+                lhs' = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms lhs]
+                rhs' = asInteger (rhs * fromIntegral d)
+                c2 = case op of
+                       MIP.Le  -> lhs' .<=. fromInteger rhs'
+                       MIP.Ge  -> lhs' .>=. fromInteger rhs'
+                       MIP.Eql -> lhs' .==. fromInteger rhs'
+            case MIP.constrIndicator c of
+              Nothing -> Integer.addConstraint enc c2
+              Just (var, val) -> do
+                let var' = asBin (vmap Map.! var)
+                case val of
+                  1 -> Integer.addConstraintSoft enc var' c2
+                  0 -> Integer.addConstraintSoft enc (SAT.litNot var') c2
+                  _ -> return ()
+      case (MIP.constrLB c, MIP.constrUB c) of
+        (MIP.Finite x1, MIP.Finite x2) | x1==x2 -> f MIP.Eql x2
+        (lb, ub) -> do
+          case lb of
+            MIP.NegInf -> return ()
+            MIP.Finite x -> f MIP.Ge x
+            MIP.PosInf -> SAT.addClause solver []
+          case ub of
+            MIP.NegInf -> SAT.addClause solver []
+            MIP.Finite x -> f MIP.Le x
+            MIP.PosInf -> return ()
 
     putCommentLine "Loading SOS constraints"
     forM_ (MIP.sosConstraints mip) $ \MIP.SOSConstraint{ MIP.sosType = typ, MIP.sosBody = xs } -> do

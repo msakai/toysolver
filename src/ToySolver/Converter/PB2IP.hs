@@ -44,12 +44,11 @@ convert formula = (mip, mtrans (PBFile.pbNumVars formula))
 
     cs2 = do
       (lhs,op,rhs) <- PBFile.pbConstraints formula
-      let op2 = case op of
-                  PBFile.Ge -> MIP.Ge
-                  PBFile.Eq -> MIP.Eql
-          (lhs2,c) = splitConst $ convExpr lhs
+      let (lhs2,c) = splitConst $ convExpr lhs
           rhs2 = fromIntegral rhs - c
-      return $ def{ MIP.constrBody = (lhs2, op2, rhs2) }
+      return $ case op of
+        PBFile.Ge -> def{ MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2 }
+        PBFile.Eq -> def{ MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2, MIP.constrUB = MIP.Finite rhs2 }
 
 convExpr :: PBFile.Sum -> MIP.Expr
 convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
@@ -84,7 +83,7 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
      case PBFile.wboTopCost formula of
        Nothing -> []
        Just t ->
-          [ def{ MIP.constrBody = (MIP.objExpr obj2, MIP.Le, fromInteger t - 1) } ]
+          [ def{ MIP.constrExpr = MIP.objExpr obj2, MIP.constrUB = MIP.Finite (fromInteger t - 1) } ]
 
     cs2 :: [([(Integer, MIP.Var)], MIP.Constraint)]
     cs2 = do
@@ -97,24 +96,20 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
               Nothing -> ([], Nothing)
               Just w2 -> ([(w2,v)], Just (v,0))
       if isNothing w || useIndicator then do
-         let op2 =
+         let c =
                case op of
-                 PBFile.Ge -> MIP.Ge
-                 PBFile.Eq -> MIP.Eql
-             c = def
-                 { MIP.constrIndicator = ind
-                 , MIP.constrBody      = (lhs2, op2, rhs2)
-                 }
+                 PBFile.Ge -> def{ MIP.constrIndicator = ind, MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2 }
+                 PBFile.Eq -> def{ MIP.constrIndicator = ind, MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2, MIP.constrUB = MIP.Finite rhs2 }
          return (ts, c)
       else do
          let (lhsGE,rhsGE) = relaxGE v (lhs2,rhs2)
-             c1 = def{ MIP.constrBody = (lhsGE, MIP.Ge, rhsGE) }
+             c1 = def{ MIP.constrExpr = lhsGE, MIP.constrLB = MIP.Finite rhsGE }
          case op of
            PBFile.Ge -> do
              return (ts, c1)
            PBFile.Eq -> do
              let (lhsLE,rhsLE) = relaxLE v (lhs2,rhs2)
-                 c2 = def{ MIP.constrBody = (lhsLE, MIP.Le, rhsLE) }
+                 c2 = def{ MIP.constrExpr = lhsLE, MIP.constrUB = MIP.Finite rhsLE }
              [ (ts, c1), ([], c2) ]
 
 splitConst :: MIP.Expr -> (MIP.Expr, Rational)
