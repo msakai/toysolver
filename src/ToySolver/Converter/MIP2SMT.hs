@@ -162,6 +162,20 @@ realNum opt r =
             Just s  -> showString s
             Nothing -> list [showChar '/', shows (numerator r) . showString ".0", shows (denominator r) . showString ".0"]
 
+rel2 :: Options -> Env -> MIP.Problem -> Bool -> MIP.BoundExpr -> MIP.Expr -> MIP.BoundExpr -> ShowS
+rel2 opt env mip q lb e ub = and' (c1 ++ c2)
+  where
+    c1 =
+      case lb of
+        MIP.NegInf -> []
+        MIP.Finite x -> [rel opt env mip q MIP.Ge e x]
+        MIP.PosInf -> [showString "false"]
+    c2 =
+      case ub of
+        MIP.NegInf -> [showString "false"]
+        MIP.Finite x -> [rel opt env mip q MIP.Le e x]
+        MIP.PosInf -> []
+
 rel :: Options -> Env -> MIP.Problem -> Bool -> MIP.RelOp -> MIP.Expr -> Rational -> ShowS
 rel opt env mip q op lhs rhs
   | and [isInt mip v | v <- Set.toList (MIP.vars lhs)] &&
@@ -199,10 +213,12 @@ constraint opt q env mip
   MIP.Constraint
   { MIP.constrLabel     = label
   , MIP.constrIndicator = g
-  , MIP.constrBody      = (e, op, b)
+  , MIP.constrExpr = e
+  , MIP.constrLB = lb
+  , MIP.constrUB = ub
   } = (c1, label)
   where
-    c0 = rel opt env mip q op e b
+    c0 = rel2 opt env mip q lb e ub
     c1 = case g of
            Nothing -> c0
            Just (var,val) ->

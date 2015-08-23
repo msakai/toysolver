@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, BangPatterns #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
@@ -31,6 +31,7 @@ module ToySolver.Data.MIP.LPFile
 import Control.Applicative ((<*))
 import Control.Monad
 import Control.Monad.Writer
+import Control.Monad.ST
 import Data.Char
 import Data.Default.Class
 import Data.List
@@ -40,6 +41,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.STRef
 import Data.OptDir
 import Text.Parsec hiding (label)
 import Text.Parsec.String
@@ -209,11 +211,20 @@ constraint isLazy = do
   e <- expr
   op <- relOp
   s <- option 1 sign
-  rhs <- number
+  rhs <- liftM (s*) number
+
+  let (lb,ub) =
+        case op of
+          MIP.Le -> (MIP.NegInf, MIP.Finite rhs)
+          MIP.Ge -> (MIP.Finite rhs, MIP.PosInf)
+          MIP.Eql -> (MIP.Finite rhs, MIP.Finite rhs)
+         
   return $ MIP.Constraint
     { MIP.constrLabel     = name
     , MIP.constrIndicator = g
-    , MIP.constrBody      = (e, op, s*rhs)
+    , MIP.constrExpr      = e
+    , MIP.constrLB        = lb
+    , MIP.constrUB        = ub
     , MIP.constrIsLazy    = isLazy
     }
 
@@ -425,7 +436,7 @@ writeChar c = tell $ showChar c
 
 -- | Render a problem into a string.
 render :: MIP.Problem -> Either String String
-render mip = Right $ execM $ render' $ removeEmptyExpr mip
+render mip = Right $ execM $ render' $ normalize mip
 
 writeVar :: MIP.Var -> M ()
 writeVar v = writeString $ MIP.fromVar v
@@ -565,7 +576,7 @@ renderOp MIP.Ge = writeString ">="
 renderOp MIP.Eql = writeString "="
 
 renderConstraint :: MIP.Constraint -> M ()
-renderConstraint c@MIP.Constraint{ MIP.constrBody = (e,op,val) }  = do
+renderConstraint c@MIP.Constraint{ MIP.constrExpr = e, MIP.constrLB = lb, MIP.constrUB = ub } = do
   renderLabel (MIP.constrLabel c)
   case MIP.constrIndicator c of
     Nothing -> return ()
@@ -577,6 +588,12 @@ renderConstraint c@MIP.Constraint{ MIP.constrBody = (e,op,val) }  = do
 
   renderExpr False e
   writeChar ' '
+  let (op, val) =
+        case (lb, ub) of
+          (MIP.NegInf, MIP.Finite x) -> (MIP.Le, x)
+          (MIP.Finite x, MIP.PosInf) -> (MIP.Ge, x)
+          (MIP.Finite x1, MIP.Finite x2) | x1==x2 -> (MIP.Eql, x1)
+          _ -> error "ToySolver.Data.MIP.LPFile.renderConstraint: should not happen"
   renderOp op
   writeChar ' '
   writeString $ showValue val
@@ -613,6 +630,50 @@ compileExpr e = do
 
 -- ---------------------------------------------------------------------------
 
+normalize :: MIP.Problem -> MIP.Problem
+normalize = removeEmptyExpr . removeRangeConstraints
+
+removeRangeConstraints :: MIP.Problem -> MIP.Problem
+removeRangeConstraints prob = runST $ do
+  vsRef <- newSTRef $ MIP.variables prob
+  cntRef <- newSTRef (0::Int)
+  newvsRef <- newSTRef []
+            
+  let gensym = do
+        vs <- readSTRef vsRef
+        let loop !c = do
+              let v = MIP.toVar ("~r_" ++ show c)
+              if v `Set.member` vs then
+                loop (c+1)
+              else do
+                writeSTRef cntRef $! c+1
+                modifySTRef vsRef (Set.insert v)
+                return v
+        loop =<< readSTRef cntRef
+
+  cs2 <- forM (MIP.constraints prob) $ \c -> do
+    case (MIP.constrLB c, MIP.constrUB c) of
+      (MIP.NegInf, MIP.Finite _) -> return c
+      (MIP.Finite _, MIP.PosInf) -> return c
+      (MIP.Finite x1, MIP.Finite x2) | x1 == x2 -> return c
+      (lb, ub) -> do
+        v <- gensym
+        modifySTRef newvsRef ((v, (lb,ub)) :)
+        return $
+          c
+          { MIP.constrExpr = MIP.constrExpr c - MIP.varExpr v
+          , MIP.constrLB = 0
+          , MIP.constrUB = 0
+          }
+
+  newvs <- liftM reverse $ readSTRef newvsRef
+  return $
+    prob
+    { MIP.constraints = cs2
+    , MIP.varType = MIP.varType prob `Map.union` Map.fromList [(v, MIP.ContinuousVariable) | (v,_) <- newvs]
+    , MIP.varBounds = MIP.varBounds prob `Map.union` (Map.fromList newvs)
+    }
+          
 removeEmptyExpr :: MIP.Problem -> MIP.Problem
 removeEmptyExpr prob =
   prob
@@ -628,7 +689,5 @@ removeEmptyExpr prob =
 
     convertConstr constr =
       constr
-      { MIP.constrBody =
-          case MIP.constrBody constr of
-            (lhs,op,rhs) -> (convertExpr lhs, op, rhs)
+      { MIP.constrExpr = convertExpr $ MIP.constrExpr constr
       }
