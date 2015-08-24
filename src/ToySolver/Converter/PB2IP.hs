@@ -23,6 +23,7 @@ import qualified Data.Map as Map
 
 import qualified Data.PseudoBoolean as PBFile
 import qualified ToySolver.Data.MIP as MIP
+import ToySolver.Data.MIP ((.==.), (.<=.), (.>=.))
 import qualified ToySolver.SAT.Types as SAT
 
 convert :: PBFile.Formula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
@@ -98,18 +99,18 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
       if isNothing w || useIndicator then do
          let c =
                case op of
-                 PBFile.Ge -> def{ MIP.constrIndicator = ind, MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2 }
-                 PBFile.Eq -> def{ MIP.constrIndicator = ind, MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2, MIP.constrUB = MIP.Finite rhs2 }
+                 PBFile.Ge -> (lhs2 .>=. MIP.constExpr rhs2) { MIP.constrIndicator = ind }
+                 PBFile.Eq -> (lhs2 .==. MIP.constExpr rhs2) { MIP.constrIndicator = ind }
          return (ts, c)
       else do
          let (lhsGE,rhsGE) = relaxGE v (lhs2,rhs2)
-             c1 = def{ MIP.constrExpr = lhsGE, MIP.constrLB = MIP.Finite rhsGE }
+             c1 = lhsGE .>=. MIP.constExpr rhsGE
          case op of
            PBFile.Ge -> do
              return (ts, c1)
            PBFile.Eq -> do
              let (lhsLE,rhsLE) = relaxLE v (lhs2,rhs2)
-                 c2 = def{ MIP.constrExpr = lhsLE, MIP.constrUB = MIP.Finite rhsLE }
+                 c2 = lhsLE .<=. MIP.constExpr rhsLE
              [ (ts, c1), ([], c2) ]
 
 splitConst :: MIP.Expr -> (MIP.Expr, Rational)

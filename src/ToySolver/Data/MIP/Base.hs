@@ -22,6 +22,9 @@ module ToySolver.Data.MIP.Base
   , OptDir (..)
   , ObjectiveFunction (..)
   , Constraint (..)
+  , (.==.)
+  , (.<=.)
+  , (.>=.)
   , Bounds
   , Label
   , Var
@@ -57,6 +60,8 @@ import Data.Interned (intern, unintern)
 import Data.Interned.String
 import Data.ExtendedReal
 import Data.OptDir
+
+infix 4 .<=., .>=., .==.
 
 -- ---------------------------------------------------------------------------
 
@@ -140,6 +145,27 @@ data Constraint
   }
   deriving (Eq, Ord, Show)
 
+(.==.) :: Expr -> Expr -> Constraint
+lhs .==. rhs =
+  case splitConst (lhs - rhs) of
+    (e, c) -> def{ constrExpr = e, constrLB = Finite (- c), constrUB = Finite (- c) }
+
+(.<=.) :: Expr -> Expr -> Constraint
+lhs .<=. rhs =
+  case splitConst (lhs - rhs) of
+    (e, c) -> def{ constrExpr = e, constrUB = Finite (- c) }
+
+(.>=.) :: Expr -> Expr -> Constraint
+lhs .>=. rhs =
+  case splitConst (lhs - rhs) of
+    (e, c) -> def{ constrExpr = e, constrLB = Finite (- c) }
+
+splitConst :: Expr -> (Expr, Rational)
+splitConst e = (e2, c)
+  where
+    e2 = Expr [t | t@(Term _ (_:_)) <- terms e]
+    c = sum [c | Term c [] <- terms e]
+    
 instance Default Constraint where
   def = Constraint
         { constrLabel = Nothing

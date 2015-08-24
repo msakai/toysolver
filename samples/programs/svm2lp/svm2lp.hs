@@ -8,6 +8,7 @@ import Data.Maybe
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
+import ToySolver.Data.MIP ((.==.), (.>=.))
 import qualified ToySolver.Data.MIP as MIP
 import System.Console.GetOpt
 import System.Environment
@@ -37,14 +38,11 @@ primal c prob
          sum [MIP.constExpr (realToFrac (fromJust c)) * xi_i | isJust c, xi_i <- fmap MIP.varExpr xi]
       }
   , MIP.constraints =
-      [ def{ MIP.constrExpr =
-               MIP.Expr (IntMap.elems (IntMap.intersectionWith (\w_j xs_ij -> MIP.Term (fromIntegral y_i * realToFrac xs_ij) [w_j]) w xs_i))
-                 - (MIP.constExpr (fromIntegral y_i) *  MIP.varExpr b - (if isJust c then MIP.varExpr xi_i else 0))
-           , MIP.constrLB = 1
-           }
+      [ MIP.constExpr (fromIntegral y_i) * (IntMap.map MIP.varExpr w `dot` IntMap.map (MIP.constExpr . realToFrac) xs_i - MIP.varExpr b)
+        .>=. 1 - (if isJust c then MIP.varExpr xi_i else 0)
       | ((y_i, xs_i), xi_i) <- zip prob xi
       ]
-  , MIP.varType = Map.fromList [(x, MIP.ContinuousVariable) | x <- b  : [w_j | w_j <- IntMap.elems w] ++ [xi_i | isJust c, xi_i <- xi]]
+  , MIP.varType = Map.fromList [(x, MIP.ContinuousVariable) | x <- b : [w_j | w_j <- IntMap.elems w] ++ [xi_i | isJust c, xi_i <- xi]]
   , MIP.varBounds =
       Map.unions
       [ Map.singleton b (MIP.NegInf, MIP.PosInf)
@@ -76,11 +74,7 @@ dual c kernel prob
           ]
       }
   , MIP.constraints =
-      [ def{ MIP.constrExpr = MIP.Expr [ MIP.Term (fromIntegral y_i) [a_i]  | ((y_i, _xs_i), a_i) <- zip prob a]
-           , MIP.constrLB = 0
-           , MIP.constrUB = 0
-           }
-      ]
+      [ MIP.Expr [ MIP.Term (fromIntegral y_i) [a_i] | ((y_i, _xs_i), a_i) <- zip prob a ] .==. 0 ]
   , MIP.varType = Map.fromList [(a_i, MIP.ContinuousVariable) | a_i <- a]
   , MIP.varBounds = Map.fromList [(a_i, (0, if isJust c then MIP.Finite (realToFrac (fromJust c)) else MIP.PosInf)) | a_i <- a]
   }
@@ -88,7 +82,7 @@ dual c kernel prob
     m = length prob
     a = [MIP.toVar ("a_" ++ show i) | i <- [1..m]]
 
-dot :: IntMap Double -> IntMap Double -> Double
+dot :: Num a => IntMap a -> IntMap a -> a
 dot a b = sum $ IntMap.elems $ IntMap.intersectionWith (*) a b
 
 gaussian :: Double -> IntMap Double -> IntMap Double -> Double
@@ -165,7 +159,7 @@ main = do
                    else primal (optC opt) svm
                  "gaussian" -> do
                    case optGamma opt of
-                     Nothing -> error "--gamma must be specified"
+                     Nothing -> error "--gamma= must be specified"
                      Just gamma -> dual (optC opt) (gaussian gamma) svm
                  _ -> error $ "unknown kernel: "  ++ optKernel opt
           case MIP.toLPString mip of
@@ -173,4 +167,4 @@ main = do
               hPutStrLn stderr err
               exitFailure
             Right s -> do
-              putStrLn s
+              putStr s
