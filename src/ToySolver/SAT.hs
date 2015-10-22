@@ -1818,7 +1818,7 @@ deduceB solver = loop
           case ret of
             Just _ -> return ret
             Nothing -> do
-              ret <- processVar (litVar lit)
+              ret <- processVar lit
               case ret of
                 Just _ -> return ret
                 Nothing -> loop
