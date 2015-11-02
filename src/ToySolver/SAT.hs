@@ -3737,7 +3737,8 @@ instance ConstraintHandler TheoryHandler where
 
   constrReasonOf solver _this l = do
     Just t <- readIORef (svTheorySolver solver)
-    thExplain t l
+    lits <- thExplain t l
+    return $ [-lit | lit <- lits]
 
   constrOnUnassigned _solver _this _this2 _lit = return ()
 

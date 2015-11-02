@@ -279,9 +279,7 @@ newTheorySolver cnf@(nv,cs) = do
             solveWith solver xs
         , thExplain = \m -> do
             case m of
-              Nothing -> do
-                ls <- getFailedAssumptions solver
-                return [-l | l <- ls]
+              Nothing -> getFailedAssumptions solver
               Just _ -> return []
         , thPushBacktrackPoint = modifyIORef ref ([] :)
         , thPopBacktrackPoint = modifyIORef ref tail
