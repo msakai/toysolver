@@ -8,6 +8,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Maybe
 import Data.VectorSpace
 
 import Test.Tasty
@@ -447,6 +448,34 @@ prop_Simplex2_backtrack = QM.monadicIO $ do
        return $ QM.assert ret2
      else do
        return $ return ()
+
+prop_Simplex2_explain :: Property
+prop_Simplex2_explain = QM.monadicIO $ do
+   (vs,cs) <- QM.pick genQFLAConj
+
+   let f p = QM.run $ do
+         solver <- Simplex2.newSolver
+         m <- liftM IM.fromList $ forM (IS.toList vs) $ \v -> do
+           v2 <- Simplex2.newVar solver
+           return (v, LA.var v2)
+         forM (zip [0..] cs) $ \(i,c) -> do
+           when (p i) $
+             Simplex2.assertAtomEx' solver (LA.applySubstAtom m c) (Just i)
+         ret <- Simplex2.check solver
+         if ret then do
+           return Nothing
+         else do
+           liftM Just $ Simplex2.explain solver
+
+   ret <- f (const True)
+   case ret of
+     Nothing -> return ()
+     Just e -> do
+       ret2 <- f (`IS.member` e)
+       QM.assert (ret2 == Just e)
+       forM_ (IS.toList e) $ \i -> do
+         ret3 <- f (`IS.member` (IS.delete i e))
+         QM.assert (isNothing ret3)
 
 ------------------------------------------------------------------------
 

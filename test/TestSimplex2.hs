@@ -183,25 +183,25 @@ case_AssertAtom = do
   x0 <- newVar solver
   assertAtom solver (LA.constant 1 .<=. LA.var x0)
   ret <- getLB solver x0
-  ret @?= Just 1
+  boundValue ret @?= Just 1
 
   solver <- newSolver
   x0 <- newVar solver
   assertAtom solver (LA.var x0 .>=. LA.constant 1)
   ret <- getLB solver x0
-  ret @?= Just 1
+  boundValue ret @?= Just 1
 
   solver <- newSolver
   x0 <- newVar solver
   assertAtom solver (LA.constant 1 .>=. LA.var x0)
   ret <- getUB solver x0
-  ret @?= Just 1
+  boundValue ret @?= Just 1
 
   solver <- newSolver
   x0 <- newVar solver
   assertAtom solver (LA.var x0 .<=. LA.constant 1)
   ret <- getUB solver x0
-  ret @?= Just 1
+  boundValue ret @?= Just 1
 
 ------------------------------------------------------------------------
 

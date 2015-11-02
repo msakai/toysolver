@@ -41,10 +41,16 @@ module ToySolver.Arith.Simplex2
   , RelOp (..)
   , (.<=.), (.>=.), (.==.), (.<.), (.>.)
   , Atom (..)
+  , ConstrID
+  , ConstrIDSet
   , assertAtom
+  , assertAtom'
   , assertAtomEx
+  , assertAtomEx'
   , assertLower
+  , assertLower'
   , assertUpper
+  , assertUpper'
   , setObj
   , getObj
   , OptDir (..)
@@ -67,6 +73,7 @@ module ToySolver.Arith.Simplex2
   , getRawModel
   , getValue
   , getObjValue
+  , explain
 
   -- * Reading status
   , getTableau
@@ -80,6 +87,9 @@ module ToySolver.Arith.Simplex2
   , isOptimal
   , getLB
   , getUB
+  , Bound
+  , boundValue
+  , boundExplanation
 
   -- * Configulation
   , setLogger
@@ -99,11 +109,14 @@ import Data.Ord
 import Data.IORef
 import Data.List
 import Data.Maybe
+import Data.Monoid
 import Data.Ratio
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Text.Printf
 import Data.Time
 import Data.OptDir
@@ -125,9 +138,10 @@ type Var = Int
 data GenericSolver v
   = GenericSolver
   { svTableau :: !(IORef (IntMap (LA.Expr Rational)))
-  , svLB      :: !(IORef (IntMap v))
-  , svUB      :: !(IORef (IntMap v))
+  , svLB      :: !(IORef (IntMap (v, ConstrIDSet)))
+  , svUB      :: !(IORef (IntMap (v, ConstrIDSet)))
   , svModel   :: !(IORef (IntMap v))
+  , svExplanation :: !(IORef ConstrIDSet)
   , svVCnt    :: !(IORef Int)
   , svOk      :: !(IORef Bool)
   , svOptDir  :: !(IORef OptDir)
@@ -153,6 +167,7 @@ newSolver = do
   l <- newIORef IntMap.empty
   u <- newIORef IntMap.empty
   m <- newIORef (IntMap.singleton objVar zeroV)
+  e <- newIORef mempty
   v <- newIORef 0
   ok <- newIORef True
   dir <- newIORef OptMin
@@ -167,6 +182,7 @@ newSolver = do
     , svLB      = l
     , svUB      = u
     , svModel   = m
+    , svExplanation = e
     , svVCnt    = v
     , svOk      = ok
     , svOptDir  = dir
@@ -183,6 +199,7 @@ cloneSolver solver = do
   l      <- newIORef =<< readIORef (svLB solver)
   u      <- newIORef =<< readIORef (svUB solver)
   m      <- newIORef =<< readIORef (svModel solver)
+  e      <- newIORef =<< readIORef (svExplanation solver)
   v      <- newIORef =<< readIORef (svVCnt solver)
   ok     <- newIORef =<< readIORef (svOk solver)
   dir    <- newIORef =<< readIORef (svOptDir solver)
@@ -197,6 +214,7 @@ cloneSolver solver = do
     , svLB      = l
     , svUB      = u
     , svModel   = m
+    , svExplanation = e
     , svVCnt    = v
     , svOk      = ok
     , svOptDir  = dir
@@ -227,13 +245,24 @@ instance SolverValue (Delta Rational) where
       lb <- getLB solver x
       ub <- getUB solver x
       return $
-        [(p - c) / (k - q) | Just (Delta c k) <- return lb, c < p, k > q] ++
-        [(d - p) / (q - h) | Just (Delta d h) <- return ub, p < d, q > h]
+        [(p - c) / (k - q) | Just (Delta c k, _) <- return lb, c < p, k > q] ++
+        [(d - p) / (q - h) | Just (Delta d h, _) <- return ub, p < d, q > h]
     let delta0 :: Rational
         delta0 = if null ys then 0.1 else minimum ys
         f :: Delta Rational -> Rational
         f (Delta r k) = r + k * delta0
     liftM (IntMap.map f) $ readIORef (svModel solver)
+
+type ConstrID = Int
+type ConstrIDSet = IntSet
+
+type Bound v = Maybe (v, ConstrIDSet)
+
+boundValue :: SolverValue v => Bound v -> Maybe v
+boundValue = fmap fst
+
+boundExplanation :: SolverValue v => Bound v -> ConstrIDSet
+boundExplanation = maybe mempty snd
 
 {-
 Largest coefficient rule: original rule suggested by G. Dantzig.
@@ -258,8 +287,8 @@ setPivotStrategy solver ps = writeIORef (svPivotStrategy solver) ps
 
 data BacktrackPoint v
   = BacktrackPoint
-  { bpSavedLB :: !(IORef (IntMap (Maybe v)))
-  , bpSavedUB :: !(IORef (IntMap (Maybe v)))
+  { bpSavedLB :: !(IORef (IntMap (Bound v)))
+  , bpSavedUB :: !(IORef (IntMap (Bound v)))
   }
 
 cloneBacktrackPoint :: BacktrackPoint v -> IO (BacktrackPoint v)
@@ -334,28 +363,34 @@ newVar solver = do
   return v
 
 assertAtom :: Solver -> LA.Atom Rational -> IO ()
-assertAtom solver atom = do
+assertAtom solver atom = assertAtom' solver atom Nothing
+
+assertAtom' :: Solver -> LA.Atom Rational -> Maybe ConstrID -> IO ()
+assertAtom' solver atom cid = do
   (v,op,rhs') <- simplifyAtom solver atom
   case op of
-    Le  -> assertUpper solver v (toValue rhs')
-    Ge  -> assertLower solver v (toValue rhs')
+    Le  -> assertUpper' solver v (toValue rhs') cid
+    Ge  -> assertLower' solver v (toValue rhs') cid
     Eql -> do
-      assertLower solver v (toValue rhs')
-      assertUpper solver v (toValue rhs')
+      assertLower' solver v (toValue rhs') cid
+      assertUpper' solver v (toValue rhs') cid
     _ -> error "unsupported"
   return ()
 
 assertAtomEx :: GenericSolver (Delta Rational) -> LA.Atom Rational -> IO ()
-assertAtomEx solver atom = do
+assertAtomEx solver atom = assertAtomEx' solver atom Nothing
+
+assertAtomEx' :: GenericSolver (Delta Rational) -> LA.Atom Rational -> Maybe ConstrID -> IO ()
+assertAtomEx' solver atom cid = do
   (v,op,rhs') <- simplifyAtom solver atom
   case op of
-    Le  -> assertUpper solver v (toValue rhs')
-    Ge  -> assertLower solver v (toValue rhs')
-    Lt  -> assertUpper solver v (toValue rhs' ^-^ delta)
-    Gt  -> assertLower solver v (toValue rhs' ^+^ delta)
+    Le  -> assertUpper' solver v (toValue rhs') cid
+    Ge  -> assertLower' solver v (toValue rhs') cid
+    Lt  -> assertUpper' solver v (toValue rhs' ^-^ delta) cid
+    Gt  -> assertLower' solver v (toValue rhs' ^+^ delta) cid
     Eql -> do
-      assertLower solver v (toValue rhs')
-      assertUpper solver v (toValue rhs')
+      assertLower' solver v (toValue rhs') cid
+      assertUpper' solver v (toValue rhs') cid
   return ()
 
 simplifyAtom :: SolverValue v => GenericSolver v -> LA.Atom Rational -> IO (Var, RelOp, Rational)
@@ -378,6 +413,11 @@ simplifyAtom solver (ArithRel lhs op rhs) = do
           v <- newVar solver
           setRow solver v lhs''
           modifyIORef (svDefDB solver) $ Map.insert lhs'' v
+          case LA.asConst lhs'' of
+            Just 0 -> do
+              modifyIORef (svLB solver) (IntMap.insert v (toValue 0, mempty))
+              modifyIORef (svUB solver) (IntMap.insert v (toValue 0, mempty))
+            _ -> return ()
           return (v,op'',rhs'')
   where
     scale :: LA.Expr Rational -> (Rational, LA.Expr Rational)
@@ -386,32 +426,44 @@ simplifyAtom solver (ArithRel lhs op rhs) = do
         c = c1 * c2
         c1 = fromIntegral $ foldl' lcm 1 [denominator c | (c, _) <- LA.terms e]
         c2 = signum $ head ([c | (c,x) <- LA.terms e] ++ [1])
-
+             
 assertLower :: SolverValue v => GenericSolver v -> Var -> v -> IO ()
-assertLower solver x l = do
+assertLower solver x l = assertLower' solver x l Nothing
+
+assertLower' :: SolverValue v => GenericSolver v -> Var -> v -> Maybe ConstrID -> IO ()
+assertLower' solver x l cid = do
+  let cidSet = IntSet.fromList $ maybeToList cid
   l0 <- getLB solver x
   u0 <- getUB solver x
   case (l0,u0) of 
-    (Just l0', _) | l <= l0' -> return ()
-    (_, Just u0') | u0' < l -> markBad solver
+    (Just (l0', _), _) | l <= l0' -> return ()
+    (_, Just (u0', cidSet2)) | u0' < l -> do
+      writeIORef (svExplanation solver) $ cidSet `IntSet.union` cidSet2
+      markBad solver
     _ -> do
       bpSaveLB solver x
-      modifyIORef (svLB solver) (IntMap.insert x l)
+      modifyIORef (svLB solver) (IntMap.insert x (l, cidSet))
       b <- isNonBasicVariable solver x
       v <- getValue solver x
       when (b && not (l <= v)) $ update solver x l
       checkNBFeasibility solver
 
 assertUpper :: SolverValue v => GenericSolver v -> Var -> v -> IO ()
-assertUpper solver x u = do
+assertUpper solver x u = assertUpper' solver x u Nothing 
+
+assertUpper' :: SolverValue v => GenericSolver v -> Var -> v -> Maybe ConstrID -> IO ()
+assertUpper' solver x u cid = do
+  let cidSet = IntSet.fromList $ maybeToList cid
   l0 <- getLB solver x
   u0 <- getUB solver x
-  case (l0,u0) of 
-    (_, Just u0') | u0' <= u -> return ()
-    (Just l0', _) | u < l0' -> markBad solver
+  case (l0,u0) of
+    (_, Just (u0', _)) | u0' <= u -> return ()
+    (Just (l0', cidSet2), _) | u < l0' -> do
+      writeIORef (svExplanation solver) $ cidSet `IntSet.union` cidSet2
+      markBad solver
     _ -> do
       bpSaveUB solver x
-      modifyIORef (svUB solver) (IntMap.insert x u)
+      modifyIORef (svUB solver) (IntMap.insert x (u, cidSet))
       b <- isNonBasicVariable solver x
       v <- getValue solver x
       when (b && not (v <= u)) $ update solver x u
@@ -496,9 +548,24 @@ check solver = do
           xi_def <- getRow solver xi
           r <- liftM (fmap snd) $ findM q (LA.terms xi_def)              
           case r of
-            Nothing -> markBad solver >> return False
+            Nothing -> do
+              let c = if isLBViolated then li else ui
+              core <- liftM (mconcat . map boundExplanation . (c :)) $ forM (LA.terms xi_def) $ \(aij, xj) -> do
+                if isLBViolated then do
+                  if aij > 0 then do
+                    getUB solver xj
+                  else do
+                    getLB solver xj
+                else do
+                  if aij > 0 then do
+                    getLB solver xj
+                  else do
+                    getUB solver xj
+              writeIORef (svExplanation solver) core
+              markBad solver
+              return False
             Just xj -> do
-              pivotAndUpdate solver xi xj (fromJust (if isLBViolated then li else ui))
+              pivotAndUpdate solver xi xj (fromJust $ boundValue $ if isLBViolated then li else ui)
               loop
 
   ok <- readIORef (svOk solver)
@@ -536,8 +603,8 @@ selectViolatingBasicVariable solver = do
               li <- getLB solver xi
               ui <- getUB solver xi
               if not (testLB li vi)
-                then return (xi, fromJust li ^-^ vi)
-                else return (xi, vi ^-^ fromJust ui)
+                then return (xi, fromJust (boundValue li) ^-^ vi)
+                else return (xi, vi ^-^ fromJust (boundValue ui))
           return $ Just $ fst $ maximumBy (comparing snd) xs2
 
 {--------------------------------------------------------------------
@@ -636,7 +703,7 @@ canIncrease1 solver x = do
   v <- getValue solver x
   case u of
     Nothing -> return True
-    Just uv -> return $! (v < uv)
+    Just (uv, _) -> return $! (v < uv)
 
 canDecrease1 :: SolverValue v => GenericSolver v -> Var -> IO Bool
 canDecrease1 solver x = do
@@ -644,7 +711,7 @@ canDecrease1 solver x = do
   v <- getValue solver x
   case l of
     Nothing -> return True
-    Just lv -> return $! (lv < v)
+    Just (lv, _) -> return $! (lv < v)
 
 -- | feasibility を保ちつつ non-basic variable xj の値を大きくする
 increaseNB :: Solver -> Var -> IO Bool
@@ -658,7 +725,7 @@ increaseNB solver xj = do
     li <- getLB solver xi
     ui <- getUB solver xi
     return [ assert (theta >= zeroV) ((xi,v2), theta)
-           | Just v2 <- [ui | aij > 0] ++ [li | aij < 0]
+           | Just v2 <- [boundValue ui | aij > 0] ++ [boundValue li | aij < 0]
            , let theta = (v2 ^-^ v1) ^/ aij ]
 
   -- β(xj) := β(xj) + θ なので θ を大きく
@@ -681,7 +748,7 @@ decreaseNB solver xj = do
     li <- getLB solver xi
     ui <- getUB solver xi
     return [ assert (theta <= zeroV) ((xi,v2), theta)
-           | Just v2 <- [li | aij > 0] ++ [ui | aij < 0]
+           | Just v2 <- [boundValue li | aij > 0] ++ [boundValue ui | aij < 0]
            , let theta = (v2 ^-^ v1) ^/ aij ]
 
   -- β(xj) := β(xj) + θ なので θ を小さく
@@ -715,9 +782,25 @@ dualSimplex solver opt = do
                 return $ not (testLB li vi)
               r <- dualRTest solver xi_def isLBViolated
               case r of
-                Nothing -> markBad solver >> return Unsat -- dual unbounded
+                Nothing -> do
+                  -- dual unbounded
+                  let c = if isLBViolated then li else ui
+                  core <- liftM (mconcat . map boundExplanation . (c :)) $ forM (LA.terms xi_def) $ \(aij, xj) -> do
+                    if isLBViolated then do
+                      if aij > 0 then do
+                        getUB solver xj
+                      else do
+                        getLB solver xj
+                    else do
+                      if aij > 0 then do
+                        getLB solver xj
+                      else do
+                        getUB solver xj
+                  writeIORef (svExplanation solver) core
+                  markBad solver
+                  return Unsat
                 Just xj -> do
-                  pivotAndUpdate solver xi xj (fromJust (if isLBViolated then li else ui))
+                  pivotAndUpdate solver xi xj (fromJust $ boundValue $ if isLBViolated then li else ui)
                   loop
 
   ok <- readIORef (svOk solver)
@@ -788,6 +871,9 @@ getObjValue :: GenericSolver v -> IO v
 getObjValue solver = getValue solver objVar  
 
 type Model = IntMap Rational
+
+explain :: GenericSolver v -> IO ConstrIDSet
+explain solver = readIORef (svExplanation solver)
   
 {--------------------------------------------------------------------
   major function
@@ -843,12 +929,12 @@ pivotAndUpdate solver xi xj v = do
   -- log solver $ printf "after pivotAndUpdate x%d x%d (%s)" xi xj (show v)
   -- dump solver
 
-getLB :: GenericSolver v -> Var -> IO (Maybe v)
+getLB :: GenericSolver v -> Var -> IO (Bound v)
 getLB solver x = do
   lb <- readIORef (svLB solver)
   return $ IntMap.lookup x lb
 
-getUB :: GenericSolver v -> Var -> IO (Maybe v)
+getUB :: GenericSolver v -> Var -> IO (Bound v)
 getUB solver x = do
   ub <- readIORef (svUB solver)
   return $ IntMap.lookup x ub
@@ -895,13 +981,13 @@ findM p (x:xs) = do
   then return (Just x)
   else findM p xs
 
-testLB :: SolverValue v => Maybe v -> v -> Bool
+testLB :: SolverValue v => Bound v -> v -> Bool
 testLB Nothing _  = True
-testLB (Just l) x = l <= x
+testLB (Just (l,_)) x = l <= x
 
-testUB :: SolverValue v => Maybe v -> v -> Bool
+testUB :: SolverValue v => Bound v -> v -> Bool
 testUB Nothing _  = True
-testUB (Just u) x = x <= u
+testUB (Just (u,_)) x = x <= u
 
 variables :: GenericSolver v -> IO [Var]
 variables solver = do
@@ -986,8 +1072,8 @@ test4 = do
   x1 <- newVar solver
 
   writeIORef (svTableau solver) (IntMap.fromList [(x1, LA.var x0)])
-  writeIORef (svLB solver) (IntMap.fromList [(x0, toValue 0), (x1, toValue 0)])
-  writeIORef (svUB solver) (IntMap.fromList [(x0, toValue 2), (x1, toValue 3)])
+  writeIORef (svLB solver) $ fmap (\v -> (v, mempty)) $ IntMap.fromList [(x0, 0), (x1, 0)]
+  writeIORef (svUB solver) $ fmap (\v -> (v, mempty)) $ IntMap.fromList [(x0, 2), (x1, 3)]
   setObj solver (LA.fromTerms [(-1, x0)])
 
   ret <- optimize solver def
@@ -1002,8 +1088,8 @@ test5 = do
   x1 <- newVar solver
 
   writeIORef (svTableau solver) (IntMap.fromList [(x1, LA.var x0)])
-  writeIORef (svLB solver) (IntMap.fromList [(x0, toValue 0), (x1, toValue 0)])
-  writeIORef (svUB solver) (IntMap.fromList [(x0, toValue 2), (x1, toValue 0)])
+  writeIORef (svLB solver) $ fmap (\v -> (v, mempty)) $ IntMap.fromList [(x0, 0), (x1, 0)]
+  writeIORef (svUB solver) $ fmap (\v -> (v, mempty)) $ IntMap.fromList [(x0, 2), (x1, 0)]
   setObj solver (LA.fromTerms [(-1, x0)])
 
   checkFeasibility solver
@@ -1058,7 +1144,7 @@ dump solver = do
     u <- getUB solver x
     v <- getValue solver x
     let f Nothing = "Nothing"
-        f (Just x) = showValue True x
+        f (Just (x,_)) = showValue True x
     log solver $ printf "beta(x%d) = %s; %s <= x%d <= %s" x (showValue True v) (f l) x (f u)
 
   log solver ""
@@ -1079,7 +1165,7 @@ checkFeasibility solver = do
     l <- getLB solver x
     u <- getUB solver x
     let f Nothing = "Nothing"
-        f (Just x) = showValue True x
+        f (Just (x,_)) = showValue True x
     unless (testLB l v) $
       error (printf "(%s) <= x%d is violated; x%d = (%s)" (f l) x x (showValue True v))
     unless (testUB u v) $
@@ -1097,7 +1183,7 @@ checkNBFeasibility solver = do
       l <- getLB solver x
       u <- getUB solver x
       let f Nothing = "Nothing"
-          f (Just x) = showValue True x
+          f (Just (x,_)) = showValue True x
       unless (testLB l v) $
         error (printf "checkNBFeasibility: (%s) <= x%d is violated; x%d = (%s)" (f l) x x (showValue True v))
       unless (testUB u v) $
