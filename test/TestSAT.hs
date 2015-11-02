@@ -8,6 +8,8 @@ import Data.IORef
 import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Vector as V
@@ -32,6 +34,10 @@ import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.PBNLC as PBNLC
+
+import ToySolver.Data.ArithRel
+import qualified ToySolver.Data.LA as LA
+import qualified ToySolver.Arith.Simplex2 as Simplex2
 
 allAssignments :: Int -> [Model]
 allAssignments nv = [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]]
@@ -313,6 +319,73 @@ prop_solveCNF_using_BooleanTheory = QM.monadicIO $ do
     Nothing -> do
       forM_ (allAssignments nv) $ \m -> do
         QM.assert $ not (evalCNF m cnf)
+
+case_QF_LRA :: IO ()
+case_QF_LRA = do
+  lraSolver <- Simplex2.newSolver
+  x <- Simplex2.newVar lraSolver
+  y <- Simplex2.newVar lraSolver
+  
+  satSolver <- newSolver  
+  a <- newVar satSolver
+  le1 <- newVar satSolver -- 2 x + (1/3) y <= -4
+  eq2 <- newVar satSolver -- 1.5 y = -2 x
+  lt2 <- newVar satSolver -- 1.5 y < -2 x
+  gt2 <- newVar satSolver -- 1.5 y > -2 x
+  gt3 <- newVar satSolver -- x > y
+  lt4 <- newVar satSolver -- 3 x < -1 + (1/5) (x + y)
+  let defs = IntMap.fromList
+        [ (le1,  LA.fromTerms [(2,x), (1/3,y)] .<=. LA.constant (-4))
+        , (-le1, LA.fromTerms [(2,x), (1/3,y)] .>.  LA.constant (-4))
+        , (eq2,  LA.fromTerms [(1.5,x)] .==. LA.fromTerms [(-2,x)])
+        , (lt2,  LA.fromTerms [(1.5,x)] .<.  LA.fromTerms [(-2,x)])
+        , (gt2,  LA.fromTerms [(1.5,x)] .>.  LA.fromTerms [(-2,x)])
+        , (gt3,  LA.fromTerms [(1,x)] .>.  LA.fromTerms [(1,y)])
+        , (-gt3, LA.fromTerms [(1,x)] .<=. LA.fromTerms [(1,y)])
+        , (lt4,  LA.fromTerms [(3,x)] .<.  LA.fromTerms [(-1,LA.unitVar), (1/5,x), (1/5,y)])
+        , (-lt4, LA.fromTerms [(3,x)] .>=. LA.fromTerms [(-1,LA.unitVar), (1/5,x), (1/5,y)])
+        ] 
+
+  let tsolver =
+        TheorySolver
+        { thAssertLit = \_ l -> do
+            case IntMap.lookup l defs of
+              Nothing -> return True
+              Just atom -> do
+                Simplex2.assertAtomEx' lraSolver atom (Just l)
+                return True
+        , thCheck = \_ -> do
+            Simplex2.check lraSolver
+        , thExplain = \m -> do
+            case m of
+              Nothing -> liftM IntSet.toList $ Simplex2.explain lraSolver
+              Just _ -> return []
+        , thPushBacktrackPoint = do
+            Simplex2.pushBacktrackPoint lraSolver
+        , thPopBacktrackPoint = do
+            Simplex2.popBacktrackPoint lraSolver
+        }
+  setTheory satSolver tsolver
+  
+  addClause satSolver [eq2, lt2, gt2] -- ¬eq2 → (lt2 ∨ gt2)
+  addClause satSolver [-lt2, -eq2] -- lt2 → ¬eq2
+  addClause satSolver [-gt2, -eq2] -- gt2 → ¬eq2
+  
+  enc <- Tseitin.newEncoder satSolver
+  Tseitin.addFormula enc $ ite (Atom a) (Atom le1) (Atom eq2)
+  Tseitin.addFormula enc $ Atom gt3 .||. (Atom a .<=>. Atom lt4)
+
+  ret <- solve satSolver
+  ret @?= True
+  
+  m1 <- getModel satSolver
+  m2 <- Simplex2.getModel lraSolver
+  let f lit =
+        case IntMap.lookup lit defs of
+          Nothing -> evalLit m1 lit
+          Just atom -> LA.evalAtom m2 atom
+  fold f (ite (Atom a) (Atom le1) (Atom eq2)) @?= True 
+  fold f (Atom gt3 .||. (Atom a .<=>. Atom lt4)) @?= True
 
 -- should be SAT
 case_solve_SAT :: IO ()
