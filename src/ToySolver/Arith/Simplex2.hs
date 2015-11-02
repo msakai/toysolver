@@ -413,6 +413,11 @@ simplifyAtom solver (ArithRel lhs op rhs) = do
           v <- newVar solver
           setRow solver v lhs''
           modifyIORef (svDefDB solver) $ Map.insert lhs'' v
+          case LA.asConst lhs'' of
+            Just 0 -> do
+              modifyIORef (svLB solver) (IntMap.insert v (toValue 0, mempty))
+              modifyIORef (svUB solver) (IntMap.insert v (toValue 0, mempty))
+            _ -> return ()
           return (v,op'',rhs'')
   where
     scale :: LA.Expr Rational -> (Rational, LA.Expr Rational)
