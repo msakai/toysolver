@@ -48,7 +48,9 @@ data FlatTerm
   | FTApp Var Var
   deriving (Ord, Eq, Show)
 
-type Eqn1 = (FlatTerm, Var)
+-- | @Eqn a b c@ represents an equation "f(a,b) = c"
+data Eqn1 = Eqn1 Var Var Var
+
 type PendingEqn = Either (Var,Var) (Eqn1, Eqn1)
 
 data Solver
@@ -113,14 +115,15 @@ mergeFlatTerm solver (s, a) = do
       a2' <- getRepresentative solver a2
       ret <- lookup solver a1' a2'
       case ret of
-        Just (FTApp b1 b2, b) -> do
-          addToPending solver $ Right ((FTApp a1 a2, a), (FTApp b1 b2, b))
+        Just eq2 -> do
+          addToPending solver $ Right (Eqn1 a1 a2 a, eq2)
           propagate solver
         Nothing -> do
-          setLookup solver a1' a2' (FTApp a1 a2, a)
+          let eq = Eqn1 a1 a2 a
+          setLookup solver a1' a2' eq
           modifyIORef (svUseList solver) $
-            IntMap.alter (Just . ((FTApp a1 a2, a) :) . fromMaybe []) a1' .
-            IntMap.alter (Just . ((FTApp a1 a2, a) :) . fromMaybe []) a2'
+            IntMap.alter (Just . (eq :) . fromMaybe []) a1' .
+            IntMap.alter (Just . (eq :) . fromMaybe []) a2'
 
 propagate :: Solver -> IO ()
 propagate solver = go
@@ -137,7 +140,7 @@ propagate solver = go
     processEqn p = do
       let (a,b) = case p of
                     Left (a,b) -> (a,b)
-                    Right ((_, a), (_, b)) -> (a,b)
+                    Right (Eqn1 _ _ a, Eqn1 _ _ b) -> (a,b)
       a' <- getRepresentative solver a
       b' <- getRepresentative solver b
       if a' == b'
@@ -157,13 +160,13 @@ propagate solver = go
         IntMap.insert b' (classA ++ classB) . IntMap.delete a'
 
       useList <- readIORef (svUseList solver)
-      forM_ (useList IntMap.! a') $ \(FTApp c1 c2, c) -> do -- FIXME: not exhaustive
+      forM_ (useList IntMap.! a') $ \eq1@(Eqn1 c1 c2 _) -> do
         c1' <- getRepresentative solver c1
         c2' <- getRepresentative solver c2
         ret <- lookup solver c1' c2'
         case ret of
-          Just (FTApp d1 d2, d) -> do -- FIXME: not exhaustive
-            addToPending solver $ Right ((FTApp c1 c2, c), (FTApp d1 d2, d))
+          Just eq2 -> do
+            addToPending solver $ Right (eq1, eq2)
           Nothing -> do
             return ()
       writeIORef (svUseList solver) $ IntMap.delete a' useList        
@@ -187,7 +190,7 @@ normalize solver (FTApp t1 t2) = do
   u2 <- getRepresentative solver t2
   ret <- lookup solver u1 u2
   case ret of
-    Just (FTApp _ _, a) -> liftM FTConst $ getRepresentative solver a
+    Just (Eqn1 _ _ a) -> liftM FTConst $ getRepresentative solver a
     Nothing -> return $ FTApp u1 u2
 
 {--------------------------------------------------------------------
