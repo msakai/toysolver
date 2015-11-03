@@ -222,13 +222,20 @@ asConstant p =
 scale :: (Eq k, Num k, Ord v) => k -> Polynomial k v -> Polynomial k v
 scale 0 _ = zero
 scale 1 p = p
-scale a (Polynomial m) = normalize $ Polynomial (Map.map (a*) m)
+scale a (Polynomial m) = Polynomial (Map.mapMaybe f m)
+  where
+    f b = if c == 0 then Nothing else Just c
+      where c = a * b
 
 zero :: (Eq k, Num k, Ord v) => Polynomial k v
 zero = Polynomial $ Map.empty
 
 plus :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v -> Polynomial k v
-plus (Polynomial m1) (Polynomial m2) = normalize $ Polynomial $ Map.unionWith (+) m1 m2
+plus (Polynomial m1) (Polynomial m2) = Polynomial $ Map.mergeWithKey f id id m1 m2
+  where
+    f _ a b = if c == 0 then Nothing else Just c
+      where
+        c = a + b
 
 neg :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v
 neg (Polynomial m) = Polynomial $ Map.map negate m
@@ -237,7 +244,7 @@ mult :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v -> Polynomial k
 mult a b
   | Just c <- asConstant a = scale c b
   | Just c <- asConstant b = scale c a
-mult (Polynomial m1) (Polynomial m2) = normalize $ Polynomial $ Map.fromListWith (+)
+mult (Polynomial m1) (Polynomial m2) = fromCoeffMap $ Map.fromListWith (+)
       [ (xs1 `mmult` xs2, c1*c2)
       | (xs1,c1) <- Map.toList m1, (xs2,c2) <- Map.toList m2
       ]
@@ -251,14 +258,15 @@ constant c = fromTerm (c, mone)
 
 -- | construct a polynomial from a list of terms
 fromTerms :: (Eq k, Num k, Ord v) => [Term k v] -> Polynomial k v
-fromTerms = normalize . Polynomial . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
+fromTerms = fromCoeffMap . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
 
 fromCoeffMap :: (Eq k, Num k, Ord v) => Map (Monomial v) k -> Polynomial k v
 fromCoeffMap m = normalize $ Polynomial m
 
 -- | construct a polynomial from a singlet term
 fromTerm :: (Eq k, Num k, Ord v) => Term k v -> Polynomial k v
-fromTerm (c,xs) = normalize $ Polynomial $ Map.singleton xs c
+fromTerm (0,_) = zero
+fromTerm (c,xs) = Polynomial $ Map.singleton xs c
 
 -- | list of terms
 terms :: Polynomial k v -> [Term k v]
