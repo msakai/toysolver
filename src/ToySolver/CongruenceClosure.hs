@@ -2,7 +2,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.CongruenceClosure
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Copyright   :  (c) Masahiro Sakai 2012, 2015
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -19,11 +19,14 @@
 module ToySolver.CongruenceClosure
   ( Solver
   , Var
+  , Term (..)
   , FlatTerm (..)
   , newSolver
   , newVar
   , merge
+  , mergeFlatTerm
   , areCongruent
+  , areCongruentFlatTerm
   ) where
 
 import Prelude hiding (lookup)
@@ -33,8 +36,12 @@ import Data.IORef
 import Data.Maybe
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-
+import Data.Map (Map)
+import qualified Data.Map as Map
+    
 type Var = Int
+
+data Term = TApp Var [Term]
 
 data FlatTerm
   = FTConst Var
@@ -47,6 +54,7 @@ type PendingEqn = Either (Var,Var) (Eqn1, Eqn1)
 data Solver
   = Solver
   { svVarCounter           :: IORef Int
+  , svDefs                 :: IORef (IntMap (Var,Var), Map (Var,Var) Var)
   , svPending              :: IORef [PendingEqn]
   , svRepresentativeTable  :: IORef (IntMap Var) -- 本当は配列が良い
   , svClassList            :: IORef (IntMap [Var])
@@ -57,6 +65,7 @@ data Solver
 newSolver :: IO Solver
 newSolver = do
   vcnt     <- newIORef 0
+  defs     <- newIORef (IntMap.empty, Map.empty)
   pending  <- newIORef []
   rep      <- newIORef IntMap.empty
   classes  <- newIORef IntMap.empty
@@ -65,6 +74,7 @@ newSolver = do
   return $
     Solver
     { svVarCounter          = vcnt
+    , svDefs                = defs
     , svPending             = pending
     , svRepresentativeTable = rep
     , svClassList           = classes
@@ -81,8 +91,19 @@ newVar solver = do
   modifyIORef (svUseList solver) (IntMap.insert v [])
   return v
 
-merge :: Solver -> (FlatTerm, Var) -> IO ()
-merge solver (s, a) = do
+merge :: Solver -> Term -> Term -> IO ()
+merge solver t u = do
+  t' <- transform solver t
+  u' <- transform solver u
+  case (t', u') of
+    (FTConst c, _) -> mergeFlatTerm solver (u', c)
+    (_, FTConst c) -> mergeFlatTerm solver (t', c)
+    _ -> do
+      c <- nameFlatTerm solver u'
+      mergeFlatTerm solver (t', c)
+
+mergeFlatTerm :: Solver -> (FlatTerm, Var) -> IO ()
+mergeFlatTerm solver (s, a) = do
   case s of
     FTConst c -> do
       addToPending solver (Left (c, a))
@@ -147,8 +168,14 @@ propagate solver = go
             return ()
       writeIORef (svUseList solver) $ IntMap.delete a' useList        
 
-areCongruent :: Solver -> FlatTerm -> FlatTerm -> IO Bool
+areCongruent :: Solver -> Term -> Term -> IO Bool
 areCongruent solver t1 t2 = do
+  u1 <- transform solver t1
+  u2 <- transform solver t2
+  areCongruentFlatTerm solver u1 u2
+
+areCongruentFlatTerm :: Solver -> FlatTerm -> FlatTerm -> IO Bool
+areCongruentFlatTerm solver t1 t2 = do
   u1 <- normalize solver t1
   u2 <- normalize solver t2
   return $ u1 == u2
@@ -186,3 +213,26 @@ getRepresentative :: Solver -> Var -> IO Var
 getRepresentative solver c = do
   m <- readIORef $ svRepresentativeTable solver
   return $ m IntMap.! c
+
+transform :: Solver -> Term -> IO FlatTerm
+transform solver (TApp f xs) = do
+  xs' <- mapM (transform solver) xs
+  let phi t u = do
+        t' <- nameFlatTerm solver t
+        u' <- nameFlatTerm solver u
+        return $ FTApp t' u'
+  foldM phi (FTConst f) xs'
+
+-- バックトラックとの関係が悩ましい
+-- 最初からその変数が存在したかのようにふるまいたいが
+nameFlatTerm :: Solver -> FlatTerm -> IO Var
+nameFlatTerm _ (FTConst c) = return c
+nameFlatTerm solver (FTApp c d) = do
+  (defs1,defs2) <- readIORef $ svDefs solver
+  case Map.lookup (c,d) defs2 of
+    Just a -> return a
+    Nothing -> do
+      a <- newVar solver
+      writeIORef (svDefs solver) (IntMap.insert a (c,d) defs1, Map.insert (c,d) a defs2)
+      mergeFlatTerm solver (FTApp c d, a)
+      return a

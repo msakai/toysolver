@@ -19,14 +19,30 @@ case_1 = do
   c <- newVar solver
   d <- newVar solver
 
-  merge solver (FTConst a, c)
-  ret <- areCongruent solver (FTApp a b) (FTApp c d)
+  merge solver (TApp a []) (TApp c [])
+  ret <- areCongruent solver (TApp a [TApp b []]) (TApp c [TApp d []])
   ret @?= False
   
-  merge solver (FTConst b, d)
-  ret <- areCongruent solver (FTApp a b) (FTApp c d)
+  merge solver (TApp b []) (TApp d [])
+  ret <- areCongruent solver (TApp a [TApp b []]) (TApp c [TApp d []])
   ret @?= True
 
+case_1_FlatTerm :: IO ()
+case_1_FlatTerm = do
+  solver <- newSolver
+  a <- newVar solver
+  b <- newVar solver
+  c <- newVar solver
+  d <- newVar solver
+
+  mergeFlatTerm solver (FTConst a, c)
+  ret <- areCongruentFlatTerm solver (FTApp a b) (FTApp c d)
+  ret @?= False
+  
+  mergeFlatTerm solver (FTConst b, d)
+  ret <- areCongruentFlatTerm solver (FTApp a b) (FTApp c d)
+  ret @?= True
+      
 ------------------------------------------------------------------------
 -- Test harness
 
