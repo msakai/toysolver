@@ -14,6 +14,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import qualified Data.Traversable as Traversable
 import qualified Data.Vector as V
 import qualified System.Random.MWC as Rand
 
@@ -329,8 +330,8 @@ case_QF_LRA = do
 
   tblRef <- newIORef $ Map.empty
   defsRef <- newIORef $ IntMap.empty
-  let newLRALit :: LA.Atom Rational -> IO SAT.Lit
-      newLRALit atom = do
+  let abstractLAAtom :: LA.Atom Rational -> IO SAT.Lit
+      abstractLAAtom atom = do
         (v,op,rhs) <- Simplex2.simplifyAtom lraSolver atom
         tbl <- readIORef tblRef
         (vLt, vEq, vGt) <-
@@ -362,6 +363,12 @@ case_QF_LRA = do
           Ge  -> return (-vLt)
           NEq -> return (-vEq)
 
+      abstract :: BoolExpr (Either SAT.Lit (LA.Atom Rational)) -> IO (BoolExpr SAT.Lit)
+      abstract = Traversable.mapM f
+        where
+          f (Left lit) = return lit
+          f (Right atom) = abstractLAAtom atom
+
   let tsolver =
         TheorySolver
         { thAssertLit = \_ l -> do
@@ -384,31 +391,36 @@ case_QF_LRA = do
         }
   SAT.setTheory satSolver tsolver
 
+  enc <- Tseitin.newEncoder satSolver
+  let addFormula :: BoolExpr (Either SAT.Lit (LA.Atom Rational)) -> IO ()
+      addFormula c = Tseitin.addFormula enc =<< abstract c
+
   a <- SAT.newVar satSolver
   x <- Simplex2.newVar lraSolver
   y <- Simplex2.newVar lraSolver
 
-  le1 <- newLRALit $ LA.fromTerms [(2,x), (1/3,y)] .<=. LA.constant (-4) -- 2 x + (1/3) y <= -4
-  eq2 <- newLRALit $ LA.fromTerms [(1.5,x)] .==. LA.fromTerms [(-2,x)] -- 1.5 y = -2 x
-  gt3 <- newLRALit $ LA.fromTerms [(1,x)] .>. LA.fromTerms [(1,y)] -- x > y
-  lt4 <- newLRALit $ LA.fromTerms [(3,x)] .<. LA.fromTerms [(-1,LA.unitVar), (1/5,x), (1/5,y)] -- 3 x < -1 + (1/5) (x + y)
-  
-  enc <- Tseitin.newEncoder satSolver
-  Tseitin.addFormula enc $ ite (Atom a) (Atom le1) (Atom eq2)
-  Tseitin.addFormula enc $ Atom gt3 .||. (Atom a .<=>. Atom lt4)
+  let le1 = LA.fromTerms [(2,x), (1/3,y)] .<=. LA.constant (-4) -- 2 x + (1/3) y <= -4
+      eq2 = LA.fromTerms [(1.5,x)] .==. LA.fromTerms [(-2,x)] -- 1.5 y = -2 x
+      gt3 = LA.var x .>. LA.var y -- x > y
+      lt4 = LA.fromTerms [(3,x)] .<. LA.fromTerms [(-1,LA.unitVar), (1/5,x), (1/5,y)] -- 3 x < -1 + (1/5) (x + y)
+
+      c1, c2 :: BoolExpr (Either SAT.Lit (LA.Atom Rational))
+      c1 = ite (Atom (Left a)) (Atom $ Right le1) (Atom $ Right eq2)
+      c2 = Atom (Right gt3) .||. (Atom (Left a) .<=>. Atom (Right lt4))
+
+  addFormula c1
+  addFormula c2
 
   ret <- SAT.solve satSolver
   ret @?= True
-  
+
   m1 <- SAT.getModel satSolver
   m2 <- Simplex2.getModel lraSolver
   defs <- readIORef defsRef
-  let f lit =
-        case IntMap.lookup lit defs of
-          Nothing -> SAT.evalLit m1 lit
-          Just atom -> LA.evalAtom m2 atom
-  fold f (ite (Atom a) (Atom le1) (Atom eq2)) @?= True 
-  fold f (Atom gt3 .||. (Atom a .<=>. Atom lt4)) @?= True
+  let f (Left lit) = SAT.evalLit m1 lit
+      f (Right atom) = LA.evalAtom m2 atom
+  fold f c1 @?= True
+  fold f c2 @?= True
 
 -- should be SAT
 case_solve_SAT :: IO ()
