@@ -144,15 +144,14 @@ propagate solver = go
                     Right (Eqn1 _ _ a, Eqn1 _ _ b) -> (a,b)
       a' <- getRepresentative solver a
       b' <- getRepresentative solver b
-      if a' == b'
-        then return ()
-        else do
-          clist <- readIORef (svClassList  solver)
-          let classA = clist IntMap.! a'
-              classB = clist IntMap.! b'
-          if length classA < length classB
-            then update a' b' classA classB
-            else update b' a' classB classA
+      unless (a' == b') $ do
+        clist <- readIORef (svClassList  solver)
+        let classA = clist IntMap.! a'
+            classB = clist IntMap.! b'
+        if length classA < length classB then
+          update a' b' classA classB
+        else
+          update b' a' classB classA
 
     update a' b' classA classB = do
       modifyIORef (svRepresentativeTable solver) $ 
