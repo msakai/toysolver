@@ -99,6 +99,9 @@ module ToySolver.Arith.Simplex2
 
   -- * Debug
   , dump
+
+  -- * Misc
+  , simplifyAtom
   ) where
 
 import Prelude hiding (log)

@@ -6,6 +6,8 @@ import Data.Array.IArray
 import Data.Default.Class
 import Data.IORef
 import Data.List
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.IntMap (IntMap)
@@ -322,33 +324,48 @@ prop_solveCNF_using_BooleanTheory = QM.monadicIO $ do
 
 case_QF_LRA :: IO ()
 case_QF_LRA = do
+  satSolver <- SAT.newSolver
   lraSolver <- Simplex2.newSolver
-  x <- Simplex2.newVar lraSolver
-  y <- Simplex2.newVar lraSolver
-  
-  satSolver <- SAT.newSolver  
-  a <- SAT.newVar satSolver
-  le1 <- SAT.newVar satSolver -- 2 x + (1/3) y <= -4
-  eq2 <- SAT.newVar satSolver -- 1.5 y = -2 x
-  lt2 <- SAT.newVar satSolver -- 1.5 y < -2 x
-  gt2 <- SAT.newVar satSolver -- 1.5 y > -2 x
-  gt3 <- SAT.newVar satSolver -- x > y
-  lt4 <- SAT.newVar satSolver -- 3 x < -1 + (1/5) (x + y)
-  let defs = IntMap.fromList
-        [ (le1,  LA.fromTerms [(2,x), (1/3,y)] .<=. LA.constant (-4))
-        , (-le1, LA.fromTerms [(2,x), (1/3,y)] .>.  LA.constant (-4))
-        , (eq2,  LA.fromTerms [(1.5,x)] .==. LA.fromTerms [(-2,x)])
-        , (lt2,  LA.fromTerms [(1.5,x)] .<.  LA.fromTerms [(-2,x)])
-        , (gt2,  LA.fromTerms [(1.5,x)] .>.  LA.fromTerms [(-2,x)])
-        , (gt3,  LA.fromTerms [(1,x)] .>.  LA.fromTerms [(1,y)])
-        , (-gt3, LA.fromTerms [(1,x)] .<=. LA.fromTerms [(1,y)])
-        , (lt4,  LA.fromTerms [(3,x)] .<.  LA.fromTerms [(-1,LA.unitVar), (1/5,x), (1/5,y)])
-        , (-lt4, LA.fromTerms [(3,x)] .>=. LA.fromTerms [(-1,LA.unitVar), (1/5,x), (1/5,y)])
-        ] 
+
+  tblRef <- newIORef $ Map.empty
+  defsRef <- newIORef $ IntMap.empty
+  let newLRALit :: LA.Atom Rational -> IO SAT.Lit
+      newLRALit atom = do
+        (v,op,rhs) <- Simplex2.simplifyAtom lraSolver atom
+        tbl <- readIORef tblRef
+        (vLt, vEq, vGt) <-
+          case Map.lookup (v,rhs) tbl of
+            Just (vLt, vEq, vGt) -> return (vLt, vEq, vGt)
+            Nothing -> do
+              vLt <- SAT.newVar satSolver
+              vEq <- SAT.newVar satSolver
+              vGt <- SAT.newVar satSolver
+              SAT.addClause satSolver [vLt,vEq,vGt]
+              SAT.addClause satSolver [-vLt, -vEq]
+              SAT.addClause satSolver [-vLt, -vGt]                 
+              SAT.addClause satSolver [-vEq, -vGt]
+              writeIORef tblRef (Map.insert (v,rhs) (vLt, vEq, vGt) tbl)
+              let xs = IntMap.fromList
+                       [ (vEq,  LA.var v .==. LA.constant rhs)
+                       , (vLt,  LA.var v .<.  LA.constant rhs)
+                       , (vGt,  LA.var v .>.  LA.constant rhs)
+                       , (-vLt, LA.var v .>=. LA.constant rhs)
+                       , (-vGt, LA.var v .<=. LA.constant rhs)
+                       ]
+              modifyIORef defsRef (IntMap.union xs)
+              return (vLt, vEq, vGt)
+        case op of
+          Lt  -> return vLt
+          Gt  -> return vGt
+          Eql -> return vEq
+          Le  -> return (-vGt)
+          Ge  -> return (-vLt)
+          NEq -> return (-vEq)
 
   let tsolver =
         TheorySolver
         { thAssertLit = \_ l -> do
+            defs <- readIORef defsRef
             case IntMap.lookup l defs of
               Nothing -> return True
               Just atom -> do
@@ -366,10 +383,15 @@ case_QF_LRA = do
             Simplex2.popBacktrackPoint lraSolver
         }
   SAT.setTheory satSolver tsolver
-  
-  SAT.addClause satSolver [eq2, lt2, gt2] -- ¬eq2 → (lt2 ∨ gt2)
-  SAT.addClause satSolver [-lt2, -eq2] -- lt2 → ¬eq2
-  SAT.addClause satSolver [-gt2, -eq2] -- gt2 → ¬eq2
+
+  a <- SAT.newVar satSolver
+  x <- Simplex2.newVar lraSolver
+  y <- Simplex2.newVar lraSolver
+
+  le1 <- newLRALit $ LA.fromTerms [(2,x), (1/3,y)] .<=. LA.constant (-4) -- 2 x + (1/3) y <= -4
+  eq2 <- newLRALit $ LA.fromTerms [(1.5,x)] .==. LA.fromTerms [(-2,x)] -- 1.5 y = -2 x
+  gt3 <- newLRALit $ LA.fromTerms [(1,x)] .>. LA.fromTerms [(1,y)] -- x > y
+  lt4 <- newLRALit $ LA.fromTerms [(3,x)] .<. LA.fromTerms [(-1,LA.unitVar), (1/5,x), (1/5,y)] -- 3 x < -1 + (1/5) (x + y)
   
   enc <- Tseitin.newEncoder satSolver
   Tseitin.addFormula enc $ ite (Atom a) (Atom le1) (Atom eq2)
@@ -380,6 +402,7 @@ case_QF_LRA = do
   
   m1 <- SAT.getModel satSolver
   m2 <- Simplex2.getModel lraSolver
+  defs <- readIORef defsRef
   let f lit =
         case IntMap.lookup lit defs of
           Nothing -> SAT.evalLit m1 lit
