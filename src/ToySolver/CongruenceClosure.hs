@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -7,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (BangPatterns)
 --
 -- References:
 --
@@ -37,6 +38,8 @@ import Data.IORef
 import Data.Maybe
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Map (Map)
 import qualified Data.Map as Map
     
@@ -61,6 +64,7 @@ data Solver
   , svPending              :: IORef [PendingEqn]
   , svRepresentativeTable  :: IORef (IntMap Var) -- 本当は配列が良い
   , svClassList            :: IORef (IntMap [Var])
+  , svParent               :: IORef (IntMap (Var, PendingEqn))
   , svUseList              :: IORef (IntMap [Eqn1])
   , svLookupTable          :: IORef (IntMap (IntMap Eqn1))
   }
@@ -72,6 +76,7 @@ newSolver = do
   pending  <- newIORef []
   rep      <- newIORef IntMap.empty
   classes  <- newIORef IntMap.empty
+  parent   <- newIORef IntMap.empty
   useList  <- newIORef IntMap.empty
   lookup   <- newIORef IntMap.empty
   return $
@@ -81,6 +86,7 @@ newSolver = do
     , svPending             = pending
     , svRepresentativeTable = rep
     , svClassList           = classes
+    , svParent              = parent
     , svUseList             = useList
     , svLookupTable         = lookup
     }
@@ -148,9 +154,11 @@ propagate solver = go
         clist <- readIORef (svClassList  solver)
         let classA = clist IntMap.! a'
             classB = clist IntMap.! b'
-        if length classA < length classB then
+        if length classA < length classB then do
+          updateParent a b p
           update a' b' classA classB
-        else
+        else do
+          updateParent b a p
           update b' a' classB classA
 
     update a' b' classA classB = do
@@ -172,7 +180,17 @@ propagate solver = go
             addToPending solver $ Right (eq1, eq2)
           Nothing -> do
             return ()
-      writeIORef (svUseList solver) $ IntMap.delete a' useList        
+      writeIORef (svUseList solver) $ IntMap.delete a' useList
+
+    -- Insert edge a→b labelled with a_eq_b into the proof forest, and re-orient its original ancestors.
+    updateParent a b a_eq_b = do
+      let loop d (c, c_eq_d) = do
+            tbl <- readIORef (svParent solver)
+            writeIORef (svParent solver) (IntMap.insert d (c, c_eq_d) tbl)
+            case IntMap.lookup d tbl of
+              Nothing -> return ()
+              Just (e, d_eq_e) -> loop e (d, d_eq_e)
+      loop a (b, a_eq_b)
 
 areCongruent :: Solver -> Term -> Term -> IO Bool
 areCongruent solver t1 t2 = do
@@ -219,6 +237,30 @@ getRepresentative :: Solver -> Var -> IO Var
 getRepresentative solver c = do
   m <- readIORef $ svRepresentativeTable solver
   return $ m IntMap.! c
+
+getParent :: Solver -> Var -> IO (Maybe (Var, PendingEqn))
+getParent solver c = do
+  m <- readIORef $ svParent solver
+  return $ IntMap.lookup c m
+
+nearestCommonAncestor :: Solver -> Var -> Var -> IO (Maybe Var)
+nearestCommonAncestor solver a b = do
+  let loop c !ret = do
+        m <- getParent solver c
+        case m of
+          Nothing -> return ret
+          Just (d,_) -> loop d (IntSet.insert d ret)
+  a_ancestors <- loop a (IntSet.singleton a)
+
+  let loop2 c = do
+        if c `IntSet.member` a_ancestors then
+          return (Just c)
+        else do
+          m <- getParent solver c
+          case m of
+            Nothing -> return Nothing
+            Just (d,_) -> loop2 d
+  loop2 b
 
 transform :: Solver -> Term -> IO FlatTerm
 transform solver (TApp f xs) = do
