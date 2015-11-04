@@ -31,6 +31,7 @@ module ToySolver.CongruenceClosure
 
 import Prelude hiding (lookup)
 
+import Control.Exception (assert)
 import Control.Monad
 import Data.IORef
 import Data.Maybe
@@ -111,19 +112,19 @@ mergeFlatTerm solver (s, a) = do
       addToPending solver (Left (c, a))
       propagate solver
     FTApp a1 a2 -> do
+      let eq1 = Eqn1 a1 a2 a
       a1' <- getRepresentative solver a1
       a2' <- getRepresentative solver a2
       ret <- lookup solver a1' a2'
       case ret of
         Just eq2 -> do
-          addToPending solver $ Right (Eqn1 a1 a2 a, eq2)
+          addToPending solver $ Right (eq1, eq2)
           propagate solver
-        Nothing -> do
-          let eq = Eqn1 a1 a2 a
-          setLookup solver a1' a2' eq
+        Nothing -> do          
+          setLookup solver a1' a2' eq1
           modifyIORef (svUseList solver) $
-            IntMap.alter (Just . (eq :) . fromMaybe []) a1' .
-            IntMap.alter (Just . (eq :) . fromMaybe []) a2'
+            IntMap.alter (Just . (eq1 :) . fromMaybe []) a1' .
+            IntMap.alter (Just . (eq1 :) . fromMaybe []) a2'
 
 propagate :: Solver -> IO ()
 propagate solver = go
@@ -155,6 +156,7 @@ propagate solver = go
 
     update a' b' classA classB = do
       modifyIORef (svRepresentativeTable solver) $ 
+        -- Note that 'IntMap.union' is left biased.
         IntMap.union (IntMap.fromList [(c,b') | c <- classA])
       modifyIORef (svClassList solver) $
         IntMap.insert b' (classA ++ classB) . IntMap.delete a'
@@ -163,6 +165,8 @@ propagate solver = go
       forM_ (useList IntMap.! a') $ \eq1@(Eqn1 c1 c2 _) -> do
         c1' <- getRepresentative solver c1
         c2' <- getRepresentative solver c2
+        assert (a' == c1' || a' == c2') $ return ()
+        -- unless (a' == c1' || a' == c2') $ error "CongruenceClosure.propagate.update: should not happen"
         ret <- lookup solver c1' c2'
         case ret of
           Just eq2 -> do
