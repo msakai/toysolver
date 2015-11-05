@@ -187,6 +187,7 @@ propagate solver = go
         IntMap.insert b' (classA `IntSet.union` classB) . IntMap.delete a'
 
       useList <- readIORef (svUseList solver)
+      writeIORef (svUseList solver) $ IntMap.delete a' useList
       forM_ (useList IntMap.! a') $ \eq1@(Eqn1 _ c1 c2 _) -> do
         c1' <- getRepresentative solver c1
         c2' <- getRepresentative solver c2
@@ -197,8 +198,10 @@ propagate solver = go
           Just eq2 -> do
             addToPending solver $ Right (eq1, eq2)
           Nothing -> do
+            setLookup solver c1' c2' eq1
+            modifyIORef (svUseList solver) $
+              IntMap.alter (Just . (eq1 :) . fromMaybe []) b'
             return ()
-      writeIORef (svUseList solver) $ IntMap.delete a' useList
 
     -- Insert edge a→b labelled with a_eq_b into the proof forest, and re-orient its original ancestors.
     updateParent a b a_eq_b = do
