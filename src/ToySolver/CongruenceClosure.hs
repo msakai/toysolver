@@ -135,6 +135,7 @@ mergeFlatTerm' solver s a cid = do
       let eq1 = Eqn0 cid c a
       addToPending solver (Left eq1)
       propagate solver
+      -- checkInvariant solver
     FTApp a1 a2 -> do
       let eq1 = Eqn1 cid a1 a2 a
       a1' <- getRepresentative solver a1
@@ -144,16 +145,19 @@ mergeFlatTerm' solver s a cid = do
         Just eq2 -> do
           addToPending solver $ Right (eq1, eq2)
           propagate solver
+          -- checkInvariant solver
         Nothing -> do          
           setLookup solver a1' a2' eq1
           modifyIORef (svUseList solver) $
             IntMap.adjust (eq1 :) a1' .
             IntMap.adjust (eq1 :) a2'
+          -- checkInvariant solver
 
 propagate :: Solver -> IO ()
 propagate solver = go
   where
     go = do
+      checkInvariant solver
       ps <- readIORef (svPending solver)
       case ps of
         [] -> return ()
@@ -234,6 +238,57 @@ normalize solver (FTApp t1 t2) = do
   case ret of
     Just (Eqn1 _ _ _ a) -> liftM FTConst $ getRepresentative solver a
     Nothing -> return $ FTApp u1 u2
+
+checkInvariant :: Solver -> IO ()
+checkInvariant solver = do
+  nv <- readIORef (svVarCounter solver)
+  representativeTable <- readIORef (svRepresentativeTable solver)
+  classList <- readIORef (svClassList solver)
+                         
+  let representatives = IntSet.fromList [a' | (a,a') <- IntMap.toList representativeTable]
+  unless (IntMap.keysSet classList == representatives) $
+    error "CongruenceClosure.checkInvariant: IntMap.keysSet classList /= representatives"
+
+  unless (IntSet.unions (IntMap.elems classList) == IntSet.fromList [0..nv-1]) $
+    error "CongruenceClosure.checkInvariant: classList is not exhaustive"
+  forM_ (IntMap.toList classList) $ \(a, bs) -> do
+    forM_ (IntSet.toList bs) $ \b -> do
+      b' <- getRepresentative solver b
+      unless (a == b') $
+        error "CongruenceClosure.checkInvariant: inconsistency between classList and representativeTable"
+
+  pendings <- readIORef (svPending solver)
+  forM_ pendings $ \p -> do
+    case p of
+      Left _ -> return ()
+      Right (Eqn1 _ a1 a2 a, Eqn1 _ b1 b2 b) -> do
+        a1' <- getRepresentative solver a1
+        a2' <- getRepresentative solver a2
+        b1' <- getRepresentative solver b1
+        b2' <- getRepresentative solver b2
+        unless (a1' == b1' && a2' == b2') $
+          error "CongruenceClosure.checkInvariant: error in pendingList"
+
+  useList <- readIORef (svUseList solver)
+  unless (IntMap.keysSet useList == representatives) $
+    error "CongruenceClosure.checkInvariant: IntMap.keysSet useList /= representatives"
+  forM_ (IntMap.toList useList) $ \(a,es) -> do
+    forM_ es $ \(Eqn1 _ b1 b2 _) -> do
+      b1' <- getRepresentative solver b1
+      b2' <- getRepresentative solver b2
+      unless (a == b1' || a == b2') $
+        error "CongruenceClosure.checkInvariant: error in useList"
+
+  forM_ (IntSet.toList representatives) $ \b -> do
+    forM_ (IntSet.toList representatives) $ \c -> do
+      m <- lookup solver b c
+      case m of
+        Nothing -> return ()
+        Just (Eqn1 _ a1 a2 _) -> do
+          a1' <- getRepresentative solver a1
+          a2' <- getRepresentative solver a2
+          unless (b == a1' && c == a2') $
+            error "CongruenceClosure.checkInvariant: error in lookupTable"
 
 explain :: Solver -> Term -> Term -> IO (Maybe IntSet)
 explain solver t1 t2 = do
