@@ -25,12 +25,12 @@ module ToySolver.CongruenceClosure
   , newSolver
   , newVar
   , merge
+  , merge'    
   , mergeFlatTerm
+  , mergeFlatTerm'
   , areCongruent
   , areCongruentFlatTerm
-  , Eqn1 (..)
-  , PendingEqn
-  , explainFlatTerm
+  , explain
   ) where
 
 import Prelude hiding (lookup)
@@ -55,11 +55,16 @@ data FlatTerm
   | FTApp Var Var
   deriving (Ord, Eq, Show)
 
--- | @Eqn a b c@ represents an equation "f(a,b) = c"
-data Eqn1 = Eqn1 Var Var Var
+type ConstrID = Int
+
+-- | @Eqn0 cid a b@ represents an equation "a = b"
+data Eqn0 = Eqn0 (Maybe ConstrID) Var Var
+    
+-- | @Eqn cid a b c@ represents an equation "f(a,b) = c"
+data Eqn1 = Eqn1 (Maybe ConstrID) Var Var Var
   deriving (Eq, Ord, Show)
 
-type PendingEqn = Either (Var,Var) (Eqn1, Eqn1)
+type PendingEqn = Either Eqn0 (Eqn1, Eqn1)
 
 data Solver
   = Solver
@@ -105,24 +110,31 @@ newVar solver = do
   return v
 
 merge :: Solver -> Term -> Term -> IO ()
-merge solver t u = do
+merge solver t u = merge' solver t u Nothing
+
+merge' :: Solver -> Term -> Term -> Maybe ConstrID -> IO ()
+merge' solver t u cid = do
   t' <- transform solver t
   u' <- transform solver u
   case (t', u') of
-    (FTConst c, _) -> mergeFlatTerm solver (u', c)
-    (_, FTConst c) -> mergeFlatTerm solver (t', c)
+    (FTConst c, _) -> mergeFlatTerm' solver (u', c) cid
+    (_, FTConst c) -> mergeFlatTerm' solver (t', c) cid
     _ -> do
       c <- nameFlatTerm solver u'
-      mergeFlatTerm solver (t', c)
+      mergeFlatTerm' solver (t', c) cid
 
 mergeFlatTerm :: Solver -> (FlatTerm, Var) -> IO ()
-mergeFlatTerm solver (s, a) = do
+mergeFlatTerm solver (s, a) = mergeFlatTerm' solver (s, a) Nothing
+
+mergeFlatTerm' :: Solver -> (FlatTerm, Var) -> Maybe ConstrID -> IO ()
+mergeFlatTerm' solver (s, a) cid = do
   case s of
     FTConst c -> do
-      addToPending solver (Left (c, a))
+      let eq1 = Eqn0 cid c a
+      addToPending solver (Left eq1)
       propagate solver
     FTApp a1 a2 -> do
-      let eq1 = Eqn1 a1 a2 a
+      let eq1 = Eqn1 cid a1 a2 a
       a1' <- getRepresentative solver a1
       a2' <- getRepresentative solver a2
       ret <- lookup solver a1' a2'
@@ -150,8 +162,8 @@ propagate solver = go
 
     processEqn p = do
       let (a,b) = case p of
-                    Left (a,b) -> (a,b)
-                    Right (Eqn1 _ _ a, Eqn1 _ _ b) -> (a,b)
+                    Left (Eqn0 _ a b) -> (a,b)
+                    Right (Eqn1 _ _ _ a, Eqn1 _ _ _ b) -> (a,b)
       a' <- getRepresentative solver a
       b' <- getRepresentative solver b
       unless (a' == b') $ do
@@ -173,7 +185,7 @@ propagate solver = go
         IntMap.insert b' (classA ++ classB) . IntMap.delete a'
 
       useList <- readIORef (svUseList solver)
-      forM_ (useList IntMap.! a') $ \eq1@(Eqn1 c1 c2 _) -> do
+      forM_ (useList IntMap.! a') $ \eq1@(Eqn1 _ c1 c2 _) -> do
         c1' <- getRepresentative solver c1
         c2' <- getRepresentative solver c2
         assert (b' == c1' || b' == c2') $ return ()
@@ -215,11 +227,11 @@ normalize solver (FTApp t1 t2) = do
   u2 <- getRepresentative solver t2
   ret <- lookup solver u1 u2
   case ret of
-    Just (Eqn1 _ _ a) -> liftM FTConst $ getRepresentative solver a
+    Just (Eqn1 _ _ _ a) -> liftM FTConst $ getRepresentative solver a
     Nothing -> return $ FTApp u1 u2
 
-explainFlatTerm :: Solver -> Var -> Var -> IO (Maybe [PendingEqn])
-explainFlatTerm solver c1 c2 = do
+explain :: Solver -> Var -> Var -> IO (Maybe IntSet)
+explain solver c1 c2 = do
   n <- readIORef (svVarCounter solver)
   
   -- Additional union-find data structure
@@ -262,7 +274,7 @@ explainFlatTerm solver c1 c2 = do
               IntMap.insert b' h . IntMap.delete a'
 
   pendingProofs <- newIORef ([(c1,c2)] :: [(Var,Var)])
-  result <- newIORef ([] :: [PendingEqn])
+  result <- newIORef ([] :: [Int])
 
   let loop = do
         ps <- readIORef pendingProofs
@@ -285,10 +297,11 @@ explainFlatTerm solver c1 c2 = do
         let loop a =
               unless (a == c) $ do
                 Just (b, eq) <- getParent solver a
-                modifyIORef result (eq :)
                 case eq of
-                  Left _ -> return ()
-                  Right (Eqn1 a1 a2 a, Eqn1 b1 b2 b) -> do
+                  Left (Eqn0 cid _ _) -> do
+                    modifyIORef result (maybeToList cid ++)
+                  Right (Eqn1 cid1 a1 a2 a, Eqn1 cid2 b1 b2 b) -> do
+                    modifyIORef result (catMaybes [cid1,cid2] ++)
                     modifyIORef pendingProofs (\xs -> (a1,b1) : (a2,b2) : xs)
                 union a b
                 loop =<< highestNode b
@@ -296,7 +309,7 @@ explainFlatTerm solver c1 c2 = do
 
   b <- loop
   if b
-  then liftM Just $ readIORef result
+  then liftM (Just . IntSet.fromList) $ readIORef result
   else return Nothing
 
 {--------------------------------------------------------------------

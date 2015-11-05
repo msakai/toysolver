@@ -6,6 +6,8 @@ import Control.Monad
 import Data.Array
 import Data.Graph
 import qualified Data.Tree as Tree
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -57,9 +59,9 @@ case_Example_11 = do
   solver <- newSolver
   replicateM_ 15 $ newVar solver
   let xs = [(1,8),(7,2),(3,13),(7,1),(6,7),(6,7),(9,5),(9,3),(14,11),(10,4),(12,9),(4,11),(10,7)]
-  forM_ xs $ \(a,b) -> mergeFlatTerm solver (FTConst a, b)
-  m <- explainFlatTerm solver 1 4
-  fmap Set.fromList m @?= Just (Set.fromList [Left (7,1),Left (10,4),Left (10,7)])
+  forM_ (zip [0..] xs) $ \(i,(a,b)) -> mergeFlatTerm' solver (FTConst a, b) (Just i)
+  m <- explain solver 1 4
+  fmap (Set.fromList . map (xs!!) . IntSet.toList) m @?= Just (Set.fromList [(7,1), (10,4), (10,7)])
 
 -- f(g,h)=d, c=d, f(g,d)=a, e=c, e=b, b=h
 case_Example_16 :: IO ()
@@ -72,14 +74,14 @@ case_Example_16 = do
   e <- newVar solver
   g <- newVar solver
   h <- newVar solver
-  mergeFlatTerm solver (FTApp g h, d)
-  mergeFlatTerm solver (FTConst c, d)
-  mergeFlatTerm solver (FTApp g d, a)
-  mergeFlatTerm solver (FTConst e, c)
-  mergeFlatTerm solver (FTConst e, b)
-  mergeFlatTerm solver (FTConst b, h)
-  m <- explainFlatTerm solver a b
-  fmap Set.fromList m @?= Just (Set.fromList [Left (c,d),Left (e,c),Left (e,b),Left (b,h),Right (Eqn1 g h d,Eqn1 g d a)])
+  mergeFlatTerm' solver (FTApp g h, d) (Just 0)
+  mergeFlatTerm' solver (FTConst c, d) (Just 1)
+  mergeFlatTerm' solver (FTApp g d, a) (Just 2)
+  mergeFlatTerm' solver (FTConst e, c) (Just 3)
+  mergeFlatTerm' solver (FTConst e, b) (Just 4)
+  mergeFlatTerm' solver (FTConst b, h) (Just 5)
+  m <- explain solver a b
+  m @?= Just (IntSet.fromList [1,3,4,5,0,2])
   -- d = c = e = b = h
   -- a = f(g,d) = f(g,h) = d = c = e = b
 
