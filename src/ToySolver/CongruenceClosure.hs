@@ -147,8 +147,8 @@ mergeFlatTerm' solver s a cid = do
         Nothing -> do          
           setLookup solver a1' a2' eq1
           modifyIORef (svUseList solver) $
-            IntMap.alter (Just . (eq1 :) . fromMaybe []) a1' .
-            IntMap.alter (Just . (eq1 :) . fromMaybe []) a2'
+            IntMap.adjust (eq1 :) a1' .
+            IntMap.adjust (eq1 :) a2'
 
 propagate :: Solver -> IO ()
 propagate solver = go
@@ -200,7 +200,7 @@ propagate solver = go
           Nothing -> do
             setLookup solver c1' c2' eq1
             modifyIORef (svUseList solver) $
-              IntMap.alter (Just . (eq1 :) . fromMaybe []) b'
+              IntMap.adjust (eq1 :) b'
             return ()
 
     -- Insert edge a→b labelled with a_eq_b into the proof forest, and re-orient its original ancestors.
