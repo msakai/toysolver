@@ -28,6 +28,7 @@ module ToySolver.CongruenceClosure
   , mergeFlatTerm
   , areCongruent
   , areCongruentFlatTerm
+  , explainFlatTerm
   ) where
 
 import Prelude hiding (lookup)
@@ -213,6 +214,87 @@ normalize solver (FTApp t1 t2) = do
   case ret of
     Just (Eqn1 _ _ a) -> liftM FTConst $ getRepresentative solver a
     Nothing -> return $ FTApp u1 u2
+
+explainFlatTerm :: Solver -> Var -> Var -> IO (Maybe [PendingEqn])
+explainFlatTerm solver c1 c2 = do
+  n <- readIORef (svVarCounter solver)
+  
+  -- Additional union-find data structure
+  representativeTable2 <- newIORef (IntMap.fromList [(a,a) | a <- [0..n-1]])
+  classList2 <- newIORef (IntMap.fromList [(a,[a]) | a <- [0..n-1]])
+  highestNodeTable <- newIORef (IntMap.fromList [(a,a) | a <- [0..n-1]])
+                
+  let getRepresentative2 :: Var -> IO Var
+      getRepresentative2 a = do
+        m <- readIORef representativeTable2
+        return $ m IntMap.! a
+
+      highestNode :: Var -> IO Var
+      highestNode c = do
+        d <- getRepresentative2 c
+        m <- readIORef highestNodeTable
+        return $ m IntMap.! d
+
+      union :: Var -> Var -> IO ()
+      union a b = do
+        a' <- getRepresentative2 a
+        b' <- getRepresentative2 b
+        cls <- readIORef classList2
+        let classA = cls IntMap.! a'
+            classB = cls IntMap.! b'
+        h <- highestNode b'
+        if length classA < length classB then do
+          update a' b' classA classB h
+        else do
+          update b' a' classB classA h
+
+        where
+          update a' b' classA classB h = do
+            modifyIORef representativeTable2 $ 
+              -- Note that 'IntMap.union' is left biased.
+              IntMap.union (IntMap.fromList [(c,b') | c <- classA])
+            modifyIORef classList2 $
+              IntMap.insert b' (classA ++ classB) . IntMap.delete a'
+            modifyIORef highestNodeTable $
+              IntMap.insert b' h . IntMap.delete a'
+
+  pendingProofs <- newIORef ([(c1,c2)] :: [(Var,Var)])
+  result <- newIORef ([] :: [PendingEqn])
+
+  let loop = do
+        ps <- readIORef pendingProofs
+        case ps of
+          [] -> return True
+          ((a,b) : ps') -> do
+            writeIORef pendingProofs ps'
+            m <- nearestCommonAncestor solver a b
+            case m of
+              Nothing -> return False
+              Just c -> do
+                explainAlongPath a c
+                explainAlongPath b c
+                loop
+
+      explainAlongPath :: Var -> Var -> IO ()
+      explainAlongPath a c = do
+        a <- highestNode a
+        -- note that c is already @highestNode c@
+        let loop a =
+              unless (a == c) $ do
+                Just (b, eq) <- getParent solver a
+                modifyIORef result (eq :)
+                case eq of
+                  Left _ -> return ()
+                  Right (Eqn1 a1 a2 a, Eqn1 b1 b2 b) -> do
+                    modifyIORef pendingProofs (\xs -> (a1,b1) : (a2,b2) : xs)
+                union a b
+                loop =<< highestNode b
+        loop a
+
+  b <- loop
+  if b
+  then liftM Just $ readIORef result
+  else return Nothing
 
 {--------------------------------------------------------------------
   Helper funcions
