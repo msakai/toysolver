@@ -39,6 +39,13 @@ module ToySolver.FOLModelFinder
   , Entity
   , showModel
   , showEntity
+  , evalFormula
+  , evalAtom
+  , evalTerm
+  , evalLit
+  , evalClause
+  , evalClauses
+  , evalClausesU
 
   -- * Main function
   , findModel
@@ -453,6 +460,44 @@ showModel m =
   | (f, xss) <- Map.toList (mFunctions m)
   , (xs, y) <- xss
   ]
+
+evalFormula :: Model -> Formula -> Bool
+evalFormula m = f Map.empty
+  where
+    f :: Map Var Entity -> Formula -> Bool
+    f env T = True
+    f env F = False
+    f env (Atom a) = evalAtom m env a
+    f env (And phi1 phi2) = f env phi1 && f env phi2
+    f env (Or phi1 phi2)  = f env phi1 || f env phi2
+    f env (Not phi) = not (f env phi)
+    f env (Imply phi1 phi2) = not (f env phi1) || f env phi2
+    f env (Equiv phi1 phi2) = f env phi1 == f env phi2
+    f env (Forall v phi) = all (\e -> f (Map.insert v e env) phi) (mUniverse m)
+    f env (Exists v phi) = any (\e -> f (Map.insert v e env) phi) (mUniverse m)
+
+evalAtom :: Model -> Map Var Entity -> Atom -> Bool
+evalAtom m env (PApp "=" [x1,x2]) = evalTerm m env x1 == evalTerm m env x2
+evalAtom m env (PApp p xs) = map (evalTerm m env) xs `elem` (mRelations m Map.! p)
+
+evalTerm :: Model -> Map Var Entity -> Term -> Entity
+evalTerm m env (TmVar v) = env Map.! v
+evalTerm m env (TmApp f xs) = head [y | (xs2,y) <- mFunctions m Map.! f, xs' == xs2]
+  where
+    xs' = map (evalTerm m env) xs
+
+evalLit :: Model -> Map Var Entity -> Lit -> Bool
+evalLit m env (Pos atom) = evalAtom m env atom
+evalLit m env (Neg atom) = not $ evalAtom m env atom
+
+evalClause :: Model -> Map Var Entity -> Clause -> Bool
+evalClause m env = any (evalLit m env)
+
+evalClauses :: Model -> Map Var Entity -> [Clause] -> Bool
+evalClauses m env = all (evalClause m env)
+
+evalClausesU :: Model -> [Clause] -> Bool
+evalClausesU m cs = all (\env -> evalClauses m env cs) (enumSubst (vars cs) (mUniverse m))
 
 -- ---------------------------------------------------------------------------
 
