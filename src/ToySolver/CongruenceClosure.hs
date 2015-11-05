@@ -28,6 +28,8 @@ module ToySolver.CongruenceClosure
   , mergeFlatTerm
   , areCongruent
   , areCongruentFlatTerm
+  , Eqn1 (..)
+  , PendingEqn
   , explainFlatTerm
   ) where
 
@@ -55,6 +57,7 @@ data FlatTerm
 
 -- | @Eqn a b c@ represents an equation "f(a,b) = c"
 data Eqn1 = Eqn1 Var Var Var
+  deriving (Eq, Ord, Show)
 
 type PendingEqn = Either (Var,Var) (Eqn1, Eqn1)
 
