@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -7,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (BangPatterns)
 --
 -- References:
 --
@@ -24,9 +25,12 @@ module ToySolver.CongruenceClosure
   , newSolver
   , newVar
   , merge
+  , merge'    
   , mergeFlatTerm
+  , mergeFlatTerm'
   , areCongruent
   , areCongruentFlatTerm
+  , explain
   ) where
 
 import Prelude hiding (lookup)
@@ -37,6 +41,8 @@ import Data.IORef
 import Data.Maybe
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Map (Map)
 import qualified Data.Map as Map
     
@@ -49,10 +55,16 @@ data FlatTerm
   | FTApp Var Var
   deriving (Ord, Eq, Show)
 
--- | @Eqn a b c@ represents an equation "f(a,b) = c"
-data Eqn1 = Eqn1 Var Var Var
+type ConstrID = Int
 
-type PendingEqn = Either (Var,Var) (Eqn1, Eqn1)
+-- | @Eqn0 cid a b@ represents an equation "a = b"
+data Eqn0 = Eqn0 (Maybe ConstrID) Var Var
+    
+-- | @Eqn cid a b c@ represents an equation "f(a,b) = c"
+data Eqn1 = Eqn1 (Maybe ConstrID) Var Var Var
+  deriving (Eq, Ord, Show)
+
+type PendingEqn = Either Eqn0 (Eqn1, Eqn1)
 
 data Solver
   = Solver
@@ -61,6 +73,7 @@ data Solver
   , svPending              :: IORef [PendingEqn]
   , svRepresentativeTable  :: IORef (IntMap Var) -- 本当は配列が良い
   , svClassList            :: IORef (IntMap [Var])
+  , svParent               :: IORef (IntMap (Var, PendingEqn))
   , svUseList              :: IORef (IntMap [Eqn1])
   , svLookupTable          :: IORef (IntMap (IntMap Eqn1))
   }
@@ -72,6 +85,7 @@ newSolver = do
   pending  <- newIORef []
   rep      <- newIORef IntMap.empty
   classes  <- newIORef IntMap.empty
+  parent   <- newIORef IntMap.empty
   useList  <- newIORef IntMap.empty
   lookup   <- newIORef IntMap.empty
   return $
@@ -81,6 +95,7 @@ newSolver = do
     , svPending             = pending
     , svRepresentativeTable = rep
     , svClassList           = classes
+    , svParent              = parent
     , svUseList             = useList
     , svLookupTable         = lookup
     }
@@ -95,24 +110,31 @@ newVar solver = do
   return v
 
 merge :: Solver -> Term -> Term -> IO ()
-merge solver t u = do
+merge solver t u = merge' solver t u Nothing
+
+merge' :: Solver -> Term -> Term -> Maybe ConstrID -> IO ()
+merge' solver t u cid = do
   t' <- transform solver t
   u' <- transform solver u
   case (t', u') of
-    (FTConst c, _) -> mergeFlatTerm solver (u', c)
-    (_, FTConst c) -> mergeFlatTerm solver (t', c)
+    (FTConst c, _) -> mergeFlatTerm' solver (u', c) cid
+    (_, FTConst c) -> mergeFlatTerm' solver (t', c) cid
     _ -> do
       c <- nameFlatTerm solver u'
-      mergeFlatTerm solver (t', c)
+      mergeFlatTerm' solver (t', c) cid
 
 mergeFlatTerm :: Solver -> (FlatTerm, Var) -> IO ()
-mergeFlatTerm solver (s, a) = do
+mergeFlatTerm solver (s, a) = mergeFlatTerm' solver (s, a) Nothing
+
+mergeFlatTerm' :: Solver -> (FlatTerm, Var) -> Maybe ConstrID -> IO ()
+mergeFlatTerm' solver (s, a) cid = do
   case s of
     FTConst c -> do
-      addToPending solver (Left (c, a))
+      let eq1 = Eqn0 cid c a
+      addToPending solver (Left eq1)
       propagate solver
     FTApp a1 a2 -> do
-      let eq1 = Eqn1 a1 a2 a
+      let eq1 = Eqn1 cid a1 a2 a
       a1' <- getRepresentative solver a1
       a2' <- getRepresentative solver a2
       ret <- lookup solver a1' a2'
@@ -140,17 +162,19 @@ propagate solver = go
 
     processEqn p = do
       let (a,b) = case p of
-                    Left (a,b) -> (a,b)
-                    Right (Eqn1 _ _ a, Eqn1 _ _ b) -> (a,b)
+                    Left (Eqn0 _ a b) -> (a,b)
+                    Right (Eqn1 _ _ _ a, Eqn1 _ _ _ b) -> (a,b)
       a' <- getRepresentative solver a
       b' <- getRepresentative solver b
       unless (a' == b') $ do
         clist <- readIORef (svClassList  solver)
         let classA = clist IntMap.! a'
             classB = clist IntMap.! b'
-        if length classA < length classB then
+        if length classA < length classB then do
+          updateParent a b p
           update a' b' classA classB
-        else
+        else do
+          updateParent b a p
           update b' a' classB classA
 
     update a' b' classA classB = do
@@ -161,7 +185,7 @@ propagate solver = go
         IntMap.insert b' (classA ++ classB) . IntMap.delete a'
 
       useList <- readIORef (svUseList solver)
-      forM_ (useList IntMap.! a') $ \eq1@(Eqn1 c1 c2 _) -> do
+      forM_ (useList IntMap.! a') $ \eq1@(Eqn1 _ c1 c2 _) -> do
         c1' <- getRepresentative solver c1
         c2' <- getRepresentative solver c2
         assert (b' == c1' || b' == c2') $ return ()
@@ -172,7 +196,17 @@ propagate solver = go
             addToPending solver $ Right (eq1, eq2)
           Nothing -> do
             return ()
-      writeIORef (svUseList solver) $ IntMap.delete a' useList        
+      writeIORef (svUseList solver) $ IntMap.delete a' useList
+
+    -- Insert edge a→b labelled with a_eq_b into the proof forest, and re-orient its original ancestors.
+    updateParent a b a_eq_b = do
+      let loop d (c, c_eq_d) = do
+            tbl <- readIORef (svParent solver)
+            writeIORef (svParent solver) (IntMap.insert d (c, c_eq_d) tbl)
+            case IntMap.lookup d tbl of
+              Nothing -> return ()
+              Just (e, d_eq_e) -> loop e (d, d_eq_e)
+      loop a (b, a_eq_b)
 
 areCongruent :: Solver -> Term -> Term -> IO Bool
 areCongruent solver t1 t2 = do
@@ -193,8 +227,90 @@ normalize solver (FTApp t1 t2) = do
   u2 <- getRepresentative solver t2
   ret <- lookup solver u1 u2
   case ret of
-    Just (Eqn1 _ _ a) -> liftM FTConst $ getRepresentative solver a
+    Just (Eqn1 _ _ _ a) -> liftM FTConst $ getRepresentative solver a
     Nothing -> return $ FTApp u1 u2
+
+explain :: Solver -> Var -> Var -> IO (Maybe IntSet)
+explain solver c1 c2 = do
+  n <- readIORef (svVarCounter solver)
+  
+  -- Additional union-find data structure
+  representativeTable2 <- newIORef (IntMap.fromList [(a,a) | a <- [0..n-1]])
+  classList2 <- newIORef (IntMap.fromList [(a,[a]) | a <- [0..n-1]])
+  highestNodeTable <- newIORef (IntMap.fromList [(a,a) | a <- [0..n-1]])
+                
+  let getRepresentative2 :: Var -> IO Var
+      getRepresentative2 a = do
+        m <- readIORef representativeTable2
+        return $ m IntMap.! a
+
+      highestNode :: Var -> IO Var
+      highestNode c = do
+        d <- getRepresentative2 c
+        m <- readIORef highestNodeTable
+        return $ m IntMap.! d
+
+      union :: Var -> Var -> IO ()
+      union a b = do
+        a' <- getRepresentative2 a
+        b' <- getRepresentative2 b
+        cls <- readIORef classList2
+        let classA = cls IntMap.! a'
+            classB = cls IntMap.! b'
+        h <- highestNode b'
+        if length classA < length classB then do
+          update a' b' classA classB h
+        else do
+          update b' a' classB classA h
+
+        where
+          update a' b' classA classB h = do
+            modifyIORef representativeTable2 $ 
+              -- Note that 'IntMap.union' is left biased.
+              IntMap.union (IntMap.fromList [(c,b') | c <- classA])
+            modifyIORef classList2 $
+              IntMap.insert b' (classA ++ classB) . IntMap.delete a'
+            modifyIORef highestNodeTable $
+              IntMap.insert b' h . IntMap.delete a'
+
+  pendingProofs <- newIORef ([(c1,c2)] :: [(Var,Var)])
+  result <- newIORef ([] :: [Int])
+
+  let loop = do
+        ps <- readIORef pendingProofs
+        case ps of
+          [] -> return True
+          ((a,b) : ps') -> do
+            writeIORef pendingProofs ps'
+            m <- nearestCommonAncestor solver a b
+            case m of
+              Nothing -> return False
+              Just c -> do
+                explainAlongPath a c
+                explainAlongPath b c
+                loop
+
+      explainAlongPath :: Var -> Var -> IO ()
+      explainAlongPath a c = do
+        a <- highestNode a
+        -- note that c is already @highestNode c@
+        let loop a =
+              unless (a == c) $ do
+                Just (b, eq) <- getParent solver a
+                case eq of
+                  Left (Eqn0 cid _ _) -> do
+                    modifyIORef result (maybeToList cid ++)
+                  Right (Eqn1 cid1 a1 a2 a, Eqn1 cid2 b1 b2 b) -> do
+                    modifyIORef result (catMaybes [cid1,cid2] ++)
+                    modifyIORef pendingProofs (\xs -> (a1,b1) : (a2,b2) : xs)
+                union a b
+                loop =<< highestNode b
+        loop a
+
+  b <- loop
+  if b
+  then liftM (Just . IntSet.fromList) $ readIORef result
+  else return Nothing
 
 {--------------------------------------------------------------------
   Helper funcions
@@ -219,6 +335,30 @@ getRepresentative :: Solver -> Var -> IO Var
 getRepresentative solver c = do
   m <- readIORef $ svRepresentativeTable solver
   return $ m IntMap.! c
+
+getParent :: Solver -> Var -> IO (Maybe (Var, PendingEqn))
+getParent solver c = do
+  m <- readIORef $ svParent solver
+  return $ IntMap.lookup c m
+
+nearestCommonAncestor :: Solver -> Var -> Var -> IO (Maybe Var)
+nearestCommonAncestor solver a b = do
+  let loop c !ret = do
+        m <- getParent solver c
+        case m of
+          Nothing -> return ret
+          Just (d,_) -> loop d (IntSet.insert d ret)
+  a_ancestors <- loop a (IntSet.singleton a)
+
+  let loop2 c = do
+        if c `IntSet.member` a_ancestors then
+          return (Just c)
+        else do
+          m <- getParent solver c
+          case m of
+            Nothing -> return Nothing
+            Just (d,_) -> loop2 d
+  loop2 b
 
 transform :: Solver -> Term -> IO FlatTerm
 transform solver (TApp f xs) = do
