@@ -164,8 +164,8 @@ propagate solver = go
       forM_ (useList IntMap.! a') $ \eq1@(Eqn1 c1 c2 _) -> do
         c1' <- getRepresentative solver c1
         c2' <- getRepresentative solver c2
-        assert (a' == c1' || a' == c2') $ return ()
-        -- unless (a' == c1' || a' == c2') $ error "CongruenceClosure.propagate.update: should not happen"
+        assert (b' == c1' || b' == c2') $ return ()
+        -- unless (b' == c1' || b' == c2') $ error "CongruenceClosure.propagate.update: should not happen"
         ret <- lookup solver c1' c2'
         case ret of
           Just eq2 -> do
