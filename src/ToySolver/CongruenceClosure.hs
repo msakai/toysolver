@@ -74,7 +74,7 @@ data Solver
   , svDefs                 :: IORef (IntMap (Var,Var), Map (Var,Var) Var)
   , svPending              :: IORef [PendingEqn]
   , svRepresentativeTable  :: IORef (IntMap Var) -- 本当は配列が良い
-  , svClassList            :: IORef (IntMap [Var])
+  , svClassList            :: IORef (IntMap IntSet)
   , svParent               :: IORef (IntMap (Var, PendingEqn))
   , svUseList              :: IORef (IntMap [Eqn1])
   , svLookupTable          :: IORef (IntMap (IntMap Eqn1))
@@ -107,7 +107,7 @@ newVar solver = do
   v <- readIORef (svVarCounter solver)
   writeIORef (svVarCounter solver) $! v + 1
   modifyIORef (svRepresentativeTable solver) (IntMap.insert v v)
-  modifyIORef (svClassList solver) (IntMap.insert v [v])
+  modifyIORef (svClassList solver) (IntMap.insert v (IntSet.singleton v))
   modifyIORef (svUseList solver) (IntMap.insert v [])
   return v
 
@@ -172,7 +172,7 @@ propagate solver = go
         clist <- readIORef (svClassList  solver)
         let classA = clist IntMap.! a'
             classB = clist IntMap.! b'
-        if length classA < length classB then do
+        if IntSet.size classA < IntSet.size classB then do
           updateParent a b p
           update a' b' classA classB
         else do
@@ -182,9 +182,9 @@ propagate solver = go
     update a' b' classA classB = do
       modifyIORef (svRepresentativeTable solver) $ 
         -- Note that 'IntMap.union' is left biased.
-        IntMap.union (IntMap.fromList [(c,b') | c <- classA])
+        IntMap.union (IntMap.fromAscList [(c,b') | c <- IntSet.toAscList classA])
       modifyIORef (svClassList solver) $
-        IntMap.insert b' (classA ++ classB) . IntMap.delete a'
+        IntMap.insert b' (classA `IntSet.union` classB) . IntMap.delete a'
 
       useList <- readIORef (svUseList solver)
       forM_ (useList IntMap.! a') $ \eq1@(Eqn1 _ c1 c2 _) -> do
@@ -250,7 +250,7 @@ explainVar solver c1 c2 = do
   
   -- Additional union-find data structure
   representativeTable2 <- newIORef (IntMap.fromList [(a,a) | a <- [0..n-1]])
-  classList2 <- newIORef (IntMap.fromList [(a,[a]) | a <- [0..n-1]])
+  classList2 <- newIORef (IntMap.fromList [(a, IntSet.singleton a) | a <- [0..n-1]])
   highestNodeTable <- newIORef (IntMap.fromList [(a,a) | a <- [0..n-1]])
                 
   let getRepresentative2 :: Var -> IO Var
@@ -272,7 +272,7 @@ explainVar solver c1 c2 = do
         let classA = cls IntMap.! a'
             classB = cls IntMap.! b'
         h <- highestNode b'
-        if length classA < length classB then do
+        if IntSet.size classA < IntSet.size classB then do
           update a' b' classA classB h
         else do
           update b' a' classB classA h
@@ -281,9 +281,9 @@ explainVar solver c1 c2 = do
           update a' b' classA classB h = do
             modifyIORef representativeTable2 $ 
               -- Note that 'IntMap.union' is left biased.
-              IntMap.union (IntMap.fromList [(c,b') | c <- classA])
+              IntMap.union (IntMap.fromAscList [(c,b') | c <- IntSet.toAscList classA])
             modifyIORef classList2 $
-              IntMap.insert b' (classA ++ classB) . IntMap.delete a'
+              IntMap.insert b' (classA `IntSet.union` classB) . IntMap.delete a'
             modifyIORef highestNodeTable $
               IntMap.insert b' h . IntMap.delete a'
 
