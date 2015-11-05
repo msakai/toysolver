@@ -46,11 +46,11 @@ case_1_FlatTerm = do
   c <- newVar solver
   d <- newVar solver
 
-  mergeFlatTerm solver (FTConst a, c)
+  mergeFlatTerm solver (FTConst a) c
   ret <- areCongruentFlatTerm solver (FTApp a b) (FTApp c d)
   ret @?= False
   
-  mergeFlatTerm solver (FTConst b, d)
+  mergeFlatTerm solver (FTConst b) d
   ret <- areCongruentFlatTerm solver (FTApp a b) (FTApp c d)
   ret @?= True
 
@@ -59,8 +59,8 @@ case_Example_11 = do
   solver <- newSolver
   replicateM_ 15 $ newVar solver
   let xs = [(1,8),(7,2),(3,13),(7,1),(6,7),(6,7),(9,5),(9,3),(14,11),(10,4),(12,9),(4,11),(10,7)]
-  forM_ (zip [0..] xs) $ \(i,(a,b)) -> mergeFlatTerm' solver (FTConst a, b) (Just i)
-  m <- explain solver 1 4
+  forM_ (zip [0..] xs) $ \(i,(a,b)) -> mergeFlatTerm' solver (FTConst a) b (Just i)
+  m <- explainVar solver 1 4
   fmap (Set.fromList . map (xs!!) . IntSet.toList) m @?= Just (Set.fromList [(7,1), (10,4), (10,7)])
 
 -- f(g,h)=d, c=d, f(g,d)=a, e=c, e=b, b=h
@@ -74,13 +74,13 @@ case_Example_16 = do
   e <- newVar solver
   g <- newVar solver
   h <- newVar solver
-  mergeFlatTerm' solver (FTApp g h, d) (Just 0)
-  mergeFlatTerm' solver (FTConst c, d) (Just 1)
-  mergeFlatTerm' solver (FTApp g d, a) (Just 2)
-  mergeFlatTerm' solver (FTConst e, c) (Just 3)
-  mergeFlatTerm' solver (FTConst e, b) (Just 4)
-  mergeFlatTerm' solver (FTConst b, h) (Just 5)
-  m <- explain solver a b
+  mergeFlatTerm' solver (FTApp g h) d (Just 0)
+  mergeFlatTerm' solver (FTConst c) d (Just 1)
+  mergeFlatTerm' solver (FTApp g d) a (Just 2)
+  mergeFlatTerm' solver (FTConst e) c (Just 3)
+  mergeFlatTerm' solver (FTConst e) b (Just 4)
+  mergeFlatTerm' solver (FTConst b) h (Just 5)
+  m <- explainVar solver a b
   m @?= Just (IntSet.fromList [1,3,4,5,0,2])
   -- d = c = e = b = h
   -- a = f(g,d) = f(g,h) = d = c = e = b
@@ -100,7 +100,7 @@ prop_components = QM.monadicIO $ do
   solver <- QM.run $ newSolver
   QM.run $ do
     replicateM_ nv $ newVar solver
-    forM_ edges $ \(s,t) -> mergeFlatTerm solver (FTConst s, t)
+    forM_ edges $ \(s,t) -> mergeFlatTerm solver (FTConst s) t
   forM_ [0..(nv-1)] $ \c ->
     forM_ [0..(nv-1)] $ \d -> do
       b <- QM.run $ areCongruentFlatTerm solver (FTConst c) (FTConst d)

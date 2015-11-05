@@ -31,6 +31,8 @@ module ToySolver.CongruenceClosure
   , areCongruent
   , areCongruentFlatTerm
   , explain
+  , explainFlatTerm
+  , explainVar
   ) where
 
 import Prelude hiding (lookup)
@@ -117,17 +119,17 @@ merge' solver t u cid = do
   t' <- transform solver t
   u' <- transform solver u
   case (t', u') of
-    (FTConst c, _) -> mergeFlatTerm' solver (u', c) cid
-    (_, FTConst c) -> mergeFlatTerm' solver (t', c) cid
+    (FTConst c, _) -> mergeFlatTerm' solver u' c cid
+    (_, FTConst c) -> mergeFlatTerm' solver t' c cid
     _ -> do
       c <- nameFlatTerm solver u'
-      mergeFlatTerm' solver (t', c) cid
+      mergeFlatTerm' solver t' c cid
 
-mergeFlatTerm :: Solver -> (FlatTerm, Var) -> IO ()
-mergeFlatTerm solver (s, a) = mergeFlatTerm' solver (s, a) Nothing
+mergeFlatTerm :: Solver -> FlatTerm -> Var -> IO ()
+mergeFlatTerm solver s a = mergeFlatTerm' solver s a Nothing
 
-mergeFlatTerm' :: Solver -> (FlatTerm, Var) -> Maybe ConstrID -> IO ()
-mergeFlatTerm' solver (s, a) cid = do
+mergeFlatTerm' :: Solver -> FlatTerm -> Var -> Maybe ConstrID -> IO ()
+mergeFlatTerm' solver s a cid = do
   case s of
     FTConst c -> do
       let eq1 = Eqn0 cid c a
@@ -230,8 +232,20 @@ normalize solver (FTApp t1 t2) = do
     Just (Eqn1 _ _ _ a) -> liftM FTConst $ getRepresentative solver a
     Nothing -> return $ FTApp u1 u2
 
-explain :: Solver -> Var -> Var -> IO (Maybe IntSet)
-explain solver c1 c2 = do
+explain :: Solver -> Term -> Term -> IO (Maybe IntSet)
+explain solver t1 t2 = do
+  c1 <- transform solver t1
+  c2 <- transform solver t2
+  explainFlatTerm solver c1 c2
+
+explainFlatTerm :: Solver -> FlatTerm -> FlatTerm -> IO (Maybe IntSet)
+explainFlatTerm solver t1 t2 = do
+  c1 <- nameFlatTerm solver t1
+  c2 <- nameFlatTerm solver t2
+  explainVar solver c1 c2
+
+explainVar :: Solver -> Var -> Var -> IO (Maybe IntSet)
+explainVar solver c1 c2 = do
   n <- readIORef (svVarCounter solver)
   
   -- Additional union-find data structure
@@ -369,16 +383,16 @@ transform solver (TApp f xs) = do
         return $ FTApp t' u'
   foldM phi (FTConst f) xs'
 
--- バックトラックとの関係が悩ましい
--- 最初からその変数が存在したかのようにふるまいたいが
 nameFlatTerm :: Solver -> FlatTerm -> IO Var
 nameFlatTerm _ (FTConst c) = return c
 nameFlatTerm solver (FTApp c d) = do
   (defs1,defs2) <- readIORef $ svDefs solver
-  case Map.lookup (c,d) defs2 of
-    Just a -> return a
-    Nothing -> do
-      a <- newVar solver
-      writeIORef (svDefs solver) (IntMap.insert a (c,d) defs1, Map.insert (c,d) a defs2)
-      mergeFlatTerm solver (FTApp c d, a)
-      return a
+  a <- case Map.lookup (c,d) defs2 of
+         Just a -> return a
+         Nothing -> do
+           a <- newVar solver
+           writeIORef (svDefs solver) (IntMap.insert a (c,d) defs1, Map.insert (c,d) a defs2)
+           return a
+  -- We call 'mergeFlatTerm' everytime, because backtracking might have canceled its effect.
+  mergeFlatTerm solver (FTApp c d) a
+  return a
