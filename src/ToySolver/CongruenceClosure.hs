@@ -47,6 +47,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Semigroup
     
 type Var = Int
 
@@ -68,13 +69,39 @@ data Eqn1 = Eqn1 (Maybe ConstrID) Var Var Var
 
 type PendingEqn = Either Eqn0 (Eqn1, Eqn1)
 
+data Class
+  = ClassSingleton !Var
+  | ClassUnion !Int Class Class
+
+instance Semigroup Class where
+  xs <> ys = ClassUnion (classSize xs + classSize ys) xs ys
+  stimes = stimesIdempotent
+
+classSize :: Class -> Int
+classSize (ClassSingleton v) = 1
+classSize (ClassUnion size _ _) = size
+
+-- Use mono-traversable package?
+classToList :: Class -> [Var]
+classToList c = f c []
+  where
+    f (ClassSingleton v) = (v :)
+    f (ClassUnion _ xs ys) = f xs . f ys
+
+-- Use mono-traversable package?
+classForM_ :: Monad m => (Var -> m ()) -> Class -> m ()
+classForM_ f = g
+  where
+    g (ClassSingleton v) = f v
+    g (ClassUnion _ xs ys) = g xs >> g ys
+
 data Solver
   = Solver
   { svVarCounter           :: IORef Int
   , svDefs                 :: IORef (IntMap (Var,Var), Map (Var,Var) Var)
   , svPending              :: IORef [PendingEqn]
   , svRepresentativeTable  :: IORef (IntMap Var) -- 本当は配列が良い
-  , svClassList            :: IORef (IntMap IntSet)
+  , svClassList            :: IORef (IntMap Class)
   , svParent               :: IORef (IntMap (Var, PendingEqn))
   , svUseList              :: IORef (IntMap [Eqn1])
   , svLookupTable          :: IORef (IntMap (IntMap Eqn1))
@@ -107,7 +134,7 @@ newVar solver = do
   v <- readIORef (svVarCounter solver)
   writeIORef (svVarCounter solver) $! v + 1
   modifyIORef (svRepresentativeTable solver) (IntMap.insert v v)
-  modifyIORef (svClassList solver) (IntMap.insert v (IntSet.singleton v))
+  modifyIORef (svClassList solver) (IntMap.insert v (ClassSingleton v))
   modifyIORef (svUseList solver) (IntMap.insert v [])
   return v
 
@@ -176,7 +203,7 @@ propagate solver = go
         clist <- readIORef (svClassList  solver)
         let classA = clist IntMap.! a'
             classB = clist IntMap.! b'
-        if IntSet.size classA < IntSet.size classB then do
+        if classSize classA < classSize classB then do
           updateParent a b p
           update a' b' classA classB
         else do
@@ -186,9 +213,9 @@ propagate solver = go
     update a' b' classA classB = do
       modifyIORef (svRepresentativeTable solver) $ 
         -- Note that 'IntMap.union' is left biased.
-        IntMap.union (IntMap.fromAscList [(c,b') | c <- IntSet.toAscList classA])
+        IntMap.union (IntMap.fromList [(c,b') | c <- classToList classA])
       modifyIORef (svClassList solver) $
-        IntMap.insert b' (classA `IntSet.union` classB) . IntMap.delete a'
+        IntMap.insert b' (classA <> classB) . IntMap.delete a'
 
       useList <- readIORef (svUseList solver)
       writeIORef (svUseList solver) $ IntMap.delete a' useList
@@ -249,10 +276,10 @@ checkInvariant solver = do
   unless (IntMap.keysSet classList == representatives) $
     error "CongruenceClosure.checkInvariant: IntMap.keysSet classList /= representatives"
 
-  unless (IntSet.unions (IntMap.elems classList) == IntSet.fromList [0..nv-1]) $
+  unless (IntSet.unions (map (IntSet.fromList . classToList) (IntMap.elems classList)) == IntSet.fromList [0..nv-1]) $
     error "CongruenceClosure.checkInvariant: classList is not exhaustive"
   forM_ (IntMap.toList classList) $ \(a, bs) -> do
-    forM_ (IntSet.toList bs) $ \b -> do
+    forM_ (classToList bs) $ \b -> do
       b' <- getRepresentative solver b
       unless (a == b') $
         error "CongruenceClosure.checkInvariant: inconsistency between classList and representativeTable"
