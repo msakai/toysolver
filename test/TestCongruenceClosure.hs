@@ -85,6 +85,34 @@ case_Example_16 = do
   -- d = c = e = b = h
   -- a = f(g,d) = f(g,h) = d = c = e = b
 
+case_backtracking_1 :: IO ()
+case_backtracking_1 = do
+  solver <- newSolver
+  a1 <- newVar solver
+  a2 <- newVar solver
+  b1 <- newVar solver
+  b2 <- newVar solver
+
+  mergeFlatTerm solver (FTConst a1) b1
+
+  pushBacktrackPoint solver
+  mergeFlatTerm solver (FTConst a2) b2
+  ret <- areCongruentFlatTerm solver (FTApp a1 a2) (FTApp b1 b2)
+  ret @?= True
+  popBacktrackPoint solver
+
+  ret <- areCongruentFlatTerm solver (FTConst a2) (FTConst b2)
+  ret @?= False
+  ret <- areCongruentFlatTerm solver (FTApp a1 a2) (FTApp b1 b2)
+  ret @?= False
+
+  pushBacktrackPoint solver
+  ret <- areCongruentFlatTerm solver (FTConst a2) (FTConst b2)
+  ret @?= False
+  ret <- areCongruentFlatTerm solver (FTApp a1 a2) (FTApp b1 b2)
+  ret @?= False  
+  popBacktrackPoint solver
+
 prop_components :: Property
 prop_components = QM.monadicIO $ do
   nv <- QM.pick $ choose (1, 10)
