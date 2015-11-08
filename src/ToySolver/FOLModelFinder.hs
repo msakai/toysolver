@@ -39,6 +39,13 @@ module ToySolver.FOLModelFinder
   , Entity
   , showModel
   , showEntity
+  , evalFormula
+  , evalAtom
+  , evalTerm
+  , evalLit
+  , evalClause
+  , evalClauses
+  , evalClausesU
 
   -- * Main function
   , findModel
@@ -274,23 +281,23 @@ instance Vars SAtom where
 
 -- ---------------------------------------------------------------------------
 
-type M = State (Set Var, Int, [SLit])
+type M = State (Set Var, Int, Map (FSym, [Var]) Var, [SLit])
 
-flatten :: Clause -> SClause
+flatten :: Clause -> Maybe SClause
 flatten c =
-  case runState (mapM flattenLit c) (vars c, 0, []) of
-    (c, (_,_,ls)) -> removeNegEq $ ls ++ c
+  case runState (mapM flattenLit c) (vars c, 0, Map.empty, []) of
+    (c, (_,_,_,ls)) -> removeTautology $ removeNegEq $ ls ++ c
   where
     gensym :: M Var
     gensym = do
-      (vs, n, ls) <- get
+      (vs, n, defs, ls) <- get
       let go :: Int -> M Var
           go m = do
             let v = "#" ++ show m
             if v `Set.member` vs
               then go (m+1)
               else do
-                put (Set.insert v vs, m+1, ls)
+                put (Set.insert v vs, m+1, defs, ls)
                 return v
       go n
 
@@ -318,10 +325,14 @@ flatten c =
     flattenTerm (TmVar x)    = return x
     flattenTerm (TmApp f ts) = do
       xs <- mapM flattenTerm ts
-      x <- gensym
-      (vs, n, ls) <- get
-      put (vs, n, Neg (SEq (STmApp f xs) x) : ls)
-      return x
+      (_, _, defs, _) <- get
+      case Map.lookup (f, xs) defs of
+        Just x -> return x
+        Nothing -> do
+          x <- gensym
+          (vs, n, defs, ls) <- get
+          put (vs, n, Map.insert (f, xs) x defs, Neg (SEq (STmApp f xs) x) : ls)
+          return x
 
     removeNegEq :: SClause -> SClause
     removeNegEq = go []
@@ -346,6 +357,14 @@ flatten c =
         substVar x y v
           | v==x      = y
           | otherwise = v
+
+    removeTautology :: SClause -> Maybe SClause
+    removeTautology lits
+      | Set.null (pos `Set.intersection` neg) = Just $ [Neg l | l <- Set.toList neg] ++ [Pos l | l <- Set.toList pos]
+      | otherwise = Nothing
+      where
+        pos = Set.fromList [l | Pos l <- lits]
+        neg = Set.fromList [l | Neg l <- lits]
 
 test_flatten = flatten [Pos $ PApp "P" [TmApp "a" [], TmApp "f" [TmVar "x"]]]
 
@@ -411,27 +430,30 @@ simplifyGroundClause = liftM concat . mapM f
     f (Pos (SEq (STmVar x) y)) = if x==y then Nothing else return []
     f lit = return [lit]
 
-collectFSym :: SClause -> Set (FSym, Int)
+collectFSym :: Clause -> Set (FSym, Int)
 collectFSym = Set.unions . map f
   where
-    f :: SLit -> Set (FSym, Int)
+    f :: Lit -> Set (FSym, Int)
     f (Pos a) = g a
     f (Neg a) = g a
 
-    g :: SAtom -> Set (FSym, Int)
-    g (SEq (STmApp f xs) _) = Set.singleton (f, length xs)
-    g _ = Set.empty
+    g :: Atom -> Set (FSym, Int)
+    g (PApp _ xs) = Set.unions $ map h xs
 
-collectPSym :: SClause -> Set (PSym, Int)
+    h :: Term -> Set (FSym, Int)
+    h (TmVar _) = Set.empty
+    h (TmApp f xs) = Set.unions $ Set.singleton (f, length xs) : map h xs
+
+collectPSym :: Clause -> Set (PSym, Int)
 collectPSym = Set.unions . map f
   where
-    f :: SLit -> Set (PSym, Int)
+    f :: Lit -> Set (PSym, Int)
     f (Pos a) = g a
     f (Neg a) = g a
 
-    g :: SAtom -> Set (PSym, Int)
-    g (SPApp p xs) = Set.singleton (p, length xs)
-    g _ = Set.empty
+    g :: Atom -> Set (PSym, Int)
+    g (PApp "=" [_,_]) = Set.empty
+    g (PApp p xs) = Set.singleton (p, length xs)
 
 -- ---------------------------------------------------------------------------
 
@@ -454,15 +476,53 @@ showModel m =
   , (xs, y) <- xss
   ]
 
+evalFormula :: Model -> Formula -> Bool
+evalFormula m = f Map.empty
+  where
+    f :: Map Var Entity -> Formula -> Bool
+    f env T = True
+    f env F = False
+    f env (Atom a) = evalAtom m env a
+    f env (And phi1 phi2) = f env phi1 && f env phi2
+    f env (Or phi1 phi2)  = f env phi1 || f env phi2
+    f env (Not phi) = not (f env phi)
+    f env (Imply phi1 phi2) = not (f env phi1) || f env phi2
+    f env (Equiv phi1 phi2) = f env phi1 == f env phi2
+    f env (Forall v phi) = all (\e -> f (Map.insert v e env) phi) (mUniverse m)
+    f env (Exists v phi) = any (\e -> f (Map.insert v e env) phi) (mUniverse m)
+
+evalAtom :: Model -> Map Var Entity -> Atom -> Bool
+evalAtom m env (PApp "=" [x1,x2]) = evalTerm m env x1 == evalTerm m env x2
+evalAtom m env (PApp p xs) = map (evalTerm m env) xs `elem` (mRelations m Map.! p)
+
+evalTerm :: Model -> Map Var Entity -> Term -> Entity
+evalTerm m env (TmVar v) = env Map.! v
+evalTerm m env (TmApp f xs) = head [y | (xs2,y) <- mFunctions m Map.! f, xs' == xs2]
+  where
+    xs' = map (evalTerm m env) xs
+
+evalLit :: Model -> Map Var Entity -> Lit -> Bool
+evalLit m env (Pos atom) = evalAtom m env atom
+evalLit m env (Neg atom) = not $ evalAtom m env atom
+
+evalClause :: Model -> Map Var Entity -> Clause -> Bool
+evalClause m env = any (evalLit m env)
+
+evalClauses :: Model -> Map Var Entity -> [Clause] -> Bool
+evalClauses m env = all (evalClause m env)
+
+evalClausesU :: Model -> [Clause] -> Bool
+evalClausesU m cs = all (\env -> evalClauses m env cs) (enumSubst (vars cs) (mUniverse m))
+
 -- ---------------------------------------------------------------------------
 
 findModel :: Int -> [Clause] -> IO (Maybe Model)
 findModel size cs = do
   let univ = [0..size-1]
 
-  let cs2 = map flatten cs
-      fs = Set.unions $ map collectFSym cs2
-      ps = Set.unions $ map collectPSym cs2
+  let cs2 = mapMaybe flatten cs
+      fs = Set.unions $ map collectFSym cs
+      ps = Set.unions $ map collectPSym cs
 
   solver <- SAT.newSolver
 

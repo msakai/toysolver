@@ -679,6 +679,24 @@ Test-suite TestCongruenceClosure
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
+Test-suite TestFOLModelFinder
+  Type:              exitcode-stdio-1.0
+  HS-Source-Dirs:    test
+  Main-is:           TestFOLModelFinder.hs
+  Build-depends:
+    base >=4 && <5,
+    containers,
+    mtl,
+    toysolver,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
+    HUnit,
+    QuickCheck >=2.5 && <3
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell
+
 Test-suite TestLPFile
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
