@@ -33,6 +33,9 @@ module ToySolver.CongruenceClosure
   , explain
   , explainFlatTerm
   , explainVar
+
+  , pushBacktrackPoint
+  , popBacktrackPoint
   ) where
 
 import Prelude hiding (lookup)
@@ -48,6 +51,8 @@ import qualified Data.IntSet as IntSet
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Semigroup
+
+import qualified ToySolver.Internal.Data.Vec as Vec
     
 type Var = Int
 
@@ -90,12 +95,14 @@ classToList c = f c []
     f (ClassSingleton v) = (v :)
     f (ClassUnion _ xs ys) = f xs . f ys
 
+{-
 -- Use mono-traversable package?
 classForM_ :: Monad m => (Var -> m ()) -> Class -> m ()
 classForM_ f = g
   where
     g (ClassSingleton v) = f v
     g (ClassUnion _ xs ys) = g xs >> g ys
+-}
 
 data Solver
   = Solver
@@ -105,8 +112,12 @@ data Solver
   , svRepresentativeTable  :: IORef (IntMap Var) -- 本当は配列が良い
   , svClassList            :: IORef (IntMap Class)
   , svParent               :: IORef (IntMap (Var, PendingEqn))
-  , svUseList              :: IORef (IntMap [Eqn1])
+  , svUseList              :: IORef (IntMap [(Eqn1, Level, Gen)])
   , svLookupTable          :: IORef (IntMap (IntMap Eqn1))
+
+  -- for Backtracking
+  , svTrail :: Vec.Vec [TrailItem]
+  , svLevelGen :: Vec.UVec Int
   }
 
 newSolver :: IO Solver
@@ -119,6 +130,11 @@ newSolver = do
   parent   <- newIORef IntMap.empty
   useList  <- newIORef IntMap.empty
   lookup   <- newIORef IntMap.empty
+
+  trail <- Vec.new
+  gen <- Vec.new
+  Vec.push gen 0
+      
   return $
     Solver
     { svVarCounter          = vcnt
@@ -129,6 +145,9 @@ newSolver = do
     , svParent              = parent
     , svUseList             = useList
     , svLookupTable         = lookup
+
+    , svTrail = trail
+    , svLevelGen = gen
     }
 
 newVar :: Solver -> IO Var
@@ -177,9 +196,11 @@ mergeFlatTerm' solver s a cid = do
           checkInvariant solver
         Nothing -> do          
           setLookup solver a1' a2' eq1
+          lv <- getCurrentLevel solver
+          gen <- getLevelGen solver lv
           modifyIORef (svUseList solver) $
-            IntMap.adjust (eq1 :) a1' .
-            IntMap.adjust (eq1 :) a2'
+            IntMap.adjust ((eq1, lv, gen) :) a1' .
+            IntMap.adjust ((eq1, lv, gen) :) a2'
           checkInvariant solver
 
 propagate :: Solver -> IO ()
@@ -205,12 +226,14 @@ propagate solver = go
         clist <- readIORef (svClassList  solver)
         let classA = clist IntMap.! a'
             classB = clist IntMap.! b'
-        if classSize classA < classSize classB then do
-          updateParent a b p
-          update a' b' classA classB
-        else do
-          updateParent b a p
-          update b' a' classB classA
+        (a,b,a',b',classA,classB) <- return $
+          if classSize classA < classSize classB then
+            (a,b,a',b',classA,classB)
+          else
+            (b,a,b',a',classB,classA)
+        origRootA <- updateParent a b p
+        update a' b' classA classB
+        addToTrail solver (TrailMerge a' b' a origRootA)
 
     update a' b' classA classB = do
       modifyIORef (svRepresentativeTable solver) $ 
@@ -219,22 +242,29 @@ propagate solver = go
       modifyIORef (svClassList solver) $
         IntMap.insert b' (classA <> classB) . IntMap.delete a'
 
+      lv <- getCurrentLevel solver
+      lv_gen <- getLevelGen solver lv
       useList <- readIORef (svUseList solver)
-      writeIORef (svUseList solver) $ IntMap.delete a' useList
-      forM_ (useList IntMap.! a') $ \eq1@(Eqn1 _ c1 c2 _) -> do
-        c1' <- getRepresentative solver c1
-        c2' <- getRepresentative solver c2
-        assert (b' == c1' || b' == c2') $ return ()
-        -- unless (b' == c1' || b' == c2') $ error "CongruenceClosure.propagate.update: should not happen"
-        ret <- lookup solver c1' c2'
-        case ret of
-          Just eq2 -> do
-            addToPending solver $ Right (eq1, eq2)
-          Nothing -> do
-            setLookup solver c1' c2' eq1
-            modifyIORef (svUseList solver) $
-              IntMap.adjust (eq1 :) b'
-            return ()
+      useList_a' <- flip filterM (useList IntMap.! a') $ \(eq1@(Eqn1 _ c1 c2 _), lv2, lv2_gen2) -> do
+        lv2_gen <- getLevelGen solver lv2
+        if lv2 <= lv && lv2_gen2 == lv2_gen then do
+          c1' <- getRepresentative solver c1
+          c2' <- getRepresentative solver c2
+          assert (b' == c1' || b' == c2') $ return ()
+          -- unless (b' == c1' || b' == c2') $ error "CongruenceClosure.propagate.update: should not happen"
+          ret <- lookup solver c1' c2'
+          case ret of
+            Just eq2 -> do
+              addToPending solver $ Right (eq1, eq2)
+            Nothing -> do
+              setLookup solver c1' c2' eq1
+              modifyIORef (svUseList solver) $ IntMap.adjust ((eq1, lv, lv_gen) :) b'
+              return ()
+          return True
+        else do
+          -- out-of-date entry
+          return False
+      modifyIORef (svUseList solver) (IntMap.insert a' useList_a')
 
     -- Insert edge a→b labelled with a_eq_b into the proof forest, and re-orient its original ancestors.
     updateParent a b a_eq_b = do
@@ -242,7 +272,7 @@ propagate solver = go
             tbl <- readIORef (svParent solver)
             writeIORef (svParent solver) (IntMap.insert d (c, c_eq_d) tbl)
             case IntMap.lookup d tbl of
-              Nothing -> return ()
+              Nothing -> return d
               Just (e, d_eq_e) -> loop e (d, d_eq_e)
       loop a (b, a_eq_b)
 
@@ -300,14 +330,15 @@ checkInvariant solver = do
           error "CongruenceClosure.checkInvariant: error in pendingList"
 
   useList <- readIORef (svUseList solver)
-  unless (IntMap.keysSet useList == representatives) $
-    error "CongruenceClosure.checkInvariant: IntMap.keysSet useList /= representatives"
-  forM_ (IntMap.toList useList) $ \(a,es) -> do
-    forM_ es $ \(Eqn1 _ b1 b2 _) -> do
-      b1' <- getRepresentative solver b1
-      b2' <- getRepresentative solver b2
-      unless (a == b1' || a == b2') $
-        error "CongruenceClosure.checkInvariant: error in useList"
+  lv <- getCurrentLevel solver
+  forM_ (IntSet.toList representatives) $ \a -> do
+    forM_ (useList IntMap.! a) $ \(Eqn1 _ b1 b2 _, lv2, lv2_gen2) -> do
+      lv2_gen <- getLevelGen solver lv2
+      when (lv2 <= lv && lv2_gen2 == lv2_gen) $ do
+        b1' <- getRepresentative solver b1
+        b2' <- getRepresentative solver b2
+        unless (a == b1' || a == b2') $
+          error "CongruenceClosure.checkInvariant: error in useList"
 
   forM_ (IntSet.toList representatives) $ \b -> do
     forM_ (IntSet.toList representatives) $ \c -> do
@@ -414,6 +445,68 @@ explainVar solver c1 c2 = do
   then liftM (Just . IntSet.fromList) $ readIORef result
   else return Nothing
 
+-- -------------------------------------------------------------------
+-- Backtracking
+-- -------------------------------------------------------------------
+
+type Level = Int
+type Gen = Int
+
+data TrailItem
+  = TrailMerge !Var !Var !Var !Var
+  | TrailSetLookup !Var !Var
+  deriving (Show)
+
+addToTrail :: Solver -> TrailItem -> IO ()
+addToTrail solver item = do
+  lv <- getCurrentLevel solver
+  when (lv /= 0) $ do
+    xs <- Vec.unsafeRead (svTrail solver) (lv - 1)
+    seq item $ Vec.unsafeWrite (svTrail solver) (lv - 1) (item : xs)
+       
+getCurrentLevel :: Solver -> IO Level
+getCurrentLevel solver = Vec.getSize (svTrail solver)
+
+getLevelGen :: Solver -> Level -> IO Gen
+getLevelGen solver lv = Vec.unsafeRead (svLevelGen solver) lv
+
+pushBacktrackPoint :: Solver -> IO ()
+pushBacktrackPoint solver = do
+  Vec.push (svTrail solver) []
+  lv <- getCurrentLevel solver
+  size <- Vec.getSize (svLevelGen solver)
+  if lv < size then do
+    g <- Vec.unsafeRead (svLevelGen solver) lv
+    Vec.unsafeWrite (svLevelGen solver) lv (g + 1)
+  else
+    Vec.push (svLevelGen solver) 0
+
+popBacktrackPoint :: Solver -> IO ()
+popBacktrackPoint solver = do
+  xs <- Vec.unsafePop (svTrail solver)
+  forM_ xs $ \item -> do
+    case item of
+      TrailSetLookup a' b' -> do
+        modifyIORef (svLookupTable solver) (IntMap.adjust (IntMap.delete b') a')
+      TrailMerge a' b' a origRootA -> do
+        -- Revert changes to Union-Find data strucutres
+        classList <- readIORef (svClassList solver)
+        let (ClassUnion _ origClassA origClassB) = classList IntMap.! b'
+        modifyIORef (svRepresentativeTable solver) $
+          -- Note that 'IntMap.union' is left biased.
+          IntMap.union (IntMap.fromList [(c,a') | c <- classToList origClassA])                                                          
+        writeIORef (svClassList solver) $
+          IntMap.insert a' origClassA $ IntMap.insert b' origClassB $ classList
+
+        -- Revert changes to proof-forest data strucutres
+        let loop c p = do
+              tbl <- readIORef (svParent solver)
+              writeIORef (svParent solver) (IntMap.update (const p) c tbl)
+              unless (c == a) $ do
+                let (d, c_eq_d) = tbl IntMap.! c
+                loop d (Just (c, c_eq_d))
+        loop origRootA Nothing
+
 {--------------------------------------------------------------------
   Helper funcions
 --------------------------------------------------------------------}
@@ -428,7 +521,8 @@ lookup solver c1 c2 = do
 setLookup :: Solver -> Var -> Var -> Eqn1 -> IO ()
 setLookup solver a1 a2 eqn = do
   modifyIORef (svLookupTable solver) $
-    IntMap.insertWith IntMap.union a1 (IntMap.singleton a2 eqn)
+    IntMap.insertWith IntMap.union a1 (IntMap.singleton a2 eqn)  
+  addToTrail solver (TrailSetLookup a1 a2)
 
 addToPending :: Solver -> PendingEqn -> IO ()
 addToPending solver eqn = modifyIORef (svPending solver) (eqn :)
