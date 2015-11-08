@@ -62,8 +62,9 @@ type ConstrID = Int
 
 -- | @Eqn0 cid a b@ represents an equation "a = b"
 data Eqn0 = Eqn0 (Maybe ConstrID) Var Var
-    
--- | @Eqn cid a b c@ represents an equation "f(a,b) = c"
+  deriving (Eq, Ord, Show)
+
+-- | @Eqn1 cid a b c@ represents an equation "f(a,b) = c"
 data Eqn1 = Eqn1 (Maybe ConstrID) Var Var Var
   deriving (Eq, Ord, Show)
 
@@ -72,13 +73,14 @@ type PendingEqn = Either Eqn0 (Eqn1, Eqn1)
 data Class
   = ClassSingleton !Var
   | ClassUnion !Int Class Class
+  deriving (Show)
 
 instance Semigroup Class where
   xs <> ys = ClassUnion (classSize xs + classSize ys) xs ys
   stimes = stimesIdempotent
 
 classSize :: Class -> Int
-classSize (ClassSingleton v) = 1
+classSize (ClassSingleton _) = 1
 classSize (ClassUnion size _ _) = size
 
 -- Use mono-traversable package?
@@ -162,7 +164,7 @@ mergeFlatTerm' solver s a cid = do
       let eq1 = Eqn0 cid c a
       addToPending solver (Left eq1)
       propagate solver
-      -- checkInvariant solver
+      checkInvariant solver
     FTApp a1 a2 -> do
       let eq1 = Eqn1 cid a1 a2 a
       a1' <- getRepresentative solver a1
@@ -172,13 +174,13 @@ mergeFlatTerm' solver s a cid = do
         Just eq2 -> do
           addToPending solver $ Right (eq1, eq2)
           propagate solver
-          -- checkInvariant solver
+          checkInvariant solver
         Nothing -> do          
           setLookup solver a1' a2' eq1
           modifyIORef (svUseList solver) $
             IntMap.adjust (eq1 :) a1' .
             IntMap.adjust (eq1 :) a2'
-          -- checkInvariant solver
+          checkInvariant solver
 
 propagate :: Solver -> IO ()
 propagate solver = go
@@ -267,12 +269,13 @@ normalize solver (FTApp t1 t2) = do
     Nothing -> return $ FTApp u1 u2
 
 checkInvariant :: Solver -> IO ()
+checkInvariant solver | True = return ()
 checkInvariant solver = do
   nv <- readIORef (svVarCounter solver)
   representativeTable <- readIORef (svRepresentativeTable solver)
   classList <- readIORef (svClassList solver)
                          
-  let representatives = IntSet.fromList [a' | (a,a') <- IntMap.toList representativeTable]
+  let representatives = IntSet.fromList [a' | (_,a') <- IntMap.toList representativeTable]
   unless (IntMap.keysSet classList == representatives) $
     error "CongruenceClosure.checkInvariant: IntMap.keysSet classList /= representatives"
 
@@ -288,7 +291,7 @@ checkInvariant solver = do
   forM_ pendings $ \p -> do
     case p of
       Left _ -> return ()
-      Right (Eqn1 _ a1 a2 a, Eqn1 _ b1 b2 b) -> do
+      Right (Eqn1 _ a1 a2 _, Eqn1 _ b1 b2 _) -> do
         a1' <- getRepresentative solver a1
         a2' <- getRepresentative solver a2
         b1' <- getRepresentative solver b1
@@ -399,7 +402,7 @@ explainVar solver c1 c2 = do
                 case eq of
                   Left (Eqn0 cid _ _) -> do
                     modifyIORef result (maybeToList cid ++)
-                  Right (Eqn1 cid1 a1 a2 a, Eqn1 cid2 b1 b2 b) -> do
+                  Right (Eqn1 cid1 a1 a2 _, Eqn1 cid2 b1 b2 _) -> do
                     modifyIORef result (catMaybes [cid1,cid2] ++)
                     modifyIORef pendingProofs (\xs -> (a1,b1) : (a2,b2) : xs)
                 union a b
