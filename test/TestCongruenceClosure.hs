@@ -53,6 +53,29 @@ case_1_FlatTerm = do
   mergeFlatTerm solver (FTConst b) d
   ret <- areCongruentFlatTerm solver (FTApp a b) (FTApp c d)
   ret @?= True
+  
+case_example_1 :: IO ()
+case_example_1 = do
+  solver <- newSolver
+  a <- liftM (\c -> TApp c []) $ newFSym solver
+  b <- liftM (\c -> TApp c []) $ newFSym solver
+  c <- liftM (\c -> TApp c []) $ newFSym solver
+  d <- liftM (\c -> TApp c []) $ newFSym solver
+  f <- liftM (\c x -> TApp c [x]) $ newFSym solver
+  g <- liftM (\c x -> TApp c [x]) $ newFSym solver
+  h <- liftM (\c x y -> TApp c [x,y]) $ newFSym solver  
+  
+  merge solver (f b) c
+  merge solver (f c) a
+  merge solver (g a) (h a a)
+  ret <- areCongruent solver (g b) (h c b)
+  ret @?= False
+  
+  merge solver b c
+  ret <- areCongruent solver (g b) (h c b)
+  ret @?= True  
+  
+  -- [[f b .=. c], [f c .=. a], [g a .=. h a a], [g b ./=. h c b]]  
 
 case_Example_11 :: IO ()
 case_Example_11 = do
