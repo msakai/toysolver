@@ -283,10 +283,10 @@ instance Vars SAtom where
 
 type M = State (Set Var, Int, Map (FSym, [Var]) Var, [SLit])
 
-flatten :: Clause -> SClause
+flatten :: Clause -> Maybe SClause
 flatten c =
   case runState (mapM flattenLit c) (vars c, 0, Map.empty, []) of
-    (c, (_,_,_,ls)) -> removeNegEq $ ls ++ c
+    (c, (_,_,_,ls)) -> removeTautology $ removeNegEq $ ls ++ c
   where
     gensym :: M Var
     gensym = do
@@ -358,6 +358,14 @@ flatten c =
           | v==x      = y
           | otherwise = v
 
+    removeTautology :: SClause -> Maybe SClause
+    removeTautology lits
+      | Set.null (pos `Set.intersection` neg) = Just $ [Neg l | l <- Set.toList neg] ++ [Pos l | l <- Set.toList pos]
+      | otherwise = Nothing
+      where
+        pos = Set.fromList [l | Pos l <- lits]
+        neg = Set.fromList [l | Neg l <- lits]
+
 test_flatten = flatten [Pos $ PApp "P" [TmApp "a" [], TmApp "f" [TmVar "x"]]]
 
 {-
@@ -422,27 +430,30 @@ simplifyGroundClause = liftM concat . mapM f
     f (Pos (SEq (STmVar x) y)) = if x==y then Nothing else return []
     f lit = return [lit]
 
-collectFSym :: SClause -> Set (FSym, Int)
+collectFSym :: Clause -> Set (FSym, Int)
 collectFSym = Set.unions . map f
   where
-    f :: SLit -> Set (FSym, Int)
+    f :: Lit -> Set (FSym, Int)
     f (Pos a) = g a
     f (Neg a) = g a
 
-    g :: SAtom -> Set (FSym, Int)
-    g (SEq (STmApp f xs) _) = Set.singleton (f, length xs)
-    g _ = Set.empty
+    g :: Atom -> Set (FSym, Int)
+    g (PApp _ xs) = Set.unions $ map h xs
 
-collectPSym :: SClause -> Set (PSym, Int)
+    h :: Term -> Set (FSym, Int)
+    h (TmVar _) = Set.empty
+    h (TmApp f xs) = Set.unions $ Set.singleton (f, length xs) : map h xs
+
+collectPSym :: Clause -> Set (PSym, Int)
 collectPSym = Set.unions . map f
   where
-    f :: SLit -> Set (PSym, Int)
+    f :: Lit -> Set (PSym, Int)
     f (Pos a) = g a
     f (Neg a) = g a
 
-    g :: SAtom -> Set (PSym, Int)
-    g (SPApp p xs) = Set.singleton (p, length xs)
-    g _ = Set.empty
+    g :: Atom -> Set (PSym, Int)
+    g (PApp "=" [_,_]) = Set.empty
+    g (PApp p xs) = Set.singleton (p, length xs)
 
 -- ---------------------------------------------------------------------------
 
@@ -509,9 +520,9 @@ findModel :: Int -> [Clause] -> IO (Maybe Model)
 findModel size cs = do
   let univ = [0..size-1]
 
-  let cs2 = map flatten cs
-      fs = Set.unions $ map collectFSym cs2
-      ps = Set.unions $ map collectPSym cs2
+  let cs2 = mapMaybe flatten cs
+      fs = Set.unions $ map collectFSym cs
+      ps = Set.unions $ map collectPSym cs
 
   solver <- SAT.newSolver
 
