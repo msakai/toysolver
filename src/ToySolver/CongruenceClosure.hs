@@ -24,10 +24,10 @@ module ToySolver.CongruenceClosure
   , newSolver
 
   -- * Problem description
-  , Var
+  , FSym
   , Term (..)
   , FlatTerm (..)    
-  , newVar
+  , newFSym
   , merge
   , merge'    
   , mergeFlatTerm
@@ -40,10 +40,10 @@ module ToySolver.CongruenceClosure
   -- * Explanation
   , explain
   , explainFlatTerm
-  , explainVar
+  , explainConst
 
   -- * Read state    
-  , getNVars
+  , getNFSyms
 
   -- * Backtracking
   , pushBacktrackPoint
@@ -66,23 +66,23 @@ import Data.Semigroup
 
 import qualified ToySolver.Internal.Data.Vec as Vec
     
-type Var = Int
+type FSym = Int
 
-data Term = TApp Var [Term]
+data Term = TApp FSym [Term]
 
 data FlatTerm
-  = FTConst !Var
-  | FTApp !Var !Var
+  = FTConst !FSym
+  | FTApp !FSym !FSym
   deriving (Ord, Eq, Show)
 
 type ConstrID = Int
 
 -- | @Eqn0 cid a b@ represents an equation "a = b"
-data Eqn0 = Eqn0 (Maybe ConstrID) !Var !Var
+data Eqn0 = Eqn0 (Maybe ConstrID) !FSym !FSym
   deriving (Eq, Ord, Show)
 
 -- | @Eqn1 cid a b c@ represents an equation "f(a,b) = c"
-data Eqn1 = Eqn1 (Maybe ConstrID) !Var !Var !Var
+data Eqn1 = Eqn1 (Maybe ConstrID) !FSym !FSym !FSym
   deriving (Eq, Ord, Show)
 
 -- | An equation @a = b@ represented as either
@@ -94,7 +94,7 @@ data Eqn1 = Eqn1 (Maybe ConstrID) !Var !Var !Var
 type Eqn = Either Eqn0 (Eqn1, Eqn1)
 
 data Class
-  = ClassSingleton !Var
+  = ClassSingleton !FSym
   | ClassUnion !Int Class Class
   deriving (Show)
 
@@ -107,14 +107,14 @@ classSize (ClassSingleton _) = 1
 classSize (ClassUnion size _ _) = size
 
 -- Use mono-traversable package?
-classToList :: Class -> [Var]
+classToList :: Class -> [FSym]
 classToList c = f c []
   where
     f (ClassSingleton v) = (v :)
     f (ClassUnion _ xs ys) = f xs . f ys
 
 -- Use mono-traversable package?
-classForM_ :: Monad m => Class -> (Var -> m ()) -> m ()
+classForM_ :: Monad m => Class -> (FSym -> m ()) -> m ()
 classForM_ xs f = g xs
   where
     g (ClassSingleton v) = f v
@@ -122,10 +122,10 @@ classForM_ xs f = g xs
 
 data Solver
   = Solver
-  { svDefs                 :: !(IORef (IntMap (Var,Var), Map (Var,Var) Var))
-  , svRepresentativeTable  :: !(Vec.UVec Var)
+  { svDefs                 :: !(IORef (IntMap (FSym,FSym), Map (FSym,FSym) FSym))
+  , svRepresentativeTable  :: !(Vec.UVec FSym)
   , svClassList            :: !(IORef (IntMap Class))
-  , svParent               :: !(IORef (IntMap (Var, Eqn)))
+  , svParent               :: !(IORef (IntMap (FSym, Eqn)))
   , svUseList              :: !(IORef (IntMap [(Eqn1, Level, Gen)]))
   , svLookupTable          :: !(IORef (IntMap (IntMap Eqn1)))
 
@@ -167,12 +167,12 @@ newSolver = do
     , svLevelGen = gen
     }
 
-getNVars :: Solver -> IO Int
-getNVars solver = Vec.getSize (svRepresentativeTable solver)
+getNFSyms :: Solver -> IO Int
+getNFSyms solver = Vec.getSize (svRepresentativeTable solver)
 
-newVar :: Solver -> IO Var
-newVar solver = do
-  v <- getNVars solver
+newFSym :: Solver -> IO FSym
+newFSym solver = do
+  v <- getNFSyms solver
   Vec.push (svRepresentativeTable solver) v
   modifyIORef (svClassList solver) (IntMap.insert v (ClassSingleton v))
   modifyIORef (svUseList solver) (IntMap.insert v [])
@@ -192,10 +192,10 @@ merge' solver t u cid = do
       c <- nameFlatTerm solver u'
       mergeFlatTerm' solver t' c cid
 
-mergeFlatTerm :: Solver -> FlatTerm -> Var -> IO ()
+mergeFlatTerm :: Solver -> FlatTerm -> FSym -> IO ()
 mergeFlatTerm solver s a = mergeFlatTerm' solver s a Nothing
 
-mergeFlatTerm' :: Solver -> FlatTerm -> Var -> Maybe ConstrID -> IO ()
+mergeFlatTerm' :: Solver -> FlatTerm -> FSym -> Maybe ConstrID -> IO ()
 mergeFlatTerm' solver s a cid = do
   case s of
     FTConst c -> do
@@ -316,7 +316,7 @@ normalize solver (FTApp t1 t2) = do
 checkInvariant :: Solver -> IO ()
 checkInvariant _ | True = return ()
 checkInvariant solver = do
-  nv <- getNVars solver
+  nv <- getNFSyms solver
   classList <- readIORef (svClassList solver)
                          
   representatives <- liftM IntSet.fromList $ Vec.getElems (svRepresentativeTable solver)
@@ -375,29 +375,29 @@ explainFlatTerm :: Solver -> FlatTerm -> FlatTerm -> IO (Maybe IntSet)
 explainFlatTerm solver t1 t2 = do
   c1 <- nameFlatTerm solver t1
   c2 <- nameFlatTerm solver t2
-  explainVar solver c1 c2
+  explainConst solver c1 c2
 
-explainVar :: Solver -> Var -> Var -> IO (Maybe IntSet)
-explainVar solver c1 c2 = do
-  n <- getNVars solver
+explainConst :: Solver -> FSym -> FSym -> IO (Maybe IntSet)
+explainConst solver c1 c2 = do
+  n <- getNFSyms solver
   
   -- Additional union-find data structure
   representativeTable2 <- newIORef (IntMap.fromList [(a,a) | a <- [0..n-1]])
   classList2 <- newIORef (IntMap.fromList [(a, IntSet.singleton a) | a <- [0..n-1]])
   highestNodeTable <- newIORef (IntMap.fromList [(a,a) | a <- [0..n-1]])
                 
-  let getRepresentative2 :: Var -> IO Var
+  let getRepresentative2 :: FSym -> IO FSym
       getRepresentative2 a = do
         m <- readIORef representativeTable2
         return $ m IntMap.! a
 
-      highestNode :: Var -> IO Var
+      highestNode :: FSym -> IO FSym
       highestNode c = do
         d <- getRepresentative2 c
         m <- readIORef highestNodeTable
         return $ m IntMap.! d
 
-      union :: Var -> Var -> IO ()
+      union :: FSym -> FSym -> IO ()
       union a b = do
         a' <- getRepresentative2 a
         b' <- getRepresentative2 b
@@ -420,7 +420,7 @@ explainVar solver c1 c2 = do
             modifyIORef highestNodeTable $
               IntMap.insert b' h . IntMap.delete a'
 
-  (pendingProofs :: Vec.Vec (Var,Var)) <- Vec.new
+  (pendingProofs :: Vec.Vec (FSym,FSym)) <- Vec.new
   Vec.push pendingProofs (c1,c2)
   result <- newIORef ([] :: [Int])
 
@@ -438,7 +438,7 @@ explainVar solver c1 c2 = do
               explainAlongPath b c
               loop
 
-      explainAlongPath :: Var -> Var -> IO ()
+      explainAlongPath :: FSym -> FSym -> IO ()
       explainAlongPath a c = do
         a <- highestNode a
         -- note that c is already @highestNode c@
@@ -469,8 +469,8 @@ type Level = Int
 type Gen = Int
 
 data TrailItem
-  = TrailMerge !Var !Var !Var !Var
-  | TrailSetLookup !Var !Var
+  = TrailMerge !FSym !FSym !FSym !FSym
+  | TrailSetLookup !FSym !FSym
   deriving (Show)
 
 addToTrail :: Solver -> TrailItem -> IO ()
@@ -526,14 +526,14 @@ popBacktrackPoint solver = do
   Helper funcions
 --------------------------------------------------------------------}
 
-lookup :: Solver -> Var -> Var -> IO (Maybe Eqn1)
+lookup :: Solver -> FSym -> FSym -> IO (Maybe Eqn1)
 lookup solver c1 c2 = do
   tbl <- readIORef $ svLookupTable solver
   return $ do
      m <- IntMap.lookup c1 tbl
      IntMap.lookup c2 m
 
-setLookup :: Solver -> Var -> Var -> Eqn1 -> IO ()
+setLookup :: Solver -> FSym -> FSym -> Eqn1 -> IO ()
 setLookup solver a1 a2 eqn = do
   modifyIORef (svLookupTable solver) $
     IntMap.insertWith IntMap.union a1 (IntMap.singleton a2 eqn)  
@@ -542,15 +542,15 @@ setLookup solver a1 a2 eqn = do
 addToPending :: Solver -> Eqn -> IO ()
 addToPending solver eqn = Vec.push (svPending solver) eqn
 
-getRepresentative :: Solver -> Var -> IO Var
+getRepresentative :: Solver -> FSym -> IO FSym
 getRepresentative solver c = Vec.unsafeRead (svRepresentativeTable solver) c
 
-getParent :: Solver -> Var -> IO (Maybe (Var, Eqn))
+getParent :: Solver -> FSym -> IO (Maybe (FSym, Eqn))
 getParent solver c = do
   m <- readIORef $ svParent solver
   return $ IntMap.lookup c m
 
-nearestCommonAncestor :: Solver -> Var -> Var -> IO (Maybe Var)
+nearestCommonAncestor :: Solver -> FSym -> FSym -> IO (Maybe FSym)
 nearestCommonAncestor solver a b = do
   let loop c !ret = do
         m <- getParent solver c
@@ -578,14 +578,14 @@ transform solver (TApp f xs) = do
         return $ FTApp t' u'
   foldM phi (FTConst f) xs'
 
-nameFlatTerm :: Solver -> FlatTerm -> IO Var
+nameFlatTerm :: Solver -> FlatTerm -> IO FSym
 nameFlatTerm _ (FTConst c) = return c
 nameFlatTerm solver (FTApp c d) = do
   (defs1,defs2) <- readIORef $ svDefs solver
   a <- case Map.lookup (c,d) defs2 of
          Just a -> return a
          Nothing -> do
-           a <- newVar solver
+           a <- newFSym solver
            writeIORef (svDefs solver) (IntMap.insert a (c,d) defs1, Map.insert (c,d) a defs2)
            return a
   -- We call 'mergeFlatTerm' everytime, because backtracking might have canceled its effect.
