@@ -281,23 +281,23 @@ instance Vars SAtom where
 
 -- ---------------------------------------------------------------------------
 
-type M = State (Set Var, Int, [SLit])
+type M = State (Set Var, Int, Map (FSym, [Var]) Var, [SLit])
 
 flatten :: Clause -> SClause
 flatten c =
-  case runState (mapM flattenLit c) (vars c, 0, []) of
-    (c, (_,_,ls)) -> removeNegEq $ ls ++ c
+  case runState (mapM flattenLit c) (vars c, 0, Map.empty, []) of
+    (c, (_,_,_,ls)) -> removeNegEq $ ls ++ c
   where
     gensym :: M Var
     gensym = do
-      (vs, n, ls) <- get
+      (vs, n, defs, ls) <- get
       let go :: Int -> M Var
           go m = do
             let v = "#" ++ show m
             if v `Set.member` vs
               then go (m+1)
               else do
-                put (Set.insert v vs, m+1, ls)
+                put (Set.insert v vs, m+1, defs, ls)
                 return v
       go n
 
@@ -325,10 +325,14 @@ flatten c =
     flattenTerm (TmVar x)    = return x
     flattenTerm (TmApp f ts) = do
       xs <- mapM flattenTerm ts
-      x <- gensym
-      (vs, n, ls) <- get
-      put (vs, n, Neg (SEq (STmApp f xs) x) : ls)
-      return x
+      (_, _, defs, _) <- get
+      case Map.lookup (f, xs) defs of
+        Just x -> return x
+        Nothing -> do
+          x <- gensym
+          (vs, n, defs, ls) <- get
+          put (vs, n, Map.insert (f, xs) x defs, Neg (SEq (STmApp f xs) x) : ls)
+          return x
 
     removeNegEq :: SClause -> SClause
     removeNegEq = go []
