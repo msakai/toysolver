@@ -13,7 +13,7 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
-import qualified ToySolver.FOLModelFinder as MF
+import qualified ToySolver.EUF.FiniteModelFinder as MF
 
 type Sig = (Map MF.FSym Int, Map MF.PSym Int)
 

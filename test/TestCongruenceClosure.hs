@@ -17,7 +17,7 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
-import ToySolver.CongruenceClosure
+import ToySolver.EUF.CongruenceClosure
 
 ------------------------------------------------------------------------
 -- Test cases

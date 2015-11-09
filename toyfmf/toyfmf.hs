@@ -21,7 +21,7 @@ import System.Environment
 import System.IO
 import qualified Codec.TPTP as TPTP
 import ToySolver.Data.Boolean
-import qualified ToySolver.FOLModelFinder as MF
+import qualified ToySolver.EUF.FiniteModelFinder as MF
 
 main :: IO ()
 main = do

@@ -190,8 +190,8 @@ Library
      ToySolver.Arith.Simplex
      ToySolver.Arith.Simplex2
      ToySolver.Arith.VirtualSubstitution
-     ToySolver.CongruenceClosure
-     ToySolver.FOLModelFinder
+     ToySolver.EUF.CongruenceClosure
+     ToySolver.EUF.FiniteModelFinder
      ToySolver.Combinatorial.HittingSet.Simple
      ToySolver.Combinatorial.HittingSet.HTCBDD
      ToySolver.Combinatorial.HittingSet.SHD
@@ -679,10 +679,10 @@ Test-suite TestCongruenceClosure
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
-Test-suite TestFOLModelFinder
+Test-suite TestFiniteModelFinder
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test
-  Main-is:           TestFOLModelFinder.hs
+  Main-is:           TestFiniteModelFinder.hs
   Build-depends:
     base >=4 && <5,
     containers,

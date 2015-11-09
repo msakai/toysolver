@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.CongruenceClosure
+-- Module      :  ToySolver.EUF.CongruenceClosure
 -- Copyright   :  (c) Masahiro Sakai 2012, 2015
 -- License     :  BSD-style
 -- 
@@ -17,7 +17,7 @@
 --   <http://www.lsi.upc.edu/~oliveras/espai/papers/IC.pdf>
 --
 -----------------------------------------------------------------------------
-module ToySolver.CongruenceClosure
+module ToySolver.EUF.CongruenceClosure
   (
   -- * The @Solver@ type
     Solver
@@ -287,7 +287,7 @@ propagate solver = go
           c1' <- getRepresentative solver c1
           c2' <- getRepresentative solver c2
           assert (b' == c1' || b' == c2') $ return ()
-          -- unless (b' == c1' || b' == c2') $ error "CongruenceClosure.propagate.update: should not happen"
+          -- unless (b' == c1' || b' == c2') $ error "ToySolver.EUF.CongruenceClosure.propagate.update: should not happen"
           ret <- lookup solver c1' c2'
           case ret of
             Just eq2 -> do
@@ -347,12 +347,12 @@ checkInvariant solver = do
     forM_ (classToList bs) $ \b -> do
       b' <- getRepresentative solver b
       unless (a' == b') $
-        error "CongruenceClosure.checkInvariant: inconsistency between classList and representativeTable"
+        error "ToySolver.EUF.CongruenceClosure.checkInvariant: inconsistency between classList and representativeTable"
       modifyIORef' ref (IntSet.insert b)
 
   xs <- readIORef ref
   unless (xs == IntSet.fromList [0..nv-1]) $
-    error "CongruenceClosure.checkInvariant: classList is not exhaustive"
+    error "ToySolver.EUF.CongruenceClosure.checkInvariant: classList is not exhaustive"
 
   pendings <- Vec.getElems (svPending solver)
   forM_ pendings $ \p -> do
@@ -364,7 +364,7 @@ checkInvariant solver = do
         b1' <- getRepresentative solver b1
         b2' <- getRepresentative solver b2
         unless (a1' == b1' && a2' == b2') $
-          error "CongruenceClosure.checkInvariant: error in pendingList"
+          error "ToySolver.EUF.CongruenceClosure.checkInvariant: error in pendingList"
 
   useList <- readIORef (svUseList solver)
   lv <- getCurrentLevel solver
@@ -375,7 +375,7 @@ checkInvariant solver = do
         b1' <- getRepresentative solver b1
         b2' <- getRepresentative solver b2
         unless (a == b1' || a == b2') $
-          error "CongruenceClosure.checkInvariant: error in useList"
+          error "ToySolver.EUF.CongruenceClosure.checkInvariant: error in useList"
 
   forM_ (IntSet.toList representatives) $ \b -> do
     forM_ (IntSet.toList representatives) $ \c -> do
@@ -386,7 +386,7 @@ checkInvariant solver = do
           a1' <- getRepresentative solver a1
           a2' <- getRepresentative solver a2
           unless (b == a1' && c == a2') $
-            error "CongruenceClosure.checkInvariant: error in lookupTable"
+            error "ToySolver.EUF.CongruenceClosure.checkInvariant: error in lookupTable"
 
 explain :: Solver -> Term -> Term -> IO (Maybe IntSet)
 explain solver t1 t2 = do
