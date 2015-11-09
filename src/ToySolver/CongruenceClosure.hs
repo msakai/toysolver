@@ -124,7 +124,7 @@ data Solver
   = Solver
   { svDefs                 :: !(IORef (IntMap (FSym,FSym), Map (FSym,FSym) FSym))
   , svRepresentativeTable  :: !(Vec.UVec FSym)
-  , svClassList            :: !(IORef (IntMap Class))
+  , svClassList            :: !(Vec.Vec Class)
   , svParent               :: !(IORef (IntMap (FSym, Eqn)))
   , svUseList              :: !(IORef (IntMap [(Eqn1, Level, Gen)]))
   , svLookupTable          :: !(IORef (IntMap (IntMap Eqn1)))
@@ -141,7 +141,7 @@ newSolver :: IO Solver
 newSolver = do
   defs     <- newIORef (IntMap.empty, Map.empty)
   rep      <- Vec.new
-  classes  <- newIORef IntMap.empty
+  classes  <- Vec.new
   parent   <- newIORef IntMap.empty
   useList  <- newIORef IntMap.empty
   lookup   <- newIORef IntMap.empty
@@ -174,7 +174,7 @@ newFSym :: Solver -> IO FSym
 newFSym solver = do
   v <- getNFSyms solver
   Vec.push (svRepresentativeTable solver) v
-  modifyIORef (svClassList solver) (IntMap.insert v (ClassSingleton v))
+  Vec.push (svClassList solver) (ClassSingleton v)
   modifyIORef (svUseList solver) (IntMap.insert v [])
   return v
 
@@ -239,9 +239,8 @@ propagate solver = go
       a' <- getRepresentative solver a
       b' <- getRepresentative solver b
       unless (a' == b') $ do
-        clist <- readIORef (svClassList  solver)
-        let classA = clist IntMap.! a'
-            classB = clist IntMap.! b'
+        classA <- Vec.unsafeRead (svClassList  solver) a'
+        classB <- Vec.unsafeRead (svClassList  solver) b'
         (a,b,a',b',classA,classB) <- return $
           if classSize classA < classSize classB then
             (a,b,a',b',classA,classB)
@@ -254,8 +253,7 @@ propagate solver = go
     update a' b' classA classB = do
       classForM_ classA $ \c -> do
         Vec.unsafeWrite (svRepresentativeTable solver) c b'
-      modifyIORef (svClassList solver) $
-        IntMap.insert b' (classA <> classB) . IntMap.delete a'
+      Vec.unsafeWrite (svClassList solver) b' (classA <> classB)
 
       lv <- getCurrentLevel solver
       lv_gen <- getLevelGen solver lv
@@ -317,19 +315,21 @@ checkInvariant :: Solver -> IO ()
 checkInvariant _ | True = return ()
 checkInvariant solver = do
   nv <- getNFSyms solver
-  classList <- readIORef (svClassList solver)
-                         
-  representatives <- liftM IntSet.fromList $ Vec.getElems (svRepresentativeTable solver)
-  unless (IntMap.keysSet classList == representatives) $
-    error "CongruenceClosure.checkInvariant: IntMap.keysSet classList /= representatives"
 
-  unless (IntSet.unions (map (IntSet.fromList . classToList) (IntMap.elems classList)) == IntSet.fromList [0..nv-1]) $
-    error "CongruenceClosure.checkInvariant: classList is not exhaustive"
-  forM_ (IntMap.toList classList) $ \(a, bs) -> do
+  representatives <- liftM IntSet.fromList $ Vec.getElems (svRepresentativeTable solver)
+
+  ref <- newIORef IntSet.empty          
+  forM_ (IntSet.toList representatives) $ \a' -> do
+    bs <- Vec.read (svClassList solver) a'
     forM_ (classToList bs) $ \b -> do
       b' <- getRepresentative solver b
-      unless (a == b') $
+      unless (a' == b') $
         error "CongruenceClosure.checkInvariant: inconsistency between classList and representativeTable"
+      modifyIORef' ref (IntSet.insert b)
+
+  xs <- readIORef ref
+  unless (xs == IntSet.fromList [0..nv-1]) $
+    error "CongruenceClosure.checkInvariant: classList is not exhaustive"
 
   pendings <- Vec.getElems (svPending solver)
   forM_ pendings $ \p -> do
@@ -506,12 +506,10 @@ popBacktrackPoint solver = do
         modifyIORef (svLookupTable solver) (IntMap.adjust (IntMap.delete b') a')
       TrailMerge a' b' a origRootA -> do
         -- Revert changes to Union-Find data strucutres
-        classList <- readIORef (svClassList solver)
-        let (ClassUnion _ origClassA origClassB) = classList IntMap.! b'
+        ClassUnion _ origClassA origClassB <- Vec.unsafeRead (svClassList solver) b'        
         classForM_ origClassA $ \c -> do
           Vec.unsafeWrite (svRepresentativeTable solver) c a'
-        writeIORef (svClassList solver) $
-          IntMap.insert a' origClassA $ IntMap.insert b' origClassB $ classList
+        Vec.unsafeWrite (svClassList solver) b' origClassB
 
         -- Revert changes to proof-forest data strucutres
         let loop c p = do
