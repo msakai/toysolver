@@ -22,8 +22,8 @@ import ToySolver.CongruenceClosure
 ------------------------------------------------------------------------
 -- Test cases
 
-case_1 :: IO ()
-case_1 = do
+case_Example_1 :: IO ()
+case_Example_1 = do
   solver <- newSolver
   a <- newFSym solver
   b <- newFSym solver
@@ -38,8 +38,8 @@ case_1 = do
   ret <- areCongruent solver (TApp a [TApp b []]) (TApp c [TApp d []])
   ret @?= True
 
-case_1_FlatTerm :: IO ()
-case_1_FlatTerm = do
+case_Example_1_FlatTerm :: IO ()
+case_Example_1_FlatTerm = do
   solver <- newSolver
   a <- newFSym solver
   b <- newFSym solver
@@ -54,8 +54,8 @@ case_1_FlatTerm = do
   ret <- areCongruentFlatTerm solver (FTApp a b) (FTApp c d)
   ret @?= True
   
-case_example_1 :: IO ()
-case_example_1 = do
+case_Example_2 :: IO ()
+case_Example_2 = do
   solver <- newSolver
   a <- liftM (\c -> TApp c []) $ newFSym solver
   b <- liftM (\c -> TApp c []) $ newFSym solver
@@ -73,12 +73,10 @@ case_example_1 = do
   
   merge solver b c
   ret <- areCongruent solver (g b) (h c b)
-  ret @?= True  
-  
-  -- [[f b .=. c], [f c .=. a], [g a .=. h a a], [g b ./=. h c b]]  
+  ret @?= True
 
-case_Example_11 :: IO ()
-case_Example_11 = do
+case_NO2007_Example_11 :: IO ()
+case_NO2007_Example_11 = do
   solver <- newSolver
   replicateM_ 15 $ newFSym solver
   let xs = [(1,8),(7,2),(3,13),(7,1),(6,7),(6,7),(9,5),(9,3),(14,11),(10,4),(12,9),(4,11),(10,7)]
@@ -87,8 +85,8 @@ case_Example_11 = do
   fmap (Set.fromList . map (xs!!) . IntSet.toList) m @?= Just (Set.fromList [(7,1), (10,4), (10,7)])
 
 -- f(g,h)=d, c=d, f(g,d)=a, e=c, e=b, b=h
-case_Example_16 :: IO ()
-case_Example_16 = do
+case_NO2007_Example_16 :: IO ()
+case_NO2007_Example_16 = do
   solver <- newSolver
   a <- newFSym solver
   b <- newFSym solver  
