@@ -76,6 +76,38 @@ prop_findModel_soundness = QM.monadicIO $ do
     Nothing -> return ()
     Just m -> QM.assert (MF.evalClausesU m cs)
 
+case_example_1 = do
+  ret <- MF.findModel 2 cs
+  case ret of
+    Nothing -> assertFailure (show cs ++ " should be satisfiable")
+    Just m -> assertBool (show cs ++ " should be evaluated to true on " ++ unlines (MF.showModel m)) (MF.evalClausesU m cs)
+  where
+    cs = [[f b .=. c], [f c .=. a], [g a .=. h a a], [g b ./=. h c b]]
+    (.=.) x y  = MF.Pos $ MF.PApp "=" [x, y]
+    (./=.) x y = MF.Neg $ MF.PApp "=" [x, y]
+    a = MF.TmApp "a" []
+    b = MF.TmApp "b" []
+    c = MF.TmApp "c" []
+    f x = MF.TmApp "f" [x]
+    g x = MF.TmApp "g" [x]
+    h x y = MF.TmApp "h" [x, y]
+
+case_example_2 = do
+  ret <- MF.findModel 5 cs
+  case ret of
+    Nothing -> return ()
+    Just _ -> assertFailure (show cs ++ " should be unsatisfiable")
+  where
+    cs = [[f b .=. c], [f c .=. a], [g a .=. h a a], [g b ./=. h c b], [b .=. c]]
+    (.=.) x y  = MF.Pos $ MF.PApp "=" [x, y]
+    (./=.) x y = MF.Neg $ MF.PApp "=" [x, y]
+    a = MF.TmApp "a" []
+    b = MF.TmApp "b" []
+    c = MF.TmApp "c" []
+    f x = MF.TmApp "f" [x]
+    g x = MF.TmApp "g" [x]
+    h x y = MF.TmApp "h" [x, y]
+
 -- ---------------------------------------------------------------------
 --  Test harness
 
