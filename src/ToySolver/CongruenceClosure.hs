@@ -57,12 +57,12 @@ import Control.Loop
 import Control.Monad
 import Data.IORef
 import Data.Maybe
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Semigroup
 
 import qualified ToySolver.Internal.Data.Vec as Vec
@@ -195,7 +195,7 @@ newFSym solver = do
   v <- getNFSyms solver
   Vec.push (svRepresentativeTable solver) v
   Vec.push (svClassList solver) (ClassSingleton v)
-  modifyIORef (svUseList solver) (IntMap.insert v [])
+  modifyIORef' (svUseList solver) (IntMap.insert v [])
   Vec.push (svERepresentativeTable solver) v
   Vec.push (svEClassList solver) undefined
   Vec.push (svEHighestNodeTable solver) v
@@ -240,7 +240,7 @@ mergeFlatTerm' solver s a cid = do
           setLookup solver a1' a2' eq1
           lv <- getCurrentLevel solver
           gen <- getLevelGen solver lv
-          modifyIORef (svUseList solver) $
+          modifyIORef' (svUseList solver) $
             IntMap.adjust ((eq1, lv, gen) :) a1' .
             IntMap.adjust ((eq1, lv, gen) :) a2'
           checkInvariant solver
@@ -300,7 +300,7 @@ propagate solver = go
         else do
           -- out-of-date entry
           return False
-      modifyIORef (svUseList solver) (IntMap.insert a' useList_a')
+      modifyIORef' (svUseList solver) (IntMap.insert a' useList_a')
 
     -- Insert edge a→b labelled with a_eq_b into the proof forest, and re-orient its original ancestors.
     updateParent a b a_eq_b = do
@@ -518,7 +518,7 @@ popBacktrackPoint solver = do
   forM_ xs $ \item -> do
     case item of
       TrailSetLookup a' b' -> do
-        modifyIORef (svLookupTable solver) (IntMap.adjust (IntMap.delete b') a')
+        modifyIORef' (svLookupTable solver) (IntMap.adjust (IntMap.delete b') a')
       TrailMerge a' b' a origRootA -> do
         -- Revert changes to Union-Find data strucutres
         ClassUnion _ origClassA origClassB <- Vec.unsafeRead (svClassList solver) b'        
@@ -548,7 +548,7 @@ lookup solver c1 c2 = do
 
 setLookup :: Solver -> FSym -> FSym -> Eqn1 -> IO ()
 setLookup solver a1 a2 eqn = do
-  modifyIORef (svLookupTable solver) $
+  modifyIORef' (svLookupTable solver) $
     IntMap.insertWith IntMap.union a1 (IntMap.singleton a2 eqn)  
   addToTrail solver (TrailSetLookup a1 a2)
 
