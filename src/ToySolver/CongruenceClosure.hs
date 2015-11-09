@@ -53,6 +53,7 @@ module ToySolver.CongruenceClosure
 import Prelude hiding (lookup)
 
 import Control.Exception (assert)
+import Control.Loop
 import Control.Monad
 import Data.IORef
 import Data.Maybe
@@ -132,7 +133,13 @@ data Solver
   -- workspace for constraint propagation
   , svPending :: !(Vec.Vec Eqn)
 
-  -- for Backtracking
+  -- workspace for explanation generation
+  , svERepresentativeTable :: !(Vec.UVec FSym)
+  , svEClassList           :: !(Vec.Vec Class)
+  , svEHighestNodeTable    :: !(Vec.UVec FSym)
+  , svEPendingProofs       :: !(Vec.Vec (FSym,FSym))
+
+  -- for backtracking
   , svTrail :: !(Vec.Vec [TrailItem])
   , svLevelGen :: !(Vec.UVec Int)
   }
@@ -148,6 +155,11 @@ newSolver = do
 
   pending  <- Vec.new
 
+  repE     <- Vec.new
+  classesE <- Vec.new
+  highE    <- Vec.new
+  pendingE <- Vec.new
+
   trail <- Vec.new
   gen <- Vec.new
   Vec.push gen 0
@@ -161,8 +173,16 @@ newSolver = do
     , svUseList             = useList
     , svLookupTable         = lookup
 
+    -- workspace for constraint propagation
     , svPending = pending
 
+    -- workspace for explanation generation
+    , svERepresentativeTable = repE
+    , svEClassList           = classesE
+    , svEHighestNodeTable    = highE
+    , svEPendingProofs       = pendingE
+
+    -- for backtracking
     , svTrail = trail
     , svLevelGen = gen
     }
@@ -176,6 +196,9 @@ newFSym solver = do
   Vec.push (svRepresentativeTable solver) v
   Vec.push (svClassList solver) (ClassSingleton v)
   modifyIORef (svUseList solver) (IntMap.insert v [])
+  Vec.push (svERepresentativeTable solver) v
+  Vec.push (svEClassList solver) undefined
+  Vec.push (svEHighestNodeTable solver) v
   return v
 
 merge :: Solver -> Term -> Term -> IO ()
@@ -382,54 +405,46 @@ explainConst solver c1 c2 = do
   n <- getNFSyms solver
   
   -- Additional union-find data structure
-  representativeTable2 <- newIORef (IntMap.fromList [(a,a) | a <- [0..n-1]])
-  classList2 <- newIORef (IntMap.fromList [(a, IntSet.singleton a) | a <- [0..n-1]])
-  highestNodeTable <- newIORef (IntMap.fromList [(a,a) | a <- [0..n-1]])
+  forLoop 0 (<n) (+1) $ \a -> do
+    Vec.unsafeWrite (svERepresentativeTable solver) a a
+    Vec.unsafeWrite (svEClassList solver) a (ClassSingleton a)
+    Vec.unsafeWrite (svEHighestNodeTable solver) a a
                 
   let getRepresentative2 :: FSym -> IO FSym
-      getRepresentative2 a = do
-        m <- readIORef representativeTable2
-        return $ m IntMap.! a
+      getRepresentative2 a = Vec.unsafeRead (svERepresentativeTable solver) a
 
       highestNode :: FSym -> IO FSym
       highestNode c = do
         d <- getRepresentative2 c
-        m <- readIORef highestNodeTable
-        return $ m IntMap.! d
+        Vec.unsafeRead (svEHighestNodeTable solver) d
 
       union :: FSym -> FSym -> IO ()
       union a b = do
         a' <- getRepresentative2 a
         b' <- getRepresentative2 b
-        cls <- readIORef classList2
-        let classA = cls IntMap.! a'
-            classB = cls IntMap.! b'
+        classA <- Vec.unsafeRead (svEClassList solver) a'
+        classB <- Vec.unsafeRead (svEClassList solver) b'
         h <- highestNode b'
-        if IntSet.size classA < IntSet.size classB then do
-          update a' b' classA classB h
-        else do
-          update b' a' classB classA h
+        (a', b', classA, classB) <-
+          if classSize classA < classSize classB then do
+            return (a', b', classA, classB)
+          else
+            return (b', a', classB, classA)
+        classForM_ classA $ \c -> do
+          Vec.unsafeWrite (svERepresentativeTable solver) c b'
+        Vec.unsafeWrite (svEClassList solver) b' (classA <> classB)
+        Vec.unsafeWrite (svEHighestNodeTable solver) b' h
 
-        where
-          update a' b' classA classB h = do
-            modifyIORef representativeTable2 $ 
-              -- Note that 'IntMap.union' is left biased.
-              IntMap.union (IntMap.fromAscList [(c,b') | c <- IntSet.toAscList classA])
-            modifyIORef classList2 $
-              IntMap.insert b' (classA `IntSet.union` classB) . IntMap.delete a'
-            modifyIORef highestNodeTable $
-              IntMap.insert b' h . IntMap.delete a'
-
-  (pendingProofs :: Vec.Vec (FSym,FSym)) <- Vec.new
-  Vec.push pendingProofs (c1,c2)
-  result <- newIORef ([] :: [Int])
+  Vec.clear (svEPendingProofs solver)
+  Vec.push (svEPendingProofs solver) (c1,c2)
+  result <- newIORef IntSet.empty
 
   let loop = do
-        n <- Vec.getSize pendingProofs
+        n <- Vec.getSize (svEPendingProofs solver)
         if n == 0 then
           return True
         else do
-          (a,b) <- Vec.unsafePop pendingProofs
+          (a,b) <- Vec.unsafePop (svEPendingProofs solver)
           m <- nearestCommonAncestor solver a b
           case m of
             Nothing -> return False
@@ -447,18 +462,18 @@ explainConst solver c1 c2 = do
                 Just (b, eq) <- getParent solver a
                 case eq of
                   Left (Eqn0 cid _ _) -> do
-                    modifyIORef result (maybeToList cid ++)
+                    modifyIORef' result (maybeToIntSet cid <>)
                   Right (Eqn1 cid1 a1 a2 _, Eqn1 cid2 b1 b2 _) -> do
-                    modifyIORef result (catMaybes [cid1,cid2] ++)
-                    Vec.push pendingProofs (a1,b1)
-                    Vec.push pendingProofs (a2,b2)
+                    modifyIORef' result ((maybeToIntSet cid1 <> maybeToIntSet cid2) <>)
+                    Vec.push (svEPendingProofs solver) (a1,b1)
+                    Vec.push (svEPendingProofs solver) (a2,b2)
                 union a b
                 loop =<< highestNode b
         loop a
 
   b <- loop
   if b
-  then liftM (Just . IntSet.fromList) $ readIORef result
+  then liftM Just $ readIORef result
   else return Nothing
 
 -- -------------------------------------------------------------------
@@ -589,3 +604,7 @@ nameFlatTerm solver (FTApp c d) = do
   -- We call 'mergeFlatTerm' everytime, because backtracking might have canceled its effect.
   mergeFlatTerm solver (FTApp c d) a
   return a
+
+maybeToIntSet :: Maybe Int -> IntSet
+maybeToIntSet Nothing  = IntSet.empty
+maybeToIntSet (Just x) = IntSet.singleton x
