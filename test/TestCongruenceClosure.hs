@@ -22,13 +22,13 @@ import ToySolver.CongruenceClosure
 ------------------------------------------------------------------------
 -- Test cases
 
-case_1 :: IO ()
-case_1 = do
+case_Example_1 :: IO ()
+case_Example_1 = do
   solver <- newSolver
-  a <- newVar solver
-  b <- newVar solver
-  c <- newVar solver
-  d <- newVar solver
+  a <- newFSym solver
+  b <- newFSym solver
+  c <- newFSym solver
+  d <- newFSym solver
 
   merge solver (TApp a []) (TApp c [])
   ret <- areCongruent solver (TApp a [TApp b []]) (TApp c [TApp d []])
@@ -38,13 +38,13 @@ case_1 = do
   ret <- areCongruent solver (TApp a [TApp b []]) (TApp c [TApp d []])
   ret @?= True
 
-case_1_FlatTerm :: IO ()
-case_1_FlatTerm = do
+case_Example_1_FlatTerm :: IO ()
+case_Example_1_FlatTerm = do
   solver <- newSolver
-  a <- newVar solver
-  b <- newVar solver
-  c <- newVar solver
-  d <- newVar solver
+  a <- newFSym solver
+  b <- newFSym solver
+  c <- newFSym solver
+  d <- newFSym solver
 
   mergeFlatTerm solver (FTConst a) c
   ret <- areCongruentFlatTerm solver (FTApp a b) (FTApp c d)
@@ -53,34 +53,55 @@ case_1_FlatTerm = do
   mergeFlatTerm solver (FTConst b) d
   ret <- areCongruentFlatTerm solver (FTApp a b) (FTApp c d)
   ret @?= True
-
-case_Example_11 :: IO ()
-case_Example_11 = do
+  
+case_Example_2 :: IO ()
+case_Example_2 = do
   solver <- newSolver
-  replicateM_ 15 $ newVar solver
+  a <- liftM (\c -> TApp c []) $ newFSym solver
+  b <- liftM (\c -> TApp c []) $ newFSym solver
+  c <- liftM (\c -> TApp c []) $ newFSym solver
+  d <- liftM (\c -> TApp c []) $ newFSym solver
+  f <- liftM (\c x -> TApp c [x]) $ newFSym solver
+  g <- liftM (\c x -> TApp c [x]) $ newFSym solver
+  h <- liftM (\c x y -> TApp c [x,y]) $ newFSym solver  
+  
+  merge solver (f b) c
+  merge solver (f c) a
+  merge solver (g a) (h a a)
+  ret <- areCongruent solver (g b) (h c b)
+  ret @?= False
+  
+  merge solver b c
+  ret <- areCongruent solver (g b) (h c b)
+  ret @?= True
+
+case_NO2007_Example_11 :: IO ()
+case_NO2007_Example_11 = do
+  solver <- newSolver
+  replicateM_ 15 $ newFSym solver
   let xs = [(1,8),(7,2),(3,13),(7,1),(6,7),(6,7),(9,5),(9,3),(14,11),(10,4),(12,9),(4,11),(10,7)]
   forM_ (zip [0..] xs) $ \(i,(a,b)) -> mergeFlatTerm' solver (FTConst a) b (Just i)
-  m <- explainVar solver 1 4
+  m <- explainConst solver 1 4
   fmap (Set.fromList . map (xs!!) . IntSet.toList) m @?= Just (Set.fromList [(7,1), (10,4), (10,7)])
 
 -- f(g,h)=d, c=d, f(g,d)=a, e=c, e=b, b=h
-case_Example_16 :: IO ()
-case_Example_16 = do
+case_NO2007_Example_16 :: IO ()
+case_NO2007_Example_16 = do
   solver <- newSolver
-  a <- newVar solver
-  b <- newVar solver  
-  c <- newVar solver
-  d <- newVar solver
-  e <- newVar solver
-  g <- newVar solver
-  h <- newVar solver
+  a <- newFSym solver
+  b <- newFSym solver  
+  c <- newFSym solver
+  d <- newFSym solver
+  e <- newFSym solver
+  g <- newFSym solver
+  h <- newFSym solver
   mergeFlatTerm' solver (FTApp g h) d (Just 0)
   mergeFlatTerm' solver (FTConst c) d (Just 1)
   mergeFlatTerm' solver (FTApp g d) a (Just 2)
   mergeFlatTerm' solver (FTConst e) c (Just 3)
   mergeFlatTerm' solver (FTConst e) b (Just 4)
   mergeFlatTerm' solver (FTConst b) h (Just 5)
-  m <- explainVar solver a b
+  m <- explainConst solver a b
   m @?= Just (IntSet.fromList [1,3,4,5,0,2])
   -- d = c = e = b = h
   -- a = f(g,d) = f(g,h) = d = c = e = b
@@ -88,10 +109,10 @@ case_Example_16 = do
 case_backtracking_1 :: IO ()
 case_backtracking_1 = do
   solver <- newSolver
-  a1 <- newVar solver
-  a2 <- newVar solver
-  b1 <- newVar solver
-  b2 <- newVar solver
+  a1 <- newFSym solver
+  a2 <- newFSym solver
+  b1 <- newFSym solver
+  b2 <- newFSym solver
 
   mergeFlatTerm solver (FTConst a1) b1
 
@@ -127,7 +148,7 @@ prop_components = QM.monadicIO $ do
 
   solver <- QM.run $ newSolver
   QM.run $ do
-    replicateM_ nv $ newVar solver
+    replicateM_ nv $ newFSym solver
     forM_ edges $ \(s,t) -> mergeFlatTerm solver (FTConst s) t
   forM_ [0..(nv-1)] $ \c ->
     forM_ [0..(nv-1)] $ \d -> do
