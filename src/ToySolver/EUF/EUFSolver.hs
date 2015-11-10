@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.EUF.EUFSolver
@@ -6,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  unstable
--- Portability :  portable
+-- Portability :  non-portable (CPP)
 --
 -----------------------------------------------------------------------------
 module ToySolver.EUF.EUFSolver
@@ -153,3 +154,11 @@ popBacktrackPoint solver = do
     CC.popBacktrackPoint (svCCSolver solver)
     xs <- Vec.unsafePop (svBacktrackPoints solver)
     modifyIORef' (svDisequalities solver) $ (`Map.difference` xs)
+
+#if !MIN_VERSION_base(4,7,0)
+
+isRight :: Either a b -> Bool
+isRight (Left  _) = False
+isRight (Right _) = True
+
+#endif
