@@ -19,6 +19,8 @@ module ToySolver.EUF.EUFSolver
   , Term (..)
   , ConstrID
   , newFSym
+  , newConst
+  , newFuncN
   , assertEqual
   , assertEqual'
   , assertNotEqual
@@ -78,6 +80,12 @@ newSolver = do
 
 newFSym :: Solver -> IO FSym
 newFSym solver = CC.newFSym (svCCSolver solver)
+
+newConst :: Solver -> IO Term
+newConst solver = CC.newConst (svCCSolver solver)
+
+newFuncN :: Solver -> IO ([Term] -> Term)
+newFuncN solver = CC.newFuncN (svCCSolver solver)
 
 assertEqual :: Solver -> Term -> Term -> IO ()
 assertEqual solver t1 t2 = assertEqual' solver t1 t2 Nothing
