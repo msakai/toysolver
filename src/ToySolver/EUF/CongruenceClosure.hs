@@ -26,7 +26,8 @@ module ToySolver.EUF.CongruenceClosure
   -- * Problem description
   , FSym
   , Term (..)
-  , FlatTerm (..)    
+  , FlatTerm (..)
+  , ConstrID
   , newFSym
   , merge
   , merge'    
@@ -70,6 +71,7 @@ import qualified ToySolver.Internal.Data.Vec as Vec
 type FSym = Int
 
 data Term = TApp FSym [Term]
+  deriving (Ord, Eq, Show)
 
 data FlatTerm
   = FTConst !FSym
