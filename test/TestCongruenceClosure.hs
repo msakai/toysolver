@@ -143,7 +143,6 @@ prop_components = QM.monadicIO $ do
     t <- choose (0,nv-1)
     return (s,t)
   let g = buildG (0,nv-1) edges
-      comps = map Tree.flatten $ components g
       repr = array (0,nv-1) [(c, Tree.rootLabel comp) | comp <- components g, c <- Tree.flatten comp]
 
   solver <- QM.run $ newSolver

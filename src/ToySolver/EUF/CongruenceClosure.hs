@@ -56,7 +56,6 @@ import Control.Exception (assert)
 import Control.Loop
 import Control.Monad
 import Data.IORef
-import Data.Maybe
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)

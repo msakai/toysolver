@@ -124,7 +124,7 @@ enumMinimalHittingSets dnf = loop Set.empty
       case findPrimeImplicateOrPrimeImplicant vs f cs dnf of
         Nothing -> []
         Just (Left c)  -> c : loop (Set.insert c cs)
-        Just (Right d) -> error "GurvichKhachiyan1999.enumMinimalHittingSets: should not happen"
+        Just (Right _) -> error "GurvichKhachiyan1999.enumMinimalHittingSets: should not happen"
 
 evalDNF :: Set IntSet -> IntSet -> Bool
 evalDNF dnf xs = or [is `IntSet.isSubsetOf` xs | is <- Set.toList dnf]

@@ -1305,7 +1305,7 @@ search solver !conflict_lim onConflict = do
         Nothing -> do
           case pb of
             Nothing -> return Nothing
-            Just ((lhs,rhs), pbLevel) -> do
+            Just ((lhs,rhs), _pbLevel) -> do
               h <- newPBHandlerPromoted solver lhs rhs True
               case h of
                 CHClause _ -> do

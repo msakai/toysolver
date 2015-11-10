@@ -92,7 +92,7 @@ not' :: ShowS -> ShowS
 not' x = list [showString "not", x]
 
 intExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> ShowS
-intExpr opt env mip e =
+intExpr opt env _mip e =
   case MIP.terms e of
     [] -> intNum opt 0
     [t] -> f t

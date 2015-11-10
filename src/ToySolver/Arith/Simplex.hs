@@ -328,7 +328,7 @@ pdPivot optdir tbl
              then Left PDUnbounded -- dual infeasible
              else Right (pivot q p tbl)
   where
-    qs = [ (Right i, bi) | (i, (row_i, bi)) <- IM.toList tbl, i /= objRowIndex, 0 > bi ]
+    qs = [ (Right i, bi) | (i, (_row_i, bi)) <- IM.toList tbl, i /= objRowIndex, 0 > bi ]
     ps = [ (Left j, cj')
          | (j,cj) <- IM.toList (fst (lookupRow objRowIndex tbl))
          , let cj' = if optdir==OptMax then cj else -cj
