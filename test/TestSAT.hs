@@ -41,6 +41,7 @@ import qualified ToySolver.SAT.PBNLC as PBNLC
 import ToySolver.Data.ArithRel
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Arith.Simplex2 as Simplex2
+import qualified ToySolver.EUF.EUFSolver as EUF
 
 allAssignments :: Int -> [SAT.Model]
 allAssignments nv = [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]]
@@ -421,6 +422,147 @@ case_QF_LRA = do
       f (Right atom) = LA.evalAtom m2 atom
   fold f c1 @?= True
   fold f c2 @?= True
+
+
+case_QF_EUF :: IO ()
+case_QF_EUF = do
+  satSolver <- SAT.newSolver
+  eufSolver <- EUF.newSolver
+  enc <- Tseitin.newEncoder satSolver
+  
+  tblRef <- newIORef (Map.empty :: Map (EUF.Term, EUF.Term) SAT.Var)
+  defsRef <- newIORef (IntMap.empty :: IntMap (EUF.Term, EUF.Term))
+ 
+  let abstractEUFAtom :: (EUF.Term, EUF.Term) -> IO SAT.Lit
+      abstractEUFAtom (t1,t2) | t1 >= t2 = abstractEUFAtom (t2,t1)
+      abstractEUFAtom (t1,t2) = do
+        tbl <- readIORef tblRef
+        case Map.lookup (t1,t2) tbl of
+          Just v -> return v
+          Nothing -> do
+            v <- SAT.newVar satSolver
+            writeIORef tblRef $! Map.insert (t1,t2) v tbl
+            modifyIORef' defsRef $! IntMap.insert v (t1,t2)
+            return v
+
+      abstract :: BoolExpr (Either SAT.Lit (EUF.Term, EUF.Term)) -> IO (BoolExpr SAT.Lit)
+      abstract = Traversable.mapM f
+        where
+          f (Left lit) = return lit
+          f (Right atom) = abstractEUFAtom atom
+
+  let tsolver =
+        TheorySolver
+        { thAssertLit = \_ l -> do
+            defs <- readIORef defsRef
+            case IntMap.lookup (SAT.litVar l) defs of
+              Nothing -> return True
+              Just (t1,t2) -> do
+                if SAT.litPolarity l then
+                  EUF.assertEqual' eufSolver t1 t2 (Just l)
+                else
+                  EUF.assertNotEqual' eufSolver t1 t2 (Just l)
+                return True
+        , thCheck = \callback -> do
+            b <- EUF.check eufSolver
+            when b $ do
+              defs <- readIORef defsRef
+              forM_ (IntMap.toList defs) $ \(v, (t1, t2)) -> do
+                b2 <- EUF.areEqual eufSolver t1 t2
+                when b2 $ do
+                  callback v
+                  return ()
+            return b            
+        , thExplain = \m -> do
+            case m of
+              Nothing -> liftM IntSet.toList $ EUF.explain eufSolver Nothing
+              Just v -> do
+                defs <- readIORef defsRef
+                case IntMap.lookup v defs of
+                  Nothing -> error "should not happen"
+                  Just (t1,t2) -> do
+                    liftM IntSet.toList $ EUF.explain eufSolver (Just (t1,t2))
+        , thPushBacktrackPoint = do
+            EUF.pushBacktrackPoint eufSolver
+        , thPopBacktrackPoint = do
+            EUF.popBacktrackPoint eufSolver
+        }
+  SAT.setTheory satSolver tsolver
+
+  true  <- EUF.newConst eufSolver
+  false <- EUF.newConst eufSolver
+  EUF.assertNotEqual eufSolver true false
+  boolToTermRef <- newIORef (IntMap.empty :: IntMap EUF.Term)
+  termToBoolRef <- newIORef (Map.empty :: Map EUF.Term SAT.Lit)
+
+  let connectBoolTerm :: SAT.Lit -> EUF.Term -> IO ()
+      connectBoolTerm lit t = do
+        lit1 <- abstractEUFAtom (t, true)
+        lit2 <- abstractEUFAtom (t, false)
+        SAT.addClause satSolver [-lit, lit1]  --  lit  ->  lit1
+        SAT.addClause satSolver [-lit1, lit]  --  lit1 ->  lit
+        SAT.addClause satSolver [lit, lit2]   -- -lit  ->  lit2
+        SAT.addClause satSolver [-lit2, -lit] --  lit2 -> -lit
+        modifyIORef' boolToTermRef $ IntMap.insert lit t
+        modifyIORef' termToBoolRef $ Map.insert t lit
+
+      boolToTerm :: SAT.Lit -> IO EUF.Term
+      boolToTerm lit = do
+        tbl <- readIORef boolToTermRef
+        case IntMap.lookup lit tbl of
+          Just t -> return t
+          Nothing -> do
+            t <- EUF.newConst eufSolver
+            connectBoolTerm lit t
+            return t
+
+      termToBool :: EUF.Term -> IO SAT.Lit
+      termToBool t = do
+        tbl <- readIORef termToBoolRef
+        case Map.lookup t tbl of
+          Just lit -> return lit
+          Nothing -> do
+            lit <- SAT.newVar satSolver
+            connectBoolTerm lit t
+            return lit
+
+  let addFormula :: BoolExpr (Either SAT.Lit (EUF.Term, EUF.Term)) -> IO ()
+      addFormula c = Tseitin.addFormula enc =<< abstract c
+
+  do
+    x <- SAT.newVar satSolver
+    x' <- boolToTerm x
+    f <- liftM (\s x -> EUF.TApp s [x]) $ EUF.newFSym eufSolver
+    fx <- termToBool (f x')
+    ftt <- abstractEUFAtom (f true, true)
+    ret <- SAT.solveWith satSolver [-fx, ftt]
+    ret @?= True
+    m <- SAT.getModel satSolver
+    SAT.evalLit m x @?= False
+    ret <- SAT.solveWith satSolver [-fx, ftt, x]
+    ret @?= False
+
+  do
+    -- a : Bool
+    -- f : U -> U
+    -- x : U
+    -- y : U
+    -- (a or x=y)
+    -- f x /= f y
+    a <- SAT.newVar satSolver
+    f <- liftM (\s x -> EUF.TApp s [x]) $ EUF.newFSym eufSolver
+    g <- liftM (\s x -> EUF.TApp s [x]) $ EUF.newFSym eufSolver
+    x <- EUF.newConst eufSolver
+    y <- EUF.newConst eufSolver
+    let c1, c2 :: BoolExpr (Either SAT.Lit (EUF.Term, EUF.Term))
+        c1 = Atom (Left a) .||. Atom (Right (x,y))
+        c2 = notB $ Atom (Right (f x, f y))
+    addFormula c1
+    addFormula c2
+    ret <- SAT.solve satSolver
+    ret @?= True
+    ret <- SAT.solveWith satSolver [-a]
+    ret @?= False
 
 -- should be SAT
 case_solve_SAT :: IO ()

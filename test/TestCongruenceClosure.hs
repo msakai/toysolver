@@ -57,10 +57,10 @@ case_Example_1_FlatTerm = do
 case_Example_2 :: IO ()
 case_Example_2 = do
   solver <- newSolver
-  a <- liftM (\c -> TApp c []) $ newFSym solver
-  b <- liftM (\c -> TApp c []) $ newFSym solver
-  c <- liftM (\c -> TApp c []) $ newFSym solver
-  d <- liftM (\c -> TApp c []) $ newFSym solver
+  a <- newConst solver
+  b <- newConst solver
+  c <- newConst solver
+  d <- newConst solver
   f <- liftM (\c x -> TApp c [x]) $ newFSym solver
   g <- liftM (\c x -> TApp c [x]) $ newFSym solver
   h <- liftM (\c x y -> TApp c [x,y]) $ newFSym solver  

@@ -26,8 +26,11 @@ module ToySolver.EUF.CongruenceClosure
   -- * Problem description
   , FSym
   , Term (..)
-  , FlatTerm (..)    
+  , FlatTerm (..)
+  , ConstrID
   , newFSym
+  , newConst
+  , newFuncN
   , merge
   , merge'    
   , mergeFlatTerm
@@ -41,9 +44,6 @@ module ToySolver.EUF.CongruenceClosure
   , explain
   , explainFlatTerm
   , explainConst
-
-  -- * Read state    
-  , getNFSyms
 
   -- * Backtracking
   , pushBacktrackPoint
@@ -69,6 +69,7 @@ import qualified ToySolver.Internal.Data.Vec as Vec
 type FSym = Int
 
 data Term = TApp FSym [Term]
+  deriving (Ord, Eq, Show)
 
 data FlatTerm
   = FTConst !FSym
@@ -199,6 +200,16 @@ newFSym solver = do
   Vec.push (svEClassList solver) undefined
   Vec.push (svEHighestNodeTable solver) v
   return v
+
+newConst :: Solver -> IO Term
+newConst solver = do
+  c <- newFSym solver
+  return $ TApp c []
+
+newFuncN :: Solver -> IO ([Term] -> Term)
+newFuncN solver = do
+  c <- newFSym solver
+  return $ TApp c
 
 merge :: Solver -> Term -> Term -> IO ()
 merge solver t u = merge' solver t u Nothing
