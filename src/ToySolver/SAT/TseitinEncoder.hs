@@ -63,6 +63,8 @@ module ToySolver.SAT.TseitinEncoder
 
   -- * Encoding of boolean formulas
   , addFormula
+  , encodeFormula
+  , encodeFormulaWithPolarity
   , encodeConj
   , encodeConjWithPolarity
   , encodeDisj
@@ -125,16 +127,16 @@ addFormula encoder formula = do
   case formula of
     And xs -> mapM_ (addFormula encoder) xs
     Equiv a b -> do
-      lit1 <- encodeToLit encoder a
-      lit2 <- encodeToLit encoder b
+      lit1 <- encodeFormula encoder a
+      lit2 <- encodeFormula encoder b
       SAT.addClause solver [SAT.litNot lit1, lit2] -- a→b
       SAT.addClause solver [SAT.litNot lit2, lit1] -- b→a
     Not (Not a)     -> addFormula encoder a
     Not (Or xs)     -> addFormula encoder (andB (map notB xs))
     Not (Imply a b) -> addFormula encoder (a .&&. notB b)
     Not (Equiv a b) -> do
-      lit1 <- encodeToLit encoder a
-      lit2 <- encodeToLit encoder b
+      lit1 <- encodeFormula encoder a
+      lit2 <- encodeFormula encoder b
       SAT.addClause solver [lit1, lit2] -- a ∨ b
       SAT.addClause solver [SAT.litNot lit1, SAT.litNot lit2] -- ¬a ∨ ¬b
     _ -> do
@@ -154,30 +156,30 @@ encodeToClause encoder formula =
     Imply a b -> do
       encodeToClause encoder (notB a .||. b)
     _ -> do
-      l <- encodeToLitWithPolarity encoder polarityPos formula
+      l <- encodeFormulaWithPolarity encoder polarityPos formula
       return [l]
 
-encodeToLit :: Encoder -> Formula -> IO SAT.Lit
-encodeToLit encoder = encodeToLitWithPolarity encoder polarityBoth
+encodeFormula :: Encoder -> Formula -> IO SAT.Lit
+encodeFormula encoder = encodeFormulaWithPolarity encoder polarityBoth
 
-encodeToLitWithPolarity :: Encoder -> Polarity -> Formula -> IO SAT.Lit
-encodeToLitWithPolarity encoder p formula = do
+encodeFormulaWithPolarity :: Encoder -> Polarity -> Formula -> IO SAT.Lit
+encodeFormulaWithPolarity encoder p formula = do
   case formula of
     Atom l -> return l
-    And xs -> encodeConjWithPolarity encoder p =<< mapM (encodeToLitWithPolarity encoder p) xs
-    Or xs  -> encodeDisjWithPolarity encoder p =<< mapM (encodeToLitWithPolarity encoder p) xs
-    Not x -> liftM SAT.litNot $ encodeToLitWithPolarity encoder (negatePolarity p) x
+    And xs -> encodeConjWithPolarity encoder p =<< mapM (encodeFormulaWithPolarity encoder p) xs
+    Or xs  -> encodeDisjWithPolarity encoder p =<< mapM (encodeFormulaWithPolarity encoder p) xs
+    Not x -> liftM SAT.litNot $ encodeFormulaWithPolarity encoder (negatePolarity p) x
     Imply x y -> do
-      encodeToLitWithPolarity encoder p (notB x .||. y)
+      encodeFormulaWithPolarity encoder p (notB x .||. y)
     Equiv x y -> do
-      lit1 <- encodeToLitWithPolarity encoder polarityBoth x
-      lit2 <- encodeToLitWithPolarity encoder polarityBoth y
-      encodeToLitWithPolarity encoder p $
+      lit1 <- encodeFormulaWithPolarity encoder polarityBoth x
+      lit2 <- encodeFormulaWithPolarity encoder polarityBoth y
+      encodeFormulaWithPolarity encoder p $
         (Atom lit1 .=>. Atom lit2) .&&. (Atom lit2 .=>. Atom lit1)
     ITE c t e -> do
-      c' <- encodeToLitWithPolarity encoder polarityBoth c
-      t' <- encodeToLitWithPolarity encoder p t
-      e' <- encodeToLitWithPolarity encoder p e
+      c' <- encodeFormulaWithPolarity encoder polarityBoth c
+      t' <- encodeFormulaWithPolarity encoder p t
+      e' <- encodeFormulaWithPolarity encoder p e
       encodeITEWithPolarity encoder p c' t' e'
 
 -- | Return an literal which is equivalent to a given conjunction.
