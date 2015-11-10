@@ -30,6 +30,10 @@ module ToySolver.EUF.EUFSolver
 
   -- * Explanation
   , explain
+    
+  -- * Backtracking
+  , pushBacktrackPoint
+  , popBacktrackPoint
   ) where
 
 import Control.Monad
@@ -40,8 +44,11 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.IORef
 
+import qualified ToySolver.Internal.Data.Vec as Vec
 import ToySolver.EUF.CongruenceClosure (FSym, Term (..), ConstrID)
 import qualified ToySolver.EUF.CongruenceClosure as CC
 
@@ -50,6 +57,7 @@ data Solver
   { svCCSolver :: !CC.Solver
   , svDisequalities :: IORef (Map (Term, Term) (Maybe ConstrID))
   , svExplanation :: IORef IntSet
+  , svBacktrackPoints :: !(Vec.Vec (Map (Term, Term) ()))
   }
 
 newSolver :: IO Solver
@@ -57,11 +65,14 @@ newSolver = do
   cc <- CC.newSolver
   deqs <- newIORef Map.empty
   expl <- newIORef undefined
+  bp <- Vec.new
+
   let solver = 
         Solver
         { svCCSolver = cc
         , svDisequalities = deqs
         , svExplanation = expl
+        , svBacktrackPoints = bp
         }
   return solver
 
@@ -82,8 +93,12 @@ assertNotEqual' solver t1 t2 cid = if t1 < t2 then f (t1,t2) cid else f (t2,t1) 
   where
     f deq cid = do
       ds <- readIORef (svDisequalities solver)
-      unless (deq `Map.member` ds) $
+      unless (deq `Map.member` ds) $ do
         writeIORef (svDisequalities solver) $! Map.insert deq cid ds
+        lv <- getCurrentLevel solver
+        unless (lv==0) $ do
+          xs <- Vec.unsafeRead (svBacktrackPoints solver) (lv - 1)
+          Vec.unsafeWrite (svBacktrackPoints solver) (lv - 1) $! Map.insert deq () xs
 
 check :: Solver -> IO Bool
 check solver = do
@@ -110,3 +125,23 @@ explain solver (Just (t1,t2)) = do
   case ret of
     Nothing -> error "ToySolver.EUF.EUFSolver.explain: should not happen"
     Just cs -> return cs
+
+type Level = Int
+
+getCurrentLevel :: Solver -> IO Level
+getCurrentLevel solver = Vec.getSize (svBacktrackPoints solver)
+
+pushBacktrackPoint :: Solver -> IO ()
+pushBacktrackPoint solver = do
+  CC.pushBacktrackPoint (svCCSolver solver)
+  Vec.push (svBacktrackPoints solver) Map.empty
+
+popBacktrackPoint :: Solver -> IO ()
+popBacktrackPoint solver = do
+  lv <- getCurrentLevel solver
+  if lv==0 then
+    error "ToySolver.EUF.EUFSolver.popBacktrackPoint: root level"
+  else do
+    CC.popBacktrackPoint (svCCSolver solver)
+    xs <- Vec.unsafePop (svBacktrackPoints solver)
+    modifyIORef' (svDisequalities solver) $ (`Map.difference` xs)
