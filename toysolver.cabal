@@ -111,6 +111,8 @@ Library
      -- IntMap.mergeWithKey and IntMap.toDescList require containers >=0.5.0
      containers >=0.5.0,
      unordered-containers >=0.2.3 && <0.3.0,
+     transformers >=0.2,
+     transformers-compat >=0.3,
      mtl >=2.1.2,
      array >=0.4.0.0,
      stm >=2.3,
@@ -191,6 +193,7 @@ Library
      ToySolver.Arith.Simplex2
      ToySolver.Arith.VirtualSubstitution
      ToySolver.EUF.CongruenceClosure
+     ToySolver.EUF.EUFSolver
      ToySolver.EUF.FiniteModelFinder
      ToySolver.Combinatorial.HittingSet.Simple
      ToySolver.Combinatorial.HittingSet.HTCBDD
