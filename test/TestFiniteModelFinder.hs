@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
-module Main (main) where
+module TestFiniteModelFinder (fmfTestGroup) where
 
 import Control.Monad
 import Control.Monad.State
@@ -111,6 +111,5 @@ case_example_2 = do
 -- ---------------------------------------------------------------------
 --  Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
-
+fmfTestGroup :: TestTree
+fmfTestGroup = $(testGroupGenerator)

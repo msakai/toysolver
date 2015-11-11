@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
-module Main (main) where
+module TestMisc (miscTestGroup) where
 
 import Prelude hiding (all)
 
@@ -622,5 +622,5 @@ case_Wang_Peirces_Law =
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+miscTestGroup :: TestTree
+miscTestGroup = $(testGroupGenerator)

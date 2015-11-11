@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Main (main) where
+module TestContiTraverso (ctTestGroup) where
 
 import Control.Monad
 import Data.List
@@ -99,6 +99,5 @@ case_test3' = solve' P.grlex (IS.fromList vs) obj cs @?= Nothing
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
-
+ctTestGroup :: TestTree
+ctTestGroup = $(testGroupGenerator)

@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wall #-}
-module Main (main) where
+module TestCongruenceClosure (ccTestGroup) where
 
 import Control.Monad
 import Data.Array
@@ -157,5 +157,5 @@ prop_components = QM.monadicIO $ do
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+ccTestGroup :: TestTree
+ccTestGroup = $(testGroupGenerator)

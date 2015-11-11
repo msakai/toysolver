@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Main (main) where
+module TestSDPFile (sdpTestGroup) where
 
 import Control.Monad
 import Data.List
@@ -76,5 +76,5 @@ checkParsed actual expected =
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+sdpTestGroup :: TestTree
+sdpTestGroup = $(testGroupGenerator)
