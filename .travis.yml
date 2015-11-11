@@ -62,7 +62,7 @@ script:
    cd ..
 
 after_script:
- - "[ -n \"$COVERAGE\" ] && hpc-coveralls TestSAT TestSimplex TestSimplex2 TestMIPSolver2 TestPolynomial TestAReal TestArith TestContiTraverso TestCongruenceClosure TestLPFile TestMPSFile TestSDPFile TestUtil --exclude-dir=test || true"
+ - "[ -n \"$COVERAGE\" ] && hpc-coveralls TestSuite TestPolynomial --exclude-dir=test || true"
 
 notifications:
   webhooks:
