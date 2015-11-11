@@ -165,12 +165,17 @@ Library
      FunctionalDependencies
      GeneralizedNewtypeDeriving
      MultiParamTypeClasses
+     OverloadedStrings
+     RecursiveDo
      Rank2Types
      ScopedTypeVariables
+     TemplateHaskell
      TypeFamilies
      TypeSynonymInstances
-     OverloadedStrings
-     TemplateHaskell
+  if impl(ghc)
+     Other-Extensions:
+        MagicHash
+        UnboxedTuples
   Exposed-Modules:
      ToySolver.Arith.BoundsInference
      ToySolver.Arith.CAD
@@ -291,7 +296,7 @@ Executable toysolver
   Main-is: toysolver.hs
   HS-Source-Dirs: toysolver
   Build-Depends:
-    base >=4.4 && <5,
+    base,
     containers,
     array,
     data-default-class,
@@ -315,10 +320,10 @@ Executable toysat
   Other-Modules: UBCSAT
   HS-Source-Dirs: toysat
   Build-Depends:
-    base >=4 && <5,
+    base,
     data-default-class,
     mwc-random,
-    containers >= 0.4.2,
+    containers,
     array,
     process >=1.1.0.2,
     parsec,
@@ -327,7 +332,7 @@ Executable toysat
     parse-dimacs,
     unbounded-delays,
     vector,
-    vector-space >=0.8.6,
+    vector-space,
     pseudo-boolean,
     toysolver
   if flag(Time15)
@@ -352,8 +357,8 @@ Executable toyfmf
   HS-Source-Dirs: toyfmf
   If flag(BuildToyFMF)
     Build-Depends:
-      base >=4 && <5,
-      containers >= 0.4.2,
+      base,
+      containers,
       toysolver,
       logic-TPTP >=0.4.1
   Default-Language: Haskell2010
@@ -369,7 +374,7 @@ Executable lpconvert
   Main-is: lpconvert.hs
   HS-Source-Dirs: lpconvert
   Build-Depends:
-    base >=4 && <5,
+    base,
     containers,
     filepath,
     data-default-class,
@@ -472,7 +477,7 @@ Executable pigeonhole
   Main-is: pigeonhole.hs
   HS-Source-Dirs: pigeonhole
   Build-Depends:
-    base >=4 && <5,
+    base,
     containers,
     filepath,
     pseudo-boolean,
@@ -487,7 +492,7 @@ Executable maxsatverify
   Main-is: maxsatverify.hs
   HS-Source-Dirs: maxsatverify
   Build-Depends:
-    base >=4 && <5,
+    base,
     array,
     containers,
     filepath,
@@ -502,7 +507,7 @@ Executable pbverify
     Buildable: False
   HS-Source-Dirs: pbverify
   Build-Depends:
-    base >=4 && <5,
+    base,
     array,
     containers,
     filepath,
@@ -519,7 +524,7 @@ Test-suite TestPolynomial
   HS-Source-Dirs:    test
   Main-is:           TestPolynomial.hs
   Build-depends:
-    base >=4 && <5,
+    base,
     containers,
     toysolver,
     tasty >=0.10.1,
@@ -553,7 +558,7 @@ Test-suite TestSuite
     TestSimplex
     TestSimplex2
   Build-depends:
-    base >=4 && <5,
+    base,
     array,
     containers,
     data-default-class,
