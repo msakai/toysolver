@@ -106,7 +106,7 @@ Library
   Exposed: True
   Hs-source-dirs: src
   Build-Depends:
-     base >=4 && <5,
+     base >=4.6 && <5,
      template-haskell,
      -- IntMap.mergeWithKey and IntMap.toDescList require containers >=0.5.0
      containers >=0.5.0,

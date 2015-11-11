@@ -56,7 +56,7 @@ import GHC.Environment (getFullArgs)
 #ifdef FORCE_CHAR8
 import GHC.IO.Encoding
 #endif
-#if defined(__GLASGOW_HASKELL__) && MIN_VERSION_base(4,5,0)
+#if defined(__GLASGOW_HASKELL__)
 import qualified GHC.Stats as Stats
 #endif
 
@@ -360,14 +360,10 @@ main = do
           printGCStat
 
 printGCStat :: IO ()
-#if defined(__GLASGOW_HASKELL__) && MIN_VERSION_base(4,5,0)
+#if defined(__GLASGOW_HASKELL__)
 printGCStat = do
-#if MIN_VERSION_base(4,6,0)
   b <- Stats.getGCStatsEnabled
   when b $ do
-#else
-  do
-#endif
     stat <- Stats.getGCStats
     putCommentLine "GCStats:"
     putCommentLine $ printf "  bytesAllocated = %d"         $ Stats.bytesAllocated stat
@@ -386,11 +382,7 @@ printGCStat = do
     putCommentLine $ printf "  gcWallSeconds = %5.2f"       $ Stats.gcWallSeconds stat
     putCommentLine $ printf "  cpuSeconds = %5.2f"          $ Stats.cpuSeconds stat
     putCommentLine $ printf "  wallSeconds = %5.2f"         $ Stats.wallSeconds stat
-#if MIN_VERSION_base(4,6,0)
     putCommentLine $ printf "  parTotBytesCopied = %d"      $ Stats.parTotBytesCopied stat
-#else
-    putCommentLine $ printf "  parAvgBytesCopied = %d"      $ Stats.parAvgBytesCopied stat
-#endif
     putCommentLine $ printf "  parMaxBytesCopied = %d"      $ Stats.parMaxBytesCopied stat
 #else
 printGCStat = return ()
@@ -947,13 +939,3 @@ writeSOLFile opt m obj nbvar = do
     Just fname -> do
       let m2 = Map.fromList [("x" ++ show x, if b then 1 else 0) | (x,b) <- assocs m, x <= nbvar]
       writeFile fname (GurobiSol.render (Map.map fromInteger m2) (fmap fromInteger obj))
-
-
-#if !MIN_VERSION_base(4,6,0)
-
-modifyIORef' :: IORef a -> (a -> a) -> IO ()
-modifyIORef' ref f = do
-  x <- readIORef ref
-  writeIORef ref $! f x
-
-#endif
