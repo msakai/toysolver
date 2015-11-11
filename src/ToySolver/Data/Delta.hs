@@ -72,6 +72,44 @@ instance Num r => VectorSpace (Delta r) where
   type Scalar (Delta r) = r
   c *^ Delta r k = Delta (c*r) (c*k)
 
+-- | This instance assumes the symbolic infinitesimal parameter δ is a nilpotent with δ² = 0.
+instance (Num r, Ord r) => Num (Delta r) where
+  (+) = (^+^)
+  negate = negateV
+  Delta r1 k1 * Delta r2 k2 = Delta (r1*r2) (r1*k2+r2*k1)
+  abs x =
+    case x `compare` 0 of
+      LT -> negateV x
+      EQ -> x
+      GT -> x
+  signum x =
+    case x `compare` 0 of
+      LT -> -1
+      EQ -> 0
+      GT -> 1
+  fromInteger x = Delta (fromInteger x) 0
+
+-- | This is unsafe instance in the sense that only a proper real can be a divisor.
+instance (Fractional r, Ord r) => Fractional (Delta r) where
+  Delta r1 k1 / Delta r2 0  = Delta (r1 / r2) (k1 / r2)
+  Delta r1 k1 / Delta r2 k2 =
+    error "Fractional{ToySolver.Data.Delta.Delta}.(/): divisor must be a proper real"
+  fromRational x = Delta (fromRational x) 0
+  
+instance (Real r, Eq r) => Real (Delta r) where
+  toRational (Delta r 0) = toRational r
+  toRational (Delta r k) =
+    error "Real{ToySolver.Data.Delta.Delta}.toRational: not a real number"
+
+instance (RealFrac r, Eq r) => RealFrac (Delta r) where
+  properFraction x =
+    case x `compare` 0 of
+      LT -> let n = ceiling' x in (n, x - fromIntegral n)
+      EQ -> (0, 0)
+      GT -> let n = floor' x in (n, x - fromIntegral n)
+  ceiling = ceiling'
+  floor   = floor'
+
 -- | 'Delta' version of 'floor'.
 -- @'floor'' x@ returns the greatest integer not greater than @x@
 floor' :: (RealFrac r, Integral a) => Delta r -> a
