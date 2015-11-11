@@ -1,12 +1,7 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
-{-# LANGUAGE BangPatterns, ScopedTypeVariables, CPP, DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns, ScopedTypeVariables, CPP, DeriveDataTypeable, RecursiveDo #-}
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE UnboxedTuples, MagicHash #-}
-#endif
-#if __GLASGOW_HASKELL__ < 706
-{-# LANGUAGE DoRec #-}
-#else
-{-# LANGUAGE RecursiveDo #-}
 #endif
 -----------------------------------------------------------------------------
 -- |
@@ -3845,15 +3840,6 @@ anyM p = go
       if b
         then return True
         else go xs
-
-#if !MIN_VERSION_base(4,6,0)
-
-modifyIORef' :: IORef a -> (a -> a) -> IO ()
-modifyIORef' ref f = do
-  x <- readIORef ref
-  writeIORef ref $! f x
-
-#endif
 
 shift :: IORef [a] -> IO a
 shift ref = do

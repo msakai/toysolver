@@ -1002,15 +1002,6 @@ basicVariables solver = do
   t <- readIORef (svTableau solver)
   return (IntMap.keys t)
 
-#if !MIN_VERSION_base(4,6,0)
-
-modifyIORef' :: IORef a -> (a -> a) -> IO ()
-modifyIORef' ref f = do
-  x <- readIORef ref
-  writeIORef ref $! f x
-
-#endif
-
 recordTime :: SolverValue v => GenericSolver v -> IO a -> IO a
 recordTime solver act = do
   dumpSize solver
