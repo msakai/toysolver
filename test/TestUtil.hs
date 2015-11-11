@@ -14,6 +14,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
+import Data.VectorSpace ((*^))
 import Test.QuickCheck.Function
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
@@ -21,6 +22,8 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 import ToySolver.Data.Boolean
 import ToySolver.Data.BoolExpr
+import ToySolver.Data.Delta (Delta (..))
+import qualified ToySolver.Data.Delta as Delta
 import qualified ToySolver.Internal.Data.Vec as Vec
 import ToySolver.Internal.Util
 import ToySolver.Internal.TextUtil
@@ -351,6 +354,91 @@ prop_subsetSum_completeness =
     g = do
       n <- choose (0,10)
       replicateM n arbitrary
+
+-- ---------------------------------------------------------------------
+-- Delta
+      
+instance Arbitrary r => Arbitrary (Delta r) where
+  arbitrary = do
+    r <- arbitrary
+    k <- arbitrary
+    return (Delta r k)
+
+prop_Delta_add_comm =
+  forAll arbitrary $ \(a :: Delta Rational) ->
+  forAll arbitrary $ \b ->
+    a + b == b + a
+
+prop_Delta_add_assoc =
+  forAll arbitrary $ \(a :: Delta Rational) ->
+  forAll arbitrary $ \b ->
+  forAll arbitrary $ \c ->
+    a + (b + c) == (a + b) + c
+
+prop_Delta_add_unitL =
+  forAll arbitrary $ \(a :: Delta Rational) ->
+    0 + a == a
+
+prop_Delta_add_unitR =
+  forAll arbitrary $ \(a :: Delta Rational) ->
+    a + 0 == a
+
+prop_Delta_mult_comm =
+  forAll arbitrary $ \(a :: Delta Rational) ->
+  forAll arbitrary $ \b ->
+    a * b == b * a
+
+prop_Delta_mult_assoc =
+  forAll arbitrary $ \(a :: Delta Rational) ->
+  forAll arbitrary $ \b ->
+  forAll arbitrary $ \c ->
+    a * (b * c) == (a * b) * c
+
+prop_Delta_mult_unitL =
+  forAll arbitrary $ \(a :: Delta Rational) ->
+    1 * a == a
+
+prop_Delta_mult_unitR =
+  forAll arbitrary $ \(a :: Delta Rational) ->
+    a * 1 == a
+
+prop_Delta_mult_dist =
+  forAll arbitrary $ \(a :: Delta Rational) ->
+  forAll arbitrary $ \b ->
+  forAll arbitrary $ \c ->
+    a * (b + c) == a * b + a * c
+
+prop_Delta_mult_zero = 
+  forAll arbitrary $ \(a :: Delta Rational) ->
+    0 * a ==  0
+
+prop_Delta_scale_mult = 
+  forAll arbitrary $ \(a :: Delta Rational) ->
+  forAll arbitrary $ \b ->
+    Delta.fromReal a * b ==  a *^ b
+
+prop_Delta_signum_abs =
+  forAll arbitrary $ \(x :: Delta Rational) ->
+    abs x * signum x == x
+    
+prop_Delta_floor =
+  forAll arbitrary $ \(x :: Delta Rational) ->
+    let y = Delta.floor' x
+    in fromIntegral y <= x && x < fromIntegral (y+1)
+
+prop_Delta_ceiling =
+  forAll arbitrary $ \(x :: Delta Rational) ->
+    let y = Delta.ceiling' x
+    in fromIntegral (y-1) < x && x <= fromIntegral y
+
+prop_Delta_properFraction =
+  forAll arbitrary $ \(x :: Delta Rational) ->
+    let (n,f) = properFraction x
+    in and
+       [ abs f < 1
+       , not (x >= 0) || (n >= 0 && f >= 0)
+       , not (x <= 0) || (n <= 0 && f <= 0)
+       ]
 
 -- ---------------------------------------------------------------------
 -- Vec
