@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Main (main) where
+module TestMPSFile (mpsTestGroup) where
 
 import Control.Monad
 import Data.List
@@ -64,5 +64,5 @@ checkString name str = do
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+mpsTestGroup :: TestTree
+mpsTestGroup = $(testGroupGenerator)

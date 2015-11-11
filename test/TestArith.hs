@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Main (main) where
+module TestArith (arithTestGroup) where
 
 import Control.Monad
 import Data.List
@@ -494,9 +494,8 @@ disabled_case_ContiTraverso_test2 =
   case ContiTraverso.solve P.grlex (fst test2') OptMin (LA.constant 0) (snd test2') of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
-
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+arithTestGroup :: TestTree
+arithTestGroup = $(testGroupGenerator)

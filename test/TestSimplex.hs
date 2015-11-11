@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Main (main) where
+module TestSimplex (simplexTestGroup) where
 
 import Control.Monad
 import Control.Monad.State
@@ -173,5 +173,5 @@ case_lp_example_5_7_primalDualSimplex = do
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+simplexTestGroup :: TestTree
+simplexTestGroup = $(testGroupGenerator)

@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Main (main) where
+module TestSimplex2 (simplex2TestGroup) where
 
 import Control.Monad
 import Data.Default.Class
@@ -404,5 +404,5 @@ case_kuhn_7_3 = do
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+simplex2TestGroup :: TestTree
+simplex2TestGroup = $(testGroupGenerator)

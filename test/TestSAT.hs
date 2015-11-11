@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
-module Main (main) where
+module TestSAT (satTestGroup) where
 
 import Control.Monad
 import Data.Array.IArray
@@ -1648,5 +1648,5 @@ instance Arbitrary PBO.SearchStrategy where
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+satTestGroup :: TestTree
+satTestGroup = $(testGroupGenerator)

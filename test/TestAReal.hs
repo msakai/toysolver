@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+module TestAReal (arealTestGroup) where
 
 import Data.Maybe
 import Data.Ratio
@@ -287,5 +288,5 @@ case_separate = do
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+arealTestGroup :: TestTree
+arealTestGroup = $(testGroupGenerator)

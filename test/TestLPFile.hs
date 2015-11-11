@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Main (main) where
+module TestLPFile (lpTestGroup) where
 
 import Control.Monad
 import Data.List
@@ -62,5 +62,5 @@ checkString name str = do
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+lpTestGroup :: TestTree
+lpTestGroup = $(testGroupGenerator)
