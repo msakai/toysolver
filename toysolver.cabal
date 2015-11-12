@@ -158,8 +158,6 @@ Library
      BangPatterns
      CPP
      DeriveDataTypeable
-     DeriveGeneric
-     DoRec
      FlexibleContexts
      FlexibleInstances
      FunctionalDependencies
