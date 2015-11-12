@@ -158,8 +158,6 @@ Library
      BangPatterns
      CPP
      DeriveDataTypeable
-     DeriveGeneric
-     DoRec
      FlexibleContexts
      FlexibleInstances
      FunctionalDependencies
@@ -590,7 +588,7 @@ Benchmark BenchmarkSATLIB
     data-default-class,
     parse-dimacs,
     toysolver,
-    criterion >=1.0 && <1.1
+    criterion >=1.0 && <1.2
   Default-Language: Haskell2010
 
 Benchmark BenchmarkKnapsack
@@ -600,7 +598,7 @@ Benchmark BenchmarkKnapsack
   build-depends:
     base >=4 && <5,
     toysolver,
-    criterion >=1.0 && <1.1
+    criterion >=1.0 && <1.2
   Default-Language: Haskell2010
 
 Benchmark BenchmarkSubsetSum
@@ -611,5 +609,5 @@ Benchmark BenchmarkSubsetSum
     base >=4 && <5,
     vector,
     toysolver,
-    criterion >=1.0 && <1.1
+    criterion >=1.0 && <1.2
   Default-Language: Haskell2010
