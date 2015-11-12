@@ -134,6 +134,23 @@ case_backtracking_1 = do
   ret @?= False  
   popBacktrackPoint solver
 
+case_backtracking_preserve_definition :: IO ()
+case_backtracking_preserve_definition = do
+  solver <- newSolver
+  a1 <- newFSym solver
+  a2 <- newFSym solver
+  b1 <- newFSym solver
+  b2 <- newFSym solver
+  pushBacktrackPoint solver
+  a <- flatTermToFSym solver (FTApp a1 a2)
+  b <- flatTermToFSym solver (FTApp b1 b2)
+  popBacktrackPoint solver
+  c <- newFSym solver  
+  mergeFlatTerm solver (FTApp a1 a2) c
+  mergeFlatTerm solver (FTApp b1 b2) c
+  ret <- areCongruentFlatTerm solver (FTConst a) (FTConst b)
+  ret @?= True
+
 prop_components :: Property
 prop_components = QM.monadicIO $ do
   nv <- QM.pick $ choose (1, 10)

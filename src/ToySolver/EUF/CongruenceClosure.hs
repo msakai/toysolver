@@ -48,6 +48,11 @@ module ToySolver.EUF.CongruenceClosure
   -- * Backtracking
   , pushBacktrackPoint
   , popBacktrackPoint
+
+  -- * Low-level operations
+  , termToFlatTerm
+  , termToFSym
+  , flatTermToFSym
   ) where
 
 import Prelude hiding (lookup)
@@ -142,6 +147,7 @@ data Solver
   -- for backtracking
   , svTrail :: !(Vec.Vec [TrailItem])
   , svLevelGen :: !(Vec.UVec Int)
+  , svIsAfterBacktracking :: !(IORef Bool)
   }
 
 newSolver :: IO Solver
@@ -163,6 +169,7 @@ newSolver = do
   trail <- Vec.new
   gen <- Vec.new
   Vec.push gen 0
+  isAfterBT <- newIORef False
       
   return $
     Solver
@@ -185,6 +192,7 @@ newSolver = do
     -- for backtracking
     , svTrail = trail
     , svLevelGen = gen
+    , svIsAfterBacktracking = isAfterBT
     }
 
 getNFSyms :: Solver -> IO Int
@@ -216,13 +224,13 @@ merge solver t u = merge' solver t u Nothing
 
 merge' :: Solver -> Term -> Term -> Maybe ConstrID -> IO ()
 merge' solver t u cid = do
-  t' <- transform solver t
-  u' <- transform solver u
+  t' <- termToFlatTerm solver t
+  u' <- termToFlatTerm solver u
   case (t', u') of
     (FTConst c, _) -> mergeFlatTerm' solver u' c cid
     (_, FTConst c) -> mergeFlatTerm' solver t' c cid
     _ -> do
-      c <- nameFlatTerm solver u'
+      c <- flatTermToFSym solver u'
       mergeFlatTerm' solver t' c cid
 
 mergeFlatTerm :: Solver -> FlatTerm -> FSym -> IO ()
@@ -230,6 +238,7 @@ mergeFlatTerm solver s a = mergeFlatTerm' solver s a Nothing
 
 mergeFlatTerm' :: Solver -> FlatTerm -> FSym -> Maybe ConstrID -> IO ()
 mergeFlatTerm' solver s a cid = do
+  initAfterBacktracking solver
   case s of
     FTConst c -> do
       let eq1 = Eqn0 cid c a
@@ -324,12 +333,13 @@ propagate solver = go
 
 areCongruent :: Solver -> Term -> Term -> IO Bool
 areCongruent solver t1 t2 = do
-  u1 <- transform solver t1
-  u2 <- transform solver t2
+  u1 <- termToFlatTerm solver t1
+  u2 <- termToFlatTerm solver t2
   areCongruentFlatTerm solver u1 u2
 
 areCongruentFlatTerm :: Solver -> FlatTerm -> FlatTerm -> IO Bool
 areCongruentFlatTerm solver t1 t2 = do
+  initAfterBacktracking solver
   u1 <- normalize solver t1
   u2 <- normalize solver t2
   return $ u1 == u2
@@ -400,18 +410,19 @@ checkInvariant solver = do
 
 explain :: Solver -> Term -> Term -> IO (Maybe IntSet)
 explain solver t1 t2 = do
-  c1 <- transform solver t1
-  c2 <- transform solver t2
+  c1 <- termToFlatTerm solver t1
+  c2 <- termToFlatTerm solver t2
   explainFlatTerm solver c1 c2
 
 explainFlatTerm :: Solver -> FlatTerm -> FlatTerm -> IO (Maybe IntSet)
 explainFlatTerm solver t1 t2 = do
-  c1 <- nameFlatTerm solver t1
-  c2 <- nameFlatTerm solver t2
+  c1 <- flatTermToFSym solver t1
+  c2 <- flatTermToFSym solver t2
   explainConst solver c1 c2
 
 explainConst :: Solver -> FSym -> FSym -> IO (Maybe IntSet)
 explainConst solver c1 c2 = do
+  initAfterBacktracking solver
   n <- getNFSyms solver
   
   -- Additional union-find data structure
@@ -524,6 +535,7 @@ pushBacktrackPoint solver = do
 
 popBacktrackPoint :: Solver -> IO ()
 popBacktrackPoint solver = do
+  writeIORef (svIsAfterBacktracking solver) True
   xs <- Vec.unsafePop (svTrail solver)
   forM_ xs $ \item -> do
     case item of
@@ -544,6 +556,15 @@ popBacktrackPoint solver = do
                 let (d, c_eq_d) = tbl IntMap.! c
                 loop d (Just (c, c_eq_d))
         loop origRootA Nothing
+
+initAfterBacktracking :: Solver -> IO ()
+initAfterBacktracking solver = do
+  b <- readIORef (svIsAfterBacktracking solver)
+  when b $ do
+    writeIORef (svIsAfterBacktracking solver) False
+    (defs, _) <- readIORef (svDefs solver)
+    forM_ (IntMap.toList defs) $ \(a,(a1,a2)) -> do
+      mergeFlatTerm solver (FTApp a1 a2) a
 
 {--------------------------------------------------------------------
   Helper funcions
@@ -592,28 +613,30 @@ nearestCommonAncestor solver a b = do
             Just (d,_) -> loop2 d
   loop2 b
 
-transform :: Solver -> Term -> IO FlatTerm
-transform solver (TApp f xs) = do
-  xs' <- mapM (transform solver) xs
+termToFlatTerm :: Solver -> Term -> IO FlatTerm
+termToFlatTerm solver (TApp f xs) = do
+  xs' <- mapM (termToFlatTerm solver) xs
   let phi t u = do
-        t' <- nameFlatTerm solver t
-        u' <- nameFlatTerm solver u
+        t' <- flatTermToFSym solver t
+        u' <- flatTermToFSym solver u
         return $ FTApp t' u'
   foldM phi (FTConst f) xs'
 
-nameFlatTerm :: Solver -> FlatTerm -> IO FSym
-nameFlatTerm _ (FTConst c) = return c
-nameFlatTerm solver (FTApp c d) = do
+flatTermToFSym :: Solver -> FlatTerm -> IO FSym
+flatTermToFSym _ (FTConst c) = return c
+flatTermToFSym solver (FTApp c d) = do
   (defs1,defs2) <- readIORef $ svDefs solver
   a <- case Map.lookup (c,d) defs2 of
          Just a -> return a
          Nothing -> do
            a <- newFSym solver
            writeIORef (svDefs solver) (IntMap.insert a (c,d) defs1, Map.insert (c,d) a defs2)
+           mergeFlatTerm solver (FTApp c d) a
            return a
-  -- We call 'mergeFlatTerm' everytime, because backtracking might have canceled its effect.
-  mergeFlatTerm solver (FTApp c d) a
   return a
+
+termToFSym :: Solver -> Term -> IO FSym
+termToFSym solver t = flatTermToFSym solver =<< termToFlatTerm solver t
 
 maybeToIntSet :: Maybe Int -> IntSet
 maybeToIntSet Nothing  = IntSet.empty
