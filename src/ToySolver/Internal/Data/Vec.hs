@@ -90,7 +90,7 @@ read !v !i = do
   if 0 <= i && i < s then
     A.unsafeRead a i
   else
-    error $ "ToySolver.Data.Vec.read: index " ++ show i ++ " out of bounds"
+    error $ "ToySolver.Internal.Data.Vec.read: index " ++ show i ++ " out of bounds"
 
 {-# SPECIALIZE write :: Vec e -> Int -> e -> IO () #-}
 {-# SPECIALIZE write :: UVec Int -> Int -> Int -> IO () #-}
@@ -103,7 +103,7 @@ write !v !i e = do
   if 0 <= i && i < s then
     A.unsafeWrite a i e
   else
-    error $ "ToySolver.Data.Vec.write: index " ++ show i ++ " out of bounds"
+    error $ "ToySolver.Internal.Data.Vec.write: index " ++ show i ++ " out of bounds"
 
 {-# INLINE modify #-}
 modify :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
@@ -114,7 +114,7 @@ modify !v !i f = do
     x <- A.unsafeRead a i
     A.unsafeWrite a i (f x)
   else
-    error $ "ToySolver.Data.Vec.modify: index " ++ show i ++ " out of bounds"
+    error $ "ToySolver.Internal.Data.Vec.modify: index " ++ show i ++ " out of bounds"
 
 {-# INLINE modify' #-}
 modify' :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
@@ -125,7 +125,7 @@ modify' !v !i f = do
     x <- A.unsafeRead a i
     A.unsafeWrite a i $! f x
   else
-    error $ "ToySolver.Data.Vec.modify': index " ++ show i ++ " out of bounds"
+    error $ "ToySolver.Internal.Data.Vec.modify': index " ++ show i ++ " out of bounds"
 
 {-# INLINE unsafeModify #-}
 unsafeModify :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
@@ -205,7 +205,7 @@ pop :: A.MArray a e IO => GenericVec a e -> IO e
 pop v = do
   s <- getSize v
   if s == 0 then
-    error $ "ToySolver.Data.Vec.pop: empty Vec"
+    error $ "ToySolver.Internal.Data.Vec.pop: empty Vec"
   else do
     e <- unsafeRead v (s-1)
     resize v (s-1)
