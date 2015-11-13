@@ -106,8 +106,7 @@ assertNotEqual' solver t1 t2 cid = if t1 < t2 then f (t1,t2) cid else f (t2,t1) 
         writeIORef (svDisequalities solver) $! Map.insert deq cid ds
         lv <- getCurrentLevel solver
         unless (lv==0) $ do
-          xs <- Vec.unsafeRead (svBacktrackPoints solver) (lv - 1)
-          Vec.unsafeWrite (svBacktrackPoints solver) (lv - 1) $! Map.insert deq () xs
+          Vec.unsafeModify' (svBacktrackPoints solver) (lv - 1) $ Map.insert deq ()
 
 check :: Solver -> IO Bool
 check solver = do

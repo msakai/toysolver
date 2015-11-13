@@ -513,9 +513,8 @@ addToTrail :: Solver -> TrailItem -> IO ()
 addToTrail solver item = do
   lv <- getCurrentLevel solver
   when (lv /= 0) $ do
-    xs <- Vec.unsafeRead (svTrail solver) (lv - 1)
-    seq item $ Vec.unsafeWrite (svTrail solver) (lv - 1) (item : xs)
-       
+    seq item $ Vec.unsafeModify (svTrail solver) (lv - 1) (item :)
+
 getCurrentLevel :: Solver -> IO Level
 getCurrentLevel solver = Vec.getSize (svTrail solver)
 

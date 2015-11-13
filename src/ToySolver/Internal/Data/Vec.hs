@@ -41,6 +41,8 @@ module ToySolver.Internal.Data.Vec
   , pop
   , popMaybe
   , unsafePop
+  , peek
+  , unsafePeek
   , clear
   , getElems
 
@@ -221,6 +223,21 @@ unsafePop v = do
   e <- unsafeRead v (s-1)
   resize v (s-1)
   return e
+
+{-# INLINE peek #-}
+peek :: A.MArray a e IO => GenericVec a e -> IO e
+peek v = do
+  s <- getSize v
+  if s == 0 then
+    error $ "ToySolver.Internal.Data.Vec.peek: empty Vec"
+  else do
+    unsafeRead v (s-1)
+
+{-# INLINE unsafePeek #-}
+unsafePeek :: A.MArray a e IO => GenericVec a e -> IO e
+unsafePeek v = do
+  s <- getSize v
+  unsafeRead v (s-1)
 
 clear :: A.MArray a e IO => GenericVec a e -> IO ()
 clear v = resize v 0
