@@ -29,11 +29,17 @@ module ToySolver.Internal.Data.Vec
   , getSize
   , read
   , write
+  , modify
+  , modify'  
   , unsafeRead
   , unsafeWrite
+  , unsafeModify
+  , unsafeModify'
   , resize
   , growTo
   , push
+  , pop
+  , popMaybe
   , unsafePop
   , clear
   , getElems
@@ -99,6 +105,42 @@ write !v !i e = do
   else
     error $ "ToySolver.Data.Vec.write: index " ++ show i ++ " out of bounds"
 
+{-# INLINE modify #-}
+modify :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
+modify !v !i f = do
+  a <- getArray v
+  s <- getSize v
+  if 0 <= i && i < s then do
+    x <- A.unsafeRead a i
+    A.unsafeWrite a i (f x)
+  else
+    error $ "ToySolver.Data.Vec.modify: index " ++ show i ++ " out of bounds"
+
+{-# INLINE modify' #-}
+modify' :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
+modify' !v !i f = do
+  a <- getArray v
+  s <- getSize v
+  if 0 <= i && i < s then do
+    x <- A.unsafeRead a i
+    A.unsafeWrite a i $! f x
+  else
+    error $ "ToySolver.Data.Vec.modify': index " ++ show i ++ " out of bounds"
+
+{-# INLINE unsafeModify #-}
+unsafeModify :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
+unsafeModify !v !i f = do
+  a <- getArray v
+  x <- A.unsafeRead a i
+  A.unsafeWrite a i (f x)
+
+{-# INLINE unsafeModify' #-}
+unsafeModify' :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
+unsafeModify' !v !i f = do
+  a <- getArray v
+  x <- A.unsafeRead a i
+  A.unsafeWrite a i $! f x
+
 {-# INLINE unsafeRead #-}
 unsafeRead :: A.MArray a e IO => GenericVec a e -> Int -> IO e
 unsafeRead !v !i = do
@@ -144,6 +186,30 @@ push v e = do
   s <- getSize v
   resize v (s+1)
   unsafeWrite v s e
+
+popMaybe :: A.MArray a e IO => GenericVec a e -> IO (Maybe e)
+popMaybe v = do
+  s <- getSize v
+  if s == 0 then
+    return Nothing
+  else do
+    e <- unsafeRead v (s-1)
+    resize v (s-1)
+    return (Just e)
+
+{-# SPECIALIZE unsafePop :: Vec e -> IO e #-}
+{-# SPECIALIZE unsafePop :: UVec Int -> IO Int #-}
+{-# SPECIALIZE unsafePop :: UVec Double -> IO Double #-}
+{-# SPECIALIZE unsafePop :: UVec Bool -> IO Bool #-}
+pop :: A.MArray a e IO => GenericVec a e -> IO e
+pop v = do
+  s <- getSize v
+  if s == 0 then
+    error $ "ToySolver.Data.Vec.pop: empty Vec"
+  else do
+    e <- unsafeRead v (s-1)
+    resize v (s-1)
+    return e
 
 {-# SPECIALIZE unsafePop :: Vec e -> IO e #-}
 {-# SPECIALIZE unsafePop :: UVec Int -> IO Int #-}
