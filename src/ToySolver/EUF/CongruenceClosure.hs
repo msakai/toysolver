@@ -39,6 +39,8 @@ module ToySolver.EUF.CongruenceClosure
   -- * Query
   , areCongruent
   , areCongruentFlatTerm
+  , watch
+  , setOnMerged
 
   -- * Explanation
   , explain
@@ -137,6 +139,10 @@ data Solver
   , svUseList              :: !(IORef (IntMap [(Eqn1, Level, Gen)]))
   , svLookupTable          :: !(IORef (IntMap (IntMap Eqn1)))
 
+  -- for notification
+  , svOnMerged :: !(IORef (Term -> Term -> IO ()))
+  , svWatches :: !(Vec.Vec [FSym])
+
   -- workspace for constraint propagation
   , svPending :: !(Vec.Vec Eqn)
 
@@ -160,6 +166,9 @@ newSolver = do
   parent   <- newIORef IntMap.empty
   useList  <- newIORef IntMap.empty
   lookup   <- newIORef IntMap.empty
+  
+  onMerged <- newIORef (\_t1 _t2 -> return ())
+  watches <- Vec.new
 
   pending  <- Vec.new
 
@@ -181,6 +190,10 @@ newSolver = do
     , svParent              = parent
     , svUseList             = useList
     , svLookupTable         = lookup
+
+    -- for notification
+    , svOnMerged = onMerged
+    , svWatches = watches
 
     -- workspace for constraint propagation
     , svPending = pending
@@ -206,6 +219,7 @@ newFSym solver = do
   Vec.push (svRepresentativeTable solver) v
   Vec.push (svClassList solver) (ClassSingleton v)
   modifyIORef' (svUseList solver) (IntMap.insert v [])
+  Vec.push (svWatches solver) []
   Vec.push (svERepresentativeTable solver) v
   Vec.push (svEClassList solver) undefined
   Vec.push (svEHighestNodeTable solver) v
@@ -295,8 +309,16 @@ propagate solver = go
         addToTrail solver (TrailMerge a' b' a origRootA)
 
     update a' b' classA classB = do
+      callback <- readIORef (svOnMerged solver)
       classForM_ classA $ \c -> do
         Vec.unsafeWrite (svRepresentativeTable solver) c b'
+        ds <- Vec.unsafeRead (svWatches solver) c
+        forM_ ds $ \d -> do
+          d' <- getRepresentative solver d
+          when (d' == b') $ do
+            t1 <- fsymToTerm solver c
+            t2 <- fsymToTerm solver d
+            callback t1 t2
       Vec.unsafeWrite (svClassList solver) b' (classA <> classB)
 
       lv <- getCurrentLevel solver
@@ -409,6 +431,21 @@ checkInvariant solver = do
           a2' <- getRepresentative solver a2
           unless (b == a1' && c == a2') $
             error "ToySolver.EUF.CongruenceClosure.checkInvariant: error in lookupTable"
+
+setOnMerged :: Solver -> (Term -> Term -> IO ()) -> IO ()
+setOnMerged solver callback = writeIORef (svOnMerged solver) callback
+
+watch :: Solver -> Term -> Term -> IO ()
+watch solver t1 t2 = do
+  c1 <- termToFSym solver t1
+  c2 <- termToFSym solver t2
+  c1' <- getRepresentative solver c1
+  c2' <- getRepresentative solver c2
+  Vec.unsafeModify (svWatches solver) c1 (c2 :)
+  Vec.unsafeModify (svWatches solver) c2 (c1 :)
+  when (c1' == c2') $ do
+    callback <- readIORef (svOnMerged solver)
+    callback t1 t2
 
 explain :: Solver -> Term -> Term -> IO (Maybe IntSet)
 explain solver t1 t2 = do
