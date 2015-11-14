@@ -269,6 +269,7 @@ Library
      ToySolver.SAT.TseitinEncoder
      ToySolver.SAT.Types
      ToySolver.SAT.Printer
+     ToySolver.SMT
      ToySolver.Text.GCNF
      ToySolver.Text.GurobiSol
      ToySolver.Text.MaxSAT
@@ -555,6 +556,7 @@ Test-suite TestSuite
     TestSDPFile
     TestSimplex
     TestSimplex2
+    TestSMT
   Build-depends:
     base,
     array,

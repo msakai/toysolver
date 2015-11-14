@@ -15,6 +15,7 @@ import TestMisc
 import TestSAT
 import TestSimplex
 import TestSimplex2
+import TestSMT
 
 main :: IO ()
 main = defaultMain $ testGroup "ToySolver test suite"
@@ -31,4 +32,5 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , sdpTestGroup
   , simplexTestGroup
   , simplex2TestGroup
+  , smtTestGroup
   ]
