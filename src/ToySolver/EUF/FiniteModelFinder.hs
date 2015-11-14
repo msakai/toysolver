@@ -37,6 +37,7 @@ module ToySolver.EUF.FiniteModelFinder
   -- * Model types
   , Model (..)
   , Entity
+  , EntityTuple
   , showModel
   , showEntity
   , evalFormula
@@ -384,11 +385,13 @@ f(x) ≠ z ∨ a ≠ y ∨ P(y,z)
 -- | Element of model.
 type Entity = Int
 
+type EntityTuple = [Entity]
+
 -- | print entity
 showEntity :: Entity -> String
 showEntity e = "$" ++ show e
 
-showEntityTuple :: [Entity] -> String
+showEntityTuple :: EntityTuple -> String
 showEntityTuple xs = printf "(%s)" $ intercalate ", " $ map showEntity xs
 
 -- ---------------------------------------------------------------------------
@@ -460,8 +463,8 @@ collectPSym = Set.unions . map f
 data Model
   = Model
   { mUniverse  :: [Entity]
-  , mRelations :: Map PSym [[Entity]]
-  , mFunctions :: Map FSym [([Entity], Entity)]
+  , mRelations :: Map PSym (Set EntityTuple)
+  , mFunctions :: Map FSym (Map EntityTuple Entity)
   }
 
 showModel :: Model -> [String]
@@ -469,11 +472,11 @@ showModel m =
   printf "DOMAIN = {%s}" (intercalate ", " (map showEntity (mUniverse m))) :
   [ printf "%s = { %s }" p s
   | (p, xss) <- Map.toList (mRelations m)
-  , let s = intercalate ", " [if length xs == 1 then showEntity (head xs) else showEntityTuple xs | xs <- xss]
+  , let s = intercalate ", " [if length xs == 1 then showEntity (head xs) else showEntityTuple xs | xs <- Set.toList xss]
   ] ++
   [ printf "%s%s = %s" f (if length xs == 0 then "" else showEntityTuple xs) (showEntity y)
   | (f, xss) <- Map.toList (mFunctions m)
-  , (xs, y) <- xss
+  , (xs, y) <- Map.toList xss
   ]
 
 evalFormula :: Model -> Formula -> Bool
@@ -493,13 +496,11 @@ evalFormula m = f Map.empty
 
 evalAtom :: Model -> Map Var Entity -> Atom -> Bool
 evalAtom m env (PApp "=" [x1,x2]) = evalTerm m env x1 == evalTerm m env x2
-evalAtom m env (PApp p xs) = map (evalTerm m env) xs `elem` (mRelations m Map.! p)
+evalAtom m env (PApp p xs) = map (evalTerm m env) xs `Set.member` (mRelations m Map.! p)
 
 evalTerm :: Model -> Map Var Entity -> Term -> Entity
 evalTerm m env (TmVar v) = env Map.! v
-evalTerm m env (TmApp f xs) = head [y | (xs2,y) <- mFunctions m Map.! f, xs' == xs2]
-  where
-    xs' = map (evalTerm m env) xs
+evalTerm m env (TmApp f xs) = (mFunctions m Map.! f) Map.! map (evalTerm m env) xs
 
 evalLit :: Model -> Map Var Entity -> Lit -> Bool
 evalLit m env (Pos atom) = evalAtom m env atom
@@ -576,11 +577,11 @@ findModel size cs = do
 
       let rels = Map.fromList $ do
             (p,_) <- Set.toList ps
-            let tbl = sort [xs | (SPApp p' xs, b) <- Map.toList m, p == p', bmodel ! b]
+            let tbl = Set.fromList [xs | (SPApp p' xs, b) <- Map.toList m, p == p', bmodel ! b]
             return (p, tbl)
       let funs = Map.fromList $ do
             (f,_) <- Set.toList fs
-            let tbl = sort [(xs, y) | (SEq (STmApp f' xs) y, b) <- Map.toList m, f == f', bmodel ! b]
+            let tbl = Map.fromList [(xs, y) | (SEq (STmApp f' xs) y, b) <- Map.toList m, f == f', bmodel ! b]
             return (f, tbl)
 
       let model = Model
