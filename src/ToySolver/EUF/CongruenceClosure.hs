@@ -52,6 +52,8 @@ module ToySolver.EUF.CongruenceClosure
   -- * Low-level operations
   , termToFlatTerm
   , termToFSym
+  , fsymToTerm
+  , fsymToFlatTerm
   , flatTermToFSym
   ) where
 
@@ -634,8 +636,31 @@ flatTermToFSym solver (FTApp c d) = do
            return a
   return a
 
+fsymToFlatTerm :: Solver -> FSym -> IO FlatTerm
+fsymToFlatTerm solver a = do
+  (defs1,_) <- readIORef $ svDefs solver
+  case IntMap.lookup a defs1 of
+    Just (c,d) -> return (FTApp c d)
+    Nothing -> return (FTConst a)
+
 termToFSym :: Solver -> Term -> IO FSym
 termToFSym solver t = flatTermToFSym solver =<< termToFlatTerm solver t
+
+fsymToTerm :: Solver -> FSym -> IO Term
+fsymToTerm solver a = do
+  (defs1,_) <- readIORef $ svDefs solver
+  let convert :: FSym -> Term
+      convert a =
+        case convert' a of
+          (f, xs) -> TApp f (reverse xs)
+      convert' :: FSym -> (FSym, [Term])
+      convert' a =
+        case IntMap.lookup a defs1 of
+          Nothing -> (a, [])
+          Just (c,d) ->
+            case convert' c of
+              (f,xs) -> (f, convert d : xs)
+  return (convert a)
 
 maybeToIntSet :: Maybe Int -> IntSet
 maybeToIntSet Nothing  = IntSet.empty

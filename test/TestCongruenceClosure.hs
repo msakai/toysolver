@@ -171,6 +171,17 @@ prop_components = QM.monadicIO $ do
       b <- QM.run $ areCongruentFlatTerm solver (FTConst c) (FTConst d)
       QM.assert $ b == (repr ! c == repr ! d)
 
+case_fsymToTerm_termToSym = do
+  solver <- newSolver
+  f <- liftM (\f x y -> TApp f [x,y]) $ newFSym solver
+  g <- liftM (\f x -> TApp f [x]) $ newFSym solver
+  a <- newConst solver
+
+  let t = f (g a) (g (g a))
+  c <- termToFSym solver t
+  t2 <- fsymToTerm solver c
+  t2 @?= t
+
 ------------------------------------------------------------------------
 -- Test harness
 
