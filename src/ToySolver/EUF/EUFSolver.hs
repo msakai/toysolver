@@ -37,6 +37,13 @@ module ToySolver.EUF.EUFSolver
   -- * Backtracking
   , pushBacktrackPoint
   , popBacktrackPoint
+
+  -- * Low-level operations
+  , termToFlatTerm
+  , termToFSym
+  , fsymToTerm
+  , fsymToFlatTerm
+  , flatTermToFSym
   ) where
 
 import Control.Monad
@@ -153,6 +160,12 @@ popBacktrackPoint solver = do
     CC.popBacktrackPoint (svCCSolver solver)
     xs <- Vec.unsafePop (svBacktrackPoints solver)
     modifyIORef' (svDisequalities solver) $ (`Map.difference` xs)
+
+termToFlatTerm = CC.termToFlatTerm . svCCSolver
+termToFSym     = CC.termToFSym     . svCCSolver
+fsymToTerm     = CC.fsymToTerm     . svCCSolver
+fsymToFlatTerm = CC.fsymToFlatTerm . svCCSolver
+flatTermToFSym = CC.flatTermToFSym . svCCSolver
 
 #if !MIN_VERSION_base(4,7,0)
 
