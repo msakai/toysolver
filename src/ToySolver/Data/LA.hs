@@ -16,6 +16,7 @@ module ToySolver.Data.LA
   (
   -- * Expression of linear arithmetics
     Expr
+  , Var
 
   -- ** Conversion
   , var
