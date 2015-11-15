@@ -45,6 +45,13 @@ module ToySolver.EUF.CongruenceClosure
   , explainFlatTerm
   , explainConst
 
+  -- * Model Construction
+  , Entity
+  , EntityTuple
+  , Model (..)
+  , getModel
+  , eval
+
   -- * Backtracking
   , pushBacktrackPoint
   , popBacktrackPoint
@@ -70,6 +77,8 @@ import qualified Data.IntSet as IntSet
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Semigroup
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 import qualified ToySolver.Internal.Data.Vec as Vec
     
@@ -498,6 +507,102 @@ explainConst solver c1 c2 = do
   if b
   then liftM Just $ readIORef result
   else return Nothing
+
+-- -------------------------------------------------------------------
+-- Model construction
+-- -------------------------------------------------------------------
+
+type Entity = FSym
+type EntityTuple = [Entity]
+
+data Model
+  = Model
+  { mUniverse    :: !IntSet
+  , mFunctions   :: !(IntMap (Map EntityTuple Entity))
+  , mUnspecified :: !Entity
+  }
+  deriving (Show)
+
+getModel :: Solver -> IO Model
+getModel solver = do  
+  n <- Vec.getSize (svRepresentativeTable solver)
+  univRef <- newIORef IntSet.empty
+  reprRef <- newIORef IntMap.empty
+  forM_ [0..n-1] $ \a -> do
+    a' <- Vec.unsafeRead (svRepresentativeTable solver) a
+    when (a == a') $ modifyIORef' univRef (IntSet.insert a)
+    modifyIORef' reprRef (IntMap.insert a a')
+  univ <- readIORef univRef
+  repr <- readIORef reprRef
+
+  lookups <- readIORef (svLookupTable solver)
+  (defs1,_) <- readIORef (svDefs solver)
+
+  let -- "(b,c) ∈ appRel[a]" means f(b,c)=a
+      appRel :: IntMap (Set (FSym, FSym))
+      appRel = IntMap.fromListWith Set.union $
+        [ (repr IntMap.! c, Set.singleton (repr IntMap.! a, repr IntMap.! b))
+        | (a,m) <- IntMap.toList lookups, (b, Eqn1 _ _ _ c) <- IntMap.toList m
+        ]
+
+      partialApps :: IntSet
+      partialApps = IntSet.fromList [b | (a, xs) <- IntMap.toList appRel, (b,_) <- Set.toList xs]
+
+      xs1 :: IntMap (Map EntityTuple Entity)
+      xs1 = IntMap.fromListWith Map.union $
+              [ (f, Map.singleton (reverse argsRev) (repr IntMap.! a))
+              | a <- IntMap.keys appRel, a `IntSet.notMember` partialApps, (f, argsRev) <- expand a
+              ]
+        where
+          expand :: FSym -> [(FSym, [FSym])]
+          expand a =
+            case IntMap.lookup a appRel of
+              Nothing -> return (repr IntMap.! a, [])
+              Just xs -> do
+                (c,d) <- Set.toList xs
+                (f,xs) <- expand c
+                return (f, repr IntMap.! d : xs)
+
+      xs2 :: IntMap (Map EntityTuple Entity)
+      xs2 = IntMap.fromListWith Map.union $
+              [ (a, Map.singleton [] a') | (a, a') <- IntMap.toList repr, a `IntMap.notMember` defs1, a `IntMap.notMember` xs1 ]
+
+      funcs :: IntMap (Map EntityTuple Entity)
+      funcs = IntMap.unionWith Map.union xs1 xs2
+
+      used :: IntSet
+      used = IntSet.unions [IntSet.fromList (y : xs) | m <- IntMap.elems funcs, (xs,y) <- Map.toList m]
+
+  -- renaming
+  let univ2 :: IntSet
+      univ2 = IntSet.insert (-1) $ IntSet.fromList [0 .. IntSet.size used - 1]
+
+      to_univ2' :: IntMap Entity
+      to_univ2' = IntMap.fromList (zip (IntSet.toList used) [0..])
+
+      to_univ2 :: FSym -> Entity
+      to_univ2 = (to_univ2' IntMap.!)
+
+      funcs2 :: IntMap (Map EntityTuple Entity)
+      funcs2 = fmap (\m -> Map.fromList [(map to_univ2 xs, to_univ2 y) | (xs,y) <- Map.toList m]) funcs
+
+  return $
+    Model
+    { mUniverse    = univ2
+    , mFunctions   = funcs2
+    , mUnspecified = -1
+    }
+
+eval :: Model -> Term -> Entity
+eval m = go
+  where
+    go (TApp f xs) =
+      case IntMap.lookup f (mFunctions m) of
+        Nothing -> mUnspecified m
+        Just fdef ->
+          case Map.lookup (map go xs) fdef of
+            Nothing -> mUnspecified m
+            Just e -> e
 
 -- -------------------------------------------------------------------
 -- Backtracking

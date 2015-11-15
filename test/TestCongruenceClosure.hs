@@ -182,6 +182,33 @@ case_fsymToTerm_termToSym = do
   t2 <- fsymToTerm solver c
   t2 @?= t
 
+case_getModel = do
+  solver <- newSolver
+  a <- newConst solver
+  b <- newConst solver
+  c <- newConst solver
+  d <- newConst solver
+  f <- liftM (\c x -> TApp c [x]) $ newFSym solver
+  g <- liftM (\c x -> TApp c [x]) $ newFSym solver
+  h <- liftM (\c x y -> TApp c [x,y]) $ newFSym solver
+
+  merge solver (f b) c
+  merge solver (f c) a
+  merge solver (g a) (h a a)
+  m1 <- getModel solver
+  (eval m1 (f b) == eval m1 c) @?= True
+  (eval m1 (f c) == eval m1 a) @?= True
+  (eval m1 (g a) == eval m1 (h a a)) @?= True
+  (eval m1 (f b) == eval m1 (f c)) @?= False
+
+  merge solver b c
+  m2 <- getModel solver
+  (eval m2 (f b) == eval m2 c) @?= True
+  (eval m2 (f c) == eval m2 a) @?= True
+  (eval m2 (g a) == eval m2 (h a a)) @?= True
+  (eval m2 (f b) == eval m2 (f c)) @?= True
+  (eval m2 (g b) == eval m2 (g c)) @?= True
+
 ------------------------------------------------------------------------
 -- Test harness
 
