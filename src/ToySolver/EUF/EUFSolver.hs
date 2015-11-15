@@ -19,9 +19,10 @@ module ToySolver.EUF.EUFSolver
   , FSym
   , Term (..)
   , ConstrID
+  , VAFun (..)
   , newFSym
+  , newFun
   , newConst
-  , newFuncN
   , assertEqual
   , assertEqual'
   , assertNotEqual
@@ -66,7 +67,7 @@ import qualified Data.Set as Set
 import Data.IORef
 
 import qualified ToySolver.Internal.Data.Vec as Vec
-import ToySolver.EUF.CongruenceClosure (FSym, Term (..), ConstrID)
+import ToySolver.EUF.CongruenceClosure (FSym, Term (..), ConstrID, VAFun (..))
 import ToySolver.EUF.CongruenceClosure (Model (..), Entity, EntityTuple, eval)
 import qualified ToySolver.EUF.CongruenceClosure as CC
 
@@ -100,8 +101,8 @@ newFSym solver = CC.newFSym (svCCSolver solver)
 newConst :: Solver -> IO Term
 newConst solver = CC.newConst (svCCSolver solver)
 
-newFuncN :: Solver -> IO ([Term] -> Term)
-newFuncN solver = CC.newFuncN (svCCSolver solver)
+newFun :: CC.VAFun a => Solver -> IO a
+newFun solver = CC.newFun (svCCSolver solver)
 
 assertEqual :: Solver -> Term -> Term -> IO ()
 assertEqual solver t1 t2 = assertEqual' solver t1 t2 Nothing

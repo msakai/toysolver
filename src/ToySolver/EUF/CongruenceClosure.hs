@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns, ScopedTypeVariables, FlexibleInstances #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, ScopedTypeVariables)
+-- Portability :  non-portable (BangPatterns, ScopedTypeVariables, FlexibleInstances)
 --
 -- References:
 --
@@ -29,8 +29,9 @@ module ToySolver.EUF.CongruenceClosure
   , FlatTerm (..)
   , ConstrID
   , newFSym
+  , VAFun (..)
+  , newFun
   , newConst
-  , newFuncN
   , merge
   , merge'    
   , mergeFlatTerm
@@ -220,15 +221,22 @@ newFSym solver = do
   Vec.push (svEHighestNodeTable solver) v
   return v
 
-newConst :: Solver -> IO Term
-newConst solver = do
-  c <- newFSym solver
-  return $ TApp c []
+class VAFun a where
+  withVArgs :: ([Term] -> Term) -> a
 
-newFuncN :: Solver -> IO ([Term] -> Term)
-newFuncN solver = do
+instance VAFun Term where
+  withVArgs k = k []
+
+instance VAFun a => VAFun (Term -> a) where
+  withVArgs k x = withVArgs (\xs -> k (x : xs))
+
+newFun :: VAFun a => Solver -> IO a
+newFun solver = do
   c <- newFSym solver
-  return $ TApp c
+  return $ withVArgs (TApp c)
+
+newConst :: Solver -> IO Term
+newConst = newFun
 
 merge :: Solver -> Term -> Term -> IO ()
 merge solver t u = merge' solver t u Nothing

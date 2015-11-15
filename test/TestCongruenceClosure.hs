@@ -62,9 +62,9 @@ case_Example_2 = do
   b <- newConst solver
   c <- newConst solver
   d <- newConst solver
-  f <- liftM (\c x -> TApp c [x]) $ newFSym solver
-  g <- liftM (\c x -> TApp c [x]) $ newFSym solver
-  h <- liftM (\c x y -> TApp c [x,y]) $ newFSym solver  
+  f <- newFun solver
+  g <- newFun solver
+  h <- newFun solver  
   
   merge solver (f b) c
   merge solver (f c) a
@@ -189,9 +189,9 @@ case_getModel = do
   b <- newConst solver
   c <- newConst solver
   d <- newConst solver
-  f <- liftM (\c x -> TApp c [x]) $ newFSym solver
-  g <- liftM (\c x -> TApp c [x]) $ newFSym solver
-  h <- liftM (\c x y -> TApp c [x,y]) $ newFSym solver
+  f <- newFun solver
+  g <- newFun solver
+  h <- newFun solver
 
   merge solver (f b) c
   merge solver (f c) a
@@ -216,9 +216,9 @@ case_EUF_getModel = do
   b <- EUF.newConst solver -- 1
   c <- EUF.newConst solver -- 2
   d <- EUF.newConst solver -- 3
-  f <- liftM (\c x -> TApp c [x]) $ EUF.newFSym solver -- 4
-  g <- liftM (\c x -> TApp c [x]) $ EUF.newFSym solver -- 5
-  h <- liftM (\c x y -> TApp c [x,y]) $ EUF.newFSym solver -- 6
+  f <- EUF.newFun solver -- 4
+  g <- EUF.newFun solver -- 5
+  h <- EUF.newFun solver -- 6
 
   EUF.assertEqual solver (f b) c
   EUF.assertEqual solver (f c) a

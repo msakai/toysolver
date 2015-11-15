@@ -532,7 +532,7 @@ case_QF_EUF = do
   do
     x <- SAT.newVar satSolver
     x' <- boolToTerm x
-    f <- liftM (\s x -> EUF.TApp s [x]) $ EUF.newFSym eufSolver
+    f <- EUF.newFun eufSolver
     fx <- termToBool (f x')
     ftt <- abstractEUFAtom (f true, true)
     ret <- SAT.solveWith satSolver [-fx, ftt]
@@ -550,8 +550,7 @@ case_QF_EUF = do
     -- (a or x=y)
     -- f x /= f y
     a <- SAT.newVar satSolver
-    f <- liftM (\s x -> EUF.TApp s [x]) $ EUF.newFSym eufSolver
-    g <- liftM (\s x -> EUF.TApp s [x]) $ EUF.newFSym eufSolver
+    f <- EUF.newFun eufSolver
     x <- EUF.newConst eufSolver
     y <- EUF.newConst eufSolver
     let c1, c2 :: BoolExpr (Either SAT.Lit (EUF.Term, EUF.Term))
