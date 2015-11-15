@@ -33,7 +33,14 @@ module ToySolver.EUF.EUFSolver
 
   -- * Explanation
   , explain
-    
+
+  -- * Model Construction
+  , Entity
+  , EntityTuple
+  , Model (..)
+  , getModel
+  , eval
+
   -- * Backtracking
   , pushBacktrackPoint
   , popBacktrackPoint
@@ -60,6 +67,7 @@ import Data.IORef
 
 import qualified ToySolver.Internal.Data.Vec as Vec
 import ToySolver.EUF.CongruenceClosure (FSym, Term (..), ConstrID)
+import ToySolver.EUF.CongruenceClosure (Model (..), Entity, EntityTuple, eval)
 import qualified ToySolver.EUF.CongruenceClosure as CC
 
 data Solver
@@ -110,6 +118,8 @@ assertNotEqual' solver t1 t2 cid = if t1 < t2 then f (t1,t2) cid else f (t2,t1) 
     f deq cid = do
       ds <- readIORef (svDisequalities solver)
       unless (deq `Map.member` ds) $ do
+        _ <- termToFSym solver (fst deq) -- It is important to name the term for model generation
+        _ <- termToFSym solver (snd deq) -- It is important to name the term for model generation
         writeIORef (svDisequalities solver) $! Map.insert deq cid ds
         lv <- getCurrentLevel solver
         unless (lv==0) $ do
@@ -140,6 +150,17 @@ explain solver (Just (t1,t2)) = do
   case ret of
     Nothing -> error "ToySolver.EUF.EUFSolver.explain: should not happen"
     Just cs -> return cs
+
+-- -------------------------------------------------------------------
+-- Model construction
+-- -------------------------------------------------------------------
+
+getModel :: Solver -> IO Model
+getModel = CC.getModel . svCCSolver
+
+-- -------------------------------------------------------------------
+-- Backtracking
+-- -------------------------------------------------------------------
 
 type Level = Int
 

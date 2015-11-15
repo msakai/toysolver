@@ -18,6 +18,7 @@ import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
 import ToySolver.EUF.CongruenceClosure
+import qualified ToySolver.EUF.EUFSolver as EUF
 
 ------------------------------------------------------------------------
 -- Test cases
@@ -208,6 +209,31 @@ case_getModel = do
   (eval m2 (g a) == eval m2 (h a a)) @?= True
   (eval m2 (f b) == eval m2 (f c)) @?= True
   (eval m2 (g b) == eval m2 (g c)) @?= True
+
+case_EUF_getModel = do
+  solver <- EUF.newSolver
+  a <- EUF.newConst solver -- 0
+  b <- EUF.newConst solver -- 1
+  c <- EUF.newConst solver -- 2
+  d <- EUF.newConst solver -- 3
+  f <- liftM (\c x -> TApp c [x]) $ EUF.newFSym solver -- 4
+  g <- liftM (\c x -> TApp c [x]) $ EUF.newFSym solver -- 5
+  h <- liftM (\c x y -> TApp c [x,y]) $ EUF.newFSym solver -- 6
+
+  EUF.assertEqual solver (f b) c
+  EUF.assertEqual solver (f c) a
+  EUF.assertEqual solver (g a) (h a a)
+  True <- EUF.check solver
+  m1 <- EUF.getModel solver
+  (eval m1 (g b) == eval m1 (h c b)) @?= True
+
+  EUF.assertNotEqual solver (g b) (h c b)
+  True <- EUF.check solver
+  m2 <- EUF.getModel solver
+  print m2
+  print $ eval m2 (g b)
+  print $ eval m2 (h c b)
+  (eval m2 (g b) == eval m2 (h c b)) @?= False -- !
 
 ------------------------------------------------------------------------
 -- Test harness
