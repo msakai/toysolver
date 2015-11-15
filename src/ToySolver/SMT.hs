@@ -1,4 +1,15 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.SMT
+-- Copyright   :  (c) Masahiro Sakai 2015
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  unstable
+-- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances)
+--
+-----------------------------------------------------------------------------
 module ToySolver.SMT
   (
   -- * The Solver type
