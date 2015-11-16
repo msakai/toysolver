@@ -427,6 +427,10 @@ checkInvariant solver = do
           unless (b == a1' && c == a2') $
             error "ToySolver.EUF.CongruenceClosure.checkInvariant: error in lookupTable"
 
+-- -------------------------------------------------------------------
+-- Explanation
+-- -------------------------------------------------------------------
+
 explain :: Solver -> Term -> Term -> IO (Maybe IntSet)
 explain solver t1 t2 = do
   c1 <- termToFlatTerm solver t1
@@ -450,21 +454,13 @@ explainConst solver c1 c2 = do
     Vec.unsafeWrite (svEClassList solver) a (ClassSingleton a)
     Vec.unsafeWrite (svEHighestNodeTable solver) a a
                 
-  let getRepresentative2 :: FSym -> IO FSym
-      getRepresentative2 a = Vec.unsafeRead (svERepresentativeTable solver) a
-
-      highestNode :: FSym -> IO FSym
-      highestNode c = do
-        d <- getRepresentative2 c
-        Vec.unsafeRead (svEHighestNodeTable solver) d
-
-      union :: FSym -> FSym -> IO ()
+  let union :: FSym -> FSym -> IO ()
       union a b = do
-        a' <- getRepresentative2 a
-        b' <- getRepresentative2 b
+        a' <- getERepresentative solver a
+        b' <- getERepresentative solver b
         classA <- Vec.unsafeRead (svEClassList solver) a'
         classB <- Vec.unsafeRead (svEClassList solver) b'
-        h <- highestNode b'
+        h <- getHighestNode solver b'
         (a', b', classA, classB) <-
           if classSize classA < classSize classB then do
             return (a', b', classA, classB)
@@ -495,8 +491,8 @@ explainConst solver c1 c2 = do
 
       explainAlongPath :: FSym -> FSym -> IO ()
       explainAlongPath a c = do
-        a <- highestNode a
-        -- note that c is already @highestNode c@
+        a <- getHighestNode solver a
+        -- note that c is already @getHighestNode solver c@
         let loop a =
               unless (a == c) $ do
                 Just (b, eq) <- getParent solver a
@@ -508,7 +504,7 @@ explainConst solver c1 c2 = do
                     Vec.push (svEPendingProofs solver) (a1,b1)
                     Vec.push (svEPendingProofs solver) (a2,b2)
                 union a b
-                loop =<< highestNode b
+                loop =<< getHighestNode solver b
         loop a
 
   b <- loop
@@ -708,6 +704,14 @@ getParent solver c = do
   m <- readIORef $ svParent solver
   return $ IntMap.lookup c m
 
+getERepresentative :: Solver -> FSym -> IO FSym
+getERepresentative solver a = Vec.unsafeRead (svERepresentativeTable solver) a
+
+getHighestNode :: Solver -> FSym -> IO FSym
+getHighestNode solver c = do
+  d <- getERepresentative solver c
+  Vec.unsafeRead (svEHighestNodeTable solver) d
+
 nearestCommonAncestor :: Solver -> FSym -> FSym -> IO (Maybe FSym)
 nearestCommonAncestor solver a b = do
   let loop c !ret = do
@@ -719,7 +723,7 @@ nearestCommonAncestor solver a b = do
 
   let loop2 c = do
         if c `IntSet.member` a_ancestors then
-          return (Just c)
+          liftM Just $ getHighestNode solver c
         else do
           m <- getParent solver c
           case m of
