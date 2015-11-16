@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+module Test.AReal2 (areal2TestGroup) where
 
 import Data.Maybe
 import Data.Ratio
@@ -7,9 +8,9 @@ import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
 import Test.Tasty.TH
 
-import Data.Polynomial (UPolynomial, X (..))
-import qualified Data.Polynomial as P
-import Data.AlgebraicNumber.Real
+import ToySolver.Data.Polynomial (UPolynomial, X (..))
+import qualified ToySolver.Data.Polynomial as P
+import ToySolver.Data.AlgebraicNumber.Real
 
 import Control.Monad
 import System.IO
@@ -82,5 +83,5 @@ samples = [0, 1, -1, 2, -2] ++ concatMap realRoots ps
 ------------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+areal2TestGroup :: TestTree
+areal2TestGroup = $(testGroupGenerator)

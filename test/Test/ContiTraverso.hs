@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module TestContiTraverso (ctTestGroup) where
+module Test.ContiTraverso (ctTestGroup) where
 
 import Control.Monad
 import Data.List

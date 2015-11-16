@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module TestMIPSolver2 (mipSolver2TestGroup) where
+module Test.MIPSolver2 (mipSolver2TestGroup) where
 
 import Control.Monad
 import Data.List

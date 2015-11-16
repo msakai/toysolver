@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module TestSimplex2 (simplex2TestGroup) where
+module Test.Simplex2 (simplex2TestGroup) where
 
 import Control.Monad
 import Data.Default.Class

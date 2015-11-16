@@ -2,24 +2,26 @@ module Main where
 
 import Test.Tasty (defaultMain, testGroup)
 
-import TestAReal
-import TestArith
-import TestCongruenceClosure
-import TestContiTraverso
-import TestFiniteModelFinder
-import TestLPFile
-import TestMIPSolver2
-import TestMPSFile
-import TestSDPFile
-import TestMisc
-import TestSAT
-import TestSimplex
-import TestSimplex2
-import TestSMT
+import Test.AReal
+import Test.AReal2
+import Test.Arith
+import Test.CongruenceClosure
+import Test.ContiTraverso
+import Test.FiniteModelFinder
+import Test.LPFile
+import Test.MIPSolver2
+import Test.MPSFile
+import Test.SDPFile
+import Test.Misc
+import Test.SAT
+import Test.Simplex
+import Test.Simplex2
+import Test.SMT
 
 main :: IO ()
 main = defaultMain $ testGroup "ToySolver test suite"
   [ arealTestGroup
+--  , areal2TestGroup
   , arithTestGroup
   , ccTestGroup
   , ctTestGroup

@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
-module TestAReal (arealTestGroup) where
+module Test.AReal (arealTestGroup) where
 
 import Data.Maybe
 import Data.Ratio

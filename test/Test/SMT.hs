@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
-module TestSMT (smtTestGroup) where
+module Test.SMT (smtTestGroup) where
 
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))

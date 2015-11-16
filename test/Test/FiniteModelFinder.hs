@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
-module TestFiniteModelFinder (fmfTestGroup) where
+module Test.FiniteModelFinder (fmfTestGroup) where
 
 import Control.Monad
 import Control.Monad.State

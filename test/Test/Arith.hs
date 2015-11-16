@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module TestArith (arithTestGroup) where
+module Test.Arith (arithTestGroup) where
 
 import Control.Monad
 import Data.List

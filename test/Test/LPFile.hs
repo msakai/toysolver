@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module TestLPFile (lpTestGroup) where
+module Test.LPFile (lpTestGroup) where
 
 import Control.Monad
 import Data.List

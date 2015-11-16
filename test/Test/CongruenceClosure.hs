@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wall #-}
-module TestCongruenceClosure (ccTestGroup) where
+module Test.CongruenceClosure (ccTestGroup) where
 
 import Control.Monad
 import Data.Array

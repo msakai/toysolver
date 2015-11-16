@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
-module TestSAT (satTestGroup) where
+module Test.SAT (satTestGroup) where
 
 import Control.Monad
 import Data.Array.IArray

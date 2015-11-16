@@ -60,7 +60,6 @@ Extra-Source-Files:
    samples/programs/htc/test1.dat
    samples/programs/htc/test2.dat
    samples/programs/svm2lp/a1a
-   test/TestAReal2.hs
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
 Build-Type: Simple
@@ -543,20 +542,21 @@ Test-suite TestSuite
   HS-Source-Dirs:    test
   Main-is:           TestSuite.hs
   Other-Modules:
-    TestAReal
-    TestArith
-    TestCongruenceClosure
-    TestContiTraverso
-    TestFiniteModelFinder
-    TestLPFile
-    TestMisc
-    TestMIPSolver2
-    TestMPSFile
-    TestSAT
-    TestSDPFile
-    TestSimplex
-    TestSimplex2
-    TestSMT
+    Test.AReal
+    Test.AReal2
+    Test.Arith
+    Test.CongruenceClosure
+    Test.ContiTraverso
+    Test.FiniteModelFinder
+    Test.LPFile
+    Test.Misc
+    Test.MIPSolver2
+    Test.MPSFile
+    Test.SAT
+    Test.SDPFile
+    Test.Simplex
+    Test.Simplex2
+    Test.SMT
   Build-depends:
     base,
     array,

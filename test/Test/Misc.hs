@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
-module TestMisc (miscTestGroup) where
+module Test.Misc (miscTestGroup) where
 
 import Prelude hiding (all)
 

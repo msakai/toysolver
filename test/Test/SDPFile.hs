@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module TestSDPFile (sdpTestGroup) where
+module Test.SDPFile (sdpTestGroup) where
 
 import Control.Monad
 import Data.List

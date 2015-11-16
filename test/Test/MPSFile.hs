@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module TestMPSFile (mpsTestGroup) where
+module Test.MPSFile (mpsTestGroup) where
 
 import Control.Monad
 import Data.List
