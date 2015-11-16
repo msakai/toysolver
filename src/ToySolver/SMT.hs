@@ -425,8 +425,11 @@ lraExprToEUFTerm solver e = do
     Just c -> return (EUF.TApp c [])
     Nothing -> do
       c <- EUF.newFSym (smtEUF solver)
-      forM_ (IntMap.keys fsymToReal) $ \d -> do
-        abstractEUFAtom solver (EUF.TApp c [], EUF.TApp d []) -- allocate interface equalities
+      forM_ (IntMap.toList fsymToReal) $ \(d, d_lra) -> do
+        -- allocate interface equalities
+        b1 <- abstractEUFAtom solver (EUF.TApp c [], EUF.TApp d [])
+        b2 <- abstractLRAAtom solver (e .==. d_lra)
+        Tseitin.addFormula (smtEnc solver) (Atom b1 .<=>. Atom b2)
       writeIORef (smtRealTermDefs solver) $
         ( Map.insert e c realToFSym
         , IntMap.insert c e fsymToReal
@@ -442,8 +445,11 @@ lraExprFromTerm solver t = do
     Nothing -> do
       v <- Simplex2.newVar (smtLRA solver)
       let e = LA.var v
-      forM_ (IntMap.keys fsymToReal) $ \d -> do
-        abstractEUFAtom solver (EUF.TApp c [], EUF.TApp d []) -- allocate interface equalities
+      forM_ (IntMap.toList fsymToReal) $ \(d, d_lra) -> do
+        -- allocate interface equalities
+        b1 <- abstractEUFAtom solver (EUF.TApp c [], EUF.TApp d [])
+        b2 <- abstractLRAAtom solver (e .==. d_lra)
+        Tseitin.addFormula (smtEnc solver) (Atom b1 .<=>. Atom b2)
       writeIORef (smtRealTermDefs solver) $
         ( Map.insert e c realToFSym
         , IntMap.insert c e fsymToReal

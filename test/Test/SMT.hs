@@ -60,6 +60,29 @@ case_QF_EUF_2 = do
   ret <- SMT.checkSAT solver
   ret @?= False
 
+case_QF_EUF_LRA :: IO ()
+case_QF_EUF_LRA = do
+  solver <- SMT.newSolver
+  a <- SMT.declareConst solver "a" SReal
+  b <- SMT.declareConst solver "b" SReal
+  c <- SMT.declareConst solver "c" SReal
+  f <- SMT.declareFun solver "f" [SReal] SReal
+  g <- SMT.declareFun solver "g" [SReal] SReal
+  h <- SMT.declareFun solver "h" [SReal, SReal] SReal
+
+  SMT.assert solver $ 2*a .>=. b + f (g c)
+  SMT.assert solver $ f b .==. c
+  SMT.assert solver $ f c .==. a
+  SMT.assert solver $ g a .<. h a a
+  SMT.assert solver $ g b .>. h c b
+
+  ret <- SMT.checkSAT solver
+  ret @?= True
+
+  SMT.assert solver $ b .==. c
+  ret <- SMT.checkSAT solver
+  ret @?= False
+
 case_pushContext :: IO ()
 case_pushContext = do
   solver <- SMT.newSolver
