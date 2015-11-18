@@ -3,6 +3,7 @@
 module Test.CongruenceClosure (ccTestGroup) where
 
 import Control.Monad
+import Control.Monad.State
 import Data.Array
 import Data.Graph
 import qualified Data.Tree as Tree
@@ -183,7 +184,7 @@ case_fsymToTerm_termToSym = do
   t2 <- fsymToTerm solver c
   t2 @?= t
 
-case_getModel = do
+case_getModel_test1 = do
   solver <- newSolver
   a <- newConst solver
   b <- newConst solver
@@ -210,7 +211,7 @@ case_getModel = do
   (eval m2 (f b) == eval m2 (f c)) @?= True
   (eval m2 (g b) == eval m2 (g c)) @?= True
 
-case_EUF_getModel = do
+case_EUF_getModel_test1 = do
   solver <- EUF.newSolver
   a <- EUF.newConst solver -- 0
   b <- EUF.newConst solver -- 1
@@ -230,10 +231,90 @@ case_EUF_getModel = do
   EUF.assertNotEqual solver (g b) (h c b)
   True <- EUF.check solver
   m2 <- EUF.getModel solver
-  print m2
-  print $ eval m2 (g b)
-  print $ eval m2 (h c b)
-  (eval m2 (g b) == eval m2 (h c b)) @?= False -- !
+  (eval m2 (g b) == eval m2 (h c b)) @?= False
+
+prop_getModel_eval_1 = QM.monadicIO $ do
+  solver <- QM.run newSolver
+  a <- QM.run $ newConst solver
+  b <- QM.run $ newConst solver
+  c <- QM.run $ newConst solver
+  f <- QM.run $ newFun solver
+  g <- QM.run $ newFun solver
+  h <- QM.run $ newFun solver
+
+  let genExpr :: Gen Term
+      genExpr = evalStateT genExpr' 10
+
+      genExpr' :: StateT Int Gen Term
+      genExpr' = do
+        budget <- get
+        modify (subtract 1)
+        join $ lift $ elements $ concat $
+          [ map return [a,b,c]
+          , [ liftM f genExpr' | budget >= 2 ]
+          , [ liftM g genExpr' | budget >= 2 ]
+          , [ liftM2 h genExpr' genExpr' | budget >= 3 ]
+          ]
+
+  es <- QM.pick $ do
+    n <- choose (0, 20)
+    replicateM n $ do
+      lhs <- genExpr
+      rhs <- genExpr
+      return (lhs,rhs)
+
+  join $ QM.run $ do
+    forM_ es $ \(lhs,rhs) ->
+      merge solver lhs rhs
+    m <- getModel solver
+    return $
+      forM_ es $ \(lhs,rhs) -> do
+        QM.assert (eval m lhs == eval m rhs)
+
+prop_getModel_eval_2 = QM.monadicIO $ do
+  solver <- QM.run newSolver
+  a <- QM.run $ newConst solver
+  b <- QM.run $ newConst solver
+  c <- QM.run $ newConst solver
+  f <- QM.run $ newFun solver
+  g <- QM.run $ newFun solver
+  h <- QM.run $ newFun solver
+
+  let genExpr :: Gen Term
+      genExpr = evalStateT genExpr' 10
+
+      genExpr' :: StateT Int Gen Term
+      genExpr' = do
+        budget <- get
+        modify (subtract 1)
+        join $ lift $ elements $ concat $
+          [ map return [a,b,c]
+          , [ liftM f genExpr' | budget >= 2 ]
+          , [ liftM g genExpr' | budget >= 2 ]
+          , [ liftM2 h genExpr' genExpr' | budget >= 3 ]
+          ]
+
+  es <- QM.pick $ do
+    n <- choose (0, 20)
+    replicateM n $ do
+      lhs <- genExpr
+      rhs <- genExpr
+      return (lhs,rhs)
+
+  (lhs,rhs) <- QM.pick $ do
+    lhs <- genExpr
+    rhs <- genExpr
+    return (lhs,rhs)
+
+  join $ QM.run $ do
+    forM_ es $ \(lhs,rhs) -> do
+      merge solver lhs rhs
+    b <- areCongruent solver lhs rhs
+    if b then do
+      m <- getModel solver
+      return $ QM.assert (eval m lhs == eval m rhs)
+    else
+      return $ return ()
 
 ------------------------------------------------------------------------
 -- Test harness
