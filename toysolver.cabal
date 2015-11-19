@@ -126,7 +126,6 @@ Library
      parse-dimacs,
      queue,
      heaps,
-     unbounded-delays,
      vector,
      vector-space >=0.8.6,
      multiset,
@@ -299,7 +298,6 @@ Executable toysolver
     array,
     data-default-class,
     filepath,
-    parsec,
     OptDir,
     parse-dimacs,
     pseudo-boolean,
@@ -373,7 +371,6 @@ Executable lpconvert
   HS-Source-Dirs: lpconvert
   Build-Depends:
     base,
-    containers,
     filepath,
     data-default-class,
     parse-dimacs,
@@ -388,7 +385,6 @@ Executable pbconvert
   HS-Source-Dirs: pbconvert
   Build-Depends:
     base >=4 && <5,
-    containers,
     filepath,
     data-default-class,
     parse-dimacs,
@@ -433,7 +429,6 @@ Executable knapsack
   HS-Source-Dirs: samples/programs/knapsack
   Build-Depends:
     base,
-    array,
     toysolver
   Default-Language: Haskell2010
   if flag(LinuxStatic)
@@ -477,7 +472,6 @@ Executable pigeonhole
   Build-Depends:
     base,
     containers,
-    filepath,
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
@@ -492,8 +486,6 @@ Executable maxsatverify
   Build-Depends:
     base,
     array,
-    containers,
-    filepath,
     toysolver
   Default-Language: Haskell2010
   if flag(LinuxStatic)
@@ -507,8 +499,6 @@ Executable pbverify
   Build-Depends:
     base,
     array,
-    containers,
-    filepath,
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
@@ -529,8 +519,6 @@ Test-suite TestPolynomial
     tasty-hunit ==0.9.*,
     tasty-quickcheck ==0.8.*,
     tasty-th,
-    HUnit,
-    QuickCheck >=2.5 && <3,
     data-interval,
     finite-field >=0.7.0 && <1.0.0,
     prettyclass >=1.0.0
@@ -564,7 +552,6 @@ Test-suite TestSuite
     data-default-class,
     mtl,
     mwc-random,
-    stm,
     vector,
     vector-space,
     toysolver,
@@ -574,7 +561,6 @@ Test-suite TestSuite
     tasty-hunit ==0.9.*,
     tasty-quickcheck ==0.8.*,
     tasty-th,
-    HUnit,
     QuickCheck >=2.5 && <3
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell, ScopedTypeVariables
@@ -586,7 +572,6 @@ Benchmark BenchmarkSATLIB
   build-depends:
     base >=4 && <5,
     array,
-    containers,
     data-default-class,
     parse-dimacs,
     toysolver,
