@@ -213,6 +213,8 @@ newSolver = do
         , thPopBacktrackPoint = do
             Simplex2.popBacktrackPoint lra
             EUF.popBacktrackPoint euf
+        , thConstructModel = do
+            return () -- TODO
         }
   SAT.setTheory sat tsolver
 

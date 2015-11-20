@@ -12,6 +12,7 @@ data TheorySolver =
   , thExplain   :: Maybe Lit -> IO [Lit]
   , thPushBacktrackPoint :: IO ()
   , thPopBacktrackPoint  :: IO ()
+  , thConstructModel :: IO ()
   }
 
 emptyTheory :: TheorySolver
@@ -22,4 +23,5 @@ emptyTheory =
   , thExplain = \_ -> error "should not happen"
   , thPushBacktrackPoint = return ()
   , thPopBacktrackPoint  = return ()
+  , thConstructModel = return ()
   }
