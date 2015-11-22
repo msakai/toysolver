@@ -52,6 +52,7 @@ module ToySolver.EUF.CongruenceClosure
   , Model (..)
   , getModel
   , eval
+  , evalAp
 
   -- * Backtracking
   , pushBacktrackPoint
@@ -598,15 +599,16 @@ getModel solver = do
     }
 
 eval :: Model -> Term -> Entity
-eval m = go
-  where
-    go (TApp f xs) =
-      case IntMap.lookup f (mFunctions m) of
+eval m (TApp f xs) = evalAp m f (map (eval m) xs)
+
+evalAp :: Model -> FSym -> [Entity] -> Entity
+evalAp m f xs =
+  case IntMap.lookup f (mFunctions m) of
+    Nothing -> mUnspecified m
+    Just fdef ->
+      case Map.lookup xs fdef of
         Nothing -> mUnspecified m
-        Just fdef ->
-          case Map.lookup (map go xs) fdef of
-            Nothing -> mUnspecified m
-            Just e -> e
+        Just e -> e
 
 -- -------------------------------------------------------------------
 -- Backtracking
