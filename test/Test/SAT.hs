@@ -293,6 +293,7 @@ newTheorySolver cnf@(nv,cs) = do
               Just _ -> return []
         , thPushBacktrackPoint = modifyIORef ref ([] :)
         , thPopBacktrackPoint = modifyIORef ref tail
+        , thConstructModel = return ()
         }
   return tsolver
 
@@ -389,6 +390,8 @@ case_QF_LRA = do
             Simplex2.pushBacktrackPoint lraSolver
         , thPopBacktrackPoint = do
             Simplex2.popBacktrackPoint lraSolver
+        , thConstructModel = do
+            return ()
         }
   SAT.setTheory satSolver tsolver
 
@@ -432,6 +435,7 @@ case_QF_EUF = do
   
   tblRef <- newIORef (Map.empty :: Map (EUF.Term, EUF.Term) SAT.Var)
   defsRef <- newIORef (IntMap.empty :: IntMap (EUF.Term, EUF.Term))
+  eufModelRef <- newIORef (undefined :: EUF.Model)
  
   let abstractEUFAtom :: (EUF.Term, EUF.Term) -> IO SAT.Lit
       abstractEUFAtom (t1,t2) | t1 >= t2 = abstractEUFAtom (t2,t1)
@@ -486,6 +490,9 @@ case_QF_EUF = do
             EUF.pushBacktrackPoint eufSolver
         , thPopBacktrackPoint = do
             EUF.popBacktrackPoint eufSolver
+        , thConstructModel = do
+            writeIORef eufModelRef =<< EUF.getModel eufSolver
+            return ()
         }
   SAT.setTheory satSolver tsolver
 
@@ -537,8 +544,14 @@ case_QF_EUF = do
     ftt <- abstractEUFAtom (f true, true)
     ret <- SAT.solveWith satSolver [-fx, ftt]
     ret @?= True
-    m <- SAT.getModel satSolver
-    SAT.evalLit m x @?= False
+
+    m1 <- SAT.getModel satSolver
+    m2 <- readIORef eufModelRef
+    let e (Left lit) = SAT.evalLit m1 lit
+        e (Right (lhs,rhs)) = EUF.eval m2 lhs == EUF.eval m2 rhs
+    fold e (notB (Atom (Left fx)) .||. (Atom (Right (f true, true)))) @?= True
+    SAT.evalLit m1 x @?= False
+
     ret <- SAT.solveWith satSolver [-fx, ftt, x]
     ret @?= False
 
@@ -560,6 +573,13 @@ case_QF_EUF = do
     addFormula c2
     ret <- SAT.solve satSolver
     ret @?= True
+    m1 <- SAT.getModel satSolver
+    m2 <- readIORef eufModelRef
+    let e (Left lit) = SAT.evalLit m1 lit
+        e (Right (lhs,rhs)) = EUF.eval m2 lhs == EUF.eval m2 rhs
+    fold e c1 @?= True
+    fold e c2 @?= True
+
     ret <- SAT.solveWith satSolver [-a]
     ret @?= False
 

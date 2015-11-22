@@ -1123,6 +1123,10 @@ solve_ solver = do
     when (result == Just True) $ do
       when (configCheckModel config) $ checkSatisfied solver
       constructModel solver
+      mt <- getTheory solver
+      case mt of
+        Nothing -> return ()
+        Just t -> thConstructModel t
     unless (result == Just False) $ do
       saveAssumptionsImplications solver
 

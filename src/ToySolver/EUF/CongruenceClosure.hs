@@ -570,7 +570,7 @@ getModel solver = do
 
       xs2 :: IntMap (Map EntityTuple Entity)
       xs2 = IntMap.fromListWith Map.union $
-              [ (a, Map.singleton [] a') | (a, a') <- IntMap.toList repr, a `IntMap.notMember` defs1, a `IntMap.notMember` xs1 ]
+              [ (a, Map.singleton [] a') | (a, a') <- IntMap.toList repr, a `IntMap.notMember` xs1 ]
 
       funcs :: IntMap (Map EntityTuple Entity)
       funcs = IntMap.unionWith Map.union xs1 xs2

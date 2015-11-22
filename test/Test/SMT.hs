@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Test.SMT (smtTestGroup) where
 
+import Control.Monad
+
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
 import Test.Tasty.HUnit
@@ -21,11 +23,17 @@ case_QF_LRA = do
   a <- SMT.declareConst solver "a" SBool
   x <- SMT.declareConst solver "x" SReal
   y <- SMT.declareConst solver "y" SReal
-  SMT.assert solver $ ite a (2*x + (1/3)*y .<=. -4) (1.5 * y .==. -2*x)
-  SMT.assert solver $ (x .>. y) .||. (a .<=>. (3*x .<. -1 + (1/5)*(x + y)))
+  let c1 = ite a (2*x + (1/3)*y .<=. -4) (1.5 * y .==. -2*x)
+      c2 = (x .>. y) .||. (a .<=>. (3*x .<. -1 + (1/5)*(x + y)))
+  SMT.assert solver c1
+  SMT.assert solver c2
 
   ret <- SMT.checkSAT solver
   ret @?= True
+
+  m <- SMT.getModel solver
+  SMT.eval m c1 @?= SMT.ValBool True
+  SMT.eval m c2 @?= SMT.ValBool True
 
 case_QF_EUF_1 :: IO ()
 case_QF_EUF_1 = do
@@ -33,10 +41,16 @@ case_QF_EUF_1 = do
   x <- SMT.declareConst solver "x" SBool
   f <- SMT.declareFun solver "f" [SBool] SBool  
 
-  SMT.assert solver $ f true .==. true
-  SMT.assert solver $ notB (f x)
+  let c1 = f true .==. true
+      c2 = notB (f x)
+  SMT.assert solver c1
+  SMT.assert solver c2
   ret <- SMT.checkSAT solver
   ret @?= True
+
+  m <- SMT.getModel solver
+  SMT.eval m c1 @?= SMT.ValBool True
+  SMT.eval m c2 @?= SMT.ValBool True
   
   SMT.assert solver $ x
   ret <- SMT.checkSAT solver
@@ -51,10 +65,16 @@ case_QF_EUF_2 = do
   y <- SMT.declareConst solver "y" SU
   f <- SMT.declareFun solver "f" [SU] SU  
 
-  SMT.assert solver $ a .||. (x .==. y)
-  SMT.assert solver $ f x ./=. f y
+  let c1 = a .||. (x .==. y)
+      c2 = f x ./=. f y
+  SMT.assert solver c1
+  SMT.assert solver c2
   ret <- SMT.checkSAT solver
   ret @?= True
+
+  m <- SMT.getModel solver
+  SMT.eval m c1 @?= SMT.ValBool True
+  SMT.eval m c2 @?= SMT.ValBool True
 
   SMT.assert solver $ notB a
   ret <- SMT.checkSAT solver
@@ -70,14 +90,20 @@ case_QF_EUF_LRA = do
   g <- SMT.declareFun solver "g" [SReal] SReal
   h <- SMT.declareFun solver "h" [SReal, SReal] SReal
 
-  SMT.assert solver $ 2*a .>=. b + f (g c)
-  SMT.assert solver $ f b .==. c
-  SMT.assert solver $ f c .==. a
-  SMT.assert solver $ g a .<. h a a
-  SMT.assert solver $ g b .>. h c b
+  let cs =
+        [ 2*a .>=. b + f (g c)
+        , f b .==. c
+        , f c .==. a
+        , g a .<. h a a
+        , g b .>. h c b
+        ]
+  mapM_ (SMT.assert solver) cs
 
   ret <- SMT.checkSAT solver
   ret @?= True
+  m <- SMT.getModel solver
+  forM_ cs $ \c -> do
+    SMT.eval m c @?= SMT.ValBool True
 
   SMT.assert solver $ b .==. c
   ret <- SMT.checkSAT solver
@@ -93,13 +119,19 @@ case_QF_EUF_Bool = do
   g <- SMT.declareFun solver "g" [SBool] SBool
   h <- SMT.declareFun solver "h" [SBool, SBool] SBool
 
-  SMT.assert solver $ f b .==. c
-  SMT.assert solver $ f c .==. a
-  SMT.assert solver $ g a .==. h a a
-  SMT.assert solver $ g b ./=. h c b
+  let cs =
+        [ f b .==. c
+        , f c .==. a
+        , g a .==. h a a
+        , g b ./=. h c b
+        ]
+  mapM_ (SMT.assert solver) cs
 
   ret <- SMT.checkSAT solver
   ret @?= True
+  m <- SMT.getModel solver
+  forM_ cs $ \c -> do
+    SMT.eval m c @?= SMT.ValBool True
 
   SMT.assert solver $ b .==. c
   ret <- SMT.checkSAT solver
