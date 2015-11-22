@@ -294,7 +294,12 @@ exprSort solver (EAp f xs)
   | f `Set.member` Set.fromList ["true","false","and","or","not","=>","<=>","=",">=","<=",">","<"] = return SBool
   | f `Set.member` Set.fromList ["+", "-", "*"] = return SReal
   | f == "ite" = exprSort solver (xs !! 1)
-  | otherwise = return SU
+  | otherwise = do
+      fdefs <- readIORef (smtFDefs solver)
+      case fdefs Map.! f of
+        FBoolVar _ -> return SBool
+        FLRAVar _ -> return SReal
+        FEUFFun (_,s) _ -> return s
 
 -- -------------------------------------------------------------------
                                               
