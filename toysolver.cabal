@@ -335,6 +335,10 @@ Executable toysat
     Build-Depends: time >=1.5.0
   else
     Build-Depends: time <1.5.0, old-locale
+  if impl(ghc <7.7)
+    Build-Depends:
+      -- vector-space depends on MemoTrie, but MemoTrie >=0.6.3 uses extensions that are not available on GHC 7.6.
+      MemoTrie <=0.6.2
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
   if impl(ghc >= 7)
