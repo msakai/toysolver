@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SMT
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  unstable
--- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances)
+-- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, CPP)
 --
 -----------------------------------------------------------------------------
 module ToySolver.SMT
@@ -34,6 +34,9 @@ module ToySolver.SMT
   ) where
 
 import Control.Monad
+import Control.Monad.Trans
+import Control.Monad.Trans.Except
+import Data.Either
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
@@ -182,12 +185,12 @@ newSolver = do
               b2 <- EUF.check euf
               if b2 then do
                 (_, defsEUF) <- readIORef eufAtomDefs
-                forM_ (IntMap.toList defsEUF) $ \(v, (t1, t2)) -> do
-                  b3 <- EUF.areEqual euf t1 t2
-                  when b3 $ do
-                    callback v
-                    return ()
-                return b2
+                liftM isRight $ runExceptT $ do
+                  forM_ (IntMap.toList defsEUF) $ \(v, (t1, t2)) -> do
+                    b3 <- lift $ EUF.areEqual euf t1 t2
+                    when b3 $ do
+                      b4 <- lift $ callback v
+                      unless b4 $ throwE ()
               else do
                 writeIORef conflictTheory False
                 return b2
@@ -553,3 +556,13 @@ popContext :: Solver -> IO ()
 popContext solver = do
   Vec.pop (smtContexts solver)
   return ()
+
+-- -------------------------------------------------------------------
+
+#if !MIN_VERSION_base(4,7,0)
+
+isRight :: Either a b -> Bool
+isRight (Left  _) = False
+isRight (Right _) = True
+
+#endif
