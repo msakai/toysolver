@@ -31,6 +31,12 @@ module ToySolver.SMT
   , checkSAT
   , pushContext
   , popContext
+
+  -- * Model
+  , Model
+  , Value (..)
+  , getModel
+  , eval
   ) where
 
 import Control.Monad
@@ -127,6 +133,7 @@ data Solver
   , smtRealTermDefs :: !(IORef (Map (LA.Expr Rational) EUF.FSym, IntMap (LA.Expr Rational)))
   , smtEUFTrue  :: !EUF.Term
   , smtEUFFalse :: !EUF.Term
+  , smtEUFModel :: !(IORef EUF.Model)
 
   , smtFDefs :: !(IORef (Map FSym FDef))
 
@@ -154,6 +161,8 @@ newSolver = do
     , IntMap.fromList [(litTrue, eufTrue), (litFalse, eufFalse)]
     )
   realTermDefs <- newIORef (Map.empty, IntMap.empty)
+
+  eufModelRef <- newIORef (undefined :: EUF.Model)
 
   fdefs <- newIORef Map.empty
 
@@ -217,7 +226,8 @@ newSolver = do
             Simplex2.popBacktrackPoint lra
             EUF.popBacktrackPoint euf
         , thConstructModel = do
-            return () -- TODO
+            writeIORef eufModelRef =<< EUF.getModel euf
+            return ()
         }
   SAT.setTheory sat tsolver
 
@@ -236,6 +246,7 @@ newSolver = do
     , smtRealTermDefs = realTermDefs
     , smtEUFTrue  = eufTrue
     , smtEUFFalse = eufFalse
+    , smtEUFModel = eufModelRef
 
     , smtFDefs = fdefs
 
@@ -558,6 +569,100 @@ popContext :: Solver -> IO ()
 popContext solver = do
   Vec.pop (smtContexts solver)
   return ()
+
+-- -------------------------------------------------------------------
+
+data Model
+  = Model
+  { mDefs      :: !(Map FSym FDef)
+  , mBoolModel :: !SAT.Model
+  , mLRAModel  :: !Simplex2.Model
+  , mEUFModel  :: !EUF.Model
+  , mEUFTrue   :: !EUF.Entity
+  , mEUFFalse  :: !EUF.Entity
+  , mEntityToRational :: !(IntMap Rational)
+  , mRationalToEntity :: !(Map Rational EUF.Entity)
+  }
+  deriving (Show)
+
+data Value
+  = ValRational !Rational
+  | ValBool !Bool
+  | ValUninterpreted !Int
+  deriving (Eq, Show)
+
+getModel :: Solver -> IO Model
+getModel solver = do
+  defs <- readIORef (smtFDefs solver)
+  boolModel <- SAT.getModel (smtSAT solver)
+  lraModel <- Simplex2.getModel (smtLRA solver)
+  eufModel <- readIORef (smtEUFModel solver)
+  (_, fsymToReal) <- readIORef (smtRealTermDefs solver)
+  let xs = [(e, LA.evalExpr lraModel lraExpr) | (fsym, lraExpr) <- IntMap.toList fsymToReal, let e = EUF.evalAp eufModel fsym [], e /= EUF.mUnspecified eufModel]
+  return $
+    Model
+    { mDefs = defs
+    , mBoolModel = boolModel
+    , mLRAModel = lraModel
+    , mEUFModel = eufModel
+    , mEUFTrue  = EUF.eval eufModel (smtEUFTrue solver)
+    , mEUFFalse = EUF.eval eufModel (smtEUFFalse solver)
+    , mEntityToRational = IntMap.fromList xs
+    , mRationalToEntity = Map.fromList [(r,e) | (e,r) <- xs]
+    }
+
+eval :: Model -> Expr -> Value
+eval m (EFrac r) = ValRational r
+eval m (EAp "true" [])   = ValBool True
+eval m (EAp "false" [])  = ValBool False
+eval m (EAp "ite" [a,b,c]) = if valToBool m (eval m a) then eval m b else eval m c
+eval m (EAp "and" xs)    = ValBool $ and $ map (valToBool m . eval m) xs
+eval m (EAp "or" xs)     = ValBool $ or $ map (valToBool m . eval m) xs
+eval m (EAp "not" [x])   = ValBool $ not $ valToBool m $ eval m x
+eval m (EAp "=>" [x,y])  = ValBool $ valToBool m (eval m x) .=>. valToBool m (eval m y)
+eval m (EAp "<=>" [x,y]) = ValBool $ valToBool m (eval m x) .<=>. valToBool m (eval m y)
+eval m (EAp "<=" [x,y])  = ValBool $ valToRational m (eval m x) <= valToRational m (eval m y)
+eval m (EAp ">=" [x,y])  = ValBool $ valToRational m (eval m x) >= valToRational m (eval m y)
+eval m (EAp ">" [x,y])   = ValBool $ valToRational m (eval m x) >  valToRational m (eval m y)
+eval m (EAp "<" [x,y])   = ValBool $ valToRational m (eval m x) <  valToRational m (eval m y)
+eval m (EAp "+" xs)      = ValRational $ sum $ map (valToRational m . eval m) xs
+eval m (EAp "-" [x])     = ValRational $ negate $ valToRational m (eval m x)
+eval m (EAp "-" [x,y])   = ValRational $ valToRational m (eval m x) - valToRational m (eval m y)
+eval m (EAp "*" xs)      = ValRational $ product $ map (valToRational m . eval m) xs
+eval m (EAp "/" [x,y])   = ValRational $ valToRational m (eval m x) / valToRational m (eval m y)
+eval m (EAp "=" [x,y])   = ValBool $
+  case (eval m x, eval m y) of
+    (v1, v2) -> v1 == v2
+eval m (EAp f xs) =
+  case Map.lookup f (mDefs m) of
+    Nothing -> error ("unknown symbol: " ++ show f)
+    Just (FBoolVar v) -> ValBool $ SAT.evalLit (mBoolModel m) v
+    Just (FLRAVar v) -> ValRational $ mLRAModel m IntMap.! v
+    Just (FEUFFun (_,s) sym) ->
+      let e = EUF.evalAp (mEUFModel m) sym (map (valToEntity m . eval m) xs)
+      in case s of
+           SU -> ValUninterpreted e
+           SBool -> ValBool (e == mEUFTrue m)
+           SReal ->
+             case IntMap.lookup e (mEntityToRational m) of
+               Just r -> ValRational r
+               Nothing -> ValRational (fromIntegral (1000000 + e))
+
+valToBool :: Model -> Value -> Bool
+valToBool _ (ValBool b) = b
+valToBool _ _ = error "boolean value is expected"
+
+valToRational :: Model -> Value -> Rational
+valToRational _ (ValRational r) = r
+valToRational _ _ = error "rational value is expected"
+
+valToEntity :: Model -> Value -> EUF.Entity
+valToEntity _ (ValUninterpreted e) = e
+valToEntity m (ValBool b)     = if b then mEUFTrue m else mEUFFalse m
+valToEntity m (ValRational r) =
+  case Map.lookup r (mRationalToEntity m) of
+    Just e -> e
+    Nothing -> EUF.mUnspecified (mEUFModel m)
 
 -- -------------------------------------------------------------------
 
