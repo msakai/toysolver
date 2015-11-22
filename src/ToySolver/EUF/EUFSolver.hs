@@ -41,6 +41,7 @@ module ToySolver.EUF.EUFSolver
   , Model (..)
   , getModel
   , eval
+  , evalAp
 
   -- * Backtracking
   , pushBacktrackPoint
@@ -68,7 +69,7 @@ import Data.IORef
 
 import qualified ToySolver.Internal.Data.Vec as Vec
 import ToySolver.EUF.CongruenceClosure (FSym, Term (..), ConstrID, VAFun (..))
-import ToySolver.EUF.CongruenceClosure (Model (..), Entity, EntityTuple, eval)
+import ToySolver.EUF.CongruenceClosure (Model (..), Entity, EntityTuple, eval, evalAp)
 import qualified ToySolver.EUF.CongruenceClosure as CC
 
 data Solver
