@@ -40,7 +40,7 @@ import Data.OptDir
 import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Arith as FOL
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Data.LA.FOL as LAFOL
@@ -159,12 +159,12 @@ run solver opt mip printModel = do
           msum
             [ case lb of
                 MIP.NegInf -> []
-                MIP.PosInf -> [ArithRel 1 Le 0] -- False
-                MIP.Finite x -> [ArithRel e2 Ge (Const x)]
+                MIP.PosInf -> [OrdRel 1 Le 0] -- False
+                MIP.Finite x -> [OrdRel e2 Ge (Const x)]
             , case ub of
-                MIP.NegInf -> [ArithRel 1 Le 0] -- False
+                MIP.NegInf -> [OrdRel 1 Le 0] -- False
                 MIP.PosInf -> []
-                MIP.Finite x -> [ArithRel e2 Le (Const x)]
+                MIP.Finite x -> [OrdRel e2 Le (Const x)]
             ]
         Just _ -> error "indicator constraint is not supported yet"
 
