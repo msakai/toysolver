@@ -27,11 +27,11 @@ module ToySolver.SMT
   , FSym
   , declareSSym
   , declareSort
-  , VASortFun (..)
+  , VASortFun
   , declareFSym
   , declareFun
   , declareConst
-  , VAFun (..)
+  , VAFun
   , assert
 
   -- * Solving
@@ -284,19 +284,21 @@ declareSSym solver name arity = return (SSymUserDefined name arity)
 declareSort :: VASortFun a => Solver -> String -> Int -> IO a
 declareSort solver name arity = do
   ssym <- declareSSym solver name arity
-  return $ withSortVArgs $ \xs ->
-    if length xs == arity
-    then Sort ssym xs
-    else error "argument number error"
+  let f = withSortVArgs (Sort ssym)
+  unless (arityVASortFun f == arity) $ error "ToySolver.SMT.declareSort: argument number error"
+  return f
 
 class VASortFun a where
   withSortVArgs :: ([Sort] -> Sort) -> a
+  arityVASortFun :: a -> Int
 
 instance VASortFun Sort where
   withSortVArgs k = k []
+  arityVASortFun f = 0
 
 instance VASortFun a => VASortFun (Sort -> a) where
   withSortVArgs k x = withSortVArgs (\xs -> k (x : xs))
+  arityVASortFun f = arityVASortFun (f undefined) + 1
 
 declareFSym :: Solver -> String -> [Sort] -> Sort -> IO FSym
 declareFSym solver f xs y = do
@@ -321,20 +323,22 @@ declareFSym solver f xs y = do
 
 class VAFun a where
   withVArgs :: ([Expr] -> Expr) -> a
+  arityVAFun :: a -> Int
 
 instance VAFun Expr where
   withVArgs k = k []
+  arityVAFun _ = 0
 
 instance VAFun a => VAFun (Expr -> a) where
   withVArgs k x = withVArgs (\xs -> k (x : xs))
+  arityVAFun f = arityVAFun (f undefined) + 1
 
 declareFun :: VAFun a => Solver -> String -> [Sort] -> Sort -> IO a
 declareFun solver name ps r = do
   fsym <- declareFSym solver name ps r
-  return $ withVArgs $ \xs ->
-    if length xs == length ps
-    then EAp fsym xs
-    else error "argument number error"
+  let f = withVArgs (EAp fsym)
+  unless (arityVAFun f == length ps) $ error "ToySolver.SMT.declareFun: argument number error"
+  return f
 
 declareConst :: Solver -> String -> Sort -> IO Expr
 declareConst solver name s = declareFun solver name [] s
