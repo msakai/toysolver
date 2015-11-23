@@ -61,11 +61,10 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.VectorSpace
 
-import ToySolver.Data.ArithRel
 import ToySolver.Data.Delta
 import ToySolver.Data.Boolean
 import ToySolver.Data.BoolExpr
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Internal.Data.Vec as Vec
 import qualified ToySolver.SAT as SAT
@@ -133,13 +132,15 @@ instance Fractional Expr where
   x / y = EAp "/" [x,y]
   fromRational x = EFrac x
 
-instance IsArithRel Expr Expr where
-  arithRel Lt a b = EAp "<" [a,b]
-  arithRel Gt a b = EAp ">" [a,b]
-  arithRel Le a b = EAp "<=" [a,b]
-  arithRel Ge a b = EAp ">=" [a,b]
-  arithRel Eql a b = EAp "=" [a,b]
-  arithRel NEq a b = notB (a .==. b)
+instance IsEqRel Expr Expr where
+  a .==. b = EAp "=" [a,b]
+  a ./=. b = notB (a .==. b)
+
+instance IsOrdRel Expr Expr where
+  a .<. b = EAp "<" [a,b]
+  a .>. b = EAp ">" [a,b]
+  a .<=. b = EAp "<=" [a,b]
+  a .>=. b = EAp ">=" [a,b]
 
 data FDef
   = FBoolVar SAT.Var

@@ -63,7 +63,7 @@ import qualified Data.Interval as I
 import Data.Sign (Sign (..))
 import qualified Data.Sign as Sign
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.AlgebraicNumber.Real (AReal)
 import qualified ToySolver.Data.AlgebraicNumber.Real as AReal
 import ToySolver.Data.DNF
@@ -448,20 +448,20 @@ evalPoint m (RootOf p n) = RootOf (AReal.minimalPolynomial a) (AReal.rootIndex a
 project
   :: (Ord v, Show v, PrettyVar v)
   => v
-  -> [ArithRel (Polynomial Rational v)]
-  -> [([ArithRel (Polynomial Rational v)], Model v -> Model v)]
+  -> [OrdRel (Polynomial Rational v)]
+  -> [([OrdRel (Polynomial Rational v)], Model v -> Model v)]
 project v cs = projectN (Set.singleton v) cs
 
 projectN
   :: (Ord v, Show v, PrettyVar v)
   => Set v
-  -> [ArithRel (Polynomial Rational v)]
-  -> [([ArithRel (Polynomial Rational v)], Model v -> Model v)]
+  -> [OrdRel (Polynomial Rational v)]
+  -> [([OrdRel (Polynomial Rational v)], Model v -> Model v)]
 projectN vs cs = do
   (cs', mt) <- projectN' vs (map f cs)
   return (map g cs', mt)
   where  
-    f (ArithRel lhs op rhs) = (lhs - rhs, h op)
+    f (OrdRel lhs op rhs) = (lhs - rhs, h op)
       where
         h Le  = [Zero, Neg]
         h Ge  = [Zero, Pos]
@@ -469,7 +469,7 @@ projectN vs cs = do
         h Gt  = [Pos]
         h Eql = [Zero]
         h NEq = [Pos,Neg]
-    g (p,ss) = (ArithRel p op 0)
+    g (p,ss) = (OrdRel p op 0)
       where
         ss' = Set.fromList ss
         op
@@ -502,11 +502,11 @@ projectN' vs = loop (Set.toList vs)
 solve
   :: forall v. (Ord v, Show v, PrettyVar v)
   => Set v
-  -> [(ArithRel (Polynomial Rational v))]
+  -> [(OrdRel (Polynomial Rational v))]
   -> Maybe (Model v)
 solve vs cs0 = solve' vs (map f cs0)
   where
-    f (ArithRel lhs op rhs) = (lhs - rhs, g op)
+    f (OrdRel lhs op rhs) = (lhs - rhs, g op)
     g Le  = [Zero, Neg]
     g Ge  = [Zero, Pos]
     g Lt  = [Neg]

@@ -51,7 +51,7 @@ module ToySolver.Data.LA
   , applySubstAtom
   , applySubst1Atom
   , solveFor
-  , module ToySolver.Data.ArithRel
+  , module ToySolver.Data.OrdRel
 
   -- * misc
   , BoundsEnv
@@ -68,8 +68,8 @@ import qualified Data.IntSet as IntSet
 import Data.Interval
 import Data.VectorSpace
 
-import qualified ToySolver.Data.ArithRel as ArithRel
-import ToySolver.Data.ArithRel
+import qualified ToySolver.Data.OrdRel as OrdRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.Var
 
 -----------------------------------------------------------------------------
@@ -254,28 +254,28 @@ showExprWith env (Expr m) = foldr (.) id xs ""
 -----------------------------------------------------------------------------
 
 -- | Atomic Formula of Linear Arithmetics
-type Atom r = ArithRel (Expr r)
+type Atom r = OrdRel (Expr r)
 
 showAtom :: (Num r, Eq r, Show r) => Atom r -> String
-showAtom (ArithRel lhs op rhs) = showExpr lhs ++ showOp op ++ showExpr rhs
+showAtom (OrdRel lhs op rhs) = showExpr lhs ++ showOp op ++ showExpr rhs
 
 -- | evaluate the formula under the model.
 evalAtom :: (Num r, Ord r) => Model r -> Atom r -> Bool
-evalAtom m (ArithRel lhs op rhs) = evalOp op (evalExpr m lhs) (evalExpr m rhs)
+evalAtom m (OrdRel lhs op rhs) = evalOp op (evalExpr m lhs) (evalExpr m rhs)
 
 applySubstAtom :: (Num r, Eq r) => VarMap (Expr r) -> Atom r -> Atom r
-applySubstAtom s (ArithRel lhs op rhs) = ArithRel (applySubst s lhs) op (applySubst s rhs)
+applySubstAtom s (OrdRel lhs op rhs) = OrdRel (applySubst s lhs) op (applySubst s rhs)
 
 -- | applySubst1 x e phi == phi[e/x]
 applySubst1Atom :: (Num r, Eq r) => Var -> Expr r -> Atom r -> Atom r
-applySubst1Atom x e (ArithRel lhs op rhs) = ArithRel (applySubst1 x e lhs) op (applySubst1 x e rhs)
+applySubst1Atom x e (OrdRel lhs op rhs) = OrdRel (applySubst1 x e lhs) op (applySubst1 x e rhs)
 
 -- | Solve linear (in)equation for the given variable.
 --
 -- @solveFor a v@ returns @Just (op, e)@ such that @Atom v op e@
 -- is equivalent to @a@.
 solveFor :: (Real r, Fractional r) => Atom r -> Var -> Maybe (RelOp, Expr r)
-solveFor (ArithRel lhs op rhs) v = do
+solveFor (OrdRel lhs op rhs) v = do
   (c,e) <- extractMaybe v (lhs ^-^ rhs)
   return ( if c < 0 then flipOp op else op
          , (1/c) *^ negateV e

@@ -58,7 +58,7 @@ import Data.VectorSpace hiding (project)
 import qualified Data.Interval as Interval
 import Data.Interval (Interval, Extended (..), (<=..<), (<..<=), (<..<))
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.Boolean
 import ToySolver.Data.DNF
 import qualified ToySolver.Data.LA as LA
@@ -149,7 +149,7 @@ evalConstr m (IsZero t)   = LA.evalExpr m (LA.mapCoeff fromInteger t) == 0
 -- ---------------------------------------------------------------------------
 
 fromLAAtom :: LA.Atom Rational -> DNF Constr
-fromLAAtom (ArithRel a op b) = atomR' op (toRat a) (toRat b)
+fromLAAtom (OrdRel a op b) = atomR' op (toRat a) (toRat b)
   where
     atomR' :: RelOp -> Rat -> Rat -> DNF Constr
     atomR' op a b = 

@@ -41,7 +41,7 @@ import Data.VectorSpace
 
 import Data.OptDir
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Polynomial (Polynomial, UPolynomial, Monomial, MonomialOrder)
 import qualified ToySolver.Data.Polynomial as P

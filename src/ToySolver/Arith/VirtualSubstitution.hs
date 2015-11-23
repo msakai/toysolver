@@ -45,7 +45,7 @@ import qualified Data.Set as Set
 import Data.Maybe
 import Data.VectorSpace hiding (project)
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.Boolean
 import ToySolver.Data.BoolExpr (BoolExpr (..))
 import qualified ToySolver.Data.BoolExpr as BoolExpr
@@ -59,7 +59,7 @@ type QFFormula = BoolExpr (LA.Atom Rational)
 evalQFFormula :: Model Rational -> QFFormula -> Bool
 evalQFFormula m = BoolExpr.fold f
   where
-    f (ArithRel lhs op rhs) = evalOp op (LA.evalExpr m lhs) (LA.evalExpr m rhs)
+    f (OrdRel lhs op rhs) = evalOp op (LA.evalExpr m lhs) (LA.evalExpr m rhs)
 
 {-| @'project' x φ@ returns @(ψ, lift)@ such that:
 
@@ -153,17 +153,17 @@ simplify :: QFFormula -> QFFormula
 simplify = BoolExpr.simplify . BoolExpr.fold simplifyLit
 
 simplifyLit :: LA.Atom Rational -> QFFormula
-simplifyLit (ArithRel lhs op rhs) =
+simplifyLit (OrdRel lhs op rhs) =
   case LA.asConst e of
     Just c -> if evalOp op c 0 then true else false
-    Nothing -> Atom (ArithRel e op (LA.constant 0))
+    Nothing -> Atom (OrdRel e op (LA.constant 0))
   where
     e = lhs ^-^ rhs
 
 collect :: Var -> QFFormula -> Set (LA.Expr Rational)
 collect v = Foldable.foldMap f
   where
-    f (ArithRel lhs _ rhs) = assert (rhs == LA.constant 0) $
+    f (OrdRel lhs _ rhs) = assert (rhs == LA.constant 0) $
       case LA.extractMaybe v lhs of
         Nothing -> Set.empty
         Just (a,b) -> Set.singleton (negateV (b ^/ a))

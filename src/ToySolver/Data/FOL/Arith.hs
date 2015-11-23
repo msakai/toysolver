@@ -20,7 +20,7 @@ module ToySolver.Data.FOL.Arith
   , evalExpr
 
   -- * Atomic formula
-  , module ToySolver.Data.ArithRel
+  , module ToySolver.Data.OrdRel
   , Atom (..)
   , evalAtom
 
@@ -35,7 +35,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Ratio
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Formula
 import ToySolver.Data.Var
 
@@ -96,13 +96,17 @@ evalExpr m = f
 -- ---------------------------------------------------------------------------
 
 -- | Atomic formula
-type Atom c = ArithRel (Expr c)
+type Atom c = OrdRel (Expr c)
 
 evalAtom :: (Real r, Fractional r) => Model r -> Atom r -> Bool
-evalAtom m (ArithRel a op b) = evalOp op (evalExpr m a) (evalExpr m b)
+evalAtom m (OrdRel a op b) = evalOp op (evalExpr m a) (evalExpr m b)
 
-instance IsArithRel (Expr c) (Formula (Atom c)) where
-  arithRel op a b = Atom (arithRel op a b)
+instance IsEqRel (Expr c) (Formula (Atom c)) where
+  a .==. b = Atom (a .==. b)
+  a ./=. b = Atom (a ./=. b)
+
+instance IsOrdRel (Expr c) (Formula (Atom c)) where
+  ordRel op a b = Atom (ordRel op a b)
 
 -- ---------------------------------------------------------------------------
 

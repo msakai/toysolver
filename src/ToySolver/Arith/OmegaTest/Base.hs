@@ -47,7 +47,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.VectorSpace
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.Boolean
 import ToySolver.Data.DNF
 import qualified ToySolver.Data.LA as LA
@@ -298,7 +298,7 @@ solve :: Options -> VarSet -> [LA.Atom Rational] -> Maybe (Model Integer)
 solve opt vs cs = msum [solve' opt vs cs | cs <- unDNF dnf]
   where
     dnf = andB (map f cs)
-    f (ArithRel lhs op rhs) =
+    f (OrdRel lhs op rhs) =
       case op of
         Lt  -> DNF [[a `ltZ` b]]
         Le  -> DNF [[a `leZ` b]]

@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Data.ArithRel
+-- Module      :  ToySolver.Data.OrdRel
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 -- 
@@ -9,10 +9,10 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies)
 --
--- Arithmetic relations
+-- Ordering relations
 -- 
 -----------------------------------------------------------------------------
-module ToySolver.Data.ArithRel
+module ToySolver.Data.OrdRel
   (
   -- * Relational operators
     RelOp (..)
@@ -22,12 +22,12 @@ module ToySolver.Data.ArithRel
   , evalOp
 
   -- * Relation
-  , ArithRel (..)
-  , fromArithRel
+  , OrdRel (..)
+  , fromOrdRel
 
   -- * DSL
-  , IsArithRel (..)
-  , (.<.), (.<=.), (.>=.), (.>.), (.==.), (./=.)
+  , IsEqRel (..)
+  , IsOrdRel (..)
   ) where
 
 import qualified Data.IntSet as IS
@@ -87,52 +87,52 @@ evalOp NEq = (/=)
 -- ---------------------------------------------------------------------------
 
 -- | type class for constructing relational formula
-class IsArithRel e r | r -> e where
-  arithRel :: RelOp -> e -> e -> r
+class IsEqRel e r | r -> e where
+  (.==.) :: e -> e -> r
+  (./=.) :: e -> e -> r
 
--- | constructing relational formula
-(.<.) :: IsArithRel e r => e -> e -> r
-a .<. b  = arithRel Lt a b
+-- | type class for constructing relational formula
+class IsEqRel e r => IsOrdRel e r | r -> e where
+  (.<.), (.<=.), (.>.), (.>=.) :: e -> e -> r
+  ordRel :: RelOp -> e -> e -> r
 
--- | constructing relational formula
-(.<=.) :: IsArithRel e r => e -> e -> r
-a .<=. b = arithRel Le a b
+  a .<. b  = ordRel Lt a b
+  a .<=. b = ordRel Le a b
+  a .>. b  = ordRel Gt a b
+  a .>=. b = ordRel Ge a b
 
--- | constructing relational formula
-(.>.) :: IsArithRel e r => e -> e -> r
-a .>. b  = arithRel Gt a b
+  ordRel Lt a b  = a .<. b
+  ordRel Gt a b  = a .>. b
+  ordRel Le a b  = a .<=. b
+  ordRel Ge a b  = a .>=. b
+  ordRel Eql a b = a .==. b
+  ordRel NEq a b = a ./=. b
 
--- | constructing relational formula
-(.>=.) :: IsArithRel e r => e -> e -> r
-a .>=. b = arithRel Ge a b
-
--- | constructing relational formula
-(.==.) :: IsArithRel e r => e -> e -> r
-a .==. b = arithRel Eql a b
-
--- | constructing relational formula
-(./=.) :: IsArithRel e r => e -> e -> r
-a ./=. b = arithRel NEq a b
+  {-# MINIMAL ((.<.), (.<=.), (.>.), (.>=.)) | ordRel #-}
 
 -- ---------------------------------------------------------------------------
 
 -- | Atomic formula
-data ArithRel e = ArithRel e RelOp e
+data OrdRel e = OrdRel e RelOp e
     deriving (Show, Eq, Ord)
 
-instance Complement (ArithRel c) where
-  notB (ArithRel lhs op rhs) = ArithRel lhs (negOp op) rhs
+instance Complement (OrdRel c) where
+  notB (OrdRel lhs op rhs) = OrdRel lhs (negOp op) rhs
 
-instance IsArithRel e (ArithRel e) where
-  arithRel op a b = ArithRel a op b
+instance IsEqRel e (OrdRel e) where
+  (.==.) = ordRel Eql
+  (./=.) = ordRel NEq
 
-instance Variables e => Variables (ArithRel e) where
-  vars (ArithRel a _ b) = vars a `IS.union` vars b
+instance IsOrdRel e (OrdRel e) where
+  ordRel op a b = OrdRel a op b
 
-instance Functor ArithRel where
-  fmap f (ArithRel a op b) = ArithRel (f a) op (f b)
+instance Variables e => Variables (OrdRel e) where
+  vars (OrdRel a _ b) = vars a `IS.union` vars b
 
-fromArithRel :: IsArithRel e r => ArithRel e -> r
-fromArithRel (ArithRel a op b) = arithRel op a b
+instance Functor OrdRel where
+  fmap f (OrdRel a op b) = OrdRel (f a) op (f b)
+
+fromOrdRel :: IsOrdRel e r => OrdRel e -> r
+fromOrdRel (OrdRel a op b) = ordRel op a b
 
 -- ---------------------------------------------------------------------------

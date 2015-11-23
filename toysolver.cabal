@@ -222,7 +222,6 @@ Library
      ToySolver.Data.AlgebraicNumber.Real
      ToySolver.Data.AlgebraicNumber.Root
      ToySolver.Data.AlgebraicNumber.Sturm
-     ToySolver.Data.ArithRel
      ToySolver.Data.Boolean
      ToySolver.Data.BoolExpr
      ToySolver.Data.Delta
@@ -236,6 +235,7 @@ Library
      ToySolver.Data.MIP.Base
      ToySolver.Data.MIP.LPFile
      ToySolver.Data.MIP.MPSFile
+     ToySolver.Data.OrdRel
      ToySolver.Data.Polynomial
      ToySolver.Data.Polynomial.Factorization.FiniteField
      ToySolver.Data.Polynomial.Factorization.Hensel

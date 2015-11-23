@@ -10,7 +10,7 @@ import Control.Monad
 import Data.Maybe
 import Data.VectorSpace hiding (project)
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.Boolean
 import ToySolver.Data.DNF
 import qualified ToySolver.Data.FOL.Arith as FOL
@@ -58,10 +58,10 @@ eliminateQuantifiers' = f
   where
     f FOL.T = return true
     f FOL.F = return false
-    f (FOL.Atom (ArithRel a op b)) = do
+    f (FOL.Atom (OrdRel a op b)) = do
        a' <- LAFOL.fromFOLExpr a
        b' <- LAFOL.fromFOLExpr b
-       return $ fromLAAtom $ ArithRel a' op b'
+       return $ fromLAAtom $ OrdRel a' op b'
     f (FOL.And a b) = liftM2 (.&&.) (f a) (f b)
     f (FOL.Or a b) = liftM2 (.||.) (f a) (f b)
     f (FOL.Not a) = f (FOL.pushNot a)

@@ -128,7 +128,7 @@ import System.CPUTime
 
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.LA (Atom (..))
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.Delta
 import ToySolver.Internal.Util (showRational)
 
@@ -397,7 +397,7 @@ assertAtomEx' solver atom cid = do
   return ()
 
 simplifyAtom :: SolverValue v => GenericSolver v -> LA.Atom Rational -> IO (Var, RelOp, Rational)
-simplifyAtom solver (ArithRel lhs op rhs) = do
+simplifyAtom solver (OrdRel lhs op rhs) = do
   let (lhs',rhs') =
         case LA.extract LA.unitVar (lhs ^-^ rhs) of
           (n,e) -> (e, -n)

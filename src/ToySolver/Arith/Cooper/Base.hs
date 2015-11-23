@@ -59,7 +59,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.VectorSpace hiding (project)
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.Boolean
 import ToySolver.Data.BoolExpr (BoolExpr (..))
 import qualified ToySolver.Data.BoolExpr as BoolExpr
@@ -73,7 +73,7 @@ import qualified ToySolver.Arith.FourierMotzkin as FM
 type ExprZ = LA.Expr Integer
 
 fromLAAtom :: LA.Atom Rational -> QFFormula
-fromLAAtom (ArithRel a op b) = arithRel op a' b'
+fromLAAtom (OrdRel a op b) = ordRel op a' b'
   where
     (e1,c1) = toRat a
     (e2,c2) = toRat b
@@ -119,15 +119,19 @@ instance Complement Lit where
 -- | Quantifier-free formula of Presburger arithmetic.
 type QFFormula = BoolExpr Lit
 
-instance IsArithRel (LA.Expr Integer) QFFormula where
-  arithRel op lhs rhs =
+instance IsEqRel (LA.Expr Integer) QFFormula where
+  a .==. b = eqZ a b
+  a ./=. b = notB $ eqZ a b
+  
+instance IsOrdRel (LA.Expr Integer) QFFormula where
+  ordRel op lhs rhs =
     case op of
       Le  -> Atom $ leZ lhs rhs
       Ge  -> Atom $ geZ lhs rhs
       Lt  -> Atom $ ltZ lhs rhs
       Gt  -> Atom $ gtZ lhs rhs
-      Eql -> eqZ lhs rhs
-      NEq -> notB $ arithRel Eql lhs rhs
+      Eql -> lhs .==. rhs
+      NEq -> lhs ./=. rhs
 
 -- | @d | e@ means @e@ can be divided by @d@.
 (.|.) :: Integer -> ExprZ -> QFFormula

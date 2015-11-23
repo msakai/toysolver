@@ -38,7 +38,7 @@ import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.PBNLC as PBNLC
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Arith.Simplex2 as Simplex2
 import qualified ToySolver.EUF.EUFSolver as EUF

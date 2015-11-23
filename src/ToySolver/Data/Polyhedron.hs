@@ -31,7 +31,7 @@ import Prelude hiding (null)
 import Algebra.Lattice
 
 import qualified Data.Interval as Interval
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
 

@@ -44,7 +44,7 @@ import qualified Data.IntSet as IS
 import Data.OptDir
 import Data.VectorSpace
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.Var
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Arith.Simplex as Simplex

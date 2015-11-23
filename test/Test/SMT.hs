@@ -10,7 +10,7 @@ import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
 import ToySolver.Data.Boolean
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.SMT (Expr (..))
 import qualified ToySolver.SMT as SMT
 

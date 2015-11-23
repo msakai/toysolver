@@ -22,7 +22,7 @@ import qualified Data.Interval as Interval
 import Data.OptDir
 
 import ToySolver.Data.AlgebraicNumber.Real
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Arith
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Data.Polynomial as P
@@ -168,7 +168,7 @@ genQFLAConj = do
     op  <- elements [Lt, Le, Ge, Gt, Eql] -- , NEq
     lhs <- genLAExpr [1..nv]
     rhs <- genLAExpr [1..nv]
-    return $ arithRel op lhs rhs
+    return $ ordRel op lhs rhs
   return (vs, cs)
   
 genQFLAConjSmallInt :: Gen (VarSet, [LA.Atom Rational])
@@ -180,7 +180,7 @@ genQFLAConjSmallInt = do
     op  <- elements [Lt, Le, Ge, Gt, Eql] -- , NEq
     lhs <- genLAExprSmallInt [1..nv]
     rhs <- genLAExprSmallInt [1..nv]
-    return $ arithRel op lhs rhs
+    return $ ordRel op lhs rhs
   return (vs, cs)
 
 genModel :: Arbitrary a => VarSet -> Gen (Model a)
@@ -325,14 +325,14 @@ case_CAD_test_nonlinear_multivariate =
 toP :: LA.Expr Rational -> P.Polynomial Rational Int
 toP e = P.fromTerms [(c, if x == LA.unitVar then P.mone else P.var x) | (c,x) <- LA.terms e]
 
-toPRel :: LA.Atom Rational -> ArithRel (P.Polynomial Rational Int)
+toPRel :: LA.Atom Rational -> OrdRel (P.Polynomial Rational Int)
 toPRel = fmap toP
 
 evalP :: Map.Map Int AReal -> P.Polynomial Rational Int -> AReal
 evalP m p = P.eval (m Map.!) $ P.mapCoeff fromRational p
 
-evalPAtom :: Map.Map Int AReal -> ArithRel (P.Polynomial Rational Int) -> Bool
-evalPAtom m (ArithRel lhs op rhs) =　evalOp op (evalP m lhs) (evalP m rhs)
+evalPAtom :: Map.Map Int AReal -> OrdRel (P.Polynomial Rational Int) -> Bool
+evalPAtom m (OrdRel lhs op rhs) =　evalOp op (evalP m lhs) (evalP m rhs)
 
 ------------------------------------------------------------------------
 

@@ -13,7 +13,7 @@ import Data.Array.IArray
 import Data.VectorSpace
 import Text.Printf
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.TseitinEncoder as TseitinEncoder
@@ -59,8 +59,8 @@ linearize enc (Expr xs) = do
   zs <- PBNLC.linearizePBSum enc ys
   return (zs, c)
 
-addConstraint :: TseitinEncoder.Encoder -> ArithRel Expr -> IO ()
-addConstraint enc (ArithRel lhs op rhs) = do
+addConstraint :: TseitinEncoder.Encoder -> OrdRel Expr -> IO ()
+addConstraint enc (OrdRel lhs op rhs) = do
   let solver = TseitinEncoder.encSolver enc
   let Expr e = lhs - rhs
   case op of
@@ -74,8 +74,8 @@ addConstraint enc (ArithRel lhs op rhs) = do
       PBNLC.addPBAtLeastSoft enc sel e 1
       PBNLC.addPBAtMostSoft  enc (-sel) e (-1)
 
-addConstraintSoft :: TseitinEncoder.Encoder -> SAT.Lit -> ArithRel Expr -> IO ()
-addConstraintSoft enc sel (ArithRel lhs op rhs) = do
+addConstraintSoft :: TseitinEncoder.Encoder -> SAT.Lit -> OrdRel Expr -> IO ()
+addConstraintSoft enc sel (OrdRel lhs op rhs) = do
   let solver = TseitinEncoder.encSolver enc
   let Expr e = lhs - rhs
   case op of

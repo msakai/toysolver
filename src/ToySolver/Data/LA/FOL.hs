@@ -9,17 +9,17 @@ module ToySolver.Data.LA.FOL
 import Control.Monad
 import Data.VectorSpace
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Arith
 import qualified ToySolver.Data.LA as LA
 
 -- ---------------------------------------------------------------------------
 
 fromFOLAtom :: (Real r, Fractional r) => Atom r -> Maybe (LA.Atom r)
-fromFOLAtom (ArithRel a op b) = do
+fromFOLAtom (OrdRel a op b) = do
   a' <- fromFOLExpr a
   b' <- fromFOLExpr b
-  return $ arithRel op a' b'
+  return $ ordRel op a' b'
 
 toFOLFormula :: (Real r, Fractional r) => LA.Atom r -> Formula (Atom r)
 toFOLFormula r = Atom $ fmap toFOLExpr r

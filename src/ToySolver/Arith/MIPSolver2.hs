@@ -77,7 +77,7 @@ import System.Timeout
 import Text.Printf
 
 import qualified ToySolver.Data.LA as LA
-import ToySolver.Data.ArithRel ((.<=.), (.>=.))
+import ToySolver.Data.OrdRel ((.<=.), (.>=.))
 import qualified ToySolver.Arith.Simplex2 as Simplex2
 import ToySolver.Arith.Simplex2 (OptResult (..), Var, Model)
 import ToySolver.Internal.Util (isInteger, fracPart)

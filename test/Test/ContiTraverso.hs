@@ -17,7 +17,7 @@ import Data.OptDir
 
 import ToySolver.Arith.ContiTraverso
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Polynomial (Polynomial)
 import qualified ToySolver.Data.Polynomial as P

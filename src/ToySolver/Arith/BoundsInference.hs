@@ -24,7 +24,7 @@ import qualified Data.IntSet as IS
 import Data.VectorSpace
 import Data.Interval
 
-import ToySolver.Data.ArithRel
+import ToySolver.Data.OrdRel
 import ToySolver.Data.LA (BoundsEnv)
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Var
@@ -43,7 +43,7 @@ inferBounds bounds constraints ivs limit = loop 0 bounds
   where
     cs :: VarMap [C r]
     cs = IM.fromListWith (++) $ do
-      ArithRel lhs op rhs <- constraints
+      OrdRel lhs op rhs <- constraints
       let m = LA.coeffMap (lhs ^-^ rhs)
       (v,c) <- IM.toList m
       guard $ v /= LA.unitVar
