@@ -18,13 +18,16 @@ module ToySolver.SMT
 
   -- * Problem Specification
   , SSym (..)
+  , ssymArity
   , Sort (..)
   , sBool
   , sReal
-  , sU
   , Type
   , Expr (..)
   , FSym
+  , declareSSym
+  , declareSort
+  , VASortFun (..)
   , declareFSym
   , declareFun
   , declareConst
@@ -77,8 +80,13 @@ type FSym = String
 data SSym
   = SSymBool
   | SSymReal
-  | SSymUserDefined
+  | SSymUserDefined String !Int
   deriving (Show, Eq, Ord)
+
+ssymArity :: SSym -> Int
+ssymArity SSymBool = 0
+ssymArity SSymReal = 0
+ssymArity (SSymUserDefined _ ar) = ar
 
 data Sort = Sort SSym [Sort]
   deriving (Show, Eq, Ord)
@@ -88,9 +96,6 @@ sBool = Sort SSymBool []
 
 sReal :: Sort
 sReal = Sort SSymReal []
-
-sU :: Sort
-sU = Sort SSymUserDefined []
 
 type Type = ([Sort],Sort)
 
@@ -273,6 +278,26 @@ newSolver = do
     , smtContexts = contexts
     }
 
+declareSSym :: Solver -> String -> Int -> IO SSym
+declareSSym solver name arity = return (SSymUserDefined name arity)
+
+declareSort :: VASortFun a => Solver -> String -> Int -> IO a
+declareSort solver name arity = do
+  ssym <- declareSSym solver name arity
+  return $ withSortVArgs $ \xs ->
+    if length xs == arity
+    then Sort ssym xs
+    else error "argument number error"
+
+class VASortFun a where
+  withSortVArgs :: ([Sort] -> Sort) -> a
+
+instance VASortFun Sort where
+  withSortVArgs k = k []
+
+instance VASortFun a => VASortFun (Sort -> a) where
+  withSortVArgs k x = withSortVArgs (\xs -> k (x : xs))
+
 declareFSym :: Solver -> String -> [Sort] -> Sort -> IO FSym
 declareFSym solver f xs y = do
   fdefs <- readIORef (smtFDefs solver)
@@ -373,7 +398,7 @@ exprToFormula solver (EAp "=" [e1,e2]) = do
       e1' <- exprToLRAExpr solver e1
       e2' <- exprToLRAExpr solver e2
       liftM Atom $ abstractLRAAtom solver (e1' .==. e2')
-    (Sort SSymUserDefined _) -> do
+    (Sort (SSymUserDefined _ _) _) -> do
       e1' <- exprToEUFArg solver e1
       e2' <- exprToEUFArg solver e2
       liftM Atom $ abstractEUFAtom solver (e1',e2')
@@ -661,7 +686,7 @@ eval m (EAp f xs) =
     Just (FEUFFun (_, Sort s []) sym) ->
       let e = EUF.evalAp (mEUFModel m) sym (map (valToEntity m . eval m) xs)
       in case s of
-           SSymUserDefined -> ValUninterpreted e
+           SSymUserDefined _ _ -> ValUninterpreted e
            SSymBool -> ValBool (e == mEUFTrue m)
            SSymReal ->
              case IntMap.lookup e (mEntityToRational m) of

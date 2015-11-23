@@ -59,11 +59,12 @@ case_QF_EUF_1 = do
 case_QF_EUF_2 :: IO ()
 case_QF_EUF_2 = do
   solver <- SMT.newSolver
+  sU <- SMT.declareSort solver "U" 0
 
   a <- SMT.declareConst solver "a" SMT.sBool
-  x <- SMT.declareConst solver "x" SMT.sU
-  y <- SMT.declareConst solver "y" SMT.sU
-  f <- SMT.declareFun solver "f" [SMT.sU] SMT.sU  
+  x <- SMT.declareConst solver "x" sU
+  y <- SMT.declareConst solver "y" sU
+  f <- SMT.declareFun solver "f" [sU] sU  
 
   let c1 = a .||. (x .==. y)
       c2 = f x ./=. f y
@@ -140,9 +141,11 @@ case_QF_EUF_Bool = do
 case_pushContext :: IO ()
 case_pushContext = do
   solver <- SMT.newSolver
-  x <- SMT.declareConst solver "x" SMT.sU
-  y <- SMT.declareConst solver "y" SMT.sU
-  f <- SMT.declareFun solver "f" [SMT.sU] SMT.sU
+  sU <- SMT.declareSort solver "U" 0
+
+  x <- SMT.declareConst solver "x" sU
+  y <- SMT.declareConst solver "y" sU
+  f <- SMT.declareFun solver "f" [sU] sU
 
   SMT.assert solver $ f x ./=. f y
   ret <- SMT.checkSAT solver
