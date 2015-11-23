@@ -149,6 +149,10 @@ Library
      Build-Depends: temporary >1.2.0.2, exceptions >=0.6
   else
      Build-Depends: temporary >=1.2, exceptions ==0.5
+  if impl(ghc <7.7)
+    Build-Depends:
+      -- vector-space depends on MemoTrie, but MemoTrie >=0.6.3 uses extensions that are not available on GHC 7.6.
+      MemoTrie <=0.6.2
   if impl(ghc)
      Build-Depends: ghc-prim
   Default-Language: Haskell2010
@@ -304,9 +308,7 @@ Executable toysolver
     toysolver
   Default-Language: Haskell2010
   if impl(ghc)
-    GHC-Options: -threaded
-  if impl(ghc >= 7)
-    GHC-Options: -rtsopts
+    GHC-Options: -rtsopts -threaded
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
   -- GHC-Prof-Options: -auto-all
@@ -335,13 +337,9 @@ Executable toysat
     Build-Depends: time >=1.5.0
   else
     Build-Depends: time <1.5.0, old-locale
-  if impl(ghc <7.7)
-    Build-Depends:
-      -- vector-space depends on MemoTrie, but MemoTrie >=0.6.3 uses extensions that are not available on GHC 7.6.
-      MemoTrie <=0.6.2
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
-  if impl(ghc >= 7)
+  if impl(ghc)
     GHC-Options: -rtsopts
   -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8) && impl(ghc)
@@ -362,7 +360,7 @@ Executable toyfmf
       toysolver,
       logic-TPTP >=0.4.1
   Default-Language: Haskell2010
-  if impl(ghc >= 7)
+  if impl(ghc)
     GHC-Options: -rtsopts
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
