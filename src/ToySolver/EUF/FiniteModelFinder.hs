@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.EUF.FiniteModelFinder
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables)
+-- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, MultiParamTypeClasses)
 --
 -- A simple model finder.
 --
@@ -147,6 +147,9 @@ instance MonotoneBoolean (GenFormula a) where
 
 instance Complement (GenFormula a) where
   notB = Not
+
+instance IfThenElse (GenFormula a) (GenFormula a) where
+  ite = iteBoolean
 
 instance Boolean (GenFormula a) where
   (.=>.) = Imply

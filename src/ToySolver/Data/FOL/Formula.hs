@@ -1,7 +1,8 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.FOL.Formula
--- Copyright   :  (c) Masahiro Sakai 2011-2013
+-- Copyright   :  (c) Masahiro Sakai 2011-2015
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -62,6 +63,9 @@ instance MonotoneBoolean (Formula c) where
   false = F
   (.&&.) = And
   (.||.) = Or
+
+instance IfThenElse (Formula c) (Formula c) where
+  ite = iteBoolean
 
 instance Boolean (Formula c) where
   (.=>.)  = Imply

@@ -113,10 +113,12 @@ instance MonotoneBoolean Expr where
 instance Complement Expr where
   notB x = EAp "not" [x]
 
+instance IfThenElse Expr Expr where
+  ite x y z = EAp "ite" [x,y,z]
+
 instance Boolean Expr where
   x .=>. y  = EAp "=>" [x,y]
   x .<=>. y = EAp "<=>" [x,y]
-  ite x y z = EAp "ite" [x,y,z] -- XXX
 
 instance Num Expr where
   x + y = EAp "+" [x,y]

@@ -1,14 +1,14 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.BoolExpr
--- Copyright   :  (c) Masahiro Sakai 2014
+-- Copyright   :  (c) Masahiro Sakai 2014-2015
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (MultiParamTypeClasses, DeriveDataTypeable)
 --
 -- Boolean expression over a given type of atoms
 -- 
@@ -92,10 +92,12 @@ instance MonotoneBoolean (BoolExpr a) where
   andB = And
   orB  = Or
 
+instance IfThenElse (BoolExpr a) (BoolExpr a) where
+  ite = ITE
+
 instance Boolean (BoolExpr a) where
   (.=>.) = Imply
   (.<=>.) = Equiv
-  ite = ITE
 
 instance Variables a => Variables (BoolExpr a) where
   vars = foldMap vars
@@ -141,6 +143,12 @@ instance MonotoneBoolean (Simplify a) where
       f (And zs) = zs
       f z = [z]
 
+instance IfThenElse (Simplify a) (Simplify a) where
+  ite (Simplify c) (Simplify t) (Simplify e)
+    | isTrue c  = Simplify t
+    | isFalse c = Simplify e
+    | otherwise = Simplify (ITE c t e)  
+
 instance Boolean (Simplify a) where
   Simplify x .=>. Simplify y
     | isFalse x = true
@@ -148,10 +156,6 @@ instance Boolean (Simplify a) where
     | isTrue x  = Simplify y
     | isFalse y = notB (Simplify x)
     | otherwise = Simplify (x .=>. y)
-  ite (Simplify c) (Simplify t) (Simplify e)
-    | isTrue c  = Simplify t
-    | isFalse c = Simplify e
-    | otherwise = Simplify (ITE c t e)
 
 isTrue :: BoolExpr a -> Bool
 isTrue (And []) = True

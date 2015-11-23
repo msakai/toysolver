@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.DNF
@@ -32,5 +33,7 @@ instance MonotoneBoolean (DNF lit) where
   DNF xs .||. DNF ys = DNF (xs++ys)
   DNF xs .&&. DNF ys = DNF [x++y | x<-xs, y<-ys]
 
-instance Complement lit => Boolean (DNF lit)
+instance Complement lit => IfThenElse (DNF lit) (DNF lit) where
+  ite = iteBoolean
 
+instance Complement lit => Boolean (DNF lit)

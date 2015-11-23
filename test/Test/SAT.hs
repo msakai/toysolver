@@ -409,7 +409,7 @@ case_QF_LRA = do
       lt4 = LA.fromTerms [(3,x)] .<. LA.fromTerms [(-1,LA.unitVar), (1/5,x), (1/5,y)] -- 3 x < -1 + (1/5) (x + y)
 
       c1, c2 :: BoolExpr (Either SAT.Lit (LA.Atom Rational))
-      c1 = ite (Atom (Left a)) (Atom $ Right le1) (Atom $ Right eq2)
+      c1 = ite (Atom (Left a) :: BoolExpr (Either SAT.Lit (LA.Atom Rational))) (Atom $ Right le1) (Atom $ Right eq2)
       c2 = Atom (Right gt3) .||. (Atom (Left a) .<=>. Atom (Right lt4))
 
   addFormula c1
