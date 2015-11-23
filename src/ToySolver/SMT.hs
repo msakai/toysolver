@@ -17,7 +17,11 @@ module ToySolver.SMT
   , newSolver
 
   -- * Problem Specification
+  , SSym (..)
   , Sort (..)
+  , sBool
+  , sReal
+  , sU
   , Type
   , Expr (..)
   , FSym
@@ -69,8 +73,24 @@ import qualified ToySolver.EUF.EUFSolver as EUF
 
 type FSym = String
 
-data Sort = SBool | SReal | SU
+-- | Sort symbols
+data SSym
+  = SSymBool
+  | SSymReal
+  | SSymUserDefined
   deriving (Show, Eq, Ord)
+
+data Sort = Sort SSym [Sort]
+  deriving (Show, Eq, Ord)
+
+sBool :: Sort
+sBool = Sort SSymBool []
+
+sReal :: Sort
+sReal = Sort SSymReal []
+
+sU :: Sort
+sU = Sort SSymUserDefined []
 
 type Type = ([Sort],Sort)
 
@@ -260,10 +280,10 @@ declareFSym solver f xs y = do
     error $ "function symbol " ++ f ++ " is already declared"
   fdef <-
     case (xs, y) of
-      ([], SBool) -> do
+      ([], Sort SSymBool []) -> do
         v <- SAT.newVar (smtSAT solver)
         return (FBoolVar v)
-      ([], SReal) -> do
+      ([], Sort SSymReal []) -> do
         v <- Simplex2.newVar (smtLRA solver)
         return (FLRAVar v)
       _ -> do
@@ -305,16 +325,16 @@ assert solver e = do
     Tseitin.addFormula (smtEnc solver) formula
 
 exprSort :: Solver -> Expr -> IO Sort
-exprSort solver (EFrac _) = return SReal
+exprSort solver (EFrac _) = return (Sort SSymReal [])
 exprSort solver (EAp f xs)
-  | f `Set.member` Set.fromList ["true","false","and","or","not","=>","<=>","=",">=","<=",">","<"] = return SBool
-  | f `Set.member` Set.fromList ["+", "-", "*"] = return SReal
+  | f `Set.member` Set.fromList ["true","false","and","or","not","=>","<=>","=",">=","<=",">","<"] = return (Sort SSymBool [])
+  | f `Set.member` Set.fromList ["+", "-", "*"] = return (Sort SSymReal [])
   | f == "ite" = exprSort solver (xs !! 1)
   | otherwise = do
       fdefs <- readIORef (smtFDefs solver)
       case fdefs Map.! f of
-        FBoolVar _ -> return SBool
-        FLRAVar _ -> return SReal
+        FBoolVar _ -> return (Sort SSymBool [])
+        FLRAVar _ -> return (Sort SSymReal [])
         FEUFFun (_,s) _ -> return s
 
 -- -------------------------------------------------------------------
@@ -345,15 +365,15 @@ exprToFormula solver (EAp "ite" [e1,e2,e3]) = do
 exprToFormula solver (EAp "=" [e1,e2]) = do
   s <- exprSort solver e1
   case s of
-    SBool -> do
+    (Sort SSymBool _) -> do
       b1 <- exprToFormula solver e1
       b2 <- exprToFormula solver e2
       return $ b1 .<=>. b2
-    SReal -> do
+    (Sort SSymReal _) -> do
       e1' <- exprToLRAExpr solver e1
       e2' <- exprToLRAExpr solver e2
       liftM Atom $ abstractLRAAtom solver (e1' .==. e2')
-    SU -> do
+    (Sort SSymUserDefined _) -> do
       e1' <- exprToEUFArg solver e1
       e2' <- exprToEUFArg solver e2
       liftM Atom $ abstractEUFAtom solver (e1',e2')
@@ -492,11 +512,11 @@ exprToEUFTerm solver f xs = do
 exprToEUFArg :: Solver -> Expr -> IO EUF.Term
 exprToEUFArg solver (EFrac r) = lraExprToEUFTerm solver (LA.constant r)
 exprToEUFArg solver e@(EAp f xs) = do
-  s <- exprSort solver e
+  Sort s _ <- exprSort solver e
   case s of
-    SBool -> formulaToEUFTerm solver =<< exprToFormula solver e
-    SReal -> lraExprToEUFTerm solver =<< exprToLRAExpr solver e
-    SU -> exprToEUFTerm solver f xs
+    SSymBool -> formulaToEUFTerm solver =<< exprToFormula solver e
+    SSymReal -> lraExprToEUFTerm solver =<< exprToLRAExpr solver e
+    _ -> exprToEUFTerm solver f xs
 
 abstractEUFAtom :: Solver -> (EUF.Term, EUF.Term) -> IO SAT.Lit
 abstractEUFAtom solver (t1,t2) | t1 >= t2 = abstractEUFAtom solver (t2,t1)
@@ -638,12 +658,12 @@ eval m (EAp f xs) =
     Nothing -> error ("unknown symbol: " ++ show f)
     Just (FBoolVar v) -> ValBool $ SAT.evalLit (mBoolModel m) v
     Just (FLRAVar v) -> ValRational $ mLRAModel m IntMap.! v
-    Just (FEUFFun (_,s) sym) ->
+    Just (FEUFFun (_, Sort s []) sym) ->
       let e = EUF.evalAp (mEUFModel m) sym (map (valToEntity m . eval m) xs)
       in case s of
-           SU -> ValUninterpreted e
-           SBool -> ValBool (e == mEUFTrue m)
-           SReal ->
+           SSymUserDefined -> ValUninterpreted e
+           SSymBool -> ValBool (e == mEUFTrue m)
+           SSymReal ->
              case IntMap.lookup e (mEntityToRational m) of
                Just r -> ValRational r
                Nothing -> ValRational (fromIntegral (1000000 + e))

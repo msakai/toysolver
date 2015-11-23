@@ -11,7 +11,7 @@ import qualified Test.QuickCheck.Monadic as QM
 
 import ToySolver.Data.Boolean
 import ToySolver.Data.ArithRel
-import ToySolver.SMT (Expr (..), Sort (..))
+import ToySolver.SMT (Expr (..))
 import qualified ToySolver.SMT as SMT
 
 -- -------------------------------------------------------------------
@@ -20,9 +20,9 @@ case_QF_LRA :: IO ()
 case_QF_LRA = do
   solver <- SMT.newSolver
 
-  a <- SMT.declareConst solver "a" SBool
-  x <- SMT.declareConst solver "x" SReal
-  y <- SMT.declareConst solver "y" SReal
+  a <- SMT.declareConst solver "a" SMT.sBool
+  x <- SMT.declareConst solver "x" SMT.sReal
+  y <- SMT.declareConst solver "y" SMT.sReal
   let c1 = ite a (2*x + (1/3)*y .<=. -4) (1.5 * y .==. -2*x)
       c2 = (x .>. y) .||. (a .<=>. (3*x .<. -1 + (1/5)*(x + y)))
   SMT.assert solver c1
@@ -38,8 +38,8 @@ case_QF_LRA = do
 case_QF_EUF_1 :: IO ()
 case_QF_EUF_1 = do
   solver <- SMT.newSolver
-  x <- SMT.declareConst solver "x" SBool
-  f <- SMT.declareFun solver "f" [SBool] SBool  
+  x <- SMT.declareConst solver "x" SMT.sBool
+  f <- SMT.declareFun solver "f" [SMT.sBool] SMT.sBool  
 
   let c1 = f true .==. true
       c2 = notB (f x)
@@ -60,10 +60,10 @@ case_QF_EUF_2 :: IO ()
 case_QF_EUF_2 = do
   solver <- SMT.newSolver
 
-  a <- SMT.declareConst solver "a" SBool
-  x <- SMT.declareConst solver "x" SU
-  y <- SMT.declareConst solver "y" SU
-  f <- SMT.declareFun solver "f" [SU] SU  
+  a <- SMT.declareConst solver "a" SMT.sBool
+  x <- SMT.declareConst solver "x" SMT.sU
+  y <- SMT.declareConst solver "y" SMT.sU
+  f <- SMT.declareFun solver "f" [SMT.sU] SMT.sU  
 
   let c1 = a .||. (x .==. y)
       c2 = f x ./=. f y
@@ -83,12 +83,12 @@ case_QF_EUF_2 = do
 case_QF_EUF_LRA :: IO ()
 case_QF_EUF_LRA = do
   solver <- SMT.newSolver
-  a <- SMT.declareConst solver "a" SReal
-  b <- SMT.declareConst solver "b" SReal
-  c <- SMT.declareConst solver "c" SReal
-  f <- SMT.declareFun solver "f" [SReal] SReal
-  g <- SMT.declareFun solver "g" [SReal] SReal
-  h <- SMT.declareFun solver "h" [SReal, SReal] SReal
+  a <- SMT.declareConst solver "a" SMT.sReal
+  b <- SMT.declareConst solver "b" SMT.sReal
+  c <- SMT.declareConst solver "c" SMT.sReal
+  f <- SMT.declareFun solver "f" [SMT.sReal] SMT.sReal
+  g <- SMT.declareFun solver "g" [SMT.sReal] SMT.sReal
+  h <- SMT.declareFun solver "h" [SMT.sReal, SMT.sReal] SMT.sReal
 
   let cs =
         [ 2*a .>=. b + f (g c)
@@ -112,12 +112,12 @@ case_QF_EUF_LRA = do
 case_QF_EUF_Bool :: IO ()
 case_QF_EUF_Bool = do
   solver <- SMT.newSolver
-  a <- SMT.declareConst solver "a" SBool
-  b <- SMT.declareConst solver "b" SBool
-  c <- SMT.declareConst solver "c" SBool
-  f <- SMT.declareFun solver "f" [SBool] SBool
-  g <- SMT.declareFun solver "g" [SBool] SBool
-  h <- SMT.declareFun solver "h" [SBool, SBool] SBool
+  a <- SMT.declareConst solver "a" SMT.sBool
+  b <- SMT.declareConst solver "b" SMT.sBool
+  c <- SMT.declareConst solver "c" SMT.sBool
+  f <- SMT.declareFun solver "f" [SMT.sBool] SMT.sBool
+  g <- SMT.declareFun solver "g" [SMT.sBool] SMT.sBool
+  h <- SMT.declareFun solver "h" [SMT.sBool, SMT.sBool] SMT.sBool
 
   let cs =
         [ f b .==. c
@@ -140,9 +140,9 @@ case_QF_EUF_Bool = do
 case_pushContext :: IO ()
 case_pushContext = do
   solver <- SMT.newSolver
-  x <- SMT.declareConst solver "x" SU
-  y <- SMT.declareConst solver "y" SU
-  f <- SMT.declareFun solver "f" [SU] SU
+  x <- SMT.declareConst solver "x" SMT.sU
+  y <- SMT.declareConst solver "y" SMT.sU
+  f <- SMT.declareFun solver "f" [SMT.sU] SMT.sU
 
   SMT.assert solver $ f x ./=. f y
   ret <- SMT.checkSAT solver
