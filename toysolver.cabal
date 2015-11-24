@@ -348,6 +348,38 @@ Executable toysat
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
+Executable toysmt
+  HS-Source-Dirs: toysmt
+  Main-is: toysmt.hs
+  Other-Modules:
+     Solver,
+     -- Following modules are copied from SmtLib package.
+     -- http://hackage.haskell.org/package/SmtLib
+     -- https://github.com/MfesGA/Smtlib
+     Smtlib.Parsers.CommonParsers,
+     Smtlib.Parsers.ResponseParsers,
+     Smtlib.Parsers.CommandsParsers,
+     Smtlib.Syntax.Syntax,
+     Smtlib.Syntax.ShowSL
+  Build-Depends:
+    base,
+    containers,
+    parsec,
+    transformers,
+    transformers-compat,
+    mtl,
+    toysolver
+  Default-Language: Haskell2010
+  Other-Extensions: ScopedTypeVariables, CPP
+  if impl(ghc >= 7)
+    GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
+  if flag(ForceChar8) && impl(ghc)
+    Build-Depends: base >=4.5
+    CPP-OPtions: "-DFORCE_CHAR8"
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
+
 Executable toyfmf
   If !flag(BuildToyFMF)
     Buildable: False
