@@ -455,6 +455,15 @@ exprToLRAExpr solver (EAp "/" [x,y]) = do
   case LA.asConst y' of
     Nothing -> error "division by non-constant is not supported"
     Just c -> return $ (1/c) *^ x'
+exprToLRAExpr solver (EAp "ite" [c,t,e]) = do
+  c' <- exprToFormula solver c
+  ret <- liftM LA.var $ Simplex2.newVar (smtLRA solver)
+  t' <- exprToLRAExpr solver t
+  e' <- exprToLRAExpr solver e
+  c1 <- abstractLRAAtom solver (ret .==. t')
+  c2 <- abstractLRAAtom solver (ret .==. e')
+  Tseitin.addFormula (smtEnc solver) $ ite c' (Atom c1) (Atom c2)
+  return ret
 exprToLRAExpr solver (EAp f xs) = 
   lraExprFromTerm solver =<< exprToEUFTerm solver f xs
 
@@ -532,6 +541,15 @@ lraExprFromTerm solver t = do
 -- -------------------------------------------------------------------
 
 exprToEUFTerm :: Solver -> FSym -> [Expr] -> IO EUF.Term
+exprToEUFTerm solver "ite" [c,t,e] = do
+  c' <- exprToFormula solver c
+  ret <- EUF.newConst (smtEUF solver)
+  t' <- exprToEUFArg solver t
+  e' <- exprToEUFArg solver e
+  c1 <- abstractEUFAtom solver (ret, t')
+  c2 <- abstractEUFAtom solver (ret, e')
+  Tseitin.addFormula (smtEnc solver) $ ite c' (Atom c1) (Atom c2)
+  return ret
 exprToEUFTerm solver f xs = do
   fdefs <- readIORef (smtFDefs solver)
   case Map.lookup f fdefs of
