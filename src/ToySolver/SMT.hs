@@ -55,6 +55,7 @@ import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.IORef
+import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -394,7 +395,56 @@ exprToFormula solver (EAp "ite" [e1,e2,e3]) = do
   b2 <- exprToFormula solver e2
   b3 <- exprToFormula solver e3
   return $ ite b1 b2 b3
-exprToFormula solver (EAp "=" [e1,e2]) = do
+exprToFormula solver (EAp "=" []) = return true -- ???
+exprToFormula solver (EAp "=" xs) =
+  chain solver (abstractEq solver) xs
+exprToFormula solver (EAp "distinct" []) = return true -- ???
+exprToFormula solver (EAp "distinct" xs) =
+  pairwise solver (\e1 e2 -> liftM notB (abstractEq solver e1 e2)) xs
+exprToFormula solver (EAp ">=" xs) = do
+  let f e1 e2 = do
+        e1' <- exprToLRAExpr solver e1
+        e2' <- exprToLRAExpr solver e2
+        liftM Atom $ abstractLRAAtom solver (e1' .>=. e2')
+  chain solver f xs
+exprToFormula solver (EAp "<=" xs) = do
+    let f e1 e2 = do
+          e1' <- exprToLRAExpr solver e1
+          e2' <- exprToLRAExpr solver e2
+          liftM Atom $ abstractLRAAtom solver (e1' .<=. e2')
+    chain solver f xs
+exprToFormula solver (EAp ">" xs) = do
+  let f e1 e2 = do
+        e1' <- exprToLRAExpr solver e1
+        e2' <- exprToLRAExpr solver e2
+        liftM Atom $ abstractLRAAtom solver (e1' .>. e2')
+  chain solver f xs
+exprToFormula solver (EAp "<" xs) = do
+  let f e1 e2 = do
+        e1' <- exprToLRAExpr solver e1
+        e2' <- exprToLRAExpr solver e2
+        liftM Atom $ abstractLRAAtom solver (e1' .<. e2')
+  chain solver f xs
+exprToFormula solver (EAp f []) = do
+  fdefs <- readIORef (smtFDefs solver)
+  case Map.lookup f fdefs of
+    Just (FBoolVar v) -> return (Atom v)
+    Just _ -> error "non Bool constant appears in a boolean context"
+    Nothing -> error "unknown constant"
+exprToFormula solver (EAp f xs) = do
+  e' <- exprToEUFTerm solver f xs
+  formulaFromEUFTerm solver e'
+
+chain :: Solver -> (Expr -> Expr -> IO Tseitin.Formula) -> [Expr] -> IO Tseitin.Formula
+chain _ _ [] = return true
+chain solver p xs = liftM andB $ mapM (uncurry p) (zip xs (tail xs))
+
+pairwise :: Solver -> (Expr -> Expr -> IO Tseitin.Formula) -> [Expr] -> IO Tseitin.Formula
+pairwise _ _ [] = return true
+pairwise solver p xs = liftM andB $ mapM (uncurry p) (pairs xs)
+
+abstractEq :: Solver -> Expr -> Expr -> IO Tseitin.Formula
+abstractEq solver e1 e2 = do
   s <- exprSort solver e1
   case s of
     (Sort SSymBool _) -> do
@@ -409,39 +459,17 @@ exprToFormula solver (EAp "=" [e1,e2]) = do
       e1' <- exprToEUFArg solver e1
       e2' <- exprToEUFArg solver e2
       liftM Atom $ abstractEUFAtom solver (e1',e2')
-exprToFormula solver (EAp "=" _) = undefined
-exprToFormula solver (EAp ">=" [e1,e2]) = do
-  e1' <- exprToLRAExpr solver e1
-  e2' <- exprToLRAExpr solver e2
-  liftM Atom $ abstractLRAAtom solver (e1' .>=. e2')
-exprToFormula solver (EAp "<=" [e1,e2]) = do
-  e1' <- exprToLRAExpr solver e1
-  e2' <- exprToLRAExpr solver e2
-  liftM Atom $ abstractLRAAtom solver (e1' .<=. e2')
-exprToFormula solver (EAp ">" [e1,e2]) = do
-  e1' <- exprToLRAExpr solver e1
-  e2' <- exprToLRAExpr solver e2
-  liftM Atom $ abstractLRAAtom solver (e1' .>. e2')
-exprToFormula solver (EAp "<" [e1,e2]) = do
-  e1' <- exprToLRAExpr solver e1
-  e2' <- exprToLRAExpr solver e2
-  liftM Atom $ abstractLRAAtom solver (e1' .<. e2')
-exprToFormula solver (EAp f []) = do
-  fdefs <- readIORef (smtFDefs solver)
-  case Map.lookup f fdefs of
-    Just (FBoolVar v) -> return (Atom v)
-    Just _ -> error "non Bool constant appears in a boolean context"
-    Nothing -> error "unknown constant"
-exprToFormula solver (EAp f xs) = do
-  e' <- exprToEUFTerm solver f xs
-  formulaFromEUFTerm solver e'
 
 -- -------------------------------------------------------------------
 
 exprToLRAExpr :: Solver -> Expr -> IO (LA.Expr Rational)
 exprToLRAExpr solver (EFrac r) = return (LA.constant r)
+exprToLRAExpr solver (EAp "-" []) = error "ToySolver.SMT: nullary '-' function"
 exprToLRAExpr solver (EAp "-" [x]) = liftM negateV $ exprToLRAExpr solver x
-exprToLRAExpr solver (EAp "-" [x,y]) = liftM2 (^-^) (exprToLRAExpr solver x) (exprToLRAExpr solver y)
+exprToLRAExpr solver (EAp "-" (x:xs)) = do
+  x' <- exprToLRAExpr solver x
+  xs' <- mapM (exprToLRAExpr solver) xs
+  return $ foldl' (^-^) x' xs'
 exprToLRAExpr solver (EAp "+" xs) = liftM sumV $ mapM (exprToLRAExpr solver) xs
 exprToLRAExpr solver (EAp "*" xs) = liftM (foldr mult (LA.constant 1)) $ mapM (exprToLRAExpr solver) xs
   where
@@ -735,6 +763,10 @@ valToEntity m (ValRational r) =
     Nothing -> EUF.mUnspecified (mEUFModel m)
 
 -- -------------------------------------------------------------------
+
+pairs :: [a] -> [(a,a)]
+pairs [] = []
+pairs (x:xs) = [(x,y) | y <- xs] ++ pairs xs
 
 #if !MIN_VERSION_base(4,7,0)
 
