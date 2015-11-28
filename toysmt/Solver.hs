@@ -169,7 +169,7 @@ newSolver = do
   solverRef <- newIORef =<< SMT.newSolver
   let fenv = Map.fromList
         [ (name, EFSym name)
-        | name <- ["=", "true", "false", "not", "and", "or", "ite", "=>", "<=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
+        | name <- ["=", "true", "false", "not", "and", "or", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
         ]
       senv = Map.fromList
         [ ("Real", SortExpr SMT.sReal)
@@ -242,7 +242,7 @@ reset solver = do
   writeIORef (svSMTSolverRef solver) =<< SMT.newSolver
   let fenv = Map.fromList
         [ (name, EFSym name)
-        | name <- ["=", "true", "false", "not", "and", "or", "ite", "=>", "<=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
+        | name <- ["=", "true", "false", "not", "and", "or", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
         ]
       senv = Map.fromList
         [ ("Real", SortExpr SMT.sReal)

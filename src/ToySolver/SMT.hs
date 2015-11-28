@@ -360,7 +360,7 @@ assert solver e = do
 exprSort :: Solver -> Expr -> IO Sort
 exprSort solver (EFrac _) = return (Sort SSymReal [])
 exprSort solver (EAp f xs)
-  | f `Set.member` Set.fromList ["true","false","and","or","not","=>","<=>","=",">=","<=",">","<"] = return (Sort SSymBool [])
+  | f `Set.member` Set.fromList ["true","false","and","or","not","=>","=",">=","<=",">","<"] = return (Sort SSymBool [])
   | f `Set.member` Set.fromList ["+", "-", "*"] = return (Sort SSymReal [])
   | f == "ite" = exprSort solver (xs !! 1)
   | otherwise = do
@@ -386,10 +386,6 @@ exprToFormula solver (EAp "=>" [e1,e2]) = do
   b1 <- exprToFormula solver e1
   b2 <- exprToFormula solver e2
   return $ b1 .=>. b2
-exprToFormula solver (EAp "<=>" [e1,e2]) = do
-  b1 <- exprToFormula solver e1
-  b2 <- exprToFormula solver e2
-  return $ b1 .<=>. b2
 exprToFormula solver (EAp "ite" [e1,e2,e3]) = do
   b1 <- exprToFormula solver e1
   b2 <- exprToFormula solver e2
