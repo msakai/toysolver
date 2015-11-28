@@ -173,7 +173,7 @@ instance ShowSL CmdResponse where
 
 instance ShowSL GenResponse where
   showSL Unsupported = "unsupported"
-  showSL Success = "Success"
+  showSL Success = "success"
   showSL (Error s) = "(error " ++ s ++ ")"
 
 instance ShowSL ErrorBehavior where
