@@ -37,7 +37,6 @@ Arithmetic solver for the following problems:
     * Weighted Max-SAT
     * Weighted Partial Max-SAT
 * Real Closed Field
-* LA(Q), LA(Z) (NOT IMPLEMENTED YET)
 
 Usage:
 
@@ -86,6 +85,16 @@ PB'12 competition result:
 * toysat placed 2nd in PARTIAL-BIGINT-LIN and SOFT-BIGINT-LIN categories
 * toysat placed 4th in PARTIAL-SMALLINT-LIN and SOFT-SMALLINT-LIN categories
 * toysat placed 8th in OPT-BIGINT-LIN category
+
+### toysmt
+
+SMT solver based on toysat.
+
+Usage:
+
+    toysmt [file.smt2]
+
+Currently only QF_LRA logic is supported.
 
 ### toyfmf
 
