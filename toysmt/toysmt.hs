@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toysmt
@@ -7,15 +8,19 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable (CPP)
 --
 -----------------------------------------------------------------------------
 module Main where
 
 import Control.Monad
+import Control.Monad.Trans
 import Data.Default.Class
 import Data.Version
 import System.Console.GetOpt
+#ifdef USE_HASKELINE_PACKAGE
+import qualified System.Console.Haskeline as Haskeline
+#endif
 import System.Environment
 import System.Exit
 import System.IO
@@ -90,6 +95,14 @@ loadFile solver fname = do
 
 repl :: Solver -> IO ()
 repl solver = do
+#ifdef USE_HASKELINE_PACKAGE
+  replHaskeline solver
+#else
+  replSimple solver
+#endif
+
+replSimple :: Solver -> IO ()
+replSimple solver = do
   hSetBuffering stdin LineBuffering
   forever $ do
     putStr "toysmt> "
@@ -100,6 +113,22 @@ repl solver = do
         hPrint stderr err
       Right cmd -> do
         execCommand solver cmd
+
+#ifdef USE_HASKELINE_PACKAGE
+
+replHaskeline :: Solver -> IO ()
+replHaskeline solver = Haskeline.runInputT Haskeline.defaultSettings $ forever $ do
+  m <- Haskeline.getInputLine "toysmt> "
+  case m of
+    Nothing -> return ()
+    Just s -> do
+      case parse (spaces >> parseCommand) "<stdin>" s of
+        Left err -> do
+          lift $ hPrint stderr err
+        Right cmd -> do
+          lift $ execCommand solver cmd
+
+#endif
 
 showHelp :: Handle -> IO ()
 showHelp h = hPutStrLn h (usageInfo header options)

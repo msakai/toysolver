@@ -97,6 +97,11 @@ Flag Time15
   Description: use time >=1.5.0
   Manual: False
 
+Flag UseHaskeline
+  Description: use haskeline package
+  Manual: True
+  Default: True
+
 source-repository head
   type:     git
   location: git://github.com/msakai/toysolver.git
@@ -370,6 +375,9 @@ Executable toysmt
     transformers,
     transformers-compat,
     toysolver
+  if flag(UseHaskeline)
+    Build-Depends: haskeline >=0.7 && <0.8
+    CPP-Options: "-DUSE_HASKELINE_PACKAGE"
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
   if impl(ghc >= 7)
