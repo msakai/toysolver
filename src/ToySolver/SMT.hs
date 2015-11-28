@@ -118,7 +118,7 @@ instance IfThenElse Expr Expr where
 
 instance Boolean Expr where
   x .=>. y  = EAp "=>" [x,y]
-  x .<=>. y = EAp "<=>" [x,y]
+  x .<=>. y = EAp "=" [x,y]
 
 instance Num Expr where
   x + y = EAp "+" [x,y]
