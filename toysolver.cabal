@@ -364,10 +364,11 @@ Executable toysmt
   Build-Depends:
     base,
     containers,
+    data-default-class,
+    mtl,
     parsec,
     transformers,
     transformers-compat,
-    mtl,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
