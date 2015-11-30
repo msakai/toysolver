@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, CPP #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SMT
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  unstable
--- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, CPP)
+-- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP)
 --
 -----------------------------------------------------------------------------
 module ToySolver.SMT
