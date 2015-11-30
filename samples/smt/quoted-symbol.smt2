@@ -1,0 +1,6 @@
+(set-logic QF_LRA)
+(set-info :status unsat)
+(declare-fun abc () Real)
+(assert (= abc 0))
+(assert (= |abc| 1))
+(check-sat)
