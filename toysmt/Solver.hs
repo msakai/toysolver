@@ -269,6 +269,8 @@ setLogic solver logic = do
   else do
     writeIORef (svModeRef solver) ModeAssert
     case logic of
+      "QF_UFLRA" -> return Success
+      "QF_UF" -> return Success
       "QF_LRA" -> return Success
       "ALL" -> return Success
       _ -> return Unsupported
