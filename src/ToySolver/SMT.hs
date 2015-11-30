@@ -15,6 +15,7 @@ module ToySolver.SMT
   -- * The Solver type
     Solver
   , newSolver
+  , Exception (..)
 
   -- * Problem Specification
   , SSym (..)
@@ -46,6 +47,7 @@ module ToySolver.SMT
   , eval
   ) where
 
+import qualified Control.Exception as E
 import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
@@ -60,6 +62,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Typeable
 import Data.VectorSpace
 
 import ToySolver.Data.Delta
@@ -148,6 +151,13 @@ data FDef
   | FLRAVar LA.Var
   | FEUFFun Type EUF.FSym
   deriving (Show)
+
+data Exception
+  = Error String
+  | Unsupported
+  deriving (Show, Typeable)
+
+instance E.Exception Exception    
 
 data Solver
   = Solver
@@ -321,7 +331,8 @@ declareFSym solver f xs y = do
         v <- EUF.newFSym (smtEUF solver)
         return (FEUFFun (xs,y) v)
   fdefs <- readIORef (smtFDefs solver)
-  when (f `Map.member` fdefs) $ error ("function " ++ show f ++ " is already defined")
+  when (f `Map.member` fdefs) $ do
+    E.throwIO (Error ("function " ++ show f ++ " is already defined"))
   writeIORef (smtFDefs solver) $ Map.insert f fdef fdefs
   return f
 
@@ -341,7 +352,8 @@ declareFun :: VAFun a => Solver -> String -> [Sort] -> Sort -> IO a
 declareFun solver name ps r = do
   fsym <- declareFSym solver name ps r
   let f = withVArgs (EAp fsym)
-  unless (arityVAFun f == length ps) $ error "ToySolver.SMT.declareFun: argument number error"
+  unless (arityVAFun f == length ps) $ do
+    E.throwIO (Error "ToySolver.SMT.declareFun: argument number error")
   return f
 
 declareConst :: Solver -> String -> Sort -> IO Expr
@@ -425,8 +437,8 @@ exprToFormula solver (EAp f []) = do
   fdefs <- readIORef (smtFDefs solver)
   case Map.lookup f fdefs of
     Just (FBoolVar v) -> return (Atom v)
-    Just _ -> error "non Bool constant appears in a boolean context"
-    Nothing -> error "unknown constant"
+    Just _ -> E.throwIO $ Error "non Bool constant appears in a boolean context"
+    Nothing -> E.throwIO $ Error "unknown constant"
 exprToFormula solver (EAp f xs) = do
   e' <- exprToEUFTerm solver f xs
   formulaFromEUFTerm solver e'
@@ -460,7 +472,7 @@ abstractEq solver e1 e2 = do
 
 exprToLRAExpr :: Solver -> Expr -> IO (LA.Expr Rational)
 exprToLRAExpr solver (EFrac r) = return (LA.constant r)
-exprToLRAExpr solver (EAp "-" []) = error "ToySolver.SMT: nullary '-' function"
+exprToLRAExpr solver (EAp "-" []) = E.throwIO $ Error "ToySolver.SMT: nullary '-' function"
 exprToLRAExpr solver (EAp "-" [x]) = liftM negateV $ exprToLRAExpr solver x
 exprToLRAExpr solver (EAp "-" (x:xs)) = do
   x' <- exprToLRAExpr solver x
@@ -472,12 +484,12 @@ exprToLRAExpr solver (EAp "*" xs) = liftM (foldr mult (LA.constant 1)) $ mapM (e
     mult e1 e2
       | Just c <- LA.asConst e1 = c *^ e2
       | Just c <- LA.asConst e2 = c *^ e1
-      | otherwise = error "non-linear multiplication is not supported"
+      | otherwise = E.throw $ Error "non-linear multiplication is not supported"
 exprToLRAExpr solver (EAp "/" [x,y]) = do
   x' <- exprToLRAExpr solver x
   y' <- exprToLRAExpr solver y
   case LA.asConst y' of
-    Nothing -> error "division by non-constant is not supported"
+    Nothing -> E.throwIO $ Error "division by non-constant is not supported"
     Just c -> return $ (1/c) *^ x'
 exprToLRAExpr solver (EAp "ite" [c,t,e]) = do
   c' <- exprToFormula solver c
@@ -581,7 +593,7 @@ exprToEUFTerm solver f xs = do
     Just (FLRAVar v) -> lraExprToEUFTerm solver (LA.var v)
     Just (FEUFFun _ fsym) ->
       liftM (EUF.TApp fsym) $ mapM (exprToEUFArg solver) xs
-    _ -> error ("hogehoge: " ++ show (f,xs))
+    _ -> E.throw $ Error ("hogehoge: " ++ show (f,xs))
 
 exprToEUFArg :: Solver -> Expr -> IO EUF.Term
 exprToEUFArg solver (EFrac r) = lraExprToEUFTerm solver (LA.constant r)
@@ -729,7 +741,7 @@ eval m (EAp "=" [x,y])   = ValBool $
     (v1, v2) -> v1 == v2
 eval m (EAp f xs) =
   case Map.lookup f (mDefs m) of
-    Nothing -> error ("unknown symbol: " ++ show f)
+    Nothing -> E.throw $ Error ("unknown symbol: " ++ show f)
     Just (FBoolVar v) -> ValBool $ SAT.evalLit (mBoolModel m) v
     Just (FLRAVar v) -> ValRational $ mLRAModel m IntMap.! v
     Just (FEUFFun (_, Sort s []) sym) ->
@@ -744,11 +756,11 @@ eval m (EAp f xs) =
 
 valToBool :: Model -> Value -> Bool
 valToBool _ (ValBool b) = b
-valToBool _ _ = error "boolean value is expected"
+valToBool _ _ = E.throw $ Error "boolean value is expected"
 
 valToRational :: Model -> Value -> Rational
 valToRational _ (ValRational r) = r
-valToRational _ _ = error "rational value is expected"
+valToRational _ _ = E.throw $ Error "rational value is expected"
 
 valToEntity :: Model -> Value -> EUF.Entity
 valToEntity _ (ValUninterpreted e) = e

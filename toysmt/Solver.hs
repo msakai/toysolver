@@ -62,6 +62,7 @@ module Solver
   ) where
 
 import Control.Applicative
+import qualified Control.Exception as E
 import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
@@ -206,7 +207,7 @@ printResponse solver rsp = do
     hPutStrLn h (showSL rsp)
 
 runCommand :: Solver -> Command -> IO CmdResponse
-runCommand solver cmd =
+runCommand solver cmd = E.handle h $
   case cmd of
     -- FIXME: unsupported commands
     -- * reset-assertions
@@ -234,6 +235,9 @@ runCommand solver cmd =
     GetProof -> either CmdGenResponse CmdGetProofResponse <$> getProof solver
     GetUnsatCore -> either CmdGenResponse CmdGetUnsatCoreResponse <$> getUnsatCore solver
     Exit -> CmdGenResponse <$> exit solver
+  where
+    h SMT.Unsupported = return (CmdGenResponse Unsupported)
+    h (SMT.Error s) = return (CmdGenResponse (Error s))
 
 -- ----------------------------------------------------------------------
 
