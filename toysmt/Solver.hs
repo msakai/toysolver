@@ -64,9 +64,6 @@ module Solver
 import Control.Applicative
 import qualified Control.Exception as E
 import Control.Monad
-import Control.Monad.Trans
-import Control.Monad.Trans.Except
-import Data.Either
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -216,28 +213,30 @@ runCommand solver cmd = E.handle h $
     -- * get-unsat-assumptions
     -- * reset
     -- * echo
-    SetLogic logic -> CmdGenResponse <$> setLogic solver logic
-    SetOption opt -> CmdGenResponse <$> setOption solver opt
-    GetOption s -> either CmdGenResponse CmdGetOptionResponse <$> getOption solver s
-    SetInfo attr -> CmdGenResponse <$> setInfo solver attr
-    GetInfo flags -> either CmdGenResponse CmdGetInfoResponse <$> getInfo solver flags
-    Push n -> CmdGenResponse <$> push solver n
-    Pop n -> CmdGenResponse <$> pop solver n
-    DeclareSort name arity -> CmdGenResponse <$> declareSort solver name arity
-    DefineSort name xs body -> CmdGenResponse <$> defineSort solver name xs body
-    DeclareFun name xs y -> CmdGenResponse <$> declareFun solver name xs y
-    DefineFun name xs y body -> CmdGenResponse <$> defineFun solver name xs y body
-    Assert tm -> CmdGenResponse <$> assert solver tm
-    GetAssertions -> either CmdGenResponse CmdGetAssertionsResponse <$> getAssertions solver
+    SetLogic logic -> const (CmdGenResponse Success) <$> setLogic solver logic
+    SetOption opt -> const (CmdGenResponse Success) <$> setOption solver opt
+    GetOption s -> CmdGetOptionResponse <$> getOption solver s
+    SetInfo attr -> const (CmdGenResponse Success) <$> setInfo solver attr
+    GetInfo flags -> CmdGetInfoResponse <$> getInfo solver flags
+    Push n -> const (CmdGenResponse Success) <$> push solver n
+    Pop n -> const (CmdGenResponse Success) <$> pop solver n
+    DeclareSort name arity -> const (CmdGenResponse Success) <$> declareSort solver name arity
+    DefineSort name xs body -> const (CmdGenResponse Success) <$> defineSort solver name xs body
+    DeclareFun name xs y -> const (CmdGenResponse Success) <$> declareFun solver name xs y
+    DefineFun name xs y body -> const (CmdGenResponse Success) <$> defineFun solver name xs y body
+    Assert tm -> const (CmdGenResponse Success) <$> assert solver tm
+    GetAssertions -> CmdGetAssertionsResponse <$> getAssertions solver
     CheckSat -> CmdCheckSatResponse <$> checkSat solver
-    GetValue ts -> either CmdGenResponse CmdGetValueResponse <$> getValue solver ts
-    GetAssignment -> either CmdGenResponse CmdGetAssignmentResponse <$> getAssignment solver
-    GetProof -> either CmdGenResponse CmdGetProofResponse <$> getProof solver
-    GetUnsatCore -> either CmdGenResponse CmdGetUnsatCoreResponse <$> getUnsatCore solver
-    Exit -> CmdGenResponse <$> exit solver
+    GetValue ts -> CmdGetValueResponse <$> getValue solver ts
+    GetAssignment -> CmdGetAssignmentResponse <$> getAssignment solver
+    GetProof -> CmdGetProofResponse <$> getProof solver
+    GetUnsatCore -> CmdGetUnsatCoreResponse <$> getUnsatCore solver
+    Exit -> const (CmdGenResponse Success) <$> exit solver
   where
     h SMT.Unsupported = return (CmdGenResponse Unsupported)
-    h (SMT.Error s) = return (CmdGenResponse (Error s))
+    h (SMT.Error s) = return $ CmdGenResponse $
+     -- GenResponse type uses strings in printed form.
+     Error $ "\"" ++ concat [if c == '"' then "\"\"" else [c] | c <- s] ++ "\""
 
 -- ----------------------------------------------------------------------
 
@@ -261,222 +260,215 @@ reset solver = do
   writeIORef (svPrintSuccessRef solver) True
   return Success
 
-setLogic :: Solver -> String -> IO GenResponse
+setLogic :: Solver -> String -> IO ()
 setLogic solver logic = do
   mode <- readIORef (svModeRef solver)
   if mode /= ModeStart then do
-    return (Error "set-logic: not start mode")
+    E.throwIO $ SMT.Error "set-logic can only be used in start mode"
   else do
     writeIORef (svModeRef solver) ModeAssert
     case logic of
-      "QF_UFLRA" -> return Success
-      "QF_UF" -> return Success
-      "QF_LRA" -> return Success
-      "ALL" -> return Success
-      _ -> return Unsupported
+      "QF_UFLRA" -> return ()
+      "QF_UF" -> return ()
+      "QF_LRA" -> return ()
+      "ALL" -> return ()
+      _ -> E.throwIO SMT.Unsupported
 
-setOption :: Solver -> Option -> IO GenResponse
+setOption :: Solver -> Option -> IO ()
 setOption solver opt = do
   mode <- readIORef (svModeRef solver)
   case opt of
     PrintSuccess b -> do
       writeIORef (svPrintSuccessRef solver) b
-      return Success
     ExpandDefinitions _b -> do
       -- expand-definitions has been removed in SMT-LIB 2.5.
-      return Unsupported
+      E.throwIO SMT.Unsupported
     InteractiveMode _b -> do
       -- interactive-mode is the old name for produce-assertions. Deprecated.
       if mode /= ModeStart then
-        return (Error "interactive-mode option can be set only in start mode")
+        E.throwIO $ SMT.Error "interactive-mode option can be set only in start mode"
       else
-        return Unsupported
-    ProduceProofs b ->
+        E.throwIO SMT.Unsupported
+    ProduceProofs b -> do
       if mode /= ModeStart then
-        return (Error "produce-proofs option can be set only in start mode")
+        E.throwIO $ SMT.Error "produce-proofs option can be set only in start mode"
       else if b then
-        return Unsupported
+        E.throwIO SMT.Unsupported
       else
-        return Success
+        return ()
     ProduceUnsatCores b ->
       if mode /= ModeStart then
-        return (Error "produce-unsat-cores option can be set only in start mode")
+        E.throwIO $ SMT.Error "produce-unsat-cores option can be set only in start mode"
       else if b then
-        return Unsupported
+        E.throwIO SMT.Unsupported
       else
-        return Success
+        return ()
     ProduceModels b ->
       if mode /= ModeStart then
-        return (Error "produce-models option can be set only in start mode")
+        E.throwIO $ SMT.Error "produce-models option can be set only in start mode"
       else if b then
-        return Unsupported
+        E.throwIO SMT.Unsupported
       else
-        return Success
+        return ()
     ProduceAssignments b ->
       if mode /= ModeStart then
-        return (Error "produce-assignments option can be set only in start mode")
+        E.throwIO $ SMT.Error "produce-assignments option can be set only in start mode"
       else if b then
-        return Unsupported
+        E.throwIO SMT.Unsupported
       else
-        return Success
+        return ()
     RegularOutputChannel fname -> do
       h <- if fname == "stdout" then
              return stdout
            else
              openFile fname AppendMode
       writeIORef (svRegularOutputChannelRef solver) (fname, h)
-      return Success
+      return ()
     DiagnosticOutputChannel fname -> do
       h <- if fname == "stderr" then
              return stderr
            else
              openFile fname AppendMode
       writeIORef (svDiagnosticOutputChannelRef solver) (fname, h)
-      return Success
+      return ()
     RandomSeed _i ->
       if mode /= ModeStart then
-        return (Error "produce-assignments option can be set only in start mode")
+        E.throwIO $ SMT.Error "produce-assignments option can be set only in start mode"
       else
-        return Unsupported
-    Verbosity _lv -> return Unsupported
+        E.throwIO SMT.Unsupported
+    Verbosity _lv -> E.throwIO SMT.Unsupported
     OptionAttr (AttributeVal "produce-assertions" _) -> do
       if mode /= ModeStart then
-        return (Error "produce-assertions option can be set only in start mode")
+        E.throwIO $ SMT.Error "produce-assertions option can be set only in start mode"
       else
-        return Unsupported
+        E.throwIO SMT.Unsupported
     OptionAttr (AttributeVal "produce-unsat-assumptions" _) -> do
       if mode /= ModeStart then
-        return (Error "produce-unsat-assumptions option can be set only in start mode")
+        E.throwIO $ SMT.Error "produce-unsat-assumptions option can be set only in start mode"
       else
-        return Unsupported
+        E.throwIO SMT.Unsupported
     OptionAttr (AttributeVal "global-declarations" _) -> do
       if mode /= ModeStart then
-        return (Error "global-declarations option can be set only in start mode")
+        E.throwIO $ SMT.Error "global-declarations option can be set only in start mode"
       else
-        return Unsupported
+        E.throwIO SMT.Unsupported
     OptionAttr (AttributeVal "reproducible-resource-limit" _) -> do
       if mode /= ModeStart then
-        return (Error "reproducible-resource-limit option can be set only in start mode")
+        E.throwIO $ SMT.Error "reproducible-resource-limit option can be set only in start mode"
       else
-        return Unsupported
-    OptionAttr _attr -> return Unsupported
+        E.throwIO SMT.Unsupported
+    OptionAttr _attr -> E.throwIO SMT.Unsupported
 
-getOption :: Solver -> String -> IO (Either GenResponse GetOptionResponse)
+getOption :: Solver -> String -> IO GetOptionResponse
 getOption solver opt =
   case opt of
     "expand-definitions" -> do
       -- expand-definitions has been removed in SMT-LIB 2.5.
-      return $ Left Unsupported -- FIXME?
+      E.throwIO SMT.Unsupported -- FIXME?
     "global-declarations" ->
-      return $ Right $ AttrValueSymbol "false" -- default value
+      return $ AttrValueSymbol "false" -- default value
     "interactive-mode" -> do
-      return $ Right $ AttrValueSymbol "false" -- default value
+      return $ AttrValueSymbol "false" -- default value
     "print-success" -> do
       b <- readIORef (svPrintSuccessRef solver)
-      return $ Right $ AttrValueSymbol $ if b then "true" else "false"
+      return $ AttrValueSymbol $ if b then "true" else "false"
     "produce-assignments" -> do
-      return $ Right $ AttrValueSymbol "false" -- default value
+      return $ AttrValueSymbol "false" -- default value
     "produce-models" -> do
-      return $ Right $ AttrValueSymbol "false" -- default value
+      return $ AttrValueSymbol "false" -- default value
     "produce-proofs" -> do
-      return $ Right $ AttrValueSymbol "false" -- default value
+      return $ AttrValueSymbol "false" -- default value
     "produce-unsat-cores" -> do
-      return $ Right $ AttrValueSymbol "false" -- default value
+      return $ AttrValueSymbol "false" -- default value
     "produce-unsat-assumptions" -> do
-      return $ Right $ AttrValueSymbol "false" -- default value
+      return $ AttrValueSymbol "false" -- default value
     "regular-output-channel" -> do
       (fname,_) <- readIORef (svRegularOutputChannelRef solver)
-      return $ Right $ AttrValueConstant (SpecConstantString fname)
+      return $ AttrValueConstant (SpecConstantString fname)
     "diagnostic-output-channel" -> do
       (fname,_) <- readIORef (svDiagnosticOutputChannelRef solver)
-      return $ Right $ AttrValueConstant (SpecConstantString fname)
+      return $ AttrValueConstant (SpecConstantString fname)
     "random-seed" -> do
-      return $ Right $ AttrValueConstant (SpecConstantNumeral 0) -- default value
+      return $ AttrValueConstant (SpecConstantNumeral 0) -- default value
     "reproducible-resource-limit" -> do
-      return $ Right $ AttrValueConstant (SpecConstantNumeral 0) -- default value
+      return $ AttrValueConstant (SpecConstantNumeral 0) -- default value
     "verbosity" -> do
-      return $ Right $ AttrValueConstant (SpecConstantNumeral 0) -- default value
+      return $ AttrValueConstant (SpecConstantNumeral 0) -- default value
     _ -> do
-      return $ Left Unsupported
+      E.throwIO SMT.Unsupported
 
-setInfo :: Solver -> Attribute -> IO GenResponse
+setInfo :: Solver -> Attribute -> IO ()
 setInfo solver attr = do
   modifyIORef (svInfoRef solver) (attr : )
-  return Success
 
-getInfo :: Solver -> InfoFlags -> IO (Either GenResponse GetInfoResponse)
+getInfo :: Solver -> InfoFlags -> IO GetInfoResponse
 getInfo solver flags = do
   mode <- readIORef (svModeRef solver)
   case flags of
-    ErrorBehavior -> return $ Right [ResponseErrorBehavior ImmediateExit]
-    Name -> return $ Right [ResponseName "toysmt"]
-    Authors -> return $ Right [ResponseName "Masahiro Sakai"]
-    Version -> return $ Right [ResponseVersion (V.showVersion version)]
-    Status -> return $ Left Unsupported
+    ErrorBehavior -> return [ResponseErrorBehavior ImmediateExit]
+    Name -> return [ResponseName "toysmt"]
+    Authors -> return [ResponseName "Masahiro Sakai"]
+    Version -> return [ResponseVersion (V.showVersion version)]
+    Status -> E.throwIO SMT.Unsupported
     ReasonUnknown -> do
       if mode /= ModeSat then
-        return $ Left (Error "Executions of get-info with :reason-unknown are allowed only when the solver is in sat mode following a check command whose response was unknown.")
+        E.throwIO $ SMT.Error "Executions of get-info with :reason-unknown are allowed only when the solver is in sat mode following a check command whose response was unknown."
       else
-        return $ Right [ResponseReasonUnknown Incomplete]
+        return [ResponseReasonUnknown Incomplete]
     AllStatistics -> do
       if not (mode == ModeSat || mode == ModeUnsat) then
-        return $ Left (Error "Executions of get-info with :all-statistics are allowed only when the solver is in sat or unsat mode.")
+        E.throwIO $ SMT.Error "Executions of get-info with :all-statistics are allowed only when the solver is in sat or unsat mode."
       else
-        return $ Left Unsupported
+        E.throwIO SMT.Unsupported
     InfoFlags _s -> do
-      return $ Left Unsupported
+      E.throwIO SMT.Unsupported
 
-push :: Solver -> Int -> IO GenResponse
+push :: Solver -> Int -> IO ()
 push solver n = do
   replicateM_ n $ do
     (env,senv) <- readIORef (svEnvRef solver)
     modifyIORef (svSavedContextsRef solver) ((env,senv) :)
     SMT.pushContext =<< readIORef (svSMTSolverRef solver)
     writeIORef (svModeRef solver) ModeAssert
-  return Success
 
-pop :: Solver -> Int -> IO GenResponse
-pop solver n = liftM (either id id) $ runExceptT $ do
+pop :: Solver -> Int -> IO ()
+pop solver n = do
   replicateM_ n $ do
-    cs <- lift $ readIORef (svSavedContextsRef solver)
+    cs <- readIORef (svSavedContextsRef solver)
     case cs of
-      [] -> throwE (Error "pop from empty context")
-      ((env,senv) : cs) -> lift $ do
+      [] -> E.throwIO $ SMT.Error "pop from empty context"
+      ((env,senv) : cs) -> do
         writeIORef (svEnvRef solver) (env,senv)
         writeIORef (svSavedContextsRef solver) cs
         SMT.popContext =<< readIORef (svSMTSolverRef solver)
         writeIORef (svModeRef solver) ModeAssert
-  return Success
 
 echo :: Solver -> String -> IO ()
 echo solver s = do
   (_,h) <- readIORef (svRegularOutputChannelRef solver)
   hPrint h s -- "simply prints back s as is—including the surrounding double-quotes"
 
-declareSort :: Solver -> String -> Int -> IO GenResponse
+declareSort :: Solver -> String -> Int -> IO ()
 declareSort solver name arity = do
   smt <- readIORef (svSMTSolverRef solver)
   s <- SMT.declareSSym smt name arity
   modifyIORef (svEnvRef solver) $ (\(fenv, senv) -> (fenv, Map.insert name (SortSym s) senv))
   writeIORef (svModeRef solver) ModeAssert
-  return Success
 
-defineSort :: Solver -> String -> [String] -> Sort -> IO GenResponse
+defineSort :: Solver -> String -> [String] -> Sort -> IO ()
 defineSort solver name xs body = do
   modifyIORef (svEnvRef solver) $ (\(fenv, senv) -> (fenv, Map.insert name (SortDef senv xs body) senv))
   writeIORef (svModeRef solver) ModeAssert
-  return Success
 
-declareFun :: Solver -> String -> [Sort] -> Sort -> IO GenResponse
+declareFun :: Solver -> String -> [Sort] -> Sort -> IO ()
 declareFun solver name xs y = do
   smt <- readIORef (svSMTSolverRef solver)
   (_, senv) <- readIORef (svEnvRef solver)
   f <- SMT.declareFSym smt name (map (interpretSort senv) xs) (interpretSort senv y)
   modifyIORef (svEnvRef solver) $ \(fenv, senv) -> (Map.insert name (EFSym f) fenv, senv)
   writeIORef (svModeRef solver) ModeAssert
-  return Success
 
-defineFun :: Solver -> String -> [SortedVar] -> Sort -> Term -> IO GenResponse
+defineFun :: Solver -> String -> [SortedVar] -> Sort -> Term -> IO ()
 defineFun solver name xs y body = do
   writeIORef (svModeRef solver) ModeAssert
   (_, senv) <- readIORef (svEnvRef solver)
@@ -484,23 +476,21 @@ defineFun solver name xs y body = do
       y'  = interpretSort senv y
   modifyIORef (svEnvRef solver) $ \(fenv, senv) -> (Map.insert name (EFunDef fenv xs' y' body) fenv, senv)
   writeIORef (svModeRef solver) ModeAssert
-  return Success
 
-assert :: Solver -> Term -> IO GenResponse
+assert :: Solver -> Term -> IO ()
 assert solver tm = do
   smt <- readIORef (svSMTSolverRef solver)
   (env,_) <- readIORef (svEnvRef solver)
   SMT.assert smt (interpretFun env tm)
   writeIORef (svModeRef solver) ModeAssert
-  return Success
 
-getAssertions :: Solver -> IO (Either GenResponse GetAssertionsResponse)
+getAssertions :: Solver -> IO GetAssertionsResponse
 getAssertions solver = do
   mode <- readIORef (svModeRef solver)
   if mode == ModeStart then
-    return $ Left $ Error "get-assertions cannot be used in start mode"
+    E.throwIO $ SMT.Error "get-assertions cannot be used in start mode"
   else
-    return $ Left $ Unsupported
+    E.throwIO SMT.Unsupported
 
 checkSat :: Solver -> IO CheckSatResponse
 checkSat solver = do
@@ -513,39 +503,39 @@ checkSat solver = do
     writeIORef (svModeRef solver) ModeUnsat
     return Unsat
 
-getValue :: Solver -> [Term] -> IO (Either GenResponse GetValueResponse)
+getValue :: Solver -> [Term] -> IO GetValueResponse
 getValue solver _ts = do
   mode <- readIORef (svModeRef solver)
   if mode /= ModeSat then
-    return $ Left $ Error "get-value can only be used in sat mode"
+    E.throwIO $ SMT.Error "get-value can only be used in sat mode"
   else
-    return $ Left $ Unsupported
+    E.throwIO SMT.Unsupported
 
-getAssignment :: Solver -> IO (Either GenResponse GetAssignmentResponse)
+getAssignment :: Solver -> IO GetAssignmentResponse
 getAssignment solver = do
   mode <- readIORef (svModeRef solver)
   if mode /= ModeSat then
-    return $ Left $ Error "get-assignment can only be used in sat mode"
+    E.throwIO $ SMT.Error "get-assignment can only be used in sat mode"
   else
-    return $ Left $ Unsupported
+    E.throwIO SMT.Unsupported
 
-getProof :: Solver -> IO (Either GenResponse GetProofResponse)
+getProof :: Solver -> IO GetProofResponse
 getProof solver = do
   mode <- readIORef (svModeRef solver)
   if mode /= ModeUnsat then
-    return $ Left $ Error "get-proof can only be used in unsat mode"
+    E.throwIO $ SMT.Error "get-proof can only be used in unsat mode"
   else
-    return $ Left $ Unsupported
+    E.throwIO SMT.Unsupported
 
-getUnsatCore :: Solver -> IO (Either GenResponse GetUnsatCoreResponse)
+getUnsatCore :: Solver -> IO GetUnsatCoreResponse
 getUnsatCore solver = do
   mode <- readIORef (svModeRef solver)
   if mode /= ModeUnsat then
-    return $ Left $ Error "get-unsat-core can only be used in unsat mode"
+    E.throwIO $ SMT.Error "get-unsat-core can only be used in unsat mode"
   else
-    return $ Left $ Unsupported
+    E.throwIO SMT.Unsupported
 
-exit :: Solver -> IO GenResponse
+exit :: Solver -> IO ()
 exit _solver = exitSuccess
 
 -- ----------------------------------------------------------------------
