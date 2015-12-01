@@ -269,7 +269,9 @@ setLogic solver logic = do
     writeIORef (svModeRef solver) ModeAssert
     case logic of
       "QF_UFLRA" -> return ()
+      "QF_UFRDL" -> return ()
       "QF_UF" -> return ()
+      "QF_RDL" -> return ()
       "QF_LRA" -> return ()
       "ALL" -> return ()
       _ -> E.throwIO SMT.Unsupported

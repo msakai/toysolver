@@ -94,7 +94,7 @@ Usage:
 
     toysmt [file.smt2]
 
-Currently only QF_UF, QF_LRA and QF_UFLRA logic are supported.
+Currently only QF_UF, QF_RDL, QF_LRA, QF_UFRDL and QF_UFLRA logic are supported.
 
 ### toyfmf
 
