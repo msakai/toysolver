@@ -13,6 +13,7 @@
 -----------------------------------------------------------------------------
 module Main where
 
+import Control.Applicative ((<*))
 import Control.Monad
 import Control.Monad.Trans
 import Data.Default.Class
