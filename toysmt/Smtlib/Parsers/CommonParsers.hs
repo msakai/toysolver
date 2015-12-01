@@ -115,8 +115,15 @@ false = string "false"
 
 
 emptySpace :: ParsecT String u Identity String
-emptySpace = Pc.try $ Pc.many $
-    char ' ' <|> char '\n' <|> char '\t' <|> char '\r'
+emptySpace = liftM concat $ Pc.try $ Pc.many $
+    liftM (\c -> [c]) (char ' ' <|> char '\n' <|> char '\t' <|> char '\r') <|> comment
+
+comment :: ParsecT String u Identity String
+comment = char ';' <:> scan
+  where
+    scan  = do{ c <- char '\n' <|> char '\r'; return [c] }
+          <|>
+            do{ c <- anyChar; cs <- scan; return (c:cs) }
 
 reservedWords :: ParsecT String u Identity String
 reservedWords =  string "let"

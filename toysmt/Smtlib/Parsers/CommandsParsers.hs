@@ -32,7 +32,7 @@ import           Text.ParserCombinators.Parsec as Pc
 
 
 parseSource :: ParsecT String u Identity Source
-parseSource = Pc.many $ parseCommand <* Pc.try emptySpace
+parseSource = emptySpace *> (Pc.many $ parseCommand <* Pc.try emptySpace)
 
 
 {-
