@@ -729,7 +729,6 @@ eval m (EAp "and" xs)    = ValBool $ and $ map (valToBool m . eval m) xs
 eval m (EAp "or" xs)     = ValBool $ or $ map (valToBool m . eval m) xs
 eval m (EAp "not" [x])   = ValBool $ not $ valToBool m $ eval m x
 eval m (EAp "=>" [x,y])  = ValBool $ valToBool m (eval m x) .=>. valToBool m (eval m y)
-eval m (EAp "<=>" [x,y]) = ValBool $ valToBool m (eval m x) .<=>. valToBool m (eval m y)
 eval m (EAp "<=" [x,y])  = ValBool $ valToRational m (eval m x) <= valToRational m (eval m y)
 eval m (EAp ">=" [x,y])  = ValBool $ valToRational m (eval m x) >= valToRational m (eval m y)
 eval m (EAp ">" [x,y])   = ValBool $ valToRational m (eval m x) >  valToRational m (eval m y)
