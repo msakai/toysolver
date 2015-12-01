@@ -431,6 +431,7 @@ push solver n = do
   replicateM_ n $ do
     (env,senv) <- readIORef (svEnvRef solver)
     modifyIORef (svSavedContextsRef solver) ((env,senv) :)
+    SMT.pushContext =<< readIORef (svSMTSolverRef solver)
     writeIORef (svModeRef solver) ModeAssert
   return Success
 
@@ -443,6 +444,7 @@ pop solver n = liftM (either id id) $ runExceptT $ do
       ((env,senv) : cs) -> lift $ do
         writeIORef (svEnvRef solver) (env,senv)
         writeIORef (svSavedContextsRef solver) cs
+        SMT.popContext =<< readIORef (svSMTSolverRef solver)
         writeIORef (svModeRef solver) ModeAssert
   return Success
 

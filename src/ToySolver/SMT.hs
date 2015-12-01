@@ -676,8 +676,13 @@ pushContext solver = do
 
 popContext :: Solver -> IO ()
 popContext solver = do
-  Vec.pop (smtContexts solver)
-  return ()
+  n <- Vec.getSize (smtContexts solver)
+  if n==0 then
+    E.throwIO $ Error $ "assertion stack is empty"
+  else do
+    l <- Vec.unsafePop (smtContexts solver)
+    SAT.addClause (smtSAT solver) [-l]
+    return ()
 
 -- -------------------------------------------------------------------
 
