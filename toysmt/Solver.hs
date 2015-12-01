@@ -30,6 +30,7 @@ module Solver
   -- ** Modifying the assertion stack
   , push
   , pop
+  , resetAssertions
 
   -- ** Introducing new symbols
   , declareSort
@@ -444,6 +445,11 @@ pop solver n = do
         writeIORef (svSavedContextsRef solver) cs
         SMT.popContext =<< readIORef (svSMTSolverRef solver)
         writeIORef (svModeRef solver) ModeAssert
+
+resetAssertions :: Solver -> IO ()
+resetAssertions solver = do
+  cs <- readIORef (svSavedContextsRef solver)
+  pop solver (length cs)
 
 echo :: Solver -> String -> IO ()
 echo solver s = do
