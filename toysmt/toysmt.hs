@@ -84,7 +84,7 @@ main = do
 
 loadFile :: Solver -> FilePath -> IO ()
 loadFile solver fname = do
-  ret <- parseFromFile parseSource fname
+  ret <- parseFromFile (parseSource <* eof) fname
   case ret of
     Left err -> do
       hPrint stderr err
@@ -108,7 +108,7 @@ replSimple solver = do
     putStr "toysmt> "
     hFlush stdout
     s <- getLine
-    case parse (spaces >> parseCommand) "<stdin>" s of
+    case parse (spaces >> parseCommand <* eof) "<stdin>" s of
       Left err -> do
         hPrint stderr err
       Right cmd -> do
