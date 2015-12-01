@@ -299,7 +299,8 @@ declareSort :: VASortFun a => Solver -> String -> Int -> IO a
 declareSort solver name arity = do
   ssym <- declareSSym solver name arity
   let f = withSortVArgs (Sort ssym)
-  unless (arityVASortFun f == arity) $ error "ToySolver.SMT.declareSort: argument number error"
+  unless (arityVASortFun f == arity) $ do
+    E.throwIO $ Error "ToySolver.SMT.declareSort: argument number error"
   return f
 
 class VASortFun a where
@@ -318,7 +319,7 @@ declareFSym :: Solver -> String -> [Sort] -> Sort -> IO FSym
 declareFSym solver f xs y = do
   fdefs <- readIORef (smtFDefs solver)
   when (f `Map.member` fdefs) $ do
-    error $ "function symbol " ++ f ++ " is already declared"
+    E.throwIO $ Error $ "function symbol " ++ f ++ " is already declared"
   fdef <-
     case (xs, y) of
       ([], Sort SSymBool []) -> do
@@ -332,7 +333,7 @@ declareFSym solver f xs y = do
         return (FEUFFun (xs,y) v)
   fdefs <- readIORef (smtFDefs solver)
   when (f `Map.member` fdefs) $ do
-    E.throwIO (Error ("function " ++ show f ++ " is already defined"))
+    E.throwIO $ Error $ "function " ++ show f ++ " is already defined"
   writeIORef (smtFDefs solver) $ Map.insert f fdef fdefs
   return f
 
@@ -353,7 +354,7 @@ declareFun solver name ps r = do
   fsym <- declareFSym solver name ps r
   let f = withVArgs (EAp fsym)
   unless (arityVAFun f == length ps) $ do
-    E.throwIO (Error "ToySolver.SMT.declareFun: argument number error")
+    E.throwIO $ Error "ToySolver.SMT.declareFun: argument number error"
   return f
 
 declareConst :: Solver -> String -> Sort -> IO Expr
@@ -438,7 +439,7 @@ exprToFormula solver (EAp f []) = do
   case Map.lookup f fdefs of
     Just (FBoolVar v) -> return (Atom v)
     Just _ -> E.throwIO $ Error "non Bool constant appears in a boolean context"
-    Nothing -> E.throwIO $ Error "unknown constant"
+    Nothing -> E.throwIO $ Error $ "unknown function symbol: " ++ show f
 exprToFormula solver (EAp f xs) = do
   e' <- exprToEUFTerm solver f xs
   formulaFromEUFTerm solver e'
@@ -591,9 +592,11 @@ exprToEUFTerm solver f xs = do
   case Map.lookup f fdefs of
     Just (FBoolVar v) -> formulaToEUFTerm solver (Atom v)
     Just (FLRAVar v) -> lraExprToEUFTerm solver (LA.var v)
-    Just (FEUFFun _ fsym) ->
+    Just (FEUFFun (ps,_) fsym) -> do
+      unless (length ps == length xs) $ do
+        E.throwIO $ Error "argument number error"
       liftM (EUF.TApp fsym) $ mapM (exprToEUFArg solver) xs
-    _ -> E.throw $ Error ("hogehoge: " ++ show (f,xs))
+    _ -> E.throw $ Error $ "unknown function symbol: " ++ show f
 
 exprToEUFArg :: Solver -> Expr -> IO EUF.Term
 exprToEUFArg solver (EFrac r) = lraExprToEUFTerm solver (LA.constant r)
@@ -741,7 +744,7 @@ eval m (EAp "=" [x,y])   = ValBool $
     (v1, v2) -> v1 == v2
 eval m (EAp f xs) =
   case Map.lookup f (mDefs m) of
-    Nothing -> E.throw $ Error ("unknown symbol: " ++ show f)
+    Nothing -> E.throw $ Error $ "unknown function symbol: " ++ show f
     Just (FBoolVar v) -> ValBool $ SAT.evalLit (mBoolModel m) v
     Just (FLRAVar v) -> ValRational $ mLRAModel m IntMap.! v
     Just (FEUFFun (_, Sort s []) sym) ->
