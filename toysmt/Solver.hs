@@ -68,6 +68,7 @@ import Control.Monad
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Ratio
 import qualified Data.Version as V
 import Numeric (readFloat, readHex)
 import System.Exit
@@ -149,6 +150,22 @@ interpretFun env t =
         Just (EFunDef env' params _y body) ->
           interpretFun (Map.fromList [(p,a) | ((p,_s),a) <- zip params (map (EExpr . interpretFun env) args) ] `Map.union` env') body
 
+valueToTerm :: SMT.Value -> Term
+valueToTerm (SMT.ValRational v) =
+  case v `compare` 0 of
+    GT -> f v
+    EQ -> TermSpecConstant (SpecConstantNumeral 0)
+    LT -> TermQualIdentifierT (QIdentifier $ ISymbol "-") [ f (negate v) ]
+  where
+    f v = TermQualIdentifierT (QIdentifier $ ISymbol "/")
+          [ TermSpecConstant (SpecConstantNumeral (numerator v))
+          , TermSpecConstant (SpecConstantNumeral (denominator v))
+          ]
+valueToTerm (SMT.ValBool b) =
+  TermQualIdentifier $ QIdentifier $ ISymbol $ if b then "true" else "false"
+valueToTerm (SMT.ValUninterpreted n) =
+  TermQualIdentifier $ QIdentifier $ ISymbol $ "@" ++ show n
+                       
 -- ----------------------------------------------------------------------
 
 data Solver
@@ -512,12 +529,17 @@ checkSat solver = do
     return Unsat
 
 getValue :: Solver -> [Term] -> IO GetValueResponse
-getValue solver _ts = do
+getValue solver ts = do
   mode <- readIORef (svModeRef solver)
-  if mode /= ModeSat then
+  unless (mode == ModeSat) $ do
     E.throwIO $ SMT.Error "get-value can only be used in sat mode"
-  else
-    E.throwIO SMT.Unsupported
+  smt <- readIORef (svSMTSolverRef solver)
+  m <- SMT.getModel smt
+  (env,_) <- readIORef (svEnvRef solver)
+  forM ts $ \t -> do
+    let e = interpretFun env t
+    let v = SMT.eval m e
+    return $ ValuationPair t (valueToTerm v)
 
 getAssignment :: Solver -> IO GetAssignmentResponse
 getAssignment solver = do
