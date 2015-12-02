@@ -37,6 +37,7 @@ module ToySolver.SMT
 
   -- * Solving
   , checkSAT
+  , checkSATAssuming
   , pushContext
   , popContext
 
@@ -658,6 +659,12 @@ checkSAT :: Solver -> IO Bool
 checkSAT solver = do  
   l <- getContextLit solver
   SAT.solveWith (smtSAT solver) [l]
+
+checkSATAssuming :: Solver -> [Expr] -> IO Bool
+checkSATAssuming solver xs = do
+  l <- getContextLit solver
+  ls <- mapM (\x -> Tseitin.encodeFormula (smtEnc solver) =<< exprToFormula solver x) xs
+  SAT.solveWith (smtSAT solver) (l : ls)
 
 getContextLit :: Solver -> IO SAT.Lit
 getContextLit solver = do
