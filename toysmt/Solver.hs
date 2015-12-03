@@ -477,12 +477,13 @@ declareSort :: Solver -> String -> Int -> IO ()
 declareSort solver name arity = do
   smt <- readIORef (svSMTSolverRef solver)
   s <- SMT.declareSSym smt name arity
-  modifyIORef (svEnvRef solver) $ (\(fenv, senv) -> (fenv, Map.insert name (SortSym s) senv))
+  insertSort solver name (SortSym s)
   writeIORef (svModeRef solver) ModeAssert
 
 defineSort :: Solver -> String -> [String] -> Sort -> IO ()
 defineSort solver name xs body = do
-  modifyIORef (svEnvRef solver) $ (\(fenv, senv) -> (fenv, Map.insert name (SortDef senv xs body) senv))
+  (_, senv) <- readIORef (svEnvRef solver)
+  insertSort solver name (SortDef senv xs body)
   writeIORef (svModeRef solver) ModeAssert
 
 declareFun :: Solver -> String -> [Sort] -> Sort -> IO ()
@@ -490,7 +491,7 @@ declareFun solver name xs y = do
   smt <- readIORef (svSMTSolverRef solver)
   (_, senv) <- readIORef (svEnvRef solver)
   f <- SMT.declareFSym smt name (map (interpretSort senv) xs) (interpretSort senv y)
-  modifyIORef (svEnvRef solver) $ \(fenv, senv) -> (Map.insert name (EFSym f) fenv, senv)
+  insertFun solver name (EFSym f)
   writeIORef (svModeRef solver) ModeAssert
 
 defineFun :: Solver -> String -> [SortedVar] -> Sort -> Term -> IO ()
@@ -501,10 +502,12 @@ defineFun solver name xs y body = do
       y'  = interpretSort senv y
   if null xs' then do
     body' <- processNamed solver body
+    (fenv, _) <- readIORef (svEnvRef solver)
     -- use EExpr?
-    modifyIORef (svEnvRef solver) $ \(fenv, senv) -> (Map.insert name (EFunDef fenv [] y' body') fenv, senv)
+    insertFun solver name (EFunDef fenv [] y' body')
   else do
-    modifyIORef (svEnvRef solver) $ \(fenv, senv) -> (Map.insert name (EFunDef fenv xs' y' body) fenv, senv)
+    (fenv, _) <- readIORef (svEnvRef solver)
+    insertFun solver name (EFunDef fenv xs' y' body)
   writeIORef (svModeRef solver) ModeAssert
 
 assert :: Solver -> Term -> IO ()
@@ -577,6 +580,19 @@ exit _solver = exitSuccess
 
 -- ----------------------------------------------------------------------
 
+insertSort :: Solver -> String -> SortEntry -> IO ()
+insertSort solver name sdef = do
+  (fenv, senv) <- readIORef (svEnvRef solver)
+  case Map.lookup name senv of
+    Nothing -> writeIORef (svEnvRef solver) (fenv, Map.insert name sdef senv)
+    Just _ -> E.throwIO $ SMT.Error (name ++ " is already used")
+
+insertFun :: Solver -> String -> EEntry -> IO ()
+insertFun solver name fdef = do
+  (fenv, senv) <- readIORef (svEnvRef solver)
+  case Map.lookup name fenv of
+    Nothing -> writeIORef (svEnvRef solver) (Map.insert name fdef fenv, senv)
+    Just _ -> E.throwIO $ SMT.Error (name ++ " is already used")
 
 -- TODO: check closedness of terms
 processNamed :: Solver -> Term -> IO Term
@@ -607,7 +623,7 @@ processNamed solver = f
                 let e = interpretFun env body'
                 -- smt <- readIORef (svSMTSolverRef solver)
                 -- s <- SMT.exprSort smt e
-                modifyIORef (svEnvRef solver) $ \(fenv, senv) -> (Map.insert name (EExpr e) fenv, senv)
+                insertFun solver name (EExpr e)
               _ -> E.throwIO $ SMT.Error ":named attribute value should be a symbol"
           _ -> return ()
       let attrs' = [attr | attr <- attrs, attrName attr /= ":named"]
