@@ -499,14 +499,20 @@ defineFun solver name xs y body = do
   (_, senv) <- readIORef (svEnvRef solver)
   let xs' = map (\(SV x s) -> (x, interpretSort senv s)) xs
       y'  = interpretSort senv y
-  modifyIORef (svEnvRef solver) $ \(fenv, senv) -> (Map.insert name (EFunDef fenv xs' y' body) fenv, senv)
+  if null xs' then do
+    body' <- processNamed solver body
+    -- use EExpr?
+    modifyIORef (svEnvRef solver) $ \(fenv, senv) -> (Map.insert name (EFunDef fenv [] y' body') fenv, senv)
+  else do
+    modifyIORef (svEnvRef solver) $ \(fenv, senv) -> (Map.insert name (EFunDef fenv xs' y' body) fenv, senv)
   writeIORef (svModeRef solver) ModeAssert
 
 assert :: Solver -> Term -> IO ()
 assert solver tm = do
+  tm' <- processNamed solver tm
   smt <- readIORef (svSMTSolverRef solver)
   (env,_) <- readIORef (svEnvRef solver)
-  SMT.assert smt (interpretFun env tm)
+  SMT.assert smt (interpretFun env tm')
   writeIORef (svModeRef solver) ModeAssert
 
 getAssertions :: Solver -> IO GetAssertionsResponse
@@ -530,6 +536,7 @@ checkSat solver = do
 
 getValue :: Solver -> [Term] -> IO GetValueResponse
 getValue solver ts = do
+  ts <- mapM (processNamed solver) ts  
   mode <- readIORef (svModeRef solver)
   unless (mode == ModeSat) $ do
     E.throwIO $ SMT.Error "get-value can only be used in sat mode"
@@ -569,3 +576,45 @@ exit :: Solver -> IO ()
 exit _solver = exitSuccess
 
 -- ----------------------------------------------------------------------
+
+
+-- TODO: check closedness of terms
+processNamed :: Solver -> Term -> IO Term
+processNamed solver = f
+  where
+    f t@(TermSpecConstant _) = return t
+    f t@(TermQualIdentifier _) = return t
+    f (TermQualIdentifierT qid args) = do
+      args' <- mapM f args
+      return $ TermQualIdentifierT qid args'
+    f (TermLet bindings body) = do
+      body' <- f body
+      return $ TermLet bindings body'
+    f (TermForall bindings body) = do
+      body' <- f body
+      return $ TermForall bindings body'
+    f (TermExists bindings body) = do
+      body' <- f body
+      return $ TermExists bindings body'
+    f (TermAnnot body attrs) = do
+      body' <- f body
+      forM_ attrs $ \attr -> do
+        case attr of
+          AttributeVal ":named" val ->
+            case val of
+              AttrValueSymbol name -> do
+                (env,_) <- readIORef (svEnvRef solver)
+                let e = interpretFun env body'
+                -- smt <- readIORef (svSMTSolverRef solver)
+                -- s <- SMT.exprSort smt e
+                modifyIORef (svEnvRef solver) $ \(fenv, senv) -> (Map.insert name (EExpr e) fenv, senv)
+              _ -> E.throwIO $ SMT.Error ":named attribute value should be a symbol"
+          _ -> return ()
+      let attrs' = [attr | attr <- attrs, attrName attr /= ":named"]
+            where
+              attrName (Attribute s) = s
+              attrName (AttributeVal s _v) = s
+      if null attrs' then
+        return body'
+      else
+        return $ TermAnnot body' attrs'
