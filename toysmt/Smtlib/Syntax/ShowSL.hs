@@ -202,4 +202,4 @@ instance ShowSL ValuationPair where
     "(" ++ showSL term1 ++ " " ++ showSL term2 ++ ")"
 
 instance ShowSL TValuationPair where
-  showSL (TValuationPair str b) = "(" ++ str ++ " " ++ show b ++ ")"
+  showSL (TValuationPair str b) = "(" ++ str ++ " " ++ showSL b ++ ")"
