@@ -355,7 +355,7 @@ setOption solver opt = do
       return ()
     RandomSeed _i ->
       if mode /= ModeStart then
-        E.throwIO $ SMT.Error "produce-assignments option can be set only in start mode"
+        E.throwIO $ SMT.Error "random-seed option can be set only in start mode"
       else
         E.throwIO SMT.Unsupported
     Verbosity _lv -> E.throwIO SMT.Unsupported
