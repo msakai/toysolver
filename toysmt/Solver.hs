@@ -94,7 +94,7 @@ type Env = (EEnv, SortEnv)
 
 data EEntry
   = EFSym SMT.FSym
-  | EExpr SMT.Expr
+  | EExpr SMT.Expr Bool
   | EFunDef EEnv [(String, SMT.Sort)] SMT.Sort Term
 
 data SortEntry
@@ -129,7 +129,7 @@ interpretFun env t =
     TermQualIdentifier qid -> f qid []
     TermQualIdentifierT  qid args -> f qid args
     TermLet bindings body ->
-      interpretFun (Map.fromList [(v, EExpr (interpretFun env t2)) | VB v t2 <- bindings] `Map.union` env) body
+      interpretFun (Map.fromList [(v, EExpr (interpretFun env t2) False) | VB v t2 <- bindings] `Map.union` env) body
     TermForall _bindings _body -> error "universal quantifiers are not supported yet"
     TermExists _bindings _body -> error "existential quantifiers are not supported yet"
     TermAnnot t2 _ -> interpretFun env t2 -- annotations are not supported yet
@@ -145,10 +145,10 @@ interpretFun env t =
     f qid args =
       case Map.lookup (getName qid) env of
         Nothing -> error ("unknown function symbol: " ++ getName qid)
-        Just (EExpr e) -> e
+        Just (EExpr e _) -> e
         Just (EFSym fsym) -> SMT.EAp fsym (map (interpretFun env) args)
         Just (EFunDef env' params _y body) ->
-          interpretFun (Map.fromList [(p,a) | ((p,_s),a) <- zip params (map (EExpr . interpretFun env) args) ] `Map.union` env') body
+          interpretFun (Map.fromList [(p,a) | ((p,_s),a) <- zip params (map (\t -> EExpr (interpretFun env t) False) args) ] `Map.union` env') body
 
 valueToTerm :: SMT.Value -> Term
 valueToTerm (SMT.ValRational v) =
@@ -178,6 +178,7 @@ data Solver
   , svRegularOutputChannelRef :: !(IORef (String, Handle))
   , svDiagnosticOutputChannelRef :: !(IORef (String, Handle))
   , svPrintSuccessRef :: !(IORef Bool)
+  , svProduceAssignmentRef :: !(IORef Bool)
   }
 
 newSolver :: IO Solver
@@ -198,6 +199,7 @@ newSolver = do
   regOutputRef <- newIORef ("stdout", stdout)
   diagOutputRef <- newIORef ("stderr", stderr)
   printSuccessRef <- newIORef True
+  produceAssignmentRef <- newIORef False
   return $
     Solver
     { svSMTSolverRef = solverRef
@@ -208,6 +210,7 @@ newSolver = do
     , svRegularOutputChannelRef = regOutputRef
     , svDiagnosticOutputChannelRef = diagOutputRef
     , svPrintSuccessRef = printSuccessRef
+    , svProduceAssignmentRef = produceAssignmentRef
     }
 
 execCommand :: Solver -> Command -> IO ()
@@ -276,6 +279,7 @@ reset solver = do
   writeIORef (svRegularOutputChannelRef solver) ("stdout",stdout)
   writeIORef (svDiagnosticOutputChannelRef solver) ("stderr",stderr)
   writeIORef (svPrintSuccessRef solver) True
+  writeIORef (svProduceAssignmentRef solver) False
   return Success
 
 setLogic :: Solver -> String -> IO ()
@@ -330,13 +334,11 @@ setOption solver opt = do
         E.throwIO SMT.Unsupported
       else
         return ()
-    ProduceAssignments b ->
-      if mode /= ModeStart then
+    ProduceAssignments b -> do
+      unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-assignments option can be set only in start mode"
-      else if b then
-        E.throwIO SMT.Unsupported
-      else
-        return ()
+      writeIORef (svProduceAssignmentRef solver) b
+      return ()
     RegularOutputChannel fname -> do
       h <- if fname == "stdout" then
              return stdout
@@ -393,7 +395,8 @@ getOption solver opt =
       b <- readIORef (svPrintSuccessRef solver)
       return $ AttrValueSymbol $ if b then "true" else "false"
     "produce-assignments" -> do
-      return $ AttrValueSymbol "false" -- default value
+      b <- readIORef (svProduceAssignmentRef solver)
+      return $ AttrValueSymbol (if b then "true" else "false")
     "produce-models" -> do
       return $ AttrValueSymbol "false" -- default value
     "produce-proofs" -> do
@@ -554,10 +557,23 @@ getValue solver ts = do
 getAssignment :: Solver -> IO GetAssignmentResponse
 getAssignment solver = do
   mode <- readIORef (svModeRef solver)
-  if mode /= ModeSat then
+  unless (mode == ModeSat) $ do
     E.throwIO $ SMT.Error "get-assignment can only be used in sat mode"
-  else
-    E.throwIO SMT.Unsupported
+  smt <- readIORef (svSMTSolverRef solver)
+  m <- SMT.getModel smt
+  (env, _) <- readIORef (svEnvRef solver)
+  liftM concat $ forM (Map.toList env) $ \(name, entry) -> do
+    case entry of
+      EExpr e True -> do
+        s <- SMT.exprSort smt e
+        if s /= SMT.sBool then do
+          return []
+        else do
+          let v = SMT.eval m e
+          case v of
+            (SMT.ValBool b) -> return [TValuationPair name b]
+            _ -> E.throwIO $ SMT.Error "get-assignment: should not happen"
+      _ -> return []   
 
 getProof :: Solver -> IO GetProofResponse
 getProof solver = do
@@ -623,7 +639,7 @@ processNamed solver = f
                 let e = interpretFun env body'
                 -- smt <- readIORef (svSMTSolverRef solver)
                 -- s <- SMT.exprSort smt e
-                insertFun solver name (EExpr e)
+                insertFun solver name (EExpr e True)
               _ -> E.throwIO $ SMT.Error ":named attribute value should be a symbol"
           _ -> return ()
       let attrs' = [attr | attr <- attrs, attrName attr /= ":named"]

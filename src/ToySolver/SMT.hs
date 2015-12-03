@@ -25,6 +25,7 @@ module ToySolver.SMT
   , sReal
   , Type
   , Expr (..)
+  , exprSort
   , FSym
   , declareSSym
   , declareSort
