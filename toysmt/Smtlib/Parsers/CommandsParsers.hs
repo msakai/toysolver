@@ -383,7 +383,7 @@ parseProduceModels = do
 
 parseProduceAssignments :: ParsecT String u Identity Option
 parseProduceAssignments = do
-  _ <- string ":produce-assignnments"
+  _ <- string ":produce-assignments"
   _ <- spaces
   val <- parseBool
   return $  ProduceAssignments val
