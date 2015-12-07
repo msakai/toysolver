@@ -60,6 +60,8 @@ Extra-Source-Files:
    samples/programs/htc/test1.dat
    samples/programs/htc/test2.dat
    samples/programs/svm2lp/a1a
+   samples/programs/nonogram/*.cwd
+   samples/programs/nonogram/README.md
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
 Build-Type: Simple
