@@ -24,5 +24,5 @@ PKG=toysolver-$VER-linux-i386
 
 rm -r $PKG
 mkdir $PKG
-cp dist/build/htc/htc dist/build/knapsack/knapsack dist/build/lpconvert/lpconvert dist/build/nqueens/nqueens dist/build/pbconvert/pbconvert dist/build/sudoku/sudoku dist/build/toyfmf/toyfmf dist/build/toysat/toysat dist/build/toysolver/toysolver $PKG/
+cp dist/build/htc/htc dist/build/knapsack/knapsack dist/build/lpconvert/lpconvert dist/build/nonogram/nonogram dist/build/nqueens/nqueens dist/build/pbconvert/pbconvert dist/build/sudoku/sudoku dist/build/toyfmf/toyfmf dist/build/toysat/toysat dist/build/toysolver/toysolver $PKG/
 tar Jcf $PKG.tar.xz $PKG --owner=sakai --group=sakai
