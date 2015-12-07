@@ -452,6 +452,20 @@ Executable sudoku
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
+Executable nonogram
+  If !flag(BuildSamplePrograms)
+    Buildable: False
+  Main-is: nonogram.hs
+  HS-Source-Dirs: samples/programs/nonogram
+  Build-Depends:
+    base,
+    array,
+    containers,
+    toysolver
+  Default-Language: Haskell2010
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
+
 Executable nqueens
   If !flag(BuildSamplePrograms)
     Buildable: False
