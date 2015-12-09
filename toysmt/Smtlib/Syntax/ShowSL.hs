@@ -55,9 +55,11 @@ instance ShowSL Command where
   showSL (Pop n) = "(pop " ++show n ++ ")"
   showSL (Assert term) = "(assert " ++ showSL term ++ ")"
   showSL CheckSat = "(check-sat)"
+  showSL (CheckSatAssuming terms) = "(check-sat-assuming (" ++ joinA terms ++ "))"
   showSL GetAssertions = "(get-assertions)"
   showSL GetProof = "(get-proof)"
   showSL GetUnsatCore = "(get-unsat-core)"
+  showSL GetUnsatAssumptions = "(get-unsat-assumptions)"
   showSL (GetValue terms) = "( (" ++ joinA terms ++ ") )"
   showSL GetAssignment =  "(get-assignment)"
   showSL (GetOption opt) = "(get-option " ++ opt ++ ")"
@@ -75,6 +77,7 @@ instance ShowSL Option where
   showSL (InteractiveMode b) = ":interactive-mode " ++ showSL b
   showSL (ProduceProofs b) = ":produce-proofs " ++ showSL b
   showSL (ProduceUnsatCores b) = ":produce-unsat-cores " ++  showSL b
+  showSL (ProduceUnsatAssumptions b) = ":produce-unsat-assumptions " ++  showSL b
   showSL (ProduceModels b) = ":produce-models " ++ showSL b
   showSL (ProduceAssignments b) = ":produce-assignments " ++ showSL b
   showSL (RegularOutputChannel s) = ":regular-output-channel " ++ s
@@ -167,6 +170,7 @@ instance ShowSL CmdResponse where
   showSL (CmdGetAssignmentResponse x) = "(" ++ joinA x ++ ")"
   showSL (CmdGetProofResponse x) = showSL x
   showSL (CmdGetUnsatCoreResponse x) = "(" ++ unwords x ++ ")"
+  showSL (CmdGetUnsatAssumptionsResponse terms) = "(" ++  joinA terms ++ ")"
   showSL (CmdGetValueResponse x) = "(" ++ joinA x ++ ")"
   showSL (CmdGetOptionResponse x) = showSL x
 

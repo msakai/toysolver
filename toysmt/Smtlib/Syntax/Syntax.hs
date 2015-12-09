@@ -34,9 +34,11 @@ data Command = SetLogic String
              | Pop Int
              | Assert Term
              | CheckSat
+             | CheckSatAssuming [Term]
              | GetAssertions
              | GetProof
              | GetUnsatCore
+             | GetUnsatAssumptions
              | GetValue [Term]
              | GetAssignment
              | GetOption String
@@ -49,6 +51,7 @@ data Option = PrintSuccess Bool
             | InteractiveMode Bool
             | ProduceProofs Bool
             | ProduceUnsatCores Bool
+            | ProduceUnsatAssumptions Bool
             | ProduceModels Bool
             | ProduceAssignments Bool
             | RegularOutputChannel String
@@ -167,6 +170,7 @@ data CmdResponse = CmdGenResponse GenResponse
                  | CmdGetAssignmentResponse GetAssignmentResponse
                  | CmdGetProofResponse GetProofResponse
                  | CmdGetUnsatCoreResponse GetUnsatCoreResponse
+                 | CmdGetUnsatAssumptionsResponse GetUnsatAssumptionsResponse
                  | CmdGetValueResponse GetValueResponse
                  | CmdGetOptionResponse GetOptionResponse
                  deriving (Show, Eq)
@@ -219,6 +223,9 @@ type GetProofResponse = Sexpr
 
 type GetUnsatCoreResponse = [String]
 
+-- Get Unsat Assumptions Response
+
+type GetUnsatAssumptionsResponse = [Term]
 
 -- Get Valuation Pair
 
