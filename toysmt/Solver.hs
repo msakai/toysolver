@@ -44,6 +44,7 @@ module Solver
 
   -- ** Checking for satisfiability
   , checkSat
+  , checkSatAssuming
 
   -- ** Inspecting models
   , getValue
@@ -52,6 +53,7 @@ module Solver
   -- ** Inspecting proofs
   , getProof
   , getUnsatCore
+  , getUnsatAssumptions
 
   -- ** Inspecting settings
   , getInfo
@@ -179,6 +181,8 @@ data Solver
   , svDiagnosticOutputChannelRef :: !(IORef (String, Handle))
   , svPrintSuccessRef :: !(IORef Bool)
   , svProduceAssignmentRef :: !(IORef Bool)
+  , svProduceUnsatAssumptionsRef :: !(IORef Bool)
+  , svUnsatAssumptionsRef :: !(IORef [Term])
   }
 
 newSolver :: IO Solver
@@ -200,17 +204,21 @@ newSolver = do
   diagOutputRef <- newIORef ("stderr", stderr)
   printSuccessRef <- newIORef True
   produceAssignmentRef <- newIORef False
+  produceUnsatAssumptionsRef <- newIORef False
+  unsatAssumptionsRef <- newIORef undefined
   return $
     Solver
     { svSMTSolverRef = solverRef
     , svEnvRef = envRef
     , svModeRef = modeRef
+    , svUnsatAssumptionsRef = unsatAssumptionsRef
     , svSavedContextsRef = savedContextsRef
     , svInfoRef = infoRef
     , svRegularOutputChannelRef = regOutputRef
     , svDiagnosticOutputChannelRef = diagOutputRef
     , svPrintSuccessRef = printSuccessRef
     , svProduceAssignmentRef = produceAssignmentRef
+    , svProduceUnsatAssumptionsRef = produceUnsatAssumptionsRef
     }
 
 execCommand :: Solver -> Command -> IO ()
@@ -248,10 +256,12 @@ runCommand solver cmd = E.handle h $
     Assert tm -> const (CmdGenResponse Success) <$> assert solver tm
     GetAssertions -> CmdGetAssertionsResponse <$> getAssertions solver
     CheckSat -> CmdCheckSatResponse <$> checkSat solver
+    CheckSatAssuming ts -> CmdCheckSatResponse <$> checkSatAssuming solver ts
     GetValue ts -> CmdGetValueResponse <$> getValue solver ts
     GetAssignment -> CmdGetAssignmentResponse <$> getAssignment solver
     GetProof -> CmdGetProofResponse <$> getProof solver
     GetUnsatCore -> CmdGetUnsatCoreResponse <$> getUnsatCore solver
+    GetUnsatAssumptions -> CmdGetUnsatAssumptionsResponse <$> getUnsatAssumptions solver  
     Exit -> const (CmdGenResponse Success) <$> exit solver
   where
     h SMT.Unsupported = return (CmdGenResponse Unsupported)
@@ -280,6 +290,8 @@ reset solver = do
   writeIORef (svDiagnosticOutputChannelRef solver) ("stderr",stderr)
   writeIORef (svPrintSuccessRef solver) True
   writeIORef (svProduceAssignmentRef solver) False
+  writeIORef (svProduceUnsatAssumptionsRef solver) False
+  writeIORef (svUnsatAssumptionsRef solver) undefined
   return Success
 
 setLogic :: Solver -> String -> IO ()
@@ -327,6 +339,11 @@ setOption solver opt = do
         E.throwIO SMT.Unsupported
       else
         return ()
+    ProduceUnsatAssumptions b -> do
+      unless (mode == ModeStart) $ do
+        E.throwIO $ SMT.Error "produce-unsat-assumptions option can be set only in start mode"
+      writeIORef (svProduceUnsatAssumptionsRef solver) b
+      return ()
     ProduceModels b ->
       if mode /= ModeStart then
         E.throwIO $ SMT.Error "produce-models option can be set only in start mode"
@@ -362,11 +379,6 @@ setOption solver opt = do
     OptionAttr (AttributeVal "produce-assertions" _) -> do
       if mode /= ModeStart then
         E.throwIO $ SMT.Error "produce-assertions option can be set only in start mode"
-      else
-        E.throwIO SMT.Unsupported
-    OptionAttr (AttributeVal "produce-unsat-assumptions" _) -> do
-      if mode /= ModeStart then
-        E.throwIO $ SMT.Error "produce-unsat-assumptions option can be set only in start mode"
       else
         E.throwIO SMT.Unsupported
     OptionAttr (AttributeVal "global-declarations" _) -> do
@@ -530,14 +542,28 @@ getAssertions solver = do
     E.throwIO SMT.Unsupported
 
 checkSat :: Solver -> IO CheckSatResponse
-checkSat solver = do
+checkSat solver = checkSatAssuming solver []
+
+checkSatAssuming :: Solver -> [Term] -> IO CheckSatResponse
+checkSatAssuming solver xs = do
   smt <- readIORef (svSMTSolverRef solver)
-  ret <- SMT.checkSAT smt
+
+  (env,_) <- readIORef (svEnvRef solver)
+  ref <- newIORef Map.empty
+  ys <- forM xs $ \x -> do
+    let y = interpretFun env x
+    modifyIORef ref (Map.insert y x)
+    return y
+
+  ret <- SMT.checkSATAssuming smt ys
   if ret then do
     writeIORef (svModeRef solver) ModeSat
     return Sat
   else do
     writeIORef (svModeRef solver) ModeUnsat
+    m <- readIORef ref
+    es <- SMT.getUnsatAssumptions smt
+    writeIORef (svUnsatAssumptionsRef solver) [m Map.! e | e <- es]
     return Unsat
 
 getValue :: Solver -> [Term] -> IO GetValueResponse
@@ -590,6 +616,13 @@ getUnsatCore solver = do
     E.throwIO $ SMT.Error "get-unsat-core can only be used in unsat mode"
   else
     E.throwIO SMT.Unsupported
+
+getUnsatAssumptions :: Solver -> IO [Term]
+getUnsatAssumptions solver = do
+  mode <- readIORef (svModeRef solver)
+  unless (mode == ModeUnsat) $ do
+    E.throwIO $ SMT.Error "get-unsat-assumptions can only be used in unsat mode"
+  readIORef (svUnsatAssumptionsRef solver)
 
 exit :: Solver -> IO ()
 exit _solver = exitSuccess

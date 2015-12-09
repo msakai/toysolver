@@ -42,11 +42,14 @@ module ToySolver.SMT
   , pushContext
   , popContext
 
-  -- * Model
+  -- * Inspecting models
   , Model
   , Value (..)
   , getModel
   , eval
+
+  -- * Inspecting proofs
+  , getUnsatAssumptions
   ) where
 
 import qualified Control.Exception as E
@@ -62,6 +65,7 @@ import Data.IORef
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe (catMaybes)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Typeable
@@ -107,7 +111,7 @@ type Type = ([Sort],Sort)
 data Expr
   = EAp FSym [Expr]
   | EFrac Rational
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 instance MonotoneBoolean Expr where
   true  = EAp "true" []
@@ -179,6 +183,8 @@ data Solver
   , smtFDefs :: !(IORef (Map FSym FDef))
 
   , smtContexts :: !(Vec.UVec SAT.Lit)
+
+  , smtUnsatAssumptions :: !(IORef [Expr])
   }
 
 newSolver :: IO Solver
@@ -274,6 +280,8 @@ newSolver = do
 
   contexts <- Vec.new
 
+  unsatAssumptionsRef <- newIORef undefined
+
   return $
     Solver
     { smtSAT = sat
@@ -292,6 +300,7 @@ newSolver = do
     , smtFDefs = fdefs
 
     , smtContexts = contexts
+    , smtUnsatAssumptions = unsatAssumptionsRef
     }
 
 declareSSym :: Solver -> String -> Int -> IO SSym
@@ -664,8 +673,19 @@ checkSAT solver = do
 checkSATAssuming :: Solver -> [Expr] -> IO Bool
 checkSATAssuming solver xs = do
   l <- getContextLit solver
-  ls <- mapM (\x -> Tseitin.encodeFormula (smtEnc solver) =<< exprToFormula solver x) xs
-  SAT.solveWith (smtSAT solver) (l : ls)
+  ref <- newIORef IntMap.empty
+  ls <- forM xs $ \x -> do
+    b <- Tseitin.encodeFormula (smtEnc solver) =<< exprToFormula solver x
+    modifyIORef ref (IntMap.insert b x)
+    return b
+  ret <- SAT.solveWith (smtSAT solver) (l : ls)
+  if ret then
+    writeIORef (smtUnsatAssumptions solver) undefined
+  else do
+    m <- readIORef ref
+    failed <- SAT.getFailedAssumptions (smtSAT solver)
+    writeIORef (smtUnsatAssumptions solver) $ catMaybes [IntMap.lookup l m | l <- failed]
+  return ret
 
 getContextLit :: Solver -> IO SAT.Lit
 getContextLit solver = do
@@ -784,6 +804,12 @@ valToEntity m (ValRational r) =
   case Map.lookup r (mRationalToEntity m) of
     Just e -> e
     Nothing -> EUF.mUnspecified (mEUFModel m)
+
+-- -------------------------------------------------------------------
+
+getUnsatAssumptions :: Solver -> IO [Expr]
+getUnsatAssumptions solver = do
+  readIORef (smtUnsatAssumptions solver)
 
 -- -------------------------------------------------------------------
 
