@@ -20,6 +20,7 @@ Extra-Source-Files:
    COPYING-GPL
    .ghci
    .travis.yml
+   appveyor.yml
    build_bdist_linux-i386.sh
    build_bdist_linux-x86_64.sh
    build_bdist_macos.sh
