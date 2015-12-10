@@ -69,6 +69,7 @@ data InfoFlags = ErrorBehavior
                | Status
                | ReasonUnknown
                | AllStatistics
+               | AssertionStackLevels
                | InfoFlags String
                 deriving (Show,Eq)
 
@@ -206,6 +207,7 @@ data InfoResponse  = ResponseErrorBehavior ErrorBehavior
                    | ResponseAuthors String
                    | ResponseVersion String
                    | ResponseReasonUnknown ReasonUnknown
+                   | ResponseAssertionStackLevels Int
                    | ResponseAttribute Attribute
                    deriving (Show, Eq)
 

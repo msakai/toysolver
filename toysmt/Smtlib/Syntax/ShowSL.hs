@@ -94,6 +94,7 @@ instance ShowSL InfoFlags where
   showSL Status = ":status"
   showSL ReasonUnknown = ":reason-unknown"
   showSL AllStatistics = ":all-statistics"
+  showSL AssertionStackLevels = ":assertion-stack-levels"
   showSL (InfoFlags s) = s
 
 
@@ -199,6 +200,7 @@ instance ShowSL InfoResponse where
   showSL (ResponseAuthors s) = ":authors " ++ s
   showSL (ResponseVersion s) = ":version" ++ s
   showSL (ResponseReasonUnknown x) = ":reason-unknown " ++ showSL x
+  showSL (ResponseAssertionStackLevels n) = ":assertion-stack-levels " ++ show n
   showSL (ResponseAttribute x)  = showSL x
 
 instance ShowSL ValuationPair where
