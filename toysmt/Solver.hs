@@ -455,6 +455,10 @@ getInfo solver flags = do
         E.throwIO $ SMT.Error "Executions of get-info with :all-statistics are allowed only when the solver is in sat or unsat mode."
       else
         E.throwIO SMT.Unsupported
+    AssertionStackLevels -> do
+      saved <- readIORef (svSavedContextsRef solver)
+      let n = length saved
+      n `seq` return [ResponseAssertionStackLevels n]
     InfoFlags _s -> do
       E.throwIO SMT.Unsupported
 
