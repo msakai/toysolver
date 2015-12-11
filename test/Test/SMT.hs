@@ -138,8 +138,8 @@ case_QF_EUF_Bool = do
   ret <- SMT.checkSAT solver
   ret @?= False
 
-case_pushContext :: IO ()
-case_pushContext = do
+case_push :: IO ()
+case_push = do
   solver <- SMT.newSolver
   sU <- SMT.declareSort solver "U" 0
 
@@ -151,11 +151,11 @@ case_pushContext = do
   ret <- SMT.checkSAT solver
   ret @?= True
 
-  SMT.pushContext solver
+  SMT.push solver
   SMT.assert solver $ x .==. y
   ret <- SMT.checkSAT solver
   ret @?= False
-  SMT.popContext solver
+  SMT.pop solver
 
   ret <- SMT.checkSAT solver
   ret @?= True

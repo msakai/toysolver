@@ -182,6 +182,7 @@ data Solver
   , svPrintSuccessRef :: !(IORef Bool)
   , svProduceAssignmentRef :: !(IORef Bool)
   , svProduceUnsatAssumptionsRef :: !(IORef Bool)
+  , svProduceUnsatCoreRef :: !(IORef Bool)
   , svUnsatAssumptionsRef :: !(IORef [Term])
   }
 
@@ -205,6 +206,7 @@ newSolver = do
   printSuccessRef <- newIORef True
   produceAssignmentRef <- newIORef False
   produceUnsatAssumptionsRef <- newIORef False
+  produceUnsatCoreRef <- newIORef False  
   unsatAssumptionsRef <- newIORef undefined
   return $
     Solver
@@ -218,6 +220,7 @@ newSolver = do
     , svDiagnosticOutputChannelRef = diagOutputRef
     , svPrintSuccessRef = printSuccessRef
     , svProduceAssignmentRef = produceAssignmentRef
+    , svProduceUnsatCoreRef = produceUnsatCoreRef
     , svProduceUnsatAssumptionsRef = produceUnsatAssumptionsRef
     }
 
@@ -291,6 +294,7 @@ reset solver = do
   writeIORef (svPrintSuccessRef solver) True
   writeIORef (svProduceAssignmentRef solver) False
   writeIORef (svProduceUnsatAssumptionsRef solver) False
+  writeIORef (svProduceUnsatCoreRef solver) False
   writeIORef (svUnsatAssumptionsRef solver) undefined
   return Success
 
@@ -332,13 +336,11 @@ setOption solver opt = do
         E.throwIO SMT.Unsupported
       else
         return ()
-    ProduceUnsatCores b ->
-      if mode /= ModeStart then
+    ProduceUnsatCores b -> do
+      unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-unsat-cores option can be set only in start mode"
-      else if b then
-        E.throwIO SMT.Unsupported
-      else
-        return ()
+      writeIORef (svProduceUnsatCoreRef solver) b
+      return ()
     ProduceUnsatAssumptions b -> do
       unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-unsat-assumptions option can be set only in start mode"
@@ -467,7 +469,7 @@ push solver n = do
   replicateM_ n $ do
     (env,senv) <- readIORef (svEnvRef solver)
     modifyIORef (svSavedContextsRef solver) ((env,senv) :)
-    SMT.pushContext =<< readIORef (svSMTSolverRef solver)
+    SMT.push =<< readIORef (svSMTSolverRef solver)
     writeIORef (svModeRef solver) ModeAssert
 
 pop :: Solver -> Int -> IO ()
@@ -479,7 +481,7 @@ pop solver n = do
       ((env,senv) : cs) -> do
         writeIORef (svEnvRef solver) (env,senv)
         writeIORef (svSavedContextsRef solver) cs
-        SMT.popContext =<< readIORef (svSMTSolverRef solver)
+        SMT.pop =<< readIORef (svSMTSolverRef solver)
         writeIORef (svModeRef solver) ModeAssert
 
 resetAssertions :: Solver -> IO ()
@@ -531,10 +533,18 @@ defineFun solver name xs y body = do
 
 assert :: Solver -> Term -> IO ()
 assert solver tm = do
+  let mname =
+        case tm of
+          TermAnnot body attrs
+            | name:_ <- [name | AttributeVal ":named" (AttrValueSymbol name) <- attrs] ->
+                Just name
+          _ -> Nothing
   tm' <- processNamed solver tm
   smt <- readIORef (svSMTSolverRef solver)
   (env,_) <- readIORef (svEnvRef solver)
-  SMT.assert smt (interpretFun env tm')
+  case mname of
+    Nothing -> SMT.assert smt (interpretFun env tm')
+    Just name -> SMT.assertNamed smt name (interpretFun env tm')
   writeIORef (svModeRef solver) ModeAssert
 
 getAssertions :: Solver -> IO GetAssertionsResponse
@@ -615,11 +625,11 @@ getProof solver = do
 
 getUnsatCore :: Solver -> IO GetUnsatCoreResponse
 getUnsatCore solver = do
+  smt <- readIORef (svSMTSolverRef solver)
   mode <- readIORef (svModeRef solver)
-  if mode /= ModeUnsat then
+  unless (mode == ModeUnsat) $ do
     E.throwIO $ SMT.Error "get-unsat-core can only be used in unsat mode"
-  else
-    E.throwIO SMT.Unsupported
+  SMT.getUnsatCore smt
 
 getUnsatAssumptions :: Solver -> IO [Term]
 getUnsatAssumptions solver = do

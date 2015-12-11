@@ -35,12 +35,13 @@ module ToySolver.SMT
   , declareConst
   , VAFun
   , assert
+  , assertNamed
 
   -- * Solving
   , checkSAT
   , checkSATAssuming
-  , pushContext
-  , popContext
+  , push
+  , pop
 
   -- * Inspecting models
   , Model
@@ -50,6 +51,7 @@ module ToySolver.SMT
 
   -- * Inspecting proofs
   , getUnsatAssumptions
+  , getUnsatCore
   ) where
 
 import qualified Control.Exception as E
@@ -182,9 +184,17 @@ data Solver
 
   , smtFDefs :: !(IORef (Map FSym FDef))
 
-  , smtContexts :: !(Vec.UVec SAT.Lit)
+  , smtNamedAssertions :: !(IORef (Map String SAT.Lit))
+  , smtAssertionStack :: !(Vec.Vec AssertionLevel)
 
   , smtUnsatAssumptions :: !(IORef [Expr])
+  , smtUnsatCore :: !(IORef [String])
+  }
+
+data AssertionLevel
+  = AssertionLevel
+  { alSavedNamedAssertions :: Map String SAT.Lit
+  , alSelector :: SAT.Lit
   }
 
 newSolver :: IO Solver
@@ -278,9 +288,12 @@ newSolver = do
         }
   SAT.setTheory sat tsolver
 
-  contexts <- Vec.new
+  named <- newIORef Map.empty
+
+  stack <- Vec.new
 
   unsatAssumptionsRef <- newIORef undefined
+  unsatCoreRef <- newIORef undefined
 
   return $
     Solver
@@ -299,8 +312,10 @@ newSolver = do
 
     , smtFDefs = fdefs
 
-    , smtContexts = contexts
+    , smtNamedAssertions = named
+    , smtAssertionStack = stack
     , smtUnsatAssumptions = unsatAssumptionsRef
+    , smtUnsatCore = unsatCoreRef
     }
 
 declareSSym :: Solver -> String -> Int -> IO SSym
@@ -374,12 +389,17 @@ declareConst solver name s = declareFun solver name [] s
 assert :: Solver -> Expr -> IO ()
 assert solver e = do
   formula <- exprToFormula solver e
-  n <- Vec.getSize (smtContexts solver)
+  n <- Vec.getSize (smtAssertionStack solver)
   if n>0 then do
-    lit <- Vec.peek (smtContexts solver)
-    Tseitin.addFormula (smtEnc solver) $ Atom lit .=>. formula
+    assertionLevel <- Vec.peek (smtAssertionStack solver)
+    Tseitin.addFormula (smtEnc solver) $ Atom (alSelector assertionLevel) .=>. formula
   else
     Tseitin.addFormula (smtEnc solver) formula
+
+assertNamed :: Solver -> String -> Expr -> IO ()
+assertNamed solver name e = do
+  lit <- Tseitin.encodeFormula (smtEnc solver) =<< exprToFormula solver e
+  modifyIORef (smtNamedAssertions solver) (Map.insert name lit)
 
 exprSort :: Solver -> Expr -> IO Sort
 exprSort solver (EFrac _) = return (Sort SSymReal [])
@@ -666,50 +686,62 @@ connectBoolTerm solver lit t = do
 -- -------------------------------------------------------------------
 
 checkSAT :: Solver -> IO Bool
-checkSAT solver = do  
-  l <- getContextLit solver
-  SAT.solveWith (smtSAT solver) [l]
+checkSAT solver = checkSATAssuming solver []
 
 checkSATAssuming :: Solver -> [Expr] -> IO Bool
 checkSATAssuming solver xs = do
   l <- getContextLit solver
+  named <- readIORef (smtNamedAssertions solver) 
+
   ref <- newIORef IntMap.empty
   ls <- forM xs $ \x -> do
     b <- Tseitin.encodeFormula (smtEnc solver) =<< exprToFormula solver x
     modifyIORef ref (IntMap.insert b x)
     return b
-  ret <- SAT.solveWith (smtSAT solver) (l : ls)
-  if ret then
+
+  ret <- SAT.solveWith (smtSAT solver) (l : ls ++ Map.elems named)
+  if ret then do
     writeIORef (smtUnsatAssumptions solver) undefined
+    writeIORef (smtUnsatCore solver) undefined
   else do
-    m <- readIORef ref
+    m1 <- readIORef ref
+    let m2 = IntMap.fromList [(lit, name) | (name, lit) <- Map.toList named]
     failed <- SAT.getFailedAssumptions (smtSAT solver)
-    writeIORef (smtUnsatAssumptions solver) $ catMaybes [IntMap.lookup l m | l <- failed]
+    writeIORef (smtUnsatAssumptions solver) $ catMaybes [IntMap.lookup l m1 | l <- failed]
+    writeIORef (smtUnsatCore solver) $ catMaybes [IntMap.lookup l m2 | l <- failed]
   return ret
 
 getContextLit :: Solver -> IO SAT.Lit
 getContextLit solver = do
-  n <- Vec.getSize (smtContexts solver)
-  if n>0 then
-    Vec.peek (smtContexts solver)
+  n <- Vec.getSize (smtAssertionStack solver)
+  if n>0 then do
+    assertionLevel <- Vec.peek (smtAssertionStack solver)
+    return $ alSelector assertionLevel
   else
     Tseitin.encodeConj (smtEnc solver) [] -- true
 
-pushContext :: Solver -> IO ()
-pushContext solver = do
+push :: Solver -> IO ()
+push solver = do
   l1 <- getContextLit solver
   l2 <- SAT.newVar (smtSAT solver)
   SAT.addClause (smtSAT solver) [-l2, l1] -- l2 → l1
-  Vec.push (smtContexts solver) l2
+  named <- readIORef (smtNamedAssertions solver)
+  let newLevel =
+        AssertionLevel
+        { alSavedNamedAssertions = named
+        , alSelector = l2
+        }  
+  Vec.push (smtAssertionStack solver) newLevel
 
-popContext :: Solver -> IO ()
-popContext solver = do
-  n <- Vec.getSize (smtContexts solver)
+pop :: Solver -> IO ()
+pop solver = do
+  n <- Vec.getSize (smtAssertionStack solver)
   if n==0 then
-    E.throwIO $ Error $ "assertion stack is empty"
+    E.throwIO $ Error $ "cannot pop first assertion level"
   else do
-    l <- Vec.unsafePop (smtContexts solver)
-    SAT.addClause (smtSAT solver) [-l]
+    assertionLevel <- Vec.unsafePop (smtAssertionStack solver)
+    SAT.addClause (smtSAT solver) [- alSelector assertionLevel]
+    writeIORef (smtNamedAssertions solver) (alSavedNamedAssertions assertionLevel)
     return ()
 
 -- -------------------------------------------------------------------
@@ -810,6 +842,10 @@ valToEntity m (ValRational r) =
 getUnsatAssumptions :: Solver -> IO [Expr]
 getUnsatAssumptions solver = do
   readIORef (smtUnsatAssumptions solver)
+
+getUnsatCore :: Solver -> IO [String]
+getUnsatCore solver = do
+  readIORef (smtUnsatCore solver)
 
 -- -------------------------------------------------------------------
 
