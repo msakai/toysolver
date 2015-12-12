@@ -35,8 +35,11 @@ module Solver
   -- ** Introducing new symbols
   , declareSort
   , defineSort
+  , declareConst
   , declareFun
   , defineFun
+  , defineFunRec
+  , defineFunsRec
 
   -- ** Asserting and inspecting formulas
   , assert
@@ -49,6 +52,7 @@ module Solver
   -- ** Inspecting models
   , getValue
   , getAssignment
+  , getModel
 
   -- ** Inspecting proofs
   , getProof
@@ -236,15 +240,9 @@ printResponse solver rsp = do
     hPutStrLn h (showSL rsp)
 
 runCommand :: Solver -> Command -> IO CmdResponse
-runCommand solver cmd = E.handle h $
+runCommand solver cmd = E.handle h $ do
+  putStrLn $ showSL cmd
   case cmd of
-    -- FIXME: unsupported commands
-    -- * reset-assertions
-    -- * declare-const, define-fun-rec, define-funs-rec
-    -- * get-model
-    -- * get-unsat-assumptions
-    -- * reset
-    -- * echo
     SetLogic logic -> const (CmdGenResponse Success) <$> setLogic solver logic
     SetOption opt -> const (CmdGenResponse Success) <$> setOption solver opt
     GetOption s -> CmdGetOptionResponse <$> getOption solver s
@@ -254,17 +252,24 @@ runCommand solver cmd = E.handle h $
     Pop n -> const (CmdGenResponse Success) <$> pop solver n
     DeclareSort name arity -> const (CmdGenResponse Success) <$> declareSort solver name arity
     DefineSort name xs body -> const (CmdGenResponse Success) <$> defineSort solver name xs body
+    DeclareConst name y -> const (CmdGenResponse Success) <$> declareConst solver name y
     DeclareFun name xs y -> const (CmdGenResponse Success) <$> declareFun solver name xs y
     DefineFun name xs y body -> const (CmdGenResponse Success) <$> defineFun solver name xs y body
+    DefineFunRec name xs y body -> const (CmdGenResponse Success) <$> defineFunRec solver name xs y body
+    DefineFunsRec fundecs terms -> const (CmdGenResponse Success) <$> defineFunsRec solver fundecs terms
     Assert tm -> const (CmdGenResponse Success) <$> assert solver tm
     GetAssertions -> CmdGetAssertionsResponse <$> getAssertions solver
     CheckSat -> CmdCheckSatResponse <$> checkSat solver
     CheckSatAssuming ts -> CmdCheckSatResponse <$> checkSatAssuming solver ts
     GetValue ts -> CmdGetValueResponse <$> getValue solver ts
     GetAssignment -> CmdGetAssignmentResponse <$> getAssignment solver
+    GetModel -> CmdGetModelResponse <$> getModel solver
     GetProof -> CmdGetProofResponse <$> getProof solver
     GetUnsatCore -> CmdGetUnsatCoreResponse <$> getUnsatCore solver
     GetUnsatAssumptions -> CmdGetUnsatAssumptionsResponse <$> getUnsatAssumptions solver  
+    Reset -> const (CmdGenResponse Success) <$> reset solver
+    ResetAssertions -> const (CmdGenResponse Success) <$> resetAssertions solver
+    Echo s -> CmdEchoResponse <$> echo solver s
     Exit -> const (CmdGenResponse Success) <$> exit solver
   where
     h SMT.Unsupported = return (CmdGenResponse Unsupported)
@@ -358,6 +363,16 @@ setOption solver opt = do
         E.throwIO $ SMT.Error "produce-assignments option can be set only in start mode"
       writeIORef (svProduceAssignmentRef solver) b
       return ()
+    ProduceAssertions _b ->
+      if mode /= ModeStart then
+        E.throwIO $ SMT.Error "produce-assertions option can be set only in start mode"
+      else
+        E.throwIO SMT.Unsupported
+    GlobalDeclarations _b ->
+      if mode /= ModeStart then
+        E.throwIO $ SMT.Error "global-declarations option can be set only in start mode"
+      else
+        E.throwIO SMT.Unsupported
     RegularOutputChannel fname -> do
       h <- if fname == "stdout" then
              return stdout
@@ -378,17 +393,7 @@ setOption solver opt = do
       else
         E.throwIO SMT.Unsupported
     Verbosity _lv -> E.throwIO SMT.Unsupported
-    OptionAttr (AttributeVal "produce-assertions" _) -> do
-      if mode /= ModeStart then
-        E.throwIO $ SMT.Error "produce-assertions option can be set only in start mode"
-      else
-        E.throwIO SMT.Unsupported
-    OptionAttr (AttributeVal "global-declarations" _) -> do
-      if mode /= ModeStart then
-        E.throwIO $ SMT.Error "global-declarations option can be set only in start mode"
-      else
-        E.throwIO SMT.Unsupported
-    OptionAttr (AttributeVal "reproducible-resource-limit" _) -> do
+    ReproducibleResourceLimit _val -> do
       if mode /= ModeStart then
         E.throwIO $ SMT.Error "reproducible-resource-limit option can be set only in start mode"
       else
@@ -489,10 +494,8 @@ resetAssertions solver = do
   cs <- readIORef (svSavedContextsRef solver)
   pop solver (length cs)
 
-echo :: Solver -> String -> IO ()
-echo solver s = do
-  (_,h) <- readIORef (svRegularOutputChannelRef solver)
-  hPrint h s -- "simply prints back s as is—including the surrounding double-quotes"
+echo :: Solver -> String -> IO String
+echo solver s = return s
 
 declareSort :: Solver -> String -> Int -> IO ()
 declareSort solver name arity = do
@@ -506,6 +509,9 @@ defineSort solver name xs body = do
   (_, senv) <- readIORef (svEnvRef solver)
   insertSort solver name (SortDef senv xs body)
   writeIORef (svModeRef solver) ModeAssert
+
+declareConst :: Solver -> String -> Sort -> IO ()
+declareConst solver name y = declareFun solver name [] y
 
 declareFun :: Solver -> String -> [Sort] -> Sort -> IO ()
 declareFun solver name xs y = do
@@ -530,6 +536,14 @@ defineFun solver name xs y body = do
     (fenv, _) <- readIORef (svEnvRef solver)
     insertFun solver name (EFunDef fenv xs' y' body)
   writeIORef (svModeRef solver) ModeAssert
+
+defineFunRec :: Solver -> String -> [SortedVar] -> Sort -> Term -> IO ()
+defineFunRec _solver _name _xs _y _body = do
+  E.throwIO SMT.Unsupported
+
+defineFunsRec :: Solver -> [FunDec] -> [Term] -> IO ()
+defineFunsRec _solver _fundecs _terms = do
+  E.throwIO SMT.Unsupported
 
 assert :: Solver -> Term -> IO ()
 assert solver tm = do
@@ -613,7 +627,11 @@ getAssignment solver = do
           case v of
             (SMT.ValBool b) -> return [TValuationPair name b]
             _ -> E.throwIO $ SMT.Error "get-assignment: should not happen"
-      _ -> return []   
+      _ -> return []
+
+getModel :: Solver -> IO GetModelResponse
+getModel solver = do
+  E.throwIO SMT.Unsupported
 
 getProof :: Solver -> IO GetProofResponse
 getProof solver = do

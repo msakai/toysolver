@@ -1,0 +1,8 @@
+(set-logic QF_LRA)
+(declare-const b Bool)
+(echo "foo")
+(declare-const x Real)
+(echo "bar")
+(declare-const y Real)
+(echo "baz")
+(check-sat)

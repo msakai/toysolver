@@ -1,0 +1,5 @@
+(set-logic QF_LRA)
+(declare-const b Bool)
+(declare-const x Real)
+(declare-const y Real)
+(check-sat)
