@@ -47,16 +47,23 @@ instance ShowSL Command where
     " " ++ show val ++ ")"
   showSL (DefineSort str strs sort) = "(define-sort " ++ str ++
     " (" ++ unwords strs ++ ") " ++ showSL sort ++ ") "
+  showSL (DeclareConst str sort) = "(declare-fun  " ++ str ++
+    " " ++ showSL sort ++ ") "
   showSL (DeclareFun  str sorts sort) = "(declare-fun  " ++ str ++
     " ("  ++ joinA sorts ++ ") " ++ showSL sort ++ ") "
   showSL (DefineFun str srvs sort term) = "( define-fun "   ++ str ++
     " (" ++ joinA srvs ++ ") " ++ showSL sort ++ " " ++ showSL term ++ ")"
+  showSL (DefineFunRec str srvs sort term) = "(define-fun-rec "   ++ str ++
+    " (" ++ joinA srvs ++ ") " ++ showSL sort ++ " " ++ showSL term ++ ")"
+  showSL (DefineFunsRec fundecs terms) = "(define-fun-recs " ++
+    " (" ++ joinA fundecs ++ ") (" ++ joinA terms ++ "))"
   showSL (Push n) = "(push " ++ show n ++ ")"
   showSL (Pop n) = "(pop " ++show n ++ ")"
   showSL (Assert term) = "(assert " ++ showSL term ++ ")"
   showSL CheckSat = "(check-sat)"
   showSL (CheckSatAssuming terms) = "(check-sat-assuming (" ++ joinA terms ++ "))"
   showSL GetAssertions = "(get-assertions)"
+  showSL GetModel = "(get-model)"
   showSL GetProof = "(get-proof)"
   showSL GetUnsatCore = "(get-unsat-core)"
   showSL GetUnsatAssumptions = "(get-unsat-assumptions)"
@@ -64,6 +71,9 @@ instance ShowSL Command where
   showSL GetAssignment =  "(get-assignment)"
   showSL (GetOption opt) = "(get-option " ++ opt ++ ")"
   showSL (GetInfo info) = "(get-info " ++ showSL info ++ ")"
+  showSL Reset = "(reset)"
+  showSL ResetAssertions = "(reset-assertions)"
+  showSL (Echo str) = "(echo " ++ str ++ ")"
   showSL Exit = "(exit)"
 
 
@@ -80,10 +90,13 @@ instance ShowSL Option where
   showSL (ProduceUnsatAssumptions b) = ":produce-unsat-assumptions " ++  showSL b
   showSL (ProduceModels b) = ":produce-models " ++ showSL b
   showSL (ProduceAssignments b) = ":produce-assignments " ++ showSL b
+  showSL (ProduceAssertions b) = ":produce-assertions " ++ showSL b
+  showSL (GlobalDeclarations b) = ":global-declarations " ++ showSL b
   showSL (RegularOutputChannel s) = ":regular-output-channel " ++ s
   showSL (DiagnosticOutputChannel s) = ":diagnostic-output-channel " ++ s
   showSL (RandomSeed n) = ":random-seed " ++ show n
-  showSL (Verbosity n) = ":verbosity'" ++ show n
+  showSL (Verbosity n) = ":verbosity " ++ show n
+  showSL (ReproducibleResourceLimit n) = ":reproducible-resource-limit " ++ show n
   showSL (OptionAttr attr) = show attr
 
 instance ShowSL InfoFlags where
@@ -122,6 +135,10 @@ instance ShowSL QualIdentifier where
   showSL (QIdentifier iden) = showSL iden
   showSL (QIdentifierAs iden sort) =
     "(as " ++ showSL iden ++ " " ++ showSL sort ++ ")"
+
+instance ShowSL FunDec where
+  showSL (FunDec str srvs sort) =
+    "(" ++ str ++ " (" ++ joinA srvs ++ ") " ++ showSL sort ++ ")"
 
 instance ShowSL AttrValue where
   showSL (AttrValueConstant spc) = showSL spc
@@ -173,7 +190,9 @@ instance ShowSL CmdResponse where
   showSL (CmdGetUnsatCoreResponse x) = "(" ++ unwords x ++ ")"
   showSL (CmdGetUnsatAssumptionsResponse terms) = "(" ++  joinA terms ++ ")"
   showSL (CmdGetValueResponse x) = "(" ++ joinA x ++ ")"
+  showSL (CmdGetModelResponse cmds) = "(" ++ joinA cmds ++ ")"
   showSL (CmdGetOptionResponse x) = showSL x
+  showSL (CmdEchoResponse x) = x
 
 
 instance ShowSL GenResponse where

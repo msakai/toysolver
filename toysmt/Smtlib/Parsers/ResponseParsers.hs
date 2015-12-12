@@ -17,6 +17,7 @@ import           Control.Applicative           as Ctr hiding ((<|>))
 import           Control.Monad
 import           Data.Functor.Identity
 import           Smtlib.Parsers.CommonParsers
+import           Smtlib.Parsers.CommandParsers
 import           Smtlib.Syntax.Syntax        as CmdRsp
 import           Text.Parsec.Prim              as Prim
 import           Text.ParserCombinators.Parsec as Pc
@@ -32,7 +33,9 @@ parseCmdResult = Pc.try parseCmdGenResponse
              <|> Pc.try parseCmdGetProof
              <|> Pc.try parseCmdGetProof
              <|> Pc.try parseCmdGetValueResponse
-             <|> parseCmdGetOptionResponse
+             <|> Pc.try parseCmdGetModelResponse
+             <|> Pc.try parseCmdGetOptionResponse
+             <|> Pc.try parseCmdEchoResponse
 
 {-
    #########################################################################
@@ -304,7 +307,24 @@ parseTValuationPair = do
     return $ TValuationPair symb bval
 
 
+{-
+   #########################################################################
+   #                                                                       #
+   #                       Parser Cmd Get model response                   #
+   #                                                                       #
+   #########################################################################
+-}
 
+
+parseCmdGetModelResponse :: ParsecT String u Identity CmdResponse
+parseCmdGetModelResponse = liftM CmdGetModelResponse parseGetModelResponse
+
+
+
+-- parse Get Model response
+parseGetModelResponse :: ParsecT String u Identity [Command]
+parseGetModelResponse =
+    aspO *> (Pc.many $ parseCommand <* Pc.try emptySpace) <* aspC
 
 
 {-
@@ -323,6 +343,23 @@ parseCmdGetOptionResponse = liftM CmdGetOptionResponse parseGetOptionResponse
 -- parse Get Option Response
 parseGetOptionResponse :: ParsecT String u Identity AttrValue
 parseGetOptionResponse = parseAttributeValue
+
+{-
+   #########################################################################
+   #                                                                       #
+   #                       Parser Cmd get option response                  #
+   #                                                                       #
+   #########################################################################
+-}
+
+
+parseCmdEchoResponse :: ParsecT String u Identity CmdResponse
+parseCmdEchoResponse = liftM CmdEchoResponse parseEchoResponse
+
+
+-- parse Echo Response
+parseEchoResponse :: ParsecT String u Identity EchoResponse
+parseEchoResponse = str
 
 {-
    #########################################################################
