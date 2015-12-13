@@ -17,7 +17,7 @@ import           Control.Applicative           as Ctr hiding ((<|>))
 import           Control.Monad
 import           Data.Functor.Identity
 import           Smtlib.Parsers.CommonParsers
-import           Smtlib.Parsers.CommandParsers
+import           Smtlib.Parsers.CommandsParsers
 import           Smtlib.Syntax.Syntax        as CmdRsp
 import           Text.Parsec.Prim              as Prim
 import           Text.ParserCombinators.Parsec as Pc
