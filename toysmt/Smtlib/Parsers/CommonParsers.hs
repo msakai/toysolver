@@ -69,7 +69,7 @@ bin = char '0' <|> char '1'
 --parse a String
 -- Dosent parse strings with escape characters
 str :: ParsecT String u Identity String
-str = string "\"" <++> Pc.many strChar <++> string "\""
+str = string "\"" <++> liftM concat (Pc.many (liftM (\c -> [c]) strChar <|> Pc.try (string "\"\""))) <++> string "\""
 
 strChar :: ParsecT String u Identity Char
 strChar = alphaNum
