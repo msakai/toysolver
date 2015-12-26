@@ -48,6 +48,7 @@ module ToySolver.SMT
   , Value (..)
   , getModel
   , eval
+  , valSort
 
   -- * Inspecting proofs
   , getUnsatAssumptions
@@ -402,17 +403,21 @@ assertNamed solver name e = do
   modifyIORef (smtNamedAssertions solver) (Map.insert name lit)
 
 exprSort :: Solver -> Expr -> IO Sort
-exprSort solver (EFrac _) = return (Sort SSymReal [])
-exprSort solver (EAp f xs)
-  | f `Set.member` Set.fromList ["true","false","and","or","not","=>","=",">=","<=",">","<"] = return (Sort SSymBool [])
-  | f `Set.member` Set.fromList ["+", "-", "*"] = return (Sort SSymReal [])
-  | f == "ite" = exprSort solver (xs !! 1)
-  | otherwise = do
-      fdefs <- readIORef (smtFDefs solver)
+exprSort solver e = do
+  fdefs <- readIORef (smtFDefs solver)
+  return $! exprSort' fdefs e
+
+exprSort' :: Map FSym FDef -> Expr -> Sort
+exprSort' _fdefs (EFrac _) = Sort SSymReal []
+exprSort' fdefs (EAp f xs)
+  | f `Set.member` Set.fromList ["true","false","and","or","not","=>","=",">=","<=",">","<"] = Sort SSymBool []
+  | f `Set.member` Set.fromList ["+", "-", "*"] = Sort SSymReal []
+  | f == "ite" = exprSort' fdefs (xs !! 1)
+  | otherwise =
       case fdefs Map.! f of
-        FBoolVar _ -> return (Sort SSymBool [])
-        FLRAVar _ -> return (Sort SSymReal [])
-        FEUFFun (_,s) _ -> return s
+        FBoolVar _ -> Sort SSymBool []
+        FLRAVar _ -> Sort SSymReal []
+        FEUFFun (_,s) _ -> s
 
 -- -------------------------------------------------------------------
                                               
@@ -762,7 +767,7 @@ data Model
 data Value
   = ValRational !Rational
   | ValBool !Bool
-  | ValUninterpreted !Int
+  | ValUninterpreted !Int !Sort
   deriving (Eq, Show)
 
 getModel :: Solver -> IO Model
@@ -806,7 +811,7 @@ eval m (EAp "/" [x,y])   = ValRational $ valToRational m (eval m x) / valToRatio
 eval m (EAp "=" [x,y])   = ValBool $
   case (eval m x, eval m y) of
     (v1, v2) -> v1 == v2
-eval m (EAp f xs) =
+eval m expr@(EAp f xs) =
   case Map.lookup f (mDefs m) of
     Nothing -> E.throw $ Error $ "unknown function symbol: " ++ show f
     Just (FBoolVar v) -> ValBool $ SAT.evalLit (mBoolModel m) v
@@ -814,7 +819,7 @@ eval m (EAp f xs) =
     Just (FEUFFun (_, Sort s []) sym) ->
       let e = EUF.evalAp (mEUFModel m) sym (map (valToEntity m . eval m) xs)
       in case s of
-           SSymUserDeclared _ _ -> ValUninterpreted e
+           SSymUserDeclared _ _ -> ValUninterpreted e (exprSort' (mDefs m) expr)
            SSymBool -> ValBool (e == mEUFTrue m)
            SSymReal ->
              case IntMap.lookup e (mEntityToRational m) of
@@ -830,12 +835,17 @@ valToRational _ (ValRational r) = r
 valToRational _ _ = E.throw $ Error "rational value is expected"
 
 valToEntity :: Model -> Value -> EUF.Entity
-valToEntity _ (ValUninterpreted e) = e
+valToEntity _ (ValUninterpreted e _) = e
 valToEntity m (ValBool b)     = if b then mEUFTrue m else mEUFFalse m
 valToEntity m (ValRational r) =
   case Map.lookup r (mRationalToEntity m) of
     Just e -> e
     Nothing -> EUF.mUnspecified (mEUFModel m)
+
+valSort :: Model -> Value -> Sort
+valSort _m (ValUninterpreted _e s) = s
+valSort _m (ValBool _b)     = sBool
+valSort _m (ValRational _r) = sReal
 
 -- -------------------------------------------------------------------
 

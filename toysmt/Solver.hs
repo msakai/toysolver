@@ -169,9 +169,15 @@ valueToTerm (SMT.ValRational v) =
           ]
 valueToTerm (SMT.ValBool b) =
   TermQualIdentifier $ QIdentifier $ ISymbol $ if b then "true" else "false"
-valueToTerm (SMT.ValUninterpreted n) =
-  TermQualIdentifier $ QIdentifier $ ISymbol $ "@" ++ show n
-                       
+valueToTerm (SMT.ValUninterpreted n s) =
+  TermQualIdentifier $ QIdentifierAs (ISymbol $ "@" ++ show n) (mkSort s)
+  where
+    mkSort :: SMT.Sort -> Sort
+    mkSort (SMT.Sort SMT.SSymBool []) = SortId (ISymbol "Bool")
+    mkSort (SMT.Sort SMT.SSymReal []) = SortId (ISymbol "Real")
+    mkSort (SMT.Sort (SMT.SSymUserDeclared name 0) []) = SortId (ISymbol name)
+    mkSort (SMT.Sort (SMT.SSymUserDeclared name _arity) xs) = SortIdentifiers (ISymbol name) (map mkSort xs)
+
 -- ----------------------------------------------------------------------
 
 data Solver
