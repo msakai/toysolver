@@ -91,13 +91,13 @@ type FSym = String
 data SSym
   = SSymBool
   | SSymReal
-  | SSymUserDefined String !Int
+  | SSymUserDeclared String !Int
   deriving (Show, Eq, Ord)
 
 ssymArity :: SSym -> Int
 ssymArity SSymBool = 0
 ssymArity SSymReal = 0
-ssymArity (SSymUserDefined _ ar) = ar
+ssymArity (SSymUserDeclared _ ar) = ar
 
 data Sort = Sort SSym [Sort]
   deriving (Show, Eq, Ord)
@@ -319,7 +319,7 @@ newSolver = do
     }
 
 declareSSym :: Solver -> String -> Int -> IO SSym
-declareSSym solver name arity = return (SSymUserDefined name arity)
+declareSSym solver name arity = return (SSymUserDeclared name arity)
 
 declareSort :: VASortFun a => Solver -> String -> Int -> IO a
 declareSort solver name arity = do
@@ -495,7 +495,7 @@ abstractEq solver e1 e2 = do
       e1' <- exprToLRAExpr solver e1
       e2' <- exprToLRAExpr solver e2
       liftM Atom $ abstractLRAAtom solver (e1' .==. e2')
-    (Sort (SSymUserDefined _ _) _) -> do
+    (Sort (SSymUserDeclared _ _) _) -> do
       e1' <- exprToEUFArg solver e1
       e2' <- exprToEUFArg solver e2
       liftM Atom $ abstractEUFAtom solver (e1',e2')
@@ -814,7 +814,7 @@ eval m (EAp f xs) =
     Just (FEUFFun (_, Sort s []) sym) ->
       let e = EUF.evalAp (mEUFModel m) sym (map (valToEntity m . eval m) xs)
       in case s of
-           SSymUserDefined _ _ -> ValUninterpreted e
+           SSymUserDeclared _ _ -> ValUninterpreted e
            SSymBool -> ValBool (e == mEUFTrue m)
            SSymReal ->
              case IntMap.lookup e (mEntityToRational m) of
