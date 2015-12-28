@@ -11,7 +11,7 @@ sudo apt-get install wine wget cabal-install
 
 if [ ! -f "$GHC_PATH" ]; then
   wget -c https://www.haskell.org/platform/download/$HPVER/HaskellPlatform-$HPVER-$HPARCH-setup.exe
-  wine HaskellPlatform-$HPVER-$HPARCH-setup.exe
+  wine HaskellPlatform-$HPVER-$HPARCH-setup.exe /S
 fi
 
 # https://plus.google.com/+MasahiroSakai/posts/RTXUt5MkVPt
