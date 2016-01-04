@@ -51,7 +51,7 @@ instance ShowSL Command where
     " " ++ showSL sort ++ ") "
   showSL (DeclareFun  str sorts sort) = "(declare-fun  " ++ str ++
     " ("  ++ joinA sorts ++ ") " ++ showSL sort ++ ") "
-  showSL (DefineFun str srvs sort term) = "( define-fun "   ++ str ++
+  showSL (DefineFun str srvs sort term) = "(define-fun "   ++ str ++
     " (" ++ joinA srvs ++ ") " ++ showSL sort ++ " " ++ showSL term ++ ")"
   showSL (DefineFunRec str srvs sort term) = "(define-fun-rec "   ++ str ++
     " (" ++ joinA srvs ++ ") " ++ showSL sort ++ " " ++ showSL term ++ ")"
@@ -151,7 +151,7 @@ instance ShowSL Attribute where
 
 instance ShowSL Identifier where
   showSL (ISymbol str) = str
-  showSL (I_Symbol str ns) = "( _ " ++ str ++ " " ++ joinNs ns  ++ ")"
+  showSL (I_Symbol str ns) = "(_ " ++ str ++ " " ++ joinNs ns  ++ ")"
 
 instance ShowSL Sort where
   showSL (SortId iden) = showSL iden
