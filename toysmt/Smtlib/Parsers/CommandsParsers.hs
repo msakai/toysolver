@@ -262,10 +262,12 @@ parsePush = do
   _ <- emptySpace
   _ <- string "push"
   _ <- emptySpace
-  nume <- numeral
-  _ <- emptySpace
+  nume <- option 1 $ do
+    nume <- numeral
+    _ <- emptySpace
+    return (read nume :: Int)
   _ <- aspC
-  return $ Push (read nume :: Int)
+  return $ Push nume
 
 
 parsePop :: ParsecT String u Identity Command
@@ -274,10 +276,12 @@ parsePop = do
   _ <- emptySpace
   _ <- string "pop"
   _ <- emptySpace
-  nume <- numeral
-  _ <- emptySpace
+  nume <- option 1 $ do
+    nume <- numeral
+    _ <- emptySpace
+    return (read nume :: Int)
   _ <- aspC
-  return $ Pop (read nume :: Int)
+  return $ Pop nume
 
 
 
