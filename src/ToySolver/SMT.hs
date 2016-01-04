@@ -49,6 +49,8 @@ module ToySolver.SMT
   , getModel
   , eval
   , valSort
+  , FunDef (..)
+  , evalFSym
 
   -- * Inspecting proofs
   , getUnsatAssumptions
@@ -842,10 +844,38 @@ valToEntity m (ValRational r) =
     Just e -> e
     Nothing -> EUF.mUnspecified (mEUFModel m)
 
+entityToValue :: Model -> EUF.Entity -> Sort -> Value
+entityToValue m e s = 
+  case s of
+    Sort SSymBool _ -> ValBool (e == mEUFTrue m)
+    Sort SSymReal _ ->
+      case IntMap.lookup e (mEntityToRational m) of
+        Just r -> ValRational r
+        Nothing -> ValRational (fromIntegral (1000000 + e))
+    Sort (SSymUserDeclared _ _) _ -> ValUninterpreted e s
+
 valSort :: Model -> Value -> Sort
 valSort _m (ValUninterpreted _e s) = s
 valSort _m (ValBool _b)     = sBool
 valSort _m (ValRational _r) = sReal
+
+data FunDef = FunDef [([Value], Value)] Value
+
+evalFSym :: Model -> FSym -> FunDef
+evalFSym m f = 
+  case Map.lookup f (mDefs m) of
+    Just (FEUFFun (argsSorts@(_:_), resultSort) sym) -> -- proper function symbol
+      let tbl = EUF.mFunctions (mEUFModel m) IntMap.! sym
+          defaultVal =
+            case resultSort of
+              Sort SSymReal [] -> ValRational 555555 -- Is it ok?
+              Sort SSymBool [] -> ValBool False -- Is it ok?
+              Sort (SSymUserDeclared _s _ar) _ss -> ValUninterpreted (EUF.mUnspecified (mEUFModel m)) resultSort
+      in FunDef [ (zipWith (entityToValue m) args argsSorts, entityToValue m result resultSort)
+                | (args, result) <- Map.toList tbl ]
+                defaultVal
+    Just _ -> FunDef [] $ eval m (EAp f []) -- constant symbol
+    Nothing -> E.throw $ Error $ "unknown function symbol: " ++ show f
 
 -- -------------------------------------------------------------------
 

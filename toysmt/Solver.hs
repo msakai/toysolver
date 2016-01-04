@@ -74,6 +74,7 @@ import Control.Monad
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe (catMaybes)
 import Data.Ratio
 import qualified Data.Version as V
 import Numeric (readFloat, readHex)
@@ -99,7 +100,8 @@ type SortEnv = Map String SortEntry
 type Env = (EEnv, SortEnv)
 
 data EEntry
-  = EFSym SMT.FSym
+  = EFSymBuiltin SMT.FSym
+  | EFSymDeclared SMT.FSym [SMT.Sort] SMT.Sort
   | EExpr SMT.Expr Bool
   | EFunDef EEnv [(String, SMT.Sort)] SMT.Sort Term
 
@@ -152,7 +154,8 @@ interpretFun env t =
       case Map.lookup (getName qid) env of
         Nothing -> error ("unknown function symbol: " ++ getName qid)
         Just (EExpr e _) -> e
-        Just (EFSym fsym) -> SMT.EAp fsym (map (interpretFun env) args)
+        Just (EFSymBuiltin fsym) -> SMT.EAp fsym (map (interpretFun env) args)
+        Just (EFSymDeclared fsym _ _) -> SMT.EAp fsym (map (interpretFun env) args)
         Just (EFunDef env' params _y body) ->
           interpretFun (Map.fromList [(p,a) | ((p,_s),a) <- zip params (map (\t -> EExpr (interpretFun env t) False) args) ] `Map.union` env') body
 
@@ -170,13 +173,13 @@ valueToTerm (SMT.ValRational v) =
 valueToTerm (SMT.ValBool b) =
   TermQualIdentifier $ QIdentifier $ ISymbol $ if b then "true" else "false"
 valueToTerm (SMT.ValUninterpreted n s) =
-  TermQualIdentifier $ QIdentifierAs (ISymbol $ "@" ++ show n) (mkSort s)
-  where
-    mkSort :: SMT.Sort -> Sort
-    mkSort (SMT.Sort SMT.SSymBool []) = SortId (ISymbol "Bool")
-    mkSort (SMT.Sort SMT.SSymReal []) = SortId (ISymbol "Real")
-    mkSort (SMT.Sort (SMT.SSymUserDeclared name 0) []) = SortId (ISymbol name)
-    mkSort (SMT.Sort (SMT.SSymUserDeclared name _arity) xs) = SortIdentifiers (ISymbol name) (map mkSort xs)
+  TermQualIdentifier $ QIdentifierAs (ISymbol $ "@" ++ show n) (sortToSortTerm s)
+
+sortToSortTerm :: SMT.Sort -> Sort
+sortToSortTerm (SMT.Sort SMT.SSymBool []) = SortId (ISymbol "Bool")
+sortToSortTerm (SMT.Sort SMT.SSymReal []) = SortId (ISymbol "Real")
+sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name 0) []) = SortId (ISymbol name)
+sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name _arity) xs) = SortIdentifiers (ISymbol name) (map sortToSortTerm xs)
 
 -- ----------------------------------------------------------------------
 
@@ -191,6 +194,7 @@ data Solver
   , svDiagnosticOutputChannelRef :: !(IORef (String, Handle))
   , svPrintSuccessRef :: !(IORef Bool)
   , svProduceAssignmentRef :: !(IORef Bool)
+  , svProduceModelsRef :: !(IORef Bool)
   , svProduceUnsatAssumptionsRef :: !(IORef Bool)
   , svProduceUnsatCoreRef :: !(IORef Bool)
   , svUnsatAssumptionsRef :: !(IORef [Term])
@@ -200,7 +204,7 @@ newSolver :: IO Solver
 newSolver = do
   solverRef <- newIORef =<< SMT.newSolver
   let fenv = Map.fromList
-        [ (name, EFSym name)
+        [ (name, EFSymBuiltin name)
         | name <- ["=", "true", "false", "not", "and", "or", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
         ]
       senv = Map.fromList
@@ -215,6 +219,7 @@ newSolver = do
   diagOutputRef <- newIORef ("stderr", stderr)
   printSuccessRef <- newIORef True
   produceAssignmentRef <- newIORef False
+  produceModelsRef <- newIORef False
   produceUnsatAssumptionsRef <- newIORef False
   produceUnsatCoreRef <- newIORef False  
   unsatAssumptionsRef <- newIORef undefined
@@ -230,6 +235,7 @@ newSolver = do
     , svDiagnosticOutputChannelRef = diagOutputRef
     , svPrintSuccessRef = printSuccessRef
     , svProduceAssignmentRef = produceAssignmentRef
+    , svProduceModelsRef = produceModelsRef
     , svProduceUnsatCoreRef = produceUnsatCoreRef
     , svProduceUnsatAssumptionsRef = produceUnsatAssumptionsRef
     }
@@ -289,7 +295,7 @@ reset :: Solver -> IO GenResponse
 reset solver = do
   writeIORef (svSMTSolverRef solver) =<< SMT.newSolver
   let fenv = Map.fromList
-        [ (name, EFSym name)
+        [ (name, EFSymBuiltin name)
         | name <- ["=", "true", "false", "not", "and", "or", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
         ]
       senv = Map.fromList
@@ -357,13 +363,11 @@ setOption solver opt = do
         E.throwIO $ SMT.Error "produce-unsat-assumptions option can be set only in start mode"
       writeIORef (svProduceUnsatAssumptionsRef solver) b
       return ()
-    ProduceModels b ->
-      if mode /= ModeStart then
+    ProduceModels b -> do
+      unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-models option can be set only in start mode"
-      else if b then
-        E.throwIO SMT.Unsupported
-      else
-        return ()
+      writeIORef (svProduceModelsRef solver) b
+      return ()
     ProduceAssignments b -> do
       unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-assignments option can be set only in start mode"
@@ -523,8 +527,10 @@ declareFun :: Solver -> String -> [Sort] -> Sort -> IO ()
 declareFun solver name xs y = do
   smt <- readIORef (svSMTSolverRef solver)
   (_, senv) <- readIORef (svEnvRef solver)
-  f <- SMT.declareFSym smt name (map (interpretSort senv) xs) (interpretSort senv y)
-  insertFun solver name (EFSym f)
+  let argsSorts = map (interpretSort senv) xs
+      resultSort = interpretSort senv y
+  f <- SMT.declareFSym smt name argsSorts resultSort
+  insertFun solver name (EFSymDeclared f argsSorts resultSort)
   writeIORef (svModeRef solver) ModeAssert
 
 defineFun :: Solver -> String -> [SortedVar] -> Sort -> Term -> IO ()
@@ -637,7 +643,34 @@ getAssignment solver = do
 
 getModel :: Solver -> IO GetModelResponse
 getModel solver = do
-  E.throwIO SMT.Unsupported
+  mode <- readIORef (svModeRef solver)
+  unless (mode == ModeSat) $ do
+    E.throwIO $ SMT.Error "get-model can only be used in sat mode"
+  smt <- readIORef (svSMTSolverRef solver)
+  m <- SMT.getModel smt
+  (env, _) <- readIORef (svEnvRef solver)
+  liftM catMaybes $ forM (Map.toList env) $ \(name, entry) -> do
+    case entry of
+      EFSymDeclared sym argsSorts resultSort -> do
+        case SMT.evalFSym m sym of
+          SMT.FunDef [] val ->  do -- constant
+            return $ Just $ DefineFun name [] (sortToSortTerm resultSort) (valueToTerm val)
+          SMT.FunDef tbl defaultVal -> do -- proper function
+            let argsSV :: [SortedVar]
+                argsSV = [SV ("x!" ++ show i) (sortToSortTerm s) | (i,s) <- zip [1..] argsSorts]
+                args :: [Term]
+                args = [TermQualIdentifier (QIdentifier (ISymbol x)) | SV x _ <- argsSV]
+                f :: ([SMT.Value], SMT.Value) -> Term -> Term
+                f (vals,val) tm = 
+                  TermQualIdentifierT (QIdentifier (ISymbol "ite")) [cond, valueToTerm val, tm]
+                  where
+                    cond =
+                      case zipWith (\arg val -> TermQualIdentifierT (QIdentifier (ISymbol "=")) [arg, valueToTerm val]) args vals of
+                        [c] -> c
+                        cs -> TermQualIdentifierT (QIdentifier (ISymbol "and")) cs
+            return $ Just $ DefineFun name argsSV (sortToSortTerm resultSort) $
+              foldr f (valueToTerm defaultVal) tbl
+      _ -> return Nothing
 
 getProof :: Solver -> IO GetProofResponse
 getProof solver = do
