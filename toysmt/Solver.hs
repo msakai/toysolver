@@ -457,7 +457,7 @@ getInfo :: Solver -> InfoFlags -> IO GetInfoResponse
 getInfo solver flags = do
   mode <- readIORef (svModeRef solver)
   case flags of
-    ErrorBehavior -> return [ResponseErrorBehavior ImmediateExit]
+    ErrorBehavior -> return [ResponseErrorBehavior ContinuedExecution]
     Name -> return [ResponseName "toysmt"]
     Authors -> return [ResponseName "Masahiro Sakai"]
     Version -> return [ResponseVersion (V.showVersion version)]
