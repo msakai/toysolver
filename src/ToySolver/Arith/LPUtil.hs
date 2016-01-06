@@ -67,7 +67,7 @@ toStandardForm' (obj, cs) = m
                 return $ IM.singleton v (LA.var v1 ^-^ LA.constant lb)
       let obj2 = LA.applySubst s obj
 
-      cs2 <- liftM concat $ forM cs $ \(OrdRel lhs op rhs) -> do
+      cs2 <- liftM catMaybes $ forM cs $ \(OrdRel lhs op rhs) -> do
         case LA.extract LA.unitVar (LA.applySubst s (lhs ^-^ rhs)) of
           (c,e) -> do
             let (lhs2,op2,rhs2) =
@@ -75,16 +75,16 @@ toStandardForm' (obj, cs) = m
                   then (e,op,-c)
                   else (negateV e, flipOp op, c)
             case op2 of
-              Eql -> return [(lhs2,rhs2)]
+              Eql -> return $ Just (lhs2,rhs2)
               Le  -> do
                 v <- gensym
-                return [(lhs2 ^+^ LA.var v, rhs2)]
+                return $ Just (lhs2 ^+^ LA.var v, rhs2)
               Ge  -> do
                 case LA.terms lhs2 of
-                  [(1,_)] | rhs2<=0 -> return []
+                  [(1,_)] | rhs2<=0 -> return Nothing
                   _ -> do
                     v <- gensym
-                    return [(lhs2 ^-^ LA.var v, rhs2)]
+                    return $ Just (lhs2 ^-^ LA.var v, rhs2)
               _   -> error $ "ToySolver.LPUtil.toStandardForm: " ++ show op2 ++ " is not supported"
 
       assert (and [isNothing $ LA.lookupCoeff LA.unitVar c | (c,_) <- cs2]) $ return ()

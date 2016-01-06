@@ -71,7 +71,7 @@ checkRealByVS vs as = isJust $ VS.solve vs as
 checkRealBySimplex :: VarSet -> [LA.Atom Rational] -> Bool
 checkRealBySimplex vs as = unsafePerformIO $ do
   solver <- Simplex2.newSolver
-  s <- liftM IM.fromList $ forM (IS.toList vs) $ \v -> do
+  s <- liftM IM.fromAscList $ forM (IS.toAscList vs) $ \v -> do
     v2 <- Simplex2.newVar solver
     return (v, LA.var v2)
   forM_ as $ \a -> do

@@ -657,7 +657,7 @@ getModel solver = do
             return $ Just $ DefineFun name [] (sortToSortTerm resultSort) (valueToTerm val)
           SMT.FunDef tbl defaultVal -> do -- proper function
             let argsSV :: [SortedVar]
-                argsSV = [SV ("x!" ++ show i) (sortToSortTerm s) | (i,s) <- zip [1..] argsSorts]
+                argsSV = [SV ("x!" ++ show i) (sortToSortTerm s) | (i,s) <- zip [(1::Int)..] argsSorts]
                 args :: [Term]
                 args = [TermQualIdentifier (QIdentifier (ISymbol x)) | SV x _ <- argsSV]
                 f :: ([SMT.Value], SMT.Value) -> Term -> Term
