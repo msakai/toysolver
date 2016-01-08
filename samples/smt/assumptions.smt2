@@ -1,4 +1,5 @@
 (set-option :produce-unsat-assumptions true)
+(get-option :produce-unsat-assumptions)
 (set-logic QF_UF)
 (declare-fun a () Bool)
 (declare-fun b () Bool)

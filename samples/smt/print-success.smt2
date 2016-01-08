@@ -1,0 +1,8 @@
+(set-logic QF_UF)
+(get-option :print-success)
+(declare-fun a () Bool)
+(set-option :print-success false)
+(get-option :print-success)
+(declare-fun b () Bool)
+(assert (or a b))
+(check-sat)

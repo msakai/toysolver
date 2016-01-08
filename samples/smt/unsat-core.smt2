@@ -2,7 +2,8 @@
 ; φ= (x1) ∧ (¬x1) ∧ (¬x1∨x2) ∧ (¬x2) ∧ (¬x1∨x3) ∧ (¬x3)
 ; MUSes(φ) = {{C1, C2}, {C1, C3, C4}, {C1, C5, C6}}
 ; MCSes(φ) = {{C1}, {C2, C3, C5}, {C2, C3, C6}, {C2, C4, C5}, {C2, C4, C6}}
-(set-option :produce-unsat-assumptions true)
+(set-option :produce-unsat-cores true)
+(get-option :produce-unsat-cores)
 (set-logic QF_UF)
 (declare-fun x1 () Bool)
 (declare-fun x2 () Bool)

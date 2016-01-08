@@ -1,5 +1,6 @@
 (set-option :produce-assertions true)
 ; (set-option :interactive-mode true)
+(get-option :produce-assertions)
 (set-logic QF_UF)
 (declare-fun a () Bool)
 (declare-fun b () Bool)

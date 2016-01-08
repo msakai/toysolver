@@ -422,46 +422,48 @@ setOption solver opt = do
 getOption :: Solver -> String -> IO GetOptionResponse
 getOption solver opt =
   case opt of
-    "expand-definitions" -> do
+    ":expand-definitions" -> do
       -- expand-definitions has been removed in SMT-LIB 2.5.
       E.throwIO SMT.Unsupported -- FIXME?
-    "global-declarations" ->
-      return $ AttrValueSymbol "false" -- default value
-    "interactive-mode" -> do
+    ":global-declarations" -> do
+      let b = False -- default value
+      return $ AttrValueSymbol (showSL b)
+    ":interactive-mode" -> do
       -- interactive-mode is the old name for produce-assertions. Deprecated.
-      b <- readIORef (svProduceAssignmentRef solver)
-      return $ AttrValueSymbol (if b then "true" else "false")
-    "print-success" -> do
+      b <- readIORef (svProduceAssertionsRef solver)
+      return $ AttrValueSymbol (showSL b)
+    ":print-success" -> do
       b <- readIORef (svPrintSuccessRef solver)
-      return $ AttrValueSymbol $ if b then "true" else "false"
-    "produce-assertions" -> do
+      return $ AttrValueSymbol (showSL b) 
+    ":produce-assertions" -> do
+      b <- readIORef (svProduceAssertionsRef solver)
+      return $ AttrValueSymbol (showSL b)
+    ":produce-assignments" -> do
       b <- readIORef (svProduceAssignmentRef solver)
-      return $ AttrValueSymbol (if b then "true" else "false")
-    "produce-assignments" -> do
-      b <- readIORef (svProduceAssignmentRef solver)
-      return $ AttrValueSymbol (if b then "true" else "false")
-    "produce-models" -> do
+      return $ AttrValueSymbol (showSL b)
+    ":produce-models" -> do
       b <- readIORef (svProduceModelsRef solver)
-      return $ AttrValueSymbol (if b then "true" else "false")
-    "produce-proofs" -> do
-      return $ AttrValueSymbol "false" -- default value
-    "produce-unsat-cores" -> do
+      return $ AttrValueSymbol (showSL b)
+    ":produce-proofs" -> do
+      let b = False -- default value
+      return $ AttrValueSymbol (showSL b)
+    ":produce-unsat-cores" -> do
       b <- readIORef (svProduceUnsatCoreRef solver)
-      return $ AttrValueSymbol (if b then "true" else "false")
-    "produce-unsat-assumptions" -> do
+      return $ AttrValueSymbol (showSL b)
+    ":produce-unsat-assumptions" -> do
       b <- readIORef (svProduceUnsatAssumptionsRef solver)
-      return $ AttrValueSymbol (if b then "true" else "false")
-    "regular-output-channel" -> do
+      return $ AttrValueSymbol (showSL b)
+    ":regular-output-channel" -> do
       (fname,_) <- readIORef (svRegularOutputChannelRef solver)
       return $ AttrValueConstant (SpecConstantString fname)
-    "diagnostic-output-channel" -> do
+    ":diagnostic-output-channel" -> do
       (fname,_) <- readIORef (svDiagnosticOutputChannelRef solver)
       return $ AttrValueConstant (SpecConstantString fname)
-    "random-seed" -> do
+    ":random-seed" -> do
       return $ AttrValueConstant (SpecConstantNumeral 0) -- default value
-    "reproducible-resource-limit" -> do
+    ":reproducible-resource-limit" -> do
       return $ AttrValueConstant (SpecConstantNumeral 0) -- default value
-    "verbosity" -> do
+    ":verbosity" -> do
       return $ AttrValueConstant (SpecConstantNumeral 0) -- default value
     _ -> do
       E.throwIO SMT.Unsupported

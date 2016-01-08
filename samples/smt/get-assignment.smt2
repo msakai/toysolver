@@ -1,4 +1,5 @@
 (set-option :produce-assignments true)
+(get-option :produce-assignments)
 (set-logic QF_UF)
 (declare-fun a () Bool)
 (declare-fun b () Bool)
