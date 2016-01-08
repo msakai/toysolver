@@ -189,7 +189,7 @@ data Solver
   { svSMTSolverRef :: !(IORef SMT.Solver)
   , svEnvRef :: !(IORef Env)
   , svModeRef :: !(IORef Mode)
-  , svSavedContextsRef :: !(IORef [(EEnv, SortEnv, [Term])])
+  , svSavedContextsRef :: !(IORef [(Maybe (EEnv, SortEnv), [Term])])
   , svInfoRef :: IORef [Attribute]
   , svAssertionsRef :: IORef [Term]
   , svRegularOutputChannelRef :: !(IORef (String, Handle))
@@ -200,6 +200,7 @@ data Solver
   , svProduceModelsRef :: !(IORef Bool)
   , svProduceUnsatAssumptionsRef :: !(IORef Bool)
   , svProduceUnsatCoresRef :: !(IORef Bool)
+  , svGlobalDeclarationsRef :: !(IORef Bool)
   , svUnsatAssumptionsRef :: !(IORef [Term])
   }
 
@@ -227,6 +228,7 @@ newSolver = do
   produceModelsRef <- newIORef False
   produceUnsatAssumptionsRef <- newIORef False
   produceUnsatCoresRef <- newIORef False  
+  globalDeclarationsRef <- newIORef False
   unsatAssumptionsRef <- newIORef undefined
   return $
     Solver
@@ -245,6 +247,7 @@ newSolver = do
     , svProduceModelsRef = produceModelsRef
     , svProduceUnsatCoresRef = produceUnsatCoresRef
     , svProduceUnsatAssumptionsRef = produceUnsatAssumptionsRef
+    , svGlobalDeclarationsRef = globalDeclarationsRef
     }
 
 execCommand :: Solver -> Command -> IO ()
@@ -387,11 +390,12 @@ setOption solver opt = do
         E.throwIO $ SMT.Error "produce-assertions option can be set only in start mode"
       writeIORef (svProduceAssertionsRef solver) b
       return ()
-    GlobalDeclarations _b ->
-      if mode /= ModeStart then
+    GlobalDeclarations b -> do
+      unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "global-declarations option can be set only in start mode"
-      else
-        E.throwIO SMT.Unsupported
+      writeIORef (svGlobalDeclarationsRef solver) b
+      smt <- readIORef (svSMTSolverRef solver)
+      SMT.setGlobalDeclarations smt b
     RegularOutputChannel fname -> do
       h <- if fname == "stdout" then
              return stdout
@@ -427,7 +431,7 @@ getOption solver opt =
       let b = False
       return $ AttrValueSymbol (showSL b)
     ":global-declarations" -> do
-      let b = False -- default value
+      b <- readIORef (svGlobalDeclarationsRef solver)
       return $ AttrValueSymbol (showSL b)
     ":interactive-mode" -> do
       -- interactive-mode is the old name for produce-assertions. Deprecated.
@@ -504,7 +508,11 @@ push solver n = do
   replicateM_ n $ do
     (env,senv) <- readIORef (svEnvRef solver)
     assertions <- readIORef (svAssertionsRef solver)
-    modifyIORef (svSavedContextsRef solver) ((env,senv,assertions) :)
+    globalDeclarations <- readIORef (svGlobalDeclarationsRef solver)
+    if globalDeclarations then
+      modifyIORef (svSavedContextsRef solver) ((Nothing, assertions) :)
+    else
+      modifyIORef (svSavedContextsRef solver) ((Just (env,senv), assertions) :)
     SMT.push =<< readIORef (svSMTSolverRef solver)
     writeIORef (svModeRef solver) ModeAssert
 
@@ -514,8 +522,10 @@ pop solver n = do
     cs <- readIORef (svSavedContextsRef solver)
     case cs of
       [] -> E.throwIO $ SMT.Error "pop from empty context"
-      ((env,senv,assertions) : cs) -> do
-        writeIORef (svEnvRef solver) (env,senv)
+      ((m,assertions) : cs) -> do
+        case m of
+          Just (env,senv) -> writeIORef (svEnvRef solver) (env,senv)
+          Nothing -> return ()
         writeIORef (svAssertionsRef solver) assertions
         writeIORef (svSavedContextsRef solver) cs
         SMT.pop =<< readIORef (svSMTSolverRef solver)

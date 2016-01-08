@@ -36,6 +36,8 @@ module ToySolver.SMT
   , VAFun
   , assert
   , assertNamed
+  , getGlobalDeclarations
+  , setGlobalDeclarations
 
   -- * Solving
   , checkSAT
@@ -185,8 +187,8 @@ data Solver
   , smtEUFFalse :: !EUF.Term
   , smtEUFModel :: !(IORef EUF.Model)
 
+  , smtGlobalDeclarationsRef :: !(IORef Bool)
   , smtFDefs :: !(IORef (Map FSym FDef))
-
   , smtNamedAssertions :: !(IORef (Map String SAT.Lit))
   , smtAssertionStack :: !(Vec.Vec AssertionLevel)
 
@@ -197,6 +199,7 @@ data Solver
 data AssertionLevel
   = AssertionLevel
   { alSavedNamedAssertions :: Map String SAT.Lit
+  , alSavedFDefs :: Maybe (Map FSym FDef)
   , alSelector :: SAT.Lit
   }
 
@@ -224,6 +227,7 @@ newSolver = do
 
   eufModelRef <- newIORef (undefined :: EUF.Model)
 
+  globalDeclarationsRef <- newIORef False
   fdefs <- newIORef Map.empty
 
   conflictTheory <- newIORef True
@@ -313,10 +317,11 @@ newSolver = do
     , smtEUFFalse = eufFalse
     , smtEUFModel = eufModelRef
 
+    , smtGlobalDeclarationsRef = globalDeclarationsRef
     , smtFDefs = fdefs
-
     , smtNamedAssertions = named
     , smtAssertionStack = stack
+
     , smtUnsatAssumptions = unsatAssumptionsRef
     , smtUnsatCore = unsatCoreRef
     }
@@ -400,6 +405,12 @@ assertNamed :: Solver -> String -> Expr -> IO ()
 assertNamed solver name e = do
   lit <- Tseitin.encodeFormula (smtEnc solver) =<< exprToFormula solver e
   modifyIORef (smtNamedAssertions solver) (Map.insert name lit)
+
+getGlobalDeclarations :: Solver -> IO Bool
+getGlobalDeclarations solver = readIORef (smtGlobalDeclarationsRef solver)
+
+setGlobalDeclarations :: Solver -> Bool -> IO ()
+setGlobalDeclarations solver = writeIORef (smtGlobalDeclarationsRef solver)
 
 exprSort :: Solver -> Expr -> IO Sort
 exprSort solver e = do
@@ -729,10 +740,13 @@ push solver = do
   l1 <- getContextLit solver
   l2 <- SAT.newVar (smtSAT solver)
   SAT.addClause (smtSAT solver) [-l2, l1] -- l2 → l1
+  globalDeclarations <- readIORef (smtGlobalDeclarationsRef solver)
   named <- readIORef (smtNamedAssertions solver)
+  fdefs <- readIORef (smtFDefs solver)
   let newLevel =
         AssertionLevel
         { alSavedNamedAssertions = named
+        , alSavedFDefs = if globalDeclarations then Nothing else Just fdefs
         , alSelector = l2
         }  
   Vec.push (smtAssertionStack solver) newLevel
@@ -746,6 +760,9 @@ pop solver = do
     assertionLevel <- Vec.unsafePop (smtAssertionStack solver)
     SAT.addClause (smtSAT solver) [- alSelector assertionLevel]
     writeIORef (smtNamedAssertions solver) (alSavedNamedAssertions assertionLevel)
+    case alSavedFDefs assertionLevel of
+      Nothing -> return ()
+      Just fdefs -> writeIORef (smtFDefs solver) fdefs
     return ()
 
 -- -------------------------------------------------------------------
