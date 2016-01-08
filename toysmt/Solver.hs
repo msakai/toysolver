@@ -199,7 +199,7 @@ data Solver
   , svProduceAssignmentRef :: !(IORef Bool)
   , svProduceModelsRef :: !(IORef Bool)
   , svProduceUnsatAssumptionsRef :: !(IORef Bool)
-  , svProduceUnsatCoreRef :: !(IORef Bool)
+  , svProduceUnsatCoresRef :: !(IORef Bool)
   , svUnsatAssumptionsRef :: !(IORef [Term])
   }
 
@@ -226,7 +226,7 @@ newSolver = do
   produceAssignmentRef <- newIORef False
   produceModelsRef <- newIORef False
   produceUnsatAssumptionsRef <- newIORef False
-  produceUnsatCoreRef <- newIORef False  
+  produceUnsatCoresRef <- newIORef False  
   unsatAssumptionsRef <- newIORef undefined
   return $
     Solver
@@ -243,7 +243,7 @@ newSolver = do
     , svProduceAssertionsRef = produceAssertionsRef
     , svProduceAssignmentRef = produceAssignmentRef
     , svProduceModelsRef = produceModelsRef
-    , svProduceUnsatCoreRef = produceUnsatCoreRef
+    , svProduceUnsatCoresRef = produceUnsatCoresRef
     , svProduceUnsatAssumptionsRef = produceUnsatAssumptionsRef
     }
 
@@ -320,7 +320,7 @@ reset solver = do
   writeIORef (svProduceAssignmentRef solver) False
   writeIORef (svProduceModelsRef solver) False
   writeIORef (svProduceUnsatAssumptionsRef solver) False
-  writeIORef (svProduceUnsatCoreRef solver) False
+  writeIORef (svProduceUnsatCoresRef solver) False
   writeIORef (svUnsatAssumptionsRef solver) undefined
   return Success
 
@@ -365,7 +365,7 @@ setOption solver opt = do
     ProduceUnsatCores b -> do
       unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-unsat-cores option can be set only in start mode"
-      writeIORef (svProduceUnsatCoreRef solver) b
+      writeIORef (svProduceUnsatCoresRef solver) b
       return ()
     ProduceUnsatAssumptions b -> do
       unless (mode == ModeStart) $ do
@@ -448,7 +448,7 @@ getOption solver opt =
       let b = False -- default value
       return $ AttrValueSymbol (showSL b)
     ":produce-unsat-cores" -> do
-      b <- readIORef (svProduceUnsatCoreRef solver)
+      b <- readIORef (svProduceUnsatCoresRef solver)
       return $ AttrValueSymbol (showSL b)
     ":produce-unsat-assumptions" -> do
       b <- readIORef (svProduceUnsatAssumptionsRef solver)
