@@ -348,7 +348,7 @@ declareFSym :: Solver -> String -> [Sort] -> Sort -> IO FSym
 declareFSym solver f xs y = do
   fdefs <- readIORef (smtFDefs solver)
   when (f `Map.member` fdefs) $ do
-    E.throwIO $ Error $ "function symbol " ++ f ++ " is already declared"
+    E.throwIO $ Error $ "function symbol " ++ f ++ " is already used"
   fdef <-
     case (xs, y) of
       ([], Sort SSymBool []) -> do
@@ -360,9 +360,6 @@ declareFSym solver f xs y = do
       _ -> do
         v <- EUF.newFSym (smtEUF solver)
         return (FEUFFun (xs,y) v)
-  fdefs <- readIORef (smtFDefs solver)
-  when (f `Map.member` fdefs) $ do
-    E.throwIO $ Error $ "function " ++ show f ++ " is already defined"
   writeIORef (smtFDefs solver) $ Map.insert f fdef fdefs
   return f
 
