@@ -249,6 +249,7 @@ newSolver = do
 
 execCommand :: Solver -> Command -> IO ()
 execCommand solver cmd = do
+  -- putStrLn $ showSL cmd
   printResponse solver =<< runCommand solver cmd
 
 printResponse :: Solver -> CmdResponse -> IO ()
@@ -260,7 +261,6 @@ printResponse solver rsp = do
 
 runCommand :: Solver -> Command -> IO CmdResponse
 runCommand solver cmd = E.handle h $ do
-  putStrLn $ showSL cmd
   case cmd of
     SetLogic logic -> const (CmdGenResponse Success) <$> setLogic solver logic
     SetOption opt -> const (CmdGenResponse Success) <$> setOption solver opt
