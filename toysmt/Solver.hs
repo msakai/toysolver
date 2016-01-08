@@ -189,11 +189,13 @@ data Solver
   { svSMTSolverRef :: !(IORef SMT.Solver)
   , svEnvRef :: !(IORef Env)
   , svModeRef :: !(IORef Mode)
-  , svSavedContextsRef :: !(IORef [Env])
+  , svSavedContextsRef :: !(IORef [(EEnv, SortEnv, [Term])])
   , svInfoRef :: IORef [Attribute]
+  , svAssertionsRef :: IORef [Term]
   , svRegularOutputChannelRef :: !(IORef (String, Handle))
   , svDiagnosticOutputChannelRef :: !(IORef (String, Handle))
   , svPrintSuccessRef :: !(IORef Bool)
+  , svProduceAssertionsRef :: !(IORef Bool)
   , svProduceAssignmentRef :: !(IORef Bool)
   , svProduceModelsRef :: !(IORef Bool)
   , svProduceUnsatAssumptionsRef :: !(IORef Bool)
@@ -216,9 +218,11 @@ newSolver = do
   modeRef <- newIORef ModeStart
   savedContextsRef <- newIORef []
   infoRef <- newIORef ([] :: [Attribute])
+  assertionsRef <- newIORef ([] :: [Term])
   regOutputRef <- newIORef ("stdout", stdout)
   diagOutputRef <- newIORef ("stderr", stderr)
   printSuccessRef <- newIORef True
+  produceAssertionsRef <- newIORef False
   produceAssignmentRef <- newIORef False
   produceModelsRef <- newIORef False
   produceUnsatAssumptionsRef <- newIORef False
@@ -232,9 +236,11 @@ newSolver = do
     , svUnsatAssumptionsRef = unsatAssumptionsRef
     , svSavedContextsRef = savedContextsRef
     , svInfoRef = infoRef
+    , svAssertionsRef = assertionsRef
     , svRegularOutputChannelRef = regOutputRef
     , svDiagnosticOutputChannelRef = diagOutputRef
     , svPrintSuccessRef = printSuccessRef
+    , svProduceAssertionsRef = produceAssertionsRef
     , svProduceAssignmentRef = produceAssignmentRef
     , svProduceModelsRef = produceModelsRef
     , svProduceUnsatCoreRef = produceUnsatCoreRef
@@ -310,6 +316,7 @@ reset solver = do
   writeIORef (svRegularOutputChannelRef solver) ("stdout",stdout)
   writeIORef (svDiagnosticOutputChannelRef solver) ("stderr",stderr)
   writeIORef (svPrintSuccessRef solver) True
+  writeIORef (svProduceAssertionsRef solver) False
   writeIORef (svProduceAssignmentRef solver) False
   writeIORef (svProduceModelsRef solver) False
   writeIORef (svProduceUnsatAssumptionsRef solver) False
@@ -342,12 +349,12 @@ setOption solver opt = do
     ExpandDefinitions _b -> do
       -- expand-definitions has been removed in SMT-LIB 2.5.
       E.throwIO SMT.Unsupported
-    InteractiveMode _b -> do
+    InteractiveMode b -> do
       -- interactive-mode is the old name for produce-assertions. Deprecated.
-      if mode /= ModeStart then
+      unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "interactive-mode option can be set only in start mode"
-      else
-        E.throwIO SMT.Unsupported
+      writeIORef (svProduceAssertionsRef solver) b
+      return ()
     ProduceProofs b -> do
       if mode /= ModeStart then
         E.throwIO $ SMT.Error "produce-proofs option can be set only in start mode"
@@ -375,11 +382,11 @@ setOption solver opt = do
         E.throwIO $ SMT.Error "produce-assignments option can be set only in start mode"
       writeIORef (svProduceAssignmentRef solver) b
       return ()
-    ProduceAssertions _b ->
-      if mode /= ModeStart then
+    ProduceAssertions b -> do
+      unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-assertions option can be set only in start mode"
-      else
-        E.throwIO SMT.Unsupported
+      writeIORef (svProduceAssertionsRef solver) b
+      return ()
     GlobalDeclarations _b ->
       if mode /= ModeStart then
         E.throwIO $ SMT.Error "global-declarations option can be set only in start mode"
@@ -485,7 +492,8 @@ push :: Solver -> Int -> IO ()
 push solver n = do
   replicateM_ n $ do
     (env,senv) <- readIORef (svEnvRef solver)
-    modifyIORef (svSavedContextsRef solver) ((env,senv) :)
+    assertions <- readIORef (svAssertionsRef solver)
+    modifyIORef (svSavedContextsRef solver) ((env,senv,assertions) :)
     SMT.push =<< readIORef (svSMTSolverRef solver)
     writeIORef (svModeRef solver) ModeAssert
 
@@ -495,8 +503,9 @@ pop solver n = do
     cs <- readIORef (svSavedContextsRef solver)
     case cs of
       [] -> E.throwIO $ SMT.Error "pop from empty context"
-      ((env,senv) : cs) -> do
+      ((env,senv,assertions) : cs) -> do
         writeIORef (svEnvRef solver) (env,senv)
+        writeIORef (svAssertionsRef solver) assertions
         writeIORef (svSavedContextsRef solver) cs
         SMT.pop =<< readIORef (svSMTSolverRef solver)
         writeIORef (svModeRef solver) ModeAssert
@@ -573,15 +582,19 @@ assert solver tm = do
   case mname of
     Nothing -> SMT.assert smt (interpretFun env tm')
     Just name -> SMT.assertNamed smt name (interpretFun env tm')
+  do b <- readIORef (svProduceAssertionsRef solver)
+     when b $ modifyIORef (svAssertionsRef solver) (tm :)
   writeIORef (svModeRef solver) ModeAssert
 
 getAssertions :: Solver -> IO GetAssertionsResponse
 getAssertions solver = do
   mode <- readIORef (svModeRef solver)
-  if mode == ModeStart then
+  when (mode == ModeStart) $ do
     E.throwIO $ SMT.Error "get-assertions cannot be used in start mode"
-  else
-    E.throwIO SMT.Unsupported
+  b <- readIORef (svProduceAssertionsRef solver)
+  unless b $ do
+    E.throwIO $ SMT.Error ":produce-assertions is not enabled"
+  reverse <$> readIORef (svAssertionsRef solver)
 
 checkSat :: Solver -> IO CheckSatResponse
 checkSat solver = checkSatAssuming solver []
