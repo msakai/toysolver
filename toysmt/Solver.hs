@@ -428,21 +428,29 @@ getOption solver opt =
     "global-declarations" ->
       return $ AttrValueSymbol "false" -- default value
     "interactive-mode" -> do
-      return $ AttrValueSymbol "false" -- default value
+      -- interactive-mode is the old name for produce-assertions. Deprecated.
+      b <- readIORef (svProduceAssignmentRef solver)
+      return $ AttrValueSymbol (if b then "true" else "false")
     "print-success" -> do
       b <- readIORef (svPrintSuccessRef solver)
       return $ AttrValueSymbol $ if b then "true" else "false"
+    "produce-assertions" -> do
+      b <- readIORef (svProduceAssignmentRef solver)
+      return $ AttrValueSymbol (if b then "true" else "false")
     "produce-assignments" -> do
       b <- readIORef (svProduceAssignmentRef solver)
       return $ AttrValueSymbol (if b then "true" else "false")
     "produce-models" -> do
-      return $ AttrValueSymbol "false" -- default value
+      b <- readIORef (svProduceModelsRef solver)
+      return $ AttrValueSymbol (if b then "true" else "false")
     "produce-proofs" -> do
       return $ AttrValueSymbol "false" -- default value
     "produce-unsat-cores" -> do
-      return $ AttrValueSymbol "false" -- default value
+      b <- readIORef (svProduceUnsatCoreRef solver)
+      return $ AttrValueSymbol (if b then "true" else "false")
     "produce-unsat-assumptions" -> do
-      return $ AttrValueSymbol "false" -- default value
+      b <- readIORef (svProduceUnsatAssumptionsRef solver)
+      return $ AttrValueSymbol (if b then "true" else "false")
     "regular-output-channel" -> do
       (fname,_) <- readIORef (svRegularOutputChannelRef solver)
       return $ AttrValueConstant (SpecConstantString fname)
