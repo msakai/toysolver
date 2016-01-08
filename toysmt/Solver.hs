@@ -310,6 +310,7 @@ reset solver = do
   writeIORef (svDiagnosticOutputChannelRef solver) ("stderr",stderr)
   writeIORef (svPrintSuccessRef solver) True
   writeIORef (svProduceAssignmentRef solver) False
+  writeIORef (svProduceModelsRef solver) False
   writeIORef (svProduceUnsatAssumptionsRef solver) False
   writeIORef (svProduceUnsatCoreRef solver) False
   writeIORef (svUnsatAssumptionsRef solver) undefined
