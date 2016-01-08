@@ -424,7 +424,8 @@ getOption solver opt =
   case opt of
     ":expand-definitions" -> do
       -- expand-definitions has been removed in SMT-LIB 2.5.
-      E.throwIO SMT.Unsupported -- FIXME?
+      let b = False
+      return $ AttrValueSymbol (showSL b)
     ":global-declarations" -> do
       let b = False -- default value
       return $ AttrValueSymbol (showSL b)
