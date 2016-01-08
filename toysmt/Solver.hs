@@ -143,8 +143,8 @@ interpretFun env t =
     TermAnnot t2 _ -> interpretFun env t2 -- annotations are not supported yet
   where
     getName :: QualIdentifier -> String
-    getName (QIdentifier id) = idToName id
-    getName (QIdentifierAs id _sort) = idToName id
+    getName (QIdentifier ident) = idToName ident
+    getName (QIdentifierAs ident _sort) = idToName ident
 
     idToName :: Identifier -> String
     idToName (ISymbol s) = s
@@ -180,6 +180,7 @@ sortToSortTerm (SMT.Sort SMT.SSymBool []) = SortId (ISymbol "Bool")
 sortToSortTerm (SMT.Sort SMT.SSymReal []) = SortId (ISymbol "Real")
 sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name 0) []) = SortId (ISymbol name)
 sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name _arity) xs) = SortIdentifiers (ISymbol name) (map sortToSortTerm xs)
+sortToSortTerm s = error ("unknown sort: " ++ show s)
 
 -- ----------------------------------------------------------------------
 
@@ -506,7 +507,7 @@ resetAssertions solver = do
   pop solver (length cs)
 
 echo :: Solver -> String -> IO String
-echo solver s = return s
+echo _solver s = return s
 
 declareSort :: Solver -> String -> Int -> IO ()
 declareSort solver name arity = do
@@ -562,7 +563,7 @@ assert :: Solver -> Term -> IO ()
 assert solver tm = do
   let mname =
         case tm of
-          TermAnnot body attrs
+          TermAnnot _body attrs
             | name:_ <- [name | AttributeVal ":named" (AttrValueSymbol name) <- attrs] ->
                 Just name
           _ -> Nothing
