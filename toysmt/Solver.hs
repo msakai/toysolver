@@ -190,7 +190,7 @@ data Solver
   , svEnvRef :: !(IORef Env)
   , svModeRef :: !(IORef Mode)
   , svSavedContextsRef :: !(IORef [(Maybe (EEnv, SortEnv), [Term])])
-  , svInfoRef :: IORef [Attribute]
+  , svStatusRef :: IORef (Maybe Bool)
   , svAssertionsRef :: IORef [Term]
   , svRegularOutputChannelRef :: !(IORef (String, Handle))
   , svDiagnosticOutputChannelRef :: !(IORef (String, Handle))
@@ -218,7 +218,7 @@ newSolver = do
   envRef <- newIORef (fenv, senv)
   modeRef <- newIORef ModeStart
   savedContextsRef <- newIORef []
-  infoRef <- newIORef ([] :: [Attribute])
+  statusRef <- newIORef Nothing
   assertionsRef <- newIORef ([] :: [Term])
   regOutputRef <- newIORef ("stdout", stdout)
   diagOutputRef <- newIORef ("stderr", stderr)
@@ -237,7 +237,7 @@ newSolver = do
     , svModeRef = modeRef
     , svUnsatAssumptionsRef = unsatAssumptionsRef
     , svSavedContextsRef = savedContextsRef
-    , svInfoRef = infoRef
+    , svStatusRef = statusRef
     , svAssertionsRef = assertionsRef
     , svRegularOutputChannelRef = regOutputRef
     , svDiagnosticOutputChannelRef = diagOutputRef
@@ -315,7 +315,7 @@ reset solver = do
   writeIORef (svEnvRef solver) (fenv, senv)
   writeIORef (svModeRef solver) ModeStart
   writeIORef (svSavedContextsRef solver) []
-  writeIORef (svInfoRef solver) []
+  writeIORef (svStatusRef solver) Nothing
   writeIORef (svRegularOutputChannelRef solver) ("stdout",stdout)
   writeIORef (svDiagnosticOutputChannelRef solver) ("stderr",stderr)
   writeIORef (svPrintSuccessRef solver) True
@@ -474,8 +474,14 @@ getOption solver opt =
       E.throwIO SMT.Unsupported
 
 setInfo :: Solver -> Attribute -> IO ()
-setInfo solver attr = do
-  modifyIORef (svInfoRef solver) (attr : )
+setInfo solver (AttributeVal ":status" (AttrValueSymbol s)) = do
+  v <- case s of
+         "sat" -> return $ Just True
+         "unsat" -> return $ Just False
+         "unknown" -> return $ Nothing
+         _ -> E.throwIO $ SMT.Error $ "invalid status value: " ++ s
+  writeIORef (svStatusRef solver) v
+setInfo solver _ = return ()
 
 getInfo :: Solver -> InfoFlags -> IO GetInfoResponse
 getInfo solver flags = do
@@ -632,6 +638,16 @@ checkSatAssuming solver xs = do
     return y
 
   ret <- SMT.checkSATAssuming smt ys
+
+  do expected <- readIORef (svStatusRef solver)
+     writeIORef (svStatusRef solver) Nothing -- I'm not sure if we should reset or not.
+     h <- snd <$> readIORef (svDiagnosticOutputChannelRef solver)
+     case expected of
+       Just True | not ret -> hPutStrLn h "WARNING: unexpected unsat; expecting sat"
+       Just False | ret -> hPutStrLn h "WARNING: unexpected sat; expecting unsat"
+       _ -> return ()
+     hFlush h
+
   if ret then do
     writeIORef (svModeRef solver) ModeSat
     return Sat
