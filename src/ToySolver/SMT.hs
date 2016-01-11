@@ -421,7 +421,7 @@ exprSort' :: Map FSym FDef -> Expr -> Sort
 exprSort' _fdefs (EFrac _) = Sort SSymReal []
 exprSort' fdefs (EAp f xs)
   | f `Set.member` Set.fromList ["true","false","and","or","not","=>","=",">=","<=",">","<"] = Sort SSymBool []
-  | f `Set.member` Set.fromList ["+", "-", "*"] = Sort SSymReal []
+  | f `Set.member` Set.fromList ["+", "-", "*", "/"] = Sort SSymReal []
   | f == "ite" = exprSort' fdefs (xs !! 1)
   | otherwise =
       case fdefs Map.! f of
