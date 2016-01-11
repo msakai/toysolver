@@ -216,6 +216,7 @@ newSolver = do
   eufTrue  <- EUF.newConst euf
   eufFalse <- EUF.newConst euf
   EUF.assertNotEqual euf eufTrue eufFalse
+  divByZero <- EUF.newFSym euf
 
   eufAtomDefs <- newIORef (Map.empty, IntMap.empty)
   lraAtomDefs <- newIORef (Map.empty, IntMap.empty)
@@ -228,7 +229,7 @@ newSolver = do
   eufModelRef <- newIORef (undefined :: EUF.Model)
 
   globalDeclarationsRef <- newIORef False
-  fdefs <- newIORef Map.empty
+  fdefs <- newIORef $ Map.singleton "_/0" (FEUFFun ([sReal], sReal) divByZero)
 
   conflictTheory <- newIORef True
 
@@ -533,11 +534,14 @@ exprToLRAExpr solver (EAp "*" xs) = liftM (foldr mult (LA.constant 1)) $ mapM (e
       | Just c <- LA.asConst e2 = c *^ e1
       | otherwise = E.throw $ Error "non-linear multiplication is not supported"
 exprToLRAExpr solver (EAp "/" [x,y]) = do
-  x' <- exprToLRAExpr solver x
   y' <- exprToLRAExpr solver y
   case LA.asConst y' of
     Nothing -> E.throwIO $ Error "division by non-constant is not supported"
-    Just c -> return $ (1/c) *^ x'
+    Just 0 -> do
+      lraExprFromTerm solver =<< exprToEUFTerm solver "_/0" [x]
+    Just c -> do
+      x' <- exprToLRAExpr solver x
+      return $ (1/c) *^ x'
 exprToLRAExpr solver (EAp "ite" [c,t,e]) = do
   c' <- exprToFormula solver c
   ret <- liftM LA.var $ Simplex2.newVar (smtLRA solver)
@@ -823,7 +827,11 @@ eval m (EAp "+" xs)      = ValRational $ sum $ map (valToRational m . eval m) xs
 eval m (EAp "-" [x])     = ValRational $ negate $ valToRational m (eval m x)
 eval m (EAp "-" [x,y])   = ValRational $ valToRational m (eval m x) - valToRational m (eval m y)
 eval m (EAp "*" xs)      = ValRational $ product $ map (valToRational m . eval m) xs
-eval m (EAp "/" [x,y])   = ValRational $ valToRational m (eval m x) / valToRational m (eval m y)
+eval m (EAp "/" [x,y])
+  | y' == 0   = eval m (EAp "_/0" [x])
+  | otherwise = ValRational $ valToRational m (eval m x) / y'
+  where
+    y' = valToRational m (eval m y)
 eval m (EAp "=" [x,y])   = ValBool $
   case (eval m x, eval m y) of
     (v1, v2) -> v1 == v2

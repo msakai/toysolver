@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Test.SMT (smtTestGroup) where
 
+import Control.Exception (evaluate)
 import Control.Monad
 
 import Test.Tasty
@@ -159,6 +160,30 @@ case_push = do
 
   ret <- SMT.checkSAT solver
   ret @?= True
+
+case_QF_LRA_division_by_zero :: IO ()
+case_QF_LRA_division_by_zero = do
+  solver <- SMT.newSolver
+
+  x1 <- SMT.declareConst solver "x1" SMT.sReal
+  x2 <- SMT.declareConst solver "x2" SMT.sReal
+  let y1 = x1 / 0
+      y2 = x2 / 0
+
+  ret <- SMT.checkSAT solver
+  ret @?= True
+  m <- SMT.getModel solver
+  evaluate $ SMT.eval m y1
+  evaluate $ SMT.eval m y2
+
+  SMT.assert solver $ y1 ./=. y2
+  ret <- SMT.checkSAT solver
+  ret @?= True
+  m <- SMT.getModel solver
+
+  SMT.assert solver $ x1 .==. x2
+  ret <- SMT.checkSAT solver
+  ret @?= False
 
 ------------------------------------------------------------------------
 -- Test harness
