@@ -21,8 +21,7 @@ Extra-Source-Files:
    .ghci
    .travis.yml
    appveyor.yml
-   build_bdist_linux-i386.sh
-   build_bdist_linux-x86_64.sh
+   build_bdist_linux.sh
    build_bdist_macos.sh
    build_bdist_win32.sh
    build_bdist_win64.sh
