@@ -24,7 +24,7 @@ matrix:
 
 before_install:
  - unset CC
- - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:/opt/alex/3.1.4/bin:/opt/happy/1.19.5/bin:$PATH
+ - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:/opt/alex/3.1.4/bin:/opt/happy/1.19.5/bin:~/.cabal/bin:$PATH
 
 install:
  - cabal --version
@@ -78,7 +78,8 @@ script:
  - SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz &&
    (cd dist && cabal install --force-reinstalls "$SRC_TGZ")
 
-after_script:
+# This block must be executed before before_cache
+#after_script:
  - "[ -n \"$COVERAGE\" ] && cabal install hpc-coveralls --avoid-reinstalls --constraint=\"regex-posix >=0.95.2\" || true" # regex-posix-0.95.1 has compilation problem
  - "[ -n \"$COVERAGE\" ] && hpc-coveralls TestSuite TestPolynomial --exclude-dir=test || true"
 
