@@ -1,5 +1,5 @@
 #!/bin/bash
-HPVER=2014.2.0.0
+HPVER=7.10.3
 HPARCH=i386
 export WINEPREFIX=~/.wine-hp-$HPARCH
 GHC_PATH=$WINEPREFIX/drive_c/Program\ Files\ \(x86\)/Haskell\ Platform/$HPVER/bin/ghc.exe
