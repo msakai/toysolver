@@ -18,9 +18,9 @@ cabal install --only-dependencies --flag=BuildToyFMF --flag=BuildSamplePrograms 
 cabal configure -fLinuxStatic --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
 cabal build
 
-VER=`ghc -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
-OS=`ghc -e ":m +System.Info" -e "putStrLn os"`
-ARCH=`ghc -e ":m +System.Info" -e "putStrLn arch"`
+VER=`ghc -ignore-dot-ghci -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
+OS=`ghc -ignore-dot-ghci -e ":m +System.Info" -e "putStrLn os"`
+ARCH=`ghc -ignore-dot-ghci -e ":m +System.Info" -e "putStrLn arch"`
 
 PKG=toysolver-${VER}-${OS}-${ARCH}
 

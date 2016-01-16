@@ -6,7 +6,7 @@ cabal install --only-dependencies --flag=BuildToyFMF --flag=BuildSamplePrograms 
 cabal configure --ghc-options="-optl-mmacosx-version-min=10.6" --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
 cabal build
 
-VER=`ghc -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
+VER=`ghc -ignore-dot-ghci -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
 
 PKG=toysolver-$VER-macos
 

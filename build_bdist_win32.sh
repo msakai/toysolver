@@ -26,7 +26,7 @@ wine cabal clean --builddir=$BUILDDIR
 wine cabal configure --builddir=$BUILDDIR --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
 wine cabal build --builddir=$BUILDDIR
 
-VER=`wine ghc -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version System.IO" -e "hSetBinaryMode stdout True" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
+VER=`wine ghc -ignore-dot-ghci -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version System.IO" -e "hSetBinaryMode stdout True" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
 
 PKG=toysolver-$VER-$ARCH
 
