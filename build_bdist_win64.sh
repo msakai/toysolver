@@ -1,5 +1,5 @@
 #!/bin/bash
-HPVER=2014.2.0.0
+HPVER=7.10.3
 HPARCH=x86_64
 export WINEPREFIX=~/.wine-hp-$HPARCH
 GHC_PATH=$WINEPREFIX/drive_c/Program\ Files/Haskell\ Platform/$HPVER/bin/ghc.exe
@@ -26,11 +26,11 @@ wine cabal clean --builddir=$BUILDDIR
 wine cabal configure --builddir=$BUILDDIR --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
 wine cabal build --builddir=$BUILDDIR
 
-VER=`wine ghc -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version System.IO" -e "hSetBinaryMode stdout True" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
+VER=`wine ghc -ignore-dot-ghci -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version System.IO" -e "hSetBinaryMode stdout True" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
 
 PKG=toysolver-$VER-$ARCH
 
 rm -r $PKG
 mkdir $PKG
-cp $BUILDDIR/build/htc/htc.exe $BUILDDIR/build/knapsack/knapsack.exe $BUILDDIR/build/lpconvert/lpconvert.exe $BUILDDIR/build/nonogram/nonogram.exe $BUILDDIR/build/nqueens/nqueens.exe $BUILDDIR/build/pbconvert/pbconvert.exe $BUILDDIR/build/sudoku/sudoku.exe $BUILDDIR/build/toyfmf/toyfmf.exe $BUILDDIR/build/toysat/toysat.exe $BUILDDIR/build/ToySolver/toysolver.exe $PKG/
+cp $BUILDDIR/build/htc/htc.exe $BUILDDIR/build/knapsack/knapsack.exe $BUILDDIR/build/lpconvert/lpconvert.exe $BUILDDIR/build/nonogram/nonogram.exe $BUILDDIR/build/nqueens/nqueens.exe $BUILDDIR/build/pbconvert/pbconvert.exe $BUILDDIR/build/sudoku/sudoku.exe $BUILDDIR/build/toyfmf/toyfmf.exe $BUILDDIR/build/toysat/toysat.exe $BUILDDIR/build/toysmt/toysmt.exe $BUILDDIR/build/ToySolver/toysolver.exe $PKG/
 zip -r $PKG.zip $PKG
