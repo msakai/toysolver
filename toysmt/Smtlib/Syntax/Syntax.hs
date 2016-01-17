@@ -130,8 +130,12 @@ data Attribute = Attribute String
 
 -- Identifiers
 
+data Index = IndexNumeral Int
+           | IndexSymbol String
+           deriving (Show,Eq)
+
 data Identifier = ISymbol String
-                | I_Symbol String [Int] deriving (Show,Eq)
+                | I_Symbol String [Index] deriving (Show,Eq)
 
 -- Sorts
 

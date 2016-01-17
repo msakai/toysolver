@@ -386,9 +386,9 @@ parseNSymbol = do
        _ <- emptySpace
        symb <- symbol
        _ <- emptySpace
-       nume <- many1  (numeral <* Pc.try spaces)
+       indexes <- many1 ((liftM (IndexNumeral . read) numeral <|> liftM IndexSymbol symbol) <* Pc.try spaces)
        _ <- aspC
-       return $ I_Symbol symb (fmap (read) nume)
+       return $ I_Symbol symb indexes
 
 {-
    #########################################################################

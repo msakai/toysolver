@@ -149,9 +149,13 @@ instance ShowSL Attribute where
   showSL (Attribute str) = str
   showSL (AttributeVal str attrVal) = str ++ " " ++ showSL attrVal
 
+instance ShowSL Index where
+  showSL (IndexNumeral i) = show i
+  showSL (IndexSymbol str) = str
+
 instance ShowSL Identifier where
   showSL (ISymbol str) = str
-  showSL (I_Symbol str ns) = "(_ " ++ str ++ " " ++ joinNs ns  ++ ")"
+  showSL (I_Symbol str is) = "(_ " ++ str ++ " " ++ joinA is  ++ ")"
 
 instance ShowSL Sort where
   showSL (SortId iden) = showSL iden
