@@ -218,7 +218,7 @@ instance ShowSL CheckSatResponse where
   showSL Unknown = "unknown"
 
 instance ShowSL InfoResponse where
-  showSL (ResponseErrorBehavior x) = ":error-behaviour " ++ showSL x
+  showSL (ResponseErrorBehavior x) = ":error-behavior " ++ showSL x
   showSL (ResponseName s) = ":name " ++ s
   showSL (ResponseAuthors s) = ":authors " ++ s
   showSL (ResponseVersion s) = ":version" ++ s
