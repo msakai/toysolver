@@ -658,7 +658,7 @@ exprToEUFArg solver e@(EAp f xs) = do
     _ -> exprToEUFTerm solver f xs
 
 abstractEUFAtom :: Solver -> (EUF.Term, EUF.Term) -> IO SAT.Lit
-abstractEUFAtom solver (t1,t2) | t1 >= t2 = abstractEUFAtom solver (t2,t1)
+abstractEUFAtom solver (t1,t2) | t1 > t2 = abstractEUFAtom solver (t2,t1)
 abstractEUFAtom solver (t1,t2) = do
   (tbl,defs) <- readIORef (smtEUFAtomDefs solver)
   case Map.lookup (t1,t2) tbl of
