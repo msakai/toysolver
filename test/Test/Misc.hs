@@ -61,11 +61,11 @@ prop_readUnsignedInteger =
 -- ---------------------------------------------------------------------
 -- Knapsack problems
 
-case_knapsack_1 :: IO ()
-case_knapsack_1 = KnapsackBB.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
+case_knapsack_BB_1 :: IO ()
+case_knapsack_BB_1 = KnapsackBB.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
 
-case_knapsack_2 :: IO ()
-case_knapsack_2 = KnapsackBB.solve [(16,2), (19,3), (23,4), (28,5)] 7 @?= (44, 7, [True,False,False,True])
+case_knapsack_BB_2 :: IO ()
+case_knapsack_BB_2 = KnapsackBB.solve [(16,2), (19,3), (23,4), (28,5)] 7 @?= (44, 7, [True,False,False,True])
 
 case_knapsack_DPDense_1 :: IO ()
 case_knapsack_DPDense_1 = KnapsackDPDense.solve [(5,4), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
@@ -250,6 +250,64 @@ prop_FredmanKhachiyan1996_to_selfDuality =
               , Set.singleton (IntSet.fromList [y,z])
               ] 
     in HittingSet.minimalHittingSets h == h
+
+case_FredmanKhachiyan1996_condition_1_1_solve_L = (xs `FredmanKhachiyan1996.isCounterExampleOf` (f,g)) @?= True
+  where
+    Just xs = FredmanKhachiyan1996.condition_1_1_solve f g
+    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9], [4]]
+    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
+
+case_FredmanKhachiyan1996_condition_1_1_solve_R = (xs `FredmanKhachiyan1996.isCounterExampleOf` (f,g)) @?= True
+  where
+    Just xs = FredmanKhachiyan1996.condition_1_1_solve f g
+    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
+    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9], [4,7,8]]
+
+case_FredmanKhachiyan1996_condition_1_2_solve_L = (xs `FredmanKhachiyan1996.isCounterExampleOf` (f,g)) @?= True
+  where
+    Just xs = FredmanKhachiyan1996.condition_1_2_solve f g
+    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9,10]]
+    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
+
+case_FredmanKhachiyan1996_condition_1_2_solve_R = (xs `FredmanKhachiyan1996.isCounterExampleOf` (f,g)) @?= True
+  where
+    Just xs = FredmanKhachiyan1996.condition_1_2_solve f g
+    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
+    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9,10]]
+
+case_FredmanKhachiyan1996_condition_1_3_solve_L = (xs `FredmanKhachiyan1996.isCounterExampleOf` (f,g)) @?= True
+  where
+    Just xs = FredmanKhachiyan1996.condition_1_3_solve f g
+    f = Set.fromList $ map IntSet.fromList [[2,4,7,10], [7,8], [9]]
+    g = Set.fromList $ map IntSet.fromList [[7,9,10], [4,8,9], [2,8,9]]
+
+case_FredmanKhachiyan1996_condition_1_3_solve_R = (xs `FredmanKhachiyan1996.isCounterExampleOf` (f,g)) @?= True
+  where
+    Just xs = FredmanKhachiyan1996.condition_1_3_solve f g
+    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9,10]]
+    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9,10]]
+
+case_FredmanKhachiyan1996_condition_2_1_solve_L = (xs `FredmanKhachiyan1996.isCounterExampleOf` (f,g)) @?= True
+  where
+    Just xs = FredmanKhachiyan1996.condition_2_1_solve f g
+    f = Set.fromList $ map IntSet.fromList [[2,4,7], [4,7,9], [7,8,9]]
+    g = Set.fromList $ map IntSet.fromList [[2,4,7], [2,8,9], [4,8,9]]
+
+case_FredmanKhachiyan1996_condition_2_1_solve_R = (xs `FredmanKhachiyan1996.isCounterExampleOf` (f,g)) @?= True
+  where
+    Just xs = FredmanKhachiyan1996.condition_2_1_solve f g
+    g = Set.fromList $ map IntSet.fromList [[2,4,7], [4,7,9], [7,8,9]]
+    f = Set.fromList $ map IntSet.fromList [[2,4,7], [2,8,9], [4,8,9]]
+
+case_FredmanKhachiyan1996_checkDualityA = FredmanKhachiyan1996.checkDualityA f g @?= Nothing
+  where
+    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
+    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
+
+case_FredmanKhachiyan1996_checkDualityB = FredmanKhachiyan1996.checkDualityB f g @?= Nothing
+  where
+    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
+    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
 
 prop_GurvichKhachiyan1999_generateCNFAndDNF =
   forAll hyperGraph $ \g ->

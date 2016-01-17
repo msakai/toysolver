@@ -138,7 +138,3 @@ solveInteger items limit
     items' = [(v, w `div` d) | (v, w) <- items]
     limit' = limit `div` d
     maxInt = fromIntegral (maxBound :: Int)
-
-test1, test2 :: (Int, Int, [Bool])
-test1 = solve [(5,4), (4,5), (3,2)] 9
-test2 = solve [(45,5), (48,8), (35,3)] 10

@@ -133,12 +133,15 @@ evalCNF :: Set IntSet -> IntSet -> Bool
 evalCNF cnf xs = and [not $ IntSet.null $ is `IntSet.intersection` xs | is <- Set.toList cnf]
  
 
+f, g :: Set IntSet
 f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
 g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
 
+testA1, testA2, testA3, testA4 :: Maybe (Either IntSet IntSet)
 testA1 = findPrimeImplicateOrPrimeImplicant (IntSet.fromList [2,4,7,8,9]) (evalDNF f) Set.empty f 
 testA2 = findPrimeImplicateOrPrimeImplicant (IntSet.fromList [2,4,7,8,9]) (evalDNF f) (Set.singleton (IntSet.fromList [2,8,9])) f
 testA3 = findPrimeImplicateOrPrimeImplicant (IntSet.fromList [2,4,7,8,9]) (evalDNF f) (Set.fromList [IntSet.fromList [2,8,9], IntSet.fromList [4,8,9]]) f
 testA4 = findPrimeImplicateOrPrimeImplicant (IntSet.fromList [2,4,7,8,9]) (evalDNF f) (Set.fromList [IntSet.fromList [2,8,9], IntSet.fromList [4,8,9], IntSet.fromList [7,9]]) f
 
+testB1 :: Maybe (Either IntSet IntSet)
 testB1 = findPrimeImplicateOrPrimeImplicant (IntSet.fromList [2,4,7,8,9]) (evalDNF f) g Set.empty

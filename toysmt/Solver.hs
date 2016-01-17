@@ -481,7 +481,7 @@ setInfo solver (AttributeVal ":status" (AttrValueSymbol s)) = do
          "unknown" -> return $ Nothing
          _ -> E.throwIO $ SMT.Error $ "invalid status value: " ++ s
   writeIORef (svStatusRef solver) v
-setInfo solver _ = return ()
+setInfo _solver _ = return ()
 
 getInfo :: Solver -> InfoFlags -> IO GetInfoResponse
 getInfo solver flags = do

@@ -62,7 +62,6 @@ case_Example_2 = do
   a <- newConst solver
   b <- newConst solver
   c <- newConst solver
-  d <- newConst solver
   f <- newFun solver
   g <- newFun solver
   h <- newFun solver  
@@ -173,6 +172,7 @@ prop_components = QM.monadicIO $ do
       b <- QM.run $ areCongruentFlatTerm solver (FTConst c) (FTConst d)
       QM.assert $ b == (repr ! c == repr ! d)
 
+case_fsymToTerm_termToSym :: IO ()
 case_fsymToTerm_termToSym = do
   solver <- newSolver
   f <- liftM (\f x y -> TApp f [x,y]) $ newFSym solver
@@ -184,6 +184,7 @@ case_fsymToTerm_termToSym = do
   t2 <- fsymToTerm solver c
   t2 @?= t
 
+case_getModel_test1 :: IO ()
 case_getModel_test1 = do
   solver <- newSolver
   a <- newConst solver
@@ -211,15 +212,15 @@ case_getModel_test1 = do
   (eval m2 (f b) == eval m2 (f c)) @?= True
   (eval m2 (g b) == eval m2 (g c)) @?= True
 
+case_EUF_getModel_test1 :: IO ()
 case_EUF_getModel_test1 = do
   solver <- EUF.newSolver
   a <- EUF.newConst solver -- 0
   b <- EUF.newConst solver -- 1
   c <- EUF.newConst solver -- 2
-  d <- EUF.newConst solver -- 3
-  f <- EUF.newFun solver -- 4
-  g <- EUF.newFun solver -- 5
-  h <- EUF.newFun solver -- 6
+  f <- EUF.newFun solver -- 3
+  g <- EUF.newFun solver -- 4
+  h <- EUF.newFun solver -- 5
 
   EUF.assertEqual solver (f b) c
   EUF.assertEqual solver (f c) a
@@ -233,6 +234,7 @@ case_EUF_getModel_test1 = do
   m2 <- EUF.getModel solver
   (eval m2 (g b) == eval m2 (h c b)) @?= False
 
+prop_getModel_eval_1 :: Property
 prop_getModel_eval_1 = QM.monadicIO $ do
   solver <- QM.run newSolver
   a <- QM.run $ newConst solver
@@ -271,6 +273,7 @@ prop_getModel_eval_1 = QM.monadicIO $ do
       forM_ es $ \(lhs,rhs) -> do
         QM.assert (eval m lhs == eval m rhs)
 
+prop_getModel_eval_2 :: Property
 prop_getModel_eval_2 = QM.monadicIO $ do
   solver <- QM.run newSolver
   a <- QM.run $ newConst solver

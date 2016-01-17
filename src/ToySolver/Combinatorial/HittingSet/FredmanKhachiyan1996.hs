@@ -37,6 +37,16 @@ module ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996
   -- * Utilities for testing
   , isCounterExampleOf
   , occurFreq
+
+  -- * Internal functions exported only for testing purpose
+  , condition_1_1
+  , condition_1_2
+  , condition_1_3
+  , condition_2_1
+  , condition_1_1_solve
+  , condition_1_2_solve
+  , condition_1_3_solve
+  , condition_2_1_solve
   ) where
 
 import Prelude hiding (all, any)
@@ -373,61 +383,3 @@ checkDualityB' f g
 -- An implicant /I∈F/ of a DNF /F/ is redundant if /F/ contains proper subset of /I/.
 -- A DNF /F/ is called redundant if it contains redundant implicants.
 -- The main functions of this modules does not care about redundancy of DNFs.
-
-test_condition_1_1_solve_L = xs `isCounterExampleOf` (f,g)
-  where
-    Just xs = condition_1_1_solve f g
-    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9], [4]]
-    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
-
-test_condition_1_1_solve_R = xs `isCounterExampleOf` (f,g)
-  where
-    Just xs = condition_1_1_solve f g
-    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
-    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9], [4,7,8]]
-
-test_condition_1_2_solve_L = xs `isCounterExampleOf` (f,g)
-  where
-    Just xs = condition_1_2_solve f g
-    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9,10]]
-    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
-
-test_condition_1_2_solve_R = xs `isCounterExampleOf` (f,g)
-  where
-    Just xs = condition_1_2_solve f g
-    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
-    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9,10]]
-
-test_condition_1_3_solve_L = xs `isCounterExampleOf` (f,g)
-  where
-    Just xs = condition_1_3_solve f g
-    f = Set.fromList $ map IntSet.fromList [[2,4,7,10], [7,8], [9]]
-    g = Set.fromList $ map IntSet.fromList [[7,9,10], [4,8,9], [2,8,9]]
-
-test_condition_1_3_solve_R = xs `isCounterExampleOf` (f,g)
-  where
-    Just xs = condition_1_3_solve f g
-    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9,10]]
-    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9,10]]
-
-test_condition_2_1_solve_L = xs `isCounterExampleOf` (f,g)
-  where
-    Just xs = condition_2_1_solve f g
-    f = Set.fromList $ map IntSet.fromList [[2,4,7], [4,7,9], [7,8,9]]
-    g = Set.fromList $ map IntSet.fromList [[2,4,7], [2,8,9], [4,8,9]]
-
-test_condition_2_1_solve_R = xs `isCounterExampleOf` (f,g)
-  where
-    Just xs = condition_2_1_solve f g
-    g = Set.fromList $ map IntSet.fromList [[2,4,7], [4,7,9], [7,8,9]]
-    f = Set.fromList $ map IntSet.fromList [[2,4,7], [2,8,9], [4,8,9]]
-
-test_checkDualityA = checkDualityA f g == Nothing
-  where
-    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
-    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
-
-test_checkDualityB = checkDualityB f g == Nothing
-  where
-    f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
-    g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]

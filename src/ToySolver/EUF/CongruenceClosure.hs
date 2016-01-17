@@ -537,11 +537,11 @@ getModel solver = do
     a' <- Vec.unsafeRead (svRepresentativeTable solver) a
     when (a == a') $ modifyIORef' univRef (IntSet.insert a)
     modifyIORef' reprRef (IntMap.insert a a')
-  univ <- readIORef univRef
+  -- univ <- readIORef univRef
   repr <- readIORef reprRef
 
   lookups <- readIORef (svLookupTable solver)
-  (defs1,_) <- readIORef (svDefs solver)
+  -- (defs1,_) <- readIORef (svDefs solver)
 
   let -- "(b,c) ∈ appRel[a]" means f(b,c)=a
       appRel :: IntMap (Set (FSym, FSym))
@@ -551,7 +551,7 @@ getModel solver = do
         ]
 
       partialApps :: IntSet
-      partialApps = IntSet.fromList [b | (a, xs) <- IntMap.toList appRel, (b,_) <- Set.toList xs]
+      partialApps = IntSet.fromList [b | xs <- IntMap.elems appRel, (b,_) <- Set.toList xs]
 
       xs1 :: IntMap (Map EntityTuple Entity)
       xs1 = IntMap.fromListWith Map.union $
