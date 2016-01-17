@@ -80,11 +80,13 @@ import qualified Data.Version as V
 import Numeric (readFloat, readHex)
 import System.Exit
 import System.IO
+import qualified Text.Parsec as Parsec
 
 import qualified ToySolver.SMT as SMT
 import ToySolver.Version
 import Smtlib.Syntax.Syntax
 import Smtlib.Syntax.ShowSL
+import qualified Smtlib.Parsers.CommonParsers as CommonParsers
 
 -- ----------------------------------------------------------------------
 
@@ -113,10 +115,8 @@ data SortEntry
 interpretSort :: SortEnv -> Sort -> SMT.Sort
 interpretSort env s =
   case s of
-    SortId (ISymbol name) -> f name []
-    SortIdentifiers (ISymbol name) args -> f name args
-    SortId (I_Symbol _ _) -> undefined
-    SortIdentifiers (I_Symbol _ _) _ -> undefined
+    SortId ident -> f (idToName ident) []
+    SortIdentifiers ident args -> f (idToName ident) args
   where
     f name args =
       case Map.lookup name env of
@@ -146,10 +146,6 @@ interpretFun env t =
     getName (QIdentifier ident) = idToName ident
     getName (QIdentifierAs ident _sort) = idToName ident
 
-    idToName :: Identifier -> String
-    idToName (ISymbol s) = s
-    idToName (I_Symbol s _) = s -- XXX
-
     f qid args =
       case Map.lookup (getName qid) env of
         Nothing -> error ("unknown function symbol: " ++ getName qid)
@@ -178,9 +174,18 @@ valueToTerm (SMT.ValUninterpreted n s) =
 sortToSortTerm :: SMT.Sort -> Sort
 sortToSortTerm (SMT.Sort SMT.SSymBool []) = SortId (ISymbol "Bool")
 sortToSortTerm (SMT.Sort SMT.SSymReal []) = SortId (ISymbol "Real")
-sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name 0) []) = SortId (ISymbol name)
-sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name _arity) xs) = SortIdentifiers (ISymbol name) (map sortToSortTerm xs)
+sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name 0) []) = SortId (nameToId name)
+sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name _arity) xs) = SortIdentifiers (nameToId name) (map sortToSortTerm xs)
 sortToSortTerm s = error ("unknown sort: " ++ show s)
+
+idToName :: Identifier -> String
+idToName = showSL
+
+nameToId :: String -> Identifier
+nameToId s =
+  case Parsec.parse CommonParsers.parseIdentifier "" s of
+    Left e -> error (show e)
+    Right x -> x
 
 -- ----------------------------------------------------------------------
 
