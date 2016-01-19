@@ -517,7 +517,7 @@ explainConst solver c1 c2 = do
 -- Model construction
 -- -------------------------------------------------------------------
 
-type Entity = FSym
+type Entity = Int
 type EntityTuple = [Entity]
 
 data Model
@@ -525,6 +525,7 @@ data Model
   { mUniverse    :: !IntSet
   , mFunctions   :: !(IntMap (Map EntityTuple Entity))
   , mUnspecified :: !Entity
+  , mEquivClasses :: [(Set Term, Entity)]
   }
   deriving (Show)
 
@@ -578,6 +579,11 @@ getModel solver = do
       used :: IntSet
       used = IntSet.unions [IntSet.fromList (y : xs) | m <- IntMap.elems funcs, (xs,y) <- Map.toList m]
 
+  classes <- forM (IntSet.toList used) $ \a -> do
+    classA <- Vec.unsafeRead (svClassList  solver) a
+    classA' <- liftM Set.fromList $ mapM (fsymToTerm solver) (classToList classA)
+    return (classA', a)
+
   -- renaming
   let univ2 :: IntSet
       univ2 = IntSet.insert (-1) $ IntSet.fromList [0 .. IntSet.size used - 1]
@@ -590,12 +596,16 @@ getModel solver = do
 
       funcs2 :: IntMap (Map EntityTuple Entity)
       funcs2 = fmap (\m -> Map.fromList [(map to_univ2 xs, to_univ2 y) | (xs,y) <- Map.toList m]) funcs
+      
+      classes2 :: [(Set Term, Entity)]
+      classes2 = [(classA, to_univ2 a) | (classA,a) <- classes]
 
   return $
     Model
     { mUniverse    = univ2
     , mFunctions   = funcs2
     , mUnspecified = -1
+    , mEquivClasses = classes2
     }
 
 eval :: Model -> Term -> Entity
