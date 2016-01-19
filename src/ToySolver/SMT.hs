@@ -53,6 +53,7 @@ module ToySolver.SMT
   , valSort
   , FunDef (..)
   , evalFSym
+  , dumpModel
 
   -- * Inspecting proofs
   , getUnsatAssumptions
@@ -792,6 +793,56 @@ data Model
   , mRationalToEntity :: !(Map Rational EUF.Entity)
   }
   deriving (Show)
+           
+dumpModel :: Solver -> Model -> IO ()
+dumpModel solver m = do
+  fdefs <- readIORef (smtFDefs solver)
+  let fromEUFFSym = IntMap.fromList [(fsym, name) | (name, FEUFFun _ fsym) <- Map.toList fdefs]
+      fromLRAVar  = IntMap.fromList [(v, name) | (name, FLRAVar v) <- Map.toList fdefs]
+      fromBoolVar = IntMap.fromList [(v, name) | (name, FBoolVar v) <- Map.toList fdefs]
+      
+  (_, boolToEUFAtom) <- readIORef (smtEUFAtomDefs solver)
+  (_, boolToLRAAtom) <- readIORef (smtLRAAtomDefs solver)
+
+  (_, fsymToReal) <- readIORef (smtRealTermDefs solver)
+  (termToBool, boolToTerm) <- readIORef (smtBoolTermDefs solver)
+  (_, defsLRA) <- readIORef (smtLRAAtomDefs solver)
+
+  let fromLRAExpr :: LA.Expr Rational -> Expr
+      fromLRAExpr e =
+        case LA.terms e of
+          [(c,v)] -> f (c,v)
+          ts -> EAp "+" (map f ts)
+        where
+          f (c,v)
+            | c == 1 = EAp (case IntMap.lookup v fromLRAVar of{ Nothing -> "@lra"++show v; Just name -> "name" }) []
+            | v == LA.unitVar = EFrac c
+            | otherwise = EAp "*" [f (c, LA.unitVar), f (1, v)]
+
+  let f :: EUF.Term -> Expr
+      f t
+        | t == smtEUFTrue solver  = true
+        | t == smtEUFFalse solver = false
+        | Just b <- Map.lookup t termToBool, Just (lhs,rhs) <- IntMap.lookup (abs b) boolToEUFAtom =
+            if b > 0 then EAp "=" [f lhs, f rhs] else EAp "not" [EAp "=" [f lhs, f rhs]]
+        | Just b <- Map.lookup t termToBool, Just (LA.OrdRel lhs op rhs) <- IntMap.lookup b boolToLRAAtom =
+            EAp (LA.showOp op) [fromLRAExpr lhs, fromLRAExpr rhs]
+--         | Just b <- Map.lookup t termToBool, 
+      f (EUF.TApp fun xs)
+        | Just name <- IntMap.lookup fun fromEUFFSym = EAp name (map f xs)
+        | Just l <- IntMap.lookup fun fsymToReal = fromLRAExpr l
+        | otherwise = EAp ("@" ++ show fun) (map f xs)
+
+  let cs = EUF.mEquivClasses (mEUFModel m)
+  forM_ cs $ \(ts, e) -> do
+     print ([f t | t <- Set.toList ts], e)
+  
+  print fdefs
+  -- print $ IntMap.lookup b25 boolToLRAAtom 
+  
+  print $ SAT.evalLit (mBoolModel m) (-41)
+  print $ IntMap.lookup 3 (mLRAModel m)
+  
 
 data Value
   = ValRational !Rational
