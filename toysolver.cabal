@@ -99,6 +99,10 @@ Flag Time15
   Description: use time >=1.5.0
   Manual: False
 
+Flag Transformers051
+  Description: use transformers >=0.5.1
+  Manual: False
+
 Flag UseHaskeline
   Description: use haskeline package
   Manual: True
@@ -160,6 +164,10 @@ Library
     Build-Depends:
       -- vector-space depends on MemoTrie, but MemoTrie >=0.6.3 uses extensions that are not available on GHC 7.6.
       MemoTrie <=0.6.2
+  if flag(Transformers051)
+     Build-Depends: transformers >=0.5.1.0
+  else
+     Build-Depends: transformers <0.5.1.0
   if impl(ghc)
      Build-Depends: ghc-prim
   Default-Language: Haskell2010
@@ -402,6 +410,9 @@ Executable toyfmf
       containers,
       toysolver,
       logic-TPTP >=0.4.1
+    -- logic-TPTP <=0.4.3 has build error on ghc <7.9 and transformers >=0.5.1.
+    if impl(ghc <7.9) && flag(Transformers051)
+      Build-Depends: logic-TPTP >=0.4.4.0
   Default-Language: Haskell2010
   if impl(ghc)
     GHC-Options: -rtsopts
