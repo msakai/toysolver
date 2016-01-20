@@ -1,8 +1,12 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Test.SMT (smtTestGroup) where
 
+import Control.Applicative((<$>))
 import Control.Exception (evaluate)
 import Control.Monad
+import Control.Monad.State.Strict
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
@@ -229,6 +233,105 @@ to satisfy the constraints. But if we were compute it after backtracking, the
 range of delta becomes (0, (10-4)/3] = (0,2] and choosing delta=2 causes
 violation of a+b < 15.
 -}
+
+prop_getModel_eval :: Property
+prop_getModel_eval = QM.monadicIO $ do
+  solver <- QM.run $ SMT.newSolver
+
+  nsorts <- QM.pick $ choose ((0::Int), 3)
+  xs <- QM.run $ forM [(1::Int)..nsorts] $ \i -> do
+    s <- SMT.declareSort solver ("U" ++ show i) 0
+    c <- SMT.declareFSym solver ("U" ++ show i ++ "const") [] s
+    return (s, (c, ([],s)))
+  let sorts = [SMT.sBool, SMT.sReal] ++ map fst xs
+      cs = map snd xs
+  fs1 <- QM.pick $ do
+    ts <- listOf (genType sorts)
+    return [("f" ++ show i, t) | (i,t) <- zip [1..] ts]
+  fs2 <- QM.run $ forM fs1 $ \(name, t@(argsSorts, resultSort)) -> do
+    f <- SMT.declareFSym solver name argsSorts resultSort
+    return (f, t)
+
+  let sig =  [("ite", ([SMT.sBool,s,s], s)) | s <- sorts]
+          ++ [("=", ([s,s], SMT.sBool)) | s <- sorts]
+          ++ [ ("true", ([], SMT.sBool))
+             , ("and", ([SMT.sBool,SMT.sBool], SMT.sBool))
+             , ("or", ([SMT.sBool,SMT.sBool], SMT.sBool))
+             , ("not", ([SMT.sBool], SMT.sBool))
+             , ("=>", ([SMT.sBool,SMT.sBool], SMT.sBool))
+             , ("+", ([SMT.sReal,SMT.sReal], SMT.sReal))
+             , ("-", ([SMT.sReal,SMT.sReal], SMT.sReal))
+             , ("*", ([SMT.sReal,SMT.sReal], SMT.sReal))
+             , ("/", ([SMT.sReal,SMT.sReal], SMT.sReal))
+             , ("-", ([SMT.sReal], SMT.sReal))
+             , (">=", ([SMT.sReal, SMT.sReal], SMT.sBool))
+             , ("<=", ([SMT.sReal, SMT.sReal], SMT.sBool))
+             , (">", ([SMT.sReal, SMT.sReal], SMT.sBool))
+             , ("<", ([SMT.sReal, SMT.sReal], SMT.sBool))
+             ]
+          ++ fs2 ++ cs
+
+  constrs <- QM.pick $ do
+    nconstrs <- choose ((0::Int), 3)
+    replicateM nconstrs (genExpr sig SMT.sBool 10)
+  ret <- QM.run $ do
+    forM_ constrs $ \constr -> SMT.assert solver constr
+    SMT.checkSAT solver
+  when ret $ do
+    m <- QM.run $ SMT.getModel solver
+    forM_ constrs $ \constr -> do
+      QM.assert $ SMT.eval m constr == SMT.ValBool True
+
+genType :: [SMT.Sort] -> Gen SMT.Type
+genType sorts = do
+  resultSort <- elements sorts
+  argsSorts <- listOf $ elements sorts
+  return (argsSorts, resultSort)
+
+genExpr :: [(SMT.FSym, SMT.Type)] -> SMT.Sort -> Int -> Gen SMT.Expr
+genExpr sig s size = evalStateT (f s) size
+  where
+    sig' :: Map SMT.Sort [(SMT.FSym, [SMT.Sort])]
+    sig' = Map.fromListWith (++) [(resultSort, [(fsym, argsSorts)]) | (fsym, (argsSorts,resultSort)) <- sig]
+
+    f :: SMT.Sort -> StateT Int Gen SMT.Expr
+    f s | s == SMT.sReal = do
+      modify (subtract 1)
+      size <- get
+      (e,size') <- lift $ oneof $
+        [ do
+            r <- arbitrary
+            return (fromRational r, size - 1)
+        ]
+        ++
+        [ flip runStateT size $ do
+            arg1 <- f SMT.sReal
+            arg2 <- lift $ fromRational <$> arbitrary
+            lift $ elements [ arg1 * arg2, arg2 * arg1, arg1 / arg2 ]
+        | size >= 2
+        ]
+        ++
+        [ flip runStateT size $ do
+            args <- mapM f argsSorts
+            return $ EAp op args
+        | (op, argsSorts) <- Map.findWithDefault [] s sig'
+        , op /= "*" && op /= "/"
+        , size >= length argsSorts || null argsSorts
+        ]
+      put size'
+      return e
+    f s = do
+      modify (subtract 1)
+      size <- get
+      (e,size') <- lift $ oneof $
+        [ flip runStateT size $ do
+            args <- mapM f argsSorts
+            return $ EAp op args
+        | (op, argsSorts) <- Map.findWithDefault [] s sig'
+        , size >= length argsSorts || null argsSorts
+        ]
+      put size'
+      return e
 
 ------------------------------------------------------------------------
 -- Test harness
