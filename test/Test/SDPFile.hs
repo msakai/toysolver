@@ -67,7 +67,7 @@ case_test4 = checkParsed example2b example2
     s = renderSparse example2 ""
     example2b = parseSparseDataString "" s
 
--- checkParsed :: Either ParseError Problem -> Problem -> IO ()
+-- checkParsed :: Either ParseError Problem -> Problem -> Assertion
 checkParsed actual expected =
   case actual of
     Left err -> assertFailure $ show err

@@ -13,7 +13,7 @@ import Text.Printf
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Arith.Simplex2
 
-case_test1 :: IO ()
+case_test1 :: Assertion
 case_test1 = do
   solver <- newSolver
   x <- newVar solver
@@ -39,7 +39,7 @@ case_test1 = do
   assertBool (printf "vx should be >=-50 but %s" (show vy)) $ vy >= -50
   assertBool (printf "vx should be <=50 but %s"  (show vy)) $ vy <= 50
 
-case_test2 :: IO ()
+case_test2 :: Assertion
 case_test2 = do
   solver <- newSolver
   x <- newVar solver
@@ -74,7 +74,7 @@ Bounds
  2 <= x4 <= 3
 End
 -}
-case_test3 :: IO ()
+case_test3 :: Assertion
 case_test3 = do
   solver <- newSolver
 
@@ -114,7 +114,7 @@ subject to
 
 optimal value is 11
 -}
-case_test6 :: IO ()
+case_test6 :: Assertion
 case_test6 = do
   solver <- newSolver
 
@@ -151,7 +151,7 @@ subject to
 
 optimal value should be -11
 -}
-case_test7 :: IO ()
+case_test7 :: Assertion
 case_test7 = do
   solver <- newSolver
 
@@ -177,7 +177,7 @@ case_test7 = do
   val <- getObjValue solver
   val @?= -11
 
-case_AssertAtom :: IO ()
+case_AssertAtom :: Assertion
 case_AssertAtom = do
   solver <- newSolver
   x0 <- newVar solver

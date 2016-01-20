@@ -27,7 +27,7 @@ example_3_2 = IntMap.fromList
   , (objRowIndex, (IntMap.fromList [(1,-3), (2,-2), (3,-3)], 0))
   ]
 
-case_example_3_2_simplex :: IO ()
+case_example_3_2_simplex :: Assertion
 case_example_3_2_simplex = do
   assertBool "simplex failed" ret
   assertBool "invalid tableau" (isValidTableau result)
@@ -39,7 +39,7 @@ case_example_3_2_simplex = do
     result :: Tableau Rational
     (ret,result) = simplex OptMax example_3_2
 
-case_example_3_2_primalDualSimplex :: IO ()
+case_example_3_2_primalDualSimplex :: Assertion
 case_example_3_2_primalDualSimplex = do
   assertBool "simplex failed" ret
   assertBool "invalid tableau" (isValidTableau result)
@@ -58,7 +58,7 @@ exampe_5_3_phase1 = IntMap.fromList
   , (7, (IntMap.fromList [(3,1), (4,-1), (5,1), (7,1)], 0))
   ]
 
-case_exampe_5_3_phase1 :: IO ()
+case_exampe_5_3_phase1 :: Assertion
 case_exampe_5_3_phase1 = do
   let (ret,result) = phaseI exampe_5_3_phase1 (IntSet.fromList [6,7])
   assertBool "phase1 failed" ret
@@ -74,7 +74,7 @@ kuhn_7_3 = IntMap.fromList
   , (objRowIndex, (IntMap.fromList [(4,2), (5,3), (6,-1), (7,-12)], 0))
   ]
 
-case_kuhn_7_3 :: IO ()
+case_kuhn_7_3 :: Assertion
 case_kuhn_7_3 = do
   assertBool "simplex failed" ret
   assertBool "invalid tableau" (isValidTableau result)
@@ -84,7 +84,7 @@ case_kuhn_7_3 = do
     result :: Tableau Rational
     (ret,result) = simplex OptMin kuhn_7_3
 
--- case_pd_kuhn_7_3 :: IO ()
+-- case_pd_kuhn_7_3 :: Assertion
 -- case_pd_kuhn_7_3 = do
 --   assertBool "simplex failed" ret
 --   assertBool "invalid tableau" (isValidTableau result)
@@ -102,7 +102,7 @@ example_5_7 = IntMap.fromList
   , (objRowIndex, (IntMap.fromList [(1,3),(2,4),(3,5)], 0))
   ]
 
-case_example_5_7 :: IO ()
+case_example_5_7 :: Assertion
 case_example_5_7 = do
   assertBool "dual simplex failed" ret
   assertBool "invalid tableau" (isValidTableau result)
@@ -112,7 +112,7 @@ case_example_5_7 = do
     result :: Tableau Rational
     (ret,result) = dualSimplex OptMax example_5_7
 
-case_pd_example_5_7 :: IO ()
+case_pd_example_5_7 :: Assertion
 case_pd_example_5_7 = do
   assertBool "dual simplex failed" ret
   assertBool "invalid tableau" (isValidTableau result)
@@ -124,7 +124,7 @@ case_pd_example_5_7 = do
 
 ------------------------------------------------------------------------
 
-case_lp_example_5_7_twoPhaseSimplex :: IO ()
+case_lp_example_5_7_twoPhaseSimplex :: Assertion
 case_lp_example_5_7_twoPhaseSimplex = do  
   ret @?= LP.Optimum
   oval @?= -11
@@ -147,7 +147,7 @@ case_lp_example_5_7_twoPhaseSimplex = do
       let oval = LA.evalExpr m obj
       return (ret,tbl,oval)
 
-case_lp_example_5_7_primalDualSimplex :: IO ()
+case_lp_example_5_7_primalDualSimplex :: Assertion
 case_lp_example_5_7_primalDualSimplex = do  
   ret @?= LP.Optimum
   oval @?= -11

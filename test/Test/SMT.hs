@@ -21,7 +21,7 @@ import qualified ToySolver.SMT as SMT
 
 -- -------------------------------------------------------------------
 
-case_QF_LRA :: IO ()
+case_QF_LRA :: Assertion
 case_QF_LRA = do
   solver <- SMT.newSolver
 
@@ -40,7 +40,7 @@ case_QF_LRA = do
   SMT.eval m c1 @?= SMT.ValBool True
   SMT.eval m c2 @?= SMT.ValBool True
 
-case_QF_EUF_1 :: IO ()
+case_QF_EUF_1 :: Assertion
 case_QF_EUF_1 = do
   solver <- SMT.newSolver
   x <- SMT.declareConst solver "x" SMT.sBool
@@ -61,7 +61,7 @@ case_QF_EUF_1 = do
   ret <- SMT.checkSAT solver
   ret @?= False
 
-case_QF_EUF_2 :: IO ()
+case_QF_EUF_2 :: Assertion
 case_QF_EUF_2 = do
   solver <- SMT.newSolver
   sU <- SMT.declareSort solver "U" 0
@@ -86,7 +86,7 @@ case_QF_EUF_2 = do
   ret <- SMT.checkSAT solver
   ret @?= False
 
-case_QF_EUF_LRA :: IO ()
+case_QF_EUF_LRA :: Assertion
 case_QF_EUF_LRA = do
   solver <- SMT.newSolver
   a <- SMT.declareConst solver "a" SMT.sReal
@@ -115,7 +115,7 @@ case_QF_EUF_LRA = do
   ret <- SMT.checkSAT solver
   ret @?= False
 
-case_QF_EUF_Bool :: IO ()
+case_QF_EUF_Bool :: Assertion
 case_QF_EUF_Bool = do
   solver <- SMT.newSolver
   a <- SMT.declareConst solver "a" SMT.sBool
@@ -143,7 +143,7 @@ case_QF_EUF_Bool = do
   ret <- SMT.checkSAT solver
   ret @?= False
 
-case_push :: IO ()
+case_push :: Assertion
 case_push = do
   solver <- SMT.newSolver
   sU <- SMT.declareSort solver "U" 0
@@ -165,7 +165,7 @@ case_push = do
   ret <- SMT.checkSAT solver
   ret @?= True
 
-case_QF_LRA_division_by_zero :: IO ()
+case_QF_LRA_division_by_zero :: Assertion
 case_QF_LRA_division_by_zero = do
   solver <- SMT.newSolver
 
@@ -189,7 +189,7 @@ case_QF_LRA_division_by_zero = do
   ret <- SMT.checkSAT solver
   ret @?= False
 
-case_LRA_model_construction_bug :: IO ()
+case_LRA_model_construction_bug :: Assertion
 case_LRA_model_construction_bug = do
   solver <- SMT.newSolver
   cond <- SMT.declareConst solver "cond" SMT.sBool

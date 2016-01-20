@@ -818,7 +818,7 @@ case_sqfree_Rational = actual @?= expected
 ------------------------------------------------------------------------
 
 -- http://www14.in.tum.de/konferenzen/Jass07/courses/1/Bulwahn/Buhlwahn_Paper.pdf
-case_Hensel_Lifting :: IO ()
+case_Hensel_Lifting :: Assertion
 case_Hensel_Lifting = do
   Hensel.hensel f fs 2 @?= [x^(2::Int) + 5*x + 18, x + 5]
   Hensel.hensel f fs 3 @?= [x^(2::Int) + 105*x + 43, x + 30]
@@ -831,7 +831,7 @@ case_Hensel_Lifting = do
     fs :: [UPolynomial $(FF.primeField 5)]
     fs = [x^(2::Int)+3, x]
 
-case_cabook_proposition_5_10 :: IO ()
+case_cabook_proposition_5_10 :: Assertion
 case_cabook_proposition_5_10 =
   sum [ei * (product fs `P.div` fi) | (ei,fi) <- zip es fs] @?= 1
   where
@@ -840,7 +840,7 @@ case_cabook_proposition_5_10 =
     fs = [x, x+1, x+2]
     es = Hensel.cabook_proposition_5_10 fs
 
-case_cabook_proposition_5_11 :: IO ()
+case_cabook_proposition_5_11 :: Assertion
 case_cabook_proposition_5_11 =
   sum [ei * (product fs `P.div` fi) | (ei,fi) <- zip es fs] @?= g
   where
@@ -852,7 +852,7 @@ case_cabook_proposition_5_11 =
 
 ------------------------------------------------------------------------
 
-case_Zassenhaus_factor :: IO ()
+case_Zassenhaus_factor :: Assertion
 case_Zassenhaus_factor = actual @?= expected
   where
     x :: UPolynomial Integer
@@ -862,7 +862,7 @@ case_Zassenhaus_factor = actual @?= expected
     actual   = sort $ Zassenhaus.factor f
     expected = sort $ [(-1,1), (x^(2::Int)+x+1,1), (x^(3::Int)-x+2,1)]
 
-case_Zassenhaus_zassenhaus_1 :: IO ()
+case_Zassenhaus_zassenhaus_1 :: Assertion
 case_Zassenhaus_zassenhaus_1 = actual @?= expected
   where
     x = P.var X
@@ -871,7 +871,7 @@ case_Zassenhaus_zassenhaus_1 = actual @?= expected
     actual   = sort $ Zassenhaus.zassenhaus f
     expected = sort $ [x^(2::Int)+2*x+2, x^(2::Int)-2*x+2]
 
-case_Zassenhaus_zassenhaus_2 :: IO ()
+case_Zassenhaus_zassenhaus_2 :: Assertion
 case_Zassenhaus_zassenhaus_2 = actual @?= expected
   where
     x = P.var X

@@ -603,9 +603,13 @@ Test-suite TestSuite
     Test.AReal
     Test.AReal2
     Test.Arith
+    Test.BoolExpr
     Test.CongruenceClosure
     Test.ContiTraverso
+    Test.Delta
     Test.FiniteModelFinder
+    Test.HittingSets
+    Test.Knapsack
     Test.LPFile
     Test.Misc
     Test.MIPSolver2
@@ -615,6 +619,7 @@ Test-suite TestSuite
     Test.Simplex
     Test.Simplex2
     Test.SMT
+    Test.SubsetSum
   Build-depends:
     base,
     array,

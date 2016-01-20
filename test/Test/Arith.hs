@@ -198,7 +198,7 @@ prop_FourierMotzkin_solve =
       Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom m) cs == False
       Just m  -> property $ all (LA.evalAtom m) cs
 
-case_FourierMotzkin_test1 :: IO ()
+case_FourierMotzkin_test1 :: Assertion
 case_FourierMotzkin_test1 = 
   case uncurry FourierMotzkin.solve test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
@@ -206,7 +206,7 @@ case_FourierMotzkin_test1 =
       forM_ (snd test1') $ \a -> do
         LA.evalAtom m a @?= True
 
-case_FourierMotzkin_test2 :: IO ()
+case_FourierMotzkin_test2 :: Assertion
 case_FourierMotzkin_test2 = 
   case uncurry FourierMotzkin.solve test2' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
@@ -226,7 +226,7 @@ Bounds
  2 <= x4 <= 3
 End
 -}
-case_FourierMotzkinOptimization_test1 :: IO ()
+case_FourierMotzkinOptimization_test1 :: Assertion
 case_FourierMotzkinOptimization_test1 = do
   Interval.upperBound' i @?= (3005/24, True)
   and [LA.evalAtom m c | c <- cs] @?= True
@@ -256,7 +256,7 @@ prop_VirtualSubstitution_solve =
        Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom m) cs == False
        Just m  -> property $ all (LA.evalAtom m) cs
 
-case_VirtualSubstitution_test1 :: IO ()
+case_VirtualSubstitution_test1 :: Assertion
 case_VirtualSubstitution_test1 = 
   case uncurry VirtualSubstitution.solve test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
@@ -264,7 +264,7 @@ case_VirtualSubstitution_test1 =
       forM_ (snd test1') $ \a -> do
         LA.evalAtom m a @?= True
 
-case_VirtualSubstitution_test2 :: IO ()
+case_VirtualSubstitution_test2 :: Assertion
 case_VirtualSubstitution_test2 = 
   case uncurry VirtualSubstitution.solve test2' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
@@ -287,7 +287,7 @@ disabled_prop_CAD_solve =
               in all (evalPAtom m') cs' == False
           Just m  -> property $ all (evalPAtom m) cs'
 
-case_CAD_test1 :: IO ()
+case_CAD_test1 :: Assertion
 case_CAD_test1 = 
   case CAD.solve vs cs of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
@@ -298,7 +298,7 @@ case_CAD_test1 =
     vs = Set.fromAscList $ IS.toAscList $ fst test1'
     cs = map toPRel $ snd test1'
 
-case_CAD_test2 :: IO ()
+case_CAD_test2 :: Assertion
 case_CAD_test2 = 
   case CAD.solve vs cs of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
@@ -309,7 +309,7 @@ case_CAD_test2 =
     vs = Set.fromAscList $ IS.toAscList $ fst test2'
     cs = map toPRel $ snd test2'
 
-case_CAD_test_nonlinear_multivariate :: IO ()
+case_CAD_test_nonlinear_multivariate :: Assertion
 case_CAD_test_nonlinear_multivariate =
   case CAD.solve vs cs of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
@@ -343,7 +343,7 @@ prop_OmegaTest_solve =
        Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom (fmap fromInteger m)) cs == False
        Just m  -> property $ all (LA.evalAtom (fmap fromInteger m)) cs
 
-case_OmegaTest_test1 :: IO ()
+case_OmegaTest_test1 :: Assertion
 case_OmegaTest_test1 = 
   case uncurry (OmegaTest.solve def) test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
@@ -351,7 +351,7 @@ case_OmegaTest_test1 =
       forM_ (snd test1') $ \a -> do
         LA.evalAtom (IM.map fromInteger m) a @?= True
 
-case_OmegaTest_test2 :: IO ()
+case_OmegaTest_test2 :: Assertion
 case_OmegaTest_test2 = 
   case uncurry (OmegaTest.solve def) test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
@@ -375,7 +375,7 @@ prop_Cooper_solve =
          property (OmegaTest.solve def vs cs == Nothing)
        Just m  -> property $ all (LA.evalAtom (fmap fromInteger m)) cs
 
-case_Cooper_test1 :: IO ()
+case_Cooper_test1 :: Assertion
 case_Cooper_test1 = 
   case uncurry Cooper.solve test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
@@ -383,7 +383,7 @@ case_Cooper_test1 =
       forM_ (snd test1') $ \a -> do
         LA.evalAtom (IM.map fromInteger m) a @?= True
 
-case_Cooper_test2 :: IO ()
+case_Cooper_test2 :: Assertion
 case_Cooper_test2 = 
   case uncurry Cooper.solve test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
@@ -409,7 +409,7 @@ prop_Simplex2_solve = QM.monadicIO $ do
      else do
        return $ return ()
 
-case_Simplex2_test1 :: IO ()
+case_Simplex2_test1 :: Assertion
 case_Simplex2_test1 = do
   solver <- Simplex2.newSolver
   forM_ (IS.toList (fst test1')) $ \_ -> Simplex2.newVar solver
@@ -417,7 +417,7 @@ case_Simplex2_test1 = do
   ret <- Simplex2.check solver
   ret @?= True
 
-case_Simplex2_test2 :: IO ()
+case_Simplex2_test2 :: Assertion
 case_Simplex2_test2 = do
   solver <- Simplex2.newSolver
   forM_ (IS.toList (fst test2')) $ \_ -> Simplex2.newVar solver
@@ -481,7 +481,7 @@ prop_Simplex2_explain = QM.monadicIO $ do
 
 -- Too slow
 
-disabled_case_ContiTraverso_test1 :: IO ()
+disabled_case_ContiTraverso_test1 :: Assertion
 disabled_case_ContiTraverso_test1 = 
   case ContiTraverso.solve P.grlex (fst test1') OptMin (LA.constant 0) (snd test1') of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
@@ -489,7 +489,7 @@ disabled_case_ContiTraverso_test1 =
       forM_ (snd test1') $ \a -> do
         LA.evalAtom (IM.map fromInteger m) a @?= True
 
-disabled_case_ContiTraverso_test2 :: IO ()
+disabled_case_ContiTraverso_test2 :: Assertion
 disabled_case_ContiTraverso_test2 = 
   case ContiTraverso.solve P.grlex (fst test2') OptMin (LA.constant 0) (snd test2') of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"

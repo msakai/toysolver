@@ -24,7 +24,7 @@ import qualified ToySolver.EUF.EUFSolver as EUF
 ------------------------------------------------------------------------
 -- Test cases
 
-case_Example_1 :: IO ()
+case_Example_1 :: Assertion
 case_Example_1 = do
   solver <- newSolver
   a <- newFSym solver
@@ -40,7 +40,7 @@ case_Example_1 = do
   ret <- areCongruent solver (TApp a [TApp b []]) (TApp c [TApp d []])
   ret @?= True
 
-case_Example_1_FlatTerm :: IO ()
+case_Example_1_FlatTerm :: Assertion
 case_Example_1_FlatTerm = do
   solver <- newSolver
   a <- newFSym solver
@@ -56,7 +56,7 @@ case_Example_1_FlatTerm = do
   ret <- areCongruentFlatTerm solver (FTApp a b) (FTApp c d)
   ret @?= True
   
-case_Example_2 :: IO ()
+case_Example_2 :: Assertion
 case_Example_2 = do
   solver <- newSolver
   a <- newConst solver
@@ -76,7 +76,7 @@ case_Example_2 = do
   ret <- areCongruent solver (g b) (h c b)
   ret @?= True
 
-case_NO2007_Example_11 :: IO ()
+case_NO2007_Example_11 :: Assertion
 case_NO2007_Example_11 = do
   solver <- newSolver
   replicateM_ 15 $ newFSym solver
@@ -86,7 +86,7 @@ case_NO2007_Example_11 = do
   fmap (Set.fromList . map (xs!!) . IntSet.toList) m @?= Just (Set.fromList [(7,1), (10,4), (10,7)])
 
 -- f(g,h)=d, c=d, f(g,d)=a, e=c, e=b, b=h
-case_NO2007_Example_16 :: IO ()
+case_NO2007_Example_16 :: Assertion
 case_NO2007_Example_16 = do
   solver <- newSolver
   a <- newFSym solver
@@ -107,7 +107,7 @@ case_NO2007_Example_16 = do
   -- d = c = e = b = h
   -- a = f(g,d) = f(g,h) = d = c = e = b
 
-case_backtracking_1 :: IO ()
+case_backtracking_1 :: Assertion
 case_backtracking_1 = do
   solver <- newSolver
   a1 <- newFSym solver
@@ -135,7 +135,7 @@ case_backtracking_1 = do
   ret @?= False  
   popBacktrackPoint solver
 
-case_backtracking_preserve_definition :: IO ()
+case_backtracking_preserve_definition :: Assertion
 case_backtracking_preserve_definition = do
   solver <- newSolver
   a1 <- newFSym solver
@@ -172,7 +172,7 @@ prop_components = QM.monadicIO $ do
       b <- QM.run $ areCongruentFlatTerm solver (FTConst c) (FTConst d)
       QM.assert $ b == (repr ! c == repr ! d)
 
-case_fsymToTerm_termToSym :: IO ()
+case_fsymToTerm_termToSym :: Assertion
 case_fsymToTerm_termToSym = do
   solver <- newSolver
   f <- liftM (\f x y -> TApp f [x,y]) $ newFSym solver
@@ -184,7 +184,7 @@ case_fsymToTerm_termToSym = do
   t2 <- fsymToTerm solver c
   t2 @?= t
 
-case_getModel_test1 :: IO ()
+case_getModel_test1 :: Assertion
 case_getModel_test1 = do
   solver <- newSolver
   a <- newConst solver
@@ -212,7 +212,7 @@ case_getModel_test1 = do
   (eval m2 (f b) == eval m2 (f c)) @?= True
   (eval m2 (g b) == eval m2 (g c)) @?= True
 
-case_EUF_getModel_test1 :: IO ()
+case_EUF_getModel_test1 :: Assertion
 case_EUF_getModel_test1 = do
   solver <- EUF.newSolver
   a <- EUF.newConst solver -- 0

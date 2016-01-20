@@ -48,14 +48,14 @@ testdata = unlines
 ------------------------------------------------------------------------
 -- Utilities
 
-checkFile :: FilePath -> IO ()
+checkFile :: FilePath -> Assertion
 checkFile fname = do
   r <- parseFile fname
   case r of
     Left err -> assertFailure (show err)
     Right lp -> return ()
 
-checkString :: String -> String -> IO ()
+checkString :: String -> String -> Assertion
 checkString name str = do
   case parseString name str of
     Left err -> assertFailure (show err)

@@ -325,7 +325,7 @@ prop_solveCNF_using_BooleanTheory = QM.monadicIO $ do
       forM_ (allAssignments nv) $ \m -> do
         QM.assert $ not (evalCNF m cnf)
 
-case_QF_LRA :: IO ()
+case_QF_LRA :: Assertion
 case_QF_LRA = do
   satSolver <- SAT.newSolver
   lraSolver <- Simplex2.newSolver
@@ -427,7 +427,7 @@ case_QF_LRA = do
   fold f c2 @?= True
 
 
-case_QF_EUF :: IO ()
+case_QF_EUF :: Assertion
 case_QF_EUF = do
   satSolver <- SAT.newSolver
   eufSolver <- EUF.newSolver
@@ -584,7 +584,7 @@ case_QF_EUF = do
     ret @?= False
 
 -- should be SAT
-case_solve_SAT :: IO ()
+case_solve_SAT :: Assertion
 case_solve_SAT = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -596,7 +596,7 @@ case_solve_SAT = do
   ret @?= True
 
 -- shuld be UNSAT
-case_solve_UNSAT :: IO ()
+case_solve_UNSAT :: Assertion
 case_solve_UNSAT = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -609,7 +609,7 @@ case_solve_UNSAT = do
   ret @?= False
 
 -- top level でいきなり矛盾
-case_root_inconsistent :: IO ()
+case_root_inconsistent :: Assertion
 case_root_inconsistent = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -619,7 +619,7 @@ case_root_inconsistent = do
   ret @?= False
 
 -- incremental に制約を追加
-case_incremental_solving :: IO ()
+case_incremental_solving :: Assertion
 case_incremental_solving = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -635,14 +635,14 @@ case_incremental_solving = do
   ret @?= False
 
 -- 制約なし
-case_empty_constraint :: IO ()
+case_empty_constraint :: Assertion
 case_empty_constraint = do
   solver <- SAT.newSolver
   ret <- SAT.solve solver
   ret @?= True
 
 -- 空の節
-case_empty_claue :: IO ()
+case_empty_claue :: Assertion
 case_empty_claue = do
   solver <- SAT.newSolver
   SAT.addClause solver []
@@ -650,7 +650,7 @@ case_empty_claue = do
   ret @?= False
 
 -- 自明に真な節
-case_excluded_middle_claue :: IO ()
+case_excluded_middle_claue :: Assertion
 case_excluded_middle_claue = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -659,7 +659,7 @@ case_excluded_middle_claue = do
   ret @?= True
 
 -- 冗長な節
-case_redundant_clause :: IO ()
+case_redundant_clause :: Assertion
 case_redundant_clause = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -667,7 +667,7 @@ case_redundant_clause = do
   ret <- SAT.solve solver
   ret @?= True
 
-case_instantiateClause :: IO ()
+case_instantiateClause :: Assertion
 case_instantiateClause = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -678,7 +678,7 @@ case_instantiateClause = do
   ret <- SAT.solve solver
   ret @?= True
 
-case_instantiateAtLeast :: IO ()
+case_instantiateAtLeast :: Assertion
 case_instantiateAtLeast = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -695,7 +695,7 @@ case_instantiateAtLeast = do
   ret <- SAT.solve solver
   ret @?= True
 
-case_inconsistent_AtLeast :: IO ()
+case_inconsistent_AtLeast :: Assertion
 case_inconsistent_AtLeast = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -704,7 +704,7 @@ case_inconsistent_AtLeast = do
   ret <- SAT.solve solver -- unsat
   ret @?= False
 
-case_trivial_AtLeast :: IO ()
+case_trivial_AtLeast :: Assertion
 case_trivial_AtLeast = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -720,7 +720,7 @@ case_trivial_AtLeast = do
   ret <- SAT.solve solver
   ret @?= True
 
-case_AtLeast_1 :: IO ()
+case_AtLeast_1 :: Assertion
 case_AtLeast_1 = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -731,7 +731,7 @@ case_AtLeast_1 = do
   ret <- SAT.solve solver -- unsat
   ret @?= False
 
-case_AtLeast_2 :: IO ()
+case_AtLeast_2 :: Assertion
 case_AtLeast_2 = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -744,7 +744,7 @@ case_AtLeast_2 = do
   ret <- SAT.solve solver
   ret @?= True
 
-case_AtLeast_3 :: IO ()
+case_AtLeast_3 :: Assertion
 case_AtLeast_3 = do
   forM_ [(-1) .. 3] $ \n -> do
     solver <- SAT.newSolver
@@ -755,7 +755,7 @@ case_AtLeast_3 = do
     assertEqual ("case_AtLeast3_" ++ show n) (n <= 2) ret
 
 -- from http://www.cril.univ-artois.fr/PB11/format.pdf
-case_PB_sample1 :: IO ()
+case_PB_sample1 :: Assertion
 case_PB_sample1 = do
   solver <- SAT.newSolver
 
@@ -774,7 +774,7 @@ case_PB_sample1 = do
   ret @?= True
 
 -- 一部の変数を否定に置き換えたもの
-case_PB_sample1' :: IO ()
+case_PB_sample1' :: Assertion
 case_PB_sample1' = do
   solver <- SAT.newSolver
 
@@ -793,7 +793,7 @@ case_PB_sample1' = do
   ret @?= True
 
 -- いきなり矛盾したPB制約
-case_root_inconsistent_PB :: IO ()
+case_root_inconsistent_PB :: Assertion
 case_root_inconsistent_PB = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -802,7 +802,7 @@ case_root_inconsistent_PB = do
   ret <- SAT.solve solver
   ret @?= False
 
-case_pb_propagate :: IO ()
+case_pb_propagate :: Assertion
 case_pb_propagate = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -812,7 +812,7 @@ case_pb_propagate = do
   ret <- SAT.solve solver
   ret @?= True
 
-case_solveWith_1 :: IO ()
+case_solveWith_1 :: Assertion
 case_solveWith_1 = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -832,7 +832,7 @@ case_solveWith_1 = do
   ret <- SAT.solve solver -- sat
   ret @?= True
 
-case_solveWith_2 :: IO ()
+case_solveWith_2 :: Assertion
 case_solveWith_2 = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -846,7 +846,7 @@ case_solveWith_2 = do
   ret <- SAT.solveWith solver [-x2]
   ret @?= False
 
-case_getVarFixed :: IO ()
+case_getVarFixed :: Assertion
 case_getVarFixed = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -867,7 +867,7 @@ case_getVarFixed = do
   ret <- SAT.getLitFixed solver x2
   ret @?= lTrue
 
-case_getAssumptionsImplications_case1 :: IO ()
+case_getAssumptionsImplications_case1 :: Assertion
 case_getAssumptionsImplications_case1 = do
   solver <- SAT.newSolver
   x1 <- SAT.newVar solver
@@ -1127,7 +1127,7 @@ case_xor_case3 = do
 
 -- from "Pueblo: A Hybrid Pseudo-Boolean SAT Solver"
 -- clauseがunitになるレベルで、PB制約が違反状態のままという例。
-case_hybridLearning_1 :: IO ()
+case_hybridLearning_1 :: Assertion
 case_hybridLearning_1 = do
   solver <- SAT.newSolver
   [x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11] <- replicateM 11 (SAT.newVar solver)
@@ -1156,7 +1156,7 @@ case_hybridLearning_1 = do
 -- from "Pueblo: A Hybrid Pseudo-Boolean SAT Solver"
 -- clauseがunitになるレベルで、PB制約が違反状態のままという例。
 -- さらに、学習したPB制約はunitにはならない。
-case_hybridLearning_2 :: IO ()
+case_hybridLearning_2 :: Assertion
 case_hybridLearning_2 = do
   solver <- SAT.newSolver
   [x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12] <- replicateM 12 (SAT.newVar solver)
@@ -1179,7 +1179,7 @@ case_hybridLearning_2 = do
   ret @?= True
 
 -- regression test for the bug triggered by normalized-blast-floppy1-8.ucl.opb.bz2
-case_addPBAtLeast_regression :: IO ()
+case_addPBAtLeast_regression :: Assertion
 case_addPBAtLeast_regression = do
   solver <- SAT.newSolver
   [x1,x2,x3,x4] <- replicateM 4 (SAT.newVar solver)
