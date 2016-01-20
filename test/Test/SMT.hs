@@ -185,6 +185,51 @@ case_QF_LRA_division_by_zero = do
   ret <- SMT.checkSAT solver
   ret @?= False
 
+case_LRA_model_construction_bug :: IO ()
+case_LRA_model_construction_bug = do
+  solver <- SMT.newSolver
+  cond <- SMT.declareConst solver "cond" SMT.sBool
+  a <- SMT.declareConst solver "a" SMT.sReal
+  b <- SMT.declareConst solver "b" SMT.sReal
+  let cs = [ a .<. 10
+           , b .<. 10
+           , cond .=>. a+b .>. 14
+           , cond .=>. a+b .<. 15
+           ]
+  forM_ cs $ SMT.assert solver
+  ret <- SMT.checkSATAssuming solver [cond]
+  m <- SMT.getModel solver 
+  forM_ cs $ \c -> do
+    let val = SMT.eval m c
+    -- unless (val == SMT.ValBool True) $ print val
+    val @?= SMT.ValBool True
+{-
+The solving process goes like the following.
+
+  ASSERT: a <= 10 - delta
+  ASSERT: b <= 10 - delta
+  PUSH
+  ASSERT a+b <= 15 - delta
+  ASSERT a+b >= 14 + delta
+
+This produces assignment
+
+  a+b = 14 + delta
+  a   = 10 - delta
+  b   = (a+b) - a = (14 + delta) - (10 - delta) = 4 + 2 delta
+
+OR alternatively
+
+  a+b = 14 + delta
+  b   = 10 - delta
+  a   = (a+b) - b = (14 + delta) - (10 - delta) = 4 + 2 delta.
+
+The delta value should be in the range (0, min{(15-14)/2, (10-4)/3}] = (0, 1/2]
+to satisfy the constraints. But if we were compute it after backtracking, the
+range of delta becomes (0, (10-4)/3] = (0,2] and choosing delta=2 causes
+violation of a+b < 15.
+-}
+
 ------------------------------------------------------------------------
 -- Test harness
 

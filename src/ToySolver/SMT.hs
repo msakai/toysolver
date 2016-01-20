@@ -185,7 +185,9 @@ data Solver
   , smtRealTermDefs :: !(IORef (Map (LA.Expr Rational) EUF.FSym, IntMap (LA.Expr Rational)))
   , smtEUFTrue  :: !EUF.Term
   , smtEUFFalse :: !EUF.Term
+
   , smtEUFModel :: !(IORef EUF.Model)
+  , smtLRAModel :: !(IORef Simplex2.Model)
 
   , smtGlobalDeclarationsRef :: !(IORef Bool)
   , smtFDefs :: !(IORef (Map FSym FDef))
@@ -227,6 +229,7 @@ newSolver = do
   realTermDefs <- newIORef (Map.empty, IntMap.empty)
 
   eufModelRef <- newIORef (undefined :: EUF.Model)
+  lraModelRef <- newIORef (undefined :: Simplex2.Model)
 
   globalDeclarationsRef <- newIORef False
   fdefs <- newIORef $ Map.singleton "_/0" (FEUFFun ([sReal], sReal) divByZero)
@@ -292,6 +295,10 @@ newSolver = do
             EUF.popBacktrackPoint euf
         , thConstructModel = do
             writeIORef eufModelRef =<< EUF.getModel euf
+            -- We need to call Simplex2.getModel here.
+            -- Because backtracking removes constraints that are necessary
+            -- for computing the value of delta.
+            writeIORef lraModelRef =<< Simplex2.getModel lra
             return ()
         }
   SAT.setTheory sat tsolver
@@ -316,7 +323,9 @@ newSolver = do
     , smtRealTermDefs = realTermDefs
     , smtEUFTrue  = eufTrue
     , smtEUFFalse = eufFalse
+
     , smtEUFModel = eufModelRef
+    , smtLRAModel = lraModelRef
 
     , smtGlobalDeclarationsRef = globalDeclarationsRef
     , smtFDefs = fdefs
@@ -794,7 +803,7 @@ getModel :: Solver -> IO Model
 getModel solver = do
   defs <- readIORef (smtFDefs solver)
   boolModel <- SAT.getModel (smtSAT solver)
-  lraModel <- Simplex2.getModel (smtLRA solver)
+  lraModel <- readIORef (smtLRAModel solver)
   eufModel <- readIORef (smtEUFModel solver)
   (_, fsymToReal) <- readIORef (smtRealTermDefs solver)
   let xs = [(e, LA.evalExpr lraModel lraExpr) | (fsym, lraExpr) <- IntMap.toList fsymToReal, let e = EUF.evalAp eufModel fsym [], e /= EUF.mUnspecified eufModel]
