@@ -165,8 +165,8 @@ instance ShowSL Sort where
 instance ShowSL SpecConstant where
   showSL (SpecConstantNumeral n) = show n
   showSL (SpecConstantDecimal str) = str
-  showSL (SpecConstantHexadecimal str) = str
-  showSL (SpecConstantBinary str)  = str
+  showSL (SpecConstantHexadecimal str) = "#x" ++ str
+  showSL (SpecConstantBinary str)  = "#b" ++ str
   showSL (SpecConstantString str) = str
 
 instance ShowSL Sexpr where
