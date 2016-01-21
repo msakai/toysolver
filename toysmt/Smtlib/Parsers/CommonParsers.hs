@@ -72,10 +72,7 @@ str :: ParsecT String u Identity String
 str = string "\"" <++> liftM concat (Pc.many (liftM (\c -> [c]) strChar <|> Pc.try (string "\"\""))) <++> string "\""
 
 strChar :: ParsecT String u Identity Char
-strChar = alphaNum
-      <|> char ' '
-      <|> char ':'
-      <|> char ','
+strChar = (oneOf $ ['\t','\n','\r'] ++ [c | c <- [toEnum 32 .. toEnum 126], c /= '"']) <|> satisfy (toEnum 128 <=)
 
 
 --parse a Symbol
