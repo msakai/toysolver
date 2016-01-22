@@ -18,6 +18,7 @@ module Smtlib.Parsers.CommonParsers where
 
 import           Control.Applicative               as Ctr hiding ((<|>))
 import           Data.Functor.Identity
+import qualified Data.Set                          as Set
 import           Text.Parsec.Prim                  as Prim
 import           Text.ParserCombinators.Parsec     as Pc
 import           Smtlib.Syntax.Syntax
@@ -83,8 +84,15 @@ quotedSymbol :: ParsecT String u Identity String
 quotedSymbol = char '|' *> Pc.many (noneOf "|")  <* char '|'
 
 simpleSymbol :: ParsecT String u Identity String
-simpleSymbol = (letter <|> spcSymb) <:>  sq
-    where sq = Pc.many (alphaNum <|> spcSymb)
+simpleSymbol = Pc.try $ do
+  s <- (letter <|> spcSymb) <:>  sq
+  guard $ s `Set.notMember` reserved
+  return s
+  where
+    sq = Pc.many (alphaNum <|> spcSymb)
+    reserved = Set.fromList $
+      ["BINARY", "DECIMAL", "HEXADECIMAL", "NUMERAL", "STRING", "_", "!", "as", "let", "exists", "forall", "par"] ++
+      ["set-logic", "set-option", "set-info", "declare-sort", "define-sort", "declare-const", "declare-fun", "declare-fun-rec", "declare-funs-rec", "push", "pop", "reset", "reset-assertions", "assert", "check-sat", "check-sat-assuming", "get-assertions", "get-model", "get-proof", "get-unsat-core", "get-unsat-assumptions", "get-value", "get-assignment", "get-option", "get-info", "echo", "exit"]
 
 spcSymb :: ParsecT String u Identity Char
 spcSymb = oneOf  "+-/*=%?!.$_~^&<>@"
