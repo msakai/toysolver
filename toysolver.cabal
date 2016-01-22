@@ -640,6 +640,28 @@ Test-suite TestSuite
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell, ScopedTypeVariables
 
+Test-suite TestSmtlib
+  Type:              exitcode-stdio-1.0
+  HS-Source-Dirs:    test toysmt
+  Main-is:           TestSmtlib.hs
+  Build-depends:
+    base,
+    array,
+    containers,
+    data-default-class,
+    mtl,
+    parsec,
+    transformers,
+    transformers-compat,
+    toysolver,
+    tasty >=0.10.1,
+    tasty-hunit ==0.9.*,
+    tasty-quickcheck ==0.8.*,
+    tasty-th,
+    QuickCheck >=2.5 && <3
+  Default-Language: Haskell2010
+  Other-Extensions: TemplateHaskell, ScopedTypeVariables
+
 Benchmark BenchmarkSATLIB
   type:             exitcode-stdio-1.0
   hs-source-dirs:   benchmarks
