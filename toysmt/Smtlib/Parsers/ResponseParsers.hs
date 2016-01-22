@@ -133,7 +133,7 @@ parseResponseVersion = string ":version" *> emptySpace *>
 
 
 parseResponseReasonUnknown :: ParsecT String u Identity InfoResponse
-parseResponseReasonUnknown = string "reason" *> emptySpace *>
+parseResponseReasonUnknown = string ":reason-unknown" *> emptySpace *>
     liftM ResponseReasonUnknown parseRReasonUnknown
 
 parseRReasonUnknown :: ParsecT String u Identity ReasonUnknown
