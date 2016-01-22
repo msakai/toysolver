@@ -210,7 +210,7 @@ instance ShowSL ErrorBehavior where
 
 instance ShowSL ReasonUnknown where
   showSL Memout = "memout"
-  showSL Incomplete = "imcomplete"
+  showSL Incomplete = "incomplete"
 
 instance ShowSL CheckSatResponse where
   showSL Sat = "sat"
