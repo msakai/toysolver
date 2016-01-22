@@ -176,7 +176,7 @@ parseCmdCheckSatResponse = liftM  CmdCheckSatResponse parseCheckSatResponse
 parseCheckSatResponse :: ParsecT String u Identity CheckSatResponse
 parseCheckSatResponse =
     (string "sat" >> return Sat) <|>
-    (string "unsat" >> return Unsat) <|>
+    Pc.try (string "unsat" >> return Unsat) <|>
     (string "unknown" >> return Unknown)
 
 
