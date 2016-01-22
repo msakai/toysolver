@@ -97,7 +97,7 @@ instance ShowSL Option where
   showSL (RandomSeed n) = ":random-seed " ++ show n
   showSL (Verbosity n) = ":verbosity " ++ show n
   showSL (ReproducibleResourceLimit n) = ":reproducible-resource-limit " ++ show n
-  showSL (OptionAttr attr) = show attr
+  showSL (OptionAttr attr) = showSL attr
 
 instance ShowSL InfoFlags where
   showSL ErrorBehavior = ":error-behavior"
