@@ -18,6 +18,7 @@ module Smtlib.Parsers.CommonParsers where
 
 import           Control.Applicative               as Ctr hiding ((<|>))
 import           Data.Functor.Identity
+import qualified Data.Set                          as Set
 import           Text.Parsec.Prim                  as Prim
 import           Text.ParserCombinators.Parsec     as Pc
 import           Smtlib.Syntax.Syntax
@@ -72,10 +73,7 @@ str :: ParsecT String u Identity String
 str = string "\"" <++> liftM concat (Pc.many (liftM (\c -> [c]) strChar <|> Pc.try (string "\"\""))) <++> string "\""
 
 strChar :: ParsecT String u Identity Char
-strChar = alphaNum
-      <|> char ' '
-      <|> char ':'
-      <|> char ','
+strChar = (oneOf $ ['\t','\n','\r'] ++ [c | c <- [toEnum 32 .. toEnum 126], c /= '"']) <|> satisfy (toEnum 128 <=)
 
 
 --parse a Symbol
@@ -86,8 +84,15 @@ quotedSymbol :: ParsecT String u Identity String
 quotedSymbol = char '|' *> Pc.many (noneOf "|")  <* char '|'
 
 simpleSymbol :: ParsecT String u Identity String
-simpleSymbol = (letter <|> spcSymb) <:>  sq
-    where sq = Pc.many (alphaNum <|> spcSymb)
+simpleSymbol = Pc.try $ do
+  s <- (letter <|> spcSymb) <:>  sq
+  guard $ s `Set.notMember` reserved
+  return s
+  where
+    sq = Pc.many (alphaNum <|> spcSymb)
+    reserved = Set.fromList $
+      ["BINARY", "DECIMAL", "HEXADECIMAL", "NUMERAL", "STRING", "_", "!", "as", "let", "exists", "forall", "par"] ++
+      ["set-logic", "set-option", "set-info", "declare-sort", "define-sort", "declare-const", "declare-fun", "declare-fun-rec", "declare-funs-rec", "push", "pop", "reset", "reset-assertions", "assert", "check-sat", "check-sat-assuming", "get-assertions", "get-model", "get-proof", "get-unsat-core", "get-unsat-assumptions", "get-value", "get-assignment", "get-option", "get-info", "echo", "exit"]
 
 spcSymb :: ParsecT String u Identity Char
 spcSymb = oneOf  "+-/*=%?!.$_~^&<>@"
@@ -115,8 +120,13 @@ false = string "false"
 
 
 emptySpace :: ParsecT String u Identity String
-emptySpace = liftM concat $ Pc.try $ Pc.many $
-    liftM (\c -> [c]) (char ' ' <|> char '\n' <|> char '\t' <|> char '\r') <|> comment
+emptySpace = liftM concat $ Pc.try $ Pc.many emptySpaceSingle
+
+emptySpace1 :: ParsecT String u Identity String
+emptySpace1 = liftM concat $ Pc.try $ Pc.many1 emptySpaceSingle
+
+emptySpaceSingle :: ParsecT String u Identity String
+emptySpaceSingle = liftM (\c -> [c]) (char ' ' <|> char '\n' <|> char '\t' <|> char '\r') <|> comment
 
 comment :: ParsecT String u Identity String
 comment = char ';' <:> scan
@@ -383,7 +393,7 @@ parseNSymbol = do
        _ <- aspO
        _ <- emptySpace
        _ <- aspUS
-       _ <- emptySpace
+       _ <- emptySpace1
        symb <- symbol
        _ <- emptySpace
        indexes <- many1 ((liftM (IndexNumeral . read) numeral <|> liftM IndexSymbol symbol) <* Pc.try spaces)
@@ -408,7 +418,7 @@ parseSexprSymbol :: ParsecT String u Identity Sexpr
 parseSexprSymbol = liftM SexprSymbol symbol
 
 parseSexprKeyword :: ParsecT String u Identity Sexpr
-parseSexprKeyword = liftM SexprSymbol keyword
+parseSexprKeyword = liftM SexprKeyword keyword
 
 parseAtomSexpr :: ParsecT String u Identity Sexpr
 parseAtomSexpr = parseSexprConstant

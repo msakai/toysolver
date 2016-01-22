@@ -83,7 +83,7 @@ script:
 # This block must be executed before before_cache
 #after_script:
  - "[ -n \"$COVERAGE\" ] && cabal install hpc-coveralls --avoid-reinstalls --constraint=\"regex-posix >=0.95.2\" || true" # regex-posix-0.95.1 has compilation problem
- - "[ -n \"$COVERAGE\" ] && hpc-coveralls TestSuite TestPolynomial --exclude-dir=test || true"
+ - "[ -n \"$COVERAGE\" ] && hpc-coveralls TestSuite TestPolynomial TestSmtlib --exclude-dir=test || true"
 
 notifications:
   webhooks:

@@ -103,6 +103,7 @@ parseInfoResponse =
     Pc.try parseResponseAuthors <|>
     Pc.try parseResponseVersion <|>
     Pc.try parseResponseReasonUnknown <|>
+    Pc.try parseResponseAssertionStackLevels <|>
     parseResponseAttribute
 
 
@@ -133,7 +134,7 @@ parseResponseVersion = string ":version" *> emptySpace *>
 
 
 parseResponseReasonUnknown :: ParsecT String u Identity InfoResponse
-parseResponseReasonUnknown = string "reason" *> emptySpace *>
+parseResponseReasonUnknown = string ":reason-unknown" *> emptySpace *>
     liftM ResponseReasonUnknown parseRReasonUnknown
 
 parseRReasonUnknown :: ParsecT String u Identity ReasonUnknown
@@ -141,6 +142,10 @@ parseRReasonUnknown =
     (string "memout" >> return Memout) <|>
     (string "incomplete" >> return Incomplete)
 
+parseResponseAssertionStackLevels :: ParsecT String u Identity InfoResponse
+parseResponseAssertionStackLevels =
+  string ":assertion-stack-levels" *> emptySpace *>
+    liftM ResponseAssertionStackLevels (liftM read numeral)
 
 
 parseResponseAttribute :: ParsecT String u Identity InfoResponse
@@ -171,7 +176,7 @@ parseCmdCheckSatResponse = liftM  CmdCheckSatResponse parseCheckSatResponse
 parseCheckSatResponse :: ParsecT String u Identity CheckSatResponse
 parseCheckSatResponse =
     (string "sat" >> return Sat) <|>
-    (string "unsat" >> return Unsat) <|>
+    Pc.try (string "unsat" >> return Unsat) <|>
     (string "unknown" >> return Unknown)
 
 

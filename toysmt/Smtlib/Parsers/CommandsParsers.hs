@@ -313,7 +313,8 @@ parseCheckSatAssuming = do
   _ <- string "check-sat-assuming"
   _ <- emptySpace
   _ <- aspO
-  terms <- Pc.many1 $ parseTerm <* Pc.try emptySpace
+  emptySpace
+  terms <- Pc.many $ parseTerm <* Pc.try emptySpace
   _ <- aspC
   _ <- emptySpace
   _ <- aspC

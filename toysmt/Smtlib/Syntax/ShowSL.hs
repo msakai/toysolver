@@ -11,6 +11,8 @@ Functions to print the syntax as a SMTLib.
 -}
 module Smtlib.Syntax.ShowSL where
 
+import           Data.Char
+import qualified Data.Set as Set
 import           Data.List
 import           Smtlib.Syntax.Syntax
 
@@ -23,6 +25,18 @@ joinA = unwords.fmap showSL
 
 joinNs :: [Int] -> String
 joinNs = unwords.fmap show
+
+showSymbol :: String -> String
+showSymbol s
+  | c:_ <- s, isDigit c = quoted
+  | all p s && s `Set.notMember` reserved = s
+  | otherwise = quoted
+  where
+    quoted = "|" ++ s ++ "|"
+    p c = (isAscii c && isAlpha c) || isDigit c || c `elem` "~!@$%^&*_-+=<>.?/"
+    reserved = Set.fromList $
+      ["BINARY", "DECIMAL", "HEXADECIMAL", "NUMERAL", "STRING", "_", "!", "as", "let", "exists", "forall", "par"] ++
+      ["set-logic", "set-option", "set-info", "declare-sort", "define-sort", "declare-const", "declare-fun", "declare-fun-rec", "declare-funs-rec", "push", "pop", "reset", "reset-assertions", "assert", "check-sat", "check-sat-assuming", "get-assertions", "get-model", "get-proof", "get-unsat-core", "get-unsat-assumptions", "get-value", "get-assignment", "get-option", "get-info", "echo", "exit"]
 
 
 class ShowSL a where
@@ -40,22 +54,22 @@ class ShowSL a where
 
 
 instance ShowSL Command where
-  showSL (SetLogic s) = "(set-logic " ++ s ++ ")"
+  showSL (SetLogic s) = "(set-logic " ++ showSymbol s ++ ")"
   showSL (SetOption opt) = "(set-option " ++ showSL opt ++ ")"
   showSL (SetInfo info) = "(set-info " ++ showSL info ++ ")"
-  showSL (DeclareSort str val) =  "(declare-sort " ++ str ++
+  showSL (DeclareSort str val) =  "(declare-sort " ++ showSymbol str ++
     " " ++ show val ++ ")"
-  showSL (DefineSort str strs sort) = "(define-sort " ++ str ++
-    " (" ++ unwords strs ++ ") " ++ showSL sort ++ ") "
-  showSL (DeclareConst str sort) = "(declare-fun  " ++ str ++
+  showSL (DefineSort str strs sort) = "(define-sort " ++ showSymbol str ++
+    " (" ++ unwords (map showSymbol strs) ++ ") " ++ showSL sort ++ ") "
+  showSL (DeclareConst str sort) = "(declare-const  " ++ showSymbol str ++
     " " ++ showSL sort ++ ") "
-  showSL (DeclareFun  str sorts sort) = "(declare-fun  " ++ str ++
+  showSL (DeclareFun  str sorts sort) = "(declare-fun  " ++ showSymbol str ++
     " ("  ++ joinA sorts ++ ") " ++ showSL sort ++ ") "
-  showSL (DefineFun str srvs sort term) = "(define-fun "   ++ str ++
+  showSL (DefineFun str srvs sort term) = "(define-fun "   ++ showSymbol str ++
     " (" ++ joinA srvs ++ ") " ++ showSL sort ++ " " ++ showSL term ++ ")"
-  showSL (DefineFunRec str srvs sort term) = "(define-fun-rec "   ++ str ++
+  showSL (DefineFunRec str srvs sort term) = "(define-fun-rec "   ++ showSymbol str ++
     " (" ++ joinA srvs ++ ") " ++ showSL sort ++ " " ++ showSL term ++ ")"
-  showSL (DefineFunsRec fundecs terms) = "(define-fun-recs " ++
+  showSL (DefineFunsRec fundecs terms) = "(define-funs-rec " ++
     " (" ++ joinA fundecs ++ ") (" ++ joinA terms ++ "))"
   showSL (Push n) = "(push " ++ show n ++ ")"
   showSL (Pop n) = "(pop " ++show n ++ ")"
@@ -97,7 +111,7 @@ instance ShowSL Option where
   showSL (RandomSeed n) = ":random-seed " ++ show n
   showSL (Verbosity n) = ":verbosity " ++ show n
   showSL (ReproducibleResourceLimit n) = ":reproducible-resource-limit " ++ show n
-  showSL (OptionAttr attr) = show attr
+  showSL (OptionAttr attr) = showSL attr
 
 instance ShowSL InfoFlags where
   showSL ErrorBehavior = ":error-behavior"
@@ -126,10 +140,10 @@ instance ShowSL Term where
     "(! " ++ showSL term ++ " " ++ joinA atts ++ ")"
 
 instance ShowSL VarBinding where
-  showSL (VB str term) = "("++ str ++ " " ++ showSL term ++ ")"
+  showSL (VB str term) = "("++ showSymbol str ++ " " ++ showSL term ++ ")"
 
 instance ShowSL SortedVar where
-  showSL (SV str sort)  = "(" ++ str ++ " " ++ showSL sort ++ ")"
+  showSL (SV str sort)  = "(" ++ showSymbol str ++ " " ++ showSL sort ++ ")"
 
 instance ShowSL QualIdentifier where
   showSL (QIdentifier iden) = showSL iden
@@ -138,11 +152,11 @@ instance ShowSL QualIdentifier where
 
 instance ShowSL FunDec where
   showSL (FunDec str srvs sort) =
-    "(" ++ str ++ " (" ++ joinA srvs ++ ") " ++ showSL sort ++ ")"
+    "(" ++ showSymbol str ++ " (" ++ joinA srvs ++ ") " ++ showSL sort ++ ")"
 
 instance ShowSL AttrValue where
   showSL (AttrValueConstant spc) = showSL spc
-  showSL (AttrValueSymbol str) = str
+  showSL (AttrValueSymbol str) = showSymbol str
   showSL (AttrValueSexpr sexprs) = "(" ++ joinA sexprs  ++ ")"
 
 instance ShowSL Attribute where
@@ -151,11 +165,11 @@ instance ShowSL Attribute where
 
 instance ShowSL Index where
   showSL (IndexNumeral i) = show i
-  showSL (IndexSymbol str) = str
+  showSL (IndexSymbol str) = showSymbol str
 
 instance ShowSL Identifier where
-  showSL (ISymbol str) = str
-  showSL (I_Symbol str is) = "(_ " ++ str ++ " " ++ joinA is  ++ ")"
+  showSL (ISymbol str) = showSymbol str
+  showSL (I_Symbol str is) = "(_ " ++ showSymbol str ++ " " ++ joinA is  ++ ")"
 
 instance ShowSL Sort where
   showSL (SortId iden) = showSL iden
@@ -165,13 +179,13 @@ instance ShowSL Sort where
 instance ShowSL SpecConstant where
   showSL (SpecConstantNumeral n) = show n
   showSL (SpecConstantDecimal str) = str
-  showSL (SpecConstantHexadecimal str) = str
-  showSL (SpecConstantBinary str)  = str
+  showSL (SpecConstantHexadecimal str) = "#x" ++ str
+  showSL (SpecConstantBinary str)  = "#b" ++ str
   showSL (SpecConstantString str) = str
 
 instance ShowSL Sexpr where
   showSL (SexprSpecConstant sc) = showSL sc
-  showSL (SexprSymbol str) = str
+  showSL (SexprSymbol str) = showSymbol str
   showSL (SexprKeyword str) = str
   showSL (SexprSxp srps) = "(" ++ joinA srps ++ ")"
 
@@ -191,7 +205,7 @@ instance ShowSL CmdResponse where
   showSL (CmdGetAssertionsResponse x) = "(" ++ joinA x ++ ")"
   showSL (CmdGetAssignmentResponse x) = "(" ++ joinA x ++ ")"
   showSL (CmdGetProofResponse x) = showSL x
-  showSL (CmdGetUnsatCoreResponse x) = "(" ++ unwords x ++ ")"
+  showSL (CmdGetUnsatCoreResponse x) = "(" ++ unwords (map showSymbol x) ++ ")"
   showSL (CmdGetUnsatAssumptionsResponse terms) = "(" ++  joinA terms ++ ")"
   showSL (CmdGetValueResponse x) = "(" ++ joinA x ++ ")"
   showSL (CmdGetModelResponse cmds) = "(" ++ joinA cmds ++ ")"
@@ -210,7 +224,7 @@ instance ShowSL ErrorBehavior where
 
 instance ShowSL ReasonUnknown where
   showSL Memout = "memout"
-  showSL Incomplete = "imcomplete"
+  showSL Incomplete = "incomplete"
 
 instance ShowSL CheckSatResponse where
   showSL Sat = "sat"
@@ -231,4 +245,4 @@ instance ShowSL ValuationPair where
     "(" ++ showSL term1 ++ " " ++ showSL term2 ++ ")"
 
 instance ShowSL TValuationPair where
-  showSL (TValuationPair str b) = "(" ++ str ++ " " ++ showSL b ++ ")"
+  showSL (TValuationPair str b) = "(" ++ showSymbol str ++ " " ++ showSL b ++ ")"
