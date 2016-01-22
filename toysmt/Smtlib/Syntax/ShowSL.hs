@@ -55,7 +55,7 @@ instance ShowSL Command where
     " (" ++ joinA srvs ++ ") " ++ showSL sort ++ " " ++ showSL term ++ ")"
   showSL (DefineFunRec str srvs sort term) = "(define-fun-rec "   ++ str ++
     " (" ++ joinA srvs ++ ") " ++ showSL sort ++ " " ++ showSL term ++ ")"
-  showSL (DefineFunsRec fundecs terms) = "(define-fun-recs " ++
+  showSL (DefineFunsRec fundecs terms) = "(define-funs-rec " ++
     " (" ++ joinA fundecs ++ ") (" ++ joinA terms ++ "))"
   showSL (Push n) = "(push " ++ show n ++ ")"
   showSL (Pop n) = "(pop " ++show n ++ ")"
