@@ -367,7 +367,7 @@ Executable toysmt
   HS-Source-Dirs: toysmt, Smtlib
   Main-is: toysmt.hs
   Other-Modules:
-     Solver,
+     ToySolver.SMT.SMTLIB2Solver,
      -- Following modules are copied from SmtLib package.
      -- http://hackage.haskell.org/package/SmtLib
      -- https://github.com/MfesGA/Smtlib

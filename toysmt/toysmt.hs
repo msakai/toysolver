@@ -28,10 +28,10 @@ import System.IO
 import Text.Parsec
 import Text.Parsec.String
 
-import ToySolver.Version
-
 import Smtlib.Parsers.CommandsParsers
-import Solver
+
+import ToySolver.Version
+import ToySolver.SMT.SMTLIB2Solver
 
 data Mode
   = ModeHelp

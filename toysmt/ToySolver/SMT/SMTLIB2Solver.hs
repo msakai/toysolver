@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Solver
+-- Module      :  ToySolver.SMT.SMTLIB2Solver
 -- Copyright   :  (c) Masahiro Sakai 2015
 -- License     :  BSD-style
 --
@@ -10,7 +10,7 @@
 -- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module Solver
+module ToySolver.SMT.SMTLIB2Solver
   ( Solver
   , newSolver
 
