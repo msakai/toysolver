@@ -364,7 +364,7 @@ Executable toysat
     GHC-Options: -static -optl-static -optl-pthread
 
 Executable toysmt
-  HS-Source-Dirs: toysmt
+  HS-Source-Dirs: toysmt, Smtlib
   Main-is: toysmt.hs
   Other-Modules:
      Solver,
@@ -642,8 +642,14 @@ Test-suite TestSuite
 
 Test-suite TestSmtlib
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    test toysmt
+  HS-Source-Dirs:    test Smtlib
   Main-is:           TestSmtlib.hs
+  Other-Modules:
+     Smtlib.Parsers.CommonParsers,
+     Smtlib.Parsers.ResponseParsers,
+     Smtlib.Parsers.CommandsParsers,
+     Smtlib.Syntax.Syntax,
+     Smtlib.Syntax.ShowSL
   Build-depends:
     base,
     array,
