@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Test.BoolExpr (boolExprTestGroup) where
 

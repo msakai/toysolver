@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns, TypeSynonymInstances, FlexibleInstances #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.Polynomial.Factorization.FiniteField
