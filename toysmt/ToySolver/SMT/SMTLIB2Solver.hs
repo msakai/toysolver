@@ -212,15 +212,7 @@ data Solver
 newSolver :: IO Solver
 newSolver = do
   solverRef <- newIORef =<< SMT.newSolver
-  let fenv = Map.fromList
-        [ (name, EFSymBuiltin name)
-        | name <- ["=", "true", "false", "not", "and", "or", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
-        ]
-      senv = Map.fromList
-        [ ("Real", SortExpr SMT.sReal)
-        , ("Bool", SortExpr SMT.sBool)
-        ]
-  envRef <- newIORef (fenv, senv)
+  envRef <- newIORef initialEnv
   modeRef <- newIORef ModeStart
   savedContextsRef <- newIORef []
   statusRef <- newIORef Nothing
@@ -254,6 +246,18 @@ newSolver = do
     , svProduceUnsatAssumptionsRef = produceUnsatAssumptionsRef
     , svGlobalDeclarationsRef = globalDeclarationsRef
     }
+
+initialEnv :: Env
+initialEnv = (fenv, senv)
+  where
+    fenv = Map.fromList
+      [ (name, EFSymBuiltin name)
+      | name <- ["=", "true", "false", "not", "and", "or", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
+      ]
+    senv = Map.fromList
+      [ ("Real", SortExpr SMT.sReal)
+      , ("Bool", SortExpr SMT.sBool)
+      ]
 
 execCommand :: Solver -> Command -> IO ()
 execCommand solver cmd = do
@@ -309,15 +313,7 @@ runCommand solver cmd = E.handle h $ do
 reset :: Solver -> IO GenResponse
 reset solver = do
   writeIORef (svSMTSolverRef solver) =<< SMT.newSolver
-  let fenv = Map.fromList
-        [ (name, EFSymBuiltin name)
-        | name <- ["=", "true", "false", "not", "and", "or", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
-        ]
-      senv = Map.fromList
-        [ ("Real", SortExpr SMT.sReal)
-        , ("Bool", SortExpr SMT.sBool)
-        ]
-  writeIORef (svEnvRef solver) (fenv, senv)
+  writeIORef (svEnvRef solver) initialEnv
   writeIORef (svModeRef solver) ModeStart
   writeIORef (svSavedContextsRef solver) []
   writeIORef (svStatusRef solver) Nothing
