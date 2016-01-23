@@ -272,7 +272,7 @@ parseQIAs = do
   _ <- aspO
   _ <- emptySpace
   _ <- string "as"
-  _ <- emptySpace
+  _ <- emptySpace1
   ident <- parseIdentifier
   _ <- emptySpace
   sort <- parseSort

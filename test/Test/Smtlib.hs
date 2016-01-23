@@ -121,6 +121,10 @@ case_bug_1 = do
   parse parseSort "" "(_a b)" @?= Right (SortIdentifiers (ISymbol "_a") [SortId (ISymbol "b")])
   parse parseTerm "" "(_a b)" @?= Right (TermQualIdentifierT (QIdentifier (ISymbol "_a")) [TermQualIdentifier (QIdentifier (ISymbol "b"))])
 
+case_bug_2 :: Assertion
+case_bug_2 = do
+  parse parseTerm "" "(asX b)" @?= Right (TermQualIdentifierT (QIdentifier (ISymbol "asX")) [TermQualIdentifier (QIdentifier (ISymbol "b"))])
+
 case_parse_string_literal_ascii :: Assertion
 case_parse_string_literal_ascii = parse str "" s @?= Right s
   where
