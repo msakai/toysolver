@@ -597,7 +597,7 @@ Test-suite TestPolynomial
 
 Test-suite TestSuite
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    test
+  HS-Source-Dirs:    test Smtlib
   Main-is:           TestSuite.hs
   Other-Modules:
     Test.AReal
@@ -620,6 +620,11 @@ Test-suite TestSuite
     Test.Simplex2
     Test.SMT
     Test.SubsetSum
+    Smtlib.Parsers.CommonParsers,
+    Smtlib.Parsers.ResponseParsers,
+    Smtlib.Parsers.CommandsParsers,
+    Smtlib.Syntax.Syntax,
+    Smtlib.Syntax.ShowSL
   Build-depends:
     base,
     array,
@@ -627,39 +632,14 @@ Test-suite TestSuite
     data-default-class,
     mtl,
     mwc-random,
+    parsec,
+    transformers,
+    transformers-compat,
     vector,
     vector-space,
     toysolver,
     data-interval,
     OptDir,
-    tasty >=0.10.1,
-    tasty-hunit ==0.9.*,
-    tasty-quickcheck ==0.8.*,
-    tasty-th,
-    QuickCheck >=2.5 && <3
-  Default-Language: Haskell2010
-  Other-Extensions: TemplateHaskell, ScopedTypeVariables
-
-Test-suite TestSmtlib
-  Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    test Smtlib
-  Main-is:           TestSmtlib.hs
-  Other-Modules:
-     Smtlib.Parsers.CommonParsers,
-     Smtlib.Parsers.ResponseParsers,
-     Smtlib.Parsers.CommandsParsers,
-     Smtlib.Syntax.Syntax,
-     Smtlib.Syntax.ShowSL
-  Build-depends:
-    base,
-    array,
-    containers,
-    data-default-class,
-    mtl,
-    parsec,
-    transformers,
-    transformers-compat,
-    toysolver,
     tasty >=0.10.1,
     tasty-hunit ==0.9.*,
     tasty-quickcheck ==0.8.*,

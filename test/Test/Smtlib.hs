@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+module Test.Smtlib (smtlibTestGroup) where
 
 import Control.Applicative
 import Control.Monad
@@ -415,5 +416,5 @@ instance Arbitrary TValuationPair where
 -- ---------------------------------------------------------------------
 -- Test harness
 
-main :: IO ()
-main = $(defaultMainGenerator)
+smtlibTestGroup :: TestTree
+smtlibTestGroup = $(testGroupGenerator)
