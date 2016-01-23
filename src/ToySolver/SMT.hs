@@ -23,7 +23,7 @@ module ToySolver.SMT
   , Sort (..)
   , sBool
   , sReal
-  , Type
+  , FunType
   , Expr (..)
   , exprSort
   , FSym
@@ -113,7 +113,7 @@ sBool = Sort SSymBool []
 sReal :: Sort
 sReal = Sort SSymReal []
 
-type Type = ([Sort],Sort)
+type FunType = ([Sort],Sort)
 
 data Expr
   = EAp FSym [Expr]
@@ -162,7 +162,7 @@ instance IsOrdRel Expr Expr where
 data FDef
   = FBoolVar SAT.Var
   | FLRAVar LA.Var
-  | FEUFFun Type EUF.FSym
+  | FEUFFun FunType EUF.FSym
   deriving (Show)
 
 data Exception

@@ -246,7 +246,7 @@ prop_getModel_eval = QM.monadicIO $ do
   let sorts = [SMT.sBool, SMT.sReal] ++ map fst xs
       cs = map snd xs
   fs1 <- QM.pick $ do
-    ts <- listOf (genType sorts)
+    ts <- listOf (genFunType sorts)
     return [("f" ++ show i, t) | (i,t) <- zip [1..] ts]
   fs2 <- QM.run $ forM fs1 $ \(name, t@(argsSorts, resultSort)) -> do
     f <- SMT.declareFSym solver name argsSorts resultSort
@@ -282,13 +282,13 @@ prop_getModel_eval = QM.monadicIO $ do
     forM_ constrs $ \constr -> do
       QM.assert $ SMT.eval m constr == SMT.ValBool True
 
-genType :: [SMT.Sort] -> Gen SMT.Type
-genType sorts = do
+genFunType :: [SMT.Sort] -> Gen SMT.FunType
+genFunType sorts = do
   resultSort <- elements sorts
   argsSorts <- listOf $ elements sorts
   return (argsSorts, resultSort)
 
-genExpr :: [(SMT.FSym, SMT.Type)] -> SMT.Sort -> Int -> Gen SMT.Expr
+genExpr :: [(SMT.FSym, SMT.FunType)] -> SMT.Sort -> Int -> Gen SMT.Expr
 genExpr sig s size = evalStateT (f s) size
   where
     sig' :: Map SMT.Sort [(SMT.FSym, [SMT.Sort])]
