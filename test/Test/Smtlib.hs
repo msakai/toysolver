@@ -224,6 +224,26 @@ prop_ErrorBehavior_show :: Property
 prop_ErrorBehavior_show = forAll arbitrary $ \(a :: ErrorBehavior) ->
   show a `deepseq` True
 
+prop_ReasonUnknown_show :: Property
+prop_ReasonUnknown_show = forAll arbitrary $ \(a :: ReasonUnknown) ->
+  show a `deepseq` True
+
+prop_CheckSatResponse_show :: Property
+prop_CheckSatResponse_show = forAll arbitrary $ \(a :: CheckSatResponse) ->
+  show a `deepseq` True
+
+prop_InfoResponse_show :: Property
+prop_InfoResponse_show = forAll arbitrary $ \(a :: InfoResponse) ->
+  show a `deepseq` True
+
+prop_ValuationPair_show :: Property
+prop_ValuationPair_show = forAll arbitrary $ \(a :: ValuationPair) ->
+  show a `deepseq` True
+
+prop_TValuationPair_show :: Property
+prop_TValuationPair_show = forAll arbitrary $ \(a :: TValuationPair) ->
+  show a `deepseq` True
+
 -- ---------------------------------------------------------------------
 
 instance Arbitrary Term where
@@ -439,8 +459,28 @@ instance Arbitrary Option where
     , RandomSeed <$> (abs <$> arbitrary)
     , Verbosity <$> abs <$> arbitrary
     , ReproducibleResourceLimit <$> abs <$> arbitrary
-    , OptionAttr <$> arbitrary
+    , OptionAttr <$> (arbitrary `suchThat` p)
     ]
+    where
+      p (Attribute kw) = kw `Set.notMember` reserved
+      p (AttributeVal kw _) = kw `Set.notMember` reserved
+      reserved = Set.fromList
+        [ ":print-success"
+        , ":expand-definitions"
+        , ":interactive-mode"
+        , ":produce-proofs"
+        , ":produce-unsat-cores"
+        , ":produce-unsat-assumptions"
+        , ":produce-models"
+        , ":produce-assignments"
+        , ":produce-assertions"
+        , ":global-declarations"
+        , ":regular-output-channel"
+        , ":diagnostic-output-channel"
+        , ":random-seed"
+        , ":verbosity"
+        , ":reproducible-resource-limit"
+        ]
 
 instance Arbitrary InfoFlags where
   arbitrary = oneof
