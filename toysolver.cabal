@@ -630,6 +630,7 @@ Test-suite TestSuite
     array,
     containers,
     data-default-class,
+    deepseq,
     mtl,
     mwc-random,
     parsec,

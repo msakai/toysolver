@@ -3,6 +3,7 @@
 module Test.Smtlib (smtlibTestGroup) where
 
 import Control.Applicative
+import Control.DeepSeq
 import Control.Monad
 import qualified Data.Set as Set
 
@@ -44,6 +45,10 @@ prop_parseSpecConstant :: Property
 prop_parseSpecConstant = forAll arbitrary $ \a ->
   parse parseSpecConstant "" (showSL a) == Right a
 
+prop_parseSource :: Property
+prop_parseSource = forAll arbitrary $ \a ->
+  parse parseSource "" (joinA a) == Right a
+
 prop_parseCommand :: Property
 prop_parseCommand = forAll arbitrary $ \a ->
   parse parseCommand "" (showSL a) == Right a
@@ -56,9 +61,12 @@ prop_parseInfoFlags :: Property
 prop_parseInfoFlags = forAll arbitrary $ \a ->
   parse parseOption "" (showSL a) == Right a
 
--- prop_parseCmdResult :: Property
--- prop_parseCmdResult = forAll arbitrary $ \a ->
---   parse parseCmdResult "" (showSL a) == Right a
+prop_parseCmdResult :: Property
+prop_parseCmdResult = forAll arbitrary $ \(a :: CmdResponse) ->
+  let b = showSL a
+  in case parse parseCmdResult "" b of
+       Left err -> error (show err)
+       Right a' -> showSL a' == b
 
 prop_parseGenResponse :: Property
 prop_parseGenResponse = forAll arbitrary $ \a ->
@@ -136,6 +144,85 @@ case_parseBinary :: Assertion
 case_parseBinary = parse parseBinary "" (showSL s) @?= Right s
   where
     s = SpecConstantBinary "011001"
+
+case_comment :: Assertion
+case_comment = do
+  parse parseTerm "" "(f ; hogehoge\na;bbb\n)" @?=
+    Right (TermQualIdentifierT (QIdentifier (ISymbol "f")) [TermQualIdentifier (QIdentifier (ISymbol "a"))])
+
+-- ---------------------------------------------------------------------
+
+prop_Command_show :: Property
+prop_Command_show = forAll arbitrary $ \(a :: Command) ->
+  show a `deepseq` True
+
+prop_Option_show :: Property
+prop_Option_show = forAll arbitrary $ \(a :: Option) ->
+  show a `deepseq` True
+
+prop_InfoFlags_show :: Property
+prop_InfoFlags_show = forAll arbitrary $ \(a :: InfoFlags) ->
+  show a `deepseq` True
+
+prop_Term_show :: Property
+prop_Term_show = forAll arbitrary $ \(a :: Term) ->
+  show a `deepseq` True
+
+prop_VarBinding_show :: Property
+prop_VarBinding_show = forAll arbitrary $ \(a :: VarBinding) ->
+  show a `deepseq` True
+
+prop_SortedVar_show :: Property
+prop_SortedVar_show = forAll arbitrary $ \(a :: VarBinding) ->
+  show a `deepseq` True
+
+prop_QualIdentifier_show :: Property
+prop_QualIdentifier_show = forAll arbitrary $ \(a :: QualIdentifier) ->
+  show a `deepseq` True
+
+prop_FunDec_show :: Property
+prop_FunDec_show = forAll arbitrary $ \(a :: FunDec) ->
+  show a `deepseq` True
+
+prop_AttrValue_show :: Property
+prop_AttrValue_show = forAll arbitrary $ \(a :: AttrValue) ->
+  show a `deepseq` True
+
+prop_Attribute_show :: Property
+prop_Attribute_show = forAll arbitrary $ \(a :: Attribute) ->
+  show a `deepseq` True
+
+prop_Index_show :: Property
+prop_Index_show = forAll arbitrary $ \(a :: Index) ->
+  show a `deepseq` True
+
+prop_Identifier_show :: Property
+prop_Identifier_show = forAll arbitrary $ \(a :: Identifier) ->
+  show a `deepseq` True
+
+prop_Sort_show :: Property
+prop_Sort_show = forAll arbitrary $ \(a :: Sort) ->
+  show a `deepseq` True
+
+prop_SpecConstant_show :: Property
+prop_SpecConstant_show = forAll arbitrary $ \(a :: SpecConstant) ->
+  show a `deepseq` True
+
+prop_Sexpr_show :: Property
+prop_Sexpr_show = forAll arbitrary $ \(a :: Sexpr) ->
+  show a `deepseq` True
+
+prop_CmdResponse_show :: Property
+prop_CmdResponse_show = forAll arbitrary $ \(a :: CmdResponse) ->
+  show a `deepseq` True
+
+prop_GenResponse_show :: Property
+prop_GenResponse_show = forAll arbitrary $ \(a :: GenResponse) ->
+  show a `deepseq` True
+
+prop_ErrorBehavior_show :: Property
+prop_ErrorBehavior_show = forAll arbitrary $ \(a :: ErrorBehavior) ->
+  show a `deepseq` True
 
 -- ---------------------------------------------------------------------
 
@@ -260,7 +347,35 @@ genQuotedSymbol = listOf1 g
     xs = Set.fromList (['\t','\n','\r'] ++ [' ' .. toEnum 126]) `Set.difference` Set.fromList ['\\', '|']    
 
 genKeyword :: Gen String
-genKeyword = (':':) <$> genSimpleSymbol
+genKeyword = oneof
+  [ (':':) <$> genSimpleSymbol
+  , elements
+      [ ":print-success"
+      , ":expand-definitions"
+      , ":interactive-mode"
+      , ":produce-proofs"
+      , ":produce-unsat-cores"
+      , ":produce-unsat-assumptions"
+      , ":produce-models"
+      , ":produce-assignments"
+      , ":produce-assertions"
+      , ":global-declarations"
+      , ":regular-output-channel"
+      , ":diagnostic-output-channel"
+      , ":random-seed"
+      , ":verbosity"
+      , ":reproducible-resource-limit"
+
+      , ":error-behavior"
+      , ":name"
+      , ":authors"
+      , ":version"
+      , ":status"
+      , ":reason-unknown"
+      , ":all-statistics"
+      , ":assertion-stack-levels"
+      ]
+  ]
 
 genStringLiteral :: Gen String
 genStringLiteral = showStringLiteral <$> listOf genStringChar
@@ -337,8 +452,19 @@ instance Arbitrary InfoFlags where
     , return ReasonUnknown
     , return AllStatistics
     , return AssertionStackLevels
-    , InfoFlags <$> genKeyword
+    , InfoFlags <$> (genKeyword `suchThat` (`Set.notMember` reserved))
     ]
+    where
+      reserved = Set.fromList
+        [ ":error-behavior"
+        , ":name"
+        , ":authors"
+        , ":version"
+        , ":status"
+        , ":reason-unknown"
+        , ":all-statistics"
+        , ":assertion-stack-levels"
+        ]
 
 instance Arbitrary FunDec where
   arbitrary = FunDec <$> genSymbol <*> listOf' arbitrary <*> arbitrary
@@ -348,7 +474,7 @@ instance Arbitrary FunDec where
 instance Arbitrary CmdResponse where
   arbitrary = oneof
     [ CmdGenResponse <$> arbitrary
-    , CmdGetInfoResponse <$> arbitrary
+    , CmdGetInfoResponse <$> genGetInfoResponse
     , CmdCheckSatResponse <$> arbitrary
     , CmdGetAssertionsResponse <$> genGetAssertionsResponse
     , CmdGetAssignmentResponse <$> arbitrary
@@ -385,8 +511,24 @@ instance Arbitrary InfoResponse where
     , ResponseVersion <$> genStringLiteral
     , ResponseReasonUnknown <$> arbitrary
     , ResponseAssertionStackLevels <$> abs <$> arbitrary
-    , ResponseAttribute <$> arbitrary
+    , ResponseAttribute <$> (arbitrary `suchThat` p)
     ]
+    where
+      p (Attribute kw) = kw `Set.notMember` reserved
+      p (AttributeVal kw _) = kw `Set.notMember` reserved
+      reserved = Set.fromList
+        [ ":error-behavior"
+        , ":name"
+        , ":authors"
+        , ":version"
+        , ":status"
+        , ":reason-unknown"
+        , ":all-statistics"
+        , ":assertion-stack-levels"
+        ]
+
+genGetInfoResponse :: Gen [InfoResponse]
+genGetInfoResponse = listOf' arbitrary
 
 genGetAssertionsResponse :: Gen [Term]
 genGetAssertionsResponse = listOf' arbitrary
