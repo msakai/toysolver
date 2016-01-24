@@ -597,7 +597,7 @@ Test-suite TestPolynomial
 
 Test-suite TestSuite
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    test Smtlib
+  HS-Source-Dirs:    test Smtlib toysmt
   Main-is:           TestSuite.hs
   Other-Modules:
     Test.AReal
@@ -619,6 +619,7 @@ Test-suite TestSuite
     Test.Simplex
     Test.Simplex2
     Test.SMT
+    Test.SMTLIB2Solver
     Test.SubsetSum
     Smtlib.Parsers.CommonParsers,
     Smtlib.Parsers.ResponseParsers,

@@ -21,6 +21,7 @@ import Test.SAT
 import Test.Simplex
 import Test.Simplex2
 import Test.SMT
+import Test.SMTLIB2Solver
 import Test.Smtlib
 import Test.SubsetSum
 
@@ -45,6 +46,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , simplexTestGroup
   , simplex2TestGroup
   , smtTestGroup
+  , smtlib2SolverTestGroup
   , smtlibTestGroup
   , subsetSumTestGroup
   ]
