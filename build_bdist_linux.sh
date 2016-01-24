@@ -26,5 +26,8 @@ PKG=toysolver-${VER}-${OS}-${ARCH}
 
 rm -r $PKG
 mkdir $PKG
-cp dist/build/htc/htc dist/build/knapsack/knapsack dist/build/lpconvert/lpconvert dist/build/nonogram/nonogram dist/build/nqueens/nqueens dist/build/pbconvert/pbconvert dist/build/sudoku/sudoku dist/build/toyfmf/toyfmf dist/build/toysat/toysat dist/build/toysmt/toysmt dist/build/toysolver/toysolver $PKG/
+mkdir $PKG/bin
+cp dist/build/htc/htc dist/build/knapsack/knapsack dist/build/lpconvert/lpconvert dist/build/nonogram/nonogram dist/build/nqueens/nqueens dist/build/pbconvert/pbconvert dist/build/sudoku/sudoku dist/build/toyfmf/toyfmf dist/build/toysat/toysat dist/build/toysmt/toysmt dist/build/toysolver/toysolver $PKG/bin
+cp -a samples $PKG/
+cp COPYING-GPL README.md CHANGELOG.markdown $PKG/
 tar Jcf $PKG.tar.xz $PKG --owner=sakai --group=sakai
