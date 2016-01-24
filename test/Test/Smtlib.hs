@@ -63,10 +63,9 @@ prop_parseInfoFlags = forAll arbitrary $ \a ->
 
 prop_parseCmdResult :: Property
 prop_parseCmdResult = forAll arbitrary $ \(a :: CmdResponse) ->
-  let b = showSL a
-  in case parse parseCmdResult "" b of
-       Left err -> error (show err)
-       Right a' -> showSL a' == b
+  case parse parseCmdResult "" (showSL a) of
+    Left err -> error (show err)
+    Right a' -> parse parseCmdResult "" (showSL a') == Right a'
 
 prop_parseGenResponse :: Property
 prop_parseGenResponse = forAll arbitrary $ \a ->
