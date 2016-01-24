@@ -84,6 +84,8 @@ case_getAssertions :: Assertion
 case_getAssertions = do
   solver <- SMTLIB2.newSolver
   SMTLIB2.setOption solver (ProduceAssertions True)
+  o <- SMTLIB2.getOption solver ":produce-assertions"
+  o @?= AttrValueSymbol "true"
   SMTLIB2.setLogic solver "QF_UF"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun a () Bool)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun b () Bool)"
@@ -104,10 +106,12 @@ case_getAssignment = do
   SMTLIB2.setOption solver (ProduceAssignments True)
   o <- SMTLIB2.getOption solver ":produce-assignments"
   o @?= AttrValueSymbol "true"
-  SMTLIB2.setLogic solver "QF_UF"
+  SMTLIB2.setLogic solver "QF_UFLRA"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun a () Bool)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun b () Bool)"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun c () Real)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (or (! a :named aa) (! b :named bb)))"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(assert (>= (! c :named cc) 0))"
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (not (and a bb)))"
   SMTLIB2.checkSat solver
   r <- SMTLIB2.getAssignment solver
@@ -263,6 +267,70 @@ case_getUnsatCore = do
   r <- SMTLIB2.getUnsatCore solver
   let expected = map Set.fromList [["C1", "C2"], ["C1", "C3", "C4"], ["C1", "C5", "C6"]]
   Set.fromList r `elem` expected @?= True
+
+case_echo :: Assertion
+case_echo = do
+  solver <- SMTLIB2.newSolver
+  r <- SMTLIB2.runCommandString solver "(echo \"hello\")"
+  showSL r @?= "\"hello\""
+
+case_let :: Assertion
+case_let = do
+  solver <- SMTLIB2.newSolver
+  SMTLIB2.setLogic solver "QF_LRA"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(define-fun x () Real (let ((y 1)) (+ y 2)))"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(assert (not (= x 3)))"
+  r <- SMTLIB2.checkSat solver
+  r @?= Unsat
+
+case_delcareSort :: Assertion
+case_delcareSort = do
+  solver <- SMTLIB2.newSolver
+  SMTLIB2.setLogic solver "QF_UFLRA"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(declare-sort U 1)"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const x1 (U Real))"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const x2 (U Bool))"
+
+case_defineSort :: Assertion
+case_defineSort = do
+  solver <- SMTLIB2.newSolver
+  SMTLIB2.setLogic solver "QF_UFLRA"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(declare-sort U 1)"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(define-sort T (X) (U X))"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const x1 (T Real))"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const x2 (T Bool))"
+
+case_defineFun :: Assertion
+case_defineFun = do
+  solver <- SMTLIB2.newSolver
+  SMTLIB2.setOption solver (ProduceModels True)
+  SMTLIB2.setLogic solver "QF_UFLRA"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(define-fun f ((b Bool) (x Real)) Bool (ite b (>= x 0) (>= 0 x)))"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const bb Bool)"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const xx Real)"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(assert (>= xx 100))"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(assert (f bb xx))"
+  r <- SMTLIB2.checkSat solver
+  r @?= Sat
+  r <- SMTLIB2.runCommandString solver "(get-value (bb))"
+  showSL r @?= "((bb true))"
+
+case_getInfo :: Assertion
+case_getInfo = do
+  solver <- SMTLIB2.newSolver
+  _ <- SMTLIB2.getInfo solver ErrorBehavior
+  _ <- SMTLIB2.getInfo solver Name
+  _ <- SMTLIB2.getInfo solver Authors
+  _ <- SMTLIB2.getInfo solver Version
+  return ()
+
+case_setInfo :: Assertion
+case_setInfo = do
+  solver <- SMTLIB2.newSolver
+  assertSuccess =<< SMTLIB2.runCommandString solver "(set-info :status sat)"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(set-info :status unsat)"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(set-info :status unknown)"
+  return ()
 
 -- ---------------------------------------------------------------------
 
