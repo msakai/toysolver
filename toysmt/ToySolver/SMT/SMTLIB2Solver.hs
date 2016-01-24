@@ -11,12 +11,18 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.SMT.SMTLIB2Solver
-  ( Solver
+  ( module Smtlib.Syntax.Syntax
+  , ShowSL (..)
+
+  -- * The solver type
+  , Solver
   , newSolver
 
   -- * High-level API
   , execCommand
+  , execCommandString
   , runCommand
+  , runCommandString
   , printResponse
 
   -- * Individual commands
@@ -86,6 +92,7 @@ import qualified ToySolver.SMT as SMT
 import ToySolver.Version
 import Smtlib.Syntax.Syntax
 import Smtlib.Syntax.ShowSL
+import qualified Smtlib.Parsers.CommandsParsers as CommandsParsers
 import qualified Smtlib.Parsers.CommonParsers as CommonParsers
 
 -- ----------------------------------------------------------------------
@@ -307,6 +314,19 @@ runCommand solver cmd = E.handle h $ do
     h (SMT.Error s) = return $ CmdGenResponse $
      -- GenResponse type uses strings in printed form.
      Error $ "\"" ++ concat [if c == '"' then "\"\"" else [c] | c <- s] ++ "\""
+
+execCommandString :: Solver -> String -> IO ()
+execCommandString solver cmd = do
+  printResponse solver =<< runCommandString solver cmd
+
+runCommandString :: Solver -> String -> IO CmdResponse
+runCommandString solver cmd =
+  case Parsec.parse (Parsec.spaces >> CommandsParsers.parseCommand <* Parsec.eof) "" cmd of
+    Left err -> 
+      -- GenResponse type uses strings in printed form.
+      return $ CmdGenResponse $ Error $ "\"" ++ concat [if c == '"' then "\"\"" else [c] | c <- show err] ++ "\""
+    Right cmd ->
+      runCommand solver cmd
 
 -- ----------------------------------------------------------------------
 
