@@ -16,6 +16,7 @@ rm -r $PKG
 mkdir $PKG
 mkdir $PKG/bin
 cp dist/build/htc/htc dist/build/knapsack/knapsack dist/build/lpconvert/lpconvert dist/build/nonogram/nonogram dist/build/nqueens/nqueens dist/build/pbconvert/pbconvert dist/build/sudoku/sudoku dist/build/toyfmf/toyfmf dist/build/toysat/toysat dist/build/toysmt/toysmt dist/build/toysolver/toysolver $PKG/bin
+strip $PKG/bin/*
 cp -a samples $PKG/
 cp COPYING-GPL README.md CHANGELOG.markdown $PKG/
 zip -r $PKG.zip $PKG

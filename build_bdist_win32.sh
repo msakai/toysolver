@@ -34,6 +34,7 @@ rm -r $PKG
 mkdir $PKG
 mkdir $PKG/bin
 cp $BUILDDIR/build/htc/htc.exe $BUILDDIR/build/knapsack/knapsack.exe $BUILDDIR/build/lpconvert/lpconvert.exe $BUILDDIR/build/nonogram/nonogram.exe $BUILDDIR/build/nqueens/nqueens.exe $BUILDDIR/build/pbconvert/pbconvert.exe $BUILDDIR/build/sudoku/sudoku.exe $BUILDDIR/build/toyfmf/toyfmf.exe $BUILDDIR/build/toysat/toysat.exe $BUILDDIR/build/toysmt/toysmt.exe $BUILDDIR/build/ToySolver/toysolver.exe $PKG/bin/
+wine strip $PKG/bin/*.exe
 cp -a samples $PKG/
 cp COPYING-GPL README.md CHANGELOG.markdown $PKG/
 zip -r $PKG.zip $PKG
