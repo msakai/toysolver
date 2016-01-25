@@ -99,14 +99,23 @@ packageVersions = sort $ tail
 #ifdef VERSION_queue
   , ("queue",        VERSION_queue        )
 #endif
+#ifdef VERSION_semigroups
+  , ("semigroups",   VERSION_semigroups   )
+#endif
 #ifdef VERSION_sign
   , ("sign",         VERSION_sign         )
 #endif
 #ifdef VERSION_stm
   , ("stm",          VERSION_stm          )
 #endif
+#ifdef VERSION_transformers
+  , ("transformers", VERSION_transformers )
+#endif
+#ifdef VERSION_transformers_compat
+  , ("transformers-compat", VERSION_transformers_compat)
+#endif
 #ifdef VERSION_temporary
-  , ("temporary",    VERSION_time         )
+  , ("temporary",    VERSION_temporary    )
 #endif
 #ifdef VERSION_time
   , ("time",         VERSION_time         )
@@ -119,6 +128,9 @@ packageVersions = sort $ tail
 #endif
 #ifdef VERSION_unordered_containers
   , ("unordered-containers", VERSION_unordered_containers)
+#endif
+#ifdef VERSION_vector
+  , ("vector",       VERSION_vector)
 #endif
 #ifdef VERSION_vector_space
   , ("vector-space", VERSION_vector_space)
