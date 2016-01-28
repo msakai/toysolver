@@ -290,6 +290,7 @@ Library
      ToySolver.Text.GCNF
      ToySolver.Text.GurobiSol
      ToySolver.Text.MaxSAT
+     ToySolver.Text.QDimacs
      ToySolver.Text.SDPFile
      ToySolver.Internal.Data.IndexedPriorityQueue
      ToySolver.Internal.Data.IOURef
