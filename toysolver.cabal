@@ -267,6 +267,7 @@ Library
      ToySolver.Data.Polynomial.GroebnerBasis
      ToySolver.Data.Polynomial.Interpolation.Lagrange
      ToySolver.Data.Var
+     ToySolver.QBF
      ToySolver.SAT
      ToySolver.SAT.Integer
      ToySolver.SAT.MUS
