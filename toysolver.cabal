@@ -99,9 +99,10 @@ Flag Time15
   Description: use time >=1.5.0
   Manual: False
 
-Flag Transformers051
-  Description: use transformers >=0.5.1
+Flag LogicTPTP045
+  Description: use logic-TPTP >=0.4.5.0
   Manual: False
+  Default: True
 
 Flag UseHaskeline
   Description: use haskeline package
@@ -408,6 +409,14 @@ Executable toyfmf
       -- logic-TPTP <=0.4.3 has build error on ghc <7.9 and transformers >=0.5.1.
       -- https://github.com/DanielSchuessler/logic-TPTP/pull/4
       logic-TPTP >=0.4.4.0
+  -- logic-TPTP <=0.4.4.0 is not compatible with transformers-compat >=0.5
+  if flag(LogicTPTP045)
+    Build-Depends:
+      logic-TPTP >=0.4.5.0
+  else
+    if impl(ghc <7.9)
+      Build-Depends:
+        transformers-compat <0.5
   Default-Language: Haskell2010
   if impl(ghc)
     GHC-Options: -rtsopts
