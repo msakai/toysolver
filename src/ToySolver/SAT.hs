@@ -77,7 +77,7 @@ module ToySolver.SAT
   , addXORClauseSoft
   , XORClause
   , evalXORClause
-  -- ** Thery
+  -- ** Theory
   , setTheory
 
   -- * Solving
