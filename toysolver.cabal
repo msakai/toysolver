@@ -401,6 +401,23 @@ Executable toysmt
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
+Executable toyqbf
+  Main-is: toyqbf.hs
+  HS-Source-Dirs: toyqbf
+  Build-Depends:
+    base,
+    containers,
+    data-default-class,
+    toysolver
+  Default-Language: Haskell2010
+  Other-Extensions: ScopedTypeVariables, CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
+
 Executable toyfmf
   If !flag(BuildToyFMF)
     Buildable: False
