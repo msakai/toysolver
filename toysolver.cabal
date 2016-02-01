@@ -633,6 +633,7 @@ Test-suite TestSuite
     Test.Misc
     Test.MIPSolver2
     Test.MPSFile
+    Test.QBF
     Test.SAT
     Test.SDPFile
     Test.Simplex
