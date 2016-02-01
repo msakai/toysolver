@@ -321,8 +321,7 @@ Executable toysolver
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
-  if impl(ghc)
-    GHC-Options: -rtsopts -threaded
+  GHC-Options: -rtsopts -threaded
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
   -- GHC-Prof-Options: -auto-all
@@ -353,11 +352,9 @@ Executable toysat
     Build-Depends: time <1.5.0, old-locale
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
-  if impl(ghc)
-    GHC-Options: -rtsopts
+  GHC-Options: -rtsopts
   -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8) && impl(ghc)
-    Build-Depends: base >=4.5
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
@@ -389,11 +386,9 @@ Executable toysmt
     CPP-Options: "-DUSE_HASKELINE_PACKAGE"
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
-  if impl(ghc >= 7)
-    GHC-Options: -rtsopts
+  GHC-Options: -rtsopts
   -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8) && impl(ghc)
-    Build-Depends: base >=4.5
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
@@ -437,8 +432,7 @@ Executable toyfmf
       Build-Depends:
         transformers-compat <0.5
   Default-Language: Haskell2010
-  if impl(ghc)
-    GHC-Options: -rtsopts
+  GHC-Options: -rtsopts
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
   -- GHC-Prof-Options: -auto-all
@@ -463,7 +457,7 @@ Executable pbconvert
   Main-is: pbconvert.hs
   HS-Source-Dirs: pbconvert
   Build-Depends:
-    base >=4 && <5,
+    base,
     filepath,
     data-default-class,
     parse-dimacs,
@@ -679,7 +673,7 @@ Benchmark BenchmarkSATLIB
   hs-source-dirs:   benchmarks
   main-is:          BenchmarkSATLIB.hs
   build-depends:
-    base >=4 && <5,
+    base,
     array,
     data-default-class,
     parse-dimacs,
@@ -692,7 +686,7 @@ Benchmark BenchmarkKnapsack
   hs-source-dirs:   benchmarks
   main-is:          BenchmarkKnapsack.hs
   build-depends:
-    base >=4 && <5,
+    base,
     toysolver,
     criterion >=1.0 && <1.2
   Default-Language: Haskell2010
@@ -702,7 +696,7 @@ Benchmark BenchmarkSubsetSum
   hs-source-dirs:   benchmarks
   main-is:          BenchmarkSubsetSum.hs
   build-depends:
-    base >=4 && <5,
+    base,
     vector,
     toysolver,
     criterion >=1.0 && <1.2
