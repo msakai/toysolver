@@ -264,6 +264,7 @@ Library
      ToySolver.Data.Polynomial.GroebnerBasis
      ToySolver.Data.Polynomial.Interpolation.Lagrange
      ToySolver.Data.Var
+     ToySolver.QBF
      ToySolver.SAT
      ToySolver.SAT.Integer
      ToySolver.SAT.MUS
@@ -287,6 +288,7 @@ Library
      ToySolver.Text.GCNF
      ToySolver.Text.GurobiSol
      ToySolver.Text.MaxSAT
+     ToySolver.Text.QDimacs
      ToySolver.Text.SDPFile
      ToySolver.Internal.Data.IndexedPriorityQueue
      ToySolver.Internal.Data.IOURef
@@ -392,6 +394,23 @@ Executable toysmt
   -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8) && impl(ghc)
     Build-Depends: base >=4.5
+    CPP-OPtions: "-DFORCE_CHAR8"
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
+
+Executable toyqbf
+  Main-is: toyqbf.hs
+  HS-Source-Dirs: toyqbf
+  Build-Depends:
+    base,
+    containers,
+    data-default-class,
+    toysolver
+  Default-Language: Haskell2010
+  Other-Extensions: ScopedTypeVariables, CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
+  if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
@@ -618,6 +637,7 @@ Test-suite TestSuite
     Test.Misc
     Test.MIPSolver2
     Test.MPSFile
+    Test.QBF
     Test.SAT
     Test.SDPFile
     Test.Simplex

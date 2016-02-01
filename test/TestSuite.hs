@@ -17,6 +17,7 @@ import Test.MIPSolver2
 import Test.MPSFile
 import Test.SDPFile
 import Test.Misc
+import Test.QBF
 import Test.SAT
 import Test.Simplex
 import Test.Simplex2
@@ -41,6 +42,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , miscTestGroup
   , mipSolver2TestGroup
   , mpsTestGroup
+  , qbfTestGroup
   , satTestGroup
   , sdpTestGroup
   , simplexTestGroup
