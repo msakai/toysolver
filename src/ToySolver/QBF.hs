@@ -27,6 +27,7 @@ module ToySolver.QBF
   , Matrix
   , solveNaive
   , solveCEGAR
+  , solveCEGARIncremental
   ) where
 
 import Control.Monad
@@ -304,6 +305,82 @@ solveCEGAR nv prefix matrix =
                   Nothing -> return (Just tau)
                   Just nu -> loop (nu : counterMoves)
       loop []
+
+-- ----------------------------------------------------------------------------
+
+-- | Abstraction-Based Algorithm for a Winning Move
+solveCEGARIncremental :: Int -> Prefix -> Matrix -> IO (Bool, Maybe LitSet)
+solveCEGARIncremental nv prefix matrix =
+  case prefix' of
+    [] -> if BoolExpr.fold undefined matrix
+          then return (True, Just IntSet.empty)
+          else return (False, Nothing)
+    (E,_) : _ -> do
+      m <- f nv prefix' matrix
+      return (isJust m, m)
+    (A,_) : _ -> do
+      m <- f nv prefix' matrix
+      return (isNothing m, m)
+  where
+    prefix' = normalizePrefix prefix
+
+    {-
+    Function Solve (QX. Φ)
+    begin
+      if Φ has no quant then
+        return (Q = ∃) ? SAT(φ) : SAT(¬φ)
+      ω ← ∅
+      while true do
+        α ← (Q = ∃) ? ∧_{μ∈ω} Φ[μ] : ∨_{μ∈ω} Φ[μ] // abstraction
+        τ' ← Solve(Prenex(QX.α)) // find a candidate
+        if τ' = NULL then return NULL // no winning move
+        τ ← {l | l ∈ τ′ ∧ var(l) ∈ X} // filter a move for X
+        μ ← Solve(Φ[τ])
+        if μ = NULL then return τ
+        ω ← ω∪{μ}
+      end
+    end
+    -}
+    f :: Int -> Prefix -> Matrix -> IO (Maybe LitSet)
+    f nv prefix matrix = do
+      solver <- SAT.newSolver
+      SAT.newVars_ solver nv
+      enc <- Tseitin.newEncoder solver
+      xs <-
+        case last prefix of
+          (E, xs) -> do
+            Tseitin.addFormula enc matrix
+            return xs
+          (A, xs) -> do
+            Tseitin.addFormula enc (notB matrix)
+            return xs
+      let g :: Int -> Prefix -> Matrix -> LitSet -> IO (Maybe LitSet)
+          g _nv [] _matrix _assumptions = error "should not happen"
+          g nv [(q,xs)] matrix assumptions = do
+            ret <- SAT.solveWith solver (IntSet.toList assumptions)
+            if ret then do
+              m <- SAT.getModel solver
+              return $ Just $ IntSet.fromList [if SAT.evalLit m x then x else -x | x <- IntSet.toList xs]
+            else
+              return Nothing            
+          g nv prefix@((q,xs) : prefix'@((_q2,_) : prefix'')) matrix assumptions = do
+            let loop counterMoves = do
+                  let ys = [(nv, prefix'', reduct matrix nu) | nu <- counterMoves]
+                      (nv2, prefix2, matrix2) =
+                        if q==E
+                        then foldl' prenexAnd (nv,[],true) ys
+                        else foldl' prenexOr (nv,[],false) ys
+                  ret <- f nv2 (normalizePrefix ((q,xs) : prefix2)) matrix2
+                  case ret of
+                    Nothing -> return Nothing
+                    Just tau' -> do
+                      let tau = IntSet.filter (\l -> abs l `IntSet.member` xs) tau'
+                      ret2 <- g nv prefix' (reduct matrix tau) (assumptions `IntSet.union` tau)
+                      case ret2 of
+                        Nothing -> return (Just tau)
+                        Just nu -> loop (nu : counterMoves)
+            loop []
+      g nv prefix matrix IntSet.empty
 
 -- ----------------------------------------------------------------------------
 

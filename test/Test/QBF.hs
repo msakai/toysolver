@@ -35,6 +35,16 @@ prop_solveCEGAR = QM.monadicIO $ do
     Just ls ->
       QM.assert $ sat == evalQBFNaive' (IntMap.fromList [(abs lit, lit > 0) | lit <- IntSet.toList ls]) prefix' matrix
 
+prop_solveCEGARIncremental = QM.monadicIO $ do
+  (nv, prefix@((q,xs) : prefix'), matrix) <- QM.pick arbitrarySmallQBF
+  (sat, cert) <- QM.run $ QBF.solveCEGARIncremental nv prefix matrix
+  QM.assert $ sat == evalQBFNaive prefix matrix
+  case cert of
+    Nothing -> return ()
+    Just ls ->
+      QM.assert $ sat == evalQBFNaive' (IntMap.fromList [(abs lit, lit > 0) | lit <- IntSet.toList ls]) prefix' matrix
+
+
 {-
 If the innermost quantifier is a universal quantifier,
 we can remove the bound variable v from the clauses that
