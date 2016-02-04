@@ -18,6 +18,8 @@ import Control.Monad
 import Data.Char
 import Data.Default.Class
 import qualified Data.IntSet as IntSet
+import Data.List
+import Data.Ord
 import Data.Version
 import System.Console.GetOpt
 import System.Environment
@@ -94,7 +96,7 @@ main = do
                   case certificate of
                     Nothing -> return ()
                     Just lits -> do
-                      forM_ (IntSet.toList lits) $ \lit -> do
+                      forM_ (sortBy (comparing abs) (IntSet.toList lits)) $ \lit -> do
                         putStrLn ("V " ++ show lit)
                   if ans then
                     exitWith (ExitFailure 10)
