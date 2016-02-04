@@ -66,7 +66,7 @@ prop_eliminate_last_universal_quantifier = QM.monadicIO $ do
         if nv == 0 then
           return []
         else do
-          mapM (\v -> elements [v, -v]) =<< sublistOf vs
+          mapM (\v -> elements [v, -v]) =<< subsetof vs
       return
         ( nv
         , [(q1,vs1), (q2, vs2 IntSet.\\ vs1), (QBF.A, IntSet.fromList vs IntSet.\\ (vs1 `IntSet.union` vs2))]
