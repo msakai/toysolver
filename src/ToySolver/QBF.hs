@@ -25,6 +25,7 @@ module ToySolver.QBF
   , normalizePrefix
   , quantifyFreeVariables 
   , Matrix
+  , solve
   , solveNaive
   , solveCEGAR
   , solveCEGARIncremental
@@ -174,6 +175,11 @@ prenexOr (nv1, prefix1, matrix1) (nv2, prefix2, matrix2) =
           xs' = (xs `IntSet.difference` bvs) `IntSet.union` IntSet.fromList (IntMap.elems s)
           subst2' = fmap BoolExpr.Atom s `IntMap.union` subst2
       f (prefix ++ [(q, xs')]) (bvs `IntSet.union` xs') subst1 subst2' prefix1 prefix2'
+
+-- ----------------------------------------------------------------------------
+
+solve :: Int -> Prefix -> Matrix -> IO (Bool, Maybe LitSet)
+solve = solveCEGARIncremental
 
 -- ----------------------------------------------------------------------------
 

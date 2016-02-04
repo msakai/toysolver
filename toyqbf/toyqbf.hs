@@ -15,6 +15,7 @@
 module Main where
 
 import Control.Monad
+import Data.Char
 import Data.Default.Class
 import qualified Data.IntSet as IntSet
 import Data.Version
@@ -37,18 +38,23 @@ data Mode
 data Options
   = Options
   { optMode :: Maybe Mode
+  , optAlgorithm :: String
   }
 
 instance Default Options where
   def =
     Options
     { optMode = Nothing
+    , optAlgorithm = "cegar-incremental"
     }
 
 options :: [OptDescr (Options -> Options)]
 options =
     [ Option ['h'] ["help"]   (NoArg (\opt -> opt{ optMode = Just ModeHelp   })) "show help"
     , Option [] ["version"]   (NoArg (\opt -> opt{ optMode = Just ModeVersion})) "show version"
+    , Option [] ["algorithm"]
+        (ReqArg (\val opt -> opt{ optAlgorithm = val }) "<str>")
+        "Algorithm: naive, cegar, cegar-incremental (default)"
     ]
 
 main :: IO ()
@@ -75,7 +81,15 @@ main = do
                       nc = QDimacs.numClauses qdimacs
                       prefix' = QBF.quantifyFreeVariables nv [(q, IntSet.fromList xs) | (q,xs) <- QDimacs.prefix qdimacs]
                       matrix' = andB [orB [if lit > 0 then BoolExpr.Atom lit else notB (BoolExpr.Atom (abs lit)) | lit <- clause] | clause <- QDimacs.matrix qdimacs]
-                  (ans, certificate) <- QBF.solveCEGAR nv prefix' matrix'
+                  (ans, certificate) <-
+                    case map toLower (optAlgorithm opt) of
+                      "naive" -> QBF.solveNaive nv prefix' matrix'
+                      "cegar" -> QBF.solveCEGAR nv prefix' matrix'
+                      "cegar-incremental" -> QBF.solveCEGARIncremental nv prefix' matrix'
+                      _ -> do
+                        putStrLn $ "c unknown --algorithm option: " ++ show (optAlgorithm opt)
+                        putStrLn $ "s cnf 0 " ++ show nv ++ " " ++ show nc
+                        exitFailure
                   putStrLn $ "s cnf " ++ (if ans then "1" else "-1") ++ " " ++ show nv ++ " " ++ show nc
                   case certificate of
                     Nothing -> return ()
