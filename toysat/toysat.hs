@@ -53,9 +53,6 @@ import Text.Printf
 #ifdef __GLASGOW_HASKELL__
 import GHC.Environment (getFullArgs)
 #endif
-#ifdef FORCE_CHAR8
-import GHC.IO.Encoding
-#endif
 #if defined(__GLASGOW_HASKELL__)
 import qualified GHC.Stats as Stats
 #endif
@@ -79,7 +76,7 @@ import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GCNF as GCNF
 import qualified ToySolver.Text.GurobiSol as GurobiSol
 import ToySolver.Version
-import ToySolver.Internal.Util (showRational, revForM)
+import ToySolver.Internal.Util (showRational, revForM, setEncodingChar8)
 
 import UBCSAT
 
@@ -293,9 +290,7 @@ options =
 main :: IO ()
 main = do
 #ifdef FORCE_CHAR8
-  setLocaleEncoding char8
-  setForeignEncoding char8
-  setFileSystemEncoding char8
+  setEncodingChar8
 #endif
 
   startCPU <- getCPUTime

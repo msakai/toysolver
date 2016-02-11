@@ -32,6 +32,7 @@ import Smtlib.Parsers.CommandsParsers
 
 import ToySolver.Version
 import ToySolver.SMT.SMTLIB2Solver
+import ToySolver.Internal.Util (setEncodingChar8)
 
 data Mode
   = ModeHelp
@@ -61,6 +62,10 @@ options =
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   args <- getArgs
   case getOpt Permute options args of
     (_,_,errs@(_:_)) -> do

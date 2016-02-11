@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Main where
 
 import Control.Monad
@@ -7,9 +8,14 @@ import System.Environment
 import Text.Printf
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import ToySolver.SAT.Types
+import ToySolver.Internal.Util (setEncodingChar8)
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   [problemFile, modelFile] <- getArgs
   Right wcnf <- MaxSAT.parseFile problemFile
   model <- liftM readModel (readFile modelFile)

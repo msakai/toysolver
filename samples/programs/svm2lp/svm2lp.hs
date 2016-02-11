@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 import Control.Monad
 import qualified Data.Foldable as F
@@ -14,6 +15,7 @@ import System.Console.GetOpt
 import System.Environment
 import System.Exit
 import System.IO
+import ToySolver.Internal.Util (setEncodingChar8)
 
 type Problem = [(Int, IntMap Double)]
 
@@ -135,6 +137,10 @@ showHelp h = hPutStrLn h (usageInfo header options)
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   args <- getArgs
   case getOpt Permute options args of
     (_,_,errs@(_:_)) -> do

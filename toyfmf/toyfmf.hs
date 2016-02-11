@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toyfmf
@@ -6,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable (CPP)
 --
 -- A toy-level model finder
 --
@@ -22,9 +23,14 @@ import System.IO
 import qualified Codec.TPTP as TPTP
 import ToySolver.Data.Boolean
 import qualified ToySolver.EUF.FiniteModelFinder as MF
+import ToySolver.Internal.Util (setEncodingChar8)
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   args <- getArgs
   case args of
     [fpath, size] -> solve fpath (read size)

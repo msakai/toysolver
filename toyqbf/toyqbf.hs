@@ -30,6 +30,7 @@ import ToySolver.Data.Boolean
 import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.QBF as QBF
 import qualified ToySolver.Text.QDimacs as QDimacs
+import ToySolver.Internal.Util (setEncodingChar8)
 import ToySolver.Version
 
 data Mode
@@ -61,6 +62,10 @@ options =
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   args <- getArgs
   case getOpt Permute options args of
     (_,_,errs@(_:_)) -> do

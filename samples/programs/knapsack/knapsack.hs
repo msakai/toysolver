@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 module Main where
 
@@ -8,12 +8,17 @@ import System.Environment
 import System.IO
 import Text.Printf
 import qualified ToySolver.Combinatorial.Knapsack.BB as Knapsack
+import ToySolver.Internal.Util (setEncodingChar8)
 
 type Value = Integer
 type Weight = Integer
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   args <- getArgs
   case args of
     [fname] -> do

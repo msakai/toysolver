@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 module Main where
 
@@ -6,9 +6,14 @@ import Control.Monad
 import Data.Array.IArray
 import System.Environment
 import qualified ToySolver.SAT as SAT
+import ToySolver.Internal.Util (setEncodingChar8)
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   [s] <- getArgs
   let n = read s
   ans <- solve n

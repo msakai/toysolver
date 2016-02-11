@@ -19,6 +19,8 @@ import Control.Monad
 import Data.Ratio
 import Data.Set (Set)
 import qualified Data.Set as Set
+import System.IO
+import GHC.IO.Encoding
 
 -- | Combining two @Maybe@ values using given function.
 combineMaybe :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a
@@ -85,3 +87,9 @@ revMapM f = revSequence . map f
 {-# INLINE revForM #-}
 revForM :: Monad m => [a] -> (a -> m b) -> m [b]
 revForM = flip revMapM
+
+setEncodingChar8 :: IO ()
+setEncodingChar8 = do
+  setLocaleEncoding char8
+  setForeignEncoding char8
+  setFileSystemEncoding char8

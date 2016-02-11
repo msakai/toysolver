@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -7,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable (CPP)
 --
 -----------------------------------------------------------------------------
 
@@ -41,6 +42,7 @@ import qualified ToySolver.Converter.PBSetObj as PBSetObj
 import qualified ToySolver.Converter.PB2SMP as PB2SMP
 import qualified ToySolver.Converter.WBO2PB as WBO2PB
 import ToySolver.Version
+import ToySolver.Internal.Util (setEncodingChar8)
 
 data Flag
   = Help
@@ -179,6 +181,10 @@ writePBFile o pb = do
           
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   args <- getArgs
   case getOpt Permute options args of
     (o,_,[])

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toysolver
@@ -382,6 +383,10 @@ getSolver xs = last $ "mip" : [s | Solver s <- xs]
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   args <- getArgs
   case getOpt Permute options args of
     (o,_,[])

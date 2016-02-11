@@ -321,7 +321,10 @@ Executable toysolver
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
   GHC-Options: -rtsopts -threaded
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
   -- GHC-Prof-Options: -auto-all
@@ -354,7 +357,7 @@ Executable toysat
   Other-Extensions: ScopedTypeVariables, CPP
   GHC-Options: -rtsopts
   -- GHC-Prof-Options: -auto-all
-  if flag(ForceChar8) && impl(ghc)
+  if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
@@ -388,7 +391,7 @@ Executable toysmt
   Other-Extensions: ScopedTypeVariables, CPP
   GHC-Options: -rtsopts
   -- GHC-Prof-Options: -auto-all
-  if flag(ForceChar8) && impl(ghc)
+  if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
@@ -432,7 +435,10 @@ Executable toyfmf
       Build-Depends:
         transformers-compat <0.5
   Default-Language: Haskell2010
+  Other-Extensions: CPP
   GHC-Options: -rtsopts
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
   -- GHC-Prof-Options: -auto-all
@@ -450,6 +456,9 @@ Executable lpconvert
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -464,6 +473,9 @@ Executable pbconvert
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -479,6 +491,9 @@ Executable sudoku
     array,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -493,6 +508,9 @@ Executable nonogram
     containers,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -506,6 +524,9 @@ Executable nqueens
     array,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -518,6 +539,9 @@ Executable knapsack
     base,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -531,6 +555,9 @@ Executable htc
     containers,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -546,6 +573,9 @@ Executable svm2lp
     split,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -562,6 +592,9 @@ Executable pigeonhole
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -575,6 +608,9 @@ Executable maxsatverify
     array,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -589,6 +625,9 @@ Executable pbverify
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 

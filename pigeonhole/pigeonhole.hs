@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Main where
 
 import Data.List
@@ -7,6 +8,7 @@ import System.Environment
 import System.Exit
 import System.IO
 import Data.PseudoBoolean as PBFile
+import ToySolver.Internal.Util (setEncodingChar8)
 
 pigeonHole :: Integer -> Integer -> Formula
 pigeonHole p h =
@@ -31,6 +33,10 @@ pigeonHole p h =
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   xs <- getArgs
   case xs of
     [p,h] -> do

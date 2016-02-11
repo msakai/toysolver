@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 module Main where
 
@@ -16,6 +16,7 @@ import System.Exit
 import System.IO
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
+import ToySolver.Internal.Util (setEncodingChar8)
 
 -- row patterns and column patterns
 type Problem = ([[Int]], [[Int]])
@@ -170,6 +171,10 @@ showHelp h = hPutStrLn h (usageInfo header options)
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   args <- getArgs
   case getOpt Permute options args of
     (_,_,errs@(_:_)) -> do

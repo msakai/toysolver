@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 module Main where
 
@@ -9,9 +9,14 @@ import System.Environment
 import System.Exit
 import System.IO
 import qualified ToySolver.SAT as SAT
+import ToySolver.Internal.Util (setEncodingChar8)
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   args <- getArgs
   case args of
     [fname] -> do

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Main where
 
 import Control.Monad
@@ -7,9 +8,14 @@ import Text.Printf
 import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import ToySolver.SAT.Types
+import ToySolver.Internal.Util (setEncodingChar8)
 
 main :: IO ()
 main = do
+#ifdef FORCE_CHAR8
+  setEncodingChar8
+#endif
+
   [problemFile, modelFile] <- getArgs
   Right formula <- PBFileAttoparsec.parseOPBFile problemFile
   model <- liftM readModel (readFile modelFile)
