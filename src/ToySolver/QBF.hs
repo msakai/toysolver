@@ -322,10 +322,10 @@ solveCEGARIncremental nv prefix matrix =
           then return (True, Just IntSet.empty)
           else return (False, Nothing)
     (E,_) : _ -> do
-      m <- f nv prefix' matrix
+      m <- f nv IntSet.empty prefix' matrix
       return (isJust m, m)
     (A,_) : _ -> do
-      m <- f nv prefix' matrix
+      m <- f nv IntSet.empty prefix' matrix
       return (isNothing m, m)
   where
     prefix' = normalizePrefix prefix
@@ -347,8 +347,8 @@ solveCEGARIncremental nv prefix matrix =
       end
     end
     -}
-    f :: Int -> Prefix -> Matrix -> IO (Maybe LitSet)
-    f nv prefix matrix = do
+    f :: Int -> LitSet -> Prefix -> Matrix -> IO (Maybe LitSet)
+    f nv assumptions prefix matrix = do
       solver <- SAT.newSolver
       SAT.newVars_ solver nv
       enc <- Tseitin.newEncoder solver
@@ -360,33 +360,33 @@ solveCEGARIncremental nv prefix matrix =
           (A, xs) -> do
             Tseitin.addFormula enc (notB matrix)
             return xs
-      let g :: Int -> Prefix -> Matrix -> LitSet -> IO (Maybe LitSet)
-          g _nv [] _matrix _assumptions = error "should not happen"
-          g nv [(q,xs)] matrix assumptions = do
+      let g :: Int -> LitSet -> Prefix -> Matrix -> IO (Maybe LitSet)
+          g _nv _assumptions [] _matrix = error "should not happen"
+          g nv assumptions [(q,xs)] matrix = do
             ret <- SAT.solveWith solver (IntSet.toList assumptions)
             if ret then do
               m <- SAT.getModel solver
               return $ Just $ IntSet.fromList [if SAT.evalLit m x then x else -x | x <- IntSet.toList xs]
             else
               return Nothing            
-          g nv prefix@((q,xs) : prefix'@((_q2,_) : prefix'')) matrix assumptions = do
+          g nv assumptions prefix@((q,xs) : prefix'@((_q2,_) : prefix'')) matrix = do
             let loop counterMoves = do
                   let ys = [(nv, prefix'', reduct matrix nu) | nu <- counterMoves]
                       (nv2, prefix2, matrix2) =
                         if q==E
                         then foldl' prenexAnd (nv,[],true) ys
                         else foldl' prenexOr (nv,[],false) ys
-                  ret <- f nv2 (normalizePrefix ((q,xs) : prefix2)) matrix2
+                  ret <- f nv2 assumptions (normalizePrefix ((q,xs) : prefix2)) matrix2
                   case ret of
                     Nothing -> return Nothing
                     Just tau' -> do
                       let tau = IntSet.filter (\l -> abs l `IntSet.member` xs) tau'
-                      ret2 <- g nv prefix' (reduct matrix tau) (assumptions `IntSet.union` tau)
+                      ret2 <- g nv (assumptions `IntSet.union` tau) prefix' (reduct matrix tau)
                       case ret2 of
                         Nothing -> return (Just tau)
                         Just nu -> loop (nu : counterMoves)
             loop []
-      g nv prefix matrix IntSet.empty
+      g nv IntSet.empty prefix matrix
 
 -- ----------------------------------------------------------------------------
 
