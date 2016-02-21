@@ -141,7 +141,7 @@ newSolver nv clauses = do
   varProbT <- VGM.new nv
   varProbF <- VGM.new nv
 
-  tolRef <- newIORef 0.1
+  tolRef <- newIORef 0.01
   maxIterRef <- newIORef (Just 1000)
   nthreadsRef <- newIORef 1
 
