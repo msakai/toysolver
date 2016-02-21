@@ -494,14 +494,12 @@ initPolarityUsingSP solver nv clauses = do
     xs <- forM [1 .. nv] $ \v -> do
       (pt,pf,_)<- SP.getVarProb sp v
       let bias = pt - pf
-      putCommentLine $ "SAT.setVarPolarity solver " ++ show v ++ " " ++ show (pt >= pf) ++ "(bias=" ++ show bias ++ ")"
       SAT.setVarPolarity solver v (bias >= 0)
       if abs bias > 0.1 then
         return $ Just (v, abs bias)
       else
         return Nothing
     forM_ (sortBy (comparing snd) (catMaybes xs)) $ \(v,_) -> do
-      putCommentLine $ "SAT.varBumpActivity solver " ++ show v
       SAT.varBumpActivity solver v
   else do
     putCommentLine $ printf "Survey propagation did not converge"
