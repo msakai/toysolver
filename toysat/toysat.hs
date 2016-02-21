@@ -67,6 +67,7 @@ import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Integer as Integer
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
 import qualified ToySolver.SAT.PBNLC as PBNLC
+import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
@@ -104,6 +105,7 @@ data Options
   , optTimeout :: Integer
   , optWriteFile :: Maybe FilePath
   , optUBCSAT :: FilePath
+  , optInitSP :: Bool
   }
 
 instance Default Options where
@@ -123,6 +125,7 @@ instance Default Options where
     , optTimeout = 0
     , optWriteFile = Nothing
     , optUBCSAT = "ubcsat"
+    , optInitSP = False
     }
 
 options :: [OptDescr (Options -> Options)]
@@ -186,6 +189,10 @@ options =
     , Option [] ["random-gen"]
         (ReqArg (\val opt -> opt{ optRandomSeed = Just (Rand.toSeed (V.fromList (map read $ words $ val) :: V.Vector Word32)) }) "<str>")
         "another way of specifying random seed used by the random variable selection"
+
+    , Option [] ["init-sp"]
+        (NoArg (\opt -> opt{ optInitSP = True }))
+        "Use survey propation to compute initial polarity (CNF only)"
 
     , Option [] ["linearizer-pb"]
         (NoArg (\opt -> opt{ optLinearizerPB = True }))
@@ -462,12 +469,43 @@ solveSAT opt solver cnf = do
   SAT.newVars_ solver (DIMACS.numVars cnf)
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
+  when (optInitSP opt) $
+    initPolarityUsingSP solver (DIMACS.numVars cnf) [elems clause | clause <- DIMACS.clauses cnf]
   result <- SAT.solve solver
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   when result $ do
     m <- SAT.getModel solver
     satPrintModel stdout m (DIMACS.numVars cnf)
     writeSOLFile opt m Nothing (DIMACS.numVars cnf)
+
+initPolarityUsingSP :: SAT.Solver -> Int -> [SAT.Clause] -> IO ()
+initPolarityUsingSP solver nv clauses = do
+  putCommentLine $ "Running survey propgation ..."
+  startWC  <- getCurrentTime
+  sp <- SP.newSolver nv clauses
+  Rand.withSystemRandom $ SP.initializeRandom sp
+  lits <- SAT.getFixedLiterals solver
+  forM_ lits $ \lit -> do
+    when (abs lit <= nv) $ SP.fixLit sp lit
+  b <- SP.propagate sp
+  endWC  <- getCurrentTime
+  if b then do
+    putCommentLine $ printf "Survey propagation converged in %.3fs" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
+    xs <- forM [1 .. nv] $ \v -> do
+      (pt,pf,_)<- SP.getVarProb sp v
+      let bias = pt - pf
+      putCommentLine $ "SAT.setVarPolarity solver " ++ show v ++ " " ++ show (pt >= pf) ++ "(bias=" ++ show bias ++ ")"
+      SAT.setVarPolarity solver v (bias >= 0)
+      if abs bias > 0.1 then
+        return $ Just (v, abs bias)
+      else
+        return Nothing
+    forM_ (sortBy (comparing snd) (catMaybes xs)) $ \(v,_) -> do
+      putCommentLine $ "SAT.varBumpActivity solver " ++ show v
+      SAT.varBumpActivity solver v
+  else do
+    putCommentLine $ printf "Survey propagation did not converge"
+    return ()
 
 -- ------------------------------------------------------------------------
 
@@ -509,6 +547,9 @@ solveMUS opt solver gcnf = do
     if idx==0
     then SAT.addClause solver clause
     else SAT.addClause solver (- (idx2sel ! idx) : clause)
+
+  when (optInitSP opt) $
+    initPolarityUsingSP solver (GCNF.numVars gcnf) [clause | (_, clause) <- GCNF.clauses gcnf]
 
   result <- SAT.solveWith solver (map (idx2sel !) [1..GCNF.lastGroupIndex gcnf])
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
@@ -699,6 +740,10 @@ solveWBO opt solver isMaxSat formula initialModel = do
   case PBFile.wboTopCost formula of
     Nothing -> return ()
     Just c -> SAT.addPBAtMost solver obj (c-1)
+
+  -- XXX
+  when (isMaxSat && optInitSP opt) $ do
+    initPolarityUsingSP solver nv [[lit | (1,[lit]) <- cs] | (_, (cs, PBFile.Ge, 1)) <- PBFile.wboConstraints formula]
 
   nv' <- SAT.getNVars solver
   defs1 <- Tseitin.getDefinitions enc

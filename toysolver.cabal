@@ -269,6 +269,7 @@ Library
      ToySolver.QBF
      ToySolver.SAT
      ToySolver.SAT.Integer
+     ToySolver.SAT.MessagePassing.SurveyPropagation
      ToySolver.SAT.MUS
      ToySolver.SAT.MUS.CAMUS
      ToySolver.SAT.MUS.DAA
@@ -576,6 +577,25 @@ Executable svm2lp
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
+
+Executable spsat
+  If !flag(BuildSamplePrograms)
+    Buildable: False
+  Main-is: spsat.hs
+  HS-Source-Dirs: samples/programs/spsat
+  Build-Depends:
+    base,
+    array,
+    mwc-random,
+    parse-dimacs,
+    toysolver
+  Default-Language: Haskell2010
+  Other-Extensions: CPP
+  GHC-Options: -threaded
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
