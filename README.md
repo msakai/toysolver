@@ -140,4 +140,4 @@ TODO
 ----
 
 * Local search
-* Survey propagation
+
