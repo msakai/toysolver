@@ -174,7 +174,7 @@ initializeRandom :: Solver -> Rand.GenIO -> IO ()
 initializeRandom solver gen = do
   n <- getNEdges solver
   numLoop 0 (n-1) $ \e -> do
-    VGM.write (svEdgeSurvey solver) e =<< Rand.uniform gen -- (0,1]
+    VGM.write (svEdgeSurvey solver) e =<< Rand.uniformR (0.05,0.95) gen -- (0.05, 0.95]
 
 -- | number of variables of the problem.
 getNVars :: Solver -> IO Int
