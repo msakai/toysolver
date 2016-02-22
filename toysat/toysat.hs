@@ -483,7 +483,7 @@ initPolarityUsingSP solver nv clauses = do
   putCommentLine $ "Running survey propgation ..."
   startWC  <- getCurrentTime
   sp <- SP.newSolver nv clauses
-  Rand.withSystemRandom $ SP.initializeRandom sp
+  SP.initializeRandom sp =<< SAT.getRandomGen solver
   lits <- SAT.getFixedLiterals solver
   forM_ lits $ \lit -> do
     when (abs lit <= nv) $ SP.fixLit sp lit
