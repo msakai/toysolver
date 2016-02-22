@@ -3,12 +3,11 @@
 module Main where
 
 import Control.Concurrent
-import qualified Data.Array.IArray as A
-import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import System.Environment
 import qualified System.Random.MWC as Rand
 
 import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
+import qualified ToySolver.Text.MaxSAT as MaxSAT
 import ToySolver.Internal.Util (setEncodingChar8)
 
 main :: IO ()
@@ -17,9 +16,8 @@ main = do
   setEncodingChar8
 #endif
   [fname] <- getArgs
-  Right cnf <- DIMACS.parseFile fname
-  solver <- SP.newSolver (DIMACS.numVars cnf) [A.elems clause | clause <- DIMACS.clauses cnf]
+  Right wcnf <- MaxSAT.parseFile fname
+  solver <- SP.newSolver (MaxSAT.numVars wcnf) [(fromIntegral w, clause) | (w,clause) <- MaxSAT.clauses wcnf]
   SP.setNThreads solver =<< getNumCapabilities
   Rand.withSystemRandom $ SP.initializeRandom solver
   print =<< SP.solve solver
-

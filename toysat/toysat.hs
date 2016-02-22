@@ -470,7 +470,7 @@ solveSAT opt solver cnf = do
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
   when (optInitSP opt) $
-    initPolarityUsingSP solver (DIMACS.numVars cnf) [elems clause | clause <- DIMACS.clauses cnf]
+    initPolarityUsingSP solver (DIMACS.numVars cnf) [(1, elems clause) | clause <- DIMACS.clauses cnf]
   result <- SAT.solve solver
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   when result $ do
@@ -478,7 +478,7 @@ solveSAT opt solver cnf = do
     satPrintModel stdout m (DIMACS.numVars cnf)
     writeSOLFile opt m Nothing (DIMACS.numVars cnf)
 
-initPolarityUsingSP :: SAT.Solver -> Int -> [SAT.Clause] -> IO ()
+initPolarityUsingSP :: SAT.Solver -> Int -> [(Double, SAT.Clause)] -> IO ()
 initPolarityUsingSP solver nv clauses = do
   putCommentLine $ "Running survey propgation ..."
   startWC  <- getCurrentTime
@@ -547,7 +547,7 @@ solveMUS opt solver gcnf = do
     else SAT.addClause solver (- (idx2sel ! idx) : clause)
 
   when (optInitSP opt) $
-    initPolarityUsingSP solver (GCNF.numVars gcnf) [clause | (_, clause) <- GCNF.clauses gcnf]
+    initPolarityUsingSP solver (GCNF.numVars gcnf) [(1, clause) | (_, clause) <- GCNF.clauses gcnf]
 
   result <- SAT.solveWith solver (map (idx2sel !) [1..GCNF.lastGroupIndex gcnf])
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
@@ -739,9 +739,10 @@ solveWBO opt solver isMaxSat formula initialModel = do
     Nothing -> return ()
     Just c -> SAT.addPBAtMost solver obj (c-1)
 
-  -- XXX
-  when (isMaxSat && optInitSP opt) $ do
-    initPolarityUsingSP solver nv [[lit | (1,[lit]) <- cs] | (_, (cs, PBFile.Ge, 1)) <- PBFile.wboConstraints formula]
+  when (optInitSP opt) $ do
+    case wboToMaxSAT formula of
+      Nothing -> return ()
+      Just wcnf -> initPolarityUsingSP solver nv [(fromIntegral w, c) | (w, c) <-  MaxSAT.clauses wcnf]
 
   nv' <- SAT.getNVars solver
   defs1 <- Tseitin.getDefinitions enc
@@ -793,6 +794,31 @@ solveWBO opt solver isMaxSat formula initialModel = do
           writeSOLFile opt m (Just val) nv
         else 
           putSLine "UNKNOWN"
+
+-- NOTE: This does not encode proper pseudo boolean constraints into clauses,
+-- and it also ignores top cost.
+wboToMaxSAT :: PBFile.SoftFormula -> Maybe MaxSAT.WCNF
+wboToMaxSAT formula = do
+  cs <- mapM f (PBFile.wboConstraints formula)
+  return $
+    MaxSAT.WCNF
+    { MaxSAT.numVars    = PBFile.wboNumVars formula
+    , MaxSAT.numClauses = PBFile.wboNumConstraints formula
+    , MaxSAT.topCost    = w2
+    , MaxSAT.clauses    = cs
+    }         
+  where
+    w2 = sum [w | (Just w, _) <- PBFile.wboConstraints formula] + 1
+    
+    f :: PBFile.SoftConstraint -> Maybe MaxSAT.WeightedClause
+    f (w, (cs, PBFile.Ge, 1)) = do
+      lits <- forM cs $ \(a,xs) -> do
+        guard $ a == 1
+        case xs of
+          [lit] -> return lit
+          _ -> Nothing
+      return (case w of{ Just n -> n; Nothing -> w2 }, lits)
+    f _ = Nothing
 
 -- ------------------------------------------------------------------------
 

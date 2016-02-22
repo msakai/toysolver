@@ -591,7 +591,6 @@ Executable spsat
     base,
     array,
     mwc-random,
-    parse-dimacs,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP

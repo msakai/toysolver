@@ -86,6 +86,7 @@ data Solver
   , svVarFixed :: !(VM.IOVector (Maybe Bool))
 
   , svClauseEdges :: !(V.Vector [EdgeIndex])
+  , svClauseWeight :: !(VU.Vector Double)
 
   , svEdgeLit    :: !(VU.Vector SAT.Lit) -- i
   , svEdgeClause :: !(VU.Vector ClauseIndex) -- a
@@ -99,10 +100,10 @@ data Solver
   , svNThreadsRef :: !(IORef Int)
   }
 
-newSolver :: Int -> [SAT.Clause] -> IO Solver
+newSolver :: Int -> [(Double, SAT.Clause)] -> IO Solver
 newSolver nv clauses = do
   let num_clauses = length clauses
-      num_edges = sum [length c | c <- clauses]
+      num_edges = sum [length c | (_,c) <- clauses]
 
   varEdgesRef <- newIORef IntMap.empty
   clauseEdgesM <- VGM.new num_clauses
@@ -111,7 +112,7 @@ newSolver nv clauses = do
   (edgeClauseM :: VUM.IOVector ClauseIndex) <- VGM.new num_edges
 
   ref <- newIORef 0
-  forM_ (zip [0..] clauses) $ \(i,c) -> do
+  forM_ (zip [0..] clauses) $ \(i,(_,c)) -> do
     es <- forM c $ \lit -> do
       e <- readIORef ref
       modifyIORef' ref (+1)
@@ -155,6 +156,7 @@ newSolver nv clauses = do
         , svVarFixed = varFixed
 
         , svClauseEdges = clauseEdges
+        , svClauseWeight = VG.fromListN (VG.length clauseEdges) (map fst clauses)
 
         , svEdgeLit     = edgeLit
         , svEdgeClause  = edgeClause
@@ -326,8 +328,9 @@ updateEdgeProb solver e = do
               return (val1, val2)
             else do
               eta_bj <- VGM.read (svEdgeSurvey solver) e2 -- η_{b→j}
-              let val1' = if signum lit == signum lit2 then val1 * (1 - eta_bj) else val1
-                  val2' = if signum lit /= signum lit2 then val2 * (1 - eta_bj) else val2
+              let w = svClauseWeight solver ! b
+              let val1' = if signum lit == signum lit2 then val1 * (1 - eta_bj) ** w else val1
+                  val2' = if signum lit /= signum lit2 then val2 * (1 - eta_bj) ** w else val2
               return (val1',val2')
       (val1,val2) <- foldM f (1,1) (svVarEdges solver ! (j - 1))
       -- val1 = Π_{V^s_a(j) \ a} (1 - η_{b→j})
@@ -363,9 +366,11 @@ computeVarProb solver v = do
   let i = v - 1
       f (val1,val2) e = do
         let lit = svEdgeLit solver ! e
+            a = svEdgeClause solver ! e
+            w = svClauseWeight solver ! a
         eta_ai <- VGM.read (svEdgeSurvey solver) e
-        let val1' = if lit > 0 then val1 * (1 - eta_ai) else val1
-            val2' = if lit < 0 then val2 * (1 - eta_ai) else val2
+        let val1' = if lit > 0 then val1 * (1 - eta_ai) ** w else val1
+            val2' = if lit < 0 then val2 * (1 - eta_ai) ** w else val2
         return (val1',val2')
   (val1,val2) <- foldM f (1,1) (svVarEdges solver ! i)
   let p0 = val1 * val2       -- \^{Π}^{0}_i
