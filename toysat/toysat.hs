@@ -61,6 +61,7 @@ import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.PBO as PBO
@@ -470,7 +471,8 @@ solveSAT opt solver cnf = do
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
   when (optInitSP opt) $
-    initPolarityUsingSP solver (DIMACS.numVars cnf) [(1, elems clause) | clause <- DIMACS.clauses cnf]
+    initPolarityUsingSP solver (DIMACS.numVars cnf)
+      (DIMACS.numVars cnf) [(1, elems clause) | clause <- DIMACS.clauses cnf]
   result <- SAT.solve solver
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   when result $ do
@@ -478,20 +480,20 @@ solveSAT opt solver cnf = do
     satPrintModel stdout m (DIMACS.numVars cnf)
     writeSOLFile opt m Nothing (DIMACS.numVars cnf)
 
-initPolarityUsingSP :: SAT.Solver -> Int -> [(Double, SAT.Clause)] -> IO ()
-initPolarityUsingSP solver nv clauses = do
+initPolarityUsingSP :: SAT.Solver -> Int -> Int -> [(Double, SAT.Clause)] -> IO ()
+initPolarityUsingSP solver nvOrig nv clauses = do
   putCommentLine $ "Running survey propgation ..."
   startWC  <- getCurrentTime
   sp <- SP.newSolver nv clauses
   SP.initializeRandom sp =<< SAT.getRandomGen solver
   lits <- SAT.getFixedLiterals solver
   forM_ lits $ \lit -> do
-    when (abs lit <= nv) $ SP.fixLit sp lit
+    when (abs lit <= nvOrig) $ SP.fixLit sp lit
   b <- SP.propagate sp
   endWC  <- getCurrentTime
   if b then do
     putCommentLine $ printf "Survey propagation converged in %.3fs" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
-    xs <- forM [1 .. nv] $ \v -> do
+    xs <- forM [1 .. nvOrig] $ \v -> do
       (pt,pf,_)<- SP.getVarProb sp v
       let bias = pt - pf
       SAT.setVarPolarity solver v (bias >= 0)
@@ -546,8 +548,10 @@ solveMUS opt solver gcnf = do
     then SAT.addClause solver clause
     else SAT.addClause solver (- (idx2sel ! idx) : clause)
 
-  when (optInitSP opt) $
-    initPolarityUsingSP solver (GCNF.numVars gcnf) [(1, clause) | (_, clause) <- GCNF.clauses gcnf]
+  when (optInitSP opt) $ do
+    let wcnf = GCNF2MaxSAT.convert gcnf
+    initPolarityUsingSP solver (GCNF.numVars gcnf)
+      (MaxSAT.numVars wcnf) [(fromIntegral w, clause) | (w, clause) <- MaxSAT.clauses wcnf]
 
   result <- SAT.solveWith solver (map (idx2sel !) [1..GCNF.lastGroupIndex gcnf])
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
@@ -742,7 +746,7 @@ solveWBO opt solver isMaxSat formula initialModel = do
   when (optInitSP opt) $ do
     case wboToMaxSAT formula of
       Nothing -> return ()
-      Just wcnf -> initPolarityUsingSP solver nv [(fromIntegral w, c) | (w, c) <-  MaxSAT.clauses wcnf]
+      Just wcnf -> initPolarityUsingSP solver nv nv [(fromIntegral w, c) | (w, c) <-  MaxSAT.clauses wcnf]
 
   nv' <- SAT.getNVars solver
   defs1 <- Tseitin.getDefinitions enc
