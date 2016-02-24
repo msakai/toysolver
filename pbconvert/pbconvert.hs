@@ -29,9 +29,11 @@ import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
 import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.Text.GCNF as GCNF
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.SAT2PB as SAT2PB
+import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.MaxSAT2NLPB as MaxSAT2NLPB
@@ -115,16 +117,22 @@ readPBFile o fname = do
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
         Right wbo -> return $ Right wbo
+    ".gcnf" -> do
+      ret <- GCNF.parseFile fname
+      case ret of
+        Left err -> hPutStrLn stderr err >> exitFailure
+        Right gcnf -> return $ fromWCNF $ GCNF2MaxSAT.convert gcnf
     ext ->
       error $ "unknown file extension: " ++ show ext
-  where
+  where    
     readWCNF = do
       ret <- MaxSAT.parseFile fname
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
-        Right wcnf
-          | MaxSATNonLinear `elem` o -> return $ Left $ MaxSAT2NLPB.convert wcnf
-          | otherwise -> return $ Right $ MaxSAT2WBO.convert wcnf
+        Right wcnf -> return $ fromWCNF wcnf
+    fromWCNF wcnf
+      | MaxSATNonLinear `elem` o = Left $ MaxSAT2NLPB.convert wcnf
+      | otherwise = Right $ MaxSAT2WBO.convert wcnf
 
 transformPBFile :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> Either PBFile.Formula PBFile.SoftFormula
 transformPBFile o pb =

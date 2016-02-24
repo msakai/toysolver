@@ -28,8 +28,10 @@ import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import qualified Data.PseudoBoolean as PBFile
 
 import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.Text.GCNF as GCNF
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import ToySolver.Converter.ObjType
+import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.MaxSAT2IP as MaxSAT2IP
 import qualified ToySolver.Converter.MaxSAT2NLPB as MaxSAT2NLPB
@@ -103,6 +105,11 @@ readLP o fname = do
               let (mip, _) = PB2IP.convert pb
               return mip
     ".wcnf" -> readWCNF
+    ".gcnf" -> do
+      ret <- GCNF.parseFile fname
+      case ret of
+        Left err -> hPutStrLn stderr err >> exitFailure
+        Right gcnf -> return $ fromWCNF $ GCNF2MaxSAT.convert gcnf
     ".opb"  -> do
       ret <- PBFile.parseOPBFile fname
       case ret of
@@ -135,14 +142,15 @@ readLP o fname = do
       ret <- MaxSAT.parseFile fname
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
-        Right wcnf
-          | MaxSATNonLinear `elem` o -> do
-              let pb = transformPBFile o $ MaxSAT2NLPB.convert wcnf
-                  (mip, _) = PB2IP.convert pb
-              return mip
-          | otherwise -> do
-              let (mip, _) = MaxSAT2IP.convert (IndicatorConstraint `elem` o) wcnf
-              return mip
+        Right wcnf -> return $ fromWCNF wcnf
+    fromWCNF wcnf
+      | MaxSATNonLinear `elem` o =
+          let pb = transformPBFile o $ MaxSAT2NLPB.convert wcnf
+              (mip, _) = PB2IP.convert pb
+          in mip
+      | otherwise =
+          let (mip, _) = MaxSAT2IP.convert (IndicatorConstraint `elem` o) wcnf
+          in mip
 
 transformPBFile :: [Flag] -> PBFile.Formula -> PBFile.Formula
 transformPBFile o opb | isNothing (PBFile.pbObjectiveFunction opb) = PBSetObj.setObj objType opb
