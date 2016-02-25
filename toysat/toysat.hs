@@ -16,6 +16,7 @@
 
 module Main where
 
+import Control.Concurrent (getNumCapabilities)
 import Control.Concurrent.Timeout
 import Control.Monad
 import Control.Exception
@@ -482,10 +483,12 @@ solveSAT opt solver cnf = do
 
 initPolarityUsingSP :: SAT.Solver -> Int -> Int -> [(Double, SAT.Clause)] -> IO ()
 initPolarityUsingSP solver nvOrig nv clauses = do
-  putCommentLine $ "Running survey propgation ..."
+  n <- getNumCapabilities
+  putCommentLine $ "Running survey propgation using " ++ show n ++" threads ..."
   startWC  <- getCurrentTime
-  sp <- SP.newSolver nv clauses
+  sp <- SP.newSolver nv clauses  
   SP.initializeRandom sp =<< SAT.getRandomGen solver
+  SP.setNThreads sp n
   lits <- SAT.getFixedLiterals solver
   forM_ lits $ \lit -> do
     when (abs lit <= nvOrig) $ SP.fixLit sp lit

@@ -359,7 +359,7 @@ Executable toysat
     Build-Depends: time <1.5.0, old-locale
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
-  GHC-Options: -rtsopts
+  GHC-Options: -rtsopts -threaded
   -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"

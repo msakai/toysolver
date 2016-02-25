@@ -80,12 +80,12 @@ type EdgeIndex   = Int
 
 data Solver
   = Solver
-  { svVarEdges :: !(V.Vector [EdgeIndex])
+  { svVarEdges :: !(V.Vector (VU.Vector EdgeIndex))
   , svVarProbT :: !(VUM.IOVector Double)
   , svVarProbF :: !(VUM.IOVector Double)
   , svVarFixed :: !(VM.IOVector (Maybe Bool))
 
-  , svClauseEdges :: !(V.Vector [EdgeIndex])
+  , svClauseEdges :: !(V.Vector (VU.Vector EdgeIndex))
   , svClauseWeight :: !(VU.Vector Double)
 
   , svEdgeLit    :: !(VU.Vector SAT.Lit) -- i
@@ -94,6 +94,9 @@ data Solver
   , svEdgeProbS  :: !(VUM.IOVector Double) -- Π^s_{i → a}
   , svEdgeProbU  :: !(VUM.IOVector Double) -- Π^u_{i → a}
   , svEdgeProb0  :: !(VUM.IOVector Double) -- Π^0_{i → a}
+
+  , svEdgeTmp1 :: !(VUM.IOVector Double) -- working space
+  , svEdgeTmp2 :: !(VUM.IOVector Double) -- working space
 
   , svTolRef :: !(IORef Double)
   , svIterLimRef :: !(IORef (Maybe Int))
@@ -117,10 +120,10 @@ newSolver nv clauses = do
       e <- readIORef ref
       modifyIORef' ref (+1)
       modifyIORef' varEdgesRef (IntMap.insertWith IntSet.union (abs lit) (IntSet.singleton e))
-      VGM.write edgeLitM e lit
-      VGM.write edgeClauseM e i
+      VGM.unsafeWrite edgeLitM e lit
+      VGM.unsafeWrite edgeClauseM e i
       return e
-    VGM.write clauseEdgesM i es
+    VGM.unsafeWrite clauseEdgesM i (VG.fromList es)
 
   varEdges <- readIORef varEdgesRef
   clauseEdges <- VG.unsafeFreeze clauseEdgesM
@@ -142,6 +145,9 @@ newSolver nv clauses = do
   varProbT <- VGM.new nv
   varProbF <- VGM.new nv
 
+  tmp1 <- VGM.new num_edges
+  tmp2 <- VGM.new num_edges
+
   tolRef <- newIORef 0.01
   maxIterRef <- newIORef (Just 1000)
   nthreadsRef <- newIORef 1
@@ -149,8 +155,8 @@ newSolver nv clauses = do
   let solver = Solver
         { svVarEdges    = VG.generate nv $ \i ->
             case IntMap.lookup (i+1) varEdges of
-              Nothing -> []
-              Just es -> IntSet.toList es
+              Nothing -> VG.empty
+              Just es -> VG.fromListN (IntSet.size es) (IntSet.toList es)
         , svVarProbT = varProbT
         , svVarProbF = varProbF
         , svVarFixed = varFixed
@@ -165,6 +171,9 @@ newSolver nv clauses = do
         , svEdgeProbU   = edgeProbU
         , svEdgeProb0   = edgeProb0
 
+        , svEdgeTmp1 = tmp1
+        , svEdgeTmp2 = tmp2
+
         , svTolRef = tolRef
         , svIterLimRef = maxIterRef
         , svNThreadsRef = nthreadsRef
@@ -176,7 +185,7 @@ initializeRandom :: Solver -> Rand.GenIO -> IO ()
 initializeRandom solver gen = do
   n <- getNEdges solver
   numLoop 0 (n-1) $ \e -> do
-    VGM.write (svEdgeSurvey solver) e =<< Rand.uniformR (0.05,0.95) gen -- (0.05, 0.95]
+    VGM.unsafeWrite (svEdgeSurvey solver) e =<< Rand.uniformR (0.05,0.95) gen -- (0.05, 0.95]
 
 -- | number of variables of the problem.
 getNVars :: Solver -> IO Int
@@ -220,14 +229,15 @@ propagateST :: Solver -> IO Bool
 propagateST solver = do
   tol <- getTolerance solver
   lim <- getIterationLimit solver
-  ne <- getNEdges solver
   nv <- getNVars solver
+  nc <- getNConstraints solver
   let loop !i
         | Just l <- lim, i > l = return False
         | otherwise = do
-            numLoop 0 (ne-1) $ \e -> updateEdgeProb solver e
-            let f maxDelta e = max maxDelta <$> updateEdgeSurvey solver e
-            delta <- foldM f 0 [0 .. ne-1]
+            numLoop 1 nv $ \v -> updateEdgeProb solver v
+            let f maxDelta c = max maxDelta <$> updateEdgeSurvey solver c
+            delta <- foldM f 0 [0 .. nc-1]
+            -- numLoop 0 (ne-1) $ \e -> checkEdgeSurvey solver e
             if delta <= tol then do
               numLoop 1 nv $ \v -> computeVarProb solver v
               return True
@@ -245,8 +255,8 @@ propagateMT :: Solver -> Int -> IO Bool
 propagateMT solver nthreads = do
   tol <- getTolerance solver
   lim <- getIterationLimit solver
-  ne <- getNEdges solver
   nv <- getNVars solver
+  nc <- getNConstraints solver
 
   mask $ \restore -> do
     ex <- newEmptyTMVarIO
@@ -254,13 +264,13 @@ propagateMT solver nthreads = do
         wait m = join $ atomically $ liftM return m `orElse` liftM throwIO (takeTMVar ex)
 
     workers <- do
-      let mE = (ne + nthreads - 1) `div` nthreads
-          mV = (nv + nthreads - 1) `div` nthreads
+      let mV = (nv + nthreads - 1) `div` nthreads
+          mC = (nc + nthreads - 1) `div` nthreads
       forM [0..nthreads-1] $ \i -> do
-         let lbE = mE * i
-             ubE = min (lbE + mE) ne
-             lbV = mV * i + 1
+         let lbV = mV * i + 1
              ubV = min (lbV + mV) nv + 1
+             lbC = mC * i + 1
+             ubC = min (lbC + mC) nv + 1
          reqVar   <- newEmptyMVar
          respVar  <- newEmptyTMVarIO
          respVar2 <- newEmptyTMVarIO
@@ -270,12 +280,12 @@ propagateMT solver nthreads = do
                  case cmd of
                    WCTerminate -> return ()
                    WCUpdateEdgeProb -> do
-                     numLoop lbE (ubE-1) $ \e -> updateEdgeProb solver e
+                     numLoop lbV (ubV-1) $ \v -> updateEdgeProb solver v
                      atomically $ putTMVar respVar ()
                      loop
                    WCUpdateSurvey -> do
-                     let f maxDelta e = max maxDelta <$> updateEdgeSurvey solver e
-                     delta <- foldM f 0 [lbE .. ubE-1]
+                     let f maxDelta c = max maxDelta <$> updateEdgeSurvey solver c
+                     delta <- foldM f 0 [lbC .. ubC-1]
                      atomically $ putTMVar respVar2 delta
                      loop
                    WCComputeVarProb -> do
@@ -307,59 +317,93 @@ propagateMT solver nthreads = do
         mapM_ (\(th,_,_,_) -> killThread th) workers
         throwIO e
 
-updateEdgeProb :: Solver -> EdgeIndex -> IO ()
-updateEdgeProb solver e = do
-  let lit = svEdgeLit solver ! e
-      j = abs lit
-      a = svEdgeClause solver ! e
-  m <- VGM.read (svVarFixed solver) (j - 1)
+updateEdgeProb :: Solver -> SAT.Var -> IO ()
+updateEdgeProb solver v = do
+  let i = v - 1
+      edges = svVarEdges solver ! i
+  m <- VGM.unsafeRead (svVarFixed solver) i
   case m of
-    Just b -> do
-      let flag = (lit > 0) == b
-      VGM.write (svEdgeProbU solver) e (if flag then 0 else 1) -- Π^u_{j→a}
-      VGM.write (svEdgeProbS solver) e (if flag then 1 else 0) -- Π^s_{j→a}
-      VGM.write (svEdgeProb0 solver) e 0                       -- Π^0_{j→a}
+    Just val -> do
+      VG.forM_ edges $ \e -> do
+        let lit = svEdgeLit solver ! e
+            flag = (lit > 0) == val
+        VGM.unsafeWrite (svEdgeProbU solver) e (if flag then 0 else 1) -- Π^u_{i→a}
+        VGM.unsafeWrite (svEdgeProbS solver) e (if flag then 1 else 0) -- Π^s_{i→a}
+        VGM.unsafeWrite (svEdgeProb0 solver) e 0                       -- Π^0_{i→a}
     Nothing -> do
-      let f :: (Double, Double) -> EdgeIndex -> IO (Double, Double)
-          f (!val1, !val2) e2 = do
-            let b = svEdgeClause solver ! e2
-                lit2 = svEdgeLit solver ! e2
-            if a==b then
-              return (val1, val2)
-            else do
-              eta_bj <- VGM.read (svEdgeSurvey solver) e2 -- η_{b→j}
-              let w = svClauseWeight solver ! b
-              let val1' = if signum lit == signum lit2 then val1 * (1 - eta_bj) ** w else val1
-                  val2' = if signum lit /= signum lit2 then val2 * (1 - eta_bj) ** w else val2
-              return (val1',val2')
-      (val1,val2) <- foldM f (1,1) (svVarEdges solver ! (j - 1))
-      -- val1 = Π_{V^s_a(j) \ a} (1 - η_{b→j})
-      -- val2 = Π_{V^u_a(j) \ a} (1 - η_{b→j})
-      VGM.write (svEdgeProbU solver) e ((1 - val2) * val1) -- Π^u_{j→a}
-      VGM.write (svEdgeProbS solver) e ((1 - val1) * val2) -- Π^s_{j→a}
-      VGM.write (svEdgeProb0 solver) e (val1 * val2)       -- Π^0_{j→a}
+      let tmp1 = svEdgeTmp1 solver
+          tmp2 = svEdgeTmp2 solver
+      let f !k !val1_pre !val2_pre
+            | k >= VG.length edges = return ()
+            | otherwise = do
+                let e = edges ! k
+                    a = svEdgeClause solver ! e
+                VGM.unsafeWrite tmp1 e val1_pre
+                VGM.unsafeWrite tmp2 e val2_pre
+                eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e -- η_{a→i}
+                let w = svClauseWeight solver ! a
+                    lit2 = svEdgeLit solver ! e
+                    val1_pre' = if lit2 > 0 then val1_pre * (1 - eta_ai) ** w else val1_pre
+                    val2_pre' = if lit2 > 0 then val2_pre else val2_pre * (1 - eta_ai) ** w
+                f (k+1) val1_pre' val2_pre'
+      f 0 1 1
+      -- tmp1 ! (edges ! k) = Π_{a∈edges[0..k-1], a∈V^{+}(i)} (1 - eta_ai)^{w_i}
+      -- tmp2 ! (edges ! k) = Π_{a∈edges[0..k-1], a∈V^{-}(i)} (1 - eta_ai)^{w_i}
+      let g !k !val1_post !val2_post
+            | k < 0 = return ()
+            | otherwise = do
+                let e = edges ! k
+                    a = svEdgeClause solver ! e
+                    w = svClauseWeight solver ! a
+                    lit2 = svEdgeLit solver ! e
+                val1_pre <- VGM.unsafeRead tmp1 e
+                val2_pre <- VGM.unsafeRead tmp2 e
+                eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e -- η_{a→i}
+                let val1 = val1_pre * val1_post -- val1 = Π_{b∈edges, b∈V^{+}(i), a≠b} (1 - eta_bi)^{w_i}
+                    val2 = val2_pre * val2_post -- val2 = Π_{b∈edges, b∈V^{-}(i), a≠b} (1 - eta_bi)^{w_i}
+                VGM.unsafeWrite (svEdgeProb0 solver) e (val1 * val2) -- Π^0_{i→a}
+                if lit2 > 0 then do
+                  VGM.unsafeWrite (svEdgeProbU solver) e ((1 - val2) * val1) -- Π^u_{i→a}
+                  VGM.unsafeWrite (svEdgeProbS solver) e ((1 - val1) * val2) -- Π^s_{i→a}
+                else do
+                  VGM.unsafeWrite (svEdgeProbU solver) e ((1 - val1) * val2) -- Π^u_{i→a}
+                  VGM.unsafeWrite (svEdgeProbS solver) e ((1 - val2) * val1) -- Π^s_{i→a}
+                let val1_post' = if lit2 > 0 then val1_post * (1 - eta_ai) ** w else val1_post
+                    val2_post' = if lit2 > 0 then val2_post else val2_post * (1 - eta_ai) ** w
+                g (k-1) val1_post' val2_post'
+      g (VG.length edges - 1) 1 1
 
-updateEdgeSurvey :: Solver -> EdgeIndex -> IO Double
-updateEdgeSurvey solver e = do
-  let a = svEdgeClause solver ! e
-      lit = svEdgeLit solver ! e
-      i = abs lit
-      f :: Double -> EdgeIndex -> IO Double
-      f !p e2 = do
-        let lit2 = svEdgeLit solver ! e2
-            j = abs lit2
-        if i == j then
-          return p
-        else do
-          pu <- VGM.read (svEdgeProbU solver) e2 -- Π^u_{j→a}
-          ps <- VGM.read (svEdgeProbS solver) e2 -- Π^s_{j→a}
-          p0 <- VGM.read (svEdgeProb0 solver) e2 -- Π^0_{j→a}
-          -- (pu / (pu + ps + p0)) is the probability of lit being false, if the edge does not exist.
-          return $! p * (pu / (pu + ps + p0))
-  eta_ai <- VGM.read (svEdgeSurvey solver) e
-  eta_ai' <- foldM f 1 (svClauseEdges solver ! a)
-  VGM.write (svEdgeSurvey solver) e eta_ai'
-  return $! abs (eta_ai' - eta_ai)
+updateEdgeSurvey :: Solver -> ClauseIndex -> IO Double
+updateEdgeSurvey solver a = do
+  let edges = svClauseEdges solver ! a
+      tmp = svEdgeTmp1 solver
+  let f !k !p_pre
+        | k >= VG.length edges = return ()
+        | otherwise = do
+            let e = edges ! k
+            VGM.unsafeWrite tmp e p_pre
+            pu <- VGM.unsafeRead (svEdgeProbU solver) e -- Π^u_{i→a}
+            ps <- VGM.unsafeRead (svEdgeProbS solver) e -- Π^s_{i→a}
+            p0 <- VGM.unsafeRead (svEdgeProb0 solver) e -- Π^0_{i→a}
+            -- (pu / (pu + ps + p0)) is the probability of lit being false, if the edge does not exist.
+            f (k+1) (p_pre * (pu / (pu + ps + p0)))
+  let g !k !p_post !maxDelta
+        | k < 0 = return maxDelta
+        | otherwise = do
+            let e = edges ! k
+            -- p_post = Π_{e∈edges[k+1..]} (pu / (pu + ps + p0))
+            p_pre <- VGM.unsafeRead tmp e -- Π_{e∈edges[0..k-1]} (pu / (pu + ps + p0))
+            pu <- VGM.unsafeRead (svEdgeProbU solver) e -- Π^u_{i→a}
+            ps <- VGM.unsafeRead (svEdgeProbS solver) e -- Π^s_{i→a}
+            p0 <- VGM.unsafeRead (svEdgeProb0 solver) e -- Π^0_{i→a}
+            eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e
+            let eta_ai' = p_pre * p_post -- Π_{e∈edges[0,..,k-1,k+1,..]} (pu / (pu + ps + p0))
+            VGM.unsafeWrite (svEdgeSurvey solver) e eta_ai'
+            let delta = abs (eta_ai' - eta_ai)
+            g (k-1) (p_post * (pu / (pu + ps + p0))) (max delta maxDelta)
+  f 0 1
+  -- tmp ! k = Π_{e∈edges[0..k-1]} (pu / (pu + ps + p0))
+  g (VG.length edges - 1) 1 0
 
 computeVarProb :: Solver -> SAT.Var -> IO ()
 computeVarProb solver v = do
@@ -368,24 +412,24 @@ computeVarProb solver v = do
         let lit = svEdgeLit solver ! e
             a = svEdgeClause solver ! e
             w = svClauseWeight solver ! a
-        eta_ai <- VGM.read (svEdgeSurvey solver) e
+        eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e
         let val1' = if lit > 0 then val1 * (1 - eta_ai) ** w else val1
             val2' = if lit < 0 then val2 * (1 - eta_ai) ** w else val2
         return (val1',val2')
-  (val1,val2) <- foldM f (1,1) (svVarEdges solver ! i)
+  (val1,val2) <- VG.foldM' f (1,1) (svVarEdges solver ! i)
   let p0 = val1 * val2       -- \^{Π}^{0}_i
       pp = (1 - val1) * val2 -- \^{Π}^{+}_i
       pn = (1 - val2) * val1 -- \^{Π}^{-}_i
   let wp = pp / (pp + pn + p0)
       wn = pn / (pp + pn + p0)
-  VGM.write (svVarProbT solver) i wp -- W^{(+)}_i
-  VGM.write (svVarProbF solver) i wn -- W^{(-)}_i
+  VGM.unsafeWrite (svVarProbT solver) i wp -- W^{(+)}_i
+  VGM.unsafeWrite (svVarProbF solver) i wn -- W^{(-)}_i
 
 -- | Get the marginal probability of the variable to be @True@, @False@ and unspecified respectively.
 getVarProb :: Solver -> SAT.Var -> IO (Double, Double, Double)
 getVarProb solver v = do
-  pt <- VGM.read (svVarProbT solver) (v - 1)
-  pf <- VGM.read (svVarProbF solver) (v - 1)
+  pt <- VGM.unsafeRead (svVarProbT solver) (v - 1)
+  pf <- VGM.unsafeRead (svVarProbF solver) (v - 1)
   return (pt, pf, 1 - (pt + pf))
 
 findLargestBiasLit :: Solver -> IO (Maybe SAT.Lit)
@@ -393,7 +437,7 @@ findLargestBiasLit solver = do
   nv <- getNVars solver
   let f (!lit,!maxBias) v = do
         let i = v - 1
-        m <- VGM.read (svVarFixed solver) i
+        m <- VGM.unsafeRead (svVarFixed solver) i
         case m of
           Just _ -> return (lit,maxBias)
           Nothing -> do
@@ -414,25 +458,26 @@ findLargestBiasLit solver = do
 
 fixLit :: Solver -> SAT.Lit -> IO ()
 fixLit solver lit = do
-  VGM.write (svVarFixed solver) (abs lit - 1) (if lit > 0 then Just True else Just False)
+  VGM.unsafeWrite (svVarFixed solver) (abs lit - 1) (if lit > 0 then Just True else Just False)
 
 unfixLit :: Solver -> SAT.Lit -> IO ()
 unfixLit solver lit = do
-  VGM.write (svVarFixed solver) (abs lit - 1) Nothing
+  VGM.unsafeWrite (svVarFixed solver) (abs lit - 1) Nothing
 
 checkConsis :: Solver -> IO Bool
 checkConsis solver = do
   nc <- getNConstraints solver
   let loop i | i >= nc = return True
       loop i = do
-        let loop2 [] = return False
-            loop2 (e : es) = do
-              let lit = svEdgeLit solver ! e
-              m <- VM.read (svVarFixed solver) (abs lit - 1)
+        let edges = svClauseEdges solver ! i
+            loop2 k | k >= VG.length edges = return False
+            loop2 k = do
+              let lit = svEdgeLit solver ! (edges ! k)
+              m <- VM.unsafeRead (svVarFixed solver) (abs lit - 1)
               case m of
                 Nothing -> return True
-                Just b -> if b == (lit > 0) then return True else loop2 es
-        b <- loop2 (svClauseEdges solver ! i)
+                Just b -> if b == (lit > 0) then return True else loop2 (k+1)
+        b <- loop2 0
         if b then
           loop (i + 1)
         else
@@ -472,7 +517,7 @@ solve solver = do
                         return Nothing
               Nothing -> do
                 xs <- forM [1..nv] $ \v -> do
-                  m2 <- VGM.read (svVarFixed solver) (v-1)
+                  m2 <- VGM.unsafeRead (svVarFixed solver) (v-1)
                   return (v, fromJust m2)
                 return $ Just $ A.array (1,nv) xs
   loop
