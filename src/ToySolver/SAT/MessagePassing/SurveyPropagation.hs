@@ -72,7 +72,6 @@ import Data.Vector.Generic ((!))
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VGM
 import qualified System.Random.MWC as Rand
-import System.IO
 
 import qualified ToySolver.SAT.Types as SAT
 
@@ -225,13 +224,12 @@ propagateST solver = do
   nc <- getNConstraints solver
   let max_v_len = VG.maximum $ VG.map VG.length $ svVarEdges solver
       max_c_len = VG.maximum $ VG.map VG.length $ svClauseEdges solver
-  tmp1 <- VGM.new (max max_v_len max_c_len)
-  tmp2 <- VGM.new max_v_len
+  tmp <- VGM.new (max (max_v_len * 2) max_c_len)
   let loop !i
         | Just l <- lim, i > l = return False
         | otherwise = do
-            numLoop 1 nv $ \v -> updateEdgeProb solver v tmp1 tmp2
-            let f maxDelta c = max maxDelta <$> updateEdgeSurvey solver c tmp1
+            numLoop 1 nv $ \v -> updateEdgeProb solver v tmp
+            let f maxDelta c = max maxDelta <$> updateEdgeSurvey solver c tmp
             delta <- foldM f 0 [0 .. nc-1]
             if delta <= tol then do
               numLoop 1 nv $ \v -> computeVarProb solver v
@@ -253,9 +251,6 @@ propagateMT solver nthreads = do
   nv <- getNVars solver
   nc <- getNConstraints solver
 
-  print (nv,nc)
-  hFlush stdout
-
   mask $ \restore -> do
     ex <- newEmptyTMVarIO
     let wait :: STM a -> IO a
@@ -269,12 +264,9 @@ propagateMT solver nthreads = do
              ubV = min (lbV + mV) (nv + 1) -- exclusive
              lbC = mC * i -- exclusive
              ubC = min (lbC + mC) nc -- exclusive
-         print ((lbV,ubV,ubV - lbV),(lbC,ubC,ubC - lbC))
-         hFlush stdout
          let max_v_len = VG.maximum $ VG.map VG.length $ VG.slice (lbV - 1) (ubV - lbV) (svVarEdges solver)
              max_c_len = VG.maximum $ VG.map VG.length $ VG.slice lbC (ubC - lbC) (svClauseEdges solver)
-         tmp1 <- VGM.new (max max_v_len max_c_len)
-         tmp2 <- VGM.new max_v_len
+         tmp <- VGM.new (max (max_v_len*2) max_c_len)
          reqVar   <- newEmptyMVar
          respVar  <- newEmptyTMVarIO
          respVar2 <- newEmptyTMVarIO
@@ -284,11 +276,11 @@ propagateMT solver nthreads = do
                  case cmd of
                    WCTerminate -> return ()
                    WCUpdateEdgeProb -> do
-                     numLoop lbV (ubV-1) $ \v -> updateEdgeProb solver v tmp1 tmp2
+                     numLoop lbV (ubV-1) $ \v -> updateEdgeProb solver v tmp
                      atomically $ putTMVar respVar ()
                      loop
                    WCUpdateSurvey -> do
-                     let f maxDelta c = max maxDelta <$> updateEdgeSurvey solver c tmp1
+                     let f maxDelta c = max maxDelta <$> updateEdgeSurvey solver c tmp
                      delta <- foldM f 0 [lbC .. ubC-1]
                      atomically $ putTMVar respVar2 delta
                      loop
@@ -321,9 +313,9 @@ propagateMT solver nthreads = do
         mapM_ (\(th,_,_,_) -> killThread th) workers
         throwIO e
 
--- tmp1 and tmp2 must have at least @VG.length (svVarEdges solver ! (v - 1))@ elements
-updateEdgeProb :: Solver -> SAT.Var -> VUM.IOVector Double -> VUM.IOVector Double -> IO ()
-updateEdgeProb solver v tmp1 tmp2 = do
+-- tmp1 must have at least @VG.length (svVarEdges solver ! (v - 1)) * 2@ elements
+updateEdgeProb :: Solver -> SAT.Var -> VUM.IOVector Double -> IO ()
+updateEdgeProb solver v tmp = do
   let i = v - 1
       edges = svVarEdges solver ! i
   m <- VGM.unsafeRead (svVarFixed solver) i
@@ -341,8 +333,8 @@ updateEdgeProb solver v tmp1 tmp2 = do
             | otherwise = do
                 let e = edges ! k
                     a = svEdgeClause solver ! e
-                VGM.unsafeWrite tmp1 k val1_pre
-                VGM.unsafeWrite tmp2 k val2_pre
+                VGM.unsafeWrite tmp (k*2) val1_pre
+                VGM.unsafeWrite tmp (k*2+1) val2_pre
                 eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e -- η_{a→i}
                 let w = svClauseWeight solver ! a
                     lit2 = svEdgeLit solver ! e
@@ -351,16 +343,16 @@ updateEdgeProb solver v tmp1 tmp2 = do
                 f (k+1) val1_pre' val2_pre'
       f 0 1 1
 
-      -- tmp1 ! k == Π_{a∈edges[0..k-1], a∈V^{+}(i)} (1 - eta_ai)^{w_i}
-      -- tmp2 ! k == Π_{a∈edges[0..k-1], a∈V^{-}(i)} (1 - eta_ai)^{w_i}
+      -- tmp ! (k*2)   == Π_{a∈edges[0..k-1], a∈V^{+}(i)} (1 - eta_ai)^{w_i}
+      -- tmp ! (k*2+1) == Π_{a∈edges[0..k-1], a∈V^{-}(i)} (1 - eta_ai)^{w_i}
       let g !k !val1_post !val2_post
             | k < 0 = return ()
             | otherwise = do
                 let e = edges ! k
                     a = svEdgeClause solver ! e
                     lit2 = svEdgeLit solver ! e
-                val1_pre <- VGM.unsafeRead tmp1 k
-                val2_pre <- VGM.unsafeRead tmp2 k
+                val1_pre <- VGM.unsafeRead tmp (k*2)
+                val2_pre <- VGM.unsafeRead tmp (k*2+1)
                 let val1 = val1_pre * val1_post -- val1 == Π_{b∈edges, b∈V^{+}(i), a≠b} (1 - eta_bi)^{w_i}
                     val2 = val2_pre * val2_post -- val2 == Π_{b∈edges, b∈V^{-}(i), a≠b} (1 - eta_bi)^{w_i}
                 eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e -- η_{a→i}
