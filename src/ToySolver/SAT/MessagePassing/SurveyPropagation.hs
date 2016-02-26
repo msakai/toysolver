@@ -91,9 +91,7 @@ data Solver
   , svEdgeLit    :: !(VU.Vector SAT.Lit) -- i
   , svEdgeClause :: !(VU.Vector ClauseIndex) -- a
   , svEdgeSurvey :: !(VUM.IOVector Double) -- η_{a → i}
-  , svEdgeProbS  :: !(VUM.IOVector Double) -- Π^s_{i → a}
-  , svEdgeProbU  :: !(VUM.IOVector Double) -- Π^u_{i → a}
-  , svEdgeProb0  :: !(VUM.IOVector Double) -- Π^0_{i → a}
+  , svEdgeProbU  :: !(VUM.IOVector Double) -- Π^u_{i → a} / (Π^u_{i → a} + Π^s_{i → a} + Π^0_{i → a})
 
   , svTolRef :: !(IORef Double)
   , svIterLimRef :: !(IORef (Maybe Int))
@@ -134,9 +132,7 @@ newSolver nv clauses = do
   -- * Π^0_{i→a} = 1, Π^u_{i→a} = Π^s_{i→a} = 0 for all i and a,
   -- * \^{Π}^{0}_i = 1, \^{Π}^{+}_i = \^{Π}^{-}_i = 0
   edgeSurvey  <- VGM.replicate num_edges 0.5
-  edgeProbS   <- VGM.new num_edges
   edgeProbU   <- VGM.new num_edges
-  edgeProb0   <- VGM.new num_edges
 
   varFixed <- VGM.replicate nv Nothing
   varProbT <- VGM.new nv
@@ -161,9 +157,7 @@ newSolver nv clauses = do
         , svEdgeLit     = edgeLit
         , svEdgeClause  = edgeClause
         , svEdgeSurvey  = edgeSurvey
-        , svEdgeProbS   = edgeProbS
         , svEdgeProbU   = edgeProbU
-        , svEdgeProb0   = edgeProb0
 
         , svTolRef = tolRef
         , svIterLimRef = maxIterRef
@@ -324,9 +318,7 @@ updateEdgeProb solver v tmp = do
       VG.forM_ edges $ \e -> do
         let lit = svEdgeLit solver ! e
             flag = (lit > 0) == val
-        VGM.unsafeWrite (svEdgeProbU solver) e (if flag then 0 else 1) -- Π^u_{i→a}
-        VGM.unsafeWrite (svEdgeProbS solver) e (if flag then 1 else 0) -- Π^s_{i→a}
-        VGM.unsafeWrite (svEdgeProb0 solver) e 0                       -- Π^0_{i→a}
+        VGM.unsafeWrite (svEdgeProbU solver) e (if flag then 0 else 1)
     Nothing -> do
       let f !k !val1_pre !val2_pre
             | k >= VG.length edges = return ()
@@ -342,9 +334,9 @@ updateEdgeProb solver v tmp = do
                     val2_pre' = if lit2 > 0 then val2_pre else val2_pre * (1 - eta_ai) ** w
                 f (k+1) val1_pre' val2_pre'
       f 0 1 1
-
       -- tmp ! (k*2)   == Π_{a∈edges[0..k-1], a∈V^{+}(i)} (1 - eta_ai)^{w_i}
       -- tmp ! (k*2+1) == Π_{a∈edges[0..k-1], a∈V^{-}(i)} (1 - eta_ai)^{w_i}
+
       let g !k !val1_post !val2_post
             | k < 0 = return ()
             | otherwise = do
@@ -359,13 +351,10 @@ updateEdgeProb solver v tmp = do
                 let w = svClauseWeight solver ! a
                     val1_post' = if lit2 > 0 then val1_post * (1 - eta_ai) ** w else val1_post
                     val2_post' = if lit2 > 0 then val2_post else val2_post * (1 - eta_ai) ** w
-                VGM.unsafeWrite (svEdgeProb0 solver) e (val1 * val2) -- Π^0_{i→a}
-                if lit2 > 0 then do
-                  VGM.unsafeWrite (svEdgeProbU solver) e ((1 - val2) * val1) -- Π^u_{i→a}
-                  VGM.unsafeWrite (svEdgeProbS solver) e ((1 - val1) * val2) -- Π^s_{i→a}
-                else do
-                  VGM.unsafeWrite (svEdgeProbU solver) e ((1 - val1) * val2) -- Π^u_{i→a}
-                  VGM.unsafeWrite (svEdgeProbS solver) e ((1 - val2) * val1) -- Π^s_{i→a}
+                let pi_0 = val1 * val2 -- Π^0_{i→a}
+                    pi_u = if lit2 > 0 then (1 - val2) * val1 else (1 - val1) * val2 -- Π^u_{i→a}
+                    pi_s = if lit2 > 0 then (1 - val1) * val2 else (1 - val2) * val1 -- Π^s_{i→a}
+                VGM.unsafeWrite (svEdgeProbU solver) e (pi_u / (pi_0 + pi_u + pi_s))
                 g (k-1) val1_post' val2_post'
       g (VG.length edges - 1) 1 1
 
@@ -378,27 +367,23 @@ updateEdgeSurvey solver a tmp = do
         | otherwise = do
             let e = edges ! k
             VGM.unsafeWrite tmp k p_pre
-            pu <- VGM.unsafeRead (svEdgeProbU solver) e -- Π^u_{i→a}
-            ps <- VGM.unsafeRead (svEdgeProbS solver) e -- Π^s_{i→a}
-            p0 <- VGM.unsafeRead (svEdgeProb0 solver) e -- Π^0_{i→a}
-            -- (pu / (pu + ps + p0)) is the probability of lit being false, if the edge does not exist.
-            f (k+1) (p_pre * (pu / (pu + ps + p0)))
+            p <- VGM.unsafeRead (svEdgeProbU solver) e
+            -- p is the probability of lit being false, if the edge does not exist.
+            f (k+1) (p_pre * p)
   let g !k !p_post !maxDelta
         | k < 0 = return maxDelta
         | otherwise = do
             let e = edges ! k
-            -- p_post == Π_{e∈edges[k+1..]} (pu / (pu + ps + p0))
-            p_pre <- VGM.unsafeRead tmp k -- Π_{e∈edges[0..k-1]} (pu / (pu + ps + p0))
-            pu <- VGM.unsafeRead (svEdgeProbU solver) e -- Π^u_{i→a}
-            ps <- VGM.unsafeRead (svEdgeProbS solver) e -- Π^s_{i→a}
-            p0 <- VGM.unsafeRead (svEdgeProb0 solver) e -- Π^0_{i→a}
+            -- p_post == Π_{e∈edges[k+1..]} p_e
+            p_pre <- VGM.unsafeRead tmp k -- Π_{e∈edges[0..k-1]} p_e
+            p <- VGM.unsafeRead (svEdgeProbU solver) e
             eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e
-            let eta_ai' = p_pre * p_post -- Π_{e∈edges[0,..,k-1,k+1,..]} (pu / (pu + ps + p0))
+            let eta_ai' = p_pre * p_post -- Π_{e∈edges[0,..,k-1,k+1,..]} p_e
             VGM.unsafeWrite (svEdgeSurvey solver) e eta_ai'
             let delta = abs (eta_ai' - eta_ai)
-            g (k-1) (p_post * (pu / (pu + ps + p0))) (max delta maxDelta)
+            g (k-1) (p_post * p) (max delta maxDelta)
   f 0 1
-  -- tmp ! k == Π_{e∈edges[0..k-1]} (pu / (pu + ps + p0))
+  -- tmp ! k == Π_{e∈edges[0..k-1]} p_e
   g (VG.length edges - 1) 1 0
 
 computeVarProb :: Solver -> SAT.Var -> IO ()
@@ -521,10 +506,8 @@ solve solver = do
 printInfo :: Solver -> IO ()
 printInfo solver = do
   (surveys :: VU.Vector Double) <- VG.freeze (svEdgeSurvey solver)
-  (s :: VU.Vector Double) <- VG.freeze (svEdgeProbS solver)
   (u :: VU.Vector Double) <- VG.freeze (svEdgeProbU solver)
-  (z :: VU.Vector Double) <- VG.freeze (svEdgeProb0 solver)
-  let xs = [(clause, lit, eta, s ! e, u ! e, z ! e) | (e, eta) <- zip [0..] (VG.toList surveys), let lit = svEdgeLit solver ! e, let clause = svEdgeClause solver ! e]
+  let xs = [(clause, lit, eta, u ! e) | (e, eta) <- zip [0..] (VG.toList surveys), let lit = svEdgeLit solver ! e, let clause = svEdgeClause solver ! e]
   putStrLn $ "edges: " ++ show xs
 
   (pt :: VU.Vector Double) <- VG.freeze (svVarProbT solver)
