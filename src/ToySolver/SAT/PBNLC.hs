@@ -16,12 +16,12 @@ module ToySolver.SAT.PBNLC
   , PBSum
 
   -- * Adding constraints
-  , addPBAtLeast
-  , addPBAtMost  
-  , addPBExactly
-  , addPBAtLeastSoft
-  , addPBAtMostSoft
-  , addPBExactlySoft
+  , addPBNLAtLeast
+  , addPBNLAtMost  
+  , addPBNLExactly
+  , addPBNLAtLeastSoft
+  , addPBNLAtMostSoft
+  , addPBNLExactlySoft
 
   -- * Linearlization
   , linearizePBSum
@@ -40,66 +40,66 @@ type PBTerm = (Integer, [Lit])
 type PBSum = [PBTerm]
 
 -- | Add a non-linear pseudo boolean constraints /c1*ls1 + c2*ls2 + … ≥ n/.
-addPBAtLeast
+addPBNLAtLeast
   :: Encoder
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
   -> IO ()
-addPBAtLeast enc lhs rhs = do
+addPBNLAtLeast enc lhs rhs = do
   let c = sum [c | (c,[]) <- lhs]
   lhs' <- linearizePBSumWithPolarity enc polarityPos [(c,ls) | (c,ls) <- lhs, not (null ls)]
   SAT.addPBAtLeast (encSolver enc) lhs' (rhs - c)
 
 -- | Add a non-linear pseudo boolean constraints /c1*ls1 + c2*ls2 + … ≥ n/.
-addPBAtMost
+addPBNLAtMost
   :: Encoder
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
   -> IO ()
-addPBAtMost enc lhs rhs =
-  addPBAtLeast enc [(-c,ls) | (c,ls) <- lhs] (negate rhs)
+addPBNLAtMost enc lhs rhs =
+  addPBNLAtLeast enc [(-c,ls) | (c,ls) <- lhs] (negate rhs)
 
 -- | Add a non-linear pseudo boolean constraints /c1*ls1 + c2*ls2 + … = n/.
-addPBExactly
+addPBNLExactly
   :: Encoder
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
   -> IO ()
-addPBExactly enc lhs rhs = do
+addPBNLExactly enc lhs rhs = do
   let c = sum [c | (c,[]) <- lhs]
   lhs' <- linearizePBSum enc [(c,ls) | (c,ls) <- lhs, not (null ls)]
   SAT.addPBExactly (encSolver enc) lhs' (rhs - c)
 
 -- | Add a soft non-linear pseudo boolean constraints /sel ⇒ c1*ls1 + c2*ls2 + … ≥ n/.
-addPBAtLeastSoft
+addPBNLAtLeastSoft
   :: Encoder
   -> Lit     -- ^ Selector literal @sel@
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
   -> IO ()
-addPBAtLeastSoft enc sel lhs rhs = do
+addPBNLAtLeastSoft enc sel lhs rhs = do
   let c = sum [c | (c,[]) <- lhs]
   lhs' <- linearizePBSumWithPolarity enc polarityPos [(c,ls) | (c,ls) <- lhs, not (null ls)]
   SAT.addPBAtLeastSoft (encSolver enc) sel lhs' (rhs - c)
 
 -- | Add a soft non-linear pseudo boolean constraints /sel ⇒ c1*ls1 + c2*ls2 + … ≤ n/.
-addPBAtMostSoft
+addPBNLAtMostSoft
   :: Encoder
   -> Lit     -- ^ Selector literal @sel@
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
   -> IO ()
-addPBAtMostSoft enc sel lhs rhs =
-  addPBAtLeastSoft enc sel [(negate c, lit) | (c,lit) <- lhs] (negate rhs)
+addPBNLAtMostSoft enc sel lhs rhs =
+  addPBNLAtLeastSoft enc sel [(negate c, lit) | (c,lit) <- lhs] (negate rhs)
 
 -- | Add a soft non-linear pseudo boolean constraints /lit ⇒ c1*ls1 + c2*ls2 + … = n/.
-addPBExactlySoft
+addPBNLExactlySoft
   :: Encoder
   -> Lit     -- ^ indicator @lit@
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
   -> IO ()
-addPBExactlySoft enc sel lhs rhs = do
+addPBNLExactlySoft enc sel lhs rhs = do
   let c = sum [c | (c,[]) <- lhs]
   lhs' <- linearizePBSum enc [(c,ls) | (c,ls) <- lhs, not (null ls)]
   SAT.addPBExactlySoft (encSolver enc) sel lhs' (rhs - c)

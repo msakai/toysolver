@@ -621,8 +621,8 @@ solvePB opt solver formula initialModel = do
 
   forM_ (PBFile.pbConstraints formula) $ \(lhs, op, rhs) -> do
     case op of
-      PBFile.Ge -> PBNLC.addPBAtLeast enc lhs rhs
-      PBFile.Eq -> PBNLC.addPBExactly enc lhs rhs
+      PBFile.Ge -> PBNLC.addPBNLAtLeast enc lhs rhs
+      PBFile.Eq -> PBNLC.addPBNLExactly enc lhs rhs
 
   case PBFile.pbObjectiveFunction formula of
     Nothing -> do
@@ -719,8 +719,8 @@ solveWBO opt solver isMaxSat formula initialModel = do
     case cost of
       Nothing -> do
         case op of
-          PBFile.Ge -> PBNLC.addPBAtLeast enc lhs rhs
-          PBFile.Eq -> PBNLC.addPBExactly enc lhs rhs
+          PBFile.Ge -> PBNLC.addPBNLAtLeast enc lhs rhs
+          PBFile.Eq -> PBNLC.addPBNLExactly enc lhs rhs
       Just cval -> do
         sel <-
           case op of
@@ -730,12 +730,12 @@ solveWBO opt solver isMaxSat formula initialModel = do
                   Tseitin.encodeConjWithPolarity enc Tseitin.polarityPos ls
                 _ -> do
                   sel <- SAT.newVar solver
-                  PBNLC.addPBAtLeastSoft enc sel lhs rhs
+                  PBNLC.addPBNLAtLeastSoft enc sel lhs rhs
                   modifyIORef defsRef ((sel, constr) : )
                   return sel
             PBFile.Eq -> do
               sel <- SAT.newVar solver
-              PBNLC.addPBExactlySoft enc sel lhs rhs
+              PBNLC.addPBNLExactlySoft enc sel lhs rhs
               modifyIORef defsRef ((sel, constr) : )
               return sel
         modifyIORef objRef ((cval, SAT.litNot sel) : )

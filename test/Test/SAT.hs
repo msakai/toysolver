@@ -191,9 +191,9 @@ solvePBNLC solver (nv,cs) = do
   enc <- Tseitin.newEncoder solver
   forM_ cs $ \(o,lhs,rhs) -> do
     case o of
-      PBRelGE -> PBNLC.addPBAtLeast enc lhs rhs
-      PBRelLE -> PBNLC.addPBAtMost enc lhs rhs
-      PBRelEQ -> PBNLC.addPBExactly enc lhs rhs
+      PBRelGE -> PBNLC.addPBNLAtLeast enc lhs rhs
+      PBRelLE -> PBNLC.addPBNLAtMost enc lhs rhs
+      PBRelEQ -> PBNLC.addPBNLExactly enc lhs rhs
   ret <- SAT.solve solver
   if ret then do
     m <- SAT.getModel solver

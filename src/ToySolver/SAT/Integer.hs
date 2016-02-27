@@ -64,32 +64,32 @@ addConstraint enc (OrdRel lhs op rhs) = do
   let solver = TseitinEncoder.encSolver enc
   let Expr e = lhs - rhs
   case op of
-    Le  -> PBNLC.addPBAtMost  enc e 0
-    Lt  -> PBNLC.addPBAtMost  enc e (-1)
-    Ge  -> PBNLC.addPBAtLeast enc e 0
-    Gt  -> PBNLC.addPBAtLeast enc e 1
-    Eql -> PBNLC.addPBExactly enc e 0
+    Le  -> PBNLC.addPBNLAtMost  enc e 0
+    Lt  -> PBNLC.addPBNLAtMost  enc e (-1)
+    Ge  -> PBNLC.addPBNLAtLeast enc e 0
+    Gt  -> PBNLC.addPBNLAtLeast enc e 1
+    Eql -> PBNLC.addPBNLExactly enc e 0
     NEq -> do
       sel <- SAT.newVar solver
-      PBNLC.addPBAtLeastSoft enc sel e 1
-      PBNLC.addPBAtMostSoft  enc (-sel) e (-1)
+      PBNLC.addPBNLAtLeastSoft enc sel e 1
+      PBNLC.addPBNLAtMostSoft  enc (-sel) e (-1)
 
 addConstraintSoft :: TseitinEncoder.Encoder -> SAT.Lit -> OrdRel Expr -> IO ()
 addConstraintSoft enc sel (OrdRel lhs op rhs) = do
   let solver = TseitinEncoder.encSolver enc
   let Expr e = lhs - rhs
   case op of
-    Le  -> PBNLC.addPBAtMostSoft  enc sel e 0
-    Lt  -> PBNLC.addPBAtMostSoft  enc sel e (-1)
-    Ge  -> PBNLC.addPBAtLeastSoft enc sel e 0
-    Gt  -> PBNLC.addPBAtLeastSoft enc sel e 1
-    Eql -> PBNLC.addPBExactlySoft enc sel e 0
+    Le  -> PBNLC.addPBNLAtMostSoft  enc sel e 0
+    Lt  -> PBNLC.addPBNLAtMostSoft  enc sel e (-1)
+    Ge  -> PBNLC.addPBNLAtLeastSoft enc sel e 0
+    Gt  -> PBNLC.addPBNLAtLeastSoft enc sel e 1
+    Eql -> PBNLC.addPBNLExactlySoft enc sel e 0
     NEq -> do
       sel2 <- SAT.newVar solver
       sel3 <- TseitinEncoder.encodeConjWithPolarity enc TseitinEncoder.polarityNeg [sel,sel2]
       sel4 <- TseitinEncoder.encodeConjWithPolarity enc TseitinEncoder.polarityNeg [sel,-sel2]
-      PBNLC.addPBAtLeastSoft enc sel3 e 1
-      PBNLC.addPBAtMostSoft  enc sel4 e (-1)
+      PBNLC.addPBNLAtLeastSoft enc sel3 e 1
+      PBNLC.addPBNLAtMostSoft  enc sel4 e (-1)
 
 eval :: SAT.IModel m => m -> Expr -> Integer
 eval m (Expr ts) = sum [if and [SAT.evalLit m lit | lit <- lits] then n else 0 | (n,lits) <- ts]
