@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
 module ToySolver.SAT.Types
   (
   -- * Variable
@@ -64,6 +64,13 @@ module ToySolver.SAT.Types
   , normalizeXORClause
   , instantiateXORClause
   , evalXORClause
+
+  -- * Type classes for solvers
+  , NewVar (..)
+  , AddClause (..)
+  , AddCardinality (..)
+  , AddPBLin (..)
+  , AddXORClause (..)
   ) where
 
 import Control.Monad
@@ -438,3 +445,132 @@ evalXORClause m (lits, rhs) = foldl' xor False (map f lits) == rhs
     xor = (/=)
     f 0 = True
     f lit = evalLit m lit
+
+
+class Monad m => NewVar m a | a -> m where
+  {-# MINIMAL newVar #-}
+
+  -- | Add a new variable
+  newVar :: a -> m Var
+
+  -- | Add variables. @newVars a n = replicateM n (newVar a)@, but maybe faster.
+  newVars :: a -> Int -> m [Var]
+  newVars a n = replicateM n (newVar a)
+
+  -- | Add variables. @newVars_ a n = newVars a n >> return ()@, but maybe faster.
+  newVars_ :: a -> Int -> m ()
+  newVars_ a n = replicateM_ n (newVar a)
+
+class NewVar m a => AddClause m a | a -> m where
+  addClause :: a -> Clause -> m ()
+
+class AddClause m a => AddCardinality m a | a -> m where
+  {-# MINIMAL addAtLeast #-}
+
+  -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.  
+  addAtLeast
+    :: a
+    -> [Lit] -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)
+    -> Int   -- ^ /n/
+    -> m ()
+
+  -- | Add a cardinality constraints /atmost({l1,l2,..},n)/.
+  addAtMost
+    :: a
+    -> [Lit] -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)
+    -> Int   -- ^ /n/
+    -> m ()
+  addAtMost a lits n = do
+    addAtLeast a (map litNot lits) (length lits - n)
+
+  -- | Add a cardinality constraints /exactly({l1,l2,..},n)/.
+  addExactly
+    :: a
+    -> [Lit] -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)
+    -> Int   -- ^ /n/
+    -> m ()
+  addExactly a lits n = do
+    addAtLeast a lits n
+    addAtMost a lits n
+
+class AddCardinality m a => AddPBLin m a | a -> m where
+  {-# MINIMAL addPBAtLeast #-}
+
+  -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≥ n/.
+  addPBAtLeast
+    :: a
+    -> PBLinSum -- ^ list of terms @[(c1,l1),(c2,l2),…]@
+    -> Integer  -- ^ /n/
+    -> m ()
+
+  -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
+  addPBAtMost
+    :: a
+    -> PBLinSum -- ^ list of @[(c1,l1),(c2,l2),…]@
+    -> Integer  -- ^ /n/
+    -> m ()
+  addPBAtMost a ts n = addPBAtLeast a [(-c,l) | (c,l) <- ts] (negate n)
+
+  -- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … = n/.
+  addPBExactly
+    :: a
+    -> PBLinSum -- ^ list of terms @[(c1,l1),(c2,l2),…]@
+    -> Integer  -- ^ /n/
+    -> m ()
+  addPBExactly a ts n = do
+    addPBAtLeast a ts n
+    addPBAtMost a ts n
+
+  -- | Add a soft pseudo boolean constraints /sel ⇒ c1*l1 + c2*l2 + … ≥ n/.
+  addPBAtLeastSoft
+    :: a
+    -> Lit             -- ^ Selector literal @sel@
+    -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
+    -> Integer         -- ^ /n/
+    -> m ()
+  addPBAtLeastSoft a sel lhs rhs = do
+    let (lhs2,rhs2) = normalizePBLinAtLeast (lhs,rhs)
+    addPBAtLeast a ((rhs2, litNot sel) : lhs2) rhs2
+
+  -- | Add a soft pseudo boolean constraints /sel ⇒ c1*l1 + c2*l2 + … ≤ n/.
+  addPBAtMostSoft
+    :: a
+    -> Lit             -- ^ Selector literal @sel@
+    -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
+    -> Integer         -- ^ /n/
+    -> m ()
+  addPBAtMostSoft a sel lhs rhs =
+    addPBAtLeastSoft a sel [(negate c, lit) | (c,lit) <- lhs] (negate rhs)
+
+  -- | Add a soft pseudo boolean constraints /sel ⇒ c1*l1 + c2*l2 + … = n/.
+  addPBExactlySoft
+    :: a
+    -> Lit             -- ^ Selector literal @sel@
+    -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
+    -> Integer         -- ^ /n/
+    -> m ()
+  addPBExactlySoft a sel lhs rhs = do
+    addPBAtLeastSoft a sel lhs rhs
+    addPBAtMostSoft a sel lhs rhs
+
+class AddClause m a => AddXORClause m a | a -> m where
+  {-# MINIMAL addXORClause #-}
+
+  -- | Add a parity constraint /l1 ⊕ l2 ⊕ … ⊕ ln = rhs/
+  addXORClause
+    :: a
+    -> [Lit]  -- ^ literals @[l1, l2, …, ln]@
+    -> Bool   -- ^ /rhs/
+    -> m ()
+
+  -- | Add a soft parity constraint /sel ⇒ l1 ⊕ l2 ⊕ … ⊕ ln = rhs/
+  addXORClauseSoft
+    :: a
+    -> Lit    -- ^ Selector literal @sel@
+    -> [Lit]  -- ^ literals @[l1, l2, …, ln]@
+    -> Bool   -- ^ /rhs/
+    -> m ()
+  addXORClauseSoft a sel lits rhs = do
+    reified <- newVar a
+    addXORClause a (litNot reified : lits) rhs
+    addClause a [litNot sel, reified] -- sel ⇒ reified

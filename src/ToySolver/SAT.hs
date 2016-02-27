@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
-{-# LANGUAGE BangPatterns, ScopedTypeVariables, CPP, DeriveDataTypeable, RecursiveDo #-}
+{-# LANGUAGE BangPatterns, ScopedTypeVariables, CPP, DeriveDataTypeable, RecursiveDo, MultiParamTypeClasses, InstanceSigs #-}
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE UnboxedTuples, MagicHash #-}
 #endif
@@ -46,25 +46,18 @@ module ToySolver.SAT
   , newVars_
   , resizeVarCapacity
   -- ** Clauses
-  , addClause
+  , AddClause (..)
   , Clause
   , evalClause
   -- ** Cardinality constraints
-  , addAtLeast
-  , addAtMost
-  , addExactly
+  , AddCardinality (..)
   , AtLeast
   , Exactly
   , evalAtLeast
   , evalExactly
 
   -- ** (Linear) pseudo-boolean constraints
-  , addPBAtLeast
-  , addPBAtMost
-  , addPBExactly
-  , addPBAtLeastSoft
-  , addPBAtMostSoft
-  , addPBExactlySoft
+  , AddPBLin (..)
   , PBLinTerm
   , PBLinSum
   , PBLinAtLeast
@@ -73,8 +66,7 @@ module ToySolver.SAT
   , evalPBLinAtLeast
   , evalPBLinExactly
   -- ** XOR clauses
-  , addXORClause
-  , addXORClauseSoft
+  , AddXORClause (..)
   , XORClause
   , evalXORClause
   -- ** Theory
@@ -776,29 +768,27 @@ ltVar solver v1 v2 = do
   Problem specification
 --------------------------------------------------------------------}
 
--- |Add a new variable
-newVar :: Solver -> IO Var
-newVar solver = do
-  n <- Vec.getSize (svVarData solver)
-  let v = n + 1
-  vd <- newVarData
-  Vec.push (svVarData solver) vd
-  PQ.enqueue (svVarQueue solver) v
-  return v
+instance NewVar IO Solver where
+  newVar :: Solver -> IO Var
+  newVar solver = do
+    n <- Vec.getSize (svVarData solver)
+    let v = n + 1
+    vd <- newVarData
+    Vec.push (svVarData solver) vd
+    PQ.enqueue (svVarQueue solver) v
+    return v
 
--- |Add variables. @newVars solver n = replicateM n (newVar solver)@
-newVars :: Solver -> Int -> IO [Var]
-newVars solver n = do
-  nv <- getNVars solver
-  resizeVarCapacity solver (nv+n)
-  replicateM n (newVar solver)
+  newVars :: Solver -> Int -> IO [Var]
+  newVars solver n = do
+    nv <- getNVars solver
+    resizeVarCapacity solver (nv+n)
+    replicateM n (newVar solver)
 
--- |Add variables. @newVars_ solver n = newVars solver n >> return ()@
-newVars_ :: Solver -> Int -> IO ()
-newVars_ solver n = do
-  nv <- getNVars solver
-  resizeVarCapacity solver (nv+n)
-  replicateM_ n (newVar solver)
+  newVars_ :: Solver -> Int -> IO ()
+  newVars_ solver n = do
+    nv <- getNVars solver
+    resizeVarCapacity solver (nv+n)
+    replicateM_ n (newVar solver)
 
 -- |Pre-allocate internal buffer for @n@ variables.
 resizeVarCapacity :: Solver -> Int -> IO ()
@@ -807,126 +797,120 @@ resizeVarCapacity solver n = do
   PQ.resizeHeapCapacity (svVarQueue solver) n
   PQ.resizeTableCapacity (svVarQueue solver) (n+1)
 
--- |Add a clause to the solver.
-addClause :: Solver -> Clause -> IO ()
-addClause solver lits = do
-  d <- getDecisionLevel solver
-  assert (d == levelRoot) $ return ()
+instance AddClause IO Solver where
+  addClause :: Solver -> Clause -> IO ()
+  addClause solver lits = do
+    d <- getDecisionLevel solver
+    assert (d == levelRoot) $ return ()
 
-  ok <- readIORef (svOk solver)
-  when ok $ do
-    m <- instantiateClause (getLitFixed solver) lits
-    case normalizeClause =<< m of
-      Nothing -> return ()
-      Just [] -> markBad solver
-      Just [lit] -> do
+    ok <- readIORef (svOk solver)
+    when ok $ do
+      m <- instantiateClause (getLitFixed solver) lits
+      case normalizeClause =<< m of
+        Nothing -> return ()
+        Just [] -> markBad solver
+        Just [lit] -> do
+          {- We do not call 'removeBackwardSubsumedBy' here,
+             because subsumed constraints will be removed by 'simplify'. -}
+          ret <- assign solver lit
+          assert ret $ return ()
+          ret2 <- deduce solver
+          case ret2 of
+            Nothing -> return ()
+            Just _ -> markBad solver
+        Just lits2 -> do
+          subsumed <- checkForwardSubsumption solver lits
+          unless subsumed $ do
+            removeBackwardSubsumedBy solver ([(1,lit) | lit <- lits2], 1)
+            clause <- newClauseHandler lits2 False
+            addToDB solver clause
+            _ <- basicAttachClauseHandler solver clause
+            return ()
+
+instance AddCardinality IO Solver where
+  addAtLeast :: Solver -> [Lit] -> Int -> IO ()
+  addAtLeast solver lits n = do
+    d <- getDecisionLevel solver
+    assert (d == levelRoot) $ return ()
+
+    ok <- readIORef (svOk solver)
+    when ok $ do
+      (lits',n') <- liftM normalizeAtLeast $ instantiateAtLeast (getLitFixed solver) (lits,n)
+      let len = length lits'
+
+      if n' <= 0 then return ()
+      else if n' > len then markBad solver
+      else if n' == 1 then addClause solver lits'
+      else if n' == len then do
         {- We do not call 'removeBackwardSubsumedBy' here,
            because subsumed constraints will be removed by 'simplify'. -}
-        ret <- assign solver lit
-        assert ret $ return ()
+        forM_ lits' $ \l -> do
+          ret <- assign solver l
+          assert ret $ return ()
         ret2 <- deduce solver
         case ret2 of
           Nothing -> return ()
           Just _ -> markBad solver
-      Just lits2 -> do
-        subsumed <- checkForwardSubsumption solver lits
-        unless subsumed $ do
-          removeBackwardSubsumedBy solver ([(1,lit) | lit <- lits2], 1)
-          clause <- newClauseHandler lits2 False
-          addToDB solver clause
-          _ <- basicAttachClauseHandler solver clause
-          return ()
+      else do -- n' < len
+        removeBackwardSubsumedBy solver ([(1,lit) | lit <- lits'], fromIntegral n')
+        c <- newAtLeastHandler lits' n' False
+        addToDB solver c
+        _ <- basicAttachAtLeastHandler solver c
+        return ()
 
--- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
-addAtLeast :: Solver -- ^ The 'Solver' argument.
-           -> [Lit]  -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)
-           -> Int    -- ^ /n/.
-           -> IO ()
-addAtLeast solver lits n = do
-  d <- getDecisionLevel solver
-  assert (d == levelRoot) $ return ()
+instance AddPBLin IO Solver where
+  addPBAtLeast :: Solver -> PBLinSum -> Integer -> IO ()
+  addPBAtLeast solver ts n = do
+    d <- getDecisionLevel solver
+    assert (d == levelRoot) $ return ()
 
-  ok <- readIORef (svOk solver)
-  when ok $ do
-    (lits',n') <- liftM normalizeAtLeast $ instantiateAtLeast (getLitFixed solver) (lits,n)
-    let len = length lits'
+    ok <- readIORef (svOk solver)
+    when ok $ do
+      (ts',n') <- liftM normalizePBLinAtLeast $ instantiatePBLinAtLeast (getLitFixed solver) (ts,n)
 
-    if n' <= 0 then return ()
-    else if n' > len then markBad solver
-    else if n' == 1 then addClause solver lits'
-    else if n' == len then do
-      {- We do not call 'removeBackwardSubsumedBy' here,
-         because subsumed constraints will be removed by 'simplify'. -}
-      forM_ lits' $ \l -> do
-        ret <- assign solver l
-        assert ret $ return ()
-      ret2 <- deduce solver
-      case ret2 of
-        Nothing -> return ()
-        Just _ -> markBad solver
-    else do -- n' < len
-      removeBackwardSubsumedBy solver ([(1,lit) | lit <- lits'], fromIntegral n')
-      c <- newAtLeastHandler lits' n' False
-      addToDB solver c
-      _ <- basicAttachAtLeastHandler solver c
-      return ()
-
--- | Add a cardinality constraints /atmost({l1,l2,..},n)/.
-addAtMost :: Solver -- ^ The 'Solver' argument
-          -> [Lit]  -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)
-          -> Int    -- ^ /n/
-          -> IO ()
-addAtMost solver lits n =
-  addAtLeast solver (map litNot lits) (length lits - n)
-
--- | Add a cardinality constraints /exactly({l1,l2,..},n)/.
-addExactly :: Solver -- ^ The 'Solver' argument
-           -> [Lit]  -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)
-           -> Int    -- ^ /n/
-           -> IO ()
-addExactly solver lits n = do
-  addAtLeast solver lits n
-  addAtMost solver lits n
-
--- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≥ n/.
-addPBAtLeast :: Solver          -- ^ The 'Solver' argument.
-             -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
-             -> Integer         -- ^ /n/
-             -> IO ()
-addPBAtLeast solver ts n = do
-  d <- getDecisionLevel solver
-  assert (d == levelRoot) $ return ()
-
-  ok <- readIORef (svOk solver)
-  when ok $ do
-    (ts',n') <- liftM normalizePBLinAtLeast $ instantiatePBLinAtLeast (getLitFixed solver) (ts,n)
-  
-    case pbToAtLeast (ts',n') of
-      Just (lhs',rhs') -> addAtLeast solver lhs' rhs'
-      Nothing -> do
-        let cs = map fst ts'
-            slack = sum cs - n'
-        if n' <= 0 then return ()
-        else if slack < 0 then markBad solver
-        else do
-          removeBackwardSubsumedBy solver (ts', n')          
-          (ts'',n'') <- do
-            b <- getPBSplitClausePart solver
-            if b
-            then pbSplitClausePart solver (ts',n')
-            else return (ts',n')
-
-          c <- newPBHandler solver ts'' n'' False
-          let constr = toConstraintHandler c
-          addToDB solver constr
-          ret <- attach solver constr
-          if not ret then do
-            markBad solver
+      case pbToAtLeast (ts',n') of
+        Just (lhs',rhs') -> addAtLeast solver lhs' rhs'
+        Nothing -> do
+          let cs = map fst ts'
+              slack = sum cs - n'
+          if n' <= 0 then return ()
+          else if slack < 0 then markBad solver
           else do
-            ret2 <- deduce solver
-            case ret2 of
-              Nothing -> return ()
-              Just _ -> markBad solver
+            removeBackwardSubsumedBy solver (ts', n')
+            (ts'',n'') <- do
+              b <- getPBSplitClausePart solver
+              if b
+              then pbSplitClausePart solver (ts',n')
+              else return (ts',n')
+
+            c <- newPBHandler solver ts'' n'' False
+            let constr = toConstraintHandler c
+            addToDB solver constr
+            ret <- attach solver constr
+            if not ret then do
+              markBad solver
+            else do
+              ret2 <- deduce solver
+              case ret2 of
+                Nothing -> return ()
+                Just _ -> markBad solver
+
+  addPBExactly :: Solver -> PBLinSum -> Integer -> IO ()
+  addPBExactly solver ts n = do
+    (ts2,n2) <- liftM normalizePBLinExactly $ instantiatePBLinExactly (getLitFixed solver) (ts,n)
+    addPBAtLeast solver ts2 n2
+    addPBAtMost solver ts2 n2
+
+  addPBAtLeastSoft :: Solver -> Lit -> PBLinSum -> Integer -> IO ()
+  addPBAtLeastSoft solver sel lhs rhs = do
+    (lhs', rhs') <- liftM normalizePBLinAtLeast $ instantiatePBLinAtLeast (getLitFixed solver) (lhs,rhs)
+    addPBAtLeast solver ((rhs', litNot sel) : lhs') rhs'
+
+  addPBExactlySoft :: Solver -> Lit -> PBLinSum -> Integer -> IO ()
+  addPBExactlySoft solver sel lhs rhs = do
+    (lhs2, rhs2) <- liftM normalizePBLinExactly $ instantiatePBLinExactly (getLitFixed solver) (lhs,rhs)
+    addPBAtLeastSoft solver sel lhs2 rhs2
+    addPBAtMostSoft solver sel lhs2 rhs2
 
 -- | See documentation of 'setPBSplitClausePart'.
 pbSplitClausePart :: Solver -> PBLinAtLeast -> IO PBLinAtLeast
@@ -939,90 +923,24 @@ pbSplitClausePart solver (lhs,rhs) = do
     addClause solver $ -sel : [l | (_,l) <- ts1]
     return ((rhs,sel) : ts2, rhs)
 
--- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … ≤ n/.
-addPBAtMost :: Solver          -- ^ The 'Solver' argument.
-            -> PBLinSum        -- ^ list of @[(c1,l1),(c2,l2),…]@
-            -> Integer         -- ^ /n/
-            -> IO ()
-addPBAtMost solver ts n = addPBAtLeast solver [(-c,l) | (c,l) <- ts] (negate n)
+instance AddXORClause IO Solver where
+  addXORClause :: Solver -> [Lit] -> Bool -> IO ()
+  addXORClause solver lits rhs = do
+    d <- getDecisionLevel solver
+    assert (d == levelRoot) $ return ()
 
--- | Add a pseudo boolean constraints /c1*l1 + c2*l2 + … = n/.
-addPBExactly :: Solver          -- ^ The 'Solver' argument.
-             -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
-             -> Integer         -- ^ /n/
-             -> IO ()
-addPBExactly solver ts n = do
-  (ts2,n2) <- liftM normalizePBLinExactly $ instantiatePBLinExactly (getLitFixed solver) (ts,n)
-  addPBAtLeast solver ts2 n2
-  addPBAtMost solver ts2 n2
-
--- | Add a soft pseudo boolean constraints /sel ⇒ c1*l1 + c2*l2 + … ≥ n/.
-addPBAtLeastSoft
-  :: Solver          -- ^ The 'Solver' argument.
-  -> Lit             -- ^ Selector literal @sel@
-  -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
-  -> Integer         -- ^ /n/
-  -> IO ()
-addPBAtLeastSoft solver sel lhs rhs = do
-  (lhs', rhs') <- liftM normalizePBLinAtLeast $ instantiatePBLinAtLeast (getLitFixed solver) (lhs,rhs)
-  addPBAtLeast solver ((rhs', litNot sel) : lhs') rhs'
-
--- | Add a soft pseudo boolean constraints /sel ⇒ c1*l1 + c2*l2 + … ≤ n/.
-addPBAtMostSoft
-  :: Solver          -- ^ The 'Solver' argument.
-  -> Lit             -- ^ Selector literal @sel@
-  -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
-  -> Integer         -- ^ /n/
-  -> IO ()
-addPBAtMostSoft solver sel lhs rhs =
-  addPBAtLeastSoft solver sel [(negate c, lit) | (c,lit) <- lhs] (negate rhs)
-
--- | Add a soft pseudo boolean constraints /sel ⇒ c1*l1 + c2*l2 + … = n/.
-addPBExactlySoft
-  :: Solver          -- ^ The 'Solver' argument.
-  -> Lit             -- ^ Selector literal @sel@
-  -> PBLinSum        -- ^ list of terms @[(c1,l1),(c2,l2),…]@
-  -> Integer         -- ^ /n/
-  -> IO ()
-addPBExactlySoft solver sel lhs rhs = do
-  (lhs2, rhs2) <- liftM normalizePBLinExactly $ instantiatePBLinExactly (getLitFixed solver) (lhs,rhs)
-  addPBAtLeastSoft solver sel lhs2 rhs2
-  addPBAtMostSoft solver sel lhs2 rhs2
-
--- | Add a parity constraint /l1 ⊕ l2 ⊕ … ⊕ ln = rhs/
-addXORClause
-  :: Solver -- ^ The 'Solver' argument.
-  -> [Lit]  -- ^ literals @[l1, l2, …, ln]@
-  -> Bool   -- ^ /rhs/
-  -> IO ()
-addXORClause solver lits rhs = do
-  d <- getDecisionLevel solver
-  assert (d == levelRoot) $ return ()
-
-  ok <- readIORef (svOk solver)
-  when ok $ do
-    xcl <- instantiateXORClause (getLitFixed solver) (lits,rhs)
-    case normalizeXORClause xcl of
-      ([], True) -> markBad solver
-      ([], False) -> return ()
-      ([l], b) -> addClause solver [if b then l else litNot l]
-      (l:ls, b) -> do
-        c <- newXORClauseHandler ((if b then l else litNot l) : ls) False
-        addToDB solver c
-        _ <- basicAttachXORClauseHandler solver c
-        return ()
-
--- | Add a soft parity constraint /sel ⇒ l1 ⊕ l2 ⊕ … ⊕ ln = rhs/
-addXORClauseSoft
-  :: Solver -- ^ The 'Solver' argument.
-  -> Lit    -- ^ Selector literal @sel@
-  -> [Lit]  -- ^ literals @[l1, l2, …, ln]@
-  -> Bool   -- ^ /rhs/
-  -> IO ()
-addXORClauseSoft solver sel lits rhs = do
-  reified <- newVar solver
-  addXORClause solver (litNot reified : lits) rhs
-  addClause solver [litNot sel, reified] -- sel ⇒ reified
+    ok <- readIORef (svOk solver)
+    when ok $ do
+      xcl <- instantiateXORClause (getLitFixed solver) (lits,rhs)
+      case normalizeXORClause xcl of
+        ([], True) -> markBad solver
+        ([], False) -> return ()
+        ([l], b) -> addClause solver [if b then l else litNot l]
+        (l:ls, b) -> do
+          c <- newXORClauseHandler ((if b then l else litNot l) : ls) False
+          addToDB solver c
+          _ <- basicAttachXORClauseHandler solver c
+          return ()
 
 {--------------------------------------------------------------------
   Problem solving

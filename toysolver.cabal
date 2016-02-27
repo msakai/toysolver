@@ -186,6 +186,8 @@ Library
      TemplateHaskell
      TypeFamilies
      TypeSynonymInstances
+     -- commented out because cabal-1.16 does not understand InstanceSigs extension
+     -- InstanceSigs
   if impl(ghc)
      Other-Extensions:
         MagicHash
