@@ -306,7 +306,7 @@ getVarFixed solver !v = do
   else
     return lUndef
 
-getLitFixed :: Solver -> Var -> IO LBool
+getLitFixed :: Solver -> Lit -> IO LBool
 getLitFixed solver !l = do
   -- litVar による heap allocation を避けるために、
   -- litPolarityによる分岐後にvarDataを呼ぶ。
