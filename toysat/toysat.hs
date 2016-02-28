@@ -63,9 +63,9 @@ import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.MIP2PB as MIP2PB
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.PBO as PBO
-import qualified ToySolver.SAT.Integer as Integer
-import qualified ToySolver.SAT.TseitinEncoder as Tseitin
-import qualified ToySolver.SAT.PBNLC as PBNLC
+import qualified ToySolver.SAT.Encoder.Integer as Integer
+import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain

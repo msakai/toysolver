@@ -2,7 +2,7 @@
 {-# LANGUAGE ExistentialQuantification, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.PBNLC
+-- Module      :  ToySolver.SAT.Encoder.PBNLC
 -- Copyright   :  (c) Masahiro Sakai 2015
 -- License     :  BSD-style
 -- 
@@ -11,7 +11,7 @@
 -- Portability :  non-portable (ExistentialQuantification, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses)
 -- 
 -----------------------------------------------------------------------------
-module ToySolver.SAT.PBNLC
+module ToySolver.SAT.Encoder.PBNLC
   (
   -- * The encoder type
     Encoder
@@ -38,7 +38,7 @@ module ToySolver.SAT.PBNLC
 
 import Control.Monad.Primitive
 import ToySolver.SAT.Types as SAT
-import qualified ToySolver.SAT.TseitinEncoder as Tseitin
+import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.Internal.Util (revForM)
 
 data Encoder m

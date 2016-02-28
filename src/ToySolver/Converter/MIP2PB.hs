@@ -36,7 +36,7 @@ import qualified Data.PseudoBoolean as PBFile
 import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Data.OrdRel
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.SAT.Integer as Integer
+import qualified ToySolver.SAT.Encoder.Integer as Integer
 import ToySolver.Internal.Util (revForM)
 
 -- -----------------------------------------------------------------------------

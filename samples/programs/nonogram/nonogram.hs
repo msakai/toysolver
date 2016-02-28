@@ -15,7 +15,7 @@ import System.Environment
 import System.Exit
 import System.IO
 import qualified ToySolver.SAT as SAT
-import qualified ToySolver.SAT.TseitinEncoder as Tseitin
+import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.Internal.Util (setEncodingChar8)
 
 -- row patterns and column patterns

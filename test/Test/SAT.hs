@@ -30,13 +30,13 @@ import ToySolver.Data.Boolean
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.SAT.TheorySolver
-import qualified ToySolver.SAT.TseitinEncoder as Tseitin
+import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
-import qualified ToySolver.SAT.PBNLC as PBNLC
 
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA

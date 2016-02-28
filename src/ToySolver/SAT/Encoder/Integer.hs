@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
-module ToySolver.SAT.Integer
+module ToySolver.SAT.Encoder.Integer
   ( Expr (..)
   , newVar
   , linearize
@@ -16,8 +16,7 @@ import Text.Printf
 
 import ToySolver.Data.OrdRel
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.SAT.TseitinEncoder as TseitinEncoder
-import qualified ToySolver.SAT.PBNLC as PBNLC
+import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 
 newtype Expr = Expr SAT.PBSum
 

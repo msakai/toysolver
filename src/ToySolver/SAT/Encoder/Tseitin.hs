@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.TseitinEncoder
+-- Module      :  ToySolver.SAT.Encoder.Tseitin
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -42,7 +42,7 @@
 --   Constraints into SAT. JSAT 2:1–26, 2006.
 --
 -----------------------------------------------------------------------------
-module ToySolver.SAT.TseitinEncoder
+module ToySolver.SAT.Encoder.Tseitin
   (
   -- * The @Encoder@ type
     Encoder

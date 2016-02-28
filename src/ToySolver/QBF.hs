@@ -46,7 +46,7 @@ import ToySolver.Data.BoolExpr (BoolExpr)
 import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types (LitSet, VarSet, VarMap)
-import qualified ToySolver.SAT.TseitinEncoder as Tseitin
+import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
 import ToySolver.Text.QDimacs (Quantifier (..))
 import qualified ToySolver.Text.QDimacs as QDimacs
