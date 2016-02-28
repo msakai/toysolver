@@ -47,6 +47,7 @@ module ToySolver.SAT.TseitinEncoder
   -- * The @Encoder@ type
     Encoder
   , newEncoder
+  , newEncoderWithPBLin
   , setUsePB
 
   -- * Polarity
@@ -93,9 +94,10 @@ evalFormula m = fold (SAT.evalLit m)
 
 -- | Encoder instance
 data Encoder =
-  forall a. SAT.AddPBLin IO a =>
+  forall a. SAT.AddClause IO a =>
   Encoder
   { encSolver    :: a
+  , encAddPBAtLeast :: Maybe (SAT.PBLinSum -> Integer -> IO ())
   , encUsePB     :: IORef Bool
   , encConjTable :: !(IORef (Map SAT.LitSet (SAT.Lit, Bool, Bool)))
   , encITETable  :: !(IORef (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Lit, Bool, Bool)))
@@ -110,7 +112,8 @@ instance SAT.AddClause IO Encoder where
   addClause Encoder{ encSolver = a } = SAT.addClause a
 
 -- | Create a @Encoder@ instance.
-newEncoder :: SAT.AddPBLin IO a => a -> IO Encoder
+-- If the encoder is built using this function, 'setUsePB' has no effect.
+newEncoder :: SAT.AddClause IO a => a -> IO Encoder
 newEncoder solver = do
   usePBRef <- newIORef False
   table <- newIORef Map.empty
@@ -118,12 +121,30 @@ newEncoder solver = do
   return $
     Encoder
     { encSolver = solver
+    , encAddPBAtLeast = Nothing
+    , encUsePB  = usePBRef
+    , encConjTable = table
+    , encITETable = table2
+    }
+
+-- | Create a @Encoder@ instance.
+-- If the encoder is built using this function, 'setUsePB' has an effect.
+newEncoderWithPBLin :: SAT.AddPBLin IO a => a -> IO Encoder
+newEncoderWithPBLin solver = do
+  usePBRef <- newIORef False
+  table <- newIORef Map.empty
+  table2 <- newIORef Map.empty
+  return $
+    Encoder
+    { encSolver = solver
+    , encAddPBAtLeast = Just (SAT.addPBAtLeast solver)
     , encUsePB  = usePBRef
     , encConjTable = table
     , encITETable = table2
     }
 
 -- | Use /pseudo boolean constraints/ or use only /clauses/.
+-- This option has an effect only when the encoder is built using 'newEncoderWithPBLin'.
 setUsePB :: Encoder -> Bool -> IO ()
 setUsePB encoder usePB = writeIORef (encUsePB encoder) usePB
 
@@ -200,7 +221,7 @@ encodeConj encoder = encodeConjWithPolarity encoder polarityBoth
 -- | Return an literal which is equivalent to a given conjunction which occurs only in specified polarity.
 encodeConjWithPolarity :: Encoder -> Polarity -> [SAT.Lit] -> IO SAT.Lit
 encodeConjWithPolarity _ _ [l] =  return l
-encodeConjWithPolarity encoder@Encoder{ encSolver = solver } (Polarity pos neg) ls = do
+encodeConjWithPolarity encoder (Polarity pos neg) ls = do
   let ls2 = IntSet.fromList ls
   usePB <- readIORef (encUsePB encoder)
   table <- readIORef (encConjTable encoder)
@@ -208,14 +229,15 @@ encodeConjWithPolarity encoder@Encoder{ encSolver = solver } (Polarity pos neg) 
   let -- If F is monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x → A∧B)
       definePos :: SAT.Lit -> IO ()
       definePos l = do
-        if usePB then do
-          -- ∀i.(l → li) ⇔ Σli >= n*l ⇔ Σli - n*l >= 0
-          let n = IntSet.size ls2
-          SAT.addPBAtLeast solver ((- fromIntegral n, l) : [(1,li) | li <- IntSet.toList ls2]) 0
-        else do
-          forM_ (IntSet.toList ls2) $ \li -> do
-            -- (l → li)  ⇔  (¬l ∨ li)
-            SAT.addClause encoder [SAT.litNot l, li]
+        case encAddPBAtLeast encoder of
+          Just addPBAtLeast | usePB -> do
+            -- ∀i.(l → li) ⇔ Σli >= n*l ⇔ Σli - n*l >= 0
+            let n = IntSet.size ls2
+            addPBAtLeast ((- fromIntegral n, l) : [(1,li) | li <- IntSet.toList ls2]) 0
+          _ -> do
+            forM_ (IntSet.toList ls2) $ \li -> do
+              -- (l → li)  ⇔  (¬l ∨ li)
+              SAT.addClause encoder [SAT.litNot l, li]
 
       -- If F is anti-monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x ← A∧B) ⇔ ∃x. F(x) ∧ (x∨¬A∨¬B).
       defineNeg :: SAT.Lit -> IO ()

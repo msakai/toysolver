@@ -616,7 +616,7 @@ solvePB opt solver formula initialModel = do
   putCommentLine $ printf "#constraints %d" nc
 
   SAT.newVars_ solver nv
-  enc <- Tseitin.newEncoder solver
+  enc <- Tseitin.newEncoderWithPBLin solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
   pbnlc <- PBNLC.newEncoder solver enc
 
@@ -710,7 +710,7 @@ solveWBO opt solver isMaxSat formula initialModel = do
 
   SAT.resizeVarCapacity solver (nv + length [() | (Just _, _) <- PBFile.wboConstraints formula])
   SAT.newVars_ solver nv
-  enc <- Tseitin.newEncoder solver
+  enc <- Tseitin.newEncoderWithPBLin solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
   pbnlc <- PBNLC.newEncoder solver enc
 
@@ -883,7 +883,7 @@ solveMIP opt solver mip = do
     putSLine "UNKNOWN"
     exitFailure
   else do
-    enc <- Tseitin.newEncoder solver
+    enc <- Tseitin.newEncoderWithPBLin solver
     Tseitin.setUsePB enc (optLinearizerPB opt)
     pbnlc <- PBNLC.newEncoder solver enc
 
