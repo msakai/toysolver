@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, ExistentialQuantification #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.TseitinEncoder
@@ -7,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (FlexibleContexts, MultiParamTypeClasses, ExistentialQuantification)
 -- 
 -- Tseitin encoding
 --
@@ -48,6 +49,7 @@ module ToySolver.SAT.TseitinEncoder
   , newEncoder
   , setUsePB
   , encSolver
+  , SomeAddPBLin (..)
 
   -- * Polarity
   , Polarity (..)
@@ -83,7 +85,6 @@ import qualified Data.Map as Map
 import qualified Data.IntSet as IntSet
 import ToySolver.Data.Boolean
 import ToySolver.Data.BoolExpr
-import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 
 -- | Arbitrary formula not restricted to CNF
@@ -94,22 +95,57 @@ evalFormula m = fold (SAT.evalLit m)
 
 -- | Encoder instance
 data Encoder =
+  forall a. SAT.AddPBLin IO a =>
   Encoder
-  { encSolver    :: SAT.Solver
+  { encSolver'   :: a
   , encUsePB     :: IORef Bool
   , encConjTable :: !(IORef (Map SAT.LitSet (SAT.Lit, Bool, Bool)))
   , encITETable  :: !(IORef (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Lit, Bool, Bool)))
   }
 
+instance SAT.NewVar IO Encoder where
+  newVar   Encoder{ encSolver' = a } = SAT.newVar a
+  newVars  Encoder{ encSolver' = a } = SAT.newVars a
+  newVars_ Encoder{ encSolver' = a } = SAT.newVars_ a
+
+instance SAT.AddClause IO Encoder where
+  addClause Encoder{ encSolver' = a } = SAT.addClause a
+
+data SomeAddPBLin = forall a. SAT.AddPBLin IO a => SomeAddPBLin !a
+
+instance SAT.NewVar IO SomeAddPBLin where
+  newVar (SomeAddPBLin a)   = SAT.newVar a
+  newVars (SomeAddPBLin a)  = SAT.newVars a
+  newVars_ (SomeAddPBLin a) = SAT.newVars_ a
+
+instance SAT.AddClause IO SomeAddPBLin where
+  addClause (SomeAddPBLin a) = SAT.addClause a
+
+instance SAT.AddCardinality IO SomeAddPBLin where
+  addAtLeast (SomeAddPBLin a) = SAT.addAtLeast a
+  addAtMost (SomeAddPBLin a)  = SAT.addAtMost a
+  addExactly (SomeAddPBLin a) = SAT.addExactly a
+
+instance SAT.AddPBLin IO SomeAddPBLin where
+  addPBAtLeast (SomeAddPBLin a) = SAT.addPBAtLeast a
+  addPBAtMost (SomeAddPBLin a)  = SAT.addPBAtMost a
+  addPBExactly (SomeAddPBLin a) = SAT.addPBExactly a
+  addPBAtLeastSoft (SomeAddPBLin a) = SAT.addPBAtLeastSoft a
+  addPBAtMostSoft (SomeAddPBLin a)  = SAT.addPBAtMostSoft a
+  addPBExactlySoft (SomeAddPBLin a) = SAT.addPBExactlySoft a
+
+encSolver :: Encoder -> SomeAddPBLin
+encSolver Encoder{ encSolver' = a } = SomeAddPBLin a
+
 -- | Create a @Encoder@ instance.
-newEncoder :: SAT.Solver -> IO Encoder
+newEncoder :: SAT.AddPBLin IO a => a -> IO Encoder
 newEncoder solver = do
   usePBRef <- newIORef False
   table <- newIORef Map.empty
   table2 <- newIORef Map.empty
   return $
     Encoder
-    { encSolver = solver
+    { encSolver' = solver
     , encUsePB  = usePBRef
     , encConjTable = table
     , encITETable = table2
@@ -123,25 +159,24 @@ setUsePB encoder usePB = writeIORef (encUsePB encoder) usePB
 -- Tseitin encoding.
 addFormula :: Encoder -> Formula -> IO ()
 addFormula encoder formula = do
-  let solver = encSolver encoder
   case formula of
     And xs -> mapM_ (addFormula encoder) xs
     Equiv a b -> do
       lit1 <- encodeFormula encoder a
       lit2 <- encodeFormula encoder b
-      SAT.addClause solver [SAT.litNot lit1, lit2] -- a→b
-      SAT.addClause solver [SAT.litNot lit2, lit1] -- b→a
+      SAT.addClause encoder [SAT.litNot lit1, lit2] -- a→b
+      SAT.addClause encoder [SAT.litNot lit2, lit1] -- b→a
     Not (Not a)     -> addFormula encoder a
     Not (Or xs)     -> addFormula encoder (andB (map notB xs))
     Not (Imply a b) -> addFormula encoder (a .&&. notB b)
     Not (Equiv a b) -> do
       lit1 <- encodeFormula encoder a
       lit2 <- encodeFormula encoder b
-      SAT.addClause solver [lit1, lit2] -- a ∨ b
-      SAT.addClause solver [SAT.litNot lit1, SAT.litNot lit2] -- ¬a ∨ ¬b
+      SAT.addClause encoder [lit1, lit2] -- a ∨ b
+      SAT.addClause encoder [SAT.litNot lit1, SAT.litNot lit2] -- ¬a ∨ ¬b
     _ -> do
       c <- encodeToClause encoder formula
-      SAT.addClause solver c
+      SAT.addClause encoder c
 
 encodeToClause :: Encoder -> Formula -> IO SAT.Clause
 encodeToClause encoder formula =
@@ -193,9 +228,8 @@ encodeConj encoder = encodeConjWithPolarity encoder polarityBoth
 -- | Return an literal which is equivalent to a given conjunction which occurs only in specified polarity.
 encodeConjWithPolarity :: Encoder -> Polarity -> [SAT.Lit] -> IO SAT.Lit
 encodeConjWithPolarity _ _ [l] =  return l
-encodeConjWithPolarity encoder (Polarity pos neg) ls = do
+encodeConjWithPolarity encoder@Encoder{ encSolver' = solver } (Polarity pos neg) ls = do
   let ls2 = IntSet.fromList ls
-  let solver = encSolver encoder
   usePB <- readIORef (encUsePB encoder)
   table <- readIORef (encConjTable encoder)
 
@@ -209,14 +243,13 @@ encodeConjWithPolarity encoder (Polarity pos neg) ls = do
         else do
           forM_ (IntSet.toList ls2) $ \li -> do
             -- (l → li)  ⇔  (¬l ∨ li)
-            SAT.addClause solver [SAT.litNot l, li]
+            SAT.addClause encoder [SAT.litNot l, li]
 
       -- If F is anti-monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x ← A∧B) ⇔ ∃x. F(x) ∧ (x∨¬A∨¬B).
       defineNeg :: SAT.Lit -> IO ()
       defineNeg l = do
-        let solver = encSolver encoder
         -- ((l1 ∧ l2 ∧ … ∧ ln) → l)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ l)
-        SAT.addClause solver (l : map SAT.litNot (IntSet.toList ls2))
+        SAT.addClause encoder (l : map SAT.litNot (IntSet.toList ls2))
 
   case Map.lookup ls2 table of
     Just (l, posDefined, negDefined) -> do
@@ -226,8 +259,7 @@ encodeConjWithPolarity encoder (Polarity pos neg) ls = do
         modifyIORef (encConjTable encoder) (Map.insert ls2 (l, (max posDefined pos), (max negDefined neg)))
       return l
     Nothing -> do
-      let sat = encSolver encoder
-      l <- SAT.newVar sat
+      l <- SAT.newVar encoder
       when pos $ definePos l
       when neg $ defineNeg l
       modifyIORef (encConjTable encoder) (Map.insert ls2 (l, pos, neg))
@@ -262,7 +294,6 @@ encodeITEWithPolarity :: Encoder -> Polarity -> SAT.Lit -> SAT.Lit -> SAT.Lit ->
 encodeITEWithPolarity encoder p c t e | c < 0 =
   encodeITEWithPolarity encoder p (- c) e t
 encodeITEWithPolarity encoder (Polarity pos neg) c t e = do
-  let solver = encSolver encoder
   table <- readIORef (encITETable encoder)
 
   let definePos :: SAT.Lit -> IO ()
@@ -271,9 +302,9 @@ encodeITEWithPolarity encoder (Polarity pos neg) c t e = do
         -- ⇔ x → (c∧t ∨ ¬c∧e)
         -- ⇔ (x∧c → t) ∧ (x∧¬c → e)
         -- ⇔ (¬x∨¬c∨t) ∧ (¬x∨c∨e)
-        SAT.addClause solver [-x, -c, t]
-        SAT.addClause solver [-x, c, e]
-        SAT.addClause solver [t, e, -x] -- redundant, but will increase the strength of unit propagation.
+        SAT.addClause encoder [-x, -c, t]
+        SAT.addClause encoder [-x, c, e]
+        SAT.addClause encoder [t, e, -x] -- redundant, but will increase the strength of unit propagation.
   
       defineNeg :: SAT.Lit -> IO ()
       defineNeg x = do
@@ -281,9 +312,9 @@ encodeITEWithPolarity encoder (Polarity pos neg) c t e = do
         -- ⇔ (c∧t ∨ ¬c∧e) → x
         -- ⇔ (c∧t → x) ∨ (¬c∧e →x)
         -- ⇔ (¬c∨¬t∨x) ∨ (c∧¬e∨x)
-        SAT.addClause solver [-c, -t, x]
-        SAT.addClause solver [c, -e, x]
-        SAT.addClause solver [-t, -e, x] -- redundant, but will increase the strength of unit propagation.
+        SAT.addClause encoder [-c, -t, x]
+        SAT.addClause encoder [c, -e, x]
+        SAT.addClause encoder [-t, -e, x] -- redundant, but will increase the strength of unit propagation.
 
   case Map.lookup (c,t,e) table of
     Just (l, posDefined, negDefined) -> do
@@ -293,7 +324,7 @@ encodeITEWithPolarity encoder (Polarity pos neg) c t e = do
         modifyIORef (encITETable encoder) (Map.insert (c,t,e) (l, (max posDefined pos), (max negDefined neg)))
       return l
     Nothing -> do
-      l <- SAT.newVar solver
+      l <- SAT.newVar encoder
       when pos $ definePos l
       when neg $ defineNeg l
       modifyIORef (encITETable encoder) (Map.insert (c,t,e) (l, pos, neg))
