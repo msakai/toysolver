@@ -48,8 +48,6 @@ module ToySolver.SAT.TseitinEncoder
     Encoder
   , newEncoder
   , setUsePB
-  , encSolver
-  , SomeAddPBLin (..)
 
   -- * Polarity
   , Polarity (..)
@@ -97,45 +95,19 @@ evalFormula m = fold (SAT.evalLit m)
 data Encoder =
   forall a. SAT.AddPBLin IO a =>
   Encoder
-  { encSolver'   :: a
+  { encSolver    :: a
   , encUsePB     :: IORef Bool
   , encConjTable :: !(IORef (Map SAT.LitSet (SAT.Lit, Bool, Bool)))
   , encITETable  :: !(IORef (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Lit, Bool, Bool)))
   }
 
 instance SAT.NewVar IO Encoder where
-  newVar   Encoder{ encSolver' = a } = SAT.newVar a
-  newVars  Encoder{ encSolver' = a } = SAT.newVars a
-  newVars_ Encoder{ encSolver' = a } = SAT.newVars_ a
+  newVar   Encoder{ encSolver = a } = SAT.newVar a
+  newVars  Encoder{ encSolver = a } = SAT.newVars a
+  newVars_ Encoder{ encSolver = a } = SAT.newVars_ a
 
 instance SAT.AddClause IO Encoder where
-  addClause Encoder{ encSolver' = a } = SAT.addClause a
-
-data SomeAddPBLin = forall a. SAT.AddPBLin IO a => SomeAddPBLin !a
-
-instance SAT.NewVar IO SomeAddPBLin where
-  newVar (SomeAddPBLin a)   = SAT.newVar a
-  newVars (SomeAddPBLin a)  = SAT.newVars a
-  newVars_ (SomeAddPBLin a) = SAT.newVars_ a
-
-instance SAT.AddClause IO SomeAddPBLin where
-  addClause (SomeAddPBLin a) = SAT.addClause a
-
-instance SAT.AddCardinality IO SomeAddPBLin where
-  addAtLeast (SomeAddPBLin a) = SAT.addAtLeast a
-  addAtMost (SomeAddPBLin a)  = SAT.addAtMost a
-  addExactly (SomeAddPBLin a) = SAT.addExactly a
-
-instance SAT.AddPBLin IO SomeAddPBLin where
-  addPBAtLeast (SomeAddPBLin a) = SAT.addPBAtLeast a
-  addPBAtMost (SomeAddPBLin a)  = SAT.addPBAtMost a
-  addPBExactly (SomeAddPBLin a) = SAT.addPBExactly a
-  addPBAtLeastSoft (SomeAddPBLin a) = SAT.addPBAtLeastSoft a
-  addPBAtMostSoft (SomeAddPBLin a)  = SAT.addPBAtMostSoft a
-  addPBExactlySoft (SomeAddPBLin a) = SAT.addPBExactlySoft a
-
-encSolver :: Encoder -> SomeAddPBLin
-encSolver Encoder{ encSolver' = a } = SomeAddPBLin a
+  addClause Encoder{ encSolver = a } = SAT.addClause a
 
 -- | Create a @Encoder@ instance.
 newEncoder :: SAT.AddPBLin IO a => a -> IO Encoder
@@ -145,7 +117,7 @@ newEncoder solver = do
   table2 <- newIORef Map.empty
   return $
     Encoder
-    { encSolver' = solver
+    { encSolver = solver
     , encUsePB  = usePBRef
     , encConjTable = table
     , encITETable = table2
@@ -228,7 +200,7 @@ encodeConj encoder = encodeConjWithPolarity encoder polarityBoth
 -- | Return an literal which is equivalent to a given conjunction which occurs only in specified polarity.
 encodeConjWithPolarity :: Encoder -> Polarity -> [SAT.Lit] -> IO SAT.Lit
 encodeConjWithPolarity _ _ [l] =  return l
-encodeConjWithPolarity encoder@Encoder{ encSolver' = solver } (Polarity pos neg) ls = do
+encodeConjWithPolarity encoder@Encoder{ encSolver = solver } (Polarity pos neg) ls = do
   let ls2 = IntSet.fromList ls
   usePB <- readIORef (encUsePB encoder)
   table <- readIORef (encConjTable encoder)

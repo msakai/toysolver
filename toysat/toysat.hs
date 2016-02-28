@@ -618,11 +618,12 @@ solvePB opt solver formula initialModel = do
   SAT.newVars_ solver nv
   enc <- Tseitin.newEncoder solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
+  pbnlc <- PBNLC.newEncoder solver enc
 
   forM_ (PBFile.pbConstraints formula) $ \(lhs, op, rhs) -> do
     case op of
-      PBFile.Ge -> PBNLC.addPBNLAtLeast enc lhs rhs
-      PBFile.Eq -> PBNLC.addPBNLExactly enc lhs rhs
+      PBFile.Ge -> PBNLC.addPBNLAtLeast pbnlc lhs rhs
+      PBFile.Eq -> PBNLC.addPBNLExactly pbnlc lhs rhs
 
   case PBFile.pbObjectiveFunction formula of
     Nothing -> do
@@ -634,7 +635,7 @@ solvePB opt solver formula initialModel = do
         writeSOLFile opt m Nothing nv
 
     Just obj' -> do
-      obj'' <- PBNLC.linearizePBSumWithPolarity enc Tseitin.polarityNeg obj'
+      obj'' <- PBNLC.linearizePBSumWithPolarity pbnlc Tseitin.polarityNeg obj'
 
       nv' <- SAT.getNVars solver
       defs <- Tseitin.getDefinitions enc
@@ -711,6 +712,7 @@ solveWBO opt solver isMaxSat formula initialModel = do
   SAT.newVars_ solver nv
   enc <- Tseitin.newEncoder solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
+  pbnlc <- PBNLC.newEncoder solver enc
 
   objRef <- newIORef []
   defsRef <- newIORef []
@@ -719,8 +721,8 @@ solveWBO opt solver isMaxSat formula initialModel = do
     case cost of
       Nothing -> do
         case op of
-          PBFile.Ge -> PBNLC.addPBNLAtLeast enc lhs rhs
-          PBFile.Eq -> PBNLC.addPBNLExactly enc lhs rhs
+          PBFile.Ge -> PBNLC.addPBNLAtLeast pbnlc lhs rhs
+          PBFile.Eq -> PBNLC.addPBNLExactly pbnlc lhs rhs
       Just cval -> do
         sel <-
           case op of
@@ -730,12 +732,12 @@ solveWBO opt solver isMaxSat formula initialModel = do
                   Tseitin.encodeConjWithPolarity enc Tseitin.polarityPos ls
                 _ -> do
                   sel <- SAT.newVar solver
-                  PBNLC.addPBNLAtLeastSoft enc sel lhs rhs
+                  PBNLC.addPBNLAtLeastSoft pbnlc sel lhs rhs
                   modifyIORef defsRef ((sel, constr) : )
                   return sel
             PBFile.Eq -> do
               sel <- SAT.newVar solver
-              PBNLC.addPBNLExactlySoft enc sel lhs rhs
+              PBNLC.addPBNLExactlySoft pbnlc sel lhs rhs
               modifyIORef defsRef ((sel, constr) : )
               return sel
         modifyIORef objRef ((cval, SAT.litNot sel) : )
@@ -883,12 +885,13 @@ solveMIP opt solver mip = do
   else do
     enc <- Tseitin.newEncoder solver
     Tseitin.setUsePB enc (optLinearizerPB opt)
+    pbnlc <- PBNLC.newEncoder solver enc
 
     putCommentLine $ "Loading variables and bounds"
     vmap <- liftM Map.fromList $ revForM (Set.toList ivs) $ \v -> do
       case MIP.getBounds mip v of
         (MIP.Finite lb, MIP.Finite ub) -> do
-          v2 <- Integer.newVar solver (ceiling lb) (floor ub)
+          v2 <- Integer.newVar pbnlc (ceiling lb) (floor ub)
           return (v,v2)
         _ -> do
           putCommentLine $ "cannot handle unbounded variable: " ++ MIP.fromVar v
@@ -907,12 +910,12 @@ solveMIP opt solver mip = do
                        MIP.Ge  -> lhs' .>=. fromInteger rhs'
                        MIP.Eql -> lhs' .==. fromInteger rhs'
             case MIP.constrIndicator c of
-              Nothing -> Integer.addConstraint enc c2
+              Nothing -> Integer.addConstraint pbnlc c2
               Just (var, val) -> do
                 let var' = asBin (vmap Map.! var)
                 case val of
-                  1 -> Integer.addConstraintSoft enc var' c2
-                  0 -> Integer.addConstraintSoft enc (SAT.litNot var') c2
+                  1 -> Integer.addConstraintSoft pbnlc var' c2
+                  0 -> Integer.addConstraintSoft pbnlc (SAT.litNot var') c2
                   _ -> return ()
       case (MIP.constrLB c, MIP.constrUB c) of
         (MIP.Finite x1, MIP.Finite x2) | x1==x2 -> f MIP.Eql x2
@@ -939,7 +942,7 @@ solveMIP opt solver mip = do
         d = foldl' lcm 1 [denominator r | MIP.Term r _ <- MIP.terms (MIP.objExpr obj)] *
             (if MIP.objDir obj == MIP.OptMin then 1 else -1)
         obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms (MIP.objExpr obj)]
-    (obj3,obj3_c) <- Integer.linearize enc obj2
+    (obj3,obj3_c) <- Integer.linearize pbnlc obj2
 
     let transformObjVal :: Integer -> Rational
         transformObjVal val = fromIntegral (val + obj3_c) / fromIntegral d

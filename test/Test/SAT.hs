@@ -188,7 +188,7 @@ prop_solvePBNLC = QM.monadicIO $ do
 solvePBNLC :: SAT.Solver -> (Int,[(PBRel,PBNLC.PBSum,Integer)]) -> IO (Maybe SAT.Model)
 solvePBNLC solver (nv,cs) = do
   SAT.newVars_ solver nv
-  enc <- Tseitin.newEncoder solver
+  enc <- PBNLC.newEncoder solver =<< Tseitin.newEncoder solver
   forM_ cs $ \(o,lhs,rhs) -> do
     case o of
       PBRelGE -> PBNLC.addPBNLAtLeast enc lhs rhs

@@ -21,18 +21,18 @@ import qualified ToySolver.SAT.PBNLC as PBNLC
 
 newtype Expr = Expr PBNLC.PBSum
 
-newVar :: SAT.Solver -> Integer -> Integer -> IO Expr
-newVar solver lo hi
+newVar :: PBNLC.Encoder -> Integer -> Integer -> IO Expr
+newVar enc lo hi
   | lo > hi = do
-      SAT.addClause solver [] -- assert inconsistency
+      SAT.addClause enc [] -- assert inconsistency
       return 0
   | lo == hi = return $ fromInteger lo
   | otherwise = do
       let hi' = hi - lo
           bitWidth = head $ [w | w <- [1..], let mx = 2 ^ w - 1, hi' <= mx]
-      vs <- SAT.newVars solver bitWidth
+      vs <- SAT.newVars enc bitWidth
       let xs = zip (iterate (2*) 1) vs
-      SAT.addPBAtMost solver xs hi'
+      SAT.addPBAtMost enc xs hi'
       return $ Expr ((lo,[]) : [(c,[x]) | (c,x) <- xs])
 
 instance AdditiveGroup Expr where
@@ -52,16 +52,15 @@ instance Num Expr where
   signum _ = 1
   fromInteger c = Expr [(c,[])]
 
-linearize :: TseitinEncoder.Encoder -> Expr -> IO (SAT.PBLinSum, Integer)
+linearize :: PBNLC.Encoder -> Expr -> IO (SAT.PBLinSum, Integer)
 linearize enc (Expr xs) = do
   let ys = [(c,lits) | (c,lits@(_:_)) <- xs]
       c  = sum [c | (c,[]) <- xs]
   zs <- PBNLC.linearizePBSum enc ys
   return (zs, c)
 
-addConstraint :: TseitinEncoder.Encoder -> OrdRel Expr -> IO ()
+addConstraint :: PBNLC.Encoder -> OrdRel Expr -> IO ()
 addConstraint enc (OrdRel lhs op rhs) = do
-  let solver = TseitinEncoder.encSolver enc
   let Expr e = lhs - rhs
   case op of
     Le  -> PBNLC.addPBNLAtMost  enc e 0
@@ -70,13 +69,12 @@ addConstraint enc (OrdRel lhs op rhs) = do
     Gt  -> PBNLC.addPBNLAtLeast enc e 1
     Eql -> PBNLC.addPBNLExactly enc e 0
     NEq -> do
-      sel <- SAT.newVar solver
+      sel <- SAT.newVar enc
       PBNLC.addPBNLAtLeastSoft enc sel e 1
       PBNLC.addPBNLAtMostSoft  enc (-sel) e (-1)
 
-addConstraintSoft :: TseitinEncoder.Encoder -> SAT.Lit -> OrdRel Expr -> IO ()
+addConstraintSoft :: PBNLC.Encoder -> SAT.Lit -> OrdRel Expr -> IO ()
 addConstraintSoft enc sel (OrdRel lhs op rhs) = do
-  let solver = TseitinEncoder.encSolver enc
   let Expr e = lhs - rhs
   case op of
     Le  -> PBNLC.addPBNLAtMostSoft  enc sel e 0
@@ -85,9 +83,9 @@ addConstraintSoft enc sel (OrdRel lhs op rhs) = do
     Gt  -> PBNLC.addPBNLAtLeastSoft enc sel e 1
     Eql -> PBNLC.addPBNLExactlySoft enc sel e 0
     NEq -> do
-      sel2 <- SAT.newVar solver
-      sel3 <- TseitinEncoder.encodeConjWithPolarity enc TseitinEncoder.polarityNeg [sel,sel2]
-      sel4 <- TseitinEncoder.encodeConjWithPolarity enc TseitinEncoder.polarityNeg [sel,-sel2]
+      sel2 <- SAT.newVar enc
+      sel3 <- TseitinEncoder.encodeConjWithPolarity (PBNLC.getTseitinEncoder enc) TseitinEncoder.polarityNeg [sel,sel2]
+      sel4 <- TseitinEncoder.encodeConjWithPolarity (PBNLC.getTseitinEncoder enc) TseitinEncoder.polarityNeg [sel,-sel2]
       PBNLC.addPBNLAtLeastSoft enc sel3 e 1
       PBNLC.addPBNLAtMostSoft  enc sel4 e (-1)
 
