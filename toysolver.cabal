@@ -236,11 +236,13 @@ Library
      ToySolver.Converter.MaxSAT2WBO
      ToySolver.Converter.PB2IP
      ToySolver.Converter.PB2LSP
+     ToySolver.Converter.PB2SAT
      ToySolver.Converter.PB2WBO
      ToySolver.Converter.PBSetObj
      ToySolver.Converter.PB2SMP
      ToySolver.Converter.SAT2PB
      ToySolver.Converter.SAT2IP
+     ToySolver.Converter.WBO2MaxSAT
      ToySolver.Converter.WBO2PB
      ToySolver.Data.AlgebraicNumber.Complex
      ToySolver.Data.AlgebraicNumber.Real
@@ -275,6 +277,7 @@ Library
      ToySolver.QBF
      ToySolver.SAT
      ToySolver.SAT.Encoder.Integer
+     ToySolver.SAT.Encoder.PB
      ToySolver.SAT.Encoder.PBNLC
      ToySolver.SAT.Encoder.Tseitin
      ToySolver.SAT.MessagePassing.SurveyPropagation
@@ -717,7 +720,9 @@ Test-suite TestSuite
     deepseq,
     mtl,
     mwc-random,
+    parse-dimacs,
     parsec,
+    pseudo-boolean,
     transformers,
     transformers-compat,
     vector,

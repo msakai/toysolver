@@ -8,6 +8,7 @@ import Data.IORef
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.IntMap (IntMap)
@@ -37,6 +38,12 @@ import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
+
+import qualified Data.PseudoBoolean as PBFile
+import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
+import qualified ToySolver.Converter.PB2SAT as PB2SAT
+import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
+import qualified ToySolver.Text.MaxSAT as MaxSAT
 
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
@@ -173,6 +180,59 @@ optimizePBO solver opt (nv,cs) = do
   PBO.optimize opt
   PBO.getBestSolution opt
 
+evalWBO :: SAT.Model -> (Int, [(Maybe Integer, (PBRel,SAT.PBLinSum,Integer))], Maybe Integer) -> Maybe Integer
+evalWBO m (nv,cs,top) = do
+  cost <- liftM sum $ forM cs $ \(w,(o,lhs,rhs)) -> do
+    if evalPBRel o (SAT.evalPBLinSum m lhs) rhs then
+      return 0
+    else
+      w
+  case top of
+    Just t -> guard (cost < t)
+    Nothing -> return ()
+  return cost
+
+arbitraryWBO :: Gen (Int, [(Maybe Integer, (PBRel,SAT.PBLinSum,Integer))], Maybe Integer)
+arbitraryWBO = do
+  (nv,cs) <- arbitraryPB
+  cs2 <- forM cs $ \c -> do
+    b <- arbitrary
+    cost <- if b then return Nothing
+            else liftM (Just . (1+) . abs) arbitrary
+    return (cost, c)
+  b <- arbitrary
+  top <- if b then return Nothing
+         else liftM (Just . (1+) . abs) arbitrary
+  return (nv,cs2,top)
+
+optimizeWBO
+  :: SAT.Solver
+  -> PBO.SearchStrategy
+  -> (Int, [(Maybe Integer, (PBRel,SAT.PBLinSum,Integer))], Maybe Integer)
+  -> IO (Maybe (SAT.Model, Integer))
+optimizeWBO solver strategy (nv,cs,top) = do
+  SAT.newVars_ solver nv
+  obj <- liftM catMaybes $ forM cs $ \(cost, (o,lhs,rhs)) -> do
+    case cost of
+      Nothing -> do
+        case o of
+          PBRelGE -> SAT.addPBAtLeast solver lhs rhs
+          PBRelLE -> SAT.addPBAtMost solver lhs rhs
+          PBRelEQ -> SAT.addPBExactly solver lhs rhs
+        return Nothing
+      Just w -> do
+        sel <- SAT.newVar solver
+        case o of
+          PBRelGE -> SAT.addPBAtLeastSoft solver sel lhs rhs
+          PBRelLE -> SAT.addPBAtMostSoft solver sel lhs rhs
+          PBRelEQ -> SAT.addPBExactlySoft solver sel lhs rhs
+        return $ Just (w,-sel)
+  case top of
+    Nothing -> return ()
+    Just c -> SAT.addPBAtMost solver obj (c-1)
+  opt <- PBO.newOptimizer solver obj
+  PBO.optimize opt
+  PBO.getBestSolution opt
 
 prop_solvePBNLC :: Property
 prop_solvePBNLC = QM.monadicIO $ do
@@ -1601,6 +1661,64 @@ case_DAA_allMUSAssumptions_2 = do
   let actual'   = Set.fromList actual
       expected' = Set.fromList $ map IntSet.fromList cores
   actual' @?= expected'
+
+------------------------------------------------------------------------
+
+prop_pb2sat :: Property
+prop_pb2sat = QM.monadicIO $ do
+  pb@(nv,cs) <- QM.pick arbitraryPB
+  let f (PBRelGE,lhs,rhs) = ([(c,[l]) | (c,l) <- lhs], PBFile.Ge, rhs)
+      f (PBRelLE,lhs,rhs) = ([(-c,[l]) | (c,l) <- lhs], PBFile.Ge, -rhs)
+      f (PBRelEQ,lhs,rhs) = ([(c,[l]) | (c,l) <- lhs], PBFile.Eq, rhs)
+  let opb = PBFile.Formula
+            { PBFile.pbObjectiveFunction = Nothing
+            , PBFile.pbNumVars = nv
+            , PBFile.pbNumConstraints = length cs
+            , PBFile.pbConstraints = map f cs
+            }
+  let dimacs = PB2SAT.convert opb
+  let cnf = (DIMACS.numVars dimacs, [elems c | c <- DIMACS.clauses dimacs])
+
+  solver1 <- arbitrarySolver
+  solver2 <- arbitrarySolver
+  ret1 <- QM.run $ solvePB solver1 pb
+  ret2 <- QM.run $ solveCNF solver2 cnf
+  QM.assert $ isJust ret1 == isJust ret2
+  case ret2 of
+    Nothing -> return ()
+    Just m -> QM.assert $ evalPB m pb
+
+prop_wbo2maxsat :: Property
+prop_wbo2maxsat = QM.monadicIO $ do
+  wbo1@(nv,cs,top) <- QM.pick arbitraryWBO
+  let f (w,(PBRelGE,lhs,rhs)) = (w,([(c,[l]) | (c,l) <- lhs], PBFile.Ge, rhs))
+      f (w,(PBRelLE,lhs,rhs)) = (w,([(-c,[l]) | (c,l) <- lhs], PBFile.Ge, -rhs))
+      f (w,(PBRelEQ,lhs,rhs)) = (w,([(c,[l]) | (c,l) <- lhs], PBFile.Eq, rhs))
+  let wbo1' = PBFile.SoftFormula
+            { PBFile.wboNumVars = nv
+            , PBFile.wboNumConstraints = length cs
+            , PBFile.wboConstraints = map f cs
+            , PBFile.wboTopCost = top
+            }
+  let wcnf = WBO2MaxSAT.convert wbo1'
+      wbo2 = ( MaxSAT.numVars wcnf
+             , [ ( if w == MaxSAT.topCost wcnf then Nothing else Just w
+                 , (PBRelGE, [(1,l) | l <- clause], 1)
+                 )
+               | (w,clause) <- MaxSAT.clauses wcnf
+               ]
+             , Nothing
+             )
+
+  solver1 <- arbitrarySolver
+  solver2 <- arbitrarySolver
+  strategy <- QM.pick arbitrary
+  ret1 <- QM.run $ optimizeWBO solver1 strategy wbo1
+  ret2 <- QM.run $ optimizeWBO solver2 strategy wbo2
+  QM.assert $ isJust ret1 == isJust ret2
+  case ret2 of
+    Nothing -> return ()
+    Just (m,val) -> QM.assert $ evalWBO m wbo1 == Just val
 
 ------------------------------------------------------------------------
 
