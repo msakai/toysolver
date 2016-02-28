@@ -86,7 +86,7 @@ import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Internal.Data.Vec as Vec
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.TheorySolver
-import qualified ToySolver.SAT.TseitinEncoder as Tseitin
+import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.Arith.Simplex2 as Simplex2
 import qualified ToySolver.EUF.EUFSolver as EUF
 
@@ -175,7 +175,7 @@ instance E.Exception Exception
 data Solver
   = Solver
   { smtSAT :: !SAT.Solver
-  , smtEnc :: !Tseitin.Encoder
+  , smtEnc :: !(Tseitin.Encoder IO)
   , smtEUF :: !EUF.Solver
   , smtLRA :: !(Simplex2.GenericSolver (Delta Rational))
 

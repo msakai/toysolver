@@ -30,13 +30,13 @@ import ToySolver.Data.Boolean
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.SAT.TheorySolver
-import qualified ToySolver.SAT.TseitinEncoder as Tseitin
+import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
-import qualified ToySolver.SAT.PBNLC as PBNLC
 
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
@@ -185,15 +185,15 @@ prop_solvePBNLC = QM.monadicIO $ do
       forM_ (allAssignments nv) $ \m -> do
         QM.assert $ not (evalPBNLC m prob)
 
-solvePBNLC :: SAT.Solver -> (Int,[(PBRel,PBNLC.PBSum,Integer)]) -> IO (Maybe SAT.Model)
+solvePBNLC :: SAT.Solver -> (Int,[(PBRel,SAT.PBSum,Integer)]) -> IO (Maybe SAT.Model)
 solvePBNLC solver (nv,cs) = do
   SAT.newVars_ solver nv
-  enc <- Tseitin.newEncoder solver
+  enc <- PBNLC.newEncoder solver =<< Tseitin.newEncoder solver
   forM_ cs $ \(o,lhs,rhs) -> do
     case o of
-      PBRelGE -> PBNLC.addPBAtLeast enc lhs rhs
-      PBRelLE -> PBNLC.addPBAtMost enc lhs rhs
-      PBRelEQ -> PBNLC.addPBExactly enc lhs rhs
+      PBRelGE -> PBNLC.addPBNLAtLeast enc lhs rhs
+      PBRelLE -> PBNLC.addPBNLAtMost enc lhs rhs
+      PBRelEQ -> PBNLC.addPBNLExactly enc lhs rhs
   ret <- SAT.solve solver
   if ret then do
     m <- SAT.getModel solver
@@ -201,7 +201,7 @@ solvePBNLC solver (nv,cs) = do
   else do
     return Nothing
 
-arbitraryPBNLC :: Gen (Int,[(PBRel,PBNLC.PBSum,Integer)])
+arbitraryPBNLC :: Gen (Int,[(PBRel,SAT.PBSum,Integer)])
 arbitraryPBNLC = do
   nv <- choose (0,10)
   nc <- choose (0,50)
@@ -220,8 +220,8 @@ arbitraryPBNLC = do
     return $ (rel,lhs,rhs)
   return (nv, cs)
 
-evalPBNLC :: SAT.Model -> (Int,[(PBRel,PBNLC.PBSum,Integer)]) -> Bool
-evalPBNLC m (_,cs) = all (\(o,lhs,rhs) -> evalPBRel o (PBNLC.evalPBSum m lhs) rhs) cs
+evalPBNLC :: SAT.Model -> (Int,[(PBRel,SAT.PBSum,Integer)]) -> Bool
+evalPBNLC m (_,cs) = all (\(o,lhs,rhs) -> evalPBRel o (SAT.evalPBSum m lhs) rhs) cs
 
 
 prop_solveXOR :: Property

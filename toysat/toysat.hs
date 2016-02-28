@@ -23,7 +23,6 @@ import Control.Exception
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy as BS
 import Data.Default.Class
-import qualified Data.Set as Set
 import qualified Data.IntSet as IntSet
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -32,10 +31,8 @@ import Data.IORef
 import Data.List
 import Data.Maybe
 import Data.Ord
-import Data.Ratio
 import Data.Word
 import qualified Data.Vector.Unboxed as V
-import Data.VectorSpace
 import Data.Version
 import Data.Time
 import System.IO
@@ -60,15 +57,15 @@ import qualified GHC.Stats as Stats
 
 import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
-import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
+import qualified ToySolver.Converter.MIP2PB as MIP2PB
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.PBO as PBO
-import qualified ToySolver.SAT.Integer as Integer
-import qualified ToySolver.SAT.TseitinEncoder as Tseitin
-import qualified ToySolver.SAT.PBNLC as PBNLC
+import qualified ToySolver.SAT.Encoder.Integer as Integer
+import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
@@ -79,7 +76,7 @@ import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GCNF as GCNF
 import qualified ToySolver.Text.GurobiSol as GurobiSol
 import ToySolver.Version
-import ToySolver.Internal.Util (showRational, revForM, setEncodingChar8)
+import ToySolver.Internal.Util (showRational, setEncodingChar8)
 
 import UBCSAT
 
@@ -616,13 +613,14 @@ solvePB opt solver formula initialModel = do
   putCommentLine $ printf "#constraints %d" nc
 
   SAT.newVars_ solver nv
-  enc <- Tseitin.newEncoder solver
+  enc <- Tseitin.newEncoderWithPBLin solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
+  pbnlc <- PBNLC.newEncoder solver enc
 
   forM_ (PBFile.pbConstraints formula) $ \(lhs, op, rhs) -> do
     case op of
-      PBFile.Ge -> PBNLC.addPBAtLeast enc lhs rhs
-      PBFile.Eq -> PBNLC.addPBExactly enc lhs rhs
+      PBFile.Ge -> PBNLC.addPBNLAtLeast pbnlc lhs rhs
+      PBFile.Eq -> PBNLC.addPBNLExactly pbnlc lhs rhs
 
   case PBFile.pbObjectiveFunction formula of
     Nothing -> do
@@ -634,7 +632,7 @@ solvePB opt solver formula initialModel = do
         writeSOLFile opt m Nothing nv
 
     Just obj' -> do
-      obj'' <- PBNLC.linearizePBSumWithPolarity enc Tseitin.polarityNeg obj'
+      obj'' <- PBNLC.linearizePBSumWithPolarity pbnlc Tseitin.polarityNeg obj'
 
       nv' <- SAT.getNVars solver
       defs <- Tseitin.getDefinitions enc
@@ -709,8 +707,9 @@ solveWBO opt solver isMaxSat formula initialModel = do
 
   SAT.resizeVarCapacity solver (nv + length [() | (Just _, _) <- PBFile.wboConstraints formula])
   SAT.newVars_ solver nv
-  enc <- Tseitin.newEncoder solver
+  enc <- Tseitin.newEncoderWithPBLin solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
+  pbnlc <- PBNLC.newEncoder solver enc
 
   objRef <- newIORef []
   defsRef <- newIORef []
@@ -719,8 +718,8 @@ solveWBO opt solver isMaxSat formula initialModel = do
     case cost of
       Nothing -> do
         case op of
-          PBFile.Ge -> PBNLC.addPBAtLeast enc lhs rhs
-          PBFile.Eq -> PBNLC.addPBExactly enc lhs rhs
+          PBFile.Ge -> PBNLC.addPBNLAtLeast pbnlc lhs rhs
+          PBFile.Eq -> PBNLC.addPBNLExactly pbnlc lhs rhs
       Just cval -> do
         sel <-
           case op of
@@ -730,12 +729,12 @@ solveWBO opt solver isMaxSat formula initialModel = do
                   Tseitin.encodeConjWithPolarity enc Tseitin.polarityPos ls
                 _ -> do
                   sel <- SAT.newVar solver
-                  PBNLC.addPBAtLeastSoft enc sel lhs rhs
+                  PBNLC.addPBNLAtLeastSoft pbnlc sel lhs rhs
                   modifyIORef defsRef ((sel, constr) : )
                   return sel
             PBFile.Eq -> do
               sel <- SAT.newVar solver
-              PBNLC.addPBExactlySoft enc sel lhs rhs
+              PBNLC.addPBNLExactlySoft pbnlc sel lhs rhs
               modifyIORef defsRef ((sel, constr) : )
               return sel
         modifyIORef objRef ((cval, SAT.litNot sel) : )
@@ -876,130 +875,59 @@ mainMIP opt solver args = do
 
 solveMIP :: Options -> SAT.Solver -> MIP.Problem -> IO ()
 solveMIP opt solver mip = do
-  if not (Set.null nivs) then do
-    putCommentLine $ "cannot handle non-integer variables: " ++ intercalate ", " (map MIP.fromVar (Set.toList nivs))
-    putSLine "UNKNOWN"
-    exitFailure
-  else do
-    enc <- Tseitin.newEncoder solver
-    Tseitin.setUsePB enc (optLinearizerPB opt)
+  enc <- Tseitin.newEncoderWithPBLin solver
+  Tseitin.setUsePB enc (optLinearizerPB opt)
+  pbnlc <- PBNLC.newEncoder solver enc
+  ret <- MIP2PB.addMIP pbnlc mip
+  case ret of
+    Left msg -> do
+      putCommentLine msg
+      putSLine "UNKNOWN"
+      exitFailure
+    Right (obj, otrans, mtrans) -> do
+      (linObj, linObjOffset) <- Integer.linearize pbnlc obj
 
-    putCommentLine $ "Loading variables and bounds"
-    vmap <- liftM Map.fromList $ revForM (Set.toList ivs) $ \v -> do
-      case MIP.getBounds mip v of
-        (MIP.Finite lb, MIP.Finite ub) -> do
-          v2 <- Integer.newVar solver (ceiling lb) (floor ub)
-          return (v,v2)
-        _ -> do
-          putCommentLine $ "cannot handle unbounded variable: " ++ MIP.fromVar v
-          putSLine "UNKNOWN"
-          exitFailure
-
-    putCommentLine "Loading constraints"
-    forM_ (MIP.constraints mip) $ \c -> do
-      let lhs = MIP.constrExpr c                            
-      let f op rhs = do
-            let d = foldl' lcm 1 (map denominator  (rhs:[r | MIP.Term r _ <- MIP.terms lhs]))
-                lhs' = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms lhs]
-                rhs' = asInteger (rhs * fromIntegral d)
-                c2 = case op of
-                       MIP.Le  -> lhs' .<=. fromInteger rhs'
-                       MIP.Ge  -> lhs' .>=. fromInteger rhs'
-                       MIP.Eql -> lhs' .==. fromInteger rhs'
-            case MIP.constrIndicator c of
-              Nothing -> Integer.addConstraint enc c2
-              Just (var, val) -> do
-                let var' = asBin (vmap Map.! var)
-                case val of
-                  1 -> Integer.addConstraintSoft enc var' c2
-                  0 -> Integer.addConstraintSoft enc (SAT.litNot var') c2
-                  _ -> return ()
-      case (MIP.constrLB c, MIP.constrUB c) of
-        (MIP.Finite x1, MIP.Finite x2) | x1==x2 -> f MIP.Eql x2
-        (lb, ub) -> do
-          case lb of
-            MIP.NegInf -> return ()
-            MIP.Finite x -> f MIP.Ge x
-            MIP.PosInf -> SAT.addClause solver []
-          case ub of
-            MIP.NegInf -> SAT.addClause solver []
-            MIP.Finite x -> f MIP.Le x
-            MIP.PosInf -> return ()
-
-    putCommentLine "Loading SOS constraints"
-    forM_ (MIP.sosConstraints mip) $ \MIP.SOSConstraint{ MIP.sosType = typ, MIP.sosBody = xs } -> do
-      case typ of
-        MIP.S1 -> SAT.addAtMost solver (map (asBin . (vmap Map.!) . fst) xs) 1
-        MIP.S2 -> do
-          let ps = nonAdjacentPairs $ map fst $ sortBy (comparing snd) $ xs
-          forM_ ps $ \(x1,x2) -> do
-            SAT.addClause solver [SAT.litNot $ asBin $ vmap Map.! v | v <- [x1,x2]]
-
-    let obj = MIP.objectiveFunction mip
-        d = foldl' lcm 1 [denominator r | MIP.Term r _ <- MIP.terms (MIP.objExpr obj)] *
-            (if MIP.objDir obj == MIP.OptMin then 1 else -1)
-        obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms (MIP.objExpr obj)]
-    (obj3,obj3_c) <- Integer.linearize enc obj2
-
-    let transformObjVal :: Integer -> Rational
-        transformObjVal val = fromIntegral (val + obj3_c) / fromIntegral d
-
-        transformModel :: SAT.Model -> Map String Integer
-        transformModel m = Map.fromList
-          [ (MIP.fromVar v, Integer.eval m (vmap Map.! v)) | v <- Set.toList ivs ]
-
-        printModel :: Map String Integer -> IO ()
-        printModel m = do
-          forM_ (Map.toList m) $ \(v, val) -> do
-            printf "v %s = %d\n" v val
-          hFlush stdout
-
-        writeSol :: Map String Integer -> Rational -> IO ()
-        writeSol m val = do
-          case optWriteFile opt of
-            Nothing -> return ()
-            Just fname -> do
-              writeFile fname (GurobiSol.render (fmap fromInteger m) (Just (fromRational val)))
-
-    pbo <- PBO.newOptimizer solver obj3
-    setupOptimizer pbo opt
-    PBO.setOnUpdateBestSolution pbo $ \_ val -> do
-      putOLine $ showRational (optPrintRational opt) (transformObjVal val)
-
-    finally (PBO.optimize pbo) $ do
-      ret <- PBO.getBestSolution pbo
-      case ret of
-        Nothing -> do
-          b <- PBO.isUnsat pbo
-          if b
-            then putSLine "UNSATISFIABLE"
-            else putSLine "UNKNOWN"
-        Just (m,val) -> do
-          b <- PBO.isOptimum pbo
-          if b
-            then putSLine "OPTIMUM FOUND"
-            else putSLine "SATISFIABLE"
-          let m2   = transformModel m
-              val2 = transformObjVal val
-          printModel m2
-          writeSol m2 val2
-
-  where
-    ivs = MIP.integerVariables mip
-    nivs = MIP.variables mip `Set.difference` ivs
-
-    asInteger :: Rational -> Integer
-    asInteger r
-      | denominator r /= 1 = error (show r ++ " is not integer")
-      | otherwise = numerator r
-    
-    nonAdjacentPairs :: [a] -> [(a,a)]
-    nonAdjacentPairs (x1:x2:xs) = [(x1,x3) | x3 <- xs] ++ nonAdjacentPairs (x2:xs)
-    nonAdjacentPairs _ = []
-
-    asBin :: Integer.Expr -> SAT.Lit
-    asBin (Integer.Expr [(1,[lit])]) = lit
-    asBin _ = error "asBin: failure"
+      let transformObjVal :: Integer -> Rational
+          transformObjVal val = otrans (val + linObjOffset)
+  
+          printModel :: Map MIP.Var Integer -> IO ()
+          printModel m = do
+            forM_ (Map.toList m) $ \(v, val) -> do
+              printf "v %s = %d\n" (MIP.fromVar v) val
+            hFlush stdout
+  
+          writeSol :: Map MIP.Var Integer -> Rational -> IO ()
+          writeSol m val = do
+            case optWriteFile opt of
+              Nothing -> return ()
+              Just fname -> do
+                writeFile fname $
+                  GurobiSol.render
+                    (Map.fromList [(MIP.fromVar v, fromIntegral val) | (v,val) <- Map.toList m])
+                    (Just (fromRational val))
+  
+      pbo <- PBO.newOptimizer solver linObj
+      setupOptimizer pbo opt
+      PBO.setOnUpdateBestSolution pbo $ \_ val -> do
+        putOLine $ showRational (optPrintRational opt) (transformObjVal val)
+  
+      finally (PBO.optimize pbo) $ do
+        ret <- PBO.getBestSolution pbo
+        case ret of
+          Nothing -> do
+            b <- PBO.isUnsat pbo
+            if b
+              then putSLine "UNSATISFIABLE"
+              else putSLine "UNKNOWN"
+          Just (m,val) -> do
+            b <- PBO.isOptimum pbo
+            if b
+              then putSLine "OPTIMUM FOUND"
+              else putSLine "SATISFIABLE"
+            let m2   = mtrans m
+                val2 = transformObjVal val
+            printModel m2
+            writeSol m2 val2
 
 -- ------------------------------------------------------------------------
 

@@ -138,6 +138,7 @@ Library
      primes,
      process >=1.1.0.2,
      parse-dimacs,
+     primitive >=0.6,
      queue,
      heaps,
      vector,
@@ -174,6 +175,7 @@ Library
      BangPatterns
      CPP
      DeriveDataTypeable
+     ExistentialQuantification
      FlexibleContexts
      FlexibleInstances
      FunctionalDependencies
@@ -186,6 +188,8 @@ Library
      TemplateHaskell
      TypeFamilies
      TypeSynonymInstances
+     -- commented out because cabal-1.16 does not understand InstanceSigs extension
+     -- InstanceSigs
   if impl(ghc)
      Other-Extensions:
         MagicHash
@@ -225,6 +229,7 @@ Library
      ToySolver.Combinatorial.SubsetSum
      ToySolver.Converter.GCNF2MaxSAT
      ToySolver.Converter.ObjType
+     ToySolver.Converter.MIP2PB
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.MaxSAT2IP
      ToySolver.Converter.MaxSAT2NLPB
@@ -269,14 +274,15 @@ Library
      ToySolver.Data.Var
      ToySolver.QBF
      ToySolver.SAT
-     ToySolver.SAT.Integer
+     ToySolver.SAT.Encoder.Integer
+     ToySolver.SAT.Encoder.PBNLC
+     ToySolver.SAT.Encoder.Tseitin
      ToySolver.SAT.MessagePassing.SurveyPropagation
      ToySolver.SAT.MUS
      ToySolver.SAT.MUS.CAMUS
      ToySolver.SAT.MUS.DAA
      ToySolver.SAT.MUS.Types
      ToySolver.SAT.MUS.QuickXplain
-     ToySolver.SAT.PBNLC
      ToySolver.SAT.PBO
      ToySolver.SAT.PBO.Context
      ToySolver.SAT.PBO.BC
@@ -285,7 +291,6 @@ Library
      ToySolver.SAT.PBO.MSU4
      ToySolver.SAT.PBO.UnsatBased
      ToySolver.SAT.TheorySolver
-     ToySolver.SAT.TseitinEncoder
      ToySolver.SAT.Types
      ToySolver.SAT.Printer
      ToySolver.SMT
@@ -350,7 +355,6 @@ Executable toysat
     parse-dimacs,
     unbounded-delays,
     vector,
-    vector-space,
     pseudo-boolean,
     toysolver
   if flag(Time15)
