@@ -185,7 +185,7 @@ prop_solvePBNLC = QM.monadicIO $ do
       forM_ (allAssignments nv) $ \m -> do
         QM.assert $ not (evalPBNLC m prob)
 
-solvePBNLC :: SAT.Solver -> (Int,[(PBRel,PBNLC.PBSum,Integer)]) -> IO (Maybe SAT.Model)
+solvePBNLC :: SAT.Solver -> (Int,[(PBRel,SAT.PBSum,Integer)]) -> IO (Maybe SAT.Model)
 solvePBNLC solver (nv,cs) = do
   SAT.newVars_ solver nv
   enc <- PBNLC.newEncoder solver =<< Tseitin.newEncoder solver
@@ -201,7 +201,7 @@ solvePBNLC solver (nv,cs) = do
   else do
     return Nothing
 
-arbitraryPBNLC :: Gen (Int,[(PBRel,PBNLC.PBSum,Integer)])
+arbitraryPBNLC :: Gen (Int,[(PBRel,SAT.PBSum,Integer)])
 arbitraryPBNLC = do
   nv <- choose (0,10)
   nc <- choose (0,50)
@@ -220,8 +220,8 @@ arbitraryPBNLC = do
     return $ (rel,lhs,rhs)
   return (nv, cs)
 
-evalPBNLC :: SAT.Model -> (Int,[(PBRel,PBNLC.PBSum,Integer)]) -> Bool
-evalPBNLC m (_,cs) = all (\(o,lhs,rhs) -> evalPBRel o (PBNLC.evalPBSum m lhs) rhs) cs
+evalPBNLC :: SAT.Model -> (Int,[(PBRel,SAT.PBSum,Integer)]) -> Bool
+evalPBNLC m (_,cs) = all (\(o,lhs,rhs) -> evalPBRel o (SAT.evalPBSum m lhs) rhs) cs
 
 
 prop_solveXOR :: Property

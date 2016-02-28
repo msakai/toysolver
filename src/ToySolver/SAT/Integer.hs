@@ -19,9 +19,9 @@ import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.TseitinEncoder as TseitinEncoder
 import qualified ToySolver.SAT.PBNLC as PBNLC
 
-newtype Expr = Expr PBNLC.PBSum
+newtype Expr = Expr SAT.PBSum
 
-newVar :: PrimMonad m => PBNLC.Encoder m -> Integer -> Integer -> m Expr
+newVar :: SAT.AddPBNL m enc => enc -> Integer -> Integer -> m Expr
 newVar enc lo hi
   | lo > hi = do
       SAT.addClause enc [] -- assert inconsistency
@@ -59,35 +59,37 @@ linearize enc (Expr xs) = do
   zs <- PBNLC.linearizePBSum enc ys
   return (zs, c)
 
-addConstraint :: PrimMonad m => PBNLC.Encoder m -> OrdRel Expr -> m ()
+addConstraint :: SAT.AddPBNL m enc => enc -> OrdRel Expr -> m ()
 addConstraint enc (OrdRel lhs op rhs) = do
   let Expr e = lhs - rhs
   case op of
-    Le  -> PBNLC.addPBNLAtMost  enc e 0
-    Lt  -> PBNLC.addPBNLAtMost  enc e (-1)
-    Ge  -> PBNLC.addPBNLAtLeast enc e 0
-    Gt  -> PBNLC.addPBNLAtLeast enc e 1
-    Eql -> PBNLC.addPBNLExactly enc e 0
+    Le  -> SAT.addPBNLAtMost  enc e 0
+    Lt  -> SAT.addPBNLAtMost  enc e (-1)
+    Ge  -> SAT.addPBNLAtLeast enc e 0
+    Gt  -> SAT.addPBNLAtLeast enc e 1
+    Eql -> SAT.addPBNLExactly enc e 0
     NEq -> do
       sel <- SAT.newVar enc
-      PBNLC.addPBNLAtLeastSoft enc sel e 1
-      PBNLC.addPBNLAtMostSoft  enc (-sel) e (-1)
+      SAT.addPBNLAtLeastSoft enc sel e 1
+      SAT.addPBNLAtMostSoft  enc (-sel) e (-1)
 
-addConstraintSoft :: PrimMonad m => PBNLC.Encoder m -> SAT.Lit -> OrdRel Expr -> m ()
+addConstraintSoft :: SAT.AddPBNL m enc => enc -> SAT.Lit -> OrdRel Expr -> m ()
 addConstraintSoft enc sel (OrdRel lhs op rhs) = do
   let Expr e = lhs - rhs
   case op of
-    Le  -> PBNLC.addPBNLAtMostSoft  enc sel e 0
-    Lt  -> PBNLC.addPBNLAtMostSoft  enc sel e (-1)
-    Ge  -> PBNLC.addPBNLAtLeastSoft enc sel e 0
-    Gt  -> PBNLC.addPBNLAtLeastSoft enc sel e 1
-    Eql -> PBNLC.addPBNLExactlySoft enc sel e 0
+    Le  -> SAT.addPBNLAtMostSoft  enc sel e 0
+    Lt  -> SAT.addPBNLAtMostSoft  enc sel e (-1)
+    Ge  -> SAT.addPBNLAtLeastSoft enc sel e 0
+    Gt  -> SAT.addPBNLAtLeastSoft enc sel e 1
+    Eql -> SAT.addPBNLExactlySoft enc sel e 0
     NEq -> do
       sel2 <- SAT.newVar enc
-      sel3 <- TseitinEncoder.encodeConjWithPolarity (PBNLC.getTseitinEncoder enc) TseitinEncoder.polarityNeg [sel,sel2]
-      sel4 <- TseitinEncoder.encodeConjWithPolarity (PBNLC.getTseitinEncoder enc) TseitinEncoder.polarityNeg [sel,-sel2]
-      PBNLC.addPBNLAtLeastSoft enc sel3 e 1
-      PBNLC.addPBNLAtMostSoft  enc sel4 e (-1)
+      sel3 <- SAT.newVar enc
+      sel4 <- SAT.newVar enc
+      SAT.addClause enc [-sel, -sel2, sel3] -- sel ∧  sel2 → sel3
+      SAT.addClause enc [-sel,  sel2, sel4] -- sel ∧ ¬sel2 → sel4
+      SAT.addPBNLAtLeastSoft enc sel3 e 1
+      SAT.addPBNLAtMostSoft  enc sel4 e (-1)
 
 eval :: SAT.IModel m => m -> Expr -> Integer
 eval m (Expr ts) = sum [if and [SAT.evalLit m lit | lit <- lits] then n else 0 | (n,lits) <- ts]

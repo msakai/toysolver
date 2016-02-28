@@ -39,7 +39,7 @@ module ToySolver.SAT.Types
   , evalAtLeast
   , evalExactly
 
-  -- * Pseudo Boolean Constraint
+  -- * (Linear) Pseudo Boolean Constraint
   , PBLinTerm
   , PBLinSum
   , PBLinAtLeast
@@ -59,6 +59,11 @@ module ToySolver.SAT.Types
   , pbUpperBound
   , pbSubsume
 
+  -- * Non-linear Pseudo Boolean constraint
+  , PBTerm
+  , PBSum
+  , evalPBSum
+
   -- * XOR Clause
   , XORClause
   , normalizeXORClause
@@ -70,6 +75,7 @@ module ToySolver.SAT.Types
   , AddClause (..)
   , AddCardinality (..)
   , AddPBLin (..)
+  , AddPBNL (..)
   , AddXORClause (..)
   ) where
 
@@ -395,6 +401,11 @@ pbSubsume (lhs1,rhs1) (lhs2,rhs2) =
   where
     lhs2' = IntMap.fromList [(l,c) | (c,l) <- lhs2]
 
+type PBTerm = (Integer, [Lit])
+type PBSum = [PBTerm]
+
+evalPBSum :: IModel m => m -> PBSum -> Integer
+evalPBSum m xs = sum [c | (c,lits) <- xs, all (evalLit m) lits]
 
 -- | XOR clause
 --
@@ -552,6 +563,66 @@ class AddCardinality m a => AddPBLin m a | a -> m where
   addPBExactlySoft a sel lhs rhs = do
     addPBAtLeastSoft a sel lhs rhs
     addPBAtMostSoft a sel lhs rhs
+
+class AddPBLin m a => AddPBNL m a | a -> m where
+  {-# MINIMAL addPBNLAtLeast #-}
+
+  -- | Add a non-linear pseudo boolean constraints /c1*ls1 + c2*ls2 + … ≥ n/.
+  addPBNLAtLeast
+    :: a
+    -> PBSum   -- ^ List of terms @[(c1,ls1),(c2,ls2),…]@
+    -> Integer -- ^ /n/
+    -> m ()
+
+  -- | Add a non-linear pseudo boolean constraints /c1*ls1 + c2*ls2 + … ≥ n/.
+  addPBNLAtMost
+    :: a
+    -> PBSum   -- ^ List of terms @[(c1,ls1),(c2,ls2),…]@
+    -> Integer -- ^ /n/
+    -> m ()
+  addPBNLAtMost a ts n = addPBNLAtLeast a [(-c,ls) | (c,ls) <- ts] (negate n)
+
+  -- | Add a non-linear pseudo boolean constraints /c1*ls1 + c2*ls2 + … = n/.
+  addPBNLExactly
+    :: a
+    -> PBSum   -- ^ List of terms @[(c1,ls1),(c2,ls2),…]@
+    -> Integer -- ^ /n/
+    -> m ()
+  addPBNLExactly a ts n = do
+    addPBNLAtLeast a ts n
+    addPBNLAtMost a ts n
+
+  -- | Add a soft non-linear pseudo boolean constraints /sel ⇒ c1*ls1 + c2*ls2 + … ≥ n/.
+  addPBNLAtLeastSoft
+    :: a
+    -> Lit     -- ^ Selector literal @sel@
+    -> PBSum   -- ^ List of terms @[(c1,ls1),(c2,ls2),…]@
+    -> Integer -- ^ /n/
+    -> m ()
+  addPBNLAtLeastSoft a sel lhs rhs = do
+    let n = rhs - sum [min c 0 | (c,_) <- lhs]
+    addPBNLAtLeast a ((n, [litNot sel]) : lhs) rhs
+
+  -- | Add a soft non-linear pseudo boolean constraints /sel ⇒ c1*ls1 + c2*ls2 + … ≤ n/.
+  addPBNLAtMostSoft
+    :: a
+    -> Lit     -- ^ Selector literal @sel@
+    -> PBSum   -- ^ List of terms @[(c1,ls1),(c2,ls2),…]@
+    -> Integer -- ^ /n/
+    -> m ()
+  addPBNLAtMostSoft a sel lhs rhs =
+    addPBNLAtLeastSoft a sel [(negate c, ls) | (c,ls) <- lhs] (negate rhs)
+
+  -- | Add a soft non-linear pseudo boolean constraints /lit ⇒ c1*ls1 + c2*ls2 + … = n/.
+  addPBNLExactlySoft
+    :: a
+    -> Lit     -- ^ Selector literal @sel@
+    -> PBSum   -- ^ List of terms @[(c1,ls1),(c2,ls2),…]@
+    -> Integer -- ^ /n/
+    -> m ()
+  addPBNLExactlySoft a sel lhs rhs = do
+    addPBNLAtLeastSoft a sel lhs rhs
+    addPBNLAtMostSoft a sel lhs rhs
 
 class AddClause m a => AddXORClause m a | a -> m where
   {-# MINIMAL addXORClause #-}
