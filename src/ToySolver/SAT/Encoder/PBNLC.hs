@@ -29,11 +29,6 @@ module ToySolver.SAT.Encoder.PBNLC
   -- * Linearlization
   , linearizePBSum
   , linearizePBSumWithPolarity
-
-  -- * PBTerm / PBSum types (exported for compatibility)
-  , PBTerm
-  , PBSum
-  , evalPBSum
   ) where
 
 import Control.Monad.Primitive
