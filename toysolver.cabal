@@ -229,6 +229,7 @@ Library
      ToySolver.Combinatorial.SubsetSum
      ToySolver.Converter.GCNF2MaxSAT
      ToySolver.Converter.ObjType
+     ToySolver.Converter.MIP2PB
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.MaxSAT2IP
      ToySolver.Converter.MaxSAT2NLPB
@@ -354,7 +355,6 @@ Executable toysat
     parse-dimacs,
     unbounded-delays,
     vector,
-    vector-space,
     pseudo-boolean,
     toysolver
   if flag(Time15)
