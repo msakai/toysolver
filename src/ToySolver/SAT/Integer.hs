@@ -9,19 +9,19 @@ module ToySolver.SAT.Integer
   ) where
 
 import Control.Monad
+import Control.Monad.Primitive
 import Data.Array.IArray
 import Data.VectorSpace
 import Text.Printf
 
 import ToySolver.Data.OrdRel
-import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.TseitinEncoder as TseitinEncoder
 import qualified ToySolver.SAT.PBNLC as PBNLC
 
 newtype Expr = Expr PBNLC.PBSum
 
-newVar :: PBNLC.Encoder -> Integer -> Integer -> IO Expr
+newVar :: PrimMonad m => PBNLC.Encoder m -> Integer -> Integer -> m Expr
 newVar enc lo hi
   | lo > hi = do
       SAT.addClause enc [] -- assert inconsistency
@@ -52,14 +52,14 @@ instance Num Expr where
   signum _ = 1
   fromInteger c = Expr [(c,[])]
 
-linearize :: PBNLC.Encoder -> Expr -> IO (SAT.PBLinSum, Integer)
+linearize :: PrimMonad m => PBNLC.Encoder m -> Expr -> m (SAT.PBLinSum, Integer)
 linearize enc (Expr xs) = do
   let ys = [(c,lits) | (c,lits@(_:_)) <- xs]
       c  = sum [c | (c,[]) <- xs]
   zs <- PBNLC.linearizePBSum enc ys
   return (zs, c)
 
-addConstraint :: PBNLC.Encoder -> OrdRel Expr -> IO ()
+addConstraint :: PrimMonad m => PBNLC.Encoder m -> OrdRel Expr -> m ()
 addConstraint enc (OrdRel lhs op rhs) = do
   let Expr e = lhs - rhs
   case op of
@@ -73,7 +73,7 @@ addConstraint enc (OrdRel lhs op rhs) = do
       PBNLC.addPBNLAtLeastSoft enc sel e 1
       PBNLC.addPBNLAtMostSoft  enc (-sel) e (-1)
 
-addConstraintSoft :: PBNLC.Encoder -> SAT.Lit -> OrdRel Expr -> IO ()
+addConstraintSoft :: PrimMonad m => PBNLC.Encoder m -> SAT.Lit -> OrdRel Expr -> m ()
 addConstraintSoft enc sel (OrdRel lhs op rhs) = do
   let Expr e = lhs - rhs
   case op of

@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE ExistentialQuantification, FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE ExistentialQuantification, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.PBNLC
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ExistentialQuantification, FlexibleContexts, MultiParamTypeClasses)
+-- Portability :  non-portable (ExistentialQuantification, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses)
 -- 
 -----------------------------------------------------------------------------
 module ToySolver.SAT.PBNLC
@@ -35,6 +35,7 @@ module ToySolver.SAT.PBNLC
   , evalPBSum
   ) where
 
+import Control.Monad.Primitive
 import ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.TseitinEncoder as Tseitin
 import ToySolver.Internal.Util (revForM)
@@ -42,26 +43,26 @@ import ToySolver.Internal.Util (revForM)
 type PBTerm = (Integer, [Lit])
 type PBSum = [PBTerm]
 
-data Encoder
-  = forall a. SAT.AddPBLin IO a => Encoder
+data Encoder m
+  = forall a. SAT.AddPBLin m a => Encoder
   { encBase    :: a
-  , encTseitin :: Tseitin.Encoder
+  , encTseitin :: Tseitin.Encoder m
   }
 
-instance SAT.NewVar IO Encoder where
+instance Monad m => SAT.NewVar m (Encoder m) where
   newVar Encoder{ encBase = a }   = SAT.newVar a
   newVars Encoder{ encBase = a }  = SAT.newVars a
   newVars_ Encoder{ encBase = a } = SAT.newVars_ a
 
-instance SAT.AddClause IO Encoder where
+instance Monad m => SAT.AddClause m (Encoder m) where
   addClause Encoder{ encBase = a } = SAT.addClause a
 
-instance SAT.AddCardinality IO Encoder where
+instance Monad m => SAT.AddCardinality m (Encoder m) where
   addAtLeast Encoder{ encBase = a } = SAT.addAtLeast a
   addAtMost  Encoder{ encBase = a } = SAT.addAtMost a
   addExactly Encoder{ encBase = a } = SAT.addExactly a
 
-instance SAT.AddPBLin IO Encoder where
+instance Monad m => SAT.AddPBLin m (Encoder m) where
   addPBAtLeast Encoder{ encBase = a } = SAT.addPBAtLeast a
   addPBAtMost  Encoder{ encBase = a } = SAT.addPBAtMost a
   addPBExactly Encoder{ encBase = a } = SAT.addPBExactly a
@@ -69,18 +70,19 @@ instance SAT.AddPBLin IO Encoder where
   addPBAtMostSoft  Encoder{ encBase = a } = SAT.addPBAtMostSoft a
   addPBExactlySoft Encoder{ encBase = a } = SAT.addPBExactlySoft a
 
-newEncoder :: SAT.AddPBLin IO a => a -> Tseitin.Encoder -> IO Encoder
+newEncoder :: (Monad m, SAT.AddPBLin m a) => a -> Tseitin.Encoder m -> m (Encoder m)
 newEncoder a tseitin = return $ Encoder a tseitin
 
-getTseitinEncoder :: Encoder -> Tseitin.Encoder
+getTseitinEncoder :: Encoder m -> Tseitin.Encoder m
 getTseitinEncoder Encoder{ encTseitin = tseitin } = tseitin
 
 -- | Add a non-linear pseudo boolean constraints /c1*ls1 + c2*ls2 + … ≥ n/.
 addPBNLAtLeast
-  :: Encoder
+  :: PrimMonad m
+  => Encoder m
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
-  -> IO ()
+  -> m ()
 addPBNLAtLeast enc lhs rhs = do
   let c = sum [c | (c,[]) <- lhs]
   lhs' <- linearizePBSumWithPolarity enc Tseitin.polarityPos [(c,ls) | (c,ls) <- lhs, not (null ls)]
@@ -88,19 +90,21 @@ addPBNLAtLeast enc lhs rhs = do
 
 -- | Add a non-linear pseudo boolean constraints /c1*ls1 + c2*ls2 + … ≥ n/.
 addPBNLAtMost
-  :: Encoder
+  :: PrimMonad m
+  => Encoder m
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
-  -> IO ()
+  -> m ()
 addPBNLAtMost enc lhs rhs =
   addPBNLAtLeast enc [(-c,ls) | (c,ls) <- lhs] (negate rhs)
 
 -- | Add a non-linear pseudo boolean constraints /c1*ls1 + c2*ls2 + … = n/.
 addPBNLExactly
-  :: Encoder
+  :: PrimMonad m
+  => Encoder m
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
-  -> IO ()
+  -> m ()
 addPBNLExactly enc lhs rhs = do
   let c = sum [c | (c,[]) <- lhs]
   lhs' <- linearizePBSum enc [(c,ls) | (c,ls) <- lhs, not (null ls)]
@@ -108,11 +112,12 @@ addPBNLExactly enc lhs rhs = do
 
 -- | Add a soft non-linear pseudo boolean constraints /sel ⇒ c1*ls1 + c2*ls2 + … ≥ n/.
 addPBNLAtLeastSoft
-  :: Encoder
+  :: PrimMonad m
+  => Encoder m
   -> Lit     -- ^ Selector literal @sel@
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
-  -> IO ()
+  -> m ()
 addPBNLAtLeastSoft enc sel lhs rhs = do
   let c = sum [c | (c,[]) <- lhs]
   lhs' <- linearizePBSumWithPolarity enc Tseitin.polarityPos [(c,ls) | (c,ls) <- lhs, not (null ls)]
@@ -120,21 +125,23 @@ addPBNLAtLeastSoft enc sel lhs rhs = do
 
 -- | Add a soft non-linear pseudo boolean constraints /sel ⇒ c1*ls1 + c2*ls2 + … ≤ n/.
 addPBNLAtMostSoft
-  :: Encoder
+  :: PrimMonad m
+  => Encoder m
   -> Lit     -- ^ Selector literal @sel@
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
-  -> IO ()
+  -> m ()
 addPBNLAtMostSoft enc sel lhs rhs =
   addPBNLAtLeastSoft enc sel [(negate c, lit) | (c,lit) <- lhs] (negate rhs)
 
 -- | Add a soft non-linear pseudo boolean constraints /lit ⇒ c1*ls1 + c2*ls2 + … = n/.
 addPBNLExactlySoft
-  :: Encoder
+  :: PrimMonad m
+  => Encoder m
   -> Lit     -- ^ indicator @lit@
   -> PBSum   -- ^ @[(c1,ls1),(c2,ls2),…]@
   -> Integer -- ^ /n/
-  -> IO ()
+  -> m ()
 addPBNLExactlySoft enc sel lhs rhs = do
   let c = sum [c | (c,[]) <- lhs]
   lhs' <- linearizePBSum enc [(c,ls) | (c,ls) <- lhs, not (null ls)]
@@ -144,9 +151,10 @@ addPBNLExactlySoft enc sel lhs rhs = do
 --
 -- @linearizePBSum enc s@ is equivalent to @linearizePBSumWithPolarity enc polarityBoth@.
 linearizePBSum
-  :: Encoder
+  :: PrimMonad m
+  => Encoder m
   -> PBSum
-  -> IO PBLinSum
+  -> m PBLinSum
 linearizePBSum enc = linearizePBSumWithPolarity enc Tseitin.polarityBoth
 
 -- | Linearize a non-linear 'PBSum' into a lienar 'PBLinSum'.
@@ -158,10 +166,11 @@ linearizePBSum enc = linearizePBSumWithPolarity enc Tseitin.polarityBoth
 -- * If @'polarityNegOccurs' p@, the value of resulting 'PBLinSum' is /lesser than/ or /equal to/ the value of original 'PBSum'.
 -- 
 linearizePBSumWithPolarity
-  :: Encoder
+  :: PrimMonad m
+  => Encoder m
   -> Tseitin.Polarity -- polarity /p/
   -> PBSum
-  -> IO PBLinSum
+  -> m PBLinSum
 linearizePBSumWithPolarity Encoder{ encTseitin = tseitin } p xs =
   revForM xs $ \(c,ls) -> do
     l <- if c > 0 then

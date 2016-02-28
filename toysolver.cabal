@@ -138,6 +138,7 @@ Library
      primes,
      process >=1.1.0.2,
      parse-dimacs,
+     primitive >=0.6,
      queue,
      heaps,
      vector,

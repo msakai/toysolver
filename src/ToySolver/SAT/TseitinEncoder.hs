@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, ExistentialQuantification #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.TseitinEncoder
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleContexts, MultiParamTypeClasses, ExistentialQuantification)
+-- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification)
 -- 
 -- Tseitin encoding
 --
@@ -78,7 +78,8 @@ module ToySolver.SAT.TseitinEncoder
   ) where
 
 import Control.Monad
-import Data.IORef
+import Control.Monad.Primitive
+import Data.Primitive.MutVar
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntSet as IntSet
@@ -93,31 +94,31 @@ evalFormula :: SAT.IModel m => m -> Formula -> Bool
 evalFormula m = fold (SAT.evalLit m)
 
 -- | Encoder instance
-data Encoder =
-  forall a. SAT.AddClause IO a =>
+data Encoder m =
+  forall a. SAT.AddClause m a =>
   Encoder
   { encSolver    :: a
-  , encAddPBAtLeast :: Maybe (SAT.PBLinSum -> Integer -> IO ())
-  , encUsePB     :: IORef Bool
-  , encConjTable :: !(IORef (Map SAT.LitSet (SAT.Lit, Bool, Bool)))
-  , encITETable  :: !(IORef (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Lit, Bool, Bool)))
+  , encAddPBAtLeast :: Maybe (SAT.PBLinSum -> Integer -> m ())
+  , encUsePB     :: MutVar (PrimState m) Bool
+  , encConjTable :: !(MutVar (PrimState m) (Map SAT.LitSet (SAT.Lit, Bool, Bool)))
+  , encITETable  :: !(MutVar (PrimState m) (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Lit, Bool, Bool)))
   }
 
-instance SAT.NewVar IO Encoder where
+instance Monad m => SAT.NewVar m (Encoder m) where
   newVar   Encoder{ encSolver = a } = SAT.newVar a
   newVars  Encoder{ encSolver = a } = SAT.newVars a
   newVars_ Encoder{ encSolver = a } = SAT.newVars_ a
 
-instance SAT.AddClause IO Encoder where
+instance Monad m => SAT.AddClause m (Encoder m) where
   addClause Encoder{ encSolver = a } = SAT.addClause a
 
 -- | Create a @Encoder@ instance.
 -- If the encoder is built using this function, 'setUsePB' has no effect.
-newEncoder :: SAT.AddClause IO a => a -> IO Encoder
+newEncoder :: PrimMonad m => SAT.AddClause m a => a -> m (Encoder m)
 newEncoder solver = do
-  usePBRef <- newIORef False
-  table <- newIORef Map.empty
-  table2 <- newIORef Map.empty
+  usePBRef <- newMutVar False
+  table <- newMutVar Map.empty
+  table2 <- newMutVar Map.empty
   return $
     Encoder
     { encSolver = solver
@@ -129,11 +130,11 @@ newEncoder solver = do
 
 -- | Create a @Encoder@ instance.
 -- If the encoder is built using this function, 'setUsePB' has an effect.
-newEncoderWithPBLin :: SAT.AddPBLin IO a => a -> IO Encoder
+newEncoderWithPBLin :: PrimMonad m => SAT.AddPBLin m a => a -> m (Encoder m)
 newEncoderWithPBLin solver = do
-  usePBRef <- newIORef False
-  table <- newIORef Map.empty
-  table2 <- newIORef Map.empty
+  usePBRef <- newMutVar False
+  table <- newMutVar Map.empty
+  table2 <- newMutVar Map.empty
   return $
     Encoder
     { encSolver = solver
@@ -145,12 +146,12 @@ newEncoderWithPBLin solver = do
 
 -- | Use /pseudo boolean constraints/ or use only /clauses/.
 -- This option has an effect only when the encoder is built using 'newEncoderWithPBLin'.
-setUsePB :: Encoder -> Bool -> IO ()
-setUsePB encoder usePB = writeIORef (encUsePB encoder) usePB
+setUsePB :: PrimMonad m => Encoder m -> Bool -> m ()
+setUsePB encoder usePB = writeMutVar (encUsePB encoder) usePB
 
 -- | Assert a given formula to underlying SAT solver by using
 -- Tseitin encoding.
-addFormula :: Encoder -> Formula -> IO ()
+addFormula :: PrimMonad m => Encoder m -> Formula -> m ()
 addFormula encoder formula = do
   case formula of
     And xs -> mapM_ (addFormula encoder) xs
@@ -171,7 +172,7 @@ addFormula encoder formula = do
       c <- encodeToClause encoder formula
       SAT.addClause encoder c
 
-encodeToClause :: Encoder -> Formula -> IO SAT.Clause
+encodeToClause :: PrimMonad m => Encoder m -> Formula -> m SAT.Clause
 encodeToClause encoder formula =
   case formula of
     And [x] -> encodeToClause encoder x
@@ -187,10 +188,10 @@ encodeToClause encoder formula =
       l <- encodeFormulaWithPolarity encoder polarityPos formula
       return [l]
 
-encodeFormula :: Encoder -> Formula -> IO SAT.Lit
+encodeFormula :: PrimMonad m => Encoder m -> Formula -> m SAT.Lit
 encodeFormula encoder = encodeFormulaWithPolarity encoder polarityBoth
 
-encodeFormulaWithPolarity :: Encoder -> Polarity -> Formula -> IO SAT.Lit
+encodeFormulaWithPolarity :: PrimMonad m => Encoder m -> Polarity -> Formula -> m SAT.Lit
 encodeFormulaWithPolarity encoder p formula = do
   case formula of
     Atom l -> return l
@@ -215,19 +216,19 @@ encodeFormulaWithPolarity encoder p formula = do
 -- @
 --   encodeConj encoder = 'encodeConjWithPolarity' encoder 'polarityBoth'
 -- @
-encodeConj :: Encoder -> [SAT.Lit] -> IO SAT.Lit
+encodeConj :: PrimMonad m => Encoder m -> [SAT.Lit] -> m SAT.Lit
 encodeConj encoder = encodeConjWithPolarity encoder polarityBoth
 
 -- | Return an literal which is equivalent to a given conjunction which occurs only in specified polarity.
-encodeConjWithPolarity :: Encoder -> Polarity -> [SAT.Lit] -> IO SAT.Lit
+encodeConjWithPolarity :: forall m. PrimMonad m => Encoder m -> Polarity -> [SAT.Lit] -> m SAT.Lit
 encodeConjWithPolarity _ _ [l] =  return l
 encodeConjWithPolarity encoder (Polarity pos neg) ls = do
   let ls2 = IntSet.fromList ls
-  usePB <- readIORef (encUsePB encoder)
-  table <- readIORef (encConjTable encoder)
+  usePB <- readMutVar (encUsePB encoder)
+  table <- readMutVar (encConjTable encoder)
 
   let -- If F is monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x → A∧B)
-      definePos :: SAT.Lit -> IO ()
+      definePos :: SAT.Lit -> m ()
       definePos l = do
         case encAddPBAtLeast encoder of
           Just addPBAtLeast | usePB -> do
@@ -240,7 +241,7 @@ encodeConjWithPolarity encoder (Polarity pos neg) ls = do
               SAT.addClause encoder [SAT.litNot l, li]
 
       -- If F is anti-monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x ← A∧B) ⇔ ∃x. F(x) ∧ (x∨¬A∨¬B).
-      defineNeg :: SAT.Lit -> IO ()
+      defineNeg :: SAT.Lit -> m ()
       defineNeg l = do
         -- ((l1 ∧ l2 ∧ … ∧ ln) → l)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ l)
         SAT.addClause encoder (l : map SAT.litNot (IntSet.toList ls2))
@@ -250,13 +251,13 @@ encodeConjWithPolarity encoder (Polarity pos neg) ls = do
       when (pos && not posDefined) $ definePos l
       when (neg && not negDefined) $ defineNeg l
       when (posDefined < pos || negDefined < neg) $
-        modifyIORef (encConjTable encoder) (Map.insert ls2 (l, (max posDefined pos), (max negDefined neg)))
+        modifyMutVar (encConjTable encoder) (Map.insert ls2 (l, (max posDefined pos), (max negDefined neg)))
       return l
     Nothing -> do
       l <- SAT.newVar encoder
       when pos $ definePos l
       when neg $ defineNeg l
-      modifyIORef (encConjTable encoder) (Map.insert ls2 (l, pos, neg))
+      modifyMutVar (encConjTable encoder) (Map.insert ls2 (l, pos, neg))
       return l
 
 -- | Return an literal which is equivalent to a given disjunction.
@@ -264,11 +265,11 @@ encodeConjWithPolarity encoder (Polarity pos neg) ls = do
 -- @
 --   encodeDisj encoder = 'encodeDisjWithPolarity' encoder 'polarityBoth'
 -- @
-encodeDisj :: Encoder -> [SAT.Lit] -> IO SAT.Lit
+encodeDisj :: PrimMonad m => Encoder m -> [SAT.Lit] -> m SAT.Lit
 encodeDisj encoder = encodeDisjWithPolarity encoder polarityBoth
 
 -- | Return an literal which is equivalent to a given disjunction which occurs only in specified polarity.
-encodeDisjWithPolarity :: Encoder -> Polarity -> [SAT.Lit] -> IO SAT.Lit
+encodeDisjWithPolarity :: PrimMonad m => Encoder m -> Polarity -> [SAT.Lit] -> m SAT.Lit
 encodeDisjWithPolarity _ _ [l] =  return l
 encodeDisjWithPolarity encoder p ls = do
   -- ¬l ⇔ ¬(¬l1 ∧ … ∧ ¬ln) ⇔ (l1 ∨ … ∨ ln)
@@ -280,17 +281,17 @@ encodeDisjWithPolarity encoder p ls = do
 -- @
 --   encodeITE encoder = 'encodeITEWithPolarity' encoder 'polarityBoth'
 -- @
-encodeITE :: Encoder -> SAT.Lit -> SAT.Lit -> SAT.Lit -> IO SAT.Lit
+encodeITE :: PrimMonad m => Encoder m -> SAT.Lit -> SAT.Lit -> SAT.Lit -> m SAT.Lit
 encodeITE encoder = encodeITEWithPolarity encoder polarityBoth
 
 -- | Return an literal which is equivalent to a given if-then-else which occurs only in specified polarity.
-encodeITEWithPolarity :: Encoder -> Polarity -> SAT.Lit -> SAT.Lit -> SAT.Lit -> IO SAT.Lit
+encodeITEWithPolarity :: forall m. PrimMonad m => Encoder m -> Polarity -> SAT.Lit -> SAT.Lit -> SAT.Lit -> m SAT.Lit
 encodeITEWithPolarity encoder p c t e | c < 0 =
   encodeITEWithPolarity encoder p (- c) e t
 encodeITEWithPolarity encoder (Polarity pos neg) c t e = do
-  table <- readIORef (encITETable encoder)
+  table <- readMutVar (encITETable encoder)
 
-  let definePos :: SAT.Lit -> IO ()
+  let definePos :: SAT.Lit -> m ()
       definePos x = do
         -- x → ite(c,t,e)
         -- ⇔ x → (c∧t ∨ ¬c∧e)
@@ -300,7 +301,7 @@ encodeITEWithPolarity encoder (Polarity pos neg) c t e = do
         SAT.addClause encoder [-x, c, e]
         SAT.addClause encoder [t, e, -x] -- redundant, but will increase the strength of unit propagation.
   
-      defineNeg :: SAT.Lit -> IO ()
+      defineNeg :: SAT.Lit -> m ()
       defineNeg x = do
         -- ite(c,t,e) → x
         -- ⇔ (c∧t ∨ ¬c∧e) → x
@@ -315,19 +316,19 @@ encodeITEWithPolarity encoder (Polarity pos neg) c t e = do
       when (pos && not posDefined) $ definePos l
       when (neg && not negDefined) $ defineNeg l
       when (posDefined < pos || negDefined < neg) $
-        modifyIORef (encITETable encoder) (Map.insert (c,t,e) (l, (max posDefined pos), (max negDefined neg)))
+        modifyMutVar (encITETable encoder) (Map.insert (c,t,e) (l, (max posDefined pos), (max negDefined neg)))
       return l
     Nothing -> do
       l <- SAT.newVar encoder
       when pos $ definePos l
       when neg $ defineNeg l
-      modifyIORef (encITETable encoder) (Map.insert (c,t,e) (l, pos, neg))
+      modifyMutVar (encITETable encoder) (Map.insert (c,t,e) (l, pos, neg))
       return l
 
 
-getDefinitions :: Encoder -> IO [(SAT.Lit, Formula)]
+getDefinitions :: PrimMonad m => Encoder m -> m [(SAT.Lit, Formula)]
 getDefinitions encoder = do
-  t <- readIORef (encConjTable encoder)
+  t <- readMutVar (encConjTable encoder)
   return $ [(l, andB [Atom l1 | l1 <- IntSet.toList ls]) | (ls, (l, _, _)) <- Map.toList t]
 
 

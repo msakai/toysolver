@@ -175,7 +175,7 @@ instance E.Exception Exception
 data Solver
   = Solver
   { smtSAT :: !SAT.Solver
-  , smtEnc :: !Tseitin.Encoder
+  , smtEnc :: !(Tseitin.Encoder IO)
   , smtEUF :: !EUF.Solver
   , smtLRA :: !(Simplex2.GenericSolver (Delta Rational))
 
