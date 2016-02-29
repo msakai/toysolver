@@ -57,7 +57,10 @@ instance SAT.NewVar (ST s) (CNFStore s) where
     readSTRef ref
 
 instance SAT.AddClause (ST s) (CNFStore s) where
-  addClause (CNFStore _ ref) clause = modifySTRef ref (|> clause)
+  addClause (CNFStore _ ref) clause =
+    case SAT.normalizeClause clause of
+      Just clause' -> modifySTRef ref (|> clause')
+      Nothing -> return ()
 
 newCNFStore :: ST s (CNFStore s)
 newCNFStore = do
