@@ -31,6 +31,7 @@ import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Text.GCNF as GCNF
 import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.CNF as CNF
 import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.SAT2PB as SAT2PB
 import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
@@ -42,7 +43,9 @@ import qualified ToySolver.Converter.PB2LSP as PB2LSP
 import qualified ToySolver.Converter.PB2WBO as PB2WBO
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
 import qualified ToySolver.Converter.PB2SMP as PB2SMP
+import qualified ToySolver.Converter.PB2SAT as PB2SAT
 import qualified ToySolver.Converter.WBO2PB as WBO2PB
+import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
 import ToySolver.Version
 import ToySolver.Internal.Util (setEncodingChar8)
 
@@ -90,8 +93,8 @@ header = unlines
   , "    pbconvert -o <outputfile> <inputfile>"
   , ""
   , "Supported formats:"
-  , "    input: .cnf .wcnf .opb .wbo"
-  , "    output: .opb .wbo"
+  , "    input: .cnf .wcnf .opb .wbo .gcnf"
+  , "    output: .cnf .wcnf .opb .wbo .lsp .lp .mps .smp .smt2 .ys"
   , ""
   , "Options:"
   ]
@@ -174,6 +177,8 @@ writePBFile o pb = do
       case map toLower (takeExtension fname) of
         ".opb" -> PBFile.writeOPBFile fname opb
         ".wbo" -> PBFile.writeWBOFile fname wbo
+        ".cnf" -> CNF.writeFile fname (PB2SAT.convert opb)
+        ".wcnf" -> MaxSAT.writeFile fname (WBO2MaxSAT.convert wbo)
         ".lsp" -> writeFile fname (lsp "")
         ".lp" -> MIP.writeLPFile fname lp
         ".mps" -> MIP.writeMPSFile fname lp

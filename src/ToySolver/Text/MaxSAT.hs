@@ -25,10 +25,18 @@ module ToySolver.Text.MaxSAT
   , parseFile
   , parseString
   , parseByteString
+
+  -- * Generating .wcnf files
+  , writeFile
   ) where
 
+import Prelude hiding (writeFile)
 import qualified Data.ByteString.Lazy.Char8 as BS
+import Data.ByteString.Builder
 import Data.Char
+import Data.Monoid
+import System.IO hiding (writeFile)
+
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.Internal.TextUtil
 
@@ -179,3 +187,20 @@ isCommentBS s =
 seqList :: [a] -> b -> b
 seqList [] b = b
 seqList (x:xs) b = seq x $ seqList xs b
+
+writeFile :: FilePath -> WCNF -> IO ()
+writeFile filepath wcnf = do
+  withBinaryFile filepath WriteMode $ \h -> do
+    hSetBuffering h (BlockBuffering Nothing)
+    hPutBuilder h (wcnfBuilder wcnf)
+
+wcnfBuilder :: WCNF -> Builder
+wcnfBuilder wcnf = header <> mconcat (map f (clauses wcnf))
+  where
+    header = mconcat
+      [ byteString "p wcnf "
+      , intDec (numVars wcnf), char7 ' '
+      , intDec (numClauses wcnf), char7 ' '
+      , integerDec (topCost wcnf), char7 '\n'
+      ]
+    f (w,c) = integerDec w <> mconcat [char7 ' ' <> intDec lit | lit <- c] <> byteString " 0\n"
