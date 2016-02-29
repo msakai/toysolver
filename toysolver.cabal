@@ -297,6 +297,7 @@ Library
      ToySolver.SAT.Types
      ToySolver.SAT.Printer
      ToySolver.SMT
+     ToySolver.Text.CNF
      ToySolver.Text.GCNF
      ToySolver.Text.GurobiSol
      ToySolver.Text.MaxSAT
