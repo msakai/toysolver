@@ -99,7 +99,7 @@ data Encoder m =
   Encoder
   { encSolver    :: a
   , encAddPBAtLeast :: Maybe (SAT.PBLinSum -> Integer -> m ())
-  , encUsePB     :: MutVar (PrimState m) Bool
+  , encUsePB     :: !(MutVar (PrimState m) Bool)
   , encConjTable :: !(MutVar (PrimState m) (Map SAT.LitSet (SAT.Lit, Bool, Bool)))
   , encITETable  :: !(MutVar (PrimState m) (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Lit, Bool, Bool)))
   }

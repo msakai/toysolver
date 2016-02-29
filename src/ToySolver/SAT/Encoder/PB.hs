@@ -1,5 +1,21 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wall #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.SAT.Encoder.PB
+-- Copyright   :  (c) Masahiro Sakai 2016
+-- License     :  BSD-style
+-- 
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses)
+--
+-- References:
+--
+-- * [ES06] N . Eéen and N. Sörensson. Translating Pseudo-Boolean
+--   Constraints into SAT. JSAT 2:1–26, 2006.
+--
+-----------------------------------------------------------------------------
 module ToySolver.SAT.Encoder.PB
   ( Encoder
   , newEncoder
