@@ -61,6 +61,8 @@ import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.MIP2PB as MIP2PB
+import qualified ToySolver.Converter.PB2SAT as PB2SAT
+import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Encoder.Integer as Integer
@@ -622,6 +624,10 @@ solvePB opt solver formula initialModel = do
       PBFile.Ge -> PBNLC.addPBNLAtLeast pbnlc lhs rhs
       PBFile.Eq -> PBNLC.addPBNLExactly pbnlc lhs rhs
 
+  when (optInitSP opt) $ do
+    let cnf = PB2SAT.convert formula
+    initPolarityUsingSP solver nv (DIMACS.numVars cnf) [(1.0, elems clause) | clause <-  DIMACS.clauses cnf]
+
   case PBFile.pbObjectiveFunction formula of
     Nothing -> do
       result <- SAT.solve solver
@@ -746,9 +752,8 @@ solveWBO opt solver isMaxSat formula initialModel = do
     Just c -> SAT.addPBAtMost solver obj (c-1)
 
   when (optInitSP opt) $ do
-    case wboToMaxSAT formula of
-      Nothing -> return ()
-      Just wcnf -> initPolarityUsingSP solver nv nv [(fromIntegral w, c) | (w, c) <-  MaxSAT.clauses wcnf]
+    let wcnf = WBO2MaxSAT.convert formula
+    initPolarityUsingSP solver nv (MaxSAT.numVars wcnf) [(fromIntegral w, c) | (w, c) <-  MaxSAT.clauses wcnf]
 
   nv' <- SAT.getNVars solver
   defs1 <- Tseitin.getDefinitions enc
@@ -800,31 +805,6 @@ solveWBO opt solver isMaxSat formula initialModel = do
           writeSOLFile opt m (Just val) nv
         else 
           putSLine "UNKNOWN"
-
--- NOTE: This does not encode proper pseudo boolean constraints into clauses,
--- and it also ignores top cost.
-wboToMaxSAT :: PBFile.SoftFormula -> Maybe MaxSAT.WCNF
-wboToMaxSAT formula = do
-  cs <- mapM f (PBFile.wboConstraints formula)
-  return $
-    MaxSAT.WCNF
-    { MaxSAT.numVars    = PBFile.wboNumVars formula
-    , MaxSAT.numClauses = PBFile.wboNumConstraints formula
-    , MaxSAT.topCost    = w2
-    , MaxSAT.clauses    = cs
-    }         
-  where
-    w2 = sum [w | (Just w, _) <- PBFile.wboConstraints formula] + 1
-    
-    f :: PBFile.SoftConstraint -> Maybe MaxSAT.WeightedClause
-    f (w, (cs, PBFile.Ge, 1)) = do
-      lits <- forM cs $ \(a,xs) -> do
-        guard $ a == 1
-        case xs of
-          [lit] -> return lit
-          _ -> Nothing
-      return (case w of{ Just n -> n; Nothing -> w2 }, lits)
-    f _ = Nothing
 
 -- ------------------------------------------------------------------------
 
