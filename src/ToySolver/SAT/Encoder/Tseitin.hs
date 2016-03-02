@@ -168,6 +168,12 @@ addFormula encoder formula = do
       lit2 <- encodeFormula encoder b
       SAT.addClause encoder [lit1, lit2] -- a ∨ b
       SAT.addClause encoder [SAT.litNot lit1, SAT.litNot lit2] -- ¬a ∨ ¬b
+    ITE c t e -> do
+      c' <- encodeFormula encoder c
+      t' <- encodeFormulaWithPolarity encoder polarityPos t
+      e' <- encodeFormulaWithPolarity encoder polarityPos e
+      SAT.addClause encoder [-c', t'] --  c' → t'
+      SAT.addClause encoder [ c', e'] -- ¬c' → e'
     _ -> do
       c <- encodeToClause encoder formula
       SAT.addClause encoder c
