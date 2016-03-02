@@ -77,8 +77,12 @@ encodePBLinAtLeast' (Encoder tseitin) (lhs,rhs) = do
                     [(_,l)] -> return l
                     (c,l) : xs' -> do
                       thenLit <- f xs' (rhs - c) slack
-                      elseLit <- f xs' rhs (slack - c)
-                      l2 <- lift $ Tseitin.encodeITEWithPolarity tseitin Tseitin.polarityPos l thenLit elseLit
-                      modify (Map.insert (xs,rhs) l2)
-                      return l2
+                      l2 <- lift $ Tseitin.encodeConjWithPolarity tseitin Tseitin.polarityPos [l, thenLit]
+                      l3 <- if c > slack then
+                              return l2
+                            else do
+                              elseLit <- f xs' rhs (slack - c)
+                              lift $ Tseitin.encodeDisjWithPolarity tseitin Tseitin.polarityPos [l2, elseLit]
+                      modify (Map.insert (xs,rhs) l3)
+                      return l3
     f lhs' rhs (sum [c | (c,_) <- lhs'] - rhs)
