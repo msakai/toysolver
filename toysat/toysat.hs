@@ -193,7 +193,7 @@ options =
 
     , Option [] ["init-sp"]
         (NoArg (\opt -> opt{ optInitSP = True }))
-        "Use survey propation to compute initial polarity (CNF only)"
+        "Use survey propation to compute initial polarity (when possible)"
 
     , Option [] ["linearizer-pb"]
         (NoArg (\opt -> opt{ optLinearizerPB = True }))
