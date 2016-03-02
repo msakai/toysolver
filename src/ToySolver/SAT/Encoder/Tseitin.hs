@@ -229,42 +229,51 @@ encodeConj encoder = encodeConjWithPolarity encoder polarityBoth
 encodeConjWithPolarity :: forall m. PrimMonad m => Encoder m -> Polarity -> [SAT.Lit] -> m SAT.Lit
 encodeConjWithPolarity _ _ [l] =  return l
 encodeConjWithPolarity encoder (Polarity pos neg) ls = do
-  let ls2 = IntSet.fromList ls
   usePB <- readMutVar (encUsePB encoder)
   table <- readMutVar (encConjTable encoder)
+  let ls3 = IntSet.fromList ls
+      ls2 = case Map.lookup IntSet.empty table of
+              Nothing -> ls3
+              Just (litTrue, _, _)
+                | litFalse `IntSet.member` ls3 -> IntSet.singleton litFalse
+                | otherwise -> IntSet.delete litTrue ls3
+                where litFalse = SAT.litNot litTrue
 
-  let -- If F is monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x → A∧B)
-      definePos :: SAT.Lit -> m ()
-      definePos l = do
-        case encAddPBAtLeast encoder of
-          Just addPBAtLeast | usePB -> do
-            -- ∀i.(l → li) ⇔ Σli >= n*l ⇔ Σli - n*l >= 0
-            let n = IntSet.size ls2
-            addPBAtLeast ((- fromIntegral n, l) : [(1,li) | li <- IntSet.toList ls2]) 0
-          _ -> do
-            forM_ (IntSet.toList ls2) $ \li -> do
-              -- (l → li)  ⇔  (¬l ∨ li)
-              SAT.addClause encoder [SAT.litNot l, li]
+  if IntSet.size ls2 == 1 then do
+    return $ head $ IntSet.toList ls2
+  else do
+    let -- If F is monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x → A∧B)
+        definePos :: SAT.Lit -> m ()
+        definePos l = do
+          case encAddPBAtLeast encoder of
+            Just addPBAtLeast | usePB -> do
+              -- ∀i.(l → li) ⇔ Σli >= n*l ⇔ Σli - n*l >= 0
+              let n = IntSet.size ls2
+              addPBAtLeast ((- fromIntegral n, l) : [(1,li) | li <- IntSet.toList ls2]) 0
+            _ -> do
+              forM_ (IntSet.toList ls2) $ \li -> do
+                -- (l → li)  ⇔  (¬l ∨ li)
+                SAT.addClause encoder [SAT.litNot l, li]
+  
+        -- If F is anti-monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x ← A∧B) ⇔ ∃x. F(x) ∧ (x∨¬A∨¬B).
+        defineNeg :: SAT.Lit -> m ()
+        defineNeg l = do
+          -- ((l1 ∧ l2 ∧ … ∧ ln) → l)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ l)
+          SAT.addClause encoder (l : map SAT.litNot (IntSet.toList ls2))
 
-      -- If F is anti-monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x ← A∧B) ⇔ ∃x. F(x) ∧ (x∨¬A∨¬B).
-      defineNeg :: SAT.Lit -> m ()
-      defineNeg l = do
-        -- ((l1 ∧ l2 ∧ … ∧ ln) → l)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ l)
-        SAT.addClause encoder (l : map SAT.litNot (IntSet.toList ls2))
-
-  case Map.lookup ls2 table of
-    Just (l, posDefined, negDefined) -> do
-      when (pos && not posDefined) $ definePos l
-      when (neg && not negDefined) $ defineNeg l
-      when (posDefined < pos || negDefined < neg) $
-        modifyMutVar (encConjTable encoder) (Map.insert ls2 (l, (max posDefined pos), (max negDefined neg)))
-      return l
-    Nothing -> do
-      l <- SAT.newVar encoder
-      when pos $ definePos l
-      when neg $ defineNeg l
-      modifyMutVar (encConjTable encoder) (Map.insert ls2 (l, pos, neg))
-      return l
+    case Map.lookup ls2 table of
+      Just (l, posDefined, negDefined) -> do
+        when (pos && not posDefined) $ definePos l
+        when (neg && not negDefined) $ defineNeg l
+        when (posDefined < pos || negDefined < neg) $
+          modifyMutVar (encConjTable encoder) (Map.insert ls2 (l, (max posDefined pos), (max negDefined neg)))
+        return l
+      Nothing -> do
+        l <- SAT.newVar encoder
+        when pos $ definePos l
+        when neg $ defineNeg l
+        modifyMutVar (encConjTable encoder) (Map.insert ls2 (l, pos, neg))
+        return l
 
 -- | Return an literal which is equivalent to a given disjunction.
 --
