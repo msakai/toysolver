@@ -28,6 +28,8 @@ module ToySolver.Text.MaxSAT
 
   -- * Generating .wcnf files
   , writeFile
+  , hPutWCNF
+  , wcnfBuilder
   ) where
 
 import Prelude hiding (writeFile)
@@ -192,7 +194,7 @@ writeFile :: FilePath -> WCNF -> IO ()
 writeFile filepath wcnf = do
   withBinaryFile filepath WriteMode $ \h -> do
     hSetBuffering h (BlockBuffering Nothing)
-    hPutBuilder h (wcnfBuilder wcnf)
+    hPutWCNF h wcnf
 
 wcnfBuilder :: WCNF -> Builder
 wcnfBuilder wcnf = header <> mconcat (map f (clauses wcnf))
@@ -204,3 +206,6 @@ wcnfBuilder wcnf = header <> mconcat (map f (clauses wcnf))
       , integerDec (topCost wcnf), char7 '\n'
       ]
     f (w,c) = integerDec w <> mconcat [char7 ' ' <> intDec lit | lit <- c] <> byteString " 0\n"
+
+hPutWCNF :: Handle -> WCNF -> IO ()
+hPutWCNF h wcnf = hPutBuilder h (wcnfBuilder wcnf)
