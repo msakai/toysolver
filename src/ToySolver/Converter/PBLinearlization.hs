@@ -35,10 +35,12 @@ linearlize formula usePB = runST $ do
   tseitin <-  Tseitin.newEncoderWithPBLin db
   Tseitin.setUsePB tseitin usePB
   pbnlc <- PBNLC.newEncoder db tseitin
-  forM_ (PBFile.pbConstraints formula) $ \(lhs,op,rhs) -> do
-    case op of
-      PBFile.Ge -> SAT.addPBNLAtLeast pbnlc lhs rhs
-      PBFile.Eq -> SAT.addPBNLExactly pbnlc lhs rhs
+  cs' <- forM (PBFile.pbConstraints formula) $ \(lhs,op,rhs) -> do
+    let p = case op of
+              PBFile.Ge -> Tseitin.polarityPos
+              PBFile.Eq -> Tseitin.polarityBoth
+    lhs' <- PBNLC.linearizePBSumWithPolarity pbnlc p lhs
+    return ([(c,[l]) | (c,l) <- lhs'],op,rhs)
   obj' <-
     case PBFile.pbObjectiveFunction formula of
       Nothing -> return Nothing
@@ -46,7 +48,12 @@ linearlize formula usePB = runST $ do
         obj' <- PBNLC.linearizePBSumWithPolarity pbnlc Tseitin.polarityNeg obj
         return $ Just [(c, [l]) | (c,l) <- obj']
   formula' <- getPBFormula db
-  return formula'{ PBFile.pbObjectiveFunction = obj' }
+  return $
+    formula'
+    { PBFile.pbObjectiveFunction = obj'
+    , PBFile.pbConstraints = cs' ++ PBFile.pbConstraints formula'
+    , PBFile.pbNumConstraints = PBFile.pbNumConstraints formula + PBFile.pbNumConstraints formula'
+    }
 
 linearlizeWBO :: PBFile.SoftFormula -> Bool -> PBFile.SoftFormula
 linearlizeWBO formula usePB = runST $ do
