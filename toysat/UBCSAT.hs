@@ -29,6 +29,7 @@ ubcsat cmd fname wcnf = do
         ]
       stdinStr = ""
     
+  putStrLn $ "c Running " ++ show cmd ++ " with " ++ show args
   ret <- try $ readProcess cmd args stdinStr
   case ret of
     Left (err :: IOError) -> do

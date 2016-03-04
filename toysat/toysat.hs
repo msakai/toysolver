@@ -36,6 +36,8 @@ import qualified Data.Vector.Unboxed as V
 import Data.Version
 import Data.Time
 import System.IO
+import System.IO.Temp
+import System.Directory
 import System.Environment
 import System.Exit
 #if !MIN_VERSION_time(1,5,0)
@@ -107,6 +109,7 @@ data Options
   , optWriteFile :: Maybe FilePath
   , optUBCSAT :: FilePath
   , optInitSP :: Bool
+  , optTempDir :: Maybe FilePath
   }
 
 instance Default Options where
@@ -127,6 +130,7 @@ instance Default Options where
     , optWriteFile = Nothing
     , optUBCSAT = "ubcsat"
     , optInitSP = False
+    , optTempDir = Nothing
     }
 
 options :: [OptDescr (Options -> Options)]
@@ -250,6 +254,9 @@ options =
     , Option [] ["with-ubcsat"]
         (ReqArg (\val opt -> opt{ optUBCSAT = val }) "<PATH>")
         "give the path to the UBCSAT command"
+    , Option [] ["temp-dir"]
+        (ReqArg (\val opt -> opt{ optTempDir = Just val }) "<PATH>")
+        "temporary directory"
     ]
   where
     parseRestartStrategy s =
@@ -702,10 +709,14 @@ mainWBO opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
-    Right formula -> solveWBO opt solver False formula Nothing
+    Right formula -> solveWBO opt solver False formula
 
-solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> Maybe SAT.Model -> IO ()
-solveWBO opt solver isMaxSat formula initialModel = do
+solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
+solveWBO opt solver isMaxSat formula =
+  solveWBO' opt solver isMaxSat formula (WBO2MaxSAT.convert formula) Nothing
+
+solveWBO' :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> MaxSAT.WCNF -> Maybe FilePath -> IO ()
+solveWBO' opt solver isMaxSat formula wcnf wcnfFileName = do
   let nv = PBFile.wboNumVars formula
       nc = PBFile.wboNumConstraints formula
   putCommentLine $ printf "#vars %d" nv
@@ -752,8 +763,25 @@ solveWBO opt solver isMaxSat formula initialModel = do
     Just c -> SAT.addPBAtMost solver obj (c-1)
 
   when (optInitSP opt) $ do
-    let wcnf = WBO2MaxSAT.convert formula
     initPolarityUsingSP solver nv (MaxSAT.numVars wcnf) [(fromIntegral w, c) | (w, c) <-  MaxSAT.clauses wcnf]
+
+  initialModel <- 
+    if optLocalSearchInitial opt then do
+      case wcnfFileName of
+        Just fname | or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"]] -> do
+          UBCSAT.ubcsat (optUBCSAT opt) fname wcnf
+        Nothing -> do
+          dir <- case optTempDir opt of
+                   Just dir -> return dir
+                   Nothing -> getTemporaryDirectory
+          withTempFile dir ".wcnf" $ \fname h -> do
+            hSetBinaryMode h True
+            hSetBuffering h (BlockBuffering Nothing)
+            MaxSAT.hPutWCNF h wcnf
+            hClose h
+            UBCSAT.ubcsat (optUBCSAT opt) fname wcnf
+    else
+      return Nothing
 
   nv' <- SAT.getNVars solver
   defs1 <- Tseitin.getDefinitions enc
@@ -817,16 +845,14 @@ mainMaxSAT opt solver args = do
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right wcnf -> do
-      initialModel <-
-        case args of
-          [fname] | optLocalSearchInitial opt && or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"] ] ->
-            UBCSAT.ubcsat (optUBCSAT opt) fname wcnf
-          _ -> return Nothing
-      solveMaxSAT opt solver wcnf initialModel
+      let fname = case args of
+                    [fname] | fname /= "-" -> Just fname
+                    _ -> Nothing
+      solveMaxSAT opt solver wcnf fname
 
-solveMaxSAT :: Options -> SAT.Solver -> MaxSAT.WCNF -> Maybe SAT.Model -> IO ()
-solveMaxSAT opt solver wcnf initialModel =
-  solveWBO opt solver True (MaxSAT2WBO.convert wcnf) initialModel
+solveMaxSAT :: Options -> SAT.Solver -> MaxSAT.WCNF -> Maybe FilePath -> IO ()
+solveMaxSAT opt solver wcnf wcnfFileName =
+  solveWBO' opt solver True (MaxSAT2WBO.convert wcnf) wcnf wcnfFileName
 
 -- ------------------------------------------------------------------------
 
