@@ -36,6 +36,7 @@ import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.MaxSAT2IP as MaxSAT2IP
 import qualified ToySolver.Converter.MaxSAT2NLPB as MaxSAT2NLPB
 import qualified ToySolver.Converter.PB2IP as PB2IP
+import qualified ToySolver.Converter.PBLinearlization as PBLinearlization
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
 import qualified ToySolver.Converter.SAT2PB as SAT2PB
 import ToySolver.Version
@@ -54,6 +55,8 @@ data Flag
   | SMTNoProduceModel
   | MaxSATNonLinear
   | Yices2
+  | Linearlization
+  | LinearlizationUsingPB
   deriving Eq
 
 options :: [OptDescr Flag]
@@ -70,6 +73,8 @@ options =
     , Option []    ["smt-no-produce-model"] (NoArg SMTNoProduceModel) "do not output \"(set-option :produce-models true)\""    
     , Option []    ["maxsat-nonlinear"] (NoArg MaxSATNonLinear) "use non-linear formulation of Max-SAT"
     , Option []    ["yices2"] (NoArg Yices2) "output for yices2 rather than yices1"
+    , Option []    ["linearlize"] (NoArg Linearlization) "linearliza nonlinear pseudo-boolean constraints"
+    , Option []    ["linearizer-pb"] (NoArg LinearlizationUsingPB) "Use PB constraint in linearization"
     ]
   where
     parseObjType s =
@@ -153,10 +158,16 @@ readLP o fname = do
           in mip
 
 transformPBFile :: [Flag] -> PBFile.Formula -> PBFile.Formula
-transformPBFile o opb | isNothing (PBFile.pbObjectiveFunction opb) = PBSetObj.setObj objType opb
+transformPBFile o = transformObj o . transformPBLinearlization o
+
+transformObj :: [Flag] -> PBFile.Formula -> PBFile.Formula
+transformObj o opb | isNothing (PBFile.pbObjectiveFunction opb) = PBSetObj.setObj objType opb
   where
     objType = last (ObjNone : [t | ObjType t <- o])
-transformPBFile _ opb = opb
+transformObj _ opb = opb
+
+transformPBLinearlization :: [Flag] -> PBFile.Formula -> PBFile.Formula
+transformPBLinearlization o opb = PBLinearlization.linearlize    opb (LinearlizationUsingPB `elem` o)
 
 writeLP :: [Flag] -> MIP.Problem -> IO ()
 writeLP o mip = do

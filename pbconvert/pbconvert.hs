@@ -39,6 +39,7 @@ import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.MaxSAT2NLPB as MaxSAT2NLPB
 import qualified ToySolver.Converter.PB2IP as PB2IP
+import qualified ToySolver.Converter.PBLinearlization as PBLinearlization
 import qualified ToySolver.Converter.PB2LSP as PB2LSP
 import qualified ToySolver.Converter.PB2WBO as PB2WBO
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
@@ -62,6 +63,8 @@ data Flag
   | SMTNoProduceModel
   | MaxSATNonLinear
   | Yices2
+  | Linearlization
+  | LinearlizationUsingPB
   deriving Eq
 
 options :: [OptDescr Flag]
@@ -78,6 +81,8 @@ options =
     , Option []    ["smt-no-produce-model"] (NoArg SMTNoProduceModel) "do not output \"(set-option :produce-models true)\""    
     , Option []    ["maxsat-nonlinear"] (NoArg MaxSATNonLinear) "use non-linear formulation of Max-SAT"
     , Option []    ["yices2"] (NoArg Yices2) "output for yices2 rather than yices1"
+    , Option []    ["linearlize"] (NoArg Linearlization) "linearliza nonlinear pseudo-boolean constraints"
+    , Option []    ["linearizer-pb"] (NoArg LinearlizationUsingPB) "Use PB constraint in linearization"
     ]
   where
     parseObjType s =
@@ -138,12 +143,23 @@ readPBFile o fname = do
       | otherwise = Right $ MaxSAT2WBO.convert wcnf
 
 transformPBFile :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> Either PBFile.Formula PBFile.SoftFormula
-transformPBFile o pb =
+transformPBFile o = transformObj o . transformPBLinearlization o
+
+transformObj :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> Either PBFile.Formula PBFile.SoftFormula
+transformObj o pb =
   case pb of
     Left opb | isNothing (PBFile.pbObjectiveFunction opb) -> Left $ PBSetObj.setObj objType opb
     _ -> pb
   where
     objType = last (ObjNone : [t | ObjType t <- o])
+
+transformPBLinearlization :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> Either PBFile.Formula PBFile.SoftFormula
+transformPBLinearlization o pb
+  | Linearlization `elem` o =
+      case pb of
+        Left opb  -> Left  $ PBLinearlization.linearlize    opb (LinearlizationUsingPB `elem` o)
+        Right wbo -> Right $ PBLinearlization.linearlizeWBO wbo (LinearlizationUsingPB `elem` o)
+  | otherwise = pb
 
 writePBFile :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> IO ()
 writePBFile o pb = do
