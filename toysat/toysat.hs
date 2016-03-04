@@ -64,6 +64,7 @@ import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.MIP2PB as MIP2PB
 import qualified ToySolver.Converter.PB2SAT as PB2SAT
+import qualified ToySolver.Converter.PB2WBO as PB2WBO
 import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.PBO as PBO
@@ -612,10 +613,10 @@ mainPB opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
-    Right formula -> solvePB opt solver formula Nothing
+    Right formula -> solvePB opt solver formula
 
-solvePB :: Options -> SAT.Solver -> PBFile.Formula -> Maybe SAT.Model -> IO ()
-solvePB opt solver formula initialModel = do
+solvePB :: Options -> SAT.Solver -> PBFile.Formula -> IO ()
+solvePB opt solver formula = do
   let nv = PBFile.pbNumVars formula
       nc = PBFile.pbNumConstraints formula
   putCommentLine $ printf "#vars %d" nv
@@ -645,6 +646,24 @@ solvePB opt solver formula initialModel = do
         writeSOLFile opt m Nothing nv
 
     Just obj' -> do
+      initialModel <- 
+        if optLocalSearchInitial opt then do
+          let wcnf = WBO2MaxSAT.convert $ PB2WBO.convert formula
+          dir <- case optTempDir opt of
+                   Just dir -> return dir
+                   Nothing -> getTemporaryDirectory
+          withTempFile dir ".wcnf" $ \fname h -> do
+            hSetBinaryMode h True
+            hSetBuffering h (BlockBuffering Nothing)
+            MaxSAT.hPutWCNF h wcnf
+            hClose h
+            let -- remove variables introduced by WBO→WCNF conversion
+                f :: SAT.Model -> SAT.Model
+                f m = array (1,nv) [(v, m ! v) | v <- [1..nv]]
+            liftM (fmap f) $ UBCSAT.ubcsat (optUBCSAT opt) fname wcnf
+        else
+          return Nothing
+
       obj'' <- PBNLC.linearizePBSumWithPolarity pbnlc Tseitin.polarityNeg obj'
 
       nv' <- SAT.getNVars solver
