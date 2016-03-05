@@ -786,7 +786,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, mtrans) wcnfFileName = do
       case wcnfFileName of
         Just fname | or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"]] -> do
           UBCSAT.ubcsat (optUBCSAT opt) fname wcnf
-        Nothing -> do
+        _ -> do
           dir <- case optTempDir opt of
                    Just dir -> return dir
                    Nothing -> getTemporaryDirectory
