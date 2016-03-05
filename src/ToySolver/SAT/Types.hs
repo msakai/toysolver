@@ -10,6 +10,7 @@ module ToySolver.SAT.Types
   -- * Model
   , IModel (..)
   , Model
+  , restrictModel
 
   -- * Literal
   , Lit
@@ -107,6 +108,10 @@ class IModel a where
 
 -- | A model is represented as a mapping from variables to its values.
 type Model = UArray Var Bool
+
+-- | Restrict model to first @nv@ variables.
+restrictModel :: Int -> Model -> Model
+restrictModel nv m = array (1,nv) [(v, m ! v) | v <- [1..nv]]
 
 instance IModel (UArray Var Bool) where
   evalVar m v = m ! v
