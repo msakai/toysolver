@@ -633,8 +633,8 @@ solvePB opt solver formula = do
       PBFile.Eq -> PBNLC.addPBNLExactly pbnlc lhs rhs
 
   when (optInitSP opt) $ do
-    let cnf = PB2SAT.convert formula
-    initPolarityUsingSP solver nv (DIMACS.numVars cnf) [(1.0, elems clause) | clause <-  DIMACS.clauses cnf]
+    let (cnf, _) = PB2SAT.convert formula
+    initPolarityUsingSP solver nv (DIMACS.numVars cnf) [(1.0, elems clause) | clause <- DIMACS.clauses cnf]
 
   case PBFile.pbObjectiveFunction formula of
     Nothing -> do
@@ -648,7 +648,7 @@ solvePB opt solver formula = do
     Just obj' -> do
       initialModel <- 
         if optLocalSearchInitial opt then do
-          let wcnf = WBO2MaxSAT.convert $ PB2WBO.convert formula
+          let (wcnf, mtrans) = WBO2MaxSAT.convert $ PB2WBO.convert formula
           dir <- case optTempDir opt of
                    Just dir -> return dir
                    Nothing -> getTemporaryDirectory
@@ -657,10 +657,7 @@ solvePB opt solver formula = do
             hSetBuffering h (BlockBuffering Nothing)
             MaxSAT.hPutWCNF h wcnf
             hClose h
-            let -- remove variables introduced by WBO→WCNF conversion
-                f :: SAT.Model -> SAT.Model
-                f m = array (1,nv) [(v, m ! v) | v <- [1..nv]]
-            liftM (fmap f) $ UBCSAT.ubcsat (optUBCSAT opt) fname wcnf
+            liftM (fmap mtrans) $ UBCSAT.ubcsat (optUBCSAT opt) fname wcnf
         else
           return Nothing
 
@@ -734,8 +731,8 @@ solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
 solveWBO opt solver isMaxSat formula =
   solveWBO' opt solver isMaxSat formula (WBO2MaxSAT.convert formula) Nothing
 
-solveWBO' :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> MaxSAT.WCNF -> Maybe FilePath -> IO ()
-solveWBO' opt solver isMaxSat formula wcnf wcnfFileName = do
+solveWBO' :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> (MaxSAT.WCNF, SAT.Model -> SAT.Model) -> Maybe FilePath -> IO ()
+solveWBO' opt solver isMaxSat formula (wcnf, mtrans) wcnfFileName = do
   let nv = PBFile.wboNumVars formula
       nc = PBFile.wboNumConstraints formula
   putCommentLine $ printf "#vars %d" nv
@@ -784,7 +781,7 @@ solveWBO' opt solver isMaxSat formula wcnf wcnfFileName = do
   when (optInitSP opt) $ do
     initPolarityUsingSP solver nv (MaxSAT.numVars wcnf) [(fromIntegral w, c) | (w, c) <-  MaxSAT.clauses wcnf]
 
-  initialModel <- 
+  initialModel <- liftM (fmap mtrans) $ 
     if optLocalSearchInitial opt then do
       case wcnfFileName of
         Just fname | or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"]] -> do
@@ -871,7 +868,7 @@ mainMaxSAT opt solver args = do
 
 solveMaxSAT :: Options -> SAT.Solver -> MaxSAT.WCNF -> Maybe FilePath -> IO ()
 solveMaxSAT opt solver wcnf wcnfFileName =
-  solveWBO' opt solver True (MaxSAT2WBO.convert wcnf) wcnf wcnfFileName
+  solveWBO' opt solver True (MaxSAT2WBO.convert wcnf) (wcnf, id) wcnfFileName
 
 -- ------------------------------------------------------------------------
 

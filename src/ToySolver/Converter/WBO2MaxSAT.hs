@@ -29,7 +29,7 @@ import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 
-convert :: PBFile.SoftFormula -> MaxSAT.WCNF
+convert :: PBFile.SoftFormula -> (MaxSAT.WCNF, SAT.Model -> SAT.Model)
 convert formula = runST $ do
   db <- newCNFStore
   SAT.newVars_ db (PBFile.wboNumVars formula)
@@ -67,13 +67,13 @@ convert formula = runST $ do
   let top = F.sum (fst <$> softClauses) + 1
   (nv, hardClauses) <- getCNFFormula db
   let cs = softClauses <> fmap (\clause -> (top, clause)) hardClauses
-  return $
-    MaxSAT.WCNF
-    { MaxSAT.numVars = nv
-    , MaxSAT.numClauses = Seq.length cs
-    , MaxSAT.topCost = top
-    , MaxSAT.clauses = F.toList cs
-    }
+  let wcnf = MaxSAT.WCNF
+             { MaxSAT.numVars = nv
+             , MaxSAT.numClauses = Seq.length cs
+             , MaxSAT.topCost = top
+             , MaxSAT.clauses = F.toList cs
+             }
+  return (wcnf, SAT.restrictModel (PBFile.wboNumVars formula))
 
 -- -----------------------------------------------------------------------------
 

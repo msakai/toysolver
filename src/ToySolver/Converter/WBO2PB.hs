@@ -17,7 +17,7 @@ import qualified ToySolver.SAT.Types as SAT
 import qualified Data.PseudoBoolean as PBFile
 
 convert :: PBFile.SoftFormula -> (PBFile.Formula, SAT.Model -> SAT.Model)
-convert wbo = (formula, mtrans)
+convert wbo = (formula, SAT.restrictModel nv)
   where
     nv = PBFile.wboNumVars wbo
 
@@ -51,7 +51,3 @@ convert wbo = (formula, mtrans)
       }
       where
         cs = topConstr ++ concatMap f cm
-
-    mtrans :: SAT.Model -> SAT.Model
-    mtrans m = 
-      array (1, nv) [(x, m ! x) | x <- [1..nv]]

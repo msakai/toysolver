@@ -28,7 +28,7 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 
-convert :: PBFile.Formula -> DIMACS.CNF
+convert :: PBFile.Formula -> (DIMACS.CNF, SAT.Model -> SAT.Model)
 convert formula = runST $ do
   db <- newCNFStore
   SAT.newVars_ db (PBFile.pbNumVars formula)
@@ -40,12 +40,12 @@ convert formula = runST $ do
       PBFile.Ge -> SAT.addPBNLAtLeast pbnlc lhs rhs
       PBFile.Eq -> SAT.addPBNLExactly pbnlc lhs rhs
   (nv, cs) <- getCNFFormula db
-  return $
-    DIMACS.CNF
-    { DIMACS.numVars = nv
-    , DIMACS.numClauses = Seq.length cs
-    , DIMACS.clauses = [listArray (0, length c - 1) c | c <- toList cs]
-    }
+  let cnf = DIMACS.CNF
+            { DIMACS.numVars = nv
+            , DIMACS.numClauses = Seq.length cs
+            , DIMACS.clauses = [listArray (0, length c - 1) c | c <- toList cs]
+            }
+  return (cnf, SAT.restrictModel nv)
 
 -- -----------------------------------------------------------------------------
 

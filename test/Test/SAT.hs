@@ -1676,7 +1676,7 @@ prop_pb2sat = QM.monadicIO $ do
             , PBFile.pbNumConstraints = length cs
             , PBFile.pbConstraints = map f cs
             }
-  let dimacs = PB2SAT.convert opb
+  let (dimacs, _) = PB2SAT.convert opb
   let cnf = (DIMACS.numVars dimacs, [elems c | c <- DIMACS.clauses dimacs])
 
   solver1 <- arbitrarySolver
@@ -1700,7 +1700,7 @@ prop_wbo2maxsat = QM.monadicIO $ do
             , PBFile.wboConstraints = map f cs
             , PBFile.wboTopCost = top
             }
-  let wcnf = WBO2MaxSAT.convert wbo1'
+  let (wcnf, _) = WBO2MaxSAT.convert wbo1'
       wbo2 = ( MaxSAT.numVars wcnf
              , [ ( if w == MaxSAT.topCost wcnf then Nothing else Just w
                  , (PBRelGE, [(1,l) | l <- clause], 1)

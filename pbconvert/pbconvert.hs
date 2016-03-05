@@ -193,8 +193,8 @@ writePBFile o pb = do
       case map toLower (takeExtension fname) of
         ".opb" -> PBFile.writeOPBFile fname opb
         ".wbo" -> PBFile.writeWBOFile fname wbo
-        ".cnf" -> CNF.writeFile fname (PB2SAT.convert opb)
-        ".wcnf" -> MaxSAT.writeFile fname (WBO2MaxSAT.convert wbo)
+        ".cnf" -> CNF.writeFile fname $ fst $ PB2SAT.convert opb
+        ".wcnf" -> MaxSAT.writeFile fname $ fst $ WBO2MaxSAT.convert wbo
         ".lsp" -> writeFile fname (lsp "")
         ".lp" -> MIP.writeLPFile fname lp
         ".mps" -> MIP.writeMPSFile fname lp
