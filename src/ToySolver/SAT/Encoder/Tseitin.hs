@@ -100,8 +100,8 @@ data Encoder m =
   { encSolver    :: a
   , encAddPBAtLeast :: Maybe (SAT.PBLinSum -> Integer -> m ())
   , encUsePB     :: !(MutVar (PrimState m) Bool)
-  , encConjTable :: !(MutVar (PrimState m) (Map SAT.LitSet (SAT.Lit, Bool, Bool)))
-  , encITETable  :: !(MutVar (PrimState m) (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Lit, Bool, Bool)))
+  , encConjTable :: !(MutVar (PrimState m) (Map SAT.LitSet (SAT.Var, Bool, Bool)))
+  , encITETable  :: !(MutVar (PrimState m) (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Var, Bool, Bool)))
   }
 
 instance Monad m => SAT.NewVar m (Encoder m) where
@@ -262,18 +262,18 @@ encodeConjWithPolarity encoder (Polarity pos neg) ls = do
           SAT.addClause encoder (l : map SAT.litNot (IntSet.toList ls2))
 
     case Map.lookup ls2 table of
-      Just (l, posDefined, negDefined) -> do
-        when (pos && not posDefined) $ definePos l
-        when (neg && not negDefined) $ defineNeg l
+      Just (v, posDefined, negDefined) -> do
+        when (pos && not posDefined) $ definePos v
+        when (neg && not negDefined) $ defineNeg v
         when (posDefined < pos || negDefined < neg) $
-          modifyMutVar (encConjTable encoder) (Map.insert ls2 (l, (max posDefined pos), (max negDefined neg)))
-        return l
+          modifyMutVar (encConjTable encoder) (Map.insert ls2 (v, (max posDefined pos), (max negDefined neg)))
+        return v
       Nothing -> do
-        l <- SAT.newVar encoder
-        when pos $ definePos l
-        when neg $ defineNeg l
-        modifyMutVar (encConjTable encoder) (Map.insert ls2 (l, pos, neg))
-        return l
+        v <- SAT.newVar encoder
+        when pos $ definePos v
+        when neg $ defineNeg v
+        modifyMutVar (encConjTable encoder) (Map.insert ls2 (v, pos, neg))
+        return v
 
 -- | Return an literal which is equivalent to a given disjunction.
 --
@@ -327,24 +327,27 @@ encodeITEWithPolarity encoder (Polarity pos neg) c t e = do
         SAT.addClause encoder [-t, -e, x] -- redundant, but will increase the strength of unit propagation.
 
   case Map.lookup (c,t,e) table of
-    Just (l, posDefined, negDefined) -> do
-      when (pos && not posDefined) $ definePos l
-      when (neg && not negDefined) $ defineNeg l
+    Just (v, posDefined, negDefined) -> do
+      when (pos && not posDefined) $ definePos v
+      when (neg && not negDefined) $ defineNeg v
       when (posDefined < pos || negDefined < neg) $
-        modifyMutVar (encITETable encoder) (Map.insert (c,t,e) (l, (max posDefined pos), (max negDefined neg)))
-      return l
+        modifyMutVar (encITETable encoder) (Map.insert (c,t,e) (v, (max posDefined pos), (max negDefined neg)))
+      return v
     Nothing -> do
-      l <- SAT.newVar encoder
-      when pos $ definePos l
-      when neg $ defineNeg l
-      modifyMutVar (encITETable encoder) (Map.insert (c,t,e) (l, pos, neg))
-      return l
+      v <- SAT.newVar encoder
+      when pos $ definePos v
+      when neg $ defineNeg v
+      modifyMutVar (encITETable encoder) (Map.insert (c,t,e) (v, pos, neg))
+      return v
 
 
-getDefinitions :: PrimMonad m => Encoder m -> m [(SAT.Lit, Formula)]
+getDefinitions :: PrimMonad m => Encoder m -> m [(SAT.Var, Formula)]
 getDefinitions encoder = do
-  t <- readMutVar (encConjTable encoder)
-  return $ [(l, andB [Atom l1 | l1 <- IntSet.toList ls]) | (ls, (l, _, _)) <- Map.toList t]
+  t1 <- readMutVar (encConjTable encoder)
+  t2 <- readMutVar (encITETable encoder)
+  let m1 = [(v, andB [Atom l1 | l1 <- IntSet.toList ls]) | (ls, (v, _, _)) <- Map.toList t1]
+      m2 = [(v, ite (Atom c) (Atom t) (Atom e)) | ((c,t,e), (v, _, _)) <- Map.toList t2]
+  return $ m1 ++ m2
 
 
 data Polarity
