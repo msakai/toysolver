@@ -1339,9 +1339,7 @@ case_evalFormula = do
       g m = (not x1 || (x3 && x4)) || (not x2 || (x3 && x5))
         where
           [x1,x2,x3,x4,x5] = elems m
-  let ms :: [SAT.Model]
-      ms = liftM (array (1,5)) $ sequence [[(x,val) | val <- [False,True]] | x <- xs]
-  forM_ ms $ \m -> do
+  forM_ (allAssignments 5) $ \m -> do
     Tseitin.evalFormula m f @?= g m
 
 ------------------------------------------------------------------------
