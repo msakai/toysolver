@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.WBO2MaxSAT
@@ -8,7 +8,7 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable (FlexibleContexts, MultiParamTypeClasses)
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.WBO2MaxSAT (convert) where
@@ -16,6 +16,7 @@ module ToySolver.Converter.WBO2MaxSAT (convert) where
 import Control.Applicative
 import Control.Monad
 import Control.Monad.ST
+import Data.Array.IArray
 import qualified Data.Foldable as F
 import Data.Monoid
 import Data.Sequence (Seq, (|>))
@@ -29,7 +30,7 @@ import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 
-convert :: PBFile.SoftFormula -> (MaxSAT.WCNF, SAT.Model -> SAT.Model)
+convert :: PBFile.SoftFormula -> (MaxSAT.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
 convert formula = runST $ do
   db <- newCNFStore
   SAT.newVars_ db (PBFile.wboNumVars formula)
@@ -73,7 +74,17 @@ convert formula = runST $ do
              , MaxSAT.topCost = top
              , MaxSAT.clauses = F.toList cs
              }
-  return (wcnf, SAT.restrictModel (PBFile.wboNumVars formula))
+
+  defs <- Tseitin.getDefinitions tseitin
+  let extendModel :: SAT.Model -> SAT.Model
+      extendModel m = array (1,nv) (assocs a)
+        where
+          -- Use BOXED array to tie the knot
+          a :: Array SAT.Var Bool
+          a = array (1,nv) $
+                assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
+
+  return (wcnf, extendModel, SAT.restrictModel (PBFile.wboNumVars formula))
 
 -- -----------------------------------------------------------------------------
 

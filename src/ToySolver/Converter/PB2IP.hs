@@ -26,8 +26,8 @@ import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Data.MIP ((.==.), (.<=.), (.>=.))
 import qualified ToySolver.SAT.Types as SAT
 
-convert :: PBFile.Formula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
-convert formula = (mip, mtrans (PBFile.pbNumVars formula))
+convert :: PBFile.Formula -> (MIP.Problem, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
+convert formula = (mip, mforth, mtrans (PBFile.pbNumVars formula))
   where
     mip = def
       { MIP.objectiveFunction = obj2
@@ -51,6 +51,9 @@ convert formula = (mip, mtrans (PBFile.pbNumVars formula))
         PBFile.Ge -> def{ MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2 }
         PBFile.Eq -> def{ MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2, MIP.constrUB = MIP.Finite rhs2 }
 
+    mforth :: SAT.Model -> Map MIP.Var Rational
+    mforth m = Map.fromList [(convVar v, if val then 1 else 0) | (v,val) <- assocs m]
+
 convExpr :: PBFile.Sum -> MIP.Expr
 convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
   where
@@ -62,8 +65,8 @@ convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
 convVar :: PBFile.Var -> MIP.Var
 convVar x = MIP.toVar ("x" ++ show x)
 
-convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
-convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
+convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
+convertWBO useIndicator formula = (mip, mforth, mtrans (PBFile.wboNumVars formula))
   where
     mip = def
       { MIP.objectiveFunction = obj2
@@ -86,12 +89,14 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
        Just t ->
           [ def{ MIP.constrExpr = MIP.objExpr obj2, MIP.constrUB = MIP.Finite (fromInteger t - 1) } ]
 
+    relaxVariables :: [(MIP.Var, PBFile.SoftConstraint)]
+    relaxVariables = [(MIP.toVar ("r" ++ show n), c) | (n, c) <- zip [(0::Int)..] (PBFile.wboConstraints formula)]
+
     cs2 :: [([(Integer, MIP.Var)], MIP.Constraint)]
     cs2 = do
-      (n, (w, (lhs,op,rhs))) <- zip [(0::Int)..] (PBFile.wboConstraints formula)
+      (v, (w, (lhs,op,rhs))) <- relaxVariables
       let (lhs2,c) = splitConst $ convExpr lhs
           rhs2 = fromIntegral rhs - c
-          v = MIP.toVar ("r" ++ show n)
           (ts,ind) =
             case w of
               Nothing -> ([], Nothing)
@@ -112,6 +117,19 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
              let (lhsLE,rhsLE) = relaxLE v (lhs2,rhs2)
                  c2 = lhsLE .<=. MIP.constExpr rhsLE
              [ (ts, c1), ([], c2) ]
+
+    mforth :: SAT.Model -> Map MIP.Var Rational
+    mforth m = Map.union m1 m2
+      where
+        m1 = Map.fromList $ [(convVar v, if val then 1 else 0) | (v,val) <- assocs m]
+        m2 = Map.fromList $ [(v, if evalPBConstraint m c then 0 else 1) | (v, (Just _, c)) <- relaxVariables]
+
+evalPBConstraint :: SAT.Model -> PBFile.Constraint -> Bool
+evalPBConstraint m (lhs,op,rhs) = op' (SAT.evalPBSum m lhs) rhs
+  where
+    op' = case op of
+            PBFile.Ge -> (>=)
+            PBFile.Eq -> (==)
 
 splitConst :: MIP.Expr -> (MIP.Expr, Rational)
 splitConst e = (e2, c)

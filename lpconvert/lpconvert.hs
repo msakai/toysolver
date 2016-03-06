@@ -107,7 +107,7 @@ readLP o fname = do
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
               let pb = transformPBFile o $ SAT2PB.convert cnf
-              let (mip, _) = PB2IP.convert pb
+              let (mip, _, _) = PB2IP.convert pb
               return mip
     ".wcnf" -> readWCNF
     ".gcnf" -> do
@@ -121,14 +121,14 @@ readLP o fname = do
         Left err -> hPrint stderr err >> exitFailure
         Right formula -> do
           let pb = transformPBFile o formula
-          let (mip, _) = PB2IP.convert pb
+          let (mip, _, _) = PB2IP.convert pb
           return mip
     ".wbo"  -> do
       ret <- PBFile.parseWBOFile fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
         Right formula -> do
-          let (mip, _) = PB2IP.convertWBO (IndicatorConstraint `elem` o) formula
+          let (mip, _, _) = PB2IP.convertWBO (IndicatorConstraint `elem` o) formula
           return mip
     ".lp"   -> do
       ret <- MIP.readLPFile fname
@@ -151,10 +151,10 @@ readLP o fname = do
     fromWCNF wcnf
       | MaxSATNonLinear `elem` o =
           let pb = transformPBFile o $ MaxSAT2NLPB.convert wcnf
-              (mip, _) = PB2IP.convert pb
+              (mip, _, _) = PB2IP.convert pb
           in mip
       | otherwise =
-          let (mip, _) = MaxSAT2IP.convert (IndicatorConstraint `elem` o) wcnf
+          let (mip, _, _) = MaxSAT2IP.convert (IndicatorConstraint `elem` o) wcnf
           in mip
 
 transformPBFile :: [Flag] -> PBFile.Formula -> PBFile.Formula

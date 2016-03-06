@@ -180,21 +180,31 @@ writePBFile o pb = do
     Just fname -> do
       let opb = case pb of
                   Left opb  -> opb
-                  Right wbo -> fst $ WBO2PB.convert wbo
+                  Right wbo ->
+                    case WBO2PB.convert wbo of
+                      (opb, _, _) -> opb
           wbo = case pb of
                   Left opb  -> PB2WBO.convert opb
                   Right wbo -> wbo
           lp  = case pb of
-                  Left opb  -> fst $ PB2IP.convert opb
-                  Right wbo -> fst $ PB2IP.convertWBO (IndicatorConstraint `elem` o) wbo
+                  Left opb  ->
+                    case PB2IP.convert opb of
+                      (ip, _, _) -> ip
+                  Right wbo ->
+                    case PB2IP.convertWBO (IndicatorConstraint `elem` o) wbo of
+                      (ip, _, _) -> ip
           lsp = case pb of
                   Left opb  -> PB2LSP.convert opb
                   Right wbo -> PB2LSP.convertWBO wbo
       case map toLower (takeExtension fname) of
         ".opb" -> PBFile.writeOPBFile fname opb
         ".wbo" -> PBFile.writeWBOFile fname wbo
-        ".cnf" -> CNF.writeFile fname $ fst $ PB2SAT.convert opb
-        ".wcnf" -> MaxSAT.writeFile fname $ fst $ WBO2MaxSAT.convert wbo
+        ".cnf" ->
+          case PB2SAT.convert opb of
+	    (cnf, _, _) -> CNF.writeFile fname cnf
+        ".wcnf" ->
+          case WBO2MaxSAT.convert wbo of
+            (wcnf, _, _) -> MaxSAT.writeFile fname wcnf
         ".lsp" -> writeFile fname (lsp "")
         ".lp" -> MIP.writeLPFile fname lp
         ".mps" -> MIP.writeMPSFile fname lp

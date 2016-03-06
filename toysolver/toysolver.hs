@@ -413,7 +413,7 @@ main = do
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
-              let (mip,mtrans) = SAT2IP.convert cnf
+              let (mip,_,mtrans) = SAT2IP.convert cnf
               run (getSolver o) o mip $ \m -> do
                 let m2 = mtrans m
                 satPrintModel stdout m2 0
@@ -423,7 +423,7 @@ main = do
           case ret of
             Left err -> hPutStrLn stderr err >> exitFailure
             Right pb -> do
-              let (mip,mtrans) = PB2IP.convert pb
+              let (mip,_,mtrans) = PB2IP.convert pb
               run (getSolver o) o mip $ \m -> do
                 let m2 = mtrans m
                 pbPrintModel stdout m2 0
@@ -433,7 +433,7 @@ main = do
           case ret of
             Left err -> hPutStrLn stderr err >> exitFailure
             Right wbo -> do
-              let (mip,mtrans) = PB2IP.convertWBO False wbo
+              let (mip,_,mtrans) = PB2IP.convertWBO False wbo
               run (getSolver o) o mip $ \m -> do
                 let m2 = mtrans m
                 pbPrintModel stdout m2 0
@@ -443,7 +443,7 @@ main = do
           case ret of
             Left err -> hPutStrLn stderr err >> exitFailure
             Right wcnf -> do
-              let (mip,mtrans) = MaxSAT2IP.convert False wcnf
+              let (mip,_,mtrans) = MaxSAT2IP.convert False wcnf
               run (getSolver o) o mip $ \m -> do
                 let m2 = mtrans m
                 maxsatPrintModel stdout m2 0

@@ -232,7 +232,7 @@ optimizeWBO solver strategy (nv,cs,top) = do
     Just c -> SAT.addPBAtMost solver obj (c-1)
   opt <- PBO.newOptimizer solver obj
   PBO.optimize opt
-  PBO.getBestSolution opt
+  liftM (fmap (\(m, val) -> (SAT.restrictModel nv m, val))) $ PBO.getBestSolution opt
 
 prop_solvePBNLC :: Property
 prop_solvePBNLC = QM.monadicIO $ do
@@ -257,7 +257,7 @@ solvePBNLC solver (nv,cs) = do
   ret <- SAT.solve solver
   if ret then do
     m <- SAT.getModel solver
-    return (Just m)
+    return $ Just $ SAT.restrictModel nv m
   else do
     return Nothing
 
@@ -1662,6 +1662,7 @@ case_DAA_allMUSAssumptions_2 = do
 
 ------------------------------------------------------------------------
 
+
 prop_pb2sat :: Property
 prop_pb2sat = QM.monadicIO $ do
   pb@(nv,cs) <- QM.pick arbitraryPB
@@ -1674,7 +1675,7 @@ prop_pb2sat = QM.monadicIO $ do
             , PBFile.pbNumConstraints = length cs
             , PBFile.pbConstraints = map f cs
             }
-  let (dimacs, _) = PB2SAT.convert opb
+  let (dimacs, mforth, mback) = PB2SAT.convert opb
   let cnf = (DIMACS.numVars dimacs, [elems c | c <- DIMACS.clauses dimacs])
 
   solver1 <- arbitrarySolver
@@ -1682,9 +1683,12 @@ prop_pb2sat = QM.monadicIO $ do
   ret1 <- QM.run $ solvePB solver1 pb
   ret2 <- QM.run $ solveCNF solver2 cnf
   QM.assert $ isJust ret1 == isJust ret2
+  case ret1 of
+    Nothing -> return ()
+    Just m -> QM.assert $ evalCNF (mforth m) cnf
   case ret2 of
     Nothing -> return ()
-    Just m -> QM.assert $ evalPB m pb
+    Just m -> QM.assert $ evalPB (mback m) pb
 
 prop_wbo2maxsat :: Property
 prop_wbo2maxsat = QM.monadicIO $ do
@@ -1698,7 +1702,7 @@ prop_wbo2maxsat = QM.monadicIO $ do
             , PBFile.wboConstraints = map f cs
             , PBFile.wboTopCost = top
             }
-  let (wcnf, _) = WBO2MaxSAT.convert wbo1'
+  let (wcnf, mforth, mback) = WBO2MaxSAT.convert wbo1'
       wbo2 = ( MaxSAT.numVars wcnf
              , [ ( if w == MaxSAT.topCost wcnf then Nothing else Just w
                  , (PBRelGE, [(1,l) | l <- clause], 1)
@@ -1714,9 +1718,12 @@ prop_wbo2maxsat = QM.monadicIO $ do
   ret1 <- QM.run $ optimizeWBO solver1 strategy wbo1
   ret2 <- QM.run $ optimizeWBO solver2 strategy wbo2
   QM.assert $ isJust ret1 == isJust ret2
+  case ret1 of
+    Nothing -> return ()
+    Just (m,val) -> QM.assert $ evalWBO (mforth m) wbo2 == Just val
   case ret2 of
     Nothing -> return ()
-    Just (m,val) -> QM.assert $ evalWBO m wbo1 == Just val
+    Just (m,val) -> QM.assert $ evalWBO (mback m) wbo1 == Just val
 
 ------------------------------------------------------------------------
 

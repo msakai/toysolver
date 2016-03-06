@@ -22,5 +22,5 @@ import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Converter.PB2IP as PB2IP
 import qualified ToySolver.Converter.SAT2PB as SAT2PB
 
-convert :: DIMACS.CNF -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
+convert :: DIMACS.CNF -> (MIP.Problem, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
 convert cnf = PB2IP.convert (SAT2PB.convert cnf)

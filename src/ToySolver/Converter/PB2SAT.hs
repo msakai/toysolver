@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB2SAT
@@ -8,7 +8,7 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable (FlexibleContexts, MultiParamTypeClasses)
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2SAT (convert) where
@@ -28,7 +28,14 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 
-convert :: PBFile.Formula -> (DIMACS.CNF, SAT.Model -> SAT.Model)
+-- | Convert a pseudo boolean formula φ to a equisatisfiable CNF formula ψ
+-- together with two functions f and g such that:
+--
+-- * if M ⊨ φ then f(M) ⊨ ψ
+--
+-- * if M ⊨ ψ then g(M) ⊨ φ
+-- 
+convert :: PBFile.Formula -> (DIMACS.CNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
 convert formula = runST $ do
   db <- newCNFStore
   SAT.newVars_ db (PBFile.pbNumVars formula)
@@ -45,7 +52,17 @@ convert formula = runST $ do
             , DIMACS.numClauses = Seq.length cs
             , DIMACS.clauses = [listArray (0, length c - 1) c | c <- toList cs]
             }
-  return (cnf, SAT.restrictModel nv)
+
+  defs <- Tseitin.getDefinitions tseitin
+  let extendModel :: SAT.Model -> SAT.Model
+      extendModel m = array (1,nv) (assocs a)
+        where
+          -- Use BOXED array to tie the knot
+          a :: Array SAT.Var Bool
+          a = array (1,nv) $
+                assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
+
+  return (cnf, extendModel, SAT.restrictModel nv)
 
 -- -----------------------------------------------------------------------------
 
