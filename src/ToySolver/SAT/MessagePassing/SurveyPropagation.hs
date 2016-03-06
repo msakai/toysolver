@@ -15,7 +15,7 @@
 -- * Alfredo Braunstein, Marc Mézard and Riccardo Zecchina.
 --   Survey Propagation: An Algorithm for Satisfiability,
 --   <http://arxiv.org/abs/cs/0212002>
-
+--
 -- * Corrie Scalisi. Visualizing Survey Propagation in 3-SAT Factor Graphs,
 --   <http://classes.soe.ucsc.edu/cmps290c/Winter06/proj/corriereport.pdf>.
 --
@@ -128,9 +128,13 @@ newSolver nv clauses = do
 
   -- Initialize all surveys with non-zero values.
   -- If we initialize to zero, following trivial solution exists:
-  -- * η_{a→i} = 0 for all i and a.
-  -- * Π^0_{i→a} = 1, Π^u_{i→a} = Π^s_{i→a} = 0 for all i and a,
-  -- * \^{Π}^{0}_i = 1, \^{Π}^{+}_i = \^{Π}^{-}_i = 0
+  -- 
+  -- η_{a→i} = 0 for all i and a.
+  -- 
+  -- Π^0_{i→a} = 1, Π^u_{i→a} = Π^s_{i→a} = 0 for all i and a,
+  -- 
+  -- \^{Π}^{0}_i = 1, \^{Π}^{+}_i = \^{Π}^{-}_i = 0
+  -- 
   edgeSurvey  <- VGM.replicate num_edges 0.5
   edgeProbU   <- VGM.new num_edges
 
