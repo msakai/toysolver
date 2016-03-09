@@ -302,6 +302,8 @@ Library
      ToySolver.SAT.PBO.BCD2
      ToySolver.SAT.PBO.MSU4
      ToySolver.SAT.PBO.UnsatBased
+     ToySolver.SAT.Store.CNF
+     ToySolver.SAT.Store.PB
      ToySolver.SAT.TheorySolver
      ToySolver.SAT.Types
      ToySolver.SAT.Printer
