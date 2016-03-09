@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.Store.PB
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (FlexibleContexts, MultiParamTypeClasses)
+-- Portability :  non-portable (FlexibleContexts, FlexibleInstances, MultiParamTypeClasses)
 --
 -----------------------------------------------------------------------------
 module ToySolver.SAT.Store.PB
@@ -17,48 +17,48 @@ module ToySolver.SAT.Store.PB
   , getPBFormula
   ) where
 
-import Control.Monad.ST
+import Control.Monad.Primitive
 import Data.Foldable (toList)
+import Data.Primitive.MutVar
 import Data.Sequence (Seq, (|>))
 import qualified Data.Sequence as Seq
-import Data.STRef
 import qualified Data.PseudoBoolean as PBFile
 import qualified ToySolver.SAT.Types as SAT
 
-data PBStore s = PBStore (STRef s Int) (STRef s (Seq PBFile.Constraint))
+data PBStore m = PBStore (MutVar (PrimState m) Int) (MutVar (PrimState m) (Seq PBFile.Constraint))
 
-instance SAT.NewVar (ST s) (PBStore s) where
+instance PrimMonad m => SAT.NewVar m (PBStore m) where
   newVar (PBStore ref _) = do
-    modifySTRef' ref (+1)
-    readSTRef ref
+    modifyMutVar' ref (+1)
+    readMutVar ref
 
-instance SAT.AddClause (ST s) (PBStore s) where
+instance PrimMonad m => SAT.AddClause m (PBStore m) where
   addClause enc clause = SAT.addPBNLAtLeast enc [(1,[l]) | l <- clause] 1
 
-instance SAT.AddCardinality (ST s) (PBStore s) where
+instance PrimMonad m => SAT.AddCardinality m (PBStore m) where
   addAtLeast enc lhs rhs = SAT.addPBNLAtLeast enc [(1,[l]) | l <- lhs] (fromIntegral rhs)
 
-instance SAT.AddPBLin (ST s) (PBStore s) where
+instance PrimMonad m => SAT.AddPBLin m (PBStore m) where
   addPBAtLeast enc lhs rhs = SAT.addPBNLAtLeast enc [(c,[l]) | (c,l) <- lhs] rhs
   addPBAtMost enc lhs rhs  = SAT.addPBNLAtMost enc  [(c,[l]) | (c,l) <- lhs] rhs
   addPBExactly enc lhs rhs = SAT.addPBNLExactly enc [(c,[l]) | (c,l) <- lhs] rhs
 
-instance SAT.AddPBNL (ST s) (PBStore s) where
+instance PrimMonad m => SAT.AddPBNL m (PBStore m) where
   addPBNLAtLeast (PBStore _ ref) lhs rhs = do
-    modifySTRef ref (|> (lhs, PBFile.Ge, rhs))
+    modifyMutVar ref (|> (lhs, PBFile.Ge, rhs))
   addPBNLExactly (PBStore _ ref) lhs rhs = do
-    modifySTRef ref (|> (lhs, PBFile.Eq, rhs))
+    modifyMutVar ref (|> (lhs, PBFile.Eq, rhs))
 
-newPBStore :: ST s (PBStore s)
+newPBStore :: PrimMonad m => m (PBStore m)
 newPBStore = do
-  ref1 <- newSTRef 0
-  ref2 <- newSTRef Seq.empty
+  ref1 <- newMutVar 0
+  ref2 <- newMutVar Seq.empty
   return (PBStore ref1 ref2)
 
-getPBFormula :: PBStore s -> ST s (PBFile.Formula)
+getPBFormula :: PrimMonad m => PBStore m -> m (PBFile.Formula)
 getPBFormula (PBStore ref1 ref2) = do
-  nv <- readSTRef ref1
-  cs <- readSTRef ref2
+  nv <- readMutVar ref1
+  cs <- readMutVar ref2
   return $
     PBFile.Formula
     { PBFile.pbObjectiveFunction = Nothing

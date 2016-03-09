@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.Store.CNF
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (FlexibleContexts, MultiParamTypeClasses)
+-- Portability :  non-portable (FlexibleContexts, FlexibleInstances, MultiParamTypeClasses)
 --
 -----------------------------------------------------------------------------
 module ToySolver.SAT.Store.CNF
@@ -17,33 +17,33 @@ module ToySolver.SAT.Store.CNF
   , getCNFFormula
   ) where
 
-import Control.Monad.ST
+import Control.Monad.Primitive
+import Data.Primitive.MutVar
 import Data.Sequence (Seq, (|>))
 import qualified Data.Sequence as Seq
-import Data.STRef
 import qualified ToySolver.SAT.Types as SAT
 
-data CNFStore s = CNFStore (STRef s Int) (STRef s (Seq SAT.Clause))
+data CNFStore m = CNFStore (MutVar (PrimState m) Int) (MutVar (PrimState m) (Seq SAT.Clause))
 
-instance SAT.NewVar (ST s) (CNFStore s) where
+instance PrimMonad m => SAT.NewVar m (CNFStore m) where
   newVar (CNFStore ref _) = do
-    modifySTRef' ref (+1)
-    readSTRef ref
+    modifyMutVar' ref (+1)
+    readMutVar ref
 
-instance SAT.AddClause (ST s) (CNFStore s) where
+instance PrimMonad m => SAT.AddClause m (CNFStore m) where
   addClause (CNFStore _ ref) clause =
     case SAT.normalizeClause clause of
-      Just clause' -> modifySTRef ref (|> clause')
+      Just clause' -> modifyMutVar ref (|> clause')
       Nothing -> return ()
 
-newCNFStore :: ST s (CNFStore s)
+newCNFStore :: PrimMonad m => m (CNFStore m)
 newCNFStore = do
-  ref1 <- newSTRef 0
-  ref2 <- newSTRef Seq.empty
+  ref1 <- newMutVar 0
+  ref2 <- newMutVar Seq.empty
   return (CNFStore ref1 ref2)
 
-getCNFFormula :: CNFStore s -> ST s (Int, Seq SAT.Clause)
+getCNFFormula :: PrimMonad m => CNFStore m -> m (Int, Seq SAT.Clause)
 getCNFFormula (CNFStore ref1 ref2) = do
-  nv <- readSTRef ref1
-  cs <- readSTRef ref2
+  nv <- readMutVar ref1
+  cs <- readMutVar ref2
   return (nv, cs)
