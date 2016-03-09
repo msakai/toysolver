@@ -43,6 +43,7 @@ import qualified Data.PseudoBoolean as PBFile
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import qualified ToySolver.Converter.PB2SAT as PB2SAT
 import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
+import qualified ToySolver.Converter.WBO2PB as WBO2PB
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 
 import ToySolver.Data.OrdRel
@@ -260,6 +261,25 @@ solvePBNLC solver (nv,cs) = do
     return $ Just $ SAT.restrictModel nv m
   else do
     return Nothing
+
+optimizePBNLC
+  :: SAT.Solver
+  -> PBO.SearchStrategy
+  -> (Int, SAT.PBSum, [(PBRel,SAT.PBSum,Integer)])
+  -> IO (Maybe (SAT.Model, Integer))
+optimizePBNLC solver strategy (nv,obj,cs) = do
+  SAT.newVars_ solver nv
+  enc <- PBNLC.newEncoder solver =<< Tseitin.newEncoder solver
+  forM_ cs $ \(o,lhs,rhs) -> do
+    case o of
+      PBRelGE -> PBNLC.addPBNLAtLeast enc lhs rhs
+      PBRelLE -> PBNLC.addPBNLAtMost enc lhs rhs
+      PBRelEQ -> PBNLC.addPBNLExactly enc lhs rhs
+  obj2 <- PBNLC.linearizePBSumWithPolarity enc Tseitin.polarityNeg obj
+  opt <- PBO.newOptimizer2 solver obj2 (\m -> SAT.evalPBSum m obj)
+  PBO.setSearchStrategy opt strategy
+  PBO.optimize opt
+  liftM (fmap (\(m, val) -> (SAT.restrictModel nv m, val))) $ PBO.getBestSolution opt
 
 arbitraryPBNLC :: Gen (Int,[(PBRel,SAT.PBSum,Integer)])
 arbitraryPBNLC = do
@@ -1724,6 +1744,40 @@ prop_wbo2maxsat = QM.monadicIO $ do
   case ret2 of
     Nothing -> return ()
     Just (m,val) -> QM.assert $ evalWBO (mback m) wbo1 == Just val
+
+prop_wbo2pb :: Property
+prop_wbo2pb = QM.monadicIO $ do
+  wbo@(nv,cs,top) <- QM.pick arbitraryWBO
+  let f (w,(PBRelGE,lhs,rhs)) = (w,([(c,[l]) | (c,l) <- lhs], PBFile.Ge, rhs))
+      f (w,(PBRelLE,lhs,rhs)) = (w,([(-c,[l]) | (c,l) <- lhs], PBFile.Ge, -rhs))
+      f (w,(PBRelEQ,lhs,rhs)) = (w,([(c,[l]) | (c,l) <- lhs], PBFile.Eq, rhs))
+  let wbo' = PBFile.SoftFormula
+            { PBFile.wboNumVars = nv
+            , PBFile.wboNumConstraints = length cs
+            , PBFile.wboConstraints = map f cs
+            , PBFile.wboTopCost = top
+            }
+  let (opb, mforth, mback) = WBO2PB.convert wbo'
+      obj = fromMaybe [] $ PBFile.pbObjectiveFunction opb
+      f (lhs, PBFile.Ge, rhs) = (PBRelGE, lhs, rhs)
+      f (lhs, PBFile.Eq, rhs) = (PBRelEQ, lhs, rhs)
+      cs2 = map f (PBFile.pbConstraints opb)
+      pb = (PBFile.pbNumVars opb, obj, cs2)
+
+  solver1 <- arbitrarySolver
+  solver2 <- arbitrarySolver
+  strategy <- QM.pick arbitrary
+  ret1 <- QM.run $ optimizeWBO solver1 strategy wbo
+  ret2 <- QM.run $ optimizePBNLC solver2 strategy pb
+  QM.assert $ isJust ret1 == isJust ret2
+  case ret1 of
+    Nothing -> return ()
+    Just (m,val) -> do
+      QM.assert $ evalPBNLC (mforth m) (PBFile.pbNumVars opb, cs2)
+      QM.assert $ SAT.evalPBSum (mforth m) obj == val
+  case ret2 of
+    Nothing -> return ()
+    Just (m,val) -> QM.assert $ evalWBO (mback m) wbo == Just val
 
 ------------------------------------------------------------------------
 

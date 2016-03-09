@@ -2,7 +2,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.WBO2PB
--- Copyright   :  (c) Masahiro Sakai 2013
+-- Copyright   :  (c) Masahiro Sakai 2013,2016
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -12,50 +12,56 @@
 -----------------------------------------------------------------------------
 module ToySolver.Converter.WBO2PB (convert) where
 
+import Control.Applicative
+import Control.Monad
+import Control.Monad.ST
 import Data.Array.IArray
+import Data.STRef
 import qualified ToySolver.SAT.Types as SAT
+import ToySolver.SAT.Store.PB
 import qualified Data.PseudoBoolean as PBFile
 
 convert :: PBFile.SoftFormula -> (PBFile.Formula, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
-convert wbo = (formula, mforth, SAT.restrictModel nv)
-  where
-    nv = PBFile.wboNumVars wbo
+convert wbo = runST $ do
+  let nv = PBFile.wboNumVars wbo
+  db <- newPBStore
+  SAT.newVars_ db nv
 
-    cm  = zip [nv+1..] (PBFile.wboConstraints wbo)
-    obj = [(w, [i]) | (i, (Just w,_)) <- cm]
+  objRef <- newSTRef []
+  defsRef <- newSTRef []
+  forM_ (PBFile.wboConstraints wbo) $ \(cost, constr) -> do
+    case cost of
+      Nothing -> do
+        case constr of
+          (lhs, PBFile.Ge, rhs) -> SAT.addPBNLAtLeast db lhs rhs
+          (lhs, PBFile.Eq, rhs) -> SAT.addPBNLExactly db lhs rhs
+      Just w -> do
+        sel <- SAT.newVar db
+        case constr of
+          (lhs, PBFile.Ge, rhs) -> SAT.addPBNLAtLeastSoft db sel lhs rhs
+          (lhs, PBFile.Eq, rhs) -> SAT.addPBNLExactlySoft db sel lhs rhs
+        modifySTRef objRef ((w,[-sel]) :)
+        modifySTRef defsRef ((sel,constr) :)
+  obj <- reverse <$> readSTRef objRef
+  defs <- reverse <$> readSTRef defsRef
 
-    f :: (PBFile.Var, PBFile.SoftConstraint) -> [PBFile.Constraint]
-    f (_, (Nothing, c)) = return c
-    f (i, (Just _, c))  = relax i c
+  case PBFile.wboTopCost wbo of
+    Nothing -> return ()
+    Just t -> SAT.addPBNLAtMost db obj (t - 1)
 
-    relax :: PBFile.Var -> PBFile.Constraint -> [PBFile.Constraint]
-    relax i (lhs, PBFile.Ge, rhs) = [((d, [i]) : lhs, PBFile.Ge, rhs)]
-      where
-        d = rhs - SAT.pbLowerBound [(c,1) | (c,_) <- lhs]
-    relax i (lhs, PBFile.Eq, rhs) =
-      relax i (lhs, PBFile.Ge, rhs) ++
-      relax i ([(-c,ls) | (c,ls) <- lhs], PBFile.Ge, - rhs)
+  formula <- getPBFormula db
 
-    topConstr :: [PBFile.Constraint]
-    topConstr = 
-     case PBFile.wboTopCost wbo of
-       Nothing -> []
-       Just t -> [([(-c,ls) | (c,ls) <- obj], PBFile.Ge, - (t - 1))]
+  let mforth :: SAT.Model -> SAT.Model
+      mforth m = array (1, (PBFile.pbNumVars formula)) $ assocs m ++ [(v, evalPBConstraint m constr) | (v, constr) <- defs]
 
-    nv2 = nv + PBFile.wboNumConstraints wbo
+      mback :: SAT.Model -> SAT.Model
+      mback = SAT.restrictModel nv
 
-    formula =
-      PBFile.Formula
-      { PBFile.pbObjectiveFunction = Just obj
-      , PBFile.pbConstraints = cs
-      , PBFile.pbNumVars = nv2
-      , PBFile.pbNumConstraints = length cs
-      }
-      where
-        cs = topConstr ++ concatMap f cm
-
-    mforth :: SAT.Model -> SAT.Model
-    mforth m = array (1, nv2) $ assocs m ++ [(v, not (evalPBConstraint m c)) | (v, (_, c)) <- cm]
+  return
+    ( formula{ PBFile.pbObjectiveFunction = Just obj }
+    , mforth
+    , mback
+    )
 
 evalPBConstraint :: SAT.Model -> PBFile.Constraint -> Bool
 evalPBConstraint m (lhs,op,rhs) = op' (SAT.evalPBSum m lhs) rhs
