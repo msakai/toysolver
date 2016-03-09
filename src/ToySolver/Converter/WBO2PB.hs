@@ -29,19 +29,38 @@ convert wbo = runST $ do
 
   objRef <- newSTRef []
   defsRef <- newSTRef []
-  forM_ (PBFile.wboConstraints wbo) $ \(cost, constr) -> do
+  forM_ (PBFile.wboConstraints wbo) $ \(cost, constr@(lhs,op,rhs)) -> do
     case cost of
       Nothing -> do
-        case constr of
-          (lhs, PBFile.Ge, rhs) -> SAT.addPBNLAtLeast db lhs rhs
-          (lhs, PBFile.Eq, rhs) -> SAT.addPBNLExactly db lhs rhs
+        case op of
+          PBFile.Ge -> SAT.addPBNLAtLeast db lhs rhs
+          PBFile.Eq -> SAT.addPBNLExactly db lhs rhs
       Just w -> do
-        sel <- SAT.newVar db
-        case constr of
-          (lhs, PBFile.Ge, rhs) -> SAT.addPBNLAtLeastSoft db sel lhs rhs
-          (lhs, PBFile.Eq, rhs) -> SAT.addPBNLExactlySoft db sel lhs rhs
-        modifySTRef objRef ((w,[-sel]) :)
-        modifySTRef defsRef ((sel,constr) :)
+        case op of
+          PBFile.Ge -> do
+            case lhs of
+              [(1,ls)] | rhs == 1 -> do
+                -- ∧L ≥ 1 ⇔ ∧L
+                -- obj += w * (1 - ∧L)
+                modifySTRef objRef (\obj -> (w,[]) : (-w,ls) : obj)
+              [(-1,ls)] | rhs == 0 -> do
+                -- -1*∧L ≥ 0 ⇔ (1 - ∧L) ≥ 1 ⇔ ￢∧L
+                -- obj += w * ∧L
+                modifySTRef objRef ((w,ls) :)
+              _ | and [c==1 && length ls == 1 | (c,ls) <- lhs] && rhs == 1 -> do
+                -- ∑L ≥ 1 ⇔ ∨L ⇔ ￢∧￢L
+                -- obj += w * ∧￢L
+                modifySTRef objRef ((w, [-l | (_,[l]) <- lhs]) :)
+              _ -> do
+                sel <- SAT.newVar db
+                SAT.addPBNLAtLeastSoft db sel lhs rhs
+                modifySTRef objRef ((w,[-sel]) :)
+                modifySTRef defsRef ((sel,constr) :)
+          PBFile.Eq -> do
+            sel <- SAT.newVar db
+            SAT.addPBNLExactlySoft db sel lhs rhs
+            modifySTRef objRef ((w,[-sel]) :)
+            modifySTRef defsRef ((sel,constr) :)
   obj <- reverse <$> readSTRef objRef
   defs <- reverse <$> readSTRef defsRef
 
