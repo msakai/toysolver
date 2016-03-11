@@ -254,6 +254,14 @@ propagate solver = do
   svOutputMessage solver $ "MAX_COMPUTE_UNITS = " ++ show maxComputeUnits
   svOutputMessage solver $ "MAX_WORK_GROUP_SIZE = " ++ show maxWorkGroupSize
   svOutputMessage solver $ "MAX_WORK_ITEM_SIZES = " ++ show maxWorkItemSizes
+  (globalMemSize :: Int) <- fromIntegral <$> clGetDeviceGlobalMemSize dev
+  (localMemSize :: Int) <- fromIntegral <$> clGetDeviceLocalMemSize dev
+  (maxConstantBufferSize :: Int) <- fromIntegral <$> clGetDeviceMaxConstantBufferSize dev
+  (maxConstantArgs :: Int) <- fromIntegral <$> clGetDeviceMaxConstantArgs dev
+  svOutputMessage solver $ "GLOBAL_MEM_SIZE = " ++ show globalMemSize
+  svOutputMessage solver $ "LOCAL_MEM_SIZE = " ++ show localMemSize
+  svOutputMessage solver $ "MAX_CONSTANT_BUFFER_SIZE = " ++ show maxConstantBufferSize
+  svOutputMessage solver $ "MAX_CONSTANT_ARGS = " ++ show maxConstantArgs
 
   let defaultNumGroups = maxComputeUnits * 4
 
