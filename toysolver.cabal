@@ -635,6 +635,9 @@ Executable spcl
   HS-Source-Dirs: samples/programs/spcl
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  -- We use threaded RTS to avoid the error "schedule: re-entered unsafely.
+  -- Perhaps a 'foreign import unsafe' should be 'safe'?" on NVIDIA CUDA.
+  GHC-Options: -threaded
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
