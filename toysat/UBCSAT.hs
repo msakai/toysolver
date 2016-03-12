@@ -9,14 +9,26 @@ import Data.Char
 import Data.Either
 import Data.Function
 import Data.List
+import System.IO
+import System.IO.Temp
 import System.Process
 import Text.ParserCombinators.Parsec hiding (try)
 
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 
-ubcsat :: FilePath -> FilePath -> MaxSAT.WCNF -> IO (Maybe SAT.Model)
-ubcsat cmd fname wcnf = do
+ubcsat :: FilePath -> FilePath -> MaxSAT.WCNF -> [SAT.Lit] -> IO (Maybe SAT.Model)
+ubcsat cmd fname wcnf [] = ubcsat' cmd fname wcnf Nothing
+ubcsat cmd fname wcnf initLits = do
+  withSystemTempFile ".txt" $ \varInitFile h -> do
+    hSetBinaryMode h True
+    hSetBuffering h (BlockBuffering Nothing)
+    hPutStrLn h $ intercalate " "  (map show initLits)
+    hClose h
+    ubcsat' cmd fname wcnf (Just varInitFile)
+
+ubcsat' :: FilePath -> FilePath -> MaxSAT.WCNF -> Maybe FilePath -> IO (Maybe SAT.Model)
+ubcsat' cmd fname wcnf varInitFile = do
   let args =
         [ "-w" | ".wcnf" `isSuffixOf` map toLower fname] ++
         [ "-alg", "irots"
@@ -26,7 +38,10 @@ ubcsat cmd fname wcnf = do
         , "-solve"
         , "-r", "bestsol"
         , "-inst", fname
-        ]
+        ] ++
+        (case varInitFile of
+           Nothing -> []
+           Just fname2 -> ["-varinitfile", fname2])
       stdinStr = ""
     
   putStrLn $ "c Running " ++ show cmd ++ " with " ++ show args

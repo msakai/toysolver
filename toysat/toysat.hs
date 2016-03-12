@@ -16,6 +16,7 @@
 
 module Main where
 
+import Control.Applicative
 import Control.Concurrent (getNumCapabilities)
 import Control.Concurrent.Timeout
 import Control.Monad
@@ -649,6 +650,7 @@ solvePB opt solver formula = do
       initialModel <- 
         if optLocalSearchInitial opt then do
           let (wcnf, _, mtrans) = WBO2MaxSAT.convert $ PB2WBO.convert formula
+          fixed <- filter (\lit -> abs lit <= nv) <$> SAT.getFixedLiterals solver
           dir <- case optTempDir opt of
                    Just dir -> return dir
                    Nothing -> getTemporaryDirectory
@@ -657,7 +659,7 @@ solvePB opt solver formula = do
             hSetBuffering h (BlockBuffering Nothing)
             MaxSAT.hPutWCNF h wcnf
             hClose h
-            liftM (fmap mtrans) $ UBCSAT.ubcsat (optUBCSAT opt) fname wcnf
+            liftM (fmap mtrans) $ UBCSAT.ubcsat (optUBCSAT opt) fname wcnf fixed
         else
           return Nothing
 
@@ -783,9 +785,10 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
 
   initialModel <- liftM (fmap mtrans) $ 
     if optLocalSearchInitial opt then do
+      fixed <- filter (\lit -> abs lit <= nv) <$> SAT.getFixedLiterals solver
       case wcnfFileName of
         Just fname | or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"]] -> do
-          UBCSAT.ubcsat (optUBCSAT opt) fname wcnf
+          UBCSAT.ubcsat (optUBCSAT opt) fname wcnf fixed
         _ -> do
           dir <- case optTempDir opt of
                    Just dir -> return dir
@@ -795,7 +798,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
             hSetBuffering h (BlockBuffering Nothing)
             MaxSAT.hPutWCNF h wcnf
             hClose h
-            UBCSAT.ubcsat (optUBCSAT opt) fname wcnf
+            UBCSAT.ubcsat (optUBCSAT opt) fname wcnf fixed
     else
       return Nothing
 
