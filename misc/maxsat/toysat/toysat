@@ -1,2 +1,5 @@
 #!/bin/sh
-./toysat_main +RTS -H1G -K1G -RTS --search=bcd2 --maxsat $@
+tempdir=/tmp/toysat-$$-$1
+./toysat_main +RTS -H1G -K1G -RTS --search=bcd2 --temp-dir=$tempdir --maxsat $@
+rm -r $tempdir
+
