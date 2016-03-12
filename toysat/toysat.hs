@@ -16,7 +16,6 @@
 
 module Main where
 
-import Control.Applicative
 import Control.Concurrent (getNumCapabilities)
 import Control.Concurrent.Timeout
 import Control.Monad
@@ -37,8 +36,6 @@ import qualified Data.Vector.Unboxed as V
 import Data.Version
 import Data.Time
 import System.IO
-import System.IO.Temp
-import System.Directory
 import System.Environment
 import System.Exit
 #if !MIN_VERSION_time(1,5,0)
@@ -84,7 +81,7 @@ import qualified ToySolver.Text.GurobiSol as GurobiSol
 import ToySolver.Version
 import ToySolver.Internal.Util (showRational, setEncodingChar8)
 
-import UBCSAT
+import qualified UBCSAT
 
 -- ------------------------------------------------------------------------
 
@@ -651,15 +648,14 @@ solvePB opt solver formula = do
         if optLocalSearchInitial opt then do
           let (wcnf, _, mtrans) = WBO2MaxSAT.convert $ PB2WBO.convert formula
           fixed <- filter (\lit -> abs lit <= nv) <$> SAT.getFixedLiterals solver
-          dir <- case optTempDir opt of
-                   Just dir -> return dir
-                   Nothing -> getTemporaryDirectory
-          withTempFile dir ".wcnf" $ \fname h -> do
-            hSetBinaryMode h True
-            hSetBuffering h (BlockBuffering Nothing)
-            MaxSAT.hPutWCNF h wcnf
-            hClose h
-            liftM (fmap mtrans) $ UBCSAT.ubcsat (optUBCSAT opt) fname wcnf fixed
+          let opt2 =
+                def
+                { UBCSAT.optCommand = optUBCSAT opt
+                , UBCSAT.optTempDir = optTempDir opt
+                , UBCSAT.optProblem = wcnf
+                , UBCSAT.optFixedLiterals = fixed
+                }
+          liftM (fmap mtrans) $ UBCSAT.ubcsat opt2
         else
           return Nothing
 
@@ -786,19 +782,18 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
   initialModel <- liftM (fmap mtrans) $ 
     if optLocalSearchInitial opt then do
       fixed <- filter (\lit -> abs lit <= nv) <$> SAT.getFixedLiterals solver
-      case wcnfFileName of
-        Just fname | or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"]] -> do
-          UBCSAT.ubcsat (optUBCSAT opt) fname wcnf fixed
-        _ -> do
-          dir <- case optTempDir opt of
-                   Just dir -> return dir
-                   Nothing -> getTemporaryDirectory
-          withTempFile dir ".wcnf" $ \fname h -> do
-            hSetBinaryMode h True
-            hSetBuffering h (BlockBuffering Nothing)
-            MaxSAT.hPutWCNF h wcnf
-            hClose h
-            UBCSAT.ubcsat (optUBCSAT opt) fname wcnf fixed
+      let opt2 =
+            def
+            { UBCSAT.optCommand = optUBCSAT opt
+            , UBCSAT.optTempDir = optTempDir opt
+            , UBCSAT.optProblem = wcnf
+            , UBCSAT.optProblemFile = do
+                fname <- wcnfFileName
+                guard $ or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"]]
+                return fname
+            , UBCSAT.optFixedLiterals = fixed
+            }
+      UBCSAT.ubcsat opt2
     else
       return Nothing
 

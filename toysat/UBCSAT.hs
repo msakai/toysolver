@@ -1,14 +1,19 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
-module UBCSAT (ubcsat) where
+module UBCSAT
+  ( ubcsat
+  , Options (..)
+  ) where
 
 import Control.Exception
 import Control.Monad
 import Data.Array.IArray
 import Data.Char
+import Data.Default
 import Data.Either
 import Data.Function
 import Data.List
+import System.Directory
 import System.IO
 import System.IO.Temp
 import System.Process
@@ -17,18 +22,59 @@ import Text.ParserCombinators.Parsec hiding (try)
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 
-ubcsat :: FilePath -> FilePath -> MaxSAT.WCNF -> [SAT.Lit] -> IO (Maybe SAT.Model)
-ubcsat cmd fname wcnf [] = ubcsat' cmd fname wcnf Nothing
-ubcsat cmd fname wcnf initLits = do
-  withSystemTempFile ".txt" $ \varInitFile h -> do
-    hSetBinaryMode h True
-    hSetBuffering h (BlockBuffering Nothing)
-    hPutStrLn h $ intercalate " "  (map show initLits)
-    hClose h
-    ubcsat' cmd fname wcnf (Just varInitFile)
+data Options
+  = Options
+  { optCommand :: FilePath
+  , optTempDir :: Maybe FilePath
+  , optProblem :: MaxSAT.WCNF
+  , optProblemFile :: Maybe FilePath
+  , optFixedLiterals :: [SAT.Lit]
+  }
 
-ubcsat' :: FilePath -> FilePath -> MaxSAT.WCNF -> Maybe FilePath -> IO (Maybe SAT.Model)
-ubcsat' cmd fname wcnf varInitFile = do
+instance Default Options where
+  def = Options
+        { optCommand = "ubcsat"
+        , optTempDir = Nothing
+        , optProblem =
+            MaxSAT.WCNF
+            { MaxSAT.numVars    = 0
+            , MaxSAT.numClauses = 0
+            , MaxSAT.topCost    = 1
+            , MaxSAT.clauses    = []
+            }
+        , optProblemFile   = Nothing
+        , optFixedLiterals = []
+        }
+
+ubcsat :: Options -> IO (Maybe SAT.Model)
+ubcsat opt = do
+  dir <- case optTempDir opt of
+           Just dir -> return dir
+           Nothing -> getTemporaryDirectory
+
+  let f fname
+        | null (optFixedLiterals opt) = ubcsat' opt fname Nothing
+        | otherwise = do
+            withTempFile dir ".txt" $ \varInitFile h -> do
+              hSetBinaryMode h True
+              hSetBuffering h (BlockBuffering Nothing)
+              hPutStrLn h $ intercalate " "  (map show (optFixedLiterals opt))
+              hClose h
+              ubcsat' opt fname (Just varInitFile)
+
+  case optProblemFile opt of
+    Just fname -> f fname
+    Nothing -> do
+      withTempFile dir ".wcnf" $ \fname h -> do
+        hSetBinaryMode h True
+        hSetBuffering h (BlockBuffering Nothing)
+        MaxSAT.hPutWCNF h (optProblem opt)
+        hClose h
+        f fname
+
+ubcsat' :: Options -> FilePath -> Maybe FilePath -> IO (Maybe SAT.Model)
+ubcsat' opt fname varInitFile = do
+  let wcnf = optProblem opt
   let args =
         [ "-w" | ".wcnf" `isSuffixOf` map toLower fname] ++
         [ "-alg", "irots"
@@ -43,9 +89,9 @@ ubcsat' cmd fname wcnf varInitFile = do
            Nothing -> []
            Just fname2 -> ["-varinitfile", fname2])
       stdinStr = ""
-    
-  putStrLn $ "c Running " ++ show cmd ++ " with " ++ show args
-  ret <- try $ readProcess cmd args stdinStr
+
+  putStrLn $ "c Running " ++ show (optCommand opt) ++ " with " ++ show args
+  ret <- try $ readProcess (optCommand opt) args stdinStr
   case ret of
     Left (err :: IOError) -> do
       forM_ (lines (show err)) $ \l -> do
