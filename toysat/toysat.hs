@@ -510,8 +510,8 @@ initPolarityUsingSP solver nvOrig nv clauses = do
         return $ Just (v, abs bias)
       else
         return Nothing
-    forM_ (sortBy (comparing snd) (catMaybes xs)) $ \(v,_) -> do
-      SAT.varBumpActivity solver v
+    forM_ (zip (sortBy (comparing snd) (catMaybes xs)) [1..]) $ \((v,_),w) -> do
+      replicateM w $ SAT.varBumpActivity solver v
   else do
     putCommentLine $ printf "Survey propagation did not converge"
     return ()
