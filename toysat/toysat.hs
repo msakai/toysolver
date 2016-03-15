@@ -807,10 +807,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
             { UBCSAT.optCommand = optUBCSAT opt
             , UBCSAT.optTempDir = optTempDir opt
             , UBCSAT.optProblem = wcnf
-            , UBCSAT.optProblemFile = do
-                fname <- wcnfFileName
-                guard $ or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"]]
-                return fname
+            , UBCSAT.optProblemFile = wcnfFileName
             , UBCSAT.optVarInit = var_init
             }
       UBCSAT.ubcsat opt2
@@ -880,7 +877,7 @@ mainMaxSAT opt solver args = do
     Left err -> hPutStrLn stderr err >> exitFailure
     Right wcnf -> do
       let fname = case args of
-                    [fname] | fname /= "-" -> Just fname
+                    [fname] | or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"]] -> Just fname
                     _ -> Nothing
       solveMaxSAT opt solver wcnf fname
 
