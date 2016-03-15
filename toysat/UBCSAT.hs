@@ -28,7 +28,7 @@ data Options
   , optTempDir :: Maybe FilePath
   , optProblem :: MaxSAT.WCNF
   , optProblemFile :: Maybe FilePath
-  , optFixedLiterals :: [SAT.Lit]
+  , optVarInit :: [SAT.Lit]
   }
 
 instance Default Options where
@@ -43,7 +43,7 @@ instance Default Options where
             , MaxSAT.clauses    = []
             }
         , optProblemFile   = Nothing
-        , optFixedLiterals = []
+        , optVarInit = []
         }
 
 ubcsat :: Options -> IO (Maybe SAT.Model)
@@ -53,12 +53,12 @@ ubcsat opt = do
            Nothing -> getTemporaryDirectory
 
   let f fname
-        | null (optFixedLiterals opt) = ubcsat' opt fname Nothing
+        | null (optVarInit opt) = ubcsat' opt fname Nothing
         | otherwise = do
             withTempFile dir ".txt" $ \varInitFile h -> do
               hSetBinaryMode h True
               hSetBuffering h (BlockBuffering Nothing)
-              hPutStrLn h $ intercalate " "  (map show (optFixedLiterals opt))
+              hPutStrLn h $ intercalate " "  (map show (optVarInit opt))
               hClose h
               ubcsat' opt fname (Just varInitFile)
 

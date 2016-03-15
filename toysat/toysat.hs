@@ -666,7 +666,7 @@ solvePB opt solver formula = do
                 { UBCSAT.optCommand = optUBCSAT opt
                 , UBCSAT.optTempDir = optTempDir opt
                 , UBCSAT.optProblem = wcnf
-                , UBCSAT.optFixedLiterals = var_init
+                , UBCSAT.optVarInit = var_init
                 }
           liftM (fmap mtrans) $ UBCSAT.ubcsat opt2
         else
@@ -811,7 +811,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
                 fname <- wcnfFileName
                 guard $ or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"]]
                 return fname
-            , UBCSAT.optFixedLiterals = var_init
+            , UBCSAT.optVarInit = var_init
             }
       UBCSAT.ubcsat opt2
     else
