@@ -24,6 +24,8 @@ import Control.Exception
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy as BS
 import Data.Default.Class
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -477,9 +479,10 @@ solveSAT opt solver cnf = do
   SAT.newVars_ solver (DIMACS.numVars cnf)
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
-  when (optInitSP opt) $
+  when (optInitSP opt) $ do
     initPolarityUsingSP solver (DIMACS.numVars cnf)
       (DIMACS.numVars cnf) [(1, elems clause) | clause <- DIMACS.clauses cnf]
+    return ()
   result <- SAT.solve solver
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   when result $ do
@@ -487,7 +490,7 @@ solveSAT opt solver cnf = do
     satPrintModel stdout m (DIMACS.numVars cnf)
     writeSOLFile opt m Nothing (DIMACS.numVars cnf)
 
-initPolarityUsingSP :: SAT.Solver -> Int -> Int -> [(Double, SAT.Clause)] -> IO ()
+initPolarityUsingSP :: SAT.Solver -> Int -> Int -> [(Double, SAT.Clause)] -> IO (IntMap Double)
 initPolarityUsingSP solver nvOrig nv clauses = do
   n <- getNumCapabilities
   putCommentLine $ "Running survey propgation using " ++ show n ++" threads ..."
@@ -502,19 +505,20 @@ initPolarityUsingSP solver nvOrig nv clauses = do
   endWC  <- getCurrentTime
   if b then do
     putCommentLine $ printf "Survey propagation converged in %.3fs" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
-    xs <- forM [1 .. nvOrig] $ \v -> do
+    xs <- liftM catMaybes $ forM [1 .. nvOrig] $ \v -> do
       (pt,pf,_)<- SP.getVarProb sp v
       let bias = pt - pf
       SAT.setVarPolarity solver v (bias >= 0)
-      if abs bias > 0.1 then
-        return $ Just (v, abs bias)
+      if abs bias > 0.3 then
+        return $ Just (v, bias)
       else
         return Nothing
-    forM_ (zip (sortBy (comparing snd) (catMaybes xs)) [1..]) $ \((v,_),w) -> do
+    forM_ (zip (sortBy (comparing (abs . snd)) xs) [1..]) $ \((v,_),w) -> do
       replicateM w $ SAT.varBumpActivity solver v
+    return $ IntMap.fromList xs
   else do
     putCommentLine $ printf "Survey propagation did not converge"
-    return ()
+    return $ IntMap.empty
 
 -- ------------------------------------------------------------------------
 
@@ -561,6 +565,7 @@ solveMUS opt solver gcnf = do
     let wcnf = GCNF2MaxSAT.convert gcnf
     initPolarityUsingSP solver (GCNF.numVars gcnf)
       (MaxSAT.numVars wcnf) [(fromIntegral w, clause) | (w, clause) <- MaxSAT.clauses wcnf]
+    return ()
 
   result <- SAT.solveWith solver (map (idx2sel !) [1..GCNF.lastGroupIndex gcnf])
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
@@ -631,9 +636,12 @@ solvePB opt solver formula = do
       PBFile.Ge -> PBNLC.addPBNLAtLeast pbnlc lhs rhs
       PBFile.Eq -> PBNLC.addPBNLExactly pbnlc lhs rhs
 
-  when (optInitSP opt) $ do
-    let (cnf, _, _) = PB2SAT.convert formula
-    initPolarityUsingSP solver nv (DIMACS.numVars cnf) [(1.0, elems clause) | clause <- DIMACS.clauses cnf]
+  spHighlyBiased <- 
+    if optInitSP opt then do
+      let (cnf, _, _) = PB2SAT.convert formula
+      initPolarityUsingSP solver nv (DIMACS.numVars cnf) [(1.0, elems clause) | clause <- DIMACS.clauses cnf]
+    else
+      return IntMap.empty
 
   case PBFile.pbObjectiveFunction formula of
     Nothing -> do
@@ -649,12 +657,16 @@ solvePB opt solver formula = do
         if optLocalSearchInitial opt then do
           let (wcnf, _, mtrans) = WBO2MaxSAT.convert $ PB2WBO.convert formula
           fixed <- filter (\lit -> abs lit <= nv) <$> SAT.getFixedLiterals solver
+          let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= nv]
+              var_init2 = IntMap.map (>0) spHighlyBiased
+              -- note that IntMap.union is left-biased.
+              var_init = [if b then v else -v | (v, b) <- IntMap.toList (var_init1 `IntMap.union` var_init2)]
           let opt2 =
                 def
                 { UBCSAT.optCommand = optUBCSAT opt
                 , UBCSAT.optTempDir = optTempDir opt
                 , UBCSAT.optProblem = wcnf
-                , UBCSAT.optFixedLiterals = fixed
+                , UBCSAT.optFixedLiterals = var_init
                 }
           liftM (fmap mtrans) $ UBCSAT.ubcsat opt2
         else
@@ -777,12 +789,19 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
     Nothing -> return ()
     Just c -> SAT.addPBAtMost solver obj (c-1)
 
-  when (optInitSP opt) $ do
-    initPolarityUsingSP solver nv (MaxSAT.numVars wcnf) [(fromIntegral w, c) | (w, c) <-  MaxSAT.clauses wcnf]
+  spHighlyBiased <-
+    if optInitSP opt then do
+      initPolarityUsingSP solver nv (MaxSAT.numVars wcnf) [(fromIntegral w, c) | (w, c) <-  MaxSAT.clauses wcnf]
+    else
+      return IntMap.empty
 
   initialModel <- liftM (fmap mtrans) $ 
     if optLocalSearchInitial opt then do
-      fixed <- filter (\lit -> abs lit <= nv) <$> SAT.getFixedLiterals solver
+      fixed <- SAT.getFixedLiterals solver
+      let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= nv]
+          var_init2 = IntMap.map (>0) spHighlyBiased
+          -- note that IntMap.union is left-biased.
+          var_init = [if b then v else -v | (v, b) <- IntMap.toList (var_init1 `IntMap.union` var_init2)]
       let opt2 =
             def
             { UBCSAT.optCommand = optUBCSAT opt
@@ -792,7 +811,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
                 fname <- wcnfFileName
                 guard $ or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"]]
                 return fname
-            , UBCSAT.optFixedLiterals = fixed
+            , UBCSAT.optFixedLiterals = var_init
             }
       UBCSAT.ubcsat opt2
     else
