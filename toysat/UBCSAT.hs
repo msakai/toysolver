@@ -1,7 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 module UBCSAT
-  ( ubcsat
+  ( ubcsatBest
+  , ubcsatBestFeasible
+  , ubcsatMany
   , Options (..)
   ) where
 
@@ -46,8 +48,26 @@ instance Default Options where
         , optVarInit = []
         }
 
-ubcsat :: Options -> IO (Maybe SAT.Model)
-ubcsat opt = do
+ubcsatBestFeasible :: Options -> IO (Maybe (Integer, SAT.Model))
+ubcsatBestFeasible opt = do
+  ret <- ubcsatBest opt
+  case ret of
+    Nothing -> return Nothing
+    Just (obj,_) ->
+      if obj < MaxSAT.topCost (optProblem opt) then
+        return ret
+      else
+        return Nothing
+
+ubcsatBest :: Options -> IO (Maybe (Integer, SAT.Model))
+ubcsatBest opt = do
+  sols <- ubcsatMany opt
+  case sols of
+    [] -> return Nothing
+    _ -> return $ Just $ minimumBy (compare `on` fst) sols
+
+ubcsatMany :: Options -> IO [(Integer, SAT.Model)]
+ubcsatMany opt = do
   dir <- case optTempDir opt of
            Just dir -> return dir
            Nothing -> getTemporaryDirectory
@@ -72,7 +92,7 @@ ubcsat opt = do
         hClose h
         f fname
 
-ubcsat' :: Options -> FilePath -> Maybe FilePath -> IO (Maybe SAT.Model)
+ubcsat' :: Options -> FilePath -> Maybe FilePath -> IO [(Integer, SAT.Model)]
 ubcsat' opt fname varInitFile = do
   let wcnf = optProblem opt
   let args =
@@ -96,23 +116,16 @@ ubcsat' opt fname varInitFile = do
     Left (err :: IOError) -> do
       forM_ (lines (show err)) $ \l -> do
         putStr "c " >> putStrLn l
-      return Nothing
+      return []
     Right s -> do
       forM_ (lines s) $ \l -> putStr "c " >> putStrLn l
-      case scanSolutions s of
-        [] -> return Nothing
-        sols -> do
-          let (obj,m) = minimumBy (compare `on` fst) sols
-          if obj < MaxSAT.topCost wcnf then
-            return $ Just $ array (1, MaxSAT.numVars wcnf) (zip [1..] m)
-          else
-            return Nothing
+      return $ scanSolutions (MaxSAT.numVars wcnf) s
 
-scanSolutions :: String -> [(Integer, [Bool])]
-scanSolutions s = rights $ map (parse solution "") $ lines s
+scanSolutions :: Int -> String -> [(Integer, SAT.Model)]
+scanSolutions nv s = rights $ map (parse (solution nv) "") $ lines s
 
-solution :: Parser (Integer, [Bool])
-solution = do
+solution :: Int -> Parser (Integer, SAT.Model)
+solution nv = do
   skipMany1 digit
   spaces
   _ <- char '0' <|> char '1'
@@ -120,4 +133,5 @@ solution = do
   obj <- liftM read $ many1 digit
   spaces
   values <- many ((char '0' >> return False) <|> (char '1' >> return True))
-  return (obj, values)
+  let m = array (1, nv) (zip [1..] values)
+  return (obj, m)

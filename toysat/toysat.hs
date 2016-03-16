@@ -668,7 +668,7 @@ solvePB opt solver formula = do
                 , UBCSAT.optProblem = wcnf
                 , UBCSAT.optVarInit = var_init
                 }
-          liftM (fmap mtrans) $ UBCSAT.ubcsat opt2
+          liftM (fmap (mtrans . snd)) $ UBCSAT.ubcsatBestFeasible opt2
         else
           return Nothing
 
@@ -795,7 +795,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
     else
       return IntMap.empty
 
-  initialModel <- liftM (fmap mtrans) $ 
+  initialModel <- liftM (fmap (mtrans . snd)) $
     if optLocalSearchInitial opt then do
       fixed <- SAT.getFixedLiterals solver
       let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= nv]
@@ -810,7 +810,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
             , UBCSAT.optProblemFile = wcnfFileName
             , UBCSAT.optVarInit = var_init
             }
-      UBCSAT.ubcsat opt2
+      UBCSAT.ubcsatBestFeasible opt2
     else
       return Nothing
 
