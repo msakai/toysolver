@@ -679,6 +679,35 @@ solvePB opt solver formula = do
     else
       return IntMap.empty
 
+  initialModel <- 
+    if optLocalSearchInitial opt then do
+      let (wcnf, _, mtrans) = WBO2MaxSAT.convert $ PB2WBO.convert formula
+      fixed <- filter (\lit -> abs lit <= nv) <$> SAT.getFixedLiterals solver
+      let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= nv]
+          var_init2 = IntMap.map (>0) spHighlyBiased
+          -- note that IntMap.union is left-biased.
+          var_init = [if b then v else -v | (v, b) <- IntMap.toList (var_init1 `IntMap.union` var_init2)]
+      let opt2 =
+            def
+            { UBCSAT.optCommand = optUBCSAT opt
+            , UBCSAT.optTempDir = optTempDir opt
+            , UBCSAT.optProblem = wcnf
+            , UBCSAT.optVarInit = var_init
+            }
+      ret <- UBCSAT.ubcsatBest opt2
+      case ret of
+        Nothing -> return Nothing
+        Just (obj,m) -> do
+          let m2 = mtrans m
+          forM_ (assocs m2) $ \(v, val) -> do
+            SAT.setVarPolarity solver v val
+          if obj < MaxSAT.topCost wcnf then
+            return $ Just m2 
+          else
+            return Nothing
+    else
+      return Nothing
+
   case PBFile.pbObjectiveFunction formula of
     Nothing -> do
       result <- SAT.solve solver
@@ -689,25 +718,6 @@ solvePB opt solver formula = do
         writeSOLFile opt m Nothing nv
 
     Just obj' -> do
-      initialModel <- 
-        if optLocalSearchInitial opt then do
-          let (wcnf, _, mtrans) = WBO2MaxSAT.convert $ PB2WBO.convert formula
-          fixed <- filter (\lit -> abs lit <= nv) <$> SAT.getFixedLiterals solver
-          let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= nv]
-              var_init2 = IntMap.map (>0) spHighlyBiased
-              -- note that IntMap.union is left-biased.
-              var_init = [if b then v else -v | (v, b) <- IntMap.toList (var_init1 `IntMap.union` var_init2)]
-          let opt2 =
-                def
-                { UBCSAT.optCommand = optUBCSAT opt
-                , UBCSAT.optTempDir = optTempDir opt
-                , UBCSAT.optProblem = wcnf
-                , UBCSAT.optVarInit = var_init
-                }
-          liftM (fmap (mtrans . snd)) $ UBCSAT.ubcsatBestFeasible opt2
-        else
-          return Nothing
-
       obj'' <- PBNLC.linearizePBSumWithPolarity pbnlc Tseitin.polarityNeg obj'
 
       nv' <- SAT.getNVars solver
