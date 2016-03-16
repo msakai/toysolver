@@ -470,19 +470,55 @@ mainSAT opt solver args = do
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
-    Right cnf -> solveSAT opt solver cnf
+    Right cnf -> do
+      let fname = case args of
+                    [fname] | or [".cnf" `isSuffixOf` map toLower fname] -> Just fname
+                    _ -> Nothing
+      solveSAT opt solver cnf fname
 
-solveSAT :: Options -> SAT.Solver -> DIMACS.CNF -> IO ()
-solveSAT opt solver cnf = do
+solveSAT :: Options -> SAT.Solver -> DIMACS.CNF -> Maybe FilePath -> IO ()
+solveSAT opt solver cnf cnfFileName = do
   putCommentLine $ printf "#vars %d" (DIMACS.numVars cnf)
   putCommentLine $ printf "#constraints %d" (DIMACS.numClauses cnf)
   SAT.newVars_ solver (DIMACS.numVars cnf)
   forM_ (DIMACS.clauses cnf) $ \clause ->
     SAT.addClause solver (elems clause)
-  when (optInitSP opt) $ do
-    initPolarityUsingSP solver (DIMACS.numVars cnf)
-      (DIMACS.numVars cnf) [(1, elems clause) | clause <- DIMACS.clauses cnf]
-    return ()
+
+  spHighlyBiased <-
+    if optInitSP opt then do
+      initPolarityUsingSP solver (DIMACS.numVars cnf)
+        (DIMACS.numVars cnf) [(1, elems clause) | clause <- DIMACS.clauses cnf]
+    else
+      return IntMap.empty
+
+  when (optLocalSearchInitial opt) $ do
+    fixed <- SAT.getFixedLiterals solver
+    let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= DIMACS.numVars cnf]
+        var_init2 = IntMap.map (>0) spHighlyBiased
+        -- note that IntMap.union is left-biased.
+        var_init = [if b then v else -v | (v, b) <- IntMap.toList (var_init1 `IntMap.union` var_init2)]
+    let wcnf =
+          MaxSAT.WCNF
+          { MaxSAT.numVars = DIMACS.numVars cnf
+          , MaxSAT.numClauses = DIMACS.numClauses cnf
+          , MaxSAT.topCost = 1
+          , MaxSAT.clauses = [(1, elems clause) | clause <- DIMACS.clauses cnf]
+          }
+    let opt2 =
+          def
+          { UBCSAT.optCommand = optUBCSAT opt
+          , UBCSAT.optTempDir = optTempDir opt
+          , UBCSAT.optProblem = wcnf
+          , UBCSAT.optProblemFile = cnfFileName
+          , UBCSAT.optVarInit = var_init
+          }
+    ret <- UBCSAT.ubcsatBest opt2
+    case ret of
+      Nothing -> return ()
+      Just (_,m) -> do
+        forM_ (assocs m) $ \(v, val) -> do
+          SAT.setVarPolarity solver v val
+
   result <- SAT.solve solver
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   when result $ do
