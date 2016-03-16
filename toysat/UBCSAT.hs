@@ -101,6 +101,8 @@ ubcsat' opt fname varInitFile = do
         , "-seed", "0"
         , "-runs", "10"
         , "-cutoff", show (MaxSAT.numVars wcnf * 50)
+        , "-timeout", show (10 :: Int)
+        , "-gtimeout", show (30 :: Int)
         , "-solve"
         , "-r", "bestsol"
         , "-inst", fname
