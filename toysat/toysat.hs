@@ -67,6 +67,7 @@ import qualified ToySolver.Converter.MIP2PB as MIP2PB
 import qualified ToySolver.Converter.PB2SAT as PB2SAT
 import qualified ToySolver.Converter.PB2WBO as PB2WBO
 import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
+import qualified ToySolver.Converter.WBO2PB as WBO2PB
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Encoder.Integer as Integer
@@ -801,39 +802,8 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
   Tseitin.setUsePB enc (optLinearizerPB opt)
   pbnlc <- PBNLC.newEncoder solver enc
 
-  objRef <- newIORef []
-  defsRef <- newIORef []
-
-  forM_ (PBFile.wboConstraints formula) $ \(cost, constr@(lhs, op, rhs)) -> do
-    case cost of
-      Nothing -> do
-        case op of
-          PBFile.Ge -> PBNLC.addPBNLAtLeast pbnlc lhs rhs
-          PBFile.Eq -> PBNLC.addPBNLExactly pbnlc lhs rhs
-      Just cval -> do
-        sel <-
-          case op of
-            PBFile.Ge -> do
-              case lhs of
-                [(1,ls)] | rhs == 1 ->
-                  Tseitin.encodeConjWithPolarity enc Tseitin.polarityPos ls
-                _ -> do
-                  sel <- SAT.newVar solver
-                  PBNLC.addPBNLAtLeastSoft pbnlc sel lhs rhs
-                  modifyIORef defsRef ((sel, constr) : )
-                  return sel
-            PBFile.Eq -> do
-              sel <- SAT.newVar solver
-              PBNLC.addPBNLExactlySoft pbnlc sel lhs rhs
-              modifyIORef defsRef ((sel, constr) : )
-              return sel
-        modifyIORef objRef ((cval, SAT.litNot sel) : )
-
-  obj <- readIORef objRef
-
-  case PBFile.wboTopCost formula of
-    Nothing -> return ()
-    Just c -> SAT.addPBAtMost solver obj (c-1)
+  (obj, defsPB) <- WBO2PB.addWBO pbnlc formula
+  objLin <- PBNLC.linearizePBSumWithPolarity pbnlc Tseitin.polarityNeg obj
 
   spHighlyBiased <-
     if optInitSP opt then do
@@ -861,8 +831,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
       return Nothing
 
   nv' <- SAT.getNVars solver
-  defs1 <- Tseitin.getDefinitions enc
-  defs2 <- readIORef defsRef
+  defsTseitin <- Tseitin.getDefinitions enc
   let extendModel :: SAT.Model -> SAT.Model
       extendModel m = array (1,nv') (assocs a)
         where
@@ -870,12 +839,12 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
           a :: Array SAT.Var Bool
           a = array (1,nv') $
                 assocs m ++
-                [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs1] ++
-                [(v, evalPBConstraint a constr) | (v, constr) <- defs2]
+                [(v, Tseitin.evalFormula a phi) | (v, phi) <- defsTseitin] ++
+                [(v, evalPBConstraint a constr) | (v, constr) <- defsPB]
 
   let softConstrs = [(c, constr) | (Just c, constr) <- PBFile.wboConstraints formula]
                 
-  pbo <- PBO.newOptimizer2 solver obj $ \m ->
+  pbo <- PBO.newOptimizer2 solver objLin $ \m ->
            sum [if evalPBConstraint m constr then 0 else w | (w,constr) <- softConstrs]
 
   setupOptimizer pbo opt
