@@ -78,7 +78,8 @@ ubcsatMany opt = do
             withTempFile dir ".txt" $ \varInitFile h -> do
               hSetBinaryMode h True
               hSetBuffering h (BlockBuffering Nothing)
-              hPutStrLn h $ intercalate " "  (map show (optVarInit opt))
+              forM_ (split 10 (optVarInit opt)) $ \xs -> do
+                hPutStrLn h $ intercalate " "  (map show xs)
               hClose h
               ubcsat' opt fname (Just varInitFile)
 
@@ -137,3 +138,12 @@ solution nv = do
   values <- many ((char '0' >> return False) <|> (char '1' >> return True))
   let m = array (1, nv) (zip [1..] values)
   return (obj, m)
+
+
+split :: Int -> [a] -> [[a]]
+split n = go
+  where
+    go [] = []
+    go xs =
+      case splitAt n xs of
+        (ys, zs) -> ys : go zs
