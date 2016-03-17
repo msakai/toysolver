@@ -182,7 +182,11 @@ writePBFile o pb = do
                   Left opb  -> opb
                   Right wbo ->
                     case WBO2PB.convert wbo of
-                      (opb, _, _) -> opb
+                      (opb, _, _)
+                        | Linearlization `elem` o ->
+                            -- WBO->OPB conversion may have introduced non-linearity
+                            PBLinearlization.linearlize opb (LinearlizationUsingPB `elem` o)
+			| otherwise -> opb
           wbo = case pb of
                   Left opb  -> PB2WBO.convert opb
                   Right wbo -> wbo
