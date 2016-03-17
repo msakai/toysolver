@@ -1,15 +1,21 @@
 /* -*- mode: c -*- */
 
+#ifdef USE_CONSTANT_BUFFER
+#define CONSTANT __constant
+#else
+#define CONSTANT __global
+#endif
+
 __kernel void
 update_edge_prob(
     int n_vars,
-    __constant int *var_offset,           // int[n_vars]
-    __constant int *var_degree,           // int[n_vars]
-    __constant int *var_edges,            // int[M]
-    __constant float *var_edges_weight,   // float[M]
-    __global float2 *var_edges_buf,       // float2[M]
-    __global float *edge_survey,          // float[n_edges]
-    __global float *edge_prob_u           // float[n_edges]
+    CONSTANT int *var_offset,         // int[n_vars]
+    CONSTANT int *var_degree,         // int[n_vars]
+    CONSTANT int *var_edges,          // int[M]
+    CONSTANT float *var_edges_weight, // float[M]
+    __global float2 *var_edges_buf,   // float2[M]
+    __global float *edge_survey,      // float[n_edges]
+    __global float *edge_prob_u       // float[n_edges]
     )
 {
     int global_size = get_global_size(0);
@@ -73,8 +79,8 @@ update_edge_prob(
 __kernel void
 update_edge_survey(
    int n_clauses,
-   __constant int *clause_offset,   // int[n_clauses]
-   __constant int *clause_degree,   // int[n_clauses]
+   CONSTANT int *clause_offset,     // int[n_clauses]
+   CONSTANT int *clause_degree,     // int[n_clauses]
    __global float *edge_survey,     // float[n_edges]
    __global float *edge_prob_u,     // float[n_edges]
    __global float *edge_buf,        // float[n_edges]
@@ -126,12 +132,12 @@ update_edge_survey(
 __kernel void
 compute_var_prob(
     int n_vars,
-    __constant int *var_offset,           // int[n_vars]
-    __constant int *var_degree,           // int[n_vars]
-    __global float2 *var_prob,            // float2[n_vars]
-    __constant int *var_edges,            // int[M]
-    __constant float *var_edges_weight,   // float[M]
-    __global float *edge_survey           // float[E]
+    CONSTANT int *var_offset,         // int[n_vars]
+    CONSTANT int *var_degree,         // int[n_vars]
+    __global float2 *var_prob,        // float2[n_vars]
+    CONSTANT int *var_edges,          // int[M]
+    CONSTANT float *var_edges_weight, // float[M]
+    __global float *edge_survey       // float[E]
     )
 {
     int global_size = get_global_size(0);

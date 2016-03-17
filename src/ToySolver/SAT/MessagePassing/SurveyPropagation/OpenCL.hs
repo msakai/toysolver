@@ -94,17 +94,6 @@ newSolver outputMessage context dev nv clauses = do
   _ <- clRetainContext context
   queue <- clCreateCommandQueue context dev []
 
-  -- Compile
-  -- programSource <- openBinaryFile "sp.cl" ReadMode >>= hGetContents
-  let programSource = $(runIO (do{ h <- openFile "src/ToySolver/SAT/MessagePassing/SurveyPropagation/sp.cl" ReadMode; hSetEncoding h utf8; hGetContents h }) >>= \s -> litE (stringL s))
-  program <- clCreateProgramWithSource context programSource
-  finally (clBuildProgram program [dev] "")
-          (outputMessage =<< clGetProgramBuildLog program dev)
-  -- Create kernel
-  update_edge_prob   <- clCreateKernel program "update_edge_prob"
-  update_edge_survey <- clCreateKernel program "update_edge_survey"
-  compute_var_prob   <- clCreateKernel program "compute_var_prob"
-
   let num_clauses = length clauses
       num_edges = sum [length c | (_,c) <- clauses]
 
@@ -154,6 +143,26 @@ newSolver outputMessage context dev nv clauses = do
 
   tolRef <- newIORef 0.01
   maxIterRef <- newIORef (Just 1000)
+
+  -- Compile
+  let byteSize :: forall a. VSM.Storable a => VSM.IOVector a -> Int
+      byteSize v = VGM.length v * sizeOf (undefined :: a)
+  (maxConstantBufferSize :: Int) <- fromIntegral <$> clGetDeviceMaxConstantBufferSize dev
+  let reqConstantBufferSize =
+        byteSize varEdges + byteSize varEdgesWeight +
+        byteSize varOffset + byteSize varLength +
+        byteSize clauseOffset + byteSize clauseLength
+  let flags =
+        ["-DUSE_CONSTANT_BUFFER" | maxConstantBufferSize >= reqConstantBufferSize]
+  -- programSource <- openBinaryFile "sp.cl" ReadMode >>= hGetContents
+  let programSource = $(runIO (do{ h <- openFile "src/ToySolver/SAT/MessagePassing/SurveyPropagation/sp.cl" ReadMode; hSetEncoding h utf8; hGetContents h }) >>= \s -> litE (stringL s))
+  outputMessage $ "Compiling kernels with options: " ++ unwords flags
+  program <- clCreateProgramWithSource context programSource
+  finally (clBuildProgram program [dev] (unwords flags))
+          (outputMessage =<< clGetProgramBuildLog program dev)
+  update_edge_prob   <- clCreateKernel program "update_edge_prob"
+  update_edge_survey <- clCreateKernel program "update_edge_survey"
+  compute_var_prob   <- clCreateKernel program "compute_var_prob"
 
   return $
     Solver
