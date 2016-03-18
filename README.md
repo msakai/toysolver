@@ -117,18 +117,18 @@ Supported formats:
 * Input formats: lp, mps, cnf, wcnf, opb, wbo
 * Output formats: lp, .mps, smt2, ys
 
-### pbconvert
+### toyconvert
 
-Converter between SAT/PB-related formats
+Converter between various problem files.
 
 Usage:
 
-    pbconvert -o [outputfile] [inputfile]
+    toyconvert -o [outputfile] [inputfile]
 
 Supported formats:
 
-* Input formats: cnf, wcnf, opb, wbo
-* Output formats: opb, wbo, lsp, lp, mps, smp, smt2, ys
+* Input formats: .cnf .wcnf .opb .wbo .gcnf .lp .mps
+* Output formats: .cnf .wcnf .opb .wbo .lsp .lp .mps .smp .smt2 .ys
 
 Bindings
 --------

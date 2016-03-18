@@ -2,8 +2,8 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  pbconvert
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Module      :  toyconvert
+-- Copyright   :  (c) Masahiro Sakai 2012-2016
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -35,6 +35,7 @@ import qualified ToySolver.Text.CNF as CNF
 import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.SAT2PB as SAT2PB
 import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
+import qualified ToySolver.Converter.MIP2PB as MIP2PB
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.MaxSAT2NLPB as MaxSAT2NLPB
@@ -95,10 +96,10 @@ options =
 header :: String
 header = unlines
   [ "Usage:"
-  , "    pbconvert -o <outputfile> <inputfile>"
+  , "    toyconvert -o <outputfile> <inputfile>"
   , ""
   , "Supported formats:"
-  , "    input: .cnf .wcnf .opb .wbo .gcnf"
+  , "    input: .cnf .wcnf .opb .wbo .gcnf .lp .mps"
   , "    output: .cnf .wcnf .opb .wbo .lsp .lp .mps .smp .smt2 .ys"
   , ""
   , "Options:"
@@ -107,6 +108,7 @@ header = unlines
 data Problem
   = ProbOPB PBFile.Formula
   | ProbWBO PBFile.SoftFormula
+  | ProbMIP MIP.Problem
 
 readProblem :: [Flag] -> String -> IO Problem
 readProblem o fname = do
@@ -134,6 +136,16 @@ readProblem o fname = do
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
         Right gcnf -> return $ fromWCNF $ GCNF2MaxSAT.convert gcnf
+    ".lp"   -> do
+      ret <- MIP.readLPFile fname
+      case ret of
+        Left err -> hPrint stderr err >> exitFailure
+        Right mip -> return $ ProbMIP mip
+    ".mps"  -> do
+      ret <- MIP.readMPSFile fname
+      case ret of
+        Left err -> hPrint stderr err >> exitFailure
+        Right mip -> return $ ProbMIP mip
     ext ->
       error $ "unknown file extension: " ++ show ext
   where    
@@ -163,6 +175,7 @@ transformPBLinearlization o problem
       case problem of
         ProbOPB opb -> ProbOPB $ PBLinearlization.linearlize    opb (LinearlizationUsingPB `elem` o)
         ProbWBO wbo -> ProbWBO $ PBLinearlization.linearlizeWBO wbo (LinearlizationUsingPB `elem` o)
+        ProbMIP mip -> ProbMIP mip
   | otherwise = problem
 
 writeProblem :: [Flag] -> Problem -> IO ()
@@ -181,6 +194,10 @@ writeProblem o problem = do
       case problem of
         ProbOPB opb -> PBFile.hPutOPB stdout opb
         ProbWBO wbo -> PBFile.hPutWBO stdout wbo
+        ProbMIP mip -> do
+          case MIP.toLPString mip of
+            Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
+            Right s -> hPutStr stdout s
     Just fname -> do
       let opb = case problem of
                   ProbOPB opb -> opb
@@ -191,9 +208,14 @@ writeProblem o problem = do
                             -- WBO->OPB conversion may have introduced non-linearity
                             PBLinearlization.linearlize opb (LinearlizationUsingPB `elem` o)
                         | otherwise -> opb
+                  ProbMIP mip ->
+                    case MIP2PB.convert mip of
+                      Left err -> error err
+                      Right (opb, _, _) -> opb
           wbo = case problem of
                   ProbOPB opb -> PB2WBO.convert opb
                   ProbWBO wbo -> wbo
+                  ProbMIP _   -> PB2WBO.convert opb
           lp  = case problem of
                   ProbOPB opb ->
                     case PB2IP.convert opb of
@@ -201,9 +223,11 @@ writeProblem o problem = do
                   ProbWBO wbo ->
                     case PB2IP.convertWBO (IndicatorConstraint `elem` o) wbo of
                       (ip, _, _) -> ip
+                  ProbMIP mip -> mip
           lsp = case problem of
                   ProbOPB opb -> PB2LSP.convert opb
                   ProbWBO wbo -> PB2LSP.convertWBO wbo
+                  ProbMIP _   -> PB2LSP.convert opb
       case map toLower (takeExtension fname) of
         ".opb" -> PBFile.writeOPBFile fname opb
         ".wbo" -> PBFile.writeWBOFile fname wbo
