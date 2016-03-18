@@ -1705,10 +1705,16 @@ prop_pb2sat = QM.monadicIO $ do
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
     Nothing -> return ()
-    Just m -> QM.assert $ evalCNF (mforth m) cnf
+    Just m1 -> do
+      let m2 = mforth m1
+      QM.assert $ bounds m2 == (1, DIMACS.numVars dimacs)
+      QM.assert $ evalCNF m2 cnf
   case ret2 of
     Nothing -> return ()
-    Just m -> QM.assert $ evalPB (mback m) pb
+    Just m2 -> do
+      let m1 = mback m2
+      QM.assert $ bounds m1 == (1, nv)
+      QM.assert $ evalPB m1 pb
 
 prop_wbo2maxsat :: Property
 prop_wbo2maxsat = QM.monadicIO $ do
@@ -1740,10 +1746,16 @@ prop_wbo2maxsat = QM.monadicIO $ do
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
     Nothing -> return ()
-    Just (m,val) -> QM.assert $ evalWBO (mforth m) wbo2 == Just val
+    Just (m1,val) -> do
+      let m2 = mforth m1
+      QM.assert $ bounds m2 == (1, MaxSAT.numVars wcnf)
+      QM.assert $ evalWBO m2 wbo2 == Just val
   case ret2 of
     Nothing -> return ()
-    Just (m,val) -> QM.assert $ evalWBO (mback m) wbo1 == Just val
+    Just (m2,val) -> do
+      let m1 = mback m2
+      QM.assert $ bounds m1 == (1, nv)
+      QM.assert $ evalWBO m1 wbo1 == Just val
 
 prop_wbo2pb :: Property
 prop_wbo2pb = QM.monadicIO $ do
@@ -1772,12 +1784,17 @@ prop_wbo2pb = QM.monadicIO $ do
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
     Nothing -> return ()
-    Just (m,val) -> do
-      QM.assert $ evalPBNLC (mforth m) (PBFile.pbNumVars opb, cs2)
-      QM.assert $ SAT.evalPBSum (mforth m) obj == val
+    Just (m1,val1) -> do
+      let m2 = mforth m1
+      QM.assert $ bounds m2 == (1, PBFile.pbNumVars opb)
+      QM.assert $ evalPBNLC m2 (PBFile.pbNumVars opb, cs2)
+      QM.assert $ SAT.evalPBSum m2 obj == val1
   case ret2 of
     Nothing -> return ()
-    Just (m,val) -> QM.assert $ evalWBO (mback m) wbo == Just val
+    Just (m2,val2) -> do
+      let m1 = mback m2
+      QM.assert $ bounds m1 == (1,nv)
+      QM.assert $ evalWBO m1 wbo == Just val2
 
 ------------------------------------------------------------------------
 

@@ -37,7 +37,8 @@ import ToySolver.SAT.Store.CNF
 convert :: PBFile.Formula -> (DIMACS.CNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
 convert formula = runST $ do
   db <- newCNFStore
-  SAT.newVars_ db (PBFile.pbNumVars formula)
+  let nv1 = PBFile.pbNumVars formula
+  SAT.newVars_ db nv1
   tseitin <-  Tseitin.newEncoder db
   pb <- PB.newEncoder tseitin
   pbnlc <- PBNLC.newEncoder pb tseitin
@@ -61,6 +62,6 @@ convert formula = runST $ do
           a = array (1,nv) $
                 assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
 
-  return (cnf, extendModel, SAT.restrictModel nv)
+  return (cnf, extendModel, SAT.restrictModel nv1)
 
 -- -----------------------------------------------------------------------------
