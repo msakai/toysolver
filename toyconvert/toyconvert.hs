@@ -38,7 +38,6 @@ import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
 import qualified ToySolver.Converter.MIP2PB as MIP2PB
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
-import qualified ToySolver.Converter.MaxSAT2NLPB as MaxSAT2NLPB
 import qualified ToySolver.Converter.PB2IP as PB2IP
 import qualified ToySolver.Converter.PBLinearlization as PBLinearlization
 import qualified ToySolver.Converter.PB2LSP as PB2LSP
@@ -62,7 +61,6 @@ data Flag
   | SMTOptimize
   | SMTNoCheck
   | SMTNoProduceModel
-  | MaxSATNonLinear
   | Yices2
   | Linearlization
   | LinearlizationUsingPB
@@ -80,7 +78,6 @@ options =
     , Option []    ["smt-optimize"] (NoArg SMTOptimize)   "output optimiality condition which uses quantifiers"
     , Option []    ["smt-no-check"] (NoArg SMTNoCheck)    "do not output \"(check)\""
     , Option []    ["smt-no-produce-model"] (NoArg SMTNoProduceModel) "do not output \"(set-option :produce-models true)\""    
-    , Option []    ["maxsat-nonlinear"] (NoArg MaxSATNonLinear) "use non-linear formulation of Max-SAT"
     , Option []    ["yices2"] (NoArg Yices2) "output for yices2 rather than yices1"
     , Option []    ["linearlize"] (NoArg Linearlization) "linearliza nonlinear pseudo-boolean constraints"
     , Option []    ["linearizer-pb"] (NoArg LinearlizationUsingPB) "Use PB constraint in linearization"
@@ -135,7 +132,7 @@ readProblem o fname = do
       ret <- GCNF.parseFile fname
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
-        Right gcnf -> return $ fromWCNF $ GCNF2MaxSAT.convert gcnf
+        Right gcnf -> return $ ProbWBO $ MaxSAT2WBO.convert $ GCNF2MaxSAT.convert gcnf
     ".lp"   -> do
       ret <- MIP.readLPFile fname
       case ret of
@@ -153,10 +150,7 @@ readProblem o fname = do
       ret <- MaxSAT.parseFile fname
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
-        Right wcnf -> return $ fromWCNF wcnf
-    fromWCNF wcnf
-      | MaxSATNonLinear `elem` o = ProbOPB $ MaxSAT2NLPB.convert wcnf
-      | otherwise = ProbWBO $ MaxSAT2WBO.convert wcnf
+        Right wcnf -> return $ ProbWBO $ MaxSAT2WBO.convert $ wcnf
 
 transformProblem :: [Flag] -> Problem -> Problem
 transformProblem o = transformObj o . transformPBLinearlization o

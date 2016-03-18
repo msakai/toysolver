@@ -240,7 +240,6 @@ Library
      ToySolver.Converter.MIP2PB
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.MaxSAT2IP
-     ToySolver.Converter.MaxSAT2NLPB
      ToySolver.Converter.MaxSAT2WBO
      ToySolver.Converter.PB2IP
      ToySolver.Converter.PBLinearlization
