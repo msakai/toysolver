@@ -248,6 +248,7 @@ Library
      ToySolver.Converter.PB2WBO
      ToySolver.Converter.PBSetObj
      ToySolver.Converter.PB2SMP
+     ToySolver.Converter.SAT2KSAT
      ToySolver.Converter.SAT2PB
      ToySolver.Converter.SAT2IP
      ToySolver.Converter.WBO2MaxSAT

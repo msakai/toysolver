@@ -44,6 +44,7 @@ import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import qualified ToySolver.Converter.PB2SAT as PB2SAT
 import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
 import qualified ToySolver.Converter.WBO2PB as WBO2PB
+import qualified ToySolver.Converter.SAT2KSAT as SAT2KSAT
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 
 import ToySolver.Data.OrdRel
@@ -1795,6 +1796,35 @@ prop_wbo2pb = QM.monadicIO $ do
       let m1 = mback m2
       QM.assert $ bounds m1 == (1,nv)
       QM.assert $ evalWBO m1 wbo == Just val2
+
+prop_sat2ksat :: Property
+prop_sat2ksat = QM.monadicIO $ do
+  k <- QM.pick $ choose (3,10)
+
+  cnf1@(nv1,cs1) <- QM.pick arbitraryCNF
+  let f c = listArray (0, length c - 1) c
+  let cnf1' = DIMACS.CNF{ DIMACS.numVars = nv1, DIMACS.numClauses = length cs1, DIMACS.clauses = map f cs1 }
+
+  let (cnf2', mforth, mback) = SAT2KSAT.convert k cnf1'
+  let cnf2@(nv2,cs2) = (DIMACS.numVars cnf2', map elems (DIMACS.clauses cnf2'))
+
+  solver1 <- arbitrarySolver
+  solver2 <- arbitrarySolver
+  ret1 <- QM.run $ solveCNF solver1 cnf1
+  ret2 <- QM.run $ solveCNF solver2 cnf2
+  QM.assert $ isJust ret1 == isJust ret2
+  case ret1 of
+    Nothing -> return ()
+    Just m1 -> do
+      let m2 = mforth m1
+      QM.assert $ bounds m2 == (1, nv2)
+      QM.assert $ evalCNF m2 cnf2
+  case ret2 of
+    Nothing -> return ()
+    Just m2 -> do
+      let m1 = mback m2
+      QM.assert $ bounds m1 == (1, nv1)
+      QM.assert $ evalCNF m1 cnf1
 
 ------------------------------------------------------------------------
 
