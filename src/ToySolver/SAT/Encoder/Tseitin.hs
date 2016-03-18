@@ -266,13 +266,13 @@ encodeConjWithPolarity encoder (Polarity pos neg) ls = do
         when (pos && not posDefined) $ definePos v
         when (neg && not negDefined) $ defineNeg v
         when (posDefined < pos || negDefined < neg) $
-          modifyMutVar (encConjTable encoder) (Map.insert ls2 (v, (max posDefined pos), (max negDefined neg)))
+          modifyMutVar' (encConjTable encoder) (Map.insert ls2 (v, (max posDefined pos), (max negDefined neg)))
         return v
       Nothing -> do
         v <- SAT.newVar encoder
         when pos $ definePos v
         when neg $ defineNeg v
-        modifyMutVar (encConjTable encoder) (Map.insert ls2 (v, pos, neg))
+        modifyMutVar' (encConjTable encoder) (Map.insert ls2 (v, pos, neg))
         return v
 
 -- | Return an literal which is equivalent to a given disjunction.
@@ -331,13 +331,13 @@ encodeITEWithPolarity encoder (Polarity pos neg) c t e = do
       when (pos && not posDefined) $ definePos v
       when (neg && not negDefined) $ defineNeg v
       when (posDefined < pos || negDefined < neg) $
-        modifyMutVar (encITETable encoder) (Map.insert (c,t,e) (v, (max posDefined pos), (max negDefined neg)))
+        modifyMutVar' (encITETable encoder) (Map.insert (c,t,e) (v, (max posDefined pos), (max negDefined neg)))
       return v
     Nothing -> do
       v <- SAT.newVar encoder
       when pos $ definePos v
       when neg $ defineNeg v
-      modifyMutVar (encITETable encoder) (Map.insert (c,t,e) (v, pos, neg))
+      modifyMutVar' (encITETable encoder) (Map.insert (c,t,e) (v, pos, neg))
       return v
 
 

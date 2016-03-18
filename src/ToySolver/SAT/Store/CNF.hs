@@ -33,7 +33,7 @@ instance PrimMonad m => SAT.NewVar m (CNFStore m) where
 instance PrimMonad m => SAT.AddClause m (CNFStore m) where
   addClause (CNFStore _ ref) clause =
     case SAT.normalizeClause clause of
-      Just clause' -> modifyMutVar ref (|> clause')
+      Just clause' -> modifyMutVar' ref (|> clause')
       Nothing -> return ()
 
 newCNFStore :: PrimMonad m => m (CNFStore m)

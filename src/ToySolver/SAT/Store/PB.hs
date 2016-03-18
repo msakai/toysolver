@@ -47,11 +47,11 @@ instance PrimMonad m => SAT.AddPBNL m (PBStore m) where
   addPBNLAtLeast (PBStore _ ref) lhs rhs = do
     let lhs' = [(c,ls) | (c,ls@(_:_)) <- lhs]
         rhs' = rhs - sum [c | (c,[]) <- lhs]
-    modifyMutVar ref (|> (lhs', PBFile.Ge, rhs'))
+    modifyMutVar' ref (|> (lhs', PBFile.Ge, rhs'))
   addPBNLExactly (PBStore _ ref) lhs rhs = do
     let lhs' = [(c,ls) | (c,ls@(_:_)) <- lhs]
         rhs' = rhs - sum [c | (c,[]) <- lhs]
-    modifyMutVar ref (|> (lhs', PBFile.Eq, rhs'))
+    modifyMutVar' ref (|> (lhs', PBFile.Eq, rhs'))
 
 newPBStore :: PrimMonad m => m (PBStore m)
 newPBStore = do
