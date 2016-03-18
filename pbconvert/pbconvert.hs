@@ -104,8 +104,12 @@ header = unlines
   , "Options:"
   ]
 
-readPBFile :: [Flag] -> String -> IO (Either PBFile.Formula PBFile.SoftFormula)
-readPBFile o fname = do
+data Problem
+  = ProbOPB PBFile.Formula
+  | ProbWBO PBFile.SoftFormula
+
+readProblem :: [Flag] -> String -> IO Problem
+readProblem o fname = do
   case map toLower (takeExtension fname) of
     ".cnf"
       | AsMaxSAT `elem` o -> readWCNF
@@ -113,18 +117,18 @@ readPBFile o fname = do
           ret <- DIMACS.parseFile fname
           case ret of
             Left err  -> hPrint stderr err >> exitFailure
-            Right cnf -> return $ Left $ SAT2PB.convert cnf
+            Right cnf -> return $ ProbOPB $ SAT2PB.convert cnf
     ".wcnf" -> readWCNF
     ".opb"  -> do
       ret <- PBFileAttoparsec.parseOPBFile fname
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
-        Right opb -> return $ Left opb
+        Right opb -> return $ ProbOPB opb
     ".wbo"  -> do
       ret <- PBFileAttoparsec.parseWBOFile fname
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
-        Right wbo -> return $ Right wbo
+        Right wbo -> return $ ProbWBO wbo
     ".gcnf" -> do
       ret <- GCNF.parseFile fname
       case ret of
@@ -139,30 +143,30 @@ readPBFile o fname = do
         Left err -> hPutStrLn stderr err >> exitFailure
         Right wcnf -> return $ fromWCNF wcnf
     fromWCNF wcnf
-      | MaxSATNonLinear `elem` o = Left $ MaxSAT2NLPB.convert wcnf
-      | otherwise = Right $ MaxSAT2WBO.convert wcnf
+      | MaxSATNonLinear `elem` o = ProbOPB $ MaxSAT2NLPB.convert wcnf
+      | otherwise = ProbWBO $ MaxSAT2WBO.convert wcnf
 
-transformPBFile :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> Either PBFile.Formula PBFile.SoftFormula
-transformPBFile o = transformObj o . transformPBLinearlization o
+transformProblem :: [Flag] -> Problem -> Problem
+transformProblem o = transformObj o . transformPBLinearlization o
 
-transformObj :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> Either PBFile.Formula PBFile.SoftFormula
-transformObj o pb =
-  case pb of
-    Left opb | isNothing (PBFile.pbObjectiveFunction opb) -> Left $ PBSetObj.setObj objType opb
-    _ -> pb
+transformObj :: [Flag] -> Problem -> Problem
+transformObj o problem =
+  case problem of
+    ProbOPB opb | isNothing (PBFile.pbObjectiveFunction opb) -> ProbOPB $ PBSetObj.setObj objType opb
+    _ -> problem
   where
     objType = last (ObjNone : [t | ObjType t <- o])
 
-transformPBLinearlization :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> Either PBFile.Formula PBFile.SoftFormula
-transformPBLinearlization o pb
+transformPBLinearlization :: [Flag] -> Problem -> Problem
+transformPBLinearlization o problem
   | Linearlization `elem` o =
-      case pb of
-        Left opb  -> Left  $ PBLinearlization.linearlize    opb (LinearlizationUsingPB `elem` o)
-        Right wbo -> Right $ PBLinearlization.linearlizeWBO wbo (LinearlizationUsingPB `elem` o)
-  | otherwise = pb
+      case problem of
+        ProbOPB opb -> ProbOPB $ PBLinearlization.linearlize    opb (LinearlizationUsingPB `elem` o)
+        ProbWBO wbo -> ProbWBO $ PBLinearlization.linearlizeWBO wbo (LinearlizationUsingPB `elem` o)
+  | otherwise = problem
 
-writePBFile :: [Flag] -> Either PBFile.Formula PBFile.SoftFormula -> IO ()
-writePBFile o pb = do
+writeProblem :: [Flag] -> Problem -> IO ()
+writeProblem o problem = do
   let mip2smtOpt =
         def
         { MIP2SMT.optSetLogic     = listToMaybe [logic | SMTSetLogic logic <- o]
@@ -174,38 +178,38 @@ writePBFile o pb = do
     Nothing -> do
       hSetBinaryMode stdout True
       hSetBuffering stdout (BlockBuffering Nothing)
-      case pb of
-        Left opb  -> PBFile.hPutOPB stdout opb
-        Right wbo -> PBFile.hPutWBO stdout wbo
+      case problem of
+        ProbOPB opb -> PBFile.hPutOPB stdout opb
+        ProbWBO wbo -> PBFile.hPutWBO stdout wbo
     Just fname -> do
-      let opb = case pb of
-                  Left opb  -> opb
-                  Right wbo ->
+      let opb = case problem of
+                  ProbOPB opb -> opb
+                  ProbWBO wbo ->
                     case WBO2PB.convert wbo of
                       (opb, _, _)
                         | Linearlization `elem` o ->
                             -- WBO->OPB conversion may have introduced non-linearity
                             PBLinearlization.linearlize opb (LinearlizationUsingPB `elem` o)
-			| otherwise -> opb
-          wbo = case pb of
-                  Left opb  -> PB2WBO.convert opb
-                  Right wbo -> wbo
-          lp  = case pb of
-                  Left opb  ->
+                        | otherwise -> opb
+          wbo = case problem of
+                  ProbOPB opb -> PB2WBO.convert opb
+                  ProbWBO wbo -> wbo
+          lp  = case problem of
+                  ProbOPB opb ->
                     case PB2IP.convert opb of
                       (ip, _, _) -> ip
-                  Right wbo ->
+                  ProbWBO wbo ->
                     case PB2IP.convertWBO (IndicatorConstraint `elem` o) wbo of
                       (ip, _, _) -> ip
-          lsp = case pb of
-                  Left opb  -> PB2LSP.convert opb
-                  Right wbo -> PB2LSP.convertWBO wbo
+          lsp = case problem of
+                  ProbOPB opb -> PB2LSP.convert opb
+                  ProbWBO wbo -> PB2LSP.convertWBO wbo
       case map toLower (takeExtension fname) of
         ".opb" -> PBFile.writeOPBFile fname opb
         ".wbo" -> PBFile.writeWBOFile fname wbo
         ".cnf" ->
           case PB2SAT.convert opb of
-	    (cnf, _, _) -> CNF.writeFile fname cnf
+            (cnf, _, _) -> CNF.writeFile fname cnf
         ".wcnf" ->
           case WBO2MaxSAT.convert wbo of
             (wcnf, _, _) -> MaxSAT.writeFile fname wcnf
@@ -234,9 +238,9 @@ main = do
       | Help `elem` o    -> putStrLn (usageInfo header options)
       | Version `elem` o -> putStrLn (V.showVersion version)
     (o,[fname],[]) -> do
-      pb <- readPBFile o fname
-      let pb2 = transformPBFile o pb
-      writePBFile o pb2
+      prob <- readProblem o fname
+      let prob2 = transformProblem o prob
+      writeProblem o prob2
     (_,_,errs) -> do
       hPutStrLn stderr $ concat errs ++ usageInfo header options
       exitFailure
