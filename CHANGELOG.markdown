@@ -1,3 +1,7 @@
+0.5.0
+-----
+* pbconvert and lpconvert were merged into a single command 'toyconvert'.
+
 0.4.0
 -----
 * add experimental SMT (Satisfiablity Modulo Theories) solver 'toysmt', which supports theory of uninterpreted functions and linear real arithmetics.

@@ -471,26 +471,9 @@ Executable toyfmf
 
 -- Converters
 
-Executable lpconvert
-  Main-is: lpconvert.hs
-  HS-Source-Dirs: lpconvert
-  Build-Depends:
-    base,
-    filepath,
-    data-default-class,
-    parse-dimacs,
-    pseudo-boolean,
-    toysolver
-  Default-Language: Haskell2010
-  Other-Extensions: CPP
-  if flag(ForceChar8)
-    CPP-OPtions: "-DFORCE_CHAR8"
-  if flag(LinuxStatic)
-    GHC-Options: -static -optl-static -optl-pthread
-
-Executable pbconvert
-  Main-is: pbconvert.hs
-  HS-Source-Dirs: pbconvert
+Executable toyconvert
+  Main-is: toyconvert.hs
+  HS-Source-Dirs: toyconvert
   Build-Depends:
     base,
     filepath,

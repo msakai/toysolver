@@ -2,8 +2,8 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  pbconvert
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Module      :  toyconvert
+-- Copyright   :  (c) Masahiro Sakai 2012-2016
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -96,7 +96,7 @@ options =
 header :: String
 header = unlines
   [ "Usage:"
-  , "    pbconvert -o <outputfile> <inputfile>"
+  , "    toyconvert -o <outputfile> <inputfile>"
   , ""
   , "Supported formats:"
   , "    input: .cnf .wcnf .opb .wbo .gcnf .lp .mps"
