@@ -45,6 +45,7 @@ import qualified ToySolver.Converter.PB2WBO as PB2WBO
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
 import qualified ToySolver.Converter.PB2SMP as PB2SMP
 import qualified ToySolver.Converter.PB2SAT as PB2SAT
+import qualified ToySolver.Converter.SAT2KSAT as SAT2KSAT
 import qualified ToySolver.Converter.WBO2PB as WBO2PB
 import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
 import ToySolver.Version
@@ -64,6 +65,7 @@ data Flag
   | Yices2
   | Linearlization
   | LinearlizationUsingPB
+  | KSat !Int
   deriving Eq
 
 options :: [OptDescr Flag]
@@ -81,6 +83,7 @@ options =
     , Option []    ["yices2"] (NoArg Yices2) "output for yices2 rather than yices1"
     , Option []    ["linearlize"] (NoArg Linearlization) "linearliza nonlinear pseudo-boolean constraints"
     , Option []    ["linearizer-pb"] (NoArg LinearlizationUsingPB) "Use PB constraint in linearization"
+    , Option []    ["ksat"] (ReqArg (KSat . read) "NUMBER") "generate k-SAT formula when outputing .cnf file"
     ]
   where
     parseObjType s =
@@ -227,7 +230,12 @@ writeProblem o problem = do
         ".wbo" -> PBFile.writeWBOFile fname wbo
         ".cnf" ->
           case PB2SAT.convert opb of
-            (cnf, _, _) -> CNF.writeFile fname cnf
+            (cnf, _, _) ->
+              case head ([Just k | KSat k <- o] ++ [Nothing]) of
+                Nothing -> CNF.writeFile fname cnf
+                Just k ->
+                  let (cnf2, _, _) = SAT2KSAT.convert k cnf
+                  in CNF.writeFile fname cnf2
         ".wcnf" ->
           case WBO2MaxSAT.convert wbo of
             (wcnf, _, _) -> MaxSAT.writeFile fname wcnf
