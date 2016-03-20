@@ -104,19 +104,6 @@ Usage:
 
     toyfmf [file.tptp] [size]
 
-### lpconvert
-
-Converter between LP/MIP/SAT-related formats
-
-Usage:
-
-    lpconvert -o [outputfile] [inputfile]
-
-Supported formats:
-
-* Input formats: lp, mps, cnf, wcnf, opb, wbo
-* Output formats: lp, .mps, smt2, ys
-
 ### toyconvert
 
 Converter between various problem files.
