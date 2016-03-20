@@ -122,14 +122,7 @@ convertWBO useIndicator formula = (mip, mforth, mtrans (PBFile.wboNumVars formul
     mforth m = Map.union m1 m2
       where
         m1 = Map.fromList $ [(convVar v, if val then 1 else 0) | (v,val) <- assocs m]
-        m2 = Map.fromList $ [(v, if evalPBConstraint m c then 0 else 1) | (v, (Just _, c)) <- relaxVariables]
-
-evalPBConstraint :: SAT.Model -> PBFile.Constraint -> Bool
-evalPBConstraint m (lhs,op,rhs) = op' (SAT.evalPBSum m lhs) rhs
-  where
-    op' = case op of
-            PBFile.Ge -> (>=)
-            PBFile.Eq -> (==)
+        m2 = Map.fromList $ [(v, if SAT.evalPBConstraint m c then 0 else 1) | (v, (Just _, c)) <- relaxVariables]
 
 splitConst :: MIP.Expr -> (MIP.Expr, Rational)
 splitConst e = (e2, c)

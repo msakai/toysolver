@@ -33,7 +33,7 @@ convert wbo = runST $ do
   formula <- getPBFormula db
 
   let mforth :: SAT.Model -> SAT.Model
-      mforth m = array (1, PBFile.pbNumVars formula) $ assocs m ++ [(v, evalPBConstraint m constr) | (v, constr) <- defs]
+      mforth m = array (1, PBFile.pbNumVars formula) $ assocs m ++ [(v, SAT.evalPBConstraint m constr) | (v, constr) <- defs]
 
       mback :: SAT.Model -> SAT.Model
       mback = SAT.restrictModel nv
@@ -91,11 +91,3 @@ addWBO db wbo = do
     Just t -> SAT.addPBNLAtMost db obj (t - 1)
 
   return (obj, defs)
-
-
-evalPBConstraint :: SAT.Model -> PBFile.Constraint -> Bool
-evalPBConstraint m (lhs,op,rhs) = op' (SAT.evalPBSum m lhs) rhs
-  where
-    op' = case op of
-            PBFile.Ge -> (>=)
-            PBFile.Eq -> (==)

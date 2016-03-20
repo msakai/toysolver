@@ -730,7 +730,7 @@ solvePB opt solver formula = do
               a :: Array SAT.Var Bool
               a = array (1,nv') $ assocs m ++ [(v, Tseitin.evalFormula a phi) | (v,phi) <- defs]
 
-      pbo <- PBO.newOptimizer2 solver obj'' (\m -> evalPBSum m obj')
+      pbo <- PBO.newOptimizer2 solver obj'' (\m -> SAT.evalPBSum m obj')
       setupOptimizer pbo opt
       PBO.setOnUpdateBestSolution pbo $ \_ val -> putOLine (show val)
       PBO.setOnUpdateLowerBound pbo $ \lb -> do
@@ -755,17 +755,6 @@ solvePB opt solver formula = do
               else putSLine "SATISFIABLE"
             pbPrintModel stdout m nv
             writeSOLFile opt m (Just val) nv
-
-evalPBSum :: SAT.IModel m => m -> PBFile.Sum -> Integer
-evalPBSum m s = sum [if and [SAT.evalLit m lit | lit <- tm] then c else 0 | (c,tm) <- s]
-
-evalPBConstraint :: SAT.IModel m => m -> PBFile.Constraint -> Bool
-evalPBConstraint m (lhs,op,rhs) = op' lhs' rhs
-  where
-    op' = case op of
-            PBFile.Ge -> (>=)
-            PBFile.Eq -> (==)
-    lhs' = evalPBSum m lhs
 
 setupOptimizer :: PBO.Optimizer -> Options -> IO ()
 setupOptimizer pbo opt = do
@@ -840,12 +829,12 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
           a = array (1,nv') $
                 assocs m ++
                 [(v, Tseitin.evalFormula a phi) | (v, phi) <- defsTseitin] ++
-                [(v, evalPBConstraint a constr) | (v, constr) <- defsPB]
+                [(v, SAT.evalPBConstraint a constr) | (v, constr) <- defsPB]
 
   let softConstrs = [(c, constr) | (Just c, constr) <- PBFile.wboConstraints formula]
                 
   pbo <- PBO.newOptimizer2 solver objLin $ \m ->
-           sum [if evalPBConstraint m constr then 0 else w | (w,constr) <- softConstrs]
+           sum [if SAT.evalPBConstraint m constr then 0 else w | (w,constr) <- softConstrs]
 
   setupOptimizer pbo opt
   PBO.setOnUpdateBestSolution pbo $ \_ val -> putOLine (show val)

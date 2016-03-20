@@ -59,6 +59,7 @@ module ToySolver.SAT.Types
   , pbLowerBound
   , pbUpperBound
   , pbSubsume
+  , evalPBConstraint
 
   -- * Non-linear Pseudo Boolean constraint
   , PBTerm
@@ -90,6 +91,7 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Vector as V
+import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Data.LBool
 import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
 
@@ -411,6 +413,13 @@ type PBSum = [PBTerm]
 
 evalPBSum :: IModel m => m -> PBSum -> Integer
 evalPBSum m xs = sum [c | (c,lits) <- xs, all (evalLit m) lits]
+
+evalPBConstraint :: IModel m => m -> PBFile.Constraint -> Bool
+evalPBConstraint m (lhs,op,rhs) = op' (evalPBSum m lhs) rhs
+  where
+    op' = case op of
+            PBFile.Ge -> (>=)
+            PBFile.Eq -> (==)
 
 -- | XOR clause
 --
