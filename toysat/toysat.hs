@@ -69,6 +69,7 @@ import qualified ToySolver.Converter.PB2WBO as PB2WBO
 import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
 import qualified ToySolver.Converter.WBO2PB as WBO2PB
 import qualified ToySolver.SAT as SAT
+import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Encoder.Integer as Integer
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
