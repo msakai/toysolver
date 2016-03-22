@@ -22,7 +22,7 @@ PKG=toysat-maxsat`date +%Y`-`date +%Y%m%d`-`git rev-parse --short HEAD`
 rm -r $PKG
 mkdir $PKG
 cp dist/build/toysat/toysat $PKG/toysat_main
-cp misc/maxsat/toysat/README.md misc/maxsat/toysat/toysat $PKG/
+cp COPYING misc/maxsat/toysat/README.md misc/maxsat/toysat/toysat $PKG/
 tar Jcf $PKG.tar.xz $PKG --owner=sakai --group=sakai
 
 if [ ! -f ubcsat-beta-12-b18.tar.gz ]; then
@@ -39,6 +39,6 @@ PKG=toysat_ls-maxsat`date +%Y`-`date +%Y%m%d`-`git rev-parse --short HEAD`
 rm -r $PKG
 mkdir $PKG
 cp dist/build/toysat/toysat $PKG/toysat_main
-cp misc/maxsat/toysat_ls/README.md misc/maxsat/toysat_ls/toysat_ls $PKG/
+cp COPYING misc/maxsat/toysat_ls/README.md misc/maxsat/toysat_ls/toysat_ls $PKG/
 cp ubcsat-beta-12-b18/ubcsat $PKG/
 tar Jcf $PKG.tar.xz $PKG --owner=sakai --group=sakai

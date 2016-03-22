@@ -22,5 +22,5 @@ PKG=toysat-pb`date +%Y`-`date +%Y%m%d`-`git rev-parse --short HEAD`
 rm -r $PKG
 mkdir $PKG
 cp dist/build/toysat/toysat $PKG/
-cp misc/pb/README.md $PKG/
+cp COPYING misc/pb/README.md $PKG/
 tar Jcf $PKG.tar.xz $PKG --owner=sakai --group=sakai
