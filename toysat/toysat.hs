@@ -44,8 +44,8 @@ import System.Exit
 #if !MIN_VERSION_time(1,5,0)
 import System.Locale (defaultTimeLocale)
 #endif
+import System.Clock
 import System.Console.GetOpt
-import System.CPUTime
 import System.FilePath
 import qualified System.Info as SysInfo
 import qualified System.Random.MWC as Rand
@@ -312,8 +312,8 @@ main = do
   setEncodingChar8
 #endif
 
-  startCPU <- getCPUTime
-  startWC  <- getCurrentTime
+  startCPU <- getTime ProcessCPUTime
+  startWC  <- getTime Monotonic
   args <- getArgs
   case getOpt Permute options args of
     (_,_,errs@(_:_)) -> do
@@ -367,10 +367,10 @@ main = do
     
           when (isNothing ret) $ do
             putCommentLine "TIMEOUT"
-          endCPU <- getCPUTime
-          endWC  <- getCurrentTime
-          putCommentLine $ printf "total CPU time = %.3fs" (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
-          putCommentLine $ printf "total wall clock time = %.3fs" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
+          endCPU <- getTime ProcessCPUTime
+          endWC  <- getTime Monotonic
+          putCommentLine $ printf "total CPU time = %.3fs" (durationSecs startCPU endCPU)
+          putCommentLine $ printf "total wall clock time = %.3fs" (durationSecs startWC endWC)
           printGCStat
 
 printGCStat :: IO ()
@@ -532,7 +532,7 @@ initPolarityUsingSP :: SAT.Solver -> Int -> Int -> [(Double, SAT.Clause)] -> IO 
 initPolarityUsingSP solver nvOrig nv clauses = do
   n <- getNumCapabilities
   putCommentLine $ "Running survey propgation using " ++ show n ++" threads ..."
-  startWC  <- getCurrentTime
+  startWC  <- getTime Monotonic
   sp <- SP.newSolver nv clauses  
   SP.initializeRandom sp =<< SAT.getRandomGen solver
   SP.setNThreads sp n
@@ -540,9 +540,9 @@ initPolarityUsingSP solver nvOrig nv clauses = do
   forM_ lits $ \lit -> do
     when (abs lit <= nvOrig) $ SP.fixLit sp lit
   b <- SP.propagate sp
-  endWC  <- getCurrentTime
+  endWC  <- getTime Monotonic
   if b then do
-    putCommentLine $ printf "Survey propagation converged in %.3fs" (realToFrac (endWC `diffUTCTime` startWC) :: Double)
+    putCommentLine $ printf "Survey propagation converged in %.3fs" (durationSecs startWC endWC)
     xs <- liftM catMaybes $ forM [1 .. nvOrig] $ \v -> do
       (pt,pf,_)<- SP.getVarProb sp v
       let bias = pt - pf
@@ -980,3 +980,6 @@ writeSOLFile opt m obj nbvar = do
     Just fname -> do
       let m2 = Map.fromList [("x" ++ show x, if b then 1 else 0) | (x,b) <- assocs m, x <= nbvar]
       writeFile fname (GurobiSol.render (Map.map fromInteger m2) (fmap fromInteger obj))
+
+durationSecs :: TimeSpec -> TimeSpec -> Double
+durationSecs start end = fromIntegral (timeSpecAsNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)

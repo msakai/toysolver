@@ -121,10 +121,9 @@ import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Text.Printf
-import Data.Time
 import Data.OptDir
 import Data.VectorSpace
-import System.CPUTime
+import System.Clock
 
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.LA (Atom (..))
@@ -1007,16 +1006,18 @@ recordTime solver act = do
   dumpSize solver
   writeIORef (svNPivot solver) 0
 
-  startCPU <- getCPUTime
-  startWC  <- getCurrentTime
+  startCPU <- getTime ProcessCPUTime
+  startWC  <- getTime Monotonic
 
   result <- act
 
-  endCPU <- getCPUTime
-  endWC  <- getCurrentTime
+  endCPU <- getTime ProcessCPUTime
+  endWC  <- getTime Monotonic
 
-  (log solver . printf "cpu time = %.3fs") (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
-  (log solver . printf "wall clock time = %.3fs") (realToFrac (endWC `diffUTCTime` startWC) :: Double)
+  let durationSecs :: TimeSpec -> TimeSpec -> Double
+      durationSecs start end = fromIntegral (timeSpecAsNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)
+  (log solver . printf "cpu time = %.3fs") (durationSecs startCPU endCPU)
+  (log solver . printf "wall clock time = %.3fs") (durationSecs startWC endWC)
   (log solver . printf "#pivot = %d") =<< readIORef (svNPivot solver)
   return result
 

@@ -177,9 +177,8 @@ import qualified Data.Set as Set
 import ToySolver.Internal.Data.IOURef
 import qualified ToySolver.Internal.Data.IndexedPriorityQueue as PQ
 import qualified ToySolver.Internal.Data.Vec as Vec
-import Data.Time
 import Data.Typeable
-import System.CPUTime
+import System.Clock
 import qualified System.Random.MWC as Rand
 import Text.Printf
 
@@ -384,8 +383,8 @@ data Solver
 
   -- Logging
   , svLogger :: !(IORef (Maybe (String -> IO ())))
-  , svStartWC    :: !(IORef UTCTime)
-  , svLastStatWC :: !(IORef UTCTime)
+  , svStartWC    :: !(IORef TimeSpec)
+  , svLastStatWC :: !(IORef TimeSpec)
 
   -- Working spaces
   , svAssumptions     :: !(Vec.UVec Lit)
@@ -1031,12 +1030,12 @@ solve_ solver = do
 
     printStatHeader solver
 
-    startCPU <- getCPUTime
-    startWC  <- getCurrentTime
+    startCPU <- getTime ProcessCPUTime
+    startWC  <- getTime Monotonic
     writeIORef (svStartWC solver) startWC
     result <- loop restartSeq
-    endCPU <- getCPUTime
-    endWC  <- getCurrentTime
+    endCPU <- getTime ProcessCPUTime
+    endWC  <- getTime Monotonic
 
     when (result == Just True) $ do
       when (configCheckModel config) $ checkSatisfied solver
@@ -1053,8 +1052,10 @@ solve_ solver = do
     when debugMode $ dumpVarActivity solver
     when debugMode $ dumpConstrActivity solver
     printStat solver True
-    (log solver . printf "#cpu_time = %.3fs") (fromIntegral (endCPU - startCPU) / 10^(12::Int) :: Double)
-    (log solver . printf "#wall_clock_time = %.3fs") (realToFrac (endWC `diffUTCTime` startWC) :: Double)
+    let durationSecs :: TimeSpec -> TimeSpec -> Double
+        durationSecs start end = fromIntegral (timeSpecAsNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)
+    (log solver . printf "#cpu_time = %.3fs") (durationSecs startCPU endCPU)
+    (log solver . printf "#wall_clock_time = %.3fs") (durationSecs startWC endWC)
     (log solver . printf "#decision = %d") =<< readIOURef (svNDecision solver)
     (log solver . printf "#random_decision = %d") =<< readIOURef (svNRandomDecision solver)
     (log solver . printf "#conflict = %d") =<< readIOURef (svNConflict solver)
@@ -2179,15 +2180,15 @@ printStatHeader solver = do
 
 printStat :: Solver -> Bool -> IO ()
 printStat solver force = do
-  nowWC <- getCurrentTime
+  nowWC <- getTime Monotonic
   b <- if force
        then return True
        else do
          lastWC <- readIORef (svLastStatWC solver)
-         return $ (nowWC `diffUTCTime` lastWC) > 1
+         return $ sec (nowWC `diffTimeSpec` lastWC) > 1
   when b $ do
     startWC   <- readIORef (svStartWC solver)
-    let tm = showTimeDiff $ nowWC `diffUTCTime` startWC
+    let tm = showTimeDiff $ nowWC `diffTimeSpec` startWC
     restart   <- readIOURef (svNRestart solver)
     dec       <- readIOURef (svNDecision solver)
     conflict  <- readIOURef (svNConflict solver)
@@ -2199,8 +2200,8 @@ printStat solver force = do
       tm restart dec conflict learntLim learntGC fixed removed
     writeIORef (svLastStatWC solver) nowWC
 
-showTimeDiff :: NominalDiffTime -> String
-showTimeDiff sec
+showTimeDiff :: TimeSpec -> String
+showTimeDiff t
   | si <  100  = printf "%4.1fs" (fromRational s :: Double)
   | si <= 9999 = printf "%4ds" si
   | mi <  100  = printf "%4.1fm" (fromRational m :: Double)
@@ -2209,10 +2210,10 @@ showTimeDiff sec
   | otherwise  = printf "%4dh" hi
   where
     s :: Rational
-    s = realToFrac sec
+    s = fromIntegral (timeSpecAsNanoSecs t) / 10^(9::Int)
 
     si :: Integer
-    si = round s
+    si = fromIntegral (sec t)
 
     m :: Rational
     m = s / 60

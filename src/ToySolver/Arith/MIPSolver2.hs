@@ -71,8 +71,7 @@ import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Foldable as F
 import Data.VectorSpace
-import Data.Time
-import System.CPUTime
+import System.Clock
 import System.Timeout
 import Text.Printf
 
@@ -270,18 +269,18 @@ branchAndBound solver rootLP update = do
 
   log solver $ printf "MIP: forking %d worker threads..." nthreads
 
-  startCPU <- getCPUTime
-  startWC  <- getCurrentTime
+  startCPU <- getTime ProcessCPUTime
+  startWC  <- getTime Monotonic
   ex <- newEmptyTMVarIO
 
   let printStatus :: Seq.Seq Node -> Int -> IO ()
       printStatus nodes visited
         | Seq.null nodes = return () -- should not happen
         | otherwise = do
-            nowCPU <- getCPUTime
-            nowWC  <- getCurrentTime
-            let spentCPU = (nowCPU - startCPU) `div` 10^(12::Int)
-            let spentWC  = round (nowWC `diffUTCTime` startWC) :: Int
+            nowCPU <- getTime ProcessCPUTime
+            nowWC  <- getTime Monotonic
+            let spentCPU = sec (nowCPU `diffTimeSpec` startCPU)
+            let spentWC  = sec (nowWC  `diffTimeSpec` startWC )
 
             let vs = map ndValue (F.toList nodes)
                 dualBound =
