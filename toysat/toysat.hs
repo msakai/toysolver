@@ -787,11 +787,9 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
   putCommentLine $ printf "#constraints %d" nc
 
   SAT.resizeVarCapacity solver (nv + length [() | (Just _, _) <- PBFile.wboConstraints formula])
-  SAT.newVars_ solver nv
   enc <- Tseitin.newEncoderWithPBLin solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
   pbnlc <- PBNLC.newEncoder solver enc
-
   (obj, defsPB) <- WBO2PB.addWBO pbnlc formula
   objLin <- PBNLC.linearizePBSumWithPolarity pbnlc Tseitin.polarityNeg obj
 
