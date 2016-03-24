@@ -54,8 +54,8 @@ case_example_3_2_primalDualSimplex = do
 -- from http://www.math.cuhk.edu.hk/~wei/lpch5.pdf
 exampe_5_3_phase1 :: Tableau Rational
 exampe_5_3_phase1 = IntMap.fromList
-  [ (6, (IntMap.fromList [(2,-1), (3,-1), (5,1), (6,1)], 1))
-  , (7, (IntMap.fromList [(3,1), (4,-1), (5,1), (7,1)], 0))
+  [ (6, (IntMap.fromList [(2,-1), (3,-1), (5,1)], 1))
+  , (7, (IntMap.fromList [(3,1), (4,-1), (5,1)], 0))
   ]
 
 case_exampe_5_3_phase1 :: Assertion
