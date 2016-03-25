@@ -52,15 +52,15 @@ case_example_3_2_primalDualSimplex = do
     (ret,result) = primalDualSimplex OptMax example_3_2
 
 -- from http://www.math.cuhk.edu.hk/~wei/lpch5.pdf
-exampe_5_3_phase1 :: Tableau Rational
-exampe_5_3_phase1 = IntMap.fromList
+example_5_3_phase1 :: Tableau Rational
+example_5_3_phase1 = IntMap.fromList
   [ (6, (IntMap.fromList [(2,-1), (3,-1), (5,1)], 1))
   , (7, (IntMap.fromList [(3,1), (4,-1), (5,1)], 0))
   ]
 
-case_exampe_5_3_phase1 :: Assertion
-case_exampe_5_3_phase1 = do
-  let (ret,result) = phaseI exampe_5_3_phase1 (IntSet.fromList [6,7])
+case_example_5_3_phase1 :: Assertion
+case_example_5_3_phase1 = do
+  let (ret,result) = phaseI example_5_3_phase1 (IntSet.fromList [6,7])
   assertBool "phase1 failed" ret
   assertBool "invalid tableau" (isValidTableau result)
   assertBool "infeasible tableau" (isFeasible result)    
