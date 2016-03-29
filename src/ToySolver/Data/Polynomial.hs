@@ -27,6 +27,7 @@ module ToySolver.Data.Polynomial
 
   -- * Conversion
   , Var (..)
+  , FromX (..)
   , constant
   , terms
   , fromTerms

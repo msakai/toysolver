@@ -28,6 +28,7 @@ module ToySolver.Data.Polynomial.Base
 
   -- * Conversion
   , Var (..)
+  , FromX (..)
   , constant
   , terms
   , fromTerms
@@ -160,6 +161,9 @@ class Ord v => Vars a v | a -> v where
 class Degree t where
   deg :: t -> Integer
 
+class FromX a where
+  x :: a
+
 {--------------------------------------------------------------------
   Polynomial type
 --------------------------------------------------------------------}
@@ -208,6 +212,9 @@ instance Degree (Polynomial k v) where
   deg p
     | isZero p  = -1
     | otherwise = maximum [deg mm | (_,mm) <- terms p]
+
+instance (Eq k, Num k, Ord v, FromX v) => FromX (Polynomial k v) where
+  x = var x
 
 normalize :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
@@ -582,6 +589,9 @@ instance NFData X where
 instance Hashable X where
   hashWithSalt = hashUsing fromEnum
 
+instance FromX X where
+  x = X
+
 -- | Natural ordering /x^0 < x^1 < x^2 ../ is the unique monomial order for
 -- univariate polynomials.
 nat :: MonomialOrder X
@@ -762,6 +772,9 @@ instance Ord v => Vars (Monomial v) v where
 
 instance Hashable v => Hashable (Monomial v) where
   hashWithSalt = hashUsing (Map.toList . mindicesMap)
+
+instance (Ord v, FromX v) => FromX (Monomial v) where
+  x = var x
 
 mone :: Monomial v
 mone = Monomial $ Map.empty
