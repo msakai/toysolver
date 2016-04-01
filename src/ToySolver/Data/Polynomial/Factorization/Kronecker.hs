@@ -71,7 +71,7 @@ factor2 p =
     Just (xi,_) ->
       let q1 = x - P.constant xi
           q2 = p' `P.div` P.mapCoeff fromInteger q1
-      in Just (q1, toZ q2)
+      in Just (q1, P.pp q2)
     Nothing ->
       let qs = map Interpolation.interpolate $
                   sequence [[(fromInteger xi, fromInteger z) | z <- factors yi] | (xi,yi) <- vs]
@@ -82,7 +82,7 @@ factor2 p =
                ]
       in case zs of
            [] -> Nothing
-           (q1,q2):_ -> Just (toZ q1, toZ q2)
+           (q1,q2):_ -> Just (P.pp q1, P.pp q2)
   where
     n = P.deg p `div` 2
     xs = take (fromIntegral n + 1) xvalues
@@ -93,9 +93,6 @@ factor2 p =
 
 isUPolyZ :: UPolynomial Rational -> Bool
 isUPolyZ p = and [isInteger c | (c,_) <- P.terms p]
-
-toZ :: Ord v => Polynomial Rational v -> Polynomial Integer v
-toZ = P.mapCoeff numerator . P.pp
 
 -- [0, 1, -1, 2, -2, 3, -3 ..]
 xvalues :: [Integer]

@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts, TemplateHaskell, ScopedTypeVariables #-}
 
 import Prelude hiding (lex)
 import qualified Control.Exception as E
@@ -256,6 +256,7 @@ case_cont_pp_Rational = do
   P.cont p @?= 1/6
   P.pp p   @?= (2*x^5 + 21*x^2 + 12*x + 6)
   where
+    x :: P.Var a X => a
     x = P.var X
     p :: UPolynomial Rational
     p = P.constant (1/3) * x^5 + P.constant (7/2) * x^2 + 2 * x + 1

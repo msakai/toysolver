@@ -399,7 +399,7 @@ isAlgebraicInteger x = abs (P.lc P.nat (P.pp (minimalPolynomial x))) == 1
 -- coefficients of the irreducible and primitive polynomial with integral
 -- rational coefficients.
 height :: AReal -> Integer
-height x = maximum [abs (numerator c) | (c,_) <- P.terms $ P.pp $ minimalPolynomial x]
+height x = maximum [abs c | (c,_) <- P.terms $ P.pp $ minimalPolynomial x]
 
 -- | root index, satisfying
 --

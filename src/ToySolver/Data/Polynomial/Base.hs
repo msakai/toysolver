@@ -308,19 +308,24 @@ ppI p = mapCoeff f p
     f x = assert (x `Prelude.mod` c == 0) $ x `Prelude.div` c
 
 class ContPP k where
+  type PPCoeff k
+
   -- | Content of a polynomial  
   cont :: (Ord v) => Polynomial k v -> k
   -- constructive-algebra-0.3.0 では cont 0 は error になる
 
   -- | Primitive part of a polynomial
-  pp :: (Ord v) => Polynomial k v -> Polynomial k v
+  pp :: (Ord v) => Polynomial k v -> Polynomial (PPCoeff k) v
 
 instance ContPP Integer where
+  type PPCoeff Integer = Integer
   cont = contI
   pp   = ppI
 
 instance Integral r => ContPP (Ratio r) where
   {-# SPECIALIZE instance ContPP (Ratio Integer) #-}
+
+  type PPCoeff (Ratio r) = r
 
   cont 0 = 1
   cont p = foldl1' Prelude.gcd ns % foldl' Prelude.lcm 1 ds
@@ -328,7 +333,7 @@ instance Integral r => ContPP (Ratio r) where
       ns = [abs (numerator c) | (c,_) <- terms p]
       ds = [denominator c     | (c,_) <- terms p]  
 
-  pp p = mapCoeff (/ c) p
+  pp p = mapCoeff (numerator . (/ c)) p
     where
       c = cont p
 

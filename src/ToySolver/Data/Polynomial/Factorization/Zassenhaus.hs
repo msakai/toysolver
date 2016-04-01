@@ -114,7 +114,7 @@ search pk f0 fs0 = runST $ do
       let f1 = P.mapCoeff fromInteger f
 
       when (P.deg g1 > 0 && g1 `P.divides` f1) $ do
-        let g2 = P.mapCoeff numerator $ P.pp g1
+        let g2 = P.pp g1
             -- we choose leading coefficient to be positive.
             g :: UPolynomial Integer
             g = if P.lc P.nat g2 < 0 then - g2 else g2

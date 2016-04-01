@@ -60,4 +60,4 @@ instance P.SQFree (UPolynomial Integer) where
           [(P.constant (numerator u), 1) | u /= 1] ++ ys
       go !u ys ((g,n):xs)
         | P.deg g <= 0 = go (u * P.coeff P.mone g) ys xs
-        | otherwise    = go (u * (P.cont g)^n) ((P.mapCoeff numerator (P.pp g), n) : ys) xs
+        | otherwise    = go (u * (P.cont g)^n) ((P.pp g, n) : ys) xs
