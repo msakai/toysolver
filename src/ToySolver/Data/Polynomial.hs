@@ -77,6 +77,7 @@ module ToySolver.Data.Polynomial
   , isRootOf
   , isSquareFree
   , nat
+  , eisensteinsCriterion
 
   -- * Term
   , Term

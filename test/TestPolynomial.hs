@@ -907,6 +907,15 @@ case_Lagrange_interpolation_2 = p @?= q
         ]
     q = 6*x^2 - 11*x + 6
 
+-- ---------------------------------------------------------------------
+
+-- http://www.math.tamu.edu/~geller/factoring.pdf
+case_eisensteinsCriterion_1 = P.eisensteinsCriterion p @?= True
+  where
+    x :: UPolynomial Rational
+    x = P.var X
+    p = 2*x^17 - 18*x^12 + 24*x^9 + 243*x^6 - 30*x^3 - 6
+
 ------------------------------------------------------------------------
 -- Test harness
 

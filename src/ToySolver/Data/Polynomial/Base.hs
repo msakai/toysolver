@@ -78,6 +78,7 @@ module ToySolver.Data.Polynomial.Base
   , isRootOf
   , isSquareFree
   , nat
+  , eisensteinsCriterion
 
   -- * Term
   , Term
@@ -132,6 +133,7 @@ import Data.Function
 import Data.Hashable
 import Data.List
 import Data.Monoid
+import Data.Numbers.Primes (primeFactors)
 import Data.Ratio
 import Data.String (IsString (..))
 import Data.Map.Strict (Map)
@@ -456,6 +458,33 @@ class SQFree a where
   -- | factor a polynomial @p@ into @p1 ^ n1 * p2 ^ n2 * ..@ and
   -- return a list @[(p1,n1), (p2,n2), ..]@.
   sqfree :: a -> [(a, Integer)]
+
+-- | Eisenstein's irreducibility criterion.
+--
+-- Given a polynomial with integer coefficients @P[x] = an x^n + .. + a1*x + a0@,
+-- it is irreducible over rational numbers if there exists a prime number @p@
+-- satisfying the following conditions:
+--
+-- * @p@ divides ai for @i /= n@,
+--
+-- * @p@ does not divides @an@, and
+--
+-- * @p^2@ does not divides @a0@.
+--
+eisensteinsCriterion
+  :: (Num k, ContPP k, PPCoeff k ~ Integer)
+  => UPolynomial k -> Bool
+eisensteinsCriterion p
+  | deg p <= 1 = True
+  | otherwise  = eisensteinsCriterion' (pp p)
+
+eisensteinsCriterion' :: UPolynomial Integer -> Bool
+eisensteinsCriterion' p = or [criterion prime | prime <- map head $ group $ primeFactors c]
+  where
+    Just ((_,an), ts) = Map.maxViewWithKey (coeffMap p)
+    a0 = coeff mone p
+    c = foldl' Prelude.gcd 0 [ai | (_,ai) <- Map.toList ts]
+    criterion prime = an `Prelude.mod` prime /= 0 && a0 `Prelude.mod` (prime*prime) /= 0
 
 {--------------------------------------------------------------------
   Pretty printing
