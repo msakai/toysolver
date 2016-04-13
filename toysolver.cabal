@@ -237,7 +237,9 @@ Library
      ToySolver.Combinatorial.Knapsack.BB
      ToySolver.Combinatorial.Knapsack.DPDense
      ToySolver.Combinatorial.Knapsack.DPSparse
+     ToySolver.Combinatorial.MaximumCardinalityBipartiteMatching
      ToySolver.Combinatorial.SubsetSum
+     ToySolver.Combinatorial.WeightedBipartiteMatching
      ToySolver.Converter.GCNF2MaxSAT
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2PB
@@ -741,6 +743,7 @@ Test-suite TestSuite
     containers,
     data-default-class,
     deepseq,
+    hashable,
     mtl,
     mwc-random,
     parse-dimacs,
@@ -748,6 +751,7 @@ Test-suite TestSuite
     pseudo-boolean,
     transformers,
     transformers-compat,
+    unordered-containers,
     vector,
     vector-space,
     toysolver,
