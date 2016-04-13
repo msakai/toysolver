@@ -211,6 +211,7 @@ Library
      ToySolver.Arith.Cooper
      ToySolver.Arith.Cooper.Base
      ToySolver.Arith.Cooper.FOL
+     ToySolver.Arith.DifferenceLogic
      ToySolver.Arith.FourierMotzkin
      ToySolver.Arith.FourierMotzkin.Base
      ToySolver.Arith.FourierMotzkin.FOL
