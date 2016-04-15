@@ -561,6 +561,24 @@ Executable knapsack
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
+Executable assign
+  If !flag(BuildSamplePrograms)
+    Buildable: False
+  Main-is: assign.hs
+  HS-Source-Dirs: samples/programs/assign
+  Build-Depends:
+    base,
+    bytestring,
+    unordered-containers,
+    vector,
+    toysolver
+  Default-Language: Haskell2010
+  Other-Extensions: CPP
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
+
 Executable htc
   If !flag(BuildSamplePrograms)
     Buildable: False
