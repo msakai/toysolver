@@ -1,4 +1,5 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Combinatorial.MaximumCardinalityBipartiteMatching
@@ -20,11 +21,15 @@ module ToySolver.Combinatorial.MaximumCardinalityBipartiteMatching
   , solve'
   ) where
 
+import Data.Foldable (toList)
 import Data.Hashable
 import Data.HashMap.Strict (HashMap, (!))
 import qualified Data.HashMap.Strict as HashMap
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
+import Data.Monoid
+import Data.Sequence (Seq, ViewL (..))
+import qualified Data.Sequence as Seq
 import ToySolver.BellmanFord
 
 solve
@@ -39,34 +44,35 @@ solve' as bs es = loop
   where
     loop :: HashSet (a,b) -> HashSet (a,b)
     loop m =
-      case bellmanford g ([Right b | b <- HashSet.toList b_exposed]) of
-        Left _ -> error "MaximumCardinalityBipartiteMatching: should not happen"
-        Right d ->
-          case [a | a <- HashSet.toList a_exposed, Left a `HashMap.member` d] of
-            [] -> m
-            a : _ ->
-              let path = constructPath d (Left a)
-                  d1 = HashSet.fromList [(a,b) | (Left a, Right b) <- path]
-                  d2 = HashSet.fromList [(a,b) | (Right b, Left a) <- path]
-                  m' = (m `HashSet.difference` d1) `HashSet.union` d2
-              in loop $! m'
+      case search HashSet.empty HashSet.empty (Seq.fromList [(Right b, [], []) | b <- HashSet.toList b_exposed]) of
+        Nothing -> m
+        Just (d1, d2) ->
+          loop $! (m `HashSet.difference` (HashSet.fromList d1)) `HashSet.union` HashSet.fromList d2
       where
-        g :: HashMap (Either a b) [(Either a b, Int, ())]
-        g = HashMap.fromListWith (++) $
-            [(Left a, [(Right b, 1, ())]) | (a,b) <- HashSet.toList m] ++
-            [(Right b, [(Left a, 1, ())]) | (a,b) <- HashSet.toList (es `HashSet.difference` m)]
         a_exposed = as `HashSet.difference` HashSet.map (\(a,b) -> a) m
         b_exposed = bs `HashSet.difference` HashSet.map (\(a,b) -> b) m
 
-constructPath
-  :: (Hashable vertex, Eq vertex)
-  => HashMap vertex (cost, Maybe (vertex, label)) -> vertex -> [(vertex,vertex)]
-constructPath d v = loop v []
-  where
-    loop v path =
-      case d ! v of
-        (_, Nothing) -> path
-        (_, Just (u,_)) -> loop u ((u,v) : path)
+        a2b :: HashMap a (Seq b)
+        a2b = HashMap.fromListWith (<>) [(a, Seq.singleton b) | (a,b) <- HashSet.toList m]
+
+        b2a :: HashMap b (Seq a)
+        b2a = HashMap.fromListWith (<>) [(b, Seq.singleton a) | e@(a,b) <- HashSet.toList es, not (e `HashSet.member` m)]
+
+        search :: HashSet a -> HashSet b -> Seq (Either a b, [(a,b)], [(a,b)]) -> Maybe ([(a,b)], [(a,b)])
+        search !visitedA !visitedB curr =
+          case Seq.viewl curr of
+            Seq.EmptyL -> Nothing
+            (Left a, d1, d2) :< curr'
+              | a `HashSet.member` visitedA -> search visitedA visitedB curr'
+              | a `HashSet.member` a_exposed -> Just $ (d1,d2)
+              | otherwise ->
+                  search (HashSet.insert a visitedA) visitedB
+                         (curr' <> fmap (\b -> (Right b, (a,b):d1, d2)) (HashMap.lookupDefault Seq.empty a a2b))
+            (Right b, d1, d2) :< curr'
+              | b `HashSet.member` visitedB -> search visitedA visitedB curr'
+              | otherwise ->
+                  search visitedA (HashSet.insert b visitedB)
+                         (curr' <> fmap (\a -> (Left a, d1, (a,b):d2)) (HashMap.lookupDefault Seq.empty b b2a))
 
 test = solve as bs es
   where
