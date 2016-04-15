@@ -28,9 +28,6 @@ import qualified Data.HashMap.Strict as HashMap
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import Data.Monoid
-import Data.Sequence (Seq, ViewL (..))
-import qualified Data.Sequence as Seq
-import ToySolver.BellmanFord
 
 solve
   :: forall a b. (Hashable a, Eq a, Hashable b, Eq b)
@@ -40,39 +37,58 @@ solve as bs es = solve' as bs es HashSet.empty
 solve'
   :: forall a b. (Hashable a, Eq a, Hashable b, Eq b)
   => HashSet a -> HashSet b -> HashSet (a,b) -> HashSet (a,b) -> HashSet (a,b)
-solve' as bs es = loop
+solve' as bs es m0 = loop m0_a2b m0_b2a m0_b_exposed
   where
-    loop :: HashSet (a,b) -> HashSet (a,b)
-    loop m =
-      case search HashSet.empty HashSet.empty (Seq.fromList [(Right b, [], []) | b <- HashSet.toList b_exposed]) of
-        Nothing -> m
-        Just (d1, d2) ->
-          loop $! (m `HashSet.difference` (HashSet.fromList d1)) `HashSet.union` HashSet.fromList d2
+    e_b2a :: HashMap b (HashSet a)
+    e_b2a = HashMap.fromListWith HashSet.union [(b, HashSet.singleton a) | (a,b) <- HashSet.toList es]
+
+    m0_a2b = HashMap.fromList [(a,b) | (a,b) <- HashSet.toList m0]
+    m0_b2a = HashMap.fromList [(b,a) | (a,b) <- HashSet.toList m0]
+    m0_b_exposed = HashSet.filter (not . (`HashMap.member` m0_b2a)) bs
+
+    loop :: HashMap a b -> HashMap b a -> HashSet b -> HashSet (a,b)
+    loop m_a2b m_b2a m_b_exposed =
+      case search m_b_exposed of
+        Nothing -> HashSet.fromList $ HashMap.toList m_a2b
+        Just d2 ->
+          let -- Note that HashMap.union is left-biased
+              m_a2b' = HashMap.fromList d2 `HashMap.union` m_a2b
+              m_b2a' = HashMap.fromList [(b,a) | (a,b) <- d2] `HashMap.union` m_b2a
+              m_b_exposed' = HashSet.delete (snd (last d2)) m_b_exposed
+          in loop m_a2b' m_b2a' m_b_exposed'
       where
-        a_exposed = as `HashSet.difference` HashSet.map (\(a,b) -> a) m
-        b_exposed = bs `HashSet.difference` HashSet.map (\(a,b) -> b) m
-
-        a2b :: HashMap a (Seq b)
-        a2b = HashMap.fromListWith (<>) [(a, Seq.singleton b) | (a,b) <- HashSet.toList m]
-
-        b2a :: HashMap b (Seq a)
-        b2a = HashMap.fromListWith (<>) [(b, Seq.singleton a) | e@(a,b) <- HashSet.toList es, not (e `HashSet.member` m)]
-
-        search :: HashSet a -> HashSet b -> Seq (Either a b, [(a,b)], [(a,b)]) -> Maybe ([(a,b)], [(a,b)])
-        search !visitedA !visitedB curr =
-          case Seq.viewl curr of
-            Seq.EmptyL -> Nothing
-            (Left a, d1, d2) :< curr'
-              | a `HashSet.member` visitedA -> search visitedA visitedB curr'
-              | a `HashSet.member` a_exposed -> Just $ (d1,d2)
-              | otherwise ->
-                  search (HashSet.insert a visitedA) visitedB
-                         (curr' <> fmap (\b -> (Right b, (a,b):d1, d2)) (HashMap.lookupDefault Seq.empty a a2b))
-            (Right b, d1, d2) :< curr'
-              | b `HashSet.member` visitedB -> search visitedA visitedB curr'
-              | otherwise ->
-                  search visitedA (HashSet.insert b visitedB)
-                         (curr' <> fmap (\a -> (Left a, d1, (a,b):d2)) (HashMap.lookupDefault Seq.empty b b2a))
+        search :: HashSet b -> Maybe [(a,b)]
+        search bs = loopB HashSet.empty bs [] [(b, []) | b <- HashSet.toList bs]
+          where
+            loopA :: HashSet a -> HashSet b -> [(a, [(a,b)])] -> [(b, [(a,b)])] -> Maybe [(a,b)]
+            loopA !visitedA !visitedB currA currB =
+              case currA of
+                []
+                  | null currB -> Nothing
+                  | otherwise -> loopB visitedA visitedB [] currB 
+                (a, d2) : currA'
+                  | a `HashSet.member` visitedA -> loopA visitedA visitedB currA' currB
+                  | otherwise ->
+                      case HashMap.lookup a m_a2b of
+                        Nothing -> Just d2
+                        Just b
+                          | b `HashSet.member` visitedB -> loopA (HashSet.insert a visitedA) visitedB currA' currB
+                          | otherwise -> loopA (HashSet.insert a visitedA) (HashSet.insert b visitedB) currA' ((b, d2) : currB)
+            loopB :: HashSet a -> HashSet b -> [(a, [(a,b)])] -> [(b, [(a,b)])] -> Maybe [(a,b)]
+            loopB !visitedA !visitedB currA currB =
+              case currB of
+                []
+                  | null currA -> Nothing
+                  | otherwise -> loopA visitedA visitedB currA []
+                (b, d2) : currB' ->
+                  loopB visitedA (HashSet.insert b visitedB)
+                    ([(a, (a,b):d2) | a <- HashSet.toList as3] ++ currA)
+                    currB'
+                  where
+                    as2 = HashMap.lookupDefault HashSet.empty b e_b2a
+                    as3 = case HashMap.lookup b m_b2a of
+                            Nothing -> as2
+                            Just a -> HashSet.delete a as2
 
 test = solve as bs es
   where
