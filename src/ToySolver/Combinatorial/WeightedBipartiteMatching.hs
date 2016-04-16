@@ -92,64 +92,56 @@ minimumPerfectMatching
   => HashSet a -> HashSet b -> (a -> b -> w)
   -> (w, HashSet (a,b), (HashMap a w, HashMap b w))
 minimumPerfectMatching as bs _ | HashSet.size as /= HashSet.size bs = error "minimumPerfectMatching: two sets must be same size"
-minimumPerfectMatching as bs w = loop m0 ys0
+minimumPerfectMatching as bs w = loop m0 ys0 (equalityGraph ys0)
   where
     ys0 :: (HashMap a w, HashMap b w)
     ys0 = ( HashMap.fromList [(a, minimum [w a b | b <- HashSet.toList bs]) | a <- HashSet.toList as]
           , HashMap.fromList [(b, 0) | b <- HashSet.toList bs]
           )
-    m0 = MaxCardMatching.solve as bs (equalityGraph ys0)
+    m0 = HashSet.empty
 
     loop
-      :: HashSet (a,b) -> (HashMap a w, HashMap b w)
+      :: HashSet (a,b) -> (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
       -> (w, HashSet (a,b), (HashMap a w, HashMap b w))
-    loop m ys@(ysA,ysB)
+    loop m_pre ys@(ysA,ysB) g_eq
       | isPerfect m = (F.sum ysA + F.sum ysB, m, ys)
-      | otherwise = loop m' ys'
+      | otherwise = loop m ys' g_eq'
       where
-        b_exposed = bs `HashSet.difference` HashSet.map (\(_,b) -> b) m
+        (m, l_a, l_b) = MaxCardMatching.solve' as bs (g_eq !) m_pre
+        l_a' = as `HashSet.difference` l_a -- A \ L
 
-        l :: HashSet (Either a b)
-        l = go [Right b | b <- HashSet.toList b_exposed] HashSet.empty
-          where
-            g :: HashMap (Either a b) [Either a b]
-            g = HashMap.fromListWith (++)
-                [ if e `HashSet.member` m then (Left a, [Right b]) else (Right b, [Left a])
-                | e@(a,b) <- HashSet.toList (equalityGraph ys)
+        slack :: w
+        slack = minimum
+                [ w u v - (ysA!u + ysB!v)
+                | u <- HashSet.toList l_a'
+                , v <- HashSet.toList l_b
                 ]
-
-            go :: [Either a b] -> HashSet (Either a b) -> HashSet (Either a b)
-            go [] visited = visited
-            go (v:vs) visited
-              | v `HashSet.member` visited = go vs visited
-              | otherwise = go (HashMap.lookupDefault [] v g ++ vs) (HashSet.insert v visited)
 
         -- augmenting dual solution
         ys' :: (HashMap a w, HashMap b w)
         ys' = (HashMap.mapWithKey f ysA, HashMap.mapWithKey g ysB)
           where
             f a val
-              | not (Left a `HashSet.member` l) = val + slack
+              | not (a `HashSet.member` l_a) = val + slack
               | otherwise = val
             g b val
-              | not (Right b `HashSet.member` l) = val - slack
+              | not (b `HashSet.member` l_b) = val - slack
               | otherwise = val
-            slack = minimum
-                    [ w u v - (ysA!u + ysB!v)
-                    | u <- HashSet.toList as, not (Left u `HashSet.member` l)
-                    , v <- HashSet.toList bs, Right v `HashSet.member` l
-                    ]
 
-        -- augmenting primal solution
-        m' :: HashSet (a,b)
-        m' = MaxCardMatching.solve' as bs (equalityGraph ys') m
+        g_eq' :: HashMap b (HashSet a)
+        g_eq' = HashMap.mapWithKey f g_eq
+          where
+            f b as3
+              | b `HashSet.member` l_b =
+                  as3 `HashSet.union` HashSet.fromList [a | a <- HashSet.toList l_a', w a b == (fst ys' ! a + snd ys' ! b)]
+              | otherwise = as3 `HashSet.intersection` l_a'
 
-    equalityGraph :: (HashMap a w, HashMap b w) -> HashSet (a,b)
-    equalityGraph (ysA,ysB) = HashSet.fromList $ do
-      a <- HashSet.toList as
-      b <- HashSet.toList bs
-      guard $ w a b == ysA!a + ysB!b
-      return (a,b)
+    equalityGraph :: (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
+    equalityGraph (ysA,ysB) =
+      HashMap.fromList
+      [ (b, HashSet.fromList [a | a <- HashSet.toList as, w a b == ysA!a + ysB!b])
+      | b <- HashSet.toList bs
+      ]
 
     isPerfect :: HashSet (a,b) -> Bool
     isPerfect m = F.all (`HashSet.member` as') as && F.all (`HashSet.member` bs') bs
