@@ -133,8 +133,8 @@ minimumPerfectMatching as bs w = loop m0 ys0 (equalityGraph ys0)
           where
             f b as3
               | b `HashSet.member` l_b =
-                  as3 `HashSet.union` HashSet.fromList [a | a <- HashSet.toList l_a', w a b == (fst ys' ! a + snd ys' ! b)]
-              | otherwise = as3 `HashSet.intersection` l_a'
+                  as3 `HashSet.union` HashSet.filter (\a -> w a b == (fst ys' ! a + snd ys' ! b)) l_a'
+              | otherwise = as3 `HashSet.difference` l_a
 
     equalityGraph :: (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
     equalityGraph (ysA,ysB) =
