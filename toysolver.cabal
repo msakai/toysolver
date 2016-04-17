@@ -567,6 +567,7 @@ Executable assign
   Main-is: assign.hs
   HS-Source-Dirs: samples/programs/assign
   Build-Depends:
+    attoparsec,
     base,
     bytestring,
     unordered-containers,
