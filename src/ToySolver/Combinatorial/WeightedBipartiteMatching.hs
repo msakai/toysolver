@@ -21,6 +21,7 @@ module ToySolver.Combinatorial.WeightedBipartiteMatching
   , minimumMatching
   , maximumPerfectMatching
   , minimumPerfectMatching
+  , minimumPerfectMatching'
   ) where
 
 import Control.Monad
@@ -148,6 +149,82 @@ minimumPerfectMatching as bs w = loop m0 ys0 (equalityGraph ys0)
       where
         as' = HashSet.map (\(a,_) -> a) m
         bs' = HashSet.map (\(_,b) -> b) m
+
+-- | Minimum weight perfect matching of bipartite graph.
+--
+-- The two sets must be same size.
+minimumPerfectMatching'
+  :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
+  => HashSet a -> HashSet b -> HashMap (a,b) w
+  -> Maybe (w, HashSet (a,b), (HashMap a w, HashMap b w))
+minimumPerfectMatching' as bs _ | HashSet.size as /= HashSet.size bs = error "minimumPerfectMatching: two sets must be same size"
+minimumPerfectMatching' as bs es
+  | F.any HashMap.null e_b2a = Nothing
+  | otherwise = loop m0 ys0 (equalityGraph ys0)
+  where
+    -- Note that HashMap.union is left-biased.
+    e_b2a :: HashMap b (HashMap a w)
+    e_b2a = fmap HashMap.fromList $ HashMap.fromListWith (++) [(b,[(a,w)]) | ((a,b),w) <- HashMap.toList es]
+              `HashMap.union` HashMap.fromList [(b,[]) | b <- HashSet.toList bs]
+{-
+    e_b2a = HashMap.fromListWith HashMap.union [(b, HashMap.singleton a w) | ((a,b),w) <- HashMap.toList es]
+              `HashMap.union` HashMap.fromList [(b, HashMap.empty) | b <- HashSet.toList bs]
+-}
+
+    ys0 :: (HashMap a w, HashMap b w)
+    ys0 = ( HashMap.fromList [(a, 0) | a <- HashSet.toList as]
+          , HashMap.fromList [(b, minimum (HashMap.elems xs)) | (b,xs) <- HashMap.toList e_b2a]
+          )
+    m0 = HashSet.empty
+
+    loop
+      :: HashSet (a,b) -> (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
+      -> Maybe (w, HashSet (a,b), (HashMap a w, HashMap b w))
+    loop m_pre ys@(ysA,ysB) g_eq
+      | isPerfect m = Just (F.sum ysA + F.sum ysB, m, ys)
+      | null slacks = Nothing
+      | otherwise = loop m ys' g_eq'
+      where
+        (m, l_a, l_b) = MaxCardMatching.solve' as bs (g_eq !) m_pre
+
+        slacks :: [w]
+        slacks = [w - (ysA!a + ysB!b) | b <- HashSet.toList l_b, (a,w) <- HashMap.toList (e_b2a ! b), not (a `HashSet.member` l_a)]
+
+        slack :: w
+        slack = minimum slacks
+
+        -- augmenting dual solution
+        ys' :: (HashMap a w, HashMap b w)
+        ys' = (HashMap.mapWithKey f ysA, HashMap.mapWithKey g ysB)
+          where
+            f a val
+              | not (a `HashSet.member` l_a) = val + slack
+              | otherwise = val
+            g b val
+              | not (b `HashSet.member` l_b) = val - slack
+              | otherwise = val
+
+        g_eq' :: HashMap b (HashSet a)
+        g_eq' = HashMap.mapWithKey f g_eq
+          where
+            f b as3
+              | b `HashSet.member` l_b =
+                  as3 `HashSet.union` HashSet.fromList [a | (a,w) <- HashMap.toList (e_b2a ! b), not (a `HashSet.member` l_a), w == fst ys' ! a + snd ys' ! b]
+              | otherwise = as3 `HashSet.difference` l_a
+
+    equalityGraph :: (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
+    equalityGraph (ysA,ysB) =
+      HashMap.fromList
+      [ (b, HashSet.fromList [a | (a,w) <- HashMap.toList xs, w == ysA!a + ysB!b])
+      | (b,xs) <- HashMap.toList e_b2a
+      ]
+
+    isPerfect :: HashSet (a,b) -> Bool
+    isPerfect m = F.all (`HashSet.member` as') as && F.all (`HashSet.member` bs') bs
+      where
+        as' = HashSet.map (\(a,_) -> a) m
+        bs' = HashSet.map (\(_,b) -> b) m
+
 
 test_minimumPerfectMatching = minimumPerfectMatching as bs (\a b -> w!(a,b))
   where
