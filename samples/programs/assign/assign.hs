@@ -50,7 +50,7 @@ main = do
     ["-pp", fname] -> do
       s <- BL.readFile fname
       let (as, bs, w) = parse1 s
-          es = HashMap.fromList [((a,b), w a b) | a <- HashSet.toList as, b <- HashSet.toList bs]
+          es = [(a, b, w a b) | a <- HashSet.toList as, b <- HashSet.toList bs]
       case minimumPerfectMatching' as bs es of
         Nothing ->
           putStrLn $ "infeasible"
@@ -83,13 +83,13 @@ parse1 s = (as, bs, w)
     bs = as
     w a b = tbl VU.! (a*n+b)
 
-parse2 :: BL.ByteString -> (HashSet Int, HashSet Int, HashMap (Int,Int) Int)
+parse2 :: BL.ByteString -> (HashSet Int, HashSet Int, [(Int,Int,Int)])
 parse2 s =
   case AL.eitherResult (AL.parse pfile s) of
     Left s -> error s
     Right x -> x
 
-pfile :: Parser (HashSet Int, HashSet Int, HashMap (Int,Int) Int)
+pfile :: Parser (HashSet Int, HashSet Int, [(Int,Int,Int)])
 pfile = do
   skipSpace
   n <- decimal <* skipSpace
@@ -98,9 +98,9 @@ pfile = do
           (do a <- decimal <* skipSpace
               b <- decimal <* skipSpace
               w <- decimal <* skipSpace
-              p (((a,b),w) : es))
+              p ((a,b,w) : es))
           (endOfInput *> return es)
   es <- p []
   let as = HashSet.fromList [1..n]
       bs = as
-  return (as, bs, HashMap.fromList es)
+  return (as, bs, es)
