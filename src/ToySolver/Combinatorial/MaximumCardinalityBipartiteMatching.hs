@@ -73,37 +73,23 @@ solve' as bs e_b2a m0 = loop m0_a2b m0_b2a m0_b_exposed
           in loop m_a2b' m_b2a' m_b_exposed'
       where
         search :: HashSet b -> Either (HashSet a, HashSet b) [(a,b)]
-        search bs = loopB HashSet.empty bs [] [(b, []) | b <- HashSet.toList bs]
+        search b_exposed = loopB HashSet.empty b_exposed [(b, []) | b <- HashSet.toList b_exposed] []
           where
-            loopA :: HashSet a -> HashSet b -> [(a, [(a,b)])] -> [(b, [(a,b)])] -> Either (HashSet a, HashSet b) [(a,b)]
-            loopA !visitedA !visitedB currA currB =
-              case currA of
-                []
-                  | null currB -> Left (visitedA, visitedB)
-                  | otherwise -> loopB visitedA visitedB [] currB 
-                (a, d2) : currA'
-                  | a `HashSet.member` visitedA -> loopA visitedA visitedB currA' currB
-                  | otherwise ->
+            loopB :: HashSet a -> HashSet b -> [(b, [(a,b)])] -> [(b, [(a,b)])] -> Either (HashSet a, HashSet b) [(a,b)]
+            loopB !visitedA !visitedB [] [] = Left (visitedA, visitedB)
+            loopB !visitedA !visitedB [] nextB = loopB visitedA visitedB nextB []
+            loopB !visitedA !visitedB ((b, d2) : currB) nextB = loopA visitedA visitedB (HashSet.toList (e_b2a b)) currB nextB
+              where
+                loopA !visitedA !visitedB [] currB nextB = loopB visitedA visitedB currB nextB
+                loopA !visitedA !visitedB (a:as) currB nextB
+                  | a `HashSet.member` visitedA = loopA visitedA visitedB as currB nextB
+                  | otherwise =
                       case HashMap.lookup a m_a2b of
-                        Nothing -> Right d2
-                        Just b
-                          | b `HashSet.member` visitedB -> loopA (HashSet.insert a visitedA) visitedB currA' currB
-                          | otherwise -> loopA (HashSet.insert a visitedA) (HashSet.insert b visitedB) currA' ((b, d2) : currB)
-            loopB :: HashSet a -> HashSet b -> [(a, [(a,b)])] -> [(b, [(a,b)])] -> Either (HashSet a, HashSet b) [(a,b)]
-            loopB !visitedA !visitedB currA currB =
-              case currB of
-                []
-                  | null currA -> Left (visitedA, visitedB)
-                  | otherwise -> loopA visitedA visitedB currA []
-                (b, d2) : currB' ->
-                  loopB visitedA (HashSet.insert b visitedB)
-                    ([(a, (a,b):d2) | a <- HashSet.toList as3] ++ currA)
-                    currB'
-                  where
-                    as2 = e_b2a b
-                    as3 = case HashMap.lookup b m_b2a of
-                            Nothing -> as2
-                            Just a -> HashSet.delete a as2
+                        Nothing -> Right ((a,b) : d2)
+                        Just b2
+                          | b==b2 -> loopA visitedA visitedB as currB nextB
+                          | b2 `HashSet.member` visitedB -> loopA (HashSet.insert a visitedA) visitedB as currB nextB
+                          | otherwise -> loopA (HashSet.insert a visitedA) (HashSet.insert b2 visitedB) as currB ((b2, (a,b2):(a,b):d2) : nextB)
 
 test = solve as bs es
   where
