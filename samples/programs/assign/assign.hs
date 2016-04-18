@@ -22,6 +22,7 @@ Problem set        Files
 -}
 module Main where
 
+import Control.Applicative
 import Control.Monad
 import Data.Attoparsec.ByteString.Char8 hiding (isSpace)
 import qualified Data.Attoparsec.ByteString.Lazy as AL
