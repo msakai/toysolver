@@ -92,20 +92,23 @@ minimumPerfectMatching
   :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
   => HashSet a -> HashSet b -> (a -> b -> w)
   -> (w, HashSet (a,b), (HashMap a w, HashMap b w))
-minimumPerfectMatching as bs _ | HashSet.size as /= HashSet.size bs = error "minimumPerfectMatching: two sets must be same size"
-minimumPerfectMatching as bs w = loop m0 ys0 (equalityGraph ys0)
+minimumPerfectMatching as bs w
+  | n /= HashSet.size bs = error "minimumPerfectMatching: two sets must be same size"
+  | otherwise = loop m0 ys0 (equalityGraph ys0)
   where
+    n = HashSet.size as
+
     ys0 :: (HashMap a w, HashMap b w)
     ys0 = ( HashMap.fromList [(a, minimum [w a b | b <- HashSet.toList bs]) | a <- HashSet.toList as]
           , HashMap.fromList [(b, 0) | b <- HashSet.toList bs]
           )
-    m0 = HashSet.empty
+    m0 = HashMap.empty
 
     loop
-      :: HashSet (a,b) -> (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
+      :: HashMap a b -> (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
       -> (w, HashSet (a,b), (HashMap a w, HashMap b w))
     loop m_pre ys@(ysA,ysB) g_eq
-      | isPerfect m = (F.sum ysA + F.sum ysB, m, ys)
+      | HashMap.size m == n = (F.sum ysA + F.sum ysB, HashSet.fromList (HashMap.toList m), ys)
       | otherwise = loop m ys' g_eq'
       where
         (m, l_a, l_b) = MaxCardMatching.solve' as bs (g_eq !) m_pre
@@ -144,12 +147,6 @@ minimumPerfectMatching as bs w = loop m0 ys0 (equalityGraph ys0)
       | b <- HashSet.toList bs
       ]
 
-    isPerfect :: HashSet (a,b) -> Bool
-    isPerfect m = F.all (`HashSet.member` as') as && F.all (`HashSet.member` bs') bs
-      where
-        as' = HashSet.map (\(a,_) -> a) m
-        bs' = HashSet.map (\(_,b) -> b) m
-
 -- | Minimum weight perfect matching of bipartite graph.
 --
 -- The two sets must be same size.
@@ -157,11 +154,13 @@ minimumPerfectMatching'
   :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
   => HashSet a -> HashSet b -> [(a,b,w)]
   -> Maybe (w, HashSet (a,b), (HashMap a w, HashMap b w))
-minimumPerfectMatching' as bs _ | HashSet.size as /= HashSet.size bs = error "minimumPerfectMatching: two sets must be same size"
 minimumPerfectMatching' as bs es
+  | n /= HashSet.size bs = error "minimumPerfectMatching: two sets must be same size"
   | F.any HashMap.null e_b2a = Nothing
   | otherwise = loop m0 ys0 (equalityGraph ys0)
   where
+    n = HashSet.size as
+
     -- Note that HashMap.union is left-biased.
     e_b2a :: HashMap b (HashMap a w)
     e_b2a = fmap HashMap.fromList $ HashMap.fromListWith (++) [(b,[(a,w)]) | (a,b,w) <- es]
@@ -175,13 +174,13 @@ minimumPerfectMatching' as bs es
     ys0 = ( HashMap.fromList [(a, 0) | a <- HashSet.toList as]
           , HashMap.fromList [(b, minimum (HashMap.elems xs)) | (b,xs) <- HashMap.toList e_b2a]
           )
-    m0 = HashSet.empty
+    m0 = HashMap.empty
 
     loop
-      :: HashSet (a,b) -> (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
+      :: HashMap a b -> (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
       -> Maybe (w, HashSet (a,b), (HashMap a w, HashMap b w))
     loop m_pre ys@(ysA,ysB) g_eq
-      | isPerfect m = Just (F.sum ysA + F.sum ysB, m, ys)
+      | HashMap.size m == n = Just (F.sum ysA + F.sum ysB, HashSet.fromList (HashMap.toList m), ys)
       | null slacks = Nothing
       | otherwise = loop m ys' g_eq'
       where
@@ -216,12 +215,6 @@ minimumPerfectMatching' as bs es
     equalityGraph (ysA,ysB) = HashMap.mapWithKey f e_b2a
       where
         f b xs = HashSet.fromList [a | (a,w) <- HashMap.toList xs, w == ysA!a + ysB!b]
-
-    isPerfect :: HashSet (a,b) -> Bool
-    isPerfect m = F.all (`HashSet.member` as') as && F.all (`HashSet.member` bs') bs
-      where
-        as' = HashSet.map (\(a,_) -> a) m
-        bs' = HashSet.map (\(_,b) -> b) m
 
 
 test_minimumPerfectMatching = minimumPerfectMatching as bs (\a b -> w!(a,b))

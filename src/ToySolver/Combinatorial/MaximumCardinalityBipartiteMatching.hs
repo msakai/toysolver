@@ -33,8 +33,8 @@ solve
   :: forall a b. (Hashable a, Eq a, Hashable b, Eq b)
   => HashSet a -> HashSet b -> HashSet (a,b) -> HashSet (a,b)
 solve as bs es = 
-  case solve' as bs (\b -> HashMap.lookupDefault HashSet.empty b e_b2a) HashSet.empty of
-    (m, _, _) -> m
+  case solve' as bs (\b -> HashMap.lookupDefault HashSet.empty b e_b2a) HashMap.empty of
+    (m, _, _) -> HashSet.fromList $ HashMap.toList m
   where
     e_b2a :: HashMap b (HashSet a)
     e_b2a = HashMap.fromListWith HashSet.union [(b, HashSet.singleton a) | (a,b) <- HashSet.toList es]
@@ -48,29 +48,22 @@ solve'
   :: forall a b. (Hashable a, Eq a, Hashable b, Eq b)
   => HashSet a        -- ^ vertex set A
   -> HashSet b        -- ^ vertex set B
-  -> (b -> HashSet a) -- ^ set of edges E⊆A×B represented  as a mapping from B to 2^A.
-  -> HashSet (a,b)    -- ^ partial matching
-  -> (HashSet (a,b), HashSet a, HashSet b)
-solve' as bs e_b2a m0 = loop m0_a2b m0_b2a m0_b_exposed
+  -> (b -> HashSet a) -- ^ set of edges E⊆A×B represented as a mapping from B to 2^A.
+  -> HashMap a b      -- ^ partial matching represented as an injective mapping from A to B
+  -> (HashMap a b, HashSet a, HashSet b)
+solve' as bs e_b2a m0 = loop m0 m0_b_exposed
   where
-    m0_a2b = HashMap.fromList [(a,b) | (a,b) <- HashSet.toList m0]
-    m0_b2a = HashMap.fromList [(b,a) | (a,b) <- HashSet.toList m0]
-    m0_b_exposed = HashSet.filter (not . (`HashMap.member` m0_b2a)) bs
+    m0_b_exposed = bs `HashSet.difference` HashSet.fromList [b | (_,b) <- HashMap.toList m0]
 
-    loop :: HashMap a b -> HashMap b a -> HashSet b -> (HashSet (a,b), HashSet a, HashSet b)
-    loop m_a2b m_b2a m_b_exposed =
+    loop :: HashMap a b -> HashSet b -> (HashMap a b, HashSet a, HashSet b)
+    loop m m_b_exposed =
       case search m_b_exposed of
-        Left (l_a, l_b) ->
-          ( HashSet.fromList $ HashMap.toList m_a2b
-          , l_a
-          , l_b
-          )
+        Left (l_a, l_b) -> (m, l_a, l_b)
         Right d2 ->
           let -- Note that HashMap.union is left-biased
-              m_a2b' = HashMap.fromList d2 `HashMap.union` m_a2b
-              m_b2a' = HashMap.fromList [(b,a) | (a,b) <- d2] `HashMap.union` m_b2a
+              m' = HashMap.fromList d2 `HashMap.union` m
               m_b_exposed' = HashSet.delete (snd (last d2)) m_b_exposed
-          in loop m_a2b' m_b2a' m_b_exposed'
+          in loop m' m_b_exposed'
       where
         search :: HashSet b -> Either (HashSet a, HashSet b) [(a,b)]
         search b_exposed = loopB HashSet.empty b_exposed [(b, []) | b <- HashSet.toList b_exposed] []
@@ -84,7 +77,7 @@ solve' as bs e_b2a m0 = loop m0_a2b m0_b2a m0_b_exposed
                 loopA !visitedA !visitedB (a:as) currB nextB
                   | a `HashSet.member` visitedA = loopA visitedA visitedB as currB nextB
                   | otherwise =
-                      case HashMap.lookup a m_a2b of
+                      case HashMap.lookup a m of
                         Nothing -> Right ((a,b) : d2)
                         Just b2
                           | b==b2 -> loopA visitedA visitedB as currB nextB
