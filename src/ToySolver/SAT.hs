@@ -1053,7 +1053,7 @@ solve_ solver = do
     when debugMode $ dumpConstrActivity solver
     printStat solver True
     let durationSecs :: TimeSpec -> TimeSpec -> Double
-        durationSecs start end = fromIntegral (timeSpecAsNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)
+        durationSecs start end = fromIntegral (toNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)
     (log solver . printf "#cpu_time = %.3fs") (durationSecs startCPU endCPU)
     (log solver . printf "#wall_clock_time = %.3fs") (durationSecs startWC endWC)
     (log solver . printf "#decision = %d") =<< readIOURef (svNDecision solver)
@@ -2210,7 +2210,7 @@ showTimeDiff t
   | otherwise  = printf "%4dh" hi
   where
     s :: Rational
-    s = fromIntegral (timeSpecAsNanoSecs t) / 10^(9::Int)
+    s = fromIntegral (toNanoSecs t) / 10^(9::Int)
 
     si :: Integer
     si = fromIntegral (sec t)
