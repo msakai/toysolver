@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC #-}
+{-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
@@ -58,31 +58,33 @@ solve' as bs e_b2a m0 = loop m0 m0_b_exposed
     loop :: HashMap a b -> HashSet b -> (HashMap a b, HashSet a, HashSet b)
     loop m m_b_exposed =
       case search m_b_exposed of
-        Left (l_a, l_b) -> (m, l_a, l_b)
-        Right d2 ->
+        (l_a, l_b, []) -> (m, l_a, l_b)
+        (_, _, ds) ->
           let -- Note that HashMap.union is left-biased
-              m' = HashMap.fromList d2 `HashMap.union` m
-              m_b_exposed' = HashSet.delete (snd (last d2)) m_b_exposed
+              ds2 = [HashMap.fromList d2 | (d2,_) <- ds]
+              m' = HashMap.unions ds2 `HashMap.union` m
+              m_b_exposed' = m_b_exposed `HashSet.difference` HashSet.fromList [b0 | (d2, b0) <- ds]
           in loop m' m_b_exposed'
       where
-        search :: HashSet b -> Either (HashSet a, HashSet b) [(a,b)]
-        search b_exposed = loopB HashSet.empty b_exposed [(b, []) | b <- HashSet.toList b_exposed] []
+        search :: HashSet b -> (HashSet a, HashSet b, [([(a,b)], b)])
+        search b_exposed = loopB HashSet.empty b_exposed [(b, [], b) | b <- HashSet.toList b_exposed] [] []
           where
-            loopB :: HashSet a -> HashSet b -> [(b, [(a,b)])] -> [(b, [(a,b)])] -> Either (HashSet a, HashSet b) [(a,b)]
-            loopB !visitedA !visitedB [] [] = Left (visitedA, visitedB)
-            loopB !visitedA !visitedB [] nextB = loopB visitedA visitedB nextB []
-            loopB !visitedA !visitedB ((b, d2) : currB) nextB = loopA visitedA visitedB (HashSet.toList (e_b2a b)) currB nextB
+            loopB :: HashSet a -> HashSet b -> [(b, [(a,b)], b)] -> [(b, [(a,b)], b)] -> [([(a,b)], b)] -> (HashSet a, HashSet b, [([(a,b)], b)])
+            loopB !visitedA !visitedB [] [] result = (visitedA, visitedB, result)
+            loopB !visitedA !visitedB [] nextB result = loopB visitedA visitedB nextB [] result
+            loopB !visitedA !visitedB ((b, d2, b0) : currB) nextB result = loopA visitedA visitedB (HashSet.toList (e_b2a b)) currB nextB result
               where
-                loopA !visitedA !visitedB [] currB nextB = loopB visitedA visitedB currB nextB
-                loopA !visitedA !visitedB (a:as) currB nextB
-                  | a `HashSet.member` visitedA = loopA visitedA visitedB as currB nextB
+                loopA !visitedA !visitedB [] currB nextB result = loopB visitedA visitedB currB nextB result
+                loopA !visitedA !visitedB (a:as) currB nextB result
+                  | a `HashSet.member` visitedA = loopA visitedA visitedB as currB nextB result
                   | otherwise =
                       case HashMap.lookup a m of
-                        Nothing -> Right ((a,b) : d2)
+                        Nothing ->
+                          loopB (HashSet.insert a visitedA) visitedB (filter (\(_,_,b0') -> b0/=b0') currB) (filter (\(_,_,b0') -> b0/=b0') nextB) (((a,b) : d2, b0) : result)
                         Just b2
-                          | b==b2 -> loopA visitedA visitedB as currB nextB
-                          | b2 `HashSet.member` visitedB -> loopA (HashSet.insert a visitedA) visitedB as currB nextB
-                          | otherwise -> loopA (HashSet.insert a visitedA) (HashSet.insert b2 visitedB) as currB ((b2, (a,b2):(a,b):d2) : nextB)
+                          | b==b2 -> loopA visitedA visitedB as currB nextB result
+                          | b2 `HashSet.member` visitedB -> loopA (HashSet.insert a visitedA) visitedB as currB nextB result
+                          | otherwise -> loopA (HashSet.insert a visitedA) (HashSet.insert b2 visitedB) as currB ((b2, (a,b):d2, b0) : nextB) result
 
 test = solve as bs es
   where
