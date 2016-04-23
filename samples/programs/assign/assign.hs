@@ -35,7 +35,7 @@ import qualified Data.HashSet as HashSet
 import Data.List
 import qualified Data.Vector.Unboxed as VU
 import System.Environment
-import ToySolver.Combinatorial.WeightedBipartiteMatching
+import ToySolver.Combinatorial.BipartiteMatching
 
 main :: IO ()
 main = do

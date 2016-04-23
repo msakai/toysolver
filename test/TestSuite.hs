@@ -25,7 +25,7 @@ import Test.SMT
 import Test.SMTLIB2Solver
 import Test.Smtlib
 import Test.SubsetSum
-import Test.WeightedBipartiteMatching
+import Test.BipartiteMatching
 
 main :: IO ()
 main = defaultMain $ testGroup "ToySolver test suite"
@@ -52,5 +52,5 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , smtlib2SolverTestGroup
   , smtlibTestGroup
   , subsetSumTestGroup
-  , weightedBipartiteMatchingTestGroup
+  , bipartiteMatchingTestGroup
   ]

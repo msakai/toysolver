@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
-module Test.WeightedBipartiteMatching (weightedBipartiteMatchingTestGroup) where
+module Test.BipartiteMatching (bipartiteMatchingTestGroup) where
 
 import Control.Monad
 import qualified Data.Foldable as F
@@ -8,7 +8,7 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import Data.HashMap.Strict (HashMap, (!))
 import qualified Data.HashMap.Strict as HashMap
-import ToySolver.Combinatorial.WeightedBipartiteMatching
+import ToySolver.Combinatorial.BipartiteMatching
 
 import Test.Tasty
 import Test.Tasty.QuickCheck
@@ -66,5 +66,5 @@ arbitraryWeight as bs =
       w <- arbitrary
       return ((a,b),w)
 
-weightedBipartiteMatchingTestGroup :: TestTree
-weightedBipartiteMatchingTestGroup = $(testGroupGenerator)
+bipartiteMatchingTestGroup :: TestTree
+bipartiteMatchingTestGroup = $(testGroupGenerator)

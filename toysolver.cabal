@@ -230,6 +230,7 @@ Library
      ToySolver.EUF.CongruenceClosure
      ToySolver.EUF.EUFSolver
      ToySolver.EUF.FiniteModelFinder
+     ToySolver.Combinatorial.BipartiteMatching
      ToySolver.Combinatorial.HittingSet.Simple
      ToySolver.Combinatorial.HittingSet.HTCBDD
      ToySolver.Combinatorial.HittingSet.SHD
@@ -238,9 +239,7 @@ Library
      ToySolver.Combinatorial.Knapsack.BB
      ToySolver.Combinatorial.Knapsack.DPDense
      ToySolver.Combinatorial.Knapsack.DPSparse
-     ToySolver.Combinatorial.MaximumCardinalityBipartiteMatching
      ToySolver.Combinatorial.SubsetSum
-     ToySolver.Combinatorial.WeightedBipartiteMatching
      ToySolver.Converter.GCNF2MaxSAT
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2PB
@@ -734,6 +733,7 @@ Test-suite TestSuite
     Test.AReal2
     Test.Arith
     Test.BoolExpr
+    Test.BipartiteMatching
     Test.CongruenceClosure
     Test.ContiTraverso
     Test.Delta
