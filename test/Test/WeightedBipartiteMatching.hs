@@ -15,45 +15,49 @@ import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
 import Test.Tasty.TH
 
-prop_minimumPerfectMatching =
+prop_minimumWeightPerfectMatching =
   forAll (choose (0,10)) $ \n ->
     let as = HashSet.fromList [1..n]
     in forAll (arbitraryWeight as as) $ \(w' :: HashMap (Int,Int) Rational) ->
          let w a b = w' ! (a,b)
-             (obj, m, (ysA,ysB)) = minimumPerfectMatching as as w
+             (obj, m, (ysA,ysB)) = minimumWeightPerfectMatching as as w
          in obj == sum [w a b | (a,b) <- HashSet.toList m] &&
             obj == F.sum ysA + F.sum ysB &&
-            and [ya + yb <= w a b | (a,ya) <- HashMap.toList ysA, (b,yb) <- HashMap.toList ysB]
+            and [ya + yb <= w a b | (a,ya) <- HashMap.toList ysA, (b,yb) <- HashMap.toList ysB] &&
+            HashSet.size m == n
 
-prop_maximumPerfectMatching =
+prop_maximumWeightPerfectMatching =
   forAll (choose (0,10)) $ \n ->
     let as = HashSet.fromList [1..n]
     in forAll (arbitraryWeight as as) $ \(w' :: HashMap (Int,Int) Rational) ->
          let w a b = w' ! (a,b)
-             (obj, m, (ysA,ysB)) = maximumPerfectMatching as as w
+             (obj, m, (ysA,ysB)) = maximumWeightPerfectMatching as as w
          in obj == sum [w a b | (a,b) <- HashSet.toList m] &&
             obj == F.sum ysA + F.sum ysB &&
-            and [ya + yb >= w a b | (a,ya) <- HashMap.toList ysA, (b,yb) <- HashMap.toList ysB]
+            and [ya + yb >= w a b | (a,ya) <- HashMap.toList ysA, (b,yb) <- HashMap.toList ysB] &&
+            HashSet.size m == n
 
-prop_minimumMatching =
+prop_minimumWeightMaximumMatching =
   forAll (choose (0,10)) $ \(nA::Int) ->
   forAll (choose (0,10)) $ \(nB::Int) ->
     let as = HashSet.fromList [1..nA]
         bs = HashSet.fromList [1..nB]
     in forAll (arbitraryWeight as bs) $ \(w' :: HashMap (Int,Int) Rational) ->
          let w a b = w' ! (a,b)
-             (obj, m) = minimumMatching as bs w
-         in obj == sum [w a b | (a,b) <- HashSet.toList m]
+             (obj, m) = minimumWeightMaximumMatching as bs w
+         in obj == sum [w a b | (a,b) <- HashSet.toList m] &&
+            HashSet.size m == min nA nB
 
-prop_maximumMatching =
+prop_maximumWeightMaximumMatching =
   forAll (choose (0,10)) $ \(nA::Int) ->
   forAll (choose (0,10)) $ \(nB::Int) ->
     let as = HashSet.fromList [1..nA]
         bs = HashSet.fromList [1..nB]
     in forAll (arbitraryWeight as bs) $ \(w' :: HashMap (Int,Int) Rational) ->
          let w a b = w' ! (a,b)
-             (obj, m) = maximumMatching as bs w
-         in obj == sum [w a b | (a,b) <- HashSet.toList m]
+             (obj, m) = maximumWeightMaximumMatching as bs w
+         in obj == sum [w a b | (a,b) <- HashSet.toList m] &&
+            HashSet.size m == min nA nB
 
 arbitraryWeight :: (Hashable a, Eq a, Hashable b, Eq b, Arbitrary w) => HashSet a -> HashSet b -> Gen (HashMap (a, b) w)
 arbitraryWeight as bs =

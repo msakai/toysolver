@@ -17,11 +17,11 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Combinatorial.WeightedBipartiteMatching
-  ( maximumMatching
-  , minimumMatching
-  , maximumPerfectMatching
-  , minimumPerfectMatching
-  , minimumPerfectMatching'
+  ( maximumWeightMaximumMatching
+  , minimumWeightMaximumMatching
+  , maximumWeightPerfectMatching
+  , minimumWeightPerfectMatching
+  , minimumWeightPerfectMatching'
   ) where
 
 import Control.Monad
@@ -33,21 +33,21 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import qualified ToySolver.Combinatorial.MaximumCardinalityBipartiteMatching as MaxCardMatching
 
--- | Maximum weight matching of bipartite graph
-maximumMatching
+-- | Maximum weight maximum matching of a complete bipartite graph
+maximumWeightMaximumMatching
   :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
   => HashSet a -> HashSet b -> (a -> b -> w)
   -> (w, HashSet (a,b))
-maximumMatching as bs w =
+maximumWeightMaximumMatching as bs w =
   case as_size `compare` bs_size of
     EQ ->
-      case maximumPerfectMatching as bs w of
+      case maximumWeightPerfectMatching as bs w of
         (obj, sol, _) -> (obj, sol)
     GT ->
       let bs' = HashSet.map Right bs `HashSet.union` HashSet.fromList [Left i | i <- [1..(as_size-bs_size)]]
           w' _ (Left _)  = 0
           w' a (Right b) = w a b
-      in case maximumPerfectMatching as bs' w' of
+      in case maximumWeightPerfectMatching as bs' w' of
            (obj, sol, _) ->
              ( obj
              , HashSet.fromList [(a,b) | (a,Right b) <- HashSet.toList sol]
@@ -56,7 +56,7 @@ maximumMatching as bs w =
       let as' = HashSet.map Right as `HashSet.union` HashSet.fromList [Left i | i <- [1..(bs_size-as_size)]]
           w' (Left _) _ = 0
           w' (Right a) b = w a b
-      in case maximumPerfectMatching as' bs w' of
+      in case maximumWeightPerfectMatching as' bs w' of
            (obj, sol, _) ->
              ( obj
              , HashSet.fromList [(a,b) | (Right a, b) <- HashSet.toList sol]
@@ -65,35 +65,35 @@ maximumMatching as bs w =
     as_size = HashSet.size as
     bs_size = HashSet.size bs
 
--- | Minimum weight matching of bipartite graph
-minimumMatching
+-- | Minimum weight maximum matching of a complete bipartite graph
+minimumWeightMaximumMatching
   :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
   => HashSet a -> HashSet b -> (a -> b -> w)
   -> (w, HashSet (a,b))
-minimumMatching as bs w =
-  case maximumMatching as bs (\a b -> - w a b) of
+minimumWeightMaximumMatching as bs w =
+  case maximumWeightMaximumMatching as bs (\a b -> - w a b) of
     (obj, m) -> (- obj, m)
 
--- | Maximum weight perfect matching of complete bipartite graph.
+-- | Maximum weight perfect matching of a complete bipartite graph.
 --
 -- The two sets must be same size.
-maximumPerfectMatching
+maximumWeightPerfectMatching
   :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
   => HashSet a -> HashSet b -> (a -> b -> w)
   -> (w, HashSet (a,b), (HashMap a w, HashMap b w))
-maximumPerfectMatching as bs w =
-  case minimumPerfectMatching as bs (\a b -> - w a b) of
+maximumWeightPerfectMatching as bs w =
+  case minimumWeightPerfectMatching as bs (\a b -> - w a b) of
     (obj, m, (ysA,ysB)) -> (- obj, m, (HashMap.map negate ysA, HashMap.map negate ysB))
 
--- | Minimum weight perfect matching of complete bipartite graph.
+-- | Minimum weight perfect matching of a complete bipartite graph.
 --
 -- The two sets must be same size.
-minimumPerfectMatching
+minimumWeightPerfectMatching
   :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
   => HashSet a -> HashSet b -> (a -> b -> w)
   -> (w, HashSet (a,b), (HashMap a w, HashMap b w))
-minimumPerfectMatching as bs w
-  | n /= HashSet.size bs = error "minimumPerfectMatching: two sets must be same size"
+minimumWeightPerfectMatching as bs w
+  | n /= HashSet.size bs = error "minimumWeightPerfectMatching: two sets must be same size"
   | otherwise = loop m0 ys0 (equalityGraph ys0)
   where
     n = HashSet.size as
@@ -147,15 +147,15 @@ minimumPerfectMatching as bs w
       | b <- HashSet.toList bs
       ]
 
--- | Minimum weight perfect matching of bipartite graph.
+-- | Minimum weight perfect matching of a bipartite graph.
 --
 -- The two sets must be same size.
-minimumPerfectMatching'
+minimumWeightPerfectMatching'
   :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
   => HashSet a -> HashSet b -> [(a,b,w)]
   -> Maybe (w, HashSet (a,b), (HashMap a w, HashMap b w))
-minimumPerfectMatching' as bs es
-  | n /= HashSet.size bs = error "minimumPerfectMatching: two sets must be same size"
+minimumWeightPerfectMatching' as bs es
+  | n /= HashSet.size bs = error "minimumWeightPerfectMatching: two sets must be same size"
   | F.any HashMap.null e_b2a = Nothing
   | otherwise = loop m0 ys0 (equalityGraph ys0)
   where
@@ -217,14 +217,14 @@ minimumPerfectMatching' as bs es
         f b xs = HashSet.fromList [a | (a,w) <- HashMap.toList xs, w == ysA!a + ysB!b]
 
 
-test_minimumPerfectMatching = minimumPerfectMatching as bs (\a b -> w!(a,b))
+test_minimumWeightPerfectMatching = minimumWeightPerfectMatching as bs (\a b -> w!(a,b))
   where
     as = HashSet.fromList [1,3]
     bs = HashSet.fromList [2,4]
     w :: HashMap (Int,Int) Int
     w = HashMap.fromList [((1,2),5),((1,4),2),((3,2),9),((3,4),3)]
 
-test_minimumMatching = minimumMatching as bs (\a b -> w!(a,b))
+test_minimumWeightMaximumMatching = minimumWeightMaximumMatching as bs (\a b -> w!(a,b))
   where
     as = HashSet.fromList [1,3,5]
     bs = HashSet.fromList [2,4]
