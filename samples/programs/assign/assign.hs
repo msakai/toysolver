@@ -28,10 +28,10 @@ import Data.Attoparsec.ByteString.Char8 hiding (isSpace)
 import qualified Data.Attoparsec.ByteString.Lazy as AL
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Char
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
-import Data.HashSet (HashSet)
-import qualified Data.HashSet as HashSet
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.List
 import qualified Data.Vector.Unboxed as VU
 import System.Environment
@@ -46,18 +46,18 @@ main = do
       let (as, bs, w) = parse1 s
           (obj, m, _) = minimumWeightPerfectMatching as bs w
       putStrLn $ "obj = " ++ show obj
-      forM_ (HashSet.toList m) $ \(a,b) -> do
+      forM_ (IntMap.toList m) $ \(a,b) -> do
         putStrLn $ unwords $ map show [a,b]
     ["-pp", fname] -> do
       s <- BL.readFile fname
       let (as, bs, w) = parse1 s
-          es = [(a, b, w a b) | a <- HashSet.toList as, b <- HashSet.toList bs]
+          es = [(a, b, w a b) | a <- IntSet.toList as, b <- IntSet.toList bs]
       case minimumWeightPerfectMatching' as bs es of
         Nothing ->
           putStrLn $ "infeasible"
         Just (obj, m, _) -> do
           putStrLn $ "obj = " ++ show obj
-          forM_ (HashSet.toList m) $ \(a,b) -> do
+          forM_ (IntMap.toList m) $ \(a,b) -> do
             putStrLn $ unwords $ map show [a,b]
     ["-p", fname] -> do
       s <- BL.readFile fname
@@ -67,10 +67,10 @@ main = do
           putStrLn $ "infeasible"
         Just (obj, m, _) -> do
           putStrLn $ "obj = " ++ show obj
-          forM_ (HashSet.toList m) $ \(a,b) -> do
+          forM_ (IntMap.toList m) $ \(a,b) -> do
             putStrLn $ unwords $ map show [a,b]
 
-parse1 :: BL.ByteString -> (HashSet Int, HashSet Int, Int -> Int -> Int)
+parse1 :: BL.ByteString -> (IntSet, IntSet, Int -> Int -> Int)
 parse1 s = (as, bs, w)
   where
     f s =
@@ -80,17 +80,17 @@ parse1 s = (as, bs, w)
     (n:xs) = unfoldr f (BL.dropWhile isSpace s)
     tbl :: VU.Vector Int
     tbl = VU.fromListN (n*n) xs
-    as = HashSet.fromList [0..n-1]
+    as = IntSet.fromList [0..n-1]
     bs = as
     w a b = tbl VU.! (a*n+b)
 
-parse2 :: BL.ByteString -> (HashSet Int, HashSet Int, [(Int,Int,Int)])
+parse2 :: BL.ByteString -> (IntSet, IntSet, [(Int,Int,Int)])
 parse2 s =
   case AL.eitherResult (AL.parse pfile s) of
     Left s -> error s
     Right x -> x
 
-pfile :: Parser (HashSet Int, HashSet Int, [(Int,Int,Int)])
+pfile :: Parser (IntSet, IntSet, [(Int,Int,Int)])
 pfile = do
   skipSpace
   n <- decimal <* skipSpace
@@ -102,6 +102,6 @@ pfile = do
               p ((a,b,w) : es))
           (endOfInput *> return es)
   es <- p []
-  let as = HashSet.fromList [1..n]
+  let as = IntSet.fromList [1..n]
       bs = as
   return (as, bs, es)

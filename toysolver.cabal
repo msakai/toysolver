@@ -569,7 +569,7 @@ Executable assign
     attoparsec,
     base,
     bytestring,
-    unordered-containers,
+    containers,
     vector,
     toysolver
   Default-Language: Haskell2010

@@ -26,25 +26,24 @@ module ToySolver.Combinatorial.BipartiteMatching
   , minimumWeightPerfectMatching'
   ) where
 
-import Control.Monad
 import qualified Data.Foldable as F
-import Data.Hashable
-import Data.HashMap.Strict (HashMap, (!))
-import qualified Data.HashMap.Strict as HashMap
-import Data.HashSet (HashSet)
-import qualified Data.HashSet as HashSet
+import Data.IntMap.Strict (IntMap, (!))
+import qualified Data.IntMap.Strict as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 
 -- -----------------------------------------------------------------------------
 
 maximumMatching
-  :: forall a b. (Hashable a, Eq a, Hashable b, Eq b)
-  => HashSet a -> HashSet b -> HashSet (a,b) -> HashSet (a,b)
+  :: IntSet -> IntSet -> [(Int,Int)] -> IntMap Int
 maximumMatching as bs es = 
-  case maximumMatching' as bs (\b -> HashMap.lookupDefault HashSet.empty b e_b2a) HashMap.empty of
-    (m, _, _) -> HashSet.fromList $ HashMap.toList m
+  case maximumMatching' as bs (\b -> IntMap.findWithDefault IntSet.empty b e_b2a) IntMap.empty of
+    (m, _, _) -> m
   where
-    e_b2a :: HashMap b (HashSet a)
-    e_b2a = HashMap.fromListWith HashSet.union [(b, HashSet.singleton a) | (a,b) <- HashSet.toList es]
+    e_b2a :: IntMap IntSet
+    e_b2a = IntMap.fromListWith IntSet.union [(b, IntSet.singleton a) | (a,b) <- es]
 
 -- | Internal low-level routine for maximum cardinality bipartite matching.
 --
@@ -52,93 +51,94 @@ maximumMatching as bs es =
 -- vertexes reachable from exposed B vertexes (b∈B such that ∀a∈A. (a,b)∉M)
 -- on a directed graph of (A∪B, {a→b|(a,b)∈M}∪{b→a|(a,b)⊆E\\M}).
 maximumMatching'
-  :: forall a b. (Hashable a, Eq a, Hashable b, Eq b)
-  => HashSet a        -- ^ vertex set A
-  -> HashSet b        -- ^ vertex set B
-  -> (b -> HashSet a) -- ^ set of edges E⊆A×B represented as a mapping from B to 2^A.
-  -> HashMap a b      -- ^ partial matching represented as an injective mapping from A to B
-  -> (HashMap a b, HashSet a, HashSet b)
+  :: IntSet          -- ^ vertex set A
+  -> IntSet          -- ^ vertex set B
+  -> (Int -> IntSet) -- ^ set of edges E⊆A×B represented as a mapping from B to 2^A.
+  -> IntMap Int      -- ^ partial matching represented as an injective mapping from A to B
+  -> (IntMap Int, IntSet, IntSet)
 maximumMatching' as bs e_b2a m0 = loop m0 m0_b_exposed
   where
-    m0_b_exposed = bs `HashSet.difference` HashSet.fromList [b | (_,b) <- HashMap.toList m0]
+    m0_b_exposed = bs `IntSet.difference` IntSet.fromList [b | (_,b) <- IntMap.toList m0]
 
-    loop :: HashMap a b -> HashSet b -> (HashMap a b, HashSet a, HashSet b)
+    loop :: IntMap Int -> IntSet -> (IntMap Int, IntSet, IntSet)
     loop m m_b_exposed =
       case search m_b_exposed of
         (l_a, l_b, []) -> (m, l_a, l_b)
         (_, _, ds) ->
-          let -- Note that HashMap.union is left-biased
-              ds2 = [HashMap.fromList d2 | (d2,_) <- ds]
-              m' = HashMap.unions ds2 `HashMap.union` m
-              m_b_exposed' = m_b_exposed `HashSet.difference` HashSet.fromList [b0 | (d2, b0) <- ds]
+          let -- Note that IntMap.union is left-biased
+              ds2 = [IntMap.fromList d2 | (d2,_) <- ds]
+              m' = IntMap.unions ds2 `IntMap.union` m
+              m_b_exposed' = m_b_exposed `IntSet.difference` IntSet.fromList [b0 | (d2, b0) <- ds]
           in loop m' m_b_exposed'
       where
-        search :: HashSet b -> (HashSet a, HashSet b, [([(a,b)], b)])
-        search b_exposed = loopB HashSet.empty b_exposed [(b, [], b) | b <- HashSet.toList b_exposed] [] []
+        search :: IntSet -> (IntSet, IntSet, [([(Int,Int)], Int)])
+        search b_exposed = loopB IntSet.empty b_exposed [(b, [], b) | b <- IntSet.toList b_exposed] [] []
           where
-            loopB :: HashSet a -> HashSet b -> [(b, [(a,b)], b)] -> [(b, [(a,b)], b)] -> [([(a,b)], b)] -> (HashSet a, HashSet b, [([(a,b)], b)])
+            loopB :: IntSet -> IntSet -> [(Int, [(Int,Int)], Int)] -> [(Int, [(Int,Int)], Int)] -> [([(Int,Int)], Int)] -> (IntSet, IntSet, [([(Int,Int)], Int)])
             loopB !visitedA !visitedB [] [] result = (visitedA, visitedB, result)
             loopB !visitedA !visitedB [] nextB result = loopB visitedA visitedB nextB [] result
-            loopB !visitedA !visitedB ((b, d2, b0) : currB) nextB result = loopA visitedA visitedB (HashSet.toList (e_b2a b)) currB nextB result
+            loopB !visitedA !visitedB ((b, d2, b0) : currB) nextB result = loopA visitedA visitedB (IntSet.toList (e_b2a b)) currB nextB result
               where
                 loopA !visitedA !visitedB [] currB nextB result = loopB visitedA visitedB currB nextB result
                 loopA !visitedA !visitedB (a:as) currB nextB result
-                  | a `HashSet.member` visitedA = loopA visitedA visitedB as currB nextB result
+                  | a `IntSet.member` visitedA = loopA visitedA visitedB as currB nextB result
                   | otherwise =
-                      case HashMap.lookup a m of
+                      case IntMap.lookup a m of
                         Nothing ->
-                          loopB (HashSet.insert a visitedA) visitedB (filter (\(_,_,b0') -> b0/=b0') currB) (filter (\(_,_,b0') -> b0/=b0') nextB) (((a,b) : d2, b0) : result)
+                          loopB (IntSet.insert a visitedA) visitedB (filter (\(_,_,b0') -> b0/=b0') currB) (filter (\(_,_,b0') -> b0/=b0') nextB) (((a,b) : d2, b0) : result)
                         Just b2
                           | b==b2 -> loopA visitedA visitedB as currB nextB result
-                          | b2 `HashSet.member` visitedB -> loopA (HashSet.insert a visitedA) visitedB as currB nextB result
-                          | otherwise -> loopA (HashSet.insert a visitedA) (HashSet.insert b2 visitedB) as currB ((b2, (a,b):d2, b0) : nextB) result
+                          | b2 `IntSet.member` visitedB -> loopA (IntSet.insert a visitedA) visitedB as currB nextB result
+                          | otherwise -> loopA (IntSet.insert a visitedA) (IntSet.insert b2 visitedB) as currB ((b2, (a,b):d2, b0) : nextB) result
 
 test_maximumMatching = maximumMatching as bs es
   where
-    as = HashSet.fromList ['a'..'e']
-    bs :: HashSet Int
-    bs = HashSet.fromList [1..5]
-    es = HashSet.fromList [(a,b) | a <- HashSet.toList as, b <- HashSet.toList bs]
+    as = IntSet.fromList [1..5] -- ['a'..'e']
+    bs :: IntSet
+    bs = IntSet.fromList [1..5]
+    es = [(a,b) | a <- IntSet.toList as, b <- IntSet.toList bs]
 
 -- -----------------------------------------------------------------------------
 
 -- | Maximum weight maximum matching of a complete bipartite graph
 maximumWeightMaximumMatching
-  :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
-  => HashSet a -> HashSet b -> (a -> b -> w)
-  -> (w, HashSet (a,b))
+  :: forall w. (Real w)
+  => IntSet -> IntSet -> (Int -> Int -> w)
+  -> (w, IntMap Int)
 maximumWeightMaximumMatching as bs w =
   case as_size `compare` bs_size of
     EQ ->
       case maximumWeightPerfectMatching as bs w of
         (obj, sol, _) -> (obj, sol)
     GT ->
-      let bs' = HashSet.map Right bs `HashSet.union` HashSet.fromList [Left i | i <- [1..(as_size-bs_size)]]
-          w' _ (Left _)  = 0
-          w' a (Right b) = w a b
+      let bs' = bs `IntSet.union` IntSet.fromList (take (as_size-bs_size) $ filter (`IntSet.notMember` bs) [0..])
+          w' a b
+            | b `IntSet.member` bs = w a b
+            | otherwise = 0
       in case maximumWeightPerfectMatching as bs' w' of
            (obj, sol, _) ->
              ( obj
-             , HashSet.fromList [(a,b) | (a,Right b) <- HashSet.toList sol]
+             , IntMap.fromList [(a,b) | (a,b) <- IntMap.toList sol, b `IntSet.member` bs]
              )
     LT ->
-      let as' = HashSet.map Right as `HashSet.union` HashSet.fromList [Left i | i <- [1..(bs_size-as_size)]]
-          w' (Left _) _ = 0
-          w' (Right a) b = w a b
+      let as' = as `IntSet.union` IntSet.fromList (take (bs_size-as_size) $ filter (`IntSet.notMember` as) [0..])
+          w' a b
+            | a `IntSet.member` as = w a b
+            | otherwise = 0
       in case maximumWeightPerfectMatching as' bs w' of
            (obj, sol, _) ->
              ( obj
-             , HashSet.fromList [(a,b) | (Right a, b) <- HashSet.toList sol]
+             , IntMap.fromList [(a,b) | (a, b) <- IntMap.toList sol, a `IntSet.member` as]
              )
   where
-    as_size = HashSet.size as
-    bs_size = HashSet.size bs
+    as_size = IntSet.size as
+    bs_size = IntSet.size bs
 
 -- | Minimum weight maximum matching of a complete bipartite graph
 minimumWeightMaximumMatching
-  :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
-  => HashSet a -> HashSet b -> (a -> b -> w)
-  -> (w, HashSet (a,b))
+  :: forall w. (Real w)
+  => IntSet -> IntSet -> (Int -> Int -> w)
+  -> (w, IntMap Int)
 minimumWeightMaximumMatching as bs w =
   case maximumWeightMaximumMatching as bs (\a b -> - w a b) of
     (obj, m) -> (- obj, m)
@@ -149,73 +149,73 @@ minimumWeightMaximumMatching as bs w =
 --
 -- The two sets must be same size.
 maximumWeightPerfectMatching
-  :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
-  => HashSet a -> HashSet b -> (a -> b -> w)
-  -> (w, HashSet (a,b), (HashMap a w, HashMap b w))
+  :: forall w. (Real w)
+  => IntSet -> IntSet -> (Int -> Int -> w)
+  -> (w, IntMap Int, (IntMap w, IntMap w))
 maximumWeightPerfectMatching as bs w =
   case minimumWeightPerfectMatching as bs (\a b -> - w a b) of
-    (obj, m, (ysA,ysB)) -> (- obj, m, (HashMap.map negate ysA, HashMap.map negate ysB))
+    (obj, m, (ysA,ysB)) -> (- obj, m, (IntMap.map negate ysA, IntMap.map negate ysB))
 
 -- | Minimum weight perfect matching of a complete bipartite graph.
 --
 -- The two sets must be same size.
 minimumWeightPerfectMatching
-  :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
-  => HashSet a -> HashSet b -> (a -> b -> w)
-  -> (w, HashSet (a,b), (HashMap a w, HashMap b w))
+  :: forall w. (Real w)
+  => IntSet -> IntSet -> (Int -> Int -> w)
+  -> (w, IntMap Int, (IntMap w, IntMap w))
 minimumWeightPerfectMatching as bs w
-  | n /= HashSet.size bs = error "minimumWeightPerfectMatching: two sets must be same size"
+  | n /= IntSet.size bs = error "minimumWeightPerfectMatching: two sets must be same size"
   | otherwise = loop m0 ys0 (equalityGraph ys0)
   where
-    n = HashSet.size as
+    n = IntSet.size as
 
-    ys0 :: (HashMap a w, HashMap b w)
-    ys0 = ( HashMap.fromList [(a, minimum [w a b | b <- HashSet.toList bs]) | a <- HashSet.toList as]
-          , HashMap.fromList [(b, 0) | b <- HashSet.toList bs]
+    ys0 :: (IntMap w, IntMap w)
+    ys0 = ( IntMap.fromList [(a, minimum [w a b | b <- IntSet.toList bs]) | a <- IntSet.toList as]
+          , IntMap.fromList [(b, 0) | b <- IntSet.toList bs]
           )
-    m0 = HashMap.empty
+    m0 = IntMap.empty
 
     loop
-      :: HashMap a b -> (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
-      -> (w, HashSet (a,b), (HashMap a w, HashMap b w))
+      :: IntMap Int -> (IntMap w, IntMap w) -> IntMap IntSet
+      -> (w, IntMap Int, (IntMap w, IntMap w))
     loop m_pre ys@(ysA,ysB) g_eq
-      | HashMap.size m == n = (F.sum ysA + F.sum ysB, HashSet.fromList (HashMap.toList m), ys)
+      | IntMap.size m == n = (F.sum ysA + F.sum ysB, m, ys)
       | otherwise = loop m ys' g_eq'
       where
         (m, l_a, l_b) = maximumMatching' as bs (g_eq !) m_pre
-        l_a' = as `HashSet.difference` l_a -- A \ L
+        l_a' = as `IntSet.difference` l_a -- A \ L
 
         slack :: w
         slack = minimum
                 [ w u v - (ysA!u + ysB!v)
-                | u <- HashSet.toList l_a'
-                , v <- HashSet.toList l_b
+                | u <- IntSet.toList l_a'
+                , v <- IntSet.toList l_b
                 ]
 
         -- augmenting dual solution
-        ys' :: (HashMap a w, HashMap b w)
-        ys' = (HashMap.mapWithKey f ysA, HashMap.mapWithKey g ysB)
+        ys' :: (IntMap w, IntMap w)
+        ys' = (IntMap.mapWithKey f ysA, IntMap.mapWithKey g ysB)
           where
             f a val
-              | not (a `HashSet.member` l_a) = val + slack
+              | a `IntSet.notMember` l_a = val + slack
               | otherwise = val
             g b val
-              | not (b `HashSet.member` l_b) = val - slack
+              | b `IntSet.notMember` l_b = val - slack
               | otherwise = val
 
-        g_eq' :: HashMap b (HashSet a)
-        g_eq' = HashMap.mapWithKey f g_eq
+        g_eq' :: IntMap IntSet
+        g_eq' = IntMap.mapWithKey f g_eq
           where
             f b as3
-              | b `HashSet.member` l_b =
-                  as3 `HashSet.union` HashSet.filter (\a -> w a b == (fst ys' ! a + snd ys' ! b)) l_a'
-              | otherwise = as3 `HashSet.difference` l_a
+              | b `IntSet.member` l_b =
+                  as3 `IntSet.union` IntSet.filter (\a -> w a b == (fst ys' ! a + snd ys' ! b)) l_a'
+              | otherwise = as3 `IntSet.difference` l_a
 
-    equalityGraph :: (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
+    equalityGraph :: (IntMap w, IntMap w) -> IntMap IntSet
     equalityGraph (ysA,ysB) =
-      HashMap.fromList
-      [ (b, HashSet.fromList [a | a <- HashSet.toList as, w a b == ysA!a + ysB!b])
-      | b <- HashSet.toList bs
+      IntMap.fromList
+      [ (b, IntSet.fromList [a | a <- IntSet.toList as, w a b == ysA!a + ysB!b])
+      | b <- IntSet.toList bs
       ]
 
 -- -----------------------------------------------------------------------------
@@ -224,85 +224,85 @@ minimumWeightPerfectMatching as bs w
 --
 -- The two sets must be same size.
 minimumWeightPerfectMatching'
-  :: forall a b w. (Hashable a, Eq a, Hashable b, Eq b, Real w)
-  => HashSet a -> HashSet b -> [(a,b,w)]
-  -> Maybe (w, HashSet (a,b), (HashMap a w, HashMap b w))
+  :: forall w. (Real w)
+  => IntSet -> IntSet -> [(Int,Int,w)]
+  -> Maybe (w, IntMap Int, (IntMap w, IntMap w))
 minimumWeightPerfectMatching' as bs es
-  | n /= HashSet.size bs = error "minimumWeightPerfectMatching: two sets must be same size"
-  | F.any HashMap.null e_b2a = Nothing
+  | n /= IntSet.size bs = error "minimumWeightPerfectMatching: two sets must be same size"
+  | F.any IntMap.null e_b2a = Nothing
   | otherwise = loop m0 ys0 (equalityGraph ys0)
   where
-    n = HashSet.size as
+    n = IntSet.size as
 
-    -- Note that HashMap.union is left-biased.
-    e_b2a :: HashMap b (HashMap a w)
-    e_b2a = fmap HashMap.fromList $ HashMap.fromListWith (++) [(b,[(a,w)]) | (a,b,w) <- es]
-              `HashMap.union` HashMap.fromList [(b,[]) | b <- HashSet.toList bs]
+    -- Note that IntMap.union is left-biased.
+    e_b2a :: IntMap (IntMap w)
+    e_b2a = fmap IntMap.fromList $ IntMap.fromListWith (++) [(b,[(a,w)]) | (a,b,w) <- es]
+              `IntMap.union` IntMap.fromList [(b,[]) | b <- IntSet.toList bs]
 {-
-    e_b2a = HashMap.fromListWith HashMap.union [(b, HashMap.singleton a w) | (a,b,w) <- es]
-              `HashMap.union` HashMap.fromList [(b, HashMap.empty) | b <- HashSet.toList bs]
+    e_b2a = IntMap.fromListWith IntMap.union [(b, IntMap.singleton a w) | (a,b,w) <- es]
+              `IntMap.union` IntMap.fromList [(b, IntMap.empty) | b <- IntSet.toList bs]
 -}
 
-    ys0 :: (HashMap a w, HashMap b w)
-    ys0 = ( HashMap.fromList [(a, 0) | a <- HashSet.toList as]
-          , HashMap.fromList [(b, minimum (HashMap.elems xs)) | (b,xs) <- HashMap.toList e_b2a]
+    ys0 :: (IntMap w, IntMap w)
+    ys0 = ( IntMap.fromList [(a, 0) | a <- IntSet.toList as]
+          , IntMap.fromList [(b, minimum (IntMap.elems xs)) | (b,xs) <- IntMap.toList e_b2a]
           )
-    m0 = HashMap.empty
+    m0 = IntMap.empty
 
     loop
-      :: HashMap a b -> (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
-      -> Maybe (w, HashSet (a,b), (HashMap a w, HashMap b w))
+      :: IntMap Int -> (IntMap w, IntMap w) -> IntMap IntSet
+      -> Maybe (w, IntMap Int, (IntMap w, IntMap w))
     loop m_pre ys@(ysA,ysB) g_eq
-      | HashMap.size m == n = Just (F.sum ysA + F.sum ysB, HashSet.fromList (HashMap.toList m), ys)
+      | IntMap.size m == n = Just (F.sum ysA + F.sum ysB, m, ys)
       | null slacks = Nothing
       | otherwise = loop m ys' g_eq'
       where
         (m, l_a, l_b) = maximumMatching' as bs (g_eq !) m_pre
 
         slacks :: [w]
-        slacks = [w - (ysA!a + ysB!b) | b <- HashSet.toList l_b, (a,w) <- HashMap.toList (e_b2a ! b), not (a `HashSet.member` l_a)]
+        slacks = [w - (ysA!a + ysB!b) | b <- IntSet.toList l_b, (a,w) <- IntMap.toList (e_b2a ! b), a `IntSet.notMember` l_a]
 
         slack :: w
         slack = minimum slacks
 
         -- augmenting dual solution
-        ys' :: (HashMap a w, HashMap b w)
-        ys' = (HashMap.mapWithKey f ysA, HashMap.mapWithKey g ysB)
+        ys' :: (IntMap w, IntMap w)
+        ys' = (IntMap.mapWithKey f ysA, IntMap.mapWithKey g ysB)
           where
             f a val
-              | not (a `HashSet.member` l_a) = val + slack
+              | a `IntSet.notMember` l_a = val + slack
               | otherwise = val
             g b val
-              | not (b `HashSet.member` l_b) = val - slack
+              | b `IntSet.notMember` l_b = val - slack
               | otherwise = val
 
-        g_eq' :: HashMap b (HashSet a)
-        g_eq' = HashMap.mapWithKey f g_eq
+        g_eq' :: IntMap IntSet
+        g_eq' = IntMap.mapWithKey f g_eq
           where
             f b as3
-              | b `HashSet.member` l_b =
-                  as3 `HashSet.union` HashSet.fromList [a | (a,w) <- HashMap.toList (e_b2a ! b), not (a `HashSet.member` l_a), w == fst ys' ! a + snd ys' ! b]
-              | otherwise = as3 `HashSet.difference` l_a
+              | b `IntSet.member` l_b =
+                  as3 `IntSet.union` IntSet.fromList [a | (a,w) <- IntMap.toList (e_b2a ! b), a `IntSet.notMember` l_a, w == fst ys' ! a + snd ys' ! b]
+              | otherwise = as3 `IntSet.difference` l_a
 
-    equalityGraph :: (HashMap a w, HashMap b w) -> HashMap b (HashSet a)
-    equalityGraph (ysA,ysB) = HashMap.mapWithKey f e_b2a
+    equalityGraph :: (IntMap w, IntMap w) -> IntMap IntSet
+    equalityGraph (ysA,ysB) = IntMap.mapWithKey f e_b2a
       where
-        f b xs = HashSet.fromList [a | (a,w) <- HashMap.toList xs, w == ysA!a + ysB!b]
+        f b xs = IntSet.fromList [a | (a,w) <- IntMap.toList xs, w == ysA!a + ysB!b]
 
 
-test_minimumWeightPerfectMatching = minimumWeightPerfectMatching as bs (\a b -> w!(a,b))
+test_minimumWeightPerfectMatching = minimumWeightPerfectMatching as bs (\a b -> w Map.! (a,b))
   where
-    as = HashSet.fromList [1,3]
-    bs = HashSet.fromList [2,4]
-    w :: HashMap (Int,Int) Int
-    w = HashMap.fromList [((1,2),5),((1,4),2),((3,2),9),((3,4),3)]
+    as = IntSet.fromList [1,3]
+    bs = IntSet.fromList [2,4]
+    w :: Map (Int,Int) Int
+    w = Map.fromList [((1,2),5),((1,4),2),((3,2),9),((3,4),3)]
 
-test_minimumWeightMaximumMatching = minimumWeightMaximumMatching as bs (\a b -> w!(a,b))
+test_minimumWeightMaximumMatching = minimumWeightMaximumMatching as bs (\a b -> w Map.! (a,b))
   where
-    as = HashSet.fromList [1,3,5]
-    bs = HashSet.fromList [2,4]
-    w :: HashMap (Int,Int) Int
-    w = HashMap.fromList
+    as = IntSet.fromList [1,3,5]
+    bs = IntSet.fromList [2,4]
+    w :: Map (Int,Int) Int
+    w = Map.fromList
         [ ((1,2),5), ((1,4),2)
         , ((3,2),9), ((3,4),3)
         , ((5,2),10), ((5,4),4)
