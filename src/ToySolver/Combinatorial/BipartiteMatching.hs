@@ -19,6 +19,8 @@
 module ToySolver.Combinatorial.BipartiteMatching
   ( maximumMatching
   , maximumMatching'
+  , maximumWeightMatching
+  , maximumWeightMatching'
   , maximumWeightMaximumMatching
   , minimumWeightMaximumMatching
   , maximumWeightPerfectMatching
@@ -26,6 +28,7 @@ module ToySolver.Combinatorial.BipartiteMatching
   , minimumWeightPerfectMatching'
   ) where
 
+import Control.Monad
 import qualified Data.Foldable as F
 import Data.IntMap.Strict (IntMap, (!))
 import qualified Data.IntMap.Strict as IntMap
@@ -33,6 +36,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe
 
 -- -----------------------------------------------------------------------------
 
@@ -105,6 +109,39 @@ test_maximumMatching = maximumMatching as bs es
     bs :: IntSet
     bs = IntSet.fromList [1..5]
     es = [(a,b) | a <- IntSet.toList as, b <- IntSet.toList bs]
+
+-- -----------------------------------------------------------------------------
+
+-- | Maximum weight matching of a complete bipartite graph
+maximumWeightMatching
+  :: forall w. (Real w)
+  => IntSet -> IntSet -> (Int -> Int -> w)
+  -> (w, IntMap Int)
+maximumWeightMatching as bs w =
+  case maximumWeightMaximumMatching as bs (\a b -> max 0 (w a b)) of
+    (_, m) ->
+      let m' = IntMap.filterWithKey (\a b -> w a b > 0) m
+      in (sum [w a b | (a,b) <- IntMap.toList m'], m')
+
+-- | Maximum weight matching of a bipartite graph
+maximumWeightMatching'
+  :: forall w. (Real w)
+  => IntSet -> IntSet -> [(Int, Int, w)]
+  -> (w, IntMap Int)
+maximumWeightMatching' as bs w =
+  case maximumWeightMaximumMatching as bs g of
+    (_, m) ->
+      let m' = IntMap.filterWithKey (\a b -> isJust (f a b)) m
+      in (sum [g a b | (a,b) <- IntMap.toList m'], m')
+  where
+    tbl :: IntMap (IntMap w)
+    tbl = IntMap.fromListWith IntMap.union [(a, (IntMap.singleton b v)) | (a,b,v) <- w]
+    f a b = do
+      t <- IntMap.lookup a tbl 
+      v <- IntMap.lookup b t
+      guard $ v >= 0
+      return v
+    g a b = fromMaybe 0 (f a b)
 
 -- -----------------------------------------------------------------------------
 
