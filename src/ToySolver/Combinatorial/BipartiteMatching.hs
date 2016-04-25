@@ -45,6 +45,14 @@ maximumMatching as bs es =
     e_b2a :: IntMap IntSet
     e_b2a = IntMap.fromListWith IntSet.union [(b, IntSet.singleton a) | (a,b) <- es]
 
+-- | Alternating path b_0, a_0, …, b_{n-1}, a_{n-1}, b_n is represented as
+-- (b_n, [(a_{n-1}, b_{n-1}) .. (a_0, b_0)], b_0).
+type AlternatingPath = (Int, [(Int,Int)], Int)
+
+-- | Augmenting path b_0, a_0, …, b_n, a_n is represented as
+-- ([(a_n, b_n) .. (a_0, b_0)], b_0).
+type AugmentingPath = ([(Int,Int)], Int)
+
 -- | Internal low-level routine for maximum cardinality bipartite matching.
 --
 -- It returns a maximum cardinality matching M together with sets of
@@ -58,7 +66,7 @@ maximumMatching'
   -> (IntMap Int, IntSet, IntSet)
 maximumMatching' as bs e_b2a m0 = loop m0 m0_b_exposed
   where
-    m0_b_exposed = bs `IntSet.difference` IntSet.fromList [b | (_,b) <- IntMap.toList m0]
+    m0_b_exposed = bs `IntSet.difference` IntSet.fromList (IntMap.elems m0)
 
     loop :: IntMap Int -> IntSet -> (IntMap Int, IntSet, IntSet)
     loop m m_b_exposed =
@@ -68,13 +76,13 @@ maximumMatching' as bs e_b2a m0 = loop m0 m0_b_exposed
           let -- Note that IntMap.union is left-biased
               ds2 = [IntMap.fromList d2 | (d2,_) <- ds]
               m' = IntMap.unions ds2 `IntMap.union` m
-              m_b_exposed' = m_b_exposed `IntSet.difference` IntSet.fromList [b0 | (d2, b0) <- ds]
+              m_b_exposed' = m_b_exposed `IntSet.difference` IntSet.fromList [b0 | (_, b0) <- ds]
           in loop m' m_b_exposed'
       where
-        search :: IntSet -> (IntSet, IntSet, [([(Int,Int)], Int)])
+        search :: IntSet -> (IntSet, IntSet, [AugmentingPath])
         search b_exposed = loopB IntSet.empty b_exposed [(b, [], b) | b <- IntSet.toList b_exposed] [] []
           where
-            loopB :: IntSet -> IntSet -> [(Int, [(Int,Int)], Int)] -> [(Int, [(Int,Int)], Int)] -> [([(Int,Int)], Int)] -> (IntSet, IntSet, [([(Int,Int)], Int)])
+            loopB :: IntSet -> IntSet -> [AlternatingPath] -> [AlternatingPath] -> [AugmentingPath] -> (IntSet, IntSet, [AugmentingPath])
             loopB !visitedA !visitedB [] [] result = (visitedA, visitedB, result)
             loopB !visitedA !visitedB [] nextB result = loopB visitedA visitedB nextB [] result
             loopB !visitedA !visitedB ((b, d2, b0) : currB) nextB result = loopA visitedA visitedB (IntSet.toList (e_b2a b)) currB nextB result
@@ -111,24 +119,24 @@ maximumWeightMaximumMatching as bs w =
       case maximumWeightPerfectMatching as bs w of
         (obj, sol, _) -> (obj, sol)
     GT ->
-      let bs' = bs `IntSet.union` IntSet.fromList (take (as_size-bs_size) $ filter (`IntSet.notMember` bs) [0..])
+      let bs' = bs `IntSet.union` IntSet.fromAscList (take (as_size-bs_size) $ filter (`IntSet.notMember` bs) [0..])
           w' a b
             | b `IntSet.member` bs = w a b
             | otherwise = 0
       in case maximumWeightPerfectMatching as bs' w' of
            (obj, sol, _) ->
              ( obj
-             , IntMap.fromList [(a,b) | (a,b) <- IntMap.toList sol, b `IntSet.member` bs]
+             , IntMap.filterWithKey (\_ b -> b `IntSet.member` bs) sol
              )
     LT ->
-      let as' = as `IntSet.union` IntSet.fromList (take (bs_size-as_size) $ filter (`IntSet.notMember` as) [0..])
+      let as' = as `IntSet.union` IntSet.fromAscList (take (bs_size-as_size) $ filter (`IntSet.notMember` as) [0..])
           w' a b
             | a `IntSet.member` as = w a b
             | otherwise = 0
       in case maximumWeightPerfectMatching as' bs w' of
            (obj, sol, _) ->
              ( obj
-             , IntMap.fromList [(a,b) | (a, b) <- IntMap.toList sol, a `IntSet.member` as]
+             , IntMap.filterWithKey (\a _ -> a `IntSet.member` as) sol
              )
   where
     as_size = IntSet.size as
@@ -170,8 +178,8 @@ minimumWeightPerfectMatching as bs w
     n = IntSet.size as
 
     ys0 :: (IntMap w, IntMap w)
-    ys0 = ( IntMap.fromList [(a, minimum [w a b | b <- IntSet.toList bs]) | a <- IntSet.toList as]
-          , IntMap.fromList [(b, 0) | b <- IntSet.toList bs]
+    ys0 = ( IntMap.fromSet (\a -> minimum [w a b | b <- IntSet.toList bs]) as
+          , IntMap.fromSet (\_ -> 0) bs
           )
     m0 = IntMap.empty
 
@@ -187,9 +195,9 @@ minimumWeightPerfectMatching as bs w
 
         slack :: w
         slack = minimum
-                [ w u v - (ysA!u + ysB!v)
-                | u <- IntSet.toList l_a'
-                , v <- IntSet.toList l_b
+                [ w a b - (ysA!a + ysB!b)
+                | a <- IntSet.toList l_a'
+                , b <- IntSet.toList l_b
                 ]
 
         -- augmenting dual solution
@@ -213,10 +221,7 @@ minimumWeightPerfectMatching as bs w
 
     equalityGraph :: (IntMap w, IntMap w) -> IntMap IntSet
     equalityGraph (ysA,ysB) =
-      IntMap.fromList
-      [ (b, IntSet.fromList [a | a <- IntSet.toList as, w a b == ysA!a + ysB!b])
-      | b <- IntSet.toList bs
-      ]
+      IntMap.fromSet (\b -> IntSet.filter (\a -> w a b == ysA!a + ysB!b) as) bs
 
 -- -----------------------------------------------------------------------------
 
@@ -237,15 +242,15 @@ minimumWeightPerfectMatching' as bs es
     -- Note that IntMap.union is left-biased.
     e_b2a :: IntMap (IntMap w)
     e_b2a = fmap IntMap.fromList $ IntMap.fromListWith (++) [(b,[(a,w)]) | (a,b,w) <- es]
-              `IntMap.union` IntMap.fromList [(b,[]) | b <- IntSet.toList bs]
+              `IntMap.union` IntMap.fromSet (\_ -> []) bs
 {-
     e_b2a = IntMap.fromListWith IntMap.union [(b, IntMap.singleton a w) | (a,b,w) <- es]
               `IntMap.union` IntMap.fromList [(b, IntMap.empty) | b <- IntSet.toList bs]
 -}
 
     ys0 :: (IntMap w, IntMap w)
-    ys0 = ( IntMap.fromList [(a, 0) | a <- IntSet.toList as]
-          , IntMap.fromList [(b, minimum (IntMap.elems xs)) | (b,xs) <- IntMap.toList e_b2a]
+    ys0 = ( IntMap.fromSet (\_ -> 0) as
+          , fmap F.minimum e_b2a
           )
     m0 = IntMap.empty
 
@@ -281,13 +286,13 @@ minimumWeightPerfectMatching' as bs es
           where
             f b as3
               | b `IntSet.member` l_b =
-                  as3 `IntSet.union` IntSet.fromList [a | (a,w) <- IntMap.toList (e_b2a ! b), a `IntSet.notMember` l_a, w == fst ys' ! a + snd ys' ! b]
+                  as3 `IntSet.union` IntSet.fromAscList [a | (a,w) <- IntMap.toAscList (e_b2a ! b), a `IntSet.notMember` l_a, w == fst ys' ! a + snd ys' ! b]
               | otherwise = as3 `IntSet.difference` l_a
 
     equalityGraph :: (IntMap w, IntMap w) -> IntMap IntSet
     equalityGraph (ysA,ysB) = IntMap.mapWithKey f e_b2a
       where
-        f b xs = IntSet.fromList [a | (a,w) <- IntMap.toList xs, w == ysA!a + ysB!b]
+        f b xs = IntSet.fromAscList [a | (a,w) <- IntMap.toAscList xs, w == ysA!a + ysB!b]
 
 
 test_minimumWeightPerfectMatching = minimumWeightPerfectMatching as bs (\a b -> w Map.! (a,b))
