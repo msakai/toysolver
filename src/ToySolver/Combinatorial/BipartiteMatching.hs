@@ -40,8 +40,15 @@ import Data.Maybe
 
 -- -----------------------------------------------------------------------------
 
+-- | Maximum cardinality bipartite matching.
+--
+-- It returns a maximum cardinality matching M together with sets
+-- on a directed graph of (A+B, {a→b|(a,b)∈M}∪{b→a|(a,b)⊆E\\M}).
 maximumMatching
-  :: IntSet -> IntSet -> [(Int,Int)] -> IntMap Int
+  :: IntSet      -- ^ vertex set A
+  -> IntSet      -- ^ vertex set B
+  -> [(Int,Int)] -- ^ set of edges E⊆A×B
+  -> IntMap Int
 maximumMatching as bs es = 
   case maximumMatching' as bs (\b -> IntMap.findWithDefault IntSet.empty b e_b2a) IntMap.empty of
     (m, _, _) -> m
@@ -112,10 +119,12 @@ test_maximumMatching = maximumMatching as bs es
 
 -- -----------------------------------------------------------------------------
 
--- | Maximum weight matching of a complete bipartite graph
+-- | Maximum weight matching of a complete bipartite graph (A+B,A×B).
 maximumWeightMatching
   :: forall w. (Real w)
-  => IntSet -> IntSet -> (Int -> Int -> w)
+  => IntSet            -- ^ vertex set A
+  -> IntSet            -- ^ vertex set B
+  -> (Int -> Int -> w) -- ^ weight of edges A×B
   -> (w, IntMap Int)
 maximumWeightMatching as bs w =
   case maximumWeightMaximumMatching as bs (\a b -> max 0 (w a b)) of
@@ -123,10 +132,12 @@ maximumWeightMatching as bs w =
       let m' = IntMap.filterWithKey (\a b -> w a b > 0) m
       in (sum [w a b | (a,b) <- IntMap.toList m'], m')
 
--- | Maximum weight matching of a bipartite graph
+-- | Maximum weight matching of a bipartite graph (A+B,E).
 maximumWeightMatching'
   :: forall w. (Real w)
-  => IntSet -> IntSet -> [(Int, Int, w)]
+  => IntSet          -- ^ vertex set A
+  -> IntSet          -- ^ vertex set B
+  -> [(Int, Int, w)] -- ^ edges E⊆A×B and their weights
   -> (w, IntMap Int)
 maximumWeightMatching' as bs w =
   case maximumWeightMaximumMatching as bs g of
@@ -145,10 +156,12 @@ maximumWeightMatching' as bs w =
 
 -- -----------------------------------------------------------------------------
 
--- | Maximum weight maximum matching of a complete bipartite graph
+-- | Maximum weight maximum matching of a complete bipartite graph (A+B,A×B).
 maximumWeightMaximumMatching
   :: forall w. (Real w)
-  => IntSet -> IntSet -> (Int -> Int -> w)
+  => IntSet            -- ^ vertex set A
+  -> IntSet            -- ^ vertex set B
+  -> (Int -> Int -> w) -- ^ weight of edges A×B
   -> (w, IntMap Int)
 maximumWeightMaximumMatching as bs w =
   case as_size `compare` bs_size of
@@ -179,10 +192,12 @@ maximumWeightMaximumMatching as bs w =
     as_size = IntSet.size as
     bs_size = IntSet.size bs
 
--- | Minimum weight maximum matching of a complete bipartite graph
+-- | Minimum weight maximum matching of a complete bipartite graph (A+B,A×B).
 minimumWeightMaximumMatching
   :: forall w. (Real w)
-  => IntSet -> IntSet -> (Int -> Int -> w)
+  => IntSet            -- ^ vertex set A
+  -> IntSet            -- ^ vertex set B
+  -> (Int -> Int -> w) -- ^ weight of edges A×B
   -> (w, IntMap Int)
 minimumWeightMaximumMatching as bs w =
   case maximumWeightMaximumMatching as bs (\a b -> - w a b) of
@@ -190,23 +205,27 @@ minimumWeightMaximumMatching as bs w =
 
 -- -----------------------------------------------------------------------------
 
--- | Maximum weight perfect matching of a complete bipartite graph.
+-- | Maximum weight perfect matching of a complete bipartite graph (A+B,A×B).
 --
--- The two sets must be same size.
+-- The two sets must be same size (\|A\| = \|B\|).
 maximumWeightPerfectMatching
   :: forall w. (Real w)
-  => IntSet -> IntSet -> (Int -> Int -> w)
+  => IntSet            -- ^ vertex set A
+  -> IntSet            -- ^ vertex set B
+  -> (Int -> Int -> w) -- ^ weight of edges A×B
   -> (w, IntMap Int, (IntMap w, IntMap w))
 maximumWeightPerfectMatching as bs w =
   case minimumWeightPerfectMatching as bs (\a b -> - w a b) of
     (obj, m, (ysA,ysB)) -> (- obj, m, (IntMap.map negate ysA, IntMap.map negate ysB))
 
--- | Minimum weight perfect matching of a complete bipartite graph.
+-- | Minimum weight perfect matching of a complete bipartite graph (A+B,A×B).
 --
--- The two sets must be same size.
+-- The two sets must be same size (\|A\| = \|B\|).
 minimumWeightPerfectMatching
   :: forall w. (Real w)
-  => IntSet -> IntSet -> (Int -> Int -> w)
+  => IntSet            -- ^ vertex set A
+  -> IntSet            -- ^ vertex set B
+  -> (Int -> Int -> w) -- ^ weight of edges A×B
   -> (w, IntMap Int, (IntMap w, IntMap w))
 minimumWeightPerfectMatching as bs w
   | n /= IntSet.size bs = error "minimumWeightPerfectMatching: two sets must be same size"
@@ -262,15 +281,17 @@ minimumWeightPerfectMatching as bs w
 
 -- -----------------------------------------------------------------------------
 
--- | Minimum weight perfect matching of a bipartite graph.
+-- | Minimum weight perfect matching of a bipartite graph (A+B, E).
 --
--- The two sets must be same size.
+-- If no such matching exist, it returns @Nothing@.
 minimumWeightPerfectMatching'
   :: forall w. (Real w)
-  => IntSet -> IntSet -> [(Int,Int,w)]
+  => IntSet        -- ^ vertex set A
+  -> IntSet        -- ^ vertex set B
+  -> [(Int,Int,w)] -- ^ edges E⊆A×B and their weights
   -> Maybe (w, IntMap Int, (IntMap w, IntMap w))
 minimumWeightPerfectMatching' as bs es
-  | n /= IntSet.size bs = error "minimumWeightPerfectMatching: two sets must be same size"
+  | n /= IntSet.size bs = Nothing
   | F.any IntMap.null e_b2a = Nothing
   | otherwise = loop m0 ys0 (equalityGraph ys0)
   where
