@@ -10,6 +10,9 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (ScopedTypeVariables, BangPatterns)
 --
+-- This module provides functions for computing several kind of bipartite
+-- matching. 
+-- 
 -- Reference:
 --
 -- * Friedrich Eisenbrand. “Linear and Discrete Optimization”.
@@ -17,15 +20,19 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Combinatorial.BipartiteMatching
-  ( maximumMatching
-  , maximumMatching'
+  ( 
+  -- * Maximum cardinality bipartite matching
+    maximumCardinalityMatching
+
+  -- * Maximum weight bipartite matching
   , maximumWeightMatching
-  , maximumWeightMatching'
-  , maximumWeightMaximumMatching
-  , minimumWeightMaximumMatching
+  , maximumWeightMatchingComplete
+
+  -- * Maximum/Minimum weight bipartite perfect matching
   , maximumWeightPerfectMatching
   , minimumWeightPerfectMatching
-  , minimumWeightPerfectMatching'
+  , maximumWeightPerfectMatchingComplete
+  , minimumWeightPerfectMatchingComplete
   ) where
 
 import Control.Monad
@@ -44,13 +51,13 @@ import Data.Maybe
 --
 -- It returns a maximum cardinality matching M together with sets
 -- on a directed graph of (A+B, {a→b|(a,b)∈M}∪{b→a|(a,b)⊆E\\M}).
-maximumMatching
+maximumCardinalityMatching
   :: IntSet      -- ^ vertex set A
   -> IntSet      -- ^ vertex set B
   -> [(Int,Int)] -- ^ set of edges E⊆A×B
   -> IntMap Int
-maximumMatching as bs es = 
-  case maximumMatching' as bs (\b -> IntMap.findWithDefault IntSet.empty b e_b2a) IntMap.empty of
+maximumCardinalityMatching as bs es = 
+  case maximumCardinalityMatching' as bs (\b -> IntMap.findWithDefault IntSet.empty b e_b2a) IntMap.empty of
     (m, _, _) -> m
   where
     e_b2a :: IntMap IntSet
@@ -69,13 +76,13 @@ type AugmentingPath = ([(Int,Int)], Int)
 -- It returns a maximum cardinality matching M together with sets of
 -- vertexes reachable from exposed B vertexes (b∈B such that ∀a∈A. (a,b)∉M)
 -- on a directed graph of (A∪B, {a→b|(a,b)∈M}∪{b→a|(a,b)⊆E\\M}).
-maximumMatching'
+maximumCardinalityMatching'
   :: IntSet          -- ^ vertex set A
   -> IntSet          -- ^ vertex set B
   -> (Int -> IntSet) -- ^ set of edges E⊆A×B represented as a mapping from B to 2^A.
   -> IntMap Int      -- ^ partial matching represented as an injective mapping from A to B
   -> (IntMap Int, IntSet, IntSet)
-maximumMatching' as bs e_b2a m0 = loop m0 m0_b_exposed
+maximumCardinalityMatching' as bs e_b2a m0 = loop m0 m0_b_exposed
   where
     m0_b_exposed = bs `IntSet.difference` IntSet.fromList (IntMap.elems m0)
 
@@ -110,7 +117,7 @@ maximumMatching' as bs e_b2a m0 = loop m0 m0_b_exposed
                           | b2 `IntSet.member` visitedB -> loopA (IntSet.insert a visitedA) visitedB as currB nextB result
                           | otherwise -> loopA (IntSet.insert a visitedA) (IntSet.insert b2 visitedB) as currB ((b2, (a,b):d2, b0) : nextB) result
 
-test_maximumMatching = maximumMatching as bs es
+test_maximumCardinalityMatching = maximumCardinalityMatching as bs es
   where
     as = IntSet.fromList [1..5] -- ['a'..'e']
     bs :: IntSet
@@ -120,27 +127,27 @@ test_maximumMatching = maximumMatching as bs es
 -- -----------------------------------------------------------------------------
 
 -- | Maximum weight matching of a complete bipartite graph (A+B,A×B).
-maximumWeightMatching
+maximumWeightMatchingComplete
   :: forall w. (Real w)
   => IntSet            -- ^ vertex set A
   -> IntSet            -- ^ vertex set B
   -> (Int -> Int -> w) -- ^ weight of edges A×B
   -> (w, IntMap Int)
-maximumWeightMatching as bs w =
-  case maximumWeightMaximumMatching as bs (\a b -> max 0 (w a b)) of
+maximumWeightMatchingComplete as bs w =
+  case maximumWeightMaximumMatchingComplete as bs (\a b -> max 0 (w a b)) of
     (_, m) ->
       let m' = IntMap.filterWithKey (\a b -> w a b > 0) m
       in (sum [w a b | (a,b) <- IntMap.toList m'], m')
 
 -- | Maximum weight matching of a bipartite graph (A+B,E).
-maximumWeightMatching'
+maximumWeightMatching
   :: forall w. (Real w)
   => IntSet          -- ^ vertex set A
   -> IntSet          -- ^ vertex set B
   -> [(Int, Int, w)] -- ^ edges E⊆A×B and their weights
   -> (w, IntMap Int)
-maximumWeightMatching' as bs w =
-  case maximumWeightMaximumMatching as bs g of
+maximumWeightMatching as bs w =
+  case maximumWeightMaximumMatchingComplete as bs g of
     (_, m) ->
       let m' = IntMap.filterWithKey (\a b -> isJust (f a b)) m
       in (sum [g a b | (a,b) <- IntMap.toList m'], m')
@@ -157,23 +164,23 @@ maximumWeightMatching' as bs w =
 -- -----------------------------------------------------------------------------
 
 -- | Maximum weight maximum matching of a complete bipartite graph (A+B,A×B).
-maximumWeightMaximumMatching
+maximumWeightMaximumMatchingComplete
   :: forall w. (Real w)
   => IntSet            -- ^ vertex set A
   -> IntSet            -- ^ vertex set B
   -> (Int -> Int -> w) -- ^ weight of edges A×B
   -> (w, IntMap Int)
-maximumWeightMaximumMatching as bs w =
+maximumWeightMaximumMatchingComplete as bs w =
   case as_size `compare` bs_size of
     EQ ->
-      case maximumWeightPerfectMatching as bs w of
+      case maximumWeightPerfectMatchingComplete as bs w of
         (obj, sol, _) -> (obj, sol)
     GT ->
       let bs' = bs `IntSet.union` IntSet.fromAscList (take (as_size-bs_size) $ filter (`IntSet.notMember` bs) [0..])
           w' a b
             | b `IntSet.member` bs = w a b
             | otherwise = 0
-      in case maximumWeightPerfectMatching as bs' w' of
+      in case maximumWeightPerfectMatchingComplete as bs' w' of
            (obj, sol, _) ->
              ( obj
              , IntMap.filterWithKey (\_ b -> b `IntSet.member` bs) sol
@@ -183,7 +190,7 @@ maximumWeightMaximumMatching as bs w =
           w' a b
             | a `IntSet.member` as = w a b
             | otherwise = 0
-      in case maximumWeightPerfectMatching as' bs w' of
+      in case maximumWeightPerfectMatchingComplete as' bs w' of
            (obj, sol, _) ->
              ( obj
              , IntMap.filterWithKey (\a _ -> a `IntSet.member` as) sol
@@ -192,43 +199,32 @@ maximumWeightMaximumMatching as bs w =
     as_size = IntSet.size as
     bs_size = IntSet.size bs
 
--- | Minimum weight maximum matching of a complete bipartite graph (A+B,A×B).
-minimumWeightMaximumMatching
-  :: forall w. (Real w)
-  => IntSet            -- ^ vertex set A
-  -> IntSet            -- ^ vertex set B
-  -> (Int -> Int -> w) -- ^ weight of edges A×B
-  -> (w, IntMap Int)
-minimumWeightMaximumMatching as bs w =
-  case maximumWeightMaximumMatching as bs (\a b -> - w a b) of
-    (obj, m) -> (- obj, m)
-
 -- -----------------------------------------------------------------------------
 
 -- | Maximum weight perfect matching of a complete bipartite graph (A+B,A×B).
 --
 -- The two sets must be same size (\|A\| = \|B\|).
-maximumWeightPerfectMatching
+maximumWeightPerfectMatchingComplete
   :: forall w. (Real w)
   => IntSet            -- ^ vertex set A
   -> IntSet            -- ^ vertex set B
   -> (Int -> Int -> w) -- ^ weight of edges A×B
   -> (w, IntMap Int, (IntMap w, IntMap w))
-maximumWeightPerfectMatching as bs w =
-  case minimumWeightPerfectMatching as bs (\a b -> - w a b) of
+maximumWeightPerfectMatchingComplete as bs w =
+  case minimumWeightPerfectMatchingComplete as bs (\a b -> - w a b) of
     (obj, m, (ysA,ysB)) -> (- obj, m, (IntMap.map negate ysA, IntMap.map negate ysB))
 
 -- | Minimum weight perfect matching of a complete bipartite graph (A+B,A×B).
 --
 -- The two sets must be same size (\|A\| = \|B\|).
-minimumWeightPerfectMatching
+minimumWeightPerfectMatchingComplete
   :: forall w. (Real w)
   => IntSet            -- ^ vertex set A
   -> IntSet            -- ^ vertex set B
   -> (Int -> Int -> w) -- ^ weight of edges A×B
   -> (w, IntMap Int, (IntMap w, IntMap w))
-minimumWeightPerfectMatching as bs w
-  | n /= IntSet.size bs = error "minimumWeightPerfectMatching: two sets must be same size"
+minimumWeightPerfectMatchingComplete as bs w
+  | n /= IntSet.size bs = error "minimumWeightPerfectMatchingComplete: two sets must be same size"
   | otherwise = loop m0 ys0 (equalityGraph ys0)
   where
     n = IntSet.size as
@@ -246,7 +242,7 @@ minimumWeightPerfectMatching as bs w
       | IntMap.size m == n = (F.sum ysA + F.sum ysB, m, ys)
       | otherwise = loop m ys' g_eq'
       where
-        (m, l_a, l_b) = maximumMatching' as bs (g_eq !) m_pre
+        (m, l_a, l_b) = maximumCardinalityMatching' as bs (g_eq !) m_pre
         l_a' = as `IntSet.difference` l_a -- A \ L
 
         slack :: w
@@ -281,16 +277,29 @@ minimumWeightPerfectMatching as bs w
 
 -- -----------------------------------------------------------------------------
 
--- | Minimum weight perfect matching of a bipartite graph (A+B, E).
+-- | Maximum weight perfect matching of a complete bipartite graph (A+B,E).
 --
 -- If no such matching exist, it returns @Nothing@.
-minimumWeightPerfectMatching'
+maximumWeightPerfectMatching
   :: forall w. (Real w)
   => IntSet        -- ^ vertex set A
   -> IntSet        -- ^ vertex set B
   -> [(Int,Int,w)] -- ^ edges E⊆A×B and their weights
   -> Maybe (w, IntMap Int, (IntMap w, IntMap w))
-minimumWeightPerfectMatching' as bs es
+maximumWeightPerfectMatching as bs es = do
+  (obj, m, (ysA,ysB)) <- minimumWeightPerfectMatching as bs [(a,b,-w) |(a,b,w) <- es]
+  return (- obj, m, (IntMap.map negate ysA, IntMap.map negate ysB))
+
+-- | Minimum weight perfect matching of a bipartite graph (A+B, E).
+--
+-- If no such matching exist, it returns @Nothing@.
+minimumWeightPerfectMatching
+  :: forall w. (Real w)
+  => IntSet        -- ^ vertex set A
+  -> IntSet        -- ^ vertex set B
+  -> [(Int,Int,w)] -- ^ edges E⊆A×B and their weights
+  -> Maybe (w, IntMap Int, (IntMap w, IntMap w))
+minimumWeightPerfectMatching as bs es
   | n /= IntSet.size bs = Nothing
   | F.any IntMap.null e_b2a = Nothing
   | otherwise = loop m0 ys0 (equalityGraph ys0)
@@ -320,7 +329,7 @@ minimumWeightPerfectMatching' as bs es
       | null slacks = Nothing
       | otherwise = loop m ys' g_eq'
       where
-        (m, l_a, l_b) = maximumMatching' as bs (g_eq !) m_pre
+        (m, l_a, l_b) = maximumCardinalityMatching' as bs (g_eq !) m_pre
 
         slacks :: [w]
         slacks = [w - (ysA!a + ysB!b) | b <- IntSet.toList l_b, (a,w) <- IntMap.toList (e_b2a ! b), a `IntSet.notMember` l_a]
@@ -353,23 +362,12 @@ minimumWeightPerfectMatching' as bs es
         f b xs = IntSet.fromAscList [a | (a,w) <- IntMap.toAscList xs, w == ysA!a + ysB!b]
 
 
-test_minimumWeightPerfectMatching = minimumWeightPerfectMatching as bs (\a b -> w Map.! (a,b))
+test_minimumWeightPerfectMatchingComplete = minimumWeightPerfectMatchingComplete as bs (\a b -> w Map.! (a,b))
   where
     as = IntSet.fromList [1,3]
     bs = IntSet.fromList [2,4]
     w :: Map (Int,Int) Int
     w = Map.fromList [((1,2),5),((1,4),2),((3,2),9),((3,4),3)]
-
-test_minimumWeightMaximumMatching = minimumWeightMaximumMatching as bs (\a b -> w Map.! (a,b))
-  where
-    as = IntSet.fromList [1,3,5]
-    bs = IntSet.fromList [2,4]
-    w :: Map (Int,Int) Int
-    w = Map.fromList
-        [ ((1,2),5), ((1,4),2)
-        , ((3,2),9), ((3,4),3)
-        , ((5,2),10), ((5,4),4)
-        ]
 
 -- -----------------------------------------------------------------------------
 

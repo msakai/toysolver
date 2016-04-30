@@ -44,7 +44,7 @@ main = do
     [fname] -> do
       s <- BL.readFile fname
       let (as, bs, w) = parse1 s
-          (obj, m, _) = minimumWeightPerfectMatching as bs w
+          (obj, m, _) = minimumWeightPerfectMatchingComplete as bs w
       putStrLn $ "obj = " ++ show obj
       forM_ (IntMap.toList m) $ \(a,b) -> do
         putStrLn $ unwords $ map show [a,b]
@@ -52,7 +52,7 @@ main = do
       s <- BL.readFile fname
       let (as, bs, w) = parse1 s
           es = [(a, b, w a b) | a <- IntSet.toList as, b <- IntSet.toList bs]
-      case minimumWeightPerfectMatching' as bs es of
+      case minimumWeightPerfectMatching as bs es of
         Nothing ->
           putStrLn $ "infeasible"
         Just (obj, m, _) -> do
@@ -62,7 +62,7 @@ main = do
     ["-p", fname] -> do
       s <- BL.readFile fname
       let (as, bs, es) = parse2 s
-      case minimumWeightPerfectMatching' as bs es of
+      case minimumWeightPerfectMatching as bs es of
         Nothing ->
           putStrLn $ "infeasible"
         Just (obj, m, _) -> do

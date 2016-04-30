@@ -22,7 +22,7 @@ prop_minimumWeightPerfectMatching =
     let as = IntSet.fromList [1..n]
     in forAll (arbitraryWeight as as) $ \(w' :: Map (Int,Int) Rational) ->
          let w a b = w' ! (a,b)
-             (obj, m, (ysA,ysB)) = minimumWeightPerfectMatching as as w
+             (obj, m, (ysA,ysB)) = minimumWeightPerfectMatchingComplete as as w
          in obj == sum [w a b | (a,b) <- IntMap.toList m] &&
             obj == F.sum ysA + F.sum ysB &&
             and [ya + yb <= w a b | (a,ya) <- IntMap.toList ysA, (b,yb) <- IntMap.toList ysB] &&
@@ -33,33 +33,11 @@ prop_maximumWeightPerfectMatching =
     let as = IntSet.fromList [1..n]
     in forAll (arbitraryWeight as as) $ \(w' :: Map (Int,Int) Rational) ->
          let w a b = w' ! (a,b)
-             (obj, m, (ysA,ysB)) = maximumWeightPerfectMatching as as w
+             (obj, m, (ysA,ysB)) = maximumWeightPerfectMatchingComplete as as w
          in obj == sum [w a b | (a,b) <- IntMap.toList m] &&
             obj == F.sum ysA + F.sum ysB &&
             and [ya + yb >= w a b | (a,ya) <- IntMap.toList ysA, (b,yb) <- IntMap.toList ysB] &&
             IntMap.size m == n
-
-prop_minimumWeightMaximumMatching =
-  forAll (choose (0,10)) $ \(nA::Int) ->
-  forAll (choose (0,10)) $ \(nB::Int) ->
-    let as = IntSet.fromList [1..nA]
-        bs = IntSet.fromList [1..nB]
-    in forAll (arbitraryWeight as bs) $ \(w' :: Map (Int,Int) Rational) ->
-         let w a b = w' ! (a,b)
-             (obj, m) = minimumWeightMaximumMatching as bs w
-         in obj == sum [w a b | (a,b) <- IntMap.toList m] &&
-            IntMap.size m == min nA nB
-
-prop_maximumWeightMaximumMatching =
-  forAll (choose (0,10)) $ \(nA::Int) ->
-  forAll (choose (0,10)) $ \(nB::Int) ->
-    let as = IntSet.fromList [1..nA]
-        bs = IntSet.fromList [1..nB]
-    in forAll (arbitraryWeight as bs) $ \(w' :: Map (Int,Int) Rational) ->
-         let w a b = w' ! (a,b)
-             (obj, m) = maximumWeightMaximumMatching as bs w
-         in obj == sum [w a b | (a,b) <- IntMap.toList m] &&
-            IntMap.size m == min nA nB
 
 arbitraryWeight :: (Arbitrary w) => IntSet -> IntSet -> Gen (Map (Int, Int) w)
 arbitraryWeight as bs =
