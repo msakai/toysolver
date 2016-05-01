@@ -1015,7 +1015,7 @@ recordTime solver act = do
   endWC  <- getTime Monotonic
 
   let durationSecs :: TimeSpec -> TimeSpec -> Double
-      durationSecs start end = fromIntegral (timeSpecAsNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)
+      durationSecs start end = fromIntegral (toNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)
   (log solver . printf "cpu time = %.3fs") (durationSecs startCPU endCPU)
   (log solver . printf "wall clock time = %.3fs") (durationSecs startWC endWC)
   (log solver . printf "#pivot = %d") =<< readIORef (svNPivot solver)

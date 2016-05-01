@@ -980,4 +980,4 @@ writeSOLFile opt m obj nbvar = do
       writeFile fname (GurobiSol.render (Map.map fromInteger m2) (fmap fromInteger obj))
 
 durationSecs :: TimeSpec -> TimeSpec -> Double
-durationSecs start end = fromIntegral (timeSpecAsNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)
+durationSecs start end = fromIntegral (toNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)
