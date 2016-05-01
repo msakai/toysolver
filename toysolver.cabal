@@ -124,48 +124,48 @@ Library
   Exposed: True
   Hs-source-dirs: src
   Build-Depends:
-     base >=4.6 && <5,
-     template-haskell,
-     -- IntMap.mergeWithKey and IntMap.toDescList require containers >=0.5.0
-     containers >=0.5.0,
-     unordered-containers >=0.2.3 && <0.3.0,
-     transformers >=0.2,
-     transformers-compat >=0.3,
-     mtl >=2.1.2,
      array >=0.4.0.0,
-     clock >=0.7.1,
-     stm >=2.3,
-     parsec >=3.1.2 && <4,
+     base >=4.6 && <5,
      bytestring >=0.9.2.1 && <0.11,
      bytestring-builder,
-     filepath,
+     clock >=0.7.1,
+     -- IntMap.mergeWithKey and IntMap.toDescList require containers >=0.5.0
+     containers >=0.5.0,
+     data-default-class,
+     data-interval >=1.0.1 && <1.3.0,
      deepseq,
-     time,
-     primes,
-     process >=1.1.0.2,
-     parse-dimacs,
-     primitive >=0.6,
-     queue,
-     heaps,
-     vector,
-     vector-space >=0.8.6,
-     multiset,
-     prettyclass >=1.0.0,
-     type-level-numbers >=0.1.1.0 && <0.2.0.0,
+     extended-reals >=0.1 && <1.0,
+     filepath,
+     finite-field >=0.7.0 && <1.0.0,
      hashable >=1.1.2.5 && <1.3.0.0,
+     hashtables,
+     heaps,
      intern >=0.9.1.2 && <1.0.0.0,
      loop >=0.2.0 && < 1.0.0,
-     data-default-class,
+     mtl >=2.1.2,
+     multiset,
      -- createSystemRandom requires mwc-random >=0.13.1.0
      mwc-random >=0.13.1 && <0.14,
-     semigroups >=0.17,
-     hashtables,
      OptDir,
-     extended-reals >=0.1 && <1.0,
-     data-interval >=1.0.1 && <1.3.0,
-     finite-field >=0.7.0 && <1.0.0,
+     parse-dimacs,
+     parsec >=3.1.2 && <4,
+     prettyclass >=1.0.0,
+     primes,
+     primitive >=0.6,
+     process >=1.1.0.2,
+     pseudo-boolean >=0.1.3.0 && <0.2.0.0,
+     queue,
+     semigroups >=0.17,
      sign >=0.2.0 && <1.0.0,
-     pseudo-boolean >=0.1.3.0 && <0.2.0.0
+     stm >=2.3,
+     template-haskell,
+     time,
+     transformers >=0.2,
+     transformers-compat >=0.3,
+     type-level-numbers >=0.1.1.0 && <0.2.0.0,
+     unordered-containers >=0.2.3 && <0.3.0,
+     vector,
+     vector-space >=0.8.6
   -- NOTE: temporary-1.2.0.2 does not work with exceptions-0.6
   if flag(Exceptions06)
      Build-Depends: temporary >1.2.0.2, exceptions >=0.6
@@ -340,9 +340,9 @@ Executable toysolver
   Main-is: toysolver.hs
   HS-Source-Dirs: toysolver
   Build-Depends:
+    array,
     base,
     containers,
-    array,
     data-default-class,
     filepath,
     OptDir,
@@ -363,24 +363,24 @@ Executable toysat
   Other-Modules: UBCSAT
   HS-Source-Dirs: toysat
   Build-Depends:
-    base,
-    data-default-class,
-    mwc-random,
-    containers,
     array,
-    clock,
-    directory,
-    data-default,
-    process >=1.1.0.2,
-    parsec,
+    base,
     bytestring,
+    containers,
+    clock,
+    data-default,
+    data-default-class,
+    directory,
     filepath,
+    mwc-random,
+    parsec,
     parse-dimacs,
-    temporary,
-    unbounded-delays,
-    vector,
+    process >=1.1.0.2,
     pseudo-boolean,
-    toysolver
+    temporary,
+    toysolver,
+    unbounded-delays,
+    vector
   if flag(Time15)
     Build-Depends: time >=1.5.0
   else
@@ -413,9 +413,9 @@ Executable toysmt
     data-default-class,
     mtl,
     parsec,
+    toysolver,
     transformers,
-    transformers-compat,
-    toysolver
+    transformers-compat
   if flag(UseHaskeline)
     Build-Depends: haskeline >=0.7 && <0.8
     CPP-Options: "-DUSE_HASKELINE_PACKAGE"
@@ -454,18 +454,18 @@ Executable toyfmf
     Build-Depends:
       base,
       containers,
-      toysolver,
       -- logic-TPTP <=0.4.3 has build error on ghc <7.9 and transformers >=0.5.1.
       -- https://github.com/DanielSchuessler/logic-TPTP/pull/4
-      logic-TPTP >=0.4.4.0
-  -- logic-TPTP <=0.4.4.0 is not compatible with transformers-compat >=0.5
-  if flag(LogicTPTP045)
-    Build-Depends:
-      logic-TPTP >=0.4.5.0
-  else
-    if impl(ghc <7.9)
+      logic-TPTP >=0.4.4.0,
+      toysolver
+    -- logic-TPTP <=0.4.4.0 is not compatible with transformers-compat >=0.5
+    if flag(LogicTPTP045)
       Build-Depends:
-        transformers-compat <0.5
+        logic-TPTP >=0.4.5.0
+    else
+      if impl(ghc <7.9)
+        Build-Depends:
+          transformers-compat <0.5
   Default-Language: Haskell2010
   Other-Extensions: CPP
   GHC-Options: -rtsopts
@@ -482,8 +482,8 @@ Executable toyconvert
   HS-Source-Dirs: toyconvert
   Build-Depends:
     base,
-    filepath,
     data-default-class,
+    filepath,
     parse-dimacs,
     pseudo-boolean,
     toysolver
@@ -502,8 +502,8 @@ Executable sudoku
   Main-is: sudoku.hs
   HS-Source-Dirs: samples/programs/sudoku
   Build-Depends:
-    base,
     array,
+    base,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
@@ -518,8 +518,8 @@ Executable nonogram
   Main-is: nonogram.hs
   HS-Source-Dirs: samples/programs/nonogram
   Build-Depends:
-    base,
     array,
+    base,
     containers,
     toysolver
   Default-Language: Haskell2010
@@ -535,8 +535,8 @@ Executable nqueens
   Main-is: nqueens.hs
   HS-Source-Dirs: samples/programs/nqueens
   Build-Depends:
-    base,
     array,
+    base,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
@@ -570,8 +570,8 @@ Executable assign
     base,
     bytestring,
     containers,
-    vector,
-    toysolver
+    toysolver,
+    vector
   Default-Language: Haskell2010
   Other-Extensions: CPP
   if flag(ForceChar8)
@@ -619,8 +619,8 @@ Executable spsat
   Main-is: spsat.hs
   HS-Source-Dirs: samples/programs/spsat
   Build-Depends:
-    base,
     array,
+    base,
     mwc-random,
     toysolver
   Default-Language: Haskell2010
@@ -677,8 +677,8 @@ Executable maxsatverify
   Main-is: maxsatverify.hs
   HS-Source-Dirs: maxsatverify
   Build-Depends:
-    base,
     array,
+    base,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
@@ -693,8 +693,8 @@ Executable pbverify
     Buildable: False
   HS-Source-Dirs: pbverify
   Build-Depends:
-    base,
     array,
+    base,
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
@@ -713,14 +713,14 @@ Test-suite TestPolynomial
   Build-depends:
     base,
     containers,
-    toysolver,
+    data-interval,
+    finite-field >=0.7.0 && <1.0.0,
+    prettyclass >=1.0.0,
     tasty >=0.10.1,
     tasty-hunit ==0.9.*,
     tasty-quickcheck ==0.8.*,
     tasty-th,
-    data-interval,
-    finite-field >=0.7.0 && <1.0.0,
-    prettyclass >=1.0.0
+    toysolver
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell
 
@@ -758,30 +758,30 @@ Test-suite TestSuite
     Smtlib.Syntax.Syntax,
     Smtlib.Syntax.ShowSL
   Build-depends:
-    base,
     array,
+    base,
     containers,
     data-default-class,
+    data-interval,
     deepseq,
     hashable,
     mtl,
     mwc-random,
+    OptDir,
     parse-dimacs,
     parsec,
     pseudo-boolean,
-    transformers,
-    transformers-compat,
-    unordered-containers,
-    vector,
-    vector-space,
-    toysolver,
-    data-interval,
-    OptDir,
+    QuickCheck >=2.5 && <3,
     tasty >=0.10.1,
     tasty-hunit ==0.9.*,
     tasty-quickcheck ==0.8.*,
     tasty-th,
-    QuickCheck >=2.5 && <3
+    toysolver,
+    transformers,
+    transformers-compat,
+    unordered-containers,
+    vector,
+    vector-space
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell, ScopedTypeVariables
 
@@ -790,12 +790,12 @@ Benchmark BenchmarkSATLIB
   hs-source-dirs:   benchmarks
   main-is:          BenchmarkSATLIB.hs
   build-depends:
-    base,
     array,
+    base,
+    criterion >=1.0 && <1.2,
     data-default-class,
     parse-dimacs,
-    toysolver,
-    criterion >=1.0 && <1.2
+    toysolver
   Default-Language: Haskell2010
 
 Benchmark BenchmarkKnapsack
@@ -804,8 +804,8 @@ Benchmark BenchmarkKnapsack
   main-is:          BenchmarkKnapsack.hs
   build-depends:
     base,
-    toysolver,
-    criterion >=1.0 && <1.2
+    criterion >=1.0 && <1.2,
+    toysolver
   Default-Language: Haskell2010
 
 Benchmark BenchmarkSubsetSum
@@ -814,7 +814,7 @@ Benchmark BenchmarkSubsetSum
   main-is:          BenchmarkSubsetSum.hs
   build-depends:
     base,
-    vector,
+    criterion >=1.0 && <1.2,
     toysolver,
-    criterion >=1.0 && <1.2
+    vector
   Default-Language: Haskell2010
