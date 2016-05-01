@@ -15,11 +15,17 @@ import Paths_toysolver
 packageVersions :: [(String, String)]
 packageVersions = sort $ tail
   [ (undefined, undefined) -- dummy
+#ifdef VERSION_OpenCL
+  , ("OpenCL",       VERSION_OpenCL       )
+#endif
 #ifdef VERSION_OptDir
   , ("OptDir",       VERSION_OptDir       )
 #endif
 #ifdef VERSION_array
   , ("array",        VERSION_array        )
+#endif
+#ifdef VERSION_attoparsec
+  , ("attoparsec",   VERSION_attoparsec   )
 #endif
 #ifdef VERSION_base
   , ("base",         VERSION_base         )
@@ -30,17 +36,26 @@ packageVersions = sort $ tail
 #ifdef VERSION_bytestring_builder
   , ("bytestring-builder",   VERSION_bytestring_builder   )
 #endif
+#ifdef VERSION_clock
+  , ("clock",        VERSION_clock   )
+#endif
 #ifdef VERSION_containers
   , ("containers",   VERSION_containers   )
 #endif
-#ifdef VERSION_data_interval
-  , ("data-interval", VERSION_data_interval)
+#ifdef VERSION_data_default
+  , ("data-default", VERSION_data_default )
 #endif
 #ifdef VERSION_data_default_class
   , ("data-default-class", VERSION_data_default_class)
 #endif
+#ifdef VERSION_data_interval
+  , ("data-interval", VERSION_data_interval)
+#endif
 #ifdef VERSION_deepseq
   , ("deepseq",      VERSION_deepseq      )
+#endif
+#ifdef VERSION_directory
+  , ("directory",    VERSION_directory    )
 #endif
 #ifdef VERSION_exceptions
   , ("exceptions",   VERSION_exceptions   )
@@ -56,6 +71,9 @@ packageVersions = sort $ tail
 #endif
 #ifdef VERSION_hashable
   , ("hashable",     VERSION_hashable     )
+#endif
+#ifdef VERSION_hashtable
+  , ("hashtable",    VERSION_hashtable     )
 #endif
 #ifdef VERSION_heaps
   , ("heaps",        VERSION_heaps        )
@@ -90,6 +108,9 @@ packageVersions = sort $ tail
 #ifdef VERSION_primes
   , ("primes",       VERSION_primes       )
 #endif
+#ifdef VERSION_primitive
+  , ("primitive",    VERSION_primitive    )
+#endif
 #ifdef VERSION_process
   , ("process",      VERSION_process      )
 #endif
@@ -108,17 +129,20 @@ packageVersions = sort $ tail
 #ifdef VERSION_stm
   , ("stm",          VERSION_stm          )
 #endif
-#ifdef VERSION_transformers
-  , ("transformers", VERSION_transformers )
-#endif
-#ifdef VERSION_transformers_compat
-  , ("transformers-compat", VERSION_transformers_compat)
+#ifdef VERSION_template_haskell
+  , ("template-haskell", VERSION_template_haskell)
 #endif
 #ifdef VERSION_temporary
   , ("temporary",    VERSION_temporary    )
 #endif
 #ifdef VERSION_time
   , ("time",         VERSION_time         )
+#endif
+#ifdef VERSION_transformers
+  , ("transformers", VERSION_transformers )
+#endif
+#ifdef VERSION_transformers_compat
+  , ("transformers-compat", VERSION_transformers_compat)
 #endif
 #ifdef VERSION_type_level_numbers
   , ("type-level-numbers", VERSION_type_level_numbers)
