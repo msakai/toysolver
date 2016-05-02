@@ -49,8 +49,8 @@ import Data.Maybe
 
 -- | Maximum cardinality bipartite matching.
 --
--- It returns a maximum cardinality matching M together with sets
--- on a directed graph of (A+B, {a→b|(a,b)∈M}∪{b→a|(a,b)⊆E\\M}).
+-- It returns a maximum cardinality matching M on a directed graph
+-- (A+B, E).
 maximumCardinalityMatching
   :: IntSet      -- ^ vertex set A
   -> IntSet      -- ^ vertex set B
@@ -75,7 +75,7 @@ type AugmentingPath = ([(Int,Int)], Int)
 --
 -- It returns a maximum cardinality matching M together with sets of
 -- vertexes reachable from exposed B vertexes (b∈B such that ∀a∈A. (a,b)∉M)
--- on a directed graph of (A∪B, {a→b|(a,b)∈M}∪{b→a|(a,b)⊆E\\M}).
+-- on a directed graph (A+B, {a→b|(a,b)∈M}∪{b→a|(a,b)⊆E\\M}).
 maximumCardinalityMatching'
   :: IntSet          -- ^ vertex set A
   -> IntSet          -- ^ vertex set B
