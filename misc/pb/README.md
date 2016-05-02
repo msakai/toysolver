@@ -4,9 +4,9 @@ Toysat submission for the Pseudo-Boolean Competition 2016
 Usage
 -----
 
-    toysat +RTS -H1G -MMEMLIMITm -K1G -RTS --pb --search=bcd2 file.opb
+    toysat +RTS -H1G -MMEMLIMITm -K1G -RTS --pb --search=bcd2 BENCHNAME
 
-    toysat +RTS -H1G -MMEMLIMITm -K1G -RTS --wbo --search=bcd2 file.wbo
+    toysat +RTS -H1G -MMEMLIMITm -K1G -RTS --wbo --search=bcd2 BENCHNAME
 
 Categories of benchmarks
 ------------------------
