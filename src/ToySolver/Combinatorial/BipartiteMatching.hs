@@ -33,6 +33,9 @@ module ToySolver.Combinatorial.BipartiteMatching
   , minimumWeightPerfectMatching
   , maximumWeightPerfectMatchingComplete
   , minimumWeightPerfectMatchingComplete
+
+  -- * Misc
+  , minimumCardinalityEdgeCover
   ) where
 
 import Control.Monad
@@ -43,6 +46,8 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Maybe
 
 -- -----------------------------------------------------------------------------
@@ -371,3 +376,28 @@ test_minimumWeightPerfectMatchingComplete = minimumWeightPerfectMatchingComplete
 
 -- -----------------------------------------------------------------------------
 
+-- | Minimum cardinality edge cover of bipartite graph (A+B, E).
+minimumCardinalityEdgeCover
+  :: IntSet      -- ^ vertex set A
+  -> IntSet      -- ^ vertex set B
+  -> [(Int,Int)] -- ^ edges E⊆A×B
+  -> Maybe (Set (Int,Int))
+minimumCardinalityEdgeCover as bs es
+  | IntMap.size ca /= IntSet.size as = Nothing
+  | IntMap.size cb /= IntSet.size bs = Nothing
+  | otherwise =
+      case maximumCardinalityMatching as bs es of
+        m -> 
+          let ma = IntMap.keysSet m
+              mb = IntSet.fromList $ IntMap.elems m
+              m2 = Set.unions
+                   [ Set.fromList (IntMap.toList m)
+                   , Set.fromList [(a,b) | a <- IntSet.toList (as `IntSet.difference` ma), let b = ca IntMap.! a]
+                   , Set.fromList [(a,b) | b <- IntSet.toList (bs `IntSet.difference` mb), let a = cb IntMap.! b]
+                   ]
+          in Just $ m2
+  where
+    ca = IntMap.fromList es
+    cb = IntMap.fromList [(b,a) | (a,b) <- es]
+
+-- -----------------------------------------------------------------------------

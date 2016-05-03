@@ -10,6 +10,8 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
+import Data.Set
+import qualified Data.Set as Set
 import ToySolver.Combinatorial.BipartiteMatching
 
 import Test.Tasty
@@ -38,6 +40,41 @@ prop_maximumWeightPerfectMatching =
             obj == F.sum ysA + F.sum ysB &&
             and [ya + yb >= w a b | (a,ya) <- IntMap.toList ysA, (b,yb) <- IntMap.toList ysB] &&
             IntMap.size m == n
+
+prop_minimumCardinalityEdgeCover =
+  forAll (arbitrarySmallIntSet 4) $ \as ->
+    forAll (arbitrarySmallIntSet 4) $ \bs ->
+      forAll (arbitrarySubsetOf [(a,b) | a <- IntSet.toList as, b <- IntSet.toList bs]) $ \es ->
+        let isEdgeCover cs =
+              IntSet.fromList [a | (a,_) <- Set.toList cs] == as &&
+              IntSet.fromList [b | (_,b) <- Set.toList cs] == bs
+        in case minimumCardinalityEdgeCover as bs es of
+             Nothing -> 
+               and [not (isEdgeCover cs') | cs' <- fmap Set.fromList $ subsetsOf es]
+             Just cs ->
+               isEdgeCover cs &&
+               and [not (isEdgeCover cs') || Set.size cs <= Set.size cs' | cs' <- fmap Set.fromList $ subsetsOf es]
+
+subsetsOf :: [a] -> [[a]]
+subsetsOf [] = [[]]
+subsetsOf (x:xs) = do
+  ys <- subsetsOf xs
+  [ys, x:ys]
+
+arbitrarySubsetOf :: [a] -> Gen [a]
+arbitrarySubsetOf [] = return []
+arbitrarySubsetOf (x:xs) = do
+  ys <- arbitrarySubsetOf xs
+  b <- arbitrary
+  if b then
+    return ys
+  else
+    return (x:ys)
+
+arbitrarySmallIntSet :: Int -> Gen IntSet
+arbitrarySmallIntSet maxCard = do
+  nX <- choose (0,maxCard)
+  liftM IntSet.fromList $ replicateM nX $ arbitrary
 
 arbitraryWeight :: (Arbitrary w) => IntSet -> IntSet -> Gen (Map (Int, Int) w)
 arbitraryWeight as bs =
