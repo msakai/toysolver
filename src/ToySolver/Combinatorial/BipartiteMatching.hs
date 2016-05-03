@@ -52,10 +52,7 @@ import Data.Maybe
 
 -- -----------------------------------------------------------------------------
 
--- | Maximum cardinality bipartite matching.
---
--- It returns a maximum cardinality matching M on a directed graph
--- (A+B, E).
+-- | Maximum cardinality matching on a bipartite graph (A+B, E).
 maximumCardinalityMatching
   :: IntSet      -- ^ vertex set A
   -> IntSet      -- ^ vertex set B
