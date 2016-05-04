@@ -44,8 +44,6 @@ import Data.IntMap.Strict (IntMap, (!))
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Maybe
@@ -58,8 +56,8 @@ maximumCardinalityMatching
   -> IntSet      -- ^ vertex set B
   -> [(Int,Int)] -- ^ set of edges E⊆A×B
   -> IntMap Int
-maximumCardinalityMatching as bs es = 
-  case maximumCardinalityMatching' as bs (\b -> IntMap.findWithDefault IntSet.empty b e_b2a) IntMap.empty of
+maximumCardinalityMatching _as bs es = 
+  case maximumCardinalityMatching' bs (\b -> IntMap.findWithDefault IntSet.empty b e_b2a) IntMap.empty of
     (m, _, _) -> m
   where
     e_b2a :: IntMap IntSet
@@ -79,12 +77,11 @@ type AugmentingPath = ([(Int,Int)], Int)
 -- vertexes reachable from exposed B vertexes (b∈B such that ∀a∈A. (a,b)∉M)
 -- on a directed graph (A+B, {a→b|(a,b)∈M}∪{b→a|(a,b)⊆E\\M}).
 maximumCardinalityMatching'
-  :: IntSet          -- ^ vertex set A
-  -> IntSet          -- ^ vertex set B
+  :: IntSet          -- ^ vertex set B
   -> (Int -> IntSet) -- ^ set of edges E⊆A×B represented as a mapping from B to 2^A.
   -> IntMap Int      -- ^ partial matching represented as an injective mapping from A to B
   -> (IntMap Int, IntSet, IntSet)
-maximumCardinalityMatching' as bs e_b2a m0 = loop m0 m0_b_exposed
+maximumCardinalityMatching' bs e_b2a m0 = loop m0 m0_b_exposed
   where
     m0_b_exposed = bs `IntSet.difference` IntSet.fromList (IntMap.elems m0)
 
@@ -237,7 +234,7 @@ minimumWeightPerfectMatchingComplete as bs w
       | IntMap.size m == n = (F.sum ysA + F.sum ysB, m, ys)
       | otherwise = loop m ys' g_eq'
       where
-        (m, l_a, l_b) = maximumCardinalityMatching' as bs (g_eq !) m_pre
+        (m, l_a, l_b) = maximumCardinalityMatching' bs (g_eq !) m_pre
         l_a' = as `IntSet.difference` l_a -- A \ L
 
         slack :: w
@@ -324,7 +321,7 @@ minimumWeightPerfectMatching as bs es
       | null slacks = Nothing
       | otherwise = loop m ys' g_eq'
       where
-        (m, l_a, l_b) = maximumCardinalityMatching' as bs (g_eq !) m_pre
+        (m, l_a, l_b) = maximumCardinalityMatching' bs (g_eq !) m_pre
 
         slacks :: [w]
         slacks = [w - (ysA!a + ysB!b) | b <- IntSet.toList l_b, (a,w) <- IntMap.toList (e_b2a ! b), a `IntSet.notMember` l_a]
