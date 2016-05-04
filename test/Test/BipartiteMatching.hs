@@ -53,6 +53,16 @@ prop_maximumWeightMatchingComplete =
   where
     isMatching m = IntSet.size (IntSet.fromList (IntMap.elems m)) == IntMap.size m
 
+case_minimumWeightPerfectMatchingComplete_1 = do
+  obj @?= 8
+  m @?= IntMap.fromList [(1,2), (3,4)]
+  where
+    (obj, m, _) = minimumWeightPerfectMatchingComplete as bs (\a b -> w Map.! (a,b))
+    as = IntSet.fromList [1,3]
+    bs = IntSet.fromList [2,4]
+    w :: Map (Int,Int) Int
+    w = Map.fromList [((1,2),5),((1,4),2),((3,2),9),((3,4),3)]
+
 prop_minimumWeightPerfectMatchingComplete =
   forAll (choose (0,10)) $ \n ->
     let as = IntSet.fromList [1..n]

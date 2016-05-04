@@ -119,13 +119,6 @@ maximumCardinalityMatching' as bs e_b2a m0 = loop m0 m0_b_exposed
                           | b2 `IntSet.member` visitedB -> loopA (IntSet.insert a visitedA) visitedB as currB nextB result
                           | otherwise -> loopA (IntSet.insert a visitedA) (IntSet.insert b2 visitedB) as currB ((b2, (a,b):d2, b0) : nextB) result
 
-test_maximumCardinalityMatching = maximumCardinalityMatching as bs es
-  where
-    as = IntSet.fromList [1..5] -- ['a'..'e']
-    bs :: IntSet
-    bs = IntSet.fromList [1..5]
-    es = [(a,b) | a <- IntSet.toList as, b <- IntSet.toList bs]
-
 -- -----------------------------------------------------------------------------
 
 -- | Maximum weight matching of a complete bipartite graph (A+B,A×B).
@@ -362,14 +355,6 @@ minimumWeightPerfectMatching as bs es
     equalityGraph (ysA,ysB) = IntMap.mapWithKey f e_b2a
       where
         f b xs = IntSet.fromAscList [a | (a,w) <- IntMap.toAscList xs, w == ysA!a + ysB!b]
-
-
-test_minimumWeightPerfectMatchingComplete = minimumWeightPerfectMatchingComplete as bs (\a b -> w Map.! (a,b))
-  where
-    as = IntSet.fromList [1,3]
-    bs = IntSet.fromList [2,4]
-    w :: Map (Int,Int) Int
-    w = Map.fromList [((1,2),5),((1,4),2),((3,2),9),((3,4),3)]
 
 -- -----------------------------------------------------------------------------
 
