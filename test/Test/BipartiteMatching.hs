@@ -141,6 +141,38 @@ prop_minimumCardinalityEdgeCover =
                isEdgeCover cs &&
                and [not (isEdgeCover cs') || Set.size cs <= Set.size cs' | cs' <- fmap Set.fromList $ subsetsOf es]
 
+prop_minimumWeightEdgeCover =
+  forAll (arbitrarySmallIntSet 4) $ \as ->
+    forAll (arbitrarySmallIntSet 4) $ \bs ->
+      forAll (arbitraryWeight' as bs) $ \(w :: Map (Int,Int) Rational) ->
+        let es = Map.keys w
+            isEdgeCover cs =
+              IntSet.fromList [a | (a,_) <- Set.toList cs] == as &&
+              IntSet.fromList [b | (_,b) <- Set.toList cs] == bs
+            obj cs = sum [w Map.! (a,b) | (a,b) <- Set.toList cs]
+        in case minimumWeightEdgeCover as bs [(a,b,w) | ((a,b),w) <- Map.toList w] of
+             Nothing ->
+               and [not (isEdgeCover cs') | cs' <- fmap Set.fromList $ subsetsOf es]
+             Just cs ->
+               isEdgeCover cs &&
+               and [not (isEdgeCover cs') || obj cs <= obj cs' | cs' <- fmap Set.fromList $ subsetsOf es]
+
+prop_minimumWeightEdgeCoverComplete =
+  forAll (arbitrarySmallIntSet 4) $ \as ->
+    forAll (arbitrarySmallIntSet 4) $ \bs ->
+      forAll (arbitraryWeight as bs) $ \(w :: Map (Int,Int) Rational) ->
+        let es = Map.keys w
+            isEdgeCover cs =
+              IntSet.fromList [a | (a,_) <- Set.toList cs] == as &&
+              IntSet.fromList [b | (_,b) <- Set.toList cs] == bs
+            obj cs = sum [w Map.! (a,b) | (a,b) <- Set.toList cs]
+        in case minimumWeightEdgeCoverComplete as bs (\a b -> w Map.! (a,b)) of
+             Nothing ->
+               and [not (isEdgeCover cs') | cs' <- fmap Set.fromList $ subsetsOf es]
+             Just cs ->
+               isEdgeCover cs &&
+               and [not (isEdgeCover cs') || obj cs <= obj cs' | cs' <- fmap Set.fromList $ subsetsOf es]
+
 allMatchings :: IntSet -> IntSet -> [(Int,Int)] -> [IntMap Int]
 allMatchings as bs es = loop (IntSet.toList as) IntSet.empty IntMap.empty
   where

@@ -36,6 +36,8 @@ module ToySolver.Combinatorial.BipartiteMatching
 
   -- * Misc
   , minimumCardinalityEdgeCover
+  , minimumWeightEdgeCover
+  , minimumWeightEdgeCoverComplete
   ) where
 
 import Control.Monad
@@ -378,5 +380,66 @@ minimumCardinalityEdgeCover as bs es
   where
     ca = IntMap.fromList es
     cb = IntMap.fromList [(b,a) | (a,b) <- es]
+
+-- | Minimum weight edge cover of bipartite graph (A+B, E).
+minimumWeightEdgeCover
+  :: forall w. (Real w)
+  => IntSet        -- ^ vertex set A
+  -> IntSet        -- ^ vertex set B
+  -> [(Int,Int,w)] -- ^ edges E⊆A×B and their weights
+  -> Maybe (Set (Int,Int))
+minimumWeightEdgeCover as bs es
+  | IntMap.size ca /= IntSet.size as = Nothing
+  | IntMap.size cb /= IntSet.size bs = Nothing
+  | otherwise =
+      case maximumWeightMatching as' bs' es' of
+        (_, m) ->
+          let ma = IntMap.keysSet m
+              mb = IntSet.fromList $ IntMap.elems m
+              m2 = Set.unions
+                   [ Set.fromList (IntMap.toList m)
+                   , Set.fromList [(a,b) | a <- IntSet.toList (as `IntSet.difference` ma), let (b,_) = ca IntMap.! a]
+                   , Set.fromList [(a,b) | b <- IntSet.toList (bs `IntSet.difference` mb), let (a,_) = cb IntMap.! b]
+                   , Set.fromList [(a,b) | (a,b,w) <- es, w < 0]
+                   ]
+          in Just m2
+  where
+    minOnSnd xw1@(_,w1) xw2@(_,w2) = if w1 <= w2 then xw1 else xw2
+    ca = IntMap.fromListWith minOnSnd [(a,(b,w)) | (a,b,w) <- es]
+    cb = IntMap.fromListWith minOnSnd [(b,(a,w)) | (a,b,w) <- es]
+    as' = IntSet.fromAscList [a | (a,(_,w)) <- IntMap.toAscList ca, w >= 0]
+    bs' = IntSet.fromAscList [b | (b,(_,w)) <- IntMap.toAscList cb, w >= 0]
+    es' = [(a, b, (snd (ca IntMap.! a) + snd (cb IntMap.! b)) - w) | (a,b,w) <- es, w >= 0]
+
+-- | Minimum weight edge cover of complete bipartite graph (A+B, A×B).
+minimumWeightEdgeCoverComplete
+  :: forall w. (Real w)
+  => IntSet            -- ^ vertex set A
+  -> IntSet            -- ^ vertex set B
+  -> (Int -> Int -> w) -- ^ weight of edges A×B
+  -> Maybe (Set (Int,Int))
+minimumWeightEdgeCoverComplete as bs w
+  | IntMap.size ca /= IntSet.size as = Nothing
+  | IntMap.size cb /= IntSet.size bs = Nothing
+  | otherwise =
+      case maximumWeightMatching as' bs' es' of
+        (_, m) ->
+          let ma = IntMap.keysSet m
+              mb = IntSet.fromList $ IntMap.elems m
+              m2 = Set.unions
+                   [ Set.fromList (IntMap.toList m)
+                   , Set.fromList [(a,b) | a <- IntSet.toList (as `IntSet.difference` ma), let (b,_) = ca IntMap.! a]
+                   , Set.fromList [(a,b) | b <- IntSet.toList (bs `IntSet.difference` mb), let (a,_) = cb IntMap.! b]
+                   , Set.fromList [(a,b) | a <- IntSet.toList as, b <- IntSet.toList bs, let w' = w a b, w' < 0]
+                   ]
+          in Just m2
+  where
+    minOnSnd xw1@(_,w1) xw2@(_,w2) = if w1 <= w2 then xw1 else xw2
+    ca = IntMap.fromListWith minOnSnd [(a, (b, w a b)) | a <- IntSet.toList as, b <- IntSet.toList bs]
+    cb = IntMap.fromListWith minOnSnd [(b, (a, w a b)) | a <- IntSet.toList as, b <- IntSet.toList bs]
+    as' = IntSet.fromAscList [a | (a,(_,w)) <- IntMap.toAscList ca, w >= 0]
+    bs' = IntSet.fromAscList [b | (b,(_,w)) <- IntMap.toAscList cb, w >= 0]
+    es' = [ (a, b, (snd (ca IntMap.! a) + snd (cb IntMap.! b)) - w')
+          | a <- IntSet.toList as, b <- IntSet.toList bs, let w' = w a b, w' >= 0 ]
 
 -- -----------------------------------------------------------------------------
