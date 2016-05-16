@@ -28,6 +28,7 @@ Extra-Source-Files:
    build_bdist_maxsat_evaluation.sh
    build_bdist_pb_evaluation.sh
    build_bdist_qbf_evaluation.sh
+   build_bdist_smtcomp.sh
    misc/maxsat/toysat/README.md
    misc/maxsat/toysat/toysat
    misc/maxsat/toysat_ls/README.md
