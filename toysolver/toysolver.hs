@@ -248,6 +248,7 @@ run solver opt mip printModel = do
       let nthreads = last (0 : [n | NThread n <- opt])
 
       Simplex2.setLogger solver putCommentLine
+      Simplex2.enableTimeRecording solver
       replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
       Simplex2.setOptDir solver $ MIP.objDir $ MIP.objectiveFunction mip
       Simplex2.setObj solver $ fromJust (LAFOL.fromFOLExpr obj)

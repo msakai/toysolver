@@ -197,6 +197,7 @@ Library
      ScopedTypeVariables
      TemplateHaskell
      TypeFamilies
+     TypeOperators
      TypeSynonymInstances
      -- commented out because cabal-1.16 does not understand InstanceSigs extension
      -- InstanceSigs
