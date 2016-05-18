@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ConstraintKinds, FlexibleContexts, GADTs, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleContexts, ScopedTypeVariables)
+-- Portability :  non-portable (CPP, ConstraintKinds, FlexibleContexts, GADTs, ScopedTypeVariables)
 --
 -- References:
 --
@@ -47,14 +47,21 @@ module ToySolver.Text.SDPFile
 
 import Control.Applicative ((<*))
 import Control.Monad
-import Data.Functor.Identity
+import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as BL
 import Data.List (intersperse)
 import Data.Ratio
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
-import Text.Parsec
-import qualified Text.Parsec.ByteString.Lazy as ParsecBL
+import Text.Megaparsec
+import Text.Megaparsec.Prim (MonadParsec ())
+
+#if MIN_VERSION_megaparsec(5,0,0)
+type C e s m = (MonadParsec e s m, Token s ~ Char)
+#else
+type C e s m = (MonadParsec s m Char)
+#endif
 
 -- ---------------------------------------------------------------------------
 -- problem description
@@ -105,22 +112,42 @@ diagBlock xs = Map.fromList [((i,i),x) | (i,x) <- zip [1..] xs]
 -- ---------------------------------------------------------------------------
 
 -- | Parse a SDPA format (.dat) string.
-parseDataString :: Stream s Identity Char => SourceName -> s -> Either ParseError Problem
+#if MIN_VERSION_megaparsec(5,0,0)
+parseDataString :: (Stream s, Token s ~ Char) => String -> s -> Either (ParseError Char Dec) Problem
+#else
+parseDataString :: Stream s Char => String -> s -> Either ParseError Problem
+#endif
 parseDataString = parse (pDataFile <* eof)
 
 -- | Parse a SDPA format file (.dat).
+#if MIN_VERSION_megaparsec(5,0,0)
+parseDataFile :: FilePath -> IO (Either (ParseError Char Dec) Problem)
+#else
 parseDataFile :: FilePath -> IO (Either ParseError Problem)
-parseDataFile = ParsecBL.parseFromFile (pDataFile <* eof)
+#endif
+parseDataFile fname = do
+  s <- BL.readFile fname
+  return $! parse (pDataFile <* eof) fname s
 
 -- | Parse a SDPA sparse format (.dat-s) string.
-parseSparseDataString :: Stream s Identity Char => SourceName -> s -> Either ParseError Problem
+#if MIN_VERSION_megaparsec(5,0,0)
+parseSparseDataString :: (Stream s, Token s ~ Char) => String -> s -> Either (ParseError Char Dec) Problem
+#else
+parseSparseDataString :: Stream s Char => String -> s -> Either ParseError Problem
+#endif
 parseSparseDataString = parse (pSparseDataFile <* eof)
 
 -- | Parse a SDPA sparse format file (.dat-s).
+#if MIN_VERSION_megaparsec(5,0,0)
+parseSparseDataFile :: FilePath -> IO (Either (ParseError Char Dec) Problem)
+#else
 parseSparseDataFile :: FilePath -> IO (Either ParseError Problem)
-parseSparseDataFile = ParsecBL.parseFromFile (pSparseDataFile <* eof)
+#endif
+parseSparseDataFile fname = do
+  s <- BL.readFile fname
+  return $! parse (pSparseDataFile <* eof) fname s
 
-pDataFile :: Stream s m Char => ParsecT s u m Problem
+pDataFile :: C e s m => m Problem
 pDataFile = do
   _ <- many pComment
   m  <- nat_line -- mDim
@@ -128,7 +155,7 @@ pDataFile = do
   bs <- pBlockStruct -- bLOCKsTRUCT
   cs <- pCosts
   ms <- pDenseMatrices (fromIntegral m) bs
-  spaces
+  space
   return $
     Problem
     { blockStruct = bs
@@ -136,7 +163,7 @@ pDataFile = do
     , matrices    = ms
     }
 
-pSparseDataFile :: Stream s m Char => ParsecT s u m Problem
+pSparseDataFile :: C e s m => m Problem
 pSparseDataFile = do
   _ <- many pComment
   m  <- nat_line -- mDim
@@ -144,7 +171,7 @@ pSparseDataFile = do
   bs <- pBlockStruct -- bLOCKsTRUCT
   cs <- pCosts
   ms <- pSparseMatrices (fromIntegral m) bs
-  spaces
+  space
   return $
     Problem
     { blockStruct = bs
@@ -152,13 +179,13 @@ pSparseDataFile = do
     , matrices    = ms
     }
 
-pComment :: Stream s m Char => ParsecT s u m String
+pComment :: C e s m => m String
 pComment = do
   c <- oneOf "*\""
   cs <- manyTill anyChar newline
   return (c:cs)
 
-pBlockStruct :: Stream s m Char => ParsecT s u m [Int]
+pBlockStruct :: C e s m => m [Int]
 pBlockStruct = do
   optional sep
   let int' = int >>= \i -> optional sep >> return i
@@ -166,21 +193,21 @@ pBlockStruct = do
   _ <- manyTill anyChar newline
   return $ map fromIntegral xs 
   where
-    sep = many1 (oneOf " \t(){},")
+    sep = some (oneOf " \t(){},")
 
-pCosts :: Stream s m Char => ParsecT s u m [Rational]
+pCosts :: C e s m => m [Rational]
 pCosts = do
-  let sep = many1 (oneOf " \t(){},")
+  let sep = some (oneOf " \t(){},")
       real' = real >>= \r -> optional sep >> return r
   optional sep
   cs <- many real'
   _ <- newline
   return cs
 
-pDenseMatrices :: Stream s m Char => Int -> [Int] -> ParsecT s u m [Matrix]
+pDenseMatrices :: C e s m => Int -> [Int] -> m [Matrix]
 pDenseMatrices m bs = optional sep >> replicateM (fromIntegral m + 1) pDenceMatrix
   where
-    sep = many1 (space <|> oneOf "(){},")
+    sep = some ((spaceChar >> return ()) <|> (oneOf "(){}," >> return ()))
     real' = real >>= \r -> optional sep >> return r
     pDenceMatrix = forM bs $ \b ->
       if b >= 0
@@ -191,7 +218,7 @@ pDenseMatrices m bs = optional sep >> replicateM (fromIntegral m + 1) pDenceMatr
         xs <- replicateM (abs b) real'
         return $ diagBlock xs
 
-pSparseMatrices :: Stream s m Char => Int -> [Int] -> ParsecT s u m [Matrix]
+pSparseMatrices :: C e s m => Int -> [Int] -> m [Matrix]
 pSparseMatrices m bs = do
   xs <- many pLine
   let t = IntMap.unionsWith (IntMap.unionWith Map.union)
@@ -203,7 +230,7 @@ pSparseMatrices m bs = do
     ]
 
   where
-    sep = many1 (oneOf " \t") >> return ()
+    sep = some (oneOf " \t") >> return ()
     pLine = do
       optional sep
       matno <- nat
@@ -219,25 +246,25 @@ pSparseMatrices m bs = do
       _ <- newline
       return (fromIntegral matno, fromIntegral blkno, fromIntegral i, fromIntegral j, e)
 
-nat_line :: Stream s m Char => ParsecT s u m Integer
+nat_line :: C e s m => m Integer
 nat_line = do
-  spaces
+  space
   n <- nat
   _ <- manyTill anyChar newline
   return n
 
-nat :: Stream s m Char => ParsecT s u m Integer
+nat :: C e s m => m Integer
 nat = do
-  ds <- many1 digit
+  ds <- some digitChar
   return $! read ds
 
-int :: Stream s m Char => ParsecT s u m Integer
+int :: C e s m => m Integer
 int = do
   s <- option 1 sign
   n <- nat
   return $! s * n
 
-real :: forall s u m. Stream s m Char => ParsecT s u m Rational
+real :: forall e s m. C e s m => m Rational
 real = do
   s <- option 1 sign 
   b <- (do{ x <- nat; y <- option 0 frac; return (fromInteger x + y) })
@@ -245,15 +272,15 @@ real = do
   c <- option 0 e
   return (s * b*10^^c)
   where
-    digits = many1 digit
+    digits = some digitChar
 
-    frac :: ParsecT s u m Rational
+    frac :: m Rational
     frac = do
       _ <- char '.'
       s <- digits
       return (read s % 10^(length s))
 
-    e :: ParsecT s u m Integer
+    e :: m Integer
     e = do
       _ <- oneOf "eE"
       f <- msum [ char '+' >> return id
@@ -262,7 +289,7 @@ real = do
                 ]
       liftM f nat
 
-sign :: Num a => Stream s m Char => ParsecT s u m a
+sign :: Num a => C e s m => m a
 sign = (char '+' >> return 1) <|> (char '-' >> return (-1))
 
 -- ---------------------------------------------------------------------------

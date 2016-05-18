@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, OverloadedStrings, FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE ConstraintKinds, CPP, TypeFamilies, OverloadedStrings, FlexibleContexts, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeFamilies, OverloadedStrings, FlexibleContexts, ScopedTypeVariables)
+-- Portability :  non-portable (ConstraintKinds, CPP, TypeFamilies, OverloadedStrings, FlexibleContexts, ScopedTypeVariables)
 --
 -- A .mps format parser library.
 -- 
@@ -34,7 +34,6 @@ import Control.Applicative ((<$>), (<*))
 import Control.Monad
 import Control.Monad.Writer
 import Data.Default.Class
-import Data.Functor.Identity
 import Data.Maybe
 import Data.Monoid
 import Data.Set (Set)
@@ -51,8 +50,9 @@ import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as B
 import qualified Data.Text.Lazy.IO as TLIO
 import System.IO
-import qualified Text.Parsec as P
-import Text.Parsec hiding (spaces, newline, Column)
+import qualified Text.Megaparsec as P
+import Text.Megaparsec hiding (string', newline)
+import Text.Megaparsec.Prim (MonadParsec ())
 
 import Data.OptDir
 import qualified ToySolver.Data.MIP.Base as MIP
@@ -77,13 +77,27 @@ data BoundType
 
 -- ---------------------------------------------------------------------------
 
+#if MIN_VERSION_megaparsec(5,0,0)
+type C e s m = (MonadParsec e s m, Token s ~ Char)
+#else
+type C e s m = (MonadParsec s m Char)
+#endif
+
 -- | Parse a string containing MPS file data.
 -- The source name is only | used in error messages and may be the empty string.
-parseString :: Stream s Identity Char => MIP.FileOptions -> SourceName -> s -> Either ParseError MIP.Problem
+#if MIN_VERSION_megaparsec(5,0,0)
+parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError Char Dec) MIP.Problem
+#else
+parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError MIP.Problem
+#endif
 parseString _ = parse (parser <* eof)
 
 -- | Parse a file containing MPS file data.
+#if MIN_VERSION_megaparsec(5,0,0)
+parseFile :: MIP.FileOptions -> FilePath -> IO (Either (ParseError Char Dec) MIP.Problem)
+#else
 parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError MIP.Problem)
+#endif
 parseFile opt fname = do
   h <- openFile fname ReadMode
   case MIP.optFileEncoding opt of
@@ -93,70 +107,70 @@ parseFile opt fname = do
 
 -- ---------------------------------------------------------------------------
 
-space' :: Stream s m Char => ParsecT s u m Char
+space' :: C e s m => m Char
 space' = oneOf [' ', '\t']
 
-spaces' :: Stream s m Char => ParsecT s u m ()
+spaces' :: C e s m => m ()
 spaces' = skipMany space'
 
-spaces1' :: Stream s m Char => ParsecT s u m ()
-spaces1' = skipMany1 space'
+spaces1' :: C e s m => m ()
+spaces1' = skipSome space'
 
-commentline :: Stream s m Char => ParsecT s u m ()
+commentline :: C e s m => m ()
 commentline = do
   _ <- char '*'
   _ <- manyTill anyChar P.newline
   return ()
 
-newline' :: Stream s m Char => ParsecT s u m ()
+newline' :: C e s m => m ()
 newline' = do
   spaces'
   _ <- P.newline
   skipMany commentline
   return ()
 
-tok :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
+tok :: C e s m => m a -> m a
 tok p = do
   x <- p
   msum [eof, lookAhead (char '\n' >> return ()), spaces1']
   return x
 
-row :: Stream s m Char => ParsecT s u m Row
+row :: C e s m => m Row
 row = liftM intern ident
 
-column :: Stream s m Char => ParsecT s u m Column
+column :: C e s m => m Column
 column = liftM intern $ ident
 
-ident :: Stream s m Char => ParsecT s u m T.Text
-ident = liftM fromString $ tok $ many1 $ noneOf [' ', '\t', '\n']
+ident :: C e s m => m T.Text
+ident = liftM fromString $ tok $ some $ noneOf [' ', '\t', '\n']
 
-stringLn :: Stream s m Char => String -> ParsecT s u m ()
+stringLn :: C e s m => String -> m ()
 stringLn s = string s >> newline'
 
-sign :: (Stream s m Char, Num a) => ParsecT s u m a
+sign :: (C e s m, Num a) => m a
 sign = (char '+' >> return 1) <|> (char '-' >> return (-1))
 
-number :: forall s m u. Stream s m Char => ParsecT s u m Rational
+number :: forall e s m. C e s m => m Rational
 number = tok $ do
   b <- (do{ s <- option 1 sign; x <- nat; y <- option 0 frac; return (s * (fromInteger x + y)) })
     <|> frac
   c <- option 0 e
   return (b*10^^c)
   where
-    digits = many1 digit
+    digits = some digitChar
 
-    nat :: ParsecT s u m Integer
+    nat :: m Integer
     nat = liftM readUnsignedInteger digits
 
-    frac :: ParsecT s u m Rational
+    frac :: m Rational
     frac = do
       char '.'
       s <- digits
       return (readUnsignedInteger s % 10^(length s))
 
-    e :: ParsecT s u m Integer
+    e :: m Integer
     e = do
-      oneOf "eE"
+      oneOf ("eE" :: [Char])
       f <- msum [ char '+' >> return id
                 , char '-' >> return negate
                 , return id
@@ -166,7 +180,11 @@ number = tok $ do
 -- ---------------------------------------------------------------------------
 
 -- | MPS file parser
-parser :: Stream s m Char => ParsecT s u m MIP.Problem
+#if MIN_VERSION_megaparsec(5,0,0)
+parser :: (MonadParsec e s m, Token s ~ Char) => m MIP.Problem
+#else
+parser :: MonadParsec s m Char => m MIP.Problem
+#endif
 parser = do
   many commentline
 
@@ -175,8 +193,8 @@ parser = do
   -- http://pic.dhe.ibm.com/infocenter/cosinfoc/v12r4/topic/ilog.odms.cplex.help/CPLEX/File_formats_reference/topics/MPS_ext_objsen.html
   -- CPLEX extends the MPS standard by allowing two additional sections: OBJSEN and OBJNAME.
   -- If these options are used, they must appear in order and as the first and second sections after the NAME section. 
-  objsense <- optionMaybe $ objSenseSection
-  objname  <- optionMaybe $ objNameSection
+  objsense <- optional $ objSenseSection
+  objname  <- optional $ objNameSection
 
   rows <- rowsSection
 
@@ -210,7 +228,7 @@ parser = do
   inds <- option Map.empty indicatorsSection
 
   string "ENDATA"
-  P.spaces
+  P.space
 
   let objrow =
         case objname of
@@ -352,16 +370,16 @@ parser = do
 
   return mip
 
-nameSection :: Stream s m Char => ParsecT s u m (Maybe T.Text)
+nameSection :: C e s m => m (Maybe T.Text)
 nameSection = do
   string "NAME"
-  n <- optionMaybe $ try $ do
+  n <- optional $ try $ do
     spaces1'
     ident
   newline'
   return n
 
-objSenseSection :: Stream s m Char => ParsecT s u m OptDir
+objSenseSection :: C e s m => m OptDir
 objSenseSection = do
   try $ stringLn "OBJSENSE"
   spaces1'
@@ -369,7 +387,7 @@ objSenseSection = do
     <|> (stringLn "MIN" >> return OptMin)
   return d
 
-objNameSection :: Stream s m Char => ParsecT s u m T.Text
+objNameSection :: C e s m => m T.Text
 objNameSection = do
   try $ stringLn "OBJNAME"
   spaces1'
@@ -377,22 +395,22 @@ objNameSection = do
   newline'
   return name
 
-rowsSection :: Stream s m Char => ParsecT s u m [(Maybe MIP.RelOp, Row)]
+rowsSection :: C e s m => m [(Maybe MIP.RelOp, Row)]
 rowsSection = do
   try $ stringLn "ROWS"
   rowsBody
 
-userCutsSection :: Stream s m Char => ParsecT s u m [(Maybe MIP.RelOp, Row)]
+userCutsSection :: C e s m => m [(Maybe MIP.RelOp, Row)]
 userCutsSection = do
   try $ stringLn "USERCUTS"
   rowsBody
 
-lazyConsSection :: Stream s m Char => ParsecT s u m [(Maybe MIP.RelOp, Row)]
+lazyConsSection :: C e s m => m [(Maybe MIP.RelOp, Row)]
 lazyConsSection = do
   try $ stringLn "LAZYCONS"
   rowsBody
 
-rowsBody :: Stream s m Char => ParsecT s u m [(Maybe MIP.RelOp, Row)]
+rowsBody :: C e s m => m [(Maybe MIP.RelOp, Row)]
 rowsBody = many $ do
   spaces1'
   op <- msum
@@ -406,12 +424,12 @@ rowsBody = many $ do
   newline'
   return (op, name)
 
-colsSection :: forall s m u. Stream s m Char => ParsecT s u m (Map Column (Map Row Rational), Set Column)
+colsSection :: forall e s m. C e s m => m (Map Column (Map Row Rational), Set Column)
 colsSection = do
   try $ stringLn "COLUMNS"
   body False Map.empty Set.empty
   where
-    body :: Bool -> Map Column (Map Row Rational) -> Set Column -> ParsecT s u m (Map Column (Map Row Rational), Set Column)
+    body :: Bool -> Map Column (Map Row Rational) -> Set Column -> m (Map Column (Map Row Rational), Set Column)
     body isInt rs ivs = msum
       [ do _ <- spaces1'
            x <- ident
@@ -426,7 +444,7 @@ colsSection = do
       , return (rs, ivs)
       ]
 
-    intMarker :: ParsecT s u m Bool
+    intMarker :: m Bool
     intMarker = do
       string "'MARKER'"
       spaces1'
@@ -435,23 +453,23 @@ colsSection = do
       newline'
       return b
 
-    entry :: T.Text -> ParsecT s u m (Column, Map Row Rational)
+    entry :: T.Text -> m (Column, Map Row Rational)
     entry x = do
       let col = intern x
       rv1 <- rowAndVal
-      opt <- optionMaybe rowAndVal
+      opt <- optional rowAndVal
       newline'
       case opt of
         Nothing -> return (col, rv1)
         Just rv2 ->  return (col, Map.union rv1 rv2)
 
-rowAndVal :: Stream s m Char => ParsecT s u m (Map Row Rational)
+rowAndVal :: C e s m => m (Map Row Rational)
 rowAndVal = do
   r <- row
   val <- number
   return $ Map.singleton r val
 
-rhsSection :: Stream s m Char => ParsecT s u m (Map Row Rational)
+rhsSection :: C e s m => m (Map Row Rational)
 rhsSection = do
   try $ stringLn "RHS"
   liftM Map.unions $ many entry
@@ -460,13 +478,13 @@ rhsSection = do
       spaces1'
       _name <- ident
       rv1 <- rowAndVal
-      opt <- optionMaybe rowAndVal
+      opt <- optional rowAndVal
       newline'
       case opt of
         Nothing  -> return rv1
         Just rv2 -> return $ Map.union rv1 rv2
 
-rangesSection :: Stream s m Char => ParsecT s u m (Map Row Rational)
+rangesSection :: C e s m => m (Map Row Rational)
 rangesSection = do
   try $ stringLn "RANGES"
   liftM Map.unions $ many entry
@@ -475,13 +493,13 @@ rangesSection = do
       spaces1'
       _name <- ident
       rv1 <- rowAndVal
-      opt <- optionMaybe rowAndVal
+      opt <- optional rowAndVal
       newline'
       case opt of
         Nothing  -> return rv1
         Just rv2 -> return $ Map.union rv1 rv2
 
-boundsSection :: Stream s m Char => ParsecT s u m [(BoundType, Column, Rational)]
+boundsSection :: C e s m => m [(BoundType, Column, Rational)]
 boundsSection = do
   try $ stringLn "BOUNDS"
   many entry
@@ -497,11 +515,11 @@ boundsSection = do
       newline'
       return (typ, col, val)
 
-boundType :: Stream s m Char => ParsecT s u m BoundType
+boundType :: C e s m => m BoundType
 boundType = tok $ do
   msum [try (string (show k)) >> return k | k <- [minBound..maxBound]]
 
-sosSection :: forall s m u. Stream s m Char => ParsecT s u m [MIP.SOSConstraint]
+sosSection :: forall e s m. C e s m => m [MIP.SOSConstraint]
 sosSection = do
   try $ stringLn "SOS"
   many entry
@@ -516,7 +534,7 @@ sosSection = do
       xs <- many (try identAndVal)
       return $ MIP.SOSConstraint{ MIP.sosLabel = Just name, MIP.sosType = typ, MIP.sosBody = xs }
 
-    identAndVal :: ParsecT s u m (Column, Rational)
+    identAndVal :: m (Column, Rational)
     identAndVal = do
       spaces1'
       col <- column
@@ -524,7 +542,7 @@ sosSection = do
       newline'
       return (col, val)
 
-quadObjSection :: Stream s m Char => ParsecT s u m [MIP.Term]
+quadObjSection :: C e s m => m [MIP.Term]
 quadObjSection = do
   try $ stringLn "QUADOBJ"
   many entry
@@ -537,7 +555,7 @@ quadObjSection = do
       newline'
       return $ MIP.Term (if col1 /= col2 then val else val / 2) [col1, col2]
 
-qMatrixSection :: Stream s m Char => ParsecT s u m [MIP.Term]
+qMatrixSection :: C e s m => m [MIP.Term]
 qMatrixSection = do
   try $ stringLn "QMATRIX"
   many entry
@@ -550,7 +568,7 @@ qMatrixSection = do
       newline'
       return $ MIP.Term (val / 2) [col1, col2]
 
-qcMatrixSection :: Stream s m Char => ParsecT s u m (Row, [MIP.Term])
+qcMatrixSection :: C e s m => m (Row, [MIP.Term])
 qcMatrixSection = do
   try $ string "QCMATRIX"
   spaces1'
@@ -567,7 +585,7 @@ qcMatrixSection = do
       newline'
       return $ MIP.Term val [col1, col2]
 
-indicatorsSection :: Stream s m Char => ParsecT s u m (Map Row (Column, Rational))
+indicatorsSection :: C e s m => m (Map Row (Column, Rational))
 indicatorsSection = do
   try $ stringLn "INDICATORS"
   liftM Map.fromList $ many entry

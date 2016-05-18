@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 module UBCSAT
@@ -19,8 +20,8 @@ import System.Directory
 import System.IO
 import System.IO.Temp
 import System.Process
-import Text.Parsec hiding (try)
-import Text.Parsec.String
+import Text.Megaparsec hiding (try)
+import Text.Megaparsec.String
 
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.MaxSAT as MaxSAT
@@ -130,12 +131,12 @@ scanSolutions nv s = rights $ map (parse (solution nv) "") $ lines s
 
 solution :: Int -> Parser (Integer, SAT.Model)
 solution nv = do
-  skipMany1 digit
-  spaces
+  skipSome digitChar
+  space
   _ <- char '0' <|> char '1'
-  spaces
-  obj <- liftM read $ many1 digit
-  spaces
+  space
+  obj <- liftM read $ some digitChar
+  space
   values <- many ((char '0' >> return False) <|> (char '1' >> return True))
   let m = array (1, nv) (zip [1..] values)
   return (obj, m)

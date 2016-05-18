@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.MIP
@@ -32,14 +33,18 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.IO as TLIO
 import System.FilePath (takeExtension)
 import System.IO hiding (readFile, writeFile)
-import Text.Parsec
+import Text.Megaparsec
 
 import ToySolver.Data.MIP.Base
 import qualified ToySolver.Data.MIP.LPFile as LPFile
 import qualified ToySolver.Data.MIP.MPSFile as MPSFile
 
 -- | Parse .lp or .mps file based on file extension
+#if MIN_VERSION_megaparsec(5,0,0)
+readFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) Problem)
+#else
 readFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+#endif
 readFile opt fname =
   case map toLower (takeExtension fname) of
     ".lp"  -> readLPFile opt fname
@@ -47,19 +52,35 @@ readFile opt fname =
     ext -> ioError $ userError $ "unknown extension: " ++ ext
 
 -- | Parse a file containing LP file data.
+#if MIN_VERSION_megaparsec(5,0,0)
+readLPFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) Problem)
+#else
 readLPFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+#endif
 readLPFile = LPFile.parseFile
 
 -- | Parse a file containing MPS file data.
+#if MIN_VERSION_megaparsec(5,0,0)
+readMPSFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) Problem)
+#else
 readMPSFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+#endif
 readMPSFile = MPSFile.parseFile
 
 -- | Parse a string containing LP file data.
-parseLPString :: FileOptions -> SourceName -> String -> Either ParseError Problem
+#if MIN_VERSION_megaparsec(5,0,0)
+parseLPString :: FileOptions -> String -> String -> Either (ParseError Char Dec) Problem
+#else
+parseLPString :: FileOptions -> String -> String -> Either ParseError Problem
+#endif
 parseLPString = LPFile.parseString
 
 -- | Parse a string containing MPS file data.
-parseMPSString :: FileOptions -> SourceName -> String -> Either ParseError Problem
+#if MIN_VERSION_megaparsec(5,0,0)
+parseMPSString :: FileOptions -> String -> String -> Either (ParseError Char Dec) Problem
+#else
+parseMPSString :: FileOptions -> String -> String -> Either ParseError Problem
+#endif
 parseMPSString = MPSFile.parseString
 
 writeFile :: FileOptions -> FilePath -> Problem -> IO ()
