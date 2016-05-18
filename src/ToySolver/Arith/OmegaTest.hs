@@ -40,11 +40,11 @@ module ToySolver.Arith.OmegaTest
     ) where
 
 import Control.Monad
+import Control.Monad.ST
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Maybe
 import qualified Data.Set as Set
-import System.IO.Unsafe
 
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Data.Polynomial as P
@@ -69,7 +69,7 @@ checkRealByVS :: VarSet -> [LA.Atom Rational] -> Bool
 checkRealByVS vs as = isJust $ VS.solve vs as
 
 checkRealBySimplex :: VarSet -> [LA.Atom Rational] -> Bool
-checkRealBySimplex vs as = unsafePerformIO $ do
+checkRealBySimplex vs as = runST $ do
   solver <- Simplex2.newSolver
   s <- liftM IM.fromAscList $ forM (IS.toAscList vs) $ \v -> do
     v2 <- Simplex2.newVar solver
