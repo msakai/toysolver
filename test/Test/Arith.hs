@@ -35,6 +35,7 @@ import qualified ToySolver.Arith.OmegaTest.Base as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.Simplex2 as Simplex2
+import qualified ToySolver.Arith.Simplex2.Simple as Simplex2Simple
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
 import qualified ToySolver.Arith.VirtualSubstitution as VirtualSubstitution
 
@@ -392,38 +393,18 @@ case_Cooper_test2 =
 ------------------------------------------------------------------------
     
 prop_Simplex2_solve :: Property
-prop_Simplex2_solve = QM.monadicIO $ do
-   (vs,cs) <- QM.pick genQFLAConj
-   join $ QM.run $ do
-     solver <- Simplex2.newSolver
-     m <- liftM IM.fromList $ forM (IS.toList vs) $ \v -> do
-       v2 <- Simplex2.newVar solver
-       return (v, LA.var v2)
-     let cs' = map (LA.applySubstAtom m) cs
-     forM_ cs' $ \c -> do
-       Simplex2.assertAtomEx solver c
-     ret <- Simplex2.check solver
-     if ret then do
-       m <- Simplex2.getModel solver
-       return $ forM_ cs' $ \c -> QM.assert (LA.evalAtom m c)
-     else do
-       return $ return ()
+prop_Simplex2_solve = forAll genQFLAConj $ \(vs,cs) -> do
+  case Simplex2Simple.check vs cs of
+    Nothing -> True
+    Just m -> all (LA.evalAtom m) cs
 
 case_Simplex2_test1 :: Assertion
-case_Simplex2_test1 = do
-  solver <- Simplex2.newSolver
-  forM_ (IS.toList (fst test1')) $ \_ -> Simplex2.newVar solver
-  mapM_ (Simplex2.assertAtomEx solver) (snd test1')
-  ret <- Simplex2.check solver
-  ret @?= True
+case_Simplex2_test1 =
+  isJust (uncurry Simplex2Simple.check test1') @?= True
 
 case_Simplex2_test2 :: Assertion
 case_Simplex2_test2 = do
-  solver <- Simplex2.newSolver
-  forM_ (IS.toList (fst test2')) $ \_ -> Simplex2.newVar solver
-  mapM_ (Simplex2.assertAtomEx solver) (snd test2')
-  ret <- Simplex2.check solver
-  ret @?= True
+  isJust (uncurry Simplex2Simple.check test2') @?= True
 
 prop_Simplex2_backtrack :: Property
 prop_Simplex2_backtrack = QM.monadicIO $ do
