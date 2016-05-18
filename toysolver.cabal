@@ -226,6 +226,7 @@ Library
      ToySolver.Arith.OmegaTest.Base
      ToySolver.Arith.Simplex
      ToySolver.Arith.Simplex2
+     ToySolver.Arith.Simplex2.Simple
      ToySolver.Arith.VirtualSubstitution
      ToySolver.BellmanFord
      ToySolver.EUF.CongruenceClosure
