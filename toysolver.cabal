@@ -753,6 +753,7 @@ Test-suite TestSuite
     Test.Simplex2
     Test.SMT
     Test.SMTLIB2Solver
+    Test.Smtlib
     Test.SubsetSum
     Smtlib.Parsers.CommonParsers,
     Smtlib.Parsers.ResponseParsers,
