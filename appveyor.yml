@@ -1,4 +1,6 @@
 install:
+- git submodule init
+- git submodule update
 - ps: |
     choco install haskellplatform -version 2014.2.0.0 -y
     # Haskell Platfrom package doesn't update PATH for the current shell instance
