@@ -19,7 +19,8 @@ import System.Directory
 import System.IO
 import System.IO.Temp
 import System.Process
-import Text.ParserCombinators.Parsec hiding (try)
+import Text.Parsec hiding (try)
+import Text.Parsec.String
 
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.MaxSAT as MaxSAT
