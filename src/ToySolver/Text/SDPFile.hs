@@ -54,7 +54,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import Text.Parsec
-import Text.Parsec.String
+import qualified Text.Parsec.ByteString.Lazy as ParsecBL
 
 -- ---------------------------------------------------------------------------
 -- problem description
@@ -110,7 +110,7 @@ parseDataString = parse (pDataFile <* eof)
 
 -- | Parse a SDPA format file (.dat).
 parseDataFile :: FilePath -> IO (Either ParseError Problem)
-parseDataFile = parseFromFile (pDataFile <* eof)
+parseDataFile = ParsecBL.parseFromFile (pDataFile <* eof)
 
 -- | Parse a SDPA sparse format (.dat-s) string.
 parseSparseDataString :: Stream s Identity Char => SourceName -> s -> Either ParseError Problem
@@ -118,7 +118,7 @@ parseSparseDataString = parse (pSparseDataFile <* eof)
 
 -- | Parse a SDPA sparse format file (.dat-s).
 parseSparseDataFile :: FilePath -> IO (Either ParseError Problem)
-parseSparseDataFile = parseFromFile (pSparseDataFile <* eof)
+parseSparseDataFile = ParsecBL.parseFromFile (pSparseDataFile <* eof)
 
 pDataFile :: Stream s m Char => ParsecT s u m Problem
 pDataFile = do
