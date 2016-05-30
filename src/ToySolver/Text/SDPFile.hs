@@ -1,13 +1,14 @@
+{-# LANGUAGE FlexibleContexts, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Text.SDPFile
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Copyright   :  (c) Masahiro Sakai 2012,2016
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (FlexibleContexts, ScopedTypeVariables)
 --
 -- References:
 --
@@ -46,6 +47,7 @@ module ToySolver.Text.SDPFile
 
 import Control.Applicative ((<*))
 import Control.Monad
+import Data.Functor.Identity
 import Data.List (intersperse)
 import Data.Ratio
 import Data.Map (Map)
@@ -103,7 +105,7 @@ diagBlock xs = Map.fromList [((i,i),x) | (i,x) <- zip [1..] xs]
 -- ---------------------------------------------------------------------------
 
 -- | Parse a SDPA format (.dat) string.
-parseDataString :: SourceName -> String -> Either ParseError Problem
+parseDataString :: Stream s Identity Char => SourceName -> s -> Either ParseError Problem
 parseDataString = parse (pDataFile <* eof)
 
 -- | Parse a SDPA format file (.dat).
@@ -111,14 +113,14 @@ parseDataFile :: FilePath -> IO (Either ParseError Problem)
 parseDataFile = parseFromFile (pDataFile <* eof)
 
 -- | Parse a SDPA sparse format (.dat-s) string.
-parseSparseDataString :: SourceName -> String -> Either ParseError Problem
+parseSparseDataString :: Stream s Identity Char => SourceName -> s -> Either ParseError Problem
 parseSparseDataString = parse (pSparseDataFile <* eof)
 
 -- | Parse a SDPA sparse format file (.dat-s).
 parseSparseDataFile :: FilePath -> IO (Either ParseError Problem)
 parseSparseDataFile = parseFromFile (pSparseDataFile <* eof)
 
-pDataFile :: Parser Problem
+pDataFile :: Stream s m Char => ParsecT s u m Problem
 pDataFile = do
   _ <- many pComment
   m  <- nat_line -- mDim
@@ -134,7 +136,7 @@ pDataFile = do
     , matrices    = ms
     }
 
-pSparseDataFile :: Parser Problem
+pSparseDataFile :: Stream s m Char => ParsecT s u m Problem
 pSparseDataFile = do
   _ <- many pComment
   m  <- nat_line -- mDim
@@ -150,13 +152,13 @@ pSparseDataFile = do
     , matrices    = ms
     }
 
-pComment :: Parser String
+pComment :: Stream s m Char => ParsecT s u m String
 pComment = do
   c <- oneOf "*\""
   cs <- manyTill anyChar newline
   return (c:cs)
 
-pBlockStruct :: Parser [Int]
+pBlockStruct :: Stream s m Char => ParsecT s u m [Int]
 pBlockStruct = do
   optional sep
   let int' = int >>= \i -> optional sep >> return i
@@ -166,7 +168,7 @@ pBlockStruct = do
   where
     sep = many1 (oneOf " \t(){},")
 
-pCosts :: Parser [Rational]
+pCosts :: Stream s m Char => ParsecT s u m [Rational]
 pCosts = do
   let sep = many1 (oneOf " \t(){},")
       real' = real >>= \r -> optional sep >> return r
@@ -175,7 +177,7 @@ pCosts = do
   _ <- newline
   return cs
 
-pDenseMatrices :: Int -> [Int] -> Parser [Matrix]
+pDenseMatrices :: Stream s m Char => Int -> [Int] -> ParsecT s u m [Matrix]
 pDenseMatrices m bs = optional sep >> replicateM (fromIntegral m + 1) pDenceMatrix
   where
     sep = many1 (space <|> oneOf "(){},")
@@ -189,7 +191,7 @@ pDenseMatrices m bs = optional sep >> replicateM (fromIntegral m + 1) pDenceMatr
         xs <- replicateM (abs b) real'
         return $ diagBlock xs
 
-pSparseMatrices :: Int -> [Int] -> Parser [Matrix]
+pSparseMatrices :: Stream s m Char => Int -> [Int] -> ParsecT s u m [Matrix]
 pSparseMatrices m bs = do
   xs <- many pLine
   let t = IntMap.unionsWith (IntMap.unionWith Map.union)
@@ -217,25 +219,25 @@ pSparseMatrices m bs = do
       _ <- newline
       return (fromIntegral matno, fromIntegral blkno, fromIntegral i, fromIntegral j, e)
 
-nat_line :: Parser Integer
+nat_line :: Stream s m Char => ParsecT s u m Integer
 nat_line = do
   spaces
   n <- nat
   _ <- manyTill anyChar newline
   return n
 
-nat :: Parser Integer
+nat :: Stream s m Char => ParsecT s u m Integer
 nat = do
   ds <- many1 digit
   return $! read ds
 
-int :: Parser Integer
+int :: Stream s m Char => ParsecT s u m Integer
 int = do
   s <- option 1 sign
   n <- nat
   return $! s * n
 
-real :: Parser Rational
+real :: forall s u m. Stream s m Char => ParsecT s u m Rational
 real = do
   s <- option 1 sign 
   b <- (do{ x <- nat; y <- option 0 frac; return (fromInteger x + y) })
@@ -245,13 +247,13 @@ real = do
   where
     digits = many1 digit
 
-    frac :: Parser Rational
+    frac :: ParsecT s u m Rational
     frac = do
       _ <- char '.'
       s <- digits
       return (read s % 10^(length s))
 
-    e :: Parser Integer
+    e :: ParsecT s u m Integer
     e = do
       _ <- oneOf "eE"
       f <- msum [ char '+' >> return id
@@ -260,7 +262,7 @@ real = do
                 ]
       liftM f nat
 
-sign :: Num a => Parser a
+sign :: Num a => Stream s m Char => ParsecT s u m a
 sign = (char '+' >> return 1) <|> (char '-' >> return (-1))
 
 -- ---------------------------------------------------------------------------
