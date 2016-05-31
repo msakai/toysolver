@@ -17,6 +17,8 @@ module Main where
 import Data.Char
 import Data.Default.Class
 import Data.Maybe
+import qualified Data.Foldable as F
+import qualified Data.Traversable as T
 import qualified Data.Version as V
 import System.Environment
 import System.IO
@@ -66,6 +68,7 @@ data Flag
   | Linearlization
   | LinearlizationUsingPB
   | KSat !Int
+  | FileEncoding String
   deriving Eq
 
 options :: [OptDescr Flag]
@@ -84,6 +87,7 @@ options =
     , Option []    ["linearlize"] (NoArg Linearlization) "linearliza nonlinear pseudo-boolean constraints"
     , Option []    ["linearizer-pb"] (NoArg LinearlizationUsingPB) "Use PB constraint in linearization"
     , Option []    ["ksat"] (ReqArg (KSat . read) "NUMBER") "generate k-SAT formula when outputing .cnf file"
+    , Option []    ["encoding"] (ReqArg FileEncoding "<ENCODING>") "file encoding for LP/MPS files"
     ]
   where
     parseObjType s =
@@ -112,6 +116,7 @@ data Problem
 
 readProblem :: [Flag] -> String -> IO Problem
 readProblem o fname = do
+  enc <- T.mapM mkTextEncoding $ last $ Nothing : [Just s | FileEncoding s <- o]
   case map toLower (takeExtension fname) of
     ".cnf"
       | AsMaxSAT `elem` o -> readWCNF
@@ -137,12 +142,12 @@ readProblem o fname = do
         Left err -> hPutStrLn stderr err >> exitFailure
         Right gcnf -> return $ ProbWBO $ MaxSAT2WBO.convert $ GCNF2MaxSAT.convert gcnf
     ".lp"   -> do
-      ret <- MIP.readLPFile def fname
+      ret <- MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
         Right mip -> return $ ProbMIP mip
     ".mps"  -> do
-      ret <- MIP.readMPSFile def fname
+      ret <- MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
         Right mip -> return $ ProbMIP mip
@@ -177,6 +182,7 @@ transformPBLinearlization o problem
 
 writeProblem :: [Flag] -> Problem -> IO ()
 writeProblem o problem = do
+  enc <- T.mapM mkTextEncoding $ last $ Nothing : [Just s | FileEncoding s <- o]
   let mip2smtOpt =
         def
         { MIP2SMT.optSetLogic     = listToMaybe [logic | SMTSetLogic logic <- o]
@@ -194,7 +200,9 @@ writeProblem o problem = do
         ProbMIP mip -> do
           case MIP.toLPString def mip of
             Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
-            Right s -> hPutStr stdout s
+            Right s -> do
+              F.mapM_ (hSetEncoding stdout) enc
+              hPutStr stdout s
     Just fname -> do
       let opb = case problem of
                   ProbOPB opb -> opb
@@ -240,8 +248,8 @@ writeProblem o problem = do
           case WBO2MaxSAT.convert wbo of
             (wcnf, _, _) -> MaxSAT.writeFile fname wcnf
         ".lsp" -> writeFile fname (lsp "")
-        ".lp" -> MIP.writeLPFile def fname lp
-        ".mps" -> MIP.writeMPSFile def fname lp
+        ".lp" -> MIP.writeLPFile def{ MIP.optFileEncoding = enc } fname lp
+        ".mps" -> MIP.writeMPSFile def{ MIP.optFileEncoding = enc } fname lp
         ".smp" -> do
           writeFile fname (PB2SMP.convert False opb "")
         ".smt2" -> do

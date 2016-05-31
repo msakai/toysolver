@@ -29,6 +29,8 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.Foldable as F
+import qualified Data.Traversable as T
 import Data.Char
 import Data.IORef
 import Data.List
@@ -114,6 +116,7 @@ data Options
   , optUBCSAT :: FilePath
   , optInitSP :: Bool
   , optTempDir :: Maybe FilePath
+  , optFileEncoding :: Maybe String
   }
 
 instance Default Options where
@@ -135,6 +138,7 @@ instance Default Options where
     , optUBCSAT = "ubcsat"
     , optInitSP = False
     , optTempDir = Nothing
+    , optFileEncoding = Nothing
     }
 
 options :: [OptDescr (Options -> Options)]
@@ -261,6 +265,10 @@ options =
     , Option [] ["temp-dir"]
         (ReqArg (\val opt -> opt{ optTempDir = Just val }) "<PATH>")
         "temporary directory"
+
+    , Option [] ["encoding"]
+        (ReqArg (\val opt -> opt{ optFileEncoding = Just val }) "<ENCODING>")
+        "file encoding for LP/MPS files"
     ]
   where
     parseRestartStrategy s =
@@ -895,6 +903,7 @@ mainMIP opt solver args = do
   mip <-
     case args of
       [fname@"-"]   -> do
+        F.mapM_ (\s -> hSetEncoding stdin =<< mkTextEncoding s) (optFileEncoding opt)
         s <- hGetContents stdin
         case MIP.parseLPString def fname s of
           Right mip -> return mip
@@ -906,7 +915,8 @@ mainMIP opt solver args = do
                 hPrint stderr err2
                 exitFailure
       [fname] -> do
-        ret <- MIP.readFile def fname
+        enc <- T.mapM mkTextEncoding (optFileEncoding opt)
+        ret <- MIP.readFile def{ MIP.optFileEncoding = enc } fname
         case ret of
           Left err -> hPrint stderr err >> exitFailure
           Right mip -> return mip
