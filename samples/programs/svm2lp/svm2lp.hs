@@ -168,7 +168,7 @@ main = do
                      Nothing -> error "--gamma= must be specified"
                      Just gamma -> dual (optC opt) (gaussian gamma) svm
                  _ -> error $ "unknown kernel: "  ++ optKernel opt
-          case MIP.toLPString mip of
+          case MIP.toLPString def mip of
             Left err -> do
               hPutStrLn stderr err
               exitFailure

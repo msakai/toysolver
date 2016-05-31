@@ -30,7 +30,7 @@ module ToySolver.Data.MIP.MPSFile
   , render
   ) where
 
-import Control.Applicative ((<*))
+import Control.Applicative ((<$>), (<*))
 import Control.Monad
 import Control.Monad.Writer
 import Data.Default.Class
@@ -42,7 +42,7 @@ import qualified Data.Map as Map
 import Data.Ratio
 import Data.Interned
 import Data.Interned.String
-
+import System.IO
 import qualified Text.Parsec as P
 import Text.Parsec hiding (spaces, newline, Column)
 import Text.Parsec.String
@@ -73,12 +73,17 @@ data BoundType
 
 -- | Parse a string containing MPS file data.
 -- The source name is only | used in error messages and may be the empty string.
-parseString :: SourceName -> String -> Either ParseError MIP.Problem
-parseString = parse (parser <* eof)
+parseString :: MIP.FileOptions -> SourceName -> String -> Either ParseError MIP.Problem
+parseString _ = parse (parser <* eof)
 
 -- | Parse a file containing MPS file data.
-parseFile :: FilePath -> IO (Either ParseError MIP.Problem)
-parseFile = parseFromFile (parser <* eof)
+parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError MIP.Problem)
+parseFile opt fname = do
+  h <- openFile fname ReadMode
+  case MIP.optFileEncoding opt of
+    Nothing -> return ()
+    Just enc -> hSetEncoding h enc
+  parse (parser <* eof) fname <$> hGetContents h
 
 -- ---------------------------------------------------------------------------
 
@@ -585,9 +590,9 @@ writeChar c = tell $ showChar c
 
 -- ---------------------------------------------------------------------------
 
-render :: MIP.Problem -> Either String String
-render mip | not (checkAtMostQuadratic mip) = Left "Expression must be atmost quadratic"
-render mip = Right $ execM $ render' $ nameRows mip
+render :: MIP.FileOptions -> MIP.Problem -> Either String String
+render _ mip | not (checkAtMostQuadratic mip) = Left "Expression must be atmost quadratic"
+render _ mip = Right $ execM $ render' $ nameRows mip
 
 render' :: MIP.Problem -> M ()
 render' mip = do

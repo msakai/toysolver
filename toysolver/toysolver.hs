@@ -450,7 +450,7 @@ main = do
                 maxsatPrintModel stdout m2 0
                 writeSOLFileSAT o m2
         ModeMIP -> do
-          ret <- MIP.readFile fname
+          ret <- MIP.readFile def fname
           mip <- case ret of
                   Right mip -> return mip
                   Left err -> hPrint stderr err >> exitFailure

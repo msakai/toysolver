@@ -27,9 +27,9 @@ module ToySolver.Data.MIP
   ) where
 
 import Prelude hiding (readFile, writeFile)
-import qualified Prelude as P
 import Data.Char
 import System.FilePath (takeExtension)
+import System.IO hiding (readFile, writeFile)
 import Text.Parsec
 
 import ToySolver.Data.MIP.Base
@@ -37,50 +37,60 @@ import qualified ToySolver.Data.MIP.LPFile as LPFile
 import qualified ToySolver.Data.MIP.MPSFile as MPSFile
 
 -- | Parse .lp or .mps file based on file extension
-readFile :: FilePath -> IO (Either ParseError Problem)
-readFile fname =
+readFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+readFile opt fname =
   case map toLower (takeExtension fname) of
-    ".lp"  -> readLPFile fname
-    ".mps" -> readMPSFile fname
+    ".lp"  -> readLPFile opt fname
+    ".mps" -> readMPSFile opt fname
     ext -> ioError $ userError $ "unknown extension: " ++ ext
 
 -- | Parse a file containing LP file data.
-readLPFile :: FilePath -> IO (Either ParseError Problem)
+readLPFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
 readLPFile = LPFile.parseFile
 
 -- | Parse a file containing MPS file data.
-readMPSFile :: FilePath -> IO (Either ParseError Problem)
+readMPSFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
 readMPSFile = MPSFile.parseFile
 
 -- | Parse a string containing LP file data.
-parseLPString :: SourceName -> String -> Either ParseError Problem
+parseLPString :: FileOptions -> SourceName -> String -> Either ParseError Problem
 parseLPString = LPFile.parseString
 
 -- | Parse a string containing MPS file data.
-parseMPSString :: SourceName -> String -> Either ParseError Problem
+parseMPSString :: FileOptions -> SourceName -> String -> Either ParseError Problem
 parseMPSString = MPSFile.parseString
 
-writeFile :: FilePath -> Problem -> IO ()
-writeFile fname prob =
+writeFile :: FileOptions -> FilePath -> Problem -> IO ()
+writeFile opt fname prob =
   case map toLower (takeExtension fname) of
-    ".lp"  -> writeLPFile fname prob
-    ".mps" -> writeMPSFile fname prob
+    ".lp"  -> writeLPFile opt fname prob
+    ".mps" -> writeMPSFile opt fname prob
     ext -> ioError $ userError $ "unknown extension: " ++ ext
 
-writeLPFile :: FilePath -> Problem -> IO ()
-writeLPFile fname prob =
-  case LPFile.render prob of
+writeLPFile :: FileOptions -> FilePath -> Problem -> IO ()
+writeLPFile opt fname prob =
+  case LPFile.render opt prob of
     Left err -> ioError $ userError err
-    Right s -> P.writeFile fname s
+    Right s ->
+      withFile fname WriteMode $ \h -> do
+        case optFileEncoding opt of
+          Nothing -> return ()
+          Just enc -> hSetEncoding h enc
+        hPutStr h s
 
-writeMPSFile :: FilePath -> Problem -> IO ()
-writeMPSFile fname prob = 
-  case MPSFile.render prob of
+writeMPSFile :: FileOptions -> FilePath -> Problem -> IO ()
+writeMPSFile opt fname prob = 
+  case MPSFile.render opt prob of
     Left err -> ioError $ userError err
-    Right s -> P.writeFile fname s
+    Right s ->
+      withFile fname WriteMode $ \h -> do
+        case optFileEncoding opt of
+          Nothing -> return ()
+          Just enc -> hSetEncoding h enc
+        hPutStr h s
 
-toLPString :: Problem -> Either String String
+toLPString :: FileOptions -> Problem -> Either String String
 toLPString = LPFile.render
 
-toMPSString :: Problem -> Either String String
+toMPSString :: FileOptions -> Problem -> Either String String
 toMPSString = MPSFile.render

@@ -896,17 +896,17 @@ mainMIP opt solver args = do
     case args of
       [fname@"-"]   -> do
         s <- hGetContents stdin
-        case MIP.parseLPString fname s of
+        case MIP.parseLPString def fname s of
           Right mip -> return mip
           Left err ->
-            case MIP.parseMPSString fname s of
+            case MIP.parseMPSString def fname s of
               Right mip -> return mip
               Left err2 -> do
                 hPrint stderr err
                 hPrint stderr err2
                 exitFailure
       [fname] -> do
-        ret <- MIP.readFile fname
+        ret <- MIP.readFile def fname
         case ret of
           Left err -> hPrint stderr err >> exitFailure
           Right mip -> return mip

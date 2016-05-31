@@ -46,6 +46,9 @@ module ToySolver.Data.MIP.Base
   , semiContinuousVariables
   , semiIntegerVariables
 
+  -- * File I/O options
+  , FileOptions (..)
+
   -- * Utilities
   , Variables (..)
   , intersectBounds
@@ -60,6 +63,7 @@ import Data.Interned (intern, unintern)
 import Data.Interned.String
 import Data.ExtendedReal
 import Data.OptDir
+import System.IO (TextEncoding)
 
 infix 4 .<=., .>=., .==.
 
@@ -291,3 +295,14 @@ semiContinuousVariables mip = Map.keysSet $ Map.filter (SemiContinuousVariable =
 
 semiIntegerVariables :: Problem -> Set Var
 semiIntegerVariables mip = Map.keysSet $ Map.filter (SemiIntegerVariable ==) (varType mip)
+
+data FileOptions
+  = FileOptions
+  { optFileEncoding :: Maybe TextEncoding
+  } deriving (Show)
+
+instance Default FileOptions where
+  def =
+    FileOptions
+    { optFileEncoding = Nothing
+    }

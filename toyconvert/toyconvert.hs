@@ -137,12 +137,12 @@ readProblem o fname = do
         Left err -> hPutStrLn stderr err >> exitFailure
         Right gcnf -> return $ ProbWBO $ MaxSAT2WBO.convert $ GCNF2MaxSAT.convert gcnf
     ".lp"   -> do
-      ret <- MIP.readLPFile fname
+      ret <- MIP.readLPFile def fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
         Right mip -> return $ ProbMIP mip
     ".mps"  -> do
-      ret <- MIP.readMPSFile fname
+      ret <- MIP.readMPSFile def fname
       case ret of
         Left err -> hPrint stderr err >> exitFailure
         Right mip -> return $ ProbMIP mip
@@ -192,7 +192,7 @@ writeProblem o problem = do
         ProbOPB opb -> PBFile.hPutOPB stdout opb
         ProbWBO wbo -> PBFile.hPutWBO stdout wbo
         ProbMIP mip -> do
-          case MIP.toLPString mip of
+          case MIP.toLPString def mip of
             Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
             Right s -> hPutStr stdout s
     Just fname -> do
@@ -240,8 +240,8 @@ writeProblem o problem = do
           case WBO2MaxSAT.convert wbo of
             (wcnf, _, _) -> MaxSAT.writeFile fname wcnf
         ".lsp" -> writeFile fname (lsp "")
-        ".lp" -> MIP.writeLPFile fname lp
-        ".mps" -> MIP.writeMPSFile fname lp
+        ".lp" -> MIP.writeLPFile def fname lp
+        ".mps" -> MIP.writeMPSFile def fname lp
         ".smp" -> do
           writeFile fname (PB2SMP.convert False opb "")
         ".smt2" -> do
