@@ -398,7 +398,7 @@ isInt mip v = vt == MIP.IntegerVariable || vt == MIP.SemiIntegerVariable
 
 testFile :: FilePath -> IO ()
 testFile fname = do
-  result <- MIP.readLPFile fname
+  result <- MIP.readLPFile def fname
   case result of
     Right mip -> putStrLn $ convert def mip ""
     Left err -> hPrint stderr err
@@ -407,7 +407,7 @@ test :: IO ()
 test = putStrLn $ convert def testdata ""
 
 testdata :: MIP.Problem
-Right testdata = MIP.parseLPString "test" $ unlines
+Right testdata = MIP.parseLPString def "test" $ unlines
   [ "Maximize"
   , " obj: x1 + 2 x2 + 3 x3 + x4"
   , "Subject To"

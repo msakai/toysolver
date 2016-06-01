@@ -28,6 +28,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
+import qualified Data.Traversable as T
 import System.Exit
 import System.Environment
 import System.FilePath
@@ -81,6 +82,7 @@ data Flag
     | NThread !Int
     | OmegaReal String
     | Mode !Mode
+    | FileEncoding String
     deriving Eq
 
 options :: [OptDescr Flag]
@@ -103,6 +105,8 @@ options =
     , Option []    ["lp"]     (NoArg (Mode ModeMIP))    "solve LP/MIP problem in .lp or .mps file (default)"
 
     , Option [] ["nomip"] (NoArg NoMIP)                 "consider all integer variables as continuous"
+
+    , Option [] ["encoding"] (ReqArg FileEncoding "<ENCODING>") "file encoding for LP/MPS files"
     ]
 
 header :: String
@@ -450,7 +454,8 @@ main = do
                 maxsatPrintModel stdout m2 0
                 writeSOLFileSAT o m2
         ModeMIP -> do
-          ret <- MIP.readFile fname
+          enc <- T.mapM mkTextEncoding $ last $ Nothing : [Just s | FileEncoding s <- o]
+          ret <- MIP.readFile def{ MIP.optFileEncoding = enc } fname
           mip <- case ret of
                   Right mip -> return mip
                   Left err -> hPrint stderr err >> exitFailure

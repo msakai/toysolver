@@ -2,6 +2,7 @@
 module Test.LPFile (lpTestGroup) where
 
 import Control.Monad
+import Data.Default.Class
 import Data.List
 import Data.Maybe
 import Test.Tasty
@@ -42,20 +43,20 @@ testdata = unlines
 
 checkFile :: FilePath -> Assertion
 checkFile fname = do
-  r <- parseFile fname
+  r <- parseFile def fname
   case r of
     Left err -> assertFailure $ show err
     Right lp ->
-      case render lp of
+      case render def lp of
         Left err -> assertFailure ("render failure: " ++ err)
         Right _ -> return ()
 
 checkString :: String -> String -> Assertion
 checkString name str = do
-  case parseString name str of
+  case parseString def name str of
     Left err -> assertFailure $ show err
     Right lp ->
-      case render lp of
+      case render def lp of
         Left err -> assertFailure ("render failure: " ++ err)
         Right _ -> return ()
 

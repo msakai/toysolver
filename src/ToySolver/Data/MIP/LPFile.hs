@@ -28,7 +28,7 @@ module ToySolver.Data.MIP.LPFile
   , render
   ) where
 
-import Control.Applicative ((<*))
+import Control.Applicative ((<$>), (<*))
 import Control.Monad
 import Control.Monad.Writer
 import Control.Monad.ST
@@ -43,6 +43,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.STRef
 import Data.OptDir
+import System.IO
 import Text.Parsec hiding (label)
 import Text.Parsec.String
 
@@ -54,12 +55,17 @@ import ToySolver.Internal.TextUtil (readUnsignedInteger)
 
 -- | Parse a string containing LP file data.
 -- The source name is only | used in error messages and may be the empty string.
-parseString :: SourceName -> String -> Either ParseError MIP.Problem
-parseString = parse (parser <* eof)
+parseString :: MIP.FileOptions -> SourceName -> String -> Either ParseError MIP.Problem
+parseString _ = parse (parser <* eof)
 
 -- | Parse a file containing LP file data.
-parseFile :: FilePath -> IO (Either ParseError MIP.Problem)
-parseFile = parseFromFile (parser <* eof)
+parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError MIP.Problem)
+parseFile opt fname = do
+  h <- openFile fname ReadMode
+  case MIP.optFileEncoding opt of
+    Nothing -> return ()
+    Just enc -> hSetEncoding h enc
+  parse (parser <* eof) fname <$> hGetContents h
 
 -- ---------------------------------------------------------------------------
 
@@ -440,8 +446,8 @@ writeChar c = tell $ showChar c
 -- ---------------------------------------------------------------------------
 
 -- | Render a problem into a string.
-render :: MIP.Problem -> Either String String
-render mip = Right $ execM $ render' $ normalize mip
+render :: MIP.FileOptions -> MIP.Problem -> Either String String
+render _ mip = Right $ execM $ render' $ normalize mip
 
 writeVar :: MIP.Var -> M ()
 writeVar v = writeString $ MIP.fromVar v
