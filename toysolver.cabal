@@ -484,6 +484,8 @@ Executable toyconvert
   HS-Source-Dirs: toyconvert
   Build-Depends:
     base,
+    bytestring,
+    bytestring-builder,
     data-default-class,
     filepath,
     parse-dimacs,

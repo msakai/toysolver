@@ -14,6 +14,7 @@
 
 module Main where
 
+import qualified Data.ByteString.Builder as ByteStringBuilder
 import Data.Char
 import Data.Default.Class
 import Data.Maybe
@@ -247,11 +248,14 @@ writeProblem o problem = do
         ".wcnf" ->
           case WBO2MaxSAT.convert wbo of
             (wcnf, _, _) -> MaxSAT.writeFile fname wcnf
-        ".lsp" -> writeFile fname (lsp "")
+        ".lsp" ->
+          withBinaryFile fname WriteMode $ \h ->
+            ByteStringBuilder.hPutBuilder h lsp
         ".lp" -> MIP.writeLPFile def{ MIP.optFileEncoding = enc } fname lp
         ".mps" -> MIP.writeMPSFile def{ MIP.optFileEncoding = enc } fname lp
         ".smp" -> do
-          writeFile fname (PB2SMP.convert False opb "")
+          withBinaryFile fname WriteMode $ \h ->
+            ByteStringBuilder.hPutBuilder h (PB2SMP.convert False opb)
         ".smt2" -> do
           writeFile fname (MIP2SMT.convert mip2smtOpt lp "")
         ".ys" -> do

@@ -1,85 +1,87 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB2SMP
--- Copyright   :  (c) Masahiro Sakai 2013
+-- Copyright   :  (c) Masahiro Sakai 2013,2016
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable (OverloadedStrings)
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2SMP
   ( convert
   ) where
 
+import Data.ByteString.Builder
 import Data.List
+import Data.Monoid
 import qualified Data.PseudoBoolean as PBFile
 
-convert :: Bool -> PBFile.Formula -> ShowS
+convert :: Bool -> PBFile.Formula -> Builder
 convert isUnix formula =
-  header .
-  decls .
-  showString "\n" .
-  obj2 .
-  showString "\n" .
-  constrs .
-  showString "\n" .
-  actions .
+  header <>
+  decls <>
+  char7 '\n' <>
+  obj2 <>
+  char7 '\n' <>
+  constrs <>
+  char7 '\n' <>
+  actions <>
   footer
   where
     nv = PBFile.pbNumVars formula
 
     header =
       if isUnix
-      then showString "#include \"simple.h\"\nvoid ufun()\n{\n\n"
-      else id
+      then byteString "#include \"simple.h\"\nvoid ufun()\n{\n\n"
+      else mempty
     
     footer =
       if isUnix
-      then showString "\n}\n"
-      else id
+      then "\n}\n"
+      else mempty
 
-    actions =
-      showString "solve();\n" .
-      showString "x[i].val.print();\n" .
-      showString "cost.val.print();\n"
+    actions = byteString $
+      "solve();\n" <>
+      "x[i].val.print();\n" <>
+      "cost.val.print();\n"
 
-    decls = showString $
-      "Element i(set=\"1 .. " ++ show nv ++ "\");\n" ++
-      "IntegerVariable x(type=binary, index=i);\n"
+    decls =
+      byteString "Element i(set=\"1 .. " <> intDec nv <>
+      byteString "\");\nIntegerVariable x(type=binary, index=i);\n"
 
-    constrs = foldr (.) id
-      [ showString (showSum lhs) .
-        showString op2 .
-        shows rhs .
-        showString ";\n"
+    constrs = mconcat
+      [ showSum lhs <>
+        op2 <>
+        integerDec rhs <>
+        ";\n"
       | (lhs, op, rhs) <- PBFile.pbConstraints formula
       , let op2 = case op of
                     PBFile.Ge -> " >= "
                     PBFile.Eq -> " == "
       ]
 
-    showSum :: PBFile.Sum -> String
-    showSum [] = "0"
-    showSum xs = intercalate " + " $ map showTerm xs
+    showSum :: PBFile.Sum -> Builder
+    showSum [] = char7 '0'
+    showSum xs = mconcat $ intersperse " + " $ map showTerm xs
 
-    showTerm (n,ls) = intercalate "*" $ showCoeff n ++ [showLit l | l<-ls]
+    showTerm (n,ls) = mconcat $ intersperse (char7 '*') $ showCoeff n ++ [showLit l | l<-ls]
 
     showCoeff n
       | n == 1    = []
-      | n < 0     = ["(" ++ show n ++ ")"]
-      | otherwise = [show n]
+      | n < 0     = [char7 '(' <> integerDec n <> char7 ')']
+      | otherwise = [integerDec n]
 
     showLit l =
       if l < 0
-      then "(1-x[" ++ show (abs l) ++ "])"
-      else "x[" ++ show l ++ "]"
+      then "(1-x[" <> intDec (abs l) <> "])"
+      else "x[" <> intDec l <> "]"
 
     obj2 =
       case PBFile.pbObjectiveFunction formula of
         Just obj' ->
-          showString "Objective cost(type=minimize);\n" .
-          showString "cost = " . showString (showSum obj') . showString ";\n"
-        Nothing -> id
+          byteString "Objective cost(type=minimize);\ncost = " <> showSum obj' <> ";\n"
+        Nothing -> mempty

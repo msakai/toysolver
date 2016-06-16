@@ -1,13 +1,14 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB2LSP
--- Copyright   :  (c) Masahiro Sakai 2013-2014
+-- Copyright   :  (c) Masahiro Sakai 2013-2014,2016
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable (OverloadedStrings)
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2LSP
@@ -15,89 +16,89 @@ module ToySolver.Converter.PB2LSP
   , convertWBO
   ) where
 
+import Data.ByteString.Builder
 import Data.List
+import Data.Monoid
 import qualified Data.PseudoBoolean as PBFile
 
-convert :: PBFile.Formula -> ShowS
+convert :: PBFile.Formula -> Builder
 convert formula =
-  showString "function model() {\n" .
-  decls .
-  constrs .
-  obj2 .
-  showString "}\n"
+  byteString "function model() {\n" <>
+  decls <>
+  constrs <>
+  obj2 <>
+  "}\n"
   where
     nv = PBFile.pbNumVars formula
 
-    decls = showString $
-      "  for [i in 1.." ++ show nv ++ "] x[i] <- bool();\n"
+    decls = byteString "  for [i in 1.." <> intDec nv <> byteString "] x[i] <- bool();\n"
 
-    constrs = foldr (.) id
-      [ showString "  constraint " .
-        showString (showConstr c) .
-        showString ";\n"
+    constrs = mconcat
+      [ byteString "  constraint " <>
+        showConstr c <>
+        ";\n"
       | c <- PBFile.pbConstraints formula
       ]
 
     obj2 =
       case PBFile.pbObjectiveFunction formula of
-        Just obj' -> showString "  minimize " . showString (showSum obj') . showString ";\n"
-        Nothing -> id
+        Just obj' -> byteString "  minimize " <> showSum obj' <> ";\n"
+        Nothing -> mempty
 
-convertWBO :: PBFile.SoftFormula -> ShowS
+convertWBO :: PBFile.SoftFormula -> Builder
 convertWBO softFormula =
-  showString "function model() {\n" .
-  decls .
-  constrs .
-  costDef .
-  topConstr .
-  showString "  minimize cost;\n" .
-  showString "}\n"
+  byteString "function model() {\n" <>
+  decls <>
+  constrs <>
+  costDef <>
+  topConstr <>
+  byteString "  minimize cost;\n}\n"
   where
     nv = PBFile.wboNumVars softFormula
 
-    decls = showString $
-      "  for [i in 1.." ++ show nv ++ "] x[i] <- bool();\n"
+    decls = byteString "  for [i in 1.." <> intDec nv <> byteString "] x[i] <- bool();\n"
 
-    constrs = foldr (.) id
-      [ showString "  constraint " .
-        showString (showConstr c) .
-        showString ";\n"
+    constrs = mconcat
+      [ byteString "  constraint " <>
+        showConstr c <>
+        ";\n"
       | (Nothing, c) <- PBFile.wboConstraints softFormula
       ]
 
-    costDef = showString "  cost <- sum(\n" . s . showString ");\n"
+    costDef = byteString "  cost <- sum(\n" <> s <> ");\n"
       where
-        s = foldr (.) id . intersperse (showString ",\n") . map showString $ xs
-        xs = ["    " ++ show w ++ "*!(" ++ showConstr c ++ ")" | (Just w, c) <- PBFile.wboConstraints softFormula]
+        s = mconcat . intersperse (",\n") $ xs
+        xs = ["    " <> integerDec w <> "*!(" <> showConstr c <> ")"
+             | (Just w, c) <- PBFile.wboConstraints softFormula]
 
     topConstr =
       case PBFile.wboTopCost softFormula of
-        Nothing -> id
-        Just t -> showString $ "  constraint cost <= " ++ show t ++ ";\n"
+        Nothing -> mempty
+        Just t -> byteString "  constraint cost <= " <> integerDec t <> ";\n"
 
-showConstr :: PBFile.Constraint -> String
+showConstr :: PBFile.Constraint -> Builder
 showConstr (lhs, PBFile.Ge, 1) | and [c==1 | (c,_) <- lhs] =
-  "or(" ++ intercalate "," (map (f . snd) lhs) ++ ")"
+  "or(" <> mconcat (intersperse "," (map (f . snd) lhs)) <> ")"
   where
     f [l] = showLit l
-    f ls  = "and(" ++ intercalate "," (map showLit ls) ++ ")"
-showConstr (lhs, op, rhs) = showSum lhs  ++ op2 ++ show rhs
+    f ls  = "and(" <> mconcat (intersperse "," (map showLit ls)) <> ")"
+showConstr (lhs, op, rhs) = showSum lhs  <> op2 <> integerDec rhs
   where
     op2 = case op of
             PBFile.Ge -> " >= "
             PBFile.Eq -> " == "
 
-sum' :: [String] -> String
-sum' xs = "sum(" ++ intercalate ", " xs ++ ")"
+sum' :: [Builder] -> Builder
+sum' xs = "sum(" <> mconcat (intersperse ", " xs) <> ")"
 
-showSum :: PBFile.Sum -> String
+showSum :: PBFile.Sum -> Builder
 showSum = sum' . map showTerm
 
-showTerm :: PBFile.WeightedTerm -> String
-showTerm (n,ls) = intercalate "*" $ [show n | n /= 1] ++ [showLit l | l<-ls]
+showTerm :: PBFile.WeightedTerm -> Builder
+showTerm (n,ls) = mconcat $ intersperse "*" $ [integerDec n | n /= 1] ++ [showLit l | l<-ls]
 
-showLit :: PBFile.Lit -> String
+showLit :: PBFile.Lit -> Builder
 showLit l =
   if l < 0
-  then "!x[" ++ show (abs l) ++ "]"
-  else "x[" ++ show l ++ "]"
+  then "!x[" <> intDec (abs l) <> "]"
+  else "x[" <> intDec l <> "]"
