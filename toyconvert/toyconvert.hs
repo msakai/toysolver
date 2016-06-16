@@ -19,6 +19,8 @@ import Data.Char
 import Data.Default.Class
 import Data.Maybe
 import qualified Data.Foldable as F
+import qualified Data.Text.Lazy.Builder as TextBuilder
+import qualified Data.Text.Lazy.IO as TLIO
 import qualified Data.Traversable as T
 import qualified Data.Version as V
 import System.Environment
@@ -257,10 +259,16 @@ writeProblem o problem = do
           withBinaryFile fname WriteMode $ \h ->
             ByteStringBuilder.hPutBuilder h (PB2SMP.convert False opb)
         ".smt2" -> do
-          writeFile fname (MIP2SMT.convert mip2smtOpt lp "")
+          withFile fname WriteMode $ \h -> do
+            F.mapM_ (hSetEncoding h) enc
+            TLIO.hPutStr h $ TextBuilder.toLazyText $
+              MIP2SMT.convert mip2smtOpt lp
         ".ys" -> do
           let lang = MIP2SMT.YICES (if Yices2 `elem` o then MIP2SMT.Yices2 else MIP2SMT.Yices1)
-          writeFile fname (MIP2SMT.convert mip2smtOpt{ MIP2SMT.optLanguage = lang } lp "")
+          withFile fname WriteMode $ \h -> do
+            F.mapM_ (hSetEncoding h) enc
+            TLIO.hPutStr h $ TextBuilder.toLazyText $
+              MIP2SMT.convert mip2smtOpt{ MIP2SMT.optLanguage = lang } lp
         ext -> do
           error $ "unknown file extension: " ++ show ext
           

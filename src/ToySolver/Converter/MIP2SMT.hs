@@ -1,13 +1,14 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.MIP2SMT
--- Copyright   :  (c) Masahiro Sakai 2012-2014
+-- Copyright   :  (c) Masahiro Sakai 2012-2014,2016
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable (OverloadedStrings)
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.MIP2SMT
@@ -21,10 +22,16 @@ import Data.Char
 import Data.Default.Class
 import Data.Ord
 import Data.List
+import Data.Monoid
 import Data.Ratio
 import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.Text as T
+import qualified Data.Text.Lazy.IO as TLIO
+import Data.Text.Lazy.Builder (Builder)
+import qualified Data.Text.Lazy.Builder as B
+import qualified Data.Text.Lazy.Builder.Int as B
 import System.IO
 import Text.Printf
 
@@ -66,117 +73,111 @@ data YicesVersion
 
 -- ------------------------------------------------------------------------
 
-type Var = String
+type Var = T.Text
 type Env = Map MIP.Var Var
 
-concatS :: [ShowS] -> ShowS
-concatS = foldr (.) id
- 
-unlinesS :: [ShowS] -> ShowS
-unlinesS = concatS . map (. showChar '\n')
+list :: [Builder] -> Builder
+list xs = B.singleton '(' <> mconcat (intersperse (B.singleton ' ') xs) <> B.singleton ')'
 
-list :: [ShowS] -> ShowS
-list xs = showParen True $ concatS (intersperse (showChar ' ') xs)
-
-and' :: [ShowS] -> ShowS
-and' [] = showString "true"
+and' :: [Builder] -> Builder
+and' [] = "true"
 and' [x] = x
-and' xs = list (showString "and" : xs)
+and' xs = list ("and" : xs)
 
-or' :: [ShowS] -> ShowS
-or' [] = showString "false"
+or' :: [Builder] -> Builder
+or' [] = "false"
 or' [x] = x
-or' xs = list (showString "or" : xs)
+or' xs = list ("or" : xs)
 
-not' :: ShowS -> ShowS
-not' x = list [showString "not", x]
+not' :: Builder -> Builder
+not' x = list ["not", x]
 
-intExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> ShowS
+intExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> Builder
 intExpr opt env _mip e =
   case MIP.terms e of
     [] -> intNum opt 0
     [t] -> f t
-    ts -> list (showChar '+' : map f ts)
+    ts -> list (B.singleton '+' : map f ts)
   where
     f (MIP.Term c _) | not (isInteger c) =
       error ("ToySolver.Converter.MIP2SMT.intExpr: fractional coefficient: " ++ show c)
     f (MIP.Term c []) = intNum opt (floor c)
-    f (MIP.Term (-1) vs) = list [showChar '-', f (MIP.Term 1 vs)]
+    f (MIP.Term (-1) vs) = list [B.singleton '-', f (MIP.Term 1 vs)]
     f (MIP.Term c vs) =
       case xs of
         [] -> intNum opt 1
         [x] -> x
-        _ -> list (showChar '*' : xs)
+        _ -> list (B.singleton '*' : xs)
       where
         xs = [intNum opt (floor c) | c /= 1] ++
-             [showString (env Map.! v) | v <- vs]
+             [B.fromText (env Map.! v) | v <- vs]
 
-realExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> ShowS
+realExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> Builder
 realExpr opt env mip e =
   case MIP.terms e of
     [] -> realNum opt 0
     [t] -> f t
-    ts -> list (showChar '+' : map f ts)
+    ts -> list (B.singleton '+' : map f ts)
   where
     f (MIP.Term c []) = realNum opt c
-    f (MIP.Term (-1) vs) = list [showChar '-', f (MIP.Term 1 vs)]
+    f (MIP.Term (-1) vs) = list [B.singleton '-', f (MIP.Term 1 vs)]
     f (MIP.Term c vs) =
       case xs of
         [] -> realNum opt 1
         [x] -> x
-        _ -> list (showChar '*' : xs)
+        _ -> list (B.singleton '*' : xs)
       where
         xs = [realNum opt c | c /= 1] ++
              [ v3
              | v <- vs
              , let v2 = env Map.! v
              , let v3 = if isInt mip v
-                        then toReal opt (showString v2)
-                        else showString v2
+                        then toReal opt (B.fromText v2)
+                        else B.fromText v2
              ]
 
-intNum :: Options -> Integer -> ShowS
+intNum :: Options -> Integer -> Builder
 intNum opt x =
   case optLanguage opt of
     SMTLIB2
-      | x < 0     -> list [showChar '-', shows (negate x)]
-      | otherwise -> shows x
-    YICES _ -> shows x
+      | x < 0     -> list [B.singleton '-', B.decimal (negate x)]
+      | otherwise -> B.decimal x
+    YICES _ -> B.decimal x
 
-realNum :: Options -> Rational -> ShowS
+realNum :: Options -> Rational -> Builder
 realNum opt r =
   case optLanguage opt of
     SMTLIB2
-      | r < 0     -> list [showChar '-', f (negate r)]
+      | r < 0     -> list [B.singleton '-', f (negate r)]
       | otherwise -> f r
     YICES Yices1 ->
       if denominator r == 1
-        then shows (numerator r)
-        else shows (numerator r) . showChar '/' . shows (denominator r)
+        then B.decimal (numerator r)
+        else B.decimal (numerator r) <> B.singleton '/' <> B.decimal (denominator r)
     YICES Yices2 ->
       case showRationalAsFiniteDecimal r of
-        Just s  -> showString s
-        Nothing -> shows (numerator r) . showChar '/' . shows (denominator r)
+        Just s  -> B.fromString s
+        Nothing -> B.decimal (numerator r) <> B.singleton '/' <> B.decimal (denominator r)
   where
     f r = case showRationalAsFiniteDecimal r of
-            Just s  -> showString s
-            Nothing -> list [showChar '/', shows (numerator r) . showString ".0", shows (denominator r) . showString ".0"]
+            Just s  -> B.fromString s
+            Nothing -> list [B.singleton '/', B.decimal (numerator r) <> ".0", B.decimal (denominator r) <> ".0"]
 
-rel2 :: Options -> Env -> MIP.Problem -> Bool -> MIP.BoundExpr -> MIP.Expr -> MIP.BoundExpr -> ShowS
+rel2 :: Options -> Env -> MIP.Problem -> Bool -> MIP.BoundExpr -> MIP.Expr -> MIP.BoundExpr -> Builder
 rel2 opt env mip q lb e ub = and' (c1 ++ c2)
   where
     c1 =
       case lb of
         MIP.NegInf -> []
         MIP.Finite x -> [rel opt env mip q MIP.Ge e x]
-        MIP.PosInf -> [showString "false"]
+        MIP.PosInf -> ["false"]
     c2 =
       case ub of
-        MIP.NegInf -> [showString "false"]
+        MIP.NegInf -> ["false"]
         MIP.Finite x -> [rel opt env mip q MIP.Le e x]
         MIP.PosInf -> []
 
-rel :: Options -> Env -> MIP.Problem -> Bool -> MIP.RelOp -> MIP.Expr -> Rational -> ShowS
+rel :: Options -> Env -> MIP.Problem -> Bool -> MIP.RelOp -> MIP.Expr -> Rational -> Builder
 rel opt env mip q op lhs rhs
   | and [isInt mip v | v <- Set.toList (MIP.vars lhs)] &&
     and [isInteger c | MIP.Term c _ <- MIP.terms lhs] && isInteger rhs =
@@ -184,31 +185,31 @@ rel opt env mip q op lhs rhs
   | otherwise =
       f q op (realExpr opt env mip lhs) (realNum opt rhs)
   where
-    f :: Bool -> MIP.RelOp -> ShowS -> ShowS -> ShowS
+    f :: Bool -> MIP.RelOp -> Builder -> Builder -> Builder
     f True MIP.Eql x y = and' [f False MIP.Le x y, f False MIP.Ge x y]
-    f _ MIP.Eql x y = list [showString "=", x, y]
-    f _ MIP.Le x y = list [showString "<=", x, y]
-    f _ MIP.Ge x y = list [showString ">=", x, y]
+    f _ MIP.Eql x y = list ["=", x, y]
+    f _ MIP.Le x y = list ["<=", x, y]
+    f _ MIP.Ge x y = list [">=", x, y]
 
-toReal :: Options -> ShowS -> ShowS
+toReal :: Options -> Builder -> Builder
 toReal opt x =
   case optLanguage opt of
-    SMTLIB2 -> list [showString "to_real", x]
+    SMTLIB2 -> list ["to_real", x]
     YICES _ -> x
 
-assert :: Options -> (ShowS, Maybe String) -> ShowS
-assert opt (x, label) = list [showString "assert", x']
+assert :: Options -> (Builder, Maybe String) -> Builder
+assert opt (x, label) = list ["assert", x']
   where
     x' = case label of
            Just name | optLanguage opt == SMTLIB2 ->
-             list [ showString "!"
+             list [ "!"
                   , x
-                  , showString ":named"
-                  , showString (encode opt name)
+                  , ":named"
+                  , B.fromString (encode opt name)
                   ]
            _ -> x
 
-constraint :: Options -> Bool -> Env -> MIP.Problem -> MIP.Constraint -> (ShowS, Maybe String)
+constraint :: Options -> Bool -> Env -> MIP.Problem -> MIP.Constraint -> (Builder, Maybe String)
 constraint opt q env mip
   MIP.Constraint
   { MIP.constrLabel     = label
@@ -222,12 +223,12 @@ constraint opt q env mip
     c1 = case g of
            Nothing -> c0
            Just (var,val) ->
-             list [ showString "=>"
+             list [ "=>"
                   , rel opt env mip q MIP.Eql (MIP.varExpr var) val
                   , c0
                   ]
 
-conditions :: Options -> Bool -> Env -> MIP.Problem -> [(ShowS, Maybe String)]
+conditions :: Options -> Bool -> Env -> MIP.Problem -> [(Builder, Maybe String)]
 conditions opt q env mip = bnds ++ cs ++ ss
   where
     vs = MIP.variables mip
@@ -245,11 +246,11 @@ conditions opt q env mip = bnds ++ cs ++ ss
             -- Supported solvers: cvc4-1.1, yices-2.2.1, z3-4.3.0
             -- Unsupported solvers: z3-4.0
             SMTLIB2
-              | lb == MIP.PosInf || ub == MIP.NegInf -> showString "false"
-              | length args >= 2 -> list (showString "<=" : args)
-              | otherwise -> showString "true"
+              | lb == MIP.PosInf || ub == MIP.NegInf -> "false"
+              | length args >= 2 -> list ("<=" : args)
+              | otherwise -> "true"
                   where
-                    args = lb2 ++ [showString v2] ++ ub2
+                    args = lb2 ++ [B.fromText v2] ++ ub2
                     lb2 = case lb of
                             MIP.NegInf -> []
                             MIP.PosInf -> error "should not happen"
@@ -266,24 +267,24 @@ conditions opt q env mip = bnds ++ cs ++ ss
               where
                 s1 = case lb of
                        MIP.NegInf -> []
-                       MIP.PosInf -> [showString "false"]
+                       MIP.PosInf -> ["false"]
                        MIP.Finite x ->
                          if isInt mip v
-                         then [list [showString "<=", intNum opt (ceiling x), showString v2]]
-                         else [list [showString "<=", realNum opt x, showString v2]]
+                         then [list ["<=", intNum opt (ceiling x), B.fromText v2]]
+                         else [list ["<=", realNum opt x, B.fromText v2]]
                 s2 = case ub of
-                       MIP.NegInf -> [showString "false"]
+                       MIP.NegInf -> ["false"]
                        MIP.PosInf -> []
                        MIP.Finite x ->
                          if isInt mip v
-                         then [list [showString "<=", showString v2, intNum opt (floor x)]]
-                         else [list [showString "<=", showString v2, realNum opt x]]
+                         then [list ["<=", B.fromText v2, intNum opt (floor x)]]
+                         else [list ["<=", B.fromText v2, realNum opt x]]
 
         c1 = case MIP.getVarType mip v of
                MIP.SemiContinuousVariable ->
-                 or' [list [showString "=", showString v2, realNum opt 0], c0]
+                 or' [list ["=", B.fromText v2, realNum opt 0], c0]
                MIP.SemiIntegerVariable ->
-                 or' [list [showString "=", showString v2, intNum opt 0], c0]
+                 or' [list ["=", B.fromText v2, intNum opt 0], c0]
                _ ->
                  c0
 
@@ -294,12 +295,12 @@ conditions opt q env mip = bnds ++ cs ++ ss
                     MIP.S1 -> pairs $ map fst xs
                     MIP.S2 -> nonAdjacentPairs $ map fst $ sortBy (comparing snd) $ xs
       let c = not' $ and'
-            [ list [showString "/=", v3, realNum opt 0]
+            [ list ["/=", v3, realNum opt 0]
             | v<-[x1,x2]
             , let v2 = env Map.! v
             , let v3 = if isInt mip v
-                       then toReal opt (showString v2)
-                       else showString v2
+                       then toReal opt (B.fromText v2)
+                       else B.fromText v2
             ]
       return (c, label)
 
@@ -311,14 +312,15 @@ nonAdjacentPairs :: [a] -> [(a,a)]
 nonAdjacentPairs (x1:x2:xs) = [(x1,x3) | x3 <- xs] ++ nonAdjacentPairs (x2:xs)
 nonAdjacentPairs _ = []
 
-convert :: Options -> MIP.Problem -> ShowS
+convert :: Options -> MIP.Problem -> Builder
 convert opt mip =
-  unlinesS $ options ++ set_logic ++ defs ++ map (assert opt) (conditions opt False env mip)
-             ++ [ assert opt (optimality, Nothing) | optOptimize opt ]
-             ++ [ case optLanguage opt of
-                    SMTLIB2 -> list [showString "check-sat"]
-                    YICES _ -> list [showString "check"]
-                | optCheckSAT opt ]
+  mconcat $ map (<> B.singleton '\n') $
+    options ++ set_logic ++ defs ++ map (assert opt) (conditions opt False env mip)
+    ++ [ assert opt (optimality, Nothing) | optOptimize opt ]
+    ++ [ case optLanguage opt of
+           SMTLIB2 -> list ["check-sat"]
+           YICES _ -> list ["check"]
+       | optCheckSAT opt ]
   where
     vs = MIP.variables mip
     real_vs = vs `Set.difference` int_vs
@@ -333,40 +335,40 @@ convert opt mip =
         YICES _ -> "int"
     ts = [(v, realType) | v <- Set.toList real_vs] ++ [(v, intType) | v <- Set.toList int_vs]
     obj = MIP.objectiveFunction mip
-    env = Map.fromList [(v, encode opt (MIP.fromVar v)) | v <- Set.toList vs]
+    env = Map.fromList [(v, T.pack $ encode opt (MIP.fromVar v)) | v <- Set.toList vs]
     -- Note that identifiers of LPFile does not contain '-'.
     -- So that there are no name crash.
-    env2 = Map.fromList [(v, encode opt (MIP.fromVar v ++ "-2")) | v <- Set.toList vs]
+    env2 = Map.fromList [(v, T.pack $ encode opt (MIP.fromVar v ++ "-2")) | v <- Set.toList vs]
 
     options =
       [ case optLanguage opt of
-          SMTLIB2 -> list [showString "set-option", showString ":produce-models", showString "true"]
-          YICES _ -> list [showString "set-evidence!", showString "true"]
+          SMTLIB2 -> list ["set-option", ":produce-models", "true"]
+          YICES _ -> list ["set-evidence!", "true"]
       | optProduceModel opt && optLanguage opt /= YICES Yices2
       ]
 
     set_logic =
       case optSetLogic opt of
-        Just logic | optLanguage opt == SMTLIB2 -> [list [showString "set-logic", showString logic]]
+        Just logic | optLanguage opt == SMTLIB2 -> [list ["set-logic", B.fromString logic]]
         _ -> []
 
     defs = do
       (v,t) <- ts
       let v2 = env Map.! v
-      return $ showString $
+      return $ B.fromString $
         case optLanguage opt of
           SMTLIB2 -> printf "(declare-fun %s () %s)" v2 t
           YICES _ -> printf "(define %s::%s) ; %s"  v2 t (MIP.fromVar v)
 
-    optimality = list [showString "forall", decl, body]
+    optimality = list ["forall", decl, body]
       where
         decl =
           case optLanguage opt of
-            SMTLIB2 -> list [list [showString (env2 Map.! v), showString t] | (v,t) <- ts]
-            YICES _ -> list [showString $ printf "%s::%s" (env2 Map.! v) t | (v,t) <- ts]
-        body = list [showString "=>"
+            SMTLIB2 -> list [list [B.fromText (env2 Map.! v), B.fromString t] | (v,t) <- ts]
+            YICES _ -> list [B.fromString $ printf "%s::%s" (env2 Map.! v) t | (v,t) <- ts]
+        body = list ["=>"
                     , and' (map fst (conditions opt True env2 mip))
-                    , list [ showString $ if MIP.objDir obj == MIP.OptMin then "<=" else ">="
+                    , list [ if MIP.objDir obj == MIP.OptMin then "<=" else ">="
                            , realExpr opt env mip (MIP.objExpr obj), realExpr opt env2 mip (MIP.objExpr obj)
                            ]
                     ]
@@ -380,13 +382,13 @@ encode opt s =
      | otherwise -> "|" ++ s ++ "|"
     YICES _ -> concatMap f s
   where
-    p c = isAscii c && (isAlpha c || isDigit c || c `elem` "~!@$%^&*_-+=<>.?/")
+    p c = isAscii c && (isAlpha c || isDigit c || c `elem` ("~!@$%^&*_-+=<>.?/" :: [Char]))
     q c = c == '|' && c == '\\'
 
     -- Note that '[', ']', '\\' does not appear in identifiers of LP file.
     f '(' = "["
     f ')' = "]"
-    f c | c `elem` "/\";" = printf "\\x%02d" (fromEnum c :: Int)
+    f c | c `elem` ("/\";" :: [Char]) = printf "\\x%02d" (fromEnum c :: Int)
     f c = [c]
 
 isInt :: MIP.Problem -> MIP.Var -> Bool
@@ -400,11 +402,11 @@ testFile :: FilePath -> IO ()
 testFile fname = do
   result <- MIP.readLPFile def fname
   case result of
-    Right mip -> putStrLn $ convert def mip ""
+    Right mip -> TLIO.putStrLn $ B.toLazyText $ convert def mip
     Left err -> hPrint stderr err
 
 test :: IO ()
-test = putStrLn $ convert def testdata ""
+test = TLIO.putStrLn $ B.toLazyText $ convert def testdata
 
 testdata :: MIP.Problem
 Right testdata = MIP.parseLPString def "test" $ unlines

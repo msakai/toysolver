@@ -159,6 +159,7 @@ Library
      sign >=0.2.0 && <1.0.0,
      stm >=2.3,
      template-haskell,
+     text >=1.1.0.0,
      time,
      transformers >=0.2,
      transformers-compat >=0.3,
@@ -490,6 +491,7 @@ Executable toyconvert
     filepath,
     parse-dimacs,
     pseudo-boolean,
+    text,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
