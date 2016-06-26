@@ -349,6 +349,7 @@ Executable toysolver
     containers,
     data-default-class,
     filepath,
+    intern,
     OptDir,
     parse-dimacs,
     pseudo-boolean,

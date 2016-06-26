@@ -24,6 +24,7 @@ import Control.Exception
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy as BS
 import Data.Default.Class
+import Data.Interned.Text
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
@@ -900,6 +901,8 @@ solveMaxSAT opt solver wcnf wcnfFileName =
 
 -- ------------------------------------------------------------------------
 
+type MIPVar = InternedText
+
 mainMIP :: Options -> SAT.Solver -> [String] -> IO ()
 mainMIP opt solver args = do
   mip <-
@@ -942,13 +945,13 @@ solveMIP opt solver mip = do
       let transformObjVal :: Integer -> Rational
           transformObjVal val = otrans (val + linObjOffset)
   
-          printModel :: Map MIP.Var Integer -> IO ()
+          printModel :: Map MIPVar Integer -> IO ()
           printModel m = do
             forM_ (Map.toList m) $ \(v, val) -> do
               printf "v %s = %d\n" (MIP.fromVar v) val
             hFlush stdout
   
-          writeSol :: Map MIP.Var Integer -> Rational -> IO ()
+          writeSol :: Map MIPVar Integer -> Rational -> IO ()
           writeSol m val = do
             case optWriteFile opt of
               Nothing -> return ()
