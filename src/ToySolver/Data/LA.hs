@@ -160,6 +160,24 @@ instance (Num r, Eq r) => VectorSpace (Expr r) where
   0 *^ e = zeroV
   c *^ e = mapCoeff (c*) e
 
+-- | This is unsafe instance in the sense that non-linear multiplication is not defined.
+instance (Num r, Eq r) => Num (Expr r) where
+  (+) = (^+^)
+  negate = negateV
+  a * b
+    | Just c <- asConst a = c *^ b
+    | Just c <- asConst b = c *^ a
+    | otherwise = error "Real{ToySolver.Data.LA.Expr}.(*): one of factors must be a constant"
+  abs x = x
+  signum x = 1
+  fromInteger = constant . fromInteger
+
+instance (Fractional r, Eq r) => Fractional (Expr r) where
+  a / b
+    | Just c <- asConst b = a ^/ c
+    | otherwise = error "Fractional{ToySolver.Data.LA.Expr}.(/): divisor must be a constant"
+  fromRational = constant . fromRational
+
 plus :: Num r => Expr r -> Expr r -> Expr r
 plus (Expr t1) (Expr t2) = Expr $ IntMap.unionWith (+) t1 t2
 
