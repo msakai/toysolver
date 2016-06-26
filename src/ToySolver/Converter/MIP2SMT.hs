@@ -355,17 +355,17 @@ convert opt mip =
     defs = do
       (v,t) <- ts
       let v2 = env Map.! v
-      return $ B.fromString $
+      return $
         case optLanguage opt of
-          SMTLIB2 -> printf "(declare-fun %s () %s)" v2 t
-          YICES _ -> printf "(define %s::%s) ; %s"  v2 t (MIP.fromVar v)
+          SMTLIB2 -> "(declare-fun " <> B.fromText v2 <> " () " <> B.fromString t <> ")"
+          YICES _ -> "(define " <> B.fromText v2 <> "::" <> B.fromString t <> ") ; " <> B.fromString  (MIP.fromVar v)
 
     optimality = list ["forall", decl, body]
       where
         decl =
           case optLanguage opt of
             SMTLIB2 -> list [list [B.fromText (env2 Map.! v), B.fromString t] | (v,t) <- ts]
-            YICES _ -> list [B.fromString $ printf "%s::%s" (env2 Map.! v) t | (v,t) <- ts]
+            YICES _ -> list [B.fromText (env2 Map.! v) <> "::" <> B.fromString t | (v,t) <- ts]
         body = list ["=>"
                     , and' (map fst (conditions opt True env2 mip))
                     , list [ if MIP.objDir obj == MIP.OptMin then "<=" else ">="
