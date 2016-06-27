@@ -20,6 +20,7 @@ module ToySolver.Converter.MIP2SMT
 
 import Data.Char
 import Data.Default.Class
+import Data.Interned
 import Data.Ord
 import Data.List
 import Data.Monoid
@@ -197,7 +198,7 @@ toReal opt x =
     SMTLIB2 -> list ["to_real", x]
     YICES _ -> x
 
-assert :: Options -> (Builder, Maybe String) -> Builder
+assert :: Options -> (Builder, Maybe T.Text) -> Builder
 assert opt (x, label) = list ["assert", x']
   where
     x' = case label of
@@ -205,11 +206,11 @@ assert opt (x, label) = list ["assert", x']
              list [ "!"
                   , x
                   , ":named"
-                  , B.fromString (encode opt name)
+                  , B.fromText (encode opt name)
                   ]
            _ -> x
 
-constraint :: Options -> Bool -> Env -> MIP.Problem -> MIP.Constraint -> (Builder, Maybe String)
+constraint :: Options -> Bool -> Env -> MIP.Problem -> MIP.Constraint -> (Builder, Maybe T.Text)
 constraint opt q env mip
   MIP.Constraint
   { MIP.constrLabel     = label
@@ -228,7 +229,7 @@ constraint opt q env mip
                   , c0
                   ]
 
-conditions :: Options -> Bool -> Env -> MIP.Problem -> [(Builder, Maybe String)]
+conditions :: Options -> Bool -> Env -> MIP.Problem -> [(Builder, Maybe T.Text)]
 conditions opt q env mip = bnds ++ cs ++ ss
   where
     vs = MIP.variables mip
@@ -335,10 +336,10 @@ convert opt mip =
         YICES _ -> "int"
     ts = [(v, realType) | v <- Set.toList real_vs] ++ [(v, intType) | v <- Set.toList int_vs]
     obj = MIP.objectiveFunction mip
-    env = Map.fromList [(v, T.pack $ encode opt (MIP.fromVar v)) | v <- Set.toList vs]
+    env = Map.fromList [(v, encode opt (unintern v)) | v <- Set.toList vs]
     -- Note that identifiers of LPFile does not contain '-'.
     -- So that there are no name crash.
-    env2 = Map.fromList [(v, T.pack $ encode opt (MIP.fromVar v ++ "-2")) | v <- Set.toList vs]
+    env2 = Map.fromList [(v, encode opt (unintern v <> "-2")) | v <- Set.toList vs]
 
     options =
       [ case optLanguage opt of
@@ -373,14 +374,14 @@ convert opt mip =
                            ]
                     ]
 
-encode :: Options -> String -> String
+encode :: Options -> T.Text -> T.Text
 encode opt s = 
   case optLanguage opt of
     SMTLIB2
-     | all p s   -> s
-     | any q s   -> error $ "cannot encode " ++ show s
-     | otherwise -> "|" ++ s ++ "|"
-    YICES _ -> concatMap f s
+     | T.all p s   -> s
+     | T.any q s   -> error $ "cannot encode " ++ show s
+     | otherwise -> "|" <> s <> "|"
+    YICES _ -> T.concatMap f s
   where
     p c = isAscii c && (isAlpha c || isDigit c || c `elem` ("~!@$%^&*_-+=<>.?/" :: [Char]))
     q c = c == '|' && c == '\\'
@@ -388,8 +389,8 @@ encode opt s =
     -- Note that '[', ']', '\\' does not appear in identifiers of LP file.
     f '(' = "["
     f ')' = "]"
-    f c | c `elem` ("/\";" :: [Char]) = printf "\\x%02d" (fromEnum c :: Int)
-    f c = [c]
+    f c | c `elem` ("/\";" :: [Char]) = T.pack $ printf "\\x%02d" (fromEnum c :: Int)
+    f c = T.singleton c
 
 isInt :: MIP.Problem -> MIP.Var -> Bool
 isInt mip v = vt == MIP.IntegerVariable || vt == MIP.SemiIntegerVariable

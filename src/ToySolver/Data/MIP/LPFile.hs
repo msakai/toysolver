@@ -42,6 +42,8 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.STRef
+import Data.String
+import qualified Data.Text as T
 import Data.OptDir
 import System.IO
 import Text.Parsec hiding (label)
@@ -107,7 +109,7 @@ label :: Parser MIP.Label
 label = do
   name <- ident
   tok $ char ':'
-  return name
+  return $! T.pack name
 
 reserved :: Set String
 reserved = Set.fromList
@@ -128,7 +130,7 @@ parser = do
   name <- optionMaybe $ try $ do
     spaces
     string' "\\* Problem: " 
-    manyTill anyChar (try (string " *\\\n"))
+    liftM fromString $ manyTill anyChar (try (string " *\\\n"))
   sep
   obj <- problem
 
@@ -455,7 +457,7 @@ writeVar v = writeString $ MIP.fromVar v
 render' :: MIP.Problem -> M ()
 render' mip = do
   case MIP.name mip of
-    Just name -> writeString $ "\\* Problem: " ++ name ++ " *\\\n"
+    Just name -> writeString $ "\\* Problem: " ++ T.unpack name ++ " *\\\n"
     Nothing -> return ()
 
   let obj = MIP.objectiveFunction mip   
@@ -583,7 +585,7 @@ renderLabel :: Maybe MIP.Label -> M ()
 renderLabel l =
   case l of
     Nothing -> return ()
-    Just s -> writeString s >> writeString ": "
+    Just s -> writeString (T.unpack s) >> writeString ": "
 
 renderOp :: MIP.RelOp -> M ()
 renderOp MIP.Le = writeString "<="
