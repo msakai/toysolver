@@ -205,7 +205,7 @@ writeProblem o problem = do
             Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
             Right s -> do
               F.mapM_ (hSetEncoding stdout) enc
-              hPutStr stdout s
+              TLIO.hPutStr stdout s
     Just fname -> do
       let opb = case problem of
                   ProbOPB opb -> opb

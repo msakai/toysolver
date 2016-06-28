@@ -60,9 +60,11 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Interned (intern, unintern)
-import Data.Interned.String
+import Data.Interned.Text
 import Data.ExtendedReal
 import Data.OptDir
+import Data.String
+import qualified Data.Text as T
 import System.IO (TextEncoding)
 
 infix 4 .<=., .>=., .==.
@@ -72,7 +74,7 @@ infix 4 .<=., .>=., .==.
 -- | Problem
 data Problem
   = Problem
-  { name :: Maybe String
+  { name :: Maybe T.Text
   , objectiveFunction :: ObjectiveFunction
   , constraints :: [Constraint]
   , sosConstraints :: [SOSConstraint]
@@ -196,10 +198,10 @@ instance Default VarType where
 type Bounds = (BoundExpr, BoundExpr)
 
 -- | label
-type Label = String
+type Label = T.Text
 
 -- | variable
-type Var = InternedString
+type Var = InternedText
 
 -- | type for representing lower/upper bound of variables
 type BoundExpr = Extended Rational
@@ -267,11 +269,11 @@ defaultUB = PosInf
 
 -- | convert a string into a variable
 toVar :: String -> Var
-toVar = intern
+toVar = fromString
 
 -- | convert a variable into a string
 fromVar :: Var -> String
-fromVar = unintern
+fromVar = T.unpack . unintern
 
 -- | looking up bounds for a variable
 getVarType :: Problem -> Var -> VarType

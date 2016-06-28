@@ -9,6 +9,7 @@ import Data.Maybe
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
+import qualified Data.Text.Lazy.IO as TLIO
 import ToySolver.Data.MIP ((.==.), (.>=.))
 import qualified ToySolver.Data.MIP as MIP
 import System.Console.GetOpt
@@ -173,4 +174,4 @@ main = do
               hPutStrLn stderr err
               exitFailure
             Right s -> do
-              putStr s
+              TLIO.putStr s
