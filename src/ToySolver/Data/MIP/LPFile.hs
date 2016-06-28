@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, BangPatterns #-}
+{-# LANGUAGE OverloadedStrings, BangPatterns, FlexibleContexts, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (OverloadedStrings, BangPatterns, FlexibleContexts, ScopedTypeVariables)
 --
 -- A CPLEX .lp format parser library.
 -- 
@@ -34,6 +34,7 @@ import Control.Monad.Writer
 import Control.Monad.ST
 import Data.Char
 import Data.Default.Class
+import Data.Functor.Identity
 import Data.Interned
 import Data.List
 import Data.Maybe
@@ -49,10 +50,10 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as B
+import qualified Data.Text.Lazy.IO as TLIO
 import Data.OptDir
 import System.IO
 import Text.Parsec hiding (label)
-import Text.Parsec.String
 
 import qualified ToySolver.Data.MIP.Base as MIP
 import ToySolver.Internal.Util (combineMaybe)
@@ -62,7 +63,7 @@ import ToySolver.Internal.TextUtil (readUnsignedInteger)
 
 -- | Parse a string containing LP file data.
 -- The source name is only | used in error messages and may be the empty string.
-parseString :: MIP.FileOptions -> SourceName -> String -> Either ParseError MIP.Problem
+parseString :: Stream s Identity Char => MIP.FileOptions -> SourceName -> s -> Either ParseError MIP.Problem
 parseString _ = parse (parser <* eof)
 
 -- | Parse a file containing LP file data.
@@ -72,31 +73,31 @@ parseFile opt fname = do
   case MIP.optFileEncoding opt of
     Nothing -> return ()
     Just enc -> hSetEncoding h enc
-  parse (parser <* eof) fname <$> hGetContents h
+  parse (parser <* eof) fname <$> TLIO.hGetContents h
 
 -- ---------------------------------------------------------------------------
 
-char' :: Char -> Parser Char
+char' :: Stream s m Char => Char -> ParsecT s u m Char
 char' c = (char c <|> char (toUpper c)) <?> show c
 
-string' :: String -> Parser ()
+string' :: Stream s m Char => String -> ParsecT s u m ()
 string' s = mapM_ char' s <?> show s
 
-sep :: Parser ()
+sep :: Stream s m Char => ParsecT s u m ()
 sep = skipMany ((comment >> return ()) <|> (space >> return ()))
 
-comment :: Parser String
+comment :: Stream s m Char => ParsecT s u m String
 comment = do
   char '\\'
   manyTill anyChar (try newline)
 
-tok :: Parser a -> Parser a
+tok :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
 tok p = do
   x <- p
   sep
   return x
 
-ident :: Parser String
+ident :: Stream s m Char => ParsecT s u m String
 ident = tok $ do
   x <- letter <|> oneOf syms1 
   xs <- many (alphaNum <|> oneOf syms2)
@@ -107,10 +108,10 @@ ident = tok $ do
     syms1 = "!\"#$%&()/,;?@_`'{}|~"
     syms2 = '.' : syms1
 
-variable :: Parser MIP.Var
+variable :: Stream s m Char => ParsecT s u m MIP.Var
 variable = liftM MIP.toVar ident
 
-label :: Parser MIP.Label
+label :: Stream s m Char => ParsecT s u m MIP.Label
 label = do
   name <- ident
   tok $ char ':'
@@ -130,7 +131,7 @@ reserved = Set.fromList
 -- ---------------------------------------------------------------------------
 
 -- | LP file parser
-parser :: Parser MIP.Problem
+parser :: Stream s m Char => ParsecT s u m MIP.Problem
 parser = do
   name <- optionMaybe $ try $ do
     spaces
@@ -185,7 +186,7 @@ parser = do
     , MIP.varBounds         = Map.fromAscList [ (v, Map.findWithDefault MIP.defaultBounds v bnds2) | v <- Set.toAscList vs]
     }
 
-problem :: Parser MIP.ObjectiveFunction
+problem :: Stream s m Char => ParsecT s u m MIP.ObjectiveFunction
 problem = do
   flag <-  (try minimize >> return OptMin)
        <|> (try maximize >> return OptMax)
@@ -193,19 +194,19 @@ problem = do
   obj <- expr
   return def{ MIP.objLabel = name, MIP.objDir = flag, MIP.objExpr = obj }
 
-minimize, maximize :: Parser ()
+minimize, maximize :: Stream s m Char => ParsecT s u m ()
 minimize = tok $ string' "min" >> optional (string' "imize")
 maximize = tok $ string' "max" >> optional (string' "imize")
 
-end :: Parser ()
+end :: Stream s m Char => ParsecT s u m ()
 end = tok $ string' "end"
 
 -- ---------------------------------------------------------------------------
 
-constraintSection :: Parser [MIP.Constraint]
+constraintSection :: Stream s m Char => ParsecT s u m [MIP.Constraint]
 constraintSection = subjectTo >> many (try (constraint False))
 
-subjectTo :: Parser ()
+subjectTo :: Stream s m Char => ParsecT s u m ()
 subjectTo = msum
   [ try $ tok (string' "subject") >> tok (string' "to")
   , try $ tok (string' "such") >> tok (string' "that")
@@ -214,7 +215,7 @@ subjectTo = msum
         >> tok (char '.') >> return ()
   ]
 
-constraint :: Bool -> Parser MIP.Constraint
+constraint :: Stream s m Char => Bool -> ParsecT s u m MIP.Constraint
 constraint isLazy = do
   name <- optionMaybe (try label)
 
@@ -246,7 +247,7 @@ constraint isLazy = do
     , MIP.constrIsLazy    = isLazy
     }
 
-relOp :: Parser MIP.RelOp
+relOp :: Stream s m Char => ParsecT s u m MIP.RelOp
 relOp = tok $ msum
   [ char '<' >> optional (char '=') >> return MIP.Le
   , char '>' >> optional (char '=') >> return MIP.Ge
@@ -256,13 +257,13 @@ relOp = tok $ msum
                      ]
   ]
 
-lazyConstraintsSection :: Parser [MIP.Constraint]
+lazyConstraintsSection :: Stream s m Char => ParsecT s u m [MIP.Constraint]
 lazyConstraintsSection = do
   tok $ string' "lazy"
   tok $ string' "constraints"
   many $ try $ constraint True
 
-userCutsSection :: Parser [MIP.Constraint]
+userCutsSection :: Stream s m Char => ParsecT s u m [MIP.Constraint]
 userCutsSection = do
   tok $ string' "user"
   tok $ string' "cuts"
@@ -270,7 +271,7 @@ userCutsSection = do
 
 type Bounds2 = (Maybe MIP.BoundExpr, Maybe MIP.BoundExpr)
 
-boundsSection :: Parser (Map MIP.Var MIP.Bounds)
+boundsSection :: Stream s m Char => ParsecT s u m (Map MIP.Var MIP.Bounds)
 boundsSection = do
   tok $ string' "bound" >> optional (char' 's')
   liftM (Map.map g . Map.fromListWith f) $ many (try bound)
@@ -280,7 +281,7 @@ boundsSection = do
                  , fromMaybe MIP.defaultUB ub
                  )
 
-bound :: Parser (MIP.Var, Bounds2)
+bound :: Stream s m Char => ParsecT s u m (MIP.Var, Bounds2)
 bound = msum
   [ try $ do
       v <- try variable
@@ -311,7 +312,7 @@ bound = msum
       return (v, (b1, b2))
   ]
 
-boundExpr :: Parser MIP.BoundExpr
+boundExpr :: Stream s m Char => ParsecT s u m MIP.BoundExpr
 boundExpr = msum 
   [ try (tok (char '+') >> inf >> return MIP.PosInf)
   , try (tok (char '-') >> inf >> return MIP.NegInf)
@@ -321,27 +322,27 @@ boundExpr = msum
       return $ MIP.Finite (s*x)
   ]
 
-inf :: Parser ()
+inf :: Stream s m Char => ParsecT s u m ()
 inf = tok (string "inf" >> optional (string "inity"))
 
 -- ---------------------------------------------------------------------------
 
-generalSection :: Parser [MIP.Var]
+generalSection :: Stream s m Char => ParsecT s u m [MIP.Var]
 generalSection = do
   tok $ string' "gen" >> optional (string' "eral" >> optional (string' "s"))
   many (try variable)
 
-binarySection :: Parser [MIP.Var]
+binarySection :: Stream s m Char => ParsecT s u m [MIP.Var]
 binarySection = do
   tok $ string' "bin" >> optional (string' "ar" >> (string' "y" <|> string' "ies"))
   many (try variable)
 
-semiSection :: Parser [MIP.Var]
+semiSection :: Stream s m Char => ParsecT s u m [MIP.Var]
 semiSection = do
   tok $ string' "semi" >> optional (string' "-continuous" <|> string' "s")
   many (try variable)
 
-sosSection :: Parser [MIP.SOSConstraint]
+sosSection :: Stream s m Char => ParsecT s u m [MIP.SOSConstraint]
 sosSection = do
   tok $ string' "sos"
   many $ try $ do
@@ -361,19 +362,19 @@ sosSection = do
 
 -- ---------------------------------------------------------------------------
 
-expr :: Parser MIP.Expr
+expr :: forall s m u. Stream s m Char => ParsecT s u m MIP.Expr
 expr = try expr1 <|> return 0
   where
-    expr1 :: Parser MIP.Expr
+    expr1 :: ParsecT s u m MIP.Expr
     expr1 = do
       t <- term True
       ts <- many (term False)
       return $ sum (t : ts)
 
-sign :: Num a => Parser a
+sign :: (Stream s m Char, Num a) => ParsecT s u m a
 sign = tok ((char '+' >> return 1) <|> (char '-' >> return (-1)))
 
-term :: Bool -> Parser MIP.Expr
+term :: Stream s m Char => Bool -> ParsecT s u m MIP.Expr
 term flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
@@ -382,7 +383,7 @@ term flag = do
     Nothing -> e
     Just d -> MIP.constExpr d * e
 
-qexpr :: Parser MIP.Expr
+qexpr :: Stream s m Char => ParsecT s u m MIP.Expr
 qexpr = do
   tok (char '[')
   t <- qterm True
@@ -394,7 +395,7 @@ qexpr = do
       return $ MIP.constExpr (1/2) * e)
    <|> return e
 
-qterm :: Bool -> Parser MIP.Term
+qterm :: Stream s m Char => Bool -> ParsecT s u m MIP.Term
 qterm flag = do
   s <- if flag then optionMaybe sign else liftM Just sign
   c <- optionMaybe number
@@ -403,14 +404,14 @@ qterm flag = do
     Nothing -> MIP.Term 1 es
     Just d -> MIP.Term d es
 
-qfactor :: Parser [MIP.Var]
+qfactor :: Stream s m Char => ParsecT s u m [MIP.Var]
 qfactor = do
   v <- variable
   msum [ tok (char '^') >> tok (char '2') >> return [v,v]
        , return [v]
        ]
 
-number :: Parser Rational
+number :: forall s m u. Stream s m Char => ParsecT s u m Rational
 number = tok $ do
   b <- (do{ x <- nat; y <- option 0 frac; return (fromInteger x + y) })
     <|> frac
@@ -419,16 +420,16 @@ number = tok $ do
   where
     digits = many1 digit
 
-    nat :: Parser Integer
+    nat :: ParsecT s u m Integer
     nat = liftM readUnsignedInteger digits
 
-    frac :: Parser Rational
+    frac :: ParsecT s u m Rational
     frac = do
       char '.'
       s <- digits
       return (readUnsignedInteger s % 10^(length s))
 
-    e :: Parser Integer
+    e :: ParsecT s u m Integer
     e = do
       oneOf "eE"
       f <- msum [ char '+' >> return id
