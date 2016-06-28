@@ -35,6 +35,7 @@ import Control.Monad
 import Control.Monad.Writer
 import Data.Default.Class
 import Data.Maybe
+import Data.Monoid
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Map (Map)
@@ -44,6 +45,9 @@ import Data.Interned
 import Data.Interned.Text
 import Data.String
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import Data.Text.Lazy.Builder (Builder)
+import qualified Data.Text.Lazy.Builder as B
 import System.IO
 import qualified Text.Parsec as P
 import Text.Parsec hiding (spaces, newline, Column)
@@ -579,20 +583,23 @@ indicatorsSection = do
 
 -- ---------------------------------------------------------------------------
 
-type M a = Writer ShowS a
+type M a = Writer Builder a
 
-execM :: M a -> String
-execM m = execWriter m ""
+execM :: M a -> TL.Text
+execM m = B.toLazyText $ execWriter m
 
 writeString :: String -> M ()
-writeString s = tell $ showString s
+writeString s = tell $ B.fromString s
+
+writeText :: T.Text -> M ()
+writeText s = tell $ B.fromText s
 
 writeChar :: Char -> M ()
-writeChar c = tell $ showChar c
+writeChar c = tell $ B.singleton c
 
 -- ---------------------------------------------------------------------------
 
-render :: MIP.FileOptions -> MIP.Problem -> Either String String
+render :: MIP.FileOptions -> MIP.Problem -> Either String TL.Text
 render _ mip | not (checkAtMostQuadratic mip) = Left "Expression must be atmost quadratic"
 render _ mip = Right $ execM $ render' $ nameRows mip
 
@@ -602,7 +609,7 @@ render' mip = do
 
   -- NAME section
   -- The name starts in column 15 in fixed formats.
-  writeSectionHeader $ "NAME" ++ replicate 10 ' ' ++ T.unpack probName
+  writeSectionHeader $ "NAME" <> T.replicate 10 " " <> probName
   
   let MIP.ObjectiveFunction
        { MIP.objLabel = Just objName
@@ -640,11 +647,11 @@ render' mip = do
                     MIP.Le  -> "L"
                     MIP.Ge  -> "G"
                     MIP.Eql -> "E"
-          writeFields [s, T.unpack $ fromJust $ MIP.constrLabel c]
+          writeFields [s, fromJust $ MIP.constrLabel c]
 
   -- ROWS section
   writeSectionHeader "ROWS"
-  writeFields ["N", T.unpack objName]
+  writeFields ["N", objName]
   renderRows [c | c <- MIP.constraints mip, not (MIP.constrIsLazy c)]
 
   -- USERCUTS section
@@ -670,7 +677,7 @@ render' mip = do
              ]
       f col xs =
         forM_ (Map.toList xs) $ \(row, d) -> do
-          writeFields ["", T.unpack $ unintern col, T.unpack $ row, showValue d]
+          writeFields ["", unintern col, row, showValue d]
       ivs = MIP.integerVariables mip `Set.union` MIP.semiIntegerVariables mip
   forM_ (Map.toList (Map.filterWithKey (\col _ -> col `Set.notMember` ivs) cols)) $ \(col, xs) -> f col xs
   unless (Set.null ivs) $ do
@@ -682,14 +689,14 @@ render' mip = do
   let rs = [(fromJust $ MIP.constrLabel c, rhs) | c <- MIP.constraints mip ++ MIP.userCuts mip, let ((_,rhs),_) = splitRange c, rhs /= 0]
   writeSectionHeader "RHS"
   forM_ rs $ \(name, val) -> do
-    writeFields ["", "rhs", T.unpack name, showValue val]
+    writeFields ["", "rhs", name, showValue val]
 
   -- RANGES section
   let rngs = [(fromJust $ MIP.constrLabel c, fromJust rng) | c <- MIP.constraints mip ++ MIP.userCuts mip, let ((_,_), rng) = splitRange c, isJust rng]
   unless (null rngs) $ do
     writeSectionHeader "RANGES"
     forM_ rngs $ \(name, val) -> do
-      writeFields ["", "rhs", T.unpack name, showValue val]
+      writeFields ["", "rhs", name, showValue val]
 
   -- BOUNDS section
   writeSectionHeader "BOUNDS"
@@ -698,28 +705,28 @@ render' mip = do
     case (lb,ub)  of
       (MIP.NegInf, MIP.PosInf) -> do
         -- free variable (no lower or upper bound)
-        writeFields ["FR", "bound", T.unpack (unintern col)]
+        writeFields ["FR", "bound", unintern col]
                   
       (MIP.Finite 0, MIP.Finite 1) | vt == MIP.IntegerVariable -> do
         -- variable is binary (equal 0 or 1)
-        writeFields ["BV", "bound", T.unpack (unintern col)]
+        writeFields ["BV", "bound", unintern col]
 
       (MIP.Finite a, MIP.Finite b) | a == b -> do
         -- variable is fixed at the specified value
-        writeFields ["FX", "bound", T.unpack (unintern col), showValue a]
+        writeFields ["FX", "bound", unintern col, showValue a]
 
       _ -> do
         case lb of
           MIP.PosInf -> error "should not happen"
           MIP.NegInf -> do
             -- Minus infinity
-            writeFields ["MI", "bound", T.unpack (unintern col)]
+            writeFields ["MI", "bound", unintern col]
           MIP.Finite 0 | vt == MIP.ContinuousVariable -> return ()
           MIP.Finite a -> do
             let t = case vt of
                       MIP.IntegerVariable -> "LI" -- lower bound for integer variable
                       _ -> "LO" -- Lower bound
-            writeFields [t, "bound", T.unpack (unintern col), showValue a]
+            writeFields [t, "bound", unintern col, showValue a]
 
         case ub of
           MIP.NegInf -> error "should not happen"
@@ -727,7 +734,7 @@ render' mip = do
           MIP.PosInf -> do
             when (vt == MIP.SemiContinuousVariable || vt == MIP.SemiIntegerVariable) $
               error "cannot express +inf upper bound of semi-continuous or semi-integer variable"
-            writeFields ["PL", "bound", T.unpack (unintern col)] -- Plus infinity
+            writeFields ["PL", "bound", unintern col] -- Plus infinity
           MIP.Finite a -> do
             let t = case vt of
                       MIP.SemiContinuousVariable -> "SC" -- Upper bound for semi-continuous variable
@@ -736,7 +743,7 @@ render' mip = do
                         "SC"
                       MIP.IntegerVariable -> "UI" -- Upper bound for integer variable
                       _ -> "UP" -- Upper bound
-            writeFields [t, "bound", T.unpack (unintern col), showValue a]
+            writeFields [t, "bound", unintern col, showValue a]
 
   -- QMATRIX section
   -- Gurobiは対称行列になっていないと "qmatrix isn't symmetric" というエラーを発生させる
@@ -744,7 +751,7 @@ render' mip = do
   unless (Map.null qm) $ do
     writeSectionHeader "QMATRIX"
     forM_ (Map.toList qm) $ \(((v1,v2), val)) -> do
-      writeFields ["", T.unpack (unintern v1), T.unpack (unintern v2), showValue val]
+      writeFields ["", unintern v1, unintern v2, showValue val]
 
   -- SOS section
   unless (null (MIP.sosConstraints mip)) $ do
@@ -753,9 +760,9 @@ render' mip = do
       let t = case MIP.sosType sos of
                 MIP.S1 -> "S1"
                 MIP.S2 -> "S2"
-      writeFields $ t : maybeToList (fmap T.unpack (MIP.sosLabel sos))
+      writeFields $ t : maybeToList (MIP.sosLabel sos)
       forM_ (MIP.sosBody sos) $ \(var,val) -> do
-        writeFields ["", T.unpack (unintern var), showValue val]
+        writeFields ["", unintern var, showValue val]
 
   -- QCMATRIX section
   let xs = [ (fromJust $ MIP.constrLabel c, qm)
@@ -766,9 +773,9 @@ render' mip = do
   unless (null xs) $ do
     forM_ xs $ \(row, qm) -> do
       -- The name starts in column 12 in fixed formats.
-      writeSectionHeader $ "QCMATRIX" ++ replicate 3 ' ' ++ T.unpack row
+      writeSectionHeader $ "QCMATRIX" <> T.replicate 3 " " <> row
       forM_ (Map.toList qm) $ \((v1,v2), val) -> do
-        writeFields ["", T.unpack (unintern v1), T.unpack (unintern v2), showValue val]
+        writeFields ["", unintern v1, unintern v2, showValue val]
 
   -- INDICATORS section
   -- Note: Gurobi-5.6.3 does not support this section.
@@ -777,60 +784,60 @@ render' mip = do
     writeSectionHeader "INDICATORS"
     forM_ ics $ \c -> do
       let Just (var,val) = MIP.constrIndicator c
-      writeFields ["IF", T.unpack $ fromJust (MIP.constrLabel c), T.unpack (unintern var), showValue val]
+      writeFields ["IF", fromJust (MIP.constrLabel c), unintern var, showValue val]
 
   -- ENDATA section
   writeSectionHeader "ENDATA"
 
-writeSectionHeader :: String -> M ()
-writeSectionHeader s = writeString s >> writeChar '\n'
+writeSectionHeader :: T.Text -> M ()
+writeSectionHeader s = writeText s >> writeChar '\n'
 
 -- Fields start in column 2, 5, 15, 25, 40 and 50
-writeFields :: [String] -> M ()
+writeFields :: [T.Text] -> M ()
 writeFields xs = f1 xs >> writeChar '\n'
   where
     -- columns 1-4
     f1 [] = return ()
-    f1 [x] = writeString (' ' : x)
+    f1 [x] = writeChar ' ' >> writeText x
     f1 (x:xs) = do
-      writeString $ printf " %-2s " x
+      writeString $ printf " %-2s " (T.unpack x)
       f2 xs
 
     -- columns 5-14
     f2 [] = return ()
-    f2 [x] = writeString x
+    f2 [x] = writeText x
     f2 (x:xs) = do
-      writeString $ printf "%-9s " x
+      writeString $ printf "%-9s " (T.unpack x)
       f3 xs
 
     -- columns 15-24
     f3 [] = return ()
-    f3 [x] = writeString x
+    f3 [x] = writeText x
     f3 (x:xs) = do
-      writeString $ printf "%-9s " x
+      writeString $ printf "%-9s " (T.unpack x)
       f4 xs
 
     -- columns 25-39
     f4 [] = return ()
-    f4 [x] = writeString x
+    f4 [x] = writeText x
     f4 (x:xs) = do
-      writeString $ printf "%-14s " x
+      writeString $ printf "%-14s " (T.unpack x)
       f5 xs
 
     -- columns 40-49
     f5 [] = return ()
-    f5 [x] = writeString x
+    f5 [x] = writeText x
     f5 (x:xs) = do
-      writeString $ printf "%-19s " x
+      writeString $ printf "%-19s " (T.unpack x)
       f6 xs
 
     -- columns 50-
     f6 [] = return ()
-    f6 [x] = writeString x
+    f6 [x] = writeText x
     f6 _ = error "MPSFile: >6 fields (this should not happen)"
 
-showValue :: Rational -> String
-showValue c =
+showValue :: Rational -> T.Text
+showValue c = T.pack $
   if denominator c == 1
     then show (numerator c)
     else show (fromRational c :: Double)

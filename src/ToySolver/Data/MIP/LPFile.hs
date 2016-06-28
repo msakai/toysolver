@@ -34,8 +34,10 @@ import Control.Monad.Writer
 import Control.Monad.ST
 import Data.Char
 import Data.Default.Class
+import Data.Interned
 import Data.List
 import Data.Maybe
+import Data.Monoid
 import Data.Ratio
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -44,6 +46,9 @@ import qualified Data.Set as Set
 import Data.STRef
 import Data.String
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import Data.Text.Lazy.Builder (Builder)
+import qualified Data.Text.Lazy.Builder as B
 import Data.OptDir
 import System.IO
 import Text.Parsec hiding (label)
@@ -434,30 +439,30 @@ number = tok $ do
 
 -- ---------------------------------------------------------------------------
 
-type M a = Writer ShowS a
+type M a = Writer Builder a
 
-execM :: M a -> String
-execM m = execWriter m ""
+execM :: M a -> TL.Text
+execM m = B.toLazyText $ execWriter m
 
-writeString :: String -> M ()
-writeString s = tell $ showString s
+writeString :: T.Text -> M ()
+writeString s = tell $ B.fromText s
 
 writeChar :: Char -> M ()
-writeChar c = tell $ showChar c
+writeChar c = tell $ B.singleton c
 
 -- ---------------------------------------------------------------------------
 
 -- | Render a problem into a string.
-render :: MIP.FileOptions -> MIP.Problem -> Either String String
+render :: MIP.FileOptions -> MIP.Problem -> Either String TL.Text
 render _ mip = Right $ execM $ render' $ normalize mip
 
 writeVar :: MIP.Var -> M ()
-writeVar v = writeString $ MIP.fromVar v
+writeVar v = writeString $ unintern v
 
 render' :: MIP.Problem -> M ()
 render' mip = do
   case MIP.name mip of
-    Just name -> writeString $ "\\* Problem: " ++ T.unpack name ++ " *\\\n"
+    Just name -> writeString $ "\\* Problem: " <> name <> " *\\\n"
     Nothing -> return ()
 
   let obj = MIP.objectiveFunction mip   
@@ -522,7 +527,7 @@ render' mip = do
     writeString "SOS\n"
     forM_ (MIP.sosConstraints mip) $ \(MIP.SOSConstraint l typ xs) -> do
       renderLabel l
-      writeString $ show typ
+      writeString $ fromString $ show typ
       writeString " ::"
       forM_ xs $ \(v, r) -> do
         writeString "  "
@@ -550,33 +555,33 @@ renderExpr isObj e = fill 80 (ts1 ++ ts2)
         -- SCIP-3.1.0 does not allow spaces between '/' and '2'.
         ["+ ["] ++ map g qts ++ [if isObj then "] /2" else "]"]
 
-    f :: MIP.Term -> String
+    f :: MIP.Term -> T.Text
     f (MIP.Term c [])  = showConstTerm c
-    f (MIP.Term c [v]) = showCoeff c ++ MIP.fromVar v
+    f (MIP.Term c [v]) = showCoeff c <> fromString (MIP.fromVar v)
     f _ = error "should not happen"
 
-    g :: MIP.Term -> String
+    g :: MIP.Term -> T.Text
     g (MIP.Term c vs) = 
-      (if isObj then showCoeff (2*c) else showCoeff c) ++
-      intercalate " * " (map MIP.fromVar vs)
+      (if isObj then showCoeff (2*c) else showCoeff c) <>
+      mconcat (intersperse " * " (map (fromString . MIP.fromVar) vs))
 
-showValue :: Rational -> String
+showValue :: Rational -> T.Text
 showValue c =
   if denominator c == 1
-    then show (numerator c)
-    else show (fromRational c :: Double)
+    then fromString $ show (numerator c)
+    else fromString $ show (fromRational c :: Double)
 
-showCoeff :: Rational -> String
+showCoeff :: Rational -> T.Text
 showCoeff c =
   if c' == 1
     then s
-    else s ++ showValue c' ++ " "
+    else s <> showValue c' <> " "
   where
     c' = abs c
     s = if c >= 0 then "+ " else "- "
 
-showConstTerm :: Rational -> String
-showConstTerm c = s ++ v
+showConstTerm :: Rational -> T.Text
+showConstTerm c = s <> v
   where
     s = if c >= 0 then "+ " else "- "
     v = showValue (abs c)
@@ -585,7 +590,7 @@ renderLabel :: Maybe MIP.Label -> M ()
 renderLabel l =
   case l of
     Nothing -> return ()
-    Just s -> writeString (T.unpack s) >> writeString ": "
+    Just s -> writeString s >> writeString ": "
 
 renderOp :: MIP.RelOp -> M ()
 renderOp MIP.Le = writeString "<="
@@ -621,16 +626,16 @@ renderBoundExpr MIP.NegInf = writeString "-inf"
 renderBoundExpr MIP.PosInf = writeString "+inf"
 
 renderVariableList :: [MIP.Var] -> M ()
-renderVariableList vs = fill 80 (map MIP.fromVar vs) >> writeChar '\n'
+renderVariableList vs = fill 80 (map (fromString . MIP.fromVar) vs) >> writeChar '\n'
 
-fill :: Int -> [String] -> M ()
+fill :: Int -> [T.Text] -> M ()
 fill width str = go str 0
   where
     go [] _ = return ()
-    go (x:xs) 0 = writeString x >> go xs (length x)
+    go (x:xs) 0 = writeString x >> go xs (T.length x)
     go (x:xs) w =
-      if w + 1 + length x <= width
-        then writeChar ' ' >> writeString x >> go xs (w + 1 + length x)
+      if w + 1 + T.length x <= width
+        then writeChar ' ' >> writeString x >> go xs (w + 1 + T.length x)
         else writeChar '\n' >> go (x:xs) 0
 
 -- ---------------------------------------------------------------------------

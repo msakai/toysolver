@@ -28,6 +28,8 @@ module ToySolver.Data.MIP
 
 import Prelude hiding (readFile, writeFile)
 import Data.Char
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.IO as TLIO
 import System.FilePath (takeExtension)
 import System.IO hiding (readFile, writeFile)
 import Text.Parsec
@@ -76,7 +78,7 @@ writeLPFile opt fname prob =
         case optFileEncoding opt of
           Nothing -> return ()
           Just enc -> hSetEncoding h enc
-        hPutStr h s
+        TLIO.hPutStr h s
 
 writeMPSFile :: FileOptions -> FilePath -> Problem -> IO ()
 writeMPSFile opt fname prob = 
@@ -87,10 +89,10 @@ writeMPSFile opt fname prob =
         case optFileEncoding opt of
           Nothing -> return ()
           Just enc -> hSetEncoding h enc
-        hPutStr h s
+        TLIO.hPutStr h s
 
-toLPString :: FileOptions -> Problem -> Either String String
+toLPString :: FileOptions -> Problem -> Either String TL.Text
 toLPString = LPFile.render
 
-toMPSString :: FileOptions -> Problem -> Either String String
+toMPSString :: FileOptions -> Problem -> Either String TL.Text
 toMPSString = MPSFile.render

@@ -611,6 +611,7 @@ Executable svm2lp
     containers,
     data-default-class,
     split,
+    text,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
