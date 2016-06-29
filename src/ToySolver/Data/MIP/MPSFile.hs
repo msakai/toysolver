@@ -54,7 +54,6 @@ import System.IO
 import qualified Text.Parsec as P
 import Text.Parsec hiding (spaces, newline, Column)
 import Text.Parsec.String
-import Text.Printf
 
 import Data.OptDir
 import qualified ToySolver.Data.MIP.Base as MIP
@@ -590,9 +589,6 @@ type M a = Writer Builder a
 execM :: M a -> TL.Text
 execM m = B.toLazyText $ execWriter m
 
-writeString :: String -> M ()
-writeString s = tell $ B.fromString s
-
 writeText :: T.Text -> M ()
 writeText s = tell $ B.fromText s
 
@@ -802,35 +798,51 @@ writeFields xs = f1 xs >> writeChar '\n'
     f1 [] = return ()
     f1 [x] = writeChar ' ' >> writeText x
     f1 (x:xs) = do
-      writeString $ printf " %-2s " (T.unpack x)
+      writeChar ' '
+      writeText x
+      let len = T.length x
+      when (len < 2) $ writeText $ T.replicate (2 - len) " "
+      writeChar ' '
       f2 xs
 
     -- columns 5-14
     f2 [] = return ()
     f2 [x] = writeText x
     f2 (x:xs) = do
-      writeString $ printf "%-9s " (T.unpack x)
+      writeText x
+      let len = T.length x
+      when (len < 9) $ writeText $ T.replicate (9 - len) " "
+      writeChar ' '
       f3 xs
 
     -- columns 15-24
     f3 [] = return ()
     f3 [x] = writeText x
     f3 (x:xs) = do
-      writeString $ printf "%-9s " (T.unpack x)
+      writeText x
+      let len = T.length x
+      when (len < 9) $ writeText $ T.replicate (9 - len) " "
+      writeChar ' '
       f4 xs
 
     -- columns 25-39
     f4 [] = return ()
     f4 [x] = writeText x
     f4 (x:xs) = do
-      writeString $ printf "%-14s " (T.unpack x)
+      writeText x
+      let len = T.length x
+      when (len < 14) $ writeText $ T.replicate (14 - len) " "
+      writeChar ' '
       f5 xs
 
     -- columns 40-49
     f5 [] = return ()
     f5 [x] = writeText x
     f5 (x:xs) = do
-      writeString $ printf "%-19s " (T.unpack x)
+      writeText x
+      let len = T.length x
+      when (len < 19) $ writeText $ T.replicate (19 - len) " "
+      writeChar ' '
       f6 xs
 
     -- columns 50-
