@@ -84,12 +84,12 @@ string' :: Stream s m Char => String -> ParsecT s u m ()
 string' s = mapM_ char' s <?> show s
 
 sep :: Stream s m Char => ParsecT s u m ()
-sep = skipMany ((comment >> return ()) <|> (space >> return ()))
+sep = skipMany ((space >> return ()) <|> comment)
 
-comment :: Stream s m Char => ParsecT s u m String
+comment :: Stream s m Char => ParsecT s u m ()
 comment = do
   char '\\'
-  manyTill anyChar (try newline)
+  skipManyTill anyChar (try newline)
 
 tok :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
 tok p = do
@@ -218,13 +218,7 @@ subjectTo = msum
 constraint :: Stream s m Char => Bool -> ParsecT s u m MIP.Constraint
 constraint isLazy = do
   name <- optionMaybe (try label)
-
-  g <- optionMaybe $ try $ do
-    var <- variable
-    tok (char '=')
-    val <- tok ((char '0' >> return 0) <|> (char '1' >> return 1))
-    tok $ string "->"
-    return (var, val)
+  g <- optionMaybe $ try indicator
 
   -- It seems that CPLEX allows empty lhs, but GLPK rejects it.
   e <- expr
@@ -256,6 +250,14 @@ relOp = tok $ msum
                      , return MIP.Eql
                      ]
   ]
+
+indicator :: Stream s m Char => ParsecT s u m (MIP.Var, Rational)
+indicator = do
+  var <- variable
+  tok (char '=')
+  val <- tok ((char '0' >> return 0) <|> (char '1' >> return 1))
+  tok $ string "->"
+  return (var, val)
 
 lazyConstraintsSection :: Stream s m Char => ParsecT s u m [MIP.Constraint]
 lazyConstraintsSection = do
@@ -437,6 +439,12 @@ number = tok $ do
                 , return id
                 ]
       liftM f nat
+      
+skipManyTill :: (Stream s m t) => ParsecT s u m a -> ParsecT s u m end -> ParsecT s u m ()
+skipManyTill p end = scan
+  where
+    scan = do{ end; return () }
+         <|> do{ _ <- p; scan; return () }
 
 -- ---------------------------------------------------------------------------
 

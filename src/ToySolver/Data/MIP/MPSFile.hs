@@ -53,7 +53,6 @@ import qualified Data.Text.Lazy.IO as TLIO
 import System.IO
 import qualified Text.Parsec as P
 import Text.Parsec hiding (spaces, newline, Column)
-import Text.Parsec.String
 
 import Data.OptDir
 import qualified ToySolver.Data.MIP.Base as MIP
@@ -119,7 +118,7 @@ newline' = do
 tok :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
 tok p = do
   x <- p
-  msum [spaces1', lookAhead (try (char '\n' >> return ())), eof]
+  msum [eof, lookAhead (char '\n' >> return ()), spaces1']
   return x
 
 row :: Stream s m Char => ParsecT s u m Row
@@ -414,19 +413,21 @@ colsSection = do
   where
     body :: Bool -> Map Column (Map Row Rational) -> Set Column -> ParsecT s u m (Map Column (Map Row Rational), Set Column)
     body isInt rs ivs = msum
-      [ do isInt' <- try intMarker
-           body isInt' rs ivs
-      , do (k,v) <- entry
-           let rs'  = Map.insertWith Map.union k v rs
-               ivs' = if isInt then Set.insert k ivs else ivs
-           seq rs' $ seq ivs' $ body isInt rs' ivs'
+      [ do _ <- spaces1'
+           x <- ident
+           msum
+             [ do isInt' <- try intMarker
+                  body isInt' rs ivs
+             , do (k,v) <- entry x
+                  let rs'  = Map.insertWith Map.union k v rs
+                      ivs' = if isInt then Set.insert k ivs else ivs
+                  seq rs' $ seq ivs' $ body isInt rs' ivs'
+             ]
       , return (rs, ivs)
       ]
 
     intMarker :: ParsecT s u m Bool
     intMarker = do
-      spaces1'
-      _marker <- ident 
       string "'MARKER'"
       spaces1'
       b <-  (try (string "'INTORG'") >> return True)
@@ -434,10 +435,9 @@ colsSection = do
       newline'
       return b
 
-    entry :: ParsecT s u m (Column, Map Row Rational)
-    entry = do
-      spaces1'
-      col <- column
+    entry :: T.Text -> ParsecT s u m (Column, Map Row Rational)
+    entry x = do
+      let col = intern x
       rv1 <- rowAndVal
       opt <- optionMaybe rowAndVal
       newline'
