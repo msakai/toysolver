@@ -369,7 +369,7 @@ expr = try expr1 <|> return 0
     expr1 = do
       t <- term True
       ts <- many (term False)
-      return $ sum (t : ts)
+      return $ foldr (+) 0 (t : ts)
 
 sign :: (Stream s m Char, Num a) => ParsecT s u m a
 sign = tok ((char '+' >> return 1) <|> (char '-' >> return (-1)))
