@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TypeFamilies, OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toyfmf
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (CPP)
+-- Portability :  non-portable (CPP, TypeFamilies, OverloadedStrings)
 --
 -- A toy-level model finder
 --
@@ -15,9 +15,13 @@
 module Main where
 
 import Control.Monad
+import Data.Interned (intern, unintern)
 import Data.IORef
 import qualified Data.Map as Map
+import Data.Monoid
 import Data.Ratio
+import Data.String
+import qualified Data.Text as Text
 import System.Environment
 import System.IO
 import qualified Codec.TPTP as TPTP
@@ -45,7 +49,7 @@ solve fpath size = do
   ref <- newIORef 0
   let skolem name _ = do
         n <- readIORef ref
-        let fsym = name ++ "#" ++ show n
+        let fsym = intern $ unintern name <> "#" <> fromString (show n)
         writeIORef ref (n+1)
         return fsym
   cs <- liftM concat $ mapM (MF.toSkolemNF skolem) fs
@@ -56,7 +60,7 @@ solve fpath size = do
       putStrLn "s NO MODEL FOUND"
     Just m -> do
       putStrLn "s SATISFIABLE"
-      let isSkolem k = '#' `elem` k
+      let isSkolem k = Text.any ('#'==) (unintern k)
       let m' = m{ MF.mFunctions = Map.filterWithKey (\k _ -> not (isSkolem k)) (MF.mFunctions m) }
       forM_ (MF.showModel m') $ \s ->
         putStrLn $ "v " ++ s
@@ -78,7 +82,7 @@ translateFormula :: TPTP.Formula -> MF.Formula
 translateFormula = TPTP.foldF neg quant binop eq rel
   where
     neg phi = notB $ translateFormula phi
-    quant q vs phi = foldr q' (translateFormula phi) [v | TPTP.V v <- vs]
+    quant q vs phi = foldr q' (translateFormula phi) [fromString v | TPTP.V v <- vs]
       where
         q' =
           case q of 
@@ -105,17 +109,17 @@ translateFormula = TPTP.foldF neg quant binop eq rel
       where
         lhs' = translateTerm lhs
         rhs' = translateTerm rhs
-    rel (TPTP.AtomicWord p) ts = MF.Atom $ MF.PApp p ts'
+    rel (TPTP.AtomicWord p) ts = MF.Atom $ MF.PApp (fromString p) ts'
       where
         ts' = map translateTerm ts
 
 translateTerm :: TPTP.Term -> MF.Term
 translateTerm = TPTP.foldT str num var app
   where
-    str s = MF.TmApp (show s) []
-    num r = MF.TmApp (showRational r) []
-    var (TPTP.V v) = MF.TmVar v
-    app (TPTP.AtomicWord f) ts = MF.TmApp f ts'
+    str s = MF.TmApp (fromString (show s)) []
+    num r = MF.TmApp (fromString (showRational r)) []
+    var (TPTP.V v) = MF.TmVar (fromString v)
+    app (TPTP.AtomicWord f) ts = MF.TmApp (fromString f) ts'
       where
         ts' = map translateTerm ts
 

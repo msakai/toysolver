@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, MultiParamTypeClasses #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, MultiParamTypeClasses, OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.EUF.FiniteModelFinder
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, MultiParamTypeClasses)
+-- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, MultiParamTypeClasses, OverloadedStrings)
 --
 -- A simple model finder.
 --
@@ -55,13 +55,19 @@ module ToySolver.EUF.FiniteModelFinder
 import Control.Monad
 import Control.Monad.State
 import Data.Array.IArray
+import Data.Interned (intern, unintern)
+import Data.Interned.Text
 import Data.IORef
 import Data.List
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Monoid
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.String
+import Data.Text (Text)
+import qualified Data.Text as Text
 import Text.Printf
 
 import ToySolver.Data.Boolean
@@ -70,13 +76,13 @@ import qualified ToySolver.SAT as SAT
 -- ---------------------------------------------------------------------------
 
 -- | Variable
-type Var = String
+type Var = InternedText
 
 -- | Function Symbol
-type FSym = String
+type FSym = InternedText
 
 -- | Predicate Symbol
-type PSym = String
+type PSym = InternedText
 
 class Vars a where
   vars :: a -> Set Var
@@ -196,7 +202,7 @@ toNNF = f
 -- TODO:
 -- 
 -- * Tseitin encoding
-toSkolemNF :: forall m. Monad m => (String -> Int -> m FSym) -> Formula -> m [Clause]
+toSkolemNF :: forall m. Monad m => (Var -> Int -> m FSym) -> Formula -> m [Clause]
 toSkolemNF skolem phi = f [] Map.empty (toNNF phi)
   where
     f :: [Var] -> Map Var Term -> Formula -> m [Clause]
@@ -213,17 +219,17 @@ toSkolemNF skolem phi = f [] Map.empty (toNNF phi)
       psi' <- f uvs s psi
       return $ [c1++c2 | c1 <- phi', c2 <- psi']
     f uvs s psi@(Forall v phi) = do
-      let v' = gensym v (vars psi `Set.union` Set.fromList uvs)
+      let v' = gensym (unintern v) (vars psi `Set.union` Set.fromList uvs)
       f (v' : uvs) (Map.insert v (TmVar v') s) phi
     f uvs s (Exists v phi) = do
       fsym <- skolem v (length uvs)
       f uvs (Map.insert v (TmApp fsym [TmVar v | v <- reverse uvs]) s) phi
     f _ _ _ = error "ToySolver.EUF.FiniteModelFinder.toSkolemNF: should not happen"
 
-    gensym :: String -> Set Var -> Var
+    gensym :: Text -> Set Var -> Var
     gensym template vs = head [name | name <- names, Set.notMember name vs]
       where
-        names = template : [template ++ show n | n <-[1..]]
+        names = map intern $ template : [template <> fromString (show n) | n <-[1..]]
 
     substAtom :: Map Var Term -> Atom -> Atom
     substAtom s (PApp p ts) = PApp p (map (substTerm s) ts)
@@ -234,9 +240,10 @@ toSkolemNF skolem phi = f [] Map.empty (toNNF phi)
 
 test_toSkolemNF = do
   ref <- newIORef 0
-  let skolem name _ = do
+  let skolem :: Var -> Int -> IO FSym
+      skolem name _ = do
         n <- readIORef ref
-        let fsym = name ++ "#" ++ show n
+        let fsym = intern $ unintern name <> "#" <> fromString (show n)
         writeIORef ref (n+1)
         return fsym
 
@@ -297,7 +304,7 @@ flatten c =
       (vs, n, defs, ls) <- get
       let go :: Int -> M Var
           go m = do
-            let v = "#" ++ show m
+            let v = intern $ "#" <> fromString (show m)
             if v `Set.member` vs
               then go (m+1)
               else do
@@ -473,11 +480,11 @@ data Model
 showModel :: Model -> [String]
 showModel m = 
   printf "DOMAIN = {%s}" (intercalate ", " (map showEntity (mUniverse m))) :
-  [ printf "%s = { %s }" p s
+  [ printf "%s = { %s }" (Text.unpack (unintern p)) s
   | (p, xss) <- Map.toList (mRelations m)
   , let s = intercalate ", " [if length xs == 1 then showEntity (head xs) else showEntityTuple xs | xs <- Set.toList xss]
   ] ++
-  [ printf "%s%s = %s" f (if length xs == 0 then "" else showEntityTuple xs) (showEntity y)
+  [ printf "%s%s = %s" (Text.unpack (unintern f)) (if length xs == 0 then "" else showEntityTuple xs) (showEntity y)
   | (f, xss) <- Map.toList (mFunctions m)
   , (xs, y) <- Map.toList xss
   ]
@@ -620,9 +627,10 @@ test2 = do
               Atom (PApp "=" [TmApp "f" [TmVar "y"], TmVar "x"])
 
   ref <- newIORef 0
-  let skolem name _ = do
+  let skolem :: Var -> Int -> IO FSym
+      skolem name _ = do
         n <- readIORef ref
-        let fsym = name ++ "#" ++ show n
+        let fsym = intern $ unintern name <> "#" <> fromString (show n)
         writeIORef ref (n+1)
         return fsym
   cs <- toSkolemNF skolem phi
