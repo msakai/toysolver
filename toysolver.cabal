@@ -497,6 +497,8 @@ Executable toyconvert
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -515,6 +517,7 @@ Executable sudoku
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  GHC-Options: -rtsopts
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -532,6 +535,8 @@ Executable nonogram
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -548,6 +553,8 @@ Executable nqueens
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -563,6 +570,8 @@ Executable knapsack
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -582,6 +591,8 @@ Executable assign
     vector
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -598,6 +609,8 @@ Executable htc
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -617,6 +630,8 @@ Executable svm2lp
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -634,7 +649,8 @@ Executable spsat
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
-  GHC-Options: -threaded
+  GHC-Options: -rtsopts -threaded
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -655,7 +671,8 @@ Executable spcl
   Other-Extensions: CPP
   -- We use threaded RTS to avoid the error "schedule: re-entered unsafely.
   -- Perhaps a 'foreign import unsafe' should be 'safe'?" on NVIDIA CUDA.
-  GHC-Options: -threaded
+  GHC-Options: -rtsopts -threaded
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -675,6 +692,8 @@ Executable pigeonhole
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -691,6 +710,8 @@ Executable maxsatverify
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
@@ -708,6 +729,8 @@ Executable pbverify
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
