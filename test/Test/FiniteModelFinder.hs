@@ -1,11 +1,14 @@
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, OverloadedStrings #-}
 module Test.FiniteModelFinder (fmfTestGroup) where
 
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Trans
+import Data.Interned (intern, unintern)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Monoid
+import Data.String
 
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
@@ -58,16 +61,16 @@ genSmallSig = do
   nPred <- choose (0::Int, 3)
   fsyms <- liftM Map.fromList $ forM [0..nFun-1] $ \i -> do
     arity <- if i == 0 then return 0 else choose (0, 3)
-    return ("f" ++ show i, arity)
+    return (intern ("f" <> fromString (show i)), arity)
   psyms <- liftM Map.fromList $ forM [0..nPred-1] $ \i -> do
     arity <- choose (0, 3)
-    return ("p" ++ show i, arity)
+    return (intern ("p" <> fromString (show i)), arity)
   return (fsyms, psyms)
 
 prop_findModel_soundness = QM.monadicIO $ do
   sig <- QM.pick genSmallSig
   nv <- QM.pick $ choose (0::Int, 2)
-  let vs = ["v" ++ show i | i <- [0..nv-1]]
+  let vs = [fromString ("v" ++ show i) | i <- [0..nv-1]]
   nc <- QM.pick $ choose (0::Int, 3)
   cs <- QM.pick $ replicateM nc $ genClause sig vs
   size <- QM.pick $ choose (1::Int, 5)

@@ -457,9 +457,11 @@ Executable toyfmf
     Build-Depends:
       base,
       containers,
+      intern,
       -- logic-TPTP <=0.4.3 has build error on ghc <7.9 and transformers >=0.5.1.
       -- https://github.com/DanielSchuessler/logic-TPTP/pull/4
       logic-TPTP >=0.4.4.0,
+      text,
       toysolver
     -- logic-TPTP <=0.4.4.0 is not compatible with transformers-compat >=0.5
     if flag(LogicTPTP045)
@@ -773,6 +775,7 @@ Test-suite TestSuite
     data-interval,
     deepseq,
     hashable,
+    intern,
     mtl,
     mwc-random,
     OptDir,
