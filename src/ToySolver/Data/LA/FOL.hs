@@ -21,7 +21,7 @@ fromFOLAtom (OrdRel a op b) = do
   b' <- fromFOLExpr b
   return $ ordRel op a' b'
 
-toFOLFormula :: (Real r, Fractional r) => LA.Atom r -> Formula (Atom r)
+toFOLFormula :: (Real r) => LA.Atom r -> Formula (Atom r)
 toFOLFormula r = Atom $ fmap toFOLExpr r
 
 fromFOLExpr :: (Real r, Fractional r) => Expr r -> Maybe (LA.Expr r)
@@ -41,7 +41,7 @@ fromFOLExpr (a :/: b) = do
   guard $ c /= 0
   return (a' ^/ c)
 
-toFOLExpr :: (Real r, Fractional r) => LA.Expr r -> Expr r
+toFOLExpr :: (Real r) => LA.Expr r -> Expr r
 toFOLExpr e =
   case map f (LA.terms e) of
     []  -> Const 0

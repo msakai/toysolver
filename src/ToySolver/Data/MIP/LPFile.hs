@@ -440,7 +440,7 @@ number = tok $ do
                 ]
       liftM f nat
       
-skipManyTill :: (Stream s m t) => ParsecT s u m a -> ParsecT s u m end -> ParsecT s u m ()
+skipManyTill :: ParsecT s u m a -> ParsecT s u m end -> ParsecT s u m ()
 skipManyTill p end = scan
   where
     scan = do{ end; return () }

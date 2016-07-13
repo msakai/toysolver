@@ -63,7 +63,7 @@ instance Monad m => SAT.AddPBLin m (Encoder m) where
   addPBAtMostSoft  Encoder{ encBase = a } = SAT.addPBAtMostSoft a
   addPBExactlySoft Encoder{ encBase = a } = SAT.addPBExactlySoft a
 
-newEncoder :: (Monad m, SAT.AddPBLin m a) => a -> Tseitin.Encoder m -> m (Encoder m)
+newEncoder :: (SAT.AddPBLin m a) => a -> Tseitin.Encoder m -> m (Encoder m)
 newEncoder a tseitin = return $ Encoder a tseitin
 
 getTseitinEncoder :: Encoder m -> Tseitin.Encoder m

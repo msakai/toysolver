@@ -190,7 +190,7 @@ instance (Eq k, Num k, Ord v) => VectorSpace (Polynomial k v) where
   type Scalar (Polynomial k v) = k
   k *^ p = scale k p
 
-instance (Show v, Ord v, Show k) => Show (Polynomial k v) where
+instance (Show v, Show k) => Show (Polynomial k v) where
   showsPrec d p  = showParen (d > 10) $
     showString "fromTerms " . shows (terms p)
 
@@ -203,7 +203,7 @@ instance (Hashable k, Hashable v) => Hashable (Polynomial k v) where
 instance (Eq k, Num k, Ord v) => Var (Polynomial k v) v where
   var x = fromTerm (1, var x)
 
-instance (Eq k, Num k, Ord v) => Vars (Polynomial k v) v where
+instance (Ord v) => Vars (Polynomial k v) v where
   vars p = Set.unions $ [vars mm | (_, mm) <- terms p]
 
 instance Degree (Polynomial k v) where
@@ -211,7 +211,7 @@ instance Degree (Polynomial k v) where
     | isZero p  = -1
     | otherwise = maximum [deg mm | (_,mm) <- terms p]
 
-normalize :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v
+normalize :: (Eq k, Num k) => Polynomial k v -> Polynomial k v
 normalize (Polynomial m) = Polynomial (Map.filter (0/=) m)
 
 asConstant :: Num k => Polynomial k v -> Maybe k
@@ -221,7 +221,7 @@ asConstant p =
     [(c,xs)] | Map.null (mindicesMap xs) -> Just c
     _ -> Nothing
 
-scale :: (Eq k, Num k, Ord v) => k -> Polynomial k v -> Polynomial k v
+scale :: (Eq k, Num k) => k -> Polynomial k v -> Polynomial k v
 scale 0 _ = zero
 scale 1 p = p
 scale a (Polynomial m) = Polynomial (Map.mapMaybe f m)
@@ -229,7 +229,7 @@ scale a (Polynomial m) = Polynomial (Map.mapMaybe f m)
     f b = if c == 0 then Nothing else Just c
       where c = a * b
 
-zero :: (Eq k, Num k, Ord v) => Polynomial k v
+zero :: Polynomial k v
 zero = Polynomial $ Map.empty
 
 plus :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v -> Polynomial k v
@@ -239,7 +239,7 @@ plus (Polynomial m1) (Polynomial m2) = Polynomial $ Map.mergeWithKey f id id m1 
       where
         c = a + b
 
-neg :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v
+neg :: (Num k) => Polynomial k v -> Polynomial k v
 neg (Polynomial m) = Polynomial $ Map.map negate m
 
 mult :: (Eq k, Num k, Ord v) => Polynomial k v -> Polynomial k v -> Polynomial k v
@@ -255,18 +255,18 @@ isZero :: Polynomial k v -> Bool
 isZero (Polynomial m) = Map.null m
 
 -- | construct a polynomial from a constant
-constant :: (Eq k, Num k, Ord v) => k -> Polynomial k v
+constant :: (Eq k, Num k) => k -> Polynomial k v
 constant c = fromTerm (c, mone)
 
 -- | construct a polynomial from a list of terms
 fromTerms :: (Eq k, Num k, Ord v) => [Term k v] -> Polynomial k v
 fromTerms = fromCoeffMap . Map.fromListWith (+) . map (\(c,xs) -> (xs,c))
 
-fromCoeffMap :: (Eq k, Num k, Ord v) => Map (Monomial v) k -> Polynomial k v
+fromCoeffMap :: (Eq k, Num k) => Map (Monomial v) k -> Polynomial k v
 fromCoeffMap m = normalize $ Polynomial m
 
 -- | construct a polynomial from a singlet term
-fromTerm :: (Eq k, Num k, Ord v) => Term k v -> Polynomial k v
+fromTerm :: (Eq k, Num k) => Term k v -> Polynomial k v
 fromTerm (0,_) = zero
 fromTerm (c,xs) = Polynomial $ Map.singleton xs c
 
@@ -275,18 +275,18 @@ terms :: Polynomial k v -> [Term k v]
 terms (Polynomial m) = [(c,xs) | (xs,c) <- Map.toList m]
 
 -- | leading term with respect to a given monomial order
-lt :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Term k v
+lt :: (Num k) => MonomialOrder v -> Polynomial k v -> Term k v
 lt cmp p =
   case terms p of
     [] -> (0, mone) -- should be error?
     ms -> maximumBy (cmp `on` snd) ms
 
 -- | leading coefficient with respect to a given monomial order
-lc :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> k
+lc :: (Num k) => MonomialOrder v -> Polynomial k v -> k
 lc cmp = fst . lt cmp
 
 -- | leading monomial with respect to a given monomial order
-lm :: (Eq k, Num k, Ord v) => MonomialOrder v -> Polynomial k v -> Monomial v
+lm :: (Num k) => MonomialOrder v -> Polynomial k v -> Monomial v
 lm cmp = snd . lt cmp
 
 -- | Look up a coefficient for a given monomial.
@@ -352,18 +352,18 @@ integral :: (Eq k, Fractional k, Ord v) => Polynomial k v -> v -> Polynomial k v
 integral p x = sumV [fromTerm (tintegral m x) | m <- terms p]
 
 -- | Evaluation
-eval :: (Num k, Ord v) => (v -> k) -> Polynomial k v -> k
+eval :: (Num k) => (v -> k) -> Polynomial k v -> k
 eval env p = sum [c * product [(env x) ^ e | (x,e) <- mindices xs] | (c,xs) <- terms p]
 
 -- | Substitution or bind
 subst
-  :: (Eq k, Num k, Ord v1, Ord v2)
+  :: (Eq k, Num k, Ord v2)
   => Polynomial k v1 -> (v1 -> Polynomial k v2) -> Polynomial k v2
 subst p s =
   sumV [constant c * product [(s x)^e | (x,e) <- mindices xs] | (c, xs) <- terms p]
 
 -- | Transform polynomial coefficients.
-mapCoeff :: (Eq k1, Num k1, Ord v) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
+mapCoeff :: (Eq k1, Num k1) => (k -> k1) -> Polynomial k v -> Polynomial k1 v
 mapCoeff f (Polynomial m) = Polynomial $ Map.mapMaybe g m
   where
     g x = if y == 0 then Nothing else Just y
@@ -371,7 +371,7 @@ mapCoeff f (Polynomial m) = Polynomial $ Map.mapMaybe g m
         y = f x
 
 -- | Transform a polynomial into a monic polynomial with respect to the given monomial order.
-toMonic :: (Eq r, Fractional r, Ord v) => MonomialOrder v -> Polynomial r v -> Polynomial r v
+toMonic :: (Eq r, Fractional r) => MonomialOrder v -> Polynomial r v -> Polynomial r v
 toMonic cmp p
   | c == 0 || c == 1 = p
   | otherwise = mapCoeff (/c) p
@@ -472,7 +472,7 @@ class SQFree a where
 -- * @p^2@ does not divides @a0@.
 --
 eisensteinsCriterion
-  :: (Num k, ContPP k, PPCoeff k ~ Integer)
+  :: (ContPP k, PPCoeff k ~ Integer)
   => UPolynomial k -> Bool
 eisensteinsCriterion p
   | deg p <= 1 = True
@@ -514,7 +514,7 @@ instance (Ord k, Num k, Ord v, PrettyCoeff k, PrettyVar v) => Pretty (Polynomial
   pPrintPrec = prettyPrint def
 
 prettyPrint
-  :: (Ord k, Num k, Ord v)
+  :: (Ord k, Num k)
   => PrintOptions k v
   -> PrettyLevel -> Rational -> Polynomial k v -> Doc
 prettyPrint opt lv prec p =
@@ -537,7 +537,7 @@ prettyPrint opt lv prec p =
         else PP.space <> PP.char '+' <> PP.space <> prettyPrintTerm opt lv (addPrec+1) (c,xs)
 
 prettyPrintTerm
-  :: (Ord k, Num k, Ord v)
+  :: (Ord k, Num k)
   => PrintOptions k v
   -> PrettyLevel -> Rational -> Term k v -> Doc
 prettyPrintTerm opt lv prec (c,xs)
@@ -718,7 +718,7 @@ pmod f g
             s = fromTerm (lc_f1, lm_f1 `mdiv` lm_g)
 
 -- | GCD of univariate polynomials
-gcd' :: (Eq r, Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
+gcd' :: (Integral r) => UPolynomial r -> UPolynomial r -> UPolynomial r
 gcd' f1 0  = ppI f1
 gcd' f1 f2 = gcd' f2 (f1 `pmod` f2)
 
@@ -741,24 +741,24 @@ type UTerm k = Term k X
 tdeg :: Term k v -> Integer
 tdeg (_,xs) = deg xs
 
-tscale :: (Num k, Ord v) => k -> Term k v -> Term k v
+tscale :: (Num k) => k -> Term k v -> Term k v
 tscale a (c, xs) = (a*c, xs)
 
 tmult :: (Num k, Ord v) => Term k v -> Term k v -> Term k v
 tmult (c1,xs1) (c2,xs2) = (c1*c2, xs1 `mmult` xs2)
 
-tdivides :: (Fractional k, Ord v) => Term k v -> Term k v -> Bool
+tdivides :: (Ord v) => Term k v -> Term k v -> Bool
 tdivides (_,xs1) (_,xs2) = xs1 `mdivides` xs2
 
 tdiv :: (Fractional k, Ord v) => Term k v -> Term k v -> Term k v
 tdiv (c1,xs1) (c2,xs2) = (c1 / c2, xs1 `mdiv` xs2)
 
-tderiv :: (Eq k, Num k, Ord v) => Term k v -> v -> Term k v
+tderiv :: (Num k, Ord v) => Term k v -> v -> Term k v
 tderiv (c,xs) x =
   case mderiv xs x of
     (s,ys) -> (c * fromIntegral s, ys)
 
-tintegral :: (Eq k, Fractional k, Ord v) => Term k v -> v -> Term k v
+tintegral :: (Fractional k, Ord v) => Term k v -> v -> Term k v
 tintegral (c,xs) x =
   case mintegral xs x of
     (s,ys) -> (c * fromRational s, ys)
@@ -775,7 +775,7 @@ newtype Monomial v = Monomial{ mindicesMap :: Map v Integer }
 
 type UMonomial = Monomial X
 
-instance (Ord v, Show v) => Show (Monomial v) where
+instance (Show v) => Show (Monomial v) where
   showsPrec d m  = showParen (d > 10) $
     showString "mfromIndices " . shows (mindices m)
 
@@ -810,10 +810,10 @@ mfromIndicesMap m
   | any (\(_,e) -> 0>e) (Map.toList m) = error "ToySolver.Data.Polynomial.mfromIndicesMap: negative exponent"
   | otherwise = mfromIndicesMap' m
 
-mfromIndicesMap' :: Ord v => Map v Integer -> Monomial v
+mfromIndicesMap' :: Map v Integer -> Monomial v
 mfromIndicesMap' m = Monomial $ Map.filter (>0) m
 
-mindices :: Ord v => Monomial v -> [(v, Integer)]
+mindices :: Monomial v -> [(v, Integer)]
 mindices = Map.toAscList . mindicesMap
 
 mmult :: Ord v => Monomial v -> Monomial v -> Monomial v

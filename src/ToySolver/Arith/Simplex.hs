@@ -154,7 +154,7 @@ currentValue tbl v =
     Nothing -> 0
     Just (_, val) -> val
 
-currentObjValue :: Num r => Tableau r -> r
+currentObjValue :: Tableau r -> r
 currentObjValue = snd . lookupRow objRowIndex
 
 isValidTableau :: Tableau r -> Bool
@@ -337,7 +337,7 @@ pdPivot optdir tbl
 
 -- ---------------------------------------------------------------------------
 
-toCSV :: (Num r, Eq r, Show r) => (r -> String) -> Tableau r -> String
+toCSV :: (Num r) => (r -> String) -> Tableau r -> String
 toCSV showCell tbl = unlines . map (concat . intersperse ",") $ header : body
   where
     header :: [String]

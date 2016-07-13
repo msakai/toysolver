@@ -103,7 +103,7 @@ cabook_proposition_5_10 fs = normalize (go fs)
 
 -- http://www.math.kobe-u.ac.jp/Asir/ca.pdf
 cabook_proposition_5_11
-  :: forall k. (Num k, Fractional k, Eq k, P.PrettyCoeff k, Ord k)
+  :: forall k. (Fractional k, Ord k)
   => [UPolynomial k] -> UPolynomial k -> [UPolynomial k]
 cabook_proposition_5_11 fs g =
   assert (P.deg g <= P.deg (product fs)) $

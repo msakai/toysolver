@@ -78,7 +78,7 @@ new = do
 
 {- INLINE getSize #-}
 -- | Get the internal representation array
-getSize :: A.MArray a e IO => GenericVec a e -> IO Int
+getSize :: GenericVec a e -> IO Int
 getSize (GenericVec sizeRef _) = readIOURef sizeRef
 
 {-# SPECIALIZE read :: Vec e -> Int -> IO e #-}
