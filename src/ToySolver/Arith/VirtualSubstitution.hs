@@ -57,9 +57,7 @@ type QFFormula = BoolExpr (LA.Atom Rational)
 
 -- | @'evalQFFormula' M φ@ returns whether @M ⊧_LRA φ@ or not.
 evalQFFormula :: Model Rational -> QFFormula -> Bool
-evalQFFormula m = BoolExpr.fold f
-  where
-    f (OrdRel lhs op rhs) = evalOp op (LA.evalExpr m lhs) (LA.evalExpr m rhs)
+evalQFFormula m = BoolExpr.fold (LA.evalAtom m)
 
 {-| @'project' x φ@ returns @(ψ, lift)@ such that:
 
