@@ -34,6 +34,7 @@ module ToySolver.Arith.Cooper.Base
     , (.|.)
     , evalQFFormula
     , Model
+    , Eval (..)
 
     -- * Projection
     , project
@@ -170,28 +171,33 @@ simplifyLit lit@(Divisible b c e)
     c' = c `checkedDiv` d
     e' = LA.mapCoeff (`checkedDiv` d) e2
 
+{-# DEPRECATED evalQFFormula "Use Eval class instead" #-}
 -- | @'evalQFFormula' M φ@ returns whether @M ⊧_LIA φ@ or not.
 evalQFFormula :: Model Integer -> QFFormula -> Bool
-evalQFFormula m = BoolExpr.fold (evalLit m)
+evalQFFormula = eval
 
+{-# DEPRECATED evalLit "Use Eval class instead" #-}
 evalLit :: Model Integer -> Lit -> Bool
-evalLit m (IsPos e) = LA.evalExpr m e > 0
-evalLit m (Divisible True n e)  = LA.evalExpr m e `mod` n == 0
-evalLit m (Divisible False n e) = LA.evalExpr m e `mod` n /= 0
+evalLit = eval
+
+instance Eval (Model Integer) Lit Bool where
+  eval m (IsPos e) = LA.eval m e > 0
+  eval m (Divisible True n e)  = LA.eval m e `mod` n == 0
+  eval m (Divisible False n e) = LA.eval m e `mod` n /= 0
 
 -- ---------------------------------------------------------------------------
 
 data Witness = WCase1 Integer ExprZ | WCase2 Integer Integer Integer (Set ExprZ)
   deriving (Show)
 
-evalWitness :: Model Integer -> Witness -> Integer
-evalWitness model (WCase1 c e) = LA.evalExpr model e `checkedDiv` c
-evalWitness model (WCase2 c j delta us)
-  | Set.null us' = j `checkedDiv` c
-  | otherwise = (j + (((u - delta - 1) `div` delta) * delta)) `checkedDiv` c
-  where
-    us' = Set.map (LA.evalExpr model) us
-    u = Set.findMin us'
+instance Eval (Model Integer) Witness Integer where
+  eval model (WCase1 c e) = LA.eval model e `checkedDiv` c
+  eval model (WCase2 c j delta us)
+    | Set.null us' = j `checkedDiv` c
+    | otherwise = (j + (((u - delta - 1) `div` delta) * delta)) `checkedDiv` c
+    where
+      us' = Set.map (LA.eval model) us
+      u = Set.findMin us'
 
 -- ---------------------------------------------------------------------------
 
@@ -208,7 +214,7 @@ project x formula = (formula', mt)
     formula' = orB' [phi | (phi,_) <- xs]
     mt m = head $ do
       (phi, mt') <- xs
-      guard $ evalQFFormula m phi
+      guard $ eval m phi
       return $ mt' m
     orB' = orB . concatMap f
       where
@@ -240,7 +246,7 @@ projectN vs2 = f (IS.toList vs2)
 projectCases :: Var -> QFFormula -> [(QFFormula, Model Integer -> Model Integer)]
 projectCases x formula = do
   (phi, wit) <- projectCases' x formula
-  return (phi, \m -> IM.insert x (evalWitness m wit) m)
+  return (phi, \m -> IM.insert x (eval m wit) m)
 
 projectCases' :: Var -> QFFormula -> [(QFFormula, Witness)]
 projectCases' x formula = [(phi', w) | (phi,w) <- case1 ++ case2, let phi' = simplify phi, phi' /= false]
@@ -385,8 +391,9 @@ checkedDiv a b =
 solveQFFormula :: VarSet -> QFFormula -> Maybe (Model Integer)
 solveQFFormula vs formula = listToMaybe $ do
   (formula2, mt) <- projectCasesN vs formula
-  let m = IM.empty
-  guard $ evalQFFormula m formula2
+  let m :: Model Integer
+      m = IM.empty
+  guard $ eval m formula2
   return $ mt m
 
 -- | @'solve' {x1,…,xn} φ@ returns @Just M@ that @M ⊧_LIA φ@ when

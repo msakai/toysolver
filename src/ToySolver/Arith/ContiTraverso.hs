@@ -112,7 +112,7 @@ costOrdering :: LA.Expr Integer -> MonomialOrder Var
 costOrdering obj = compare `on` f
   where
     vs = vars obj
-    f xs = LA.evalExpr (mkModel (IS.toList vs) xs) obj
+    f xs = LA.eval (mkModel (IS.toList vs) xs) obj
 
 elimOrdering :: IS.IntSet -> MonomialOrder Var
 elimOrdering xs = compare `on` f

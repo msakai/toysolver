@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -7,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses)
 --
 -- (incomplete) implementation of Omega Test
 --
@@ -141,9 +142,9 @@ applySubst1Constr :: Var -> ExprZ -> Constr -> Constr
 applySubst1Constr v e (IsNonneg e2) = LA.applySubst1 v e e2 `geZ` LA.constant 0
 applySubst1Constr v e (IsZero e2)   = LA.applySubst1 v e e2 `eqZ` LA.constant 0
 
-evalConstr :: Model Integer -> Constr -> Bool
-evalConstr m (IsNonneg t) = LA.evalExpr m t >= 0
-evalConstr m (IsZero t)   = LA.evalExpr m t == 0
+instance Eval (Model Integer) Constr Bool where
+  eval m (IsNonneg t) = LA.eval m t >= 0
+  eval m (IsZero t)   = LA.eval m t == 0
 
 -- ---------------------------------------------------------------------------
 
@@ -159,8 +160,8 @@ type BoundsZ = ([Rat],[Rat])
 evalBoundsZ :: Model Integer -> BoundsZ -> IntervalZ
 evalBoundsZ model (ls,us) =
   foldl' intersectZ univZ $ 
-    [ (Just (ceiling (LA.evalExpr model x % c)), Nothing) | (x,c) <- ls ] ++ 
-    [ (Nothing, Just (floor (LA.evalExpr model x % c))) | (x,c) <- us ]
+    [ (Just (ceiling (LA.eval model x % c)), Nothing) | (x,c) <- ls ] ++ 
+    [ (Nothing, Just (floor (LA.eval model x % c))) | (x,c) <- us ]
 
 collectBoundsZ :: Var -> [Constr] -> (BoundsZ, [Constr])
 collectBoundsZ v = foldr phi (([],[]),[])
@@ -182,8 +183,9 @@ solve' opt vs2 xs = simplify xs >>= go vs2
   where
     go :: VarSet -> [Constr] -> Maybe (Model Integer)
     go vs cs | IS.null vs = do
-      let m = IM.empty
-      guard $ all (evalConstr m) cs
+      let m :: Model Integer
+          m = IM.empty
+      guard $ all (eval m) cs
       return m
     go vs cs | Just (e,cs2) <- extractEq cs = do
       (vs',cs3, mt) <- eliminateEq e vs cs2
@@ -250,7 +252,7 @@ eliminateEq e vs cs = do
         return $
            ( IS.delete xk vs
            , [applySubst1Constr xk xk_def c | c <- cs]
-           , \model -> IM.insert xk (LA.evalExpr model xk_def) model
+           , \model -> IM.insert xk (LA.eval model xk_def) model
            )
   else do
     let m = abs ak + 1
@@ -267,7 +269,8 @@ eliminateEq e vs cs = do
         e2 = (- abs ak) *^ LA.var sigma ^+^ 
                 LA.fromTerms [((floor (a%m + 1/2) + (a `zmod` m)), x) | (a,x) <- LA.terms e, x /= xk]
     assert (m *^ e2 == LA.applySubst1 xk xk_def e) $ return ()
-    let mt model = IM.delete sigma $ IM.insert xk (LA.evalExpr model xk_def) model
+    let mt :: Model Integer -> Model Integer
+        mt model = IM.delete sigma $ IM.insert xk (LA.eval model xk_def) model
     c <- isZero e2
     return (IS.insert sigma (IS.delete xk vs), c : [applySubst1Constr xk xk_def c | c <- cs], mt)
 

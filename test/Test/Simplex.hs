@@ -144,7 +144,7 @@ case_lp_example_5_7_twoPhaseSimplex = do
       ret <- LP.twoPhaseSimplex OptMax obj
       tbl <- LP.getTableau
       m <- LP.getModel (IntSet.fromList [x1,x2,x3])
-      let oval = LA.evalExpr m obj
+      let oval = LA.eval m obj
       return (ret,tbl,oval)
 
 case_lp_example_5_7_primalDualSimplex :: Assertion
@@ -167,7 +167,7 @@ case_lp_example_5_7_primalDualSimplex = do
       ret <- LP.primalDualSimplex OptMax obj
       tbl <- LP.getTableau
       m <- LP.getModel (IntSet.fromList [x1,x2,x3])
-      let oval = LA.evalExpr m obj
+      let oval = LA.eval m obj
       return (ret,tbl,oval)
 
 ------------------------------------------------------------------------

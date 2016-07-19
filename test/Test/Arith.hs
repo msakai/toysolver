@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Test.Arith (arithTestGroup) where
 
 import Control.Monad
@@ -196,8 +196,8 @@ prop_FourierMotzkin_solve :: Property
 prop_FourierMotzkin_solve =
   forAll genQFLAConj $ \(vs,cs) ->
     case FourierMotzkin.solve vs cs of
-      Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom m) cs == False
-      Just m  -> property $ all (LA.evalAtom m) cs
+      Nothing -> forAll (genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False
+      Just m  -> property $ all (LA.eval m) cs
 
 case_FourierMotzkin_test1 :: Assertion
 case_FourierMotzkin_test1 = 
@@ -205,7 +205,7 @@ case_FourierMotzkin_test1 =
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
       forM_ (snd test1') $ \a -> do
-        LA.evalAtom m a @?= True
+        LA.eval m a @?= True
 
 case_FourierMotzkin_test2 :: Assertion
 case_FourierMotzkin_test2 = 
@@ -213,7 +213,7 @@ case_FourierMotzkin_test2 =
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
       forM_ (snd test2') $ \a -> do
-        LA.evalAtom m a @?= True
+        LA.eval m a @?= True
 
 {-
 Maximize
@@ -230,7 +230,7 @@ End
 case_FourierMotzkinOptimization_test1 :: Assertion
 case_FourierMotzkinOptimization_test1 = do
   Interval.upperBound' i @?= (3005/24, True)
-  and [LA.evalAtom m c | c <- cs] @?= True
+  and [LA.eval m c | c <- cs] @?= True
   where
     (i, f) = FMOpt.optimize (IS.fromList vs) OptMax obj cs
     m = f (3005/24)
@@ -254,8 +254,8 @@ prop_VirtualSubstitution_solve :: Property
 prop_VirtualSubstitution_solve =
    forAll genQFLAConj $ \(vs,cs) ->
      case VirtualSubstitution.solve vs cs of
-       Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom m) cs == False
-       Just m  -> property $ all (LA.evalAtom m) cs
+       Nothing -> forAll (genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False
+       Just m  -> property $ all (LA.eval m) cs
 
 case_VirtualSubstitution_test1 :: Assertion
 case_VirtualSubstitution_test1 = 
@@ -263,7 +263,7 @@ case_VirtualSubstitution_test1 =
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
       forM_ (snd test1') $ \a -> do
-        LA.evalAtom m a @?= True
+        LA.eval m a @?= True
 
 case_VirtualSubstitution_test2 :: Assertion
 case_VirtualSubstitution_test2 = 
@@ -271,7 +271,7 @@ case_VirtualSubstitution_test2 =
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
       forM_ (snd test2') $ \a -> do
-        LA.evalAtom m a @?= True
+        LA.eval m a @?= True
 
 ------------------------------------------------------------------------
         
@@ -341,8 +341,9 @@ prop_OmegaTest_solve :: Property
 prop_OmegaTest_solve =
    forAll genQFLAConjSmallInt $ \(vs,cs) ->
      case OmegaTest.solve def vs cs of
-       Nothing -> forAll (genModel vs) $ \m -> all (LA.evalAtom (fmap fromInteger m)) cs == False
-       Just m  -> property $ all (LA.evalAtom (fmap fromInteger m)) cs
+       Nothing ->
+         forAll (genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False
+       Just m  -> property $ all (LA.eval (fmap fromInteger m :: Model Rational)) cs
 
 case_OmegaTest_test1 :: Assertion
 case_OmegaTest_test1 = 
@@ -350,7 +351,7 @@ case_OmegaTest_test1 =
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
       forM_ (snd test1') $ \a -> do
-        LA.evalAtom (IM.map fromInteger m) a @?= True
+        LA.eval (IM.map fromInteger m :: Model Rational) a @?= True
 
 case_OmegaTest_test2 :: Assertion
 case_OmegaTest_test2 = 
@@ -372,9 +373,10 @@ prop_Cooper_solve =
    forAll genQFLAConjSmallInt $ \(vs,cs) ->
      case Cooper.solve vs cs of
        Nothing ->
-         (forAll (genModel vs) $ \m -> all (LA.evalAtom (fmap fromInteger m)) cs == False) QC..&&.
+         (forAll (genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False)
+         QC..&&.
          property (OmegaTest.solve def vs cs == Nothing)
-       Just m  -> property $ all (LA.evalAtom (fmap fromInteger m)) cs
+       Just m  -> property $ all (LA.eval (fmap fromInteger m :: Model Rational)) cs
 
 case_Cooper_test1 :: Assertion
 case_Cooper_test1 = 
@@ -382,7 +384,7 @@ case_Cooper_test1 =
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
       forM_ (snd test1') $ \a -> do
-        LA.evalAtom (IM.map fromInteger m) a @?= True
+        LA.eval (IM.map fromInteger m :: Model Rational) a @?= True
 
 case_Cooper_test2 :: Assertion
 case_Cooper_test2 = 
@@ -396,7 +398,7 @@ prop_Simplex2_solve :: Property
 prop_Simplex2_solve = forAll genQFLAConj $ \(vs,cs) -> do
   case Simplex2Simple.check vs cs of
     Nothing -> True
-    Just m -> all (LA.evalAtom m) cs
+    Just m -> all (LA.eval m) cs
 
 case_Simplex2_test1 :: Assertion
 case_Simplex2_test1 =
@@ -468,7 +470,7 @@ disabled_case_ContiTraverso_test1 =
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
       forM_ (snd test1') $ \a -> do
-        LA.evalAtom (IM.map fromInteger m) a @?= True
+        LA.eval (IM.map fromInteger m :: Model Rational) a @?= True
 
 disabled_case_ContiTraverso_test2 :: Assertion
 disabled_case_ContiTraverso_test2 = 

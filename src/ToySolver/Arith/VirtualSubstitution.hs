@@ -23,6 +23,8 @@
 module ToySolver.Arith.VirtualSubstitution
   ( QFFormula
   , evalQFFormula
+  , Model
+  , Eval (..)
 
   -- * Projection
   , project
@@ -55,9 +57,10 @@ import ToySolver.Data.Var
 -- | Quantifier-free formula of LRA
 type QFFormula = BoolExpr (LA.Atom Rational)
 
+{-# DEPRECATED evalQFFormula "Use Eval class instead" #-}
 -- | @'evalQFFormula' M φ@ returns whether @M ⊧_LRA φ@ or not.
 evalQFFormula :: Model Rational -> QFFormula -> Bool
-evalQFFormula m = BoolExpr.fold (LA.evalAtom m)
+evalQFFormula = eval
 
 {-| @'project' x φ@ returns @(ψ, lift)@ such that:
 
@@ -72,7 +75,7 @@ project x formula = (formula', mt)
     formula' = orB' [phi | (phi,_) <- xs]
     mt m = head $ do
       (phi, mt') <- xs
-      guard $ evalQFFormula m phi
+      guard $ eval m phi
       return $ mt' m
     orB' = orB . concatMap f
       where
@@ -102,7 +105,7 @@ projectN vs2 = f (IS.toList vs2)
 * if @M ⊧_LRA ψ_i@ then @lift_i M ⊧_LRA φ@.
 -}
 projectCases :: Var -> QFFormula -> [(QFFormula, Model Rational -> Model Rational)]
-projectCases v phi = [(psi, \m -> IM.insert v (LA.evalExpr m t) m) | (psi, t) <- projectCases' v phi]
+projectCases v phi = [(psi, \m -> IM.insert v (LA.eval m t) m) | (psi, t) <- projectCases' v phi]
 
 {-| @'projectCases' x φ@ returns @[(ψ_1, lift_1), …, (ψ_m, lift_m)]@ such that:
 
@@ -183,8 +186,9 @@ pairs (x:xs) = [(x,x2) | x2 <- xs] ++ pairs xs
 solveQFFormula :: VarSet -> QFFormula -> Maybe (Model Rational)
 solveQFFormula vs formula = listToMaybe $ do
   (formula2, mt) <- projectCasesN vs formula
-  let m = IM.empty
-  guard $ evalQFFormula m formula2
+  let m :: Model Rational
+      m = IM.empty
+  guard $ eval m formula2
   return $ mt m
 
 -- | @'solve' {x1,…,xn} φ@ returns @Just M@ such that @M ⊧_LRA φ@ when

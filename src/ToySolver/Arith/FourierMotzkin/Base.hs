@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -7,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses)
 --
 -- Naïve implementation of Fourier-Motzkin Variable Elimination
 -- 
@@ -141,10 +142,10 @@ simplify = fmap concat . mapM f
         Just x -> guard (x == 0) >> return []
         Nothing -> return [c]
 
-evalConstr :: Model Rational -> Constr -> Bool
-evalConstr m (IsPos t)    = LA.evalExpr m (LA.mapCoeff fromInteger t) > 0
-evalConstr m (IsNonneg t) = LA.evalExpr m (LA.mapCoeff fromInteger t) >= 0
-evalConstr m (IsZero t)   = LA.evalExpr m (LA.mapCoeff fromInteger t) == 0
+instance Eval (Model Rational) Constr Bool where
+  eval m (IsPos t)    = LA.eval m (LA.mapCoeff fromInteger t :: LA.Expr Rational) > 0
+  eval m (IsNonneg t) = LA.eval m (LA.mapCoeff fromInteger t :: LA.Expr Rational) >= 0
+  eval m (IsZero t)   = LA.eval m (LA.mapCoeff fromInteger t :: LA.Expr Rational) == 0
 
 -- ---------------------------------------------------------------------------
 
@@ -299,8 +300,9 @@ solve vs cs = msum [solve' vs cs2 | cs2 <- unDNF (constraintsToDNF cs)]
 solve' :: VarSet -> [Constr] -> Maybe (Model Rational)
 solve' vs cs = do
   (cs2,mt) <- projectN' vs =<< simplify cs
-  let m = IM.empty
-  guard $ all (evalConstr m) cs2
+  let m :: Model Rational
+      m = IM.empty
+  guard $ all (eval m) cs2
   return $ mt m
 
 -- ---------------------------------------------------------------------------

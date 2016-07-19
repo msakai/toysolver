@@ -224,7 +224,7 @@ getModel vs = do
   defs <- getDefs
   let vs' = (vs `IS.difference` IM.keysSet defs) `IS.union` IS.unions [vars e | e <- IM.elems defs]
       m0 = IM.fromAscList [(v, Simplex.currentValue tbl v) | v <- IS.toAscList vs']
-  return $ IM.filterWithKey (\k _ -> k `IS.member` vs) $ IM.map (LA.evalExpr m0) defs `IM.union` m0
+  return $ IM.filterWithKey (\k _ -> k `IS.member` vs) $ IM.map (LA.eval m0) defs `IM.union` m0
 
 phaseI :: (Fractional r, Real r) => LP r Bool
 phaseI = do

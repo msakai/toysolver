@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.OrdRel
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies)
+-- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances)
 --
 -- Ordering relations
 -- 
@@ -136,3 +136,6 @@ fromOrdRel :: IsOrdRel e r => OrdRel e -> r
 fromOrdRel (OrdRel a op b) = ordRel op a b
 
 -- ---------------------------------------------------------------------------
+
+instance (Eval m e a, Ord a) => Eval m (OrdRel e) Bool where
+  eval m (OrdRel lhs op rhs) = evalOp op (eval m lhs) (eval m rhs)

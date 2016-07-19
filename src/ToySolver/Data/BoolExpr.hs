@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveDataTypeable, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses, DeriveDataTypeable)
+-- Portability :  non-portable (MultiParamTypeClasses, DeriveDataTypeable, FlexibleContexts, FlexibleInstances)
 --
 -- Boolean expression over a given type of atoms
 -- 
@@ -117,6 +117,9 @@ fold f = g
 {-# RULES
   "fold/fmap"    forall f g e.  fold f (fmap g e) = fold (f.g) e
  #-}
+
+instance Eval m a Bool => Eval m (BoolExpr a) Bool where
+  eval m = fold (eval m)
 
 simplify :: BoolExpr a -> BoolExpr a
 simplify = runSimplify . fold (Simplify . Atom)

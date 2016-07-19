@@ -93,6 +93,9 @@ evalExpr m = f
     f (a :*: b) = f a * f b
     f (a :/: b) = f a / f b
 
+instance Fractional r => Eval (Model r) (Expr r) r where
+  eval = evalExpr
+
 -- ---------------------------------------------------------------------------
 
 -- | Atomic formula

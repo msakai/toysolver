@@ -27,10 +27,11 @@ toStandardForm prob1@(obj, cs) = (prob2, mt)
   where
     vs = vars obj `IS.union` vars cs
     (prob2,s) = toStandardForm' prob1
+    mt :: Model Rational -> Model Rational
     mt m = IM.fromAscList $ do
       v <- IS.toAscList vs
       case IM.lookup v s of
-        Just def -> return (v, LA.evalExpr m def)
+        Just def -> return (v, LA.eval m def)
         Nothing  -> return (v, m IM.! v)
 
 type M = State Var

@@ -806,7 +806,7 @@ getModel solver = do
   lraModel <- readIORef (smtLRAModel solver)
   eufModel <- readIORef (smtEUFModel solver)
   (_, fsymToReal) <- readIORef (smtRealTermDefs solver)
-  let xs = [(e, LA.evalExpr lraModel lraExpr) | (fsym, lraExpr) <- IntMap.toList fsymToReal, let e = EUF.evalAp eufModel fsym [], e /= EUF.mUnspecified eufModel]
+  let xs = [(e, LA.eval lraModel lraExpr) | (fsym, lraExpr) <- IntMap.toList fsymToReal, let e = EUF.evalAp eufModel fsym [], e /= EUF.mUnspecified eufModel]
   return $
     Model
     { mDefs = defs

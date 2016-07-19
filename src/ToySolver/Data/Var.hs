@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.Var
@@ -6,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (MultiParamTypeClasses)
 -- 
 -----------------------------------------------------------------------------
 module ToySolver.Data.Var
@@ -15,6 +16,7 @@ module ToySolver.Data.Var
   , VarMap
   , Variables (..)
   , Model
+  , Eval (..)
   ) where
 
 import Data.IntMap (IntMap)
@@ -42,5 +44,9 @@ instance Variables a => Variables [a] where
 
 -- | A @Model@ is a map from variables to values.
 type Model r = VarMap r
+
+-- | Evaluataion of something (e.g. expression or formula) under the model.
+class Eval m e v | m e -> v where
+  eval :: m -> e -> v
 
 -- ---------------------------------------------------------------------------

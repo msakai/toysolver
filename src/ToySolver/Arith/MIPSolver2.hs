@@ -169,12 +169,12 @@ optimize solver = do
             Simplex2.clearLogger lp2
             Simplex2.setObj lp2 (LA.constant 0)
             branchAndBound solver lp2 $ \m _ -> do
-              update m (LA.evalExpr m origObj)
+              update m (LA.eval m origObj)
             best <- readTVarIO (mipBest solver)
             case best of
               Just nd -> do
                 m <- Simplex2.getModel (ndLP nd)
-                atomically $ writeTVar (mipBest solver) $ Just nd{ ndValue = LA.evalExpr m origObj }
+                atomically $ writeTVar (mipBest solver) $ Just nd{ ndValue = LA.eval m origObj }
                 return Unbounded
               Nothing -> return Unsat
       Optimum -> do

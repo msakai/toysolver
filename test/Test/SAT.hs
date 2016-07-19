@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
 module Test.SAT (satTestGroup) where
 
 import Control.Monad
@@ -503,7 +503,7 @@ case_QF_LRA = do
   m2 <- Simplex2.getModel lraSolver
   defs <- readIORef defsRef
   let f (Left lit) = SAT.evalLit m1 lit
-      f (Right atom) = LA.evalAtom m2 atom
+      f (Right atom) = LA.eval m2 atom
   fold f c1 @?= True
   fold f c2 @?= True
 

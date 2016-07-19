@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.LA
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeFamilies)
+-- Portability :  non-portable (TypeFamilies, TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses)
 --
 -- Some definition for Theory of Linear Arithmetics.
 -- 
@@ -52,6 +52,9 @@ module ToySolver.Data.LA
   , applySubst1Atom
   , solveFor
   , module ToySolver.Data.OrdRel
+
+  -- * Evaluation of expression and atomic formula
+  , Eval (..)
 
   -- * misc
   , BoundsEnv
@@ -163,10 +166,14 @@ instance (Num r, Eq r) => VectorSpace (Expr r) where
 plus :: Num r => Expr r -> Expr r -> Expr r
 plus (Expr t1) (Expr t2) = Expr $ IntMap.unionWith (+) t1 t2
 
+instance Num r => Eval (Model r) (Expr r) r where
+  eval m (Expr t) = sum [(m' IntMap.! v) * c | (v,c) <- IntMap.toList t]
+    where m' = IntMap.insert unitVar 1 m
+
+{-# DEPRECATED evalExpr "Use Eval class instead" #-}
 -- | evaluate the expression under the model.
 evalExpr :: Num r => Model r -> Expr r -> r
-evalExpr m (Expr t) = sum [(m' IntMap.! v) * c | (v,c) <- IntMap.toList t]
-  where m' = IntMap.insert unitVar 1 m
+evalExpr = eval
 
 -- | evaluate the expression under the model.
 evalLinear :: VectorSpace a => Model a -> a -> Expr (Scalar a) -> a
@@ -259,9 +266,10 @@ type Atom r = OrdRel (Expr r)
 showAtom :: (Num r, Eq r, Show r) => Atom r -> String
 showAtom (OrdRel lhs op rhs) = showExpr lhs ++ showOp op ++ showExpr rhs
 
+{-# DEPRECATED evalAtom "Use Eval class instead" #-}
 -- | evaluate the formula under the model.
 evalAtom :: (Num r, Ord r) => Model r -> Atom r -> Bool
-evalAtom m (OrdRel lhs op rhs) = evalOp op (evalExpr m lhs) (evalExpr m rhs)
+evalAtom = eval
 
 applySubstAtom :: (Num r, Eq r) => VarMap (Expr r) -> Atom r -> Atom r
 applySubstAtom s (OrdRel lhs op rhs) = OrdRel (applySubst s lhs) op (applySubst s rhs)
