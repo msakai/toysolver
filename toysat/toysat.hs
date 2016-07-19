@@ -572,8 +572,8 @@ mainMUS :: Options -> SAT.Solver -> [String] -> IO ()
 mainMUS opt solver args = do
   gcnf <- case args of
            ["-"]   -> do
-             s <- hGetContents stdin
-             case GCNF.parseString s of
+             s <- BS.hGetContents stdin
+             case GCNF.parseByteString s of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
            [fname] -> do
