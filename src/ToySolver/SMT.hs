@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP, OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SMT
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  unstable
--- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP)
+-- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP, OverloadedStrings)
 --
 -----------------------------------------------------------------------------
 module ToySolver.SMT
@@ -64,6 +64,8 @@ import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import Data.Either
+import Data.Interned (intern, unintern)
+import Data.Interned.Text
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
@@ -75,6 +77,7 @@ import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import Data.Typeable
 import Data.VectorSpace
 
@@ -90,7 +93,7 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.Arith.Simplex2 as Simplex2
 import qualified ToySolver.EUF.EUFSolver as EUF
 
-type FSym = String
+type FSym = InternedText
 
 -- | Sort symbols
 data SSym
@@ -360,10 +363,11 @@ instance VASortFun a => VASortFun (Sort -> a) where
   arityVASortFun f = arityVASortFun (f undefined) + 1
 
 declareFSym :: Solver -> String -> [Sort] -> Sort -> IO FSym
-declareFSym solver f xs y = do
+declareFSym solver f' xs y = do
+  let f = intern $ T.pack f'
   fdefs <- readIORef (smtFDefs solver)
   when (f `Map.member` fdefs) $ do
-    E.throwIO $ Error $ "function symbol " ++ f ++ " is already used"
+    E.throwIO $ Error $ "function symbol " ++ f' ++ " is already used"
   fdef <-
     case (xs, y) of
       ([], Sort SSymBool []) -> do

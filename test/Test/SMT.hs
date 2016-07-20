@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, OverloadedStrings #-}
 module Test.SMT (smtTestGroup) where
 
 import Control.Applicative((<$>))

@@ -82,6 +82,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import Data.Ratio
+import Data.String
 import qualified Data.Version as V
 import Numeric (readFloat, readHex)
 import System.Exit
@@ -258,7 +259,7 @@ initialEnv :: Env
 initialEnv = (fenv, senv)
   where
     fenv = Map.fromList
-      [ (name, EFSymBuiltin name)
+      [ (name, EFSymBuiltin (fromString name))
       | name <- ["=", "true", "false", "not", "and", "or", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
       ]
     senv = Map.fromList
