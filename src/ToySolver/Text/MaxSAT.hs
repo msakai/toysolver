@@ -23,7 +23,6 @@ module ToySolver.Text.MaxSAT
 
   -- * Parsing .cnf/.wcnf files
   , parseFile
-  , parseString
   , parseByteString
 
   -- * Generating .wcnf files
@@ -57,69 +56,8 @@ type Weight = Integer
 
 parseFile :: FilePath -> IO (Either String WCNF)
 parseFile filename = do
-{-
-  s <- readFile filename
-  return $ parseString s
--}
   s <- BS.readFile filename
   return $ parseByteString s
-
-parseString :: String -> Either String WCNF
-parseString s =
-  case words l of
-    (["p","wcnf", nvar, nclause, top]) ->
-      Right $
-        WCNF
-        { numVars    = read nvar
-        , numClauses = read nclause
-        , topCost    = read top
-        , clauses    = map parseWCNFLine ls
-        }
-    (["p","wcnf", nvar, nclause]) ->
-      Right $
-        WCNF
-        { numVars    = read nvar
-        , numClauses = read nclause
-          -- top must be greater than the sum of the weights of violated soft clauses.
-        , topCost    = fromInteger $ 2^(63::Int) - 1
-        , clauses    = map parseWCNFLine ls
-        }
-    (["p","cnf", nvar, nclause]) ->
-      Right $
-        WCNF
-        { numVars    = read nvar
-        , numClauses = read nclause
-          -- top must be greater than the sum of the weights of violated soft clauses.
-        , topCost    = fromInteger $ 2^(63::Int) - 1
-        , clauses    = map parseCNFLine ls
-        }
-    _ ->
-      Left "cannot find wcnf/cnf header"
-  where
-    (l:ls) = filter (not . isComment) (lines s)
-
-isComment :: String -> Bool
-isComment ('c':_) = True
-isComment _ = False
-
-parseWCNFLine :: String -> WeightedClause
-parseWCNFLine s =
-  case words s of
-    (w:xs)
-      | last xs == "0" -> seq w' $ seqList ys $ (w', ys)
-      | otherwise -> error "ToySolver.Text.MaxSAT: parse error"
-      where
-        w' = readUnsignedInteger w
-        ys = map readInt $ init xs
-    _ -> error "ToySolver.Text.MaxSAT: parse error"
-
-parseCNFLine :: String -> WeightedClause
-parseCNFLine s
-  | null xs || last xs /= 0 = error "ToySolver.Text.MaxSAT: parse error"
-  | otherwise = seqList ys $ (1, ys)
-  where
-    xs = map readInt (words s)
-    ys = init xs
 
 parseByteString :: BS.ByteString -> Either String WCNF
 parseByteString s =
