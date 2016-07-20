@@ -10,7 +10,7 @@ install:
     $env:Path += ";.\.cabal-sandbox\bin"
 - cabal sandbox init
 - cabal update
-- cabal install --only-dependencies --enable-tests --enable-benchmarks --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
+- cabal install --only-dependencies --max-backjumps=-1 --enable-tests --enable-benchmarks --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
 
 build_script:
 - cabal configure --enable-tests --enable-benchmarks -v2 --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms # -v2 provides useful information for debugging
