@@ -464,11 +464,11 @@ Executable toyfmf
       text,
       toysolver
     -- logic-TPTP <=0.4.4.0 is not compatible with transformers-compat >=0.5
-    if flag(LogicTPTP045)
-      Build-Depends:
-        logic-TPTP >=0.4.5.0
-    else
-      if impl(ghc <7.9)
+    if impl(ghc <7.9)
+      if flag(LogicTPTP045)
+        Build-Depends:
+          logic-TPTP >=0.4.5.0
+      else
         Build-Depends:
           transformers-compat <0.5
   Default-Language: Haskell2010
