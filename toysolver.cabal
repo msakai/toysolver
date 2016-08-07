@@ -64,6 +64,9 @@ Extra-Source-Files:
    samples/programs/svm2lp/a1a
    samples/programs/nonogram/*.cwd
    samples/programs/nonogram/README.md
+   samples/programs/numberlink/ADC2013/*.txt
+   samples/programs/numberlink/ADC2014_QA/A/*.txt
+   samples/programs/numberlink/ADC2014_QA/Q/*.txt
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
 Build-Type: Simple
@@ -550,6 +553,28 @@ Executable nqueens
   Build-Depends:
     array,
     base,
+    toysolver
+  Default-Language: Haskell2010
+  Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
+
+Executable numberlink
+  If !flag(BuildSamplePrograms)
+    Buildable: False
+  Main-is: numberlink.hs
+  HS-Source-Dirs: samples/programs/numberlink
+  Build-Depends:
+    array,
+    base,
+    bytestring,
+    containers,
+    parsec,
+    pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
