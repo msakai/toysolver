@@ -140,8 +140,8 @@ main = do
       case r of
         Left err -> error (show err)
         Right prob -> do
-          -- printBoard prob $ Map.fromList [(c,k) | (k,src,dst) <- probLines sample, c <- [src,dst]]
-          r <- solve sample
+          -- printBoard prob $ Map.fromList [(c,k) | (k,src,dst) <- probLines prob, c <- [src,dst]]
+          r <- solve prob
           case r of
             Nothing -> putStrLn "UNSATISFIABLE"
             Just sol -> do
