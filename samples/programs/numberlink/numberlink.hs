@@ -147,6 +147,16 @@ main = do
             Just sol -> do
               putStrLn "SATISFIABLE"
               printBoard prob sol
+    [fname, fname2] -> do
+      r <- ParsecBL.parseFromFile parser fname
+      case r of
+        Left err -> error (show err)
+        Right prob -> do
+          store <- PBStore.newPBStore
+          vs <- encode store prob
+          -- print vs
+          opb <- PBStore.getPBFormula store
+          PB.writeOPBFile fname2 opb
 
 sampleFile :: BL.ByteString
 sampleFile = BL.unlines
@@ -168,11 +178,3 @@ sampleFile = BL.unlines
 
 sample :: Problem
 Right sample = parse parser "sample" sampleFile
-
-writeOPB :: FilePath -> Problem -> IO ()
-writeOPB fname prob = do
-  store <- PBStore.newPBStore  
-  vs <- encode store prob
-  print vs
-  opb <- PBStore.getPBFormula store
-  PB.writeOPBFile fname opb
