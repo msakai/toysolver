@@ -64,38 +64,59 @@ parser = do
       _ <- char ')'
       return (x,y)
 
--- | 参考: http://wavefrontip.la.coocan.jp/%E3%83%8A%E3%83%B3%E3%83%90%E3%83%BC%E3%83%AA%E3%83%B3%E3%82%AF.pdf
+
 encode :: SAT.AddPBLin m enc => enc -> Problem -> m (Array Cell (Array Number SAT.Var))
 encode enc Problem{ probSize = (w,h), probLineNum = n, probLines = ls }= do
   let bnd = ((0,0), (w-1,h-1))
       cells = range bnd
+      edges = [(a,b) | a@(x,y) <- cells, b <- [(x+1,y),(x,y+1)], inRange bnd b]
+      adjacentEdges a@(x,y) =
+        [(a,b) | b <- [(x+1,y),(x,y+1)], inRange bnd b] ++
+        [(b,a) | b <- [(x-1,y),(x,y-1)], inRange bnd b]
       ks = [1..n]
-      adjacentCells (x,y) = [c | c <- [(x-1,y),(x+1,y),(x,y-1),(x,y+1)], inRange bnd c]
+
+  -- 各マスへの数字の割り当てを表す変数
   vs <- liftM (array bnd) $ forM cells $ \(x,y) -> do
     zs <- liftM (array (1,n)) $ forM ks $ \k -> do
       v <- SAT.newVar enc
       return (k,v)
     return ((x,y), zs)
+  -- 各辺の有無を表す変数
+  evs <- liftM Map.fromList $ forM edges $ \e -> do
+    v <- SAT.newVar enc
+    return (e,v)
+
   -- 初期数字
   let m0 = Map.fromList [(c,k) | (k,src,dst) <- ls, c <- [src,dst]]
   forM_ (Map.toList m0) $ \(c,k) -> do
     SAT.addClause enc [vs!c!k]
+
   -- 各マスには高々ひとつしか数字が入らない
-  forM_ (range bnd) $ \c -> do
-    SAT.addAtMost enc [vs!c!k | k <- ks] 1
-  -- 初期数字の入っているマスの隣には同一数字の入ったマスが1個(以上)ある
-  forM_ (Map.toList m0) $ \(c,k) -> do
-    SAT.addAtLeast enc [vs!c'!k | c' <- adjacentCells c] 1
-  -- 初期数字の入っていないマスの隣には同一数字の入ったマスが2個(以上)ある
-  forM_ (range bnd) $ \c -> do
+  forM_ (range bnd) $ \a -> do
+    SAT.addAtMost enc [vs!a!k | k <- ks] 1
+  -- 辺で連結されるマスは同じ数字
+  forM_ (Map.toList evs) $ \((a,b),v) ->
     forM_ ks $ \k -> do
-      when (c `Map.notMember` m0) $ do
-        SAT.addPBAtLeastSoft enc (vs!c!k) [(1, vs!c'!k) | c' <- adjacentCells c] 2
+      SAT.addClause enc [-v, -(vs!a!k), vs!b!k]
+      SAT.addClause enc [-v, -(vs!b!k), vs!a!k]
+
+  -- 初期数字の入っているマスの次数は1
+  forM_ (Map.toList m0) $ \(a,_) -> do
+    SAT.addExactly enc [evs Map.! e | e <- adjacentEdges a] 1
+  -- 初期数字の入っていないマスの次数は0か2
+  forM_ (range bnd) $ \a -> do
+    forM_ ks $ \k -> do
+      when (a `Map.notMember` m0) $ do
+        v <- SAT.newVar enc
+        SAT.addPBExactlySoft enc (-v) [(1, evs Map.! e) | e <- adjacentEdges a] 0
+        SAT.addPBExactlySoft enc v [(1, evs Map.! e) | e <- adjacentEdges a] 2
+
   -- 同一数字のマスが４個、田の字に凝ってはいけない
   forM_ [0..w-2] $ \x -> do
     forM_ [0..h-2] $ \y -> do
       forM_ ks $ \k -> do
-        SAT.addAtMost enc [vs!c'!k | c' <- [(x,y),(x+1,y),(x,y+1),(x+1,y+1)]] 3
+        SAT.addAtMost enc [vs!a!k | a <- [(x,y),(x+1,y),(x,y+1),(x+1,y+1)]] 3
+
   return vs
 
 decode :: Array Cell (Array Number SAT.Var) -> SAT.Model -> Map Cell Number
