@@ -6,6 +6,7 @@ import Control.Applicative hiding (many)
 import Control.Monad
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy.Char8 as BL
+import Data.List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -13,6 +14,7 @@ import qualified Data.PseudoBoolean as PB
 import Text.Parsec hiding (try)
 import qualified Text.Parsec.ByteString.Lazy as ParsecBL
 import System.Environment
+import System.IO
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Store.PB as PBStore
 
@@ -130,7 +132,7 @@ decode vs m = Map.fromList $ catMaybes [f (x,y) | (x,y) <- range (bounds vs)]
 solve :: Problem -> IO (Maybe (Map Cell Number))
 solve prob = do
   solver <- SAT.newSolver
-  SAT.setLogger solver putStrLn  
+  SAT.setLogger solver $ hPutStrLn stderr
   vs <- encode solver prob  
   ret <- SAT.solve solver
   if ret then do
@@ -139,14 +141,14 @@ solve prob = do
   else
     return Nothing
 
-printBoard :: Problem -> Map Cell Number -> IO ()
-printBoard prob sol = do
+printSolution :: Problem -> Map Cell Number -> IO ()
+printSolution prob sol = do
   let (w,h) = probSize prob
   forM_ [0 .. h-1] $ \y -> do
-    putStrLn $ unwords
+    putStrLn $ concat $ intersperse ","
      [ case Map.lookup (x,y) sol of
-         Nothing -> replicate width '_'
-         Just k -> replicate (width - length (show k)) ' ' ++ show k
+         Nothing -> replicate width '0'
+         Just k -> replicate (width - length (show k)) '0' ++ show k
      | x <- [0 .. w-1]
      ]
   where
@@ -160,14 +162,12 @@ main = do
       r <- ParsecBL.parseFromFile parser fname
       case r of
         Left err -> error (show err)
-        Right prob -> do
-          -- printBoard prob $ Map.fromList [(c,k) | (k,src,dst) <- probLines prob, c <- [src,dst]]
+        Right prob@Problem{ probSize = (w,h) } -> do
+          putStrLn $ "SIZE " ++ show w ++ " " ++ show h
           r <- solve prob
           case r of
-            Nothing -> putStrLn "UNSATISFIABLE"
-            Just sol -> do
-              putStrLn "SATISFIABLE"
-              printBoard prob sol
+            Nothing -> return ()
+            Just sol -> printSolution prob sol
     [fname, fname2] -> do
       r <- ParsecBL.parseFromFile parser fname
       case r of
