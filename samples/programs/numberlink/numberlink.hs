@@ -28,6 +28,7 @@ data Problem
 
 type Number = Int
 type Cell = (Int,Int)
+type Edge = (Cell, Cell)
 
 parser ::  Stream s m Char => ParsecT s u m Problem
 parser = do
@@ -66,9 +67,10 @@ parser = do
       _ <- char ')'
       return (x,y)
 
+type Encoded = (Array Cell (Array Number SAT.Var), Map Edge SAT.Var)
 
-encode :: SAT.AddPBLin m enc => enc -> Problem -> m (Array Cell (Array Number SAT.Var))
-encode enc Problem{ probSize = (w,h), probLineNum = n, probLines = ls }= do
+encode :: SAT.AddPBLin m enc => enc -> Problem -> m Encoded
+encode enc Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
   let bnd = ((0,0), (w-1,h-1))
       cells = range bnd
       edges = [(a,b) | a@(x,y) <- cells, b <- [(x+1,y),(x,y+1)], inRange bnd b]
@@ -119,10 +121,10 @@ encode enc Problem{ probSize = (w,h), probLineNum = n, probLines = ls }= do
       forM_ ks $ \k -> do
         SAT.addAtMost enc [vs!a!k | a <- [(x,y),(x+1,y),(x,y+1),(x+1,y+1)]] 3
 
-  return vs
+  return (vs, evs)
 
-decode :: Array Cell (Array Number SAT.Var) -> SAT.Model -> Map Cell Number
-decode vs m = Map.fromList $ catMaybes [f (x,y) | (x,y) <- range (bounds vs)]
+decode :: Problem -> Encoded -> SAT.Model -> Map Cell Number
+decode prob (vs, evs) m = Map.fromList $ catMaybes [f (x,y) | (x,y) <- range (bounds vs)]
   where
     f (x,y) =
       case [k | (k,v) <- assocs (vs!(x,y)), SAT.evalLit m v] of
@@ -133,11 +135,11 @@ solve :: Problem -> IO (Maybe (Map Cell Number))
 solve prob = do
   solver <- SAT.newSolver
   SAT.setLogger solver $ hPutStrLn stderr
-  vs <- encode solver prob  
+  encoded <- encode solver prob  
   ret <- SAT.solve solver
   if ret then do
     m <- SAT.getModel solver
-    return $ Just $ decode vs m
+    return $ Just $ decode prob encoded m
   else
     return Nothing
 
@@ -174,8 +176,7 @@ main = do
         Left err -> error (show err)
         Right prob -> do
           store <- PBStore.newPBStore
-          vs <- encode store prob
-          -- print vs
+          _encoded <- encode store prob
           opb <- PBStore.getPBFormula store
           PB.writeOPBFile fname2 opb
 
