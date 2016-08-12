@@ -110,11 +110,10 @@ encode enc Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
     SAT.addExactly enc [evs Map.! e | e <- adjacentEdges a] 1
   -- 初期数字の入っていないマスの次数は0か2
   forM_ (range bnd) $ \a -> do
-    forM_ ks $ \k -> do
-      when (a `Map.notMember` m0) $ do
-        v <- SAT.newVar enc
-        SAT.addPBExactlySoft enc (-v) [(1, evs Map.! e) | e <- adjacentEdges a] 0
-        SAT.addPBExactlySoft enc v [(1, evs Map.! e) | e <- adjacentEdges a] 2
+    when (a `Map.notMember` m0) $ do
+      v <- SAT.newVar enc
+      SAT.addPBExactlySoft enc (-v) [(1, evs Map.! e) | e <- adjacentEdges a] 0
+      SAT.addPBExactlySoft enc v [(1, evs Map.! e) | e <- adjacentEdges a] 2
 
   -- 同一数字のマスが４個、田の字に凝ってはいけない
   forM_ [0..w-2] $ \x -> do
