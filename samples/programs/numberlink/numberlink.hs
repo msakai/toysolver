@@ -11,6 +11,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import qualified Data.PseudoBoolean as PB
+import qualified Data.Set as Set
 import Text.Parsec hiding (try)
 import qualified Text.Parsec.ByteString.Lazy as ParsecBL
 import System.Environment
@@ -126,10 +127,20 @@ encode enc Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
 decode :: Problem -> Encoded -> SAT.Model -> Map Cell Number
 decode prob (vs, evs) m = Map.fromList $ catMaybes [f (x,y) | (x,y) <- range (bounds vs)]
   where
-    f (x,y) =
-      case [k | (k,v) <- assocs (vs!(x,y)), SAT.evalLit m v] of
-        k:_ -> Just ((x,y),k)
-        [] -> Nothing
+    edges = [e | (e,ev) <- Map.toList evs, SAT.evalLit m ev]
+    adjacents = Map.fromListWith Set.union $ concat $ [[(a, Set.singleton b), (b, Set.singleton a)] | (a,b) <- edges]
+    usedCells = Set.unions [g a (Set.singleton a) | (_k,a,_b) <- probLines prob]
+      where
+        g a visited =
+          case Set.toList (Map.findWithDefault Set.empty a adjacents Set.\\ visited) of
+            [] -> visited
+            b:_ -> g b (Set.insert b visited)
+    f (x,y)
+      | (x,y) `Set.member` usedCells =
+          case [k | (k,v) <- assocs (vs!(x,y)), SAT.evalLit m v] of
+            k:_ -> Just ((x,y),k)
+            [] -> Nothing
+      | otherwise = Nothing
 
 solve :: Problem -> IO (Maybe (Map Cell Number))
 solve prob = do
