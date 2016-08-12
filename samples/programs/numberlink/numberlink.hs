@@ -118,8 +118,11 @@ encode enc Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
   -- 同一数字のマスが４個、田の字に凝ってはいけない
   forM_ [0..w-2] $ \x -> do
     forM_ [0..h-2] $ \y -> do
-      forM_ ks $ \k -> do
-        SAT.addAtMost enc [vs!a!k | a <- [(x,y),(x+1,y),(x,y+1),(x+1,y+1)]] 3
+      let a = (x,y)
+          b = (x+1, y)
+          c = (x, y+1)
+          d = (x+1,y+1)
+      SAT.addAtMost enc [evs Map.! e | e <- [(a,b),(a,c),(b,d),(c,d)]] 2
 
   return (vs, evs)
 
