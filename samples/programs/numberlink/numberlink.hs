@@ -85,7 +85,10 @@ encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
 
   -- 各マスへの数字の割り当てを表す変数 (0 は数字なしを表す)
   vs <- liftM (array bnd) $ forM cells $ \(x,y) -> do
-    zs <- liftM (array (0,n)) $ forM [0..n] $ \k -> do
+    let r = if optAssumeNoBlank opt
+            then (1,n)
+            else (0,n)
+    zs <- liftM (array r) $ forM (range r) $ \k -> do
       v <- SAT.newVar enc
       return (k,v)
     return ((x,y), zs)
@@ -114,14 +117,17 @@ encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
   -- 初期数字の入っていないマスの次数は0か2
   forM_ (range bnd) $ \a -> do
     when (a `Map.notMember` m0) $ do
-      let v = vs!a!0
-      -- v → deg(a)=0
-      -- SAT.addPBAtMostSoft enc v [(1, evs Map.! e) | e <- adjacentEdges a] 0
-      forM_ (adjacentEdges a) $ \e -> SAT.addClause enc [-v, -(evs Map.! e)]     
-      -- ¬v → deg(a)=2
-      SAT.addPBExactlySoft enc (-v) [(1, evs Map.! e) | e <- adjacentEdges a] 2
-      -- ¬v → deg(a)>0
-      -- SAT.addClause enc $ v : [evs Map.! e | e <- adjacentEdges a]
+      if optAssumeNoBlank opt then do
+        SAT.addExactly enc [evs Map.! e | e <- adjacentEdges a] 2
+      else do
+        let v = vs!a!0
+        -- v → deg(a)=0
+        -- SAT.addPBAtMostSoft enc v [(1, evs Map.! e) | e <- adjacentEdges a] 0
+        forM_ (adjacentEdges a) $ \e -> SAT.addClause enc [-v, -(evs Map.! e)]     
+        -- ¬v → deg(a)=2
+        SAT.addPBExactlySoft enc (-v) [(1, evs Map.! e) | e <- adjacentEdges a] 2
+        -- ¬v → deg(a)>0
+        -- SAT.addClause enc $ v : [evs Map.! e | e <- adjacentEdges a]
 
   -- 同一数字のマスが４個、田の字に凝ってはいけない
   when (optAssumeNoDetour opt) $ do
@@ -158,8 +164,9 @@ solve opt prob = do
   solver <- SAT.newSolver
   SAT.setLogger solver $ hPutStrLn stderr
   encoded <- encode solver opt prob
-  forM_ (elems (fst encoded)) $ \xs -> do
-    SAT.setVarPolarity solver (xs!0) False
+  unless (optAssumeNoBlank opt) $ do
+    forM_ (elems (fst encoded)) $ \xs -> do
+      SAT.setVarPolarity solver (xs!0) False
   ret <- SAT.solve solver
   if ret then do
     m <- SAT.getModel solver
@@ -182,20 +189,25 @@ printSolution prob sol = do
 
 data Options
   = Options
-  { optAssumeNoDetour :: Bool
+  { optAssumeNoBlank :: Bool
+  , optAssumeNoDetour :: Bool
   }
 
 instance Default Options where
   def =
     Options
-    { optAssumeNoDetour = False
+    { optAssumeNoBlank = False
+    , optAssumeNoDetour = False
     }
 
 options :: [OptDescr (Options -> Options)]
 options =
-    [ Option [] ["no-detour"]
+    [ Option [] ["no-blank"]
+        (NoArg (\opt -> opt{ optAssumeNoBlank = True }))
+        "Assume no blank cells in solution"
+    , Option [] ["no-detour"]
         (NoArg (\opt -> opt{ optAssumeNoDetour = True }))
-        "Assume no detour"
+        "Assume no detour in solution"
     ]
 
 header :: String
