@@ -163,20 +163,24 @@ decode prob (vs, evs) m = (solCells, solEdges)
             [] -> visited
             b:_ -> g b (Set.insert b visited)
 
-solve :: Options -> Problem -> IO (Maybe Solution)
-solve opt prob = do
+createSolver :: Options -> Problem -> IO (IO (Maybe Solution))
+createSolver opt prob = do
   solver <- SAT.newSolver
   SAT.setLogger solver $ hPutStrLn stderr
   encoded <- encode solver opt prob
   unless (optAssumeNoBlank opt) $ do
     forM_ (elems (fst encoded)) $ \xs -> do
       SAT.setVarPolarity solver (xs!0) False
-  ret <- SAT.solve solver
-  if ret then do
-    m <- SAT.getModel solver
-    return $ Just $ decode prob encoded m
-  else
-    return Nothing
+  let m = do
+        ret <- SAT.solve solver
+        if ret then do
+          m <- SAT.getModel solver
+          let sol = decode prob encoded m
+          SAT.addClause solver $ blockingClause prob encoded sol
+          return $ Just sol
+        else
+          return Nothing
+  return m
 
 printSolution :: Problem -> Solution -> IO ()
 printSolution prob (cells, _) = do
@@ -191,10 +195,14 @@ printSolution prob (cells, _) = do
   where
     width = length $ show (probLineNum prob)
 
+blockingClause :: Problem -> Encoded -> Solution -> SAT.Clause
+blockingClause _prob (_,edgesEnc) (_,edges) = [- (edgesEnc Map.! e) | e <- Set.toList edges]
+
 data Options
   = Options
   { optAssumeNoBlank :: Bool
   , optAssumeNoDetour :: Bool
+  , optNumSolutions :: Int
   }
 
 instance Default Options where
@@ -202,6 +210,7 @@ instance Default Options where
     Options
     { optAssumeNoBlank = False
     , optAssumeNoDetour = False
+    , optNumSolutions = 1
     }
 
 options :: [OptDescr (Options -> Options)]
@@ -212,6 +221,9 @@ options =
     , Option [] ["no-detour"]
         (NoArg (\opt -> opt{ optAssumeNoDetour = True }))
         "Assume no detour in solution"
+    , Option ['n'] []
+        (ReqArg (\val opt -> opt{ optNumSolutions = read val }) "<int>")
+        "Maximal number of solutions to enumerate, or negative value for all solutions (default: 1)"
     ]
 
 header :: String
@@ -242,10 +254,19 @@ main = do
             Left err -> error (show err)
             Right prob@Problem{ probSize = (w,h) } -> do
               putStrLn $ "SIZE " ++ show w ++ " " ++ show h
-              r <- solve opt prob
-              case r of
-                Nothing -> return ()
-                Just sol -> printSolution prob sol
+              solve <- createSolver opt prob
+              let loop n
+                    | n == 0 = return ()
+                    | otherwise = do
+                        m <- solve
+                        case m of
+                          Nothing -> return ()
+                          Just sol -> do
+                            printSolution prob sol
+                            putStrLn ""
+                            loop (if n > 0 then n - 1 else n)
+              loop (optNumSolutions opt)
+
         [fname, fname2] -> do
           r <- ParsecBL.parseFromFile parser fname
           case r of
