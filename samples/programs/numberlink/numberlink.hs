@@ -10,8 +10,8 @@ import Data.Default.Class
 import Data.List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe
 import qualified Data.PseudoBoolean as PB
+import Data.Set (Set)
 import qualified Data.Set as Set
 import System.Console.GetOpt
 import System.Environment
@@ -141,9 +141,19 @@ encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
 
   return (vs, evs)
 
-decode :: Problem -> Encoded -> SAT.Model -> Map Cell Number
-decode prob (vs, evs) m = Map.fromList $ catMaybes [f (x,y) | (x,y) <- range (bounds vs)]
+type Solution = (Map Cell Number, Set Edge)
+
+decode :: Problem -> Encoded -> SAT.Model -> Solution
+decode prob (vs, evs) m = (solCells, solEdges)
   where
+    solCells = Map.fromList $ do
+      a@(x,y) <- range (bounds vs)
+      guard $ a `Set.member` usedCells
+      case [k | (k,v) <- assocs (vs!(x,y)), SAT.evalLit m v] of
+        k:_ -> return ((x,y),k)
+        [] -> mzero
+    solEdges = Set.fromList [e | e@(a,_) <- edges, a `Set.member` usedCells]
+    
     edges = [e | (e,ev) <- Map.toList evs, SAT.evalLit m ev]
     adjacents = Map.fromListWith Set.union $ concat $ [[(a, Set.singleton b), (b, Set.singleton a)] | (a,b) <- edges]
     usedCells = Set.unions [g a (Set.singleton a) | (_k,a,_b) <- probLines prob]
@@ -152,14 +162,8 @@ decode prob (vs, evs) m = Map.fromList $ catMaybes [f (x,y) | (x,y) <- range (bo
           case Set.toList (Map.findWithDefault Set.empty a adjacents Set.\\ visited) of
             [] -> visited
             b:_ -> g b (Set.insert b visited)
-    f (x,y)
-      | (x,y) `Set.member` usedCells =
-          case [k | (k,v) <- assocs (vs!(x,y)), SAT.evalLit m v] of
-            k:_ -> Just ((x,y),k)
-            [] -> Nothing
-      | otherwise = Nothing
 
-solve :: Options -> Problem -> IO (Maybe (Map Cell Number))
+solve :: Options -> Problem -> IO (Maybe Solution)
 solve opt prob = do
   solver <- SAT.newSolver
   SAT.setLogger solver $ hPutStrLn stderr
@@ -174,12 +178,12 @@ solve opt prob = do
   else
     return Nothing
 
-printSolution :: Problem -> Map Cell Number -> IO ()
-printSolution prob sol = do
+printSolution :: Problem -> Solution -> IO ()
+printSolution prob (cells, _) = do
   let (w,h) = probSize prob
   forM_ [0 .. h-1] $ \y -> do
     putStrLn $ concat $ intersperse ","
-     [ case Map.lookup (x,y) sol of
+     [ case Map.lookup (x,y) cells of
          Nothing -> replicate width '0'
          Just k -> replicate (width - length (show k)) '0' ++ show k
      | x <- [0 .. w-1]
