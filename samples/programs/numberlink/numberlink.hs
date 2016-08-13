@@ -83,9 +83,9 @@ encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
         [(b,a) | b <- [(x-1,y),(x,y-1)], inRange bnd b]
       ks = [1..n]
 
-  -- 各マスへの数字の割り当てを表す変数
+  -- 各マスへの数字の割り当てを表す変数 (0 は数字なしを表す)
   vs <- liftM (array bnd) $ forM cells $ \(x,y) -> do
-    zs <- liftM (array (1,n)) $ forM ks $ \k -> do
+    zs <- liftM (array (0,n)) $ forM [0..n] $ \k -> do
       v <- SAT.newVar enc
       return (k,v)
     return ((x,y), zs)
@@ -101,7 +101,7 @@ encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
 
   -- 各マスには高々ひとつしか数字が入らない
   forM_ (range bnd) $ \a -> do
-    SAT.addAtMost enc [vs!a!k | k <- ks] 1
+    SAT.addExactly enc [v | v <- elems (vs!a)] 1
   -- 辺で連結されるマスは同じ数字
   forM_ (Map.toList evs) $ \((a,b),v) ->
     forM_ ks $ \k -> do
@@ -114,9 +114,14 @@ encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
   -- 初期数字の入っていないマスの次数は0か2
   forM_ (range bnd) $ \a -> do
     when (a `Map.notMember` m0) $ do
-      v <- SAT.newVar enc
-      SAT.addPBExactlySoft enc (-v) [(1, evs Map.! e) | e <- adjacentEdges a] 0
-      SAT.addPBExactlySoft enc v [(1, evs Map.! e) | e <- adjacentEdges a] 2
+      let v = vs!a!0
+      -- v → deg(a)=0
+      -- SAT.addPBAtMostSoft enc v [(1, evs Map.! e) | e <- adjacentEdges a] 0
+      forM_ (adjacentEdges a) $ \e -> SAT.addClause enc [-v, -(evs Map.! e)]     
+      -- ¬v → deg(a)=2
+      SAT.addPBExactlySoft enc (-v) [(1, evs Map.! e) | e <- adjacentEdges a] 2
+      -- ¬v → deg(a)>0
+      -- SAT.addClause enc $ v : [evs Map.! e | e <- adjacentEdges a]
 
   -- 同一数字のマスが４個、田の字に凝ってはいけない
   when (optAssumeNoDetour opt) $ do
@@ -153,6 +158,8 @@ solve opt prob = do
   solver <- SAT.newSolver
   SAT.setLogger solver $ hPutStrLn stderr
   encoded <- encode solver opt prob
+  forM_ (elems (fst encoded)) $ \xs -> do
+    SAT.setVarPolarity solver (xs!0) False
   ret <- SAT.solve solver
   if ret then do
     m <- SAT.getModel solver
