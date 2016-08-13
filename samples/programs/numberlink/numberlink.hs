@@ -6,16 +6,19 @@ import Control.Applicative hiding (many)
 import Control.Monad
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy.Char8 as BL
+import Data.Default.Class
 import Data.List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import qualified Data.PseudoBoolean as PB
 import qualified Data.Set as Set
+import System.Console.GetOpt
+import System.Environment
+import System.Exit
+import System.IO
 import Text.Parsec hiding (try)
 import qualified Text.Parsec.ByteString.Lazy as ParsecBL
-import System.Environment
-import System.IO
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Store.PB as PBStore
 
@@ -70,8 +73,8 @@ parser = do
 
 type Encoded = (Array Cell (Array Number SAT.Var), Map Edge SAT.Var)
 
-encode :: SAT.AddPBLin m enc => enc -> Problem -> m Encoded
-encode enc Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
+encode :: SAT.AddPBLin m enc => enc -> Options -> Problem -> m Encoded
+encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
   let bnd = ((0,0), (w-1,h-1))
       cells = range bnd
       edges = [(a,b) | a@(x,y) <- cells, b <- [(x+1,y),(x,y+1)], inRange bnd b]
@@ -116,13 +119,14 @@ encode enc Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
       SAT.addPBExactlySoft enc v [(1, evs Map.! e) | e <- adjacentEdges a] 2
 
   -- 同一数字のマスが４個、田の字に凝ってはいけない
-  forM_ [0..w-2] $ \x -> do
-    forM_ [0..h-2] $ \y -> do
-      let a = (x,y)
-          b = (x+1, y)
-          c = (x, y+1)
-          d = (x+1,y+1)
-      SAT.addAtMost enc [evs Map.! e | e <- [(a,b),(a,c),(b,d),(c,d)]] 2
+  when (optAssumeNoDetour opt) $ do
+    forM_ [0..w-2] $ \x -> do
+      forM_ [0..h-2] $ \y -> do
+        let a = (x,y)
+            b = (x+1, y)
+            c = (x, y+1)
+            d = (x+1,y+1)
+        SAT.addAtMost enc [evs Map.! e | e <- [(a,b),(a,c),(b,d),(c,d)]] 2
 
   return (vs, evs)
 
@@ -144,11 +148,11 @@ decode prob (vs, evs) m = Map.fromList $ catMaybes [f (x,y) | (x,y) <- range (bo
             [] -> Nothing
       | otherwise = Nothing
 
-solve :: Problem -> IO (Maybe (Map Cell Number))
-solve prob = do
+solve :: Options -> Problem -> IO (Maybe (Map Cell Number))
+solve opt prob = do
   solver <- SAT.newSolver
   SAT.setLogger solver $ hPutStrLn stderr
-  encoded <- encode solver prob  
+  encoded <- encode solver opt prob
   ret <- SAT.solve solver
   if ret then do
     m <- SAT.getModel solver
@@ -169,29 +173,67 @@ printSolution prob sol = do
   where
     width = length $ show (probLineNum prob)
 
+data Options
+  = Options
+  { optAssumeNoDetour :: Bool
+  }
+
+instance Default Options where
+  def =
+    Options
+    { optAssumeNoDetour = False
+    }
+
+options :: [OptDescr (Options -> Options)]
+options =
+    [ Option [] ["no-detour"]
+        (NoArg (\opt -> opt{ optAssumeNoDetour = True }))
+        "Assume no detour"
+    ]
+
+header :: String
+header = unlines
+  [ "Usage:"
+  , "  numberlink [OPTION]... problem.txt"
+  , "  numberlink [OPTION]... problem.txt encoded.opb"
+  , ""
+  , "Options:"
+  ]
+
+showHelp :: Handle -> IO ()
+showHelp h = hPutStrLn h (usageInfo header options)
+
 main :: IO ()
 main = do
   args <- getArgs
-  case args of
-    [fname] -> do
-      r <- ParsecBL.parseFromFile parser fname
-      case r of
-        Left err -> error (show err)
-        Right prob@Problem{ probSize = (w,h) } -> do
-          putStrLn $ "SIZE " ++ show w ++ " " ++ show h
-          r <- solve prob
+  case getOpt Permute options args of
+    (_,_,errs@(_:_)) -> do
+      mapM_ putStrLn errs
+      exitFailure
+    (o,args2,[]) -> do
+      let opt = foldl (flip id) def o
+      case args2 of
+        [fname] -> do
+          r <- ParsecBL.parseFromFile parser fname
           case r of
-            Nothing -> return ()
-            Just sol -> printSolution prob sol
-    [fname, fname2] -> do
-      r <- ParsecBL.parseFromFile parser fname
-      case r of
-        Left err -> error (show err)
-        Right prob -> do
-          store <- PBStore.newPBStore
-          _encoded <- encode store prob
-          opb <- PBStore.getPBFormula store
-          PB.writeOPBFile fname2 opb
+            Left err -> error (show err)
+            Right prob@Problem{ probSize = (w,h) } -> do
+              putStrLn $ "SIZE " ++ show w ++ " " ++ show h
+              r <- solve opt prob
+              case r of
+                Nothing -> return ()
+                Just sol -> printSolution prob sol
+        [fname, fname2] -> do
+          r <- ParsecBL.parseFromFile parser fname
+          case r of
+            Left err -> error (show err)
+            Right prob -> do
+              store <- PBStore.newPBStore
+              _encoded <- encode store opt prob
+              opb <- PBStore.getPBFormula store
+              PB.writeOPBFile fname2 opb
+        _ -> do
+          showHelp stderr
 
 sampleFile :: BL.ByteString
 sampleFile = BL.unlines

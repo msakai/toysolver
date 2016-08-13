@@ -573,6 +573,7 @@ Executable numberlink
     base,
     bytestring,
     containers,
+    data-default-class,
     parsec,
     pseudo-boolean,
     toysolver
