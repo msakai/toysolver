@@ -20,6 +20,7 @@ import System.IO
 import Text.Parsec hiding (try)
 import qualified Text.Parsec.ByteString.Lazy as ParsecBL
 import qualified ToySolver.SAT as SAT
+import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Store.PB as PBStore
 
 data Problem
@@ -200,7 +201,8 @@ blockingClause _prob (_,edgesEnc) (_,edges) = [- (edgesEnc Map.! e) | e <- Set.t
 
 data Options
   = Options
-  { optAssumeNoBlank :: Bool
+  { optOptimize :: Bool
+  , optAssumeNoBlank :: Bool
   , optAssumeNoDetour :: Bool
   , optNumSolutions :: Int
   }
@@ -208,14 +210,18 @@ data Options
 instance Default Options where
   def =
     Options
-    { optAssumeNoBlank = False
+    { optOptimize = False
+    , optAssumeNoBlank = False
     , optAssumeNoDetour = False
     , optNumSolutions = 1
     }
 
 options :: [OptDescr (Options -> Options)]
 options =
-    [ Option [] ["no-blank"]
+    [ Option [] ["optimize"]
+        (NoArg (\opt -> opt{ optOptimize = True }))
+        "Minimize line length and turnarounds (-n option will be ignored)"
+    , Option [] ["no-blank"]
         (NoArg (\opt -> opt{ optAssumeNoBlank = True }))
         "Assume no blank cells in solution"
     , Option [] ["no-detour"]
@@ -254,18 +260,51 @@ main = do
             Left err -> error (show err)
             Right prob@Problem{ probSize = (w,h) } -> do
               putStrLn $ "SIZE " ++ show w ++ " " ++ show h
-              solve <- createSolver opt prob
-              let loop n
-                    | n == 0 = return ()
-                    | otherwise = do
-                        m <- solve
-                        case m of
-                          Nothing -> return ()
-                          Just sol -> do
-                            printSolution prob sol
-                            putStrLn ""
-                            loop (if n > 0 then n - 1 else n)
-              loop (optNumSolutions opt)
+              if not (optOptimize opt) then do                
+                solve <- createSolver opt prob
+                let loop n
+                      | n == 0 = return ()
+                      | otherwise = do
+                          m <- solve
+                          case m of
+                            Nothing -> return ()
+                            Just sol -> do
+                              printSolution prob sol
+                              putStrLn ""
+                              loop (if n > 0 then n - 1 else n)
+                loop (optNumSolutions opt)
+              else do
+                solver <- SAT.newSolver
+                SAT.setLogger solver $ hPutStrLn stderr
+                encoded@(cells,edges) <- encode solver opt prob
+                unless (optAssumeNoBlank opt) $ do
+                  forM_ (elems cells) $ \xs -> do
+                    SAT.setVarPolarity solver (xs!0) False
+                let obj1 = [(1,v) | v <- Map.elems (snd encoded)]
+                obj2 <- liftM concat $ forM (range ((0,0), (w-2,h-2))) $ \a@(x,y) -> do
+                  let b = (x+1,y)
+                      c = (x,y+1)
+                      d = (x+1,y+1)
+                  abd <- SAT.newVar solver
+                  SAT.addClause solver [- (edges Map.! (a,b)), - (edges Map.! (b,d)), abd]
+                  acd <- SAT.newVar solver
+                  SAT.addClause solver [- (edges Map.! (a,c)), - (edges Map.! (c,d)), acd]
+                  cab <- SAT.newVar solver
+                  SAT.addClause solver [- (edges Map.! (a,c)), - (edges Map.! (a,b)), cab]
+                  bdc <- SAT.newVar solver
+                  SAT.addClause solver [- (edges Map.! (b,d)), - (edges Map.! (c,d)), bdc]
+                  return [(1,abd), (1,acd), (1,cab), (1,bdc)]
+                let obj = obj1 ++ obj2
+                pbo <- PBO.newOptimizer solver obj
+                PBO.setLogger pbo $ hPutStrLn stderr
+                PBO.setOnUpdateBestSolution pbo $ \m val -> do
+                  hPutStrLn stderr $ "# obj = " ++ show val
+                  hFlush stderr
+                  let sol = decode prob encoded m
+                  printSolution prob sol
+                  putStrLn ""
+                  hFlush stdout
+                PBO.optimize pbo
 
         [fname, fname2] -> do
           r <- ParsecBL.parseFromFile parser fname
