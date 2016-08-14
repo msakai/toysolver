@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 module Main where
 
-import Control.Applicative hiding (many)
+import Control.Applicative hiding (many, optional)
 import Control.Monad
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -54,7 +54,8 @@ parser = do
     i <- num
     spaces
     src <- cell
-    _ <- char '-'
+    spaces
+    optional $ char '-' >> spaces
     dst <- cell
     _ <- endOfLine
     return (i,src,dst)
