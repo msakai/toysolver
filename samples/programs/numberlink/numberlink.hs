@@ -143,6 +143,24 @@ encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
 
   return (vs, evs)
 
+encodeObj :: SAT.AddPBLin m enc => enc -> Options -> Problem -> Encoded -> m SAT.PBLinSum
+encodeObj enc _opt Problem{ probSize = (w,h) } (_cells,edges) = do
+  let obj1 = [(1,v) | v <- Map.elems edges]
+  obj2 <- liftM concat $ forM (range ((0,0), (w-2,h-2))) $ \a@(x,y) -> do
+    let b = (x+1,y)
+        c = (x,y+1)
+        d = (x+1,y+1)
+    abd <- SAT.newVar enc
+    SAT.addClause enc [- (edges Map.! (a,b)), - (edges Map.! (b,d)), abd]
+    acd <- SAT.newVar enc
+    SAT.addClause enc [- (edges Map.! (a,c)), - (edges Map.! (c,d)), acd]
+    cab <- SAT.newVar enc
+    SAT.addClause enc [- (edges Map.! (a,c)), - (edges Map.! (a,b)), cab]
+    bdc <- SAT.newVar enc
+    SAT.addClause enc [- (edges Map.! (b,d)), - (edges Map.! (c,d)), bdc]
+    return [(1,abd), (1,acd), (1,cab), (1,bdc)]
+  return $ obj1 ++ obj2
+
 type Solution = (Map Cell Number, Set Edge)
 
 decode :: Problem -> Encoded -> SAT.Model -> Solution
@@ -277,25 +295,11 @@ main = do
               else do
                 solver <- SAT.newSolver
                 SAT.setLogger solver $ hPutStrLn stderr
-                encoded@(cells,edges) <- encode solver opt prob
+                encoded@(cells,_edges) <- encode solver opt prob
                 unless (optAssumeNoBlank opt) $ do
                   forM_ (elems cells) $ \xs -> do
                     SAT.setVarPolarity solver (xs!0) False
-                let obj1 = [(1,v) | v <- Map.elems (snd encoded)]
-                obj2 <- liftM concat $ forM (range ((0,0), (w-2,h-2))) $ \a@(x,y) -> do
-                  let b = (x+1,y)
-                      c = (x,y+1)
-                      d = (x+1,y+1)
-                  abd <- SAT.newVar solver
-                  SAT.addClause solver [- (edges Map.! (a,b)), - (edges Map.! (b,d)), abd]
-                  acd <- SAT.newVar solver
-                  SAT.addClause solver [- (edges Map.! (a,c)), - (edges Map.! (c,d)), acd]
-                  cab <- SAT.newVar solver
-                  SAT.addClause solver [- (edges Map.! (a,c)), - (edges Map.! (a,b)), cab]
-                  bdc <- SAT.newVar solver
-                  SAT.addClause solver [- (edges Map.! (b,d)), - (edges Map.! (c,d)), bdc]
-                  return [(1,abd), (1,acd), (1,cab), (1,bdc)]
-                let obj = obj1 ++ obj2
+                obj <- encodeObj solver opt prob encoded
                 pbo <- PBO.newOptimizer solver obj
                 PBO.setLogger pbo $ hPutStrLn stderr
                 PBO.setOnUpdateBestSolution pbo $ \m val -> do
@@ -313,9 +317,15 @@ main = do
             Left err -> error (show err)
             Right prob -> do
               store <- PBStore.newPBStore
-              _encoded <- encode store opt prob
+              obj <- do
+                encoded <- encode store opt prob
+                if optOptimize opt then do
+                  obj <- encodeObj store opt prob encoded
+                  return $ Just [(c,[v]) | (c,v) <- obj]
+                else do
+                  return Nothing
               opb <- PBStore.getPBFormula store
-              PB.writeOPBFile fname2 opb
+              PB.writeOPBFile fname2 $ opb{ PB.pbObjectiveFunction = obj }
         _ -> do
           showHelp stderr
 
