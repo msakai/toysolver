@@ -141,6 +141,28 @@ encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
             d = (x+1,y+1)
         SAT.addAtMost enc [evs Map.! e | e <- [(a,b),(a,c),(b,d),(c,d)]] 2
 
+  -- https://kaigi.org/jsai/webprogram/2016/pdf/67.pdf の追加成約
+  when (optJSAI2016 opt) $ do
+    -- TODO: ビアもbsには含めない
+    let bs = Set.fromList [a | a <- range bnd, a `Map.notMember` m0]
+    forM_ (range bnd) $ \a@(x,y) -> do
+      let a_n = (x,y-1)
+          a_s = (x,y+1)
+          a_w = (x-1,y)
+          a_e = (x+1,y)
+          a_nw = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y) -> (x-1,y-1)) a
+          a_ne = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y) -> (x+1,y-1)) a
+          a_sw = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y) -> (x-1,y+1)) a
+          a_se = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y) -> (x+1,y+1)) a
+      when (inRange bnd a_n && inRange bnd a_w && a_nw `Set.isSubsetOf` bs) $ do
+        SAT.addAtMost enc [evs Map.! (a_w,a), evs Map.! (a_n,a)] 1
+      when (inRange bnd a_n && inRange bnd a_e && a_ne `Set.isSubsetOf` bs) $ do
+        SAT.addAtMost enc [evs Map.! (a,a_e), evs Map.! (a_n,a)] 1
+      when (inRange bnd a_s && inRange bnd a_w && a_sw `Set.isSubsetOf` bs) $ do
+        SAT.addAtMost enc [evs Map.! (a_w,a), evs Map.! (a,a_s)] 1
+      when (inRange bnd a_s && inRange bnd a_e && a_se `Set.isSubsetOf` bs) $ do
+        SAT.addAtMost enc [evs Map.! (a,a_e), evs Map.! (a,a_s)] 1
+
   return (vs, evs)
 
 encodeObj :: SAT.AddPBLin m enc => enc -> Options -> Problem -> Encoded -> m SAT.PBLinSum
@@ -223,6 +245,7 @@ data Options
   { optOptimize :: Bool
   , optAssumeNoBlank :: Bool
   , optAssumeNoDetour :: Bool
+  , optJSAI2016 :: Bool
   , optNumSolutions :: Int
   }
 
@@ -232,6 +255,7 @@ instance Default Options where
     { optOptimize = False
     , optAssumeNoBlank = False
     , optAssumeNoDetour = False
+    , optJSAI2016 = False
     , optNumSolutions = 1
     }
 
@@ -246,6 +270,9 @@ options =
     , Option [] ["no-detour"]
         (NoArg (\opt -> opt{ optAssumeNoDetour = True }))
         "Assume no detour in solution"
+    , Option [] ["jsai2016"]
+        (NoArg (\opt -> opt{ optJSAI2016 = True }))
+        "Add constraints of JSATI2016 paper of Tatsuya Seko et.al."
     , Option ['n'] []
         (ReqArg (\val opt -> opt{ optNumSolutions = read val }) "<int>")
         "Maximal number of solutions to enumerate, or negative value for all solutions (default: 1)"
