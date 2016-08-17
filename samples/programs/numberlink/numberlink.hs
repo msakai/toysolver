@@ -10,6 +10,7 @@ import Data.Default.Class
 import Data.List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe
 import qualified Data.PseudoBoolean as PB
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -25,15 +26,18 @@ import qualified ToySolver.SAT.Store.PB as PBStore
 
 data Problem
   = Problem
-  { probSize :: (Int,Int)
+  { probSize :: (Int,Int,Int)
+  , probIsMultiLayer :: Bool
   , probLineNum :: Int
   , probLines :: [(Number, Cell, Cell)]
+  , probVias :: [(Via, [Cell])]
   }
   deriving (Show)
 
 type Number = Int
-type Cell = (Int,Int)
+type Cell = (Int,Int,Int)
 type Edge = (Cell, Cell)
+type Via = String
 
 parser ::  Stream s m Char => ParsecT s u m Problem
 parser = do
@@ -42,8 +46,28 @@ parser = do
   w <- num
   _ <- char 'X'
   h <- num
+  dd <- optionMaybe $ char 'X' >> num
+  let (d,isMultiLayer) =
+        case dd of
+          Nothing -> (1, False)
+          Just d -> (d, True)
   _ <- endOfLine
-  
+
+  let cell = do
+        _ <- char '('
+        x <- num
+        _ <- char ','
+        y <- num
+        z <-
+          if isMultiLayer then do
+            _ <- char ','
+            num
+          else
+            return 1
+        _ <- char ')'
+        spaces
+        return (x,y,z)
+
   _ <- string "LINE_NUM"
   spaces
   n <- num
@@ -54,46 +78,57 @@ parser = do
     i <- num
     spaces
     src <- cell
-    spaces
     optional $ char '-' >> spaces
     dst <- cell
-    _ <- endOfLine
     return (i,src,dst)
 
-  return $ Problem (w,h) n xs
-    
+  ys <- many $ do
+    _ <- string "VIA#"
+    v <- many letter
+    spaces
+    cs <- cell `sepBy` optional (char '-' >> spaces)
+    return (v,cs)
+
+  return $ Problem (w,h,d) (isJust dd) n xs ys
+
   where
     num = read <$> many digit
-
-    cell = do
-      _ <- char '('
-      x <- num
-      _ <- char ','
-      y <- num
-      _ <- char ')'
-      return (x,y)
 
 type Encoded = (Array Cell (Array Number SAT.Var), Map Edge SAT.Var)
 
 encode :: SAT.AddPBLin m enc => enc -> Options -> Problem -> m Encoded
-encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
-  let bnd = ((0,0), (w-1,h-1))
+encode enc opt prob@Problem{ probSize = (w,h,d), probLineNum = n, probLines = ls, probVias = vias } = do
+  let bnd = ((0,0,1), (w-1,h-1,d))
       cells = range bnd
-      edges = [(a,b) | a@(x,y) <- cells, b <- [(x+1,y),(x,y+1)], inRange bnd b]
-      adjacentEdges a@(x,y) =
-        [(a,b) | b <- [(x+1,y),(x,y+1)], inRange bnd b] ++
-        [(b,a) | b <- [(x-1,y),(x,y-1)], inRange bnd b]
+      edges = [(a,b) | a@(x,y,z) <- cells, b <- [(x+1,y,z),(x,y+1,z)], inRange bnd b]
+      adjacentEdges a@(x,y,z) =
+        [(a,b) | b <- [(x+1,y,z),(x,y+1,z)], inRange bnd b] ++
+        [(b,a) | b <- [(x-1,y,z),(x,y-1,z)], inRange bnd b]
       ks = [1..n]
 
-  -- 各マスへの数字の割り当てを表す変数 (0 は数字なしを表す)
-  vs <- liftM (array bnd) $ forM cells $ \(x,y) -> do
+  -- ビアへの数字の割当を表す変数 (0 は数字なしを表す)
+  viaVs <- liftM Map.fromList $ forM vias $ \(via, _) -> do
     let r = if optAssumeNoBlank opt
             then (1,n)
             else (0,n)
     zs <- liftM (array r) $ forM (range r) $ \k -> do
       v <- SAT.newVar enc
       return (k,v)
-    return ((x,y), zs)
+    return (via, zs)
+  let viaPos = Map.fromList [(a,via) | (via,as) <- vias, a <- as]
+
+  -- 各マスへの数字の割り当てを表す変数 (0 は数字なしを表す)
+  vs <- liftM (array bnd) $ forM cells $ \a -> do
+    case Map.lookup a viaPos of
+      Just via -> return (a, viaVs Map.! via)
+      Nothing -> do
+        let r = if optAssumeNoBlank opt
+                then (1,n)
+                else (0,n)
+        zs <- liftM (array r) $ forM (range r) $ \k -> do
+          v <- SAT.newVar enc
+          return (k,v)
+        return (a, zs)
   -- 各辺の有無を表す変数
   evs <- liftM Map.fromList $ forM edges $ \e -> do
     v <- SAT.newVar enc
@@ -113,12 +148,15 @@ encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
       SAT.addClause enc [-v, -(vs!a!k), vs!b!k]
       SAT.addClause enc [-v, -(vs!b!k), vs!a!k]
 
-  -- 初期数字の入っているマスの次数は1
-  forM_ (Map.toList m0) $ \(a,_) -> do
-    SAT.addExactly enc [evs Map.! e | e <- adjacentEdges a] 1
-  -- 初期数字の入っていないマスの次数は0か2
   forM_ (range bnd) $ \a -> do
-    when (a `Map.notMember` m0) $ do
+    if a `Map.member` m0 then do
+      -- 初期数字の入っているマスの次数は1
+      SAT.addExactly enc [evs Map.! e | e <- adjacentEdges a] 1
+    else if a `Map.member` viaPos then do
+      -- ビアの次数は高々1 (ADC2016ルールでも中間層は0になるので注意)
+      SAT.addAtMost enc [evs Map.! e | e <- adjacentEdges a] 1
+    else do
+      -- 初期数字の入っていないマスの次数は0か2
       if optAssumeNoBlank opt then do
         SAT.addExactly enc [evs Map.! e | e <- adjacentEdges a] 2
       else do
@@ -133,27 +171,27 @@ encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
 
   -- 同一数字のマスが４個、田の字に凝ってはいけない
   when (optAssumeNoDetour opt) $ do
-    forM_ [0..w-2] $ \x -> do
-      forM_ [0..h-2] $ \y -> do
-        let a = (x,y)
-            b = (x+1, y)
-            c = (x, y+1)
-            d = (x+1,y+1)
-        SAT.addAtMost enc [evs Map.! e | e <- [(a,b),(a,c),(b,d),(c,d)]] 2
+    forM_ [1..d] $ \z -> do
+      forM_ [0..w-2] $ \x -> do
+        forM_ [0..h-2] $ \y -> do
+          let a = (x, y, z)
+              b = (x+1, y, z)
+              c = (x, y+1, z)
+              d = (x+1, y+1, z)
+          SAT.addAtMost enc [evs Map.! e | e <- [(a,b),(a,c),(b,d),(c,d)]] 2
 
   -- https://kaigi.org/jsai/webprogram/2016/pdf/67.pdf の追加成約
   when (optJSAI2016 opt) $ do
-    -- TODO: ビアもbsには含めない
-    let bs = Set.fromList [a | a <- range bnd, a `Map.notMember` m0]
-    forM_ (range bnd) $ \a@(x,y) -> do
-      let a_n = (x,y-1)
-          a_s = (x,y+1)
-          a_w = (x-1,y)
-          a_e = (x+1,y)
-          a_nw = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y) -> (x-1,y-1)) a
-          a_ne = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y) -> (x+1,y-1)) a
-          a_sw = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y) -> (x-1,y+1)) a
-          a_se = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y) -> (x+1,y+1)) a
+    let bs = Set.fromList [a | a <- range bnd, a `Map.notMember` m0, a `Map.notMember` viaPos]
+    forM_ (range bnd) $ \a@(x,y,z) -> do
+      let a_n = (x,y-1,z)
+          a_s = (x,y+1,z)
+          a_w = (x-1,y,z)
+          a_e = (x+1,y,z)
+          a_nw = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y,z) -> (x-1,y-1,z)) a
+          a_ne = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y,z) -> (x+1,y-1,z)) a
+          a_sw = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y,z) -> (x-1,y+1,z)) a
+          a_se = Set.fromList $ takeWhile (inRange bnd) $ tail $ iterate (\(x,y,z) -> (x+1,y+1,z)) a
       when (inRange bnd a_n && inRange bnd a_w && a_nw `Set.isSubsetOf` bs) $ do
         SAT.addAtMost enc [evs Map.! (a_w,a), evs Map.! (a_n,a)] 1
       when (inRange bnd a_n && inRange bnd a_e && a_ne `Set.isSubsetOf` bs) $ do
@@ -163,15 +201,26 @@ encode enc opt Problem{ probSize = (w,h), probLineNum = n, probLines = ls } = do
       when (inRange bnd a_s && inRange bnd a_e && a_se `Set.isSubsetOf` bs) $ do
         SAT.addAtMost enc [evs Map.! (a,a_e), evs Map.! (a,a_s)] 1
 
+  forM_ ls $ \(k, (_,_,z1), (_,_,z2)) -> do
+    let vsk = [vs!k | (_, vs) <- Map.toList viaVs]
+    if z1 == z2 then do
+      -- ADC2016では(層をまたぐLINE数)=(VIA数)なので、他のLINEはVIAを使えない
+      when (optADC2016 opt) $ SAT.addAtMost enc vsk 0
+    else do
+      -- 異なる盤面にある数字はビアを必ず使う
+      SAT.addClause enc vsk
+      -- ADC2016では(層をまたぐLINE数)=(VIA数)
+      when (optADC2016 opt) $ SAT.addAtMost enc vsk 1
+
   return (vs, evs)
 
 encodeObj :: SAT.AddPBLin m enc => enc -> Options -> Problem -> Encoded -> m SAT.PBLinSum
-encodeObj enc _opt Problem{ probSize = (w,h) } (_cells,edges) = do
+encodeObj enc _opt Problem{ probSize = (w,h,d) } (_cells,edges) = do
   let obj1 = [(1,v) | v <- Map.elems edges]
-  obj2 <- liftM concat $ forM (range ((0,0), (w-2,h-2))) $ \a@(x,y) -> do
-    let b = (x+1,y)
-        c = (x,y+1)
-        d = (x+1,y+1)
+  obj2 <- liftM concat $ forM (range ((0,0,1), (w-2,h-2,d))) $ \a@(x,y,z) -> do
+    let b = (x+1,y,z)
+        c = (x,y+1,z)
+        d = (x+1,y+1,z)
     abd <- SAT.newVar enc
     SAT.addClause enc [- (edges Map.! (a,b)), - (edges Map.! (b,d)), abd]
     acd <- SAT.newVar enc
@@ -189,21 +238,24 @@ decode :: Problem -> Encoded -> SAT.Model -> Solution
 decode prob (vs, evs) m = (solCells, solEdges)
   where
     solCells = Map.fromList $ do
-      a@(x,y) <- range (bounds vs)
+      a <- range (bounds vs)
       guard $ a `Set.member` usedCells
-      case [k | (k,v) <- assocs (vs!(x,y)), SAT.evalLit m v] of
-        k:_ -> return ((x,y),k)
+      case [k | (k,v) <- assocs (vs!a), SAT.evalLit m v] of
+        k:_ -> return (a,k)
         [] -> mzero
     solEdges = Set.fromList [e | e@(a,_) <- edges, a `Set.member` usedCells]
     
     edges = [e | (e,ev) <- Map.toList evs, SAT.evalLit m ev]
     adjacents = Map.fromListWith Set.union $ concat $ [[(a, Set.singleton b), (b, Set.singleton a)] | (a,b) <- edges]
-    usedCells = Set.unions [g a (Set.singleton a) | (_k,a,_b) <- probLines prob]
+    usedVias = Set.fromList [(x,y,z) | ((x,y),zs) <- Map.toList cs, z <- [minimum zs .. maximum zs]]
       where
-        g a visited =
-          case Set.toList (Map.findWithDefault Set.empty a adjacents Set.\\ visited) of
-            [] -> visited
-            b:_ -> g b (Set.insert b visited)
+        cs = Map.fromList [((x,y), Set.singleton z) | (_,as) <- probVias prob, a@(x,y,z) <- as, a `Map.member` adjacents]
+    usedCells = Set.union usedVias cs
+      where
+        cs = Set.unions [g (Set.fromList [a,b]) Set.empty | (_k,a,b) <- probLines prob]
+        g xs visited
+          | Set.null xs = visited
+          | otherwise = g (Set.unions [Map.findWithDefault Set.empty x adjacents Set.\\ visited | x <- Set.toList xs]) (Set.union xs visited)
 
 createSolver :: Options -> Problem -> IO (IO (Maybe Solution))
 createSolver opt prob = do
@@ -226,14 +278,18 @@ createSolver opt prob = do
 
 printSolution :: Problem -> Solution -> IO ()
 printSolution prob (cells, _) = do
-  let (w,h) = probSize prob
-  forM_ [0 .. h-1] $ \y -> do
-    putStrLn $ concat $ intersperse ","
-     [ case Map.lookup (x,y) cells of
-         Nothing -> replicate width '0'
-         Just k -> replicate (width - length (show k)) '0' ++ show k
-     | x <- [0 .. w-1]
-     ]
+  let (w,h,d) = probSize prob
+  forM_ [1 .. d] $ \z -> do
+    when (probIsMultiLayer prob) $ do
+      unless (z == 1) $ putStrLn ""
+      putStrLn $ "LAYER " ++ show z
+    forM_ [0 .. h-1] $ \y -> do
+      putStrLn $ concat $ intersperse ","
+       [ case Map.lookup (x,y,z) cells of
+           Nothing -> replicate width '0'
+           Just k -> replicate (width - length (show k)) '0' ++ show k
+       | x <- [0 .. w-1]
+       ]
   where
     width = length $ show (probLineNum prob)
 
@@ -246,6 +302,7 @@ data Options
   , optAssumeNoBlank :: Bool
   , optAssumeNoDetour :: Bool
   , optJSAI2016 :: Bool
+  , optADC2016 :: Bool
   , optNumSolutions :: Int
   }
 
@@ -256,6 +313,7 @@ instance Default Options where
     , optAssumeNoBlank = False
     , optAssumeNoDetour = False
     , optJSAI2016 = False
+    , optADC2016 = False
     , optNumSolutions = 1
     }
 
@@ -273,6 +331,9 @@ options =
     , Option [] ["jsai2016"]
         (NoArg (\opt -> opt{ optJSAI2016 = True }))
         "Add constraints of JSATI2016 paper of Tatsuya Seko et.al."
+    , Option [] ["adc2016"]
+        (NoArg (\opt -> opt{ optADC2016 = True }))
+        "Add constraints specific to ADC2016 rule"
     , Option ['n'] []
         (ReqArg (\val opt -> opt{ optNumSolutions = read val }) "<int>")
         "Maximal number of solutions to enumerate, or negative value for all solutions (default: 1)"
@@ -304,8 +365,9 @@ main = do
           r <- ParsecBL.parseFromFile parser fname
           case r of
             Left err -> error (show err)
-            Right prob@Problem{ probSize = (w,h) } -> do
-              putStrLn $ "SIZE " ++ show w ++ " " ++ show h
+            Right prob@Problem{ probSize = (w,h,d) } -> do
+              putStrLn $ "SIZE " ++ show w ++ "X" ++ show h ++
+                           (if probIsMultiLayer prob then "X" ++ show d else "")
               if not (optOptimize opt) then do                
                 solve <- createSolver opt prob
                 let loop n
