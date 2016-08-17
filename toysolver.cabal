@@ -67,6 +67,7 @@ Extra-Source-Files:
    samples/programs/numberlink/ADC2013/*.txt
    samples/programs/numberlink/ADC2014_QA/A/*.txt
    samples/programs/numberlink/ADC2014_QA/Q/*.txt
+   samples/programs/numberlink/ADC2016/sample/01/*.txt
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
 Build-Type: Simple
