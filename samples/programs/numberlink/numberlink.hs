@@ -41,6 +41,8 @@ type Via = String
 
 parser ::  Stream s m Char => ParsecT s u m Problem
 parser = do
+  optional $ string "\xEF\xBB\xBF" -- BOM in UTF-8
+  spaces
   _ <- string "SIZE"
   spaces
   w <- num
