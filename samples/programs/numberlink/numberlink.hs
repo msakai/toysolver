@@ -252,7 +252,7 @@ decode prob (vs, evs) m = (solCells, solEdges)
     
     edges = [e | (e,ev) <- Map.toList evs, SAT.evalLit m ev]
     adjacents = Map.fromListWith Set.union $ concat $ [[(a, Set.singleton b), (b, Set.singleton a)] | (a,b) <- edges]
-    usedVias = Set.fromList [(x,y,z) | ((x,y),zs) <- Map.toList cs, z <- [minimum zs .. maximum zs]]
+    usedVias = Set.fromList [(x,y,z) | ((x,y),zs) <- Map.toList cs, z <- [Set.findMin zs .. Set.findMax zs]]
       where
         cs = Map.fromList [((x,y), Set.singleton z) | (_,as) <- probVias prob, a@(x,y,z) <- as, a `Map.member` adjacents]
     usedCells = Set.union usedVias cs
