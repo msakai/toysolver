@@ -174,7 +174,7 @@ encode enc opt prob@Problem{ probSize = (w,h,d), probLineNum = n, probLines = ls
         -- ¬v → deg(a)>0
         -- SAT.addClause enc $ v : [evs Map.! e | e <- adjacentEdges a]
 
-  -- 同一数字のマスが４個、田の字に凝ってはいけない
+  -- コの字の禁止
   when (optAssumeNoDetour opt) $ do
     forM_ [1..d] $ \z -> do
       forM_ [0..w-2] $ \x -> do
@@ -184,8 +184,6 @@ encode enc opt prob@Problem{ probSize = (w,h,d), probLineNum = n, probLines = ls
               c = (x, y+1, z)
               d = (x+1, y+1, z)
           SAT.addAtMost enc [evs Map.! e | e <- [(a,b),(a,c),(b,d),(c,d)]] 2
-          forM_ ks $ \k -> do
-            SAT.addAtMost enc [vs!a!k, vs!b!k, vs!c!k, vs!d!k] 3
 
   -- https://kaigi.org/jsai/webprogram/2016/pdf/67.pdf の追加成約
   when (optJSAI2016 opt) $ do
