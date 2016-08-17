@@ -64,6 +64,7 @@ Extra-Source-Files:
    samples/programs/svm2lp/a1a
    samples/programs/nonogram/*.cwd
    samples/programs/nonogram/README.md
+   samples/programs/numberlink/README.md
    samples/programs/numberlink/ADC2013/*.txt
    samples/programs/numberlink/ADC2014_QA/A/*.txt
    samples/programs/numberlink/ADC2014_QA/Q/*.txt
