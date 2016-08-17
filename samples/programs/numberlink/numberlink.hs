@@ -220,8 +220,14 @@ encode enc opt prob@Problem{ probSize = (w,h,d), probLineNum = n, probLines = ls
   return (vs, evs)
 
 encodeObj :: SAT.AddPBLin m enc => enc -> Options -> Problem -> Encoded -> m SAT.PBLinSum
-encodeObj enc _opt Problem{ probSize = (w,h,d) } (cells,edges) = do
-  let obj1 = [(1,v) | v <- Map.elems edges]
+encodeObj enc opt Problem{ probSize = (w,h,d) } (cells,edges) = do
+  obj1 <-
+    if optAssumeNoBlank opt then do
+      v <- SAT.newVar enc
+      SAT.addClause enc [v]
+      return [(fromIntegral (w*h*d), v)]
+    else
+      return [(1, -(vs!0)) | vs <- elems cells]
   obj2 <- forM (range (bounds cells)) $ \a@(x,y,z) -> do
     let w = ((x-1,y,z),a)
         e = (a,(x+1,y,z))
@@ -240,9 +246,10 @@ encodeObj enc _opt Problem{ probSize = (w,h,d) } (cells,edges) = do
   return $ obj1 ++ obj2
 
 evalObj :: Options -> Problem -> Encoded -> SAT.Model -> Integer
-evalObj opt prob (cells,edges) m = obj1 + obj2
+evalObj _opt prob (cells,edges) m = obj1 + obj2
   where
-    obj1 = sum [1 | v <- Map.elems edges, SAT.evalLit m v]
+    sol = decode prob (cells,edges) m
+    obj1 = fromIntegral $ Map.size (fst sol)
     obj2 = sum $ do
       a@(x,y,z) <- range (bounds cells)
       let w = ((x-1,y,z),a)
