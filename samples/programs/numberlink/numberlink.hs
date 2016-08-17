@@ -142,11 +142,14 @@ encode enc opt prob@Problem{ probSize = (w,h,d), probLineNum = n, probLines = ls
   -- 各マスには高々ひとつしか数字が入らない
   forM_ (range bnd) $ \a -> do
     SAT.addExactly enc [v | v <- elems (vs!a)] 1
-  -- 辺で連結されるマスは同じ数字
   forM_ (Map.toList evs) $ \((a,b),v) ->
     forM_ ks $ \k -> do
+      -- 辺で連結されるマスは同じ数字
       SAT.addClause enc [-v, -(vs!a!k), vs!b!k]
       SAT.addClause enc [-v, -(vs!b!k), vs!a!k]
+      -- 連結されない隣接マスは違う数字
+      when (optAssumeNoDetour opt) $
+        SAT.addClause enc [v, -(vs!a!k), -(vs!b!k)]
 
   forM_ (range bnd) $ \a -> do
     if a `Map.member` m0 then do
@@ -179,6 +182,8 @@ encode enc opt prob@Problem{ probSize = (w,h,d), probLineNum = n, probLines = ls
               c = (x, y+1, z)
               d = (x+1, y+1, z)
           SAT.addAtMost enc [evs Map.! e | e <- [(a,b),(a,c),(b,d),(c,d)]] 2
+          forM_ ks $ \k -> do
+            SAT.addAtMost enc [vs!a!k, vs!b!k, vs!c!k, vs!d!k] 3
 
   -- https://kaigi.org/jsai/webprogram/2016/pdf/67.pdf の追加成約
   when (optJSAI2016 opt) $ do
