@@ -220,22 +220,40 @@ encode enc opt prob@Problem{ probSize = (w,h,d), probLineNum = n, probLines = ls
   return (vs, evs)
 
 encodeObj :: SAT.AddPBLin m enc => enc -> Options -> Problem -> Encoded -> m SAT.PBLinSum
-encodeObj enc _opt Problem{ probSize = (w,h,d) } (_cells,edges) = do
+encodeObj enc _opt Problem{ probSize = (w,h,d) } (cells,edges) = do
   let obj1 = [(1,v) | v <- Map.elems edges]
-  obj2 <- liftM concat $ forM (range ((0,0,1), (w-2,h-2,d))) $ \a@(x,y,z) -> do
-    let b = (x+1,y,z)
-        c = (x,y+1,z)
-        d = (x+1,y+1,z)
-    abd <- SAT.newVar enc
-    SAT.addClause enc [- (edges Map.! (a,b)), - (edges Map.! (b,d)), abd]
-    acd <- SAT.newVar enc
-    SAT.addClause enc [- (edges Map.! (a,c)), - (edges Map.! (c,d)), acd]
-    cab <- SAT.newVar enc
-    SAT.addClause enc [- (edges Map.! (a,c)), - (edges Map.! (a,b)), cab]
-    bdc <- SAT.newVar enc
-    SAT.addClause enc [- (edges Map.! (b,d)), - (edges Map.! (c,d)), bdc]
-    return [(1,abd), (1,acd), (1,cab), (1,bdc)]
+  obj2 <- forM (range (bounds cells)) $ \a@(x,y,z) -> do
+    let w = ((x-1,y,z),a)
+        e = (a,(x+1,y,z))
+        n = ((x,y-1,z),a)
+        s = (a,(x,y+1,z))
+    v <- SAT.newVar enc
+    forM_ [e,w] $ \e1 -> do
+      case Map.lookup e1 edges of
+        Nothing -> return ()
+        Just v1 -> do
+          forM_ [n,s] $ \e2 -> do
+            case Map.lookup e2 edges of
+              Nothing -> return ()
+              Just v2 -> SAT.addClause enc [-v1, -v2, v]
+    return (1,v)
   return $ obj1 ++ obj2
+
+evalObj :: Options -> Problem -> Encoded -> SAT.Model -> Integer
+evalObj opt prob (cells,edges) m = obj1 + obj2
+  where
+    obj1 = sum [1 | v <- Map.elems edges, SAT.evalLit m v]
+    obj2 = sum $ do
+      a@(x,y,z) <- range (bounds cells)
+      let w = ((x-1,y,z),a)
+          e = (a,(x+1,y,z))
+          n = ((x,y-1,z),a)
+          s = (a,(x,y+1,z))
+      let vs = [(v1,v2) | e1 <- [e,w], e2 <- [n,s], v1 <- maybeToList (Map.lookup e1 edges), v2 <- maybeToList (Map.lookup e2 edges)]
+      if or [SAT.evalLit m v1 && SAT.evalLit m v2 | (v1,v2) <- vs] then
+        return 1
+      else
+        return 0
 
 type Solution = (Map Cell Number, Set Edge)
 
@@ -394,7 +412,7 @@ main = do
                   forM_ (elems cells) $ \xs -> do
                     SAT.setVarPolarity solver (xs!0) False
                 obj <- encodeObj solver opt prob encoded
-                pbo <- PBO.newOptimizer solver obj
+                pbo <- PBO.newOptimizer2 solver obj (evalObj opt prob encoded)
                 PBO.setLogger pbo $ hPutStrLn stderr
                 PBO.setOnUpdateBestSolution pbo $ \m val -> do
                   hPutStrLn stderr $ "# obj = " ++ show val
