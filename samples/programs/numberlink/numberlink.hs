@@ -6,6 +6,7 @@ import Control.Applicative hiding (many, optional)
 import Control.Monad
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy.Char8 as BL
+import Data.Char
 import Data.Default.Class
 import Data.List
 import Data.Map.Strict (Map)
@@ -221,28 +222,35 @@ encode enc opt prob@Problem{ probSize = (w,h,d), probLineNum = n, probLines = ls
 
 encodeObj :: SAT.AddPBLin m enc => enc -> Options -> Problem -> Encoded -> m SAT.PBLinSum
 encodeObj enc opt Problem{ probSize = (w,h,d) } (cells,edges) = do
+  let (o1, o2) = fromJust (optOptimize opt)
   obj1 <-
-    if optAssumeNoBlank opt then do
+    if not o1 then do
+      return []   
+    else if optAssumeNoBlank opt then do
       v <- SAT.newVar enc
       SAT.addClause enc [v]
       return [(fromIntegral (w*h*d), v)]
     else
       return [(1, -(vs!0)) | vs <- elems cells]
-  obj2 <- forM (range (bounds cells)) $ \a@(x,y,z) -> do
-    let w = ((x-1,y,z),a)
-        e = (a,(x+1,y,z))
-        n = ((x,y-1,z),a)
-        s = (a,(x,y+1,z))
-    v <- SAT.newVar enc
-    forM_ [e,w] $ \e1 -> do
-      case Map.lookup e1 edges of
-        Nothing -> return ()
-        Just v1 -> do
-          forM_ [n,s] $ \e2 -> do
-            case Map.lookup e2 edges of
-              Nothing -> return ()
-              Just v2 -> SAT.addClause enc [-v1, -v2, v]
-    return (1,v)
+  obj2 <-
+    if not o2 then do
+      return []
+    else do
+      forM (range (bounds cells)) $ \a@(x,y,z) -> do
+        let w = ((x-1,y,z),a)
+            e = (a,(x+1,y,z))
+            n = ((x,y-1,z),a)
+            s = (a,(x,y+1,z))
+        v <- SAT.newVar enc
+        forM_ [e,w] $ \e1 -> do
+          case Map.lookup e1 edges of
+            Nothing -> return ()
+            Just v1 -> do
+              forM_ [n,s] $ \e2 -> do
+                case Map.lookup e2 edges of
+                  Nothing -> return ()
+                  Just v2 -> SAT.addClause enc [-v1, -v2, v]
+        return (1,v)
   return $ obj1 ++ obj2
 
 type Solution = (Map Cell Number, Set Edge)
@@ -271,20 +279,25 @@ decode prob (vs, evs) m = (solCells, solEdges)
           | otherwise = g (Set.unions [Map.findWithDefault Set.empty x adjacents Set.\\ visited | x <- Set.toList xs]) (Set.union xs visited)
 
 evalObj :: Options -> Problem -> Solution -> Integer
-evalObj _opt prob@Problem{ probSize = (w,h,d) } (cells,edges) = obj1 + obj2
+evalObj opt prob@Problem{ probSize = (w,h,d) } (cells,edges) = obj1 + obj2
   where
+    (o1, o2) = fromJust (optOptimize opt)
     bnd = ((0,0,1),(w-1,h-1,d))
-    obj1 = fromIntegral $ Map.size cells
-    obj2 = sum $ do
-      a@(x,y,z) <- range bnd
-      let w = ((x-1,y,z),a)
-          e = (a,(x+1,y,z))
-          n = ((x,y-1,z),a)
-          s = (a,(x,y+1,z))
-      if null [() | e1 <- [e,w], e1 `Set.member` edges, e2 <- [n,s], e2 `Set.member` edges] then
-        return 0
-      else
-        return 1
+    obj1
+      | not o1 = 0
+      | otherwise = fromIntegral $ Map.size cells
+    obj2
+      | not o2 = 0
+      | otherwise = sum $ do
+          a@(x,y,z) <- range bnd
+          let w = ((x-1,y,z),a)
+              e = (a,(x+1,y,z))
+              n = ((x,y-1,z),a)
+              s = (a,(x,y+1,z))
+          if null [() | e1 <- [e,w], e1 `Set.member` edges, e2 <- [n,s], e2 `Set.member` edges] then
+            return 0
+          else
+            return 1
 
 createSolver :: Options -> Problem -> IO (IO (Maybe Solution))
 createSolver opt prob = do
@@ -327,7 +340,7 @@ blockingClause _prob (_,edgesEnc) (_,edges) = [- (edgesEnc Map.! e) | e <- Set.t
 
 data Options
   = Options
-  { optOptimize :: Bool
+  { optOptimize :: Maybe Obj
   , optAssumeNoBlank :: Bool
   , optAssumeNoDetour :: Bool
   , optJSAI2016 :: Bool
@@ -338,7 +351,7 @@ data Options
 instance Default Options where
   def =
     Options
-    { optOptimize = False
+    { optOptimize = Nothing
     , optAssumeNoBlank = False
     , optAssumeNoDetour = False
     , optJSAI2016 = False
@@ -346,11 +359,13 @@ instance Default Options where
     , optNumSolutions = 1
     }
 
+type Obj = (Bool,Bool)
+
 options :: [OptDescr (Options -> Options)]
 options =
     [ Option [] ["optimize"]
-        (NoArg (\opt -> opt{ optOptimize = True }))
-        "Minimize line length and turnarounds (-n option will be ignored)"
+        (OptArg (\arg opt -> opt{ optOptimize = Just (maybe (True,True) readObj arg) }) "<str>")
+        "Specify objective functions (-n option will be ignored): both (default), length, corners"
     , Option [] ["no-blank"]
         (NoArg (\opt -> opt{ optAssumeNoBlank = True }))
         "Assume no blank cells in solution"
@@ -367,6 +382,13 @@ options =
         (ReqArg (\val opt -> opt{ optNumSolutions = read val }) "<int>")
         "Maximal number of solutions to enumerate, or negative value for all solutions (default: 1)"
     ]
+  where
+    readObj = f . map toLower
+      where
+        f "both" = (True, True)
+        f "length" = (True, False)
+        f "corners" = (False, True)
+        f _ = error "unknown objective"
 
 header :: String
 header = unlines
@@ -397,37 +419,38 @@ main = do
             Right prob@Problem{ probSize = (w,h,d) } -> do
               putStrLn $ "SIZE " ++ show w ++ "X" ++ show h ++
                            (if probIsMultiLayer prob then "X" ++ show d else "")
-              if not (optOptimize opt) then do                
-                solve <- createSolver opt prob
-                let loop n
-                      | n == 0 = return ()
-                      | otherwise = do
-                          m <- solve
-                          case m of
-                            Nothing -> return ()
-                            Just sol -> do
-                              printSolution prob sol
-                              putStrLn ""
-                              loop (if n > 0 then n - 1 else n)
-                loop (optNumSolutions opt)
-              else do
-                solver <- SAT.newSolver
-                SAT.setLogger solver $ hPutStrLn stderr
-                encoded@(cells,_edges) <- encode solver opt prob
-                unless (optAssumeNoBlank opt) $ do
-                  forM_ (elems cells) $ \xs -> do
-                    SAT.setVarPolarity solver (xs!0) False
-                obj <- encodeObj solver opt prob encoded
-                pbo <- PBO.newOptimizer2 solver obj (\m -> evalObj opt prob (decode prob encoded m))
-                PBO.setLogger pbo $ hPutStrLn stderr
-                PBO.setOnUpdateBestSolution pbo $ \m val -> do
-                  hPutStrLn stderr $ "# obj = " ++ show val
-                  hFlush stderr
-                  let sol = decode prob encoded m
-                  printSolution prob sol
-                  putStrLn ""
-                  hFlush stdout
-                PBO.optimize pbo
+              case optOptimize opt of
+                Nothing -> do
+                  solve <- createSolver opt prob
+                  let loop n
+                        | n == 0 = return ()
+                        | otherwise = do
+                            m <- solve
+                            case m of
+                              Nothing -> return ()
+                              Just sol -> do
+                                printSolution prob sol
+                                putStrLn ""
+                                loop (if n > 0 then n - 1 else n)
+                  loop (optNumSolutions opt)
+                Just _ -> do
+                  solver <- SAT.newSolver
+                  SAT.setLogger solver $ hPutStrLn stderr
+                  encoded@(cells,_edges) <- encode solver opt prob
+                  unless (optAssumeNoBlank opt) $ do
+                    forM_ (elems cells) $ \xs -> do
+                      SAT.setVarPolarity solver (xs!0) False
+                  obj <- encodeObj solver opt prob encoded
+                  pbo <- PBO.newOptimizer2 solver obj (\m -> evalObj opt prob (decode prob encoded m))
+                  PBO.setLogger pbo $ hPutStrLn stderr
+                  PBO.setOnUpdateBestSolution pbo $ \m val -> do
+                    hPutStrLn stderr $ "# obj = " ++ show val
+                    hFlush stderr
+                    let sol = decode prob encoded m
+                    printSolution prob sol
+                    putStrLn ""
+                    hFlush stdout
+                  PBO.optimize pbo
 
         [fname, fname2] -> do
           r <- ParsecBL.parseFromFile parser fname
@@ -437,11 +460,11 @@ main = do
               store <- PBStore.newPBStore
               obj <- do
                 encoded <- encode store opt prob
-                if optOptimize opt then do
-                  obj <- encodeObj store opt prob encoded
-                  return $ Just [(c,[v]) | (c,v) <- obj]
-                else do
-                  return Nothing
+                case optOptimize opt of
+                  Nothing -> return Nothing
+                  Just _ -> do
+                    obj <- encodeObj store opt prob encoded
+                    return $ Just [(c,[v]) | (c,v) <- obj]
               opb <- PBStore.getPBFormula store
               PB.writeOPBFile fname2 $ opb{ PB.pbObjectiveFunction = obj }
         _ -> do
