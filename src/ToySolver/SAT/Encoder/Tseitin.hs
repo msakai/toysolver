@@ -97,7 +97,7 @@ evalFormula m = fold (SAT.evalLit m)
 data Encoder m =
   forall a. SAT.AddClause m a =>
   Encoder
-  { encSolver    :: a
+  { encBase :: a
   , encAddPBAtLeast :: Maybe (SAT.PBLinSum -> Integer -> m ())
   , encUsePB     :: !(MutVar (PrimState m) Bool)
   , encConjTable :: !(MutVar (PrimState m) (Map SAT.LitSet (SAT.Var, Bool, Bool)))
@@ -105,12 +105,12 @@ data Encoder m =
   }
 
 instance Monad m => SAT.NewVar m (Encoder m) where
-  newVar   Encoder{ encSolver = a } = SAT.newVar a
-  newVars  Encoder{ encSolver = a } = SAT.newVars a
-  newVars_ Encoder{ encSolver = a } = SAT.newVars_ a
+  newVar   Encoder{ encBase = a } = SAT.newVar a
+  newVars  Encoder{ encBase = a } = SAT.newVars a
+  newVars_ Encoder{ encBase = a } = SAT.newVars_ a
 
 instance Monad m => SAT.AddClause m (Encoder m) where
-  addClause Encoder{ encSolver = a } = SAT.addClause a
+  addClause Encoder{ encBase = a } = SAT.addClause a
 
 -- | Create a @Encoder@ instance.
 -- If the encoder is built using this function, 'setUsePB' has no effect.
@@ -121,7 +121,7 @@ newEncoder solver = do
   table2 <- newMutVar Map.empty
   return $
     Encoder
-    { encSolver = solver
+    { encBase = solver
     , encAddPBAtLeast = Nothing
     , encUsePB  = usePBRef
     , encConjTable = table
@@ -137,7 +137,7 @@ newEncoderWithPBLin solver = do
   table2 <- newMutVar Map.empty
   return $
     Encoder
-    { encSolver = solver
+    { encBase = solver
     , encAddPBAtLeast = Just (SAT.addPBAtLeast solver)
     , encUsePB  = usePBRef
     , encConjTable = table
