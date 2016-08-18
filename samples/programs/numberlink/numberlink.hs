@@ -245,23 +245,6 @@ encodeObj enc opt Problem{ probSize = (w,h,d) } (cells,edges) = do
     return (1,v)
   return $ obj1 ++ obj2
 
-evalObj :: Options -> Problem -> Encoded -> SAT.Model -> Integer
-evalObj _opt prob (cells,edges) m = obj1 + obj2
-  where
-    sol = decode prob (cells,edges) m
-    obj1 = fromIntegral $ Map.size (fst sol)
-    obj2 = sum $ do
-      a@(x,y,z) <- range (bounds cells)
-      let w = ((x-1,y,z),a)
-          e = (a,(x+1,y,z))
-          n = ((x,y-1,z),a)
-          s = (a,(x,y+1,z))
-      let vs = [(v1,v2) | e1 <- [e,w], e2 <- [n,s], v1 <- maybeToList (Map.lookup e1 edges), v2 <- maybeToList (Map.lookup e2 edges)]
-      if or [SAT.evalLit m v1 && SAT.evalLit m v2 | (v1,v2) <- vs] then
-        return 1
-      else
-        return 0
-
 type Solution = (Map Cell Number, Set Edge)
 
 decode :: Problem -> Encoded -> SAT.Model -> Solution
@@ -286,6 +269,22 @@ decode prob (vs, evs) m = (solCells, solEdges)
         g xs visited
           | Set.null xs = visited
           | otherwise = g (Set.unions [Map.findWithDefault Set.empty x adjacents Set.\\ visited | x <- Set.toList xs]) (Set.union xs visited)
+
+evalObj :: Options -> Problem -> Solution -> Integer
+evalObj _opt prob@Problem{ probSize = (w,h,d) } (cells,edges) = obj1 + obj2
+  where
+    bnd = ((0,0,1),(w-1,h-1,d))
+    obj1 = fromIntegral $ Map.size cells
+    obj2 = sum $ do
+      a@(x,y,z) <- range bnd
+      let w = ((x-1,y,z),a)
+          e = (a,(x+1,y,z))
+          n = ((x,y-1,z),a)
+          s = (a,(x,y+1,z))
+      if null [() | e1 <- [e,w], e1 `Set.member` edges, e2 <- [n,s], e2 `Set.member` edges] then
+        return 0
+      else
+        return 1
 
 createSolver :: Options -> Problem -> IO (IO (Maybe Solution))
 createSolver opt prob = do
@@ -419,7 +418,7 @@ main = do
                   forM_ (elems cells) $ \xs -> do
                     SAT.setVarPolarity solver (xs!0) False
                 obj <- encodeObj solver opt prob encoded
-                pbo <- PBO.newOptimizer2 solver obj (evalObj opt prob encoded)
+                pbo <- PBO.newOptimizer2 solver obj (\m -> evalObj opt prob (decode prob encoded m))
                 PBO.setLogger pbo $ hPutStrLn stderr
                 PBO.setOnUpdateBestSolution pbo $ \m val -> do
                   hPutStrLn stderr $ "# obj = " ++ show val
