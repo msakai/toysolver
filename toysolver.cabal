@@ -255,7 +255,7 @@ Library
      ToySolver.Converter.MaxSAT2IP
      ToySolver.Converter.MaxSAT2WBO
      ToySolver.Converter.PB2IP
-     ToySolver.Converter.PBLinearlization
+     ToySolver.Converter.PBLinearization
      ToySolver.Converter.PB2LSP
      ToySolver.Converter.PB2SAT
      ToySolver.Converter.PB2WBO

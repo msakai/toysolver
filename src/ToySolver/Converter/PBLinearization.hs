@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Converter.PBLinearlization
+-- Module      :  ToySolver.Converter.PBLinearization
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
 --
@@ -11,9 +11,9 @@
 -- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module ToySolver.Converter.PBLinearlization
-  ( linearlize
-  , linearlizeWBO
+module ToySolver.Converter.PBLinearization
+  ( linearize
+  , linearizeWBO
   ) where
 
 import Control.Monad
@@ -25,8 +25,8 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import ToySolver.SAT.Store.PB
 
-linearlize :: PBFile.Formula -> Bool -> PBFile.Formula
-linearlize formula usePB = runST $ do
+linearize :: PBFile.Formula -> Bool -> PBFile.Formula
+linearize formula usePB = runST $ do
   db <- newPBStore
   SAT.newVars_ db (PBFile.pbNumVars formula)
   tseitin <-  Tseitin.newEncoderWithPBLin db
@@ -52,8 +52,8 @@ linearlize formula usePB = runST $ do
     , PBFile.pbNumConstraints = PBFile.pbNumConstraints formula + PBFile.pbNumConstraints formula'
     }
 
-linearlizeWBO :: PBFile.SoftFormula -> Bool -> PBFile.SoftFormula
-linearlizeWBO formula usePB = runST $ do
+linearizeWBO :: PBFile.SoftFormula -> Bool -> PBFile.SoftFormula
+linearizeWBO formula usePB = runST $ do
   db <- newPBStore
   SAT.newVars_ db (PBFile.wboNumVars formula)
   tseitin <-  Tseitin.newEncoderWithPBLin db

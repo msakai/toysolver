@@ -26,7 +26,7 @@ module ToySolver.SAT.Encoder.PBNLC
   , addPBNLAtMostSoft
   , addPBNLExactlySoft
 
-  -- * Linearlization
+  -- * Linearization
   , linearizePBSum
   , linearizePBSumWithPolarity
   ) where

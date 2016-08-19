@@ -44,7 +44,7 @@ import qualified ToySolver.Converter.MIP2PB as MIP2PB
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.PB2IP as PB2IP
-import qualified ToySolver.Converter.PBLinearlization as PBLinearlization
+import qualified ToySolver.Converter.PBLinearization as PBLinearization
 import qualified ToySolver.Converter.PB2LSP as PB2LSP
 import qualified ToySolver.Converter.PB2WBO as PB2WBO
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
@@ -68,8 +68,8 @@ data Flag
   | SMTNoCheck
   | SMTNoProduceModel
   | Yices2
-  | Linearlization
-  | LinearlizationUsingPB
+  | Linearization
+  | LinearizationUsingPB
   | KSat !Int
   | FileEncoding String
   deriving Eq
@@ -87,8 +87,8 @@ options =
     , Option []    ["smt-no-check"] (NoArg SMTNoCheck)    "do not output \"(check)\""
     , Option []    ["smt-no-produce-model"] (NoArg SMTNoProduceModel) "do not output \"(set-option :produce-models true)\""    
     , Option []    ["yices2"] (NoArg Yices2) "output for yices2 rather than yices1"
-    , Option []    ["linearlize"] (NoArg Linearlization) "linearliza nonlinear pseudo-boolean constraints"
-    , Option []    ["linearizer-pb"] (NoArg LinearlizationUsingPB) "Use PB constraint in linearization"
+    , Option []    ["linearize"] (NoArg Linearization) "linearize nonlinear pseudo-boolean constraints"
+    , Option []    ["linearizer-pb"] (NoArg LinearizationUsingPB) "Use PB constraint in linearization"
     , Option []    ["ksat"] (ReqArg (KSat . read) "NUMBER") "generate k-SAT formula when outputing .cnf file"
     , Option []    ["encoding"] (ReqArg FileEncoding "<ENCODING>") "file encoding for LP/MPS files"
     ]
@@ -164,7 +164,7 @@ readProblem o fname = do
         Right wcnf -> return $ ProbWBO $ MaxSAT2WBO.convert $ wcnf
 
 transformProblem :: [Flag] -> Problem -> Problem
-transformProblem o = transformObj o . transformPBLinearlization o
+transformProblem o = transformObj o . transformPBLinearization o
 
 transformObj :: [Flag] -> Problem -> Problem
 transformObj o problem =
@@ -174,12 +174,12 @@ transformObj o problem =
   where
     objType = last (ObjNone : [t | ObjType t <- o])
 
-transformPBLinearlization :: [Flag] -> Problem -> Problem
-transformPBLinearlization o problem
-  | Linearlization `elem` o =
+transformPBLinearization :: [Flag] -> Problem -> Problem
+transformPBLinearization o problem
+  | Linearization `elem` o =
       case problem of
-        ProbOPB opb -> ProbOPB $ PBLinearlization.linearlize    opb (LinearlizationUsingPB `elem` o)
-        ProbWBO wbo -> ProbWBO $ PBLinearlization.linearlizeWBO wbo (LinearlizationUsingPB `elem` o)
+        ProbOPB opb -> ProbOPB $ PBLinearization.linearize    opb (LinearizationUsingPB `elem` o)
+        ProbWBO wbo -> ProbWBO $ PBLinearization.linearizeWBO wbo (LinearizationUsingPB `elem` o)
         ProbMIP mip -> ProbMIP mip
   | otherwise = problem
 
@@ -212,9 +212,9 @@ writeProblem o problem = do
                   ProbWBO wbo ->
                     case WBO2PB.convert wbo of
                       (opb, _, _)
-                        | Linearlization `elem` o ->
+                        | Linearization `elem` o ->
                             -- WBO->OPB conversion may have introduced non-linearity
-                            PBLinearlization.linearlize opb (LinearlizationUsingPB `elem` o)
+                            PBLinearization.linearize opb (LinearizationUsingPB `elem` o)
                         | otherwise -> opb
                   ProbMIP mip ->
                     case MIP2PB.convert mip of
