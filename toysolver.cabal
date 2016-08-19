@@ -813,6 +813,7 @@ Test-suite TestSuite
     Test.SMTLIB2Solver
     Test.Smtlib
     Test.SubsetSum
+    ToySolver.SMT.SMTLIB2Solver,
     Smtlib.Parsers.CommonParsers,
     Smtlib.Parsers.ResponseParsers,
     Smtlib.Parsers.CommandsParsers,
