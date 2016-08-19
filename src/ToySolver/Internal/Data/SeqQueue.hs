@@ -27,41 +27,53 @@ module ToySolver.Internal.Data.SeqQueue
   , clear
   ) where
 
-import Data.IORef
+import Control.Monad.Primitive
+import Control.Monad.ST
 import Data.Queue
 import Data.Foldable
+import Data.Primitive.MutVar
 import qualified Data.Sequence as Seq
 
-newtype SeqQueue a = SeqQueue (IORef (Seq.Seq a))
+newtype SeqQueue m a = SeqQueue (MutVar (PrimState m) (Seq.Seq a))
 
-instance NewFifo (SeqQueue a) IO where
+instance PrimMonad m => NewFifo (SeqQueue m a) m where
+  {-# SPECIALIZE instance NewFifo (SeqQueue IO a) IO #-}
+  {-# SPECIALIZE instance NewFifo (SeqQueue (ST s) a) (ST s) #-}
   newFifo = do
-    ref <- newIORef Seq.empty
+    ref <- newMutVar Seq.empty
     return (SeqQueue ref)
 
-instance Enqueue (SeqQueue a) IO a where
+instance PrimMonad m => Enqueue (SeqQueue m a) m a where
+  {-# SPECIALIZE instance Enqueue (SeqQueue IO a) IO a #-}
+  {-# SPECIALIZE instance Enqueue (SeqQueue (ST s) a) (ST s) a #-}
   enqueue (SeqQueue ref) val = do
-    modifyIORef ref (Seq.|> val)
+    modifyMutVar ref (Seq.|> val)
 
-instance Dequeue (SeqQueue a) IO a where
+instance PrimMonad m => Dequeue (SeqQueue m a) m a where
+  {-# SPECIALIZE instance Dequeue (SeqQueue IO a) IO a #-}
+  {-# SPECIALIZE instance Dequeue (SeqQueue (ST s) a) (ST s) a #-}
+
   dequeue (SeqQueue ref) = do
-    s <- readIORef ref
+    s <- readMutVar ref
     case Seq.viewl s of
       Seq.EmptyL -> return Nothing
       val Seq.:< s' -> do
-        writeIORef ref s'
+        writeMutVar ref s'
         return (Just val)
 
   dequeueBatch (SeqQueue ref) = do
-    s <- readIORef ref
-    writeIORef ref Seq.empty
+    s <- readMutVar ref
+    writeMutVar ref Seq.empty
     return (toList s)
 
-instance QueueSize (SeqQueue a) IO where
+instance PrimMonad m => QueueSize (SeqQueue m a) m where
+  {-# SPECIALIZE instance QueueSize (SeqQueue IO a) IO #-}
+  {-# SPECIALIZE instance QueueSize (SeqQueue (ST s) a) (ST s) #-}
+
   queueSize (SeqQueue ref) = do
-    s <- readIORef ref
+    s <- readMutVar ref
     return $! Seq.length s
 
-clear :: SeqQueue a -> IO ()
+clear :: PrimMonad m => SeqQueue m a -> m ()
 clear (SeqQueue ref) = do
-  writeIORef ref Seq.empty
+  writeMutVar ref Seq.empty
