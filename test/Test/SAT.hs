@@ -4,6 +4,7 @@ module Test.SAT (satTestGroup) where
 import Control.Monad
 import Data.Array.IArray
 import Data.Default.Class
+import qualified Data.Foldable as F
 import Data.IORef
 import Data.List
 import Data.Map (Map)
@@ -32,12 +33,14 @@ import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.SAT.TheorySolver
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
+import qualified ToySolver.SAT.Store.CNF as CNFStore
 
 import qualified Data.PseudoBoolean as PBFile
 import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
@@ -1363,6 +1366,29 @@ case_evalFormula = do
   forM_ (allAssignments 5) $ \m -> do
     Tseitin.evalFormula m f @?= g m
 
+prop_PBEncoder_addPBAtLeast = QM.monadicIO $ do
+  let nv = 4
+  (lhs,rhs) <- QM.pick $ do
+    lhs <- arbitraryPBLinSum nv
+    rhs <- arbitrary
+    return $ SAT.normalizePBLinAtLeast (lhs, rhs)
+  strategy <- QM.pick arbitrary
+  (cnf,defs) <- QM.run $ do
+    db <- CNFStore.newCNFStore
+    SAT.newVars_ db nv
+    tseitin <- Tseitin.newEncoder db
+    pb <- PB.newEncoderWithStrategy tseitin strategy
+    SAT.addPBAtLeast pb lhs rhs
+    cnf <- CNFStore.getCNFFormula db
+    defs <- Tseitin.getDefinitions tseitin
+    return ((fst cnf, F.toList (snd cnf)), defs)
+  forM_ (allAssignments 4) $ \m -> do
+    let m2 :: Array SAT.Var Bool
+        m2 = array (1, fst cnf) $ assocs m ++ [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs]
+        b1 = SAT.evalPBLinAtLeast m (lhs,rhs)
+        b2 = evalCNF (array (bounds m2) (assocs m2)) cnf
+    QM.assert $ b1 == b2
+
 ------------------------------------------------------------------------
 
 case_MUS = do
@@ -1886,6 +1912,9 @@ arbitraryOptimizer solver obj = do
     return opt
 
 instance Arbitrary PBO.SearchStrategy where
+  arbitrary = arbitraryBoundedEnum
+
+instance Arbitrary PB.Strategy where
   arbitrary = arbitraryBoundedEnum
 
 ------------------------------------------------------------------------
