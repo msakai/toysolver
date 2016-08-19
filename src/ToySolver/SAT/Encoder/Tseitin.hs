@@ -197,6 +197,31 @@ encodeToClause encoder formula =
 encodeFormula :: PrimMonad m => Encoder m -> Formula -> m SAT.Lit
 encodeFormula encoder = encodeFormulaWithPolarity encoder polarityBoth
 
+encodeWithPolarityHelper
+  :: (PrimMonad m, Ord k)
+  => Encoder m
+  -> MutVar (PrimState m) (Map k (SAT.Var, Bool, Bool))
+  -> (SAT.Lit -> m ()) -> (SAT.Lit -> m ())
+  -> Polarity
+  -> k
+  -> m SAT.Var
+encodeWithPolarityHelper encoder tableRef definePos defineNeg (Polarity pos neg) k = do
+  table <- readMutVar tableRef
+  case Map.lookup k table of
+    Just (v, posDefined, negDefined) -> do
+      when (pos && not posDefined) $ definePos v
+      when (neg && not negDefined) $ defineNeg v
+      when (posDefined < pos || negDefined < neg) $
+        modifyMutVar' tableRef (Map.insert k (v, (max posDefined pos), (max negDefined neg)))
+      return v
+    Nothing -> do
+      v <- SAT.newVar encoder
+      when pos $ definePos v
+      when neg $ defineNeg v
+      modifyMutVar' tableRef (Map.insert k (v, pos, neg))
+      return v
+
+
 encodeFormulaWithPolarity :: PrimMonad m => Encoder m -> Polarity -> Formula -> m SAT.Lit
 encodeFormulaWithPolarity encoder p formula = do
   case formula of
@@ -228,7 +253,7 @@ encodeConj encoder = encodeConjWithPolarity encoder polarityBoth
 -- | Return an literal which is equivalent to a given conjunction which occurs only in specified polarity.
 encodeConjWithPolarity :: forall m. PrimMonad m => Encoder m -> Polarity -> [SAT.Lit] -> m SAT.Lit
 encodeConjWithPolarity _ _ [l] =  return l
-encodeConjWithPolarity encoder (Polarity pos neg) ls = do
+encodeConjWithPolarity encoder polarity ls = do
   usePB <- readMutVar (encUsePB encoder)
   table <- readMutVar (encConjTable encoder)
   let ls3 = IntSet.fromList ls
@@ -254,26 +279,12 @@ encodeConjWithPolarity encoder (Polarity pos neg) ls = do
               forM_ (IntSet.toList ls2) $ \li -> do
                 -- (l → li)  ⇔  (¬l ∨ li)
                 SAT.addClause encoder [SAT.litNot l, li]
-  
         -- If F is anti-monotone, F(A ∧ B) ⇔ ∃x. F(x) ∧ (x ← A∧B) ⇔ ∃x. F(x) ∧ (x∨¬A∨¬B).
         defineNeg :: SAT.Lit -> m ()
         defineNeg l = do
           -- ((l1 ∧ l2 ∧ … ∧ ln) → l)  ⇔  (¬l1 ∨ ¬l2 ∨ … ∨ ¬ln ∨ l)
           SAT.addClause encoder (l : map SAT.litNot (IntSet.toList ls2))
-
-    case Map.lookup ls2 table of
-      Just (v, posDefined, negDefined) -> do
-        when (pos && not posDefined) $ definePos v
-        when (neg && not negDefined) $ defineNeg v
-        when (posDefined < pos || negDefined < neg) $
-          modifyMutVar' (encConjTable encoder) (Map.insert ls2 (v, (max posDefined pos), (max negDefined neg)))
-        return v
-      Nothing -> do
-        v <- SAT.newVar encoder
-        when pos $ definePos v
-        when neg $ defineNeg v
-        modifyMutVar' (encConjTable encoder) (Map.insert ls2 (v, pos, neg))
-        return v
+    encodeWithPolarityHelper encoder (encConjTable encoder) definePos defineNeg polarity ls2
 
 -- | Return an literal which is equivalent to a given disjunction.
 --
@@ -303,9 +314,7 @@ encodeITE encoder = encodeITEWithPolarity encoder polarityBoth
 encodeITEWithPolarity :: forall m. PrimMonad m => Encoder m -> Polarity -> SAT.Lit -> SAT.Lit -> SAT.Lit -> m SAT.Lit
 encodeITEWithPolarity encoder p c t e | c < 0 =
   encodeITEWithPolarity encoder p (- c) e t
-encodeITEWithPolarity encoder (Polarity pos neg) c t e = do
-  table <- readMutVar (encITETable encoder)
-
+encodeITEWithPolarity encoder polarity c t e = do
   let definePos :: SAT.Lit -> m ()
       definePos x = do
         -- x → ite(c,t,e)
@@ -326,19 +335,7 @@ encodeITEWithPolarity encoder (Polarity pos neg) c t e = do
         SAT.addClause encoder [c, -e, x]
         SAT.addClause encoder [-t, -e, x] -- redundant, but will increase the strength of unit propagation.
 
-  case Map.lookup (c,t,e) table of
-    Just (v, posDefined, negDefined) -> do
-      when (pos && not posDefined) $ definePos v
-      when (neg && not negDefined) $ defineNeg v
-      when (posDefined < pos || negDefined < neg) $
-        modifyMutVar' (encITETable encoder) (Map.insert (c,t,e) (v, (max posDefined pos), (max negDefined neg)))
-      return v
-    Nothing -> do
-      v <- SAT.newVar encoder
-      when pos $ definePos v
-      when neg $ defineNeg v
-      modifyMutVar' (encITETable encoder) (Map.insert (c,t,e) (v, pos, neg))
-      return v
+  encodeWithPolarityHelper encoder (encITETable encoder) definePos defineNeg polarity (c,t,e)
 
 
 getDefinitions :: PrimMonad m => Encoder m -> m [(SAT.Var, Formula)]
