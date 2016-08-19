@@ -72,6 +72,12 @@ module ToySolver.SAT.Encoder.Tseitin
   , encodeDisjWithPolarity
   , encodeITE
   , encodeITEWithPolarity
+  , encodeXOR
+  , encodeXORWithPolarity
+  , encodeFASum
+  , encodeFASumWithPolarity
+  , encodeFACarry
+  , encodeFACarryWithPolarity
 
   -- * Retrieving definitions
   , getDefinitions
@@ -102,6 +108,9 @@ data Encoder m =
   , encUsePB     :: !(MutVar (PrimState m) Bool)
   , encConjTable :: !(MutVar (PrimState m) (Map SAT.LitSet (SAT.Var, Bool, Bool)))
   , encITETable  :: !(MutVar (PrimState m) (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Var, Bool, Bool)))
+  , encXORTable  :: !(MutVar (PrimState m) (Map (SAT.Lit, SAT.Lit) (SAT.Var, Bool, Bool)))
+  , encFASumTable   :: !(MutVar (PrimState m) (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Var, Bool, Bool)))
+  , encFACarryTable :: !(MutVar (PrimState m) (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Var, Bool, Bool)))
   }
 
 instance Monad m => SAT.NewVar m (Encoder m) where
@@ -117,15 +126,21 @@ instance Monad m => SAT.AddClause m (Encoder m) where
 newEncoder :: PrimMonad m => SAT.AddClause m a => a -> m (Encoder m)
 newEncoder solver = do
   usePBRef <- newMutVar False
-  table <- newMutVar Map.empty
-  table2 <- newMutVar Map.empty
+  tableConj <- newMutVar Map.empty
+  tableITE <- newMutVar Map.empty
+  tableXOR <- newMutVar Map.empty
+  tableFASum <- newMutVar Map.empty
+  tableFACarry <- newMutVar Map.empty
   return $
     Encoder
     { encBase = solver
     , encAddPBAtLeast = Nothing
     , encUsePB  = usePBRef
-    , encConjTable = table
-    , encITETable = table2
+    , encConjTable = tableConj
+    , encITETable = tableITE
+    , encXORTable = tableXOR
+    , encFASumTable = tableFASum
+    , encFACarryTable = tableFACarry
     }
 
 -- | Create a @Encoder@ instance.
@@ -133,15 +148,21 @@ newEncoder solver = do
 newEncoderWithPBLin :: PrimMonad m => SAT.AddPBLin m a => a -> m (Encoder m)
 newEncoderWithPBLin solver = do
   usePBRef <- newMutVar False
-  table <- newMutVar Map.empty
-  table2 <- newMutVar Map.empty
+  tableConj <- newMutVar Map.empty
+  tableITE <- newMutVar Map.empty
+  tableXOR <- newMutVar Map.empty
+  tableFASum <- newMutVar Map.empty
+  tableFACarry <- newMutVar Map.empty
   return $
     Encoder
     { encBase = solver
     , encAddPBAtLeast = Just (SAT.addPBAtLeast solver)
     , encUsePB  = usePBRef
-    , encConjTable = table
-    , encITETable = table2
+    , encConjTable = tableConj
+    , encITETable = tableITE
+    , encXORTable = tableXOR
+    , encFASumTable = tableFASum
+    , encFACarryTable = tableFACarry
     }
 
 -- | Use /pseudo boolean constraints/ or use only /clauses/.
@@ -337,14 +358,93 @@ encodeITEWithPolarity encoder polarity c t e = do
 
   encodeWithPolarityHelper encoder (encITETable encoder) definePos defineNeg polarity (c,t,e)
 
+-- | Return an literal which is equivalent to an XOR of given two literals.
+--
+-- @
+--   encodeXOR encoder = 'encodeXORWithPolarity' encoder 'polarityBoth'
+-- @
+encodeXOR :: PrimMonad m => Encoder m -> SAT.Lit -> SAT.Lit -> m SAT.Lit
+encodeXOR encoder = encodeXORWithPolarity encoder polarityBoth
+
+-- | Return an literal which is equivalent to an XOR of given two literals which occurs only in specified polarity.
+encodeXORWithPolarity :: forall m. PrimMonad m => Encoder m -> Polarity -> SAT.Lit -> SAT.Lit -> m SAT.Lit
+encodeXORWithPolarity encoder polarity a b = do
+  let defineNeg x = do
+        -- (a ⊕ b) → x
+        SAT.addClause encoder [a, -b, x]   -- ¬a ∧  b → x
+        SAT.addClause encoder [-a, b, x]   --  a ∧ ¬b → x
+      definePos x = do
+        -- x → (a ⊕ b)
+        SAT.addClause encoder [a, b, -x]   -- ¬a ∧ ¬b → ¬x
+        SAT.addClause encoder [-a, -b, -x] --  a ∧  b → ¬x
+  encodeWithPolarityHelper encoder (encXORTable encoder) definePos defineNeg polarity (a,b)
+
+-- | Return an "sum"-pin of a full-adder.
+--
+-- @
+--   encodeFASum encoder = 'encodeFASumWithPolarity' encoder 'polarityBoth'
+-- @
+encodeFASum :: forall m. PrimMonad m => Encoder m -> SAT.Lit -> SAT.Lit -> SAT.Lit -> m SAT.Lit
+encodeFASum encoder = encodeFASumWithPolarity encoder polarityBoth
+
+-- | Return an "sum"-pin of a full-adder which occurs only in specified polarity.
+encodeFASumWithPolarity :: forall m. PrimMonad m => Encoder m -> Polarity -> SAT.Lit -> SAT.Lit -> SAT.Lit -> m SAT.Lit
+encodeFASumWithPolarity encoder polarity a b c = do
+  let defineNeg x = do
+        -- FASum(a,b,c) → x
+        SAT.addClause encoder [-a,-b,-c,x] --  a ∧  b ∧  c → x
+        SAT.addClause encoder [-a,b,c,x]   --  a ∧ ¬b ∧ ¬c → x
+        SAT.addClause encoder [a,-b,c,x]   -- ¬a ∧  b ∧ ¬c → x
+        SAT.addClause encoder [a,b,-c,x]   -- ¬a ∧ ¬b ∧  c → x
+      definePos x = do
+        -- x → FASum(a,b,c)
+        -- ⇔ ¬FASum(a,b,c) → ¬x
+        SAT.addClause encoder [a,b,c,-x]   -- ¬a ∧ ¬b ∧ ¬c → -x
+        SAT.addClause encoder [a,-b,-c,-x] -- ¬a ∧  b ∧  c → -x
+        SAT.addClause encoder [-a,b,-c,-x] --  a ∧ ¬b ∧  c → -x
+        SAT.addClause encoder [-a,-b,c,-x] --  a ∧  b ∧ ¬c → -x
+  encodeWithPolarityHelper encoder (encFASumTable encoder) definePos defineNeg polarity (a,b,c)
+
+-- | Return an "carry"-pin of a full-adder.
+--
+-- @
+--   encodeFACarry encoder = 'encodeFACarryWithPolarity' encoder 'polarityBoth'
+-- @
+encodeFACarry :: forall m. PrimMonad m => Encoder m -> SAT.Lit -> SAT.Lit -> SAT.Lit -> m SAT.Lit
+encodeFACarry encoder = encodeFACarryWithPolarity encoder polarityBoth
+
+-- | Return an "carry"-pin of a full-adder which occurs only in specified polarity.
+encodeFACarryWithPolarity :: forall m. PrimMonad m => Encoder m -> Polarity -> SAT.Lit -> SAT.Lit -> SAT.Lit -> m SAT.Lit
+encodeFACarryWithPolarity encoder polarity a b c = do
+  let defineNeg x = do
+        -- FACarry(a,b,c) → x
+        SAT.addClause encoder [-a,-b,x] -- a ∧ b → x
+        SAT.addClause encoder [-a,-c,x] -- a ∧ c → x
+        SAT.addClause encoder [-b,-c,x] -- b ∧ c → x
+      definePos x = do
+        -- x → FACarry(a,b,c)
+        -- ⇔ ¬FACarry(a,b,c) → ¬x
+        SAT.addClause encoder [a,b,-x]  --  ¬a ∧ ¬b → ¬x
+        SAT.addClause encoder [a,c,-x]  --  ¬a ∧ ¬c → ¬x
+        SAT.addClause encoder [b,c,-x]  --  ¬b ∧ ¬c → ¬x
+  encodeWithPolarityHelper encoder (encFACarryTable encoder) definePos defineNeg polarity (a,b,c)
+
 
 getDefinitions :: PrimMonad m => Encoder m -> m [(SAT.Var, Formula)]
 getDefinitions encoder = do
-  t1 <- readMutVar (encConjTable encoder)
-  t2 <- readMutVar (encITETable encoder)
-  let m1 = [(v, andB [Atom l1 | l1 <- IntSet.toList ls]) | (ls, (v, _, _)) <- Map.toList t1]
-      m2 = [(v, ite (Atom c) (Atom t) (Atom e)) | ((c,t,e), (v, _, _)) <- Map.toList t2]
-  return $ m1 ++ m2
+  tableConj <- readMutVar (encConjTable encoder)
+  tableITE <- readMutVar (encITETable encoder)
+  tableXOR <- readMutVar (encXORTable encoder)
+  tableFASum <- readMutVar (encFASumTable encoder)
+  tableFACarry <- readMutVar (encFACarryTable encoder)
+  let m1 = [(v, andB [Atom l1 | l1 <- IntSet.toList ls]) | (ls, (v, _, _)) <- Map.toList tableConj]
+      m2 = [(v, ite (Atom c) (Atom t) (Atom e)) | ((c,t,e), (v, _, _)) <- Map.toList tableITE]
+      m3 = [(v, (Atom a .||. Atom b) .&&. (Atom (-a) .||. Atom (-b))) | ((a,b), (v, _, _)) <- Map.toList tableXOR]
+      m4 = [(v, orB [andB [Atom l | l <- ls] | ls <- [[a,b,c],[a,-b,-c],[-a,b,-c],[-a,-b,c]]])
+             | ((a,b,c), (v, _, _)) <- Map.toList tableFASum]
+      m5 = [(v, orB [andB [Atom l | l <- ls] | ls <- [[a,b],[a,c],[b,c]]])
+             | ((a,b,c), (v, _, _)) <- Map.toList tableFACarry]
+  return $ concat [m1, m2, m3, m4, m5]
 
 
 data Polarity
