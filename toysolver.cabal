@@ -18,7 +18,6 @@ Extra-Source-Files:
    CHANGELOG.markdown
    COPYING
    COPYING-GPL
-   .ghci
    .travis.yml
    appveyor.yml
    build_bdist_linux.sh
