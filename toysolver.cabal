@@ -299,6 +299,7 @@ Library
      ToySolver.SAT
      ToySolver.SAT.Encoder.Integer
      ToySolver.SAT.Encoder.PB
+     ToySolver.SAT.Encoder.PB.Internal.Sorter
      ToySolver.SAT.Encoder.PBNLC
      ToySolver.SAT.Encoder.Tseitin
      ToySolver.SAT.MessagePassing.SurveyPropagation

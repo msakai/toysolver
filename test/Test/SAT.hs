@@ -34,6 +34,7 @@ import qualified ToySolver.SAT.Types as SAT
 import ToySolver.SAT.TheorySolver
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
+import qualified ToySolver.SAT.Encoder.PB.Internal.Sorter as PBEncSorter
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
@@ -1388,6 +1389,10 @@ prop_PBEncoder_addPBAtLeast = QM.monadicIO $ do
         b1 = SAT.evalPBLinAtLeast m (lhs,rhs)
         b2 = evalCNF (array (bounds m2) (assocs m2)) cnf
     QM.assert $ b1 == b2
+
+prop_PBEncoder_Sorter_genSorter :: [Int] -> Bool
+prop_PBEncoder_Sorter_genSorter xs =
+  V.toList (PBEncSorter.sortVector (V.fromList xs)) == sort xs
 
 ------------------------------------------------------------------------
 

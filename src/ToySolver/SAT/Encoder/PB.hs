@@ -40,13 +40,14 @@ import ToySolver.Data.BoolExpr
 import qualified ToySolver.Internal.Data.SeqQueue as SQ
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import ToySolver.SAT.Encoder.PB.Internal.Sorter (addPBLinAtLeastSorter, encodePBLinAtLeastSorter)
 
 data Encoder m = Encoder (Tseitin.Encoder m) Strategy
 
 data Strategy
   = BDD
   | Adder
-  | Sorter -- not implemented yet
+  | Sorter
   | Hybrid -- not implemented yet
   deriving (Show, Eq, Ord, Enum, Bounded)
 
@@ -85,15 +86,17 @@ encodePBLinAtLeast enc constr =
 -- -----------------------------------------------------------------------
 
 addPBLinAtLeast' :: PrimMonad m => Encoder m -> SAT.PBLinAtLeast -> m ()
-addPBLinAtLeast' enc@(Encoder _ strategy) = 
+addPBLinAtLeast' enc@(Encoder tseitin strategy) = 
   case strategy of
     Adder -> addPBLinAtLeastAdder enc
+    Sorter -> addPBLinAtLeastSorter tseitin
     _ -> addPBLinAtLeastBDD enc
 
 encodePBLinAtLeast' :: PrimMonad m => Encoder m -> SAT.PBLinAtLeast -> m SAT.Lit
-encodePBLinAtLeast' enc@(Encoder _ strategy) = 
+encodePBLinAtLeast' enc@(Encoder tseitin strategy) = 
   case strategy of
     Adder -> encodePBLinAtLeastAdder enc
+    Sorter -> encodePBLinAtLeastSorter tseitin
     _ -> encodePBLinAtLeastBDD enc
   
 -- -----------------------------------------------------------------------
