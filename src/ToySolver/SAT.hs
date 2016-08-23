@@ -1589,7 +1589,7 @@ setPBHandlerType solver ht = do
 -- 
 -- Reference:
 -- 
--- * N . Eéen and N. Sörensson. Translating Pseudo-Boolean Constraints into SAT. JSAT 2:1–26, 2006.
+-- * N. Eén and N. Sörensson. Translating Pseudo-Boolean Constraints into SAT. JSAT 2:1–26, 2006.
 --
 {-# DEPRECATED setPBSplitClausePart "Use setConfig" #-}
 setPBSplitClausePart :: Solver -> Bool -> IO ()

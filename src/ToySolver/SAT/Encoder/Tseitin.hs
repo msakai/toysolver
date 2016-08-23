@@ -38,7 +38,7 @@
 --    Clause Form Translation. In Journal on Symbolic Computation,
 --    volume 2, 1986.
 --
--- * [ES06] N . Eéen and N. Sörensson. Translating Pseudo-Boolean
+-- * [ES06] N. Eén and N. Sörensson. Translating Pseudo-Boolean
 --   Constraints into SAT. JSAT 2:1–26, 2006.
 --
 -----------------------------------------------------------------------------

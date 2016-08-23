@@ -12,7 +12,7 @@
 --
 -- References:
 --
--- * [ES06] N . Eéen and N. Sörensson. Translating Pseudo-Boolean
+-- * [ES06] N. Eén and N. Sörensson. Translating Pseudo-Boolean
 --   Constraints into SAT. JSAT 2:1–26, 2006.
 --
 -----------------------------------------------------------------------------
