@@ -40,6 +40,8 @@ import Data.Maybe
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
+import ToySolver.Data.BoolExpr
+import ToySolver.Data.Boolean
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
@@ -156,14 +158,19 @@ optimizeBase xs = reverse $ fst $ fromJust $ execState (m xs [] 0) Nothing
 
 addPBLinAtLeastSorter :: PrimMonad m => Tseitin.Encoder m -> SAT.PBLinAtLeast -> m ()
 addPBLinAtLeastSorter enc constr = do
-  l <- encodePBLinAtLeastSorter enc constr
-  SAT.addClause enc [l]
+  formula <- encodePBLinAtLeastSorter' enc constr
+  Tseitin.addFormula enc formula
 
 encodePBLinAtLeastSorter :: PrimMonad m => Tseitin.Encoder m -> SAT.PBLinAtLeast -> m SAT.Lit
-encodePBLinAtLeastSorter enc (lhs,rhs) = do
+encodePBLinAtLeastSorter enc constr = do
+  formula <- encodePBLinAtLeastSorter' enc constr
+  Tseitin.encodeFormula enc formula
+
+encodePBLinAtLeastSorter' :: PrimMonad m => Tseitin.Encoder m -> SAT.PBLinAtLeast -> m Tseitin.Formula
+encodePBLinAtLeastSorter' enc (lhs,rhs) = do
   let base = optimizeBase [c | (c,_) <- lhs]
   sorters <- genSorters enc base [(encode base c, l) | (c,l) <- lhs] []
-  lexComp enc base sorters (encode base rhs)
+  return $ lexComp base sorters (encode base rhs)
 
 genSorters :: PrimMonad m => Tseitin.Encoder m -> Base -> [(UNumber, SAT.Lit)] -> [SAT.Lit] -> m [Vector SAT.Lit]
 genSorters enc base lhs carry = do
@@ -181,44 +188,29 @@ genSorters enc base lhs carry = do
       oss <- genSorters enc bs [(ds,l) | (_:ds,l) <- lhs] [os!(i-1) | i <- takeWhile (<= V.length os) (iterate (+b) b)]
       return $ os : oss
 
-modGE :: PrimMonad m => Tseitin.Encoder m -> Vector SAT.Lit -> Maybe Int -> Int -> m SAT.Lit
-modGE enc _out _n lim | lim <= 0 = Tseitin.encodeConj enc []
-modGE enc out Nothing lim = do
-  if lim - 1 < V.length out then do
-    return $ out ! (lim - 1)
-  else
-    Tseitin.encodeDisj enc []
-modGE enc out (Just n) lim = do
-  result <- Tseitin.encodeDisj enc []
-  let f r j = do
-        x1 <- if j + lim - 1 < V.length out then do
-                return $ out ! (j + lim - 1)
-              else
-                Tseitin.encodeDisj enc []
-        x2 <- if j + n - 1 < V.length out then do
-                return $ out ! (j + n - 1)
-              else
-                Tseitin.encodeDisj enc []
-        x3 <- Tseitin.encodeConj enc [x1, -x2]
-        Tseitin.encodeDisj enc [r,x3]
-  foldM f result [0, n .. V.length out - 1]
+isGE :: Vector SAT.Lit -> Int -> Tseitin.Formula
+isGE out lim
+  | lim <= 0 = true
+  | lim - 1 < V.length out = Atom $ out ! (lim - 1)
+  | otherwise = false
 
-lexComp :: PrimMonad m => Tseitin.Encoder m -> Base -> [Vector SAT.Lit] -> UNumber -> m SAT.Lit
-lexComp enc base lhs rhs = do
-  let f ret (b:bs) (out:os) ds = do
-        let d = if null ds then 0 else head ds
-        gt <- modGE enc out (Just b) (d+1)
-        ge <- modGE enc out (Just b) d
-        x1 <- Tseitin.encodeConj enc [ge, ret]
-        x2 <- Tseitin.encodeDisj enc [gt, x1]
-        f x2 bs os (drop 1 ds)
-      f ret [] [out] ds = do
-        let d = if null ds then 0 else head ds
-        gt <- modGE enc out Nothing (d+1)
-        ge <- modGE enc out Nothing d
-        x1 <- Tseitin.encodeConj enc [ge, ret]
-        Tseitin.encodeDisj enc [gt, x1]
-  ret <- Tseitin.encodeConj enc []
-  f ret base lhs rhs
+isGEMod :: Int -> Vector SAT.Lit -> Int -> Tseitin.Formula
+isGEMod _n _out lim | lim <= 0 = true
+isGEMod n out lim =
+  orB [isGE out (j + lim) .&&. notB isGE out (j + n) | j <- [0, n .. V.length out - 1]]
+
+lexComp :: Base -> [Vector SAT.Lit] -> UNumber -> Tseitin.Formula
+lexComp base lhs rhs = f true base lhs rhs
+  where
+    f ret (b:bs) (out:os) ds = f (gt .||. (ge .&&. ret)) bs os (drop 1 ds)
+      where
+        d = if null ds then 0 else head ds
+        gt = isGEMod b out (d+1)
+        ge = isGEMod b out d
+    f ret [] [out] ds = gt .||. (ge .&&. ret)
+      where
+        d = if null ds then 0 else head ds
+        gt = isGE out (d+1)
+        ge = isGE out d
 
 -- ------------------------------------------------------------------------
