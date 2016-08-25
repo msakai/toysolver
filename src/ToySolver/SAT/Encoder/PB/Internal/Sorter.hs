@@ -20,6 +20,7 @@ module ToySolver.SAT.Encoder.PB.Internal.Sorter
   ( Base
   , UDigit
   , UNumber
+  , isRepresentable
   , encode
   , decode
 
@@ -106,6 +107,11 @@ type Base = [Int]
 type UDigit = Int
 type UNumber = [UDigit]
 
+isRepresentable :: Base -> Integer -> Bool
+isRepresentable _ 0 = True
+isRepresentable [] x = x <= fromIntegral (maxBound :: UDigit)
+isRepresentable (b:bs) x = isRepresentable bs (x `div` fromIntegral b)
+
 encode :: Base -> Integer -> UNumber
 encode _ 0 = []
 encode [] x
@@ -141,13 +147,11 @@ optimizeBase xs = reverse $ fst $ fromJust $ execState (m xs [] 0) Nothing
       case best of
         Just (_bestBase, bestCost) | bestCost < cost -> return ()
         _ -> do
-          let cost' = cost + sum xs
-          case best of
-            Just (_bestBase, bestCost) | cost' < bestCost ->
-              put $ Just (base, cost')
-            Nothing ->
-              put $ Just (base, cost')
-            _ -> return ()
+          when (sum xs <= 1024) $ do
+            let cost' = cost + sum xs
+            case best of
+              Just (_bestBase, bestCost) | bestCost < cost' -> return ()
+              _ -> put $ Just (base, cost')
           unless (null xs) $ do
             forM_ primes $ \p -> do
               m [d | x <- xs, let d = x `div` fromIntegral p, d > 0]
@@ -169,8 +173,11 @@ encodePBLinAtLeastSorter enc constr = do
 encodePBLinAtLeastSorter' :: PrimMonad m => Tseitin.Encoder m -> SAT.PBLinAtLeast -> m Tseitin.Formula
 encodePBLinAtLeastSorter' enc (lhs,rhs) = do
   let base = optimizeBase [c | (c,_) <- lhs]
-  sorters <- genSorters enc base [(encode base c, l) | (c,l) <- lhs] []
-  return $ lexComp base sorters (encode base rhs)
+  if isRepresentable base rhs then do
+    sorters <- genSorters enc base [(encode base c, l) | (c,l) <- lhs] []
+    return $ lexComp base sorters (encode base rhs)
+  else do
+    return false
 
 genSorters :: PrimMonad m => Tseitin.Encoder m -> Base -> [(UNumber, SAT.Lit)] -> [SAT.Lit] -> m [Vector SAT.Lit]
 genSorters enc base lhs carry = do

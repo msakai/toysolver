@@ -1394,6 +1394,15 @@ prop_PBEncoder_Sorter_genSorter :: [Int] -> Bool
 prop_PBEncoder_Sorter_genSorter xs =
   V.toList (PBEncSorter.sortVector (V.fromList xs)) == sort xs
 
+prop_PBEncoder_Sorter_decode_encode :: Property
+prop_PBEncoder_Sorter_decode_encode =
+  forAll arbitrary $ \base' ->
+    forAll arbitrary $ \(NonNegative x) ->
+      let base = [b | Positive b <- base']
+      in PBEncSorter.isRepresentable base x
+         ==>
+         (PBEncSorter.decode base . PBEncSorter.encode base) x == x
+
 ------------------------------------------------------------------------
 
 case_MUS = do
