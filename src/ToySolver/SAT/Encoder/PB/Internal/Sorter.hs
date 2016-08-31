@@ -37,7 +37,9 @@ module ToySolver.SAT.Encoder.PB.Internal.Sorter
 import Control.Monad.Primitive
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.List
 import Data.Maybe
+import Data.Ord
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
@@ -143,9 +145,10 @@ optimizeBase xs = reverse $ fst $ fromJust $ execState (m xs [] 0) Nothing
   where
     m :: [Integer] -> Base -> Integer -> State (Maybe (Base, Cost)) ()
     m xs base cost = do
+      let lb = cost + sum [1 | x <- xs, x > 0]
       best <- get
       case best of
-        Just (_bestBase, bestCost) | bestCost < cost -> return ()
+        Just (_bestBase, bestCost) | bestCost <= lb -> return ()
         _ -> do
           when (sum xs <= 1024) $ do
             let cost' = cost + sum xs
@@ -153,10 +156,13 @@ optimizeBase xs = reverse $ fst $ fromJust $ execState (m xs [] 0) Nothing
               Just (_bestBase, bestCost) | bestCost < cost' -> return ()
               _ -> put $ Just (base, cost')
           unless (null xs) $ do
-            forM_ primes $ \p -> do
-              m [d | x <- xs, let d = x `div` fromIntegral p, d > 0]
-                (p : base)
-                (cost + sum [r | x <- xs, let r = x `mod` fromIntegral p])
+            let delta = sortBy (comparing snd) [(p, sum [x `mod` fromIntegral p | x <- xs]) | p <- primes]
+            case delta of
+              (p,0) : _ -> do
+                m [d | x <- xs, let d = x `div` fromIntegral p, d > 0] (p : base) cost
+              _ -> do
+                forM_ delta $ \(p,s) -> do
+                  m [d | x <- xs, let d = x `div` fromIntegral p, d > 0] (p : base) (cost + s)
 
 -- ------------------------------------------------------------------------
 
