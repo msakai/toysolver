@@ -15,9 +15,9 @@ matrix:
     - env: CABALVER=1.16 GHCVER=7.6.3
       compiler: ": #GHC 7.6.3"
       addons: {apt: {packages: [libtinfo-dev,cabal-install-1.16,ghc-7.6.3,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
-    - env: CABALVER=1.18 GHCVER=7.8.3 COVERAGE=1
-      compiler: ": #GHC 7.8.3"
-      addons: {apt: {packages: [libtinfo-dev,cabal-install-1.18,ghc-7.8.3,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
+    - env: CABALVER=1.18 GHCVER=7.8.4 COVERAGE=1
+      compiler: ": #GHC 7.8.4"
+      addons: {apt: {packages: [libtinfo-dev,cabal-install-1.18,ghc-7.8.4,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
     - env: CABALVER=1.22 GHCVER=7.10.3
       compiler: ": #GHC 7.10.3"
       addons: {apt: {packages: [libtinfo-dev,cabal-install-1.22,ghc-7.10.3,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
