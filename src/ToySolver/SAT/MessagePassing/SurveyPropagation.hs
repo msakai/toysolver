@@ -224,7 +224,7 @@ propagateST solver = do
       max_c_len = VG.maximum $ VG.map VG.length $ svClauseEdges solver
   tmp <- VGM.new (max (max_v_len * 2) max_c_len)
   let loop !i
-        | Just l <- lim, i > l = return False
+        | Just l <- lim, i >= l = return False
         | otherwise = do
             numLoop 1 nv $ \v -> updateEdgeProb solver v tmp
             let f maxDelta c = max maxDelta <$> updateEdgeSurvey solver c tmp
@@ -290,7 +290,7 @@ propagateMT solver nthreads = do
          return (th, reqVar, respVar, respVar2)
  
     let loop !i
-          | Just l <- lim, i > l = return False
+          | Just l <- lim, i >= l = return False
           | otherwise = do
               mapM_ (\(_,reqVar,_,_) -> putMVar reqVar WCUpdateEdgeProb) workers
               mapM_ (\(_,_,respVar,_) -> wait (takeTMVar respVar)) workers

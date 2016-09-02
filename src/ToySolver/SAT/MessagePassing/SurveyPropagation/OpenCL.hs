@@ -367,7 +367,7 @@ propagate solver = do
   (group_max_delta_vec :: VSM.IOVector CFloat) <- VGM.new updateEdgeSurvey_num_groups
 
   let loop !i
-        | Just l <- lim, i > l = return (False,i)
+        | Just l <- lim, i >= l = return (False,i)
         | otherwise = do
             _ <- clReleaseEvent =<< clEnqueueNDRangeKernel queue (svUpdateEdgeProb solver)
                    [updateEdgeProb_global_size] [updateEdgeProb_local_size] []          
