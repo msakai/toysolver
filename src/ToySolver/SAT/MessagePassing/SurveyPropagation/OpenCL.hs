@@ -58,6 +58,7 @@ import qualified Data.Vector.Generic.Mutable as VGM
 import Foreign( castPtr, nullPtr, sizeOf )
 import Foreign.C.Types( CFloat )
 import Language.Haskell.TH (runIO, litE, stringL)
+import qualified Numeric.Log as L
 import System.IO
 import qualified System.Random.MWC as Rand
 import Text.Printf
@@ -79,11 +80,11 @@ data Solver
   , svVarEdgesWeight :: !(VSM.IOVector CFloat)
   , svVarOffset      :: !(VSM.IOVector CLint)
   , svVarLength      :: !(VSM.IOVector CLint)
-  , svVarProb        :: !(VSM.IOVector CFloat)
+  , svVarProb        :: !(VSM.IOVector (L.Log CFloat))
   , svClauseOffset   :: !(VSM.IOVector CLint)
   , svClauseLength   :: !(VSM.IOVector CLint)
-  , svEdgeSurvey     :: !(VSM.IOVector CFloat) -- η_{a → i}
-  , svEdgeProbU      :: !(VSM.IOVector CFloat) -- Π^u_{i → a} / (Π^u_{i → a} + Π^s_{i → a} + Π^0_{i → a})
+  , svEdgeSurvey     :: !(VSM.IOVector (L.Log CFloat)) -- η_{a → i}
+  , svEdgeProbU      :: !(VSM.IOVector (L.Log CFloat)) -- Π^u_{i → a} / (Π^u_{i → a} + Π^s_{i → a} + Π^0_{i → a})
 
   , svTolRef :: !(IORef Double)
   , svIterLimRef :: !(IORef (Maybe Int))
@@ -136,7 +137,7 @@ newSolver outputMessage context dev nv clauses = do
   -- 
   -- \^{Π}^{0}_i = 1, \^{Π}^{+}_i = \^{Π}^{-}_i = 0
   -- 
-  edgeSurvey  <- VGM.replicate num_edges 0.5
+  edgeSurvey  <- VGM.replicate num_edges (L.Exp (log 0.5))
   edgeProbU   <- VGM.new num_edges
 
   varProb <- VGM.new (nv*2)
@@ -203,7 +204,7 @@ initializeRandom solver gen = do
   n <- getNEdges solver
   numLoop 0 (n-1) $ \e -> do
     (d::Double) <- Rand.uniformR (0.05,0.95) gen -- (0.05, 0.95]
-    VGM.unsafeWrite (svEdgeSurvey solver) e (realToFrac d)
+    VGM.unsafeWrite (svEdgeSurvey solver) e (L.Exp (realToFrac (log d)))
 
 -- | number of variables of the problem.
 getNVars :: Solver -> IO Int
@@ -233,8 +234,8 @@ setIterationLimit solver val = writeIORef (svIterLimRef solver) val
 getVarProb :: Solver -> Var -> IO (Double, Double, Double)
 getVarProb solver v = do
   let i = v - 1
-  pt <- realToFrac <$> VGM.read (svVarProb solver) (i*2)
-  pf <- realToFrac <$> VGM.read (svVarProb solver) (i*2+1)
+  pt <- (exp . realToFrac . L.ln) <$> VGM.read (svVarProb solver) (i*2)
+  pf <- (exp . realToFrac . L.ln) <$> VGM.read (svVarProb solver) (i*2+1)
   return (pt, pf, 1 - (pt + pf))
 
 propagate :: Solver -> IO Bool
