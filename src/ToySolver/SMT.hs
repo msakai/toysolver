@@ -927,11 +927,3 @@ getUnsatCore solver = do
 pairs :: [a] -> [(a,a)]
 pairs [] = []
 pairs (x:xs) = [(x,y) | y <- xs] ++ pairs xs
-
-#if !MIN_VERSION_base(4,7,0)
-
-isRight :: Either a b -> Bool
-isRight (Left  _) = False
-isRight (Right _) = True
-
-#endif

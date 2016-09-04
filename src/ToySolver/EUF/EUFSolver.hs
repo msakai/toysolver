@@ -189,11 +189,3 @@ termToFSym     = CC.termToFSym     . svCCSolver
 fsymToTerm     = CC.fsymToTerm     . svCCSolver
 fsymToFlatTerm = CC.fsymToFlatTerm . svCCSolver
 flatTermToFSym = CC.flatTermToFSym . svCCSolver
-
-#if !MIN_VERSION_base(4,7,0)
-
-isRight :: Either a b -> Bool
-isRight (Left  _) = False
-isRight (Right _) = True
-
-#endif
