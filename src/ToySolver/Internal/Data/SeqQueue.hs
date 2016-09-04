@@ -37,22 +37,18 @@ import qualified Data.Sequence as Seq
 newtype SeqQueue m a = SeqQueue (MutVar (PrimState m) (Seq.Seq a))
 
 instance PrimMonad m => NewFifo (SeqQueue m a) m where
-  {-# SPECIALIZE instance NewFifo (SeqQueue IO a) IO #-}
-  {-# SPECIALIZE instance NewFifo (SeqQueue (ST s) a) (ST s) #-}
+  {-# INLINE newFifo #-}
   newFifo = do
     ref <- newMutVar Seq.empty
     return (SeqQueue ref)
 
 instance PrimMonad m => Enqueue (SeqQueue m a) m a where
-  {-# SPECIALIZE instance Enqueue (SeqQueue IO a) IO a #-}
-  {-# SPECIALIZE instance Enqueue (SeqQueue (ST s) a) (ST s) a #-}
+  {-# INLINE enqueue #-}
   enqueue (SeqQueue ref) val = do
     modifyMutVar ref (Seq.|> val)
 
 instance PrimMonad m => Dequeue (SeqQueue m a) m a where
-  {-# SPECIALIZE instance Dequeue (SeqQueue IO a) IO a #-}
-  {-# SPECIALIZE instance Dequeue (SeqQueue (ST s) a) (ST s) a #-}
-
+  {-# INLINE dequeue #-}
   dequeue (SeqQueue ref) = do
     s <- readMutVar ref
     case Seq.viewl s of
@@ -61,19 +57,19 @@ instance PrimMonad m => Dequeue (SeqQueue m a) m a where
         writeMutVar ref s'
         return (Just val)
 
+  {-# INLINE dequeueBatch #-}
   dequeueBatch (SeqQueue ref) = do
     s <- readMutVar ref
     writeMutVar ref Seq.empty
     return (toList s)
 
 instance PrimMonad m => QueueSize (SeqQueue m a) m where
-  {-# SPECIALIZE instance QueueSize (SeqQueue IO a) IO #-}
-  {-# SPECIALIZE instance QueueSize (SeqQueue (ST s) a) (ST s) #-}
-
+  {-# INLINE queueSize #-}
   queueSize (SeqQueue ref) = do
     s <- readMutVar ref
     return $! Seq.length s
 
+{-# INLINE clear #-}
 clear :: PrimMonad m => SeqQueue m a -> m ()
 clear (SeqQueue ref) = do
   writeMutVar ref Seq.empty
