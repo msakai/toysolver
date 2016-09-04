@@ -81,6 +81,9 @@ infixr 8 ^*
 (^*) :: Num a => L.Log a -> a -> L.Log a
 L.Exp a ^* b = L.Exp (a*b)
 
+comp :: (RealFloat a, L.Precise a) => L.Log a -> L.Log a
+comp (L.Exp a) = realToFrac $ max 0 $ 1 - exp a
+
 type ClauseIndex = Int
 type EdgeIndex   = Int
 
@@ -341,8 +344,8 @@ updateEdgeProb solver v tmp = do
                 eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e -- η_{a→i}
                 let w = svClauseWeight solver ! a
                     lit2 = svEdgeLit solver ! e
-                    val1_pre' = if lit2 > 0 then val1_pre * (1 - eta_ai) ^* w else val1_pre
-                    val2_pre' = if lit2 > 0 then val2_pre else val2_pre * (1 - eta_ai) ^* w
+                    val1_pre' = if lit2 > 0 then val1_pre * comp eta_ai ^* w else val1_pre
+                    val2_pre' = if lit2 > 0 then val2_pre else val2_pre * comp eta_ai ^* w
                 f (k+1) val1_pre' val2_pre'
       f 0 1 1
       -- tmp ! (k*2)   == Π_{a∈edges[0..k-1], a∈V^{+}(i)} (1 - eta_ai)^{w_i}
@@ -360,11 +363,11 @@ updateEdgeProb solver v tmp = do
                     val2 = val2_pre * val2_post -- val2 == Π_{b∈edges, b∈V^{-}(i), a≠b} (1 - eta_bi)^{w_i}
                 eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e -- η_{a→i}
                 let w = svClauseWeight solver ! a
-                    val1_post' = if lit2 > 0 then val1_post * (1 - eta_ai) ^* w else val1_post
-                    val2_post' = if lit2 > 0 then val2_post else val2_post * (1 - eta_ai) ^* w
+                    val1_post' = if lit2 > 0 then val1_post * comp eta_ai ^* w else val1_post
+                    val2_post' = if lit2 > 0 then val2_post else val2_post * comp eta_ai ^* w
                 let pi_0 = val1 * val2 -- Π^0_{i→a}
-                    pi_u = if lit2 > 0 then (1 - val2) * val1 else (1 - val1) * val2 -- Π^u_{i→a}
-                    pi_s = if lit2 > 0 then (1 - val1) * val2 else (1 - val2) * val1 -- Π^s_{i→a}
+                    pi_u = if lit2 > 0 then comp val2 * val1 else comp val1 * val2 -- Π^u_{i→a}
+                    pi_s = if lit2 > 0 then comp val1 * val2 else comp val2 * val1 -- Π^s_{i→a}
                 VGM.unsafeWrite (svEdgeProbU solver) e (pi_u / L.sum [pi_0, pi_u, pi_s])
                 g (k-1) val1_post' val2_post'
       g (VG.length edges - 1) 1 1
@@ -405,13 +408,13 @@ computeVarProb solver v = do
             a = svEdgeClause solver ! e
             w = svClauseWeight solver ! a
         eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e
-        let val1' = if lit > 0 then val1 * (1 - eta_ai) ^* w else val1
-            val2' = if lit < 0 then val2 * (1 - eta_ai) ^* w else val2
+        let val1' = if lit > 0 then val1 * comp eta_ai ^* w else val1
+            val2' = if lit < 0 then val2 * comp eta_ai ^* w else val2
         return (val1',val2')
   (val1,val2) <- VG.foldM' f (1,1) (svVarEdges solver ! i)
   let p0 = val1 * val2       -- \^{Π}^{0}_i
-      pp = (1 - val1) * val2 -- \^{Π}^{+}_i
-      pn = (1 - val2) * val1 -- \^{Π}^{-}_i
+      pp = comp val1 * val2 -- \^{Π}^{+}_i
+      pn = comp val2 * val1 -- \^{Π}^{-}_i
   let wp = pp / (pp + pn + p0)
       wn = pn / (pp + pn + p0)
   VGM.unsafeWrite (svVarProbT solver) i wp -- W^{(+)}_i

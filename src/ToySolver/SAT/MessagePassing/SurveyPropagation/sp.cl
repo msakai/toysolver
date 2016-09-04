@@ -9,6 +9,10 @@
 typedef float logfloat;
 typedef float2 logfloat2;
 
+static inline logfloat comp(logfloat x) {
+  return log(fmax(0.0, 1.0 - exp(x)));
+}
+
 __kernel void
 update_edge_prob(
     int n_vars,
@@ -38,9 +42,9 @@ update_edge_prob(
             logfloat w = var_edges_weight[offset+j];
 
             if (polarity) {
-              val1_pre += log(1 - exp(eta_ai)) * w;
+              val1_pre += comp(eta_ai) * w;
             } else {
-              val2_pre += log(1 - exp(eta_ai)) * w;
+              val2_pre += comp(eta_ai) * w;
             }
         }
 
@@ -60,13 +64,13 @@ update_edge_prob(
             logfloat pi_u; // Π^u_{i→a}
             logfloat pi_s; // Π^s_{i→a}
             if (polarity) {
-                pi_u = log(1 - exp(val2)) + val1;
-                pi_s = log(1 - exp(val1)) + val2;
-                val1_post += log(1 - exp(eta_ai)) * w;
+                pi_u = comp(val2) + val1;
+                pi_s = comp(val1) + val2;
+                val1_post += comp(eta_ai) * w;
             } else {
-                pi_u = log(1 - exp(val1)) + val2;
-                pi_s = log(1 - exp(val2)) + val1;
-                val2_post += log(1 - exp(eta_ai)) * w;
+                pi_u = comp(val1) + val2;
+                pi_s = comp(val2) + val1;
+                val2_post += comp(eta_ai) * w;
             }
             float psum = exp(pi_0) + exp(pi_u) + exp(pi_s);
             if (psum > 0) {
@@ -159,15 +163,15 @@ compute_var_prob(
             float w = var_edges_weight[offset+j];
 
             if (polarity) {
-              val1 += log(1 - exp(eta_ai)) * w;
+              val1 += comp(eta_ai) * w;
             } else {
-              val2 += log(1 - exp(eta_ai)) * w;
+              val2 += comp(eta_ai) * w;
             }
         }
 
         float p0 = val1 + val2;       // \^{Π}^{0}_i
-        float pp = log(1 - exp(val1)) + val2; // \^{Π}^{+}_i
-        float pn = log(1 - exp(val2)) + val1; // \^{Π}^{-}_i
+        float pp = comp(val1) + val2; // \^{Π}^{+}_i
+        float pn = comp(val2) + val1; // \^{Π}^{-}_i
         float wp = pp - log(exp(pp) + exp(pn) + exp(p0)); // W^{(+)}_i
         float wn = pn - log(exp(pp) + exp(pn) + exp(p0)); // W^{(-)}_i
         var_prob[i] = (float2)(wp, wn);
