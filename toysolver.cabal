@@ -683,17 +683,18 @@ Executable spsat
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
-Executable spcl
-  if flag(OpenCL) && flag(BuildSamplePrograms)
-    -- we do not want to depend on OpenCL if we do not build.
-    Build-Depends:
-      base,
-      OpenCL,
-      toysolver
-  else
-    Buildable: False
-  Main-is: spcl.hs
-  HS-Source-Dirs: samples/programs/spcl
+Executable sp
+  if !flag(BuildSamplePrograms)
+    Buildable: False    
+  Main-is: sp.hs
+  HS-Source-Dirs: samples/programs/sp
+  Build-Depends:
+    base,
+    data-default-class,
+    toysolver
+  if flag(OpenCL)
+    Build-Depends: OpenCL
+    CPP-Options: "-DENABLE_OPENCL"
   Default-Language: Haskell2010
   Other-Extensions: CPP
   -- We use threaded RTS to avoid the error "schedule: re-entered unsafely.
@@ -701,7 +702,7 @@ Executable spcl
   GHC-Options: -rtsopts -threaded
   -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
-    CPP-OPtions: "-DFORCE_CHAR8"
+    CPP-Options: "-DFORCE_CHAR8"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
