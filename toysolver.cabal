@@ -231,6 +231,7 @@ Library
      ToySolver.Arith.Simplex2.Simple
      ToySolver.Arith.VirtualSubstitution
      ToySolver.BellmanFord
+     ToySolver.BitVector
      ToySolver.EUF.CongruenceClosure
      ToySolver.EUF.EUFSolver
      ToySolver.EUF.FiniteModelFinder
@@ -792,6 +793,7 @@ Test-suite TestSuite
     Test.AReal
     Test.AReal2
     Test.Arith
+    Test.BitVector
     Test.BoolExpr
     Test.BipartiteMatching
     Test.CongruenceClosure
