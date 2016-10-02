@@ -21,7 +21,7 @@ Extra-Source-Files:
    .travis.yml
    appveyor.yml
    build_bdist_linux.sh
-   build_bdist_macos.sh
+   build_bdist_macos.hs
    build_bdist_win32.sh
    build_bdist_win64.sh
    build_bdist_maxsat_evaluation.sh
