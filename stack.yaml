@@ -52,7 +52,7 @@ extra-deps:
 - logic-TPTP-0.4.4.0
 - data-interval-1.2.0
 - extended-reals-0.2.2.0
-- finite-field-0.8.0
+- finite-field-0.9.0
 - pseudo-boolean-0.1.5.0
 - sign-0.4.3
 

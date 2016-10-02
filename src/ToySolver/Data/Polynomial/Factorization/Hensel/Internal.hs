@@ -25,14 +25,15 @@ module ToySolver.Data.Polynomial.Factorization.Hensel.Internal
 
 import Control.Exception (assert)
 import Data.FiniteField
-import qualified TypeLevel.Number.Nat as TL
+import Data.Proxy
+import GHC.TypeLits
 
 import ToySolver.Data.Polynomial.Base (UPolynomial)
 import qualified ToySolver.Data.Polynomial.Base as P
 
 -- import Text.PrettyPrint.HughesPJClass
 
-hensel :: forall p. TL.Nat p => UPolynomial Integer -> [UPolynomial (PrimeField p)] -> Integer -> [UPolynomial Integer]
+hensel :: forall p. KnownNat p => UPolynomial Integer -> [UPolynomial (PrimeField p)] -> Integer -> [UPolynomial Integer]
 hensel f fs1 k
   | k <= 0    = error "ToySolver.Data.Polynomial.Factorization.Hensel.hensel: k <= 0"
   | otherwise = assert precondition $ go 1 (map (P.mapCoeff Data.FiniteField.toInteger) fs1)
@@ -42,7 +43,7 @@ hensel f fs1 k
       P.deg f == P.deg (product fs1)
 
     p :: Integer
-    p = TL.toInt (undefined :: p)
+    p = natVal (Proxy :: Proxy p)
 
     go :: Integer -> [UPolynomial Integer] -> [UPolynomial Integer]
     go !i fs
