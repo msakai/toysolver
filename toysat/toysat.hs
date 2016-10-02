@@ -51,7 +51,6 @@ import System.Console.GetOpt
 import System.FilePath
 import qualified System.Info as SysInfo
 import qualified System.Random.MWC as Rand
-import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import Text.Printf
 #ifdef __GLASGOW_HASKELL__
 import GHC.Environment (getFullArgs)
@@ -82,6 +81,7 @@ import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import ToySolver.SAT.Printer
+import qualified ToySolver.Text.CNF as CNF
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GCNF as GCNF
 import qualified ToySolver.Text.GurobiSol as GurobiSol
@@ -475,8 +475,8 @@ newSolver opts = do
 mainSAT :: Options -> SAT.Solver -> [String] -> IO ()
 mainSAT opt solver args = do
   ret <- case args of
-           ["-"]   -> liftM (DIMACS.parseByteString "-") $ BS.hGetContents stdin
-           [fname] -> DIMACS.parseFile fname
+           ["-"]   -> liftM CNF.parseByteString $ BS.hGetContents stdin
+           [fname] -> CNF.parseFile fname
            _ -> showHelp stderr >> exitFailure
   case ret of
     Left err -> hPrint stderr err >> exitFailure
@@ -486,33 +486,33 @@ mainSAT opt solver args = do
                     _ -> Nothing
       solveSAT opt solver cnf fname
 
-solveSAT :: Options -> SAT.Solver -> DIMACS.CNF -> Maybe FilePath -> IO ()
+solveSAT :: Options -> SAT.Solver -> CNF.CNF -> Maybe FilePath -> IO ()
 solveSAT opt solver cnf cnfFileName = do
-  putCommentLine $ printf "#vars %d" (DIMACS.numVars cnf)
-  putCommentLine $ printf "#constraints %d" (DIMACS.numClauses cnf)
-  SAT.newVars_ solver (DIMACS.numVars cnf)
-  forM_ (DIMACS.clauses cnf) $ \clause ->
-    SAT.addClause solver (elems clause)
+  putCommentLine $ printf "#vars %d" (CNF.numVars cnf)
+  putCommentLine $ printf "#constraints %d" (CNF.numClauses cnf)
+  SAT.newVars_ solver (CNF.numVars cnf)
+  forM_ (CNF.clauses cnf) $ \clause ->
+    SAT.addClause solver clause
 
   spHighlyBiased <-
     if optInitSP opt then do
-      initPolarityUsingSP solver (DIMACS.numVars cnf)
-        (DIMACS.numVars cnf) [(1, elems clause) | clause <- DIMACS.clauses cnf]
+      initPolarityUsingSP solver (CNF.numVars cnf)
+        (CNF.numVars cnf) [(1, clause) | clause <- CNF.clauses cnf]
     else
       return IntMap.empty
 
   when (optLocalSearchInitial opt) $ do
     fixed <- SAT.getFixedLiterals solver
-    let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= DIMACS.numVars cnf]
+    let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= CNF.numVars cnf]
         var_init2 = IntMap.map (>0) spHighlyBiased
         -- note that IntMap.union is left-biased.
         var_init = [if b then v else -v | (v, b) <- IntMap.toList (var_init1 `IntMap.union` var_init2)]
     let wcnf =
           MaxSAT.WCNF
-          { MaxSAT.numVars = DIMACS.numVars cnf
-          , MaxSAT.numClauses = DIMACS.numClauses cnf
+          { MaxSAT.numVars = CNF.numVars cnf
+          , MaxSAT.numClauses = CNF.numClauses cnf
           , MaxSAT.topCost = 1
-          , MaxSAT.clauses = [(1, elems clause) | clause <- DIMACS.clauses cnf]
+          , MaxSAT.clauses = [(1, clause) | clause <- CNF.clauses cnf]
           }
     let opt2 =
           def
@@ -533,8 +533,8 @@ solveSAT opt solver cnf cnfFileName = do
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   when result $ do
     m <- SAT.getModel solver
-    satPrintModel stdout m (DIMACS.numVars cnf)
-    writeSOLFile opt m Nothing (DIMACS.numVars cnf)
+    satPrintModel stdout m (CNF.numVars cnf)
+    writeSOLFile opt m Nothing (CNF.numVars cnf)
 
 initPolarityUsingSP :: SAT.Solver -> Int -> Int -> [(Double, SAT.Clause)] -> IO (IntMap Double)
 initPolarityUsingSP solver nvOrig nv clauses = do
@@ -685,7 +685,7 @@ solvePB opt solver formula = do
   spHighlyBiased <- 
     if optInitSP opt then do
       let (cnf, _, _) = PB2SAT.convert formula
-      initPolarityUsingSP solver nv (DIMACS.numVars cnf) [(1.0, elems clause) | clause <- DIMACS.clauses cnf]
+      initPolarityUsingSP solver nv (CNF.numVars cnf) [(1.0, clause) | clause <- CNF.clauses cnf]
     else
       return IntMap.empty
 

@@ -44,11 +44,11 @@ import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Store.CNF as CNFStore
 
 import qualified Data.PseudoBoolean as PBFile
-import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import qualified ToySolver.Converter.PB2SAT as PB2SAT
 import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
 import qualified ToySolver.Converter.WBO2PB as WBO2PB
 import qualified ToySolver.Converter.SAT2KSAT as SAT2KSAT
+import qualified ToySolver.Text.CNF as CNF
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 
 import ToySolver.Data.OrdRel
@@ -61,19 +61,19 @@ allAssignments nv = [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,F
 
 prop_solveCNF :: Property
 prop_solveCNF = QM.monadicIO $ do
-  cnf@(nv,_) <- QM.pick arbitraryCNF
+  cnf <- QM.pick arbitraryCNF
   solver <- arbitrarySolver
   ret <- QM.run $ solveCNF solver cnf
   case ret of
     Just m -> QM.assert $ evalCNF m cnf
     Nothing -> do
-      forM_ (allAssignments nv) $ \m -> do
+      forM_ (allAssignments (CNF.numVars cnf)) $ \m -> do
         QM.assert $ not (evalCNF m cnf)
 
-solveCNF :: SAT.Solver -> (Int,[SAT.Clause]) -> IO (Maybe SAT.Model)
-solveCNF solver (nv,cs) = do
-  SAT.newVars_ solver nv
-  forM_ cs $ \c -> SAT.addClause solver c
+solveCNF :: SAT.Solver -> CNF.CNF -> IO (Maybe SAT.Model)
+solveCNF solver cnf = do
+  SAT.newVars_ solver (CNF.numVars cnf)
+  forM_ (CNF.clauses cnf) $ \c -> SAT.addClause solver c
   ret <- SAT.solve solver
   if ret then do
     m <- SAT.getModel solver
@@ -81,7 +81,7 @@ solveCNF solver (nv,cs) = do
   else do
     return Nothing
 
-arbitraryCNF :: Gen (Int,[SAT.Clause])
+arbitraryCNF :: Gen CNF.CNF
 arbitraryCNF = do
   nv <- choose (0,10)
   nc <- choose (0,50)
@@ -91,10 +91,15 @@ arbitraryCNF = do
       return []
     else
       replicateM len $ choose (-nv, nv) `suchThat` (/= 0)
-  return (nv, cs)
+  return $
+    CNF.CNF
+    { CNF.numVars = nv
+    , CNF.numClauses = nc
+    , CNF.clauses = cs
+    }
 
-evalCNF :: SAT.Model -> (Int,[SAT.Clause]) -> Bool
-evalCNF m (_,cs) = all (SAT.evalClause m) cs
+evalCNF :: SAT.Model -> CNF.CNF -> Bool
+evalCNF m cnf = all (SAT.evalClause m) (CNF.clauses cnf)
 
 
 prop_solvePB :: Property
@@ -351,8 +356,10 @@ evalXOR :: SAT.Model -> (Int,[SAT.XORClause]) -> Bool
 evalXOR m (_,cs) = all (SAT.evalXORClause m) cs
 
 
-newTheorySolver :: (Int, [SAT.Clause]) -> IO TheorySolver
-newTheorySolver cnf@(nv,cs) = do
+newTheorySolver :: CNF.CNF -> IO TheorySolver
+newTheorySolver cnf = do
+  let nv = CNF.numVars cnf
+      cs = CNF.clauses cnf
   solver <- SAT.newSolver
   SAT.newVars_ solver nv
   forM_ cs $ \c -> SAT.addClause solver c
@@ -384,9 +391,12 @@ newTheorySolver cnf@(nv,cs) = do
 
 prop_solveCNF_using_BooleanTheory :: Property
 prop_solveCNF_using_BooleanTheory = QM.monadicIO $ do
-  cnf@(nv,cs) <- QM.pick arbitraryCNF
-  let cnf1 = (nv, [c | (i,c) <- zip [0..] cs, i `mod` 2 == 0])
-      cnf2 = (nv, [c | (i,c) <- zip [0..] cs, i `mod` 2 /= 0])
+  cnf <- QM.pick arbitraryCNF
+  let nv = CNF.numVars cnf
+      nc = CNF.numClauses cnf
+      cs = CNF.clauses cnf
+      cnf1 = cnf{ CNF.clauses = [c | (i,c) <- zip [0..] cs, i `mod` 2 == 0], CNF.numClauses = nc - (nc `div` 2) }
+      cnf2 = cnf{ CNF.clauses = [c | (i,c) <- zip [0..] cs, i `mod` 2 /= 0], CNF.numClauses = nc `div` 2 }
 
   solver <- arbitrarySolver
 
@@ -396,7 +406,7 @@ prop_solveCNF_using_BooleanTheory = QM.monadicIO $ do
     tsolver <- newTheorySolver cnf1
     SAT.setTheory solver tsolver
 
-    forM_ (snd cnf2) $ \c -> SAT.addClause solver c
+    forM_ (CNF.clauses cnf2) $ \c -> SAT.addClause solver c
     ret <- SAT.solve solver
     if ret then do
       m <- SAT.getModel solver
@@ -968,12 +978,12 @@ case_getAssumptionsImplications_case1 = do
 
 prop_getAssumptionsImplications :: Property
 prop_getAssumptionsImplications = QM.monadicIO $ do
-  cnf@(nv,cs) <- QM.pick arbitraryCNF
+  cnf <- QM.pick arbitraryCNF
   solver <- arbitrarySolver
-  ls <- QM.pick $ liftM concat $ mapM (\v -> elements [[],[-v],[v]]) [1..nv]
+  ls <- QM.pick $ liftM concat $ mapM (\v -> elements [[],[-v],[v]]) [1..CNF.numVars cnf]
   ret <- QM.run $ do
-    SAT.newVars_ solver nv
-    forM_ cs $ \c -> SAT.addClause solver c
+    SAT.newVars_ solver (CNF.numVars cnf)
+    forM_ (CNF.clauses cnf) $ \c -> SAT.addClause solver c
     SAT.solveWith solver ls
   when ret $ do
     xs <- QM.run $ SAT.getAssumptionsImplications solver
@@ -1382,10 +1392,10 @@ prop_PBEncoder_addPBAtLeast = QM.monadicIO $ do
     SAT.addPBAtLeast pb lhs rhs
     cnf <- CNFStore.getCNFFormula db
     defs <- Tseitin.getDefinitions tseitin
-    return ((fst cnf, F.toList (snd cnf)), defs)
+    return (cnf, defs)
   forM_ (allAssignments 4) $ \m -> do
     let m2 :: Array SAT.Var Bool
-        m2 = array (1, fst cnf) $ assocs m ++ [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs]
+        m2 = array (1, CNF.numVars cnf) $ assocs m ++ [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs]
         b1 = SAT.evalPBLinAtLeast m (lhs,rhs)
         b2 = evalCNF (array (bounds m2) (assocs m2)) cnf
     QM.assert $ b1 == b2
@@ -1736,8 +1746,7 @@ prop_pb2sat = QM.monadicIO $ do
             , PBFile.pbNumConstraints = length cs
             , PBFile.pbConstraints = map f cs
             }
-  let (dimacs, mforth, mback) = PB2SAT.convert opb
-  let cnf = (DIMACS.numVars dimacs, [elems c | c <- DIMACS.clauses dimacs])
+  let (cnf, mforth, mback) = PB2SAT.convert opb
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
@@ -1748,7 +1757,7 @@ prop_pb2sat = QM.monadicIO $ do
     Nothing -> return ()
     Just m1 -> do
       let m2 = mforth m1
-      QM.assert $ bounds m2 == (1, DIMACS.numVars dimacs)
+      QM.assert $ bounds m2 == (1, CNF.numVars cnf)
       QM.assert $ evalCNF m2 cnf
   case ret2 of
     Nothing -> return ()
@@ -1841,12 +1850,8 @@ prop_sat2ksat :: Property
 prop_sat2ksat = QM.monadicIO $ do
   k <- QM.pick $ choose (3,10)
 
-  cnf1@(nv1,cs1) <- QM.pick arbitraryCNF
-  let f c = listArray (0, length c - 1) c
-  let cnf1' = DIMACS.CNF{ DIMACS.numVars = nv1, DIMACS.numClauses = length cs1, DIMACS.clauses = map f cs1 }
-
-  let (cnf2', mforth, mback) = SAT2KSAT.convert k cnf1'
-  let cnf2@(nv2,cs2) = (DIMACS.numVars cnf2', map elems (DIMACS.clauses cnf2'))
+  cnf1 <- QM.pick arbitraryCNF
+  let (cnf2, mforth, mback) = SAT2KSAT.convert k cnf1
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
@@ -1857,13 +1862,13 @@ prop_sat2ksat = QM.monadicIO $ do
     Nothing -> return ()
     Just m1 -> do
       let m2 = mforth m1
-      QM.assert $ bounds m2 == (1, nv2)
+      QM.assert $ bounds m2 == (1, CNF.numVars cnf2)
       QM.assert $ evalCNF m2 cnf2
   case ret2 of
     Nothing -> return ()
     Just m2 -> do
       let m1 = mback m2
-      QM.assert $ bounds m1 == (1, nv1)
+      QM.assert $ bounds m1 == (1, CNF.numVars cnf1)
       QM.assert $ evalCNF m1 cnf1
 
 ------------------------------------------------------------------------

@@ -35,7 +35,6 @@ import System.FilePath
 import System.Console.GetOpt
 import System.IO
 import Text.Printf
-import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import GHC.Conc (getNumProcessors, setNumCapabilities)
 
 import Data.OptDir
@@ -56,6 +55,7 @@ import qualified ToySolver.Arith.Simplex2 as Simplex2
 import qualified ToySolver.Arith.MIPSolver2 as MIPSolver2
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
+import qualified ToySolver.Text.CNF as CNF
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GurobiSol as GurobiSol
 import qualified ToySolver.Converter.SAT2IP as SAT2IP
@@ -414,7 +414,7 @@ main = do
 
       case mode of
         ModeSAT -> do
-          ret <- DIMACS.parseFile fname
+          ret <- CNF.parseFile fname
           case ret of
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do

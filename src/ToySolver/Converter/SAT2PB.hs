@@ -14,18 +14,16 @@ module ToySolver.Converter.SAT2PB
   ( convert
   ) where
 
-import Data.Array.IArray
-import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
-
 import qualified Data.PseudoBoolean as PBFile
+import qualified ToySolver.Text.CNF as CNF
 
-convert :: DIMACS.CNF -> PBFile.Formula
+convert :: CNF.CNF -> PBFile.Formula
 convert cnf
   = PBFile.Formula
   { PBFile.pbObjectiveFunction = Nothing
-  , PBFile.pbConstraints = map f (DIMACS.clauses cnf)
-  , PBFile.pbNumVars = DIMACS.numVars cnf
-  , PBFile.pbNumConstraints = DIMACS.numClauses cnf
+  , PBFile.pbConstraints = map f (CNF.clauses cnf)
+  , PBFile.pbNumVars = CNF.numVars cnf
+  , PBFile.pbNumConstraints = CNF.numClauses cnf
   }
   where
-    f clause = ([(1,[l]) | l <- elems clause], PBFile.Ge, 1)
+    f clause = ([(1,[l]) | l <- clause], PBFile.Ge, 1)

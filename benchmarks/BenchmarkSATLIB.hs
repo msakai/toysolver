@@ -5,19 +5,19 @@ import Data.Array.IArray
 import Data.Default.Class
 import Text.Printf
 import Criterion.Main
-import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 import qualified ToySolver.SAT as SAT
+import qualified ToySolver.Text.CNF as CNF
 
 solve :: FilePath -> IO ()
 solve fname = do
-  ret <- DIMACS.parseFile fname
+  ret <- CNF.parseFile fname
   case ret of
     Left err  -> error $ show err
     Right cnf -> do
       solver <- SAT.newSolverWithConfig def{ SAT.configRandomFreq = 0 }
-      _ <- replicateM (DIMACS.numVars cnf) (SAT.newVar solver)
-      forM_ (DIMACS.clauses cnf) $ \clause ->
-        SAT.addClause solver (elems clause)
+      _ <- replicateM (CNF.numVars cnf) (SAT.newVar solver)
+      forM_ (CNF.clauses cnf) $ \clause ->
+        SAT.addClause solver clause
       SAT.solve solver
       return ()
 

@@ -28,7 +28,6 @@ import System.IO
 import System.Exit
 import System.FilePath
 import System.Console.GetOpt
-import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
@@ -126,7 +125,7 @@ readProblem o fname = do
     ".cnf"
       | AsMaxSAT `elem` o -> readWCNF
       | otherwise -> do
-          ret <- DIMACS.parseFile fname
+          ret <- CNF.parseFile fname
           case ret of
             Left err  -> hPrint stderr err >> exitFailure
             Right cnf -> return $ ProbOPB $ SAT2PB.convert cnf

@@ -22,19 +22,19 @@ import Data.Foldable (toList)
 import Data.Sequence ((<|), (|>))
 import qualified Data.Sequence as Seq
 import Data.STRef
-import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.SAT.Store.CNF
+import qualified ToySolver.Text.CNF as CNF
 
-convert :: Int -> DIMACS.CNF -> (DIMACS.CNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
+convert :: Int -> CNF.CNF -> (CNF.CNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
 convert k _ | k < 3 = error "ToySolver.Converter.SAT2KSAT.convert: k must be >=3"
 convert k cnf = runST $ do
-  let nv1 = DIMACS.numVars cnf
+  let nv1 = CNF.numVars cnf
   db <- newCNFStore
   defsRef <- newSTRef Seq.empty
-  SAT.newVars_ db (DIMACS.numVars cnf)
-  forM_ (DIMACS.clauses cnf) $ \clause -> do
+  SAT.newVars_ db (CNF.numVars cnf)
+  forM_ (CNF.clauses cnf) $ \clause -> do
     let loop lits = do
           if Seq.length lits <= k then
             SAT.addClause db (toList lits)
@@ -45,20 +45,15 @@ convert k cnf = runST $ do
                 SAT.addClause db (toList (lits1 |> (-v)))
                 modifySTRef' defsRef (|> (v, toList lits1))
                 loop (v <| lits2)
-    loop $ Seq.fromList (elems clause)
+    loop $ Seq.fromList clause
     
-  (nv2, cs2) <- getCNFFormula db
-  let cnf2 = DIMACS.CNF
-             { DIMACS.numVars = nv2
-             , DIMACS.numClauses = Seq.length cs2
-             , DIMACS.clauses = [listArray (0, length c - 1) c | c <- toList cs2]
-             }
+  cnf2 <- getCNFFormula db
 
   defs <- readSTRef defsRef
 
   let extendModel :: SAT.Model -> SAT.Model
       extendModel m = runSTUArray $ do
-        m2 <- newArray_ (1,nv2)
+        m2 <- newArray_ (1,CNF.numVars cnf2)
         forM_ [1..nv1] $ \v -> do
           writeArray m2 v (SAT.evalVar m v)
         forM_ (toList defs) $ \(v, clause) -> do
