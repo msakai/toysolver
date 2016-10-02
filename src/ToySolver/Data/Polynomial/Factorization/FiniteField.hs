@@ -34,16 +34,16 @@ import Data.Function (on)
 import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified TypeLevel.Number.Nat as TL
+import GHC.TypeLits
 
 import ToySolver.Data.Polynomial.Base (Polynomial, UPolynomial, X (..))
 import qualified ToySolver.Data.Polynomial.Base as P
 import qualified ToySolver.Data.Polynomial.GroebnerBasis as GB
 
-instance TL.Nat p => P.Factor (UPolynomial (PrimeField p)) where
+instance KnownNat p => P.Factor (UPolynomial (PrimeField p)) where
   factor = factor
 
-instance TL.Nat p => P.SQFree (UPolynomial (PrimeField p)) where
+instance KnownNat p => P.SQFree (UPolynomial (PrimeField p)) where
   sqfree = sqfree
 
 factor :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [(UPolynomial k, Integer)]

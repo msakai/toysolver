@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns, ScopedTypeVariables, Rank2Types #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, ScopedTypeVariables)
+-- Portability :  non-portable (BangPatterns, ScopedTypeVariables, Rank2Types)
 --
 -- Factoriation of integer-coefficient polynomial using Zassenhaus algorithm.
 --
@@ -37,7 +37,8 @@ import ToySolver.Data.Polynomial.Factorization.FiniteField ()
 import ToySolver.Data.Polynomial.Factorization.SquareFree ()
 import qualified ToySolver.Data.Polynomial.Factorization.Hensel as Hensel
 
-import qualified TypeLevel.Number.Nat as TL
+import Data.Proxy
+import GHC.TypeLits
 import Data.FiniteField
 
 -- import Text.PrettyPrint.HughesPJClass
@@ -46,9 +47,9 @@ factor :: UPolynomial Integer -> [(UPolynomial Integer, Integer)]
 factor f = [(h,n) | (g,n) <- P.sqfree f, h <- if P.deg g > 0 then zassenhaus g else return g]
 
 zassenhaus :: UPolynomial Integer -> [UPolynomial Integer]
-zassenhaus f = fromJust $ msum [TL.withNat zassenhausWithP p | p <- primes :: [Integer]]
+zassenhaus f = fromJust $ msum [withNat zassenhausWithP p | p <- primes :: [Integer]]
   where
-    zassenhausWithP :: forall p. TL.Nat p => p -> Maybe [UPolynomial Integer]
+    zassenhausWithP :: forall p. KnownNat p => Proxy p -> Maybe [UPolynomial Integer]
     zassenhausWithP _ = do
       let f_mod_p :: UPolynomial (PrimeField p)
           f_mod_p = P.mapCoeff fromInteger f
@@ -57,6 +58,12 @@ zassenhaus f = fromJust $ msum [TL.withNat zassenhausWithP p | p <- primes :: [I
       let fs :: [UPolynomial (PrimeField p)]
           fs = [assert (n==1) fi | (fi,n) <- P.factor f_mod_p]
       return $ lift f fs
+
+    withNat :: (forall p. KnownNat p => Proxy p -> a) -> Integer -> a
+    withNat f p =
+      case someNatVal p of
+        Just (SomeNat x) -> f x
+        Nothing -> undefined
 
 {-
 Suppose @g@ is a factor of @f@.
@@ -72,7 +79,7 @@ Choose smallest @k@ such that @p^k / 2 > 2^(deg f) * norm2 f@, so that
 
 Then it call @search@ to look for actual factorization.
 -}
-lift :: forall p. TL.Nat p => UPolynomial Integer -> [UPolynomial (PrimeField p)] -> [UPolynomial Integer]
+lift :: forall p. KnownNat p => UPolynomial Integer -> [UPolynomial (PrimeField p)] -> [UPolynomial Integer]
 lift f [_] = [f]
 lift f fs  = search pk f (Hensel.hensel f fs k)
   where
