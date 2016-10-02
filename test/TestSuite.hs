@@ -5,6 +5,7 @@ import Test.Tasty (defaultMain, testGroup)
 import Test.AReal
 import Test.AReal2
 import Test.Arith
+import Test.BitVector
 import Test.BoolExpr
 import Test.CongruenceClosure
 import Test.ContiTraverso
@@ -32,6 +33,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   [ arealTestGroup
 --  , areal2TestGroup
   , arithTestGroup
+  , bitVectorTestGroup
   , boolExprTestGroup
   , ccTestGroup
   , ctTestGroup

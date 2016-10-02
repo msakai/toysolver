@@ -6,6 +6,13 @@
 #define CONSTANT __global
 #endif
 
+typedef float logfloat;
+typedef float2 logfloat2;
+
+static inline logfloat comp(logfloat x) {
+  return log(fmax(0.0, 1.0 - exp(x)));
+}
+
 __kernel void
 update_edge_prob(
     int n_vars,
@@ -13,9 +20,9 @@ update_edge_prob(
     CONSTANT int *var_degree,         // int[n_vars]
     CONSTANT int *var_edges,          // int[M]
     CONSTANT float *var_edges_weight, // float[M]
-    __global float2 *var_edges_buf,   // float2[M]
-    __global float *edge_survey,      // float[n_edges]
-    __global float *edge_prob_u       // float[n_edges]
+    __global logfloat2 *var_edges_buf,// logfloat2[M]
+    __global logfloat *edge_survey,   // logfloat[n_edges]
+    __global logfloat *edge_prob_u    // logfloat[n_edges]
     )
 {
     int global_size = get_global_size(0);
@@ -23,53 +30,53 @@ update_edge_prob(
         int offset = var_offset[i];
         int degree = var_degree[i];
 
-        float val1_pre = 1;
-        float val2_pre = 1;
+        logfloat val1_pre = log(1.0);
+        logfloat val2_pre = log(1.0);
         for (int j = 0; j < degree; j++) {
             var_edges_buf[offset+j] = (float2)(val1_pre, val2_pre);
 
             int tmp = var_edges[offset+j];
             int e = tmp >> 1;
             bool polarity = tmp & 1;
-            float eta_ai = edge_survey[e];
-            float w = var_edges_weight[offset+j];
+            logfloat eta_ai = edge_survey[e];
+            logfloat w = var_edges_weight[offset+j];
 
             if (polarity) {
-              val1_pre *= pow(1 - eta_ai, w);
+              val1_pre += comp(eta_ai) * w;
             } else {
-              val2_pre *= pow(1 - eta_ai, w);
+              val2_pre += comp(eta_ai) * w;
             }
         }
 
-        float val1_post = 1;
-        float val2_post = 1;
+        logfloat val1_post = log(1.0);
+        logfloat val2_post = log(1.0);
         for (int j = degree - 1; j >= 0; j--) {
             int tmp = var_edges[offset+j];
             int e = tmp >> 1;
             bool polarity = tmp & 1;
-            float eta_ai = edge_survey[e];
+            logfloat eta_ai = edge_survey[e];
             float w = var_edges_weight[offset+j];
 
-            float2 pre = var_edges_buf[offset+j];
-            float val1 = pre.x * val1_post; // probability that other edges do not depends on v=1.
-            float val2 = pre.y * val2_post; // probability that other edges do not depends on v=0.
-            float pi_0 = val1 * val2; // Π^0_{i→a}
-            float pi_u; // Π^u_{i→a}
-            float pi_s; // Π^s_{i→a}
+            logfloat2 pre = var_edges_buf[offset+j];
+            logfloat val1 = pre.x + val1_post; // probability that other edges do not depends on v=1.
+            logfloat val2 = pre.y + val2_post; // probability that other edges do not depends on v=0.
+            logfloat pi_0 = val1 + val2; // Π^0_{i→a}
+            logfloat pi_u; // Π^u_{i→a}
+            logfloat pi_s; // Π^s_{i→a}
             if (polarity) {
-                pi_u = (1 - val2) * val1;
-                pi_s = (1 - val1) * val2;
-                val1_post *= pow(1 - eta_ai, w);
+                pi_u = comp(val2) + val1;
+                pi_s = comp(val1) + val2;
+                val1_post += comp(eta_ai) * w;
             } else {
-                pi_u = (1 - val1) * val2;
-                pi_s = (1 - val2) * val1;
-                val2_post *= pow(1 - eta_ai, w);
+                pi_u = comp(val1) + val2;
+                pi_s = comp(val2) + val1;
+                val2_post += comp(eta_ai) * w;
             }
-            float psum = pi_0 + pi_u + pi_s;
-            if (psum != 0) {
-                edge_prob_u[e] = pi_u / psum;
+            float psum = exp(pi_0) + exp(pi_u) + exp(pi_s);
+            if (psum > 0) {
+                edge_prob_u[e] = pi_u - log(psum);
             } else {
-                edge_prob_u[e] = 0; // is that ok?
+                edge_prob_u[e] = log(0.0); // is that ok?
             }
         }
     }
@@ -81,9 +88,9 @@ update_edge_survey(
    int n_clauses,
    CONSTANT int *clause_offset,     // int[n_clauses]
    CONSTANT int *clause_degree,     // int[n_clauses]
-   __global float *edge_survey,     // float[n_edges]
-   __global float *edge_prob_u,     // float[n_edges]
-   __global float *edge_buf,        // float[n_edges]
+   __global logfloat *edge_survey,  // logfloat[n_edges]
+   __global logfloat *edge_prob_u,  // logfloat[n_edges]
+   __global logfloat *edge_buf,     // logfloat[n_edges]
    __global float *group_max_delta, // float[get_num_groups(0)]
    __local float *reduce_buf        // float[get_local_size(0)]
    )
@@ -95,22 +102,22 @@ update_edge_survey(
         int len = clause_degree[a];
         int offset = clause_offset[a];
 
-        float pre = 1;
+        logfloat pre = log(1.0);
         for (int j = 0; j < len; j++) {
             int e = offset+j;
             edge_buf[e] = pre;
-            pre *= edge_prob_u[e];
+            pre += edge_prob_u[e];
         }
 
-        float post = 1;
+        logfloat post = log(1.0);
         for (int j = len-1; j >=0; j--) {
             int e = offset+j;
-            float pre = edge_buf[e];
-            float eta_ai_orig = edge_survey[e];
-            float eta_ai_new  = pre * post;
+            logfloat pre = edge_buf[e];
+            logfloat eta_ai_orig = edge_survey[e];
+            logfloat eta_ai_new  = pre + post;
             edge_survey[e] = eta_ai_new;
-            max_delta = fmax(max_delta, fabs(eta_ai_new - eta_ai_orig));
-            post *= edge_prob_u[e];
+            max_delta = fmax(max_delta, fabs(exp(eta_ai_new) - exp(eta_ai_orig)));
+            post += edge_prob_u[e];
         }
     }
 
@@ -132,12 +139,12 @@ update_edge_survey(
 __kernel void
 compute_var_prob(
     int n_vars,
-    CONSTANT int *var_offset,         // int[n_vars]
-    CONSTANT int *var_degree,         // int[n_vars]
-    __global float2 *var_prob,        // float2[n_vars]
-    CONSTANT int *var_edges,          // int[M]
-    CONSTANT float *var_edges_weight, // float[M]
-    __global float *edge_survey       // float[E]
+    CONSTANT int *var_offset,            // int[n_vars]
+    CONSTANT int *var_degree,            // int[n_vars]
+    __global logfloat2 *var_prob,        // logfloat2[n_vars]
+    CONSTANT int *var_edges,             // int[M]
+    CONSTANT logfloat *var_edges_weight, // logfloat[M]
+    __global logfloat *edge_survey       // logfloat[E]
     )
 {
     int global_size = get_global_size(0);
@@ -146,8 +153,8 @@ compute_var_prob(
         int offset = var_offset[i];
         int degree = var_degree[i];
 
-        float val1 = 1;
-        float val2 = 1;
+        logfloat val1 = log(1.0);
+        logfloat val2 = log(1.0);
         for (int j = 0; j < degree; j++) {
             int tmp = var_edges[offset+j];
             int e = tmp >> 1;
@@ -156,17 +163,17 @@ compute_var_prob(
             float w = var_edges_weight[offset+j];
 
             if (polarity) {
-              val1 *= pow(1 - eta_ai, w);
+              val1 += comp(eta_ai) * w;
             } else {
-              val2 *= pow(1 - eta_ai, w);
+              val2 += comp(eta_ai) * w;
             }
         }
 
-        float p0 = val1 * val2;       // \^{Π}^{0}_i
-        float pp = (1 - val1) * val2; // \^{Π}^{+}_i
-        float pn = (1 - val2) * val1; // \^{Π}^{-}_i
-        float wp = pp / (pp + pn + p0); // W^{(+)}_i
-        float wn = pn / (pp + pn + p0); // W^{(-)}_i
+        float p0 = val1 + val2;       // \^{Π}^{0}_i
+        float pp = comp(val1) + val2; // \^{Π}^{+}_i
+        float pn = comp(val2) + val1; // \^{Π}^{-}_i
+        float wp = pp - log(exp(pp) + exp(pn) + exp(p0)); // W^{(+)}_i
+        float wn = pn - log(exp(pp) + exp(pn) + exp(p0)); // W^{(-)}_i
         var_prob[i] = (float2)(wp, wn);
     }
 }

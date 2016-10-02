@@ -81,6 +81,9 @@ packageVersions = sort $ tail
 #ifdef VERSION_intern
   , ("intern",       VERSION_intern       )
 #endif
+#ifdef VERSION_log_domain
+  , ("log-domain",   VERSION_log_domain   )
+#endif
 #ifdef VERSION_loop
   , ("loop",         VERSION_loop         )
 #endif

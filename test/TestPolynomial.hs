@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts, TemplateHaskell, ScopedTypeVariables, DataKinds #-}
 
 import Prelude hiding (lex)
 import qualified Control.Exception as E

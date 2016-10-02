@@ -71,6 +71,7 @@ data Flag
   | LinearizationUsingPB
   | KSat !Int
   | FileEncoding String
+  | RemoveUserCuts
   deriving Eq
 
 options :: [OptDescr Flag]
@@ -90,6 +91,7 @@ options =
     , Option []    ["linearizer-pb"] (NoArg LinearizationUsingPB) "Use PB constraint in linearization"
     , Option []    ["ksat"] (ReqArg (KSat . read) "NUMBER") "generate k-SAT formula when outputing .cnf file"
     , Option []    ["encoding"] (ReqArg FileEncoding "<ENCODING>") "file encoding for LP/MPS files"
+    , Option []    ["remove-usercuts"] (NoArg RemoveUserCuts) "remove user-defined cuts from LP/MPS files"
     ]
   where
     parseObjType s =
@@ -163,7 +165,7 @@ readProblem o fname = do
         Right wcnf -> return $ ProbWBO $ MaxSAT2WBO.convert $ wcnf
 
 transformProblem :: [Flag] -> Problem -> Problem
-transformProblem o = transformObj o . transformPBLinearization o
+transformProblem o = transformObj o . transformPBLinearization o . transformMIPRemoveUserCuts o
 
 transformObj :: [Flag] -> Problem -> Problem
 transformObj o problem =
@@ -180,6 +182,14 @@ transformPBLinearization o problem
         ProbOPB opb -> ProbOPB $ PBLinearization.linearize    opb (LinearizationUsingPB `elem` o)
         ProbWBO wbo -> ProbWBO $ PBLinearization.linearizeWBO wbo (LinearizationUsingPB `elem` o)
         ProbMIP mip -> ProbMIP mip
+  | otherwise = problem
+
+transformMIPRemoveUserCuts :: [Flag] -> Problem -> Problem
+transformMIPRemoveUserCuts o problem
+  | RemoveUserCuts `elem` o =
+      case problem of
+        ProbMIP mip -> ProbMIP $ mip{ MIP.userCuts = [] }
+        _ -> problem
   | otherwise = problem
 
 writeProblem :: [Flag] -> Problem -> IO ()

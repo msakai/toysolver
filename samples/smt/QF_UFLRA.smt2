@@ -1,4 +1,4 @@
-(set-option :produce-models)
+(set-option :produce-models true)
 (set-logic QF_UFLRA)
 (declare-sort U 0)
 (declare-fun x () Real)

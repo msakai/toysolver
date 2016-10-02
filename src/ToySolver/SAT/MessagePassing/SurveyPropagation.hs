@@ -71,9 +71,18 @@ import qualified Data.Vector.Unboxed.Mutable as VUM
 import Data.Vector.Generic ((!))
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VGM
+import qualified Numeric.Log as L
 import qualified System.Random.MWC as Rand
 
 import qualified ToySolver.SAT.Types as SAT
+
+infixr 8 ^*
+
+(^*) :: Num a => L.Log a -> a -> L.Log a
+L.Exp a ^* b = L.Exp (a*b)
+
+comp :: (RealFloat a, L.Precise a) => L.Log a -> L.Log a
+comp (L.Exp a) = realToFrac $ max 0 $ 1 - exp a
 
 type ClauseIndex = Int
 type EdgeIndex   = Int
@@ -81,8 +90,8 @@ type EdgeIndex   = Int
 data Solver
   = Solver
   { svVarEdges :: !(V.Vector (VU.Vector EdgeIndex))
-  , svVarProbT :: !(VUM.IOVector Double)
-  , svVarProbF :: !(VUM.IOVector Double)
+  , svVarProbT :: !(VUM.IOVector (L.Log Double))
+  , svVarProbF :: !(VUM.IOVector (L.Log Double))
   , svVarFixed :: !(VM.IOVector (Maybe Bool))
 
   , svClauseEdges :: !(V.Vector (VU.Vector EdgeIndex))
@@ -90,8 +99,8 @@ data Solver
 
   , svEdgeLit    :: !(VU.Vector SAT.Lit) -- i
   , svEdgeClause :: !(VU.Vector ClauseIndex) -- a
-  , svEdgeSurvey :: !(VUM.IOVector Double) -- η_{a → i}
-  , svEdgeProbU  :: !(VUM.IOVector Double) -- Π^u_{i → a} / (Π^u_{i → a} + Π^s_{i → a} + Π^0_{i → a})
+  , svEdgeSurvey :: !(VUM.IOVector (L.Log Double)) -- η_{a → i}
+  , svEdgeProbU  :: !(VUM.IOVector (L.Log Double)) -- Π^u_{i → a} / (Π^u_{i → a} + Π^s_{i → a} + Π^0_{i → a})
 
   , svTolRef :: !(IORef Double)
   , svIterLimRef :: !(IORef (Maybe Int))
@@ -174,7 +183,8 @@ initializeRandom :: Solver -> Rand.GenIO -> IO ()
 initializeRandom solver gen = do
   n <- getNEdges solver
   numLoop 0 (n-1) $ \e -> do
-    VGM.unsafeWrite (svEdgeSurvey solver) e =<< Rand.uniformR (0.05,0.95) gen -- (0.05, 0.95]
+    (d::Double) <- Rand.uniformR (0.05,0.95) gen -- (0.05, 0.95]
+    VGM.unsafeWrite (svEdgeSurvey solver) e (realToFrac d)
 
 -- | number of variables of the problem.
 getNVars :: Solver -> IO Int
@@ -312,7 +322,7 @@ propagateMT solver nthreads = do
         throwIO e
 
 -- tmp1 must have at least @VG.length (svVarEdges solver ! (v - 1)) * 2@ elements
-updateEdgeProb :: Solver -> SAT.Var -> VUM.IOVector Double -> IO ()
+updateEdgeProb :: Solver -> SAT.Var -> VUM.IOVector (L.Log Double) -> IO ()
 updateEdgeProb solver v tmp = do
   let i = v - 1
       edges = svVarEdges solver ! i
@@ -334,8 +344,8 @@ updateEdgeProb solver v tmp = do
                 eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e -- η_{a→i}
                 let w = svClauseWeight solver ! a
                     lit2 = svEdgeLit solver ! e
-                    val1_pre' = if lit2 > 0 then val1_pre * (1 - eta_ai) ** w else val1_pre
-                    val2_pre' = if lit2 > 0 then val2_pre else val2_pre * (1 - eta_ai) ** w
+                    val1_pre' = if lit2 > 0 then val1_pre * comp eta_ai ^* w else val1_pre
+                    val2_pre' = if lit2 > 0 then val2_pre else val2_pre * comp eta_ai ^* w
                 f (k+1) val1_pre' val2_pre'
       f 0 1 1
       -- tmp ! (k*2)   == Π_{a∈edges[0..k-1], a∈V^{+}(i)} (1 - eta_ai)^{w_i}
@@ -353,17 +363,17 @@ updateEdgeProb solver v tmp = do
                     val2 = val2_pre * val2_post -- val2 == Π_{b∈edges, b∈V^{-}(i), a≠b} (1 - eta_bi)^{w_i}
                 eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e -- η_{a→i}
                 let w = svClauseWeight solver ! a
-                    val1_post' = if lit2 > 0 then val1_post * (1 - eta_ai) ** w else val1_post
-                    val2_post' = if lit2 > 0 then val2_post else val2_post * (1 - eta_ai) ** w
+                    val1_post' = if lit2 > 0 then val1_post * comp eta_ai ^* w else val1_post
+                    val2_post' = if lit2 > 0 then val2_post else val2_post * comp eta_ai ^* w
                 let pi_0 = val1 * val2 -- Π^0_{i→a}
-                    pi_u = if lit2 > 0 then (1 - val2) * val1 else (1 - val1) * val2 -- Π^u_{i→a}
-                    pi_s = if lit2 > 0 then (1 - val1) * val2 else (1 - val2) * val1 -- Π^s_{i→a}
-                VGM.unsafeWrite (svEdgeProbU solver) e (pi_u / (pi_0 + pi_u + pi_s))
+                    pi_u = if lit2 > 0 then comp val2 * val1 else comp val1 * val2 -- Π^u_{i→a}
+                    pi_s = if lit2 > 0 then comp val1 * val2 else comp val2 * val1 -- Π^s_{i→a}
+                VGM.unsafeWrite (svEdgeProbU solver) e (pi_u / L.sum [pi_0, pi_u, pi_s])
                 g (k-1) val1_post' val2_post'
       g (VG.length edges - 1) 1 1
 
 -- tmp must have at least @VG.length (svClauseEdges solver ! a)@ elements
-updateEdgeSurvey :: Solver -> ClauseIndex -> VUM.IOVector Double -> IO Double
+updateEdgeSurvey :: Solver -> ClauseIndex -> VUM.IOVector (L.Log Double) -> IO Double
 updateEdgeSurvey solver a tmp = do
   let edges = svClauseEdges solver ! a
   let f !k !p_pre
@@ -384,7 +394,7 @@ updateEdgeSurvey solver a tmp = do
             eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e
             let eta_ai' = p_pre * p_post -- Π_{e∈edges[0,..,k-1,k+1,..]} p_e
             VGM.unsafeWrite (svEdgeSurvey solver) e eta_ai'
-            let delta = abs (eta_ai' - eta_ai)
+            let delta = abs (realToFrac eta_ai' - realToFrac eta_ai)
             g (k-1) (p_post * p) (max delta maxDelta)
   f 0 1
   -- tmp ! k == Π_{e∈edges[0..k-1]} p_e
@@ -398,13 +408,13 @@ computeVarProb solver v = do
             a = svEdgeClause solver ! e
             w = svClauseWeight solver ! a
         eta_ai <- VGM.unsafeRead (svEdgeSurvey solver) e
-        let val1' = if lit > 0 then val1 * (1 - eta_ai) ** w else val1
-            val2' = if lit < 0 then val2 * (1 - eta_ai) ** w else val2
+        let val1' = if lit > 0 then val1 * comp eta_ai ^* w else val1
+            val2' = if lit < 0 then val2 * comp eta_ai ^* w else val2
         return (val1',val2')
   (val1,val2) <- VG.foldM' f (1,1) (svVarEdges solver ! i)
   let p0 = val1 * val2       -- \^{Π}^{0}_i
-      pp = (1 - val1) * val2 -- \^{Π}^{+}_i
-      pn = (1 - val2) * val1 -- \^{Π}^{-}_i
+      pp = comp val1 * val2 -- \^{Π}^{+}_i
+      pn = comp val2 * val1 -- \^{Π}^{-}_i
   let wp = pp / (pp + pn + p0)
       wn = pn / (pp + pn + p0)
   VGM.unsafeWrite (svVarProbT solver) i wp -- W^{(+)}_i
@@ -413,8 +423,8 @@ computeVarProb solver v = do
 -- | Get the marginal probability of the variable to be @True@, @False@ and unspecified respectively.
 getVarProb :: Solver -> SAT.Var -> IO (Double, Double, Double)
 getVarProb solver v = do
-  pt <- VGM.unsafeRead (svVarProbT solver) (v - 1)
-  pf <- VGM.unsafeRead (svVarProbF solver) (v - 1)
+  pt <- realToFrac <$> VGM.unsafeRead (svVarProbT solver) (v - 1)
+  pf <- realToFrac <$> VGM.unsafeRead (svVarProbF solver) (v - 1)
   return (pt, pf, 1 - (pt + pf))
 
 findLargestBiasLit :: Solver -> IO (Maybe SAT.Lit)
@@ -509,13 +519,13 @@ solve solver = do
 
 printInfo :: Solver -> IO ()
 printInfo solver = do
-  (surveys :: VU.Vector Double) <- VG.freeze (svEdgeSurvey solver)
-  (u :: VU.Vector Double) <- VG.freeze (svEdgeProbU solver)
+  (surveys :: VU.Vector (L.Log Double)) <- VG.freeze (svEdgeSurvey solver)
+  (u :: VU.Vector (L.Log Double)) <- VG.freeze (svEdgeProbU solver)
   let xs = [(clause, lit, eta, u ! e) | (e, eta) <- zip [0..] (VG.toList surveys), let lit = svEdgeLit solver ! e, let clause = svEdgeClause solver ! e]
   putStrLn $ "edges: " ++ show xs
 
-  (pt :: VU.Vector Double) <- VG.freeze (svVarProbT solver)
-  (pf :: VU.Vector Double) <- VG.freeze (svVarProbF solver)
+  (pt :: VU.Vector (L.Log Double)) <- VG.freeze (svVarProbT solver)
+  (pf :: VU.Vector (L.Log Double)) <- VG.freeze (svVarProbF solver)
   nv <- getNVars solver
-  let xs2 = [(v, pt ! i, pf ! i, (pt ! i) - (pf ! i)) | v <- [1..nv], let i = v - 1]
+  let xs2 = [(v, realToFrac (pt ! i) :: Double, realToFrac (pf ! i) :: Double, realToFrac (pt ! i) - realToFrac (pf ! i) :: Double) | v <- [1..nv], let i = v - 1]
   putStrLn $ "vars: " ++ show xs2
