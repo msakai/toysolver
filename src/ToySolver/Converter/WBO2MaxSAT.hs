@@ -28,6 +28,7 @@ import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import ToySolver.SAT.Store.CNF
 import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.CNF as CNF
 
 convert :: PBFile.SoftFormula -> (MaxSAT.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
 convert formula = runST $ do
@@ -65,10 +66,10 @@ convert formula = runST $ do
     Just top -> SAT.addPBNLAtMost pbnlc [(c, [-l | l <- clause]) | (c,clause) <- F.toList softClauses] (top - 1)
 
   let top = F.sum (fst <$> softClauses) + 1
-  (nv, hardClauses) <- getCNFFormula db
-  let cs = softClauses <> fmap (\clause -> (top, clause)) hardClauses
+  cnf <- getCNFFormula db
+  let cs = softClauses <> Seq.fromList [(top, clause) | clause <- CNF.clauses cnf]
   let wcnf = MaxSAT.WCNF
-             { MaxSAT.numVars = nv
+             { MaxSAT.numVars = CNF.numVars cnf
              , MaxSAT.numClauses = Seq.length cs
              , MaxSAT.topCost = top
              , MaxSAT.clauses = F.toList cs
@@ -76,11 +77,11 @@ convert formula = runST $ do
 
   defs <- Tseitin.getDefinitions tseitin
   let extendModel :: SAT.Model -> SAT.Model
-      extendModel m = array (1,nv) (assocs a)
+      extendModel m = array (1, CNF.numVars cnf) (assocs a)
         where
           -- Use BOXED array to tie the knot
           a :: Array SAT.Var Bool
-          a = array (1,nv) $
+          a = array (1, CNF.numVars cnf) $
                 assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
 
   return (wcnf, extendModel, SAT.restrictModel (PBFile.wboNumVars formula))

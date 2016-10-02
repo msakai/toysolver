@@ -19,13 +19,13 @@ import Data.Array.IArray
 import Data.Foldable (toList)
 import qualified Data.Sequence as Seq
 import qualified Data.PseudoBoolean as PBFile
-import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import ToySolver.SAT.Store.CNF
+import qualified ToySolver.Text.CNF as CNF
 
 -- | Convert a pseudo boolean formula φ to a equisatisfiable CNF formula ψ
 -- together with two functions f and g such that:
@@ -34,7 +34,7 @@ import ToySolver.SAT.Store.CNF
 --
 -- * if M ⊨ ψ then g(M) ⊨ φ
 -- 
-convert :: PBFile.Formula -> (DIMACS.CNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
+convert :: PBFile.Formula -> (CNF.CNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
 convert formula = runST $ do
   db <- newCNFStore
   let nv1 = PBFile.pbNumVars formula
@@ -46,20 +46,15 @@ convert formula = runST $ do
     case op of
       PBFile.Ge -> SAT.addPBNLAtLeast pbnlc lhs rhs
       PBFile.Eq -> SAT.addPBNLExactly pbnlc lhs rhs
-  (nv, cs) <- getCNFFormula db
-  let cnf = DIMACS.CNF
-            { DIMACS.numVars = nv
-            , DIMACS.numClauses = Seq.length cs
-            , DIMACS.clauses = [listArray (0, length c - 1) c | c <- toList cs]
-            }
+  cnf <- getCNFFormula db
 
   defs <- Tseitin.getDefinitions tseitin
   let extendModel :: SAT.Model -> SAT.Model
-      extendModel m = array (1,nv) (assocs a)
+      extendModel m = array (1, CNF.numVars cnf) (assocs a)
         where
           -- Use BOXED array to tie the knot
           a :: Array SAT.Var Bool
-          a = array (1,nv) $
+          a = array (1, CNF.numVars cnf) $
                 assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
 
   return (cnf, extendModel, SAT.restrictModel nv1)

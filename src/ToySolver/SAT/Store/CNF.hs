@@ -18,10 +18,12 @@ module ToySolver.SAT.Store.CNF
   ) where
 
 import Control.Monad.Primitive
+import qualified Data.Foldable as F
 import Data.Primitive.MutVar
 import Data.Sequence (Seq, (|>))
 import qualified Data.Sequence as Seq
 import qualified ToySolver.SAT.Types as SAT
+import qualified ToySolver.Text.CNF as CNF
 
 data CNFStore m = CNFStore (MutVar (PrimState m) Int) (MutVar (PrimState m) (Seq SAT.Clause))
 
@@ -42,8 +44,13 @@ newCNFStore = do
   ref2 <- newMutVar Seq.empty
   return (CNFStore ref1 ref2)
 
-getCNFFormula :: PrimMonad m => CNFStore m -> m (Int, Seq SAT.Clause)
+getCNFFormula :: PrimMonad m => CNFStore m -> m CNF.CNF
 getCNFFormula (CNFStore ref1 ref2) = do
   nv <- readMutVar ref1
   cs <- readMutVar ref2
-  return (nv, cs)
+  return $
+     CNF.CNF
+     { CNF.numVars = nv
+     , CNF.numClauses = Seq.length cs
+     , CNF.clauses = F.toList cs
+     }

@@ -151,7 +151,6 @@ Library
      -- createSystemRandom requires mwc-random >=0.13.1.0
      mwc-random >=0.13.1 && <0.14,
      OptDir,
-     parse-dimacs,
      parsec >=3.1.2 && <4,
      prettyclass >=1.0.0,
      primes,
@@ -356,7 +355,6 @@ Executable toysolver
     data-default-class,
     filepath,
     OptDir,
-    parse-dimacs,
     pseudo-boolean,
     toysolver
   Default-Language: Haskell2010
@@ -384,7 +382,6 @@ Executable toysat
     filepath,
     mwc-random,
     parsec,
-    parse-dimacs,
     process >=1.1.0.2,
     pseudo-boolean,
     temporary,
@@ -498,7 +495,6 @@ Executable toyconvert
     bytestring-builder,
     data-default-class,
     filepath,
-    parse-dimacs,
     pseudo-boolean,
     text,
     toysolver
@@ -833,7 +829,6 @@ Test-suite TestSuite
     mtl,
     mwc-random,
     OptDir,
-    parse-dimacs,
     parsec,
     pseudo-boolean,
     QuickCheck >=2.5 && <3,
@@ -859,7 +854,6 @@ Benchmark BenchmarkSATLIB
     base,
     criterion >=1.0 && <1.2,
     data-default-class,
-    parse-dimacs,
     toysolver
   Default-Language: Haskell2010
 
