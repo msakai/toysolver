@@ -208,6 +208,11 @@ data AssertionLevel
   , alSelector :: SAT.Lit
   }
 
+data TheorySolverID
+  = TheorySolverEUF
+  | TheorySolverSimplex
+  deriving (Eq, Ord, Enum, Bounded)
+
 newSolver :: IO Solver
 newSolver = do
   sat <- SAT.newSolver
@@ -237,59 +242,59 @@ newSolver = do
   globalDeclarationsRef <- newIORef False
   fdefs <- newIORef $ Map.singleton "_/0" (FEUFFun ([sReal], sReal) divByZero)
 
-  conflictTheory <- newIORef True
+  conflictTheory <- newIORef undefined
 
   let tsolver =
         TheorySolver
-        { thAssertLit = \_ l -> do
-            (_, defsLRA) <- readIORef lraAtomDefs
-            (_, defsEUF) <- readIORef eufAtomDefs
+        { thAssertLit = \_ l -> liftM (either id id) $ runExceptT $ do
+            (_, defsLRA) <- lift $ readIORef lraAtomDefs
             case IntMap.lookup l defsLRA of
+              Nothing -> return ()
               Just atom -> do
-                Simplex2.assertAtomEx' lra atom (Just l)
-                return True
-              Nothing ->
-                case IntMap.lookup (SAT.litVar l) defsEUF of
-                  Just (t1,t2) -> do
-                    if SAT.litPolarity l then do
-                      EUF.assertEqual' euf t1 t2 (Just l)
-                      return True
-                    else do
-                      EUF.assertNotEqual' euf t1 t2 (Just l)
-                      return True
-                  Nothing ->
-                    return True
-        , thCheck = \callback -> do
-            b <- Simplex2.check lra
-            if b then do
-              b2 <- EUF.check euf
-              if b2 then do
-                (_, defsEUF) <- readIORef eufAtomDefs
-                liftM isRight $ runExceptT $ do
-                  forM_ (IntMap.toList defsEUF) $ \(v, (t1, t2)) -> do
-                    b3 <- lift $ EUF.areEqual euf t1 t2
-                    when b3 $ do
-                      b4 <- lift $ callback v
-                      unless b4 $ throwE ()
-              else do
-                writeIORef conflictTheory False
-                return b2
-            else do
-              writeIORef conflictTheory True
-              return False
+                lift $ Simplex2.assertAtomEx' lra atom (Just l)
+                throwE True
+
+            (_, defsEUF) <- lift $ readIORef eufAtomDefs
+            case IntMap.lookup (SAT.litVar l) defsEUF of
+              Nothing -> return ()
+              Just (t1,t2) -> do
+                if SAT.litPolarity l then do
+                  lift $ EUF.assertEqual' euf t1 t2 (Just l)
+                else do
+                  lift $ EUF.assertNotEqual' euf t1 t2 (Just l)
+                throwE True
+
+            return True
+
+        , thCheck = \callback -> liftM isRight $ runExceptT $ do
+            do b <- lift $ Simplex2.check lra
+               unless b $ do
+                 lift $ writeIORef conflictTheory TheorySolverSimplex
+                 throwE ()
+            do b <- lift $ EUF.check euf
+               unless b $ do
+                 lift $ writeIORef conflictTheory TheorySolverEUF
+                 throwE ()
+               (_, defsEUF) <- lift $ readIORef eufAtomDefs
+               forM_ (IntMap.toList defsEUF) $ \(v, (t1, t2)) -> do
+                  b2 <- lift $ EUF.areEqual euf t1 t2
+                  when b2 $ do
+                    b3 <- lift $ callback v
+                    unless b3 $ throwE ()
+
         , thExplain = \m -> do
             case m of
               Nothing -> do
-                b <- readIORef conflictTheory
-                if b then
-                  liftM IntSet.toList $ Simplex2.explain lra
-                else
-                  liftM IntSet.toList $ EUF.explain euf Nothing
+                t <- readIORef conflictTheory
+                case t of
+                  TheorySolverSimplex -> liftM IntSet.toList $ Simplex2.explain lra
+                  TheorySolverEUF -> liftM IntSet.toList $ EUF.explain euf Nothing
               Just v -> do
                 (_, defsEUF) <- readIORef eufAtomDefs
                 case IntMap.lookup v defsEUF of
                   Nothing -> error "should not happen"
                   Just (t1,t2) -> liftM IntSet.toList $ EUF.explain euf (Just (t1,t2))
+
         , thPushBacktrackPoint = do
             Simplex2.pushBacktrackPoint lra
             EUF.pushBacktrackPoint euf
