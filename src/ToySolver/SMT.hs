@@ -26,7 +26,8 @@ module ToySolver.SMT
   , FunType
   , Expr (..)
   , exprSort
-  , FSym
+  , Index (..)
+  , FSym (..)
   , declareSSym
   , declareSort
   , VASortFun
@@ -78,6 +79,7 @@ import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.String
 import qualified Data.Text as T
 import Data.Typeable
 import Data.VectorSpace
@@ -94,7 +96,17 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.Arith.Simplex2 as Simplex2
 import qualified ToySolver.EUF.EUFSolver as EUF
 
-type FSym = InternedText
+data Index
+  = IndexNumeral !Integer
+  | IndexSymbol !InternedText
+  deriving (Show,Eq, Ord)
+
+data FSym
+  = FSym !InternedText [Index]
+  deriving (Show,Eq,Ord)
+
+instance IsString FSym where
+  fromString s = FSym (fromString s) []
 
 -- | Sort symbols
 data SSym
@@ -370,7 +382,7 @@ instance VASortFun a => VASortFun (Sort -> a) where
 
 declareFSym :: Solver -> String -> [Sort] -> Sort -> IO FSym
 declareFSym solver f' xs y = do
-  let f = intern $ T.pack f'
+  let f = FSym (intern (T.pack f')) []
   fdefs <- readIORef (smtFDefs solver)
   when (f `Map.member` fdefs) $ do
     E.throwIO $ Error $ "function symbol " ++ f' ++ " is already used"
