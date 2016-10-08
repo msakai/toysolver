@@ -243,7 +243,7 @@ instance Bits Expr where
   (.&.) = EOp2 OpAnd
   (.|.) = EOp2 OpOr
   xor = EOp2 OpXOr
-  complement = EOp1 OpNeg
+  complement = EOp1 OpNot
   shiftL x i
     | i < w = extract (w-1-i) 0 x <> nat2bv i 0
     | otherwise = nat2bv w 0
