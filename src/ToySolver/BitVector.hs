@@ -611,7 +611,7 @@ isZero bs = And [Not (Atom b) | b <- VG.toList bs]
 
 isEQ :: SBV -> SBV -> Tseitin.Formula
 isEQ bs1 bs2
-  | VG.length bs1 /= VG.length bs2 = undefined
+  | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
   | otherwise = And [Equiv (Atom b1) (Atom b2) | (b1,b2) <- zip (VG.toList bs1) (VG.toList bs2)]
 
 isLE :: SBV -> SBV -> Tseitin.Formula
@@ -622,7 +622,7 @@ isLT bs1 bs2 = lexComp false bs1 bs2
 
 lexComp :: Tseitin.Formula -> SBV -> SBV -> Tseitin.Formula
 lexComp b bs1 bs2
-  | VG.length bs1 /= VG.length bs2 = undefined
+  | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
   | otherwise = f (VG.toList (VG.reverse bs1)) (VG.toList (VG.reverse bs2))
   where
     f [] [] = b
