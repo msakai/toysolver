@@ -123,16 +123,21 @@ data SortEntry
 interpretSort :: SortEnv -> Sort -> SMT.Sort
 interpretSort env s =
   case s of
-    SortId ident -> f (idToName ident) []
-    SortIdentifiers ident args -> f (idToName ident) args
+    SortId ident -> f ident []
+    SortIdentifiers ident args -> f ident args
   where
-    f name args =
+    f ident args =
       case Map.lookup name env of
-        Nothing -> error ("unknown sort: " ++ name)
-        Just (SortSym ssym) -> SMT.Sort ssym []
-        Just (SortExpr s') -> s'
+        Nothing -> error ("unknown sort: " ++ showSL ident)
+        Just (SortSym ssym) -> SMT.Sort ssym args'
+        Just (SortExpr s')
+          | null args -> s'
+          | otherwise -> error ("sort " ++ showSL ident ++ " does not take arguments")
         Just (SortDef env' params body) ->
-          interpretSort (Map.fromList (zip params (map (SortExpr . interpretSort env) args)) `Map.union` env') body
+          interpretSort (Map.fromList (zip params (map SortExpr args')) `Map.union` env') body
+      where
+        name = idToName ident
+        args' = map (interpretSort env) args
 
 interpretFun :: EEnv -> Term -> SMT.Expr
 interpretFun env t =
@@ -263,8 +268,8 @@ initialEnv = (fenv, senv)
       | name <- ["=", "true", "false", "not", "and", "or", "xor", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
       ]
     senv = Map.fromList
-      [ ("Real", SortExpr SMT.sReal)
-      , ("Bool", SortExpr SMT.sBool)
+      [ ("Real", SortSym SMT.SSymReal)
+      , ("Bool", SortSym SMT.SSymBool)
       ]
 
 execCommand :: Solver -> Command -> IO ()
