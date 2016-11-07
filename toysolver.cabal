@@ -415,6 +415,8 @@ Executable toysmt
     base,
     containers,
     data-default-class,
+    -- TODO: remove intern dependency
+    intern,
     mtl,
     parsec,
     toysolver,

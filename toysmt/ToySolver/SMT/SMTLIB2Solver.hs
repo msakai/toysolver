@@ -77,6 +77,7 @@ module ToySolver.SMT.SMTLIB2Solver
 import Control.Applicative
 import qualified Control.Exception as E
 import Control.Monad
+import Data.Interned.Text
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -89,6 +90,7 @@ import System.Exit
 import System.IO
 import qualified Text.Parsec as Parsec
 
+import qualified ToySolver.BitVector as BV
 import qualified ToySolver.SMT as SMT
 import ToySolver.Version
 import Smtlib.Syntax.Syntax
@@ -110,7 +112,7 @@ type SortEnv = Map String SortEntry
 type Env = (EEnv, SortEnv)
 
 data EEntry
-  = EFSymBuiltin SMT.FSym
+  = EFSymBuiltin InternedText
   | EFSymDeclared SMT.FSym [SMT.Sort] SMT.Sort
   | EExpr SMT.Expr Bool
   | EFunDef EEnv [(String, SMT.Sort)] SMT.Sort Term
@@ -126,6 +128,7 @@ interpretSort env s =
     SortId ident -> f ident []
     SortIdentifiers ident args -> f ident args
   where
+    f (I_Symbol "BitVec" [IndexNumeral n]) [] = SMT.Sort (SMT.SSymBitVec n) []
     f ident args =
       case Map.lookup name env of
         Nothing -> error ("unknown sort: " ++ showSL ident)
@@ -144,8 +147,11 @@ interpretFun env t =
   case t of
     TermSpecConstant (SpecConstantNumeral n) -> SMT.EFrac (fromInteger n)
     TermSpecConstant (SpecConstantDecimal s) -> SMT.EFrac $ fst $ head $ readFloat s
-    TermSpecConstant (SpecConstantHexadecimal s) -> SMT.EFrac $ fst $ head $ readHex s
-    TermSpecConstant c@(SpecConstantBinary _s) -> error (show c)
+    TermSpecConstant (SpecConstantHexadecimal s) -> 
+      let n = fst $ head $ readHex s
+      in SMT.EBitVec (BV.nat2bv (length s * 4) n)
+    TermSpecConstant c@(SpecConstantBinary s) -> 
+      SMT.EBitVec (BV.fromDescBits [c == '1' | c <- s])
     TermSpecConstant c@(SpecConstantString _s) -> error (show c)
     TermQualIdentifier qid -> f qid []
     TermQualIdentifierT  qid args -> f qid args
@@ -155,18 +161,26 @@ interpretFun env t =
     TermExists _bindings _body -> error "existential quantifiers are not supported yet"
     TermAnnot t2 _ -> interpretFun env t2 -- annotations are not supported yet
   where
-    getName :: QualIdentifier -> String
-    getName (QIdentifier ident) = idToName ident
-    getName (QIdentifierAs ident _sort) = idToName ident
+    unIdentifier :: Identifier -> (String, [Index])
+    unIdentifier (ISymbol name) = (name, [])
+    unIdentifier (I_Symbol name indexes) = (name, indexes)
 
-    f qid args =
-      case Map.lookup (getName qid) env of
-        Nothing -> error ("unknown function symbol: " ++ getName qid)
+    f (QIdentifierAs ident _sort) args = f (QIdentifier ident) args
+    f qid@(QIdentifier ident) args =
+      case Map.lookup name env of
+        Nothing -> error ("unknown function symbol: " ++ showSL qid)
+        Just (EFSymBuiltin name') ->
+          SMT.EAp (SMT.FSym name' indexes') (map (interpretFun env) args)
+        Just _ | not (null indexes) -> error (showSL ident ++ " does not take indexes")
         Just (EExpr e _) -> e
-        Just (EFSymBuiltin fsym) -> SMT.EAp fsym (map (interpretFun env) args)
         Just (EFSymDeclared fsym _ _) -> SMT.EAp fsym (map (interpretFun env) args)
         Just (EFunDef env' params _y body) ->
           interpretFun (Map.fromList [(p,a) | ((p,_s),a) <- zip params (map (\t -> EExpr (interpretFun env t) False) args) ] `Map.union` env') body
+      where
+        (name, indexes) = unIdentifier ident
+        indexes' = map g indexes
+        g (IndexNumeral n) = SMT.IndexNumeral (fromIntegral n)
+        g (IndexSymbol s) = SMT.IndexSymbol (fromString s)
 
 valueToTerm :: SMT.Value -> Term
 valueToTerm (SMT.ValRational v) =
@@ -181,12 +195,15 @@ valueToTerm (SMT.ValRational v) =
           ]
 valueToTerm (SMT.ValBool b) =
   TermQualIdentifier $ QIdentifier $ ISymbol $ if b then "true" else "false"
+valueToTerm (SMT.ValBitVec bv) =
+  TermSpecConstant (SpecConstantBinary $ [if b then '1' else '0' | b <- BV.toDescBits bv])
 valueToTerm (SMT.ValUninterpreted n s) =
   TermQualIdentifier $ QIdentifierAs (ISymbol $ "@" ++ show n) (sortToSortTerm s)
 
 sortToSortTerm :: SMT.Sort -> Sort
 sortToSortTerm (SMT.Sort SMT.SSymBool []) = SortId (ISymbol "Bool")
 sortToSortTerm (SMT.Sort SMT.SSymReal []) = SortId (ISymbol "Real")
+sortToSortTerm (SMT.Sort (SMT.SSymBitVec n) []) = SortId (I_Symbol "BitVec" [IndexNumeral n])
 sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name 0) []) = SortId (nameToId name)
 sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name _arity) xs) = SortIdentifiers (nameToId name) (map sortToSortTerm xs)
 sortToSortTerm s = error ("unknown sort: " ++ show s)
@@ -265,7 +282,11 @@ initialEnv = (fenv, senv)
   where
     fenv = Map.fromList
       [ (name, EFSymBuiltin (fromString name))
-      | name <- ["=", "true", "false", "not", "and", "or", "xor", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
+      | name <- ["=", "true", "false", "not", "and", "or", "xor", "ite", "=>", "distinct"
+                , "+", "-", "*", "/", ">=", "<=", ">", "<"
+                , "extract", "concat", "bvnot", "bvneg", "bvand", "bvor", "bvxor", "bvadd", "bvmul", "bvudiv", "bvurem", "bvshl", "bvlshr"
+                , "bvule", "bvult", "bvuge", "bvugt"
+                ]
       ]
     senv = Map.fromList
       [ ("Real", SortSym SMT.SSymReal)
@@ -367,6 +388,8 @@ setLogic solver logic = do
       "QF_UF" -> return ()
       "QF_RDL" -> return ()
       "QF_LRA" -> return ()
+      "QF_BV" -> return ()
+      "QF_UFBV" -> return ()
       "ALL" -> return ()
       _ -> E.throwIO SMT.Unsupported
 
