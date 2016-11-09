@@ -101,15 +101,26 @@ genBVExpr bases = f
             e <- f w (s - 1)
             return $ BV.EOp1 op e
           gNormalOp2 = do
-            op <- elements [BV.OpAnd, BV.OpOr, BV.OpXOr, BV.OpAdd, BV.OpMul, BV.OpUDiv, BV.OpURem, BV.OpShl, BV.OpLShr]
+            op <- elements $
+                    [BV.OpAnd, BV.OpOr, BV.OpXOr, BV.OpNAnd, BV.OpNOr, BV.OpXNOr] ++
+                    [BV.OpAdd, BV.OpSub, BV.OpMul, BV.OpUDiv, BV.OpURem, BV.OpShl, BV.OpLShr, BV.OpAShr] ++
+                    (if w >= 1 then [BV.OpSDiv, BV.OpSRem, BV.OpSMod] else [])
             s1 <- choose (0,s)
             lhs <- f w s1
             rhs <- f w (s - s1)
             return $ BV.EOp2 op lhs rhs
+          gComp = do
+            w1 <- choose (0, wmax*2)
+            s1 <- choose (0,s)
+            lhs <- f w1 s1
+            rhs <- f w1 (s - s1)
+            return $ BV.EOp2 BV.OpComp lhs rhs
+            where
+              wmax = maximum (0 : map BV.width bases)
       if s <= 0 then do
         oneof $ maybeToList gBase ++ [gConst] ++ [gConcat | w >= 2]
       else do
-        oneof $ maybeToList gBase ++ [gConst, gConcat, gExtract, gNormalOp1, gNormalOp2]
+        oneof $ maybeToList gBase ++ [gConst, gNormalOp1, gNormalOp2] ++ (if w > 0 then [gConcat, gExtract] else []) ++ [gComp | w == 1]
 
 genBVAtom :: [BV.Expr] -> Int -> Gen BV.Atom
 genBVAtom bases size = do
