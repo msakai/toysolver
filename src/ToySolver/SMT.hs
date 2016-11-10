@@ -502,7 +502,8 @@ exprSort' fdefs (EAp f xs)
       case (exprSort' fdefs (xs !! 0), exprSort' fdefs (xs !! 1)) of
         (Sort (SSymBitVec m) [], Sort (SSymBitVec n) []) -> Sort (SSymBitVec (m+n)) []
         _ -> undefined
-  | f `Set.member` Set.fromList ["bvnot","bvneg","bvand","bvor","bvxor","bvadd","bvmul","bvudiv","bvurem","bvshl","bvlshr"] =
+  | f == "bvcomp" = Sort (SSymBitVec 1) []
+  | f `Set.member` Set.fromList [name | (name, op) <- bvBinOpsSameSize] =
       exprSort' fdefs (xs !! 0)
   | f == "ite" = exprSort' fdefs (xs !! 1)
   | otherwise =
@@ -727,6 +728,24 @@ lraExprFromTerm solver t = do
 
 -- -------------------------------------------------------------------
 
+bvBinOpsSameSize :: IsString s => [(s, BV.Op2)]
+bvBinOpsSameSize =
+  [ ("bvand", BV.OpAnd)
+  , ("bvor", BV.OpOr)
+  , ("bvxor", BV.OpXOr)
+  , ("bvadd", BV.OpAdd)
+  , ("bvsub", BV.OpSub)
+  , ("bvmul", BV.OpMul)
+  , ("bvudiv", BV.OpUDiv)
+  , ("bvurem", BV.OpURem)
+  , ("bvsdiv", BV.OpSDiv)
+  , ("bvsrem", BV.OpSRem)
+  , ("bvsmod", BV.OpSMod)
+  , ("bvshl", BV.OpShl)
+  , ("bvlshr", BV.OpLShr)
+  , ("bvashr", BV.OpAShr)
+  ]
+
 exprToBVExpr :: Solver -> Expr -> IO BV.Expr
 exprToBVExpr solver (EBitVec bv) = return $ BV.fromBV bv
 exprToBVExpr solver (EAp "concat" [x,y]) = do
@@ -742,20 +761,9 @@ exprToBVExpr solver (EAp (FSym op1 []) [x])
       , ("bvneg", BV.OpNeg)
       ]
 exprToBVExpr solver (EAp (FSym op2 []) [x,y])
-  | Just op2' <- Map.lookup op2 table = liftM2 op2' (exprToBVExpr solver x) (exprToBVExpr solver y)
+  | Just op2' <- Map.lookup op2 table = liftM2 (BV.EOp2 op2') (exprToBVExpr solver x) (exprToBVExpr solver y)
   where
-    table =
-      Map.fromList
-      [ ("bvand", BV.EOp2 BV.OpAnd)
-      , ("bvor", BV.EOp2 BV.OpOr)
-      , ("bvxor", BV.EOp2 BV.OpXOr)
-      , ("bvadd", BV.EOp2 BV.OpAdd)
-      , ("bvmul", BV.EOp2 BV.OpMul)
-      , ("bvudiv", BV.EOp2 BV.OpUDiv)
-      , ("bvurem", BV.EOp2 BV.OpURem)
-      , ("bvshl", BV.EOp2 BV.OpShl)
-      , ("bvlshr", BV.EOp2 BV.OpLShr)
-      ]
+    table = Map.fromList $ [("bvcomp", BV.OpComp)] ++ bvBinOpsSameSize
 exprToBVExpr solver (EAp "ite" [c,t,e]) = do
   c' <- exprToFormula solver c
   t' <- exprToBVExpr solver t
@@ -1095,18 +1103,7 @@ eval m (EAp (FSym op2 []) [x,y])
           y' = BV.EConst $ valToBitVec m (eval m y)
       in ValBitVec $ BV.evalExpr (mBVModel m) $ BV.EOp2 op2' x' y'
   where
-    table =
-      Map.fromList
-      [ ("bvand", BV.OpAnd)
-      , ("bvor", BV.OpOr)
-      , ("bvxor", BV.OpXOr)
-      , ("bvadd", BV.OpAdd)
-      , ("bvmul", BV.OpMul)
-      , ("bvudiv", BV.OpUDiv)
-      , ("bvurem", BV.OpURem)
-      , ("bvshl", BV.OpShl)
-      , ("bvlshr", BV.OpLShr)
-      ]
+    table = Map.fromList $ [("bvcomp", BV.OpComp)] ++ bvBinOpsSameSize
 
 eval m (EAp "=" [x,y])   = ValBool $
   case (eval m x, eval m y) of

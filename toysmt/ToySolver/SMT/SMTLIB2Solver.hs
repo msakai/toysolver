@@ -284,7 +284,10 @@ initialEnv = (fenv, senv)
       [ (name, EFSymBuiltin (fromString name))
       | name <- ["=", "true", "false", "not", "and", "or", "xor", "ite", "=>", "distinct"
                 , "+", "-", "*", "/", ">=", "<=", ">", "<"
-                , "extract", "concat", "bvnot", "bvneg", "bvand", "bvor", "bvxor", "bvadd", "bvmul", "bvudiv", "bvurem", "bvshl", "bvlshr"
+                , "extract", "concat", "bvnot", "bvneg"
+                , "bvcomp"
+                , "bvand", "bvor", "bvxor", "bvnand", "bvnor", "bvxnor"
+                , "bvadd", "bvsub", "bvmul", "bvudiv", "bvurem", "bvsdiv", "bvsrem", "bvsmod", "bvshl", "bvlshr", "bvashr"
                 , "bvule", "bvult", "bvuge", "bvugt"
                 ]
       ]
