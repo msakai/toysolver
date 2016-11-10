@@ -85,7 +85,7 @@ import Data.Maybe (catMaybes)
 import Data.Ratio
 import Data.String
 import qualified Data.Version as V
-import Numeric (readFloat, readHex)
+import Numeric (readDec, readFloat, readHex)
 import System.Exit
 import System.IO
 import qualified Text.Parsec as Parsec
@@ -166,6 +166,13 @@ interpretFun env t =
     unIdentifier (I_Symbol name indexes) = (name, indexes)
 
     f (QIdentifierAs ident _sort) args = f (QIdentifier ident) args
+    f qid@(QIdentifier ident) args
+      | ('b':'v':xs, [IndexNumeral n]) <- unIdentifier ident
+      , ((x,_):_) <- readDec xs
+      , x < 2^n
+      = if not (null args)
+        then error (showSL ident ++ " does not take indexes")
+        else SMT.EBitVec (BV.nat2bv n x)
     f qid@(QIdentifier ident) args =
       case Map.lookup name env of
         Nothing -> error ("unknown function symbol: " ++ showSL qid)
