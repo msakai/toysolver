@@ -260,7 +260,7 @@ initialEnv = (fenv, senv)
   where
     fenv = Map.fromList
       [ (name, EFSymBuiltin (fromString name))
-      | name <- ["=", "true", "false", "not", "and", "or", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
+      | name <- ["=", "true", "false", "not", "and", "or", "xor", "ite", "=>", "distinct", "+", "-", "*", "/", ">=", "<=", ">", "<"]
       ]
     senv = Map.fromList
       [ ("Real", SortExpr SMT.sReal)
