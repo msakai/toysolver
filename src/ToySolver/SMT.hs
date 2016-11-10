@@ -63,6 +63,7 @@ import qualified Control.Exception as E
 import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
+import Data.Bits
 import Data.Either
 import Data.Interned (intern, unintern)
 import Data.Interned.Text
@@ -439,7 +440,7 @@ exprSort solver e = do
 exprSort' :: Map FSym FDef -> Expr -> Sort
 exprSort' _fdefs (EFrac _) = Sort SSymReal []
 exprSort' fdefs (EAp f xs)
-  | f `Set.member` Set.fromList ["true","false","and","or","not","=>","=",">=","<=",">","<"] = Sort SSymBool []
+  | f `Set.member` Set.fromList ["true","false","and","or","xor","not","=>","=",">=","<=",">","<"] = Sort SSymBool []
   | f `Set.member` Set.fromList ["+", "-", "*", "/"] = Sort SSymReal []
   | f == "ite" = exprSort' fdefs (xs !! 1)
   | otherwise =
@@ -457,6 +458,9 @@ exprToFormula solver (EAp "and" xs) =
   liftM andB $ mapM (exprToFormula solver) xs
 exprToFormula solver (EAp "or" xs) =
   liftM orB $ mapM (exprToFormula solver) xs
+exprToFormula solver (EAp "xor" xs) = do
+  ys <- mapM (exprToFormula solver) xs
+  return $ foldr (\a b -> notB (a .<=>. b)) false ys
 exprToFormula solver (EAp "not" [x]) =
   liftM notB $ exprToFormula solver x
 exprToFormula solver (EAp "not" _) = undefined
@@ -835,6 +839,7 @@ eval m (EAp "false" [])  = ValBool False
 eval m (EAp "ite" [a,b,c]) = if valToBool m (eval m a) then eval m b else eval m c
 eval m (EAp "and" xs)    = ValBool $ and $ map (valToBool m . eval m) xs
 eval m (EAp "or" xs)     = ValBool $ or $ map (valToBool m . eval m) xs
+eval m (EAp "xor" xs)    = ValBool $ foldr xor False $ map (valToBool m . eval m) xs
 eval m (EAp "not" [x])   = ValBool $ not $ valToBool m $ eval m x
 eval m (EAp "=>" [x,y])  = ValBool $ valToBool m (eval m x) .=>. valToBool m (eval m y)
 eval m (EAp "<=" [x,y])  = ValBool $ valToRational m (eval m x) <= valToRational m (eval m y)

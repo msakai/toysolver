@@ -257,6 +257,7 @@ prop_getModel_eval = QM.monadicIO $ do
           ++ [ ("true", ([], SMT.sBool))
              , ("and", ([SMT.sBool,SMT.sBool], SMT.sBool))
              , ("or", ([SMT.sBool,SMT.sBool], SMT.sBool))
+             , ("xor", ([SMT.sBool,SMT.sBool], SMT.sBool))
              , ("not", ([SMT.sBool], SMT.sBool))
              , ("=>", ([SMT.sBool,SMT.sBool], SMT.sBool))
              , ("+", ([SMT.sReal,SMT.sReal], SMT.sReal))
