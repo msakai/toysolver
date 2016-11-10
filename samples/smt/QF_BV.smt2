@@ -1,3 +1,4 @@
+(set-option :produce-models true)
 (set-logic QF_BV)
 (declare-fun x () (_ BitVec 32))
 (declare-fun y () (_ BitVec 16))
@@ -13,4 +14,5 @@
                                     (bvashr (_ bv42 16) #x0001))))))
         (and c1 (xor c2 c3))))))
 (check-sat)
+(get-model)
 (exit)
