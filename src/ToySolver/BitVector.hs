@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
@@ -31,8 +33,16 @@ module ToySolver.BitVector
   , repeat
   , zeroExtend
   , signExtend
-  , Atom
+  , Atom (..)
   , module ToySolver.Data.OrdRel
+  , ule
+  , ult
+  , uge
+  , ugt
+  , sle
+  , slt
+  , sge
+  , sgt
   , Model
   , evalExpr
   , evalAtom
@@ -324,7 +334,25 @@ instance Bits Expr where
   bitSize _ = error "bitSize is not implemented"
   isSigned _ = False
 
-type Atom = OrdRel Expr
+data Atom = Rel (OrdRel Expr) Bool
+  deriving (Eq, Ord, Show)
+
+instance Complement Atom where
+  notB (Rel rel signed) = Rel (notB rel) signed
+
+instance IsEqRel Expr Atom where
+  a .==. b = Rel (a .==. b) False
+  a ./=. b = Rel (a ./=. b) False
+
+ule, ult, uge, ugt, sle, slt, sge, sgt :: Expr -> Expr -> Atom
+ule s t = Rel (s .<=. t) False
+ult s t = Rel (s .<.  t) False
+uge s t = Rel (s .>=. t) False
+ugt s t = Rel (s .>.  t) False
+sle s t = Rel (s .<=. t) True
+slt s t = Rel (s .<.  t) True
+sge s t = Rel (s .>=. t) True
+sgt s t = Rel (s .>.  t) True
 
 -- ------------------------------------------------------------------------
 
@@ -413,7 +441,38 @@ evalExpr (env, divTable, remTable) = f
     w (BV bv) = VG.length bv
 
 evalAtom :: Model -> Atom -> Bool
-evalAtom m (OrdRel lhs op rhs) = evalOp op (evalExpr m lhs) (evalExpr m rhs)
+evalAtom m (Rel (OrdRel lhs op rhs) False) = evalOp op (evalExpr m lhs) (evalExpr m rhs)
+evalAtom m (Rel (OrdRel lhs op rhs) True) =
+  case op of
+    Lt -> bvslt' lhs' rhs'
+    Gt -> bvslt' rhs' lhs'
+    Le -> bvsle' lhs' rhs'
+    Ge -> bvsle' rhs' lhs'
+    Eql -> lhs' == rhs'
+    NEq -> lhs' /= rhs'
+  where
+    lhs' = evalExpr m lhs
+    rhs' = evalExpr m rhs
+
+    bvsle' :: BV -> BV -> Bool
+    bvsle' bs1 bs2
+      | width bs1 /= width bs2 = error ("length mismatch: " ++ show (width bs1) ++ " and " ++ show (width bs2))
+      | w == 0 = true
+      | otherwise = bs1_msb && not bs2_msb || (bs1_msb == bs2_msb) && bs1 <= bs2
+      where
+        w = width bs1
+        bs1_msb = testBit bs1 (w-1)
+        bs2_msb = testBit bs2 (w-1)
+
+    bvslt' :: BV -> BV -> Bool    
+    bvslt' bs1 bs2
+      | width bs1 /= width bs2 = error ("length mismatch: " ++ show (width bs1) ++ " and " ++ show (width bs2))
+      | w == 0 = false
+      | otherwise = bs1_msb && not bs2_msb || (bs1_msb == bs2_msb) && bs1 < bs2
+      where
+        w = width bs1
+        bs1_msb = testBit bs1 (w-1)
+        bs2_msb = testBit bs2 (w-1)
 
 -- ------------------------------------------------------------------------
 
@@ -454,16 +513,25 @@ newVar solver w = do
   return $ EVar $ Var{ varWidth = w, varId = v }
 
 assertAtom :: Solver -> Atom -> Maybe Int -> IO ()
-assertAtom solver (OrdRel lhs op rhs) label = do
+assertAtom solver (Rel (OrdRel lhs op rhs) signed) label = do
   s <- encodeExpr solver lhs
   t <- encodeExpr solver rhs
-  let f = case op of
-            Lt -> isLT s t
-            Gt -> isLT t s
-            Le -> isLE s t
-            Ge -> isLE t s
-            Eql -> isEQ s t
-            NEq -> Not (isEQ s t)
+  let f = if signed then
+            case op of
+              Lt -> isSLT s t
+              Gt -> isSLT t s
+              Le -> isSLE s t
+              Ge -> isSLE t s
+              Eql -> isEQ s t
+              NEq -> Not (isEQ s t)
+          else
+            case op of
+              Lt -> isLT s t
+              Gt -> isLT t s
+              Le -> isLE s t
+              Ge -> isLE t s
+              Eql -> isEQ s t
+              NEq -> Not (isEQ s t)
   size <- Vec.getSize (svContexts solver)
   case label of
     Nothing | size == 1 -> do
@@ -810,6 +878,30 @@ isLE bs1 bs2 = lexComp true bs1 bs2
 
 isLT :: SBV -> SBV -> Tseitin.Formula
 isLT bs1 bs2 = lexComp false bs1 bs2 
+
+isSLE :: SBV -> SBV -> Tseitin.Formula
+isSLE bs1 bs2
+  | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
+  | w == 0 = true
+  | otherwise =
+      Atom bs1_msb .&&. Not (Atom bs2_msb)
+      .||. (Atom bs1_msb .<=>. Atom bs2_msb) .&&. isLE bs1 bs2
+  where
+    w = VG.length bs1
+    bs1_msb = bs1 VG.! (w-1)
+    bs2_msb = bs2 VG.! (w-1)
+
+isSLT :: SBV -> SBV -> Tseitin.Formula
+isSLT bs1 bs2
+  | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
+  | w == 0 = false
+  | otherwise =
+      Atom bs1_msb .&&. Not (Atom bs2_msb)
+      .||. (Atom bs1_msb .<=>. Atom bs2_msb) .&&. isLT bs1 bs2
+  where
+    w = VG.length bs1
+    bs1_msb = bs1 VG.! (w-1)
+    bs2_msb = bs2 VG.! (w-1)
 
 lexComp :: Tseitin.Formula -> SBV -> SBV -> Tseitin.Formula
 lexComp b bs1 bs2

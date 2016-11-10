@@ -296,7 +296,7 @@ initialEnv = (fenv, senv)
                 , "bvcomp"
                 , "bvand", "bvor", "bvxor", "bvnand", "bvnor", "bvxnor"
                 , "bvadd", "bvsub", "bvmul", "bvudiv", "bvurem", "bvsdiv", "bvsrem", "bvsmod", "bvshl", "bvlshr", "bvashr"
-                , "bvule", "bvult", "bvuge", "bvugt"
+                , "bvule", "bvult", "bvuge", "bvugt", "bvsle", "bvslt", "bvsge", "bvsgt"
                 ]
       ]
     senv = Map.fromList

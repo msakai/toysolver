@@ -129,7 +129,8 @@ genBVAtom bases size = do
   e1 <- genBVExpr bases w s1
   e2 <- genBVExpr bases w (size - s1)
   op  <- elements [Lt, Le, Ge, Gt, Eql, NEq]
-  return $ ordRel op e1 e2
+  signed <- arbitrary
+  return $ BV.Rel (ordRel op e1 e2) signed
 
 genFormula :: Gen ([BV.Var], [BV.Atom])
 genFormula = do

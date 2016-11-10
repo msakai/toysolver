@@ -589,10 +589,14 @@ exprToFormula solver (EAp op [e1,e2]) | Just f <- Map.lookup op table = do
   liftM Atom $ abstractBVAtom solver (f e1' e2')
   where
     table = Map.fromList
-      [ ("bvule", (.<=.))
-      , ("bvult", (.<.))
-      , ("bvuge", (.>=.))
-      , ("bvugt", (.>.))
+      [ ("bvule", BV.ule)
+      , ("bvult", BV.ult)
+      , ("bvuge", BV.uge)
+      , ("bvugt", BV.ugt)
+      , ("bvsle", BV.sle)
+      , ("bvslt", BV.slt)
+      , ("bvsge", BV.sge)
+      , ("bvsgt", BV.sgt)
       ]
 exprToFormula solver (EAp f xs) = do
   e' <- exprToEUFTerm solver f xs
@@ -804,10 +808,11 @@ exprToBVExpr solver e@(EAp f xs) = do
 data BVAtomNormalized
   = BVEql BV.Expr BV.Expr
   | BVULt BV.Expr BV.Expr
+  | BVSLt BV.Expr BV.Expr
   deriving (Eq, Ord)
 
 normalizeBVAtom :: BV.Atom -> (BVAtomNormalized, Bool)
-normalizeBVAtom (OrdRel lhs op rhs) =
+normalizeBVAtom (BV.Rel (OrdRel lhs op rhs) False) =
   case op of
     Lt  -> (BVULt lhs rhs, True)
     Gt  -> (BVULt rhs lhs, True)
@@ -815,10 +820,19 @@ normalizeBVAtom (OrdRel lhs op rhs) =
     NEq -> (BVEql lhs rhs, False)
     Le  -> (BVULt rhs lhs, False)
     Ge  -> (BVULt lhs rhs, False)
+normalizeBVAtom (BV.Rel (OrdRel lhs op rhs) True) =
+  case op of
+    Lt  -> (BVSLt lhs rhs, True)
+    Gt  -> (BVSLt rhs lhs, True)
+    Eql -> (BVEql lhs rhs, True)
+    NEq -> (BVEql lhs rhs, False)
+    Le  -> (BVSLt rhs lhs, False)
+    Ge  -> (BVSLt lhs rhs, False)
 
 unnormalizeBVAtom :: (BVAtomNormalized, Bool) -> BV.Atom
-unnormalizeBVAtom (BVEql lhs rhs, p) = (if p then id else notB) $ OrdRel lhs Eql rhs
-unnormalizeBVAtom (BVULt lhs rhs, p) = (if p then id else notB) $ OrdRel lhs Lt rhs
+unnormalizeBVAtom (BVEql lhs rhs, p) = (if p then id else notB) $ BV.Rel (OrdRel lhs Eql rhs) False
+unnormalizeBVAtom (BVULt lhs rhs, p) = (if p then id else notB) $ BV.Rel (OrdRel lhs Lt rhs) False
+unnormalizeBVAtom (BVSLt lhs rhs, p) = (if p then id else notB) $ BV.Rel (OrdRel lhs Lt rhs) True
 
 abstractBVAtom :: Solver -> BV.Atom -> IO SAT.Lit
 abstractBVAtom solver atom = do
