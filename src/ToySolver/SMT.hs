@@ -26,7 +26,8 @@ module ToySolver.SMT
   , FunType
   , Expr (..)
   , exprSort
-  , FSym
+  , Index (..)
+  , FSym (..)
   , declareSSym
   , declareSort
   , VASortFun
@@ -59,6 +60,7 @@ module ToySolver.SMT
   , getUnsatCore
   ) where
 
+import Control.Applicative
 import qualified Control.Exception as E
 import Control.Monad
 import Control.Monad.Trans
@@ -76,8 +78,10 @@ import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
+import Data.Monoid
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.String
 import qualified Data.Text as T
 import Data.Typeable
 import Data.VectorSpace
@@ -92,20 +96,33 @@ import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.TheorySolver
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.Arith.Simplex2 as Simplex2
+import qualified ToySolver.BitVector as BV
 import qualified ToySolver.EUF.EUFSolver as EUF
 
-type FSym = InternedText
+data Index
+  = IndexNumeral !Integer
+  | IndexSymbol !InternedText
+  deriving (Show,Eq, Ord)
+
+data FSym
+  = FSym !InternedText [Index]
+  deriving (Show,Eq,Ord)
+
+instance IsString FSym where
+  fromString s = FSym (fromString s) []
 
 -- | Sort symbols
 data SSym
   = SSymBool
   | SSymReal
+  | SSymBitVec !Int
   | SSymUserDeclared String !Int
   deriving (Show, Eq, Ord)
 
 ssymArity :: SSym -> Int
 ssymArity SSymBool = 0
 ssymArity SSymReal = 0
+ssymArity (SSymBitVec _) = 0
 ssymArity (SSymUserDeclared _ ar) = ar
 
 data Sort = Sort SSym [Sort]
@@ -117,11 +134,15 @@ sBool = Sort SSymBool []
 sReal :: Sort
 sReal = Sort SSymReal []
 
+sBitVec :: Int -> Sort
+sBitVec n = Sort (SSymBitVec n) []
+
 type FunType = ([Sort],Sort)
 
 data Expr
   = EAp FSym [Expr]
   | EFrac Rational
+  | EBitVec BV.BV
   deriving (Show, Eq, Ord)
 
 instance MonotoneBoolean Expr where
@@ -166,6 +187,7 @@ instance IsOrdRel Expr Expr where
 data FDef
   = FBoolVar SAT.Var
   | FLRAVar LA.Var
+  | FBVVar BV.Var
   | FEUFFun FunType EUF.FSym
   deriving (Show)
 
@@ -182,16 +204,20 @@ data Solver
   , smtEnc :: !(Tseitin.Encoder IO)
   , smtEUF :: !EUF.Solver
   , smtLRA :: !(Simplex2.GenericSolver (Delta Rational))
+  , smtBV :: !BV.Solver
 
   , smtEUFAtomDefs  :: !(IORef (Map (EUF.Term, EUF.Term) SAT.Var, IntMap (EUF.Term, EUF.Term)))
   , smtLRAAtomDefs  :: !(IORef (Map (LA.Var, Rational) (SAT.Lit, SAT.Lit, SAT.Lit), IntMap (LA.Atom Rational)))
+  , smtBVAtomDefs   :: !(IORef (Map BVAtomNormalized SAT.Var, IntMap BVAtomNormalized))
   , smtBoolTermDefs :: !(IORef (Map EUF.Term SAT.Lit, IntMap EUF.Term))
   , smtRealTermDefs :: !(IORef (Map (LA.Expr Rational) EUF.FSym, IntMap (LA.Expr Rational)))
+  , smtBVTermDefs :: !(IORef (Map BV.Expr EUF.FSym, IntMap BV.Expr))
   , smtEUFTrue  :: !EUF.Term
   , smtEUFFalse :: !EUF.Term
 
   , smtEUFModel :: !(IORef EUF.Model)
   , smtLRAModel :: !(IORef Simplex2.Model)
+  , smtBVModel :: !(IORef BV.Model)
 
   , smtGlobalDeclarationsRef :: !(IORef Bool)
   , smtFDefs :: !(IORef (Map FSym FDef))
@@ -212,6 +238,7 @@ data AssertionLevel
 data TheorySolverID
   = TheorySolverEUF
   | TheorySolverSimplex
+  | TheorySolverBV
   deriving (Eq, Ord, Enum, Bounded)
 
 newSolver :: IO Solver
@@ -220,6 +247,7 @@ newSolver = do
   enc <- Tseitin.newEncoder sat
   euf <- EUF.newSolver
   lra <- Simplex2.newSolver
+  bv <- BV.newSolver
 
   litTrue <- Tseitin.encodeConj enc []
   let litFalse = -litTrue
@@ -231,14 +259,17 @@ newSolver = do
 
   eufAtomDefs <- newIORef (Map.empty, IntMap.empty)
   lraAtomDefs <- newIORef (Map.empty, IntMap.empty)
+  bvAtomDefs <- newIORef (Map.empty, IntMap.empty)
   boolTermDefs <- newIORef $
     ( Map.fromList [(eufTrue, litTrue), (eufFalse, litFalse)]
     , IntMap.fromList [(litTrue, eufTrue), (litFalse, eufFalse)]
     )
   realTermDefs <- newIORef (Map.empty, IntMap.empty)
+  bvTermDefs <- newIORef (Map.empty, IntMap.empty)
 
   eufModelRef <- newIORef (undefined :: EUF.Model)
   lraModelRef <- newIORef (undefined :: Simplex2.Model)
+  bvModelRef <- newIORef (undefined :: BV.Model)
 
   globalDeclarationsRef <- newIORef False
   fdefs <- newIORef $ Map.singleton "_/0" (FEUFFun ([sReal], sReal) divByZero)
@@ -265,6 +296,13 @@ newSolver = do
                   lift $ EUF.assertNotEqual' euf t1 t2 (Just l)
                 throwE True
 
+            (_, defsBV) <- lift $ readIORef bvAtomDefs
+            case IntMap.lookup (SAT.litVar l) defsBV of
+              Nothing -> return ()
+              Just atom -> do
+                lift $ BV.assertAtom bv (unnormalizeBVAtom (atom, SAT.litPolarity l)) (Just l)
+                throwE True
+
             return True
 
         , thCheck = \callback -> liftM isRight $ runExceptT $ do
@@ -282,6 +320,10 @@ newSolver = do
                   when b2 $ do
                     b3 <- lift $ callback v
                     unless b3 $ throwE ()
+            do b <- lift $ BV.check bv
+               unless b $ do
+                 lift $ writeIORef conflictTheory TheorySolverBV
+                 throwE ()
 
         , thExplain = \m -> do
             case m of
@@ -289,6 +331,7 @@ newSolver = do
                 t <- readIORef conflictTheory
                 case t of
                   TheorySolverSimplex -> liftM IntSet.toList $ Simplex2.explain lra
+                  TheorySolverBV -> liftM IntSet.toList $ BV.explain bv
                   TheorySolverEUF -> liftM IntSet.toList $ EUF.explain euf Nothing
               Just v -> do
                 (_, defsEUF) <- readIORef eufAtomDefs
@@ -299,15 +342,18 @@ newSolver = do
         , thPushBacktrackPoint = do
             Simplex2.pushBacktrackPoint lra
             EUF.pushBacktrackPoint euf
+            BV.pushBacktrackPoint bv
         , thPopBacktrackPoint = do
             Simplex2.popBacktrackPoint lra
             EUF.popBacktrackPoint euf
+            BV.popBacktrackPoint bv
         , thConstructModel = do
             writeIORef eufModelRef =<< EUF.getModel euf
             -- We need to call Simplex2.getModel here.
             -- Because backtracking removes constraints that are necessary
             -- for computing the value of delta.
             writeIORef lraModelRef =<< Simplex2.getModel lra
+            writeIORef bvModelRef =<< BV.getModel bv
             return ()
         }
   SAT.setTheory sat tsolver
@@ -325,16 +371,20 @@ newSolver = do
     , smtEnc = enc
     , smtEUF = euf
     , smtLRA = lra
+    , smtBV  = bv
 
     , smtEUFAtomDefs = eufAtomDefs
     , smtLRAAtomDefs = lraAtomDefs
+    , smtBVAtomDefs = bvAtomDefs
     , smtBoolTermDefs = boolTermDefs
     , smtRealTermDefs = realTermDefs
+    , smtBVTermDefs = bvTermDefs
     , smtEUFTrue  = eufTrue
     , smtEUFFalse = eufFalse
 
     , smtEUFModel = eufModelRef
     , smtLRAModel = lraModelRef
+    , smtBVModel = bvModelRef
 
     , smtGlobalDeclarationsRef = globalDeclarationsRef
     , smtFDefs = fdefs
@@ -370,7 +420,7 @@ instance VASortFun a => VASortFun (Sort -> a) where
 
 declareFSym :: Solver -> String -> [Sort] -> Sort -> IO FSym
 declareFSym solver f' xs y = do
-  let f = intern $ T.pack f'
+  let f = FSym (intern (T.pack f')) []
   fdefs <- readIORef (smtFDefs solver)
   when (f `Map.member` fdefs) $ do
     E.throwIO $ Error $ "function symbol " ++ f' ++ " is already used"
@@ -382,6 +432,9 @@ declareFSym solver f' xs y = do
       ([], Sort SSymReal []) -> do
         v <- Simplex2.newVar (smtLRA solver)
         return (FLRAVar v)
+      ([], Sort (SSymBitVec n) []) -> do
+        BV.EVar v <- BV.newVar (smtBV solver) n -- XXX
+        return (FBVVar v)
       _ -> do
         v <- EUF.newFSym (smtEUF solver)
         return (FEUFFun (xs,y) v)
@@ -439,14 +492,35 @@ exprSort solver e = do
 
 exprSort' :: Map FSym FDef -> Expr -> Sort
 exprSort' _fdefs (EFrac _) = Sort SSymReal []
+exprSort' _fdefs (EBitVec bv) = Sort (SSymBitVec (BV.width bv)) []
 exprSort' fdefs (EAp f xs)
   | f `Set.member` Set.fromList ["true","false","and","or","xor","not","=>","=",">=","<=",">","<"] = Sort SSymBool []
+  | f `Set.member` Set.fromList ["bvule", "bvult", "bvuge", "bvugt"] = Sort SSymBool []
   | f `Set.member` Set.fromList ["+", "-", "*", "/"] = Sort SSymReal []
+  | FSym "extract" [IndexNumeral i, IndexNumeral j] <- f = Sort (SSymBitVec (fromIntegral (i - j + 1))) []
+  | f == "concat" =
+      case (exprSort' fdefs (xs !! 0), exprSort' fdefs (xs !! 1)) of
+        (Sort (SSymBitVec m) [], Sort (SSymBitVec n) []) -> Sort (SSymBitVec (m+n)) []
+        _ -> undefined
+  | FSym "repeat" [IndexNumeral i] <- f =
+      case exprSort' fdefs (xs !! 0) of
+        Sort (SSymBitVec m) [] -> Sort (SSymBitVec (m * fromIntegral i)) []
+        _ -> undefined
+  | FSym name [IndexNumeral i] <- f, name == "zero_extend" || name == "sign_extend" =
+      case exprSort' fdefs (xs !! 0) of
+        Sort (SSymBitVec m) [] -> Sort (SSymBitVec (m + fromIntegral i)) []
+        _ -> undefined
+  | FSym name [IndexNumeral i] <- f, name == "rotate_left" || name == "rotate_right" =
+      exprSort' fdefs (xs !! 0)
+  | f == "bvcomp" = Sort (SSymBitVec 1) []
+  | f `Set.member` Set.fromList [name | (name, op) <- bvBinOpsSameSize] =
+      exprSort' fdefs (xs !! 0)
   | f == "ite" = exprSort' fdefs (xs !! 1)
   | otherwise =
       case fdefs Map.! f of
         FBoolVar _ -> Sort SSymBool []
         FLRAVar _ -> Sort SSymReal []
+        FBVVar v -> Sort (SSymBitVec (BV.width (BV.EVar v))) [] -- XXX
         FEUFFun (_,s) _ -> s
 
 -- -------------------------------------------------------------------
@@ -509,6 +583,21 @@ exprToFormula solver (EAp f []) = do
     Just (FBoolVar v) -> return (Atom v)
     Just _ -> E.throwIO $ Error "non Bool constant appears in a boolean context"
     Nothing -> E.throwIO $ Error $ "unknown function symbol: " ++ show f
+exprToFormula solver (EAp op [e1,e2]) | Just f <- Map.lookup op table = do
+  e1' <- exprToBVExpr solver e1
+  e2' <- exprToBVExpr solver e2
+  liftM Atom $ abstractBVAtom solver (f e1' e2')
+  where
+    table = Map.fromList
+      [ ("bvule", BV.ule)
+      , ("bvult", BV.ult)
+      , ("bvuge", BV.uge)
+      , ("bvugt", BV.ugt)
+      , ("bvsle", BV.sle)
+      , ("bvslt", BV.slt)
+      , ("bvsge", BV.sge)
+      , ("bvsgt", BV.sgt)
+      ]
 exprToFormula solver (EAp f xs) = do
   e' <- exprToEUFTerm solver f xs
   formulaFromEUFTerm solver e'
@@ -533,6 +622,10 @@ abstractEq solver e1 e2 = do
       e1' <- exprToLRAExpr solver e1
       e2' <- exprToLRAExpr solver e2
       liftM Atom $ abstractLRAAtom solver (e1' .==. e2')
+    (Sort (SSymBitVec _) _) -> do
+      e1' <- exprToBVExpr solver e1
+      e2' <- exprToBVExpr solver e2
+      liftM Atom $ abstractBVAtom solver (e1' .==. e2')
     (Sort (SSymUserDeclared _ _) _) -> do
       e1' <- exprToEUFArg solver e1
       e2' <- exprToEUFArg solver e2
@@ -649,6 +742,154 @@ lraExprFromTerm solver t = do
 
 -- -------------------------------------------------------------------
 
+bvBinOpsSameSize :: IsString s => [(s, BV.Op2)]
+bvBinOpsSameSize =
+  [ ("bvand", BV.OpAnd)
+  , ("bvor", BV.OpOr)
+  , ("bvxor", BV.OpXOr)
+  , ("bvadd", BV.OpAdd)
+  , ("bvsub", BV.OpSub)
+  , ("bvmul", BV.OpMul)
+  , ("bvudiv", BV.OpUDiv)
+  , ("bvurem", BV.OpURem)
+  , ("bvsdiv", BV.OpSDiv)
+  , ("bvsrem", BV.OpSRem)
+  , ("bvsmod", BV.OpSMod)
+  , ("bvshl", BV.OpShl)
+  , ("bvlshr", BV.OpLShr)
+  , ("bvashr", BV.OpAShr)
+  ]
+
+exprToBVExpr :: Solver -> Expr -> IO BV.Expr
+exprToBVExpr solver (EBitVec bv) = return $ BV.fromBV bv
+exprToBVExpr solver (EAp "concat" [x,y]) = do
+  liftM2 (<>) (exprToBVExpr solver x) (exprToBVExpr solver y)
+exprToBVExpr solver (EAp (FSym "extract" [IndexNumeral i, IndexNumeral j]) [x]) = do
+  BV.extract (fromIntegral i) (fromIntegral j) <$> exprToBVExpr solver x
+exprToBVExpr solver (EAp (FSym "repeat" [IndexNumeral i]) [x]) = do
+  BV.repeat (fromIntegral i) <$> exprToBVExpr solver x
+exprToBVExpr solver (EAp (FSym "zero_extend" [IndexNumeral i]) [x]) = do
+  BV.zeroExtend (fromIntegral i) <$> exprToBVExpr solver x
+exprToBVExpr solver (EAp (FSym "sign_extend" [IndexNumeral i]) [x]) = do
+  BV.signExtend (fromIntegral i) <$> exprToBVExpr solver x
+exprToBVExpr solver (EAp (FSym "rotate_left" [IndexNumeral i]) [x]) = do
+  rotateL <$> exprToBVExpr solver x <*> pure (fromIntegral i)
+exprToBVExpr solver (EAp (FSym "rotate_right" [IndexNumeral i]) [x]) = do
+  rotateR <$> exprToBVExpr solver x <*> pure (fromIntegral i)
+exprToBVExpr solver (EAp (FSym op1 []) [x])
+  | Just op1' <- Map.lookup op1 table = BV.EOp1 op1' <$> exprToBVExpr solver x
+  where
+    table =
+      Map.fromList
+      [ ("bvnot", BV.OpNot)
+      , ("bvneg", BV.OpNeg)
+      ]
+exprToBVExpr solver (EAp (FSym op2 []) [x,y])
+  | Just op2' <- Map.lookup op2 table = liftM2 (BV.EOp2 op2') (exprToBVExpr solver x) (exprToBVExpr solver y)
+  where
+    table = Map.fromList $ [("bvcomp", BV.OpComp)] ++ bvBinOpsSameSize
+exprToBVExpr solver (EAp "ite" [c,t,e]) = do
+  c' <- exprToFormula solver c
+  t' <- exprToBVExpr solver t
+  e' <- exprToBVExpr solver e
+  ret <- BV.newVar (smtBV solver) (BV.width t')
+  c1 <- abstractBVAtom solver (ret .==. t')
+  c2 <- abstractBVAtom solver (ret .==. e')
+  Tseitin.addFormula (smtEnc solver) $ ite c' (Atom c1) (Atom c2)
+  return ret
+exprToBVExpr solver e@(EAp f xs) = do
+  s <- exprSort solver e
+  case s of
+    Sort (SSymBitVec w) [] -> do
+      t <- exprToEUFTerm solver f xs
+      bvExprFromTerm solver t w
+    _ -> error "should not happen"
+
+data BVAtomNormalized
+  = BVEql BV.Expr BV.Expr
+  | BVULt BV.Expr BV.Expr
+  | BVSLt BV.Expr BV.Expr
+  deriving (Eq, Ord)
+
+normalizeBVAtom :: BV.Atom -> (BVAtomNormalized, Bool)
+normalizeBVAtom (BV.Rel (OrdRel lhs op rhs) False) =
+  case op of
+    Lt  -> (BVULt lhs rhs, True)
+    Gt  -> (BVULt rhs lhs, True)
+    Eql -> (BVEql lhs rhs, True)
+    NEq -> (BVEql lhs rhs, False)
+    Le  -> (BVULt rhs lhs, False)
+    Ge  -> (BVULt lhs rhs, False)
+normalizeBVAtom (BV.Rel (OrdRel lhs op rhs) True) =
+  case op of
+    Lt  -> (BVSLt lhs rhs, True)
+    Gt  -> (BVSLt rhs lhs, True)
+    Eql -> (BVEql lhs rhs, True)
+    NEq -> (BVEql lhs rhs, False)
+    Le  -> (BVSLt rhs lhs, False)
+    Ge  -> (BVSLt lhs rhs, False)
+
+unnormalizeBVAtom :: (BVAtomNormalized, Bool) -> BV.Atom
+unnormalizeBVAtom (BVEql lhs rhs, p) = (if p then id else notB) $ BV.Rel (OrdRel lhs Eql rhs) False
+unnormalizeBVAtom (BVULt lhs rhs, p) = (if p then id else notB) $ BV.Rel (OrdRel lhs Lt rhs) False
+unnormalizeBVAtom (BVSLt lhs rhs, p) = (if p then id else notB) $ BV.Rel (OrdRel lhs Lt rhs) True
+
+abstractBVAtom :: Solver -> BV.Atom -> IO SAT.Lit
+abstractBVAtom solver atom = do
+  let (atom', s) = normalizeBVAtom atom
+  (tbl,defs) <- readIORef (smtBVAtomDefs solver)
+  v <- case Map.lookup atom' tbl of
+         Just v -> return v
+         Nothing -> do
+           v <- SAT.newVar (smtSAT solver)
+           writeIORef (smtBVAtomDefs solver) (Map.insert atom' v tbl, IntMap.insert v atom' defs)
+           return v
+  return $ if s then v else -v
+
+bvExprToEUFTerm :: Solver -> BV.Expr -> IO EUF.Term
+bvExprToEUFTerm solver e = do
+  (bvToFSym, fsymToBV) <- readIORef (smtBVTermDefs solver)
+  case Map.lookup e bvToFSym of
+    Just c -> return (EUF.TApp c [])
+    Nothing -> do
+      c <- EUF.newFSym (smtEUF solver)
+      let w1 = BV.width e
+      forM_ (IntMap.toList fsymToBV) $ \(d, d_bv) -> do
+        let w2 = BV.width d_bv
+        when (w1 == w2) $ do
+          -- allocate interface equalities
+          b1 <- abstractEUFAtom solver (EUF.TApp c [], EUF.TApp d [])
+          b2 <- abstractBVAtom solver (e .==. d_bv)
+          Tseitin.addFormula (smtEnc solver) (Atom b1 .<=>. Atom b2)
+      writeIORef (smtBVTermDefs solver) $
+        ( Map.insert e c bvToFSym
+        , IntMap.insert c e fsymToBV
+        )
+      return (EUF.TApp c [])
+
+bvExprFromTerm :: Solver -> EUF.Term -> Int -> IO BV.Expr
+bvExprFromTerm solver t w = do
+  (bvToFSym, fsymToBV) <- readIORef (smtBVTermDefs solver)
+  c <- EUF.termToFSym (smtEUF solver) t
+  case IntMap.lookup c fsymToBV of
+    Just e -> return e
+    Nothing -> do
+      e <- BV.newVar (smtBV solver) w
+      forM_ (IntMap.toList fsymToBV) $ \(d, d_bv) -> do
+        let w2 = BV.width d_bv
+        when (w == w2) $ do
+          -- allocate interface equalities
+          b1 <- abstractEUFAtom solver (EUF.TApp c [], EUF.TApp d [])
+          b2 <- abstractBVAtom solver (e .==. d_bv)
+          Tseitin.addFormula (smtEnc solver) (Atom b1 .<=>. Atom b2)
+      writeIORef (smtBVTermDefs solver) $
+        ( Map.insert e c bvToFSym
+        , IntMap.insert c e fsymToBV
+        )
+      return e
+
+-- -------------------------------------------------------------------
+
 exprToEUFTerm :: Solver -> FSym -> [Expr] -> IO EUF.Term
 exprToEUFTerm solver "ite" [c,t,e] = do
   c' <- exprToFormula solver c
@@ -664,6 +905,7 @@ exprToEUFTerm solver f xs = do
   case Map.lookup f fdefs of
     Just (FBoolVar v) -> formulaToEUFTerm solver (Atom v)
     Just (FLRAVar v) -> lraExprToEUFTerm solver (LA.var v)
+    Just (FBVVar v) -> bvExprToEUFTerm solver (BV.EVar v)
     Just (FEUFFun (ps,_) fsym) -> do
       unless (length ps == length xs) $ do
         E.throwIO $ Error "argument number error"
@@ -677,6 +919,7 @@ exprToEUFArg solver e@(EAp f xs) = do
   case s of
     SSymBool -> formulaToEUFTerm solver =<< exprToFormula solver e
     SSymReal -> lraExprToEUFTerm solver =<< exprToLRAExpr solver e
+    SSymBitVec _ -> bvExprToEUFTerm solver =<< exprToBVExpr solver e
     _ -> exprToEUFTerm solver f xs
 
 abstractEUFAtom :: Solver -> (EUF.Term, EUF.Term) -> IO SAT.Lit
@@ -798,16 +1041,20 @@ data Model
   { mDefs      :: !(Map FSym FDef)
   , mBoolModel :: !SAT.Model
   , mLRAModel  :: !Simplex2.Model
+  , mBVModel   :: !BV.Model
   , mEUFModel  :: !EUF.Model
   , mEUFTrue   :: !EUF.Entity
   , mEUFFalse  :: !EUF.Entity
   , mEntityToRational :: !(IntMap Rational)
   , mRationalToEntity :: !(Map Rational EUF.Entity)
+  , mEntityToBitVec :: !(IntMap BV.BV)
+  , mBitVecToEntity :: !(Map BV.BV EUF.Entity)
   }
   deriving (Show)
 
 data Value
   = ValRational !Rational
+  | ValBitVec !BV.BV
   | ValBool !Bool
   | ValUninterpreted !Int !Sort
   deriving (Eq, Show)
@@ -817,19 +1064,29 @@ getModel solver = do
   defs <- readIORef (smtFDefs solver)
   boolModel <- SAT.getModel (smtSAT solver)
   lraModel <- readIORef (smtLRAModel solver)
+  bvModel  <- readIORef (smtBVModel solver)
   eufModel <- readIORef (smtEUFModel solver)
+
   (_, fsymToReal) <- readIORef (smtRealTermDefs solver)
   let xs = [(e, LA.eval lraModel lraExpr) | (fsym, lraExpr) <- IntMap.toList fsymToReal, let e = EUF.evalAp eufModel fsym [], e /= EUF.mUnspecified eufModel]
+
+  (_, fsymToBV) <- readIORef (smtBVTermDefs solver)
+  let ys = [(e, BV.evalExpr bvModel bvExpr) | (fsym, bvExpr) <- IntMap.toList fsymToBV, let e = EUF.evalAp eufModel fsym [], e /= EUF.mUnspecified eufModel]
+
   return $
     Model
     { mDefs = defs
     , mBoolModel = boolModel
     , mLRAModel = lraModel
+    , mBVModel  = bvModel
     , mEUFModel = eufModel
     , mEUFTrue  = EUF.eval eufModel (smtEUFTrue solver)
     , mEUFFalse = EUF.eval eufModel (smtEUFFalse solver)
     , mEntityToRational = IntMap.fromList xs
     , mRationalToEntity = Map.fromList [(r,e) | (e,r) <- xs]
+
+    , mEntityToBitVec = IntMap.fromList ys
+    , mBitVecToEntity = Map.fromList [(bv,e) | (e,bv) <- ys]
     }
 
 eval :: Model -> Expr -> Value
@@ -855,6 +1112,43 @@ eval m (EAp "/" [x,y])
   | otherwise = ValRational $ valToRational m (eval m x) / y'
   where
     y' = valToRational m (eval m y)
+
+eval m (EAp "bvule" [x,y]) = ValBool $ valToBitVec m (eval m x) <= valToBitVec m (eval m y)
+eval m (EAp "bvult" [x,y]) = ValBool $ valToBitVec m (eval m x) <  valToBitVec m (eval m y)
+eval m (EAp "bvuge" [x,y]) = ValBool $ valToBitVec m (eval m x) >= valToBitVec m (eval m y)
+eval m (EAp "bvugt" [x,y]) = ValBool $ valToBitVec m (eval m x) >  valToBitVec m (eval m y)
+eval m (EAp "concat" [x,y]) =
+  ValBitVec $ valToBitVec m (eval m x) <> valToBitVec m (eval m y)
+eval m (EAp (FSym "extract" [IndexNumeral i, IndexNumeral j]) [x]) =
+  ValBitVec $ BV.extract (fromIntegral i) (fromIntegral j) (valToBitVec m (eval m x))
+eval m (EAp (FSym "repeat" [IndexNumeral i]) [x]) =
+  ValBitVec $ BV.repeat (fromIntegral i) (valToBitVec m (eval m x))
+eval m (EAp (FSym "zero_extend" [IndexNumeral i]) [x]) =
+  ValBitVec $ BV.zeroExtend (fromIntegral i) (valToBitVec m (eval m x))
+eval m (EAp (FSym "sign_extend" [IndexNumeral i]) [x]) =
+  ValBitVec $ BV.signExtend (fromIntegral i) (valToBitVec m (eval m x))
+eval m (EAp (FSym "rotate_left" [IndexNumeral i]) [x]) =
+  ValBitVec $ rotateL (valToBitVec m (eval m x)) (fromIntegral i)
+eval m (EAp (FSym "rotate_right" [IndexNumeral i]) [x]) =
+  ValBitVec $ rotateR (valToBitVec m (eval m x)) (fromIntegral i)
+eval m (EAp (FSym op1 []) [x])
+  | Just op1' <- Map.lookup op1 table =
+      let x' = BV.EConst $ valToBitVec m (eval m x)
+      in ValBitVec $ BV.evalExpr (mBVModel m) $ BV.EOp1 op1' x'
+  where
+    table =
+      Map.fromList
+      [ ("bvnot", BV.OpNot)
+      , ("bvneg", BV.OpNeg)
+      ]
+eval m (EAp (FSym op2 []) [x,y])
+  | Just op2' <- Map.lookup op2 table =
+      let x' = BV.EConst $ valToBitVec m (eval m x)
+          y' = BV.EConst $ valToBitVec m (eval m y)
+      in ValBitVec $ BV.evalExpr (mBVModel m) $ BV.EOp2 op2' x' y'
+  where
+    table = Map.fromList $ [("bvcomp", BV.OpComp)] ++ bvBinOpsSameSize
+
 eval m (EAp "=" [x,y])   = ValBool $
   case (eval m x, eval m y) of
     (v1, v2) -> v1 == v2
@@ -863,6 +1157,7 @@ eval m expr@(EAp f xs) =
     Nothing -> E.throw $ Error $ "unknown function symbol: " ++ show f
     Just (FBoolVar v) -> ValBool $ SAT.evalLit (mBoolModel m) v
     Just (FLRAVar v) -> ValRational $ mLRAModel m IntMap.! v
+    Just (FBVVar v) -> ValBitVec $ BV.evalExpr (mBVModel m) (BV.EVar v)
     Just (FEUFFun (_, Sort s []) sym) ->
       let e = EUF.evalAp (mEUFModel m) sym (map (valToEntity m . eval m) xs)
       in case s of
@@ -881,11 +1176,19 @@ valToRational :: Model -> Value -> Rational
 valToRational _ (ValRational r) = r
 valToRational _ _ = E.throw $ Error "rational value is expected"
 
+valToBitVec :: Model -> Value -> BV.BV
+valToBitVec _ (ValBitVec bv) = bv
+valToBitVec _ _ = E.throw $ Error "bitvector value is expected"
+
 valToEntity :: Model -> Value -> EUF.Entity
 valToEntity _ (ValUninterpreted e _) = e
 valToEntity m (ValBool b)     = if b then mEUFTrue m else mEUFFalse m
 valToEntity m (ValRational r) =
   case Map.lookup r (mRationalToEntity m) of
+    Just e -> e
+    Nothing -> EUF.mUnspecified (mEUFModel m)
+valToEntity m (ValBitVec bv) =
+  case Map.lookup bv (mBitVecToEntity m) of
     Just e -> e
     Nothing -> EUF.mUnspecified (mEUFModel m)
 
@@ -897,12 +1200,17 @@ entityToValue m e s =
       case IntMap.lookup e (mEntityToRational m) of
         Just r -> ValRational r
         Nothing -> ValRational (fromIntegral (1000000 + e))
+    Sort (SSymBitVec n) _ ->
+      case IntMap.lookup e (mEntityToBitVec m) of
+        Just bv -> ValBitVec bv
+        Nothing -> ValBitVec (BV.nat2bv n 0)
     Sort (SSymUserDeclared _ _) _ -> ValUninterpreted e s
 
 valSort :: Model -> Value -> Sort
 valSort _m (ValUninterpreted _e s) = s
 valSort _m (ValBool _b)     = sBool
 valSort _m (ValRational _r) = sReal
+valSort _m (ValBitVec bv) = sBitVec (BV.width bv)
 
 data FunDef = FunDef [([Value], Value)] Value
 

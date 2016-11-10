@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
@@ -28,8 +30,19 @@ module ToySolver.BitVector
   , Expr (..)
   , Op1 (..)
   , Op2 (..)
-  , Atom
+  , repeat
+  , zeroExtend
+  , signExtend
+  , Atom (..)
   , module ToySolver.Data.OrdRel
+  , ule
+  , ult
+  , uge
+  , ugt
+  , sle
+  , slt
+  , sge
+  , sgt
   , Model
   , evalExpr
   , evalAtom
@@ -46,6 +59,7 @@ module ToySolver.BitVector
   , popBacktrackPoint
   ) where
 
+import Prelude hiding (repeat)
 import Control.Applicative hiding (Const (..))
 import Control.Monad
 import Data.Bits
@@ -77,6 +91,19 @@ class Monoid a => IsBV a where
   width :: a -> Int
   extract :: Int -> Int -> a -> a
   fromBV :: BV -> a
+
+repeat :: Monoid m => Int -> m -> m
+repeat i x = mconcat (replicate i x)
+
+zeroExtend :: IsBV a => Int -> a -> a
+zeroExtend i s = fromAscBits (replicate i False) <> s
+
+signExtend :: IsBV a => Int -> a -> a
+signExtend i s
+  | w == 0 = fromAscBits (replicate i False)
+  | otherwise = repeat i (extract (w-1) (w-1) s) <> s
+  where
+    w = width s
 
 -- ------------------------------------------------------------------------
     
@@ -211,12 +238,21 @@ data Op2
   | OpAnd
   | OpOr
   | OpXOr
+  | OpNAnd
+  | OpNOr
+  | OpXNOr
+  | OpComp
   | OpAdd
+  | OpSub
   | OpMul
   | OpUDiv
   | OpURem
+  | OpSDiv
+  | OpSRem
+  | OpSMod
   | OpShl
   | OpLShr
+  | OpAShr
   deriving (Eq, Ord, Enum, Bounded, Show)
 
 instance IsBV Expr where
@@ -229,6 +265,7 @@ instance IsBV Expr where
   width (EOp2 op arg1 arg2) =
     case op of
       OpConcat -> width arg1 + width arg2
+      OpComp -> 1
       _ -> width arg1
 
   extract i j = EOp1 (OpExtract i j)
@@ -243,7 +280,7 @@ instance Bits Expr where
   (.&.) = EOp2 OpAnd
   (.|.) = EOp2 OpOr
   xor = EOp2 OpXOr
-  complement = EOp1 OpNeg
+  complement = EOp1 OpNot
   shiftL x i
     | i < w = extract (w-1-i) 0 x <> nat2bv i 0
     | otherwise = nat2bv w 0
@@ -297,7 +334,25 @@ instance Bits Expr where
   bitSize _ = error "bitSize is not implemented"
   isSigned _ = False
 
-type Atom = OrdRel Expr
+data Atom = Rel (OrdRel Expr) Bool
+  deriving (Eq, Ord, Show)
+
+instance Complement Atom where
+  notB (Rel rel signed) = Rel (notB rel) signed
+
+instance IsEqRel Expr Atom where
+  a .==. b = Rel (a .==. b) False
+  a ./=. b = Rel (a ./=. b) False
+
+ule, ult, uge, ugt, sle, slt, sge, sgt :: Expr -> Expr -> Atom
+ule s t = Rel (s .<=. t) False
+ult s t = Rel (s .<.  t) False
+uge s t = Rel (s .>=. t) False
+ugt s t = Rel (s .>.  t) False
+sle s t = Rel (s .<=. t) True
+slt s t = Rel (s .<.  t) True
+sge s t = Rel (s .>=. t) True
+sgt s t = Rel (s .>.  t) True
 
 -- ------------------------------------------------------------------------
 
@@ -319,7 +374,11 @@ evalExpr (env, divTable, remTable) = f
     evalOp2 OpAnd x y = x .&. y
     evalOp2 OpOr x y = x .|. y
     evalOp2 OpXOr x y = x `xor` y
+    evalOp2 OpNAnd x y = complement (x .&. y)
+    evalOp2 OpNOr x y  = complement (x .|. y)
+    evalOp2 OpXNOr x y = complement (x `xor` y)
     evalOp2 OpAdd x y = nat2bv (w x) (bv2nat x + bv2nat y)
+    evalOp2 OpSub x y = evalOp2 OpAdd x (evalOp1 OpNeg y)
     evalOp2 OpMul x y = nat2bv (w x) (bv2nat x * bv2nat y)
     evalOp2 OpUDiv x y
       | y' /= 0 = nat2bv (w x) (bv2nat x `div` y')
@@ -339,13 +398,81 @@ evalExpr (env, divTable, remTable) = f
       where
         y' :: Integer
         y' = bv2nat y
+    evalOp2 OpSDiv x y
+      | width x < 1 || width y < 1 || width x /= width y = error "invalid width"
+      | not msb_x && not msb_y = evalOp2 OpUDiv x y
+      | msb_x && not msb_y = evalOp1 OpNeg $ evalOp2 OpUDiv (evalOp1 OpNeg x) y
+      | not msb_x && msb_y = evalOp1 OpNeg $ evalOp2 OpUDiv x (evalOp1 OpNeg y)
+      | otherwise = evalOp2 OpUDiv (evalOp1 OpNeg x) (evalOp1 OpNeg y)
+      where
+        msb_x = testBit x (width x - 1)
+        msb_y = testBit y (width y - 1)
+    evalOp2 OpSRem x y
+      | width x < 1 || width y < 1 || width x /= width y = error "invalid width"
+      | not msb_x && not msb_y = evalOp2 OpURem x y
+      | msb_x && not msb_y = evalOp1 OpNeg $ evalOp2 OpURem (evalOp1 OpNeg x) y
+      | not msb_x && msb_y = evalOp2 OpURem x (evalOp1 OpNeg y)
+      | otherwise = evalOp1 OpNeg $ evalOp2 OpURem (evalOp1 OpNeg x) (evalOp1 OpNeg y)
+      where
+        msb_x = testBit x (width x - 1)
+        msb_y = testBit y (width y - 1)
+    evalOp2 OpSMod x y
+      | width x < 1 || width y < 1 || width x /= width y = error "invalid width"
+      | bv2nat u == (0::Integer) = u
+      | not msb_x && not msb_y = u
+      | msb_x && not msb_y = evalOp2 OpAdd (evalOp1 OpNeg u) y
+      | not msb_x && msb_y = evalOp2 OpAdd u y
+      | otherwise = evalOp1 OpNeg u
+      where
+        msb_x = testBit x (width x - 1)
+        msb_y = testBit y (width y - 1)
+        abs_x = if msb_x then evalOp1 OpNeg x else x
+        abs_y = if msb_y then evalOp1 OpNeg y else y
+        u = evalOp2 OpURem abs_x abs_y
     evalOp2 OpShl x y = nat2bv (w x) (bv2nat x `shiftL` bv2nat y)
     evalOp2 OpLShr x y = nat2bv (w x) (bv2nat x `shiftR` bv2nat y)
+    evalOp2 OpAShr x y
+      | not msb_x = evalOp2 OpLShr x y
+      | otherwise = evalOp1 OpNot $ evalOp2 OpLShr (evalOp1 OpNot x) y
+      where
+        msb_x = testBit x (width x - 1)
+    evalOp2 OpComp x y = nat2bv 1 (if x==y then 1 else 0)
     
     w (BV bv) = VG.length bv
 
 evalAtom :: Model -> Atom -> Bool
-evalAtom m (OrdRel lhs op rhs) = evalOp op (evalExpr m lhs) (evalExpr m rhs)
+evalAtom m (Rel (OrdRel lhs op rhs) False) = evalOp op (evalExpr m lhs) (evalExpr m rhs)
+evalAtom m (Rel (OrdRel lhs op rhs) True) =
+  case op of
+    Lt -> bvslt' lhs' rhs'
+    Gt -> bvslt' rhs' lhs'
+    Le -> bvsle' lhs' rhs'
+    Ge -> bvsle' rhs' lhs'
+    Eql -> lhs' == rhs'
+    NEq -> lhs' /= rhs'
+  where
+    lhs' = evalExpr m lhs
+    rhs' = evalExpr m rhs
+
+    bvsle' :: BV -> BV -> Bool
+    bvsle' bs1 bs2
+      | width bs1 /= width bs2 = error ("length mismatch: " ++ show (width bs1) ++ " and " ++ show (width bs2))
+      | w == 0 = true
+      | otherwise = bs1_msb && not bs2_msb || (bs1_msb == bs2_msb) && bs1 <= bs2
+      where
+        w = width bs1
+        bs1_msb = testBit bs1 (w-1)
+        bs2_msb = testBit bs2 (w-1)
+
+    bvslt' :: BV -> BV -> Bool    
+    bvslt' bs1 bs2
+      | width bs1 /= width bs2 = error ("length mismatch: " ++ show (width bs1) ++ " and " ++ show (width bs2))
+      | w == 0 = false
+      | otherwise = bs1_msb && not bs2_msb || (bs1_msb == bs2_msb) && bs1 < bs2
+      where
+        w = width bs1
+        bs1_msb = testBit bs1 (w-1)
+        bs2_msb = testBit bs2 (w-1)
 
 -- ------------------------------------------------------------------------
 
@@ -386,16 +513,25 @@ newVar solver w = do
   return $ EVar $ Var{ varWidth = w, varId = v }
 
 assertAtom :: Solver -> Atom -> Maybe Int -> IO ()
-assertAtom solver (OrdRel lhs op rhs) label = do
+assertAtom solver (Rel (OrdRel lhs op rhs) signed) label = do
   s <- encodeExpr solver lhs
   t <- encodeExpr solver rhs
-  let f = case op of
-            Lt -> isLT s t
-            Gt -> isLT t s
-            Le -> isLE s t
-            Ge -> isLE t s
-            Eql -> isEQ s t
-            NEq -> Not (isEQ s t)
+  let f = if signed then
+            case op of
+              Lt -> isSLT s t
+              Gt -> isSLT t s
+              Le -> isSLE s t
+              Ge -> isSLE t s
+              Eql -> isEQ s t
+              NEq -> Not (isEQ s t)
+          else
+            case op of
+              Lt -> isLT s t
+              Gt -> isLT t s
+              Le -> isLE s t
+              Ge -> isLE t s
+              Eql -> isEQ s t
+              NEq -> Not (isEQ s t)
   size <- Vec.getSize (svContexts solver)
   case label of
     Nothing | size == 1 -> do
@@ -467,16 +603,16 @@ encodeExpr solver = enc
     enc' (EOp1 op arg) = do
       arg' <- enc arg
       case op of
-        OpExtract i j -> return $ VG.slice j (i - j + 1) arg'
+        OpExtract i j -> do
+          unless (VG.length arg' > i && i >= j && j >= 0) $
+            error ("invalid extract " ++ show (i,j) ++ " on bit-vector of length " ++ show (VG.length arg') ++ " : " ++ show arg)
+          return $ VG.slice j (i - j + 1) arg'
         OpNot -> return $ VG.map negate arg'
-        OpNeg -> do
-          let f _ [] ret = return $ VU.fromList $ reverse ret
-              f b (x:xs) ret = do
-                y <- Tseitin.encodeITE (svTseitin solver) b (- x) x
-                b' <- Tseitin.encodeDisj (svTseitin solver) [b, x]
-                f b' xs (y : ret)
-          b0 <- Tseitin.encodeDisj (svTseitin solver) []
-          f b0 (VG.toList arg') []
+        OpNeg -> encodeNegate (svTseitin solver) arg'
+    enc' (EOp2 OpNAnd arg1 arg2) = enc' (EOp1 OpNot (EOp2 OpAnd arg1 arg2))
+    enc' (EOp2 OpNOr  arg1 arg2) = enc' (EOp1 OpNot (EOp2 OpOr arg1 arg2))
+    enc' (EOp2 OpXNOr arg1 arg2) = enc' (EOp1 OpNot (EOp2 OpXOr arg1 arg2))
+    enc' (EOp2 OpSub arg1 arg2) = enc' (EOp2 OpAdd arg1 (EOp1 OpNeg arg2))
     enc' (EOp2 op arg1 arg2) = do
       arg1' <- enc arg1
       arg2' <- enc arg2
@@ -485,30 +621,17 @@ encodeExpr solver = enc
         OpAnd -> VG.zipWithM (\l1 l2 -> Tseitin.encodeConj (svTseitin solver) [l1,l2]) arg1' arg2'
         OpOr  -> VG.zipWithM (\l1 l2 -> Tseitin.encodeDisj (svTseitin solver) [l1,l2]) arg1' arg2'
         OpXOr -> VG.zipWithM (Tseitin.encodeXOR (svTseitin solver)) arg1' arg2'
+        OpComp -> VG.singleton <$> Tseitin.encodeFormula (svTseitin solver) (isEQ arg1' arg2')
         OpAdd -> encodeSum (svTseitin solver) (VG.length arg1') True [arg1', arg2']
         OpMul -> encodeMul (svTseitin solver) True arg1' arg2'
         OpUDiv -> fst <$> encodeDivRem solver arg1' arg2'
         OpURem -> snd <$> encodeDivRem solver arg1' arg2'
-        OpShl  -> do
-          let w = VG.length arg1'
-          b0 <- Tseitin.encodeDisj (svTseitin solver) [] -- False
-          let go bs (i,b) =
-                VG.generateM w $ \j -> do
-                  let k = j - 2^i
-                      t = if k >= 0 then bs VG.! k else b0
-                      e = bs VG.! j
-                  Tseitin.encodeITE (svTseitin solver) b t e
-          foldM go arg1' (zip [(0::Int)..] (VG.toList arg2'))
-        OpLShr -> do
-          let w = VG.length arg1'
-          b0 <- Tseitin.encodeDisj (svTseitin solver) [] -- False
-          let go bs (i,b) =
-                VG.generateM w $ \j -> do
-                  let k = j + 2^i
-                      t = if k < VG.length bs then bs VG.! k else b0
-                      e = bs VG.! j
-                  Tseitin.encodeITE (svTseitin solver) b t e
-          foldM go arg1' (zip [(0::Int)..] (VG.toList arg2'))
+        OpSDiv -> encodeSDiv solver arg1' arg2'
+        OpSRem -> encodeSRem solver arg1' arg2'
+        OpSMod -> encodeSMod solver arg1' arg2'
+        OpShl  -> encodeShl (svTseitin solver) arg1' arg2'
+        OpLShr -> encodeLShr (svTseitin solver) arg1' arg2'
+        OpAShr -> encodeAShr (svTseitin solver) arg1' arg2'
 
 encodeMul :: Tseitin.Encoder IO -> Bool -> SBV -> SBV -> IO SBV
 encodeMul enc allowOverflow arg1 arg2 = do
@@ -590,6 +713,71 @@ encodeHASum = Tseitin.encodeXOR
 encodeHACarry :: Tseitin.Encoder IO -> SAT.Lit -> SAT.Lit -> IO SAT.Lit
 encodeHACarry enc a b = Tseitin.encodeConj enc [a,b]
 
+encodeNegate :: Tseitin.Encoder IO -> SBV -> IO SBV
+encodeNegate enc s = do
+  let f _ [] ret = return $ VU.fromList $ reverse ret
+      f b (x:xs) ret = do
+        y <- Tseitin.encodeITE enc b (- x) x
+        b' <- Tseitin.encodeDisj enc [b, x]
+        f b' xs (y : ret)
+  b0 <- Tseitin.encodeDisj enc []
+  f b0 (VG.toList s) []
+
+encodeAbs :: Tseitin.Encoder IO -> SBV -> IO SBV
+encodeAbs enc s = do
+  let w = VG.length s
+  if w == 0 then
+    return VG.empty
+  else do
+    let msb_s = VG.last s
+    r <- VG.fromList <$> SAT.newVars enc w
+    t <- encodeNegate enc s
+    Tseitin.addFormula enc $
+      ite (Atom (-msb_s)) (isEQ r s) (isEQ r t)
+    return r
+
+encodeShl :: Tseitin.Encoder IO -> SBV -> SBV -> IO SBV
+encodeShl enc s t = do
+  let w = VG.length s
+  when (w /= VG.length t) $ error "invalid width"
+  b0 <- Tseitin.encodeDisj enc [] -- False
+  let go bs (i,b) =
+        VG.generateM w $ \j -> do
+          let k = j - 2^i
+              t = if k >= 0 then bs VG.! k else b0
+              e = bs VG.! j
+          Tseitin.encodeITE enc b t e
+  foldM go s (zip [(0::Int)..] (VG.toList t))
+  
+encodeLShr :: Tseitin.Encoder IO -> SBV -> SBV -> IO SBV
+encodeLShr enc s t = do
+  let w = VG.length s
+  when (w /= VG.length t) $ error "invalid width"
+  b0 <- Tseitin.encodeDisj enc [] -- False
+  let go bs (i,b) =
+        VG.generateM w $ \j -> do
+          let k = j + 2^i
+              t = if k < VG.length bs then bs VG.! k else b0
+              e = bs VG.! j
+          Tseitin.encodeITE enc b t e
+  foldM go s (zip [(0::Int)..] (VG.toList t))
+
+encodeAShr :: Tseitin.Encoder IO -> SBV -> SBV -> IO SBV
+encodeAShr enc s t = do
+  let w = VG.length s
+  when (w /= VG.length t) $ error "invalid width"
+  if w == 0 then
+    return VG.empty
+  else do
+    let msb_s = VG.last s
+    r <- VG.fromList <$> SAT.newVars enc w
+    let s' = VG.map negate s
+    a <- encodeLShr enc s t
+    b <- VG.map negate <$> encodeLShr enc (VG.map negate s) t
+    Tseitin.addFormula enc $
+      ite (Atom (-msb_s)) (isEQ r a) (isEQ r b)
+    return r
+
 encodeDivRem :: Solver -> SBV -> SBV -> IO (SBV, SBV)
 encodeDivRem solver s t = do
   let w = VG.length s
@@ -606,12 +794,83 @@ encodeDivRem solver s t = do
   modifyIORef (svDivRemTable solver) ((s,t,d,r) :)
   return (d,r)
 
+encodeSDiv :: Solver -> SBV -> SBV -> IO SBV
+encodeSDiv solver s t = do
+  let w = VG.length s
+  when (w /= VG.length t) $ error "invalid width"
+  if w == 0 then
+    return VG.empty
+  else do    
+    s' <- encodeNegate (svTseitin solver) s
+    t' <- encodeNegate (svTseitin solver) t
+    let msb_s = VG.last s
+        msb_t = VG.last t
+    r <- VG.fromList <$> SAT.newVars (svSATSolver solver) w
+    let f x y = fst <$> encodeDivRem solver x y
+    a <- f s t
+    b <- encodeNegate (svTseitin solver) =<< f s' t
+    c <- encodeNegate (svTseitin solver) =<< f s t'
+    d <- f s' t'
+    Tseitin.addFormula (svTseitin solver) $
+      ite (Atom (-msb_s) .&&. Atom (-msb_t)) (isEQ r a) $
+      ite (Atom msb_s .&&. Atom (-msb_t)) (isEQ r b) $
+      ite (Atom (-msb_s) .&&. Atom msb_t) (isEQ r c) $
+      (isEQ r d)
+    return r
+
+encodeSRem :: Solver -> SBV -> SBV -> IO SBV
+encodeSRem solver s t = do
+  let w = VG.length s
+  when (w /= VG.length t) $ error "invalid width"
+  if w == 0 then
+    return VG.empty
+  else do
+    s' <- encodeNegate (svTseitin solver) s
+    t' <- encodeNegate (svTseitin solver) t
+    let msb_s = VG.last s
+        msb_t = VG.last t
+    r <- VG.fromList <$> SAT.newVars (svSATSolver solver) w
+    let f x y = snd <$> encodeDivRem solver x y
+    a <- f s t
+    b <- encodeNegate (svTseitin solver) =<< f s' t
+    c <- f s t'
+    d <- encodeNegate (svTseitin solver) =<< f s' t'
+    Tseitin.addFormula (svTseitin solver) $
+      ite (Atom (-msb_s) .&&. Atom (-msb_t)) (isEQ r a) $
+      ite (Atom msb_s .&&. Atom (-msb_t)) (isEQ r b) $
+      ite (Atom (-msb_s) .&&. Atom msb_t) (isEQ r c) $
+      (isEQ r d)
+    return r
+
+encodeSMod :: Solver -> SBV -> SBV -> IO SBV
+encodeSMod solver s t = do
+  let w = VG.length s
+  when (w /= VG.length t) $ error "invalid width"
+  if w == 0 then
+    return VG.empty
+  else do
+    let msb_s = VG.last s
+        msb_t = VG.last t
+    r <- VG.fromList <$> SAT.newVars (svSATSolver solver) w
+    abs_s <- encodeAbs (svTseitin solver) s
+    abs_t <- encodeAbs (svTseitin solver) t
+    u <- snd <$> encodeDivRem solver abs_s abs_t
+    u' <- encodeNegate (svTseitin solver) u
+    a <- encodeSum (svTseitin solver) w True [u', t]
+    b <- encodeSum (svTseitin solver) w True [u, t]
+    Tseitin.addFormula (svTseitin solver) $
+      ite (isZero u .||. (Atom (-msb_s) .&&. Atom (-msb_t))) (isEQ r u) $
+      ite (Atom msb_s .&&. Atom (-msb_t)) (isEQ r a) $
+      ite (Atom (-msb_s) .&&. Atom msb_t) (isEQ r b) $
+      (isEQ r u')
+    return r
+
 isZero :: SBV -> Tseitin.Formula
 isZero bs = And [Not (Atom b) | b <- VG.toList bs]
 
 isEQ :: SBV -> SBV -> Tseitin.Formula
 isEQ bs1 bs2
-  | VG.length bs1 /= VG.length bs2 = undefined
+  | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
   | otherwise = And [Equiv (Atom b1) (Atom b2) | (b1,b2) <- zip (VG.toList bs1) (VG.toList bs2)]
 
 isLE :: SBV -> SBV -> Tseitin.Formula
@@ -620,9 +879,33 @@ isLE bs1 bs2 = lexComp true bs1 bs2
 isLT :: SBV -> SBV -> Tseitin.Formula
 isLT bs1 bs2 = lexComp false bs1 bs2 
 
+isSLE :: SBV -> SBV -> Tseitin.Formula
+isSLE bs1 bs2
+  | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
+  | w == 0 = true
+  | otherwise =
+      Atom bs1_msb .&&. Not (Atom bs2_msb)
+      .||. (Atom bs1_msb .<=>. Atom bs2_msb) .&&. isLE bs1 bs2
+  where
+    w = VG.length bs1
+    bs1_msb = bs1 VG.! (w-1)
+    bs2_msb = bs2 VG.! (w-1)
+
+isSLT :: SBV -> SBV -> Tseitin.Formula
+isSLT bs1 bs2
+  | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
+  | w == 0 = false
+  | otherwise =
+      Atom bs1_msb .&&. Not (Atom bs2_msb)
+      .||. (Atom bs1_msb .<=>. Atom bs2_msb) .&&. isLT bs1 bs2
+  where
+    w = VG.length bs1
+    bs1_msb = bs1 VG.! (w-1)
+    bs2_msb = bs2 VG.! (w-1)
+
 lexComp :: Tseitin.Formula -> SBV -> SBV -> Tseitin.Formula
 lexComp b bs1 bs2
-  | VG.length bs1 /= VG.length bs2 = undefined
+  | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
   | otherwise = f (VG.toList (VG.reverse bs1)) (VG.toList (VG.reverse bs2))
   where
     f [] [] = b
