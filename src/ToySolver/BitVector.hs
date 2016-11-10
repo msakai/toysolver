@@ -28,6 +28,9 @@ module ToySolver.BitVector
   , Expr (..)
   , Op1 (..)
   , Op2 (..)
+  , repeat
+  , zeroExtend
+  , signExtend
   , Atom
   , module ToySolver.Data.OrdRel
   , Model
@@ -46,6 +49,7 @@ module ToySolver.BitVector
   , popBacktrackPoint
   ) where
 
+import Prelude hiding (repeat)
 import Control.Applicative hiding (Const (..))
 import Control.Monad
 import Data.Bits
@@ -77,6 +81,19 @@ class Monoid a => IsBV a where
   width :: a -> Int
   extract :: Int -> Int -> a -> a
   fromBV :: BV -> a
+
+repeat :: Monoid m => Int -> m -> m
+repeat i x = mconcat (replicate i x)
+
+zeroExtend :: IsBV a => Int -> a -> a
+zeroExtend i s = fromAscBits (replicate i False) <> s
+
+signExtend :: IsBV a => Int -> a -> a
+signExtend i s
+  | w == 0 = fromAscBits (replicate i False)
+  | otherwise = repeat i (extract (w-1) (w-1) s) <> s
+  where
+    w = width s
 
 -- ------------------------------------------------------------------------
     

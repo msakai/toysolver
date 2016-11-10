@@ -292,6 +292,7 @@ initialEnv = (fenv, senv)
       | name <- ["=", "true", "false", "not", "and", "or", "xor", "ite", "=>", "distinct"
                 , "+", "-", "*", "/", ">=", "<=", ">", "<"
                 , "extract", "concat", "bvnot", "bvneg"
+                , "repeat", "zero_extend", "sign_extend", "rotate_left", "rotate_right"
                 , "bvcomp"
                 , "bvand", "bvor", "bvxor", "bvnand", "bvnor", "bvxnor"
                 , "bvadd", "bvsub", "bvmul", "bvudiv", "bvurem", "bvsdiv", "bvsrem", "bvsmod", "bvshl", "bvlshr", "bvashr"

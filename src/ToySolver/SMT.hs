@@ -502,6 +502,16 @@ exprSort' fdefs (EAp f xs)
       case (exprSort' fdefs (xs !! 0), exprSort' fdefs (xs !! 1)) of
         (Sort (SSymBitVec m) [], Sort (SSymBitVec n) []) -> Sort (SSymBitVec (m+n)) []
         _ -> undefined
+  | FSym "repeat" [IndexNumeral i] <- f =
+      case exprSort' fdefs (xs !! 0) of
+        Sort (SSymBitVec m) [] -> Sort (SSymBitVec (m * fromIntegral i)) []
+        _ -> undefined
+  | FSym name [IndexNumeral i] <- f, name == "zero_extend" || name == "sign_extend" =
+      case exprSort' fdefs (xs !! 0) of
+        Sort (SSymBitVec m) [] -> Sort (SSymBitVec (m + fromIntegral i)) []
+        _ -> undefined
+  | FSym name [IndexNumeral i] <- f, name == "rotate_left" || name == "rotate_right" =
+      exprSort' fdefs (xs !! 0)
   | f == "bvcomp" = Sort (SSymBitVec 1) []
   | f `Set.member` Set.fromList [name | (name, op) <- bvBinOpsSameSize] =
       exprSort' fdefs (xs !! 0)
@@ -752,6 +762,16 @@ exprToBVExpr solver (EAp "concat" [x,y]) = do
   liftM2 (<>) (exprToBVExpr solver x) (exprToBVExpr solver y)
 exprToBVExpr solver (EAp (FSym "extract" [IndexNumeral i, IndexNumeral j]) [x]) = do
   BV.extract (fromIntegral i) (fromIntegral j) <$> exprToBVExpr solver x
+exprToBVExpr solver (EAp (FSym "repeat" [IndexNumeral i]) [x]) = do
+  BV.repeat (fromIntegral i) <$> exprToBVExpr solver x
+exprToBVExpr solver (EAp (FSym "zero_extend" [IndexNumeral i]) [x]) = do
+  BV.zeroExtend (fromIntegral i) <$> exprToBVExpr solver x
+exprToBVExpr solver (EAp (FSym "sign_extend" [IndexNumeral i]) [x]) = do
+  BV.signExtend (fromIntegral i) <$> exprToBVExpr solver x
+exprToBVExpr solver (EAp (FSym "rotate_left" [IndexNumeral i]) [x]) = do
+  rotateL <$> exprToBVExpr solver x <*> pure (fromIntegral i)
+exprToBVExpr solver (EAp (FSym "rotate_right" [IndexNumeral i]) [x]) = do
+  rotateR <$> exprToBVExpr solver x <*> pure (fromIntegral i)
 exprToBVExpr solver (EAp (FSym op1 []) [x])
   | Just op1' <- Map.lookup op1 table = BV.EOp1 op1' <$> exprToBVExpr solver x
   where
@@ -1087,6 +1107,16 @@ eval m (EAp "concat" [x,y]) =
   ValBitVec $ valToBitVec m (eval m x) <> valToBitVec m (eval m y)
 eval m (EAp (FSym "extract" [IndexNumeral i, IndexNumeral j]) [x]) =
   ValBitVec $ BV.extract (fromIntegral i) (fromIntegral j) (valToBitVec m (eval m x))
+eval m (EAp (FSym "repeat" [IndexNumeral i]) [x]) =
+  ValBitVec $ BV.repeat (fromIntegral i) (valToBitVec m (eval m x))
+eval m (EAp (FSym "zero_extend" [IndexNumeral i]) [x]) =
+  ValBitVec $ BV.zeroExtend (fromIntegral i) (valToBitVec m (eval m x))
+eval m (EAp (FSym "sign_extend" [IndexNumeral i]) [x]) =
+  ValBitVec $ BV.signExtend (fromIntegral i) (valToBitVec m (eval m x))
+eval m (EAp (FSym "rotate_left" [IndexNumeral i]) [x]) =
+  ValBitVec $ rotateL (valToBitVec m (eval m x)) (fromIntegral i)
+eval m (EAp (FSym "rotate_right" [IndexNumeral i]) [x]) =
+  ValBitVec $ rotateR (valToBitVec m (eval m x)) (fromIntegral i)
 eval m (EAp (FSym op1 []) [x])
   | Just op1' <- Map.lookup op1 table =
       let x' = BV.EConst $ valToBitVec m (eval m x)
