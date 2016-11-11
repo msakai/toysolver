@@ -518,11 +518,14 @@ exprSort' fdefs (EAp f xs)
       exprSort' fdefs (xs !! 0)
   | f == "ite" = exprSort' fdefs (xs !! 1)
   | otherwise =
-      case fdefs Map.! f of
-        FBoolVar _ -> Sort SSymBool []
-        FLRAVar _ -> Sort SSymReal []
-        FBVVar v -> Sort (SSymBitVec (BV.width (BV.EVar v))) [] -- XXX
-        FEUFFun (_,s) _ -> s
+      case Map.lookup f fdefs of
+        Nothing -> error $ show f ++ " was not found"
+        Just fdef ->
+          case fdef of
+            FBoolVar _ -> Sort SSymBool []
+            FLRAVar _ -> Sort SSymReal []
+            FBVVar v -> Sort (SSymBitVec (BV.width (BV.EVar v))) [] -- XXX
+            FEUFFun (_,s) _ -> s
 
 -- -------------------------------------------------------------------
                                               
