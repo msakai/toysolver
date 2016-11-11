@@ -14,6 +14,7 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
+import qualified ToySolver.BitVector as BV
 import ToySolver.Data.Boolean
 import ToySolver.Data.OrdRel
 import ToySolver.SMT (Expr (..))
@@ -321,6 +322,64 @@ genExpr sig s size = evalStateT (f s) size
         ]
       put size'
       return e
+    f s@(SMT.Sort (SMT.SSymBitVec w) []) = do
+      modify (subtract 1)
+      size <- get
+      (e,size') <- lift $ oneof $
+        [ do
+            bs <- replicateM w arbitrary
+            return (EBitVec (BV.fromDescBits bs), size)
+        ]
+        ++
+        [ flip runStateT size $ do
+            w1 <- lift $ choose (1,w-1)
+            arg1 <- f (SMT.Sort (SMT.SSymBitVec w1) [])
+            arg2 <- f (SMT.Sort (SMT.SSymBitVec (w - w1)) [])
+            return $ EAp "concat" [arg1,arg2]
+        | w > 0
+        ]
+        ++
+        [ flip runStateT size $ do
+            wd <- lift $ choose (0,10)
+            l <- lift $ choose (0, wd) -- inclusive range
+            let u = l + w - 1
+            arg <- f (SMT.Sort (SMT.SSymBitVec (w + wd)) [])
+            return $ EAp (SMT.FSym "extract" [SMT.IndexNumeral (fromIntegral u), SMT.IndexNumeral (fromIntegral l)]) [arg]
+        | w > 0, size > 0
+        ]
+        ++
+        [ flip runStateT size $ do
+            arg <- f s
+            return $ EAp op [arg]
+        | op <- ["bvnot","bvneg"]
+        , size > 0
+        ]
+        ++
+        [ flip runStateT size $ do
+            arg1 <- f s
+            arg2 <- f s
+            return $ EAp op [arg1, arg2]
+        | op <- ["bvand","bvor","bvxor","bvnand","bvnor","bvxnor","bvadd"] ++
+                ["bvsub","bvmul","bvudiv","bvurem","bvshl","bvlshr","bvashr"] ++
+                (if w >= 1 then ["bvsdiv", "bvsrem", "bvsmod"] else [])
+        , size > 0
+        ]
+        ++
+        [ flip runStateT size $ do
+            w2 <- lift $ choose (1, 10)
+            arg1 <- f (SMT.Sort (SMT.SSymBitVec w2) [])
+            arg2 <- f (SMT.Sort (SMT.SSymBitVec w2) [])
+            return $ EAp "bvcomp" [arg1, arg2]
+        | w == 1
+        ] ++
+        [ flip runStateT size $ do
+            args <- mapM f argsSorts
+            return $ EAp op args
+        | (op, argsSorts) <- Map.findWithDefault [] s sig'
+        , size >= length argsSorts || null argsSorts
+        ]
+      put size'
+      return e      
     f s = do
       modify (subtract 1)
       size <- get
@@ -331,6 +390,15 @@ genExpr sig s size = evalStateT (f s) size
         | (op, argsSorts) <- Map.findWithDefault [] s sig'
         , size >= length argsSorts || null argsSorts
         ]
+        ++
+        [ flip runStateT size $ do
+            w <- lift $ choose (1, 10)
+            arg1 <- f (SMT.Sort (SMT.SSymBitVec w) [])
+            arg2 <- f (SMT.Sort (SMT.SSymBitVec w) [])
+            return $ EAp op [arg1, arg2]
+        | s == SMT.sBool
+        , op <- ["=","bvule","bvult","bvuge","bvugt","bvsle","bvslt","bvsge","bvsgt"]
+        ]        
       put size'
       return e
 
