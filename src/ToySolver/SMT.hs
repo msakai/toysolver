@@ -495,7 +495,7 @@ exprSort' _fdefs (EFrac _) = Sort SSymReal []
 exprSort' _fdefs (EBitVec bv) = Sort (SSymBitVec (BV.width bv)) []
 exprSort' fdefs (EAp f xs)
   | f `Set.member` Set.fromList ["true","false","and","or","xor","not","=>","=",">=","<=",">","<"] = Sort SSymBool []
-  | f `Set.member` Set.fromList ["bvule", "bvult", "bvuge", "bvugt"] = Sort SSymBool []
+  | f `Set.member` Set.fromList ["bvule", "bvult", "bvuge", "bvugt", "bvsle", "bvslt", "bvsge", "bvsgt"] = Sort SSymBool []
   | f `Set.member` Set.fromList ["+", "-", "*", "/"] = Sort SSymReal []
   | FSym "extract" [IndexNumeral i, IndexNumeral j] <- f = Sort (SSymBitVec (fromIntegral (i - j + 1))) []
   | f == "concat" =
@@ -512,6 +512,7 @@ exprSort' fdefs (EAp f xs)
         _ -> undefined
   | FSym name [IndexNumeral i] <- f, name == "rotate_left" || name == "rotate_right" =
       exprSort' fdefs (xs !! 0)
+  | f == "bvnot" || f == "bvneg" = exprSort' fdefs (xs !! 0)
   | f == "bvcomp" = Sort (SSymBitVec 1) []
   | f `Set.member` Set.fromList [name | (name, op) <- bvBinOpsSameSize] =
       exprSort' fdefs (xs !! 0)
@@ -747,6 +748,9 @@ bvBinOpsSameSize =
   [ ("bvand", BV.OpAnd)
   , ("bvor", BV.OpOr)
   , ("bvxor", BV.OpXOr)
+  , ("bvnand", BV.OpNAnd)
+  , ("bvnor", BV.OpNOr)
+  , ("bvxnor", BV.OpXNOr)
   , ("bvadd", BV.OpAdd)
   , ("bvsub", BV.OpSub)
   , ("bvmul", BV.OpMul)
@@ -1091,6 +1095,7 @@ getModel solver = do
 
 eval :: Model -> Expr -> Value
 eval m (EFrac r) = ValRational r
+eval m (EBitVec bv) = ValBitVec bv
 eval m (EAp "true" [])   = ValBool True
 eval m (EAp "false" [])  = ValBool False
 eval m (EAp "ite" [a,b,c]) = if valToBool m (eval m a) then eval m b else eval m c
@@ -1117,6 +1122,10 @@ eval m (EAp "bvule" [x,y]) = ValBool $ valToBitVec m (eval m x) <= valToBitVec m
 eval m (EAp "bvult" [x,y]) = ValBool $ valToBitVec m (eval m x) <  valToBitVec m (eval m y)
 eval m (EAp "bvuge" [x,y]) = ValBool $ valToBitVec m (eval m x) >= valToBitVec m (eval m y)
 eval m (EAp "bvugt" [x,y]) = ValBool $ valToBitVec m (eval m x) >  valToBitVec m (eval m y)
+eval m (EAp "bvsle" [x,y]) = ValBool $ BV.evalAtom (mBVModel m) $ BV.sle (BV.EConst (BV.fromBV (valToBitVec m (eval m x)))) (BV.EConst (BV.fromBV (valToBitVec m (eval m y))))
+eval m (EAp "bvslt" [x,y]) = ValBool $ BV.evalAtom (mBVModel m) $ BV.slt (BV.EConst (BV.fromBV (valToBitVec m (eval m x)))) (BV.EConst (BV.fromBV (valToBitVec m (eval m y))))
+eval m (EAp "bvsge" [x,y]) = ValBool $ BV.evalAtom (mBVModel m) $ BV.sge (BV.EConst (BV.fromBV (valToBitVec m (eval m x)))) (BV.EConst (BV.fromBV (valToBitVec m (eval m y))))
+eval m (EAp "bvsgt" [x,y]) = ValBool $ BV.evalAtom (mBVModel m) $ BV.sgt (BV.EConst (BV.fromBV (valToBitVec m (eval m x)))) (BV.EConst (BV.fromBV (valToBitVec m (eval m y))))
 eval m (EAp "concat" [x,y]) =
   ValBitVec $ valToBitVec m (eval m x) <> valToBitVec m (eval m y)
 eval m (EAp (FSym "extract" [IndexNumeral i, IndexNumeral j]) [x]) =
