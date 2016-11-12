@@ -593,14 +593,14 @@ exprToFormula solver (EAp op [e1,e2]) | Just f <- Map.lookup op table = do
   liftM Atom $ abstractBVAtom solver (f e1' e2')
   where
     table = Map.fromList
-      [ ("bvule", BV.ule)
-      , ("bvult", BV.ult)
-      , ("bvuge", BV.uge)
-      , ("bvugt", BV.ugt)
-      , ("bvsle", BV.sle)
-      , ("bvslt", BV.slt)
-      , ("bvsge", BV.sge)
-      , ("bvsgt", BV.sgt)
+      [ ("bvule", BV.bvule)
+      , ("bvult", BV.bvult)
+      , ("bvuge", BV.bvuge)
+      , ("bvugt", BV.bvugt)
+      , ("bvsle", BV.bvsle)
+      , ("bvslt", BV.bvslt)
+      , ("bvsge", BV.bvsge)
+      , ("bvsgt", BV.bvsgt)
       ]
 exprToFormula solver (EAp f xs) = do
   e' <- exprToEUFTerm solver f xs
@@ -1121,14 +1121,14 @@ eval m (EAp "/" [x,y])
   where
     y' = valToRational m (eval m y)
 
-eval m (EAp "bvule" [x,y]) = ValBool $ valToBitVec m (eval m x) <= valToBitVec m (eval m y)
-eval m (EAp "bvult" [x,y]) = ValBool $ valToBitVec m (eval m x) <  valToBitVec m (eval m y)
-eval m (EAp "bvuge" [x,y]) = ValBool $ valToBitVec m (eval m x) >= valToBitVec m (eval m y)
-eval m (EAp "bvugt" [x,y]) = ValBool $ valToBitVec m (eval m x) >  valToBitVec m (eval m y)
-eval m (EAp "bvsle" [x,y]) = ValBool $ BV.evalAtom (mBVModel m) $ BV.sle (BV.EConst (BV.fromBV (valToBitVec m (eval m x)))) (BV.EConst (BV.fromBV (valToBitVec m (eval m y))))
-eval m (EAp "bvslt" [x,y]) = ValBool $ BV.evalAtom (mBVModel m) $ BV.slt (BV.EConst (BV.fromBV (valToBitVec m (eval m x)))) (BV.EConst (BV.fromBV (valToBitVec m (eval m y))))
-eval m (EAp "bvsge" [x,y]) = ValBool $ BV.evalAtom (mBVModel m) $ BV.sge (BV.EConst (BV.fromBV (valToBitVec m (eval m x)))) (BV.EConst (BV.fromBV (valToBitVec m (eval m y))))
-eval m (EAp "bvsgt" [x,y]) = ValBool $ BV.evalAtom (mBVModel m) $ BV.sgt (BV.EConst (BV.fromBV (valToBitVec m (eval m x)))) (BV.EConst (BV.fromBV (valToBitVec m (eval m y))))
+eval m (EAp "bvule" [x,y]) = ValBool $ BV.bvule (valToBitVec m (eval m x)) (valToBitVec m (eval m y))
+eval m (EAp "bvult" [x,y]) = ValBool $ BV.bvult (valToBitVec m (eval m x)) (valToBitVec m (eval m y))
+eval m (EAp "bvuge" [x,y]) = ValBool $ BV.bvuge (valToBitVec m (eval m x)) (valToBitVec m (eval m y))
+eval m (EAp "bvugt" [x,y]) = ValBool $ BV.bvugt (valToBitVec m (eval m x)) (valToBitVec m (eval m y))
+eval m (EAp "bvsle" [x,y]) = ValBool $ BV.bvsle (valToBitVec m (eval m x)) (valToBitVec m (eval m y))
+eval m (EAp "bvslt" [x,y]) = ValBool $ BV.bvslt (valToBitVec m (eval m x)) (valToBitVec m (eval m y))
+eval m (EAp "bvsge" [x,y]) = ValBool $ BV.bvsge (valToBitVec m (eval m x)) (valToBitVec m (eval m y))
+eval m (EAp "bvsgt" [x,y]) = ValBool $ BV.bvsgt (valToBitVec m (eval m x)) (valToBitVec m (eval m y))
 eval m (EAp "concat" [x,y]) =
   ValBitVec $ valToBitVec m (eval m x) <> valToBitVec m (eval m y)
 eval m (EAp (FSym "extract" [IndexNumeral i, IndexNumeral j]) [x]) =

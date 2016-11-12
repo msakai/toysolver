@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.BitVector
@@ -34,15 +35,8 @@ module ToySolver.BitVector
   , zeroExtend
   , signExtend
   , Atom (..)
+  , BVComparison (..)
   , module ToySolver.Data.OrdRel
-  , ule
-  , ult
-  , uge
-  , ugt
-  , sle
-  , slt
-  , sge
-  , sgt
   , Model
   , evalExpr
   , evalAtom
@@ -120,6 +114,23 @@ signExtend i s
   | otherwise = repeat i (extract (w-1) (w-1) s) <> s
   where
     w = width s
+
+class (IsBV a, IsEqRel a (ComparisonResult a), Complement (ComparisonResult a)) => BVComparison a where
+  type ComparisonResult a
+
+  bvule, bvult, bvuge, bvugt, bvsle, bvslt, bvsge, bvsgt :: a -> a -> ComparisonResult a
+
+  bvule a b = notB (bvult b a)
+  bvult a b = notB (bvule b a)
+  bvuge a b = bvule b a
+  bvugt a b = bvult b a
+
+  bvsle a b = notB (bvslt b a)
+  bvslt a b = notB (bvsle b a)
+  bvsge a b = bvsle b a
+  bvsgt a b = bvslt b a
+
+  {-# MINIMAL (bvule | bvult), (bvsle | bvslt) #-}
 
 -- ------------------------------------------------------------------------
     
@@ -288,6 +299,24 @@ instance IsBV BV where
     | width x /= width y = error "invalid width"
     | otherwise = nat2bv 1 (if x==y then 1 else 0)
 
+instance IsEqRel BV Bool where
+  (.==.) = (==)
+  (./=.) = (/=)
+
+instance BVComparison BV where
+  type ComparisonResult BV = Bool
+
+  bvule = (<=)
+
+  bvsle bs1 bs2
+    | width bs1 /= width bs2 = error ("length mismatch: " ++ show (width bs1) ++ " and " ++ show (width bs2))
+    | w == 0 = true
+    | otherwise = bs1_msb && not bs2_msb || (bs1_msb == bs2_msb) && bs1 <= bs2
+    where
+      w = width bs1
+      bs1_msb = testBit bs1 (w-1)
+      bs2_msb = testBit bs2 (w-1)
+
 bv2nat :: Integral a => BV -> a
 bv2nat (BV bv) = VG.ifoldl' (\r i x -> if x then r+2^i else r) 0 bv
 
@@ -453,15 +482,17 @@ instance IsEqRel Expr Atom where
   a .==. b = Rel (a .==. b) False
   a ./=. b = Rel (a ./=. b) False
 
-ule, ult, uge, ugt, sle, slt, sge, sgt :: Expr -> Expr -> Atom
-ule s t = Rel (s .<=. t) False
-ult s t = Rel (s .<.  t) False
-uge s t = Rel (s .>=. t) False
-ugt s t = Rel (s .>.  t) False
-sle s t = Rel (s .<=. t) True
-slt s t = Rel (s .<.  t) True
-sge s t = Rel (s .>=. t) True
-sgt s t = Rel (s .>.  t) True
+instance BVComparison Expr where
+  type ComparisonResult Expr = Atom
+
+  bvule s t = Rel (s .<=. t) False
+  bvult s t = Rel (s .<.  t) False
+  bvuge s t = Rel (s .>=. t) False
+  bvugt s t = Rel (s .>.  t) False
+  bvsle s t = Rel (s .<=. t) True
+  bvslt s t = Rel (s .<.  t) True
+  bvsge s t = Rel (s .>=. t) True
+  bvsgt s t = Rel (s .>.  t) True
 
 -- ------------------------------------------------------------------------
 
@@ -547,35 +578,15 @@ evalAtom :: Model -> Atom -> Bool
 evalAtom m (Rel (OrdRel lhs op rhs) False) = evalOp op (evalExpr m lhs) (evalExpr m rhs)
 evalAtom m (Rel (OrdRel lhs op rhs) True) =
   case op of
-    Lt -> bvslt' lhs' rhs'
-    Gt -> bvslt' rhs' lhs'
-    Le -> bvsle' lhs' rhs'
-    Ge -> bvsle' rhs' lhs'
+    Lt -> bvslt lhs' rhs'
+    Gt -> bvslt rhs' lhs'
+    Le -> bvsle lhs' rhs'
+    Ge -> bvsle rhs' lhs'
     Eql -> lhs' == rhs'
     NEq -> lhs' /= rhs'
   where
     lhs' = evalExpr m lhs
     rhs' = evalExpr m rhs
-
-    bvsle' :: BV -> BV -> Bool
-    bvsle' bs1 bs2
-      | width bs1 /= width bs2 = error ("length mismatch: " ++ show (width bs1) ++ " and " ++ show (width bs2))
-      | w == 0 = true
-      | otherwise = bs1_msb && not bs2_msb || (bs1_msb == bs2_msb) && bs1 <= bs2
-      where
-        w = width bs1
-        bs1_msb = testBit bs1 (w-1)
-        bs2_msb = testBit bs2 (w-1)
-
-    bvslt' :: BV -> BV -> Bool    
-    bvslt' bs1 bs2
-      | width bs1 /= width bs2 = error ("length mismatch: " ++ show (width bs1) ++ " and " ++ show (width bs2))
-      | w == 0 = false
-      | otherwise = bs1_msb && not bs2_msb || (bs1_msb == bs2_msb) && bs1 < bs2
-      where
-        w = width bs1
-        bs1_msb = testBit bs1 (w-1)
-        bs2_msb = testBit bs2 (w-1)
 
 -- ------------------------------------------------------------------------
 
