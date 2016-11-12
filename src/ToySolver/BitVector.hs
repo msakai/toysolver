@@ -885,8 +885,9 @@ encodeAShr enc s t = do
   else do
     let msb_s = VG.last s
     r <- VG.fromList <$> SAT.newVars enc w
+    s' <- encodeNegate enc s
     a <- encodeLShr enc s t
-    b <- VG.map negate <$> encodeLShr enc (VG.map negate s) t
+    b <- encodeNegate enc =<< encodeLShr enc s' t
     Tseitin.addFormula enc $
       ite (Atom (-msb_s)) (isEQ r a) (isEQ r b)
     return r
