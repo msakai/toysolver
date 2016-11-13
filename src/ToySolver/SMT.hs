@@ -919,6 +919,7 @@ exprToEUFTerm solver f xs = do
 
 exprToEUFArg :: Solver -> Expr -> IO EUF.Term
 exprToEUFArg solver (EFrac r) = lraExprToEUFTerm solver (LA.constant r)
+exprToEUFArg solver (EBitVec bv) = bvExprToEUFTerm solver (BV.fromBV bv)
 exprToEUFArg solver e@(EAp f xs) = do
   Sort s _ <- exprSort solver e
   case s of
@@ -1177,6 +1178,10 @@ eval m expr@(EAp f xs) =
              case IntMap.lookup e (mEntityToRational m) of
                Just r -> ValRational r
                Nothing -> ValRational (fromIntegral (1000000 + e))
+           SSymBitVec w ->
+             case IntMap.lookup e (mEntityToBitVec m) of
+               Just bv -> ValBitVec bv
+               Nothing -> ValBitVec (BV.nat2bv w 0)
 
 valToBool :: Model -> Value -> Bool
 valToBool _ (ValBool b) = b
