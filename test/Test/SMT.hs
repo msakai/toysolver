@@ -336,7 +336,7 @@ genExpr sig s size = evalStateT (f s) size
             arg1 <- f (SMT.Sort (SMT.SSymBitVec w1) [])
             arg2 <- f (SMT.Sort (SMT.SSymBitVec (w - w1)) [])
             return $ EAp "concat" [arg1,arg2]
-        | w > 0
+        | w > 0, size > 0
         ]
         ++
         [ flip runStateT size $ do
@@ -370,7 +370,7 @@ genExpr sig s size = evalStateT (f s) size
             arg1 <- f (SMT.Sort (SMT.SSymBitVec w2) [])
             arg2 <- f (SMT.Sort (SMT.SSymBitVec w2) [])
             return $ EAp "bvcomp" [arg1, arg2]
-        | w == 1
+        | w == 1, size > 0
         ] ++
         [ flip runStateT size $ do
             args <- mapM f argsSorts
