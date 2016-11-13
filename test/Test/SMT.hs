@@ -244,18 +244,23 @@ prop_getModel_eval = QM.monadicIO $ do
     s <- SMT.declareSort solver ("U" ++ show i) 0
     c <- SMT.declareFSym solver ("U" ++ show i ++ "const") [] s
     return (s, (c, ([],s)))
-  let sorts = [SMT.sBool, SMT.sReal] ++ map fst xs
+  let genSorts = oneof $
+        [ return SMT.sBool
+        , return SMT.sReal
+        , do w <- choose (1,10) -- inclusive
+             return $ SMT.Sort (SMT.SSymBitVec w) []
+        ] ++
+        [ fst <$> elements xs | not (null xs) ]
       cs = map snd xs
   fs1 <- QM.pick $ do
-    ts <- listOf (genFunType sorts)
+    ts <- listOf (genFunType genSorts)
     return [("f" ++ show i, t) | (i,t) <- zip [1..] ts]
   fs2 <- QM.run $ forM fs1 $ \(name, t@(argsSorts, resultSort)) -> do
     f <- SMT.declareFSym solver name argsSorts resultSort
     return (f, t)
 
-  let sig =  [("ite", ([SMT.sBool,s,s], s)) | s <- sorts]
-          ++ [("=", ([s,s], SMT.sBool)) | s <- sorts]
-          ++ [ ("true", ([], SMT.sBool))
+  let sig =  [ ("true", ([], SMT.sBool))
+             , ("false", ([], SMT.sBool))
              , ("and", ([SMT.sBool,SMT.sBool], SMT.sBool))
              , ("or", ([SMT.sBool,SMT.sBool], SMT.sBool))
              , ("xor", ([SMT.sBool,SMT.sBool], SMT.sBool))
@@ -275,7 +280,7 @@ prop_getModel_eval = QM.monadicIO $ do
 
   constrs <- QM.pick $ do
     nconstrs <- choose ((0::Int), 3)
-    replicateM nconstrs (genExpr sig SMT.sBool 10)
+    replicateM nconstrs (genExpr genSorts sig SMT.sBool 10)
   ret <- QM.run $ do
     forM_ constrs $ \constr -> SMT.assert solver constr
     SMT.checkSAT solver
@@ -284,14 +289,14 @@ prop_getModel_eval = QM.monadicIO $ do
     forM_ constrs $ \constr -> do
       QM.assert $ SMT.eval m constr == SMT.ValBool True
 
-genFunType :: [SMT.Sort] -> Gen SMT.FunType
-genFunType sorts = do
-  resultSort <- elements sorts
-  argsSorts <- listOf $ elements sorts
+genFunType :: Gen SMT.Sort -> Gen SMT.FunType
+genFunType genSorts = do
+  resultSort <- genSorts
+  argsSorts <- listOf $ genSorts
   return (argsSorts, resultSort)
 
-genExpr :: [(SMT.FSym, SMT.FunType)] -> SMT.Sort -> Int -> Gen SMT.Expr
-genExpr sig s size = evalStateT (f s) size
+genExpr :: Gen SMT.Sort -> [(SMT.FSym, SMT.FunType)] -> SMT.Sort -> Int -> Gen SMT.Expr
+genExpr genSorts sig s size = evalStateT (f s) size
   where
     sig' :: Map SMT.Sort [(SMT.FSym, [SMT.Sort])]
     sig' = Map.fromListWith (++) [(resultSort, [(fsym, argsSorts)]) | (fsym, (argsSorts,resultSort)) <- sig]
@@ -320,6 +325,14 @@ genExpr sig s size = evalStateT (f s) size
         , op /= "*" && op /= "/"
         , size >= length argsSorts || null argsSorts
         ]
+        ++
+        [ flip runStateT size $ do
+            arg1 <- f SMT.sBool
+            arg2 <- f s
+            arg3 <- f s
+            return $ EAp "ite" [arg1, arg2, arg3]
+        | size >= 3
+        ]
       put size'
       return e
     f s@(SMT.Sort (SMT.SSymBitVec w) []) = do
@@ -336,7 +349,7 @@ genExpr sig s size = evalStateT (f s) size
             arg1 <- f (SMT.Sort (SMT.SSymBitVec w1) [])
             arg2 <- f (SMT.Sort (SMT.SSymBitVec (w - w1)) [])
             return $ EAp "concat" [arg1,arg2]
-        | w > 0
+        | w > 0, size >= 2
         ]
         ++
         [ flip runStateT size $ do
@@ -345,14 +358,14 @@ genExpr sig s size = evalStateT (f s) size
             let u = l + w - 1
             arg <- f (SMT.Sort (SMT.SSymBitVec (w + wd)) [])
             return $ EAp (SMT.FSym "extract" [SMT.IndexNumeral (fromIntegral u), SMT.IndexNumeral (fromIntegral l)]) [arg]
-        | w > 0, size > 0
+        | w > 0, size >= 1
         ]
         ++
         [ flip runStateT size $ do
             arg <- f s
             return $ EAp op [arg]
         | op <- ["bvnot","bvneg"]
-        , size > 0
+        , size >= 1
         ]
         ++
         [ flip runStateT size $ do
@@ -362,7 +375,7 @@ genExpr sig s size = evalStateT (f s) size
         | op <- ["bvand","bvor","bvxor","bvnand","bvnor","bvxnor","bvadd"] ++
                 ["bvsub","bvmul","bvudiv","bvurem","bvshl","bvlshr","bvashr"] ++
                 (if w >= 1 then ["bvsdiv", "bvsrem", "bvsmod"] else [])
-        , size > 0
+        , size >= 2
         ]
         ++
         [ flip runStateT size $ do
@@ -370,13 +383,22 @@ genExpr sig s size = evalStateT (f s) size
             arg1 <- f (SMT.Sort (SMT.SSymBitVec w2) [])
             arg2 <- f (SMT.Sort (SMT.SSymBitVec w2) [])
             return $ EAp "bvcomp" [arg1, arg2]
-        | w == 1
-        ] ++
+        | w == 1, size >= 2
+        ]
+        ++
         [ flip runStateT size $ do
             args <- mapM f argsSorts
             return $ EAp op args
         | (op, argsSorts) <- Map.findWithDefault [] s sig'
         , size >= length argsSorts || null argsSorts
+        ]
+        ++
+        [ flip runStateT size $ do
+            arg1 <- f SMT.sBool
+            arg2 <- f s
+            arg3 <- f s
+            return $ EAp "ite" [arg1, arg2, arg3]
+        | size >= 3
         ]
       put size'
       return e      
@@ -392,13 +414,30 @@ genExpr sig s size = evalStateT (f s) size
         ]
         ++
         [ flip runStateT size $ do
+            arg1 <- f SMT.sBool
+            arg2 <- f s
+            arg3 <- f s
+            return $ EAp "ite" [arg1, arg2, arg3]
+        | size >= 3
+        ]
+        ++
+        [ flip runStateT size $ do
+            s1 <- lift $ genSorts
+            arg1 <- f s1
+            arg2 <- f s1
+            return $ EAp op [arg1, arg2]
+        | s == SMT.sBool, size >= 2
+        , op <- ["="]
+        ]
+        ++ 
+        [ flip runStateT size $ do
             w <- lift $ choose (1, 10)
             arg1 <- f (SMT.Sort (SMT.SSymBitVec w) [])
             arg2 <- f (SMT.Sort (SMT.SSymBitVec w) [])
             return $ EAp op [arg1, arg2]
-        | s == SMT.sBool
-        , op <- ["=","bvule","bvult","bvuge","bvugt","bvsle","bvslt","bvsge","bvsgt"]
-        ]        
+        | s == SMT.sBool, size >= 2
+        , op <- ["bvule","bvult","bvuge","bvugt","bvsle","bvslt","bvsge","bvsgt"]
+        ]
       put size'
       return e
 

@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.BitVector
@@ -34,15 +35,8 @@ module ToySolver.BitVector
   , zeroExtend
   , signExtend
   , Atom (..)
+  , BVComparison (..)
   , module ToySolver.Data.OrdRel
-  , ule
-  , ult
-  , uge
-  , ugt
-  , sle
-  , slt
-  , sge
-  , sgt
   , Model
   , evalExpr
   , evalAtom
@@ -92,6 +86,22 @@ class Monoid a => IsBV a where
   extract :: Int -> Int -> a -> a
   fromBV :: BV -> a
 
+  bvneg  :: a -> a
+  bvadd  :: a -> a -> a
+  bvsub  :: a -> a -> a
+  bvmul  :: a -> a -> a
+  bvudiv :: a -> a -> a
+  bvurem :: a -> a -> a
+  bvsdiv :: a -> a -> a
+  bvsrem :: a -> a -> a
+  bvsmod :: a -> a -> a
+  bvshl  :: a -> a -> a
+  bvlshr :: a -> a -> a
+  bvashr :: a -> a -> a
+  bvcomp :: a -> a -> a
+
+  bvsub s t = bvadd s (bvneg t)
+
 repeat :: Monoid m => Int -> m -> m
 repeat i x = mconcat (replicate i x)
 
@@ -104,6 +114,23 @@ signExtend i s
   | otherwise = repeat i (extract (w-1) (w-1) s) <> s
   where
     w = width s
+
+class (IsBV a, IsEqRel a (ComparisonResult a), Complement (ComparisonResult a)) => BVComparison a where
+  type ComparisonResult a
+
+  bvule, bvult, bvuge, bvugt, bvsle, bvslt, bvsge, bvsgt :: a -> a -> ComparisonResult a
+
+  bvule a b = notB (bvult b a)
+  bvult a b = notB (bvule b a)
+  bvuge a b = bvule b a
+  bvugt a b = bvult b a
+
+  bvsle a b = notB (bvslt b a)
+  bvslt a b = notB (bvsle b a)
+  bvsge a b = bvsle b a
+  bvsgt a b = bvslt b a
+
+  {-# MINIMAL (bvule | bvult), (bvsle | bvslt) #-}
 
 -- ------------------------------------------------------------------------
     
@@ -193,6 +220,103 @@ instance IsBV BV where
   extract i j (BV bs) = BV $ VG.slice j (i - j + 1) bs
   fromBV = id
 
+  bvneg x = nat2bv (width x) $ 2 ^ width x - bv2nat x
+
+  bvadd x y
+    | width x /= width y = error "invalid width"
+    | otherwise = nat2bv (width x) (bv2nat x + bv2nat y)
+
+  bvmul x y
+    | width x /= width y = error "invalid width"
+    | otherwise = nat2bv (width x) (bv2nat x * bv2nat y)
+
+  bvudiv x y
+    | width x /= width y = error "invalid width"
+    | y' == 0 = error "division by zero"
+    | otherwise = nat2bv (width x) (bv2nat x `div` y')
+    where
+      y' :: Integer
+      y' = bv2nat y
+
+  bvurem x y
+    | width x /= width y = error "invalid width"
+    | y' == 0 = error "division by zero"
+    | otherwise = nat2bv (width x) (bv2nat x `mod` y')
+    where
+      y' :: Integer
+      y' = bv2nat y
+
+  bvsdiv x y
+    | width x < 1 || width y < 1 || width x /= width y = error "invalid width"
+    | not msb_x && not msb_y = bvudiv x y
+    | msb_x && not msb_y = bvneg $ bvudiv (bvneg x) y
+    | not msb_x && msb_y = bvneg $ bvudiv x (bvneg y)
+    | otherwise = bvudiv (bvneg x) (bvneg y)
+    where
+      msb_x = testBit x (width x - 1)
+      msb_y = testBit y (width y - 1)
+
+  bvsrem x y
+    | width x < 1 || width y < 1 || width x /= width y = error "invalid width"
+    | not msb_x && not msb_y = bvurem x y
+    | msb_x && not msb_y = bvneg $ bvurem (bvneg x) y
+    | not msb_x && msb_y = bvurem x (bvneg y)
+    | otherwise = bvneg $ bvurem (bvneg x) (bvneg y)
+    where
+      msb_x = testBit x (width x - 1)
+      msb_y = testBit y (width y - 1)
+
+  bvsmod x y
+    | width x < 1 || width y < 1 || width x /= width y = error "invalid width"
+    | bv2nat u == (0::Integer) = u
+    | not msb_x && not msb_y = u
+    | msb_x && not msb_y = bvadd (bvneg u) y
+    | not msb_x && msb_y = bvadd u y
+    | otherwise = bvneg u
+    where
+      msb_x = testBit x (width x - 1)
+      msb_y = testBit y (width y - 1)
+      abs_x = if msb_x then bvneg x else x
+      abs_y = if msb_y then bvneg y else y
+      u = bvurem abs_x abs_y
+
+  bvshl  x y
+    | width x /= width y = error "invalid width"
+    | otherwise = nat2bv (width x) (bv2nat x `shiftL` bv2nat y)
+
+  bvlshr x y
+    | width x /= width y = error "invalid width"
+    | otherwise = nat2bv (width x) (bv2nat x `shiftR` bv2nat y)
+
+  bvashr x y
+    | width x /= width y = error "invalid width"
+    | not msb_x = bvlshr x y
+    | otherwise = bvneg $ bvlshr (bvneg x) y
+    where
+      msb_x = testBit x (width x - 1)
+
+  bvcomp x y
+    | width x /= width y = error "invalid width"
+    | otherwise = nat2bv 1 (if x==y then 1 else 0)
+
+instance IsEqRel BV Bool where
+  (.==.) = (==)
+  (./=.) = (/=)
+
+instance BVComparison BV where
+  type ComparisonResult BV = Bool
+
+  bvule = (<=)
+
+  bvsle bs1 bs2
+    | width bs1 /= width bs2 = error ("length mismatch: " ++ show (width bs1) ++ " and " ++ show (width bs2))
+    | w == 0 = true
+    | otherwise = bs1_msb && not bs2_msb || (bs1_msb == bs2_msb) && bs1 <= bs2
+    where
+      w = width bs1
+      bs1_msb = testBit bs1 (w-1)
+      bs2_msb = testBit bs2 (w-1)
+
 bv2nat :: Integral a => BV -> a
 bv2nat (BV bv) = VG.ifoldl' (\r i x -> if x then r+2^i else r) 0 bv
 
@@ -272,6 +396,20 @@ instance IsBV Expr where
 
   fromBV = EConst
 
+  bvneg  = EOp1 OpNeg
+  bvadd  = EOp2 OpAdd
+  bvsub  = EOp2 OpSub
+  bvmul  = EOp2 OpMul
+  bvudiv = EOp2 OpUDiv
+  bvurem = EOp2 OpURem
+  bvsdiv = EOp2 OpSDiv
+  bvsrem = EOp2 OpSRem
+  bvsmod = EOp2 OpSMod
+  bvshl  = EOp2 OpShl
+  bvlshr = EOp2 OpLShr
+  bvashr = EOp2 OpAShr
+  bvcomp = EOp2 OpComp
+
 instance Monoid Expr where
   mempty = EConst mempty
   mappend = EOp2 OpConcat
@@ -344,15 +482,17 @@ instance IsEqRel Expr Atom where
   a .==. b = Rel (a .==. b) False
   a ./=. b = Rel (a ./=. b) False
 
-ule, ult, uge, ugt, sle, slt, sge, sgt :: Expr -> Expr -> Atom
-ule s t = Rel (s .<=. t) False
-ult s t = Rel (s .<.  t) False
-uge s t = Rel (s .>=. t) False
-ugt s t = Rel (s .>.  t) False
-sle s t = Rel (s .<=. t) True
-slt s t = Rel (s .<.  t) True
-sge s t = Rel (s .>=. t) True
-sgt s t = Rel (s .>.  t) True
+instance BVComparison Expr where
+  type ComparisonResult Expr = Atom
+
+  bvule s t = Rel (s .<=. t) False
+  bvult s t = Rel (s .<.  t) False
+  bvuge s t = Rel (s .>=. t) False
+  bvugt s t = Rel (s .>.  t) False
+  bvsle s t = Rel (s .<=. t) True
+  bvslt s t = Rel (s .<.  t) True
+  bvsge s t = Rel (s .>=. t) True
+  bvsgt s t = Rel (s .>.  t) True
 
 -- ------------------------------------------------------------------------
 
@@ -366,9 +506,9 @@ evalExpr (env, divTable, remTable) = f
     f (EOp1 op x) = evalOp1 op (f x)
     f (EOp2 op x y) = evalOp2 op (f x) (f y)
 
-    evalOp1 (OpExtract i j) x = extract i j x
-    evalOp1 OpNot x = complement x
-    evalOp1 OpNeg x = nat2bv (w x) $ 2 ^ w x - bv2nat x
+    evalOp1 (OpExtract i j) = extract i j
+    evalOp1 OpNot = complement
+    evalOp1 OpNeg = bvneg
 
     evalOp2 OpConcat a b = a <> b
     evalOp2 OpAnd x y = x .&. y
@@ -377,42 +517,42 @@ evalExpr (env, divTable, remTable) = f
     evalOp2 OpNAnd x y = complement (x .&. y)
     evalOp2 OpNOr x y  = complement (x .|. y)
     evalOp2 OpXNOr x y = complement (x `xor` y)
-    evalOp2 OpAdd x y = nat2bv (w x) (bv2nat x + bv2nat y)
-    evalOp2 OpSub x y = evalOp2 OpAdd x (evalOp1 OpNeg y)
-    evalOp2 OpMul x y = nat2bv (w x) (bv2nat x * bv2nat y)
+    evalOp2 OpAdd x y = bvadd x y
+    evalOp2 OpSub x y = bvsub x y
+    evalOp2 OpMul x y = bvmul x y
     evalOp2 OpUDiv x y
-      | y' /= 0 = nat2bv (w x) (bv2nat x `div` y')
+      | y' /= 0 = bvudiv x y
       | otherwise =
           case Map.lookup x divTable of
             Just d -> d
-            Nothing -> nat2bv (w x) 0
+            Nothing -> nat2bv (width x) 0
       where
         y' :: Integer
         y' = bv2nat y
     evalOp2 OpURem x y
-      | y' /= 0 = nat2bv (w x) (bv2nat x `mod` y')
+      | y' /= 0 = bvurem x y
       | otherwise =
           case Map.lookup x remTable of
             Just r -> r
-            Nothing -> nat2bv (w x) 0
+            Nothing -> nat2bv (width x) 0
       where
         y' :: Integer
         y' = bv2nat y
     evalOp2 OpSDiv x y
       | width x < 1 || width y < 1 || width x /= width y = error "invalid width"
       | not msb_x && not msb_y = evalOp2 OpUDiv x y
-      | msb_x && not msb_y = evalOp1 OpNeg $ evalOp2 OpUDiv (evalOp1 OpNeg x) y
-      | not msb_x && msb_y = evalOp1 OpNeg $ evalOp2 OpUDiv x (evalOp1 OpNeg y)
-      | otherwise = evalOp2 OpUDiv (evalOp1 OpNeg x) (evalOp1 OpNeg y)
+      | msb_x && not msb_y = bvneg $ evalOp2 OpUDiv (bvneg x) y
+      | not msb_x && msb_y = bvneg $ evalOp2 OpUDiv x (bvneg y)
+      | otherwise = evalOp2 OpUDiv (bvneg x) (bvneg y)
       where
         msb_x = testBit x (width x - 1)
         msb_y = testBit y (width y - 1)
     evalOp2 OpSRem x y
       | width x < 1 || width y < 1 || width x /= width y = error "invalid width"
       | not msb_x && not msb_y = evalOp2 OpURem x y
-      | msb_x && not msb_y = evalOp1 OpNeg $ evalOp2 OpURem (evalOp1 OpNeg x) y
-      | not msb_x && msb_y = evalOp2 OpURem x (evalOp1 OpNeg y)
-      | otherwise = evalOp1 OpNeg $ evalOp2 OpURem (evalOp1 OpNeg x) (evalOp1 OpNeg y)
+      | msb_x && not msb_y = bvneg $ evalOp2 OpURem (bvneg x) y
+      | not msb_x && msb_y = evalOp2 OpURem x (bvneg y)
+      | otherwise = bvneg $ evalOp2 OpURem (bvneg x) (bvneg y)
       where
         msb_x = testBit x (width x - 1)
         msb_y = testBit y (width y - 1)
@@ -420,59 +560,33 @@ evalExpr (env, divTable, remTable) = f
       | width x < 1 || width y < 1 || width x /= width y = error "invalid width"
       | bv2nat u == (0::Integer) = u
       | not msb_x && not msb_y = u
-      | msb_x && not msb_y = evalOp2 OpAdd (evalOp1 OpNeg u) y
-      | not msb_x && msb_y = evalOp2 OpAdd u y
-      | otherwise = evalOp1 OpNeg u
+      | msb_x && not msb_y = bvadd (bvneg u) y
+      | not msb_x && msb_y = bvadd u y
+      | otherwise = bvneg u
       where
         msb_x = testBit x (width x - 1)
         msb_y = testBit y (width y - 1)
-        abs_x = if msb_x then evalOp1 OpNeg x else x
-        abs_y = if msb_y then evalOp1 OpNeg y else y
+        abs_x = if msb_x then bvneg x else x
+        abs_y = if msb_y then bvneg y else y
         u = evalOp2 OpURem abs_x abs_y
-    evalOp2 OpShl x y = nat2bv (w x) (bv2nat x `shiftL` bv2nat y)
-    evalOp2 OpLShr x y = nat2bv (w x) (bv2nat x `shiftR` bv2nat y)
-    evalOp2 OpAShr x y
-      | not msb_x = evalOp2 OpLShr x y
-      | otherwise = evalOp1 OpNot $ evalOp2 OpLShr (evalOp1 OpNot x) y
-      where
-        msb_x = testBit x (width x - 1)
+    evalOp2 OpShl x y = bvshl x y
+    evalOp2 OpLShr x y = bvlshr x y
+    evalOp2 OpAShr x y = bvashr x y
     evalOp2 OpComp x y = nat2bv 1 (if x==y then 1 else 0)
-    
-    w (BV bv) = VG.length bv
 
 evalAtom :: Model -> Atom -> Bool
 evalAtom m (Rel (OrdRel lhs op rhs) False) = evalOp op (evalExpr m lhs) (evalExpr m rhs)
 evalAtom m (Rel (OrdRel lhs op rhs) True) =
   case op of
-    Lt -> bvslt' lhs' rhs'
-    Gt -> bvslt' rhs' lhs'
-    Le -> bvsle' lhs' rhs'
-    Ge -> bvsle' rhs' lhs'
+    Lt -> bvslt lhs' rhs'
+    Gt -> bvslt rhs' lhs'
+    Le -> bvsle lhs' rhs'
+    Ge -> bvsle rhs' lhs'
     Eql -> lhs' == rhs'
     NEq -> lhs' /= rhs'
   where
     lhs' = evalExpr m lhs
     rhs' = evalExpr m rhs
-
-    bvsle' :: BV -> BV -> Bool
-    bvsle' bs1 bs2
-      | width bs1 /= width bs2 = error ("length mismatch: " ++ show (width bs1) ++ " and " ++ show (width bs2))
-      | w == 0 = true
-      | otherwise = bs1_msb && not bs2_msb || (bs1_msb == bs2_msb) && bs1 <= bs2
-      where
-        w = width bs1
-        bs1_msb = testBit bs1 (w-1)
-        bs2_msb = testBit bs2 (w-1)
-
-    bvslt' :: BV -> BV -> Bool    
-    bvslt' bs1 bs2
-      | width bs1 /= width bs2 = error ("length mismatch: " ++ show (width bs1) ++ " and " ++ show (width bs2))
-      | w == 0 = false
-      | otherwise = bs1_msb && not bs2_msb || (bs1_msb == bs2_msb) && bs1 < bs2
-      where
-        w = width bs1
-        bs1_msb = testBit bs1 (w-1)
-        bs2_msb = testBit bs2 (w-1)
 
 -- ------------------------------------------------------------------------
 
@@ -483,6 +597,7 @@ data Solver
   , svTseitin :: Tseitin.Encoder IO
   , svEncTable :: IORef (Map Expr (VU.Vector SAT.Lit))
   , svDivRemTable :: IORef [(VU.Vector SAT.Lit, VU.Vector SAT.Lit, VU.Vector SAT.Lit, VU.Vector SAT.Lit)]
+  , svAtomTable :: IORef (Map NormalizedAtom SAT.Lit)
   , svContexts :: Vec.Vec (IntMap (Maybe Int))
   }
 
@@ -493,6 +608,7 @@ newSolver = do
   tseitin <- Tseitin.newEncoder sat
   table <- newIORef Map.empty
   divRemTable <- newIORef []
+  atomTable <- newIORef Map.empty
   contexts <- Vec.new
   Vec.push contexts IntMap.empty
   return $
@@ -502,6 +618,7 @@ newSolver = do
     , svTseitin = tseitin
     , svEncTable = table
     , svDivRemTable = divRemTable
+    , svAtomTable = atomTable
     , svContexts = contexts
     }
 
@@ -512,32 +629,51 @@ newVar solver w = do
   Vec.push (svVars solver) bs
   return $ EVar $ Var{ varWidth = w, varId = v }
 
+data NormalizedRel = NRSLt | NRULt | NREql
+  deriving (Eq, Ord, Enum, Bounded, Show)  
+
+data NormalizedAtom = NormalizedAtom NormalizedRel Expr Expr
+  deriving (Eq, Ord, Show)
+
+normalizeAtom :: Atom -> (NormalizedAtom, Bool)
+normalizeAtom (Rel (OrdRel lhs op rhs) True) =
+  case op of
+    Lt -> (NormalizedAtom NRSLt lhs rhs, True)
+    Gt -> (NormalizedAtom NRSLt rhs lhs, True)
+    Le -> (NormalizedAtom NRSLt rhs lhs, False)
+    Ge -> (NormalizedAtom NRSLt lhs rhs, False)
+    Eql -> (NormalizedAtom NREql lhs rhs, True)
+    NEq -> (NormalizedAtom NREql lhs rhs, False)
+normalizeAtom (Rel (OrdRel lhs op rhs) False) =
+  case op of
+    Lt -> (NormalizedAtom NRULt lhs rhs, True)
+    Gt -> (NormalizedAtom NRULt rhs lhs, True)
+    Le -> (NormalizedAtom NRULt rhs lhs, False)
+    Ge -> (NormalizedAtom NRULt lhs rhs, False)
+    Eql -> (NormalizedAtom NREql lhs rhs, True)
+    NEq -> (NormalizedAtom NREql lhs rhs, False)
+
 assertAtom :: Solver -> Atom -> Maybe Int -> IO ()
-assertAtom solver (Rel (OrdRel lhs op rhs) signed) label = do
-  s <- encodeExpr solver lhs
-  t <- encodeExpr solver rhs
-  let f = if signed then
-            case op of
-              Lt -> isSLT s t
-              Gt -> isSLT t s
-              Le -> isSLE s t
-              Ge -> isSLE t s
-              Eql -> isEQ s t
-              NEq -> Not (isEQ s t)
-          else
-            case op of
-              Lt -> isLT s t
-              Gt -> isLT t s
-              Le -> isLE s t
-              Ge -> isLE t s
-              Eql -> isEQ s t
-              NEq -> Not (isEQ s t)
+assertAtom solver atom label = do
+  let (atom'@(NormalizedAtom op lhs rhs), polarity) = normalizeAtom atom
+  table <- readIORef (svAtomTable solver)
+  l <- (if polarity then id else negate) <$>
+    case Map.lookup atom' table of
+      Just lit -> return lit
+      Nothing -> do
+        s <- encodeExpr solver lhs
+        t <- encodeExpr solver rhs
+        l <- Tseitin.encodeFormula (svTseitin solver) $
+          case op of
+            NRULt -> isLT s t
+            NRSLt -> isSLT s t
+            NREql -> isEQ s t
+        writeIORef (svAtomTable solver) $ Map.insert atom' l table
+        return l
   size <- Vec.getSize (svContexts solver)
   case label of
-    Nothing | size == 1 -> do
-      Tseitin.addFormula (svTseitin solver) f
+    Nothing | size == 1 -> SAT.addClause (svTseitin solver) [l]
     _ -> do
-      l <- Tseitin.encodeFormula (svTseitin solver) f
       Vec.modify (svContexts solver) (size - 1) (IntMap.insert l label)
 
 check :: Solver -> IO Bool
@@ -771,9 +907,9 @@ encodeAShr enc s t = do
   else do
     let msb_s = VG.last s
     r <- VG.fromList <$> SAT.newVars enc w
-    let s' = VG.map negate s
+    s' <- encodeNegate enc s
     a <- encodeLShr enc s t
-    b <- VG.map negate <$> encodeLShr enc (VG.map negate s) t
+    b <- encodeNegate enc =<< encodeLShr enc s' t
     Tseitin.addFormula enc $
       ite (Atom (-msb_s)) (isEQ r a) (isEQ r b)
     return r
