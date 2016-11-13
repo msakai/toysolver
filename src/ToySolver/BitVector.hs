@@ -597,6 +597,7 @@ data Solver
   , svTseitin :: Tseitin.Encoder IO
   , svEncTable :: IORef (Map Expr (VU.Vector SAT.Lit))
   , svDivRemTable :: IORef [(VU.Vector SAT.Lit, VU.Vector SAT.Lit, VU.Vector SAT.Lit, VU.Vector SAT.Lit)]
+  , svAtomTable :: IORef (Map NormalizedAtom SAT.Lit)
   , svContexts :: Vec.Vec (IntMap (Maybe Int))
   }
 
@@ -607,6 +608,7 @@ newSolver = do
   tseitin <- Tseitin.newEncoder sat
   table <- newIORef Map.empty
   divRemTable <- newIORef []
+  atomTable <- newIORef Map.empty
   contexts <- Vec.new
   Vec.push contexts IntMap.empty
   return $
@@ -616,6 +618,7 @@ newSolver = do
     , svTseitin = tseitin
     , svEncTable = table
     , svDivRemTable = divRemTable
+    , svAtomTable = atomTable
     , svContexts = contexts
     }
 
@@ -626,32 +629,51 @@ newVar solver w = do
   Vec.push (svVars solver) bs
   return $ EVar $ Var{ varWidth = w, varId = v }
 
+data NormalizedRel = NRSLt | NRULt | NREql
+  deriving (Eq, Ord, Enum, Bounded, Show)  
+
+data NormalizedAtom = NormalizedAtom NormalizedRel Expr Expr
+  deriving (Eq, Ord, Show)
+
+normalizeAtom :: Atom -> (NormalizedAtom, Bool)
+normalizeAtom (Rel (OrdRel lhs op rhs) True) =
+  case op of
+    Lt -> (NormalizedAtom NRSLt lhs rhs, True)
+    Gt -> (NormalizedAtom NRSLt rhs lhs, True)
+    Le -> (NormalizedAtom NRSLt rhs lhs, False)
+    Ge -> (NormalizedAtom NRSLt lhs rhs, False)
+    Eql -> (NormalizedAtom NREql lhs rhs, True)
+    NEq -> (NormalizedAtom NREql lhs rhs, False)
+normalizeAtom (Rel (OrdRel lhs op rhs) False) =
+  case op of
+    Lt -> (NormalizedAtom NRULt lhs rhs, True)
+    Gt -> (NormalizedAtom NRULt rhs lhs, True)
+    Le -> (NormalizedAtom NRULt rhs lhs, False)
+    Ge -> (NormalizedAtom NRULt lhs rhs, False)
+    Eql -> (NormalizedAtom NREql lhs rhs, True)
+    NEq -> (NormalizedAtom NREql lhs rhs, False)
+
 assertAtom :: Solver -> Atom -> Maybe Int -> IO ()
-assertAtom solver (Rel (OrdRel lhs op rhs) signed) label = do
-  s <- encodeExpr solver lhs
-  t <- encodeExpr solver rhs
-  let f = if signed then
-            case op of
-              Lt -> isSLT s t
-              Gt -> isSLT t s
-              Le -> isSLE s t
-              Ge -> isSLE t s
-              Eql -> isEQ s t
-              NEq -> Not (isEQ s t)
-          else
-            case op of
-              Lt -> isLT s t
-              Gt -> isLT t s
-              Le -> isLE s t
-              Ge -> isLE t s
-              Eql -> isEQ s t
-              NEq -> Not (isEQ s t)
+assertAtom solver atom label = do
+  let (atom'@(NormalizedAtom op lhs rhs), polarity) = normalizeAtom atom
+  table <- readIORef (svAtomTable solver)
+  l <- (if polarity then id else negate) <$>
+    case Map.lookup atom' table of
+      Just lit -> return lit
+      Nothing -> do
+        s <- encodeExpr solver lhs
+        t <- encodeExpr solver rhs
+        l <- Tseitin.encodeFormula (svTseitin solver) $
+          case op of
+            NRULt -> isLT s t
+            NRSLt -> isSLT s t
+            NREql -> isEQ s t
+        writeIORef (svAtomTable solver) $ Map.insert atom' l table
+        return l
   size <- Vec.getSize (svContexts solver)
   case label of
-    Nothing | size == 1 -> do
-      Tseitin.addFormula (svTseitin solver) f
+    Nothing | size == 1 -> SAT.addClause (svTseitin solver) [l]
     _ -> do
-      l <- Tseitin.encodeFormula (svTseitin solver) f
       Vec.modify (svContexts solver) (size - 1) (IntMap.insert l label)
 
 check :: Solver -> IO Bool
