@@ -230,6 +230,8 @@ Library
      ToySolver.Arith.VirtualSubstitution
      ToySolver.BellmanFord
      ToySolver.BitVector
+     ToySolver.BitVector.Base
+     ToySolver.BitVector.Solver
      ToySolver.EUF.CongruenceClosure
      ToySolver.EUF.EUFSolver
      ToySolver.EUF.FiniteModelFinder
