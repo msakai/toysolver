@@ -665,7 +665,7 @@ assertAtom solver atom label = do
         t <- encodeExpr solver rhs
         l <- Tseitin.encodeFormula (svTseitin solver) $
           case op of
-            NRULt -> isLT s t
+            NRULt -> isULT s t
             NRSLt -> isSLT s t
             NREql -> isEQ s t
         writeIORef (svAtomTable solver) $ Map.insert atom' l table
@@ -926,7 +926,7 @@ encodeDivRem solver s t = do
   Tseitin.addFormula (svTseitin solver) $
     ite (isZero t)
         (And [(isEQ s s' .&&. isZero t') .=>. (isEQ d d' .&&. isEQ r r') | (s',t',d',r') <- tbl, w == VG.length s'])
-        (isEQ s c .&&. isLT r t)
+        (isEQ s c .&&. isULT r t)
   modifyIORef (svDivRemTable solver) ((s,t,d,r) :)
   return (d,r)
 
@@ -1009,23 +1009,14 @@ isEQ bs1 bs2
   | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
   | otherwise = And [Equiv (Atom b1) (Atom b2) | (b1,b2) <- zip (VG.toList bs1) (VG.toList bs2)]
 
-isLE :: SBV -> SBV -> Tseitin.Formula
-isLE bs1 bs2 = lexComp true bs1 bs2
-
-isLT :: SBV -> SBV -> Tseitin.Formula
-isLT bs1 bs2 = lexComp false bs1 bs2 
-
-isSLE :: SBV -> SBV -> Tseitin.Formula
-isSLE bs1 bs2
+isULT :: SBV -> SBV -> Tseitin.Formula
+isULT bs1 bs2
   | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
-  | w == 0 = true
-  | otherwise =
-      Atom bs1_msb .&&. Not (Atom bs2_msb)
-      .||. (Atom bs1_msb .<=>. Atom bs2_msb) .&&. isLE bs1 bs2
+  | otherwise = f (VG.toList (VG.reverse bs1)) (VG.toList (VG.reverse bs2))
   where
-    w = VG.length bs1
-    bs1_msb = bs1 VG.! (w-1)
-    bs2_msb = bs2 VG.! (w-1)
+    f [] [] = false
+    f (b1:bs1) (b2:bs2) =
+      (notB (Atom b1) .&&. Atom b2) .||. ((Atom b1 .=>. Atom b2) .&&. f bs1 bs2)
 
 isSLT :: SBV -> SBV -> Tseitin.Formula
 isSLT bs1 bs2
@@ -1033,20 +1024,11 @@ isSLT bs1 bs2
   | w == 0 = false
   | otherwise =
       Atom bs1_msb .&&. Not (Atom bs2_msb)
-      .||. (Atom bs1_msb .<=>. Atom bs2_msb) .&&. isLT bs1 bs2
+      .||. (Atom bs1_msb .<=>. Atom bs2_msb) .&&. isULT bs1 bs2
   where
     w = VG.length bs1
     bs1_msb = bs1 VG.! (w-1)
     bs2_msb = bs2 VG.! (w-1)
-
-lexComp :: Tseitin.Formula -> SBV -> SBV -> Tseitin.Formula
-lexComp b bs1 bs2
-  | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
-  | otherwise = f (VG.toList (VG.reverse bs1)) (VG.toList (VG.reverse bs2))
-  where
-    f [] [] = b
-    f (b1:bs1) (b2:bs2) =
-      (notB (Atom b1) .&&. Atom b2) .||. ((Atom b1 .=>. Atom b2) .&&. f bs1 bs2)
 
 -- ------------------------------------------------------------------------
 
