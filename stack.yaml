@@ -38,7 +38,7 @@ resolver: lts-7.2
 packages:
 - .
 - location:
-    git: git@github.com:msakai/opencl
+    git: https://github.com/msakai/opencl.git
     commit: 80d0cb9d235819cd53e6a36d7a9258bc19d564ab
   extra-dep: true
 
