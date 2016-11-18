@@ -40,6 +40,7 @@ module ToySolver.SAT.MessagePassing.SurveyPropagation
 
   -- * Computing marginal distributions
   , initializeRandom
+  , initializeRandomDirichlet
   , propagate
   , getVarProb
 
@@ -73,6 +74,7 @@ import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VGM
 import qualified Numeric.Log as L
 import qualified System.Random.MWC as Rand
+import qualified System.Random.MWC.Distributions as Rand
 
 import qualified ToySolver.SAT.Types as SAT
 
@@ -181,10 +183,27 @@ newSolver nv clauses = do
 
 initializeRandom :: Solver -> Rand.GenIO -> IO ()
 initializeRandom solver gen = do
-  n <- getNEdges solver
-  numLoop 0 (n-1) $ \e -> do
-    (d::Double) <- Rand.uniformR (0.05,0.95) gen -- (0.05, 0.95]
-    VGM.unsafeWrite (svEdgeSurvey solver) e (realToFrac d)
+  VG.forM_ (svClauseEdges solver) $ \es -> do
+    case VG.length es of
+      0 -> return ()
+      1 -> VGM.unsafeWrite (svEdgeSurvey solver) (es ! 0) 1
+      n -> do
+        let p :: Double
+            p = 1 / fromIntegral n
+        VG.forM_ es $ \e -> do
+          d <- Rand.uniformR (p*0.5, p*1.5) gen
+          VGM.unsafeWrite (svEdgeSurvey solver) e (realToFrac d)
+
+initializeRandomDirichlet :: Solver -> Rand.GenIO -> IO ()
+initializeRandomDirichlet solver gen = do
+  VG.forM_ (svClauseEdges solver) $ \es -> do
+    case VG.length es of
+      0 -> return ()
+      1 -> VGM.unsafeWrite (svEdgeSurvey solver) (es ! 0) 1
+      len -> do
+        (ps :: V.Vector Double) <- Rand.dirichlet (VG.replicate len 1) gen
+        numLoop 0 (len-1) $ \i -> do
+          VGM.unsafeWrite (svEdgeSurvey solver) (es ! i) (realToFrac (ps ! i))
 
 -- | number of variables of the problem.
 getNVars :: Solver -> IO Int

@@ -39,6 +39,7 @@ module ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL
 
   -- * Computing marginal distributions
   , initializeRandom
+  , initializeRandomDirichlet
   , propagate
   , getVarProb
   ) where
@@ -50,9 +51,11 @@ import Control.Monad
 import Control.Parallel.OpenCL
 import Data.Bits
 import Data.IORef
+import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
+import Data.Vector.Generic ((!))
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VGM
 import Foreign( castPtr, nullPtr, sizeOf )
@@ -61,6 +64,7 @@ import Language.Haskell.TH (runIO, litE, stringL)
 import qualified Numeric.Log as L
 import System.IO
 import qualified System.Random.MWC as Rand
+import qualified System.Random.MWC.Distributions as Rand
 import Text.Printf
 
 import ToySolver.SAT.Types
@@ -201,10 +205,33 @@ deleteSolver solver = do
 
 initializeRandom :: Solver -> Rand.GenIO -> IO ()
 initializeRandom solver gen = do
-  n <- getNEdges solver
-  numLoop 0 (n-1) $ \e -> do
-    (d::Double) <- Rand.uniformR (0.05,0.95) gen -- (0.05, 0.95]
-    VGM.unsafeWrite (svEdgeSurvey solver) e (L.Exp (realToFrac (log d)))
+  n <- getNConstraints solver
+  numLoop 0 (n-1) $ \i -> do
+    off <- fromIntegral <$> VGM.unsafeRead (svClauseOffset solver) i
+    len <- fromIntegral <$> VGM.unsafeRead (svClauseLength solver) i
+    case len of
+      0 -> return ()
+      1 -> VGM.unsafeWrite (svEdgeSurvey solver) off (L.Exp 0)
+      _ -> do
+        let p :: Double
+            p = 1 / fromIntegral len
+        numLoop 0 (len-1) $ \i -> do
+          d <- Rand.uniformR (p*0.5, p*1.5) gen
+          VGM.unsafeWrite (svEdgeSurvey solver) (off+i) (L.Exp (realToFrac (log d)))
+
+initializeRandomDirichlet :: Solver -> Rand.GenIO -> IO ()
+initializeRandomDirichlet solver gen = do
+  n <- getNConstraints solver
+  numLoop 0 (n-1) $ \i -> do
+    off <- fromIntegral <$> VGM.unsafeRead (svClauseOffset solver) i
+    len <- fromIntegral <$> VGM.unsafeRead (svClauseLength solver) i
+    case len of
+      0 -> return ()
+      1 -> VGM.unsafeWrite (svEdgeSurvey solver) off (L.Exp 0)
+      _ -> do
+        (ps :: V.Vector Double) <- Rand.dirichlet (VG.replicate len 1) gen
+        numLoop 0 (len-1) $ \i -> do
+          VGM.unsafeWrite (svEdgeSurvey solver) (off+i) (L.Exp (realToFrac (log (ps ! i))))
 
 -- | number of variables of the problem.
 getNVars :: Solver -> IO Int
