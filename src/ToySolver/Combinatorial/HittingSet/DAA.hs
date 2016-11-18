@@ -11,7 +11,6 @@ module ToySolver.Combinatorial.HittingSet.DAA
   , generateCNFAndDNF
   ) where
 
-import Control.Applicative
 import Control.Monad
 import Control.Monad.Identity
 import Data.Default.Class
@@ -36,7 +35,7 @@ class Monad m => Problem prob m | prob -> m where
            let ys' = IntSet.insert z ys
            b2 <- isInteresting prob ys'
            if b2 then return ys' else return ys
-     Just <$> foldM f xs (IntSet.toList (universe prob `IntSet.difference` xs))
+     liftM Just $ foldM f xs (IntSet.toList (universe prob `IntSet.difference` xs))
 
 data SimpleProblem m = SimpleProblem IntSet (IntSet -> m Bool)
 
