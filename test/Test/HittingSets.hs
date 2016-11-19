@@ -295,7 +295,7 @@ prop_DAA_generateCNFAndDNF =
         is `isImplicateOf` f = is `isImplicantOf` dual f
         is `isPrimeImplicantOf` f = is `isImplicantOf` f && all (\i -> not (IntSet.delete i is `isImplicantOf` f)) (IntSet.toList is)
         is `isPrimeImplicateOf` f = is `isImplicateOf` f && all (\i -> not (IntSet.delete i is `isImplicateOf` f)) (IntSet.toList is)
-        (cnf,dnf) = DAA.generateCNFAndDNF vs f
+        (cnf,dnf) = DAA.generateCNFAndDNF vs f Set.empty Set.empty
     in all (`isPrimeImplicantOf` f) (Set.toList dnf) &&
        all (`isPrimeImplicateOf` f) (Set.toList cnf)
 
