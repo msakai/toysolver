@@ -57,8 +57,8 @@ import qualified ToySolver.Combinatorial.HittingSet.Simple as HTC
 class Monad m => IsProblem prob m | prob -> m where
   universe :: prob -> IntSet
 
-  -- | @isInteresting@ is a monotone function, i.e. if @isInteresting prob xs@
-  -- returns @True@ and xs ⊆ ys, then @isInteresting prob ys@ also returns @True@.
+  -- | Interesting sets are lower closed subsets of 'universe', i.e. if @xs@ is
+  -- interesting then @ys@ ⊆ @xs@ is also interesting.
   isInteresting :: prob -> IntSet -> m Bool
 
   -- | If @xs@ is an interesting set @maximalInterestingSet prob xs@ returns @Just ys@
