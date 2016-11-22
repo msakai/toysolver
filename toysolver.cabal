@@ -423,6 +423,7 @@ Executable toysmt
     mtl,
     parsec,
     toysolver,
+    text,
     transformers,
     transformers-compat
   if flag(UseHaskeline)
@@ -840,6 +841,7 @@ Test-suite TestSuite
     tasty-hunit ==0.9.*,
     tasty-quickcheck ==0.8.*,
     tasty-th,
+    text,
     toysolver,
     transformers,
     transformers-compat,

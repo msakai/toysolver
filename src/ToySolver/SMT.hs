@@ -116,14 +116,14 @@ data SSym
   = SSymBool
   | SSymReal
   | SSymBitVec !Int
-  | SSymUserDeclared String !Int
+  | SSymUninterpreted !InternedText !Int
   deriving (Show, Eq, Ord)
 
 ssymArity :: SSym -> Int
 ssymArity SSymBool = 0
 ssymArity SSymReal = 0
 ssymArity (SSymBitVec _) = 0
-ssymArity (SSymUserDeclared _ ar) = ar
+ssymArity (SSymUninterpreted _ ar) = ar
 
 data Sort = Sort SSym [Sort]
   deriving (Show, Eq, Ord)
@@ -396,7 +396,7 @@ newSolver = do
     }
 
 declareSSym :: Solver -> String -> Int -> IO SSym
-declareSSym solver name arity = return (SSymUserDeclared name arity)
+declareSSym solver name arity = return (SSymUninterpreted (fromString name) arity)
 
 declareSort :: VASortFun a => Solver -> String -> Int -> IO a
 declareSort solver name arity = do
@@ -630,7 +630,7 @@ abstractEq solver e1 e2 = do
       e1' <- exprToBVExpr solver e1
       e2' <- exprToBVExpr solver e2
       liftM Atom $ abstractBVAtom solver (e1' .==. e2')
-    (Sort (SSymUserDeclared _ _) _) -> do
+    (Sort (SSymUninterpreted _ _) _) -> do
       e1' <- exprToEUFArg solver e1
       e2' <- exprToEUFArg solver e2
       liftM Atom $ abstractEUFAtom solver (e1',e2')
@@ -1172,7 +1172,7 @@ eval m expr@(EAp f xs) =
     Just (FEUFFun (_, Sort s []) sym) ->
       let e = EUF.evalAp (mEUFModel m) sym (map (valToEntity m . eval m) xs)
       in case s of
-           SSymUserDeclared _ _ -> ValUninterpreted e (exprSort' (mDefs m) expr)
+           SSymUninterpreted _ _ -> ValUninterpreted e (exprSort' (mDefs m) expr)
            SSymBool -> ValBool (e == mEUFTrue m)
            SSymReal ->
              case IntMap.lookup e (mEntityToRational m) of
@@ -1219,7 +1219,7 @@ entityToValue m e s =
       case IntMap.lookup e (mEntityToBitVec m) of
         Just bv -> ValBitVec bv
         Nothing -> ValBitVec (BV.nat2bv n 0)
-    Sort (SSymUserDeclared _ _) _ -> ValUninterpreted e s
+    Sort (SSymUninterpreted _ _) _ -> ValUninterpreted e s
 
 valSort :: Model -> Value -> Sort
 valSort _m (ValUninterpreted _e s) = s
@@ -1238,7 +1238,7 @@ evalFSym m f =
             case resultSort of
               Sort SSymReal [] -> ValRational 555555 -- Is it ok?
               Sort SSymBool [] -> ValBool False -- Is it ok?
-              Sort (SSymUserDeclared _s _ar) _ss -> ValUninterpreted (EUF.mUnspecified (mEUFModel m)) resultSort
+              Sort (SSymUninterpreted _s _ar) _ss -> ValUninterpreted (EUF.mUnspecified (mEUFModel m)) resultSort
       in FunDef [ (zipWith (entityToValue m) args argsSorts, entityToValue m result resultSort)
                 | (args, result) <- Map.toList tbl ]
                 defaultVal

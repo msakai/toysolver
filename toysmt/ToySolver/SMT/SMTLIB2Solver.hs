@@ -77,6 +77,7 @@ module ToySolver.SMT.SMTLIB2Solver
 import Control.Applicative
 import qualified Control.Exception as E
 import Control.Monad
+import Data.Interned (unintern)
 import Data.Interned.Text
 import Data.IORef
 import Data.Map (Map)
@@ -84,6 +85,7 @@ import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import Data.Ratio
 import Data.String
+import qualified Data.Text as T
 import qualified Data.Version as V
 import Numeric (readDec, readFloat, readHex)
 import System.Exit
@@ -96,7 +98,6 @@ import ToySolver.Version
 import Smtlib.Syntax.Syntax
 import Smtlib.Syntax.ShowSL
 import qualified Smtlib.Parsers.CommandsParsers as CommandsParsers
-import qualified Smtlib.Parsers.CommonParsers as CommonParsers
 
 -- ----------------------------------------------------------------------
 
@@ -128,18 +129,24 @@ interpretSort env s =
     SortId ident -> f ident []
     SortIdentifiers ident args -> f ident args
   where
-    f (I_Symbol "BitVec" [IndexNumeral n]) [] = SMT.Sort (SMT.SSymBitVec n) []
-    f ident args =
+    f ident@(I_Symbol "BitVec" indexes) args
+      | not (null args) = error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for 0)")
+      | [IndexNumeral n] <- indexes = SMT.Sort (SMT.SSymBitVec n) []
+      | otherwise = error ("BitVec: wrong number of indexes (" ++ show (length indexes) ++ " for 1)")
+    f ident@(I_Symbol _ _) _ =
+      error ("unknown sort: " ++ showSL ident)
+    f ident@(ISymbol name) args =
       case Map.lookup name env of
         Nothing -> error ("unknown sort: " ++ showSL ident)
-        Just (SortSym ssym) -> SMT.Sort ssym args'
+        Just (SortSym ssym)
+          | SMT.ssymArity ssym == length args -> SMT.Sort ssym args'
+          | otherwise -> error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for " ++ show (SMT.ssymArity ssym) ++ ")")
         Just (SortExpr s')
           | null args -> s'
-          | otherwise -> error ("sort " ++ showSL ident ++ " does not take arguments")
+          | otherwise -> error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for 0)")
         Just (SortDef env' params body) ->
           interpretSort (Map.fromList (zip params (map SortExpr args')) `Map.union` env') body
       where
-        name = idToName ident
         args' = map (interpretSort env) args
 
 interpretFun :: EEnv -> Term -> SMT.Expr
@@ -207,22 +214,15 @@ valueToTerm (SMT.ValBitVec bv) =
 valueToTerm (SMT.ValUninterpreted n s) =
   TermQualIdentifier $ QIdentifierAs (ISymbol $ "@" ++ show n) (sortToSortTerm s)
 
+ssymToSymbol :: SMT.SSym -> Identifier
+ssymToSymbol SMT.SSymBool = ISymbol "Bool"
+ssymToSymbol SMT.SSymReal = ISymbol "Real"
+ssymToSymbol (SMT.SSymBitVec n) = I_Symbol "BitVec" [IndexNumeral n]
+ssymToSymbol (SMT.SSymUninterpreted name _) = ISymbol (T.unpack (unintern name))
+
 sortToSortTerm :: SMT.Sort -> Sort
-sortToSortTerm (SMT.Sort SMT.SSymBool []) = SortId (ISymbol "Bool")
-sortToSortTerm (SMT.Sort SMT.SSymReal []) = SortId (ISymbol "Real")
-sortToSortTerm (SMT.Sort (SMT.SSymBitVec n) []) = SortId (I_Symbol "BitVec" [IndexNumeral n])
-sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name 0) []) = SortId (nameToId name)
-sortToSortTerm (SMT.Sort (SMT.SSymUserDeclared name _arity) xs) = SortIdentifiers (nameToId name) (map sortToSortTerm xs)
-sortToSortTerm s = error ("unknown sort: " ++ show s)
-
-idToName :: Identifier -> String
-idToName = showSL
-
-nameToId :: String -> Identifier
-nameToId s =
-  case Parsec.parse CommonParsers.parseIdentifier "" s of
-    Left e -> error (show e)
-    Right x -> x
+sortToSortTerm (SMT.Sort s []) = SortId (ssymToSymbol s)
+sortToSortTerm (SMT.Sort s xs) = SortIdentifiers (ssymToSymbol s) (map sortToSortTerm xs)
 
 -- ----------------------------------------------------------------------
 
