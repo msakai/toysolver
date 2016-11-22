@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP, OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP, OverloadedStrings, ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SMT
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  unstable
--- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP, OverloadedStrings)
+-- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP, OverloadedStrings, ScopedTypeVariables)
 --
 -----------------------------------------------------------------------------
 module ToySolver.SMT
@@ -514,7 +514,7 @@ exprSort' fdefs (EAp f xs)
       exprSort' fdefs (xs !! 0)
   | f == "bvnot" || f == "bvneg" = exprSort' fdefs (xs !! 0)
   | f == "bvcomp" = Sort (SSymBitVec 1) []
-  | f `Set.member` Set.fromList [name | (name, op) <- bvBinOpsSameSize] =
+  | f `Set.member` Set.fromList [name | (name, _op::BV.BV->BV.BV->BV.BV) <- bvBinOpsSameSize] =
       exprSort' fdefs (xs !! 0)
   | f == "ite" = exprSort' fdefs (xs !! 1)
   | otherwise =
@@ -746,25 +746,25 @@ lraExprFromTerm solver t = do
 
 -- -------------------------------------------------------------------
 
-bvBinOpsSameSize :: IsString s => [(s, BV.Op2)]
+bvBinOpsSameSize :: (IsString s, BV.IsBV bv) => [(s, bv -> bv -> bv)]
 bvBinOpsSameSize =
-  [ ("bvand", BV.OpAnd)
-  , ("bvor", BV.OpOr)
-  , ("bvxor", BV.OpXOr)
-  , ("bvnand", BV.OpNAnd)
-  , ("bvnor", BV.OpNOr)
-  , ("bvxnor", BV.OpXNOr)
-  , ("bvadd", BV.OpAdd)
-  , ("bvsub", BV.OpSub)
-  , ("bvmul", BV.OpMul)
-  , ("bvudiv", BV.OpUDiv)
-  , ("bvurem", BV.OpURem)
-  , ("bvsdiv", BV.OpSDiv)
-  , ("bvsrem", BV.OpSRem)
-  , ("bvsmod", BV.OpSMod)
-  , ("bvshl", BV.OpShl)
-  , ("bvlshr", BV.OpLShr)
-  , ("bvashr", BV.OpAShr)
+  [ ("bvand", BV.bvand)
+  , ("bvor", BV.bvor)
+  , ("bvxor", BV.bvxor)
+  , ("bvnand", BV.bvnand)
+  , ("bvnor", BV.bvnor)
+  , ("bvxnor", BV.bvxnor)
+  , ("bvadd", BV.bvadd)
+  , ("bvsub", BV.bvsub)
+  , ("bvmul", BV.bvmul)
+  , ("bvudiv", BV.bvudiv)
+  , ("bvurem", BV.bvurem)
+  , ("bvsdiv", BV.bvsdiv)
+  , ("bvsrem", BV.bvsrem)
+  , ("bvsmod", BV.bvsmod)
+  , ("bvshl", BV.bvshl)
+  , ("bvlshr", BV.bvlshr)
+  , ("bvashr", BV.bvashr)
   ]
 
 exprToBVExpr :: Solver -> Expr -> IO BV.Expr
@@ -784,17 +784,17 @@ exprToBVExpr solver (EAp (FSym "rotate_left" [IndexNumeral i]) [x]) = do
 exprToBVExpr solver (EAp (FSym "rotate_right" [IndexNumeral i]) [x]) = do
   rotateR <$> exprToBVExpr solver x <*> pure (fromIntegral i)
 exprToBVExpr solver (EAp (FSym op1 []) [x])
-  | Just op1' <- Map.lookup op1 table = BV.EOp1 op1' <$> exprToBVExpr solver x
+  | Just op1' <- Map.lookup op1 table = op1' <$> exprToBVExpr solver x
   where
     table =
       Map.fromList
-      [ ("bvnot", BV.OpNot)
-      , ("bvneg", BV.OpNeg)
+      [ ("bvnot", BV.bvnot)
+      , ("bvneg", BV.bvneg)
       ]
 exprToBVExpr solver (EAp (FSym op2 []) [x,y])
-  | Just op2' <- Map.lookup op2 table = liftM2 (BV.EOp2 op2') (exprToBVExpr solver x) (exprToBVExpr solver y)
+  | Just op2' <- Map.lookup op2 table = liftM2 op2' (exprToBVExpr solver x) (exprToBVExpr solver y)
   where
-    table = Map.fromList $ [("bvcomp", BV.OpComp)] ++ bvBinOpsSameSize
+    table = Map.fromList $ [("bvcomp", BV.bvcomp)] ++ bvBinOpsSameSize
 exprToBVExpr solver (EAp "ite" [c,t,e]) = do
   c' <- exprToFormula solver c
   t' <- exprToBVExpr solver t
@@ -1145,20 +1145,20 @@ eval m (EAp (FSym "rotate_right" [IndexNumeral i]) [x]) =
 eval m (EAp (FSym op1 []) [x])
   | Just op1' <- Map.lookup op1 table =
       let x' = BV.EConst $ valToBitVec m (eval m x)
-      in ValBitVec $ BV.evalExpr (mBVModel m) $ BV.EOp1 op1' x'
+      in ValBitVec $ BV.evalExpr (mBVModel m) $ op1' x'
   where
     table =
       Map.fromList
-      [ ("bvnot", BV.OpNot)
-      , ("bvneg", BV.OpNeg)
+      [ ("bvnot", BV.bvnot)
+      , ("bvneg", BV.bvneg)
       ]
 eval m (EAp (FSym op2 []) [x,y])
   | Just op2' <- Map.lookup op2 table =
       let x' = BV.EConst $ valToBitVec m (eval m x)
           y' = BV.EConst $ valToBitVec m (eval m y)
-      in ValBitVec $ BV.evalExpr (mBVModel m) $ BV.EOp2 op2' x' y'
+      in ValBitVec $ BV.evalExpr (mBVModel m) $ op2' x' y'
   where
-    table = Map.fromList $ [("bvcomp", BV.OpComp)] ++ bvBinOpsSameSize
+    table = Map.fromList $ [("bvcomp", BV.bvcomp)] ++ bvBinOpsSameSize
 
 eval m (EAp "=" [x,y])   = ValBool $
   case (eval m x, eval m y) of

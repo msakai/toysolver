@@ -210,10 +210,6 @@ encodeExpr solver = enc
           return $ VG.slice j (i - j + 1) arg'
         OpNot -> return $ VG.map negate arg'
         OpNeg -> encodeNegate (svTseitin solver) arg'
-    enc' (EOp2 OpNAnd arg1 arg2) = enc' (EOp1 OpNot (EOp2 OpAnd arg1 arg2))
-    enc' (EOp2 OpNOr  arg1 arg2) = enc' (EOp1 OpNot (EOp2 OpOr arg1 arg2))
-    enc' (EOp2 OpXNOr arg1 arg2) = enc' (EOp1 OpNot (EOp2 OpXOr arg1 arg2))
-    enc' (EOp2 OpSub arg1 arg2) = enc' (EOp2 OpAdd arg1 (EOp1 OpNeg arg2))
     enc' (EOp2 op arg1 arg2) = do
       arg1' <- enc arg1
       arg2' <- enc arg2

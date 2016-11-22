@@ -48,7 +48,7 @@ case_division_by_zero_cong = do
   v1 <- BV.newVar solver 8
   v2 <- BV.newVar solver 8
   let z = BV.nat2bv 8 0
-  BV.assertAtom solver (BV.EOp2 BV.OpUDiv v1 z ./=. BV.EOp2 BV.OpUDiv v2 z) Nothing
+  BV.assertAtom solver (BV.bvudiv v1 z ./=. BV.bvudiv v2 z) Nothing
   ret <- BV.check solver
   ret @?= True
   BV.assertAtom solver (v1 .==. v2) Nothing
@@ -97,24 +97,24 @@ genBVExpr bases = f
             let u = l + w - 1
             return $ BV.extract u l e
           gNormalOp1 = do
-            op <- elements [BV.OpNot, BV.OpNeg]
+            op <- elements [BV.bvnot, BV.bvneg]
             e <- f w (s - 1)
-            return $ BV.EOp1 op e
+            return $ op e
           gNormalOp2 = do
             op <- elements $
-                    [BV.OpAnd, BV.OpOr, BV.OpXOr, BV.OpNAnd, BV.OpNOr, BV.OpXNOr] ++
-                    [BV.OpAdd, BV.OpSub, BV.OpMul, BV.OpUDiv, BV.OpURem, BV.OpShl, BV.OpLShr, BV.OpAShr] ++
-                    (if w >= 1 then [BV.OpSDiv, BV.OpSRem, BV.OpSMod] else [])
+                    [BV.bvand, BV.bvor, BV.bvxor, BV.bvnand, BV.bvnor, BV.bvxnor] ++
+                    [BV.bvadd, BV.bvsub, BV.bvmul, BV.bvudiv, BV.bvurem, BV.bvshl, BV.bvlshr, BV.bvashr] ++
+                    (if w >= 1 then [BV.bvsdiv, BV.bvsrem, BV.bvsmod] else [])
             s1 <- choose (0,s)
             lhs <- f w s1
             rhs <- f w (s - s1)
-            return $ BV.EOp2 op lhs rhs
+            return $ op lhs rhs
           gComp = do
             w1 <- choose (0, wmax*2)
             s1 <- choose (0,s)
             lhs <- f w1 s1
             rhs <- f w1 (s - s1)
-            return $ BV.EOp2 BV.OpComp lhs rhs
+            return $ BV.bvcomp lhs rhs
             where
               wmax = maximum (0 : map BV.width bases)
       if s <= 0 then do

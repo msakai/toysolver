@@ -57,6 +57,14 @@ class Monoid a => IsBV a where
   extract :: Int -> Int -> a -> a
   fromBV :: BV -> a
 
+  bvnot  :: a -> a
+  bvand  :: a -> a -> a
+  bvor   :: a -> a -> a
+  bvxor  :: a -> a -> a
+  bvnand :: a -> a -> a
+  bvnor  :: a -> a -> a
+  bvxnor :: a -> a -> a
+
   bvneg  :: a -> a
   bvadd  :: a -> a -> a
   bvsub  :: a -> a -> a
@@ -70,6 +78,10 @@ class Monoid a => IsBV a where
   bvlshr :: a -> a -> a
   bvashr :: a -> a -> a
   bvcomp :: a -> a -> a
+
+  bvnand s t = bvnot (bvand s t)
+  bvnor s t  = bvnot (bvor s t)
+  bvxnor s t = bvnot (bvxor s t)
 
   bvsub s t = bvadd s (bvneg t)
 
@@ -120,17 +132,10 @@ instance Show BV where
   show bv = "0b" ++ [if b then '1' else '0' | b <- toDescBits bv]
 
 instance Bits BV where
-  BV bs1 .&. BV bs2
-    | VG.length bs1 /= VG.length bs2 = error "width mismatch"
-    | otherwise = BV $ VG.zipWith (&&) bs1 bs2
-  BV bs1 .|. BV bs2
-    | VG.length bs1 /= VG.length bs2 = error "width mismatch"
-    | otherwise = BV $ VG.zipWith (||) bs1 bs2
-  xor (BV bs1) (BV bs2) 
-    | VG.length bs1 /= VG.length bs2 = error "width mismatch"
-    | otherwise = BV $ VG.zipWith (/=) bs1 bs2
-
-  complement (BV bs) = BV $ VG.map not bs
+  (.&.) = bvand
+  (.|.) = bvor
+  xor = bvxor
+  complement = bvnot
 
   shiftL x i
     | i < w = extract (w-1-i) 0 x <> nat2bv i 0
@@ -190,6 +195,18 @@ instance IsBV BV where
   width (BV bs) = VG.length bs
   extract i j (BV bs) = BV $ VG.slice j (i - j + 1) bs
   fromBV = id
+
+  bvnot (BV bs) = BV $ VG.map not bs
+
+  bvand (BV bs1) (BV bs2)
+    | VG.length bs1 /= VG.length bs2 = error "width mismatch"
+    | otherwise = BV $ VG.zipWith (&&) bs1 bs2
+  bvor (BV bs1) (BV bs2)
+    | VG.length bs1 /= VG.length bs2 = error "width mismatch"
+    | otherwise = BV $ VG.zipWith (||) bs1 bs2
+  bvxor (BV bs1) (BV bs2) 
+    | VG.length bs1 /= VG.length bs2 = error "width mismatch"
+    | otherwise = BV $ VG.zipWith (/=) bs1 bs2
 
   bvneg x = nat2bv (width x) $ 2 ^ width x - bv2nat x
 
@@ -333,12 +350,8 @@ data Op2
   | OpAnd
   | OpOr
   | OpXOr
-  | OpNAnd
-  | OpNOr
-  | OpXNOr
   | OpComp
   | OpAdd
-  | OpSub
   | OpMul
   | OpUDiv
   | OpURem
@@ -367,9 +380,13 @@ instance IsBV Expr where
 
   fromBV = EConst
 
+  bvnot = EOp1 OpNot
+  bvand = EOp2 OpAnd
+  bvor  = EOp2 OpOr
+  bvxor = EOp2 OpXOr
+
   bvneg  = EOp1 OpNeg
   bvadd  = EOp2 OpAdd
-  bvsub  = EOp2 OpSub
   bvmul  = EOp2 OpMul
   bvudiv = EOp2 OpUDiv
   bvurem = EOp2 OpURem
@@ -386,10 +403,10 @@ instance Monoid Expr where
   mappend = EOp2 OpConcat
 
 instance Bits Expr where
-  (.&.) = EOp2 OpAnd
-  (.|.) = EOp2 OpOr
-  xor = EOp2 OpXOr
-  complement = EOp1 OpNot
+  (.&.) = bvand
+  (.|.) = bvor
+  xor = bvxor
+  complement = bvnot
   shiftL x i
     | i < w = extract (w-1-i) 0 x <> nat2bv i 0
     | otherwise = nat2bv w 0
@@ -430,7 +447,7 @@ instance Bits Expr where
       w = width x
 
   complementBit x i
-    | 0 <= i && i < w = extract (w-1) (i+1) x <> complement (extract i i x) <> extract (i-1) 0 x
+    | 0 <= i && i < w = extract (w-1) (i+1) x <> bvnot (extract i i x) <> extract (i-1) 0 x
     | otherwise = x
     where
       w = width x
@@ -478,18 +495,14 @@ evalExpr (env, divTable, remTable) = f
     f (EOp2 op x y) = evalOp2 op (f x) (f y)
 
     evalOp1 (OpExtract i j) = extract i j
-    evalOp1 OpNot = complement
+    evalOp1 OpNot = bvnot
     evalOp1 OpNeg = bvneg
 
     evalOp2 OpConcat a b = a <> b
-    evalOp2 OpAnd x y = x .&. y
-    evalOp2 OpOr x y = x .|. y
-    evalOp2 OpXOr x y = x `xor` y
-    evalOp2 OpNAnd x y = complement (x .&. y)
-    evalOp2 OpNOr x y  = complement (x .|. y)
-    evalOp2 OpXNOr x y = complement (x `xor` y)
+    evalOp2 OpAnd x y = bvand x y
+    evalOp2 OpOr x y = bvor x y
+    evalOp2 OpXOr x y = bvxor x y
     evalOp2 OpAdd x y = bvadd x y
-    evalOp2 OpSub x y = bvsub x y
     evalOp2 OpMul x y = bvmul x y
     evalOp2 OpUDiv x y
       | y' /= 0 = bvudiv x y
