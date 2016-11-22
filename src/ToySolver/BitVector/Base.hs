@@ -350,12 +350,8 @@ data Op2
   | OpAnd
   | OpOr
   | OpXOr
-  | OpNAnd
-  | OpNOr
-  | OpXNOr
   | OpComp
   | OpAdd
-  | OpSub
   | OpMul
   | OpUDiv
   | OpURem
@@ -391,7 +387,6 @@ instance IsBV Expr where
 
   bvneg  = EOp1 OpNeg
   bvadd  = EOp2 OpAdd
-  bvsub  = EOp2 OpSub
   bvmul  = EOp2 OpMul
   bvudiv = EOp2 OpUDiv
   bvurem = EOp2 OpURem
@@ -507,11 +502,7 @@ evalExpr (env, divTable, remTable) = f
     evalOp2 OpAnd x y = bvand x y
     evalOp2 OpOr x y = bvor x y
     evalOp2 OpXOr x y = bvxor x y
-    evalOp2 OpNAnd x y = bvnand x y
-    evalOp2 OpNOr x y  = bvnor x y
-    evalOp2 OpXNOr x y = bvxnor x y
     evalOp2 OpAdd x y = bvadd x y
-    evalOp2 OpSub x y = bvsub x y
     evalOp2 OpMul x y = bvmul x y
     evalOp2 OpUDiv x y
       | y' /= 0 = bvudiv x y
