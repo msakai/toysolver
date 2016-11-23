@@ -1228,6 +1228,7 @@ valSort _m (ValRational _r) = sReal
 valSort _m (ValBitVec bv) = sBitVec (BV.width bv)
 
 data FunDef = FunDef [([Value], Value)] Value
+  deriving (Eq, Show)
 
 evalFSym :: Model -> FSym -> FunDef
 evalFSym m f = 
@@ -1238,6 +1239,7 @@ evalFSym m f =
             case resultSort of
               Sort SSymReal [] -> ValRational 555555 -- Is it ok?
               Sort SSymBool [] -> ValBool False -- Is it ok?
+              Sort (SSymBitVec w) [] -> ValBitVec (BV.nat2bv w 0) -- Is it ok?
               Sort (SSymUninterpreted _s _ar) _ss -> ValUninterpreted (EUF.mUnspecified (mEUFModel m)) resultSort
       in FunDef [ (zipWith (entityToValue m) args argsSorts, entityToValue m result resultSort)
                 | (args, result) <- Map.toList tbl ]

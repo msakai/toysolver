@@ -2,6 +2,7 @@
 module Test.SMT (smtTestGroup) where
 
 import Control.Applicative((<$>))
+import Control.DeepSeq
 import Control.Exception (evaluate)
 import Control.Monad
 import Control.Monad.State.Strict
@@ -288,6 +289,61 @@ prop_getModel_eval = QM.monadicIO $ do
     m <- QM.run $ SMT.getModel solver
     forM_ constrs $ \constr -> do
       QM.assert $ SMT.eval m constr == SMT.ValBool True
+
+prop_getModel_evalFSym :: Property
+prop_getModel_evalFSym = QM.monadicIO $ do
+  solver <- QM.run $ SMT.newSolver
+
+  nsorts <- QM.pick $ choose ((0::Int), 3)
+  xs <- QM.run $ forM [(1::Int)..nsorts] $ \i -> do
+    s <- SMT.declareSort solver ("U" ++ show i) 0
+    c <- SMT.declareFSym solver ("U" ++ show i ++ "const") [] s
+    return (s, (c, ([],s)))
+  let genSorts = oneof $
+        [ return SMT.sBool
+        , return SMT.sReal
+        , do w <- choose (1,10) -- inclusive
+             return $ SMT.Sort (SMT.SSymBitVec w) []
+        ] ++
+        [ fst <$> elements xs | not (null xs) ]
+      cs = map snd xs
+  fs1 <- QM.pick $ do
+    ts <- listOf (genFunType genSorts)
+    return [("f" ++ show i, t) | (i,t) <- zip [1..] ts]
+  fs2 <- QM.run $ forM fs1 $ \(name, t@(argsSorts, resultSort)) -> do
+    f <- SMT.declareFSym solver name argsSorts resultSort
+    return (f, t)
+
+  let sig =  [ ("true", ([], SMT.sBool))
+             , ("false", ([], SMT.sBool))
+             , ("and", ([SMT.sBool,SMT.sBool], SMT.sBool))
+             , ("or", ([SMT.sBool,SMT.sBool], SMT.sBool))
+             , ("xor", ([SMT.sBool,SMT.sBool], SMT.sBool))
+             , ("not", ([SMT.sBool], SMT.sBool))
+             , ("=>", ([SMT.sBool,SMT.sBool], SMT.sBool))
+             , ("+", ([SMT.sReal,SMT.sReal], SMT.sReal))
+             , ("-", ([SMT.sReal,SMT.sReal], SMT.sReal))
+             , ("*", ([SMT.sReal,SMT.sReal], SMT.sReal))
+             , ("/", ([SMT.sReal,SMT.sReal], SMT.sReal))
+             , ("-", ([SMT.sReal], SMT.sReal))
+             , (">=", ([SMT.sReal, SMT.sReal], SMT.sBool))
+             , ("<=", ([SMT.sReal, SMT.sReal], SMT.sBool))
+             , (">", ([SMT.sReal, SMT.sReal], SMT.sBool))
+             , ("<", ([SMT.sReal, SMT.sReal], SMT.sBool))
+             ]
+          ++ fs2 ++ cs
+
+  constrs <- QM.pick $ do
+    nconstrs <- choose ((0::Int), 3)
+    replicateM nconstrs (genExpr genSorts sig SMT.sBool 10)
+  QM.run $ do
+    forM_ constrs $ \constr -> SMT.assert solver constr
+    ret <- SMT.checkSAT solver    
+    when ret $ do
+      m <- SMT.getModel solver
+      forM_ fs2 $ \(f,_) -> do
+        evaluate $ force $ show $ SMT.evalFSym m f
+      return ()
 
 genFunType :: Gen SMT.Sort -> Gen SMT.FunType
 genFunType genSorts = do
