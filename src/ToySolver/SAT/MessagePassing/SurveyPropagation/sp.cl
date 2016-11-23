@@ -10,7 +10,7 @@ typedef float logfloat;
 typedef float2 logfloat2;
 
 static inline logfloat comp(logfloat x) {
-  return log(fmax(0.0, 1.0 - exp(x)));
+  return log1p(fmax(-1.0f, -exp(x)));
 }
 
 __kernel void

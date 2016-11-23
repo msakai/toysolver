@@ -84,7 +84,7 @@ infixr 8 ^*
 L.Exp a ^* b = L.Exp (a*b)
 
 comp :: (RealFloat a, L.Precise a) => L.Log a -> L.Log a
-comp (L.Exp a) = realToFrac $ max 0 $ 1 - exp a
+comp (L.Exp a) = L.Exp $ L.log1p $ max (-1) $ negate (exp a)
 
 type ClauseIndex = Int
 type EdgeIndex   = Int
