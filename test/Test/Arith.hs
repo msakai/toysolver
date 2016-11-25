@@ -342,7 +342,7 @@ prop_OmegaTest_solve =
    forAll genQFLAConjSmallInt $ \(vs,cs) ->
      case OmegaTest.solve def vs cs of
        Nothing ->
-         forAll (genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False
+         forAll (liftM (fmap fromInteger) $ genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False
        Just m  -> property $ all (LA.eval (fmap fromInteger m :: Model Rational)) cs
 
 case_OmegaTest_test1 :: Assertion
@@ -373,7 +373,7 @@ prop_Cooper_solve =
    forAll genQFLAConjSmallInt $ \(vs,cs) ->
      case Cooper.solve vs cs of
        Nothing ->
-         (forAll (genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False)
+         (forAll (liftM (fmap fromInteger) $ genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False)
          QC..&&.
          property (OmegaTest.solve def vs cs == Nothing)
        Just m  -> property $ all (LA.eval (fmap fromInteger m :: Model Rational)) cs
