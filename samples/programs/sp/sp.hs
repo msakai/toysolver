@@ -29,7 +29,7 @@ instance Default Options where
 
 options :: [OptDescr (Options -> Options)]
 options =
-  [ Option [] ["opencl"] (NoArg (\opt -> opt{ optOpenCL = True })) "show help"
+  [ Option [] ["opencl"] (NoArg (\opt -> opt{ optOpenCL = True })) "use OpenCL version"
   , Option [] ["threads"] (ReqArg (\val opt -> opt{ optNThreads = read val }) "<integer>") "number of threads"
   ]
 
