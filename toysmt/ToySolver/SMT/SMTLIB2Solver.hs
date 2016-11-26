@@ -131,7 +131,7 @@ interpretSort env s =
   where
     f ident@(I_Symbol "BitVec" indexes) args
       | not (null args) = error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for 0)")
-      | [IndexNumeral n] <- indexes = SMT.Sort (SMT.SSymBitVec n) []
+      | [IndexNumeral n] <- indexes = SMT.sBitVec n
       | otherwise = error ("BitVec: wrong number of indexes (" ++ show (length indexes) ++ " for 1)")
     f ident@(I_Symbol _ _) _ =
       error ("unknown sort: " ++ showSL ident)

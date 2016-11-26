@@ -23,6 +23,7 @@ module ToySolver.SMT
   , Sort (..)
   , sBool
   , sReal
+  , sBitVec
   , FunType
   , Expr (..)
   , exprSort
@@ -426,14 +427,14 @@ declareFSym solver f' xs y = do
     E.throwIO $ Error $ "function symbol " ++ f' ++ " is already used"
   fdef <-
     case (xs, y) of
-      ([], Sort SSymBool []) -> do
+      ([], Sort SSymBool _) -> do
         v <- SAT.newVar (smtSAT solver)
         return (FBoolVar v)
-      ([], Sort SSymReal []) -> do
+      ([], Sort SSymReal _) -> do
         v <- Simplex2.newVar (smtLRA solver)
         return (FLRAVar v)
-      ([], Sort (SSymBitVec n) []) -> do
-        BV.EVar v <- BV.newVar (smtBV solver) n -- XXX
+      ([], Sort (SSymBitVec n) _) -> do
+        v <- BV.newVar' (smtBV solver) n
         return (FBVVar v)
       _ -> do
         v <- EUF.newFSym (smtEUF solver)
@@ -491,29 +492,29 @@ exprSort solver e = do
   return $! exprSort' fdefs e
 
 exprSort' :: Map FSym FDef -> Expr -> Sort
-exprSort' _fdefs (EFrac _) = Sort SSymReal []
-exprSort' _fdefs (EBitVec bv) = Sort (SSymBitVec (BV.width bv)) []
+exprSort' _fdefs (EFrac _) = sReal
+exprSort' _fdefs (EBitVec bv) = sBitVec (BV.width bv)
 exprSort' fdefs (EAp f xs)
-  | f `Set.member` Set.fromList ["true","false","and","or","xor","not","=>","=",">=","<=",">","<"] = Sort SSymBool []
-  | f `Set.member` Set.fromList ["bvule", "bvult", "bvuge", "bvugt", "bvsle", "bvslt", "bvsge", "bvsgt"] = Sort SSymBool []
-  | f `Set.member` Set.fromList ["+", "-", "*", "/"] = Sort SSymReal []
-  | FSym "extract" [IndexNumeral i, IndexNumeral j] <- f = Sort (SSymBitVec (fromIntegral (i - j + 1))) []
+  | f `Set.member` Set.fromList ["true","false","and","or","xor","not","=>","=",">=","<=",">","<"] = sBool
+  | f `Set.member` Set.fromList ["bvule", "bvult", "bvuge", "bvugt", "bvsle", "bvslt", "bvsge", "bvsgt"] = sBool
+  | f `Set.member` Set.fromList ["+", "-", "*", "/"] = sReal
+  | FSym "extract" [IndexNumeral i, IndexNumeral j] <- f = sBitVec (fromIntegral (i - j + 1))
   | f == "concat" =
       case (exprSort' fdefs (xs !! 0), exprSort' fdefs (xs !! 1)) of
-        (Sort (SSymBitVec m) [], Sort (SSymBitVec n) []) -> Sort (SSymBitVec (m+n)) []
+        (Sort (SSymBitVec m) [], Sort (SSymBitVec n) []) -> sBitVec (m+n)
         _ -> undefined
   | FSym "repeat" [IndexNumeral i] <- f =
       case exprSort' fdefs (xs !! 0) of
-        Sort (SSymBitVec m) [] -> Sort (SSymBitVec (m * fromIntegral i)) []
+        Sort (SSymBitVec m) [] -> sBitVec (m * fromIntegral i)
         _ -> undefined
   | FSym name [IndexNumeral i] <- f, name == "zero_extend" || name == "sign_extend" =
       case exprSort' fdefs (xs !! 0) of
-        Sort (SSymBitVec m) [] -> Sort (SSymBitVec (m + fromIntegral i)) []
+        Sort (SSymBitVec m) [] -> sBitVec (m + fromIntegral i)
         _ -> undefined
   | FSym name [IndexNumeral i] <- f, name == "rotate_left" || name == "rotate_right" =
       exprSort' fdefs (xs !! 0)
   | f == "bvnot" || f == "bvneg" = exprSort' fdefs (xs !! 0)
-  | f == "bvcomp" = Sort (SSymBitVec 1) []
+  | f == "bvcomp" = sBitVec 1
   | f `Set.member` Set.fromList [name | (name, _op::BV.BV->BV.BV->BV.BV) <- bvBinOpsSameSize] =
       exprSort' fdefs (xs !! 0)
   | f == "ite" = exprSort' fdefs (xs !! 1)
@@ -522,9 +523,9 @@ exprSort' fdefs (EAp f xs)
         Nothing -> error $ show f ++ " was not found"
         Just fdef ->
           case fdef of
-            FBoolVar _ -> Sort SSymBool []
-            FLRAVar _ -> Sort SSymReal []
-            FBVVar v -> Sort (SSymBitVec (BV.width (BV.EVar v))) [] -- XXX
+            FBoolVar _ -> sBool
+            FLRAVar _ -> sReal
+            FBVVar v -> sBitVec (BV.varWidth v)
             FEUFFun (_,s) _ -> s
 
 -- -------------------------------------------------------------------
@@ -1237,10 +1238,10 @@ evalFSym m f =
       let tbl = EUF.mFunctions (mEUFModel m) IntMap.! sym
           defaultVal =
             case resultSort of
-              Sort SSymReal [] -> ValRational 555555 -- Is it ok?
-              Sort SSymBool [] -> ValBool False -- Is it ok?
-              Sort (SSymBitVec w) [] -> ValBitVec (BV.nat2bv w 0) -- Is it ok?
-              Sort (SSymUninterpreted _s _ar) _ss -> ValUninterpreted (EUF.mUnspecified (mEUFModel m)) resultSort
+              Sort SSymReal _ -> ValRational 555555
+              Sort SSymBool _ -> ValBool False
+              Sort (SSymBitVec w) _ -> ValBitVec (BV.nat2bv w 0)
+              Sort (SSymUninterpreted _s _ar) _ -> ValUninterpreted (EUF.mUnspecified (mEUFModel m)) resultSort
       in FunDef [ (zipWith (entityToValue m) args argsSorts, entityToValue m result resultSort)
                 | (args, result) <- Map.toList tbl ]
                 defaultVal

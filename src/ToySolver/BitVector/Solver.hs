@@ -17,6 +17,7 @@ module ToySolver.BitVector.Solver
     Solver
   , newSolver
   , newVar
+  , newVar'
   , assertAtom
   , check
   , getModel
@@ -87,11 +88,14 @@ newSolver = do
     }
 
 newVar :: Solver -> Int -> IO Expr
-newVar solver w = do
+newVar solver w = EVar <$> newVar' solver w
+
+newVar' :: Solver -> Int -> IO Var
+newVar' solver w = do
   bs <- VG.fromList <$> SAT.newVars (svSATSolver solver) w
   v <- Vec.getSize $ svVars solver
   Vec.push (svVars solver) bs
-  return $ EVar $ Var{ varWidth = w, varId = v }
+  return $ Var{ varWidth = w, varId = v }
 
 data NormalizedRel = NRSLt | NRULt | NREql
   deriving (Eq, Ord, Enum, Bounded, Show)  
