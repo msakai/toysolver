@@ -157,7 +157,7 @@ interpretFun env t =
     TermSpecConstant (SpecConstantHexadecimal s) -> 
       let n = fst $ head $ readHex s
       in SMT.EBitVec (BV.nat2bv (length s * 4) n)
-    TermSpecConstant c@(SpecConstantBinary s) -> 
+    TermSpecConstant (SpecConstantBinary s) -> 
       SMT.EBitVec (BV.fromDescBits [c == '1' | c <- s])
     TermSpecConstant c@(SpecConstantString _s) -> error (show c)
     TermQualIdentifier qid -> f qid []
@@ -173,7 +173,7 @@ interpretFun env t =
     unIdentifier (I_Symbol name indexes) = (name, indexes)
 
     f (QIdentifierAs ident _sort) args = f (QIdentifier ident) args
-    f qid@(QIdentifier ident) args
+    f (QIdentifier ident) args
       | ('b':'v':xs, [IndexNumeral n]) <- unIdentifier ident
       , ((x,_):_) <- readDec xs
       , x < 2^n

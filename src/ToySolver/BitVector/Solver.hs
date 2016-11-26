@@ -482,6 +482,7 @@ isULT bs1 bs2
     f [] [] = false
     f (b1:bs1) (b2:bs2) =
       (notB (Atom b1) .&&. Atom b2) .||. ((Atom b1 .=>. Atom b2) .&&. f bs1 bs2)
+    f _ _ = error "should not happen"
 
 isSLT :: SBV -> SBV -> Tseitin.Formula
 isSLT bs1 bs2
@@ -497,6 +498,7 @@ isSLT bs1 bs2
 
 -- ------------------------------------------------------------------------
 
+test1 :: IO ()
 test1 = do
   solver <- newSolver
   v1 <- newVar solver 8
@@ -506,6 +508,7 @@ test1 = do
   m <- getModel solver
   print m
 
+test2 :: IO ()
 test2 = do
   solver <- newSolver
   v1 <- newVar solver 8

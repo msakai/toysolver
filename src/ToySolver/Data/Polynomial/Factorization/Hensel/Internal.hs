@@ -51,20 +51,20 @@ hensel f fs1 k
       | otherwise = assert (check i fs) $ go (i+1) (lift i fs)
 
     check :: Integer -> [UPolynomial Integer] -> Bool
-    check k fs =
+    check k' fs =
         and 
         [ P.mapCoeff (`mod` pk) f == P.mapCoeff (`mod` pk) (product fs)
         , fs1 == map (P.mapCoeff fromInteger) fs
         , and [P.deg fi1 == P.deg fik | (fi1, fik) <- zip fs1 fs]
         ]
       where
-        pk = p ^ k
+        pk = p ^ k'
 
     lift :: Integer -> [UPolynomial Integer] -> [UPolynomial Integer]
-    lift k fs = fs'
+    lift k' fs = fs'
       where
-        pk  = p^k
-        pk1 = p^(k+1)
+        pk  = p^k'
+        pk1 = p^(k'+1)
 
         -- f ≡ product fs + p^k h  (mod p^(k+1))
         h :: UPolynomial Integer
@@ -84,18 +84,18 @@ cabook_proposition_5_10
 cabook_proposition_5_10 fs = normalize (go fs)
   where
     check :: [UPolynomial k] -> [UPolynomial k] -> Bool
-    check es fs = sum [ei * (product fs `P.div` fi) | (ei,fi) <- zip es fs] == 1
+    check es fs' = sum [ei * (product fs' `P.div` fi) | (ei,fi) <- zip es fs'] == 1
 
     go :: [UPolynomial k] -> [UPolynomial k]
     go [] = error "cabook_proposition_5_10: empty list"
     go [fi] = assert (check [1] [fi]) [1]
-    go fs@(fi : fs') = 
+    go (fi : fs') =
       case P.exgcd (product fs') fi of
         (g,ei,v) ->
            assert (g == 1) $
              let es' = go fs'
                  es  = ei : map (v*) es'
-             in assert (check es fs) es
+             in assert (check es (fi : fs')) es
 
     normalize :: [UPolynomial k] -> [UPolynomial k]
     normalize es = assert (check es2 fs) es2
@@ -109,7 +109,7 @@ cabook_proposition_5_11
 cabook_proposition_5_11 fs g =
   assert (P.deg g <= P.deg (product fs)) $
   assert (P.deg c <= 0) $
-  assert (check es2 fs g) $
+  assert (check es2) $
     es2
   where
     es  = map (g*) $ cabook_proposition_5_10 fs
@@ -117,7 +117,7 @@ cabook_proposition_5_11 fs g =
     es2 = case zipWith P.mod es fs of
             e2' : es2' -> e2' + c * head fs : es2'          
 
-    check :: [UPolynomial k] -> [UPolynomial k] -> UPolynomial k -> Bool
-    check es fs g =
-      sum [ei * (product fs `P.div` fi) | (ei,fi) <- zip es fs] == g &&
-      and [P.deg ei <= P.deg fi | (ei,fi) <- zip es fs]
+    check :: [UPolynomial k] -> Bool
+    check es' =
+      sum [ei * (product fs `P.div` fi) | (ei,fi) <- zip es' fs] == g &&
+      and [P.deg ei <= P.deg fi | (ei,fi) <- zip es' fs]

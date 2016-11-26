@@ -525,11 +525,11 @@ prettyPrint opt lv prec p =
         prettyParen (prec > addPrec) $
           PP.hcat (pLeadingTerm addPrec t : map pTrailingTerm ts)
     where
-      pLeadingTerm prec (c,xs) =
+      pLeadingTerm prec' (c,xs) =
         if pOptIsNegativeCoeff opt c
-        then prettyParen (prec > addPrec) $
+        then prettyParen (prec' > addPrec) $
                PP.char '-' <> prettyPrintTerm opt lv (addPrec+1) (-c,xs)
-        else prettyPrintTerm opt lv prec (c,xs)
+        else prettyPrintTerm opt lv prec' (c,xs)
 
       pTrailingTerm (c,xs) =
         if pOptIsNegativeCoeff opt c
@@ -552,9 +552,9 @@ prettyPrintTerm opt lv prec (c,xs)
       fs  = [pOptPrintCoeff opt lv (appPrec+1) c | c /= 1] ++ [pPow (mulPrec+1) p | p <- mindices xs]
       -- intentionally specify (appPrec+1) to parenthesize any composite expression
 
-      pPow prec (x,1) = pOptPrintVar opt lv prec x
-      pPow prec (x,n) =
-        prettyParen (prec > expPrec) $
+      pPow prec' (x,1) = pOptPrintVar opt lv prec' x
+      pPow prec' (x,n) =
+        prettyParen (prec' > expPrec) $
           pOptPrintVar opt lv (expPrec+1) x <> PP.char '^' <> PP.integer n
 
 class PrettyCoeff a where
@@ -869,7 +869,7 @@ type MonomialOrder v = Monomial v -> Monomial v -> Ordering
 
 -- | Lexicographic order
 lex :: Ord v => MonomialOrder v
-lex xs1 xs2 = go (mindices xs1) (mindices xs2)
+lex = go `on` mindices
   where
     go [] [] = EQ
     go [] _  = LT -- = compare 0 n2
@@ -884,7 +884,7 @@ lex xs1 xs2 = go (mindices xs1) (mindices xs2)
 -- 
 -- Note that revlex is /NOT/ a monomial order.
 revlex :: Ord v => Monomial v -> Monomial v -> Ordering
-revlex xs1 xs2 = go (Map.toDescList (mindicesMap xs1)) (Map.toDescList (mindicesMap xs2))
+revlex = go `on` (Map.toDescList . mindicesMap)
   where
     go [] [] = EQ
     go [] _  = GT -- = cmp 0 n2

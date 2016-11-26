@@ -96,14 +96,15 @@ parseByteString = f . BL.lines
           case BL.words s of
             ["cnf", numVars', numClauses'] ->
               case parsePrefix ls of
-                (prefix, ls') -> Right $
+                (prefix', ls') -> Right $
                   QDimacs
                   { numVars = read $ BL.unpack numVars'
                   , numClauses = read $ BL.unpack numClauses'
-                  , prefix = prefix
+                  , prefix = prefix'
                   , matrix = parseClauses ls'
                   }
             _ -> Left "QDimacs.parseByteString: invalid problem line"
+        Just (c, _) -> Left ("QDimacs.parseByteString: invalid prefix " ++ show c)
 
 parsePrefix :: [BL.ByteString] -> ([QuantSet], [BL.ByteString])
 parsePrefix = go []
