@@ -149,8 +149,8 @@ interpretSort env s =
       where
         args' = map (interpretSort env) args
 
-interpretFun :: EEnv -> Term -> SMT.Expr
-interpretFun env t =
+interpretFun :: Env -> Term -> SMT.Expr
+interpretFun (env,senv) t =
   case t of
     TermSpecConstant (SpecConstantNumeral n) -> SMT.EValue $ SMT.ValRational $ fromInteger n
     TermSpecConstant (SpecConstantDecimal s) -> SMT.EValue $ SMT.ValRational $ fst $ head $ readFloat s
@@ -163,16 +163,20 @@ interpretFun env t =
     TermQualIdentifier qid -> f qid []
     TermQualIdentifierT  qid args -> f qid args
     TermLet bindings body ->
-      interpretFun (Map.fromList [(v, EExpr (interpretFun env t2) False) | VB v t2 <- bindings] `Map.union` env) body
+      interpretFun (Map.fromList [(v, EExpr (interpretFun (env,senv) t2) False) | VB v t2 <- bindings] `Map.union` env, senv) body
     TermForall _bindings _body -> error "universal quantifiers are not supported yet"
     TermExists _bindings _body -> error "existential quantifiers are not supported yet"
-    TermAnnot t2 _ -> interpretFun env t2 -- annotations are not supported yet
+    TermAnnot t2 _ -> interpretFun (env,senv) t2 -- annotations are not supported yet
   where
     unIdentifier :: Identifier -> (String, [Index])
     unIdentifier (ISymbol name) = (name, [])
     unIdentifier (I_Symbol name indexes) = (name, indexes)
 
-    f (QIdentifierAs ident _sort) args = f (QIdentifier ident) args
+    f (QIdentifierAs ident sort) args =
+      case ident of
+        ISymbol ('@':s) | (n,[]):_ <- reads s ->
+          SMT.EValue $ SMT.ValUninterpreted n (interpretSort senv sort)
+        _ -> f (QIdentifier ident) args
     f (QIdentifier ident) args
       | ('b':'v':xs, [IndexNumeral n]) <- unIdentifier ident
       , ((x,_):_) <- readDec xs
@@ -184,12 +188,12 @@ interpretFun env t =
       case Map.lookup name env of
         Nothing -> error ("unknown function symbol: " ++ showSL qid)
         Just (EFSymBuiltin name') ->
-          SMT.EAp (SMT.FSym name' indexes') (map (interpretFun env) args)
+          SMT.EAp (SMT.FSym name' indexes') (map (interpretFun (env,senv)) args)
         Just _ | not (null indexes) -> error (showSL ident ++ " does not take indexes")
         Just (EExpr e _) -> e
-        Just (EFSymDeclared fsym _ _) -> SMT.EAp fsym (map (interpretFun env) args)
+        Just (EFSymDeclared fsym _ _) -> SMT.EAp fsym (map (interpretFun (env,senv)) args)
         Just (EFunDef env' params _y body) ->
-          interpretFun (Map.fromList [(p,a) | ((p,_s),a) <- zip params (map (\t -> EExpr (interpretFun env t) False) args) ] `Map.union` env') body
+          interpretFun (Map.fromList [(p,a) | ((p,_s),a) <- zip params (map (\t -> EExpr (interpretFun (env,senv) t) False) args) ] `Map.union` env', senv) body
       where
         (name, indexes) = unIdentifier ident
         indexes' = map g indexes
@@ -666,7 +670,7 @@ assert solver tm = do
           _ -> Nothing
   tm' <- processNamed solver tm
   smt <- readIORef (svSMTSolverRef solver)
-  (env,_) <- readIORef (svEnvRef solver)
+  env <- readIORef (svEnvRef solver)
   case mname of
     Nothing -> SMT.assert smt (interpretFun env tm')
     Just name -> SMT.assertNamed smt name (interpretFun env tm')
@@ -691,7 +695,7 @@ checkSatAssuming :: Solver -> [Term] -> IO CheckSatResponse
 checkSatAssuming solver xs = do
   smt <- readIORef (svSMTSolverRef solver)
 
-  (env,_) <- readIORef (svEnvRef solver)
+  env <- readIORef (svEnvRef solver)
   ref <- newIORef Map.empty
   ys <- forM xs $ \x -> do
     let y = interpretFun env x
@@ -727,7 +731,7 @@ getValue solver ts = do
     E.throwIO $ SMT.Error "get-value can only be used in sat mode"
   smt <- readIORef (svSMTSolverRef solver)
   m <- SMT.getModel smt
-  (env,_) <- readIORef (svEnvRef solver)
+  env <- readIORef (svEnvRef solver)
   forM ts $ \t -> do
     let e = interpretFun env t
     let v = SMT.eval m e
@@ -852,7 +856,7 @@ processNamed solver = f
           AttributeVal ":named" val ->
             case val of
               AttrValueSymbol name -> do
-                (env,_) <- readIORef (svEnvRef solver)
+                env <- readIORef (svEnvRef solver)
                 let e = interpretFun env body'
                 -- smt <- readIORef (svSMTSolverRef solver)
                 -- s <- SMT.exprSort smt e
