@@ -236,6 +236,20 @@ range of delta becomes (0, (10-4)/3] = (0,2] and choosing delta=2 causes
 violation of a+b < 15.
 -}
 
+case_uninterpretedSortFunction_eval :: Assertion
+case_uninterpretedSortFunction_eval = do
+  solver <- SMT.newSolver
+  (sF :: SMT.Sort -> SMT.Sort) <- SMT.declareSort solver "F" 1
+  (sU :: SMT.Sort) <- SMT.declareSort solver "U" 0
+  let s = sF sU
+  x <- SMT.declareConst solver "x" s
+  ret <- SMT.checkSAT solver
+  ret @?= True
+  m <- SMT.getModel solver
+  case SMT.eval m x of
+    SMT.ValUninterpreted n s' -> s' @?= s
+    _ -> assertFailure "should be ValUninterpreted"
+
 prop_getModel_eval :: Property
 prop_getModel_eval = QM.monadicIO $ do
   solver <- QM.run $ SMT.newSolver

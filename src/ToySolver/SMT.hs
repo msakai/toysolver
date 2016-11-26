@@ -1170,7 +1170,7 @@ eval m expr@(EAp f xs) =
     Just (FBoolVar v) -> ValBool $ SAT.evalLit (mBoolModel m) v
     Just (FLRAVar v) -> ValRational $ mLRAModel m IntMap.! v
     Just (FBVVar v) -> ValBitVec $ BV.evalExpr (mBVModel m) (BV.EVar v)
-    Just (FEUFFun (_, Sort s []) sym) ->
+    Just (FEUFFun (_, Sort s _) sym) ->
       let e = EUF.evalAp (mEUFModel m) sym (map (valToEntity m . eval m) xs)
       in case s of
            SSymUninterpreted _ _ -> ValUninterpreted e (exprSort' (mDefs m) expr)
