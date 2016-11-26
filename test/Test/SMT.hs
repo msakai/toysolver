@@ -411,7 +411,7 @@ genExpr genSorts sig s size = evalStateT (f s) size
       (e,size') <- lift $ oneof $
         [ do
             bs <- replicateM w arbitrary
-            return (EBitVec (BV.fromDescBits bs), size)
+            return (EValue (SMT.ValBitVec (BV.fromDescBits bs)), size)
         ]
         ++
         [ flip runStateT size $ do

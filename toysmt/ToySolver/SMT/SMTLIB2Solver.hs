@@ -152,13 +152,13 @@ interpretSort env s =
 interpretFun :: EEnv -> Term -> SMT.Expr
 interpretFun env t =
   case t of
-    TermSpecConstant (SpecConstantNumeral n) -> SMT.EFrac (fromInteger n)
-    TermSpecConstant (SpecConstantDecimal s) -> SMT.EFrac $ fst $ head $ readFloat s
+    TermSpecConstant (SpecConstantNumeral n) -> SMT.EValue $ SMT.ValRational $ fromInteger n
+    TermSpecConstant (SpecConstantDecimal s) -> SMT.EValue $ SMT.ValRational $ fst $ head $ readFloat s
     TermSpecConstant (SpecConstantHexadecimal s) -> 
       let n = fst $ head $ readHex s
-      in SMT.EBitVec (BV.nat2bv (length s * 4) n)
+      in SMT.EValue $ SMT.ValBitVec $ BV.nat2bv (length s * 4) n
     TermSpecConstant (SpecConstantBinary s) -> 
-      SMT.EBitVec (BV.fromDescBits [c == '1' | c <- s])
+      SMT.EValue $ SMT.ValBitVec $ BV.fromDescBits [c == '1' | c <- s]
     TermSpecConstant c@(SpecConstantString _s) -> error (show c)
     TermQualIdentifier qid -> f qid []
     TermQualIdentifierT  qid args -> f qid args
@@ -179,7 +179,7 @@ interpretFun env t =
       , x < 2^n
       = if not (null args)
         then error (showSL ident ++ " does not take indexes")
-        else SMT.EBitVec (BV.nat2bv n x)
+        else SMT.EValue $ SMT.ValBitVec $ BV.nat2bv n x
     f qid@(QIdentifier ident) args =
       case Map.lookup name env of
         Nothing -> error ("unknown function symbol: " ++ showSL qid)

@@ -142,8 +142,7 @@ type FunType = ([Sort],Sort)
 
 data Expr
   = EAp FSym [Expr]
-  | EFrac Rational
-  | EBitVec BV.BV
+  | EValue !Value
   deriving (Show, Eq, Ord)
 
 instance MonotoneBoolean Expr where
@@ -169,11 +168,11 @@ instance Num Expr where
   negate x = EAp "-" [x]
   abs x = error "Num{ToySolver.SMT.Expr}.abs is not implemented"
   signum x = error "Num{ToySolver.SMT.Expr}.signum is not implemented"
-  fromInteger x = EFrac (fromInteger x)
+  fromInteger x = EValue $ ValRational $ fromInteger x
 
 instance Fractional Expr where
   x / y = EAp "/" [x,y]
-  fromRational x = EFrac x
+  fromRational x = EValue $ ValRational x
 
 instance IsEqRel Expr Expr where
   a .==. b = EAp "=" [a,b]
@@ -492,8 +491,7 @@ exprSort solver e = do
   return $! exprSort' fdefs e
 
 exprSort' :: Map FSym FDef -> Expr -> Sort
-exprSort' _fdefs (EFrac _) = sReal
-exprSort' _fdefs (EBitVec bv) = sBitVec (BV.width bv)
+exprSort' _fdefs (EValue v) = valSort v
 exprSort' fdefs (EAp f xs)
   | f `Set.member` Set.fromList ["true","false","and","or","xor","not","=>","=",">=","<=",">","<"] = sBool
   | f `Set.member` Set.fromList ["bvule", "bvult", "bvuge", "bvugt", "bvsle", "bvslt", "bvsge", "bvsgt"] = sBool
@@ -639,7 +637,7 @@ abstractEq solver e1 e2 = do
 -- -------------------------------------------------------------------
 
 exprToLRAExpr :: Solver -> Expr -> IO (LA.Expr Rational)
-exprToLRAExpr solver (EFrac r) = return (LA.constant r)
+exprToLRAExpr solver (EValue (ValRational r)) = return (LA.constant r)
 exprToLRAExpr solver (EAp "-" []) = E.throwIO $ Error "ToySolver.SMT: nullary '-' function"
 exprToLRAExpr solver (EAp "-" [x]) = liftM negateV $ exprToLRAExpr solver x
 exprToLRAExpr solver (EAp "-" (x:xs)) = do
@@ -769,7 +767,7 @@ bvBinOpsSameSize =
   ]
 
 exprToBVExpr :: Solver -> Expr -> IO BV.Expr
-exprToBVExpr solver (EBitVec bv) = return $ BV.fromBV bv
+exprToBVExpr solver (EValue (ValBitVec bv)) = return $ BV.fromBV bv
 exprToBVExpr solver (EAp "concat" [x,y]) = do
   liftM2 (<>) (exprToBVExpr solver x) (exprToBVExpr solver y)
 exprToBVExpr solver (EAp (FSym "extract" [IndexNumeral i, IndexNumeral j]) [x]) = do
@@ -918,9 +916,13 @@ exprToEUFTerm solver f xs = do
       liftM (EUF.TApp fsym) $ mapM (exprToEUFArg solver) xs
     _ -> E.throw $ Error $ "unknown function symbol: " ++ show f
 
+valToEUFArg :: Solver -> Value -> IO EUF.Term
+valToEUFArg solver (ValBool b) = return $! if b then smtEUFTrue solver else smtEUFFalse solver
+valToEUFArg solver (ValRational r) = lraExprToEUFTerm solver (LA.constant r)
+valToEUFArg solver (ValBitVec bv) = bvExprToEUFTerm solver (BV.fromBV bv)
+
 exprToEUFArg :: Solver -> Expr -> IO EUF.Term
-exprToEUFArg solver (EFrac r) = lraExprToEUFTerm solver (LA.constant r)
-exprToEUFArg solver (EBitVec bv) = bvExprToEUFTerm solver (BV.fromBV bv)
+exprToEUFArg solver (EValue v) = valToEUFArg solver v
 exprToEUFArg solver e@(EAp f xs) = do
   Sort s _ <- exprSort solver e
   case s of
@@ -1064,7 +1066,7 @@ data Value
   | ValBitVec !BV.BV
   | ValBool !Bool
   | ValUninterpreted !Int !Sort
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 getModel :: Solver -> IO Model
 getModel solver = do
@@ -1097,8 +1099,7 @@ getModel solver = do
     }
 
 eval :: Model -> Expr -> Value
-eval m (EFrac r) = ValRational r
-eval m (EBitVec bv) = ValBitVec bv
+eval m (EValue v) = v
 eval m (EAp "true" [])   = ValBool True
 eval m (EAp "false" [])  = ValBool False
 eval m (EAp "ite" [a,b,c]) = if valToBool m (eval m a) then eval m b else eval m c
@@ -1222,11 +1223,11 @@ entityToValue m e s =
         Nothing -> ValBitVec (BV.nat2bv n 0)
     Sort (SSymUninterpreted _ _) _ -> ValUninterpreted e s
 
-valSort :: Model -> Value -> Sort
-valSort _m (ValUninterpreted _e s) = s
-valSort _m (ValBool _b)     = sBool
-valSort _m (ValRational _r) = sReal
-valSort _m (ValBitVec bv) = sBitVec (BV.width bv)
+valSort :: Value -> Sort
+valSort (ValUninterpreted _e s) = s
+valSort (ValBool _b)     = sBool
+valSort (ValRational _r) = sReal
+valSort (ValBitVec bv) = sBitVec (BV.width bv)
 
 data FunDef = FunDef [([Value], Value)] Value
   deriving (Eq, Show)
