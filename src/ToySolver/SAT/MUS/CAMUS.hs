@@ -62,6 +62,13 @@ data Options
   , optKnownCSes  :: [CS]
     -- ^ MCS candidates (see HYCAM paper for details).
     -- A MCS candidate must be a superset of a real MCS.
+  , optEvalOrigConstr :: SAT.Model -> Lit -> Bool
+    -- ^ Because each soft constraint /C_i/ is represented as a selector
+    -- literal /l_i/ together with a hard constraint /l_i ⇒ C_i/, there
+    -- are cases that a model assigns false to /l_i/ even though /C_i/
+    -- itself is true. This function is used to inform the truth value
+    -- of the original constraint /C_i/ that corresponds to the selector
+    -- literal /l_i/.
   }
 
 instance Default Options where
@@ -73,6 +80,7 @@ instance Default Options where
     , optKnownMCSes = []
     , optKnownMUSes = []
     , optKnownCSes = []
+    , optEvalOrigConstr = SAT.evalLit
     }
 
 enumMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ()

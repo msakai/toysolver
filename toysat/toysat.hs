@@ -22,6 +22,7 @@ import Control.Concurrent.Timeout
 import Control.Monad
 import Control.Exception
 import Data.Array.IArray
+import Data.Array.IO
 import qualified Data.ByteString.Lazy as BS
 import Data.Default.Class
 import Data.IntMap (IntMap)
@@ -602,10 +603,15 @@ solveMUS opt solver gcnf = do
       sel2idx :: Array SAT.Lit Int
       sel2idx = array selrng [(sel, idx) | (idx, sel) <- tbl]
 
+  (idx2clausesM :: IOArray Int [SAT.Clause]) <- newArray (1, GCNF.lastGroupIndex gcnf) []
   forM_ (GCNF.clauses gcnf) $ \(idx, clause) ->
     if idx==0
     then SAT.addClause solver clause
-    else SAT.addClause solver (- (idx2sel ! idx) : clause)
+    else do
+      SAT.addClause solver (- (idx2sel ! idx) : clause)
+      cs <- readArray idx2clausesM idx
+      writeArray idx2clausesM idx (clause : cs)
+  (idx2clauses :: Array Int [SAT.Clause]) <- freeze idx2clausesM
 
   when (optInitSP opt) $ do
     let wcnf = GCNF2MaxSAT.convert gcnf
@@ -647,6 +653,8 @@ solveMUS opt solver gcnf = do
                          putCommentLine $ "MUS #" ++ show (i :: Int)
                          let mus2 = sort $ map (sel2idx !) $ IntSet.toList mus
                          musPrintSol stdout mus2
+                     , CAMUS.optEvalOrigConstr = \m sel ->
+                         and [SAT.evalClause m c | c <- idx2clauses ! (sel2idx ! sel)]
                      }
           case optAllMUSMethod opt of
             AllMUSCAMUS -> CAMUS.allMUSAssumptions solver (map snd tbl) opt2

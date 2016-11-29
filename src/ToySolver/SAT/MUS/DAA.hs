@@ -76,7 +76,7 @@ daa solver sels opt =
       b <- SAT.solveWith solver (IntSet.toList xs)
       if b then do
         m <- SAT.getModel solver
-        liftM Just $ grow $ IntSet.fromList [l | l <- sels, evalLit m l]
+        liftM Just $ grow $ IntSet.fromList [l | l <- sels, optEvalOrigConstr opt m l]
       else do
         SAT.addClause solver [-l | l <- IntSet.toList xs] -- lemma
         return Nothing
@@ -91,7 +91,7 @@ daa solver sels opt =
               b <- SAT.solveWith solver (c : IntSet.toList xs)
               if b then do
                 m <- SAT.getModel solver
-                let cs = IntSet.fromList [l | l <- sels, evalLit m l]
+                let cs = IntSet.fromList [l | l <- sels, optEvalOrigConstr opt m l]
                 loop (xs `IntSet.union` cs) (ys' `IntSet.difference` cs)
               else do
                 zs <- SAT.getFailedAssumptions solver
