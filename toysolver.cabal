@@ -305,8 +305,7 @@ Library
      ToySolver.SAT.Encoder.Tseitin
      ToySolver.SAT.MessagePassing.SurveyPropagation
      ToySolver.SAT.MUS
-     ToySolver.SAT.MUS.CAMUS
-     ToySolver.SAT.MUS.DAA
+     ToySolver.SAT.MUS.Enum
      ToySolver.SAT.MUS.Types
      ToySolver.SAT.PBO
      ToySolver.SAT.PBO.Context
@@ -343,6 +342,9 @@ Library
      ToySolver.SAT.MUS.Base
      ToySolver.SAT.MUS.Linear
      ToySolver.SAT.MUS.QuickXplain
+     ToySolver.SAT.MUS.Enum.Base
+     ToySolver.SAT.MUS.Enum.CAMUS
+     ToySolver.SAT.MUS.Enum.DAA
      ToySolver.Version.TH
      Paths_toysolver
   -- GHC-Prof-Options: -auto-all

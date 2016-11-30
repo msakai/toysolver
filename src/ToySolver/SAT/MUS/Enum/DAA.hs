@@ -2,7 +2,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.MUS.DAA
+-- Module      :  ToySolver.SAT.MUS.Enum.DAA
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
 -- 
@@ -18,12 +18,9 @@
 --   <http://ww2.cs.mu.oz.au/~pjs/papers/padl05.pdf>
 --
 -----------------------------------------------------------------------------
-module ToySolver.SAT.MUS.DAA
-  ( module ToySolver.SAT.MUS.Types
-  , Options (..)
-  , allMCSAssumptions
+module ToySolver.SAT.MUS.Enum.DAA
+  ( module ToySolver.SAT.MUS.Enum.Base
   , allMUSAssumptions
-  , daa
   ) where
 
 import Control.Monad
@@ -34,20 +31,10 @@ import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types
 import ToySolver.SAT.MUS.Types
-import ToySolver.SAT.MUS.CAMUS (Options (..))
+import ToySolver.SAT.MUS.Enum.Base
 
-allMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MCS]
-allMCSAssumptions solver sels opt = do
-  (_, mcses) <- daa solver sels opt
-  return mcses
-
-allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MUS]
-allMUSAssumptions solver sels opt = do
-  (muses, _) <- daa solver sels opt
-  return muses
-
-daa :: SAT.Solver -> [Lit] -> Options -> IO ([MUS], [MCS])
-daa solver sels opt =
+allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ([MUS], [MCS])
+allMUSAssumptions solver sels opt =
   loop (Set.fromList (optKnownMUSes opt)) (Set.fromList (optKnownMCSes opt))
   where
     selsSet :: LitSet
