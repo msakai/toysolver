@@ -37,7 +37,6 @@ import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PB.Internal.Sorter as PBEncSorter
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.SAT.MUS as MUS
-import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
 import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.DAA as DAA
 import qualified ToySolver.SAT.PBO as PBO
@@ -1415,7 +1414,7 @@ prop_PBEncoder_Sorter_decode_encode =
 
 ------------------------------------------------------------------------
 
-case_MUS = do
+case_MUS_Linear = do
   solver <- SAT.newSolver
   [x1,x2,x3] <- SAT.newVars solver 3
   sels@[y1,y2,y3,y4,y5,y6] <- SAT.newVars solver 6
@@ -1429,7 +1428,7 @@ case_MUS = do
   ret <- SAT.solveWith solver sels
   ret @?= False
 
-  actual <- MUS.findMUSAssumptions solver def
+  actual <- MUS.findMUSAssumptions solver def{ MUS.optMethod = MUS.Linear }
   let actual'  = IntSet.map (\x -> x-3) actual
       expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
   actual' `elem` expected @?= True
@@ -1448,7 +1447,7 @@ case_MUS_QuickXplain = do
   ret <- SAT.solveWith solver sels
   ret @?= False
 
-  actual <- QuickXplain.findMUSAssumptions solver def
+  actual <- MUS.findMUSAssumptions solver def{ MUS.optMethod = MUS.QuickXplain }
   let actual'  = IntSet.map (\x -> x-3) actual
       expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
   actual' `elem` expected @?= True

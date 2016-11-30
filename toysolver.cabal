@@ -308,7 +308,6 @@ Library
      ToySolver.SAT.MUS.CAMUS
      ToySolver.SAT.MUS.DAA
      ToySolver.SAT.MUS.Types
-     ToySolver.SAT.MUS.QuickXplain
      ToySolver.SAT.PBO
      ToySolver.SAT.PBO.Context
      ToySolver.SAT.PBO.BC
@@ -341,6 +340,9 @@ Library
   Other-Modules:
      ToySolver.Data.AlgebraicNumber.Graeffe
      ToySolver.Data.Polynomial.Base
+     ToySolver.SAT.MUS.Base
+     ToySolver.SAT.MUS.Linear
+     ToySolver.SAT.MUS.QuickXplain
      ToySolver.Version.TH
      Paths_toysolver
   -- GHC-Prof-Options: -auto-all
