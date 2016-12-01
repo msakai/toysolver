@@ -46,7 +46,6 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
 - intern-0.9.1.4
-- parse-dimacs-1.3
 - queue-0.1.2
 - OptDir-0.0.3
 - logic-TPTP-0.4.4.0
