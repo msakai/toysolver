@@ -18,7 +18,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.SAT.MUS.QuickXplain
-  ( module ToySolver.SAT.MUS.Types
+  ( module ToySolver.SAT.MUS.Base
   , Options (..)
   , findMUSAssumptions
   ) where
@@ -29,8 +29,7 @@ import Data.List
 import qualified Data.IntSet as IS
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types
-import ToySolver.SAT.MUS.Types
-import ToySolver.SAT.MUS hiding (findMUSAssumptions)
+import ToySolver.SAT.MUS.Base
 
 -- | Find a minimal set of assumptions that causes a conflict.
 -- Initial set of assumptions is taken from 'SAT.getFailedAssumptions'.

@@ -37,9 +37,7 @@ import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PB.Internal.Sorter as PBEncSorter
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.SAT.MUS as MUS
-import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
-import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
-import qualified ToySolver.SAT.MUS.DAA as DAA
+import qualified ToySolver.SAT.MUS.Enum as MUSEnum
 import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Store.CNF as CNFStore
 
@@ -1415,7 +1413,7 @@ prop_PBEncoder_Sorter_decode_encode =
 
 ------------------------------------------------------------------------
 
-case_MUS = do
+case_MUS_Linear = do
   solver <- SAT.newSolver
   [x1,x2,x3] <- SAT.newVars solver 3
   sels@[y1,y2,y3,y4,y5,y6] <- SAT.newVars solver 6
@@ -1429,7 +1427,7 @@ case_MUS = do
   ret <- SAT.solveWith solver sels
   ret @?= False
 
-  actual <- MUS.findMUSAssumptions solver def
+  actual <- MUS.findMUSAssumptions solver def{ MUS.optMethod = MUS.Linear }
   let actual'  = IntSet.map (\x -> x-3) actual
       expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
   actual' `elem` expected @?= True
@@ -1448,7 +1446,7 @@ case_MUS_QuickXplain = do
   ret <- SAT.solveWith solver sels
   ret @?= False
 
-  actual <- QuickXplain.findMUSAssumptions solver def
+  actual <- MUS.findMUSAssumptions solver def{ MUS.optMethod = MUS.QuickXplain }
   let actual'  = IntSet.map (\x -> x-3) actual
       expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
   actual' `elem` expected @?= True
@@ -1469,7 +1467,7 @@ p cnf 3 6
 -3 0
 -}
 
-case_camus_allMCSAssumptions = do
+case_CAMUS_allMUSAssumptions = do
   solver <- SAT.newSolver
   [x1,x2,x3] <- SAT.newVars solver 3
   sels@[y1,y2,y3,y4,y5,y6] <- SAT.newVars solver 6
@@ -1479,43 +1477,9 @@ case_camus_allMCSAssumptions = do
   SAT.addClause solver [-y4, -x2]
   SAT.addClause solver [-y5, -x1, x3]
   SAT.addClause solver [-y6, -x3]
-  actual <- CAMUS.allMCSAssumptions solver sels def
-  let actual'   = Set.fromList actual
-      expected  = map (IntSet.fromList . map (+3)) [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
-      expected' = Set.fromList expected
-  actual' @?= expected'
-
-case_DAA_allMCSAssumptions = do
-  solver <- SAT.newSolver
-  [x1,x2,x3] <- SAT.newVars solver 3
-  sels@[y1,y2,y3,y4,y5,y6] <- SAT.newVars solver 6
-  SAT.addClause solver [-y1, x1]
-  SAT.addClause solver [-y2, -x1]
-  SAT.addClause solver [-y3, -x1, x2]
-  SAT.addClause solver [-y4, -x2]
-  SAT.addClause solver [-y5, -x1, x3]
-  SAT.addClause solver [-y6, -x3]
-  actual <- DAA.allMCSAssumptions solver sels def
-  let actual'   = Set.fromList $ actual
-      expected  = map (IntSet.fromList . map (+3)) [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]]
-      expected' = Set.fromList $ expected
-  actual' @?= expected'
-
-case_camus_allMUSAssumptions = do
-  solver <- SAT.newSolver
-  [x1,x2,x3] <- SAT.newVars solver 3
-  sels@[y1,y2,y3,y4,y5,y6] <- SAT.newVars solver 6
-  SAT.addClause solver [-y1, x1]
-  SAT.addClause solver [-y2, -x1]
-  SAT.addClause solver [-y3, -x1, x2]
-  SAT.addClause solver [-y4, -x2]
-  SAT.addClause solver [-y5, -x1, x3]
-  SAT.addClause solver [-y6, -x3]
-  actual <- CAMUS.allMUSAssumptions solver sels def
-  let actual'   = Set.fromList $ actual
-      expected  = map (IntSet.fromList . map (+3)) [[1,2], [1,3,4], [1,5,6]]
-      expected' = Set.fromList $ expected
-  actual' @?= expected'
+  (muses, mcses) <- MUSEnum.allMUSAssumptions solver sels def{ MUSEnum.optMethod = MUSEnum.CAMUS }
+  Set.fromList muses @?= Set.fromList (map (IntSet.fromList . map (+3)) [[1,2], [1,3,4], [1,5,6]])
+  Set.fromList mcses @?= Set.fromList (map (IntSet.fromList . map (+3)) [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]])
 
 case_DAA_allMUSAssumptions = do
   solver <- SAT.newSolver
@@ -1527,11 +1491,9 @@ case_DAA_allMUSAssumptions = do
   SAT.addClause solver [-y4, -x2]
   SAT.addClause solver [-y5, -x1, x3]
   SAT.addClause solver [-y6, -x3]
-  actual <- DAA.allMUSAssumptions solver sels def
-  let actual'   = Set.fromList $ actual
-      expected  = map (IntSet.fromList . map (+3)) [[1,2], [1,3,4], [1,5,6]]
-      expected' = Set.fromList $ expected
-  actual' @?= expected'
+  (muses, mcses) <- MUSEnum.allMUSAssumptions solver sels def{ MUSEnum.optMethod = MUSEnum.DAA }
+  Set.fromList muses @?= Set.fromList (map (IntSet.fromList . map (+3)) [[1,2], [1,3,4], [1,5,6]])
+  Set.fromList mcses @?= Set.fromList (map (IntSet.fromList . map (+3)) [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]])
 
 {-
 Boosting a Complete Technique to Find MSS and MUS thanks to a Local Search Oracle
@@ -1551,7 +1513,7 @@ C10 : (¬a ∨ b ∨ ¬d)
 C11 : (a ∨ ¬b ∨ c)
 C12 : (a ∨ ¬b ∨ ¬d)
 -}
-case_camus_allMUSAssumptions_2 = do
+case_CAMUS_allMUSAssumptions_2 = do
   solver <- SAT.newSolver
   [a,b,c,d,e] <- SAT.newVars solver 5
   sels@[y0,y1,y2,y3,y4,y5,y6,y7,y8,y9,y10,y11,y12] <- SAT.newVars solver 13
@@ -1600,7 +1562,7 @@ case_camus_allMUSAssumptions_2 = do
       ret <- SAT.solveWith solver xs
       assertBool (show core ++ " should be satisfiable") ret
 
-  actual <- CAMUS.allMUSAssumptions solver sels def
+  (actual,_) <- MUSEnum.allMUSAssumptions solver sels def{ MUSEnum.optMethod = MUSEnum.CAMUS }
   let actual'   = Set.fromList actual
       expected' = Set.fromList $ map IntSet.fromList $ cores
   actual' @?= expected'
@@ -1672,7 +1634,7 @@ case_HYCAM_allMUSAssumptions = do
   assertBool "failed to prove the bug of HYCAM paper" (not ret)
   
   let cand = map IntSet.fromList [[y5], [y3,y2], [y0,y1,y2]]
-  actual <- CAMUS.allMUSAssumptions solver sels def{ CAMUS.optKnownCSes = cand }
+  (actual,_) <- MUSEnum.allMUSAssumptions solver sels def{ MUSEnum.optMethod = MUSEnum.CAMUS, MUSEnum.optKnownCSes = cand }
   let actual'   = Set.fromList $ actual
       expected' = Set.fromList $ map IntSet.fromList cores
   actual' @?= expected'
@@ -1726,7 +1688,7 @@ case_DAA_allMUSAssumptions_2 = do
       ret <- SAT.solveWith solver xs
       assertBool (show core ++ " should be satisfiable") ret
 
-  actual <- DAA.allMUSAssumptions solver sels def
+  (actual,_) <- MUSEnum.allMUSAssumptions solver sels def{ MUSEnum.optMethod = MUSEnum.DAA }
   let actual'   = Set.fromList actual
       expected' = Set.fromList $ map IntSet.fromList cores
   actual' @?= expected'

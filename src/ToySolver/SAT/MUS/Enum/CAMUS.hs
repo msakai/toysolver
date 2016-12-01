@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.MUS.CAMUS
+-- Module      :  ToySolver.SAT.MUS.Enum.CAMUS
 -- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
 -- 
@@ -27,13 +27,11 @@
 --   <http://ijcai.org/papers07/Papers/IJCAI07-370.pdf>
 --
 -----------------------------------------------------------------------------
-module ToySolver.SAT.MUS.CAMUS
-  ( module ToySolver.SAT.MUS.Types
-  , Options (..)
-  , allMCSAssumptions
+module ToySolver.SAT.MUS.Enum.CAMUS
+  ( module ToySolver.SAT.MUS.Enum.Base
   , allMUSAssumptions
+  , allMCSAssumptions
   , enumMCSAssumptions
-  , camus
   ) where
 
 import Control.Monad
@@ -47,41 +45,7 @@ import qualified Data.Set as Set
 import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types
-import ToySolver.SAT.MUS.Types
-
--- | Options for 'enumMCSAssumptions', 'allMCSAssumptions', 'allMUSAssumptions'
---
--- The default value can be obtained by 'def'.
-data Options
-  = Options
-  { optLogger     :: String -> IO ()
-  , optOnMCSFound :: MCS -> IO ()
-  , optOnMUSFound :: MUS -> IO ()
-  , optKnownMCSes :: [MCS]
-  , optKnownMUSes :: [MUS]
-  , optKnownCSes  :: [CS]
-    -- ^ MCS candidates (see HYCAM paper for details).
-    -- A MCS candidate must be a superset of a real MCS.
-  , optEvalOrigConstr :: SAT.Model -> Lit -> Bool
-    -- ^ Because each soft constraint /C_i/ is represented as a selector
-    -- literal /l_i/ together with a hard constraint /l_i ⇒ C_i/, there
-    -- are cases that a model assigns false to /l_i/ even though /C_i/
-    -- itself is true. This function is used to inform the truth value
-    -- of the original constraint /C_i/ that corresponds to the selector
-    -- literal /l_i/.
-  }
-
-instance Default Options where
-  def =
-    Options
-    { optLogger     = \_ -> return ()
-    , optOnMCSFound = \_ -> return ()
-    , optOnMUSFound = \_ -> return ()
-    , optKnownMCSes = []
-    , optKnownMUSes = []
-    , optKnownCSes = []
-    , optEvalOrigConstr = SAT.evalLit
-    }
+import ToySolver.SAT.MUS.Enum.Base
 
 enumMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ()
 enumMCSAssumptions solver sels opt = do
@@ -137,13 +101,8 @@ allMCSAssumptions solver sels opt = do
   enumMCSAssumptions solver sels opt2
   readIORef ref
 
-allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MUS]
+allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ([MUS], [MCS])
 allMUSAssumptions solver sels opt = do
-  (muses, _mcses) <- camus solver sels opt
-  return $ muses
-
-camus :: SAT.Solver -> [Lit] -> Options -> IO ([MUS], [MCS])
-camus solver sels opt = do
   log "CAMUS: MCS enumeration begins"
   mcses <- allMCSAssumptions solver sels opt
   log "CAMUS: MCS enumeration done"

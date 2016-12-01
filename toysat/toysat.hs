@@ -78,9 +78,7 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
 import qualified ToySolver.SAT.MUS as MUS
-import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
-import qualified ToySolver.SAT.MUS.CAMUS as CAMUS
-import qualified ToySolver.SAT.MUS.DAA as DAA
+import qualified ToySolver.SAT.MUS.Enum as MUSEnum
 import ToySolver.SAT.Printer
 import qualified ToySolver.Text.CNF as CNF
 import qualified ToySolver.Text.MaxSAT as MaxSAT
@@ -95,10 +93,6 @@ import qualified UBCSAT
 
 data Mode = ModeHelp | ModeVersion | ModeSAT | ModeMUS | ModePB | ModeWBO | ModeMaxSAT | ModeMIP
 
-data MUSMethod = MUSLinear | MUSQuickXplain
-
-data AllMUSMethod = AllMUSCAMUS | AllMUSDAA
-
 data Options
   = Options
   { optMode          :: Maybe Mode
@@ -108,9 +102,9 @@ data Options
   , optSearchStrategy       :: PBO.SearchStrategy
   , optObjFunVarsHeuristics :: Bool
   , optLocalSearchInitial   :: Bool
-  , optMUSMethod :: MUSMethod
+  , optMUSMethod :: MUS.Method
   , optAllMUSes :: Bool
-  , optAllMUSMethod :: AllMUSMethod
+  , optAllMUSMethod :: MUSEnum.Method
   , optPrintRational :: Bool
   , optTimeout :: Integer
   , optWriteFile :: Maybe FilePath
@@ -130,9 +124,9 @@ instance Default Options where
     , optSearchStrategy       = def
     , optObjFunVarsHeuristics = PBO.defaultEnableObjFunVarsHeuristics
     , optLocalSearchInitial   = False
-    , optMUSMethod = MUSLinear
+    , optMUSMethod = MUS.optMethod def
     , optAllMUSes = False
-    , optAllMUSMethod = AllMUSCAMUS
+    , optAllMUSMethod = MUSEnum.optMethod def
     , optPrintRational = False
     , optTimeout = 0
     , optWriteFile = Nothing
@@ -240,10 +234,12 @@ options =
         "enumerate all MUSes"
     , Option [] ["mus-method"]
         (ReqArg (\val opt -> opt{ optMUSMethod = parseMUSMethod val }) "<str>")
-        "MUS computation method: linear (default), QuickXplain"
+        ("MUS computation method: " ++ intercalate ", "
+         [MUS.showMethod m ++ (if optMUSMethod def == m then " (default)" else "") | m <- [minBound .. maxBound]])
     , Option [] ["all-mus-method"]
         (ReqArg (\val opt -> opt{ optAllMUSMethod = parseAllMUSMethod val }) "<str>")
-        "MUS enumeration method: camus (default), daa"
+        ("MUS enumeration method: " ++ intercalate ", "
+         [MUSEnum.showMethod m ++ (if optAllMUSMethod def == m then " (default)" else "") | m <- [minBound .. maxBound]])
 
     , Option [] ["print-rational"]
         (NoArg (\opt -> opt{ optPrintRational = True }))
@@ -291,17 +287,9 @@ options =
         "bcd2"     -> PBO.BCD2
         _ -> error (printf "unknown search strategy \"%s\"" s)
 
-    parseMUSMethod s =
-      case map toLower s of
-        "linear"      -> MUSLinear
-        "quickxplain" -> MUSQuickXplain
-        _ -> error (printf "unknown MUS finding method \"%s\"" s)
+    parseMUSMethod s = fromMaybe (error (printf "unknown MUS finding method \"%s\"" s)) (MUS.parseMethod s)
 
-    parseAllMUSMethod s =
-      case map toLower s of
-        "camus"    -> AllMUSCAMUS
-        "daa"      -> AllMUSDAA
-        _ -> error (printf "unknown MUS enumeration method \"%s\"" s)
+    parseAllMUSMethod s = fromMaybe (error (printf "unknown MUS enumeration method \"%s\"" s)) (MUSEnum.parseMethod s)
 
     parseLS s =
       case map toLower s of
@@ -630,35 +618,32 @@ solveMUS opt solver gcnf = do
       if not (optAllMUSes opt)
       then do
           let opt2 = def
-                     { MUS.optLogger = putCommentLine
+                     { MUS.optMethod = optMUSMethod opt
+                     , MUS.optLogger = putCommentLine
                      , MUS.optLitPrinter = \lit ->
                          show (sel2idx ! lit)
                      }
-          mus <-
-            case optMUSMethod opt of
-              MUSLinear -> MUS.findMUSAssumptions solver opt2
-              MUSQuickXplain -> QuickXplain.findMUSAssumptions solver opt2
+          mus <- MUS.findMUSAssumptions solver opt2
           let mus2 = sort $ map (sel2idx !) $ IntSet.toList mus
           musPrintSol stdout mus2
       else do
           counter <- newIORef 1
           let opt2 = def
-                     { CAMUS.optLogger = putCommentLine
-                     , CAMUS.optOnMCSFound = \mcs -> do
+                     { MUSEnum.optMethod = optAllMUSMethod opt
+                     , MUSEnum.optLogger = putCommentLine
+                     , MUSEnum.optOnMCSFound = \mcs -> do
                          let mcs2 = sort $ map (sel2idx !) $ IntSet.toList mcs
                          putCommentLine $ "MCS found: " ++ show mcs2
-                     , CAMUS.optOnMUSFound = \mus -> do
+                     , MUSEnum.optOnMUSFound = \mus -> do
                          i <- readIORef counter
                          modifyIORef' counter (+1)
                          putCommentLine $ "MUS #" ++ show (i :: Int)
                          let mus2 = sort $ map (sel2idx !) $ IntSet.toList mus
                          musPrintSol stdout mus2
-                     , CAMUS.optEvalOrigConstr = \m sel ->
+                     , MUSEnum.optEvalOrigConstr = \m sel ->
                          and [SAT.evalClause m c | c <- idx2clauses ! (sel2idx ! sel)]
                      }
-          case optAllMUSMethod opt of
-            AllMUSCAMUS -> CAMUS.allMUSAssumptions solver (map snd tbl) opt2
-            AllMUSDAA   -> DAA.allMUSAssumptions solver (map snd tbl) opt2
+          MUSEnum.allMUSAssumptions solver (map snd tbl) opt2
           return ()
 
 -- ------------------------------------------------------------------------
