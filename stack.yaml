@@ -55,6 +55,10 @@ extra-deps:
 - pseudo-boolean-0.1.5.0
 - sign-0.4.3
 
+# hack for avoiding haddock error of MemoTrie-0.6.4
+#- MemoTrie-0.6.7
+#- newtype-generics-0.5
+
 # Override default flag values for local packages and extra-deps
 flags: {}
 
