@@ -20,6 +20,7 @@ import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996 as FredmanKhachiyan1996
 import qualified ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999 as GurvichKhachiyan1999
 import qualified ToySolver.Combinatorial.HittingSet.DAA as DAA
+import qualified ToySolver.Combinatorial.HittingSet.MARCO as MARCO
 
 -- ---------------------------------------------------------------------
 -- Hitting sets
@@ -250,8 +251,10 @@ case_FredmanKhachiyan1996_checkDualityB = FredmanKhachiyan1996.checkDualityB f g
     f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
     g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
 
-prop_GurvichKhachiyan1999_generateCNFAndDNF :: Property
-prop_GurvichKhachiyan1999_generateCNFAndDNF =
+propGenerateCNFAndDNF
+  :: (IntSet -> (IntSet -> Bool) -> Set IntSet -> Set IntSet -> (Set IntSet, Set IntSet))
+  -> Property
+propGenerateCNFAndDNF impl = 
   forAll hyperGraph $ \g ->
     let vs = IntSet.unions $ Set.toList g
         f xs = any (\is -> not $ IntSet.null $ xs `IntSet.intersection` is) (Set.toList g)
@@ -260,9 +263,12 @@ prop_GurvichKhachiyan1999_generateCNFAndDNF =
         is `isImplicateOf` f = is `isImplicantOf` dual f
         is `isPrimeImplicantOf` f = is `isImplicantOf` f && all (\i -> not (IntSet.delete i is `isImplicantOf` f)) (IntSet.toList is)
         is `isPrimeImplicateOf` f = is `isImplicateOf` f && all (\i -> not (IntSet.delete i is `isImplicateOf` f)) (IntSet.toList is)
-        (cnf,dnf) = GurvichKhachiyan1999.generateCNFAndDNF vs f Set.empty Set.empty
+        (cnf,dnf) = impl vs f Set.empty Set.empty
     in all (`isPrimeImplicantOf` f) (Set.toList dnf) &&
        all (`isPrimeImplicateOf` f) (Set.toList cnf)
+
+prop_GurvichKhachiyan1999_generateCNFAndDNF :: Property
+prop_GurvichKhachiyan1999_generateCNFAndDNF = propGenerateCNFAndDNF GurvichKhachiyan1999.generateCNFAndDNF
 
 prop_GurvichKhachiyan1999_minimalHittingSets_duality :: Property
 prop_GurvichKhachiyan1999_minimalHittingSets_duality =
@@ -286,18 +292,10 @@ prop_GurvichKhachiyan1999_minimalHittingSets_minimality =
           not $ IntSet.delete v s `isHittingSetOf` g
 
 prop_DAA_generateCNFAndDNF :: Property
-prop_DAA_generateCNFAndDNF =
-  forAll hyperGraph $ \g ->
-    let vs = IntSet.unions $ Set.toList g
-        f xs = any (\is -> not $ IntSet.null $ xs `IntSet.intersection` is) (Set.toList g)
-        dual f is = not $ f (vs `IntSet.difference` is)
-        is `isImplicantOf` f = f is
-        is `isImplicateOf` f = is `isImplicantOf` dual f
-        is `isPrimeImplicantOf` f = is `isImplicantOf` f && all (\i -> not (IntSet.delete i is `isImplicantOf` f)) (IntSet.toList is)
-        is `isPrimeImplicateOf` f = is `isImplicateOf` f && all (\i -> not (IntSet.delete i is `isImplicateOf` f)) (IntSet.toList is)
-        (cnf,dnf) = DAA.generateCNFAndDNF vs f Set.empty Set.empty
-    in all (`isPrimeImplicantOf` f) (Set.toList dnf) &&
-       all (`isPrimeImplicateOf` f) (Set.toList cnf)
+prop_DAA_generateCNFAndDNF = propGenerateCNFAndDNF DAA.generateCNFAndDNF
+
+prop_MARCO_generateCNFAndDNF :: Property
+prop_MARCO_generateCNFAndDNF = propGenerateCNFAndDNF MARCO.generateCNFAndDNF
 
 ------------------------------------------------------------------------
 -- Test harness

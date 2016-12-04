@@ -237,6 +237,7 @@ Library
      ToySolver.EUF.FiniteModelFinder
      ToySolver.Combinatorial.BipartiteMatching
      ToySolver.Combinatorial.HittingSet.DAA
+     ToySolver.Combinatorial.HittingSet.MARCO
      ToySolver.Combinatorial.HittingSet.Simple
      ToySolver.Combinatorial.HittingSet.HTCBDD
      ToySolver.Combinatorial.HittingSet.SHD
