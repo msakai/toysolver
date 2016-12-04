@@ -24,6 +24,7 @@ import ToySolver.SAT.MUS.Types
 
 data Method
   = Linear
+  | Insertion
   | QuickXplain
   deriving (Eq, Ord, Enum, Bounded, Show)
 

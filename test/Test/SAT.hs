@@ -1432,6 +1432,25 @@ case_MUS_Linear = do
       expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
   actual' `elem` expected @?= True
 
+case_MUS_Insertion = do
+  solver <- SAT.newSolver
+  [x1,x2,x3] <- SAT.newVars solver 3
+  sels@[y1,y2,y3,y4,y5,y6] <- SAT.newVars solver 6
+  SAT.addClause solver [-y1, x1]
+  SAT.addClause solver [-y2, -x1]
+  SAT.addClause solver [-y3, -x1, x2]
+  SAT.addClause solver [-y4, -x2]
+  SAT.addClause solver [-y5, -x1, x3]
+  SAT.addClause solver [-y6, -x3]
+
+  ret <- SAT.solveWith solver sels
+  ret @?= False
+
+  actual <- MUS.findMUSAssumptions solver def{ MUS.optMethod = MUS.Insertion }
+  let actual'  = IntSet.map (\x -> x-3) actual
+      expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
+  actual' `elem` expected @?= True
+
 case_MUS_QuickXplain = do
   solver <- SAT.newSolver
   [x1,x2,x3] <- SAT.newVars solver 3
