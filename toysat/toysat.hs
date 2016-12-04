@@ -620,8 +620,9 @@ solveMUS opt solver gcnf = do
           let opt2 = def
                      { MUS.optMethod = optMUSMethod opt
                      , MUS.optLogger = putCommentLine
-                     , MUS.optLitPrinter = \lit ->
-                         show (sel2idx ! lit)
+                     , MUS.optShowLit = \lit -> show (sel2idx ! lit)
+                     , MUS.optEvalConstr = \m sel ->
+                         and [SAT.evalClause m c | c <- idx2clauses ! (sel2idx ! sel)]
                      }
           mus <- MUS.findMUSAssumptions solver opt2
           let mus2 = sort $ map (sel2idx !) $ IntSet.toList mus
@@ -631,6 +632,9 @@ solveMUS opt solver gcnf = do
           let opt2 = def
                      { MUSEnum.optMethod = optAllMUSMethod opt
                      , MUSEnum.optLogger = putCommentLine
+                     , MUSEnum.optShowLit = \lit -> show (sel2idx ! lit)
+                     , MUSEnum.optEvalConstr = \m sel ->
+                         and [SAT.evalClause m c | c <- idx2clauses ! (sel2idx ! sel)]
                      , MUSEnum.optOnMCSFound = \mcs -> do
                          let mcs2 = sort $ map (sel2idx !) $ IntSet.toList mcs
                          putCommentLine $ "MCS found: " ++ show mcs2
@@ -640,8 +644,6 @@ solveMUS opt solver gcnf = do
                          putCommentLine $ "MUS #" ++ show (i :: Int)
                          let mus2 = sort $ map (sel2idx !) $ IntSet.toList mus
                          musPrintSol stdout mus2
-                     , MUSEnum.optEvalOrigConstr = \m sel ->
-                         and [SAT.evalClause m c | c <- idx2clauses ! (sel2idx ! sel)]
                      }
           MUSEnum.allMUSAssumptions solver (map snd tbl) opt2
           return ()

@@ -25,6 +25,7 @@ module ToySolver.SAT.MUS.Enum.DAA
 
 import Control.Monad
 import qualified Data.IntSet as IntSet
+import Data.List (intercalate)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
@@ -37,6 +38,12 @@ allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ([MUS], [MCS])
 allMUSAssumptions solver sels opt =
   loop (Set.fromList (optKnownMUSes opt)) (Set.fromList (optKnownMCSes opt))
   where
+    showLit :: Lit -> String
+    showLit = optShowLit opt
+
+    showLits :: IntSet.IntSet -> String
+    showLits ls = "{" ++ intercalate ", " (map showLit (IntSet.toList ls)) ++ "}"
+
     selsSet :: LitSet
     selsSet = IntSet.fromList sels
 
@@ -56,34 +63,47 @@ allMUSAssumptions solver sels opt =
                 f (Set.insert mus muses) xss
       f muses (Set.toList (HittingSet.minimalHittingSets mcses `Set.difference` muses))
 
+    checkSAT :: LitSet -> IO (Either LitSet LitSet)
+    checkSAT xs = do
+      b <- SAT.solveWith solver (IntSet.toList xs)
+      if b then do
+        m <- SAT.getModel solver
+        return $ Right $ IntSet.fromList [l | l <- sels, optEvalConstr opt m l]
+      else do
+        zs <- SAT.getFailedAssumptions solver
+        return $ Left $ IntSet.fromList zs
+
     findMSS :: LitSet -> IO (Maybe LitSet)
     findMSS xs = do
       forM_ sels $ \l -> do
         SAT.setVarPolarity solver (litVar l) (litPolarity l)
-      b <- SAT.solveWith solver (IntSet.toList xs)
-      if b then do
-        m <- SAT.getModel solver
-        liftM Just $ grow $ IntSet.fromList [l | l <- sels, optEvalOrigConstr opt m l]
-      else do
-        SAT.addClause solver [-l | l <- IntSet.toList xs] -- lemma
-        return Nothing
+      optLogger opt $ "DAA: checking satisfiability of " ++ showLits xs
+      ret <- checkSAT xs
+      case ret of
+        Right ys -> do
+          optLogger opt $ "DAA: " ++ showLits xs ++ " is satisfiable"
+          liftM Just $ grow ys
+        Left _ -> do
+          optLogger opt $ "DAA: " ++ showLits xs ++ " is unsatisfiable"
+          SAT.addClause solver [-l | l <- IntSet.toList xs] -- lemma
+          return Nothing
 
     grow :: LitSet -> IO LitSet
-    grow xs = loop xs (selsSet `IntSet.difference` xs)
+    grow xs = do
+      ys <- loop xs (selsSet `IntSet.difference` xs)
+      optLogger opt $ "DAA: grow " ++ showLits xs ++ " => " ++ showLits ys
+      return ys
       where
         loop xs ys =
           case IntSet.minView ys of
             Nothing -> return xs
             Just (c, ys') -> do
-              b <- SAT.solveWith solver (c : IntSet.toList xs)
-              if b then do
-                m <- SAT.getModel solver
-                let cs = IntSet.fromList [l | l <- sels, optEvalOrigConstr opt m l]
-                loop (xs `IntSet.union` cs) (ys' `IntSet.difference` cs)
-              else do
-                zs <- SAT.getFailedAssumptions solver
-                SAT.addClause solver [-l | l <- zs] -- lemma
-                loop xs ys'
+              ret <- checkSAT (IntSet.insert c xs)
+              case ret of
+                Right cs -> loop (xs `IntSet.union` cs) (ys' `IntSet.difference` cs)
+                Left zs -> do
+                  SAT.addClause solver [-l | l <- IntSet.toList zs] -- lemma
+                  loop xs ys'
 
 {-
 daa_min_unsat(U)

@@ -55,7 +55,7 @@ findMUSAssumptions solver opt = do
     update = optUpdateBest opt
 
     showLit :: Lit -> String
-    showLit = optLitPrinter opt
+    showLit = optShowLit opt
 
     showLits :: IS.IntSet -> String
     showLits ls = "{" ++ intercalate ", " (map showLit (IS.toList ls)) ++ "}"
