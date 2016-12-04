@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
@@ -30,9 +31,15 @@
 -----------------------------------------------------------------------------
 module ToySolver.Combinatorial.HittingSet.DAA
   (
-  -- * Main functionality
+  -- * Problem definition
     IsProblem (..)
+  , defaultGrow
+  , defaultShrink
+  , defaultMaximalInterestingSet
+  , defaultMinimalUninterestingSet
   , SimpleProblem (..)
+
+  -- * Main functionality
   , Options (..)
   , run
 
@@ -43,6 +50,7 @@ module ToySolver.Combinatorial.HittingSet.DAA
 import Control.Monad
 import Control.Monad.Identity
 import Data.Default.Class
+import Data.Either
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Set (Set)
@@ -60,24 +68,75 @@ class Monad m => IsProblem prob m | prob -> m where
   -- | Interesting sets are lower closed subsets of 'universe', i.e. if @xs@ is
   -- interesting then @ys@ ⊆ @xs@ is also interesting.
   isInteresting :: prob -> IntSet -> m Bool
+  isInteresting prob xs = liftM isRight $ isInteresting' prob xs
+
+  -- | If @xs@ is interesting it returns @Right ys@ where @ys@ is an interesting superset of @xs@.
+  -- If @xs@ is uninteresting it returns @Left ys@ where @ys@ is an uninteresting subset of @xs@.
+  isInteresting' :: prob -> IntSet -> m (Either IntSet IntSet)
+  isInteresting' prob xs = do
+    b <- isInteresting prob xs
+    return $ if b then Right xs else Left xs
+
+  -- | @grow xs@ computes maximal interesting set @ys@ that is a superset of @xs@.
+  grow :: prob -> IntSet -> m IntSet
+  grow = defaultGrow
+
+  -- | @shrink xs@ computes minimal uninteresting set @ys@ that is a subset of @xs@.
+  shrink :: prob -> IntSet -> m IntSet
+  shrink = defaultShrink
 
   -- | If @xs@ is an interesting set @maximalInterestingSet prob xs@ returns @Just ys@
-  -- such that ys is a maximall interesting superset of xs, otherwise it returns @Nothing@.
+  -- such that @ys@ is a maximal interesting superset of @xs@, otherwise it returns @Nothing@.
   maximalInterestingSet :: prob -> IntSet -> m (Maybe IntSet)
-  maximalInterestingSet prob xs = do
-   b <- isInteresting prob xs
-   if not b then
-     return Nothing
-   else do
-     let f ys z = do
-           let ys' = IntSet.insert z ys
-           b2 <- isInteresting prob ys'
-           if b2 then return ys' else return ys
-     liftM Just $ foldM f xs (IntSet.toList (universe prob `IntSet.difference` xs))
+  maximalInterestingSet = defaultMaximalInterestingSet
 
-data SimpleProblem = SimpleProblem IntSet (IntSet -> Bool)
+  -- | If @xs@ is an uninteresting set @minimalUninterestingSet prob xs@ returns @Just ys@
+  -- such that @ys@ is a minimal uninteresting subset of @xs@, otherwise it returns @Nothing@.
+  minimalUninterestingSet :: prob -> IntSet -> m (Maybe IntSet)
+  minimalUninterestingSet = defaultMinimalUninterestingSet
 
-instance IsProblem SimpleProblem Identity where
+  {-# MINIMAL universe, (isInteresting | isInteresting') #-}
+
+-- | Default implementation of 'grow' using 'isInteresting''.
+defaultGrow :: IsProblem prob m => prob -> IntSet -> m IntSet
+defaultGrow prob xs = foldM f xs (IntSet.toList (universe prob `IntSet.difference` xs))
+  where
+    f xs' y = do
+      ret <- isInteresting' prob (IntSet.insert y xs')
+      case ret of
+        Left _ -> return xs'
+        Right xs'' -> return xs''
+
+-- | Default implementation of 'shrink' using 'isInteresting''.
+defaultShrink :: IsProblem prob m => prob -> IntSet -> m IntSet
+defaultShrink prob xs = foldM f xs (IntSet.toList xs)
+  where
+    f xs' y = do
+      ret <- isInteresting' prob (IntSet.delete y xs')
+      case ret of
+        Left xs'' -> return xs''
+        Right _ -> return xs'
+
+-- | Default implementation of 'maximalUninterestingSet' using 'isInteresting'' and 'grow'.
+defaultMaximalInterestingSet :: IsProblem prob m => prob -> IntSet -> m (Maybe IntSet)
+defaultMaximalInterestingSet prob xs = do
+ ret <- isInteresting' prob xs
+ case ret of
+   Left _ -> return Nothing
+   Right xs' -> liftM Just $ grow prob xs'
+
+-- | Default implementation of 'minimalUninterestingSet' using 'isInteresting'' and 'shrink'.
+defaultMinimalUninterestingSet :: IsProblem prob m => prob -> IntSet -> m (Maybe IntSet)
+defaultMinimalUninterestingSet prob xs = do
+ ret <- isInteresting' prob xs
+ case ret of
+   Left xs' -> liftM Just $ shrink prob xs'
+   Right _ -> return Nothing
+
+
+data SimpleProblem (m :: * -> *) = SimpleProblem IntSet (IntSet -> Bool)
+
+instance Monad m => IsProblem (SimpleProblem m) m where
   universe (SimpleProblem univ _) = univ
   isInteresting (SimpleProblem _ f) = return . f
 
@@ -86,9 +145,9 @@ data Options m
   = Options
   { optMinimalHittingSets :: Set IntSet -> m (Set IntSet)
   , optMaximalInterestingSets :: Set IntSet
-  , optMinimalNoninterestingSets :: Set IntSet
+  , optMinimalUninterestingSets :: Set IntSet
   , optOnMaximalInterestingSetFound :: IntSet -> m ()
-  , optOnMinimalNoninterestingSetFound :: IntSet -> m ()
+  , optOnMinimalUninterestingSetFound :: IntSet -> m ()
   }
 
 instance Monad m => Default (Options m) where
@@ -96,15 +155,15 @@ instance Monad m => Default (Options m) where
     Options
     { optMinimalHittingSets = return . HTC.minimalHittingSets
     , optMaximalInterestingSets = Set.empty
-    , optMinimalNoninterestingSets = Set.empty
+    , optMinimalUninterestingSets = Set.empty
     , optOnMaximalInterestingSetFound = \_ -> return ()
-    , optOnMinimalNoninterestingSetFound = \_ -> return ()
+    , optOnMinimalUninterestingSetFound = \_ -> return ()
     }
 
 -- | Given a problem and an option, it computes maximal interesting sets and
--- minimal non-interesting sets.
+-- minimal uninteresting sets.
 run :: forall prob m. IsProblem prob m => prob -> Options m -> m (Set IntSet, Set IntSet)
-run prob opt = loop (Set.map complement (optMaximalInterestingSets opt)) (optMinimalNoninterestingSets opt)
+run prob opt = loop (Set.map complement (optMaximalInterestingSets opt)) (optMinimalUninterestingSets opt)
   where
     univ :: IntSet
     univ = universe prob
@@ -127,7 +186,7 @@ run prob opt = loop (Set.map complement (optMaximalInterestingSets opt)) (optMin
       ret <- maximalInterestingSet prob xs
       case ret of
         Nothing -> do          
-          optOnMinimalNoninterestingSetFound opt xs
+          optOnMinimalUninterestingSetFound opt xs
           loop2 comp_pos (Set.insert xs neg) xss
         Just ys -> do
           optOnMaximalInterestingSetFound opt ys
@@ -150,6 +209,6 @@ generateCNFAndDNF vs f cs ds = (Set.map (vs `IntSet.difference`) pos, neg)
     prob = SimpleProblem vs (not . f)
     opt = def
       { optMaximalInterestingSets = Set.map (vs `IntSet.difference`) cs
-      , optMinimalNoninterestingSets = ds
+      , optMinimalUninterestingSets = ds
       }
     (pos,neg) = runIdentity $ run prob opt
