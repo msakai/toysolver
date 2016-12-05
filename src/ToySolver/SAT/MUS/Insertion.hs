@@ -35,22 +35,27 @@ findMUSAssumptions
   -> Options
   -> IO MUS
 findMUSAssumptions solver opt = do
-  log "computing a minimal unsatisfiable core"
+  log "computing a minimal unsatisfiable core by insertion method"
   core <- liftM IntSet.fromList $ SAT.getFailedAssumptions solver
-  update $ IntSet.toList core
-  mus <- do
-    b <- SAT.solve solver
-    if b then
-      loop IntSet.empty core
-    else
-      return IntSet.empty
-  update $ IntSet.toList mus
-  return mus
+  log $ "initial core = " ++ showLits core
+  update core
+  if IntSet.null core then
+    return core
+  else do
+    mus <- do
+      b <- SAT.solve solver
+      if b then
+        loop IntSet.empty core
+      else
+        return IntSet.empty
+    log $ "new core = " ++ showLits mus
+    update mus
+    return mus
   where
     log :: String -> IO ()
     log = optLogger opt
 
-    update :: [Lit] -> IO ()
+    update :: US -> IO ()
     update = optUpdateBest opt
 
     showLit :: Lit -> String

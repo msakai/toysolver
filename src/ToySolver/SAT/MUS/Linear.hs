@@ -31,17 +31,20 @@ findMUSAssumptions
   -> Options
   -> IO MUS
 findMUSAssumptions solver opt = do
-  log "computing a minimal unsatisfiable core"
+  log "computing a minimal unsatisfiable core by linear method"
   core <- liftM IS.fromList $ SAT.getFailedAssumptions solver
-  update $ IS.toList core
-  log $ "core = " ++ showLits core
-  loop core IS.empty
+  log $ "initial core = " ++ showLits core
+  update core
+  if IS.null core then
+    return core
+  else
+    loop core IS.empty
 
   where
     log :: String -> IO ()
     log = optLogger opt
 
-    update :: [Lit] -> IO ()
+    update :: US -> IO ()
     update = optUpdateBest opt
 
     showLit :: Lit -> String
@@ -65,7 +68,7 @@ findMUSAssumptions solver opt = do
               let removed = ls1 `IS.difference` ls2
               log $ "successed to remove " ++ showLits removed
               log $ "new core = " ++ showLits (ls2 `IS.union` fixed)
-              update $ IS.toList ls2
+              update ls2
               forM_ (IS.toList removed) $ \l ->
                 SAT.addClause solver [-l]
               loop ls2 fixed

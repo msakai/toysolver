@@ -43,7 +43,7 @@ data Options
     -- itself is true. This function is used to inform the truth value
     -- of the original constraint /C_i/ that corresponds to the selector
     -- literal /l_i/.
-  , optUpdateBest :: [Lit] -> IO ()
+  , optUpdateBest :: US -> IO ()
   }
 
 instance Default Options where
