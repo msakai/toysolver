@@ -628,7 +628,8 @@ solveMUS opt solver gcnf = do
           let mus2 = sort $ map (sel2idx !) $ IntSet.toList mus
           musPrintSol stdout mus2
       else do
-          counter <- newIORef 1
+          musCounter <- newIORef 1
+          mcsCounter <- newIORef 1
           let opt2 = def
                      { MUSEnum.optMethod = optAllMUSMethod opt
                      , MUSEnum.optLogger = putCommentLine
@@ -636,11 +637,13 @@ solveMUS opt solver gcnf = do
                      , MUSEnum.optEvalConstr = \m sel ->
                          and [SAT.evalClause m c | c <- idx2clauses ! (sel2idx ! sel)]
                      , MUSEnum.optOnMCSFound = \mcs -> do
+                         i <- readIORef mcsCounter
+                         modifyIORef' mcsCounter (+1)
                          let mcs2 = sort $ map (sel2idx !) $ IntSet.toList mcs
-                         putCommentLine $ "MCS found: " ++ show mcs2
+                         putCommentLine $ "MCS #" ++ show (i :: Int) ++ ": " ++ intercalate " " (map show mcs2)
                      , MUSEnum.optOnMUSFound = \mus -> do
-                         i <- readIORef counter
-                         modifyIORef' counter (+1)
+                         i <- readIORef musCounter
+                         modifyIORef' musCounter (+1)
                          putCommentLine $ "MUS #" ++ show (i :: Int)
                          let mus2 = sort $ map (sel2idx !) $ IntSet.toList mus
                          musPrintSol stdout mus2
