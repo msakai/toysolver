@@ -341,6 +341,7 @@ Library
      ToySolver.Data.AlgebraicNumber.Graeffe
      ToySolver.Data.Polynomial.Base
      ToySolver.SAT.MUS.Base
+     ToySolver.SAT.MUS.Insertion
      ToySolver.SAT.MUS.Linear
      ToySolver.SAT.MUS.QuickXplain
      ToySolver.SAT.MUS.Enum.Base
