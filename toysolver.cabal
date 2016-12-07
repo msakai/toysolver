@@ -347,6 +347,7 @@ Library
      ToySolver.SAT.MUS.Enum.Base
      ToySolver.SAT.MUS.Enum.CAMUS
      ToySolver.SAT.MUS.Enum.DAA
+     ToySolver.SAT.MUS.Enum.MARCO
      ToySolver.Version.TH
      Paths_toysolver
   -- GHC-Prof-Options: -auto-all

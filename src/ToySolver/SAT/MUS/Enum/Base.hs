@@ -12,6 +12,7 @@ import ToySolver.SAT.MUS.Types
 data Method
   = CAMUS
   | DAA
+  | MARCO
   deriving (Eq, Ord, Enum, Bounded, Show)
 
 -- The default value can be obtained by 'def'.

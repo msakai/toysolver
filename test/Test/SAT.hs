@@ -1514,6 +1514,20 @@ case_DAA_allMUSAssumptions = do
   Set.fromList muses @?= Set.fromList (map (IntSet.fromList . map (+3)) [[1,2], [1,3,4], [1,5,6]])
   Set.fromList mcses @?= Set.fromList (map (IntSet.fromList . map (+3)) [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]])
 
+case_MARCO_allMUSAssumptions = do
+  solver <- SAT.newSolver
+  [x1,x2,x3] <- SAT.newVars solver 3
+  sels@[y1,y2,y3,y4,y5,y6] <- SAT.newVars solver 6
+  SAT.addClause solver [-y1, x1]
+  SAT.addClause solver [-y2, -x1]
+  SAT.addClause solver [-y3, -x1, x2]
+  SAT.addClause solver [-y4, -x2]
+  SAT.addClause solver [-y5, -x1, x3]
+  SAT.addClause solver [-y6, -x3]
+  (muses, mcses) <- MUSEnum.allMUSAssumptions solver sels def{ MUSEnum.optMethod = MUSEnum.MARCO }
+  Set.fromList muses @?= Set.fromList (map (IntSet.fromList . map (+3)) [[1,2], [1,3,4], [1,5,6]])
+  Set.fromList mcses @?= Set.fromList (map (IntSet.fromList . map (+3)) [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]])
+
 {-
 Boosting a Complete Technique to Find MSS and MUS thanks to a Local Search Oracle
 http://www.cril.univ-artois.fr/~piette/IJCAI07_HYCAM.pdf

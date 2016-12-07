@@ -48,6 +48,7 @@ import ToySolver.SAT.MUS.Types
 import ToySolver.SAT.MUS.Enum.Base
 import qualified ToySolver.SAT.MUS.Enum.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.Enum.DAA as DAA
+import qualified ToySolver.SAT.MUS.Enum.MARCO as MARCO
 
 showMethod :: Method -> String
 showMethod m = map toLower (show m)
@@ -57,6 +58,7 @@ parseMethod s =
   case map toLower s of
     "camus" -> Just CAMUS
     "daa" -> Just DAA
+    "marco" -> Just MARCO
     _ -> Nothing
 
 allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ([MUS], [MCS])
@@ -64,3 +66,4 @@ allMUSAssumptions solver sels opt =
   case optMethod opt of
     CAMUS -> CAMUS.allMUSAssumptions solver sels opt
     DAA -> DAA.allMUSAssumptions solver sels opt
+    MARCO -> MARCO.allMUSAssumptions solver sels opt
