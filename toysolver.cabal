@@ -240,6 +240,7 @@ Library
      ToySolver.Combinatorial.HittingSet.MARCO
      ToySolver.Combinatorial.HittingSet.Simple
      ToySolver.Combinatorial.HittingSet.HTCBDD
+     ToySolver.Combinatorial.HittingSet.InterestingSets
      ToySolver.Combinatorial.HittingSet.SHD
      ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996
      ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999

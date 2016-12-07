@@ -24,15 +24,9 @@
 module ToySolver.Combinatorial.HittingSet.MARCO
   (
   -- * Problem definition
-    IsProblem (..)
-  , defaultGrow
-  , defaultShrink
-  , defaultMaximalInterestingSet
-  , defaultMinimalUninterestingSet
-  , SimpleProblem (..)
+    module ToySolver.Combinatorial.HittingSet.InterestingSets
 
   -- * Main functionality
-  , Options (..)
   , run
 
   -- * Applications
@@ -49,15 +43,7 @@ import Data.IORef
 import Data.Set (Set)
 import qualified Data.Set as Set
 import System.IO.Unsafe
-import ToySolver.Combinatorial.HittingSet.DAA
-  ( IsProblem (..)
-  , defaultGrow
-  , defaultShrink
-  , defaultMaximalInterestingSet
-  , defaultMinimalUninterestingSet
-  , SimpleProblem (..)
-  , Options (..)
-  )
+import ToySolver.Combinatorial.HittingSet.InterestingSets
 import qualified ToySolver.SAT as SAT
 
 -- | Given a problem and an option, it computes maximal interesting sets and
