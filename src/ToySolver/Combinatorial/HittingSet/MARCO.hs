@@ -14,9 +14,6 @@
 -- Stability   :  provisional
 -- Portability :  non-portable
 --
--- "Dualize and Advance" algorithm for enumerating maximal interesting sets
--- and minimal non-interesting sets.
---
 -- * M. Liffiton and A. Malik, "Enumerating infeasibility: Finding multiple
 --   MUSes quickly," in Integration of AI and OR Techniques in Constraint
 --   Programming for Combinatorial Optimization Problems, C. Gomes and

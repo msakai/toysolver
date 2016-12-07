@@ -297,7 +297,7 @@ solveSmall f g
 -- Complexity: /O(n^o(log n))/ where @n = 'Set.size' f + 'Set.size' g@.
 checkDualityB
   :: Set IntSet -- ^ a monotone boolean function /f/ given in DNF
-  -> Set IntSet -- ^ a monotone boolean function /f/ given in DNF
+  -> Set IntSet -- ^ a monotone boolean function /g/ given in DNF
   -> Maybe IntSet
 checkDualityB f g
   | Just xs <- condition_1_1_solve f g = Just xs
