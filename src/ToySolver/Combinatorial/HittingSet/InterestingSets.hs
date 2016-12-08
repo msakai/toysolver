@@ -28,6 +28,7 @@ module ToySolver.Combinatorial.HittingSet.InterestingSets
   , defaultShrink
   , defaultMaximalInterestingSet
   , defaultMinimalUninterestingSet
+  , defaultMinimalUninterestingSetOrMaximalInterestingSet
   , SimpleProblem (..)
 
   -- * Options for maximal interesting sets enumeration
@@ -80,6 +81,13 @@ class Monad m => IsProblem prob m | prob -> m where
   -- such that @ys@ is a minimal uninteresting subset of @xs@, otherwise it returns @Nothing@.
   minimalUninterestingSet :: prob -> IntSet -> m (Maybe IntSet)
   minimalUninterestingSet = defaultMinimalUninterestingSet
+
+  -- | If @xs@ is an uninteresting set @minimalUninterestingSetOrMaximalInterestingSet prob xs@ returns @Left ys@
+  -- such that @ys@ is a minimal uninteresting subset of @xs@.
+  -- If @xs@ is an interesting set @minimalUninterestingSetOrMaximalInterestingSet prob xs@ returns @Right ys@
+  -- such that @ys@ is a maximal interesting superset of @xs@
+  minimalUninterestingSetOrMaximalInterestingSet :: prob -> IntSet -> m (Either IntSet IntSet)
+  minimalUninterestingSetOrMaximalInterestingSet = defaultMinimalUninterestingSetOrMaximalInterestingSet
 
   {-# MINIMAL universe, (isInteresting | isInteresting') #-}
 

@@ -64,18 +64,16 @@ run prob opt = do
           model <- SAT.getModel solver
           -- let xs = IntSet.fromList [item | (item,var) <- IntMap.toList item2var, SAT.evalLit model var]
           let xs = IntMap.keysSet $ IntMap.filter (SAT.evalLit model) item2var
-          ret2 <- isInteresting' prob xs
+          ret2 <- minimalUninterestingSetOrMaximalInterestingSet prob xs
           case ret2 of
             Left ys -> do
-              ys' <- shrink prob ys
-              SAT.addClause solver [-(item2var ! y) | y <- IntSet.toList ys'] -- blockUp
-              modifyIORef negRef (ys' :)
-              optOnMinimalUninterestingSetFound opt ys'
+              SAT.addClause solver [-(item2var ! y) | y <- IntSet.toList ys] -- blockUp
+              modifyIORef negRef (ys :)
+              optOnMinimalUninterestingSetFound opt ys
             Right ys -> do
-              ys' <- grow prob ys              
-              SAT.addClause solver [item2var ! y | y <- IntSet.toList (universe prob `IntSet.difference` ys')] -- blockDown
-              modifyIORef posRef (ys' :)
-              optOnMaximalInterestingSetFound opt ys'
+              SAT.addClause solver [item2var ! y | y <- IntSet.toList (universe prob `IntSet.difference` ys)] -- blockDown
+              modifyIORef posRef (ys :)
+              optOnMaximalInterestingSetFound opt ys
           loop
   loop
   pos <- readIORef posRef
