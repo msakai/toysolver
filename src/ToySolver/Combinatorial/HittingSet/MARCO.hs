@@ -29,8 +29,11 @@ module ToySolver.Combinatorial.HittingSet.MARCO
   -- * Main functionality
   , run
 
-  -- * Applications
+  -- * Applications: monotone boolean functions
   , generateCNFAndDNF
+
+  -- * Applicaitons: minimal hitting sets
+  , minimalHittingSets
   ) where
 
 import Control.Monad
@@ -54,24 +57,27 @@ run prob opt = do
   item2var <- liftM IntMap.fromList $ forM (IntSet.toList (universe prob)) $ \item -> do
     v <- SAT.newVar solver
     return (item,v)
-  posRef <- newIORef []
-  negRef <- newIORef []
+  let blockUp xs = SAT.addClause solver [-(item2var ! x) | x <- IntSet.toList xs]
+      blockDown xs = SAT.addClause solver [item2var ! x | x <- IntSet.toList (universe prob `IntSet.difference` xs)]
+  posRef <- newIORef $ Set.toList $ optMaximalInterestingSets opt
+  negRef <- newIORef $ Set.toList $ optMinimalUninterestingSets opt
+  mapM_ blockUp $ Set.toList $ optMinimalUninterestingSets opt
+  mapM_ blockDown $ Set.toList $ optMaximalInterestingSets opt
   let loop = do
         ret <- SAT.solve solver
         if not ret then
           return ()
         else do
           model <- SAT.getModel solver
-          -- let xs = IntSet.fromList [item | (item,var) <- IntMap.toList item2var, SAT.evalLit model var]
           let xs = IntMap.keysSet $ IntMap.filter (SAT.evalLit model) item2var
           ret2 <- minimalUninterestingSetOrMaximalInterestingSet prob xs
           case ret2 of
             Left ys -> do
-              SAT.addClause solver [-(item2var ! y) | y <- IntSet.toList ys] -- blockUp
+              blockUp ys
               modifyIORef negRef (ys :)
               optOnMinimalUninterestingSetFound opt ys
             Right ys -> do
-              SAT.addClause solver [item2var ! y | y <- IntSet.toList (universe prob `IntSet.difference` ys)] -- blockDown
+              blockDown ys
               modifyIORef posRef (ys :)
               optOnMaximalInterestingSetFound opt ys
           loop
@@ -101,3 +107,11 @@ generateCNFAndDNF vs f cs ds = unsafeDupablePerformIO $ do
       { optMaximalInterestingSets = Set.map (vs `IntSet.difference`) cs
       , optMinimalUninterestingSets = ds
       }
+
+minimalHittingSets :: Set IntSet -> Set IntSet
+minimalHittingSets xss = 
+  case generateCNFAndDNF (IntSet.unions $ Set.toList xss) (evalDNF xss) Set.empty xss of
+    (yss, _) -> yss
+
+evalDNF :: Set IntSet -> IntSet -> Bool
+evalDNF dnf xs = or [is `IntSet.isSubsetOf` xs | is <- Set.toList dnf]

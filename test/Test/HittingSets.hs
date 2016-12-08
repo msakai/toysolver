@@ -267,35 +267,59 @@ propGenerateCNFAndDNF impl =
     in all (`isPrimeImplicantOf` f) (Set.toList dnf) &&
        all (`isPrimeImplicateOf` f) (Set.toList cnf)
 
-prop_GurvichKhachiyan1999_generateCNFAndDNF :: Property
-prop_GurvichKhachiyan1999_generateCNFAndDNF = propGenerateCNFAndDNF GurvichKhachiyan1999.generateCNFAndDNF
-
-prop_GurvichKhachiyan1999_minimalHittingSets_duality :: Property
-prop_GurvichKhachiyan1999_minimalHittingSets_duality =
+propMinimalHittingSetsMinimality :: (Set IntSet -> Set IntSet) -> Property
+propMinimalHittingSetsMinimality minimalHittingSets =
   forAll hyperGraph $ \g ->
-    let h = GurvichKhachiyan1999.minimalHittingSets g
-    in h == GurvichKhachiyan1999.minimalHittingSets (GurvichKhachiyan1999.minimalHittingSets h)
-
-prop_GurvichKhachiyan1999_minimalHittingSets_isHittingSet :: Property
-prop_GurvichKhachiyan1999_minimalHittingSets_isHittingSet =
-  forAll hyperGraph $ \g ->
-    all (`isHittingSetOf` g) (GurvichKhachiyan1999.minimalHittingSets g)
-
-prop_GurvichKhachiyan1999_minimalHittingSets_minimality :: Property
-prop_GurvichKhachiyan1999_minimalHittingSets_minimality =
-  forAll hyperGraph $ \g ->
-    forAll (elements (Set.toList (GurvichKhachiyan1999.minimalHittingSets g))) $ \s ->
+    forAll (elements (Set.toList (minimalHittingSets g))) $ \s ->
       if IntSet.null s then
         property True
       else
         forAll (elements (IntSet.toList s)) $ \v ->
           not $ IntSet.delete v s `isHittingSetOf` g
 
+propMinimalHittingSetsDuality :: (Set IntSet -> Set IntSet) -> Property
+propMinimalHittingSetsDuality minimalHittingSets =
+  forAll hyperGraph $ \g ->
+    let h = minimalHittingSets g
+    in h == minimalHittingSets (minimalHittingSets h)
+
+propMinimalHittingSetsIsHittingSet :: (Set IntSet -> Set IntSet) -> Property
+propMinimalHittingSetsIsHittingSet minimalHittingSets =
+  forAll hyperGraph $ \g ->
+    all (`isHittingSetOf` g) (minimalHittingSets g)
+
+prop_GurvichKhachiyan1999_generateCNFAndDNF :: Property
+prop_GurvichKhachiyan1999_generateCNFAndDNF = propGenerateCNFAndDNF GurvichKhachiyan1999.generateCNFAndDNF
+
+prop_GurvichKhachiyan1999_minimalHittingSets_duality :: Property
+prop_GurvichKhachiyan1999_minimalHittingSets_duality =
+  propMinimalHittingSetsDuality GurvichKhachiyan1999.minimalHittingSets
+
+prop_GurvichKhachiyan1999_minimalHittingSets_isHittingSet :: Property
+prop_GurvichKhachiyan1999_minimalHittingSets_isHittingSet =
+  propMinimalHittingSetsIsHittingSet GurvichKhachiyan1999.minimalHittingSets
+
+prop_GurvichKhachiyan1999_minimalHittingSets_minimality :: Property
+prop_GurvichKhachiyan1999_minimalHittingSets_minimality =
+  propMinimalHittingSetsIsHittingSet GurvichKhachiyan1999.minimalHittingSets
+
 prop_DAA_generateCNFAndDNF :: Property
 prop_DAA_generateCNFAndDNF = propGenerateCNFAndDNF DAA.generateCNFAndDNF
 
 prop_MARCO_generateCNFAndDNF :: Property
 prop_MARCO_generateCNFAndDNF = propGenerateCNFAndDNF MARCO.generateCNFAndDNF
+
+prop_MARCO_minimalHittingSets_duality :: Property
+prop_MARCO_minimalHittingSets_duality =
+  propMinimalHittingSetsDuality MARCO.minimalHittingSets
+
+prop_MARCO_minimalHittingSets_isHittingSet :: Property
+prop_MARCO_minimalHittingSets_isHittingSet =
+  propMinimalHittingSetsIsHittingSet MARCO.minimalHittingSets
+
+prop_MARCO_minimalHittingSets_minimality :: Property
+prop_MARCO_minimalHittingSets_minimality =
+  propMinimalHittingSetsIsHittingSet MARCO.minimalHittingSets
 
 ------------------------------------------------------------------------
 -- Test harness

@@ -37,7 +37,7 @@ module ToySolver.Combinatorial.HittingSet.DAA
   -- * Main functionality
   , run
 
-  -- * Applications
+  -- * Applications: minimal hitting sets
   , generateCNFAndDNF
   ) where
 
