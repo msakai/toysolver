@@ -49,16 +49,18 @@ import ToySolver.SAT.MUS.Enum.Base
 import qualified ToySolver.SAT.MUS.Enum.CAMUS as CAMUS
 import qualified ToySolver.SAT.MUS.Enum.DAA as DAA
 import qualified ToySolver.SAT.MUS.Enum.MARCO as MARCO
+import qualified ToySolver.SAT.MUS.Enum.GurvichKhachiyan1999 as GurvichKhachiyan1999
 
 showMethod :: Method -> String
 showMethod m = map toLower (show m)
 
 parseMethod :: String -> Maybe Method
 parseMethod s =
-  case map toLower s of
+  case filter (/='-') $ map toLower s of
     "camus" -> Just CAMUS
     "daa" -> Just DAA
     "marco" -> Just MARCO
+    "gurvichkhachiyan1999" -> Just GurvichKhachiyan1999
     _ -> Nothing
 
 allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ([MUS], [MCS])
@@ -67,3 +69,4 @@ allMUSAssumptions solver sels opt =
     CAMUS -> CAMUS.allMUSAssumptions solver sels opt
     DAA -> DAA.allMUSAssumptions solver sels opt
     MARCO -> MARCO.allMUSAssumptions solver sels opt
+    GurvichKhachiyan1999 -> GurvichKhachiyan1999.allMUSAssumptions solver sels opt
