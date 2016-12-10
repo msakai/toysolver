@@ -1,12 +1,15 @@
+{-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.MUS.Enum
--- Copyright   :  (c) Masahiro Sakai 2012-2014
+-- Copyright   :  (c) Masahiro Sakai 2012-2016
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (MultiParamTypeClasses)
 --
 -- In this module, we assume each soft constraint /C_i/ is represented as a literal.
 -- If a constraint /C_i/ is not a literal, we can represent it as a fresh variable /v/
@@ -42,14 +45,19 @@ module ToySolver.SAT.MUS.Enum
   ) where
 
 import Data.Char
+import Data.Default.Class
+import qualified Data.IntSet as IntSet
+import Data.List (intercalate)
+import qualified Data.Set as Set
+import qualified ToySolver.Combinatorial.HittingSet.InterestingSets as I
+import qualified ToySolver.Combinatorial.HittingSet.DAA as DAA
+import qualified ToySolver.Combinatorial.HittingSet.MARCO as MARCO
+import qualified ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999 as GurvichKhachiyan1999
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types
 import ToySolver.SAT.MUS.Types
 import ToySolver.SAT.MUS.Enum.Base
 import qualified ToySolver.SAT.MUS.Enum.CAMUS as CAMUS
-import qualified ToySolver.SAT.MUS.Enum.DAA as DAA
-import qualified ToySolver.SAT.MUS.Enum.MARCO as MARCO
-import qualified ToySolver.SAT.MUS.Enum.GurvichKhachiyan1999 as GurvichKhachiyan1999
 
 showMethod :: Method -> String
 showMethod m = map toLower (show m)
@@ -67,6 +75,63 @@ allMUSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO ([MUS], [MCS])
 allMUSAssumptions solver sels opt =
   case optMethod opt of
     CAMUS -> CAMUS.allMUSAssumptions solver sels opt
-    DAA -> DAA.allMUSAssumptions solver sels opt
-    MARCO -> MARCO.allMUSAssumptions solver sels opt
-    GurvichKhachiyan1999 -> GurvichKhachiyan1999.allMUSAssumptions solver sels opt
+    DAA -> do
+      (msses, muses) <- DAA.run prob opt2
+      return (Set.toList muses, map mss2mcs (Set.toList msses))
+    MARCO -> do
+      (msses, muses) <- MARCO.run prob opt2
+      return (Set.toList muses, map mss2mcs (Set.toList msses))
+    GurvichKhachiyan1999 -> do
+      (msses, muses) <- GurvichKhachiyan1999.run prob opt2
+      return (Set.toList muses, map mss2mcs (Set.toList msses))
+  where
+    prob = Problem solver selsSet opt
+
+    opt2 :: I.Options IO
+    opt2 =
+      (def :: I.Options IO)
+      { I.optOnMaximalInterestingSetFound = \xs ->
+          optOnMCSFound opt (mss2mcs xs)
+      , I.optOnMinimalUninterestingSetFound = \xs ->
+          optOnMUSFound opt xs
+      }
+
+    selsSet :: LitSet
+    selsSet = IntSet.fromList sels
+
+    mss2mcs :: LitSet -> LitSet
+    mss2mcs = (selsSet `IntSet.difference`)
+
+-- -----------------------------------------------------------------
+
+data Problem = Problem SAT.Solver LitSet Options
+
+instance I.IsProblem Problem IO where
+  universe (Problem _ univ _) = univ
+
+  isInteresting' (Problem solver univ opt) xs = do
+    b <- SAT.solveWith solver (IntSet.toList xs)
+    if b then do
+      m <- SAT.getModel solver
+      return $ Right $ IntSet.fromList [l | l <- IntSet.toList univ, optEvalConstr opt m l]
+    else do
+      zs <- SAT.getFailedAssumptions solver
+      return $ Left $ IntSet.fromList zs
+
+  grow prob@(Problem _ _ opt) xs = do
+    optLogger opt $ show (optMethod opt) ++ ": grow " ++ showLits prob xs
+    ys <- I.defaultGrow prob xs
+    optLogger opt $ show (optMethod opt) ++ ": grow added " ++ showLits prob (ys `IntSet.difference` xs)
+    return ys
+
+  shrink prob@(Problem _ _ opt) xs = do
+    optLogger opt $ show (optMethod opt) ++ ": shrink " ++ showLits prob xs
+    ys <- I.defaultShrink prob xs
+    optLogger opt $ show (optMethod opt) ++ ": shrink deleted " ++ showLits prob (xs `IntSet.difference` ys)
+    return ys
+
+showLits :: Problem -> IntSet.IntSet -> String
+showLits (Problem _ _ opt) ls =
+  "{" ++ intercalate ", " (map (optShowLit opt) (IntSet.toList ls)) ++ "}"
+
+-- -----------------------------------------------------------------
