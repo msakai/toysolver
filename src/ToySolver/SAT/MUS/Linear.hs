@@ -62,17 +62,16 @@ findMUSAssumptions solver opt = do
         Just (l,ls) -> do
           log $ "trying to remove " ++ showLit l
           ret <- SAT.solveWith solver (IS.toList ls)
-          if not ret
-            then do
-              ls2 <- liftM IS.fromList $ SAT.getFailedAssumptions solver
-              let removed = ls1 `IS.difference` ls2
-              log $ "successed to remove " ++ showLits removed
-              log $ "new core = " ++ showLits (ls2 `IS.union` fixed)
-              update ls2
-              forM_ (IS.toList removed) $ \l ->
-                SAT.addClause solver [-l]
-              loop ls2 fixed
-            else do
-              log $ "failed to remove " ++ showLit l
-              SAT.addClause solver [l]
-              loop ls (IS.insert l fixed)
+          if not ret then do
+            ls2 <- liftM IS.fromList $ SAT.getFailedAssumptions solver
+            let removed = ls1 `IS.difference` ls2
+            log $ "successed to remove " ++ showLits removed
+            log $ "new core = " ++ showLits (ls2 `IS.union` fixed)
+            update ls2
+            forM_ (IS.toList removed) $ \l ->
+              SAT.addClause solver [-l]
+            loop ls2 fixed
+          else do
+            log $ "failed to remove " ++ showLit l
+            SAT.addClause solver [l]
+            loop ls (IS.insert l fixed)
