@@ -12,6 +12,7 @@ import System.Exit
 import System.IO
 import qualified ToySolver.Combinatorial.HittingSet.Simple as HittingSet
 import qualified ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999 as GurvichKhachiyan1999
+import qualified ToySolver.Combinatorial.HittingSet.MARCO as MARCO
 import ToySolver.Internal.Util (setEncodingChar8)
 
 main :: IO ()
@@ -28,6 +29,7 @@ main = do
       hPutStrLn stderr "Supported METHODs:"
       hPutStrLn stderr "  simple"
       hPutStrLn stderr "  gurvichkhachiyan1999"
+      hPutStrLn stderr "  marco"
     [method, fname] -> f (Just method) fname
     [fname] -> f Nothing fname
 
@@ -43,6 +45,7 @@ f method fname = do
           "simple" -> return $ HittingSet.minimalHittingSets xss
           "gurvichkhachiyan1999" -> return $ GurvichKhachiyan1999.minimalHittingSets xss
           "gurvichkhachiyan" -> return $ GurvichKhachiyan1999.minimalHittingSets xss
+          "marco" -> return $ MARCO.minimalHittingSets xss
           _ -> do
             hPutStrLn stderr ("unknown method: " ++ s)
             exitFailure

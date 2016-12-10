@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -19,17 +20,59 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999
-  ( findPrimeImplicateOrPrimeImplicant
+  (
+  -- * Problem definition
+    module ToySolver.Combinatorial.HittingSet.InterestingSets
+
+  -- * Main functionality
+  , run
+
+  -- * Applications: monotone boolean functions
+  , findPrimeImplicateOrPrimeImplicant
   , generateCNFAndDNF
+
+  -- * Applicaitons: minimal hitting sets
   , minimalHittingSets
   , enumMinimalHittingSets
   ) where
 
+import Control.Monad.Identity
+import Data.Default.Class
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996 as FredmanKhachiyan1996
+import ToySolver.Combinatorial.HittingSet.InterestingSets
+
+-- -----------------------------------------------------------------
+
+-- | Given a problem and an option, it computes maximal interesting sets and
+-- minimal uninteresting sets.
+run :: forall m prob. IsProblem prob m => prob -> Options m -> m (Set IntSet, Set IntSet)
+run prob opt = loop (Set.map complement (optMaximalInterestingSets opt)) (optMinimalUninterestingSets opt)
+  where
+    univ :: IntSet
+    univ = universe prob
+
+    complement :: IntSet -> IntSet
+    complement = (univ `IntSet.difference`)
+
+    loop :: Set IntSet -> Set IntSet -> m (Set IntSet, Set IntSet)
+    loop comp_pos neg = do
+      case FredmanKhachiyan1996.checkDuality neg comp_pos of
+        Nothing -> return (Set.map complement comp_pos, neg)
+        Just xs -> do
+          ret <- minimalUninterestingSetOrMaximalInterestingSet prob xs
+          case ret of
+            Left ys -> do
+              optOnMinimalUninterestingSetFound opt ys
+              loop comp_pos (Set.insert ys neg)
+            Right ys -> do
+              optOnMaximalInterestingSetFound opt ys
+              loop (Set.insert (complement ys) comp_pos) neg
+
+-- -----------------------------------------------------------------
 
 -- | Find a new prime implicant or implicate.
 --
@@ -52,45 +95,11 @@ findPrimeImplicateOrPrimeImplicant
   -> Set IntSet -- ^ Subset /D'/ of prime implicants /D/ of /f/
   -> Maybe (Either IntSet IntSet)
 findPrimeImplicateOrPrimeImplicant vs f cs ds = do
-  ret <- findImplicateOrImplicant vs f cs ds
-  case ret of
-    Left xs -> return $ Left $ minimizeImplicate vs f xs
-    Right xs -> return $ Right $ minimizeImplicant vs f xs
-
-findImplicateOrImplicant
-  :: IntSet -- ^ Set of variables /V/
-  -> (IntSet -> Bool) -- ^ A monotone boolean function /f/ from /{0,1}^|V| ≅ P(V)/ to @Bool@
-  -> Set IntSet -- ^ Subset /C'/ of prime implicates /C/ of /f/
-  -> Set IntSet -- ^ Subset /D'/ of prime implicants /D/ of /f/
-  -> Maybe (Either IntSet IntSet)
-findImplicateOrImplicant vs f cs ds = do
   xs <- FredmanKhachiyan1996.checkDuality ds cs
-  if f xs then
-    return $ Right xs
-  else
-    return $ Left (vs `IntSet.difference` xs)
-
--- Minimize I such that ∧_{i∈I} x_i → f(x)
-minimizeImplicant :: IntSet -> (IntSet -> Bool) -> IntSet -> IntSet
-minimizeImplicant _ f is = loop (IntSet.toList is) is
-  where
-    loop [] !ret = ret
-    loop (x:xs) !ret =
-      if f (IntSet.delete x ret)
-      then loop xs (IntSet.delete x ret)
-      else loop xs ret
-
--- Minimize I such that f(x) → ∨_{i∈I} x_i
--- i.e. Minimize I such that ∧_{i∈I} ¬x_i → ¬f(x)
--- i.e. Maximize J such that ∧_{j∈J} x_j → ¬f(x)
-minimizeImplicate :: IntSet -> (IntSet -> Bool) -> IntSet -> IntSet
-minimizeImplicate vs f is = (vs `IntSet.difference`) $ loop (IntSet.toList is) (vs `IntSet.difference` is)
-  where
-    loop [] !ret = ret
-    loop (x:xs) !ret =
-      if not (f (IntSet.insert x ret))
-      then loop xs (IntSet.insert x ret)
-      else loop xs ret
+  let prob = SimpleProblem vs (not . f)
+  case runIdentity (minimalUninterestingSetOrMaximalInterestingSet prob xs) of
+    Left ys -> return (Right ys)
+    Right ys -> return (Left (vs `IntSet.difference` ys))
 
 -- | Compute the irredundant CNF representation and DNF representation.
 --
@@ -104,11 +113,14 @@ generateCNFAndDNF
   -> Set IntSet -- ^ Subset /C'/ of prime implicates /C/ of /f/
   -> Set IntSet -- ^ Subset /D'/ of prime implicants /D/ of /f/
   -> (Set IntSet, Set IntSet)
-generateCNFAndDNF vs f cs ds =
-  case findPrimeImplicateOrPrimeImplicant vs f cs ds of
-    Nothing -> (cs, ds)
-    Just (Left xs)  -> generateCNFAndDNF vs f (Set.insert xs cs) ds
-    Just (Right xs) -> generateCNFAndDNF vs f cs (Set.insert xs ds)
+generateCNFAndDNF vs f cs ds = (Set.map (vs `IntSet.difference`) pos, neg)
+  where
+    prob = SimpleProblem vs (not . f)
+    opt = def
+      { optMaximalInterestingSets = Set.map (vs `IntSet.difference`) cs
+      , optMinimalUninterestingSets = ds
+      }
+    (pos,neg) = runIdentity $ run prob opt
 
 minimalHittingSets :: Set IntSet -> Set IntSet
 minimalHittingSets = Set.fromList . enumMinimalHittingSets

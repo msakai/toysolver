@@ -14,9 +14,6 @@
 -- Stability   :  provisional
 -- Portability :  non-portable
 --
--- "Dualize and Advance" algorithm for enumerating maximal interesting sets
--- and minimal non-interesting sets.
---
 -- * M. Liffiton and A. Malik, "Enumerating infeasibility: Finding multiple
 --   MUSes quickly," in Integration of AI and OR Techniques in Constraint
 --   Programming for Combinatorial Optimization Problems, C. Gomes and
@@ -27,19 +24,16 @@
 module ToySolver.Combinatorial.HittingSet.MARCO
   (
   -- * Problem definition
-    IsProblem (..)
-  , defaultGrow
-  , defaultShrink
-  , defaultMaximalInterestingSet
-  , defaultMinimalUninterestingSet
-  , SimpleProblem (..)
+    module ToySolver.Combinatorial.HittingSet.InterestingSets
 
   -- * Main functionality
-  , Options (..)
   , run
 
-  -- * Applications
+  -- * Applications: monotone boolean functions
   , generateCNFAndDNF
+
+  -- * Applicaitons: minimal hitting sets
+  , minimalHittingSets
   ) where
 
 import Control.Monad
@@ -52,15 +46,7 @@ import Data.IORef
 import Data.Set (Set)
 import qualified Data.Set as Set
 import System.IO.Unsafe
-import ToySolver.Combinatorial.HittingSet.DAA
-  ( IsProblem (..)
-  , defaultGrow
-  , defaultShrink
-  , defaultMaximalInterestingSet
-  , defaultMinimalUninterestingSet
-  , SimpleProblem (..)
-  , Options (..)
-  )
+import ToySolver.Combinatorial.HittingSet.InterestingSets
 import qualified ToySolver.SAT as SAT
 
 -- | Given a problem and an option, it computes maximal interesting sets and
@@ -71,28 +57,29 @@ run prob opt = do
   item2var <- liftM IntMap.fromList $ forM (IntSet.toList (universe prob)) $ \item -> do
     v <- SAT.newVar solver
     return (item,v)
-  posRef <- newIORef []
-  negRef <- newIORef []
+  let blockUp xs = SAT.addClause solver [-(item2var ! x) | x <- IntSet.toList xs]
+      blockDown xs = SAT.addClause solver [item2var ! x | x <- IntSet.toList (universe prob `IntSet.difference` xs)]
+  posRef <- newIORef $ Set.toList $ optMaximalInterestingSets opt
+  negRef <- newIORef $ Set.toList $ optMinimalUninterestingSets opt
+  mapM_ blockUp $ Set.toList $ optMinimalUninterestingSets opt
+  mapM_ blockDown $ Set.toList $ optMaximalInterestingSets opt
   let loop = do
         ret <- SAT.solve solver
         if not ret then
           return ()
         else do
           model <- SAT.getModel solver
-          -- let xs = IntSet.fromList [item | (item,var) <- IntMap.toList item2var, SAT.evalLit model var]
           let xs = IntMap.keysSet $ IntMap.filter (SAT.evalLit model) item2var
-          ret2 <- isInteresting' prob xs
+          ret2 <- minimalUninterestingSetOrMaximalInterestingSet prob xs
           case ret2 of
             Left ys -> do
-              ys' <- shrink prob ys
-              SAT.addClause solver [-(item2var ! y) | y <- IntSet.toList ys'] -- blockUp
-              modifyIORef negRef (ys' :)
-              optOnMinimalUninterestingSetFound opt ys'
+              blockUp ys
+              modifyIORef negRef (ys :)
+              optOnMinimalUninterestingSetFound opt ys
             Right ys -> do
-              ys' <- grow prob ys              
-              SAT.addClause solver [item2var ! y | y <- IntSet.toList (universe prob `IntSet.difference` ys')] -- blockDown
-              modifyIORef posRef (ys' :)
-              optOnMaximalInterestingSetFound opt ys'
+              blockDown ys
+              modifyIORef posRef (ys :)
+              optOnMaximalInterestingSetFound opt ys
           loop
   loop
   pos <- readIORef posRef
@@ -120,3 +107,11 @@ generateCNFAndDNF vs f cs ds = unsafeDupablePerformIO $ do
       { optMaximalInterestingSets = Set.map (vs `IntSet.difference`) cs
       , optMinimalUninterestingSets = ds
       }
+
+minimalHittingSets :: Set IntSet -> Set IntSet
+minimalHittingSets xss = 
+  case generateCNFAndDNF (IntSet.unions $ Set.toList xss) (evalDNF xss) Set.empty xss of
+    (yss, _) -> yss
+
+evalDNF :: Set IntSet -> IntSet -> Bool
+evalDNF dnf xs = or [is `IntSet.isSubsetOf` xs | is <- Set.toList dnf]
