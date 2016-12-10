@@ -218,6 +218,20 @@ valueToTerm (SMT.ValBitVec bv) =
 valueToTerm (SMT.ValUninterpreted n s) =
   TermQualIdentifier $ QIdentifierAs (ISymbol $ "@" ++ show n) (sortToSortTerm s)
 
+fsymToIdentifier :: SMT.FSym -> Identifier
+fsymToIdentifier (SMT.FSym f indexes) = 
+  case indexes of
+    [] -> ISymbol (T.unpack $ unintern f)
+    _ -> I_Symbol (T.unpack $ unintern f) (map g indexes)
+  where
+    g (SMT.IndexNumeral n) =  IndexNumeral (fromIntegral n)
+    g (SMT.IndexSymbol s)  = IndexSymbol (T.unpack $ unintern s)
+
+exprToTerm :: SMT.Expr -> Term
+exprToTerm (SMT.EValue v) = valueToTerm v
+exprToTerm (SMT.EAp f []) = TermQualIdentifier (QIdentifier (fsymToIdentifier f))
+exprToTerm (SMT.EAp f xs) = TermQualIdentifierT (QIdentifier (fsymToIdentifier f)) (map exprToTerm xs)
+
 ssymToSymbol :: SMT.SSym -> Identifier
 ssymToSymbol SMT.SSymBool = ISymbol "Bool"
 ssymToSymbol SMT.SSymReal = ISymbol "Real"
@@ -766,7 +780,7 @@ getModel solver = do
   smt <- readIORef (svSMTSolverRef solver)
   m <- SMT.getModel smt
   (env, _) <- readIORef (svEnvRef solver)
-  liftM catMaybes $ forM (Map.toList env) $ \(name, entry) -> do
+  defs <- liftM catMaybes $ forM (Map.toList env) $ \(name, entry) -> do
     case entry of
       EFSymDeclared sym argsSorts resultSort -> do
         case SMT.evalFSym m sym of
@@ -788,6 +802,7 @@ getModel solver = do
             return $ Just $ DefineFun name argsSV (sortToSortTerm resultSort) $
               foldr f (valueToTerm defaultVal) tbl
       _ -> return Nothing
+  return $ defs ++ [Assert (exprToTerm x) | x <- SMT.modelGetAssertions m]
 
 getProof :: Solver -> IO GetProofResponse
 getProof solver = do

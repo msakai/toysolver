@@ -55,6 +55,7 @@ module ToySolver.SMT
   , valSort
   , FunDef (..)
   , evalFSym
+  , modelGetAssertions
 
   -- * Inspecting proofs
   , getUnsatAssumptions
@@ -1248,6 +1249,45 @@ evalFSym m f =
                 defaultVal
     Just _ -> FunDef [] $ eval m (EAp f []) -- constant symbol
     Nothing -> E.throw $ Error $ "unknown function symbol: " ++ show f
+
+-- | Constraints that cannot represented as function definitions.
+-- 
+-- For example, zero-division result values cannot be specified by
+-- function definition, because division is interpreted function.
+modelGetAssertions :: Model -> [Expr]
+modelGetAssertions m =
+  [ EAp "="
+      [ EAp "/"
+        [ EValue (entityToValue m arg sReal)
+        , EValue (ValRational 0)
+        ]
+      , EValue (entityToValue m result sReal)
+      ]
+  | let FEUFFun _ sym = mDefs m Map.! "_/0"
+  , ([arg], result) <- Map.toList $ EUF.mFunctions (mEUFModel m) IntMap.! sym
+  ]
+  ++
+  [ EAp "="
+      [ EAp "bvudiv"
+        [ EValue (ValBitVec s)
+        , EValue (ValBitVec (BV.nat2bv (BV.width s) 0))
+        ]
+      , EValue (ValBitVec t)
+      ]
+  | (s,t) <- Map.toList bvDivTable
+  ]
+  ++
+  [ EAp "="
+      [ EAp "bvurem"
+        [ EValue (ValBitVec s)
+        , EValue (ValBitVec (BV.nat2bv (BV.width s) 0))
+        ]
+      , EValue (ValBitVec t)
+      ]
+  | (s,t) <- Map.toList bvRemTable
+  ]  
+  where
+    (_, bvDivTable, bvRemTable) = mBVModel m
 
 -- -------------------------------------------------------------------
 
