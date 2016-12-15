@@ -30,7 +30,6 @@ module ToySolver.Data.MIP.LPFile
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Writer
 import Control.Monad.ST
 import Data.Char
 import Data.Default.Class
@@ -469,107 +468,73 @@ skipManyTill p end = scan
 
 -- ---------------------------------------------------------------------------
 
-type M a = Writer Builder a
-
-execM :: M a -> TL.Text
-execM m = B.toLazyText $ execWriter m
-
-writeString :: T.Text -> M ()
-writeString s = tell $ B.fromText s
-
-writeChar :: Char -> M ()
-writeChar c = tell $ B.singleton c
-
--- ---------------------------------------------------------------------------
-
 -- | Render a problem into a string.
 render :: MIP.FileOptions -> MIP.Problem -> Either String TL.Text
-render _ mip = Right $ execM $ render' $ normalize mip
+render _ mip = Right $ B.toLazyText $ render' $ normalize mip
 
-writeVar :: MIP.Var -> M ()
-writeVar v = writeString $ unintern v
+renderVar :: MIP.Var -> Builder
+renderVar v = B.fromText $ unintern v
 
-render' :: MIP.Problem -> M ()
-render' mip = do
-  case MIP.name mip of
-    Just name -> writeString $ "\\* Problem: " <> name <> " *\\\n"
-    Nothing -> return ()
+render' :: MIP.Problem -> Builder
+render' mip = mconcat
+  [ case MIP.name mip of
+      Just name -> "\\* Problem: " <> B.fromText name <> " *\\\n"
+      Nothing -> mempty
 
-  let obj = MIP.objectiveFunction mip   
-  
-  writeString $
-    case MIP.objDir obj of
+  , case MIP.objDir (MIP.objectiveFunction mip) of
       OptMin -> "MINIMIZE"
       OptMax -> "MAXIMIZE"
-  writeChar '\n'
+  , B.singleton '\n'
+  , renderLabel (MIP.objLabel (MIP.objectiveFunction mip))
+  , renderExpr True (MIP.objExpr (MIP.objectiveFunction mip))
+  , B.singleton '\n'
 
-  renderLabel (MIP.objLabel obj)
-  renderExpr True (MIP.objExpr obj)
-  writeChar '\n'
+  , "SUBJECT TO\n"
+  , mconcat
+    [ renderConstraint c <> B.singleton '\n'
+    | c <- MIP.constraints mip, not (MIP.constrIsLazy c)
+    ]
 
-  writeString "SUBJECT TO\n"
-  forM_ (MIP.constraints mip) $ \c -> do
-    unless (MIP.constrIsLazy c) $ do
-      renderConstraint c
-      writeChar '\n'
+  , if null lcs then mempty
+    else "LAZY CONSTRAINTS\n" <> mconcat [renderConstraint c <> B.singleton '\n' | c <- lcs]
 
-  let lcs = [c | c <- MIP.constraints mip, MIP.constrIsLazy c]
-  unless (null lcs) $ do
-    writeString "LAZY CONSTRAINTS\n"
-    forM_ lcs $ \c -> do
-      renderConstraint c
-      writeChar '\n'
+  , if null cuts then mempty
+    else "USER CUTS\n" <> mconcat [renderConstraint c <> B.singleton '\n' | c <- cuts]
 
-  let cuts = [c | c <- MIP.userCuts mip]
-  unless (null cuts) $ do
-    writeString "USER CUTS\n"
-    forM_ cuts $ \c -> do
-      renderConstraint c
-      writeChar '\n'
+  , "BOUNDS\n"
+  , mconcat
+    [ renderBoundExpr lb <> " <= " <> renderVar v <> " <= " <> renderBoundExpr ub <> B.singleton '\n'
+    | (v, (lb,ub)) <- Map.toAscList (MIP.varBounds mip)
+    , v `Set.notMember` bins
+    ]
 
-  let ivs = MIP.integerVariables mip `Set.union` MIP.semiIntegerVariables mip
-      (bins,gens) = Set.partition (\v -> MIP.getBounds mip v == (MIP.Finite 0, MIP.Finite 1)) ivs
-      scs = MIP.semiContinuousVariables mip `Set.union` MIP.semiIntegerVariables mip
+  , if Set.null gens then mempty
+    else "GENERALS\n" <> renderVariableList (Set.toList gens)
+  , if Set.null bins then mempty
+    else "BINARIES\n" <> renderVariableList (Set.toList bins)
+  , if Set.null scs then mempty
+    else "SEMI-CONTINUOUS\n" <> renderVariableList (Set.toList scs)
 
-  writeString "BOUNDS\n"
-  forM_ (Map.toAscList (MIP.varBounds mip)) $ \(v, (lb,ub)) -> do
-    unless (v `Set.member` bins) $ do
-      renderBoundExpr lb
-      writeString " <= "
-      writeVar v
-      writeString " <= "
-      renderBoundExpr ub
-      writeChar '\n'
+  , if null (MIP.sosConstraints mip) then mempty
+    else
+      "SOS\n" <> mconcat
+      [ renderLabel l <> B.fromString (show typ) <> " ::" <>
+        mconcat ["  " <> renderVar v <> " : " <> showValue r | (v,r) <- xs] <>
+        B.singleton '\n'
+      | MIP.SOSConstraint l typ xs <- MIP.sosConstraints mip
+      ]
 
-  unless (Set.null gens) $ do
-    writeString "GENERALS\n"
-    renderVariableList $ Set.toList gens
-
-  unless (Set.null bins) $ do
-    writeString "BINARIES\n"
-    renderVariableList $ Set.toList bins
-
-  unless (Set.null scs) $ do
-    writeString "SEMI-CONTINUOUS\n"
-    renderVariableList $ Set.toList scs
-
-  unless (null (MIP.sosConstraints mip)) $ do
-    writeString "SOS\n"
-    forM_ (MIP.sosConstraints mip) $ \(MIP.SOSConstraint l typ xs) -> do
-      renderLabel l
-      writeString $ fromString $ show typ
-      writeString " ::"
-      forM_ xs $ \(v, r) -> do
-        writeString "  "
-        writeVar v
-        writeString " : "
-        writeString $ showValue r
-      writeChar '\n'
-
-  writeString "END\n"
+  , "END\n"
+  ]
+  where
+    lcs = [c | c <- MIP.constraints mip, MIP.constrIsLazy c]
+    cuts = [c | c <- MIP.userCuts mip]
+    ivs = MIP.integerVariables mip `Set.union` MIP.semiIntegerVariables mip
+    (bins,gens) = Set.partition (\v -> MIP.getBounds mip v == (MIP.Finite 0, MIP.Finite 1)) ivs
+    scs = MIP.semiContinuousVariables mip `Set.union` MIP.semiIntegerVariables mip
 
 -- FIXME: Gurobi は quadratic term が最後に一つある形式でないとダメっぽい
-renderExpr :: Bool -> MIP.Expr -> M ()
+renderExpr :: Bool -> MIP.Expr -> Builder
 renderExpr isObj e = fill 80 (ts1 ++ ts2)
   where
     (ts,qts) = partition isLin (MIP.terms e)
@@ -587,15 +552,15 @@ renderExpr isObj e = fill 80 (ts1 ++ ts2)
 
     f :: MIP.Term -> T.Text
     f (MIP.Term c [])  = showConstTerm c
-    f (MIP.Term c [v]) = showCoeff c <> fromString (MIP.fromVar v)
+    f (MIP.Term c [v]) = showCoeff c <> unintern v
     f _ = error "should not happen"
 
     g :: MIP.Term -> T.Text
     g (MIP.Term c vs) = 
       (if isObj then showCoeff (2*c) else showCoeff c) <>
-      mconcat (intersperse " * " (map (fromString . MIP.fromVar) vs))
+      mconcat (intersperse " * " (map unintern vs))
 
-showValue :: Rational -> T.Text
+showValue :: IsString s => Rational -> s
 showValue c =
   if denominator c == 1
     then fromString $ show (numerator c)
@@ -616,57 +581,54 @@ showConstTerm c = s <> v
     s = if c >= 0 then "+ " else "- "
     v = showValue (abs c)
 
-renderLabel :: Maybe MIP.Label -> M ()
+renderLabel :: Maybe MIP.Label -> Builder
 renderLabel l =
   case l of
-    Nothing -> return ()
-    Just s -> writeString s >> writeString ": "
+    Nothing -> mempty
+    Just s -> B.fromText s <> ": "
 
-renderOp :: MIP.RelOp -> M ()
-renderOp MIP.Le = writeString "<="
-renderOp MIP.Ge = writeString ">="
-renderOp MIP.Eql = writeString "="
+renderOp :: MIP.RelOp -> Builder
+renderOp MIP.Le = "<="
+renderOp MIP.Ge = ">="
+renderOp MIP.Eql = "="
 
-renderConstraint :: MIP.Constraint -> M ()
-renderConstraint c@MIP.Constraint{ MIP.constrExpr = e, MIP.constrLB = lb, MIP.constrUB = ub } = do
-  renderLabel (MIP.constrLabel c)
-  case MIP.constrIndicator c of
-    Nothing -> return ()
-    Just (v,vval) -> do
-      writeVar v
-      writeString " = "
-      writeString $ showValue vval
-      writeString " -> "
+renderConstraint :: MIP.Constraint -> Builder
+renderConstraint c@MIP.Constraint{ MIP.constrExpr = e, MIP.constrLB = lb, MIP.constrUB = ub } = mconcat
+  [ renderLabel (MIP.constrLabel c)
+  , case MIP.constrIndicator c of
+      Nothing -> mempty
+      Just (v,vval) -> renderVar v <> " = " <> showValue vval <> " -> "
+  , renderExpr False e
+  , B.singleton ' '
+  , renderOp op
+  , B.singleton ' '
+  , showValue val
+  ]
+  where
+    (op, val) =
+      case (lb, ub) of
+        (MIP.NegInf, MIP.Finite x) -> (MIP.Le, x)
+        (MIP.Finite x, MIP.PosInf) -> (MIP.Ge, x)
+        (MIP.Finite x1, MIP.Finite x2) | x1==x2 -> (MIP.Eql, x1)
+        _ -> error "ToySolver.Data.MIP.LPFile.renderConstraint: should not happen"
 
-  renderExpr False e
-  writeChar ' '
-  let (op, val) =
-        case (lb, ub) of
-          (MIP.NegInf, MIP.Finite x) -> (MIP.Le, x)
-          (MIP.Finite x, MIP.PosInf) -> (MIP.Ge, x)
-          (MIP.Finite x1, MIP.Finite x2) | x1==x2 -> (MIP.Eql, x1)
-          _ -> error "ToySolver.Data.MIP.LPFile.renderConstraint: should not happen"
-  renderOp op
-  writeChar ' '
-  writeString $ showValue val
+renderBoundExpr :: MIP.BoundExpr -> Builder
+renderBoundExpr (MIP.Finite r) = showValue r
+renderBoundExpr MIP.NegInf = "-inf"
+renderBoundExpr MIP.PosInf = "+inf"
 
-renderBoundExpr :: MIP.BoundExpr -> M ()
-renderBoundExpr (MIP.Finite r) = writeString $ showValue r
-renderBoundExpr MIP.NegInf = writeString "-inf"
-renderBoundExpr MIP.PosInf = writeString "+inf"
+renderVariableList :: [MIP.Var] -> Builder
+renderVariableList vs = fill 80 (map unintern vs) <> B.singleton '\n'
 
-renderVariableList :: [MIP.Var] -> M ()
-renderVariableList vs = fill 80 (map (fromString . MIP.fromVar) vs) >> writeChar '\n'
-
-fill :: Int -> [T.Text] -> M ()
+fill :: Int -> [T.Text] -> Builder
 fill width str = go str 0
   where
-    go [] _ = return ()
-    go (x:xs) 0 = writeString x >> go xs (T.length x)
+    go [] _ = mempty
+    go (x:xs) 0 = B.fromText x <> go xs (T.length x)
     go (x:xs) w =
       if w + 1 + T.length x <= width
-        then writeChar ' ' >> writeString x >> go xs (w + 1 + T.length x)
-        else writeChar '\n' >> go (x:xs) 0
+        then B.singleton ' ' <> B.fromText x <> go xs (w + 1 + T.length x)
+        else B.singleton '\n' <> go (x:xs) 0
 
 -- ---------------------------------------------------------------------------
 
