@@ -130,20 +130,20 @@ interpretSort env s =
     SortIdentifiers ident args -> f ident args
   where
     f ident@(I_Symbol "BitVec" indexes) args
-      | not (null args) = error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for 0)")
+      | not (null args) = E.throw $ SMT.Error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for 0)")
       | [IndexNumeral n] <- indexes = SMT.sBitVec n
-      | otherwise = error ("BitVec: wrong number of indexes (" ++ show (length indexes) ++ " for 1)")
+      | otherwise = E.throw $ SMT.Error ("BitVec: wrong number of indexes (" ++ show (length indexes) ++ " for 1)")
     f ident@(I_Symbol _ _) _ =
-      error ("unknown sort: " ++ showSL ident)
+      E.throw $ SMT.Error ("unknown sort: " ++ showSL ident)
     f ident@(ISymbol name) args =
       case Map.lookup name env of
-        Nothing -> error ("unknown sort: " ++ showSL ident)
+        Nothing -> E.throw $ SMT.Error ("unknown sort: " ++ showSL ident)
         Just (SortSym ssym)
           | SMT.ssymArity ssym == length args -> SMT.Sort ssym args'
-          | otherwise -> error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for " ++ show (SMT.ssymArity ssym) ++ ")")
+          | otherwise -> E.throw $ SMT.Error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for " ++ show (SMT.ssymArity ssym) ++ ")")
         Just (SortExpr s')
           | null args -> s'
-          | otherwise -> error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for 0)")
+          | otherwise -> E.throw $ SMT.Error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for 0)")
         Just (SortDef env' params body) ->
           interpretSort (Map.fromList (zip params (map SortExpr args')) `Map.union` env') body
       where
@@ -159,13 +159,13 @@ interpretFun (env,senv) t =
       in SMT.EValue $ SMT.ValBitVec $ BV.nat2bv (length s * 4) n
     TermSpecConstant (SpecConstantBinary s) -> 
       SMT.EValue $ SMT.ValBitVec $ BV.fromDescBits [c == '1' | c <- s]
-    TermSpecConstant c@(SpecConstantString _s) -> error (show c)
+    TermSpecConstant c@(SpecConstantString _s) -> E.throw $ SMT.Error (show c)
     TermQualIdentifier qid -> f qid []
     TermQualIdentifierT  qid args -> f qid args
     TermLet bindings body ->
       interpretFun (Map.fromList [(v, EExpr (interpretFun (env,senv) t2) False) | VB v t2 <- bindings] `Map.union` env, senv) body
-    TermForall _bindings _body -> error "universal quantifiers are not supported yet"
-    TermExists _bindings _body -> error "existential quantifiers are not supported yet"
+    TermForall _bindings _body -> E.throw $ SMT.Error "universal quantifiers are not supported yet"
+    TermExists _bindings _body -> E.throw $ SMT.Error "existential quantifiers are not supported yet"
     TermAnnot t2 _ -> interpretFun (env,senv) t2 -- annotations are not supported yet
   where
     unIdentifier :: Identifier -> (String, [Index])
@@ -182,14 +182,14 @@ interpretFun (env,senv) t =
       , ((x,_):_) <- readDec xs
       , x < 2^n
       = if not (null args)
-        then error (showSL ident ++ " does not take indexes")
+        then E.throw $ SMT.Error (showSL ident ++ " does not take indexes")
         else SMT.EValue $ SMT.ValBitVec $ BV.nat2bv n x
     f qid@(QIdentifier ident) args =
       case Map.lookup name env of
-        Nothing -> error ("unknown function symbol: " ++ showSL qid)
+        Nothing -> E.throw $ SMT.Error ("unknown function symbol: " ++ showSL qid)
         Just (EFSymBuiltin name') ->
           SMT.EAp (SMT.FSym name' indexes') (map (interpretFun (env,senv)) args)
-        Just _ | not (null indexes) -> error (showSL ident ++ " does not take indexes")
+        Just _ | not (null indexes) -> E.throw $ SMT.Error (showSL ident ++ " does not take indexes")
         Just (EExpr e _) -> e
         Just (EFSymDeclared fsym _ _) -> SMT.EAp fsym (map (interpretFun (env,senv)) args)
         Just (EFunDef env' params _y body) ->
