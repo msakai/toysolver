@@ -150,16 +150,20 @@ options =
 
     , Option [] ["restart"]
         (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRestartStrategy = parseRestartStrategy val } }) "<str>")
-        "Restart startegy: MiniSAT (default), Armin, Luby."
+        ("Restart startegy: " ++ intercalate ", "
+         [ SAT.showRestartStrategy s ++ (if SAT.configRestartStrategy (optSATConfig def) == s then " (default)" else "")
+         | s <- [minBound .. maxBound] ])
     , Option [] ["restart-first"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRestartFirst = read val } }) "<integer>")
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRestartFirst = read val } }) "<int>")
         (printf "The initial restart limit. (default %d)" (SAT.configRestartFirst def))
     , Option [] ["restart-inc"]
         (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRestartInc = read val } }) "<real>")
         (printf "The factor with which the restart limit is multiplied in each restart. (default %f)" (SAT.configRestartInc def))
     , Option [] ["learning"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configLearningStrategy = parseLS val } }) "<name>")
-        "Leaning scheme: clause (default), hybrid"
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configLearningStrategy = parseLearningStrategy val } }) "<str>")
+        ("Leaning scheme: " ++ intercalate ", "
+         [ SAT.showLearningStrategy s ++ (if SAT.configLearningStrategy (optSATConfig def) == s then " (default)" else "")
+         | s <- [minBound .. maxBound] ])
     , Option [] ["learnt-size-first"]
         (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configLearntSizeFirst = read val } }) "<int>")
         "The initial limit for learnt clauses."
@@ -207,8 +211,10 @@ options =
         "Use PB constraint in linearization."
 
     , Option [] ["pb-handler"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configPBHandlerType = parsePBHandler val } }) "<name>")
-        "PB constraint handler: counter (default), pueblo"
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configPBHandlerType = parsePBHandler val } }) "<str>")
+        ("PB constraint handler: " ++ intercalate ", "
+         [ SAT.showPBHandlerType h ++ (if SAT.configPBHandlerType (optSATConfig def) == h then " (default)" else "")
+         | h <- [minBound .. maxBound] ])
     , Option [] ["pb-split-clause-part"]
         (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnablePBSplitClausePart = True } }))
         ("Split clause part of PB constraints." ++ (if SAT.configEnablePBSplitClausePart def then " (default)" else ""))
@@ -269,30 +275,17 @@ options =
         "file encoding for LP/MPS files"
     ]
   where
-    parseRestartStrategy s =
-      case map toLower s of
-        "minisat" -> SAT.MiniSATRestarts
-        "armin" -> SAT.ArminRestarts
-        "luby" -> SAT.LubyRestarts
-        _ -> error (printf "unknown restart strategy \"%s\"" s)
-
     parseOptMethod s = fromMaybe (error (printf "unknown optimization method \"%s\"" s)) (PBO.parseMethod s)
 
     parseMUSMethod s = fromMaybe (error (printf "unknown MUS finding method \"%s\"" s)) (MUS.parseMethod s)
 
     parseAllMUSMethod s = fromMaybe (error (printf "unknown MUS enumeration method \"%s\"" s)) (MUSEnum.parseMethod s)
 
-    parseLS s =
-      case map toLower s of
-        "clause" -> SAT.LearningClause
-        "hybrid" -> SAT.LearningHybrid
-        _ -> error (printf "unknown learning strategy \"%s\"" s)
+    parseRestartStrategy s = fromMaybe (error (printf "unknown restart strategy \"%s\"" s)) (SAT.parseRestartStrategy s)
 
-    parsePBHandler s =
-      case map toLower s of
-        "counter" -> SAT.PBHandlerTypeCounter
-        "pueblo"  -> SAT.PBHandlerTypePueblo
-        _ -> error (printf "unknown PB constraint handler %s" s)
+    parseLearningStrategy s = fromMaybe (error (printf "unknown learning strategy \"%s\"" s)) (SAT.parseLearningStrategy s)
+
+    parsePBHandler s = fromMaybe (error (printf "unknown PB constraint handler \"%s\"" s)) (SAT.parsePBHandlerType s)
 
 main :: IO ()
 main = do

@@ -90,13 +90,19 @@ module ToySolver.SAT
   , setConfig
   , modifyConfig
   , RestartStrategy (..)
+  , showRestartStrategy
+  , parseRestartStrategy
   , LearningStrategy (..)
+  , showLearningStrategy
+  , parseLearningStrategy
   , setVarPolarity
   , setLogger
   , setRandomGen
   , getRandomGen
   , setConfBudget
   , PBHandlerType (..)
+  , showPBHandlerType
+  , parsePBHandlerType
 
   -- ** Deprecated
   , setRestartStrategy
@@ -162,6 +168,7 @@ import Data.Array.Base (unsafeRead, unsafeWrite)
 #if MIN_VERSION_hashable(1,2,0)
 import Data.Bits (xor) -- for defining 'combine' function
 #endif
+import Data.Char
 import Data.Default.Class
 import Data.Function (on)
 import Data.Hashable
@@ -1486,6 +1493,17 @@ data LearningStrategy
 instance Default LearningStrategy where
   def = LearningClause
 
+showLearningStrategy :: LearningStrategy -> String
+showLearningStrategy LearningClause = "clause"
+showLearningStrategy LearningHybrid = "hybrid"
+
+parseLearningStrategy :: String -> Maybe LearningStrategy
+parseLearningStrategy s =
+  case map toLower s of
+    "clause" -> Just LearningClause
+    "hybrid" -> Just LearningHybrid
+    _ -> Nothing
+
 {-# DEPRECATED setLearningStrategy "Use setConfig" #-}
 setLearningStrategy :: Solver -> LearningStrategy -> IO ()
 setLearningStrategy solver l = modifyIORef' (svConfig solver) $ \config -> config{ configLearningStrategy = l }
@@ -1567,6 +1585,17 @@ data PBHandlerType = PBHandlerTypeCounter | PBHandlerTypePueblo
 
 instance Default PBHandlerType where
   def = PBHandlerTypeCounter
+
+showPBHandlerType :: PBHandlerType -> String
+showPBHandlerType PBHandlerTypeCounter = "counter"
+showPBHandlerType PBHandlerTypePueblo = "pueblo"
+
+parsePBHandlerType :: String -> Maybe PBHandlerType
+parsePBHandlerType s =
+  case map toLower s of
+    "counter" -> Just PBHandlerTypeCounter
+    "pueblo" -> Just PBHandlerTypePueblo
+    _ -> Nothing
 
 {-# DEPRECATED setPBHandlerType "Use setConfig" #-}
 setPBHandlerType :: Solver -> PBHandlerType -> IO ()
@@ -3684,6 +3713,19 @@ data RestartStrategy = MiniSATRestarts | ArminRestarts | LubyRestarts
 
 instance Default RestartStrategy where
   def = MiniSATRestarts
+
+showRestartStrategy :: RestartStrategy -> String
+showRestartStrategy MiniSATRestarts = "minisat"
+showRestartStrategy ArminRestarts = "armin"
+showRestartStrategy LubyRestarts = "luby"
+
+parseRestartStrategy :: String -> Maybe RestartStrategy
+parseRestartStrategy s =
+  case map toLower s of
+    "minisat" -> Just MiniSATRestarts
+    "armin" -> Just ArminRestarts
+    "luby" -> Just LubyRestarts
+    _ -> Nothing
 
 mkRestartSeq :: RestartStrategy -> Int -> Double -> [Int]
 mkRestartSeq MiniSATRestarts = miniSatRestartSeq
