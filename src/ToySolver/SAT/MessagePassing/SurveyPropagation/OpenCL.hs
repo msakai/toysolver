@@ -61,6 +61,7 @@ import qualified Data.Vector.Generic.Mutable as VGM
 import Foreign( castPtr, nullPtr, sizeOf )
 import Foreign.C.Types( CFloat )
 import Language.Haskell.TH (runIO, litE, stringL)
+import Language.Haskell.TH.Syntax (addDependentFile)
 import qualified Numeric.Log as L
 import System.IO
 import qualified System.Random.MWC as Rand
@@ -160,7 +161,7 @@ newSolver outputMessage context dev nv clauses = do
   let flags =
         ["-DUSE_CONSTANT_BUFFER" | maxConstantBufferSize >= reqConstantBufferSize]
   -- programSource <- openBinaryFile "sp.cl" ReadMode >>= hGetContents
-  let programSource = $(runIO (do{ h <- openFile "src/ToySolver/SAT/MessagePassing/SurveyPropagation/sp.cl" ReadMode; hSetEncoding h utf8; hGetContents h }) >>= \s -> litE (stringL s))
+  let programSource = $(runIO (do{ h <- openFile "src/ToySolver/SAT/MessagePassing/SurveyPropagation/sp.cl" ReadMode; hSetEncoding h utf8; hGetContents h }) >>= \s -> addDependentFile "src/ToySolver/SAT/MessagePassing/SurveyPropagation/sp.cl" >> litE (stringL s))
   outputMessage $ "Compiling kernels with options: " ++ unwords flags
   program <- clCreateProgramWithSource context programSource
   finally (clBuildProgram program [dev] (unwords flags))
