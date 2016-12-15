@@ -32,9 +32,11 @@ module ToySolver.SAT.PBO
   , isFinished
 
   -- * Configulation
-  , SearchStrategy (..)
-  , getSearchStrategy
-  , setSearchStrategy
+  , Method (..)
+  , showMethod
+  , parseMethod
+  , getMethod
+  , setMethod
   , defaultEnableObjFunVarsHeuristics
   , getEnableObjFunVarsHeuristics
   , setEnableObjFunVarsHeuristics
@@ -50,6 +52,7 @@ import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
 import Data.Array.IArray
+import Data.Char
 import Data.Default.Class
 import Data.IORef
 import qualified Data.Set as Set
@@ -63,10 +66,10 @@ import qualified ToySolver.SAT.PBO.BCD2 as BCD2
 import qualified ToySolver.SAT.PBO.UnsatBased as UnsatBased
 import qualified ToySolver.SAT.PBO.MSU4 as MSU4
 
--- | Optimization strategy
+-- | Optimization method
 --
 -- The default value can be obtained by 'def'.
-data SearchStrategy
+data Method
   = LinearSearch
   | BinarySearch
   | AdaptiveSearch
@@ -77,14 +80,39 @@ data SearchStrategy
   | BCD2
   deriving (Eq, Ord, Show, Enum, Bounded)
 
-instance Default SearchStrategy where
+instance Default Method where
   def = LinearSearch
+
+showMethod :: Method -> String
+showMethod m =
+  case m of
+    LinearSearch -> "linear"
+    BinarySearch -> "binary"
+    AdaptiveSearch -> "adaptive"
+    UnsatBased -> "unsat-based"
+    MSU4 -> "msu4"
+    BC -> "bc"
+    BCD -> "bcd"
+    BCD2 -> "bcd2"
+
+parseMethod :: String -> Maybe Method
+parseMethod s =
+  case map toLower s of
+    "linear"   -> Just LinearSearch
+    "binary"   -> Just BinarySearch
+    "adaptive" -> Just AdaptiveSearch
+    "unsat"    -> Just UnsatBased
+    "msu4"     -> Just MSU4
+    "bc"       -> Just BC
+    "bcd"      -> Just BCD
+    "bcd2"     -> Just BCD2
+    _ -> Nothing
 
 data Optimizer
   = Optimizer
   { optContext :: C.SimpleContext
   , optSolver  :: SAT.Solver
-  , optSearchStrategyRef :: IORef SearchStrategy
+  , optMethodRef :: IORef Method
   , optEnableObjFunVarsHeuristicsRef :: IORef Bool
   , optTrialLimitConfRef :: IORef Int
   }
@@ -102,7 +130,7 @@ newOptimizer2 solver obj obj2 = do
     Optimizer
     { optContext = cxt
     , optSolver = solver
-    , optSearchStrategyRef = strategyRef
+    , optMethodRef = strategyRef
     , optEnableObjFunVarsHeuristicsRef = heuristicsRef
     , optTrialLimitConfRef = trialLimitRef
     }
@@ -123,7 +151,7 @@ optimize opt = do
       forM_ (assocs m) $ \(v, val) -> do
         SAT.setVarPolarity solver v val
 
-  strategy <- getSearchStrategy opt
+  strategy <- getMethod opt
   case strategy of
     UnsatBased -> UnsatBased.solve cxt solver
     MSU4 -> MSU4.solve cxt solver
@@ -163,11 +191,11 @@ optimize opt = do
           adaptiveSearch cxt solver lim
         _              -> error "ToySolver.SAT.PBO.minimize: should not happen"  
 
-getSearchStrategy :: Optimizer -> IO SearchStrategy
-getSearchStrategy opt = readIORef (optSearchStrategyRef opt)
+getMethod :: Optimizer -> IO Method
+getMethod opt = readIORef (optMethodRef opt)
 
-setSearchStrategy :: Optimizer -> SearchStrategy -> IO ()
-setSearchStrategy opt val = writeIORef (optSearchStrategyRef opt) val
+setMethod :: Optimizer -> Method -> IO ()
+setMethod opt val = writeIORef (optMethodRef opt) val
 
 defaultEnableObjFunVarsHeuristics :: Bool
 defaultEnableObjFunVarsHeuristics = False

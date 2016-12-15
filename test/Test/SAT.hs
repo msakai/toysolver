@@ -216,10 +216,10 @@ arbitraryWBO = do
 
 optimizeWBO
   :: SAT.Solver
-  -> PBO.SearchStrategy
+  -> PBO.Method
   -> (Int, [(Maybe Integer, (PBRel,SAT.PBLinSum,Integer))], Maybe Integer)
   -> IO (Maybe (SAT.Model, Integer))
-optimizeWBO solver strategy (nv,cs,top) = do
+optimizeWBO solver method (nv,cs,top) = do
   SAT.newVars_ solver nv
   obj <- liftM catMaybes $ forM cs $ \(cost, (o,lhs,rhs)) -> do
     case cost of
@@ -272,10 +272,10 @@ solvePBNLC solver (nv,cs) = do
 
 optimizePBNLC
   :: SAT.Solver
-  -> PBO.SearchStrategy
+  -> PBO.Method
   -> (Int, SAT.PBSum, [(PBRel,SAT.PBSum,Integer)])
   -> IO (Maybe (SAT.Model, Integer))
-optimizePBNLC solver strategy (nv,obj,cs) = do
+optimizePBNLC solver method (nv,obj,cs) = do
   SAT.newVars_ solver nv
   enc <- PBNLC.newEncoder solver =<< Tseitin.newEncoder solver
   forM_ cs $ \(o,lhs,rhs) -> do
@@ -285,7 +285,7 @@ optimizePBNLC solver strategy (nv,obj,cs) = do
       PBRelEQ -> PBNLC.addPBNLExactly enc lhs rhs
   obj2 <- PBNLC.linearizePBSumWithPolarity enc Tseitin.polarityNeg obj
   opt <- PBO.newOptimizer2 solver obj2 (\m -> SAT.evalPBSum m obj)
-  PBO.setSearchStrategy opt strategy
+  PBO.setMethod opt method
   PBO.optimize opt
   liftM (fmap (\(m, val) -> (SAT.restrictModel nv m, val))) $ PBO.getBestSolution opt
 
@@ -1682,9 +1682,9 @@ prop_wbo2maxsat = QM.monadicIO $ do
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
-  strategy <- QM.pick arbitrary
-  ret1 <- QM.run $ optimizeWBO solver1 strategy wbo1
-  ret2 <- QM.run $ optimizeWBO solver2 strategy wbo2
+  method <- QM.pick arbitrary
+  ret1 <- QM.run $ optimizeWBO solver1 method wbo1
+  ret2 <- QM.run $ optimizeWBO solver2 method wbo2
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
     Nothing -> return ()
@@ -1720,9 +1720,9 @@ prop_wbo2pb = QM.monadicIO $ do
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
-  strategy <- QM.pick arbitrary
-  ret1 <- QM.run $ optimizeWBO solver1 strategy wbo
-  ret2 <- QM.run $ optimizePBNLC solver2 strategy pb
+  method <- QM.pick arbitrary
+  ret1 <- QM.run $ optimizeWBO solver1 method wbo
+  ret2 <- QM.run $ optimizePBNLC solver2 method pb
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
     Nothing -> return ()
@@ -1816,13 +1816,13 @@ arbitrarySolver = do
 
 arbitraryOptimizer :: SAT.Solver -> SAT.PBLinSum -> QM.PropertyM IO PBO.Optimizer
 arbitraryOptimizer solver obj = do
-  strategy <- QM.pick arbitrary
+  method <- QM.pick arbitrary
   QM.run $ do
     opt <- PBO.newOptimizer solver obj
-    PBO.setSearchStrategy opt strategy
+    PBO.setMethod opt method
     return opt
 
-instance Arbitrary PBO.SearchStrategy where
+instance Arbitrary PBO.Method where
   arbitrary = arbitraryBoundedEnum
 
 instance Arbitrary PB.Strategy where

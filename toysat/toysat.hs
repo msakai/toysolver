@@ -99,7 +99,7 @@ data Options
   , optSATConfig     :: SAT.Config
   , optRandomSeed    :: Maybe Rand.Seed
   , optLinearizerPB  :: Bool
-  , optSearchStrategy       :: PBO.SearchStrategy
+  , optOptMethod     :: PBO.Method
   , optObjFunVarsHeuristics :: Bool
   , optLocalSearchInitial   :: Bool
   , optMUSMethod :: MUS.Method
@@ -121,7 +121,7 @@ instance Default Options where
     , optSATConfig     = def
     , optRandomSeed    = Nothing
     , optLinearizerPB  = False
-    , optSearchStrategy       = def
+    , optOptMethod     = def
     , optObjFunVarsHeuristics = PBO.defaultEnableObjFunVarsHeuristics
     , optLocalSearchInitial   = False
     , optMUSMethod = MUS.optMethod def
@@ -216,9 +216,10 @@ options =
         (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnablePBSplitClausePart = False } }))
         ("Do not split clause part of PB constraints." ++ (if SAT.configEnablePBSplitClausePart def then "" else " (default)"))
 
-    , Option [] ["search"]
-        (ReqArg (\val opt -> opt{ optSearchStrategy = parseSearch val }) "<str>")
-        "Search algorithm used in optimization; linear (default), binary, adaptive, unsat, msu4, bc, bcd, bcd2"
+    , Option [] ["opt-method"]
+        (ReqArg (\val opt -> opt{ optOptMethod = parseOptMethod val }) "<str>")
+        ("Optimization method: " ++ intercalate ", "
+         [PBO.showMethod m ++ (if optOptMethod def == m then " (default)" else "") | m <- [minBound .. maxBound]])
     , Option [] ["objfun-heuristics"]
         (NoArg (\opt -> opt{ optObjFunVarsHeuristics = True }))
         "Enable heuristics for polarity/activity of variables in objective function (default)"
@@ -275,17 +276,7 @@ options =
         "luby" -> SAT.LubyRestarts
         _ -> error (printf "unknown restart strategy \"%s\"" s)
 
-    parseSearch s =
-      case map toLower s of
-        "linear"   -> PBO.LinearSearch
-        "binary"   -> PBO.BinarySearch
-        "adaptive" -> PBO.AdaptiveSearch
-        "unsat"    -> PBO.UnsatBased
-        "msu4"     -> PBO.MSU4
-        "bc"       -> PBO.BC
-        "bcd"      -> PBO.BCD
-        "bcd2"     -> PBO.BCD2
-        _ -> error (printf "unknown search strategy \"%s\"" s)
+    parseOptMethod s = fromMaybe (error (printf "unknown optimization method \"%s\"" s)) (PBO.parseMethod s)
 
     parseMUSMethod s = fromMaybe (error (printf "unknown MUS finding method \"%s\"" s)) (MUS.parseMethod s)
 
@@ -766,7 +757,7 @@ solvePB opt solver formula = do
 setupOptimizer :: PBO.Optimizer -> Options -> IO ()
 setupOptimizer pbo opt = do
   PBO.setEnableObjFunVarsHeuristics pbo $ optObjFunVarsHeuristics opt
-  PBO.setSearchStrategy pbo $ optSearchStrategy opt
+  PBO.setMethod pbo $ optOptMethod opt
   PBO.setLogger pbo putCommentLine
 
 -- ------------------------------------------------------------------------
