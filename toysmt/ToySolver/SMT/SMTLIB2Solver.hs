@@ -420,6 +420,7 @@ setLogic solver logic = do
       "QF_BV" -> return ()
       "QF_UFBV" -> return ()
       "ALL" -> return ()
+      "ALL_SUPPORTED" -> return ()
       _ -> E.throwIO SMT.Unsupported
 
 setOption :: Solver -> Option -> IO ()
