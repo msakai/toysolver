@@ -283,7 +283,8 @@ resizeCapacity (GenericVec sizeRef arrayRef) capa = do
   arr <- readIORef arrayRef
   capa0 <- liftM rangeSize $ A.getBounds arr
   when (capa0 < capa) $ do
-    arr' <- A.newArray_ (0, capa-1)
+    let capa' = max capa (n * 3 `div` 2)
+    arr' <- A.newArray_ (0, capa'-1)
     copyTo arr arr' (0, n-1)
     writeIORef arrayRef arr'
 
