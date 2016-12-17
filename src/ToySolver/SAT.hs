@@ -157,6 +157,8 @@ import Prelude hiding (log)
 import Control.Applicative hiding (empty)
 import Control.Loop
 import Control.Monad
+import Control.Monad.Trans
+import Control.Monad.Trans.Except
 import Control.Exception
 #if MIN_VERSION_array(0,5,0)
 import Data.Array.IO
@@ -170,6 +172,7 @@ import Data.Bits (xor) -- for defining 'combine' function
 #endif
 import Data.Char
 import Data.Default.Class
+import Data.Either
 import Data.Function (on)
 import Data.Hashable
 import Data.HashSet (HashSet)
@@ -2713,9 +2716,10 @@ instance ConstraintHandler ClauseHandler where
     return ([(1,l) | l <- lits], 1)
 
   isSatisfied solver this = do
-    lits <- getElems (claLits this)
-    vals <- mapM (litValue solver) lits
-    return $ lTrue `elem` vals
+    (lb,ub) <- getBounds (claLits this)
+    liftM isLeft $ runExceptT $ numLoop lb ub $ \i -> do
+      v <- lift $ litValue solver =<< unsafeRead (claLits this) i
+      when (v == lTrue) $ throwE ()
 
   constrIsProtected _ this = do
     size <- claGetSize this
@@ -2977,9 +2981,15 @@ instance ConstraintHandler AtLeastHandler where
     return ([(1,l) | l <- lits], fromIntegral (atLeastNum this))
 
   isSatisfied solver this = do
-    lits <- getElems (atLeastLits this)
-    vals <- mapM (litValue solver) lits
-    return $ length [v | v <- vals, v == lTrue] >= atLeastNum this
+    (lb,ub) <- getBounds (atLeastLits this)
+    liftM isLeft $ runExceptT $ numLoopState lb ub 0 $ \(!n) i -> do
+      v <- lift $ litValue solver =<< unsafeRead (atLeastLits this) i
+      if v /= lTrue then do
+        return n
+      else do
+        let n' = n + 1
+        when (n' >= atLeastNum this) $ throwE ()
+        return n'
 
   constrReadActivity this = readIORef (atLeastActivity this)
 
