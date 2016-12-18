@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification, TypeFamilies, ViewPatterns, DeriveGeneric, DeriveAnyClass, PatternSynonyms #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification, TypeFamilies, ViewPatterns, DeriveGeneric, PatternSynonyms #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.Encoder.Tseitin
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification, TypeFamilies, ViewPatterns, DeriveGeneric, DeriveAnyClass)
+-- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification, TypeFamilies, ViewPatterns, DeriveGeneric, PatternSynonyms)
 -- 
 -- Tseitin encoding
 --
@@ -150,7 +150,9 @@ data UFormula
   | UImply Formula Formula
   | UEquiv Formula Formula
   | UITE Formula Formula Formula
-  deriving (Eq, Generic, Hashable)
+  deriving (Eq, Generic)
+
+instance Hashable UFormula
 
 instance Interned Formula where
   type Uninterned Formula = UFormula
@@ -162,7 +164,7 @@ instance Interned Formula where
     | DImply Id Id
     | DEquiv Id Id
     | DITE Id Id Id
-    deriving (Eq, Generic, Hashable)
+    deriving (Eq, Generic)
   describe (UAtom a) = DAtom a
   describe (UAnd xs) = DAnd [i | Formula i _ <- xs]
   describe (UOr xs) = DOr [i | Formula i _ <- xs]
@@ -174,6 +176,8 @@ instance Interned Formula where
   seedIdentity _ = 1
   identify = Formula
   cache = formulaCache
+
+instance Hashable (Description Formula)
 
 instance Uninternable Formula where
   unintern (Formula _ uformula) = uformula
