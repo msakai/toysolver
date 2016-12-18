@@ -27,8 +27,8 @@ import System.Exit
 import System.IO
 
 import ToySolver.Data.Boolean
-import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.QBF as QBF
+import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.Text.QDimacs as QDimacs
 import ToySolver.Internal.Util (setEncodingChar8)
 import ToySolver.Version
@@ -87,7 +87,7 @@ main = do
                   let nv = QDimacs.numVars qdimacs
                       nc = QDimacs.numClauses qdimacs
                       prefix' = QBF.quantifyFreeVariables nv [(q, IntSet.fromList xs) | (q,xs) <- QDimacs.prefix qdimacs]
-                      matrix' = andB [orB [if lit > 0 then BoolExpr.Atom lit else notB (BoolExpr.Atom (abs lit)) | lit <- clause] | clause <- QDimacs.matrix qdimacs]
+                      matrix' = andB [orB [if lit > 0 then Tseitin.Atom lit else notB (Tseitin.Atom (abs lit)) | lit <- clause] | clause <- QDimacs.matrix qdimacs]
                   (ans, certificate) <-
                     case map toLower (optAlgorithm opt) of
                       "naive" -> QBF.solveNaive nv prefix' matrix'

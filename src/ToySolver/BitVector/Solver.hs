@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PatternSynonyms #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.BitVector.Solver
@@ -43,13 +44,13 @@ import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
-import ToySolver.Data.BoolExpr
 import ToySolver.Data.Boolean
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Internal.Data.SeqQueue as SQ
 import qualified ToySolver.Internal.Data.Vec as Vec
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import ToySolver.SAT.Encoder.Tseitin (pattern Atom, pattern And, pattern Or, pattern Not, pattern Equiv, pattern Imply)
 
 import ToySolver.BitVector.Base
 
@@ -390,7 +391,7 @@ encodeDivRem solver s t = do
   tbl <- readIORef (svDivRemTable solver)
   Tseitin.addFormula (svTseitin solver) $
     ite (isZero t)
-        (And [(isEQ s s' .&&. isZero t') .=>. (isEQ d d' .&&. isEQ r r') | (s',t',d',r') <- tbl, w == VG.length s'])
+        (andB [(isEQ s s' .&&. isZero t') .=>. (isEQ d d' .&&. isEQ r r') | (s',t',d',r') <- tbl, w == VG.length s'])
         (isEQ s c .&&. isULT r t)
   modifyIORef (svDivRemTable solver) ((s,t,d,r) :)
   return (d,r)
@@ -489,7 +490,7 @@ isSLT bs1 bs2
   | VG.length bs1 /= VG.length bs2 = error ("length mismatch: " ++ show (VG.length bs1) ++ " and " ++ show (VG.length bs2))
   | w == 0 = false
   | otherwise =
-      Atom bs1_msb .&&. Not (Atom bs2_msb)
+      Atom bs1_msb .&&. notB (Atom bs2_msb)
       .||. (Atom bs1_msb .<=>. Atom bs2_msb) .&&. isULT bs1 bs2
   where
     w = VG.length bs1

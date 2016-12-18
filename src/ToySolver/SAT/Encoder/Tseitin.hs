@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification, TypeFamilies, ViewPatterns, DeriveGeneric, DeriveAnyClass, PatternSynonyms #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.Encoder.Tseitin
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification)
+-- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification, TypeFamilies, ViewPatterns, DeriveGeneric, DeriveAnyClass)
 -- 
 -- Tseitin encoding
 --
@@ -60,6 +60,15 @@ module ToySolver.SAT.Encoder.Tseitin
 
   -- * Boolean formula type
   , Formula
+  , pattern Atom
+  , pattern And
+  , pattern Or
+  , pattern Not
+  , pattern Imply
+  , pattern Equiv
+  , pattern ITE
+  , fold
+  , simplify
   , evalFormula
 
   -- * Encoding of boolean formulas
@@ -85,19 +94,170 @@ module ToySolver.SAT.Encoder.Tseitin
 
 import Control.Monad
 import Control.Monad.Primitive
+import Data.Hashable
+import Data.Interned
 import Data.Primitive.MutVar
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntSet as IntSet
+import GHC.Generics (Generic)
 import ToySolver.Data.Boolean
-import ToySolver.Data.BoolExpr
+import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.SAT.Types as SAT
 
--- | Arbitrary formula not restricted to CNF
-type Formula = BoolExpr SAT.Lit
+-- | Boolean expression over a given type of atoms
+data Formula = Formula {-# UNPACK #-} !Id UFormula
+
+instance Eq Formula where
+  Formula i _ == Formula j _ = i == j
+
+instance Hashable Formula where
+  hashWithSalt s (Formula i _) = hashWithSalt s i
+
+instance Show Formula where
+  showsPrec prec x = showsPrec prec (fold BoolExpr.Atom x) -- XXX
+
+pattern I :: Uninternable t => Uninterned t -> t
+pattern I u <- (unintern -> u) where
+  I u = intern u
+
+pattern Atom :: SAT.Lit -> Formula
+pattern Atom x = I (UAtom x)
+
+pattern And :: [Formula] -> Formula
+pattern And xs = I (UAnd xs)
+
+pattern Or :: [Formula] -> Formula
+pattern Or xs = I (UOr xs)
+
+pattern Not :: Formula -> Formula
+pattern Not xs = I (UNot xs)
+
+pattern Imply :: Formula -> Formula -> Formula
+pattern Imply x y = I (UImply x y)
+
+pattern Equiv :: Formula -> Formula -> Formula
+pattern Equiv x y = I (UEquiv x y)
+
+pattern ITE :: Formula -> Formula -> Formula -> Formula
+pattern ITE x y z = I (UITE x y z)
+
+data UFormula
+  = UAtom SAT.Lit
+  | UAnd [Formula]
+  | UOr [Formula]
+  | UNot Formula
+  | UImply Formula Formula
+  | UEquiv Formula Formula
+  | UITE Formula Formula Formula
+  deriving (Eq, Generic, Hashable)
+
+instance Interned Formula where
+  type Uninterned Formula = UFormula
+  data Description Formula
+    = DAtom SAT.Lit
+    | DAnd [Id]
+    | DOr [Id]
+    | DNot Id
+    | DImply Id Id
+    | DEquiv Id Id
+    | DITE Id Id Id
+    deriving (Eq, Generic, Hashable)
+  describe (UAtom a) = DAtom a
+  describe (UAnd xs) = DAnd [i | Formula i _ <- xs]
+  describe (UOr xs) = DOr [i | Formula i _ <- xs]
+  describe (UNot (Formula i _)) = DNot i
+  describe (UImply (Formula i _) (Formula j _)) = DImply i j
+  describe (UEquiv (Formula i _) (Formula j _)) = DEquiv i j
+  describe (UITE (Formula i _) (Formula j _) (Formula k _)) = DITE i j k
+  cacheWidth _ = 16384 -- a huge cache width!
+  seedIdentity _ = 1
+  identify = Formula
+  cache = formulaCache
+
+instance Uninternable Formula where
+  unintern (Formula _ uformula) = uformula
+
+formulaCache :: Cache Formula
+formulaCache = mkCache
+{-# NOINLINE formulaCache #-}
+
+instance Complement Formula where
+  notB = Not
+
+instance MonotoneBoolean Formula where
+  andB = And 
+  orB  = Or
+
+instance IfThenElse Formula Formula where
+  ite = ITE
+
+instance Boolean Formula where
+  (.=>.) = Imply
+  (.<=>.) = Equiv
+
+fold :: Boolean b => (SAT.Lit -> b) -> Formula -> b
+fold f = g
+  where
+    g x =
+      case unintern x of
+        UAtom a -> f a
+        UOr xs -> orB (map g xs)
+        UAnd xs -> andB (map g xs)
+        UNot x -> notB (g x)
+        UImply x y -> g x .=>. g y
+        UEquiv x y -> g x .<=>. g y
+        UITE c t e -> ite (g c) (g t) (g e)
 
 evalFormula :: SAT.IModel m => m -> Formula -> Bool
 evalFormula m = fold (SAT.evalLit m)
+
+simplify :: Formula -> Formula
+simplify = runSimplify . fold (Simplify . Atom)
+
+newtype Simplify = Simplify{ runSimplify :: Formula }
+
+instance Complement Simplify where
+  notB (Simplify (Not x)) = Simplify x
+  notB (Simplify x) = Simplify (Not x)
+
+instance MonotoneBoolean Simplify where
+  orB xs
+    | any isTrue ys = Simplify true
+    | otherwise = Simplify $ Or ys
+    where
+      ys = concat [f x | Simplify x <- xs]
+      f (Or zs) = zs
+      f z = [z]
+  andB xs 
+    | any isFalse ys = Simplify false
+    | otherwise = Simplify $ And ys
+    where
+      ys = concat [f x | Simplify x <- xs]
+      f (And zs) = zs
+      f z = [z]
+
+instance IfThenElse Simplify Simplify where
+  ite (Simplify c) (Simplify t) (Simplify e)
+    | isTrue c  = Simplify t
+    | isFalse c = Simplify e
+    | otherwise = Simplify (ITE c t e)  
+
+instance Boolean Simplify where
+  Simplify x .=>. Simplify y
+    | isFalse x = true
+    | isTrue y  = true
+    | isTrue x  = Simplify y
+    | isFalse y = notB (Simplify x)
+    | otherwise = Simplify (x .=>. y)
+
+isTrue :: Formula -> Bool
+isTrue (And []) = True
+isTrue _ = False
+
+isFalse :: Formula -> Bool
+isFalse (Or []) = True
+isFalse _ = False
 
 -- | Encoder instance
 data Encoder m =
@@ -174,22 +334,22 @@ setUsePB encoder usePB = writeMutVar (encUsePB encoder) usePB
 -- Tseitin encoding.
 addFormula :: PrimMonad m => Encoder m -> Formula -> m ()
 addFormula encoder formula = do
-  case formula of
-    And xs -> mapM_ (addFormula encoder) xs
-    Equiv a b -> do
+  case unintern formula of
+    UAnd xs -> mapM_ (addFormula encoder) xs
+    UEquiv a b -> do
       lit1 <- encodeFormula encoder a
       lit2 <- encodeFormula encoder b
       SAT.addClause encoder [SAT.litNot lit1, lit2] -- a→b
       SAT.addClause encoder [SAT.litNot lit2, lit1] -- b→a
-    Not (Not a)     -> addFormula encoder a
-    Not (Or xs)     -> addFormula encoder (andB (map notB xs))
-    Not (Imply a b) -> addFormula encoder (a .&&. notB b)
-    Not (Equiv a b) -> do
+    UNot (Not a)     -> addFormula encoder a
+    UNot (Or xs)     -> addFormula encoder (andB (map notB xs))
+    UNot (Imply a b) -> addFormula encoder (a .&&. notB b)
+    UNot (Equiv a b) -> do
       lit1 <- encodeFormula encoder a
       lit2 <- encodeFormula encoder b
       SAT.addClause encoder [lit1, lit2] -- a ∨ b
       SAT.addClause encoder [SAT.litNot lit1, SAT.litNot lit2] -- ¬a ∨ ¬b
-    ITE c t e -> do
+    UITE c t e -> do
       c' <- encodeFormula encoder c
       t' <- encodeFormulaWithPolarity encoder polarityPos t
       e' <- encodeFormulaWithPolarity encoder polarityPos e
@@ -201,15 +361,15 @@ addFormula encoder formula = do
 
 encodeToClause :: PrimMonad m => Encoder m -> Formula -> m SAT.Clause
 encodeToClause encoder formula =
-  case formula of
-    And [x] -> encodeToClause encoder x
-    Or xs -> do
+  case unintern formula of
+    UAnd [x] -> encodeToClause encoder x
+    UOr xs -> do
       cs <- mapM (encodeToClause encoder) xs
       return $ concat cs
-    Not (Not x)  -> encodeToClause encoder x
-    Not (And xs) -> do
+    UNot (Not x)  -> encodeToClause encoder x
+    UNot (And xs) -> do
       encodeToClause encoder (orB (map notB xs))
-    Imply a b -> do
+    UImply a b -> do
       encodeToClause encoder (notB a .||. b)
     _ -> do
       l <- encodeFormulaWithPolarity encoder polarityPos formula
@@ -245,19 +405,19 @@ encodeWithPolarityHelper encoder tableRef definePos defineNeg (Polarity pos neg)
 
 encodeFormulaWithPolarity :: PrimMonad m => Encoder m -> Polarity -> Formula -> m SAT.Lit
 encodeFormulaWithPolarity encoder p formula = do
-  case formula of
-    Atom l -> return l
-    And xs -> encodeConjWithPolarity encoder p =<< mapM (encodeFormulaWithPolarity encoder p) xs
-    Or xs  -> encodeDisjWithPolarity encoder p =<< mapM (encodeFormulaWithPolarity encoder p) xs
-    Not x -> liftM SAT.litNot $ encodeFormulaWithPolarity encoder (negatePolarity p) x
-    Imply x y -> do
+  case unintern formula of
+    UAtom l -> return l
+    UAnd xs -> encodeConjWithPolarity encoder p =<< mapM (encodeFormulaWithPolarity encoder p) xs
+    UOr xs  -> encodeDisjWithPolarity encoder p =<< mapM (encodeFormulaWithPolarity encoder p) xs
+    UNot x -> liftM SAT.litNot $ encodeFormulaWithPolarity encoder (negatePolarity p) x
+    UImply x y -> do
       encodeFormulaWithPolarity encoder p (notB x .||. y)
-    Equiv x y -> do
+    UEquiv x y -> do
       lit1 <- encodeFormulaWithPolarity encoder polarityBoth x
       lit2 <- encodeFormulaWithPolarity encoder polarityBoth y
       encodeFormulaWithPolarity encoder p $
         (Atom lit1 .=>. Atom lit2) .&&. (Atom lit2 .=>. Atom lit1)
-    ITE c t e -> do
+    UITE c t e -> do
       c' <- encodeFormulaWithPolarity encoder polarityBoth c
       t' <- encodeFormulaWithPolarity encoder p t
       e' <- encodeFormulaWithPolarity encoder p e

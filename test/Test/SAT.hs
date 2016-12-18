@@ -458,8 +458,8 @@ case_QF_LRA = do
           Ge  -> return (-vLt)
           NEq -> return (-vEq)
 
-      abstract :: BoolExpr (Either SAT.Lit (LA.Atom Rational)) -> IO (BoolExpr SAT.Lit)
-      abstract = Traversable.mapM f
+      abstract :: BoolExpr (Either SAT.Lit (LA.Atom Rational)) -> IO Tseitin.Formula
+      abstract = liftM (fold Tseitin.Atom) . Traversable.mapM f
         where
           f (Left lit) = return lit
           f (Right atom) = abstractLAAtom atom
@@ -542,8 +542,8 @@ case_QF_EUF = do
             modifyIORef' defsRef $! IntMap.insert v (t1,t2)
             return v
 
-      abstract :: BoolExpr (Either SAT.Lit (EUF.Term, EUF.Term)) -> IO (BoolExpr SAT.Lit)
-      abstract = Traversable.mapM f
+      abstract :: BoolExpr (Either SAT.Lit (EUF.Term, EUF.Term)) -> IO Tseitin.Formula
+      abstract = liftM (fold Tseitin.Atom) . Traversable.mapM f
         where
           f (Left lit) = return lit
           f (Right atom) = abstractEUFAtom atom
@@ -1289,7 +1289,7 @@ case_addFormula = do
   solver <- SAT.newSolver
   enc <- Tseitin.newEncoder solver
 
-  [x1,x2,x3,x4,x5] <- replicateM 5 $ liftM Atom $ SAT.newVar solver
+  [x1,x2,x3,x4,x5] <- replicateM 5 $ liftM Tseitin.Atom $ SAT.newVar solver
   Tseitin.addFormula enc $ orB [x1 .=>. x3 .&&. x4, x2 .=>. x3 .&&. x5]
   -- x6 = x3 ∧ x4
   -- x7 = x3 ∧ x5
@@ -1317,7 +1317,7 @@ case_addFormula = do
 case_addFormula_Peirces_Law = do
   solver <- SAT.newSolver
   enc <- Tseitin.newEncoder solver
-  [x1,x2] <- replicateM 2 $ liftM Atom $ SAT.newVar solver
+  [x1,x2] <- replicateM 2 $ liftM Tseitin.Atom $ SAT.newVar solver
   Tseitin.addFormula enc $ notB $ ((x1 .=>. x2) .=>. x1) .=>. x1
   ret <- SAT.solve solver
   ret @?= False
@@ -1367,7 +1367,7 @@ case_evalFormula = do
   xs <- SAT.newVars solver 5
   let f = (x1 .=>. x3 .&&. x4) .||. (x2 .=>. x3 .&&. x5)
         where
-          [x1,x2,x3,x4,x5] = map Atom xs
+          [x1,x2,x3,x4,x5] = map Tseitin.Atom xs
       g :: SAT.Model -> Bool
       g m = (not x1 || (x3 && x4)) || (not x2 || (x3 && x5))
         where

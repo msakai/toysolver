@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP, OverloadedStrings, ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP, OverloadedStrings, ScopedTypeVariables, PatternSynonyms #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SMT
@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  unstable
--- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP, OverloadedStrings, ScopedTypeVariables)
+-- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP, OverloadedStrings, ScopedTypeVariables, PatternSynonyms)
 --
 -----------------------------------------------------------------------------
 module ToySolver.SMT
@@ -90,12 +90,13 @@ import Data.VectorSpace
 
 import ToySolver.Data.Delta
 import ToySolver.Data.Boolean
-import ToySolver.Data.BoolExpr
+import ToySolver.Data.BoolExpr hiding (Atom)
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Internal.Data.Vec as Vec
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.TheorySolver
+import ToySolver.SAT.Encoder.Tseitin (pattern Atom)
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.Arith.Simplex2 as Simplex2
 import qualified ToySolver.BitVector as BV

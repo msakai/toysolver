@@ -23,6 +23,7 @@ import qualified Test.QuickCheck.Monadic as QM
 import ToySolver.Data.Boolean
 import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.QBF as QBF
+import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
 -- -------------------------------------------------------------------
 
@@ -57,8 +58,8 @@ prop_eliminate_last_universal_quantifier = QM.monadicIO $ do
       matrix1' = andB [orB [f lit | lit <- clause] | clause <- matrix1]
       matrix2' = andB [orB [f lit | lit <- clause] | clause <- matrix2]
       f lit = if lit > 0
-              then BoolExpr.Atom lit
-              else notB (BoolExpr.Atom (abs lit))
+              then Tseitin.Atom lit
+              else notB (Tseitin.Atom (abs lit))
   (sat1, cert1) <- QM.run $ QBF.solveCEGAR nv prefix matrix1'
   (sat2, cert2) <- QM.run $ QBF.solveCEGAR nv (init prefix) matrix2'
   QM.assert $ sat1 == sat2
@@ -91,7 +92,7 @@ evalQBFNaive prefix = evalQBFNaive' IntMap.empty prefix
 evalQBFNaive' :: IntMap Bool -> QBF.Prefix -> QBF.Matrix -> Bool
 evalQBFNaive' env prefix = f env [(q,v) | (q,vs) <- prefix, v <- IntSet.toList vs]
   where
-    f env [] matrix = BoolExpr.fold (env IntMap.!) matrix
+    f env [] matrix = Tseitin.fold (env IntMap.!) matrix
     f env ((QBF.A,x) : prefix) matrix =
       f (IntMap.insert x True  env) prefix matrix &&
       f (IntMap.insert x False env) prefix matrix
@@ -108,8 +109,8 @@ arbitrarySmallQBF :: Gen (Int, QBF.Prefix, QBF.Matrix)
 arbitrarySmallQBF = do
   (nv, prefix, matrix') <- arbitrarySmallQBF'
   let f lit = if lit > 0
-              then BoolExpr.Atom lit
-              else notB (BoolExpr.Atom (abs lit))
+              then Tseitin.Atom lit
+              else notB (Tseitin.Atom (abs lit))
       matrix = andB [orB [f lit | lit <- clause] | clause <- matrix']
   return (nv, prefix, matrix)
 

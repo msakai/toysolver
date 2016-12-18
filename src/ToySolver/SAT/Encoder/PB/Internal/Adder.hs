@@ -28,7 +28,6 @@ import Data.Primitive.MutVar
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import ToySolver.Data.Boolean
-import ToySolver.Data.BoolExpr
 import qualified ToySolver.Internal.Data.SeqQueue as SQ
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
@@ -54,8 +53,8 @@ encodePBLinAtLeastAdder' enc (lhs,rhs) = do
     let lhs2 = reverse lhs1
         rhs2 = replicate (length lhs1 - length rhs1) False ++ reverse rhs1
         f [] = true
-        f ((x,False) : xs) = Atom x .||. f xs
-        f ((x,True) : xs) = Atom x .&&. f xs
+        f ((x,False) : xs) = Tseitin.Atom x .||. f xs
+        f ((x,True) : xs) = Tseitin.Atom x .&&. f xs
     return $ f (zip lhs2 rhs2)
   where
     bits :: Integer -> [Bool]
