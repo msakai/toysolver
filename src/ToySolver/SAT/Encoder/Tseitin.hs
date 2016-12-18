@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification, TypeFamilies, ViewPatterns, DeriveGeneric, PatternSynonyms #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification, TypeFamilies, ViewPatterns, DeriveGeneric, PatternSynonyms, CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.Encoder.Tseitin
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification, TypeFamilies, ViewPatterns, DeriveGeneric, PatternSynonyms)
+-- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification, TypeFamilies, ViewPatterns, DeriveGeneric, PatternSynonyms, CPP)
 -- 
 -- Tseitin encoding
 --
@@ -117,29 +117,45 @@ instance Hashable Formula where
 instance Show Formula where
   showsPrec prec x = showsPrec prec (fold BoolExpr.Atom x) -- XXX
 
+#if __GLASGOW_HASKELL__ >= 800
 pattern I :: Uninternable t => Uninterned t -> t
+#endif
 pattern I u <- (unintern -> u) where
   I u = intern u
 
+#if __GLASGOW_HASKELL__ >= 710
 pattern Atom :: SAT.Lit -> Formula
+#endif
 pattern Atom x = I (UAtom x)
 
+#if __GLASGOW_HASKELL__ >= 710
 pattern And :: [Formula] -> Formula
+#endif
 pattern And xs = I (UAnd xs)
 
+#if __GLASGOW_HASKELL__ >= 710
 pattern Or :: [Formula] -> Formula
+#endif
 pattern Or xs = I (UOr xs)
 
+#if __GLASGOW_HASKELL__ >= 710
 pattern Not :: Formula -> Formula
+#endif
 pattern Not xs = I (UNot xs)
 
+#if __GLASGOW_HASKELL__ >= 710
 pattern Imply :: Formula -> Formula -> Formula
+#endif
 pattern Imply x y = I (UImply x y)
 
+#if __GLASGOW_HASKELL__ >= 710
 pattern Equiv :: Formula -> Formula -> Formula
+#endif
 pattern Equiv x y = I (UEquiv x y)
 
+#if __GLASGOW_HASKELL__ >= 710
 pattern ITE :: Formula -> Formula -> Formula -> Formula
+#endif
 pattern ITE x y z = I (UITE x y z)
 
 data UFormula
