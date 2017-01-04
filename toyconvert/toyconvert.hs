@@ -116,7 +116,7 @@ header = unlines
 data Problem
   = ProbOPB PBFile.Formula
   | ProbWBO PBFile.SoftFormula
-  | ProbMIP MIP.Problem
+  | ProbMIP (MIP.Problem Rational)
 
 readProblem :: [Flag] -> String -> IO Problem
 readProblem o fname = do

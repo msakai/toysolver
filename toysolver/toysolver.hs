@@ -117,7 +117,7 @@ header = "Usage: toysolver [OPTION]... file"
 run
   :: String
   -> [Flag]
-  -> MIP.Problem
+  -> MIP.Problem Rational
   -> (Map MIP.Var Rational -> IO ())
   -> IO ()
 run solver opt mip printModel = do
@@ -136,10 +136,10 @@ run solver opt mip printModel = do
     nameToVar = Map.fromList vsAssoc
     varToName = IntMap.fromList [(v,name) | (name,v) <- vsAssoc]
 
-    compileE :: MIP.Expr -> Expr Rational
+    compileE :: MIP.Expr Rational -> Expr Rational
     compileE = foldr (+) (Const 0) . map compileT . MIP.terms
 
-    compileT :: MIP.Term -> Expr Rational
+    compileT :: MIP.Term Rational -> Expr Rational
     compileT (MIP.Term c vs) =
       foldr (*) (Const c) [Var (nameToVar Map.! v) | v <- vs]
 

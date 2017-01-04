@@ -41,9 +41,9 @@ import qualified ToySolver.Data.MIP.MPSFile as MPSFile
 
 -- | Parse .lp or .mps file based on file extension
 #if MIN_VERSION_megaparsec(5,0,0)
-readFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) Problem)
+readFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Rational))
 #else
-readFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+readFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Rational))
 #endif
 readFile opt fname =
   case map toLower (takeExtension fname) of
@@ -53,44 +53,44 @@ readFile opt fname =
 
 -- | Parse a file containing LP file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-readLPFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) Problem)
+readLPFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Rational))
 #else
-readLPFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+readLPFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Rational))
 #endif
 readLPFile = LPFile.parseFile
 
 -- | Parse a file containing MPS file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-readMPSFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) Problem)
+readMPSFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Rational))
 #else
-readMPSFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+readMPSFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Rational))
 #endif
 readMPSFile = MPSFile.parseFile
 
 -- | Parse a string containing LP file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseLPString :: FileOptions -> String -> String -> Either (ParseError Char Dec) Problem
+parseLPString :: FileOptions -> String -> String -> Either (ParseError Char Dec) (Problem Rational)
 #else
-parseLPString :: FileOptions -> String -> String -> Either ParseError Problem
+parseLPString :: FileOptions -> String -> String -> Either ParseError (Problem Rational)
 #endif
 parseLPString = LPFile.parseString
 
 -- | Parse a string containing MPS file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseMPSString :: FileOptions -> String -> String -> Either (ParseError Char Dec) Problem
+parseMPSString :: FileOptions -> String -> String -> Either (ParseError Char Dec) (Problem Rational)
 #else
-parseMPSString :: FileOptions -> String -> String -> Either ParseError Problem
+parseMPSString :: FileOptions -> String -> String -> Either ParseError (Problem Rational)
 #endif
 parseMPSString = MPSFile.parseString
 
-writeFile :: FileOptions -> FilePath -> Problem -> IO ()
+writeFile :: FileOptions -> FilePath -> Problem Rational -> IO ()
 writeFile opt fname prob =
   case map toLower (takeExtension fname) of
     ".lp"  -> writeLPFile opt fname prob
     ".mps" -> writeMPSFile opt fname prob
     ext -> ioError $ userError $ "unknown extension: " ++ ext
 
-writeLPFile :: FileOptions -> FilePath -> Problem -> IO ()
+writeLPFile :: FileOptions -> FilePath -> Problem Rational -> IO ()
 writeLPFile opt fname prob =
   case LPFile.render opt prob of
     Left err -> ioError $ userError err
@@ -101,7 +101,7 @@ writeLPFile opt fname prob =
           Just enc -> hSetEncoding h enc
         TLIO.hPutStr h s
 
-writeMPSFile :: FileOptions -> FilePath -> Problem -> IO ()
+writeMPSFile :: FileOptions -> FilePath -> Problem Rational -> IO ()
 writeMPSFile opt fname prob = 
   case MPSFile.render opt prob of
     Left err -> ioError $ userError err
@@ -112,8 +112,8 @@ writeMPSFile opt fname prob =
           Just enc -> hSetEncoding h enc
         TLIO.hPutStr h s
 
-toLPString :: FileOptions -> Problem -> Either String TL.Text
+toLPString :: FileOptions -> Problem Rational -> Either String TL.Text
 toLPString = LPFile.render
 
-toMPSString :: FileOptions -> Problem -> Either String TL.Text
+toMPSString :: FileOptions -> Problem Rational -> Either String TL.Text
 toMPSString = MPSFile.render

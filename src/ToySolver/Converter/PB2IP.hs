@@ -26,7 +26,7 @@ import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Data.MIP ((.==.), (.<=.), (.>=.))
 import qualified ToySolver.SAT.Types as SAT
 
-convert :: PBFile.Formula -> (MIP.Problem, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
+convert :: PBFile.Formula -> (MIP.Problem Rational, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
 convert formula = (mip, mforth, mtrans (PBFile.pbNumVars formula))
   where
     mip = def
@@ -54,10 +54,10 @@ convert formula = (mip, mforth, mtrans (PBFile.pbNumVars formula))
     mforth :: SAT.Model -> Map MIP.Var Rational
     mforth m = Map.fromList [(convVar v, if val then 1 else 0) | (v,val) <- assocs m]
 
-convExpr :: PBFile.Sum -> MIP.Expr
+convExpr :: PBFile.Sum -> MIP.Expr Rational
 convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
   where
-    f :: PBFile.Lit -> MIP.Expr
+    f :: PBFile.Lit -> MIP.Expr Rational
     f x
       | x > 0     = MIP.varExpr (convVar x)
       | otherwise = 1 - MIP.varExpr (convVar (abs x))
@@ -65,7 +65,7 @@ convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
 convVar :: PBFile.Var -> MIP.Var
 convVar x = MIP.toVar ("x" ++ show x)
 
-convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
+convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem Rational, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
 convertWBO useIndicator formula = (mip, mforth, mtrans (PBFile.wboNumVars formula))
   where
     mip = def
@@ -82,7 +82,7 @@ convertWBO useIndicator formula = (mip, mforth, mtrans (PBFile.wboNumVars formul
       , MIP.objExpr = MIP.Expr [MIP.Term (fromIntegral w) [v] | (ts, _) <- cs2, (w, v) <- ts]
       }
 
-    topConstr :: [MIP.Constraint]
+    topConstr :: [MIP.Constraint Rational]
     topConstr = 
      case PBFile.wboTopCost formula of
        Nothing -> []
@@ -92,7 +92,7 @@ convertWBO useIndicator formula = (mip, mforth, mtrans (PBFile.wboNumVars formul
     relaxVariables :: [(MIP.Var, PBFile.SoftConstraint)]
     relaxVariables = [(MIP.toVar ("r" ++ show n), c) | (n, c) <- zip [(0::Int)..] (PBFile.wboConstraints formula)]
 
-    cs2 :: [([(Integer, MIP.Var)], MIP.Constraint)]
+    cs2 :: [([(Integer, MIP.Var)], MIP.Constraint Rational)]
     cs2 = do
       (v, (w, (lhs,op,rhs))) <- relaxVariables
       let (lhs2,c) = splitConst $ convExpr lhs
@@ -124,18 +124,18 @@ convertWBO useIndicator formula = (mip, mforth, mtrans (PBFile.wboNumVars formul
         m1 = Map.fromList $ [(convVar v, if val then 1 else 0) | (v,val) <- assocs m]
         m2 = Map.fromList $ [(v, if SAT.evalPBConstraint m c then 0 else 1) | (v, (Just _, c)) <- relaxVariables]
 
-splitConst :: MIP.Expr -> (MIP.Expr, Rational)
+splitConst :: MIP.Expr Rational -> (MIP.Expr Rational, Rational)
 splitConst e = (e2, c)
   where
     e2 = MIP.Expr [t | t@(MIP.Term _ (_:_)) <- MIP.terms e]
     c = sum [c | MIP.Term c [] <- MIP.terms e]
              
-relaxGE :: MIP.Var -> (MIP.Expr, Rational) -> (MIP.Expr, Rational)
+relaxGE :: MIP.Var -> (MIP.Expr Rational, Rational) -> (MIP.Expr Rational, Rational)
 relaxGE v (lhs, rhs) = (MIP.constExpr (rhs - lhs_lb) * MIP.varExpr v + lhs, rhs)
   where
     lhs_lb = sum [min c 0 | MIP.Term c _ <- MIP.terms lhs]
 
-relaxLE :: MIP.Var -> (MIP.Expr, Rational) -> (MIP.Expr, Rational)
+relaxLE :: MIP.Var -> (MIP.Expr Rational, Rational) -> (MIP.Expr Rational, Rational)
 relaxLE v (lhs, rhs) = (MIP.constExpr (rhs - lhs_ub) * MIP.varExpr v + lhs, rhs)
   where
     lhs_ub = sum [max c 0 | MIP.Term c _ <- MIP.terms lhs]

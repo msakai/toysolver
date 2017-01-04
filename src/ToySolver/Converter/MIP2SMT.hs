@@ -93,7 +93,7 @@ or' xs = list ("or" : xs)
 not' :: Builder -> Builder
 not' x = list ["not", x]
 
-intExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> Builder
+intExpr :: Options -> Env -> MIP.Problem Rational -> MIP.Expr Rational -> Builder
 intExpr opt env _mip e =
   case MIP.terms e of
     [] -> intNum opt 0
@@ -113,7 +113,7 @@ intExpr opt env _mip e =
         xs = [intNum opt (floor c) | c /= 1] ++
              [B.fromText (env Map.! v) | v <- vs]
 
-realExpr :: Options -> Env -> MIP.Problem -> MIP.Expr -> Builder
+realExpr :: Options -> Env -> MIP.Problem Rational -> MIP.Expr Rational -> Builder
 realExpr opt env mip e =
   case MIP.terms e of
     [] -> realNum opt 0
@@ -164,7 +164,7 @@ realNum opt r =
             Just s  -> B.fromString s
             Nothing -> list [B.singleton '/', B.decimal (numerator r) <> ".0", B.decimal (denominator r) <> ".0"]
 
-rel2 :: Options -> Env -> MIP.Problem -> Bool -> MIP.BoundExpr -> MIP.Expr -> MIP.BoundExpr -> Builder
+rel2 :: Options -> Env -> MIP.Problem Rational -> Bool -> MIP.BoundExpr Rational -> MIP.Expr Rational -> MIP.BoundExpr Rational -> Builder
 rel2 opt env mip q lb e ub = and' (c1 ++ c2)
   where
     c1 =
@@ -178,7 +178,7 @@ rel2 opt env mip q lb e ub = and' (c1 ++ c2)
         MIP.Finite x -> [rel opt env mip q MIP.Le e x]
         MIP.PosInf -> []
 
-rel :: Options -> Env -> MIP.Problem -> Bool -> MIP.RelOp -> MIP.Expr -> Rational -> Builder
+rel :: Options -> Env -> MIP.Problem Rational -> Bool -> MIP.RelOp -> MIP.Expr Rational -> Rational -> Builder
 rel opt env mip q op lhs rhs
   | and [isInt mip v | v <- Set.toList (MIP.vars lhs)] &&
     and [isInteger c | MIP.Term c _ <- MIP.terms lhs] && isInteger rhs =
@@ -210,7 +210,7 @@ assert opt (x, label) = list ["assert", x']
                   ]
            _ -> x
 
-constraint :: Options -> Bool -> Env -> MIP.Problem -> MIP.Constraint -> (Builder, Maybe T.Text)
+constraint :: Options -> Bool -> Env -> MIP.Problem Rational -> MIP.Constraint Rational -> (Builder, Maybe T.Text)
 constraint opt q env mip
   MIP.Constraint
   { MIP.constrLabel     = label
@@ -229,7 +229,7 @@ constraint opt q env mip
                   , c0
                   ]
 
-conditions :: Options -> Bool -> Env -> MIP.Problem -> [(Builder, Maybe T.Text)]
+conditions :: Options -> Bool -> Env -> MIP.Problem Rational -> [(Builder, Maybe T.Text)]
 conditions opt q env mip = bnds ++ cs ++ ss
   where
     vs = MIP.variables mip
@@ -313,7 +313,7 @@ nonAdjacentPairs :: [a] -> [(a,a)]
 nonAdjacentPairs (x1:x2:xs) = [(x1,x3) | x3 <- xs] ++ nonAdjacentPairs (x2:xs)
 nonAdjacentPairs _ = []
 
-convert :: Options -> MIP.Problem -> Builder
+convert :: Options -> MIP.Problem Rational -> Builder
 convert opt mip =
   mconcat $ map (<> B.singleton '\n') $
     options ++ set_logic ++ defs ++ map (assert opt) (conditions opt False env mip)
@@ -392,7 +392,7 @@ encode opt s =
     f c | c `elem` ("/\";" :: [Char]) = T.pack $ printf "\\x%02d" (fromEnum c :: Int)
     f c = T.singleton c
 
-isInt :: MIP.Problem -> MIP.Var -> Bool
+isInt :: MIP.Problem Rational -> MIP.Var -> Bool
 isInt mip v = vt == MIP.IntegerVariable || vt == MIP.SemiIntegerVariable
   where
     vt = MIP.getVarType mip v
@@ -409,7 +409,7 @@ testFile fname = do
 test :: IO ()
 test = TLIO.putStrLn $ B.toLazyText $ convert def testdata
 
-testdata :: MIP.Problem
+testdata :: MIP.Problem Rational
 Right testdata = MIP.parseLPString def "test" $ unlines
   [ "Maximize"
   , " obj: x1 + 2 x2 + 3 x3 + x4"

@@ -905,7 +905,7 @@ mainMIP opt solver args = do
       _ -> showHelp stderr >> exitFailure
   solveMIP opt solver mip
 
-solveMIP :: Options -> SAT.Solver -> MIP.Problem -> IO ()
+solveMIP :: Options -> SAT.Solver -> MIP.Problem Rational -> IO ()
 solveMIP opt solver mip = do
   enc <- Tseitin.newEncoderWithPBLin solver
   Tseitin.setUsePB enc (optLinearizerPB opt)

@@ -22,5 +22,5 @@ import qualified ToySolver.Converter.PB2IP as PB2IP
 import qualified ToySolver.Converter.SAT2PB as SAT2PB
 import qualified ToySolver.Text.CNF as CNF
 
-convert :: CNF.CNF -> (MIP.Problem, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
+convert :: CNF.CNF -> (MIP.Problem Rational, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
 convert cnf = PB2IP.convert (SAT2PB.convert cnf)

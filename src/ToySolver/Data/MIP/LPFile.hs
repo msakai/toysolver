@@ -71,17 +71,17 @@ type C e s m = (MonadParsec s m Char)
 -- | Parse a string containing LP file data.
 -- The source name is only | used in error messages and may be the empty string.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError Char Dec) MIP.Problem
+parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError Char Dec) (MIP.Problem Rational)
 #else
-parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError MIP.Problem
+parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Rational)
 #endif
 parseString _ = parse (parser <* eof)
 
 -- | Parse a file containing LP file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either (ParseError Char Dec) MIP.Problem)
+parseFile :: MIP.FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (MIP.Problem Rational))
 #else
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError MIP.Problem)
+parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError (MIP.Problem Rational))
 #endif
 parseFile opt fname = do
   h <- openFile fname ReadMode
@@ -147,9 +147,9 @@ reserved = Set.fromList
 
 -- | LP file parser
 #if MIN_VERSION_megaparsec(5,0,0)
-parser :: (MonadParsec e s m, Token s ~ Char) => m MIP.Problem
+parser :: (MonadParsec e s m, Token s ~ Char) => m (MIP.Problem Rational)
 #else
-parser :: MonadParsec s m Char => m MIP.Problem
+parser :: MonadParsec s m Char => m (MIP.Problem Rational)
 #endif
 parser = do
   name <- optional $ try $ do
@@ -205,7 +205,7 @@ parser = do
     , MIP.varBounds         = Map.fromAscList [ (v, Map.findWithDefault MIP.defaultBounds v bnds2) | v <- Set.toAscList vs]
     }
 
-problem :: C e s m => m MIP.ObjectiveFunction
+problem :: C e s m => m (MIP.ObjectiveFunction Rational)
 problem = do
   flag <-  (try minimize >> return OptMin)
        <|> (try maximize >> return OptMax)
@@ -222,7 +222,7 @@ end = tok $ string' "end"
 
 -- ---------------------------------------------------------------------------
 
-constraintSection :: C e s m => m [MIP.Constraint]
+constraintSection :: C e s m => m [MIP.Constraint Rational]
 constraintSection = subjectTo >> many (try (constraint False))
 
 subjectTo :: C e s m => m ()
@@ -234,7 +234,7 @@ subjectTo = msum
         >> tok (char '.') >> return ()
   ]
 
-constraint :: C e s m => Bool -> m MIP.Constraint
+constraint :: C e s m => Bool -> m (MIP.Constraint Rational)
 constraint isLazy = do
   name <- optional (try label)
   g <- optional $ try indicator
@@ -278,21 +278,21 @@ indicator = do
   tok $ string "->"
   return (var, val)
 
-lazyConstraintsSection :: C e s m => m [MIP.Constraint]
+lazyConstraintsSection :: C e s m => m [MIP.Constraint Rational]
 lazyConstraintsSection = do
   tok $ string' "lazy"
   tok $ string' "constraints"
   many $ try $ constraint True
 
-userCutsSection :: C e s m => m [MIP.Constraint]
+userCutsSection :: C e s m => m [MIP.Constraint Rational]
 userCutsSection = do
   tok $ string' "user"
   tok $ string' "cuts"
   many $ try $ constraint False
 
-type Bounds2 = (Maybe MIP.BoundExpr, Maybe MIP.BoundExpr)
+type Bounds2 c = (Maybe (MIP.BoundExpr c), Maybe (MIP.BoundExpr c))
 
-boundsSection :: C e s m => m (Map MIP.Var MIP.Bounds)
+boundsSection :: C e s m => m (Map MIP.Var (MIP.Bounds Rational)) 
 boundsSection = do
   tok $ string' "bound" >> optional (char' 's')
   liftM (Map.map g . Map.fromListWith f) $ many (try bound)
@@ -302,7 +302,7 @@ boundsSection = do
                  , fromMaybe MIP.defaultUB ub
                  )
 
-bound :: C e s m => m (MIP.Var, Bounds2)
+bound :: C e s m => m (MIP.Var, Bounds2 Rational)
 bound = msum
   [ try $ do
       v <- try variable
@@ -333,7 +333,7 @@ bound = msum
       return (v, (b1, b2))
   ]
 
-boundExpr :: C e s m => m MIP.BoundExpr
+boundExpr :: C e s m => m (MIP.BoundExpr Rational)
 boundExpr = msum 
   [ try (tok (char '+') >> inf >> return MIP.PosInf)
   , try (tok (char '-') >> inf >> return MIP.NegInf)
@@ -363,7 +363,7 @@ semiSection = do
   tok $ string' "semi" >> optional (string' "-continuous" <|> string' "s")
   many (try variable)
 
-sosSection :: C e s m => m [MIP.SOSConstraint]
+sosSection :: C e s m => m [MIP.SOSConstraint Rational]
 sosSection = do
   tok $ string' "sos"
   many $ try $ do
@@ -383,10 +383,10 @@ sosSection = do
 
 -- ---------------------------------------------------------------------------
 
-expr :: forall e s m. C e s m => m MIP.Expr
+expr :: forall e s m. C e s m => m (MIP.Expr Rational)
 expr = try expr1 <|> return 0
   where
-    expr1 :: m MIP.Expr
+    expr1 :: m (MIP.Expr Rational)
     expr1 = do
       t <- term True
       ts <- many (term False)
@@ -395,7 +395,7 @@ expr = try expr1 <|> return 0
 sign :: (C e s m, Num a) => m a
 sign = tok ((char '+' >> return 1) <|> (char '-' >> return (-1)))
 
-term :: C e s m => Bool -> m MIP.Expr
+term :: C e s m => Bool -> m (MIP.Expr Rational)
 term flag = do
   s <- if flag then optional sign else liftM Just sign
   c <- optional number
@@ -404,7 +404,7 @@ term flag = do
     Nothing -> e
     Just d -> MIP.constExpr d * e
 
-qexpr :: C e s m => m MIP.Expr
+qexpr :: C e s m => m (MIP.Expr Rational)
 qexpr = do
   tok (char '[')
   t <- qterm True
@@ -416,7 +416,7 @@ qexpr = do
       return $ MIP.constExpr (1/2) * e)
    <|> return e
 
-qterm :: C e s m => Bool -> m MIP.Term
+qterm :: C e s m => Bool -> m (MIP.Term Rational)
 qterm flag = do
   s <- if flag then optional sign else liftM Just sign
   c <- optional number
@@ -483,13 +483,13 @@ writeChar c = tell $ B.singleton c
 -- ---------------------------------------------------------------------------
 
 -- | Render a problem into a string.
-render :: MIP.FileOptions -> MIP.Problem -> Either String TL.Text
+render :: MIP.FileOptions -> MIP.Problem Rational -> Either String TL.Text
 render _ mip = Right $ execM $ render' $ normalize mip
 
 writeVar :: MIP.Var -> M ()
 writeVar v = writeString $ unintern v
 
-render' :: MIP.Problem -> M ()
+render' :: MIP.Problem Rational -> M ()
 render' mip = do
   case MIP.name mip of
     Just name -> writeString $ "\\* Problem: " <> name <> " *\\\n"
@@ -569,7 +569,7 @@ render' mip = do
   writeString "END\n"
 
 -- FIXME: Gurobi は quadratic term が最後に一つある形式でないとダメっぽい
-renderExpr :: Bool -> MIP.Expr -> M ()
+renderExpr :: Bool -> MIP.Expr Rational -> M ()
 renderExpr isObj e = fill 80 (ts1 ++ ts2)
   where
     (ts,qts) = partition isLin (MIP.terms e)
@@ -585,12 +585,12 @@ renderExpr isObj e = fill 80 (ts1 ++ ts2)
         -- SCIP-3.1.0 does not allow spaces between '/' and '2'.
         ["+ ["] ++ map g qts ++ [if isObj then "] /2" else "]"]
 
-    f :: MIP.Term -> T.Text
+    f :: MIP.Term Rational -> T.Text
     f (MIP.Term c [])  = showConstTerm c
     f (MIP.Term c [v]) = showCoeff c <> fromString (MIP.fromVar v)
     f _ = error "should not happen"
 
-    g :: MIP.Term -> T.Text
+    g :: MIP.Term Rational -> T.Text
     g (MIP.Term c vs) = 
       (if isObj then showCoeff (2*c) else showCoeff c) <>
       mconcat (intersperse " * " (map (fromString . MIP.fromVar) vs))
@@ -627,7 +627,7 @@ renderOp MIP.Le = writeString "<="
 renderOp MIP.Ge = writeString ">="
 renderOp MIP.Eql = writeString "="
 
-renderConstraint :: MIP.Constraint -> M ()
+renderConstraint :: MIP.Constraint Rational -> M ()
 renderConstraint c@MIP.Constraint{ MIP.constrExpr = e, MIP.constrLB = lb, MIP.constrUB = ub } = do
   renderLabel (MIP.constrLabel c)
   case MIP.constrIndicator c of
@@ -650,7 +650,7 @@ renderConstraint c@MIP.Constraint{ MIP.constrExpr = e, MIP.constrLB = lb, MIP.co
   writeChar ' '
   writeString $ showValue val
 
-renderBoundExpr :: MIP.BoundExpr -> M ()
+renderBoundExpr :: MIP.BoundExpr Rational -> M ()
 renderBoundExpr (MIP.Finite r) = writeString $ showValue r
 renderBoundExpr MIP.NegInf = writeString "-inf"
 renderBoundExpr MIP.PosInf = writeString "+inf"
@@ -682,10 +682,10 @@ compileExpr e = do
 
 -- ---------------------------------------------------------------------------
 
-normalize :: MIP.Problem -> MIP.Problem
+normalize :: (Eq r, Num r) => MIP.Problem r -> MIP.Problem r
 normalize = removeEmptyExpr . removeRangeConstraints
 
-removeRangeConstraints :: MIP.Problem -> MIP.Problem
+removeRangeConstraints :: (Eq r, Num r) => MIP.Problem r -> MIP.Problem r
 removeRangeConstraints prob = runST $ do
   vsRef <- newSTRef $ MIP.variables prob
   cntRef <- newSTRef (0::Int)
@@ -714,8 +714,8 @@ removeRangeConstraints prob = runST $ do
         return $
           c
           { MIP.constrExpr = MIP.constrExpr c - MIP.varExpr v
-          , MIP.constrLB = 0
-          , MIP.constrUB = 0
+          , MIP.constrLB = MIP.Finite 0
+          , MIP.constrUB = MIP.Finite 0
           }
 
   newvs <- liftM reverse $ readSTRef newvsRef
@@ -725,8 +725,8 @@ removeRangeConstraints prob = runST $ do
     , MIP.varType = MIP.varType prob `Map.union` Map.fromList [(v, MIP.ContinuousVariable) | (v,_) <- newvs]
     , MIP.varBounds = MIP.varBounds prob `Map.union` (Map.fromList newvs)
     }
-          
-removeEmptyExpr :: MIP.Problem -> MIP.Problem
+
+removeEmptyExpr :: Num r => MIP.Problem r -> MIP.Problem r
 removeEmptyExpr prob =
   prob
   { MIP.objectiveFunction = obj{ MIP.objExpr = convertExpr (MIP.objExpr obj) }

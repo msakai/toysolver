@@ -31,7 +31,7 @@ loadFile fname = do
       case words s of
         (y : xs) -> (read (dropWhile ('+'==) y), IntMap.fromList [(read v, read val) | x <- xs, let [v,val] = splitOn ":" x])
 
-primal :: Maybe Double -> Problem -> MIP.Problem
+primal :: Maybe Double -> Problem -> MIP.Problem Rational
 primal c prob
   = def
   { MIP.objectiveFunction = def
@@ -64,7 +64,7 @@ dual
   :: Maybe Double
   -> (IntMap Double -> IntMap Double -> Double)
   -> Problem
-  -> MIP.Problem
+  -> MIP.Problem Rational
 dual c kernel prob
   = def
   { MIP.objectiveFunction = def

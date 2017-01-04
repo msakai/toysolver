@@ -86,17 +86,17 @@ type C e s m = (MonadParsec s m Char)
 -- | Parse a string containing MPS file data.
 -- The source name is only | used in error messages and may be the empty string.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError Char Dec) MIP.Problem
+parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError Char Dec) (MIP.Problem Rational)
 #else
-parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError MIP.Problem
+parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Rational)
 #endif
 parseString _ = parse (parser <* eof)
 
 -- | Parse a file containing MPS file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either (ParseError Char Dec) MIP.Problem)
+parseFile :: MIP.FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (MIP.Problem Rational))
 #else
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError MIP.Problem)
+parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError (MIP.Problem Rational))
 #endif
 parseFile opt fname = do
   h <- openFile fname ReadMode
@@ -181,9 +181,9 @@ number = tok $ do
 
 -- | MPS file parser
 #if MIN_VERSION_megaparsec(5,0,0)
-parser :: (MonadParsec e s m, Token s ~ Char) => m MIP.Problem
+parser :: (MonadParsec e s m, Token s ~ Char) => m (MIP.Problem Rational)
 #else
-parser :: MonadParsec s m Char => m MIP.Problem
+parser :: MonadParsec s m Char => m (MIP.Problem Rational)
 #endif
 parser = do
   many commentline
@@ -309,7 +309,7 @@ parser = do
   let rowCoeffs :: Map Row (Map Column Rational)
       rowCoeffs = Map.fromListWith Map.union [(row, Map.singleton col coeff) | (col,m) <- Map.toList cols, (row,coeff) <- Map.toList m]
 
-  let f :: Bool -> (Maybe MIP.RelOp, Row) -> [MIP.Constraint]
+  let f :: Bool -> (Maybe MIP.RelOp, Row) -> [MIP.Constraint Rational]
       f _isLazy (Nothing, _row) = []
       f isLazy (Just op, row) = do
         let lhs = [MIP.Term c [col] | (col,c) <- Map.toList (Map.findWithDefault Map.empty row rowCoeffs)]
@@ -519,7 +519,7 @@ boundType :: C e s m => m BoundType
 boundType = tok $ do
   msum [try (string (show k)) >> return k | k <- [minBound..maxBound]]
 
-sosSection :: forall e s m. C e s m => m [MIP.SOSConstraint]
+sosSection :: forall e s m. C e s m => m [MIP.SOSConstraint Rational]
 sosSection = do
   try $ stringLn "SOS"
   many entry
@@ -542,7 +542,7 @@ sosSection = do
       newline'
       return (col, val)
 
-quadObjSection :: C e s m => m [MIP.Term]
+quadObjSection :: C e s m => m [MIP.Term Rational]
 quadObjSection = do
   try $ stringLn "QUADOBJ"
   many entry
@@ -555,7 +555,7 @@ quadObjSection = do
       newline'
       return $ MIP.Term (if col1 /= col2 then val else val / 2) [col1, col2]
 
-qMatrixSection :: C e s m => m [MIP.Term]
+qMatrixSection :: C e s m => m [MIP.Term Rational]
 qMatrixSection = do
   try $ stringLn "QMATRIX"
   many entry
@@ -568,7 +568,7 @@ qMatrixSection = do
       newline'
       return $ MIP.Term (val / 2) [col1, col2]
 
-qcMatrixSection :: C e s m => m (Row, [MIP.Term])
+qcMatrixSection :: C e s m => m (Row, [MIP.Term Rational])
 qcMatrixSection = do
   try $ string "QCMATRIX"
   spaces1'
@@ -615,11 +615,11 @@ writeChar c = tell $ B.singleton c
 
 -- ---------------------------------------------------------------------------
 
-render :: MIP.FileOptions -> MIP.Problem -> Either String TL.Text
+render :: MIP.FileOptions -> MIP.Problem Rational -> Either String TL.Text
 render _ mip | not (checkAtMostQuadratic mip) = Left "Expression must be atmost quadratic"
 render _ mip = Right $ execM $ render' $ nameRows mip
 
-render' :: MIP.Problem -> M ()
+render' :: MIP.Problem Rational -> M ()
 render' mip = do
   let probName = fromMaybe "" (MIP.name mip)
 
@@ -874,7 +874,7 @@ showValue c = T.pack $
     then show (numerator c)
     else show (fromRational c :: Double)
  
-nameRows :: MIP.Problem -> MIP.Problem
+nameRows :: MIP.Problem r -> MIP.Problem r
 nameRows mip
   = mip
   { MIP.objectiveFunction = (MIP.objectiveFunction mip){ MIP.objLabel = Just objName' }
@@ -899,7 +899,7 @@ nameRows mip
       | name `Set.notMember` used = c{ MIP.sosLabel = Just name } : g cs names
       | otherwise = g (c:cs) names
 
-quadMatrix :: MIP.Expr -> Map (MIP.Var, MIP.Var) Rational
+quadMatrix :: Fractional r => MIP.Expr r -> Map (MIP.Var, MIP.Var) r
 quadMatrix e = Map.fromList $ do
   let m = Map.fromListWith (+) [(if v1<=v2 then (v1,v2) else (v2,v1), c) | MIP.Term c [v1,v2] <- MIP.terms e]
   ((v1,v2),c) <- Map.toList m
@@ -908,12 +908,12 @@ quadMatrix e = Map.fromList $ do
   else
     [((v1,v2), c/2), ((v2,v1), c/2)]
 
-checkAtMostQuadratic :: MIP.Problem -> Bool
+checkAtMostQuadratic :: forall r. MIP.Problem r -> Bool
 checkAtMostQuadratic mip =  all (all f . MIP.terms) es
   where
     es = MIP.objExpr (MIP.objectiveFunction mip) :
          [lhs | c <- MIP.constraints mip ++ MIP.userCuts mip, let lhs = MIP.constrExpr c]
-    f :: MIP.Term -> Bool
+    f :: MIP.Term r -> Bool
     f (MIP.Term _ [_]) = True
     f (MIP.Term _ [_,_]) = True
     f _ = False
