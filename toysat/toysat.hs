@@ -903,7 +903,7 @@ mainMIP opt solver args = do
           Left err -> hPrint stderr err >> exitFailure
           Right mip -> return mip
       _ -> showHelp stderr >> exitFailure
-  solveMIP opt solver mip
+  solveMIP opt solver (fmap toRational mip)
 
 solveMIP :: Options -> SAT.Solver -> MIP.Problem Rational -> IO ()
 solveMIP opt solver mip = do

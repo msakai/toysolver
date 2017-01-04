@@ -459,7 +459,7 @@ main = do
           mip <- case ret of
                   Right mip -> return mip
                   Left err -> hPrint stderr err >> exitFailure
-          run (getSolver o) o mip $ \m -> do
+          run (getSolver o) o (fmap toRational mip) $ \m -> do
             mipPrintModel stdout (PrintRational `elem` o) m
             writeSOLFileMIP o m
     (_,_,errs) ->

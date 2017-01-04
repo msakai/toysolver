@@ -29,6 +29,7 @@ module ToySolver.Data.MIP
 
 import Prelude hiding (readFile, writeFile)
 import Data.Char
+import Data.Scientific (Scientific)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.IO as TLIO
 import System.FilePath (takeExtension)
@@ -41,9 +42,9 @@ import qualified ToySolver.Data.MIP.MPSFile as MPSFile
 
 -- | Parse .lp or .mps file based on file extension
 #if MIN_VERSION_megaparsec(5,0,0)
-readFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Rational))
+readFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Scientific))
 #else
-readFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Rational))
+readFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Scientific))
 #endif
 readFile opt fname =
   case map toLower (takeExtension fname) of
@@ -53,44 +54,44 @@ readFile opt fname =
 
 -- | Parse a file containing LP file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-readLPFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Rational))
+readLPFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Scientific))
 #else
-readLPFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Rational))
+readLPFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Scientific))
 #endif
 readLPFile = LPFile.parseFile
 
 -- | Parse a file containing MPS file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-readMPSFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Rational))
+readMPSFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Scientific))
 #else
-readMPSFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Rational))
+readMPSFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Scientific))
 #endif
 readMPSFile = MPSFile.parseFile
 
 -- | Parse a string containing LP file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseLPString :: FileOptions -> String -> String -> Either (ParseError Char Dec) (Problem Rational)
+parseLPString :: FileOptions -> String -> String -> Either (ParseError Char Dec) (Problem Scientific)
 #else
-parseLPString :: FileOptions -> String -> String -> Either ParseError (Problem Rational)
+parseLPString :: FileOptions -> String -> String -> Either ParseError (Problem Scientific)
 #endif
 parseLPString = LPFile.parseString
 
 -- | Parse a string containing MPS file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseMPSString :: FileOptions -> String -> String -> Either (ParseError Char Dec) (Problem Rational)
+parseMPSString :: FileOptions -> String -> String -> Either (ParseError Char Dec) (Problem Scientific)
 #else
-parseMPSString :: FileOptions -> String -> String -> Either ParseError (Problem Rational)
+parseMPSString :: FileOptions -> String -> String -> Either ParseError (Problem Scientific)
 #endif
 parseMPSString = MPSFile.parseString
 
-writeFile :: FileOptions -> FilePath -> Problem Rational -> IO ()
+writeFile :: FileOptions -> FilePath -> Problem Scientific -> IO ()
 writeFile opt fname prob =
   case map toLower (takeExtension fname) of
     ".lp"  -> writeLPFile opt fname prob
     ".mps" -> writeMPSFile opt fname prob
     ext -> ioError $ userError $ "unknown extension: " ++ ext
 
-writeLPFile :: FileOptions -> FilePath -> Problem Rational -> IO ()
+writeLPFile :: FileOptions -> FilePath -> Problem Scientific -> IO ()
 writeLPFile opt fname prob =
   case LPFile.render opt prob of
     Left err -> ioError $ userError err
@@ -101,7 +102,7 @@ writeLPFile opt fname prob =
           Just enc -> hSetEncoding h enc
         TLIO.hPutStr h s
 
-writeMPSFile :: FileOptions -> FilePath -> Problem Rational -> IO ()
+writeMPSFile :: FileOptions -> FilePath -> Problem Scientific -> IO ()
 writeMPSFile opt fname prob = 
   case MPSFile.render opt prob of
     Left err -> ioError $ userError err
@@ -112,8 +113,8 @@ writeMPSFile opt fname prob =
           Just enc -> hSetEncoding h enc
         TLIO.hPutStr h s
 
-toLPString :: FileOptions -> Problem Rational -> Either String TL.Text
+toLPString :: FileOptions -> Problem Scientific -> Either String TL.Text
 toLPString = LPFile.render
 
-toMPSString :: FileOptions -> Problem Rational -> Either String TL.Text
+toMPSString :: FileOptions -> Problem Scientific -> Either String TL.Text
 toMPSString = MPSFile.render

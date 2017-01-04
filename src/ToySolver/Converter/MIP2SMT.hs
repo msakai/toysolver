@@ -403,14 +403,14 @@ testFile :: FilePath -> IO ()
 testFile fname = do
   result <- MIP.readLPFile def fname
   case result of
-    Right mip -> TLIO.putStrLn $ B.toLazyText $ convert def mip
+    Right mip -> TLIO.putStrLn $ B.toLazyText $ convert def (fmap toRational mip)
     Left err -> hPrint stderr err
 
 test :: IO ()
 test = TLIO.putStrLn $ B.toLazyText $ convert def testdata
 
 testdata :: MIP.Problem Rational
-Right testdata = MIP.parseLPString def "test" $ unlines
+Right testdata = fmap (fmap toRational) $ MIP.parseLPString def "test" $ unlines
   [ "Maximize"
   , " obj: x1 + 2 x2 + 3 x3 + x4"
   , "Subject To"

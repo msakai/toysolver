@@ -40,7 +40,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Ratio
+import Data.Scientific
 import Data.Interned
 import Data.Interned.Text
 import Data.String
@@ -52,11 +52,11 @@ import qualified Data.Text.Lazy.IO as TLIO
 import System.IO
 import qualified Text.Megaparsec as P
 import Text.Megaparsec hiding (string', newline)
+import qualified Text.Megaparsec.Lexer as Lexer
 import Text.Megaparsec.Prim (MonadParsec ())
 
 import Data.OptDir
 import qualified ToySolver.Data.MIP.Base as MIP
-import ToySolver.Internal.TextUtil (readUnsignedInteger)
 
 type Column = MIP.Var
 type Row = InternedText
@@ -86,17 +86,17 @@ type C e s m = (MonadParsec s m Char)
 -- | Parse a string containing MPS file data.
 -- The source name is only | used in error messages and may be the empty string.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError Char Dec) (MIP.Problem Rational)
+parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError Char Dec) (MIP.Problem Scientific)
 #else
-parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Rational)
+parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Scientific)
 #endif
 parseString _ = parse (parser <* eof)
 
 -- | Parse a file containing MPS file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (MIP.Problem Rational))
+parseFile :: MIP.FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (MIP.Problem Scientific))
 #else
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError (MIP.Problem Rational))
+parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError (MIP.Problem Scientific))
 #endif
 parseFile opt fname = do
   h <- openFile fname ReadMode
@@ -147,43 +147,16 @@ ident = liftM fromString $ tok $ some $ noneOf [' ', '\t', '\n']
 stringLn :: C e s m => String -> m ()
 stringLn s = string s >> newline'
 
-sign :: (C e s m, Num a) => m a
-sign = (char '+' >> return 1) <|> (char '-' >> return (-1))
-
-number :: forall e s m. C e s m => m Rational
-number = tok $ do
-  b <- (do{ s <- option 1 sign; x <- nat; y <- option 0 frac; return (s * (fromInteger x + y)) })
-    <|> frac
-  c <- option 0 e
-  return (b*10^^c)
-  where
-    digits = some digitChar
-
-    nat :: m Integer
-    nat = liftM readUnsignedInteger digits
-
-    frac :: m Rational
-    frac = do
-      char '.'
-      s <- digits
-      return (readUnsignedInteger s % 10^(length s))
-
-    e :: m Integer
-    e = do
-      oneOf ("eE" :: [Char])
-      f <- msum [ char '+' >> return id
-                , char '-' >> return negate
-                , return id
-                ]
-      liftM f nat
+number :: forall e s m. C e s m => m Scientific
+number = tok $ Lexer.signed (return ()) Lexer.number
 
 -- ---------------------------------------------------------------------------
 
 -- | MPS file parser
 #if MIN_VERSION_megaparsec(5,0,0)
-parser :: (MonadParsec e s m, Token s ~ Char) => m (MIP.Problem Rational)
+parser :: (MonadParsec e s m, Token s ~ Char) => m (MIP.Problem Scientific)
 #else
-parser :: MonadParsec s m Char => m (MIP.Problem Rational)
+parser :: MonadParsec s m Char => m (MIP.Problem Scientific)
 #endif
 parser = do
   many commentline
@@ -306,10 +279,10 @@ parser = do
               (v, (fromMaybe (MIP.Finite 0) lb, fromMaybe MIP.PosInf ub))
         | v <- Set.toList vs ]
 
-  let rowCoeffs :: Map Row (Map Column Rational)
+  let rowCoeffs :: Map Row (Map Column Scientific)
       rowCoeffs = Map.fromListWith Map.union [(row, Map.singleton col coeff) | (col,m) <- Map.toList cols, (row,coeff) <- Map.toList m]
 
-  let f :: Bool -> (Maybe MIP.RelOp, Row) -> [MIP.Constraint Rational]
+  let f :: Bool -> (Maybe MIP.RelOp, Row) -> [MIP.Constraint Scientific]
       f _isLazy (Nothing, _row) = []
       f isLazy (Just op, row) = do
         let lhs = [MIP.Term c [col] | (col,c) <- Map.toList (Map.findWithDefault Map.empty row rowCoeffs)]
@@ -424,12 +397,12 @@ rowsBody = many $ do
   newline'
   return (op, name)
 
-colsSection :: forall e s m. C e s m => m (Map Column (Map Row Rational), Set Column)
+colsSection :: forall e s m. C e s m => m (Map Column (Map Row Scientific), Set Column)
 colsSection = do
   try $ stringLn "COLUMNS"
   body False Map.empty Set.empty
   where
-    body :: Bool -> Map Column (Map Row Rational) -> Set Column -> m (Map Column (Map Row Rational), Set Column)
+    body :: Bool -> Map Column (Map Row Scientific) -> Set Column -> m (Map Column (Map Row Scientific), Set Column)
     body isInt rs ivs = msum
       [ do _ <- spaces1'
            x <- ident
@@ -453,7 +426,7 @@ colsSection = do
       newline'
       return b
 
-    entry :: T.Text -> m (Column, Map Row Rational)
+    entry :: T.Text -> m (Column, Map Row Scientific)
     entry x = do
       let col = intern x
       rv1 <- rowAndVal
@@ -463,13 +436,13 @@ colsSection = do
         Nothing -> return (col, rv1)
         Just rv2 ->  return (col, Map.union rv1 rv2)
 
-rowAndVal :: C e s m => m (Map Row Rational)
+rowAndVal :: C e s m => m (Map Row Scientific)
 rowAndVal = do
   r <- row
   val <- number
   return $ Map.singleton r val
 
-rhsSection :: C e s m => m (Map Row Rational)
+rhsSection :: C e s m => m (Map Row Scientific)
 rhsSection = do
   try $ stringLn "RHS"
   liftM Map.unions $ many entry
@@ -484,7 +457,7 @@ rhsSection = do
         Nothing  -> return rv1
         Just rv2 -> return $ Map.union rv1 rv2
 
-rangesSection :: C e s m => m (Map Row Rational)
+rangesSection :: C e s m => m (Map Row Scientific)
 rangesSection = do
   try $ stringLn "RANGES"
   liftM Map.unions $ many entry
@@ -499,7 +472,7 @@ rangesSection = do
         Nothing  -> return rv1
         Just rv2 -> return $ Map.union rv1 rv2
 
-boundsSection :: C e s m => m [(BoundType, Column, Rational)]
+boundsSection :: C e s m => m [(BoundType, Column, Scientific)]
 boundsSection = do
   try $ stringLn "BOUNDS"
   many entry
@@ -519,7 +492,7 @@ boundType :: C e s m => m BoundType
 boundType = tok $ do
   msum [try (string (show k)) >> return k | k <- [minBound..maxBound]]
 
-sosSection :: forall e s m. C e s m => m [MIP.SOSConstraint Rational]
+sosSection :: forall e s m. C e s m => m [MIP.SOSConstraint Scientific]
 sosSection = do
   try $ stringLn "SOS"
   many entry
@@ -534,7 +507,7 @@ sosSection = do
       xs <- many (try identAndVal)
       return $ MIP.SOSConstraint{ MIP.sosLabel = Just name, MIP.sosType = typ, MIP.sosBody = xs }
 
-    identAndVal :: m (Column, Rational)
+    identAndVal :: m (Column, Scientific)
     identAndVal = do
       spaces1'
       col <- column
@@ -542,7 +515,7 @@ sosSection = do
       newline'
       return (col, val)
 
-quadObjSection :: C e s m => m [MIP.Term Rational]
+quadObjSection :: C e s m => m [MIP.Term Scientific]
 quadObjSection = do
   try $ stringLn "QUADOBJ"
   many entry
@@ -555,7 +528,7 @@ quadObjSection = do
       newline'
       return $ MIP.Term (if col1 /= col2 then val else val / 2) [col1, col2]
 
-qMatrixSection :: C e s m => m [MIP.Term Rational]
+qMatrixSection :: C e s m => m [MIP.Term Scientific]
 qMatrixSection = do
   try $ stringLn "QMATRIX"
   many entry
@@ -568,7 +541,7 @@ qMatrixSection = do
       newline'
       return $ MIP.Term (val / 2) [col1, col2]
 
-qcMatrixSection :: C e s m => m (Row, [MIP.Term Rational])
+qcMatrixSection :: C e s m => m (Row, [MIP.Term Scientific])
 qcMatrixSection = do
   try $ string "QCMATRIX"
   spaces1'
@@ -585,7 +558,7 @@ qcMatrixSection = do
       newline'
       return $ MIP.Term val [col1, col2]
 
-indicatorsSection :: C e s m => m (Map Row (Column, Rational))
+indicatorsSection :: C e s m => m (Map Row (Column, Scientific))
 indicatorsSection = do
   try $ stringLn "INDICATORS"
   liftM Map.fromList $ many entry
@@ -615,11 +588,11 @@ writeChar c = tell $ B.singleton c
 
 -- ---------------------------------------------------------------------------
 
-render :: MIP.FileOptions -> MIP.Problem Rational -> Either String TL.Text
+render :: MIP.FileOptions -> MIP.Problem Scientific -> Either String TL.Text
 render _ mip | not (checkAtMostQuadratic mip) = Left "Expression must be atmost quadratic"
 render _ mip = Right $ execM $ render' $ nameRows mip
 
-render' :: MIP.Problem Rational -> M ()
+render' :: MIP.Problem Scientific -> M ()
 render' mip = do
   let probName = fromMaybe "" (MIP.name mip)
 
@@ -683,7 +656,7 @@ render' mip = do
 
   -- COLUMNS section
   writeSectionHeader "COLUMNS"
-  let cols :: Map Column (Map T.Text Rational)
+  let cols :: Map Column (Map T.Text Scientific)
       cols = Map.fromListWith Map.union
              [ (v, Map.singleton l d)
              | (Just l, xs) <-
@@ -868,11 +841,8 @@ writeFields xs = f1 xs >> writeChar '\n'
     f6 [x] = writeText x
     f6 _ = error "MPSFile: >6 fields (this should not happen)"
 
-showValue :: Rational -> T.Text
-showValue c = T.pack $
-  if denominator c == 1
-    then show (numerator c)
-    else show (fromRational c :: Double)
+showValue :: Scientific -> T.Text
+showValue = fromString . show
  
 nameRows :: MIP.Problem r -> MIP.Problem r
 nameRows mip

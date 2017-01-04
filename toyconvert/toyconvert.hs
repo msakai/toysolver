@@ -19,6 +19,7 @@ import Data.Char
 import Data.Default.Class
 import Data.Maybe
 import qualified Data.Foldable as F
+import Data.Scientific (Scientific)
 import qualified Data.Text.Lazy.Builder as TextBuilder
 import qualified Data.Text.Lazy.IO as TLIO
 import qualified Data.Traversable as T
@@ -116,7 +117,7 @@ header = unlines
 data Problem
   = ProbOPB PBFile.Formula
   | ProbWBO PBFile.SoftFormula
-  | ProbMIP (MIP.Problem Rational)
+  | ProbMIP (MIP.Problem Scientific)
 
 readProblem :: [Flag] -> String -> IO Problem
 readProblem o fname = do
@@ -226,7 +227,7 @@ writeProblem o problem = do
                             PBLinearization.linearize opb (LinearizationUsingPB `elem` o)
                         | otherwise -> opb
                   ProbMIP mip ->
-                    case MIP2PB.convert mip of
+                    case MIP2PB.convert (fmap toRational mip) of
                       Left err -> error err
                       Right (opb, _, _) -> opb
           wbo = case problem of
@@ -271,13 +272,13 @@ writeProblem o problem = do
           withFile fname WriteMode $ \h -> do
             F.mapM_ (hSetEncoding h) enc
             TLIO.hPutStr h $ TextBuilder.toLazyText $
-              MIP2SMT.convert mip2smtOpt lp
+              MIP2SMT.convert mip2smtOpt (fmap toRational lp)
         ".ys" -> do
           let lang = MIP2SMT.YICES (if Yices2 `elem` o then MIP2SMT.Yices2 else MIP2SMT.Yices1)
           withFile fname WriteMode $ \h -> do
             F.mapM_ (hSetEncoding h) enc
             TLIO.hPutStr h $ TextBuilder.toLazyText $
-              MIP2SMT.convert mip2smtOpt{ MIP2SMT.optLanguage = lang } lp
+              MIP2SMT.convert mip2smtOpt{ MIP2SMT.optLanguage = lang } (fmap toRational lp)
         ext -> do
           error $ "unknown file extension: " ++ show ext
           
