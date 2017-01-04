@@ -419,7 +419,7 @@ main = do
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
               let (mip,_,mtrans) = SAT2IP.convert cnf
-              run (getSolver o) o mip $ \m -> do
+              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
                 let m2 = mtrans m
                 satPrintModel stdout m2 0
                 writeSOLFileSAT o m2
@@ -429,7 +429,7 @@ main = do
             Left err -> hPutStrLn stderr err >> exitFailure
             Right pb -> do
               let (mip,_,mtrans) = PB2IP.convert pb
-              run (getSolver o) o mip $ \m -> do
+              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
                 let m2 = mtrans m
                 pbPrintModel stdout m2 0
                 writeSOLFileSAT o m2
@@ -439,7 +439,7 @@ main = do
             Left err -> hPutStrLn stderr err >> exitFailure
             Right wbo -> do
               let (mip,_,mtrans) = PB2IP.convertWBO False wbo
-              run (getSolver o) o mip $ \m -> do
+              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
                 let m2 = mtrans m
                 pbPrintModel stdout m2 0
                 writeSOLFileSAT o m2
@@ -449,7 +449,7 @@ main = do
             Left err -> hPutStrLn stderr err >> exitFailure
             Right wcnf -> do
               let (mip,_,mtrans) = MaxSAT2IP.convert False wcnf
-              run (getSolver o) o mip $ \m -> do
+              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
                 let m2 = mtrans m
                 maxsatPrintModel stdout m2 0
                 writeSOLFileSAT o m2

@@ -236,10 +236,10 @@ writeProblem o problem = do
           lp  = case problem of
                   ProbOPB opb ->
                     case PB2IP.convert opb of
-                      (ip, _, _) -> ip
+                      (ip, _, _) -> fmap fromInteger ip
                   ProbWBO wbo ->
                     case PB2IP.convertWBO (IndicatorConstraint `elem` o) wbo of
-                      (ip, _, _) -> ip
+                      (ip, _, _) -> fmap fromInteger ip
                   ProbMIP mip -> mip
           lsp = case problem of
                   ProbOPB opb -> PB2LSP.convert opb
