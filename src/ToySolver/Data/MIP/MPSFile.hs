@@ -30,12 +30,15 @@ module ToySolver.Data.MIP.MPSFile
   , render
   ) where
 
+import Control.Arrow ((***))
 import Control.Applicative ((<$>), (<*))
 import Control.Monad
 import Control.Monad.Writer
 import Data.Default.Class
+import Data.List (sortBy)
 import Data.Maybe
 import Data.Monoid
+import Data.Ord (comparing)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Map (Map)
@@ -668,10 +671,10 @@ render' mip = do
         forM_ (Map.toList xs) $ \(row, d) -> do
           writeFields ["", unintern col, row, showValue d]
       ivs = MIP.integerVariables mip `Set.union` MIP.semiIntegerVariables mip
-  forM_ (Map.toList (Map.filterWithKey (\col _ -> col `Set.notMember` ivs) cols)) $ \(col, xs) -> f col xs
+  forM_ (sortBy (comparing (unintern . fst)) $ Map.toList (Map.filterWithKey (\col _ -> col `Set.notMember` ivs) cols)) $ \(col, xs) -> f col xs
   unless (Set.null ivs) $ do
     writeFields ["", "MARK0000", "'MARKER'", "", "'INTORG'"]
-    forM_ (Map.toList (Map.filterWithKey (\col _ -> col `Set.member` ivs) cols)) $ \(col, xs) -> f col xs
+    forM_ (sortBy (comparing (unintern . fst)) $ Map.toList (Map.filterWithKey (\col _ -> col `Set.member` ivs) cols)) $ \(col, xs) -> f col xs
     writeFields ["", "MARK0001", "'MARKER'", "", "'INTEND'"]
 
   -- RHS section
@@ -689,7 +692,7 @@ render' mip = do
 
   -- BOUNDS section
   writeSectionHeader "BOUNDS"
-  forM_ (Map.toList (MIP.varType mip)) $ \(col, vt) -> do
+  forM_ (sortBy (comparing (unintern . fst)) $ Map.toList (MIP.varType mip)) $ \(col, vt) -> do
     let (lb,ub) = MIP.getBounds mip col
     case (lb,ub)  of
       (MIP.NegInf, MIP.PosInf) -> do
@@ -736,11 +739,11 @@ render' mip = do
 
   -- QMATRIX section
   -- Gurobiは対称行列になっていないと "qmatrix isn't symmetric" というエラーを発生させる
-  let qm = Map.map (2*) $ quadMatrix obj
-  unless (Map.null qm) $ do
+  let qm = map (id *** (2*)) $ quadMatrix obj
+  unless (null qm) $ do
     writeSectionHeader "QMATRIX"
-    forM_ (Map.toList qm) $ \(((v1,v2), val)) -> do
-      writeFields ["", unintern v1, unintern v2, showValue val]
+    forM_ (sortBy (comparing fst) . map ((unintern *** unintern) *** id) $ qm) $ \(((v1,v2), val)) -> do
+      writeFields ["", v1, v2, showValue val]
 
   -- SOS section
   unless (null (MIP.sosConstraints mip)) $ do
@@ -758,13 +761,13 @@ render' mip = do
            | c <- MIP.constraints mip ++ MIP.userCuts mip
            , let lhs = MIP.constrExpr c
            , let qm = quadMatrix lhs
-           , not (Map.null qm) ]
+           , not (null qm) ]
   unless (null xs) $ do
     forM_ xs $ \(row, qm) -> do
       -- The name starts in column 12 in fixed formats.
       writeSectionHeader $ "QCMATRIX" <> T.replicate 3 " " <> row
-      forM_ (Map.toList qm) $ \((v1,v2), val) -> do
-        writeFields ["", unintern v1, unintern v2, showValue val]
+      forM_ (sortBy (comparing fst) . map ((unintern *** unintern) *** id) $ qm) $ \((v1,v2), val) -> do
+        writeFields ["", v1, v2, showValue val]
 
   -- INDICATORS section
   -- Note: Gurobi-5.6.3 does not support this section.
@@ -869,8 +872,8 @@ nameRows mip
       | name `Set.notMember` used = c{ MIP.sosLabel = Just name } : g cs names
       | otherwise = g (c:cs) names
 
-quadMatrix :: Fractional r => MIP.Expr r -> Map (MIP.Var, MIP.Var) r
-quadMatrix e = Map.fromList $ do
+quadMatrix :: Fractional r => MIP.Expr r -> [((MIP.Var, MIP.Var), r)]
+quadMatrix e = do
   let m = Map.fromListWith (+) [(if v1<=v2 then (v1,v2) else (v2,v1), c) | MIP.Term c [v1,v2] <- MIP.terms e]
   ((v1,v2),c) <- Map.toList m
   if v1==v2 then

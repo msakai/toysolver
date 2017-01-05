@@ -39,6 +39,7 @@ import Data.Interned
 import Data.List
 import Data.Maybe
 import Data.Monoid
+import Data.Ord (comparing)
 import Data.Scientific (Scientific)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -509,7 +510,7 @@ render' mip = do
       scs = MIP.semiContinuousVariables mip `Set.union` MIP.semiIntegerVariables mip
 
   writeString "BOUNDS\n"
-  forM_ (Map.toAscList (MIP.varBounds mip)) $ \(v, (lb,ub)) -> do
+  forM_ (sortBy (comparing (unintern . fst)) $ Map.toList (MIP.varBounds mip)) $ \(v, (lb,ub)) -> do
     unless (v `Set.member` bins) $ do
       renderBoundExpr lb
       writeString " <= "
@@ -629,7 +630,7 @@ renderBoundExpr MIP.NegInf = writeString "-inf"
 renderBoundExpr MIP.PosInf = writeString "+inf"
 
 renderVariableList :: [MIP.Var] -> M ()
-renderVariableList vs = fill 80 (map (fromString . MIP.fromVar) vs) >> writeChar '\n'
+renderVariableList vs = fill 80 (sort (map unintern vs)) >> writeChar '\n'
 
 fill :: Int -> [T.Text] -> M ()
 fill width str = go str 0
