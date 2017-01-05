@@ -50,11 +50,12 @@ import Control.Monad
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL
 import Data.List (intersperse)
-import Data.Ratio
+import Data.Scientific (Scientific)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import Text.Megaparsec
+import qualified Text.Megaparsec.Lexer as Lexer
 import Text.Megaparsec.Prim (MonadParsec ())
 
 #if MIN_VERSION_megaparsec(5,0,0)
@@ -70,14 +71,14 @@ type C e s m = (MonadParsec s m Char)
 data Problem
   = Problem
   { blockStruct :: [Int]      -- ^ the block strcuture vector (bLOCKsTRUCT)
-  , costs       :: [Rational] -- ^ Constant Vector
+  , costs       :: [Scientific] -- ^ Constant Vector
   , matrices    :: [Matrix]   -- ^ Constraint Matrices
   }
   deriving (Show, Ord, Eq)
 
 type Matrix = [Block]
 
-type Block = Map (Int,Int) Rational
+type Block = Map (Int,Int) Scientific
 
 -- | the number of primal variables (mDim)
 mDim :: Problem -> Int
@@ -87,7 +88,7 @@ mDim prob = length (matrices prob) - 1
 nBlock :: Problem -> Int
 nBlock prob = length (blockStruct prob)
 
-blockElem :: Int -> Int -> Block -> Rational
+blockElem :: Int -> Int -> Block -> Scientific
 blockElem i j b = Map.findWithDefault 0 (i,j) b
 
 -- ---------------------------------------------------------------------------
@@ -96,7 +97,7 @@ blockElem i j b = Map.findWithDefault 0 (i,j) b
 
 type DenseMatrix = [DenseBlock]
 
-type DenseBlock = [[Rational]]
+type DenseBlock = [[Scientific]]
 
 denseBlock :: DenseBlock -> Block
 denseBlock xxs = Map.fromList [((i,j),x) | (i,xs) <- zip [1..] xxs, (j,x) <- zip [1..] xs, x /= 0]
@@ -104,7 +105,7 @@ denseBlock xxs = Map.fromList [((i,j),x) | (i,xs) <- zip [1..] xxs, (j,x) <- zip
 denseMatrix :: DenseMatrix -> Matrix
 denseMatrix = map denseBlock
 
-diagBlock :: [Rational] -> Block
+diagBlock :: [Scientific] -> Block
 diagBlock xs = Map.fromList [((i,i),x) | (i,x) <- zip [1..] xs]
 
 -- ---------------------------------------------------------------------------
@@ -195,7 +196,7 @@ pBlockStruct = do
   where
     sep = some (oneOf " \t(){},")
 
-pCosts :: C e s m => m [Rational]
+pCosts :: C e s m => m [Scientific]
 pCosts = do
   let sep = some (oneOf " \t(){},")
       real' = real >>= \r -> optional sep >> return r
@@ -254,43 +255,13 @@ nat_line = do
   return n
 
 nat :: C e s m => m Integer
-nat = do
-  ds <- some digitChar
-  return $! read ds
+nat = Lexer.decimal
 
 int :: C e s m => m Integer
-int = do
-  s <- option 1 sign
-  n <- nat
-  return $! s * n
+int = Lexer.signed (return ()) Lexer.decimal
 
-real :: forall e s m. C e s m => m Rational
-real = do
-  s <- option 1 sign 
-  b <- (do{ x <- nat; y <- option 0 frac; return (fromInteger x + y) })
-    <|> frac
-  c <- option 0 e
-  return (s * b*10^^c)
-  where
-    digits = some digitChar
-
-    frac :: m Rational
-    frac = do
-      _ <- char '.'
-      s <- digits
-      return (read s % 10^(length s))
-
-    e :: m Integer
-    e = do
-      _ <- oneOf "eE"
-      f <- msum [ char '+' >> return id
-                , char '-' >> return negate
-                , return id
-                ]
-      liftM f nat
-
-sign :: Num a => C e s m => m a
-sign = (char '+' >> return 1) <|> (char '-' >> return (-1))
+real :: forall e s m. C e s m => m Scientific
+real = Lexer.signed (return ()) Lexer.number
 
 -- ---------------------------------------------------------------------------
 -- rendering
@@ -318,7 +289,7 @@ renderImpl sparse prob =
 
   -- costs
   showChar '(' .
-    sepByS [showRat c | c <- costs prob] (showString ", ") .
+    sepByS [shows c | c <- costs prob] (showString ", ") .
     showString ")\n" .
 
   -- matrices
@@ -333,7 +304,7 @@ renderImpl sparse prob =
                 shows blkno . showChar ' ' .
                 shows i . showChar ' ' .
                 shows j . showChar ' ' .
-                showRat e . showChar '\n'
+                shows e . showChar '\n'
               | (blkno, blk) <- zip [(1::Int)..] m, ((i,j),e) <- Map.toList blk, i <= j ]
 
     renderDenseMatrix :: Matrix -> ShowS
@@ -353,16 +324,11 @@ renderImpl sparse prob =
       where
         renderRow i = renderVec [blockElem i j b | j <- [1..s]]
 
-renderVec :: [Rational] -> ShowS
+renderVec :: [Scientific] -> ShowS
 renderVec xs =
   showChar '{' .
-  sepByS (map showRat xs) (showString ", ") .
+  sepByS (map shows xs) (showString ", ") .
   showChar '}'
-
-showRat :: Rational -> ShowS
-showRat r
-  | denominator r == 1 = shows (numerator r)
-  | otherwise = shows (fromRational r :: Double)
 
 concatS :: [ShowS] -> ShowS
 concatS = foldr (.) id
