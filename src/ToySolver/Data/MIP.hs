@@ -5,10 +5,10 @@
 -- Module      :  ToySolver.Data.MIP
 -- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable
 --
 -- Mixed-Integer Programming Problems with some commmonly used extensions
 --
@@ -103,7 +103,7 @@ writeLPFile opt fname prob =
         TLIO.hPutStr h s
 
 writeMPSFile :: FileOptions -> FilePath -> Problem Scientific -> IO ()
-writeMPSFile opt fname prob = 
+writeMPSFile opt fname prob =
   case MPSFile.render opt prob of
     Left err -> ioError $ userError err
     Right s ->

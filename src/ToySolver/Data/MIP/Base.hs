@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.Data.MIP.Base
 -- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
@@ -60,7 +60,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Interned (intern, unintern)
+import Data.Interned (unintern)
 import Data.Interned.Text
 import Data.ExtendedReal
 import Data.OptDir
@@ -116,7 +116,7 @@ varExpr v = Expr [Term 1 [v]]
 constExpr :: (Eq c, Num c) => c -> Expr c
 constExpr 0 = Expr []
 constExpr c = Expr [Term c []]
-           
+
 terms :: Expr c -> [Term c]
 terms (Expr ts) = ts
 
@@ -187,11 +187,11 @@ lhs .>=. rhs =
     (e, c) -> def{ constrExpr = e, constrLB = Finite (- c) }
 
 splitConst :: Num c => Expr c -> (Expr c, c)
-splitConst e = (e2, c)
+splitConst e = (e2, c2)
   where
     e2 = Expr [t | t@(Term _ (_:_)) <- terms e]
-    c = sum [c | Term c [] <- terms e]
-    
+    c2 = sum [c | Term c [] <- terms e]
+
 instance Default (Constraint c) where
   def = Constraint
         { constrLabel = Nothing

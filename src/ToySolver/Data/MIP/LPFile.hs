@@ -1,23 +1,29 @@
-{-# LANGUAGE ConstraintKinds, CPP, OverloadedStrings, BangPatterns, FlexibleContexts, ScopedTypeVariables, TypeFamilies #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
+{-# LANGUAGE BangPatterns  #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.MIP.LPFile
 -- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ConstraintKinds, CPP, OverloadedStrings, BangPatterns, FlexibleContexts, ScopedTypeVariables, TypeFamilies)
+-- Portability :  non-portable
 --
 -- A CPLEX .lp format parser library.
--- 
+--
 -- References:
--- 
+--
 -- * <http://publib.boulder.ibm.com/infocenter/cosinfoc/v12r2/index.jsp?topic=/ilog.odms.cplex.help/Content/Optimization/Documentation/CPLEX/_pubskel/CPLEX880.html>
--- 
+--
 -- * <http://www.gurobi.com/doc/45/refman/node589.html>
--- 
+--
 -- * <http://lpsolve.sourceforge.net/5.5/CPLEX-format.htm>
 --
 -----------------------------------------------------------------------------
@@ -34,7 +40,6 @@ import Control.Monad.Writer
 import Control.Monad.ST
 import Data.Char
 import Data.Default.Class
-import Data.Functor.Identity
 import Data.Interned
 import Data.List
 import Data.Maybe
@@ -115,9 +120,9 @@ tok p = do
 
 ident :: C e s m => m String
 ident = tok $ do
-  x <- letterChar <|> oneOf syms1 
+  x <- letterChar <|> oneOf syms1
   xs <- many (alphaNumChar <|> oneOf syms2)
-  let s = x:xs 
+  let s = x:xs
   guard $ map toLower s `Set.notMember` reserved
   return s
   where
@@ -155,7 +160,7 @@ parser :: MonadParsec s m Char => m (MIP.Problem Scientific)
 parser = do
   name <- optional $ try $ do
     space
-    string' "\\* Problem: " 
+    string' "\\* Problem: "
     liftM fromString $ manyTill anyChar (try (string " *\\\n"))
   sep
   obj <- problem
@@ -251,7 +256,7 @@ constraint isLazy = do
           MIP.Le -> (MIP.NegInf, MIP.Finite rhs)
           MIP.Ge -> (MIP.Finite rhs, MIP.PosInf)
           MIP.Eql -> (MIP.Finite rhs, MIP.Finite rhs)
-         
+
   return $ MIP.Constraint
     { MIP.constrLabel     = name
     , MIP.constrIndicator = g
@@ -293,7 +298,7 @@ userCutsSection = do
 
 type Bounds2 c = (Maybe (MIP.BoundExpr c), Maybe (MIP.BoundExpr c))
 
-boundsSection :: C e s m => m (Map MIP.Var (MIP.Bounds Scientific)) 
+boundsSection :: C e s m => m (Map MIP.Var (MIP.Bounds Scientific))
 boundsSection = do
   tok $ string' "bound" >> optional (char' 's')
   liftM (Map.map g . Map.fromListWith f) $ many (try bound)
@@ -335,7 +340,7 @@ bound = msum
   ]
 
 boundExpr :: C e s m => m (MIP.BoundExpr Scientific)
-boundExpr = msum 
+boundExpr = msum
   [ try (tok (char '+') >> inf >> return MIP.PosInf)
   , try (tok (char '-') >> inf >> return MIP.NegInf)
   , do
@@ -438,11 +443,11 @@ qfactor = do
 
 number :: forall e s m. C e s m => m Scientific
 number = tok $ P.signed sep P.number
- 
+
 skipManyTill :: Alternative m => m a -> m end -> m ()
-skipManyTill p end = scan
+skipManyTill p end' = scan
   where
-    scan = (end *> pure ()) <|> (p *> scan)
+    scan = (end' *> pure ()) <|> (p *> scan)
 
 -- ---------------------------------------------------------------------------
 
@@ -472,8 +477,8 @@ render' mip = do
     Just name -> writeString $ "\\* Problem: " <> name <> " *\\\n"
     Nothing -> return ()
 
-  let obj = MIP.objectiveFunction mip   
-  
+  let obj = MIP.objectiveFunction mip
+
   writeString $
     case MIP.objDir obj of
       OptMin -> "MINIMIZE"
@@ -568,7 +573,7 @@ renderExpr isObj e = fill 80 (ts1 ++ ts2)
     f _ = error "should not happen"
 
     g :: MIP.Term Scientific -> T.Text
-    g (MIP.Term c vs) = 
+    g (MIP.Term c vs) =
       (if isObj then showCoeff (2*c) else showCoeff c) <>
       mconcat (intersperse " * " (map (fromString . MIP.fromVar) vs))
 
@@ -629,7 +634,7 @@ renderBoundExpr MIP.NegInf = writeString "-inf"
 renderBoundExpr MIP.PosInf = writeString "+inf"
 
 renderVariableList :: [MIP.Var] -> M ()
-renderVariableList vs = fill 80 (map (fromString . MIP.fromVar) vs) >> writeChar '\n'
+renderVariableList vs = fill 80 (map unintern vs) >> writeChar '\n'
 
 fill :: Int -> [T.Text] -> M ()
 fill width str = go str 0
@@ -663,7 +668,7 @@ removeRangeConstraints prob = runST $ do
   vsRef <- newSTRef $ MIP.variables prob
   cntRef <- newSTRef (0::Int)
   newvsRef <- newSTRef []
-            
+
   let gensym = do
         vs <- readSTRef vsRef
         let loop !c = do
@@ -708,7 +713,7 @@ removeEmptyExpr prob =
   }
   where
     obj = MIP.objectiveFunction prob
-    
+
     convertExpr (MIP.Expr []) = MIP.Expr [MIP.Term 0 [MIP.toVar "x0"]]
     convertExpr e = e
 
