@@ -97,14 +97,6 @@ Flag BuildMiscPrograms
   Default: False
   Manual: True
 
-Flag Exceptions06
-  Description: use exceptions >=0.6
-  Manual: False
-
-Flag Time15
-  Description: use time >=1.5.0
-  Manual: False
-
 Flag LogicTPTP045
   Description: use logic-TPTP >=0.4.5.0
   Manual: False
@@ -164,18 +156,14 @@ Library
      sign >=0.2.0 && <1.0.0,
      stm >=2.3,
      template-haskell,
+     temporary >=1.2,
      text >=1.1.0.0,
-     time,
+     time >=1.5.0,
      transformers >=0.2,
      transformers-compat >=0.3,
      unordered-containers >=0.2.3 && <0.3.0,
      vector,
      vector-space >=0.8.6
-  -- NOTE: temporary-1.2.0.2 does not work with exceptions-0.6
-  if flag(Exceptions06)
-     Build-Depends: temporary >1.2.0.2, exceptions >=0.6
-  else
-     Build-Depends: temporary >=1.2, exceptions ==0.5
   if flag(OpenCL)
      Build-Depends: OpenCL >=1.0.3.4
      Exposed-Modules: ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL
@@ -392,13 +380,10 @@ Executable toysat
     process >=1.1.0.2,
     pseudo-boolean,
     temporary,
+    time,
     toysolver,
     unbounded-delays,
     vector
-  if flag(Time15)
-    Build-Depends: time >=1.5.0
-  else
-    Build-Depends: time <1.5.0, old-locale
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
   GHC-Options: -rtsopts -threaded
