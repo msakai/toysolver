@@ -47,7 +47,6 @@ module ToySolver.Text.SDPFile
 
 import Control.Applicative ((<*))
 import Control.Monad
-import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL
 import Data.List (intersperse)
 import Data.Scientific (Scientific)
@@ -188,7 +187,7 @@ pComment = do
 
 pBlockStruct :: C e s m => m [Int]
 pBlockStruct = do
-  optional sep
+  _ <- optional sep
   let int' = int >>= \i -> optional sep >> return i
   xs <- many int'
   _ <- manyTill anyChar newline
@@ -200,7 +199,7 @@ pCosts :: C e s m => m [Scientific]
 pCosts = do
   let sep = some (oneOf " \t(){},")
       real' = real >>= \r -> optional sep >> return r
-  optional sep
+  _ <- optional sep
   cs <- many real'
   _ <- newline
   return cs
@@ -233,7 +232,7 @@ pSparseMatrices m bs = do
   where
     sep = some (oneOf " \t") >> return ()
     pLine = do
-      optional sep
+      _ <- optional sep
       matno <- nat
       sep
       blkno <- nat
@@ -243,7 +242,7 @@ pSparseMatrices m bs = do
       j <- nat
       sep
       e <- real
-      optional sep
+      _ <- optional sep
       _ <- newline
       return (fromIntegral matno, fromIntegral blkno, fromIntegral i, fromIntegral j, e)
 
