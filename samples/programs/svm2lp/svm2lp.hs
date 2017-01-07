@@ -9,6 +9,7 @@ import Data.Maybe
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
+import Data.Scientific
 import qualified Data.Text.Lazy.IO as TLIO
 import ToySolver.Data.MIP ((.==.), (.>=.))
 import qualified ToySolver.Data.MIP as MIP
@@ -31,7 +32,7 @@ loadFile fname = do
       case words s of
         (y : xs) -> (read (dropWhile ('+'==) y), IntMap.fromList [(read v, read val) | x <- xs, let [v,val] = splitOn ":" x])
 
-primal :: Maybe Double -> Problem -> MIP.Problem
+primal :: Maybe Double -> Problem -> MIP.Problem Scientific
 primal c prob
   = def
   { MIP.objectiveFunction = def
@@ -64,7 +65,7 @@ dual
   :: Maybe Double
   -> (IntMap Double -> IntMap Double -> Double)
   -> Problem
-  -> MIP.Problem
+  -> MIP.Problem Scientific
 dual c kernel prob
   = def
   { MIP.objectiveFunction = def

@@ -117,7 +117,7 @@ header = "Usage: toysolver [OPTION]... file"
 run
   :: String
   -> [Flag]
-  -> MIP.Problem
+  -> MIP.Problem Rational
   -> (Map MIP.Var Rational -> IO ())
   -> IO ()
 run solver opt mip printModel = do
@@ -136,10 +136,10 @@ run solver opt mip printModel = do
     nameToVar = Map.fromList vsAssoc
     varToName = IntMap.fromList [(v,name) | (name,v) <- vsAssoc]
 
-    compileE :: MIP.Expr -> Expr Rational
+    compileE :: MIP.Expr Rational -> Expr Rational
     compileE = foldr (+) (Const 0) . map compileT . MIP.terms
 
-    compileT :: MIP.Term -> Expr Rational
+    compileT :: MIP.Term Rational -> Expr Rational
     compileT (MIP.Term c vs) =
       foldr (*) (Const c) [Var (nameToVar Map.! v) | v <- vs]
 
@@ -419,7 +419,7 @@ main = do
             Left err -> hPrint stderr err >> exitFailure
             Right cnf -> do
               let (mip,_,mtrans) = SAT2IP.convert cnf
-              run (getSolver o) o mip $ \m -> do
+              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
                 let m2 = mtrans m
                 satPrintModel stdout m2 0
                 writeSOLFileSAT o m2
@@ -429,7 +429,7 @@ main = do
             Left err -> hPutStrLn stderr err >> exitFailure
             Right pb -> do
               let (mip,_,mtrans) = PB2IP.convert pb
-              run (getSolver o) o mip $ \m -> do
+              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
                 let m2 = mtrans m
                 pbPrintModel stdout m2 0
                 writeSOLFileSAT o m2
@@ -439,7 +439,7 @@ main = do
             Left err -> hPutStrLn stderr err >> exitFailure
             Right wbo -> do
               let (mip,_,mtrans) = PB2IP.convertWBO False wbo
-              run (getSolver o) o mip $ \m -> do
+              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
                 let m2 = mtrans m
                 pbPrintModel stdout m2 0
                 writeSOLFileSAT o m2
@@ -449,7 +449,7 @@ main = do
             Left err -> hPutStrLn stderr err >> exitFailure
             Right wcnf -> do
               let (mip,_,mtrans) = MaxSAT2IP.convert False wcnf
-              run (getSolver o) o mip $ \m -> do
+              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
                 let m2 = mtrans m
                 maxsatPrintModel stdout m2 0
                 writeSOLFileSAT o m2
@@ -459,7 +459,7 @@ main = do
           mip <- case ret of
                   Right mip -> return mip
                   Left err -> hPrint stderr err >> exitFailure
-          run (getSolver o) o mip $ \m -> do
+          run (getSolver o) o (fmap toRational mip) $ \m -> do
             mipPrintModel stdout (PrintRational `elem` o) m
             writeSOLFileMIP o m
     (_,_,errs) ->

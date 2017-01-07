@@ -5,10 +5,10 @@
 -- Module      :  ToySolver.Data.MIP
 -- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable
 --
 -- Mixed-Integer Programming Problems with some commmonly used extensions
 --
@@ -29,6 +29,7 @@ module ToySolver.Data.MIP
 
 import Prelude hiding (readFile, writeFile)
 import Data.Char
+import Data.Scientific (Scientific)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.IO as TLIO
 import System.FilePath (takeExtension)
@@ -41,9 +42,9 @@ import qualified ToySolver.Data.MIP.MPSFile as MPSFile
 
 -- | Parse .lp or .mps file based on file extension
 #if MIN_VERSION_megaparsec(5,0,0)
-readFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) Problem)
+readFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Scientific))
 #else
-readFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+readFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Scientific))
 #endif
 readFile opt fname =
   case map toLower (takeExtension fname) of
@@ -53,44 +54,44 @@ readFile opt fname =
 
 -- | Parse a file containing LP file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-readLPFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) Problem)
+readLPFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Scientific))
 #else
-readLPFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+readLPFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Scientific))
 #endif
 readLPFile = LPFile.parseFile
 
 -- | Parse a file containing MPS file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-readMPSFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) Problem)
+readMPSFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Scientific))
 #else
-readMPSFile :: FileOptions -> FilePath -> IO (Either ParseError Problem)
+readMPSFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Scientific))
 #endif
 readMPSFile = MPSFile.parseFile
 
 -- | Parse a string containing LP file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseLPString :: FileOptions -> String -> String -> Either (ParseError Char Dec) Problem
+parseLPString :: FileOptions -> String -> String -> Either (ParseError Char Dec) (Problem Scientific)
 #else
-parseLPString :: FileOptions -> String -> String -> Either ParseError Problem
+parseLPString :: FileOptions -> String -> String -> Either ParseError (Problem Scientific)
 #endif
 parseLPString = LPFile.parseString
 
 -- | Parse a string containing MPS file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseMPSString :: FileOptions -> String -> String -> Either (ParseError Char Dec) Problem
+parseMPSString :: FileOptions -> String -> String -> Either (ParseError Char Dec) (Problem Scientific)
 #else
-parseMPSString :: FileOptions -> String -> String -> Either ParseError Problem
+parseMPSString :: FileOptions -> String -> String -> Either ParseError (Problem Scientific)
 #endif
 parseMPSString = MPSFile.parseString
 
-writeFile :: FileOptions -> FilePath -> Problem -> IO ()
+writeFile :: FileOptions -> FilePath -> Problem Scientific -> IO ()
 writeFile opt fname prob =
   case map toLower (takeExtension fname) of
     ".lp"  -> writeLPFile opt fname prob
     ".mps" -> writeMPSFile opt fname prob
     ext -> ioError $ userError $ "unknown extension: " ++ ext
 
-writeLPFile :: FileOptions -> FilePath -> Problem -> IO ()
+writeLPFile :: FileOptions -> FilePath -> Problem Scientific -> IO ()
 writeLPFile opt fname prob =
   case LPFile.render opt prob of
     Left err -> ioError $ userError err
@@ -101,8 +102,8 @@ writeLPFile opt fname prob =
           Just enc -> hSetEncoding h enc
         TLIO.hPutStr h s
 
-writeMPSFile :: FileOptions -> FilePath -> Problem -> IO ()
-writeMPSFile opt fname prob = 
+writeMPSFile :: FileOptions -> FilePath -> Problem Scientific -> IO ()
+writeMPSFile opt fname prob =
   case MPSFile.render opt prob of
     Left err -> ioError $ userError err
     Right s ->
@@ -112,8 +113,8 @@ writeMPSFile opt fname prob =
           Just enc -> hSetEncoding h enc
         TLIO.hPutStr h s
 
-toLPString :: FileOptions -> Problem -> Either String TL.Text
+toLPString :: FileOptions -> Problem Scientific -> Either String TL.Text
 toLPString = LPFile.render
 
-toMPSString :: FileOptions -> Problem -> Either String TL.Text
+toMPSString :: FileOptions -> Problem Scientific -> Either String TL.Text
 toMPSString = MPSFile.render

@@ -1,23 +1,29 @@
-{-# LANGUAGE ConstraintKinds, CPP, OverloadedStrings, BangPatterns, FlexibleContexts, ScopedTypeVariables, TypeFamilies #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
+{-# LANGUAGE BangPatterns  #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.MIP.LPFile
 -- Copyright   :  (c) Masahiro Sakai 2011-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ConstraintKinds, CPP, OverloadedStrings, BangPatterns, FlexibleContexts, ScopedTypeVariables, TypeFamilies)
+-- Portability :  non-portable
 --
 -- A CPLEX .lp format parser library.
--- 
+--
 -- References:
--- 
+--
 -- * <http://publib.boulder.ibm.com/infocenter/cosinfoc/v12r2/index.jsp?topic=/ilog.odms.cplex.help/Content/Optimization/Documentation/CPLEX/_pubskel/CPLEX880.html>
--- 
+--
 -- * <http://www.gurobi.com/doc/45/refman/node589.html>
--- 
+--
 -- * <http://lpsolve.sourceforge.net/5.5/CPLEX-format.htm>
 --
 -----------------------------------------------------------------------------
@@ -34,12 +40,11 @@ import Control.Monad.Writer
 import Control.Monad.ST
 import Data.Char
 import Data.Default.Class
-import Data.Functor.Identity
 import Data.Interned
 import Data.List
 import Data.Maybe
 import Data.Monoid
-import Data.Ratio
+import Data.Scientific (Scientific)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -50,15 +55,16 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as B
+import qualified Data.Text.Lazy.Builder.Scientific as B
 import qualified Data.Text.Lazy.IO as TLIO
 import Data.OptDir
 import System.IO
 import Text.Megaparsec hiding (label, string', char')
+import qualified Text.Megaparsec.Lexer as P
 import Text.Megaparsec.Prim (MonadParsec ())
 
 import qualified ToySolver.Data.MIP.Base as MIP
 import ToySolver.Internal.Util (combineMaybe)
-import ToySolver.Internal.TextUtil (readUnsignedInteger)
 
 -- ---------------------------------------------------------------------------
 
@@ -71,17 +77,17 @@ type C e s m = (MonadParsec s m Char)
 -- | Parse a string containing LP file data.
 -- The source name is only | used in error messages and may be the empty string.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError Char Dec) MIP.Problem
+parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError Char Dec) (MIP.Problem Scientific)
 #else
-parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError MIP.Problem
+parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Scientific)
 #endif
 parseString _ = parse (parser <* eof)
 
 -- | Parse a file containing LP file data.
 #if MIN_VERSION_megaparsec(5,0,0)
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either (ParseError Char Dec) MIP.Problem)
+parseFile :: MIP.FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (MIP.Problem Scientific))
 #else
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError MIP.Problem)
+parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError (MIP.Problem Scientific))
 #endif
 parseFile opt fname = do
   h <- openFile fname ReadMode
@@ -114,9 +120,9 @@ tok p = do
 
 ident :: C e s m => m String
 ident = tok $ do
-  x <- letterChar <|> oneOf syms1 
+  x <- letterChar <|> oneOf syms1
   xs <- many (alphaNumChar <|> oneOf syms2)
-  let s = x:xs 
+  let s = x:xs
   guard $ map toLower s `Set.notMember` reserved
   return s
   where
@@ -147,14 +153,14 @@ reserved = Set.fromList
 
 -- | LP file parser
 #if MIN_VERSION_megaparsec(5,0,0)
-parser :: (MonadParsec e s m, Token s ~ Char) => m MIP.Problem
+parser :: (MonadParsec e s m, Token s ~ Char) => m (MIP.Problem Scientific)
 #else
-parser :: MonadParsec s m Char => m MIP.Problem
+parser :: MonadParsec s m Char => m (MIP.Problem Scientific)
 #endif
 parser = do
   name <- optional $ try $ do
     space
-    string' "\\* Problem: " 
+    string' "\\* Problem: "
     liftM fromString $ manyTill anyChar (try (string " *\\\n"))
   sep
   obj <- problem
@@ -205,7 +211,7 @@ parser = do
     , MIP.varBounds         = Map.fromAscList [ (v, Map.findWithDefault MIP.defaultBounds v bnds2) | v <- Set.toAscList vs]
     }
 
-problem :: C e s m => m MIP.ObjectiveFunction
+problem :: C e s m => m (MIP.ObjectiveFunction Scientific)
 problem = do
   flag <-  (try minimize >> return OptMin)
        <|> (try maximize >> return OptMax)
@@ -222,7 +228,7 @@ end = tok $ string' "end"
 
 -- ---------------------------------------------------------------------------
 
-constraintSection :: C e s m => m [MIP.Constraint]
+constraintSection :: C e s m => m [MIP.Constraint Scientific]
 constraintSection = subjectTo >> many (try (constraint False))
 
 subjectTo :: C e s m => m ()
@@ -234,7 +240,7 @@ subjectTo = msum
         >> tok (char '.') >> return ()
   ]
 
-constraint :: C e s m => Bool -> m MIP.Constraint
+constraint :: C e s m => Bool -> m (MIP.Constraint Scientific)
 constraint isLazy = do
   name <- optional (try label)
   g <- optional $ try indicator
@@ -250,7 +256,7 @@ constraint isLazy = do
           MIP.Le -> (MIP.NegInf, MIP.Finite rhs)
           MIP.Ge -> (MIP.Finite rhs, MIP.PosInf)
           MIP.Eql -> (MIP.Finite rhs, MIP.Finite rhs)
-         
+
   return $ MIP.Constraint
     { MIP.constrLabel     = name
     , MIP.constrIndicator = g
@@ -270,7 +276,7 @@ relOp = tok $ msum
                      ]
   ]
 
-indicator :: C e s m => m (MIP.Var, Rational)
+indicator :: C e s m => m (MIP.Var, Scientific)
 indicator = do
   var <- variable
   tok (char '=')
@@ -278,21 +284,21 @@ indicator = do
   tok $ string "->"
   return (var, val)
 
-lazyConstraintsSection :: C e s m => m [MIP.Constraint]
+lazyConstraintsSection :: C e s m => m [MIP.Constraint Scientific]
 lazyConstraintsSection = do
   tok $ string' "lazy"
   tok $ string' "constraints"
   many $ try $ constraint True
 
-userCutsSection :: C e s m => m [MIP.Constraint]
+userCutsSection :: C e s m => m [MIP.Constraint Scientific]
 userCutsSection = do
   tok $ string' "user"
   tok $ string' "cuts"
   many $ try $ constraint False
 
-type Bounds2 = (Maybe MIP.BoundExpr, Maybe MIP.BoundExpr)
+type Bounds2 c = (Maybe (MIP.BoundExpr c), Maybe (MIP.BoundExpr c))
 
-boundsSection :: C e s m => m (Map MIP.Var MIP.Bounds)
+boundsSection :: C e s m => m (Map MIP.Var (MIP.Bounds Scientific))
 boundsSection = do
   tok $ string' "bound" >> optional (char' 's')
   liftM (Map.map g . Map.fromListWith f) $ many (try bound)
@@ -302,7 +308,7 @@ boundsSection = do
                  , fromMaybe MIP.defaultUB ub
                  )
 
-bound :: C e s m => m (MIP.Var, Bounds2)
+bound :: C e s m => m (MIP.Var, Bounds2 Scientific)
 bound = msum
   [ try $ do
       v <- try variable
@@ -333,8 +339,8 @@ bound = msum
       return (v, (b1, b2))
   ]
 
-boundExpr :: C e s m => m MIP.BoundExpr
-boundExpr = msum 
+boundExpr :: C e s m => m (MIP.BoundExpr Scientific)
+boundExpr = msum
   [ try (tok (char '+') >> inf >> return MIP.PosInf)
   , try (tok (char '-') >> inf >> return MIP.NegInf)
   , do
@@ -363,7 +369,7 @@ semiSection = do
   tok $ string' "semi" >> optional (string' "-continuous" <|> string' "s")
   many (try variable)
 
-sosSection :: C e s m => m [MIP.SOSConstraint]
+sosSection :: C e s m => m [MIP.SOSConstraint Scientific]
 sosSection = do
   tok $ string' "sos"
   many $ try $ do
@@ -383,10 +389,10 @@ sosSection = do
 
 -- ---------------------------------------------------------------------------
 
-expr :: forall e s m. C e s m => m MIP.Expr
+expr :: forall e s m. C e s m => m (MIP.Expr Scientific)
 expr = try expr1 <|> return 0
   where
-    expr1 :: m MIP.Expr
+    expr1 :: m (MIP.Expr Scientific)
     expr1 = do
       t <- term True
       ts <- many (term False)
@@ -395,7 +401,7 @@ expr = try expr1 <|> return 0
 sign :: (C e s m, Num a) => m a
 sign = tok ((char '+' >> return 1) <|> (char '-' >> return (-1)))
 
-term :: C e s m => Bool -> m MIP.Expr
+term :: C e s m => Bool -> m (MIP.Expr Scientific)
 term flag = do
   s <- if flag then optional sign else liftM Just sign
   c <- optional number
@@ -404,7 +410,7 @@ term flag = do
     Nothing -> e
     Just d -> MIP.constExpr d * e
 
-qexpr :: C e s m => m MIP.Expr
+qexpr :: C e s m => m (MIP.Expr Scientific)
 qexpr = do
   tok (char '[')
   t <- qterm True
@@ -416,7 +422,7 @@ qexpr = do
       return $ MIP.constExpr (1/2) * e)
    <|> return e
 
-qterm :: C e s m => Bool -> m MIP.Term
+qterm :: C e s m => Bool -> m (MIP.Term Scientific)
 qterm flag = do
   s <- if flag then optional sign else liftM Just sign
   c <- optional number
@@ -435,37 +441,13 @@ qfactor = do
        , return [v]
        ]
 
-number :: forall e s m. C e s m => m Rational
-number = tok $ do
-  b <- (do{ x <- nat; y <- option 0 frac; return (fromInteger x + y) })
-    <|> frac
-  c <- option 0 e
-  return (b*10^^c)
-  where
-    digits = some digitChar
+number :: forall e s m. C e s m => m Scientific
+number = tok $ P.signed sep P.number
 
-    nat :: m Integer
-    nat = liftM readUnsignedInteger digits
-
-    frac :: m Rational
-    frac = do
-      char '.'
-      s <- digits
-      return (readUnsignedInteger s % 10^(length s))
-
-    e :: m Integer
-    e = do
-      oneOf ['e','E']
-      f <- msum [ char '+' >> return id
-                , char '-' >> return negate
-                , return id
-                ]
-      liftM f nat
-      
 skipManyTill :: Alternative m => m a -> m end -> m ()
-skipManyTill p end = scan
+skipManyTill p end' = scan
   where
-    scan = (end *> pure ()) <|> (p *> scan)
+    scan = (end' *> pure ()) <|> (p *> scan)
 
 -- ---------------------------------------------------------------------------
 
@@ -483,20 +465,20 @@ writeChar c = tell $ B.singleton c
 -- ---------------------------------------------------------------------------
 
 -- | Render a problem into a string.
-render :: MIP.FileOptions -> MIP.Problem -> Either String TL.Text
+render :: MIP.FileOptions -> MIP.Problem Scientific -> Either String TL.Text
 render _ mip = Right $ execM $ render' $ normalize mip
 
 writeVar :: MIP.Var -> M ()
 writeVar v = writeString $ unintern v
 
-render' :: MIP.Problem -> M ()
+render' :: MIP.Problem Scientific -> M ()
 render' mip = do
   case MIP.name mip of
     Just name -> writeString $ "\\* Problem: " <> name <> " *\\\n"
     Nothing -> return ()
 
-  let obj = MIP.objectiveFunction mip   
-  
+  let obj = MIP.objectiveFunction mip
+
   writeString $
     case MIP.objDir obj of
       OptMin -> "MINIMIZE"
@@ -563,13 +545,13 @@ render' mip = do
         writeString "  "
         writeVar v
         writeString " : "
-        writeString $ showValue r
+        tell $ B.scientificBuilder r
       writeChar '\n'
 
   writeString "END\n"
 
 -- FIXME: Gurobi は quadratic term が最後に一つある形式でないとダメっぽい
-renderExpr :: Bool -> MIP.Expr -> M ()
+renderExpr :: Bool -> MIP.Expr Scientific -> M ()
 renderExpr isObj e = fill 80 (ts1 ++ ts2)
   where
     (ts,qts) = partition isLin (MIP.terms e)
@@ -585,23 +567,20 @@ renderExpr isObj e = fill 80 (ts1 ++ ts2)
         -- SCIP-3.1.0 does not allow spaces between '/' and '2'.
         ["+ ["] ++ map g qts ++ [if isObj then "] /2" else "]"]
 
-    f :: MIP.Term -> T.Text
+    f :: MIP.Term Scientific -> T.Text
     f (MIP.Term c [])  = showConstTerm c
     f (MIP.Term c [v]) = showCoeff c <> fromString (MIP.fromVar v)
     f _ = error "should not happen"
 
-    g :: MIP.Term -> T.Text
-    g (MIP.Term c vs) = 
+    g :: MIP.Term Scientific -> T.Text
+    g (MIP.Term c vs) =
       (if isObj then showCoeff (2*c) else showCoeff c) <>
       mconcat (intersperse " * " (map (fromString . MIP.fromVar) vs))
 
-showValue :: Rational -> T.Text
-showValue c =
-  if denominator c == 1
-    then fromString $ show (numerator c)
-    else fromString $ show (fromRational c :: Double)
+showValue :: Scientific -> T.Text
+showValue = fromString . show
 
-showCoeff :: Rational -> T.Text
+showCoeff :: Scientific -> T.Text
 showCoeff c =
   if c' == 1
     then s
@@ -610,11 +589,10 @@ showCoeff c =
     c' = abs c
     s = if c >= 0 then "+ " else "- "
 
-showConstTerm :: Rational -> T.Text
-showConstTerm c = s <> v
+showConstTerm :: Scientific -> T.Text
+showConstTerm c = s <> showValue (abs c)
   where
     s = if c >= 0 then "+ " else "- "
-    v = showValue (abs c)
 
 renderLabel :: Maybe MIP.Label -> M ()
 renderLabel l =
@@ -627,7 +605,7 @@ renderOp MIP.Le = writeString "<="
 renderOp MIP.Ge = writeString ">="
 renderOp MIP.Eql = writeString "="
 
-renderConstraint :: MIP.Constraint -> M ()
+renderConstraint :: MIP.Constraint Scientific -> M ()
 renderConstraint c@MIP.Constraint{ MIP.constrExpr = e, MIP.constrLB = lb, MIP.constrUB = ub } = do
   renderLabel (MIP.constrLabel c)
   case MIP.constrIndicator c of
@@ -635,7 +613,7 @@ renderConstraint c@MIP.Constraint{ MIP.constrExpr = e, MIP.constrLB = lb, MIP.co
     Just (v,vval) -> do
       writeVar v
       writeString " = "
-      writeString $ showValue vval
+      tell $ B.scientificBuilder vval
       writeString " -> "
 
   renderExpr False e
@@ -648,15 +626,15 @@ renderConstraint c@MIP.Constraint{ MIP.constrExpr = e, MIP.constrLB = lb, MIP.co
           _ -> error "ToySolver.Data.MIP.LPFile.renderConstraint: should not happen"
   renderOp op
   writeChar ' '
-  writeString $ showValue val
+  tell $ B.scientificBuilder val
 
-renderBoundExpr :: MIP.BoundExpr -> M ()
-renderBoundExpr (MIP.Finite r) = writeString $ showValue r
+renderBoundExpr :: MIP.BoundExpr Scientific -> M ()
+renderBoundExpr (MIP.Finite r) = tell $ B.scientificBuilder r
 renderBoundExpr MIP.NegInf = writeString "-inf"
 renderBoundExpr MIP.PosInf = writeString "+inf"
 
 renderVariableList :: [MIP.Var] -> M ()
-renderVariableList vs = fill 80 (map (fromString . MIP.fromVar) vs) >> writeChar '\n'
+renderVariableList vs = fill 80 (map unintern vs) >> writeChar '\n'
 
 fill :: Int -> [T.Text] -> M ()
 fill width str = go str 0
@@ -671,7 +649,7 @@ fill width str = go str 0
 -- ---------------------------------------------------------------------------
 
 {-
-compileExpr :: Expr -> Maybe (Map Var Rational)
+compileExpr :: Expr -> Maybe (Map Var Scientific)
 compileExpr e = do
   xs <- forM e $ \(Term c vs) ->
     case vs of
@@ -682,15 +660,15 @@ compileExpr e = do
 
 -- ---------------------------------------------------------------------------
 
-normalize :: MIP.Problem -> MIP.Problem
+normalize :: (Eq r, Num r) => MIP.Problem r -> MIP.Problem r
 normalize = removeEmptyExpr . removeRangeConstraints
 
-removeRangeConstraints :: MIP.Problem -> MIP.Problem
+removeRangeConstraints :: (Eq r, Num r) => MIP.Problem r -> MIP.Problem r
 removeRangeConstraints prob = runST $ do
   vsRef <- newSTRef $ MIP.variables prob
   cntRef <- newSTRef (0::Int)
   newvsRef <- newSTRef []
-            
+
   let gensym = do
         vs <- readSTRef vsRef
         let loop !c = do
@@ -714,8 +692,8 @@ removeRangeConstraints prob = runST $ do
         return $
           c
           { MIP.constrExpr = MIP.constrExpr c - MIP.varExpr v
-          , MIP.constrLB = 0
-          , MIP.constrUB = 0
+          , MIP.constrLB = MIP.Finite 0
+          , MIP.constrUB = MIP.Finite 0
           }
 
   newvs <- liftM reverse $ readSTRef newvsRef
@@ -725,8 +703,8 @@ removeRangeConstraints prob = runST $ do
     , MIP.varType = MIP.varType prob `Map.union` Map.fromList [(v, MIP.ContinuousVariable) | (v,_) <- newvs]
     , MIP.varBounds = MIP.varBounds prob `Map.union` (Map.fromList newvs)
     }
-          
-removeEmptyExpr :: MIP.Problem -> MIP.Problem
+
+removeEmptyExpr :: Num r => MIP.Problem r -> MIP.Problem r
 removeEmptyExpr prob =
   prob
   { MIP.objectiveFunction = obj{ MIP.objExpr = convertExpr (MIP.objExpr obj) }
@@ -735,7 +713,7 @@ removeEmptyExpr prob =
   }
   where
     obj = MIP.objectiveFunction prob
-    
+
     convertExpr (MIP.Expr []) = MIP.Expr [MIP.Term 0 [MIP.toVar "x0"]]
     convertExpr e = e
 

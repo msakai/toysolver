@@ -38,7 +38,7 @@ import ToySolver.Internal.Util (revForM)
 
 -- -----------------------------------------------------------------------------
 
-convert :: MIP.Problem -> Either String (PBFile.Formula, Integer -> Rational, SAT.Model -> Map MIP.Var Integer)
+convert :: MIP.Problem Rational -> Either String (PBFile.Formula, Integer -> Rational, SAT.Model -> Map MIP.Var Integer)
 convert mip = runST $ runExceptT $ m
   where
     m :: ExceptT String (ST s) (PBFile.Formula, Integer -> Rational, SAT.Model -> Map MIP.Var Integer)
@@ -50,10 +50,10 @@ convert mip = runST $ runExceptT $ m
 
 -- -----------------------------------------------------------------------------
 
-addMIP :: SAT.AddPBNL m enc => enc -> MIP.Problem -> m (Either String (Integer.Expr, Integer -> Rational, SAT.Model -> Map MIP.Var Integer))
+addMIP :: SAT.AddPBNL m enc => enc -> MIP.Problem Rational -> m (Either String (Integer.Expr, Integer -> Rational, SAT.Model -> Map MIP.Var Integer))
 addMIP enc mip = runExceptT $ addMIP' enc mip
 
-addMIP' :: SAT.AddPBNL m enc => enc -> MIP.Problem -> ExceptT String m (Integer.Expr, Integer -> Rational, SAT.Model -> Map MIP.Var Integer)
+addMIP' :: SAT.AddPBNL m enc => enc -> MIP.Problem Rational -> ExceptT String m (Integer.Expr, Integer -> Rational, SAT.Model -> Map MIP.Var Integer)
 addMIP' enc mip = do
   if not (Set.null nivs) then do
     throwE $ "cannot handle non-integer variables: " ++ intercalate ", " (map MIP.fromVar (Set.toList nivs))
