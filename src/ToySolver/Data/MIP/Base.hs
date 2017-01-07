@@ -13,38 +13,58 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Base
-  ( Problem (..)
+  ( 
+  -- * The MIP Problem type
+    Problem (..)
+  , Label
+
+  -- * Variables
+  , Var
+  , toVar
+  , fromVar
+
+  -- ** Variable types
+  , VarType (..)
+  , getVarType
+
+  -- ** Variable bounds
+  , BoundExpr
+  , Extended (..)
+  , Bounds
+  , defaultBounds
+  , defaultLB
+  , defaultUB
+  , getBounds
+
+  -- ** Variable getters
+  , variables
+  , integerVariables
+  , semiContinuousVariables
+  , semiIntegerVariables
+
+  -- * Expressions
   , Expr (..)
   , varExpr
   , constExpr
   , terms
   , Term (..)
+
+  -- * Objective function
   , OptDir (..)
   , ObjectiveFunction (..)
+
+  -- * Constraints
+
+  -- ** Linear (or Quadratic or Polynomial) constraints
   , Constraint (..)
   , (.==.)
   , (.<=.)
   , (.>=.)
-  , Bounds
-  , Label
-  , Var
-  , VarType (..)
-  , BoundExpr
-  , Extended (..)
   , RelOp (..)
+
+  -- ** SOS constraints
   , SOSType (..)
   , SOSConstraint (..)
-  , defaultBounds
-  , defaultLB
-  , defaultUB
-  , toVar
-  , fromVar
-  , getVarType
-  , getBounds
-  , variables
-  , integerVariables
-  , semiContinuousVariables
-  , semiIntegerVariables
 
   -- * File I/O options
   , FileOptions (..)
@@ -106,6 +126,63 @@ instance Functor Problem where
     , varBounds         = fmap (fmap f *** fmap f) (varBounds prob)
     }
 
+-- | label
+type Label = T.Text
+
+-- ---------------------------------------------------------------------------
+
+-- | variable
+type Var = InternedText
+
+-- | convert a string into a variable
+toVar :: String -> Var
+toVar = fromString
+
+-- | convert a variable into a string
+fromVar :: Var -> String
+fromVar = T.unpack . unintern
+
+data VarType
+  = ContinuousVariable
+  | IntegerVariable
+  | SemiContinuousVariable
+  | SemiIntegerVariable
+  deriving (Eq, Ord, Show)
+
+instance Default VarType where
+  def = ContinuousVariable
+
+-- | looking up bounds for a variable
+getVarType :: Problem c -> Var -> VarType
+getVarType mip v = Map.findWithDefault def v (varType mip)
+
+-- | type for representing lower/upper bound of variables
+type BoundExpr c = Extended c
+
+-- | type for representing lower/upper bound of variables
+type Bounds c = (BoundExpr c, BoundExpr c)
+
+-- | default bounds
+defaultBounds :: Num c => Bounds c
+defaultBounds = (defaultLB, defaultUB)
+
+-- | default lower bound (0)
+defaultLB :: Num c => BoundExpr c
+defaultLB = Finite 0
+
+-- | default upper bound (+∞)
+defaultUB :: BoundExpr c
+defaultUB = PosInf
+
+-- | looking up bounds for a variable
+getBounds :: Num c => Problem c -> Var -> Bounds c
+getBounds mip v = Map.findWithDefault defaultBounds v (varBounds mip)
+
+intersectBounds :: Ord c => Bounds c -> Bounds c -> Bounds c
+intersectBounds (lb1,ub1) (lb2,ub2) = (max lb1 lb2, min ub1 ub2)
+
+-- ---------------------------------------------------------------------------
+
 -- | expressions
 newtype Expr c = Expr [Term c]
   deriving (Eq, Ord, Show)
@@ -132,12 +209,20 @@ instance Num c => Num (Expr c) where
 instance Functor Expr where
   fmap f (Expr ts) = Expr $ map (fmap f) ts
 
+splitConst :: Num c => Expr c -> (Expr c, c)
+splitConst e = (e2, c2)
+  where
+    e2 = Expr [t | t@(Term _ (_:_)) <- terms e]
+    c2 = sum [c | Term c [] <- terms e]
+
 -- | terms
 data Term c = Term c [Var]
   deriving (Eq, Ord, Show)
 
 instance Functor Term where
   fmap f (Term c vs) = Term (f c) vs
+
+-- ---------------------------------------------------------------------------
 
 -- | objective function
 data ObjectiveFunction c
@@ -158,6 +243,8 @@ instance Default (ObjectiveFunction c) where
 
 instance Functor ObjectiveFunction where
   fmap f obj = obj{ objExpr = fmap f (objExpr obj) }
+
+-- ---------------------------------------------------------------------------
 
 -- | constraint
 data Constraint c
@@ -186,12 +273,6 @@ lhs .>=. rhs =
   case splitConst (lhs - rhs) of
     (e, c) -> def{ constrExpr = e, constrLB = Finite (- c) }
 
-splitConst :: Num c => Expr c -> (Expr c, c)
-splitConst e = (e2, c2)
-  where
-    e2 = Expr [t | t@(Term _ (_:_)) <- terms e]
-    c2 = sum [c | Term c [] <- terms e]
-
 instance Default (Constraint c) where
   def = Constraint
         { constrLabel = Nothing
@@ -211,39 +292,17 @@ instance Functor Constraint where
     , constrUB = fmap f (constrUB c)
     }
 
-data VarType
-  = ContinuousVariable
-  | IntegerVariable
--- 'nothaddock' is inserted not to confuse haddock
-  -- nothaddock | BinaryVariable
-  | SemiContinuousVariable
-  | SemiIntegerVariable
-  deriving (Eq, Ord, Show)
-
-instance Default VarType where
-  def = ContinuousVariable
-
--- | type for representing lower/upper bound of variables
-type Bounds c = (BoundExpr c, BoundExpr c)
-
--- | label
-type Label = T.Text
-
--- | variable
-type Var = InternedText
-
--- | type for representing lower/upper bound of variables
-type BoundExpr c = Extended c
-
 -- | relational operators
 data RelOp = Le | Ge | Eql
-    deriving (Eq, Ord, Enum, Show)
+  deriving (Eq, Ord, Enum, Show)
+
+-- ---------------------------------------------------------------------------
 
 -- | types of SOS (special ordered sets) constraints
 data SOSType
   = S1 -- ^ Type 1 SOS constraint
   | S2 -- ^ Type 2 SOS constraint
-    deriving (Eq, Ord, Enum, Show, Read)
+  deriving (Eq, Ord, Enum, Show, Read)
 
 -- | SOS (special ordered sets) constraints
 data SOSConstraint c
@@ -256,6 +315,8 @@ data SOSConstraint c
 
 instance Functor SOSConstraint where
   fmap f c = c{ sosBody = map (id *** f) (sosBody c) }
+
+-- ---------------------------------------------------------------------------
 
 class Variables a where
   vars :: a -> Set Var
@@ -287,36 +348,7 @@ instance Variables (Constraint c) where
 instance Variables (SOSConstraint c) where
   vars SOSConstraint{ sosBody = xs } = Set.fromList (map fst xs)
 
--- | default bounds
-defaultBounds :: Num c => Bounds c
-defaultBounds = (defaultLB, defaultUB)
-
--- | default lower bound (0)
-defaultLB :: Num c => BoundExpr c
-defaultLB = Finite 0
-
--- | default upper bound (+∞)
-defaultUB :: BoundExpr c
-defaultUB = PosInf
-
--- | convert a string into a variable
-toVar :: String -> Var
-toVar = fromString
-
--- | convert a variable into a string
-fromVar :: Var -> String
-fromVar = T.unpack . unintern
-
--- | looking up bounds for a variable
-getVarType :: Problem c -> Var -> VarType
-getVarType mip v = Map.findWithDefault def v (varType mip)
-
--- | looking up bounds for a variable
-getBounds :: Num c => Problem c -> Var -> Bounds c
-getBounds mip v = Map.findWithDefault defaultBounds v (varBounds mip)
-
-intersectBounds :: Ord c => Bounds c -> Bounds c -> Bounds c
-intersectBounds (lb1,ub1) (lb2,ub2) = (max lb1 lb2, min ub1 ub2)
+-- ---------------------------------------------------------------------------
 
 variables :: Problem c -> Set Var
 variables mip = Map.keysSet $ varType mip
@@ -329,6 +361,8 @@ semiContinuousVariables mip = Map.keysSet $ Map.filter (SemiContinuousVariable =
 
 semiIntegerVariables :: Problem c -> Set Var
 semiIntegerVariables mip = Map.keysSet $ Map.filter (SemiIntegerVariable ==) (varType mip)
+
+-- ---------------------------------------------------------------------------
 
 data FileOptions
   = FileOptions
