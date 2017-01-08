@@ -274,6 +274,7 @@ Library
      ToySolver.Data.MIP.LPFile
      ToySolver.Data.MIP.MPSFile
      ToySolver.Data.MIP.Solution.Gurobi
+     ToySolver.Data.MIP.Solution.SCIP
      ToySolver.Data.OrdRel
      ToySolver.Data.Polynomial
      ToySolver.Data.Polynomial.Factorization.FiniteField
