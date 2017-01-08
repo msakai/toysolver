@@ -22,6 +22,9 @@ import Data.Default.Class
 import Data.List
 import Data.Maybe
 import Data.Ratio
+import Data.Scientific (Scientific)
+import qualified Data.Scientific as Scientific
+import Data.String
 import qualified Data.Version as V
 import qualified Data.Set as Set
 import Data.Map (Map)
@@ -468,17 +471,22 @@ main = do
 -- FIXME: 目的関数値を表示するように
 writeSOLFileMIP :: [Flag] -> Map MIP.Var Rational -> IO ()
 writeSOLFileMIP opt m = do
-  let m2 = Map.fromList [(MIP.fromVar v, fromRational val) | (v,val) <- Map.toList m]
-  writeSOLFileRaw opt m2
+  let sol = MIP.Solution
+            { MIP.solObjectiveValue = Nothing
+            , MIP.solVariables = Map.fromList [(v, Scientific.fromFloatDigits (fromRational val :: Double)) | (v,val) <- Map.toList m]
+            }
+  writeSOLFileRaw opt sol
 
 -- FIXME: 目的関数値を表示するように
 writeSOLFileSAT :: [Flag] -> SAT.Model -> IO ()
 writeSOLFileSAT opt m = do
-  let m2 = Map.fromList [("x" ++ show x, if b then 1 else 0) | (x,b) <- assocs m]
-  writeSOLFileRaw opt m2
+  let sol = MIP.Solution
+            { MIP.solObjectiveValue = Nothing
+            , MIP.solVariables = Map.fromList [(fromString ("x" ++ show x), if b then 1 else 0) | (x,b) <- assocs m]
+            }
+  writeSOLFileRaw opt sol
 
-writeSOLFileRaw :: [Flag] -> Map String Rational -> IO ()
-writeSOLFileRaw opt m = do
+writeSOLFileRaw :: [Flag] -> MIP.Solution Scientific -> IO ()
+writeSOLFileRaw opt sol = do
   forM_ [fname | WriteFile fname <- opt ] $ \fname -> do
-    let m2 = Map.map fromRational m
-    writeFile fname (GurobiSol.render m2 Nothing)
+    GurobiSol.writeFile fname sol

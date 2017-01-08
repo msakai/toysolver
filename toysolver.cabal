@@ -351,6 +351,7 @@ Executable toysolver
     filepath,
     OptDir,
     pseudo-boolean,
+    scientific,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
@@ -379,6 +380,7 @@ Executable toysat
     mwc-random,
     process >=1.1.0.2,
     pseudo-boolean,
+    scientific,
     temporary,
     time,
     toysolver,

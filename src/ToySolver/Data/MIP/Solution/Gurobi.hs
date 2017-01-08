@@ -1,18 +1,30 @@
+{-# LANGUAGE OverloadedStrings #-}
 module ToySolver.Data.MIP.Solution.Gurobi
-  ( Model
-  , render
+  ( render
+  , writeFile
   ) where
 
+import Prelude hiding (writeFile)
+import Data.Interned (unintern)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Ratio
+import Data.Monoid
+import Data.Scientific (Scientific)
+import qualified Data.Text.Lazy as TL
+import Data.Text.Lazy.Builder (Builder)
+import qualified Data.Text.Lazy.Builder as B
+import qualified Data.Text.Lazy.Builder.Scientific as B
+import qualified Data.Text.Lazy.IO as TLIO
+import qualified ToySolver.Data.MIP as MIP
 
-type Model = Map String Double
-
-render :: Model -> Maybe Double -> String
-render m obj = unlines $ ls1 ++ ls2
+render :: MIP.Solution Scientific -> TL.Text
+render (MIP.Solution obj vs) = B.toLazyText $ ls1 <> mconcat ls2
   where
     ls1 = case obj of
-            Nothing  -> []
-            Just val -> ["# Objective value = " ++ show val]
-    ls2 = [name ++ " " ++ show val | (name,val) <- Map.toList m]
+            Nothing  -> mempty
+            Just val -> "# Objective value = " <> B.scientificBuilder val <> B.singleton '\n'
+    ls2 = [B.fromText (unintern name) <> B.singleton ' ' <> B.scientificBuilder val <> B.singleton '\n' | (name,val) <- Map.toList vs]
+
+writeFile :: FilePath -> MIP.Solution Scientific -> IO ()
+writeFile fname sol = do
+  TLIO.writeFile fname (render sol)

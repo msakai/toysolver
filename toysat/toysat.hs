@@ -40,6 +40,7 @@ import Data.Ord
 import Data.Word
 import qualified Data.Vector.Unboxed as V
 import Data.Version
+import Data.Scientific as Scientific
 import Data.Time
 import System.IO
 import System.Environment
@@ -933,10 +934,11 @@ solveMIP opt solver mip = do
             case optWriteFile opt of
               Nothing -> return ()
               Just fname -> do
-                writeFile fname $
-                  GurobiSol.render
-                    (Map.fromList [(MIP.fromVar v, fromIntegral val) | (v,val) <- Map.toList m])
-                    (Just (fromRational val))
+                let sol = MIP.Solution
+                          { MIP.solObjectiveValue = Just $ Scientific.fromFloatDigits (fromRational val :: Double)
+                          , MIP.solVariables = Map.fromList [(v, fromIntegral val) | (v,val) <- Map.toList m]
+                          }
+                GurobiSol.writeFile fname sol
   
       pbo <- PBO.newOptimizer solver linObj
       setupOptimizer pbo opt
@@ -968,8 +970,11 @@ writeSOLFile opt m obj nbvar = do
   case optWriteFile opt of
     Nothing -> return ()
     Just fname -> do
-      let m2 = Map.fromList [("x" ++ show x, if b then 1 else 0) | (x,b) <- assocs m, x <= nbvar]
-      writeFile fname (GurobiSol.render (Map.map fromInteger m2) (fmap fromInteger obj))
+      let sol = MIP.Solution
+                { MIP.solObjectiveValue = fmap fromIntegral obj
+                , MIP.solVariables = Map.fromList [(MIP.toVar ("x" ++ show x), if b then 1.0 else 0.0) | (x,b) <- assocs m, x <= nbvar]
+                }
+      GurobiSol.writeFile fname sol
 
 durationSecs :: TimeSpec -> TimeSpec -> Double
 durationSecs start end = fromIntegral (toNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)
