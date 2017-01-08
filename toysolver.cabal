@@ -39,6 +39,7 @@ Extra-Source-Files:
    samples/gcnf/*.gcnf
    samples/gcnf/edn_20403_8.cnf_0.03000000.unsat.gcnf
    samples/lp/*.lp
+   samples/lp/*.sol
    samples/lp/error/*.lp
    samples/maxsat/*.cnf
    samples/maxsat/t3pm3-5555.spn.cnf
@@ -801,6 +802,7 @@ Test-suite TestSuite
     Test.Knapsack
     Test.LPFile
     Test.Misc
+    Test.MIP
     Test.MIPSolver2
     Test.MPSFile
     Test.QBF
