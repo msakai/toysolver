@@ -1,4 +1,4 @@
-module ToySolver.Text.GurobiSol
+module ToySolver.Data.MIP.Solution.Gurobi
   ( Model
   , render
   ) where

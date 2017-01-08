@@ -63,6 +63,7 @@ import qualified GHC.Stats as Stats
 import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
 import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.MIP2PB as MIP2PB
@@ -83,7 +84,6 @@ import ToySolver.SAT.Printer
 import qualified ToySolver.Text.CNF as CNF
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GCNF as GCNF
-import qualified ToySolver.Text.GurobiSol as GurobiSol
 import ToySolver.Version
 import ToySolver.Internal.Util (showRational, setEncodingChar8)
 

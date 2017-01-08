@@ -272,6 +272,7 @@ Library
      ToySolver.Data.MIP.Base
      ToySolver.Data.MIP.LPFile
      ToySolver.Data.MIP.MPSFile
+     ToySolver.Data.MIP.Solution.Gurobi
      ToySolver.Data.OrdRel
      ToySolver.Data.Polynomial
      ToySolver.Data.Polynomial.Factorization.FiniteField
@@ -313,7 +314,6 @@ Library
      ToySolver.SMT
      ToySolver.Text.CNF
      ToySolver.Text.GCNF
-     ToySolver.Text.GurobiSol
      ToySolver.Text.MaxSAT
      ToySolver.Text.QDimacs
      ToySolver.Text.SDPFile
