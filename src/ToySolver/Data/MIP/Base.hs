@@ -66,6 +66,9 @@ module ToySolver.Data.MIP.Base
   , SOSType (..)
   , SOSConstraint (..)
 
+  -- * Solutions
+  , Solution (..)
+
   -- * File I/O options
   , FileOptions (..)
 
@@ -315,6 +318,24 @@ data SOSConstraint c
 
 instance Functor SOSConstraint where
   fmap f c = c{ sosBody = map (id *** f) (sosBody c) }
+
+-- ---------------------------------------------------------------------------
+
+data Solution r
+  = Solution
+  { solObjectiveValue :: Maybe r
+  , solVariables :: Map Var r
+  }
+  deriving (Eq, Ord, Show)
+
+instance Functor Solution where
+  fmap f (Solution obj vs) = Solution (fmap f obj) (fmap f vs)
+
+instance Default (Solution r) where
+  def = Solution
+        { solObjectiveValue = Nothing
+        , solVariables = Map.empty
+        }
 
 -- ---------------------------------------------------------------------------
 
