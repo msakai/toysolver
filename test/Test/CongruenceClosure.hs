@@ -7,9 +7,7 @@ import Control.Monad.State
 import Data.Array
 import Data.Graph
 import qualified Data.Tree as Tree
-import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.Set (Set)
 import qualified Data.Set as Set
 
 import Test.Tasty
@@ -190,7 +188,7 @@ case_getModel_test1 = do
   a <- newConst solver
   b <- newConst solver
   c <- newConst solver
-  d <- newConst solver
+  _d <- newConst solver
   f <- newFun solver
   g <- newFun solver
   h <- newFun solver

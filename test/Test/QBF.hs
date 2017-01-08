@@ -1,22 +1,16 @@
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Test.QBF (qbfTestGroup) where
 
 import Control.Applicative((<$>))
-import Control.Exception (evaluate)
 import Control.Monad
-import Control.Monad.State.Strict
-import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
-import Test.Tasty.HUnit
 import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
@@ -26,8 +20,9 @@ import qualified ToySolver.QBF as QBF
 
 -- -------------------------------------------------------------------
 
+prop_solveCEGAR :: Property
 prop_solveCEGAR = QM.monadicIO $ do
-  (nv, prefix@((q,xs) : prefix'), matrix) <- QM.pick arbitrarySmallQBF
+  (nv, prefix@(_ : prefix'), matrix) <- QM.pick arbitrarySmallQBF
   (sat, cert) <- QM.run $ QBF.solveCEGAR nv prefix matrix
   QM.assert $ sat == evalQBFNaive prefix matrix
   case cert of
@@ -35,8 +30,9 @@ prop_solveCEGAR = QM.monadicIO $ do
     Just ls ->
       QM.assert $ sat == evalQBFNaive' (IntMap.fromList [(abs lit, lit > 0) | lit <- IntSet.toList ls]) prefix' matrix
 
+prop_solveCEGARIncremental :: Property
 prop_solveCEGARIncremental = QM.monadicIO $ do
-  (nv, prefix@((q,xs) : prefix'), matrix) <- QM.pick arbitrarySmallQBF
+  (nv, prefix@(_ : prefix'), matrix) <- QM.pick arbitrarySmallQBF
   (sat, cert) <- QM.run $ QBF.solveCEGARIncremental nv prefix matrix
   QM.assert $ sat == evalQBFNaive prefix matrix
   case cert of
@@ -50,6 +46,7 @@ If the innermost quantifier is a universal quantifier,
 we can remove the bound variable v from the clauses that
 do not contain v and ¬v simultaneously.
 -}
+prop_eliminate_last_universal_quantifier :: Property
 prop_eliminate_last_universal_quantifier = QM.monadicIO $ do
   (nv, prefix, matrix1) <- QM.pick gen
   let (QBF.A, xs) = last prefix

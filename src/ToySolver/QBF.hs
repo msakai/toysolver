@@ -33,7 +33,6 @@ module ToySolver.QBF
 
 import Control.Monad
 import Control.Monad.State.Strict
-import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
@@ -49,7 +48,6 @@ import ToySolver.SAT.Types (LitSet, VarSet, VarMap)
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
 import ToySolver.Text.QDimacs (Quantifier (..))
-import qualified ToySolver.Text.QDimacs as QDimacs
 
 -- ----------------------------------------------------------------------------
 

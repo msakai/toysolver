@@ -16,8 +16,6 @@ module ToySolver.Converter.PB2SAT (convert) where
 import Control.Monad
 import Control.Monad.ST
 import Data.Array.IArray
-import Data.Foldable (toList)
-import qualified Data.Sequence as Seq
 import qualified Data.PseudoBoolean as PBFile
 
 import qualified ToySolver.SAT.Types as SAT

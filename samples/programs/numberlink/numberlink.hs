@@ -100,7 +100,7 @@ parser = do
 type Encoded = (Array Cell (Array Number SAT.Var), Map Edge SAT.Var)
 
 encode :: SAT.AddPBLin m enc => enc -> Options -> Problem -> m Encoded
-encode enc opt prob@Problem{ probSize = (w,h,d), probLineNum = n, probLines = ls, probVias = vias } = do
+encode enc opt Problem{ probSize = (w,h,d), probLineNum = n, probLines = ls, probVias = vias } = do
   let bnd = ((0,0,1), (w-1,h-1,d))
       cells = range bnd
       edges = [(a,b) | a@(x,y,z) <- cells, b <- [(x+1,y,z),(x,y+1,z)], inRange bnd b]
@@ -279,7 +279,7 @@ decode prob (vs, evs) m = (solCells, solEdges)
           | otherwise = g (Set.unions [Map.findWithDefault Set.empty x adjacents Set.\\ visited | x <- Set.toList xs]) (Set.union xs visited)
 
 evalObj :: Options -> Problem -> Solution -> Integer
-evalObj opt prob@Problem{ probSize = (w,h,d) } (cells,edges) = obj1 + obj2
+evalObj opt Problem{ probSize = (w,h,d) } (cells,edges) = obj1 + obj2
   where
     (o1, o2) = fromJust (optOptimize opt)
     bnd = ((0,0,1),(w-1,h-1,d))
