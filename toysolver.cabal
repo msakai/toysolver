@@ -40,6 +40,7 @@ Extra-Source-Files:
    samples/gcnf/edn_20403_8.cnf_0.03000000.unsat.gcnf
    samples/lp/*.lp
    samples/lp/*.sol
+   samples/lp/*.txt
    samples/lp/error/*.lp
    samples/maxsat/*.cnf
    samples/maxsat/t3pm3-5555.spn.cnf
@@ -273,6 +274,7 @@ Library
      ToySolver.Data.MIP.Base
      ToySolver.Data.MIP.LPFile
      ToySolver.Data.MIP.MPSFile
+     ToySolver.Data.MIP.Solution.CBC
      ToySolver.Data.MIP.Solution.GLPK
      ToySolver.Data.MIP.Solution.Gurobi
      ToySolver.Data.MIP.Solution.SCIP

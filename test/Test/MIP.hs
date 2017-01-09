@@ -9,9 +9,41 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.TH
 import qualified ToySolver.Data.MIP as MIP
+import qualified ToySolver.Data.MIP.Solution.CBC as CBCSol
 import qualified ToySolver.Data.MIP.Solution.GLPK as GLPKSol
 import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
 import qualified ToySolver.Data.MIP.Solution.SCIP as SCIPSol
+
+case_CBCSol :: Assertion
+case_CBCSol = do
+  (status,sol) <- CBCSol.readFile "samples/lp/test-solution-cbc.txt"
+  status @?= "Optimal"
+  sol @?=
+    MIP.Solution
+    { MIP.solObjectiveValue = Just (-122.5)
+    , MIP.solVariables = Map.fromList [("x1", 40), ("x2", 10.5), ("x3", 19.5), ("x4", 3)]
+    }
+
+case_CBCSol_infeasible :: Assertion
+case_CBCSol_infeasible = do
+  (status,sol) <- CBCSol.readFile "samples/lp/test-solution-cbc-infeasible.txt"
+  status @?= "Integer infeasible"
+  sol @?=
+    MIP.Solution
+    { MIP.solObjectiveValue = Just 0.00000000
+    , MIP.solVariables = Map.fromList [("x", 0.11111111), ("y", 0), ("z", 0.33333333)]
+    }
+
+case_CBCSol_unbounded :: Assertion
+case_CBCSol_unbounded = do
+  (status,sol) <- CBCSol.readFile "samples/lp/test-solution-cbc-unbounded.txt"
+  status @?= "Unbounded"
+  sol @?=
+    MIP.Solution
+    { MIP.solObjectiveValue = Just 0.00000000
+    , MIP.solVariables = Map.fromList [("x", 0), ("y", 0)]
+    }
+
 
 case_GLPKSol :: Assertion
 case_GLPKSol = do
