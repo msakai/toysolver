@@ -273,6 +273,7 @@ Library
      ToySolver.Data.MIP.Base
      ToySolver.Data.MIP.LPFile
      ToySolver.Data.MIP.MPSFile
+     ToySolver.Data.MIP.Solution.GLPK
      ToySolver.Data.MIP.Solution.Gurobi
      ToySolver.Data.MIP.Solution.SCIP
      ToySolver.Data.OrdRel
