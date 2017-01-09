@@ -472,7 +472,8 @@ main = do
 writeSOLFileMIP :: [Flag] -> Map MIP.Var Rational -> IO ()
 writeSOLFileMIP opt m = do
   let sol = MIP.Solution
-            { MIP.solObjectiveValue = Nothing
+            { MIP.solStatus = Nothing
+            , MIP.solObjectiveValue = Nothing
             , MIP.solVariables = Map.fromList [(v, Scientific.fromFloatDigits (fromRational val :: Double)) | (v,val) <- Map.toList m]
             }
   writeSOLFileRaw opt sol
@@ -481,7 +482,8 @@ writeSOLFileMIP opt m = do
 writeSOLFileSAT :: [Flag] -> SAT.Model -> IO ()
 writeSOLFileSAT opt m = do
   let sol = MIP.Solution
-            { MIP.solObjectiveValue = Nothing
+            { MIP.solStatus = Nothing
+            , MIP.solObjectiveValue = Nothing
             , MIP.solVariables = Map.fromList [(fromString ("x" ++ show x), if b then 1 else 0) | (x,b) <- assocs m]
             }
   writeSOLFileRaw opt sol

@@ -10,6 +10,7 @@ module ToySolver.Data.MIP.Solution.Gurobi
 
 import Prelude hiding (readFile, writeFile)
 import Control.Applicative
+import Data.Default.Class
 import Data.Interned (intern, unintern)
 import Data.List (foldl')
 import qualified Data.Map as Map
@@ -23,12 +24,14 @@ import ToySolver.Data.MIP (Solution)
 import qualified ToySolver.Data.MIP as MIP
 
 render :: MIP.Solution Scientific -> TL.Text
-render (MIP.Solution obj vs) = B.toLazyText $ ls1 <> mconcat ls2
+render sol = B.toLazyText $ ls1 <> mconcat ls2
   where
-    ls1 = case obj of
+    ls1 = case MIP.solObjectiveValue sol of
             Nothing  -> mempty
             Just val -> "# Objective value = " <> B.scientificBuilder val <> B.singleton '\n'
-    ls2 = [B.fromText (unintern name) <> B.singleton ' ' <> B.scientificBuilder val <> B.singleton '\n' | (name,val) <- Map.toList vs]
+    ls2 = [ B.fromText (unintern name) <> B.singleton ' ' <> B.scientificBuilder val <> B.singleton '\n'
+          | (name,val) <- Map.toList (MIP.solVariables sol)
+          ]
 
 writeFile :: FilePath -> MIP.Solution Scientific -> IO ()
 writeFile fname sol = do
@@ -37,7 +40,7 @@ writeFile fname sol = do
 parse :: TL.Text -> MIP.Solution Scientific
 parse t = 
   case foldl' f (Nothing,[]) $ TL.lines t of
-    (obj, vs) ->  MIP.Solution{ MIP.solObjectiveValue = obj, MIP.solVariables = Map.fromList vs }
+    (obj, vs) ->  def{ MIP.solObjectiveValue = obj, MIP.solVariables = Map.fromList vs }
   where
     f :: (Maybe Scientific, [(MIP.Var, Scientific)]) -> TL.Text -> (Maybe Scientific, [(MIP.Var, Scientific)])
     f (obj,vs) l

@@ -18,16 +18,16 @@ import qualified Data.Text.Lazy.IO as TLIO
 import ToySolver.Data.MIP (Solution)
 import qualified ToySolver.Data.MIP as MIP
 
-parse :: TL.Text -> (T.Text, MIP.Solution Scientific)
+parse :: TL.Text -> MIP.Solution Scientific
 parse t = parse' $ TL.lines t
 
-parse' :: [TL.Text] -> (T.Text, MIP.Solution Scientific)
+parse' :: [TL.Text] -> MIP.Solution Scientific
 parse' ls =
   case parseHeaders ls of
     (headers, ls2) ->
       case parseColumns (skipRows ls2) of
         (vs, _) ->
-          let status = headers Map.! "Status"
+          let status = Map.lookup (headers Map.! "Status") statusTable
               objstr = headers Map.! "Objective"
               objstr2 = 
                 case T.findIndex ('='==) objstr of
@@ -36,7 +36,11 @@ parse' ls =
               obj = case reads (T.unpack objstr2) of
                       [] -> error "parse error"
                       (r,_):_ -> r
-          in (status, MIP.Solution{ MIP.solObjectiveValue = Just obj, MIP.solVariables = vs })
+          in MIP.Solution
+             { MIP.solStatus = status
+             , MIP.solObjectiveValue = Just obj
+             , MIP.solVariables = vs
+             }
 
 parseHeaders :: [TL.Text] -> (Map T.Text T.Text, [TL.Text])
 parseHeaders = f Map.empty
@@ -75,5 +79,12 @@ parseColumns (l1:l2:ls)
             _ -> error "parse error"
 parseColumns _ = error "parse error"
 
-readFile :: FilePath -> IO (T.Text, MIP.Solution Scientific)
+statusTable :: Map T.Text MIP.Status
+statusTable = Map.fromList
+  [ ("INTEGER OPTIMAL", MIP.StatusOptimal)
+  , ("INTEGER NON-OPTIMAL", MIP.StatusInterrupted)
+  , ("INTEGER EMPTY", MIP.StatusInfeasible)
+  ]
+
+readFile :: FilePath -> IO (MIP.Solution Scientific)
 readFile fname = parse <$> TLIO.readFile fname
