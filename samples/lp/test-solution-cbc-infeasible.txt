@@ -1,0 +1,4 @@
+Integer infeasible - objective value 0.00000000
+      0 x             0.11111111                       0
+      1 y                      0                       0
+      2 z             0.33333333                       0

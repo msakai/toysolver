@@ -66,6 +66,10 @@ module ToySolver.Data.MIP.Base
   , SOSType (..)
   , SOSConstraint (..)
 
+  -- * Solutions
+  , Solution (..)
+  , Status (..)
+
   -- * File I/O options
   , FileOptions (..)
 
@@ -315,6 +319,34 @@ data SOSConstraint c
 
 instance Functor SOSConstraint where
   fmap f c = c{ sosBody = map (id *** f) (sosBody c) }
+
+-- ---------------------------------------------------------------------------
+
+data Status
+  = StatusOptimal
+  | StatusUnbounded
+  | StatusInfeasible
+  | StatusInfeasibleOrUnbounded
+  | StatusInterrupted
+  deriving (Eq, Ord, Show)
+
+data Solution r
+  = Solution
+  { solStatus :: Maybe Status
+  , solObjectiveValue :: Maybe r
+  , solVariables :: Map Var r
+  }
+  deriving (Eq, Ord, Show)
+
+instance Functor Solution where
+  fmap f (Solution status obj vs) = Solution status (fmap f obj) (fmap f vs)
+
+instance Default (Solution r) where
+  def = Solution
+        { solStatus = Nothing
+        , solObjectiveValue = Nothing
+        , solVariables = Map.empty
+        }
 
 -- ---------------------------------------------------------------------------
 

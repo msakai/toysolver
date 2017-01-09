@@ -39,6 +39,8 @@ Extra-Source-Files:
    samples/gcnf/*.gcnf
    samples/gcnf/edn_20403_8.cnf_0.03000000.unsat.gcnf
    samples/lp/*.lp
+   samples/lp/*.sol
+   samples/lp/*.txt
    samples/lp/error/*.lp
    samples/maxsat/*.cnf
    samples/maxsat/t3pm3-5555.spn.cnf
@@ -272,6 +274,10 @@ Library
      ToySolver.Data.MIP.Base
      ToySolver.Data.MIP.LPFile
      ToySolver.Data.MIP.MPSFile
+     ToySolver.Data.MIP.Solution.CBC
+     ToySolver.Data.MIP.Solution.GLPK
+     ToySolver.Data.MIP.Solution.Gurobi
+     ToySolver.Data.MIP.Solution.SCIP
      ToySolver.Data.OrdRel
      ToySolver.Data.Polynomial
      ToySolver.Data.Polynomial.Factorization.FiniteField
@@ -313,7 +319,6 @@ Library
      ToySolver.SMT
      ToySolver.Text.CNF
      ToySolver.Text.GCNF
-     ToySolver.Text.GurobiSol
      ToySolver.Text.MaxSAT
      ToySolver.Text.QDimacs
      ToySolver.Text.SDPFile
@@ -351,6 +356,7 @@ Executable toysolver
     filepath,
     OptDir,
     pseudo-boolean,
+    scientific,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP
@@ -379,6 +385,7 @@ Executable toysat
     mwc-random,
     process >=1.1.0.2,
     pseudo-boolean,
+    scientific,
     temporary,
     time,
     toysolver,
@@ -799,6 +806,7 @@ Test-suite TestSuite
     Test.Knapsack
     Test.LPFile
     Test.Misc
+    Test.MIP
     Test.MIPSolver2
     Test.MPSFile
     Test.QBF
