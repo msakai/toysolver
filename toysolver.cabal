@@ -278,6 +278,12 @@ Library
      ToySolver.Data.MIP.Solution.GLPK
      ToySolver.Data.MIP.Solution.Gurobi
      ToySolver.Data.MIP.Solution.SCIP
+     ToySolver.Data.MIP.Solver
+     ToySolver.Data.MIP.Solver.Base
+     ToySolver.Data.MIP.Solver.CBC
+     ToySolver.Data.MIP.Solver.Glpsol
+     ToySolver.Data.MIP.Solver.GurobiCl
+     ToySolver.Data.MIP.Solver.SCIP
      ToySolver.Data.OrdRel
      ToySolver.Data.Polynomial
      ToySolver.Data.Polynomial.Factorization.FiniteField
