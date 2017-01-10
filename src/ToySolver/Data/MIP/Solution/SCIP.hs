@@ -31,23 +31,31 @@ parse' (t1:t2:ts) = do
     case TL.stripPrefix "solution status:" t1 of
       Nothing -> throwError "first line must start with \"solution status:\""
       Just s -> return $ Map.lookup (TL.toStrict $ TL.strip s) statusTable
-  obj <-
-    case TL.stripPrefix "objective value:" t2 of
-      Nothing -> throwError "second line must start with \"objective value:\""
-      Just s -> return $ read $ TL.unpack $ TL.strip s
-  let f :: [(MIP.Var, Scientific)] -> TL.Text -> Either String [(MIP.Var, Scientific)]
-      f vs t =
-        case TL.words t of
-          (w1:w2:_) -> return $ (intern (TL.toStrict w1), read (TL.unpack w2)) : vs
-          [] -> return $ vs
-          _ -> throwError ("ToySolver.Data.MIP.Solution.SCIP: invalid line " ++ show t)
-  vs <- foldM f [] ts
-  return $
-    MIP.Solution
-    { MIP.solStatus = status
-    , MIP.solObjectiveValue = Just obj
-    , MIP.solVariables = Map.fromList vs
-    }
+  if t2 == "no solution available" then do
+    return $ 
+      MIP.Solution
+      { MIP.solStatus = status
+      , MIP.solObjectiveValue = Nothing
+      , MIP.solVariables = Map.empty
+      }
+  else do
+    obj <-
+      case TL.stripPrefix "objective value:" t2 of
+        Nothing -> throwError "second line must start with \"objective value:\""
+        Just s -> return $ read $ TL.unpack $ TL.strip s
+    let f :: [(MIP.Var, Scientific)] -> TL.Text -> Either String [(MIP.Var, Scientific)]
+        f vs t =
+          case TL.words t of
+            (w1:w2:_) -> return $ (intern (TL.toStrict w1), read (TL.unpack w2)) : vs
+            [] -> return $ vs
+            _ -> throwError ("ToySolver.Data.MIP.Solution.SCIP: invalid line " ++ show t)
+    vs <- foldM f [] ts
+    return $
+      MIP.Solution
+      { MIP.solStatus = status
+      , MIP.solObjectiveValue = Just obj
+      , MIP.solVariables = Map.fromList vs
+      }
 parse' _ = throwError "must have >=2 lines"
 
 statusTable :: Map T.Text MIP.Status
