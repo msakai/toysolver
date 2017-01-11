@@ -14,6 +14,7 @@
 
 module Main where
 
+import Control.Applicative
 import qualified Data.ByteString.Builder as ByteStringBuilder
 import Data.Char
 import Data.Default.Class
@@ -146,16 +147,8 @@ readProblem o fname = do
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
         Right gcnf -> return $ ProbWBO $ MaxSAT2WBO.convert $ GCNF2MaxSAT.convert gcnf
-    ".lp"   -> do
-      ret <- MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
-      case ret of
-        Left err -> hPrint stderr err >> exitFailure
-        Right mip -> return $ ProbMIP mip
-    ".mps"  -> do
-      ret <- MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
-      case ret of
-        Left err -> hPrint stderr err >> exitFailure
-        Right mip -> return $ ProbMIP mip
+    ".lp"   -> ProbMIP <$> MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
+    ".mps"  -> ProbMIP <$> MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
     ext ->
       error $ "unknown file extension: " ++ show ext
   where    

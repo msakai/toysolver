@@ -36,6 +36,7 @@ module ToySolver.Data.MIP.MPSFile
   ) where
 
 import Control.Applicative ((<$>), (<*))
+import Control.Exception (throw)
 import Control.Monad
 import Control.Monad.Writer
 import Data.Default.Class
@@ -98,17 +99,20 @@ parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseEr
 parseString _ = parse (parser <* eof)
 
 -- | Parse a file containing MPS file data.
-#if MIN_VERSION_megaparsec(5,0,0)
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (MIP.Problem Scientific))
-#else
-parseFile :: MIP.FileOptions -> FilePath -> IO (Either ParseError (MIP.Problem Scientific))
-#endif
+parseFile :: MIP.FileOptions -> FilePath -> IO (MIP.Problem Scientific)
 parseFile opt fname = do
   h <- openFile fname ReadMode
   case MIP.optFileEncoding opt of
     Nothing -> return ()
     Just enc -> hSetEncoding h enc
-  parse (parser <* eof) fname <$> TLIO.hGetContents h
+  ret <- parse (parser <* eof) fname <$> TLIO.hGetContents h
+  case ret of
+#if MIN_VERSION_megaparsec(5,0,0)
+    Left e -> throw (e :: ParseError Char Dec)
+#else
+    Left e -> throw (e :: ParseError)
+#endif
+    Right a -> return a
 
 -- ---------------------------------------------------------------------------
 

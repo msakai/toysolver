@@ -25,9 +25,11 @@ module ToySolver.Data.MIP
   , writeMPSFile
   , toLPString
   , toMPSString
+  , ParseError (..)
   ) where
 
 import Prelude hiding (readFile, writeFile)
+import Control.Exception
 import Data.Char
 import Data.Scientific (Scientific)
 import qualified Data.Text.Lazy as TL
@@ -41,11 +43,7 @@ import qualified ToySolver.Data.MIP.LPFile as LPFile
 import qualified ToySolver.Data.MIP.MPSFile as MPSFile
 
 -- | Parse .lp or .mps file based on file extension
-#if MIN_VERSION_megaparsec(5,0,0)
-readFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Scientific))
-#else
-readFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Scientific))
-#endif
+readFile :: FileOptions -> FilePath -> IO (Problem Scientific)
 readFile opt fname =
   case map toLower (takeExtension fname) of
     ".lp"  -> readLPFile opt fname
@@ -53,19 +51,11 @@ readFile opt fname =
     ext -> ioError $ userError $ "unknown extension: " ++ ext
 
 -- | Parse a file containing LP file data.
-#if MIN_VERSION_megaparsec(5,0,0)
-readLPFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Scientific))
-#else
-readLPFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Scientific))
-#endif
+readLPFile :: FileOptions -> FilePath -> IO (Problem Scientific)
 readLPFile = LPFile.parseFile
 
 -- | Parse a file containing MPS file data.
-#if MIN_VERSION_megaparsec(5,0,0)
-readMPSFile :: FileOptions -> FilePath -> IO (Either (ParseError Char Dec) (Problem Scientific))
-#else
-readMPSFile :: FileOptions -> FilePath -> IO (Either ParseError (Problem Scientific))
-#endif
+readMPSFile :: FileOptions -> FilePath -> IO (Problem Scientific)
 readMPSFile = MPSFile.parseFile
 
 -- | Parse a string containing LP file data.

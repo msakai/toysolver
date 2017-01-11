@@ -458,10 +458,7 @@ main = do
                 writeSOLFileSAT o m2
         ModeMIP -> do
           enc <- T.mapM mkTextEncoding $ last $ Nothing : [Just s | FileEncoding s <- o]
-          ret <- MIP.readFile def{ MIP.optFileEncoding = enc } fname
-          mip <- case ret of
-                  Right mip -> return mip
-                  Left err -> hPrint stderr err >> exitFailure
+          mip <- MIP.readFile def{ MIP.optFileEncoding = enc } fname
           run (getSolver o) o (fmap toRational mip) $ \m -> do
             mipPrintModel stdout (PrintRational `elem` o) m
             writeSOLFileMIP o m
