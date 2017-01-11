@@ -935,7 +935,8 @@ solveMIP opt solver mip = do
               Nothing -> return ()
               Just fname -> do
                 let sol = MIP.Solution
-                          { MIP.solObjectiveValue = Just $ Scientific.fromFloatDigits (fromRational val :: Double)
+                          { MIP.solStatus = Nothing
+                          , MIP.solObjectiveValue = Just $ Scientific.fromFloatDigits (fromRational val :: Double)
                           , MIP.solVariables = Map.fromList [(v, fromIntegral val) | (v,val) <- Map.toList m]
                           }
                 GurobiSol.writeFile fname sol
@@ -971,7 +972,8 @@ writeSOLFile opt m obj nbvar = do
     Nothing -> return ()
     Just fname -> do
       let sol = MIP.Solution
-                { MIP.solObjectiveValue = fmap fromIntegral obj
+                { MIP.solStatus = Nothing
+                , MIP.solObjectiveValue = fmap fromIntegral obj
                 , MIP.solVariables = Map.fromList [(MIP.toVar ("x" ++ show x), if b then 1.0 else 0.0) | (x,b) <- assocs m, x <= nbvar]
                 }
       GurobiSol.writeFile fname sol
