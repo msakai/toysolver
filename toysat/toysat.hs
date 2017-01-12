@@ -899,10 +899,7 @@ mainMIP opt solver args = do
                 exitFailure
       [fname] -> do
         enc <- T.mapM mkTextEncoding (optFileEncoding opt)
-        ret <- MIP.readFile def{ MIP.optFileEncoding = enc } fname
-        case ret of
-          Left err -> hPrint stderr err >> exitFailure
-          Right mip -> return mip
+        MIP.readFile def{ MIP.optFileEncoding = enc } fname
       _ -> showHelp stderr >> exitFailure
   solveMIP opt solver (fmap toRational mip)
 

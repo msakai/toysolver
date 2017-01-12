@@ -33,7 +33,6 @@ import qualified Data.Text.Lazy.IO as TLIO
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as B
 import qualified Data.Text.Lazy.Builder.Int as B
-import System.IO
 import Text.Printf
 
 import qualified ToySolver.Data.MIP as MIP
@@ -401,10 +400,8 @@ isInt mip v = vt == MIP.IntegerVariable || vt == MIP.SemiIntegerVariable
 
 testFile :: FilePath -> IO ()
 testFile fname = do
-  result <- MIP.readLPFile def fname
-  case result of
-    Right mip -> TLIO.putStrLn $ B.toLazyText $ convert def (fmap toRational mip)
-    Left err -> hPrint stderr err
+  mip <- MIP.readLPFile def fname
+  TLIO.putStrLn $ B.toLazyText $ convert def (fmap toRational mip)
 
 test :: IO ()
 test = TLIO.putStrLn $ B.toLazyText $ convert def testdata

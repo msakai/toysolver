@@ -43,13 +43,10 @@ testdata = unlines
 
 checkFile :: FilePath -> Assertion
 checkFile fname = do
-  r <- parseFile def fname
-  case r of
-    Left err -> assertFailure $ show err
-    Right lp ->
-      case render def lp of
-        Left err -> assertFailure ("render failure: " ++ err)
-        Right _ -> return ()
+  lp <- parseFile def fname
+  case render def lp of
+    Left err -> assertFailure ("render failure: " ++ err)
+    Right _ -> return ()
 
 checkString :: String -> String -> Assertion
 checkString name str = do
