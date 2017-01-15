@@ -46,7 +46,7 @@ parse t =
     f (obj,vs) l
       | Just l2 <- TL.stripPrefix "# " l
       , Just l3 <- TL.stripPrefix "objective value = " (TL.toLower l2)
-      , ((r,_):_) <- reads (TL.unpack l3) =
+      , (r:_) <- [r | (r,[]) <- reads (TL.unpack l3)] =
           (Just r, vs)
       | otherwise =
           case TL.words (TL.takeWhile (/= '#') l) of
