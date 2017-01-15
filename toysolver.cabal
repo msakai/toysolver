@@ -165,7 +165,8 @@ Library
      transformers-compat >=0.3,
      unordered-containers >=0.2.3 && <0.3.0,
      vector,
-     vector-space >=0.8.6
+     vector-space >=0.8.6,
+     xml-conduit
   if flag(OpenCL)
      Build-Depends: OpenCL >=1.0.3.4
      Exposed-Modules: ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL
@@ -275,6 +276,7 @@ Library
      ToySolver.Data.MIP.LPFile
      ToySolver.Data.MIP.MPSFile
      ToySolver.Data.MIP.Solution.CBC
+     ToySolver.Data.MIP.Solution.CPLEX
      ToySolver.Data.MIP.Solution.GLPK
      ToySolver.Data.MIP.Solution.Gurobi
      ToySolver.Data.MIP.Solution.SCIP

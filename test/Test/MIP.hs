@@ -10,6 +10,7 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Data.MIP.Solution.CBC as CBCSol
+import qualified ToySolver.Data.MIP.Solution.CPLEX as CPLEXSol
 import qualified ToySolver.Data.MIP.Solution.GLPK as GLPKSol
 import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
 import qualified ToySolver.Data.MIP.Solution.SCIP as SCIPSol
@@ -44,6 +45,25 @@ case_CBCSol_unbounded = do
     , MIP.solVariables = Map.fromList [("x", 0), ("y", 0)]
     }
 
+case_CPLEXSol :: Assertion
+case_CPLEXSol = do
+  sol <- CPLEXSol.readFile "samples/lp/test-solution-cplex.sol"
+  sol @?=
+    MIP.Solution
+    { MIP.solStatus = Just MIP.StatusOptimal
+    , MIP.solObjectiveValue = Just 122.5
+    , MIP.solVariables = Map.fromList [("x1", 40), ("x2", 10.5), ("x3", 19.5), ("x4", 3)]
+    }
+
+case_CPLEXSol_unbounded :: Assertion
+case_CPLEXSol_unbounded = do
+  sol <- CPLEXSol.readFile "samples/lp/test-solution-cplex-unbounded.sol"
+  sol @?=
+    MIP.Solution
+    { MIP.solStatus = Just MIP.StatusUnbounded
+    , MIP.solObjectiveValue = Just 3.0
+    , MIP.solVariables = Map.fromList [("x", 1.0), ("y", 2.0)]
+    }
 
 case_GLPKSol :: Assertion
 case_GLPKSol = do
