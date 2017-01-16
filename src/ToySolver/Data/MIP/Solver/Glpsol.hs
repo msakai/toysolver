@@ -40,13 +40,20 @@ instance IsSolver Glpsol IO where
           withSystemTempFile "glpsol.sol" $ \fname2 h2 -> do
             hClose h2
             isUnboundedRef <- newIORef False
+            isInfeasibleRef <- newIORef False
             let args = ["--lp", fname1, "-o", fname2] ++
                        (case solveTimeLimit opt of
                           Nothing -> []
                           Just sec -> ["--tmlim", show (max 1 (floor sec) :: Int)])
                 onGetLine s = do
-                  when (s == "LP HAS UNBOUNDED PRIMAL SOLUTION") $ do
-                    writeIORef isUnboundedRef True
+                  case s of
+                    "LP HAS UNBOUNDED PRIMAL SOLUTION" ->
+                      writeIORef isUnboundedRef True
+                    "PROBLEM HAS UNBOUNDED SOLUTION" ->
+                      writeIORef isUnboundedRef True
+                    "PROBLEM HAS NO PRIMAL FEASIBLE SOLUTION" ->
+                      writeIORef isInfeasibleRef True
+                    _ -> return ()
                   putStrLn s
                 onGetErrorLine s = putStrLn $ "err: " ++ s
             exitcode <- runProcessWithOutputCallback (glpsolPath solver) args "" onGetLine onGetErrorLine
@@ -55,7 +62,10 @@ instance IsSolver Glpsol IO where
               ExitSuccess -> do
                 sol <- GLPKSol.readFile fname2
                 isUnbounded <- readIORef isUnboundedRef
+                isInfeasible <- readIORef isInfeasibleRef
                 if isUnbounded && MIP.solStatus sol == Nothing then
                   return $ sol{ MIP.solStatus = Just MIP.StatusInfeasibleOrUnbounded }
+                else if isInfeasible && MIP.solStatus sol == Nothing then
+                  return $ sol{ MIP.solStatus = Just MIP.StatusInfeasible }
                 else
                   return sol
