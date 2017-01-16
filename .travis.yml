@@ -14,13 +14,13 @@ matrix:
   include:
     - env: CABALVER=1.18 GHCVER=7.8.4 COVERAGE=1
       compiler: ": #GHC 7.8.4"
-      addons: {apt: {packages: [libtinfo-dev,cabal-install-1.18,ghc-7.8.4,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
+      addons: {apt: {packages: [libtinfo-dev,coinor-libcbc0,glpk,lp-solve,cabal-install-1.18,ghc-7.8.4,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
     - env: CABALVER=1.22 GHCVER=7.10.3
       compiler: ": #GHC 7.10.3"
-      addons: {apt: {packages: [libtinfo-dev,cabal-install-1.22,ghc-7.10.3,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
+      addons: {apt: {packages: [libtinfo-dev,coinor-libcbc0,glpk,lp-solve,cabal-install-1.22,ghc-7.10.3,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
     - env: CABALVER=1.24 GHCVER=8.0.1
       compiler: ": #GHC 8.0.1"
-      addons: {apt: {packages: [libtinfo-dev,cabal-install-1.24,ghc-8.0.1,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
+      addons: {apt: {packages: [libtinfo-dev,coinor-libcbc0,glpk,lp-solve,cabal-install-1.24,ghc-8.0.1,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
 
 before_install:
  - unset CC
@@ -66,7 +66,7 @@ install:
 # any command which exits with a non-zero exit code causes the build to fail.
 script:
  - if [ -f configure.ac ]; then autoreconf -i; fi
- - cabal configure --enable-tests --enable-benchmarks -v2 --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms $([ "$COVERAGE" = "1" ] && echo "--enable-library-coverage") # -v2 provides useful information for debugging
+ - cabal configure --enable-tests --enable-benchmarks -v2 --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms --flag=TestCBC --flag=TestGlpsol --flag=TestLPSolve $([ "$COVERAGE" = "1" ] && echo "--enable-library-coverage") # -v2 provides useful information for debugging
  - cabal build   # this builds all libraries and executables (including tests/benchmarks)
  - cabal test
  - cabal check

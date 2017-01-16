@@ -114,6 +114,36 @@ Flag OpenCL
   Manual: True
   Default: False
 
+Flag TestCBC
+  Description: run test cases that depends on cbc command
+  Manual: True
+  Default: False
+
+Flag TestCPLEX
+  Description: run test cases that depends on cplex command
+  Manual: True
+  Default: False
+
+Flag TestGlpsol
+  Description: run test cases that depends on glpsol command
+  Manual: True
+  Default: False
+
+Flag TestGurobiCl
+  Description: run test cases that depends on gurobi_cl command
+  Manual: True
+  Default: False
+
+Flag TestLPSolve
+  Description: run test cases that depends on lp_solve command
+  Manual: True
+  Default: False
+
+Flag TestSCIP
+  Description: run test cases that depends on scip command
+  Manual: True
+  Default: False
+
 source-repository head
   type:     git
   location: git://github.com/msakai/toysolver.git
@@ -817,6 +847,7 @@ Test-suite TestSuite
     Test.LPFile
     Test.Misc
     Test.MIP
+    Test.MIPSolver
     Test.MIPSolver2
     Test.MPSFile
     Test.QBF
@@ -863,6 +894,18 @@ Test-suite TestSuite
     vector-space
   Default-Language: Haskell2010
   Other-Extensions: TemplateHaskell, ScopedTypeVariables
+  if flag(TestCBC)
+    CPP-Options: "-DTEST_CBC"
+  if flag(TestCPLEX)
+    CPP-Options: "-DTEST_CPLEX"
+  if flag(TestGlpsol)
+    CPP-Options: "-DTEST_GLPSOL"
+  if flag(TestGurobiCl)
+    CPP-Options: "-DTEST_GUROBI_CL"
+  if flag(TestLPSolve)
+    CPP-Options: "-DTEST_LP_SOLVE"
+  if flag(TestSCIP)
+    CPP-Options: "-DTEST_SCIP"
 
 Benchmark BenchmarkSATLIB
   type:             exitcode-stdio-1.0

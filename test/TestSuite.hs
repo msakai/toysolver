@@ -15,6 +15,7 @@ import Test.HittingSets
 import Test.Knapsack
 import Test.LPFile
 import Test.MIP
+import Test.MIPSolver
 import Test.MIPSolver2
 import Test.MPSFile
 import Test.SDPFile
@@ -45,6 +46,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , lpTestGroup
   , miscTestGroup
   , mipTestGroup
+  , mipSolverTestGroup
   , mipSolver2TestGroup
   , mpsTestGroup
   , qbfTestGroup
