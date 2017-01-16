@@ -54,8 +54,8 @@ instance IsSolver Glpsol IO where
                     "PROBLEM HAS NO PRIMAL FEASIBLE SOLUTION" ->
                       writeIORef isInfeasibleRef True
                     _ -> return ()
-                  putStrLn s
-                onGetErrorLine s = putStrLn $ "err: " ++ s
+                  solveLogger opt s
+                onGetErrorLine = solveErrorLogger opt
             exitcode <- runProcessWithOutputCallback (glpsolPath solver) args "" onGetLine onGetErrorLine
             case exitcode of
               ExitFailure n -> ioError $ userError $ "exit with " ++ show n

@@ -52,8 +52,8 @@ instance IsSolver GurobiCl IO where
                     "Model is infeasible" -> writeIORef statusRef (Just MIP.StatusInfeasible)
                     _ | isPrefixOf "Optimal solution found" s -> writeIORef statusRef (Just MIP.StatusOptimal)
                     _ -> return ()
-                  putStrLn s
-                onGetErrorLine s = putStrLn $ "err: " ++ s
+                  solveLogger opt s
+                onGetErrorLine = solveErrorLogger opt
             exitcode <- runProcessWithOutputCallback (gurobiClPath solver) args "" onGetLine onGetErrorLine
             case exitcode of
               ExitFailure n -> ioError $ userError $ "exit with " ++ show n

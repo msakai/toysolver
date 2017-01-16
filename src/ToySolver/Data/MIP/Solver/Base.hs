@@ -14,12 +14,18 @@ data SolveOptions
   = SolveOptions
   { solveTimeLimit :: Maybe Double
     -- ^ time limit in seconds
+  , solveLogger :: String -> IO ()
+    -- ^ invoked when a solver output a line
+  , solveErrorLogger :: String -> IO ()
+    -- ^ invoked when a solver output a line to stderr
   }
 
 instance Default SolveOptions where
   def =
     SolveOptions
     { solveTimeLimit = Nothing
+    , solveLogger = const $ return ()
+    , solveErrorLogger = const $ return ()
     }
 
 class Monad m => IsSolver s m | s -> m where

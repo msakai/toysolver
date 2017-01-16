@@ -54,8 +54,8 @@ instance IsSolver CPLEX IO where
                 onGetLine s = do
                   when (s == "MIP - Integer infeasible.") $ do
                     writeIORef isInfeasibleRef True
-                  putStrLn s
-                onGetErrorLine s = putStrLn $ "err: " ++ s
+                  solveLogger opt s
+                onGetErrorLine = solveErrorLogger opt
             exitcode <- runProcessWithOutputCallback (cplexPath solver) args input onGetLine onGetErrorLine
             case exitcode of
               ExitFailure n -> ioError $ userError $ "exit with " ++ show n

@@ -44,8 +44,8 @@ instance IsSolver SCIP IO where
                        , "-c", "write solution " ++ show fname2
                        , "-c", "quit"
                        ]
-                onGetLine s = putStrLn s
-                onGetErrorLine s = putStrLn $ "err: " ++ s
+                onGetLine = solveLogger opt
+                onGetErrorLine = solveErrorLogger opt
             exitcode <- runProcessWithOutputCallback (scipPath solver) args "" onGetLine onGetErrorLine
             case exitcode of
               ExitFailure n -> ioError $ userError $ "exit with " ++ show n

@@ -58,8 +58,8 @@ instance IsSolver LPSolve IO where
                         [var,val] -> modifyIORef solRef ((fromString var, read val) :)
                         _ -> return ()
                     return ()
-                putStrLn s
-              onGetErrorLine s = putStrLn $ "err: " ++ s
+                solveLogger opt s
+              onGetErrorLine = solveErrorLogger opt
           exitcode <- runProcessWithOutputCallback (lpSolvePath solver) args "" onGetLine onGetErrorLine
           status <-
             case exitcode of
