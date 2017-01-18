@@ -36,11 +36,11 @@ parse' (l1:ls) = do
             let s1' = TL.toStrict (TL.strip s1)
             return
               ( case Map.lookup s1' statusTable of
-                  Just st -> Just st
+                  Just st -> st
                   Nothing ->
                     if T.isPrefixOf "Stopped on " s1'
-                    then Just MIP.StatusInterrupted
-                    else Nothing
+                    then MIP.StatusUnknown
+                    else MIP.StatusUnknown
               , read (TL.unpack s3)
               )
   let f :: [(MIP.Var, Scientific)] -> TL.Text -> Either String [(MIP.Var, Scientific)]
@@ -62,7 +62,7 @@ parse' _ = throwError "must have >=1 lines"
 statusTable :: Map T.Text MIP.Status
 statusTable = Map.fromList
   [ ("Optimal", MIP.StatusOptimal)
-  , ("Unbounded", MIP.StatusUnbounded)
+  , ("Unbounded", MIP.StatusInfeasibleOrUnbounded)
   , ("Integer infeasible", MIP.StatusInfeasible)
   , ("Infeasible", MIP.StatusInfeasible)
   ]

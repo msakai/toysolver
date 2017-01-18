@@ -39,7 +39,7 @@ instance IsSolver GurobiCl IO where
           hClose h1
           withSystemTempFile "gurobi.sol" $ \fname2 h2 -> do
             hClose h2
-            statusRef <- newIORef Nothing
+            statusRef <- newIORef MIP.StatusUnknown
             let args = ["ResultFile=" ++ fname2]
                     ++ (case solveTimeLimit opt of
                           Nothing -> []
@@ -47,10 +47,11 @@ instance IsSolver GurobiCl IO where
                     ++ [fname1]
                 onGetLine s = do
                   case s of
-                    "Time limit reached" -> writeIORef statusRef (Just MIP.StatusInterrupted)
-                    "Model is unbounded" -> writeIORef statusRef (Just MIP.StatusUnbounded)
-                    "Model is infeasible" -> writeIORef statusRef (Just MIP.StatusInfeasible)
-                    _ | isPrefixOf "Optimal solution found" s -> writeIORef statusRef (Just MIP.StatusOptimal)
+                    -- "Time limit reached" -> writeIORef statusRef MIP.StatusUnknown
+                    "Model is unbounded" -> writeIORef statusRef MIP.StatusUnbounded
+                    "Model is infeasible" -> writeIORef statusRef MIP.StatusInfeasible
+                    "Model is infeasible or unbounded" -> writeIORef statusRef MIP.StatusInfeasibleOrUnbounded
+                    _ | isPrefixOf "Optimal solution found" s -> writeIORef statusRef MIP.StatusOptimal
                     _ -> return ()
                   solveLogger opt s
                 onGetErrorLine = solveErrorLogger opt

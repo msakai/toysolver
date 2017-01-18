@@ -5,6 +5,7 @@ module ToySolver.Data.MIP.Solver.Glpsol
   , glpsol
   ) where
 
+import Algebra.PartialOrd
 import Control.Monad
 import Data.Default.Class
 import Data.IORef
@@ -63,9 +64,9 @@ instance IsSolver Glpsol IO where
                 sol <- GLPKSol.readFile fname2
                 isUnbounded <- readIORef isUnboundedRef
                 isInfeasible <- readIORef isInfeasibleRef
-                if isUnbounded && MIP.solStatus sol == Nothing then
-                  return $ sol{ MIP.solStatus = Just MIP.StatusInfeasibleOrUnbounded }
-                else if isInfeasible && MIP.solStatus sol == Nothing then
-                  return $ sol{ MIP.solStatus = Just MIP.StatusInfeasible }
+                if isUnbounded && MIP.solStatus sol `leq` MIP.StatusInfeasibleOrUnbounded then
+                  return $ sol{ MIP.solStatus = MIP.StatusInfeasibleOrUnbounded }
+                else if isInfeasible && MIP.solStatus sol `leq` MIP.StatusInfeasible then
+                  return $ sol{ MIP.solStatus = MIP.StatusInfeasible }
                 else
                   return sol

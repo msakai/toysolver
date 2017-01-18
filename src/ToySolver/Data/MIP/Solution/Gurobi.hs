@@ -40,7 +40,11 @@ writeFile fname sol = do
 parse :: TL.Text -> MIP.Solution Scientific
 parse t = 
   case foldl' f (Nothing,[]) $ TL.lines t of
-    (obj, vs) ->  def{ MIP.solObjectiveValue = obj, MIP.solVariables = Map.fromList vs }
+    (obj, vs) ->
+      def{ MIP.solStatus = MIP.StatusFeasible
+         , MIP.solObjectiveValue = obj
+         , MIP.solVariables = Map.fromList vs
+         }
   where
     f :: (Maybe Scientific, [(MIP.Var, Scientific)]) -> TL.Text -> (Maybe Scientific, [(MIP.Var, Scientific)])
     f (obj,vs) l

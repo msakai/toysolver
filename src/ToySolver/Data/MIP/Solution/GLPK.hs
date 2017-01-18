@@ -27,7 +27,7 @@ parse' ls =
     (headers, ls2) ->
       case parseColumns (skipRows ls2) of
         (vs, _) ->
-          let status = Map.lookup (headers Map.! "Status") statusTable
+          let status = Map.findWithDefault MIP.StatusUnknown (headers Map.! "Status") statusTable
               objstr = headers Map.! "Objective"
               objstr2 = 
                 case T.findIndex ('='==) objstr of
@@ -82,7 +82,7 @@ parseColumns _ = error "parse error"
 statusTable :: Map T.Text MIP.Status
 statusTable = Map.fromList
   [ ("INTEGER OPTIMAL", MIP.StatusOptimal)
-  , ("INTEGER NON-OPTIMAL", MIP.StatusInterrupted)
+  , ("INTEGER NON-OPTIMAL", MIP.StatusUnknown)
   , ("INTEGER EMPTY", MIP.StatusInfeasible)
   ]
 

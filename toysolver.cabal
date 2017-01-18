@@ -176,6 +176,7 @@ Library
      -- createSystemRandom requires mwc-random >=0.13.1.0
      mwc-random >=0.13.1 && <0.14,
      OptDir,
+     lattices,
      megaparsec >=4 && <6,
      prettyclass >=1.0.0,
      primes,
@@ -874,6 +875,7 @@ Test-suite TestSuite
     deepseq,
     hashable,
     intern,
+    lattices,
     megaparsec,
     mtl,
     mwc-random,

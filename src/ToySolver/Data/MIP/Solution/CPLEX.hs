@@ -39,13 +39,13 @@ parseDoc doc =
       >=> attribute "objectiveValue"
       &| (read . T.unpack)
 
-    status :: Maybe MIP.Status
+    status :: MIP.Status
     status = head
       $  fromDocument doc
       $| element "CPLEXSolution"
       &/ element "header"
       >=> attribute "solutionStatusValue"
-      &| (flip IntMap.lookup table . read . T.unpack)
+      &| (flip (IntMap.findWithDefault MIP.StatusUnknown) table . read . T.unpack)
 
     f :: Cursor -> [(MIP.Var, Scientific)]
     f x
@@ -64,33 +64,31 @@ parseDoc doc =
 -- https://www.ibm.com/support/knowledgecenter/en/SSSA5P_12.7.0/ilog.odms.cplex.help/refcallablelibrary/macros/Solution_status_codes.html
 table :: IntMap MIP.Status
 table = IntMap.fromList
-  [ (1,   MIP.StatusOptimal) -- CPX_STAT_OPTIMAL
-  , (2,   MIP.StatusUnbounded) -- CPX_STAT_UNBOUNDED
-  , (3,   MIP.StatusInfeasible) -- CPX_STAT_INFEASIBLE
+  [ (1,   MIP.StatusOptimal)               -- CPX_STAT_OPTIMAL
+  , (2,   MIP.StatusUnbounded)             -- CPX_STAT_UNBOUNDED
+  , (3,   MIP.StatusInfeasible)            -- CPX_STAT_INFEASIBLE
   , (4,   MIP.StatusInfeasibleOrUnbounded) -- CPX_STAT_INForUNBD
-  , (5,   MIP.StatusOptimal) -- CPX_STAT_OPTIMAL_INFEAS
-  , (6,   MIP.StatusInterrupted) -- CPX_STAT_NUM_BEST
-  , (10,  MIP.StatusInterrupted) -- CPX_STAT_ABORT_IT_LIM
-  , (11,  MIP.StatusInterrupted) -- CPX_STAT_ABORT_TIME_LIM
-  , (12,  MIP.StatusInterrupted) -- CPX_STAT_ABORT_OBJ_LIM
-  , (13,  MIP.StatusInterrupted) -- CPX_STAT_ABORT_USER
+  , (5,   MIP.StatusOptimal)               -- CPX_STAT_OPTIMAL_INFEAS
 {-
+  , (6,   ) -- CPX_STAT_NUM_BEST
+  , (10,  ) -- CPX_STAT_ABORT_IT_LIM
+  , (11,  ) -- CPX_STAT_ABORT_TIME_LIM
+  , (12,  ) -- CPX_STAT_ABORT_OBJ_LIM
+  , (13,  ) -- CPX_STAT_ABORT_USER
   , (14,  ) -- CPX_STAT_FEASIBLE_RELAXED_SUM
   , (15,  ) -- CPX_STAT_OPTIMAL_RELAXED_SUM
   , (16,  ) -- CPX_STAT_FEASIBLE_RELAXED_INF
   , (17,  ) -- CPX_STAT_OPTIMAL_RELAXED_INF
-  , (18,  ) -- CPX_STAT_FEASIBLE_RELAXED_QaUAD
+  , (18,  ) -- CPX_STAT_FEASIBLE_RELAXED_QUAD
   , (19,  ) -- CPX_STAT_OPTIMAL_RELAXED_QUAD
   , (20,  ) -- CPX_STAT_OPTIMAL_FACE_UNBOUNDED
--}
-  , (21,  MIP.StatusInterrupted) -- CPX_STAT_ABORT_PRIM_OBJ_LIM
-  , (22,  MIP.StatusInterrupted) -- CPX_STAT_ABORT_DUAL_OBJ_LIM
-{-
+  , (21,  ) -- CPX_STAT_ABORT_PRIM_OBJ_LIM
+  , (22,  ) -- CPX_STAT_ABORT_DUAL_OBJ_LIM
   , (23,  ) -- CPX_STAT_FEASIBLE
 -}
-  , (24,  MIP.StatusInterrupted) -- CPX_STAT_FIRSTORDER
-  , (25,  MIP.StatusInterrupted) -- CPX_STAT_ABORT_DETTIME_LIM
+  , (24,  MIP.StatusFeasible) -- CPX_STAT_FIRSTORDER
 {-
+  , (25,  ) -- CPX_STAT_ABORT_DETTIME_LIM
   , (30,  ) -- CPX_STAT_CONFLICT_FEASIBLE
   , (31,  ) -- CPX_STAT_CONFLICT_MINIMAL
   , (32,  ) -- CPX_STAT_CONFLICT_ABORT_CONTRADICTION
@@ -103,25 +101,25 @@ table = IntMap.fromList
   , (39,  ) -- CPX_STAT_CONFLICT_ABORT_DETTIME_LIM
 -}
   , (40,  MIP.StatusInfeasibleOrUnbounded) -- CPX_STAT_BENDERS_MASTER_UNBOUNDED
-  , (41,  MIP.StatusInterrupted) -- CPX_STAT_BENDERS_NUM_BEST
-  , (101, MIP.StatusOptimal) -- CPXMIP_OPTIMAL
-  , (102, MIP.StatusOptimal) -- CPXMIP_OPTIMAL_TOL
-  , (103, MIP.StatusInfeasible) -- CPXMIP_INFEASIBLE
-  , (104, MIP.StatusInterrupted) -- CPXMIP_SOL_LIM
-  , (105, MIP.StatusInterrupted) -- CPXMIP_NODE_LIM_FEAS
-  , (106, MIP.StatusInterrupted) -- CPXMIP_NODE_LIM_INFEAS
-  , (107, MIP.StatusInterrupted) -- CPXMIP_TIME_LIM_FEAS
-  , (108, MIP.StatusInterrupted) -- CPXMIP_TIME_LIM_INFEAS
-  , (109, MIP.StatusInterrupted) -- CPXMIP_FAIL_FEAS
-  , (110, MIP.StatusInterrupted) -- CPXMIP_FAIL_INFEAS
-  , (111, MIP.StatusInterrupted) -- CPXMIP_MEM_LIM_FEAS
-  , (112, MIP.StatusInterrupted) -- CPXMIP_MEM_LIM_INFEAS
-  , (113, MIP.StatusInterrupted) -- CPXMIP_ABORT_FEAS
-  , (114, MIP.StatusInterrupted) -- CPXMIP_ABORT_INFEAS
-  , (115, MIP.StatusOptimal) -- CPXMIP_OPTIMAL_INFEAS
-  , (116, MIP.StatusInterrupted) -- CPXMIP_FAIL_FEAS_NO_TREE
-  , (117, MIP.StatusInterrupted) -- CPXMIP_FAIL_INFEAS_NO_TREE
-  , (118, MIP.StatusUnbounded) -- CPXMIP_UNBOUNDED
+--  , (41,  ) -- CPX_STAT_BENDERS_NUM_BEST
+  , (101, MIP.StatusOptimal)               -- CPXMIP_OPTIMAL
+  , (102, MIP.StatusOptimal)               -- CPXMIP_OPTIMAL_TOL
+  , (103, MIP.StatusInfeasible)            -- CPXMIP_INFEASIBLE
+--  , (104, ) -- CPXMIP_SOL_LIM
+  , (105, MIP.StatusFeasible)              -- CPXMIP_NODE_LIM_FEAS
+--  , (106, ) -- CPXMIP_NODE_LIM_INFEAS
+  , (107, MIP.StatusFeasible)              -- CPXMIP_TIME_LIM_FEAS
+--  , (108, ) -- CPXMIP_TIME_LIM_INFEAS
+  , (109, MIP.StatusFeasible)              -- CPXMIP_FAIL_FEAS
+--  , (110, ) -- CPXMIP_FAIL_INFEAS
+  , (111, MIP.StatusFeasible)              -- CPXMIP_MEM_LIM_FEAS
+--  , (112, ) -- CPXMIP_MEM_LIM_INFEAS
+  , (113, MIP.StatusFeasible)              -- CPXMIP_ABORT_FEAS
+--  , (114, ) -- CPXMIP_ABORT_INFEAS
+  , (115, MIP.StatusOptimal)               -- CPXMIP_OPTIMAL_INFEAS
+  , (116, MIP.StatusFeasible)              -- CPXMIP_FAIL_FEAS_NO_TREE
+--  , (117, ) -- CPXMIP_FAIL_INFEAS_NO_TREE
+  , (118, MIP.StatusUnbounded)             -- CPXMIP_UNBOUNDED
   , (119, MIP.StatusInfeasibleOrUnbounded) -- CPXMIP_INForUNBD
 {-
   , (120, ) -- CPXMIP_FEASIBLE_RELAXED_SUM
@@ -130,15 +128,15 @@ table = IntMap.fromList
   , (123, ) -- CPXMIP_OPTIMAL_RELAXED_INF
   , (124, ) -- CPXMIP_FEASIBLE_RELAXED_QUAD
   , (125, ) -- CPXMIP_OPTIMAL_RELAXED_QUAD
+  , (126, ) -- CPXMIP_ABORT_RELAXED
 -}
-  , (126, MIP.StatusInterrupted) -- CPXMIP_ABORT_RELAXED
-  , (127, MIP.StatusInterrupted) -- CPXMIP_FEASIBLE
-  , (128, MIP.StatusInterrupted) -- CPXMIP_POPULATESOL_LIM
-  , (129, MIP.StatusOptimal) -- CPXMIP_OPTIMAL_POPULATED
-  , (130, MIP.StatusOptimal) -- CPXMIP_OPTIMAL_POPULATED_TOL
-  , (131, MIP.StatusInterrupted) -- CPXMIP_DETTIME_LIM_FEAS
-  , (132, MIP.StatusInterrupted) -- CPXMIP_DETTIME_LIM_INFEAS
-  , (133, MIP.StatusInterrupted) -- CPXMIP_ABORT_RELAXATION_UNBOUNDED
+  , (127, MIP.StatusFeasible)              -- CPXMIP_FEASIBLE
+--  , (128, ) -- CPXMIP_POPULATESOL_LIM
+  , (129, MIP.StatusOptimal)               -- CPXMIP_OPTIMAL_POPULATED
+  , (130, MIP.StatusOptimal)               -- CPXMIP_OPTIMAL_POPULATED_TOL
+  , (131, MIP.StatusFeasible)              -- CPXMIP_DETTIME_LIM_FEAS
+--  , (132, ) -- CPXMIP_DETTIME_LIM_INFEAS
+  , (133, MIP.StatusInfeasibleOrUnbounded) -- CPXMIP_ABORT_RELAXATION_UNBOUNDED
   ]
 
 parse :: TL.Text -> MIP.Solution Scientific

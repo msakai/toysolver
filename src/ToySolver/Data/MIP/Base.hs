@@ -78,6 +78,8 @@ module ToySolver.Data.MIP.Base
   , intersectBounds
   ) where
 
+import Algebra.Lattice
+import Algebra.PartialOrd
 import Control.Arrow ((***))
 import Data.Default.Class
 import Data.Map (Map)
@@ -323,16 +325,54 @@ instance Functor SOSConstraint where
 -- ---------------------------------------------------------------------------
 
 data Status
-  = StatusOptimal
-  | StatusUnbounded
-  | StatusInfeasible
+  = StatusUnknown
+  | StatusFeasible
+  | StatusOptimal
   | StatusInfeasibleOrUnbounded
-  | StatusInterrupted
-  deriving (Eq, Ord, Show)
+  | StatusInfeasible
+  | StatusUnbounded
+  deriving (Eq, Ord, Enum, Bounded, Show)
+
+instance PartialOrd Status where
+  leq a b = (a,b) `Set.member` rel
+    where
+      rel = unsafeLfpFrom rel0 $ \r ->
+        Set.union r (Set.fromList [(a,c) | (a,b) <- Set.toList r, (b',c) <- Set.toList r, b == b'])
+      rel0 = Set.fromList $
+        [(a,a) | a <- [minBound .. maxBound]] ++
+        [ (StatusUnknown, StatusFeasible)
+        , (StatusUnknown, StatusInfeasibleOrUnbounded)
+        , (StatusFeasible, StatusOptimal)
+        , (StatusFeasible, StatusUnbounded)
+        , (StatusInfeasibleOrUnbounded, StatusUnbounded)
+        , (StatusInfeasibleOrUnbounded, StatusInfeasible)
+        ]
+
+instance MeetSemiLattice Status where
+  StatusUnknown /\ b = StatusUnknown
+  StatusFeasible /\ b
+    | StatusFeasible `leq` b = StatusFeasible
+    | otherwise = StatusUnknown
+  StatusOptimal /\ StatusOptimal = StatusOptimal
+  StatusOptimal /\ b
+    | StatusFeasible `leq` b = StatusFeasible
+    | otherwise = StatusUnknown
+  StatusInfeasibleOrUnbounded /\ b
+    | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
+    | otherwise = StatusUnknown
+  StatusInfeasible /\ StatusInfeasible = StatusInfeasible
+  StatusInfeasible /\ b
+    | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
+    | otherwise = StatusUnknown
+  StatusUnbounded /\ StatusUnbounded = StatusUnbounded
+  StatusUnbounded /\ b
+    | StatusFeasible `leq` b = StatusFeasible
+    | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
+    | otherwise = StatusUnknown
 
 data Solution r
   = Solution
-  { solStatus :: Maybe Status
+  { solStatus :: Status
   , solObjectiveValue :: Maybe r
   , solVariables :: Map Var r
   }
@@ -343,7 +383,7 @@ instance Functor Solution where
 
 instance Default (Solution r) where
   def = Solution
-        { solStatus = Nothing
+        { solStatus = StatusUnknown
         , solObjectiveValue = Nothing
         , solVariables = Map.empty
         }

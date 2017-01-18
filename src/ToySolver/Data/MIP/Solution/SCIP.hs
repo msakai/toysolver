@@ -30,7 +30,7 @@ parse' (t1:t2:ts) = do
   status <-
     case TL.stripPrefix "solution status:" t1 of
       Nothing -> throwError "first line must start with \"solution status:\""
-      Just s -> return $ Map.lookup (TL.toStrict $ TL.strip s) statusTable
+      Just s -> return $ Map.findWithDefault MIP.StatusUnknown (TL.toStrict $ TL.strip s) statusTable
   if t2 == "no solution available" then do
     return $ 
       MIP.Solution
@@ -60,15 +60,15 @@ parse' _ = throwError "must have >=2 lines"
 
 statusTable :: Map T.Text MIP.Status
 statusTable = Map.fromList
-  [ ("user interrupt", MIP.StatusInterrupted)
-  , ("node limit reached", MIP.StatusInterrupted)
-  , ("total node limit reached", MIP.StatusInterrupted)
-  , ("stall node limit reached", MIP.StatusInterrupted)
-  , ("time limit reached", MIP.StatusInterrupted)
-  , ("memory limit reached", MIP.StatusInterrupted)
-  , ("gap limit reached", MIP.StatusInterrupted)
-  , ("solution limit reached", MIP.StatusInterrupted)
-  , ("solution improvement limit reached", MIP.StatusInterrupted)
+  [ ("user interrupt", MIP.StatusUnknown)
+  , ("node limit reached", MIP.StatusUnknown)
+  , ("total node limit reached", MIP.StatusUnknown)
+  , ("stall node limit reached", MIP.StatusUnknown)
+  , ("time limit reached", MIP.StatusUnknown)
+  , ("memory limit reached", MIP.StatusUnknown)
+  , ("gap limit reached", MIP.StatusUnknown)
+  , ("solution limit reached", MIP.StatusUnknown)
+  , ("solution improvement limit reached", MIP.StatusUnknown)
   , ("optimal solution found", MIP.StatusOptimal)
   , ("infeasible", MIP.StatusInfeasible)
   , ("unbounded", MIP.StatusUnbounded)

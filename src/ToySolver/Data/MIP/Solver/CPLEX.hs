@@ -64,7 +64,7 @@ instance IsSolver CPLEX IO where
                 if size == 0 then do
                   isInfeasible <- readIORef isInfeasibleRef
                   if isInfeasible then
-                    return def{ MIP.solStatus = Just MIP.StatusInfeasible }
+                    return def{ MIP.solStatus = MIP.StatusInfeasible }
                   else
                     return def
                 else

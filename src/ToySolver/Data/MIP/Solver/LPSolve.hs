@@ -63,17 +63,17 @@ instance IsSolver LPSolve IO where
           exitcode <- runProcessWithOutputCallback (lpSolvePath solver) args "" onGetLine onGetErrorLine
           status <-
             case exitcode of
-              ExitSuccess      -> return (Just MIP.StatusOptimal)
-              ExitFailure (-2) -> return (Just MIP.StatusInterrupted) -- NOMEMORY
-              ExitFailure 1    -> return (Just MIP.StatusInterrupted) -- SUBOPTIMAL
-              ExitFailure 2    -> return (Just MIP.StatusInfeasible)  -- INFEASIBLE
-              ExitFailure 3    -> return (Just MIP.StatusUnbounded)   -- UNBOUNDED
-              ExitFailure 4    -> return Nothing                      -- DEGENERATE
-              ExitFailure 5    -> return Nothing                      -- NUMFAILURE
-              ExitFailure 6    -> return (Just MIP.StatusInterrupted) -- USERABORT
-              ExitFailure 7    -> return (Just MIP.StatusInterrupted) -- TIMEOUT
-              ExitFailure 9    -> return (Just MIP.StatusOptimal)     -- PRESOLVED
-              ExitFailure 25   -> return (Just MIP.StatusInterrupted) -- NUMFAILURE
+              ExitSuccess      -> return MIP.StatusOptimal
+              ExitFailure (-2) -> return MIP.StatusUnknown               -- NOMEMORY
+              ExitFailure 1    -> return MIP.StatusFeasible              -- SUBOPTIMAL
+              ExitFailure 2    -> return MIP.StatusInfeasible            -- INFEASIBLE
+              ExitFailure 3    -> return MIP.StatusInfeasibleOrUnbounded -- UNBOUNDED
+              ExitFailure 4    -> return MIP.StatusUnknown               -- DEGENERATE
+              ExitFailure 5    -> return MIP.StatusUnknown               -- NUMFAILURE
+              ExitFailure 6    -> return MIP.StatusUnknown               -- USERABORT
+              ExitFailure 7    -> return MIP.StatusUnknown               -- TIMEOUT
+              ExitFailure 9    -> return MIP.StatusOptimal               -- PRESOLVED
+              ExitFailure 25   -> return MIP.StatusUnknown               -- NUMFAILURE
               ExitFailure n    -> ioError $ userError $ "unknown exit code: " ++ show n
           obj <- readIORef objRef
           sol <- readIORef solRef
