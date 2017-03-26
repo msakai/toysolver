@@ -40,6 +40,7 @@ import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.Enum as MUSEnum
 import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Store.CNF as CNFStore
+import qualified ToySolver.SAT.ExistentialQuantification as ExistentialQuantification
 
 import qualified Data.PseudoBoolean as PBFile
 import qualified ToySolver.Converter.PB2SAT as PB2SAT
@@ -1622,6 +1623,18 @@ case_allMUSAssumptions_2_HYCAM = do
   let actual'   = Set.fromList $ actual
       expected' = Set.fromList $ map IntSet.fromList cores
   actual' @?= expected'
+
+------------------------------------------------------------------------
+
+prop_ExistentialQuantification :: Property
+prop_ExistentialQuantification = QM.monadicIO $ do
+  phi <- QM.pick arbitraryCNF
+  xs <- QM.pick $ liftM IntSet.fromList $ sublistOf [1 .. CNF.numVars phi]
+  psi <- QM.run $ ExistentialQuantification.project xs phi
+  forM_ (allAssignments (CNF.numVars phi)) $ \m -> do
+    let b1 = evalCNF m phi
+        b2 = evalCNF m psi
+    QM.assert $ not b1 || b2
 
 ------------------------------------------------------------------------
 
