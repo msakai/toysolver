@@ -341,6 +341,7 @@ Library
      ToySolver.SAT.Encoder.PB.Internal.Sorter
      ToySolver.SAT.Encoder.PBNLC
      ToySolver.SAT.Encoder.Tseitin
+     ToySolver.SAT.ExistentialQuantification
      ToySolver.SAT.MessagePassing.SurveyPropagation
      ToySolver.SAT.MUS
      ToySolver.SAT.MUS.Enum
