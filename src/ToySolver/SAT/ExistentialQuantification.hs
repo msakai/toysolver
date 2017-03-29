@@ -22,6 +22,7 @@
 
 module ToySolver.SAT.ExistentialQuantification
   ( project
+  , shortestImplicants
   ) where
 
 import Control.Monad
@@ -90,8 +91,8 @@ cube info m = IntSet.fromList $ concat $
 blockingClause :: Info -> SAT.Model -> Clause
 blockingClause info m = [-y | y <- IntMap.keys (backwardMap info), SAT.evalLit m y]
 
-enumShortestImplicant :: SAT.VarSet -> CNF.CNF -> IO [LitSet]
-enumShortestImplicant vs formula = do
+shortestImplicants :: SAT.VarSet -> CNF.CNF -> IO [LitSet]
+shortestImplicants vs formula = do
   let (tau_formula, info) = dualRailEncoding vs formula
   solver <- SAT.newSolver
   SAT.newVars_ solver (CNF.numVars tau_formula)
@@ -124,14 +125,14 @@ project :: SAT.VarSet -> CNF.CNF -> IO CNF.CNF
 project xs cnf = do
   let ys = IntSet.fromList [1 .. CNF.numVars cnf] IntSet.\\ xs
       nv = if IntSet.null ys then 0 else IntSet.findMax ys
-  implicants <- enumShortestImplicant ys cnf
+  implicants <- shortestImplicants ys cnf
   let cnf' =
         CNF.CNF
         { CNF.numVars = nv
         , CNF.numClauses = length implicants
         , CNF.clauses = map (map negate . IntSet.toList) implicants
         }
-  negated_implicates <- enumShortestImplicant ys cnf'
+  negated_implicates <- shortestImplicants ys cnf'
   let implicates = map (map negate . IntSet.toList) negated_implicates
   return $
     CNF.CNF

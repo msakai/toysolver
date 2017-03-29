@@ -1630,11 +1630,186 @@ prop_ExistentialQuantification :: Property
 prop_ExistentialQuantification = QM.monadicIO $ do
   phi <- QM.pick arbitraryCNF
   xs <- QM.pick $ liftM IntSet.fromList $ sublistOf [1 .. CNF.numVars phi]
+  let ys = IntSet.fromList [1 .. CNF.numVars phi] IntSet.\\ xs
   psi <- QM.run $ ExistentialQuantification.project xs phi
-  forM_ (allAssignments (CNF.numVars phi)) $ \m -> do
-    let b1 = evalCNF m phi
-        b2 = evalCNF m psi
-    QM.assert $ not b1 || b2
+  forM_ (replicateM (IntSet.size ys) [False,True]) $ \bs -> do
+    let m :: SAT.Model
+        m = array (1, if IntSet.null ys then 0 else IntSet.findMax ys) (zip (IntSet.toList ys) bs)
+    b1 <- QM.run $ do
+      solver <- SAT.newSolver
+      SAT.newVars_ solver (CNF.numVars phi)
+      forM_ (CNF.clauses phi) $ \c -> SAT.addClause solver c
+      SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- IntSet.toList ys]
+    let b2 = evalCNF m psi
+    QM.assert $ b1 == b2
+
+brauer11_phi :: CNF.CNF
+brauer11_phi =
+  CNF.CNF
+  { CNF.numVars = 13
+  , CNF.numClauses = 23
+  , CNF.clauses =
+      [
+      -- μ
+        [-x2, -y2]
+      , [-y2, -y1]
+      , [-x4, -x6, y1]
+      , [-x3, y4], [x3, -y4]
+      , [-x4, y3], [x4, -y3]
+      , [-x5, y6], [x5, -y6]
+      , [-x6, y5], [x6, -y5]
+
+      -- ξ
+      , [-x13, x1]
+      , [-x13, -x2]
+      , [-x13, x3]
+      , [-x13, -x4]
+      , [-x13, x5]
+      , [-x13, -x6]
+      , [x13, x1]
+      , [x13, -x2]
+      , [x13, -x3]
+      , [x13, x4]
+      , [x13, -x5]
+      , [x13, x6]
+      ]
+  }
+  where
+    [y1,y2,y3,y4,y5,y6] = [1..6]
+    [x1,x2,x3,x4,x5,x6,x13] = [7..13]
+
+{-
+ξ(m'1) = (¬y1 ∧ ¬y3 ∧ y4 ∧ ¬y5 ∧ y6)
+ξ(m'2) = (y1 ∧ ¬y2 ∧ ¬y3 ∧ y4 ∧ ¬y5 ∧ y6)
+ξ(m'3) = (y1 ∧ ¬y2 ∧ y3 ∧ ¬y4 ∧ y5 ∧ ¬y6)
+ω = ¬(ξ(m'1) ∨ ξ(m'2) ∨ ξ(m'3))
+-}
+brauer11_omega :: CNF.CNF
+brauer11_omega =
+  CNF.CNF
+  { CNF.numVars = 6
+  , CNF.numClauses = 3
+  , CNF.clauses =
+      [ [y1, y3, -y4, y5, -y6]
+      , [-y1, y2, y3, -y4, y5, -y6]
+      , [-y1, y2, -y3, y4, -y5, y6]
+      ]
+  }
+  where
+    [y1,y2,y3,y4,y5,y6] = [1..6]
+
+case_ExistentialQuantification_project_phi :: Assertion
+case_ExistentialQuantification_project_phi = do
+  psi <- ExistentialQuantification.project (IntSet.fromList [7..13]) brauer11_phi
+  forM_ (replicateM 6 [False,True]) $ \bs -> do
+    let m :: SAT.Model
+        m = array (1,13) (zip [1..] bs)    
+    b1 <- do
+      solver <- SAT.newSolver
+      SAT.newVars_ solver (CNF.numVars brauer11_phi)
+      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver c
+      SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
+    let b2 = all (SAT.evalClause m) (CNF.clauses psi)
+    (b1 == b2) @?= True
+
+case_ExistentialQuantification_project_phi' :: Assertion
+case_ExistentialQuantification_project_phi' = do
+  let [y1,y2,y3,y4,y5,y6] = [1..6]
+      psi = CNF.CNF
+            { CNF.numVars = 6
+            , CNF.numClauses = 8
+            , CNF.clauses =
+                [ [-y2, y6]
+                , [-y3, -y6]
+                , [y5, y6]
+                , [y3, -y5]
+                , [y4, -y6]
+                , [y1, y6]
+                , [-y1, -y2]
+                , [-y4, y6]
+                ]
+            }
+  forM_ (replicateM 6 [False,True]) $ \bs -> do
+    let m :: SAT.Model
+        m = array (1,13) (zip [1..] bs)
+    b1 <- do
+      solver <- SAT.newSolver
+      SAT.newVars_ solver (CNF.numVars brauer11_phi)
+      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver c
+      SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
+    let b2 = all (SAT.evalClause m) (CNF.clauses psi)    
+    (b1 == b2) @?= True
+
+case_shortestImplicants_phi :: Assertion
+case_shortestImplicants_phi = do
+  xss <- ExistentialQuantification.shortestImplicants (IntSet.fromList [1..6]) brauer11_phi
+  forM_ (replicateM 6 [False,True]) $ \bs -> do
+    let m :: SAT.Model
+        m = array (1,6) (zip [1..] bs)
+    b1 <- do
+      solver <- SAT.newSolver
+      SAT.newVars_ solver (CNF.numVars brauer11_phi)
+      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver c
+      SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
+    let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
+    (b1 == b2) @?= True
+
+case_shortestImplicants_phi' :: Assertion
+case_shortestImplicants_phi' = do
+  let [y1,y2,y3,y4,y5,y6] = [1..6]
+      xss = map IntSet.fromList
+            [ [-y1, -y3, y4, -y5, y6]
+            , [y1, -y2, -y3, y4, -y5, y6]
+            , [y1, -y2, y3, -y4, y5, -y6]
+            ]
+  forM_ (replicateM 6 [False,True]) $ \bs -> do
+    let m :: SAT.Model
+        m = array (1,6) (zip [1..] bs)
+    b1 <- do
+      solver <- SAT.newSolver
+      SAT.newVars_ solver (CNF.numVars brauer11_phi)
+      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver c
+      SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
+    let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
+    (b1 == b2) @?= True
+
+case_shortestImplicants_omega :: Assertion
+case_shortestImplicants_omega = do
+  xss <- ExistentialQuantification.shortestImplicants (IntSet.fromList [1..6]) brauer11_omega
+  forM_ (replicateM 6 [False,True]) $ \bs -> do
+    let m :: SAT.Model
+        m = array (1,6) (zip [1..] bs)
+    b1 <- do
+      solver <- SAT.newSolver
+      SAT.newVars_ solver (CNF.numVars brauer11_omega)
+      forM_ (CNF.clauses brauer11_omega) $ \c -> SAT.addClause solver c
+      SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
+    let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
+    unless (b1 == b2) $ print m
+
+case_shortestImplicants_omega' :: Assertion
+case_shortestImplicants_omega' = do
+  let [y1,y2,y3,y4,y5,y6] = [1..6]
+      xss = map IntSet.fromList
+              [ [y2, -y6]
+              , [y3, y6]
+              , [-y5, -y6]
+              , [-y3, y5]
+              , [-y4, y6]
+              , [-y1, -y6]
+              , [y1, y2]
+              , [y4, -y6]
+              ]
+  forM_ (replicateM 6 [False,True]) $ \bs -> do
+    let m :: SAT.Model
+        m = array (1,6) (zip [1..] bs)
+    b1 <- do
+      solver <- SAT.newSolver
+      SAT.newVars_ solver (CNF.numVars brauer11_omega)
+      forM_ (CNF.clauses brauer11_omega) $ \c -> SAT.addClause solver c
+      SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
+    let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
+    (b1 == b2) @?= True
 
 ------------------------------------------------------------------------
 
