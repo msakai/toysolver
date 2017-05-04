@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
+{-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Combinatorial.HittingSet.Simple
@@ -18,9 +18,9 @@ module ToySolver.Combinatorial.HittingSet.Simple
 import Control.Monad
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
+import ToySolver.Combinatorial.HittingSet.Util (maintainNoSupersets)
 
 minimalHittingSets :: Set IntSet -> Set IntSet
 minimalHittingSets = Set.fromList . minimalHittingSets' . Set.toList
@@ -47,14 +47,6 @@ propagateChoice es v e = zs
     xs = filter (v `IntSet.notMember`) es
     ys = map (IntSet.filter (v <) . (`IntSet.difference` e)) xs
     zs = maintainNoSupersets ys
-
-maintainNoSupersets :: [IntSet] -> [IntSet]
-maintainNoSupersets xss = go [] xss
-  where
-    go yss [] = yss
-    go yss (xs:xss) = go (xs : filter p yss) (filter p xss)
-      where
-        p zs = not (xs `IntSet.isSubsetOf` zs)
 
 nubOrd :: Ord a => [a] -> [a]
 nubOrd = go Set.empty

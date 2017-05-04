@@ -267,6 +267,7 @@ Library
      ToySolver.Combinatorial.HittingSet.SHD
      ToySolver.Combinatorial.HittingSet.FredmanKhachiyan1996
      ToySolver.Combinatorial.HittingSet.GurvichKhachiyan1999
+     ToySolver.Combinatorial.HittingSet.Util
      ToySolver.Combinatorial.Knapsack.BB
      ToySolver.Combinatorial.Knapsack.DPDense
      ToySolver.Combinatorial.Knapsack.DPSparse
