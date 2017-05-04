@@ -17,13 +17,15 @@
 -- "Dualize and Advance" algorithm for enumerating maximal interesting sets
 -- and minimal non-interesting sets.
 --
--- * D. Gunopulos, H. Mannila, R. Khardon, and H. Toivonen, Data mining,
+-- * [GMKT1997]
+--   D. Gunopulos, H. Mannila, R. Khardon, and H. Toivonen, Data mining,
 --   hypergraph transversals, and machine learning (extended abstract),
 --   in Proceedings of the Sixteenth ACM SIGACT-SIGMOD-SIGART Symposium
 --   on Principles of Database Systems, ser. PODS '97. 1997, pp. 209-216.
 --   <http://almaden.ibm.com/cs/projects/iis/hdb/Publications/papers/pods97_trans.pdf>
 -- 
--- * J. Bailey and P. Stuckey, Discovery of minimal unsatisfiable
+-- * [BaileyStuckey2015]
+--   J. Bailey and P. Stuckey, Discovery of minimal unsatisfiable
 --   subsets of constraints using hitting set dualization," in Practical
 --   Aspects of Declarative Languages, pp. 174-186, 2005.
 --   <http://ww2.cs.mu.oz.au/~pjs/papers/padl05.pdf>
@@ -41,7 +43,6 @@ module ToySolver.Combinatorial.HittingSet.DAA
   , generateCNFAndDNF
   ) where
 
-import Control.Monad
 import Control.Monad.Identity
 import Data.Default.Class
 import Data.IntSet (IntSet)
@@ -49,11 +50,16 @@ import qualified Data.IntSet as IntSet
 import Data.Set (Set)
 import qualified Data.Set as Set
 import ToySolver.Combinatorial.HittingSet.InterestingSets
+import ToySolver.Combinatorial.HittingSet.Util (maintainNoSupersets)
 
 -- | Given a problem and an option, it computes maximal interesting sets and
 -- minimal uninteresting sets.
 run :: forall prob m. IsProblem prob m => prob -> Options m -> m (Set IntSet, Set IntSet)
-run prob opt = loop (Set.map complement (optMaximalInterestingSets opt)) (optMinimalUninterestingSets opt)
+run prob opt = do
+  let comp_pos = Set.map complement (optMaximalInterestingSets opt)
+  hst_comp_pos <- optMinimalHittingSets opt comp_pos
+  loop comp_pos hst_comp_pos (optMinimalUninterestingSets opt)
+
   where
     univ :: IntSet
     univ = universe prob
@@ -61,26 +67,32 @@ run prob opt = loop (Set.map complement (optMaximalInterestingSets opt)) (optMin
     complement :: IntSet -> IntSet
     complement = (univ `IntSet.difference`)
 
-    loop :: Set IntSet -> Set IntSet -> m (Set IntSet, Set IntSet)
-    loop comp_pos neg = do
-      xss <- liftM (`Set.difference` neg) $ optMinimalHittingSets opt comp_pos
+    loop :: Set IntSet -> Set IntSet -> Set IntSet -> m (Set IntSet, Set IntSet)
+    loop comp_pos hst_comp_pos neg = do
+      let xss = hst_comp_pos `Set.difference` neg
       if Set.null xss then
         return (Set.map complement comp_pos, neg)
       else do
-        (comp_pos',neg') <- loop2 comp_pos neg (Set.toList xss)
-        loop comp_pos' neg'
+        (comp_pos', hst_comp_pos', neg') <- loop2 comp_pos hst_comp_pos neg (Set.toList xss)
+        loop comp_pos' hst_comp_pos' neg'
 
-    loop2 :: Set IntSet -> Set IntSet -> [IntSet] -> m (Set IntSet, Set IntSet)
-    loop2 comp_pos neg [] = return (comp_pos, neg)
-    loop2 comp_pos neg (xs : xss) = do
+    loop2 :: Set IntSet -> Set IntSet -> Set IntSet -> [IntSet] -> m (Set IntSet, Set IntSet, Set IntSet)
+    loop2 comp_pos hst_comp_pos neg [] = return (comp_pos, hst_comp_pos, neg)
+    loop2 comp_pos hst_comp_pos neg (xs : xss) = do
       ret <- maximalInterestingSet prob xs
       case ret of
-        Nothing -> do          
+        Nothing -> do
           optOnMinimalUninterestingSetFound opt xs
-          loop2 comp_pos (Set.insert xs neg) xss
+          loop2 comp_pos hst_comp_pos (Set.insert xs neg) xss
         Just ys -> do
           optOnMaximalInterestingSetFound opt ys
-          return (Set.insert (complement ys) comp_pos, neg)
+          let zs = complement ys
+              comp_pos' = Set.insert zs comp_pos
+              -- "4.2 Incremental Hitting set Calculation" from [BaileyStuckey2015]
+              hst_comp_pos' = Set.fromList $ maintainNoSupersets $
+                [IntSet.insert w ws | ws <- Set.toList hst_comp_pos, w <- IntSet.toList zs]
+          -- hst_comp_pos' <- optMinimalHittingSets opt comp_pos'
+          return (comp_pos', hst_comp_pos', neg)
 
 -- | Compute the irredundant CNF representation and DNF representation.
 --
