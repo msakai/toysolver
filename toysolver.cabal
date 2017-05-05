@@ -333,6 +333,8 @@ Library
      ToySolver.Data.Polynomial.Interpolation.Lagrange
      ToySolver.Data.Var
      ToySolver.Graph.BellmanFord
+     ToySolver.Graph.Dijkstra
+     ToySolver.Graph.FloydWarshall
      ToySolver.QBF
      ToySolver.SAT
      ToySolver.SAT.Encoder.Integer
