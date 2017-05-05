@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -- ------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.BellmanFord
+-- Module      :  ToySolver.Graph.BellmanFord
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
 --
@@ -19,7 +19,7 @@
 --   <https://www.coursera.org/course/linearopt>
 --
 -- ------------------------------------------------------------------------
-module ToySolver.BellmanFord
+module ToySolver.Graph.BellmanFord
   ( bellmanford
   ) where
 

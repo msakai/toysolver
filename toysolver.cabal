@@ -251,7 +251,6 @@ Library
      ToySolver.Arith.Simplex2
      ToySolver.Arith.Simplex2.Simple
      ToySolver.Arith.VirtualSubstitution
-     ToySolver.BellmanFord
      ToySolver.BitVector
      ToySolver.BitVector.Base
      ToySolver.BitVector.Solver
@@ -333,6 +332,7 @@ Library
      ToySolver.Data.Polynomial.GroebnerBasis
      ToySolver.Data.Polynomial.Interpolation.Lagrange
      ToySolver.Data.Var
+     ToySolver.Graph.BellmanFord
      ToySolver.QBF
      ToySolver.SAT
      ToySolver.SAT.Encoder.Integer

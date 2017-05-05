@@ -27,7 +27,7 @@ import qualified Data.HashMap.Strict as HashMap
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 
-import ToySolver.BellmanFord
+import ToySolver.Graph.BellmanFord
 
 -- (a,b,k) represents (a - b ≤ k)
 type SimpleAtom v b = (v,v,b)
