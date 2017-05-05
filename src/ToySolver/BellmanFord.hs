@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE BangPatterns #-}
------------------------------------------------------------------------------
+-- ------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.BellmanFord
 -- Copyright   :  (c) Masahiro Sakai 2016
@@ -8,17 +7,18 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns)
+-- Portability :  portable
 --
--- Bellman-Ford algorithm for computing for computing shortest paths from a
--- source vertexes to all of the other vertices in a weighted digraph.
+-- Bellman-Ford algorithm for finding shortest paths from source vertexes
+-- to all of the other vertices in a weighted graph with negative weight
+-- edges allowed.
 --
 -- Reference:
 --
 -- * Friedrich Eisenbrand. “Linear and Discrete Optimization”.
 --   <https://www.coursera.org/course/linearopt>
 --
------------------------------------------------------------------------------
+-- ------------------------------------------------------------------------
 module ToySolver.BellmanFord
   ( bellmanford
   ) where
