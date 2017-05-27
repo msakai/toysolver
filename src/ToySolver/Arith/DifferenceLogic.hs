@@ -27,7 +27,7 @@ import qualified Data.HashMap.Strict as HashMap
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 
-import ToySolver.Graph.BellmanFord
+import ToySolver.Graph.ShortestPath (bellmanFord)
 
 -- (a,b,k) represents (a - b ≤ k)
 type SimpleAtom v b = (v,v,b)
@@ -37,7 +37,7 @@ solve
   => [(label, SimpleAtom v b)]
   -> Either (HashSet label) (HashMap v b)
 solve xs =
-  case bellmanford g vs of
+  case bellmanFord g vs of
     Left es -> Left $ HashSet.fromList [l | (_,l,_) <- es]
     Right m -> Right $ fmap (\(d, _) -> - d) m
   where
