@@ -20,9 +20,14 @@ module ToySolver.Graph.FloydWarshall
   , pathFrom
   , pathTo
   , pathCost
+  , pathEmpty
   , pathAppend
   , pathEdges
+  , pathEdgesBackward
+  , pathEdgesSeq
   , pathVertexes
+  , pathVertexesBackward
+  , pathVertexesSeq
   ) where
 
 import Data.Hashable
@@ -30,43 +35,88 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.List (foldl')
 import Data.Maybe
+import Data.Monoid
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 
 -- ------------------------------------------------------------------------
 
 data Path vertex label cost 
-  = Singleton vertex vertex label !cost
+  = Empty vertex
+  | Singleton vertex vertex label !cost
   | Append (Path vertex label cost) (Path vertex label cost) !cost
   deriving (Eq, Show)
 
 pathFrom :: Path vertex label cost -> vertex
+pathFrom (Empty v) = v
 pathFrom (Singleton from _ _ _) = from
 pathFrom (Append p1 _ _) = pathFrom p1
 
 pathTo :: Path vertex label cost -> vertex
+pathTo (Empty v) = v
 pathTo (Singleton _ to _ _) = to
 pathTo (Append _ p2 _) = pathTo p2
 
-pathCost :: Path vertex label cost -> cost
+pathCost :: Num cost => Path vertex label cost -> cost
+pathCost (Empty _) = 0
 pathCost (Singleton _ _ _ c) = c
 pathCost (Append _ _ c) = c
 
-pathAppend :: Num cost => Path vertex label cost -> Path vertex label cost -> Path vertex label cost
-pathAppend p1 p2 = Append p1 p2 (pathCost p1 + pathCost p2)
+pathEmpty :: vertex -> Path vertex label cost
+pathEmpty = Empty
+
+pathAppend :: (Eq vertex, Num cost) => Path vertex label cost -> Path vertex label cost -> Path vertex label cost
+pathAppend p1 p2 
+  | pathTo p1 /= pathFrom p2 = error "ToySolver.Graph.FloydWarshall.pathAppend: pathTo/pathFrom mismatch"
+  | otherwise =
+      case (p1, p2) of
+        (Empty _, _) -> p2
+        (_, Empty _) -> p1
+        _ -> Append p1 p2 (pathCost p1 + pathCost p2)
 
 pathEdges :: Path vertex label cost -> [(vertex,vertex,label,cost)]
 pathEdges p = f p []
   where
+    f (Empty _) xs = xs
     f (Singleton v1 v2 l c) xs = (v1,v2,l,c) : xs
-    f (Append p1 p2 _) xs = (f p1 . f p2) xs
+    f (Append p1 p2 _) xs = f p1 (f p2 xs)
+
+pathEdgesBackward :: Path vertex label cost -> [(vertex,vertex,label,cost)]
+pathEdgesBackward p = f p []
+  where
+    f (Empty _) xs = xs
+    f (Singleton v1 v2 l c) xs = (v1,v2,l,c) : xs
+    f (Append p1 p2 _) xs = f p2 (f p1 xs)
+
+pathEdgesSeq :: Path vertex label cost -> Seq (vertex,vertex,label,cost)
+pathEdgesSeq (Empty _) = Seq.empty
+pathEdgesSeq (Singleton v1 v2 l c) = Seq.singleton (v1,v2,l,c)
+pathEdgesSeq (Append p1 p2 _) = pathEdgesSeq p1 <> pathEdgesSeq p2
 
 pathVertexes :: Path vertex label cost -> [vertex]
-pathVertexes p = f True p []
+pathVertexes p = pathFrom p : f p []
   where
-    f True (Singleton v1 v2 _ _) xs = v1 : v2 : xs
-    f False (Singleton v1 _ _ _) xs = v1 : xs
-    f b (Append p1 p2 _) xs = (f False p1 . f b p2) xs
+    f (Empty _) xs = xs
+    f (Singleton _ v2 _ _) xs = v2 : xs
+    f (Append p1 p2 _) xs = f p1 (f p2 xs)
 
-pathMin :: Ord cost => Path vertex label cost -> Path vertex label cost -> Path vertex label cost
+pathVertexesBackward :: Path vertex label cost -> [vertex]
+pathVertexesBackward p = pathTo p : f p []
+  where
+    f (Empty _) xs = xs
+    f (Singleton v1 _ _ _) xs = v1 : xs
+    f (Append p1 p2 _) xs = f p2 (f p1 xs)
+
+pathVertexesSeq :: Path vertex label cost -> Seq vertex
+pathVertexesSeq p = f True p
+  where
+    f True  (Empty v) = Seq.singleton v
+    f False (Empty _) = mempty
+    f True  (Singleton v1 v2 _ _) = Seq.fromList [v1, v2]
+    f False (Singleton v1 _ _ _)  = Seq.singleton v1
+    f b (Append p1 p2 _) = f False p1 <> f b p2
+
+pathMin :: (Num cost, Ord cost) => Path vertex label cost -> Path vertex label cost -> Path vertex label cost
 pathMin p1 p2
   | pathCost p1 <= pathCost p2 = p1
   | otherwise = p2
