@@ -36,6 +36,9 @@ module ToySolver.Graph.ShortestPath
   , bellmanFord
   , dijkstra
   , floydWarshall
+
+  -- * Utility functions
+  , buildPaths
   ) where
 
 import Control.Monad
@@ -47,6 +50,7 @@ import qualified Data.HashTable.Class as H
 import qualified Data.HashTable.ST.Cuckoo as C
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.HashMap.Lazy as HashMapLazy
 import qualified Data.HashSet as HashSet
 import qualified Data.Heap as Heap -- http://hackage.haskell.org/package/heaps
 import Data.List (foldl')
@@ -273,6 +277,18 @@ floydWarshall g = HashMap.unionWith pathMin (foldl' f tbl0 vs) paths0
           | vi <- vs, p1 <- maybeToList (HashMap.lookup (vi,vk) tbl)
           , vj <- vs, p2 <- maybeToList (HashMap.lookup (vk,vj) tbl)
           ]
+
+-- ------------------------------------------------------------------------
+
+buildPaths
+  :: (Eq vertex, Hashable vertex, Real cost)
+  => HashMap vertex (cost, Maybe (InEdge vertex cost label))
+  -> HashMap vertex (Path vertex cost label)
+buildPaths m = paths
+  where
+    paths = HashMapLazy.mapWithKey f m
+    f u (_, Nothing) = pathEmpty u
+    f u (_, Just (v,c,l)) = (paths HashMap.! v) `pathAppend` Singleton (v,u,c,l)
 
 -- ------------------------------------------------------------------------
 
