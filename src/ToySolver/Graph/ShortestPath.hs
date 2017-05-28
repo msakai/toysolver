@@ -253,9 +253,12 @@ floydWarshall
   :: forall vertex cost label. (Eq vertex, Hashable vertex, Real cost)
   => HashMap vertex [OutEdge vertex cost label]
   -> HashMap (vertex,vertex) (Path vertex cost label)
-floydWarshall g = foldl' f tbl0 vs
+floydWarshall g = HashMap.unionWith pathMin (foldl' f tbl0 vs) paths0
   where
     vs = HashMap.keys g
+
+    paths0 :: HashMap (vertex,vertex) (Path vertex cost label)
+    paths0 = HashMap.fromList [((v,v), pathEmpty v) | v <- HashMap.keys g]
 
     tbl0 :: HashMap (vertex,vertex) (Path vertex cost label)
     tbl0 = HashMap.fromListWith pathMin [((v,u), Singleton (v,u,c,l)) | (v, es) <- HashMap.toList g, (u,c,l) <- es]
