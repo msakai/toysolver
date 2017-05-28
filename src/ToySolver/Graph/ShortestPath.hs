@@ -158,7 +158,7 @@ bellmanFord
   :: (Eq vertex, Hashable vertex, Real cost)
   => HashMap vertex [OutEdge vertex cost label]
   -> [vertex] -- ^ list of source vertexes
-  -> Either [(vertex,label,vertex)] (HashMap vertex (cost, Maybe (vertex, label)))
+  -> Either (Path vertex cost label) (HashMap vertex (cost, Maybe (InEdge vertex cost label)))
 bellmanFord g ss = runST $ do
   let n = HashMap.size g
   d <- C.newSized n
@@ -177,7 +177,7 @@ bellmanFord g ss = runST $ do
           case m of
             Just (c0, _) | c0 <= du + c -> return ()
             _ -> do
-              H.insert d v (du + c, Just (u,l))
+              H.insert d v (du + c, Just (u,c,l))
               modifySTRef' updatedRef (HashSet.insert v)
 
   xs <- H.toList d
@@ -188,10 +188,10 @@ bellmanFord g ss = runST $ do
         when (du + c < dv) $ do
           -- a negative cycle is detected
           cycle <- lift $ do
-            H.insert d v (du + c, Just (u, l))
+            H.insert d v (du + c, Just (u, c, l))
             u0 <- do
               let getParent u = do
-                    Just (_, Just (v,_)) <- H.lookup d u
+                    Just (_, Just (v,_,_)) <- H.lookup d u
                     return v
                   go hare tortoise
                     | hare == tortoise = return hare
@@ -203,12 +203,12 @@ bellmanFord g ss = runST $ do
               tortoise0 <- getParent v
               go hare0 tortoise0
             let go u result = do
-                  Just (_, Just (v,l)) <- H.lookup d u
+                  Just (_, Just (v,c,l)) <- H.lookup d u
                   if v == u0 then
-                    return ((v,l,u) : result)
+                    return (Singleton (v,u,c,l) `pathAppend` result)
                   else
-                    go v ((v,l,u) : result)
-            go u0 []
+                    go v (Singleton (v,u,c,l) `pathAppend` result)
+            go u0 (pathEmpty u0)
           throwE cycle
     d' <- lift $ freezeHashTable d
     return d'
@@ -225,13 +225,13 @@ dijkstra
   :: forall vertex cost label. (Eq vertex, Hashable vertex, Real cost)
   => HashMap vertex [OutEdge vertex cost label]
   -> [vertex] -- ^ list of source vertexes
-  -> HashMap vertex (cost, Maybe (vertex, label))
+  -> HashMap vertex (cost, Maybe (InEdge vertex cost label))
 dijkstra g ss = loop (Heap.fromList [Heap.Entry 0 (s, Nothing) | s <- ss]) HashMap.empty
   where
     loop
-      :: Heap.Heap (Heap.Entry cost (vertex, Maybe (vertex, label)))
-      -> HashMap vertex (cost, Maybe (vertex, label))
-      -> HashMap vertex (cost, Maybe (vertex, label))
+      :: Heap.Heap (Heap.Entry cost (vertex, Maybe (InEdge vertex cost label)))
+      -> HashMap vertex (cost, Maybe (InEdge vertex cost label))
+      -> HashMap vertex (cost, Maybe (InEdge vertex cost label))
     loop q visited =
       case Heap.viewMin q of
         Nothing -> visited
@@ -239,7 +239,7 @@ dijkstra g ss = loop (Heap.fromList [Heap.Entry 0 (s, Nothing) | s <- ss]) HashM
           | v `HashMap.member` visited -> loop q' visited
           | otherwise ->
               let q2 = Heap.fromList
-                       [ Heap.Entry (c+c') (ch, Just (v,l))
+                       [ Heap.Entry (c+c') (ch, Just (v,c',l))
                        | (ch,c',l) <- HashMap.lookupDefault [] v g
                        , not (ch `HashMap.member` visited)
                        ]
