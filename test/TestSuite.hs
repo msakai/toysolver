@@ -11,6 +11,7 @@ import Test.CongruenceClosure
 import Test.ContiTraverso
 import Test.Delta
 import Test.FiniteModelFinder
+import Test.GraphShortestPath
 import Test.HittingSets
 import Test.Knapsack
 import Test.LPFile
@@ -41,6 +42,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , ctTestGroup
   , deltaTestGroup
   , fmfTestGroup
+  , graphShortestPathTestGroup
   , hittingSetsTestGroup
   , knapsackTestGroup
   , lpTestGroup

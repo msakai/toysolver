@@ -845,6 +845,7 @@ Test-suite TestSuite
     Test.ContiTraverso
     Test.Delta
     Test.FiniteModelFinder
+    Test.GraphShortestPath
     Test.HittingSets
     Test.Knapsack
     Test.LPFile
