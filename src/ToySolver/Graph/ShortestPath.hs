@@ -191,7 +191,7 @@ bellmanFord g ss = runST $ do
         Just (dv,_) <- lift $ H.lookup d v
         when (du + c < dv) $ do
           -- a negative cycle is detected
-          cycle <- lift $ do
+          cyclePath <- lift $ do
             H.insert d v (du + c, Just (u, c, l))
             u0 <- do
               let getParent u = do
@@ -213,7 +213,7 @@ bellmanFord g ss = runST $ do
                   else
                     go v (Singleton (v,u,c,l) `pathAppend` result)
             go u0 (pathEmpty u0)
-          throwE cycle
+          throwE cyclePath
     d' <- lift $ freezeHashTable d
     return d'
 
