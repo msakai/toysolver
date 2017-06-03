@@ -46,6 +46,9 @@ import Data.List
 import Data.Maybe
 import Data.Monoid
 import Data.Scientific (Scientific)
+#if !MIN_VERSION_megaparsec(5,0,0)
+import Data.Scientific (fromFloatDigits)
+#endif
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -446,7 +449,11 @@ qfactor = do
        ]
 
 number :: forall e s m. C e s m => m Scientific
+#if MIN_VERSION_megaparsec(5,0,0)
 number = tok $ P.signed sep P.number
+#else
+number = tok $ liftM (either fromInteger fromFloatDigits) $ P.signed sep P.number
+#endif
 
 skipManyTill :: Alternative m => m a -> m end -> m ()
 skipManyTill p end' = scan

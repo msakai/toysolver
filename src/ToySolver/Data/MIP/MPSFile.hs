@@ -157,7 +157,11 @@ stringLn :: C e s m => String -> m ()
 stringLn s = string s >> newline'
 
 number :: forall e s m. C e s m => m Scientific
+#if MIN_VERSION_megaparsec(5,0,0)
 number = tok $ Lexer.signed (return ()) Lexer.number
+#else
+number = tok $ liftM (either fromInteger fromFloatDigits) $ Lexer.signed (return ()) Lexer.number
+#endif
 
 -- ---------------------------------------------------------------------------
 

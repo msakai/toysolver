@@ -50,6 +50,9 @@ import Control.Monad
 import qualified Data.ByteString.Lazy as BL
 import Data.List (intersperse)
 import Data.Scientific (Scientific)
+#if !MIN_VERSION_megaparsec(5,0,0)
+import Data.Scientific (fromFloatDigits)
+#endif
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
@@ -260,7 +263,11 @@ int :: C e s m => m Integer
 int = Lexer.signed (return ()) Lexer.decimal
 
 real :: forall e s m. C e s m => m Scientific
+#if MIN_VERSION_megaparsec(5,0,0)
 real = Lexer.signed (return ()) Lexer.number
+#else
+real = liftM (either fromInteger fromFloatDigits) $ Lexer.signed (return ()) $ Lexer.number
+#endif
 
 -- ---------------------------------------------------------------------------
 -- rendering
