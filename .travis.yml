@@ -15,7 +15,7 @@ sudo: false
 language: generic
 
 env:
-- GHCVER=8.0.1 STACK_YAML=stack.yaml
+- GHCVER=8.0.1 STACK_YAML=stack-travis.yaml
 
 # Caching so the next build will be fast too.
 cache:
@@ -39,11 +39,11 @@ before_install:
 
 install:
 # Build dependencies
-- stack --no-terminal --install-ghc test --only-dependencies --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve
+- stack --stack-yaml=$STACK_YAML --no-terminal --install-ghc test --only-dependencies --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve
 
 script:
 # Build the package, its tests, and its docs and run the tests
-- stack --no-terminal test --haddock --no-haddock-deps --coverage --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve
+- stack --stack-yaml=$STACK_YAML --no-terminal test --haddock --no-haddock-deps --coverage --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve
 
 after_script:
 - travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$GHCVER.tar.bz2 | tar -xj
