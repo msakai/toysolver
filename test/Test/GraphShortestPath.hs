@@ -1,159 +1,196 @@
-{-# OPTIONS_GHC -Wall #-}
--- ------------------------------------------------------------------------
--- |
--- Module      :  ToySolver.Graph.BellmanFord
--- Copyright   :  (c) Masahiro Sakai 2016
--- License     :  BSD-style
---
--- Maintainer  :  masahiro.sakai@gmail.com
--- Stability   :  provisional
--- Portability :  portable
---
--- Bellman-Ford algorithm for finding shortest paths from source vertexes
--- to all of the other vertices in a weighted graph with negative weight
--- edges allowed.
---
--- Reference:
---
--- * Friedrich Eisenbrand. “Linear and Discrete Optimization”.
---   <https://www.coursera.org/course/linearopt>
---
--- ------------------------------------------------------------------------
-module ToySolver.Graph.BellmanFord
-  ( bellmanford
-  ) where
+{-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+module Test.GraphShortestPath (graphShortestPathTestGroup) where
 
 import Control.Monad
-import Control.Monad.ST
-import Control.Monad.Trans
-import Control.Monad.Trans.Except
 import Data.Hashable
-import qualified Data.HashTable.Class as H
-import qualified Data.HashTable.ST.Cuckoo as C
+import Test.Tasty
+import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
+import Test.Tasty.TH
+import ToySolver.Graph.ShortestPath
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet as HashSet
-import Data.STRef
-
-bellmanford
-  :: (Eq vertex, Hashable vertex, Real cost)
-  => HashMap vertex [(vertex, cost, label)]
-  -> [vertex] -- ^ list of source vertexes
-  -> Either [(vertex,label,vertex)] (HashMap vertex (cost, Maybe (vertex, label)))
-bellmanford g ss = runST $ do
-  let n = HashMap.size g
-  d <- C.newSized n
-  forM_ ss $ \s -> H.insert d s (0, Nothing)
-
-  updatedRef <- newSTRef (HashSet.fromList ss)
-  _ <- runExceptT $ replicateM_ n $ do
-    us <- lift $ readSTRef updatedRef
-    when (HashSet.null us) $ throwE ()
-    lift $ do
-      writeSTRef updatedRef HashSet.empty
-      forM_ (HashSet.toList us) $ \u -> do
-        Just (du, _) <- H.lookup d u
-        forM_ (HashMap.lookupDefault [] u g) $ \(v, c, l) -> do
-          m <- H.lookup d v
-          case m of
-            Just (c0, _) | c0 <= du + c -> return ()
-            _ -> do
-              H.insert d v (du + c, Just (u,l))
-              modifySTRef' updatedRef (HashSet.insert v)
-
-  xs <- H.toList d
-  runExceptT $ do
-    forM_ xs $ \(u,(du,_)) ->
-      forM_ (HashMap.lookupDefault [] u g) $ \(v, c, l) -> do
-        Just (dv,_) <- lift $ H.lookup d v
-        when (du + c < dv) $ do
-          -- a negative cycle is detected
-          cycle <- lift $ do
-            H.insert d v (du + c, Just (u, l))
-            u0 <- do
-              let getParent u = do
-                    Just (_, Just (v,_)) <- H.lookup d u
-                    return v
-                  go hare tortoise
-                    | hare == tortoise = return hare
-                    | otherwise = do
-                        hare' <- getParent =<< getParent hare
-                        tortoise' <- getParent tortoise
-                        go hare' tortoise'
-              hare0 <- getParent =<< getParent v
-              tortoise0 <- getParent v
-              go hare0 tortoise0
-            let go u result = do
-                  Just (_, Just (v,l)) <- H.lookup d u
-                  if v == u0 then
-                    return ((v,l,u) : result)
-                  else
-                    go v ((v,l,u) : result)
-            go u0 []
-          throwE cycle
-    d' <- lift $ freezeHashTable d
-    return d'
-
-freezeHashTable :: (H.HashTable h, Hashable k, Eq k) => h s k v -> ST s (HashMap k v)
-freezeHashTable h = H.foldM (\m (k,v) -> return $! HashMap.insert k v m) HashMap.empty h
 
 -- ------------------------------------------------------------------------
 
-test = bellmanford g ['A']
+type Vertex = Int
+type Cost = Rational
+type Label = Char
+    
+genGraph :: Gen Cost -> Gen (HashMap Vertex [OutEdge Vertex Cost Label])
+genGraph genCost = do
+  n <- choose (1, 20) -- inclusive
+  liftM HashMap.fromList $ forM [1..n] $ \i -> do
+    m <- choose (0, min (n+1) 20)
+    ys <- replicateM m $ do
+      j <- choose (1, n)
+      c <- genCost
+      l <- elements ['A'..'Z']
+      return (j,c,l)
+    return (i, ys)
 
-g :: HashMap Char [(Char, Int, ())]
-g = HashMap.fromList
-    [ ('A', [('B',-7,()), ('C',-9,())])
-    , ('B', [('C',-8,()), ('D',4,())])
-    , ('C', [('D',4,())])
-    , ('D', [('E',-3,())])
-    , ('E', [('F',5,())])
-    , ('F', [('C',-3,())])
-    ]
+genGraphNonNegative :: Gen (HashMap Vertex [OutEdge Vertex Cost Label])
+genGraphNonNegative = genGraph (liftM getNonNegative arbitrary)
 
--- ------------------------------------------------------------------------
+isValidEdge
+  :: (Eq vertex, Hashable vertex, Eq cost, Eq label)
+  => HashMap vertex [OutEdge vertex cost label]
+  -> Edge vertex cost label
+  -> Bool
+isValidEdge g (v,u,c,l) =
+  case HashMap.lookup  v g of
+    Nothing -> False
+    Just outs -> (u,c,l) `elem` outs
 
-test_bellmanfordexample = bellmanford g [24]
+isValidPath
+  :: (Eq vertex, Hashable vertex, Eq cost, Num cost, Eq label)
+  => HashMap vertex [OutEdge vertex cost label]
+  -> Path vertex cost label
+  -> Bool
+isValidPath g = f
   where
-    g = HashMap.fromListWith (++) $
-          [(v,[(u,c,())]) | ((v,u),c) <- bellmanfordexample_cost]
+    f (Empty v) = v `HashMap.member` g
+    f (Singleton e) = isValidEdge g e
+    f (Append p1 p2 c) = f p1 && f p2 && pathTo p1 == pathFrom p2 && pathCost p1 + pathCost p2 == c
 
-bellmanfordexample_g :: [(Int, [Int])]
-bellmanfordexample_g =
-  [ (0, [7, 8, 13, 27, 25, 4, 29, 17, 3, 10, 20])
-  , (1, [5, 20, 11, 29, 3, 24, 10, 18, 19, 17, 2])
-  , (2, [0, 29, 24, 25, 5, 16, 22, 4, 1, 3])
-  , (3, [7, 27, 0, 12, 4, 8, 15, 5, 14, 20, 28, 24])
-  , (4, [6, 28, 23, 20, 3, 1, 12, 15, 16, 26, 25, 10, 0])
-  , (5, [29, 12, 20, 6, 16, 7, 14, 27, 11, 15, 3, 26, 17, 21, 9])
-  , (6, [1, 3, 25, 9, 28, 29, 10, 2, 11, 21, 12, 23, 19, 22, 27, 0, 14])
-  , (7, [8, 6, 17, 24, 4, 11, 29, 13, 14, 12, 21, 3, 1])
-  , (8, [6, 20, 23, 19, 5, 25, 28, 1, 4, 13, 17])
-  , (9, [29, 19, 13, 27, 6, 0, 2, 5, 24, 17])
-  , (10, [9, 28, 13, 15, 18, 0, 17, 14, 25, 5, 4, 12, 11, 7])
-  , (11, [7, 12, 8, 2, 15, 25, 20, 23, 10, 6, 5])
-  , (12, [14, 15, 17, 0, 9, 28, 24, 19, 13, 20, 29, 18])
-  , (13, [19, 3, 4, 5, 23, 27, 14, 12, 15, 24, 2])
-  , (14, [5, 15, 20, 9, 25, 27, 28, 21])
-  , (15, [4, 17, 6, 14, 11, 25, 12, 28, 18, 3, 1])
-  , (16, [15, 4, 11, 1, 26, 12, 25, 3, 24, 17, 22])
-  , (17, [27, 7, 14, 20, 29, 18, 8, 5, 25, 12, 16, 21, 2, 4])
-  , (18, [7, 12, 5, 28, 17, 25, 26, 21, 16, 14])
-  , (19, [9, 3, 0, 10, 22, 18, 24, 6, 2, 14, 25, 5, 28, 15, 11])
-  , (20, [12, 4, 14, 24, 8, 27, 18, 15, 25])
-  , (21, [5, 10, 16, 29, 13, 25, 18, 26, 1, 6, 28, 15, 14, 20])
-  , (22, [14, 9, 25, 13, 11, 23, 28])
-  , (23, [0, 12, 28, 11, 8, 3, 29, 14, 26, 9, 22, 15, 1])
-  , (24, [1, 20, 17, 0, 28, 27, 16, 10, 12, 11, 21, 19, 29, 8, 7])
-  , (25, [26, 14, 11, 12, 29, 8, 22, 18, 6, 15, 4, 3])
-  , (26, [10, 15, 8, 11, 29, 12, 24, 23, 9, 27, 13, 5])
-  , (27, [22, 8, 14, 12, 9, 24, 2])
-  , (28, [15, 13, 8, 0, 2, 16, 22, 27, 11, 20, 1, 26])
-  , (29, [23, 12, 22, 16, 15, 2, 17, 14, 19, 1, 6, 10, 11, 13, 20])
+isValidNegativeCostCycle
+  :: (Eq vertex, Hashable vertex, Num cost, Ord cost, Eq label)
+  => HashMap vertex [OutEdge vertex cost label]
+  -> Path vertex cost label
+  -> Bool
+isValidNegativeCostCycle g cyclePath =
+  isValidPath g cyclePath &&
+  pathFrom cyclePath == pathTo cyclePath &&
+  pathCost cyclePath < 0
+
+isValidResult
+  :: (Eq vertex, Hashable vertex, Eq cost, Num cost, Eq label)
+  => HashMap vertex [OutEdge vertex cost label]
+  -> [vertex]
+  -> HashMap vertex (cost, Maybe (InEdge vertex cost label))
+  -> Bool
+isValidResult g ss p = 
+  and
+  [ case m of
+      Nothing -> tc == 0 && u `HashSet.member` ss'
+      Just (v,c,l) -> isValidEdge g (v,u,c,l) && tc == fst (p HashMap.! v) + c
+  | (u, (tc,m)) <- HashMap.toList p
   ]
+  where
+    ss' = HashSet.fromList ss
 
-bellmanfordexample_cost :: [((Int,Int), Int)]
-bellmanfordexample_cost =
+-- ------------------------------------------------------------------------
+
+prop_bellmanFord_valid_path :: Property
+prop_bellmanFord_valid_path =
+  forAll (genGraph arbitrary) $ \g ->
+    forAll (sublistOf (HashMap.keys g)) $ \ss ->
+      case bellmanFord g ss of
+        Left cyclePath -> isValidNegativeCostCycle g cyclePath
+        Right m -> and
+          [ isValidPath g path &&
+            pathTo path == u &&
+            pathFrom path `elem` ss
+          | (u, path) <- HashMap.toList $ buildPaths m
+          ]
+
+prop_dijkstra_valid_path :: Property
+prop_dijkstra_valid_path =
+  forAll (genGraphNonNegative) $ \g ->
+    forAll (sublistOf (HashMap.keys g)) $ \ss ->
+      and
+      [ isValidPath g path &&
+        pathTo path == u &&
+        pathFrom path `elem` ss
+      | (u, path) <- HashMap.toList $ buildPaths $ dijkstra g ss
+      ]
+
+prop_floydWarshall_valid_path :: Property
+prop_floydWarshall_valid_path =
+  forAll (genGraphNonNegative) $ \g ->
+      and
+      [ isValidPath g path &&
+        pathFrom path == u &&
+        pathTo path == v
+      | ((u,v), path) <- HashMap.toList (floydWarshall g)
+      ]
+
+prop_dijkstra_equals_bellmanFord :: Property
+prop_dijkstra_equals_bellmanFord =
+  forAll (genGraphNonNegative) $ \g ->
+    let vs = HashMap.keys g
+    in forAll (elements vs) $ \v ->
+       forAll (elements vs) $ \u ->
+         ((Right . fmap pathCost . HashMap.lookup u . buildPaths) $ dijkstra g [v])
+         ==
+         (fmap (fmap pathCost . HashMap.lookup u . buildPaths) $ bellmanFord g [v])
+
+prop_floydWarshall_equals_dijkstra :: Property
+prop_floydWarshall_equals_dijkstra =
+  forAll (genGraphNonNegative) $ \g ->
+    let vs = HashMap.keys g
+        m  = floydWarshall g        
+    in forAll (elements vs) $ \v ->
+       forAll (elements vs) $ \u ->
+         fmap pathCost (HashMap.lookup (v,u) m)
+         ==
+         fmap pathCost (HashMap.lookup u $ buildPaths $ dijkstra g [v])
+
+prop_floydWarshall_equals_bellmanFord :: Property
+prop_floydWarshall_equals_bellmanFord =
+  forAll (genGraph arbitrary) $ \g ->
+    let vs = HashMap.keys g
+        ret1 = floydWarshall g
+    in counterexample (show ret1) $ conjoin $
+         [ counterexample (show v) $ counterexample (show ret2) $
+             case ret2 of
+               Left cyclePath ->
+                 conjoin
+                 [ counterexample (show u) (pathCost (ret1 HashMap.! (u,u)) < 0)
+                 | u <- pathVertexes cyclePath
+                 ]
+               Right m2 ->
+                 HashMap.fromList [(u, pathCost path) | ((v',u), path) <- HashMap.toList ret1, v==v']
+                 ===
+                 fmap fst m2
+         | v <- vs, let ret2 = bellmanFord g [v]
+         ]
+
+-- progassgn5.py example from “Linear and Discrete Optimization”
+-- <https://www.coursera.org/course/linearopt>
+case_bellmanFord_test1 :: Assertion
+case_bellmanFord_test1 = bellmanFord g ['A'] @?= expected
+  where
+    g :: HashMap Char [(Char, Int, ())]
+    g = HashMap.fromList
+        [ ('A', [('B',-7,()), ('C',-9,())])
+        , ('B', [('C',-8,()), ('D',-10,())])
+        , ('C', [('D',4,())])
+        , ('D', [('E',-3,())])
+        , ('E', [('F',5,())])
+        , ('F', [('C',-3,())])
+        ]
+    expected = Right $ HashMap.fromList
+      [ ('A', (0, Nothing))
+      , ('B', (-7, Just ('A',-7,())))
+      , ('C', (-18, Just ('F',-3,())))
+      , ('D', (-17, Just ('B',-10,())))
+      , ('E', (-20, Just ('D',-3,())))
+      , ('F', (-15, Just ('E',5,())))
+      ]
+
+case_bellmanFord_normal :: Assertion
+case_bellmanFord_normal = do
+  let g = HashMap.fromListWith (++) $
+            [(v,[(u,c,())]) | ((v,u),c) <- bellmanford_example_normal]
+  case bellmanFord g [24] of
+    Left cyclePath -> assertFailure ("negative cost cycle should not be found (" ++ show cyclePath ++ ")")
+    Right m -> assertBool (show m ++ " is not a valid result") $ isValidResult g [24] m
+
+bellmanford_example_normal :: [((Vertex, Vertex), Cost)]
+bellmanford_example_normal =
   [ ((7, 3), 236)
   , ((20, 25), 218)
   , ((6, 28), 765)
@@ -512,49 +549,16 @@ bellmanfordexample_cost =
   , ((27, 8), 284)
   ]
 
--- ------------------------------------------------------------------------
+case_bellmanFord_negativecost_cycle :: Assertion
+case_bellmanFord_negativecost_cycle = do
+  let g = HashMap.fromListWith (++) $
+            [(v, [(u,c,())]) | ((v,u),c) <- bellmanford_example_negativecost_cycle]
+  case bellmanFord g [25] of
+    Left cyclePath -> assertBool (show cyclePath ++ " should be valid negative cost cycle") $ isValidNegativeCostCycle g cyclePath
+    Right m -> assertFailure ("negative cost cycle should be found (" ++ show m ++ ")") 
 
-test_negativecostcycle = bellmanford g [25]
-  where
-    g = HashMap.fromListWith (++) $
-          [(v, [(u,c,())]) | ((v,u),c) <- negativecostcycle_cost]
-
-negativecostcycle_g :: [(Int, [Int])]
-negativecostcycle_g =
-  [ (0, [4, 5, 6, 7, 9, 11, 13, 16, 18, 21, 22, 23, 24, 26, 27])
-  , (1, [3, 4, 6, 7, 9, 10, 11, 15, 16, 18, 23, 27])
-  , (2, [0, 1, 4, 6, 7, 8, 9, 11, 14, 15, 16, 18, 24, 25, 26, 27])
-  , (3, [1, 2, 5, 8, 12, 13, 17, 18, 24, 25, 26])
-  , (4, [0, 3, 5, 7, 8, 10, 12, 14, 15, 24, 27])
-  , (5, [0, 1, 3, 7, 9, 10, 11, 14, 16, 19, 20, 24, 28, 29])
-  , (6, [4, 5, 7, 9, 10, 11, 13, 15, 17, 19, 20, 21, 26, 27])
-  , (7, [1, 2, 3, 4, 6, 9, 10, 13, 18, 21, 25, 27])
-  , (8, [3, 4, 6, 7, 10, 18, 19, 21, 22, 27, 28, 29])
-  , (9, [1, 8, 16, 20, 25, 29])
-  , (10, [4, 7, 8, 14, 15, 16, 17, 18, 23, 26, 28])
-  , (11, [1, 2, 3, 5, 7, 8, 9, 10, 13, 22, 23, 27, 29])
-  , (12, [1, 4, 5, 6, 7, 9, 10, 11, 14, 16, 18, 19, 22, 23, 27, 28])
-  , (13, [0, 1, 2, 3, 4, 9, 12, 23, 26, 28])
-  , (14, [0, 5, 6, 7, 8, 9, 10, 11, 17, 23, 27, 28])
-  , (15, [5, 8, 11, 13, 20, 22, 23, 26, 27])
-  , (16, [5, 6, 9, 10, 13, 17, 18, 19, 22, 23, 24, 25, 26])
-  , (17, [0, 1, 7, 9, 10, 14, 15, 18, 21, 24, 25, 27, 29])
-  , (18, [4, 7, 8, 9, 12, 13, 14, 19, 20, 22, 23, 26, 27])
-  , (19, [1, 3, 4, 7, 9, 14, 21, 24, 27, 29])
-  , (20, [0, 5, 7, 10, 12, 13, 17, 21, 23, 24, 26, 27, 28, 29])
-  , (21, [1, 5, 10, 12, 15, 19, 20, 22, 23, 25, 26, 27, 28, 29])
-  , (22, [2, 4, 5, 6, 9, 10, 11, 16, 21, 25, 26, 27])
-  , (23, [0, 4, 5, 6, 7, 9, 10, 11, 12, 17, 18, 21, 22, 24, 25, 28, 29])
-  , (24, [0, 3, 8, 10, 12, 13, 16, 23, 26, 27, 28])
-  , (25, [0, 2, 9, 10, 12, 18, 19, 20, 23, 26, 28, 29])
-  , (26, [1, 2, 10, 11, 14, 15, 16, 18, 23, 24, 28])
-  , (27, [5, 7, 10, 13, 18, 19, 21, 22, 25, 26, 28, 29])
-  , (28, [0, 6, 7, 9, 10, 12, 13, 15, 16, 21, 22, 25, 26, 29])
-  , (29, [0, 1, 2, 4, 7, 11, 13, 17, 22, 23, 24, 25, 26, 27, 28])
-  ]
-
-negativecostcycle_cost :: [((Int,Int), Int)]
-negativecostcycle_cost =
+bellmanford_example_negativecost_cycle :: [((Vertex, Vertex), Cost)]
+bellmanford_example_negativecost_cycle =
   [ ((7, 3), 558)
   , ((16, 9), 913)
   , ((21, 28), 902)
@@ -932,4 +936,34 @@ negativecostcycle_cost =
   , ((29, 24), 441)
   ]
 
+case_floydWarshall_normal :: Assertion
+case_floydWarshall_normal = do
+  fmap pathCost m @?= expected
+  forM_ (HashMap.toList m) $ \((u,v),path) -> do
+    pathFrom path @?= u
+    pathTo path @?= v
+    assertBool (show path ++ " is not a valid path") (isValidPath floydWarshall_example path)
+  where
+    m = floydWarshall floydWarshall_example
+    expected =
+      HashMap.fromList
+      [ ((1,1),0), ((1,2),-1), ((1,3),-2), ((1,4),0)
+      , ((2,1),4), ((2,2),0),  ((2,3),2),  ((2,4),4)
+      , ((3,1),5), ((3,2),1),  ((3,3),0),  ((3,4),2)
+      , ((4,1),3), ((4,2),-1), ((4,3),1),  ((4,4),0)
+      ]
+
+-- https://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm
+floydWarshall_example :: HashMap Vertex [OutEdge Vertex Cost ()]
+floydWarshall_example = HashMap.fromList
+  [ (1, [(3,-2,())])
+  , (2, [(1,4,()), (3,3,())])
+  , (3, [(4,2,())])
+  , (4, [(2,-1,())])
+  ]
+
 -- ------------------------------------------------------------------------
+-- Test harness
+
+graphShortestPathTestGroup :: TestTree
+graphShortestPathTestGroup = $(testGroupGenerator)

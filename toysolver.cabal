@@ -332,9 +332,7 @@ Library
      ToySolver.Data.Polynomial.GroebnerBasis
      ToySolver.Data.Polynomial.Interpolation.Lagrange
      ToySolver.Data.Var
-     ToySolver.Graph.BellmanFord
-     ToySolver.Graph.Dijkstra
-     ToySolver.Graph.FloydWarshall
+     ToySolver.Graph.ShortestPath
      ToySolver.QBF
      ToySolver.SAT
      ToySolver.SAT.Encoder.Integer
@@ -847,6 +845,7 @@ Test-suite TestSuite
     Test.ContiTraverso
     Test.Delta
     Test.FiniteModelFinder
+    Test.GraphShortestPath
     Test.HittingSets
     Test.Knapsack
     Test.LPFile
