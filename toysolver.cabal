@@ -170,7 +170,8 @@ Library
      heaps,
      intern >=0.9.1.2 && <1.0.0.0,
      log-domain,
-     loop >=0.2.0 && < 1.0.0,
+     -- numLoopState requires loop >=0.3.0
+     loop >=0.3.0 && < 1.0.0,
      mtl >=2.1.2,
      multiset,
      -- createSystemRandom requires mwc-random >=0.13.1.0
