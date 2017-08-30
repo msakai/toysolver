@@ -16,6 +16,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Scientific (Scientific)
+import Data.String
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Text.XML as XML
@@ -143,5 +144,5 @@ parse :: TL.Text -> MIP.Solution Scientific
 parse t = parseDoc $ XML.parseText_ def t
 
 readFile :: FilePath -> IO (MIP.Solution Scientific)
-readFile fname = parseDoc <$> XML.readFile def fname
+readFile fname = parseDoc <$> XML.readFile def (fromString fname)
 
