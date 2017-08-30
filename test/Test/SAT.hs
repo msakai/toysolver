@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
 module Test.SAT (satTestGroup) where
 
@@ -2015,6 +2016,13 @@ instance Arbitrary PBO.Method where
 
 instance Arbitrary PB.Strategy where
   arbitrary = arbitraryBoundedEnum
+
+-- ---------------------------------------------------------------------
+
+#if !MIN_VERSION_QuickCheck(2,8,0)
+sublistOf :: [a] -> Gen [a]
+sublistOf xs = filterM (\_ -> choose (False, True)) xs
+#endif
 
 ------------------------------------------------------------------------
 -- Test harness
