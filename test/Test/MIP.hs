@@ -36,17 +36,17 @@ prop_status_trans =
 prop_status_meet_idempotency :: Property
 prop_status_meet_idempotency =
   forAll arbitrary $ \(x :: MIP.Status) ->
-    x /\ x == x
+    x `meet` x == x
 
 prop_status_meet_comm :: Property
 prop_status_meet_comm =
   forAll arbitrary $ \(x :: MIP.Status) y ->
-    x /\ y == y /\ x
+    x `meet` y == y `meet` x
 
 prop_status_meet_assoc :: Property
 prop_status_meet_assoc =
   forAll arbitrary $ \(x :: MIP.Status) y z ->
-    (x /\ y) /\ z == x /\ (y /\ z)
+    (x `meet` y) `meet` z == x `meet` (y `meet` z)
 
 prop_status_meet_leq :: Property
 prop_status_meet_leq =

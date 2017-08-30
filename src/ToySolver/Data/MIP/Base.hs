@@ -349,23 +349,23 @@ instance PartialOrd Status where
         ]
 
 instance MeetSemiLattice Status where
-  StatusUnknown /\ b = StatusUnknown
-  StatusFeasible /\ b
+  StatusUnknown `meet` b = StatusUnknown
+  StatusFeasible `meet` b
     | StatusFeasible `leq` b = StatusFeasible
     | otherwise = StatusUnknown
-  StatusOptimal /\ StatusOptimal = StatusOptimal
-  StatusOptimal /\ b
+  StatusOptimal `meet` StatusOptimal = StatusOptimal
+  StatusOptimal `meet` b
     | StatusFeasible `leq` b = StatusFeasible
     | otherwise = StatusUnknown
-  StatusInfeasibleOrUnbounded /\ b
+  StatusInfeasibleOrUnbounded `meet` b
     | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
     | otherwise = StatusUnknown
-  StatusInfeasible /\ StatusInfeasible = StatusInfeasible
-  StatusInfeasible /\ b
+  StatusInfeasible `meet` StatusInfeasible = StatusInfeasible
+  StatusInfeasible `meet` b
     | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
     | otherwise = StatusUnknown
-  StatusUnbounded /\ StatusUnbounded = StatusUnbounded
-  StatusUnbounded /\ b
+  StatusUnbounded `meet` StatusUnbounded = StatusUnbounded
+  StatusUnbounded `meet` b
     | StatusFeasible `leq` b = StatusFeasible
     | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
     | otherwise = StatusUnknown
