@@ -11,6 +11,8 @@
 # Use new container infrastructure to enable caching
 sudo: false
 
+dist: trusty
+
 # Do not choose a language; we provide our own build tools.
 language: generic
 
@@ -18,13 +20,13 @@ matrix:
   include:
     - env: STACK_YAML=stack-travis.yaml RESOLVER=lts-9.2 GHCVER=8.0.1 COVERAGE=1
       compiler: ": #GHC 8.0.2"
-      addons: {apt: {packages: [libgmp-dev,coinor-libcbc0,glpk,lp-solve]}}
+      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve]}}
     - env: STACK_YAML=stack-travis.yaml RESOLVER=lts-6.33 GHCVER=7.10.3
       compiler: ": #GHC 7.10.3"
-      addons: {apt: {packages: [libgmp-dev,coinor-libcbc0,glpk,lp-solve]}}
+      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve]}}
     - env: STACK_YAML=stack-travis-ghc-7.8.yaml RESOLVER=lts-2.22 GHCVER=7.8.4
       compiler: ": #GHC 7.8.4"
-      addons: {apt: {packages: [libgmp-dev,coinor-libcbc0,glpk,lp-solve]}}
+      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve]}}
 
 # Caching so the next build will be fast too.
 cache:
@@ -36,8 +38,8 @@ addons:
   apt:
     packages:
       - libgmp-dev
-      - coinor-libcbc0
-      - glpk
+      - coinor-cbc
+      - glpk-utils
       - lp-solve
 
 before_install:
