@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Test.GraphShortestPath (graphShortestPathTestGroup) where
 
@@ -961,6 +962,13 @@ floydWarshall_example = HashMap.fromList
   , (3, [(4,2,())])
   , (4, [(2,-1,())])
   ]
+
+-- ------------------------------------------------------------------------
+
+#if !MIN_VERSION_QuickCheck(2,8,0)
+sublistOf :: [a] -> Gen [a]
+sublistOf xs = filterM (\_ -> choose (False, True)) xs
+#endif
 
 -- ------------------------------------------------------------------------
 -- Test harness
