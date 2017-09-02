@@ -49,10 +49,10 @@ extra-deps:
 - queue-0.1.2
 - OptDir-0.0.3
 - logic-TPTP-0.4.4.0
-- data-interval-1.2.0
+- data-interval-1.3.0
 - extended-reals-0.2.2.0
 - finite-field-0.9.0
-- pseudo-boolean-0.1.5.0
+- pseudo-boolean-0.1.6.0
 - sign-0.4.3
 - OpenCL-1.0.3.4
 
