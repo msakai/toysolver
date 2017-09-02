@@ -825,7 +825,7 @@ Test-suite TestPolynomial
     prettyclass >=1.0.0,
     tasty >=0.10.1,
     tasty-hunit ==0.9.*,
-    tasty-quickcheck ==0.8.*,
+    tasty-quickcheck >=0.8 && <0.10,
     tasty-th,
     toysolver
   Default-Language: Haskell2010
@@ -889,7 +889,7 @@ Test-suite TestSuite
     QuickCheck >=2.5 && <3,
     tasty >=0.10.1,
     tasty-hunit ==0.9.*,
-    tasty-quickcheck ==0.8.*,
+    tasty-quickcheck >=0.8 && <0.10,
     tasty-th,
     text,
     toysolver,
