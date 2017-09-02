@@ -178,7 +178,7 @@ Library
      mwc-random >=0.13.1 && <0.14,
      OptDir,
      lattices,
-     megaparsec >=4 && <6,
+     megaparsec >=4 && <7,
      prettyclass >=1.0.0,
      primes,
      primitive >=0.6,

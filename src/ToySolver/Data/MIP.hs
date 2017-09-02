@@ -34,6 +34,9 @@ import Data.Char
 import Data.Scientific (Scientific)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.IO as TLIO
+#if MIN_VERSION_megaparsec(6,0,0)
+import Data.Void
+#endif
 import System.FilePath (takeExtension)
 import System.IO hiding (readFile, writeFile)
 import Text.Megaparsec
@@ -59,7 +62,9 @@ readMPSFile :: FileOptions -> FilePath -> IO (Problem Scientific)
 readMPSFile = MPSFile.parseFile
 
 -- | Parse a string containing LP file data.
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+parseLPString :: FileOptions -> String -> String -> Either (ParseError Char Void) (Problem Scientific)
+#elif MIN_VERSION_megaparsec(5,0,0)
 parseLPString :: FileOptions -> String -> String -> Either (ParseError Char Dec) (Problem Scientific)
 #else
 parseLPString :: FileOptions -> String -> String -> Either ParseError (Problem Scientific)
@@ -67,7 +72,9 @@ parseLPString :: FileOptions -> String -> String -> Either ParseError (Problem S
 parseLPString = LPFile.parseString
 
 -- | Parse a string containing MPS file data.
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+parseMPSString :: FileOptions -> String -> String -> Either (ParseError Char Void) (Problem Scientific)
+#elif MIN_VERSION_megaparsec(5,0,0)
 parseMPSString :: FileOptions -> String -> String -> Either (ParseError Char Dec) (Problem Scientific)
 #else
 parseMPSString :: FileOptions -> String -> String -> Either ParseError (Problem Scientific)
