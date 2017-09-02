@@ -357,6 +357,46 @@ main = do
 
 printGCStat :: IO ()
 #if defined(__GLASGOW_HASKELL__)
+#if __GLASGOW_HASKELL__ >= 802
+printGCStat = do
+  b <- Stats.getRTSStatsEnabled
+  when b $ do
+    stat <- Stats.getRTSStats
+    putCommentLine "RTSStats:"
+    putCommentLine $ printf "  gcs = %d"                             $ Stats.gcs stat
+    putCommentLine $ printf "  major_gcs = %d"                       $ Stats.major_gcs stat
+    putCommentLine $ printf "  allocated_bytes = %d"                 $ Stats.allocated_bytes stat
+    putCommentLine $ printf "  max_live_bytes = %d"                  $ Stats.max_live_bytes stat
+    putCommentLine $ printf "  max_large_objects_bytes = %d"         $ Stats.max_large_objects_bytes stat
+    putCommentLine $ printf "  max_compact_bytes = %d"               $ Stats.max_compact_bytes stat
+    putCommentLine $ printf "  max_slop_bytes = %d"                  $ Stats.max_slop_bytes stat
+    putCommentLine $ printf "  max_mem_in_use_bytes = %d"            $ Stats.max_mem_in_use_bytes stat
+    putCommentLine $ printf "  cumulative_live_bytes = %d"           $ Stats.cumulative_live_bytes stat
+    putCommentLine $ printf "  copied_bytes = %d"                    $ Stats.copied_bytes stat
+    putCommentLine $ printf "  par_copied_bytes = %d"                $ Stats.par_copied_bytes stat
+    putCommentLine $ printf "  cumulative_par_max_copied_bytes = %d" $ Stats.cumulative_par_max_copied_bytes stat
+    putCommentLine $ printf "  mutator_cpu_ns = %d"                  $ Stats.mutator_cpu_ns stat
+    putCommentLine $ printf "  mutator_elapsed_ns = %d"              $ Stats.mutator_elapsed_ns stat
+    putCommentLine $ printf "  gc_cpu_ns = %d"                       $ Stats.gc_cpu_ns stat
+    putCommentLine $ printf "  gc_elapsed_ns = %d"                   $ Stats.gc_elapsed_ns stat
+    putCommentLine $ printf "  cpu_ns = %d"                          $ Stats.cpu_ns stat
+    putCommentLine $ printf "  elapsed_ns = %d"                      $ Stats.elapsed_ns stat
+    let gc = Stats.gc stat
+    putCommentLine $ "  gc:"
+    putCommentLine $ printf "    gen = %d"                           $ Stats.gcdetails_gen gc
+    putCommentLine $ printf "    threads = %d"                       $ Stats.gcdetails_threads gc
+    putCommentLine $ printf "    allocated_bytes = %d"               $ Stats.gcdetails_allocated_bytes gc
+    putCommentLine $ printf "    live_bytes = %d"                    $ Stats.gcdetails_live_bytes gc
+    putCommentLine $ printf "    large_objects_bytes = %d"           $ Stats.gcdetails_large_objects_bytes gc
+    putCommentLine $ printf "    compact_bytes = %d"                 $ Stats.gcdetails_compact_bytes gc
+    putCommentLine $ printf "    slop_bytes = %d"                    $ Stats.gcdetails_slop_bytes gc
+    putCommentLine $ printf "    mem_in_use_bytes = %d"              $ Stats.gcdetails_mem_in_use_bytes gc
+    putCommentLine $ printf "    copied_bytes = %d"                  $ Stats.gcdetails_copied_bytes gc
+    putCommentLine $ printf "    par_max_copied_bytes = %d"          $ Stats.gcdetails_par_max_copied_bytes gc
+    putCommentLine $ printf "    sync_elapsed_ns = %d"               $ Stats.gcdetails_sync_elapsed_ns gc
+    putCommentLine $ printf "    cpu_ns = %d"                        $ Stats.gcdetails_cpu_ns gc
+    putCommentLine $ printf "    elapsed_ns = %d"                    $ Stats.gcdetails_elapsed_ns gc
+#else
 printGCStat = do
   b <- Stats.getGCStatsEnabled
   when b $ do
@@ -380,6 +420,7 @@ printGCStat = do
     putCommentLine $ printf "  wallSeconds = %5.2f"         $ Stats.wallSeconds stat
     putCommentLine $ printf "  parTotBytesCopied = %d"      $ Stats.parTotBytesCopied stat
     putCommentLine $ printf "  parMaxBytesCopied = %d"      $ Stats.parMaxBytesCopied stat
+#endif
 #else
 printGCStat = return ()
 #endif

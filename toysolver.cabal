@@ -920,7 +920,7 @@ Benchmark BenchmarkSATLIB
   build-depends:
     array,
     base,
-    criterion >=1.0 && <1.2,
+    criterion >=1.0 && <1.3,
     data-default-class,
     toysolver
   Default-Language: Haskell2010
@@ -931,7 +931,7 @@ Benchmark BenchmarkKnapsack
   main-is:          BenchmarkKnapsack.hs
   build-depends:
     base,
-    criterion >=1.0 && <1.2,
+    criterion >=1.0 && <1.3,
     toysolver
   Default-Language: Haskell2010
 
@@ -941,7 +941,7 @@ Benchmark BenchmarkSubsetSum
   main-is:          BenchmarkSubsetSum.hs
   build-depends:
     base,
-    criterion >=1.0 && <1.2,
+    criterion >=1.0 && <1.3,
     toysolver,
     vector
   Default-Language: Haskell2010
