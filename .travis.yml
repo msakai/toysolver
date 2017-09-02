@@ -50,11 +50,11 @@ before_install:
 
 install:
 # Build dependencies
-- stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER --no-terminal --install-ghc test --only-dependencies $([ "$GHCVER" != "7.8.4" ] && echo "--flag toysolver:BuildToyFMF") --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve
+- stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER --jobs 1 --no-terminal --install-ghc test --only-dependencies $([ "$GHCVER" != "7.8.4" ] && echo "--flag toysolver:BuildToyFMF") --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve
 
 script:
 # Build the package, its tests, and its docs and run the tests
-- stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER --no-terminal test --haddock --no-haddock-deps --coverage $([ "$GHCVER" != "7.8.4" ] && echo "--flag toysolver:BuildToyFMF") --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve
+- stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER --jobs 1 --no-terminal test --haddock --no-haddock-deps --coverage $([ "$GHCVER" != "7.8.4" ] && echo "--flag toysolver:BuildToyFMF") --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve
 
 after_script:
 - "[ -n \"$COVERAGE\" ] && travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$GHCVER.tar.bz2 | tar -xj"
