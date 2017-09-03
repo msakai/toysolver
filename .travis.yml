@@ -20,16 +20,16 @@ matrix:
   include:
     - env: STACK_YAML=stack-travis-ghc-8.2.yaml RESOLVER=nightly-2017-08-30 GHCVER=8.2.1
       compiler: ": #GHC 8.2.1"
-      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve]}}
+      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve,c2hs,ocl-icd-opencl-dev]}}
     - env: STACK_YAML=stack-travis.yaml RESOLVER=lts-9.2 GHCVER=8.0.1 COVERAGE=1
       compiler: ": #GHC 8.0.2"
-      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve]}}
+      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve,c2hs,ocl-icd-opencl-dev]}}
     - env: STACK_YAML=stack-travis.yaml RESOLVER=lts-6.33 GHCVER=7.10.3
       compiler: ": #GHC 7.10.3"
-      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve]}}
+      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve,c2hs,ocl-icd-opencl-dev]}}
     - env: STACK_YAML=stack-travis-ghc-7.8.yaml RESOLVER=lts-2.22 GHCVER=7.8.4
       compiler: ": #GHC 7.8.4"
-      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve]}}
+      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve,c2hs,ocl-icd-opencl-dev]}}
 
 # Caching so the next build will be fast too.
 cache:
@@ -44,6 +44,8 @@ addons:
       - coinor-cbc
       - glpk-utils
       - lp-solve
+      - ocl-icd-opencl-dev
+      - c2hs
 
 before_install:
 # Download and unpack the stack executable
@@ -53,11 +55,12 @@ before_install:
 
 install:
 # Build dependencies
-- stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER --jobs 2 --no-terminal --install-ghc test --only-dependencies $([ "$GHCVER" != "7.8.4" ] && echo "--flag toysolver:BuildToyFMF") --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve
+- stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER --jobs 2 --no-terminal --install-ghc test --only-dependencies $([ "$GHCVER" != "7.8.4" ] && echo "--flag toysolver:BuildToyFMF") --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL
+- stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER          --no-terminal --install-ghc test --only-dependencies $([ "$GHCVER" != "7.8.4" ] && echo "--flag toysolver:BuildToyFMF") --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL
 
 script:
 # Build the package, its tests, and its docs and run the tests
-- stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER --jobs 2 --no-terminal test --haddock --no-haddock-deps --coverage $([ "$GHCVER" != "7.8.4" ] && echo "--flag toysolver:BuildToyFMF") --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve
+- stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER --jobs 2 --no-terminal test --haddock --no-haddock-deps --coverage $([ "$GHCVER" != "7.8.4" ] && echo "--flag toysolver:BuildToyFMF") --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL
 
 after_script:
 - "[ -n \"$COVERAGE\" ] && travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$GHCVER.tar.bz2 | tar -xj"
