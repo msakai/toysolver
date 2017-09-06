@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-9.2
+resolver: lts-6.33
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -37,10 +37,10 @@ resolver: lts-9.2
 # will not be run. This is useful for tweaking upstream packages.
 packages:
 - .
-- location:
-    git: https://github.com/msakai/opencl.git
-    commit: 80d0cb9d235819cd53e6a36d7a9258bc19d564ab
-  extra-dep: true
+# - location:
+#     git: https://github.com/msakai/opencl.git
+#     commit: 80d0cb9d235819cd53e6a36d7a9258bc19d564ab
+#   extra-dep: true
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
@@ -48,12 +48,13 @@ extra-deps:
 - intern-0.9.1.4
 - queue-0.1.2
 - OptDir-0.0.3
-- logic-TPTP-0.4.5.0
+- logic-TPTP-0.4.4.0 # logic-TPTP-0.4.5.0 requires transformers-compat >=0.5 but lts-6.33 provides transformers-compat-0.4.0.4
 - data-interval-1.3.0
 - extended-reals-0.2.2.0
 - finite-field-0.9.0
 - pseudo-boolean-0.1.6.0
 - sign-0.4.3
+- OpenCL-1.0.3.4
 
 # hack for avoiding haddock error of MemoTrie-0.6.4
 #- MemoTrie-0.6.7
@@ -61,6 +62,12 @@ extra-deps:
 
 # Override default flag values for local packages and extra-deps
 flags: {}
+#flags:
+#  toysolver:
+#    BuildToyFMF: true
+#    BuildSamplePrograms: true
+#    BuildMiscPrograms: true
+#    OpenCL: true
 
 # Extra package databases containing global packages
 extra-package-dbs: []
