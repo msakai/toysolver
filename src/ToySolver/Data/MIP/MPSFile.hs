@@ -55,11 +55,21 @@ import qualified Data.Text.Lazy as TL
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as B
 import qualified Data.Text.Lazy.IO as TLIO
+#if MIN_VERSION_megaparsec(6,0,0)
+import Data.Void
+#endif
 import System.IO
+#if MIN_VERSION_megaparsec(6,0,0)
+import Text.Megaparsec
+import Text.Megaparsec.Char hiding (string', newline)
+import qualified Text.Megaparsec.Char as P
+import qualified Text.Megaparsec.Char.Lexer as Lexer
+#else
 import qualified Text.Megaparsec as P
 import Text.Megaparsec hiding (string', newline)
 import qualified Text.Megaparsec.Lexer as Lexer
 import Text.Megaparsec.Prim (MonadParsec ())
+#endif
 
 import Data.OptDir
 import qualified ToySolver.Data.MIP.Base as MIP
@@ -83,7 +93,9 @@ data BoundType
 
 -- ---------------------------------------------------------------------------
 
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+type C e s m = (MonadParsec e s m, Token s ~ Char, IsString (Tokens s))
+#elif MIN_VERSION_megaparsec(5,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Char)
 #else
 type C e s m = (MonadParsec s m Char)
@@ -91,7 +103,9 @@ type C e s m = (MonadParsec s m Char)
 
 -- | Parse a string containing MPS file data.
 -- The source name is only | used in error messages and may be the empty string.
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+parseString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => MIP.FileOptions -> String -> s -> Either (ParseError Char Void) (MIP.Problem Scientific)
+#elif MIN_VERSION_megaparsec(5,0,0)
 parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError Char Dec) (MIP.Problem Scientific)
 #else
 parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Scientific)
@@ -107,7 +121,9 @@ parseFile opt fname = do
     Just enc -> hSetEncoding h enc
   ret <- parse (parser <* eof) fname <$> TLIO.hGetContents h
   case ret of
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+    Left e -> throw (e :: ParseError Char Void)
+#elif MIN_VERSION_megaparsec(5,0,0)
     Left e -> throw (e :: ParseError Char Dec)
 #else
     Left e -> throw (e :: ParseError)
@@ -154,10 +170,12 @@ ident :: C e s m => m T.Text
 ident = liftM fromString $ tok $ some $ noneOf [' ', '\t', '\n']
 
 stringLn :: C e s m => String -> m ()
-stringLn s = string s >> newline'
+stringLn s = string (fromString s) >> newline'
 
 number :: forall e s m. C e s m => m Scientific
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+number = tok $ Lexer.signed (return ()) Lexer.scientific
+#elif MIN_VERSION_megaparsec(5,0,0)
 number = tok $ Lexer.signed (return ()) Lexer.number
 #else
 number = tok $ liftM (either fromInteger fromFloatDigits) $ Lexer.signed (return ()) Lexer.number
@@ -166,7 +184,9 @@ number = tok $ liftM (either fromInteger fromFloatDigits) $ Lexer.signed (return
 -- ---------------------------------------------------------------------------
 
 -- | MPS file parser
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+parser :: (MonadParsec e s m, Token s ~ Char, IsString (Tokens s)) => m (MIP.Problem Scientific)
+#elif MIN_VERSION_megaparsec(5,0,0)
 parser :: (MonadParsec e s m, Token s ~ Char) => m (MIP.Problem Scientific)
 #else
 parser :: MonadParsec s m Char => m (MIP.Problem Scientific)
@@ -503,7 +523,7 @@ boundsSection = do
 
 boundType :: C e s m => m BoundType
 boundType = tok $ do
-  msum [try (string (show k)) >> return k | k <- [minBound..maxBound]]
+  msum [try (string (fromString (show k))) >> return k | k <- [minBound..maxBound]]
 
 sosSection :: forall e s m. C e s m => m [MIP.SOSConstraint Scientific]
 sosSection = do

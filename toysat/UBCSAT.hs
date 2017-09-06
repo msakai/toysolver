@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
@@ -16,12 +17,19 @@ import Data.Default
 import Data.Either
 import Data.Function
 import Data.List
+#if MIN_VERSION_megaparsec(6,0,0)
+import Data.Void
+#endif
 import System.Directory
 import System.IO
 import System.IO.Temp
 import System.Process
 import Text.Megaparsec hiding (try)
+#if MIN_VERSION_megaparsec(6,0,0)
+import Text.Megaparsec.Char
+#else
 import Text.Megaparsec.String
+#endif
 
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.MaxSAT as MaxSAT
@@ -129,7 +137,11 @@ ubcsat' opt fname varInitFile = do
 scanSolutions :: Int -> String -> [(Integer, SAT.Model)]
 scanSolutions nv s = rights $ map (parse (solution nv) "") $ lines s
 
+#if MIN_VERSION_megaparsec(6,0,0)
+solution :: MonadParsec Void String m => Int -> m (Integer, SAT.Model)
+#else
 solution :: Int -> Parser (Integer, SAT.Model)
+#endif
 solution nv = do
   skipSome digitChar
   space

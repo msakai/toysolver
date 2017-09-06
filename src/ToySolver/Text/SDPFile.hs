@@ -56,11 +56,22 @@ import Data.Scientific (fromFloatDigits)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
+#if MIN_VERSION_megaparsec(6,0,0)
+import Data.String
+import Data.Void
+import System.IO
+import Text.Megaparsec
+import Text.Megaparsec.Char
+import qualified Text.Megaparsec.Char.Lexer as Lexer
+#else
 import Text.Megaparsec
 import qualified Text.Megaparsec.Lexer as Lexer
 import Text.Megaparsec.Prim (MonadParsec ())
+#endif
 
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+type C e s m = (MonadParsec e s m, Token s ~ Char, IsString (Tokens s))
+#elif MIN_VERSION_megaparsec(5,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Char)
 #else
 type C e s m = (MonadParsec s m Char)
@@ -115,7 +126,9 @@ diagBlock xs = Map.fromList [((i,i),x) | (i,x) <- zip [1..] xs]
 -- ---------------------------------------------------------------------------
 
 -- | Parse a SDPA format (.dat) string.
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+parseDataString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => String -> s -> Either (ParseError Char Void) Problem
+#elif MIN_VERSION_megaparsec(5,0,0)
 parseDataString :: (Stream s, Token s ~ Char) => String -> s -> Either (ParseError Char Dec) Problem
 #else
 parseDataString :: Stream s Char => String -> s -> Either ParseError Problem
@@ -123,17 +136,25 @@ parseDataString :: Stream s Char => String -> s -> Either ParseError Problem
 parseDataString = parse (pDataFile <* eof)
 
 -- | Parse a SDPA format file (.dat).
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+parseDataFile :: FilePath -> IO (Either (ParseError Char Void) Problem)
+#elif MIN_VERSION_megaparsec(5,0,0)
 parseDataFile :: FilePath -> IO (Either (ParseError Char Dec) Problem)
 #else
 parseDataFile :: FilePath -> IO (Either ParseError Problem)
 #endif
 parseDataFile fname = do
+#if MIN_VERSION_megaparsec(6,0,0)
+  s <- hGetContents =<< openBinaryFile fname ReadMode
+#else
   s <- BL.readFile fname
+#endif
   return $! parse (pDataFile <* eof) fname s
 
 -- | Parse a SDPA sparse format (.dat-s) string.
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+parseSparseDataString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => String -> s -> Either (ParseError Char Void) Problem
+#elif MIN_VERSION_megaparsec(5,0,0)
 parseSparseDataString :: (Stream s, Token s ~ Char) => String -> s -> Either (ParseError Char Dec) Problem
 #else
 parseSparseDataString :: Stream s Char => String -> s -> Either ParseError Problem
@@ -141,13 +162,19 @@ parseSparseDataString :: Stream s Char => String -> s -> Either ParseError Probl
 parseSparseDataString = parse (pSparseDataFile <* eof)
 
 -- | Parse a SDPA sparse format file (.dat-s).
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+parseSparseDataFile :: FilePath -> IO (Either (ParseError Char Void) Problem)
+#elif MIN_VERSION_megaparsec(5,0,0)
 parseSparseDataFile :: FilePath -> IO (Either (ParseError Char Dec) Problem)
 #else
 parseSparseDataFile :: FilePath -> IO (Either ParseError Problem)
 #endif
 parseSparseDataFile fname = do
+#if MIN_VERSION_megaparsec(6,0,0)
+  s <- hGetContents =<< openBinaryFile fname ReadMode
+#else
   s <- BL.readFile fname
+#endif
   return $! parse (pSparseDataFile <* eof) fname s
 
 pDataFile :: C e s m => m Problem
@@ -263,7 +290,9 @@ int :: C e s m => m Integer
 int = Lexer.signed (return ()) Lexer.decimal
 
 real :: forall e s m. C e s m => m Scientific
-#if MIN_VERSION_megaparsec(5,0,0)
+#if MIN_VERSION_megaparsec(6,0,0)
+real = Lexer.signed (return ()) Lexer.scientific
+#elif MIN_VERSION_megaparsec(5,0,0)
 real = Lexer.signed (return ()) Lexer.number
 #else
 real = liftM (either fromInteger fromFloatDigits) $ Lexer.signed (return ()) $ Lexer.number
