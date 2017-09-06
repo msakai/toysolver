@@ -23,7 +23,7 @@ import ToySolver.SAT.Types
 import ToySolver.SAT.MUS.Types
 
 data Method
-  = Linear
+  = Deletion
   | Insertion
   | QuickXplain
   deriving (Eq, Ord, Enum, Bounded, Show)
@@ -49,7 +49,7 @@ data Options
 instance Default Options where
   def =
     Options
-    { optMethod     = Linear
+    { optMethod     = Deletion
     , optLogger     = \_ -> return ()
     , optShowLit    = show
     , optEvalConstr = SAT.evalLit

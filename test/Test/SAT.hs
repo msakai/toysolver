@@ -1435,7 +1435,7 @@ findMUSAssumptions_case1 method = do
       expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
   actual' `elem` expected @?= True
 
-case_findMUSAssumptions_Linear = findMUSAssumptions_case1 MUS.Linear
+case_findMUSAssumptions_Deletion = findMUSAssumptions_case1 MUS.Deletion
 case_findMUSAssumptions_Insertion = findMUSAssumptions_case1 MUS.Insertion
 case_findMUSAssumptions_QuickXplain = findMUSAssumptions_case1 MUS.QuickXplain
 

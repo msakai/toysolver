@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.MUS.Linear
+-- Module      :  ToySolver.SAT.MUS.Deletion
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -11,7 +11,7 @@
 -- Minimal Unsatifiable Subset (MUS) Finder
 --
 -----------------------------------------------------------------------------
-module ToySolver.SAT.MUS.Linear
+module ToySolver.SAT.MUS.Deletion
   ( module ToySolver.SAT.MUS.Base
   , findMUSAssumptions
   ) where
@@ -31,7 +31,7 @@ findMUSAssumptions
   -> Options
   -> IO MUS
 findMUSAssumptions solver opt = do
-  log "computing a minimal unsatisfiable core by linear method"
+  log "computing a minimal unsatisfiable core by deletion method"
   core <- liftM IS.fromList $ SAT.getFailedAssumptions solver
   log $ "initial core = " ++ showLits core
   update core

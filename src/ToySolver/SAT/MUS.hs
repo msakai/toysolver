@@ -31,7 +31,7 @@ import Data.Char
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.MUS.Base
 import ToySolver.SAT.MUS.Types
-import qualified ToySolver.SAT.MUS.Linear as Linear
+import qualified ToySolver.SAT.MUS.Deletion as Deletion
 import qualified ToySolver.SAT.MUS.Insertion as Insertion
 import qualified ToySolver.SAT.MUS.QuickXplain as QuickXplain
 
@@ -41,7 +41,8 @@ showMethod m = map toLower (show m)
 parseMethod :: String -> Maybe Method
 parseMethod s =
   case map toLower s of
-    "linear" -> Just Linear
+    "linear" -> Just Deletion
+    "deletion" -> Just Deletion
     "insertion" -> Just Insertion
     "quickxplain" -> Just QuickXplain
     _ -> Nothing
@@ -54,6 +55,6 @@ findMUSAssumptions
   -> IO MUS
 findMUSAssumptions solver opt =
   case optMethod opt of
-    Linear -> Linear.findMUSAssumptions solver opt
+    Deletion -> Deletion.findMUSAssumptions solver opt
     Insertion -> Insertion.findMUSAssumptions solver opt
     QuickXplain -> QuickXplain.findMUSAssumptions solver opt
