@@ -169,8 +169,7 @@ import Data.Array.IO
 import Data.Array.IO hiding (unsafeFreeze)
 #endif
 import Data.Array.Unsafe (unsafeFreeze)
-import Data.Array.Base ((!), unsafeRead, unsafeWrite)
-import Data.Array.Unboxed
+import Data.Array.Base (unsafeRead, unsafeWrite)
 #if MIN_VERSION_hashable(1,2,0)
 import Data.Bits (xor) -- for defining 'combine' function
 #endif
