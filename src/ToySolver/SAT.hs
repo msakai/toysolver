@@ -95,6 +95,9 @@ module ToySolver.SAT
   , LearningStrategy (..)
   , showLearningStrategy
   , parseLearningStrategy
+  , BranchingStrategy (..)
+  , showBranchingStrategy
+  , parseBranchingStrategy
   , setVarPolarity
   , setLogger
   , setRandomGen
@@ -166,7 +169,8 @@ import Data.Array.IO
 import Data.Array.IO hiding (unsafeFreeze)
 #endif
 import Data.Array.Unsafe (unsafeFreeze)
-import Data.Array.Base (unsafeRead, unsafeWrite)
+import Data.Array.Base ((!), unsafeRead, unsafeWrite)
+import Data.Array.Unboxed
 #if MIN_VERSION_hashable(1,2,0)
 import Data.Bits (xor) -- for defining 'combine' function
 #endif
@@ -224,6 +228,14 @@ data VarData
   , vdLevel :: !(IOURef Level)
   , vdReason :: !(IORef (Maybe SomeConstraintHandler))
   , vdOnUnassigned :: !(IORef [SomeConstraintHandler])
+  -- | exponential moving average estimate
+  , vdEMAScaled :: !(IOURef Double)
+  -- | When v was last assigned
+  , vdWhenAssigned :: !(IOURef Int)
+  -- | The number of learnt clauses v participated in generating since Assigned.
+  , vdParticipated :: !(IOURef Int)
+  -- | The number of learnt clauses v reasoned in generating since Assigned.
+  , vdReasoned :: !(IOURef Int)
   }
 
 data LitData
@@ -247,6 +259,11 @@ newVarData = do
   reason <- newIORef Nothing
   onUnassigned <- newIORef []
 
+  ema <- newIOURef 0
+  whenAssigned <- newIOURef (-1)
+  participated <- newIOURef 0
+  reasoned <- newIOURef 0
+
   return $
     VarData
     { vdPolarity = polarity
@@ -259,6 +276,10 @@ newVarData = do
     , vdLevel = lv
     , vdReason = reason
     , vdOnUnassigned = onUnassigned
+    , vdEMAScaled = ema
+    , vdWhenAssigned = whenAssigned
+    , vdParticipated = participated
+    , vdReasoned = reasoned
     }
 
 newLitData :: IO LitData
@@ -407,6 +428,13 @@ data Solver
 
   -- | Amount to bump next constraint with.
   , svConstrInc    :: !(IOURef Double)
+
+  -- ERWA / LRB
+
+  -- | step-size parameter α
+  , svERWAStepSize :: !(IOURef Double)
+  , svEMAScale :: !(IOURef Double)
+  , svLearntCounter :: !(IOURef Int)
   }
 
 markBad :: Solver -> IO ()
@@ -470,6 +498,9 @@ assign_ solver !lit reason = assert (validLit lit) $ do
     writeIOURef (vdTrailIndex vd) idx
     writeIOURef (vdLevel vd) lv
     writeIORef (vdReason vd) reason
+    writeIOURef (vdWhenAssigned vd) =<< readIOURef (svLearntCounter solver)
+    writeIOURef (vdParticipated vd) 0
+    writeIOURef (vdReasoned vd) 0
 
     Vec.push (svTrail solver) lit
 
@@ -494,6 +525,24 @@ unassign solver !v = assert (validVar v) $ do
   writeIOURef (vdTrailIndex vd) maxBound
   writeIOURef (vdLevel vd) maxBound
   writeIORef (vdReason vd) Nothing
+
+  -- ERWA / LRB computation
+  interval <- do
+    t2 <- readIOURef (svLearntCounter solver)
+    t1 <- readIOURef (vdWhenAssigned vd)
+    return (t2 - t1)
+  -- Interval = 0 is possible due to restarts.
+  when (interval > 0) $ do
+    participated <- readIOURef (vdParticipated vd)
+    reasoned <- readIOURef (vdReasoned vd)
+    alpha <- readIOURef (svERWAStepSize solver)
+    let learningRate = fromIntegral participated / fromIntegral interval
+        reasonSideRate = fromIntegral reasoned / fromIntegral interval
+    scale <- readIOURef (svEMAScale solver)
+    -- ema := (1 - α)ema + α*r
+    modifyIOURef (vdEMAScaled vd) $ \orig -> (1 - alpha) * orig + alpha * scale * (learningRate + reasonSideRate)
+    -- If v is assigned by random decision, it's possible that v is still in the queue.
+    PQ.update (svVarQueue solver) v
 
   let !l = if val == lTrue then v else -v
   cs <- readIORef (vdOnUnassigned vd)
@@ -603,7 +652,9 @@ varBumpActivity solver !v = do
   inc <- readIOURef (svVarInc solver)
   vd <- varData solver v
   modifyIOURef (vdActivity vd) (+inc)
-  PQ.update (svVarQueue solver) v
+  conf <- getConfig solver
+  when (configBranchingStrategy conf == BranchingVSIDS) $ do
+    PQ.update (svVarQueue solver) v
   aval <- readIOURef (vdActivity vd)
   when (aval > 1e20) $
     -- Rescale
@@ -616,6 +667,42 @@ varRescaleAllActivity solver = do
     vd <- varData solver v
     modifyIOURef (vdActivity vd) (* 1e-20)
   modifyIOURef (svVarInc solver) (* 1e-20)
+
+varEMAScaled :: Solver -> Var -> IO Double
+varEMAScaled solver v = do
+  vd <- varData solver v
+  readIOURef (vdEMAScaled vd)
+
+varIncrementParticipated :: Solver -> Var -> IO ()
+varIncrementParticipated solver v = do
+  vd <- varData solver v
+  modifyIOURef (vdParticipated vd) (+1)
+
+varIncrementReasoned :: Solver -> Var -> IO ()
+varIncrementReasoned solver v = do
+  vd <- varData solver v
+  modifyIOURef (vdReasoned vd) (+1)
+
+varEMADecay :: Solver -> IO ()
+varEMADecay solver = do
+  config <- getConfig solver
+
+  alpha <- readIOURef (svERWAStepSize solver)
+  let alphaMin = configERWAStepSizeMin config
+  when (alpha > alphaMin) $ do
+    writeIOURef (svERWAStepSize solver) (max alphaMin (alpha - configERWAStepSizeDec config))
+
+  case configBranchingStrategy config of
+    BranchingLRB -> do
+      modifyIOURef (svEMAScale solver) (configEMADecay config *)
+      scale <- readIOURef (svEMAScale solver)
+      when (scale > 1e20) $ do
+        vs <- variables solver
+        forM_ vs $ \v -> do
+          vd <- varData solver v
+          modifyIOURef (vdEMAScaled vd) (/ scale)
+        writeIOURef (svEMAScale solver) 1.0
+    _ -> return ()
 
 variables :: Solver -> IO [Var]
 variables solver = do
@@ -719,6 +806,10 @@ newSolverWithConfig config = do
   tsolver <- newIORef Nothing
   tchecked <- newIOURef 0
 
+  alpha <- newIOURef 0.4
+  emaScale <- newIOURef 1.0
+  learntCounter <- newIOURef 0
+
   let solver =
         Solver
         { svOk = ok
@@ -764,14 +855,25 @@ newSolverWithConfig config = do
         , svLearntLimSeq    = learntLimSeq
         , svVarInc      = varInc
         , svConstrInc   = constrInc
+
+        , svERWAStepSize = alpha
+        , svEMAScale = emaScale
+        , svLearntCounter = learntCounter
         }
  return solver
 
 ltVar :: Solver -> Var -> Var -> IO Bool
-ltVar solver v1 v2 = do
-  a1 <- varActivity solver v1
-  a2 <- varActivity solver v2
-  return $! a1 > a2
+ltVar solver !v1 !v2 = do
+  conf <- getConfig solver
+  case configBranchingStrategy conf of
+    BranchingVSIDS -> do
+      a1 <- varActivity solver v1
+      a2 <- varActivity solver v2
+      return $! a1 > a2
+    _ -> do -- BranchingERWA and BranchingLRB
+      a1 <- varEMAScaled solver v1
+      a2 <- varEMAScaled solver v1
+      return $! a1 > a2
 
 {--------------------------------------------------------------------
   Problem specification
@@ -1026,6 +1128,14 @@ solve_ solver = do
       writeIORef (svLearntLimSeq solver) (zip learntSizeSeq learntSizeAdjSeq)
       learntSizeAdj
 
+    unless (0 <= configERWAStepSizeFirst config && configERWAStepSizeFirst config <= 1) $ 
+      error "ERWAStepSizeFirst must be in [0..1]"
+    unless (0 <= configERWAStepSizeMin config && configERWAStepSizeFirst config <= 1) $
+      error "ERWAStepSizeMin must be in [0..1]"
+    unless (0 <= configERWAStepSizeDec config) $
+      error "ERWAStepSizeDec must be >=0"
+    writeIOURef (svERWAStepSize solver) (configERWAStepSizeFirst config)
+
     let loop [] = error "solve_: should not happen"
         loop (conflict_lim:rs) = do
           printStat solver True
@@ -1149,6 +1259,7 @@ search solver !conflict_lim onConflict = do
 
     handleConflict :: IORef Int -> SomeConstraintHandler -> IO (Maybe SearchResult)
     handleConflict conflictCounter constr = do
+      varEMADecay solver
       varDecayActivity solver
       constrDecayActivity solver
       onConflict
@@ -1178,6 +1289,7 @@ search solver !conflict_lim onConflict = do
       else if conflict_lim > 0 && c >= conflict_lim then
         return $ Just SRRestart
       else do
+        modifyIOURef (svLearntCounter solver) (+1)
         strat <- configLearningStrategy <$> getConfig solver
         case strat of
           LearningClause -> learnClause constr >> return Nothing
@@ -1394,6 +1506,15 @@ data Config
     -- This must be @>1@.                     
   , configCCMin :: !Int
     -- ^ Controls conflict constraint minimization (0=none, 1=local, 2=recursive)
+  , configBranchingStrategy :: !BranchingStrategy
+  , configERWAStepSizeFirst :: !Double
+    -- ^ step-size α in ERWA and LRB branching heuristic is initialized with this value. (default 0.4)
+  , configERWAStepSizeDec :: !Double
+    -- ^ step-size α in ERWA and LRB branching heuristic is decreased by this value after each conflict. (default 0.06)
+  , configERWAStepSizeMin :: !Double
+    -- ^ step-size α in ERWA and LRB branching heuristic is decreased until it reach the value. (default 0.06)
+  , configEMADecay :: !Double
+    -- ^ inverse of the variable EMA decay factor used by LRB branching heuristic. (default 1 / 0.95)
   , configEnablePhaseSaving :: !Bool
   , configEnableForwardSubsumptionRemoval :: !Bool
   , configEnableBackwardSubsumptionRemoval :: !Bool
@@ -1436,6 +1557,11 @@ instance Default Config where
     , configLearntSizeFirst = defaultLearntSizeFirst
     , configLearntSizeInc = defaultLearntSizeInc
     , configCCMin = defaultCCMin
+    , configBranchingStrategy = def
+    , configERWAStepSizeFirst = 0.4
+    , configERWAStepSizeDec = 10**(-6)
+    , configERWAStepSizeMin = 0.06
+    , configEMADecay = 1 / 0.95
     , configEnablePhaseSaving = defaultEnablePhaseSaving
     , configEnableForwardSubsumptionRemoval = defaultEnableForwardSubsumptionRemoval
     , configEnableBackwardSubsumptionRemoval = defaultEnableBackwardSubsumptionRemoval
@@ -1451,7 +1577,11 @@ getConfig :: Solver -> IO Config
 getConfig solver = readIORef $ svConfig solver
 
 setConfig :: Solver -> Config -> IO ()
-setConfig solver = writeIORef (svConfig solver)
+setConfig solver conf = do
+  orig <- readIORef $ svConfig solver
+  writeIORef (svConfig solver) conf
+  when (configBranchingStrategy orig /= configBranchingStrategy conf) $ do
+    PQ.rebuild (svVarQueue solver)
 
 modifyConfig :: Solver -> (Config -> Config) -> IO ()
 modifyConfig solver = modifyIORef' (svConfig solver)
@@ -1510,6 +1640,41 @@ parseLearningStrategy s =
 {-# DEPRECATED setLearningStrategy "Use setConfig" #-}
 setLearningStrategy :: Solver -> LearningStrategy -> IO ()
 setLearningStrategy solver l = modifyIORef' (svConfig solver) $ \config -> config{ configLearningStrategy = l }
+
+-- | Branching strategy.
+--
+-- The default value can be obtained by 'def'.
+--
+-- 'BranchingERWA' and 'BranchingLRB' is based on [Liang et al 2016].
+--
+-- * J. Liang, V. Ganesh, P. Poupart, and K. Czarnecki, "Learning rate based branching heuristic for SAT solvers,"
+--   in Proceedings of Theory and Applications of Satisfiability Testing (SAT 2016), pp. 123-140.
+--   <http://link.springer.com/chapter/10.1007/978-3-319-40970-2_9>
+--   <https://cs.uwaterloo.ca/~ppoupart/publications/sat/learning-rate-branching-heuristic-SAT.pdf>
+data BranchingStrategy
+  = BranchingVSIDS
+    -- ^ VSIDS (Variable State Independent Decaying Sum) branching heuristic
+  | BranchingERWA
+    -- ^ ERWA (Exponential Recency Weighted Average) branching heuristic
+  | BranchingLRB
+    -- ^ LRB (Learning Rate Branching) heuristic
+  deriving (Show, Eq, Ord, Enum, Bounded)
+
+instance Default BranchingStrategy where
+  def = BranchingVSIDS
+
+showBranchingStrategy :: BranchingStrategy -> String
+showBranchingStrategy BranchingVSIDS = "vsids"
+showBranchingStrategy BranchingERWA  = "erwa"
+showBranchingStrategy BranchingLRB   = "lrb"
+
+parseBranchingStrategy :: String -> Maybe BranchingStrategy
+parseBranchingStrategy s =
+  case map toLower s of
+    "vsids" -> Just BranchingVSIDS
+    "erwa"  -> Just BranchingERWA
+    "lrb"   -> Just BranchingLRB
+    _ -> Nothing
 
 -- | The initial limit for learnt clauses.
 -- 
@@ -1840,7 +2005,9 @@ analyzeConflict solver constr = do
                 Just constr2 -> do
                   constrBumpActivity solver constr2
                   xs <- reasonOf solver constr2 (Just l)
-                  forM_ xs $ \lit -> varBumpActivity solver (litVar lit)
+                  forM_ xs $ \lit -> do
+                     varBumpActivity solver (litVar lit)
+                     varIncrementParticipated solver (litVar lit)
                   popTrail solver
                   (ys,zs) <- split xs
                   loop (IS.delete (litNot l) lits1 `IS.union` ys)
@@ -1851,7 +2018,9 @@ analyzeConflict solver constr = do
 
   constrBumpActivity solver constr
   conflictClause <- reasonOf solver constr Nothing
-  forM_ conflictClause $ \lit -> varBumpActivity solver (litVar lit)
+  forM_ conflictClause $ \lit -> do
+    varBumpActivity solver (litVar lit)
+    varIncrementParticipated solver (litVar lit)
   (ys,zs) <- split conflictClause
   lits <- loop ys zs
 
@@ -1927,7 +2096,9 @@ analyzeConflictHybrid solver constr = do
                     return (lits1,lits2)
                   else do
                     constrBumpActivity solver constr2
-                    forM_ xs $ \lit -> varBumpActivity solver (litVar lit)
+                    forM_ xs $ \lit -> do
+                      varBumpActivity solver (litVar lit)
+                      varIncrementParticipated solver (litVar lit)
                     (ys,zs) <- split xs
                     return  (IS.delete (litNot l) lits1 `IS.union` ys, lits2 `IS.union` zs)
 
@@ -1962,11 +2133,25 @@ analyzeConflictHybrid solver constr = do
       toPBLinAtLeast constr
     else
       return (clauseToPBLinAtLeast conflictClause)
-  forM_ conflictClause $ \lit -> varBumpActivity solver (litVar lit)
+  forM_ conflictClause $ \lit -> do
+    varBumpActivity solver (litVar lit)
+    varIncrementParticipated solver (litVar lit)
   (ys,zs) <- split conflictClause
   (lits, pb) <- loop ys zs pbConfl
 
   lits2 <- minimizeConflictClause solver lits
+
+  do let f reasonSided l = do
+           m <- varReason solver (litVar l)
+           case m of
+             Nothing -> return reasonSided
+             Just constr -> do
+               v <- litValue solver l
+               unless (v == lFalse) undefined
+               xs <- constrReasonOf solver constr (Just (litNot l))
+               return $ reasonSided `IS.union` IS.fromList (map litVar xs)
+     reasonSided <- foldM f IS.empty (IS.toList lits2)
+     mapM_ (varIncrementReasoned solver) (IS.toList reasonSided)
 
   xs <- liftM (sortBy (flip (comparing snd))) $
     forM (IS.toList lits2) $ \l -> do

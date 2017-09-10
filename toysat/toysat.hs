@@ -171,6 +171,23 @@ options =
     , Option [] ["learnt-size-inc"]
         (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configLearntSizeInc = read val } }) "<real>")
         (printf "The limit for learnt clauses is multiplied with this factor periodically. (default %f)" (SAT.configLearntSizeInc def))
+    , Option [] ["branch"]
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configBranchingStrategy = parseBranchingStrategy val } }) "<str>")
+        ("Branching startegy: " ++ intercalate ", "
+         [ SAT.showBranchingStrategy s ++ (if SAT.configBranchingStrategy (optSATConfig def) == s then " (default)" else "")
+         | s <- [minBound .. maxBound] ])
+    , Option [] ["erwa-alpha-first"]
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configERWAStepSizeFirst = read val } }) "<real>")
+        (printf "step-size alpha in ERWA and LRB branching heuristic is initialized with this value. (default %f)" (SAT.configERWAStepSizeFirst def))
+    , Option [] ["erwa-alpha-dec"]
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configERWAStepSizeDec = read val } }) "<real>")
+        (printf "step-size alpha in ERWA and LRB branching heuristic is decreased by this value after each conflict. (default %f)" (SAT.configERWAStepSizeDec def))
+    , Option [] ["erwa-alpha-min"]
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configERWAStepSizeMin = read val } }) "<real>")
+        (printf "step-size alpha in ERWA and LRB branching heuristic is decreased until it reach the value. (default %f)" (SAT.configERWAStepSizeMin def))
+    , Option [] ["ema-decay"]
+        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEMADecay = read val } }) "<real>")
+        (printf "inverse of the variable EMA decay factor used by LRB branching heuristic. (default %f)" (SAT.configEMADecay def))
     , Option [] ["ccmin"]
         (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configCCMin = read val } }) "<int>")
         (printf "Conflict clause minimization (0=none, 1=local, 2=recursive; default %d)" (SAT.configCCMin def))
@@ -285,6 +302,8 @@ options =
     parseRestartStrategy s = fromMaybe (error (printf "unknown restart strategy \"%s\"" s)) (SAT.parseRestartStrategy s)
 
     parseLearningStrategy s = fromMaybe (error (printf "unknown learning strategy \"%s\"" s)) (SAT.parseLearningStrategy s)
+
+    parseBranchingStrategy s = fromMaybe (error (printf "unknown branching strategy \"%s\"" s)) (SAT.parseBranchingStrategy s)
 
     parsePBHandler s = fromMaybe (error (printf "unknown PB constraint handler \"%s\"" s)) (SAT.parsePBHandlerType s)
 

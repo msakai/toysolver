@@ -1960,6 +1960,9 @@ instance Arbitrary SAT.LearningStrategy where
 instance Arbitrary SAT.RestartStrategy where
   arbitrary = arbitraryBoundedEnum
 
+instance Arbitrary SAT.BranchingStrategy where
+  arbitrary = arbitraryBoundedEnum
+
 instance Arbitrary SAT.PBHandlerType where
   arbitrary = arbitraryBoundedEnum
 
@@ -1971,6 +1974,10 @@ instance Arbitrary SAT.Config where
     learningStrategy <- arbitrary
     learntSizeFirst <- arbitrary
     learntSizeInc <- liftM ((1.01 +) . abs) arbitrary
+    branchingStrategy <- arbitrary
+    erwaStepSizeFirst <- choose (0, 1)
+    erwaStepSizeMin   <- choose (0, 1)
+    erwaStepSizeDec   <- choose (0, 1)
     pbhandler <- arbitrary
     ccmin <- choose (0,2)
     phaseSaving <- arbitrary
@@ -1987,6 +1994,10 @@ instance Arbitrary SAT.Config where
       , SAT.configLearntSizeInc = learntSizeInc
       , SAT.configPBHandlerType = pbhandler
       , SAT.configCCMin = ccmin
+      , SAT.configBranchingStrategy = branchingStrategy
+      , SAT.configERWAStepSizeFirst = erwaStepSizeFirst
+      , SAT.configERWAStepSizeDec   = erwaStepSizeDec
+      , SAT.configERWAStepSizeMin   = erwaStepSizeMin
       , SAT.configEnablePhaseSaving = phaseSaving
       , SAT.configEnableForwardSubsumptionRemoval = forwardSubsumptionRemoval
       , SAT.configEnableBackwardSubsumptionRemoval = backwardSubsumptionRemoval

@@ -40,6 +40,7 @@ module ToySolver.Internal.Data.IndexedPriorityQueue
   , QueueSize (..)
   , member
   , update
+  , rebuild
   , getHeapArray
   , getHeapVec
 
@@ -48,6 +49,7 @@ module ToySolver.Internal.Data.IndexedPriorityQueue
   , resizeTableCapacity
   ) where
 
+import Control.Loop
 import Control.Monad
 import qualified Data.Array.IO as A
 import Data.Queue.Classes
@@ -231,6 +233,12 @@ down q !i = do
   j <- loop i
   Vec.unsafeWrite (heap q) j val
   Vec.unsafeWrite (table q) val j
+
+rebuild :: PriorityQueue -> IO ()
+rebuild q = do
+  n <- Vec.getSize (heap q)
+  forLoop 0 (<n) (+1) $ \i -> do
+    up q i
 
 -- | Get the internal representation of a given priority queue.
 getHeapArray :: PriorityQueue -> IO (A.IOUArray Index Value)
