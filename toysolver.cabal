@@ -336,6 +336,7 @@ Library
      ToySolver.Graph.ShortestPath
      ToySolver.QBF
      ToySolver.SAT
+     ToySolver.SAT.Config
      ToySolver.SAT.Encoder.Integer
      ToySolver.SAT.Encoder.PB
      ToySolver.SAT.Encoder.PB.Internal.Adder

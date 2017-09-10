@@ -85,57 +85,35 @@ module ToySolver.SAT
   , getAssumptionsImplications
 
   -- * Solver configulation
-  , Config (..)
+  , module ToySolver.SAT.Config
   , getConfig
   , setConfig
   , modifyConfig
-  , RestartStrategy (..)
-  , showRestartStrategy
-  , parseRestartStrategy
-  , LearningStrategy (..)
-  , showLearningStrategy
-  , parseLearningStrategy
-  , BranchingStrategy (..)
-  , showBranchingStrategy
-  , parseBranchingStrategy
   , setVarPolarity
   , setLogger
   , setRandomGen
   , getRandomGen
   , setConfBudget
-  , PBHandlerType (..)
-  , showPBHandlerType
-  , parsePBHandlerType
 
   -- ** Deprecated
   , setRestartStrategy
   , setRestartFirst
-  , defaultRestartFirst
   , setRestartInc
-  , defaultRestartInc
   , setLearntSizeFirst
-  , defaultLearntSizeFirst
   , setLearntSizeInc
-  , defaultLearntSizeInc
   , setCCMin
-  , defaultCCMin
   , setLearningStrategy
   , setEnablePhaseSaving
   , getEnablePhaseSaving
-  , defaultEnablePhaseSaving
   , setEnableForwardSubsumptionRemoval
   , getEnableForwardSubsumptionRemoval
-  , defaultEnableForwardSubsumptionRemoval
   , setEnableBackwardSubsumptionRemoval
   , getEnableBackwardSubsumptionRemoval
-  , defaultEnableBackwardSubsumptionRemoval
   , setCheckModel
   , setRandomFreq
-  , defaultRandomFreq
   , setPBHandlerType
   , setPBSplitClausePart
   , getPBSplitClausePart
-  , defaultPBSplitClausePart
 
   -- * Read state
   , getNVars
@@ -173,7 +151,6 @@ import Data.Array.Base (unsafeRead, unsafeWrite)
 #if MIN_VERSION_hashable(1,2,0)
 import Data.Bits (xor) -- for defining 'combine' function
 #endif
-import Data.Char
 import Data.Default.Class
 import Data.Either
 import Data.Function (on)
@@ -201,6 +178,7 @@ import GHC.Exts hiding (Constraint)
 #endif
 
 import ToySolver.Data.LBool
+import ToySolver.SAT.Config
 import ToySolver.SAT.Types
 import ToySolver.SAT.TheorySolver
 import ToySolver.Internal.Util (revMapM)
@@ -1487,91 +1465,6 @@ removeConstraintHandlers solver zs = do
   Configulation
 --------------------------------------------------------------------}
          
-data Config
-  = Config
-  { configRestartStrategy :: !RestartStrategy
-  , configRestartFirst :: !Int
-    -- ^ The initial restart limit. (default 100)
-    -- Zero and negative values are used to disable restart.
-  , configRestartInc :: !Double
-    -- ^ The factor with which the restart limit is multiplied in each restart. (default 1.5)
-    -- This must be @>1@.
-  , configLearningStrategy :: !LearningStrategy
-  , configLearntSizeFirst :: !Int
-    -- ^ The initial limit for learnt constraints.
-    -- Negative value means computing default value from problem instance.
-  , configLearntSizeInc :: !Double
-    -- ^ The limit for learnt constraints is multiplied with this factor periodically. (default 1.1)
-    -- This must be @>1@.                     
-  , configCCMin :: !Int
-    -- ^ Controls conflict constraint minimization (0=none, 1=local, 2=recursive)
-  , configBranchingStrategy :: !BranchingStrategy
-  , configERWAStepSizeFirst :: !Double
-    -- ^ step-size α in ERWA and LRB branching heuristic is initialized with this value. (default 0.4)
-  , configERWAStepSizeDec :: !Double
-    -- ^ step-size α in ERWA and LRB branching heuristic is decreased by this value after each conflict. (default 0.06)
-  , configERWAStepSizeMin :: !Double
-    -- ^ step-size α in ERWA and LRB branching heuristic is decreased until it reach the value. (default 0.06)
-  , configEMADecay :: !Double
-    -- ^ inverse of the variable EMA decay factor used by LRB branching heuristic. (default 1 / 0.95)
-  , configEnablePhaseSaving :: !Bool
-  , configEnableForwardSubsumptionRemoval :: !Bool
-  , configEnableBackwardSubsumptionRemoval :: !Bool
-  , configRandomFreq :: !Double
-    -- ^ The frequency with which the decision heuristic tries to choose a random variable
-  , configPBHandlerType :: !PBHandlerType
-  , configEnablePBSplitClausePart :: !Bool
-    -- ^ Split PB-constraints into a PB part and a clause part.
-    --
-    -- Example from minisat+ paper:
-    --
-    -- * 4 x1 + 4 x2 + 4 x3 + 4 x4 + 2y1 + y2 + y3 ≥ 4
-    -- 
-    -- would be split into
-    --
-    -- * x1 + x2 + x3 + x4 + ¬z ≥ 1 (clause part)
-    --
-    -- * 2 y1 + y2 + y3 + 4 z ≥ 4 (PB part)
-    --
-    -- where z is a newly introduced variable, not present in any other constraint.
-    -- 
-    -- Reference:
-    -- 
-    -- * N . Eéen and N. Sörensson. Translating Pseudo-Boolean Constraints into SAT. JSAT 2:1–26, 2006.
-    --                               
-  , configCheckModel :: !Bool
-  , configVarDecay :: !Double
-    -- ^ Inverse of the variable activity decay factor. (default 1 / 0.95)
-  , configConstrDecay :: !Double
-    -- ^ Inverse of the constraint activity decay factor. (1 / 0.999)
-  } deriving (Show, Eq, Ord)
-
-instance Default Config where
-  def =
-    Config
-    { configRestartStrategy = def
-    , configRestartFirst = defaultRestartFirst
-    , configRestartInc = defaultRestartInc
-    , configLearningStrategy = def
-    , configLearntSizeFirst = defaultLearntSizeFirst
-    , configLearntSizeInc = defaultLearntSizeInc
-    , configCCMin = defaultCCMin
-    , configBranchingStrategy = def
-    , configERWAStepSizeFirst = 0.4
-    , configERWAStepSizeDec = 10**(-6)
-    , configERWAStepSizeMin = 0.06
-    , configEMADecay = 1 / 0.95
-    , configEnablePhaseSaving = defaultEnablePhaseSaving
-    , configEnableForwardSubsumptionRemoval = defaultEnableForwardSubsumptionRemoval
-    , configEnableBackwardSubsumptionRemoval = defaultEnableBackwardSubsumptionRemoval
-    , configRandomFreq = defaultRandomFreq
-    , configPBHandlerType = def
-    , configEnablePBSplitClausePart = defaultPBSplitClausePart
-    , configCheckModel = False
-    , configVarDecay = 1 / 0.95
-    , configConstrDecay = 1 / 0.999
-    }
-
 getConfig :: Solver -> IO Config
 getConfig solver = readIORef $ svConfig solver
 
@@ -1595,11 +1488,6 @@ setRestartStrategy solver s = modifyIORef' (svConfig solver) $ \config -> config
 setRestartFirst :: Solver -> Int -> IO ()
 setRestartFirst solver !n = modifyIORef' (svConfig solver) $ \config -> config{ configRestartFirst = n }
 
--- | default value for @RestartFirst@.
-{-# DEPRECATED defaultRestartFirst "Use configRestartFirst def" #-}
-defaultRestartFirst :: Int
-defaultRestartFirst = 100
-
 -- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
 -- 
 -- This must be @>1@.
@@ -1609,71 +1497,9 @@ setRestartInc solver !r
   | r > 1 = modifyIORef' (svConfig solver) $ \config -> config{ configRestartInc = r }
   | otherwise = error "setRestartInc: RestartInc must be >1"
 
--- | default value for @RestartInc@.
-{-# DEPRECATED defaultRestartInc "Use configRestartInc def" #-}
-defaultRestartInc :: Double
-defaultRestartInc = 1.5
-
--- | Learning strategy.
---
--- The default value can be obtained by 'def'.
-data LearningStrategy
-  = LearningClause
-  | LearningHybrid
-  deriving (Show, Eq, Ord, Enum, Bounded)
-
-instance Default LearningStrategy where
-  def = LearningClause
-
-showLearningStrategy :: LearningStrategy -> String
-showLearningStrategy LearningClause = "clause"
-showLearningStrategy LearningHybrid = "hybrid"
-
-parseLearningStrategy :: String -> Maybe LearningStrategy
-parseLearningStrategy s =
-  case map toLower s of
-    "clause" -> Just LearningClause
-    "hybrid" -> Just LearningHybrid
-    _ -> Nothing
-
 {-# DEPRECATED setLearningStrategy "Use setConfig" #-}
 setLearningStrategy :: Solver -> LearningStrategy -> IO ()
 setLearningStrategy solver l = modifyIORef' (svConfig solver) $ \config -> config{ configLearningStrategy = l }
-
--- | Branching strategy.
---
--- The default value can be obtained by 'def'.
---
--- 'BranchingERWA' and 'BranchingLRB' is based on [Liang et al 2016].
---
--- * J. Liang, V. Ganesh, P. Poupart, and K. Czarnecki, "Learning rate based branching heuristic for SAT solvers,"
---   in Proceedings of Theory and Applications of Satisfiability Testing (SAT 2016), pp. 123-140.
---   <http://link.springer.com/chapter/10.1007/978-3-319-40970-2_9>
---   <https://cs.uwaterloo.ca/~ppoupart/publications/sat/learning-rate-branching-heuristic-SAT.pdf>
-data BranchingStrategy
-  = BranchingVSIDS
-    -- ^ VSIDS (Variable State Independent Decaying Sum) branching heuristic
-  | BranchingERWA
-    -- ^ ERWA (Exponential Recency Weighted Average) branching heuristic
-  | BranchingLRB
-    -- ^ LRB (Learning Rate Branching) heuristic
-  deriving (Show, Eq, Ord, Enum, Bounded)
-
-instance Default BranchingStrategy where
-  def = BranchingVSIDS
-
-showBranchingStrategy :: BranchingStrategy -> String
-showBranchingStrategy BranchingVSIDS = "vsids"
-showBranchingStrategy BranchingERWA  = "erwa"
-showBranchingStrategy BranchingLRB   = "lrb"
-
-parseBranchingStrategy :: String -> Maybe BranchingStrategy
-parseBranchingStrategy s =
-  case map toLower s of
-    "vsids" -> Just BranchingVSIDS
-    "erwa"  -> Just BranchingERWA
-    "lrb"   -> Just BranchingLRB
-    _ -> Nothing
 
 -- | The initial limit for learnt clauses.
 -- 
@@ -1681,11 +1507,6 @@ parseBranchingStrategy s =
 {-# DEPRECATED setLearntSizeFirst "Use setConfig" #-}
 setLearntSizeFirst :: Solver -> Int -> IO ()
 setLearntSizeFirst solver !x = modifyIORef' (svConfig solver) $ \config -> config{ configLearntSizeFirst = x }
-
--- | default value for @LearntSizeFirst@.
-{-# DEPRECATED defaultLearntSizeFirst "Use learntSizeFirst def" #-}
-defaultLearntSizeFirst :: Int
-defaultLearntSizeFirst = -1
 
 -- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
 -- 
@@ -1696,20 +1517,10 @@ setLearntSizeInc solver !r
   | r > 1 = modifyIORef' (svConfig solver) $ \config -> config{ configLearntSizeInc = r }
   | otherwise = error "setLearntSizeInc: LearntSizeInc must be >1"
 
--- | default value for @LearntSizeInc@.
-{-# DEPRECATED defaultLearntSizeInc "Use learntSizeInc def" #-}
-defaultLearntSizeInc :: Double
-defaultLearntSizeInc = 1.1
-
 -- | Controls conflict clause minimization (0=none, 1=basic, 2=deep)
 {-# DEPRECATED setCCMin "Use setConfig" #-}
 setCCMin :: Solver -> Int -> IO ()
 setCCMin solver !v = modifyIORef' (svConfig solver) $ \config -> config{ configCCMin = v }
-
--- | default value for @CCMin@.
-{-# DEPRECATED defaultCCMin "Use ccMin def" #-}
-defaultCCMin :: Int
-defaultCCMin = 2
 
 -- | The default polarity of a variable.
 setVarPolarity :: Solver -> Var -> Bool -> IO ()
@@ -1728,10 +1539,6 @@ setRandomFreq :: Solver -> Double -> IO ()
 setRandomFreq solver r =
   modifyIORef' (svConfig solver) $ \config -> config{ configRandomFreq = r }
 
-{-# DEPRECATED defaultRandomFreq "Use configRandomFreq def" #-}
-defaultRandomFreq :: Double
-defaultRandomFreq = 0.005
-
 -- | Set random generator used by the random variable selection
 setRandomGen :: Solver -> Rand.GenIO -> IO ()
 setRandomGen solver = writeIORef (svRandomGen solver)
@@ -1743,26 +1550,6 @@ getRandomGen solver = readIORef (svRandomGen solver)
 setConfBudget :: Solver -> Maybe Int -> IO ()
 setConfBudget solver (Just b) | b >= 0 = writeIOURef (svConfBudget solver) b
 setConfBudget solver _ = writeIOURef (svConfBudget solver) (-1)
-
--- | Pseudo boolean constraint handler implimentation.
---
--- The default value can be obtained by 'def'.
-data PBHandlerType = PBHandlerTypeCounter | PBHandlerTypePueblo
-  deriving (Show, Eq, Ord, Enum, Bounded)
-
-instance Default PBHandlerType where
-  def = PBHandlerTypeCounter
-
-showPBHandlerType :: PBHandlerType -> String
-showPBHandlerType PBHandlerTypeCounter = "counter"
-showPBHandlerType PBHandlerTypePueblo = "pueblo"
-
-parsePBHandlerType :: String -> Maybe PBHandlerType
-parsePBHandlerType s =
-  case map toLower s of
-    "counter" -> Just PBHandlerTypeCounter
-    "pueblo" -> Just PBHandlerTypePueblo
-    _ -> Nothing
 
 {-# DEPRECATED setPBHandlerType "Use setConfig" #-}
 setPBHandlerType :: Solver -> PBHandlerType -> IO ()
@@ -1797,11 +1584,6 @@ getPBSplitClausePart :: Solver -> IO Bool
 getPBSplitClausePart solver =
   configEnablePBSplitClausePart <$> getConfig solver
 
--- | See documentation of 'setPBSplitClausePart'.
-{-# DEPRECATED defaultPBSplitClausePart "Use configEnablePBSplitClausePart def" #-}
-defaultPBSplitClausePart :: Bool
-defaultPBSplitClausePart = False
-
 {-# DEPRECATED setEnablePhaseSaving "Use setConfig" #-}
 setEnablePhaseSaving :: Solver -> Bool -> IO ()
 setEnablePhaseSaving solver flag = do
@@ -1811,10 +1593,6 @@ setEnablePhaseSaving solver flag = do
 getEnablePhaseSaving :: Solver -> IO Bool
 getEnablePhaseSaving solver = do
   configEnablePhaseSaving <$> getConfig solver
-
-{-# DEPRECATED defaultEnablePhaseSaving "Use configEnablePhaseSaving def" #-}
-defaultEnablePhaseSaving :: Bool
-defaultEnablePhaseSaving = True
 
 {-# DEPRECATED setEnableForwardSubsumptionRemoval "Use setConfig" #-}
 setEnableForwardSubsumptionRemoval :: Solver -> Bool -> IO ()
@@ -1826,10 +1604,6 @@ getEnableForwardSubsumptionRemoval :: Solver -> IO Bool
 getEnableForwardSubsumptionRemoval solver = do
   configEnableForwardSubsumptionRemoval <$> getConfig solver
 
-{-# DEPRECATED defaultEnableForwardSubsumptionRemoval "Use configEnableForwardSubsumptionRemoval def" #-}
-defaultEnableForwardSubsumptionRemoval :: Bool
-defaultEnableForwardSubsumptionRemoval = False
-
 {-# DEPRECATED setEnableBackwardSubsumptionRemoval "Use setConfig" #-}
 setEnableBackwardSubsumptionRemoval :: Solver -> Bool -> IO ()
 setEnableBackwardSubsumptionRemoval solver flag = do
@@ -1839,10 +1613,6 @@ setEnableBackwardSubsumptionRemoval solver flag = do
 getEnableBackwardSubsumptionRemoval :: Solver -> IO Bool
 getEnableBackwardSubsumptionRemoval solver = do
   configEnableBackwardSubsumptionRemoval <$> getConfig solver
-
-{-# DEPRECATED defaultEnableBackwardSubsumptionRemoval "Use configEnableBackwardSubsumptionRemoval def" #-}
-defaultEnableBackwardSubsumptionRemoval :: Bool
-defaultEnableBackwardSubsumptionRemoval = False
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
@@ -3898,28 +3668,6 @@ instance ConstraintHandler TheoryHandler where
 {--------------------------------------------------------------------
   Restart strategy
 --------------------------------------------------------------------}
-
--- | Restart strategy.
---
--- The default value can be obtained by 'def'.
-data RestartStrategy = MiniSATRestarts | ArminRestarts | LubyRestarts
-  deriving (Show, Eq, Ord, Enum, Bounded)
-
-instance Default RestartStrategy where
-  def = MiniSATRestarts
-
-showRestartStrategy :: RestartStrategy -> String
-showRestartStrategy MiniSATRestarts = "minisat"
-showRestartStrategy ArminRestarts = "armin"
-showRestartStrategy LubyRestarts = "luby"
-
-parseRestartStrategy :: String -> Maybe RestartStrategy
-parseRestartStrategy s =
-  case map toLower s of
-    "minisat" -> Just MiniSATRestarts
-    "armin" -> Just ArminRestarts
-    "luby" -> Just LubyRestarts
-    _ -> Nothing
 
 mkRestartSeq :: RestartStrategy -> Int -> Double -> [Int]
 mkRestartSeq MiniSATRestarts = miniSatRestartSeq
