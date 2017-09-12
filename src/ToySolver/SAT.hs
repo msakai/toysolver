@@ -138,6 +138,7 @@ import Prelude hiding (log)
 import Control.Applicative hiding (empty)
 import Control.Loop
 import Control.Monad
+import Control.Monad.IO.Class
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import Control.Exception
@@ -1674,42 +1675,31 @@ decide solver !lit = do
   return ()
 
 deduce :: Solver -> IO (Maybe SomeConstraintHandler)
-deduce solver = do
-  m <- deduceB solver
-  case m of
-    Just _ -> return m
-    Nothing -> do
-      m2 <- deduceT solver
-      case m2 of
-        Just _ -> return m2
-        Nothing -> do
-          empty <- bcpIsEmpty solver
-          if empty then
-            return Nothing
-          else
-            deduce solver
+deduce solver = liftM (either Just (const Nothing)) $ runExceptT $ do
+  let loop = do
+        deduceB solver
+        deduceT solver
+        empty <- liftIO $ bcpIsEmpty solver
+        unless empty $ loop
+  loop
 
-deduceB :: Solver -> IO (Maybe SomeConstraintHandler)
+deduceB :: Solver -> ExceptT SomeConstraintHandler IO ()
 deduceB solver = loop
   where
-    loop :: IO (Maybe SomeConstraintHandler)
+    loop :: ExceptT SomeConstraintHandler IO ()
     loop = do
-      r <- bcpDequeue solver
+      r <- liftIO $ bcpDequeue solver
       case r of
-        Nothing -> return Nothing
+        Nothing -> return ()
         Just lit -> do
-          ret <- processLit lit
-          case ret of
-            Just _ -> return ret
-            Nothing -> do
-              ret <- processVar lit
-              case ret of
-                Just _ -> return ret
-                Nothing -> loop
+          processLit lit
+          processVar lit
+          loop
 
-    processLit :: Lit -> IO (Maybe SomeConstraintHandler)
-    processLit !lit = do
-      let falsifiedLit = litNot lit
+    processLit :: Lit -> ExceptT SomeConstraintHandler IO ()
+    processLit !lit = ExceptT $ liftM (maybe (Right ()) Left) $ do
+      let falsifiedLit =
+              litNot lit
       ld <- litData solver falsifiedLit
       let wsref = ldWatches ld
       let loop2 [] = return Nothing
@@ -1724,8 +1714,8 @@ deduceB solver = loop
       writeIORef wsref []
       loop2 ws
 
-    processVar :: Lit -> IO (Maybe SomeConstraintHandler)
-    processVar !lit = do
+    processVar :: Lit -> ExceptT SomeConstraintHandler IO ()
+    processVar !lit = ExceptT $ liftM (maybe (Right ()) Left) $ do
       let falsifiedLit = litNot lit
       vd <- varData solver (litVar lit)
       let wsref = vdWatches vd
@@ -3597,35 +3587,29 @@ setTheory solver tsolver = do
 getTheory :: Solver -> IO (Maybe TheorySolver)
 getTheory solver = readIORef (svTheorySolver solver)
 
-deduceT :: Solver -> IO (Maybe SomeConstraintHandler)
+deduceT :: Solver -> ExceptT SomeConstraintHandler IO ()
 deduceT solver = do
-  mt <- readIORef (svTheorySolver solver)
+  mt <- liftIO $ readIORef (svTheorySolver solver)
   case mt of
-    Nothing -> return Nothing
+    Nothing -> return ()
     Just t -> do
-      n <- Vec.getSize (svTrail solver)
+      n <- liftIO $ Vec.getSize (svTrail solver)
       let h = CHTheory TheoryHandler
           callback l = assignBy solver l h
           loop i = do
-            if i < n then do
-              l <- Vec.unsafeRead (svTrail solver) i
-              ok <- thAssertLit t callback l
+            when (i < n) $ do
+              l <- liftIO $ Vec.unsafeRead (svTrail solver) i
+              ok <- liftIO $ thAssertLit t callback l
               if ok then
                 loop (i+1)
               else
-                return False
-            else do
-              return True
-      b <- loop =<< readIOURef (svTheoryChecked solver)
-      if not b then
-        return (Just h)
-      else do
-        b2 <- thCheck t callback
-        if b2 then do
-          writeIOURef (svTheoryChecked solver) n
-          return Nothing
-        else
-          return (Just h)
+                throwE h
+      loop =<< liftIO (readIOURef (svTheoryChecked solver))
+      b2 <- liftIO $ thCheck t callback
+      if b2 then do
+        liftIO $ writeIOURef (svTheoryChecked solver) n
+      else
+        throwE h
 
 data TheoryHandler = TheoryHandler deriving (Eq)
 
