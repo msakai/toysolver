@@ -1075,13 +1075,10 @@ solve_ solver = do
     nv <- getNVars solver
     Vec.resizeCapacity (svTrail solver) nv
 
-    restartStrategy <- configRestartStrategy <$> getConfig solver
-    restartFirst  <- configRestartFirst <$> getConfig solver
-    restartInc    <- configRestartInc <$> getConfig solver
-    unless (restartInc > 1) $ error "restartInc must be >1"
+    unless (configRestartInc config > 1) $ error "RestartInc must be >1"
     let restartSeq =
-          if restartFirst > 0
-          then mkRestartSeq restartStrategy restartFirst restartInc
+          if configRestartFirst config  > 0
+          then mkRestartSeq (configRestartStrategy config) (configRestartFirst config) (configRestartInc config)
           else repeat 0
 
     let learntSizeAdj = do
@@ -1096,12 +1093,10 @@ solve_ solver = do
 
     cnt <- readIORef (svLearntLimAdjCnt solver)
     when (cnt == -1) $ do
-      learntSizeFirst <- configLearntSizeFirst <$> getConfig solver
-      learntSizeInc   <- configLearntSizeInc <$> getConfig solver
-      unless (learntSizeInc > 1) $ error "learntSizeInc must be >1"
+      unless (configLearntSizeInc config > 1) $ error "LearntSizeInc must be >1"
       nc <- getNConstraints solver
-      let initialLearntLim = if learntSizeFirst > 0 then learntSizeFirst else max ((nc + nv) `div` 3) 16
-          learntSizeSeq    = iterate (ceiling . (learntSizeInc*) . fromIntegral) initialLearntLim
+      let initialLearntLim = if configLearntSizeFirst config > 0 then configLearntSizeFirst config else max ((nc + nv) `div` 3) 16
+          learntSizeSeq    = iterate (ceiling . (configLearntSizeInc config *) . fromIntegral) initialLearntLim
           learntSizeAdjSeq = iterate (\x -> (x * 3) `div` 2) (100::Int)
       writeIORef (svLearntLimSeq solver) (zip learntSizeSeq learntSizeAdjSeq)
       learntSizeAdj
@@ -1268,8 +1263,8 @@ search solver !conflict_lim onConflict = do
         return $ Just SRRestart
       else do
         modifyIOURef (svLearntCounter solver) (+1)
-        strat <- configLearningStrategy <$> getConfig solver
-        case strat of
+        config <- getConfig solver
+        case configLearningStrategy config of
           LearningClause -> learnClause constr >> return Nothing
           LearningHybrid -> learnHybrid conflictCounter constr
 
