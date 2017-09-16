@@ -45,29 +45,23 @@ module ToySolver.Graph.ShortestPath
 
   -- * Shortest-path algorithms
   , bellmanFord
-  , bellmanFordFold
   , dijkstra
-  , dijkstraFold
   , floydWarshall
-  , floydWarshallFold
 
   -- * Utility functions
-  , buildPaths
   , detectCycle
   ) where
 
-import Control.Arrow
+import Control.Arrow ((&&&))
 import Control.Monad
 import Control.Monad.ST
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
-import Data.Coerce
 import Data.Hashable
 import qualified Data.HashTable.Class as H
 import qualified Data.HashTable.ST.Cuckoo as C
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.HashMap.Lazy as HashMapLazy
 import qualified Data.HashSet as HashSet
 import qualified Data.Heap as Heap -- http://hackage.haskell.org/package/heaps
 import Data.List (foldl')
@@ -223,13 +217,24 @@ lastInEdge = monoid' (\(v,_,c,l) -> Last (Just (v,c,l)))
 
 -- ------------------------------------------------------------------------
 
-bellmanFordFold
+-- | Bellman-Ford algorithm for finding shortest paths from source vertexes
+-- to all of the other vertices in a weighted graph with negative weight
+-- edges allowed.
+--
+-- It compute shortest-paths from given source vertexes, and folds edge
+-- information along shortest paths using a given 'Fold' operation.
+--
+-- Reference:
+--
+-- * Friedrich Eisenbrand. “Linear and Discrete Optimization”.
+--   <https://www.coursera.org/course/linearopt>
+bellmanFord
   :: (Eq vertex, Hashable vertex, Real cost)
   => Fold vertex cost label a
   -> HashMap vertex [OutEdge vertex cost label]
   -> [vertex] -- ^ list of source vertexes
   -> HashMap vertex (cost, a)
-bellmanFordFold (Fold fV fE fC) g ss = runST $ do
+bellmanFord (Fold fV fE fC) g ss = runST $ do
   let n = HashMap.size g
   d <- C.newSized n
   forM_ ss $ \s -> H.insert d s (0, fV s)
@@ -285,36 +290,21 @@ detectCycle (Fold fV fE fC) g d = either Just (const Nothing) $ do
                 go v (fC (fE (v,u,c,l)) result)
         Left $ go u0 (fV u0)
 
--- | Bellman-Ford algorithm for finding shortest paths from source vertexes
--- to all of the other vertices in a weighted graph with negative weight
--- edges allowed.
---
--- Reference:
---
--- * Friedrich Eisenbrand. “Linear and Discrete Optimization”.
---   <https://www.coursera.org/course/linearopt>
-bellmanFord
-  :: forall vertex cost label. (Eq vertex, Hashable vertex, Real cost)
-  => HashMap vertex [OutEdge vertex cost label]
-  -> [vertex] -- ^ list of source vertexes
-  -> Either (Path vertex cost label) (HashMap vertex (cost, Maybe (InEdge vertex cost label)))
-bellmanFord g ss =
-  case detectCycle path g d of
-    Nothing -> Right (coerce d) --fmap (id *** getLast) d
-    Just cyclePath -> Left cyclePath
-  where
-    d :: HashMap vertex (cost, Last (InEdge vertex cost label))
-    d = bellmanFordFold lastInEdge g ss
-
 -- ------------------------------------------------------------------------
 
-dijkstraFold
+-- | Dijkstra's algorithm for finding shortest paths from source vertexes
+-- to all of the other vertices in a weighted graph with non-negative edge
+-- weight.
+--
+-- It compute shortest-paths from given source vertexes, and folds edge
+-- information along shortest paths using a given 'Fold' operation.
+dijkstra
   :: forall vertex cost label a. (Eq vertex, Hashable vertex, Real cost)
   => Fold vertex cost label a
   -> HashMap vertex [OutEdge vertex cost label]
   -> [vertex] -- ^ list of source vertexes
   -> HashMap vertex (cost, a)
-dijkstraFold (Fold fV fE fC) g ss = loop (Heap.fromList [Heap.Entry 0 (s, fV s) | s <- ss]) HashMap.empty
+dijkstra (Fold fV fE fC) g ss = loop (Heap.fromList [Heap.Entry 0 (s, fV s) | s <- ss]) HashMap.empty
   where
     loop
       :: Heap.Heap (Heap.Entry cost (vertex, a))
@@ -333,27 +323,19 @@ dijkstraFold (Fold fV fE fC) g ss = loop (Heap.fromList [Heap.Entry 0 (s, fV s) 
                        ]
               in loop (Heap.union q' q2) (HashMap.insert v (c, a) visited)
 
--- | Dijkstra's algorithm for finding shortest paths from source vertexes
--- to all of the other vertices in a weighted graph with non-negative edge
--- weight.
-dijkstra
-  :: forall vertex cost label. (Eq vertex, Hashable vertex, Real cost)
-  => HashMap vertex [OutEdge vertex cost label]
-  -> [vertex] -- ^ list of source vertexes
-  -> HashMap vertex (cost, Maybe (InEdge vertex cost label))
-dijkstra g ss = coerce $ dijkstraFold lastInEdge g ss
--- dijkstra g ss = fmap (id *** getLast) $ dijkstraFold lastInEdge g ss
-
 -- ------------------------------------------------------------------------
 
 -- | Floyd-Warshall algorithm for finding shortest paths in a weighted graph
 -- with positive or negative edge weights (but with no negative cycles).
-floydWarshallFold
+--
+-- It compute shortest-paths between each pair of vertexes, and folds edge
+-- information along shortest paths using a given 'Fold' operation.
+floydWarshall
   :: forall vertex cost label a. (Eq vertex, Hashable vertex, Real cost)
   => Fold vertex cost label a
   -> HashMap vertex [OutEdge vertex cost label]
   -> HashMap (vertex,vertex) (cost, a)
-floydWarshallFold (Fold fV fE fC) g = HashMap.unionWith minP (foldl' f tbl0 vs) paths0
+floydWarshall (Fold fV fE fC) g = HashMap.unionWith minP (foldl' f tbl0 vs) paths0
   where
     vs = HashMap.keys g
 
@@ -383,25 +365,5 @@ minBy f a b =
     LT -> a
     EQ -> a
     GT -> b
-
--- | Floyd-Warshall algorithm for finding shortest paths in a weighted graph
--- with positive or negative edge weights (but with no negative cycles).
-floydWarshall
-  :: forall vertex cost label. (Eq vertex, Hashable vertex, Real cost)
-  => HashMap vertex [OutEdge vertex cost label]
-  -> HashMap (vertex,vertex) (Path vertex cost label)
-floydWarshall g = fmap snd $ floydWarshallFold path g
-
--- ------------------------------------------------------------------------
-
-buildPaths
-  :: (Eq vertex, Hashable vertex, Real cost)
-  => HashMap vertex (cost, Maybe (InEdge vertex cost label))
-  -> HashMap vertex (Path vertex cost label)
-buildPaths m = paths
-  where
-    paths = HashMapLazy.mapWithKey f m
-    f u (_, Nothing) = pathEmpty u
-    f u (_, Just (v,c,l)) = (paths HashMap.! v) `pathAppend` Singleton (v,u,c,l)
 
 -- ------------------------------------------------------------------------

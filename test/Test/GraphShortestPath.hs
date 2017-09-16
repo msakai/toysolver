@@ -5,6 +5,7 @@ module Test.GraphShortestPath (graphShortestPathTestGroup) where
 
 import Control.Monad
 import Data.Hashable
+import Data.Monoid
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
@@ -70,14 +71,14 @@ isValidResult
   :: (Eq vertex, Hashable vertex, Eq cost, Num cost, Eq label)
   => HashMap vertex [OutEdge vertex cost label]
   -> [vertex]
-  -> HashMap vertex (cost, Maybe (InEdge vertex cost label))
+  -> HashMap vertex (cost, Last (InEdge vertex cost label))
   -> Bool
 isValidResult g ss p = 
   and
   [ case m of
       Nothing -> tc == 0 && u `HashSet.member` ss'
       Just (v,c,l) -> isValidEdge g (v,u,c,l) && tc == fst (p HashMap.! v) + c
-  | (u, (tc,m)) <- HashMap.toList p
+  | (u, (tc,Last m)) <- HashMap.toList p
   ]
   where
     ss' = HashSet.fromList ss
@@ -88,34 +89,32 @@ prop_bellmanFord_valid_path :: Property
 prop_bellmanFord_valid_path =
   forAll (genGraph arbitrary) $ \g ->
     forAll (sublistOf (HashMap.keys g)) $ \ss ->
-      case bellmanFord g ss of
-        Left cyclePath -> isValidNegativeCostCycle g cyclePath
-        Right m -> and
-          [ isValidPath g path &&
-            pathTo path == u &&
-            pathFrom path `elem` ss
-          | (u, path) <- HashMap.toList $ buildPaths m
-          ]
+      and
+      [ isValidPath g p &&
+        pathTo p == u &&
+        pathFrom p `elem` ss
+      | (u, (_,p)) <- HashMap.toList $ bellmanFord path g ss
+      ]
 
 prop_dijkstra_valid_path :: Property
 prop_dijkstra_valid_path =
   forAll (genGraphNonNegative) $ \g ->
     forAll (sublistOf (HashMap.keys g)) $ \ss ->
       and
-      [ isValidPath g path &&
-        pathTo path == u &&
-        pathFrom path `elem` ss
-      | (u, path) <- HashMap.toList $ buildPaths $ dijkstra g ss
+      [ isValidPath g p &&
+        pathTo p == u &&
+        pathFrom p `elem` ss
+      | (u, (_,p)) <- HashMap.toList $ dijkstra path g ss
       ]
 
 prop_floydWarshall_valid_path :: Property
 prop_floydWarshall_valid_path =
   forAll (genGraphNonNegative) $ \g ->
       and
-      [ isValidPath g path &&
-        pathFrom path == u &&
-        pathTo path == v
-      | ((u,v), path) <- HashMap.toList (floydWarshall g)
+      [ isValidPath g p &&
+        pathFrom p == u &&
+        pathTo p == v
+      | ((u,v), (_,p)) <- HashMap.toList (floydWarshall path g)
       ]
 
 prop_dijkstra_equals_bellmanFord :: Property
@@ -124,45 +123,49 @@ prop_dijkstra_equals_bellmanFord =
     let vs = HashMap.keys g
     in forAll (elements vs) $ \v ->
        forAll (elements vs) $ \u ->
-         ((Right . fmap pathCost . HashMap.lookup u . buildPaths) $ dijkstra g [v])
+         (fmap (pathCost . snd) . HashMap.lookup u $ dijkstra path g [v])
          ==
-         (fmap (fmap pathCost . HashMap.lookup u . buildPaths) $ bellmanFord g [v])
+         (fmap (pathCost . snd) . HashMap.lookup u $ bellmanFord path g [v])
 
 prop_floydWarshall_equals_dijkstra :: Property
 prop_floydWarshall_equals_dijkstra =
   forAll (genGraphNonNegative) $ \g ->
     let vs = HashMap.keys g
-        m  = floydWarshall g        
+        m  = floydWarshall path g
     in forAll (elements vs) $ \v ->
        forAll (elements vs) $ \u ->
-         fmap pathCost (HashMap.lookup (v,u) m)
+         fmap (pathCost . snd) (HashMap.lookup (v,u) m)
          ==
-         fmap pathCost (HashMap.lookup u $ buildPaths $ dijkstra g [v])
+         fmap (pathCost . snd) (HashMap.lookup u $ dijkstra path g [v])
 
 prop_floydWarshall_equals_bellmanFord :: Property
 prop_floydWarshall_equals_bellmanFord =
   forAll (genGraph arbitrary) $ \g ->
     let vs = HashMap.keys g
-        ret1 = floydWarshall g
+        ret1 = floydWarshall lastInEdge g
     in counterexample (show ret1) $ conjoin $
          [ counterexample (show v) $ counterexample (show ret2) $
-             case ret2 of
-               Left cyclePath ->
+             case detectCycle path g ret2 of
+               Just cyclePath ->
                  conjoin
-                 [ counterexample (show u) (pathCost (ret1 HashMap.! (u,u)) < 0)
+                 [ counterexample (show u) (fst (ret1 HashMap.! (u,u)) < 0)
                  | u <- pathVertexes cyclePath
                  ]
-               Right m2 ->
-                 HashMap.fromList [(u, pathCost path) | ((v',u), path) <- HashMap.toList ret1, v==v']
+               Nothing ->
+                 HashMap.fromList [(u,c) | ((v',u), (c,_)) <- HashMap.toList ret1, v==v']
                  ===
-                 fmap fst m2
-         | v <- vs, let ret2 = bellmanFord g [v]
+                 fmap fst ret2
+         | v <- vs
+         , let ret2 = bellmanFord lastInEdge g [v]
          ]
 
 -- progassgn5.py example from “Linear and Discrete Optimization”
 -- <https://www.coursera.org/course/linearopt>
 case_bellmanFord_test1 :: Assertion
-case_bellmanFord_test1 = bellmanFord g ['A'] @?= expected
+case_bellmanFord_test1 = do
+  let ret = bellmanFord lastInEdge g ['A']
+  ret @?= expected
+  detectCycle path g ret @?= Nothing
   where
     g :: HashMap Char [(Char, Int, ())]
     g = HashMap.fromList
@@ -173,22 +176,24 @@ case_bellmanFord_test1 = bellmanFord g ['A'] @?= expected
         , ('E', [('F',5,())])
         , ('F', [('C',-3,())])
         ]
-    expected = Right $ HashMap.fromList
-      [ ('A', (0, Nothing))
-      , ('B', (-7, Just ('A',-7,())))
-      , ('C', (-18, Just ('F',-3,())))
-      , ('D', (-17, Just ('B',-10,())))
-      , ('E', (-20, Just ('D',-3,())))
-      , ('F', (-15, Just ('E',5,())))
+    expected = HashMap.fromList
+      [ ('A', (0, Last Nothing))
+      , ('B', (-7, Last (Just ('A',-7,()))))
+      , ('C', (-18, Last (Just ('F',-3,()))))
+      , ('D', (-17, Last (Just ('B',-10,()))))
+      , ('E', (-20, Last (Just ('D',-3,()))))
+      , ('F', (-15, Last (Just ('E',5,()))))
       ]
 
 case_bellmanFord_normal :: Assertion
 case_bellmanFord_normal = do
   let g = HashMap.fromListWith (++) $
             [(v,[(u,c,())]) | ((v,u),c) <- bellmanford_example_normal]
-  case bellmanFord g [24] of
-    Left cyclePath -> assertFailure ("negative cost cycle should not be found (" ++ show cyclePath ++ ")")
-    Right m -> assertBool (show m ++ " is not a valid result") $ isValidResult g [24] m
+      m = bellmanFord lastInEdge g [24]
+  assertBool (show m ++ " is not a valid result") $ isValidResult g [24] m
+  case detectCycle path g m of
+    Nothing -> return ()
+    Just cyclePath -> assertFailure ("negative cost cycle should not be found (" ++ show cyclePath ++ ")")
 
 bellmanford_example_normal :: [((Vertex, Vertex), Cost)]
 bellmanford_example_normal =
@@ -554,9 +559,10 @@ case_bellmanFord_negativecost_cycle :: Assertion
 case_bellmanFord_negativecost_cycle = do
   let g = HashMap.fromListWith (++) $
             [(v, [(u,c,())]) | ((v,u),c) <- bellmanford_example_negativecost_cycle]
-  case bellmanFord g [25] of
-    Left cyclePath -> assertBool (show cyclePath ++ " should be valid negative cost cycle") $ isValidNegativeCostCycle g cyclePath
-    Right m -> assertFailure ("negative cost cycle should be found (" ++ show m ++ ")") 
+      m = bellmanFord lastInEdge g [25]
+  case detectCycle path g m of
+    Nothing -> assertFailure ("negative cost cycle should be found (" ++ show m ++ ")") 
+    Just cyclePath -> assertBool (show cyclePath ++ " should be valid negative cost cycle") $ isValidNegativeCostCycle g cyclePath
 
 bellmanford_example_negativecost_cycle :: [((Vertex, Vertex), Cost)]
 bellmanford_example_negativecost_cycle =
@@ -939,13 +945,13 @@ bellmanford_example_negativecost_cycle =
 
 case_floydWarshall_normal :: Assertion
 case_floydWarshall_normal = do
-  fmap pathCost m @?= expected
-  forM_ (HashMap.toList m) $ \((u,v),path) -> do
-    pathFrom path @?= u
-    pathTo path @?= v
-    assertBool (show path ++ " is not a valid path") (isValidPath floydWarshall_example path)
+  fmap fst m @?= expected
+  forM_ (HashMap.toList m) $ \((u,v),(_,p)) -> do
+    pathFrom p @?= u
+    pathTo p @?= v
+    assertBool (show p ++ " is not a valid path") (isValidPath floydWarshall_example p)
   where
-    m = floydWarshall floydWarshall_example
+    m = floydWarshall path floydWarshall_example
     expected =
       HashMap.fromList
       [ ((1,1),0), ((1,2),-1), ((1,3),-2), ((1,4),0)

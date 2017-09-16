@@ -26,8 +26,9 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
+import Data.Monoid
 
-import ToySolver.Graph.ShortestPath (bellmanFord, pathEdges)
+import ToySolver.Graph.ShortestPath (bellmanFord, lastInEdge, detectCycle, monoid')
 
 -- (a,b,k) represents (a - b ≤ k)
 type SimpleAtom v b = (v,v,b)
@@ -37,12 +38,13 @@ solve
   => [(label, SimpleAtom v b)]
   -> Either (HashSet label) (HashMap v b)
 solve xs =
-  case bellmanFord g vs of
-    Left cyclePath -> Left $ HashSet.fromList [l | (_,_,_,l) <- pathEdges cyclePath]
-    Right m -> Right $ fmap (\(d, _) -> - d) m
+  case detectCycle (monoid' (\(_,_,_,l) -> Endo (l:))) g d of
+    Just f -> Left $ HashSet.fromList $ appEndo f []
+    Nothing -> Right $ fmap (\(c,_) -> - c) d
   where
     vs = HashSet.toList $ HashSet.fromList [v | (_,(a,b,_)) <- xs, v <- [a,b]]
     g = HashMap.fromList [(a,[(b,k,l)]) | (l,(a,b,k)) <- xs]
+    d = bellmanFord lastInEdge g vs
 
 -- M = {a−b ≤ 2, b−c ≤ 3, c−a ≤ −3}
 test_sat = solve xs
