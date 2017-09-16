@@ -18,6 +18,16 @@ module ToySolver.Graph.ShortestPath
   , OutEdge
   , InEdge
 
+  -- * Fold data type
+  , Fold (..)
+  , monoid'
+  , monoid
+  , unit
+  , pair
+  , path
+  , firstOutEdge
+  , lastInEdge
+
   -- * Path data types
   , Path (..)
   , pathFrom
@@ -31,20 +41,27 @@ module ToySolver.Graph.ShortestPath
   , pathVertexes
   , pathVertexesBackward
   , pathVertexesSeq
+  , pathFold
 
   -- * Shortest-path algorithms
   , bellmanFord
+  , bellmanFordFold
   , dijkstra
+  , dijkstraFold
   , floydWarshall
+  , floydWarshallFold
 
   -- * Utility functions
   , buildPaths
+  , detectCycle
   ) where
 
+import Control.Arrow
 import Control.Monad
 import Control.Monad.ST
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
+import Data.Coerce
 import Data.Hashable
 import qualified Data.HashTable.Class as H
 import qualified Data.HashTable.ST.Cuckoo as C
@@ -56,6 +73,7 @@ import qualified Data.Heap as Heap -- http://hackage.haskell.org/package/heaps
 import Data.List (foldl')
 import Data.Maybe
 import Data.Monoid
+import Data.Ord
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.STRef
@@ -148,7 +166,124 @@ pathMin p1 p2
   | pathCost p1 <= pathCost p2 = p1
   | otherwise = p2
 
+pathFold :: Fold vertex cost label a -> Path vertex cost label -> a
+pathFold (Fold fV fE fC) = h
+  where
+    h (Empty v) = fV v
+    h (Singleton e) = fE e
+    h (Append p1 p2 _) = fC (h p1) (h p2)
+
 -- ------------------------------------------------------------------------
+
+-- | Operations for folding edge information along with a path into a @r@ value.
+--
+-- @Fold vertex cost label r@ consists of three opetations:
+--
+-- * @vertex -> r@ corresponds to an empty path,
+--
+-- * @Edge vertex cost label -> r@ corresponds to a single edge, and
+--
+-- * @r -> r -> r@ corresponds to path concatenation.
+--
+data Fold vertex cost label r = Fold (vertex -> r) (Edge vertex cost label -> r) (r -> r -> r)
+
+-- | Project `Edge` into a monoid value and fold using monoidal operation.
+monoid' :: Monoid m => (Edge vertex cost label -> m) -> Fold vertex cost label m
+monoid' f = Fold (\_ -> mempty) f mappend
+
+-- | Similar to 'monoid'' but a /label/ is directly used as a monoid value.
+monoid :: Monoid m => Fold vertex cost m m
+monoid = monoid' (\(_,_,_,m) -> m)
+
+-- | Ignore contents and return a unit value.
+unit :: Fold vertex cost label ()
+unit = monoid' (\_ -> ())
+
+-- | Pairs two `Fold` into one that produce a tuple.
+pair :: Fold vertex cost label a -> Fold vertex cost label b -> Fold vertex cost label (a,b)
+pair (Fold fV1 fE1 fC1) (Fold fV2 fE2 fC2) =
+  Fold (fV1 &&& fV2) (fE1 &&& fE2) (\(a1,b1) (a2,b2) -> (fC1 a1 a2, fC2 b1 b2))
+
+-- | Construct a `Path` value.
+path :: (Eq vertex, Num cost) => Fold vertex cost label (Path vertex cost label)
+path = Fold pathEmpty Singleton pathAppend
+
+-- | Compute cost of a path.
+cost :: Num cost => Fold vertex cost label cost
+cost = Fold (\_ -> 0) (\(_,_,c,_) -> c) (+)
+
+-- | Get the first `OutEdge` of a path.
+firstOutEdge :: Fold vertex cost label (First (OutEdge vertex cost label))
+firstOutEdge = monoid' (\(_,v,c,l) -> First (Just (v,c,l)))
+
+-- | Get the last `InEdge` of a path.
+-- This is useful for constructing a /parent/ map of a spanning tree.
+lastInEdge :: Fold vertex cost label (Last (InEdge vertex cost label))
+lastInEdge = monoid' (\(v,_,c,l) -> Last (Just (v,c,l)))
+
+-- ------------------------------------------------------------------------
+
+bellmanFordFold
+  :: (Eq vertex, Hashable vertex, Real cost)
+  => Fold vertex cost label a
+  -> HashMap vertex [OutEdge vertex cost label]
+  -> [vertex] -- ^ list of source vertexes
+  -> HashMap vertex (cost, a)
+bellmanFordFold (Fold fV fE fC) g ss = runST $ do
+  let n = HashMap.size g
+  d <- C.newSized n
+  forM_ ss $ \s -> H.insert d s (0, fV s)
+
+  updatedRef <- newSTRef (HashSet.fromList ss)
+  _ <- runExceptT $ replicateM_ n $ do
+    us <- lift $ readSTRef updatedRef
+    when (HashSet.null us) $ throwE ()
+    lift $ do
+      writeSTRef updatedRef HashSet.empty
+      forM_ (HashSet.toList us) $ \u -> do
+        Just (du, a) <- H.lookup d u
+        forM_ (HashMap.lookupDefault [] u g) $ \(v, c, l) -> do
+          m <- H.lookup d v
+          case m of
+            Just (c0, _) | c0 <= du + c -> return ()
+            _ -> do
+              H.insert d v (du + c, a `fC` fE (u,v,c,l))
+              modifySTRef' updatedRef (HashSet.insert v)
+
+  freezeHashTable d
+
+freezeHashTable :: (H.HashTable h, Hashable k, Eq k) => h s k v -> ST s (HashMap k v)
+freezeHashTable h = H.foldM (\m (k,v) -> return $! HashMap.insert k v m) HashMap.empty h
+
+detectCycle
+  :: forall vertex cost label a. (Eq vertex, Hashable vertex, Real cost)
+  => Fold vertex cost label a
+  -> HashMap vertex [OutEdge vertex cost label]
+  -> HashMap vertex (cost, Last (InEdge vertex cost label))
+  -> Maybe a
+detectCycle (Fold fV fE fC) g d = either Just (const Nothing) $ do
+  forM_ (HashMap.toList d) $ \(u,(du,_)) ->
+    forM_ (HashMap.lookupDefault [] u g) $ \(v, c, l) -> do
+      let (dv,_) = d HashMap.! v
+      when (du + c < dv) $ do
+        -- a negative cycle is detected
+        let d' = HashMap.insert v (du + c, Last (Just (u, c, l))) d
+            parent u = do
+              case HashMap.lookup u d' of
+                Just (_, Last (Just (v,_,_))) -> v
+                _ -> undefined
+            u0 = go (parent (parent v)) (parent v)
+              where
+                go hare tortoise
+                  | hare == tortoise = hare
+                  | otherwise = go (parent (parent hare)) (parent tortoise)
+        let go u result = do
+              let Just (_, Last (Just (v,c,l))) = HashMap.lookup u d'
+              if v == u0 then
+                fC (fE (v,u,c,l)) result
+              else
+                go v (fC (fE (v,u,c,l)) result)
+        Left $ go u0 (fV u0)
 
 -- | Bellman-Ford algorithm for finding shortest paths from source vertexes
 -- to all of the other vertices in a weighted graph with negative weight
@@ -159,68 +294,44 @@ pathMin p1 p2
 -- * Friedrich Eisenbrand. “Linear and Discrete Optimization”.
 --   <https://www.coursera.org/course/linearopt>
 bellmanFord
-  :: (Eq vertex, Hashable vertex, Real cost)
+  :: forall vertex cost label. (Eq vertex, Hashable vertex, Real cost)
   => HashMap vertex [OutEdge vertex cost label]
   -> [vertex] -- ^ list of source vertexes
   -> Either (Path vertex cost label) (HashMap vertex (cost, Maybe (InEdge vertex cost label)))
-bellmanFord g ss = runST $ do
-  let n = HashMap.size g
-  d <- C.newSized n
-  forM_ ss $ \s -> H.insert d s (0, Nothing)
-
-  updatedRef <- newSTRef (HashSet.fromList ss)
-  _ <- runExceptT $ replicateM_ n $ do
-    us <- lift $ readSTRef updatedRef
-    when (HashSet.null us) $ throwE ()
-    lift $ do
-      writeSTRef updatedRef HashSet.empty
-      forM_ (HashSet.toList us) $ \u -> do
-        Just (du, _) <- H.lookup d u
-        forM_ (HashMap.lookupDefault [] u g) $ \(v, c, l) -> do
-          m <- H.lookup d v
-          case m of
-            Just (c0, _) | c0 <= du + c -> return ()
-            _ -> do
-              H.insert d v (du + c, Just (u,c,l))
-              modifySTRef' updatedRef (HashSet.insert v)
-
-  xs <- H.toList d
-  runExceptT $ do
-    forM_ xs $ \(u,(du,_)) ->
-      forM_ (HashMap.lookupDefault [] u g) $ \(v, c, l) -> do
-        Just (dv,_) <- lift $ H.lookup d v
-        when (du + c < dv) $ do
-          -- a negative cycle is detected
-          cyclePath <- lift $ do
-            H.insert d v (du + c, Just (u, c, l))
-            u0 <- do
-              let getParent u = do
-                    Just (_, Just (v,_,_)) <- H.lookup d u
-                    return v
-                  go hare tortoise
-                    | hare == tortoise = return hare
-                    | otherwise = do
-                        hare' <- getParent =<< getParent hare
-                        tortoise' <- getParent tortoise
-                        go hare' tortoise'
-              hare0 <- getParent =<< getParent v
-              tortoise0 <- getParent v
-              go hare0 tortoise0
-            let go u result = do
-                  Just (_, Just (v,c,l)) <- H.lookup d u
-                  if v == u0 then
-                    return (Singleton (v,u,c,l) `pathAppend` result)
-                  else
-                    go v (Singleton (v,u,c,l) `pathAppend` result)
-            go u0 (pathEmpty u0)
-          throwE cyclePath
-    d' <- lift $ freezeHashTable d
-    return d'
-
-freezeHashTable :: (H.HashTable h, Hashable k, Eq k) => h s k v -> ST s (HashMap k v)
-freezeHashTable h = H.foldM (\m (k,v) -> return $! HashMap.insert k v m) HashMap.empty h
+bellmanFord g ss =
+  case detectCycle path g d of
+    Nothing -> Right (coerce d) --fmap (id *** getLast) d
+    Just cyclePath -> Left cyclePath
+  where
+    d :: HashMap vertex (cost, Last (InEdge vertex cost label))
+    d = bellmanFordFold lastInEdge g ss
 
 -- ------------------------------------------------------------------------
+
+dijkstraFold
+  :: forall vertex cost label a. (Eq vertex, Hashable vertex, Real cost)
+  => Fold vertex cost label a
+  -> HashMap vertex [OutEdge vertex cost label]
+  -> [vertex] -- ^ list of source vertexes
+  -> HashMap vertex (cost, a)
+dijkstraFold (Fold fV fE fC) g ss = loop (Heap.fromList [Heap.Entry 0 (s, fV s) | s <- ss]) HashMap.empty
+  where
+    loop
+      :: Heap.Heap (Heap.Entry cost (vertex, a))
+      -> HashMap vertex (cost, a)
+      -> HashMap vertex (cost, a)
+    loop q visited =
+      case Heap.viewMin q of
+        Nothing -> visited
+        Just (Heap.Entry c (v, a), q')
+          | v `HashMap.member` visited -> loop q' visited
+          | otherwise ->
+              let q2 = Heap.fromList
+                       [ Heap.Entry (c+c') (ch, a `fC` fE (v,ch,c',l))
+                       | (ch,c',l) <- HashMap.lookupDefault [] v g
+                       , not (ch `HashMap.member` visited)
+                       ]
+              in loop (Heap.union q' q2) (HashMap.insert v (c, a) visited)
 
 -- | Dijkstra's algorithm for finding shortest paths from source vertexes
 -- to all of the other vertices in a weighted graph with non-negative edge
@@ -230,26 +341,48 @@ dijkstra
   => HashMap vertex [OutEdge vertex cost label]
   -> [vertex] -- ^ list of source vertexes
   -> HashMap vertex (cost, Maybe (InEdge vertex cost label))
-dijkstra g ss = loop (Heap.fromList [Heap.Entry 0 (s, Nothing) | s <- ss]) HashMap.empty
-  where
-    loop
-      :: Heap.Heap (Heap.Entry cost (vertex, Maybe (InEdge vertex cost label)))
-      -> HashMap vertex (cost, Maybe (InEdge vertex cost label))
-      -> HashMap vertex (cost, Maybe (InEdge vertex cost label))
-    loop q visited =
-      case Heap.viewMin q of
-        Nothing -> visited
-        Just (Heap.Entry c (v, m), q')
-          | v `HashMap.member` visited -> loop q' visited
-          | otherwise ->
-              let q2 = Heap.fromList
-                       [ Heap.Entry (c+c') (ch, Just (v,c',l))
-                       | (ch,c',l) <- HashMap.lookupDefault [] v g
-                       , not (ch `HashMap.member` visited)
-                       ]
-              in loop (Heap.union q' q2) (HashMap.insert v (c, m) visited)
+dijkstra g ss = coerce $ dijkstraFold lastInEdge g ss
+-- dijkstra g ss = fmap (id *** getLast) $ dijkstraFold lastInEdge g ss
 
 -- ------------------------------------------------------------------------
+
+-- | Floyd-Warshall algorithm for finding shortest paths in a weighted graph
+-- with positive or negative edge weights (but with no negative cycles).
+floydWarshallFold
+  :: forall vertex cost label a. (Eq vertex, Hashable vertex, Real cost)
+  => Fold vertex cost label a
+  -> HashMap vertex [OutEdge vertex cost label]
+  -> HashMap (vertex,vertex) (cost, a)
+floydWarshallFold (Fold fV fE fC) g = HashMap.unionWith minP (foldl' f tbl0 vs) paths0
+  where
+    vs = HashMap.keys g
+
+    paths0 :: HashMap (vertex,vertex) (cost, a)
+    paths0 = HashMap.fromList [((v,v), (0, fV v)) | v <- HashMap.keys g]
+
+    tbl0 :: HashMap (vertex,vertex) (cost, a)
+    tbl0 = HashMap.fromListWith minP [((v,u), (c, fE (v,u,c,l))) | (v, es) <- HashMap.toList g, (u,c,l) <- es]
+
+    minP :: (cost, a) -> (cost, a) -> (cost, a)
+    minP = minBy (comparing fst)
+
+    f :: HashMap (vertex,vertex) (cost, a)
+      -> vertex
+      -> HashMap (vertex,vertex) (cost, a)
+    f tbl vk = HashMap.unionWith minP tbl tbl'
+      where
+        tbl' = HashMap.fromList
+          [ ((vi,vj), (c1+c2, fC a1 a2))
+          | vi <- vs, (c1,a1) <- maybeToList (HashMap.lookup (vi,vk) tbl)
+          , vj <- vs, (c2,a2) <- maybeToList (HashMap.lookup (vk,vj) tbl)
+          ]
+
+minBy :: (a -> a -> Ordering) -> a -> a -> a
+minBy f a b =
+  case f a b of
+    LT -> a
+    EQ -> a
+    GT -> b
 
 -- | Floyd-Warshall algorithm for finding shortest paths in a weighted graph
 -- with positive or negative edge weights (but with no negative cycles).
@@ -257,26 +390,7 @@ floydWarshall
   :: forall vertex cost label. (Eq vertex, Hashable vertex, Real cost)
   => HashMap vertex [OutEdge vertex cost label]
   -> HashMap (vertex,vertex) (Path vertex cost label)
-floydWarshall g = HashMap.unionWith pathMin (foldl' f tbl0 vs) paths0
-  where
-    vs = HashMap.keys g
-
-    paths0 :: HashMap (vertex,vertex) (Path vertex cost label)
-    paths0 = HashMap.fromList [((v,v), pathEmpty v) | v <- HashMap.keys g]
-
-    tbl0 :: HashMap (vertex,vertex) (Path vertex cost label)
-    tbl0 = HashMap.fromListWith pathMin [((v,u), Singleton (v,u,c,l)) | (v, es) <- HashMap.toList g, (u,c,l) <- es]
-
-    f :: HashMap (vertex,vertex) (Path vertex cost label)
-      -> vertex
-      -> HashMap (vertex,vertex) (Path vertex cost label)
-    f tbl vk = HashMap.unionWith pathMin tbl tbl'
-      where
-        tbl' = HashMap.fromList
-          [ ((vi,vj), pathAppend p1 p2)
-          | vi <- vs, p1 <- maybeToList (HashMap.lookup (vi,vk) tbl)
-          , vj <- vs, p2 <- maybeToList (HashMap.lookup (vk,vj) tbl)
-          ]
+floydWarshall g = fmap snd $ floydWarshallFold path g
 
 -- ------------------------------------------------------------------------
 
