@@ -1780,6 +1780,8 @@ analyzeConflict solver constr = do
 
   lits2 <- minimizeConflictClause solver lits
 
+  incrementReasoned solver (IS.toList lits2)
+
   xs <- liftM (sortBy (flip (comparing snd))) $
     forM (IS.toList lits2) $ \l -> do
       lv <- litLevel solver l
@@ -1895,17 +1897,7 @@ analyzeConflictHybrid solver constr = do
 
   lits2 <- minimizeConflictClause solver lits
 
-  do let f reasonSided l = do
-           m <- varReason solver (litVar l)
-           case m of
-             Nothing -> return reasonSided
-             Just constr -> do
-               v <- litValue solver l
-               unless (v == lFalse) undefined
-               xs <- constrReasonOf solver constr (Just (litNot l))
-               return $ reasonSided `IS.union` IS.fromList (map litVar xs)
-     reasonSided <- foldM f IS.empty (IS.toList lits2)
-     mapM_ (varIncrementReasoned solver) (IS.toList reasonSided)
+  incrementReasoned solver (IS.toList lits2)
 
   xs <- liftM (sortBy (flip (comparing snd))) $
     forM (IS.toList lits2) $ \l -> do
@@ -2016,6 +2008,20 @@ minimizeConflictClauseRecursive solver lits = do
     log solver $ show xs
     log solver $ show ys
   return $ IS.fromAscList $ ys
+
+incrementReasoned :: Solver -> Clause -> IO ()
+incrementReasoned solver ls = do
+  let f reasonSided l = do
+        m <- varReason solver (litVar l)
+        case m of
+          Nothing -> return reasonSided
+          Just constr -> do
+            v <- litValue solver l
+            unless (v == lFalse) undefined
+            xs <- constrReasonOf solver constr (Just (litNot l))
+            return $ reasonSided `IS.union` IS.fromList (map litVar xs)
+  reasonSided <- foldM f IS.empty ls
+  mapM_ (varIncrementReasoned solver) (IS.toList reasonSided)
 
 peekTrail :: Solver -> IO Lit
 peekTrail solver = do
