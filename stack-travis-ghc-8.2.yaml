@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: nightly-2017-08-30
+resolver: nightly-2017-09-17
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -49,8 +49,6 @@ extra-deps:
 - queue-0.1.2
 - log-domain-0.11.2
 - logic-TPTP-0.4.5.0
-- statistics-0.13.3.0
-- xml-conduit-1.4.0.4
 - OptDir-0.0.3
 - data-interval-1.3.0
 - extended-reals-0.2.2.0
