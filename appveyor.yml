@@ -23,4 +23,4 @@ build_script:
 test_script:
 # The ugly echo "" hack is to avoid complaints about 0 being an invalid file
 # descriptor
-- echo "" | stack --no-terminal test --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC
+- echo "" | stack --no-terminal test --bench --no-run-benchmarks --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC
