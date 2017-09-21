@@ -159,6 +159,7 @@ Library
      containers >=0.5.0,
      data-default-class,
      data-interval >=1.0.1 && <1.4.0,
+     conduit-combinators,
      deepseq,
      extended-reals >=0.1 && <1.0,
      filepath,
@@ -342,6 +343,7 @@ Library
      ToySolver.SAT.Encoder.PB.Internal.Sorter
      ToySolver.SAT.Encoder.PBNLC
      ToySolver.SAT.Encoder.Tseitin
+     ToySolver.SAT.Enum
      ToySolver.SAT.ExistentialQuantification
      ToySolver.SAT.MessagePassing.SurveyPropagation
      ToySolver.SAT.MUS
