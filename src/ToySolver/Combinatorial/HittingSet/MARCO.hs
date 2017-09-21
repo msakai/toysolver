@@ -72,11 +72,11 @@ run prob opt = do
           let xs = IntMap.keysSet $ IntMap.filter (SAT.evalLit model) item2var
           ret2 <- minimalUninterestingSetOrMaximalInterestingSet prob xs
           case ret2 of
-            Left ys -> do
+            UninterestingSet ys -> do
               blockUp ys
               modifyIORef negRef (ys :)
               optOnMinimalUninterestingSetFound opt ys
-            Right ys -> do
+            InterestingSet ys -> do
               blockDown ys
               modifyIORef posRef (ys :)
               optOnMaximalInterestingSetFound opt ys

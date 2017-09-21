@@ -113,10 +113,10 @@ instance I.IsProblem Problem IO where
     b <- SAT.solveWith solver (IntSet.toList xs)
     if b then do
       m <- SAT.getModel solver
-      return $ Right $ IntSet.fromList [l | l <- IntSet.toList univ, optEvalConstr opt m l]
+      return $ I.InterestingSet $ IntSet.fromList [l | l <- IntSet.toList univ, optEvalConstr opt m l]
     else do
       zs <- SAT.getFailedAssumptions solver
-      return $ Left $ IntSet.fromList zs
+      return $ I.UninterestingSet $ IntSet.fromList zs
 
   grow prob@(Problem _ _ opt) xs = do
     optLogger opt $ show (optMethod opt) ++ ": grow " ++ showLits prob xs

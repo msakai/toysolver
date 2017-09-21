@@ -65,10 +65,10 @@ run prob opt = loop (Set.map complement (optMaximalInterestingSets opt)) (optMin
         Just xs -> do
           ret <- minimalUninterestingSetOrMaximalInterestingSet prob xs
           case ret of
-            Left ys -> do
+            UninterestingSet ys -> do
               optOnMinimalUninterestingSetFound opt ys
               loop comp_pos (Set.insert ys neg)
-            Right ys -> do
+            InterestingSet ys -> do
               optOnMaximalInterestingSetFound opt ys
               loop (Set.insert (complement ys) comp_pos) neg
 
@@ -93,13 +93,13 @@ findPrimeImplicateOrPrimeImplicant
   -> (IntSet -> Bool) -- ^ A monotone boolean function /f/ from /{0,1}^|V| ≅ P(V)/ to @Bool@
   -> Set IntSet -- ^ Subset /C'/ of prime implicates /C/ of /f/
   -> Set IntSet -- ^ Subset /D'/ of prime implicants /D/ of /f/
-  -> Maybe (Either IntSet IntSet)
+  -> Maybe ImplicateOrImplicant
 findPrimeImplicateOrPrimeImplicant vs f cs ds = do
   xs <- FredmanKhachiyan1996.checkDuality ds cs
   let prob = SimpleProblem vs (not . f)
   case runIdentity (minimalUninterestingSetOrMaximalInterestingSet prob xs) of
-    Left ys -> return (Right ys)
-    Right ys -> return (Left (vs `IntSet.difference` ys))
+    UninterestingSet ys -> return (Implicant ys)
+    InterestingSet ys -> return (Implicate (vs `IntSet.difference` ys))
 
 -- | Compute the irredundant CNF representation and DNF representation.
 --
@@ -135,8 +135,8 @@ enumMinimalHittingSets dnf = loop Set.empty
     loop cs =
       case findPrimeImplicateOrPrimeImplicant vs f cs dnf of
         Nothing -> []
-        Just (Left c)  -> c : loop (Set.insert c cs)
-        Just (Right _) -> error "GurvichKhachiyan1999.enumMinimalHittingSets: should not happen"
+        Just (Implicate c)  -> c : loop (Set.insert c cs)
+        Just (Implicant _) -> error "GurvichKhachiyan1999.enumMinimalHittingSets: should not happen"
 
 evalDNF :: Set IntSet -> IntSet -> Bool
 evalDNF dnf xs = or [is `IntSet.isSubsetOf` xs | is <- Set.toList dnf]
@@ -149,11 +149,11 @@ f, g :: Set IntSet
 f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]
 g = Set.fromList $ map IntSet.fromList [[7,9], [4,8,9], [2,8,9]]
 
-testA1, testA2, testA3, testA4 :: Maybe (Either IntSet IntSet)
+testA1, testA2, testA3, testA4 :: Maybe ImplicateOrImplicant
 testA1 = findPrimeImplicateOrPrimeImplicant (IntSet.fromList [2,4,7,8,9]) (evalDNF f) Set.empty f 
 testA2 = findPrimeImplicateOrPrimeImplicant (IntSet.fromList [2,4,7,8,9]) (evalDNF f) (Set.singleton (IntSet.fromList [2,8,9])) f
 testA3 = findPrimeImplicateOrPrimeImplicant (IntSet.fromList [2,4,7,8,9]) (evalDNF f) (Set.fromList [IntSet.fromList [2,8,9], IntSet.fromList [4,8,9]]) f
 testA4 = findPrimeImplicateOrPrimeImplicant (IntSet.fromList [2,4,7,8,9]) (evalDNF f) (Set.fromList [IntSet.fromList [2,8,9], IntSet.fromList [4,8,9], IntSet.fromList [7,9]]) f
 
-testB1 :: Maybe (Either IntSet IntSet)
+testB1 :: Maybe ImplicateOrImplicant
 testB1 = findPrimeImplicateOrPrimeImplicant (IntSet.fromList [2,4,7,8,9]) (evalDNF f) g Set.empty

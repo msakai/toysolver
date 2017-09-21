@@ -24,6 +24,7 @@ module ToySolver.Combinatorial.HittingSet.InterestingSets
   (
   -- * Problem definition
     IsProblem (..)
+  , InterestingOrUninterestingSet (..)
   , defaultGrow
   , defaultShrink
   , defaultMaximalInterestingSet
@@ -33,16 +34,23 @@ module ToySolver.Combinatorial.HittingSet.InterestingSets
 
   -- * Options for maximal interesting sets enumeration
   , Options (..)
+
+  -- * Datatype for monotone CNF/DNF dualization
+  , ImplicateOrImplicant (..)
   ) where
 
 import Control.Monad
 import Data.Default.Class
-import Data.Either
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified ToySolver.Combinatorial.HittingSet.Simple as HTC
+
+data InterestingOrUninterestingSet
+  = UninterestingSet IntSet
+  | InterestingSet IntSet
+  deriving (Eq, Ord, Show, Read)
 
 -- | A problem is essentially a pair of an @IntSet@ (@universe@) and
 -- a monotone pure function @IntSet -> Bool@ (@isInteresting@), but
@@ -55,14 +63,19 @@ class Monad m => IsProblem prob m | prob -> m where
   -- | Interesting sets are lower closed subsets of 'universe', i.e. if @xs@ is
   -- interesting then @ys@ ⊆ @xs@ is also interesting.
   isInteresting :: prob -> IntSet -> m Bool
-  isInteresting prob xs = liftM isRight $ isInteresting' prob xs
+  isInteresting prob xs = do
+    ret <- isInteresting' prob xs
+    return $!
+      case ret of
+        InterestingSet _ -> True
+        UninterestingSet _ -> False
 
   -- | If @xs@ is interesting it returns @Right ys@ where @ys@ is an interesting superset of @xs@.
   -- If @xs@ is uninteresting it returns @Left ys@ where @ys@ is an uninteresting subset of @xs@.
-  isInteresting' :: prob -> IntSet -> m (Either IntSet IntSet)
+  isInteresting' :: prob -> IntSet -> m InterestingOrUninterestingSet
   isInteresting' prob xs = do
     b <- isInteresting prob xs
-    return $ if b then Right xs else Left xs
+    return $ if b then InterestingSet xs else UninterestingSet xs
 
   -- | @grow xs@ computes maximal interesting set @ys@ that is a superset of @xs@.
   grow :: prob -> IntSet -> m IntSet
@@ -86,7 +99,7 @@ class Monad m => IsProblem prob m | prob -> m where
   -- such that @ys@ is a minimal uninteresting subset of @xs@.
   -- If @xs@ is an interesting set @minimalUninterestingSetOrMaximalInterestingSet prob xs@ returns @Right ys@
   -- such that @ys@ is a maximal interesting superset of @xs@
-  minimalUninterestingSetOrMaximalInterestingSet :: prob -> IntSet -> m (Either IntSet IntSet)
+  minimalUninterestingSetOrMaximalInterestingSet :: prob -> IntSet -> m InterestingOrUninterestingSet
   minimalUninterestingSetOrMaximalInterestingSet = defaultMinimalUninterestingSetOrMaximalInterestingSet
 
   {-# MINIMAL universe, (isInteresting | isInteresting') #-}
@@ -98,8 +111,8 @@ defaultGrow prob xs = foldM f xs (IntSet.toList (universe prob `IntSet.differenc
     f xs' y = do
       ret <- isInteresting' prob (IntSet.insert y xs')
       case ret of
-        Left _ -> return xs'
-        Right xs'' -> return xs''
+        UninterestingSet _ -> return xs'
+        InterestingSet xs'' -> return xs''
 
 -- | Default implementation of 'shrink' using 'isInteresting''.
 defaultShrink :: IsProblem prob m => prob -> IntSet -> m IntSet
@@ -108,33 +121,33 @@ defaultShrink prob xs = foldM f xs (IntSet.toList xs)
     f xs' y = do
       ret <- isInteresting' prob (IntSet.delete y xs')
       case ret of
-        Left xs'' -> return xs''
-        Right _ -> return xs'
+        UninterestingSet xs'' -> return xs''
+        InterestingSet _ -> return xs'
 
 -- | Default implementation of 'maximalUninterestingSet' using 'isInteresting'' and 'grow'.
 defaultMaximalInterestingSet :: IsProblem prob m => prob -> IntSet -> m (Maybe IntSet)
 defaultMaximalInterestingSet prob xs = do
  ret <- isInteresting' prob xs
  case ret of
-   Left _ -> return Nothing
-   Right xs' -> liftM Just $ grow prob xs'
+   UninterestingSet _ -> return Nothing
+   InterestingSet xs' -> liftM Just $ grow prob xs'
 
 -- | Default implementation of 'minimalUninterestingSet' using 'isInteresting'' and 'shrink'.
 defaultMinimalUninterestingSet :: IsProblem prob m => prob -> IntSet -> m (Maybe IntSet)
 defaultMinimalUninterestingSet prob xs = do
  ret <- isInteresting' prob xs
  case ret of
-   Left xs' -> liftM Just $ shrink prob xs'
-   Right _ -> return Nothing
+   UninterestingSet xs' -> liftM Just $ shrink prob xs'
+   InterestingSet _ -> return Nothing
 
 -- | Default implementation of 'minimalUninterestingSetOrMaximalInterestingSet' using 'isInteresting'', 'shrink' 'grow'.
 defaultMinimalUninterestingSetOrMaximalInterestingSet
-  :: IsProblem prob m => prob -> IntSet -> m (Either IntSet IntSet)
+  :: IsProblem prob m => prob -> IntSet -> m InterestingOrUninterestingSet
 defaultMinimalUninterestingSetOrMaximalInterestingSet prob xs = do
  ret <- isInteresting' prob xs
  case ret of
-   Left ys -> liftM Left $ shrink prob ys
-   Right ys -> liftM Right $ grow prob ys
+   UninterestingSet ys -> liftM UninterestingSet $ shrink prob ys
+   InterestingSet ys -> liftM InterestingSet $ grow prob ys
 
 data SimpleProblem (m :: * -> *) = SimpleProblem IntSet (IntSet -> Bool)
 
@@ -160,3 +173,9 @@ instance Monad m => Default (Options m) where
     , optOnMaximalInterestingSetFound = \_ -> return ()
     , optOnMinimalUninterestingSetFound = \_ -> return ()
     }
+
+
+data ImplicateOrImplicant
+  = Implicate IntSet
+  | Implicant IntSet
+  deriving (Eq, Ord, Show, Read)
