@@ -76,6 +76,8 @@ module ToySolver.SAT
   , solve
   , solveWith
   , BudgetExceeded (..)
+  , cancel
+  , Canceled (..)
 
   -- * Extract results
   , IModel (..)
@@ -396,6 +398,7 @@ data Solver
   , svLastStatWC :: !(IORef TimeSpec)
 
   -- Working spaces
+  , svCanceled        :: !(IORef Bool)
   , svAssumptions     :: !(Vec.UVec Lit)
   , svLearntLim       :: !(IORef Int)
   , svLearntLimAdjCnt :: !(IORef Int)
@@ -754,6 +757,7 @@ newSolverWithConfig config = do
   db2 <- newIORef (0,[])
   as  <- Vec.new
   m   <- newIORef Nothing
+  canceled <- newIORef False
   ndecision <- newIOURef 0
   nranddec  <- newIOURef 0
   nconflict <- newIOURef 0
@@ -827,6 +831,7 @@ newSolverWithConfig config = do
         , svLastStatWC = lastStatWC
 
         -- Working space
+        , svCanceled        = canceled
         , svAssumptions     = as
         , svLearntLim       = learntLim
         , svLearntLimAdjCnt = learntLimAdjCnt
@@ -1061,6 +1066,7 @@ solve_ solver = do
 
   log solver "Solving starts ..."
   resetStat solver
+  writeIORef (svCanceled solver) False
   writeIORef (svModel solver) Nothing
   writeIORef (svFailedAssumptions solver) []
 
@@ -1114,8 +1120,9 @@ solve_ solver = do
           printStat solver True
           ret <- search solver conflict_lim onConflict
           case ret of
-            SRFinished x -> return $ Just x
-            SRBudgetExceeded -> return Nothing
+            SRFinished x -> return $ Right x
+            SRBudgetExceeded -> return $ Left (throw BudgetExceeded)
+            SRCanceled -> return $ Left (throw Canceled)
             SRRestart -> do
               modifyIOURef (svNRestart solver) (+1)
               backtrackTo solver levelRoot
@@ -1130,15 +1137,18 @@ solve_ solver = do
     endCPU <- getTime ProcessCPUTime
     endWC  <- getTime Monotonic
 
-    when (result == Just True) $ do
-      when (configCheckModel config) $ checkSatisfied solver
-      constructModel solver
-      mt <- getTheory solver
-      case mt of
-        Nothing -> return ()
-        Just t -> thConstructModel t
-    unless (result == Just False) $ do
-      saveAssumptionsImplications solver
+    case result of
+      Right True -> do
+        when (configCheckModel config) $ checkSatisfied solver
+        constructModel solver
+        mt <- getTheory solver
+        case mt of
+          Nothing -> return ()
+          Just t -> thConstructModel t
+      _ -> return ()
+    case result of
+      Right False -> return ()
+      _ -> saveAssumptionsImplications solver
 
     backtrackTo solver levelRoot
 
@@ -1155,18 +1165,24 @@ solve_ solver = do
     (log solver . printf "#restart = %d")  =<< readIOURef (svNRestart solver)
 
     case result of
-      Just x  -> return x
-      Nothing -> throw BudgetExceeded
+      Right x  -> return x
+      Left m -> m
 
 data BudgetExceeded = BudgetExceeded
   deriving (Show, Typeable)
 
 instance Exception BudgetExceeded
 
+data Canceled = Canceled
+  deriving (Show, Typeable)
+
+instance Exception Canceled
+
 data SearchResult
   = SRFinished Bool
   | SRRestart
   | SRBudgetExceeded
+  | SRCanceled
 
 search :: Solver -> Int -> IO () -> IO SearchResult
 search solver !conflict_lim onConflict = do
@@ -1250,6 +1266,7 @@ search solver !conflict_lim onConflict = do
       modifyIOURef (svConfBudget solver) $ \confBudget ->
         if confBudget > 0 then confBudget - 1 else confBudget
       confBudget <- readIOURef (svConfBudget solver)
+      canceled <- readIORef (svCanceled solver)
 
       when (c `mod` 100 == 0) $ do
         printStat solver False
@@ -1259,6 +1276,8 @@ search solver !conflict_lim onConflict = do
         return $ Just (SRFinished False)
       else if confBudget==0 then
         return $ Just SRBudgetExceeded
+      else if canceled then
+        return $ Just SRCanceled
       else if conflict_lim > 0 && c >= conflict_lim then
         return $ Just SRRestart
       else do
@@ -1333,6 +1352,12 @@ search solver !conflict_lim onConflict = do
                     return Nothing
                   else
                     handleConflict conflictCounter h
+
+-- | Cancel exectution of 'solve' or 'solveWith'.
+--
+-- This can be called from other threads.
+cancel :: Solver -> IO ()
+cancel solver = writeIORef (svCanceled solver) True
 
 -- | After 'solve' returns True, it returns an satisfying assignment.
 getModel :: Solver -> IO Model
