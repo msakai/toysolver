@@ -10,10 +10,11 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.Verbosity
 import Data.Version
+import qualified System.Info as Info
 
 main :: IO ()
 main = sh $ do
-  let package_platform = "win32" -- "macos", "linux-x86_64"
+  let package_platform = if Info.arch == "x86_64" then "win64" else "win32"
 
   Just local_install_root <- fold (inproc "stack"  ["path", "--local-install-root"] empty) L.head
 
