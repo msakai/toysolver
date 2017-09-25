@@ -392,30 +392,33 @@ floydWarshall
   => Fold vertex cost label a
      -- ^ Operation used to fold shotest paths
   -> Graph vertex cost label
-  -> HashMap (vertex,vertex) (cost, a)
-floydWarshall (Fold fV fE fC (fD :: x -> a)) g = fmap (id *** fD) $ HashMap.unionWith minP (foldl' f tbl0 vs) paths0
+  -> HashMap vertex (HashMap vertex (cost, a))
+floydWarshall (Fold fV fE fC (fD :: x -> a)) g = fmap (fmap (id *** fD)) $ HashMap.unionWith (HashMap.unionWith minP) (foldl' f tbl0 vs) paths0
   where
     vs = HashMap.keys g
 
-    paths0 :: HashMap (vertex,vertex) (cost, x)
-    paths0 = HashMap.fromList [((v,v), (0, fV v)) | v <- HashMap.keys g]
+    paths0 :: HashMap vertex (HashMap vertex (cost, x))
+    paths0 = HashMap.mapWithKey (\v _ -> HashMap.singleton v (0, fV v)) g
 
-    tbl0 :: HashMap (vertex,vertex) (cost, x)
-    tbl0 = HashMap.fromListWith minP [((v,u), (c, fE (v,u,c,l))) | (v, es) <- HashMap.toList g, (u,c,l) <- es]
+    tbl0 :: HashMap vertex (HashMap vertex (cost, x))
+    tbl0 = HashMap.mapWithKey (\v es -> HashMap.fromListWith minP [(u, (c, fE (v,u,c,l))) | (u,c,l) <- es]) g
 
     minP :: (cost, x) -> (cost, x) -> (cost, x)
     minP = minBy (comparing fst)
 
-    f :: HashMap (vertex,vertex) (cost, x)
+    f :: HashMap vertex (HashMap vertex (cost, x))
       -> vertex
-      -> HashMap (vertex,vertex) (cost, x)
-    f tbl vk = HashMap.unionWith minP tbl tbl'
-      where
-        tbl' = HashMap.fromList
-          [ ((vi,vj), (c1+c2, fC a1 a2))
-          | vi <- vs, (c1,a1) <- maybeToList (HashMap.lookup (vi,vk) tbl)
-          , vj <- vs, (c2,a2) <- maybeToList (HashMap.lookup (vk,vj) tbl)
-          ]
+      -> HashMap vertex (HashMap vertex (cost, x))
+    f tbl vk =
+      case HashMap.lookup vk tbl of
+        Nothing -> tbl
+        Just hk -> HashMap.map h tbl
+          where
+            h :: HashMap vertex (cost, x) -> HashMap vertex (cost, x)
+            h m =
+              case HashMap.lookup vk m of
+                Nothing -> m
+                Just (c1,x1) -> HashMap.unionWith minP m (HashMap.map (\(c2,x2) -> (c1+c2, fC x1 x2)) hk)
 
 minBy :: (a -> a -> Ordering) -> a -> a -> a
 minBy f a b =
