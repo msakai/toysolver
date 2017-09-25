@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 --------------------------------------------------------------------------
 -- |
@@ -60,7 +61,8 @@ module ToySolver.Graph.ShortestPath
   , detectCycle
   ) where
 
-import Control.Arrow ((&&&))
+import Control.Applicative
+import Control.Arrow ((***))
 import Control.Monad
 import Control.Monad.ST
 import Control.Monad.Trans
@@ -191,7 +193,7 @@ pathMin p1 p2
 
 -- | Fold a path using a given 'Fold` operation.
 pathFold :: Fold vertex cost label a -> Path vertex cost label -> a
-pathFold (Fold fV fE fC) = h
+pathFold (Fold fV fE fC fD) p = fD (h p)
   where
     h (Empty v) = fV v
     h (Singleton e) = fE e
@@ -201,19 +203,39 @@ pathFold (Fold fV fE fC) = h
 
 -- | Operations for folding edge information along with a path into a @r@ value.
 --
--- @Fold vertex cost label r@ consists of three opetations:
+-- @Fold vertex cost label r@ consists of three operations
 --
--- * @vertex -> r@ corresponds to an empty path,
+-- * @vertex -> a@ corresponds to an empty path,
 --
--- * @Edge vertex cost label -> r@ corresponds to a single edge, and
+-- * @Edge vertex cost label -> a@ corresponds to a single edge,
 --
--- * @r -> r -> r@ corresponds to path concatenation.
+-- * @a -> a -> a@ corresponds to path concatenation,
 --
-data Fold vertex cost label r = Fold (vertex -> r) (Edge vertex cost label -> r) (r -> r -> r)
+-- and @a -> r@ to finish the computation.
+data Fold vertex cost label r
+  = forall a. Fold (vertex -> a) (Edge vertex cost label -> a) (a -> a -> a) (a -> r)
+
+instance Functor (Fold vertex cost label) where
+  {-# INLINE fmap #-}
+  fmap f (Fold fV fE fC fD) = Fold fV fE fC (f . fD)
+
+instance Applicative (Fold vertex cost label) where
+  {-# INLINE pure #-}
+  pure a = Fold (\_ -> ()) (\_ -> ()) (\_ _ -> ()) (const a)
+
+  {-# INLINE (<*>) #-}
+  Fold fV1 fE1 fC1 fD1 <*> Fold fV2 fE2 fC2 fD2 =
+    Fold (\v -> Pair (fV1 v) (fV2 v))
+         (\e -> Pair (fE1 e) (fE2 e))
+         (\(Pair a1 b1) (Pair a2 b2) -> Pair (fC1 a1 a2) (fC2 b1 b2))
+         (\(Pair a b) -> fD1 a (fD2 b))
+
+-- | Strict pair type
+data Pair a b = Pair !a !b
 
 -- | Project `Edge` into a monoid value and fold using monoidal operation.
 monoid' :: Monoid m => (Edge vertex cost label -> m) -> Fold vertex cost label m
-monoid' f = Fold (\_ -> mempty) f mappend
+monoid' f = Fold (\_ -> mempty) f mappend id
 
 -- | Similar to 'monoid'' but a /label/ is directly used as a monoid value.
 monoid :: Monoid m => Fold vertex cost m m
@@ -225,16 +247,19 @@ unit = monoid' (\_ -> ())
 
 -- | Pairs two `Fold` into one that produce a tuple.
 pair :: Fold vertex cost label a -> Fold vertex cost label b -> Fold vertex cost label (a,b)
-pair (Fold fV1 fE1 fC1) (Fold fV2 fE2 fC2) =
-  Fold (fV1 &&& fV2) (fE1 &&& fE2) (\(a1,b1) (a2,b2) -> (fC1 a1 a2, fC2 b1 b2))
+pair (Fold fV1 fE1 fC1 fD1) (Fold fV2 fE2 fC2 fD2) =
+  Fold (\v -> Pair (fV1 v) (fV2 v))
+       (\e -> Pair (fE1 e) (fE2 e))
+       (\(Pair a1 b1) (Pair a2 b2) -> Pair (fC1 a1 a2) (fC2 b1 b2))
+       (\(Pair a b) -> (fD1 a, fD2 b))
 
 -- | Construct a `Path` value.
 path :: (Eq vertex, Num cost) => Fold vertex cost label (Path vertex cost label)
-path = Fold pathEmpty Singleton pathAppend
+path = Fold pathEmpty Singleton pathAppend id
 
 -- | Compute cost of a path.
 cost :: Num cost => Fold vertex cost label cost
-cost = Fold (\_ -> 0) (\(_,_,c,_) -> c) (+)
+cost = Fold (\_ -> 0) (\(_,_,c,_) -> c) (+) id
 
 -- | Get the first `OutEdge` of a path.
 firstOutEdge :: Fold vertex cost label (First (OutEdge vertex cost label))
@@ -261,7 +286,7 @@ bellmanFord
   -> [vertex]
      -- ^ List of source vertexes @vs@
   -> HashMap vertex (cost, a)
-bellmanFord (Fold fV fE fC) g ss = runST $ do
+bellmanFord (Fold fV fE fC fD) g ss = runST $ do
   let n = HashMap.size g
   d <- C.newSized n
   forM_ ss $ \s -> H.insert d s (0, fV s)
@@ -282,7 +307,7 @@ bellmanFord (Fold fV fE fC) g ss = runST $ do
               H.insert d v (du + c, a `fC` fE (u,v,c,l))
               modifySTRef' updatedRef (HashSet.insert v)
 
-  freezeHashTable d
+  liftM (fmap (id *** fD)) $ freezeHashTable d
 
 freezeHashTable :: (H.HashTable h, Hashable k, Eq k) => h s k v -> ST s (HashMap k v)
 freezeHashTable h = H.foldM (\m (k,v) -> return $! HashMap.insert k v m) HashMap.empty h
@@ -296,7 +321,7 @@ detectCycle
   -> HashMap vertex (cost, Last (InEdge vertex cost label))
      -- ^ Result of @'bellmanFord' 'lastInEdge' vs@
   -> Maybe a
-detectCycle (Fold fV fE fC) g d = either Just (const Nothing) $ do
+detectCycle (Fold fV fE fC fD) g d = either (Just . fD) (const Nothing) $ do
   forM_ (HashMap.toList d) $ \(u,(du,_)) ->
     forM_ (HashMap.lookupDefault [] u g) $ \(v, c, l) -> do
       let (dv,_) = d HashMap.! v
@@ -336,12 +361,12 @@ dijkstra
   -> [vertex]
      -- ^ List of source vertexes
   -> HashMap vertex (cost, a)
-dijkstra (Fold fV fE fC) g ss = loop (Heap.fromList [Heap.Entry 0 (s, fV s) | s <- ss]) HashMap.empty
+dijkstra (Fold fV fE fC (fD :: x -> a)) g ss = fmap (id *** fD) $ loop (Heap.fromList [Heap.Entry 0 (s, fV s) | s <- ss]) HashMap.empty
   where
     loop
-      :: Heap.Heap (Heap.Entry cost (vertex, a))
-      -> HashMap vertex (cost, a)
-      -> HashMap vertex (cost, a)
+      :: Heap.Heap (Heap.Entry cost (vertex, x))
+      -> HashMap vertex (cost, x)
+      -> HashMap vertex (cost, x)
     loop q visited =
       case Heap.viewMin q of
         Nothing -> visited
@@ -368,22 +393,22 @@ floydWarshall
      -- ^ Operation used to fold shotest paths
   -> Graph vertex cost label
   -> HashMap (vertex,vertex) (cost, a)
-floydWarshall (Fold fV fE fC) g = HashMap.unionWith minP (foldl' f tbl0 vs) paths0
+floydWarshall (Fold fV fE fC (fD :: x -> a)) g = fmap (id *** fD) $ HashMap.unionWith minP (foldl' f tbl0 vs) paths0
   where
     vs = HashMap.keys g
 
-    paths0 :: HashMap (vertex,vertex) (cost, a)
+    paths0 :: HashMap (vertex,vertex) (cost, x)
     paths0 = HashMap.fromList [((v,v), (0, fV v)) | v <- HashMap.keys g]
 
-    tbl0 :: HashMap (vertex,vertex) (cost, a)
+    tbl0 :: HashMap (vertex,vertex) (cost, x)
     tbl0 = HashMap.fromListWith minP [((v,u), (c, fE (v,u,c,l))) | (v, es) <- HashMap.toList g, (u,c,l) <- es]
 
-    minP :: (cost, a) -> (cost, a) -> (cost, a)
+    minP :: (cost, x) -> (cost, x) -> (cost, x)
     minP = minBy (comparing fst)
 
-    f :: HashMap (vertex,vertex) (cost, a)
+    f :: HashMap (vertex,vertex) (cost, x)
       -> vertex
-      -> HashMap (vertex,vertex) (cost, a)
+      -> HashMap (vertex,vertex) (cost, x)
     f tbl vk = HashMap.unionWith minP tbl tbl'
       where
         tbl' = HashMap.fromList
