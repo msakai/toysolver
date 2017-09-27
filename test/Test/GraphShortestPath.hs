@@ -114,7 +114,8 @@ prop_floydWarshall_valid_path =
       [ isValidPath g p &&
         pathFrom p == u &&
         pathTo p == v
-      | ((u,v), (_,p)) <- HashMap.toList (floydWarshall path g)
+      | (u,m) <- HashMap.toList (floydWarshall path g)
+      , (v,(_,p)) <- HashMap.toList m
       ]
 
 prop_dijkstra_equals_bellmanFord :: Property
@@ -134,7 +135,7 @@ prop_floydWarshall_equals_dijkstra =
         m  = floydWarshall path g
     in forAll (elements vs) $ \v ->
        forAll (elements vs) $ \u ->
-         fmap (pathCost . snd) (HashMap.lookup (v,u) m)
+         fmap (pathCost . snd) (HashMap.lookup u =<< HashMap.lookup v m)
          ==
          fmap (pathCost . snd) (HashMap.lookup u $ dijkstra path g [v])
 
@@ -148,11 +149,11 @@ prop_floydWarshall_equals_bellmanFord =
              case detectCycle path g ret2 of
                Just cyclePath ->
                  conjoin
-                 [ counterexample (show u) (fst (ret1 HashMap.! (u,u)) < 0)
+                 [ counterexample (show u) (fst (ret1 HashMap.! u HashMap.! u) < 0)
                  | u <- pathVertexes cyclePath
                  ]
                Nothing ->
-                 HashMap.fromList [(u,c) | ((v',u), (c,_)) <- HashMap.toList ret1, v==v']
+                 fmap fst (HashMap.lookupDefault HashMap.empty v ret1)
                  ===
                  fmap fst ret2
          | v <- vs
@@ -945,15 +946,16 @@ bellmanford_example_negativecost_cycle =
 
 case_floydWarshall_normal :: Assertion
 case_floydWarshall_normal = do
-  fmap fst m @?= expected
-  forM_ (HashMap.toList m) $ \((u,v),(_,p)) -> do
-    pathFrom p @?= u
-    pathTo p @?= v
-    assertBool (show p ++ " is not a valid path") (isValidPath floydWarshall_example p)
+  fmap (fmap fst) m @?= expected
+  forM_ (HashMap.toList m) $ \(u,m1) -> do
+    forM_ (HashMap.toList m1) $ \(v,(_,p)) -> do
+      pathFrom p @?= u
+      pathTo p @?= v
+      assertBool (show p ++ " is not a valid path") (isValidPath floydWarshall_example p)
   where
     m = floydWarshall path floydWarshall_example
-    expected =
-      HashMap.fromList
+    expected = HashMap.fromListWith HashMap.union [(u, HashMap.singleton v c) | ((u,v),c) <- xs]
+    xs =
       [ ((1,1),0), ((1,2),-1), ((1,3),-2), ((1,4),0)
       , ((2,1),4), ((2,2),0),  ((2,3),2),  ((2,4),4)
       , ((3,1),5), ((3,2),1),  ((3,3),0),  ((3,4),2)
