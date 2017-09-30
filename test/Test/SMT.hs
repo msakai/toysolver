@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, OverloadedStrings #-}
+{-# LANGUAGE BinaryLiterals #-}
 module Test.SMT (smtTestGroup) where
 
 import Control.Applicative((<$>))
@@ -20,6 +21,7 @@ import ToySolver.Data.Boolean
 import ToySolver.Data.OrdRel
 import ToySolver.SMT (Expr (..))
 import qualified ToySolver.SMT as SMT
+import ToySolver.BitVector (nat2bv)
 
 -- -------------------------------------------------------------------
 
@@ -358,6 +360,14 @@ prop_getModel_evalFSym = QM.monadicIO $ do
       forM_ fs2 $ \(f,_) -> do
         evaluate $ force $ show $ SMT.evalFSym m f
       return ()
+
+-- https://github.com/msakai/toysolver/issues/21
+case_issue21 :: Assertion
+case_issue21 = do
+  solver <- SMT.newSolver
+  let constr =
+        SMT.EAp (SMT.FSym "bvsgt" []) [SMT.EAp (SMT.FSym "bvsub" []) [SMT.EAp (SMT.FSym "extract" [SMT.IndexNumeral 12,SMT.IndexNumeral 3]) [SMT.EAp (SMT.FSym "bvor" []) [SMT.EAp (SMT.FSym "extract" [SMT.IndexNumeral 17,SMT.IndexNumeral 2]) [SMT.EAp (SMT.FSym "extract" [SMT.IndexNumeral 28,SMT.IndexNumeral 7]) [SMT.EAp (SMT.FSym "bvlshr" []) [SMT.EAp (SMT.FSym "concat" []) [SMT.EAp (SMT.FSym "extract" [SMT.IndexNumeral 7,SMT.IndexNumeral 2]) [SMT.EValue (SMT.ValBitVec (nat2bv 8 0b10100111))],SMT.EValue (SMT.ValBitVec (nat2bv 26 0b01110011101110111001111010))],SMT.EValue (SMT.ValBitVec (nat2bv 32 0b10111100110011111101101101110001))]]],SMT.EValue (SMT.ValBitVec (nat2bv 16 0b0110101000000110))]],SMT.EValue (SMT.ValBitVec (nat2bv 10 0b1010001011))],SMT.EValue (SMT.ValBitVec (nat2bv 10 0b1001010100))]
+  SMT.assert solver constr
 
 genFunType :: Gen SMT.Sort -> Gen SMT.FunType
 genFunType genSorts = do
