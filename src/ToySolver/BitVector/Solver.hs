@@ -349,8 +349,8 @@ encodeShl enc s t = do
   b0 <- Tseitin.encodeDisj enc [] -- False
   let go bs (i,b) =
         VG.generateM w $ \j -> do
-          let k = j - 2^i
-              t = if k >= 0 then bs VG.! k else b0
+          let k = toInteger j - 2^i
+              t = if k >= 0 then bs VG.! fromInteger k else b0
               e = bs VG.! j
           Tseitin.encodeITE enc b t e
   foldM go s (zip [(0::Int)..] (VG.toList t))
@@ -362,8 +362,8 @@ encodeLShr enc s t = do
   b0 <- Tseitin.encodeDisj enc [] -- False
   let go bs (i,b) =
         VG.generateM w $ \j -> do
-          let k = j + 2^i
-              t = if k < VG.length bs then bs VG.! k else b0
+          let k = toInteger j + 2^i
+              t = if k < fromIntegral (VG.length bs) then bs VG.! fromInteger k else b0
               e = bs VG.! j
           Tseitin.encodeITE enc b t e
   foldM go s (zip [(0::Int)..] (VG.toList t))

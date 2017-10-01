@@ -20,6 +20,7 @@ import ToySolver.Data.Boolean
 import ToySolver.Data.OrdRel
 import ToySolver.SMT (Expr (..))
 import qualified ToySolver.SMT as SMT
+import ToySolver.BitVector (nat2bv)
 
 -- -------------------------------------------------------------------
 
@@ -358,6 +359,26 @@ prop_getModel_evalFSym = QM.monadicIO $ do
       forM_ fs2 $ \(f,_) -> do
         evaluate $ force $ show $ SMT.evalFSym m f
       return ()
+
+-- https://github.com/msakai/toysolver/issues/21
+case_issue21_32bit :: Assertion
+case_issue21_32bit = do
+  solver <- SMT.newSolver
+  let constr =
+        SMT.EAp (SMT.FSym "bvlshr" []) [SMT.EValue (SMT.ValBitVec (nat2bv 32 0)), SMT.EValue (SMT.ValBitVec (nat2bv 32 31))]
+        .==.
+        SMT.EValue (SMT.ValBitVec (nat2bv 32 0))
+  SMT.assert solver constr
+
+-- https://github.com/msakai/toysolver/issues/21
+case_issue21_64bit :: Assertion
+case_issue21_64bit = do
+  solver <- SMT.newSolver
+  let constr =
+        SMT.EAp (SMT.FSym "bvlshr" []) [SMT.EValue (SMT.ValBitVec (nat2bv 64 0)), SMT.EValue (SMT.ValBitVec (nat2bv 64 63))]
+        .==.
+        SMT.EValue (SMT.ValBitVec (nat2bv 64 0))
+  SMT.assert solver constr
 
 genFunType :: Gen SMT.Sort -> Gen SMT.FunType
 genFunType genSorts = do
