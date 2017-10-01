@@ -28,7 +28,7 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import Data.Monoid
 
-import ToySolver.Graph.ShortestPath (bellmanFord, lastInEdge, detectCycle, monoid')
+import ToySolver.Graph.ShortestPath (bellmanFord, lastInEdge, bellmanFordDetectNegativeCycle, monoid')
 
 -- (a,b,k) represents (a - b ≤ k)
 type SimpleAtom v b = (v,v,b)
@@ -38,7 +38,7 @@ solve
   => [(label, SimpleAtom v b)]
   -> Either (HashSet label) (HashMap v b)
 solve xs =
-  case detectCycle (monoid' (\(_,_,_,l) -> Endo (l:))) g d of
+  case bellmanFordDetectNegativeCycle (monoid' (\(_,_,_,l) -> Endo (l:))) g d of
     Just f -> Left $ HashSet.fromList $ appEndo f []
     Nothing -> Right $ fmap (\(c,_) -> - c) d
   where

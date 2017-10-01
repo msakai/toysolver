@@ -58,7 +58,7 @@ module ToySolver.Graph.ShortestPath
   , floydWarshall
 
   -- * Utility functions
-  , detectCycle
+  , bellmanFordDetectNegativeCycle
   ) where
 
 import Control.Applicative
@@ -312,8 +312,8 @@ bellmanFord (Fold fV fE fC fD) g ss = runST $ do
 freezeHashTable :: (H.HashTable h, Hashable k, Eq k) => h s k v -> ST s (HashMap k v)
 freezeHashTable h = H.foldM (\m (k,v) -> return $! HashMap.insert k v m) HashMap.empty h
 
--- | Utility function for detecting a cycle.
-detectCycle
+-- | Utility function for detecting a negative cycle.
+bellmanFordDetectNegativeCycle
   :: forall vertex cost label a. (Eq vertex, Hashable vertex, Real cost)
   => Fold vertex cost label a
      -- ^ Operation used to fold a cycle
@@ -321,7 +321,7 @@ detectCycle
   -> HashMap vertex (cost, Last (InEdge vertex cost label))
      -- ^ Result of @'bellmanFord' 'lastInEdge' vs@
   -> Maybe a
-detectCycle (Fold fV fE fC fD) g d = either (Just . fD) (const Nothing) $ do
+bellmanFordDetectNegativeCycle (Fold fV fE fC fD) g d = either (Just . fD) (const Nothing) $ do
   forM_ (HashMap.toList d) $ \(u,(du,_)) ->
     forM_ (HashMap.lookupDefault [] u g) $ \(v, c, l) -> do
       let (dv,_) = d HashMap.! v
