@@ -1,40 +1,31 @@
 #!/bin/bash
-HPVER=7.10.3
-HPARCH=i386
-export WINEPREFIX=~/.wine-hp-$HPARCH
-GHC_PATH=$WINEPREFIX/drive_c/Program\ Files\ \(x86\)/Haskell\ Platform/$HPVER/bin/ghc.exe
+
+STACK_YAML=stack.yaml
+RESOLVER=lts-9.2
 ARCH=win32
-BUILDDIR=dist-$ARCH
 
-sudo apt-get update
-sudo apt-get install wine wget cabal-install
-
-if [ ! -f "$GHC_PATH" ]; then
-  wget -c https://www.haskell.org/platform/download/$HPVER/HaskellPlatform-$HPVER-$HPARCH-setup.exe
-  wine HaskellPlatform-$HPVER-$HPARCH-setup.exe /S
+if [ ! -f stack-windows-i386.zip ]; then
+  curl -ostack-windows-i386.zip -L --insecure http://www.stackage.org/stack/windows-i386
 fi
+unzip stack-windows-i386.zip stack.exe
 
-# https://plus.google.com/+MasahiroSakai/posts/RTXUt5MkVPt
-#wine cabal update
-cabal update
-mkdir -p $WINEPREFIX/drive_c/users/`whoami`/Application\ Data/cabal
-cp -a ~/.cabal/packages $WINEPREFIX/drive_c/users/`whoami`/Application\ Data/cabal/
+#sudo apt-get update
+#sudo apt-get install wine
 
-wine cabal sandbox init
-wine cabal install --only-dependencies --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
-wine cabal clean --builddir=$BUILDDIR
-wine cabal configure --builddir=$BUILDDIR --flag=BuildToyFMF --flag=BuildSamplePrograms --flag=BuildMiscPrograms
-wine cabal build --builddir=$BUILDDIR
+wine stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER --install-ghc build \
+  --flag toysolver:BuildToyFMF \
+  --flag toysolver:BuildSamplePrograms
 
-VER=`wine ghc -ignore-dot-ghci -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version System.IO" -e "hSetBinaryMode stdout True" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
+VER=`wine stack exec ghc -- -ignore-dot-ghci -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version System.IO" -e "hSetBinaryMode stdout True" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
+STACK_LOCAL_INSTALL_ROOT=`wine stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER path --local-install-root`
 
-PKG=toysolver-$VER-$ARCH
+PKG=toysolver-${VER}-$ARCH
 
 rm -r $PKG
 mkdir $PKG
 mkdir $PKG/bin
-cp $BUILDDIR/build/htc/htc.exe $BUILDDIR/build/knapsack/knapsack.exe $BUILDDIR/build/nonogram/nonogram.exe $BUILDDIR/build/nqueens/nqueens.exe $BUILDDIR/build/toyconvert/toyconvert.exe $BUILDDIR/build/sudoku/sudoku.exe $BUILDDIR/build/toyfmf/toyfmf.exe $BUILDDIR/build/toysat/toysat.exe $BUILDDIR/build/toysmt/toysmt.exe $BUILDDIR/build/ToySolver/toysolver.exe $PKG/bin/
-wine strip $PKG/bin/*.exe
+cp $STACK_LOCAL_INSTALL_ROOT/bin/{toyconvert,toyfmf,toyqbf,toysat,toysmt,toysolver}.exe $PKG/bin/
+cp $STACK_LOCAL_INSTALL_ROOT/bin/{assign,htc,knapsack,nonogram,nqueens,numberlink,sudoku}.exe $PKG/bin/
 cp -a samples $PKG/
 cp COPYING-GPL README.md CHANGELOG.markdown $PKG/
 zip -r $PKG.zip $PKG
