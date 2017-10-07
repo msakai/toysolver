@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, ConstraintKinds, FlexibleContexts, GADTs, ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +9,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (CPP, ConstraintKinds, FlexibleContexts, GADTs, ScopedTypeVariables)
+-- Portability :  non-portable
 --
 -- References:
 --
@@ -39,16 +40,21 @@ module ToySolver.Text.SDPFile
   , renderSparse
 
     -- * Parsing
-  , parseDataString
+  , ParseError
+  , parseData
   , parseDataFile
-  , parseSparseDataString
+  , parseSparseData
   , parseSparseDataFile
   ) where
 
 import Control.Applicative ((<*))
 import Control.Monad
 import qualified Data.ByteString.Lazy as BL
+import Data.ByteString.Builder (Builder)
+import qualified Data.ByteString.Builder as B
+import qualified Data.ByteString.Builder.Scientific as B
 import Data.List (intersperse)
+import Data.Monoid
 import Data.Scientific (Scientific)
 #if !MIN_VERSION_megaparsec(5,0,0)
 import Data.Scientific (fromFloatDigits)
@@ -56,25 +62,30 @@ import Data.Scientific (fromFloatDigits)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
+import qualified Text.Megaparsec as MegaParsec
 #if MIN_VERSION_megaparsec(6,0,0)
-import Data.String
+import Data.Word
 import Data.Void
-import System.IO
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as Lexer
+import Text.Megaparsec hiding (ParseError)
+import Text.Megaparsec.Byte hiding (oneOf)
+import qualified Text.Megaparsec.Byte as MegaParsec
+import qualified Text.Megaparsec.Byte.Lexer as Lexer
 #else
-import Text.Megaparsec
+import qualified Data.ByteString.Lazy.Char8 as BL8
+import Text.Megaparsec hiding (ParseError, oneOf)
 import qualified Text.Megaparsec.Lexer as Lexer
 import Text.Megaparsec.Prim (MonadParsec ())
 #endif
 
 #if MIN_VERSION_megaparsec(6,0,0)
-type C e s m = (MonadParsec e s m, Token s ~ Char, IsString (Tokens s))
+type C e s m = (MonadParsec e s m, Token s ~ Word8)
+type ParseError = MegaParsec.ParseError Word8 Void
 #elif MIN_VERSION_megaparsec(5,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Char)
+type ParseError = MegaParsec.ParseError Char Dec
 #else
 type C e s m = (MonadParsec s m Char)
+type ParseError = MegaParsec.ParseError
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -126,55 +137,23 @@ diagBlock xs = Map.fromList [((i,i),x) | (i,x) <- zip [1..] xs]
 -- ---------------------------------------------------------------------------
 
 -- | Parse a SDPA format (.dat) string.
-#if MIN_VERSION_megaparsec(6,0,0)
-parseDataString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => String -> s -> Either (ParseError Char Void) Problem
-#elif MIN_VERSION_megaparsec(5,0,0)
-parseDataString :: (Stream s, Token s ~ Char) => String -> s -> Either (ParseError Char Dec) Problem
-#else
-parseDataString :: Stream s Char => String -> s -> Either ParseError Problem
-#endif
-parseDataString = parse (pDataFile <* eof)
+parseData :: String -> BL.ByteString -> Either ParseError Problem
+parseData = parse (pDataFile <* eof)
 
 -- | Parse a SDPA format file (.dat).
-#if MIN_VERSION_megaparsec(6,0,0)
-parseDataFile :: FilePath -> IO (Either (ParseError Char Void) Problem)
-#elif MIN_VERSION_megaparsec(5,0,0)
-parseDataFile :: FilePath -> IO (Either (ParseError Char Dec) Problem)
-#else
 parseDataFile :: FilePath -> IO (Either ParseError Problem)
-#endif
 parseDataFile fname = do
-#if MIN_VERSION_megaparsec(6,0,0)
-  s <- hGetContents =<< openBinaryFile fname ReadMode
-#else
   s <- BL.readFile fname
-#endif
   return $! parse (pDataFile <* eof) fname s
 
 -- | Parse a SDPA sparse format (.dat-s) string.
-#if MIN_VERSION_megaparsec(6,0,0)
-parseSparseDataString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => String -> s -> Either (ParseError Char Void) Problem
-#elif MIN_VERSION_megaparsec(5,0,0)
-parseSparseDataString :: (Stream s, Token s ~ Char) => String -> s -> Either (ParseError Char Dec) Problem
-#else
-parseSparseDataString :: Stream s Char => String -> s -> Either ParseError Problem
-#endif
-parseSparseDataString = parse (pSparseDataFile <* eof)
+parseSparseData :: String -> BL.ByteString -> Either ParseError Problem
+parseSparseData = parse (pSparseDataFile <* eof)
 
 -- | Parse a SDPA sparse format file (.dat-s).
-#if MIN_VERSION_megaparsec(6,0,0)
-parseSparseDataFile :: FilePath -> IO (Either (ParseError Char Void) Problem)
-#elif MIN_VERSION_megaparsec(5,0,0)
-parseSparseDataFile :: FilePath -> IO (Either (ParseError Char Dec) Problem)
-#else
 parseSparseDataFile :: FilePath -> IO (Either ParseError Problem)
-#endif
 parseSparseDataFile fname = do
-#if MIN_VERSION_megaparsec(6,0,0)
-  s <- hGetContents =<< openBinaryFile fname ReadMode
-#else
   s <- BL.readFile fname
-#endif
   return $! parse (pSparseDataFile <* eof) fname s
 
 pDataFile :: C e s m => m Problem
@@ -209,11 +188,15 @@ pSparseDataFile = do
     , matrices    = ms
     }
 
-pComment :: C e s m => m String
+pComment :: C e s m => m BL.ByteString
 pComment = do
   c <- oneOf "*\""
   cs <- manyTill anyChar newline
-  return (c:cs)
+#if MIN_VERSION_megaparsec(6,0,0)
+  return $ BL.pack (c:cs)
+#else
+  return $ BL8.pack (c:cs)
+#endif
 
 pBlockStruct :: C e s m => m [Int]
 pBlockStruct = do
@@ -298,75 +281,82 @@ real = Lexer.signed (return ()) Lexer.number
 real = liftM (either fromInteger fromFloatDigits) $ Lexer.signed (return ()) $ Lexer.number
 #endif
 
+#if MIN_VERSION_megaparsec(6,0,0)
+oneOf :: C e s m => [Char] -> m Word8
+oneOf = MegaParsec.oneOf . map (fromIntegral . fromEnum)
+#else
+oneOf :: C e s m => [Char] -> m Char
+oneOf = MegaParsec.oneOf
+#endif
+
 -- ---------------------------------------------------------------------------
 -- rendering
 -- ---------------------------------------------------------------------------
 
-render :: Problem -> ShowS
+render :: Problem -> Builder
 render = renderImpl False
 
-renderSparse :: Problem -> ShowS
+renderSparse :: Problem -> Builder
 renderSparse = renderImpl True
 
-renderImpl :: Bool -> Problem -> ShowS
-renderImpl sparse prob =
+renderImpl :: Bool -> Problem -> Builder
+renderImpl sparse prob = mconcat
+  [
   -- mDim
-  shows (mDim prob) . showString " = mDIM\n" .
+    B.intDec (mDim prob) <> " = mDIM\n"
 
   -- nBlock
-  shows (nBlock prob) . showString " = nBlock\n" .
+  , B.intDec (nBlock prob) <> " = nBlock\n"
 
   -- blockStruct
-  showChar '(' .
-    sepByS [shows i | i <- blockStruct prob] (showString ", ") .
-    showChar ')' .
-    showString " = bLOCKsTRUCT\n" .
+  , B.char7 '('
+  , sepByS [B.intDec i | i <- blockStruct prob] ", "
+  , B.char7 ')'
+  , " = bLOCKsTRUCT\n"
 
   -- costs
-  showChar '(' .
-    sepByS [shows c | c <- costs prob] (showString ", ") .
-    showString ")\n" .
+  , B.char7 '('
+  , sepByS [B.scientificBuilder c | c <- costs prob] ", "
+  , ")\n"
 
   -- matrices
-  if sparse
-    then concatS [renderSparseMatrix matno m | (matno, m) <- zip [0..] (matrices prob)]
-    else concatS $ map renderDenseMatrix (matrices prob)
+  , if sparse
+    then mconcat [renderSparseMatrix matno m | (matno, m) <- zip [0..] (matrices prob)]
+    else mconcat $ map renderDenseMatrix (matrices prob)
+  ]
 
   where
-    renderSparseMatrix :: Int -> Matrix -> ShowS
+    renderSparseMatrix :: Int -> Matrix -> Builder
     renderSparseMatrix matno m =
-      concatS [ shows matno . showChar ' ' .
-                shows blkno . showChar ' ' .
-                shows i . showChar ' ' .
-                shows j . showChar ' ' .
-                shows e . showChar '\n'
+      mconcat [ B.intDec matno <> B.char7 ' ' <>
+                B.intDec blkno <> B.char7 ' ' <>
+                B.intDec i <> B.char7 ' ' <>
+                B.intDec j <> B.char7 ' ' <>
+                B.scientificBuilder e <> B.char7 '\n'
               | (blkno, blk) <- zip [(1::Int)..] m, ((i,j),e) <- Map.toList blk, i <= j ]
 
-    renderDenseMatrix :: Matrix -> ShowS
+    renderDenseMatrix :: Matrix -> Builder
     renderDenseMatrix m = 
-      showString "{\n" .
-      concatS [renderDenseBlock b s . showString "\n" | (b,s) <- zip m (blockStruct prob)] .
-      showString "}\n"
+      "{\n" <>
+      mconcat [renderDenseBlock b s <> "\n" | (b,s) <- zip m (blockStruct prob)] <>
+      "}\n"
 
-    renderDenseBlock :: Block -> Int -> ShowS
+    renderDenseBlock :: Block -> Int -> Builder
     renderDenseBlock b s
       | s < 0 =
-          showString "  " . renderVec [blockElem i i b | i <- [1 .. abs s]]
+          "  " <> renderVec [blockElem i i b | i <- [1 .. abs s]]
       | otherwise = 
-          showString "  { " .
-          sepByS [renderRow i | i <- [1..s]] (showString ", ") .     
-          showString " }"
+          "  { " <>
+          sepByS [renderRow i | i <- [1..s]] ", " <>     
+          " }"
       where
         renderRow i = renderVec [blockElem i j b | j <- [1..s]]
 
-renderVec :: [Scientific] -> ShowS
+renderVec :: [Scientific] -> Builder
 renderVec xs =
-  showChar '{' .
-  sepByS (map shows xs) (showString ", ") .
-  showChar '}'
+  B.char7 '{' <>
+  sepByS (map B.scientificBuilder xs) ", " <>
+  B.char7 '}'
 
-concatS :: [ShowS] -> ShowS
-concatS = foldr (.) id
-
-sepByS :: [ShowS] -> ShowS -> ShowS
-sepByS xs sep = concatS $ intersperse sep xs
+sepByS :: [Builder] -> Builder -> Builder
+sepByS xs sep = mconcat $ intersperse sep xs
