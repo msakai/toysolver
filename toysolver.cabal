@@ -872,6 +872,8 @@ Test-suite TestSuite
   Build-depends:
     array,
     base,
+    bytestring,
+    bytestring-builder,
     containers,
     data-default-class,
     data-interval,

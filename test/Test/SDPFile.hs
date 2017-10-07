@@ -4,6 +4,7 @@ module Test.SDPFile (sdpTestGroup) where
 import Control.Monad
 import Data.List
 import Data.Maybe
+import Data.ByteString.Builder (toLazyByteString)
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
@@ -49,22 +50,22 @@ example2
 
 case_test1 = checkParsed example1b example1
   where
-    s = render example1 ""
+    s = toLazyByteString $ render example1
     example1b = parseDataString "" s
 
 case_test2 = checkParsed example1b example1
   where
-    s = renderSparse example1 ""
+    s = toLazyByteString $ renderSparse example1
     example1b = parseSparseDataString "" s
 
 case_test3 = checkParsed example2b example2
   where
-    s = render example2 ""
+    s = toLazyByteString $ render example2
     example2b = parseDataString "" s
 
 case_test4 = checkParsed example2b example2
   where
-    s = renderSparse example2 ""
+    s = toLazyByteString $ renderSparse example2
     example2b = parseSparseDataString "" s
 
 -- checkParsed :: Either ParseError Problem -> Problem -> Assertion
