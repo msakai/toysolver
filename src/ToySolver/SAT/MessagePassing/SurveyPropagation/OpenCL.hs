@@ -69,7 +69,7 @@ import qualified System.Random.MWC as Rand
 import qualified System.Random.MWC.Distributions as Rand
 import Text.Printf
 
-import ToySolver.SAT.Types
+import qualified ToySolver.SAT.Types as SAT
 
 data Solver
   = Solver
@@ -96,7 +96,7 @@ data Solver
   , svIterLimRef :: !(IORef (Maybe Int))
   }
 
-newSolver :: (String -> IO ()) -> CLContext -> CLDeviceID -> Int -> [(Double, Clause)] -> IO Solver
+newSolver :: (String -> IO ()) -> CLContext -> CLDeviceID -> Int -> [(Double, SAT.Clause)] -> IO Solver
 newSolver outputMessage context dev nv clauses = do
   _ <- clRetainContext context
   queue <- clCreateCommandQueue context dev []
@@ -264,7 +264,7 @@ setIterationLimit :: Solver -> Maybe Int -> IO ()
 setIterationLimit solver val = writeIORef (svIterLimRef solver) val
 
 -- | Get the marginal probability of the variable to be @True@, @False@ and unspecified respectively.
-getVarProb :: Solver -> Var -> IO (Double, Double, Double)
+getVarProb :: Solver -> SAT.Var -> IO (Double, Double, Double)
 getVarProb solver v = do
   let i = v - 1
   pt <- (exp . realToFrac . L.ln) <$> VGM.read (svVarProb solver) (i*2)
