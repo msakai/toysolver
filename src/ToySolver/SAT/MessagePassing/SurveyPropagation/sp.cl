@@ -18,6 +18,7 @@ update_edge_prob(
     int n_vars,
     CONSTANT int *var_offset,         // int[n_vars]
     CONSTANT int *var_degree,         // int[n_vars]
+    CONSTANT char *var_fixed,         // char[n_vars]
     CONSTANT int *var_edges,          // int[M]
     CONSTANT float *var_edges_weight, // float[M]
     __global logfloat2 *var_edges_buf,// logfloat2[M]
@@ -29,6 +30,19 @@ update_edge_prob(
     for (int i = get_global_id(0); i < n_vars; i += global_size) {
         int offset = var_offset[i];
         int degree = var_degree[i];
+        int fixed  = var_fixed[i];
+
+        if (fixed != 0) {
+            for (int j = 0; j < degree; j++) {
+                int tmp = var_edges[offset+j];
+                int e = tmp >> 1;
+                bool polarity = tmp & 1;
+                if (polarity == (bool)(tmp > 0))
+                    edge_prob_u[e] = log(0.0);
+                else
+                    edge_prob_u[e] = log(1.0);
+            }
+        }
 
         logfloat val1_pre = log(1.0);
         logfloat val2_pre = log(1.0);
