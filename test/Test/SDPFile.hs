@@ -51,22 +51,22 @@ example2
 case_test1 = checkParsed example1b example1
   where
     s = toLazyByteString $ render example1
-    example1b = parseDataString "" s
+    example1b = parseData "" s
 
 case_test2 = checkParsed example1b example1
   where
     s = toLazyByteString $ renderSparse example1
-    example1b = parseSparseDataString "" s
+    example1b = parseSparseData "" s
 
 case_test3 = checkParsed example2b example2
   where
     s = toLazyByteString $ render example2
-    example2b = parseDataString "" s
+    example2b = parseData "" s
 
 case_test4 = checkParsed example2b example2
   where
     s = toLazyByteString $ renderSparse example2
-    example2b = parseSparseDataString "" s
+    example2b = parseSparseData "" s
 
 -- checkParsed :: Either ParseError Problem -> Problem -> Assertion
 checkParsed actual expected =

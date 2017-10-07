@@ -40,9 +40,10 @@ module ToySolver.Text.SDPFile
   , renderSparse
 
     -- * Parsing
-  , parseDataString
+  , ParseError
+  , parseData
   , parseDataFile
-  , parseSparseDataString
+  , parseSparseData
   , parseSparseDataFile
   ) where
 
@@ -61,25 +62,30 @@ import Data.Scientific (fromFloatDigits)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
+import qualified Text.Megaparsec as MegaParsec
 #if MIN_VERSION_megaparsec(6,0,0)
-import Data.String
+import Data.Word
 import Data.Void
-import System.IO
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as Lexer
+import Text.Megaparsec hiding (ParseError)
+import Text.Megaparsec.Byte hiding (oneOf)
+import qualified Text.Megaparsec.Byte as MegaParsec
+import qualified Text.Megaparsec.Byte.Lexer as Lexer
 #else
-import Text.Megaparsec
+import qualified Data.ByteString.Lazy.Char8 as BL8
+import Text.Megaparsec hiding (ParseError, oneOf)
 import qualified Text.Megaparsec.Lexer as Lexer
 import Text.Megaparsec.Prim (MonadParsec ())
 #endif
 
 #if MIN_VERSION_megaparsec(6,0,0)
-type C e s m = (MonadParsec e s m, Token s ~ Char, IsString (Tokens s))
+type C e s m = (MonadParsec e s m, Token s ~ Word8)
+type ParseError = MegaParsec.ParseError Word8 Void
 #elif MIN_VERSION_megaparsec(5,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Char)
+type ParseError = MegaParsec.ParseError Char Dec
 #else
 type C e s m = (MonadParsec s m Char)
+type ParseError = MegaParsec.ParseError
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -131,55 +137,23 @@ diagBlock xs = Map.fromList [((i,i),x) | (i,x) <- zip [1..] xs]
 -- ---------------------------------------------------------------------------
 
 -- | Parse a SDPA format (.dat) string.
-#if MIN_VERSION_megaparsec(6,0,0)
-parseDataString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => String -> s -> Either (ParseError Char Void) Problem
-#elif MIN_VERSION_megaparsec(5,0,0)
-parseDataString :: (Stream s, Token s ~ Char) => String -> s -> Either (ParseError Char Dec) Problem
-#else
-parseDataString :: Stream s Char => String -> s -> Either ParseError Problem
-#endif
-parseDataString = parse (pDataFile <* eof)
+parseData :: String -> BL.ByteString -> Either ParseError Problem
+parseData = parse (pDataFile <* eof)
 
 -- | Parse a SDPA format file (.dat).
-#if MIN_VERSION_megaparsec(6,0,0)
-parseDataFile :: FilePath -> IO (Either (ParseError Char Void) Problem)
-#elif MIN_VERSION_megaparsec(5,0,0)
-parseDataFile :: FilePath -> IO (Either (ParseError Char Dec) Problem)
-#else
 parseDataFile :: FilePath -> IO (Either ParseError Problem)
-#endif
 parseDataFile fname = do
-#if MIN_VERSION_megaparsec(6,0,0)
-  s <- hGetContents =<< openBinaryFile fname ReadMode
-#else
   s <- BL.readFile fname
-#endif
   return $! parse (pDataFile <* eof) fname s
 
 -- | Parse a SDPA sparse format (.dat-s) string.
-#if MIN_VERSION_megaparsec(6,0,0)
-parseSparseDataString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => String -> s -> Either (ParseError Char Void) Problem
-#elif MIN_VERSION_megaparsec(5,0,0)
-parseSparseDataString :: (Stream s, Token s ~ Char) => String -> s -> Either (ParseError Char Dec) Problem
-#else
-parseSparseDataString :: Stream s Char => String -> s -> Either ParseError Problem
-#endif
-parseSparseDataString = parse (pSparseDataFile <* eof)
+parseSparseData :: String -> BL.ByteString -> Either ParseError Problem
+parseSparseData = parse (pSparseDataFile <* eof)
 
 -- | Parse a SDPA sparse format file (.dat-s).
-#if MIN_VERSION_megaparsec(6,0,0)
-parseSparseDataFile :: FilePath -> IO (Either (ParseError Char Void) Problem)
-#elif MIN_VERSION_megaparsec(5,0,0)
-parseSparseDataFile :: FilePath -> IO (Either (ParseError Char Dec) Problem)
-#else
 parseSparseDataFile :: FilePath -> IO (Either ParseError Problem)
-#endif
 parseSparseDataFile fname = do
-#if MIN_VERSION_megaparsec(6,0,0)
-  s <- hGetContents =<< openBinaryFile fname ReadMode
-#else
   s <- BL.readFile fname
-#endif
   return $! parse (pSparseDataFile <* eof) fname s
 
 pDataFile :: C e s m => m Problem
@@ -214,11 +188,15 @@ pSparseDataFile = do
     , matrices    = ms
     }
 
-pComment :: C e s m => m String
+pComment :: C e s m => m BL.ByteString
 pComment = do
-  c <- oneOf ("*\"" :: [Char])
+  c <- oneOf "*\""
   cs <- manyTill anyChar newline
-  return (c:cs)
+#if MIN_VERSION_megaparsec(6,0,0)
+  return $ BL.pack (c:cs)
+#else
+  return $ BL8.pack (c:cs)
+#endif
 
 pBlockStruct :: C e s m => m [Int]
 pBlockStruct = do
@@ -228,11 +206,11 @@ pBlockStruct = do
   _ <- manyTill anyChar newline
   return $ map fromIntegral xs 
   where
-    sep = some (oneOf (" \t(){}," :: [Char]))
+    sep = some (oneOf " \t(){},")
 
 pCosts :: C e s m => m [Scientific]
 pCosts = do
-  let sep = some (oneOf (" \t(){}," :: [Char]))
+  let sep = some (oneOf " \t(){},")
       real' = real >>= \r -> optional sep >> return r
   _ <- optional sep
   cs <- many real'
@@ -242,7 +220,7 @@ pCosts = do
 pDenseMatrices :: C e s m => Int -> [Int] -> m [Matrix]
 pDenseMatrices m bs = optional sep >> replicateM (fromIntegral m + 1) pDenceMatrix
   where
-    sep = some ((spaceChar >> return ()) <|> (oneOf ("(){}," :: [Char]) >> return ()))
+    sep = some ((spaceChar >> return ()) <|> (oneOf "(){}," >> return ()))
     real' = real >>= \r -> optional sep >> return r
     pDenceMatrix = forM bs $ \b ->
       if b >= 0
@@ -265,7 +243,7 @@ pSparseMatrices m bs = do
     ]
 
   where
-    sep = some (oneOf (" \t" :: [Char])) >> return ()
+    sep = some (oneOf " \t") >> return ()
     pLine = do
       _ <- optional sep
       matno <- nat
@@ -301,6 +279,14 @@ real = Lexer.signed (return ()) Lexer.scientific
 real = Lexer.signed (return ()) Lexer.number
 #else
 real = liftM (either fromInteger fromFloatDigits) $ Lexer.signed (return ()) $ Lexer.number
+#endif
+
+#if MIN_VERSION_megaparsec(6,0,0)
+oneOf :: C e s m => [Char] -> m Word8
+oneOf = MegaParsec.oneOf . map (fromIntegral . fromEnum)
+#else
+oneOf :: C e s m => [Char] -> m Char
+oneOf = MegaParsec.oneOf
 #endif
 
 -- ---------------------------------------------------------------------------
