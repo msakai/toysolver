@@ -15,6 +15,22 @@ import qualified System.Info as Info
 main :: IO ()
 main = sh $ do
   let package_platform = if Info.arch == "x86_64" then "win64" else "win32"
+      exe_files =
+        [ "toyconvert"
+        , "toyfmf"
+        , "toyqbf"
+        , "toysat"
+        , "toysmt"
+        , "toysolver"
+        ] ++
+        [ "assign"
+        , "htc"
+        , "knapsack"
+        , "nonogram"
+        , "nqueens"
+        , "numberlink"
+        , "sudoku"
+        ]
 
   Just local_install_root <- fold (inproc "stack"  ["path", "--local-install-root"] empty) L.head
 
@@ -27,9 +43,8 @@ main = sh $ do
   mktree (pkg </> "bin")
 
   let binDir = fromText (lineToText local_install_root) </> "bin"
-  files <- fold (ls binDir) L.list
-  forM files $ \name -> do
-    cp name (pkg </> "bin" </> filename name)
+  forM exe_files $ \name -> do
+    cp (binDir </> name <.> "exe") (pkg </> "bin" </> name <.> "exe")
   
   cptree "samples" (pkg </> "samples")
   cp "COPYING-GPL" (pkg </> "COPYING-GPL")
