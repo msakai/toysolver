@@ -710,11 +710,11 @@ Executable svm2lp
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
-Executable sp
+Executable survey-propagation
   if !flag(BuildSamplePrograms)
     Buildable: False    
-  Main-is: sp.hs
-  HS-Source-Dirs: samples/programs/sp
+  Main-is: survey-propagation.hs
+  HS-Source-Dirs: samples/programs/survey-propagation
   Build-Depends:
     base,
     data-default-class,
