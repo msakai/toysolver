@@ -25,6 +25,7 @@ module ToySolver.SAT.MessagePassing.SurveyPropagation
   -- * The Solver type
     Solver
   , newSolver
+  , deleteSolver
 
   -- * Problem information
   , getNVars
@@ -178,6 +179,9 @@ newSolver nv clauses = do
         }
 
   return solver
+
+deleteSolver :: Solver -> IO ()
+deleteSolver solver = return ()
 
 initializeRandom :: Solver -> Rand.GenIO -> IO ()
 initializeRandom solver gen = do

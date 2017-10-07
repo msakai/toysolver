@@ -83,7 +83,7 @@ main = do
           forM_ [1 .. MaxSAT.numVars wcnf] $ \v -> do
             prob <- SP.getVarProb solver v
             print (v,prob)
-          -- SP.deleteSolver solver
+          SP.deleteSolver solver
 
     _ -> do
        showHelp stderr
