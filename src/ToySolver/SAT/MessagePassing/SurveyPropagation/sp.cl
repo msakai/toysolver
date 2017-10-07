@@ -38,14 +38,14 @@ update_edge_prob(
                 int e = tmp >> 1;
                 bool polarity = tmp & 1;
                 if (polarity == (bool)(tmp > 0))
-                    edge_prob_u[e] = log(0.0);
+                    edge_prob_u[e] = log(0.0f);
                 else
-                    edge_prob_u[e] = log(1.0);
+                    edge_prob_u[e] = log(1.0f);
             }
         }
 
-        logfloat val1_pre = log(1.0);
-        logfloat val2_pre = log(1.0);
+        logfloat val1_pre = log(1.0f);
+        logfloat val2_pre = log(1.0f);
         for (int j = 0; j < degree; j++) {
             var_edges_buf[offset+j] = (float2)(val1_pre, val2_pre);
 
@@ -62,8 +62,8 @@ update_edge_prob(
             }
         }
 
-        logfloat val1_post = log(1.0);
-        logfloat val2_post = log(1.0);
+        logfloat val1_post = log(1.0f);
+        logfloat val2_post = log(1.0f);
         for (int j = degree - 1; j >= 0; j--) {
             int tmp = var_edges[offset+j];
             int e = tmp >> 1;
@@ -90,7 +90,7 @@ update_edge_prob(
             if (psum > 0) {
                 edge_prob_u[e] = pi_u - log(psum);
             } else {
-                edge_prob_u[e] = log(0.0); // is that ok?
+                edge_prob_u[e] = log(0.0f); // is that ok?
             }
         }
     }
@@ -116,14 +116,14 @@ update_edge_survey(
         int len = clause_degree[a];
         int offset = clause_offset[a];
 
-        logfloat pre = log(1.0);
+        logfloat pre = log(1.0f);
         for (int j = 0; j < len; j++) {
             int e = offset+j;
             edge_buf[e] = pre;
             pre += edge_prob_u[e];
         }
 
-        logfloat post = log(1.0);
+        logfloat post = log(1.0f);
         for (int j = len-1; j >=0; j--) {
             int e = offset+j;
             logfloat pre = edge_buf[e];
@@ -167,8 +167,8 @@ compute_var_prob(
         int offset = var_offset[i];
         int degree = var_degree[i];
 
-        logfloat val1 = log(1.0);
-        logfloat val2 = log(1.0);
+        logfloat val1 = log(1.0f);
+        logfloat val2 = log(1.0f);
         for (int j = 0; j < degree; j++) {
             int tmp = var_edges[offset+j];
             int e = tmp >> 1;
