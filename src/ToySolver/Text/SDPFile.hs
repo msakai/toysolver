@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, ConstraintKinds, FlexibleContexts, GADTs, ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +9,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (CPP, ConstraintKinds, FlexibleContexts, GADTs, ScopedTypeVariables)
+-- Portability :  non-portable
 --
 -- References:
 --
@@ -211,7 +212,7 @@ pSparseDataFile = do
 
 pComment :: C e s m => m String
 pComment = do
-  c <- oneOf "*\""
+  c <- oneOf ("*\"" :: [Char])
   cs <- manyTill anyChar newline
   return (c:cs)
 
@@ -223,11 +224,11 @@ pBlockStruct = do
   _ <- manyTill anyChar newline
   return $ map fromIntegral xs 
   where
-    sep = some (oneOf " \t(){},")
+    sep = some (oneOf (" \t(){}," :: [Char]))
 
 pCosts :: C e s m => m [Scientific]
 pCosts = do
-  let sep = some (oneOf " \t(){},")
+  let sep = some (oneOf (" \t(){}," :: [Char]))
       real' = real >>= \r -> optional sep >> return r
   _ <- optional sep
   cs <- many real'
@@ -237,7 +238,7 @@ pCosts = do
 pDenseMatrices :: C e s m => Int -> [Int] -> m [Matrix]
 pDenseMatrices m bs = optional sep >> replicateM (fromIntegral m + 1) pDenceMatrix
   where
-    sep = some ((spaceChar >> return ()) <|> (oneOf "(){}," >> return ()))
+    sep = some ((spaceChar >> return ()) <|> (oneOf ("(){}," :: [Char]) >> return ()))
     real' = real >>= \r -> optional sep >> return r
     pDenceMatrix = forM bs $ \b ->
       if b >= 0
@@ -260,7 +261,7 @@ pSparseMatrices m bs = do
     ]
 
   where
-    sep = some (oneOf " \t") >> return ()
+    sep = some (oneOf (" \t" :: [Char])) >> return ()
     pLine = do
       _ <- optional sep
       matno <- nat
