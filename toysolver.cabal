@@ -670,6 +670,26 @@ Executable assign
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
+Executable shortest-path
+  If !flag(BuildSamplePrograms)
+    Buildable: False
+  Main-is: shortest-path.hs
+  HS-Source-Dirs: samples/programs/shortest-path
+  Build-Depends:
+    base,
+    bytestring,
+    containers,
+    unordered-containers,
+    toysolver
+  Default-Language: Haskell2010
+  Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
+  if flag(ForceChar8)
+    CPP-OPtions: "-DFORCE_CHAR8"
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
+
 Executable htc
   If !flag(BuildSamplePrograms)
     Buildable: False
