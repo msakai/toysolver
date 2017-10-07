@@ -43,6 +43,10 @@ module ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL
   , initializeRandomDirichlet
   , propagate
   , getVarProb
+
+  -- * Solving
+  , fixLit
+  , unfixLit
   ) where
 
 import Control.Applicative ((<$>))
@@ -51,6 +55,7 @@ import Control.Loop
 import Control.Monad
 import Control.Parallel.OpenCL
 import Data.Bits
+import Data.Int
 import Data.IORef
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
@@ -69,7 +74,7 @@ import qualified System.Random.MWC as Rand
 import qualified System.Random.MWC.Distributions as Rand
 import Text.Printf
 
-import ToySolver.SAT.Types
+import qualified ToySolver.SAT.Types as SAT
 
 data Solver
   = Solver
@@ -86,6 +91,7 @@ data Solver
   , svVarEdgesWeight :: !(VSM.IOVector CFloat)
   , svVarOffset      :: !(VSM.IOVector CLint)
   , svVarLength      :: !(VSM.IOVector CLint)
+  , svVarFixed       :: !(VSM.IOVector Int8)
   , svVarProb        :: !(VSM.IOVector (L.Log CFloat))
   , svClauseOffset   :: !(VSM.IOVector CLint)
   , svClauseLength   :: !(VSM.IOVector CLint)
@@ -96,7 +102,7 @@ data Solver
   , svIterLimRef :: !(IORef (Maybe Int))
   }
 
-newSolver :: (String -> IO ()) -> CLContext -> CLDeviceID -> Int -> [(Double, Clause)] -> IO Solver
+newSolver :: (String -> IO ()) -> CLContext -> CLDeviceID -> Int -> [(Double, SAT.Clause)] -> IO Solver
 newSolver outputMessage context dev nv clauses = do
   _ <- clRetainContext context
   queue <- clCreateCommandQueue context dev []
@@ -123,6 +129,7 @@ newSolver outputMessage context dev nv clauses = do
 
   varOffset <- VGM.new nv
   varLength <- VGM.new nv
+  varFixed  <- VGM.new nv
   varEdges <- VGM.new num_edges
   varEdgesWeight   <- VGM.new num_edges
   let loop !i !offset
@@ -132,6 +139,7 @@ newSolver outputMessage context dev nv clauses = do
             let len = length xs
             VGM.write varOffset i (fromIntegral offset)
             VGM.write varLength i (fromIntegral len)
+            VGM.write varFixed i 0
             forM_ (zip [offset..] (reverse xs)) $ \(j, (e,polarity,w)) -> do
               VGM.write varEdges j $ (fromIntegral e `shiftL` 1) .|. (if polarity then 1 else 0)
               VGM.write varEdgesWeight j (realToFrac w)
@@ -190,6 +198,7 @@ newSolver outputMessage context dev nv clauses = do
     , svVarEdgesWeight = varEdgesWeight
     , svVarOffset      = varOffset
     , svVarLength      = varLength
+    , svVarFixed       = varFixed
     , svVarProb        = varProb
     , svClauseOffset   = clauseOffset
     , svClauseLength   = clauseLength
@@ -264,7 +273,7 @@ setIterationLimit :: Solver -> Maybe Int -> IO ()
 setIterationLimit solver val = writeIORef (svIterLimRef solver) val
 
 -- | Get the marginal probability of the variable to be @True@, @False@ and unspecified respectively.
-getVarProb :: Solver -> Var -> IO (Double, Double, Double)
+getVarProb :: Solver -> SAT.Var -> IO (Double, Double, Double)
 getVarProb solver v = do
   let i = v - 1
   pt <- (exp . realToFrac . L.ln) <$> VGM.read (svVarProb solver) (i*2)
@@ -357,6 +366,7 @@ propagate solver = do
 
   var_offset         <- createBufferFromVector [CL_MEM_READ_ONLY] $ svVarOffset solver
   var_degree         <- createBufferFromVector [CL_MEM_READ_ONLY] $ svVarLength solver
+  var_fixed          <- createBufferFromVector [CL_MEM_READ_ONLY] $ svVarFixed solver
   var_edges          <- createBufferFromVector [CL_MEM_READ_ONLY] $ svVarEdges solver
   var_edges_weight   <- createBufferFromVector [CL_MEM_READ_ONLY] $ svVarEdgesWeight solver
   clause_offset      <- createBufferFromVector [CL_MEM_READ_ONLY] $ svClauseOffset solver
@@ -375,11 +385,12 @@ propagate solver = do
   clSetKernelArgSto (svUpdateEdgeProb solver) 0 (fromIntegral nv :: CLint)
   clSetKernelArgSto (svUpdateEdgeProb solver) 1 var_offset
   clSetKernelArgSto (svUpdateEdgeProb solver) 2 var_degree
-  clSetKernelArgSto (svUpdateEdgeProb solver) 3 var_edges
-  clSetKernelArgSto (svUpdateEdgeProb solver) 4 var_edges_weight
-  clSetKernelArgSto (svUpdateEdgeProb solver) 5 global_buf
-  clSetKernelArgSto (svUpdateEdgeProb solver) 6 edge_survey
-  clSetKernelArgSto (svUpdateEdgeProb solver) 7 edge_prob_u
+  clSetKernelArgSto (svUpdateEdgeProb solver) 3 var_fixed
+  clSetKernelArgSto (svUpdateEdgeProb solver) 4 var_edges
+  clSetKernelArgSto (svUpdateEdgeProb solver) 5 var_edges_weight
+  clSetKernelArgSto (svUpdateEdgeProb solver) 6 global_buf
+  clSetKernelArgSto (svUpdateEdgeProb solver) 7 edge_survey
+  clSetKernelArgSto (svUpdateEdgeProb solver) 8 edge_prob_u
 
   clSetKernelArgSto (svUpdateEdgeSurvey solver) 0 (fromIntegral nc :: CLint)
   clSetKernelArgSto (svUpdateEdgeSurvey solver) 1 clause_offset
@@ -438,3 +449,11 @@ propagate solver = do
   _ <- clReleaseMemObject group_max_delta
 
   return b
+
+fixLit :: Solver -> SAT.Lit -> IO ()
+fixLit solver lit = do
+  VGM.unsafeWrite (svVarFixed solver) (abs lit - 1) (if lit > 0 then 1 else -1)
+
+unfixLit :: Solver -> SAT.Lit -> IO ()
+unfixLit solver lit = do
+  VGM.unsafeWrite (svVarFixed solver) (abs lit - 1) 0

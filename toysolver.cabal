@@ -710,30 +710,11 @@ Executable svm2lp
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
-Executable spsat
-  If !flag(BuildSamplePrograms)
-    Buildable: False
-  Main-is: spsat.hs
-  HS-Source-Dirs: samples/programs/spsat
-  Build-Depends:
-    array,
-    base,
-    mwc-random,
-    toysolver
-  Default-Language: Haskell2010
-  Other-Extensions: CPP
-  GHC-Options: -rtsopts -threaded
-  -- GHC-Prof-Options: -auto-all
-  if flag(ForceChar8)
-    CPP-OPtions: "-DFORCE_CHAR8"
-  if flag(LinuxStatic)
-    GHC-Options: -static -optl-static -optl-pthread
-
-Executable sp
+Executable survey-propagation
   if !flag(BuildSamplePrograms)
     Buildable: False    
-  Main-is: sp.hs
-  HS-Source-Dirs: samples/programs/sp
+  Main-is: survey-propagation.hs
+  HS-Source-Dirs: samples/programs/survey-propagation
   Build-Depends:
     base,
     data-default-class,

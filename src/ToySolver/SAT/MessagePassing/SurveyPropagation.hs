@@ -25,6 +25,7 @@ module ToySolver.SAT.MessagePassing.SurveyPropagation
   -- * The Solver type
     Solver
   , newSolver
+  , deleteSolver
 
   -- * Problem information
   , getNVars
@@ -45,10 +46,8 @@ module ToySolver.SAT.MessagePassing.SurveyPropagation
   , getVarProb
 
   -- * Solving
-  , findLargestBiasLit
   , fixLit
   , unfixLit
-  , solve
 
   -- * Debugging
   , printInfo
@@ -180,6 +179,9 @@ newSolver nv clauses = do
         }
 
   return solver
+
+deleteSolver :: Solver -> IO ()
+deleteSolver solver = return ()
 
 initializeRandom :: Solver -> Rand.GenIO -> IO ()
 initializeRandom solver gen = do
@@ -446,30 +448,6 @@ getVarProb solver v = do
   pf <- realToFrac <$> VGM.unsafeRead (svVarProbF solver) (v - 1)
   return (pt, pf, 1 - (pt + pf))
 
-findLargestBiasLit :: Solver -> IO (Maybe SAT.Lit)
-findLargestBiasLit solver = do
-  nv <- getNVars solver
-  let f (!lit,!maxBias) v = do
-        let i = v - 1
-        m <- VGM.unsafeRead (svVarFixed solver) i
-        case m of
-          Just _ -> return (lit,maxBias)
-          Nothing -> do
-            (pt,pf,_) <- getVarProb solver v
-            let bias = pt - pf
-            if lit == 0 || abs bias > maxBias then do
-              if bias >= 0 then
-                return (v, bias)
-              else
-                return (-v, abs bias)
-            else
-              return (lit, maxBias)
-  (lit,_) <- foldM f (0,0) [1..nv]
-  if lit == 0 then
-    return Nothing
-  else
-    return (Just lit)
-
 fixLit :: Solver -> SAT.Lit -> IO ()
 fixLit solver lit = do
   VGM.unsafeWrite (svVarFixed solver) (abs lit - 1) (if lit > 0 then Just True else Just False)
@@ -477,64 +455,6 @@ fixLit solver lit = do
 unfixLit :: Solver -> SAT.Lit -> IO ()
 unfixLit solver lit = do
   VGM.unsafeWrite (svVarFixed solver) (abs lit - 1) Nothing
-
-checkConsis :: Solver -> IO Bool
-checkConsis solver = do
-  nc <- getNConstraints solver
-  let loop i | i >= nc = return True
-      loop i = do
-        let edges = svClauseEdges solver ! i
-            loop2 k | k >= VG.length edges = return False
-            loop2 k = do
-              let lit = svEdgeLit solver ! (edges ! k)
-              m <- VM.unsafeRead (svVarFixed solver) (abs lit - 1)
-              case m of
-                Nothing -> return True
-                Just b -> if b == (lit > 0) then return True else loop2 (k+1)
-        b <- loop2 0
-        if b then
-          loop (i + 1)
-        else
-          return False
-  loop 0
-
-solve :: Solver -> IO (Maybe SAT.Model)
-solve solver = do
-  nv <- getNVars solver
-  let loop :: IO (Maybe SAT.Model)
-      loop = do
-        b <- checkConsis solver
-        if not b then
-          return Nothing
-        else do
-          b2 <- propagate solver
-          if not b2 then
-            return Nothing
-          else do
-            mlit <- findLargestBiasLit solver
-            case mlit of
-              Just lit -> do
-                putStrLn $ "fixing literal " ++ show lit
-                fixLit solver lit
-                ret <- loop
-                case ret of
-                  Just m -> return (Just m)
-                  Nothing -> do
-                    putStrLn $ "literal " ++ show lit ++ " failed; flipping to " ++ show (-lit)
-                    fixLit solver (-lit)
-                    ret2 <- loop
-                    case ret2 of
-                      Just m -> return (Just m)
-                      Nothing -> do
-                        putStrLn $ "both literal " ++ show lit ++ " and " ++ show (-lit) ++ " failed; backtracking"
-                        unfixLit solver lit
-                        return Nothing
-              Nothing -> do
-                xs <- forM [1..nv] $ \v -> do
-                  m2 <- VGM.unsafeRead (svVarFixed solver) (v-1)
-                  return (v, fromJust m2)
-                return $ Just $ A.array (1,nv) xs
-  loop
 
 printInfo :: Solver -> IO ()
 printInfo solver = do
