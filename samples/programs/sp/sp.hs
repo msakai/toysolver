@@ -3,6 +3,7 @@
 import Control.Exception
 import Control.Monad
 import Data.Default.Class
+import Data.List
 import System.Console.GetOpt
 import System.Environment
 import System.Exit
@@ -17,6 +18,8 @@ import qualified ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL as SPCL
 data Options
   = Options
   { optOpenCL :: Bool
+  , optOpenCLPlatform :: Maybe String
+  , optOpenCLDevice :: Int
   , optNThreads :: Int
   }
 
@@ -24,12 +27,16 @@ instance Default Options where
   def =
     Options
     { optOpenCL = False
+    , optOpenCLPlatform = Nothing
+    , optOpenCLDevice = 0
     , optNThreads = 1
     }
 
 options :: [OptDescr (Options -> Options)]
 options =
   [ Option [] ["opencl"] (NoArg (\opt -> opt{ optOpenCL = True })) "use OpenCL version"
+  , Option [] ["opencl-platform"] (ReqArg (\val opt -> opt{ optOpenCLPlatform = Just val }) "<string>") "OpenCL platform to use"
+  , Option [] ["opencl-device"] (ReqArg (\val opt -> opt{ optOpenCLDevice = read val }) "<integer>") "OpenCL device to use"
   , Option [] ["threads"] (ReqArg (\val opt -> opt{ optNThreads = read val }) "<integer>") "number of threads"
   ]
 
@@ -43,6 +50,40 @@ header = unlines
   , ""
   , "Options:"
   ]
+
+#ifdef ENABLE_OPENCL
+
+getPlatform :: Maybe String -> IO CLPlatformID
+getPlatform m = do
+  putStrLn "Listing OpenCL platforms..."
+  platforms <- clGetPlatformIDs
+  case platforms of
+    [] -> error "No OpenCL platform found"
+    _ -> do
+      tbl <- forM platforms $ \platform -> do
+        s <- clGetPlatformInfo platform CL_PLATFORM_NAME
+        devs <- clGetDeviceIDs platform CL_DEVICE_TYPE_ALL
+        putStrLn $ "  " ++ s ++ " (" ++ show (length devs) ++ " devices)"
+        forM_ (zip [0..] devs) $ \(i,dev) -> do
+          devname <- clGetDeviceName dev 
+          ts <- clGetDeviceType dev
+          let f t =
+                case t of
+                  CL_DEVICE_TYPE_CPU -> "CPU"
+                  CL_DEVICE_TYPE_GPU -> "GPU"
+                  CL_DEVICE_TYPE_ACCELERATOR -> "ACCELERATOR"
+                  CL_DEVICE_TYPE_DEFAULT -> "DEFAULT"
+                  CL_DEVICE_TYPE_ALL -> "ALL"
+          putStrLn $ "    " ++ show i ++ ": " ++ devname ++ " (" ++ intercalate "," (map f ts) ++ ")"
+        return (s,platform)
+      case m of
+        Nothing -> return (snd (head tbl))
+        Just name ->
+          case lookup name tbl of
+            Nothing -> error ("no such platform: " ++ name)
+            Just p -> return p
+
+#endif
 
 main :: IO ()
 main = do
@@ -59,8 +100,14 @@ main = do
 
 #ifdef ENABLE_OPENCL
         if optOpenCL opt then do
-          ids@(platform:_) <- clGetPlatformIDs
-          (dev:_) <- clGetDeviceIDs platform CL_DEVICE_TYPE_ALL
+          platform <- getPlatform (optOpenCLPlatform opt)
+          devs <- clGetDeviceIDs platform CL_DEVICE_TYPE_ALL
+          dev <-
+            if optOpenCLDevice opt < length devs then
+              return (devs !! optOpenCLDevice opt)
+            else do
+              name <- clGetPlatformInfo platform CL_PLATFORM_NAME
+              error ("platform " ++ name ++ " has only " ++ show (length devs) ++ " devices")
           context <- clCreateContext [] [dev] print
           solver <- SPCL.newSolver putStrLn context dev
             (MaxSAT.numVars wcnf) [(fromIntegral w, clause) | (w,clause) <- MaxSAT.clauses wcnf]
