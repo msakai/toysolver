@@ -29,6 +29,7 @@ main = sh $ do
         , "nonogram"
         , "nqueens"
         , "numberlink"
+        , "shortest-path"
         , "sudoku"
         ]
 
