@@ -70,8 +70,8 @@ class Monad m => IsProblem prob m | prob -> m where
         InterestingSet _ -> True
         UninterestingSet _ -> False
 
-  -- | If @xs@ is interesting it returns @Right ys@ where @ys@ is an interesting superset of @xs@.
-  -- If @xs@ is uninteresting it returns @Left ys@ where @ys@ is an uninteresting subset of @xs@.
+  -- | If @xs@ is interesting it returns @InterestingSet ys@ where @ys@ is an interesting superset of @xs@.
+  -- If @xs@ is uninteresting it returns @UninterestingSet ys@ where @ys@ is an uninteresting subset of @xs@.
   isInteresting' :: prob -> IntSet -> m InterestingOrUninterestingSet
   isInteresting' prob xs = do
     b <- isInteresting prob xs
