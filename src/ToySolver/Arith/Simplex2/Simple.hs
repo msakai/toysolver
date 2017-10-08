@@ -13,7 +13,7 @@
 module ToySolver.Arith.Simplex2.Simple
   ( Model
   , OptDir (..)
-  , OptResult
+  , OptResult (..)
   , check
   , optimize
   ) where
