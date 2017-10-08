@@ -391,7 +391,7 @@ Library
 
 Executable toysolver
   Main-is: toysolver.hs
-  HS-Source-Dirs: toysolver
+  HS-Source-Dirs: app
   Build-Depends:
     array,
     base,
@@ -414,7 +414,7 @@ Executable toysolver
 Executable toysat
   Main-is: toysat.hs
   Other-Modules: UBCSAT
-  HS-Source-Dirs: toysat
+  HS-Source-Dirs: app/toysat
   Build-Depends:
     array,
     base,
@@ -445,7 +445,7 @@ Executable toysat
     GHC-Options: -static -optl-static -optl-pthread
 
 Executable toysmt
-  HS-Source-Dirs: toysmt, Smtlib
+  HS-Source-Dirs: app/toysmt, Smtlib
   Main-is: toysmt.hs
   Other-Modules:
      ToySolver.SMT.SMTLIB2Solver,
@@ -483,7 +483,7 @@ Executable toysmt
 
 Executable toyqbf
   Main-is: toyqbf.hs
-  HS-Source-Dirs: toyqbf
+  HS-Source-Dirs: app
   Build-Depends:
     base,
     containers,
@@ -502,7 +502,7 @@ Executable toyfmf
   If !flag(BuildToyFMF)
     Buildable: False
   Main-is: toyfmf.hs
-  HS-Source-Dirs: toyfmf
+  HS-Source-Dirs: app
   If flag(BuildToyFMF)
     Build-Depends:
       base,
@@ -534,7 +534,7 @@ Executable toyfmf
 
 Executable toyconvert
   Main-is: toyconvert.hs
-  HS-Source-Dirs: toyconvert
+  HS-Source-Dirs: app
   Build-Depends:
     base,
     bytestring,
@@ -740,7 +740,7 @@ Executable pigeonhole
   If !flag(BuildMiscPrograms)
     Buildable: False
   Main-is: pigeonhole.hs
-  HS-Source-Dirs: pigeonhole
+  HS-Source-Dirs: app
   Build-Depends:
     base,
     containers,
@@ -759,7 +759,7 @@ Executable maxsatverify
   If !flag(BuildMiscPrograms)
     Buildable: False
   Main-is: maxsatverify.hs
-  HS-Source-Dirs: maxsatverify
+  HS-Source-Dirs: app
   Build-Depends:
     array,
     base,
@@ -777,7 +777,7 @@ Executable pbverify
   Main-is: pbverify.hs
   If !flag(BuildMiscPrograms)
     Buildable: False
-  HS-Source-Dirs: pbverify
+  HS-Source-Dirs: app
   Build-Depends:
     array,
     base,
@@ -814,7 +814,7 @@ Test-suite TestPolynomial
 
 Test-suite TestSuite
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    test Smtlib toysmt
+  HS-Source-Dirs:    test Smtlib app/toysmt
   Main-is:           TestSuite.hs
   Other-Modules:
     Test.AReal
