@@ -8,6 +8,7 @@ Category:	Algorithms, Optimisation, Optimization, Theorem Provers, Constraints, 
 Cabal-Version:	>= 1.10
 Synopsis:	Assorted decision procedures for SAT, SMT, Max-SAT, PB, MIP, etc
 Description:	Toy-level implementation of some decision procedures
+Homepage:	https://github.com/msakai/toysolver/
 Bug-Reports:	https://github.com/msakai/toysolver/issues
 Tested-With:
    GHC ==7.8.4
