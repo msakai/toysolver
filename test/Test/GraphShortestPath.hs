@@ -146,7 +146,7 @@ prop_floydWarshall_equals_bellmanFord =
         ret1 = floydWarshall lastInEdge g
     in counterexample (show ret1) $ conjoin $
          [ counterexample (show v) $ counterexample (show ret2) $
-             case detectCycle path g ret2 of
+             case bellmanFordDetectNegativeCycle path g ret2 of
                Just cyclePath ->
                  conjoin
                  [ counterexample (show u) (fst (ret1 HashMap.! u HashMap.! u) < 0)
@@ -166,7 +166,7 @@ case_bellmanFord_test1 :: Assertion
 case_bellmanFord_test1 = do
   let ret = bellmanFord lastInEdge g ['A']
   ret @?= expected
-  detectCycle path g ret @?= Nothing
+  bellmanFordDetectNegativeCycle path g ret @?= Nothing
   where
     g :: HashMap Char [(Char, Int, ())]
     g = HashMap.fromList
@@ -192,7 +192,7 @@ case_bellmanFord_normal = do
             [(v,[(u,c,())]) | ((v,u),c) <- bellmanford_example_normal]
       m = bellmanFord lastInEdge g [24]
   assertBool (show m ++ " is not a valid result") $ isValidResult g [24] m
-  case detectCycle path g m of
+  case bellmanFordDetectNegativeCycle path g m of
     Nothing -> return ()
     Just cyclePath -> assertFailure ("negative cost cycle should not be found (" ++ show cyclePath ++ ")")
 
@@ -561,7 +561,7 @@ case_bellmanFord_negativecost_cycle = do
   let g = HashMap.fromListWith (++) $
             [(v, [(u,c,())]) | ((v,u),c) <- bellmanford_example_negativecost_cycle]
       m = bellmanFord lastInEdge g [25]
-  case detectCycle path g m of
+  case bellmanFordDetectNegativeCycle path g m of
     Nothing -> assertFailure ("negative cost cycle should be found (" ++ show m ++ ")") 
     Just cyclePath -> assertBool (show cyclePath ++ " should be valid negative cost cycle") $ isValidNegativeCostCycle g cyclePath
 
