@@ -71,6 +71,9 @@ Extra-Source-Files:
    samples/programs/numberlink/ADC2016/sample/01/*.txt
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
+   doc-images/MIP-Status-diagram.tex
+Extra-Doc-Files:
+   doc-images/MIP-Status-diagram.png
 Build-Type: Simple
 
 Flag ForceChar8
