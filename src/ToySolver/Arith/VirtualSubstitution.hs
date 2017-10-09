@@ -52,7 +52,7 @@ import ToySolver.Data.Boolean
 import ToySolver.Data.BoolExpr (BoolExpr (..))
 import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.Data.LA as LA
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 
 -- | Quantifier-free formula of LRA
 type QFFormula = BoolExpr (LA.Atom Rational)

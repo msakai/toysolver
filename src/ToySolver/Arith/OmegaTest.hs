@@ -48,7 +48,7 @@ import qualified Data.Set as Set
 
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Data.Polynomial as P
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.Simplex as Simplex
 import qualified ToySolver.Arith.VirtualSubstitution as VS

@@ -45,7 +45,7 @@ import Data.OptDir
 import Data.VectorSpace
 
 import ToySolver.Data.OrdRel
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Arith.Simplex.Textbook as Simplex
 import qualified ToySolver.Arith.Simplex.Textbook.LPSolver as LPSolver

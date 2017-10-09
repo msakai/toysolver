@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Data.Var
+-- Module      :  ToySolver.Data.IntVar
 -- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
 -- 
@@ -10,7 +10,7 @@
 -- Portability :  non-portable (MultiParamTypeClasses)
 -- 
 -----------------------------------------------------------------------------
-module ToySolver.Data.Var
+module ToySolver.Data.IntVar
   ( Var
   , VarSet
   , VarMap

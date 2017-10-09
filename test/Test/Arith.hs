@@ -26,7 +26,7 @@ import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Arith
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Data.Polynomial as P
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 
 import qualified ToySolver.Arith.FourierMotzkin as FourierMotzkin
 import qualified ToySolver.Arith.FourierMotzkin.Optimization as FMOpt

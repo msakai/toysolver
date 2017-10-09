@@ -60,7 +60,7 @@ import Data.VectorSpace
 import Control.Exception
 
 import qualified ToySolver.Data.LA as LA
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 
 -- ---------------------------------------------------------------------------
 

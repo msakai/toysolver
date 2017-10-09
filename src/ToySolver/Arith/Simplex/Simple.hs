@@ -24,7 +24,7 @@ import Data.Default.Class
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
 import qualified ToySolver.Data.LA as LA
-import ToySolver.Data.Var hiding (Model)
+import ToySolver.Data.IntVar hiding (Model)
 import qualified ToySolver.Arith.Simplex as Simplex
 import ToySolver.Arith.Simplex hiding (check, optimize)
 

@@ -73,7 +73,7 @@ import Data.VectorSpace
 
 import qualified ToySolver.Data.OrdRel as OrdRel
 import ToySolver.Data.OrdRel
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 
 -----------------------------------------------------------------------------
 

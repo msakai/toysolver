@@ -64,7 +64,7 @@ import qualified Data.Interval as Interval
 
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 import qualified ToySolver.Arith.Simplex.Textbook as Simplex
 import qualified ToySolver.Arith.BoundsInference as BI
 

@@ -33,7 +33,7 @@ module ToySolver.Data.OrdRel
 import qualified Data.IntSet as IS
 
 import ToySolver.Data.Boolean
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 
 infix 4 .<., .<=., .>=., .>., .==., ./=.
 

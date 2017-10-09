@@ -302,6 +302,7 @@ Library
      ToySolver.Data.DNF
      ToySolver.Data.FOL.Arith
      ToySolver.Data.FOL.Formula
+     ToySolver.Data.IntVar
      ToySolver.Data.LA
      ToySolver.Data.LA.FOL
      ToySolver.Data.LBool
@@ -334,7 +335,6 @@ Library
      ToySolver.Data.Polynomial.Factorization.Zassenhaus
      ToySolver.Data.Polynomial.GroebnerBasis
      ToySolver.Data.Polynomial.Interpolation.Lagrange
-     ToySolver.Data.Var
      ToySolver.Graph.ShortestPath
      ToySolver.QBF
      ToySolver.SAT
