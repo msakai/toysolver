@@ -55,7 +55,7 @@ import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
 import qualified ToySolver.Arith.OmegaTest as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
 import qualified ToySolver.Arith.Simplex.Textbook.MIPSolver.Simple as TextbookMIP
-import qualified ToySolver.Arith.Simplex2 as Simplex2
+import qualified ToySolver.Arith.Simplex as Simplex
 import qualified ToySolver.Arith.MIPSolver2 as MIPSolver2
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
@@ -244,24 +244,24 @@ run solver opt mip printModel = do
               printModel m2
 
     solveByMIP2 = do
-      solver <- Simplex2.newSolver
+      solver <- Simplex.newSolver
 
       let ps = last ("bland-rule" : [s | PivotStrategy s <- opt])
       case ps of
-        "bland-rule"          -> Simplex2.setPivotStrategy solver Simplex2.PivotStrategyBlandRule
-        "largest-coefficient" -> Simplex2.setPivotStrategy solver Simplex2.PivotStrategyLargestCoefficient
+        "bland-rule"          -> Simplex.setPivotStrategy solver Simplex.PivotStrategyBlandRule
+        "largest-coefficient" -> Simplex.setPivotStrategy solver Simplex.PivotStrategyLargestCoefficient
         _ -> error ("unknown pivot strategy \"" ++ ps ++ "\"")
 
       let nthreads = last (0 : [n | NThread n <- opt])
 
-      Simplex2.setLogger solver putCommentLine
-      Simplex2.enableTimeRecording solver
-      replicateM (length vsAssoc) (Simplex2.newVar solver) -- XXX
-      Simplex2.setOptDir solver $ MIP.objDir $ MIP.objectiveFunction mip
-      Simplex2.setObj solver $ fromJust (LAFOL.fromFOLExpr obj)
+      Simplex.setLogger solver putCommentLine
+      Simplex.enableTimeRecording solver
+      replicateM (length vsAssoc) (Simplex.newVar solver) -- XXX
+      Simplex.setOptDir solver $ MIP.objDir $ MIP.objectiveFunction mip
+      Simplex.setObj solver $ fromJust (LAFOL.fromFOLExpr obj)
       putCommentLine "Loading constraints... "
       forM_ (cs1 ++ cs2) $ \c -> do
-        Simplex2.assertAtom solver $ fromJust (LAFOL.fromFOLAtom c)
+        Simplex.assertAtom solver $ fromJust (LAFOL.fromFOLAtom c)
       putCommentLine "Loading constraints finished"
 
       mip <- MIPSolver2.newSolver solver ivs2
@@ -281,16 +281,16 @@ run solver opt mip printModel = do
 
       ret <- MIPSolver2.optimize mip
       case ret of
-        Simplex2.Unsat -> do
+        Simplex.Unsat -> do
           putSLine "UNSATISFIABLE"
           exitFailure
-        Simplex2.Unbounded -> do
+        Simplex.Unbounded -> do
           putSLine "UNBOUNDED"
           Just m <- MIPSolver2.getBestModel mip
           let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2
           exitFailure
-        Simplex2.Optimum -> do
+        Simplex.Optimum -> do
           Just m <- MIPSolver2.getBestModel mip
           putSLine "OPTIMUM FOUND"
           let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]

@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, Rank2Types, TypeOperators, TypeSynonymInstances, FlexibleInstances, TypeFamilies, CPP #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Arith.Simplex2
+-- Module      :  ToySolver.Arith.Simplex
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -26,7 +26,7 @@
 --   <http://yices.csl.sri.com/sri-csl-06-01.pdf>
 --
 -----------------------------------------------------------------------------
-module ToySolver.Arith.Simplex2
+module ToySolver.Arith.Simplex
   (
   -- * The @Solver@ type
     Solver

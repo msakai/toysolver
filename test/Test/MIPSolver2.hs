@@ -13,8 +13,8 @@ import Test.Tasty.TH
 import Text.Printf
 
 import qualified ToySolver.Data.LA as LA
-import qualified ToySolver.Arith.Simplex2 as Simplex2
-import ToySolver.Arith.Simplex2
+import qualified ToySolver.Arith.Simplex as Simplex
+import ToySolver.Arith.Simplex
 import qualified ToySolver.Arith.MIPSolver2 as MIPSolver2
 
 ------------------------------------------------------------------------
@@ -43,15 +43,15 @@ example1 = (optdir, obj, cs, ivs)
 
 case_test1 = do
   let (optdir, obj, cs, ivs) = example1
-  lp <- Simplex2.newSolver
-  replicateM 5 (Simplex2.newVar lp)
+  lp <- Simplex.newSolver
+  replicateM 5 (Simplex.newVar lp)
   setOptDir lp optdir
   setObj lp obj
-  mapM_ (Simplex2.assertAtom lp) cs
+  mapM_ (Simplex.assertAtom lp) cs
   mip <- MIPSolver2.newSolver lp ivs
   ret <- MIPSolver2.optimize mip
   
-  ret @?= Simplex2.Optimum
+  ret @?= Simplex.Optimum
 
   Just m <- MIPSolver2.getBestModel mip
   forM_ [(1,40),(2,21/2),(3,39/2),(4,3)] $ \(var, val) ->
@@ -62,15 +62,15 @@ case_test1 = do
 
 case_test1' = do
   let (optdir, obj, cs, ivs) = example1
-  lp <- Simplex2.newSolver
-  replicateM 5 (Simplex2.newVar lp)
+  lp <- Simplex.newSolver
+  replicateM 5 (Simplex.newVar lp)
   setOptDir lp (f optdir)
   setObj lp (negateV obj)
-  mapM_ (Simplex2.assertAtom lp) cs
+  mapM_ (Simplex.assertAtom lp) cs
   mip <- MIPSolver2.newSolver lp ivs
   ret <- MIPSolver2.optimize mip
   
-  ret @?= Simplex2.Optimum
+  ret @?= Simplex.Optimum
 
   Just m <- MIPSolver2.getBestModel mip
   forM_ [(1,40),(2,21/2),(3,39/2),(4,3)] $ \(var, val) ->
@@ -101,15 +101,15 @@ example2 = (optdir, obj, cs, ivs)
 
 case_test2 = do
   let (optdir, obj, cs, ivs) = example2
-  lp <- Simplex2.newSolver
-  replicateM 4 (Simplex2.newVar lp)
+  lp <- Simplex.newSolver
+  replicateM 4 (Simplex.newVar lp)
   setOptDir lp optdir
   setObj lp obj
-  mapM_ (Simplex2.assertAtom lp) cs
+  mapM_ (Simplex.assertAtom lp) cs
   mip <- MIPSolver2.newSolver lp ivs
   ret <- MIPSolver2.optimize mip
   
-  ret @?= Simplex2.Optimum
+  ret @?= Simplex.Optimum
 
   Just m <- MIPSolver2.getBestModel mip
   forM_ [(1,0),(2,2),(3,5/2)] $ \(var, val) ->

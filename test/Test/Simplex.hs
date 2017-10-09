@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Test.Simplex2 (simplex2TestGroup) where
+module Test.Simplex (simplexTestGroup) where
 
 import Control.Monad
 import Data.Default.Class
@@ -11,7 +11,7 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 import Text.Printf
 import qualified ToySolver.Data.LA as LA
-import ToySolver.Arith.Simplex2
+import ToySolver.Arith.Simplex
 
 case_test1 :: Assertion
 case_test1 = do
@@ -404,5 +404,5 @@ case_kuhn_7_3 = do
 ------------------------------------------------------------------------
 -- Test harness
 
-simplex2TestGroup :: TestTree
-simplex2TestGroup = $(testGroupGenerator)
+simplexTestGroup :: TestTree
+simplexTestGroup = $(testGroupGenerator)

@@ -34,8 +34,8 @@ import qualified ToySolver.Arith.OmegaTest as OmegaTest
 import qualified ToySolver.Arith.OmegaTest.Base as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
 import qualified ToySolver.Arith.CAD as CAD
-import qualified ToySolver.Arith.Simplex2 as Simplex2
-import qualified ToySolver.Arith.Simplex2.Simple as Simplex2Simple
+import qualified ToySolver.Arith.Simplex as Simplex
+import qualified ToySolver.Arith.Simplex.Simple as SimplexSimple
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
 import qualified ToySolver.Arith.VirtualSubstitution as VirtualSubstitution
 
@@ -394,61 +394,61 @@ case_Cooper_test2 =
 
 ------------------------------------------------------------------------
     
-prop_Simplex2_solve :: Property
-prop_Simplex2_solve = forAll genQFLAConj $ \(vs,cs) -> do
-  case Simplex2Simple.check vs cs of
+prop_Simplex_solve :: Property
+prop_Simplex_solve = forAll genQFLAConj $ \(vs,cs) -> do
+  case SimplexSimple.check vs cs of
     Nothing -> True
     Just m -> all (LA.eval m) cs
 
-case_Simplex2_test1 :: Assertion
-case_Simplex2_test1 =
-  isJust (uncurry Simplex2Simple.check test1') @?= True
+case_Simplex_test1 :: Assertion
+case_Simplex_test1 =
+  isJust (uncurry SimplexSimple.check test1') @?= True
 
-case_Simplex2_test2 :: Assertion
-case_Simplex2_test2 = do
-  isJust (uncurry Simplex2Simple.check test2') @?= True
+case_Simplex_test2 :: Assertion
+case_Simplex_test2 = do
+  isJust (uncurry SimplexSimple.check test2') @?= True
 
-prop_Simplex2_backtrack :: Property
-prop_Simplex2_backtrack = QM.monadicIO $ do
+prop_Simplex_backtrack :: Property
+prop_Simplex_backtrack = QM.monadicIO $ do
    (vs,cs) <- QM.pick genQFLAConj
    (vs2,cs2) <- QM.pick genQFLAConj
 
    join $ QM.run $ do
-     solver <- Simplex2.newSolver
+     solver <- Simplex.newSolver
      m <- liftM IM.fromList $ forM (IS.toList (vs `IS.union` vs2)) $ \v -> do
-       v2 <- Simplex2.newVar solver
+       v2 <- Simplex.newVar solver
        return (v, LA.var v2)
      forM_ cs $ \c -> do
-       Simplex2.assertAtomEx solver (LA.applySubstAtom m c)
-     ret <- Simplex2.check solver
+       Simplex.assertAtomEx solver (LA.applySubstAtom m c)
+     ret <- Simplex.check solver
      if ret then do
-       Simplex2.pushBacktrackPoint solver
+       Simplex.pushBacktrackPoint solver
        forM_ cs2 $ \c -> do
-         Simplex2.assertAtomEx solver (LA.applySubstAtom m c)
-       _ <- Simplex2.check solver
-       Simplex2.popBacktrackPoint solver
-       ret2 <- Simplex2.check solver
+         Simplex.assertAtomEx solver (LA.applySubstAtom m c)
+       _ <- Simplex.check solver
+       Simplex.popBacktrackPoint solver
+       ret2 <- Simplex.check solver
        return $ QM.assert ret2
      else do
        return $ return ()
 
-prop_Simplex2_explain :: Property
-prop_Simplex2_explain = QM.monadicIO $ do
+prop_Simplex_explain :: Property
+prop_Simplex_explain = QM.monadicIO $ do
    (vs,cs) <- QM.pick genQFLAConj
 
    let f p = QM.run $ do
-         solver <- Simplex2.newSolver
+         solver <- Simplex.newSolver
          m <- liftM IM.fromList $ forM (IS.toList vs) $ \v -> do
-           v2 <- Simplex2.newVar solver
+           v2 <- Simplex.newVar solver
            return (v, LA.var v2)
          forM (zip [0..] cs) $ \(i,c) -> do
            when (p i) $
-             Simplex2.assertAtomEx' solver (LA.applySubstAtom m c) (Just i)
-         ret <- Simplex2.check solver
+             Simplex.assertAtomEx' solver (LA.applySubstAtom m c) (Just i)
+         ret <- Simplex.check solver
          if ret then do
            return Nothing
          else do
-           liftM Just $ Simplex2.explain solver
+           liftM Just $ Simplex.explain solver
 
    ret <- f (const True)
    case ret of

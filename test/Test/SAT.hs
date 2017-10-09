@@ -53,7 +53,7 @@ import qualified ToySolver.Text.MaxSAT as MaxSAT
 
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
-import qualified ToySolver.Arith.Simplex2 as Simplex2
+import qualified ToySolver.Arith.Simplex as Simplex
 import qualified ToySolver.EUF.EUFSolver as EUF
 
 allAssignments :: Int -> [SAT.Model]
@@ -423,13 +423,13 @@ prop_solveCNF_using_BooleanTheory = QM.monadicIO $ do
 case_QF_LRA :: Assertion
 case_QF_LRA = do
   satSolver <- SAT.newSolver
-  lraSolver <- Simplex2.newSolver
+  lraSolver <- Simplex.newSolver
 
   tblRef <- newIORef $ Map.empty
   defsRef <- newIORef $ IntMap.empty
   let abstractLAAtom :: LA.Atom Rational -> IO SAT.Lit
       abstractLAAtom atom = do
-        (v,op,rhs) <- Simplex2.simplifyAtom lraSolver atom
+        (v,op,rhs) <- Simplex.simplifyAtom lraSolver atom
         tbl <- readIORef tblRef
         (vLt, vEq, vGt) <-
           case Map.lookup (v,rhs) tbl of
@@ -473,18 +473,18 @@ case_QF_LRA = do
             case IntMap.lookup l defs of
               Nothing -> return True
               Just atom -> do
-                Simplex2.assertAtomEx' lraSolver atom (Just l)
+                Simplex.assertAtomEx' lraSolver atom (Just l)
                 return True
         , thCheck = \_ -> do
-            Simplex2.check lraSolver
+            Simplex.check lraSolver
         , thExplain = \m -> do
             case m of
-              Nothing -> liftM IntSet.toList $ Simplex2.explain lraSolver
+              Nothing -> liftM IntSet.toList $ Simplex.explain lraSolver
               Just _ -> return []
         , thPushBacktrackPoint = do
-            Simplex2.pushBacktrackPoint lraSolver
+            Simplex.pushBacktrackPoint lraSolver
         , thPopBacktrackPoint = do
-            Simplex2.popBacktrackPoint lraSolver
+            Simplex.popBacktrackPoint lraSolver
         , thConstructModel = do
             return ()
         }
@@ -495,8 +495,8 @@ case_QF_LRA = do
       addFormula c = Tseitin.addFormula enc =<< abstract c
 
   a <- SAT.newVar satSolver
-  x <- Simplex2.newVar lraSolver
-  y <- Simplex2.newVar lraSolver
+  x <- Simplex.newVar lraSolver
+  y <- Simplex.newVar lraSolver
 
   let le1 = LA.fromTerms [(2,x), (1/3,y)] .<=. LA.constant (-4) -- 2 x + (1/3) y <= -4
       eq2 = LA.fromTerms [(1.5,x)] .==. LA.fromTerms [(-2,x)] -- 1.5 y = -2 x
@@ -514,7 +514,7 @@ case_QF_LRA = do
   ret @?= True
 
   m1 <- SAT.getModel satSolver
-  m2 <- Simplex2.getModel lraSolver
+  m2 <- Simplex.getModel lraSolver
   defs <- readIORef defsRef
   let f (Left lit) = SAT.evalLit m1 lit
       f (Right atom) = LA.eval m2 atom
