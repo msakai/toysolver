@@ -63,7 +63,7 @@ import ToySolver.Data.OrdRel
 import ToySolver.Data.Boolean
 import ToySolver.Data.DNF
 import qualified ToySolver.Data.LA as LA
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 
 -- ---------------------------------------------------------------------------
 

@@ -48,9 +48,9 @@ import qualified Data.Set as Set
 
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Data.Polynomial as P
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 import qualified ToySolver.Arith.CAD as CAD
-import qualified ToySolver.Arith.Simplex2 as Simplex2
+import qualified ToySolver.Arith.Simplex as Simplex
 import qualified ToySolver.Arith.VirtualSubstitution as VS
 import ToySolver.Arith.OmegaTest.Base
 
@@ -70,10 +70,10 @@ checkRealByVS vs as = isJust $ VS.solve vs as
 
 checkRealBySimplex :: VarSet -> [LA.Atom Rational] -> Bool
 checkRealBySimplex vs as = runST $ do
-  solver <- Simplex2.newSolver
+  solver <- Simplex.newSolver
   s <- liftM IM.fromAscList $ forM (IS.toAscList vs) $ \v -> do
-    v2 <- Simplex2.newVar solver
+    v2 <- Simplex.newVar solver
     return (v, LA.var v2)
   forM_ as $ \a -> do
-    Simplex2.assertAtomEx solver (fmap (LA.applySubst s) a)
-  Simplex2.check solver
+    Simplex.assertAtomEx solver (fmap (LA.applySubst s) a)
+  Simplex.check solver

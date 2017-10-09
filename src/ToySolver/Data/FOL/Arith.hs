@@ -37,7 +37,7 @@ import Data.Ratio
 
 import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Formula
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 
 -- ---------------------------------------------------------------------------
 

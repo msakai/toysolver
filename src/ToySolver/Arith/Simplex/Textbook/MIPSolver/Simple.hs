@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Arith.MIPSolverHL
+-- Module      :  ToySolver.Arith.Simplex.Textbook.MIPSolver.Simple
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
 --
@@ -25,7 +25,7 @@
 --   <http://projecteuclid.org/euclid.bams/1183522679>
 -----------------------------------------------------------------------------
 
-module ToySolver.Arith.MIPSolverHL
+module ToySolver.Arith.Simplex.Textbook.MIPSolver.Simple
   ( module Data.OptDir
   , OptResult (..)
   , minimize
@@ -45,12 +45,12 @@ import Data.OptDir
 import Data.VectorSpace
 
 import ToySolver.Data.OrdRel
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 import qualified ToySolver.Data.LA as LA
-import qualified ToySolver.Arith.Simplex as Simplex
-import qualified ToySolver.Arith.LPSolver as LPSolver
-import ToySolver.Arith.LPSolver hiding (OptResult (..))
-import ToySolver.Arith.LPSolverHL (OptResult (..))
+import qualified ToySolver.Arith.Simplex.Textbook as Simplex
+import qualified ToySolver.Arith.Simplex.Textbook.LPSolver as LPSolver
+import ToySolver.Arith.Simplex.Textbook.LPSolver hiding (OptResult (..))
+import ToySolver.Arith.Simplex.Textbook.LPSolver.Simple (OptResult (..))
 import qualified ToySolver.Arith.OmegaTest as OmegaTest
 import ToySolver.Internal.Util (isInteger, fracPart)
 

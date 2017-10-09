@@ -46,7 +46,7 @@ import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.Polynomial (Polynomial, UPolynomial, Monomial, MonomialOrder)
 import qualified ToySolver.Data.Polynomial as P
 import ToySolver.Data.Polynomial.GroebnerBasis as GB
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 import qualified ToySolver.Arith.LPUtil as LPUtil
 
 solve :: MonomialOrder Var -> VarSet -> OptDir -> LA.Expr Rational -> [LA.Atom Rational] -> Maybe (Model Integer)

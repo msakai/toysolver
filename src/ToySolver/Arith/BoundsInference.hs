@@ -27,7 +27,7 @@ import Data.Interval
 import ToySolver.Data.OrdRel
 import ToySolver.Data.LA (BoundsEnv)
 import qualified ToySolver.Data.LA as LA
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 import ToySolver.Internal.Util (isInteger)
 
 type C r = (RelOp, LA.Expr r)

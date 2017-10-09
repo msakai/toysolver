@@ -243,16 +243,16 @@ Library
      ToySolver.Arith.FourierMotzkin.Base
      ToySolver.Arith.FourierMotzkin.FOL
      ToySolver.Arith.FourierMotzkin.Optimization
-     ToySolver.Arith.LPSolver
-     ToySolver.Arith.LPSolverHL
      ToySolver.Arith.LPUtil
-     ToySolver.Arith.MIPSolverHL
-     ToySolver.Arith.MIPSolver2
+     ToySolver.Arith.MIP
      ToySolver.Arith.OmegaTest
      ToySolver.Arith.OmegaTest.Base
      ToySolver.Arith.Simplex
-     ToySolver.Arith.Simplex2
-     ToySolver.Arith.Simplex2.Simple
+     ToySolver.Arith.Simplex.Simple
+     ToySolver.Arith.Simplex.Textbook
+     ToySolver.Arith.Simplex.Textbook.LPSolver
+     ToySolver.Arith.Simplex.Textbook.LPSolver.Simple
+     ToySolver.Arith.Simplex.Textbook.MIPSolver.Simple
      ToySolver.Arith.VirtualSubstitution
      ToySolver.BitVector
      ToySolver.BitVector.Base
@@ -302,6 +302,7 @@ Library
      ToySolver.Data.DNF
      ToySolver.Data.FOL.Arith
      ToySolver.Data.FOL.Formula
+     ToySolver.Data.IntVar
      ToySolver.Data.LA
      ToySolver.Data.LA.FOL
      ToySolver.Data.LBool
@@ -334,7 +335,6 @@ Library
      ToySolver.Data.Polynomial.Factorization.Zassenhaus
      ToySolver.Data.Polynomial.GroebnerBasis
      ToySolver.Data.Polynomial.Interpolation.Lagrange
-     ToySolver.Data.Var
      ToySolver.Graph.ShortestPath
      ToySolver.QBF
      ToySolver.SAT
@@ -863,7 +863,7 @@ Test-suite TestSuite
     Test.SAT
     Test.SDPFile
     Test.Simplex
-    Test.Simplex2
+    Test.SimplexTextbook
     Test.SMT
     Test.SMTLIB2Solver
     Test.Smtlib

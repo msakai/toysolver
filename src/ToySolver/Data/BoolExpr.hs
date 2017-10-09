@@ -31,7 +31,7 @@ import Data.Foldable hiding (fold, concat, any)
 import Data.Hashable
 import Data.Traversable
 import ToySolver.Data.Boolean
-import ToySolver.Data.Var
+import ToySolver.Data.IntVar
 
 -- | Boolean expression over a given type of atoms
 data BoolExpr a

@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Arith.MIPSolver2
+-- Module      :  ToySolver.Arith.MIP
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -10,7 +10,7 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (ScopedTypeVariables, Rank2Types)
 --
--- Naïve implementation of MIP solver based on Simplex2 module
+-- Naïve implementation of MIP solver based on Simplex module
 -- 
 -- Reference:
 --
@@ -32,7 +32,7 @@
 --   <http://www.jstor.org/stable/3009435>
 -- 
 -----------------------------------------------------------------------------
-module ToySolver.Arith.MIPSolver2
+module ToySolver.Arith.MIP
   (
   -- * The @Solver@ type
     Solver
@@ -77,13 +77,13 @@ import Text.Printf
 
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.OrdRel ((.<=.), (.>=.))
-import qualified ToySolver.Arith.Simplex2 as Simplex2
-import ToySolver.Arith.Simplex2 (OptResult (..), Var, Model)
+import qualified ToySolver.Arith.Simplex as Simplex
+import ToySolver.Arith.Simplex (OptResult (..), Var, Model)
 import ToySolver.Internal.Util (isInteger, fracPart)
 
 data Solver
   = MIP
-  { mipRootLP :: Simplex2.Solver
+  { mipRootLP :: Simplex.Solver
   , mipIVs    :: IS.IntSet
   , mipBest   :: TVar (Maybe Node)
 
@@ -95,25 +95,25 @@ data Solver
 
 data Node =
   Node
-  { ndLP    :: Simplex2.Solver
+  { ndLP    :: Simplex.Solver
   , ndDepth :: {-# UNPACK #-} !Int
   , ndValue :: Rational
   }
 
-newSolver :: Simplex2.Solver -> IS.IntSet -> IO Solver
+newSolver :: Simplex.Solver -> IS.IntSet -> IO Solver
 newSolver lp ivs = do
-  lp2 <- Simplex2.cloneSolver lp
+  lp2 <- Simplex.cloneSolver lp
 
   forM_ (IS.toList ivs) $ \v -> do
-    lb <- Simplex2.getLB lp2 v
+    lb <- Simplex.getLB lp2 v
     case lb of
       Just (l,_) | not (isInteger l) ->
-        Simplex2.assertLower lp2 v (fromInteger (ceiling l))
+        Simplex.assertLower lp2 v (fromInteger (ceiling l))
       _ -> return ()
-    ub <- Simplex2.getUB lp2 v
+    ub <- Simplex.getUB lp2 v
     case ub of
       Just (u,_) | not (isInteger u) ->
-        Simplex2.assertLower lp2 v (fromInteger (floor u))
+        Simplex.assertLower lp2 v (fromInteger (floor u))
       _ -> return ()
 
   bestRef <- newTVarIO Nothing
@@ -140,14 +140,14 @@ optimize solver = do
   let lp = mipRootLP solver
   update <- readIORef (mipOnUpdateBestSolution solver)
   log solver "MIP: Solving LP relaxation..."
-  ret <- Simplex2.check lp
+  ret <- Simplex.check lp
   if not ret
   then return Unsat
   else do
-    s0 <- showValue solver =<< Simplex2.getObjValue lp
+    s0 <- showValue solver =<< Simplex.getObjValue lp
     log solver (printf "MIP: LP relaxation is satisfiable with obj = %s" s0)
     log solver "MIP: Optimizing LP relaxation"
-    ret2 <- Simplex2.optimize lp def
+    ret2 <- Simplex.optimize lp def
     case ret2 of
       Unsat    -> error "should not happen"
       ObjLimit -> error "should not happen"
@@ -164,34 +164,34 @@ optimize solver = do
                 original problem is unbounded or unsatisfiable
                 when LP relaxation is unbounded.
             -}
-            origObj <- Simplex2.getObj lp
-            lp2 <- Simplex2.cloneSolver lp
-            Simplex2.clearLogger lp2
-            Simplex2.setObj lp2 (LA.constant 0)
+            origObj <- Simplex.getObj lp
+            lp2 <- Simplex.cloneSolver lp
+            Simplex.clearLogger lp2
+            Simplex.setObj lp2 (LA.constant 0)
             branchAndBound solver lp2 $ \m _ -> do
               update m (LA.eval m origObj)
             best <- readTVarIO (mipBest solver)
             case best of
               Just nd -> do
-                m <- Simplex2.getModel (ndLP nd)
+                m <- Simplex.getModel (ndLP nd)
                 atomically $ writeTVar (mipBest solver) $ Just nd{ ndValue = LA.eval m origObj }
                 return Unbounded
               Nothing -> return Unsat
       Optimum -> do
-        s1 <- showValue solver =<< Simplex2.getObjValue lp
+        s1 <- showValue solver =<< Simplex.getObjValue lp
         log solver $ "MIP: LP relaxation optimum is " ++ s1
         log solver "MIP: Integer optimization begins..."
-        Simplex2.clearLogger lp
+        Simplex.clearLogger lp
         branchAndBound solver lp update
         m <- readTVarIO (mipBest solver)
         case m of
           Nothing -> return Unsat
           Just _ -> return Optimum
 
-branchAndBound :: Solver -> Simplex2.Solver -> (Model -> Rational -> IO ()) -> IO ()
+branchAndBound :: Solver -> Simplex.Solver -> (Model -> Rational -> IO ()) -> IO ()
 branchAndBound solver rootLP update = do
-  dir <- Simplex2.getOptDir rootLP
-  rootVal <- Simplex2.getObjValue rootLP
+  dir <- Simplex.getOptDir rootLP
+  rootVal <- Simplex.getObjValue rootLP
   let root = Node{ ndLP = rootLP, ndDepth = 0, ndValue = rootVal }
 
   pool <- newTVarIO (Seq.singleton root)
@@ -224,14 +224,14 @@ branchAndBound solver rootLP update = do
       processNode node = do
         let lp = ndLP node
         lim <- liftM (fmap ndValue) $ readTVarIO (mipBest solver)
-        ret <- Simplex2.dualSimplex lp def{ Simplex2.objLimit = lim }
+        ret <- Simplex.dualSimplex lp def{ Simplex.objLimit = lim }
 
         case ret of
           Unbounded -> error "should not happen"
           Unsat ->  return ()
           ObjLimit -> return ()
           Optimum -> do
-            val <- Simplex2.getObjValue lp
+            val <- Simplex.getObjValue lp
             p <- prune solver val
             unless p $ do
               xs <- violated node (mipIVs solver)
@@ -246,16 +246,16 @@ branchAndBound solver rootLP update = do
                       let (v0,val0) = fst $ maximumBy (comparing snd)
                                       [((v,vval), abs (fromInteger (round vval) - vval)) | (v,vval) <- xs]
                       let lp1 = lp
-                      lp2 <- Simplex2.cloneSolver lp
-                      Simplex2.assertAtom lp1 (LA.var v0 .<=. LA.constant (fromInteger (floor val0)))
-                      Simplex2.assertAtom lp2 (LA.var v0 .>=. LA.constant (fromInteger (ceiling val0)))
+                      lp2 <- Simplex.cloneSolver lp
+                      Simplex.assertAtom lp1 (LA.var v0 .<=. LA.constant (fromInteger (floor val0)))
+                      Simplex.assertAtom lp2 (LA.var v0 .>=. LA.constant (fromInteger (ceiling val0)))
                       atomically $ do
                         addNode $ Node lp1 (ndDepth node + 1) val
                         addNode $ Node lp2 (ndDepth node + 1) val
                         modifyTVar visitedNodes (+1)
                     Just v -> do -- cut
                       atom <- deriveGomoryCut lp (mipIVs solver) v
-                      Simplex2.assertAtom lp atom
+                      Simplex.assertAtom lp atom
                       atomically $ do
                         addNode $ Node lp (ndDepth node + 1) val
 
@@ -346,7 +346,7 @@ branchAndBound solver rootLP update = do
                  return $ do
                    when ret $ do
                      let lp = ndLP node
-                     m <- Simplex2.getModel lp
+                     m <- Simplex.getModel lp
                      update m (ndValue node)
                    loop
             , do b <- isCompleted
@@ -376,7 +376,7 @@ getBestSolution solver = do
   case ret of
     Nothing -> return Nothing
     Just node -> do
-      m <- Simplex2.getModel (ndLP node)
+      m <- Simplex.getModel (ndLP node)
       return $ Just (m, ndValue node)
 
 getBestModel :: Solver -> IO (Maybe Model)
@@ -387,7 +387,7 @@ getBestValue solver = liftM (fmap snd) $ getBestSolution solver
 
 violated :: Node -> IS.IntSet -> IO [(Var, Rational)]
 violated node ivs = do
-  m <- Simplex2.getModel (ndLP node)
+  m <- Simplex.getModel (ndLP node)
   let p (v,val) = v `IS.member` ivs && not (isInteger val)
   return $ filter p (IM.toList m)
 
@@ -397,13 +397,13 @@ prune solver lb = do
   case b of
     Nothing -> return False
     Just node -> do
-      dir <- Simplex2.getOptDir (mipRootLP solver)
+      dir <- Simplex.getOptDir (mipRootLP solver)
       return $ if dir==OptMin then ndValue node <= lb else ndValue node >= lb
 
 showValue :: Solver -> Rational -> IO String
 showValue solver v = do
   printRat <- readIORef (mipShowRational solver)
-  return $ Simplex2.showValue printRat v
+  return $ Simplex.showValue printRat v
 
 setShowRational :: Solver -> Bool -> IO ()
 setShowRational solver = writeIORef (mipShowRational solver)
@@ -438,42 +438,42 @@ logIO solver action = do
   GomoryCut
 --------------------------------------------------------------------}
 
-deriveGomoryCut :: Simplex2.Solver -> IS.IntSet -> Var -> IO (LA.Atom Rational)
+deriveGomoryCut :: Simplex.Solver -> IS.IntSet -> Var -> IO (LA.Atom Rational)
 deriveGomoryCut lp ivs xi = do
-  v0 <- Simplex2.getValue lp xi
+  v0 <- Simplex.getValue lp xi
   let f0 = fracPart v0
   assert (0 < f0 && f0 < 1) $ return ()
 
-  row <- Simplex2.getRow lp xi
+  row <- Simplex.getRow lp xi
 
   -- remove fixed variables
   let p (_,xj) = do
-        lb <- Simplex2.getLB lp xj
-        ub <- Simplex2.getUB lp xj
+        lb <- Simplex.getLB lp xj
+        ub <- Simplex.getUB lp xj
         case (lb,ub) of
           (Just l, Just u) -> return (l < u)
           _ -> return True
   ns <- filterM p $ LA.terms row
 
   js <- flip filterM ns $ \(_, xj) -> do
-    vj <- Simplex2.getValue lp xj
-    lb <- Simplex2.getLB lp xj
-    return $ Just vj == Simplex2.boundValue lb
+    vj <- Simplex.getValue lp xj
+    lb <- Simplex.getLB lp xj
+    return $ Just vj == Simplex.boundValue lb
   ks <- flip filterM ns $ \(_, xj) -> do
-    vj <- Simplex2.getValue lp xj
-    ub <- Simplex2.getUB lp xj
-    return $ Just vj == Simplex2.boundValue ub
+    vj <- Simplex.getValue lp xj
+    ub <- Simplex.getUB lp xj
+    return $ Just vj == Simplex.boundValue ub
 
   xs1 <- forM js $ \(aij, xj) -> do
     let fj = fracPart aij
-    Just (lj,_) <- Simplex2.getLB lp xj
+    Just (lj,_) <- Simplex.getLB lp xj
     let c = if xj `IS.member` ivs
             then (if fj <= 1 - f0 then fj  / (1 - f0) else ((1 - fj) / f0))
             else (if aij > 0      then aij / (1 - f0) else (-aij     / f0))
     return $ c *^ (LA.var xj ^-^ LA.constant lj)
   xs2 <- forM ks $ \(aij, xj) -> do
     let fj = fracPart aij
-    Just (uj, _) <- Simplex2.getUB lp xj
+    Just (uj, _) <- Simplex.getUB lp xj
     let c = if xj `IS.member` ivs
             then (if fj <= f0 then fj  / f0 else ((1 - fj) / (1 - f0)))
             else (if aij > 0  then aij / f0 else (-aij     / (1 - f0)))
@@ -481,21 +481,21 @@ deriveGomoryCut lp ivs xi = do
 
   return $ sumV xs1 ^+^ sumV xs2 .>=. LA.constant 1
 
--- TODO: Simplex2をδに対応させたら、xi, xj がδを含まない有理数であるという条件も必要
-canDeriveGomoryCut :: Simplex2.Solver -> Var -> IO Bool
+-- TODO: Simplexをδに対応させたら、xi, xj がδを含まない有理数であるという条件も必要
+canDeriveGomoryCut :: Simplex.Solver -> Var -> IO Bool
 canDeriveGomoryCut lp xi = do
-  b <- Simplex2.isBasicVariable lp xi
+  b <- Simplex.isBasicVariable lp xi
   if not b
     then return False
     else do
-      val <- Simplex2.getValue lp xi
+      val <- Simplex.getValue lp xi
       if isInteger val
         then return False
         else do
-          row <- Simplex2.getRow lp xi
+          row <- Simplex.getRow lp xi
           ys <- forM (LA.terms row) $ \(_,xj) -> do
-            vj <- Simplex2.getValue lp xj
-            lb <- Simplex2.getLB lp xj
-            ub <- Simplex2.getUB lp xj
-            return $ Just vj == Simplex2.boundValue lb || Just vj == Simplex2.boundValue ub
+            vj <- Simplex.getValue lp xj
+            lb <- Simplex.getLB lp xj
+            ub <- Simplex.getUB lp xj
+            return $ Just vj == Simplex.boundValue lb || Just vj == Simplex.boundValue ub
           return (and ys)

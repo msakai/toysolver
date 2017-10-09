@@ -97,7 +97,7 @@ import qualified ToySolver.Internal.Data.Vec as Vec
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.TheorySolver
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
-import qualified ToySolver.Arith.Simplex2 as Simplex2
+import qualified ToySolver.Arith.Simplex as Simplex
 import qualified ToySolver.BitVector as BV
 import qualified ToySolver.EUF.EUFSolver as EUF
 
@@ -204,7 +204,7 @@ data Solver
   { smtSAT :: !SAT.Solver
   , smtEnc :: !(Tseitin.Encoder IO)
   , smtEUF :: !EUF.Solver
-  , smtLRA :: !(Simplex2.GenericSolver (Delta Rational))
+  , smtLRA :: !(Simplex.GenericSolver (Delta Rational))
   , smtBV :: !BV.Solver
 
   , smtEUFAtomDefs  :: !(IORef (Map (EUF.Term, EUF.Term) SAT.Var, IntMap (EUF.Term, EUF.Term)))
@@ -217,7 +217,7 @@ data Solver
   , smtEUFFalse :: !EUF.Term
 
   , smtEUFModel :: !(IORef EUF.Model)
-  , smtLRAModel :: !(IORef Simplex2.Model)
+  , smtLRAModel :: !(IORef Simplex.Model)
   , smtBVModel :: !(IORef BV.Model)
 
   , smtGlobalDeclarationsRef :: !(IORef Bool)
@@ -247,7 +247,7 @@ newSolver = do
   sat <- SAT.newSolver
   enc <- Tseitin.newEncoder sat
   euf <- EUF.newSolver
-  lra <- Simplex2.newSolver
+  lra <- Simplex.newSolver
   bv <- BV.newSolver
 
   litTrue <- Tseitin.encodeConj enc []
@@ -269,7 +269,7 @@ newSolver = do
   bvTermDefs <- newIORef (Map.empty, IntMap.empty)
 
   eufModelRef <- newIORef (undefined :: EUF.Model)
-  lraModelRef <- newIORef (undefined :: Simplex2.Model)
+  lraModelRef <- newIORef (undefined :: Simplex.Model)
   bvModelRef <- newIORef (undefined :: BV.Model)
 
   globalDeclarationsRef <- newIORef False
@@ -284,7 +284,7 @@ newSolver = do
             case IntMap.lookup l defsLRA of
               Nothing -> return ()
               Just atom -> do
-                lift $ Simplex2.assertAtomEx' lra atom (Just l)
+                lift $ Simplex.assertAtomEx' lra atom (Just l)
                 throwE True
 
             (_, defsEUF) <- lift $ readIORef eufAtomDefs
@@ -307,7 +307,7 @@ newSolver = do
             return True
 
         , thCheck = \callback -> liftM isRight $ runExceptT $ do
-            do b <- lift $ Simplex2.check lra
+            do b <- lift $ Simplex.check lra
                unless b $ do
                  lift $ writeIORef conflictTheory TheorySolverSimplex
                  throwE ()
@@ -331,7 +331,7 @@ newSolver = do
               Nothing -> do
                 t <- readIORef conflictTheory
                 case t of
-                  TheorySolverSimplex -> liftM IntSet.toList $ Simplex2.explain lra
+                  TheorySolverSimplex -> liftM IntSet.toList $ Simplex.explain lra
                   TheorySolverBV -> liftM IntSet.toList $ BV.explain bv
                   TheorySolverEUF -> liftM IntSet.toList $ EUF.explain euf Nothing
               Just v -> do
@@ -341,19 +341,19 @@ newSolver = do
                   Just (t1,t2) -> liftM IntSet.toList $ EUF.explain euf (Just (t1,t2))
 
         , thPushBacktrackPoint = do
-            Simplex2.pushBacktrackPoint lra
+            Simplex.pushBacktrackPoint lra
             EUF.pushBacktrackPoint euf
             BV.pushBacktrackPoint bv
         , thPopBacktrackPoint = do
-            Simplex2.popBacktrackPoint lra
+            Simplex.popBacktrackPoint lra
             EUF.popBacktrackPoint euf
             BV.popBacktrackPoint bv
         , thConstructModel = do
             writeIORef eufModelRef =<< EUF.getModel euf
-            -- We need to call Simplex2.getModel here.
+            -- We need to call Simplex.getModel here.
             -- Because backtracking removes constraints that are necessary
             -- for computing the value of delta.
-            writeIORef lraModelRef =<< Simplex2.getModel lra
+            writeIORef lraModelRef =<< Simplex.getModel lra
             writeIORef bvModelRef =<< BV.getModel bv
             return ()
         }
@@ -431,7 +431,7 @@ declareFSym solver f' xs y = do
         v <- SAT.newVar (smtSAT solver)
         return (FBoolVar v)
       ([], Sort SSymReal _) -> do
-        v <- Simplex2.newVar (smtLRA solver)
+        v <- Simplex.newVar (smtLRA solver)
         return (FLRAVar v)
       ([], Sort (SSymBitVec n) _) -> do
         v <- BV.newVar' (smtBV solver) n
@@ -663,7 +663,7 @@ exprToLRAExpr solver (EAp "/" [x,y]) = do
       return $ (1/c) *^ x'
 exprToLRAExpr solver (EAp "ite" [c,t,e]) = do
   c' <- exprToFormula solver c
-  ret <- liftM LA.var $ Simplex2.newVar (smtLRA solver)
+  ret <- liftM LA.var $ Simplex.newVar (smtLRA solver)
   t' <- exprToLRAExpr solver t
   e' <- exprToLRAExpr solver e
   c1 <- abstractLRAAtom solver (ret .==. t')
@@ -675,7 +675,7 @@ exprToLRAExpr solver (EAp f xs) =
 
 abstractLRAAtom :: Solver -> LA.Atom Rational -> IO SAT.Lit
 abstractLRAAtom solver atom = do
-  (v,op,rhs) <- Simplex2.simplifyAtom (smtLRA solver) atom
+  (v,op,rhs) <- Simplex.simplifyAtom (smtLRA solver) atom
   (tbl,defs) <- readIORef (smtLRAAtomDefs solver)
   (vLt, vEq, vGt) <-
     case Map.lookup (v,rhs) tbl of
@@ -731,7 +731,7 @@ lraExprFromTerm solver t = do
   case IntMap.lookup c fsymToReal of
     Just e -> return e
     Nothing -> do
-      v <- Simplex2.newVar (smtLRA solver)
+      v <- Simplex.newVar (smtLRA solver)
       let e = LA.var v
       forM_ (IntMap.toList fsymToReal) $ \(d, d_lra) -> do
         -- allocate interface equalities
@@ -1050,7 +1050,7 @@ data Model
   = Model
   { mDefs      :: !(Map FSym FDef)
   , mBoolModel :: !SAT.Model
-  , mLRAModel  :: !Simplex2.Model
+  , mLRAModel  :: !Simplex.Model
   , mBVModel   :: !BV.Model
   , mEUFModel  :: !EUF.Model
   , mEUFTrue   :: !EUF.Entity

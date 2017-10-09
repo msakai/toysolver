@@ -1,366 +1,1223 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE ScopedTypeVariables, Rank2Types, TypeOperators, TypeSynonymInstances, FlexibleInstances, TypeFamilies, CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.Simplex
--- Copyright   :  (c) Masahiro Sakai 2011
+-- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables)
+-- Portability :  non-portable (ScopedTypeVariables, Rank2Types, TypeOperators, TypeSynonymInstances, FlexibleInstances, TypeFamilies, CPP)
 --
 -- Naïve implementation of Simplex method
 -- 
 -- Reference:
 --
 -- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
+-- 
+-- * Bruno Dutertre and Leonardo de Moura.
+--   A Fast Linear-Arithmetic Solver for DPLL(T).
+--   Computer Aided Verification In Computer Aided Verification, Vol. 4144 (2006), pp. 81-94.
+--   <http://yices.csl.sri.com/cav06.pdf>
+--
+-- * Bruno Dutertre and Leonardo de Moura.
+--   Integrating Simplex with DPLL(T).
+--   CSL Technical Report SRI-CSL-06-01. 2006.
+--   <http://yices.csl.sri.com/sri-csl-06-01.pdf>
 --
 -----------------------------------------------------------------------------
 module ToySolver.Arith.Simplex
   (
-  -- * The @Tableau@ type
-    Tableau
-  , RowIndex
-  , ColIndex
-  , Row
-  , emptyTableau
-  , objRowIndex
-  , pivot
-  , lookupRow
-  , addRow
-  , setObjFun
+  -- * The @Solver@ type
+    Solver
+  , GenericSolver
+  , GenericSolverM
+  , SolverValue (..)
+  , newSolver
+  , cloneSolver
 
-  -- * Optimization direction
-  , module Data.OptDir
+  -- * Problem specification
+  , Var
+  , newVar
+  , RelOp (..)
+  , (.<=.), (.>=.), (.==.), (.<.), (.>.)
+  , Atom (..)
+  , ConstrID
+  , ConstrIDSet
+  , assertAtom
+  , assertAtom'
+  , assertAtomEx
+  , assertAtomEx'
+  , assertLower
+  , assertLower'
+  , assertUpper
+  , assertUpper'
+  , setObj
+  , getObj
+  , OptDir (..)
+  , setOptDir
+  , getOptDir
+
+  -- * Solving
+  , check
+  , pushBacktrackPoint
+  , popBacktrackPoint
+  , Options (..)
+  , OptResult (..)
+  , optimize
+  , dualSimplex
+
+  -- * Extract results
+  , Model
+  , getModel
+  , RawModel
+  , getRawModel
+  , getValue
+  , getObjValue
+  , explain
 
   -- * Reading status
-  , currentValue
-  , currentObjValue
+  , getTableau
+  , getRow
+  , getCol
+  , getCoeff
+  , nVars
+  , isBasicVariable
+  , isNonBasicVariable
   , isFeasible
   , isOptimal
+  , getLB
+  , getUB
+  , Bound
+  , boundValue
+  , boundExplanation
 
-  -- * High-level solving functions
-  , simplex
-  , dualSimplex
-  , phaseI
-  , primalDualSimplex
+  -- * Configulation
+  , setLogger
+  , clearLogger
+  , enableTimeRecording
+  , disableTimeRecording
+  , PivotStrategy (..)
+  , setPivotStrategy
 
-  -- * For debugging
-  , isValidTableau
-  , toCSV
+  -- * Debug
+  , dump
+
+  -- * Misc
+  , simplifyAtom
   ) where
 
+import Prelude hiding (log)
+import Control.Exception
+import Control.Monad
+import Control.Monad.Primitive
+import Data.Default.Class
 import Data.Ord
 import Data.List
-import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
+import Data.Maybe
+import Data.Monoid
+import Data.Primitive.MutVar
+import Data.Ratio
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
+import Text.Printf
 import Data.OptDir
 import Data.VectorSpace
-import Control.Exception
+import System.Clock
 
 import qualified ToySolver.Data.LA as LA
-import ToySolver.Data.Var
+import ToySolver.Data.LA (Atom (..))
+import ToySolver.Data.OrdRel
+import ToySolver.Data.Delta
+import ToySolver.Internal.Util (showRational)
 
--- ---------------------------------------------------------------------------
+infixr 0 ~>
+-- | A natural transformation from @f@ to @g@.
+type f ~> g = forall x. f x -> g x
 
-type Tableau r = VarMap (Row r)
+infixr 0 :~>, $$
+-- | A natural transformation suitable for storing in a container.
+newtype f :~> g = Nat { ($$) :: f ~> g }
+
+{--------------------------------------------------------------------
+  The @Solver@ type
+--------------------------------------------------------------------}
+
+type Var = Int
+
+data GenericSolverM m v
+  = GenericSolverM
+  { svTableau :: !(MutVar (PrimState m) (IntMap (LA.Expr Rational)))
+  , svLB      :: !(MutVar (PrimState m) (IntMap (v, ConstrIDSet)))
+  , svUB      :: !(MutVar (PrimState m) (IntMap (v, ConstrIDSet)))
+  , svModel   :: !(MutVar (PrimState m) (IntMap v))
+  , svExplanation :: !(MutVar (PrimState m) ConstrIDSet)
+  , svVCnt    :: !(MutVar (PrimState m) Int)
+  , svOk      :: !(MutVar (PrimState m) Bool)
+  , svOptDir  :: !(MutVar (PrimState m) OptDir)
+
+  , svDefDB  :: !(MutVar (PrimState m) (Map (LA.Expr Rational) Var))
+
+  , svLogger :: !(MutVar (PrimState m) (Maybe (String -> m ())))
+  , svRecTime :: !(MutVar (PrimState m) (Maybe (GenericSolverM m v -> (m :~> m))))
+  , svPivotStrategy :: !(MutVar (PrimState m) PivotStrategy)
+  , svNPivot  :: !(MutVar (PrimState m) Int)
+
+  , svBacktrackPoints :: !(MutVar (PrimState m) [BacktrackPoint m v])
+  }
+
+type GenericSolver v = GenericSolverM IO v
+
+type Solver = GenericSolver Rational
+
+-- special basic variable
+objVar :: Int
+objVar = -1
+
+newSolver :: (PrimMonad m, SolverValue v) => m (GenericSolverM m v)
+newSolver = do
+  t <- newMutVar (IntMap.singleton objVar zeroV)
+  l <- newMutVar IntMap.empty
+  u <- newMutVar IntMap.empty
+  m <- newMutVar (IntMap.singleton objVar zeroV)
+  e <- newMutVar mempty
+  v <- newMutVar 0
+  ok <- newMutVar True
+  dir <- newMutVar OptMin
+  defs <- newMutVar Map.empty
+  logger <- newMutVar Nothing
+  rectm <- newMutVar Nothing
+  pivot <- newMutVar PivotStrategyBlandRule
+  npivot <- newMutVar 0
+  bps <- newMutVar []
+  return $
+    GenericSolverM
+    { svTableau = t
+    , svLB      = l
+    , svUB      = u
+    , svModel   = m
+    , svExplanation = e
+    , svVCnt    = v
+    , svOk      = ok
+    , svOptDir  = dir
+    , svDefDB   = defs
+    , svLogger  = logger
+    , svRecTime = rectm
+    , svNPivot  = npivot
+    , svPivotStrategy = pivot
+    , svBacktrackPoints = bps
+    }
+
+cloneSolver :: PrimMonad m => GenericSolverM m v -> m (GenericSolverM m v)
+cloneSolver solver = do
+  t      <- newMutVar =<< readMutVar (svTableau solver)
+  l      <- newMutVar =<< readMutVar (svLB solver)
+  u      <- newMutVar =<< readMutVar (svUB solver)
+  m      <- newMutVar =<< readMutVar (svModel solver)
+  e      <- newMutVar =<< readMutVar (svExplanation solver)
+  v      <- newMutVar =<< readMutVar (svVCnt solver)
+  ok     <- newMutVar =<< readMutVar (svOk solver)
+  dir    <- newMutVar =<< readMutVar (svOptDir solver)
+  defs   <- newMutVar =<< readMutVar (svDefDB solver)
+  logger <- newMutVar =<< readMutVar (svLogger solver)
+  rectm  <- newMutVar =<< readMutVar (svRecTime solver)
+  pivot  <- newMutVar =<< readMutVar (svPivotStrategy solver)
+  npivot <- newMutVar =<< readMutVar (svNPivot solver)
+  bps    <- newMutVar =<< mapM cloneBacktrackPoint =<< readMutVar (svBacktrackPoints solver)
+  return $
+    GenericSolverM
+    { svTableau = t
+    , svLB      = l
+    , svUB      = u
+    , svModel   = m
+    , svExplanation = e
+    , svVCnt    = v
+    , svOk      = ok
+    , svOptDir  = dir
+    , svDefDB   = defs
+    , svLogger  = logger
+    , svRecTime = rectm
+    , svNPivot  = npivot
+    , svPivotStrategy = pivot
+    , svBacktrackPoints = bps
+    }  
+
+class (VectorSpace v, Scalar v ~ Rational, Ord v) => SolverValue v where
+  toValue :: Rational -> v
+  showValue :: Bool -> v -> String
+  getModel :: PrimMonad m => GenericSolverM m v -> m Model
+
+instance SolverValue Rational where
+  toValue = id
+  showValue = showRational
+  getModel = getRawModel
+
+instance SolverValue (Delta Rational) where
+  toValue = fromReal
+  showValue = showDelta
+  getModel solver = do
+    xs <- variables solver
+    ys <- liftM concat $ forM xs $ \x -> do
+      Delta p q  <- getValue solver x
+      lb <- getLB solver x
+      ub <- getUB solver x
+      return $
+        [(p - c) / (k - q) | Just (Delta c k, _) <- return lb, c < p, k > q] ++
+        [(d - p) / (q - h) | Just (Delta d h, _) <- return ub, p < d, q > h]
+    let delta0 :: Rational
+        delta0 = if null ys then 0.1 else minimum ys
+        f :: Delta Rational -> Rational
+        f (Delta r k) = r + k * delta0
+    liftM (IntMap.map f) $ readMutVar (svModel solver)
+
+type ConstrID = Int
+type ConstrIDSet = IntSet
+
+type Bound v = Maybe (v, ConstrIDSet)
+
+boundValue :: SolverValue v => Bound v -> Maybe v
+boundValue = fmap fst
+
+boundExplanation :: SolverValue v => Bound v -> ConstrIDSet
+boundExplanation = maybe mempty snd
+
 {-
-tbl ! v == (m, val)
-==>
-var v .+. m .==. constant val
+Largest coefficient rule: original rule suggested by G. Dantzig.
+Largest increase rule: computationally more expensive in comparison with Largest coefficient, but locally maximizes the progress.
+Steepest edge rule: best pivot rule in practice, an efficient approximate implementation is "Devex".
+Bland’s rule: avoids cycling but one of the slowest rules.
+Random edge rule: Randomized have lead to the current best provable bounds for the number of pivot steps of the simplex method.
+Lexicographic rule: used for avoiding cyclying.
 -}
+data PivotStrategy
+  = PivotStrategyBlandRule
+  | PivotStrategyLargestCoefficient
+--  | PivotStrategySteepestEdge
+  deriving (Eq, Ord, Enum, Show, Read)
 
--- | Basic variables
-type RowIndex = Int
+setPivotStrategy :: PrimMonad m => GenericSolverM m v -> PivotStrategy -> m ()
+setPivotStrategy solver ps = writeMutVar (svPivotStrategy solver) ps
 
--- | Non-basic variables
-type ColIndex = Int
+{--------------------------------------------------------------------
+  problem description
+--------------------------------------------------------------------}
 
-type Row r = (VarMap r, r)
+data BacktrackPoint m v
+  = BacktrackPoint
+  { bpSavedLB :: !(MutVar (PrimState m) (IntMap (Bound v)))
+  , bpSavedUB :: !(MutVar (PrimState m) (IntMap (Bound v)))
+  }
 
-data PivotResult r = PivotUnbounded | PivotFinished | PivotSuccess (Tableau r)
+cloneBacktrackPoint :: PrimMonad m => BacktrackPoint m v -> m (BacktrackPoint m v)
+cloneBacktrackPoint bp = do
+  lbs <- newMutVar =<< readMutVar (bpSavedLB bp)
+  ubs <- newMutVar =<< readMutVar (bpSavedUB bp)
+  return $ BacktrackPoint lbs ubs
+
+pushBacktrackPoint :: PrimMonad m => GenericSolverM m v -> m ()
+pushBacktrackPoint solver = do
+  savedLBs <- newMutVar IntMap.empty
+  savedUBs <- newMutVar IntMap.empty
+  lbs <- readMutVar (svLB solver)
+  ubs <- readMutVar (svUB solver)
+  modifyMutVar (svBacktrackPoints solver) (BacktrackPoint savedLBs savedUBs :)
+
+popBacktrackPoint :: PrimMonad m => GenericSolverM m v -> m ()
+popBacktrackPoint solver = do
+  bps <- readMutVar (svBacktrackPoints solver)
+  case bps of
+    [] -> error "popBacktrackPoint: empty backtrack points"
+    bp : bps' -> do
+      lbs <- readMutVar (svLB solver)
+      savedLBs <- readMutVar (bpSavedLB bp)
+      writeMutVar (svLB solver) $ IntMap.mergeWithKey (\_ _curr saved -> saved) id (const IntMap.empty) lbs savedLBs
+
+      ubs <- readMutVar (svUB solver)
+      savedUBs <- readMutVar (bpSavedUB bp)
+      writeMutVar (svUB solver) $ IntMap.mergeWithKey (\_ _curr saved -> saved) id (const IntMap.empty) ubs savedUBs
+
+      writeMutVar (svBacktrackPoints solver) bps'
+      writeMutVar (svOk solver) True
+
+withBacktrackpoint :: PrimMonad m => GenericSolverM m v -> (BacktrackPoint m v -> m ()) -> m ()
+withBacktrackpoint solver f = do
+  bps <- readMutVar (svBacktrackPoints solver)
+  case bps of
+    [] -> return ()
+    bp : _ -> f bp
+
+bpSaveLB :: PrimMonad m => GenericSolverM m v -> Var -> m ()
+bpSaveLB solver v = do
+  withBacktrackpoint solver $ \bp -> do
+    saved <- readMutVar (bpSavedLB bp)
+    if v `IntMap.member` saved then
+      return ()
+    else do
+      lb <- readMutVar (svLB solver)
+      let old = IntMap.lookup v lb
+      seq old $ writeMutVar (bpSavedLB bp) (IntMap.insert v old saved)
+
+bpSaveUB :: PrimMonad m => GenericSolverM m v -> Var -> m ()
+bpSaveUB solver v = do
+  withBacktrackpoint solver $ \bp -> do
+    saved <- readMutVar (bpSavedUB bp)
+    if v `IntMap.member` saved then
+      return ()
+    else do
+      ub <- readMutVar (svUB solver)
+      let old = IntMap.lookup v ub
+      seq old $ writeMutVar (bpSavedUB bp) (IntMap.insert v old saved)
+
+{--------------------------------------------------------------------
+  problem description
+--------------------------------------------------------------------}
+
+newVar :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> m Var
+newVar solver = do
+  v <- readMutVar (svVCnt solver)
+  writeMutVar (svVCnt solver) $! v+1
+  modifyMutVar (svModel solver) (IntMap.insert v zeroV)
+  return v
+
+assertAtom :: PrimMonad m => GenericSolverM m Rational -> LA.Atom Rational -> m ()
+assertAtom solver atom = assertAtom' solver atom Nothing
+
+assertAtom' :: PrimMonad m => GenericSolverM m Rational -> LA.Atom Rational -> Maybe ConstrID -> m ()
+assertAtom' solver atom cid = do
+  (v,op,rhs') <- simplifyAtom solver atom
+  case op of
+    Le  -> assertUpper' solver v (toValue rhs') cid
+    Ge  -> assertLower' solver v (toValue rhs') cid
+    Eql -> do
+      assertLower' solver v (toValue rhs') cid
+      assertUpper' solver v (toValue rhs') cid
+    _ -> error "unsupported"
+  return ()
+
+assertAtomEx :: PrimMonad m => GenericSolverM m (Delta Rational) -> LA.Atom Rational -> m ()
+assertAtomEx solver atom = assertAtomEx' solver atom Nothing
+
+assertAtomEx' :: PrimMonad m => GenericSolverM m (Delta Rational) -> LA.Atom Rational -> Maybe ConstrID -> m ()
+assertAtomEx' solver atom cid = do
+  (v,op,rhs') <- simplifyAtom solver atom
+  case op of
+    Le  -> assertUpper' solver v (toValue rhs') cid
+    Ge  -> assertLower' solver v (toValue rhs') cid
+    Lt  -> assertUpper' solver v (toValue rhs' ^-^ delta) cid
+    Gt  -> assertLower' solver v (toValue rhs' ^+^ delta) cid
+    Eql -> do
+      assertLower' solver v (toValue rhs') cid
+      assertUpper' solver v (toValue rhs') cid
+  return ()
+
+simplifyAtom :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> LA.Atom Rational -> m (Var, RelOp, Rational)
+simplifyAtom solver (OrdRel lhs op rhs) = do
+  let (lhs',rhs') =
+        case LA.extract LA.unitVar (lhs ^-^ rhs) of
+          (n,e) -> (e, -n)
+  case LA.terms lhs' of
+    [(1,v)] -> return (v, op, rhs')
+    [(-1,v)] -> return (v, flipOp op, -rhs')
+    _ -> do
+      defs <- readMutVar (svDefDB solver)
+      let (c,lhs'') = scale lhs' -- lhs' = lhs'' / c = rhs'
+          rhs'' = c *^ rhs'
+          op''  = if c < 0 then flipOp op else op
+      case Map.lookup lhs'' defs of
+        Just v -> do
+          return (v,op'',rhs'')
+        Nothing -> do
+          v <- newVar solver
+          setRow solver v lhs''
+          modifyMutVar (svDefDB solver) $ Map.insert lhs'' v
+          case LA.asConst lhs'' of
+            Just 0 -> do
+              modifyMutVar (svLB solver) (IntMap.insert v (toValue 0, mempty))
+              modifyMutVar (svUB solver) (IntMap.insert v (toValue 0, mempty))
+            _ -> return ()
+          return (v,op'',rhs'')
+  where
+    scale :: LA.Expr Rational -> (Rational, LA.Expr Rational)
+    scale e = (c, c *^ e)
+      where
+        c = c1 * c2
+        c1 = fromIntegral $ foldl' lcm 1 [denominator c | (c, _) <- LA.terms e]
+        c2 = signum $ head ([c | (c,x) <- LA.terms e] ++ [1])
+             
+assertLower :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> v -> m ()
+assertLower solver x l = assertLower' solver x l Nothing
+
+assertLower' :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> v -> Maybe ConstrID -> m ()
+assertLower' solver x l cid = do
+  let cidSet = IntSet.fromList $ maybeToList cid
+  l0 <- getLB solver x
+  u0 <- getUB solver x
+  case (l0,u0) of 
+    (Just (l0', _), _) | l <= l0' -> return ()
+    (_, Just (u0', cidSet2)) | u0' < l -> do
+      writeMutVar (svExplanation solver) $ cidSet `IntSet.union` cidSet2
+      markBad solver
+    _ -> do
+      bpSaveLB solver x
+      modifyMutVar (svLB solver) (IntMap.insert x (l, cidSet))
+      b <- isNonBasicVariable solver x
+      v <- getValue solver x
+      when (b && not (l <= v)) $ update solver x l
+      checkNBFeasibility solver
+
+assertUpper :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> v -> m ()
+assertUpper solver x u = assertUpper' solver x u Nothing 
+
+assertUpper' :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> v -> Maybe ConstrID -> m ()
+assertUpper' solver x u cid = do
+  let cidSet = IntSet.fromList $ maybeToList cid
+  l0 <- getLB solver x
+  u0 <- getUB solver x
+  case (l0,u0) of
+    (_, Just (u0', _)) | u0' <= u -> return ()
+    (Just (l0', cidSet2), _) | u < l0' -> do
+      writeMutVar (svExplanation solver) $ cidSet `IntSet.union` cidSet2
+      markBad solver
+    _ -> do
+      bpSaveUB solver x
+      modifyMutVar (svUB solver) (IntMap.insert x (u, cidSet))
+      b <- isNonBasicVariable solver x
+      v <- getValue solver x
+      when (b && not (v <= u)) $ update solver x u
+      checkNBFeasibility solver
+
+-- FIXME: 式に定数項が含まれる可能性を考えるとこれじゃまずい?
+setObj :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> LA.Expr Rational -> m ()
+setObj solver e = setRow solver objVar e
+
+getObj :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> m (LA.Expr Rational)
+getObj solver = getRow solver objVar
+
+setRow :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> LA.Expr Rational -> m ()
+setRow solver v e = do
+  modifyMutVar (svTableau solver) $ \t ->
+    IntMap.insert v (LA.applySubst t e) t
+  modifyMutVar (svModel solver) $ \m -> 
+    IntMap.insert v (LA.evalLinear m (toValue 1) e) m  
+
+setOptDir :: PrimMonad m => GenericSolverM m v -> OptDir -> m ()
+setOptDir solver dir = writeMutVar (svOptDir solver) dir
+
+getOptDir :: PrimMonad m => GenericSolverM m v -> m OptDir
+getOptDir solver = readMutVar (svOptDir solver)
+
+{--------------------------------------------------------------------
+  Status
+--------------------------------------------------------------------}
+
+nVars :: PrimMonad m => GenericSolverM m v -> m Int
+nVars solver = readMutVar (svVCnt solver)
+
+isBasicVariable :: PrimMonad m => GenericSolverM m v -> Var -> m Bool
+isBasicVariable solver v = do
+  t <- readMutVar (svTableau solver)
+  return $ v `IntMap.member` t
+
+isNonBasicVariable  :: PrimMonad m => GenericSolverM m v -> Var -> m Bool
+isNonBasicVariable solver x = liftM not (isBasicVariable solver x)
+
+isFeasible :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> m Bool
+isFeasible solver = do
+  xs <- variables solver
+  liftM and $ forM xs $ \x -> do
+    v <- getValue solver x
+    l <- getLB solver x
+    u <- getUB solver x
+    return (testLB l v && testUB u v)
+
+isOptimal :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> m Bool
+isOptimal solver = do
+  obj <- getRow solver objVar
+  ret <- selectEnteringVariable solver
+  return $! isNothing ret
+
+{--------------------------------------------------------------------
+  Satisfiability solving
+--------------------------------------------------------------------}
+
+check :: forall m v. (PrimMonad m, SolverValue v) => GenericSolverM m v -> m Bool
+check solver = do
+  let
+    loop :: m Bool
+    loop = do
+      m <- selectViolatingBasicVariable solver
+
+      case m of
+        Nothing -> return True
+        Just xi  -> do
+          li <- getLB solver xi
+          ui <- getUB solver xi
+          isLBViolated <- do
+            vi <- getValue solver xi
+            return $ not (testLB li vi)
+          let q = if isLBViolated
+                  then -- select the smallest non-basic variable xj such that
+                       -- (aij > 0 and β(xj) < uj) or (aij < 0 and β(xj) > lj)
+                       canIncrease solver
+                  else -- select the smallest non-basic variable xj such that
+                       -- (aij < 0 and β(xj) < uj) or (aij > 0 and β(xj) > lj)
+                       canDecrease solver
+          xi_def <- getRow solver xi
+          r <- liftM (fmap snd) $ findM q (LA.terms xi_def)              
+          case r of
+            Nothing -> do
+              let c = if isLBViolated then li else ui
+              core <- liftM (mconcat . map boundExplanation . (c :)) $ forM (LA.terms xi_def) $ \(aij, xj) -> do
+                if isLBViolated then do
+                  if aij > 0 then do
+                    getUB solver xj
+                  else do
+                    getLB solver xj
+                else do
+                  if aij > 0 then do
+                    getLB solver xj
+                  else do
+                    getUB solver xj
+              writeMutVar (svExplanation solver) core
+              markBad solver
+              return False
+            Just xj -> do
+              pivotAndUpdate solver xi xj (fromJust $ boundValue $ if isLBViolated then li else ui)
+              loop
+
+  ok <- readMutVar (svOk solver)
+  if not ok
+  then return False
+  else do
+    log solver "check"
+    result <- recordTime solver loop
+    when result $ checkFeasibility solver
+    return result
+
+selectViolatingBasicVariable :: forall m v. (PrimMonad m, SolverValue v) => GenericSolverM m v -> m (Maybe Var)
+selectViolatingBasicVariable solver = do
+  let
+    p :: Var -> m Bool
+    p x | x == objVar = return False
+    p xi = do
+      li <- getLB solver xi
+      ui <- getUB solver xi
+      vi <- getValue solver xi
+      return $ not (testLB li vi) || not (testUB ui vi)
+  vs <- basicVariables solver
+
+  ps <- readMutVar (svPivotStrategy solver)
+  case ps of
+    PivotStrategyBlandRule ->
+      findM p vs
+    PivotStrategyLargestCoefficient -> do
+      xs <- filterM p vs
+      case xs of
+        [] -> return Nothing
+        _ -> do
+          xs2 <- forM xs $ \xi -> do
+              vi <- getValue solver xi
+              li <- getLB solver xi
+              ui <- getUB solver xi
+              if not (testLB li vi)
+                then return (xi, fromJust (boundValue li) ^-^ vi)
+                else return (xi, vi ^-^ fromJust (boundValue ui))
+          return $ Just $ fst $ maximumBy (comparing snd) xs2
+
+{--------------------------------------------------------------------
+  Optimization
+--------------------------------------------------------------------}
+
+-- | results of optimization
+data OptResult = Optimum | Unsat | Unbounded | ObjLimit
   deriving (Show, Eq, Ord)
 
-emptyTableau :: Tableau r
-emptyTableau = IM.empty
+-- | Options for solving.
+--
+-- The default option can be obtained by 'def'.
+data Options
+  = Options
+  { objLimit :: Maybe Rational
+  }
+  deriving (Show, Eq, Ord)
 
-objRowIndex :: RowIndex
-objRowIndex = -1
+instance Default Options where
+  def =
+    Options
+    { objLimit = Nothing
+    }
 
-pivot :: (Fractional r, Eq r) => RowIndex -> ColIndex -> Tableau r -> Tableau r
-{-# INLINE pivot #-}
-{-# SPECIALIZE pivot :: RowIndex -> ColIndex -> Tableau Rational -> Tableau Rational #-}
-{-# SPECIALIZE pivot :: RowIndex -> ColIndex -> Tableau Double -> Tableau Double #-}
-pivot r s tbl =
-    assert (isValidTableau tbl) $  -- precondition
-    assert (isValidTableau tbl') $ -- postcondition
-      tbl'
+optimize :: forall m. PrimMonad m => GenericSolverM m Rational -> Options -> m OptResult
+optimize solver opt = do
+  ret <- do
+    is_fea <- isFeasible solver
+    if is_fea then return True else check solver
+  if not ret
+    then return Unsat -- unsat
+    else do
+      log solver "optimize"
+      result <- recordTime solver loop
+      when (result == Optimum) $ checkOptimality solver
+      return result
   where
-    tbl' = IM.insert s row_s $ IM.map f $ IM.delete r $ tbl
-    f orig@(row_i, row_i_val) =
-      case IM.lookup s row_i of
-        Nothing -> orig
-        Just c ->
-          ( IM.filter (0/=) $ IM.unionWith (+) (IM.delete s row_i) (IM.map (negate c *) row_r')
-          , row_i_val - c*row_r_val'
-          )
-    (row_r, row_r_val) = lookupRow r tbl
-    a_rs = row_r IM.! s
-    row_r' = IM.map (/ a_rs) $ IM.insert r 1 $ IM.delete s row_r
-    row_r_val' = row_r_val / a_rs
-    row_s = (row_r', row_r_val')
-
--- | Lookup a row by basic variable
-lookupRow :: RowIndex -> Tableau r -> Row r
-lookupRow r m = m IM.! r
-
--- 行の基底変数の列が0になるように変形
-normalizeRow :: (Num r, Eq r) => Tableau r -> Row r -> Row r
-normalizeRow a (row0,val0) = obj'
-  where
-    obj' = g $ foldl' f (IM.empty, val0) $ 
-           [ case IM.lookup j a of
-               Nothing -> (IM.singleton j x, 0)
-               Just (row,val) -> (IM.map ((-x)*) (IM.delete j row), -x*val)
-           | (j,x) <- IM.toList row0 ]
-    f (m1,v1) (m2,v2) = (IM.unionWith (+) m1 m2, v1+v2)
-    g (m,v) = (IM.filter (0/=) m, v)
-
-setRow :: (Num r, Eq r) => Tableau r -> RowIndex -> Row r -> Tableau r
-setRow tbl i row = assert (isValidTableau tbl) $ assert (isValidTableau tbl') $ tbl'
-  where
-    tbl' = IM.insert i (normalizeRow tbl row) tbl
-
-addRow :: (Num r, Eq r) => Tableau r -> RowIndex -> Row r -> Tableau r
-addRow tbl i row = assert (i `IM.notMember` tbl) $ setRow tbl i row
-
-setObjFun :: (Num r, Eq r) => Tableau r -> LA.Expr r -> Tableau r
-setObjFun tbl e = addRow tbl objRowIndex row
-  where
-    row =
-      case LA.extract LA.unitVar e of
-        (c, e') -> (LA.coeffMap (negateV e'), c)
-
-copyObjRow :: (Num r, Eq r) => Tableau r -> Tableau r -> Tableau r
-copyObjRow from to =
-  case IM.lookup objRowIndex from of
-    Nothing -> IM.delete objRowIndex to
-    Just row -> addRow to objRowIndex row
-
-currentValue :: Num r => Tableau r -> Var -> r
-currentValue tbl v =
-  case IM.lookup v tbl of
-    Nothing -> 0
-    Just (_, val) -> val
-
-currentObjValue :: Tableau r -> r
-currentObjValue = snd . lookupRow objRowIndex
-
-isValidTableau :: Tableau r -> Bool
-isValidTableau tbl =
-  and [v `IM.notMember` m | (v, (m,_)) <- IM.toList tbl, v /= objRowIndex] &&
-  and [IS.null (IM.keysSet m `IS.intersection` vs) | (m,_) <- IM.elems tbl']
-  where
-    tbl' = IM.delete objRowIndex tbl
-    vs = IM.keysSet tbl' 
-
-isFeasible :: Real r => Tableau r -> Bool
-isFeasible tbl = 
-  and [val >= 0 | (v, (_,val)) <- IM.toList tbl, v /= objRowIndex]
-
-isOptimal :: Real r => OptDir -> Tableau r -> Bool
-isOptimal optdir tbl =
-  and [not (cmp cj) | cj <- IM.elems (fst (lookupRow objRowIndex tbl))]
-  where
-    cmp = case optdir of
-            OptMin -> (0<)
-            OptMax -> (0>)
-
-isImproving :: Real r => OptDir -> Tableau r -> Tableau r -> Bool
-isImproving OptMin from to = currentObjValue to <= currentObjValue from 
-isImproving OptMax from to = currentObjValue to >= currentObjValue from 
-
--- ---------------------------------------------------------------------------
--- primal simplex
-
-simplex :: (Real r, Fractional r) => OptDir -> Tableau r -> (Bool, Tableau r)
-{-# SPECIALIZE simplex :: OptDir -> Tableau Rational -> (Bool, Tableau Rational) #-}
-{-# SPECIALIZE simplex :: OptDir -> Tableau Double -> (Bool, Tableau Double) #-}
-simplex optdir = go
-  where
-    go tbl = assert (isFeasible tbl) $
-      case primalPivot optdir tbl of
-        PivotFinished  -> assert (isOptimal optdir tbl) (True, tbl)
-        PivotUnbounded -> (False, tbl)
-        PivotSuccess tbl' -> assert (isImproving optdir tbl tbl') $ go tbl'
-
-primalPivot :: (Real r, Fractional r) => OptDir -> Tableau r -> PivotResult r
-{-# INLINE primalPivot #-}
-primalPivot optdir tbl
-  | null cs   = PivotFinished
-  | null rs   = PivotUnbounded
-  | otherwise = PivotSuccess (pivot r s tbl)
-  where
-    cmp = case optdir of
-            OptMin -> (0<)
-            OptMax -> (0>)
-    cs = [(j,cj) | (j,cj) <- IM.toList (fst (lookupRow objRowIndex tbl)), cmp cj]
-    -- smallest subscript rule
-    s = fst $ head cs
-    -- classical rule
-    --s = fst $ (if optdir==OptMin then maximumBy else minimumBy) (compare `on` snd) cs
-    rs = [ (i, y_i0 / y_is)
-         | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRowIndex
-         , let y_is = IM.findWithDefault 0 s row_i, y_is > 0
-         ]
-    r = fst $ minimumBy (comparing snd) rs
-
--- ---------------------------------------------------------------------------
--- dual simplex
-
-dualSimplex :: (Real r, Fractional r) => OptDir -> Tableau r -> (Bool, Tableau r)
-{-# SPECIALIZE dualSimplex :: OptDir -> Tableau Rational -> (Bool, Tableau Rational) #-}
-{-# SPECIALIZE dualSimplex :: OptDir -> Tableau Double -> (Bool, Tableau Double) #-}
-dualSimplex optdir = go
-  where
-    go tbl = assert (isOptimal optdir tbl) $
-      case dualPivot optdir tbl of
-        PivotFinished  -> assert (isFeasible tbl) $ (True, tbl)
-        PivotUnbounded -> (False, tbl)
-        PivotSuccess tbl' -> assert (isImproving optdir tbl' tbl) $ go tbl'
-
-dualPivot :: (Real r, Fractional r) => OptDir -> Tableau r -> PivotResult r
-{-# INLINE dualPivot #-}
-dualPivot optdir tbl
-  | null rs   = PivotFinished
-  | null cs   = PivotUnbounded
-  | otherwise = PivotSuccess (pivot r s tbl)
-  where
-    rs = [(i, row_i) | (i, (row_i, y_i0)) <- IM.toList tbl, i /= objRowIndex, 0 > y_i0]
-    (r, row_r) = head rs
-    cs = [ (j, if optdir==OptMin then y_0j / y_rj else - y_0j / y_rj)
-         | (j, y_rj) <- IM.toList row_r
-         , y_rj < 0
-         , let y_0j = IM.findWithDefault 0 j obj
-         ]
-    s = fst $ minimumBy (comparing snd) cs
-    (obj,_) = lookupRow objRowIndex tbl
-
--- ---------------------------------------------------------------------------
--- phase I of the two-phased method
-
-phaseI :: (Real r, Fractional r) => Tableau r -> VarSet -> (Bool, Tableau r)
-{-# SPECIALIZE phaseI :: Tableau Rational -> VarSet -> (Bool, Tableau Rational) #-}
-{-# SPECIALIZE phaseI :: Tableau Double -> VarSet -> (Bool, Tableau Double) #-}
-phaseI tbl avs
-  | currentObjValue tbl1' /= 0 = (False, tbl1')
-  | otherwise = (True, copyObjRow tbl $ removeArtificialVariables avs $ tbl1')
-  where
-    optdir = OptMax
-    tbl1 = setObjFun tbl $ negateV $ sumV [LA.var v | v <- IS.toList avs]
-    tbl1' = go tbl1
-    go tbl2
-      | currentObjValue tbl2 == 0 = tbl2
-      | otherwise = 
-        case primalPivot optdir tbl2 of
-          PivotSuccess tbl2' -> assert (isImproving optdir tbl2 tbl2') $ go tbl2'
-          PivotFinished -> assert (isOptimal optdir tbl2) tbl2
-          PivotUnbounded -> error "phaseI: should not happen"
-
--- post-processing of phaseI
--- pivotを使ってartificial variablesを基底から除いて、削除
-removeArtificialVariables :: (Real r, Fractional r) => VarSet -> Tableau r -> Tableau r
-removeArtificialVariables avs tbl0 = tbl2
-  where
-    tbl1 = foldl' f (IM.delete objRowIndex tbl0) (IS.toList avs)
-    tbl2 = IM.map (\(row,val) ->  (IM.filterWithKey (\j _ -> j `IS.notMember` avs) row, val)) tbl1
-    f tbl i =
-      case IM.lookup i tbl of
-        Nothing -> tbl
-        Just row ->
-          case [j | (j,c) <- IM.toList (fst row), c /= 0, j `IS.notMember` avs] of
-            [] -> IM.delete i tbl
-            j:_ -> pivot i j tbl
-
--- ---------------------------------------------------------------------------
--- primal-dual simplex
-
-data PDResult = PDUnsat | PDOptimal | PDUnbounded
-
-primalDualSimplex :: (Real r, Fractional r) => OptDir -> Tableau r -> (Bool, Tableau r)
-{-# SPECIALIZE primalDualSimplex :: OptDir -> Tableau Rational -> (Bool, Tableau Rational) #-}
-{-# SPECIALIZE primalDualSimplex :: OptDir -> Tableau Double -> (Bool, Tableau Double) #-}
-primalDualSimplex optdir = go
-  where
-    go tbl =
-      case pdPivot optdir tbl of
-        Left PDOptimal   -> assert (isFeasible tbl) $ assert (isOptimal optdir tbl) $ (True, tbl)
-        Left PDUnsat     -> assert (not (isFeasible tbl)) $ (False, tbl)
-        Left PDUnbounded -> assert (not (isOptimal optdir tbl)) $ (False, tbl)
-        Right tbl' -> go tbl'
-
-pdPivot :: (Real r, Fractional r) => OptDir -> Tableau r -> Either PDResult (Tableau r)
-pdPivot optdir tbl
-  | null ps && null qs = Left PDOptimal -- optimal
-  | otherwise =
+    loop :: m OptResult
+    loop = do
+      checkFeasibility solver
+      ret <- selectEnteringVariable solver
       case ret of
-        Left p -> -- primal update
-          let rs = [ (i, (bi - t) / y_ip)
-                   | (i, (row_i, bi)) <- IM.toList tbl, i /= objRowIndex
-                   , let y_ip = IM.findWithDefault 0 p row_i, y_ip > 0
-                   ]
-              q = fst $ minimumBy (comparing snd) rs
-          in if null rs
-             then Left PDUnsat
-             else Right (pivot q p tbl)
-        Right q -> -- dual update
-          let (row_q, _bq) = (tbl IM.! q)
-              cs = [ (j, (cj'-t) / (-y_qj))
-                   | (j, y_qj) <- IM.toList row_q
-                   , y_qj < 0
-                   , let cj  = IM.findWithDefault 0 j obj
-                   , let cj' = if optdir==OptMax then cj else -cj
-                   ]
-              p = fst $ maximumBy (comparing snd) cs
-              (obj,_) = lookupRow objRowIndex tbl
-          in if null cs
-             then Left PDUnbounded -- dual infeasible
-             else Right (pivot q p tbl)
+       Nothing -> return Optimum
+       Just (c,xj) -> do
+         dir <- getOptDir solver
+         r <- if dir==OptMin
+              then if c > 0
+                then decreaseNB solver xj -- xj を小さくして目的関数を小さくする
+                else increaseNB solver xj -- xj を大きくして目的関数を小さくする
+              else if c > 0
+                then increaseNB solver xj -- xj を大きくして目的関数を大きくする
+                else decreaseNB solver xj -- xj を小さくして目的関数を大きくする
+         if r
+           then loop
+           else return Unbounded
+
+selectEnteringVariable :: forall m v. (PrimMonad m, SolverValue v) => GenericSolverM m v -> m (Maybe (Rational, Var))
+selectEnteringVariable solver = do
+  ps <- readMutVar (svPivotStrategy solver)
+  obj_def <- getRow solver objVar
+  case ps of
+    PivotStrategyBlandRule ->
+      findM canEnter (LA.terms obj_def)
+    PivotStrategyLargestCoefficient -> do
+      ts <- filterM canEnter (LA.terms obj_def)
+      case ts of
+        [] -> return Nothing
+        _ -> return $ Just $ snd $ maximumBy (comparing fst) [(abs c, (c,xj)) | (c,xj) <- ts]
   where
-    qs = [ (Right i, bi) | (i, (_row_i, bi)) <- IM.toList tbl, i /= objRowIndex, 0 > bi ]
-    ps = [ (Left j, cj')
-         | (j,cj) <- IM.toList (fst (lookupRow objRowIndex tbl))
-         , let cj' = if optdir==OptMax then cj else -cj
-         , 0 > cj' ]
-    (ret, t) = minimumBy (comparing snd) (qs ++ ps)
+    canEnter :: (Rational, Var) -> m Bool
+    canEnter (_,xj) | xj == LA.unitVar = return False
+    canEnter (c,xj) = do
+      dir <- getOptDir solver
+      if dir==OptMin
+       then canDecrease solver (c,xj)
+       else canIncrease solver (c,xj)
 
--- ---------------------------------------------------------------------------
+canIncrease :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> (Rational,Var) -> m Bool
+canIncrease solver (a,x) =
+  case compare a 0 of
+    EQ -> return False
+    GT -> canIncrease1 solver x
+    LT -> canDecrease1 solver x
 
-toCSV :: (Num r) => (r -> String) -> Tableau r -> String
-toCSV showCell tbl = unlines . map (concat . intersperse ",") $ header : body
+canDecrease :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> (Rational,Var) -> m Bool
+canDecrease solver (a,x) =
+  case compare a 0 of
+    EQ -> return False
+    GT -> canDecrease1 solver x
+    LT -> canIncrease1 solver x
+
+canIncrease1 :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> m Bool
+canIncrease1 solver x = do
+  u <- getUB solver x
+  v <- getValue solver x
+  case u of
+    Nothing -> return True
+    Just (uv, _) -> return $! (v < uv)
+
+canDecrease1 :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> m Bool
+canDecrease1 solver x = do
+  l <- getLB solver x
+  v <- getValue solver x
+  case l of
+    Nothing -> return True
+    Just (lv, _) -> return $! (lv < v)
+
+-- | feasibility を保ちつつ non-basic variable xj の値を大きくする
+increaseNB :: PrimMonad m => GenericSolverM m Rational -> Var -> m Bool
+increaseNB solver xj = do
+  col <- getCol solver xj
+
+  -- Upper bounds of θ
+  -- NOTE: xj 自体の上限も考慮するのに注意
+  ubs <- liftM concat $ forM ((xj,1) : IntMap.toList col) $ \(xi,aij) -> do
+    v1 <- getValue solver xi
+    li <- getLB solver xi
+    ui <- getUB solver xi
+    return [ assert (theta >= zeroV) ((xi,v2), theta)
+           | Just v2 <- [boundValue ui | aij > 0] ++ [boundValue li | aij < 0]
+           , let theta = (v2 ^-^ v1) ^/ aij ]
+
+  -- β(xj) := β(xj) + θ なので θ を大きく
+  case ubs of
+    [] -> return False -- unbounded
+    _ -> do
+      let (xi, v) = fst $ minimumBy (comparing snd) ubs
+      pivotAndUpdate solver xi xj v
+      return True
+
+-- | feasibility を保ちつつ non-basic variable xj の値を小さくする
+decreaseNB :: PrimMonad m => GenericSolverM m Rational -> Var -> m Bool
+decreaseNB solver xj = do
+  col <- getCol solver xj
+
+  -- Lower bounds of θ
+  -- NOTE: xj 自体の下限も考慮するのに注意
+  lbs <- liftM concat $ forM ((xj,1) : IntMap.toList col) $ \(xi,aij) -> do
+    v1 <- getValue solver xi
+    li <- getLB solver xi
+    ui <- getUB solver xi
+    return [ assert (theta <= zeroV) ((xi,v2), theta)
+           | Just v2 <- [boundValue li | aij > 0] ++ [boundValue ui | aij < 0]
+           , let theta = (v2 ^-^ v1) ^/ aij ]
+
+  -- β(xj) := β(xj) + θ なので θ を小さく
+  case lbs of
+    [] -> return False -- unbounded
+    _ -> do
+      let (xi, v) = fst $ maximumBy (comparing snd) lbs
+      pivotAndUpdate solver xi xj v
+      return True
+
+dualSimplex :: forall m. PrimMonad m => GenericSolverM m Rational -> Options -> m OptResult
+dualSimplex solver opt = do
+  let
+    loop :: m OptResult
+    loop = do
+      checkOptimality solver
+
+      p <- prune solver opt
+      if p
+        then return ObjLimit
+        else do
+          m <- selectViolatingBasicVariable solver
+          case m of
+            Nothing -> return Optimum
+            Just xi  -> do
+              xi_def  <- getRow solver xi
+              li <- getLB solver xi
+              ui <- getUB solver xi
+              isLBViolated <- do
+                vi <- getValue solver xi
+                return $ not (testLB li vi)
+              r <- dualRTest solver xi_def isLBViolated
+              case r of
+                Nothing -> do
+                  -- dual unbounded
+                  let c = if isLBViolated then li else ui
+                  core <- liftM (mconcat . map boundExplanation . (c :)) $ forM (LA.terms xi_def) $ \(aij, xj) -> do
+                    if isLBViolated then do
+                      if aij > 0 then do
+                        getUB solver xj
+                      else do
+                        getLB solver xj
+                    else do
+                      if aij > 0 then do
+                        getLB solver xj
+                      else do
+                        getUB solver xj
+                  writeMutVar (svExplanation solver) core
+                  markBad solver
+                  return Unsat
+                Just xj -> do
+                  pivotAndUpdate solver xi xj (fromJust $ boundValue $ if isLBViolated then li else ui)
+                  loop
+
+  ok <- readMutVar (svOk solver)
+  if not ok
+  then return Unsat
+  else do
+    log solver "dual simplex"
+    result <- recordTime solver loop
+    when (result == Optimum) $ checkFeasibility solver
+    return result
+
+dualRTest :: PrimMonad m => GenericSolverM m Rational -> LA.Expr Rational -> Bool -> m (Maybe Var)
+dualRTest solver row isLBViolated = do
+  -- normalize to the cases of minimization
+  obj_def <- do
+    def <- getRow solver objVar
+    dir <- getOptDir solver
+    return $
+      case dir of
+        OptMin -> def
+        OptMax -> negateV def
+  -- normalize to the cases of lower bound violation
+  let xi_def =
+       if isLBViolated
+       then row
+       else negateV row
+  ws <- do
+    -- select non-basic variable xj such that
+    -- (aij > 0 and β(xj) < uj) or (aij < 0 and β(xj) > lj)
+    liftM concat $ forM (LA.terms xi_def) $ \(aij, xj) -> do
+      b <- canIncrease solver (aij, xj)
+      if b
+      then do
+        let cj = LA.coeff xj obj_def
+        let ratio = cj / aij
+        return [(xj, ratio) | ratio >= 0]
+      else
+        return []
+  case ws of
+    [] -> return Nothing
+    _ -> return $ Just $ fst $ minimumBy (comparing snd) ws
+
+prune :: PrimMonad m => GenericSolverM m Rational -> Options -> m Bool
+prune solver opt =
+  case objLimit opt of
+    Nothing -> return False
+    Just lim -> do    
+      o <- getObjValue solver
+      dir <- getOptDir solver
+      case dir of
+        OptMin -> return $! (lim <= o)
+        OptMax -> return $! (lim >= o)
+
+{--------------------------------------------------------------------
+  Extract results
+--------------------------------------------------------------------}
+
+type RawModel v = IntMap v
+
+getRawModel :: PrimMonad m => GenericSolverM m v -> m (RawModel v)
+getRawModel solver = do
+  xs <- variables solver
+  liftM IntMap.fromList $ forM xs $ \x -> do
+    val <- getValue solver x
+    return (x,val)
+
+getObjValue :: PrimMonad m => GenericSolverM m v -> m v
+getObjValue solver = getValue solver objVar  
+
+type Model = IntMap Rational
+
+explain :: PrimMonad m => GenericSolverM m v -> m ConstrIDSet
+explain solver = readMutVar (svExplanation solver)
+  
+{--------------------------------------------------------------------
+  major function
+--------------------------------------------------------------------}
+
+update :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> v -> m ()
+update solver xj v = do
+  -- log solver $ printf "before update x%d (%s)" xj (show v)
+  -- dump solver
+
+  v0 <- getValue solver xj
+  let diff = v ^-^ v0
+
+  aj <- getCol solver xj
+  modifyMutVar (svModel solver) $ \m ->
+    let m2 = IntMap.map (\aij -> aij *^ diff) aj
+    in IntMap.insert xj v $ IntMap.unionWith (^+^) m2 m
+
+  -- log solver $ printf "after update x%d (%s)" xj (show v)
+  -- dump solver
+
+pivot :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> Var -> m ()
+pivot solver xi xj = do
+  modifyMutVar' (svNPivot solver) (+1)
+  modifyMutVar' (svTableau solver) $ \defs ->
+    case LA.solveFor (LA.var xi .==. (defs IntMap.! xi)) xj of
+      Just (Eql, xj_def) ->
+        IntMap.insert xj xj_def . IntMap.map (LA.applySubst1 xj xj_def) . IntMap.delete xi $ defs
+      _ -> error "pivot: should not happen"
+
+pivotAndUpdate :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> Var -> v -> m ()
+pivotAndUpdate solver xi xj v | xi == xj = update solver xi v -- xi = xj is non-basic variable
+pivotAndUpdate solver xi xj v = do
+  -- xi is basic variable
+  -- xj is non-basic varaible
+
+  -- log solver $ printf "before pivotAndUpdate x%d x%d (%s)" xi xj (show v)
+  -- dump solver
+
+  m <- readMutVar (svModel solver)
+
+  aj <- getCol solver xj
+  let aij = aj IntMap.! xi
+  let theta = (v ^-^ (m IntMap.! xi)) ^/ aij
+
+  let m' = IntMap.fromList $
+           [(xi, v), (xj, (m IntMap.! xj) ^+^ theta)] ++
+           [(xk, (m IntMap.! xk) ^+^ (akj *^ theta)) | (xk, akj) <- IntMap.toList aj, xk /= xi]
+  writeMutVar (svModel solver) (IntMap.union m' m) -- note that 'IntMap.union' is left biased.
+
+  pivot solver xi xj
+
+  -- log solver $ printf "after pivotAndUpdate x%d x%d (%s)" xi xj (show v)
+  -- dump solver
+
+getLB :: PrimMonad m => GenericSolverM m v -> Var -> m (Bound v)
+getLB solver x = do
+  lb <- readMutVar (svLB solver)
+  return $ IntMap.lookup x lb
+
+getUB :: PrimMonad m => GenericSolverM m v -> Var -> m (Bound v)
+getUB solver x = do
+  ub <- readMutVar (svUB solver)
+  return $ IntMap.lookup x ub
+
+getTableau :: PrimMonad m => GenericSolverM m v -> m (IntMap (LA.Expr Rational))
+getTableau solver = do
+  t <- readMutVar (svTableau solver)
+  return $ IntMap.delete objVar t
+
+getValue :: PrimMonad m => GenericSolverM m v -> Var -> m v
+getValue solver x = do
+  m <- readMutVar (svModel solver)
+  return $ m IntMap.! x
+
+getRow :: PrimMonad m => GenericSolverM m v -> Var -> m (LA.Expr Rational)
+getRow solver x = do
+  -- x should be basic variable or 'objVar'
+  t <- readMutVar (svTableau solver)
+  return $! (t IntMap.! x)
+
+-- aijが非ゼロの列も全部探しているのは効率が悪い
+getCol :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> m (IntMap Rational)
+getCol solver xj = do
+  t <- readMutVar (svTableau solver)
+  return $ IntMap.mapMaybe (LA.lookupCoeff xj) t
+
+getCoeff :: PrimMonad m => GenericSolverM m v -> Var -> Var -> m Rational
+getCoeff solver xi xj = do
+  xi_def <- getRow solver xi
+  return $! LA.coeff xj xi_def
+
+markBad :: PrimMonad m => GenericSolverM m v -> m ()
+markBad solver = writeMutVar (svOk solver) False
+
+{--------------------------------------------------------------------
+  utility
+--------------------------------------------------------------------}
+
+findM :: Monad m => (a -> m Bool) -> [a] -> m (Maybe a)
+findM _ [] = return Nothing
+findM p (x:xs) = do
+  r <- p x
+  if r
+  then return (Just x)
+  else findM p xs
+
+testLB :: SolverValue v => Bound v -> v -> Bool
+testLB Nothing _  = True
+testLB (Just (l,_)) x = l <= x
+
+testUB :: SolverValue v => Bound v -> v -> Bool
+testUB Nothing _  = True
+testUB (Just (u,_)) x = x <= u
+
+variables :: PrimMonad m => GenericSolverM m v -> m [Var]
+variables solver = do
+  vcnt <- nVars solver
+  return [0..vcnt-1]
+
+basicVariables :: PrimMonad m => GenericSolverM m v -> m [Var]
+basicVariables solver = do
+  t <- readMutVar (svTableau solver)
+  return (IntMap.keys t)
+
+recordTime :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> m a -> m a
+recordTime solver act = do
+  dumpSize solver
+  writeMutVar (svNPivot solver) 0
+  rectm <- readMutVar (svRecTime solver)
+  result <-
+    case rectm of
+      Nothing -> act
+      Just f -> f solver $$ act
+  (log solver . printf "#pivot = %d") =<< readMutVar (svNPivot solver)
+  return result
+
+showDelta :: Bool -> Delta Rational -> String
+showDelta asRatio v = 
+  case v of
+    (Delta r k) -> 
+      f r ++
+        case compare k 0 of
+          EQ -> ""
+          GT -> " + " ++ f k ++ " delta"
+          LT -> " - " ++ f (abs k) ++ " delta"
   where
-    header :: [String]
-    header = "" : map colName cols ++ [""]
+    f = showRational asRatio
 
-    body :: [[String]]
-    body = [showRow i (lookupRow i tbl) | i <- rows]
+{--------------------------------------------------------------------
+  Logging
+--------------------------------------------------------------------}
 
-    rows :: [RowIndex]
-    rows = IM.keys (IM.delete objRowIndex tbl) ++ [objRowIndex]
+-- | set callback function for receiving messages.
+setLogger :: PrimMonad m => GenericSolverM m v -> (String -> m ()) -> m ()
+setLogger solver logger = do
+  writeMutVar (svLogger solver) (Just logger)
 
-    cols :: [ColIndex]
-    cols = [0..colMax]
-      where
-        colMax = maximum (-1 : [c | (row, _) <- IM.elems tbl, c <- IM.keys row])
+clearLogger :: PrimMonad m => GenericSolverM m v -> m ()
+clearLogger solver = writeMutVar (svLogger solver) Nothing
 
-    rowName :: RowIndex -> String
-    rowName i = if i==objRowIndex then "obj" else "x" ++ show i
+log :: PrimMonad m => GenericSolverM m v -> String -> m ()
+log solver msg = logM solver (return msg)
 
-    colName :: ColIndex -> String
-    colName j = "x" ++ show j
+logM :: PrimMonad m => GenericSolverM m v -> m String -> m ()
+logM solver action = do
+  m <- readMutVar (svLogger solver)
+  case m of
+    Nothing -> return ()
+    Just logger -> action >>= logger
 
-    showRow i (row, row_val) = rowName i : [showCell (IM.findWithDefault 0 j row') | j <- cols] ++ [showCell row_val]
-      where row' = IM.insert i 1 row
+enableTimeRecording :: GenericSolverM IO v -> IO ()
+enableTimeRecording solver = do
+  writeMutVar (svRecTime solver) (Just f)
+  where
+    f solver = Nat $ \act -> do
+        startCPU <- getTime ProcessCPUTime
+        startWC  <- getTime Monotonic
+        result <- act
+        endCPU <- getTime ProcessCPUTime
+        endWC  <- getTime Monotonic
+        let durationSecs :: TimeSpec -> TimeSpec -> Double
+            durationSecs start end = fromIntegral (toNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)      
+        (log solver . printf "cpu time = %.3fs") (durationSecs startCPU endCPU)
+        (log solver . printf "wall clock time = %.3fs") (durationSecs startWC endWC)
+        return result
 
--- ---------------------------------------------------------------------------
+disableTimeRecording :: PrimMonad m => GenericSolverM m v -> m ()
+disableTimeRecording solver = writeMutVar (svRecTime solver) Nothing
+
+{--------------------------------------------------------------------
+  debug and tests
+--------------------------------------------------------------------}
+
+test4 :: IO ()
+test4 = do
+  solver <- newSolver
+  setLogger solver putStrLn
+  x0 <- newVar solver
+  x1 <- newVar solver
+
+  writeMutVar (svTableau solver) (IntMap.fromList [(x1, LA.var x0)])
+  writeMutVar (svLB solver) $ fmap (\v -> (v, mempty)) $ IntMap.fromList [(x0, 0), (x1, 0)]
+  writeMutVar (svUB solver) $ fmap (\v -> (v, mempty)) $ IntMap.fromList [(x0, 2), (x1, 3)]
+  setObj solver (LA.fromTerms [(-1, x0)])
+
+  ret <- optimize solver def
+  print ret
+  dump solver
+
+test5 :: IO ()
+test5 = do
+  solver <- newSolver
+  setLogger solver putStrLn
+  x0 <- newVar solver
+  x1 <- newVar solver
+
+  writeMutVar (svTableau solver) (IntMap.fromList [(x1, LA.var x0)])
+  writeMutVar (svLB solver) $ fmap (\v -> (v, mempty)) $ IntMap.fromList [(x0, 0), (x1, 0)]
+  writeMutVar (svUB solver) $ fmap (\v -> (v, mempty)) $ IntMap.fromList [(x0, 2), (x1, 0)]
+  setObj solver (LA.fromTerms [(-1, x0)])
+
+  checkFeasibility solver
+
+  ret <- optimize solver def
+  print ret
+  dump solver
+
+test6 :: IO ()
+test6 = do
+  solver <- newSolver
+  setLogger solver putStrLn
+  x0 <- newVar solver
+
+  assertAtom solver (LA.constant 1 .<. LA.var x0)
+  assertAtom solver (LA.constant 2 .>. LA.var x0)
+
+  ret <- check solver
+  print ret
+  dump solver
+
+  m <- getModel solver
+  print m
+
+dumpSize :: forall m v. PrimMonad m => SolverValue v => GenericSolverM m v -> m ()
+dumpSize solver = do
+  t <- readMutVar (svTableau solver)
+  let nrows = IntMap.size t - 1 -- -1 is objVar
+  xs <- variables solver
+  let ncols = length xs - nrows
+  let nnz = sum [IntMap.size $ LA.coeffMap xi_def | (xi,xi_def) <- IntMap.toList t, xi /= objVar]
+  log solver $ printf "%d rows, %d columns, %d non-zeros" nrows ncols nnz
+
+dump :: PrimMonad m => SolverValue v => GenericSolverM m v -> m ()
+dump solver = do
+  log solver "============="
+
+  log solver "Tableau:"
+  t <- readMutVar (svTableau solver)
+  log solver $ printf "obj = %s" (show (t IntMap.! objVar))
+  forM_ (IntMap.toList t) $ \(xi, e) -> do
+    when (xi /= objVar) $ log solver $ printf "x%d = %s" xi (show e)
+
+  log solver ""
+
+  log solver "Assignments and Bounds:"
+  objVal <- getValue solver objVar
+  log solver $ printf "beta(obj) = %s" (showValue True objVal)
+  xs <- variables solver 
+  forM_ xs $ \x -> do
+    l <- getLB solver x
+    u <- getUB solver x
+    v <- getValue solver x
+    let f Nothing = "Nothing"
+        f (Just (x,_)) = showValue True x
+    log solver $ printf "beta(x%d) = %s; %s <= x%d <= %s" x (showValue True v) (f l) x (f u)
+
+  log solver ""
+  log solver "Status:"
+  is_fea <- isFeasible solver
+  is_opt <- isOptimal solver
+  log solver $ printf "Feasible: %s" (show is_fea)
+  log solver $ printf "Optimal: %s" (show is_opt)
+
+  log solver "============="
+
+checkFeasibility :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> m ()
+checkFeasibility _ | True = return ()
+checkFeasibility solver = do
+  xs <- variables solver
+  forM_ xs $ \x -> do
+    v <- getValue solver x
+    l <- getLB solver x
+    u <- getUB solver x
+    let f Nothing = "Nothing"
+        f (Just (x,_)) = showValue True x
+    unless (testLB l v) $
+      error (printf "(%s) <= x%d is violated; x%d = (%s)" (f l) x x (showValue True v))
+    unless (testUB u v) $
+      error (printf "x%d <= (%s) is violated; x%d = (%s)" x (f u) x (showValue True v))
+    return ()
+
+checkNBFeasibility :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> m ()
+checkNBFeasibility _ | True = return ()
+checkNBFeasibility solver = do
+  xs <- variables solver
+  forM_ xs $ \x -> do
+    b <- isNonBasicVariable solver x
+    when b $ do
+      v <- getValue solver x
+      l <- getLB solver x
+      u <- getUB solver x
+      let f Nothing = "Nothing"
+          f (Just (x,_)) = showValue True x
+      unless (testLB l v) $
+        error (printf "checkNBFeasibility: (%s) <= x%d is violated; x%d = (%s)" (f l) x x (showValue True v))
+      unless (testUB u v) $
+        error (printf "checkNBFeasibility: x%d <= (%s) is violated; x%d = (%s)" x (f u) x (showValue True v))
+
+checkOptimality :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> m ()
+checkOptimality _ | True = return ()
+checkOptimality solver = do
+  ret <- selectEnteringVariable solver
+  case ret of
+    Nothing -> return () -- optimal
+    Just (_,x) -> error (printf "checkOptimality: not optimal (x%d can be changed)" x)
