@@ -65,6 +65,20 @@ after_script:
 - "[ -n \"$COVERAGE\" ] && travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$GHCVER.tar.bz2 | tar -xj"
 - "[ -n \"$COVERAGE\" ] && ./shc toysolver TestSuite TestPolynomial"
 
+before_deploy:
+- stack --install-ghc runghc --package turtle misc/build_artifacts.hs
+
+deploy:
+  provider: releases
+  api_key:
+    secure: "WhAyiMHX+EGKdlECuT7sEqTzHOWqmnDB2DSS370ugApFklj1k8yLUp4sC1myFAxaNJYAlWRWV9ciJO/+zi/SOEmFp4+JAiNNfwVokugjqc2qeqr5NG5EGH9hqv8Sp67LBGAmvmFRZuFZ2f/0hLaBmsI8++HJJG4IBCHlBhN+XCY="
+  file_glob: true
+  file: '*.tar.xz'
+  skip_cleanup: true
+  on:
+    tags: true
+    condition: "$RESOLVER = lts-9.2"
+
 notifications:
   webhooks:
     urls:
