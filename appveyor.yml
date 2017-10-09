@@ -29,7 +29,7 @@ test_script:
 - echo "" | stack --no-terminal test --bench --no-run-benchmarks --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC
 
 after_test:
-- stack --install-ghc runghc --package turtle misc/appveyor_build_artifacts.hs
+- stack --install-ghc runghc --package turtle misc/build_artifacts.hs
 
 artifacts:
   - path: '*.7z'
