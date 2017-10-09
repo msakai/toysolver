@@ -56,7 +56,7 @@ import qualified ToySolver.Arith.OmegaTest as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
 import qualified ToySolver.Arith.Simplex.Textbook.MIPSolver.Simple as TextbookMIP
 import qualified ToySolver.Arith.Simplex as Simplex
-import qualified ToySolver.Arith.MIPSolver2 as MIPSolver2
+import qualified ToySolver.Arith.MIP as MIPSolver
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
 import qualified ToySolver.Text.CNF as CNF
@@ -264,10 +264,10 @@ run solver opt mip printModel = do
         Simplex.assertAtom solver $ fromJust (LAFOL.fromFOLAtom c)
       putCommentLine "Loading constraints finished"
 
-      mip <- MIPSolver2.newSolver solver ivs2
-      MIPSolver2.setShowRational mip printRat
-      MIPSolver2.setLogger mip putCommentLine
-      MIPSolver2.setOnUpdateBestSolution mip $ \m val -> putOLine (showValue val)
+      mip <- MIPSolver.newSolver solver ivs2
+      MIPSolver.setShowRational mip printRat
+      MIPSolver.setLogger mip putCommentLine
+      MIPSolver.setOnUpdateBestSolution mip $ \m val -> putOLine (showValue val)
 
       procs <-
         if nthreads >= 1
@@ -277,21 +277,21 @@ run solver opt mip printModel = do
           procs <- getNumProcessors
           return $ max (procs - 1) ncap
       setNumCapabilities procs
-      MIPSolver2.setNThread mip procs
+      MIPSolver.setNThread mip procs
 
-      ret <- MIPSolver2.optimize mip
+      ret <- MIPSolver.optimize mip
       case ret of
         Simplex.Unsat -> do
           putSLine "UNSATISFIABLE"
           exitFailure
         Simplex.Unbounded -> do
           putSLine "UNBOUNDED"
-          Just m <- MIPSolver2.getBestModel mip
+          Just m <- MIPSolver.getBestModel mip
           let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2
           exitFailure
         Simplex.Optimum -> do
-          Just m <- MIPSolver2.getBestModel mip
+          Just m <- MIPSolver.getBestModel mip
           putSLine "OPTIMUM FOUND"
           let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2

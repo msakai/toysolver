@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Arith.MIPSolver2
+-- Module      :  ToySolver.Arith.MIP
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -32,7 +32,7 @@
 --   <http://www.jstor.org/stable/3009435>
 -- 
 -----------------------------------------------------------------------------
-module ToySolver.Arith.MIPSolver2
+module ToySolver.Arith.MIP
   (
   -- * The @Solver@ type
     Solver

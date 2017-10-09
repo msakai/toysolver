@@ -15,7 +15,7 @@ import Text.Printf
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Arith.Simplex as Simplex
 import ToySolver.Arith.Simplex
-import qualified ToySolver.Arith.MIPSolver2 as MIPSolver2
+import qualified ToySolver.Arith.MIP as MIPSolver
 
 ------------------------------------------------------------------------
 
@@ -48,16 +48,16 @@ case_test1 = do
   setOptDir lp optdir
   setObj lp obj
   mapM_ (Simplex.assertAtom lp) cs
-  mip <- MIPSolver2.newSolver lp ivs
-  ret <- MIPSolver2.optimize mip
+  mip <- MIPSolver.newSolver lp ivs
+  ret <- MIPSolver.optimize mip
   
   ret @?= Simplex.Optimum
 
-  Just m <- MIPSolver2.getBestModel mip
+  Just m <- MIPSolver.getBestModel mip
   forM_ [(1,40),(2,21/2),(3,39/2),(4,3)] $ \(var, val) ->
     m IM.! var @?= val
 
-  Just v <- MIPSolver2.getBestValue mip
+  Just v <- MIPSolver.getBestValue mip
   v @?= 245/2
 
 case_test1' = do
@@ -67,16 +67,16 @@ case_test1' = do
   setOptDir lp (f optdir)
   setObj lp (negateV obj)
   mapM_ (Simplex.assertAtom lp) cs
-  mip <- MIPSolver2.newSolver lp ivs
-  ret <- MIPSolver2.optimize mip
+  mip <- MIPSolver.newSolver lp ivs
+  ret <- MIPSolver.optimize mip
   
   ret @?= Simplex.Optimum
 
-  Just m <- MIPSolver2.getBestModel mip
+  Just m <- MIPSolver.getBestModel mip
   forM_ [(1,40),(2,21/2),(3,39/2),(4,3)] $ \(var, val) ->
     m IM.! var @?= val
 
-  Just v <- MIPSolver2.getBestValue mip
+  Just v <- MIPSolver.getBestValue mip
   v @?= -245/2
 
   where
@@ -106,16 +106,16 @@ case_test2 = do
   setOptDir lp optdir
   setObj lp obj
   mapM_ (Simplex.assertAtom lp) cs
-  mip <- MIPSolver2.newSolver lp ivs
-  ret <- MIPSolver2.optimize mip
+  mip <- MIPSolver.newSolver lp ivs
+  ret <- MIPSolver.optimize mip
   
   ret @?= Simplex.Optimum
 
-  Just m <- MIPSolver2.getBestModel mip
+  Just m <- MIPSolver.getBestModel mip
   forM_ [(1,0),(2,2),(3,5/2)] $ \(var, val) ->
     m IM.! var @?= val
 
-  Just v <- MIPSolver2.getBestValue mip
+  Just v <- MIPSolver.getBestValue mip
   v @?= -37/2
 
 ------------------------------------------------------------------------

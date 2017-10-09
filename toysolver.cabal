@@ -244,7 +244,7 @@ Library
      ToySolver.Arith.FourierMotzkin.FOL
      ToySolver.Arith.FourierMotzkin.Optimization
      ToySolver.Arith.LPUtil
-     ToySolver.Arith.MIPSolver2
+     ToySolver.Arith.MIP
      ToySolver.Arith.OmegaTest
      ToySolver.Arith.OmegaTest.Base
      ToySolver.Arith.Simplex
