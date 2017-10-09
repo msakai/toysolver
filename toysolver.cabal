@@ -5,7 +5,7 @@ License-File:	COPYING
 Author:		Masahiro Sakai (masahiro.sakai@gmail.com)
 Maintainer:	masahiro.sakai@gmail.com
 Category:	Algorithms, Optimisation, Optimization, Theorem Provers, Constraints, Logic, Formal Methods
-Cabal-Version:	>= 1.10
+Cabal-Version:	>= 1.18
 Synopsis:	Assorted decision procedures for SAT, SMT, Max-SAT, PB, MIP, etc
 Description:	Toy-level implementation of some decision procedures
 Homepage:	https://github.com/msakai/toysolver/
