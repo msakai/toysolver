@@ -243,14 +243,14 @@ Library
      ToySolver.Arith.FourierMotzkin.Base
      ToySolver.Arith.FourierMotzkin.FOL
      ToySolver.Arith.FourierMotzkin.Optimization
-     ToySolver.Arith.LPSolver
-     ToySolver.Arith.LPSolverHL
      ToySolver.Arith.LPUtil
-     ToySolver.Arith.MIPSolverHL
      ToySolver.Arith.MIPSolver2
      ToySolver.Arith.OmegaTest
      ToySolver.Arith.OmegaTest.Base
-     ToySolver.Arith.Simplex
+     ToySolver.Arith.Simplex.Textbook
+     ToySolver.Arith.Simplex.Textbook.LPSolver
+     ToySolver.Arith.Simplex.Textbook.LPSolver.Simple
+     ToySolver.Arith.Simplex.Textbook.MIPSolver.Simple
      ToySolver.Arith.Simplex2
      ToySolver.Arith.Simplex2.Simple
      ToySolver.Arith.VirtualSubstitution
@@ -862,7 +862,7 @@ Test-suite TestSuite
     Test.QBF
     Test.SAT
     Test.SDPFile
-    Test.Simplex
+    Test.SimplexTextbook
     Test.Simplex2
     Test.SMT
     Test.SMTLIB2Solver

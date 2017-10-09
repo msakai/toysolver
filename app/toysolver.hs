@@ -54,7 +54,7 @@ import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
 import qualified ToySolver.Arith.OmegaTest as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
-import qualified ToySolver.Arith.MIPSolverHL as MIPSolverHL
+import qualified ToySolver.Arith.Simplex.Textbook.MIPSolver.Simple as TextbookMIP
 import qualified ToySolver.Arith.Simplex2 as Simplex2
 import qualified ToySolver.Arith.MIPSolver2 as MIPSolver2
 import qualified ToySolver.Arith.CAD as CAD
@@ -230,14 +230,14 @@ run solver opt mip printModel = do
           putSLine "UNKNOWN"
           exitFailure
         Just (cs',obj') ->
-          case MIPSolverHL.optimize (MIP.objDir $ MIP.objectiveFunction mip) obj' cs' ivs2 of
-            MIPSolverHL.OptUnsat -> do
+          case TextbookMIP.optimize (MIP.objDir $ MIP.objectiveFunction mip) obj' cs' ivs2 of
+            TextbookMIP.OptUnsat -> do
               putSLine "UNSATISFIABLE"
               exitFailure
-            MIPSolverHL.Unbounded -> do
+            TextbookMIP.Unbounded -> do
               putSLine "UNBOUNDED"
               exitFailure
-            MIPSolverHL.Optimum r m -> do
+            TextbookMIP.Optimum r m -> do
               putOLine $ showValue r
               putSLine "OPTIMUM FOUND"
               let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]

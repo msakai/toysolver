@@ -23,7 +23,7 @@ import Test.SDPFile
 import Test.Misc
 import Test.QBF
 import Test.SAT
-import Test.Simplex
+import Test.SimplexTextbook
 import Test.Simplex2
 import Test.SMT
 import Test.SMTLIB2Solver
@@ -54,7 +54,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , qbfTestGroup
   , satTestGroup
   , sdpTestGroup
-  , simplexTestGroup
+  , simplexTextbookTestGroup
   , simplex2TestGroup
   , smtTestGroup
   , smtlib2SolverTestGroup

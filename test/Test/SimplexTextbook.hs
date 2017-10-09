@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Test.Simplex (simplexTestGroup) where
+module Test.SimplexTextbook (simplexTextbookTestGroup) where
 
 import Control.Monad
 import Control.Monad.State
@@ -16,8 +16,8 @@ import Text.Printf
 
 import qualified ToySolver.Data.LA as LA
 import ToySolver.Data.LA ((.<=.))
-import ToySolver.Arith.Simplex
-import qualified ToySolver.Arith.LPSolver as LP
+import ToySolver.Arith.Simplex.Textbook
+import qualified ToySolver.Arith.Simplex.Textbook.LPSolver as LP
 
 example_3_2 :: Tableau Rational
 example_3_2 = IntMap.fromList
@@ -173,5 +173,5 @@ case_lp_example_5_7_primalDualSimplex = do
 ------------------------------------------------------------------------
 -- Test harness
 
-simplexTestGroup :: TestTree
-simplexTestGroup = $(testGroupGenerator)
+simplexTextbookTestGroup :: TestTree
+simplexTextbookTestGroup = $(testGroupGenerator)
