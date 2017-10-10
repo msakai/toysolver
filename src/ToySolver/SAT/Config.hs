@@ -13,18 +13,6 @@ module ToySolver.SAT.Config
   , PBHandlerType (..)
   , showPBHandlerType
   , parsePBHandlerType
-
-  -- ** Deprecated
-  , defaultRestartFirst
-  , defaultRestartInc
-  , defaultLearntSizeFirst
-  , defaultLearntSizeInc
-  , defaultCCMin
-  , defaultEnablePhaseSaving
-  , defaultEnableForwardSubsumptionRemoval
-  , defaultEnableBackwardSubsumptionRemoval
-  , defaultRandomFreq
-  , defaultPBSplitClausePart
   ) where
 
 import Data.Char
@@ -93,23 +81,23 @@ instance Default Config where
   def =
     Config
     { configRestartStrategy = def
-    , configRestartFirst = defaultRestartFirst
-    , configRestartInc = defaultRestartInc
+    , configRestartFirst = 100
+    , configRestartInc = 1.5
     , configLearningStrategy = def
-    , configLearntSizeFirst = defaultLearntSizeFirst
-    , configLearntSizeInc = defaultLearntSizeInc
-    , configCCMin = defaultCCMin
+    , configLearntSizeFirst = -1
+    , configLearntSizeInc = 1.1
+    , configCCMin = 2
     , configBranchingStrategy = def
     , configERWAStepSizeFirst = 0.4
     , configERWAStepSizeDec = 10**(-6)
     , configERWAStepSizeMin = 0.06
     , configEMADecay = 1 / 0.95
-    , configEnablePhaseSaving = defaultEnablePhaseSaving
-    , configEnableForwardSubsumptionRemoval = defaultEnableForwardSubsumptionRemoval
-    , configEnableBackwardSubsumptionRemoval = defaultEnableBackwardSubsumptionRemoval
-    , configRandomFreq = defaultRandomFreq
+    , configEnablePhaseSaving = True
+    , configEnableForwardSubsumptionRemoval = False
+    , configEnableBackwardSubsumptionRemoval = False
+    , configRandomFreq = 0.005
     , configPBHandlerType = def
-    , configEnablePBSplitClausePart = defaultPBSplitClausePart
+    , configEnablePBSplitClausePart = False
     , configCheckModel = False
     , configVarDecay = 1 / 0.95
     , configConstrDecay = 1 / 0.999
@@ -136,16 +124,6 @@ parseRestartStrategy s =
     "armin" -> Just ArminRestarts
     "luby" -> Just LubyRestarts
     _ -> Nothing
-
--- | default value for @RestartFirst@.
-{-# DEPRECATED defaultRestartFirst "Use configRestartFirst def" #-}
-defaultRestartFirst :: Int
-defaultRestartFirst = 100
-
--- | default value for @RestartInc@.
-{-# DEPRECATED defaultRestartInc "Use configRestartInc def" #-}
-defaultRestartInc :: Double
-defaultRestartInc = 1.5
 
 -- | Learning strategy.
 --
@@ -204,26 +182,6 @@ parseBranchingStrategy s =
     "lrb"   -> Just BranchingLRB
     _ -> Nothing
 
--- | default value for @LearntSizeFirst@.
-{-# DEPRECATED defaultLearntSizeFirst "Use learntSizeFirst def" #-}
-defaultLearntSizeFirst :: Int
-defaultLearntSizeFirst = -1
-
-
--- | default value for @LearntSizeInc@.
-{-# DEPRECATED defaultLearntSizeInc "Use learntSizeInc def" #-}
-defaultLearntSizeInc :: Double
-defaultLearntSizeInc = 1.1
-
--- | default value for @CCMin@.
-{-# DEPRECATED defaultCCMin "Use ccMin def" #-}
-defaultCCMin :: Int
-defaultCCMin = 2
-
-{-# DEPRECATED defaultRandomFreq "Use configRandomFreq def" #-}
-defaultRandomFreq :: Double
-defaultRandomFreq = 0.005
-
 -- | Pseudo boolean constraint handler implimentation.
 --
 -- The default value can be obtained by 'def'.
@@ -243,20 +201,3 @@ parsePBHandlerType s =
     "counter" -> Just PBHandlerTypeCounter
     "pueblo" -> Just PBHandlerTypePueblo
     _ -> Nothing
-
--- | See documentation of 'setPBSplitClausePart'.
-{-# DEPRECATED defaultPBSplitClausePart "Use configEnablePBSplitClausePart def" #-}
-defaultPBSplitClausePart :: Bool
-defaultPBSplitClausePart = False
-
-{-# DEPRECATED defaultEnablePhaseSaving "Use configEnablePhaseSaving def" #-}
-defaultEnablePhaseSaving :: Bool
-defaultEnablePhaseSaving = True
-
-{-# DEPRECATED defaultEnableForwardSubsumptionRemoval "Use configEnableForwardSubsumptionRemoval def" #-}
-defaultEnableForwardSubsumptionRemoval :: Bool
-defaultEnableForwardSubsumptionRemoval = False
-
-{-# DEPRECATED defaultEnableBackwardSubsumptionRemoval "Use configEnableBackwardSubsumptionRemoval def" #-}
-defaultEnableBackwardSubsumptionRemoval :: Bool
-defaultEnableBackwardSubsumptionRemoval = False

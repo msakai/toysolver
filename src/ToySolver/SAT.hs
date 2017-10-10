@@ -97,26 +97,6 @@ module ToySolver.SAT
   , getRandomGen
   , setConfBudget
 
-  -- ** Deprecated
-  , setRestartStrategy
-  , setRestartFirst
-  , setRestartInc
-  , setLearntSizeFirst
-  , setLearntSizeInc
-  , setCCMin
-  , setLearningStrategy
-  , setEnablePhaseSaving
-  , getEnablePhaseSaving
-  , setEnableForwardSubsumptionRemoval
-  , getEnableForwardSubsumptionRemoval
-  , setEnableBackwardSubsumptionRemoval
-  , getEnableBackwardSubsumptionRemoval
-  , setCheckModel
-  , setRandomFreq
-  , setPBHandlerType
-  , setPBSplitClausePart
-  , getPBSplitClausePart
-
   -- * Read state
   , getNVars
   , getNConstraints
@@ -124,12 +104,6 @@ module ToySolver.SAT
   , getVarFixed
   , getLitFixed
   , getFixedLiterals
-
-  -- * Read state (deprecated)
-  , nVars
-  , nAssigns
-  , nConstraints
-  , nLearnt  
 
   -- * Internal API
   , varBumpActivity
@@ -499,7 +473,7 @@ unassign solver !v = assert (validVar v) $ do
   val <- readIORef (vdValue vd)
   when (val == lUndef) $ error "unassign: should not happen"
 
-  flag <- getEnablePhaseSaving solver
+  flag <- configEnablePhaseSaving <$> getConfig solver
   when flag $ writeIORef (vdPolarity vd) $! fromJust (unliftBool val)
 
   writeIORef (vdValue vd) lUndef
@@ -694,19 +668,9 @@ variables solver = do
 getNVars :: Solver -> IO Int
 getNVars solver = Vec.getSize (svVarData solver)
 
-{-# DEPRECATED nVars "Use getNVars instead" #-}
--- | number of variables of the problem.
-nVars :: Solver -> IO Int
-nVars = getNVars
-
 -- | number of assigned 
 getNAssigned :: Solver -> IO Int
 getNAssigned solver = Vec.getSize (svTrail solver)
-
-{-# DEPRECATED nAssigns "nAssigns is deprecated" #-}
--- | number of assigned variables.
-nAssigns :: Solver -> IO Int
-nAssigns = getNAssigned
 
 -- | number of constraints.
 getNConstraints :: Solver -> IO Int
@@ -714,21 +678,11 @@ getNConstraints solver = do
   xs <- readIORef (svConstrDB solver)
   return $ length xs
 
-{-# DEPRECATED nConstraints "Use getNConstraints instead" #-}
--- | number of constraints.
-nConstraints :: Solver -> IO Int
-nConstraints = getNConstraints
-
 -- | number of learnt constrints.
 getNLearntConstraints :: Solver -> IO Int
 getNLearntConstraints solver = do
   (n,_) <- readIORef (svLearntDB solver)
   return n
-
-{-# DEPRECATED nLearnt "Use getNLearntConstraints instead" #-}
--- | number of learnt constrints.
-nLearnt :: Solver -> IO Int
-nLearnt = getNLearntConstraints
 
 learntConstraints :: Solver -> IO [SomeConstraintHandler]
 learntConstraints solver = do
@@ -972,7 +926,7 @@ instance AddPBLin IO Solver where
           else do
             removeBackwardSubsumedBy solver (ts', n')
             (ts'',n'') <- do
-              b <- getPBSplitClausePart solver
+              b <- configEnablePBSplitClausePart <$> getConfig solver
               if b
               then pbSplitClausePart solver (ts',n')
               else return (ts',n')
@@ -1413,7 +1367,7 @@ Theory and Applications of Satisfiability Testing (2005), pp. 482-489.
 
 checkForwardSubsumption :: Solver -> Clause -> IO Bool
 checkForwardSubsumption solver lits = do
-  flag <- getEnableForwardSubsumptionRemoval solver
+  flag <- configEnableForwardSubsumptionRemoval <$> getConfig solver
   if not flag then
     return False
   else do
@@ -1430,13 +1384,13 @@ checkForwardSubsumption solver lits = do
   where
     withEnablePhaseSaving solver flag m =
       bracket
-        (getEnablePhaseSaving solver)
-        (setEnablePhaseSaving solver)
-        (\_ -> setEnablePhaseSaving solver flag >> m)
+        (getConfig solver)
+        (\saved -> modifyConfig solver (\config -> config{ configEnablePhaseSaving = configEnablePhaseSaving saved }))
+        (\saved -> setConfig solver saved{ configEnablePhaseSaving = flag } >> m)
 
 removeBackwardSubsumedBy :: Solver -> PBLinAtLeast -> IO ()
 removeBackwardSubsumedBy solver pb = do
-  flag <- getEnableBackwardSubsumptionRemoval solver
+  flag <- configEnableBackwardSubsumptionRemoval <$> getConfig solver
   when flag $ do
     xs <- backwardSubsumedBy solver pb
     when debugMode $ do
@@ -1499,66 +1453,11 @@ setConfig solver conf = do
 modifyConfig :: Solver -> (Config -> Config) -> IO ()
 modifyConfig solver = modifyIORef' (svConfig solver)
 
-{-# DEPRECATED setRestartStrategy "Use setConfig" #-}
-setRestartStrategy :: Solver -> RestartStrategy -> IO ()
-setRestartStrategy solver s = modifyIORef' (svConfig solver) $ \config -> config{ configRestartStrategy = s }
-
--- | The initial restart limit. (default 100)
--- Zero and negative values are used to disable restart.
-{-# DEPRECATED setRestartFirst "Use setConfig" #-}
-setRestartFirst :: Solver -> Int -> IO ()
-setRestartFirst solver !n = modifyIORef' (svConfig solver) $ \config -> config{ configRestartFirst = n }
-
--- | The factor with which the restart limit is multiplied in each restart. (default 1.5)
--- 
--- This must be @>1@.
-{-# DEPRECATED setRestartInc "Use setConfig" #-}
-setRestartInc :: Solver -> Double -> IO ()
-setRestartInc solver !r
-  | r > 1 = modifyIORef' (svConfig solver) $ \config -> config{ configRestartInc = r }
-  | otherwise = error "setRestartInc: RestartInc must be >1"
-
-{-# DEPRECATED setLearningStrategy "Use setConfig" #-}
-setLearningStrategy :: Solver -> LearningStrategy -> IO ()
-setLearningStrategy solver l = modifyIORef' (svConfig solver) $ \config -> config{ configLearningStrategy = l }
-
--- | The initial limit for learnt clauses.
--- 
--- Negative value means computing default value from problem instance.
-{-# DEPRECATED setLearntSizeFirst "Use setConfig" #-}
-setLearntSizeFirst :: Solver -> Int -> IO ()
-setLearntSizeFirst solver !x = modifyIORef' (svConfig solver) $ \config -> config{ configLearntSizeFirst = x }
-
--- | The limit for learnt clauses is multiplied with this factor each restart. (default 1.1)
--- 
--- This must be @>1@.
-{-# DEPRECATED setLearntSizeInc "Use setConfig" #-}
-setLearntSizeInc :: Solver -> Double -> IO ()
-setLearntSizeInc solver !r
-  | r > 1 = modifyIORef' (svConfig solver) $ \config -> config{ configLearntSizeInc = r }
-  | otherwise = error "setLearntSizeInc: LearntSizeInc must be >1"
-
--- | Controls conflict clause minimization (0=none, 1=basic, 2=deep)
-{-# DEPRECATED setCCMin "Use setConfig" #-}
-setCCMin :: Solver -> Int -> IO ()
-setCCMin solver !v = modifyIORef' (svConfig solver) $ \config -> config{ configCCMin = v }
-
 -- | The default polarity of a variable.
 setVarPolarity :: Solver -> Var -> Bool -> IO ()
 setVarPolarity solver v val = do
   vd <- varData solver v
   writeIORef (vdPolarity vd) val
-
-{-# DEPRECATED setCheckModel "Use setConfig" #-}
-setCheckModel :: Solver -> Bool -> IO ()
-setCheckModel solver flag = do
-  modifyIORef' (svConfig solver) $ \config -> config{ configCheckModel = flag }
-
--- | The frequency with which the decision heuristic tries to choose a random variable
-{-# DEPRECATED setRandomFreq "Use setConfig" #-}
-setRandomFreq :: Solver -> Double -> IO ()
-setRandomFreq solver r =
-  modifyIORef' (svConfig solver) $ \config -> config{ configRandomFreq = r }
 
 -- | Set random generator used by the random variable selection
 setRandomGen :: Solver -> Rand.GenIO -> IO ()
@@ -1571,69 +1470,6 @@ getRandomGen solver = readIORef (svRandomGen solver)
 setConfBudget :: Solver -> Maybe Int -> IO ()
 setConfBudget solver (Just b) | b >= 0 = writeIOURef (svConfBudget solver) b
 setConfBudget solver _ = writeIOURef (svConfBudget solver) (-1)
-
-{-# DEPRECATED setPBHandlerType "Use setConfig" #-}
-setPBHandlerType :: Solver -> PBHandlerType -> IO ()
-setPBHandlerType solver ht = do
-  modifyIORef' (svConfig solver) $ \config -> config{ configPBHandlerType = ht }
-
--- | Split PB-constraints into a PB part and a clause part.
---
--- Example from minisat+ paper:
---
--- * 4 x1 + 4 x2 + 4 x3 + 4 x4 + 2y1 + y2 + y3 ≥ 4
--- 
--- would be split into
---
--- * x1 + x2 + x3 + x4 + ¬z ≥ 1 (clause part)
---
--- * 2 y1 + y2 + y3 + 4 z ≥ 4 (PB part)
---
--- where z is a newly introduced variable, not present in any other constraint.
--- 
--- Reference:
--- 
--- * N. Eén and N. Sörensson. Translating Pseudo-Boolean Constraints into SAT. JSAT 2:1–26, 2006.
---
-{-# DEPRECATED setPBSplitClausePart "Use setConfig" #-}
-setPBSplitClausePart :: Solver -> Bool -> IO ()
-setPBSplitClausePart solver b =
-  modifyIORef' (svConfig solver) $ \config -> config{ configEnablePBSplitClausePart = b }
-
--- | See documentation of 'setPBSplitClausePart'.
-getPBSplitClausePart :: Solver -> IO Bool
-getPBSplitClausePart solver =
-  configEnablePBSplitClausePart <$> getConfig solver
-
-{-# DEPRECATED setEnablePhaseSaving "Use setConfig" #-}
-setEnablePhaseSaving :: Solver -> Bool -> IO ()
-setEnablePhaseSaving solver flag = do
-  modifyIORef' (svConfig solver) $ \config -> config{ configEnablePhaseSaving = flag }
-
-{-# DEPRECATED getEnablePhaseSaving "Use getConfig" #-}
-getEnablePhaseSaving :: Solver -> IO Bool
-getEnablePhaseSaving solver = do
-  configEnablePhaseSaving <$> getConfig solver
-
-{-# DEPRECATED setEnableForwardSubsumptionRemoval "Use setConfig" #-}
-setEnableForwardSubsumptionRemoval :: Solver -> Bool -> IO ()
-setEnableForwardSubsumptionRemoval solver flag = do
-  modifyIORef' (svConfig solver) $ \config -> config{ configEnableForwardSubsumptionRemoval = flag }
-
-{-# DEPRECATED getEnableForwardSubsumptionRemoval "Use getConfig" #-}
-getEnableForwardSubsumptionRemoval :: Solver -> IO Bool
-getEnableForwardSubsumptionRemoval solver = do
-  configEnableForwardSubsumptionRemoval <$> getConfig solver
-
-{-# DEPRECATED setEnableBackwardSubsumptionRemoval "Use setConfig" #-}
-setEnableBackwardSubsumptionRemoval :: Solver -> Bool -> IO ()
-setEnableBackwardSubsumptionRemoval solver flag = do
-  modifyIORef' (svConfig solver) $ \config -> config{ configEnableBackwardSubsumptionRemoval = flag }
-
-{-# DEPRECATED getEnableBackwardSubsumptionRemoval "Use getConfig" #-}
-getEnableBackwardSubsumptionRemoval :: Solver -> IO Bool
-getEnableBackwardSubsumptionRemoval solver = do
-  configEnableBackwardSubsumptionRemoval <$> getConfig solver
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
