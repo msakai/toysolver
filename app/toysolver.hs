@@ -246,14 +246,15 @@ run solver opt mip printModel = do
     solveByMIP2 = do
       solver <- Simplex.newSolver
 
-      let ps = last ("bland-rule" : [s | PivotStrategy s <- opt])
-      case ps of
-        "bland-rule"          -> Simplex.setPivotStrategy solver Simplex.PivotStrategyBlandRule
-        "largest-coefficient" -> Simplex.setPivotStrategy solver Simplex.PivotStrategyLargestCoefficient
-        _ -> error ("unknown pivot strategy \"" ++ ps ++ "\"")
+      let f config (PivotStrategy s) =
+            case Simplex.parsePivotStrategy s of
+              Nothing -> error ("unknown pivot strategy \"" ++ s ++ "\"")
+              Just ps -> config{ Simplex.configPivotStrategy = ps }
+          f config _ = config
+          config = foldl' f def opt
+          nthreads = last (0 : [n | NThread n <- opt])
 
-      let nthreads = last (0 : [n | NThread n <- opt])
-
+      Simplex.setConfig solver config
       Simplex.setLogger solver putCommentLine
       Simplex.enableTimeRecording solver
       replicateM (length vsAssoc) (Simplex.newVar solver) -- XXX
