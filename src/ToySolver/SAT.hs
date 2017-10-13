@@ -1445,13 +1445,15 @@ getConfig solver = readIORef $ svConfig solver
 
 setConfig :: Solver -> Config -> IO ()
 setConfig solver conf = do
-  orig <- readIORef $ svConfig solver
+  orig <- getConfig solver
   writeIORef (svConfig solver) conf
   when (configBranchingStrategy orig /= configBranchingStrategy conf) $ do
     PQ.rebuild (svVarQueue solver)
 
 modifyConfig :: Solver -> (Config -> Config) -> IO ()
-modifyConfig solver = modifyIORef' (svConfig solver)
+modifyConfig solver f = do
+  config <- getConfig solver
+  setConfig solver $ f config
 
 -- | The default polarity of a variable.
 setVarPolarity :: Solver -> Var -> Bool -> IO ()
