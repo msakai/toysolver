@@ -97,7 +97,13 @@ module ToySolver.Arith.Simplex
   , clearLogger
   , enableTimeRecording
   , disableTimeRecording
+  , Config (..)
+  , setConfig
+  , getConfig
+  , modifyConfig
   , PivotStrategy (..)
+  , showPivotStrategy
+  , parsePivotStrategy
   , setPivotStrategy
 
   -- * Debug
@@ -111,6 +117,7 @@ import Prelude hiding (log)
 import Control.Exception
 import Control.Monad
 import Control.Monad.Primitive
+import Data.Char
 import Data.Default.Class
 import Data.Ord
 import Data.List
@@ -164,7 +171,7 @@ data GenericSolverM m v
 
   , svLogger :: !(MutVar (PrimState m) (Maybe (String -> m ())))
   , svRecTime :: !(MutVar (PrimState m) (Maybe (GenericSolverM m v -> (m :~> m))))
-  , svPivotStrategy :: !(MutVar (PrimState m) PivotStrategy)
+  , svConfig  :: !(MutVar (PrimState m) Config)
   , svNPivot  :: !(MutVar (PrimState m) Int)
 
   , svBacktrackPoints :: !(MutVar (PrimState m) [BacktrackPoint m v])
@@ -191,7 +198,7 @@ newSolver = do
   defs <- newMutVar Map.empty
   logger <- newMutVar Nothing
   rectm <- newMutVar Nothing
-  pivot <- newMutVar PivotStrategyBlandRule
+  config <- newMutVar def
   npivot <- newMutVar 0
   bps <- newMutVar []
   return $
@@ -208,7 +215,7 @@ newSolver = do
     , svLogger  = logger
     , svRecTime = rectm
     , svNPivot  = npivot
-    , svPivotStrategy = pivot
+    , svConfig  = config
     , svBacktrackPoints = bps
     }
 
@@ -225,7 +232,7 @@ cloneSolver solver = do
   defs   <- newMutVar =<< readMutVar (svDefDB solver)
   logger <- newMutVar =<< readMutVar (svLogger solver)
   rectm  <- newMutVar =<< readMutVar (svRecTime solver)
-  pivot  <- newMutVar =<< readMutVar (svPivotStrategy solver)
+  config <- newMutVar =<< readMutVar (svConfig solver)
   npivot <- newMutVar =<< readMutVar (svNPivot solver)
   bps    <- newMutVar =<< mapM cloneBacktrackPoint =<< readMutVar (svBacktrackPoints solver)
   return $
@@ -242,7 +249,7 @@ cloneSolver solver = do
     , svLogger  = logger
     , svRecTime = rectm
     , svNPivot  = npivot
-    , svPivotStrategy = pivot
+    , svConfig  = config
     , svBacktrackPoints = bps
     }  
 
@@ -285,6 +292,26 @@ boundValue = fmap fst
 boundExplanation :: SolverValue v => Bound v -> ConstrIDSet
 boundExplanation = maybe mempty snd
 
+data Config
+  = Config
+  { configPivotStrategy :: !PivotStrategy
+  } deriving (Show, Eq, Ord)
+
+instance Default Config where
+  def =
+    Config
+    { configPivotStrategy = PivotStrategyBlandRule
+    }
+
+setConfig :: PrimMonad m => GenericSolverM m v -> Config -> m ()
+setConfig solver config = writeMutVar (svConfig solver) config
+
+getConfig :: PrimMonad m => GenericSolverM m v -> m Config
+getConfig solver = readMutVar (svConfig solver)
+
+modifyConfig :: PrimMonad m => GenericSolverM m v -> (Config -> Config) -> m ()
+modifyConfig solver = modifyMutVar' (svConfig solver)
+
 {-
 Largest coefficient rule: original rule suggested by G. Dantzig.
 Largest increase rule: computationally more expensive in comparison with Largest coefficient, but locally maximizes the progress.
@@ -297,10 +324,23 @@ data PivotStrategy
   = PivotStrategyBlandRule
   | PivotStrategyLargestCoefficient
 --  | PivotStrategySteepestEdge
-  deriving (Eq, Ord, Enum, Show, Read)
+  deriving (Eq, Ord, Enum, Bounded, Show, Read)
 
+showPivotStrategy :: PivotStrategy -> String
+showPivotStrategy PivotStrategyBlandRule = "bland-rule"
+showPivotStrategy PivotStrategyLargestCoefficient = "largest-coefficient"
+
+parsePivotStrategy :: String -> Maybe PivotStrategy
+parsePivotStrategy s =
+  case map toLower s of
+    "bland-rule" -> Just PivotStrategyBlandRule
+    "largest-coefficient" -> Just PivotStrategyLargestCoefficient
+    _ -> Nothing
+
+{-# DEPRECATED nVars "Use setConfig instead" #-}
 setPivotStrategy :: PrimMonad m => GenericSolverM m v -> PivotStrategy -> m ()
-setPivotStrategy solver ps = writeMutVar (svPivotStrategy solver) ps
+setPivotStrategy solver ps = modifyConfig solver $ \config ->
+  config{ configPivotStrategy = ps }
 
 {--------------------------------------------------------------------
   problem description
@@ -610,8 +650,8 @@ selectViolatingBasicVariable solver = do
       return $ not (testLB li vi) || not (testUB ui vi)
   vs <- basicVariables solver
 
-  ps <- readMutVar (svPivotStrategy solver)
-  case ps of
+  config <- getConfig solver
+  case configPivotStrategy config of
     PivotStrategyBlandRule ->
       findM p vs
     PivotStrategyLargestCoefficient -> do
@@ -685,9 +725,9 @@ optimize solver opt = do
 
 selectEnteringVariable :: forall m v. (PrimMonad m, SolverValue v) => GenericSolverM m v -> m (Maybe (Rational, Var))
 selectEnteringVariable solver = do
-  ps <- readMutVar (svPivotStrategy solver)
+  config <- getConfig solver
   obj_def <- getRow solver objVar
-  case ps of
+  case configPivotStrategy config of
     PivotStrategyBlandRule ->
       findM canEnter (LA.terms obj_def)
     PivotStrategyLargestCoefficient -> do

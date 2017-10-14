@@ -412,9 +412,11 @@ prop_Simplex_backtrack :: Property
 prop_Simplex_backtrack = QM.monadicIO $ do
    (vs,cs) <- QM.pick genQFLAConj
    (vs2,cs2) <- QM.pick genQFLAConj
+   config <- QM.pick arbitrary
 
    join $ QM.run $ do
      solver <- Simplex.newSolver
+     Simplex.setConfig solver config
      m <- liftM IM.fromList $ forM (IS.toList (vs `IS.union` vs2)) $ \v -> do
        v2 <- Simplex.newVar solver
        return (v, LA.var v2)
@@ -435,9 +437,11 @@ prop_Simplex_backtrack = QM.monadicIO $ do
 prop_Simplex_explain :: Property
 prop_Simplex_explain = QM.monadicIO $ do
    (vs,cs) <- QM.pick genQFLAConj
+   config <- QM.pick arbitrary
 
    let f p = QM.run $ do
          solver <- Simplex.newSolver
+         Simplex.setConfig solver config
          m <- liftM IM.fromList $ forM (IS.toList vs) $ \v -> do
            v2 <- Simplex.newVar solver
            return (v, LA.var v2)
@@ -459,6 +463,17 @@ prop_Simplex_explain = QM.monadicIO $ do
        forM_ (IS.toList e) $ \i -> do
          ret3 <- f (`IS.member` (IS.delete i e))
          QM.assert (isNothing ret3)
+
+instance Arbitrary Simplex.Config where
+  arbitrary = do
+    ps <- arbitrary
+    return $
+      Simplex.Config
+      { Simplex.configPivotStrategy = ps
+      }
+
+instance Arbitrary Simplex.PivotStrategy where
+  arbitrary = arbitraryBoundedEnum
 
 ------------------------------------------------------------------------
 
