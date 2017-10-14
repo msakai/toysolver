@@ -467,9 +467,11 @@ prop_Simplex_explain = QM.monadicIO $ do
 instance Arbitrary Simplex.Config where
   arbitrary = do
     ps <- arbitrary
+    enableBoundTightening <- arbitrary
     return $
       Simplex.Config
       { Simplex.configPivotStrategy = ps
+      , Simplex.configEnableBoundTightening = enableBoundTightening
       }
 
 instance Arbitrary Simplex.PivotStrategy where

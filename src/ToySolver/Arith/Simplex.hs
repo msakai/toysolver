@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, Rank2Types, TypeOperators, TypeSynonymInstances, FlexibleInstances, TypeFamilies, CPP #-}
+{-# LANGUAGE BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.Simplex
@@ -114,6 +115,7 @@ module ToySolver.Arith.Simplex
   ) where
 
 import Prelude hiding (log)
+import Control.Arrow ((***))
 import Control.Exception
 import Control.Monad
 import Control.Monad.Primitive
@@ -292,15 +294,28 @@ boundValue = fmap fst
 boundExplanation :: SolverValue v => Bound v -> ConstrIDSet
 boundExplanation = maybe mempty snd
 
+addBound :: SolverValue v => Bound v -> Bound v -> Bound v
+addBound b1 b2 = do
+  (a1,cs1) <- b1
+  (a2,cs2) <- b2
+  let a3 = a1 ^+^ a2
+      cs3 = IntSet.union cs1 cs2
+  seq a3 $ seq cs3 $ return (a3,cs3)
+
+scaleBound :: SolverValue v => Scalar v -> Bound v -> Bound v
+scaleBound c = fmap ((c *^) *** id)
+
 data Config
   = Config
   { configPivotStrategy :: !PivotStrategy
+  , configEnableBoundTightening :: !Bool
   } deriving (Show, Eq, Ord)
 
 instance Default Config where
   def =
     Config
     { configPivotStrategy = PivotStrategyBlandRule
+    , configEnableBoundTightening = False
     }
 
 setConfig :: PrimMonad m => GenericSolverM m v -> Config -> m ()
@@ -489,11 +504,14 @@ simplifyAtom solver (OrdRel lhs op rhs) = do
         c2 = signum $ head ([c | (c,x) <- LA.terms e] ++ [1])
              
 assertLower :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> v -> m ()
-assertLower solver x l = assertLower' solver x l Nothing
+assertLower solver x l = assertLB solver x (Just (l, IntSet.empty))
 
 assertLower' :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> v -> Maybe ConstrID -> m ()
-assertLower' solver x l cid = do
-  let cidSet = IntSet.fromList $ maybeToList cid
+assertLower' solver x l cid = assertLB solver x (Just (l, IntSet.fromList (maybeToList cid)))
+
+assertLB :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> Bound v -> m ()
+assertLB solver x Nothing = return ()
+assertLB solver x (Just (l, cidSet)) = do
   l0 <- getLB solver x
   u0 <- getUB solver x
   case (l0,u0) of 
@@ -510,11 +528,14 @@ assertLower' solver x l cid = do
       checkNBFeasibility solver
 
 assertUpper :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> v -> m ()
-assertUpper solver x u = assertUpper' solver x u Nothing 
+assertUpper solver x u = assertUB solver x (Just (u, IntSet.empty))
 
 assertUpper' :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> v -> Maybe ConstrID -> m ()
-assertUpper' solver x u cid = do
-  let cidSet = IntSet.fromList $ maybeToList cid
+assertUpper' solver x u cid = assertUB solver x (Just (u, IntSet.fromList (maybeToList cid)))
+
+assertUB :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> Bound v -> m ()
+assertUB solver x Nothing = return ()
+assertUB solver x (Just (u, cidSet)) = do
   l0 <- getLB solver x
   u0 <- getUB solver x
   case (l0,u0) of
@@ -986,6 +1007,24 @@ pivotAndUpdate solver xi xj v = do
   writeMutVar (svModel solver) (IntMap.union m' m) -- note that 'IntMap.union' is left biased.
 
   pivot solver xi xj
+
+  config <- getConfig solver
+  when (configEnableBoundTightening config) $ do
+    defs <- readMutVar (svTableau solver)
+    let xj_def = defs IntMap.! xj
+        f (!lb,!ub) (c,xk) = do
+          if LA.unitVar == xk then do
+            return (addBound lb (Just (toValue c, IntSet.empty)), addBound ub (Just (toValue c, IntSet.empty)))
+          else do
+            lb_k <- getLB solver xk
+            ub_k <- getUB solver xk
+            if c > 0 then do
+              return (addBound lb (scaleBound c lb_k), addBound ub (scaleBound c ub_k))
+            else do
+              return (addBound lb (scaleBound c ub_k), addBound ub (scaleBound c lb_k))
+    (lb,ub) <- foldM f (Just (zeroV, IntSet.empty), Just (zeroV, IntSet.empty)) (LA.terms xj_def)
+    assertLB solver xj lb
+    assertUB solver xj ub
 
   -- log solver $ printf "after pivotAndUpdate x%d x%d (%s)" xi xj (show v)
   -- dump solver
