@@ -512,7 +512,7 @@ assertLB solver x (Just (l, cidSet)) = do
   case (l0,u0) of 
     (Just (l0', _), _) | l <= l0' -> return ()
     (_, Just (u0', cidSet2)) | u0' < l -> do
-      writeMutVar (svExplanation solver) $! Just $! cidSet `IntSet.union` cidSet2
+      setExplanation solver $ cidSet `IntSet.union` cidSet2
     _ -> do
       bpSaveLB solver x
       modifyMutVar (svLB solver) (IntMap.insert x (l, cidSet))
@@ -535,7 +535,7 @@ assertUB solver x (Just (u, cidSet)) = do
   case (l0,u0) of
     (_, Just (u0', _)) | u0' <= u -> return ()
     (Just (l0', cidSet2), _) | u < l0' -> do
-      writeMutVar (svExplanation solver) $! Just $! cidSet `IntSet.union` cidSet2
+      setExplanation solver $ cidSet `IntSet.union` cidSet2
     _ -> do
       bpSaveUB solver x
       modifyMutVar (svUB solver) (IntMap.insert x (u, cidSet))
@@ -636,11 +636,15 @@ check solver = do
                     getLB solver xj
                   else do
                     getUB solver xj
-              writeMutVar (svExplanation solver) $! Just $! core
+              setExplanation solver core
               return False
             Just xj -> do
               pivotAndUpdate solver xi xj (fromJust $ boundValue $ if isLBViolated then li else ui)
-              loop
+              m <- readMutVar (svExplanation solver)
+              if isJust m then
+                return False
+              else
+                loop
 
   m <- readMutVar (svExplanation solver)
   case m of
@@ -889,11 +893,15 @@ dualSimplex solver opt = do
                         getLB solver xj
                       else do
                         getUB solver xj
-                  writeMutVar (svExplanation solver) $! Just $! core
+                  setExplanation solver core
                   return Unsat
                 Just xj -> do
                   pivotAndUpdate solver xi xj (fromJust $ boundValue $ if isLBViolated then li else ui)
-                  loop
+                  m <- readMutVar (svExplanation solver)
+                  if isJust m then
+                    return Unsat
+                  else
+                    loop
 
   m <- readMutVar (svExplanation solver)
   case m of
@@ -1065,6 +1073,13 @@ getCoeff :: PrimMonad m => GenericSolverM m v -> Var -> Var -> m Rational
 getCoeff solver xi xj = do
   xi_def <- getRow solver xi
   return $! LA.coeff xj xi_def
+
+setExplanation :: PrimMonad m => GenericSolverM m v -> ConstrIDSet -> m ()
+setExplanation solver !cs = do
+  m <- readMutVar (svExplanation solver)
+  case m of
+    Just _ -> return ()
+    Nothing -> writeMutVar (svExplanation solver) (Just cs)
 
 {--------------------------------------------------------------------
   utility
