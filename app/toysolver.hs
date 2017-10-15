@@ -96,7 +96,9 @@ options =
     , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
     , Option ['w'] [] (ReqArg WriteFile "<filename>")  "write solution to filename in Gurobi .sol format"
 
-    , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "[bland-rule|largest-coefficient]") "pivot strategy for simplex (default: bland-rule)"
+    , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "NAME") $
+        printf "pivot strategy for simplex: %s"
+          (intercalate ", "[Simplex.showPivotStrategy ps ++ (if ps == Simplex.configPivotStrategy def then " (default)" else "") | ps <- [minBound..maxBound]])
     , Option [] ["threads"] (ReqArg (NThread . read) "INTEGER") "number of threads to use"
 
     , Option [] ["omega-real"] (ReqArg OmegaReal "SOLVER") "fourier-motzkin (default), virtual-substitution (or vs), cad, simplex, none"
