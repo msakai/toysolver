@@ -82,6 +82,7 @@ data Flag
     | WriteFile !FilePath
     | NoMIP
     | PivotStrategy String
+    | BoundTightening
     | NThread !Int
     | OmegaReal String
     | Mode !Mode
@@ -99,6 +100,8 @@ options =
     , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "NAME") $
         printf "pivot strategy for simplex: %s"
           (intercalate ", "[Simplex.showPivotStrategy ps ++ (if ps == Simplex.configPivotStrategy def then " (default)" else "") | ps <- [minBound..maxBound]])
+    , Option [] ["bound-tightening"] (NoArg BoundTightening) $
+        "enable bound tightening in simplex algorithm"
     , Option [] ["threads"] (ReqArg (NThread . read) "INTEGER") "number of threads to use"
 
     , Option [] ["omega-real"] (ReqArg OmegaReal "SOLVER") "fourier-motzkin (default), virtual-substitution (or vs), cad, simplex, none"
@@ -252,6 +255,7 @@ run solver opt mip printModel = do
             case Simplex.parsePivotStrategy s of
               Nothing -> error ("unknown pivot strategy \"" ++ s ++ "\"")
               Just ps -> config{ Simplex.configPivotStrategy = ps }
+          f config BoundTightening = config{ Simplex.configEnableBoundTightening = True }
           f config _ = config
           config = foldl' f def opt
           nthreads = last (0 : [n | NThread n <- opt])
