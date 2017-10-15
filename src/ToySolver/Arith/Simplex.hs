@@ -164,9 +164,8 @@ data GenericSolverM m v
   , svLB      :: !(MutVar (PrimState m) (IntMap (v, ConstrIDSet)))
   , svUB      :: !(MutVar (PrimState m) (IntMap (v, ConstrIDSet)))
   , svModel   :: !(MutVar (PrimState m) (IntMap v))
-  , svExplanation :: !(MutVar (PrimState m) ConstrIDSet)
+  , svExplanation :: !(MutVar (PrimState m) (Maybe ConstrIDSet))
   , svVCnt    :: !(MutVar (PrimState m) Int)
-  , svOk      :: !(MutVar (PrimState m) Bool)
   , svOptDir  :: !(MutVar (PrimState m) OptDir)
 
   , svDefDB  :: !(MutVar (PrimState m) (Map (LA.Expr Rational) Var))
@@ -195,7 +194,6 @@ newSolver = do
   m <- newMutVar (IntMap.singleton objVar zeroV)
   e <- newMutVar mempty
   v <- newMutVar 0
-  ok <- newMutVar True
   dir <- newMutVar OptMin
   defs <- newMutVar Map.empty
   logger <- newMutVar Nothing
@@ -211,7 +209,6 @@ newSolver = do
     , svModel   = m
     , svExplanation = e
     , svVCnt    = v
-    , svOk      = ok
     , svOptDir  = dir
     , svDefDB   = defs
     , svLogger  = logger
@@ -229,7 +226,6 @@ cloneSolver solver = do
   m      <- newMutVar =<< readMutVar (svModel solver)
   e      <- newMutVar =<< readMutVar (svExplanation solver)
   v      <- newMutVar =<< readMutVar (svVCnt solver)
-  ok     <- newMutVar =<< readMutVar (svOk solver)
   dir    <- newMutVar =<< readMutVar (svOptDir solver)
   defs   <- newMutVar =<< readMutVar (svDefDB solver)
   logger <- newMutVar =<< readMutVar (svLogger solver)
@@ -245,7 +241,6 @@ cloneSolver solver = do
     , svModel   = m
     , svExplanation = e
     , svVCnt    = v
-    , svOk      = ok
     , svOptDir  = dir
     , svDefDB   = defs
     , svLogger  = logger
@@ -396,7 +391,7 @@ popBacktrackPoint solver = do
       writeMutVar (svUB solver) $ IntMap.mergeWithKey (\_ _curr saved -> saved) id (const IntMap.empty) ubs savedUBs
 
       writeMutVar (svBacktrackPoints solver) bps'
-      writeMutVar (svOk solver) True
+      writeMutVar (svExplanation solver) Nothing
 
 withBacktrackpoint :: PrimMonad m => GenericSolverM m v -> (BacktrackPoint m v -> m ()) -> m ()
 withBacktrackpoint solver f = do
@@ -517,8 +512,7 @@ assertLB solver x (Just (l, cidSet)) = do
   case (l0,u0) of 
     (Just (l0', _), _) | l <= l0' -> return ()
     (_, Just (u0', cidSet2)) | u0' < l -> do
-      writeMutVar (svExplanation solver) $ cidSet `IntSet.union` cidSet2
-      markBad solver
+      writeMutVar (svExplanation solver) $! Just $! cidSet `IntSet.union` cidSet2
     _ -> do
       bpSaveLB solver x
       modifyMutVar (svLB solver) (IntMap.insert x (l, cidSet))
@@ -541,8 +535,7 @@ assertUB solver x (Just (u, cidSet)) = do
   case (l0,u0) of
     (_, Just (u0', _)) | u0' <= u -> return ()
     (Just (l0', cidSet2), _) | u < l0' -> do
-      writeMutVar (svExplanation solver) $ cidSet `IntSet.union` cidSet2
-      markBad solver
+      writeMutVar (svExplanation solver) $! Just $! cidSet `IntSet.union` cidSet2
     _ -> do
       bpSaveUB solver x
       modifyMutVar (svUB solver) (IntMap.insert x (u, cidSet))
@@ -628,7 +621,7 @@ check solver = do
                        -- (aij < 0 and β(xj) < uj) or (aij > 0 and β(xj) > lj)
                        canDecrease solver
           xi_def <- getRow solver xi
-          r <- liftM (fmap snd) $ findM q (LA.terms xi_def)              
+          r <- liftM (fmap snd) $ findM q (LA.terms xi_def)
           case r of
             Nothing -> do
               let c = if isLBViolated then li else ui
@@ -643,21 +636,20 @@ check solver = do
                     getLB solver xj
                   else do
                     getUB solver xj
-              writeMutVar (svExplanation solver) core
-              markBad solver
+              writeMutVar (svExplanation solver) $! Just $! core
               return False
             Just xj -> do
               pivotAndUpdate solver xi xj (fromJust $ boundValue $ if isLBViolated then li else ui)
               loop
 
-  ok <- readMutVar (svOk solver)
-  if not ok
-  then return False
-  else do
-    log solver "check"
-    result <- recordTime solver loop
-    when result $ checkFeasibility solver
-    return result
+  m <- readMutVar (svExplanation solver)
+  case m of
+    Just _ -> return False
+    Nothing -> do
+      log solver "check"
+      result <- recordTime solver loop
+      when result $ checkFeasibility solver
+      return result
 
 selectViolatingBasicVariable :: forall m v. (PrimMonad m, SolverValue v) => GenericSolverM m v -> m (Maybe Var)
 selectViolatingBasicVariable solver = do
@@ -688,6 +680,25 @@ selectViolatingBasicVariable solver = do
                 then return (xi, fromJust (boundValue li) ^-^ vi)
                 else return (xi, vi ^-^ fromJust (boundValue ui))
           return $ Just $ fst $ maximumBy (comparing snd) xs2
+
+tightenBounds :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> m ()
+tightenBounds solver x = do
+  -- x must be basic variable
+  defs <- readMutVar (svTableau solver)
+  let x_def = defs IntMap.! x
+      f (!lb,!ub) (c,xk) = do
+        if LA.unitVar == xk then do
+          return (addBound lb (Just (toValue c, IntSet.empty)), addBound ub (Just (toValue c, IntSet.empty)))
+        else do
+          lb_k <- getLB solver xk
+          ub_k <- getUB solver xk
+          if c > 0 then do
+            return (addBound lb (scaleBound c lb_k), addBound ub (scaleBound c ub_k))
+          else do
+            return (addBound lb (scaleBound c ub_k), addBound ub (scaleBound c lb_k))
+  (lb,ub) <- foldM f (Just (zeroV, IntSet.empty), Just (zeroV, IntSet.empty)) (LA.terms x_def)
+  assertLB solver x lb
+  assertUB solver x ub
 
 {--------------------------------------------------------------------
   Optimization
@@ -878,21 +889,20 @@ dualSimplex solver opt = do
                         getLB solver xj
                       else do
                         getUB solver xj
-                  writeMutVar (svExplanation solver) core
-                  markBad solver
+                  writeMutVar (svExplanation solver) $! Just $! core
                   return Unsat
                 Just xj -> do
                   pivotAndUpdate solver xi xj (fromJust $ boundValue $ if isLBViolated then li else ui)
                   loop
 
-  ok <- readMutVar (svOk solver)
-  if not ok
-  then return Unsat
-  else do
-    log solver "dual simplex"
-    result <- recordTime solver loop
-    when (result == Optimum) $ checkFeasibility solver
-    return result
+  m <- readMutVar (svExplanation solver)
+  case m of
+    Just _ -> return Unsat
+    Nothing -> do
+      log solver "dual simplex"
+      result <- recordTime solver loop
+      when (result == Optimum) $ checkFeasibility solver
+      return result
 
 dualRTest :: PrimMonad m => GenericSolverM m Rational -> LA.Expr Rational -> Bool -> m (Maybe Var)
 dualRTest solver row isLBViolated = do
@@ -955,8 +965,12 @@ getObjValue solver = getValue solver objVar
 type Model = IntMap Rational
 
 explain :: PrimMonad m => GenericSolverM m v -> m ConstrIDSet
-explain solver = readMutVar (svExplanation solver)
-  
+explain solver = do
+  m <- readMutVar (svExplanation solver)
+  case m of
+    Nothing -> error "no explanation is available"
+    Just cs -> return cs
+
 {--------------------------------------------------------------------
   major function
 --------------------------------------------------------------------}
@@ -1010,21 +1024,7 @@ pivotAndUpdate solver xi xj v = do
 
   config <- getConfig solver
   when (configEnableBoundTightening config) $ do
-    defs <- readMutVar (svTableau solver)
-    let xj_def = defs IntMap.! xj
-        f (!lb,!ub) (c,xk) = do
-          if LA.unitVar == xk then do
-            return (addBound lb (Just (toValue c, IntSet.empty)), addBound ub (Just (toValue c, IntSet.empty)))
-          else do
-            lb_k <- getLB solver xk
-            ub_k <- getUB solver xk
-            if c > 0 then do
-              return (addBound lb (scaleBound c lb_k), addBound ub (scaleBound c ub_k))
-            else do
-              return (addBound lb (scaleBound c ub_k), addBound ub (scaleBound c lb_k))
-    (lb,ub) <- foldM f (Just (zeroV, IntSet.empty), Just (zeroV, IntSet.empty)) (LA.terms xj_def)
-    assertLB solver xj lb
-    assertUB solver xj ub
+    tightenBounds solver xj
 
   -- log solver $ printf "after pivotAndUpdate x%d x%d (%s)" xi xj (show v)
   -- dump solver
@@ -1065,9 +1065,6 @@ getCoeff :: PrimMonad m => GenericSolverM m v -> Var -> Var -> m Rational
 getCoeff solver xi xj = do
   xi_def <- getRow solver xi
   return $! LA.coeff xj xi_def
-
-markBad :: PrimMonad m => GenericSolverM m v -> m ()
-markBad solver = writeMutVar (svOk solver) False
 
 {--------------------------------------------------------------------
   utility
