@@ -38,7 +38,7 @@ data CNF
   = CNF
   { numVars :: !Int
   , numClauses :: !Int
-  , clauses :: [SAT.Clause]
+  , clauses :: [SAT.PackedClause]
   }
   deriving (Show, Eq, Ord)
 
@@ -64,10 +64,9 @@ parseByteString s =
     ls :: [BS.ByteString]
     (l:ls) = filter (not . isCommentBS) (BS.lines s)
 
-parseClauseBS :: BS.ByteString -> SAT.Clause
-parseClauseBS s = seqList xs $ xs
+parseClauseBS :: BS.ByteString -> SAT.PackedClause
+parseClauseBS s = SAT.packClause (go s)
   where
-    xs = go s
     go s =
       case BS.readInt (BS.dropWhile isSpace s) of
         Nothing -> error "ToySolver.Text.MaxSAT: parse error"
@@ -79,10 +78,6 @@ isCommentBS s =
   case BS.uncons s of
     Just ('c',_) ->  True
     _ -> False
-
-seqList :: [a] -> b -> b
-seqList [] b = b
-seqList (x:xs) b = seq x $ seqList xs b
 
 writeFile :: FilePath -> CNF -> IO ()
 writeFile filepath cnf = do
@@ -98,7 +93,7 @@ cnfBuilder cnf = header <> mconcat (map f (clauses cnf))
       , intDec (numVars cnf), char7 ' '
       , intDec (numClauses cnf), char7 '\n'
       ]
-    f c = mconcat [intDec lit <> char7 ' '| lit <- c] <> byteString "0\n"
+    f c = mconcat [intDec lit <> char7 ' '| lit <- SAT.unpackClause c] <> byteString "0\n"
 
 hPutCNF :: Handle -> CNF -> IO ()
 hPutCNF h cnf = hPutBuilder h (cnfBuilder cnf)

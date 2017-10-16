@@ -50,20 +50,20 @@ convert formula = runST $ do
             lhs2 <- PBNLC.linearizePBSumWithPolarity pbnlc Tseitin.polarityPos lhs
             let (lhs3,rhs3) = SAT.normalizePBLinAtLeast (lhs2,rhs)
             if rhs3==1 && and [c==1 | (c,_) <- lhs3] then
-              return $ Seq.singleton (c, [l | (_,l) <- lhs3])
+              return $ Seq.singleton (c, SAT.packClause [l | (_,l) <- lhs3])
             else do
               lit <- PB.encodePBLinAtLeast pb (lhs3,rhs3)
-              return $ Seq.singleton (c, [lit])
+              return $ Seq.singleton (c, SAT.packClause [lit])
           PBFile.Eq -> do
             lhs2 <- PBNLC.linearizePBSumWithPolarity pbnlc Tseitin.polarityBoth lhs
             lit1 <- PB.encodePBLinAtLeast pb (lhs2, rhs)
             lit2 <- PB.encodePBLinAtLeast pb ([(-c, l) | (c,l) <- lhs2], negate rhs)
             lit <- Tseitin.encodeConjWithPolarity tseitin Tseitin.polarityPos [lit1,lit2]
-            return $ Seq.singleton (c, [lit])
+            return $ Seq.singleton (c, SAT.packClause [lit])
 
   case PBFile.wboTopCost formula of
     Nothing -> return ()
-    Just top -> SAT.addPBNLAtMost pbnlc [(c, [-l | l <- clause]) | (c,clause) <- F.toList softClauses] (top - 1)
+    Just top -> SAT.addPBNLAtMost pbnlc [(c, [-l | l <- SAT.unpackClause clause]) | (c,clause) <- F.toList softClauses] (top - 1)
 
   let top = F.sum (fst <$> softClauses) + 1
   cnf <- getCNFFormula db

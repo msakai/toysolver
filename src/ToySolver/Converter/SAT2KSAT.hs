@@ -44,7 +44,7 @@ convert k cnf = runST $ do
                 SAT.addClause db (toList (lits1 |> (-v)))
                 modifySTRef' defsRef (|> (v, toList lits1))
                 loop (v <| lits2)
-    loop $ Seq.fromList clause
+    loop $ Seq.fromList $ SAT.unpackClause clause
     
   cnf2 <- getCNFFormula db
 

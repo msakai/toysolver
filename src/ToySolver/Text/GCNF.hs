@@ -51,7 +51,7 @@ data GCNF
 
 type GroupIndex = Int
 
-type GClause = (GroupIndex, SAT.Clause)
+type GClause = (GroupIndex, SAT.PackedClause)
 
 
 parseFile :: FilePath -> IO (Either String GCNF)
@@ -92,19 +92,16 @@ parseLineBS s =
       case BS.readInt s1 of
         Just (idx,s2) | Just ('}', s3) <- BS.uncons s2 -> 
           let ys = parseClauseBS s3
-          in seq idx $ seqList ys $ (idx, ys)
+          in seq idx $ seq ys $ (idx, ys)
         _ -> error "ToySolver.Text.GCNF: parse error"
     _ -> error "ToySolver.Text.GCNF: parse error"
 
-parseCNFLineBS :: BS.ByteString -> SAT.Clause
-parseCNFLineBS s = seq xs $ seqList xs $ xs
-  where
-    xs = parseClauseBS s
+parseCNFLineBS :: BS.ByteString -> SAT.PackedClause
+parseCNFLineBS s = parseClauseBS s
 
-parseClauseBS :: BS.ByteString -> SAT.Clause
-parseClauseBS s = seqList xs $ xs
+parseClauseBS :: BS.ByteString -> SAT.PackedClause
+parseClauseBS s = SAT.packClause (go s)
   where
-    xs = go s
     go s =
       case BS.readInt (BS.dropWhile isSpace s) of
         Nothing -> error "ToySolver.Text.GCNF: parse error"
@@ -116,10 +113,6 @@ isCommentBS s =
   case BS.uncons s of
     Just ('c',_) ->  True
     _ -> False
-
-seqList :: [a] -> b -> b
-seqList [] b = b
-seqList (x:xs) b = seq x $ seqList xs b
 
 writeFile :: FilePath -> GCNF -> IO ()
 writeFile filepath gcnf = do
@@ -137,7 +130,7 @@ gcnfBuilder gcnf = header <> mconcat (map f (clauses gcnf))
       , intDec (lastGroupIndex gcnf), char7 '\n'
       ]
     f (idx,c) = char7 '{' <> intDec idx <> char7 '}' <>
-                mconcat [char7 ' ' <> intDec lit | lit <- c] <>
+                mconcat [char7 ' ' <> intDec lit | lit <- SAT.unpackClause c] <>
                 byteString " 0\n"
 
 hPutGCNF :: Handle -> GCNF -> IO ()

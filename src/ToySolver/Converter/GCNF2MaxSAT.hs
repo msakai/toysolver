@@ -14,6 +14,8 @@ module ToySolver.Converter.GCNF2MaxSAT
   ( convert
   ) where
 
+import qualified Data.Vector.Generic as VG
+import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.GCNF as GCNF
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 
@@ -28,7 +30,7 @@ convert
   =
   MaxSAT.WCNF
   { MaxSAT.topCost = top
-  , MaxSAT.clauses = [(top, if g==0 then c else -(nv+g) : c) | (g,c) <- cs] ++ [(1,[v]) | v <- [nv+1..nv+lastg]]
+  , MaxSAT.clauses = [(top, if g==0 then c else VG.cons (-(nv+g)) c) | (g,c) <- cs] ++ [(1, SAT.packClause [v]) | v <- [nv+1..nv+lastg]]
   , MaxSAT.numVars = nv + lastg
   , MaxSAT.numClauses = nc + lastg
   }

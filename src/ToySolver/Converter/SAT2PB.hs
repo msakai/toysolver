@@ -15,6 +15,7 @@ module ToySolver.Converter.SAT2PB
   ) where
 
 import qualified Data.PseudoBoolean as PBFile
+import ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.CNF as CNF
 
 convert :: CNF.CNF -> PBFile.Formula
@@ -26,4 +27,4 @@ convert cnf
   , PBFile.pbNumConstraints = CNF.numClauses cnf
   }
   where
-    f clause = ([(1,[l]) | l <- clause], PBFile.Ge, 1)
+    f clause = ([(1,[l]) | l <- SAT.unpackClause clause], PBFile.Ge, 1)

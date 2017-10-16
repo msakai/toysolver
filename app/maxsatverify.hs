@@ -29,8 +29,8 @@ main = do
         writeIORef costRef $! tc + w
   printf "total cost = %d\n" =<< readIORef costRef
 
-eval :: Model -> Clause -> Bool
-eval m lits = or [evalLit m lit | lit <- lits]
+eval :: Model -> PackedClause -> Bool
+eval m lits = or [evalLit m lit | lit <- unpackClause lits]
 
 readModel :: String -> Model
 readModel s = array (1, maximum (0 : map fst ls2)) ls2

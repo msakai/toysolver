@@ -49,7 +49,7 @@ data WCNF
   , clauses    :: [WeightedClause]
   }
 
-type WeightedClause = (Weight, SAT.Clause)
+type WeightedClause = (Weight, SAT.PackedClause)
 
 -- | Weigths must be greater than or equal to 1, and smaller than 2^63.
 type Weight = Integer
@@ -108,10 +108,9 @@ parseCNFLineBS s = seq xs $ (1, xs)
   where
     xs = parseClauseBS s
 
-parseClauseBS :: BS.ByteString -> SAT.Clause
-parseClauseBS s = seqList xs $ xs
+parseClauseBS :: BS.ByteString -> SAT.PackedClause
+parseClauseBS s = SAT.packClause (go s)
   where
-    xs = go s
     go s =
       case BS.readInt (BS.dropWhile isSpace s) of
         Nothing -> error "ToySolver.Text.MaxSAT: parse error"
@@ -123,10 +122,6 @@ isCommentBS s =
   case BS.uncons s of
     Just ('c',_) ->  True
     _ -> False
-
-seqList :: [a] -> b -> b
-seqList [] b = b
-seqList (x:xs) b = seq x $ seqList xs b
 
 writeFile :: FilePath -> WCNF -> IO ()
 writeFile filepath wcnf = do
@@ -143,7 +138,7 @@ wcnfBuilder wcnf = header <> mconcat (map f (clauses wcnf))
       , intDec (numClauses wcnf), char7 ' '
       , integerDec (topCost wcnf), char7 '\n'
       ]
-    f (w,c) = integerDec w <> mconcat [char7 ' ' <> intDec lit | lit <- c] <> byteString " 0\n"
+    f (w,c) = integerDec w <> mconcat [char7 ' ' <> intDec lit | lit <- SAT.unpackClause c] <> byteString " 0\n"
 
 hPutWCNF :: Handle -> WCNF -> IO ()
 hPutWCNF h wcnf = hPutBuilder h (wcnfBuilder wcnf)

@@ -15,6 +15,7 @@ module ToySolver.Converter.MaxSAT2WBO
   ) where
 
 import qualified Data.PseudoBoolean as PBFile
+import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.MaxSAT as MaxSAT
 
 convert :: MaxSAT.WCNF -> PBFile.SoftFormula
@@ -32,9 +33,9 @@ convert
   , PBFile.wboNumConstraints = nc
   }
   where
-    f (w,ls)
+    f (w,c)
      | w>=top    = (Nothing, p) -- hard constraint
      | otherwise = (Just w, p)  -- soft constraint
      where
-       p = ([(1,[l]) | l <- ls], PBFile.Ge, 1)
+       p = ([(1,[l]) | l <- SAT.unpackClause c], PBFile.Ge, 1)
 
