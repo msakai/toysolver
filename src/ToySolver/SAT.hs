@@ -1801,7 +1801,10 @@ pbBacktrackLevel solver (lhs, rhs) = do
           replay lvs slack_lv
 
   let initial_slack = sum [c | (c,_) <- lhs] - rhs
-  replay (IM.toList levelToLiterals) initial_slack
+  if any (\(c,_) -> c > initial_slack) lhs then
+    return 0
+  else do
+    replay (IM.toList levelToLiterals) initial_slack
 
 minimizeConflictClause :: Solver -> LitSet -> IO LitSet
 minimizeConflictClause solver lits = do
