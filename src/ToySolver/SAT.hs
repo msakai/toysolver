@@ -1768,7 +1768,7 @@ analyzeConflictHybrid solver constr = do
       return (l,lv)
 
   let level = case xs of
-                [] -> error "analyzeConflict: should not happen"
+                [] -> error "analyzeConflictHybrid: should not happen"
                 [_] -> levelRoot
                 _:(_,lv):_ -> lv
 
