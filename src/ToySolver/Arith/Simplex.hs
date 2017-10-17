@@ -488,7 +488,10 @@ simplifyAtom solver (OrdRel lhs op rhs) = do
             Just 0 -> do
               modifyMutVar (svLB solver) (IntMap.insert v (toValue 0, mempty))
               modifyMutVar (svUB solver) (IntMap.insert v (toValue 0, mempty))
-            _ -> return ()
+            _ -> do
+              config <- getConfig solver
+              when (configEnableBoundTightening config) $ do
+                tightenBounds solver v
           return (v,op'',rhs'')
   where
     scale :: LA.Expr Rational -> (Rational, LA.Expr Rational)
