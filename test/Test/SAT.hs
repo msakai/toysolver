@@ -1285,6 +1285,75 @@ case_addPBAtLeast_regression = do
   ret <- SAT.solve solver
   ret @?= False
 
+-- https://github.com/msakai/toysolver/issues/22
+case_issue22 :: Assertion
+case_issue22 = do
+  let config = def
+        { SAT.configLearningStrategy = SAT.LearningHybrid
+        , SAT.configCCMin = 2
+        , SAT.configBranchingStrategy = SAT.BranchingLRB
+        , SAT.configRandomFreq = 0.2816351099559239
+        , SAT.configPBHandlerType = SAT.PBHandlerTypeCounter
+        }
+  solver <- SAT.newSolverWithConfig config
+  _ <- SAT.newVars solver 14
+  SAT.addClause solver [-7,-1]
+  SAT.addClause solver [-9,-4]
+  SAT.addClause solver [-9,1]
+  SAT.addClause solver [-10,-1]
+  SAT.addClause solver [-11,-1]
+  SAT.addClause solver [-12,-4]
+  SAT.addClause solver [-12,4]
+  SAT.addClause solver [-13,-3]
+  SAT.addClause solver [-13,-1]
+  SAT.addClause solver [-13,3]
+  SAT.addClause solver [-14,-1]
+  SAT.addPBAtLeast solver [ (1,-14), (10,13), (7,12), (13,-11), (14,-10), (16,9), (8,8), (9,-7)]   38
+  SAT.addPBAtLeast solver [(-1,-14),(-10,13),(-7,12),(-13,-11),(-14,-10),(-16,9),(-8,8),(-9,-7)] (-38)
+  SAT.setRandomGen solver =<< Rand.initialize (V.singleton 71)
+  SAT.solve solver
+  return ()
+{-
+Scenario:
+decide 4@1
+deduce -12 by [-12,-4]
+deduce -9 by [-9,-4]
+decide 1@2
+deduce -14 by [-14,-1]
+deduce -13 by [-13,-1]
+deduce -11 by [-11,-1]
+deduce -10 by [-10,-1]
+deduce -7 by [-7,-1]
+deduce 8 by [(16,9),(14,-10),(13,-11),(10,13),(9,-7),(8,8),(7,12),(1,-14)] >= 38
+conflict: [(16,-9),(14,10),(13,11),(10,-13),(9,7),(8,-8),(7,-12),(1,14)] >= 40
+conflict analysis yields
+  [-1,9,12] @1, and
+  [(1,14),(2,-13),(1,12),(8,-9),(17,-1)],17) >= 17 @1 (but it should be @0)
+backtrack to @1
+deduce -1 by [-1,9,12]
+decide 3@3
+deduce -13 by [-13,-3]
+deduce -10, -11, -7, 8 by [(16,9),(14,-10),(13,-11),(10,13),(9,-7),(8,8),(7,12),(1,-14)] >= 38
+conflict [(16,-9),(14,10),(13,11),(10,-13),(9,7),(8,-8),(7,-12),(1,14)] >= 40
+conflict analysis yields
+  [13,9,12] @1 and
+  [(1,14),(7,13),(7,12),(7,9)] >= 7 @1 (but it should be @0)
+backtrack to @1
+deduce 13 by [13,9,12]
+deduce 3 by [3,-13]
+conflict [-3,-13]
+conflict analysis yields
+  -13 @ 0
+decide -7@1
+decide -14@2
+deduce -1 by [(17,-1),(8,-9),(2,-13),(1,14),(1,12)] >= 17
+deduce -9 by [-9,1]
+deduce 12 by [12,9,13]
+deduce 4 by [4,-12]
+conflict: [-4,-12]
+conflict analysis yields [] and that causes error
+-}
+
 ------------------------------------------------------------------------
 
 case_addFormula = do
