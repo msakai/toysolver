@@ -23,6 +23,9 @@ module ToySolver.Text.QDimacs
   , Atom
   , Lit
   , Clause
+  , PackedClause
+  , packClause
+  , unpackClause
   , parseFile
   , parseByteString
   ) where
@@ -30,6 +33,8 @@ module ToySolver.Text.QDimacs
 import Control.DeepSeq
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Char
+import qualified ToySolver.SAT.Types as SAT
+import ToySolver.SAT.Types (Clause, Lit, PackedClause, packClause, unpackClause)
 
 {-
 http://www.qbflib.org/qdimacs.html
@@ -62,7 +67,7 @@ data QDimacs
   { numVars :: !Int
   , numClauses :: !Int
   , prefix :: [QuantSet]
-  , matrix :: [Clause]
+  , matrix :: [PackedClause]
   }
   deriving (Eq, Ord, Show, Read)
 
@@ -73,11 +78,7 @@ data Quantifier
 
 type QuantSet = (Quantifier, [Atom])
 
-type Atom = Int -- better to use Int32?
-
-type Lit = Int -- better to use Int32
-
-type Clause = [Lit]
+type Atom = SAT.Var
 
 parseFile :: FilePath -> IO (Either String QDimacs)
 parseFile filename = do
@@ -101,7 +102,7 @@ parseByteString = f . BL.lines
                   { numVars = read $ BL.unpack numVars'
                   , numClauses = read $ BL.unpack numClauses'
                   , prefix = prefix'
-                  , matrix = parseClauses ls'
+                  , matrix = map parseClause ls'
                   }
             _ -> Left "QDimacs.parseByteString: invalid problem line"
         Just (c, _) -> Left ("QDimacs.parseByteString: invalid prefix " ++ show c)
@@ -121,11 +122,12 @@ parsePrefix = go []
               (reverse result, lls)
         _ -> error "QDimacs.parseProblem: invalid line"
 
-parseClauses :: [BL.ByteString] -> [Clause]
-parseClauses = map readInts
+parseClause :: BL.ByteString -> SAT.PackedClause
+parseClause = SAT.packClause . readInts
 
 readInts :: BL.ByteString -> [Int]
 readInts s =
   case BL.readInt (BL.dropWhile isSpace s) of
-    Just (z, s') -> if z == 0 then [] else z : readInts s'
-    Nothing -> []
+    Just (0,_) -> []
+    Just (z,s') -> z : readInts s'
+    Nothing -> error "QDimacs.readInts: 0 is missing"
