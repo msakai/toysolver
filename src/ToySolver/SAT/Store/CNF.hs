@@ -25,7 +25,7 @@ import qualified Data.Sequence as Seq
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.CNF as CNF
 
-data CNFStore m = CNFStore (MutVar (PrimState m) Int) (MutVar (PrimState m) (Seq SAT.Clause))
+data CNFStore m = CNFStore (MutVar (PrimState m) Int) (MutVar (PrimState m) (Seq SAT.PackedClause))
 
 instance PrimMonad m => SAT.NewVar m (CNFStore m) where
   newVar (CNFStore ref _) = do
@@ -35,7 +35,9 @@ instance PrimMonad m => SAT.NewVar m (CNFStore m) where
 instance PrimMonad m => SAT.AddClause m (CNFStore m) where
   addClause (CNFStore _ ref) clause =
     case SAT.normalizeClause clause of
-      Just clause' -> modifyMutVar' ref (|> clause')
+      Just clause' -> do
+        let clause'' = SAT.packClause clause'
+        seq clause'' $ modifyMutVar' ref (|> clause'')
       Nothing -> return ()
 
 newCNFStore :: PrimMonad m => m (CNFStore m)

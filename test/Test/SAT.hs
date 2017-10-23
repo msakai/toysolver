@@ -2,6 +2,7 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
 module Test.SAT (satTestGroup) where
 
+import Control.Applicative
 import Control.Monad
 import Data.Array.IArray
 import Data.Default.Class
@@ -73,7 +74,7 @@ prop_solveCNF = QM.monadicIO $ do
 solveCNF :: SAT.Solver -> CNF.CNF -> IO (Maybe SAT.Model)
 solveCNF solver cnf = do
   SAT.newVars_ solver (CNF.numVars cnf)
-  forM_ (CNF.clauses cnf) $ \c -> SAT.addClause solver c
+  forM_ (CNF.clauses cnf) $ \c -> SAT.addClause solver (SAT.unpackClause c)
   ret <- SAT.solve solver
   if ret then do
     m <- SAT.getModel solver
@@ -88,9 +89,9 @@ arbitraryCNF = do
   cs <- replicateM nc $ do
     len <- choose (0,10)
     if nv == 0 then
-      return []
+      return $ SAT.packClause []
     else
-      replicateM len $ choose (-nv, nv) `suchThat` (/= 0)
+      SAT.packClause <$> (replicateM len $ choose (-nv, nv) `suchThat` (/= 0))
   return $
     CNF.CNF
     { CNF.numVars = nv
@@ -99,7 +100,7 @@ arbitraryCNF = do
     }
 
 evalCNF :: SAT.Model -> CNF.CNF -> Bool
-evalCNF m cnf = all (SAT.evalClause m) (CNF.clauses cnf)
+evalCNF m cnf = all (SAT.evalClause m . SAT.unpackClause) (CNF.clauses cnf)
 
 
 prop_solvePB :: Property
@@ -362,7 +363,7 @@ newTheorySolver cnf = do
       cs = CNF.clauses cnf
   solver <- SAT.newSolver
   SAT.newVars_ solver nv
-  forM_ cs $ \c -> SAT.addClause solver c
+  forM_ cs $ \c -> SAT.addClause solver (SAT.unpackClause c)
   
   ref <- newIORef []
   let tsolver =
@@ -406,7 +407,7 @@ prop_solveCNF_using_BooleanTheory = QM.monadicIO $ do
     tsolver <- newTheorySolver cnf1
     SAT.setTheory solver tsolver
 
-    forM_ (CNF.clauses cnf2) $ \c -> SAT.addClause solver c
+    forM_ (CNF.clauses cnf2) $ \c -> SAT.addClause solver (SAT.unpackClause c)
     ret <- SAT.solve solver
     if ret then do
       m <- SAT.getModel solver
@@ -983,7 +984,7 @@ prop_getAssumptionsImplications = QM.monadicIO $ do
   ls <- QM.pick $ liftM concat $ mapM (\v -> elements [[],[-v],[v]]) [1..CNF.numVars cnf]
   ret <- QM.run $ do
     SAT.newVars_ solver (CNF.numVars cnf)
-    forM_ (CNF.clauses cnf) $ \c -> SAT.addClause solver c
+    forM_ (CNF.clauses cnf) $ \c -> SAT.addClause solver (SAT.unpackClause c)
     SAT.solveWith solver ls
   when ret $ do
     xs <- QM.run $ SAT.getAssumptionsImplications solver
@@ -1708,7 +1709,7 @@ prop_ExistentialQuantification = QM.monadicIO $ do
     b1 <- QM.run $ do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.numVars phi)
-      forM_ (CNF.clauses phi) $ \c -> SAT.addClause solver c
+      forM_ (CNF.clauses phi) $ \c -> SAT.addClause solver (SAT.unpackClause c)
       SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- IntSet.toList ys]
     let b2 = evalCNF m psi
     QM.assert $ b1 == b2
@@ -1718,7 +1719,7 @@ brauer11_phi =
   CNF.CNF
   { CNF.numVars = 13
   , CNF.numClauses = 23
-  , CNF.clauses =
+  , CNF.clauses = fmap SAT.packClause
       [
       -- μ
         [-x2, -y2]
@@ -1759,7 +1760,7 @@ brauer11_omega =
   CNF.CNF
   { CNF.numVars = 6
   , CNF.numClauses = 3
-  , CNF.clauses =
+  , CNF.clauses = map SAT.packClause
       [ [y1, y3, -y4, y5, -y6]
       , [-y1, y2, y3, -y4, y5, -y6]
       , [-y1, y2, -y3, y4, -y5, y6]
@@ -1777,9 +1778,9 @@ case_ExistentialQuantification_project_phi = do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.numVars brauer11_phi)
-      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver c
+      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver (SAT.unpackClause c)
       SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
-    let b2 = all (SAT.evalClause m) (CNF.clauses psi)
+    let b2 = all (SAT.evalClause m . SAT.unpackClause) (CNF.clauses psi)
     (b1 == b2) @?= True
 
 case_ExistentialQuantification_project_phi' :: Assertion
@@ -1788,7 +1789,7 @@ case_ExistentialQuantification_project_phi' = do
       psi = CNF.CNF
             { CNF.numVars = 6
             , CNF.numClauses = 8
-            , CNF.clauses =
+            , CNF.clauses = map SAT.packClause
                 [ [-y2, y6]
                 , [-y3, -y6]
                 , [y5, y6]
@@ -1805,9 +1806,9 @@ case_ExistentialQuantification_project_phi' = do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.numVars brauer11_phi)
-      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver c
+      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver (SAT.unpackClause c)
       SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
-    let b2 = all (SAT.evalClause m) (CNF.clauses psi)    
+    let b2 = all (SAT.evalClause m . SAT.unpackClause) (CNF.clauses psi)    
     (b1 == b2) @?= True
 
 case_shortestImplicants_phi :: Assertion
@@ -1819,7 +1820,7 @@ case_shortestImplicants_phi = do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.numVars brauer11_phi)
-      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver c
+      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver (SAT.unpackClause c)
       SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
     let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
     (b1 == b2) @?= True
@@ -1838,7 +1839,7 @@ case_shortestImplicants_phi' = do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.numVars brauer11_phi)
-      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver c
+      forM_ (CNF.clauses brauer11_phi) $ \c -> SAT.addClause solver (SAT.unpackClause c)
       SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
     let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
     (b1 == b2) @?= True
@@ -1852,7 +1853,7 @@ case_shortestImplicants_omega = do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.numVars brauer11_omega)
-      forM_ (CNF.clauses brauer11_omega) $ \c -> SAT.addClause solver c
+      forM_ (CNF.clauses brauer11_omega) $ \c -> SAT.addClause solver (SAT.unpackClause c)
       SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
     let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
     unless (b1 == b2) $ print m
@@ -1876,7 +1877,7 @@ case_shortestImplicants_omega' = do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.numVars brauer11_omega)
-      forM_ (CNF.clauses brauer11_omega) $ \c -> SAT.addClause solver c
+      forM_ (CNF.clauses brauer11_omega) $ \c -> SAT.addClause solver (SAT.unpackClause c)
       SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
     let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
     (b1 == b2) @?= True
@@ -1931,7 +1932,7 @@ prop_wbo2maxsat = QM.monadicIO $ do
   let (wcnf, mforth, mback) = WBO2MaxSAT.convert wbo1'
       wbo2 = ( MaxSAT.numVars wcnf
              , [ ( if w == MaxSAT.topCost wcnf then Nothing else Just w
-                 , (PBRelGE, [(1,l) | l <- clause], 1)
+                 , (PBRelGE, [(1,l) | l <- SAT.unpackClause clause], 1)
                  )
                | (w,clause) <- MaxSAT.clauses wcnf
                ]

@@ -49,6 +49,9 @@ module ToySolver.SAT
   , AddClause (..)
   , Clause
   , evalClause
+  , PackedClause
+  , packClause
+  , unpackClause
   -- ** Cardinality constraints
   , AddCardinality (..)
   , AtLeast

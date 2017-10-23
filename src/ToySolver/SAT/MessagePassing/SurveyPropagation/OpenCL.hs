@@ -102,13 +102,13 @@ data Solver
   , svIterLimRef :: !(IORef (Maybe Int))
   }
 
-newSolver :: (String -> IO ()) -> CLContext -> CLDeviceID -> Int -> [(Double, SAT.Clause)] -> IO Solver
+newSolver :: (String -> IO ()) -> CLContext -> CLDeviceID -> Int -> [(Double, SAT.PackedClause)] -> IO Solver
 newSolver outputMessage context dev nv clauses = do
   _ <- clRetainContext context
   queue <- clCreateCommandQueue context dev []
 
   let num_clauses = length clauses
-      num_edges = sum [length c | (_,c) <- clauses]
+      num_edges = sum [VG.length c | (_,c) <- clauses]
 
   (varEdgesTmp :: VM.IOVector [(Int,Bool,Double)]) <- VGM.replicate nv []
   clauseOffset <- VGM.new num_clauses
@@ -117,8 +117,8 @@ newSolver outputMessage context dev nv clauses = do
   ref <- newIORef 0
   forM_ (zip [0..] clauses) $ \(i,(w,c)) -> do
     VGM.write clauseOffset i =<< liftM fromIntegral (readIORef ref)
-    VGM.write clauseLength i (fromIntegral (length c))
-    forM_ c $ \lit -> do
+    VGM.write clauseLength i (fromIntegral (VG.length c))
+    forM_ (SAT.unpackClause c) $ \lit -> do
       e <- readIORef ref
       modifyIORef' ref (+1)
 #if MIN_VERSION_vector(0,11,0)

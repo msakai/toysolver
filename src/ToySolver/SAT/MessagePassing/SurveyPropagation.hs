@@ -108,10 +108,10 @@ data Solver
   , svNThreadsRef :: !(IORef Int)
   }
 
-newSolver :: Int -> [(Double, SAT.Clause)] -> IO Solver
+newSolver :: Int -> [(Double, SAT.PackedClause)] -> IO Solver
 newSolver nv clauses = do
   let num_clauses = length clauses
-      num_edges = sum [length c | (_,c) <- clauses]
+      num_edges = sum [VG.length c | (_,c) <- clauses]
 
   varEdgesRef <- newIORef IntMap.empty
   clauseEdgesM <- VGM.new num_clauses
@@ -121,7 +121,7 @@ newSolver nv clauses = do
 
   ref <- newIORef 0
   forM_ (zip [0..] clauses) $ \(i,(_,c)) -> do
-    es <- forM c $ \lit -> do
+    es <- forM (SAT.unpackClause c) $ \lit -> do
       e <- readIORef ref
       modifyIORef' ref (+1)
       modifyIORef' varEdgesRef (IntMap.insertWith IntSet.union (abs lit) (IntSet.singleton e))

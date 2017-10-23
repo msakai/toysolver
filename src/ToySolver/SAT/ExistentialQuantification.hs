@@ -30,6 +30,7 @@ import Control.Monad
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.IORef
+import qualified Data.Vector.Generic as VG
 import ToySolver.SAT as SAT
 import ToySolver.SAT.Types as SAT
 import ToySolver.Text.CNF as CNF
@@ -55,7 +56,7 @@ dualRailEncoding vs cnf =
       CNF.CNF
       { CNF.numVars = CNF.numVars cnf + IntSet.size vs
       , CNF.numClauses = CNF.numClauses cnf + IntSet.size vs
-      , CNF.clauses = [ fmap f c | c <- CNF.clauses cnf ] ++ [[-xp,-xn] | (xp,xn) <- IntMap.elems forward]
+      , CNF.clauses = [ VG.map f c | c <- CNF.clauses cnf ] ++ [SAT.packClause [-xp,-xn] | (xp,xn) <- IntMap.elems forward]
       }
     f x =
       case IntMap.lookup (abs x) forward of
@@ -97,7 +98,8 @@ shortestImplicants vs formula = do
   let (tau_formula, info) = dualRailEncoding vs formula
   solver <- SAT.newSolver
   SAT.newVars_ solver (CNF.numVars tau_formula)
-  forM_ (CNF.clauses tau_formula) (addClause solver)
+  forM_ (CNF.clauses tau_formula) $ \c -> do
+    SAT.addClause solver (SAT.unpackClause c)
 
   ref <- newIORef []
 
@@ -131,10 +133,10 @@ project xs cnf = do
         CNF.CNF
         { CNF.numVars = nv
         , CNF.numClauses = length implicants
-        , CNF.clauses = map (map negate . IntSet.toList) implicants
+        , CNF.clauses = map (SAT.packClause . map negate . IntSet.toList) implicants
         }
   negated_implicates <- shortestImplicants ys cnf'
-  let implicates = map (map negate . IntSet.toList) negated_implicates
+  let implicates = map (SAT.packClause . map negate . IntSet.toList) negated_implicates
   return $
     CNF.CNF
     { CNF.numVars = nv

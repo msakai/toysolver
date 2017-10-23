@@ -32,6 +32,11 @@ module ToySolver.SAT.Types
   , evalClause
   , clauseToPBLinAtLeast
 
+  -- * Packed Clause
+  , PackedClause
+  , packClause
+  , unpackClause
+
   -- * Cardinality Constraint
   , AtLeast
   , Exactly
@@ -91,6 +96,7 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as VU
 import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Data.LBool
 import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
@@ -210,6 +216,14 @@ evalClause m cl = any (evalLit m) cl
 
 clauseToPBLinAtLeast :: Clause -> PBLinAtLeast
 clauseToPBLinAtLeast xs = ([(1,l) | l <- xs], 1)
+
+type PackedClause = VU.Vector Lit
+
+packClause :: Clause -> PackedClause
+packClause = VU.fromList
+
+unpackClause :: PackedClause -> Clause
+unpackClause = VU.toList
 
 type AtLeast = ([Lit], Int)
 type Exactly = ([Lit], Int)

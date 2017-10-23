@@ -87,7 +87,7 @@ main = do
                   let nv = QDimacs.numVars qdimacs
                       nc = QDimacs.numClauses qdimacs
                       prefix' = QBF.quantifyFreeVariables nv [(q, IntSet.fromList xs) | (q,xs) <- QDimacs.prefix qdimacs]
-                      matrix' = andB [orB [if lit > 0 then BoolExpr.Atom lit else notB (BoolExpr.Atom (abs lit)) | lit <- clause] | clause <- QDimacs.matrix qdimacs]
+                      matrix' = andB [orB [if lit > 0 then BoolExpr.Atom lit else notB (BoolExpr.Atom (abs lit)) | lit <- QDimacs.unpackClause clause] | clause <- QDimacs.matrix qdimacs]
                   (ans, certificate) <-
                     case map toLower (optAlgorithm opt) of
                       "naive" -> QBF.solveNaive nv prefix' matrix'

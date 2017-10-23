@@ -526,7 +526,7 @@ solveSAT opt solver cnf cnfFileName = do
   putCommentLine $ printf "#constraints %d" (CNF.numClauses cnf)
   SAT.newVars_ solver (CNF.numVars cnf)
   forM_ (CNF.clauses cnf) $ \clause ->
-    SAT.addClause solver clause
+    SAT.addClause solver (SAT.unpackClause clause)
 
   spHighlyBiased <-
     if optInitSP opt then do
@@ -570,12 +570,12 @@ solveSAT opt solver cnf cnfFileName = do
     satPrintModel stdout m (CNF.numVars cnf)
     writeSOLFile opt m Nothing (CNF.numVars cnf)
 
-initPolarityUsingSP :: SAT.Solver -> Int -> Int -> [(Double, SAT.Clause)] -> IO (IntMap Double)
+initPolarityUsingSP :: SAT.Solver -> Int -> Int -> [(Double, SAT.PackedClause)] -> IO (IntMap Double)
 initPolarityUsingSP solver nvOrig nv clauses = do
   n <- getNumCapabilities
   putCommentLine $ "Running survey propgation using " ++ show n ++" threads ..."
   startWC  <- getTime Monotonic
-  sp <- SP.newSolver nv clauses  
+  sp <- SP.newSolver nv clauses
   SP.initializeRandom sp =<< SAT.getRandomGen solver
   SP.setNThreads sp n
   lits <- SAT.getFixedLiterals solver
@@ -636,15 +636,15 @@ solveMUS opt solver gcnf = do
       sel2idx :: Array SAT.Lit Int
       sel2idx = array selrng [(sel, idx) | (idx, sel) <- tbl]
 
-  (idx2clausesM :: IOArray Int [SAT.Clause]) <- newArray (1, GCNF.lastGroupIndex gcnf) []
+  (idx2clausesM :: IOArray Int [SAT.PackedClause]) <- newArray (1, GCNF.lastGroupIndex gcnf) []
   forM_ (GCNF.clauses gcnf) $ \(idx, clause) ->
     if idx==0
-    then SAT.addClause solver clause
+    then SAT.addClause solver (SAT.unpackClause clause)
     else do
-      SAT.addClause solver (- (idx2sel ! idx) : clause)
+      SAT.addClause solver (- (idx2sel ! idx) : SAT.unpackClause clause)
       cs <- readArray idx2clausesM idx
       writeArray idx2clausesM idx (clause : cs)
-  (idx2clauses :: Array Int [SAT.Clause]) <- freeze idx2clausesM
+  (idx2clauses :: Array Int [SAT.PackedClause]) <- freeze idx2clausesM
 
   when (optInitSP opt) $ do
     let wcnf = GCNF2MaxSAT.convert gcnf
@@ -667,7 +667,7 @@ solveMUS opt solver gcnf = do
                      , MUS.optLogger = putCommentLine
                      , MUS.optShowLit = \lit -> show (sel2idx ! lit)
                      , MUS.optEvalConstr = \m sel ->
-                         and [SAT.evalClause m c | c <- idx2clauses ! (sel2idx ! sel)]
+                         and [SAT.evalClause m (SAT.unpackClause c) | c <- idx2clauses ! (sel2idx ! sel)]
                      }
           mus <- MUS.findMUSAssumptions solver opt2
           let mus2 = sort $ map (sel2idx !) $ IntSet.toList mus
@@ -680,7 +680,7 @@ solveMUS opt solver gcnf = do
                      , MUSEnum.optLogger = putCommentLine
                      , MUSEnum.optShowLit = \lit -> show (sel2idx ! lit)
                      , MUSEnum.optEvalConstr = \m sel ->
-                         and [SAT.evalClause m c | c <- idx2clauses ! (sel2idx ! sel)]
+                         and [SAT.evalClause m (SAT.unpackClause c) | c <- idx2clauses ! (sel2idx ! sel)]
                      , MUSEnum.optOnMCSFound = \mcs -> do
                          i <- readIORef mcsCounter
                          modifyIORef' mcsCounter (+1)
