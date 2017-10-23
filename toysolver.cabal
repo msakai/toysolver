@@ -758,6 +758,26 @@ Executable survey-propagation
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
+Executable probsat
+  if !flag(BuildSamplePrograms)
+    Buildable: False    
+  Main-is: probsat.hs
+  HS-Source-Dirs: samples/programs/probsat
+  Build-Depends:
+    base,
+    clock,
+    data-default-class,
+    optparse-applicative,
+    toysolver
+  Default-Language: Haskell2010
+  Other-Extensions: CPP
+  GHC-Options: -rtsopts
+  -- GHC-Prof-Options: -auto-all
+  if flag(ForceChar8)
+    CPP-Options: "-DFORCE_CHAR8"
+  if flag(LinuxStatic)
+    GHC-Options: -static -optl-static -optl-pthread
+
 -- Misc Programs
 
 Executable pigeonhole
