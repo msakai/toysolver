@@ -880,6 +880,7 @@ Test-suite TestSuite
     Test.MIPSolver
     Test.MIPSolver2
     Test.MPSFile
+    Test.ProbSAT
     Test.QBF
     Test.SAT
     Test.SDPFile
