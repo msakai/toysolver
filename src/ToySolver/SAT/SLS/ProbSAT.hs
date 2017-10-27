@@ -408,7 +408,9 @@ probsat solver opt cb f = do
         checkCurrentSolution solver cb
       replicateM_ (optMaxFlips opt) $ do
         cs <- lift $ readIORef (svUnsatClauses solver)
-        when (Set.size cs <= optTarget opt) $ throwE ()
+        when (Set.null cs) $ throwE ()
+        let obj = Set.size cs + svOffset solver
+        when (obj <= optTarget opt) $ throwE ()
         lift $ do
           c <- pickClause cs
           v <- pickVar c

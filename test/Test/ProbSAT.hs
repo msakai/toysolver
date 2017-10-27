@@ -63,6 +63,29 @@ prop_probSAT = QM.monadicIO $ do
   QM.assert (bounds sol == (1, CNF.numVars cnf))
   QM.assert (obj == evalCNFCost sol cnf)
 
+case_probSAT_case1 :: Assertion
+case_probSAT_case1 = do
+  let cnf =
+        CNF.CNF
+        { CNF.numVars = 1
+        , CNF.numClauses = 2
+        , CNF.clauses = map SAT.packClause
+            [ [1,-1]
+            , []
+            ]
+        }
+  solver <- ProbSAT.newSolver cnf
+  let opt =
+        def
+        { ProbSAT.optTarget   = 0
+        , ProbSAT.optMaxTries = 1
+        , ProbSAT.optMaxFlips = 10
+        }
+      cb = 3.6
+      cm = 0.5
+      f make break = cm**make / cb**break
+  ProbSAT.probsat solver opt def f
+
 ------------------------------------------------------------------------
 -- Test harness
 
