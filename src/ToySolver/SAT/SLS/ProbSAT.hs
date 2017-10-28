@@ -195,7 +195,6 @@ flipVar solver v = do
           Vec.write (svUnsatClauses solver) i c2
           unsafeWrite (svClauseUnsatClauseIndex solver) c2 i
         _ <- Vec.unsafePop (svUnsatClauses solver)
-        unsafeWrite (svClauseUnsatClauseIndex solver) c (-1)
         return ()
 
 setSolution :: SAT.IModel m => Solver -> m -> IO ()
