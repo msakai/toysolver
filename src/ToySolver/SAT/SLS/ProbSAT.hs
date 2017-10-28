@@ -51,8 +51,6 @@ import Data.IORef
 import Data.Maybe
 import Data.Sequence ((|>))
 import qualified Data.Sequence as Seq
-import Data.Set (Set)
-import qualified Data.Set as Set
 import System.Clock
 import qualified System.Random.MWC as Rand
 import qualified System.Random.MWC.Distributions as Rand
@@ -72,8 +70,9 @@ data Solver
   , svVarOccursState    :: !(Array SAT.Var (IOUArray Int Bool))
   , svSolution          :: !(IOUArray SAT.Var Bool)
 
-  , svClauseNumTrueLits    :: !(IOUArray ClauseId Int32)
-  , svUnsatClauses         :: !(IORef (Set ClauseId))
+  , svClauseNumTrueLits      :: !(IOUArray ClauseId Int32)
+  , svClauseUnsatClauseIndex :: !(IOUArray ClauseId Int)
+  , svUnsatClauses           :: !(Vec.UVec ClauseId)
 
   , svRandGen           :: !Rand.GenIO
   , svBestSolution      :: !(IORef (Int, SAT.Model))
@@ -108,12 +107,16 @@ newSolver cnf = do
   (varOccurs' :: IOArray SAT.Var (Seq.Seq (Int, Bool))) <- newArray (1, CNF.numVars cnf) Seq.empty
 
   clauseNumTrueLits <- newArray (bounds clauses) 0
-  unsatClauses <- newIORef Set.empty
+  clauseUnsatClauseIndex <- newArray (bounds clauses) (-1)
+  unsatClauses <- Vec.new
 
   forAssocsM_ clauses $ \(c,clause) -> do
     let n = sum [1 | lit <- elems clause, SAT.evalLit m lit]
     writeArray clauseNumTrueLits c n
-    when (n == 0) $ modifyIORef' unsatClauses (Set.insert c)
+    when (n == 0) $ do
+      i <- Vec.getSize unsatClauses
+      writeArray clauseUnsatClauseIndex c i
+      Vec.push unsatClauses c
     forM_ (elems clause) $ \lit -> do
       let v = SAT.litVar lit
       let b = SAT.evalLit m lit
@@ -137,7 +140,7 @@ newSolver cnf = do
 
   solution <- newListArray (1, CNF.numVars cnf) $ [SAT.evalVar m v | v <- [1..CNF.numVars cnf]]
 
-  bestObj <- liftM ((offset+) . Set.size) $ readIORef unsatClauses
+  bestObj <- liftM (offset+) $ Vec.getSize unsatClauses
   bestSol <- freeze solution
   bestSolution <- newIORef (bestObj, bestSol)
 
@@ -154,8 +157,9 @@ newSolver cnf = do
     , svVarOccursState    = varOccursState
     , svSolution          = solution
 
-    , svClauseNumTrueLits    = clauseNumTrueLits
-    , svUnsatClauses         = unsatClauses
+    , svClauseNumTrueLits      = clauseNumTrueLits
+    , svClauseUnsatClauseIndex = clauseUnsatClauseIndex
+    , svUnsatClauses           = unsatClauses
 
     , svRandGen           = randGen
     , svBestSolution      = bestSolution
@@ -175,10 +179,24 @@ flipVar solver v = do
     unsafeWrite occursState j (not b)
     if b then do
       unsafeWrite (svClauseNumTrueLits solver) c (n-1)
-      when (n==1) $ modifyIORef' (svUnsatClauses solver) (Set.insert c)
+      when (n==1) $ do
+        i <- Vec.getSize (svUnsatClauses solver)
+        Vec.push (svUnsatClauses solver) c
+        unsafeWrite (svClauseUnsatClauseIndex solver) c i
     else do
       unsafeWrite (svClauseNumTrueLits solver) c (n+1)
-      when (n==0) $ modifyIORef' (svUnsatClauses solver) (Set.delete c)
+      when (n==0) $ do
+        s <- Vec.getSize (svUnsatClauses solver)
+        i <- unsafeRead (svClauseUnsatClauseIndex solver) c
+        unless (i == s-1) $ do
+          let i2 = s-1
+          c2 <- Vec.read (svUnsatClauses solver) i2
+          Vec.write (svUnsatClauses solver) i2 c
+          Vec.write (svUnsatClauses solver) i c2
+          unsafeWrite (svClauseUnsatClauseIndex solver) c2 i
+        _ <- Vec.unsafePop (svUnsatClauses solver)
+        unsafeWrite (svClauseUnsatClauseIndex solver) c (-1)
+        return ()
 
 setSolution :: SAT.IModel m => Solver -> m -> IO ()
 setSolution solver m = do
@@ -287,9 +305,8 @@ generateUniformRandomSolution solver = do
 
 checkCurrentSolution :: Solver -> Callbacks -> IO ()
 checkCurrentSolution solver cb = do
-  cs <- readIORef (svUnsatClauses solver)
   best <- readIORef (svBestSolution solver)
-  let obj = Set.size cs + svOffset solver
+  obj <- liftM (svOffset solver +) $ Vec.getSize (svUnsatClauses solver)
   when (obj < fst best) $ do
     sol <- freeze (svSolution solver)
     writeIORef (svBestSolution solver) (obj, sol)
@@ -306,10 +323,11 @@ probsat solver opt cb f = do
   (wbuf :: IOUArray Int Double) <- newArray_ (0, maxClauseLen-1)
   wsumRef <- newIOURef (0 :: Double)
 
-  let pickClause :: Set ClauseId -> IO PackedClause
-      pickClause cs = do
-        j <- Rand.uniformR (0, Set.size cs - 1) (svRandGen solver) -- For integral types inclusive range is used
-        return $! (svClauses solver ! (Set.elemAt j cs))
+  let pickClause :: IO PackedClause
+      pickClause = do
+        s <- Vec.getSize (svUnsatClauses solver)
+        j <- Rand.uniformR (0, s - 1) (svRandGen solver) -- For integral types inclusive range is used
+        liftM (svClauses solver !) $ Vec.read (svUnsatClauses solver) j
 
       pickVar :: PackedClause -> IO SAT.Var
       pickVar c = do
@@ -346,12 +364,12 @@ probsat solver opt cb f = do
         setSolution solver sol
         checkCurrentSolution solver cb
       replicateM_ (optMaxFlips opt) $ do
-        cs <- lift $ readIORef (svUnsatClauses solver)
-        when (Set.null cs) $ throwE ()
-        let obj = Set.size cs + svOffset solver
+        s <- lift $ Vec.getSize (svUnsatClauses solver)
+        when (s == 0) $ throwE ()
+        let obj = s + svOffset solver
         when (obj <= optTarget opt) $ throwE ()
         lift $ do
-          c <- pickClause cs
+          c <- pickClause
           v <- pickVar c
           flipVar solver v
           modifyIOURef flipsRef inc
@@ -377,10 +395,11 @@ walksat solver opt cb p = do
   (buf :: Vec.UVec SAT.Var) <- Vec.new
   (breaks :: Vec.UVec Int) <- Vec.new
 
-  let pickClause :: Set ClauseId -> IO PackedClause
-      pickClause cs = do
-        j <- Rand.uniformR (0, Set.size cs - 1) (svRandGen solver) -- For integral types inclusive range is used
-        return $! (svClauses solver ! (Set.elemAt j cs))
+  let pickClause :: IO PackedClause
+      pickClause = do
+        s <- Vec.getSize (svUnsatClauses solver)
+        j <- Rand.uniformR (0, s - 1) (svRandGen solver) -- For integral types inclusive range is used
+        liftM (svClauses solver !) $ Vec.read (svUnsatClauses solver) j
 
       pickVar :: PackedClause -> IO SAT.Var
       pickVar c = do
@@ -419,10 +438,10 @@ walksat solver opt cb p = do
         setSolution solver sol
         checkCurrentSolution solver cb
       replicateM_ (optMaxFlips opt) $ do
-        cs <- lift $ readIORef (svUnsatClauses solver)
-        when (Set.size cs <= optTarget opt) $ throwE ()
+        s <- lift $ Vec.getSize (svUnsatClauses solver)
+        when (s <= optTarget opt) $ throwE ()
         lift $ do
-          c <- pickClause cs
+          c <- pickClause
           v <- pickVar c
           flipVar solver v
           modifyIOURef flipsRef inc
