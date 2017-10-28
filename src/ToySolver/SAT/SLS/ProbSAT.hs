@@ -35,9 +35,11 @@ module ToySolver.SAT.SLS.ProbSAT
 
 import Prelude hiding (break)
 
+import Control.Loop
 import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
+import Data.Array.Base (unsafeRead, unsafeWrite, unsafeAt)
 import Data.Array.IArray
 import Data.Array.IO
 import Data.Array.Unboxed
@@ -67,12 +69,10 @@ data Solver
   , svOffset            :: !Int
 
   , svVarOccurs         :: !(Array SAT.Var (UArray Int ClauseId))
-  , svVarOccursState    :: !(Array SAT.Var (IOArray Int VarOccurState))
-  , svVarStateCounts    :: !(IOUArray (SAT.Var,VarOccurState) Int32)
+  , svVarOccursState    :: !(Array SAT.Var (IOUArray Int Bool))
   , svSolution          :: !(IOUArray SAT.Var Bool)
 
   , svClauseNumTrueLits    :: !(IOUArray ClauseId Int32)
-  , svClauseVarOccursIndex :: !(Array ClauseId (Array Int Int))
   , svUnsatClauses         :: !(IORef (Set ClauseId))
 
   , svRandGen           :: !Rand.GenIO
@@ -105,51 +105,19 @@ newSolver cnf = do
   let clauses = listArray (0, length cs - 1) cs
   offset <- readIOURef offsetRef
 
-  (varOccurs' :: IOArray SAT.Var (Seq.Seq (Int, VarOccurState))) <- newArray (1, CNF.numVars cnf) Seq.empty
-  varStateCounts <- newArray ((1,minBound),(CNF.numVars cnf,maxBound)) 0
+  (varOccurs' :: IOArray SAT.Var (Seq.Seq (Int, Bool))) <- newArray (1, CNF.numVars cnf) Seq.empty
 
   clauseNumTrueLits <- newArray (bounds clauses) 0
-  (clauseVarOccursIndex' :: IOArray ClauseId (Array Int Int)) <- newArray_ (bounds clauses)
   unsatClauses <- newIORef Set.empty
 
   forAssocsM_ clauses $ \(c,clause) -> do
     let n = sum [1 | lit <- elems clause, SAT.evalLit m lit]
     writeArray clauseNumTrueLits c n
-
-    (idx :: IOUArray Int Int) <- newArray_ (bounds clause)
-
-    if n == 0 then do
-      modifyIORef' unsatClauses (Set.insert c)
-      forAssocsM_ clause $ \(k,lit) -> do
-        let v = SAT.litVar lit
-        o <- readArray varOccurs' v
-        writeArray idx k (Seq.length o)
-        writeArray varOccurs' v (o |> (c,VOSMake))
-        modifyArray varStateCounts (SAT.litVar lit, VOSMake) inc
-    else if n == 1 then do
-      forAssocsM_ clause $ \(k,lit) -> do
-        let v = SAT.litVar lit
-        o <- readArray varOccurs' v
-        writeArray idx k (Seq.length o)
-        if SAT.evalLit m lit then do
-          writeArray varOccurs' v (o |> (c,VOSBreak))
-          modifyArray varStateCounts (SAT.litVar lit, VOSBreak) inc
-        else do
-          writeArray varOccurs' v (o |> (c,VOSMakeBuf))
-          modifyArray varStateCounts (SAT.litVar lit, VOSMakeBuf) inc
-    else do
-      forAssocsM_ clause $ \(k,lit) -> do
-        let v = SAT.litVar lit
-        o <- readArray varOccurs' v
-        writeArray idx k (Seq.length o)
-        if SAT.evalLit m lit then do
-          writeArray varOccurs' v (o |> (c,VOSBreakBuf))
-          modifyArray varStateCounts (SAT.litVar lit, VOSBreakBuf) inc
-        else do
-          writeArray varOccurs' v (o |> (c,VOSMakeBuf))
-          modifyArray varStateCounts (SAT.litVar lit, VOSMakeBuf) inc
-
-    writeArray clauseVarOccursIndex' c =<< unsafeFreeze idx
+    when (n == 0) $ modifyIORef' unsatClauses (Set.insert c)
+    forM_ (elems clause) $ \lit -> do
+      let v = SAT.litVar lit
+      let b = SAT.evalLit m lit
+      seq b $ modifyArray varOccurs' v (|> (c,b))
 
   varOccurs <- do
     (arr::IOArray SAT.Var (UArray Int ClauseId)) <- newArray_ (1, CNF.numVars cnf)
@@ -159,15 +127,13 @@ newSolver cnf = do
     unsafeFreeze arr
 
   varOccursState <- do
-    (arr::IOArray SAT.Var (IOArray Int VarOccurState)) <- newArray_ (1, CNF.numVars cnf)
+    (arr::IOArray SAT.Var (IOUArray Int Bool)) <- newArray_ (1, CNF.numVars cnf)
     forM_ [1 .. CNF.numVars cnf] $ \v -> do
       s <- readArray varOccurs' v
       ss <- newArray_ (0, Seq.length s - 1)
       forM_ (zip [0..] (F.toList s)) $ \(j,a) -> writeArray ss j (snd a)
       writeArray arr v ss
     unsafeFreeze arr
-
-  clauseVarOccursIndex <- freeze clauseVarOccursIndex'
 
   solution <- newListArray (1, CNF.numVars cnf) $ [SAT.evalVar m v | v <- [1..CNF.numVars cnf]]
 
@@ -186,11 +152,9 @@ newSolver cnf = do
 
     , svVarOccurs         = varOccurs
     , svVarOccursState    = varOccursState
-    , svVarStateCounts    = varStateCounts
     , svSolution          = solution
 
     , svClauseNumTrueLits    = clauseNumTrueLits
-    , svClauseVarOccursIndex = clauseVarOccursIndex
     , svUnsatClauses         = unsatClauses
 
     , svRandGen           = randGen
@@ -204,58 +168,17 @@ flipVar solver v = do
   let occurs = svVarOccurs solver ! v
       occursState = svVarOccursState solver ! v
   seq occurs $ seq occursState $ return ()
-
   modifyArray (svSolution solver) v not
-
-  forAssocsM_ occurs $ \(j,c) -> do
-    let clause = svClauses solver ! c
-        idx  = svClauseVarOccursIndex solver ! c
-    s <- readArray occursState j
-
-    case s of
-      VOSMake -> do
-        changeVarOccurState solver v j VOSMake VOSBreak
-        modifyArray (svClauseNumTrueLits solver) c inc
-        modifyIORef' (svUnsatClauses solver) (Set.delete c)
-        forAssocsM_ clause $ \(k,lit) -> do
-          let v2 = SAT.litVar lit
-          unless (v == v2) $ do
-            changeVarOccurState solver v2 (idx ! k) VOSMake VOSMakeBuf
-      VOSBreak -> do
-        changeVarOccurState solver v j VOSBreak VOSMake
-        modifyArray (svClauseNumTrueLits solver) c dec
-        modifyIORef' (svUnsatClauses solver) (Set.insert c)
-        forAssocsM_ clause $ \(k,lit) -> do
-          let v2 = SAT.litVar lit
-          unless (v == v2) $ do
-            changeVarOccurState solver v2 (idx ! k) VOSMakeBuf VOSMake
-      VOSMakeBuf -> do
-        changeVarOccurState solver v j VOSMakeBuf VOSBreakBuf
-        modifyArray (svClauseNumTrueLits solver) c inc
-        forAssocsM_ clause $ \(k,lit) -> do
-          let v2 = SAT.litVar lit
-          unless (v == v2) $ do
-            s2 <- readArray (svVarOccursState solver ! v2) (idx ! k)
-            when (s2 == VOSBreak) $ do
-              changeVarOccurState solver v2 (idx ! k) VOSBreak VOSBreakBuf
-      VOSBreakBuf -> do
-        changeVarOccurState solver v j VOSBreakBuf VOSMakeBuf 
-        modifyArray (svClauseNumTrueLits solver) c dec
-        n <- readArray (svClauseNumTrueLits solver) c
-        when (n==1) $ do
-          forAssocsM_ clause $ \(k,lit) -> do
-            let v2 = SAT.litVar lit
-            unless (v == v2) $ do
-              s2 <- readArray (svVarOccursState solver ! v2) (idx ! k)
-              when (s2 == VOSBreakBuf) $ do
-                changeVarOccurState solver v2 (idx ! k) VOSBreakBuf VOSBreak
-
-{-# INLINE changeVarOccurState #-}
-changeVarOccurState :: Solver -> SAT.Var -> Int -> VarOccurState -> VarOccurState -> IO ()
-changeVarOccurState solver !v !i !old !new = do
-   writeArray (svVarOccursState solver ! v) i new
-   modifyArray (svVarStateCounts solver) (v, old) dec
-   modifyArray (svVarStateCounts solver) (v, new) inc  
+  forAssocsM_ occurs $ \(j,!c) -> do
+    b <- unsafeRead occursState j
+    n <- unsafeRead (svClauseNumTrueLits solver) c
+    unsafeWrite occursState j (not b)
+    if b then do
+      unsafeWrite (svClauseNumTrueLits solver) c (n-1)
+      when (n==1) $ modifyIORef' (svUnsatClauses solver) (Set.insert c)
+    else do
+      unsafeWrite (svClauseNumTrueLits solver) c (n+1)
+      when (n==0) $ modifyIORef' (svUnsatClauses solver) (Set.delete c)
 
 setSolution :: SAT.IModel m => Solver -> m -> IO ()
 setSolution solver m = do
@@ -281,14 +204,27 @@ getStatistics solver = readIORef (svStatistics solver)
 {-# INLINE getMakeValue #-}
 getMakeValue :: Solver -> SAT.Var -> IO Int
 getMakeValue solver v = do
-  m <- readArray (svVarStateCounts solver) (v, VOSMake)
-  return $! fromIntegral m
+  let occurs = svVarOccurs solver ! v
+      (lb,ub) = bounds occurs
+  seq occurs $ seq lb $ seq ub $
+    numLoopState lb ub 0 $ \ !r !i -> do
+      n <- unsafeRead (svClauseNumTrueLits solver) (unsafeAt occurs i)
+      return $! if n == 0 then (r+1) else r
 
 {-# INLINE getBreakValue #-}
 getBreakValue :: Solver -> SAT.Var -> IO Int
 getBreakValue solver v = do
-  b <- readArray (svVarStateCounts solver) (v, VOSBreak)
-  return $! fromIntegral b
+  let occurs = svVarOccurs solver ! v
+      occursState = svVarOccursState solver ! v
+      (lb,ub) = bounds occurs
+  seq occurs $ seq occursState $ seq lb $ seq ub $
+    numLoopState lb ub 0 $ \ !r !i -> do
+      b <- unsafeRead occursState i
+      if b then do
+        n <- unsafeRead (svClauseNumTrueLits solver) (unsafeAt occurs i)
+        return $! if n==1 then (r+1) else r
+      else
+        return r
 
 -- -------------------------------------------------------------------
 
@@ -439,6 +375,7 @@ probsat solver opt cb f = do
 walksat :: Solver -> Options -> Callbacks -> Double -> IO ()
 walksat solver opt cb p = do
   (buf :: Vec.UVec SAT.Var) <- Vec.new
+  (breaks :: Vec.UVec Int) <- Vec.new
 
   let pickClause :: Set ClauseId -> IO PackedClause
       pickClause cs = do
@@ -448,13 +385,14 @@ walksat solver opt cb p = do
       pickVar :: PackedClause -> IO SAT.Var
       pickVar c = do
         liftM (either id id) $ runExceptT $ do
-          let f :: Int -> SAT.Lit -> ExceptT SAT.Var IO Int
-              f b0 lit = do
-                let v = SAT.litVar lit
-                b <- lift $ getBreakValue solver v
-                when (b == 0) $ throwE v -- freebie move
-                return $! min b0 b
-          b0 <- foldM f maxBound (elems c)
+          lift $ Vec.clear breaks
+          let (lb,ub) = bounds c
+          b0 <- numLoopState lb ub maxBound $ \ !b0 !i -> do
+            let v = SAT.litVar (c ! i)
+            b <- lift $ getBreakValue solver v
+            when (b == 0) $ throwE v -- freebie move
+            lift $ Vec.push breaks b
+            return $! min b0 b
           lift $ do
             flag <- Rand.bernoulli p (svRandGen solver)
             if flag then do
@@ -464,10 +402,9 @@ walksat solver opt cb p = do
             else do
               -- greedy move
               Vec.clear buf
-              forM_ (elems c) $ \lit -> do
-                let v = SAT.litVar lit
-                b <- getBreakValue solver v
-                when (b == b0) $ Vec.push buf v
+              forAssocsM_ c $ \(i,!lit) -> do
+                b <- Vec.read breaks i
+                when (b == b0) $ Vec.push buf (SAT.litVar lit)
               s <- Vec.getSize buf
               i <- Rand.uniformR (0, s - 1) (svRandGen solver)
               Vec.read buf i
@@ -513,20 +450,14 @@ modifyArray a i f = do
   writeArray a i (f e)
 
 {-# INLINE forAssocsM_ #-}
-forAssocsM_ :: (Ix i, IArray a e, Monad m) => a i e -> ((i,e) -> m ()) -> m ()
-forAssocsM_ a f = forM_ (assocs a) f
-{-
-forAssocsM_ a f =
-  forM_ (range (bounds a)) $ \i -> do
-    f (i, a ! i)
--}
+forAssocsM_ :: (IArray a e, Monad m) => a Int e -> ((Int,e) -> m ()) -> m ()
+forAssocsM_ a f = do
+  let (lb,ub) = bounds a
+  numLoop lb ub $ \i ->
+    f (i, unsafeAt a i)
 
 {-# INLINE inc #-}
 inc :: Integral a => a -> a
 inc a = a+1
-
-{-# INLINE dec #-}
-dec :: Integral a => a -> a
-dec a = a-1
              
 -- -------------------------------------------------------------------
