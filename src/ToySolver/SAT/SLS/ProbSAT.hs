@@ -67,6 +67,7 @@ data Solver
   = Solver
   { svClauses                :: !(Array ClauseId PackedClause)
   , svClauseWeights          :: !(Array ClauseId MaxSAT.Weight)
+  , svClauseWeightsF         :: !(UArray ClauseId Double)
   , svClauseNumTrueLits      :: !(IOUArray ClauseId Int32)
   , svClauseUnsatClauseIndex :: !(IOUArray ClauseId Int)
   , svUnsatClauses           :: !(Vec.UVec ClauseId)
@@ -123,6 +124,8 @@ newSolverWeighted wcnf = do
       clauses  = listArray (0, len - 1) (map snd cs)
       weights  :: Array ClauseId MaxSAT.Weight
       weights  = listArray (0, len - 1) (map fst cs)
+      weightsF :: UArray ClauseId Double
+      weightsF = listArray (0, len - 1) (map (fromIntegral . fst) cs)
 
   (varOccurs' :: IOArray SAT.Var (Seq.Seq (Int, Bool))) <- newArray (1, nv) Seq.empty
 
@@ -173,6 +176,7 @@ newSolverWeighted wcnf = do
     Solver
     { svClauses = clauses
     , svClauseWeights          = weights
+    , svClauseWeightsF         = weightsF
     , svClauseNumTrueLits      = clauseNumTrueLits
     , svClauseUnsatClauseIndex = clauseUnsatClauseIndex
     , svUnsatClauses           = unsatClauses
@@ -243,17 +247,18 @@ getStatistics :: Solver -> IO Statistics
 getStatistics solver = readIORef (svStatistics solver)
 
 {-# INLINE getMakeValue #-}
-getMakeValue :: Solver -> SAT.Var -> IO Int
+getMakeValue :: Solver -> SAT.Var -> IO Double
 getMakeValue solver v = do
   let occurs = svVarOccurs solver ! v
       (lb,ub) = bounds occurs
   seq occurs $ seq lb $ seq ub $
     numLoopState lb ub 0 $ \ !r !i -> do
-      n <- unsafeRead (svClauseNumTrueLits solver) (unsafeAt occurs i)
-      return $! if n == 0 then (r+1) else r
+      let c = unsafeAt occurs i
+      n <- unsafeRead (svClauseNumTrueLits solver) c
+      return $! if n == 0 then (r + unsafeAt (svClauseWeightsF solver) c) else r
 
 {-# INLINE getBreakValue #-}
-getBreakValue :: Solver -> SAT.Var -> IO Int
+getBreakValue :: Solver -> SAT.Var -> IO Double
 getBreakValue solver v = do
   let occurs = svVarOccurs solver ! v
       occursState = svVarOccursState solver ! v
@@ -262,8 +267,9 @@ getBreakValue solver v = do
     numLoopState lb ub 0 $ \ !r !i -> do
       b <- unsafeRead occursState i
       if b then do
-        n <- unsafeRead (svClauseNumTrueLits solver) (unsafeAt occurs i)
-        return $! if n==1 then (r+1) else r
+        let c = unsafeAt occurs i
+        n <- unsafeRead (svClauseNumTrueLits solver) c
+        return $! if n==1 then (r + unsafeAt (svClauseWeightsF solver) c) else r
       else
         return r
 
@@ -359,7 +365,7 @@ probsat solver opt cb f = do
           let v = SAT.litVar lit
           m <- getMakeValue solver v
           b <- getBreakValue solver v
-          let w = f (fromIntegral m) (fromIntegral b)
+          let w = f m b
           writeArray wbuf k w
           modifyIOURef wsumRef (+w)
         wsum <- readIOURef wsumRef
@@ -416,7 +422,7 @@ probsat solver opt cb f = do
 walksat :: Solver -> Options -> Callbacks -> Double -> IO ()
 walksat solver opt cb p = do
   (buf :: Vec.UVec SAT.Var) <- Vec.new
-  (breaks :: Vec.UVec Int) <- Vec.new
+  (breaks :: Vec.UVec Double) <- Vec.new
 
   let pickClause :: IO PackedClause
       pickClause = do
@@ -429,7 +435,7 @@ walksat solver opt cb p = do
         liftM (either id id) $ runExceptT $ do
           lift $ Vec.clear breaks
           let (lb,ub) = bounds c
-          b0 <- numLoopState lb ub maxBound $ \ !b0 !i -> do
+          b0 <- numLoopState lb ub (1.0/0.0) $ \ !b0 !i -> do
             let v = SAT.litVar (c ! i)
             b <- lift $ getBreakValue solver v
             when (b == 0) $ throwE v -- freebie move
