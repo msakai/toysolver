@@ -63,16 +63,16 @@ import qualified ToySolver.Text.CNF as CNF
 
 data Solver
   = Solver
-  { svClauses           :: !(Array Int PackedClause)
-  , svOffset            :: !Int
+  { svClauses                :: !(Array ClauseId PackedClause)
+  , svClauseNumTrueLits      :: !(IOUArray ClauseId Int32)
+  , svClauseUnsatClauseIndex :: !(IOUArray ClauseId Int)
+  , svUnsatClauses           :: !(Vec.UVec ClauseId)
 
   , svVarOccurs         :: !(Array SAT.Var (UArray Int ClauseId))
   , svVarOccursState    :: !(Array SAT.Var (IOUArray Int Bool))
   , svSolution          :: !(IOUArray SAT.Var Bool)
 
-  , svClauseNumTrueLits      :: !(IOUArray ClauseId Int32)
-  , svClauseUnsatClauseIndex :: !(IOUArray ClauseId Int)
-  , svUnsatClauses           :: !(Vec.UVec ClauseId)
+  , svObjOffset         :: !Int
 
   , svRandGen           :: !Rand.GenIO
   , svBestSolution      :: !(IORef (Int, SAT.Model))
@@ -94,6 +94,7 @@ newSolver :: CNF.CNF -> IO Solver
 newSolver cnf = do
   let m :: SAT.Var -> Bool
       m _ = False
+      nv = CNF.numVars cnf
 
   offsetRef <- newIOURef (0::Int)
   cs <- liftM catMaybes $ forM (CNF.clauses cnf) $ \pc -> do
@@ -104,7 +105,7 @@ newSolver cnf = do
   let clauses = listArray (0, length cs - 1) cs
   offset <- readIOURef offsetRef
 
-  (varOccurs' :: IOArray SAT.Var (Seq.Seq (Int, Bool))) <- newArray (1, CNF.numVars cnf) Seq.empty
+  (varOccurs' :: IOArray SAT.Var (Seq.Seq (Int, Bool))) <- newArray (1, nv) Seq.empty
 
   clauseNumTrueLits <- newArray (bounds clauses) 0
   clauseUnsatClauseIndex <- newArray (bounds clauses) (-1)
@@ -123,22 +124,22 @@ newSolver cnf = do
       seq b $ modifyArray varOccurs' v (|> (c,b))
 
   varOccurs <- do
-    (arr::IOArray SAT.Var (UArray Int ClauseId)) <- newArray_ (1, CNF.numVars cnf)
-    forM_ [1 .. CNF.numVars cnf] $ \v -> do
+    (arr::IOArray SAT.Var (UArray Int ClauseId)) <- newArray_ (1, nv)
+    forM_ [1 .. nv] $ \v -> do
       s <- readArray varOccurs' v
       writeArray arr v $ listArray (0, Seq.length s - 1) (map fst (F.toList s))
     unsafeFreeze arr
 
   varOccursState <- do
-    (arr::IOArray SAT.Var (IOUArray Int Bool)) <- newArray_ (1, CNF.numVars cnf)
-    forM_ [1 .. CNF.numVars cnf] $ \v -> do
+    (arr::IOArray SAT.Var (IOUArray Int Bool)) <- newArray_ (1, nv)
+    forM_ [1 .. nv] $ \v -> do
       s <- readArray varOccurs' v
       ss <- newArray_ (0, Seq.length s - 1)
       forM_ (zip [0..] (F.toList s)) $ \(j,a) -> writeArray ss j (snd a)
       writeArray arr v ss
     unsafeFreeze arr
 
-  solution <- newListArray (1, CNF.numVars cnf) $ [SAT.evalVar m v | v <- [1..CNF.numVars cnf]]
+  solution <- newListArray (1, nv) $ [SAT.evalVar m v | v <- [1..nv]]
 
   bestObj <- liftM (offset+) $ Vec.getSize unsatClauses
   bestSol <- freeze solution
@@ -151,15 +152,15 @@ newSolver cnf = do
   return $
     Solver
     { svClauses = clauses
-    , svOffset = offset
+    , svClauseNumTrueLits      = clauseNumTrueLits
+    , svClauseUnsatClauseIndex = clauseUnsatClauseIndex
+    , svUnsatClauses           = unsatClauses
 
     , svVarOccurs         = varOccurs
     , svVarOccursState    = varOccursState
     , svSolution          = solution
 
-    , svClauseNumTrueLits      = clauseNumTrueLits
-    , svClauseUnsatClauseIndex = clauseUnsatClauseIndex
-    , svUnsatClauses           = unsatClauses
+    , svObjOffset = offset
 
     , svRandGen           = randGen
     , svBestSolution      = bestSolution
@@ -305,7 +306,7 @@ generateUniformRandomSolution solver = do
 checkCurrentSolution :: Solver -> Callbacks -> IO ()
 checkCurrentSolution solver cb = do
   best <- readIORef (svBestSolution solver)
-  obj <- liftM (svOffset solver +) $ Vec.getSize (svUnsatClauses solver)
+  obj <- liftM (svObjOffset solver +) $ Vec.getSize (svUnsatClauses solver)
   when (obj < fst best) $ do
     sol <- freeze (svSolution solver)
     writeIORef (svBestSolution solver) (obj, sol)
@@ -365,7 +366,7 @@ probsat solver opt cb f = do
       replicateM_ (optMaxFlips opt) $ do
         s <- lift $ Vec.getSize (svUnsatClauses solver)
         when (s == 0) $ throwE ()
-        let obj = s + svOffset solver
+        let obj = s + svObjOffset solver
         when (obj <= optTarget opt) $ throwE ()
         lift $ do
           c <- pickClause
