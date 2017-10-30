@@ -61,7 +61,7 @@ prop_probSAT = QM.monadicIO $ do
     ProbSAT.getBestSolution solver
   QM.monitor (counterexample (show (obj,sol)))
   QM.assert (bounds sol == (1, CNF.numVars cnf))
-  QM.assert (obj == evalCNFCost sol cnf)
+  QM.assert (obj == fromIntegral (evalCNFCost sol cnf))
 
 case_probSAT_case1 :: Assertion
 case_probSAT_case1 = do

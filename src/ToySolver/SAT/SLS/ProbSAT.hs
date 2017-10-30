@@ -18,6 +18,7 @@
 module ToySolver.SAT.SLS.ProbSAT
   ( Solver
   , newSolver
+  , newSolverWeighted
   , getNumVars
   , getRandGen
   , getBestSolution
@@ -58,12 +59,14 @@ import ToySolver.Internal.Data.IOURef
 import qualified ToySolver.Internal.Data.Vec as Vec
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.CNF as CNF
+import qualified ToySolver.Text.MaxSAT as MaxSAT
 
 -- -------------------------------------------------------------------
 
 data Solver
   = Solver
   { svClauses                :: !(Array ClauseId PackedClause)
+  , svClauseWeights          :: !(Array ClauseId MaxSAT.Weight)
   , svClauseNumTrueLits      :: !(IOUArray ClauseId Int32)
   , svClauseUnsatClauseIndex :: !(IOUArray ClauseId Int)
   , svUnsatClauses           :: !(Vec.UVec ClauseId)
@@ -72,10 +75,10 @@ data Solver
   , svVarOccursState    :: !(Array SAT.Var (IOUArray Int Bool))
   , svSolution          :: !(IOUArray SAT.Var Bool)
 
-  , svObjOffset         :: !Int
+  , svObj               :: !(IORef MaxSAT.Weight)
 
   , svRandGen           :: !Rand.GenIO
-  , svBestSolution      :: !(IORef (Int, SAT.Model))
+  , svBestSolution      :: !(IORef (MaxSAT.Weight, SAT.Model))
   , svStatistics        :: !(IORef Statistics)
   }
 
@@ -92,18 +95,34 @@ data VarOccurState
 
 newSolver :: CNF.CNF -> IO Solver
 newSolver cnf = do
+  let wcnf =
+        MaxSAT.WCNF
+        { MaxSAT.numVars    = CNF.numVars cnf
+        , MaxSAT.numClauses = CNF.numClauses cnf
+        , MaxSAT.topCost    = fromIntegral (CNF.numClauses cnf) + 1
+        , MaxSAT.clauses    = [(1,c) | c <- CNF.clauses cnf]
+        }
+  newSolverWeighted wcnf
+
+newSolverWeighted :: MaxSAT.WCNF -> IO Solver
+newSolverWeighted wcnf = do
   let m :: SAT.Var -> Bool
       m _ = False
-      nv = CNF.numVars cnf
+      nv = MaxSAT.numVars wcnf
 
-  offsetRef <- newIOURef (0::Int)
-  cs <- liftM catMaybes $ forM (CNF.clauses cnf) $ \pc -> do
+  objRef <- newIORef (0::Integer)
+
+  cs <- liftM catMaybes $ forM (MaxSAT.clauses wcnf) $ \(w,pc) -> do
     case SAT.normalizeClause (SAT.unpackClause pc) of
       Nothing -> return Nothing
-      Just [] -> modifyIOURef offsetRef inc >> return Nothing
-      Just c  -> return $ Just $ listArray (0, length c - 1) c
-  let clauses = listArray (0, length cs - 1) cs
-  offset <- readIOURef offsetRef
+      Just [] -> modifyIORef' objRef (w+) >> return Nothing
+      Just c  -> do
+        let c' = listArray (0, length c - 1) c
+        seq c' $ return (Just (w,c'))
+  let len = length cs
+      clauses  = listArray (0, len - 1) (map snd cs)
+      weights  :: Array ClauseId MaxSAT.Weight
+      weights  = listArray (0, len - 1) (map fst cs)
 
   (varOccurs' :: IOArray SAT.Var (Seq.Seq (Int, Bool))) <- newArray (1, nv) Seq.empty
 
@@ -118,6 +137,7 @@ newSolver cnf = do
       i <- Vec.getSize unsatClauses
       writeArray clauseUnsatClauseIndex c i
       Vec.push unsatClauses c
+      modifyIORef objRef ((weights ! c) +)
     forM_ (elems clause) $ \lit -> do
       let v = SAT.litVar lit
       let b = SAT.evalLit m lit
@@ -141,7 +161,7 @@ newSolver cnf = do
 
   solution <- newListArray (1, nv) $ [SAT.evalVar m v | v <- [1..nv]]
 
-  bestObj <- liftM (offset+) $ Vec.getSize unsatClauses
+  bestObj <- readIORef objRef
   bestSol <- freeze solution
   bestSolution <- newIORef (bestObj, bestSol)
 
@@ -152,6 +172,7 @@ newSolver cnf = do
   return $
     Solver
     { svClauses = clauses
+    , svClauseWeights          = weights
     , svClauseNumTrueLits      = clauseNumTrueLits
     , svClauseUnsatClauseIndex = clauseUnsatClauseIndex
     , svUnsatClauses           = unsatClauses
@@ -160,7 +181,7 @@ newSolver cnf = do
     , svVarOccursState    = varOccursState
     , svSolution          = solution
 
-    , svObjOffset = offset
+    , svObj = objRef
 
     , svRandGen           = randGen
     , svBestSolution      = bestSolution
@@ -184,6 +205,7 @@ flipVar solver v = do
         i <- Vec.getSize (svUnsatClauses solver)
         Vec.push (svUnsatClauses solver) c
         unsafeWrite (svClauseUnsatClauseIndex solver) c i
+        modifyIORef' (svObj solver) (+ unsafeAt (svClauseWeights solver) c)
     else do
       unsafeWrite (svClauseNumTrueLits solver) c (n+1)
       when (n==0) $ do
@@ -196,6 +218,7 @@ flipVar solver v = do
           Vec.write (svUnsatClauses solver) i c2
           unsafeWrite (svClauseUnsatClauseIndex solver) c2 i
         _ <- Vec.unsafePop (svUnsatClauses solver)
+        modifyIORef' (svObj solver) (subtract (unsafeAt (svClauseWeights solver) c))
         return ()
 
 setSolution :: SAT.IModel m => Solver -> m -> IO ()
@@ -213,7 +236,7 @@ getNumVars solver = return $ rangeSize $ bounds (svVarOccurs solver)
 getRandGen :: Solver -> IO Rand.GenIO
 getRandGen solver = return $ svRandGen solver
 
-getBestSolution :: Solver -> IO (Int, SAT.Model)
+getBestSolution :: Solver -> IO (MaxSAT.Weight, SAT.Model)
 getBestSolution solver = readIORef (svBestSolution solver)
 
 getStatistics :: Solver -> IO Statistics
@@ -248,7 +271,7 @@ getBreakValue solver v = do
 
 data Options
   = Options
-  { optTarget   :: !Int
+  { optTarget   :: !MaxSAT.Weight
   , optMaxTries :: !Int
   , optMaxFlips :: !Int
   }
@@ -265,7 +288,7 @@ instance Default Options where
 data Callbacks
   = Callbacks
   { cbGenerateInitialSolution :: Solver -> IO SAT.Model
-  , cbOnUpdateBestSolution :: Solver -> Int -> SAT.Model -> IO ()
+  , cbOnUpdateBestSolution :: Solver -> MaxSAT.Weight -> SAT.Model -> IO ()
   }
 
 instance Default Callbacks where
@@ -306,7 +329,7 @@ generateUniformRandomSolution solver = do
 checkCurrentSolution :: Solver -> Callbacks -> IO ()
 checkCurrentSolution solver cb = do
   best <- readIORef (svBestSolution solver)
-  obj <- liftM (svObjOffset solver +) $ Vec.getSize (svUnsatClauses solver)
+  obj <- readIORef (svObj solver)
   when (obj < fst best) $ do
     sol <- freeze (svSolution solver)
     writeIORef (svBestSolution solver) (obj, sol)
@@ -366,7 +389,7 @@ probsat solver opt cb f = do
       replicateM_ (optMaxFlips opt) $ do
         s <- lift $ Vec.getSize (svUnsatClauses solver)
         when (s == 0) $ throwE ()
-        let obj = s + svObjOffset solver
+        obj <- lift $ readIORef (svObj solver)
         when (obj <= optTarget opt) $ throwE ()
         lift $ do
           c <- pickClause
@@ -438,8 +461,8 @@ walksat solver opt cb p = do
         setSolution solver sol
         checkCurrentSolution solver cb
       replicateM_ (optMaxFlips opt) $ do
-        s <- lift $ Vec.getSize (svUnsatClauses solver)
-        when (s <= optTarget opt) $ throwE ()
+        obj <- lift $ readIORef (svObj solver)
+        when (obj <= optTarget opt) $ throwE ()
         lift $ do
           c <- pickClause
           v <- pickVar c

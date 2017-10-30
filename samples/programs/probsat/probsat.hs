@@ -48,7 +48,7 @@ optionsParser = Options
       <*> maxTriesOption
       <*> maxFlipsOption
 
-    targetOption :: Parser Int
+    targetOption :: Parser Integer
     targetOption = option auto
       $  long "target"
       <> help "target objective value"
