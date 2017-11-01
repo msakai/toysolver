@@ -38,6 +38,7 @@ import Prelude hiding (break)
 
 import Control.Loop
 import Control.Monad
+import Control.Monad.Primitive
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import Data.Array.Base (unsafeRead, unsafeWrite, unsafeAt)
@@ -45,6 +46,7 @@ import Data.Array.IArray
 import Data.Array.IO
 import Data.Array.Unboxed
 import Data.Array.Unsafe
+import Data.Bits
 import Data.Default.Class
 import qualified Data.Foldable as F
 import Data.Int
@@ -52,6 +54,7 @@ import Data.IORef
 import Data.Maybe
 import Data.Sequence ((|>))
 import qualified Data.Sequence as Seq
+import Data.Word
 import System.Clock
 import qualified System.Random.MWC as Rand
 import qualified System.Random.MWC.Distributions as Rand
@@ -280,6 +283,7 @@ data Options
   { optTarget   :: !MaxSAT.Weight
   , optMaxTries :: !Int
   , optMaxFlips :: !Int
+  , optPickClauseWeighted :: Bool
   }
   deriving (Eq, Show)
 
@@ -289,6 +293,7 @@ instance Default Options where
     { optTarget   = 0
     , optMaxTries = 1
     , optMaxFlips = 100000
+    , optPickClauseWeighted = False
     }
 
 data Callbacks
@@ -341,6 +346,33 @@ checkCurrentSolution solver cb = do
     writeIORef (svBestSolution solver) (obj, sol)
     cbOnUpdateBestSolution cb solver obj sol
 
+pickClause :: Solver -> Options -> IO PackedClause
+pickClause solver opt = do
+  if optPickClauseWeighted opt then do
+    obj <- readIORef (svObj solver)
+    let f !j !x = do
+          c <- Vec.read (svUnsatClauses solver) j
+          let w = svClauseWeights solver ! c
+          if x < w then
+            return c
+          else
+            f (j + 1) (x - w)
+    x <- rand obj (svRandGen solver)
+    c <- f 0 x
+    return $ (svClauses solver ! c)
+  else do
+    s <- Vec.getSize (svUnsatClauses solver)
+    j <- Rand.uniformR (0, s - 1) (svRandGen solver) -- For integral types inclusive range is used
+    liftM (svClauses solver !) $ Vec.read (svUnsatClauses solver) j
+
+rand :: PrimMonad m => Integer -> Rand.Gen (PrimState m) -> m Integer
+rand n gen
+  | n <= toInteger (maxBound :: Word32) = toInteger <$> Rand.uniformR (0, fromIntegral n - 1 :: Word32) gen
+  | otherwise = do
+      a <- rand (n `shiftR` 32) gen
+      (b::Word32) <- Rand.uniform gen
+      return $ (a `shiftL` 32) .|. toInteger b
+
 -- -------------------------------------------------------------------
 
 probsat :: Solver -> Options -> Callbacks -> (Double -> Double -> Double) -> IO ()
@@ -352,13 +384,7 @@ probsat solver opt cb f = do
   (wbuf :: IOUArray Int Double) <- newArray_ (0, maxClauseLen-1)
   wsumRef <- newIOURef (0 :: Double)
 
-  let pickClause :: IO PackedClause
-      pickClause = do
-        s <- Vec.getSize (svUnsatClauses solver)
-        j <- Rand.uniformR (0, s - 1) (svRandGen solver) -- For integral types inclusive range is used
-        liftM (svClauses solver !) $ Vec.read (svUnsatClauses solver) j
-
-      pickVar :: PackedClause -> IO SAT.Var
+  let pickVar :: PackedClause -> IO SAT.Var
       pickVar c = do
         writeIOURef wsumRef 0
         forAssocsM_ c $ \(k,lit) -> do
@@ -398,7 +424,7 @@ probsat solver opt cb f = do
         obj <- lift $ readIORef (svObj solver)
         when (obj <= optTarget opt) $ throwE ()
         lift $ do
-          c <- pickClause
+          c <- pickClause solver opt
           v <- pickVar c
           flipVar solver v
           modifyIOURef flipsRef inc
@@ -424,13 +450,7 @@ walksat solver opt cb p = do
   (buf :: Vec.UVec SAT.Var) <- Vec.new
   (breaks :: Vec.UVec Double) <- Vec.new
 
-  let pickClause :: IO PackedClause
-      pickClause = do
-        s <- Vec.getSize (svUnsatClauses solver)
-        j <- Rand.uniformR (0, s - 1) (svRandGen solver) -- For integral types inclusive range is used
-        liftM (svClauses solver !) $ Vec.read (svUnsatClauses solver) j
-
-      pickVar :: PackedClause -> IO SAT.Var
+  let pickVar :: PackedClause -> IO SAT.Var
       pickVar c = do
         liftM (either id id) $ runExceptT $ do
           lift $ Vec.clear breaks
@@ -470,7 +490,7 @@ walksat solver opt cb p = do
         obj <- lift $ readIORef (svObj solver)
         when (obj <= optTarget opt) $ throwE ()
         lift $ do
-          c <- pickClause
+          c <- pickClause solver opt
           v <- pickVar c
           flipVar solver v
           modifyIOURef flipsRef inc

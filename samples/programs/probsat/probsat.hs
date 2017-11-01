@@ -48,6 +48,7 @@ optionsParser = Options
       <$> targetOption
       <*> maxTriesOption
       <*> maxFlipsOption
+      <*> pickClauseWeightedOption
 
     targetOption :: Parser Integer
     targetOption = option auto
@@ -72,6 +73,13 @@ optionsParser = Options
       <> showDefault
       <> metavar "INT"
       <> value (ProbSAT.optMaxFlips def)
+
+    pickClauseWeightedOption :: Parser Bool
+    pickClauseWeightedOption = switch
+      $  short 'w'
+      <> long "weighted"
+      <> help "enable weighted clause selection"
+      <> showDefault
 
     func :: Parser String
     func = strOption
