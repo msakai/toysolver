@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Monad
 import Data.Char
 import Data.Default.Class
 import Data.Monoid
@@ -144,8 +145,6 @@ main = do
       stat <- ProbSAT.getStatistics solver
       printf "c TotalCPUTime = %fs\n" (fromIntegral (toNanoSecs (ProbSAT.statTotalCPUTime stat)) / 10^(9::Int) :: Double)
       printf "c FlipsPerSecond = %f\n" (ProbSAT.statFlipsPerSecond stat)
-      if obj == 0 then
+      when (obj == 0) $ do
         putStrLn "s OPTIMUM FOUND"
-      else
-        putStrLn "s UNKNOWN"
       maxsatPrintModel stdout sol (MaxSAT.numVars wcnf)
