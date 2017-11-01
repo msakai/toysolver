@@ -36,6 +36,7 @@ module ToySolver.SAT.SLS.ProbSAT
 
 import Prelude hiding (break)
 
+import Control.Applicative
 import Control.Loop
 import Control.Monad
 import Control.Monad.Primitive
@@ -367,7 +368,7 @@ pickClause solver opt = do
 
 rand :: PrimMonad m => Integer -> Rand.Gen (PrimState m) -> m Integer
 rand n gen
-  | n <= toInteger (maxBound :: Word32) = toInteger <$> Rand.uniformR (0, fromIntegral n - 1 :: Word32) gen
+  | n <= toInteger (maxBound :: Word32) = liftM toInteger $ Rand.uniformR (0, fromIntegral n - 1 :: Word32) gen
   | otherwise = do
       a <- rand (n `shiftR` 32) gen
       (b::Word32) <- Rand.uniform gen
