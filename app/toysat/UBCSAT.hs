@@ -32,13 +32,13 @@ import Text.Megaparsec.String
 #endif
 
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.WCNF as WCNF
 
 data Options
   = Options
   { optCommand :: FilePath
   , optTempDir :: Maybe FilePath
-  , optProblem :: MaxSAT.WCNF
+  , optProblem :: WCNF.WCNF
   , optProblemFile :: Maybe FilePath
   , optVarInit :: [SAT.Lit]
   }
@@ -48,11 +48,11 @@ instance Default Options where
         { optCommand = "ubcsat"
         , optTempDir = Nothing
         , optProblem =
-            MaxSAT.WCNF
-            { MaxSAT.numVars    = 0
-            , MaxSAT.numClauses = 0
-            , MaxSAT.topCost    = 1
-            , MaxSAT.clauses    = []
+            WCNF.WCNF
+            { WCNF.numVars    = 0
+            , WCNF.numClauses = 0
+            , WCNF.topCost    = 1
+            , WCNF.clauses    = []
             }
         , optProblemFile   = Nothing
         , optVarInit = []
@@ -64,7 +64,7 @@ ubcsatBestFeasible opt = do
   case ret of
     Nothing -> return Nothing
     Just (obj,_) ->
-      if obj < MaxSAT.topCost (optProblem opt) then
+      if obj < WCNF.topCost (optProblem opt) then
         return ret
       else
         return Nothing
@@ -99,7 +99,7 @@ ubcsatMany opt = do
       withTempFile dir ".wcnf" $ \fname h -> do
         hSetBinaryMode h True
         hSetBuffering h (BlockBuffering Nothing)
-        MaxSAT.hPutWCNF h (optProblem opt)
+        WCNF.hPutWCNF h (optProblem opt)
         hClose h
         f fname
 
@@ -111,7 +111,7 @@ ubcsat' opt fname varInitFile = do
         [ "-alg", "irots"
         , "-seed", "0"
         , "-runs", "10"
-        , "-cutoff", show (MaxSAT.numVars wcnf * 50)
+        , "-cutoff", show (WCNF.numVars wcnf * 50)
         , "-timeout", show (10 :: Int)
         , "-gtimeout", show (30 :: Int)
         , "-solve"
@@ -132,7 +132,7 @@ ubcsat' opt fname varInitFile = do
       return []
     Right s -> do
       forM_ (lines s) $ \l -> putStr "c " >> putStrLn l
-      return $ scanSolutions (MaxSAT.numVars wcnf) s
+      return $ scanSolutions (WCNF.numVars wcnf) s
 
 scanSolutions :: Int -> String -> [(Integer, SAT.Model)]
 scanSolutions nv s = rights $ map (parse (solution nv) "") $ lines s

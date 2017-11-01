@@ -17,9 +17,9 @@ module ToySolver.Converter.GCNF2MaxSAT
 import qualified Data.Vector.Generic as VG
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.GCNF as GCNF
-import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.WCNF as WCNF
 
-convert :: GCNF.GCNF -> MaxSAT.WCNF
+convert :: GCNF.GCNF -> WCNF.WCNF
 convert
   GCNF.GCNF
   { GCNF.numVars        = nv
@@ -28,12 +28,12 @@ convert
   , GCNF.clauses        = cs
   }
   =
-  MaxSAT.WCNF
-  { MaxSAT.topCost = top
-  , MaxSAT.clauses = [(top, if g==0 then c else VG.cons (-(nv+g)) c) | (g,c) <- cs] ++ [(1, SAT.packClause [v]) | v <- [nv+1..nv+lastg]]
-  , MaxSAT.numVars = nv + lastg
-  , MaxSAT.numClauses = nc + lastg
+  WCNF.WCNF
+  { WCNF.topCost = top
+  , WCNF.clauses = [(top, if g==0 then c else VG.cons (-(nv+g)) c) | (g,c) <- cs] ++ [(1, SAT.packClause [v]) | v <- [nv+1..nv+lastg]]
+  , WCNF.numVars = nv + lastg
+  , WCNF.numClauses = nc + lastg
   }
   where
-    top :: MaxSAT.Weight
+    top :: WCNF.Weight
     top = fromIntegral (lastg + 1)

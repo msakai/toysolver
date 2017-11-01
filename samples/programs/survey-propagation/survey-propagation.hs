@@ -8,7 +8,7 @@ import System.Console.GetOpt
 import System.Environment
 import System.Exit
 import System.IO
-import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.WCNF as WCNF
 import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
 #ifdef ENABLE_OPENCL
 import Control.Parallel.OpenCL
@@ -96,7 +96,7 @@ main = do
     (o,[fname],_) -> do
       let opt = foldl (flip id) def o
       handle (\(e::SomeException) -> hPrint stderr e) $ do
-        Right wcnf <- MaxSAT.parseFile fname
+        Right wcnf <- WCNF.parseFile fname
 
 #ifdef ENABLE_OPENCL
         if optOpenCL opt then do
@@ -110,10 +110,10 @@ main = do
               error ("platform " ++ name ++ " has only " ++ show (length devs) ++ " devices")
           context <- clCreateContext [] [dev] print
           solver <- SPCL.newSolver putStrLn context dev
-            (MaxSAT.numVars wcnf) [(fromIntegral w, clause) | (w,clause) <- MaxSAT.clauses wcnf]
+            (WCNF.numVars wcnf) [(fromIntegral w, clause) | (w,clause) <- WCNF.clauses wcnf]
           -- Rand.withSystemRandom $ SPCL.initializeRandom solver
           print =<< SPCL.propagate solver
-          forM_ [1 .. MaxSAT.numVars wcnf] $ \v -> do
+          forM_ [1 .. WCNF.numVars wcnf] $ \v -> do
             prob <- SPCL.getVarProb solver v
             print (v,prob)
           SPCL.deleteSolver solver
@@ -123,11 +123,11 @@ main = do
 #endif
         else do
           solver <- SP.newSolver
-            (MaxSAT.numVars wcnf) [(fromIntegral w, clause) | (w,clause) <- MaxSAT.clauses wcnf]
+            (WCNF.numVars wcnf) [(fromIntegral w, clause) | (w,clause) <- WCNF.clauses wcnf]
           SP.setNThreads solver (optNThreads opt)
           -- Rand.withSystemRandom $ SP.initializeRandom solver
           print =<< SP.propagate solver
-          forM_ [1 .. MaxSAT.numVars wcnf] $ \v -> do
+          forM_ [1 .. WCNF.numVars wcnf] $ \v -> do
             prob <- SP.getVarProb solver v
             print (v,prob)
           SP.deleteSolver solver

@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Text.MaxSAT
+-- Module      :  ToySolver.Text.WCNF
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
 -- 
@@ -15,7 +15,7 @@
 -- * <http://maxsat.ia.udl.cat/requirements/>
 --
 -----------------------------------------------------------------------------
-module ToySolver.Text.MaxSAT
+module ToySolver.Text.WCNF
   (
     WCNF (..)
   , WeightedClause
@@ -99,7 +99,7 @@ parseByteString s =
 parseWCNFLineBS :: BS.ByteString -> WeightedClause
 parseWCNFLineBS s =
   case BS.readInteger (BS.dropWhile isSpace s) of
-    Nothing -> error "ToySolver.Text.MaxSAT: no weight"
+    Nothing -> error "ToySolver.Text.WCNF: no weight"
     Just (w, s') -> seq w $ seq xs $ (w, xs)
       where
         xs = parseClauseBS s'
@@ -114,7 +114,7 @@ parseClauseBS s = SAT.packClause (go s)
   where
     go s =
       case BS.readInt (BS.dropWhile isSpace s) of
-        Nothing -> error "ToySolver.Text.MaxSAT: parse error"
+        Nothing -> error "ToySolver.Text.WCNF: parse error"
         Just (0,_) -> []
         Just (i,s') -> i : go s'
 

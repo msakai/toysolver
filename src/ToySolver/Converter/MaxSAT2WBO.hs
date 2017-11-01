@@ -16,15 +16,15 @@ module ToySolver.Converter.MaxSAT2WBO
 
 import qualified Data.PseudoBoolean as PBFile
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.WCNF as WCNF
 
-convert :: MaxSAT.WCNF -> PBFile.SoftFormula
+convert :: WCNF.WCNF -> PBFile.SoftFormula
 convert
-  MaxSAT.WCNF
-  { MaxSAT.topCost = top
-  , MaxSAT.clauses = cs
-  , MaxSAT.numVars = nv
-  , MaxSAT.numClauses = nc
+  WCNF.WCNF
+  { WCNF.topCost = top
+  , WCNF.clauses = cs
+  , WCNF.numVars = nv
+  , WCNF.numClauses = nc
   } =
   PBFile.SoftFormula
   { PBFile.wboTopCost = Nothing

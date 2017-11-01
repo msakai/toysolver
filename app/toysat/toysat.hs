@@ -83,8 +83,8 @@ import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.Enum as MUSEnum
 import ToySolver.SAT.Printer
 import qualified ToySolver.Text.CNF as CNF
-import qualified ToySolver.Text.MaxSAT as MaxSAT
 import qualified ToySolver.Text.GCNF as GCNF
+import qualified ToySolver.Text.WCNF as WCNF
 import ToySolver.Version
 import ToySolver.Internal.Util (showRational, setEncodingChar8)
 
@@ -542,11 +542,11 @@ solveSAT opt solver cnf cnfFileName = do
         -- note that IntMap.union is left-biased.
         var_init = [if b then v else -v | (v, b) <- IntMap.toList (var_init1 `IntMap.union` var_init2)]
     let wcnf =
-          MaxSAT.WCNF
-          { MaxSAT.numVars = CNF.numVars cnf
-          , MaxSAT.numClauses = CNF.numClauses cnf
-          , MaxSAT.topCost = 1
-          , MaxSAT.clauses = [(1, clause) | clause <- CNF.clauses cnf]
+          WCNF.WCNF
+          { WCNF.numVars = CNF.numVars cnf
+          , WCNF.numClauses = CNF.numClauses cnf
+          , WCNF.topCost = 1
+          , WCNF.clauses = [(1, clause) | clause <- CNF.clauses cnf]
           }
     let opt2 =
           def
@@ -649,7 +649,7 @@ solveMUS opt solver gcnf = do
   when (optInitSP opt) $ do
     let wcnf = GCNF2MaxSAT.convert gcnf
     initPolarityUsingSP solver (GCNF.numVars gcnf)
-      (MaxSAT.numVars wcnf) [(fromIntegral w, clause) | (w, clause) <- MaxSAT.clauses wcnf]
+      (WCNF.numVars wcnf) [(fromIntegral w, clause) | (w, clause) <- WCNF.clauses wcnf]
     return ()
 
   result <- SAT.solveWith solver (map (idx2sel !) [1..GCNF.lastGroupIndex gcnf])
@@ -754,7 +754,7 @@ solvePB opt solver formula = do
           let m2 = mtrans m
           forM_ (assocs m2) $ \(v, val) -> do
             SAT.setVarPolarity solver v val
-          if obj < MaxSAT.topCost wcnf then
+          if obj < WCNF.topCost wcnf then
             return $ Just m2 
           else
             return Nothing
@@ -830,7 +830,7 @@ solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
 solveWBO opt solver isMaxSat formula =
   solveWBO' opt solver isMaxSat formula (WBO2MaxSAT.convert formula) Nothing
 
-solveWBO' :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> (MaxSAT.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model) -> Maybe FilePath -> IO ()
+solveWBO' :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> (WCNF.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model) -> Maybe FilePath -> IO ()
 solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
   let nv = PBFile.wboNumVars formula
       nc = PBFile.wboNumConstraints formula
@@ -846,7 +846,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
 
   spHighlyBiased <-
     if optInitSP opt then do
-      initPolarityUsingSP solver nv (MaxSAT.numVars wcnf) [(fromIntegral w, c) | (w, c) <-  MaxSAT.clauses wcnf]
+      initPolarityUsingSP solver nv (WCNF.numVars wcnf) [(fromIntegral w, c) | (w, c) <-  WCNF.clauses wcnf]
     else
       return IntMap.empty
 
@@ -924,8 +924,8 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
 mainMaxSAT :: Options -> SAT.Solver -> [String] -> IO ()
 mainMaxSAT opt solver args = do
   ret <- case args of
-           ["-"]   -> liftM MaxSAT.parseByteString BS.getContents
-           [fname] -> MaxSAT.parseFile fname
+           ["-"]   -> liftM WCNF.parseByteString BS.getContents
+           [fname] -> WCNF.parseFile fname
            _ -> showHelp stderr  >> exitFailure
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
@@ -935,7 +935,7 @@ mainMaxSAT opt solver args = do
                     _ -> Nothing
       solveMaxSAT opt solver wcnf fname
 
-solveMaxSAT :: Options -> SAT.Solver -> MaxSAT.WCNF -> Maybe FilePath -> IO ()
+solveMaxSAT :: Options -> SAT.Solver -> WCNF.WCNF -> Maybe FilePath -> IO ()
 solveMaxSAT opt solver wcnf wcnfFileName =
   solveWBO' opt solver True (MaxSAT2WBO.convert wcnf) (wcnf, id, id) wcnfFileName
 

@@ -36,7 +36,7 @@ import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Text.GCNF as GCNF
-import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.WCNF as WCNF
 import qualified ToySolver.Text.CNF as CNF
 import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.SAT2PB as SAT2PB
@@ -153,7 +153,7 @@ readProblem o fname = do
       error $ "unknown file extension: " ++ show ext
   where    
     readWCNF = do
-      ret <- MaxSAT.parseFile fname
+      ret <- WCNF.parseFile fname
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
         Right wcnf -> return $ ProbWBO $ MaxSAT2WBO.convert $ wcnf
@@ -252,7 +252,7 @@ writeProblem o problem = do
                   in CNF.writeFile fname cnf2
         ".wcnf" ->
           case WBO2MaxSAT.convert wbo of
-            (wcnf, _, _) -> MaxSAT.writeFile fname wcnf
+            (wcnf, _, _) -> WCNF.writeFile fname wcnf
         ".lsp" ->
           withBinaryFile fname WriteMode $ \h ->
             ByteStringBuilder.hPutBuilder h lsp

@@ -62,14 +62,14 @@ import ToySolver.Internal.Data.IOURef
 import qualified ToySolver.Internal.Data.Vec as Vec
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.CNF as CNF
-import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.WCNF as WCNF
 
 -- -------------------------------------------------------------------
 
 data Solver
   = Solver
   { svClauses                :: !(Array ClauseId PackedClause)
-  , svClauseWeights          :: !(Array ClauseId MaxSAT.Weight)
+  , svClauseWeights          :: !(Array ClauseId WCNF.Weight)
   , svClauseWeightsF         :: !(UArray ClauseId Double)
   , svClauseNumTrueLits      :: !(IOUArray ClauseId Int32)
   , svClauseUnsatClauseIndex :: !(IOUArray ClauseId Int)
@@ -79,10 +79,10 @@ data Solver
   , svVarOccursState    :: !(Array SAT.Var (IOUArray Int Bool))
   , svSolution          :: !(IOUArray SAT.Var Bool)
 
-  , svObj               :: !(IORef MaxSAT.Weight)
+  , svObj               :: !(IORef WCNF.Weight)
 
   , svRandGen           :: !Rand.GenIO
-  , svBestSolution      :: !(IORef (MaxSAT.Weight, SAT.Model))
+  , svBestSolution      :: !(IORef (WCNF.Weight, SAT.Model))
   , svStatistics        :: !(IORef Statistics)
   }
 
@@ -100,23 +100,23 @@ data VarOccurState
 newSolver :: CNF.CNF -> IO Solver
 newSolver cnf = do
   let wcnf =
-        MaxSAT.WCNF
-        { MaxSAT.numVars    = CNF.numVars cnf
-        , MaxSAT.numClauses = CNF.numClauses cnf
-        , MaxSAT.topCost    = fromIntegral (CNF.numClauses cnf) + 1
-        , MaxSAT.clauses    = [(1,c) | c <- CNF.clauses cnf]
+        WCNF.WCNF
+        { WCNF.numVars    = CNF.numVars cnf
+        , WCNF.numClauses = CNF.numClauses cnf
+        , WCNF.topCost    = fromIntegral (CNF.numClauses cnf) + 1
+        , WCNF.clauses    = [(1,c) | c <- CNF.clauses cnf]
         }
   newSolverWeighted wcnf
 
-newSolverWeighted :: MaxSAT.WCNF -> IO Solver
+newSolverWeighted :: WCNF.WCNF -> IO Solver
 newSolverWeighted wcnf = do
   let m :: SAT.Var -> Bool
       m _ = False
-      nv = MaxSAT.numVars wcnf
+      nv = WCNF.numVars wcnf
 
   objRef <- newIORef (0::Integer)
 
-  cs <- liftM catMaybes $ forM (MaxSAT.clauses wcnf) $ \(w,pc) -> do
+  cs <- liftM catMaybes $ forM (WCNF.clauses wcnf) $ \(w,pc) -> do
     case SAT.normalizeClause (SAT.unpackClause pc) of
       Nothing -> return Nothing
       Just [] -> modifyIORef' objRef (w+) >> return Nothing
@@ -125,7 +125,7 @@ newSolverWeighted wcnf = do
         seq c' $ return (Just (w,c'))
   let len = length cs
       clauses  = listArray (0, len - 1) (map snd cs)
-      weights  :: Array ClauseId MaxSAT.Weight
+      weights  :: Array ClauseId WCNF.Weight
       weights  = listArray (0, len - 1) (map fst cs)
       weightsF :: UArray ClauseId Double
       weightsF = listArray (0, len - 1) (map (fromIntegral . fst) cs)
@@ -243,7 +243,7 @@ getNumVars solver = return $ rangeSize $ bounds (svVarOccurs solver)
 getRandGen :: Solver -> IO Rand.GenIO
 getRandGen solver = return $ svRandGen solver
 
-getBestSolution :: Solver -> IO (MaxSAT.Weight, SAT.Model)
+getBestSolution :: Solver -> IO (WCNF.Weight, SAT.Model)
 getBestSolution solver = readIORef (svBestSolution solver)
 
 getStatistics :: Solver -> IO Statistics
@@ -280,7 +280,7 @@ getBreakValue solver v = do
 
 data Options
   = Options
-  { optTarget   :: !MaxSAT.Weight
+  { optTarget   :: !WCNF.Weight
   , optMaxTries :: !Int
   , optMaxFlips :: !Int
   , optPickClauseWeighted :: Bool
@@ -299,7 +299,7 @@ instance Default Options where
 data Callbacks
   = Callbacks
   { cbGenerateInitialSolution :: Solver -> IO SAT.Model
-  , cbOnUpdateBestSolution :: Solver -> MaxSAT.Weight -> SAT.Model -> IO ()
+  , cbOnUpdateBestSolution :: Solver -> WCNF.Weight -> SAT.Model -> IO ()
   }
 
 instance Default Callbacks where

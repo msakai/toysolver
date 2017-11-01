@@ -50,7 +50,7 @@ import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
 import qualified ToySolver.Converter.WBO2PB as WBO2PB
 import qualified ToySolver.Converter.SAT2KSAT as SAT2KSAT
 import qualified ToySolver.Text.CNF as CNF
-import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.WCNF as WCNF
 
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
@@ -1930,11 +1930,11 @@ prop_wbo2maxsat = QM.monadicIO $ do
             , PBFile.wboTopCost = top
             }
   let (wcnf, mforth, mback) = WBO2MaxSAT.convert wbo1'
-      wbo2 = ( MaxSAT.numVars wcnf
-             , [ ( if w == MaxSAT.topCost wcnf then Nothing else Just w
+      wbo2 = ( WCNF.numVars wcnf
+             , [ ( if w == WCNF.topCost wcnf then Nothing else Just w
                  , (PBRelGE, [(1,l) | l <- SAT.unpackClause clause], 1)
                  )
-               | (w,clause) <- MaxSAT.clauses wcnf
+               | (w,clause) <- WCNF.clauses wcnf
                ]
              , Nothing
              )
@@ -1949,7 +1949,7 @@ prop_wbo2maxsat = QM.monadicIO $ do
     Nothing -> return ()
     Just (m1,val) -> do
       let m2 = mforth m1
-      QM.assert $ bounds m2 == (1, MaxSAT.numVars wcnf)
+      QM.assert $ bounds m2 == (1, WCNF.numVars wcnf)
       QM.assert $ evalWBO m2 wbo2 == Just val
   case ret2 of
     Nothing -> return ()

@@ -11,7 +11,7 @@ import Text.Printf
 
 import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
 import ToySolver.SAT.Printer (maxsatPrintModel)
-import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.WCNF as WCNF
 
 data Options = Options
   { optAlgorithm :: String
@@ -122,7 +122,7 @@ main :: IO ()
 main = do
   opt <- execParser parserInfo
 
-  ret <- MaxSAT.parseFile (optFileName opt)
+  ret <- WCNF.parseFile (optFileName opt)
   case ret of
     Left e -> error e
     Right wcnf -> do
@@ -155,4 +155,4 @@ main = do
       printf "c FlipsPerSecond = %f\n" (ProbSAT.statFlipsPerSecond stat)
       when (obj == 0) $ do
         putStrLn "s OPTIMUM FOUND"
-      maxsatPrintModel stdout sol (MaxSAT.numVars wcnf)
+      maxsatPrintModel stdout sol (WCNF.numVars wcnf)

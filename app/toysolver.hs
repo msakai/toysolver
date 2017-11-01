@@ -60,7 +60,7 @@ import qualified ToySolver.Arith.MIP as MIPSolver
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
 import qualified ToySolver.Text.CNF as CNF
-import qualified ToySolver.Text.MaxSAT as MaxSAT
+import qualified ToySolver.Text.WCNF as WCNF
 import qualified ToySolver.Converter.SAT2IP as SAT2IP
 import qualified ToySolver.Converter.PB2IP as PB2IP
 import qualified ToySolver.Converter.MaxSAT2IP as MaxSAT2IP
@@ -454,7 +454,7 @@ main = do
                 pbPrintModel stdout m2 0
                 writeSOLFileSAT o m2
         ModeMaxSAT -> do
-          ret <- MaxSAT.parseFile fname
+          ret <- WCNF.parseFile fname
           case ret of
             Left err -> hPutStrLn stderr err >> exitFailure
             Right wcnf -> do
