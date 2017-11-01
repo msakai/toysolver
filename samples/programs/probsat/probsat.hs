@@ -10,7 +10,7 @@ import Text.Printf
 
 import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
 import ToySolver.SAT.Printer (maxsatPrintModel)
-import qualified ToySolver.Text.CNF as CNF
+import qualified ToySolver.Text.MaxSAT as MaxSAT
 
 data Options = Options
   { optAlgorithm :: String
@@ -113,11 +113,11 @@ main :: IO ()
 main = do
   opt <- execParser parserInfo
 
-  ret <- CNF.parseFile (optFileName opt)
+  ret <- MaxSAT.parseFile (optFileName opt)
   case ret of
     Left e -> error e
-    Right cnf -> do
-      solver <- ProbSAT.newSolver cnf
+    Right wcnf -> do
+      solver <- ProbSAT.newSolverWeighted wcnf
       let callbacks =
             def
             { ProbSAT.cbOnUpdateBestSolution = \_solver obj _sol -> printf "o %d\n" obj
@@ -148,4 +148,4 @@ main = do
         putStrLn "s OPTIMUM FOUND"
       else
         putStrLn "s UNKNOWN"
-      maxsatPrintModel stdout sol (CNF.numVars cnf)
+      maxsatPrintModel stdout sol (MaxSAT.numVars wcnf)
