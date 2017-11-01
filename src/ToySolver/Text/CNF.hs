@@ -69,7 +69,7 @@ parseClauseBS s = SAT.packClause (go s)
   where
     go s =
       case BS.readInt (BS.dropWhile isSpace s) of
-        Nothing -> error "ToySolver.Text.MaxSAT: parse error"
+        Nothing -> error "ToySolver.Text.CNF: parse error"
         Just (0,_) -> []
         Just (i,s') -> i : go s'
 
