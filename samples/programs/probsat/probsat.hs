@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Monad
 import Data.Char
 import Data.Default.Class
 import Data.Monoid
@@ -10,7 +11,7 @@ import Text.Printf
 
 import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
 import ToySolver.SAT.Printer (maxsatPrintModel)
-import qualified ToySolver.Text.CNF as CNF
+import qualified ToySolver.Text.MaxSAT as MaxSAT
 
 data Options = Options
   { optAlgorithm :: String
@@ -47,8 +48,9 @@ optionsParser = Options
       <$> targetOption
       <*> maxTriesOption
       <*> maxFlipsOption
+      <*> pickClauseWeightedOption
 
-    targetOption :: Parser Int
+    targetOption :: Parser Integer
     targetOption = option auto
       $  long "target"
       <> help "target objective value"
@@ -71,6 +73,13 @@ optionsParser = Options
       <> showDefault
       <> metavar "INT"
       <> value (ProbSAT.optMaxFlips def)
+
+    pickClauseWeightedOption :: Parser Bool
+    pickClauseWeightedOption = switch
+      $  short 'w'
+      <> long "weighted"
+      <> help "enable weighted clause selection"
+      <> showDefault
 
     func :: Parser String
     func = strOption
@@ -113,11 +122,11 @@ main :: IO ()
 main = do
   opt <- execParser parserInfo
 
-  ret <- CNF.parseFile (optFileName opt)
+  ret <- MaxSAT.parseFile (optFileName opt)
   case ret of
     Left e -> error e
-    Right cnf -> do
-      solver <- ProbSAT.newSolver cnf
+    Right wcnf -> do
+      solver <- ProbSAT.newSolverWeighted wcnf
       let callbacks =
             def
             { ProbSAT.cbOnUpdateBestSolution = \_solver obj _sol -> printf "o %d\n" obj
@@ -144,8 +153,6 @@ main = do
       stat <- ProbSAT.getStatistics solver
       printf "c TotalCPUTime = %fs\n" (fromIntegral (toNanoSecs (ProbSAT.statTotalCPUTime stat)) / 10^(9::Int) :: Double)
       printf "c FlipsPerSecond = %f\n" (ProbSAT.statFlipsPerSecond stat)
-      if obj == 0 then
+      when (obj == 0) $ do
         putStrLn "s OPTIMUM FOUND"
-      else
-        putStrLn "s UNKNOWN"
-      maxsatPrintModel stdout sol (CNF.numVars cnf)
+      maxsatPrintModel stdout sol (MaxSAT.numVars wcnf)

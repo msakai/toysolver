@@ -48,6 +48,7 @@ data WCNF
   , topCost    :: !Weight
   , clauses    :: [WeightedClause]
   }
+  deriving (Show, Eq, Ord)
 
 type WeightedClause = (Weight, SAT.PackedClause)
 
