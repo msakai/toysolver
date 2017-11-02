@@ -222,9 +222,9 @@ flipVar solver v = mask_ $ do
         i <- unsafeRead (svClauseUnsatClauseIndex solver) c
         unless (i == s-1) $ do
           let i2 = s-1
-          c2 <- Vec.read (svUnsatClauses solver) i2
-          Vec.write (svUnsatClauses solver) i2 c
-          Vec.write (svUnsatClauses solver) i c2
+          c2 <- Vec.unsafeRead (svUnsatClauses solver) i2
+          Vec.unsafeWrite (svUnsatClauses solver) i2 c
+          Vec.unsafeWrite (svUnsatClauses solver) i c2
           unsafeWrite (svClauseUnsatClauseIndex solver) c2 i
         _ <- Vec.unsafePop (svUnsatClauses solver)
         modifyIORef' (svObj solver) (subtract (unsafeAt (svClauseWeights solver) c))
