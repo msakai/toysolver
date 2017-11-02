@@ -37,6 +37,7 @@ module ToySolver.SAT.SLS.ProbSAT
 import Prelude hiding (break)
 
 import Control.Applicative
+import Control.Exception
 import Control.Loop
 import Control.Monad
 import Control.Monad.Primitive
@@ -198,7 +199,7 @@ newSolverWeighted wcnf = do
 
 
 flipVar :: Solver -> SAT.Var -> IO ()
-flipVar solver v = do
+flipVar solver v = mask_ $ do
   let occurs = svVarOccurs solver ! v
       occursState = svVarOccursState solver ! v
   seq occurs $ seq occursState $ return ()
