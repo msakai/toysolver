@@ -451,9 +451,9 @@ walksat solver opt cb p = do
 
   let pickVar :: PackedClause -> IO SAT.Var
       pickVar c = do
-        liftM (either id id) $ runExceptT $ do
-          lift $ Vec.clear buf
-          let (lb,ub) = bounds c
+        Vec.clear buf
+        let (lb,ub) = bounds c
+        r <- runExceptT $ do
           _ <- numLoopState lb ub (1.0/0.0) $ \ !b0 !i -> do
             let v = SAT.litVar (c ! i)
             b <- lift $ getBreakValue solver v
@@ -467,7 +467,10 @@ walksat solver opt cb p = do
               return b0
             else do
               return b0
-          lift $ do
+          return ()
+        case r of
+          Left v -> return v
+          Right _ -> do
             flag <- Rand.bernoulli p (svRandGen solver)
             if flag then do
               -- random walk move
