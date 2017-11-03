@@ -375,6 +375,11 @@ rand n gen
       (b::Word32) <- Rand.uniform gen
       return $ (a `shiftL` 32) .|. toInteger b
 
+data Finished = Finished
+  deriving (Show)
+
+instance Exception Finished
+
 -- -------------------------------------------------------------------
 
 probsat :: Solver -> Options -> Callbacks -> (Double -> Double -> Double) -> IO ()
@@ -414,23 +419,21 @@ probsat solver opt cb f = do
   startCPUTime <- getTime ProcessCPUTime
   flipsRef <- newIOURef (0::Int)
 
-  liftM (either id id) $ runExceptT $ do
-    replicateM_ (optMaxTries opt) $ do
-      lift $ do
-        sol <- cbGenerateInitialSolution cb solver
-        setSolution solver sol
-        checkCurrentSolution solver cb
-      replicateM_ (optMaxFlips opt) $ do
-        s <- lift $ Vec.getSize (svUnsatClauses solver)
-        when (s == 0) $ throwE ()
-        obj <- lift $ readIORef (svObj solver)
-        when (obj <= optTarget opt) $ throwE ()
-        lift $ do
-          c <- pickClause solver opt
-          v <- pickVar c
-          flipVar solver v
-          modifyIOURef flipsRef inc
+  -- It's faster to use Control.Exception than using Control.Monad.Except
+  let body = do
+        replicateM_ (optMaxTries opt) $ do
+          sol <- cbGenerateInitialSolution cb solver
+          setSolution solver sol
           checkCurrentSolution solver cb
+          replicateM_ (optMaxFlips opt) $ do
+            obj <- readIORef (svObj solver)
+            when (obj <= optTarget opt) $ throw Finished
+            c <- pickClause solver opt
+            v <- pickVar c
+            flipVar solver v
+            modifyIOURef flipsRef inc
+            checkCurrentSolution solver cb
+  body `catch` (\(_::Finished) -> return ())
 
   endCPUTime <- getTime ProcessCPUTime
   flips <- readIOURef flipsRef
@@ -487,21 +490,21 @@ walksat solver opt cb p = do
   startCPUTime <- getTime ProcessCPUTime
   flipsRef <- newIOURef (0::Int)
 
-  liftM (either id id) $ runExceptT $ do
-    replicateM_ (optMaxTries opt) $ do
-      lift $ do
-        sol <- cbGenerateInitialSolution cb solver
-        setSolution solver sol
-        checkCurrentSolution solver cb
-      replicateM_ (optMaxFlips opt) $ do
-        obj <- lift $ readIORef (svObj solver)
-        when (obj <= optTarget opt) $ throwE ()
-        lift $ do
-          c <- pickClause solver opt
-          v <- pickVar c
-          flipVar solver v
-          modifyIOURef flipsRef inc
+  -- It's faster to use Control.Exception than using Control.Monad.Except
+  let body = do
+        replicateM_ (optMaxTries opt) $ do
+          sol <- cbGenerateInitialSolution cb solver
+          setSolution solver sol
           checkCurrentSolution solver cb
+          replicateM_ (optMaxFlips opt) $ do
+            obj <- readIORef (svObj solver)
+            when (obj <= optTarget opt) $ throw Finished
+            c <- pickClause solver opt
+            v <- pickVar c
+            flipVar solver v
+            modifyIOURef flipsRef inc
+            checkCurrentSolution solver cb
+  body `catch` (\(_::Finished) -> return ())
 
   endCPUTime <- getTime ProcessCPUTime
   flips <- readIOURef flipsRef
