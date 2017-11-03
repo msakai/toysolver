@@ -450,34 +450,39 @@ probsat solver opt cb f = do
 walksat :: Solver -> Options -> Callbacks -> Double -> IO ()
 walksat solver opt cb p = do
   (buf :: Vec.UVec SAT.Var) <- Vec.new
-  (breaks :: Vec.UVec Double) <- Vec.new
 
   let pickVar :: PackedClause -> IO SAT.Var
       pickVar c = do
         liftM (either id id) $ runExceptT $ do
-          lift $ Vec.clear breaks
+          lift $ Vec.clear buf
           let (lb,ub) = bounds c
-          b0 <- numLoopState lb ub (1.0/0.0) $ \ !b0 !i -> do
+          _ <- numLoopState lb ub (1.0/0.0) $ \ !b0 !i -> do
             let v = SAT.litVar (c ! i)
             b <- lift $ getBreakValue solver v
-            when (b == 0) $ throwE v -- freebie move
-            lift $ Vec.push breaks b
-            return $! min b0 b
+            if b <= 0 then
+              throwE v -- freebie move
+            else if b < b0 then do
+              lift $ Vec.clear buf >> Vec.push buf v
+              return b
+            else if b == b0 then do
+              lift $ Vec.push buf v
+              return b0
+            else do
+              return b0
           lift $ do
             flag <- Rand.bernoulli p (svRandGen solver)
             if flag then do
               -- random walk move
-              i <- Rand.uniformR (bounds c) (svRandGen solver)
+              i <- Rand.uniformR (lb,ub) (svRandGen solver)
               return $! SAT.litVar (c ! i)
             else do
               -- greedy move
-              Vec.clear buf
-              forAssocsM_ c $ \(i,!lit) -> do
-                b <- Vec.read breaks i
-                when (b == b0) $ Vec.push buf (SAT.litVar lit)
               s <- Vec.getSize buf
-              i <- Rand.uniformR (0, s - 1) (svRandGen solver)
-              Vec.read buf i
+              if s == 1 then
+                Vec.unsafeRead buf 0
+              else do
+                i <- Rand.uniformR (0, s - 1) (svRandGen solver)
+                Vec.unsafeRead buf i
 
   startCPUTime <- getTime ProcessCPUTime
   flipsRef <- newIOURef (0::Int)
