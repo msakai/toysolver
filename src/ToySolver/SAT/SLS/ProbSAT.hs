@@ -92,13 +92,6 @@ type ClauseId = Int
 
 type PackedClause = Array Int SAT.Lit
 
-data VarOccurState
-  = VOSMake
-  | VOSBreak
-  | VOSMakeBuf
-  | VOSBreakBuf
-  deriving (Eq, Ord, Enum, Bounded, Ix, Show)
-
 newSolver :: CNF.CNF -> IO Solver
 newSolver cnf = do
   let wcnf =
