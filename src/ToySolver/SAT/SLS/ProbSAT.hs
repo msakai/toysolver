@@ -426,6 +426,8 @@ probsat solver opt cb f = do
           setSolution solver sol
           checkCurrentSolution solver cb
           replicateM_ (optMaxFlips opt) $ do
+            s <- Vec.getSize (svUnsatClauses solver)
+            when (s == 0) $ throw Finished
             obj <- readIORef (svObj solver)
             when (obj <= optTarget opt) $ throw Finished
             c <- pickClause solver opt
@@ -497,6 +499,8 @@ walksat solver opt cb p = do
           setSolution solver sol
           checkCurrentSolution solver cb
           replicateM_ (optMaxFlips opt) $ do
+            s <- Vec.getSize (svUnsatClauses solver)
+            when (s == 0) $ throw Finished
             obj <- readIORef (svObj solver)
             when (obj <= optTarget opt) $ throw Finished
             c <- pickClause solver opt
