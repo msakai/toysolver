@@ -42,6 +42,7 @@ optionsParser = Options
       <> metavar "ALGORITHM"
       <> help "Algorithm: walksat, probsat"
       <> value "probsat"
+      <> showDefaultWith id
 
     solverOptions :: Parser ProbSAT.Options
     solverOptions = ProbSAT.Options
