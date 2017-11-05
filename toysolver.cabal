@@ -767,7 +767,9 @@ Executable probsat
     base,
     clock,
     data-default-class,
+    mwc-random,
     optparse-applicative,
+    vector,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: CPP

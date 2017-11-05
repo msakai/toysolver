@@ -4,9 +4,11 @@ import Control.Monad
 import Data.Char
 import Data.Default.Class
 import Data.Monoid
+import qualified Data.Vector.Unboxed as VU
 import Options.Applicative
 import System.Clock
 import System.IO
+import qualified System.Random.MWC as Rand
 import Text.Printf
 
 import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
@@ -17,6 +19,7 @@ data Options = Options
   { optAlgorithm :: String
   , optFileName :: FilePath
   , optOptions :: ProbSAT.Options
+  , optRandomSeed :: Maybe Rand.Seed
   , optProbSATFunc :: String
   , optProbSATCB :: Double
   , optProbSATCM :: Double
@@ -28,6 +31,7 @@ optionsParser = Options
   <$> algOption
   <*> fileInput
   <*> solverOptions
+  <*> randomSeedOption
   <*> func
   <*> cb
   <*> cm
@@ -50,6 +54,16 @@ optionsParser = Options
       <*> maxTriesOption
       <*> maxFlipsOption
       <*> pickClauseWeightedOption
+
+    randomSeedOption :: Parser (Maybe Rand.Seed)
+    randomSeedOption = optional $
+      (fmap (Rand.toSeed . VU.fromList . map read . words)) $
+      strOption $
+        mconcat
+        [ long "random-seed"
+        , metavar "\"INT ..\""
+        , help "random seed"
+        ]
 
     targetOption :: Parser Integer
     targetOption = option auto
@@ -128,6 +142,13 @@ main = do
     Left e -> error e
     Right wcnf -> do
       solver <- ProbSAT.newSolverWeighted wcnf
+      gen <-
+        case optRandomSeed opt of
+          Nothing -> Rand.createSystemRandom
+          Just seed -> Rand.restore seed
+      seed <- Rand.save gen
+      putStrLn $ "c use --random-seed=" ++ show (unwords . map show . VU.toList . Rand.fromSeed $ seed) ++ " option to reproduce the execution"
+      ProbSAT.setRandomGen solver gen
       let callbacks =
             def
             { ProbSAT.cbOnUpdateBestSolution = \_solver obj _sol -> printf "o %d\n" obj
