@@ -21,7 +21,8 @@ module ToySolver.SAT.SLS.ProbSAT
   , newSolver
   , newSolverWeighted
   , getNumVars
-  , getRandGen
+  , getRandomGen
+  , setRandomGen
   , getBestSolution
   , getStatistics
 
@@ -85,7 +86,7 @@ data Solver
 
   , svObj               :: !(IORef WCNF.Weight)
 
-  , svRandGen           :: !Rand.GenIO
+  , svRandomGen         :: !(IORef Rand.GenIO)
   , svBestSolution      :: !(IORef (WCNF.Weight, SAT.Model))
   , svStatistics        :: !(IORef Statistics)
   }
@@ -168,7 +169,7 @@ newSolverWeighted wcnf = do
   bestSol <- freeze solution
   bestSolution <- newIORef (bestObj, bestSol)
 
-  randGen <- Rand.create
+  randGen <- newIORef =<< Rand.create
 
   stat <- newIORef def
 
@@ -187,7 +188,7 @@ newSolverWeighted wcnf = do
 
     , svObj = objRef
 
-    , svRandGen           = randGen
+    , svRandomGen         = randGen
     , svBestSolution      = bestSolution
     , svStatistics        = stat
     }
@@ -237,8 +238,11 @@ setSolution solver m = do
 getNumVars :: Solver -> IO Int
 getNumVars solver = return $ rangeSize $ bounds (svVarOccurs solver)
 
-getRandGen :: Solver -> IO Rand.GenIO
-getRandGen solver = return $ svRandGen solver
+getRandomGen :: Solver -> IO Rand.GenIO
+getRandomGen solver = readIORef (svRandomGen solver)
+
+setRandomGen :: Solver -> Rand.GenIO -> IO ()
+setRandomGen solver gen = writeIORef (svRandomGen solver) gen
 
 getBestSolution :: Solver -> IO (WCNF.Weight, SAT.Model)
 getBestSolution solver = readIORef (svBestSolution solver)
@@ -326,11 +330,11 @@ instance Default Statistics where
 
 generateUniformRandomSolution :: Solver -> IO SAT.Model
 generateUniformRandomSolution solver = do
-  g <- getRandGen solver
+  gen <- getRandomGen solver
   n <- getNumVars solver
   (a :: IOUArray Int Bool) <- newArray_ (1,n)
   forM_ [1..n] $ \v -> do
-    b <- Rand.uniform g
+    b <- Rand.uniform gen
     writeArray a v b
   unsafeFreeze a
 
@@ -345,6 +349,7 @@ checkCurrentSolution solver cb = do
 
 pickClause :: Solver -> Options -> IO PackedClause
 pickClause solver opt = do
+  gen <- getRandomGen solver
   if optPickClauseWeighted opt then do
     obj <- readIORef (svObj solver)
     let f !j !x = do
@@ -354,12 +359,12 @@ pickClause solver opt = do
             return c
           else
             f (j + 1) (x - w)
-    x <- rand obj (svRandGen solver)
+    x <- rand obj gen
     c <- f 0 x
     return $ (svClauses solver ! c)
   else do
     s <- Vec.getSize (svUnsatClauses solver)
-    j <- Rand.uniformR (0, s - 1) (svRandGen solver) -- For integral types inclusive range is used
+    j <- Rand.uniformR (0, s - 1) gen -- For integral types inclusive range is used
     liftM (svClauses solver !) $ Vec.read (svUnsatClauses solver) j
 
 rand :: PrimMonad m => Integer -> Rand.Gen (PrimState m) -> m Integer
@@ -379,6 +384,7 @@ instance Exception Finished
 
 probsat :: Solver -> Options -> Callbacks -> (Double -> Double -> Double) -> IO ()
 probsat solver opt cb f = do
+  gen <- getRandomGen solver
   let maxClauseLen =
         if rangeSize (bounds (svClauses solver)) == 0
         then 0
@@ -408,7 +414,7 @@ probsat solver opt cb f = do
                   return k
                 else
                   go (k + 1) (a - w)
-        k <- go 0 =<< Rand.uniformR (0, wsum) (svRandGen solver)
+        k <- go 0 =<< Rand.uniformR (0, wsum) gen
         return $! SAT.litVar (c ! k)
 
   startCPUTime <- getTime ProcessCPUTime
@@ -449,6 +455,7 @@ probsat solver opt cb f = do
 
 walksat :: Solver -> Options -> Callbacks -> Double -> IO ()
 walksat solver opt cb p = do
+  gen <- getRandomGen solver
   (buf :: Vec.UVec SAT.Var) <- Vec.new
 
   let pickVar :: PackedClause -> IO SAT.Var
@@ -473,10 +480,10 @@ walksat solver opt cb p = do
         case r of
           Left v -> return v
           Right _ -> do
-            flag <- Rand.bernoulli p (svRandGen solver)
+            flag <- Rand.bernoulli p gen
             if flag then do
               -- random walk move
-              i <- Rand.uniformR (lb,ub) (svRandGen solver)
+              i <- Rand.uniformR (lb,ub) gen
               return $! SAT.litVar (c ! i)
             else do
               -- greedy move
@@ -484,7 +491,7 @@ walksat solver opt cb p = do
               if s == 1 then
                 Vec.unsafeRead buf 0
               else do
-                i <- Rand.uniformR (0, s - 1) (svRandGen solver)
+                i <- Rand.uniformR (0, s - 1) gen
                 Vec.unsafeRead buf i
 
   startCPUTime <- getTime ProcessCPUTime
