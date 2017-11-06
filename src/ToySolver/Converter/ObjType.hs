@@ -15,4 +15,4 @@ module ToySolver.Converter.ObjType
   ) where
 
 data ObjType = ObjNone | ObjMaxOne | ObjMaxZero
-  deriving Eq
+  deriving (Eq, Ord, Enum, Bounded, Show)
