@@ -492,6 +492,7 @@ Executable toyqbf
     base,
     containers,
     data-default-class,
+    optparse-applicative,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
