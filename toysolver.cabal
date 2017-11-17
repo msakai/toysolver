@@ -403,6 +403,7 @@ Executable toysolver
     data-default-class,
     filepath,
     OptDir,
+    optparse-applicative,
     pseudo-boolean,
     scientific,
     toysolver
