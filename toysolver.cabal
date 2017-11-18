@@ -465,10 +465,10 @@ Executable toysmt
   Build-Depends:
     base,
     containers,
-    data-default-class,
     -- TODO: remove intern dependency
     intern,
     mtl,
+    optparse-applicative,
     parsec >=3.1.2 && <4,
     toysolver,
     text,
