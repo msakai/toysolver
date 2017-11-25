@@ -36,20 +36,19 @@ import Data.Char
 import Data.IORef
 import Data.List
 import Data.Maybe
+import Data.Monoid
 import Data.Ord
-import Data.Word
 import qualified Data.Vector.Unboxed as V
 import Data.Version
 import Data.Scientific as Scientific
 import Data.Time
+import Options.Applicative
 import System.IO
-import System.Environment
 import System.Exit
 #if !MIN_VERSION_time(1,5,0)
 import System.Locale (defaultTimeLocale)
 #endif
 import System.Clock
-import System.Console.GetOpt
 import System.FilePath
 import qualified System.Info as SysInfo
 import qualified System.Random.MWC as Rand
@@ -92,11 +91,13 @@ import qualified UBCSAT
 
 -- ------------------------------------------------------------------------
 
-data Mode = ModeHelp | ModeVersion | ModeSAT | ModeMUS | ModePB | ModeWBO | ModeMaxSAT | ModeMIP
+data Mode = ModeSAT | ModeMUS | ModeAllMUS | ModePB | ModeWBO | ModeMaxSAT | ModeMIP
+  deriving (Eq, Ord, Enum, Bounded)
 
 data Options
   = Options
-  { optMode          :: Maybe Mode
+  { optInput         :: String
+  , optMode          :: Maybe Mode
   , optSATConfig     :: SAT.Config
   , optRandomSeed    :: Maybe Rand.Seed
   , optLinearizerPB  :: Bool
@@ -104,7 +105,6 @@ data Options
   , optObjFunVarsHeuristics :: Bool
   , optLocalSearchInitial   :: Bool
   , optMUSMethod :: MUS.Method
-  , optAllMUSes :: Bool
   , optAllMUSMethod :: MUSEnum.Method
   , optPrintRational :: Bool
   , optTimeout :: Integer
@@ -118,7 +118,8 @@ data Options
 instance Default Options where
   def =
     Options
-    { optMode          = Nothing
+    { optInput         = "" -- XXX
+    , optMode          = Nothing
     , optSATConfig     = def
     , optRandomSeed    = Nothing
     , optLinearizerPB  = False
@@ -126,7 +127,6 @@ instance Default Options where
     , optObjFunVarsHeuristics = PBO.defaultEnableObjFunVarsHeuristics
     , optLocalSearchInitial   = False
     , optMUSMethod = MUS.optMethod def
-    , optAllMUSes = False
     , optAllMUSMethod = MUSEnum.optMethod def
     , optPrintRational = False
     , optTimeout = 0
@@ -137,175 +137,295 @@ instance Default Options where
     , optFileEncoding = Nothing
     }
 
-options :: [OptDescr (Options -> Options)]
-options =
-    [ Option ['h'] ["help"]   (NoArg (\opt -> opt{ optMode = Just ModeHelp   })) "show help"
-    , Option [] ["version"]   (NoArg (\opt -> opt{ optMode = Just ModeVersion})) "show version"
-
-    , Option []    ["sat"]    (NoArg (\opt -> opt{ optMode = Just ModeSAT    })) "solve boolean satisfiability problem in .cnf file (default)"
-    , Option []    ["mus"]    (NoArg (\opt -> opt{ optMode = Just ModeMUS    })) "solve minimally unsatisfiable subset problem in .gcnf or .cnf file"
-    , Option []    ["pb"]     (NoArg (\opt -> opt{ optMode = Just ModePB     })) "solve pseudo boolean problem in .opb file"
-    , Option []    ["wbo"]    (NoArg (\opt -> opt{ optMode = Just ModeWBO    })) "solve weighted boolean optimization problem in .wbo file"
-    , Option []    ["maxsat"] (NoArg (\opt -> opt{ optMode = Just ModeMaxSAT })) "solve MaxSAT problem in .cnf or .wcnf file"
-    , Option []    ["lp"]     (NoArg (\opt -> opt{ optMode = Just ModeMIP    })) "solve bounded integer programming problem in .lp or .mps file"
-
-    , Option [] ["restart"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRestartStrategy = parseRestartStrategy val } }) "<str>")
-        ("Restart startegy: " ++ intercalate ", "
-         [ SAT.showRestartStrategy s ++ (if SAT.configRestartStrategy (optSATConfig def) == s then " (default)" else "")
-         | s <- [minBound .. maxBound] ])
-    , Option [] ["restart-first"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRestartFirst = read val } }) "<int>")
-        (printf "The initial restart limit. (default %d)" (SAT.configRestartFirst def))
-    , Option [] ["restart-inc"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRestartInc = read val } }) "<real>")
-        (printf "The factor with which the restart limit is multiplied in each restart. (default %f)" (SAT.configRestartInc def))
-    , Option [] ["learning"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configLearningStrategy = parseLearningStrategy val } }) "<str>")
-        ("Leaning scheme: " ++ intercalate ", "
-         [ SAT.showLearningStrategy s ++ (if SAT.configLearningStrategy (optSATConfig def) == s then " (default)" else "")
-         | s <- [minBound .. maxBound] ])
-    , Option [] ["learnt-size-first"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configLearntSizeFirst = read val } }) "<int>")
-        "The initial limit for learnt clauses."
-    , Option [] ["learnt-size-inc"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configLearntSizeInc = read val } }) "<real>")
-        (printf "The limit for learnt clauses is multiplied with this factor periodically. (default %f)" (SAT.configLearntSizeInc def))
-    , Option [] ["branch"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configBranchingStrategy = parseBranchingStrategy val } }) "<str>")
-        ("Branching startegy: " ++ intercalate ", "
-         [ SAT.showBranchingStrategy s ++ (if SAT.configBranchingStrategy (optSATConfig def) == s then " (default)" else "")
-         | s <- [minBound .. maxBound] ])
-    , Option [] ["erwa-alpha-first"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configERWAStepSizeFirst = read val } }) "<real>")
-        (printf "step-size alpha in ERWA and LRB branching heuristic is initialized with this value. (default %f)" (SAT.configERWAStepSizeFirst def))
-    , Option [] ["erwa-alpha-dec"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configERWAStepSizeDec = read val } }) "<real>")
-        (printf "step-size alpha in ERWA and LRB branching heuristic is decreased by this value after each conflict. (default %f)" (SAT.configERWAStepSizeDec def))
-    , Option [] ["erwa-alpha-min"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configERWAStepSizeMin = read val } }) "<real>")
-        (printf "step-size alpha in ERWA and LRB branching heuristic is decreased until it reach the value. (default %f)" (SAT.configERWAStepSizeMin def))
-    , Option [] ["ema-decay"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEMADecay = read val } }) "<real>")
-        (printf "inverse of the variable EMA decay factor used by LRB branching heuristic. (default %f)" (SAT.configEMADecay def))
-    , Option [] ["ccmin"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configCCMin = read val } }) "<int>")
-        (printf "Conflict clause minimization (0=none, 1=local, 2=recursive; default %d)" (SAT.configCCMin def))
-    , Option [] ["enable-phase-saving"]
-        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnablePhaseSaving = True } }))
-        ("Enable phase saving" ++ (if SAT.configEnablePhaseSaving def then " (default)" else ""))
-    , Option [] ["disable-phase-saving"]
-        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnablePhaseSaving = False } }))
-        ("Disable phase saving" ++ (if SAT.configEnablePhaseSaving def then "" else " (default)"))
-    , Option [] ["enable-forward-subsumption-removal"]
-        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnableForwardSubsumptionRemoval = True } }))
-        ("Enable forward subumption removal (clauses only)" ++ (if SAT.configEnableForwardSubsumptionRemoval def then " (default)" else ""))
-    , Option [] ["disable-forward-subsumption-removal"]
-        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnableForwardSubsumptionRemoval = False } }))
-        ("Disable forward subsumption removal (clauses only)" ++ (if SAT.configEnableForwardSubsumptionRemoval def then "" else " (default)"))
-    , Option [] ["enable-backward-subsumption-removal"]
-        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnableBackwardSubsumptionRemoval = True } }))
-        ("Enable backward subsumption removal." ++ (if SAT.configEnableBackwardSubsumptionRemoval def then " (default)" else ""))
-    , Option [] ["disable-backward-subsumption-removal"]
-        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnableBackwardSubsumptionRemoval = False } }))
-        ("Disable backward subsumption removal." ++ (if SAT.configEnableBackwardSubsumptionRemoval def then "" else " (default)"))
-
-    , Option [] ["random-freq"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configRandomFreq = read val } }) "<0..1>")
-        (printf "The frequency with which the decision heuristic tries to choose a random variable (default %f)" (SAT.configRandomFreq def))
-    , Option [] ["random-seed"]
-        (ReqArg (\val opt -> opt{ optRandomSeed = Just (Rand.toSeed (V.singleton (read val) :: V.Vector Word32)) }) "<int>")
-        "random seed used by the random variable selection"
-    , Option [] ["random-gen"]
-        (ReqArg (\val opt -> opt{ optRandomSeed = Just (Rand.toSeed (V.fromList (map read $ words $ val) :: V.Vector Word32)) }) "<str>")
-        "another way of specifying random seed used by the random variable selection"
-
-    , Option [] ["init-sp"]
-        (NoArg (\opt -> opt{ optInitSP = True }))
-        "Use survey propation to compute initial polarity (when possible)"
-
-    , Option [] ["linearizer-pb"]
-        (NoArg (\opt -> opt{ optLinearizerPB = True }))
-        "Use PB constraint in linearization."
-
-    , Option [] ["pb-handler"]
-        (ReqArg (\val opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configPBHandlerType = parsePBHandler val } }) "<str>")
-        ("PB constraint handler: " ++ intercalate ", "
-         [ SAT.showPBHandlerType h ++ (if SAT.configPBHandlerType (optSATConfig def) == h then " (default)" else "")
-         | h <- [minBound .. maxBound] ])
-    , Option [] ["pb-split-clause-part"]
-        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnablePBSplitClausePart = True } }))
-        ("Split clause part of PB constraints." ++ (if SAT.configEnablePBSplitClausePart def then " (default)" else ""))
-    , Option [] ["no-pb-split-clause-part"]
-        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configEnablePBSplitClausePart = False } }))
-        ("Do not split clause part of PB constraints." ++ (if SAT.configEnablePBSplitClausePart def then "" else " (default)"))
-
-    , Option [] ["opt-method"]
-        (ReqArg (\val opt -> opt{ optOptMethod = parseOptMethod val }) "<str>")
-        ("Optimization method: " ++ intercalate ", "
-         [PBO.showMethod m ++ (if optOptMethod def == m then " (default)" else "") | m <- [minBound .. maxBound]])
-    , Option [] ["objfun-heuristics"]
-        (NoArg (\opt -> opt{ optObjFunVarsHeuristics = True }))
-        "Enable heuristics for polarity/activity of variables in objective function (default)"
-    , Option [] ["no-objfun-heuristics"]
-        (NoArg (\opt -> opt{ optObjFunVarsHeuristics = False }))
-        "Disable heuristics for polarity/activity of variables in objective function"
-    , Option [] ["ls-initial"]
-        (NoArg (\opt -> opt{ optLocalSearchInitial = True }))
-        "Use local search (currently UBCSAT) for finding initial solution"
-
-    , Option [] ["all-mus"]
-        (NoArg (\opt -> opt{ optMode = Just ModeMUS, optAllMUSes = True }))
-        "enumerate all MUSes"
-    , Option [] ["mus-method"]
-        (ReqArg (\val opt -> opt{ optMUSMethod = parseMUSMethod val }) "<str>")
-        ("MUS computation method: " ++ intercalate ", "
-         [MUS.showMethod m ++ (if optMUSMethod def == m then " (default)" else "") | m <- [minBound .. maxBound]])
-    , Option [] ["all-mus-method"]
-        (ReqArg (\val opt -> opt{ optAllMUSMethod = parseAllMUSMethod val }) "<str>")
-        ("MUS enumeration method: " ++ intercalate ", "
-         [MUSEnum.showMethod m ++ (if optAllMUSMethod def == m then " (default)" else "") | m <- [minBound .. maxBound]])
-
-    , Option [] ["print-rational"]
-        (NoArg (\opt -> opt{ optPrintRational = True }))
-        "print rational numbers instead of decimals"
-    , Option ['w'] []
-        (ReqArg (\val opt -> opt{ optWriteFile = Just val }) "<filename>")
-        "write model to filename in Gurobi .sol format"
-
-    , Option [] ["check-model"]
-        (NoArg (\opt -> opt{ optSATConfig = (optSATConfig opt){ SAT.configCheckModel = True } }))
-        "check model for debug"
-
-    , Option [] ["timeout"]
-        (ReqArg (\val opt -> opt{ optTimeout = read val }) "<int>")
-        "Kill toysat after given number of seconds (default 0 (no limit))"
-
-    , Option [] ["with-ubcsat"]
-        (ReqArg (\val opt -> opt{ optUBCSAT = val }) "<PATH>")
-        "give the path to the UBCSAT command"
-    , Option [] ["temp-dir"]
-        (ReqArg (\val opt -> opt{ optTempDir = Just val }) "<PATH>")
-        "temporary directory"
-
-    , Option [] ["encoding"]
-        (ReqArg (\val opt -> opt{ optFileEncoding = Just val }) "<ENCODING>")
-        "file encoding for LP/MPS files"
-    ]
+optionsParser :: Parser Options
+optionsParser = Options
+  <$> fileInput
+  <*> modeOption
+  <*> satConfigParser
+  <*> randomSeedOption
+  <*> linearizerPBOption
+  <*> optMethodOption
+  <*> objFunVarsHeuristicsOption
+  <*> localSearchInitialOption
+  <*> musMethodOption
+  <*> allMUSMethodOption
+  <*> printRationalOption
+  <*> timeoutOption
+  <*> writeFileOption
+  <*> ubcsatOption
+  <*> initSPOption
+  <*> tempDirOption
+  <*> fileEncodingOption
   where
-    parseOptMethod s = fromMaybe (error (printf "unknown optimization method \"%s\"" s)) (PBO.parseMethod s)
+    fileInput :: Parser String
+    fileInput = strArgument $ metavar "(FILE|-)"
 
-    parseMUSMethod s = fromMaybe (error (printf "unknown MUS finding method \"%s\"" s)) (MUS.parseMethod s)
+    modeOption :: Parser (Maybe Mode)
+    -- modeOption = liftA msum $ T.sequenceA $ map optional $
+    modeOption = optional $ foldr (<|>) empty
+      [ flag' ModeSAT    $ long "sat"     <> help "solve boolean satisfiability problem in .cnf file"
+      , flag' ModeMUS    $ long "mus"     <> help "solve minimally unsatisfiable subset problem in .gcnf or .cnf file"
+      , flag' ModeAllMUS $ long "all-mus" <> help "enumerate minimally unsatisfiable subset of .gcnf or .cnf file"
+      , flag' ModePB     $ long "pb"      <> help "solve pseudo boolean problem in .opb file"
+      , flag' ModeWBO    $ long "wbo"     <> help "solve weighted boolean optimization problem in .wbo file"
+      , flag' ModeMaxSAT $ long "maxsat"  <> help "solve MaxSAT problem in .cnf or .wcnf file"
+      , flag' ModeMIP    $ long "lp"      <> help "solve LP/MIP problem in .lp or .mps file"
+      ]
 
-    parseAllMUSMethod s = fromMaybe (error (printf "unknown MUS enumeration method \"%s\"" s)) (MUSEnum.parseMethod s)
+    randomSeedOption = optional $ fmap (Rand.toSeed . V.fromList . map read . words) $ strOption
+      $  long "random-seed"
+      <> long "random-gen"
+      <> metavar "\"INT ..\""
+      <> help "random seed used by the random variable selection"
 
-    parseRestartStrategy s = fromMaybe (error (printf "unknown restart strategy \"%s\"" s)) (SAT.parseRestartStrategy s)
+    linearizerPBOption = switch
+      $  long "linearizer-pb"
+      <> help "Use PB constraint in linearization."
 
-    parseLearningStrategy s = fromMaybe (error (printf "unknown learning strategy \"%s\"" s)) (SAT.parseLearningStrategy s)
+    optMethodOption = option (maybeReader PBO.parseMethod)
+      $  long "opt-method"
+      <> metavar "STR"
+      <> help ("Optimization method: " ++ intercalate ", " [PBO.showMethod m | m <- [minBound..maxBound]])
+      <> value (optOptMethod def)
+      <> showDefaultWith PBO.showMethod
 
-    parseBranchingStrategy s = fromMaybe (error (printf "unknown branching strategy \"%s\"" s)) (SAT.parseBranchingStrategy s)
+    objFunVarsHeuristicsOption =
+          flag' True
+            (  long "objfun-heuristics"
+            <> help ("Enable heuristics for polarity/activity of variables in objective function" ++
+                     (if PBO.defaultEnableObjFunVarsHeuristics then " (default)" else "")))
+      <|> flag' False
+            (  long "no-objfun-heuristics"
+            <> help ("Disable heuristics for polarity/activity of variables in objective function" ++
+                     (if PBO.defaultEnableObjFunVarsHeuristics then "" else " (default)")))
+      <|> pure PBO.defaultEnableObjFunVarsHeuristics
 
-    parsePBHandler s = fromMaybe (error (printf "unknown PB constraint handler \"%s\"" s)) (SAT.parsePBHandlerType s)
+    localSearchInitialOption = switch
+      $  long "ls-initial"
+      <> help "Use local search (currently UBCSAT) for finding initial solution"
+
+    musMethodOption = option (maybeReader MUS.parseMethod)
+      $  long "mus-method"
+      <> metavar "STR"
+      <> help ("MUS computation method: " ++ intercalate ", " [MUS.showMethod m | m <- [minBound..maxBound]])
+      <> value (optMUSMethod def)
+      <> showDefaultWith MUS.showMethod
+
+    allMUSMethodOption = option (maybeReader MUSEnum.parseMethod)
+      $  long "all-mus-method"
+      <> metavar "STR"
+      <> help (("MUS enumeration method: " ++ intercalate ", " [MUSEnum.showMethod m | m <- [minBound..maxBound]]))
+      <> value (optAllMUSMethod def)
+      <> showDefaultWith MUSEnum.showMethod
+
+    printRationalOption = switch
+      $  long "print-rational"
+      <> help "print rational numbers instead of decimals"
+
+    timeoutOption = option auto
+      $  long "timeout"
+      <> metavar "INT"
+      <> help "Kill toysat after given number of seconds (0 means no limit)"
+      <> value (optTimeout def)
+      <> showDefault
+
+    writeFileOption = optional $ strOption
+      $  short 'w'
+      <> metavar "FILE"
+      <> help "write model to filename in Gurobi .sol format"
+
+    ubcsatOption = strOption
+      $  long "with-ubcsat"
+      <> metavar "PATH"
+      <> help "give the path to the UBCSAT command"
+      <> value (optUBCSAT def)
+
+    initSPOption = switch
+      $  long "init-sp"
+      <> help "Use survey propation to compute initial polarity (when possible)"
+
+    tempDirOption = optional $ strOption
+      $  long "temp-dir"
+      <> metavar "PATH"
+      <> help "temporary directory"
+
+    fileEncodingOption = optional $ strOption
+      $  long "encoding"
+      <> metavar "ENCODING"
+      <> help "file encoding for LP/MPS files"
+
+
+satConfigParser :: Parser SAT.Config
+satConfigParser = SAT.Config
+  <$> restartOption
+  <*> restartFirstOption
+  <*> restartIncOption
+  <*> learningOption
+  <*> learntSizeFirstOption
+  <*> learntSizeIncOption
+  <*> ccMinOption
+  <*> branchOption
+  <*> eRWAStepSizeFirstOption
+  <*> eRWAStepSizeDecOption
+  <*> eRWAStepSizeMinOption
+  <*> eMADecayOption
+  <*> enablePhaseSavingOption
+  <*> enableForwardSubsumptionRemovalOption
+  <*> enableBackwardSubsumptionRemovalOption
+  <*> randomFreqOption
+  <*> pbHandlerTypeOption
+  <*> enablePBSplitClausePartOption
+  <*> checkModelOption
+  <*> pure (SAT.configVarDecay def)
+  <*> pure (SAT.configConstrDecay def)
+  where
+    restartOption = option (maybeReader SAT.parseRestartStrategy)
+      $  long "restart"
+      <> metavar "STR"
+      <> help ("Restart startegy: " ++ intercalate ", " [SAT.showRestartStrategy s | s <- [minBound..maxBound]])
+      <> value (SAT.configRestartStrategy def)
+      <> showDefaultWith SAT.showRestartStrategy
+    restartFirstOption = option auto
+      $  long "restart-first"
+      <> metavar "INT"
+      <> help "The initial restart limit."
+      <> value (SAT.configRestartFirst def)
+      <> showDefault
+    restartIncOption = option auto
+      $  long "restart-inc"
+      <> metavar "REAL"
+      <> help "The factor with which the restart limit is multiplied in each restart."
+      <> value (SAT.configRestartInc def)
+      <> showDefault
+
+    learningOption = option (maybeReader SAT.parseLearningStrategy)
+      $  long "learning"
+      <> metavar "STR"
+      <> help ("Leaning scheme: " ++ intercalate ", " [SAT.showLearningStrategy s | s <- [minBound..maxBound]])
+      <> value (SAT.configLearningStrategy def)
+      <> showDefaultWith SAT.showLearningStrategy
+    learntSizeFirstOption = option auto
+      $  long "learnt-size-first"
+      <> metavar "INT"
+      <> help "The initial limit for learnt clauses."
+      <> value (SAT.configLearntSizeFirst def)
+      <> showDefault
+    learntSizeIncOption = option auto
+      $  long "learnt-size-inc"
+      <> metavar "REAL"
+      <> help "The limit for learnt clauses is multiplied with this factor periodically."
+      <> value (SAT.configLearntSizeInc def)
+      <> showDefault
+
+    ccMinOption = option auto
+      $  long "ccmin"
+      <> metavar "INT"
+      <> help "Conflict clause minimization: 0=none, 1=local, 2=recursive"
+      <> value (SAT.configCCMin def)
+      <> showDefault
+    branchOption = option (maybeReader SAT.parseBranchingStrategy)
+      $  long "branch"
+      <> metavar "STR"
+      <> help ("Branching startegy: " ++ intercalate ", " [SAT.showBranchingStrategy s | s <- [minBound..maxBound]])
+      <> value (SAT.configBranchingStrategy def)
+      <> showDefaultWith SAT.showBranchingStrategy
+
+    eRWAStepSizeFirstOption = option auto
+      $  long "erwa-alpha-first"
+      <> metavar "REAL"
+      <> help "step-size alpha in ERWA and LRB branching heuristic is initialized with this value."
+      <> value (SAT.configERWAStepSizeFirst def)
+      <> showDefault
+    eRWAStepSizeDecOption = option auto
+      $  long "erwa-alpha-dec"
+      <> metavar "REAL"
+      <> help "step-size alpha in ERWA and LRB branching heuristic is decreased by this value after each conflict."
+      <> value (SAT.configERWAStepSizeDec def)
+      <> showDefault
+    eRWAStepSizeMinOption = option auto
+      $  long "erwa-alpha-min"
+      <> metavar "REAL"
+      <> help "step-size alpha in ERWA and LRB branching heuristic is decreased until it reach the value."
+      <> value (SAT.configERWAStepSizeMin def)
+      <> showDefault
+
+    eMADecayOption = option auto
+      $  long "ema-decay"
+      <> metavar "REAL"
+      <> help "inverse of the variable EMA decay factor used by LRB branching heuristic."
+      <> value (SAT.configEMADecay def)
+      <> showDefault
+
+    enablePhaseSavingOption =
+          flag' True  (long "enable-phase-saving"  <> help ("Enable phase saving"  ++ (if SAT.configEnablePhaseSaving def then " (default)" else "")))
+      <|> flag' False (long "disable-phase-saving" <> help ("Disable phase saving" ++ (if SAT.configEnablePhaseSaving def then "" else " (default)")))
+      <|> pure (SAT.configEnablePhaseSaving def)
+
+    enableForwardSubsumptionRemovalOption =
+          flag' True
+            (  long "enable-forward-subsumption-removal"
+            <> help ("Enable forward subumption removal (clauses only)"  ++ (if SAT.configEnableForwardSubsumptionRemoval def then " (default)" else "")))
+      <|> flag' False
+            (  long "disable-forward-subsumption-removal"
+            <> help ("Disable forward subumption removal (clauses only)" ++ (if SAT.configEnableForwardSubsumptionRemoval def then "" else " (default)")))
+      <|> pure (SAT.configEnableForwardSubsumptionRemoval def)
+    enableBackwardSubsumptionRemovalOption =
+          flag' True
+            (  long "enable-backward-subsumption-removal"
+            <> help ("Enable backward subumption removal (clauses only)"  ++ (if SAT.configEnableBackwardSubsumptionRemoval def then " (default)" else "")))
+      <|> flag' False
+            (  long "disable-backward-subsumption-removal"
+            <> help ("Disable backward subumption removal (clauses only)" ++ (if SAT.configEnableBackwardSubsumptionRemoval def then "" else " (default)")))
+      <|> pure (SAT.configEnableBackwardSubsumptionRemoval def)
+
+    randomFreqOption = option auto
+      $  long "random-freq"
+      <> metavar "0..1"
+      <> help "The frequency with which the decision heuristic tries to choose a random variable"
+      <> value (SAT.configRandomFreq def)
+      <> showDefault
+
+    pbHandlerTypeOption = option (maybeReader SAT.parsePBHandlerType)
+      $  long "pb-handler"
+      <> metavar "STR"
+      <> help ("PB constraint handler: " ++ intercalate ", " [SAT.showPBHandlerType h | h <- [minBound..maxBound]])
+      <> value (SAT.configPBHandlerType def)
+      <> showDefaultWith SAT.showPBHandlerType
+
+    enablePBSplitClausePartOption =
+          flag' True
+            (  long "pb-split-clause-part"
+            <> help ("Split clause part of PB constraints." ++ (if SAT.configEnablePBSplitClausePart def then " (default)" else "")))
+      <|> flag' False
+            (  long "no-pb-split-clause-part"
+            <> help ("Do not split clause part of PB constraints." ++ (if SAT.configEnablePBSplitClausePart def then "" else " (default)")))
+      <|> pure (SAT.configEnablePBSplitClausePart def)
+
+    checkModelOption = switch
+      $  long "check-model"
+      <> help "check model for debugging"
+
+parserInfo :: ParserInfo Options
+parserInfo = info (helper <*> versionOption <*> optionsParser)
+  $  fullDesc
+  <> header "toysat - a solver for SAT-related problems"
+  where
+    versionOption :: Parser (a -> a)
+    versionOption = infoOption (showVersion version)
+      $  hidden
+      <> long "version"
+      <> help "Show version"
+
+#if !MIN_VERSION_optparse_applicative(0,13,0)
+
+-- | Convert a function producing a 'Maybe' into a reader.
+maybeReader :: (String -> Maybe a) -> ReadM a
+maybeReader f = eitherReader $ \arg ->
+  case f arg of
+    Nothing -> Left $ "cannot parse value `" ++ arg ++ "'"
+    Just a -> Right a
+
+#endif
 
 main :: IO ()
 main = do
@@ -315,64 +435,50 @@ main = do
 
   startCPU <- getTime ProcessCPUTime
   startWC  <- getTime Monotonic
-  args <- getArgs
-  case getOpt Permute options args of
-    (_,_,errs@(_:_)) -> do
-      mapM_ putStrLn errs
-      exitFailure
 
-    (o,args2,[]) -> do
-      let opt = foldl (flip id) def o      
-          mode =
-            case optMode opt of
-              Just m  -> m
-              Nothing ->
-                case args2 of
-                  [] -> ModeHelp
-                  fname : _ ->
-                    case map toLower (takeExtension fname) of
-                      ".cnf"  -> ModeSAT
-                      ".gcnf" -> ModeMUS
-                      ".opb"  -> ModePB
-                      ".wbo"  -> ModeWBO
-                      ".wcnf" -> ModeMaxSAT
-                      ".lp"   -> ModeMIP
-                      ".mps"  -> ModeMIP
-                      _ -> ModeSAT
+  opt <- execParser parserInfo
+  let mode =
+        case optMode opt of
+          Just m  -> m
+          Nothing ->
+            case map toLower (takeExtension (optInput opt)) of
+              ".cnf"  -> ModeSAT
+              ".gcnf" -> ModeMUS
+              ".opb"  -> ModePB
+              ".wbo"  -> ModeWBO
+              ".wcnf" -> ModeMaxSAT
+              ".lp"   -> ModeMIP
+              ".mps"  -> ModeMIP
+              _ -> ModeSAT
 
-      case mode of
-        ModeHelp    -> showHelp stdout
-        ModeVersion -> hPutStrLn stdout (showVersion version)
-        _ -> do
-          printSysInfo
+  printSysInfo
 #ifdef __GLASGOW_HASKELL__
-          fullArgs <- getFullArgs
+  fullArgs <- getFullArgs
 #else
-          let fullArgs = args
+  let fullArgs = args
 #endif
-          putCommentLine $ printf "command line = %s" (show fullArgs)
+  putCommentLine $ printf "command line = %s" (show fullArgs)
 
-          let timelim = optTimeout opt * 10^(6::Int)
-    
-          ret <- timeout (if timelim > 0 then timelim else (-1)) $ do
-             solver <- newSolver opt
-             case mode of
-               ModeHelp    -> showHelp stdout
-               ModeVersion -> hPutStrLn stdout (showVersion version)
-               ModeSAT     -> mainSAT opt solver args2
-               ModeMUS     -> mainMUS opt solver args2
-               ModePB      -> mainPB opt solver args2
-               ModeWBO     -> mainWBO opt solver args2
-               ModeMaxSAT  -> mainMaxSAT opt solver args2
-               ModeMIP     -> mainMIP opt solver args2
-    
-          when (isNothing ret) $ do
-            putCommentLine "TIMEOUT"
-          endCPU <- getTime ProcessCPUTime
-          endWC  <- getTime Monotonic
-          putCommentLine $ printf "total CPU time = %.3fs" (durationSecs startCPU endCPU)
-          putCommentLine $ printf "total wall clock time = %.3fs" (durationSecs startWC endWC)
-          printGCStat
+  let timelim = optTimeout opt * 10^(6::Int)
+  
+  ret <- timeout (if timelim > 0 then timelim else (-1)) $ do
+     solver <- newSolver opt
+     case mode of
+       ModeSAT     -> mainSAT opt solver
+       ModeMUS     -> mainMUS opt solver
+       ModeAllMUS  -> mainMUS opt solver
+       ModePB      -> mainPB opt solver
+       ModeWBO     -> mainWBO opt solver
+       ModeMaxSAT  -> mainMaxSAT opt solver
+       ModeMIP     -> mainMIP opt solver
+
+  when (isNothing ret) $ do
+    putCommentLine "TIMEOUT"
+  endCPU <- getTime ProcessCPUTime
+  endWC  <- getTime Monotonic
+  putCommentLine $ printf "total CPU time = %.3fs" (durationSecs startCPU endCPU)
+  putCommentLine $ printf "total wall clock time = %.3fs" (durationSecs startWC endWC)
+  printGCStat
 
 printGCStat :: IO ()
 #if defined(__GLASGOW_HASKELL__)
@@ -444,22 +550,6 @@ printGCStat = do
 printGCStat = return ()
 #endif
 
-showHelp :: Handle -> IO ()
-showHelp h = hPutStrLn h (usageInfo header options)
-
-header :: String
-header = unlines
-  [ "Usage:"
-  , "  toysat [OPTION]... [file.cnf|-]"
-  , "  toysat [OPTION]... --mus [file.gcnf|-]"
-  , "  toysat [OPTION]... --pb [file.opb|-]"
-  , "  toysat [OPTION]... --wbo [file.wbo|-]"
-  , "  toysat [OPTION]... --maxsat [file.cnf|file.wcnf|-]"
-  , "  toysat [OPTION]... --lp [file.lp|file.mps|-]"
-  , ""
-  , "Options:"
-  ]
-
 printSysInfo :: IO ()
 printSysInfo = do
   tm <- getZonedTime
@@ -506,18 +596,17 @@ newSolver opts = do
 
 -- ------------------------------------------------------------------------
 
-mainSAT :: Options -> SAT.Solver -> [String] -> IO ()
-mainSAT opt solver args = do
-  ret <- case args of
-           ["-"]   -> liftM CNF.parseByteString $ BS.hGetContents stdin
-           [fname] -> CNF.parseFile fname
-           _ -> showHelp stderr >> exitFailure
+mainSAT :: Options -> SAT.Solver -> IO ()
+mainSAT opt solver = do
+  ret <- case optInput opt of
+           "-"   -> liftM CNF.parseByteString $ BS.hGetContents stdin
+           fname -> CNF.parseFile fname
   case ret of
     Left err -> hPrint stderr err >> exitFailure
     Right cnf -> do
-      let fname = case args of
-                    [fname] | or [".cnf" `isSuffixOf` map toLower fname] -> Just fname
-                    _ -> Nothing
+      let fname = if ".cnf" `isSuffixOf` map toLower (optInput opt)
+                  then Just (optInput opt)
+                  else Nothing
       solveSAT opt solver cnf fname
 
 solveSAT :: Options -> SAT.Solver -> CNF.CNF -> Maybe FilePath -> IO ()
@@ -602,20 +691,19 @@ initPolarityUsingSP solver nvOrig nv clauses = do
 
 -- ------------------------------------------------------------------------
 
-mainMUS :: Options -> SAT.Solver -> [String] -> IO ()
-mainMUS opt solver args = do
-  gcnf <- case args of
-           ["-"]   -> do
+mainMUS :: Options -> SAT.Solver -> IO ()
+mainMUS opt solver = do
+  gcnf <- case optInput opt of
+           "-"   -> do
              s <- BS.hGetContents stdin
              case GCNF.parseByteString s of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
-           [fname] -> do
+           fname -> do
              ret <- GCNF.parseFile fname
              case ret of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
-           _ -> showHelp stderr >> exitFailure
   solveMUS opt solver gcnf
 
 solveMUS :: Options -> SAT.Solver -> GCNF.GCNF -> IO ()
@@ -660,7 +748,7 @@ solveMUS opt solver gcnf = do
       satPrintModel stdout m (GCNF.numVars gcnf)
       writeSOLFile opt m Nothing (GCNF.numVars gcnf)
     else do
-      if not (optAllMUSes opt)
+      if optMode opt /= Just ModeAllMUS
       then do
           let opt2 = def
                      { MUS.optMethod = optMUSMethod opt
@@ -698,12 +786,11 @@ solveMUS opt solver gcnf = do
 
 -- ------------------------------------------------------------------------
 
-mainPB :: Options -> SAT.Solver -> [String] -> IO ()
-mainPB opt solver args = do
-  ret <- case args of
-           ["-"]   -> liftM PBFileAttoparsec.parseOPBByteString $ BS.hGetContents stdin
-           [fname] -> PBFileAttoparsec.parseOPBFile fname
-           _ -> showHelp stderr >> exitFailure
+mainPB :: Options -> SAT.Solver -> IO ()
+mainPB opt solver = do
+  ret <- case optInput opt of
+           "-"   -> liftM PBFileAttoparsec.parseOPBByteString $ BS.hGetContents stdin
+           fname -> PBFileAttoparsec.parseOPBFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right formula -> solvePB opt solver formula
@@ -816,12 +903,11 @@ setupOptimizer pbo opt = do
 
 -- ------------------------------------------------------------------------
 
-mainWBO :: Options -> SAT.Solver -> [String] -> IO ()
-mainWBO opt solver args = do
-  ret <- case args of
-           ["-"]   -> liftM PBFileAttoparsec.parseWBOByteString $ BS.hGetContents stdin
-           [fname] -> PBFileAttoparsec.parseWBOFile fname
-           _ -> showHelp stderr >> exitFailure
+mainWBO :: Options -> SAT.Solver -> IO ()
+mainWBO opt solver = do
+  ret <- case optInput opt of
+           "-"   -> liftM PBFileAttoparsec.parseWBOByteString $ BS.hGetContents stdin
+           fname -> PBFileAttoparsec.parseWBOFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right formula -> solveWBO opt solver False formula
@@ -921,18 +1007,17 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
 
 -- ------------------------------------------------------------------------
 
-mainMaxSAT :: Options -> SAT.Solver -> [String] -> IO ()
-mainMaxSAT opt solver args = do
-  ret <- case args of
-           ["-"]   -> liftM WCNF.parseByteString BS.getContents
-           [fname] -> WCNF.parseFile fname
-           _ -> showHelp stderr  >> exitFailure
+mainMaxSAT :: Options -> SAT.Solver -> IO ()
+mainMaxSAT opt solver = do
+  ret <- case optInput opt of
+           "-"   -> liftM WCNF.parseByteString BS.getContents
+           fname -> WCNF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right wcnf -> do
-      let fname = case args of
-                    [fname] | or [s `isSuffixOf` map toLower fname | s <- [".cnf", ".wcnf"]] -> Just fname
-                    _ -> Nothing
+      let fname = if or [s `isSuffixOf` map toLower (optInput opt) | s <- [".cnf", ".wcnf"]]
+                  then Just (optInput opt)
+                  else Nothing
       solveMaxSAT opt solver wcnf fname
 
 solveMaxSAT :: Options -> SAT.Solver -> WCNF.WCNF -> Maybe FilePath -> IO ()
@@ -941,11 +1026,11 @@ solveMaxSAT opt solver wcnf wcnfFileName =
 
 -- ------------------------------------------------------------------------
 
-mainMIP :: Options -> SAT.Solver -> [String] -> IO ()
-mainMIP opt solver args = do
+mainMIP :: Options -> SAT.Solver -> IO ()
+mainMIP opt solver = do
   mip <-
-    case args of
-      [fname@"-"]   -> do
+    case optInput opt of
+      fname@"-"   -> do
         F.mapM_ (\s -> hSetEncoding stdin =<< mkTextEncoding s) (optFileEncoding opt)
         s <- hGetContents stdin
         case MIP.parseLPString def fname s of
@@ -957,10 +1042,9 @@ mainMIP opt solver args = do
                 hPrint stderr err
                 hPrint stderr err2
                 exitFailure
-      [fname] -> do
+      fname -> do
         enc <- T.mapM mkTextEncoding (optFileEncoding opt)
         MIP.readFile def{ MIP.optFileEncoding = enc } fname
-      _ -> showHelp stderr >> exitFailure
   solveMIP opt solver (fmap toRational mip)
 
 solveMIP :: Options -> SAT.Solver -> MIP.Problem Rational -> IO ()
