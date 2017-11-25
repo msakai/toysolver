@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE CPP, TypeFamilies, OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
@@ -22,23 +23,41 @@ import Data.Monoid
 import Data.Ratio
 import Data.String
 import qualified Data.Text as Text
-import System.Environment
-import System.IO
+import Options.Applicative
 import qualified Codec.TPTP as TPTP
 import ToySolver.Data.Boolean
 import qualified ToySolver.EUF.FiniteModelFinder as MF
 import ToySolver.Internal.Util (setEncodingChar8)
+
+data Options
+  = Options
+  { optInput :: FilePath
+  , optSize :: Int
+  }
+
+optionsParser :: Parser Options
+optionsParser = Options
+  <$> fileInput
+  <*> sizeInput
+  where
+    fileInput :: Parser FilePath
+    fileInput = argument str $ metavar "FILE.tptp"
+
+    sizeInput :: Parser Int
+    sizeInput = argument auto $ metavar "SIZE"
+
+parserInfo :: ParserInfo Options
+parserInfo = info (helper <*> optionsParser)
+  $  fullDesc
+  <> header "toyfmf - a finite model finder"
 
 main :: IO ()
 main = do
 #ifdef FORCE_CHAR8
   setEncodingChar8
 #endif
-
-  args <- getArgs
-  case args of
-    [fpath, size] -> solve fpath (read size)
-    _ -> hPutStrLn stderr "Usage: toyfmf <file.tptp> <size>"
+  opt <- execParser parserInfo
+  solve (optInput opt) (optSize opt)
 
 solve :: FilePath -> Int -> IO ()
 solve _ size | size <= 0 = error "<size> should be >=1"
@@ -46,7 +65,7 @@ solve fpath size = do
   inputs <- TPTP.parseFile fpath
   let fs = translateProblem inputs
 
-  ref <- newIORef 0
+  ref <- newIORef (0::Int)
   let skolem name _ = do
         n <- readIORef ref
         let fsym = intern $ unintern name <> "#" <> fromString (show n)
@@ -75,7 +94,7 @@ translateProblem inputs = do
   case i of
     TPTP.Comment _ -> []
     TPTP.Include _ _ -> error "\"include\" is not supported yet "
-    TPTP.AFormula{ TPTP.name = _, TPTP.role = role, TPTP.formula = formula, TPTP.annotations = _ } ->
+    TPTP.AFormula{ TPTP.name = _, TPTP.role = _, TPTP.formula = formula, TPTP.annotations = _ } ->
       return $ translateFormula formula
 
 translateFormula :: TPTP.Formula -> MF.Formula

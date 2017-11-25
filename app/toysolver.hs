@@ -21,6 +21,7 @@ import Data.Char
 import Data.Default.Class
 import Data.List
 import Data.Maybe
+import Data.Monoid
 import Data.Ratio
 import Data.Scientific (Scientific)
 import qualified Data.Scientific as Scientific
@@ -32,6 +33,7 @@ import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Traversable as T
+import Options.Applicative hiding (Const)
 import System.Exit
 import System.Environment
 import System.FilePath
@@ -72,59 +74,133 @@ import ToySolver.Internal.Util
 -- ---------------------------------------------------------------------------
 
 data Mode = ModeSAT | ModePB | ModeWBO | ModeMaxSAT | ModeMIP
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
-data Flag
-    = Help
-    | Version
-    | Solver String
-    | PrintRational
-    | WriteFile !FilePath
-    | NoMIP
-    | PivotStrategy String
-    | BoundTightening
-    | NThread !Int
-    | OmegaReal String
-    | Mode !Mode
-    | FileEncoding String
-    deriving Eq
+data Options = Options
+  { optInput :: FilePath
+  , optMode :: Maybe Mode
+  , optSolver :: String
+  , optPrintRational :: Bool
+  , optWriteFile :: Maybe FilePath
+  , optNoMIP :: Bool
+  , optPivotStrategy :: Simplex.PivotStrategy -- String
+  , optBoundTightening :: Bool
+  , optNThread :: Int
+  , optOmegaReal :: String
+  , optFileEncoding :: Maybe String
+  } deriving (Eq, Show)
 
-options :: [OptDescr Flag]
-options =
-    [ Option ['h'] ["help"]    (NoArg Help)            "show help"
-    , Option ['v'] ["version"] (NoArg Version)         "show version number"
-    , Option [] ["solver"] (ReqArg Solver "SOLVER")    "mip (default), omega-test, cooper, cad, old-mip, ct"
-    , Option [] ["print-rational"] (NoArg PrintRational) "print rational numbers instead of decimals"
-    , Option ['w'] [] (ReqArg WriteFile "<filename>")  "write solution to filename in Gurobi .sol format"
+optionsParser :: Parser Options
+optionsParser = Options
+  <$> fileInput
+  <*> modeOption
+  <*> solverOption
+  <*> printRationalOption
+  <*> writeFileOption
+  <*> noMIPOption
+  <*> pivotStrategyOption
+  <*> boundTighteningOption
+  <*> nThreadOption
+  <*> omegaRealOption
+  <*> fileEncodingOption
+  where
+    fileInput :: Parser FilePath
+    fileInput = argument str (metavar "FILE")
 
-    , Option [] ["pivot-strategy"] (ReqArg PivotStrategy "NAME") $
-        printf "pivot strategy for simplex: %s"
-          (intercalate ", "[Simplex.showPivotStrategy ps ++ (if ps == Simplex.configPivotStrategy def then " (default)" else "") | ps <- [minBound..maxBound]])
-    , Option [] ["bound-tightening"] (NoArg BoundTightening) $
-        "enable bound tightening in simplex algorithm"
-    , Option [] ["threads"] (ReqArg (NThread . read) "INTEGER") "number of threads to use"
+    modeOption :: Parser (Maybe Mode)
+    modeOption = optional $
+          flag' ModeSAT    (long "sat"    <> help "solve boolean satisfiability problem in .cnf file")
+      <|> flag' ModePB     (long "pb"     <> help "solve pseudo boolean problem in .opb file")
+      <|> flag' ModeWBO    (long "wbo"    <> help "solve weighted boolean optimization problem in .wbo file")
+      <|> flag' ModeMaxSAT (long "maxsat" <> help "solve MaxSAT problem in .cnf or .wcnf file")
+      <|> flag' ModeMIP    (long "lp"     <> help "solve LP/MIP problem in .lp or .mps file")
 
-    , Option [] ["omega-real"] (ReqArg OmegaReal "SOLVER") "fourier-motzkin (default), virtual-substitution (or vs), cad, simplex, none"
+    solverOption :: Parser String
+    solverOption = strOption
+      $  long "solver"
+      <> metavar "SOLVER"
+      <> help "Solver algorithm: mip, omega-test, cooper, cad, old-mip, ct"
+      <> value "mip"
+      <> showDefaultWith id
 
-    , Option []    ["sat"]    (NoArg (Mode ModeSAT))    "solve boolean satisfiability problem in .cnf file"
-    , Option []    ["pb"]     (NoArg (Mode ModePB))     "solve pseudo boolean problem in .opb file"
-    , Option []    ["wbo"]    (NoArg (Mode ModeWBO))    "solve weighted boolean optimization problem in .wbo file"
-    , Option []    ["maxsat"] (NoArg (Mode ModeMaxSAT)) "solve MaxSAT problem in .cnf or .wcnf file"
-    , Option []    ["lp"]     (NoArg (Mode ModeMIP))    "solve LP/MIP problem in .lp or .mps file (default)"
+    printRationalOption :: Parser Bool
+    printRationalOption = switch
+      $  long "print-rational"
+      <> help "print rational numbers instead of decimals"
 
-    , Option [] ["nomip"] (NoArg NoMIP)                 "consider all integer variables as continuous"
+    writeFileOption :: Parser (Maybe FilePath)
+    writeFileOption = optional $ strOption
+      $  short 'w'
+      <> metavar "FILE"
+      <> help "write solution to filename in Gurobi .sol format"
 
-    , Option [] ["encoding"] (ReqArg FileEncoding "<ENCODING>") "file encoding for LP/MPS files"
-    ]
+    noMIPOption :: Parser Bool
+    noMIPOption = switch
+      $  long "nomip"
+      <> help "consider all integer variables as continuous"
 
-header :: String
-header = "Usage: toysolver [OPTION]... file"
+    pivotStrategyOption :: Parser Simplex.PivotStrategy
+    pivotStrategyOption = option (maybeReader Simplex.parsePivotStrategy)
+      $  long "pivot-strategy"
+      <> metavar "NAME"
+      <> help ("pivot strategy for simplex: " ++ intercalate ", " [Simplex.showPivotStrategy ps | ps <- [minBound..maxBound]])
+      <> value (Simplex.configPivotStrategy def)
+      <> showDefaultWith Simplex.showPivotStrategy
+
+    boundTighteningOption :: Parser Bool
+    boundTighteningOption =  switch
+      $  long "bound-tightening"
+      <> help "enable bound tightening in simplex algorithm"
+
+    nThreadOption :: Parser Int
+    nThreadOption = option auto
+      $  long "threads"
+      <> metavar "INT"
+      <> help "number of threads to use (0: auto)"
+      <> value 0
+      <> showDefault
+
+    omegaRealOption :: Parser String
+    omegaRealOption = strOption
+      $  long "omega-real"
+      <> metavar "SOLVER"
+      <> help "fourier-motzkin, virtual-substitution (or vs), cad, simplex, none"
+      <> value "fourier-motzkin"
+      <> showDefaultWith id
+
+    fileEncodingOption :: Parser (Maybe String)
+    fileEncodingOption = optional $ strOption
+      $  long "encoding"
+      <> metavar "ENCODING"
+      <> help "file encoding for LP/MPS files"
+
+parserInfo :: ParserInfo Options
+parserInfo = info (helper <*> versionOption <*> optionsParser)
+  $  fullDesc
+  <> header "toysolver - a solver for arithmetic problems"
+  where
+    versionOption :: Parser (a -> a)
+    versionOption = infoOption (V.showVersion version)
+      $  hidden
+      <> long "version"
+      <> help "Show version"
+
+#if !MIN_VERSION_optparse_applicative(0,13,0)
+
+-- | Convert a function producing a 'Maybe' into a reader.
+maybeReader :: (String -> Maybe a) -> ReadM a
+maybeReader f = eitherReader $ \arg ->
+  case f arg of
+    Nothing -> Left $ "cannot parse value `" ++ arg ++ "'"
+    Just a -> Right a
+
+#endif
 
 -- ---------------------------------------------------------------------------
 
 run
   :: String
-  -> [Flag]
+  -> Options
   -> MIP.Problem Rational
   -> (Map MIP.Var Rational -> IO ())
   -> IO ()
@@ -182,8 +258,8 @@ run solver opt mip printModel = do
         Just _ -> error "indicator constraint is not supported yet"
 
     ivs
-      | NoMIP `elem` opt = Set.empty
-      | otherwise        = MIP.integerVariables mip
+      | optNoMIP opt = Set.empty
+      | otherwise    = MIP.integerVariables mip
 
     vs2  = IntMap.keysSet varToName
     ivs2 = IntSet.fromList . map (nameToVar Map.!) . Set.toList $ ivs
@@ -216,7 +292,7 @@ run solver opt mip printModel = do
            }         
            where
              realSolver =
-               case last ("fourier-motzkin" : [s | OmegaReal s <- opt]) of
+               case optOmegaReal opt of
                  "fourier-motzkin" -> OmegaTest.checkRealByFM
                  "virtual-substitution" -> OmegaTest.checkRealByVS
                  "vs"              -> OmegaTest.checkRealByVS
@@ -251,14 +327,12 @@ run solver opt mip printModel = do
     solveByMIP2 = do
       solver <- Simplex.newSolver
 
-      let f config (PivotStrategy s) =
-            case Simplex.parsePivotStrategy s of
-              Nothing -> error ("unknown pivot strategy \"" ++ s ++ "\"")
-              Just ps -> config{ Simplex.configPivotStrategy = ps }
-          f config BoundTightening = config{ Simplex.configEnableBoundTightening = True }
-          f config _ = config
-          config = foldl' f def opt
-          nthreads = last (0 : [n | NThread n <- opt])
+      let config =
+            def
+            { Simplex.configPivotStrategy = optPivotStrategy opt
+            , Simplex.configEnableBoundTightening = optBoundTightening opt
+            }
+          nthreads = optNThread opt
 
       Simplex.setConfig solver config
       Simplex.setLogger solver putCommentLine
@@ -362,7 +436,7 @@ run solver opt mip printModel = do
                   printModel m3
 
     printRat :: Bool
-    printRat = PrintRational `elem` opt
+    printRat = optPrintRational opt
 
     showValue :: Rational -> String
     showValue = showRational printRat
@@ -393,87 +467,64 @@ putOLine  s = do
 
 -- ---------------------------------------------------------------------------
 
-getSolver :: [Flag] -> String
-getSolver xs = last $ "mip" : [s | Solver s <- xs]
-
 main :: IO ()
 main = do
 #ifdef FORCE_CHAR8
   setEncodingChar8
 #endif
 
-  args <- getArgs
-  case getOpt Permute options args of
-    (o,_,[])
-      | Help `elem` o    -> putStrLn (usageInfo header options)
-      | Version `elem` o -> putStrLn (V.showVersion version)
-    (o,[fname],[]) -> do
+  o <- execParser parserInfo
 
-      let mode =
-            case reverse [m | Mode m <- o] of
-              m:_ -> m
-              [] ->
-                case map toLower (takeExtension fname) of
-                  ".cnf"  -> ModeSAT
-                  ".opb"  -> ModePB
-                  ".wbo"  -> ModeWBO
-                  ".wcnf" -> ModeMaxSAT
-                  ".lp"   -> ModeMIP
-                  ".mps"  -> ModeMIP
-                  _ -> ModeMIP
-
-      case mode of
-        ModeSAT -> do
-          ret <- CNF.parseFile fname
-          case ret of
-            Left err -> hPrint stderr err >> exitFailure
-            Right cnf -> do
-              let (mip,_,mtrans) = SAT2IP.convert cnf
-              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
-                let m2 = mtrans m
-                satPrintModel stdout m2 0
-                writeSOLFileSAT o m2
-        ModePB -> do
-          ret <- PBFileAttoparsec.parseOPBFile fname
-          case ret of
-            Left err -> hPutStrLn stderr err >> exitFailure
-            Right pb -> do
-              let (mip,_,mtrans) = PB2IP.convert pb
-              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
-                let m2 = mtrans m
-                pbPrintModel stdout m2 0
-                writeSOLFileSAT o m2
-        ModeWBO -> do
-          ret <- PBFileAttoparsec.parseWBOFile fname
-          case ret of
-            Left err -> hPutStrLn stderr err >> exitFailure
-            Right wbo -> do
-              let (mip,_,mtrans) = PB2IP.convertWBO False wbo
-              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
-                let m2 = mtrans m
-                pbPrintModel stdout m2 0
-                writeSOLFileSAT o m2
-        ModeMaxSAT -> do
-          ret <- WCNF.parseFile fname
-          case ret of
-            Left err -> hPutStrLn stderr err >> exitFailure
-            Right wcnf -> do
-              let (mip,_,mtrans) = MaxSAT2IP.convert False wcnf
-              run (getSolver o) o (fmap fromInteger mip) $ \m -> do
-                let m2 = mtrans m
-                maxsatPrintModel stdout m2 0
-                writeSOLFileSAT o m2
-        ModeMIP -> do
-          enc <- T.mapM mkTextEncoding $ last $ Nothing : [Just s | FileEncoding s <- o]
-          mip <- MIP.readFile def{ MIP.optFileEncoding = enc } fname
-          run (getSolver o) o (fmap toRational mip) $ \m -> do
-            mipPrintModel stdout (PrintRational `elem` o) m
-            writeSOLFileMIP o m
-    (_,_,errs) ->
-        hPutStrLn stderr $ concat errs ++ usageInfo header options
+  case fromMaybe ModeMIP (optMode o) of
+    ModeSAT -> do
+      ret <- CNF.parseFile (optInput o)
+      case ret of
+        Left err -> hPrint stderr err >> exitFailure
+        Right cnf -> do
+          let (mip,_,mtrans) = SAT2IP.convert cnf
+          run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+            let m2 = mtrans m
+            satPrintModel stdout m2 0
+            writeSOLFileSAT o m2
+    ModePB -> do
+      ret <- PBFileAttoparsec.parseOPBFile (optInput o)
+      case ret of
+        Left err -> hPutStrLn stderr err >> exitFailure
+        Right pb -> do
+          let (mip,_,mtrans) = PB2IP.convert pb
+          run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+            let m2 = mtrans m
+            pbPrintModel stdout m2 0
+            writeSOLFileSAT o m2
+    ModeWBO -> do
+      ret <- PBFileAttoparsec.parseWBOFile (optInput o)
+      case ret of
+        Left err -> hPutStrLn stderr err >> exitFailure
+        Right wbo -> do
+          let (mip,_,mtrans) = PB2IP.convertWBO False wbo
+          run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+            let m2 = mtrans m
+            pbPrintModel stdout m2 0
+            writeSOLFileSAT o m2
+    ModeMaxSAT -> do
+      ret <- WCNF.parseFile (optInput o)
+      case ret of
+        Left err -> hPutStrLn stderr err >> exitFailure
+        Right wcnf -> do
+          let (mip,_,mtrans) = MaxSAT2IP.convert False wcnf
+          run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+            let m2 = mtrans m
+            maxsatPrintModel stdout m2 0
+            writeSOLFileSAT o m2
+    ModeMIP -> do
+      enc <- T.mapM mkTextEncoding $ optFileEncoding o
+      mip <- MIP.readFile def{ MIP.optFileEncoding = enc } (optInput o)
+      run (optSolver o) o (fmap toRational mip) $ \m -> do
+        mipPrintModel stdout (optPrintRational o) m
+        writeSOLFileMIP o m
 
 -- FIXME: 目的関数値を表示するように
-writeSOLFileMIP :: [Flag] -> Map MIP.Var Rational -> IO ()
+writeSOLFileMIP :: Options -> Map MIP.Var Rational -> IO ()
 writeSOLFileMIP opt m = do
   let sol = MIP.Solution
             { MIP.solStatus = MIP.StatusUnknown
@@ -483,7 +534,7 @@ writeSOLFileMIP opt m = do
   writeSOLFileRaw opt sol
 
 -- FIXME: 目的関数値を表示するように
-writeSOLFileSAT :: [Flag] -> SAT.Model -> IO ()
+writeSOLFileSAT :: Options -> SAT.Model -> IO ()
 writeSOLFileSAT opt m = do
   let sol = MIP.Solution
             { MIP.solStatus = MIP.StatusUnknown
@@ -492,7 +543,9 @@ writeSOLFileSAT opt m = do
             }
   writeSOLFileRaw opt sol
 
-writeSOLFileRaw :: [Flag] -> MIP.Solution Scientific -> IO ()
+writeSOLFileRaw :: Options -> MIP.Solution Scientific -> IO ()
 writeSOLFileRaw opt sol = do
-  forM_ [fname | WriteFile fname <- opt ] $ \fname -> do
-    GurobiSol.writeFile fname sol
+  case optWriteFile opt of
+    Just fname -> GurobiSol.writeFile fname sol
+    Nothing -> return ()
+

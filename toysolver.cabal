@@ -403,6 +403,7 @@ Executable toysolver
     data-default-class,
     filepath,
     OptDir,
+    optparse-applicative,
     pseudo-boolean,
     scientific,
     toysolver
@@ -431,6 +432,7 @@ Executable toysat
     filepath,
     megaparsec,
     mwc-random,
+    optparse-applicative,
     process >=1.1.0.2,
     pseudo-boolean,
     scientific,
@@ -464,10 +466,10 @@ Executable toysmt
   Build-Depends:
     base,
     containers,
-    data-default-class,
     -- TODO: remove intern dependency
     intern,
     mtl,
+    optparse-applicative,
     parsec >=3.1.2 && <4,
     toysolver,
     text,
@@ -492,6 +494,7 @@ Executable toyqbf
     base,
     containers,
     data-default-class,
+    optparse-applicative,
     toysolver
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
@@ -515,6 +518,7 @@ Executable toyfmf
       -- logic-TPTP <=0.4.3 has build error on ghc <7.9 and transformers >=0.5.1.
       -- https://github.com/DanielSchuessler/logic-TPTP/pull/4
       logic-TPTP >=0.4.4.0,
+      optparse-applicative,
       text,
       toysolver
     -- logic-TPTP <=0.4.4.0 is not compatible with transformers-compat >=0.5
@@ -541,10 +545,12 @@ Executable toyconvert
   HS-Source-Dirs: app
   Build-Depends:
     base,
+    ansi-wl-pprint,
     bytestring,
     bytestring-builder,
     data-default-class,
     filepath,
+    optparse-applicative,
     pseudo-boolean,
     scientific,
     text,

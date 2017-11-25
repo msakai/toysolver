@@ -21,6 +21,9 @@ packageVersions = sort $ tail
 #ifdef VERSION_OptDir
   , ("OptDir", VERSION_OptDir)
 #endif
+#ifdef VERSION_ansi_wl_pprint
+  , ("ansi-wl-pprint", VERSION_ansi_wl_pprint)
+#endif
 #ifdef VERSION_array
   , ("array", VERSION_array)
 #endif
@@ -107,6 +110,9 @@ packageVersions = sort $ tail
 #endif
 #ifdef VERSION_mwc_random
   , ("mwc-random", VERSION_mwc_random)
+#endif
+#ifdef VERSION_optparse_applicative
+  , ("optparse-applicative", VERSION_optparse_applicative)
 #endif
 #ifdef VERSION_parsec
   , ("parsec", VERSION_parsec)
