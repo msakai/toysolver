@@ -364,6 +364,7 @@ Library
      ToySolver.SAT.TheorySolver
      ToySolver.SAT.Types
      ToySolver.SAT.Printer
+     ToySolver.SDP
      ToySolver.SMT
      ToySolver.Text.CNF
      ToySolver.Text.GCNF
