@@ -120,4 +120,4 @@ dualize origProb =
       ]
 
 blockIndexes :: Int -> [(Int,Int)]
-blockIndexes n = if n > 0 then [(i,j) | i <- [1..n], j <- [i..n]] else [(i,i) | i <- [1..n]]
+blockIndexes n = if n >= 0 then [(i,j) | i <- [1..n], j <- [i..n]] else [(i,i) | i <- [1..(-n)]]
