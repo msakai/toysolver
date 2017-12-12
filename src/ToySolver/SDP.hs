@@ -18,6 +18,9 @@
 
 module ToySolver.SDP
   ( dualize
+  , DualizeInfo
+  , transformSolutionForward
+  , transformSolutionBackward
   ) where
 
 import qualified Data.Map.Strict as Map
@@ -26,13 +29,15 @@ import qualified ToySolver.Text.SDPFile as SDPFile
 
 -- | Given a primal-dual pair (P), (D), it returns another primal-dual pair (P'), (D')
 -- such that (P) is equivalent to (D') and (D) is equivalent to (P').
-dualize :: SDPFile.Problem -> SDPFile.Problem
+dualize :: SDPFile.Problem -> (SDPFile.Problem, DualizeInfo)
 dualize origProb =
-  SDPFile.Problem
-  { SDPFile.blockStruct = blockStruct
-  , SDPFile.costs = d
-  , SDPFile.matrices = a0 : as
-  }
+  ( SDPFile.Problem
+    { SDPFile.blockStruct = blockStruct
+    , SDPFile.costs = d
+    , SDPFile.matrices = a0 : as
+    }
+  , DualizeInfo m (SDPFile.blockStruct origProb)
+  )
   where
     {- original:
        (P)
@@ -82,9 +87,10 @@ dualize origProb =
               ∪ {(2m+j,2m+i) ↦ 1}
 
        correspondence:
-         diag(W) = (x+, x-, X)
+         W = diag(x+, x-, X)
          Y [i,j] = z_ij if i≤j
                  = z_ji otherwise
+         Z = diag(0, 0, Y)
     -}
     blockStruct :: [Int]
     blockStruct = [-m, -m] ++ SDPFile.blockStruct origProb
@@ -121,3 +127,63 @@ dualize origProb =
 
 blockIndexes :: Int -> [(Int,Int)]
 blockIndexes n = if n >= 0 then [(i,j) | i <- [1..n], j <- [i..n]] else [(i,i) | i <- [1..(-n)]]
+
+blockIndexesLen :: Int -> Int
+blockIndexesLen n = if n >= 0 then n*(n+1) `div` 2 else -n
+
+
+data DualizeInfo = DualizeInfo Int [Int]
+
+transformSolutionForward :: DualizeInfo -> SDPFile.Solution -> SDPFile.Solution
+transformSolutionForward (DualizeInfo _origM origBlockStruct) 
+  SDPFile.Solution
+  { SDPFile.primalVector = xV
+  , SDPFile.primalMatrix = xM
+  , SDPFile.dualMatrix   = yM
+  } =
+  SDPFile.Solution
+  { SDPFile.primalVector = zV
+  , SDPFile.primalMatrix = zM
+  , SDPFile.dualMatrix   = wM
+  }
+  where
+    zV = concat [[SDPFile.blockElem i j block | (i,j) <- blockIndexes b] | (b,block) <- zip origBlockStruct yM]
+    zM = Map.empty : Map.empty : yM
+    wM =
+      [ Map.fromList $ zipWith (\i x -> ((i,i), if x >= 0 then   x else 0)) [1..] xV
+      , Map.fromList $ zipWith (\i x -> ((i,i), if x <= 0 then  -x else 0)) [1..] xV
+      ] ++ xM
+
+transformSolutionBackward :: DualizeInfo -> SDPFile.Solution -> SDPFile.Solution
+transformSolutionBackward (DualizeInfo origM origBlockStruct)
+  SDPFile.Solution
+  { SDPFile.primalVector = zV
+  , SDPFile.primalMatrix = _zM
+  , SDPFile.dualMatrix   = wM
+  } =
+  case wM of
+    (xps:xns:xM) ->
+      SDPFile.Solution
+      { SDPFile.primalVector = xV
+      , SDPFile.primalMatrix = xM
+      , SDPFile.dualMatrix   = yM
+      }
+      where
+        xV = [SDPFile.blockElem i i xps - SDPFile.blockElem i i xns | i <- [1..origM]]
+        yM = f origBlockStruct zV
+          where
+            f [] _ = []
+            f (block : blocks) zV1 =
+              case splitAt (blockIndexesLen block) zV1 of
+                (vals, zV2) -> symblock (zip (blockIndexes block) vals) : f blocks zV2
+    _ -> error "ToySolver.SDP.transformSolutionBackward: invalid solution"
+
+symblock :: [((Int,Int), Scientific)] -> SDPFile.Block
+symblock es = Map.fromList $ do
+  e@((i,j),x) <- es
+  if x == 0 then
+    []
+  else if i == j then
+    return e
+  else
+    [e, ((j,i),x)]
