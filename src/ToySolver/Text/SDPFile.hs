@@ -27,6 +27,10 @@ module ToySolver.Text.SDPFile
   , mDim
   , nBlock
   , blockElem
+    -- * The solution type
+  , Solution (..)
+  , evalPrimalObjective
+  , evalDualObjective
 
     -- * Construction
   , DenseMatrix
@@ -114,6 +118,26 @@ nBlock prob = length (blockStruct prob)
 
 blockElem :: Int -> Int -> Block -> Scientific
 blockElem i j b = Map.findWithDefault 0 (i,j) b
+
+-- ---------------------------------------------------------------------------
+-- solution
+-- ---------------------------------------------------------------------------
+
+data Solution
+  = Solution
+  { primalVector :: [Scientific] -- ^ The primal variable vector x
+  , primalMatrix :: Matrix -- ^ The primal variable matrix X
+  , dualMatrix   :: Matrix -- ^ The dual variable matrix Y
+  }
+  deriving (Show, Ord, Eq)
+
+evalPrimalObjective :: Problem -> Solution -> Scientific
+evalPrimalObjective prob sol = sum $ zipWith (*) (costs prob) (primalVector sol)
+
+evalDualObjective :: Problem -> Solution -> Scientific
+evalDualObjective Problem{ matrices = [] } _ = error "evalDualObjective: invalid problem data"
+evalDualObjective Problem{ matrices = f0:_ } sol =
+  sum $ zipWith (\blk1 blk2 -> sum (Map.intersectionWith (*) blk1 blk2)) f0 (dualMatrix sol)
 
 -- ---------------------------------------------------------------------------
 -- construction
