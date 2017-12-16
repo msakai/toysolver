@@ -44,8 +44,8 @@ module ToySolver.Text.SDPFile
   , diagBlock
   
     -- * Rendering
-  , render
-  , renderSparse
+  , renderData
+  , renderSparseData
 
     -- * Parsing
   , ParseError
@@ -336,11 +336,11 @@ oneOf = MegaParsec.oneOf
 -- rendering
 -- ---------------------------------------------------------------------------
 
-render :: Problem -> Builder
-render = renderImpl False
+renderData :: Problem -> Builder
+renderData = renderImpl False
 
-renderSparse :: Problem -> Builder
-renderSparse = renderImpl True
+renderSparseData :: Problem -> Builder
+renderSparseData = renderImpl True
 
 renderImpl :: Bool -> Problem -> Builder
 renderImpl sparse prob = mconcat

@@ -50,22 +50,22 @@ example2
 
 case_test1 = checkParsed example1b example1
   where
-    s = toLazyByteString $ render example1
+    s = toLazyByteString $ renderData example1
     example1b = parseData "" s
 
 case_test2 = checkParsed example1b example1
   where
-    s = toLazyByteString $ renderSparse example1
+    s = toLazyByteString $ renderSparseData example1
     example1b = parseSparseData "" s
 
 case_test3 = checkParsed example2b example2
   where
-    s = toLazyByteString $ render example2
+    s = toLazyByteString $ renderData example2
     example2b = parseData "" s
 
 case_test4 = checkParsed example2b example2
   where
-    s = toLazyByteString $ renderSparse example2
+    s = toLazyByteString $ renderSparseData example2
     example2b = parseSparseData "" s
 
 -- checkParsed :: Either ParseError Problem -> Problem -> Assertion
