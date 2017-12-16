@@ -32,6 +32,10 @@ module ToySolver.Text.SDPFile
   , evalPrimalObjective
   , evalDualObjective
 
+    -- * File I/O
+  , readDataFile
+  , writeDataFile
+
     -- * Construction
   , DenseMatrix
   , DenseBlock
@@ -40,23 +44,23 @@ module ToySolver.Text.SDPFile
   , diagBlock
   
     -- * Rendering
-  , render
-  , renderSparse
+  , renderData
+  , renderSparseData
 
     -- * Parsing
   , ParseError
   , parseData
-  , parseDataFile
   , parseSparseData
-  , parseSparseDataFile
   ) where
 
 import Control.Applicative ((<*))
+import Control.Exception
 import Control.Monad
 import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Builder.Scientific as B
+import Data.Char
 import Data.List (intersperse)
 import Data.Monoid
 import Data.Scientific (Scientific)
@@ -66,6 +70,8 @@ import Data.Scientific (fromFloatDigits)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
+import System.FilePath (takeExtension)
+import System.IO
 import qualified Text.Megaparsec as MegaParsec
 #if MIN_VERSION_megaparsec(6,0,0)
 import Data.Word
@@ -157,6 +163,31 @@ diagBlock :: [Scientific] -> Block
 diagBlock xs = Map.fromList [((i,i),x) | (i,x) <- zip [1..] xs]
 
 -- ---------------------------------------------------------------------------
+-- File I/O
+-- ---------------------------------------------------------------------------
+
+-- | Parse a SDPA format file (.dat) or a SDPA sparse format file (.dat-s)..
+readDataFile :: FilePath -> IO Problem
+readDataFile fname = do
+  p <- case map toLower (takeExtension fname) of
+    ".dat" -> return pDataFile
+    ".dat-s" -> return pSparseDataFile
+    ext -> ioError $ userError $ "unknown extension: " ++ ext
+  s <- BL.readFile fname
+  case parse (p <* eof) fname s of
+    Left e -> throw (e :: ParseError)
+    Right prob -> return prob
+
+writeDataFile :: FilePath -> Problem -> IO ()
+writeDataFile fname prob = do
+  isSparse <- case map toLower (takeExtension fname) of
+    ".dat" -> return False
+    ".dat-s" -> return True
+    ext -> ioError $ userError $ "unknown extension: " ++ ext
+  withBinaryFile fname WriteMode $ \h -> do
+    B.hPutBuilder h $ renderImpl isSparse prob
+
+-- ---------------------------------------------------------------------------
 -- parsing
 -- ---------------------------------------------------------------------------
 
@@ -164,21 +195,9 @@ diagBlock xs = Map.fromList [((i,i),x) | (i,x) <- zip [1..] xs]
 parseData :: String -> BL.ByteString -> Either ParseError Problem
 parseData = parse (pDataFile <* eof)
 
--- | Parse a SDPA format file (.dat).
-parseDataFile :: FilePath -> IO (Either ParseError Problem)
-parseDataFile fname = do
-  s <- BL.readFile fname
-  return $! parse (pDataFile <* eof) fname s
-
 -- | Parse a SDPA sparse format (.dat-s) string.
 parseSparseData :: String -> BL.ByteString -> Either ParseError Problem
 parseSparseData = parse (pSparseDataFile <* eof)
-
--- | Parse a SDPA sparse format file (.dat-s).
-parseSparseDataFile :: FilePath -> IO (Either ParseError Problem)
-parseSparseDataFile fname = do
-  s <- BL.readFile fname
-  return $! parse (pSparseDataFile <* eof) fname s
 
 pDataFile :: C e s m => m Problem
 pDataFile = do
@@ -317,11 +336,11 @@ oneOf = MegaParsec.oneOf
 -- rendering
 -- ---------------------------------------------------------------------------
 
-render :: Problem -> Builder
-render = renderImpl False
+renderData :: Problem -> Builder
+renderData = renderImpl False
 
-renderSparse :: Problem -> Builder
-renderSparse = renderImpl True
+renderSparseData :: Problem -> Builder
+renderSparseData = renderImpl True
 
 renderImpl :: Bool -> Problem -> Builder
 renderImpl sparse prob = mconcat
