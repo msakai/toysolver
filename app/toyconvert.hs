@@ -48,6 +48,7 @@ import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.PB2IP as PB2IP
 import qualified ToySolver.Converter.PBLinearization as PBLinearization
+import ToySolver.Converter.PBNormalization
 import qualified ToySolver.Converter.PB2LSP as PB2LSP
 import qualified ToySolver.Converter.PB2WBO as PB2WBO
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
@@ -334,8 +335,8 @@ writeProblem o problem = do
                   ProbWBO wbo -> PB2LSP.convertWBO wbo
                   ProbMIP _   -> PB2LSP.convert opb
       case map toLower (takeExtension fname) of
-        ".opb" -> PBFile.writeOPBFile fname opb
-        ".wbo" -> PBFile.writeWBOFile fname wbo
+        ".opb" -> PBFile.writeOPBFile fname $ normalizeOPB opb
+        ".wbo" -> PBFile.writeWBOFile fname $ normalizeWBO wbo
         ".cnf" ->
           case PB2SAT.convert opb of
             (cnf, _, _) ->
