@@ -13,10 +13,15 @@ module ToySolver.SAT.Config
   , PBHandlerType (..)
   , showPBHandlerType
   , parsePBHandlerType
+  , configParser
   ) where
 
+import Control.Applicative
 import Data.Char
 import Data.Default.Class
+import Data.List
+import Data.Monoid
+import Options.Applicative
 
 data Config
   = Config
@@ -201,3 +206,154 @@ parsePBHandlerType s =
     "counter" -> Just PBHandlerTypeCounter
     "pueblo" -> Just PBHandlerTypePueblo
     _ -> Nothing
+
+configParser :: Parser Config
+configParser = Config
+  <$> restartOption
+  <*> restartFirstOption
+  <*> restartIncOption
+  <*> learningOption
+  <*> learntSizeFirstOption
+  <*> learntSizeIncOption
+  <*> ccMinOption
+  <*> branchOption
+  <*> eRWAStepSizeFirstOption
+  <*> eRWAStepSizeDecOption
+  <*> eRWAStepSizeMinOption
+  <*> eMADecayOption
+  <*> enablePhaseSavingOption
+  <*> enableForwardSubsumptionRemovalOption
+  <*> enableBackwardSubsumptionRemovalOption
+  <*> randomFreqOption
+  <*> pbHandlerTypeOption
+  <*> enablePBSplitClausePartOption
+  <*> checkModelOption
+  <*> pure (configVarDecay def)
+  <*> pure (configConstrDecay def)
+  where
+    restartOption = option (maybeReader parseRestartStrategy)
+      $  long "restart"
+      <> metavar "STR"
+      <> help ("Restart startegy: " ++ intercalate ", " [showRestartStrategy s | s <- [minBound..maxBound]])
+      <> value (configRestartStrategy def)
+      <> showDefaultWith showRestartStrategy
+    restartFirstOption = option auto
+      $  long "restart-first"
+      <> metavar "INT"
+      <> help "The initial restart limit."
+      <> value (configRestartFirst def)
+      <> showDefault
+    restartIncOption = option auto
+      $  long "restart-inc"
+      <> metavar "REAL"
+      <> help "The factor with which the restart limit is multiplied in each restart."
+      <> value (configRestartInc def)
+      <> showDefault
+
+    learningOption = option (maybeReader parseLearningStrategy)
+      $  long "learning"
+      <> metavar "STR"
+      <> help ("Leaning scheme: " ++ intercalate ", " [showLearningStrategy s | s <- [minBound..maxBound]])
+      <> value (configLearningStrategy def)
+      <> showDefaultWith showLearningStrategy
+    learntSizeFirstOption = option auto
+      $  long "learnt-size-first"
+      <> metavar "INT"
+      <> help "The initial limit for learnt clauses."
+      <> value (configLearntSizeFirst def)
+      <> showDefault
+    learntSizeIncOption = option auto
+      $  long "learnt-size-inc"
+      <> metavar "REAL"
+      <> help "The limit for learnt clauses is multiplied with this factor periodically."
+      <> value (configLearntSizeInc def)
+      <> showDefault
+
+    ccMinOption = option auto
+      $  long "ccmin"
+      <> metavar "INT"
+      <> help "Conflict clause minimization: 0=none, 1=local, 2=recursive"
+      <> value (configCCMin def)
+      <> showDefault
+    branchOption = option (maybeReader parseBranchingStrategy)
+      $  long "branch"
+      <> metavar "STR"
+      <> help ("Branching startegy: " ++ intercalate ", " [showBranchingStrategy s | s <- [minBound..maxBound]])
+      <> value (configBranchingStrategy def)
+      <> showDefaultWith showBranchingStrategy
+
+    eRWAStepSizeFirstOption = option auto
+      $  long "erwa-alpha-first"
+      <> metavar "REAL"
+      <> help "step-size alpha in ERWA and LRB branching heuristic is initialized with this value."
+      <> value (configERWAStepSizeFirst def)
+      <> showDefault
+    eRWAStepSizeDecOption = option auto
+      $  long "erwa-alpha-dec"
+      <> metavar "REAL"
+      <> help "step-size alpha in ERWA and LRB branching heuristic is decreased by this value after each conflict."
+      <> value (configERWAStepSizeDec def)
+      <> showDefault
+    eRWAStepSizeMinOption = option auto
+      $  long "erwa-alpha-min"
+      <> metavar "REAL"
+      <> help "step-size alpha in ERWA and LRB branching heuristic is decreased until it reach the value."
+      <> value (configERWAStepSizeMin def)
+      <> showDefault
+
+    eMADecayOption = option auto
+      $  long "ema-decay"
+      <> metavar "REAL"
+      <> help "inverse of the variable EMA decay factor used by LRB branching heuristic."
+      <> value (configEMADecay def)
+      <> showDefault
+
+    enablePhaseSavingOption =
+          flag' True  (long "enable-phase-saving"  <> help ("Enable phase saving"  ++ (if configEnablePhaseSaving def then " (default)" else "")))
+      <|> flag' False (long "disable-phase-saving" <> help ("Disable phase saving" ++ (if configEnablePhaseSaving def then "" else " (default)")))
+      <|> pure (configEnablePhaseSaving def)
+
+    enableForwardSubsumptionRemovalOption =
+          flag' True
+            (  long "enable-forward-subsumption-removal"
+            <> help ("Enable forward subumption removal (clauses only)"  ++ (if configEnableForwardSubsumptionRemoval def then " (default)" else "")))
+      <|> flag' False
+            (  long "disable-forward-subsumption-removal"
+            <> help ("Disable forward subumption removal (clauses only)" ++ (if configEnableForwardSubsumptionRemoval def then "" else " (default)")))
+      <|> pure (configEnableForwardSubsumptionRemoval def)
+    enableBackwardSubsumptionRemovalOption =
+          flag' True
+            (  long "enable-backward-subsumption-removal"
+            <> help ("Enable backward subumption removal (clauses only)"  ++ (if configEnableBackwardSubsumptionRemoval def then " (default)" else "")))
+      <|> flag' False
+            (  long "disable-backward-subsumption-removal"
+            <> help ("Disable backward subumption removal (clauses only)" ++ (if configEnableBackwardSubsumptionRemoval def then "" else " (default)")))
+      <|> pure (configEnableBackwardSubsumptionRemoval def)
+
+    randomFreqOption = option auto
+      $  long "random-freq"
+      <> metavar "0..1"
+      <> help "The frequency with which the decision heuristic tries to choose a random variable"
+      <> value (configRandomFreq def)
+      <> showDefault
+
+    pbHandlerTypeOption = option (maybeReader parsePBHandlerType)
+      $  long "pb-handler"
+      <> metavar "STR"
+      <> help ("PB constraint handler: " ++ intercalate ", " [showPBHandlerType h | h <- [minBound..maxBound]])
+      <> value (configPBHandlerType def)
+      <> showDefaultWith showPBHandlerType
+
+    enablePBSplitClausePartOption =
+          flag' True
+            (  long "pb-split-clause-part"
+            <> help ("Split clause part of PB constraints." ++ (if configEnablePBSplitClausePart def then " (default)" else "")))
+      <|> flag' False
+            (  long "no-pb-split-clause-part"
+            <> help ("Do not split clause part of PB constraints." ++ (if configEnablePBSplitClausePart def then "" else " (default)")))
+      <|> pure (configEnablePBSplitClausePart def)
+
+    checkModelOption = switch
+      $  long "check-model"
+      <> help "check model for debugging"
+
