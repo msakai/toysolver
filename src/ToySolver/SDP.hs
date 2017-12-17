@@ -67,28 +67,30 @@ dualize origProb =
        (P')
            min d^T・z
            s.t.
-             Z = Σ_i=1^n Σ_j=i^n A_ij z_ij - A_0
+             Z = Σ_i=1^n Σ_j=1^i A_ij z_ij - A_0
              Z ⪰ 0
        (D')
            max A_0 • W
            s.t.
-             A_ij • W = d_ij  for i,j ∈ {1,…,n}, i≤j
+             A_ij • W = d_ij  for i ∈ {1,…,n}, j ∈ {1,…,i}
              W ⪰ 0
        where
          z : variable over R^{n(n+1)/2}
-         d ∈ R^{n(n+1)/2}
+         d_ij ∈ R  for i ∈ {1,…,n}, j ∈ {1,…,i}
          d_ij = - F0 [i,j]              if i=j
               = - (F0 [i,j] + F0 [j,i]) otherwise
-         A_0, A_ij ∈ R^((2m+n)×(2m+n)) for i,j∈{1,…,n} i≤j
+         A_0  ∈ R^((2m+n)×(2m+n))
          A_0  = diag(-c, c, 0_{n×n})
-         A_ij = {(k,k)       ↦ - (if i=j then F_k [i,j] else F_k [i,j] + F_k [j,i]) | k∈{1,…,m}}
-              ∪ {(m+k,m+k)   ↦   (if i=j then F_k [i,j] else F_k [i,j] + F_k [j,i]) | k∈{1,…,m}}
-              ∪ {(2m+i,2m+j) ↦ 1}
-              ∪ {(2m+j,2m+i) ↦ 1}
+         A_ij ∈ R^((2m+n)×(2m+n))  for i ∈ {1,…,n}, j ∈ {1,…,i}
+         A_ij [   k,   k] = - (if i=j then F_k [i,j] else F_k [i,j] + F_k [j,i]) for k∈{1,…,m}
+         A_ij [ m+k, m+k] =   (if i=j then F_k [i,j] else F_k [i,j] + F_k [j,i]) for k∈{1,…,m}
+         A_ij [2m+i,2m+j] = 1
+         A_ij [2m+j,2m+i] = 1
+         A_ij [  _ ,  _ ] = 0
 
        correspondence:
          W = diag(x+, x-, X)
-         Y [i,j] = z_ij if i≤j
+         Y [i,j] = z_ij if j≤i
                  = z_ji otherwise
          Z = diag(0, 0, Y)
     -}
@@ -126,7 +128,7 @@ dualize origProb =
       ]
 
 blockIndexes :: Int -> [(Int,Int)]
-blockIndexes n = if n >= 0 then [(i,j) | i <- [1..n], j <- [i..n]] else [(i,i) | i <- [1..(-n)]]
+blockIndexes n = if n >= 0 then [(i,j) | i <- [1..n], j <- [1..i]] else [(i,i) | i <- [1..(-n)]]
 
 blockIndexesLen :: Int -> Int
 blockIndexesLen n = if n >= 0 then n*(n+1) `div` 2 else -n
