@@ -61,6 +61,7 @@ import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Builder.Scientific as B
 import Data.Char
+import qualified Data.Foldable as F
 import Data.List (intersperse)
 import Data.Monoid
 import Data.Scientific (Scientific)
@@ -143,7 +144,7 @@ evalPrimalObjective prob sol = sum $ zipWith (*) (costs prob) (primalVector sol)
 evalDualObjective :: Problem -> Solution -> Scientific
 evalDualObjective Problem{ matrices = [] } _ = error "evalDualObjective: invalid problem data"
 evalDualObjective Problem{ matrices = f0:_ } sol =
-  sum $ zipWith (\blk1 blk2 -> sum (Map.intersectionWith (*) blk1 blk2)) f0 (dualMatrix sol)
+  sum $ zipWith (\blk1 blk2 -> F.sum (Map.intersectionWith (*) blk1 blk2)) f0 (dualMatrix sol)
 
 -- ---------------------------------------------------------------------------
 -- construction
