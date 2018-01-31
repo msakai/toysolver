@@ -45,7 +45,6 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
 extra-deps:
-- intern-0.9.1.4
 - queue-0.1.2
 - logic-TPTP-0.4.5.0
 - OptDir-0.0.3
