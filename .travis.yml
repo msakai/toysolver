@@ -77,7 +77,7 @@ deploy:
   skip_cleanup: true
   on:
     tags: true
-    condition: "$RESOLVER = lts-9.2"
+    condition: "$RESOLVER = lts-10.4"
 
 notifications:
   webhooks:
