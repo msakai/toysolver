@@ -7,6 +7,7 @@ cache:
 environment:
   global:
     STACK_ROOT: "c:\\sr"
+    STACK_YAML: "stack-travis-ghc-8.0.yaml"
 
 platform:
 - x86
@@ -29,7 +30,7 @@ test_script:
 - echo "" | stack --no-terminal test --bench --no-run-benchmarks --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC
 
 after_test:
-- stack --install-ghc runghc --package turtle misc/build_artifacts.hs
+- stack runghc --package turtle misc/build_artifacts.hs
 
 artifacts:
   - path: '*.7z'
