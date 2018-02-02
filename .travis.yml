@@ -18,13 +18,13 @@ language: generic
 
 matrix:
   include:
-    - env: STACK_YAML=stack-travis-ghc-8.2.yaml GHCVER=8.2.1 FLAGS="--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL" RELEASE=1
+    - env: STACK_YAML=stack-travis-ghc-8.2.yaml GHCVER=8.2.1 FLAGS="--haddock --no-haddock-deps --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL" RELEASE=1
       compiler: ": #GHC 8.2.1"
       addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve,c2hs,ocl-icd-opencl-dev]}}
     - env: STACK_YAML=stack-travis-ghc-8.2.yaml GHCVER=8.2.1 FLAGS="--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag=toysolver:OpenCL"
       compiler: ": #GHC 8.0.2"
       os: osx
-    - env: STACK_YAML=stack-travis-ghc-8.0.yaml GHCVER=8.0.1 FLAGS="--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL" COVERAGE=1
+    - env: STACK_YAML=stack-travis-ghc-8.0.yaml GHCVER=8.0.1 FLAGS="--coverage --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL" COVERAGE=1
       compiler: ": #GHC 8.0.2"
       addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve,c2hs,ocl-icd-opencl-dev]}}
     - env: STACK_YAML=stack-travis-ghc-7.10.yaml GHCVER=7.10.3 FLAGS="--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL"
@@ -56,7 +56,7 @@ install:
 
 script:
 # Build the package, its tests, and its docs and run the tests
-- stack --stack-yaml=$STACK_YAML --jobs 2 --no-terminal test --bench --no-run-benchmarks --haddock --no-haddock-deps --coverage $FLAGS
+- stack --stack-yaml=$STACK_YAML --jobs 2 --no-terminal test --bench --no-run-benchmarks $FLAGS
 
 after_script:
 - "[ -n \"$COVERAGE\" ] && travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$GHCVER.tar.bz2 | tar -xj"
