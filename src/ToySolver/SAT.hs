@@ -380,6 +380,8 @@ data Solver
   , svLearntLim       :: !(IORef Int)
   , svLearntLimAdjCnt :: !(IORef Int)
   , svLearntLimSeq    :: !(IORef [(Int,Int)])
+  , svSeen :: !(Vec.UVec Bool)
+  , svPBLearnt :: !(IORef (Maybe PBLinAtLeast))
 
   -- | Amount to bump next variable with.
   , svVarInc       :: !(IOURef Double)
@@ -745,6 +747,9 @@ newSolverWithConfig config = do
   tsolver <- newIORef Nothing
   tchecked <- newIOURef 0
 
+  seen <- Vec.new
+  pbLearnt <- newIORef Nothing
+
   alpha <- newIOURef 0.4
   emaScale <- newIOURef 1.0
   learntCounter <- newIOURef 0
@@ -795,6 +800,8 @@ newSolverWithConfig config = do
         , svLearntLimSeq    = learntLimSeq
         , svVarInc      = varInc
         , svConstrInc   = constrInc
+        , svSeen = seen
+        , svPBLearnt = pbLearnt
 
         , svERWAStepSize = alpha
         , svEMAScale = emaScale
@@ -827,6 +834,7 @@ instance NewVar IO Solver where
     vd <- newVarData
     Vec.push (svVarData solver) vd
     PQ.enqueue (svVarQueue solver) v
+    Vec.push (svSeen solver) False
     return v
 
   newVars :: Solver -> Int -> IO [Var]
@@ -845,6 +853,7 @@ instance NewVar IO Solver where
 resizeVarCapacity :: Solver -> Int -> IO ()
 resizeVarCapacity solver n = do
   Vec.resizeCapacity (svVarData solver) n
+  Vec.resizeCapacity (svSeen solver) n
   PQ.resizeHeapCapacity (svVarQueue solver) n
   PQ.resizeTableCapacity (svVarQueue solver) (n+1)
 
@@ -1264,11 +1273,14 @@ search solver !conflict_lim onConflict = do
 
     learnHybrid :: IORef Int -> SomeConstraintHandler -> IO (Maybe SearchResult)
     learnHybrid conflictCounter constr = do
-      ((learntClause, clauseLevel), pb) <- analyzeConflictHybrid solver constr
-      let minLevel =
-            case pb of
-              Nothing -> clauseLevel
-              Just (_, pbLevel) -> min clauseLevel pbLevel
+      (learntClause, clauseLevel) <- analyzeConflict solver constr
+      (pb, minLevel) <- do
+        z <- readIORef (svPBLearnt solver)
+        case z of
+          Nothing -> return (z, clauseLevel)
+          Just pb -> do
+            pbLevel <- pbBacktrackLevel solver pb
+            return (z, min clauseLevel pbLevel)
       backtrackTo solver minLevel
 
       case learntClause of
@@ -1294,7 +1306,7 @@ search solver !conflict_lim onConflict = do
         Nothing -> do
           case pb of
             Nothing -> return Nothing
-            Just ((lhs,rhs), _pbLevel) -> do
+            Just (lhs,rhs) -> do
               h <- newPBHandlerPromoted solver lhs rhs True
               case h of
                 CHClause _ -> do
@@ -1594,55 +1606,99 @@ deduceB solver = loop
 
 analyzeConflict :: ConstraintHandler c => Solver -> c -> IO (Clause, Level)
 analyzeConflict solver constr = do
+  config <- getConfig solver
+  let isHybrid = configLearningStrategy config == LearningHybrid
+
   d <- getDecisionLevel solver
+  (out :: Vec.UVec Lit) <- Vec.new
+  Vec.push out 0 -- (leave room for the asserting literal)
+  (pathC :: IOURef Int) <- newIOURef 0
 
-  let split :: [Lit] -> IO (LitSet, LitSet)
-      split = go (IS.empty, IS.empty)
-        where
-          go (xs,ys) [] = return (xs,ys)
-          go (xs,ys) (l:ls) = do
-            lv <- litLevel solver l
-            if lv == levelRoot then
-              go (xs,ys) ls
-            else if lv >= d then
-              go (IS.insert l xs, ys) ls
-            else
-              go (xs, IS.insert l ys) ls
+  pbConstrRef <- newIORef undefined
 
-  let loop :: LitSet -> LitSet -> IO LitSet
-      loop lits1 lits2
-        | sz==1 = do
-            return $ lits1 `IS.union` lits2
-        | sz>=2 = do
-            l <- peekTrail solver
-            if litNot l `IS.notMember` lits1 then do
-              popTrail solver
-              loop lits1 lits2
+  let f lits = do
+        forM_ lits $ \lit -> do
+          let !v = litVar lit
+          lv <- litLevel solver lit
+          b <- Vec.unsafeRead (svSeen solver) (v - 1)
+          when (not b && lv > levelRoot) $ do
+            varBumpActivity solver v
+            varIncrementParticipated solver v
+            if lv >= d then do
+              Vec.unsafeWrite (svSeen solver) (v - 1) True
+              modifyIOURef pathC (+1)
             else do
-              m <- varReason solver (litVar l)
-              case m of
-                Nothing -> error "analyzeConflict: should not happen"
-                Just constr2 -> do
-                  constrBumpActivity solver constr2
-                  xs <- reasonOf solver constr2 (Just l)
-                  forM_ xs $ \lit -> do
-                     varBumpActivity solver (litVar lit)
-                     varIncrementParticipated solver (litVar lit)
-                  popTrail solver
-                  (ys,zs) <- split xs
-                  loop (IS.delete (litNot l) lits1 `IS.union` ys)
-                       (lits2 `IS.union` zs)
-        | otherwise = error "analyzeConflict: should not happen: reason of current level is empty"
-        where
-          sz = IS.size lits1
+              Vec.push out lit
+
+      processLitHybrid pb@(lhs,rhs) constr lit getLits = do
+        pb2 <- do
+          let clausePB = do
+                lits <- getLits
+                return $ clauseToPBLinAtLeast (lit : lits)
+          b <- isPBRepresentable constr
+          if not b then do
+            clausePB
+          else do
+            pb2 <- toPBLinAtLeast constr
+            o <- pbOverSAT solver pb2
+            if o then do
+              clausePB
+            else
+              return pb2
+        let pb3 = cutResolve pb pb2 (litVar lit)
+            ls = IS.fromList [l | (_,l) <- fst pb3]
+        seq ls $ writeIORef pbConstrRef (ls, pb3)
+
+      popUnseen = do
+        l <- peekTrail solver
+        let !v = litVar l
+        b <- Vec.unsafeRead (svSeen solver) (v - 1)
+        if b then do
+          return ()
+        else do
+          when isHybrid $ do
+            (ls, pb) <- readIORef pbConstrRef
+            when (litNot l `IS.member` ls) $ do
+              Just constr <- varReason solver v
+              processLitHybrid pb constr l (reasonOf solver constr (Just l))
+          popTrail solver
+          popUnseen
+
+      loop = do
+        popUnseen
+        l <- peekTrail solver
+        let !v = litVar l
+        Vec.unsafeWrite (svSeen solver) (v - 1) False
+        modifyIOURef pathC (subtract 1)
+        c <- readIOURef pathC
+        if c > 0 then do
+          Just constr <- varReason solver v
+          constrBumpActivity solver constr
+          lits <- reasonOf solver constr (Just l)
+          f lits
+          when isHybrid $ do
+            (ls, pb) <- readIORef pbConstrRef
+            when (litNot l `IS.member` ls) $ do
+              processLitHybrid pb constr l (return lits)
+          popTrail solver
+          loop
+        else do
+          Vec.unsafeWrite out 0 (litNot l)
 
   constrBumpActivity solver constr
-  conflictClause <- reasonOf solver constr Nothing
-  forM_ conflictClause $ \lit -> do
-    varBumpActivity solver (litVar lit)
-    varIncrementParticipated solver (litVar lit)
-  (ys,zs) <- split conflictClause
-  lits <- loop ys zs
+  falsifiedLits <- reasonOf solver constr Nothing
+  f falsifiedLits
+  when isHybrid $ do
+     pb <- do
+       b <- isPBRepresentable constr
+       if b then
+         toPBLinAtLeast constr
+       else
+         return (clauseToPBLinAtLeast falsifiedLits)
+     let ls = IS.fromList [l | (_,l) <- fst pb]
+     seq ls $ writeIORef pbConstrRef (ls, pb)
+  loop
+  lits <- liftM IS.fromList $ Vec.getElems out
 
   lits2 <- minimizeConflictClause solver lits
 
@@ -1652,6 +1708,12 @@ analyzeConflict solver constr = do
     forM (IS.toList lits2) $ \l -> do
       lv <- litLevel solver l
       return (l,lv)
+
+  when isHybrid $ do
+    (_, pb) <- readIORef pbConstrRef
+    case pbToClause pb of
+      Just _ -> writeIORef (svPBLearnt solver) Nothing
+      Nothing -> writeIORef (svPBLearnt solver) (Just pb)
 
   let level = case xs of
                 [] -> error "analyzeConflict: should not happen"
@@ -1684,103 +1746,6 @@ analyzeFinal solver p = do
               go (i-1) seen result
   n <- Vec.getSize (svTrail solver)
   go (n-1) (IS.singleton (litVar p)) [p]
-
-analyzeConflictHybrid :: ConstraintHandler c => Solver -> c -> IO ((Clause, Level), Maybe (PBLinAtLeast, Level))
-analyzeConflictHybrid solver constr = do
-  d <- getDecisionLevel solver
-
-  let split :: [Lit] -> IO (LitSet, LitSet)
-      split = go (IS.empty, IS.empty)
-        where
-          go (xs,ys) [] = return (xs,ys)
-          go (xs,ys) (l:ls) = do
-            lv <- litLevel solver l
-            if lv == levelRoot then
-              go (xs,ys) ls
-            else if lv >= d then
-              go (IS.insert l xs, ys) ls
-            else
-              go (xs, IS.insert l ys) ls
-
-  let loop :: LitSet -> LitSet -> PBLinAtLeast -> IO (LitSet, PBLinAtLeast)
-      loop lits1 lits2 pb
-        | sz==1 = do
-            return $ (lits1 `IS.union` lits2, pb)
-        | sz>=2 = do
-            l <- peekTrail solver
-            m <- varReason solver (litVar l)
-            case m of
-              Nothing -> error "analyzeConflictHybrid: should not happen"
-              Just constr2 -> do
-                xs <- reasonOf solver constr2 (Just l)
-                (lits1',lits2') <-
-                  if litNot l `IS.notMember` lits1 then
-                    return (lits1,lits2)
-                  else do
-                    constrBumpActivity solver constr2
-                    forM_ xs $ \lit -> do
-                      varBumpActivity solver (litVar lit)
-                      varIncrementParticipated solver (litVar lit)
-                    (ys,zs) <- split xs
-                    return  (IS.delete (litNot l) lits1 `IS.union` ys, lits2 `IS.union` zs)
-
-                pb' <- if any (\(_,l2) -> litNot l == l2) (fst pb)
-                       then do
-                         pb2 <- do
-                           b <- isPBRepresentable constr2
-                           if not b then do
-                             return $ clauseToPBLinAtLeast (l:xs)
-                           else do
-                             pb2 <- toPBLinAtLeast constr2
-                             o <- pbOverSAT solver pb2
-                             if o then
-                               return $ clauseToPBLinAtLeast (l:xs)
-                             else
-                               return pb2
-                         return $ cutResolve pb pb2 (litVar l)
-                       else return pb
-
-                popTrail solver
-                loop lits1' lits2' pb'
-
-        | otherwise = error "analyzeConflictHybrid: should not happen: reason of current level is empty"
-        where
-          sz = IS.size lits1
-
-  constrBumpActivity solver constr
-  conflictClause <- reasonOf solver constr Nothing
-  pbConfl <- do
-    b <- isPBRepresentable constr
-    if b then
-      toPBLinAtLeast constr
-    else
-      return (clauseToPBLinAtLeast conflictClause)
-  forM_ conflictClause $ \lit -> do
-    varBumpActivity solver (litVar lit)
-    varIncrementParticipated solver (litVar lit)
-  (ys,zs) <- split conflictClause
-  (lits, pb) <- loop ys zs pbConfl
-
-  lits2 <- minimizeConflictClause solver lits
-
-  incrementReasoned solver (IS.toList lits2)
-
-  xs <- liftM (sortBy (flip (comparing snd))) $
-    forM (IS.toList lits2) $ \l -> do
-      lv <- litLevel solver l
-      return (l,lv)
-
-  let level = case xs of
-                [] -> error "analyzeConflictHybrid: should not happen"
-                [_] -> levelRoot
-                _:(_,lv):_ -> lv
-
-  case pbToClause pb of
-    Nothing -> do  
-      pblevel <- pbBacktrackLevel solver pb
-      return ((map fst xs, level), Just (pb, pblevel))
-    Just _ -> do
-      return ((map fst xs, level), Nothing)
 
 pbBacktrackLevel :: Solver -> PBLinAtLeast -> IO Level
 pbBacktrackLevel _ ([], rhs) = assert (rhs > 0) $ return levelRoot
