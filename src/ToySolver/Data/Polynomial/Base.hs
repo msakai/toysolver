@@ -144,7 +144,7 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.VectorSpace
 import qualified Text.PrettyPrint.HughesPJClass as PP
-import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
+import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), maybeParens)
 
 infixl 7  `div`, `mod`
 
@@ -522,12 +522,12 @@ prettyPrint opt lv prec p =
       [] -> PP.int 0
       [t] -> pLeadingTerm prec t
       t:ts ->
-        prettyParen (prec > addPrec) $
+        maybeParens (prec > addPrec) $
           PP.hcat (pLeadingTerm addPrec t : map pTrailingTerm ts)
     where
       pLeadingTerm prec' (c,xs) =
         if pOptIsNegativeCoeff opt c
-        then prettyParen (prec' > addPrec) $
+        then maybeParens (prec' > addPrec) $
                PP.char '-' <> prettyPrintTerm opt lv (addPrec+1) (-c,xs)
         else prettyPrintTerm opt lv prec' (c,xs)
 
@@ -545,7 +545,7 @@ prettyPrintTerm opt lv prec (c,xs)
     -- intentionally specify (appPrec+1) to parenthesize any composite expression
   | len == 1 && c == 1 = pPow prec $ head (mindices xs)
   | otherwise =
-      prettyParen (prec > mulPrec) $
+      maybeParens (prec > mulPrec) $
         PP.hcat $ intersperse (PP.char '*') fs
     where
       len = Map.size $ mindicesMap xs
@@ -554,7 +554,7 @@ prettyPrintTerm opt lv prec (c,xs)
 
       pPow prec' (x,1) = pOptPrintVar opt lv prec' x
       pPow prec' (x,n) =
-        prettyParen (prec' > expPrec) $
+        maybeParens (prec' > expPrec) $
           pOptPrintVar opt lv (expPrec+1) x <> PP.char '^' <> PP.integer n
 
 class PrettyCoeff a where
@@ -570,7 +570,7 @@ instance (PrettyCoeff a, Integral a) => PrettyCoeff (Ratio a) where
   pPrintCoeff lv p r
     | denominator r == 1 = pPrintCoeff lv p (numerator r)
     | otherwise = 
-        prettyParen (p > ratPrec) $
+        maybeParens (p > ratPrec) $
           pPrintCoeff lv (ratPrec+1) (numerator r) <>
           PP.char '/' <>
           pPrintCoeff lv (ratPrec+1) (denominator r)

@@ -70,6 +70,7 @@ extra-deps:
 - mmorph-1.1.0
 - mtl-2.2.1
 - multiset-0.3.3
+- pretty-1.1.2.0
 - primitive-0.6.1.0
 - semigroupoids-5
 - semigroups-0.18.2

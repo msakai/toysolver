@@ -181,7 +181,8 @@ Library
      OptDir,
      lattices,
      megaparsec >=4 && <7,
-     prettyclass >=1.0.0,
+     -- Text.PrettyPrint.HughesPJClass is available on pretty >=1.1.2.0
+     pretty >=1.1.2.0 && <1.2,
      primes,
      primitive >=0.6,
      process >=1.1.0.2,
@@ -857,7 +858,7 @@ Test-suite TestPolynomial
     containers,
     data-interval,
     finite-field >=0.7.0 && <1.0.0,
-    prettyclass >=1.0.0,
+    pretty,
     tasty >=0.10.1,
     tasty-hunit ==0.9.*,
     tasty-quickcheck >=0.8 && <0.10,

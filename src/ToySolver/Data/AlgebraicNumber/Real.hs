@@ -53,7 +53,7 @@ import Data.List
 import Data.Ratio
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJClass as PP
-import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), prettyParen)
+import Text.PrettyPrint.HughesPJClass (Doc, PrettyLevel, Pretty (..), maybeParens)
 
 import Data.Interval (Interval, Extended (..), (<=..<), (<..<=), (<..<), (<!), (>!))
 import qualified Data.Interval as Interval
@@ -418,7 +418,7 @@ rootIndex a = idx
 
 instance Pretty AReal where
   pPrintPrec lv prec r =
-    prettyParen (prec > appPrec) $
+    maybeParens (prec > appPrec) $
       PP.hsep [PP.text "RealRoot", pPrintPrec lv (appPrec+1) p, PP.int (rootIndex r)]
     where
       p = minimalPolynomial r
