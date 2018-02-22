@@ -29,6 +29,8 @@ module ToySolver.QBF
   , solveNaive
   , solveCEGAR
   , solveCEGARIncremental
+  , solveQE
+  , solveQE_CNF
   ) where
 
 import Control.Monad
@@ -46,8 +48,11 @@ import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types (LitSet, VarSet, VarMap)
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import ToySolver.SAT.Store.CNF
 
+import qualified ToySolver.SAT.ExistentialQuantification as QE
 import ToySolver.Text.QDimacs (Quantifier (..))
+import qualified ToySolver.Text.CNF as CNF
 
 -- ----------------------------------------------------------------------------
 
@@ -385,6 +390,76 @@ solveCEGARIncremental nv prefix matrix =
                         Just nu -> loop (nu : counterMoves)
             loop []
       g nv IntSet.empty prefix matrix
+
+-- ----------------------------------------------------------------------------
+
+data CNFOrDNF
+  = CNF [LitSet]
+  | DNF [LitSet]
+  deriving (Show)
+
+negateCNFOrDNF :: CNFOrDNF -> CNFOrDNF
+negateCNFOrDNF (CNF xss) = DNF (map (IntSet.map negate) xss)
+negateCNFOrDNF (DNF xss) = CNF (map (IntSet.map negate) xss)
+
+toCNF :: Int -> CNFOrDNF -> CNF.CNF
+toCNF nv (CNF clauses) = CNF.CNF nv (length clauses) (map (SAT.packClause . IntSet.toList) clauses)
+toCNF nv (DNF [])    = CNF.CNF nv 1 [SAT.packClause []]
+toCNF nv (DNF cubes) = CNF.CNF (nv + length cubes) (length cs) (map SAT.packClause cs)
+  where
+    zs = zip [nv+1..] cubes
+    cs = map fst zs : [[-sel, lit] | (sel, cube) <- zs, lit <- IntSet.toList cube]
+
+solveQE :: Int -> Prefix -> Matrix -> IO (Bool, Maybe LitSet)
+solveQE nv prefix matrix = do
+  store <- newCNFStore
+  SAT.newVars_ store nv
+  encoder <- Tseitin.newEncoder store
+  Tseitin.addFormula encoder matrix
+  cnf <- getCNFFormula store
+  let prefix' =
+        if CNF.numVars cnf > nv then
+          prefix ++ [(E, IntSet.fromList [nv+1 .. CNF.numVars cnf])]
+        else
+          prefix
+  (b, m) <- solveQE_CNF (CNF.numVars cnf) prefix' (map SAT.unpackClause (CNF.clauses cnf))
+  return (b, fmap (IntSet.filter (\lit -> abs lit <= nv)) m)
+
+solveQE_CNF :: Int -> Prefix -> [SAT.Clause] -> IO (Bool, Maybe LitSet)
+solveQE_CNF nv prefix matrix = g (normalizePrefix prefix) matrix
+  where
+    vs :: VarSet
+    vs = IntSet.fromList [1..nv]
+
+    g :: Prefix -> [SAT.Clause] -> IO (Bool, Maybe LitSet)
+    g ((E,xs) : prefix') matrix = do
+      cnf <- liftM (toCNF nv) $ f prefix' matrix
+      solver <- SAT.newSolver
+      SAT.newVars_ solver (CNF.numVars cnf)
+      forM_ (CNF.clauses cnf) $ \clause -> do
+        SAT.addClause solver (SAT.unpackClause clause)
+      ret <- SAT.solve solver
+      if ret then do
+        m <- SAT.getModel solver
+        return (True, Just $ IntSet.fromList [if SAT.evalLit m x then x else -x | x <- IntSet.toList xs])
+      else do
+        return (False, Nothing)
+    g prefix matrix = do
+      ret <- f prefix matrix
+      case ret of
+        CNF xs -> return (not (any IntSet.null xs), Nothing)
+        DNF xs -> return (any IntSet.null xs, Nothing)
+
+    f :: Prefix -> [SAT.Clause] -> IO CNFOrDNF
+    f [] matrix = return $ CNF [IntSet.fromList clause | clause <- matrix]
+    f ((E,xs) : prefix') matrix = do
+      cnf <- liftM (toCNF nv) $ f prefix' matrix
+      dnf <- QE.shortestImplicants (vs IntSet.\\ xs) cnf
+      return $ DNF dnf
+    f ((A,xs) : prefix') matrix = do
+      cnf <- liftM (toCNF nv . negateCNFOrDNF) $ f prefix' matrix
+      dnf <- QE.shortestImplicants (vs IntSet.\\ xs) cnf
+      return $ negateCNFOrDNF $ DNF dnf
 
 -- ----------------------------------------------------------------------------
 
