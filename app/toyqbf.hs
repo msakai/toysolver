@@ -91,7 +91,7 @@ main = do
             putStrLn $ "c unknown --algorithm option: " ++ show (optAlgorithm opt)
             putStrLn $ "s cnf 0 " ++ show nv ++ " " ++ show nc
             exitFailure
-      putStrLn $ "s cnf " ++ (if ans then "1" else "-1") ++ " " ++ show nv ++ " " ++ show nc
+      putStrLn $ "s cnf " ++ (if ans then "1" else "0") ++ " " ++ show nv ++ " " ++ show nc
       case certificate of
         Nothing -> return ()
         Just lits -> do
