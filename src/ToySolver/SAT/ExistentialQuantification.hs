@@ -1,6 +1,6 @@
 {-# Language BangPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
--- -------------------------------------------------------------------
+----------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.ExistentialQuantification
 -- Copyright   :  (c) Masahiro Sakai 2017
@@ -18,8 +18,7 @@
 --   pp. 191-207.
 --   <https://www.embedded.rwth-aachen.de/lib/exe/fetch.php?media=bib:bkk11a.pdf>
 --
--- -------------------------------------------------------------------
-
+----------------------------------------------------------------------
 module ToySolver.SAT.ExistentialQuantification
   ( project
   , shortestImplicants
@@ -43,7 +42,17 @@ data Info
   , backwardMap :: SAT.VarMap SAT.Lit
   }
 
-dualRailEncoding :: SAT.VarSet -> CNF.CNF -> (CNF.CNF, Info)
+-- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\), this function
+--
+-- * duplicates \(X\) with \(X^+ = \{x^+_1,\ldots,x^+_k\}\) and \(X^- = \{x^-_1,\ldots,x^-_k\}\),
+--
+-- * replaces positive literals \(x_i\) with \(x^+_i\), and negative literals \(\neg x_i\) with \(x^-_i\), and
+--
+-- * adds constraints \(\neg x^+_i \vee \neg x^-_i\).
+dualRailEncoding
+  :: SAT.VarSet -- ^ \(X\)
+  -> CNF.CNF    -- ^ \(\phi\)
+  -> (CNF.CNF, Info)
 dualRailEncoding vs cnf =
   ( cnf'
   , Info
@@ -93,7 +102,18 @@ cube info m = IntSet.fromList $ concat $
 blockingClause :: Info -> SAT.Model -> Clause
 blockingClause info m = [-y | y <- IntMap.keys (backwardMap info), SAT.evalLit m y]
 
-shortestImplicants :: SAT.VarSet -> CNF.CNF -> IO [LitSet]
+-- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\),
+-- this function computes shortest implicants of \(\phi\) in terms of \(X\).
+-- Variables except \(X\) are treated as if they are existentially quantified.
+--
+-- Resulting shortest implicants form a DNF (disjunctive normal form) formula that is
+-- equivalent to the original (existentially quantified) formula.
+--
+-- TODO: This API is not intuitive.
+shortestImplicants
+  :: SAT.VarSet  -- ^ \(X\)
+  -> CNF.CNF     -- ^ \(\phi\)
+  -> IO [LitSet]
 shortestImplicants vs formula = do
   let (tau_formula, info) = dualRailEncoding vs formula
   solver <- SAT.newSolver
@@ -124,7 +144,13 @@ shortestImplicants vs formula = do
   loop 0
   reverse <$> readIORef ref
 
-project :: SAT.VarSet -> CNF.CNF -> IO CNF.CNF
+-- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\),
+-- this function computes a CNF formula \(\psi\) that is equivalent to \(\exists X. \phi\)
+-- (i.e. \((\exists X. \phi) \leftrightarrow \psi\)).
+project
+  :: SAT.VarSet  -- ^ \(X\)
+  -> CNF.CNF     -- ^ \(\phi\)
+  -> IO CNF.CNF  -- ^ \(\psi\)
 project xs cnf = do
   let ys = IntSet.fromList [1 .. CNF.numVars cnf] IntSet.\\ xs
       nv = if IntSet.null ys then 0 else IntSet.findMax ys
