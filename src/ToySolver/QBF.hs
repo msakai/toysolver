@@ -444,6 +444,18 @@ solveQE_CNF nv prefix matrix = g (normalizePrefix prefix) matrix
         return (True, Just $ IntSet.fromList [if SAT.evalLit m x then x else -x | x <- IntSet.toList xs])
       else do
         return (False, Nothing)
+    g ((A,xs) : prefix') matrix = do
+      cnf <- liftM (toCNF nv . negateCNFOrDNF) $ f prefix' matrix
+      solver <- SAT.newSolver
+      SAT.newVars_ solver (CNF.numVars cnf)
+      forM_ (CNF.clauses cnf) $ \clause -> do
+        SAT.addClause solver (SAT.unpackClause clause)
+      ret <- SAT.solve solver
+      if ret then do
+        m <- SAT.getModel solver
+        return (False, Just $ IntSet.fromList [if SAT.evalLit m x then x else -x | x <- IntSet.toList xs])
+      else do
+        return (True, Nothing)
     g prefix matrix = do
       ret <- f prefix matrix
       case ret of
