@@ -22,6 +22,7 @@
 module ToySolver.SAT.ExistentialQuantification
   ( project
   , shortestImplicants
+  , negateCNF
   ) where
 
 import Control.Applicative
@@ -143,6 +144,20 @@ shortestImplicants vs formula = do
 
   loop 0
   reverse <$> readIORef ref
+
+-- | Given a CNF formula \(\phi\), this function returns another CNF formula \(\psi\)
+-- that is equivalent to \(\neg\phi\).
+negateCNF
+  :: CNF.CNF    -- ^ \(\phi\)
+  -> IO CNF.CNF -- ^ \(\psi \equiv \neg\phi\)
+negateCNF formula = do
+  implicants <- shortestImplicants (IntSet.fromList [1 .. CNF.numVars formula]) formula
+  return $
+    CNF.CNF
+    { CNF.numVars = CNF.numVars formula
+    , CNF.numClauses = length implicants
+    , CNF.clauses = map (SAT.packClause . map negate . IntSet.toList) implicants
+    }
 
 -- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\),
 -- this function computes a CNF formula \(\psi\) that is equivalent to \(\exists X. \phi\)

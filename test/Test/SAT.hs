@@ -1882,6 +1882,19 @@ case_shortestImplicants_omega' = do
     let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
     (b1 == b2) @?= True
 
+prop_negateCNF :: Property
+prop_negateCNF = QM.monadicIO $ do
+  phi <- QM.pick arbitraryCNF
+  psi <- QM.run $ ExistentialQuantification.negateCNF phi
+  QM.monitor (counterexample $ show psi)
+  forM_ (replicateM (CNF.numVars phi) [False,True]) $ \bs -> do
+    let m :: SAT.Model
+        m = array (1,CNF.numVars phi) (zip [1..] bs)
+        b1 = evalCNF m phi
+        b2 = evalCNF m psi
+    unless (b1 /= b2) $ QM.monitor (counterexample $ show m)
+    QM.assert $ b1 /= b2
+
 ------------------------------------------------------------------------
 
 
