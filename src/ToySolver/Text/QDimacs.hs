@@ -28,11 +28,21 @@ module ToySolver.Text.QDimacs
   , unpackClause
   , parseFile
   , parseByteString
+
+  -- * Generating .qdimacs files
+  , writeFile
+  , hPutQDimacs
+  , qdimacsBuilder
   ) where
 
+import Prelude hiding (writeFile)
+-- import Control.Applicative
 import Control.DeepSeq
+import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Char
+import Data.Monoid
+import System.IO hiding (writeFile)
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.SAT.Types (Clause, Lit, PackedClause, packClause, unpackClause)
 
@@ -131,3 +141,27 @@ readInts s =
     Just (0,_) -> []
     Just (z,s') -> z : readInts s'
     Nothing -> error "QDimacs.readInts: 0 is missing"
+
+
+writeFile :: FilePath -> QDimacs -> IO ()
+writeFile filepath qdimacs = do
+  withBinaryFile filepath WriteMode $ \h -> do
+    hSetBuffering h (BlockBuffering Nothing)
+    hPutBuilder h (qdimacsBuilder qdimacs)
+
+qdimacsBuilder :: QDimacs -> Builder
+qdimacsBuilder qdimacs = problem_line <> prefix' <> mconcat (map f (matrix qdimacs))
+  where
+    problem_line = mconcat
+      [ byteString "p cnf "
+      , intDec (numVars qdimacs), char7 ' '
+      , intDec (numClauses qdimacs), char7 '\n'
+      ]
+    prefix' = mconcat
+      [ char7 (if q == E then 'e' else 'a') <> mconcat [char7 ' ' <> intDec atom | atom <- atoms] <> byteString " 0\n"
+      | (q, atoms) <- prefix qdimacs
+      ]
+    f c = mconcat [intDec lit <> char7 ' '| lit <- SAT.unpackClause c] <> byteString "0\n"
+
+hPutQDimacs :: Handle -> QDimacs -> IO ()
+hPutQDimacs h qdimacs = hPutBuilder h (qdimacsBuilder qdimacs)
