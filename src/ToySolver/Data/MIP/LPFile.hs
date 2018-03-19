@@ -34,7 +34,7 @@ module ToySolver.Data.MIP.LPFile
   , render
   ) where
 
-import Control.Applicative
+import Control.Applicative hiding (many)
 import Control.Exception (throw)
 import Control.Monad
 import Control.Monad.Writer
