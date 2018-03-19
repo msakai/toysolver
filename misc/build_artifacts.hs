@@ -10,8 +10,8 @@ import Control.Monad
 import Distribution.Package
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
+import Distribution.Version
 import Distribution.Verbosity
-import Data.Version
 import qualified System.Info as Info
 
 main :: IO ()
@@ -48,7 +48,7 @@ main = sh $ do
   Just local_install_root <- fold (inproc "stack"  ["path", "--local-install-root"] empty) L.head
 
   ver <- liftIO $ liftM (showVersion . pkgVersion . package . packageDescription) $
-           readPackageDescription silent "toysolver.cabal"  
+           readGenericPackageDescription silent "toysolver.cabal"
   let pkg :: Turtle.FilePath
       pkg = fromString $ "toysolver-" <> ver <> "-" <> package_platform
   b <- testfile pkg
