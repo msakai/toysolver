@@ -860,7 +860,7 @@ Test-suite TestPolynomial
     finite-field >=0.7.0 && <1.0.0,
     pretty,
     tasty >=0.10.1,
-    tasty-hunit ==0.9.*,
+    tasty-hunit >=0.9 && <0.11,
     tasty-quickcheck >=0.8 && <0.10,
     tasty-th,
     toysolver
@@ -927,7 +927,7 @@ Test-suite TestSuite
     pseudo-boolean,
     QuickCheck >=2.5 && <3,
     tasty >=0.10.1,
-    tasty-hunit ==0.9.*,
+    tasty-hunit >=0.9 && <0.11,
     tasty-quickcheck >=0.8 && <0.10,
     tasty-th,
     text,
@@ -959,7 +959,7 @@ Benchmark BenchmarkSATLIB
   build-depends:
     array,
     base,
-    criterion >=1.0 && <1.3,
+    criterion >=1.0 && <1.4,
     data-default-class,
     toysolver
   Default-Language: Haskell2010
@@ -970,7 +970,7 @@ Benchmark BenchmarkKnapsack
   main-is:          BenchmarkKnapsack.hs
   build-depends:
     base,
-    criterion >=1.0 && <1.3,
+    criterion >=1.0 && <1.4,
     toysolver
   Default-Language: Haskell2010
 
@@ -980,7 +980,7 @@ Benchmark BenchmarkSubsetSum
   main-is:          BenchmarkSubsetSum.hs
   build-depends:
     base,
-    criterion >=1.0 && <1.3,
+    criterion >=1.0 && <1.4,
     toysolver,
     vector
   Default-Language: Haskell2010
