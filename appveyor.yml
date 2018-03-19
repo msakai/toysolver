@@ -7,7 +7,7 @@ cache:
 environment:
   global:
     STACK_ROOT: "c:\\sr"
-    STACK_YAML: "stack-travis-ghc-8.0.yaml"
+    STACK_YAML: "stack-travis-ghc-8.2.yaml"
 
 platform:
 - x86
