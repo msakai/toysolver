@@ -22,6 +22,7 @@
 module ToySolver.SAT.ExistentialQuantification
   ( project
   , shortestImplicants
+  , shortestImplicantsE
   , negateCNF
   ) where
 
@@ -103,20 +104,31 @@ cube info m = IntSet.fromList $ concat $
 blockingClause :: Info -> SAT.Model -> Clause
 blockingClause info m = [-y | y <- IntMap.keys (backwardMap info), SAT.evalLit m y]
 
+{-# DEPRECATED shortestImplicants "Use shortestImplicantsE instead" #-} 
 -- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\),
 -- this function computes shortest implicants of \(\phi\) in terms of \(X\).
 -- Variables except \(X\) are treated as if they are existentially quantified.
 --
 -- Resulting shortest implicants form a DNF (disjunctive normal form) formula that is
 -- equivalent to the original (existentially quantified) formula.
---
--- TODO: This API is not intuitive.
 shortestImplicants
   :: SAT.VarSet  -- ^ \(X\)
   -> CNF.CNF     -- ^ \(\phi\)
   -> IO [LitSet]
-shortestImplicants vs formula = do
-  let (tau_formula, info) = dualRailEncoding vs formula
+shortestImplicants xs formula =
+  shortestImplicantsE (IntSet.fromList [1 .. CNF.numVars formula] IntSet.\\ xs) formula
+
+-- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\),
+-- this function computes shortest implicants of \(\exists X. \phi\).
+--
+-- Resulting shortest implicants form a DNF (disjunctive normal form) formula that is
+-- equivalent to the original formula \(\exists X. \phi\).
+shortestImplicantsE
+  :: SAT.VarSet  -- ^ \(X\)
+  -> CNF.CNF     -- ^ \(\phi\)
+  -> IO [LitSet]
+shortestImplicantsE xs formula = do
+  let (tau_formula, info) = dualRailEncoding (IntSet.fromList [1 .. CNF.numVars formula] IntSet.\\ xs) formula
   solver <- SAT.newSolver
   SAT.newVars_ solver (CNF.numVars tau_formula)
   forM_ (CNF.clauses tau_formula) $ \c -> do
@@ -151,7 +163,7 @@ negateCNF
   :: CNF.CNF    -- ^ \(\phi\)
   -> IO CNF.CNF -- ^ \(\psi \equiv \neg\phi\)
 negateCNF formula = do
-  implicants <- shortestImplicants (IntSet.fromList [1 .. CNF.numVars formula]) formula
+  implicants <- shortestImplicantsE IntSet.empty formula
   return $
     CNF.CNF
     { CNF.numVars = CNF.numVars formula
@@ -169,14 +181,14 @@ project
 project xs cnf = do
   let ys = IntSet.fromList [1 .. CNF.numVars cnf] IntSet.\\ xs
       nv = if IntSet.null ys then 0 else IntSet.findMax ys
-  implicants <- shortestImplicants ys cnf
+  implicants <- shortestImplicantsE xs cnf
   let cnf' =
         CNF.CNF
         { CNF.numVars = nv
         , CNF.numClauses = length implicants
         , CNF.clauses = map (SAT.packClause . map negate . IntSet.toList) implicants
         }
-  negated_implicates <- shortestImplicants ys cnf'
+  negated_implicates <- shortestImplicantsE xs cnf'
   let implicates = map (SAT.packClause . map negate . IntSet.toList) negated_implicates
   return $
     CNF.CNF

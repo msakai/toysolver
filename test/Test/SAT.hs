@@ -1811,9 +1811,9 @@ case_ExistentialQuantification_project_phi' = do
     let b2 = all (SAT.evalClause m . SAT.unpackClause) (CNF.clauses psi)    
     (b1 == b2) @?= True
 
-case_shortestImplicants_phi :: Assertion
-case_shortestImplicants_phi = do
-  xss <- ExistentialQuantification.shortestImplicants (IntSet.fromList [1..6]) brauer11_phi
+case_shortestImplicantsE_phi :: Assertion
+case_shortestImplicantsE_phi = do
+  xss <- ExistentialQuantification.shortestImplicantsE (IntSet.fromList [7..13]) brauer11_phi
   forM_ (replicateM 6 [False,True]) $ \bs -> do
     let m :: SAT.Model
         m = array (1,6) (zip [1..] bs)
@@ -1825,8 +1825,8 @@ case_shortestImplicants_phi = do
     let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
     (b1 == b2) @?= True
 
-case_shortestImplicants_phi' :: Assertion
-case_shortestImplicants_phi' = do
+case_shortestImplicantsE_phi' :: Assertion
+case_shortestImplicantsE_phi' = do
   let [y1,y2,y3,y4,y5,y6] = [1..6]
       xss = map IntSet.fromList
             [ [-y1, -y3, y4, -y5, y6]
@@ -1844,9 +1844,9 @@ case_shortestImplicants_phi' = do
     let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
     (b1 == b2) @?= True
 
-case_shortestImplicants_omega :: Assertion
-case_shortestImplicants_omega = do
-  xss <- ExistentialQuantification.shortestImplicants (IntSet.fromList [1..6]) brauer11_omega
+case_shortestImplicantsE_omega :: Assertion
+case_shortestImplicantsE_omega = do
+  xss <- ExistentialQuantification.shortestImplicantsE IntSet.empty brauer11_omega
   forM_ (replicateM 6 [False,True]) $ \bs -> do
     let m :: SAT.Model
         m = array (1,6) (zip [1..] bs)
@@ -1858,8 +1858,8 @@ case_shortestImplicants_omega = do
     let b2 = any (all (SAT.evalLit m) . IntSet.toList) xss
     unless (b1 == b2) $ print m
 
-case_shortestImplicants_omega' :: Assertion
-case_shortestImplicants_omega' = do
+case_shortestImplicantsE_omega' :: Assertion
+case_shortestImplicantsE_omega' = do
   let [y1,y2,y3,y4,y5,y6] = [1..6]
       xss = map IntSet.fromList
               [ [y2, -y6]

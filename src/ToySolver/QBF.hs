@@ -428,9 +428,6 @@ solveQE nv prefix matrix = do
 solveQE_CNF :: Int -> Prefix -> [SAT.Clause] -> IO (Bool, Maybe LitSet)
 solveQE_CNF nv prefix matrix = g (normalizePrefix prefix) matrix
   where
-    vs :: VarSet
-    vs = IntSet.fromList [1..nv]
-
     g :: Prefix -> [SAT.Clause] -> IO (Bool, Maybe LitSet)
     g ((E,xs) : prefix') matrix = do
       cnf <- liftM (toCNF nv) $ f prefix' matrix
@@ -466,11 +463,11 @@ solveQE_CNF nv prefix matrix = g (normalizePrefix prefix) matrix
     f [] matrix = return $ CNF [IntSet.fromList clause | clause <- matrix]
     f ((E,xs) : prefix') matrix = do
       cnf <- liftM (toCNF nv) $ f prefix' matrix
-      dnf <- QE.shortestImplicants (vs IntSet.\\ xs) cnf
+      dnf <- QE.shortestImplicantsE (xs `IntSet.union` IntSet.fromList [nv+1 .. CNF.numVars cnf]) cnf
       return $ DNF dnf
     f ((A,xs) : prefix') matrix = do
       cnf <- liftM (toCNF nv . negateCNFOrDNF) $ f prefix' matrix
-      dnf <- QE.shortestImplicants (vs IntSet.\\ xs) cnf
+      dnf <- QE.shortestImplicantsE (xs `IntSet.union` IntSet.fromList [nv+1 .. CNF.numVars cnf]) cnf
       return $ negateCNFOrDNF $ DNF dnf
 
 -- ----------------------------------------------------------------------------
