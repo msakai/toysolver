@@ -147,7 +147,7 @@ writeFile :: FilePath -> QDimacs -> IO ()
 writeFile filepath qdimacs = do
   withBinaryFile filepath WriteMode $ \h -> do
     hSetBuffering h (BlockBuffering Nothing)
-    hPutBuilder h (qdimacsBuilder qdimacs)
+    hPutQDimacs h qdimacs
 
 qdimacsBuilder :: QDimacs -> Builder
 qdimacsBuilder qdimacs = problem_line <> prefix' <> mconcat (map f (matrix qdimacs))

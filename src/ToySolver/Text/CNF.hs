@@ -83,7 +83,7 @@ writeFile :: FilePath -> CNF -> IO ()
 writeFile filepath cnf = do
   withBinaryFile filepath WriteMode $ \h -> do
     hSetBuffering h (BlockBuffering Nothing)
-    hPutBuilder h (cnfBuilder cnf)
+    hPutCNF h cnf
 
 cnfBuilder :: CNF -> Builder
 cnfBuilder cnf = header <> mconcat (map f (clauses cnf))
