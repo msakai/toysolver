@@ -99,10 +99,10 @@ newSolver :: CNF.CNF -> IO Solver
 newSolver cnf = do
   let wcnf =
         WCNF.WCNF
-        { WCNF.numVars    = CNF.numVars cnf
-        , WCNF.numClauses = CNF.numClauses cnf
-        , WCNF.topCost    = fromIntegral (CNF.numClauses cnf) + 1
-        , WCNF.clauses    = [(1,c) | c <- CNF.clauses cnf]
+        { WCNF.wcnfNumVars    = CNF.cnfNumVars cnf
+        , WCNF.wcnfNumClauses = CNF.cnfNumClauses cnf
+        , WCNF.wcnfTopCost    = fromIntegral (CNF.cnfNumClauses cnf) + 1
+        , WCNF.wcnfClauses    = [(1,c) | c <- CNF.cnfClauses cnf]
         }
   newSolverWeighted wcnf
 
@@ -110,11 +110,11 @@ newSolverWeighted :: WCNF.WCNF -> IO Solver
 newSolverWeighted wcnf = do
   let m :: SAT.Var -> Bool
       m _ = False
-      nv = WCNF.numVars wcnf
+      nv = WCNF.wcnfNumVars wcnf
 
   objRef <- newIORef (0::Integer)
 
-  cs <- liftM catMaybes $ forM (WCNF.clauses wcnf) $ \(w,pc) -> do
+  cs <- liftM catMaybes $ forM (WCNF.wcnfClauses wcnf) $ \(w,pc) -> do
     case SAT.normalizeClause (SAT.unpackClause pc) of
       Nothing -> return Nothing
       Just [] -> modifyIORef' objRef (w+) >> return Nothing

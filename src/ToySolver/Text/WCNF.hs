@@ -43,10 +43,10 @@ import ToySolver.Internal.TextUtil
 
 data WCNF
   = WCNF
-  { numVars    :: !Int
-  , numClauses :: !Int
-  , topCost    :: !Weight
-  , clauses    :: [WeightedClause]
+  { wcnfNumVars    :: !Int
+  , wcnfNumClauses :: !Int
+  , wcnfTopCost    :: !Weight
+  , wcnfClauses    :: [WeightedClause]
   }
   deriving (Show, Eq, Ord)
 
@@ -66,28 +66,28 @@ parseByteString s =
     (["p","wcnf", nvar, nclause, top]) ->
       Right $
         WCNF
-        { numVars    = read $ BS.unpack nvar
-        , numClauses = read $ BS.unpack nclause
-        , topCost    = read $ BS.unpack top
-        , clauses    = map parseWCNFLineBS ls
+        { wcnfNumVars    = read $ BS.unpack nvar
+        , wcnfNumClauses = read $ BS.unpack nclause
+        , wcnfTopCost    = read $ BS.unpack top
+        , wcnfClauses    = map parseWCNFLineBS ls
         }
     (["p","wcnf", nvar, nclause]) ->
       Right $
         WCNF
-        { numVars    = read $ BS.unpack nvar
-        , numClauses = read $ BS.unpack nclause
+        { wcnfNumVars    = read $ BS.unpack nvar
+        , wcnfNumClauses = read $ BS.unpack nclause
           -- top must be greater than the sum of the weights of violated soft clauses.
-        , topCost    = fromInteger $ 2^(63::Int) - 1
-        , clauses    = map parseWCNFLineBS ls
+        , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
+        , wcnfClauses    = map parseWCNFLineBS ls
         }
     (["p","cnf", nvar, nclause]) ->
       Right $
         WCNF
-        { numVars    = read $ BS.unpack nvar
-        , numClauses = read $ BS.unpack nclause
+        { wcnfNumVars    = read $ BS.unpack nvar
+        , wcnfNumClauses = read $ BS.unpack nclause
           -- top must be greater than the sum of the weights of violated soft clauses.
-        , topCost    = fromInteger $ 2^(63::Int) - 1
-        , clauses    = map parseCNFLineBS ls
+        , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
+        , wcnfClauses    = map parseCNFLineBS ls
         }
     _ ->
       Left "cannot find wcnf/cnf header"
@@ -131,13 +131,13 @@ writeFile filepath wcnf = do
     hPutWCNF h wcnf
 
 wcnfBuilder :: WCNF -> Builder
-wcnfBuilder wcnf = header <> mconcat (map f (clauses wcnf))
+wcnfBuilder wcnf = header <> mconcat (map f (wcnfClauses wcnf))
   where
     header = mconcat
       [ byteString "p wcnf "
-      , intDec (numVars wcnf), char7 ' '
-      , intDec (numClauses wcnf), char7 ' '
-      , integerDec (topCost wcnf), char7 '\n'
+      , intDec (wcnfNumVars wcnf), char7 ' '
+      , intDec (wcnfNumClauses wcnf), char7 ' '
+      , integerDec (wcnfTopCost wcnf), char7 '\n'
       ]
     f (w,c) = integerDec w <> mconcat [char7 ' ' <> intDec lit | lit <- SAT.unpackClause c] <> byteString " 0\n"
 

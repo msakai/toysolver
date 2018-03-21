@@ -43,10 +43,10 @@ import ToySolver.Internal.TextUtil
 
 data GCNF
   = GCNF
-  { numVars        :: !Int
-  , numClauses     :: !Int
-  , lastGroupIndex :: !GroupIndex
-  , clauses        :: [GClause]
+  { gcnfNumVars        :: !Int
+  , gcnfNumClauses     :: !Int
+  , gcnfLastGroupIndex :: !GroupIndex
+  , gcnfClauses        :: [GClause]
   }
 
 type GroupIndex = Int
@@ -65,18 +65,18 @@ parseByteString s =
     (["p","gcnf", nbvar', nbclauses', lastGroupIndex']) ->
       Right $
         GCNF
-        { numVars        = read $ BS.unpack nbvar'
-        , numClauses     = read $ BS.unpack nbclauses'
-        , lastGroupIndex = read $ BS.unpack lastGroupIndex'
-        , clauses        = map parseLineBS ls
+        { gcnfNumVars        = read $ BS.unpack nbvar'
+        , gcnfNumClauses     = read $ BS.unpack nbclauses'
+        , gcnfLastGroupIndex = read $ BS.unpack lastGroupIndex'
+        , gcnfClauses        = map parseLineBS ls
         }
     (["p","cnf", nbvar', nbclause']) ->
       Right $
         GCNF
-        { numVars        = read $ BS.unpack nbvar'
-        , numClauses     = read $ BS.unpack nbclause'
-        , lastGroupIndex = read $ BS.unpack nbclause'
-        , clauses        = zip [1..] $ map parseCNFLineBS ls
+        { gcnfNumVars        = read $ BS.unpack nbvar'
+        , gcnfNumClauses     = read $ BS.unpack nbclause'
+        , gcnfLastGroupIndex = read $ BS.unpack nbclause'
+        , gcnfClauses        = zip [1..] $ map parseCNFLineBS ls
         }
     _ ->
       Left "cannot find gcnf header"
@@ -121,13 +121,13 @@ writeFile filepath gcnf = do
     hPutGCNF h gcnf
 
 gcnfBuilder :: GCNF -> Builder
-gcnfBuilder gcnf = header <> mconcat (map f (clauses gcnf))
+gcnfBuilder gcnf = header <> mconcat (map f (gcnfClauses gcnf))
   where
     header = mconcat
       [ byteString "p gcnf "
-      , intDec (numVars gcnf), char7 ' '
-      , intDec (numClauses gcnf), char7 ' '
-      , intDec (lastGroupIndex gcnf), char7 '\n'
+      , intDec (gcnfNumVars gcnf), char7 ' '
+      , intDec (gcnfNumClauses gcnf), char7 ' '
+      , intDec (gcnfLastGroupIndex gcnf), char7 '\n'
       ]
     f (idx,c) = char7 '{' <> intDec idx <> char7 '}' <>
                 mconcat [char7 ' ' <> intDec lit | lit <- SAT.unpackClause c] <>

@@ -418,11 +418,11 @@ solveQE nv prefix matrix = do
   Tseitin.addFormula encoder matrix
   cnf <- getCNFFormula store
   let prefix' =
-        if CNF.numVars cnf > nv then
-          prefix ++ [(E, IntSet.fromList [nv+1 .. CNF.numVars cnf])]
+        if CNF.cnfNumVars cnf > nv then
+          prefix ++ [(E, IntSet.fromList [nv+1 .. CNF.cnfNumVars cnf])]
         else
           prefix
-  (b, m) <- solveQE_CNF (CNF.numVars cnf) prefix' (map SAT.unpackClause (CNF.clauses cnf))
+  (b, m) <- solveQE_CNF (CNF.cnfNumVars cnf) prefix' (map SAT.unpackClause (CNF.cnfClauses cnf))
   return (b, fmap (IntSet.filter (\lit -> abs lit <= nv)) m)
 
 solveQE_CNF :: Int -> Prefix -> [SAT.Clause] -> IO (Bool, Maybe LitSet)
@@ -432,8 +432,8 @@ solveQE_CNF nv prefix matrix = g (normalizePrefix prefix) matrix
     g ((E,xs) : prefix') matrix = do
       cnf <- liftM (toCNF nv) $ f prefix' matrix
       solver <- SAT.newSolver
-      SAT.newVars_ solver (CNF.numVars cnf)
-      forM_ (CNF.clauses cnf) $ \clause -> do
+      SAT.newVars_ solver (CNF.cnfNumVars cnf)
+      forM_ (CNF.cnfClauses cnf) $ \clause -> do
         SAT.addClause solver (SAT.unpackClause clause)
       ret <- SAT.solve solver
       if ret then do
@@ -444,8 +444,8 @@ solveQE_CNF nv prefix matrix = g (normalizePrefix prefix) matrix
     g ((A,xs) : prefix') matrix = do
       cnf <- liftM (toCNF nv . negateCNFOrDNF) $ f prefix' matrix
       solver <- SAT.newSolver
-      SAT.newVars_ solver (CNF.numVars cnf)
-      forM_ (CNF.clauses cnf) $ \clause -> do
+      SAT.newVars_ solver (CNF.cnfNumVars cnf)
+      forM_ (CNF.cnfClauses cnf) $ \clause -> do
         SAT.addClause solver (SAT.unpackClause clause)
       ret <- SAT.solve solver
       if ret then do
@@ -463,11 +463,11 @@ solveQE_CNF nv prefix matrix = g (normalizePrefix prefix) matrix
     f [] matrix = return $ CNF [IntSet.fromList clause | clause <- matrix]
     f ((E,xs) : prefix') matrix = do
       cnf <- liftM (toCNF nv) $ f prefix' matrix
-      dnf <- QE.shortestImplicantsE (xs `IntSet.union` IntSet.fromList [nv+1 .. CNF.numVars cnf]) cnf
+      dnf <- QE.shortestImplicantsE (xs `IntSet.union` IntSet.fromList [nv+1 .. CNF.cnfNumVars cnf]) cnf
       return $ DNF dnf
     f ((A,xs) : prefix') matrix = do
       cnf <- liftM (toCNF nv . negateCNFOrDNF) $ f prefix' matrix
-      dnf <- QE.shortestImplicantsE (xs `IntSet.union` IntSet.fromList [nv+1 .. CNF.numVars cnf]) cnf
+      dnf <- QE.shortestImplicantsE (xs `IntSet.union` IntSet.fromList [nv+1 .. CNF.cnfNumVars cnf]) cnf
       return $ negateCNFOrDNF $ DNF dnf
 
 -- ----------------------------------------------------------------------------

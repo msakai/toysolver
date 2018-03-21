@@ -22,9 +22,9 @@ convert :: CNF.CNF -> PBFile.Formula
 convert cnf
   = PBFile.Formula
   { PBFile.pbObjectiveFunction = Nothing
-  , PBFile.pbConstraints = map f (CNF.clauses cnf)
-  , PBFile.pbNumVars = CNF.numVars cnf
-  , PBFile.pbNumConstraints = CNF.numClauses cnf
+  , PBFile.pbConstraints = map f (CNF.cnfClauses cnf)
+  , PBFile.pbNumVars = CNF.cnfNumVars cnf
+  , PBFile.pbNumConstraints = CNF.cnfNumClauses cnf
   }
   where
     f clause = ([(1,[l]) | l <- SAT.unpackClause clause], PBFile.Ge, 1)

@@ -110,10 +110,10 @@ main = do
               error ("platform " ++ name ++ " has only " ++ show (length devs) ++ " devices")
           context <- clCreateContext [] [dev] print
           solver <- SPCL.newSolver putStrLn context dev
-            (WCNF.numVars wcnf) [(fromIntegral w, clause) | (w,clause) <- WCNF.clauses wcnf]
+            (WCNF.wcnfNumVars wcnf) [(fromIntegral w, clause) | (w,clause) <- WCNF.wcnfClauses wcnf]
           -- Rand.withSystemRandom $ SPCL.initializeRandom solver
           print =<< SPCL.propagate solver
-          forM_ [1 .. WCNF.numVars wcnf] $ \v -> do
+          forM_ [1 .. WCNF.wcnfNumVars wcnf] $ \v -> do
             prob <- SPCL.getVarProb solver v
             print (v,prob)
           SPCL.deleteSolver solver
@@ -123,11 +123,11 @@ main = do
 #endif
         else do
           solver <- SP.newSolver
-            (WCNF.numVars wcnf) [(fromIntegral w, clause) | (w,clause) <- WCNF.clauses wcnf]
+            (WCNF.wcnfNumVars wcnf) [(fromIntegral w, clause) | (w,clause) <- WCNF.wcnfClauses wcnf]
           SP.setNThreads solver (optNThreads opt)
           -- Rand.withSystemRandom $ SP.initializeRandom solver
           print =<< SP.propagate solver
-          forM_ [1 .. WCNF.numVars wcnf] $ \v -> do
+          forM_ [1 .. WCNF.wcnfNumVars wcnf] $ \v -> do
             prob <- SP.getVarProb solver v
             print (v,prob)
           SP.deleteSolver solver

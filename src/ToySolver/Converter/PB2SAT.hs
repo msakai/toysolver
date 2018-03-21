@@ -48,11 +48,11 @@ convert formula = runST $ do
 
   defs <- Tseitin.getDefinitions tseitin
   let extendModel :: SAT.Model -> SAT.Model
-      extendModel m = array (1, CNF.numVars cnf) (assocs a)
+      extendModel m = array (1, CNF.cnfNumVars cnf) (assocs a)
         where
           -- Use BOXED array to tie the knot
           a :: Array SAT.Var Bool
-          a = array (1, CNF.numVars cnf) $
+          a = array (1, CNF.cnfNumVars cnf) $
                 assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
 
   return (cnf, extendModel, SAT.restrictModel nv1)

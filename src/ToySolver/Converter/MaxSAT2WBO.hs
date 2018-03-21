@@ -21,10 +21,10 @@ import qualified ToySolver.Text.WCNF as WCNF
 convert :: WCNF.WCNF -> PBFile.SoftFormula
 convert
   WCNF.WCNF
-  { WCNF.topCost = top
-  , WCNF.clauses = cs
-  , WCNF.numVars = nv
-  , WCNF.numClauses = nc
+  { WCNF.wcnfTopCost = top
+  , WCNF.wcnfClauses = cs
+  , WCNF.wcnfNumVars = nv
+  , WCNF.wcnfNumClauses = nc
   } =
   PBFile.SoftFormula
   { PBFile.wboTopCost = Nothing

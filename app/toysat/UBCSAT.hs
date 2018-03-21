@@ -49,10 +49,10 @@ instance Default Options where
         , optTempDir = Nothing
         , optProblem =
             WCNF.WCNF
-            { WCNF.numVars    = 0
-            , WCNF.numClauses = 0
-            , WCNF.topCost    = 1
-            , WCNF.clauses    = []
+            { WCNF.wcnfNumVars    = 0
+            , WCNF.wcnfNumClauses = 0
+            , WCNF.wcnfTopCost    = 1
+            , WCNF.wcnfClauses    = []
             }
         , optProblemFile   = Nothing
         , optVarInit = []
@@ -64,7 +64,7 @@ ubcsatBestFeasible opt = do
   case ret of
     Nothing -> return Nothing
     Just (obj,_) ->
-      if obj < WCNF.topCost (optProblem opt) then
+      if obj < WCNF.wcnfTopCost (optProblem opt) then
         return ret
       else
         return Nothing
@@ -111,7 +111,7 @@ ubcsat' opt fname varInitFile = do
         [ "-alg", "irots"
         , "-seed", "0"
         , "-runs", "10"
-        , "-cutoff", show (WCNF.numVars wcnf * 50)
+        , "-cutoff", show (WCNF.wcnfNumVars wcnf * 50)
         , "-timeout", show (10 :: Int)
         , "-gtimeout", show (30 :: Int)
         , "-solve"
@@ -132,7 +132,7 @@ ubcsat' opt fname varInitFile = do
       return []
     Right s -> do
       forM_ (lines s) $ \l -> putStr "c " >> putStrLn l
-      return $ scanSolutions (WCNF.numVars wcnf) s
+      return $ scanSolutions (WCNF.wcnfNumVars wcnf) s
 
 scanSolutions :: Int -> String -> [(Integer, SAT.Model)]
 scanSolutions nv s = rights $ map (parse (solution nv) "") $ lines s

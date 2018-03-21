@@ -36,9 +36,9 @@ import qualified ToySolver.SAT.Types as SAT
 
 data CNF
   = CNF
-  { numVars :: !Int
-  , numClauses :: !Int
-  , clauses :: [SAT.PackedClause]
+  { cnfNumVars :: !Int
+  , cnfNumClauses :: !Int
+  , cnfClauses :: [SAT.PackedClause]
   }
   deriving (Show, Eq, Ord)
 
@@ -53,9 +53,9 @@ parseByteString s =
     (["p","cnf", nvar, nclause]) ->
       Right $
         CNF
-        { numVars    = read $ BS.unpack nvar
-        , numClauses = read $ BS.unpack nclause
-        , clauses    = map parseClauseBS ls
+        { cnfNumVars    = read $ BS.unpack nvar
+        , cnfNumClauses = read $ BS.unpack nclause
+        , cnfClauses    = map parseClauseBS ls
         }
     _ ->
       Left "cannot find cnf header"
@@ -86,12 +86,12 @@ writeFile filepath cnf = do
     hPutCNF h cnf
 
 cnfBuilder :: CNF -> Builder
-cnfBuilder cnf = header <> mconcat (map f (clauses cnf))
+cnfBuilder cnf = header <> mconcat (map f (cnfClauses cnf))
   where
     header = mconcat
       [ byteString "p cnf "
-      , intDec (numVars cnf), char7 ' '
-      , intDec (numClauses cnf), char7 '\n'
+      , intDec (cnfNumVars cnf), char7 ' '
+      , intDec (cnfNumClauses cnf), char7 '\n'
       ]
     f c = mconcat [intDec lit <> char7 ' '| lit <- SAT.unpackClause c] <> byteString "0\n"
 

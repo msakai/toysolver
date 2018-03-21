@@ -20,9 +20,9 @@ main = do
   Right wcnf <- WCNF.parseFile problemFile
   model <- liftM readModel (readFile modelFile)
   costRef <- newIORef 0
-  forM_ (WCNF.clauses wcnf) $ \(w,c) ->
+  forM_ (WCNF.wcnfClauses wcnf) $ \(w,c) ->
     unless (eval model c) $
-      if w == WCNF.topCost wcnf
+      if w == WCNF.wcnfTopCost wcnf
       then printf "violated hard constraint: %s\n" (show c)
       else do
         tc <- readIORef costRef

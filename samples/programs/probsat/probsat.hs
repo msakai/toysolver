@@ -177,4 +177,4 @@ main = do
       printf "c FlipsPerSecond = %f\n" (ProbSAT.statFlipsPerSecond stat)
       when (obj == 0) $ do
         putStrLn "s OPTIMUM FOUND"
-      maxsatPrintModel stdout sol (WCNF.numVars wcnf)
+      maxsatPrintModel stdout sol (WCNF.wcnfNumVars wcnf)

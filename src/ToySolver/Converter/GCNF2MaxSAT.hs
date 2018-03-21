@@ -22,17 +22,17 @@ import qualified ToySolver.Text.WCNF as WCNF
 convert :: GCNF.GCNF -> WCNF.WCNF
 convert
   GCNF.GCNF
-  { GCNF.numVars        = nv
-  , GCNF.numClauses     = nc
-  , GCNF.lastGroupIndex = lastg
-  , GCNF.clauses        = cs
+  { GCNF.gcnfNumVars        = nv
+  , GCNF.gcnfNumClauses     = nc
+  , GCNF.gcnfLastGroupIndex = lastg
+  , GCNF.gcnfClauses        = cs
   }
   =
   WCNF.WCNF
-  { WCNF.topCost = top
-  , WCNF.clauses = [(top, if g==0 then c else VG.cons (-(nv+g)) c) | (g,c) <- cs] ++ [(1, SAT.packClause [v]) | v <- [nv+1..nv+lastg]]
-  , WCNF.numVars = nv + lastg
-  , WCNF.numClauses = nc + lastg
+  { WCNF.wcnfTopCost = top
+  , WCNF.wcnfClauses = [(top, if g==0 then c else VG.cons (-(nv+g)) c) | (g,c) <- cs] ++ [(1, SAT.packClause [v]) | v <- [nv+1..nv+lastg]]
+  , WCNF.wcnfNumVars = nv + lastg
+  , WCNF.wcnfNumClauses = nc + lastg
   }
   where
     top :: WCNF.Weight
