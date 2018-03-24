@@ -74,10 +74,10 @@ http://www.qbflib.org/qdimacs.html
 
 data QDimacs
   = QDimacs
-  { numVars :: !Int
-  , numClauses :: !Int
-  , prefix :: [QuantSet]
-  , matrix :: [PackedClause]
+  { qdimacsNumVars :: !Int
+  , qdimacsNumClauses :: !Int
+  , qdimacsPrefix :: [QuantSet]
+  , qdimacsMatrix :: [PackedClause]
   }
   deriving (Eq, Ord, Show, Read)
 
@@ -109,10 +109,10 @@ parseByteString = f . BL.lines
               case parsePrefix ls of
                 (prefix', ls') -> Right $
                   QDimacs
-                  { numVars = read $ BL.unpack numVars'
-                  , numClauses = read $ BL.unpack numClauses'
-                  , prefix = prefix'
-                  , matrix = map parseClause ls'
+                  { qdimacsNumVars = read $ BL.unpack numVars'
+                  , qdimacsNumClauses = read $ BL.unpack numClauses'
+                  , qdimacsPrefix = prefix'
+                  , qdimacsMatrix = map parseClause ls'
                   }
             _ -> Left "QDimacs.parseByteString: invalid problem line"
         Just (c, _) -> Left ("QDimacs.parseByteString: invalid prefix " ++ show c)
@@ -150,16 +150,16 @@ writeFile filepath qdimacs = do
     hPutQDimacs h qdimacs
 
 qdimacsBuilder :: QDimacs -> Builder
-qdimacsBuilder qdimacs = problem_line <> prefix' <> mconcat (map f (matrix qdimacs))
+qdimacsBuilder qdimacs = problem_line <> prefix' <> mconcat (map f (qdimacsMatrix qdimacs))
   where
     problem_line = mconcat
       [ byteString "p cnf "
-      , intDec (numVars qdimacs), char7 ' '
-      , intDec (numClauses qdimacs), char7 '\n'
+      , intDec (qdimacsNumVars qdimacs), char7 ' '
+      , intDec (qdimacsNumClauses qdimacs), char7 '\n'
       ]
     prefix' = mconcat
       [ char7 (if q == E then 'e' else 'a') <> mconcat [char7 ' ' <> intDec atom | atom <- atoms] <> byteString " 0\n"
-      | (q, atoms) <- prefix qdimacs
+      | (q, atoms) <- qdimacsPrefix qdimacs
       ]
     f c = mconcat [intDec lit <> char7 ' '| lit <- SAT.unpackClause c] <> byteString "0\n"
 
