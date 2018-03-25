@@ -17,11 +17,29 @@ module ToySolver.Text.CNF
     FileFormat (..)
   , parseFile
   , writeFile
-  
+
   -- * DIMACS CNF format
   , CNF (..)
   , hPutCNF
   , cnfBuilder
+
+  -- * WCNF format for weighted MAX-SAT problems
+  --
+  -- $WCNF
+  , WCNF (..)
+  , WeightedClause
+  , Weight
+  , hPutWCNF
+  , wcnfBuilder
+
+  -- * GCNF format for Group oriented MUS problems
+  --
+  -- $GCNF
+  , GCNF (..)
+  , GroupIndex
+  , GClause
+  , hPutGCNF
+  , gcnfBuilder
   ) where
 
 import Prelude hiding (writeFile)
@@ -106,3 +124,163 @@ cnfBuilder = render
 
 hPutCNF :: Handle -> CNF -> IO ()
 hPutCNF h cnf = hPutBuilder h (cnfBuilder cnf)
+
+-- -------------------------------------------------------------------
+
+-- $WCNF
+--
+-- References:
+--
+-- * <http://maxsat.ia.udl.cat/requirements/>
+
+data WCNF
+  = WCNF
+  { wcnfNumVars    :: !Int
+  , wcnfNumClauses :: !Int
+  , wcnfTopCost    :: !Weight
+  , wcnfClauses    :: [WeightedClause]
+  }
+  deriving (Show, Eq, Ord)
+
+type WeightedClause = (Weight, SAT.PackedClause)
+
+-- | Weigths must be greater than or equal to 1, and smaller than 2^63.
+type Weight = Integer
+
+instance FileFormat WCNF where
+  parseByteString s =
+    case BS.words l of
+      (["p","wcnf", nvar, nclause, top]) ->
+        Right $
+          WCNF
+          { wcnfNumVars    = read $ BS.unpack nvar
+          , wcnfNumClauses = read $ BS.unpack nclause
+          , wcnfTopCost    = read $ BS.unpack top
+          , wcnfClauses    = map parseWCNFLineBS ls
+          }
+      (["p","wcnf", nvar, nclause]) ->
+        Right $
+          WCNF
+          { wcnfNumVars    = read $ BS.unpack nvar
+          , wcnfNumClauses = read $ BS.unpack nclause
+            -- top must be greater than the sum of the weights of violated soft clauses.
+          , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
+          , wcnfClauses    = map parseWCNFLineBS ls
+          }
+      (["p","cnf", nvar, nclause]) ->
+        Right $
+          WCNF
+          { wcnfNumVars    = read $ BS.unpack nvar
+          , wcnfNumClauses = read $ BS.unpack nclause
+            -- top must be greater than the sum of the weights of violated soft clauses.
+          , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
+          , wcnfClauses    = map ((\c -> seq c (1,c)) . parseClauseBS)  ls
+          }
+      _ ->
+        Left "cannot find wcnf/cnf header"
+    where
+      l :: BS.ByteString
+      ls :: [BS.ByteString]
+      (l:ls) = filter (not . isCommentBS) (BS.lines s)
+
+  render wcnf = header <> mconcat (map f (wcnfClauses wcnf))
+    where
+      header = mconcat
+        [ byteString "p wcnf "
+        , intDec (wcnfNumVars wcnf), char7 ' '
+        , intDec (wcnfNumClauses wcnf), char7 ' '
+        , integerDec (wcnfTopCost wcnf), char7 '\n'
+        ]
+      f (w,c) = integerDec w <> mconcat [char7 ' ' <> intDec lit | lit <- SAT.unpackClause c] <> byteString " 0\n"
+
+parseWCNFLineBS :: BS.ByteString -> WeightedClause
+parseWCNFLineBS s =
+  case BS.readInteger (BS.dropWhile isSpace s) of
+    Nothing -> error "ToySolver.Text.CNF: no weight"
+    Just (w, s') -> seq w $ seq xs $ (w, xs)
+      where
+        xs = parseClauseBS s'
+
+wcnfBuilder :: WCNF -> Builder
+wcnfBuilder = render
+
+hPutWCNF :: Handle -> WCNF -> IO ()
+hPutWCNF h wcnf = hPutBuilder h (wcnfBuilder wcnf)
+
+-- -------------------------------------------------------------------
+
+-- $GCNF
+--
+-- References:
+--
+-- * <http://www.satcompetition.org/2011/rules.pdf>
+
+data GCNF
+  = GCNF
+  { gcnfNumVars        :: !Int
+  , gcnfNumClauses     :: !Int
+  , gcnfLastGroupIndex :: !GroupIndex
+  , gcnfClauses        :: [GClause]
+  }
+  deriving (Eq, Ord, Show, Read)
+
+type GroupIndex = Int
+
+type GClause = (GroupIndex, SAT.PackedClause)
+
+instance FileFormat GCNF where
+  parseByteString s =
+    case BS.words l of
+      (["p","gcnf", nbvar', nbclauses', lastGroupIndex']) ->
+        Right $
+          GCNF
+          { gcnfNumVars        = read $ BS.unpack nbvar'
+          , gcnfNumClauses     = read $ BS.unpack nbclauses'
+          , gcnfLastGroupIndex = read $ BS.unpack lastGroupIndex'
+          , gcnfClauses        = map parseGCNFLineBS ls
+          }
+      (["p","cnf", nbvar', nbclause']) ->
+        Right $
+          GCNF
+          { gcnfNumVars        = read $ BS.unpack nbvar'
+          , gcnfNumClauses     = read $ BS.unpack nbclause'
+          , gcnfLastGroupIndex = read $ BS.unpack nbclause'
+          , gcnfClauses        = zip [1..] $ map parseClauseBS ls
+          }
+      _ ->
+        Left "cannot find gcnf header"
+    where
+      l :: BS.ByteString
+      ls :: [BS.ByteString]
+      (l:ls) = filter (not . isCommentBS) (BS.lines s)
+
+  render gcnf = header <> mconcat (map f (gcnfClauses gcnf))
+    where
+      header = mconcat
+        [ byteString "p gcnf "
+        , intDec (gcnfNumVars gcnf), char7 ' '
+        , intDec (gcnfNumClauses gcnf), char7 ' '
+        , intDec (gcnfLastGroupIndex gcnf), char7 '\n'
+        ]
+      f (idx,c) = char7 '{' <> intDec idx <> char7 '}' <>
+                  mconcat [char7 ' ' <> intDec lit | lit <- SAT.unpackClause c] <>
+                  byteString " 0\n"
+
+parseGCNFLineBS :: BS.ByteString -> GClause
+parseGCNFLineBS s =
+  case BS.uncons (BS.dropWhile isSpace s) of
+    Just ('{', s1) ->
+      case BS.readInt s1 of
+        Just (idx,s2) | Just ('}', s3) <- BS.uncons s2 ->
+          let ys = parseClauseBS s3
+          in seq idx $ seq ys $ (idx, ys)
+        _ -> error "ToySolver.Text.CNF: parse error"
+    _ -> error "ToySolver.Text.CNF: parse error"
+
+gcnfBuilder :: GCNF -> Builder
+gcnfBuilder = render
+
+hPutGCNF :: Handle -> GCNF -> IO ()
+hPutGCNF h gcnf = hPutBuilder h (gcnfBuilder gcnf)
+
+-- -------------------------------------------------------------------
