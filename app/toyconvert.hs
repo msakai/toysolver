@@ -15,6 +15,7 @@
 module Main where
 
 import Control.Applicative
+import Control.Monad
 import qualified Data.ByteString.Builder as ByteStringBuilder
 import Data.Char
 import Data.Default.Class
@@ -37,8 +38,6 @@ import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
 import qualified ToySolver.Data.MIP as MIP
-import qualified ToySolver.Text.GCNF as GCNF
-import qualified ToySolver.Text.WCNF as WCNF
 import qualified ToySolver.Text.CNF as CNF
 import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.SAT2PB as SAT2PB
@@ -222,13 +221,12 @@ readProblem o fname = do
   enc <- T.mapM mkTextEncoding (optFileEncoding o)
   case map toLower (takeExtension fname) of
     ".cnf"
-      | optAsMaxSAT o -> readWCNF
+      | optAsMaxSAT o ->
+          liftM (ProbWBO . MaxSAT2WBO.convert) $ CNF.readFile fname
       | otherwise -> do
-          ret <- CNF.parseFile fname
-          case ret of
-            Left err  -> hPrint stderr err >> exitFailure
-            Right cnf -> return $ ProbOPB $ SAT2PB.convert cnf
-    ".wcnf" -> readWCNF
+          liftM (ProbOPB . SAT2PB.convert) $ CNF.readFile fname
+    ".wcnf" ->
+      liftM (ProbWBO . MaxSAT2WBO.convert) $ CNF.readFile fname
     ".opb"  -> do
       ret <- PBFileAttoparsec.parseOPBFile fname
       case ret of
@@ -239,21 +237,12 @@ readProblem o fname = do
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
         Right wbo -> return $ ProbWBO wbo
-    ".gcnf" -> do
-      ret <- GCNF.parseFile fname
-      case ret of
-        Left err -> hPutStrLn stderr err >> exitFailure
-        Right gcnf -> return $ ProbWBO $ MaxSAT2WBO.convert $ GCNF2MaxSAT.convert gcnf
+    ".gcnf" ->
+      liftM (ProbWBO . MaxSAT2WBO.convert . GCNF2MaxSAT.convert) $ CNF.readFile fname
     ".lp"   -> ProbMIP <$> MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
     ".mps"  -> ProbMIP <$> MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
     ext ->
       error $ "unknown file extension: " ++ show ext
-  where    
-    readWCNF = do
-      ret <- WCNF.parseFile fname
-      case ret of
-        Left err -> hPutStrLn stderr err >> exitFailure
-        Right wcnf -> return $ ProbWBO $ MaxSAT2WBO.convert $ wcnf
 
 transformProblem :: Options -> Problem -> Problem
 transformProblem o = transformObj o . transformPBLinearization o . transformMIPRemoveUserCuts o
@@ -347,7 +336,7 @@ writeProblem o problem = do
                   in CNF.writeFile fname cnf2
         ".wcnf" ->
           case WBO2MaxSAT.convert wbo of
-            (wcnf, _, _) -> WCNF.writeFile fname wcnf
+            (wcnf, _, _) -> CNF.writeFile fname wcnf
         ".lsp" ->
           withBinaryFile fname WriteMode $ \h ->
             ByteStringBuilder.hPutBuilder h lsp

@@ -32,13 +32,13 @@ import Text.Megaparsec.String
 #endif
 
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Text.WCNF as WCNF
+import qualified ToySolver.Text.CNF as CNF
 
 data Options
   = Options
   { optCommand :: FilePath
   , optTempDir :: Maybe FilePath
-  , optProblem :: WCNF.WCNF
+  , optProblem :: CNF.WCNF
   , optProblemFile :: Maybe FilePath
   , optVarInit :: [SAT.Lit]
   }
@@ -48,11 +48,11 @@ instance Default Options where
         { optCommand = "ubcsat"
         , optTempDir = Nothing
         , optProblem =
-            WCNF.WCNF
-            { WCNF.wcnfNumVars    = 0
-            , WCNF.wcnfNumClauses = 0
-            , WCNF.wcnfTopCost    = 1
-            , WCNF.wcnfClauses    = []
+            CNF.WCNF
+            { CNF.wcnfNumVars    = 0
+            , CNF.wcnfNumClauses = 0
+            , CNF.wcnfTopCost    = 1
+            , CNF.wcnfClauses    = []
             }
         , optProblemFile   = Nothing
         , optVarInit = []
@@ -64,7 +64,7 @@ ubcsatBestFeasible opt = do
   case ret of
     Nothing -> return Nothing
     Just (obj,_) ->
-      if obj < WCNF.wcnfTopCost (optProblem opt) then
+      if obj < CNF.wcnfTopCost (optProblem opt) then
         return ret
       else
         return Nothing
@@ -97,10 +97,8 @@ ubcsatMany opt = do
     Just fname -> f fname
     Nothing -> do
       withTempFile dir ".wcnf" $ \fname h -> do
-        hSetBinaryMode h True
-        hSetBuffering h (BlockBuffering Nothing)
-        WCNF.hPutWCNF h (optProblem opt)
         hClose h
+        CNF.writeFile fname (optProblem opt)
         f fname
 
 ubcsat' :: Options -> FilePath -> Maybe FilePath -> IO [(Integer, SAT.Model)]
@@ -111,7 +109,7 @@ ubcsat' opt fname varInitFile = do
         [ "-alg", "irots"
         , "-seed", "0"
         , "-runs", "10"
-        , "-cutoff", show (WCNF.wcnfNumVars wcnf * 50)
+        , "-cutoff", show (CNF.wcnfNumVars wcnf * 50)
         , "-timeout", show (10 :: Int)
         , "-gtimeout", show (30 :: Int)
         , "-solve"
@@ -132,7 +130,7 @@ ubcsat' opt fname varInitFile = do
       return []
     Right s -> do
       forM_ (lines s) $ \l -> putStr "c " >> putStrLn l
-      return $ scanSolutions (WCNF.wcnfNumVars wcnf) s
+      return $ scanSolutions (CNF.wcnfNumVars wcnf) s
 
 scanSolutions :: Int -> String -> [(Integer, SAT.Model)]
 scanSolutions nv s = rights $ map (parse (solution nv) "") $ lines s

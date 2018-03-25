@@ -27,10 +27,9 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import ToySolver.SAT.Store.CNF
-import qualified ToySolver.Text.WCNF as WCNF
 import qualified ToySolver.Text.CNF as CNF
 
-convert :: PBFile.SoftFormula -> (WCNF.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
+convert :: PBFile.SoftFormula -> (CNF.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
 convert formula = runST $ do
   db <- newCNFStore
   SAT.newVars_ db (PBFile.wboNumVars formula)
@@ -68,11 +67,11 @@ convert formula = runST $ do
   let top = F.sum (fst <$> softClauses) + 1
   cnf <- getCNFFormula db
   let cs = softClauses <> Seq.fromList [(top, clause) | clause <- CNF.cnfClauses cnf]
-  let wcnf = WCNF.WCNF
-             { WCNF.wcnfNumVars = CNF.cnfNumVars cnf
-             , WCNF.wcnfNumClauses = Seq.length cs
-             , WCNF.wcnfTopCost = top
-             , WCNF.wcnfClauses = F.toList cs
+  let wcnf = CNF.WCNF
+             { CNF.wcnfNumVars = CNF.cnfNumVars cnf
+             , CNF.wcnfNumClauses = Seq.length cs
+             , CNF.wcnfTopCost = top
+             , CNF.wcnfClauses = F.toList cs
              }
 
   defs <- Tseitin.getDefinitions tseitin

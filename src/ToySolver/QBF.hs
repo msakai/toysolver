@@ -51,7 +51,7 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.SAT.Store.CNF
 
 import qualified ToySolver.SAT.ExistentialQuantification as QE
-import ToySolver.Text.QDimacs (Quantifier (..))
+import ToySolver.Text.CNF (Quantifier (..))
 import qualified ToySolver.Text.CNF as CNF
 
 -- ----------------------------------------------------------------------------

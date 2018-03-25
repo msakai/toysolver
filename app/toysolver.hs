@@ -62,7 +62,6 @@ import qualified ToySolver.Arith.MIP as MIPSolver
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
 import qualified ToySolver.Text.CNF as CNF
-import qualified ToySolver.Text.WCNF as WCNF
 import qualified ToySolver.Converter.SAT2IP as SAT2IP
 import qualified ToySolver.Converter.PB2IP as PB2IP
 import qualified ToySolver.Converter.MaxSAT2IP as MaxSAT2IP
@@ -477,15 +476,12 @@ main = do
 
   case fromMaybe ModeMIP (optMode o) of
     ModeSAT -> do
-      ret <- CNF.parseFile (optInput o)
-      case ret of
-        Left err -> hPrint stderr err >> exitFailure
-        Right cnf -> do
-          let (mip,_,mtrans) = SAT2IP.convert cnf
-          run (optSolver o) o (fmap fromInteger mip) $ \m -> do
-            let m2 = mtrans m
-            satPrintModel stdout m2 0
-            writeSOLFileSAT o m2
+      cnf <- CNF.readFile (optInput o)
+      let (mip,_,mtrans) = SAT2IP.convert cnf
+      run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+        let m2 = mtrans m
+        satPrintModel stdout m2 0
+        writeSOLFileSAT o m2
     ModePB -> do
       ret <- PBFileAttoparsec.parseOPBFile (optInput o)
       case ret of
@@ -507,15 +503,12 @@ main = do
             pbPrintModel stdout m2 0
             writeSOLFileSAT o m2
     ModeMaxSAT -> do
-      ret <- WCNF.parseFile (optInput o)
-      case ret of
-        Left err -> hPutStrLn stderr err >> exitFailure
-        Right wcnf -> do
-          let (mip,_,mtrans) = MaxSAT2IP.convert False wcnf
-          run (optSolver o) o (fmap fromInteger mip) $ \m -> do
-            let m2 = mtrans m
-            maxsatPrintModel stdout m2 0
-            writeSOLFileSAT o m2
+      wcnf <- CNF.readFile (optInput o)
+      let (mip,_,mtrans) = MaxSAT2IP.convert False wcnf
+      run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+        let m2 = mtrans m
+        maxsatPrintModel stdout m2 0
+        writeSOLFileSAT o m2
     ModeMIP -> do
       enc <- T.mapM mkTextEncoding $ optFileEncoding o
       mip <- MIP.readFile def{ MIP.optFileEncoding = enc } (optInput o)

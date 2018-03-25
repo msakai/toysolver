@@ -29,7 +29,7 @@ import System.IO
 import ToySolver.Data.Boolean
 import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.QBF as QBF
-import qualified ToySolver.Text.QDimacs as QDimacs
+import qualified ToySolver.Text.CNF as CNF
 import ToySolver.Internal.Util (setEncodingChar8)
 import ToySolver.Version
 
@@ -73,14 +73,14 @@ main = do
 #endif
   opt <- execParser parserInfo
 
-  ret <- QDimacs.parseFile (optInput opt)
+  ret <- CNF.parseFile (optInput opt)
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right qdimacs -> do
-      let nv = QDimacs.qdimacsNumVars qdimacs
-          nc = QDimacs.qdimacsNumClauses qdimacs
-          prefix' = QBF.quantifyFreeVariables nv [(q, IntSet.fromList xs) | (q,xs) <- QDimacs.qdimacsPrefix qdimacs]
-          matrix' = andB [orB [if lit > 0 then BoolExpr.Atom lit else notB (BoolExpr.Atom (abs lit)) | lit <- QDimacs.unpackClause clause] | clause <- QDimacs.qdimacsMatrix qdimacs]
+      let nv = CNF.qdimacsNumVars qdimacs
+          nc = CNF.qdimacsNumClauses qdimacs
+          prefix' = QBF.quantifyFreeVariables nv [(q, IntSet.fromList xs) | (q,xs) <- CNF.qdimacsPrefix qdimacs]
+          matrix' = andB [orB [if lit > 0 then BoolExpr.Atom lit else notB (BoolExpr.Atom (abs lit)) | lit <- CNF.unpackClause clause] | clause <- CNF.qdimacsMatrix qdimacs]
       (ans, certificate) <-
         case map toLower (optAlgorithm opt) of
           "naive" -> QBF.solveNaive nv prefix' matrix'
