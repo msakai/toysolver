@@ -1,5 +1,7 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Text.CNF
@@ -95,7 +97,7 @@ data CNF
   , cnfNumClauses :: !Int
   , cnfClauses :: [SAT.PackedClause]
   }
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord, Show, Read)
 
 instance FileFormat CNF where
   parseByteString s =
@@ -123,14 +125,15 @@ instance FileFormat CNF where
         ]
       f c = mconcat [intDec lit <> char7 ' '| lit <- SAT.unpackClause c] <> byteString "0\n"
 
+readInts :: BS.ByteString -> [Int]
+readInts s =
+  case BS.readInt (BS.dropWhile isSpace s) of
+    Just (0,_) -> []
+    Just (z,s') -> z : readInts s'
+    Nothing -> error "ToySolver.Text.CNF.readInts: 0 is missing"
+
 parseClauseBS :: BS.ByteString -> SAT.PackedClause
-parseClauseBS s = SAT.packClause (go s)
-  where
-    go s =
-      case BS.readInt (BS.dropWhile isSpace s) of
-        Nothing -> error "ToySolver.Text.CNF: parse error"
-        Just (0,_) -> []
-        Just (i,s') -> i : go s'
+parseClauseBS = SAT.packClause . readInts
 
 isCommentBS :: BS.ByteString -> Bool
 isCommentBS s =
@@ -159,7 +162,7 @@ data WCNF
   , wcnfTopCost    :: !Weight
   , wcnfClauses    :: [WeightedClause]
   }
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord, Show, Read)
 
 type WeightedClause = (Weight, SAT.PackedClause)
 
@@ -286,15 +289,13 @@ instance FileFormat GCNF where
                   byteString " 0\n"
 
 parseGCNFLineBS :: BS.ByteString -> GClause
-parseGCNFLineBS s =
-  case BS.uncons (BS.dropWhile isSpace s) of
-    Just ('{', s1) ->
-      case BS.readInt s1 of
-        Just (idx,s2) | Just ('}', s3) <- BS.uncons s2 ->
-          let ys = parseClauseBS s3
-          in seq idx $ seq ys $ (idx, ys)
-        _ -> error "ToySolver.Text.CNF: parse error"
-    _ -> error "ToySolver.Text.CNF: parse error"
+parseGCNFLineBS s
+  | Just ('{', s1) <- BS.uncons (BS.dropWhile isSpace s)
+  , Just (!idx,s2) <- BS.readInt s1
+  , Just ('}', s3) <- BS.uncons s2 =
+      let ys = parseClauseBS s3
+      in seq ys $ (idx, ys)
+  | otherwise = error "ToySolver.Text.CNF: parse error"
 
 gcnfBuilder :: GCNF -> Builder
 gcnfBuilder = render
@@ -404,13 +405,6 @@ parsePrefix = go []
           | otherwise ->
               (reverse result, lls)
         _ -> error "ToySolver.Text.CNF.parseProblem: invalid line"
-
-readInts :: BS.ByteString -> [Int]
-readInts s =
-  case BS.readInt (BS.dropWhile isSpace s) of
-    Just (0,_) -> []
-    Just (z,s') -> z : readInts s'
-    Nothing -> error "ToySolver.Text.CNF.readInts: 0 is missing"
 
 qdimacsBuilder :: QDimacs -> Builder
 qdimacsBuilder = render
