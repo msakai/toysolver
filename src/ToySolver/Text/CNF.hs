@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
@@ -10,14 +11,16 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleContexts, OverloadedStrings)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Text.CNF
   (
   -- * FileFormat class
     FileFormat (..)
+  , ParseError (..)
   , parseFile
+  , readFile
   , writeFile
 
   -- * DIMACS CNF format
@@ -61,13 +64,15 @@ module ToySolver.Text.CNF
   , unpackClause
   ) where
 
-import Prelude hiding (writeFile)
+import Prelude hiding (readFile, writeFile)
 import Control.DeepSeq
+import Control.Exception
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Builder
 import Data.Char
 import Data.Monoid
-import System.IO hiding (writeFile)
+import Data.Typeable
+import System.IO hiding (readFile, writeFile)
 
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.SAT.Types (Lit, Clause, PackedClause, packClause, unpackClause)
@@ -78,10 +83,22 @@ class FileFormat a where
   parseByteString :: BS.ByteString -> Either String a
   render :: a -> Builder
 
+data ParseError = ParseError String
+  deriving (Show, Typeable)
+
+instance Exception ParseError
+
 parseFile :: FileFormat a => FilePath -> IO (Either String a)
 parseFile filename = do
   s <- BS.readFile filename
   return $ parseByteString s
+
+readFile :: FileFormat a => FilePath -> IO a
+readFile filename = do
+  s <- BS.readFile filename
+  case parseByteString s of
+    Left msg -> throw $ ParseError msg
+    Right a -> return a
 
 writeFile :: FileFormat a => FilePath -> a -> IO ()
 writeFile filepath a = do
