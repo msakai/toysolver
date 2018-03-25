@@ -40,9 +40,27 @@ module ToySolver.Text.CNF
   , GClause
   , hPutGCNF
   , gcnfBuilder
+
+  -- * QDIMACS format
+  --
+  -- $QDIMACS
+  , QDimacs (..)
+  , Quantifier (..)
+  , QuantSet
+  , Atom
+  , hPutQDimacs
+  , qdimacsBuilder
+
+  -- * Re-exports
+  , Lit
+  , Clause
+  , PackedClause
+  , packClause
+  , unpackClause
   ) where
 
 import Prelude hiding (writeFile)
+import Control.DeepSeq
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Builder
 import Data.Char
@@ -50,6 +68,7 @@ import Data.Monoid
 import System.IO hiding (writeFile)
 
 import qualified ToySolver.SAT.Types as SAT
+import ToySolver.SAT.Types (Lit, Clause, PackedClause, packClause, unpackClause)
 
 -- -------------------------------------------------------------------
 
@@ -282,5 +301,121 @@ gcnfBuilder = render
 
 hPutGCNF :: Handle -> GCNF -> IO ()
 hPutGCNF h gcnf = hPutBuilder h (gcnfBuilder gcnf)
+
+-- -------------------------------------------------------------------
+
+-- $QDIMACS
+--
+-- References:
+--
+-- * QDIMACS standard Ver. 1.1
+--   <http://www.qbflib.org/qdimacs.html>
+
+{-
+http://www.qbflib.org/qdimacs.html
+
+<input> ::= <preamble> <prefix> <matrix> EOF
+
+<preamble> ::= [<comment_lines>] <problem_line>
+<comment_lines> ::= <comment_line> <comment_lines> | <comment_line>
+<comment_line> ::= c <text> EOL
+<problem_line> ::= p cnf <pnum> <pnum> EOL
+
+<prefix> ::= [<quant_sets>]
+<quant_sets> ::= <quant_set> <quant_sets> | <quant_set>
+<quant_set> ::= <quantifier> <atom_set> 0 EOL
+<quantifier> ::= e | a
+<atom_set> ::= <pnum> <atom_set> | <pnum>
+
+<matrix> ::= <clause_list>
+<clause_list> ::= <clause> <clause_list> | <clause>
+<clause> ::= <literal> <clause> | <literal> 0 EOL
+<literal> ::= <num>
+
+<text> ::= {A sequence of non-special ASCII characters}
+<num> ::= {A 32-bit signed integer different from 0}
+<pnum> ::= {A 32-bit signed integer greater than 0}
+-}
+
+data QDimacs
+  = QDimacs
+  { qdimacsNumVars :: !Int
+  , qdimacsNumClauses :: !Int
+  , qdimacsPrefix :: [QuantSet]
+  , qdimacsMatrix :: [SAT.PackedClause]
+  }
+  deriving (Eq, Ord, Show, Read)
+
+data Quantifier
+  = E -- ^ existential quantifier
+  | A -- ^ universal quantifier
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type QuantSet = (Quantifier, [Atom])
+
+type Atom = SAT.Var
+
+instance FileFormat QDimacs where
+  parseByteString = f . BS.lines
+    where
+      f [] = Left "ToySolver.Text.CNF.parseByteString: premature end of file"
+      f (l : ls) =
+        case BS.uncons l of
+          Nothing -> Left "ToySolver.Text.CNF.parseByteString: no problem line"
+          Just ('c', _) -> f ls
+          Just ('p', s) ->
+            case BS.words s of
+              ["cnf", numVars', numClauses'] ->
+                case parsePrefix ls of
+                  (prefix', ls') -> Right $
+                    QDimacs
+                    { qdimacsNumVars = read $ BS.unpack numVars'
+                    , qdimacsNumClauses = read $ BS.unpack numClauses'
+                    , qdimacsPrefix = prefix'
+                    , qdimacsMatrix = map parseClauseBS ls'
+                    }
+              _ -> Left "ToySolver.Text.CNF.parseByteString: invalid problem line"
+          Just (c, _) -> Left ("ToySolver.Text.CNF.parseByteString: invalid prefix " ++ show c)
+
+  render qdimacs = problem_line <> prefix' <> mconcat (map f (qdimacsMatrix qdimacs))
+    where
+      problem_line = mconcat
+        [ byteString "p cnf "
+        , intDec (qdimacsNumVars qdimacs), char7 ' '
+        , intDec (qdimacsNumClauses qdimacs), char7 '\n'
+        ]
+      prefix' = mconcat
+        [ char7 (if q == E then 'e' else 'a') <> mconcat [char7 ' ' <> intDec atom | atom <- atoms] <> byteString " 0\n"
+        | (q, atoms) <- qdimacsPrefix qdimacs
+        ]
+      f c = mconcat [intDec lit <> char7 ' '| lit <- SAT.unpackClause c] <> byteString "0\n"
+
+parsePrefix :: [BS.ByteString] -> ([QuantSet], [BS.ByteString])
+parsePrefix = go []
+  where
+    go result [] = (reverse result, [])
+    go result lls@(l : ls) =
+      case BS.uncons l of
+        Just (c,s)
+          | c=='a' || c=='e' ->
+              let atoms = readInts s
+                  q = if c=='a' then A else E
+              in seq q $ deepseq atoms $ go ((q, atoms) : result) ls
+          | otherwise ->
+              (reverse result, lls)
+        _ -> error "ToySolver.Text.CNF.parseProblem: invalid line"
+
+readInts :: BS.ByteString -> [Int]
+readInts s =
+  case BS.readInt (BS.dropWhile isSpace s) of
+    Just (0,_) -> []
+    Just (z,s') -> z : readInts s'
+    Nothing -> error "ToySolver.Text.CNF.readInts: 0 is missing"
+
+qdimacsBuilder :: QDimacs -> Builder
+qdimacsBuilder = render
+
+hPutQDimacs :: Handle -> QDimacs -> IO ()
+hPutQDimacs h qdimacs = hPutBuilder h (qdimacsBuilder qdimacs)
 
 -- -------------------------------------------------------------------
