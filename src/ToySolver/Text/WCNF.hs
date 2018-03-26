@@ -32,8 +32,13 @@ module ToySolver.Text.WCNF {-# DEPRECATED "Use ToySolver.Text.CNF instead" #-}
 
 import Prelude hiding (writeFile)
 import Data.ByteString.Builder
+import qualified Data.ByteString.Lazy.Char8 as BL
 import System.IO hiding (writeFile)
-import ToySolver.Text.CNF
+import ToySolver.Text.CNF hiding (parseByteString)
+
+{-# DEPRECATED parseByteString "Use FileFormat.parse instead" #-}
+parseByteString :: BL.ByteString -> Either String WCNF
+parseByteString = parse
 
 {-# DEPRECATED wcnfBuilder "Use FileFormat.render instead" #-}
 wcnfBuilder :: WCNF -> Builder

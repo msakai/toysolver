@@ -36,9 +36,14 @@ module ToySolver.Text.QDimacs {-# DEPRECATED "Use ToySolver.Text.CNF instead" #-
 
 import Prelude hiding (writeFile)
 import Data.ByteString.Builder
+import qualified Data.ByteString.Lazy.Char8 as BL
 import System.IO hiding (writeFile)
 import ToySolver.SAT.Types (Clause, Lit, PackedClause, packClause, unpackClause)
-import ToySolver.Text.CNF
+import ToySolver.Text.CNF hiding (parseByteString)
+
+{-# DEPRECATED parseByteString "Use FileFormat.parse instead" #-}
+parseByteString :: BL.ByteString -> Either String QDimacs
+parseByteString = parse
 
 {-# DEPRECATED qdimacsBuilder "Use FileFormat.render instead" #-}
 qdimacsBuilder :: QDimacs -> Builder

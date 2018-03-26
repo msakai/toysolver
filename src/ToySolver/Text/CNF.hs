@@ -25,6 +25,7 @@ module ToySolver.Text.CNF
 
   -- * DIMACS CNF format
   , CNF (..)
+  , parseByteString
   , hPutCNF
   , cnfBuilder
 
@@ -74,7 +75,7 @@ import ToySolver.SAT.Types (Lit, Clause, PackedClause, packClause, unpackClause)
 -- -------------------------------------------------------------------
 
 class FileFormat a where
-  parseByteString :: BS.ByteString -> Either String a
+  parse :: BS.ByteString -> Either String a
   render :: a -> Builder
 
 data ParseError = ParseError String
@@ -85,12 +86,12 @@ instance Exception ParseError
 parseFile :: FileFormat a => FilePath -> IO (Either String a)
 parseFile filename = do
   s <- BS.readFile filename
-  return $ parseByteString s
+  return $ parse s
 
 readFile :: FileFormat a => FilePath -> IO a
 readFile filename = do
   s <- BS.readFile filename
-  case parseByteString s of
+  case parse s of
     Left msg -> throw $ ParseError msg
     Right a -> return a
 
@@ -111,7 +112,7 @@ data CNF
   deriving (Eq, Ord, Show, Read)
 
 instance FileFormat CNF where
-  parseByteString s =
+  parse s =
     case BS.words l of
       (["p","cnf", nvar, nclause]) ->
         Right $
@@ -152,6 +153,10 @@ isCommentBS s =
     Just ('c',_) ->  True
     _ -> False
 
+{-# DEPRECATED parseByteString "Use FileFormat.parse instead" #-}
+parseByteString :: BS.ByteString -> Either String CNF
+parseByteString = parse
+
 {-# DEPRECATED cnfBuilder "Use FileFormat.render instead" #-}
 cnfBuilder :: CNF -> Builder
 cnfBuilder = render
@@ -183,7 +188,7 @@ type WeightedClause = (Weight, SAT.PackedClause)
 type Weight = Integer
 
 instance FileFormat WCNF where
-  parseByteString s =
+  parse s =
     case BS.words l of
       (["p","wcnf", nvar, nclause, top]) ->
         Right $
@@ -258,7 +263,7 @@ type GroupIndex = Int
 type GClause = (GroupIndex, SAT.PackedClause)
 
 instance FileFormat GCNF where
-  parseByteString s =
+  parse s =
     case BS.words l of
       (["p","gcnf", nbvar', nbclauses', lastGroupIndex']) ->
         Right $
@@ -358,12 +363,12 @@ type QuantSet = (Quantifier, [Atom])
 type Atom = SAT.Var
 
 instance FileFormat QDimacs where
-  parseByteString = f . BS.lines
+  parse = f . BS.lines
     where
-      f [] = Left "ToySolver.Text.CNF.parseByteString: premature end of file"
+      f [] = Left "ToySolver.Text.CNF.parse: premature end of file"
       f (l : ls) =
         case BS.uncons l of
-          Nothing -> Left "ToySolver.Text.CNF.parseByteString: no problem line"
+          Nothing -> Left "ToySolver.Text.CNF.parse: no problem line"
           Just ('c', _) -> f ls
           Just ('p', s) ->
             case BS.words s of
@@ -376,8 +381,8 @@ instance FileFormat QDimacs where
                     , qdimacsPrefix = prefix'
                     , qdimacsMatrix = map parseClauseBS ls'
                     }
-              _ -> Left "ToySolver.Text.CNF.parseByteString: invalid problem line"
-          Just (c, _) -> Left ("ToySolver.Text.CNF.parseByteString: invalid prefix " ++ show c)
+              _ -> Left "ToySolver.Text.CNF.parse: invalid problem line"
+          Just (c, _) -> Left ("ToySolver.Text.CNF.parse: invalid prefix " ++ show c)
 
   render qdimacs = problem_line <> prefix' <> mconcat (map f (qdimacsMatrix qdimacs))
     where

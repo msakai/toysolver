@@ -597,7 +597,7 @@ newSolver opts = do
 mainSAT :: Options -> SAT.Solver -> IO ()
 mainSAT opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM CNF.parseByteString $ BS.hGetContents stdin
+           "-"   -> liftM CNF.parse $ BS.hGetContents stdin
            fname -> CNF.parseFile fname
   case ret of
     Left err -> hPrint stderr err >> exitFailure
@@ -694,7 +694,7 @@ mainMUS opt solver = do
   gcnf <- case optInput opt of
            "-"   -> do
              s <- BS.hGetContents stdin
-             case CNF.parseByteString s of
+             case CNF.parse s of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
            fname -> do
@@ -1008,7 +1008,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
 mainMaxSAT :: Options -> SAT.Solver -> IO ()
 mainMaxSAT opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM CNF.parseByteString BS.getContents
+           "-"   -> liftM CNF.parse BS.getContents
            fname -> CNF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
