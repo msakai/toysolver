@@ -15,20 +15,31 @@
 --
 --
 -----------------------------------------------------------------------------
-module ToySolver.Text.GCNF
+module ToySolver.Text.GCNF {-# DEPRECATED "Use ToySolver.Text.CNF instead" #-}
   (
-  -- * FileFormat class
-    FileFormat (..)
-  , parseFile
-  , writeFile
-
-  -- * GCNF format
-  , GCNF (..)
+    GCNF (..)
   , GroupIndex
   , GClause
+
+  -- * Parsing .gcnf files
+  , parseByteString
+  , parseFile
+
+  -- * Generating .gcnf files
+  , writeFile
   , hPutGCNF
   , gcnfBuilder
   ) where
 
 import Prelude hiding (writeFile)
+import Data.ByteString.Builder
+import System.IO hiding (writeFile)
 import ToySolver.Text.CNF
+
+{-# DEPRECATED gcnfBuilder "Use FileFormat.render instead" #-}
+gcnfBuilder :: GCNF -> Builder
+gcnfBuilder = render
+
+{-# DEPRECATED hPutGCNF "Use FileFormat.render instead" #-}
+hPutGCNF :: Handle -> GCNF -> IO ()
+hPutGCNF h gcnf = hPutBuilder h (gcnfBuilder gcnf)

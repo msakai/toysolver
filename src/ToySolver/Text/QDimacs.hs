@@ -15,15 +15,8 @@
 --   <http://www.qbflib.org/qdimacs.html>
 --
 -----------------------------------------------------------------------------
-module ToySolver.Text.QDimacs
-  (
-  -- * FileFormat class
-    FileFormat (..)
-  , parseFile
-  , writeFile
-
-  -- * QDIMACS format
-  , QDimacs (..)
+module ToySolver.Text.QDimacs {-# DEPRECATED "Use ToySolver.Text.CNF instead" #-}
+  ( QDimacs (..)
   , Quantifier (..)
   , QuantSet
   , Atom
@@ -32,10 +25,25 @@ module ToySolver.Text.QDimacs
   , PackedClause
   , packClause
   , unpackClause
+  , parseFile
+  , parseByteString
+
+  -- * Generating .qdimacs files
+  , writeFile
   , hPutQDimacs
   , qdimacsBuilder
   ) where
 
 import Prelude hiding (writeFile)
+import Data.ByteString.Builder
+import System.IO hiding (writeFile)
 import ToySolver.SAT.Types (Clause, Lit, PackedClause, packClause, unpackClause)
 import ToySolver.Text.CNF
+
+{-# DEPRECATED qdimacsBuilder "Use FileFormat.render instead" #-}
+qdimacsBuilder :: QDimacs -> Builder
+qdimacsBuilder = render
+
+{-# DEPRECATED hPutQDimacs "Use FileFormat.render instead" #-}
+hPutQDimacs :: Handle -> QDimacs -> IO ()
+hPutQDimacs h qdimacs = hPutBuilder h (qdimacsBuilder qdimacs)

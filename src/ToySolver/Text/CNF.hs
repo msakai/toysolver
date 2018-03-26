@@ -34,8 +34,6 @@ module ToySolver.Text.CNF
   , WCNF (..)
   , WeightedClause
   , Weight
-  , hPutWCNF
-  , wcnfBuilder
 
   -- * GCNF format for Group oriented MUS problems
   --
@@ -43,8 +41,6 @@ module ToySolver.Text.CNF
   , GCNF (..)
   , GroupIndex
   , GClause
-  , hPutGCNF
-  , gcnfBuilder
 
   -- * QDIMACS format
   --
@@ -53,8 +49,6 @@ module ToySolver.Text.CNF
   , Quantifier (..)
   , QuantSet
   , Atom
-  , hPutQDimacs
-  , qdimacsBuilder
 
   -- * Re-exports
   , Lit
@@ -158,9 +152,11 @@ isCommentBS s =
     Just ('c',_) ->  True
     _ -> False
 
+{-# DEPRECATED cnfBuilder "Use FileFormat.render instead" #-}
 cnfBuilder :: CNF -> Builder
 cnfBuilder = render
 
+{-# DEPRECATED hPutCNF "Use FileFormat.render instead" #-}
 hPutCNF :: Handle -> CNF -> IO ()
 hPutCNF h cnf = hPutBuilder h (cnfBuilder cnf)
 
@@ -240,12 +236,6 @@ parseWCNFLineBS s =
       where
         xs = parseClauseBS s'
 
-wcnfBuilder :: WCNF -> Builder
-wcnfBuilder = render
-
-hPutWCNF :: Handle -> WCNF -> IO ()
-hPutWCNF h wcnf = hPutBuilder h (wcnfBuilder wcnf)
-
 -- -------------------------------------------------------------------
 
 -- $GCNF
@@ -313,12 +303,6 @@ parseGCNFLineBS s
       let ys = parseClauseBS s3
       in seq ys $ (idx, ys)
   | otherwise = error "ToySolver.Text.CNF: parse error"
-
-gcnfBuilder :: GCNF -> Builder
-gcnfBuilder = render
-
-hPutGCNF :: Handle -> GCNF -> IO ()
-hPutGCNF h gcnf = hPutBuilder h (gcnfBuilder gcnf)
 
 -- -------------------------------------------------------------------
 
@@ -422,11 +406,5 @@ parsePrefix = go []
           | otherwise ->
               (reverse result, lls)
         _ -> error "ToySolver.Text.CNF.parseProblem: invalid line"
-
-qdimacsBuilder :: QDimacs -> Builder
-qdimacsBuilder = render
-
-hPutQDimacs :: Handle -> QDimacs -> IO ()
-hPutQDimacs h qdimacs = hPutBuilder h (qdimacsBuilder qdimacs)
 
 -- -------------------------------------------------------------------

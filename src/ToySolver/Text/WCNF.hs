@@ -14,20 +14,31 @@
 -- * <http://maxsat.ia.udl.cat/requirements/>
 --
 -----------------------------------------------------------------------------
-module ToySolver.Text.WCNF
+module ToySolver.Text.WCNF {-# DEPRECATED "Use ToySolver.Text.CNF instead" #-}
   (
-  -- * FileFormat class
-    FileFormat (..)
-  , parseFile
-  , writeFile
-
-  -- * WCNF format
-  , WCNF (..)
+    WCNF (..)
   , WeightedClause
   , Weight
+
+  -- * Parsing .cnf/.wcnf files
+  , parseFile
+  , parseByteString
+
+  -- * Generating .wcnf files
+  , writeFile
   , hPutWCNF
   , wcnfBuilder
   ) where
 
 import Prelude hiding (writeFile)
+import Data.ByteString.Builder
+import System.IO hiding (writeFile)
 import ToySolver.Text.CNF
+
+{-# DEPRECATED wcnfBuilder "Use FileFormat.render instead" #-}
+wcnfBuilder :: WCNF -> Builder
+wcnfBuilder = render
+
+{-# DEPRECATED hPutWCNF "Use FileFormat.render instead" #-}
+hPutWCNF :: Handle -> WCNF -> IO ()
+hPutWCNF h wcnf = hPutBuilder h (wcnfBuilder wcnf)
