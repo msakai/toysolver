@@ -878,6 +878,7 @@ Test-suite TestSuite
     Test.BitVector
     Test.BoolExpr
     Test.BipartiteMatching
+    Test.CNF
     Test.CongruenceClosure
     Test.ContiTraverso
     Test.Delta
