@@ -6,12 +6,14 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Text.CNF
--- Copyright   :  (c) Masahiro Sakai 2016
+-- Copyright   :  (c) Masahiro Sakai 2016-2018
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
+--
+-- Reader and Writer for DIMACS CNF and family of similar formats.
 --
 -----------------------------------------------------------------------------
 module ToySolver.Text.CNF
@@ -23,29 +25,23 @@ module ToySolver.Text.CNF
   , readFile
   , writeFile
 
-  -- * DIMACS CNF format
+  -- * CNF format
   , CNF (..)
   , parseByteString
   , hPutCNF
   , cnfBuilder
 
-  -- * WCNF format for weighted MAX-SAT problems
-  --
-  -- $WCNF
+  -- * WCNF format
   , WCNF (..)
   , WeightedClause
   , Weight
 
-  -- * GCNF format for Group oriented MUS problems
-  --
-  -- $GCNF
+  -- * GCNF format
   , GCNF (..)
   , GroupIndex
   , GClause
 
   -- * QDIMACS format
-  --
-  -- $QDIMACS
   , QDimacs (..)
   , Quantifier (..)
   , QuantSet
@@ -75,20 +71,27 @@ import ToySolver.SAT.Types (Lit, Clause, PackedClause, packClause, unpackClause)
 
 -- -------------------------------------------------------------------
 
+-- | A type class that abstracts file formats
 class FileFormat a where
+  -- | Parse a lazy byte string, and either returns error message or a parsed value
   parse :: BS.ByteString -> Either String a
+
+  -- | Encode a value into 'Builder'
   render :: a -> Builder
 
+-- | 'ParseError' represents a parse error and it wraps a error message.
 data ParseError = ParseError String
   deriving (Show, Typeable)
 
 instance Exception ParseError
 
+-- | Parse a file but returns an error message when parsing fails.
 parseFile :: (FileFormat a, MonadIO m) => FilePath -> m (Either String a)
 parseFile filename = liftIO $ do
   s <- BS.readFile filename
   return $ parse s
 
+-- | Parse a file. Similar to 'parseFile' but this function throws 'ParseError' when parsing fails.
 readFile :: (FileFormat a, MonadIO m) => FilePath -> m a
 readFile filename = liftIO $ do
   s <- BS.readFile filename
@@ -96,6 +99,7 @@ readFile filename = liftIO $ do
     Left msg -> throw $ ParseError msg
     Right a -> return a
 
+-- | Write a value into a file.
 writeFile :: (FileFormat a, MonadIO m) => FilePath -> a -> m ()
 writeFile filepath a = liftIO $ do
   withBinaryFile filepath WriteMode $ \h -> do
@@ -104,11 +108,15 @@ writeFile filepath a = liftIO $ do
 
 -- -------------------------------------------------------------------
 
+-- | DIMACS CNF format
 data CNF
   = CNF
   { cnfNumVars :: !Int
+    -- ^ Number of variables
   , cnfNumClauses :: !Int
+    -- ^ Number of clauses
   , cnfClauses :: [SAT.PackedClause]
+    -- ^ Clauses
   }
   deriving (Eq, Ord, Show, Read)
 
@@ -154,35 +162,45 @@ isCommentBS s =
     Just ('c',_) ->  True
     _ -> False
 
+-- | Parse a CNF file but returns an error message when parsing fails.
 {-# DEPRECATED parseByteString "Use FileFormat.parse instead" #-}
 parseByteString :: BS.ByteString -> Either String CNF
 parseByteString = parse
 
+-- | Encode a 'CNF' to a 'Builder'
 {-# DEPRECATED cnfBuilder "Use FileFormat.render instead" #-}
 cnfBuilder :: CNF -> Builder
 cnfBuilder = render
 
+-- | Output a 'CNF' to a Handle.
 {-# DEPRECATED hPutCNF "Use FileFormat.render instead" #-}
 hPutCNF :: Handle -> CNF -> IO ()
 hPutCNF h cnf = hPutBuilder h (cnfBuilder cnf)
 
 -- -------------------------------------------------------------------
 
--- $WCNF
+-- | WCNF format for representing partial weighted Max-SAT problems.
+--
+-- This format is used for for MAX-SAT evaluations.
 --
 -- References:
 --
 -- * <http://maxsat.ia.udl.cat/requirements/>
-
 data WCNF
   = WCNF
   { wcnfNumVars    :: !Int
+    -- ^ Number of variables
   , wcnfNumClauses :: !Int
+    -- ^ Number of (weighted) clauses
   , wcnfTopCost    :: !Weight
+    -- ^ Hard clauses have weight equal or greater than "top". 
+    -- We assure that "top" is a weight always greater than the sum of the weights of violated soft clauses in the solution.
   , wcnfClauses    :: [WeightedClause]
+    -- ^ Weighted clauses
   }
   deriving (Eq, Ord, Show, Read)
 
+-- | Weighted clauses
 type WeightedClause = (Weight, SAT.PackedClause)
 
 -- | Weigths must be greater than or equal to 1, and smaller than 2^63.
@@ -244,23 +262,29 @@ parseWCNFLineBS s =
 
 -- -------------------------------------------------------------------
 
--- $GCNF
+-- | Group oriented CNF Input Format
+--
+-- This format is used in Group oriented MUS track of the SAT Competition 2011.
 --
 -- References:
 --
 -- * <http://www.satcompetition.org/2011/rules.pdf>
-
 data GCNF
   = GCNF
   { gcnfNumVars        :: !Int
+    -- ^ Nubmer of variables
   , gcnfNumClauses     :: !Int
+    -- ^ Number of clauses
   , gcnfLastGroupIndex :: !GroupIndex
+    -- ^ The last index of a group in the file number of components contained in the file.
   , gcnfClauses        :: [GClause]
   }
   deriving (Eq, Ord, Show, Read)
 
+-- | Component number between 0 and `gcnfLastGroupIndex`
 type GroupIndex = Int
 
+-- | Clause together with component number
 type GClause = (GroupIndex, SAT.PackedClause)
 
 instance FileFormat GCNF where
@@ -312,13 +336,6 @@ parseGCNFLineBS s
 
 -- -------------------------------------------------------------------
 
--- $QDIMACS
---
--- References:
---
--- * QDIMACS standard Ver. 1.1
---   <http://www.qbflib.org/qdimacs.html>
-
 {-
 http://www.qbflib.org/qdimacs.html
 
@@ -345,22 +362,39 @@ http://www.qbflib.org/qdimacs.html
 <pnum> ::= {A 32-bit signed integer greater than 0}
 -}
 
+-- | QDIMACS format
+--
+-- Quantified boolean expression in prenex normal form,
+-- consisting of a sequence of quantifiers ('qdimacsPrefix') and
+-- a quantifier-free CNF part ('qdimacsMatrix').
+--
+-- References:
+--
+-- * QDIMACS standard Ver. 1.1
+--   <http://www.qbflib.org/qdimacs.html>
 data QDimacs
   = QDimacs
   { qdimacsNumVars :: !Int
+    -- ^ Number of variables
   , qdimacsNumClauses :: !Int
+    -- ^ Number of clauses
   , qdimacsPrefix :: [QuantSet]
+    -- ^ Sequence of quantifiers
   , qdimacsMatrix :: [SAT.PackedClause]
+    -- ^ Clauses
   }
   deriving (Eq, Ord, Show, Read)
 
+-- | Quantifier
 data Quantifier
-  = E -- ^ existential quantifier
-  | A -- ^ universal quantifier
+  = E -- ^ existential quantifier (∃)
+  | A -- ^ universal quantifier (∀)
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
+-- | Quantified set of variables
 type QuantSet = (Quantifier, [Atom])
 
+-- | Synonym of 'SAT.Var'
 type Atom = SAT.Var
 
 instance FileFormat QDimacs where

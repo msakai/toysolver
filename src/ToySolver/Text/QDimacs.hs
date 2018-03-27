@@ -9,11 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- References:
---
--- * QDIMACS standard Ver. 1.1
---   <http://www.qbflib.org/qdimacs.html>
---
 -----------------------------------------------------------------------------
 module ToySolver.Text.QDimacs {-# DEPRECATED "Use ToySolver.Text.CNF instead" #-}
   ( QDimacs (..)
@@ -41,14 +36,17 @@ import System.IO hiding (writeFile)
 import ToySolver.SAT.Types (Clause, Lit, PackedClause, packClause, unpackClause)
 import ToySolver.Text.CNF hiding (parseByteString)
 
+-- | Parse a QDimacs file but returns an error message when parsing fails.
 {-# DEPRECATED parseByteString "Use FileFormat.parse instead" #-}
 parseByteString :: BL.ByteString -> Either String QDimacs
 parseByteString = parse
 
+-- | Encode a 'QDimacs' to a 'Builder'
 {-# DEPRECATED qdimacsBuilder "Use FileFormat.render instead" #-}
 qdimacsBuilder :: QDimacs -> Builder
 qdimacsBuilder = render
 
+-- | Output a 'QDimacs' to a Handle.
 {-# DEPRECATED hPutQDimacs "Use FileFormat.render instead" #-}
 hPutQDimacs :: Handle -> QDimacs -> IO ()
 hPutQDimacs h qdimacs = hPutBuilder h (qdimacsBuilder qdimacs)
