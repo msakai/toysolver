@@ -6,7 +6,7 @@ import Data.Array.IArray
 import Data.IORef
 import System.Environment
 import Text.Printf
-import qualified ToySolver.Text.WCNF as WCNF
+import qualified ToySolver.Text.CNF as CNF
 import ToySolver.SAT.Types
 import ToySolver.Internal.Util (setEncodingChar8)
 
@@ -17,12 +17,12 @@ main = do
 #endif
 
   [problemFile, modelFile] <- getArgs
-  Right wcnf <- WCNF.parseFile problemFile
+  wcnf <- CNF.readFile problemFile
   model <- liftM readModel (readFile modelFile)
   costRef <- newIORef 0
-  forM_ (WCNF.clauses wcnf) $ \(w,c) ->
+  forM_ (CNF.wcnfClauses wcnf) $ \(w,c) ->
     unless (eval model c) $
-      if w == WCNF.topCost wcnf
+      if w == CNF.wcnfTopCost wcnf
       then printf "violated hard constraint: %s\n" (show c)
       else do
         tc <- readIORef costRef

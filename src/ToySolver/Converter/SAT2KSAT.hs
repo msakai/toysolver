@@ -29,11 +29,11 @@ import qualified ToySolver.Text.CNF as CNF
 convert :: Int -> CNF.CNF -> (CNF.CNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
 convert k _ | k < 3 = error "ToySolver.Converter.SAT2KSAT.convert: k must be >=3"
 convert k cnf = runST $ do
-  let nv1 = CNF.numVars cnf
+  let nv1 = CNF.cnfNumVars cnf
   db <- newCNFStore
   defsRef <- newSTRef Seq.empty
-  SAT.newVars_ db (CNF.numVars cnf)
-  forM_ (CNF.clauses cnf) $ \clause -> do
+  SAT.newVars_ db (CNF.cnfNumVars cnf)
+  forM_ (CNF.cnfClauses cnf) $ \clause -> do
     let loop lits = do
           if Seq.length lits <= k then
             SAT.addClause db (toList lits)
@@ -52,7 +52,7 @@ convert k cnf = runST $ do
 
   let extendModel :: SAT.Model -> SAT.Model
       extendModel m = runSTUArray $ do
-        m2 <- newArray_ (1,CNF.numVars cnf2)
+        m2 <- newArray_ (1,CNF.cnfNumVars cnf2)
         forM_ [1..nv1] $ \v -> do
           writeArray m2 v (SAT.evalVar m v)
         forM_ (toList defs) $ \(v, clause) -> do

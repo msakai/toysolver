@@ -82,8 +82,6 @@ import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.Enum as MUSEnum
 import ToySolver.SAT.Printer
 import qualified ToySolver.Text.CNF as CNF
-import qualified ToySolver.Text.GCNF as GCNF
-import qualified ToySolver.Text.WCNF as WCNF
 import ToySolver.Version
 import ToySolver.Internal.Util (showRational, setEncodingChar8)
 
@@ -599,7 +597,7 @@ newSolver opts = do
 mainSAT :: Options -> SAT.Solver -> IO ()
 mainSAT opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM CNF.parseByteString $ BS.hGetContents stdin
+           "-"   -> liftM CNF.parse $ BS.hGetContents stdin
            fname -> CNF.parseFile fname
   case ret of
     Left err -> hPrint stderr err >> exitFailure
@@ -611,31 +609,31 @@ mainSAT opt solver = do
 
 solveSAT :: Options -> SAT.Solver -> CNF.CNF -> Maybe FilePath -> IO ()
 solveSAT opt solver cnf cnfFileName = do
-  putCommentLine $ printf "#vars %d" (CNF.numVars cnf)
-  putCommentLine $ printf "#constraints %d" (CNF.numClauses cnf)
-  SAT.newVars_ solver (CNF.numVars cnf)
-  forM_ (CNF.clauses cnf) $ \clause ->
+  putCommentLine $ printf "#vars %d" (CNF.cnfNumVars cnf)
+  putCommentLine $ printf "#constraints %d" (CNF.cnfNumClauses cnf)
+  SAT.newVars_ solver (CNF.cnfNumVars cnf)
+  forM_ (CNF.cnfClauses cnf) $ \clause ->
     SAT.addClause solver (SAT.unpackClause clause)
 
   spHighlyBiased <-
     if optInitSP opt then do
-      initPolarityUsingSP solver (CNF.numVars cnf)
-        (CNF.numVars cnf) [(1, clause) | clause <- CNF.clauses cnf]
+      initPolarityUsingSP solver (CNF.cnfNumVars cnf)
+        (CNF.cnfNumVars cnf) [(1, clause) | clause <- CNF.cnfClauses cnf]
     else
       return IntMap.empty
 
   when (optLocalSearchInitial opt) $ do
     fixed <- SAT.getFixedLiterals solver
-    let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= CNF.numVars cnf]
+    let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= CNF.cnfNumVars cnf]
         var_init2 = IntMap.map (>0) spHighlyBiased
         -- note that IntMap.union is left-biased.
         var_init = [if b then v else -v | (v, b) <- IntMap.toList (var_init1 `IntMap.union` var_init2)]
     let wcnf =
-          WCNF.WCNF
-          { WCNF.numVars = CNF.numVars cnf
-          , WCNF.numClauses = CNF.numClauses cnf
-          , WCNF.topCost = 1
-          , WCNF.clauses = [(1, clause) | clause <- CNF.clauses cnf]
+          CNF.WCNF
+          { CNF.wcnfNumVars = CNF.cnfNumVars cnf
+          , CNF.wcnfNumClauses = CNF.cnfNumClauses cnf
+          , CNF.wcnfTopCost = 1
+          , CNF.wcnfClauses = [(1, clause) | clause <- CNF.cnfClauses cnf]
           }
     let opt2 =
           def
@@ -656,8 +654,8 @@ solveSAT opt solver cnf cnfFileName = do
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   when result $ do
     m <- SAT.getModel solver
-    satPrintModel stdout m (CNF.numVars cnf)
-    writeSOLFile opt m Nothing (CNF.numVars cnf)
+    satPrintModel stdout m (CNF.cnfNumVars cnf)
+    writeSOLFile opt m Nothing (CNF.cnfNumVars cnf)
 
 initPolarityUsingSP :: SAT.Solver -> Int -> Int -> [(Double, SAT.PackedClause)] -> IO (IntMap Double)
 initPolarityUsingSP solver nvOrig nv clauses = do
@@ -696,36 +694,36 @@ mainMUS opt solver = do
   gcnf <- case optInput opt of
            "-"   -> do
              s <- BS.hGetContents stdin
-             case GCNF.parseByteString s of
+             case CNF.parse s of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
            fname -> do
-             ret <- GCNF.parseFile fname
+             ret <- CNF.parseFile fname
              case ret of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
   solveMUS opt solver gcnf
 
-solveMUS :: Options -> SAT.Solver -> GCNF.GCNF -> IO ()
+solveMUS :: Options -> SAT.Solver -> CNF.GCNF -> IO ()
 solveMUS opt solver gcnf = do
-  putCommentLine $ printf "#vars %d" (GCNF.numVars gcnf)
-  putCommentLine $ printf "#constraints %d" (GCNF.numClauses gcnf)
-  putCommentLine $ printf "#groups %d" (GCNF.lastGroupIndex gcnf)
+  putCommentLine $ printf "#vars %d" (CNF.gcnfNumVars gcnf)
+  putCommentLine $ printf "#constraints %d" (CNF.gcnfNumClauses gcnf)
+  putCommentLine $ printf "#groups %d" (CNF.gcnfLastGroupIndex gcnf)
 
-  SAT.resizeVarCapacity solver (GCNF.numVars gcnf + GCNF.lastGroupIndex gcnf)
-  SAT.newVars_ solver (GCNF.numVars gcnf)
+  SAT.resizeVarCapacity solver (CNF.gcnfNumVars gcnf + CNF.gcnfLastGroupIndex gcnf)
+  SAT.newVars_ solver (CNF.gcnfNumVars gcnf)
 
-  tbl <- forM [1 .. GCNF.lastGroupIndex gcnf] $ \i -> do
+  tbl <- forM [1 .. CNF.gcnfLastGroupIndex gcnf] $ \i -> do
     sel <- SAT.newVar solver
     return (i, sel)
   let idx2sel :: Array Int SAT.Var
-      idx2sel = array (1, GCNF.lastGroupIndex gcnf) tbl
+      idx2sel = array (1, CNF.gcnfLastGroupIndex gcnf) tbl
       selrng  = if null tbl then (0,-1) else (snd $ head tbl, snd $ last tbl)
       sel2idx :: Array SAT.Lit Int
       sel2idx = array selrng [(sel, idx) | (idx, sel) <- tbl]
 
-  (idx2clausesM :: IOArray Int [SAT.PackedClause]) <- newArray (1, GCNF.lastGroupIndex gcnf) []
-  forM_ (GCNF.clauses gcnf) $ \(idx, clause) ->
+  (idx2clausesM :: IOArray Int [SAT.PackedClause]) <- newArray (1, CNF.gcnfLastGroupIndex gcnf) []
+  forM_ (CNF.gcnfClauses gcnf) $ \(idx, clause) ->
     if idx==0
     then SAT.addClause solver (SAT.unpackClause clause)
     else do
@@ -736,17 +734,17 @@ solveMUS opt solver gcnf = do
 
   when (optInitSP opt) $ do
     let wcnf = GCNF2MaxSAT.convert gcnf
-    initPolarityUsingSP solver (GCNF.numVars gcnf)
-      (WCNF.numVars wcnf) [(fromIntegral w, clause) | (w, clause) <- WCNF.clauses wcnf]
+    initPolarityUsingSP solver (CNF.gcnfNumVars gcnf)
+      (CNF.wcnfNumVars wcnf) [(fromIntegral w, clause) | (w, clause) <- CNF.wcnfClauses wcnf]
     return ()
 
-  result <- SAT.solveWith solver (map (idx2sel !) [1..GCNF.lastGroupIndex gcnf])
+  result <- SAT.solveWith solver (map (idx2sel !) [1..CNF.gcnfLastGroupIndex gcnf])
   putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
   if result
     then do
       m <- SAT.getModel solver
-      satPrintModel stdout m (GCNF.numVars gcnf)
-      writeSOLFile opt m Nothing (GCNF.numVars gcnf)
+      satPrintModel stdout m (CNF.gcnfNumVars gcnf)
+      writeSOLFile opt m Nothing (CNF.gcnfNumVars gcnf)
     else do
       if optMode opt /= Just ModeAllMUS
       then do
@@ -815,7 +813,7 @@ solvePB opt solver formula = do
   spHighlyBiased <- 
     if optInitSP opt then do
       let (cnf, _, _) = PB2SAT.convert formula
-      initPolarityUsingSP solver nv (CNF.numVars cnf) [(1.0, clause) | clause <- CNF.clauses cnf]
+      initPolarityUsingSP solver nv (CNF.cnfNumVars cnf) [(1.0, clause) | clause <- CNF.cnfClauses cnf]
     else
       return IntMap.empty
 
@@ -841,7 +839,7 @@ solvePB opt solver formula = do
           let m2 = mtrans m
           forM_ (assocs m2) $ \(v, val) -> do
             SAT.setVarPolarity solver v val
-          if obj < WCNF.topCost wcnf then
+          if obj < CNF.wcnfTopCost wcnf then
             return $ Just m2 
           else
             return Nothing
@@ -916,7 +914,7 @@ solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
 solveWBO opt solver isMaxSat formula =
   solveWBO' opt solver isMaxSat formula (WBO2MaxSAT.convert formula) Nothing
 
-solveWBO' :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> (WCNF.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model) -> Maybe FilePath -> IO ()
+solveWBO' :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> (CNF.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model) -> Maybe FilePath -> IO ()
 solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
   let nv = PBFile.wboNumVars formula
       nc = PBFile.wboNumConstraints formula
@@ -932,7 +930,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
 
   spHighlyBiased <-
     if optInitSP opt then do
-      initPolarityUsingSP solver nv (WCNF.numVars wcnf) [(fromIntegral w, c) | (w, c) <-  WCNF.clauses wcnf]
+      initPolarityUsingSP solver nv (CNF.wcnfNumVars wcnf) [(fromIntegral w, c) | (w, c) <-  CNF.wcnfClauses wcnf]
     else
       return IntMap.empty
 
@@ -1010,8 +1008,8 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
 mainMaxSAT :: Options -> SAT.Solver -> IO ()
 mainMaxSAT opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM WCNF.parseByteString BS.getContents
-           fname -> WCNF.parseFile fname
+           "-"   -> liftM CNF.parse BS.getContents
+           fname -> CNF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right wcnf -> do
@@ -1020,7 +1018,7 @@ mainMaxSAT opt solver = do
                   else Nothing
       solveMaxSAT opt solver wcnf fname
 
-solveMaxSAT :: Options -> SAT.Solver -> WCNF.WCNF -> Maybe FilePath -> IO ()
+solveMaxSAT :: Options -> SAT.Solver -> CNF.WCNF -> Maybe FilePath -> IO ()
 solveMaxSAT opt solver wcnf wcnfFileName =
   solveWBO' opt solver True (MaxSAT2WBO.convert wcnf) (wcnf, id, id) wcnfFileName
 

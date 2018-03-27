@@ -9,6 +9,7 @@ import Test.BitVector
 import Test.BoolExpr
 import Test.CongruenceClosure
 import Test.ContiTraverso
+import Test.CNF
 import Test.Delta
 import Test.FiniteModelFinder
 import Test.GraphShortestPath
@@ -40,6 +41,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , bitVectorTestGroup
   , boolExprTestGroup
   , ccTestGroup
+  , cnfTestGroup
   , ctTestGroup
   , deltaTestGroup
   , fmfTestGroup

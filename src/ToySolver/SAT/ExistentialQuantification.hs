@@ -65,9 +65,9 @@ dualRailEncoding vs cnf =
   where
     cnf' =
       CNF.CNF
-      { CNF.numVars = CNF.numVars cnf + IntSet.size vs
-      , CNF.numClauses = CNF.numClauses cnf + IntSet.size vs
-      , CNF.clauses = [ VG.map f c | c <- CNF.clauses cnf ] ++ [SAT.packClause [-xp,-xn] | (xp,xn) <- IntMap.elems forward]
+      { CNF.cnfNumVars = CNF.cnfNumVars cnf + IntSet.size vs
+      , CNF.cnfNumClauses = CNF.cnfNumClauses cnf + IntSet.size vs
+      , CNF.cnfClauses = [ VG.map f c | c <- CNF.cnfClauses cnf ] ++ [SAT.packClause [-xp,-xn] | (xp,xn) <- IntMap.elems forward]
       }
     f x =
       case IntMap.lookup (abs x) forward of
@@ -76,7 +76,7 @@ dualRailEncoding vs cnf =
     forward =
       IntMap.fromList
       [ (x, (x,x'))
-      | (x,x') <- zip (IntSet.toList vs) [CNF.numVars cnf + 1 ..]
+      | (x,x') <- zip (IntSet.toList vs) [CNF.cnfNumVars cnf + 1 ..]
       ]
     backward = IntMap.fromList $ concat $
       [ [(xp,x), (xn,-x)]
@@ -116,7 +116,7 @@ shortestImplicants
   -> CNF.CNF     -- ^ \(\phi\)
   -> IO [LitSet]
 shortestImplicants xs formula =
-  shortestImplicantsE (IntSet.fromList [1 .. CNF.numVars formula] IntSet.\\ xs) formula
+  shortestImplicantsE (IntSet.fromList [1 .. CNF.cnfNumVars formula] IntSet.\\ xs) formula
 
 -- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\),
 -- this function computes shortest implicants of \(\exists X. \phi\).
@@ -128,10 +128,10 @@ shortestImplicantsE
   -> CNF.CNF     -- ^ \(\phi\)
   -> IO [LitSet]
 shortestImplicantsE xs formula = do
-  let (tau_formula, info) = dualRailEncoding (IntSet.fromList [1 .. CNF.numVars formula] IntSet.\\ xs) formula
+  let (tau_formula, info) = dualRailEncoding (IntSet.fromList [1 .. CNF.cnfNumVars formula] IntSet.\\ xs) formula
   solver <- SAT.newSolver
-  SAT.newVars_ solver (CNF.numVars tau_formula)
-  forM_ (CNF.clauses tau_formula) $ \c -> do
+  SAT.newVars_ solver (CNF.cnfNumVars tau_formula)
+  forM_ (CNF.cnfClauses tau_formula) $ \c -> do
     SAT.addClause solver (SAT.unpackClause c)
 
   ref <- newIORef []
@@ -166,9 +166,9 @@ negateCNF formula = do
   implicants <- shortestImplicantsE IntSet.empty formula
   return $
     CNF.CNF
-    { CNF.numVars = CNF.numVars formula
-    , CNF.numClauses = length implicants
-    , CNF.clauses = map (SAT.packClause . map negate . IntSet.toList) implicants
+    { CNF.cnfNumVars = CNF.cnfNumVars formula
+    , CNF.cnfNumClauses = length implicants
+    , CNF.cnfClauses = map (SAT.packClause . map negate . IntSet.toList) implicants
     }
 
 -- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\),
@@ -179,20 +179,20 @@ project
   -> CNF.CNF     -- ^ \(\phi\)
   -> IO CNF.CNF  -- ^ \(\psi\)
 project xs cnf = do
-  let ys = IntSet.fromList [1 .. CNF.numVars cnf] IntSet.\\ xs
+  let ys = IntSet.fromList [1 .. CNF.cnfNumVars cnf] IntSet.\\ xs
       nv = if IntSet.null ys then 0 else IntSet.findMax ys
   implicants <- shortestImplicantsE xs cnf
   let cnf' =
         CNF.CNF
-        { CNF.numVars = nv
-        , CNF.numClauses = length implicants
-        , CNF.clauses = map (SAT.packClause . map negate . IntSet.toList) implicants
+        { CNF.cnfNumVars = nv
+        , CNF.cnfNumClauses = length implicants
+        , CNF.cnfClauses = map (SAT.packClause . map negate . IntSet.toList) implicants
         }
   negated_implicates <- shortestImplicantsE xs cnf'
   let implicates = map (SAT.packClause . map negate . IntSet.toList) negated_implicates
   return $
     CNF.CNF
-    { CNF.numVars = nv
-    , CNF.numClauses = length implicates
-    , CNF.clauses = implicates
+    { CNF.cnfNumVars = nv
+    , CNF.cnfNumClauses = length implicates
+    , CNF.cnfClauses = implicates
     }

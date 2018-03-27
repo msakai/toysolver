@@ -18,7 +18,6 @@ import Test.QuickCheck.Modifiers
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
 import qualified ToySolver.Text.CNF as CNF
-import qualified ToySolver.Text.WCNF as WCNF
 
 arbitraryCNF :: Gen CNF.CNF
 arbitraryCNF = do
@@ -32,17 +31,17 @@ arbitraryCNF = do
       SAT.packClause <$> (replicateM len $ choose (-nv, nv) `suchThat` (/= 0))
   return $
     CNF.CNF
-    { CNF.numVars = nv
-    , CNF.numClauses = nc
-    , CNF.clauses = cs
+    { CNF.cnfNumVars = nv
+    , CNF.cnfNumClauses = nc
+    , CNF.cnfClauses = cs
     }
 
 evalCNFCost :: SAT.Model -> CNF.CNF -> Int
-evalCNFCost m cnf = sum $ map f (CNF.clauses cnf)
+evalCNFCost m cnf = sum $ map f (CNF.cnfClauses cnf)
   where
     f c = if SAT.evalClause m (SAT.unpackClause c) then 0 else 1
 
-arbitraryWCNF :: Gen WCNF.WCNF
+arbitraryWCNF :: Gen CNF.WCNF
 arbitraryWCNF = do
   nv <- choose (0,10)
   nc <- choose (0,50)
@@ -57,16 +56,16 @@ arbitraryWCNF = do
     return (fmap getPositive w, c)
   let topCost = sum [w | (Just w, _) <- cs] + 1
   return $
-    WCNF.WCNF
-    { WCNF.numVars = nv
-    , WCNF.numClauses = nc
-    , WCNF.topCost = topCost
-    , WCNF.clauses = [(fromMaybe topCost w, c) | (w,c) <- cs]
+    CNF.WCNF
+    { CNF.wcnfNumVars = nv
+    , CNF.wcnfNumClauses = nc
+    , CNF.wcnfTopCost = topCost
+    , CNF.wcnfClauses = [(fromMaybe topCost w, c) | (w,c) <- cs]
     }
 
-evalWCNFCost :: SAT.Model -> WCNF.WCNF -> Integer
+evalWCNFCost :: SAT.Model -> CNF.WCNF -> Integer
 evalWCNFCost m wcnf = sum $ do
-  (w,c) <- WCNF.clauses wcnf
+  (w,c) <- CNF.wcnfClauses wcnf
   guard $ not $ SAT.evalClause m (SAT.unpackClause c)
   return w
 
@@ -91,7 +90,7 @@ prop_probSAT = QM.monadicIO $ do
     ProbSAT.probsat solver opt def f
     ProbSAT.getBestSolution solver
   QM.monitor (counterexample (show (obj,sol)))
-  QM.assert (bounds sol == (1, CNF.numVars cnf))
+  QM.assert (bounds sol == (1, CNF.cnfNumVars cnf))
   QM.assert (obj == fromIntegral (evalCNFCost sol cnf))
 
 prop_probSAT_weighted :: Property
@@ -115,16 +114,16 @@ prop_probSAT_weighted = QM.monadicIO $ do
     ProbSAT.probsat solver opt def f
     ProbSAT.getBestSolution solver
   QM.monitor (counterexample (show (obj,sol)))
-  QM.assert (bounds sol == (1, WCNF.numVars wcnf))
+  QM.assert (bounds sol == (1, CNF.wcnfNumVars wcnf))
   QM.assert (obj == evalWCNFCost sol wcnf)
 
 case_probSAT_case1 :: Assertion
 case_probSAT_case1 = do
   let cnf =
         CNF.CNF
-        { CNF.numVars = 1
-        , CNF.numClauses = 2
-        , CNF.clauses = map SAT.packClause
+        { CNF.cnfNumVars = 1
+        , CNF.cnfNumClauses = 2
+        , CNF.cnfClauses = map SAT.packClause
             [ [1,-1]
             , []
             ]

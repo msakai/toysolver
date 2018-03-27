@@ -52,7 +52,7 @@ getCNFFormula (CNFStore ref1 ref2) = do
   cs <- readMutVar ref2
   return $
      CNF.CNF
-     { CNF.numVars = nv
-     , CNF.numClauses = Seq.length cs
-     , CNF.clauses = F.toList cs
+     { CNF.cnfNumVars = nv
+     , CNF.cnfNumClauses = Seq.length cs
+     , CNF.cnfClauses = F.toList cs
      }

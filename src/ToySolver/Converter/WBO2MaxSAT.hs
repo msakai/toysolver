@@ -27,10 +27,9 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import ToySolver.SAT.Store.CNF
-import qualified ToySolver.Text.WCNF as WCNF
 import qualified ToySolver.Text.CNF as CNF
 
-convert :: PBFile.SoftFormula -> (WCNF.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
+convert :: PBFile.SoftFormula -> (CNF.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
 convert formula = runST $ do
   db <- newCNFStore
   SAT.newVars_ db (PBFile.wboNumVars formula)
@@ -67,21 +66,21 @@ convert formula = runST $ do
 
   let top = F.sum (fst <$> softClauses) + 1
   cnf <- getCNFFormula db
-  let cs = softClauses <> Seq.fromList [(top, clause) | clause <- CNF.clauses cnf]
-  let wcnf = WCNF.WCNF
-             { WCNF.numVars = CNF.numVars cnf
-             , WCNF.numClauses = Seq.length cs
-             , WCNF.topCost = top
-             , WCNF.clauses = F.toList cs
+  let cs = softClauses <> Seq.fromList [(top, clause) | clause <- CNF.cnfClauses cnf]
+  let wcnf = CNF.WCNF
+             { CNF.wcnfNumVars = CNF.cnfNumVars cnf
+             , CNF.wcnfNumClauses = Seq.length cs
+             , CNF.wcnfTopCost = top
+             , CNF.wcnfClauses = F.toList cs
              }
 
   defs <- Tseitin.getDefinitions tseitin
   let extendModel :: SAT.Model -> SAT.Model
-      extendModel m = array (1, CNF.numVars cnf) (assocs a)
+      extendModel m = array (1, CNF.cnfNumVars cnf) (assocs a)
         where
           -- Use BOXED array to tie the knot
           a :: Array SAT.Var Bool
-          a = array (1, CNF.numVars cnf) $
+          a = array (1, CNF.cnfNumVars cnf) $
                 assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
 
   return (wcnf, extendModel, SAT.restrictModel (PBFile.wboNumVars formula))

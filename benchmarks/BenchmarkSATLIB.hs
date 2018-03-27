@@ -15,8 +15,8 @@ solve fname = do
     Left err  -> error $ show err
     Right cnf -> do
       solver <- SAT.newSolverWithConfig def{ SAT.configRandomFreq = 0 }
-      _ <- replicateM (CNF.numVars cnf) (SAT.newVar solver)
-      forM_ (CNF.clauses cnf) $ \clause ->
+      _ <- replicateM (CNF.cnfNumVars cnf) (SAT.newVar solver)
+      forM_ (CNF.cnfClauses cnf) $ \clause ->
         SAT.addClause solver (SAT.unpackClause clause)
       SAT.solve solver
       return ()

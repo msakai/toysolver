@@ -16,10 +16,10 @@ module ToySolver.Converter.MaxSAT2IP
 
 import Data.Map (Map)
 import qualified ToySolver.Data.MIP as MIP
-import qualified ToySolver.Text.WCNF as WCNF
+import qualified ToySolver.Text.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.PB2IP as PB2IP
 
-convert :: Bool -> WCNF.WCNF -> (MIP.Problem Integer, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
+convert :: Bool -> CNF.WCNF -> (MIP.Problem Integer, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
 convert useIndicator wcnf = PB2IP.convertWBO useIndicator (MaxSAT2WBO.convert wcnf)

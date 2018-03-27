@@ -16,24 +16,23 @@ module ToySolver.Converter.GCNF2MaxSAT
 
 import qualified Data.Vector.Generic as VG
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Text.GCNF as GCNF
-import qualified ToySolver.Text.WCNF as WCNF
+import qualified ToySolver.Text.CNF as CNF
 
-convert :: GCNF.GCNF -> WCNF.WCNF
+convert :: CNF.GCNF -> CNF.WCNF
 convert
-  GCNF.GCNF
-  { GCNF.numVars        = nv
-  , GCNF.numClauses     = nc
-  , GCNF.lastGroupIndex = lastg
-  , GCNF.clauses        = cs
+  CNF.GCNF
+  { CNF.gcnfNumVars        = nv
+  , CNF.gcnfNumClauses     = nc
+  , CNF.gcnfLastGroupIndex = lastg
+  , CNF.gcnfClauses        = cs
   }
   =
-  WCNF.WCNF
-  { WCNF.topCost = top
-  , WCNF.clauses = [(top, if g==0 then c else VG.cons (-(nv+g)) c) | (g,c) <- cs] ++ [(1, SAT.packClause [v]) | v <- [nv+1..nv+lastg]]
-  , WCNF.numVars = nv + lastg
-  , WCNF.numClauses = nc + lastg
+  CNF.WCNF
+  { CNF.wcnfTopCost = top
+  , CNF.wcnfClauses = [(top, if g==0 then c else VG.cons (-(nv+g)) c) | (g,c) <- cs] ++ [(1, SAT.packClause [v]) | v <- [nv+1..nv+lastg]]
+  , CNF.wcnfNumVars = nv + lastg
+  , CNF.wcnfNumClauses = nc + lastg
   }
   where
-    top :: WCNF.Weight
+    top :: CNF.Weight
     top = fromIntegral (lastg + 1)

@@ -13,7 +13,7 @@ import Text.Printf
 
 import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
 import ToySolver.SAT.Printer (maxsatPrintModel)
-import qualified ToySolver.Text.WCNF as WCNF
+import qualified ToySolver.Text.CNF as CNF
 
 data Options = Options
   { optAlgorithm :: String
@@ -136,45 +136,41 @@ parserInfo = info (helper <*> optionsParser)
 main :: IO ()
 main = do
   opt <- execParser parserInfo
-
-  ret <- WCNF.parseFile (optFileName opt)
-  case ret of
-    Left e -> error e
-    Right wcnf -> do
-      solver <- ProbSAT.newSolverWeighted wcnf
-      gen <-
-        case optRandomSeed opt of
-          Nothing -> Rand.createSystemRandom
-          Just seed -> Rand.restore seed
-      seed <- Rand.save gen
-      putStrLn $ "c use --random-seed=" ++ show (unwords . map show . VU.toList . Rand.fromSeed $ seed) ++ " option to reproduce the execution"
-      ProbSAT.setRandomGen solver gen
-      let callbacks =
-            def
-            { ProbSAT.cbOnUpdateBestSolution = \_solver obj _sol -> printf "o %d\n" obj
-            }
-      case map toLower (optAlgorithm opt) of
-        "walksat" -> do
-          let p = optWalkSATP opt
-          ProbSAT.walksat solver (optOptions opt) callbacks p
-        "probsat" -> do
-          let cb = optProbSATCB opt
-              cm = optProbSATCM opt
-          seq cb $ seq cm $ return ()
-          case map toLower (optProbSATFunc opt) of
-            "exp" -> do
-              let f make break = cm**make / cb**break
-              ProbSAT.probsat solver (optOptions opt) callbacks f
-            "poly" -> do
-              let eps = 1
-                  f make break = make**cm / (eps + break**cb)
-              ProbSAT.probsat solver (optOptions opt) callbacks f
-            _ -> error ("unknown function type: " ++ optProbSATFunc opt)
-        _ -> error ("unknown algorithm name: " ++ optAlgorithm opt)
-      (obj,sol) <- ProbSAT.getBestSolution solver
-      stat <- ProbSAT.getStatistics solver
-      printf "c TotalCPUTime = %fs\n" (fromIntegral (toNanoSecs (ProbSAT.statTotalCPUTime stat)) / 10^(9::Int) :: Double)
-      printf "c FlipsPerSecond = %f\n" (ProbSAT.statFlipsPerSecond stat)
-      when (obj == 0) $ do
-        putStrLn "s OPTIMUM FOUND"
-      maxsatPrintModel stdout sol (WCNF.numVars wcnf)
+  wcnf <- CNF.readFile (optFileName opt)
+  solver <- ProbSAT.newSolverWeighted wcnf
+  gen <-
+    case optRandomSeed opt of
+      Nothing -> Rand.createSystemRandom
+      Just seed -> Rand.restore seed
+  seed <- Rand.save gen
+  putStrLn $ "c use --random-seed=" ++ show (unwords . map show . VU.toList . Rand.fromSeed $ seed) ++ " option to reproduce the execution"
+  ProbSAT.setRandomGen solver gen
+  let callbacks =
+        def
+        { ProbSAT.cbOnUpdateBestSolution = \_solver obj _sol -> printf "o %d\n" obj
+        }
+  case map toLower (optAlgorithm opt) of
+    "walksat" -> do
+      let p = optWalkSATP opt
+      ProbSAT.walksat solver (optOptions opt) callbacks p
+    "probsat" -> do
+      let cb = optProbSATCB opt
+          cm = optProbSATCM opt
+      seq cb $ seq cm $ return ()
+      case map toLower (optProbSATFunc opt) of
+        "exp" -> do
+          let f make break = cm**make / cb**break
+          ProbSAT.probsat solver (optOptions opt) callbacks f
+        "poly" -> do
+          let eps = 1
+              f make break = make**cm / (eps + break**cb)
+          ProbSAT.probsat solver (optOptions opt) callbacks f
+        _ -> error ("unknown function type: " ++ optProbSATFunc opt)
+    _ -> error ("unknown algorithm name: " ++ optAlgorithm opt)
+  (obj,sol) <- ProbSAT.getBestSolution solver
+  stat <- ProbSAT.getStatistics solver
+  printf "c TotalCPUTime = %fs\n" (fromIntegral (toNanoSecs (ProbSAT.statTotalCPUTime stat)) / 10^(9::Int) :: Double)
+  printf "c FlipsPerSecond = %f\n" (ProbSAT.statFlipsPerSecond stat)
+  when (obj == 0) $ do
+    putStrLn "s OPTIMUM FOUND"
+  maxsatPrintModel stdout sol (CNF.wcnfNumVars wcnf)
