@@ -62,6 +62,7 @@ module ToySolver.Text.CNF
 import Prelude hiding (readFile, writeFile)
 import Control.DeepSeq
 import Control.Exception
+import Control.Monad.IO.Class
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Builder
 import Data.Char
@@ -83,20 +84,20 @@ data ParseError = ParseError String
 
 instance Exception ParseError
 
-parseFile :: FileFormat a => FilePath -> IO (Either String a)
-parseFile filename = do
+parseFile :: (FileFormat a, MonadIO m) => FilePath -> m (Either String a)
+parseFile filename = liftIO $ do
   s <- BS.readFile filename
   return $ parse s
 
-readFile :: FileFormat a => FilePath -> IO a
-readFile filename = do
+readFile :: (FileFormat a, MonadIO m) => FilePath -> m a
+readFile filename = liftIO $ do
   s <- BS.readFile filename
   case parse s of
     Left msg -> throw $ ParseError msg
     Right a -> return a
 
-writeFile :: FileFormat a => FilePath -> a -> IO ()
-writeFile filepath a = do
+writeFile :: (FileFormat a, MonadIO m) => FilePath -> a -> m ()
+writeFile filepath a = liftIO $ do
   withBinaryFile filepath WriteMode $ \h -> do
     hSetBuffering h (BlockBuffering Nothing)
     hPutBuilder h (render a)
