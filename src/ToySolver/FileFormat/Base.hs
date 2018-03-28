@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.FileFormat.Base
@@ -29,6 +31,12 @@ import Data.ByteString.Builder
 import Data.Typeable
 import System.IO hiding (readFile, writeFile)
 
+#ifdef WITH_ZLIB
+import qualified Codec.Compression.GZip as GZip
+import qualified Data.CaseInsensitive as CI
+import System.FilePath
+#endif
+
 -- | A type class that abstracts file formats
 class FileFormat a where
   -- | Parse a lazy byte string, and either returns error message or a parsed value
@@ -47,13 +55,21 @@ instance Exception ParseError
 parseFile :: (FileFormat a, MonadIO m) => FilePath -> m (Either String a)
 parseFile filename = liftIO $ do
   s <- BS.readFile filename
-  return $ parse s
+#ifdef WITH_ZLIB
+  let s2 = if CI.mk (takeExtension filename) == ".gz" then
+             GZip.decompress s
+           else
+             s
+#else
+  let s2 = s
+#endif
+  return $ parse s2
 
 -- | Parse a file. Similar to 'parseFile' but this function throws 'ParseError' when parsing fails.
 readFile :: (FileFormat a, MonadIO m) => FilePath -> m a
 readFile filename = liftIO $ do
-  s <- BS.readFile filename
-  case parse s of
+  ret <- parseFile filename
+  case ret of
     Left msg -> throwIO $ ParseError msg
     Right a -> return a
 
@@ -62,4 +78,11 @@ writeFile :: (FileFormat a, MonadIO m) => FilePath -> a -> m ()
 writeFile filepath a = liftIO $ do
   withBinaryFile filepath WriteMode $ \h -> do
     hSetBuffering h (BlockBuffering Nothing)
+#ifdef WITH_ZLIB
+    if CI.mk (takeExtension filepath) == ".gz" then do
+      BS.hPut h $ GZip.compress $ toLazyByteString $ render a
+    else do
+      hPutBuilder h (render a)
+#else
     hPutBuilder h (render a)
+#endif

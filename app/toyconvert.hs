@@ -205,7 +205,7 @@ data Problem
 readProblem :: Options -> String -> IO Problem
 readProblem o fname = do
   enc <- T.mapM mkTextEncoding (optFileEncoding o)
-  case map toLower (takeExtension fname) of
+  case getExt fname of
     ".cnf"
       | optAsMaxSAT o ->
           liftM (ProbWBO . fst . maxsat2wbo) $ FF.readFile fname
@@ -221,6 +221,14 @@ readProblem o fname = do
     ".mps"  -> ProbMIP <$> MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
     ext ->
       error $ "unknown file extension: " ++ show ext
+
+getExt :: String -> String
+getExt name | (base, ext) <- splitExtension name =
+  case map toLower ext of
+#ifdef WITH_ZLIB
+    ".gz" -> getExt base
+#endif
+    s -> s
 
 transformProblem :: Options -> Problem -> Problem
 transformProblem o = transformObj o . transformPBLinearization o . transformMIPRemoveUserCuts o
@@ -301,7 +309,7 @@ writeProblem o problem = do
                   ProbOPB opb -> pb2lsp opb
                   ProbWBO wbo -> wbo2lsp wbo
                   ProbMIP _   -> pb2lsp opb
-      case map toLower (takeExtension fname) of
+      case getExt fname of
         ".opb" -> FF.writeFile fname $ normalizePB opb
         ".wbo" -> FF.writeFile fname $ normalizeWBO wbo
         ".cnf" ->
