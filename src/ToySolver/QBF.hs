@@ -31,12 +31,15 @@ module ToySolver.QBF
   , solveCEGARIncremental
   , solveQE
   , solveQE_CNF
+  , solveDDR
   ) where
 
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Trans.Except
+import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Function (on)
 import Data.List (groupBy, foldl')
@@ -469,6 +472,95 @@ solveQE_CNF nv prefix matrix = g (normalizePrefix prefix) matrix
       cnf <- liftM (toCNF nv . negateCNFOrDNF) $ f prefix' matrix
       dnf <- QE.shortestImplicantsE (xs `IntSet.union` IntSet.fromList [nv+1 .. CNF.cnfNumVars cnf]) cnf
       return $ negateCNFOrDNF $ DNF dnf
+
+-- ----------------------------------------------------------------------------
+
+solveDDR :: Int -> Prefix -> Matrix -> IO (Bool, Maybe LitSet)
+solveDDR nv prefix matrix = do
+  let prefix' = normalizePrefix prefix
+
+      -- TODO: use Array
+      binderIndexTable :: IntMap Int
+      binderIndexTable = IntMap.fromList [(v,i) | (i,(_,vs)) <- zip [0..] prefix', v <- IntSet.toList vs]
+
+      -- TODO: use Array
+      binderIndexToVars :: IntMap (Quantifier, VarSet)
+      binderIndexToVars = IntMap.fromList [(i,b) | (i,b) <- zip [0..] prefix']
+
+  store <- newCNFStore
+  SAT.newVars_ store (nv*2)
+  encoder <- Tseitin.newEncoder store
+  Tseitin.addFormula encoder matrix
+  cnf1 <- getCNFFormula store
+
+  print cnf1
+
+  store <- newCNFStore
+  SAT.newVars_ store (nv*2)
+  encoder <- Tseitin.newEncoder store
+  Tseitin.addFormula encoder (BoolExpr.Not matrix)
+  cnf2 <- getCNFFormula store
+
+  print cnf2
+
+  solver1 <- SAT.newSolver
+  -- dual rail encoding
+  SAT.newVars_ solver1 (CNF.cnfNumVars cnf1)
+  forM_ [1..nv] $ \i -> do
+    SAT.addClause solver1 [- i, - (nv + i)]
+  forM_ (CNF.cnfClauses cnf1) $ \clause -> do
+    SAT.addClause solver1 $ [if abs l <= nv then (if l > 0 then l else nv - l) else l | l <- SAT.unpackClause clause]
+
+  solver2 <- SAT.newSolver
+  -- dual rail encoding
+  SAT.newVars_ solver2 (CNF.cnfNumVars cnf2)
+  forM_ [1..nv] $ \i -> do
+    SAT.addClause solver2 [- i, - (nv + i)]
+  forM_ (CNF.cnfClauses cnf2) $ \clause -> do
+    SAT.addClause solver2 [if abs l <= nv then (if l > 0 then l else nv - l) else l | l <- SAT.unpackClause clause]
+
+  let opponent :: Quantifier -> Quantifier
+      opponent E = A
+      opponent A = E
+
+      loop :: Quantifier -> IO (Quantifier, Maybe LitSet)
+      loop q = do
+        let solver =
+              case q of
+                E -> solver1
+                A -> solver2
+        b <- SAT.solve solver 
+        if not b then do
+          -- 相手の選択によらず自分の負け
+          return (opponent q, Nothing)
+        else do
+          m <- SAT.getModel solver
+          let -- TODO: minimize implicant
+              implicant :: [SAT.Lit]
+              implicant = concat
+                          [ if SAT.evalLit m i then [i]
+                            else if SAT.evalLit m (nv+i) then [-i]
+                            else []
+                          | i <- [1..nv]
+                          ]
+              binderIndexes = IntSet.fromList [binderIndexTable IntMap.! abs l | l <- implicant]
+              binderIndexesOpponent = IntSet.filter (\i -> fst (binderIndexToVars IntMap.! i) == opponent q) binderIndexes
+          if IntSet.null binderIndexesOpponent then do
+            -- 相手の選択に無関係に充足可能なため
+            return (q, Nothing)
+          else do
+            let j = IntSet.findMax binderIndexesOpponent
+                solverO = case q of
+                            E -> solver2
+                            A -> solver1
+                -- 相手方の最後の選択までの部分集合
+                ls = [l | l <- implicant, binderIndexTable IntMap.! (abs l) <= j]
+            print (opponent q, [if l > 0 then l else nv - l | l <- ls])
+            SAT.addClause solverO [if l > 0 then l else nv - l | l <- ls]
+            loop (opponent q)
+
+  (q,witness) <- loop E
+  return (q==E, witness)
 
 -- ----------------------------------------------------------------------------
 

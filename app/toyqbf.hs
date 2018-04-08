@@ -51,7 +51,7 @@ optionsParser = Options
     algorithmOption = strOption
       $  long "algorithm"
       <> metavar "STR"
-      <> help "Algorithm: naive, cegar, cegar-incremental, qe"
+      <> help "Algorithm: naive, cegar, cegar-incremental, qe, ddr"
       <> value "cegar-incremental"
       <> showDefaultWith id
 
@@ -87,6 +87,7 @@ main = do
           "cegar" -> QBF.solveCEGAR nv prefix' matrix'
           "cegar-incremental" -> QBF.solveCEGARIncremental nv prefix' matrix'
           "qe" -> QBF.solveQE nv prefix' matrix'
+          "ddr" -> QBF.solveDDR nv prefix' matrix'
           _ -> do
             putStrLn $ "c unknown --algorithm option: " ++ show (optAlgorithm opt)
             putStrLn $ "s cnf 0 " ++ show nv ++ " " ++ show nc
