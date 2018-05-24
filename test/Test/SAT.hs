@@ -32,6 +32,7 @@ import qualified Test.QuickCheck.Monadic as QM
 import ToySolver.Data.LBool
 import ToySolver.Data.BoolExpr
 import ToySolver.Data.Boolean
+import qualified ToySolver.MaxCut as MaxCut
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.SAT.TheorySolver
@@ -51,6 +52,7 @@ import qualified ToySolver.Converter.PB2SAT as PB2SAT
 import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
 import qualified ToySolver.Converter.WBO2PB as WBO2PB
 import qualified ToySolver.Converter.SAT2KSAT as SAT2KSAT
+import qualified ToySolver.Converter.SAT2MaxCut as SAT2MaxCut
 import qualified ToySolver.Text.CNF as CNF
 
 import ToySolver.Data.OrdRel
@@ -1950,6 +1952,17 @@ prop_naesat2naeksat_backward =
     let (nae',info) = NAESAT.naesat2naeksat k nae
     in forAll (replicateM (fst nae') arbitrary >>= \m -> return (array (1, fst nae') (zip [1..] m))) $ \m ->
          NAESAT.evalNAESAT (NAESAT.naesat2naeksat_backward info m) nae || not (NAESAT.evalNAESAT m nae')
+
+prop_naesat2maxcut_forward :: Property
+prop_naesat2maxcut_forward =
+  forAll arbitraryNAESAT $ \nae ->
+    let conv@(maxcut, info@(_, threshold)) = SAT2MaxCut.naesat2maxcut nae
+    in counterexample (show conv) $
+         and
+         [ NAESAT.evalNAESAT m nae == (MaxCut.eval sol maxcut >= threshold)
+         | m <- allAssignments (fst nae)
+         , let sol = SAT2MaxCut.naesat2maxcut_forward info m
+         ]
 
 arbitraryNAESAT :: Gen NAESAT.NAESAT
 arbitraryNAESAT = do
