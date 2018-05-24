@@ -339,6 +339,7 @@ Library
      ToySolver.Data.Polynomial.GroebnerBasis
      ToySolver.Data.Polynomial.Interpolation.Lagrange
      ToySolver.Graph.ShortestPath
+     ToySolver.MaxCut
      ToySolver.QBF
      ToySolver.SAT
      ToySolver.SAT.Config
