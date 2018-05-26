@@ -281,6 +281,7 @@ Library
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.MaxSAT2IP
      ToySolver.Converter.MaxSAT2WBO
+     ToySolver.Converter.NAESAT
      ToySolver.Converter.PB2IP
      ToySolver.Converter.PBLinearization
      ToySolver.Converter.PBNormalization

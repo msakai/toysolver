@@ -20,6 +20,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Traversable as Traversable
 import qualified Data.Vector as V
+import qualified Data.Vector.Generic as VG
 import qualified System.Random.MWC as Rand
 
 import Test.Tasty
@@ -45,6 +46,7 @@ import qualified ToySolver.SAT.Store.CNF as CNFStore
 import qualified ToySolver.SAT.ExistentialQuantification as ExistentialQuantification
 
 import qualified Data.PseudoBoolean as PBFile
+import qualified ToySolver.Converter.NAESAT as NAESAT
 import qualified ToySolver.Converter.PB2SAT as PB2SAT
 import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
 import qualified ToySolver.Converter.WBO2PB as WBO2PB
@@ -1896,6 +1898,65 @@ prop_negateCNF = QM.monadicIO $ do
 
 ------------------------------------------------------------------------
 
+prop_sat2naesat_forward :: Property
+prop_sat2naesat_forward = forAll arbitraryCNF $ \cnf ->
+  let (nae,info) = NAESAT.sat2naesat cnf
+  in and
+     [ evalCNF m cnf == NAESAT.evalNAESAT (NAESAT.sat2naesat_forward info m) nae
+     | m <- allAssignments (CNF.cnfNumVars cnf)
+     ]
+
+prop_sat2naesat_backward :: Property
+prop_sat2naesat_backward = forAll arbitraryCNF $ \cnf ->
+  let (nae,info) = NAESAT.sat2naesat cnf
+  in and
+     [ evalCNF (NAESAT.sat2naesat_backward info m) cnf == NAESAT.evalNAESAT m nae
+     | m <- allAssignments (fst nae)
+     ]
+
+prop_naesat2sat_forward :: Property
+prop_naesat2sat_forward = forAll arbitraryNAESAT $ \nae ->
+  let (cnf,info) = NAESAT.naesat2sat nae
+  in and
+     [ NAESAT.evalNAESAT m nae == evalCNF (NAESAT.naesat2sat_forward info m) cnf
+     | m <- allAssignments (fst nae)
+     ]
+
+prop_naesat2sat_backward :: Property
+prop_naesat2sat_backward = forAll arbitraryNAESAT $ \nae ->
+  let (cnf,info) = NAESAT.naesat2sat nae
+  in and
+     [ NAESAT.evalNAESAT (NAESAT.naesat2sat_backward info m) nae == evalCNF m cnf
+     | m <- allAssignments (CNF.cnfNumVars cnf)
+     ]
+
+prop_naesat2naeksat_forward :: Property
+prop_naesat2naeksat_forward =
+  forAll arbitraryNAESAT $ \nae ->
+  forAll (choose (3,10)) $ \k ->
+    let (nae',info) = NAESAT.naesat2naeksat k nae
+    in counterexample (show (nae',info)) $
+         all (\c -> VG.length c <= k) (snd nae')
+         &&
+         and
+         [ NAESAT.evalNAESAT m nae == NAESAT.evalNAESAT (NAESAT.naesat2naeksat_forward info m) nae'
+         | m <- allAssignments (fst nae)
+         ]
+
+prop_naesat2naeksat_backward :: Property
+prop_naesat2naeksat_backward =
+  forAll arbitraryNAESAT $ \nae ->
+  forAll (choose (3,10)) $ \k ->
+    let (nae',info) = NAESAT.naesat2naeksat k nae
+    in forAll (replicateM (fst nae') arbitrary >>= \m -> return (array (1, fst nae') (zip [1..] m))) $ \m ->
+         NAESAT.evalNAESAT (NAESAT.naesat2naeksat_backward info m) nae || not (NAESAT.evalNAESAT m nae')
+
+arbitraryNAESAT :: Gen NAESAT.NAESAT
+arbitraryNAESAT = do
+  cnf <- arbitraryCNF
+  return (CNF.cnfNumVars cnf, CNF.cnfClauses cnf)
+
+------------------------------------------------------------------------
 
 prop_pb2sat :: Property
 prop_pb2sat = QM.monadicIO $ do
