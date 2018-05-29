@@ -291,6 +291,7 @@ Library
      ToySolver.Converter.PBSetObj
      ToySolver.Converter.PB2SMP
      ToySolver.Converter.SAT2KSAT
+     ToySolver.Converter.SAT2MaxCut
      ToySolver.Converter.SAT2PB
      ToySolver.Converter.SAT2IP
      ToySolver.Converter.WBO2MaxSAT
@@ -339,6 +340,7 @@ Library
      ToySolver.Data.Polynomial.GroebnerBasis
      ToySolver.Data.Polynomial.Interpolation.Lagrange
      ToySolver.Graph.ShortestPath
+     ToySolver.MaxCut
      ToySolver.QBF
      ToySolver.SAT
      ToySolver.SAT.Config
