@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.MIP2PB
@@ -13,6 +14,9 @@
 -----------------------------------------------------------------------------
 module ToySolver.Converter.MIP2PB
   ( convert
+  , MIP2PBInfo (..)
+  , transformObjValForward
+  , transformObjValBackward
   , addMIP
   ) where
 
@@ -29,6 +33,7 @@ import qualified Data.Set as Set
 import Data.VectorSpace
 
 import qualified Data.PseudoBoolean as PBFile
+import ToySolver.Converter.Base
 import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Data.OrdRel
 import qualified ToySolver.SAT.Types as SAT
@@ -38,22 +43,37 @@ import ToySolver.Internal.Util (revForM)
 
 -- -----------------------------------------------------------------------------
 
-convert :: MIP.Problem Rational -> Either String (PBFile.Formula, Integer -> Rational, SAT.Model -> Map MIP.Var Integer)
+convert :: MIP.Problem Rational -> Either String (PBFile.Formula, MIP2PBInfo)
 convert mip = runST $ runExceptT $ m
   where
-    m :: ExceptT String (ST s) (PBFile.Formula, Integer -> Rational, SAT.Model -> Map MIP.Var Integer)
+    m :: ExceptT String (ST s) (PBFile.Formula, MIP2PBInfo)
     m = do
       db <- lift $ newPBStore
-      (Integer.Expr obj, otrans, mtrans) <- addMIP' db mip
+      (Integer.Expr obj, info) <- addMIP' db mip
       formula <- lift $ getPBFormula db
-      return $ (formula{ PBFile.pbObjectiveFunction = Just obj }, otrans, mtrans)
+      return $ (formula{ PBFile.pbObjectiveFunction = Just obj }, info)
+
+data MIP2PBInfo = MIP2PBInfo (Map MIP.Var Integer.Expr) !Integer
+
+instance Transformer MIP2PBInfo where
+  type Source MIP2PBInfo = Map MIP.Var Integer
+  type Target MIP2PBInfo = SAT.Model
+
+instance BackwardTransformer MIP2PBInfo where
+  transformBackward (MIP2PBInfo vmap _d) m = fmap (Integer.eval m) vmap
+
+transformObjValForward :: MIP2PBInfo -> Rational -> Integer
+transformObjValForward (MIP2PBInfo _vmap d) val = asInteger (val * fromIntegral d)
+
+transformObjValBackward :: MIP2PBInfo -> Integer -> Rational
+transformObjValBackward (MIP2PBInfo _vmap d) val = fromIntegral val / fromIntegral d
 
 -- -----------------------------------------------------------------------------
 
-addMIP :: SAT.AddPBNL m enc => enc -> MIP.Problem Rational -> m (Either String (Integer.Expr, Integer -> Rational, SAT.Model -> Map MIP.Var Integer))
+addMIP :: SAT.AddPBNL m enc => enc -> MIP.Problem Rational -> m (Either String (Integer.Expr, MIP2PBInfo))
 addMIP enc mip = runExceptT $ addMIP' enc mip
 
-addMIP' :: SAT.AddPBNL m enc => enc -> MIP.Problem Rational -> ExceptT String m (Integer.Expr, Integer -> Rational, SAT.Model -> Map MIP.Var Integer)
+addMIP' :: SAT.AddPBNL m enc => enc -> MIP.Problem Rational -> ExceptT String m (Integer.Expr, MIP2PBInfo)
 addMIP' enc mip = do
   if not (Set.null nivs) then do
     throwE $ "cannot handle non-integer variables: " ++ intercalate ", " (map MIP.fromVar (Set.toList nivs))
@@ -108,22 +128,11 @@ addMIP' enc mip = do
             (if MIP.objDir obj == MIP.OptMin then 1 else -1)
         obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms (MIP.objExpr obj)]
 
-    let transformObjVal :: Integer -> Rational
-        transformObjVal val = fromIntegral val / fromIntegral d
+    return (obj2, MIP2PBInfo vmap d)
 
-        transformModel :: SAT.Model -> Map MIP.Var Integer
-        transformModel m = Map.fromList
-          [ (v, Integer.eval m (vmap Map.! v)) | v <- Set.toList ivs ]
-
-    return (obj2, transformObjVal, transformModel)
   where
     ivs = MIP.integerVariables mip
     nivs = MIP.variables mip `Set.difference` ivs
-
-    asInteger :: Rational -> Integer
-    asInteger r
-      | denominator r /= 1 = error (show r ++ " is not integer")
-      | otherwise = numerator r
 
     nonAdjacentPairs :: [a] -> [(a,a)]
     nonAdjacentPairs (x1:x2:xs) = [(x1,x3) | x3 <- xs] ++ nonAdjacentPairs (x2:xs)
@@ -132,5 +141,12 @@ addMIP' enc mip = do
     asBin :: Integer.Expr -> SAT.Lit
     asBin (Integer.Expr [(1,[lit])]) = lit
     asBin _ = error "asBin: failure"
+
+-- -----------------------------------------------------------------------------
+
+asInteger :: Rational -> Integer
+asInteger r
+  | denominator r /= 1 = error (show r ++ " is not integer")
+  | otherwise = numerator r
 
 -- -----------------------------------------------------------------------------

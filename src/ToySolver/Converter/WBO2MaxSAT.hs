@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.WBO2MaxSAT
@@ -8,10 +10,13 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (FlexibleContexts, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
-module ToySolver.Converter.WBO2MaxSAT (convert) where
+module ToySolver.Converter.WBO2MaxSAT
+  ( convert
+  , WBO2MaxSATInfo (..)
+  ) where
 
 import Control.Applicative
 import Control.Monad
@@ -22,6 +27,7 @@ import Data.Monoid
 import qualified Data.Sequence as Seq
 import qualified Data.PseudoBoolean as PBFile
 
+import ToySolver.Converter.Base
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
@@ -29,7 +35,7 @@ import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import ToySolver.SAT.Store.CNF
 import qualified ToySolver.Text.CNF as CNF
 
-convert :: PBFile.SoftFormula -> (CNF.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
+convert :: PBFile.SoftFormula -> (CNF.WCNF, WBO2MaxSATInfo)
 convert formula = runST $ do
   db <- newCNFStore
   SAT.newVars_ db (PBFile.wboNumVars formula)
@@ -73,16 +79,25 @@ convert formula = runST $ do
              , CNF.wcnfTopCost = top
              , CNF.wcnfClauses = F.toList cs
              }
-
   defs <- Tseitin.getDefinitions tseitin
-  let extendModel :: SAT.Model -> SAT.Model
-      extendModel m = array (1, CNF.cnfNumVars cnf) (assocs a)
-        where
-          -- Use BOXED array to tie the knot
-          a :: Array SAT.Var Bool
-          a = array (1, CNF.cnfNumVars cnf) $
-                assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
+  return (wcnf, WBO2MaxSATInfo (PBFile.wboNumVars formula) (CNF.cnfNumVars cnf) defs)
 
-  return (wcnf, extendModel, SAT.restrictModel (PBFile.wboNumVars formula))
+-- same as PB2SATInfo
+data WBO2MaxSATInfo = WBO2MaxSATInfo !Int !Int [(SAT.Var, Tseitin.Formula)]
+
+instance Transformer WBO2MaxSATInfo where
+  type Source WBO2MaxSATInfo = SAT.Model
+  type Target WBO2MaxSATInfo = SAT.Model
+
+instance ForwardTransformer WBO2MaxSATInfo where
+  transformForward (WBO2MaxSATInfo _nv1 nv2 defs) m = array (1, nv2) (assocs a)
+    where
+      -- Use BOXED array to tie the knot
+      a :: Array SAT.Var Bool
+      a = array (1, nv2) $
+            assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
+
+instance BackwardTransformer WBO2MaxSATInfo where
+  transformBackward (WBO2MaxSATInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
 
 -- -----------------------------------------------------------------------------

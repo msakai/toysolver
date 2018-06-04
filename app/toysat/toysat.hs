@@ -42,7 +42,8 @@ import qualified Data.Vector.Unboxed as V
 import Data.Version
 import Data.Scientific as Scientific
 import Data.Time
-import Options.Applicative
+import Options.Applicative hiding (info)
+import qualified Options.Applicative
 import System.IO
 import System.Exit
 #if !MIN_VERSION_time(1,5,0)
@@ -64,6 +65,7 @@ import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
+import ToySolver.Converter.Base
 import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.MIP2PB as MIP2PB
@@ -404,7 +406,7 @@ satConfigParser = SAT.Config
       <> help "check model for debugging"
 
 parserInfo :: ParserInfo Options
-parserInfo = info (helper <*> versionOption <*> optionsParser)
+parserInfo = Options.Applicative.info (helper <*> versionOption <*> optionsParser)
   $  fullDesc
   <> header "toysat - a solver for SAT-related problems"
   where
@@ -733,7 +735,7 @@ solveMUS opt solver gcnf = do
   (idx2clauses :: Array Int [SAT.PackedClause]) <- freeze idx2clausesM
 
   when (optInitSP opt) $ do
-    let wcnf = GCNF2MaxSAT.convert gcnf
+    let (wcnf, _) = GCNF2MaxSAT.convert gcnf
     initPolarityUsingSP solver (CNF.gcnfNumVars gcnf)
       (CNF.wcnfNumVars wcnf) [(fromIntegral w, clause) | (w, clause) <- CNF.wcnfClauses wcnf]
     return ()
@@ -812,14 +814,15 @@ solvePB opt solver formula = do
 
   spHighlyBiased <- 
     if optInitSP opt then do
-      let (cnf, _, _) = PB2SAT.convert formula
+      let (cnf, _) = PB2SAT.convert formula
       initPolarityUsingSP solver nv (CNF.cnfNumVars cnf) [(1.0, clause) | clause <- CNF.cnfClauses cnf]
     else
       return IntMap.empty
 
   initialModel <- 
     if optLocalSearchInitial opt then do
-      let (wcnf, _, mtrans) = WBO2MaxSAT.convert $ PB2WBO.convert formula
+      let (wbo,  info1) = PB2WBO.convert formula
+          (wcnf, info2) = WBO2MaxSAT.convert wbo
       fixed <- filter (\lit -> abs lit <= nv) <$> SAT.getFixedLiterals solver
       let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= nv]
           var_init2 = IntMap.map (>0) spHighlyBiased
@@ -836,7 +839,7 @@ solvePB opt solver formula = do
       case ret of
         Nothing -> return Nothing
         Just (obj,m) -> do
-          let m2 = mtrans m
+          let m2 = transformBackward info1 $ transformBackward info2 m
           forM_ (assocs m2) $ \(v, val) -> do
             SAT.setVarPolarity solver v val
           if obj < CNF.wcnfTopCost wcnf then
@@ -912,7 +915,9 @@ mainWBO opt solver = do
 
 solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
 solveWBO opt solver isMaxSat formula =
-  solveWBO' opt solver isMaxSat formula (WBO2MaxSAT.convert formula) Nothing
+  solveWBO' opt solver isMaxSat formula (wcnf, transformForward info, transformBackward info) Nothing
+  where
+    (wcnf, info) = WBO2MaxSAT.convert formula
 
 solveWBO' :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> (CNF.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model) -> Maybe FilePath -> IO ()
 solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
@@ -1020,7 +1025,9 @@ mainMaxSAT opt solver = do
 
 solveMaxSAT :: Options -> SAT.Solver -> CNF.WCNF -> Maybe FilePath -> IO ()
 solveMaxSAT opt solver wcnf wcnfFileName =
-  solveWBO' opt solver True (MaxSAT2WBO.convert wcnf) (wcnf, id, id) wcnfFileName
+  solveWBO' opt solver True wbo (wcnf, transformBackward info, transformForward info) wcnfFileName
+  where
+    (wbo, info) = MaxSAT2WBO.convert wcnf
 
 -- ------------------------------------------------------------------------
 
@@ -1056,12 +1063,12 @@ solveMIP opt solver mip = do
       putCommentLine msg
       putSLine "UNKNOWN"
       exitFailure
-    Right (obj, otrans, mtrans) -> do
+    Right (obj, info) -> do
       (linObj, linObjOffset) <- Integer.linearize pbnlc obj
 
-      let transformObjVal :: Integer -> Rational
-          transformObjVal val = otrans (val + linObjOffset)
-  
+      let transformObjValBackward :: Integer -> Rational
+          transformObjValBackward val = MIP2PB.transformObjValBackward info (val + linObjOffset)
+
           printModel :: Map MIP.Var Integer -> IO ()
           printModel m = do
             forM_ (Map.toList m) $ \(v, val) -> do
@@ -1083,7 +1090,7 @@ solveMIP opt solver mip = do
       pbo <- PBO.newOptimizer solver linObj
       setupOptimizer pbo opt
       PBO.setOnUpdateBestSolution pbo $ \_ val -> do
-        putOLine $ showRational (optPrintRational opt) (transformObjVal val)
+        putOLine $ showRational (optPrintRational opt) (transformObjValBackward val)
   
       finally (PBO.optimize pbo) $ do
         ret <- PBO.getBestSolution pbo
@@ -1098,8 +1105,8 @@ solveMIP opt solver mip = do
             if b
               then putSLine "OPTIMUM FOUND"
               else putSLine "SATISFIABLE"
-            let m2   = mtrans m
-                val2 = transformObjVal val
+            let m2   = transformBackward info m
+                val2 = transformObjValBackward val
             printModel m2
             writeSol m2 val2
 

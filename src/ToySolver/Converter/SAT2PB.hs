@@ -12,19 +12,25 @@
 -----------------------------------------------------------------------------
 module ToySolver.Converter.SAT2PB
   ( convert
+  , SAT2PBInfo
   ) where
 
 import qualified Data.PseudoBoolean as PBFile
+import ToySolver.Converter.Base
 import ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.CNF as CNF
 
-convert :: CNF.CNF -> PBFile.Formula
+type SAT2PBInfo = IdentityTransformer SAT.Model
+
+convert :: CNF.CNF -> (PBFile.Formula, SAT2PBInfo)
 convert cnf
-  = PBFile.Formula
-  { PBFile.pbObjectiveFunction = Nothing
-  , PBFile.pbConstraints = map f (CNF.cnfClauses cnf)
-  , PBFile.pbNumVars = CNF.cnfNumVars cnf
-  , PBFile.pbNumConstraints = CNF.cnfNumClauses cnf
-  }
+  = ( PBFile.Formula
+      { PBFile.pbObjectiveFunction = Nothing
+      , PBFile.pbConstraints = map f (CNF.cnfClauses cnf)
+      , PBFile.pbNumVars = CNF.cnfNumVars cnf
+      , PBFile.pbNumConstraints = CNF.cnfNumClauses cnf
+      }
+    , IdentityTransformer
+    )
   where
     f clause = ([(1,[l]) | l <- SAT.unpackClause clause], PBFile.Ge, 1)

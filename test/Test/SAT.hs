@@ -47,6 +47,7 @@ import qualified ToySolver.SAT.Store.CNF as CNFStore
 import qualified ToySolver.SAT.ExistentialQuantification as ExistentialQuantification
 
 import qualified Data.PseudoBoolean as PBFile
+import ToySolver.Converter.Base
 import qualified ToySolver.Converter.NAESAT as NAESAT
 import qualified ToySolver.Converter.PB2SAT as PB2SAT
 import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
@@ -1904,7 +1905,7 @@ prop_sat2naesat_forward :: Property
 prop_sat2naesat_forward = forAll arbitraryCNF $ \cnf ->
   let (nae,info) = NAESAT.sat2naesat cnf
   in and
-     [ evalCNF m cnf == NAESAT.evalNAESAT (NAESAT.sat2naesat_forward info m) nae
+     [ evalCNF m cnf == NAESAT.evalNAESAT (transformForward info m) nae
      | m <- allAssignments (CNF.cnfNumVars cnf)
      ]
 
@@ -1912,7 +1913,7 @@ prop_sat2naesat_backward :: Property
 prop_sat2naesat_backward = forAll arbitraryCNF $ \cnf ->
   let (nae,info) = NAESAT.sat2naesat cnf
   in and
-     [ evalCNF (NAESAT.sat2naesat_backward info m) cnf == NAESAT.evalNAESAT m nae
+     [ evalCNF (transformBackward info m) cnf == NAESAT.evalNAESAT m nae
      | m <- allAssignments (fst nae)
      ]
 
@@ -1920,7 +1921,7 @@ prop_naesat2sat_forward :: Property
 prop_naesat2sat_forward = forAll arbitraryNAESAT $ \nae ->
   let (cnf,info) = NAESAT.naesat2sat nae
   in and
-     [ NAESAT.evalNAESAT m nae == evalCNF (NAESAT.naesat2sat_forward info m) cnf
+     [ NAESAT.evalNAESAT m nae == evalCNF (transformForward info m) cnf
      | m <- allAssignments (fst nae)
      ]
 
@@ -1928,7 +1929,7 @@ prop_naesat2sat_backward :: Property
 prop_naesat2sat_backward = forAll arbitraryNAESAT $ \nae ->
   let (cnf,info) = NAESAT.naesat2sat nae
   in and
-     [ NAESAT.evalNAESAT (NAESAT.naesat2sat_backward info m) nae == evalCNF m cnf
+     [ NAESAT.evalNAESAT (transformBackward info m) nae == evalCNF m cnf
      | m <- allAssignments (CNF.cnfNumVars cnf)
      ]
 
@@ -1937,13 +1938,12 @@ prop_naesat2naeksat_forward =
   forAll arbitraryNAESAT $ \nae ->
   forAll (choose (3,10)) $ \k ->
     let (nae',info) = NAESAT.naesat2naeksat k nae
-    in counterexample (show (nae',info)) $
-         all (\c -> VG.length c <= k) (snd nae')
-         &&
-         and
-         [ NAESAT.evalNAESAT m nae == NAESAT.evalNAESAT (NAESAT.naesat2naeksat_forward info m) nae'
-         | m <- allAssignments (fst nae)
-         ]
+    in all (\c -> VG.length c <= k) (snd nae')
+       &&
+       and
+       [ NAESAT.evalNAESAT m nae == NAESAT.evalNAESAT (transformForward info m) nae'
+       | m <- allAssignments (fst nae)
+       ]
 
 prop_naesat2naeksat_backward :: Property
 prop_naesat2naeksat_backward =
@@ -1951,18 +1951,17 @@ prop_naesat2naeksat_backward =
   forAll (choose (3,10)) $ \k ->
     let (nae',info) = NAESAT.naesat2naeksat k nae
     in forAll (replicateM (fst nae') arbitrary >>= \m -> return (array (1, fst nae') (zip [1..] m))) $ \m ->
-         NAESAT.evalNAESAT (NAESAT.naesat2naeksat_backward info m) nae || not (NAESAT.evalNAESAT m nae')
+         NAESAT.evalNAESAT (transformBackward info m) nae || not (NAESAT.evalNAESAT m nae')
 
 prop_naesat2maxcut_forward :: Property
 prop_naesat2maxcut_forward =
   forAll arbitraryNAESAT $ \nae ->
-    let conv@(maxcut, info@(_, threshold)) = SAT2MaxCut.naesat2maxcut nae
-    in counterexample (show conv) $
-         and
-         [ NAESAT.evalNAESAT m nae == (MaxCut.eval sol maxcut >= threshold)
-         | m <- allAssignments (fst nae)
-         , let sol = SAT2MaxCut.naesat2maxcut_forward info m
-         ]
+    let conv@(maxcut, info@(ComposedTransformer _ (SAT2MaxCut.NAE3SAT2MaxCutInfo threshold))) = SAT2MaxCut.naesat2maxcut nae
+    in and
+       [ NAESAT.evalNAESAT m nae == (MaxCut.eval sol maxcut >= threshold)
+       | m <- allAssignments (fst nae)
+       , let sol = transformForward info m
+       ]
 
 arbitraryNAESAT :: Gen NAESAT.NAESAT
 arbitraryNAESAT = do
@@ -1983,7 +1982,7 @@ prop_pb2sat = QM.monadicIO $ do
             , PBFile.pbNumConstraints = length cs
             , PBFile.pbConstraints = map f cs
             }
-  let (cnf, mforth, mback) = PB2SAT.convert opb
+  let (cnf, info) = PB2SAT.convert opb
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
@@ -1993,13 +1992,13 @@ prop_pb2sat = QM.monadicIO $ do
   case ret1 of
     Nothing -> return ()
     Just m1 -> do
-      let m2 = mforth m1
+      let m2 = transformForward info m1
       QM.assert $ bounds m2 == (1, CNF.cnfNumVars cnf)
       QM.assert $ evalCNF m2 cnf
   case ret2 of
     Nothing -> return ()
     Just m2 -> do
-      let m1 = mback m2
+      let m1 = transformBackward info m2
       QM.assert $ bounds m1 == (1, nv)
       QM.assert $ evalPB m1 pb
 
@@ -2015,7 +2014,7 @@ prop_wbo2maxsat = QM.monadicIO $ do
             , PBFile.wboConstraints = map f cs
             , PBFile.wboTopCost = top
             }
-  let (wcnf, mforth, mback) = WBO2MaxSAT.convert wbo1'
+  let (wcnf, info) = WBO2MaxSAT.convert wbo1'
       wbo2 = ( CNF.wcnfNumVars wcnf
              , [ ( if w == CNF.wcnfTopCost wcnf then Nothing else Just w
                  , (PBRelGE, [(1,l) | l <- SAT.unpackClause clause], 1)
@@ -2034,13 +2033,13 @@ prop_wbo2maxsat = QM.monadicIO $ do
   case ret1 of
     Nothing -> return ()
     Just (m1,val) -> do
-      let m2 = mforth m1
+      let m2 = transformForward info m1
       QM.assert $ bounds m2 == (1, CNF.wcnfNumVars wcnf)
       QM.assert $ evalWBO m2 wbo2 == Just val
   case ret2 of
     Nothing -> return ()
     Just (m2,val) -> do
-      let m1 = mback m2
+      let m1 = transformBackward info m2
       QM.assert $ bounds m1 == (1, nv)
       QM.assert $ evalWBO m1 wbo1 == Just val
 
@@ -2056,7 +2055,7 @@ prop_wbo2pb = QM.monadicIO $ do
             , PBFile.wboConstraints = map f cs
             , PBFile.wboTopCost = top
             }
-  let (opb, mforth, mback) = WBO2PB.convert wbo'
+  let (opb, info) = WBO2PB.convert wbo'
       obj = fromMaybe [] $ PBFile.pbObjectiveFunction opb
       f (lhs, PBFile.Ge, rhs) = (PBRelGE, lhs, rhs)
       f (lhs, PBFile.Eq, rhs) = (PBRelEQ, lhs, rhs)
@@ -2072,14 +2071,14 @@ prop_wbo2pb = QM.monadicIO $ do
   case ret1 of
     Nothing -> return ()
     Just (m1,val1) -> do
-      let m2 = mforth m1
+      let m2 = transformForward info m1
       QM.assert $ bounds m2 == (1, PBFile.pbNumVars opb)
       QM.assert $ evalPBNLC m2 (PBFile.pbNumVars opb, cs2)
       QM.assert $ SAT.evalPBSum m2 obj == val1
   case ret2 of
     Nothing -> return ()
     Just (m2,val2) -> do
-      let m1 = mback m2
+      let m1 = transformBackward info m2
       QM.assert $ bounds m1 == (1,nv)
       QM.assert $ evalWBO m1 wbo == Just val2
 
@@ -2088,7 +2087,7 @@ prop_sat2ksat = QM.monadicIO $ do
   k <- QM.pick $ choose (3,10)
 
   cnf1 <- QM.pick arbitraryCNF
-  let (cnf2, mforth, mback) = SAT2KSAT.convert k cnf1
+  let (cnf2, info) = SAT2KSAT.convert k cnf1
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
@@ -2098,13 +2097,13 @@ prop_sat2ksat = QM.monadicIO $ do
   case ret1 of
     Nothing -> return ()
     Just m1 -> do
-      let m2 = mforth m1
+      let m2 = transformForward info m1
       QM.assert $ bounds m2 == (1, CNF.cnfNumVars cnf2)
       QM.assert $ evalCNF m2 cnf2
   case ret2 of
     Nothing -> return ()
     Just m2 -> do
-      let m1 = mback m2
+      let m1 = transformBackward info m2
       QM.assert $ bounds m1 == (1, CNF.cnfNumVars cnf1)
       QM.assert $ evalCNF m1 cnf1
 

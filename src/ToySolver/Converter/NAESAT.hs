@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.NAESAT
@@ -23,20 +24,14 @@ module ToySolver.Converter.NAESAT
   , evalNAEClause
 
   -- * Conversion with SAT problem
-  , SAT2NAESATInfo
+  , SAT2NAESATInfo (..)
   , sat2naesat
-  , sat2naesat_forward
-  , sat2naesat_backward
-  , NAESAT2SATInfo
+  , NAESAT2SATInfo (..)
   , naesat2sat
-  , naesat2sat_forward
-  , naesat2sat_backward
 
   -- * Conversion from general NAE-SAT to NAE-k-SAT
-  , NAESAT2NAEKSATInfo
+  , NAESAT2NAEKSATInfo (..)
   , naesat2naeksat
-  , naesat2naeksat_forward
-  , naesat2naeksat_backward
   ) where
 
 import Control.Monad.State.Strict
@@ -44,6 +39,7 @@ import Data.Array.Unboxed
 import qualified Data.IntMap as IntMap
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
+import ToySolver.Converter.Base
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.CNF as CNF
 
@@ -60,13 +56,13 @@ evalNAEClause m c =
 
 -- ------------------------------------------------------------------------
 
--- | Information for 'sat2naesat_forward' and 'sat2naesat_backward'.
-type SAT2NAESATInfo = SAT.Var
+-- | Information of 'sat2naesat' conversion
+newtype SAT2NAESATInfo = SAT2NAESATInfo SAT.Var
 
 -- | Convert a CNF formula φ to an equisatifiable NAE-SAT formula ψ,
 -- together with a 'SAT2NAESATInfo'
 sat2naesat :: CNF.CNF -> (NAESAT, SAT2NAESATInfo)
-sat2naesat cnf = (ret, z)
+sat2naesat cnf = (ret, SAT2NAESATInfo z)
   where
     z = CNF.cnfNumVars cnf + 1
     ret =
@@ -74,20 +70,20 @@ sat2naesat cnf = (ret, z)
       , [VG.snoc clause z | clause <- CNF.cnfClauses cnf]
       )
 
--- | Suppose @(ψ, info) = 'sat2naesat' φ@, @sat2naesat_forward@ transform
--- a model of φ to a model of ψ.
-sat2naesat_forward :: SAT2NAESATInfo -> SAT.Model -> SAT.Model
-sat2naesat_forward z m = array (1,z) $ (z,False) : assocs m
+instance Transformer SAT2NAESATInfo where
+  type Source SAT2NAESATInfo = SAT.Model
+  type Target SAT2NAESATInfo = SAT.Model
 
--- | Suppose @(ψ, info) = 'sat2naesat' φ@, @sat2naesat_forward@ transform
--- a model of ψ to a model of φ.
-sat2naesat_backward :: SAT2NAESATInfo -> SAT.Model -> SAT.Model
-sat2naesat_backward z m =
-  SAT.restrictModel (z - 1) $
-    if SAT.evalVar m z then amap not m else m
+instance ForwardTransformer SAT2NAESATInfo where
+  transformForward (SAT2NAESATInfo z) m = array (1,z) $ (z,False) : assocs m
 
--- | Information for 'naesat2sat_forward' and 'naesat2sat_backward'.
-type NAESAT2SATInfo = ()
+instance BackwardTransformer SAT2NAESATInfo where
+  transformBackward (SAT2NAESATInfo z) m = 
+    SAT.restrictModel (z - 1) $
+      if SAT.evalVar m z then amap not m else m
+
+-- | Information of 'naesat2sat' conversion
+data NAESAT2SATInfo = NAESAT2SATInfo
 
 -- | Convert a NAE-SAT formula φ to an equisatifiable CNF formula ψ,
 -- together with a 'NAESAT2SATInfo'
@@ -98,26 +94,27 @@ naesat2sat (n,cs) =
     , CNF.cnfNumClauses = length cs * 2
     , CNF.cnfClauses = concat [[c, VG.map negate c] | c <- cs]
     }
-  , ()
+  , NAESAT2SATInfo
   )
 
--- | Suppose @(ψ, info) = 'naesat2sat' φ@, @naesat2sat_forward@ transform
--- a model of φ to a model of ψ.
-naesat2sat_forward :: NAESAT2SATInfo -> SAT.Model -> SAT.Model
-naesat2sat_forward () = id
+instance Transformer NAESAT2SATInfo where
+  type Source NAESAT2SATInfo = SAT.Model
+  type Target NAESAT2SATInfo = SAT.Model
 
--- | Suppose @(ψ, info) = 'naesat2sat' φ@, @naesat2sat_forward@ transform
--- a model of ψ to a model of φ.
-naesat2sat_backward :: NAESAT2SATInfo -> SAT.Model -> SAT.Model
-naesat2sat_backward () = id
+instance ForwardTransformer NAESAT2SATInfo where
+  transformForward _ m = m
+
+instance BackwardTransformer NAESAT2SATInfo where
+  transformBackward _ m = m
 
 -- ------------------------------------------------------------------------
 
-type NAESAT2NAEKSATInfo = (Int, Int, [(SAT.Var, NAEClause, NAEClause)])
+-- Information of 'naesat2naeksta' conversion
+data NAESAT2NAEKSATInfo = NAESAT2NAEKSATInfo !Int !Int [(SAT.Var, NAEClause, NAEClause)]
 
 naesat2naeksat :: Int -> NAESAT -> (NAESAT, NAESAT2NAEKSATInfo)
 naesat2naeksat k _ | k < 3 = error "naesat2naeksat: k must be >=3"
-naesat2naeksat k (n,cs) = ((n', cs'), (n, n', reverse table))
+naesat2naeksat k (n,cs) = ((n', cs'), NAESAT2NAEKSATInfo n n' (reverse table))
   where
     (cs',(n',table)) = flip runState (n,[]) $ do
       liftM concat $ forM cs $ \c -> do
@@ -132,24 +129,29 @@ naesat2naeksat k (n,cs) = ((n', cs'), (n, n', reverse table))
                 go (VG.cons (-w) cs2) (VG.snoc cs1 w : r)
         go c []
 
-naesat2naeksat_forward :: NAESAT2NAEKSATInfo -> SAT.Model -> SAT.Model
-naesat2naeksat_forward (_n1,n2,table) m = array (1,n2) (go (IntMap.fromList (assocs m)) table)
-  where
-    go im [] = IntMap.toList im
-    go im ((w,cs1,cs2) : tbl) = go (IntMap.insert w val im) tbl
-      where
-        ev x
-          | x > 0     = im IntMap.! x
-          | otherwise = not $ im IntMap.! (- x)
-        needTrue  = VG.all ev cs2 || VG.all (not . ev) cs1
-        needFalse = VG.all ev cs1 || VG.all (not . ev) cs2
-        val
-          | needTrue && needFalse = True -- error "naesat2naeksat_forward: invalid model"
-          | needTrue  = True
-          | needFalse = False
-          | otherwise = False
+instance Transformer NAESAT2NAEKSATInfo where
+  type Source NAESAT2NAEKSATInfo = SAT.Model
+  type Target NAESAT2NAEKSATInfo = SAT.Model
 
-naesat2naeksat_backward :: NAESAT2NAEKSATInfo -> SAT.Model -> SAT.Model
-naesat2naeksat_backward (n1,_,_) m = SAT.restrictModel n1 m
+instance ForwardTransformer NAESAT2NAEKSATInfo where
+  transformForward (NAESAT2NAEKSATInfo _n1 n2 table) m =
+    array (1,n2) (go (IntMap.fromList (assocs m)) table)
+    where
+      go im [] = IntMap.toList im
+      go im ((w,cs1,cs2) : tbl) = go (IntMap.insert w val im) tbl
+        where
+          ev x
+            | x > 0     = im IntMap.! x
+            | otherwise = not $ im IntMap.! (- x)
+          needTrue  = VG.all ev cs2 || VG.all (not . ev) cs1
+          needFalse = VG.all ev cs1 || VG.all (not . ev) cs2
+          val
+            | needTrue && needFalse = True -- error "naesat2naeksat_forward: invalid model"
+            | needTrue  = True
+            | needFalse = False
+            | otherwise = False
+
+instance BackwardTransformer NAESAT2NAEKSATInfo where
+  transformBackward (NAESAT2NAEKSATInfo n1 _n2 _table) = SAT.restrictModel n1
 
 -- ------------------------------------------------------------------------

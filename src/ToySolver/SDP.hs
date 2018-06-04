@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SDP
@@ -7,7 +8,7 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  exprimental
--- Portability :  portable
+-- Portability :  non-portable
 --
 -- References:
 --
@@ -18,13 +19,12 @@
 
 module ToySolver.SDP
   ( dualize
-  , DualizeInfo
-  , transformSolutionForward
-  , transformSolutionBackward
+  , DualizeInfo (..)
   ) where
 
 import qualified Data.Map.Strict as Map
 import Data.Scientific (Scientific)
+import ToySolver.Converter.Base
 import qualified ToySolver.Text.SDPFile as SDPFile
 
 -- | Given a primal-dual pair (P), (D), it returns another primal-dual pair (P'), (D')
@@ -136,49 +136,53 @@ blockIndexesLen n = if n >= 0 then n*(n+1) `div` 2 else -n
 
 data DualizeInfo = DualizeInfo Int [Int]
 
-transformSolutionForward :: DualizeInfo -> SDPFile.Solution -> SDPFile.Solution
-transformSolutionForward (DualizeInfo _origM origBlockStruct) 
-  SDPFile.Solution
-  { SDPFile.primalVector = xV
-  , SDPFile.primalMatrix = xM
-  , SDPFile.dualMatrix   = yM
-  } =
-  SDPFile.Solution
-  { SDPFile.primalVector = zV
-  , SDPFile.primalMatrix = zM
-  , SDPFile.dualMatrix   = wM
-  }
-  where
-    zV = concat [[SDPFile.blockElem i j block | (i,j) <- blockIndexes b] | (b,block) <- zip origBlockStruct yM]
-    zM = Map.empty : Map.empty : yM
-    wM =
-      [ Map.fromList $ zipWith (\i x -> ((i,i), if x >= 0 then   x else 0)) [1..] xV
-      , Map.fromList $ zipWith (\i x -> ((i,i), if x <= 0 then  -x else 0)) [1..] xV
-      ] ++ xM
+instance Transformer DualizeInfo where
+  type Source DualizeInfo = SDPFile.Solution
+  type Target DualizeInfo = SDPFile.Solution
 
-transformSolutionBackward :: DualizeInfo -> SDPFile.Solution -> SDPFile.Solution
-transformSolutionBackward (DualizeInfo origM origBlockStruct)
-  SDPFile.Solution
-  { SDPFile.primalVector = zV
-  , SDPFile.primalMatrix = _zM
-  , SDPFile.dualMatrix   = wM
-  } =
-  case wM of
-    (xps:xns:xM) ->
-      SDPFile.Solution
-      { SDPFile.primalVector = xV
-      , SDPFile.primalMatrix = xM
-      , SDPFile.dualMatrix   = yM
-      }
-      where
-        xV = [SDPFile.blockElem i i xps - SDPFile.blockElem i i xns | i <- [1..origM]]
-        yM = f origBlockStruct zV
-          where
-            f [] _ = []
-            f (block : blocks) zV1 =
-              case splitAt (blockIndexesLen block) zV1 of
-                (vals, zV2) -> symblock (zip (blockIndexes block) vals) : f blocks zV2
-    _ -> error "ToySolver.SDP.transformSolutionBackward: invalid solution"
+instance ForwardTransformer DualizeInfo where
+  transformForward (DualizeInfo _origM origBlockStruct) 
+    SDPFile.Solution
+    { SDPFile.primalVector = xV
+    , SDPFile.primalMatrix = xM
+    , SDPFile.dualMatrix   = yM
+    } =
+    SDPFile.Solution
+    { SDPFile.primalVector = zV
+    , SDPFile.primalMatrix = zM
+    , SDPFile.dualMatrix   = wM
+    }
+    where
+      zV = concat [[SDPFile.blockElem i j block | (i,j) <- blockIndexes b] | (b,block) <- zip origBlockStruct yM]
+      zM = Map.empty : Map.empty : yM
+      wM =
+        [ Map.fromList $ zipWith (\i x -> ((i,i), if x >= 0 then   x else 0)) [1..] xV
+        , Map.fromList $ zipWith (\i x -> ((i,i), if x <= 0 then  -x else 0)) [1..] xV
+        ] ++ xM
+
+instance BackwardTransformer DualizeInfo where
+  transformBackward (DualizeInfo origM origBlockStruct)
+    SDPFile.Solution
+    { SDPFile.primalVector = zV
+    , SDPFile.primalMatrix = _zM
+    , SDPFile.dualMatrix   = wM
+    } =
+    case wM of
+      (xps:xns:xM) ->
+        SDPFile.Solution
+        { SDPFile.primalVector = xV
+        , SDPFile.primalMatrix = xM
+        , SDPFile.dualMatrix   = yM
+        }
+        where
+          xV = [SDPFile.blockElem i i xps - SDPFile.blockElem i i xns | i <- [1..origM]]
+          yM = f origBlockStruct zV
+            where
+              f [] _ = []
+              f (block : blocks) zV1 =
+                case splitAt (blockIndexesLen block) zV1 of
+                  (vals, zV2) -> symblock (zip (blockIndexes block) vals) : f blocks zV2
+      _ -> error "ToySolver.SDP.transformSolutionBackward: invalid solution"
 
 symblock :: [((Int,Int), Scientific)] -> SDPFile.Block
 symblock es = Map.fromList $ do
