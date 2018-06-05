@@ -1,7 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.WBO2MaxSAT
@@ -10,24 +7,23 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.WBO2MaxSAT
   ( convert
-  , WBO2MaxSATInfo (..)
+  , WBO2MaxSATInfo
   ) where
 
 import Control.Applicative
 import Control.Monad
 import Control.Monad.ST
-import Data.Array.IArray
 import qualified Data.Foldable as F
 import Data.Monoid
 import qualified Data.Sequence as Seq
 import qualified Data.PseudoBoolean as PBFile
 
-import ToySolver.Converter.Base
+import ToySolver.Converter.Tseitin
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
@@ -80,24 +76,8 @@ convert formula = runST $ do
              , CNF.wcnfClauses = F.toList cs
              }
   defs <- Tseitin.getDefinitions tseitin
-  return (wcnf, WBO2MaxSATInfo (PBFile.wboNumVars formula) (CNF.cnfNumVars cnf) defs)
+  return (wcnf, TseitinInfo (PBFile.wboNumVars formula) (CNF.cnfNumVars cnf) defs)
 
--- same as PB2SATInfo
-data WBO2MaxSATInfo = WBO2MaxSATInfo !Int !Int [(SAT.Var, Tseitin.Formula)]
-
-instance Transformer WBO2MaxSATInfo where
-  type Source WBO2MaxSATInfo = SAT.Model
-  type Target WBO2MaxSATInfo = SAT.Model
-
-instance ForwardTransformer WBO2MaxSATInfo where
-  transformForward (WBO2MaxSATInfo _nv1 nv2 defs) m = array (1, nv2) (assocs a)
-    where
-      -- Use BOXED array to tie the knot
-      a :: Array SAT.Var Bool
-      a = array (1, nv2) $
-            assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
-
-instance BackwardTransformer WBO2MaxSATInfo where
-  transformBackward (WBO2MaxSATInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
+type WBO2MaxSATInfo = TseitinInfo
 
 -- -----------------------------------------------------------------------------
