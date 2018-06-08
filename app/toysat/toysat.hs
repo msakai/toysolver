@@ -1,4 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables, CPP #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
 -----------------------------------------------------------------------------
 -- |
@@ -915,12 +917,12 @@ mainWBO opt solver = do
 
 solveWBO :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> IO ()
 solveWBO opt solver isMaxSat formula =
-  solveWBO' opt solver isMaxSat formula (wcnf, transformForward info, transformBackward info) Nothing
-  where
-    (wcnf, info) = WBO2MaxSAT.convert formula
+  solveWBO' opt solver isMaxSat formula (WBO2MaxSAT.convert formula) Nothing
 
-solveWBO' :: Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> (CNF.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model) -> Maybe FilePath -> IO ()
-solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
+solveWBO'
+  :: (BackwardTransformer wbo2maxsat_info, Source wbo2maxsat_info ~ SAT.Model, Target wbo2maxsat_info ~ SAT.Model)
+  => Options -> SAT.Solver -> Bool -> PBFile.SoftFormula -> (CNF.WCNF, wbo2maxsat_info) -> Maybe FilePath -> IO ()
+solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
   let nv = PBFile.wboNumVars formula
       nc = PBFile.wboNumConstraints formula
   putCommentLine $ printf "#vars %d" nv
@@ -939,7 +941,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, _, mtrans) wcnfFileName = do
     else
       return IntMap.empty
 
-  initialModel <- liftM (fmap (mtrans . snd)) $
+  initialModel <- liftM (fmap (transformBackward wbo2maxsat_info . snd)) $
     if optLocalSearchInitial opt then do
       fixed <- SAT.getFixedLiterals solver
       let var_init1 = IntMap.fromList [(abs lit, lit > 0) | lit <- fixed, abs lit <= nv]
@@ -1025,7 +1027,7 @@ mainMaxSAT opt solver = do
 
 solveMaxSAT :: Options -> SAT.Solver -> CNF.WCNF -> Maybe FilePath -> IO ()
 solveMaxSAT opt solver wcnf wcnfFileName =
-  solveWBO' opt solver True wbo (wcnf, transformBackward info, transformForward info) wcnfFileName
+  solveWBO' opt solver True wbo (wcnf, ReversedTransformer info) wcnfFileName
   where
     (wbo, info) = MaxSAT2WBO.convert wcnf
 
