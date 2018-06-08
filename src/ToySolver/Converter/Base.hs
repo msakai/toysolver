@@ -18,6 +18,7 @@ module ToySolver.Converter.Base
   , BackwardTransformer (..)
   , ComposedTransformer (..)
   , IdentityTransformer (..)
+  , ReversedTransformer (..)
   ) where
 
 
@@ -58,3 +59,16 @@ instance ForwardTransformer (IdentityTransformer a) where
 
 instance BackwardTransformer (IdentityTransformer a) where
   transformBackward IdentityTransformer = id
+
+
+data ReversedTransformer t = ReversedTransformer t
+
+instance Transformer t => Transformer (ReversedTransformer t) where
+  type Source (ReversedTransformer t) = Target t
+  type Target (ReversedTransformer t) = Source t
+
+instance BackwardTransformer t => ForwardTransformer (ReversedTransformer t) where
+  transformForward (ReversedTransformer t) = transformBackward t
+
+instance ForwardTransformer t => BackwardTransformer (ReversedTransformer t) where
+  transformBackward (ReversedTransformer t) = transformForward t
