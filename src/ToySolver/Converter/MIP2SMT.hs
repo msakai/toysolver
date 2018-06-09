@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.MIP2SMT
-  ( convert
+  ( mip2smt
   , Options (..)
   , Language (..)
   , YicesVersion (..)
@@ -312,8 +312,8 @@ nonAdjacentPairs :: [a] -> [(a,a)]
 nonAdjacentPairs (x1:x2:xs) = [(x1,x3) | x3 <- xs] ++ nonAdjacentPairs (x2:xs)
 nonAdjacentPairs _ = []
 
-convert :: Options -> MIP.Problem Rational -> Builder
-convert opt mip =
+mip2smt :: Options -> MIP.Problem Rational -> Builder
+mip2smt opt mip =
   mconcat $ map (<> B.singleton '\n') $
     options ++ set_logic ++ defs ++ map (assert opt) (conditions opt False env mip)
     ++ [ assert opt (optimality, Nothing) | optOptimize opt ]
@@ -401,10 +401,10 @@ isInt mip v = vt == MIP.IntegerVariable || vt == MIP.SemiIntegerVariable
 testFile :: FilePath -> IO ()
 testFile fname = do
   mip <- MIP.readLPFile def fname
-  TLIO.putStrLn $ B.toLazyText $ convert def (fmap toRational mip)
+  TLIO.putStrLn $ B.toLazyText $ mip2smt def (fmap toRational mip)
 
 test :: IO ()
-test = TLIO.putStrLn $ B.toLazyText $ convert def testdata
+test = TLIO.putStrLn $ B.toLazyText $ mip2smt def testdata
 
 testdata :: MIP.Problem Rational
 Right testdata = fmap (fmap toRational) $ MIP.parseLPString def "test" $ unlines

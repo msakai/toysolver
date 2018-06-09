@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2SMP
-  ( convert
+  ( pb2smp
   ) where
 
 import Data.ByteString.Builder
@@ -20,8 +20,8 @@ import Data.List
 import Data.Monoid
 import qualified Data.PseudoBoolean as PBFile
 
-convert :: Bool -> PBFile.Formula -> Builder
-convert isUnix formula =
+pb2smp :: Bool -> PBFile.Formula -> Builder
+pb2smp isUnix formula =
   header <>
   decls <>
   char7 '\n' <>

@@ -40,15 +40,15 @@ import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Text.CNF as CNF
 import ToySolver.Converter.ObjType
-import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
-import qualified ToySolver.Converter.MIP2PB as MIP2PB
+import ToySolver.Converter.GCNF2MaxSAT
+import ToySolver.Converter.MIP2PB
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import ToySolver.Converter.PB
-import qualified ToySolver.Converter.PB2IP as PB2IP
-import qualified ToySolver.Converter.PB2LSP as PB2LSP
+import ToySolver.Converter.PB2IP
+import ToySolver.Converter.PB2LSP
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
-import qualified ToySolver.Converter.PB2SMP as PB2SMP
-import qualified ToySolver.Converter.SAT2KSAT as SAT2KSAT
+import ToySolver.Converter.PB2SMP
+import ToySolver.Converter.SAT2KSAT
 import ToySolver.Version
 import ToySolver.Internal.Util (setEncodingChar8)
 
@@ -231,7 +231,7 @@ readProblem o fname = do
         Left err -> hPutStrLn stderr err >> exitFailure
         Right wbo -> return $ ProbWBO wbo
     ".gcnf" ->
-      liftM (ProbWBO . fst . maxsat2wbo . fst . GCNF2MaxSAT.convert) $ CNF.readFile fname
+      liftM (ProbWBO . fst . maxsat2wbo . fst . gcnf2maxsat) $ CNF.readFile fname
     ".lp"   -> ProbMIP <$> MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
     ".mps"  -> ProbMIP <$> MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
     ext ->
@@ -297,7 +297,7 @@ writeProblem o problem = do
                             fst $ linearizePB opb (optLinearizationUsingPB o)
                         | otherwise -> opb
                   ProbMIP mip ->
-                    case MIP2PB.convert (fmap toRational mip) of
+                    case mip2pb (fmap toRational mip) of
                       Left err -> error err
                       Right (opb, _) -> opb
           wbo = case problem of
@@ -306,16 +306,16 @@ writeProblem o problem = do
                   ProbMIP _   -> fst $ pb2wbo opb
           lp  = case problem of
                   ProbOPB opb ->
-                    case PB2IP.convert opb of
+                    case pb2ip opb of
                       (ip, _) -> fmap fromInteger ip
                   ProbWBO wbo ->
-                    case PB2IP.convertWBO (optIndicatorConstraint o) wbo of
+                    case wbo2ip (optIndicatorConstraint o) wbo of
                       (ip, _) -> fmap fromInteger ip
                   ProbMIP mip -> mip
           lsp = case problem of
-                  ProbOPB opb -> PB2LSP.convert opb
-                  ProbWBO wbo -> PB2LSP.convertWBO wbo
-                  ProbMIP _   -> PB2LSP.convert opb
+                  ProbOPB opb -> pb2lsp opb
+                  ProbWBO wbo -> wbo2lsp wbo
+                  ProbMIP _   -> pb2lsp opb
       case map toLower (takeExtension fname) of
         ".opb" -> PBFile.writeOPBFile fname $ normalizePB  opb
         ".wbo" -> PBFile.writeWBOFile fname $ normalizeWBO wbo
@@ -325,7 +325,7 @@ writeProblem o problem = do
               case optKSat o of
                 Nothing -> CNF.writeFile fname cnf
                 Just k ->
-                  let (cnf2, _) = SAT2KSAT.convert k cnf
+                  let (cnf2, _) = sat2ksat k cnf
                   in CNF.writeFile fname cnf2
         ".wcnf" ->
           case wbo2maxsat wbo of
@@ -337,18 +337,18 @@ writeProblem o problem = do
         ".mps" -> MIP.writeMPSFile def{ MIP.optFileEncoding = enc } fname lp
         ".smp" -> do
           withBinaryFile fname WriteMode $ \h ->
-            ByteStringBuilder.hPutBuilder h (PB2SMP.convert False opb)
+            ByteStringBuilder.hPutBuilder h (pb2smp False opb)
         ".smt2" -> do
           withFile fname WriteMode $ \h -> do
             F.mapM_ (hSetEncoding h) enc
             TLIO.hPutStr h $ TextBuilder.toLazyText $
-              MIP2SMT.convert mip2smtOpt (fmap toRational lp)
+              MIP2SMT.mip2smt mip2smtOpt (fmap toRational lp)
         ".ys" -> do
           let lang = MIP2SMT.YICES (if optYices2 o then MIP2SMT.Yices2 else MIP2SMT.Yices1)
           withFile fname WriteMode $ \h -> do
             F.mapM_ (hSetEncoding h) enc
             TLIO.hPutStr h $ TextBuilder.toLazyText $
-              MIP2SMT.convert mip2smtOpt{ MIP2SMT.optLanguage = lang } (fmap toRational lp)
+              MIP2SMT.mip2smt mip2smtOpt{ MIP2SMT.optLanguage = lang } (fmap toRational lp)
         ext -> do
           error $ "unknown file extension: " ++ show ext
 

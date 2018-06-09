@@ -12,8 +12,8 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2LSP
-  ( convert
-  , convertWBO
+  ( pb2lsp
+  , wbo2lsp
   ) where
 
 import Data.ByteString.Builder
@@ -21,8 +21,8 @@ import Data.List
 import Data.Monoid
 import qualified Data.PseudoBoolean as PBFile
 
-convert :: PBFile.Formula -> Builder
-convert formula =
+pb2lsp :: PBFile.Formula -> Builder
+pb2lsp formula =
   byteString "function model() {\n" <>
   decls <>
   constrs <>
@@ -45,8 +45,8 @@ convert formula =
         Just obj' -> byteString "  minimize " <> showSum obj' <> ";\n"
         Nothing -> mempty
 
-convertWBO :: PBFile.SoftFormula -> Builder
-convertWBO softFormula =
+wbo2lsp :: PBFile.SoftFormula -> Builder
+wbo2lsp softFormula =
   byteString "function model() {\n" <>
   decls <>
   constrs <>

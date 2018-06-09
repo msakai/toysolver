@@ -11,20 +11,20 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.SAT2IP
-  ( convert
+  ( sat2ip
   , SAT2IPInfo
   ) where
 
 import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Converter.Base
-import qualified ToySolver.Converter.PB2IP as PB2IP
+import ToySolver.Converter.PB2IP
 import ToySolver.Converter.PB
 import qualified ToySolver.Text.CNF as CNF
 
-type SAT2IPInfo = ComposedTransformer SAT2PBInfo PB2IP.PB2IPInfo
+type SAT2IPInfo = ComposedTransformer SAT2PBInfo PB2IPInfo
 
-convert :: CNF.CNF -> (MIP.Problem Integer, SAT2IPInfo)
-convert cnf = (ip, ComposedTransformer info1 info2)
+sat2ip :: CNF.CNF -> (MIP.Problem Integer, SAT2IPInfo)
+sat2ip cnf = (ip, ComposedTransformer info1 info2)
   where
     (pb,info1) = sat2pb cnf
-    (ip,info2) = PB2IP.convert pb
+    (ip,info2) = pb2ip pb

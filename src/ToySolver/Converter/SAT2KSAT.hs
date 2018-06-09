@@ -14,7 +14,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.SAT2KSAT
-  ( convert
+  ( sat2ksat
   , SAT2KSATInfo (..)
   ) where
 
@@ -33,9 +33,9 @@ import ToySolver.SAT.Store.CNF
 import qualified ToySolver.Text.CNF as CNF
 
 
-convert :: Int -> CNF.CNF -> (CNF.CNF, SAT2KSATInfo)
-convert k _ | k < 3 = error "ToySolver.Converter.SAT2KSAT.convert: k must be >=3"
-convert k cnf = runST $ do
+sat2ksat :: Int -> CNF.CNF -> (CNF.CNF, SAT2KSATInfo)
+sat2ksat k _ | k < 3 = error "ToySolver.Converter.SAT2KSAT.sat2ksat: k must be >=3"
+sat2ksat k cnf = runST $ do
   let nv1 = CNF.cnfNumVars cnf
   db <- newCNFStore
   defsRef <- newSTRef Seq.empty

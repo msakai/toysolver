@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.MIP2PB
-  ( convert
+  ( mip2pb
   , MIP2PBInfo (..)
   , transformObjValForward
   , transformObjValBackward
@@ -43,8 +43,8 @@ import ToySolver.Internal.Util (revForM)
 
 -- -----------------------------------------------------------------------------
 
-convert :: MIP.Problem Rational -> Either String (PBFile.Formula, MIP2PBInfo)
-convert mip = runST $ runExceptT $ m
+mip2pb :: MIP.Problem Rational -> Either String (PBFile.Formula, MIP2PBInfo)
+mip2pb mip = runST $ runExceptT $ m
   where
     m :: ExceptT String (ST s) (PBFile.Formula, MIP2PBInfo)
     m = do

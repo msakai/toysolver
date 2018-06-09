@@ -12,9 +12,9 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2IP
-  ( convert
+  ( pb2ip
   , PB2IPInfo
-  , convertWBO
+  , wbo2ip
   , WBO2IPInfo
   ) where
 
@@ -43,8 +43,8 @@ instance ForwardTransformer PB2IPInfo where
 instance BackwardTransformer PB2IPInfo where
   transformBackward (PB2IPInfo nv) = mtrans nv
 
-convert :: PBFile.Formula -> (MIP.Problem Integer, PB2IPInfo)
-convert formula = (mip, PB2IPInfo (PBFile.pbNumVars formula))
+pb2ip :: PBFile.Formula -> (MIP.Problem Integer, PB2IPInfo)
+pb2ip formula = (mip, PB2IPInfo (PBFile.pbNumVars formula))
   where
     mip = def
       { MIP.objectiveFunction = obj2
@@ -96,8 +96,8 @@ instance ForwardTransformer WBO2IPInfo where
 instance BackwardTransformer WBO2IPInfo where
   transformBackward (WBO2IPInfo nv _relaxVariables) = mtrans nv
 
-convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem Integer, WBO2IPInfo)
-convertWBO useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) relaxVariables)
+wbo2ip :: Bool -> PBFile.SoftFormula -> (MIP.Problem Integer, WBO2IPInfo)
+wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) relaxVariables)
   where
     mip = def
       { MIP.objectiveFunction = obj2

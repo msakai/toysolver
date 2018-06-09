@@ -68,7 +68,7 @@ import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
 import ToySolver.Converter.Base
-import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
+import ToySolver.Converter.GCNF2MaxSAT
 import qualified ToySolver.Converter.MIP2PB as MIP2PB
 import ToySolver.Converter.PB
 import qualified ToySolver.SAT as SAT
@@ -733,7 +733,7 @@ solveMUS opt solver gcnf = do
   (idx2clauses :: Array Int [SAT.PackedClause]) <- freeze idx2clausesM
 
   when (optInitSP opt) $ do
-    let (wcnf, _) = GCNF2MaxSAT.convert gcnf
+    let (wcnf, _) = gcnf2maxsat gcnf
     initPolarityUsingSP solver (CNF.gcnfNumVars gcnf)
       (CNF.wcnfNumVars wcnf) [(fromIntegral w, clause) | (w, clause) <- CNF.wcnfClauses wcnf]
     return ()

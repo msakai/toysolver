@@ -50,7 +50,7 @@ import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Converter.Base
 import qualified ToySolver.Converter.NAESAT as NAESAT
 import ToySolver.Converter.PB
-import qualified ToySolver.Converter.SAT2KSAT as SAT2KSAT
+import ToySolver.Converter.SAT2KSAT
 import qualified ToySolver.Converter.SAT2MaxCut as SAT2MaxCut
 import qualified ToySolver.Text.CNF as CNF
 
@@ -2085,7 +2085,7 @@ prop_sat2ksat = QM.monadicIO $ do
   k <- QM.pick $ choose (3,10)
 
   cnf1 <- QM.pick arbitraryCNF
-  let (cnf2, info) = SAT2KSAT.convert k cnf1
+  let (cnf2, info) = sat2ksat k cnf1
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
