@@ -275,6 +275,7 @@ Library
      ToySolver.Combinatorial.Knapsack.DPDense
      ToySolver.Combinatorial.Knapsack.DPSparse
      ToySolver.Combinatorial.SubsetSum
+     ToySolver.Converter.Base
      ToySolver.Converter.GCNF2MaxSAT
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2PB
@@ -294,6 +295,7 @@ Library
      ToySolver.Converter.SAT2MaxCut
      ToySolver.Converter.SAT2PB
      ToySolver.Converter.SAT2IP
+     ToySolver.Converter.Tseitin
      ToySolver.Converter.WBO2MaxSAT
      ToySolver.Converter.WBO2PB
      ToySolver.Data.AlgebraicNumber.Complex

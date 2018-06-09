@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.WBO2MaxSAT
@@ -8,20 +7,23 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (FlexibleContexts, MultiParamTypeClasses)
+-- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module ToySolver.Converter.WBO2MaxSAT (convert) where
+module ToySolver.Converter.WBO2MaxSAT
+  ( convert
+  , WBO2MaxSATInfo
+  ) where
 
 import Control.Applicative
 import Control.Monad
 import Control.Monad.ST
-import Data.Array.IArray
 import qualified Data.Foldable as F
 import Data.Monoid
 import qualified Data.Sequence as Seq
 import qualified Data.PseudoBoolean as PBFile
 
+import ToySolver.Converter.Tseitin
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
@@ -29,7 +31,7 @@ import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import ToySolver.SAT.Store.CNF
 import qualified ToySolver.Text.CNF as CNF
 
-convert :: PBFile.SoftFormula -> (CNF.WCNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
+convert :: PBFile.SoftFormula -> (CNF.WCNF, WBO2MaxSATInfo)
 convert formula = runST $ do
   db <- newCNFStore
   SAT.newVars_ db (PBFile.wboNumVars formula)
@@ -73,16 +75,9 @@ convert formula = runST $ do
              , CNF.wcnfTopCost = top
              , CNF.wcnfClauses = F.toList cs
              }
-
   defs <- Tseitin.getDefinitions tseitin
-  let extendModel :: SAT.Model -> SAT.Model
-      extendModel m = array (1, CNF.cnfNumVars cnf) (assocs a)
-        where
-          -- Use BOXED array to tie the knot
-          a :: Array SAT.Var Bool
-          a = array (1, CNF.cnfNumVars cnf) $
-                assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
+  return (wcnf, TseitinInfo (PBFile.wboNumVars formula) (CNF.cnfNumVars cnf) defs)
 
-  return (wcnf, extendModel, SAT.restrictModel (PBFile.wboNumVars formula))
+type WBO2MaxSATInfo = TseitinInfo
 
 -- -----------------------------------------------------------------------------

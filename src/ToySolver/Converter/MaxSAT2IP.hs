@@ -12,14 +12,19 @@
 -----------------------------------------------------------------------------
 module ToySolver.Converter.MaxSAT2IP
   ( convert
+  , MaxSAT2IPInfo
   ) where
 
-import Data.Map (Map)
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Text.CNF as CNF
-import qualified ToySolver.SAT.Types as SAT
+import ToySolver.Converter.Base
 import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
 import qualified ToySolver.Converter.PB2IP as PB2IP
 
-convert :: Bool -> CNF.WCNF -> (MIP.Problem Integer, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
-convert useIndicator wcnf = PB2IP.convertWBO useIndicator (MaxSAT2WBO.convert wcnf)
+type MaxSAT2IPInfo = ComposedTransformer MaxSAT2WBO.MaxSAT2WBOInfo PB2IP.WBO2IPInfo
+
+convert :: Bool -> CNF.WCNF -> (MIP.Problem Integer, MaxSAT2IPInfo)
+convert useIndicator wcnf = (ip, ComposedTransformer info1 info2)
+  where
+    (wbo, info1) = MaxSAT2WBO.convert wcnf
+    (ip, info2) = PB2IP.convertWBO useIndicator wbo

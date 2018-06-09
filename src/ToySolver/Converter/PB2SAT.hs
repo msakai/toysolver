@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB2SAT
@@ -8,22 +7,27 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (FlexibleContexts, MultiParamTypeClasses)
+-- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module ToySolver.Converter.PB2SAT (convert) where
+module ToySolver.Converter.PB2SAT
+  ( convert
+  , PB2SATInfo
+  ) where
 
 import Control.Monad
 import Control.Monad.ST
-import Data.Array.IArray
 import qualified Data.PseudoBoolean as PBFile
 
+import ToySolver.Converter.Tseitin
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import ToySolver.SAT.Store.CNF
 import qualified ToySolver.Text.CNF as CNF
+
+type PB2SATInfo = TseitinInfo
 
 -- | Convert a pseudo boolean formula φ to a equisatisfiable CNF formula ψ
 -- together with two functions f and g such that:
@@ -32,7 +36,7 @@ import qualified ToySolver.Text.CNF as CNF
 --
 -- * if M ⊨ ψ then g(M) ⊨ φ
 -- 
-convert :: PBFile.Formula -> (CNF.CNF, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
+convert :: PBFile.Formula -> (CNF.CNF, PB2SATInfo)
 convert formula = runST $ do
   db <- newCNFStore
   let nv1 = PBFile.pbNumVars formula
@@ -45,16 +49,7 @@ convert formula = runST $ do
       PBFile.Ge -> SAT.addPBNLAtLeast pbnlc lhs rhs
       PBFile.Eq -> SAT.addPBNLExactly pbnlc lhs rhs
   cnf <- getCNFFormula db
-
   defs <- Tseitin.getDefinitions tseitin
-  let extendModel :: SAT.Model -> SAT.Model
-      extendModel m = array (1, CNF.cnfNumVars cnf) (assocs a)
-        where
-          -- Use BOXED array to tie the knot
-          a :: Array SAT.Var Bool
-          a = array (1, CNF.cnfNumVars cnf) $
-                assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
-
-  return (cnf, extendModel, SAT.restrictModel nv1)
+  return (cnf, TseitinInfo nv1 (CNF.cnfNumVars cnf) defs)
 
 -- -----------------------------------------------------------------------------

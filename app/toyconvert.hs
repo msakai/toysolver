@@ -222,11 +222,11 @@ readProblem o fname = do
   case map toLower (takeExtension fname) of
     ".cnf"
       | optAsMaxSAT o ->
-          liftM (ProbWBO . MaxSAT2WBO.convert) $ CNF.readFile fname
+          liftM (ProbWBO . fst . MaxSAT2WBO.convert) $ CNF.readFile fname
       | otherwise -> do
-          liftM (ProbOPB . SAT2PB.convert) $ CNF.readFile fname
+          liftM (ProbOPB . fst . SAT2PB.convert) $ CNF.readFile fname
     ".wcnf" ->
-      liftM (ProbWBO . MaxSAT2WBO.convert) $ CNF.readFile fname
+      liftM (ProbWBO . fst . MaxSAT2WBO.convert) $ CNF.readFile fname
     ".opb"  -> do
       ret <- PBFileAttoparsec.parseOPBFile fname
       case ret of
@@ -238,7 +238,7 @@ readProblem o fname = do
         Left err -> hPutStrLn stderr err >> exitFailure
         Right wbo -> return $ ProbWBO wbo
     ".gcnf" ->
-      liftM (ProbWBO . MaxSAT2WBO.convert . GCNF2MaxSAT.convert) $ CNF.readFile fname
+      liftM (ProbWBO . fst . MaxSAT2WBO.convert . fst . GCNF2MaxSAT.convert) $ CNF.readFile fname
     ".lp"   -> ProbMIP <$> MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
     ".mps"  -> ProbMIP <$> MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
     ext ->
@@ -257,8 +257,8 @@ transformPBLinearization :: Options -> Problem -> Problem
 transformPBLinearization o problem
   | optLinearization o =
       case problem of
-        ProbOPB opb -> ProbOPB $ PBLinearization.linearize    opb (optLinearizationUsingPB o)
-        ProbWBO wbo -> ProbWBO $ PBLinearization.linearizeWBO wbo (optLinearizationUsingPB o)
+        ProbOPB opb -> ProbOPB $ fst $ PBLinearization.linearize    opb (optLinearizationUsingPB o)
+        ProbWBO wbo -> ProbWBO $ fst $ PBLinearization.linearizeWBO wbo (optLinearizationUsingPB o)
         ProbMIP mip -> ProbMIP mip
   | otherwise = problem
 
@@ -298,26 +298,26 @@ writeProblem o problem = do
                   ProbOPB opb -> opb
                   ProbWBO wbo ->
                     case WBO2PB.convert wbo of
-                      (opb, _, _)
+                      (opb, _)
                         | optLinearization o ->
                             -- WBO->OPB conversion may have introduced non-linearity
-                            PBLinearization.linearize opb (optLinearizationUsingPB o)
+                            fst $ PBLinearization.linearize opb (optLinearizationUsingPB o)
                         | otherwise -> opb
                   ProbMIP mip ->
                     case MIP2PB.convert (fmap toRational mip) of
                       Left err -> error err
-                      Right (opb, _, _) -> opb
+                      Right (opb, _) -> opb
           wbo = case problem of
-                  ProbOPB opb -> PB2WBO.convert opb
+                  ProbOPB opb -> fst $ PB2WBO.convert opb
                   ProbWBO wbo -> wbo
-                  ProbMIP _   -> PB2WBO.convert opb
+                  ProbMIP _   -> fst $ PB2WBO.convert opb
           lp  = case problem of
                   ProbOPB opb ->
                     case PB2IP.convert opb of
-                      (ip, _, _) -> fmap fromInteger ip
+                      (ip, _) -> fmap fromInteger ip
                   ProbWBO wbo ->
                     case PB2IP.convertWBO (optIndicatorConstraint o) wbo of
-                      (ip, _, _) -> fmap fromInteger ip
+                      (ip, _) -> fmap fromInteger ip
                   ProbMIP mip -> mip
           lsp = case problem of
                   ProbOPB opb -> PB2LSP.convert opb
@@ -328,15 +328,15 @@ writeProblem o problem = do
         ".wbo" -> PBFile.writeWBOFile fname $ normalizeWBO wbo
         ".cnf" ->
           case PB2SAT.convert opb of
-            (cnf, _, _) ->
+            (cnf, _) ->
               case optKSat o of
                 Nothing -> CNF.writeFile fname cnf
                 Just k ->
-                  let (cnf2, _, _) = SAT2KSAT.convert k cnf
+                  let (cnf2, _) = SAT2KSAT.convert k cnf
                   in CNF.writeFile fname cnf2
         ".wcnf" ->
           case WBO2MaxSAT.convert wbo of
-            (wcnf, _, _) -> CNF.writeFile fname wcnf
+            (wcnf, _) -> CNF.writeFile fname wcnf
         ".lsp" ->
           withBinaryFile fname WriteMode $ \h ->
             ByteStringBuilder.hPutBuilder h lsp

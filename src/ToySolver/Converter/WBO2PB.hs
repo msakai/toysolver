@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.WBO2PB
@@ -8,11 +9,12 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.WBO2PB
   ( convert
+  , WBO2PBInfo (..)
   , addWBO
   ) where
 
@@ -23,27 +25,32 @@ import Data.Array.IArray
 import Data.Primitive.MutVar
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.SAT.Store.PB
+import ToySolver.Converter.Base
 import qualified Data.PseudoBoolean as PBFile
 
-convert :: PBFile.SoftFormula -> (PBFile.Formula, SAT.Model -> SAT.Model, SAT.Model -> SAT.Model)
+convert :: PBFile.SoftFormula -> (PBFile.Formula, WBO2PBInfo)
 convert wbo = runST $ do
   let nv = PBFile.wboNumVars wbo
   db <- newPBStore
   (obj, defs) <- addWBO db wbo 
   formula <- getPBFormula db
-
-  let mforth :: SAT.Model -> SAT.Model
-      mforth m = array (1, PBFile.pbNumVars formula) $ assocs m ++ [(v, SAT.evalPBConstraint m constr) | (v, constr) <- defs]
-
-      mback :: SAT.Model -> SAT.Model
-      mback = SAT.restrictModel nv
-
   return
     ( formula{ PBFile.pbObjectiveFunction = Just obj }
-    , mforth
-    , mback
+    , WBO2PBInfo nv (PBFile.pbNumVars formula) defs
     )
 
+data WBO2PBInfo = WBO2PBInfo !Int !Int [(SAT.Var, PBFile.Constraint)]
+
+instance Transformer WBO2PBInfo where
+  type Source WBO2PBInfo = SAT.Model
+  type Target WBO2PBInfo = SAT.Model
+
+instance ForwardTransformer WBO2PBInfo where
+  transformForward (WBO2PBInfo _nv1 nv2 defs) m =
+    array (1, nv2) $ assocs m ++ [(v, SAT.evalPBConstraint m constr) | (v, constr) <- defs]
+
+instance BackwardTransformer WBO2PBInfo where
+  transformBackward (WBO2PBInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
 
 addWBO :: (PrimMonad m, SAT.AddPBNL m enc) => enc -> PBFile.SoftFormula -> m (SAT.PBSum, [(SAT.Var, PBFile.Constraint)])
 addWBO db wbo = do

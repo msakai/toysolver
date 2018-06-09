@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB2IP
@@ -7,12 +8,14 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2IP
   ( convert
+  , PB2IPInfo
   , convertWBO
+  , WBO2IPInfo
   ) where
 
 import Data.Array.IArray
@@ -22,12 +25,26 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 import qualified Data.PseudoBoolean as PBFile
+import ToySolver.Converter.Base
 import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Data.MIP ((.==.), (.<=.), (.>=.))
 import qualified ToySolver.SAT.Types as SAT
 
-convert :: PBFile.Formula -> (MIP.Problem Integer, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
-convert formula = (mip, mforth, mtrans (PBFile.pbNumVars formula))
+newtype PB2IPInfo = PB2IPInfo Int
+
+instance Transformer PB2IPInfo where
+  type Source PB2IPInfo = SAT.Model
+  type Target PB2IPInfo = Map MIP.Var Rational
+
+instance ForwardTransformer PB2IPInfo where
+  transformForward _ m =
+    Map.fromList [(convVar v, if val then 1 else 0) | (v,val) <- assocs m]
+
+instance BackwardTransformer PB2IPInfo where
+  transformBackward (PB2IPInfo nv) = mtrans nv
+
+convert :: PBFile.Formula -> (MIP.Problem Integer, PB2IPInfo)
+convert formula = (mip, PB2IPInfo (PBFile.pbNumVars formula))
   where
     mip = def
       { MIP.objectiveFunction = obj2
@@ -51,8 +68,6 @@ convert formula = (mip, mforth, mtrans (PBFile.pbNumVars formula))
         PBFile.Ge -> def{ MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2 }
         PBFile.Eq -> def{ MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2, MIP.constrUB = MIP.Finite rhs2 }
 
-    mforth :: SAT.Model -> Map MIP.Var Rational
-    mforth m = Map.fromList [(convVar v, if val then 1 else 0) | (v,val) <- assocs m]
 
 convExpr :: PBFile.Sum -> MIP.Expr Integer
 convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
@@ -65,8 +80,24 @@ convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
 convVar :: PBFile.Var -> MIP.Var
 convVar x = MIP.toVar ("x" ++ show x)
 
-convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem Integer, SAT.Model -> Map MIP.Var Rational, Map MIP.Var Rational -> SAT.Model)
-convertWBO useIndicator formula = (mip, mforth, mtrans (PBFile.wboNumVars formula))
+
+data WBO2IPInfo = WBO2IPInfo !Int [(MIP.Var, PBFile.SoftConstraint)]
+
+instance Transformer WBO2IPInfo where
+  type Source WBO2IPInfo = SAT.Model
+  type Target WBO2IPInfo = Map MIP.Var Rational
+
+instance ForwardTransformer WBO2IPInfo where
+  transformForward (WBO2IPInfo _nv relaxVariables) m = Map.union m1 m2
+      where
+        m1 = Map.fromList $ [(convVar v, if val then 1 else 0) | (v,val) <- assocs m]
+        m2 = Map.fromList $ [(v, if SAT.evalPBConstraint m c then 0 else 1) | (v, (Just _, c)) <- relaxVariables]
+
+instance BackwardTransformer WBO2IPInfo where
+  transformBackward (WBO2IPInfo nv _relaxVariables) = mtrans nv
+
+convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem Integer, WBO2IPInfo)
+convertWBO useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) relaxVariables)
   where
     mip = def
       { MIP.objectiveFunction = obj2
@@ -117,12 +148,6 @@ convertWBO useIndicator formula = (mip, mforth, mtrans (PBFile.wboNumVars formul
              let (lhsLE,rhsLE) = relaxLE v (lhs2,rhs2)
                  c2 = lhsLE .<=. MIP.constExpr rhsLE
              [ (ts, c1), ([], c2) ]
-
-    mforth :: SAT.Model -> Map MIP.Var Rational
-    mforth m = Map.union m1 m2
-      where
-        m1 = Map.fromList $ [(convVar v, if val then 1 else 0) | (v,val) <- assocs m]
-        m2 = Map.fromList $ [(v, if SAT.evalPBConstraint m c then 0 else 1) | (v, (Just _, c)) <- relaxVariables]
 
 splitConst :: MIP.Expr Integer -> (MIP.Expr Integer, Integer)
 splitConst e = (e2, c)
