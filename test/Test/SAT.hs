@@ -49,9 +49,7 @@ import qualified ToySolver.SAT.ExistentialQuantification as ExistentialQuantific
 import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Converter.Base
 import qualified ToySolver.Converter.NAESAT as NAESAT
-import qualified ToySolver.Converter.PB2SAT as PB2SAT
-import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
-import qualified ToySolver.Converter.WBO2PB as WBO2PB
+import ToySolver.Converter.PB
 import qualified ToySolver.Converter.SAT2KSAT as SAT2KSAT
 import qualified ToySolver.Converter.SAT2MaxCut as SAT2MaxCut
 import qualified ToySolver.Text.CNF as CNF
@@ -1982,7 +1980,7 @@ prop_pb2sat = QM.monadicIO $ do
             , PBFile.pbNumConstraints = length cs
             , PBFile.pbConstraints = map f cs
             }
-  let (cnf, info) = PB2SAT.convert opb
+  let (cnf, info) = pb2sat opb
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
@@ -2014,7 +2012,7 @@ prop_wbo2maxsat = QM.monadicIO $ do
             , PBFile.wboConstraints = map f cs
             , PBFile.wboTopCost = top
             }
-  let (wcnf, info) = WBO2MaxSAT.convert wbo1'
+  let (wcnf, info) = wbo2maxsat wbo1'
       wbo2 = ( CNF.wcnfNumVars wcnf
              , [ ( if w == CNF.wcnfTopCost wcnf then Nothing else Just w
                  , (PBRelGE, [(1,l) | l <- SAT.unpackClause clause], 1)
@@ -2055,7 +2053,7 @@ prop_wbo2pb = QM.monadicIO $ do
             , PBFile.wboConstraints = map f cs
             , PBFile.wboTopCost = top
             }
-  let (opb, info) = WBO2PB.convert wbo'
+  let (opb, info) = wbo2pb wbo'
       obj = fromMaybe [] $ PBFile.pbObjectiveFunction opb
       f (lhs, PBFile.Ge, rhs) = (PBRelGE, lhs, rhs)
       f (lhs, PBFile.Eq, rhs) = (PBRelEQ, lhs, rhs)

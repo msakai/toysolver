@@ -281,23 +281,16 @@ Library
      ToySolver.Converter.MIP2PB
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.MaxSAT2IP
-     ToySolver.Converter.MaxSAT2WBO
      ToySolver.Converter.NAESAT
+     ToySolver.Converter.PB
      ToySolver.Converter.PB2IP
-     ToySolver.Converter.PBLinearization
-     ToySolver.Converter.PBNormalization
      ToySolver.Converter.PB2LSP
-     ToySolver.Converter.PB2SAT
-     ToySolver.Converter.PB2WBO
      ToySolver.Converter.PBSetObj
      ToySolver.Converter.PB2SMP
      ToySolver.Converter.SAT2KSAT
      ToySolver.Converter.SAT2MaxCut
-     ToySolver.Converter.SAT2PB
      ToySolver.Converter.SAT2IP
      ToySolver.Converter.Tseitin
-     ToySolver.Converter.WBO2MaxSAT
-     ToySolver.Converter.WBO2PB
      ToySolver.Data.AlgebraicNumber.Complex
      ToySolver.Data.AlgebraicNumber.Real
      ToySolver.Data.AlgebraicNumber.Root
