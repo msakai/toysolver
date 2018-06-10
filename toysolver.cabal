@@ -275,6 +275,7 @@ Library
      ToySolver.Combinatorial.Knapsack.DPDense
      ToySolver.Combinatorial.Knapsack.DPSparse
      ToySolver.Combinatorial.SubsetSum
+     ToySolver.Converter
      ToySolver.Converter.Base
      ToySolver.Converter.GCNF2MaxSAT
      ToySolver.Converter.ObjType

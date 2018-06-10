@@ -67,10 +67,7 @@ import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
-import ToySolver.Converter.Base
-import ToySolver.Converter.GCNF2MaxSAT
-import qualified ToySolver.Converter.MIP2PB as MIP2PB
-import ToySolver.Converter.PB
+import ToySolver.Converter
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO as PBO
@@ -1055,7 +1052,7 @@ solveMIP opt solver mip = do
   enc <- Tseitin.newEncoderWithPBLin solver
   Tseitin.setUsePB enc (optLinearizerPB opt)
   pbnlc <- PBNLC.newEncoder solver enc
-  ret <- MIP2PB.addMIP pbnlc mip
+  ret <- addMIP pbnlc mip
   case ret of
     Left msg -> do
       putCommentLine msg

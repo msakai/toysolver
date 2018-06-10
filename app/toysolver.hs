@@ -62,10 +62,7 @@ import qualified ToySolver.Arith.MIP as MIPSolver
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
 import qualified ToySolver.Text.CNF as CNF
-import ToySolver.Converter.Base
-import ToySolver.Converter.SAT2IP
-import ToySolver.Converter.PB2IP
-import ToySolver.Converter.MaxSAT2IP
+import ToySolver.Converter
 import ToySolver.SAT.Printer
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.Version

@@ -39,16 +39,10 @@ import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Text.CNF as CNF
+import ToySolver.Converter
 import ToySolver.Converter.ObjType
-import ToySolver.Converter.GCNF2MaxSAT
-import ToySolver.Converter.MIP2PB
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
-import ToySolver.Converter.PB
-import ToySolver.Converter.PB2IP
-import ToySolver.Converter.PB2LSP
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
-import ToySolver.Converter.PB2SMP
-import ToySolver.Converter.SAT2KSAT
 import ToySolver.Version
 import ToySolver.Internal.Util (setEncodingChar8)
 
