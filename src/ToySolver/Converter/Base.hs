@@ -16,6 +16,9 @@ module ToySolver.Converter.Base
   ( Transformer (..)
   , ForwardTransformer (..)
   , BackwardTransformer (..)
+  , ObjValueTransformer (..)
+  , ObjValueForwardTransformer (..)
+  , ObjValueBackwardTransformer (..)
   , ComposedTransformer (..)
   , IdentityTransformer (..)
   , ReversedTransformer (..)
@@ -33,6 +36,17 @@ class Transformer a => BackwardTransformer a where
   transformBackward :: a -> Target a -> Source a
 
 
+class ObjValueTransformer a where
+  type SourceObjValue a
+  type TargetObjValue a
+
+class ObjValueTransformer a => ObjValueForwardTransformer a where
+  transformObjValueForward :: a -> SourceObjValue a -> TargetObjValue a
+
+class ObjValueTransformer a => ObjValueBackwardTransformer a where
+  transformObjValueBackward :: a -> TargetObjValue a -> SourceObjValue a
+
+
 data ComposedTransformer a b = ComposedTransformer a b
 
 instance (Transformer a, Transformer b, Target a ~ Source b) => Transformer (ComposedTransformer a b) where
@@ -46,6 +60,21 @@ instance (ForwardTransformer a, ForwardTransformer b, Target a ~ Source b)
 instance (BackwardTransformer a, BackwardTransformer b, Target a ~ Source b)
   => BackwardTransformer (ComposedTransformer a b) where
   transformBackward (ComposedTransformer a b) = transformBackward a . transformBackward b
+
+
+instance (ObjValueTransformer a, ObjValueTransformer b, TargetObjValue a ~ SourceObjValue b)
+  => ObjValueTransformer (ComposedTransformer a b) where
+  type SourceObjValue (ComposedTransformer a b) = SourceObjValue a
+  type TargetObjValue (ComposedTransformer a b) = TargetObjValue b
+
+instance (ObjValueForwardTransformer a, ObjValueForwardTransformer b, TargetObjValue a ~ SourceObjValue b)
+  => ObjValueForwardTransformer (ComposedTransformer a b) where
+  transformObjValueForward (ComposedTransformer a b) = transformObjValueForward b . transformObjValueForward a
+
+instance (ObjValueBackwardTransformer a, ObjValueBackwardTransformer b, TargetObjValue a ~ SourceObjValue b)
+  => ObjValueBackwardTransformer (ComposedTransformer a b) where
+  transformObjValueBackward (ComposedTransformer a b) = transformObjValueBackward a . transformObjValueBackward b
+
 
 
 data IdentityTransformer a = IdentityTransformer
@@ -72,3 +101,13 @@ instance BackwardTransformer t => ForwardTransformer (ReversedTransformer t) whe
 
 instance ForwardTransformer t => BackwardTransformer (ReversedTransformer t) where
   transformBackward (ReversedTransformer t) = transformForward t
+
+instance ObjValueTransformer t => ObjValueTransformer (ReversedTransformer t) where
+  type SourceObjValue (ReversedTransformer t) = TargetObjValue t
+  type TargetObjValue (ReversedTransformer t) = SourceObjValue t
+
+instance ObjValueBackwardTransformer t => ObjValueForwardTransformer (ReversedTransformer t) where
+  transformObjValueForward (ReversedTransformer t) = transformObjValueBackward t
+
+instance ObjValueForwardTransformer t => ObjValueBackwardTransformer (ReversedTransformer t) where
+  transformObjValueBackward (ReversedTransformer t) = transformObjValueForward t
