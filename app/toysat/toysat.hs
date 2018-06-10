@@ -1065,7 +1065,7 @@ solveMIP opt solver mip = do
       (linObj, linObjOffset) <- Integer.linearize pbnlc obj
 
       let transformObjValBackward :: Integer -> Rational
-          transformObjValBackward val = MIP2PB.transformObjValBackward info (val + linObjOffset)
+          transformObjValBackward val = transformObjValueBackward info (val + linObjOffset)
 
           printModel :: Map MIP.Var Integer -> IO ()
           printModel m = do

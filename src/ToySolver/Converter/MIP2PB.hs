@@ -15,8 +15,6 @@
 module ToySolver.Converter.MIP2PB
   ( mip2pb
   , MIP2PBInfo (..)
-  , transformObjValForward
-  , transformObjValBackward
   , addMIP
   ) where
 
@@ -62,11 +60,15 @@ instance Transformer MIP2PBInfo where
 instance BackwardTransformer MIP2PBInfo where
   transformBackward (MIP2PBInfo vmap _d) m = fmap (Integer.eval m) vmap
 
-transformObjValForward :: MIP2PBInfo -> Rational -> Integer
-transformObjValForward (MIP2PBInfo _vmap d) val = asInteger (val * fromIntegral d)
+instance ObjValueTransformer MIP2PBInfo where
+  type SourceObjValue MIP2PBInfo = Rational
+  type TargetObjValue MIP2PBInfo = Integer
 
-transformObjValBackward :: MIP2PBInfo -> Integer -> Rational
-transformObjValBackward (MIP2PBInfo _vmap d) val = fromIntegral val / fromIntegral d
+instance ObjValueForwardTransformer MIP2PBInfo where
+  transformObjValueForward (MIP2PBInfo _vmap d) val = asInteger (val * fromIntegral d)
+
+instance ObjValueBackwardTransformer MIP2PBInfo where
+  transformObjValueBackward (MIP2PBInfo _vmap d) val = fromIntegral val / fromIntegral d
 
 -- -----------------------------------------------------------------------------
 
