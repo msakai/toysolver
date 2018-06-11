@@ -39,23 +39,10 @@ import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Text.CNF as CNF
+import ToySolver.Converter
 import ToySolver.Converter.ObjType
-import qualified ToySolver.Converter.SAT2PB as SAT2PB
-import qualified ToySolver.Converter.GCNF2MaxSAT as GCNF2MaxSAT
-import qualified ToySolver.Converter.MIP2PB as MIP2PB
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
-import qualified ToySolver.Converter.MaxSAT2WBO as MaxSAT2WBO
-import qualified ToySolver.Converter.PB2IP as PB2IP
-import qualified ToySolver.Converter.PBLinearization as PBLinearization
-import ToySolver.Converter.PBNormalization
-import qualified ToySolver.Converter.PB2LSP as PB2LSP
-import qualified ToySolver.Converter.PB2WBO as PB2WBO
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
-import qualified ToySolver.Converter.PB2SMP as PB2SMP
-import qualified ToySolver.Converter.PB2SAT as PB2SAT
-import qualified ToySolver.Converter.SAT2KSAT as SAT2KSAT
-import qualified ToySolver.Converter.WBO2PB as WBO2PB
-import qualified ToySolver.Converter.WBO2MaxSAT as WBO2MaxSAT
 import ToySolver.Version
 import ToySolver.Internal.Util (setEncodingChar8)
 
@@ -222,11 +209,11 @@ readProblem o fname = do
   case map toLower (takeExtension fname) of
     ".cnf"
       | optAsMaxSAT o ->
-          liftM (ProbWBO . fst . MaxSAT2WBO.convert) $ CNF.readFile fname
+          liftM (ProbWBO . fst . maxsat2wbo) $ CNF.readFile fname
       | otherwise -> do
-          liftM (ProbOPB . fst . SAT2PB.convert) $ CNF.readFile fname
+          liftM (ProbOPB . fst . sat2pb) $ CNF.readFile fname
     ".wcnf" ->
-      liftM (ProbWBO . fst . MaxSAT2WBO.convert) $ CNF.readFile fname
+      liftM (ProbWBO . fst . maxsat2wbo) $ CNF.readFile fname
     ".opb"  -> do
       ret <- PBFileAttoparsec.parseOPBFile fname
       case ret of
@@ -238,7 +225,7 @@ readProblem o fname = do
         Left err -> hPutStrLn stderr err >> exitFailure
         Right wbo -> return $ ProbWBO wbo
     ".gcnf" ->
-      liftM (ProbWBO . fst . MaxSAT2WBO.convert . fst . GCNF2MaxSAT.convert) $ CNF.readFile fname
+      liftM (ProbWBO . fst . maxsat2wbo . fst . gcnf2maxsat) $ CNF.readFile fname
     ".lp"   -> ProbMIP <$> MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
     ".mps"  -> ProbMIP <$> MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
     ext ->
@@ -257,8 +244,8 @@ transformPBLinearization :: Options -> Problem -> Problem
 transformPBLinearization o problem
   | optLinearization o =
       case problem of
-        ProbOPB opb -> ProbOPB $ fst $ PBLinearization.linearize    opb (optLinearizationUsingPB o)
-        ProbWBO wbo -> ProbWBO $ fst $ PBLinearization.linearizeWBO wbo (optLinearizationUsingPB o)
+        ProbOPB opb -> ProbOPB $ fst $ linearizePB  opb (optLinearizationUsingPB o)
+        ProbWBO wbo -> ProbWBO $ fst $ linearizeWBO wbo (optLinearizationUsingPB o)
         ProbMIP mip -> ProbMIP mip
   | otherwise = problem
 
@@ -297,45 +284,45 @@ writeProblem o problem = do
       let opb = case problem of
                   ProbOPB opb -> opb
                   ProbWBO wbo ->
-                    case WBO2PB.convert wbo of
+                    case wbo2pb wbo of
                       (opb, _)
                         | optLinearization o ->
                             -- WBO->OPB conversion may have introduced non-linearity
-                            fst $ PBLinearization.linearize opb (optLinearizationUsingPB o)
+                            fst $ linearizePB opb (optLinearizationUsingPB o)
                         | otherwise -> opb
                   ProbMIP mip ->
-                    case MIP2PB.convert (fmap toRational mip) of
+                    case mip2pb (fmap toRational mip) of
                       Left err -> error err
                       Right (opb, _) -> opb
           wbo = case problem of
-                  ProbOPB opb -> fst $ PB2WBO.convert opb
+                  ProbOPB opb -> fst $ pb2wbo opb
                   ProbWBO wbo -> wbo
-                  ProbMIP _   -> fst $ PB2WBO.convert opb
+                  ProbMIP _   -> fst $ pb2wbo opb
           lp  = case problem of
                   ProbOPB opb ->
-                    case PB2IP.convert opb of
+                    case pb2ip opb of
                       (ip, _) -> fmap fromInteger ip
                   ProbWBO wbo ->
-                    case PB2IP.convertWBO (optIndicatorConstraint o) wbo of
+                    case wbo2ip (optIndicatorConstraint o) wbo of
                       (ip, _) -> fmap fromInteger ip
                   ProbMIP mip -> mip
           lsp = case problem of
-                  ProbOPB opb -> PB2LSP.convert opb
-                  ProbWBO wbo -> PB2LSP.convertWBO wbo
-                  ProbMIP _   -> PB2LSP.convert opb
+                  ProbOPB opb -> pb2lsp opb
+                  ProbWBO wbo -> wbo2lsp wbo
+                  ProbMIP _   -> pb2lsp opb
       case map toLower (takeExtension fname) of
-        ".opb" -> PBFile.writeOPBFile fname $ normalizeOPB opb
+        ".opb" -> PBFile.writeOPBFile fname $ normalizePB  opb
         ".wbo" -> PBFile.writeWBOFile fname $ normalizeWBO wbo
         ".cnf" ->
-          case PB2SAT.convert opb of
+          case pb2sat opb of
             (cnf, _) ->
               case optKSat o of
                 Nothing -> CNF.writeFile fname cnf
                 Just k ->
-                  let (cnf2, _) = SAT2KSAT.convert k cnf
+                  let (cnf2, _) = sat2ksat k cnf
                   in CNF.writeFile fname cnf2
         ".wcnf" ->
-          case WBO2MaxSAT.convert wbo of
+          case wbo2maxsat wbo of
             (wcnf, _) -> CNF.writeFile fname wcnf
         ".lsp" ->
           withBinaryFile fname WriteMode $ \h ->
@@ -344,18 +331,18 @@ writeProblem o problem = do
         ".mps" -> MIP.writeMPSFile def{ MIP.optFileEncoding = enc } fname lp
         ".smp" -> do
           withBinaryFile fname WriteMode $ \h ->
-            ByteStringBuilder.hPutBuilder h (PB2SMP.convert False opb)
+            ByteStringBuilder.hPutBuilder h (pb2smp False opb)
         ".smt2" -> do
           withFile fname WriteMode $ \h -> do
             F.mapM_ (hSetEncoding h) enc
             TLIO.hPutStr h $ TextBuilder.toLazyText $
-              MIP2SMT.convert mip2smtOpt (fmap toRational lp)
+              MIP2SMT.mip2smt mip2smtOpt (fmap toRational lp)
         ".ys" -> do
           let lang = MIP2SMT.YICES (if optYices2 o then MIP2SMT.Yices2 else MIP2SMT.Yices1)
           withFile fname WriteMode $ \h -> do
             F.mapM_ (hSetEncoding h) enc
             TLIO.hPutStr h $ TextBuilder.toLazyText $
-              MIP2SMT.convert mip2smtOpt{ MIP2SMT.optLanguage = lang } (fmap toRational lp)
+              MIP2SMT.mip2smt mip2smtOpt{ MIP2SMT.optLanguage = lang } (fmap toRational lp)
         ext -> do
           error $ "unknown file extension: " ++ show ext
 

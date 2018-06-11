@@ -12,8 +12,8 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.GCNF2MaxSAT
-  ( convert
-  , GCNF2WCNFInfo (..)
+  ( gcnf2maxsat
+  , GCNF2MaxSATInfo (..)
   ) where
 
 import qualified Data.Vector.Generic as VG
@@ -21,17 +21,17 @@ import ToySolver.Converter.Base
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.Text.CNF as CNF
 
-data GCNF2WCNFInfo = GCNF2WCNFInfo !Int
+data GCNF2MaxSATInfo = GCNF2MaxSATInfo !Int
 
-instance Transformer GCNF2WCNFInfo where
-  type Source GCNF2WCNFInfo = SAT.Model
-  type Target GCNF2WCNFInfo = SAT.Model
+instance Transformer GCNF2MaxSATInfo where
+  type Source GCNF2MaxSATInfo = SAT.Model
+  type Target GCNF2MaxSATInfo = SAT.Model
 
-instance BackwardTransformer GCNF2WCNFInfo where
-  transformBackward (GCNF2WCNFInfo nv1) = SAT.restrictModel nv1
+instance BackwardTransformer GCNF2MaxSATInfo where
+  transformBackward (GCNF2MaxSATInfo nv1) = SAT.restrictModel nv1
 
-convert :: CNF.GCNF -> (CNF.WCNF, GCNF2WCNFInfo)
-convert
+gcnf2maxsat :: CNF.GCNF -> (CNF.WCNF, GCNF2MaxSATInfo)
+gcnf2maxsat
   CNF.GCNF
   { CNF.gcnfNumVars        = nv
   , CNF.gcnfNumClauses     = nc
@@ -45,7 +45,7 @@ convert
     , CNF.wcnfNumVars = nv + lastg
     , CNF.wcnfNumClauses = nc + lastg
     }
-  , GCNF2WCNFInfo nv
+  , GCNF2MaxSATInfo nv
   )
   where
     top :: CNF.Weight

@@ -62,10 +62,7 @@ import qualified ToySolver.Arith.MIP as MIPSolver
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
 import qualified ToySolver.Text.CNF as CNF
-import ToySolver.Converter.Base
-import qualified ToySolver.Converter.SAT2IP as SAT2IP
-import qualified ToySolver.Converter.PB2IP as PB2IP
-import qualified ToySolver.Converter.MaxSAT2IP as MaxSAT2IP
+import ToySolver.Converter
 import ToySolver.SAT.Printer
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.Version
@@ -478,7 +475,7 @@ main = do
   case fromMaybe ModeMIP (optMode o) of
     ModeSAT -> do
       cnf <- CNF.readFile (optInput o)
-      let (mip,info) = SAT2IP.convert cnf
+      let (mip,info) = sat2ip cnf
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
         let m2 = transformBackward info m
         satPrintModel stdout m2 0
@@ -488,7 +485,7 @@ main = do
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
         Right pb -> do
-          let (mip,info) = PB2IP.convert pb
+          let (mip,info) = pb2ip pb
           run (optSolver o) o (fmap fromInteger mip) $ \m -> do
             let m2 = transformBackward info m
             pbPrintModel stdout m2 0
@@ -498,14 +495,14 @@ main = do
       case ret of
         Left err -> hPutStrLn stderr err >> exitFailure
         Right wbo -> do
-          let (mip,info) = PB2IP.convertWBO False wbo
+          let (mip,info) = wbo2ip False wbo
           run (optSolver o) o (fmap fromInteger mip) $ \m -> do
             let m2 = transformBackward info m
             pbPrintModel stdout m2 0
             writeSOLFileSAT o m2
     ModeMaxSAT -> do
       wcnf <- CNF.readFile (optInput o)
-      let (mip,info) = MaxSAT2IP.convert False wcnf
+      let (mip,info) = maxsat2ip False wcnf
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
         let m2 = transformBackward info m
         maxsatPrintModel stdout m2 0

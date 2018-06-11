@@ -12,10 +12,15 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2IP
-  ( convert
+  ( pb2ip
   , PB2IPInfo
-  , convertWBO
+  , wbo2ip
   , WBO2IPInfo
+
+  , sat2ip
+  , SAT2IPInfo
+  , maxsat2ip
+  , MaxSAT2IPInfo  
   ) where
 
 import Data.Array.IArray
@@ -26,9 +31,13 @@ import qualified Data.Map as Map
 
 import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Converter.Base
+import ToySolver.Converter.PB
 import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Data.MIP ((.==.), (.<=.), (.>=.))
 import qualified ToySolver.SAT.Types as SAT
+import qualified ToySolver.Text.CNF as CNF
+
+-- -----------------------------------------------------------------------------
 
 newtype PB2IPInfo = PB2IPInfo Int
 
@@ -43,8 +52,8 @@ instance ForwardTransformer PB2IPInfo where
 instance BackwardTransformer PB2IPInfo where
   transformBackward (PB2IPInfo nv) = mtrans nv
 
-convert :: PBFile.Formula -> (MIP.Problem Integer, PB2IPInfo)
-convert formula = (mip, PB2IPInfo (PBFile.pbNumVars formula))
+pb2ip :: PBFile.Formula -> (MIP.Problem Integer, PB2IPInfo)
+pb2ip formula = (mip, PB2IPInfo (PBFile.pbNumVars formula))
   where
     mip = def
       { MIP.objectiveFunction = obj2
@@ -80,6 +89,7 @@ convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
 convVar :: PBFile.Var -> MIP.Var
 convVar x = MIP.toVar ("x" ++ show x)
 
+-- -----------------------------------------------------------------------------
 
 data WBO2IPInfo = WBO2IPInfo !Int [(MIP.Var, PBFile.SoftConstraint)]
 
@@ -96,8 +106,8 @@ instance ForwardTransformer WBO2IPInfo where
 instance BackwardTransformer WBO2IPInfo where
   transformBackward (WBO2IPInfo nv _relaxVariables) = mtrans nv
 
-convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem Integer, WBO2IPInfo)
-convertWBO useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) relaxVariables)
+wbo2ip :: Bool -> PBFile.SoftFormula -> (MIP.Problem Integer, WBO2IPInfo)
+wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) relaxVariables)
   where
     mip = def
       { MIP.objectiveFunction = obj2
@@ -176,3 +186,23 @@ mtrans nvar m =
               1  -> True
               v0 -> error (show v0 ++ " is neither 0 nor 1")
     ]
+
+-- -----------------------------------------------------------------------------
+
+type SAT2IPInfo = ComposedTransformer SAT2PBInfo PB2IPInfo
+
+sat2ip :: CNF.CNF -> (MIP.Problem Integer, SAT2IPInfo)
+sat2ip cnf = (ip, ComposedTransformer info1 info2)
+  where
+    (pb,info1) = sat2pb cnf
+    (ip,info2) = pb2ip pb
+
+type MaxSAT2IPInfo = ComposedTransformer MaxSAT2WBOInfo WBO2IPInfo
+
+maxsat2ip :: Bool -> CNF.WCNF -> (MIP.Problem Integer, MaxSAT2IPInfo)
+maxsat2ip useIndicator wcnf = (ip, ComposedTransformer info1 info2)
+  where
+    (wbo, info1) = maxsat2wbo wcnf
+    (ip, info2) = wbo2ip useIndicator wbo
+
+-- -----------------------------------------------------------------------------
