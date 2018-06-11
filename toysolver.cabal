@@ -281,7 +281,6 @@ Library
      ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2PB
      ToySolver.Converter.MIP2SMT
-     ToySolver.Converter.MaxSAT2IP
      ToySolver.Converter.NAESAT
      ToySolver.Converter.PB
      ToySolver.Converter.PB2IP
@@ -290,7 +289,6 @@ Library
      ToySolver.Converter.PB2SMP
      ToySolver.Converter.SAT2KSAT
      ToySolver.Converter.SAT2MaxCut
-     ToySolver.Converter.SAT2IP
      ToySolver.Converter.Tseitin
      ToySolver.Data.AlgebraicNumber.Complex
      ToySolver.Data.AlgebraicNumber.Real
