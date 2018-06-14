@@ -323,7 +323,7 @@ branchAndBound solver rootLP update = do
         ret <- try $ restore loop
         case ret of
           Left e -> atomically (putTMVar ex e)
-          Right _ -> return ()    
+          Right _ -> return ()
 
     let propagateException :: SomeException -> IO ()
         propagateException e = do

@@ -126,7 +126,7 @@ instance Ord BV where
 
 instance Monoid BV where
   mempty = BV VG.empty
-  mappend (BV hi) (BV lo) = BV (lo <> hi) 
+  mappend (BV hi) (BV lo) = BV (lo <> hi)
 
 instance Show BV where
   show bv = "0b" ++ [if b then '1' else '0' | b <- toDescBits bv]

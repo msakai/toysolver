@@ -99,7 +99,7 @@ newVar' solver w = do
   return $ Var{ varWidth = w, varId = v }
 
 data NormalizedRel = NRSLt | NRULt | NREql
-  deriving (Eq, Ord, Enum, Bounded, Show)  
+  deriving (Eq, Ord, Enum, Bounded, Show)
 
 data NormalizedAtom = NormalizedAtom NormalizedRel Expr Expr
   deriving (Eq, Ord, Show)

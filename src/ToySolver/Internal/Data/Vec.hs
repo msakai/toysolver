@@ -177,7 +177,7 @@ resize v@(GenericVec sizeRef arrayRef) !n = do
 growTo :: A.MArray a e IO => GenericVec a e -> Int -> IO ()
 growTo v !n = do
   m <- getSize v
-  when (m < n) $ resize v n  
+  when (m < n) $ resize v n
 
 {-# SPECIALIZE push :: Vec e -> e -> IO () #-}
 {-# SPECIALIZE push :: UVec Int -> Int -> IO () #-}

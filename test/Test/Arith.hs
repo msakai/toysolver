@@ -142,7 +142,7 @@ test2' =
     y = LA.var 1
     t1 = 11*^x ^+^ 13*^y
     t2 = 7*^x ^-^ 9*^y
-    
+
 
 genLAExpr :: [Var] -> Gen (LA.Expr Rational)
 genLAExpr vs = do

@@ -163,7 +163,7 @@ isValidTableau tbl =
   and [IS.null (IM.keysSet m `IS.intersection` vs) | (m,_) <- IM.elems tbl']
   where
     tbl' = IM.delete objRowIndex tbl
-    vs = IM.keysSet tbl' 
+    vs = IM.keysSet tbl'
 
 isFeasible :: Real r => Tableau r -> Bool
 isFeasible tbl = 
@@ -179,7 +179,7 @@ isOptimal optdir tbl =
 
 isImproving :: Real r => OptDir -> Tableau r -> Tableau r -> Bool
 isImproving OptMin from to = currentObjValue to <= currentObjValue from 
-isImproving OptMax from to = currentObjValue to >= currentObjValue from 
+isImproving OptMax from to = currentObjValue to >= currentObjValue from
 
 -- ---------------------------------------------------------------------------
 -- primal simplex

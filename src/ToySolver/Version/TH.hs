@@ -9,7 +9,7 @@ import Control.Exception
 import Control.Monad
 import Data.Time
 import System.Process
-import Language.Haskell.TH    
+import Language.Haskell.TH
 
 getGitHash :: IO (Maybe String)
 getGitHash =
@@ -26,4 +26,4 @@ gitHashQ = do
 compilationTimeQ :: ExpQ
 compilationTimeQ = do
   tm <- runIO getCurrentTime
-  [| read $(litE (stringL (show tm))) :: UTCTime |] 
+  [| read $(litE (stringL (show tm))) :: UTCTime |]

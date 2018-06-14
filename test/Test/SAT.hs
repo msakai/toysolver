@@ -125,7 +125,7 @@ prop_solvePB = QM.monadicIO $ do
 data PBRel = PBRelGE | PBRelEQ | PBRelLE deriving (Eq, Ord, Enum, Bounded, Show)
 
 instance Arbitrary PBRel where
-  arbitrary = arbitraryBoundedEnum  
+  arbitrary = arbitraryBoundedEnum
 
 evalPBRel :: Ord a => PBRel -> a -> a -> Bool
 evalPBRel PBRelGE = (>=)

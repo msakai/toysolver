@@ -17,7 +17,7 @@ case_test_qcp       = checkFile "samples/lp/test-qcp.lp"
 case_test_qcp2      = checkFile "samples/lp/test-qcp2.lp"
 case_test_qp        = checkFile "samples/lp/test-qp.lp"
 case_empty_obj_1    = checkFile "samples/lp/empty_obj_1.lp"
-case_empty_obj_2    = checkFile "samples/lp/empty_obj_2.lp"  
+case_empty_obj_2    = checkFile "samples/lp/empty_obj_2.lp"
 
 ------------------------------------------------------------------------
 -- Sample data

@@ -157,7 +157,7 @@ linearizeWBO formula usePB = runST $ do
       , PBFile.wboNumConstraints = PBFile.wboNumConstraints formula + PBFile.pbNumConstraints formula'
       }
     , TseitinInfo (PBFile.wboNumVars formula) (PBFile.pbNumVars formula') defs
-    ) 
+    )
 
 -- -----------------------------------------------------------------------------
 

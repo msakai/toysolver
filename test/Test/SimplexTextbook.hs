@@ -63,7 +63,7 @@ case_example_5_3_phase1 = do
   let (ret,result) = phaseI example_5_3_phase1 (IntSet.fromList [6,7])
   assertBool "phase1 failed" ret
   assertBool "invalid tableau" (isValidTableau result)
-  assertBool "infeasible tableau" (isFeasible result)    
+  assertBool "infeasible tableau" (isFeasible result)
 
 -- 退化して巡回の起こるKuhnの7変数3制約の例
 kuhn_7_3 :: Tableau Rational

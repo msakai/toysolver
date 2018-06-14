@@ -333,7 +333,7 @@ instance Integral r => ContPP (Ratio r) where
   cont p = foldl1' Prelude.gcd ns % foldl' Prelude.lcm 1 ds
     where
       ns = [abs (numerator c) | (c,_) <- terms p]
-      ds = [denominator c     | (c,_) <- terms p]  
+      ds = [denominator c     | (c,_) <- terms p]
 
   pp p = mapCoeff (numerator . (/ c)) p
     where

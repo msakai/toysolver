@@ -89,7 +89,7 @@ deleteCoreInfo solver core = do
     SAT.addClause solver [-sel]
 
 getCoreLB :: CoreInfo -> IO Integer
-getCoreLB = readIORef . coreLBRef            
+getCoreLB = readIORef . coreLBRef
 
 solve :: C.Context cxt => cxt -> SAT.Solver -> Options -> IO ()
 solve cxt solver opt = solveWBO (C.normalize cxt) solver opt
@@ -112,7 +112,7 @@ solveWBO cxt solver opt = do
   coresRef <- newIORef []
   let getLB = do
         xs <- readIORef coresRef
-        foldM (\s core -> do{ v <- getCoreLB core; return $! s + v }) 0 xs        
+        foldM (\s core -> do{ v <- getCoreLB core; return $! s + v }) 0 xs
 
   deductedWeightRef <- newIORef weights
   let deductWeight d core =

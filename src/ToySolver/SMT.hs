@@ -197,7 +197,7 @@ data Exception
   | Unsupported
   deriving (Show, Typeable)
 
-instance E.Exception Exception    
+instance E.Exception Exception
 
 data Solver
   = Solver
@@ -985,7 +985,7 @@ checkSAT solver = checkSATAssuming solver []
 checkSATAssuming :: Solver -> [Expr] -> IO Bool
 checkSATAssuming solver xs = do
   l <- getContextLit solver
-  named <- readIORef (smtNamedAssertions solver) 
+  named <- readIORef (smtNamedAssertions solver)
 
   ref <- newIORef IntMap.empty
   ls <- forM xs $ \x -> do

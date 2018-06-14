@@ -64,7 +64,7 @@ instance MeetSemiLattice Polyhedron where
 instance Lattice Polyhedron
 
 instance BoundedJoinSemiLattice Polyhedron where
-  bottom = empty  
+  bottom = empty
 
 instance BoundedMeetSemiLattice Polyhedron where
   top = univ

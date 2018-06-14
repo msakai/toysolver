@@ -143,7 +143,7 @@ evalDNF dnf xs = or [is `IntSet.isSubsetOf` xs | is <- Set.toList dnf]
 
 evalCNF :: Set IntSet -> IntSet -> Bool
 evalCNF cnf xs = and [not $ IntSet.null $ is `IntSet.intersection` xs | is <- Set.toList cnf]
- 
+
 
 f, g :: Set IntSet
 f = Set.fromList $ map IntSet.fromList [[2,4,7], [7,8], [9]]

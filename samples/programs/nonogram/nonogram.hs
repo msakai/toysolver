@@ -141,7 +141,7 @@ solve (rows, cols) = do
       m <- SAT.getModel solver
       SAT.addClause solver [if val then -var else var | (var,val) <- assocs m]
       let sol = amap (SAT.evalLit m) bs
-      return (Just sol)         
+      return (Just sol)
 
 data Options
   = Options

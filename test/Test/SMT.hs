@@ -47,7 +47,7 @@ case_QF_EUF_1 :: Assertion
 case_QF_EUF_1 = do
   solver <- SMT.newSolver
   x <- SMT.declareConst solver "x" SMT.sBool
-  f <- SMT.declareFun solver "f" [SMT.sBool] SMT.sBool  
+  f <- SMT.declareFun solver "f" [SMT.sBool] SMT.sBool
 
   let c1 = f true .==. true
       c2 = notB (f x)
@@ -72,7 +72,7 @@ case_QF_EUF_2 = do
   a <- SMT.declareConst solver "a" SMT.sBool
   x <- SMT.declareConst solver "x" sU
   y <- SMT.declareConst solver "y" sU
-  f <- SMT.declareFun solver "f" [sU] sU  
+  f <- SMT.declareFun solver "f" [sU] sU
 
   let c1 = a .||. (x .==. y)
       c2 = f x ./=. f y

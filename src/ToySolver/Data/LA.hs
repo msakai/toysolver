@@ -32,7 +32,7 @@ module ToySolver.Data.LA
   , coeff
   , lookupCoeff
   , extract
-  , extractMaybe  
+  , extractMaybe
 
   -- ** Operations
   , mapCoeff
@@ -215,7 +215,7 @@ coeff v (Expr m) = IntMap.findWithDefault 0 v m
 --   lookupCoeff v e == fmap fst (extractMaybe v e)
 -- @
 lookupCoeff :: Num r => Var -> Expr r -> Maybe r
-lookupCoeff v (Expr m) = IntMap.lookup v m  
+lookupCoeff v (Expr m) = IntMap.lookup v m
 
 -- | @extract v e@ returns @(c, e')@ such that @e == c *^ v ^+^ e'@
 extract :: Num r => Var -> Expr r -> (r, Expr r)

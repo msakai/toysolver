@@ -1947,7 +1947,7 @@ saveAssumptionsImplications solver = do
     modifyIORef' ref (IS.insert lit)
   forM_ [0..n-1] $ \i -> do
     lit <- Vec.read (svAssumptions solver) i
-    modifyIORef' ref (IS.delete lit)  
+    modifyIORef' ref (IS.delete lit)
 
 constrDecayActivity :: Solver -> IO ()
 constrDecayActivity solver = do
@@ -2840,7 +2840,7 @@ pbToClause pb = do
 
 {--------------------------------------------------------------------
   Pseudo Boolean Constraint (Counter)
---------------------------------------------------------------------}   
+--------------------------------------------------------------------}
 
 data PBHandlerCounter
   = PBHandlerCounter

@@ -172,7 +172,7 @@ newSimpleContext2 obj obj2 = do
     }
 
 setOnUpdateBestSolution :: SimpleContext -> (SAT.Model -> Integer -> IO ()) -> IO ()
-setOnUpdateBestSolution sc h = writeIORef (scOnUpdateBestSolutionRef sc) h 
+setOnUpdateBestSolution sc h = writeIORef (scOnUpdateBestSolutionRef sc) h
 
 setOnUpdateLowerBound :: SimpleContext -> (Integer -> IO ()) -> IO ()
 setOnUpdateLowerBound sc h = writeIORef (scOnUpdateLowerBoundRef sc) h

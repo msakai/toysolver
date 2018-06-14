@@ -323,7 +323,7 @@ instance Default Statistics where
     { statTotalCPUTime = 0
     , statFlips = 0
     , statFlipsPerSecond = 0
-    } 
+    }
 
 -- -------------------------------------------------------------------
 

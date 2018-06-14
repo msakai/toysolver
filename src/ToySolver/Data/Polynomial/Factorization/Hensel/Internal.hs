@@ -115,7 +115,7 @@ cabook_proposition_5_11 fs g =
     es  = map (g*) $ cabook_proposition_5_10 fs
     c   = sum [ei `P.div` fi | (ei,fi) <- zip es fs]
     es2 = case zipWith P.mod es fs of
-            e2' : es2' -> e2' + c * head fs : es2'          
+            e2' : es2' -> e2' + c * head fs : es2'
 
     check :: [UPolynomial k] -> Bool
     check es' =

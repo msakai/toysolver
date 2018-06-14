@@ -150,7 +150,7 @@ instance IfThenElse (Simplify a) (Simplify a) where
   ite (Simplify c) (Simplify t) (Simplify e)
     | isTrue c  = Simplify t
     | isFalse c = Simplify e
-    | otherwise = Simplify (ITE c t e)  
+    | otherwise = Simplify (ITE c t e)
 
 instance Boolean (Simplify a) where
   Simplify x .=>. Simplify y

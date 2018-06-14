@@ -288,7 +288,7 @@ pickupZ :: IntervalZ -> Maybe Integer
 pickupZ (Nothing,Nothing) = return 0
 pickupZ (Just x, Nothing) = return x
 pickupZ (Nothing, Just x) = return x
-pickupZ (Just x, Just y) = if x <= y then return x else mzero 
+pickupZ (Just x, Just y) = if x <= y then return x else mzero
 
 -- ---------------------------------------------------------------------------
 

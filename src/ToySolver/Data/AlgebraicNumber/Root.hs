@@ -88,7 +88,7 @@ lift2 f p1 p2 = findPoly f_a_b gbase
     f_a_b = f (P.var a) (P.var b)
 
     gbase :: [Polynomial k Var]
-    gbase = [ P.subst p1 (\X -> P.var a), P.subst p2 (\X -> P.var b) ]              
+    gbase = [ P.subst p1 (\X -> P.var a), P.subst p2 (\X -> P.var b) ]
 
 -- | Given a polynomial P and polynomials {P1,…,Pn} over K,
 -- findPoly P [P1..Pn] computes a non-zero polynomial Q such that Q[P] = 0 modulo {P1,…,Pn}.

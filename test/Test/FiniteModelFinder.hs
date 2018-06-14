@@ -44,7 +44,7 @@ genAtom' sig@(fsyms, psyms) vs = do
 genLit' :: Sig -> [MF.Var] -> StateT Int Gen MF.Lit
 genLit' sig vs = do
   atom <- genAtom' sig vs
-  lift $ elements [MF.Pos atom, MF.Neg atom]  
+  lift $ elements [MF.Pos atom, MF.Neg atom]
 
 genClause' :: Sig -> [MF.Var] -> StateT Int Gen MF.Clause
 genClause' sig vs = do

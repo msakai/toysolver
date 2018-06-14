@@ -25,7 +25,7 @@ module ToySolver.Data.FOL.Arith
   , evalAtom
 
   -- * Arithmetic formula
-  , module ToySolver.Data.FOL.Formula  
+  , module ToySolver.Data.FOL.Formula
 
   -- * Misc
   , SatResult (..)

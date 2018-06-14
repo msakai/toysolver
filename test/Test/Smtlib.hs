@@ -367,7 +367,7 @@ genQuotedSymbol = listOf1 g
   where
     g :: Gen Char
     g = oneof [elements (Set.toList xs), choose (toEnum 128, maxBound)]
-    xs = Set.fromList (['\t','\n','\r'] ++ [' ' .. toEnum 126]) `Set.difference` Set.fromList ['\\', '|']    
+    xs = Set.fromList (['\t','\n','\r'] ++ [' ' .. toEnum 126]) `Set.difference` Set.fromList ['\\', '|']
 
 genKeyword :: Gen String
 genKeyword = oneof

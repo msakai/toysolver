@@ -248,7 +248,7 @@ cloneSolver solver = do
     , svNPivot  = npivot
     , svConfig  = config
     , svBacktrackPoints = bps
-    }  
+    }
 
 class (VectorSpace v, Scalar v ~ Rational, Ord v) => SolverValue v where
   toValue :: Rational -> v
@@ -559,7 +559,7 @@ setRow solver v e = do
   modifyMutVar (svTableau solver) $ \t ->
     IntMap.insert v (LA.applySubst t e) t
   modifyMutVar (svModel solver) $ \m -> 
-    IntMap.insert v (LA.evalLinear m (toValue 1) e) m  
+    IntMap.insert v (LA.evalLinear m (toValue 1) e) m
 
 setOptDir :: PrimMonad m => GenericSolverM m v -> OptDir -> m ()
 setOptDir solver dir = writeMutVar (svOptDir solver) dir
@@ -971,7 +971,7 @@ getRawModel solver = do
     return (x,val)
 
 getObjValue :: PrimMonad m => GenericSolverM m v -> m v
-getObjValue solver = getValue solver objVar  
+getObjValue solver = getValue solver objVar
 
 type Model = IntMap Rational
 

@@ -573,7 +573,7 @@ polynomials :: Gen (Polynomial Rational Int)
 polynomials = do
   size <- choose (0, 5)
   xs <- replicateM size genTerms
-  return $ sum $ map P.fromTerm xs 
+  return $ sum $ map P.fromTerm xs
 
 umonicMonomials :: Gen UMonomial
 umonicMonomials = do
@@ -593,7 +593,7 @@ upolynomials :: Gen (UPolynomial Rational)
 upolynomials = do
   size <- choose (0, 5)
   xs <- replicateM size genUTerms
-  return $ sum $ map P.fromTerm xs 
+  return $ sum $ map P.fromTerm xs
 
 genUTermsZ :: Gen (UTerm Integer)
 genUTermsZ = do
@@ -605,7 +605,7 @@ upolynomialsZ :: Gen (UPolynomial Integer)
 upolynomialsZ = do
   size <- choose (0, 5)
   xs <- replicateM size genUTermsZ
-  return $ sum $ map P.fromTerm xs 
+  return $ sum $ map P.fromTerm xs
 
 ------------------------------------------------------------------------
 
