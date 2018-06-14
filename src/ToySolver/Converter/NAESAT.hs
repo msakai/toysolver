@@ -32,6 +32,12 @@ module ToySolver.Converter.NAESAT
   -- * Conversion from general NAE-SAT to NAE-k-SAT
   , NAESAT2NAEKSATInfo (..)
   , naesat2naeksat
+
+  -- ** NAE-SAT to MAX-2-SAT
+  , NAESAT2Max2SATInfo
+  , naesat2max2sat
+  , NAE3SAT2Max2SATInfo (..)
+  , nae3sat2max2sat
   ) where
 
 import Control.Monad.State.Strict
@@ -155,3 +161,68 @@ instance BackwardTransformer NAESAT2NAEKSATInfo where
   transformBackward (NAESAT2NAEKSATInfo n1 _n2 _table) = SAT.restrictModel n1
 
 -- ------------------------------------------------------------------------
+
+type NAESAT2Max2SATInfo = ComposedTransformer NAESAT2NAEKSATInfo NAE3SAT2Max2SATInfo
+
+naesat2max2sat :: NAESAT -> (CNF.WCNF, NAESAT2Max2SATInfo)
+naesat2max2sat x = (x2, (ComposedTransformer info1 info2))
+  where
+    (x1, info1) = naesat2naeksat 3 x
+    (x2, info2) = nae3sat2max2sat x1
+
+-- ------------------------------------------------------------------------
+
+newtype NAE3SAT2Max2SATInfo = NAE3SAT2Max2SATInfo Integer
+
+-- Original nae-sat problem is satisfiable iff MAX-2-SAT problem has solution with cost <=threshold.
+nae3sat2max2sat :: NAESAT -> (CNF.WCNF, NAE3SAT2Max2SATInfo)
+nae3sat2max2sat (n,cs)
+  | any (\c -> VG.length c < 2) cs =
+      ( CNF.WCNF
+        { CNF.wcnfTopCost = 2
+        , CNF.wcnfNumVars = n
+        , CNF.wcnfClauses = [(1, SAT.packClause [])]
+        , CNF.wcnfNumClauses = 1
+        }
+      , NAE3SAT2Max2SATInfo 0
+      )
+  | otherwise =
+      ( CNF.WCNF
+        { CNF.wcnfTopCost = fromIntegral nc' + 1
+        , CNF.wcnfNumVars = n
+        , CNF.wcnfClauses = cs'
+        , CNF.wcnfNumClauses = nc'
+        }
+      , NAE3SAT2Max2SATInfo t
+      )
+  where
+    nc' = length cs'
+    (cs', t) = foldl f ([],0) cs
+      where
+        f :: ([CNF.WeightedClause], Integer) -> VU.Vector SAT.Lit -> ([CNF.WeightedClause], Integer)
+        f (cs, !t) c =
+          case SAT.unpackClause c of
+            []  -> error "nae3sat2max2sat: should not happen"
+            [_] -> error "nae3sat2max2sat: should not happen"
+            [_,_] ->
+                ( [(1, c), (1, VG.map negate c)] ++ cs
+                , t
+                )
+            [l0,l1,l2] ->
+                ( concat [[(1, SAT.packClause [a,b]), (1, SAT.packClause [-a,-b])] | (a,b) <- [(l0,l1),(l1,l2),(l2,l0)]] ++ cs
+                , t + 1
+                )
+            _ -> error "nae3sat2max2sat: cannot handle nae-clause of size >3"
+
+instance Transformer NAE3SAT2Max2SATInfo where
+  type Source NAE3SAT2Max2SATInfo = SAT.Model
+  type Target NAE3SAT2Max2SATInfo = SAT.Model
+
+instance ForwardTransformer NAE3SAT2Max2SATInfo where
+  transformForward _ m = m
+
+instance BackwardTransformer NAE3SAT2Max2SATInfo where
+  transformBackward _ m = m
+
+-- ------------------------------------------------------------------------
+

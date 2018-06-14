@@ -100,6 +100,16 @@ arbitraryCNF = do
 evalCNF :: SAT.Model -> CNF.CNF -> Bool
 evalCNF m cnf = all (SAT.evalClause m . SAT.unpackClause) (CNF.cnfClauses cnf)
 
+evalWCNF :: SAT.Model -> CNF.WCNF -> Maybe Integer
+evalWCNF m wcnf = foldl' (liftM2 (+)) (Just 0)
+  [ if SAT.evalClause m (SAT.unpackClause c) then
+      Just 0
+    else if w == CNF.wcnfTopCost wcnf then
+      Nothing
+    else
+      Just w
+  | (w,c) <- CNF.wcnfClauses wcnf
+  ]
 
 prop_solvePB :: Property
 prop_solvePB = QM.monadicIO $ do
@@ -1955,6 +1965,18 @@ prop_naesat2maxcut_forward =
        [ evalNAESAT m nae == (MaxCut.eval sol maxcut >= threshold)
        | m <- allAssignments (fst nae)
        , let sol = transformForward info m
+       ]
+
+prop_naesat2max2sat_forward :: Property
+prop_naesat2max2sat_forward =
+  forAll arbitraryNAESAT $ \nae ->
+    let (wcnf, info@(ComposedTransformer _ (NAE3SAT2Max2SATInfo threshold))) = naesat2max2sat nae
+    in and
+       [ case evalWCNF m2 wcnf of
+           Nothing -> False
+           Just v -> evalNAESAT m nae == (v <= threshold)
+       | m <- allAssignments (fst nae)
+       , let m2 = transformForward info m
        ]
 
 arbitraryNAESAT :: Gen NAESAT
