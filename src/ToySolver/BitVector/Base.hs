@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -46,6 +47,9 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Monoid
 import Data.Ord
+#if MIN_VERSION_base(4,9,0)
+import Data.Semigroup
+#endif
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
@@ -123,6 +127,11 @@ newtype BV = BV (VU.Vector Bool)
 instance Ord BV where
   compare (BV bs1) (BV bs2) =
     (comparing VG.length <> comparing VG.reverse) bs1 bs2
+
+#if MIN_VERSION_base(4,9,0)
+instance Semigroup BV where
+  (<>) = mappend
+#endif
 
 instance Monoid BV where
   mempty = BV VG.empty
@@ -397,6 +406,11 @@ instance IsBV Expr where
   bvlshr = EOp2 OpLShr
   bvashr = EOp2 OpAShr
   bvcomp = EOp2 OpComp
+
+#if MIN_VERSION_base(4,9,0)
+instance Semigroup Expr where
+  (<>) = mappend
+#endif
 
 instance Monoid Expr where
   mempty = EConst mempty
