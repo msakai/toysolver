@@ -529,6 +529,9 @@ Executable toyfmf
       else
         Build-Depends:
           transformers-compat <0.5
+    -- for Semigroup (as superclass of) Monoid Proposal
+    if impl(ghc >=8.4)
+      Build-Depends: logic-TPTP >=0.4.6.0
   Default-Language: Haskell2010
   Other-Extensions: CPP
   GHC-Options: -rtsopts
