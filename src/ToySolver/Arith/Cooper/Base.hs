@@ -58,9 +58,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Monoid
 import Data.Ratio
-#if MIN_VERSION_base(4,9,0)
-import Data.Semigroup
-#endif
+import qualified Data.Semigroup as Semigroup
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.VectorSpace hiding (project)
@@ -376,14 +374,14 @@ projectCasesN vs2 = f (IS.toList vs2)
 
 newtype LCM a = LCM{ getLCM :: a }
 
-#if MIN_VERSION_base(4,9,0)
-instance Integral a => Semigroup (LCM a) where
-  (<>) = mappend
-#endif
+instance Integral a => Semigroup.Semigroup (LCM a) where
+  LCM a <> LCM b = LCM $ lcm a b
 
 instance Integral a => Monoid (LCM a) where
   mempty = LCM 1
-  LCM a `mappend` LCM b = LCM $ lcm a b
+#if !(MIN_VERSION_base(4,11,0))
+  mappend = (Semigroup.<>)
+#endif
 
 checkedDiv :: Integer -> Integer -> Integer
 checkedDiv a b =

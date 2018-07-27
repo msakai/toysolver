@@ -47,9 +47,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Monoid
 import Data.Ord
-#if MIN_VERSION_base(4,9,0)
-import Data.Semigroup
-#endif
+import qualified Data.Semigroup as Semigroup
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
@@ -128,14 +126,14 @@ instance Ord BV where
   compare (BV bs1) (BV bs2) =
     (comparing VG.length <> comparing VG.reverse) bs1 bs2
 
-#if MIN_VERSION_base(4,9,0)
-instance Semigroup BV where
-  (<>) = mappend
-#endif
+instance Semigroup.Semigroup BV where
+  BV hi <> BV lo = BV (lo <> hi)
 
 instance Monoid BV where
   mempty = BV VG.empty
-  mappend (BV hi) (BV lo) = BV (lo <> hi)
+#if !(MIN_VERSION_base(4,11,0))
+  mappend = (Semigroup.<>)
+#endif
 
 instance Show BV where
   show bv = "0b" ++ [if b then '1' else '0' | b <- toDescBits bv]
@@ -407,14 +405,14 @@ instance IsBV Expr where
   bvashr = EOp2 OpAShr
   bvcomp = EOp2 OpComp
 
-#if MIN_VERSION_base(4,9,0)
-instance Semigroup Expr where
-  (<>) = mappend
-#endif
+instance Semigroup.Semigroup Expr where
+  (<>) = EOp2 OpConcat
 
 instance Monoid Expr where
   mempty = EConst mempty
-  mappend = EOp2 OpConcat
+#if !(MIN_VERSION_base(4,11,0))
+  mappend = (Semigroup.<>)
+#endif
 
 instance Bits Expr where
   (.&.) = bvand
