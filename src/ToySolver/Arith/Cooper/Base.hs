@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.Cooper.Base
@@ -56,6 +58,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.Monoid
 import Data.Ratio
+import qualified Data.Semigroup as Semigroup
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.VectorSpace hiding (project)
@@ -371,9 +374,14 @@ projectCasesN vs2 = f (IS.toList vs2)
 
 newtype LCM a = LCM{ getLCM :: a }
 
+instance Integral a => Semigroup.Semigroup (LCM a) where
+  LCM a <> LCM b = LCM $ lcm a b
+
 instance Integral a => Monoid (LCM a) where
   mempty = LCM 1
-  LCM a `mappend` LCM b = LCM $ lcm a b
+#if !(MIN_VERSION_base(4,11,0))
+  mappend = (Semigroup.<>)
+#endif
 
 checkedDiv :: Integer -> Integer -> Integer
 checkedDiv a b =
