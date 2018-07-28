@@ -119,7 +119,6 @@ data Class
 
 instance Semigroup Class where
   xs <> ys = ClassUnion (classSize xs + classSize ys) xs ys
-  stimes = stimesIdempotent
 
 classSize :: Class -> Int
 classSize (ClassSingleton _) = 1

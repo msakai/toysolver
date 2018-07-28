@@ -376,6 +376,7 @@ newtype LCM a = LCM{ getLCM :: a }
 
 instance Integral a => Semigroup.Semigroup (LCM a) where
   LCM a <> LCM b = LCM $ lcm a b
+  stimes = Semigroup.stimesIdempotent
 
 instance Integral a => Monoid (LCM a) where
   mempty = LCM 1
