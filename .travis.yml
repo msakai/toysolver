@@ -16,26 +16,31 @@ dist: trusty
 # Do not choose a language; we provide our own build tools.
 language: generic
 
+addons:
+  apt:
+    packages:
+    - libgmp-dev
+    - coinor-cbc
+    - glpk-utils
+    - lp-solve
+    - c2hs
+    - ocl-icd-opencl-dev
+
 matrix:
   include:
     - env: STACK_YAML=stack-travis-ghc-8.4.yaml GHCVER=8.4.3 FLAGS="--haddock --no-haddock-deps --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL" RELEASE=1
       compiler: ": #GHC 8.4.3"
-      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve,c2hs,ocl-icd-opencl-dev]}}
     - env: STACK_YAML=stack-travis-ghc-8.4.yaml GHCVER=8.4.3 FLAGS="--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag=toysolver:OpenCL"
       compiler: ": #GHC 8.4.3"
       os: osx
     - env: STACK_YAML=stack-travis-ghc-8.2.yaml GHCVER=8.2.1 FLAGS="--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL" RELEASE=1
       compiler: ": #GHC 8.2.1"
-      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve,c2hs,ocl-icd-opencl-dev]}}
     - env: STACK_YAML=stack-travis-ghc-8.0.yaml GHCVER=8.0.1 FLAGS="--coverage --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL" COVERAGE=1
       compiler: ": #GHC 8.0.2"
-      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve,c2hs,ocl-icd-opencl-dev]}}
     - env: STACK_YAML=stack-travis-ghc-7.10.yaml GHCVER=7.10.3 FLAGS="--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL"
       compiler: ": #GHC 7.10.3"
-      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve,c2hs,ocl-icd-opencl-dev]}}
     - env: STACK_YAML=stack-travis-ghc-7.8.yaml GHCVER=7.8.4 FLAGS="--flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve --flag=toysolver:OpenCL"
       compiler: ": #GHC 7.8.4"
-      addons: {apt: {packages: [libgmp-dev,coinor-cbc,glpk-utils,lp-solve,c2hs,ocl-icd-opencl-dev]}}
 
 # Caching so the next build will be fast too.
 cache:
