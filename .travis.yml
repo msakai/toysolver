@@ -28,18 +28,18 @@ addons:
 
 matrix:
   include:
-    - env: STACK_YAML=stack-travis-ghc-8.4.yaml GHCVER=8.4.3 RELEASE=1 HADDOCK=1
+    - env: STACK_YAML=stack-travis-ghc-8.4.yaml RELEASE=1 HADDOCK=1
       compiler: ": #GHC 8.4.3"
-    - env: STACK_YAML=stack-travis-ghc-8.4.yaml GHCVER=8.4.3 RELEASE=1
+    - env: STACK_YAML=stack-travis-ghc-8.4.yaml RELEASE=1
       compiler: ": #GHC 8.4.3"
       os: osx
-    - env: STACK_YAML=stack-travis-ghc-8.2.yaml GHCVER=8.2.1
+    - env: STACK_YAML=stack-travis-ghc-8.2.yaml
       compiler: ": #GHC 8.2.1"
-    - env: STACK_YAML=stack-travis-ghc-8.0.yaml GHCVER=8.0.1 COVERAGE=1
+    - env: STACK_YAML=stack-travis-ghc-8.0.yaml COVERAGE=1 SHC_GHCVER=8.0.1
       compiler: ": #GHC 8.0.2"
-    - env: STACK_YAML=stack-travis-ghc-7.10.yaml GHCVER=7.10.3
+    - env: STACK_YAML=stack-travis-ghc-7.10.yaml
       compiler: ": #GHC 7.10.3"
-    - env: STACK_YAML=stack-travis-ghc-7.8.yaml GHCVER=7.8.4
+    - env: STACK_YAML=stack-travis-ghc-7.8.yaml
       compiler: ": #GHC 7.8.4"
 
 # Caching so the next build will be fast too.
@@ -63,7 +63,7 @@ install:
 - if [ -n "$COVERAGE" ]; then FLAGS="$FLAGS --coverage"; fi
 - if [ -n "$HADDOCK" ]; then FLAGS="$FLAGS --haddock --no-haddock-deps"; fi
 - if [ "$TRAVIS_OS_NAME" = "linux" ]; then FLAGS="$FLAGS --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve"; fi
-- if [ ! $GHCVER = 7.8.4 ]; then FLAGS="$FLAGS --flag toysolver:BuildToyFMF"; fi
+- if [ ! $STACK_YAML = stack-travis-ghc-7.8.yaml ]; then FLAGS="$FLAGS --flag toysolver:BuildToyFMF"; fi
 
 # Build dependencies
 - stack --jobs 2 --no-terminal --install-ghc build --test --bench --only-dependencies $FLAGS
@@ -75,7 +75,7 @@ script:
 after_script:
 - |
   if [ -n "$COVERAGE" ]; then
-    travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$GHCVER.tar.bz2 | tar -xj
+    travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$SHC_GHCVER.tar.bz2 | tar -xj
     ./shc toysolver TestSuite TestPolynomial
   fi
 
