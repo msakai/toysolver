@@ -333,6 +333,8 @@ Library
      ToySolver.Data.Polynomial.Factorization.Zassenhaus
      ToySolver.Data.Polynomial.GroebnerBasis
      ToySolver.Data.Polynomial.Interpolation.Lagrange
+     ToySolver.FileFormat
+     ToySolver.FileFormat.Base
      ToySolver.Graph.ShortestPath
      ToySolver.MaxCut
      ToySolver.QBF
