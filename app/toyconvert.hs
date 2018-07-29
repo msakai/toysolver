@@ -38,11 +38,11 @@ import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
 import qualified ToySolver.Data.MIP as MIP
-import qualified ToySolver.Text.CNF as CNF
 import ToySolver.Converter
 import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
+import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Version
 import ToySolver.Internal.Util (setEncodingChar8)
 

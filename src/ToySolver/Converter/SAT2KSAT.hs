@@ -28,9 +28,9 @@ import qualified Data.Sequence as Seq
 import Data.STRef
 
 import ToySolver.Converter.Base
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.SAT.Store.CNF
-import qualified ToySolver.Text.CNF as CNF
 
 
 sat2ksat :: Int -> CNF.CNF -> (CNF.CNF, SAT2KSATInfo)

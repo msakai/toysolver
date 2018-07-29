@@ -61,7 +61,7 @@ import qualified ToySolver.Arith.Simplex as Simplex
 import qualified ToySolver.Arith.MIP as MIPSolver
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
-import qualified ToySolver.Text.CNF as CNF
+import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Converter
 import ToySolver.SAT.Printer
 import qualified ToySolver.SAT.Types as SAT

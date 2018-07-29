@@ -18,8 +18,8 @@ module ToySolver.Converter.GCNF2MaxSAT
 
 import qualified Data.Vector.Generic as VG
 import ToySolver.Converter.Base
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Text.CNF as CNF
 
 data GCNF2MaxSATInfo = GCNF2MaxSATInfo !Int
 

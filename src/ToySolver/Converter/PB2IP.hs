@@ -34,8 +34,8 @@ import ToySolver.Converter.Base
 import ToySolver.Converter.PB
 import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Data.MIP ((.==.), (.<=.), (.>=.))
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Text.CNF as CNF
 
 -- -----------------------------------------------------------------------------
 

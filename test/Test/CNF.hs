@@ -14,8 +14,8 @@ import Data.Maybe
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.TH
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Text.CNF as CNF
 
 ------------------------------------------------------------------------
 

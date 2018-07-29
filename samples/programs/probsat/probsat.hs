@@ -11,9 +11,9 @@ import System.IO
 import qualified System.Random.MWC as Rand
 import Text.Printf
 
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
 import ToySolver.SAT.Printer (maxsatPrintModel)
-import qualified ToySolver.Text.CNF as CNF
 
 data Options = Options
   { optAlgorithm :: String

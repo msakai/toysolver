@@ -335,6 +335,7 @@ Library
      ToySolver.Data.Polynomial.Interpolation.Lagrange
      ToySolver.FileFormat
      ToySolver.FileFormat.Base
+     ToySolver.FileFormat.CNF
      ToySolver.Graph.ShortestPath
      ToySolver.MaxCut
      ToySolver.QBF

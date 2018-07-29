@@ -48,7 +48,7 @@ import qualified ToySolver.SAT.ExistentialQuantification as ExistentialQuantific
 
 import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Converter
-import qualified ToySolver.Text.CNF as CNF
+import qualified ToySolver.FileFormat.CNF as CNF
 
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA

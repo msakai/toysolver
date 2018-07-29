@@ -58,13 +58,13 @@ import qualified Data.PseudoBoolean as PBFile
 
 import ToySolver.Converter.Base
 import ToySolver.Converter.Tseitin
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import ToySolver.SAT.Store.CNF
 import ToySolver.SAT.Store.PB
-import qualified ToySolver.Text.CNF as CNF
 
 -- -----------------------------------------------------------------------------
 

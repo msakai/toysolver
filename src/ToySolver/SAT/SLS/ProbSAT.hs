@@ -63,10 +63,10 @@ import Data.Word
 import System.Clock
 import qualified System.Random.MWC as Rand
 import qualified System.Random.MWC.Distributions as Rand
+import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Internal.Data.IOURef
 import qualified ToySolver.Internal.Data.Vec as Vec
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Text.CNF as CNF
 
 -- -------------------------------------------------------------------
 

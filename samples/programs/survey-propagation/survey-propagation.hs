@@ -8,7 +8,7 @@ import System.Console.GetOpt
 import System.Environment
 import System.Exit
 import System.IO
-import qualified ToySolver.Text.CNF as CNF
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
 #ifdef ENABLE_OPENCL
 import Control.Parallel.OpenCL

@@ -68,6 +68,7 @@ import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
 import ToySolver.Converter
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO as PBO
@@ -78,7 +79,6 @@ import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.Enum as MUSEnum
 import ToySolver.SAT.Printer
-import qualified ToySolver.Text.CNF as CNF
 import ToySolver.Version
 import ToySolver.Internal.Util (showRational, setEncodingChar8)
 
