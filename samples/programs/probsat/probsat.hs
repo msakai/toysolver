@@ -11,6 +11,7 @@ import System.IO
 import qualified System.Random.MWC as Rand
 import Text.Printf
 
+import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
 import ToySolver.SAT.Printer (maxsatPrintModel)
@@ -136,7 +137,7 @@ parserInfo = info (helper <*> optionsParser)
 main :: IO ()
 main = do
   opt <- execParser parserInfo
-  wcnf <- CNF.readFile (optFileName opt)
+  wcnf <- FF.readFile (optFileName opt)
   solver <- ProbSAT.newSolverWeighted wcnf
   gen <-
     case optRandomSeed opt of

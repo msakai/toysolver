@@ -8,6 +8,7 @@ import System.Console.GetOpt
 import System.Environment
 import System.Exit
 import System.IO
+import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
 #ifdef ENABLE_OPENCL
@@ -96,7 +97,7 @@ main = do
     (o,[fname],_) -> do
       let opt = foldl (flip id) def o
       handle (\(e::SomeException) -> hPrint stderr e) $ do
-        wcnf <- CNF.readFile fname
+        wcnf <- FF.readFile fname
 
 #ifdef ENABLE_OPENCL
         if optOpenCL opt then do

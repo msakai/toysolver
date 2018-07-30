@@ -61,7 +61,7 @@ import qualified ToySolver.Arith.Simplex as Simplex
 import qualified ToySolver.Arith.MIP as MIPSolver
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
-import qualified ToySolver.FileFormat.CNF as CNF
+import qualified ToySolver.FileFormat as FF
 import ToySolver.Converter
 import ToySolver.SAT.Printer
 import qualified ToySolver.SAT.Types as SAT
@@ -474,7 +474,7 @@ main = do
 
   case fromMaybe ModeMIP (optMode o) of
     ModeSAT -> do
-      cnf <- CNF.readFile (optInput o)
+      cnf <- FF.readFile (optInput o)
       let (mip,info) = sat2ip cnf
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
         let m2 = transformBackward info m
@@ -501,7 +501,7 @@ main = do
             pbPrintModel stdout m2 0
             writeSOLFileSAT o m2
     ModeMaxSAT -> do
-      wcnf <- CNF.readFile (optInput o)
+      wcnf <- FF.readFile (optInput o)
       let (mip,info) = maxsat2ip False wcnf
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
         let m2 = transformBackward info m

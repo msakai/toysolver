@@ -69,6 +69,7 @@ import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
 import ToySolver.Converter
 import qualified ToySolver.FileFormat.CNF as CNF
+import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO as PBO
@@ -594,8 +595,8 @@ newSolver opts = do
 mainSAT :: Options -> SAT.Solver -> IO ()
 mainSAT opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM CNF.parse $ BS.hGetContents stdin
-           fname -> CNF.parseFile fname
+           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           fname -> FF.parseFile fname
   case ret of
     Left err -> hPrint stderr err >> exitFailure
     Right cnf -> do
@@ -691,11 +692,11 @@ mainMUS opt solver = do
   gcnf <- case optInput opt of
            "-"   -> do
              s <- BS.hGetContents stdin
-             case CNF.parse s of
+             case FF.parse s of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
            fname -> do
-             ret <- CNF.parseFile fname
+             ret <- FF.parseFile fname
              case ret of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
@@ -1008,8 +1009,8 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
 mainMaxSAT :: Options -> SAT.Solver -> IO ()
 mainMaxSAT opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM CNF.parse BS.getContents
-           fname -> CNF.parseFile fname
+           "-"   -> liftM FF.parse BS.getContents
+           fname -> FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right wcnf -> do
