@@ -64,7 +64,6 @@ import qualified GHC.Stats as Stats
 #endif
 
 import qualified Data.PseudoBoolean as PBFile
-import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
 import ToySolver.Converter
@@ -785,8 +784,8 @@ solveMUS opt solver gcnf = do
 mainPB :: Options -> SAT.Solver -> IO ()
 mainPB opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM PBFileAttoparsec.parseOPBByteString $ BS.hGetContents stdin
-           fname -> PBFileAttoparsec.parseOPBFile fname
+           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           fname -> FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right formula -> solvePB opt solver formula
@@ -903,8 +902,8 @@ setupOptimizer pbo opt = do
 mainWBO :: Options -> SAT.Solver -> IO ()
 mainWBO opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM PBFileAttoparsec.parseWBOByteString $ BS.hGetContents stdin
-           fname -> PBFileAttoparsec.parseWBOFile fname
+           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           fname -> FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right formula -> solveWBO opt solver False formula

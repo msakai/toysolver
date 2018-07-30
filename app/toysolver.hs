@@ -44,7 +44,6 @@ import GHC.Conc (getNumProcessors, setNumCapabilities)
 
 import Data.OptDir
 import qualified Data.PseudoBoolean as PBFile
-import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
 import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Arith as FOL
@@ -481,25 +480,19 @@ main = do
         satPrintModel stdout m2 0
         writeSOLFileSAT o m2
     ModePB -> do
-      ret <- PBFileAttoparsec.parseOPBFile (optInput o)
-      case ret of
-        Left err -> hPutStrLn stderr err >> exitFailure
-        Right pb -> do
-          let (mip,info) = pb2ip pb
-          run (optSolver o) o (fmap fromInteger mip) $ \m -> do
-            let m2 = transformBackward info m
-            pbPrintModel stdout m2 0
-            writeSOLFileSAT o m2
+      pb <- FF.readFile (optInput o)
+      let (mip,info) = pb2ip pb
+      run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+        let m2 = transformBackward info m
+        pbPrintModel stdout m2 0
+        writeSOLFileSAT o m2
     ModeWBO -> do
-      ret <- PBFileAttoparsec.parseWBOFile (optInput o)
-      case ret of
-        Left err -> hPutStrLn stderr err >> exitFailure
-        Right wbo -> do
-          let (mip,info) = wbo2ip False wbo
-          run (optSolver o) o (fmap fromInteger mip) $ \m -> do
-            let m2 = transformBackward info m
-            pbPrintModel stdout m2 0
-            writeSOLFileSAT o m2
+      wbo <- FF.readFile (optInput o)
+      let (mip,info) = wbo2ip False wbo
+      run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+        let m2 = transformBackward info m
+        pbPrintModel stdout m2 0
+        writeSOLFileSAT o m2
     ModeMaxSAT -> do
       wcnf <- FF.readFile (optInput o)
       let (mip,info) = maxsat2ip False wcnf

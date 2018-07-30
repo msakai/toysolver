@@ -6,7 +6,7 @@ import Data.Array.IArray
 import System.Environment
 import Text.Printf
 import qualified Data.PseudoBoolean as PBFile
-import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
+import qualified ToySolver.FileFormat as FF
 import ToySolver.SAT.Types
 import ToySolver.Internal.Util (setEncodingChar8)
 
@@ -17,7 +17,7 @@ main = do
 #endif
 
   [problemFile, modelFile] <- getArgs
-  Right formula <- PBFileAttoparsec.parseOPBFile problemFile
+  formula <- FF.readFile problemFile
   model <- liftM readModel (readFile modelFile)
   forM_ (PBFile.pbConstraints formula) $ \c ->
     unless (eval model c) $

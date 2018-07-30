@@ -35,7 +35,6 @@ import Text.PrettyPrint.ANSI.Leijen ((<+>))
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
 
 import qualified Data.PseudoBoolean as PBFile
-import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
 import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Converter
@@ -214,16 +213,8 @@ readProblem o fname = do
           liftM (ProbOPB . fst . sat2pb) $ FF.readFile fname
     ".wcnf" ->
       liftM (ProbWBO . fst . maxsat2wbo) $ FF.readFile fname
-    ".opb"  -> do
-      ret <- PBFileAttoparsec.parseOPBFile fname
-      case ret of
-        Left err -> hPutStrLn stderr err >> exitFailure
-        Right opb -> return $ ProbOPB opb
-    ".wbo"  -> do
-      ret <- PBFileAttoparsec.parseWBOFile fname
-      case ret of
-        Left err -> hPutStrLn stderr err >> exitFailure
-        Right wbo -> return $ ProbWBO wbo
+    ".opb"  -> liftM ProbOPB $ FF.readFile fname
+    ".wbo"  -> liftM ProbWBO $ FF.readFile fname
     ".gcnf" ->
       liftM (ProbWBO . fst . maxsat2wbo . fst . gcnf2maxsat) $ FF.readFile fname
     ".lp"   -> ProbMIP <$> MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
