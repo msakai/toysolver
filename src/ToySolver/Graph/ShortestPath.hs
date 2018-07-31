@@ -298,6 +298,7 @@ bellmanFord (Fold fV fE fC fD) g ss = runST $ do
     lift $ do
       writeSTRef updatedRef HashSet.empty
       forM_ (HashSet.toList us) $ \u -> do
+        -- modifySTRef' updatedRef (HashSet.delete u) -- possible optimization
         Just (Pair du a) <- H.lookup d u
         forM_ (HashMap.lookupDefault [] u g) $ \(v, c, l) -> do
           m <- H.lookup d v
