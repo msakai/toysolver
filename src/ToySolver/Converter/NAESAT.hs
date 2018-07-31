@@ -46,8 +46,8 @@ import qualified Data.IntMap as IntMap
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
 import ToySolver.Converter.Base
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Text.CNF as CNF
 
 type NAESAT = (Int, [NAEClause])
 

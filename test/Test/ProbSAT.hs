@@ -15,9 +15,9 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 import Test.QuickCheck.Modifiers
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
-import qualified ToySolver.Text.CNF as CNF
 
 arbitraryCNF :: Gen CNF.CNF
 arbitraryCNF = do

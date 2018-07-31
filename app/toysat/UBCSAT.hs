@@ -31,8 +31,8 @@ import Text.Megaparsec.Char
 import Text.Megaparsec.String
 #endif
 
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Text.CNF as CNF
 
 data Options
   = Options

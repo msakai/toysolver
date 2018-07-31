@@ -35,14 +35,13 @@ import Text.PrettyPrint.ANSI.Leijen ((<+>))
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
 
 import qualified Data.PseudoBoolean as PBFile
-import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
 import qualified ToySolver.Data.MIP as MIP
-import qualified ToySolver.Text.CNF as CNF
 import ToySolver.Converter
 import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
+import qualified ToySolver.FileFormat as FF
 import ToySolver.Version
 import ToySolver.Internal.Util (setEncodingChar8)
 
@@ -209,23 +208,15 @@ readProblem o fname = do
   case map toLower (takeExtension fname) of
     ".cnf"
       | optAsMaxSAT o ->
-          liftM (ProbWBO . fst . maxsat2wbo) $ CNF.readFile fname
+          liftM (ProbWBO . fst . maxsat2wbo) $ FF.readFile fname
       | otherwise -> do
-          liftM (ProbOPB . fst . sat2pb) $ CNF.readFile fname
+          liftM (ProbOPB . fst . sat2pb) $ FF.readFile fname
     ".wcnf" ->
-      liftM (ProbWBO . fst . maxsat2wbo) $ CNF.readFile fname
-    ".opb"  -> do
-      ret <- PBFileAttoparsec.parseOPBFile fname
-      case ret of
-        Left err -> hPutStrLn stderr err >> exitFailure
-        Right opb -> return $ ProbOPB opb
-    ".wbo"  -> do
-      ret <- PBFileAttoparsec.parseWBOFile fname
-      case ret of
-        Left err -> hPutStrLn stderr err >> exitFailure
-        Right wbo -> return $ ProbWBO wbo
+      liftM (ProbWBO . fst . maxsat2wbo) $ FF.readFile fname
+    ".opb"  -> liftM ProbOPB $ FF.readFile fname
+    ".wbo"  -> liftM ProbWBO $ FF.readFile fname
     ".gcnf" ->
-      liftM (ProbWBO . fst . maxsat2wbo . fst . gcnf2maxsat) $ CNF.readFile fname
+      liftM (ProbWBO . fst . maxsat2wbo . fst . gcnf2maxsat) $ FF.readFile fname
     ".lp"   -> ProbMIP <$> MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
     ".mps"  -> ProbMIP <$> MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
     ext ->
@@ -317,13 +308,13 @@ writeProblem o problem = do
           case pb2sat opb of
             (cnf, _) ->
               case optKSat o of
-                Nothing -> CNF.writeFile fname cnf
+                Nothing -> FF.writeFile fname cnf
                 Just k ->
                   let (cnf2, _) = sat2ksat k cnf
-                  in CNF.writeFile fname cnf2
+                  in FF.writeFile fname cnf2
         ".wcnf" ->
           case wbo2maxsat wbo of
-            (wcnf, _) -> CNF.writeFile fname wcnf
+            (wcnf, _) -> FF.writeFile fname wcnf
         ".lsp" ->
           withBinaryFile fname WriteMode $ \h ->
             ByteStringBuilder.hPutBuilder h lsp

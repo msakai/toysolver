@@ -44,7 +44,6 @@ import GHC.Conc (getNumProcessors, setNumCapabilities)
 
 import Data.OptDir
 import qualified Data.PseudoBoolean as PBFile
-import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 
 import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Arith as FOL
@@ -61,7 +60,7 @@ import qualified ToySolver.Arith.Simplex as Simplex
 import qualified ToySolver.Arith.MIP as MIPSolver
 import qualified ToySolver.Arith.CAD as CAD
 import qualified ToySolver.Arith.ContiTraverso as ContiTraverso
-import qualified ToySolver.Text.CNF as CNF
+import qualified ToySolver.FileFormat as FF
 import ToySolver.Converter
 import ToySolver.SAT.Printer
 import qualified ToySolver.SAT.Types as SAT
@@ -474,34 +473,28 @@ main = do
 
   case fromMaybe ModeMIP (optMode o) of
     ModeSAT -> do
-      cnf <- CNF.readFile (optInput o)
+      cnf <- FF.readFile (optInput o)
       let (mip,info) = sat2ip cnf
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
         let m2 = transformBackward info m
         satPrintModel stdout m2 0
         writeSOLFileSAT o m2
     ModePB -> do
-      ret <- PBFileAttoparsec.parseOPBFile (optInput o)
-      case ret of
-        Left err -> hPutStrLn stderr err >> exitFailure
-        Right pb -> do
-          let (mip,info) = pb2ip pb
-          run (optSolver o) o (fmap fromInteger mip) $ \m -> do
-            let m2 = transformBackward info m
-            pbPrintModel stdout m2 0
-            writeSOLFileSAT o m2
+      pb <- FF.readFile (optInput o)
+      let (mip,info) = pb2ip pb
+      run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+        let m2 = transformBackward info m
+        pbPrintModel stdout m2 0
+        writeSOLFileSAT o m2
     ModeWBO -> do
-      ret <- PBFileAttoparsec.parseWBOFile (optInput o)
-      case ret of
-        Left err -> hPutStrLn stderr err >> exitFailure
-        Right wbo -> do
-          let (mip,info) = wbo2ip False wbo
-          run (optSolver o) o (fmap fromInteger mip) $ \m -> do
-            let m2 = transformBackward info m
-            pbPrintModel stdout m2 0
-            writeSOLFileSAT o m2
+      wbo <- FF.readFile (optInput o)
+      let (mip,info) = wbo2ip False wbo
+      run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+        let m2 = transformBackward info m
+        pbPrintModel stdout m2 0
+        writeSOLFileSAT o m2
     ModeMaxSAT -> do
-      wcnf <- CNF.readFile (optInput o)
+      wcnf <- FF.readFile (optInput o)
       let (mip,info) = maxsat2ip False wcnf
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
         let m2 = transformBackward info m

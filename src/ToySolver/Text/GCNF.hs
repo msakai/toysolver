@@ -10,7 +10,7 @@
 -- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module ToySolver.Text.GCNF {-# DEPRECATED "Use ToySolver.Text.CNF instead" #-}
+module ToySolver.Text.GCNF {-# DEPRECATED "Use ToySolver.FileFormat.CNF instead" #-}
   (
     GCNF (..)
   , GroupIndex
@@ -30,7 +30,7 @@ import Prelude hiding (writeFile)
 import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy.Char8 as BL
 import System.IO hiding (writeFile)
-import ToySolver.Text.CNF hiding (parseByteString)
+import ToySolver.FileFormat.CNF hiding (parseByteString)
 
 -- | Parse a GCNF file but returns an error message when parsing fails.
 {-# DEPRECATED parseByteString "Use FileFormat.parse instead" #-}

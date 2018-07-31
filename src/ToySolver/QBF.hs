@@ -45,14 +45,14 @@ import Data.Maybe
 import ToySolver.Data.Boolean
 import ToySolver.Data.BoolExpr (BoolExpr)
 import qualified ToySolver.Data.BoolExpr as BoolExpr
+import ToySolver.FileFormat.CNF (Quantifier (..))
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types (LitSet, VarSet, VarMap)
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.SAT.Store.CNF
 
 import qualified ToySolver.SAT.ExistentialQuantification as QE
-import ToySolver.Text.CNF (Quantifier (..))
-import qualified ToySolver.Text.CNF as CNF
 
 -- ----------------------------------------------------------------------------
 

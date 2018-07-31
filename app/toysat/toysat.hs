@@ -64,10 +64,11 @@ import qualified GHC.Stats as Stats
 #endif
 
 import qualified Data.PseudoBoolean as PBFile
-import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
 import ToySolver.Converter
+import qualified ToySolver.FileFormat.CNF as CNF
+import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO as PBO
@@ -78,7 +79,6 @@ import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.Enum as MUSEnum
 import ToySolver.SAT.Printer
-import qualified ToySolver.Text.CNF as CNF
 import ToySolver.Version
 import ToySolver.Internal.Util (showRational, setEncodingChar8)
 
@@ -594,8 +594,8 @@ newSolver opts = do
 mainSAT :: Options -> SAT.Solver -> IO ()
 mainSAT opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM CNF.parse $ BS.hGetContents stdin
-           fname -> CNF.parseFile fname
+           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           fname -> FF.parseFile fname
   case ret of
     Left err -> hPrint stderr err >> exitFailure
     Right cnf -> do
@@ -691,11 +691,11 @@ mainMUS opt solver = do
   gcnf <- case optInput opt of
            "-"   -> do
              s <- BS.hGetContents stdin
-             case CNF.parse s of
+             case FF.parse s of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
            fname -> do
-             ret <- CNF.parseFile fname
+             ret <- FF.parseFile fname
              case ret of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
@@ -784,8 +784,8 @@ solveMUS opt solver gcnf = do
 mainPB :: Options -> SAT.Solver -> IO ()
 mainPB opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM PBFileAttoparsec.parseOPBByteString $ BS.hGetContents stdin
-           fname -> PBFileAttoparsec.parseOPBFile fname
+           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           fname -> FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right formula -> solvePB opt solver formula
@@ -902,8 +902,8 @@ setupOptimizer pbo opt = do
 mainWBO :: Options -> SAT.Solver -> IO ()
 mainWBO opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM PBFileAttoparsec.parseWBOByteString $ BS.hGetContents stdin
-           fname -> PBFileAttoparsec.parseWBOFile fname
+           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           fname -> FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right formula -> solveWBO opt solver False formula
@@ -1008,8 +1008,8 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
 mainMaxSAT :: Options -> SAT.Solver -> IO ()
 mainMaxSAT opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM CNF.parse BS.getContents
-           fname -> CNF.parseFile fname
+           "-"   -> liftM FF.parse BS.getContents
+           fname -> FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right wcnf -> do

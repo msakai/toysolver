@@ -6,7 +6,7 @@ import Data.Array.IArray
 import Data.IORef
 import System.Environment
 import Text.Printf
-import qualified ToySolver.Text.CNF as CNF
+import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.SAT.Types
 import ToySolver.Internal.Util (setEncodingChar8)
 

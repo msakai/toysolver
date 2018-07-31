@@ -28,8 +28,8 @@ import System.IO
 
 import ToySolver.Data.Boolean
 import qualified ToySolver.Data.BoolExpr as BoolExpr
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.QBF as QBF
-import qualified ToySolver.Text.CNF as CNF
 import ToySolver.Internal.Util (setEncodingChar8)
 import ToySolver.Version
 

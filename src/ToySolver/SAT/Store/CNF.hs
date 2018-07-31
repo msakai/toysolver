@@ -22,8 +22,8 @@ import qualified Data.Foldable as F
 import Data.Primitive.MutVar
 import Data.Sequence (Seq, (|>))
 import qualified Data.Sequence as Seq
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.Text.CNF as CNF
 
 data CNFStore m = CNFStore (MutVar (PrimState m) Int) (MutVar (PrimState m) (Seq SAT.PackedClause))
 

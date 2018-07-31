@@ -32,9 +32,9 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.IORef
 import qualified Data.Vector.Generic as VG
+import ToySolver.FileFormat.CNF as CNF
 import ToySolver.SAT as SAT
 import ToySolver.SAT.Types as SAT
-import ToySolver.Text.CNF as CNF
 
 -- -------------------------------------------------------------------
 
