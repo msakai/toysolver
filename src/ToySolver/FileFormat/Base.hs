@@ -54,7 +54,7 @@ readFile :: (FileFormat a, MonadIO m) => FilePath -> m a
 readFile filename = liftIO $ do
   s <- BS.readFile filename
   case parse s of
-    Left msg -> throw $ ParseError msg
+    Left msg -> throwIO $ ParseError msg
     Right a -> return a
 
 -- | Write a value into a file.
