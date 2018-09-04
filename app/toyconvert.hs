@@ -263,8 +263,8 @@ writeProblem o problem = do
       hSetBinaryMode stdout True
       hSetBuffering stdout (BlockBuffering Nothing)
       case problem of
-        ProbOPB opb -> PBFile.hPutOPB stdout opb
-        ProbWBO wbo -> PBFile.hPutWBO stdout wbo
+        ProbOPB opb -> ByteStringBuilder.hPutBuilder stdout $ FF.render opb
+        ProbWBO wbo -> ByteStringBuilder.hPutBuilder stdout $ FF.render wbo
         ProbMIP mip -> do
           case MIP.toLPString def mip of
             Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
@@ -302,8 +302,8 @@ writeProblem o problem = do
                   ProbWBO wbo -> wbo2lsp wbo
                   ProbMIP _   -> pb2lsp opb
       case map toLower (takeExtension fname) of
-        ".opb" -> PBFile.writeOPBFile fname $ normalizePB  opb
-        ".wbo" -> PBFile.writeWBOFile fname $ normalizeWBO wbo
+        ".opb" -> FF.writeFile fname $ normalizePB opb
+        ".wbo" -> FF.writeFile fname $ normalizeWBO wbo
         ".cnf" ->
           case pb2sat opb of
             (cnf, _) ->

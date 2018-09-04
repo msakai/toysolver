@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 module Main where
 
+import qualified Data.ByteString.Builder as ByteStringBuilder
 import Data.List
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -8,6 +9,7 @@ import System.Environment
 import System.Exit
 import System.IO
 import Data.PseudoBoolean as PBFile
+import qualified ToySolver.FileFormat as FF
 import ToySolver.Internal.Util (setEncodingChar8)
 
 pigeonHole :: Integer -> Integer -> Formula
@@ -41,7 +43,7 @@ main = do
   case xs of
     [p,h] -> do
       let opb = pigeonHole (read p) (read h)
-      hPutOPB stdout opb
+      ByteStringBuilder.hPutBuilder stdout $ FF.render opb
     _ -> do
       hPutStrLn stderr "Usage: pigeonhole number_of_pigeons number_of_holes"
       exitFailure

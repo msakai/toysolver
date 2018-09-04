@@ -801,6 +801,7 @@ Executable pigeonhole
   HS-Source-Dirs: app
   Build-Depends:
     base,
+    bytestring,
     containers,
     pseudo-boolean,
     toysolver

@@ -43,7 +43,6 @@ import Text.Printf
 import GHC.Conc (getNumProcessors, setNumCapabilities)
 
 import Data.OptDir
-import qualified Data.PseudoBoolean as PBFile
 
 import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Arith as FOL
