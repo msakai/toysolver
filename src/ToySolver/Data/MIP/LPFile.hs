@@ -35,7 +35,7 @@ module ToySolver.Data.MIP.LPFile
   ) where
 
 import Control.Applicative hiding (many)
-import Control.Exception (throw)
+import Control.Exception (throwIO)
 import Control.Monad
 import Control.Monad.Writer
 import Control.Monad.ST
@@ -110,11 +110,11 @@ parseFile opt fname = do
   ret <- parse (parser <* eof) fname <$> TLIO.hGetContents h
   case ret of
 #if MIN_VERSION_megaparsec(6,0,0)
-    Left e -> throw (e :: ParseError Char Void)
+    Left e -> throwIO (e :: ParseError Char Void)
 #elif MIN_VERSION_megaparsec(5,0,0)
-    Left e -> throw (e :: ParseError Char Dec)
+    Left e -> throwIO (e :: ParseError Char Dec)
 #else
-    Left e -> throw (e :: ParseError)
+    Left e -> throwIO (e :: ParseError)
 #endif
     Right a -> return a
 
