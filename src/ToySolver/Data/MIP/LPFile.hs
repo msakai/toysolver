@@ -30,6 +30,7 @@
 module ToySolver.Data.MIP.LPFile
   ( parseString
   , parseFile
+  , ParseError
   , parser
   , render
   ) where
@@ -62,21 +63,19 @@ import qualified Data.Text.Lazy.Builder as B
 import qualified Data.Text.Lazy.Builder.Scientific as B
 import qualified Data.Text.Lazy.IO as TLIO
 import Data.OptDir
-#if MIN_VERSION_megaparsec(6,0,0)
-import Data.Void
-#endif
 import System.IO
 #if MIN_VERSION_megaparsec(6,0,0)
-import Text.Megaparsec hiding (label, skipManyTill)
+import Text.Megaparsec hiding (label, skipManyTill, ParseError)
 import Text.Megaparsec.Char hiding (string', char')
 import qualified Text.Megaparsec.Char.Lexer as P
 #else
-import Text.Megaparsec hiding (label, string', char')
+import Text.Megaparsec hiding (label, string', char', ParseError)
 import qualified Text.Megaparsec.Lexer as P
 import Text.Megaparsec.Prim (MonadParsec ())
 #endif
 
 import qualified ToySolver.Data.MIP.Base as MIP
+import ToySolver.Data.MIP.FileUtils (ParseError)
 import ToySolver.Internal.Util (combineMaybe)
 
 -- ---------------------------------------------------------------------------
@@ -92,9 +91,9 @@ type C e s m = (MonadParsec s m Char)
 -- | Parse a string containing LP file data.
 -- The source name is only | used in error messages and may be the empty string.
 #if MIN_VERSION_megaparsec(6,0,0)
-parseString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => MIP.FileOptions -> String -> s -> Either (ParseError Char Void) (MIP.Problem Scientific)
+parseString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Scientific)
 #elif MIN_VERSION_megaparsec(5,0,0)
-parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError Char Dec) (MIP.Problem Scientific)
+parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Scientific)
 #else
 parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Scientific)
 #endif
@@ -109,13 +108,7 @@ parseFile opt fname = do
     Just enc -> hSetEncoding h enc
   ret <- parse (parser <* eof) fname <$> TLIO.hGetContents h
   case ret of
-#if MIN_VERSION_megaparsec(6,0,0)
-    Left e -> throwIO (e :: ParseError Char Void)
-#elif MIN_VERSION_megaparsec(5,0,0)
-    Left e -> throwIO (e :: ParseError Char Dec)
-#else
     Left e -> throwIO (e :: ParseError)
-#endif
     Right a -> return a
 
 -- ---------------------------------------------------------------------------
