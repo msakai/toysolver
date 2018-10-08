@@ -55,6 +55,7 @@ extra-deps:
 - pseudo-boolean-0.1.6.0
 - sign-0.4.3
 - OpenCL-1.0.3.4
+- bytestring-encoding-0.1.0.0
 
 # hack for avoiding haddock error of MemoTrie-0.6.4
 #- MemoTrie-0.6.7

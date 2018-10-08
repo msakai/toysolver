@@ -21,6 +21,7 @@ import System.Exit
 import System.IO
 import Text.Parsec hiding (try)
 import qualified Text.Parsec.ByteString.Lazy as ParsecBL
+import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Store.PB as PBStore
@@ -466,7 +467,7 @@ main = do
                     obj <- encodeObj store opt prob encoded
                     return $ Just [(c,[v]) | (c,v) <- obj]
               opb <- PBStore.getPBFormula store
-              PB.writeOPBFile fname2 $ opb{ PB.pbObjectiveFunction = obj }
+              FF.writeFile fname2 $ opb{ PB.pbObjectiveFunction = obj }
         _ -> do
           showHelp stderr
 

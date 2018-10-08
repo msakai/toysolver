@@ -86,6 +86,11 @@ Flag LinuxStatic
   Default: False
   Manual: True
 
+Flag WithZlib
+  Description: Use zlib package to support gzipped files
+  Default: True
+  Manual: True
+
 Flag BuildToyFMF
   Description: build toyfmf command
   Default: False
@@ -158,6 +163,8 @@ Library
      base >=4.7 && <5,
      bytestring >=0.9.2.1 && <0.11,
      bytestring-builder,
+     bytestring-encoding,
+     case-insensitive,
      clock >=0.7.1,
      -- IntMap.mergeWithKey and IntMap.toDescList require containers >=0.5.0
      containers >=0.5.0,
@@ -202,6 +209,9 @@ Library
      vector,
      vector-space >=0.8.6,
      xml-conduit
+  if flag(WithZlib)
+     Build-Depends: zlib
+     CPP-Options: "-DWITH_ZLIB"
   if flag(OpenCL)
      Build-Depends: OpenCL >=1.0.3.4
      Exposed-Modules: ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL
@@ -450,6 +460,8 @@ Executable toysat
   -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
+  if flag(WithZlib)
+    CPP-Options: "-DWITH_ZLIB"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -567,6 +579,8 @@ Executable toyconvert
   -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
+  if flag(WithZlib)
+    CPP-Options: "-DWITH_ZLIB"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
@@ -801,6 +815,7 @@ Executable pigeonhole
   HS-Source-Dirs: app
   Build-Depends:
     base,
+    bytestring,
     containers,
     pseudo-boolean,
     toysolver

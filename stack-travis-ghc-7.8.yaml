@@ -54,6 +54,7 @@ extra-deps:
 - pseudo-boolean-0.1.6.0
 - sign-0.4.3
 - OpenCL-1.0.3.4
+- bytestring-encoding-0.1.0.0
 
 - aeson-0.11.0.0
 - attoparsec-0.13.2.0

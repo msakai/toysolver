@@ -436,7 +436,7 @@ main = do
         case optMode opt of
           Just m  -> m
           Nothing ->
-            case map toLower (takeExtension (optInput opt)) of
+            case getExt (optInput opt) of
               ".cnf"  -> ModeSAT
               ".gcnf" -> ModeMUS
               ".opb"  -> ModePB
@@ -474,6 +474,14 @@ main = do
   putCommentLine $ printf "total CPU time = %.3fs" (durationSecs startCPU endCPU)
   putCommentLine $ printf "total wall clock time = %.3fs" (durationSecs startWC endWC)
   printGCStat
+
+getExt :: String -> String
+getExt name | (base, ext) <- splitExtension name =
+  case map toLower ext of
+#ifdef WITH_ZLIB
+    ".gz" -> getExt base
+#endif
+    s -> s
 
 printGCStat :: IO ()
 #if defined(__GLASGOW_HASKELL__)
