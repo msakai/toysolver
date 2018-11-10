@@ -1999,6 +1999,56 @@ prop_satToMaxSAT2_forward =
                     Just v -> v <= threshold
        ]
 
+arbitraryMaxSAT2 :: Gen (CNF.WCNF, Integer)
+arbitraryMaxSAT2 = do
+  nv <- choose (0,5)
+  nc <- choose (0,10)
+  cs <- replicateM nc $ do
+    len <- choose (0,2)
+    c <- if nv == 0 then
+           return $ SAT.packClause []
+         else
+           SAT.packClause <$> (replicateM len $ choose (-nv, nv) `suchThat` (/= 0))
+    return (1,c)
+  th <- choose (0,nc)
+  return $
+    ( CNF.WCNF
+      { CNF.wcnfNumVars = nv
+      , CNF.wcnfNumClauses = nc
+      , CNF.wcnfClauses = cs
+      , CNF.wcnfTopCost = fromIntegral nc + 1
+      }
+    , fromIntegral th
+    )
+
+prop_simplifyMaxSAT2_forward :: Property
+prop_simplifyMaxSAT2_forward =
+  forAll arbitraryMaxSAT2 $ \(wcnf, th1) ->
+    let r@((n,cs,th2), info) = simplifyMaxSAT2 (wcnf, th1)
+    in counterexample (show r) $ and
+       [ b1 == b2
+       | m1 <- allAssignments (CNF.wcnfNumVars wcnf)
+       , let o1 = fromJust $ evalWCNF m1 wcnf
+             b1 = o1 <= th1
+             m2 = transformForward info m1
+             o2 = fromIntegral $ length [()| (l1,l2) <- Set.toList cs, not (SAT.evalLit m2 l1), not (SAT.evalLit m2 l2)]
+             b2 = o2 <= th2
+       ]
+
+prop_maxSAT2ToSimpleMaxCut_forward :: Property
+prop_maxSAT2ToSimpleMaxCut_forward =
+  forAll arbitraryMaxSAT2 $ \(wcnf, th1) ->
+    let r@((maxcut, th2), info) = maxSAT2ToSimpleMaxCut (wcnf, th1)
+    in counterexample (show r) $ and
+       [ b1 == b2
+       | m <- allAssignments (CNF.wcnfNumVars wcnf)
+       , let o1 = fromJust $ evalWCNF m wcnf
+             b1 = o1 <= th1
+             sol2 = transformForward info m
+             o2 = MaxCut.eval sol2 maxcut
+             b2 = o2 >= th2
+       ]
+
 ------------------------------------------------------------------------
 
 prop_pb2sat :: Property
