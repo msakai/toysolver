@@ -317,6 +317,7 @@ Library
      ToySolver.Data.LBool
      ToySolver.Data.MIP
      ToySolver.Data.MIP.Base
+     ToySolver.Data.MIP.FileUtils
      ToySolver.Data.MIP.LPFile
      ToySolver.Data.MIP.MPSFile
      ToySolver.Data.MIP.Solution.CBC
