@@ -48,6 +48,7 @@ class ObjValueTransformer a => ObjValueBackwardTransformer a where
 
 
 data ComposedTransformer a b = ComposedTransformer a b
+  deriving (Eq, Ord, Show)
 
 instance (Transformer a, Transformer b, Target a ~ Source b) => Transformer (ComposedTransformer a b) where
   type Source (ComposedTransformer a b) = Source a
