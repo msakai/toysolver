@@ -1989,7 +1989,7 @@ arbitraryNAESAT = do
 prop_satToMaxSAT2_forward :: Property
 prop_satToMaxSAT2_forward =
   forAll arbitraryCNF $ \cnf ->
-    let (wcnf, info@(ComposedTransformer _ (SAT3ToMaxSAT2Info _ _ ds threshold))) = satToMaxSAT2 cnf
+    let ((wcnf, threshold), info) = satToMaxSAT2 cnf
     in and
        [ evalCNF m cnf == b2
        | m <- allAssignments (CNF.cnfNumVars cnf)

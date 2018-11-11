@@ -39,24 +39,26 @@ import qualified ToySolver.SAT.Types as SAT
 
 type SATToMaxSAT2Info = ComposedTransformer SAT2KSATInfo SAT3ToMaxSAT2Info
 
-satToMaxSAT2 :: CNF.CNF -> (CNF.WCNF, SATToMaxSAT2Info)
+satToMaxSAT2 :: CNF.CNF -> ((CNF.WCNF, Integer), SATToMaxSAT2Info)
 satToMaxSAT2 x = (x2, (ComposedTransformer info1 info2))
   where
     (x1, info1) = sat2ksat 3 x
     (x2, info2) = sat3ToMaxSAT2 x1
 
 
-sat3ToMaxSAT2 :: CNF.CNF -> (CNF.WCNF, SAT3ToMaxSAT2Info)
+sat3ToMaxSAT2 :: CNF.CNF -> ((CNF.WCNF, Integer), SAT3ToMaxSAT2Info)
 sat3ToMaxSAT2 cnf =
   case foldl' f (CNF.cnfNumVars cnf, 0, [], [], 0) (CNF.cnfClauses cnf) of
     (!nv, !nc, !cs, ds, !t) ->
-      ( CNF.WCNF
-        { CNF.wcnfNumVars = nv
-        , CNF.wcnfNumClauses = nc
-        , CNF.wcnfTopCost = fromIntegral $ nc + 1
-        , CNF.wcnfClauses = reverse cs
-        }
-      , SAT3ToMaxSAT2Info (CNF.cnfNumVars cnf) nv (IntMap.fromList ds) t
+      ( ( CNF.WCNF
+          { CNF.wcnfNumVars = nv
+          , CNF.wcnfNumClauses = nc
+          , CNF.wcnfTopCost = fromIntegral $ nc + 1
+          , CNF.wcnfClauses = reverse cs
+          }
+        , t
+        )
+      , SAT3ToMaxSAT2Info (CNF.cnfNumVars cnf) nv (IntMap.fromList ds)
       )
   where
     f :: (Int, Int, [CNF.WeightedClause], [(SAT.Var,(SAT.Lit,SAT.Lit,SAT.Lit))], Integer)
@@ -73,7 +75,7 @@ sat3ToMaxSAT2 cnf =
           in (nv+1, nc + length cs2, map (\clause' -> (1, SAT.packClause clause')) cs2 ++ cs, (d, (a,b,c)) : ds, t + 3)
         _ -> error "not a 3-SAT instance"
 
-data SAT3ToMaxSAT2Info = SAT3ToMaxSAT2Info !Int !Int (IntMap (SAT.Lit,SAT.Lit,SAT.Lit)) !Integer
+data SAT3ToMaxSAT2Info = SAT3ToMaxSAT2Info !Int !Int (IntMap (SAT.Lit,SAT.Lit,SAT.Lit))
   deriving (Eq, Ord, Show)
 
 instance Transformer SAT3ToMaxSAT2Info where
@@ -81,7 +83,7 @@ instance Transformer SAT3ToMaxSAT2Info where
   type Target SAT3ToMaxSAT2Info = SAT.Model
 
 instance ForwardTransformer SAT3ToMaxSAT2Info where
-  transformForward (SAT3ToMaxSAT2Info nv1 nv2 ds _t) m = runSTUArray $ do
+  transformForward (SAT3ToMaxSAT2Info nv1 nv2 ds) m = runSTUArray $ do
     m2 <- newArray_ (1,nv2)
     forM_ [1..nv1] $ \v -> do
       writeArray m2 v (SAT.evalVar m v)
@@ -97,4 +99,4 @@ instance ForwardTransformer SAT3ToMaxSAT2Info where
     return m2
 
 instance BackwardTransformer SAT3ToMaxSAT2Info where
-  transformBackward (SAT3ToMaxSAT2Info nv1 _nv2 _ds _t) = SAT.restrictModel nv1
+  transformBackward (SAT3ToMaxSAT2Info nv1 _nv2 _ds) = SAT.restrictModel nv1
