@@ -11,6 +11,14 @@
 -- Stability   :  provisional
 -- Portability :  non-portable
 --
+-- References:
+--
+-- * M. R. Garey, D. S. Johnson, and L. Stockmeyer. Some simplified NP-complete
+--   problems. In STOC ’74: Proceedings of the sixth annual ACM symposium on Theory
+--   of computing, pages 47–63, New York, NY, USA, 1974.
+--   https://dl.acm.org/citation.cfm?doid=800119.803884
+--   https://www.sciencedirect.com/science/article/pii/0304397576900591
+--
 -----------------------------------------------------------------------------
 module ToySolver.Converter.SAT2MaxSAT
   (
