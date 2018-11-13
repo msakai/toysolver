@@ -102,7 +102,7 @@ readInts s =
   case BS.readInt (BS.dropWhile isSpace s) of
     Just (0,_) -> []
     Just (z,s') -> z : readInts s'
-    Nothing -> error "ToySolver.Text.CNF.readInts: 0 is missing"
+    Nothing -> error "ToySolver.FileFormat.CNF.readInts: 0 is missing"
 
 parseClauseBS :: BS.ByteString -> SAT.PackedClause
 parseClauseBS = SAT.packClause . readInts
@@ -191,7 +191,7 @@ instance FileFormat WCNF where
 parseWCNFLineBS :: BS.ByteString -> WeightedClause
 parseWCNFLineBS s =
   case BS.readInteger (BS.dropWhile isSpace s) of
-    Nothing -> error "ToySolver.Text.CNF: no weight"
+    Nothing -> error "ToySolver.FileFormat.CNF: no weight"
     Just (w, s') -> seq w $ seq xs $ (w, xs)
       where
         xs = parseClauseBS s'
@@ -268,7 +268,7 @@ parseGCNFLineBS s
   , Just ('}', s3) <- BS.uncons s2 =
       let ys = parseClauseBS s3
       in seq ys $ (idx, ys)
-  | otherwise = error "ToySolver.Text.CNF: parse error"
+  | otherwise = error "ToySolver.FileFormat.CNF: parse error"
 
 -- -------------------------------------------------------------------
 
@@ -336,10 +336,10 @@ type Atom = SAT.Var
 instance FileFormat QDimacs where
   parse = f . BS.lines
     where
-      f [] = Left "ToySolver.Text.CNF.parse: premature end of file"
+      f [] = Left "ToySolver.FileFormat.CNF.parse: premature end of file"
       f (l : ls) =
         case BS.uncons l of
-          Nothing -> Left "ToySolver.Text.CNF.parse: no problem line"
+          Nothing -> Left "ToySolver.FileFormat.CNF.parse: no problem line"
           Just ('c', _) -> f ls
           Just ('p', s) ->
             case BS.words s of
@@ -352,8 +352,8 @@ instance FileFormat QDimacs where
                     , qdimacsPrefix = prefix'
                     , qdimacsMatrix = map parseClauseBS ls'
                     }
-              _ -> Left "ToySolver.Text.CNF.parse: invalid problem line"
-          Just (c, _) -> Left ("ToySolver.Text.CNF.parse: invalid prefix " ++ show c)
+              _ -> Left "ToySolver.FileFormat.CNF.parse: invalid problem line"
+          Just (c, _) -> Left ("ToySolver.FileFormat.CNF.parse: invalid prefix " ++ show c)
 
   render qdimacs = problem_line <> prefix' <> mconcat (map f (qdimacsMatrix qdimacs))
     where
@@ -381,6 +381,6 @@ parsePrefix = go []
               in seq q $ deepseq atoms $ go ((q, atoms) : result) ls
           | otherwise ->
               (reverse result, lls)
-        _ -> error "ToySolver.Text.CNF.parseProblem: invalid line"
+        _ -> error "ToySolver.FileFormat.CNF.parseProblem: invalid line"
 
 -- -------------------------------------------------------------------
