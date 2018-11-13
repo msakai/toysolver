@@ -27,7 +27,8 @@ import Control.Arrow
 
 infixr 3 .&&.
 infixr 2 .||.
-infix 1 .=>., .<=>.
+infixr 1 .=>.
+infix 1 .<=>.
 
 class MonotoneBoolean a where
   true, false :: a
