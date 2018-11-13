@@ -1960,7 +1960,7 @@ prop_naesat2naeksat_backward =
 prop_naesat2maxcut_forward :: Property
 prop_naesat2maxcut_forward =
   forAll arbitraryNAESAT $ \nae ->
-    let conv@(maxcut, info@(ComposedTransformer _ (NAE3SAT2MaxCutInfo threshold))) = naesat2maxcut nae
+    let conv@((maxcut, threshold), info) = naesat2maxcut nae
     in and
        [ evalNAESAT m nae == (MaxCut.eval sol maxcut >= threshold)
        | m <- allAssignments (fst nae)
@@ -1970,7 +1970,7 @@ prop_naesat2maxcut_forward =
 prop_naesat2max2sat_forward :: Property
 prop_naesat2max2sat_forward =
   forAll arbitraryNAESAT $ \nae ->
-    let (wcnf, info@(ComposedTransformer _ (NAE3SAT2Max2SATInfo threshold))) = naesat2max2sat nae
+    let ((wcnf, threshold), info) = naesat2max2sat nae
     in and
        [ case evalWCNF m2 wcnf of
            Nothing -> False

@@ -36,7 +36,7 @@ module ToySolver.Converter.NAESAT
   -- ** NAE-SAT to MAX-2-SAT
   , NAESAT2Max2SATInfo
   , naesat2max2sat
-  , NAE3SAT2Max2SATInfo (..)
+  , NAE3SAT2Max2SATInfo
   , nae3sat2max2sat
   ) where
 
@@ -164,7 +164,7 @@ instance BackwardTransformer NAESAT2NAEKSATInfo where
 
 type NAESAT2Max2SATInfo = ComposedTransformer NAESAT2NAEKSATInfo NAE3SAT2Max2SATInfo
 
-naesat2max2sat :: NAESAT -> (CNF.WCNF, NAESAT2Max2SATInfo)
+naesat2max2sat :: NAESAT -> ((CNF.WCNF, Integer), NAESAT2Max2SATInfo)
 naesat2max2sat x = (x2, (ComposedTransformer info1 info2))
   where
     (x1, info1) = naesat2naeksat 3 x
@@ -172,28 +172,32 @@ naesat2max2sat x = (x2, (ComposedTransformer info1 info2))
 
 -- ------------------------------------------------------------------------
 
-newtype NAE3SAT2Max2SATInfo = NAE3SAT2Max2SATInfo Integer
+type NAE3SAT2Max2SATInfo = IdentityTransformer SAT.Model
 
 -- Original nae-sat problem is satisfiable iff MAX-2-SAT problem has solution with cost <=threshold.
-nae3sat2max2sat :: NAESAT -> (CNF.WCNF, NAE3SAT2Max2SATInfo)
+nae3sat2max2sat :: NAESAT -> ((CNF.WCNF, Integer), NAE3SAT2Max2SATInfo)
 nae3sat2max2sat (n,cs)
   | any (\c -> VG.length c < 2) cs =
-      ( CNF.WCNF
-        { CNF.wcnfTopCost = 2
-        , CNF.wcnfNumVars = n
-        , CNF.wcnfClauses = [(1, SAT.packClause [])]
-        , CNF.wcnfNumClauses = 1
-        }
-      , NAE3SAT2Max2SATInfo 0
+      ( ( CNF.WCNF
+          { CNF.wcnfTopCost = 2
+          , CNF.wcnfNumVars = n
+          , CNF.wcnfClauses = [(1, SAT.packClause [])]
+          , CNF.wcnfNumClauses = 1
+          }
+        , 0
+        )
+      , IdentityTransformer
       )
   | otherwise =
-      ( CNF.WCNF
-        { CNF.wcnfTopCost = fromIntegral nc' + 1
-        , CNF.wcnfNumVars = n
-        , CNF.wcnfClauses = cs'
-        , CNF.wcnfNumClauses = nc'
-        }
-      , NAE3SAT2Max2SATInfo t
+      ( ( CNF.WCNF
+          { CNF.wcnfTopCost = fromIntegral nc' + 1
+          , CNF.wcnfNumVars = n
+          , CNF.wcnfClauses = cs'
+          , CNF.wcnfNumClauses = nc'
+          }
+        , t
+        )
+      , IdentityTransformer
       )
   where
     nc' = length cs'
@@ -213,16 +217,6 @@ nae3sat2max2sat (n,cs)
                 , t + 1
                 )
             _ -> error "nae3sat2max2sat: cannot handle nae-clause of size >3"
-
-instance Transformer NAE3SAT2Max2SATInfo where
-  type Source NAE3SAT2Max2SATInfo = SAT.Model
-  type Target NAE3SAT2Max2SATInfo = SAT.Model
-
-instance ForwardTransformer NAE3SAT2Max2SATInfo where
-  transformForward _ m = m
-
-instance BackwardTransformer NAE3SAT2Max2SATInfo where
-  transformBackward _ m = m
 
 -- ------------------------------------------------------------------------
 

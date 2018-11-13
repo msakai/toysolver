@@ -47,7 +47,7 @@ import qualified ToySolver.Converter.NAESAT as NAESAT
 
 type SAT2MaxCutInfo = ComposedTransformer NAESAT.SAT2NAESATInfo NAESAT2MaxCutInfo
 
-sat2maxcut :: CNF.CNF -> (MaxCut.Problem Integer, SAT2MaxCutInfo)
+sat2maxcut :: CNF.CNF -> ((MaxCut.Problem Integer, Integer), SAT2MaxCutInfo)
 sat2maxcut x = (x2, (ComposedTransformer info1 info2))
   where
     (x1, info1) = NAESAT.sat2naesat x
@@ -57,7 +57,7 @@ sat2maxcut x = (x2, (ComposedTransformer info1 info2))
 
 type NAESAT2MaxCutInfo = ComposedTransformer NAESAT.NAESAT2NAEKSATInfo NAE3SAT2MaxCutInfo
 
-naesat2maxcut :: NAESAT -> (MaxCut.Problem Integer, NAESAT2MaxCutInfo)
+naesat2maxcut :: NAESAT -> ((MaxCut.Problem Integer, Integer), NAESAT2MaxCutInfo)
 naesat2maxcut x = (x2, (ComposedTransformer info1 info2))
   where
     (x1, info1) = NAESAT.naesat2naeksat 3 x
@@ -65,18 +65,20 @@ naesat2maxcut x = (x2, (ComposedTransformer info1 info2))
 
 -- ------------------------------------------------------------------------
 
-newtype NAE3SAT2MaxCutInfo = NAE3SAT2MaxCutInfo Integer
+data NAE3SAT2MaxCutInfo = NAE3SAT2MaxCutInfo
 
 -- Original nae-sat problem is satisfiable iff Max-Cut problem has solution with >=threshold.
-nae3sat2maxcut :: NAESAT -> (MaxCut.Problem Integer, NAE3SAT2MaxCutInfo)
+nae3sat2maxcut :: NAESAT -> ((MaxCut.Problem Integer, Integer), NAE3SAT2MaxCutInfo)
 nae3sat2maxcut (n,cs)
   | any (\c -> VG.length c < 2) cs' =
-      ( MaxCut.fromEdges (n*2) []
-      , NAE3SAT2MaxCutInfo 1
+      ( (MaxCut.fromEdges (n*2) [], 1)
+      , NAE3SAT2MaxCutInfo
       )
   | otherwise =
-      ( MaxCut.fromEdges (n*2) (variableEdges ++ clauseEdges)
-      , NAE3SAT2MaxCutInfo $ bigM * fromIntegral n + clauseEdgesObjMax
+      ( ( MaxCut.fromEdges (n*2) (variableEdges ++ clauseEdges)
+        , bigM * fromIntegral n + clauseEdgesObjMax
+        )
+      , NAE3SAT2MaxCutInfo
       )
   where
     cs' = map (VG.fromList . IntSet.toList . IntSet.fromList . VG.toList) cs
