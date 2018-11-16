@@ -64,12 +64,12 @@ module ToySolver.SAT.Types
   , pbLowerBound
   , pbUpperBound
   , pbSubsume
-  , evalPBConstraint
 
   -- * Non-linear Pseudo Boolean constraint
   , PBTerm
   , PBSum
   , evalPBSum
+  , evalPBConstraint
 
   -- * XOR Clause
   , XORClause
