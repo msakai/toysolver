@@ -352,6 +352,7 @@ Library
      ToySolver.Graph.ShortestPath
      ToySolver.MaxCut
      ToySolver.QBF
+     ToySolver.QUBO
      ToySolver.SAT
      ToySolver.SAT.Config
      ToySolver.SAT.Encoder.Integer
