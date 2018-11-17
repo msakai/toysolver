@@ -70,6 +70,7 @@ module ToySolver.SAT.Types
   , PBSum
   , evalPBSum
   , evalPBConstraint
+  , removeNegationFromPBSum
 
   -- * XOR Clause
   , XORClause
@@ -95,6 +96,8 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.PseudoBoolean as PBFile
@@ -434,6 +437,20 @@ evalPBConstraint m (lhs,op,rhs) = op' (evalPBSum m lhs) rhs
     op' = case op of
             PBFile.Ge -> (>=)
             PBFile.Eq -> (==)
+
+removeNegationFromPBSum :: PBSum -> PBSum
+removeNegationFromPBSum ts =
+  [(c, IntSet.toList m) | (m, c) <- Map.toList $ Map.unionsWith (+) $ map f ts, c /= 0]
+  where
+    f :: PBTerm -> Map VarSet Integer
+    f (c, ls) = IntSet.foldl' g (Map.singleton IntSet.empty c) (IntSet.fromList ls)
+
+    g :: Map VarSet Integer -> Lit -> Map VarSet Integer
+    g m l
+      | l > 0     = Map.mapKeysWith (+) (IntSet.insert v) m
+      | otherwise = Map.unionWith (+) m $ Map.fromListWith (+) [(IntSet.insert v xs, negate c) | (xs,c) <- Map.toList m]
+      where
+        v = litVar l
 
 -- | XOR clause
 --

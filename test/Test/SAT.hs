@@ -1150,6 +1150,35 @@ case_pbSubsume_1 = SAT.pbSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(
 case_pbSubsume_2 :: Assertion
 case_pbSubsume_2 = SAT.pbSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)],3) @?= False
 
+prop_removeNegationFromPBSum :: Property
+prop_removeNegationFromPBSum =
+  forAll (choose (0,10)) $ \nv ->
+    forAll (arbitraryPBSum nv) $ \s ->
+      let s' = SAT.removeNegationFromPBSum s
+       in counterexample (show s') $ 
+            forAll (arbitraryModel nv) $ \m -> SAT.evalPBSum m s === SAT.evalPBSum m s'
+  where
+    arbitraryPBSum :: Int -> Gen SAT.PBSum
+    arbitraryPBSum nv = do
+      nt <- choose (0,10)
+      replicateM nt $ do
+        ls <-
+          if nv==0
+          then return []
+          else do
+            m <- choose (0,nv)
+            replicateM m $ do
+              x <- choose (1,m)
+              b <- arbitrary
+              return $ if b then x else -x
+        c <- arbitrary
+        return (c,ls)
+
+    arbitraryModel :: Int -> Gen SAT.Model
+    arbitraryModel nv = do
+      bs <- replicateM nv arbitrary
+      return $ array (1,nv) (zip [1..] bs)
+
 ------------------------------------------------------------------------
 
 case_normalizeXORClause_False =
