@@ -20,6 +20,7 @@ module ToySolver.Converter
   , module ToySolver.Converter.PB2LSP
   , module ToySolver.Converter.PB2SMP
   , module ToySolver.Converter.QBF2IPC
+  , module ToySolver.Converter.QUBO
   , module ToySolver.Converter.SAT2KSAT
   , module ToySolver.Converter.SAT2MaxCut
   , module ToySolver.Converter.SAT2MaxSAT
@@ -35,6 +36,7 @@ import ToySolver.Converter.PB2IP
 import ToySolver.Converter.PB2LSP
 import ToySolver.Converter.PB2SMP
 import ToySolver.Converter.QBF2IPC
+import ToySolver.Converter.QUBO
 import ToySolver.Converter.SAT2KSAT
 import ToySolver.Converter.SAT2MaxCut
 import ToySolver.Converter.SAT2MaxSAT
