@@ -298,6 +298,7 @@ Library
      ToySolver.Converter.PBSetObj
      ToySolver.Converter.PB2SMP
      ToySolver.Converter.QBF2IPC
+     ToySolver.Converter.QUBO
      ToySolver.Converter.SAT2KSAT
      ToySolver.Converter.SAT2MaxCut
      ToySolver.Converter.SAT2MaxSAT
@@ -352,6 +353,7 @@ Library
      ToySolver.Graph.ShortestPath
      ToySolver.MaxCut
      ToySolver.QBF
+     ToySolver.QUBO
      ToySolver.SAT
      ToySolver.SAT.Config
      ToySolver.SAT.Encoder.Integer
@@ -915,6 +917,7 @@ Test-suite TestSuite
     Test.MPSFile
     Test.ProbSAT
     Test.QBF
+    Test.QUBO
     Test.SAT
     Test.SDPFile
     Test.Simplex
