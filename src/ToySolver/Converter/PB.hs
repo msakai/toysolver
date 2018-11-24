@@ -270,7 +270,7 @@ collectDegGe3Terms formula = Set.fromList [t' | t <- terms, let t' = IntSet.from
     terms = [t | s <- sums, (_,t) <- s]
 
 data PBQuadratizeInfo = PBQuadratizeInfo !Int !Int !(IntMap IntSet)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer PBQuadratizeInfo where
   type Source PBQuadratizeInfo = SAT.Model

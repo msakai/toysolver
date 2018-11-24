@@ -58,7 +58,7 @@ sat2ksat k cnf = runST $ do
 
 
 data SAT2KSATInfo = SAT2KSATInfo !Int !Int (Seq.Seq (SAT.Var, [SAT.Lit]))
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer SAT2KSATInfo where
   type Source SAT2KSATInfo = SAT.Model

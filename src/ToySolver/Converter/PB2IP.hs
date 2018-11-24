@@ -40,7 +40,7 @@ import qualified ToySolver.SAT.Types as SAT
 -- -----------------------------------------------------------------------------
 
 newtype PB2IPInfo = PB2IPInfo Int
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer PB2IPInfo where
   type Source PB2IPInfo = SAT.Model

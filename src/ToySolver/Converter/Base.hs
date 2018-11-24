@@ -48,7 +48,7 @@ class ObjValueTransformer a => ObjValueBackwardTransformer a where
 
 
 data ComposedTransformer a b = ComposedTransformer a b
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance (Transformer a, Transformer b, Target a ~ Source b) => Transformer (ComposedTransformer a b) where
   type Source (ComposedTransformer a b) = Source a
@@ -79,7 +79,7 @@ instance (ObjValueBackwardTransformer a, ObjValueBackwardTransformer b, TargetOb
 
 
 data IdentityTransformer a = IdentityTransformer
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer (IdentityTransformer a) where
   type Source (IdentityTransformer a) = a
@@ -93,7 +93,7 @@ instance BackwardTransformer (IdentityTransformer a) where
 
 
 data ReversedTransformer t = ReversedTransformer t
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer t => Transformer (ReversedTransformer t) where
   type Source (ReversedTransformer t) = Target t

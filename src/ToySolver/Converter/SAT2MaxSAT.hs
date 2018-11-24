@@ -108,7 +108,7 @@ sat3ToMaxSAT2 cnf =
         _ -> error "not a 3-SAT instance"
 
 data SAT3ToMaxSAT2Info = SAT3ToMaxSAT2Info !Int !Int (IntMap (SAT.Lit,SAT.Lit,SAT.Lit))
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer SAT3ToMaxSAT2Info where
   type Source SAT3ToMaxSAT2Info = SAT.Model
@@ -170,7 +170,7 @@ applyN n f = appEndo $ mconcat $ genericReplicate n (Endo f)
 
 data SimplifyMaxSAT2Info
   = SimplifyMaxSAT2Info !Int !Int (IntMap (SAT.Lit, SAT.Lit))
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer SimplifyMaxSAT2Info where
   type Source SimplifyMaxSAT2Info = SAT.Model
@@ -241,7 +241,7 @@ simpleMaxSAT2ToSimpleMaxCutNodes n p = (numNodes, tt, ff, t, f ,xp, xn, l)
 
 data SimpleMaxSAT2ToSimpleMaxCutInfo
   = SimpleMaxSAT2ToSimpleMaxCutInfo !Int !Int
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer SimpleMaxSAT2ToSimpleMaxCutInfo where
   type Source SimpleMaxSAT2ToSimpleMaxCutInfo = SAT.Model

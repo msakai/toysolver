@@ -64,7 +64,7 @@ evalNAEClause m c =
 
 -- | Information of 'sat2naesat' conversion
 newtype SAT2NAESATInfo = SAT2NAESATInfo SAT.Var
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 -- | Convert a CNF formula φ to an equisatifiable NAE-SAT formula ψ,
 -- together with a 'SAT2NAESATInfo'
@@ -108,7 +108,7 @@ naesat2sat (n,cs) =
 
 -- Information of 'naesat2naeksta' conversion
 data NAESAT2NAEKSATInfo = NAESAT2NAEKSATInfo !Int !Int [(SAT.Var, NAEClause, NAEClause)]
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 naesat2naeksat :: Int -> NAESAT -> (NAESAT, NAESAT2NAEKSATInfo)
 naesat2naeksat k _ | k < 3 = error "naesat2naeksat: k must be >=3"
