@@ -1,3 +1,4 @@
+
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
@@ -21,6 +22,7 @@ import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
 data TseitinInfo = TseitinInfo !Int !Int [(SAT.Var, Tseitin.Formula)]
+  deriving (Eq, Show)
 
 instance Transformer TseitinInfo where
   type Source TseitinInfo = SAT.Model

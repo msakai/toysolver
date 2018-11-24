@@ -40,6 +40,7 @@ import qualified ToySolver.SAT.Types as SAT
 -- -----------------------------------------------------------------------------
 
 newtype PB2IPInfo = PB2IPInfo Int
+  deriving (Eq, Show)
 
 instance Transformer PB2IPInfo where
   type Source PB2IPInfo = SAT.Model
@@ -92,6 +93,7 @@ convVar x = MIP.toVar ("x" ++ show x)
 -- -----------------------------------------------------------------------------
 
 data WBO2IPInfo = WBO2IPInfo !Int [(MIP.Var, PBFile.SoftConstraint)]
+  deriving (Eq, Show)
 
 instance Transformer WBO2IPInfo where
   type Source WBO2IPInfo = SAT.Model

@@ -52,6 +52,7 @@ mip2pb mip = runST $ runExceptT $ m
       return $ (formula{ PBFile.pbObjectiveFunction = Just obj }, info)
 
 data MIP2PBInfo = MIP2PBInfo (Map MIP.Var Integer.Expr) !Integer
+  deriving (Eq, Show)
 
 instance Transformer MIP2PBInfo where
   type Source MIP2PBInfo = Map MIP.Var Integer

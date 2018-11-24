@@ -66,6 +66,7 @@ naesat2maxcut x = (x2, (ComposedTransformer info1 info2))
 -- ------------------------------------------------------------------------
 
 data NAE3SAT2MaxCutInfo = NAE3SAT2MaxCutInfo
+  deriving (Eq, Show)
 
 -- Original nae-sat problem is satisfiable iff Max-Cut problem has solution with >=threshold.
 nae3sat2maxcut :: NAESAT -> ((MaxCut.Problem Integer, Integer), NAE3SAT2MaxCutInfo)

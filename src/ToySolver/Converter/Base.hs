@@ -25,7 +25,7 @@ module ToySolver.Converter.Base
   ) where
 
 
-class Transformer a where
+class (Eq a, Show a) => Transformer a where
   type Source a
   type Target a
 
@@ -48,7 +48,7 @@ class ObjValueTransformer a => ObjValueBackwardTransformer a where
 
 
 data ComposedTransformer a b = ComposedTransformer a b
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Show)
 
 instance (Transformer a, Transformer b, Target a ~ Source b) => Transformer (ComposedTransformer a b) where
   type Source (ComposedTransformer a b) = Source a
@@ -79,6 +79,7 @@ instance (ObjValueBackwardTransformer a, ObjValueBackwardTransformer b, TargetOb
 
 
 data IdentityTransformer a = IdentityTransformer
+  deriving (Eq, Show)
 
 instance Transformer (IdentityTransformer a) where
   type Source (IdentityTransformer a) = a
@@ -92,6 +93,7 @@ instance BackwardTransformer (IdentityTransformer a) where
 
 
 data ReversedTransformer t = ReversedTransformer t
+  deriving (Eq, Show)
 
 instance Transformer t => Transformer (ReversedTransformer t) where
   type Source (ReversedTransformer t) = Target t
