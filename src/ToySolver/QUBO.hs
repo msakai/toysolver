@@ -26,12 +26,17 @@ import Data.Array.Unboxed
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 
+-- | QUBO (quadratic unconstrained boolean optimization) problem.
+--
+-- Minimize \(\sum_{i\le j} Q_{i,j} x_i x_j\) where \(x_i \in \{0,1\}\) for \(i \in \{0 \ldots N-1\}\).
+--
+-- In the `Solution` type. 0 and 1 are represented as @False@ and @True@ respectively.
 data Problem a
   = Problem
   { quboNumVars :: !Int
     -- ^ Number of variables N. Variables are numbered from 0 to N-1.
   , quboMatrix :: IntMap (IntMap a)
-    -- ^ Upper triangular matrix
+    -- ^ Upper triangular matrix Q
   }
   deriving (Eq, Show)
 
@@ -46,6 +51,11 @@ eval sol prob = sum $ do
   return c
 
 
+-- | Ising model.
+--
+-- Minimize \(\sum_{i<j} J_{i,j} \sigma_i \sigma_j + \sum_i h_i \sigma_i\) where \(\sigma_i \in \{-1,+1\}\) for \(i \in \{0 \ldots N-1\}\).
+--
+-- In the `Solution` type. -1 and +1 are represented as @False@ and @True@ respectively.
 data IsingModel a
   = IsingModel
   { isingNumVars :: !Int
@@ -57,12 +67,11 @@ data IsingModel a
   }
   deriving (Eq, Show)
 
--- | +1 is represented as True and -1 is represented as False.
 evalIsingModel :: Num a => Solution -> IsingModel a -> a
-evalIsingModel sol m =
-  - sum [ jj_ij * sigma i *  sigma j
+evalIsingModel sol m
+  = sum [ jj_ij * sigma i *  sigma j
         | (i, row) <- IntMap.toList $ isingInteraction m, (j, jj_ij) <- IntMap.toList row
         ]
-  - sum [ h_i * sigma i | (i, h_i) <- IntMap.toList $ isingExternalMagneticField m ]
+  + sum [ h_i * sigma i | (i, h_i) <- IntMap.toList $ isingExternalMagneticField m ]
   where
     sigma i = if sol ! i then 1 else -1

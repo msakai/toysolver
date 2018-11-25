@@ -116,12 +116,12 @@ instance BackwardTransformer PBOAsQUBOInfo where
 
 -- -----------------------------------------------------------------------------
 
-qubo2ising :: (Eq a, Show a, Num a) => QUBO.Problem a -> (QUBO.IsingModel a, QUBO2IsingInfo a)
+qubo2ising :: (Eq a, Show a, Fractional a) => QUBO.Problem a -> (QUBO.IsingModel a, QUBO2IsingInfo a)
 qubo2ising QUBO.Problem{ QUBO.quboNumVars = n, QUBO.quboMatrix = qq } =
   ( QUBO.IsingModel
     { QUBO.isingNumVars = n
-    , QUBO.isingInteraction = normalizeMat $ fmap (fmap negate) jj'
-    , QUBO.isingExternalMagneticField = normalizeVec $ fmap negate h'
+    , QUBO.isingInteraction = normalizeMat $ jj'
+    , QUBO.isingExternalMagneticField = normalizeVec h'
     }
   , QUBO2IsingInfo c'
   )
@@ -145,15 +145,15 @@ qubo2ising QUBO.Problem{ QUBO.quboNumVars = n, QUBO.quboMatrix = qq } =
       (j, q_ij) <- IntMap.toList row
       if i /= j then
         return
-          ( IntMap.singleton (min i j) $ IntMap.singleton (max i j) q_ij
-          , IntMap.fromList [(i,q_ij), (j,q_ij)]
-          , q_ij
+          ( IntMap.singleton (min i j) $ IntMap.singleton (max i j) (q_ij / 4)
+          , IntMap.fromList [(i, q_ij / 4), (j, q_ij / 4)]
+          , q_ij / 4
           )
       else
         return
           ( IntMap.empty
-          , IntMap.singleton i (2 * q_ij)
-          , 2 * q_ij
+          , IntMap.singleton i (q_ij / 2)
+          , q_ij / 2
           )
 
     f (jj1, h1, c1) (jj2, h2, c2) =
@@ -180,11 +180,10 @@ instance ObjValueTransformer (QUBO2IsingInfo a) where
   type TargetObjValue (QUBO2IsingInfo a) = a
 
 instance (Eq a, Show a, Num a) => ObjValueForwardTransformer (QUBO2IsingInfo a) where
-  transformObjValueForward (QUBO2IsingInfo offset) obj = 4 * obj - offset
+  transformObjValueForward (QUBO2IsingInfo offset) obj = obj - offset
 
--- XXX
-instance (Eq a, Show a, Fractional a) => ObjValueBackwardTransformer (QUBO2IsingInfo a) where
-  transformObjValueBackward (QUBO2IsingInfo offset) obj = (obj + offset) / 4
+instance (Eq a, Show a, Num a) => ObjValueBackwardTransformer (QUBO2IsingInfo a) where
+  transformObjValueBackward (QUBO2IsingInfo offset) obj = obj + offset
 
 -- -----------------------------------------------------------------------------
 
@@ -201,26 +200,26 @@ ising2qubo QUBO.IsingModel{ QUBO.isingNumVars = n, QUBO.isingInteraction = jj, Q
        Let si = 2 xi - 1
 
        Then,
-         - Jij si sj
-       = - Jij (2 xi - 1) (2 xj - 1)
-       = - Jij (4 xi xj - 2 xi - 2 xj + 1)
-       = - 4 Jij xi xj + 2 Jij xi + 2 Jij xj - Jij
-       = - 4 Jij xi xj + 2 Jij xi xi + 2 Jij xj xj - Jij
+         Jij si sj
+       = Jij (2 xi - 1) (2 xj - 1)
+       = Jij (4 xi xj - 2 xi - 2 xj + 1)
+       = 4 Jij xi xj - 2 Jij xi    - 2 Jij xj    + Jij
+       = 4 Jij xi xj - 2 Jij xi xi - 2 Jij xj xj + Jij
 
-         - hi si
-       = - hi (2 xi - 1)
-       = - 2 hi xi + hi
-       = - 2 hi xi xi + hi
+         hi si
+       = hi (2 xi - 1)
+       = 2 hi xi - hi
+       = 2 hi xi xi - hi
     -}
     m =
       concat
-      [ [(i, j, -4 * jj_ij), (i, i,  2 * jj_ij), (j, j,  2 * jj_ij)]
+      [ [(i, j, 4 * jj_ij), (i, i,  - 2 * jj_ij), (j, j,  - 2 * jj_ij)]
       | (i, row) <- IntMap.toList jj, (j, jj_ij) <- IntMap.toList row
       ] ++
-      [ (i, i,  -2 * hi) | (i, hi) <- IntMap.toList h ]
+      [ (i, i,  2 * hi) | (i, hi) <- IntMap.toList h ]
     offset =
-      - sum [jj_ij | row <- IntMap.elems jj, jj_ij <- IntMap.elems row]
-      + sum (IntMap.elems h)
+        sum [jj_ij | row <- IntMap.elems jj, jj_ij <- IntMap.elems row]
+      - sum (IntMap.elems h)
 
 data Ising2QUBOInfo a = Ising2QUBOInfo a
   deriving (Eq, Show)
