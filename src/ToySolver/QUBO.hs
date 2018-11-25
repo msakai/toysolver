@@ -59,10 +59,10 @@ data IsingModel a
 
 -- | +1 is represented as True and -1 is represented as False.
 evalIsingModel :: Num a => Solution -> IsingModel a -> a
-evalIsingModel sol m =
-  - sum [ jj_ij * sigma i *  sigma j
+evalIsingModel sol m
+  = sum [ jj_ij * sigma i *  sigma j
         | (i, row) <- IntMap.toList $ isingInteraction m, (j, jj_ij) <- IntMap.toList row
         ]
-  - sum [ h_i * sigma i | (i, h_i) <- IntMap.toList $ isingExternalMagneticField m ]
+  + sum [ h_i * sigma i | (i, h_i) <- IntMap.toList $ isingExternalMagneticField m ]
   where
     sigma i = if sol ! i then 1 else -1

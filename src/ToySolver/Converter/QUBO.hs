@@ -120,8 +120,8 @@ qubo2ising :: (Eq a, Show a, Num a) => QUBO.Problem a -> (QUBO.IsingModel a, QUB
 qubo2ising QUBO.Problem{ QUBO.quboNumVars = n, QUBO.quboMatrix = qq } =
   ( QUBO.IsingModel
     { QUBO.isingNumVars = n
-    , QUBO.isingInteraction = normalizeMat $ fmap (fmap negate) jj'
-    , QUBO.isingExternalMagneticField = normalizeVec $ fmap negate h'
+    , QUBO.isingInteraction = normalizeMat $ jj'
+    , QUBO.isingExternalMagneticField = normalizeVec h'
     }
   , QUBO2IsingInfo c'
   )
@@ -201,26 +201,26 @@ ising2qubo QUBO.IsingModel{ QUBO.isingNumVars = n, QUBO.isingInteraction = jj, Q
        Let si = 2 xi - 1
 
        Then,
-         - Jij si sj
-       = - Jij (2 xi - 1) (2 xj - 1)
-       = - Jij (4 xi xj - 2 xi - 2 xj + 1)
-       = - 4 Jij xi xj + 2 Jij xi + 2 Jij xj - Jij
-       = - 4 Jij xi xj + 2 Jij xi xi + 2 Jij xj xj - Jij
+         Jij si sj
+       = Jij (2 xi - 1) (2 xj - 1)
+       = Jij (4 xi xj - 2 xi - 2 xj + 1)
+       = 4 Jij xi xj - 2 Jij xi    - 2 Jij xj    + Jij
+       = 4 Jij xi xj - 2 Jij xi xi - 2 Jij xj xj + Jij
 
-         - hi si
-       = - hi (2 xi - 1)
-       = - 2 hi xi + hi
-       = - 2 hi xi xi + hi
+         hi si
+       = hi (2 xi - 1)
+       = 2 hi xi - hi
+       = 2 hi xi xi - hi
     -}
     m =
       concat
-      [ [(i, j, -4 * jj_ij), (i, i,  2 * jj_ij), (j, j,  2 * jj_ij)]
+      [ [(i, j, 4 * jj_ij), (i, i,  - 2 * jj_ij), (j, j,  - 2 * jj_ij)]
       | (i, row) <- IntMap.toList jj, (j, jj_ij) <- IntMap.toList row
       ] ++
-      [ (i, i,  -2 * hi) | (i, hi) <- IntMap.toList h ]
+      [ (i, i,  2 * hi) | (i, hi) <- IntMap.toList h ]
     offset =
-      - sum [jj_ij | row <- IntMap.elems jj, jj_ij <- IntMap.elems row]
-      + sum (IntMap.elems h)
+        sum [jj_ij | row <- IntMap.elems jj, jj_ij <- IntMap.elems row]
+      - sum (IntMap.elems h)
 
 data Ising2QUBOInfo a = Ising2QUBOInfo a
   deriving (Eq, Show)
