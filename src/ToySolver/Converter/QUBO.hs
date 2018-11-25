@@ -116,7 +116,7 @@ instance BackwardTransformer PBOAsQUBOInfo where
 
 -- -----------------------------------------------------------------------------
 
-qubo2ising :: (Eq a, Show a, Num a) => QUBO.Problem a -> (QUBO.IsingModel a, QUBO2IsingInfo a)
+qubo2ising :: (Eq a, Show a, Fractional a) => QUBO.Problem a -> (QUBO.IsingModel a, QUBO2IsingInfo a)
 qubo2ising QUBO.Problem{ QUBO.quboNumVars = n, QUBO.quboMatrix = qq } =
   ( QUBO.IsingModel
     { QUBO.isingNumVars = n
@@ -145,15 +145,15 @@ qubo2ising QUBO.Problem{ QUBO.quboNumVars = n, QUBO.quboMatrix = qq } =
       (j, q_ij) <- IntMap.toList row
       if i /= j then
         return
-          ( IntMap.singleton (min i j) $ IntMap.singleton (max i j) q_ij
-          , IntMap.fromList [(i,q_ij), (j,q_ij)]
-          , q_ij
+          ( IntMap.singleton (min i j) $ IntMap.singleton (max i j) (q_ij / 4)
+          , IntMap.fromList [(i, q_ij / 4), (j, q_ij / 4)]
+          , q_ij / 4
           )
       else
         return
           ( IntMap.empty
-          , IntMap.singleton i (2 * q_ij)
-          , 2 * q_ij
+          , IntMap.singleton i (q_ij / 2)
+          , q_ij / 2
           )
 
     f (jj1, h1, c1) (jj2, h2, c2) =
@@ -180,11 +180,10 @@ instance ObjValueTransformer (QUBO2IsingInfo a) where
   type TargetObjValue (QUBO2IsingInfo a) = a
 
 instance (Eq a, Show a, Num a) => ObjValueForwardTransformer (QUBO2IsingInfo a) where
-  transformObjValueForward (QUBO2IsingInfo offset) obj = 4 * obj - offset
+  transformObjValueForward (QUBO2IsingInfo offset) obj = obj - offset
 
--- XXX
-instance (Eq a, Show a, Fractional a) => ObjValueBackwardTransformer (QUBO2IsingInfo a) where
-  transformObjValueBackward (QUBO2IsingInfo offset) obj = (obj + offset) / 4
+instance (Eq a, Show a, Num a) => ObjValueBackwardTransformer (QUBO2IsingInfo a) where
+  transformObjValueBackward (QUBO2IsingInfo offset) obj = obj + offset
 
 -- -----------------------------------------------------------------------------
 
