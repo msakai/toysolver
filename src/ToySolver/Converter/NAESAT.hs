@@ -26,7 +26,7 @@ module ToySolver.Converter.NAESAT
   -- * Conversion with SAT problem
   , SAT2NAESATInfo (..)
   , sat2naesat
-  , NAESAT2SATInfo (..)
+  , NAESAT2SATInfo
   , naesat2sat
 
   -- * Conversion from general NAE-SAT to NAE-k-SAT
@@ -90,8 +90,7 @@ instance BackwardTransformer SAT2NAESATInfo where
       if SAT.evalVar m z then amap not m else m
 
 -- | Information of 'naesat2sat' conversion
-data NAESAT2SATInfo = NAESAT2SATInfo
-  deriving (Eq, Show)
+type NAESAT2SATInfo = IdentityTransformer SAT.Model
 
 -- | Convert a NAE-SAT formula φ to an equisatifiable CNF formula ψ,
 -- together with a 'NAESAT2SATInfo'
@@ -102,18 +101,8 @@ naesat2sat (n,cs) =
     , CNF.cnfNumClauses = length cs * 2
     , CNF.cnfClauses = concat [[c, VG.map negate c] | c <- cs]
     }
-  , NAESAT2SATInfo
+  , IdentityTransformer
   )
-
-instance Transformer NAESAT2SATInfo where
-  type Source NAESAT2SATInfo = SAT.Model
-  type Target NAESAT2SATInfo = SAT.Model
-
-instance ForwardTransformer NAESAT2SATInfo where
-  transformForward _ m = m
-
-instance BackwardTransformer NAESAT2SATInfo where
-  transformBackward _ m = m
 
 -- ------------------------------------------------------------------------
 
