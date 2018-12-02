@@ -1157,27 +1157,6 @@ prop_removeNegationFromPBSum =
       let s' = SAT.removeNegationFromPBSum s
        in counterexample (show s') $ 
             forAll (arbitraryModel nv) $ \m -> SAT.evalPBSum m s === SAT.evalPBSum m s'
-  where
-    arbitraryPBSum :: Int -> Gen SAT.PBSum
-    arbitraryPBSum nv = do
-      nt <- choose (0,10)
-      replicateM nt $ do
-        ls <-
-          if nv==0
-          then return []
-          else do
-            m <- choose (0,nv)
-            replicateM m $ do
-              x <- choose (1,m)
-              b <- arbitrary
-              return $ if b then x else -x
-        c <- arbitrary
-        return (c,ls)
-
-    arbitraryModel :: Int -> Gen SAT.Model
-    arbitraryModel nv = do
-      bs <- replicateM nv arbitrary
-      return $ array (1,nv) (zip [1..] bs)
 
 ------------------------------------------------------------------------
 
@@ -2292,6 +2271,27 @@ instance Arbitrary PBO.Method where
 
 instance Arbitrary PB.Strategy where
   arbitrary = arbitraryBoundedEnum
+
+arbitraryPBSum :: Int -> Gen SAT.PBSum
+arbitraryPBSum nv = do
+  nt <- choose (0,10)
+  replicateM nt $ do
+    ls <-
+      if nv==0
+      then return []
+      else do
+        m <- choose (0,nv)
+        replicateM m $ do
+          x <- choose (1,m)
+          b <- arbitrary
+          return $ if b then x else -x
+    c <- arbitrary
+    return (c,ls)
+
+arbitraryModel :: Int -> Gen SAT.Model
+arbitraryModel nv = do
+  bs <- replicateM nv arbitrary
+  return $ array (1,nv) (zip [1..] bs)
 
 -- ---------------------------------------------------------------------
 
