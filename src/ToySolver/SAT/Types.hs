@@ -70,6 +70,7 @@ module ToySolver.SAT.Types
   , PBSum
   , evalPBSum
   , evalPBConstraint
+  , evalPBFormula
   , removeNegationFromPBSum
 
   -- * XOR Clause
@@ -98,6 +99,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.PseudoBoolean as PBFile
@@ -437,6 +439,11 @@ evalPBConstraint m (lhs,op,rhs) = op' (evalPBSum m lhs) rhs
     op' = case op of
             PBFile.Ge -> (>=)
             PBFile.Eq -> (==)
+
+evalPBFormula :: IModel m => m -> PBFile.Formula -> Maybe Integer
+evalPBFormula m formula = do
+  guard $ all (evalPBConstraint m) $ PBFile.pbConstraints formula
+  return $ evalPBSum m $ fromMaybe [] $ PBFile.pbObjectiveFunction formula
 
 removeNegationFromPBSum :: PBSum -> PBSum
 removeNegationFromPBSum ts =
