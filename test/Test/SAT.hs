@@ -2196,6 +2196,35 @@ prop_sat2ksat = QM.monadicIO $ do
       QM.assert $ bounds m1 == (1, CNF.cnfNumVars cnf1)
       QM.assert $ evalCNF m1 cnf1
 
+prop_quadratizePB :: Property
+prop_quadratizePB =
+  forAll arbitraryPBFormula $ \pb ->
+    let ((pb2,th), info) = quadratizePB pb
+     in counterexample (show (pb2,th)) $
+          conjoin
+          [ property $ F.all (\t -> IntSet.size t <= 2) $ collectTerms pb2
+          , property $ PBFile.pbNumConstraints pb === PBFile.pbNumConstraints pb2
+          , forAll (arbitraryModel (PBFile.pbNumVars pb)) $ \m ->
+              SAT.evalPBFormula m pb === eval2 (transformForward info m) (pb2,th)
+          , forAll (arbitraryModel (PBFile.pbNumVars pb2)) $ \m ->
+              case eval2 m (pb2,th) of
+                Just o -> SAT.evalPBFormula (transformBackward info m) pb === Just o
+                Nothing -> property True
+          ]
+  where        
+    collectTerms :: PBFile.Formula -> Set IntSet
+    collectTerms formula = Set.fromList [t' | t <- terms, let t' = IntSet.fromList t, IntSet.size t' >= 3]
+      where
+        sums = maybeToList (PBFile.pbObjectiveFunction formula) ++
+               [lhs | (lhs,_,_) <- PBFile.pbConstraints formula]
+        terms = [t | s <- sums, (_,t) <- s]
+
+    eval2 :: SAT.IModel m => m -> (PBFile.Formula, Integer) -> Maybe Integer
+    eval2 m (pb,th) = do
+      o <- SAT.evalPBFormula m pb
+      guard $ o <= th
+      return o
+
 ------------------------------------------------------------------------
 
 instance Arbitrary SAT.LearningStrategy where
@@ -2292,6 +2321,32 @@ arbitraryModel :: Int -> Gen SAT.Model
 arbitraryModel nv = do
   bs <- replicateM nv arbitrary
   return $ array (1,nv) (zip [1..] bs)
+
+arbitraryPBFormula :: Gen PBFile.Formula
+arbitraryPBFormula = do
+  nv <- choose (0,10)
+  obj <- do
+    b <- arbitrary
+    if b then
+      liftM Just $ arbitraryPBSum nv
+    else
+      return Nothing
+  nc <- choose (0,10)
+  cs <- replicateM nc $ do
+    lhs <- arbitraryPBSum nv
+    op <- arbitrary
+    rhs <- arbitrary
+    return (lhs,op,rhs)
+  return $
+    PBFile.Formula
+    { PBFile.pbObjectiveFunction = obj
+    , PBFile.pbNumVars = nv
+    , PBFile.pbNumConstraints = nc
+    , PBFile.pbConstraints = cs
+    }
+
+instance Arbitrary PBFile.Op where
+  arbitrary = arbitraryBoundedEnum
 
 -- ---------------------------------------------------------------------
 

@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -23,6 +24,10 @@ module ToySolver.Converter.PB
   , linearizePB
   , linearizeWBO
   , PBLinearizeInfo
+
+  -- * Quadratization of PB problems
+  , quadratizePB
+  , PBQuadratizeInfo
 
   -- * PB↔WBO conversion
   , pb2wbo
@@ -50,13 +55,23 @@ import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Array.IArray
 import qualified Data.Foldable as F
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.List
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Data.Maybe
 import Data.Monoid
 import Data.Primitive.MutVar
 import qualified Data.Sequence as Seq
+import Data.Set (Set)
+import qualified Data.Set as Set
 import qualified Data.PseudoBoolean as PBFile
 
 import ToySolver.Converter.Base
+import qualified ToySolver.Converter.PB.Internal.Product as Product
 import ToySolver.Converter.Tseitin
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
@@ -158,6 +173,113 @@ linearizeWBO formula usePB = runST $ do
       }
     , TseitinInfo (PBFile.wboNumVars formula) (PBFile.pbNumVars formula') defs
     )
+
+-- -----------------------------------------------------------------------------
+
+-- | Quandratize PBO/PBS problem without introducing additional constraints.
+quadratizePB :: PBFile.Formula -> ((PBFile.Formula, Integer), PBQuadratizeInfo)
+quadratizePB formula = 
+  ( ( PBFile.Formula
+      { PBFile.pbObjectiveFunction = Just $
+          conv (fromMaybe [] (PBFile.pbObjectiveFunction formula)) ++ penalty
+      , PBFile.pbConstraints = [(conv lhs, op, rhs) | (lhs,op,rhs) <- PBFile.pbConstraints formula]
+      , PBFile.pbNumVars = nv2
+      , PBFile.pbNumConstraints = PBFile.pbNumConstraints formula
+      }
+    , maxObj
+    )
+  , PBQuadratizeInfo nv1 nv2 fromV
+  )
+  where
+    nv1 = PBFile.pbNumVars formula
+    nv2 = PBFile.pbNumVars formula + Set.size termsToReplace
+
+    degGe3Terms :: Set IntSet
+    degGe3Terms = collectDegGe3Terms formula
+ 
+    m :: Map IntSet (IntSet,IntSet)
+    m = Product.decomposeToBinaryProducts degGe3Terms
+
+    termsToReplace :: Set IntSet
+    termsToReplace = go ts0 Set.empty
+      where
+        ts0 = concat [[t1,t2] | t <- Set.toList degGe3Terms, let (t1,t2) = m Map.! t]
+        go [] !ret = ret
+        go (t : ts) !ret
+          | IntSet.size t < 2  = go ts ret
+          | t `Set.member` ret = go ts ret
+          | otherwise =
+              case Map.lookup t m of
+                Nothing -> error "quadratizePB.termsToReplace: should not happen"
+                Just (t1,t2) -> go (t1 : t2 : ts) (Set.insert t ret)
+
+    fromV :: IntMap IntSet
+    toV :: Map IntSet Int
+    (fromV, toV) = (IntMap.fromList l, Map.fromList [(s,v) | (v,s) <- l])
+      where
+        l = zip [PBFile.pbNumVars formula + 1 ..] (Set.toList termsToReplace)
+
+    prodDefs :: [(SAT.Var, (SAT.Var, SAT.Var))]
+    prodDefs = [(v, (f t1, f t2)) | (v,t) <- IntMap.toList fromV, let (t1,t2) = m Map.! t]
+      where
+        f t
+          | IntSet.size t == 1 = head (IntSet.toList t)
+          | otherwise = 
+               case Map.lookup t toV of
+                 Nothing -> error "quadratizePB.prodDefs: should not happen"
+                 Just v -> v
+
+    maxObj :: Integer
+    maxObj = sum [max 0 w | (w,_) <- fromMaybe [] (PBFile.pbObjectiveFunction formula)]
+
+    minObj :: Integer
+    minObj = sum [min 0 w | (w,_) <- fromMaybe [] (PBFile.pbObjectiveFunction formula)]
+
+    penalty :: PBFile.Sum
+    penalty = [(w * w2, ts) | (w,ts) <- concat [p x y z | (z,(x,y)) <- prodDefs]]
+      where
+        -- The penalty function P(x,y,z) = xy − 2xz − 2yz + 3z is such that
+        -- P(x,y,z)=0 when z⇔xy and P(x,y,z)>0 when z⇎xy.
+        p x y z = [(1,[x,y]), (-2,[x,z]), (-2,[y,z]), (3,[z])]
+        w2 = maxObj - minObj + 1
+
+    conv :: PBFile.Sum -> PBFile.Sum
+    conv s = [(w, f t) | (w,t) <- s]
+      where
+        f t =
+          case Map.lookup t' toV of
+            Just v  -> [v]
+            Nothing
+              | IntSet.size t' >= 3 -> map g [t1, t2]
+              | otherwise -> t
+          where
+            t' = IntSet.fromList t
+            (t1, t2) = m Map.! t'
+        g t
+          | IntSet.size t == 1 = head $ IntSet.toList t
+          | otherwise = toV Map.! t
+
+
+collectDegGe3Terms :: PBFile.Formula -> Set IntSet
+collectDegGe3Terms formula = Set.fromList [t' | t <- terms, let t' = IntSet.fromList t, IntSet.size t' >= 3]
+  where
+    sums = maybeToList (PBFile.pbObjectiveFunction formula) ++
+           [lhs | (lhs,_,_) <- PBFile.pbConstraints formula]
+    terms = [t | s <- sums, (_,t) <- s]
+
+data PBQuadratizeInfo = PBQuadratizeInfo !Int !Int !(IntMap IntSet)
+  deriving (Eq, Show)
+
+instance Transformer PBQuadratizeInfo where
+  type Source PBQuadratizeInfo = SAT.Model
+  type Target PBQuadratizeInfo = SAT.Model
+
+instance ForwardTransformer PBQuadratizeInfo where
+  transformForward (PBQuadratizeInfo _nv1 nv2 defs) m =
+    array (1, nv2) $ assocs m ++ [(v, all (SAT.evalLit m) (IntSet.toList s)) | (v,s) <- IntMap.toList defs]
+
+instance BackwardTransformer PBQuadratizeInfo where
+  transformBackward (PBQuadratizeInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
 
 -- -----------------------------------------------------------------------------
 
