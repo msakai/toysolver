@@ -399,6 +399,8 @@ Library
      ToySolver.Wang
      ToySolver.Version
   Other-Modules:
+     ToySolver.Converter.PB.Internal.LargestIntersectionFinder
+     ToySolver.Converter.PB.Internal.Product
      ToySolver.Data.AlgebraicNumber.Graeffe
      ToySolver.Data.Polynomial.Base
      ToySolver.SAT.MUS.Base
