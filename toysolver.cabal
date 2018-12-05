@@ -921,6 +921,7 @@ Test-suite TestSuite
     Test.QBF
     Test.QUBO
     Test.SAT
+    Test.SAT.Utils
     Test.SDPFile
     Test.Simplex
     Test.SimplexTextbook
