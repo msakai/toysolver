@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
 module Test.SAT (satTestGroup) where
@@ -160,6 +161,7 @@ optimizeWBO solver method (nv,cs,top) = do
     Nothing -> return ()
     Just c -> SAT.addPBAtMost solver obj (c-1)
   opt <- PBO.newOptimizer solver obj
+  PBO.setMethod opt method
   PBO.optimize opt
   liftM (fmap (\(m, val) -> (SAT.restrictModel nv m, val))) $ PBO.getBestSolution opt
 
@@ -273,8 +275,8 @@ prop_solveCNF_using_BooleanTheory = QM.monadicIO $ do
   let nv = CNF.cnfNumVars cnf
       nc = CNF.cnfNumClauses cnf
       cs = CNF.cnfClauses cnf
-      cnf1 = cnf{ CNF.cnfClauses = [c | (i,c) <- zip [0..] cs, i `mod` 2 == 0], CNF.cnfNumClauses = nc - (nc `div` 2) }
-      cnf2 = cnf{ CNF.cnfClauses = [c | (i,c) <- zip [0..] cs, i `mod` 2 /= 0], CNF.cnfNumClauses = nc `div` 2 }
+      cnf1 = cnf{ CNF.cnfClauses = [c | (i,c) <- zip [(0::Int)..] cs, i `mod` 2 == 0], CNF.cnfNumClauses = nc - (nc `div` 2) }
+      cnf2 = cnf{ CNF.cnfClauses = [c | (i,c) <- zip [(0::Int)..] cs, i `mod` 2 /= 0], CNF.cnfNumClauses = nc `div` 2 }
 
   solver <- arbitrarySolver
 
@@ -393,7 +395,6 @@ case_QF_LRA = do
 
   m1 <- SAT.getModel satSolver
   m2 <- Simplex.getModel lraSolver
-  defs <- readIORef defsRef
   let f (Left lit) = SAT.evalLit m1 lit
       f (Right atom) = LA.eval m2 atom
   fold f c1 @?= True
@@ -447,7 +448,7 @@ case_QF_EUF = do
               forM_ (IntMap.toList defs) $ \(v, (t1, t2)) -> do
                 b2 <- EUF.areEqual eufSolver t1 t2
                 when b2 $ do
-                  callback v
+                  _ <- callback v
                   return ()
             return b            
         , thExplain = \m -> do
@@ -469,16 +470,16 @@ case_QF_EUF = do
         }
   SAT.setTheory satSolver tsolver
 
-  true  <- EUF.newConst eufSolver
-  false <- EUF.newConst eufSolver
-  EUF.assertNotEqual eufSolver true false
+  cTrue  <- EUF.newConst eufSolver
+  cFalse <- EUF.newConst eufSolver
+  EUF.assertNotEqual eufSolver cTrue cFalse
   boolToTermRef <- newIORef (IntMap.empty :: IntMap EUF.Term)
   termToBoolRef <- newIORef (Map.empty :: Map EUF.Term SAT.Lit)
 
   let connectBoolTerm :: SAT.Lit -> EUF.Term -> IO ()
       connectBoolTerm lit t = do
-        lit1 <- abstractEUFAtom (t, true)
-        lit2 <- abstractEUFAtom (t, false)
+        lit1 <- abstractEUFAtom (t, cTrue)
+        lit2 <- abstractEUFAtom (t, cFalse)
         SAT.addClause satSolver [-lit, lit1]  --  lit  ->  lit1
         SAT.addClause satSolver [-lit1, lit]  --  lit1 ->  lit
         SAT.addClause satSolver [lit, lit2]   -- -lit  ->  lit2
@@ -514,7 +515,7 @@ case_QF_EUF = do
     x' <- boolToTerm x
     f <- EUF.newFun eufSolver
     fx <- termToBool (f x')
-    ftt <- abstractEUFAtom (f true, true)
+    ftt <- abstractEUFAtom (f cTrue, cTrue)
     ret <- SAT.solveWith satSolver [-fx, ftt]
     ret @?= True
 
@@ -522,7 +523,7 @@ case_QF_EUF = do
     m2 <- readIORef eufModelRef
     let e (Left lit) = SAT.evalLit m1 lit
         e (Right (lhs,rhs)) = EUF.eval m2 lhs == EUF.eval m2 rhs
-    fold e (notB (Atom (Left fx)) .||. (Atom (Right (f true, true)))) @?= True
+    fold e (notB (Atom (Left fx)) .||. (Atom (Right (f cTrue, cTrue)))) @?= True
     SAT.evalLit m1 x @?= False
 
     ret <- SAT.solveWith satSolver [-fx, ftt, x]
@@ -1029,17 +1030,21 @@ prop_removeNegationFromPBSum =
 
 ------------------------------------------------------------------------
 
+case_normalizeXORClause_False :: Assertion
 case_normalizeXORClause_False =
   SAT.normalizeXORClause ([],True) @?= ([],True)
 
+case_normalizeXORClause_True :: Assertion
 case_normalizeXORClause_True =
   SAT.normalizeXORClause ([],False) @?= ([],False)
 
 -- x ⊕ y ⊕ x = y
+case_normalizeXORClause_case1 :: Assertion
 case_normalizeXORClause_case1 =
   SAT.normalizeXORClause ([1,2,1],True) @?= ([2],True)
 
 -- x ⊕ ¬x = x ⊕ x ⊕ 1 = 1
+case_normalizeXORClause_case2 :: Assertion
 case_normalizeXORClause_case2 =
   SAT.normalizeXORClause ([1,-1],True) @?= ([],False)
 
@@ -1057,12 +1062,15 @@ prop_normalizeXORClause = forAll g $ \(nv, c) ->
       rhs <- arbitrary
       return (nv, (lhs,rhs))
 
+case_evalXORClause_case1 :: Assertion
 case_evalXORClause_case1 =
   SAT.evalXORClause (array (1,2) [(1,True),(2,True)] :: Array Int Bool) ([1,2], True) @?= False
 
+case_evalXORClause_case2 :: Assertion
 case_evalXORClause_case2 =
   SAT.evalXORClause (array (1,2) [(1,False),(2,True)] :: Array Int Bool) ([1,2], True) @?= True
 
+case_xor_case1 :: Assertion
 case_xor_case1 = do
   solver <- SAT.newSolver
   SAT.modifyConfig solver $ \config -> config{ SAT.configCheckModel = True }
@@ -1075,6 +1083,7 @@ case_xor_case1 = do
   ret <- SAT.solve solver
   ret @?= False
 
+case_xor_case2 :: Assertion
 case_xor_case2 = do
   solver <- SAT.newSolver
   SAT.modifyConfig solver $ \config -> config{ SAT.configCheckModel = True }
@@ -1092,6 +1101,7 @@ case_xor_case2 = do
   m ! x2 @?= True
   m ! x3 @?= True
 
+case_xor_case3 :: Assertion
 case_xor_case3 = do
   solver <- SAT.newSolver
   SAT.modifyConfig solver $ \config -> config{ SAT.configCheckModel = True }
@@ -1119,13 +1129,13 @@ case_hybridLearning_1 = do
   SAT.addAtLeast solver [-x2, -x5, -x8, -x11] 3 -- C4
   SAT.addAtLeast solver [-x1, -x4, -x7, -x10] 3 -- C5
 
-  replicateM 3 (SAT.varBumpActivity solver x3)
+  replicateM_ 3 (SAT.varBumpActivity solver x3)
   SAT.setVarPolarity solver x3 False
 
-  replicateM 2 (SAT.varBumpActivity solver x6)
+  replicateM_ 2 (SAT.varBumpActivity solver x6)
   SAT.setVarPolarity solver x6 False
 
-  replicateM 1 (SAT.varBumpActivity solver x9)
+  replicateM_ 1 (SAT.varBumpActivity solver x9)
   SAT.setVarPolarity solver x9 False
 
   SAT.setVarPolarity solver x1 True
@@ -1197,7 +1207,7 @@ case_issue22 = do
   SAT.addPBAtLeast solver [ (1,-14), (10,13), (7,12), (13,-11), (14,-10), (16,9), (8,8), (9,-7)]   38
   SAT.addPBAtLeast solver [(-1,-14),(-10,13),(-7,12),(-13,-11),(-14,-10),(-16,9),(-8,8),(-9,-7)] (-38)
   SAT.setRandomGen solver =<< Rand.initialize (V.singleton 71)
-  SAT.solve solver
+  _ <- SAT.solve solver
   return ()
 {-
 Scenario:
@@ -1242,6 +1252,7 @@ conflict analysis yields [] and that causes error
 
 ------------------------------------------------------------------------
 
+case_addFormula :: Assertion
 case_addFormula = do
   solver <- SAT.newSolver
   enc <- Tseitin.newEncoder solver
@@ -1271,6 +1282,7 @@ case_addFormula = do
   ret <- SAT.solve solver
   ret @?= False
 
+case_addFormula_Peirces_Law :: Assertion
 case_addFormula_Peirces_Law = do
   solver <- SAT.newSolver
   enc <- Tseitin.newEncoder solver
@@ -1279,6 +1291,7 @@ case_addFormula_Peirces_Law = do
   ret <- SAT.solve solver
   ret @?= False
 
+case_encodeConj :: Assertion
 case_encodeConj = do
   solver <- SAT.newSolver
   enc <- Tseitin.newEncoder solver
@@ -1299,6 +1312,7 @@ case_encodeConj = do
   (SAT.evalLit m x1 && SAT.evalLit m x2) @?= False
   SAT.evalLit m x3 @?= False
 
+case_encodeDisj :: Assertion
 case_encodeDisj = do
   solver <- SAT.newSolver
   enc <- Tseitin.newEncoder solver
@@ -1319,6 +1333,7 @@ case_encodeDisj = do
   SAT.evalLit m x2 @?= False
   SAT.evalLit m x3 @?= False
 
+case_evalFormula :: Assertion
 case_evalFormula = do
   solver <- SAT.newSolver
   xs <- SAT.newVars solver 5
@@ -1332,6 +1347,7 @@ case_evalFormula = do
   forM_ (allAssignments 5) $ \m -> do
     Tseitin.evalFormula m f @?= g m
 
+prop_PBEncoder_addPBAtLeast :: Property
 prop_PBEncoder_addPBAtLeast = QM.monadicIO $ do
   let nv = 4
   (lhs,rhs) <- QM.pick $ do
@@ -1390,8 +1406,13 @@ findMUSAssumptions_case1 method = do
       expected = map IntSet.fromList [[1, 2], [1, 3, 4], [1, 5, 6]]
   actual' `elem` expected @?= True
 
+case_findMUSAssumptions_Deletion :: Assertion
 case_findMUSAssumptions_Deletion = findMUSAssumptions_case1 MUS.Deletion
+
+case_findMUSAssumptions_Insertion :: Assertion
 case_findMUSAssumptions_Insertion = findMUSAssumptions_case1 MUS.Insertion
+
+case_findMUSAssumptions_QuickXplain :: Assertion
 case_findMUSAssumptions_QuickXplain = findMUSAssumptions_case1 MUS.QuickXplain
 
 ------------------------------------------------------------------------
@@ -1425,9 +1446,16 @@ allMUSAssumptions_case1 method = do
   Set.fromList muses @?= Set.fromList (map (IntSet.fromList . map (+3)) [[1,2], [1,3,4], [1,5,6]])
   Set.fromList mcses @?= Set.fromList (map (IntSet.fromList . map (+3)) [[1], [2,3,5], [2,3,6], [2,4,5], [2,4,6]])
 
+case_allMUSAssumptions_CAMUS :: Assertion
 case_allMUSAssumptions_CAMUS = allMUSAssumptions_case1 MUSEnum.CAMUS
+
+case_allMUSAssumptions_DAA :: Assertion
 case_allMUSAssumptions_DAA = allMUSAssumptions_case1 MUSEnum.DAA
+
+case_allMUSAssumptions_MARCO :: Assertion
 case_allMUSAssumptions_MARCO = allMUSAssumptions_case1 MUSEnum.MARCO
+
+case_allMUSAssumptions_GurvichKhachiyan1999 :: Assertion
 case_allMUSAssumptions_GurvichKhachiyan1999 = allMUSAssumptions_case1 MUSEnum.GurvichKhachiyan1999
 
 {-
@@ -1503,11 +1531,19 @@ allMUSAssumptions_case2 method = do
       expected' = Set.fromList $ map IntSet.fromList $ cores
   actual' @?= expected'
 
+case_allMUSAssumptions_2_CAMUS :: Assertion
 case_allMUSAssumptions_2_CAMUS = allMUSAssumptions_case2 MUSEnum.CAMUS
+
+case_allMUSAssumptions_2_DAA :: Assertion
 case_allMUSAssumptions_2_DAA = allMUSAssumptions_case2 MUSEnum.DAA
+
+case_allMUSAssumptions_2_MARCO :: Assertion
 case_allMUSAssumptions_2_MARCO = allMUSAssumptions_case2 MUSEnum.MARCO
+
+case_allMUSAssumptions_2_GurvichKhachiyan1999 :: Assertion
 case_allMUSAssumptions_2_GurvichKhachiyan1999 = allMUSAssumptions_case2 MUSEnum.GurvichKhachiyan1999
 
+case_allMUSAssumptions_2_HYCAM :: Assertion
 case_allMUSAssumptions_2_HYCAM = do
   solver <- SAT.newSolver
   [a,b,c,d,e] <- SAT.newVars solver 5
@@ -1837,7 +1873,7 @@ prop_naesat2naeksat_backward =
 prop_naesat2maxcut_forward :: Property
 prop_naesat2maxcut_forward =
   forAll arbitraryNAESAT $ \nae ->
-    let conv@((maxcut, threshold), info) = naesat2maxcut nae
+    let ((maxcut, threshold), info) = naesat2maxcut nae
     in and
        [ evalNAESAT m nae == (MaxCut.eval sol maxcut >= threshold)
        | m <- allAssignments (fst nae)
@@ -1874,7 +1910,7 @@ prop_satToMaxSAT2_forward =
 prop_simplifyMaxSAT2_forward :: Property
 prop_simplifyMaxSAT2_forward =
   forAll arbitraryMaxSAT2 $ \(wcnf, th1) ->
-    let r@((n,cs,th2), info) = simplifyMaxSAT2 (wcnf, th1)
+    let r@((_n,cs,th2), info) = simplifyMaxSAT2 (wcnf, th1)
     in counterexample (show r) $ and
        [ b1 == b2
        | m1 <- allAssignments (CNF.wcnfNumVars wcnf)
