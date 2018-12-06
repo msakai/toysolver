@@ -28,6 +28,7 @@ import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
 import Test.Tasty.HUnit
 import Test.Tasty.TH
+import qualified Test.QuickCheck as QC
 import qualified Test.QuickCheck.Monadic as QM
 
 import ToySolver.Data.LBool
@@ -91,7 +92,7 @@ prop_solvePB = QM.monadicIO $ do
       forM_ (allAssignments nv) $ \m -> do
         QM.assert $ not (evalPB m prob)
 
-solvePB :: SAT.Solver -> (Int,[(PBRel,SAT.PBLinSum,Integer)]) -> IO (Maybe SAT.Model)
+solvePB :: SAT.Solver -> PBLin -> IO (Maybe SAT.Model)
 solvePB solver (nv,cs) = do
   SAT.newVars_ solver nv
   forM_ cs $ \(o,lhs,rhs) -> do
@@ -123,7 +124,7 @@ prop_optimizePBO = QM.monadicIO $ do
       forM_ (allAssignments nv) $ \m -> do
         QM.assert $ not (evalPB m prob)
            
-optimizePBO :: SAT.Solver -> PBO.Optimizer -> (Int,[(PBRel,SAT.PBLinSum,Integer)]) -> IO (Maybe (SAT.Model, Integer))
+optimizePBO :: SAT.Solver -> PBO.Optimizer -> PBLin -> IO (Maybe (SAT.Model, Integer))
 optimizePBO solver opt (nv,cs) = do
   SAT.newVars_ solver nv
   forM_ cs $ \(o,lhs,rhs) -> do
@@ -138,7 +139,7 @@ optimizePBO solver opt (nv,cs) = do
 optimizeWBO
   :: SAT.Solver
   -> PBO.Method
-  -> (Int, [(Maybe Integer, (PBRel,SAT.PBLinSum,Integer))], Maybe Integer)
+  -> WBOLin
   -> IO (Maybe (SAT.Model, Integer))
 optimizeWBO solver method (nv,cs,top) = do
   SAT.newVars_ solver nv
@@ -1026,7 +1027,7 @@ prop_removeNegationFromPBSum =
     forAll (arbitraryPBSum nv) $ \s ->
       let s' = SAT.removeNegationFromPBSum s
        in counterexample (show s') $ 
-            forAll (arbitraryModel nv) $ \m -> SAT.evalPBSum m s === SAT.evalPBSum m s'
+            forAll (arbitraryAssignment nv) $ \m -> SAT.evalPBSum m s === SAT.evalPBSum m s'
 
 ------------------------------------------------------------------------
 
@@ -1624,9 +1625,7 @@ prop_ExistentialQuantification = QM.monadicIO $ do
   xs <- QM.pick $ liftM IntSet.fromList $ sublistOf [1 .. CNF.cnfNumVars phi]
   let ys = IntSet.fromList [1 .. CNF.cnfNumVars phi] IntSet.\\ xs
   psi <- QM.run $ ExistentialQuantification.project xs phi
-  forM_ (replicateM (IntSet.size ys) [False,True]) $ \bs -> do
-    let m :: SAT.Model
-        m = array (1, if IntSet.null ys then 0 else IntSet.findMax ys) (zip (IntSet.toList ys) bs)
+  forM_ (allAssignments (if IntSet.null ys then 0 else IntSet.findMax ys)) $ \m -> do
     b1 <- QM.run $ do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.cnfNumVars phi)
@@ -1693,9 +1692,7 @@ brauer11_omega =
 case_ExistentialQuantification_project_phi :: Assertion
 case_ExistentialQuantification_project_phi = do
   psi <- ExistentialQuantification.project (IntSet.fromList [7..13]) brauer11_phi
-  forM_ (replicateM 6 [False,True]) $ \bs -> do
-    let m :: SAT.Model
-        m = array (1,13) (zip [1..] bs)    
+  forM_ (allAssignments 6) $ \m -> do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.cnfNumVars brauer11_phi)
@@ -1721,9 +1718,7 @@ case_ExistentialQuantification_project_phi' = do
                 , [-y4, y6]
                 ]
             }
-  forM_ (replicateM 6 [False,True]) $ \bs -> do
-    let m :: SAT.Model
-        m = array (1,13) (zip [1..] bs)
+  forM_ (allAssignments 6) $ \m -> do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.cnfNumVars brauer11_phi)
@@ -1735,9 +1730,7 @@ case_ExistentialQuantification_project_phi' = do
 case_shortestImplicantsE_phi :: Assertion
 case_shortestImplicantsE_phi = do
   xss <- ExistentialQuantification.shortestImplicantsE (IntSet.fromList [7..13]) brauer11_phi
-  forM_ (replicateM 6 [False,True]) $ \bs -> do
-    let m :: SAT.Model
-        m = array (1,6) (zip [1..] bs)
+  forM_ (allAssignments 6) $ \m -> do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.cnfNumVars brauer11_phi)
@@ -1754,9 +1747,7 @@ case_shortestImplicantsE_phi' = do
             , [y1, -y2, -y3, y4, -y5, y6]
             , [y1, -y2, y3, -y4, y5, -y6]
             ]
-  forM_ (replicateM 6 [False,True]) $ \bs -> do
-    let m :: SAT.Model
-        m = array (1,6) (zip [1..] bs)
+  forM_ (allAssignments 6) $ \m -> do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.cnfNumVars brauer11_phi)
@@ -1768,9 +1759,7 @@ case_shortestImplicantsE_phi' = do
 case_shortestImplicantsE_omega :: Assertion
 case_shortestImplicantsE_omega = do
   xss <- ExistentialQuantification.shortestImplicantsE IntSet.empty brauer11_omega
-  forM_ (replicateM 6 [False,True]) $ \bs -> do
-    let m :: SAT.Model
-        m = array (1,6) (zip [1..] bs)
+  forM_ (allAssignments 6) $ \m -> do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.cnfNumVars brauer11_omega)
@@ -1792,9 +1781,7 @@ case_shortestImplicantsE_omega' = do
               , [y1, y2]
               , [y4, -y6]
               ]
-  forM_ (replicateM 6 [False,True]) $ \bs -> do
-    let m :: SAT.Model
-        m = array (1,6) (zip [1..] bs)
+  forM_ (allAssignments 6) $ \m -> do
     b1 <- do
       solver <- SAT.newSolver
       SAT.newVars_ solver (CNF.cnfNumVars brauer11_omega)
@@ -1808,10 +1795,8 @@ prop_negateCNF = QM.monadicIO $ do
   phi <- QM.pick arbitraryCNF
   psi <- QM.run $ ExistentialQuantification.negateCNF phi
   QM.monitor (counterexample $ show psi)
-  forM_ (replicateM (CNF.cnfNumVars phi) [False,True]) $ \bs -> do
-    let m :: SAT.Model
-        m = array (1,CNF.cnfNumVars phi) (zip [1..] bs)
-        b1 = evalCNF m phi
+  forM_ (allAssignments (CNF.cnfNumVars phi)) $ \m -> do
+    let b1 = evalCNF m phi
         b2 = evalCNF m psi
     unless (b1 /= b2) $ QM.monitor (counterexample $ show m)
     QM.assert $ b1 /= b2
@@ -1820,77 +1805,69 @@ prop_negateCNF = QM.monadicIO $ do
 
 prop_sat2naesat_forward :: Property
 prop_sat2naesat_forward = forAll arbitraryCNF $ \cnf ->
-  let (nae,info) = sat2naesat cnf
-  in and
-     [ evalCNF m cnf == evalNAESAT (transformForward info m) nae
-     | m <- allAssignments (CNF.cnfNumVars cnf)
-     ]
+  let ret@(nae,info) = sat2naesat cnf
+   in counterexample (show ret) $ 
+        forAllAssignments (CNF.cnfNumVars cnf) $ \m ->
+          evalCNF m cnf === evalNAESAT (transformForward info m) nae
 
 prop_sat2naesat_backward :: Property
 prop_sat2naesat_backward = forAll arbitraryCNF $ \cnf ->
-  let (nae,info) = sat2naesat cnf
-  in and
-     [ evalCNF (transformBackward info m) cnf == evalNAESAT m nae
-     | m <- allAssignments (fst nae)
-     ]
+  let ret@(nae,info) = sat2naesat cnf
+   in counterexample (show ret) $ 
+        forAllAssignments (fst nae) $ \m ->
+          evalCNF (transformBackward info m) cnf === evalNAESAT m nae
 
 prop_naesat2sat_forward :: Property
 prop_naesat2sat_forward = forAll arbitraryNAESAT $ \nae ->
-  let (cnf,info) = naesat2sat nae
-  in and
-     [ evalNAESAT m nae == evalCNF (transformForward info m) cnf
-     | m <- allAssignments (fst nae)
-     ]
+  let ret@(cnf,info) = naesat2sat nae
+   in counterexample (show ret) $ 
+        forAllAssignments (fst nae) $ \m ->
+          evalNAESAT m nae === evalCNF (transformForward info m) cnf
 
 prop_naesat2sat_backward :: Property
 prop_naesat2sat_backward = forAll arbitraryNAESAT $ \nae ->
-  let (cnf,info) = naesat2sat nae
-  in and
-     [ evalNAESAT (transformBackward info m) nae == evalCNF m cnf
-     | m <- allAssignments (CNF.cnfNumVars cnf)
-     ]
+  let ret@(cnf,info) = naesat2sat nae
+   in counterexample (show ret) $
+        forAllAssignments (CNF.cnfNumVars cnf) $ \m ->
+          evalNAESAT (transformBackward info m) nae === evalCNF m cnf
 
 prop_naesat2naeksat_forward :: Property
 prop_naesat2naeksat_forward =
   forAll arbitraryNAESAT $ \nae ->
   forAll (choose (3,10)) $ \k ->
-    let (nae',info) = naesat2naeksat k nae
-    in all (\c -> VG.length c <= k) (snd nae')
-       &&
-       and
-       [ evalNAESAT m nae == evalNAESAT (transformForward info m) nae'
-       | m <- allAssignments (fst nae)
-       ]
+    let ret@(nae',info) = naesat2naeksat k nae
+     in counterexample (show ret) $
+          property (all (\c -> VG.length c <= k) (snd nae'))
+          QC..&&.
+          (forAllAssignments (fst nae) $ \m ->
+             evalNAESAT m nae === evalNAESAT (transformForward info m) nae')
 
 prop_naesat2naeksat_backward :: Property
 prop_naesat2naeksat_backward =
   forAll arbitraryNAESAT $ \nae ->
   forAll (choose (3,10)) $ \k ->
-    let (nae',info) = naesat2naeksat k nae
-    in forAll (replicateM (fst nae') arbitrary >>= \m -> return (array (1, fst nae') (zip [1..] m))) $ \m ->
-         evalNAESAT (transformBackward info m) nae || not (evalNAESAT m nae')
+    let ret@(nae',info) = naesat2naeksat k nae
+     in counterexample (show ret) $
+          forAll (arbitraryAssignment (fst nae')) $ \m ->
+            evalNAESAT (transformBackward info m) nae || not (evalNAESAT m nae')
 
 prop_naesat2maxcut_forward :: Property
 prop_naesat2maxcut_forward =
   forAll arbitraryNAESAT $ \nae ->
-    let ((maxcut, threshold), info) = naesat2maxcut nae
-    in and
-       [ evalNAESAT m nae == (MaxCut.eval sol maxcut >= threshold)
-       | m <- allAssignments (fst nae)
-       , let sol = transformForward info m
-       ]
+    let ret@((maxcut, threshold), info) = naesat2maxcut nae
+     in counterexample (show ret) $
+          forAllAssignments (fst nae) $ \m ->
+            evalNAESAT m nae === (MaxCut.eval (transformForward info m) maxcut >= threshold)
 
 prop_naesat2max2sat_forward :: Property
 prop_naesat2max2sat_forward =
   forAll arbitraryNAESAT $ \nae ->
-    let ((wcnf, threshold), info) = naesat2max2sat nae
-    in and
-       [ case evalWCNF m2 wcnf of
-           Nothing -> False
-           Just v -> evalNAESAT m nae == (v <= threshold)
-       | m <- allAssignments (fst nae)
-       , let m2 = transformForward info m
-       ]
+    let ret@((wcnf, threshold), info) = naesat2max2sat nae
+     in counterexample (show ret) $
+          forAllAssignments (fst nae) $ \m ->
+            case evalWCNF (transformForward info m) wcnf of
+              Nothing -> property False
+              Just v -> evalNAESAT m nae === (v <= threshold)
 
 ------------------------------------------------------------------------
 
@@ -2082,9 +2059,9 @@ prop_quadratizePB =
           conjoin
           [ property $ F.all (\t -> IntSet.size t <= 2) $ collectTerms pb2
           , property $ PBFile.pbNumConstraints pb === PBFile.pbNumConstraints pb2
-          , forAll (arbitraryModel (PBFile.pbNumVars pb)) $ \m ->
+          , forAll (arbitraryAssignment (PBFile.pbNumVars pb)) $ \m ->
               SAT.evalPBFormula m pb === eval2 (transformForward info m) (pb2,th)
-          , forAll (arbitraryModel (PBFile.pbNumVars pb2)) $ \m ->
+          , forAll (arbitraryAssignment (PBFile.pbNumVars pb2)) $ \m ->
               case eval2 m (pb2,th) of
                 Just o -> SAT.evalPBFormula (transformBackward info m) pb === Just o
                 Nothing -> property True

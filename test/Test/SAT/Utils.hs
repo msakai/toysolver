@@ -34,6 +34,15 @@ import qualified ToySolver.FileFormat.CNF as CNF
 allAssignments :: Int -> [SAT.Model]
 allAssignments nv = [array (1,nv) (zip [1..nv] xs) | xs <- replicateM nv [True,False]]
 
+forAllAssignments :: Testable prop => Int -> (SAT.Model -> prop) ->  Property
+forAllAssignments nv p = conjoin [counterexample (show m) (p m) | m <- allAssignments nv]
+
+arbitraryAssignment :: Int -> Gen SAT.Model
+arbitraryAssignment nv = do
+  bs <- replicateM nv arbitrary
+  return $ array (1,nv) (zip [1..] bs)
+
+-- ---------------------------------------------------------------------  
 
 arbitraryCNF :: Gen CNF.CNF
 arbitraryCNF = do
@@ -80,7 +89,9 @@ evalPBRel PBRelLE = (<=)
 evalPBRel PBRelEQ = (==)
 
 
-arbitraryPB :: Gen (Int,[(PBRel,SAT.PBLinSum,Integer)])
+type PBLin = (Int,[(PBRel,SAT.PBLinSum,Integer)])
+
+arbitraryPB :: Gen PBLin
 arbitraryPB = do
   nv <- choose (0,10)
   nc <- choose (0,50)
@@ -102,11 +113,13 @@ arbitraryPBLinSum nv = do
       c <- arbitrary
       return (c,l)
 
-evalPB :: SAT.Model -> (Int,[(PBRel,SAT.PBLinSum,Integer)]) -> Bool
+evalPB :: SAT.Model -> PBLin -> Bool
 evalPB m (_,cs) = all (\(o,lhs,rhs) -> evalPBRel o (SAT.evalPBLinSum m lhs) rhs) cs
 
 
-evalWBO :: SAT.Model -> (Int, [(Maybe Integer, (PBRel,SAT.PBLinSum,Integer))], Maybe Integer) -> Maybe Integer
+type WBOLin = (Int, [(Maybe Integer, (PBRel,SAT.PBLinSum,Integer))], Maybe Integer)
+
+evalWBO :: SAT.Model -> WBOLin -> Maybe Integer
 evalWBO m (_nv,cs,top) = do
   cost <- liftM sum $ forM cs $ \(w,(o,lhs,rhs)) -> do
     if evalPBRel o (SAT.evalPBLinSum m lhs) rhs then
@@ -118,7 +131,7 @@ evalWBO m (_nv,cs,top) = do
     Nothing -> return ()
   return cost
 
-arbitraryWBO :: Gen (Int, [(Maybe Integer, (PBRel,SAT.PBLinSum,Integer))], Maybe Integer)
+arbitraryWBO :: Gen WBOLin
 arbitraryWBO = do
   (nv,cs) <- arbitraryPB
   cs2 <- forM cs $ \c -> do
@@ -293,11 +306,6 @@ arbitraryPBSum nv = do
           return $ if b then x else -x
     c <- arbitrary
     return (c,ls)
-
-arbitraryModel :: Int -> Gen SAT.Model
-arbitraryModel nv = do
-  bs <- replicateM nv arbitrary
-  return $ array (1,nv) (zip [1..] bs)
 
 arbitraryPBFormula :: Gen PBFile.Formula
 arbitraryPBFormula = do
