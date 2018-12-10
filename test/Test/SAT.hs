@@ -36,10 +36,8 @@ import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PB.Internal.Sorter as PBEncSorter
-import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.Enum as MUSEnum
-import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Store.CNF as CNFStore
 
 import qualified Data.PseudoBoolean as PBFile
@@ -58,17 +56,6 @@ prop_solveCNF = QM.monadicIO $ do
       forM_ (allAssignments (CNF.cnfNumVars cnf)) $ \m -> do
         QM.assert $ not (evalCNF m cnf)
 
-solveCNF :: SAT.Solver -> CNF.CNF -> IO (Maybe SAT.Model)
-solveCNF solver cnf = do
-  SAT.newVars_ solver (CNF.cnfNumVars cnf)
-  forM_ (CNF.cnfClauses cnf) $ \c -> SAT.addClause solver (SAT.unpackClause c)
-  ret <- SAT.solve solver
-  if ret then do
-    m <- SAT.getModel solver
-    return (Just m)
-  else do
-    return Nothing
-
 prop_solvePB :: Property
 prop_solvePB = QM.monadicIO $ do
   prob@(nv,_) <- QM.pick arbitraryPB
@@ -79,21 +66,6 @@ prop_solvePB = QM.monadicIO $ do
     Nothing -> do
       forM_ (allAssignments nv) $ \m -> do
         QM.assert $ not (evalPB m prob)
-
-solvePB :: SAT.Solver -> PBLin -> IO (Maybe SAT.Model)
-solvePB solver (nv,cs) = do
-  SAT.newVars_ solver nv
-  forM_ cs $ \(o,lhs,rhs) -> do
-    case o of
-      PBRelGE -> SAT.addPBAtLeast solver lhs rhs
-      PBRelLE -> SAT.addPBAtMost solver lhs rhs
-      PBRelEQ -> SAT.addPBExactly solver lhs rhs
-  ret <- SAT.solve solver
-  if ret then do
-    m <- SAT.getModel solver
-    return (Just m)
-  else do
-    return Nothing
 
 prop_optimizePBO :: Property
 prop_optimizePBO = QM.monadicIO $ do
@@ -111,48 +83,6 @@ prop_optimizePBO = QM.monadicIO $ do
     Nothing -> do
       forM_ (allAssignments nv) $ \m -> do
         QM.assert $ not (evalPB m prob)
-           
-optimizePBO :: SAT.Solver -> PBO.Optimizer -> PBLin -> IO (Maybe (SAT.Model, Integer))
-optimizePBO solver opt (nv,cs) = do
-  SAT.newVars_ solver nv
-  forM_ cs $ \(o,lhs,rhs) -> do
-    case o of
-      PBRelGE -> SAT.addPBAtLeast solver lhs rhs
-      PBRelLE -> SAT.addPBAtMost solver lhs rhs
-      PBRelEQ -> SAT.addPBExactly solver lhs rhs
-  PBO.optimize opt
-  PBO.getBestSolution opt
-
-
-optimizeWBO
-  :: SAT.Solver
-  -> PBO.Method
-  -> WBOLin
-  -> IO (Maybe (SAT.Model, Integer))
-optimizeWBO solver method (nv,cs,top) = do
-  SAT.newVars_ solver nv
-  obj <- liftM catMaybes $ forM cs $ \(cost, (o,lhs,rhs)) -> do
-    case cost of
-      Nothing -> do
-        case o of
-          PBRelGE -> SAT.addPBAtLeast solver lhs rhs
-          PBRelLE -> SAT.addPBAtMost solver lhs rhs
-          PBRelEQ -> SAT.addPBExactly solver lhs rhs
-        return Nothing
-      Just w -> do
-        sel <- SAT.newVar solver
-        case o of
-          PBRelGE -> SAT.addPBAtLeastSoft solver sel lhs rhs
-          PBRelLE -> SAT.addPBAtMostSoft solver sel lhs rhs
-          PBRelEQ -> SAT.addPBExactlySoft solver sel lhs rhs
-        return $ Just (w,-sel)
-  case top of
-    Nothing -> return ()
-    Just c -> SAT.addPBAtMost solver obj (c-1)
-  opt <- PBO.newOptimizer solver obj
-  PBO.setMethod opt method
-  PBO.optimize opt
-  liftM (fmap (\(m, val) -> (SAT.restrictModel nv m, val))) $ PBO.getBestSolution opt
 
 prop_solvePBNLC :: Property
 prop_solvePBNLC = QM.monadicIO $ do
@@ -164,41 +94,6 @@ prop_solvePBNLC = QM.monadicIO $ do
     Nothing -> do
       forM_ (allAssignments nv) $ \m -> do
         QM.assert $ not (evalPBNLC m prob)
-
-solvePBNLC :: SAT.Solver -> (Int,[(PBRel,SAT.PBSum,Integer)]) -> IO (Maybe SAT.Model)
-solvePBNLC solver (nv,cs) = do
-  SAT.newVars_ solver nv
-  enc <- PBNLC.newEncoder solver =<< Tseitin.newEncoder solver
-  forM_ cs $ \(o,lhs,rhs) -> do
-    case o of
-      PBRelGE -> PBNLC.addPBNLAtLeast enc lhs rhs
-      PBRelLE -> PBNLC.addPBNLAtMost enc lhs rhs
-      PBRelEQ -> PBNLC.addPBNLExactly enc lhs rhs
-  ret <- SAT.solve solver
-  if ret then do
-    m <- SAT.getModel solver
-    return $ Just $ SAT.restrictModel nv m
-  else do
-    return Nothing
-
-optimizePBNLC
-  :: SAT.Solver
-  -> PBO.Method
-  -> (Int, SAT.PBSum, [(PBRel,SAT.PBSum,Integer)])
-  -> IO (Maybe (SAT.Model, Integer))
-optimizePBNLC solver method (nv,obj,cs) = do
-  SAT.newVars_ solver nv
-  enc <- PBNLC.newEncoder solver =<< Tseitin.newEncoder solver
-  forM_ cs $ \(o,lhs,rhs) -> do
-    case o of
-      PBRelGE -> PBNLC.addPBNLAtLeast enc lhs rhs
-      PBRelLE -> PBNLC.addPBNLAtMost enc lhs rhs
-      PBRelEQ -> PBNLC.addPBNLExactly enc lhs rhs
-  obj2 <- PBNLC.linearizePBSumWithPolarity enc Tseitin.polarityNeg obj
-  opt <- PBO.newOptimizer2 solver obj2 (\m -> SAT.evalPBSum m obj)
-  PBO.setMethod opt method
-  PBO.optimize opt
-  liftM (fmap (\(m, val) -> (SAT.restrictModel nv m, val))) $ PBO.getBestSolution opt
 
 
 prop_solveXOR :: Property
