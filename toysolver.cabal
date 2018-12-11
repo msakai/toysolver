@@ -906,6 +906,7 @@ Test-suite TestSuite
     Test.CNF
     Test.CongruenceClosure
     Test.ContiTraverso
+    Test.Converter
     Test.Delta
     Test.FiniteModelFinder
     Test.GraphShortestPath
