@@ -922,6 +922,7 @@ Test-suite TestSuite
     Test.QBF
     Test.QUBO
     Test.SAT
+    Test.SAT.Encoder
     Test.SAT.ExistentialQuantification
     Test.SAT.TheorySolver
     Test.SAT.Utils
