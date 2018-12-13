@@ -19,55 +19,8 @@ import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
 
-arbitraryCNF :: Gen CNF.CNF
-arbitraryCNF = do
-  nv <- choose (0,10)
-  nc <- choose (0,50)
-  cs <- replicateM nc $ do
-    len <- choose (0,10)
-    if nv == 0 then
-      return $ SAT.packClause []
-    else
-      SAT.packClause <$> (replicateM len $ choose (-nv, nv) `suchThat` (/= 0))
-  return $
-    CNF.CNF
-    { CNF.cnfNumVars = nv
-    , CNF.cnfNumClauses = nc
-    , CNF.cnfClauses = cs
-    }
+import Test.SAT.Utils
 
-evalCNFCost :: SAT.Model -> CNF.CNF -> Int
-evalCNFCost m cnf = sum $ map f (CNF.cnfClauses cnf)
-  where
-    f c = if SAT.evalClause m (SAT.unpackClause c) then 0 else 1
-
-arbitraryWCNF :: Gen CNF.WCNF
-arbitraryWCNF = do
-  nv <- choose (0,10)
-  nc <- choose (0,50)
-  cs <- replicateM nc $ do
-    len <- choose (0,10)
-    w <- arbitrary
-    c <- do
-      if nv == 0 then do
-        return $ SAT.packClause []
-      else do
-        SAT.packClause <$> (replicateM len $ choose (-nv, nv) `suchThat` (/= 0))
-    return (fmap getPositive w, c)
-  let topCost = sum [w | (Just w, _) <- cs] + 1
-  return $
-    CNF.WCNF
-    { CNF.wcnfNumVars = nv
-    , CNF.wcnfNumClauses = nc
-    , CNF.wcnfTopCost = topCost
-    , CNF.wcnfClauses = [(fromMaybe topCost w, c) | (w,c) <- cs]
-    }
-
-evalWCNFCost :: SAT.Model -> CNF.WCNF -> Integer
-evalWCNFCost m wcnf = sum $ do
-  (w,c) <- CNF.wcnfClauses wcnf
-  guard $ not $ SAT.evalClause m (SAT.unpackClause c)
-  return w
 
 prop_probSAT :: Property
 prop_probSAT = QM.monadicIO $ do
