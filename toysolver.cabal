@@ -924,7 +924,9 @@ Test-suite TestSuite
     Test.SAT
     Test.SAT.Encoder
     Test.SAT.ExistentialQuantification
+    Test.SAT.MUS
     Test.SAT.TheorySolver
+    Test.SAT.Types
     Test.SAT.Utils
     Test.SDPFile
     Test.Simplex
