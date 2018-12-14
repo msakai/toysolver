@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -49,7 +50,6 @@ module ToySolver.Converter.PB
   , WBO2MaxSATInfo
   ) where
 
-import Control.Applicative
 import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.ST
@@ -63,7 +63,9 @@ import Data.List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Primitive.MutVar
 import qualified Data.Sequence as Seq
 import Data.Set (Set)

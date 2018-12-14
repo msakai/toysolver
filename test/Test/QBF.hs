@@ -2,7 +2,6 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Test.QBF (qbfTestGroup) where
 
-import Control.Applicative((<$>))
 import Control.Monad
 import qualified Data.IntSet as IntSet
 import Data.IntMap (IntMap)

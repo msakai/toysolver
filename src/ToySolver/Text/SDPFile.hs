@@ -53,7 +53,6 @@ module ToySolver.Text.SDPFile
   , parseSparseData
   ) where
 
-import Control.Applicative ((<*))
 import Control.Exception
 import Control.Monad
 import qualified Data.ByteString.Lazy as BL

@@ -3,7 +3,6 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
 module Test.SAT.ExistentialQuantification (satExistentialQuantificationTestGroup) where
 
-import Control.Applicative
 import Control.Monad
 import qualified Data.IntSet as IntSet
 

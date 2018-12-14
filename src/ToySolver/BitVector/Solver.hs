@@ -28,7 +28,6 @@ module ToySolver.BitVector.Solver
   ) where
 
 import Prelude hiding (repeat)
-import Control.Applicative hiding (Const (..))
 import Control.Monad
 import qualified Data.Foldable as F
 import Data.IntMap (IntMap)
@@ -39,7 +38,9 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
 import Data.Sequence (Seq)

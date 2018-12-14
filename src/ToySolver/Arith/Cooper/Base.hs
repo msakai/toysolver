@@ -56,7 +56,6 @@ import Data.List
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
-import Data.Monoid
 import Data.Ratio
 import qualified Data.Semigroup as Semigroup
 import Data.Set (Set)

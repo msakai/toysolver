@@ -49,7 +49,6 @@ module ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL
   , unfixLit
   ) where
 
-import Control.Applicative ((<$>))
 import Control.Exception
 import Control.Loop
 import Control.Monad

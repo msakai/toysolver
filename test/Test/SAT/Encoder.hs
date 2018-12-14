@@ -3,7 +3,6 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
 module Test.SAT.Encoder (satEncoderTestGroup) where
 
-import Control.Applicative
 import Control.Monad
 import Data.Array.IArray
 import Data.List

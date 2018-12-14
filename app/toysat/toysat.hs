@@ -18,7 +18,6 @@
 
 module Main where
 
-import Control.Applicative ((<$>))
 import Control.Concurrent (getNumCapabilities)
 import Control.Concurrent.Timeout
 import Control.Monad

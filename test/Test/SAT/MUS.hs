@@ -3,7 +3,6 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
 module Test.SAT.MUS (satMUSTestGroup) where
 
-import Control.Applicative
 import Control.Monad
 import Data.Default.Class
 import qualified Data.Set as Set

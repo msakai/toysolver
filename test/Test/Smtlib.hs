@@ -2,7 +2,6 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Test.Smtlib (smtlibTestGroup) where
 
-import Control.Applicative
 import Control.DeepSeq
 import Control.Monad
 import qualified Data.Set as Set

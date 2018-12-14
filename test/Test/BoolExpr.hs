@@ -2,7 +2,6 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Test.BoolExpr (boolExprTestGroup) where
 
-import Control.Applicative
 import Test.QuickCheck.Function
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))

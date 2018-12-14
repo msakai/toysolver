@@ -63,7 +63,6 @@ module ToySolver.Graph.ShortestPath
   , bellmanFordDetectNegativeCycle
   ) where
 
-import Control.Applicative
 import Control.Monad
 import Control.Monad.ST
 import Control.Monad.Trans

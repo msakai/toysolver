@@ -114,7 +114,6 @@ module ToySolver.SAT
   ) where
 
 import Prelude hiding (log)
-import Control.Applicative hiding (empty)
 import Control.Loop
 import Control.Monad
 import Control.Monad.IO.Class
