@@ -58,8 +58,6 @@ import qualified System.Random.MWC as Rand
 import Text.Printf
 #ifdef __GLASGOW_HASKELL__
 import GHC.Environment (getFullArgs)
-#endif
-#if defined(__GLASGOW_HASKELL__)
 import qualified GHC.Stats as Stats
 #endif
 
