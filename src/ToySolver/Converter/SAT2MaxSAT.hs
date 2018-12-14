@@ -54,10 +54,8 @@ import Control.Monad
 import Data.Array.MArray
 import Data.Array.ST
 import Data.Array.Unboxed
-import qualified Data.Foldable as F
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.List
 import Data.Monoid
@@ -253,7 +251,7 @@ instance ForwardTransformer SimpleMaxSAT2ToSimpleMaxCutInfo where
   transformForward (SimpleMaxSAT2ToSimpleMaxCutInfo n p) m =
     array (0,numNodes-1) [(v, not (v `IntSet.member` s1)) | v <- [0..numNodes-1]]
     where
-      (numNodes, tt, ff, t, f ,xp, xn, l) = simpleMaxSAT2ToSimpleMaxCutNodes n p
+      (numNodes, _tt, ff, t, f ,xp, xn, _l) = simpleMaxSAT2ToSimpleMaxCutNodes n p
       s1 = IntSet.fromList $
            [ff i  | i <- [0..3*p]] ++
            [xp i  | i <- [1..n], not (SAT.evalVar m i)] ++
@@ -266,7 +264,7 @@ instance BackwardTransformer SimpleMaxSAT2ToSimpleMaxCutInfo where
     | p == 0    = array (1,n) [(i, False) | i <- [1..n]]
     | otherwise = array (1,n) [(i, (sol ! xp i) == b) | i <- [1..n]]
     where
-      (numNodes, tt, ff, t, f ,xp, xn, l) = simpleMaxSAT2ToSimpleMaxCutNodes n p
+      (_numNodes, _tt, ff, _t, _f ,xp, _xn, _l) = simpleMaxSAT2ToSimpleMaxCutNodes n p
       b = not (sol ! ff 0)
 
 -- ------------------------------------------------------------------------

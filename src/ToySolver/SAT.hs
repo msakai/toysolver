@@ -1630,7 +1630,7 @@ analyzeConflict solver constr = do
             else do
               Vec.push out lit
 
-      processLitHybrid pb@(lhs,rhs) constr lit getLits = do
+      processLitHybrid pb constr lit getLits = do
         pb2 <- do
           let clausePB = do
                 lits <- getLits

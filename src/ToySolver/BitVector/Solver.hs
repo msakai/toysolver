@@ -503,8 +503,8 @@ isSLT bs1 bs2
 
 -- ------------------------------------------------------------------------
 
-test1 :: IO ()
-test1 = do
+_test1 :: IO ()
+_test1 = do
   solver <- newSolver
   v1 <- newVar solver 8
   v2 <- newVar solver 8
@@ -513,8 +513,8 @@ test1 = do
   m <- getModel solver
   print m
 
-test2 :: IO ()
-test2 = do
+_test2 :: IO ()
+_test2 = do
   solver <- newSolver
   v1 <- newVar solver 8
   v2 <- newVar solver 8

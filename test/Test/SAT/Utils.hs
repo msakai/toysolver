@@ -1,12 +1,6 @@
+{-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
-
-#if __GLASGOW_HASKELL__ >= 800
-{-# OPTIONS_GHC -Wall -Wno-orphans #-}
-#else 
-{-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
-#endif
-
 module Test.SAT.Utils where
 
 import Control.Applicative

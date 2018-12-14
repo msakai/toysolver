@@ -33,8 +33,7 @@ import Prelude hiding (writeFile)
 import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy.Char8 as BL
 import System.IO hiding (writeFile)
-import ToySolver.SAT.Types (Clause, Lit, PackedClause, packClause, unpackClause)
-import ToySolver.FileFormat.CNF hiding (parseByteString)
+import ToySolver.FileFormat.CNF
 
 -- | Parse a QDimacs file but returns an error message when parsing fails.
 {-# DEPRECATED parseByteString "Use FileFormat.parse instead" #-}

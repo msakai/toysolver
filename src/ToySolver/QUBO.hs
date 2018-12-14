@@ -13,7 +13,7 @@
 module ToySolver.QUBO
   ( -- * QUBO (quadratic unconstrained boolean optimization)
     Problem (..)
-  , Solution (..)
+  , Solution
   , eval
 
     -- * Ising Model

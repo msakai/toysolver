@@ -59,11 +59,9 @@ import Control.Concurrent.STM
 import Control.Exception
 import Control.Loop
 import Control.Monad
-import qualified Data.Array.IArray as A
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.IORef
-import Data.Maybe (fromJust)
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Unboxed as VU
@@ -181,7 +179,7 @@ newSolver nv clauses = do
   return solver
 
 deleteSolver :: Solver -> IO ()
-deleteSolver solver = return ()
+deleteSolver _solver = return ()
 
 initializeRandom :: Solver -> Rand.GenIO -> IO ()
 initializeRandom solver gen = do

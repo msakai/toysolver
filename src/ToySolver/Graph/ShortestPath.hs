@@ -36,6 +36,7 @@ module ToySolver.Graph.ShortestPath
   , path
   , firstOutEdge
   , lastInEdge
+  , cost
 
   -- * Path data types
   , Path (..)
@@ -51,6 +52,7 @@ module ToySolver.Graph.ShortestPath
   , pathVertexesBackward
   , pathVertexesSeq
   , pathFold
+  , pathMin
 
   -- * Shortest-path algorithms
   , bellmanFord

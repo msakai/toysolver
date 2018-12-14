@@ -61,13 +61,15 @@ solve xs =
     d = bellmanFord lastInEdge g vs
 
 -- M = {a−b ≤ 2, b−c ≤ 3, c−a ≤ −3}
-test_sat = solve xs
+_test_sat :: Either (HashSet Int) (HashMap Char Int)
+_test_sat = solve xs
   where
     xs :: [(Int, SimpleAtom Char Int)]
     xs = [(1, ('a' :- 'b' :<= 2)), (2, ('b' :- 'c' :<= 3)), (3, ('c' :- 'a' :<= -3))]
 
 -- M = {a−b ≤ 2, b−c ≤ 3, c−a ≤ −7}
-test_unsat = solve xs
+_test_unsat :: Either (HashSet Int) (HashMap Char Int)
+_test_unsat = solve xs
   where
     xs :: [(Int, SimpleAtom Char Int)]
     xs = [(1, ('a' :- 'b' :<= 2)), (2, ('b' :- 'c' :<= 3)), (3, ('c' :- 'a' :<= -7))]

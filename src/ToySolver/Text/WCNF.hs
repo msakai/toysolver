@@ -30,7 +30,7 @@ import Prelude hiding (writeFile)
 import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy.Char8 as BL
 import System.IO hiding (writeFile)
-import ToySolver.FileFormat.CNF hiding (parseByteString)
+import ToySolver.FileFormat.CNF
 
 -- | Parse a WCNF file but returns an error message when parsing fails.
 {-# DEPRECATED parseByteString "Use FileFormat.parse instead" #-}

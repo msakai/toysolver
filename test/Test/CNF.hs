@@ -8,12 +8,10 @@ module Test.CNF (cnfTestGroup) where
 import Control.Applicative
 import Control.Monad
 import Data.ByteString.Builder
-import Data.Maybe
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.TH
 import qualified ToySolver.FileFormat.CNF as CNF
-import qualified ToySolver.SAT.Types as SAT
 
 import Test.SAT.Utils
 

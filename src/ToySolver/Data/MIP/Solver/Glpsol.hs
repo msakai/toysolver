@@ -6,7 +6,6 @@ module ToySolver.Data.MIP.Solver.Glpsol
   ) where
 
 import Algebra.PartialOrd
-import Control.Monad
 import Data.Default.Class
 import Data.IORef
 import qualified Data.Text.Lazy.IO as TLIO

@@ -8,7 +8,6 @@ import Data.Array.IArray
 import Data.Array.Unboxed
 import Data.IORef
 import Data.List (group)
-import Data.Map (Map)
 import qualified Data.Map as Map
 import System.Console.GetOpt
 import System.Environment

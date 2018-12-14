@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.FileFormat
@@ -18,7 +18,7 @@ import qualified Data.PseudoBoolean as PBFile
 import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified Data.PseudoBoolean.ByteStringBuilder as PBFileBB
 import ToySolver.FileFormat.Base
-import ToySolver.Text.CNF () -- importing instances
+import ToySolver.FileFormat.CNF () -- importing instances
 
 instance FileFormat PBFile.Formula where
   parse = PBFileAttoparsec.parseOPBByteString

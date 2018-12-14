@@ -351,7 +351,7 @@ solveCEGARIncremental nv prefix matrix =
     end
     -}
     f :: Int -> LitSet -> Prefix -> Matrix -> IO (Maybe LitSet)
-    f nv assumptions prefix matrix = do
+    f nv _assumptions prefix matrix = do
       solver <- SAT.newSolver
       SAT.newVars_ solver nv
       enc <- Tseitin.newEncoder solver
@@ -365,14 +365,14 @@ solveCEGARIncremental nv prefix matrix =
             return xs
       let g :: Int -> LitSet -> Prefix -> Matrix -> IO (Maybe LitSet)
           g _nv _assumptions [] _matrix = error "should not happen"
-          g nv assumptions [(q,xs)] matrix = do
+          g nv assumptions [(_q,xs)] matrix = do
             ret <- SAT.solveWith solver (IntSet.toList assumptions)
             if ret then do
               m <- SAT.getModel solver
               return $ Just $ IntSet.fromList [if SAT.evalLit m x then x else -x | x <- IntSet.toList xs]
             else
               return Nothing            
-          g nv assumptions prefix@((q,xs) : prefix'@((_q2,_) : prefix'')) matrix = do
+          g nv assumptions ((q,xs) : prefix'@((_q2,_) : prefix'')) matrix = do
             let loop counterMoves = do
                   let ys = [(nv, prefix'', reduct matrix nu) | nu <- counterMoves]
                       (nv2, prefix2, matrix2) =
@@ -473,16 +473,16 @@ solveQE_CNF nv prefix matrix = g (normalizePrefix prefix) matrix
 -- ----------------------------------------------------------------------------
 
 -- ∀y ∃x. x ∧ (y ∨ ¬x)
-test = solveNaive 2 [(A, IntSet.singleton 2), (E, IntSet.singleton 1)] (x .&&. (y .||. notB x))
+_test = solveNaive 2 [(A, IntSet.singleton 2), (E, IntSet.singleton 1)] (x .&&. (y .||. notB x))
   where
     x  = BoolExpr.Atom 1
     y  = BoolExpr.Atom 2
 
-test' = solveCEGAR 2 [(A, IntSet.singleton 2), (E, IntSet.singleton 1)] (x .&&. (y .||. notB x))
+_test' = solveCEGAR 2 [(A, IntSet.singleton 2), (E, IntSet.singleton 1)] (x .&&. (y .||. notB x))
   where
     x  = BoolExpr.Atom 1
     y  = BoolExpr.Atom 2
 
-test1 = prenexAnd (1, [(A, IntSet.singleton 1)], BoolExpr.Atom 1) (1, [(A, IntSet.singleton 1)], notB (BoolExpr.Atom 1))
+_test1 = prenexAnd (1, [(A, IntSet.singleton 1)], BoolExpr.Atom 1) (1, [(A, IntSet.singleton 1)], notB (BoolExpr.Atom 1))
 
-test2 = prenexOr (1, [(A, IntSet.singleton 1)], BoolExpr.Atom 1) (1, [(A, IntSet.singleton 1)], BoolExpr.Atom 1)
+_test2 = prenexOr (1, [(A, IntSet.singleton 1)], BoolExpr.Atom 1) (1, [(A, IntSet.singleton 1)], BoolExpr.Atom 1)

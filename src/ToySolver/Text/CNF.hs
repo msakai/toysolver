@@ -29,16 +29,12 @@ module ToySolver.Text.CNF {-# DEPRECATED "Use ToySolver.FileFormat.CNF instead" 
   ) where
 
 import Prelude hiding (readFile, writeFile)
-import Control.DeepSeq
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Builder
-import Data.Char
 import Data.Monoid
 import System.IO hiding (readFile, writeFile)
 
 import ToySolver.FileFormat.CNF
-import qualified ToySolver.SAT.Types as SAT
-import ToySolver.SAT.Types (Lit, Clause, PackedClause, packClause, unpackClause)
 
 -- | Parse a CNF file but returns an error message when parsing fails.
 {-# DEPRECATED parseByteString "Use FileFormat.parse instead" #-}

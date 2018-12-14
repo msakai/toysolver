@@ -49,6 +49,7 @@ encodePBLinAtLeastBDD enc (lhs,rhs) = do
                 Just l -> return l
                 Nothing -> do
                   case xs of
+                    [] -> error "encodePBLinAtLeastBDD: should not happen"
                     [(_,l)] -> return l
                     (c,l) : xs' -> do
                       thenLit <- f xs' (rhs - c) slack

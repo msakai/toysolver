@@ -141,8 +141,8 @@ enumMinimalHittingSets dnf = loop Set.empty
 evalDNF :: Set IntSet -> IntSet -> Bool
 evalDNF dnf xs = or [is `IntSet.isSubsetOf` xs | is <- Set.toList dnf]
 
-evalCNF :: Set IntSet -> IntSet -> Bool
-evalCNF cnf xs = and [not $ IntSet.null $ is `IntSet.intersection` xs | is <- Set.toList cnf]
+_evalCNF :: Set IntSet -> IntSet -> Bool
+_evalCNF cnf xs = and [not $ IntSet.null $ is `IntSet.intersection` xs | is <- Set.toList cnf]
 
 
 f, g :: Set IntSet

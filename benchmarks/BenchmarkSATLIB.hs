@@ -6,11 +6,12 @@ import Data.Default.Class
 import Text.Printf
 import Criterion.Main
 import qualified ToySolver.SAT as SAT
-import qualified ToySolver.Text.CNF as CNF
+import qualified ToySolver.FileFormat as FF
+import qualified ToySolver.FileFormat.CNF as CNF
 
 solve :: FilePath -> IO ()
 solve fname = do
-  ret <- CNF.parseFile fname
+  ret <- FF.parseFile fname
   case ret of
     Left err  -> error $ show err
     Right cnf -> do

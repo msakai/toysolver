@@ -89,8 +89,8 @@ isCounterExampleOf xs (f,g) = lhs == rhs
     lhs = or [is `IntSet.isSubsetOf` xs | is <- Set.toList f]
     rhs = or [xs `disjoint` js | js <- Set.toList g]
 
-volume :: Set IntSet -> Set IntSet -> Int
-volume f g = Set.size f * Set.size g
+_volume :: Set IntSet -> Set IntSet -> Int
+_volume f g = Set.size f * Set.size g
 
 condition_1_1 :: Set IntSet -> Set IntSet -> Bool
 condition_1_1 f g = all (\is -> all (\js -> is `intersect` js) g) f

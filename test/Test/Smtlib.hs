@@ -17,9 +17,8 @@ import Smtlib.Syntax.ShowSL
 import Smtlib.Parsers.CommonParsers
 import Smtlib.Parsers.CommandsParsers
 import Smtlib.Parsers.ResponseParsers
-import Text.Parsec (parse, ParseError)
+import Text.Parsec (parse)
 
-import Debug.Trace
 
 prop_parseTerm :: Property
 prop_parseTerm = forAll arbitrary $ \(t :: Term) ->

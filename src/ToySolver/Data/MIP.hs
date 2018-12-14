@@ -26,7 +26,7 @@ module ToySolver.Data.MIP
   , writeMPSFile
   , toLPString
   , toMPSString
-  , ParseError (..)
+  , ParseError
   ) where
 
 import Prelude hiding (readFile, writeFile)
