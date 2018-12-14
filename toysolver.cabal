@@ -906,6 +906,7 @@ Test-suite TestSuite
     Test.CNF
     Test.CongruenceClosure
     Test.ContiTraverso
+    Test.Converter
     Test.Delta
     Test.FiniteModelFinder
     Test.GraphShortestPath
@@ -921,6 +922,12 @@ Test-suite TestSuite
     Test.QBF
     Test.QUBO
     Test.SAT
+    Test.SAT.Encoder
+    Test.SAT.ExistentialQuantification
+    Test.SAT.MUS
+    Test.SAT.TheorySolver
+    Test.SAT.Types
+    Test.SAT.Utils
     Test.SDPFile
     Test.Simplex
     Test.SimplexTextbook
