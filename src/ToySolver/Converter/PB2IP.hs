@@ -93,7 +93,7 @@ convVar x = MIP.toVar ("x" ++ show x)
 -- -----------------------------------------------------------------------------
 
 data WBO2IPInfo = WBO2IPInfo !Int [(MIP.Var, PBFile.SoftConstraint)]
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer WBO2IPInfo where
   type Source WBO2IPInfo = SAT.Model

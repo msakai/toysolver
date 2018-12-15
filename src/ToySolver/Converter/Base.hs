@@ -25,7 +25,7 @@ module ToySolver.Converter.Base
   ) where
 
 
-class (Eq a, Show a) => Transformer a where
+class (Eq a, Show a, Read a) => Transformer a where
   type Source a
   type Target a
 

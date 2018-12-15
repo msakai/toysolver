@@ -165,24 +165,24 @@ qubo2ising QUBO.Problem{ QUBO.quboNumVars = n, QUBO.quboMatrix = qq } =
 data QUBO2IsingInfo a = QUBO2IsingInfo a
   deriving (Eq, Show, Read)
 
-instance (Eq a, Show a) => Transformer (QUBO2IsingInfo a) where
+instance (Eq a, Show a, Read a) => Transformer (QUBO2IsingInfo a) where
   type Source (QUBO2IsingInfo a) = QUBO.Solution
   type Target (QUBO2IsingInfo a) = QUBO.Solution
 
-instance (Eq a, Show a) => ForwardTransformer (QUBO2IsingInfo a) where
+instance (Eq a, Show a, Read a) => ForwardTransformer (QUBO2IsingInfo a) where
   transformForward _ sol = sol
 
-instance (Eq a, Show a) => BackwardTransformer (QUBO2IsingInfo a) where
+instance (Eq a, Show a, Read a) => BackwardTransformer (QUBO2IsingInfo a) where
   transformBackward _ sol = sol
 
 instance ObjValueTransformer (QUBO2IsingInfo a) where
   type SourceObjValue (QUBO2IsingInfo a) = a
   type TargetObjValue (QUBO2IsingInfo a) = a
 
-instance (Eq a, Show a, Num a) => ObjValueForwardTransformer (QUBO2IsingInfo a) where
+instance (Eq a, Show a, Read a, Num a) => ObjValueForwardTransformer (QUBO2IsingInfo a) where
   transformObjValueForward (QUBO2IsingInfo offset) obj = obj - offset
 
-instance (Eq a, Show a, Num a) => ObjValueBackwardTransformer (QUBO2IsingInfo a) where
+instance (Eq a, Show a, Read a, Num a) => ObjValueBackwardTransformer (QUBO2IsingInfo a) where
   transformObjValueBackward (QUBO2IsingInfo offset) obj = obj + offset
 
 -- -----------------------------------------------------------------------------
@@ -224,24 +224,24 @@ ising2qubo QUBO.IsingModel{ QUBO.isingNumVars = n, QUBO.isingInteraction = jj, Q
 data Ising2QUBOInfo a = Ising2QUBOInfo a
   deriving (Eq, Show, Read)
 
-instance (Eq a, Show a) => Transformer (Ising2QUBOInfo a) where
+instance (Eq a, Show a, Read a) => Transformer (Ising2QUBOInfo a) where
   type Source (Ising2QUBOInfo a) = QUBO.Solution
   type Target (Ising2QUBOInfo a) = QUBO.Solution
 
-instance (Eq a, Show a) => ForwardTransformer (Ising2QUBOInfo a) where
+instance (Eq a, Show a, Read a) => ForwardTransformer (Ising2QUBOInfo a) where
   transformForward _ sol = sol
 
-instance (Eq a, Show a) => BackwardTransformer (Ising2QUBOInfo a) where
+instance (Eq a, Show a, Read a) => BackwardTransformer (Ising2QUBOInfo a) where
   transformBackward _ sol = sol
 
-instance (Eq a, Show a) => ObjValueTransformer (Ising2QUBOInfo a) where
+instance (Eq a, Show a, Read a) => ObjValueTransformer (Ising2QUBOInfo a) where
   type SourceObjValue (Ising2QUBOInfo a) = a
   type TargetObjValue (Ising2QUBOInfo a) = a
 
-instance (Eq a, Show a, Num a) => ObjValueForwardTransformer (Ising2QUBOInfo a) where
+instance (Eq a, Show a, Read a, Num a) => ObjValueForwardTransformer (Ising2QUBOInfo a) where
   transformObjValueForward (Ising2QUBOInfo offset) obj = obj - offset
 
-instance (Eq a, Show a, Num a) => ObjValueBackwardTransformer (Ising2QUBOInfo a) where
+instance (Eq a, Show a, Read a, Num a) => ObjValueBackwardTransformer (Ising2QUBOInfo a) where
   transformObjValueBackward (Ising2QUBOInfo offset) obj = obj + offset
 
 -- -----------------------------------------------------------------------------
