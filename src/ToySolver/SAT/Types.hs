@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE CPP, StandaloneDeriving, ScopedTypeVariables, BangPatterns, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
 module ToySolver.SAT.Types
   (
   -- * Variable
@@ -105,6 +105,10 @@ import qualified Data.Vector.Unboxed as VU
 import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Data.LBool
 import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
+
+#if !(MIN_VERSION_pseudo_boolean(0,1,8))
+deriving instance Read PBFile.Op
+#endif
 
 -- | Variable is represented as positive integers (DIMACS format).
 type Var = Int

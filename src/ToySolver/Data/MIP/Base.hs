@@ -86,7 +86,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Interned (unintern)
+import Data.Interned (intern, unintern)
 import Data.Interned.Text
 import Data.ExtendedReal
 import Data.OptDir
@@ -139,6 +139,9 @@ type Label = T.Text
 
 -- | variable
 type Var = InternedText
+
+instance Read InternedText where
+  readsPrec p s = [(intern t, s') |  (t,s') <- readsPrec p s]
 
 -- | convert a string into a variable
 toVar :: String -> Var
