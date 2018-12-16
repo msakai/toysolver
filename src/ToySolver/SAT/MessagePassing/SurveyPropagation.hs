@@ -53,7 +53,6 @@ module ToySolver.SAT.MessagePassing.SurveyPropagation
   , printInfo
   ) where
 
-import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Exception

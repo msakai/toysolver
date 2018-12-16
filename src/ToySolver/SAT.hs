@@ -114,7 +114,6 @@ module ToySolver.SAT
   ) where
 
 import Prelude hiding (log)
-import Control.Applicative hiding (empty)
 import Control.Loop
 import Control.Monad
 import Control.Monad.IO.Class
@@ -2267,11 +2266,7 @@ findForWatch solver a (I# beg) (I# end) = IO $ \w ->
     (# w2, ret #) -> (# w2, I# ret #)
   where
     go# :: Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)
-#if __GLASGOW_HASKELL__ < 708
-    go# i end w | i ># end = (# w, -1# #)
-#else
     go# i end w | isTrue# (i ># end) = (# w, -1# #)
-#endif
     go# i end w =
       case unIO (litValue solver =<< unsafeRead a (I# i)) w of
         (# w2, val #) ->
@@ -2305,11 +2300,7 @@ findForWatch2 solver a (I# beg) (I# end) = IO $ \w ->
     (# w2, ret #) -> (# w2, I# ret #)
   where
     go# :: Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)
-#if __GLASGOW_HASKELL__ < 708
-    go# i end w | i ># end = (# w, -1# #)
-#else
     go# i end w | isTrue# (i ># end) = (# w, -1# #)
-#endif
     go# i end w =
       case unIO (litValue solver =<< unsafeRead a (I# i)) w of
         (# w2, val #) ->

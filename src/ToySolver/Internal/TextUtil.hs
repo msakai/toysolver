@@ -56,12 +56,7 @@ readUnsignedInteger str = assert (result == read str) $ result
     result = go 0 str
 
     lim :: Word
-#if !MIN_VERSION_base(4,6,1) && WORD_SIZE_IN_BITS == 32
-    {- To avoid a bug of maxBound <https://ghc.haskell.org/trac/ghc/ticket/8072> -}
-    lim = 0xFFFFFFFF `div` 10
-#else
     lim = maxBound `div` 10
-#endif
   
     go :: Integer -> [Char] -> Integer 
     go !r [] = r

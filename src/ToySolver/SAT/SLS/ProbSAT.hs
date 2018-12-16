@@ -38,7 +38,6 @@ module ToySolver.SAT.SLS.ProbSAT
 
 import Prelude hiding (break)
 
-import Control.Applicative
 import Control.Exception
 import Control.Loop
 import Control.Monad

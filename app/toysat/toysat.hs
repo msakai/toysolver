@@ -18,7 +18,6 @@
 
 module Main where
 
-import Control.Applicative ((<$>))
 import Control.Concurrent (getNumCapabilities)
 import Control.Concurrent.Timeout
 import Control.Monad
@@ -58,8 +57,6 @@ import qualified System.Random.MWC as Rand
 import Text.Printf
 #ifdef __GLASGOW_HASKELL__
 import GHC.Environment (getFullArgs)
-#endif
-#if defined(__GLASGOW_HASKELL__)
 import qualified GHC.Stats as Stats
 #endif
 

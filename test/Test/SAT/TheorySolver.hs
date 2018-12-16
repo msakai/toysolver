@@ -3,7 +3,6 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
 module Test.SAT.TheorySolver (satTheorySolverTestGroup) where
 
-import Control.Applicative
 import Control.Monad
 import Data.IORef
 import Data.Map (Map)

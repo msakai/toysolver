@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
@@ -51,7 +52,9 @@ import Control.DeepSeq
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Builder
 import Data.Char
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 
 import ToySolver.FileFormat.Base
 import qualified ToySolver.SAT.Types as SAT

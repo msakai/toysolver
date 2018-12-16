@@ -31,7 +31,6 @@ module ToySolver.Text.CNF {-# DEPRECATED "Use ToySolver.FileFormat.CNF instead" 
 import Prelude hiding (readFile, writeFile)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Builder
-import Data.Monoid
 import System.IO hiding (readFile, writeFile)
 
 import ToySolver.FileFormat.CNF

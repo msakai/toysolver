@@ -2,7 +2,6 @@
 {-# OPTIONS_GHC -Wall #-}
 module Main where
 
-import Control.Applicative hiding (many, optional)
 import Control.Monad
 import Data.Array.IArray
 import qualified Data.ByteString.Lazy.Char8 as BL

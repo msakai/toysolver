@@ -2,7 +2,6 @@
 {-# OPTIONS_GHC -Wall #-}
 module Main where
 
-import Control.Applicative
 import Control.Monad
 import Data.Array.IArray
 import Data.Array.Unboxed

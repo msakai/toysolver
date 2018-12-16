@@ -23,11 +23,9 @@ module ToySolver.Data.BoolExpr
   , simplify
   ) where
 
-import Control.Applicative
 import Control.DeepSeq
 import Control.Monad
 import Data.Data
-import Data.Foldable hiding (fold, concat, any)
 import Data.Hashable
 import Data.Traversable
 import ToySolver.Data.Boolean

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
@@ -9,10 +10,11 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
-import Control.Applicative
 import Control.Monad
-import Data.Monoid
 import Data.Maybe
+#if !MIN_VERSION_base(4,11,0)
+import Data.Monoid
+#endif
 
 import ToySolver.Data.OrdRel
 import qualified ToySolver.BitVector as BV

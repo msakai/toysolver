@@ -5,7 +5,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Test.CNF (cnfTestGroup) where
 
-import Control.Applicative
 import Control.Monad
 import Data.ByteString.Builder
 import Test.Tasty

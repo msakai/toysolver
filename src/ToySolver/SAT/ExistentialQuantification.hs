@@ -26,7 +26,6 @@ module ToySolver.SAT.ExistentialQuantification
   , negateCNF
   ) where
 
-import Control.Applicative
 import Control.Monad
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet

@@ -74,7 +74,6 @@ module ToySolver.SMT.SMTLIB2Solver
   , echo
   ) where
 
-import Control.Applicative
 import qualified Control.Exception as E
 import Control.Monad
 import Data.Interned (unintern)
