@@ -135,7 +135,7 @@ blockIndexesLen n = if n >= 0 then n*(n+1) `div` 2 else -n
 
 
 data DualizeInfo = DualizeInfo Int [Int]
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer DualizeInfo where
   type Source DualizeInfo = SDPFile.Solution

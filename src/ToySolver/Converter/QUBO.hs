@@ -55,7 +55,7 @@ qubo2pbo prob =
   )
 
 data QUBO2PBOInfo = QUBO2PBOInfo
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer QUBO2PBOInfo where
   type Source QUBO2PBOInfo = QUBO.Solution
@@ -98,7 +98,7 @@ pboAsQUBO formula = do
         }
 
 data PBOAsQUBOInfo = PBOAsQUBOInfo !Integer
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer PBOAsQUBOInfo where
   type Source PBOAsQUBOInfo = SAT.Model
@@ -163,7 +163,7 @@ qubo2ising QUBO.Problem{ QUBO.quboNumVars = n, QUBO.quboMatrix = qq } =
       )
 
 data QUBO2IsingInfo a = QUBO2IsingInfo a
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance (Eq a, Show a) => Transformer (QUBO2IsingInfo a) where
   type Source (QUBO2IsingInfo a) = QUBO.Solution
@@ -222,7 +222,7 @@ ising2qubo QUBO.IsingModel{ QUBO.isingNumVars = n, QUBO.isingInteraction = jj, Q
       - sum (IntMap.elems h)
 
 data Ising2QUBOInfo a = Ising2QUBOInfo a
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance (Eq a, Show a) => Transformer (Ising2QUBOInfo a) where
   type Source (Ising2QUBOInfo a) = QUBO.Solution

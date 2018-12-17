@@ -19,7 +19,7 @@ import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 
 newtype Expr = Expr SAT.PBSum
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 newVar :: SAT.AddPBNL m enc => enc -> Integer -> Integer -> m Expr
 newVar enc lo hi
