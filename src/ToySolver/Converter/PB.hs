@@ -75,6 +75,7 @@ import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Converter.Base
 import qualified ToySolver.Converter.PB.Internal.Product as Product
 import ToySolver.Converter.Tseitin
+import ToySolver.Data.BoolExpr
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
@@ -190,7 +191,7 @@ quadratizePB formula =
       }
     , maxObj
     )
-  , PBQuadratizeInfo nv1 nv2 fromV
+  , TseitinInfo nv1 nv2 [(v, And [Atom l1, Atom l2]) | (v, (l1,l2)) <- prodDefs]
   )
   where
     nv1 = PBFile.pbNumVars formula
@@ -269,19 +270,7 @@ collectDegGe3Terms formula = Set.fromList [t' | t <- terms, let t' = IntSet.from
            [lhs | (lhs,_,_) <- PBFile.pbConstraints formula]
     terms = [t | s <- sums, (_,t) <- s]
 
-data PBQuadratizeInfo = PBQuadratizeInfo !Int !Int !(IntMap IntSet)
-  deriving (Eq, Show, Read)
-
-instance Transformer PBQuadratizeInfo where
-  type Source PBQuadratizeInfo = SAT.Model
-  type Target PBQuadratizeInfo = SAT.Model
-
-instance ForwardTransformer PBQuadratizeInfo where
-  transformForward (PBQuadratizeInfo _nv1 nv2 defs) m =
-    array (1, nv2) $ assocs m ++ [(v, all (SAT.evalLit m) (IntSet.toList s)) | (v,s) <- IntMap.toList defs]
-
-instance BackwardTransformer PBQuadratizeInfo where
-  transformBackward (PBQuadratizeInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
+type PBQuadratizeInfo = TseitinInfo
 
 -- -----------------------------------------------------------------------------
 
