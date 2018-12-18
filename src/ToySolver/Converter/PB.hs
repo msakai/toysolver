@@ -320,7 +320,7 @@ wbo2pb wbo = runST $ do
     )
 
 data WBO2PBInfo = WBO2PBInfo !Int !Int [(SAT.Var, PBFile.Constraint)]
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 instance Transformer WBO2PBInfo where
   type Source WBO2PBInfo = SAT.Model
