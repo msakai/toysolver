@@ -52,7 +52,7 @@ extra-deps:
 - data-interval-1.3.0
 - extended-reals-0.2.2.0
 - finite-field-0.9.0
-- pseudo-boolean-0.1.6.0
+- pseudo-boolean-0.1.8.0
 - sign-0.4.3
 - OpenCL-1.0.3.4
 - bytestring-encoding-0.1.0.0
