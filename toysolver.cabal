@@ -184,7 +184,7 @@ Library
      mtl >=2.1.2,
      multiset,
      -- createSystemRandom requires mwc-random >=0.13.1.0
-     mwc-random >=0.13.1 && <0.14,
+     mwc-random >=0.13.1 && <0.15,
      OptDir,
      lattices,
      megaparsec >=4 && <7,
