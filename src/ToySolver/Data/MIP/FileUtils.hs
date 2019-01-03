@@ -20,10 +20,12 @@ import Data.Void
 #endif
 import qualified Text.Megaparsec as MP
 
-#if MIN_VERSION_megaparsec(6,0,0)
-type ParseError = MP.ParseError Char Void
+#if MIN_VERSION_megaparsec(7,0,0)
+type ParseError s = MP.ParseErrorBundle s Void
+#elif MIN_VERSION_megaparsec(6,0,0)
+type ParseError s = MP.ParseError (MP.Token s) Void
 #elif MIN_VERSION_megaparsec(5,0,0)
-type ParseError = MP.ParseError Char MP.Dec
+type ParseError s = MP.ParseError (MP.Token s) MP.Dec
 #else
-type ParseError = MP.ParseError
+type ParseError s = MP.ParseError
 #endif

@@ -103,11 +103,11 @@ type C e s m = (MonadParsec s m Char)
 -- | Parse a string containing MPS file data.
 -- The source name is only | used in error messages and may be the empty string.
 #if MIN_VERSION_megaparsec(6,0,0)
-parseString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Scientific)
+parseString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => MIP.FileOptions -> String -> s -> Either (ParseError s) (MIP.Problem Scientific)
 #elif MIN_VERSION_megaparsec(5,0,0)
-parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Scientific)
+parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError s) (MIP.Problem Scientific)
 #else
-parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either ParseError (MIP.Problem Scientific)
+parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either (ParseError s) (MIP.Problem Scientific)
 #endif
 parseString _ = parse (parser <* eof)
 
@@ -120,10 +120,16 @@ parseFile opt fname = do
     Just enc -> hSetEncoding h enc
   ret <- parse (parser <* eof) fname <$> TLIO.hGetContents h
   case ret of
-    Left e -> throwIO (e :: ParseError)
+    Left e -> throwIO (e :: ParseError TL.Text)
     Right a -> return a
 
 -- ---------------------------------------------------------------------------
+
+
+#if MIN_VERSION_megaparsec(7,0,0)
+anyChar :: C e s m => m Char
+anyChar = anySingle
+#endif
 
 space' :: C e s m => m Char
 space' = oneOf [' ', '\t']
