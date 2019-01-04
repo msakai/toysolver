@@ -104,11 +104,11 @@ readTextFile opt fname = do
 #endif
 
 -- | Parse a string containing LP file data.
-parseLPString :: FileOptions -> String -> String -> Either ParseError (Problem Scientific)
+parseLPString :: FileOptions -> String -> String -> Either (ParseError String) (Problem Scientific)
 parseLPString = LPFile.parseString
 
 -- | Parse a string containing MPS file data.
-parseMPSString :: FileOptions -> String -> String -> Either ParseError (Problem Scientific)
+parseMPSString :: FileOptions -> String -> String -> Either (ParseError String) (Problem Scientific)
 parseMPSString = MPSFile.parseString
 
 writeFile :: FileOptions -> FilePath -> Problem Scientific -> IO ()

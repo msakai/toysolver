@@ -76,7 +76,7 @@ import qualified Text.Megaparsec as MegaParsec
 #if MIN_VERSION_megaparsec(6,0,0)
 import Data.Word
 import Data.Void
-import Text.Megaparsec hiding (ParseError)
+import Text.Megaparsec hiding (ParseError, oneOf)
 import Text.Megaparsec.Byte hiding (oneOf)
 import qualified Text.Megaparsec.Byte as MegaParsec
 import qualified Text.Megaparsec.Byte.Lexer as Lexer
@@ -87,7 +87,10 @@ import qualified Text.Megaparsec.Lexer as Lexer
 import Text.Megaparsec.Prim (MonadParsec ())
 #endif
 
-#if MIN_VERSION_megaparsec(6,0,0)
+#if MIN_VERSION_megaparsec(7,0,0)
+type C e s m = (MonadParsec e s m, Token s ~ Word8)
+type ParseError = MegaParsec.ParseErrorBundle BL.ByteString Void
+#elif MIN_VERSION_megaparsec(6,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Word8)
 type ParseError = MegaParsec.ParseError Word8 Void
 #elif MIN_VERSION_megaparsec(5,0,0)
@@ -96,6 +99,11 @@ type ParseError = MegaParsec.ParseError Char Dec
 #else
 type C e s m = (MonadParsec s m Char)
 type ParseError = MegaParsec.ParseError
+#endif
+
+#if MIN_VERSION_megaparsec(7,0,0)
+anyChar :: C e s m => m Word8
+anyChar = anySingle
 #endif
 
 -- ---------------------------------------------------------------------------

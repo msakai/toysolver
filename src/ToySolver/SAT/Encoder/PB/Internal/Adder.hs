@@ -24,6 +24,7 @@ module ToySolver.SAT.Encoder.PB.Internal.Adder
 import Control.Monad
 import Control.Monad.Primitive
 import Data.Bits
+import Data.Maybe
 import Data.Primitive.MutVar
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
@@ -103,19 +104,19 @@ encodePBLinSumAdder enc lhs = do
               b <- Tseitin.encodeDisj enc [] -- False
               loop (i+1) (b : ret)
             1 -> do
-              Just b <- SQ.dequeue q
+              b <- fromJust <$> SQ.dequeue q
               loop (i+1) (b : ret)
             2 -> do
-              Just b1 <- SQ.dequeue q
-              Just b2 <- SQ.dequeue q
+              b1 <- fromJust <$> SQ.dequeue q
+              b2 <- fromJust <$> SQ.dequeue q
               s <- encodeHASum enc b1 b2
               c <- encodeHACarry enc b1 b2
               insert (i+1) c
               loop (i+1) (s : ret)
             _ -> do
-              Just b1 <- SQ.dequeue q
-              Just b2 <- SQ.dequeue q
-              Just b3 <- SQ.dequeue q
+              b1 <- fromJust <$> SQ.dequeue q
+              b2 <- fromJust <$> SQ.dequeue q
+              b3 <- fromJust <$> SQ.dequeue q
               s <- Tseitin.encodeFASum enc b1 b2 b3
               c <- Tseitin.encodeFACarry enc b1 b2 b3
               insert i s
