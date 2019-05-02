@@ -6,6 +6,7 @@ module Test.SAT.Encoder (satEncoderTestGroup) where
 import Control.Monad
 import Data.Array.IArray
 import Data.List
+import Data.Maybe
 import qualified Data.Vector as V
 
 import Test.Tasty
@@ -20,6 +21,7 @@ import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import qualified ToySolver.SAT.Encoder.Cardinality as Cardinality
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PB.Internal.Sorter as PBEncSorter
 import qualified ToySolver.SAT.Store.CNF as CNFStore
@@ -158,6 +160,34 @@ prop_PBEncoder_Sorter_decode_encode =
          ==>
          (PBEncSorter.decode base . PBEncSorter.encode base) x == x
 
+prop_CardinalityEncoder_addAtLeast :: Property
+prop_CardinalityEncoder_addAtLeast = QM.monadicIO $ do
+  let nv = 4
+  (lhs,rhs) <- QM.pick $ do
+    lhs <- liftM catMaybes $ forM [1..nv] $ \i -> do
+      b <- arbitrary
+      if b then
+        Just <$> elements [i, -i]
+      else
+        return Nothing
+    rhs <- choose (-1, nv+2)
+    return $ (lhs, rhs)
+  strategy <- QM.pick arbitrary
+  (cnf,defs) <- QM.run $ do
+    db <- CNFStore.newCNFStore
+    SAT.newVars_ db nv
+    tseitin <- Tseitin.newEncoder db
+    card <- Cardinality.newEncoderWithStrategy tseitin strategy
+    SAT.addAtLeast card lhs rhs
+    cnf <- CNFStore.getCNFFormula db
+    defs <- Tseitin.getDefinitions tseitin
+    return (cnf, defs)
+  forM_ (allAssignments nv) $ \m -> do
+    let m2 :: Array SAT.Var Bool
+        m2 = array (1, CNF.cnfNumVars cnf) $ assocs m ++ [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs]
+        b1 = SAT.evalAtLeast m (lhs,rhs)
+        b2 = evalCNF (array (bounds m2) (assocs m2)) cnf
+    QM.assert $ b1 == b2
 
 satEncoderTestGroup :: TestTree
 satEncoderTestGroup = $(testGroupGenerator)
