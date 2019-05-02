@@ -365,6 +365,9 @@ Library
      ToySolver.SAT.Encoder.PB.Internal.BDD
      ToySolver.SAT.Encoder.PB.Internal.Sorter
      ToySolver.SAT.Encoder.PBNLC
+     ToySolver.SAT.Encoder.Cardinality
+     ToySolver.SAT.Encoder.Cardinality.Internal.Naive
+     ToySolver.SAT.Encoder.Cardinality.Internal.ParallelCounter
      ToySolver.SAT.Encoder.Tseitin
      ToySolver.SAT.ExistentialQuantification
      ToySolver.SAT.MessagePassing.SurveyPropagation

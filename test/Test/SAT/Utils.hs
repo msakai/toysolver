@@ -18,6 +18,7 @@ import qualified Test.QuickCheck.Monadic as QM
 
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
+import qualified ToySolver.SAT.Encoder.Cardinality as Cardinality
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
@@ -489,6 +490,9 @@ arbitraryOptimizer solver obj = do
     return opt
 
 instance Arbitrary PBO.Method where
+  arbitrary = arbitraryBoundedEnum
+
+instance Arbitrary Cardinality.Strategy where
   arbitrary = arbitraryBoundedEnum
 
 instance Arbitrary PB.Strategy where
