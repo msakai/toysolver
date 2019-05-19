@@ -56,6 +56,10 @@ module ToySolver.Converter.PB
   , MaxSAT2WBOInfo
   , wbo2maxsat
   , WBO2MaxSATInfo
+
+  -- * PB→QUBO conversion
+  , pb2qubo'
+  , PB2QUBOInfo'
   ) where
 
 import Control.Monad
@@ -393,6 +397,16 @@ unconstrainPB' formula =
               guard $ not $ isFalse ls3
               return (ls3, c1*c2)
     isFalse ls = not $ IntSet.null $ ls `IntSet.intersection` IntSet.map negate ls
+
+-- -----------------------------------------------------------------------------
+
+pb2qubo' :: PBFile.Formula -> ((PBFile.Formula, Integer), PB2QUBOInfo')
+pb2qubo' formula = ((formula2, min th1 th2), ComposedTransformer info1 info2)
+  where
+    ((formula1, th1), info1) = unconstrainPB formula
+    ((formula2, th2), info2) = quadratizePB formula1
+
+type PB2QUBOInfo' = ComposedTransformer PBUnconstrainInfo PBQuadratizeInfo
 
 -- -----------------------------------------------------------------------------
 
