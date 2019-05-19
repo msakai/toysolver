@@ -114,6 +114,16 @@ instance BackwardTransformer PBOAsQUBOInfo where
     where
       (lb,ub) = bounds sol
 
+instance ObjValueTransformer PBOAsQUBOInfo where
+  type SourceObjValue PBOAsQUBOInfo = Integer
+  type TargetObjValue PBOAsQUBOInfo = Integer
+
+instance ObjValueForwardTransformer PBOAsQUBOInfo where
+  transformObjValueForward (PBOAsQUBOInfo offset) obj = obj - offset
+
+instance ObjValueBackwardTransformer PBOAsQUBOInfo where
+  transformObjValueBackward (PBOAsQUBOInfo offset) obj = obj + offset
+
 -- -----------------------------------------------------------------------------
 
 qubo2ising :: (Eq a, Show a, Fractional a) => QUBO.Problem a -> (QUBO.IsingModel a, QUBO2IsingInfo a)
