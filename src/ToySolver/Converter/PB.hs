@@ -30,6 +30,10 @@ module ToySolver.Converter.PB
   , quadratizePB
   , PBQuadratizeInfo
 
+  -- * Converting inequality constraints into equality constraints
+  , inequalitiesToEqualitiesPB
+  , PBInequalitiesToEqualitiesInfo
+
   -- * PB↔WBO conversion
   , pb2wbo
   , PB2WBOInfo
@@ -54,6 +58,7 @@ import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Array.IArray
+import Data.Bits
 import qualified Data.Foldable as F
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -271,6 +276,61 @@ collectDegGe3Terms formula = Set.fromList [t' | t <- terms, let t' = IntSet.from
     terms = [t | s <- sums, (_,t) <- s]
 
 type PBQuadratizeInfo = TseitinInfo
+
+-- -----------------------------------------------------------------------------
+
+-- | Convert inequality constraints into equality constraints by introducing surpass variables.
+inequalitiesToEqualitiesPB :: PBFile.Formula -> (PBFile.Formula, PBInequalitiesToEqualitiesInfo)
+inequalitiesToEqualitiesPB formula = runST $ do
+  db <- newPBStore
+  SAT.newVars_ db (PBFile.pbNumVars formula)
+
+  defs <- liftM catMaybes $ forM (PBFile.pbConstraints formula) $ \constr -> do
+    case constr of
+      (lhs, PBFile.Eq, rhs) -> do
+        SAT.addPBNLExactly db lhs rhs
+        return Nothing
+      (lhs, PBFile.Ge, rhs) -> do
+        let ub = sum [c | (c, _) <- lhs, c >= 0]
+            maxSurpass = max (ub - rhs) 0
+            maxSurpassNBits = head [i | i <- [0..], maxSurpass < bit i]
+        vs <- SAT.newVars db maxSurpassNBits
+        SAT.addPBNLExactly db (lhs ++ [(-c,[x]) | (c,x) <- zip (iterate (*2) 1) vs]) rhs
+        if maxSurpassNBits > 0 then do
+          return $ Just (lhs, rhs, vs)
+        else
+          return Nothing
+
+  formula' <- getPBFormula db
+  return
+    ( formula'{ PBFile.pbObjectiveFunction = PBFile.pbObjectiveFunction formula }
+    , PBInequalitiesToEqualitiesInfo (PBFile.pbNumVars formula) (PBFile.pbNumVars formula') defs
+    )
+
+data PBInequalitiesToEqualitiesInfo
+  = PBInequalitiesToEqualitiesInfo !Int !Int [(PBFile.Sum, Integer, [SAT.Var])]
+  deriving (Eq, Show)
+
+instance Transformer PBInequalitiesToEqualitiesInfo where
+  type Source PBInequalitiesToEqualitiesInfo = SAT.Model
+  type Target PBInequalitiesToEqualitiesInfo = SAT.Model
+
+instance ForwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformForward (PBInequalitiesToEqualitiesInfo _nv1 nv2 defs) m =
+    array (1, nv2) $ assocs m ++ [(v, testBit n i) | (lhs, rhs, vs) <- defs, let n = SAT.evalPBSum m lhs - rhs, (i,v) <- zip [0..] vs]
+
+instance BackwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformBackward (PBInequalitiesToEqualitiesInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
+
+instance ObjValueTransformer PBInequalitiesToEqualitiesInfo where
+  type SourceObjValue PBInequalitiesToEqualitiesInfo = Integer
+  type TargetObjValue PBInequalitiesToEqualitiesInfo = Integer
+
+instance ObjValueForwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformObjValueBackward _ = id
 
 -- -----------------------------------------------------------------------------
 
