@@ -5,6 +5,8 @@ module Test.QUBO (quboTestGroup) where
 import Control.Monad
 import Data.Array.IArray
 import qualified Data.IntMap.Strict as IntMap
+import Data.Maybe
+import qualified Data.PseudoBoolean as PBFile
     
 import Test.Tasty
 import Test.Tasty.QuickCheck
@@ -15,6 +17,9 @@ import qualified Test.QuickCheck.Monadic as QM
 import ToySolver.Converter
 import qualified ToySolver.QUBO as QUBO
 import ToySolver.Converter.QUBO
+import qualified ToySolver.SAT.Types as SAT
+
+import Test.SAT.Utils
 
 ------------------------------------------------------------------------
 
@@ -69,6 +74,20 @@ prop_qubo2pbo :: Property
 prop_qubo2pbo = forAll arbitrary $ \qubo ->
   let (pbo,_) = qubo2pbo qubo
    in Just qubo === fmap fst (pboAsQUBO pbo)
+
+prop_pb2qubo :: Property
+prop_pb2qubo = forAll arbitraryPBFormula $ \formula ->
+  let ((qubo,th), info) = pb2qubo formula
+   in counterexample (show (qubo,th,info)) $
+        conjoin
+        [ forAll (arbitraryAssignment (PBFile.pbNumVars formula)) $ \m ->
+            isJust (SAT.evalPBFormula m formula) === (QUBO.eval (transformForward info m) qubo <= th)
+        , forAll (arbitrarySolution (QUBO.quboNumVars qubo)) $ \sol ->
+            if QUBO.eval sol qubo <= th then
+              isJust (SAT.evalPBFormula (transformBackward info sol) formula)
+            else
+              True
+        ]
 
 prop_qubo2ising :: Property
 prop_qubo2ising = forAll arbitrary $ \(qubo :: QUBO.Problem Rational) ->
