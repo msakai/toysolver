@@ -81,12 +81,23 @@ prop_pb2qubo = forAll arbitraryPBFormula $ \formula ->
    in counterexample (show (qubo,th,info)) $
         conjoin
         [ forAll (arbitraryAssignment (PBFile.pbNumVars formula)) $ \m ->
-            isJust (SAT.evalPBFormula m formula) === (QUBO.eval (transformForward info m) qubo <= th)
+            case SAT.evalPBFormula m formula of
+              Nothing ->
+                property (QUBO.eval (transformForward info m) qubo > th)
+              Just o ->
+                conjoin
+                [ QUBO.eval (transformForward info m) qubo === transformObjValueForward info o
+                , transformObjValueBackward info (transformObjValueForward info o) === o
+                , property (transformObjValueForward info o <= th)
+                ]
         , forAll (arbitrarySolution (QUBO.quboNumVars qubo)) $ \sol ->
-            if QUBO.eval sol qubo <= th then
-              isJust (SAT.evalPBFormula (transformBackward info sol) formula)
-            else
-              True
+            let o = QUBO.eval sol qubo
+             in if (o <= th) then
+                  (SAT.evalPBFormula (transformBackward info sol) formula === Just (transformObjValueBackward info o))
+                  .&&.
+                  transformObjValueForward info (transformObjValueBackward info o) === o
+                else
+                  property True
         ]
 
 prop_qubo2ising :: Property
