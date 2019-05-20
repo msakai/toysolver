@@ -204,7 +204,7 @@ quadratizePB formula =
       }
     , maxObj
     )
-  , TseitinInfo nv1 nv2 [(v, And [Atom l1, Atom l2]) | (v, (l1,l2)) <- prodDefs]
+  , PBQuadratizeInfo $ TseitinInfo nv1 nv2 [(v, And [Atom l1, Atom l2]) | (v, (l1,l2)) <- prodDefs]
   )
   where
     nv1 = PBFile.pbNumVars formula
@@ -283,7 +283,28 @@ collectDegGe3Terms formula = Set.fromList [t' | t <- terms, let t' = IntSet.from
            [lhs | (lhs,_,_) <- PBFile.pbConstraints formula]
     terms = [t | s <- sums, (_,t) <- s]
 
-type PBQuadratizeInfo = TseitinInfo
+newtype PBQuadratizeInfo = PBQuadratizeInfo TseitinInfo
+  deriving (Eq, Show)
+
+instance Transformer PBQuadratizeInfo where
+  type Source PBQuadratizeInfo = SAT.Model
+  type Target PBQuadratizeInfo = SAT.Model
+
+instance ForwardTransformer PBQuadratizeInfo where
+  transformForward (PBQuadratizeInfo info) = transformForward info
+
+instance BackwardTransformer PBQuadratizeInfo where
+  transformBackward (PBQuadratizeInfo info) = transformBackward info
+
+instance ObjValueTransformer PBQuadratizeInfo where
+  type SourceObjValue PBQuadratizeInfo = Integer
+  type TargetObjValue PBQuadratizeInfo = Integer
+
+instance ObjValueForwardTransformer PBQuadratizeInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer PBQuadratizeInfo where
+  transformObjValueBackward _ = id
 
 -- -----------------------------------------------------------------------------
 
