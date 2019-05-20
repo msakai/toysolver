@@ -307,6 +307,43 @@ prop_quadratizePB =
       guard $ o <= th
       return o
 
+prop_inequalitiesToEqualitiesPB :: Property
+prop_inequalitiesToEqualitiesPB = QM.monadicIO $ do
+  pb@(nv,cs) <- QM.pick arbitraryPBNLC
+  let f (PBRelGE,lhs,rhs) = ([(c,ls) | (c,ls) <- lhs], PBFile.Ge, rhs)
+      f (PBRelLE,lhs,rhs) = ([(-c,ls) | (c,ls) <- lhs], PBFile.Ge, -rhs)
+      f (PBRelEQ,lhs,rhs) = ([(c,ls) | (c,ls) <- lhs], PBFile.Eq, rhs)
+  let opb = PBFile.Formula
+            { PBFile.pbObjectiveFunction = Nothing
+            , PBFile.pbNumVars = nv
+            , PBFile.pbNumConstraints = length cs
+            , PBFile.pbConstraints = map f cs
+            }
+  QM.monitor $ counterexample (show opb)
+  let (opb2, info) = inequalitiesToEqualitiesPB opb
+      pb2 = (PBFile.pbNumVars opb2, [(g op, lhs, rhs) | (lhs,op,rhs) <- PBFile.pbConstraints opb2])
+      g PBFile.Ge = PBRelGE
+      g PBFile.Eq = PBRelEQ
+  QM.monitor $ counterexample (show opb2)
+
+  solver1 <- arbitrarySolver
+  solver2 <- arbitrarySolver
+  ret1 <- QM.run $ solvePBNLC solver1 pb
+  ret2 <- QM.run $ solvePBNLC solver2 pb2
+  QM.assert $ isJust ret1 == isJust ret2
+  case ret1 of
+    Nothing -> return ()
+    Just m1 -> do
+      let m2 = transformForward info m1
+      QM.assert $ bounds m2 == (1, PBFile.pbNumVars opb2)
+      QM.assert $ evalPBNLC m2 pb2
+  case ret2 of
+    Nothing -> return ()
+    Just m2 -> do
+      let m1 = transformBackward info m2
+      QM.assert $ bounds m1 == (1, nv)
+      QM.assert $ evalPBNLC m1 pb
+
 
 converterTestGroup :: TestTree
 converterTestGroup = $(testGroupGenerator)

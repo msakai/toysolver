@@ -30,6 +30,14 @@ module ToySolver.Converter.PB
   , quadratizePB
   , PBQuadratizeInfo
 
+  -- * Converting inequality constraints into equality constraints
+  , inequalitiesToEqualitiesPB
+  , PBInequalitiesToEqualitiesInfo
+
+  -- * Converting constraints into penalty terms in objective function
+  , unconstrainPB
+  , PBUnconstrainInfo
+
   -- * PB↔WBO conversion
   , pb2wbo
   , PB2WBOInfo
@@ -48,12 +56,17 @@ module ToySolver.Converter.PB
   , MaxSAT2WBOInfo
   , wbo2maxsat
   , WBO2MaxSATInfo
+
+  -- * PB→QUBO conversion
+  , pb2qubo'
+  , PB2QUBOInfo'
   ) where
 
 import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Array.IArray
+import Data.Bits
 import qualified Data.Foldable as F
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -191,7 +204,7 @@ quadratizePB formula =
       }
     , maxObj
     )
-  , TseitinInfo nv1 nv2 [(v, And [Atom l1, Atom l2]) | (v, (l1,l2)) <- prodDefs]
+  , PBQuadratizeInfo $ TseitinInfo nv1 nv2 [(v, And [Atom l1, Atom l2]) | (v, (l1,l2)) <- prodDefs]
   )
   where
     nv1 = PBFile.pbNumVars formula
@@ -270,7 +283,151 @@ collectDegGe3Terms formula = Set.fromList [t' | t <- terms, let t' = IntSet.from
            [lhs | (lhs,_,_) <- PBFile.pbConstraints formula]
     terms = [t | s <- sums, (_,t) <- s]
 
-type PBQuadratizeInfo = TseitinInfo
+newtype PBQuadratizeInfo = PBQuadratizeInfo TseitinInfo
+  deriving (Eq, Show)
+
+instance Transformer PBQuadratizeInfo where
+  type Source PBQuadratizeInfo = SAT.Model
+  type Target PBQuadratizeInfo = SAT.Model
+
+instance ForwardTransformer PBQuadratizeInfo where
+  transformForward (PBQuadratizeInfo info) = transformForward info
+
+instance BackwardTransformer PBQuadratizeInfo where
+  transformBackward (PBQuadratizeInfo info) = transformBackward info
+
+instance ObjValueTransformer PBQuadratizeInfo where
+  type SourceObjValue PBQuadratizeInfo = Integer
+  type TargetObjValue PBQuadratizeInfo = Integer
+
+instance ObjValueForwardTransformer PBQuadratizeInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer PBQuadratizeInfo where
+  transformObjValueBackward _ = id
+
+-- -----------------------------------------------------------------------------
+
+-- | Convert inequality constraints into equality constraints by introducing surpass variables.
+inequalitiesToEqualitiesPB :: PBFile.Formula -> (PBFile.Formula, PBInequalitiesToEqualitiesInfo)
+inequalitiesToEqualitiesPB formula = runST $ do
+  db <- newPBStore
+  SAT.newVars_ db (PBFile.pbNumVars formula)
+
+  defs <- liftM catMaybes $ forM (PBFile.pbConstraints formula) $ \constr -> do
+    case constr of
+      (lhs, PBFile.Eq, rhs) -> do
+        SAT.addPBNLExactly db lhs rhs
+        return Nothing
+      (lhs, PBFile.Ge, rhs) -> do
+        let ub = sum [c | (c, _) <- lhs, c >= 0]
+            maxSurpass = max (ub - rhs) 0
+            maxSurpassNBits = head [i | i <- [0..], maxSurpass < bit i]
+        vs <- SAT.newVars db maxSurpassNBits
+        SAT.addPBNLExactly db (lhs ++ [(-c,[x]) | (c,x) <- zip (iterate (*2) 1) vs]) rhs
+        if maxSurpassNBits > 0 then do
+          return $ Just (lhs, rhs, vs)
+        else
+          return Nothing
+
+  formula' <- getPBFormula db
+  return
+    ( formula'{ PBFile.pbObjectiveFunction = PBFile.pbObjectiveFunction formula }
+    , PBInequalitiesToEqualitiesInfo (PBFile.pbNumVars formula) (PBFile.pbNumVars formula') defs
+    )
+
+data PBInequalitiesToEqualitiesInfo
+  = PBInequalitiesToEqualitiesInfo !Int !Int [(PBFile.Sum, Integer, [SAT.Var])]
+  deriving (Eq, Show)
+
+instance Transformer PBInequalitiesToEqualitiesInfo where
+  type Source PBInequalitiesToEqualitiesInfo = SAT.Model
+  type Target PBInequalitiesToEqualitiesInfo = SAT.Model
+
+instance ForwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformForward (PBInequalitiesToEqualitiesInfo _nv1 nv2 defs) m =
+    array (1, nv2) $ assocs m ++ [(v, testBit n i) | (lhs, rhs, vs) <- defs, let n = SAT.evalPBSum m lhs - rhs, (i,v) <- zip [0..] vs]
+
+instance BackwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformBackward (PBInequalitiesToEqualitiesInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
+
+instance ObjValueTransformer PBInequalitiesToEqualitiesInfo where
+  type SourceObjValue PBInequalitiesToEqualitiesInfo = Integer
+  type TargetObjValue PBInequalitiesToEqualitiesInfo = Integer
+
+instance ObjValueForwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformObjValueBackward _ = id
+
+-- -----------------------------------------------------------------------------
+
+unconstrainPB :: PBFile.Formula -> ((PBFile.Formula, Integer), PBUnconstrainInfo)
+unconstrainPB formula = (unconstrainPB' formula', PBUnconstrainInfo info)
+  where
+    (formula', info) = inequalitiesToEqualitiesPB formula
+
+newtype PBUnconstrainInfo = PBUnconstrainInfo PBInequalitiesToEqualitiesInfo
+  deriving (Eq, Show)
+
+instance Transformer PBUnconstrainInfo where
+  -- type Source PBUnconstrainInfo = Source PBInequalitiesToEqualitiesInfo
+  type Source PBUnconstrainInfo = SAT.Model
+  -- type Target PBUnconstrainInfo = Target PBInequalitiesToEqualitiesInfo
+  type Target PBUnconstrainInfo = SAT.Model
+
+instance ForwardTransformer PBUnconstrainInfo where
+  transformForward (PBUnconstrainInfo info) = transformForward info
+
+instance BackwardTransformer PBUnconstrainInfo where
+  transformBackward (PBUnconstrainInfo info) = transformBackward info
+
+instance ObjValueTransformer PBUnconstrainInfo where
+  -- type SourceObjValue PBUnconstrainInfo = SourceObjValue PBInequalitiesToEqualitiesInfo
+  type SourceObjValue PBUnconstrainInfo = Integer
+  -- type TargetObjValue PBUnconstrainInfo = TargetObjValue PBInequalitiesToEqualitiesInfo
+  type TargetObjValue PBUnconstrainInfo = Integer
+
+instance ObjValueForwardTransformer PBUnconstrainInfo where
+  transformObjValueForward (PBUnconstrainInfo info) = transformObjValueForward info
+
+instance ObjValueBackwardTransformer PBUnconstrainInfo where
+  transformObjValueBackward (PBUnconstrainInfo info) = transformObjValueBackward info
+
+unconstrainPB' :: PBFile.Formula -> (PBFile.Formula, Integer)
+unconstrainPB' formula =
+  ( formula
+    { PBFile.pbObjectiveFunction = Just $ obj1 ++ obj2
+    , PBFile.pbConstraints = []
+    , PBFile.pbNumConstraints = 0
+    }
+  , obj1ub
+  )
+  where
+    obj1 = fromMaybe [] (PBFile.pbObjectiveFunction formula)
+    obj1ub = sum [c | (c, _) <- obj1, c > 0]
+    obj1lb = sum [c | (c, _) <- obj1, c < 0]
+    p = obj1ub - obj1lb + 1
+    obj2 = [(p*c, IntSet.toList ls) | (ls, c) <- Map.toList obj2', c /= 0]
+    obj2' = Map.unionsWith (+) [sq ((-rhs, []) : lhs) | (lhs, PBFile.Eq, rhs) <- PBFile.pbConstraints formula]
+    sq ts = Map.fromListWith (+) $ do
+              (c1,ls1) <- ts
+              (c2,ls2) <- ts
+              let ls3 = IntSet.fromList ls1 `IntSet.union` IntSet.fromList ls2
+              guard $ not $ isFalse ls3
+              return (ls3, c1*c2)
+    isFalse ls = not $ IntSet.null $ ls `IntSet.intersection` IntSet.map negate ls
+
+-- -----------------------------------------------------------------------------
+
+pb2qubo' :: PBFile.Formula -> ((PBFile.Formula, Integer), PB2QUBOInfo')
+pb2qubo' formula = ((formula2, min th1 th2), ComposedTransformer info1 info2)
+  where
+    ((formula1, th1), info1) = unconstrainPB formula
+    ((formula2, th2), info2) = quadratizePB formula1
+
+type PB2QUBOInfo' = ComposedTransformer PBUnconstrainInfo PBQuadratizeInfo
 
 -- -----------------------------------------------------------------------------
 

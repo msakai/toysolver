@@ -15,6 +15,9 @@ module ToySolver.Converter.QUBO
   ( qubo2pbo
   , QUBO2PBOInfo (..)
 
+  , pb2qubo
+  , PB2QUBOInfo
+
   , pboAsQUBO
   , PBOAsQUBOInfo (..)
 
@@ -34,6 +37,7 @@ import Data.List
 import Data.Maybe
 import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Converter.Base
+import ToySolver.Converter.PB (pb2qubo', PB2QUBOInfo')
 import qualified ToySolver.QUBO as QUBO
 import qualified ToySolver.SAT.Types as SAT
 
@@ -113,6 +117,26 @@ instance BackwardTransformer PBOAsQUBOInfo where
   transformBackward (PBOAsQUBOInfo _offset) sol = ixmap (lb+1,ub+1) (subtract 1) sol
     where
       (lb,ub) = bounds sol
+
+instance ObjValueTransformer PBOAsQUBOInfo where
+  type SourceObjValue PBOAsQUBOInfo = Integer
+  type TargetObjValue PBOAsQUBOInfo = Integer
+
+instance ObjValueForwardTransformer PBOAsQUBOInfo where
+  transformObjValueForward (PBOAsQUBOInfo offset) obj = obj - offset
+
+instance ObjValueBackwardTransformer PBOAsQUBOInfo where
+  transformObjValueBackward (PBOAsQUBOInfo offset) obj = obj + offset
+
+-- -----------------------------------------------------------------------------
+
+pb2qubo :: PBFile.Formula -> ((QUBO.Problem Integer, Integer), PB2QUBOInfo)
+pb2qubo formula = ((qubo, th - offset), ComposedTransformer info1 info2)
+  where
+    ((qubo', th), info1) = pb2qubo' formula
+    Just (qubo, info2@(PBOAsQUBOInfo offset)) = pboAsQUBO qubo'
+
+type PB2QUBOInfo = ComposedTransformer PB2QUBOInfo' PBOAsQUBOInfo
 
 -- -----------------------------------------------------------------------------
 
