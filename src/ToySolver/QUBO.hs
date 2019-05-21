@@ -1,4 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.QUBO
@@ -7,7 +9,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable
 -- 
 -----------------------------------------------------------------------------
 module ToySolver.QUBO
@@ -23,8 +25,14 @@ module ToySolver.QUBO
 
 import Control.Monad
 import Data.Array.Unboxed
+import Data.ByteString.Builder
+import Data.ByteString.Builder.Scientific
+import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import Data.Monoid
+import Data.Scientific
+import ToySolver.FileFormat.Base
 
 -- | QUBO (quadratic unconstrained boolean optimization) problem.
 --
@@ -46,6 +54,57 @@ instance Functor Problem where
     { quboNumVars = quboNumVars prob
     , quboMatrix = fmap (fmap f) (quboMatrix prob)
     }
+
+parseProblem :: (BS.ByteString -> a) -> BS.ByteString -> Either String (Problem a)
+parseProblem f s = 
+  case BS.words l of
+    ["p", filetype, topology, maxNodes, _nNodes, _nCouplers] ->
+      if filetype /= "qubo" then
+        Left $ "unknown filetype: " ++ BS.unpack filetype
+      else if topology /= "0" && topology /= "unconstrained" then
+        Left $ "unknown topology: " ++ BS.unpack topology
+      else
+        Right $ Problem
+        { quboNumVars = read (BS.unpack maxNodes)
+        , quboMatrix =
+            IntMap.unionsWith IntMap.union $ do
+              l <- ls
+              case BS.words l of
+                [i, j, v] -> return $ IntMap.singleton (read (BS.unpack i)) $ IntMap.singleton (read (BS.unpack j)) $ f v
+        }
+  where
+    (l:ls) = filter (not . isCommentBS) (BS.lines s)
+
+    isCommentBS :: BS.ByteString -> Bool
+    isCommentBS s =
+      case BS.uncons s of
+        Just ('c',_) ->  True
+        _ -> False
+
+renderProblem :: (a -> Builder) -> Problem a -> Builder
+renderProblem f prob = header
+    <> mconcat [ intDec i <> char7 ' ' <> intDec i <> char7 ' ' <> f val <> char7 '\n'
+               | (i,val) <- IntMap.toList nodes
+               ]
+    <> mconcat [intDec i <> char7 ' ' <> intDec j <> char7 ' ' <> f val <> char7 '\n'
+               | (i,row) <- IntMap.toList couplers, (j,val) <- IntMap.toList row
+               ]
+  where
+    nodes = IntMap.mapMaybeWithKey IntMap.lookup (quboMatrix prob)
+    nNodes = IntMap.size nodes
+    couplers = IntMap.mapWithKey IntMap.delete (quboMatrix prob)
+    nCouplers = sum [IntMap.size row | row <- IntMap.elems couplers]
+    header = mconcat
+      ["p qubo 0 "
+      , intDec (quboNumVars prob), char7 ' '
+      , intDec nNodes, char7 ' '
+      , intDec nCouplers, char7 '\n'
+      ]
+
+instance FileFormat (Problem Scientific) where
+  parse = parseProblem (read . BS.unpack)
+  render = renderProblem scientificBuilder
+
 
 type Solution = UArray Int Bool
 
