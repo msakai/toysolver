@@ -342,6 +342,9 @@ writeProblem o problem = do
             F.mapM_ (hSetEncoding h) enc
             TLIO.hPutStr h $ TextBuilder.toLazyText $
               MIP2SMT.mip2smt mip2smtOpt{ MIP2SMT.optLanguage = lang } (fmap toRational lp)
+        ".qubo" ->
+          case pb2qubo opb of
+            ((qubo, _th), _) -> FF.writeFile fname (fmap (fromInteger :: Integer -> Scientific) qubo)
         ext -> do
           error $ "unknown file extension: " ++ show ext
 
