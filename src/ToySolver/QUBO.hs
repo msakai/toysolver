@@ -40,6 +40,13 @@ data Problem a
   }
   deriving (Eq, Show)
 
+instance Functor Problem where
+  fmap f prob =
+    Problem
+    { quboNumVars = quboNumVars prob
+    , quboMatrix = fmap (fmap f) (quboMatrix prob)
+    }
+
 type Solution = UArray Int Bool
 
 eval :: Num a => Solution -> Problem a -> a
