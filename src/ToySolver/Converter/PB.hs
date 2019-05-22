@@ -320,21 +320,43 @@ inequalitiesToEqualitiesPB formula = runST $ do
         SAT.addPBNLExactly db lhs rhs
         return Nothing
       (lhs, PBFile.Ge, rhs) -> do
-        let ub = sum [c | (c, _) <- lhs, c >= 0]
-            maxSurpass = max (ub - rhs) 0
-            maxSurpassNBits = head [i | i <- [0..], maxSurpass < bit i]
-        vs <- SAT.newVars db maxSurpassNBits
-        SAT.addPBNLExactly db (lhs ++ [(-c,[x]) | (c,x) <- zip (iterate (*2) 1) vs]) rhs
-        if maxSurpassNBits > 0 then do
-          return $ Just (lhs, rhs, vs)
-        else
-          return Nothing
+        case asClause (lhs,rhs) of
+          Just clause -> do
+            SAT.addPBNLExactly db [(1, [- l | l <- clause])] 0
+            return Nothing
+          Nothing -> do
+            let ub = sum [c | (c, _) <- lhs, c >= 0]
+                maxSurpass = max (ub - rhs) 0
+                maxSurpassNBits = head [i | i <- [0..], maxSurpass < bit i]
+            vs <- SAT.newVars db maxSurpassNBits
+            SAT.addPBNLExactly db (lhs ++ [(-c,[x]) | (c,x) <- zip (iterate (*2) 1) vs]) rhs
+            if maxSurpassNBits > 0 then do
+              return $ Just (lhs, rhs, vs)
+            else
+              return Nothing
 
   formula' <- getPBFormula db
   return
     ( formula'{ PBFile.pbObjectiveFunction = PBFile.pbObjectiveFunction formula }
     , PBInequalitiesToEqualitiesInfo (PBFile.pbNumVars formula) (PBFile.pbNumVars formula') defs
     )
+  where
+    asLinSum :: SAT.PBSum -> Maybe (SAT.PBLinSum, Integer)
+    asLinSum s = do
+      ret <- forM s $ \(c, ls) -> do
+        case ls of
+          [] -> return (Nothing, c)
+          [l] -> return (Just (c,l), 0)
+          _ -> mzero
+      return (catMaybes (map fst ret), sum (map snd ret))
+
+    asClause :: (SAT.PBSum, Integer) -> Maybe SAT.Clause
+    asClause (lhs, rhs) = do
+      (lhs', off) <- asLinSum lhs
+      let rhs' = rhs - off
+      case SAT.normalizePBLinAtLeast (lhs', rhs') of
+        (lhs'', 1) | all (\(c,_) -> c == 1) lhs'' -> return (map snd lhs'')
+        _ -> mzero
 
 data PBInequalitiesToEqualitiesInfo
   = PBInequalitiesToEqualitiesInfo !Int !Int [(PBFile.Sum, Integer, [SAT.Var])]

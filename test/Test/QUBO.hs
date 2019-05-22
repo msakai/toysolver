@@ -4,10 +4,12 @@ module Test.QUBO (quboTestGroup) where
 
 import Control.Monad
 import Data.Array.IArray
+import Data.ByteString.Builder
 import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe
 import qualified Data.PseudoBoolean as PBFile
-    
+import Data.Scientific
+
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
@@ -15,6 +17,7 @@ import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
 import ToySolver.Converter
+import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.QUBO as QUBO
 import ToySolver.Converter.QUBO
 import qualified ToySolver.SAT.Types as SAT
@@ -67,6 +70,17 @@ instance (Arbitrary a, Eq a, Num a) => Arbitrary (QUBO.IsingModel a) where
     where
       f = IntMap.mapMaybe (g . IntMap.filter (/= 0))
       g m = if IntMap.null m then Nothing else Just m
+
+------------------------------------------------------------------------
+
+prop_QUBO_ReadWrite_Invariance :: Property
+prop_QUBO_ReadWrite_Invariance = forAll g $ \qubo ->
+  let s = toLazyByteString (FF.render qubo)
+   in counterexample (show s) $ FF.parse s === Right qubo
+  where
+    g = do
+      qubo <- arbitrary
+      return $ fmap fromFloatDigits (qubo :: QUBO.Problem Double)
 
 ------------------------------------------------------------------------
 

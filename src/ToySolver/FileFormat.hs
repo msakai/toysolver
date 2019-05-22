@@ -19,6 +19,7 @@ import qualified Data.PseudoBoolean.Attoparsec as PBFileAttoparsec
 import qualified Data.PseudoBoolean.ByteStringBuilder as PBFileBB
 import ToySolver.FileFormat.Base
 import ToySolver.FileFormat.CNF () -- importing instances
+import ToySolver.QUBO () -- importing instances
 
 instance FileFormat PBFile.Formula where
   parse = PBFileAttoparsec.parseOPBByteString
