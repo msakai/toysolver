@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +9,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable
 -- 
 -----------------------------------------------------------------------------
 module ToySolver.Converter.QUBO
@@ -36,6 +37,7 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.List
 import Data.Maybe
 import qualified Data.PseudoBoolean as PBFile
+import Data.Ratio
 import ToySolver.Converter.Base
 import ToySolver.Converter.PB (pb2qubo', PB2QUBOInfo')
 import qualified ToySolver.QUBO as QUBO
@@ -43,47 +45,60 @@ import qualified ToySolver.SAT.Types as SAT
 
 -- -----------------------------------------------------------------------------
 
-qubo2pbo :: QUBO.Problem Integer -> (PBFile.Formula, QUBO2PBOInfo)
+qubo2pbo :: Real a => QUBO.Problem a -> (PBFile.Formula, QUBO2PBOInfo a)
 qubo2pbo prob =
   ( PBFile.Formula
     { PBFile.pbObjectiveFunction = Just $
         [ (c, if x1==x2 then [x1+1] else [x1+1, x2+1])
-        | (x1, row) <- IntMap.toList $ QUBO.quboMatrix prob
+        | (x1, row) <- IntMap.toList m2
         , (x2, c) <- IntMap.toList row
         ]
     , PBFile.pbConstraints = []
     , PBFile.pbNumVars = QUBO.quboNumVars prob
     , PBFile.pbNumConstraints = 0
     }
-  , QUBO2PBOInfo
+  , QUBO2PBOInfo d
   )
+  where
+    m1 = fmap (fmap toRational) $ QUBO.quboMatrix prob
+    d = foldl' lcm 1 [denominator c | row <- IntMap.elems m1, c <- IntMap.elems row, c /= 0]
+    m2 = fmap (fmap (\c -> numerator c * (d ` div` denominator c))) m1
 
-data QUBO2PBOInfo = QUBO2PBOInfo
+newtype QUBO2PBOInfo a = QUBO2PBOInfo Integer
   deriving (Eq, Show, Read)
 
-instance Transformer QUBO2PBOInfo where
-  type Source QUBO2PBOInfo = QUBO.Solution
-  type Target QUBO2PBOInfo = SAT.Model
+instance (Eq a, Show a, Read a) => Transformer (QUBO2PBOInfo a) where
+  type Source (QUBO2PBOInfo a) = QUBO.Solution
+  type Target (QUBO2PBOInfo a) = SAT.Model
 
-instance ForwardTransformer QUBO2PBOInfo where
-  transformForward QUBO2PBOInfo sol = ixmap (lb+1,ub+1) (subtract 1) sol
+instance (Eq a, Show a, Read a) => ForwardTransformer (QUBO2PBOInfo a) where
+  transformForward (QUBO2PBOInfo _) sol = ixmap (lb+1,ub+1) (subtract 1) sol
     where
       (lb,ub) = bounds sol
 
-instance BackwardTransformer QUBO2PBOInfo where
-  transformBackward QUBO2PBOInfo m = ixmap (lb-1,ub-1) (+1) m
+instance (Eq a, Show a, Read a) => BackwardTransformer (QUBO2PBOInfo a) where
+  transformBackward (QUBO2PBOInfo _) m = ixmap (lb-1,ub-1) (+1) m
     where
       (lb,ub) = bounds m
 
+instance (Eq a, Show a, Read a) => ObjValueTransformer (QUBO2PBOInfo a) where
+  type SourceObjValue (QUBO2PBOInfo a) = a
+  type TargetObjValue (QUBO2PBOInfo a) = Integer
+
+instance (Eq a, Show a, Read a, Real a) => ObjValueForwardTransformer (QUBO2PBOInfo a) where
+  transformObjValueForward (QUBO2PBOInfo d) obj = round (toRational obj) * d
+
+instance (Eq a, Show a, Read a, Num a) => ObjValueBackwardTransformer (QUBO2PBOInfo a) where
+  transformObjValueBackward (QUBO2PBOInfo d) obj = fromInteger $ (obj + d - 1) `div` d
+
 -- -----------------------------------------------------------------------------
 
-pboAsQUBO :: PBFile.Formula -> Maybe (QUBO.Problem Integer, PBOAsQUBOInfo)
+pboAsQUBO :: forall a. Real a => PBFile.Formula -> Maybe (QUBO.Problem a, PBOAsQUBOInfo a)
 pboAsQUBO formula = do
   (prob, offset) <- runStateT body 0
   return $ (prob, PBOAsQUBOInfo offset)
   where
-
-    body :: StateT Integer Maybe (QUBO.Problem Integer)
+    body :: StateT Integer Maybe (QUBO.Problem a)
     body = do
       guard $ null (PBFile.pbConstraints formula)
       let f :: PBFile.WeightedTerm -> StateT Integer Maybe [(Integer, Int, Int)]
@@ -96,47 +111,47 @@ pboAsQUBO formula = do
         QUBO.Problem
         { QUBO.quboNumVars = PBFile.pbNumVars formula
         , QUBO.quboMatrix = mkMat $
-            [ (x1', x2', c)
+            [ (x1', x2', fromInteger c)
             | (c,x1,x2) <- concat xs, let x1' = min x1 x2 - 1, let x2' = max x1 x2 - 1
             ]
         }
 
-data PBOAsQUBOInfo = PBOAsQUBOInfo !Integer
+data PBOAsQUBOInfo a = PBOAsQUBOInfo !Integer
   deriving (Eq, Show, Read)
 
-instance Transformer PBOAsQUBOInfo where
-  type Source PBOAsQUBOInfo = SAT.Model
-  type Target PBOAsQUBOInfo = QUBO.Solution
+instance Transformer (PBOAsQUBOInfo a) where
+  type Source (PBOAsQUBOInfo a) = SAT.Model
+  type Target (PBOAsQUBOInfo a) = QUBO.Solution
 
-instance ForwardTransformer PBOAsQUBOInfo where
+instance ForwardTransformer (PBOAsQUBOInfo a) where
   transformForward (PBOAsQUBOInfo _offset) m = ixmap (lb-1,ub-1) (+1) m
     where
       (lb,ub) = bounds m
 
-instance BackwardTransformer PBOAsQUBOInfo where
+instance BackwardTransformer (PBOAsQUBOInfo a) where
   transformBackward (PBOAsQUBOInfo _offset) sol = ixmap (lb+1,ub+1) (subtract 1) sol
     where
       (lb,ub) = bounds sol
 
-instance ObjValueTransformer PBOAsQUBOInfo where
-  type SourceObjValue PBOAsQUBOInfo = Integer
-  type TargetObjValue PBOAsQUBOInfo = Integer
+instance ObjValueTransformer (PBOAsQUBOInfo a) where
+  type SourceObjValue (PBOAsQUBOInfo a) = Integer
+  type TargetObjValue (PBOAsQUBOInfo a) = a
 
-instance ObjValueForwardTransformer PBOAsQUBOInfo where
-  transformObjValueForward (PBOAsQUBOInfo offset) obj = obj - offset
+instance Num a => ObjValueForwardTransformer (PBOAsQUBOInfo a) where
+  transformObjValueForward (PBOAsQUBOInfo offset) obj = fromInteger (obj - offset)
 
-instance ObjValueBackwardTransformer PBOAsQUBOInfo where
-  transformObjValueBackward (PBOAsQUBOInfo offset) obj = obj + offset
+instance Real a => ObjValueBackwardTransformer (PBOAsQUBOInfo a) where
+  transformObjValueBackward (PBOAsQUBOInfo offset) obj = round (toRational obj) + offset
 
 -- -----------------------------------------------------------------------------
 
-pb2qubo :: PBFile.Formula -> ((QUBO.Problem Integer, Integer), PB2QUBOInfo)
-pb2qubo formula = ((qubo, th - offset), ComposedTransformer info1 info2)
+pb2qubo :: Real a => PBFile.Formula -> ((QUBO.Problem a, a), PB2QUBOInfo a)
+pb2qubo formula = ((qubo, fromInteger (th - offset)), ComposedTransformer info1 info2)
   where
     ((qubo', th), info1) = pb2qubo' formula
     Just (qubo, info2@(PBOAsQUBOInfo offset)) = pboAsQUBO qubo'
 
-type PB2QUBOInfo = ComposedTransformer PB2QUBOInfo' PBOAsQUBOInfo
+type PB2QUBOInfo a = ComposedTransformer PB2QUBOInfo' (PBOAsQUBOInfo a)
 
 -- -----------------------------------------------------------------------------
 

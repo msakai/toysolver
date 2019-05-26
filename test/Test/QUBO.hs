@@ -85,13 +85,13 @@ prop_QUBO_ReadWrite_Invariance = forAll g $ \qubo ->
 ------------------------------------------------------------------------
 
 prop_qubo2pbo :: Property
-prop_qubo2pbo = forAll arbitrary $ \qubo ->
+prop_qubo2pbo = forAll arbitrary $ \(qubo :: QUBO.Problem Integer) ->
   let (pbo,_) = qubo2pbo qubo
    in Just qubo === fmap fst (pboAsQUBO pbo)
 
 prop_pb2qubo :: Property
 prop_pb2qubo = forAll arbitraryPBFormula $ \formula ->
-  let ((qubo,th), info) = pb2qubo formula
+  let ((qubo :: QUBO.Problem Integer, th), info) = pb2qubo formula
    in counterexample (show (qubo,th,info)) $
         conjoin
         [ forAll (arbitraryAssignment (PBFile.pbNumVars formula)) $ \m ->
