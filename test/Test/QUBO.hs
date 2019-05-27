@@ -84,10 +84,10 @@ prop_QUBO_ReadWrite_Invariance = forAll g $ \qubo ->
 
 ------------------------------------------------------------------------
 
-prop_qubo2pbo :: Property
-prop_qubo2pbo = forAll arbitrary $ \(qubo :: QUBO.Problem Integer) ->
-  let (pbo,_) = qubo2pbo qubo
-   in Just qubo === fmap fst (pboAsQUBO pbo)
+prop_qubo2pb :: Property
+prop_qubo2pb = forAll arbitrary $ \(qubo :: QUBO.Problem Integer) ->
+  let (pbo,_) = qubo2pb qubo
+   in Just qubo === fmap fst (pbAsQUBO pbo)
 
 prop_pb2qubo :: Property
 prop_pb2qubo = forAll arbitraryPBFormula $ \formula ->
