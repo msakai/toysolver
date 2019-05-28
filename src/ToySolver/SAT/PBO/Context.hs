@@ -72,7 +72,7 @@ getSearchUpperBound ctx = do
   ret <- getBestValue ctx
   case ret of
     Just val -> return $ val - 1
-    Nothing -> return $ SAT.pbUpperBound $ getObjectiveFunction ctx
+    Nothing -> return $ SAT.pbLinUpperBound $ getObjectiveFunction ctx
 
 setFinished :: Context a => a -> IO ()
 setFinished cxt = do
@@ -151,7 +151,7 @@ newSimpleContext2 :: SAT.PBLinSum -> (SAT.Model -> Integer) -> IO SimpleContext
 newSimpleContext2 obj obj2 = do
   unsatRef <- newTVarIO False
   bestsolRef <- newTVarIO Nothing
-  lbRef <- newTVarIO $! SAT.pbLowerBound obj
+  lbRef <- newTVarIO $! SAT.pbLinLowerBound obj
 
   onUpdateBestSolRef <- newIORef $ \_ _ -> return ()
   onUpdateLBRef <- newIORef $ \_ -> return ()

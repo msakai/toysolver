@@ -157,14 +157,14 @@ case_cardinalityReduction = (sort lhs, rhs) @?= ([1,2,3,4,5],4)
   where
     (lhs, rhs) = SAT.cardinalityReduction ([(6,1),(5,2),(4,3),(3,4),(2,5),(1,6)], 17)
 
-case_pbSubsume_clause :: Assertion
-case_pbSubsume_clause = SAT.pbSubsume ([(1,1),(1,-3)],1) ([(1,1),(1,2),(1,-3),(1,4)],1) @?= True
+case_pbLinSubsume_clause :: Assertion
+case_pbLinSubsume_clause = SAT.pbLinSubsume ([(1,1),(1,-3)],1) ([(1,1),(1,2),(1,-3),(1,4)],1) @?= True
 
-case_pbSubsume_1 :: Assertion
-case_pbSubsume_1 = SAT.pbSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)],1) @?= True
+case_pbLinSubsume_1 :: Assertion
+case_pbLinSubsume_1 = SAT.pbLinSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)],1) @?= True
 
-case_pbSubsume_2 :: Assertion
-case_pbSubsume_2 = SAT.pbSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)],3) @?= False
+case_pbLinSubsume_2 :: Assertion
+case_pbLinSubsume_2 = SAT.pbLinSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)],3) @?= False
 
 prop_removeNegationFromPBSum :: Property
 prop_removeNegationFromPBSum =

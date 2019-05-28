@@ -61,9 +61,9 @@ module ToySolver.SAT.Types
   , evalPBLinSum
   , evalPBLinAtLeast
   , evalPBLinExactly
-  , pbLowerBound
-  , pbUpperBound
-  , pbSubsume
+  , pbLinLowerBound
+  , pbLinUpperBound
+  , pbLinSubsume
 
   -- * Non-linear Pseudo Boolean constraint
   , PBTerm
@@ -414,15 +414,15 @@ evalPBLinAtLeast m (lhs,rhs) = evalPBLinSum m lhs >= rhs
 evalPBLinExactly :: IModel m => m -> PBLinAtLeast -> Bool
 evalPBLinExactly m (lhs,rhs) = evalPBLinSum m lhs == rhs
 
-pbLowerBound :: PBLinSum -> Integer
-pbLowerBound xs = sum [if c < 0 then c else 0 | (c,_) <- xs]
+pbLinLowerBound :: PBLinSum -> Integer
+pbLinLowerBound xs = sum [if c < 0 then c else 0 | (c,_) <- xs]
 
-pbUpperBound :: PBLinSum -> Integer
-pbUpperBound xs = sum [if c > 0 then c else 0 | (c,_) <- xs]
+pbLinUpperBound :: PBLinSum -> Integer
+pbLinUpperBound xs = sum [if c > 0 then c else 0 | (c,_) <- xs]
 
 -- (Σi ci li ≥ rhs1) subsumes (Σi di li ≥ rhs2) iff rhs1≥rhs2 and di≥ci for all i.
-pbSubsume :: PBLinAtLeast -> PBLinAtLeast -> Bool
-pbSubsume (lhs1,rhs1) (lhs2,rhs2) =
+pbLinSubsume :: PBLinAtLeast -> PBLinAtLeast -> Bool
+pbLinSubsume (lhs1,rhs1) (lhs2,rhs2) =
   rhs1 >= rhs2 && and [di >= ci | (ci,li) <- lhs1, let di = IntMap.findWithDefault 0 li lhs2']
   where
     lhs2' = IntMap.fromList [(l,c) | (c,l) <- lhs2]

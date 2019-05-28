@@ -1426,7 +1426,7 @@ backwardSubsumedBy solver pb@(lhs,_) = do
             -- because only such constraints are added to occur list.
             -- See 'addToDB'.
             pb2 <- instantiatePBLinAtLeast (getLitFixed solver) =<< toPBLinAtLeast c
-            return $ pbSubsume pb pb2
+            return $ pbLinSubsume pb pb2
       liftM HashSet.fromList
         $ filterM p
         $ HashSet.toList
