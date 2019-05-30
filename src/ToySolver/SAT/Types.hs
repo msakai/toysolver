@@ -71,6 +71,8 @@ module ToySolver.SAT.Types
   , evalPBSum
   , evalPBConstraint
   , evalPBFormula
+  , pbLowerBound
+  , pbUpperBound
   , removeNegationFromPBSum
 
   -- * XOR Clause
@@ -444,6 +446,12 @@ evalPBFormula :: IModel m => m -> PBFile.Formula -> Maybe Integer
 evalPBFormula m formula = do
   guard $ all (evalPBConstraint m) $ PBFile.pbConstraints formula
   return $ evalPBSum m $ fromMaybe [] $ PBFile.pbObjectiveFunction formula
+
+pbLowerBound :: PBSum -> Integer
+pbLowerBound xs = sum [c | (c,ls) <- xs, c < 0 || null ls]
+
+pbUpperBound :: PBSum -> Integer
+pbUpperBound xs = sum [c | (c,ls) <- xs, c > 0 || null ls]
 
 removeNegationFromPBSum :: PBSum -> PBSum
 removeNegationFromPBSum ts =

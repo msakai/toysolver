@@ -196,8 +196,7 @@ linearizeWBO formula usePB = runST $ do
 quadratizePB :: PBFile.Formula -> ((PBFile.Formula, Integer), PBQuadratizeInfo)
 quadratizePB formula = 
   ( ( PBFile.Formula
-      { PBFile.pbObjectiveFunction = Just $
-          conv (fromMaybe [] (PBFile.pbObjectiveFunction formula)) ++ penalty
+      { PBFile.pbObjectiveFunction = Just $ conv obj ++ penalty
       , PBFile.pbConstraints = [(conv lhs, op, rhs) | (lhs,op,rhs) <- PBFile.pbConstraints formula]
       , PBFile.pbNumVars = nv2
       , PBFile.pbNumConstraints = PBFile.pbNumConstraints formula
@@ -245,11 +244,14 @@ quadratizePB formula =
                  Nothing -> error "quadratizePB.prodDefs: should not happen"
                  Just v -> v
 
+    obj :: PBFile.Sum
+    obj = fromMaybe [] $ PBFile.pbObjectiveFunction formula
+
     maxObj :: Integer
-    maxObj = sum [max 0 w | (w,_) <- fromMaybe [] (PBFile.pbObjectiveFunction formula)]
+    maxObj = SAT.pbUpperBound obj
 
     minObj :: Integer
-    minObj = sum [min 0 w | (w,_) <- fromMaybe [] (PBFile.pbObjectiveFunction formula)]
+    minObj = SAT.pbLowerBound obj
 
     penalty :: PBFile.Sum
     penalty = [(w * w2, ts) | (w,ts) <- concat [p x y z | (z,(x,y)) <- prodDefs]]
@@ -325,8 +327,7 @@ inequalitiesToEqualitiesPB formula = runST $ do
             SAT.addPBNLExactly db [(1, [- l | l <- clause])] 0
             return Nothing
           Nothing -> do
-            let ub = sum [c | (c, _) <- lhs, c >= 0]
-                maxSurpass = max (ub - rhs) 0
+            let maxSurpass = max (SAT.pbUpperBound lhs - rhs) 0
                 maxSurpassNBits = head [i | i <- [0..], maxSurpass < bit i]
             vs <- SAT.newVars db maxSurpassNBits
             SAT.addPBNLExactly db (lhs ++ [(-c,[x]) | (c,x) <- zip (iterate (*2) 1) vs]) rhs
@@ -428,8 +429,8 @@ unconstrainPB' formula =
   )
   where
     obj1 = fromMaybe [] (PBFile.pbObjectiveFunction formula)
-    obj1ub = sum [c | (c, _) <- obj1, c > 0]
-    obj1lb = sum [c | (c, _) <- obj1, c < 0]
+    obj1ub = SAT.pbUpperBound obj1
+    obj1lb = SAT.pbLowerBound obj1
     p = obj1ub - obj1lb + 1
     obj2 = [(p*c, IntSet.toList ls) | (ls, c) <- Map.toList obj2', c /= 0]
     obj2' = Map.unionsWith (+) [sq ((-rhs, []) : lhs) | (lhs, PBFile.Eq, rhs) <- PBFile.pbConstraints formula]
