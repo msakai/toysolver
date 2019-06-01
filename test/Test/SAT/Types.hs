@@ -157,6 +157,22 @@ case_cardinalityReduction = (sort lhs, rhs) @?= ([1,2,3,4,5],4)
   where
     (lhs, rhs) = SAT.cardinalityReduction ([(6,1),(5,2),(4,3),(3,4),(2,5),(1,6)], 17)
 
+prop_pbLinUpperBound :: Property
+prop_pbLinUpperBound =
+  forAll (choose (0,10)) $ \nv ->
+    forAll (arbitraryPBLinSum nv) $ \s ->
+      forAll (arbitraryAssignment nv) $ \m -> 
+        let ub = SAT.pbLinUpperBound s
+         in counterexample (show ub) $ SAT.evalPBLinSum m s <= ub
+
+prop_pbLinLowerBound :: Property
+prop_pbLinLowerBound =
+  forAll (choose (0,10)) $ \nv ->
+    forAll (arbitraryPBLinSum nv) $ \s ->
+      forAll (arbitraryAssignment nv) $ \m -> 
+        let lb = SAT.pbLinLowerBound s
+         in counterexample (show lb) $ lb <= SAT.evalPBLinSum m s
+
 case_pbLinSubsume_clause :: Assertion
 case_pbLinSubsume_clause = SAT.pbLinSubsume ([(1,1),(1,-3)],1) ([(1,1),(1,2),(1,-3),(1,4)],1) @?= True
 
