@@ -28,6 +28,7 @@ module ToySolver.Converter.PB
 
   -- * Quadratization of PB problems
   , quadratizePB
+  , quadratizePB'
   , PBQuadratizeInfo
 
   -- * Converting inequality constraints into equality constraints
@@ -194,7 +195,13 @@ linearizeWBO formula usePB = runST $ do
 
 -- | Quandratize PBO/PBS problem without introducing additional constraints.
 quadratizePB :: PBFile.Formula -> ((PBFile.Formula, Integer), PBQuadratizeInfo)
-quadratizePB formula = 
+quadratizePB formula = quadratizePB' (formula, SAT.pbUpperBound obj)
+  where
+    obj = fromMaybe [] $ PBFile.pbObjectiveFunction formula
+
+-- | Quandratize PBO/PBS problem without introducing additional constraints.
+quadratizePB' :: (PBFile.Formula, Integer) -> ((PBFile.Formula, Integer), PBQuadratizeInfo)
+quadratizePB' (formula, maxObj) =
   ( ( PBFile.Formula
       { PBFile.pbObjectiveFunction = Just $ conv obj ++ penalty
       , PBFile.pbConstraints = [(conv lhs, op, rhs) | (lhs,op,rhs) <- PBFile.pbConstraints formula]
@@ -247,9 +254,6 @@ quadratizePB formula =
     obj :: PBFile.Sum
     obj = fromMaybe [] $ PBFile.pbObjectiveFunction formula
 
-    maxObj :: Integer
-    maxObj = SAT.pbUpperBound obj
-
     minObj :: Integer
     minObj = SAT.pbLowerBound obj
 
@@ -259,7 +263,7 @@ quadratizePB formula =
         -- The penalty function P(x,y,z) = xy − 2xz − 2yz + 3z is such that
         -- P(x,y,z)=0 when z⇔xy and P(x,y,z)>0 when z⇎xy.
         p x y z = [(1,[x,y]), (-2,[x,z]), (-2,[y,z]), (3,[z])]
-        w2 = maxObj - minObj + 1
+        w2 = max (maxObj - minObj) 0 + 1
 
     conv :: PBFile.Sum -> PBFile.Sum
     conv s = [(w, f t) | (w,t) <- s]
@@ -445,10 +449,10 @@ unconstrainPB' formula =
 -- -----------------------------------------------------------------------------
 
 pb2qubo' :: PBFile.Formula -> ((PBFile.Formula, Integer), PB2QUBOInfo')
-pb2qubo' formula = ((formula2, min th1 th2), ComposedTransformer info1 info2)
+pb2qubo' formula = ((formula2, th2), ComposedTransformer info1 info2)
   where
     ((formula1, th1), info1) = unconstrainPB formula
-    ((formula2, th2), info2) = quadratizePB formula1
+    ((formula2, th2), info2) = quadratizePB' (formula1, th1)
 
 type PB2QUBOInfo' = ComposedTransformer PBUnconstrainInfo PBQuadratizeInfo
 
