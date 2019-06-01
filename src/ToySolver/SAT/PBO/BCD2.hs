@@ -107,7 +107,7 @@ solveWBO cxt solver opt = do
   nsatRef   <- newIORef 1
   nunsatRef <- newIORef 1
 
-  lastUBRef <- newIORef $ SAT.pbUpperBound obj
+  lastUBRef <- newIORef $ SAT.pbLinUpperBound obj
 
   coresRef <- newIORef []
   let getLB = do
@@ -169,7 +169,7 @@ solveWBO cxt solver opt = do
           lastModel <- atomically $ C.getBestModel cxt
           sels <- liftM IntMap.fromList $ forM cores $ \core -> do                            
             coreLB <- getCoreLB core
-            let coreUB = SAT.pbUpperBound (coreCostFun core)
+            let coreUB = SAT.pbLinUpperBound (coreCostFun core)
             if coreUB < coreLB then do
               -- Note: we have detected unsatisfiability
               C.logMessage cxt $ printf "BCD2: coreLB (%d) exceeds coreUB (%d)" coreLB coreUB
