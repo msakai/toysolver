@@ -17,7 +17,7 @@
 --   \"/A Fast Linear-Arithmetic Solver for DPLL(T)/\",
 --   Computer Aided Verification In Computer Aided Verification, Vol. 4144
 --   (2006), pp. 81-94.
---   <http://dx.doi.org/10.1007/11817963_11>
+--   <https://doi.org/10.1007/11817963_11>
 --   <http://yices.csl.sri.com/cav06.pdf>
 --
 -----------------------------------------------------------------------------

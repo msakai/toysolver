@@ -52,7 +52,7 @@ References
   Improvements to Core-Guided binary search for MaxSAT,
   in Theory and Applications of Satisfiability Testing (SAT 2012),
   pp. 284-297.
-  <http://dx.doi.org/10.1007/978-3-642-31612-8_22>
+  <https://doi.org/10.1007/978-3-642-31612-8_22>
 
 * [2] Masahiro Sakai. <https://github.com/msakai/toysolver>
 

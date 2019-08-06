@@ -15,7 +15,7 @@
 -- * Vasco Manquinho Ruben Martins Inês Lynce
 --   Improving Unsatisfiability-based Algorithms for Boolean Optimization.
 --   Theory and Applications of Satisfiability Testing – SAT 2010, pp 181-193.
---   <http://dx.doi.org/10.1007/978-3-642-14186-7_16>
+--   <https://doi.org/10.1007/978-3-642-14186-7_16>
 --   <http://sat.inesc-id.pt/~ruben/papers/manquinho-sat10.pdf>
 --   <http://sat.inesc-id.pt/~ruben/talks/sat10-talk.pdf>
 --
