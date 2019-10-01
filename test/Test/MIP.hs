@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -12,6 +13,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 import Test.Tasty.TH
+import ToySolver.Data.MIP (meetStatus)
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.Data.MIP.Solution.CBC as CBCSol
 import qualified ToySolver.Data.MIP.Solution.CPLEX as CPLEXSol
@@ -36,22 +38,26 @@ prop_status_trans =
 prop_status_meet_idempotency :: Property
 prop_status_meet_idempotency =
   forAll arbitrary $ \(x :: MIP.Status) ->
-    x `meet` x == x
+    x `meetStatus` x == x
 
 prop_status_meet_comm :: Property
 prop_status_meet_comm =
   forAll arbitrary $ \(x :: MIP.Status) y ->
-    x `meet` y == y `meet` x
+    x `meetStatus` y == y `meetStatus` x
 
 prop_status_meet_assoc :: Property
 prop_status_meet_assoc =
   forAll arbitrary $ \(x :: MIP.Status) y z ->
-    (x `meet` y) `meet` z == x `meet` (y `meet` z)
+    (x `meetStatus` y) `meetStatus` z == x `meetStatus` (y `meetStatus` z)
 
 prop_status_meet_leq :: Property
 prop_status_meet_leq =
   forAll arbitrary $ \(x :: MIP.Status) y ->
+#if MIN_VERSION_lattices(2,0,0)
+    (x == (x `meetStatus` y)) == x `leq` y
+#else
     x `meetLeq` y == x `leq` y
+#endif
 
 instance Arbitrary MIP.Status where
   arbitrary = arbitraryBoundedEnum

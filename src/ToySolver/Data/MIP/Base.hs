@@ -1,8 +1,9 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.MIP.Base
--- Copyright   :  (c) Masahiro Sakai 2011-2014
+-- Copyright   :  (c) Masahiro Sakai 2011-2019
 -- License     :  BSD-style
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -69,6 +70,7 @@ module ToySolver.Data.MIP.Base
   -- * Solutions
   , Solution (..)
   , Status (..)
+  , meetStatus
 
   -- * File I/O options
   , FileOptions (..)
@@ -78,7 +80,9 @@ module ToySolver.Data.MIP.Base
   , intersectBounds
   ) where
 
+#if !MIN_VERSION_lattices(2,0,0)
 import Algebra.Lattice
+#endif
 import Algebra.PartialOrd
 import Control.Arrow ((***))
 import Data.Default.Class
@@ -351,27 +355,36 @@ instance PartialOrd Status where
         , (StatusInfeasibleOrUnbounded, StatusInfeasible)
         ]
 
+
+meetStatus :: Status -> Status -> Status
+StatusUnknown `meetStatus` b = StatusUnknown
+StatusFeasible `meetStatus` b
+  | StatusFeasible `leq` b = StatusFeasible
+  | otherwise = StatusUnknown
+StatusOptimal `meetStatus` StatusOptimal = StatusOptimal
+StatusOptimal `meetStatus` b
+  | StatusFeasible `leq` b = StatusFeasible
+  | otherwise = StatusUnknown
+StatusInfeasibleOrUnbounded `meetStatus` b
+  | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
+  | otherwise = StatusUnknown
+StatusInfeasible `meetStatus` StatusInfeasible = StatusInfeasible
+StatusInfeasible `meetStatus` b
+  | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
+  | otherwise = StatusUnknown
+StatusUnbounded `meetStatus` StatusUnbounded = StatusUnbounded
+StatusUnbounded `meetStatus` b
+  | StatusFeasible `leq` b = StatusFeasible
+  | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
+  | otherwise = StatusUnknown
+
+#if !MIN_VERSION_lattices(2,0,0)
+
 instance MeetSemiLattice Status where
-  StatusUnknown `meet` b = StatusUnknown
-  StatusFeasible `meet` b
-    | StatusFeasible `leq` b = StatusFeasible
-    | otherwise = StatusUnknown
-  StatusOptimal `meet` StatusOptimal = StatusOptimal
-  StatusOptimal `meet` b
-    | StatusFeasible `leq` b = StatusFeasible
-    | otherwise = StatusUnknown
-  StatusInfeasibleOrUnbounded `meet` b
-    | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
-    | otherwise = StatusUnknown
-  StatusInfeasible `meet` StatusInfeasible = StatusInfeasible
-  StatusInfeasible `meet` b
-    | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
-    | otherwise = StatusUnknown
-  StatusUnbounded `meet` StatusUnbounded = StatusUnbounded
-  StatusUnbounded `meet` b
-    | StatusFeasible `leq` b = StatusFeasible
-    | StatusInfeasibleOrUnbounded `leq` b = StatusInfeasibleOrUnbounded
-    | otherwise = StatusUnknown
+  meet = meetStatus
+
+#endif
+
 
 data Solution r
   = Solution
