@@ -15,7 +15,7 @@
 --   Algorithms for Maximum Satisfiability using Unsatisfiable Cores.
 --   In Design, Automation and Test in Europe, 2008 (DATE '08). March 2008.
 --   pp. 408-413, doi:10.1109/date.2008.4484715.
---   <http://dx.doi.org/10.1109/date.2008.4484715>
+--   <https://doi.org/10.1109/date.2008.4484715>
 --   <http://eprints.soton.ac.uk/265000/1/jpms-date08.pdf>
 --   <http://www.csi.ucd.ie/staff/jpms/talks/talksite/jpms-date08.pdf>
 --
