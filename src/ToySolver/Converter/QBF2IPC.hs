@@ -37,7 +37,7 @@ qbf2ipc qdimacs = (nv2, lhs, rhs)
 
     prefix = [(q,a) | (q,as) <- qs, a <- IntSet.toList as]
       where
-        qs = QBF.quantifyFreeVariables nv [(q, IntSet.fromList as) | (q,as) <- CNF.qdimacsPrefix qdimacs]        
+        qs = QBF.quantifyFreeVariables nv [(q, IntSet.fromList as) | (q,as) <- CNF.qdimacsPrefix qdimacs]
 
     nv2 = nv -- positive literal
         + nv -- negative literal
