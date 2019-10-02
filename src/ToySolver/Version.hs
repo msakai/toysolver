@@ -39,6 +39,12 @@ packageVersions = sort $ tail
 #ifdef VERSION_bytestring_builder
   , ("bytestring-builder", VERSION_bytestring_builder)
 #endif
+#ifdef VERSION_bytestring_encoding
+  , ("bytestring-encoding", VERSION_bytestring_encoding)
+#endif
+#ifdef VERSION_case_insensitive
+  , ("case-insensitive", VERSION_case_insensitive)
+#endif
 #ifdef VERSION_clock
   , ("clock", VERSION_clock)
 #endif
@@ -117,8 +123,8 @@ packageVersions = sort $ tail
 #ifdef VERSION_parsec
   , ("parsec", VERSION_parsec)
 #endif
-#ifdef VERSION_prettyclass
-  , ("prettyclass", VERSION_prettyclass)
+#ifdef VERSION_pretty
+  , ("pretty", VERSION_pretty)
 #endif
 #ifdef VERSION_primes
   , ("primes", VERSION_primes)
@@ -182,6 +188,9 @@ packageVersions = sort $ tail
 #endif
 #ifdef VERSION_xml_conduit
   , ("xml-conduit", VERSION_xml_conduit)
+#endif
+#ifdef VERSION_zlib
+  , ("zlib", VERSION_zlib)
 #endif
   ]
 
