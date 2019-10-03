@@ -93,6 +93,7 @@ deploy:
   file_glob: true
   file: '*.tar.xz'
   skip_cleanup: true
+  draft: true
   on:
     tags: true
     condition: "$RELEASE = 1"
