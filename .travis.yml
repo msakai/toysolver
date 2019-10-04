@@ -89,7 +89,7 @@ after_script:
 deploy:
   provider: releases
   api_key:
-    secure: "WhAyiMHX+EGKdlECuT7sEqTzHOWqmnDB2DSS370ugApFklj1k8yLUp4sC1myFAxaNJYAlWRWV9ciJO/+zi/SOEmFp4+JAiNNfwVokugjqc2qeqr5NG5EGH9hqv8Sp67LBGAmvmFRZuFZ2f/0hLaBmsI8++HJJG4IBCHlBhN+XCY="
+    secure: N3Gggk5lO32YKANw2M3XfNklyxIB6tCfrlfONOQFnoTIcVFemkNXjXnT+VUxrb0dYDYv4/0meuEBq38B4Rf7e4YQteWtb7dX092BDHPLW5sSlbvrUqxb3PSngqmKs1/fgmJFN5M8GZJqgnsvRVd3G5QQxmzNQKl2vx5bTo5j4tY=
   file_glob: true
   file: '*.tar.xz'
   skip_cleanup: true

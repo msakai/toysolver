@@ -38,7 +38,7 @@ artifacts:
 deploy:
 - provider: GitHub
   auth_token:
-    secure: F8cldz47mQ0lW3O9uCEneU5LRklWcKw8JbPuh5BDYA2TfyeqC//GO8vl8/wmBy3Z
+    secure: OtB2kBvcLy0dwCzILJI9U1yyLpqh31Tgs52BMI2eul9NnbwCCoxfLsCrI+7dZmWN
   artifact: /.*\.7z/
   release: $(appveyor_repo_tag_name)
   description: 'Release description'
