@@ -80,7 +80,8 @@ after_script:
     travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$SHC_GHCVER.tar.bz2 | tar -xj
     ./shc toysolver TestSuite TestPolynomial
   fi
-# run build_artifacts.hs here instead of 'before_deploy' section to test the code regularly
+  
+before_deploy:
 - |
   if [ -n "$RELEASE" ]; then
     stack runghc --package turtle misc/build_artifacts.hs
