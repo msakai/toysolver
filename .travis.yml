@@ -39,8 +39,6 @@ matrix:
       compiler: ": #GHC 8.2.2"
     - env: STACK_YAML=stack-travis-ghc-8.0.yaml
       compiler: ": #GHC 8.0.2"
-    - env: STACK_YAML=stack-travis-ghc-7.10.yaml
-      compiler: ": #GHC 7.10.3"
 
 # Caching so the next build will be fast too.
 cache:
@@ -54,8 +52,6 @@ before_install:
 - |
   if [ "$TRAVIS_OS_NAME" = "osx" ]; then
     travis_retry curl -L https://www.stackage.org/stack/osx-x86_64 | tar xz --strip-components=1 -C ~/.local/bin '*/stack'
-  elif [ "$STACK_YAML" = "stack-travis-ghc-7.10.yaml" ]; then
-    travis_retry curl -L https://github.com/commercialhaskell/stack/releases/download/v1.9.3/stack-1.9.3-linux-x86_64-static.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
   else
     travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
   fi  
