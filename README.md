@@ -7,6 +7,7 @@ toysolver
 [![Build Status (AppVeyor)](https://ci.appveyor.com/api/projects/status/w7g615sp8ysiqk7w/branch/master?svg=true)](https://ci.appveyor.com/project/msakai/toysolver/branch/master)
 [![Coverage Status](https://coveralls.io/repos/msakai/toysolver/badge.svg)](https://coveralls.io/r/msakai/toysolver)
 [![Hackage](https://img.shields.io/hackage/v/toysolver.svg)](https://hackage.haskell.org/package/toysolver)
+[![Hackage Deps](https://img.shields.io/hackage-deps/v/toysolver.svg)](https://packdeps.haskellers.com/feed?needle=toysolver)
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 It provides solver implementations of various problems including SAT, SMT, Max-SAT, PBS (Pseudo Boolean Satisfaction), PBO (Pseudo Boolean Optimization), MILP (Mixed Integer Linear Programming) and non-linear real arithmetic.
