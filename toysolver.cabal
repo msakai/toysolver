@@ -174,7 +174,7 @@ Library
      extended-reals >=0.1 && <1.0,
      filepath,
      finite-field >=0.9.0 && <1.0.0,
-     hashable >=1.1.2.5 && <1.3.0.0,
+     hashable >=1.1.2.5 && <1.4.0.0,
      hashtables,
      heaps,
      intern >=0.9.1.2 && <1.0.0.0,
