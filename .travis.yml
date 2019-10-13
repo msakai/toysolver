@@ -57,11 +57,10 @@ before_install:
   fi  
 
 install:
-- FLAGS="--flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag=toysolver:OpenCL"
+- FLAGS="--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag=toysolver:OpenCL"
 - if [ -n "$COVERAGE" ]; then FLAGS="$FLAGS --coverage"; fi
 - if [ -n "$HADDOCK" ]; then FLAGS="$FLAGS --haddock --no-haddock-deps"; fi
 - if [ "$TRAVIS_OS_NAME" = "linux" ]; then FLAGS="$FLAGS --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve"; fi
-- if [ ! $STACK_YAML = stack-travis-ghc-7.8.yaml ]; then FLAGS="$FLAGS --flag toysolver:BuildToyFMF"; fi
 
 # Build dependencies
 - stack --jobs 2 --no-terminal --install-ghc build --test --bench --only-dependencies $FLAGS
