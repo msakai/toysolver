@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-9.21
+resolver: nightly-2019-10-10
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -41,10 +41,12 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
 extra-deps:
-- intern-0.9.1.4
+- multiset-0.3.4.1
 - queue-0.1.2
 - OptDir-0.0.3
-- logic-TPTP-0.4.6.0
+#- logic-TPTP-0.4.6.0
+- git: https://github.com/msakai/logic-TPTP.git
+  commit: 9041314569aff4117c0da677f2af04614caf1aa5
 - data-interval-1.3.1
 - extended-reals-0.2.3.0
 - finite-field-0.9.0
