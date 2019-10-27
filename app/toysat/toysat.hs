@@ -1076,13 +1076,13 @@ solveMIP opt solver mip = do
             hFlush stdout
   
           writeSol :: Map MIP.Var Integer -> Rational -> IO ()
-          writeSol m val = do
+          writeSol m objVal = do
             case optWriteFile opt of
               Nothing -> return ()
               Just fname -> do
                 let sol = MIP.Solution
                           { MIP.solStatus = MIP.StatusUnknown
-                          , MIP.solObjectiveValue = Just $ Scientific.fromFloatDigits (fromRational val :: Double)
+                          , MIP.solObjectiveValue = Just $ Scientific.fromFloatDigits (fromRational objVal :: Double)
                           , MIP.solVariables = Map.fromList [(v, fromIntegral val) | (v,val) <- Map.toList m]
                           }
                 GurobiSol.writeFile fname sol
@@ -1093,8 +1093,8 @@ solveMIP opt solver mip = do
         putOLine $ showRational (optPrintRational opt) (transformObjValBackward val)
   
       finally (PBO.optimize pbo) $ do
-        ret <- PBO.getBestSolution pbo
-        case ret of
+        ret' <- PBO.getBestSolution pbo
+        case ret' of
           Nothing -> do
             b <- PBO.isUnsat pbo
             if b
