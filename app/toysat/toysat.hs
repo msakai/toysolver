@@ -601,7 +601,7 @@ newSolver opts = do
 mainSAT :: Options -> SAT.Solver -> IO ()
 mainSAT opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           "-"   -> liftM FF.parse BS.getContents
            fname -> FF.parseFile fname
   case ret of
     Left err -> hPrint stderr err >> exitFailure
@@ -697,7 +697,7 @@ mainMUS :: Options -> SAT.Solver -> IO ()
 mainMUS opt solver = do
   gcnf <- case optInput opt of
            "-"   -> do
-             s <- BS.hGetContents stdin
+             s <- BS.getContents
              case FF.parse s of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
@@ -791,7 +791,7 @@ solveMUS opt solver gcnf = do
 mainPB :: Options -> SAT.Solver -> IO ()
 mainPB opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           "-"   -> liftM FF.parse BS.getContents
            fname -> FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
@@ -909,7 +909,7 @@ setupOptimizer pbo opt = do
 mainWBO :: Options -> SAT.Solver -> IO ()
 mainWBO opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           "-"   -> liftM FF.parse BS.getContents
            fname -> FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
@@ -1039,7 +1039,7 @@ mainMIP opt solver = do
     case optInput opt of
       fname@"-"   -> do
         F.mapM_ (\s -> hSetEncoding stdin =<< mkTextEncoding s) (optFileEncoding opt)
-        s <- hGetContents stdin
+        s <- getContents
         case MIP.parseLPString def fname s of
           Right mip -> return mip
           Left err ->
