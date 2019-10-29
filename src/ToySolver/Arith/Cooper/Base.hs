@@ -429,8 +429,8 @@ solveQFLIRAConj vs cs ivs = listToMaybe $ do
 
 -- ---------------------------------------------------------------------------
 
-testHagiya :: QFFormula
-testHagiya = fst $ project 1 $ andB [c1, c2, c3]
+_testHagiya :: QFFormula
+_testHagiya = fst $ project 1 $ andB [c1, c2, c3]
   where
     [x,y,z] = map LA.var [1..3]
     c1 = x .<. (y ^+^ y)
@@ -443,8 +443,8 @@ testHagiya = fst $ project 1 $ andB [c1, c2, c3]
 (2y>z+1 ∧ 3|z+1) ∨ (2y>z+2 ∧ 3|z+2) ∨ (2y>z+3 ∧ 3|z+3)
 -}
 
-test3 :: QFFormula
-test3 = fst $ project 1 $ andB [p1,p2,p3,p4]
+_test3 :: QFFormula
+_test3 = fst $ project 1 $ andB [p1,p2,p3,p4]
   where
     x = LA.var 0
     y = LA.var 1

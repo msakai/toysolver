@@ -267,8 +267,8 @@ propGenerateCNFAndDNF impl =
     in all (`isPrimeImplicantOf` f) (Set.toList dnf) &&
        all (`isPrimeImplicateOf` f) (Set.toList cnf)
 
-propMinimalHittingSetsMinimality :: (Set IntSet -> Set IntSet) -> Property
-propMinimalHittingSetsMinimality minimalHittingSets =
+_propMinimalHittingSetsMinimality :: (Set IntSet -> Set IntSet) -> Property
+_propMinimalHittingSetsMinimality minimalHittingSets =
   forAll hyperGraph $ \g ->
     forAll (elements (Set.toList (minimalHittingSets g))) $ \s ->
       if IntSet.null s then

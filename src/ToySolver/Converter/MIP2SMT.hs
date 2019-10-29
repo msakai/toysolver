@@ -398,16 +398,16 @@ isInt mip v = vt == MIP.IntegerVariable || vt == MIP.SemiIntegerVariable
 
 -- ------------------------------------------------------------------------
 
-testFile :: FilePath -> IO ()
-testFile fname = do
+_testFile :: FilePath -> IO ()
+_testFile fname = do
   mip <- MIP.readLPFile def fname
   TLIO.putStrLn $ B.toLazyText $ mip2smt def (fmap toRational mip)
 
-test :: IO ()
-test = TLIO.putStrLn $ B.toLazyText $ mip2smt def testdata
+_test :: IO ()
+_test = TLIO.putStrLn $ B.toLazyText $ mip2smt def _testdata
 
-testdata :: MIP.Problem Rational
-Right testdata = fmap (fmap toRational) $ MIP.parseLPString def "test" $ unlines
+_testdata :: MIP.Problem Rational
+Right _testdata = fmap (fmap toRational) $ MIP.parseLPString def "test" $ unlines
   [ "Maximize"
   , " obj: x1 + 2 x2 + 3 x3 + x4"
   , "Subject To"
