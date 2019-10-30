@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, Rank2Types, TypeOperators, TypeSynonymInstances, FlexibleInstances, TypeFamilies, CPP #-}
+{-# LANGUAGE ScopedTypeVariables, Rank2Types, TypeOperators, FlexibleInstances, TypeFamilies, CPP #-}
 {-# LANGUAGE BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, Rank2Types, TypeOperators, TypeSynonymInstances, FlexibleInstances, TypeFamilies, CPP)
+-- Portability :  non-portable (ScopedTypeVariables, Rank2Types, TypeOperators, FlexibleInstances, TypeFamilies, CPP)
 --
 -- Naïve implementation of Simplex method
 -- 
