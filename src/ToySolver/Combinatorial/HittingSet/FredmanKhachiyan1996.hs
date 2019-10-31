@@ -54,7 +54,6 @@ import Control.Arrow ((***))
 import Control.Exception (assert)
 import Control.Monad
 import Data.Foldable (all, any)
-import Data.Function
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.List hiding (all, any, intersect)

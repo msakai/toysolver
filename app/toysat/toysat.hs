@@ -775,7 +775,7 @@ solveMUS opt solver gcnf = do
                          i <- readIORef mcsCounter
                          modifyIORef' mcsCounter (+1)
                          let mcs2 = sort $ map (sel2idx !) $ IntSet.toList mcs
-                         putCommentLine $ "MCS #" ++ show (i :: Int) ++ ": " ++ intercalate " " (map show mcs2)
+                         putCommentLine $ "MCS #" ++ show (i :: Int) ++ ": " ++ unwords (map show mcs2)
                      , MUSEnum.optOnMUSFound = \mus -> do
                          i <- readIORef musCounter
                          modifyIORef' musCounter (+1)
