@@ -156,7 +156,7 @@ optionsParser = Options
 
     modeOption :: Parser (Maybe Mode)
     -- modeOption = liftA msum $ T.sequenceA $ map optional $
-    modeOption = optional $ foldr (<|>) empty
+    modeOption = optional $ F.asum
       [ flag' ModeSAT    $ long "sat"     <> help "solve boolean satisfiability problem in .cnf file"
       , flag' ModeMUS    $ long "mus"     <> help "solve minimally unsatisfiable subset problem in .gcnf or .cnf file"
       , flag' ModeAllMUS $ long "all-mus" <> help "enumerate minimally unsatisfiable subset of .gcnf or .cnf file"
