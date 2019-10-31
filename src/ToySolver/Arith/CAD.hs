@@ -240,7 +240,7 @@ buildSignConf
 buildSignConf ps = do
   ps2 <- collectPolynomials ps
   -- normalizePoly後の多項式の次数でソートしておく必要があるので注意
-  let ts = sortBy (comparing P.deg) ps2
+  let ts = sortOn P.deg ps2
   --trace ("collected polynomials: " ++ prettyShow ts) $ return ()
   foldM (flip refineSignConf) emptySignConf ts
 
@@ -270,7 +270,7 @@ normalizePoly
   :: forall v. (Ord v, Show v, PrettyVar v)
   => UPolynomial (Polynomial Rational v)
   -> M v (UPolynomial (Polynomial Rational v))
-normalizePoly p = liftM P.fromTerms $ go $ sortBy (flip (comparing (P.deg . snd))) $ P.terms p
+normalizePoly p = liftM P.fromTerms $ go $ sortOn (Down . P.deg . snd) $ P.terms p
   where
     go [] = return []
     go xxs@((c,d):xs) =

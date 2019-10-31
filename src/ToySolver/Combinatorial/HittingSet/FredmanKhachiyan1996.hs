@@ -165,7 +165,7 @@ condition_2_1_solve f g =
 
 -- | @'isRedundant' F@ tests whether /F/ contains redundant implicants.
 isRedundant :: Set IntSet -> Bool
-isRedundant = loop . sortBy (compare `on` IntSet.size) . Set.toList
+isRedundant = loop . sortOn IntSet.size . Set.toList
   where
     loop :: [IntSet] -> Bool
     loop [] = False
@@ -176,7 +176,7 @@ isIrredundant = not . isRedundant
 
 -- | Removes redundant implicants from a given DNF.
 deleteRedundancy :: Set IntSet -> Set IntSet
-deleteRedundancy = foldl' f Set.empty . sortBy (compare `on` IntSet.size) . Set.toList
+deleteRedundancy = foldl' f Set.empty . sortOn IntSet.size . Set.toList
   where
     f :: Set IntSet -> IntSet -> Set IntSet
     f xss ys =

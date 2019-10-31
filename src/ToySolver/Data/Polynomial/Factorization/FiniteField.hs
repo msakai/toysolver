@@ -30,8 +30,8 @@ module ToySolver.Data.Polynomial.Factorization.FiniteField
 
 import Control.Exception (assert)
 import Data.FiniteField
-import Data.Function (on)
 import Data.List
+import Data.Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
 import GHC.TypeLits
@@ -117,7 +117,7 @@ berlekamp f = go (Set.singleton f) basis
 
 basisOfBerlekampSubalgebra :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [UPolynomial k]
 basisOfBerlekampSubalgebra f =
-  sortBy (flip compare `on` P.deg) $
+  sortOn (Down . P.deg) $
     map (P.toMonic P.nat) $
       basis
   where
