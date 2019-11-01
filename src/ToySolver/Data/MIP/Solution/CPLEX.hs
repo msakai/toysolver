@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 module ToySolver.Data.MIP.Solution.CPLEX
@@ -8,7 +9,9 @@ module ToySolver.Data.MIP.Solution.CPLEX
   ) where
 
 import Prelude hiding (readFile)
+#if !MIN_VERSION_base(4,8,0)
 import Control.Applicative
+#endif
 import Data.Default.Class
 import Data.Interned
 import Data.IntMap (IntMap)

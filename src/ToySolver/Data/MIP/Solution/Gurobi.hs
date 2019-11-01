@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 module ToySolver.Data.MIP.Solution.Gurobi
   ( Solution (..)
@@ -9,7 +10,9 @@ module ToySolver.Data.MIP.Solution.Gurobi
   ) where
 
 import Prelude hiding (readFile, writeFile)
+#if !MIN_VERSION_base(4,8,0)
 import Control.Applicative
+#endif
 import Data.Default.Class
 import Data.Interned (intern, unintern)
 import Data.List (foldl')
