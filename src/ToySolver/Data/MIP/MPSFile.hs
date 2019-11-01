@@ -42,7 +42,9 @@ import Control.Monad
 import Control.Monad.Writer
 import Data.Default.Class
 import Data.Maybe
+#if !MIN_VERSION_base(4,9,0)
 import Data.Monoid
+#endif
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Map (Map)

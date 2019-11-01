@@ -14,7 +14,9 @@ import Data.Default.Class
 import Data.Interned (intern, unintern)
 import Data.List (foldl')
 import qualified Data.Map as Map
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Scientific (Scientific)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as B

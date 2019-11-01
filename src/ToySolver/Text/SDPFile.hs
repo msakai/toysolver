@@ -62,7 +62,9 @@ import qualified Data.ByteString.Builder.Scientific as B
 import Data.Char
 import qualified Data.Foldable as F
 import Data.List (intersperse)
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Scientific (Scientific)
 #if !MIN_VERSION_megaparsec(5,0,0)
 import Data.Scientific (fromFloatDigits)

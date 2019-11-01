@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
@@ -30,7 +31,9 @@ import Data.ByteString.Builder.Scientific
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Scientific
 import ToySolver.FileFormat.Base
 

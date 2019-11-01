@@ -37,7 +37,9 @@ import Data.Char
 import Data.IORef
 import Data.List
 import Data.Maybe
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Ord
 import qualified Data.Vector.Unboxed as V
 import Data.Version

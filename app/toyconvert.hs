@@ -22,7 +22,9 @@ import Data.Char
 import Data.Default.Class
 import qualified Data.Foldable as F
 import Data.Maybe
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Scientific (Scientific)
 import qualified Data.Text.Lazy.Builder as TextBuilder
 import qualified Data.Text.Lazy.IO as TLIO
