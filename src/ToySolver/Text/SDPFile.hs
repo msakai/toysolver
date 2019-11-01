@@ -75,7 +75,13 @@ import qualified Data.IntMap as IntMap
 import System.FilePath (takeExtension)
 import System.IO
 import qualified Text.Megaparsec as MegaParsec
-#if MIN_VERSION_megaparsec(6,0,0)
+#if MIN_VERSION_megaparsec(7,0,0)
+import Data.Word
+import Data.Void
+import Text.Megaparsec hiding (ParseError, oneOf)
+import Text.Megaparsec.Byte
+import qualified Text.Megaparsec.Byte.Lexer as Lexer
+#elif MIN_VERSION_megaparsec(6,0,0)
 import Data.Word
 import Data.Void
 import Text.Megaparsec hiding (ParseError, oneOf)
