@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, ScopedTypeVariables, FlexibleInstances #-}
+{-# LANGUAGE CPP, BangPatterns, ScopedTypeVariables, FlexibleInstances #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, ScopedTypeVariables, FlexibleInstances)
+-- Portability :  non-portable
 --
 -- References:
 --
@@ -78,7 +78,9 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+#if !MIN_VERSION_base(4,11,0)
 import Data.Semigroup
+#endif
 import Data.Set (Set)
 import qualified Data.Set as Set
 
