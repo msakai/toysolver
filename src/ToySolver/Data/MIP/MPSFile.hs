@@ -36,7 +36,9 @@ module ToySolver.Data.MIP.MPSFile
   , render
   ) where
 
+#if !MIN_VERSION_base(4,8,0)
 import Control.Applicative ((<$>), (<*))
+#endif
 import Control.Exception (throwIO)
 import Control.Monad
 import Control.Monad.Writer

@@ -39,7 +39,7 @@ import Options.Applicative hiding (Const)
 import System.Exit
 import System.IO
 import Text.Printf
-import GHC.Conc (getNumProcessors, setNumCapabilities)
+import GHC.Conc (getNumProcessors)
 
 import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Arith as FOL
