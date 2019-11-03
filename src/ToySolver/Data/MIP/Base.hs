@@ -357,7 +357,7 @@ instance PartialOrd Status where
 
 
 meetStatus :: Status -> Status -> Status
-StatusUnknown `meetStatus` b = StatusUnknown
+StatusUnknown `meetStatus` _b = StatusUnknown
 StatusFeasible `meetStatus` b
   | StatusFeasible `leq` b = StatusFeasible
   | otherwise = StatusUnknown

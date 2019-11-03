@@ -355,7 +355,7 @@ solveCEGARIncremental nv prefix matrix =
       solver <- SAT.newSolver
       SAT.newVars_ solver nv
       enc <- Tseitin.newEncoder solver
-      xs <-
+      _xs <-
         case last prefix of
           (E, xs) -> do
             Tseitin.addFormula enc matrix
@@ -365,7 +365,7 @@ solveCEGARIncremental nv prefix matrix =
             return xs
       let g :: Int -> LitSet -> Prefix -> Matrix -> IO (Maybe LitSet)
           g _nv _assumptions [] _matrix = error "should not happen"
-          g nv assumptions [(_q,xs)] matrix = do
+          g _nv assumptions [(_q,xs)] _matrix = do
             ret <- SAT.solveWith solver (IntSet.toList assumptions)
             if ret then do
               m <- SAT.getModel solver

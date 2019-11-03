@@ -463,15 +463,15 @@ explainConst solver c1 c2 = do
         classA <- Vec.unsafeRead (svEClassList solver) a'
         classB <- Vec.unsafeRead (svEClassList solver) b'
         h <- getHighestNode solver b'
-        (a', b', classA, classB) <-
+        (b'', classA, classB) <-
           if classSize classA < classSize classB then do
-            return (a', b', classA, classB)
+            return (b', classA, classB)
           else
-            return (b', a', classB, classA)
+            return (a', classB, classA)
         classForM_ classA $ \c -> do
-          Vec.unsafeWrite (svERepresentativeTable solver) c b'
-        Vec.unsafeWrite (svEClassList solver) b' (classA <> classB)
-        Vec.unsafeWrite (svEHighestNodeTable solver) b' h
+          Vec.unsafeWrite (svERepresentativeTable solver) c b''
+        Vec.unsafeWrite (svEClassList solver) b'' (classA <> classB)
+        Vec.unsafeWrite (svEHighestNodeTable solver) b'' h
 
   Vec.clear (svEPendingProofs solver)
   Vec.push (svEPendingProofs solver) (c1,c2)
