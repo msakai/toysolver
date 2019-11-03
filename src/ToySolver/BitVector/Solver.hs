@@ -158,11 +158,11 @@ getModel solver = do
   m <- SAT.getModel (svSATSolver solver)
   vss <- Vec.getElems (svVars solver)
   let f = fromAscBits . map (SAT.evalLit m) . VG.toList
-      isZero = not . or . toAscBits
+      isZero' = not . or . toAscBits
       env = VG.fromList [f vs | vs <- vss]
   xs <- readIORef (svDivRemTable solver)
-  let divTable = Map.fromList [(f s, f d) | (s,t,d,_r) <- xs, isZero (f t)]
-      remTable = Map.fromList [(f s, f r) | (s,t,_d,r) <- xs, isZero (f t)]
+  let divTable = Map.fromList [(f s, f d) | (s,t,d,_r) <- xs, isZero' (f t)]
+      remTable = Map.fromList [(f s, f r) | (s,t,_d,r) <- xs, isZero' (f t)]
   return (env, divTable, remTable)
 
 explain :: Solver -> IO IntSet

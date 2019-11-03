@@ -84,11 +84,11 @@ normalizeWeightsToPositive (w,c)
                   VM.write w2 i wi
                   loop (i+1) offset
       offset <- loop 0 (0::Integer)
-      w2 <- VG.unsafeFreeze w2
+      w2' <- VG.unsafeFreeze w2
       let trans (obj, bs) = (obj + offset, bs2)
             where
               bs2 = VU.imap (\i bi -> if w ! i < 0 then not bi else bi) bs
-      return (w2, c - offset, trans)
+      return (w2', c - offset, trans)
 
 normalize2
   :: (V.Vector Weight, Weight)
