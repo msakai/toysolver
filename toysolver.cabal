@@ -188,7 +188,7 @@ Library
      mwc-random >=0.13.1 && <0.15,
      OptDir,
      lattices,
-     megaparsec >=4 && <8,
+     megaparsec >=5 && <8,
      -- Text.PrettyPrint.HughesPJClass is available on pretty >=1.1.2.0
      pretty >=1.1.2.0 && <1.2,
      primes,

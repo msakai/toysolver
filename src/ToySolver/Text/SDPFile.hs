@@ -66,9 +66,6 @@ import Data.List (intersperse)
 import Data.Monoid
 #endif
 import Data.Scientific (Scientific)
-#if !MIN_VERSION_megaparsec(5,0,0)
-import Data.Scientific (fromFloatDigits)
-#endif
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
@@ -101,12 +98,9 @@ type ParseError = MegaParsec.ParseErrorBundle BL.ByteString Void
 #elif MIN_VERSION_megaparsec(6,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Word8)
 type ParseError = MegaParsec.ParseError Word8 Void
-#elif MIN_VERSION_megaparsec(5,0,0)
+#else
 type C e s m = (MonadParsec e s m, Token s ~ Char)
 type ParseError = MegaParsec.ParseError Char Dec
-#else
-type C e s m = (MonadParsec s m Char)
-type ParseError = MegaParsec.ParseError
 #endif
 
 #if MIN_VERSION_megaparsec(7,0,0)
@@ -334,10 +328,8 @@ int = Lexer.signed (return ()) Lexer.decimal
 real :: forall e s m. C e s m => m Scientific
 #if MIN_VERSION_megaparsec(6,0,0)
 real = Lexer.signed (return ()) Lexer.scientific
-#elif MIN_VERSION_megaparsec(5,0,0)
-real = Lexer.signed (return ()) Lexer.number
 #else
-real = liftM (either fromInteger fromFloatDigits) $ Lexer.signed (return ()) $ Lexer.number
+real = Lexer.signed (return ()) Lexer.number
 #endif
 
 #if MIN_VERSION_megaparsec(6,0,0)

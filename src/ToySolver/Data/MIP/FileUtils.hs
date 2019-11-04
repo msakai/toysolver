@@ -24,8 +24,6 @@ import qualified Text.Megaparsec as MP
 type ParseError s = MP.ParseErrorBundle s Void
 #elif MIN_VERSION_megaparsec(6,0,0)
 type ParseError s = MP.ParseError (MP.Token s) Void
-#elif MIN_VERSION_megaparsec(5,0,0)
-type ParseError s = MP.ParseError (MP.Token s) MP.Dec
 #else
-type ParseError s = MP.ParseError
+type ParseError s = MP.ParseError (MP.Token s) MP.Dec
 #endif

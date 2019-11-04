@@ -98,20 +98,16 @@ data BoundType
 
 #if MIN_VERSION_megaparsec(6,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Char, IsString (Tokens s))
-#elif MIN_VERSION_megaparsec(5,0,0)
-type C e s m = (MonadParsec e s m, Token s ~ Char)
 #else
-type C e s m = (MonadParsec s m Char)
+type C e s m = (MonadParsec e s m, Token s ~ Char)
 #endif
 
 -- | Parse a string containing MPS file data.
 -- The source name is only | used in error messages and may be the empty string.
 #if MIN_VERSION_megaparsec(6,0,0)
 parseString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => MIP.FileOptions -> String -> s -> Either (ParseError s) (MIP.Problem Scientific)
-#elif MIN_VERSION_megaparsec(5,0,0)
-parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError s) (MIP.Problem Scientific)
 #else
-parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either (ParseError s) (MIP.Problem Scientific)
+parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError s) (MIP.Problem Scientific)
 #endif
 parseString _ = parse (parser <* eof)
 
@@ -178,10 +174,8 @@ stringLn s = string (fromString s) >> newline'
 number :: forall e s m. C e s m => m Scientific
 #if MIN_VERSION_megaparsec(6,0,0)
 number = tok $ Lexer.signed (return ()) Lexer.scientific
-#elif MIN_VERSION_megaparsec(5,0,0)
-number = tok $ Lexer.signed (return ()) Lexer.number
 #else
-number = tok $ liftM (either fromInteger fromFloatDigits) $ Lexer.signed (return ()) Lexer.number
+number = tok $ Lexer.signed (return ()) Lexer.number
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -189,10 +183,8 @@ number = tok $ liftM (either fromInteger fromFloatDigits) $ Lexer.signed (return
 -- | MPS file parser
 #if MIN_VERSION_megaparsec(6,0,0)
 parser :: (MonadParsec e s m, Token s ~ Char, IsString (Tokens s)) => m (MIP.Problem Scientific)
-#elif MIN_VERSION_megaparsec(5,0,0)
-parser :: (MonadParsec e s m, Token s ~ Char) => m (MIP.Problem Scientific)
 #else
-parser :: MonadParsec s m Char => m (MIP.Problem Scientific)
+parser :: (MonadParsec e s m, Token s ~ Char) => m (MIP.Problem Scientific)
 #endif
 parser = do
   many commentline

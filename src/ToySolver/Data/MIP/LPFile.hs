@@ -49,9 +49,6 @@ import Data.Maybe
 import Data.Monoid
 #endif
 import Data.Scientific (Scientific)
-#if !MIN_VERSION_megaparsec(5,0,0)
-import Data.Scientific (fromFloatDigits)
-#endif
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -84,20 +81,16 @@ import ToySolver.Internal.Util (combineMaybe)
 
 #if MIN_VERSION_megaparsec(6,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Char, IsString (Tokens s))
-#elif MIN_VERSION_megaparsec(5,0,0)
-type C e s m = (MonadParsec e s m, Token s ~ Char)
 #else
-type C e s m = (MonadParsec s m Char)
+type C e s m = (MonadParsec e s m, Token s ~ Char)
 #endif
 
 -- | Parse a string containing LP file data.
 -- The source name is only | used in error messages and may be the empty string.
 #if MIN_VERSION_megaparsec(6,0,0)
 parseString :: (Stream s, Token s ~ Char, IsString (Tokens s)) => MIP.FileOptions -> String -> s -> Either (ParseError s) (MIP.Problem Scientific)
-#elif MIN_VERSION_megaparsec(5,0,0)
-parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError s) (MIP.Problem Scientific)
 #else
-parseString :: Stream s Char => MIP.FileOptions -> String -> s -> Either (ParseError s) (MIP.Problem Scientific)
+parseString :: (Stream s, Token s ~ Char) => MIP.FileOptions -> String -> s -> Either (ParseError s) (MIP.Problem Scientific)
 #endif
 parseString _ = parse (parser <* eof)
 
@@ -176,10 +169,8 @@ reserved = Set.fromList
 -- | LP file parser
 #if MIN_VERSION_megaparsec(6,0,0)
 parser :: (MonadParsec e s m, Token s ~ Char, IsString (Tokens s)) => m (MIP.Problem Scientific)
-#elif MIN_VERSION_megaparsec(5,0,0)
-parser :: (MonadParsec e s m, Token s ~ Char) => m (MIP.Problem Scientific)
 #else
-parser :: MonadParsec s m Char => m (MIP.Problem Scientific)
+parser :: (MonadParsec e s m, Token s ~ Char) => m (MIP.Problem Scientific)
 #endif
 parser = do
   name <- optional $ try $ do
@@ -468,10 +459,8 @@ qfactor = do
 number :: forall e s m. C e s m => m Scientific
 #if MIN_VERSION_megaparsec(6,0,0)
 number = tok $ P.signed sep P.scientific
-#elif MIN_VERSION_megaparsec(5,0,0)
-number = tok $ P.signed sep P.number
 #else
-number = tok $ liftM (either fromInteger fromFloatDigits) $ P.signed sep P.number
+number = tok $ P.signed sep P.number
 #endif
 
 skipManyTill :: Alternative m => m a -> m end -> m ()
