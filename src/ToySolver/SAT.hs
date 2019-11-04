@@ -120,11 +120,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import Control.Exception
-#if MIN_VERSION_array(0,5,0)
 import Data.Array.IO
-#else
-import Data.Array.IO hiding (unsafeFreeze)
-#endif
 import Data.Array.Unsafe (unsafeFreeze)
 import Data.Array.Base (unsafeRead, unsafeWrite)
 #if MIN_VERSION_hashable(1,2,0)
