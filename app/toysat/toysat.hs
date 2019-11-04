@@ -407,17 +407,6 @@ parserInfo = Options.Applicative.info (helper <*> versionOption <*> optionsParse
       <> long "version"
       <> help "Show version"
 
-#if !MIN_VERSION_optparse_applicative(0,13,0)
-
--- | Convert a function producing a 'Maybe' into a reader.
-maybeReader :: (String -> Maybe a) -> ReadM a
-maybeReader f = eitherReader $ \arg ->
-  case f arg of
-    Nothing -> Left $ "cannot parse value `" ++ arg ++ "'"
-    Just a -> Right a
-
-#endif
-
 main :: IO ()
 main = do
 #ifdef FORCE_CHAR8

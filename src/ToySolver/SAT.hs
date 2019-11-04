@@ -123,9 +123,7 @@ import Control.Exception
 import Data.Array.IO
 import Data.Array.Unsafe (unsafeFreeze)
 import Data.Array.Base (unsafeRead, unsafeWrite)
-#if MIN_VERSION_hashable(1,2,0)
 import Data.Bits (xor) -- for defining 'combine' function
-#endif
 import Data.Default.Class
 import Data.Either
 import Data.Function (on)
@@ -3562,11 +3560,9 @@ shift ref = do
 
 defaultHashWithSalt :: Hashable a => Int -> a -> Int
 defaultHashWithSalt salt x = salt `combine` hash x
-#if MIN_VERSION_hashable(1,2,0)
   where
     combine :: Int -> Int -> Int
     combine h1 h2 = (h1 * 16777619) `xor` h2
-#endif
 
 {--------------------------------------------------------------------
   debug
