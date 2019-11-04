@@ -132,7 +132,9 @@ import qualified Data.FiniteField as FF
 import Data.Function
 import Data.Hashable
 import Data.List
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Numbers.Primes (primeFactors)
 import Data.Ratio
 import Data.String (IsString (..))

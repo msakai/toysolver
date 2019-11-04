@@ -45,7 +45,9 @@ import Data.Default.Class
 import Data.Interned
 import Data.List
 import Data.Maybe
+#if !MIN_VERSION_base(4,9,0)
 import Data.Monoid
+#endif
 import Data.Scientific (Scientific)
 #if !MIN_VERSION_megaparsec(5,0,0)
 import Data.Scientific (fromFloatDigits)

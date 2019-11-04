@@ -6,7 +6,9 @@
 module Test.MIP (mipTestGroup) where
 
 import Algebra.PartialOrd
+#if !MIN_VERSION_lattices(2,0,0)
 import Algebra.Lattice
+#endif
 import Data.Maybe
 import qualified Data.Map as Map
 import Test.Tasty

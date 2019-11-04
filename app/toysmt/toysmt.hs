@@ -16,7 +16,9 @@ module Main where
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Version
 import Options.Applicative hiding (Parser)
 import qualified Options.Applicative as Opt

@@ -64,8 +64,8 @@ prop_eliminate_last_universal_quantifier = QM.monadicIO $ do
       f lit = if lit > 0
               then BoolExpr.Atom lit
               else notB (BoolExpr.Atom (abs lit))
-  (sat1, cert1) <- QM.run $ QBF.solveCEGAR nv prefix matrix1'
-  (sat2, cert2) <- QM.run $ QBF.solveCEGAR nv (init prefix) matrix2'
+  (sat1, _cert1) <- QM.run $ QBF.solveCEGAR nv prefix matrix1'
+  (sat2, _cert2) <- QM.run $ QBF.solveCEGAR nv (init prefix) matrix2'
   QM.assert $ sat1 == sat2
   where
     gen :: Gen (Int, QBF.Prefix, [[Int]])

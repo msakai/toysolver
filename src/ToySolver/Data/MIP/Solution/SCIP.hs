@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 module ToySolver.Data.MIP.Solution.SCIP
   ( Solution (..)
@@ -7,7 +8,9 @@ module ToySolver.Data.MIP.Solution.SCIP
   ) where
 
 import Prelude hiding (readFile, writeFile)
+#if !MIN_VERSION_base(4,8,0)
 import Control.Applicative
+#endif
 import Control.Monad.Except
 import Data.Interned (intern)
 import Data.Map (Map)

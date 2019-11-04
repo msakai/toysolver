@@ -119,7 +119,7 @@ writeFile opt fname prob =
     ext -> ioError $ userError $ "unknown extension: " ++ ext
 
 getExt :: String -> String
-getExt name | (base, ext) <- splitExtension name =
+getExt fname | (base, ext) <- splitExtension fname =
   case map toLower ext of
 #ifdef WITH_ZLIB
     ".gz" -> getExt base

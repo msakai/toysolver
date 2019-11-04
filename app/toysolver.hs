@@ -1,13 +1,14 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toysolver
--- Copyright   :  (c) Masahiro Sakai 2011-2014
+-- Copyright   :  (c) Masahiro Sakai 2011-2019
 -- License     :  BSD-style
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 
@@ -21,8 +22,9 @@ import Data.Char
 import Data.Default.Class
 import Data.List
 import Data.Maybe
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
-import Data.Ratio
+#endif
 import Data.Scientific (Scientific)
 import qualified Data.Scientific as Scientific
 import Data.String
@@ -35,18 +37,12 @@ import qualified Data.IntSet as IntSet
 import qualified Data.Traversable as T
 import Options.Applicative hiding (Const)
 import System.Exit
-import System.Environment
-import System.FilePath
-import System.Console.GetOpt
 import System.IO
 import Text.Printf
-import GHC.Conc (getNumProcessors, setNumCapabilities)
-
-import Data.OptDir
+import GHC.Conc (getNumProcessors)
 
 import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Arith as FOL
-import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Data.LA.FOL as LAFOL
 import qualified ToySolver.Data.Polynomial as P
 import qualified ToySolver.Data.AlgebraicNumber.Real as AReal
@@ -199,8 +195,8 @@ run
   -> MIP.Problem Rational
   -> (Map MIP.Var Rational -> IO ())
   -> IO ()
-run solver opt mip printModel = do
-  unless (Set.null (MIP.semiContinuousVariables mip)) $ do
+run solver opt prob printModel = do
+  unless (Set.null (MIP.semiContinuousVariables prob)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure  
   case map toLower solver of
@@ -210,7 +206,7 @@ run solver opt mip printModel = do
     s | s `elem` ["ct", "conti-traverso"] -> solveByContiTraverso
     _ -> solveByMIP2
   where
-    vs = MIP.variables mip
+    vs = MIP.variables prob
     vsAssoc = zip (Set.toList vs) [0..]
     nameToVar = Map.fromList vsAssoc
     varToName = IntMap.fromList [(v,name) | (name,v) <- vsAssoc]
@@ -219,15 +215,15 @@ run solver opt mip printModel = do
     compileE = foldr (+) (Const 0) . map compileT . MIP.terms
 
     compileT :: MIP.Term Rational -> Expr Rational
-    compileT (MIP.Term c vs) =
-      foldr (*) (Const c) [Var (nameToVar Map.! v) | v <- vs]
+    compileT (MIP.Term c vs3) =
+      foldr (*) (Const c) [Var (nameToVar Map.! v) | v <- vs3]
 
-    obj = compileE $ MIP.objExpr $ MIP.objectiveFunction mip
+    obj = compileE $ MIP.objExpr $ MIP.objectiveFunction prob
 
     cs1 = do
       v <- Set.toList vs
       let v2 = Var (nameToVar Map.! v)
-      let (l,u) = MIP.getBounds mip v
+      let (l,u) = MIP.getBounds prob v
       [Const x .<=. v2 | MIP.Finite x <- return l] ++
         [v2 .<=. Const x | MIP.Finite x <- return u]
     cs2 = do
@@ -236,7 +232,7 @@ run solver opt mip printModel = do
         , MIP.constrExpr = e
         , MIP.constrLB = lb
         , MIP.constrUB = ub
-        } <- MIP.constraints mip
+        } <- MIP.constraints prob
       case ind of
         Nothing -> do
           let e2 = compileE e
@@ -254,7 +250,7 @@ run solver opt mip printModel = do
 
     ivs
       | optNoMIP opt = Set.empty
-      | otherwise    = MIP.integerVariables mip
+      | otherwise    = MIP.integerVariables prob
 
     vs2  = IntMap.keysSet varToName
     ivs2 = IntSet.fromList . map (nameToVar Map.!) . Set.toList $ ivs
@@ -297,16 +293,16 @@ run solver opt mip printModel = do
                  s                 -> error ("unknown solver: " ++ s)
 
     solveByMIP = do
-      let m = do
+      let prob2 = do
             cs'  <- mapM LAFOL.fromFOLAtom (cs1 ++ cs2)
             obj' <- LAFOL.fromFOLExpr obj
             return (cs',obj')
-      case m of
+      case prob2 of
         Nothing -> do
           putSLine "UNKNOWN"
           exitFailure
         Just (cs',obj') ->
-          case TextbookMIP.optimize (MIP.objDir $ MIP.objectiveFunction mip) obj' cs' ivs2 of
+          case TextbookMIP.optimize (MIP.objDir $ MIP.objectiveFunction prob) obj' cs' ivs2 of
             TextbookMIP.OptUnsat -> do
               putSLine "UNSATISFIABLE"
               exitFailure
@@ -320,7 +316,7 @@ run solver opt mip printModel = do
               printModel m2
 
     solveByMIP2 = do
-      solver <- Simplex.newSolver
+      simplex <- Simplex.newSolver
 
       let config =
             def
@@ -329,21 +325,21 @@ run solver opt mip printModel = do
             }
           nthreads = optNThread opt
 
-      Simplex.setConfig solver config
-      Simplex.setLogger solver putCommentLine
-      Simplex.enableTimeRecording solver
-      replicateM (length vsAssoc) (Simplex.newVar solver) -- XXX
-      Simplex.setOptDir solver $ MIP.objDir $ MIP.objectiveFunction mip
-      Simplex.setObj solver $ fromJust (LAFOL.fromFOLExpr obj)
+      Simplex.setConfig simplex config
+      Simplex.setLogger simplex putCommentLine
+      Simplex.enableTimeRecording simplex
+      replicateM_ (length vsAssoc) (Simplex.newVar simplex) -- XXX
+      Simplex.setOptDir simplex $ MIP.objDir $ MIP.objectiveFunction prob
+      Simplex.setObj simplex $ fromJust (LAFOL.fromFOLExpr obj)
       putCommentLine "Loading constraints... "
-      forM_ (cs1 ++ cs2) $ \c -> do
-        Simplex.assertAtom solver $ fromJust (LAFOL.fromFOLAtom c)
+      forM_ (cs1 ++ cs2) $ \c ->
+        Simplex.assertAtom simplex $ fromJust (LAFOL.fromFOLAtom c)
       putCommentLine "Loading constraints finished"
 
-      mip <- MIPSolver.newSolver solver ivs2
+      mip <- MIPSolver.newSolver simplex ivs2
       MIPSolver.setShowRational mip printRat
       MIPSolver.setLogger mip putCommentLine
-      MIPSolver.setOnUpdateBestSolution mip $ \m val -> putOLine (showValue val)
+      MIPSolver.setOnUpdateBestSolution mip $ \_m val -> putOLine (showValue val)
 
       procs <-
         if nthreads >= 1
@@ -371,6 +367,8 @@ run solver opt mip printModel = do
           putSLine "OPTIMUM FOUND"
           let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2
+        Simplex.ObjLimit -> do
+          error "should not happen"
 
     solveByCAD
       | not (IntSet.null ivs2) = do
@@ -418,8 +416,8 @@ run solver opt mip printModel = do
               putSLine "UNKNOWN"
               putCommentLine "non-linear expressions are not supported by Conti-Traverso algorithm"
               exitFailure
-            Just (linObj, linCon) -> do
-              case ContiTraverso.solve P.grlex vs2 (MIP.objDir $ MIP.objectiveFunction mip) linObj linCon of
+            Just (linObj, linCon) ->
+              case ContiTraverso.solve P.grlex vs2 (MIP.objDir $ MIP.objectiveFunction prob) linObj linCon of
                 Nothing -> do
                   putSLine "UNSATISFIABLE"
                   exitFailure
@@ -437,9 +435,9 @@ run solver opt mip printModel = do
     showValue = showRational printRat
 
 mipPrintModel :: Handle -> Bool -> Map MIP.Var Rational -> IO ()
-mipPrintModel h asRat m = do
-  forM_ (Map.toList m) $ \(v, val) -> do
-    printf "v %s = %s\n" (MIP.fromVar v) (showRational asRat val)
+mipPrintModel h asRat m =
+  forM_ (Map.toList m) $ \(v, val) ->
+    hPrintf h "v %s = %s\n" (MIP.fromVar v) (showRational asRat val)
 
 
 putCommentLine :: String -> IO ()
@@ -473,30 +471,30 @@ main = do
   case fromMaybe ModeMIP (optMode o) of
     ModeSAT -> do
       cnf <- FF.readFile (optInput o)
-      let (mip,info) = sat2ip cnf
+      let (mip,info2) = sat2ip cnf
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
-        let m2 = transformBackward info m
+        let m2 = transformBackward info2 m
         satPrintModel stdout m2 0
         writeSOLFileSAT o m2
     ModePB -> do
       pb <- FF.readFile (optInput o)
-      let (mip,info) = pb2ip pb
+      let (mip,info2) = pb2ip pb
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
-        let m2 = transformBackward info m
+        let m2 = transformBackward info2 m
         pbPrintModel stdout m2 0
         writeSOLFileSAT o m2
     ModeWBO -> do
       wbo <- FF.readFile (optInput o)
-      let (mip,info) = wbo2ip False wbo
+      let (mip,info2) = wbo2ip False wbo
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
-        let m2 = transformBackward info m
+        let m2 = transformBackward info2 m
         pbPrintModel stdout m2 0
         writeSOLFileSAT o m2
     ModeMaxSAT -> do
       wcnf <- FF.readFile (optInput o)
-      let (mip,info) = maxsat2ip False wcnf
+      let (mip,info2) = maxsat2ip False wcnf
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
-        let m2 = transformBackward info m
+        let m2 = transformBackward info2 m
         maxsatPrintModel stdout m2 0
         writeSOLFileSAT o m2
     ModeMIP -> do
@@ -527,7 +525,7 @@ writeSOLFileSAT opt m = do
   writeSOLFileRaw opt sol
 
 writeSOLFileRaw :: Options -> MIP.Solution Scientific -> IO ()
-writeSOLFileRaw opt sol = do
+writeSOLFileRaw opt sol =
   case optWriteFile opt of
     Just fname -> GurobiSol.writeFile fname sol
     Nothing -> return ()

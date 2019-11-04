@@ -62,7 +62,9 @@ import qualified Data.ByteString.Builder.Scientific as B
 import Data.Char
 import qualified Data.Foldable as F
 import Data.List (intersperse)
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Scientific (Scientific)
 #if !MIN_VERSION_megaparsec(5,0,0)
 import Data.Scientific (fromFloatDigits)
@@ -73,7 +75,13 @@ import qualified Data.IntMap as IntMap
 import System.FilePath (takeExtension)
 import System.IO
 import qualified Text.Megaparsec as MegaParsec
-#if MIN_VERSION_megaparsec(6,0,0)
+#if MIN_VERSION_megaparsec(7,0,0)
+import Data.Word
+import Data.Void
+import Text.Megaparsec hiding (ParseError, oneOf)
+import Text.Megaparsec.Byte
+import qualified Text.Megaparsec.Byte.Lexer as Lexer
+#elif MIN_VERSION_megaparsec(6,0,0)
 import Data.Word
 import Data.Void
 import Text.Megaparsec hiding (ParseError, oneOf)

@@ -344,9 +344,9 @@ instance PartialOrd Status where
   leq a b = (a,b) `Set.member` rel
     where
       rel = unsafeLfpFrom rel0 $ \r ->
-        Set.union r (Set.fromList [(a,c) | (a,b) <- Set.toList r, (b',c) <- Set.toList r, b == b'])
+        Set.union r (Set.fromList [(x,z) | (x,y) <- Set.toList r, (y',z) <- Set.toList r, y == y'])
       rel0 = Set.fromList $
-        [(a,a) | a <- [minBound .. maxBound]] ++
+        [(x,x) | x <- [minBound .. maxBound]] ++
         [ (StatusUnknown, StatusFeasible)
         , (StatusUnknown, StatusInfeasibleOrUnbounded)
         , (StatusFeasible, StatusOptimal)
@@ -357,7 +357,7 @@ instance PartialOrd Status where
 
 
 meetStatus :: Status -> Status -> Status
-StatusUnknown `meetStatus` b = StatusUnknown
+StatusUnknown `meetStatus` _b = StatusUnknown
 StatusFeasible `meetStatus` b
   | StatusFeasible `leq` b = StatusFeasible
   | otherwise = StatusUnknown

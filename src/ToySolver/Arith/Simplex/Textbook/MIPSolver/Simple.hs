@@ -236,16 +236,16 @@ example1 = (optdir, obj, cs, ivs)
       ]
     ivs = IS.singleton 4
 
-test1 :: Bool
-test1 = result==expected
+_test1 :: Bool
+_test1 = result==expected
   where
     (optdir, obj, cs, ivs) = example1
     result, expected :: OptResult Rational
     result = optimize optdir obj cs ivs
     expected = Optimum (245/2) (IM.fromList [(1,40),(2,21/2),(3,39/2),(4,3)])
 
-test1' :: Bool
-test1' = result==expected
+_test1' :: Bool
+_test1' = result==expected
   where
     (optdir, obj, cs, ivs) = example1
     f OptMin = OptMax
@@ -271,8 +271,8 @@ example2 = (optdir, obj, cs, ivs)
       ]
     ivs = IS.fromList [1,2]
 
-test2 :: Bool
-test2 = result == expected
+_test2 :: Bool
+_test2 = result == expected
   where
     result, expected :: OptResult Rational
     result = optimize optdir obj cs ivs

@@ -259,8 +259,8 @@ test_kuhn_7_3 =
   uncurry minimize kuhn_7_3 ==
   Optimum (-2) (IM.fromList [(1,2),(2,0),(3,0),(4,2),(5,0),(6,2),(7,0)])
 
-testAll :: Bool
-testAll = and
+_testAll :: Bool
+_testAll = and
   [ test_3_2
   , test_3_5
   , test_4_1

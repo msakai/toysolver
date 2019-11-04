@@ -45,7 +45,9 @@ import Prelude hiding (repeat)
 import Data.Bits
 import Data.Map (Map)
 import qualified Data.Map as Map
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Ord
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Vector as V

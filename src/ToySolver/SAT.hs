@@ -1264,11 +1264,11 @@ search solver !conflict_lim onConflict = do
           return ()
         lit:_ -> do
           cl <- newClauseHandler learntClause True
-          let constr = toConstraintHandler cl
-          addToLearntDB solver constr
+          let constr2 = toConstraintHandler cl
+          addToLearntDB solver constr2
           basicAttachClauseHandler solver cl
-          assignBy solver lit constr
-          constrBumpActivity solver constr
+          assignBy solver lit constr2
+          constrBumpActivity solver constr2
 
     learnHybrid :: IORef Int -> SomeConstraintHandler -> IO (Maybe SearchResult)
     learnHybrid conflictCounter constr = do
@@ -1289,12 +1289,12 @@ search solver !conflict_lim onConflict = do
           return ()
         lit:_ -> do
           cl <- newClauseHandler learntClause True
-          let constr = toConstraintHandler cl
-          addToLearntDB solver constr
+          let constr2 = toConstraintHandler cl
+          addToLearntDB solver constr2
           basicAttachClauseHandler solver cl
-          constrBumpActivity solver constr
+          constrBumpActivity solver constr2
           when (minLevel == clauseLevel) $ do
-            _ <- assignBy solver lit constr -- This should always succeed.
+            _ <- assignBy solver lit constr2 -- This should always succeed.
             return ()
 
       ret <- deduce solver
@@ -1385,7 +1385,7 @@ checkForwardSubsumption solver lits = do
   if not flag then
     return False
   else do
-    withEnablePhaseSaving solver False $ do
+    withEnablePhaseSaving False $ do
       bracket_
         (pushDecisionLevel solver)
         (backtrackTo solver levelRoot) $ do
@@ -1396,7 +1396,7 @@ checkForwardSubsumption solver lits = do
             when debugMode $ log solver ("forward subsumption: " ++ show lits)
             return True
   where
-    withEnablePhaseSaving solver flag m =
+    withEnablePhaseSaving flag m =
       bracket
         (getConfig solver)
         (\saved -> modifyConfig solver (\config -> config{ configEnablePhaseSaving = configEnablePhaseSaving saved }))
@@ -1629,16 +1629,16 @@ analyzeConflict solver constr = do
             else do
               Vec.push out lit
 
-      processLitHybrid pb constr lit getLits = do
+      processLitHybrid pb constr2 lit getLits = do
         pb2 <- do
           let clausePB = do
                 lits <- getLits
                 return $ clauseToPBLinAtLeast (lit : lits)
-          b <- isPBRepresentable constr
+          b <- isPBRepresentable constr2
           if not b then do
             clausePB
           else do
-            pb2 <- toPBLinAtLeast constr
+            pb2 <- toPBLinAtLeast constr2
             o <- pbOverSAT solver pb2
             if o then do
               clausePB
@@ -1658,8 +1658,8 @@ analyzeConflict solver constr = do
           when isHybrid $ do
             (ls, pb) <- readIORef pbConstrRef
             when (litNot l `IS.member` ls) $ do
-              Just constr <- varReason solver v
-              processLitHybrid pb constr l (reasonOf solver constr (Just l))
+              Just constr2 <- varReason solver v
+              processLitHybrid pb constr2 l (reasonOf solver constr2 (Just l))
           popTrail solver
           popUnseen
 
@@ -1671,14 +1671,14 @@ analyzeConflict solver constr = do
         modifyIOURef pathC (subtract 1)
         c <- readIOURef pathC
         if c > 0 then do
-          Just constr <- varReason solver v
-          constrBumpActivity solver constr
-          lits <- reasonOf solver constr (Just l)
+          Just constr2 <- varReason solver v
+          constrBumpActivity solver constr2
+          lits <- reasonOf solver constr2 (Just l)
           f lits
           when isHybrid $ do
             (ls, pb) <- readIORef pbConstrRef
             when (litNot l `IS.member` ls) $ do
-              processLitHybrid pb constr l (return lits)
+              processLitHybrid pb constr2 l (return lits)
           popTrail solver
           loop
         else do
@@ -2266,13 +2266,13 @@ findForWatch solver a (I# beg) (I# end) = IO $ \w ->
     (# w2, ret #) -> (# w2, I# ret #)
   where
     go# :: Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)
-    go# i end w | isTrue# (i ># end) = (# w, -1# #)
-    go# i end w =
+    go# i end' w | isTrue# (i ># end') = (# w, -1# #)
+    go# i end' w =
       case unIO (litValue solver =<< unsafeRead a (I# i)) w of
         (# w2, val #) ->
           if val /= lFalse
             then (# w2, i #)
-            else go# (i +# 1#) end w2
+            else go# (i +# 1#) end' w2
 
     unIO (IO f) = f
 #endif
@@ -2676,13 +2676,13 @@ instance ConstraintHandler AtLeastHandler where
           return $ printf "constrPropagate: %s is unit" str
         watchLit solver falsifiedLit this
         let loop :: Int -> IO Bool
-            loop i
-              | i >= n = return True
+            loop j
+              | j >= n = return True
               | otherwise = do
-                  liti <- unsafeRead a i
-                  ret2 <- assignBy solver liti this
+                  litj <- unsafeRead a j
+                  ret2 <- assignBy solver litj this
                   if ret2
-                    then loop (i+1)
+                    then loop (j+1)
                     else return False
         loop 0
       _ -> do
@@ -3135,8 +3135,8 @@ puebloPropagate solver constr this = do
     -- UNIT PROPAGATION
     let f [] = return True
         f ((c,lit) : ts) = do
-          watchsum <- puebloGetWatchSum this
-          if watchsum - c >= puebloDegree this then
+          watchsum' <- puebloGetWatchSum this
+          if watchsum' - c >= puebloDegree this then
             return True
           else do
             val <- litValue solver lit
@@ -3251,12 +3251,12 @@ instance ConstraintHandler XORClauseHandler where
           watchVar solver (litVar liti) this
           -- lit0 ⊕ y
           y <- do
-            ref <- newIORef False
+            ref' <- newIORef False
             forLoop 1 (<=ub) (+1) $ \j -> do
               lit_j <- unsafeRead a j
               val_j <- litValue solver lit_j
-              modifyIORef' ref (/= fromJust (unliftBool val_j))
-            readIORef ref
+              modifyIORef' ref' (/= fromJust (unliftBool val_j))
+            readIORef ref'
           assignBy solver (if y then litNot lit0 else lit0) this -- should always succeed
       else do
         ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [lb..ub] $ \l -> do

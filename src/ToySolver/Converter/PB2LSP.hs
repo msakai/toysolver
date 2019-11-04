@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +9,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (OverloadedStrings)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2LSP
@@ -18,7 +19,9 @@ module ToySolver.Converter.PB2LSP
 
 import Data.ByteString.Builder
 import Data.List
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import qualified Data.PseudoBoolean as PBFile
 
 pb2lsp :: PBFile.Formula -> Builder

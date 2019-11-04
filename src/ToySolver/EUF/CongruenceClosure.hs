@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, ScopedTypeVariables, FlexibleInstances #-}
+{-# LANGUAGE CPP, BangPatterns, ScopedTypeVariables, FlexibleInstances #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, ScopedTypeVariables, FlexibleInstances)
+-- Portability :  non-portable
 --
 -- References:
 --
@@ -78,7 +78,9 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+#if !MIN_VERSION_base(4,11,0)
 import Data.Semigroup
+#endif
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -461,15 +463,15 @@ explainConst solver c1 c2 = do
         classA <- Vec.unsafeRead (svEClassList solver) a'
         classB <- Vec.unsafeRead (svEClassList solver) b'
         h <- getHighestNode solver b'
-        (a', b', classA, classB) <-
+        (b'', classA, classB) <-
           if classSize classA < classSize classB then do
-            return (a', b', classA, classB)
+            return (b', classA, classB)
           else
-            return (b', a', classB, classA)
+            return (a', classB, classA)
         classForM_ classA $ \c -> do
-          Vec.unsafeWrite (svERepresentativeTable solver) c b'
-        Vec.unsafeWrite (svEClassList solver) b' (classA <> classB)
-        Vec.unsafeWrite (svEHighestNodeTable solver) b' h
+          Vec.unsafeWrite (svERepresentativeTable solver) c b''
+        Vec.unsafeWrite (svEClassList solver) b'' (classA <> classB)
+        Vec.unsafeWrite (svEHighestNodeTable solver) b'' h
 
   Vec.clear (svEPendingProofs solver)
   Vec.push (svEPendingProofs solver) (c1,c2)
