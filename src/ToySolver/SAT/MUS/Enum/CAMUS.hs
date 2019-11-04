@@ -3,7 +3,7 @@
 -- Module      :  ToySolver.SAT.MUS.Enum.CAMUS
 -- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
@@ -16,7 +16,7 @@
 --
 -- * [CAMUS] M. Liffiton and K. Sakallah, Algorithms for computing minimal
 --   unsatisfiable subsets of constraints, Journal of Automated Reasoning,
---   vol. 40, no. 1, pp. 1-33, Jan. 2008. 
+--   vol. 40, no. 1, pp. 1-33, Jan. 2008.
 --   <http://sun.iwu.edu/~mliffito/publications/jar_liffiton_CAMUS.pdf>
 --
 -- * [HYCAM] A. Gregoire, B. Mazure, and C. Piette, Boosting a complete
@@ -91,7 +91,7 @@ enumMCSAssumptions solver sels opt = do
 
 allMCSAssumptions :: SAT.Solver -> [Lit] -> Options -> IO [MCS]
 allMCSAssumptions solver sels opt = do
-  ref <- newIORef []  
+  ref <- newIORef []
   let opt2 =
         opt
         { optOnMCSFound = \mcs -> do

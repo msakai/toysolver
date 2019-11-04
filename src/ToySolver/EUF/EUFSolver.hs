@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.EUF.EUFSolver
 -- Copyright   :  (c) Masahiro Sakai 2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  unstable
 -- Portability :  non-portable
@@ -87,7 +87,7 @@ newSolver = do
   expl <- newIORef undefined
   bp <- Vec.new
 
-  let solver = 
+  let solver =
         Solver
         { svCCSolver = cc
         , svDisequalities = deqs

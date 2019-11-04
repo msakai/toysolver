@@ -130,7 +130,7 @@ instance Context SimpleContext where
     join $ atomically $ do
       unsat <- isUnsat sc
       when unsat $ error "addSolution: already marked as unsatisfiable" -- FIXME: use throwSTM?
-  
+
       sol0 <- getBestValue sc
       case sol0 of
         Just val0 | val0 <= val -> return $ return ()
@@ -223,7 +223,7 @@ instance Context a => Context (Normalized a) where
 
   addSolution cxt m = do
     addSolution (nBase cxt) m
-    
+
   addLowerBound cxt lb = do
     addLowerBound (nBase cxt) (lb + nOffset cxt)
 

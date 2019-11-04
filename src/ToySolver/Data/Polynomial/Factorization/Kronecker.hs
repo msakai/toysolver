@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.Data.Polynomial.Factorization.Kronecker
 -- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable

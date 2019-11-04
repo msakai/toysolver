@@ -15,7 +15,7 @@
 -- Module      :  ToySolver.Internal.Data.IndexedPriorityQueue
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -139,7 +139,7 @@ instance Enqueue PriorityQueue IO Value where
       n <- Vec.getSize (heap q)
       Vec.push (heap q) val
       Vec.growTo (table q) (val+1)
-      Vec.unsafeWrite (table q) val n  
+      Vec.unsafeWrite (table q) val n
       up q n
 
 instance Dequeue PriorityQueue IO Value where
@@ -282,7 +282,7 @@ parent i = (i-1) `div` 2
 
 {-
 checkHeapProperty :: String -> PriorityQueue -> IO ()
-checkHeapProperty str q = do 
+checkHeapProperty str q = do
   (n,arr) <- readIORef (heap q)
   let go i = do
         val <- A.readArray arr i

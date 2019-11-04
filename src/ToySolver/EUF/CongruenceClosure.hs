@@ -8,7 +8,7 @@
 -- Module      :  ToySolver.EUF.CongruenceClosure
 -- Copyright   :  (c) Masahiro Sakai 2012, 2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -36,7 +36,7 @@ module ToySolver.EUF.CongruenceClosure
   , newFun
   , newConst
   , merge
-  , merge'    
+  , merge'
   , mergeFlatTerm
   , mergeFlatTerm'
 
@@ -88,7 +88,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 import qualified ToySolver.Internal.Data.Vec as Vec
-    
+
 type FSym = Int
 
 data Term = TApp FSym [Term]
@@ -110,11 +110,11 @@ data Eqn1 = Eqn1 (Maybe ConstrID) !FSym !FSym !FSym
   deriving (Eq, Ord, Show)
 
 -- | An equation @a = b@ represented as either
--- 
+--
 -- * @a = b@ or
 --
 -- * @f(a1,a2) = a, f(b1,b2) = b@ where @a1 = b1@ and @a2 = b2@ has already been derived.
--- 
+--
 type Eqn = Either Eqn0 (Eqn1, Eqn1)
 
 data Class
@@ -187,7 +187,7 @@ newSolver = do
   gen <- Vec.new
   Vec.push gen 0
   isAfterBT <- newIORef False
-      
+
   return $
     Solver
     { svDefs                = defs
@@ -279,7 +279,7 @@ mergeFlatTerm' solver s a cid = do
           addToPending solver $ Right (eq1, eq2)
           propagate solver
           checkInvariant solver
-        Nothing -> do          
+        Nothing -> do
           setLookup solver a1' a2' eq1
           lv <- getCurrentLevel solver
           gen <- getLevelGen solver lv
@@ -385,7 +385,7 @@ checkInvariant solver = do
 
   representatives <- liftM IntSet.fromList $ Vec.getElems (svRepresentativeTable solver)
 
-  ref <- newIORef IntSet.empty          
+  ref <- newIORef IntSet.empty
   forM_ (IntSet.toList representatives) $ \a' -> do
     bs <- Vec.read (svClassList solver) a'
     forM_ (classToList bs) $ \b -> do
@@ -452,13 +452,13 @@ explainConst :: Solver -> FSym -> FSym -> IO (Maybe IntSet)
 explainConst solver c1 c2 = do
   initAfterBacktracking solver
   n <- getNFSyms solver
-  
+
   -- Additional union-find data structure
   forLoop 0 (<n) (+1) $ \a -> do
     Vec.unsafeWrite (svERepresentativeTable solver) a a
     Vec.unsafeWrite (svEClassList solver) a (ClassSingleton a)
     Vec.unsafeWrite (svEHighestNodeTable solver) a a
-                
+
   let union :: FSym -> FSym -> IO ()
       union a b = do
         a' <- getERepresentative solver a
@@ -534,7 +534,7 @@ data Model
   deriving (Show)
 
 getModel :: Solver -> IO Model
-getModel solver = do  
+getModel solver = do
   n <- Vec.getSize (svRepresentativeTable solver)
   univRef <- newIORef IntSet.empty
   reprRef <- newIORef IntMap.empty
@@ -600,7 +600,7 @@ getModel solver = do
 
       funcs2 :: IntMap (Map EntityTuple Entity)
       funcs2 = fmap (\m -> Map.fromList [(map to_univ2 xs, to_univ2 y) | (xs,y) <- Map.toList m]) funcs
-      
+
       classes2 :: [(Set Term, Entity)]
       classes2 = [(classA, to_univ2 a) | (classA,a) <- classes]
 
@@ -669,7 +669,7 @@ popBacktrackPoint solver = do
         modifyIORef' (svLookupTable solver) (IntMap.adjust (IntMap.delete b') a')
       TrailMerge a' b' a origRootA -> do
         -- Revert changes to Union-Find data strucutres
-        ClassUnion _ origClassA origClassB <- Vec.unsafeRead (svClassList solver) b'        
+        ClassUnion _ origClassA origClassB <- Vec.unsafeRead (svClassList solver) b'
         classForM_ origClassA $ \c -> do
           Vec.unsafeWrite (svRepresentativeTable solver) c a'
         Vec.unsafeWrite (svClassList solver) b' origClassB
@@ -706,7 +706,7 @@ lookup solver c1 c2 = do
 setLookup :: Solver -> FSym -> FSym -> Eqn1 -> IO ()
 setLookup solver a1 a2 eqn = do
   modifyIORef' (svLookupTable solver) $
-    IntMap.insertWith IntMap.union a1 (IntMap.singleton a2 eqn)  
+    IntMap.insertWith IntMap.union a1 (IntMap.singleton a2 eqn)
   addToTrail solver (TrailSetLookup a1 a2)
 
 addToPending :: Solver -> Eqn -> IO ()

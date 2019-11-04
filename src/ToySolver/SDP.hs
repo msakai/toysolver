@@ -142,7 +142,7 @@ instance Transformer DualizeInfo where
   type Target DualizeInfo = SDPFile.Solution
 
 instance ForwardTransformer DualizeInfo where
-  transformForward (DualizeInfo _origM origBlockStruct) 
+  transformForward (DualizeInfo _origM origBlockStruct)
     SDPFile.Solution
     { SDPFile.primalVector = xV
     , SDPFile.primalMatrix = xM

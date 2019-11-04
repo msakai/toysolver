@@ -27,7 +27,7 @@ getGitHash :: IO (Maybe String)
 getGitHash =
   liftM (Just . takeWhile (/='\n')) (readProcess "git" ["rev-parse", "--short", "HEAD"] "")
   `catch` \(_::SomeException) -> return Nothing
- 
+
 gitHashQ :: ExpQ
 gitHashQ = do
   m <- runIO getGitHash

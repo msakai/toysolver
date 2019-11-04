@@ -6,7 +6,7 @@
 -- Module      :  ToySolver.Converter.PB2LSP
 -- Copyright   :  (c) Masahiro Sakai 2013-2014,2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
 -- Portability :  non-portable

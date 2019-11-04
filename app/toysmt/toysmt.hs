@@ -81,7 +81,7 @@ main = do
   solver <- newSolver
   if optInteractive opt then do
     mapM_ (loadFile solver) (optFiles opt)
-    repl solver        
+    repl solver
   else do
     if null (optFiles opt) then
       repl solver

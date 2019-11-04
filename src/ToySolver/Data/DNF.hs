@@ -4,13 +4,13 @@
 -- Module      :  ToySolver.Data.DNF
 -- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
 --
 -- Disjunctive Normal Form
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.DNF
   ( DNF (..)

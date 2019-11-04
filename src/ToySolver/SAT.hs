@@ -15,7 +15,7 @@
 -- Module      :  ToySolver.SAT
 -- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -448,7 +448,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
   let val = liftBool (litPolarity lit)
 
   val0 <- readIORef (vdValue vd)
-  if val0 /= lUndef then do    
+  if val0 /= lUndef then do
     return $ val == val0
   else do
     idx <- Vec.getSize (svTrail solver)
@@ -673,7 +673,7 @@ variables solver = do
 getNVars :: Solver -> IO Int
 getNVars solver = Vec.getSize (svVarData solver)
 
--- | number of assigned 
+-- | number of assigned
 getNAssigned :: Solver -> IO Int
 getNAssigned solver = Vec.getSize (svTrail solver)
 
@@ -774,7 +774,7 @@ newSolverWithConfig config = do
         , svFailedAssumptions = failed
         , svAssumptionsImplications = implied
 
-        -- Statistics        
+        -- Statistics
         , svNDecision  = ndecision
         , svNRandomDecision = nranddec
         , svNConflict  = nconflict
@@ -977,7 +977,7 @@ pbSplitClausePart :: Solver -> PBLinAtLeast -> IO PBLinAtLeast
 pbSplitClausePart solver (lhs,rhs) = do
   let (ts1,ts2) = partition (\(c,_) -> c >= rhs) lhs
   if length ts1 < 2 then
-    return (lhs,rhs)    
+    return (lhs,rhs)
   else do
     sel <- newVar solver
     addClause solver $ -sel : [l | (_,l) <- ts1]
@@ -1073,7 +1073,7 @@ solve_ solver = do
       writeIORef (svLearntLimSeq solver) (zip learntSizeSeq learntSizeAdjSeq)
       learntSizeAdj
 
-    unless (0 <= configERWAStepSizeFirst config && configERWAStepSizeFirst config <= 1) $ 
+    unless (0 <= configERWAStepSizeFirst config && configERWAStepSizeFirst config <= 1) $
       error "ERWAStepSizeFirst must be in [0..1]"
     unless (0 <= configERWAStepSizeMin config && configERWAStepSizeFirst config <= 1) $
       error "ERWAStepSizeMin must be in [0..1]"
@@ -1153,7 +1153,7 @@ data SearchResult
 search :: Solver -> Int -> IO () -> IO SearchResult
 search solver !conflict_lim onConflict = do
   conflictCounter <- newIORef 0
-  let 
+  let
     loop :: IO SearchResult
     loop = do
       conflict <- deduce solver
@@ -1454,7 +1454,7 @@ removeConstraintHandlers solver zs = do
 {--------------------------------------------------------------------
   Configulation
 --------------------------------------------------------------------}
-         
+
 getConfig :: Solver -> IO Config
 getConfig solver = readIORef $ svConfig solver
 
@@ -1911,7 +1911,7 @@ backtrackTo solver level = do
     loop = do
       lv <- getDecisionLevel solver
       when (lv > level) $ do
-        popDecisionLevel solver        
+        popDecisionLevel solver
         loop
 
 constructModel :: Solver -> IO ()
@@ -2855,7 +2855,7 @@ instance Hashable PBHandlerCounter where
 newPBHandlerCounter :: PBLinSum -> Integer -> Bool -> IO PBHandlerCounter
 newPBHandlerCounter ts degree learnt = do
   let ts' = sortBy (flip compare `on` fst) ts
-      slack = sum (map fst ts) - degree      
+      slack = sum (map fst ts) - degree
       m = IM.fromList [(l,c) | (c,l) <- ts]
   s <- newIORef slack
   act <- newIORef $! (if learnt then 0 else -1)
@@ -3294,7 +3294,7 @@ instance ConstraintHandler XORClauseHandler where
       return True
     else do
       preprocess
-  
+
       !lit0 <- unsafeRead a 0
       (!lb,!ub) <- getBounds a
       assert (lb==0) $ return ()
@@ -3340,7 +3340,7 @@ instance ConstraintHandler XORClauseHandler where
     xs <-
       case l of
         Nothing -> mapM f lits
-        Just lit -> do          
+        Just lit -> do
          case lits of
            l1:ls -> do
              assert (litVar lit == litVar l1) $ return ()
@@ -3495,10 +3495,10 @@ miniSatRestartSeq start inc = map round $ iterate (inc*) (fromIntegral start)
 
 arminRestartSeq :: Int -> Double -> [Int]
 arminRestartSeq start inc = go (fromIntegral start) (fromIntegral start)
-  where  
+  where
     go !inner !outer = round inner : go inner' outer'
       where
-        (inner',outer') = 
+        (inner',outer') =
           if inner >= outer
           then (fromIntegral start, outer * inc)
           else (inner * inc, outer)

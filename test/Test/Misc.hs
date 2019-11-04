@@ -34,8 +34,8 @@ case_readUnsignedInteger_maxBound_bug =
   readUnsignedInteger "006666666666666667" @?= 6666666666666667
 
 prop_readUnsignedInteger :: Property
-prop_readUnsignedInteger = 
-  forAll (choose (0, 2^(128::Int))) $ \i -> 
+prop_readUnsignedInteger =
+  forAll (choose (0, 2^(128::Int))) $ \i ->
     readUnsignedInteger (show i) == i
 
 -- ---------------------------------------------------------------------
@@ -69,7 +69,7 @@ case_Vec = do
 
 case_Vec_clone :: Assertion
 case_Vec_clone = do
-  (v::Vec.UVec Int) <- Vec.new  
+  (v::Vec.UVec Int) <- Vec.new
   Vec.push v 0
   v2 <- Vec.clone v
   Vec.write v2 0 1

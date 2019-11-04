@@ -163,7 +163,7 @@ prop_pbLinUpperBound :: Property
 prop_pbLinUpperBound =
   forAll (choose (0,10)) $ \nv ->
     forAll (arbitraryPBLinSum nv) $ \s ->
-      forAll (arbitraryAssignment nv) $ \m -> 
+      forAll (arbitraryAssignment nv) $ \m ->
         let ub = SAT.pbLinUpperBound s
          in counterexample (show ub) $ SAT.evalPBLinSum m s <= ub
 
@@ -171,7 +171,7 @@ prop_pbLinLowerBound :: Property
 prop_pbLinLowerBound =
   forAll (choose (0,10)) $ \nv ->
     forAll (arbitraryPBLinSum nv) $ \s ->
-      forAll (arbitraryAssignment nv) $ \m -> 
+      forAll (arbitraryAssignment nv) $ \m ->
         let lb = SAT.pbLinLowerBound s
          in counterexample (show lb) $ lb <= SAT.evalPBLinSum m s
 
@@ -189,14 +189,14 @@ prop_removeNegationFromPBSum =
   forAll (choose (0,10)) $ \nv ->
     forAll (arbitraryPBSum nv) $ \s ->
       let s' = SAT.removeNegationFromPBSum s
-       in counterexample (show s') $ 
+       in counterexample (show s') $
             forAll (arbitraryAssignment nv) $ \m -> SAT.evalPBSum m s === SAT.evalPBSum m s'
 
 prop_pbUpperBound :: Property
 prop_pbUpperBound =
   forAll (choose (0,10)) $ \nv ->
     forAll (arbitraryPBSum nv) $ \s ->
-      forAll (arbitraryAssignment nv) $ \m -> 
+      forAll (arbitraryAssignment nv) $ \m ->
         let ub = SAT.pbUpperBound s
          in counterexample (show ub) $ SAT.evalPBSum m s <= ub
 
@@ -204,7 +204,7 @@ prop_pbLowerBound :: Property
 prop_pbLowerBound =
   forAll (choose (0,10)) $ \nv ->
     forAll (arbitraryPBSum nv) $ \s ->
-      forAll (arbitraryAssignment nv) $ \m -> 
+      forAll (arbitraryAssignment nv) $ \m ->
         let lb = SAT.pbLowerBound s
          in counterexample (show lb) $ lb <= SAT.evalPBSum m s
 

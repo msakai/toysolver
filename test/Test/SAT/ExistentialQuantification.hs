@@ -125,7 +125,7 @@ case_ExistentialQuantification_project_phi' = do
       SAT.newVars_ solver (CNF.cnfNumVars brauer11_phi)
       forM_ (CNF.cnfClauses brauer11_phi) $ \c -> SAT.addClause solver (SAT.unpackClause c)
       SAT.solveWith solver [if SAT.evalLit m y then y else -y | y <- [1..6]]
-    let b2 = all (SAT.evalClause m . SAT.unpackClause) (CNF.cnfClauses psi)    
+    let b2 = all (SAT.evalClause m . SAT.unpackClause) (CNF.cnfClauses psi)
     (b1 == b2) @?= True
 
 case_shortestImplicantsE_phi :: Assertion

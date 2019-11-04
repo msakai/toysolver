@@ -4,13 +4,13 @@
 -- Module      :  ToySolver.Arith.FourierMotzkin.Optimization
 -- Copyright   :  (c) Masahiro Sakai 2014-2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
 --
 -- Naïve implementation of Fourier-Motzkin Variable Elimination
--- 
+--
 -- Reference:
 --
 -- * <http://users.cecs.anu.edu.au/~michaeln/pubs/arithmetic-dps.pdf>
@@ -42,11 +42,11 @@ import ToySolver.Arith.FourierMotzkin.Base
 -- * @lift@ is a function, that takes @x ∈ I@ and returns the feasible solution with objective value /better than or equal to/ @x@.
 --
 -- Note:
--- 
+--
 -- * @'Interval.lowerBound' i@ (resp. @'Interval.upperBound' i@) is the optimal value in case of minimization (resp. maximization).
 --
 -- * If @I@ is empty, then the problem is INFEASIBLE.
--- 
+--
 optimize :: VarSet -> OptDir -> LA.Expr Rational -> [LA.Atom Rational] -> (Interval Rational, Rational -> Model Rational)
 optimize vs dir obj cs = (ival, m)
   where

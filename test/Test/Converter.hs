@@ -35,21 +35,21 @@ import Test.SAT.Utils
 prop_sat2naesat_forward :: Property
 prop_sat2naesat_forward = forAll arbitraryCNF $ \cnf ->
   let ret@(nae,info) = sat2naesat cnf
-   in counterexample (show ret) $ 
+   in counterexample (show ret) $
         forAllAssignments (CNF.cnfNumVars cnf) $ \m ->
           evalCNF m cnf === evalNAESAT (transformForward info m) nae
 
 prop_sat2naesat_backward :: Property
 prop_sat2naesat_backward = forAll arbitraryCNF $ \cnf ->
   let ret@(nae,info) = sat2naesat cnf
-   in counterexample (show ret) $ 
+   in counterexample (show ret) $
         forAllAssignments (fst nae) $ \m ->
           evalCNF (transformBackward info m) cnf === evalNAESAT m nae
 
 prop_naesat2sat_forward :: Property
 prop_naesat2sat_forward = forAll arbitraryNAESAT $ \nae ->
   let ret@(cnf,info) = naesat2sat nae
-   in counterexample (show ret) $ 
+   in counterexample (show ret) $
         forAllAssignments (fst nae) $ \m ->
           evalNAESAT m nae === evalCNF (transformForward info m) cnf
 
@@ -295,7 +295,7 @@ prop_quadratizePB =
                 Just o -> SAT.evalPBFormula (transformBackward info m) pb === Just o
                 Nothing -> property True
           ]
-  where        
+  where
     collectTerms :: PBFile.Formula -> Set IntSet
     collectTerms formula = Set.fromList [t' | t <- terms, let t' = IntSet.fromList t, IntSet.size t' >= 3]
       where

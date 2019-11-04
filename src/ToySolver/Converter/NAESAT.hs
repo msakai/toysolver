@@ -85,7 +85,7 @@ instance ForwardTransformer SAT2NAESATInfo where
   transformForward (SAT2NAESATInfo z) m = array (1,z) $ (z,False) : assocs m
 
 instance BackwardTransformer SAT2NAESATInfo where
-  transformBackward (SAT2NAESATInfo z) m = 
+  transformBackward (SAT2NAESATInfo z) m =
     SAT.restrictModel (z - 1) $
       if SAT.evalVar m z then amap not m else m
 

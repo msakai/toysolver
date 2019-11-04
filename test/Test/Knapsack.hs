@@ -35,7 +35,7 @@ prop_knapsack_DPDense_equals_BB =
         (v1,_,_) = KnapsackBB.solve items' lim'
         (v2,_,_) = KnapsackDPDense.solve items lim
     in v1 == v2
-      
+
 case_knapsack_DPSparse_1 :: Assertion
 case_knapsack_DPSparse_1 = KnapsackDPSparse.solve [(5::Int,4::Int), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
 

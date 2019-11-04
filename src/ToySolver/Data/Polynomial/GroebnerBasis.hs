@@ -4,17 +4,17 @@
 -- Module      :  ToySolver.Data.Polynomial.GroebnerBasis
 -- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
--- 
+--
 -- Gröbner basis
 --
 -- References:
 --
 -- * Monomial order <http://en.wikipedia.org/wiki/Monomial_order>
--- 
+--
 -- * Gröbner basis <http://en.wikipedia.org/wiki/Gr%C3%B6bner_basis>
 --
 -- * グレブナー基底 <http://d.hatena.ne.jp/keyword/%A5%B0%A5%EC%A5%D6%A5%CA%A1%BC%B4%F0%C4%EC>
@@ -22,7 +22,7 @@
 -- * Gröbner Bases and Buchberger’s Algorithm <http://math.rice.edu/~cbruun/vigre/vigreHW6.pdf>
 --
 -- * Docon <http://www.haskell.org/docon/>
--- 
+--
 -----------------------------------------------------------------------------
 
 module ToySolver.Data.Polynomial.GroebnerBasis

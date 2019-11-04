@@ -5,11 +5,11 @@
 -- Module      :  ToySolver.SAT.PBO.UnsatBased
 -- Copyright   :  (c) Masahiro Sakai 2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
--- 
+--
 -- Reference:
 --
 -- * Vasco Manquinho Ruben Martins Inês Lynce

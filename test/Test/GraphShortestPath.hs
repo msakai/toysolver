@@ -21,7 +21,7 @@ import qualified Data.HashSet as HashSet
 type Vertex = Int
 type Cost = Rational
 type Label = Char
-    
+
 genGraph :: Gen Cost -> Gen (HashMap Vertex [OutEdge Vertex Cost Label])
 genGraph genCost = do
   n <- choose (1, 20) -- inclusive
@@ -74,7 +74,7 @@ isValidResult
   -> [vertex]
   -> HashMap vertex (cost, Last (InEdge vertex cost label))
   -> Bool
-isValidResult g ss p = 
+isValidResult g ss p =
   and
   [ case m of
       Nothing -> tc == 0 && u `HashSet.member` ss'
@@ -563,7 +563,7 @@ case_bellmanFord_negativecost_cycle = do
             [(v, [(u,c,())]) | ((v,u),c) <- bellmanford_example_negativecost_cycle]
       m = bellmanFord lastInEdge g [25]
   case bellmanFordDetectNegativeCycle path g m of
-    Nothing -> assertFailure ("negative cost cycle should be found (" ++ show m ++ ")") 
+    Nothing -> assertFailure ("negative cost cycle should be found (" ++ show m ++ ")")
     Just cyclePath -> assertBool (show cyclePath ++ " should be valid negative cost cycle") $ isValidNegativeCostCycle g cyclePath
 
 bellmanford_example_negativecost_cycle :: [((Vertex, Vertex), Cost)]

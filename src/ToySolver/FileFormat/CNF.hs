@@ -7,7 +7,7 @@
 -- Module      :  ToySolver.FileFormat.CNF
 -- Copyright   :  (c) Masahiro Sakai 2016-2018
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -132,7 +132,7 @@ data WCNF
   , wcnfNumClauses :: !Int
     -- ^ Number of (weighted) clauses
   , wcnfTopCost    :: !Weight
-    -- ^ Hard clauses have weight equal or greater than "top". 
+    -- ^ Hard clauses have weight equal or greater than "top".
     -- We assure that "top" is a weight always greater than the sum of the weights of violated soft clauses in the solution.
   , wcnfClauses    :: [WeightedClause]
     -- ^ Weighted clauses

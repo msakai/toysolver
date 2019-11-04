@@ -108,7 +108,7 @@ http://www.math.cuhk.edu.hk/~wei/lpch5.pdf
 example 5.7
 
 minimize 3 x1 + 4 x2 + 5 x3
-subject to 
+subject to
 1 x1 + 2 x2 + 3 x3 >= 5
 2 x1 + 2 x2 + 1 x3 >= 6
 
@@ -145,7 +145,7 @@ http://www.math.cuhk.edu.hk/~wei/lpch5.pdf
 example 5.7
 
 maximize -3 x1 -4 x2 -5 x3
-subject to 
+subject to
 -1 x1 -2 x2 -3 x3 <= -5
 -2 x1 -2 x2 -1 x3 <= -6
 

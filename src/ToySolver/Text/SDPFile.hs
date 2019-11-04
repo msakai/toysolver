@@ -10,7 +10,7 @@
 -- Module      :  ToySolver.Text.SDPFile
 -- Copyright   :  (c) Masahiro Sakai 2012,2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -46,7 +46,7 @@ module ToySolver.Text.SDPFile
   , denseMatrix
   , denseBlock
   , diagBlock
-  
+
     -- * Rendering
   , renderData
   , renderSparseData
@@ -261,7 +261,7 @@ pBlockStruct = do
   let int' = int >>= \i -> optional sep >> return i
   xs <- many int'
   _ <- manyTill anyChar newline
-  return $ map fromIntegral xs 
+  return $ map fromIntegral xs
   where
     sep = some (oneOf " \t(){},")
 
@@ -391,7 +391,7 @@ renderImpl sparse prob = mconcat
               | (blkno, blk) <- zip [(1::Int)..] m, ((i,j),e) <- Map.toList blk, i <= j ]
 
     renderDenseMatrix :: Matrix -> Builder
-    renderDenseMatrix m = 
+    renderDenseMatrix m =
       "{\n" <>
       mconcat [renderDenseBlock b s <> "\n" | (b,s) <- zip m (blockStruct prob)] <>
       "}\n"
@@ -400,9 +400,9 @@ renderImpl sparse prob = mconcat
     renderDenseBlock b s
       | s < 0 =
           "  " <> renderVec [blockElem i i b | i <- [1 .. abs s]]
-      | otherwise = 
+      | otherwise =
           "  { " <>
-          sepByS [renderRow i | i <- [1..s]] ", " <>     
+          sepByS [renderRow i | i <- [1..s]] ", " <>
           " }"
       where
         renderRow i = renderVec [blockElem i j b | j <- [1..s]]

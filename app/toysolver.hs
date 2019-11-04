@@ -5,7 +5,7 @@
 -- Module      :  toysolver
 -- Copyright   :  (c) Masahiro Sakai 2011-2019
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
 -- Portability :  non-portable
@@ -187,7 +187,7 @@ run
 run solver opt prob printModel = do
   unless (Set.null (MIP.semiContinuousVariables prob)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
-    exitFailure  
+    exitFailure
   case map toLower solver of
     s | s `elem` ["omega", "omega-test", "cooper"] -> solveByQE
     s | s `elem` ["old-mip"] -> solveByMIP
@@ -269,7 +269,7 @@ run solver opt prob printModel = do
          omegaOpt =
            def
            { OmegaTest.optCheckReal = realSolver
-           }         
+           }
            where
              realSolver =
                case optOmegaReal opt of
@@ -385,7 +385,7 @@ run solver opt prob printModel = do
         f (e1 :*: e2) = f e1 * f e2
         f (e1 :/: e2)
           | P.deg p > 0 = error "can't handle rational expression"
-          | otherwise   = P.mapCoeff (/ c) $ f e1 
+          | otherwise   = P.mapCoeff (/ c) $ f e1
           where
             p = f e2
             c = P.coeff P.mone p

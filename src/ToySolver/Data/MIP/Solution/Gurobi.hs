@@ -54,7 +54,7 @@ writeFile fname sol = do
   TLIO.writeFile fname (render sol)
 
 parse :: TL.Text -> MIP.Solution Scientific
-parse t = 
+parse t =
   case foldl' f (Nothing,[]) $ TL.lines t of
     (obj, vs) ->
       def{ MIP.solStatus = MIP.StatusFeasible

@@ -290,7 +290,7 @@ solveSmall f g
 -- If they are indeed mutually dual it returns @Nothing@, otherwise
 -- it returns @Just cs@ such that {xi ↦ (if xi∈cs then True else False) | i∈{1…n}}
 -- is a solution of f(x1,…,xn) = g(¬x1,…,xn)).
--- 
+--
 -- Note that this function does not care about redundancy of DNFs.
 --
 -- Complexity: /O(n^o(log n))/ where @n = 'Set.size' f + 'Set.size' g@.

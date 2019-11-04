@@ -7,7 +7,7 @@
 -- Module      :  ToySolver.SAT.MessagePassing.SurveyPropagation
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -137,13 +137,13 @@ newSolver nv clauses = do
 
   -- Initialize all surveys with non-zero values.
   -- If we initialize to zero, following trivial solution exists:
-  -- 
+  --
   -- η_{a→i} = 0 for all i and a.
-  -- 
+  --
   -- Π^0_{i→a} = 1, Π^u_{i→a} = Π^s_{i→a} = 0 for all i and a,
-  -- 
+  --
   -- \^{Π}^{0}_i = 1, \^{Π}^{+}_i = \^{Π}^{-}_i = 0
-  -- 
+  --
   edgeSurvey  <- VGM.replicate num_edges 0.5
   edgeProbU   <- VGM.new num_edges
 
@@ -318,7 +318,7 @@ propagateMT solver nthreads = do
                      loop
            restore loop `catch` \(e :: SomeException) -> atomically (tryPutTMVar ex e >> return ())
          return (th, reqVar, respVar, respVar2)
- 
+
     let loop !i
           | Just l <- lim, i >= l = return False
           | otherwise = do

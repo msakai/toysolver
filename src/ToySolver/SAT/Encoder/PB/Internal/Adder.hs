@@ -7,7 +7,7 @@
 -- Module      :  ToySolver.SAT.Encoder.PB.Internal.Adder
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable

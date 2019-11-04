@@ -5,7 +5,7 @@
 -- Module      :  ToySolver.Arith.Simplex.Textbook.LPSolver.Simple
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -70,7 +70,7 @@ optimize optdir obj cs =
       LPSolver.Unbounded -> return Unbounded
       LPSolver.Optimum -> do
         m <- getModel vs
-        tbl <- getTableau 
+        tbl <- getTableau
         return $ Optimum (Simplex.currentObjValue tbl) m
   where
     vs = vars cs `IS.union` vars obj
@@ -95,7 +95,7 @@ example_3_2 = (obj, cond)
 
 test_3_2 :: Bool
 test_3_2 =
-  uncurry maximize example_3_2 == 
+  uncurry maximize example_3_2 ==
   Optimum (27/5) (IM.fromList [(1,1/5),(2,0),(3,8/5)])
 
 example_3_5 :: (LA.Expr Rational, [LA.Atom Rational])

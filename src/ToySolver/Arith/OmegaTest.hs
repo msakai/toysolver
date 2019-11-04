@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.Arith.OmegaTest
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
@@ -25,7 +25,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Arith.OmegaTest
-    ( 
+    (
     -- * Solving
       Model
     , solve

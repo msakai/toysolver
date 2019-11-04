@@ -53,7 +53,7 @@ decompose1 ss = snd $ foldl' (flip f) (LargestIntersectionFinder.empty, Map.empt
               else if IntSet.null s2 then -- i.e. s⊆s0
                 case Map.lookup s0 r of
                   Nothing -> error "should not happen"
-                  Just Nothing -> 
+                  Just Nothing ->
                     let s3 = s0 IntSet.\\ s
                      in ( LargestIntersectionFinder.insert s3 $ LargestIntersectionFinder.insert s t
                         , -- union is left-biased

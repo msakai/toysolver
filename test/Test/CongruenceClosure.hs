@@ -33,7 +33,7 @@ case_Example_1 = do
   merge solver (TApp a []) (TApp c [])
   ret <- areCongruent solver (TApp a [TApp b []]) (TApp c [TApp d []])
   ret @?= False
-  
+
   merge solver (TApp b []) (TApp d [])
   ret <- areCongruent solver (TApp a [TApp b []]) (TApp c [TApp d []])
   ret @?= True
@@ -49,11 +49,11 @@ case_Example_1_FlatTerm = do
   mergeFlatTerm solver (FTConst a) c
   ret <- areCongruentFlatTerm solver (FTApp a b) (FTApp c d)
   ret @?= False
-  
+
   mergeFlatTerm solver (FTConst b) d
   ret <- areCongruentFlatTerm solver (FTApp a b) (FTApp c d)
   ret @?= True
-  
+
 case_Example_2 :: Assertion
 case_Example_2 = do
   solver <- newSolver
@@ -62,14 +62,14 @@ case_Example_2 = do
   c <- newConst solver
   f <- newFun solver
   g <- newFun solver
-  h <- newFun solver  
-  
+  h <- newFun solver
+
   merge solver (f b) c
   merge solver (f c) a
   merge solver (g a) (h a a)
   ret <- areCongruent solver (g b) (h c b)
   ret @?= False
-  
+
   merge solver b c
   ret <- areCongruent solver (g b) (h c b)
   ret @?= True
@@ -88,7 +88,7 @@ case_NO2007_Example_16 :: Assertion
 case_NO2007_Example_16 = do
   solver <- newSolver
   a <- newFSym solver
-  b <- newFSym solver  
+  b <- newFSym solver
   c <- newFSym solver
   d <- newFSym solver
   e <- newFSym solver
@@ -130,7 +130,7 @@ case_backtracking_1 = do
   ret <- areCongruentFlatTerm solver (FTConst a2) (FTConst b2)
   ret @?= False
   ret <- areCongruentFlatTerm solver (FTApp a1 a2) (FTApp b1 b2)
-  ret @?= False  
+  ret @?= False
   popBacktrackPoint solver
 
 case_backtracking_preserve_definition :: Assertion
@@ -144,7 +144,7 @@ case_backtracking_preserve_definition = do
   a <- flatTermToFSym solver (FTApp a1 a2)
   b <- flatTermToFSym solver (FTApp b1 b2)
   popBacktrackPoint solver
-  c <- newFSym solver  
+  c <- newFSym solver
   mergeFlatTerm solver (FTApp a1 a2) c
   mergeFlatTerm solver (FTApp b1 b2) c
   ret <- areCongruentFlatTerm solver (FTConst a) (FTConst b)

@@ -7,7 +7,7 @@
 -- Module      :  toysat
 -- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
 -- Portability :  non-portable
@@ -440,7 +440,7 @@ main = do
   putCommentLine $ printf "command line = %s" (show fullArgs)
 
   let timelim = optTimeout opt * 10^(6::Int)
-  
+
   ret <- timeout (if timelim > 0 then timelim else (-1)) $ do
      solver <- newSolver opt
      case mode of
@@ -800,14 +800,14 @@ solvePB opt solver formula = do
       PBFile.Ge -> PBNLC.addPBNLAtLeast pbnlc lhs rhs
       PBFile.Eq -> PBNLC.addPBNLExactly pbnlc lhs rhs
 
-  spHighlyBiased <- 
+  spHighlyBiased <-
     if optInitSP opt then do
       let (cnf, _) = pb2sat formula
       initPolarityUsingSP solver nv (CNF.cnfNumVars cnf) [(1.0, clause) | clause <- CNF.cnfClauses cnf]
     else
       return IntMap.empty
 
-  initialModel <- 
+  initialModel <-
     if optLocalSearchInitial opt then do
       let (wbo,  info1) = pb2wbo formula
           (wcnf, info2) = wbo2maxsat wbo
@@ -831,7 +831,7 @@ solvePB opt solver formula = do
           forM_ (assocs m2) $ \(v, val) -> do
             SAT.setVarPolarity solver v val
           if obj < CNF.wcnfTopCost wcnf then
-            return $ Just m2 
+            return $ Just m2
           else
             return Nothing
     else
@@ -959,7 +959,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
                 [(v, SAT.evalPBConstraint a constr) | (v, constr) <- defsPB]
 
   let softConstrs = [(c, constr) | (Just c, constr) <- PBFile.wboConstraints formula]
-                
+
   pbo <- PBO.newOptimizer2 solver objLin $ \m ->
            sum [if SAT.evalPBConstraint m constr then 0 else w | (w,constr) <- softConstrs]
 
@@ -993,7 +993,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
           putSLine "SATISFIABLE"
           pbPrintModel stdout m nv
           writeSOLFile opt m (Just val) nv
-        else 
+        else
           putSLine "UNKNOWN"
 
 -- ------------------------------------------------------------------------
@@ -1062,7 +1062,7 @@ solveMIP opt solver mip = do
             forM_ (Map.toList m) $ \(v, val) -> do
               printf "v %s = %d\n" (MIP.fromVar v) val
             hFlush stdout
-  
+
           writeSol :: Map MIP.Var Integer -> Rational -> IO ()
           writeSol m objVal = do
             case optWriteFile opt of
@@ -1074,12 +1074,12 @@ solveMIP opt solver mip = do
                           , MIP.solVariables = Map.fromList [(v, fromIntegral val) | (v,val) <- Map.toList m]
                           }
                 GurobiSol.writeFile fname sol
-  
+
       pbo <- PBO.newOptimizer solver linObj
       setupOptimizer pbo opt
       PBO.setOnUpdateBestSolution pbo $ \_ val -> do
         putOLine $ showRational (optPrintRational opt) (transformObjValBackward val)
-  
+
       finally (PBO.optimize pbo) $ do
         ret' <- PBO.getBestSolution pbo
         case ret' of

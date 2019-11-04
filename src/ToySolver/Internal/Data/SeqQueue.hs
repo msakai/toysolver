@@ -5,13 +5,13 @@
 -- Module      :  ToySolver.Internal.Data.SeqQueue
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
 --
 -- Queue implemented using IORef and Sequence.
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Internal.Data.SeqQueue
   (
@@ -21,7 +21,7 @@ module ToySolver.Internal.Data.SeqQueue
   -- * Constructors
   , NewFifo (..)
 
-  -- * Operators  
+  -- * Operators
   , Enqueue (..)
   , Dequeue (..)
   , QueueSize (..)

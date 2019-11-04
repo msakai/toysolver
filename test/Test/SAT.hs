@@ -371,7 +371,7 @@ case_getVarFixed = do
   ret @?= lUndef
 
   SAT.addClause solver [-x1]
-  
+
   ret <- SAT.getVarFixed solver x1
   ret @?= lFalse
 

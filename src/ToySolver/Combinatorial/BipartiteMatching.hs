@@ -12,8 +12,8 @@
 -- Portability :  non-portable
 --
 -- This module provides functions for computing several kind of bipartite
--- matching. 
--- 
+-- matching.
+--
 -- Reference:
 --
 -- * Friedrich Eisenbrand. “Linear and Discrete Optimization”.
@@ -21,7 +21,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Combinatorial.BipartiteMatching
-  ( 
+  (
   -- * Maximum cardinality bipartite matching
     maximumCardinalityMatching
 
@@ -59,7 +59,7 @@ maximumCardinalityMatching
   -> IntSet      -- ^ vertex set B
   -> [(Int,Int)] -- ^ set of edges E⊆A×B
   -> IntMap Int
-maximumCardinalityMatching _as bs es = 
+maximumCardinalityMatching _as bs es =
   case maximumCardinalityMatching' bs (\b -> IntMap.findWithDefault IntSet.empty b e_b2a) IntMap.empty of
     (m, _, _) -> m
   where
@@ -150,7 +150,7 @@ maximumWeightMatching as bs w =
     tbl :: IntMap (IntMap w)
     tbl = IntMap.fromListWith IntMap.union [(a, (IntMap.singleton b v)) | (a,b,v) <- w]
     f a b = do
-      t <- IntMap.lookup a tbl 
+      t <- IntMap.lookup a tbl
       v <- IntMap.lookup b t
       guard $ v >= 0
       return v
@@ -369,7 +369,7 @@ minimumCardinalityEdgeCover as bs es
   | IntMap.size cb /= IntSet.size bs = Nothing
   | otherwise =
       case maximumCardinalityMatching as bs es of
-        m -> 
+        m ->
           let ma = IntMap.keysSet m
               mb = IntSet.fromList $ IntMap.elems m
               m2 = Set.unions

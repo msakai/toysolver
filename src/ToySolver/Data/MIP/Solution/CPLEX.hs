@@ -39,7 +39,7 @@ import ToySolver.Data.MIP (Solution)
 import qualified ToySolver.Data.MIP.Base as MIP
 
 parseDoc :: XML.Document -> MIP.Solution Scientific
-parseDoc doc = 
+parseDoc doc =
   MIP.Solution
   { MIP.solStatus = status
   , MIP.solObjectiveValue = obj

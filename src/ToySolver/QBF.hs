@@ -5,7 +5,7 @@
 -- Module      :  ToySolver.QBF
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -23,7 +23,7 @@ module ToySolver.QBF
   ( Quantifier (..)
   , Prefix
   , normalizePrefix
-  , quantifyFreeVariables 
+  , quantifyFreeVariables
   , Matrix
   , solve
   , solveNaive
@@ -140,7 +140,7 @@ prenexAnd (nv1, prefix1, matrix1) (nv2, prefix2, matrix2) =
           subst2' = fmap BoolExpr.Atom s `IntMap.union` subst2
       f (prefix ++ [(q, xs')]) (bvs `IntSet.union` xs') subst1 subst2' prefix1 prefix2'
 
--- XXX     
+-- XXX
 prenexOr :: (Int, Prefix, Matrix) -> (Int, Prefix, Matrix) -> (Int, Prefix, Matrix)
 prenexOr (nv1, prefix1, matrix1) (nv2, prefix2, matrix2) =
   evalState (f [] IntSet.empty IntMap.empty IntMap.empty prefix1 prefix2) (nv1 `max` nv2)
@@ -249,7 +249,7 @@ solveNaive nv prefix matrix =
 
 -- ----------------------------------------------------------------------------
 
--- | Abstraction-Based Algorithm for a Winning Move                    
+-- | Abstraction-Based Algorithm for a Winning Move
 solveCEGAR :: Int -> Prefix -> Matrix -> IO (Bool, Maybe LitSet)
 solveCEGAR nv prefix matrix =
   case prefix' of
@@ -371,7 +371,7 @@ solveCEGARIncremental nv prefix matrix =
               m <- SAT.getModel solver
               return $ Just $ IntSet.fromList [if SAT.evalLit m x then x else -x | x <- IntSet.toList xs]
             else
-              return Nothing            
+              return Nothing
           g nv assumptions ((q,xs) : prefix'@((_q2,_) : prefix'')) matrix = do
             let loop counterMoves = do
                   let ys = [(nv, prefix'', reduct matrix nu) | nu <- counterMoves]

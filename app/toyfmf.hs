@@ -7,7 +7,7 @@
 -- Module      :  toyfmf
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
 -- Portability :  non-portable
@@ -108,7 +108,7 @@ translateFormula = TPTP.foldF neg quant binop eq rel
     quant q vs phi = foldr q' (translateFormula phi) [fromString v | TPTP.V v <- vs]
       where
         q' =
-          case q of 
+          case q of
             TPTP.All    -> MF.Forall
             TPTP.Exists -> MF.Exists
     binop phi op psi = op' phi' psi'

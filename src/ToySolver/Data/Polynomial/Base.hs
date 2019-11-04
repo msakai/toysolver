@@ -12,7 +12,7 @@
 -- Module      :  ToySolver.Data.Polynomial.Base
 -- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -26,7 +26,7 @@
 -- * Polynomial class for Ruby <http://www.math.kobe-u.ac.jp/~kodama/tips-RubyPoly.html>
 --
 -- * constructive-algebra package <http://hackage.haskell.org/package/constructive-algebra>
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.Polynomial.Base
   (
@@ -321,7 +321,7 @@ ppI p = mapCoeff f p
 class ContPP k where
   type PPCoeff k
 
-  -- | Content of a polynomial  
+  -- | Content of a polynomial
   cont :: (Ord v) => Polynomial k v -> k
   -- constructive-algebra-0.3.0 では cont 0 は error になる
 
@@ -578,7 +578,7 @@ instance PrettyCoeff Integer where
 instance (PrettyCoeff a, Integral a) => PrettyCoeff (Ratio a) where
   pPrintCoeff lv p r
     | denominator r == 1 = pPrintCoeff lv p (numerator r)
-    | otherwise = 
+    | otherwise =
         maybeParens (p > ratPrec) $
           pPrintCoeff lv (ratPrec+1) (numerator r) <>
           PP.char '/' <>
@@ -890,7 +890,7 @@ lex = go `on` mindices
         EQ -> compare n1 n2 `mappend` go xs1 xs2
 
 -- | Reverse lexicographic order.
--- 
+--
 -- Note that revlex is /NOT/ a monomial order.
 revlex :: Ord v => Monomial v -> Monomial v -> Ordering
 revlex = go `on` (Map.toDescList . mindicesMap)

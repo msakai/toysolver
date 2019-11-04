@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.SAT.PBO
 -- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
@@ -257,7 +257,7 @@ linSearch cxt solver = loop
     loop = do
       result <- SAT.solve solver
       if result then do
-        m <- SAT.getModel solver        
+        m <- SAT.getModel solver
         let val = C.evalObjectiveFunction cxt m
         let ub = val - 1
         C.addSolution cxt m

@@ -3,7 +3,7 @@
 -- Module      :  ToySolver.SAT.MUS.QuickXplain
 -- Copyright   :  (c) Masahiro Sakai 2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable

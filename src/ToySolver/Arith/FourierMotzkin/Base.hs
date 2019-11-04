@@ -7,13 +7,13 @@
 -- Module      :  ToySolver.Arith.FourierMotzkin.Base
 -- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
 --
 -- Naïve implementation of Fourier-Motzkin Variable Elimination
--- 
+--
 -- Reference:
 --
 -- * <http://users.cecs.anu.edu.au/~michaeln/pubs/arithmetic-dps.pdf>
@@ -155,7 +155,7 @@ fromLAAtom :: LA.Atom Rational -> DNF Constr
 fromLAAtom (OrdRel a op b) = atomR' op (toRat a) (toRat b)
   where
     atomR' :: RelOp -> Rat -> Rat -> DNF Constr
-    atomR' op a b = 
+    atomR' op a b =
       case op of
         Le -> DNF [[a `leR` b]]
         Lt -> DNF [[a `ltR` b]]
@@ -189,9 +189,9 @@ evalBounds model (ls1,ls2,us1,us2) =
     [ NegInf <..<  Finite (evalRat model x) | x <- us2 ]
 
 boundsToConstrs :: Bounds -> Maybe [Constr]
-boundsToConstrs  (ls1, ls2, us1, us2) = simplify $ 
+boundsToConstrs  (ls1, ls2, us1, us2) = simplify $
   [ x `leR` y | x <- ls1, y <- us1 ] ++
-  [ x `ltR` y | x <- ls1, y <- us2 ] ++ 
+  [ x `ltR` y | x <- ls1, y <- us2 ] ++
   [ x `ltR` y | x <- ls2, y <- us1 ] ++
   [ x `ltR` y | x <- ls2, y <- us2 ]
 
@@ -261,10 +261,10 @@ projectN' = f
           let mt1 m = IM.insert v (evalRat m vdef) m
           (zs, mt2) <- f (IS.delete v vs) [subst1Constr v (fromRat vdef) c | c <- ys]
           return (zs, mt1 . mt2)
-      | otherwise = 
+      | otherwise =
           case IS.minView vs of
             Nothing -> return (xs, id) -- should not happen
-            Just (v,vs') -> 
+            Just (v,vs') ->
               case collectBounds v xs of
                 (bnd, rest) -> do
                   cond <- boundsToConstrs bnd
@@ -295,7 +295,7 @@ findEq vs = msum . map f . pickup
 -- such @M@ exists, returns @Nothing@ otherwise.
 --
 -- @FV(φ)@ must be a subset of @{x1,…,xn}@.
--- 
+--
 solve :: VarSet -> [LA.Atom Rational] -> Maybe (Model Rational)
 solve vs cs = msum [solve' vs cs2 | cs2 <- unDNF (constraintsToDNF cs)]
 

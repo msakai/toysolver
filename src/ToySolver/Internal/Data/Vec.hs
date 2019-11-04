@@ -7,7 +7,7 @@
 -- Module      :  ToySolver.Internal.Data.Vec
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -32,7 +32,7 @@ module ToySolver.Internal.Data.Vec
   , read
   , write
   , modify
-  , modify'  
+  , modify'
   , unsafeRead
   , unsafeWrite
   , unsafeModify

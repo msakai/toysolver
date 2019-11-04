@@ -61,7 +61,7 @@ case_QF_EUF_1 = do
   m <- SMT.getModel solver
   SMT.eval m c1 @?= SMT.ValBool True
   SMT.eval m c2 @?= SMT.ValBool True
-  
+
   SMT.assert solver $ x
   ret <- SMT.checkSAT solver
   ret @?= False
@@ -207,7 +207,7 @@ case_LRA_model_construction_bug = do
            ]
   forM_ cs $ SMT.assert solver
   ret <- SMT.checkSATAssuming solver [cond]
-  m <- SMT.getModel solver 
+  m <- SMT.getModel solver
   forM_ cs $ \c -> do
     let val = SMT.eval m c
     -- unless (val == SMT.ValBool True) $ print val
@@ -355,7 +355,7 @@ prop_getModel_evalFSym = QM.monadicIO $ do
     replicateM nconstrs (genExpr genSorts sig SMT.sBool 10)
   QM.run $ do
     forM_ constrs $ \constr -> SMT.assert solver constr
-    ret <- SMT.checkSAT solver    
+    ret <- SMT.checkSAT solver
     when ret $ do
       m <- SMT.getModel solver
       forM_ fs2 $ \(f,_) -> do
@@ -494,7 +494,7 @@ genExpr genSorts sig s size = evalStateT (f s) size
         | size >= 3
         ]
       put size'
-      return e      
+      return e
     f s = do
       modify (subtract 1)
       size <- get
@@ -522,7 +522,7 @@ genExpr genSorts sig s size = evalStateT (f s) size
         | s == SMT.sBool, size >= 2
         , op <- ["="]
         ]
-        ++ 
+        ++
         [ flip runStateT size $ do
             w <- lift $ choose (1, 10)
             arg1 <- f (SMT.Sort (SMT.SSymBitVec w) [])

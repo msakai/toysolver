@@ -46,7 +46,7 @@ parse' (t1:t2:ts) = do
       Nothing -> throwError "first line must start with \"solution status:\""
       Just s -> return $ Map.findWithDefault MIP.StatusUnknown (TL.toStrict $ TL.strip s) statusTable
   if t2 == "no solution available" then do
-    return $ 
+    return $
       MIP.Solution
       { MIP.solStatus = status
       , MIP.solObjectiveValue = Nothing

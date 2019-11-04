@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.Arith.VirtualSubstitution
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
@@ -12,10 +12,10 @@
 -- Naive implementation of virtual substitution
 --
 -- Reference:
--- 
+--
 -- * V. Weispfenning. The complexity of linear problems in fields.
 --   Journal of Symbolic Computation, 5(1-2): 3-27, Feb.-Apr. 1988.
--- 
+--
 -- * Hirokazu Anai, Shinji Hara. Parametric Robust Control by Quantifier Elimination.
 --   J.JSSAC, Vol. 10, No. 1, pp. 41-51, 2003.
 --
@@ -142,7 +142,7 @@ projectCases' v phi
 * if @M ⊧_LRA ψ_i@ then @lift_i M ⊧_LRA φ@.
 -}
 projectCasesN :: VarSet -> QFFormula -> [(QFFormula, Model Rational -> Model Rational)]
-projectCasesN vs = f (IS.toList vs) 
+projectCasesN vs = f (IS.toList vs)
   where
     f [] phi = return (phi, id)
     f (v:vs) phi = do
@@ -182,7 +182,7 @@ pairs (x:xs) = [(x,x2) | x2 <- xs] ++ pairs xs
 -- such @M@ exists, returns @Nothing@ otherwise.
 --
 -- @FV(φ)@ must be a subset of @{x1,…,xn}@.
--- 
+--
 solveQFFormula :: VarSet -> QFFormula -> Maybe (Model Rational)
 solveQFFormula vs formula = listToMaybe $ do
   (formula2, mt) <- projectCasesN vs formula
@@ -195,6 +195,6 @@ solveQFFormula vs formula = listToMaybe $ do
 -- such @M@ exists, returns @Nothing@ otherwise.
 --
 -- @FV(φ)@ must be a subset of @{x1,…,xn}@.
--- 
+--
 solve :: VarSet -> [LA.Atom Rational] -> Maybe (Model Rational)
 solve vs cs = solveQFFormula vs (andB [Atom c | c <- cs])

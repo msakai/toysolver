@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.SAT.PBO.BC
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
@@ -17,7 +17,7 @@
 --   Core-Guided binary search algorithms for maximum satisfiability,
 --   Twenty-Fifth AAAI Conference on Artificial Intelligence, 2011.
 --   <http://www.aaai.org/ocs/index.php/AAAI/AAAI11/paper/view/3713>
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.SAT.PBO.BC
   ( solve

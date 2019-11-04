@@ -14,7 +14,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Base
-  ( 
+  (
   -- * The MIP Problem type
     Problem (..)
   , Label
@@ -329,7 +329,7 @@ instance Functor SOSConstraint where
 -- ---------------------------------------------------------------------------
 
 -- | MIP status with the following partial order:
--- 
+--
 -- <<doc-images/MIP-Status-diagram.png>>
 data Status
   = StatusUnknown

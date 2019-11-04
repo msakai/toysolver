@@ -38,7 +38,7 @@ solve
   -> weight
   -> (value, weight, [Bool])
 solve = solveGeneric
-    
+
 solveGeneric
   :: forall value weight. (Real value, Real weight)
   => [(value, weight)]
@@ -118,7 +118,7 @@ solveInt items limit =
     splitLE :: Int -> IntMap v -> IntMap v
     splitLE k m
       | k == maxBound = m
-      | otherwise = 
+      | otherwise =
           case IntMap.splitLookup (k+1) m of
             (lo, _, _) -> lo
 

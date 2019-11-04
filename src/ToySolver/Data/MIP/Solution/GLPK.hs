@@ -43,7 +43,7 @@ parse' ls =
         (vs, _) ->
           let status = Map.findWithDefault MIP.StatusUnknown (headers Map.! "Status") statusTable
               objstr = headers Map.! "Objective"
-              objstr2 = 
+              objstr2 =
                 case T.findIndex ('='==) objstr of
                   Nothing -> objstr
                   Just idx -> T.drop (idx+1) objstr

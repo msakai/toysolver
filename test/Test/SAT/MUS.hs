@@ -243,7 +243,7 @@ case_allMUSAssumptions_2_HYCAM = do
   -- and hence not MSS.
   ret <- SAT.solveWith solver [y0,y1,y2,y4,y5,y6,y7,y9,y11,y12]
   assertBool "failed to prove the bug of HYCAM paper" (not ret)
-  
+
   let cand = map IntSet.fromList [[y5], [y3,y2], [y0,y1,y2]]
   (actual,_) <- MUSEnum.allMUSAssumptions solver sels def{ MUSEnum.optMethod = MUSEnum.CAMUS, MUSEnum.optKnownCSes = cand }
   let actual'   = Set.fromList $ actual

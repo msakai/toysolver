@@ -81,13 +81,13 @@ run prob opt = loop (Set.map complement (optMaximalInterestingSets opt)) (optMin
 -- CNF representation /f/ and DNF representation of /f/ respectively.
 --
 -- Given a subset /C' ⊆ C/ and /D' ⊆ D/, @'findPrimeImplicateOrPrimeImplicant' S f C' D'@ returns
--- 
+--
 -- * @Just (Left I)@ where I ∈ C \\ C',
 --
 -- * @Just (Right I)@ where J ∈ D \\ D', or
 --
 -- * @Nothing@ if /C'=C/ and /D'=D/.
--- 
+--
 findPrimeImplicateOrPrimeImplicant
   :: IntSet -- ^ Set of variables /V/
   -> (IntSet -> Bool) -- ^ A monotone boolean function /f/ from /{0,1}^|V| ≅ P(V)/ to @Bool@

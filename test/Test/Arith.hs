@@ -152,7 +152,7 @@ genLAExpr vs = do
     x <- elements (LA.unitVar : vs)
     c <- arbitrary
     return (c,x)
-    
+
 genLAExprSmallInt :: [Var] -> Gen (LA.Expr Rational)
 genLAExprSmallInt vs = do
   size <- choose (0,3)
@@ -172,7 +172,7 @@ genQFLAConj = do
     rhs <- genLAExpr [1..nv]
     return $ ordRel op lhs rhs
   return (vs, cs)
-  
+
 genQFLAConjSmallInt :: Gen (VarSet, [LA.Atom Rational])
 genQFLAConjSmallInt = do
   nv <- choose (0, 3)
@@ -192,7 +192,7 @@ genModel xs = do
     return (x,val)
 
 ------------------------------------------------------------------------
- 
+
 prop_FourierMotzkin_solve :: Property
 prop_FourierMotzkin_solve =
   forAll genQFLAConj $ \(vs,cs) ->
@@ -201,7 +201,7 @@ prop_FourierMotzkin_solve =
       Just m  -> property $ all (LA.eval m) cs
 
 case_FourierMotzkin_test1 :: Assertion
-case_FourierMotzkin_test1 = 
+case_FourierMotzkin_test1 =
   case uncurry FourierMotzkin.solve test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
@@ -209,7 +209,7 @@ case_FourierMotzkin_test1 =
         LA.eval m a @?= True
 
 case_FourierMotzkin_test2 :: Assertion
-case_FourierMotzkin_test2 = 
+case_FourierMotzkin_test2 =
   case uncurry FourierMotzkin.solve test2' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
@@ -250,7 +250,7 @@ case_FourierMotzkinOptimization_test1 = do
          ]
 
 ------------------------------------------------------------------------
-        
+
 prop_VirtualSubstitution_solve :: Property
 prop_VirtualSubstitution_solve =
    forAll genQFLAConj $ \(vs,cs) ->
@@ -259,7 +259,7 @@ prop_VirtualSubstitution_solve =
        Just m  -> property $ all (LA.eval m) cs
 
 case_VirtualSubstitution_test1 :: Assertion
-case_VirtualSubstitution_test1 = 
+case_VirtualSubstitution_test1 =
   case uncurry VirtualSubstitution.solve test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
@@ -267,7 +267,7 @@ case_VirtualSubstitution_test1 =
         LA.eval m a @?= True
 
 case_VirtualSubstitution_test2 :: Assertion
-case_VirtualSubstitution_test2 = 
+case_VirtualSubstitution_test2 =
   case uncurry VirtualSubstitution.solve test2' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
@@ -275,7 +275,7 @@ case_VirtualSubstitution_test2 =
         LA.eval m a @?= True
 
 ------------------------------------------------------------------------
-        
+
 -- too slow
 disabled_prop_CAD_solve :: Property
 disabled_prop_CAD_solve =
@@ -290,7 +290,7 @@ disabled_prop_CAD_solve =
           Just m  -> property $ all (evalPAtom m) cs'
 
 case_CAD_test1 :: Assertion
-case_CAD_test1 = 
+case_CAD_test1 =
   case CAD.solve vs cs of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
@@ -301,7 +301,7 @@ case_CAD_test1 =
     cs = map toPRel $ snd test1'
 
 case_CAD_test2 :: Assertion
-case_CAD_test2 = 
+case_CAD_test2 =
   case CAD.solve vs cs of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  ->
@@ -347,7 +347,7 @@ prop_OmegaTest_solve =
        Just m  -> property $ all (LA.eval (fmap fromInteger m :: Model Rational)) cs
 
 case_OmegaTest_test1 :: Assertion
-case_OmegaTest_test1 = 
+case_OmegaTest_test1 =
   case uncurry (OmegaTest.solve def) test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
@@ -355,7 +355,7 @@ case_OmegaTest_test1 =
         LA.eval (IM.map fromInteger m :: Model Rational) a @?= True
 
 case_OmegaTest_test2 :: Assertion
-case_OmegaTest_test2 = 
+case_OmegaTest_test2 =
   case uncurry (OmegaTest.solve def) test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
@@ -380,7 +380,7 @@ prop_Cooper_solve =
        Just m  -> property $ all (LA.eval (fmap fromInteger m :: Model Rational)) cs
 
 case_Cooper_test1 :: Assertion
-case_Cooper_test1 = 
+case_Cooper_test1 =
   case uncurry Cooper.solve test1' of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
@@ -388,13 +388,13 @@ case_Cooper_test1 =
         LA.eval (IM.map fromInteger m :: Model Rational) a @?= True
 
 case_Cooper_test2 :: Assertion
-case_Cooper_test2 = 
+case_Cooper_test2 =
   case uncurry Cooper.solve test2' of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()
 
 ------------------------------------------------------------------------
-    
+
 prop_Simplex_solve :: Property
 prop_Simplex_solve = forAll genQFLAConj $ \(vs,cs) -> do
   case SimplexSimple.check vs cs of
@@ -483,7 +483,7 @@ instance Arbitrary Simplex.PivotStrategy where
 -- Too slow
 
 disabled_case_ContiTraverso_test1 :: Assertion
-disabled_case_ContiTraverso_test1 = 
+disabled_case_ContiTraverso_test1 =
   case ContiTraverso.solve P.grlex (fst test1') OptMin (LA.constant 0) (snd test1') of
     Nothing -> assertFailure "expected: Just\n but got: Nothing"
     Just m  -> do
@@ -491,7 +491,7 @@ disabled_case_ContiTraverso_test1 =
         LA.eval (IM.map fromInteger m :: Model Rational) a @?= True
 
 disabled_case_ContiTraverso_test2 :: Assertion
-disabled_case_ContiTraverso_test2 = 
+disabled_case_ContiTraverso_test2 =
   case ContiTraverso.solve P.grlex (fst test2') OptMin (LA.constant 0) (snd test2') of
     Just _  -> assertFailure "expected: Nothing\n but got: Just"
     Nothing -> return ()

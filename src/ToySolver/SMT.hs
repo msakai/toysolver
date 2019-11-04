@@ -9,7 +9,7 @@
 -- Module      :  ToySolver.SMT
 -- Copyright   :  (c) Masahiro Sakai 2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  unstable
 -- Portability :  non-portable
@@ -533,7 +533,7 @@ exprSort' fdefs (EAp f xs)
             FEUFFun (_,s) _ -> s
 
 -- -------------------------------------------------------------------
-                                              
+
 exprToFormula :: Solver -> Expr -> IO Tseitin.Formula
 exprToFormula solver (EAp "true" [])  = return true
 exprToFormula solver (EAp "false" []) = return false
@@ -675,7 +675,7 @@ exprToLRAExpr solver (EAp "ite" [c,t,e]) = do
   c2 <- abstractLRAAtom solver (ret .==. e')
   Tseitin.addFormula (smtEnc solver) $ ite c' (Atom c1) (Atom c2)
   return ret
-exprToLRAExpr solver (EAp f xs) = 
+exprToLRAExpr solver (EAp f xs) =
   lraExprFromTerm solver =<< exprToEUFTerm solver f xs
 
 abstractLRAAtom :: Solver -> LA.Atom Rational -> IO SAT.Lit
@@ -691,7 +691,7 @@ abstractLRAAtom solver atom = do
         vGt <- SAT.newVar (smtSAT solver)
         SAT.addClause (smtSAT solver) [vLt,vEq,vGt]
         SAT.addClause (smtSAT solver) [-vLt, -vEq]
-        SAT.addClause (smtSAT solver) [-vLt, -vGt]                 
+        SAT.addClause (smtSAT solver) [-vLt, -vGt]
         SAT.addClause (smtSAT solver) [-vEq, -vGt]
         let xs = IntMap.fromList
                  [ (vEq,  LA.var v .==. LA.constant rhs)
@@ -866,7 +866,7 @@ bvExprToEUFTerm solver e = do
     Nothing -> do
       c <- EUF.newFSym (smtEUF solver)
       let w = BV.width e
-          m = IntMap.findWithDefault IntMap.empty w fsymToBV 
+          m = IntMap.findWithDefault IntMap.empty w fsymToBV
       forM_ (IntMap.toList m) $ \(d, d_bv) -> do
         -- allocate interface equalities
         b1 <- abstractEUFAtom solver (EUF.TApp c [], EUF.TApp d [])
@@ -1032,7 +1032,7 @@ push solver = do
         { alSavedNamedAssertions = named
         , alSavedFDefs = if globalDeclarations then Nothing else Just fdefs
         , alSelector = l2
-        }  
+        }
   Vec.push (smtAssertionStack solver) newLevel
 
 pop :: Solver -> IO ()
@@ -1216,7 +1216,7 @@ valToEntity m (ValBitVec bv) =
     Nothing -> EUF.mUnspecified (mEUFModel m)
 
 entityToValue :: Model -> EUF.Entity -> Sort -> Value
-entityToValue m e s = 
+entityToValue m e s =
   case s of
     Sort SSymBool _ -> ValBool (e == mEUFTrue m)
     Sort SSymReal _ ->
@@ -1239,7 +1239,7 @@ data FunDef = FunDef [([Value], Value)] Value
   deriving (Eq, Show)
 
 evalFSym :: Model -> FSym -> FunDef
-evalFSym m f = 
+evalFSym m f =
   case Map.lookup f (mDefs m) of
     Just (FEUFFun (argsSorts@(_:_), resultSort) sym) -> -- proper function symbol
       let tbl = EUF.mFunctions (mEUFModel m) IntMap.! sym
@@ -1256,7 +1256,7 @@ evalFSym m f =
     Nothing -> E.throw $ Error $ "unknown function symbol: " ++ show f
 
 -- | Constraints that cannot represented as function definitions.
--- 
+--
 -- For example, zero-division result values cannot be specified by
 -- function definition, because division is interpreted function.
 modelGetAssertions :: Model -> [Expr]
@@ -1290,7 +1290,7 @@ modelGetAssertions m =
       , EValue (ValBitVec t)
       ]
   | (s,t) <- Map.toList bvRemTable
-  ]  
+  ]
   where
     (_, bvDivTable, bvRemTable) = mBVModel m
 

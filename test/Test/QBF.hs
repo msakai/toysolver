@@ -77,7 +77,7 @@ prop_eliminate_last_universal_quantifier = QM.monadicIO $ do
       q1 <- arbitrary
       q2 <- arbitrary
       vs1 <- IntSet.fromList <$> subsetof vs
-      vs2 <- IntSet.fromList <$> subsetof vs    
+      vs2 <- IntSet.fromList <$> subsetof vs
       matrix <- replicateM nc $ do
         if nv == 0 then
           return []
@@ -137,7 +137,7 @@ arbitrarySmallQBF' = do
       return []
     else
       replicateM len $ choose (-nv, nv) `suchThat` (/= 0)
-  
+
   return
     ( nv
     , [(q1,vs1), (q2, vs2 IntSet.\\ vs1), (q3, IntSet.fromList vs IntSet.\\ (vs1 `IntSet.union` vs2))]

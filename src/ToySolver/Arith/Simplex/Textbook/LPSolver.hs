@@ -5,13 +5,13 @@
 -- Module      :  ToySolver.Arith.Simplex.Textbook.LPSolver
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
 --
 -- Naïve implementation of Simplex method
--- 
+--
 -- Reference:
 --
 -- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
@@ -128,9 +128,9 @@ getDefs = do
 -- | Add a contraint and maintain feasibility condition by introducing artificial variable (if necessary).
 --
 -- * Disequality is not supported.
--- 
+--
 -- * Unlike 'addConstraint', an equality contstraint becomes one row with an artificial variable.
--- 
+--
 addConstraintWithArtificialVariable :: Real r => LA.Atom r -> LP r ()
 addConstraintWithArtificialVariable c = do
   c2 <- expandDefs' c
@@ -162,7 +162,7 @@ addConstraintWithArtificialVariable c = do
 -- * Disequality is not supported.
 --
 -- * Unlike 'addConstraintWithArtificialVariable', an equality constraint becomes two rows.
--- 
+--
 addConstraint :: Real r => LA.Atom r -> LP r ()
 addConstraint c = do
   OrdRel lhs rop rhs <- expandDefs' c

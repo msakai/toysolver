@@ -9,7 +9,7 @@
 -- Module      :  ToySolver.Combinatorial.HittingSet.MARCO
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -109,7 +109,7 @@ generateCNFAndDNF vs f cs ds = unsafeDupablePerformIO $ do
       }
 
 minimalHittingSets :: Set IntSet -> Set IntSet
-minimalHittingSets xss = 
+minimalHittingSets xss =
   case generateCNFAndDNF (IntSet.unions $ Set.toList xss) (evalDNF xss) Set.empty xss of
     (yss, _) -> yss
 

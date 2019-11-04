@@ -43,7 +43,7 @@ arbitraryAssignment nv = do
   bs <- replicateM nv arbitrary
   return $ array (1,nv) (zip [1..] bs)
 
--- ---------------------------------------------------------------------  
+-- ---------------------------------------------------------------------
 
 arbitraryCNF :: Gen CNF.CNF
 arbitraryCNF = do
@@ -270,7 +270,7 @@ arbitraryXOR = do
   nv <- choose (0,10)
   nc <- choose (0,50)
   cs <- replicateM nc $ do
-    len <- choose (0,10)    
+    len <- choose (0,10)
     lhs <-
       if nv == 0 then
         return []

@@ -103,7 +103,7 @@ cube info m = IntSet.fromList $ concat $
 blockingClause :: Info -> SAT.Model -> Clause
 blockingClause info m = [-y | y <- IntMap.keys (backwardMap info), SAT.evalLit m y]
 
-{-# DEPRECATED shortestImplicants "Use shortestImplicantsE instead" #-} 
+{-# DEPRECATED shortestImplicants "Use shortestImplicantsE instead" #-}
 -- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\),
 -- this function computes shortest implicants of \(\phi\) in terms of \(X\).
 -- Variables except \(X\) are treated as if they are existentially quantified.

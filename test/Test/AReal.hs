@@ -55,7 +55,7 @@ case_rootAdd_sqrt2_sqrt3 = assertBool "" $ abs valP <= 0.0001
 -- bug?
 sample_rootAdd = p
   where
-    x = P.var X    
+    x = P.var X
     p :: UPolynomial Rational
     p = rootAdd (x^2 - 2) (x^6 + 6*x^3 - 2*x^2 + 9)
 

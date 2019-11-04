@@ -41,7 +41,7 @@ newTheorySolver cnf = do
   solver <- SAT.newSolver
   SAT.newVars_ solver nv
   forM_ cs $ \c -> SAT.addClause solver (SAT.unpackClause c)
-  
+
   ref <- newIORef []
   let tsolver =
         TheorySolver
@@ -118,7 +118,7 @@ case_QF_LRA = do
               vGt <- SAT.newVar satSolver
               SAT.addClause satSolver [vLt,vEq,vGt]
               SAT.addClause satSolver [-vLt, -vEq]
-              SAT.addClause satSolver [-vLt, -vGt]                 
+              SAT.addClause satSolver [-vLt, -vGt]
               SAT.addClause satSolver [-vEq, -vGt]
               writeIORef tblRef (Map.insert (v,rhs) (vLt, vEq, vGt) tbl)
               let xs = IntMap.fromList
@@ -204,11 +204,11 @@ case_QF_EUF = do
   satSolver <- SAT.newSolver
   eufSolver <- EUF.newSolver
   enc <- Tseitin.newEncoder satSolver
-  
+
   tblRef <- newIORef (Map.empty :: Map (EUF.Term, EUF.Term) SAT.Var)
   defsRef <- newIORef (IntMap.empty :: IntMap (EUF.Term, EUF.Term))
   eufModelRef <- newIORef (undefined :: EUF.Model)
- 
+
   let abstractEUFAtom :: (EUF.Term, EUF.Term) -> IO SAT.Lit
       abstractEUFAtom (t1,t2) | t1 >= t2 = abstractEUFAtom (t2,t1)
       abstractEUFAtom (t1,t2) = do
@@ -248,7 +248,7 @@ case_QF_EUF = do
                 when b2 $ do
                   _ <- callback v
                   return ()
-            return b            
+            return b
         , thExplain = \m -> do
             case m of
               Nothing -> liftM IntSet.toList $ EUF.explain eufSolver Nothing

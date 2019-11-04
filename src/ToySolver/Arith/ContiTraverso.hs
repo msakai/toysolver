@@ -3,7 +3,7 @@
 -- Module      :  ToySolver.Arith.ContiTraverso
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
@@ -21,7 +21,7 @@
 --
 -- * 伊藤雅史, , 平林 隆一, "整数計画問題のための b-Gröbner 基底変換アルゴリズム,"
 --   <http://www.kurims.kyoto-u.ac.jp/~kyodo/kokyuroku/contents/pdf/1295-27.pdf>
--- 
+--
 --
 -----------------------------------------------------------------------------
 module ToySolver.Arith.ContiTraverso

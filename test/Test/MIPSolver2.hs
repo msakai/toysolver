@@ -50,7 +50,7 @@ case_test1 = do
   mapM_ (Simplex.assertAtom lp) cs
   mip <- MIPSolver.newSolver lp ivs
   ret <- MIPSolver.optimize mip
-  
+
   ret @?= Simplex.Optimum
 
   Just m <- MIPSolver.getBestModel mip
@@ -69,7 +69,7 @@ case_test1' = do
   mapM_ (Simplex.assertAtom lp) cs
   mip <- MIPSolver.newSolver lp ivs
   ret <- MIPSolver.optimize mip
-  
+
   ret @?= Simplex.Optimum
 
   Just m <- MIPSolver.getBestModel mip
@@ -108,7 +108,7 @@ case_test2 = do
   mapM_ (Simplex.assertAtom lp) cs
   mip <- MIPSolver.newSolver lp ivs
   ret <- MIPSolver.optimize mip
-  
+
   ret @?= Simplex.Optimum
 
   Just m <- MIPSolver.getBestModel mip

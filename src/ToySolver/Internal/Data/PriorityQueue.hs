@@ -8,7 +8,7 @@
 -- Module      :  ToySolver.Internal.Data.PriorityQueue
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -203,7 +203,7 @@ parent i = (i-1) `div` 2
 
 {-
 checkHeapProperty :: String -> PriorityQueue a -> IO ()
-checkHeapProperty str q = do 
+checkHeapProperty str q = do
   (n,arr) <- readIORef (heap q)
   let go i = do
         val <- A.readArray arr i

@@ -3,19 +3,19 @@
 -- Module      :  ToySolver.Data.AlgebraicNumber.Sturm
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
--- 
+--
 -- Reference:
--- 
+--
 -- * \"/Sturm's theorem/.\" Wikipedia, The Free Encyclopedia. Wikimedia Foundation, Inc.
 --   2012-06-23. <http://en.wikipedia.org/wiki/Sturm%27s_theorem>
--- 
+--
 -- * Weisstein, Eric W. \"/Sturm Function/.\" From MathWorld--A Wolfram Web Resource.
 --   <http://mathworld.wolfram.com/SturmFunction.html>
--- 
+--
 -----------------------------------------------------------------------------
 
 module ToySolver.Data.AlgebraicNumber.Sturm
@@ -127,7 +127,7 @@ separate' chain@(p:_) = f (bounds p)
       if lb `P.isRootOf` p
       then Interval.singleton lb : g (lb,ub)
       else g (lb,ub)
-    
+
     g (lb,ub) =
       case n lb - n ub of
         0 -> []

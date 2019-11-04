@@ -6,7 +6,7 @@
 -- Module      :  ToySolver.Converter.Base
 -- Copyright   :  (c) Masahiro Sakai 2018
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
 -- Portability :  non-portable

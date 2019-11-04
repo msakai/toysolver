@@ -96,7 +96,7 @@ type OutEdge vertex cost label = (vertex, cost, label)
 type InEdge vertex cost label = (vertex, cost, label)
 
 -- | path data type.
-data Path vertex cost label 
+data Path vertex cost label
   = Empty vertex
     -- ^ empty path
   | Singleton (Edge vertex cost label)
@@ -129,7 +129,7 @@ pathEmpty = Empty
 
 -- | Concatenation of two paths
 pathAppend :: (Eq vertex, Num cost) => Path vertex cost label -> Path vertex cost label -> Path vertex cost label
-pathAppend p1 p2 
+pathAppend p1 p2
   | pathTo p1 /= pathFrom p2 = error "ToySolver.Graph.ShortestPath.pathAppend: pathTo/pathFrom mismatch"
   | otherwise =
       case (p1, p2) of
