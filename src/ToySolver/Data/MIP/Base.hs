@@ -8,7 +8,7 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable
 --
 -- Mixed-Integer Programming Problems with some commmonly used extensions
 --

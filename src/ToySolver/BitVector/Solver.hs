@@ -10,6 +10,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.BitVector.Solver

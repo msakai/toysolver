@@ -7,7 +7,7 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  portable
 --
 -- References:
 --

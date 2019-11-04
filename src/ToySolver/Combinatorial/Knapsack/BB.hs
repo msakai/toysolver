@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable
 --
 -- Simple 0-1 knapsack problem solver that uses branch-and-bound with LP-relaxation based upper bound.
 --
