@@ -224,23 +224,25 @@ Library
   Other-Extensions:
      BangPatterns
      CPP
+     ConstraintKinds
      DeriveDataTypeable
      ExistentialQuantification
      FlexibleContexts
      FlexibleInstances
      FunctionalDependencies
+     GADTs
      GeneralizedNewtypeDeriving
+     InstanceSigs
      MultiParamTypeClasses
      OverloadedStrings
-     RecursiveDo
      Rank2Types
+     RecursiveDo
      ScopedTypeVariables
      TemplateHaskell
      TypeFamilies
      TypeOperators
      TypeSynonymInstances
-     -- commented out because cabal-1.16 does not understand InstanceSigs extension
-     -- InstanceSigs
+     UndecidableInstances
   if impl(ghc)
      Other-Extensions:
         MagicHash
@@ -969,7 +971,10 @@ Test-suite TestSuite
     vector,
     vector-space
   Default-Language: Haskell2010
-  Other-Extensions: TemplateHaskell, ScopedTypeVariables
+  Other-Extensions:
+    DataKinds
+    ScopedTypeVariables
+    TemplateHaskell
   if flag(TestCBC)
     CPP-Options: "-DTEST_CBC"
   if flag(TestCPLEX)
