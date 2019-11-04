@@ -541,8 +541,3 @@ instance Arbitrary PBFile.Op where
   arbitrary = arbitraryBoundedEnum
 
 -- ---------------------------------------------------------------------
-
-#if !MIN_VERSION_QuickCheck(2,8,0)
-sublistOf :: [a] -> Gen [a]
-sublistOf xs = filterM (\_ -> choose (False, True)) xs
-#endif

@@ -972,13 +972,6 @@ floydWarshall_example = HashMap.fromList
   ]
 
 -- ------------------------------------------------------------------------
-
-#if !MIN_VERSION_QuickCheck(2,8,0)
-sublistOf :: [a] -> Gen [a]
-sublistOf xs = filterM (\_ -> choose (False, True)) xs
-#endif
-
--- ------------------------------------------------------------------------
 -- Test harness
 
 graphShortestPathTestGroup :: TestTree
