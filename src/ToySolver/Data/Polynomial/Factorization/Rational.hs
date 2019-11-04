@@ -1,5 +1,16 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Data.Polynomial.Factorization.Rational
+-- Copyright   :  (c) Masahiro Sakai 2013
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Data.Polynomial.Factorization.Rational () where
 
 import Data.List (foldl')

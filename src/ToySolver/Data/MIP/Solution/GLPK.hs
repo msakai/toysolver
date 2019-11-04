@@ -1,6 +1,17 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Data.MIP.Solution.GLPK
+-- Copyright   :  (c) Masahiro Sakai 2017
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Solution.GLPK
   ( Solution (..)
   , parse

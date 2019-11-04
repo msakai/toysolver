@@ -1,5 +1,16 @@
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.SAT.PBO.Context
+-- Copyright   :  (c) Masahiro Sakai 2014
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.SAT.PBO.Context
   ( Context (..)
   , getBestValue

@@ -3,6 +3,17 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.SAT.Types
+-- Copyright   :  (c) Masahiro Sakai 2012
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.SAT.Types
   (
   -- * Variable

@@ -1,4 +1,15 @@
 {-# OPTIONS_GHC -Wall #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Arith.FourierMotzkin.FOL
+-- Copyright   :  (c) Masahiro Sakai 2013
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Arith.FourierMotzkin.FOL
     ( solveFormula
     , eliminateQuantifiers

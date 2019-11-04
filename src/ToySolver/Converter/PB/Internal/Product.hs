@@ -1,4 +1,15 @@
 {-# OPTIONS_GHC -Wall #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Converter.PB.Internal.Product
+-- Copyright   :  (c) Masahiro Sakai 2018
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Converter.PB.Internal.Product
   ( decomposeToBinaryProducts
   ) where

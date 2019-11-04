@@ -1,4 +1,18 @@
--- http://en.wikipedia.org/wiki/Lagrange_polynomial
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Data.Polynomial.Interpolation.Lagrange
+-- Copyright   :  (c) Masahiro Sakai 2012
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-- References:
+--
+-- * Lagrange polynomial <http://en.wikipedia.org/wiki/Lagrange_polynomial>
+--
+-----------------------------------------------------------------------------
 module ToySolver.Data.Polynomial.Interpolation.Lagrange
   ( interpolate
   ) where

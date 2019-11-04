@@ -1,5 +1,16 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE FunctionalDependencies #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Data.MIP.Solver.Base
+-- Copyright   :  (c) Masahiro Sakai 2017
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Solver.Base
   ( SolveOptions (..)
   , Default (..)
