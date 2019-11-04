@@ -1,4 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, CPP #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 module Main where
 

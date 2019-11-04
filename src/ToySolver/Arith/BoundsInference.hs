@@ -1,16 +1,18 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.BoundsInference
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns)
+-- Portability :  non-portable
 --
 -- Tightening variable bounds by constraint propagation.
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Arith.BoundsInference
   ( BoundsEnv

@@ -1,5 +1,17 @@
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.SAT.PBO.Context
+-- Copyright   :  (c) Masahiro Sakai 2014
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.SAT.PBO.Context
   ( Context (..)
   , getBestValue
@@ -119,7 +131,7 @@ instance Context SimpleContext where
     join $ atomically $ do
       unsat <- isUnsat sc
       when unsat $ error "addSolution: already marked as unsatisfiable" -- FIXME: use throwSTM?
-  
+
       sol0 <- getBestValue sc
       case sol0 of
         Just val0 | val0 <= val -> return $ return ()
@@ -212,7 +224,7 @@ instance Context a => Context (Normalized a) where
 
   addSolution cxt m = do
     addSolution (nBase cxt) m
-    
+
   addLowerBound cxt lb = do
     addLowerBound (nBase cxt) (lb + nOffset cxt)
 

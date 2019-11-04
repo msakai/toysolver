@@ -1,21 +1,25 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.Polynomial.Factorization.FiniteField
 -- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns, TypeSynonymInstances, FlexibleInstances)
+-- Portability :  non-portable
 --
 -- Factoriation of polynomial over a finite field.
 --
 -- References:
 --
 -- * <http://en.wikipedia.org/wiki/Factorization_of_polynomials_over_a_finite_field_and_irreducibility_tests>
--- 
+--
 -- * <http://en.wikipedia.org/wiki/Berlekamp%27s_algorithm>
 --
 -- * Martin Kreuzer and Lorenzo Robbiano. Computational Commutative Algebra 1. Springer Verlag, 2000.
@@ -30,8 +34,8 @@ module ToySolver.Data.Polynomial.Factorization.FiniteField
 
 import Control.Exception (assert)
 import Data.FiniteField
-import Data.Function (on)
 import Data.List
+import Data.Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
 import GHC.TypeLits
@@ -82,7 +86,7 @@ sqfree' f
       | otherwise = go (i+1) c' w' result'
           where
             y  = P.gcd w c
-            z  = w `P.div` y            
+            z  = w `P.div` y
             c' = c `P.div` y
             w' = y
             result' = [(z,i) | z /= 1] ++ result
@@ -117,7 +121,7 @@ berlekamp f = go (Set.singleton f) basis
 
 basisOfBerlekampSubalgebra :: forall k. (Ord k, FiniteField k) => UPolynomial k -> [UPolynomial k]
 basisOfBerlekampSubalgebra f =
-  sortBy (flip compare `on` P.deg) $
+  sortOn (Down . P.deg) $
     map (P.toMonic P.nat) $
       basis
   where

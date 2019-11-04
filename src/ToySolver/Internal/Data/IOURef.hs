@@ -1,14 +1,15 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Internal.Data.IOURef
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleContexts)
+-- Portability :  non-portable
 --
 -- Simple unboxed IORef-like type based on IOUArray
 --

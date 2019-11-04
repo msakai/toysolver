@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 -----------------------------------------------------------------------------
@@ -6,10 +7,10 @@
 -- Module      :  ToySolver.SAT.MUS.Enum
 -- Copyright   :  (c) Masahiro Sakai 2012-2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- In this module, we assume each soft constraint /C_i/ is represented as a literal.
 -- If a constraint /C_i/ is not a literal, we can represent it as a fresh variable /v/
@@ -19,7 +20,7 @@
 --
 -- * [CAMUS] M. Liffiton and K. Sakallah, Algorithms for computing minimal
 --   unsatisfiable subsets of constraints, Journal of Automated Reasoning,
---   vol. 40, no. 1, pp. 1-33, Jan. 2008. 
+--   vol. 40, no. 1, pp. 1-33, Jan. 2008.
 --   <http://sun.iwu.edu/~mliffito/publications/jar_liffiton_CAMUS.pdf>
 --
 -- * [HYCAM] A. Gregoire, B. Mazure, and C. Piette, Boosting a complete

@@ -1,5 +1,17 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Data.MIP.Solver.GurobiCl
+-- Copyright   :  (c) Masahiro Sakai 2017
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Solver.GurobiCl
   ( GurobiCl (..)
   , gurobiCl

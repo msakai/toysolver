@@ -4,11 +4,11 @@
 -- Module      :  ToySolver.Arith.Cooper.FOL
 -- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Arith.Cooper.FOL
     ( eliminateQuantifiers
@@ -58,7 +58,7 @@ eliminateQuantifiers = f
 -- * returns @'Unsat'@ when such @M@ does not exists, and
 --
 -- * returns @'Unknown'@ when @φ@ is beyond LIA.
--- 
+--
 solveFormula :: VarSet -> FOL.Formula (FOL.Atom Rational) -> FOL.SatResult Integer
 solveFormula vs formula =
   case eliminateQuantifiers formula of

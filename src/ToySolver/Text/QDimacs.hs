@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.Text.QDimacs
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable

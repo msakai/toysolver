@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
@@ -9,7 +9,7 @@
 -- Module      :  ToySolver.Combinatorial.HittingSet.DAA
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -23,7 +23,7 @@
 --   in Proceedings of the Sixteenth ACM SIGACT-SIGMOD-SIGART Symposium
 --   on Principles of Database Systems, ser. PODS '97. 1997, pp. 209-216.
 --   <http://almaden.ibm.com/cs/projects/iis/hdb/Publications/papers/pods97_trans.pdf>
--- 
+--
 -- * [BaileyStuckey2015]
 --   J. Bailey and P. Stuckey, Discovery of minimal unsatisfiable
 --   subsets of constraints using hitting set dualization," in Practical

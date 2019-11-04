@@ -3,13 +3,13 @@
 -- Module      :  ToySolver.Data.LBool
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
 --
 -- Lifted boolean type.
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.LBool
   ( LBool

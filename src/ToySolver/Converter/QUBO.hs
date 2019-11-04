@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
@@ -6,11 +7,11 @@
 -- Module      :  ToySolver.Converter.QUBO
 -- Copyright   :  (c) Masahiro Sakai 2018
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Converter.QUBO
   ( qubo2pb

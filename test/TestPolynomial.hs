@@ -1,4 +1,7 @@
-{-# LANGUAGE FlexibleContexts, TemplateHaskell, ScopedTypeVariables, DataKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 import Prelude hiding (lex)
 import qualified Control.Exception as E
@@ -29,51 +32,51 @@ import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<
   Polynomial type
 --------------------------------------------------------------------}
 
-prop_plus_comm = 
+prop_plus_comm =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
     a + b == b + a
 
-prop_plus_assoc = 
+prop_plus_assoc =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
   forAll polynomials $ \c ->
     a + (b + c) == (a + b) + c
 
-prop_plus_unitL = 
+prop_plus_unitL =
   forAll polynomials $ \a ->
     P.constant 0 + a == a
 
-prop_plus_unitR = 
+prop_plus_unitR =
   forAll polynomials $ \a ->
     a + P.constant 0 == a
 
-prop_prod_comm = 
+prop_prod_comm =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
     a * b == b * a
 
-prop_prod_assoc = 
+prop_prod_assoc =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
   forAll polynomials $ \c ->
     a * (b * c) == (a * b) * c
 
-prop_prod_unitL = 
+prop_prod_unitL =
   forAll polynomials $ \a ->
     P.constant 1 * a == a
 
-prop_prod_unitR = 
+prop_prod_unitR =
   forAll polynomials $ \a ->
     a * P.constant 1 == a
 
-prop_distL = 
+prop_distL =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
   forAll polynomials $ \c ->
     a * (b + c) == a * b + a * c
 
-prop_distR = 
+prop_distR =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
   forAll polynomials $ \c ->
@@ -130,7 +133,7 @@ case_deg_0 = assertBool "" $ (P.deg p < 0)
 prop_divMod =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
-    b /= 0 ==> 
+    b /= 0 ==>
       let (q,r) = P.divMod a b
       in a == q*b + r && (r==0 || P.deg b > P.deg r)
 
@@ -149,7 +152,7 @@ prop_gcd_divisible =
       let c = P.gcd a b
       in a `P.mod` c == 0 && b `P.mod` c == 0
 
-prop_gcd_comm = 
+prop_gcd_comm =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
     P.gcd a b == P.gcd b a
@@ -162,13 +165,13 @@ prop_gcd_euclid =
       P.gcd p q == P.gcd p (q + p*r)
 
 case_gcd_1 = P.gcd f1 f2 @?= 1
-  where 
+  where
     x :: UPolynomial Rational
     x = P.var X
     f1 = x^3 + x^2 + x
     f2 = x^2 + 1
 
-prop_exgcd = 
+prop_exgcd =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
     let (g,u,v) = P.exgcd a b
@@ -191,7 +194,7 @@ eqUpToInvElem a b =
   case P.mapCoeff fromInteger a `P.divMod` P.mapCoeff fromInteger b of
     (q,r) -> r == 0 && P.deg q <= 0
 
-prop_gcd'_comm = 
+prop_gcd'_comm =
   forAll upolynomialsZ $ \a ->
   forAll upolynomialsZ $ \b ->
     P.gcd' a b `eqUpToInvElem` P.gcd' b a
@@ -204,7 +207,7 @@ prop_gcd'_euclid =
       P.gcd' p q `eqUpToInvElem` P.gcd' p (q + p*r)
 
 case_gcd'_1 = eqUpToInvElem (P.gcd' f1 f2) 1 @?= True
-  where 
+  where
     x :: UPolynomial Integer
     x = P.var X
     f1 = x^3 + x^2 + x
@@ -217,7 +220,7 @@ prop_lcm_divisible =
       let c = P.lcm a b
       in c `P.mod` a == 0 && c `P.mod` b == 0
 
-prop_lcm_comm = 
+prop_lcm_comm =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
     P.lcm a b == P.lcm b a
@@ -291,41 +294,41 @@ prop_pmod =
 --------------------------------------------------------------------}
 
 prop_degreeOfProduct =
-  forAll monicMonomials $ \a -> 
-  forAll monicMonomials $ \b -> 
+  forAll monicMonomials $ \a ->
+  forAll monicMonomials $ \b ->
     P.deg (a `P.mmult` b) == P.deg a + P.deg b
 
 prop_degreeOfUnit =
   P.deg P.mone == 0
 
-prop_mmult_unitL = 
-  forAll monicMonomials $ \a -> 
+prop_mmult_unitL =
+  forAll monicMonomials $ \a ->
     P.mone `P.mmult` a == a
 
-prop_mmult_unitR = 
-  forAll monicMonomials $ \a -> 
+prop_mmult_unitR =
+  forAll monicMonomials $ \a ->
     a `P.mmult` P.mone == a
 
-prop_mmult_comm = 
-  forAll monicMonomials $ \a -> 
-  forAll monicMonomials $ \b -> 
+prop_mmult_comm =
+  forAll monicMonomials $ \a ->
+  forAll monicMonomials $ \b ->
     a `P.mmult` b == b `P.mmult` a
 
-prop_mmult_assoc = 
+prop_mmult_assoc =
   forAll monicMonomials $ \a ->
   forAll monicMonomials $ \b ->
   forAll monicMonomials $ \c ->
     a `P.mmult` (b `P.mmult` c) == (a `P.mmult` b) `P.mmult` c
 
-prop_mmult_Divisible = 
-  forAll monicMonomials $ \a -> 
-  forAll monicMonomials $ \b -> 
+prop_mmult_Divisible =
+  forAll monicMonomials $ \a ->
+  forAll monicMonomials $ \b ->
     let c = a `P.mmult` b
     in a `P.mdivides` c && b `P.mdivides` c
 
-prop_mmult_Div = 
-  forAll monicMonomials $ \a -> 
-  forAll monicMonomials $ \b -> 
+prop_mmult_Div =
+  forAll monicMonomials $ \a ->
+  forAll monicMonomials $ \b ->
     let c = a `P.mmult` b
     in c `P.mdiv` a == b && c `P.mdiv` b == a
 
@@ -346,15 +349,15 @@ case_mgcd = P.mgcd p1 p2 @?= P.mfromIndices [(2,1)]
     p1 = P.mfromIndices [(1,2),(2,4)]
     p2 = P.mfromIndices [(2,1),(3,2)]
 
-prop_mlcm_divisible = 
-  forAll monicMonomials $ \a -> 
-  forAll monicMonomials $ \b -> 
+prop_mlcm_divisible =
+  forAll monicMonomials $ \a ->
+  forAll monicMonomials $ \b ->
     let c = P.mlcm a b
     in a `P.mdivides` c && b `P.mdivides` c
 
-prop_mgcd_divisible = 
-  forAll monicMonomials $ \a -> 
-  forAll monicMonomials $ \b -> 
+prop_mgcd_divisible =
+  forAll monicMonomials $ \a ->
+  forAll monicMonomials $ \b ->
     let c = P.mgcd a b
     in c `P.mdivides` a && c `P.mdivides` b
 
@@ -495,7 +498,7 @@ case_buchberger3 = Set.fromList gb @?= Set.fromList expected
 
 -- http://www.orcca.on.ca/~reid/NewWeb/DetResDes/node4.html
 -- 時間がかかるので自動実行されるテストケースには含めていない
-disabled_case_buchberger4 = Set.fromList gb @?= Set.fromList expected                   
+disabled_case_buchberger4 = Set.fromList gb @?= Set.fromList expected
   where
     x :: Polynomial Rational Int
     x = P.var 1
@@ -619,7 +622,7 @@ case_factorZ_test1 = do
   product [g^n | (g,n) <- actual] @?= f
   where
     x :: UPolynomial Integer
-    x = P.var X   
+    x = P.var X
     f = 2*(x^5 + x^4 + x^2 + x + 2)
     actual   = P.factor f
     expected = [(2,1), (x^2+x+1,1), (x^3-x+2,1)]
@@ -629,7 +632,7 @@ case_factorZ_test2 = do
   product [g^n | (g,n) <- actual] @?= f
   where
     x :: UPolynomial Integer
-    x = P.var X   
+    x = P.var X
     f = - (x^5 + x^4 + x^2 + x + 2)
     actual   = P.factor f
     expected = [(-1,1), (x^2+x+1,1), (x^3-x+2,1)]
@@ -857,7 +860,7 @@ case_Zassenhaus_factor :: Assertion
 case_Zassenhaus_factor = actual @?= expected
   where
     x :: UPolynomial Integer
-    x = P.var X   
+    x = P.var X
     f = - (x^(5::Int) + x^(4::Int) + x^(2::Int) + x + 2)
     actual, expected :: [(UPolynomial Integer, Integer)]
     actual   = sort $ Zassenhaus.factor f

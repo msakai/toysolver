@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
@@ -6,10 +7,10 @@
 -- Module      :  ToySolver.Converter.MIP2SMT
 -- Copyright   :  (c) Masahiro Sakai 2012-2014,2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (OverloadedStrings)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.MIP2SMT
@@ -245,7 +246,7 @@ conditions opt q env mip = bnds ++ cs ++ ss
           case optLanguage opt of
             -- In SMT-LIB2 format, inequalities can be chained.
             -- For example, "(<= 0 x 10)" is equivalent to "(and (<= 0 x) (<= x 10))".
-            -- 
+            --
             -- Supported solvers: cvc4-1.1, yices-2.2.1, z3-4.3.0
             -- Unsupported solvers: z3-4.0
             SMTLIB2
@@ -257,10 +258,10 @@ conditions opt q env mip = bnds ++ cs ++ ss
                     lb2 = case lb of
                             MIP.NegInf -> []
                             MIP.PosInf -> error "should not happen"
-                            MIP.Finite x 
+                            MIP.Finite x
                               | isInt mip v -> [intNum opt (ceiling x)]
                               | otherwise -> [realNum opt x]
-                    ub2 = case ub of 
+                    ub2 = case ub of
                             MIP.NegInf -> error "should not happen"
                             MIP.PosInf -> []
                             MIP.Finite x
@@ -377,7 +378,7 @@ mip2smt opt mip =
                     ]
 
 encode :: Options -> T.Text -> T.Text
-encode opt s = 
+encode opt s =
   case optLanguage opt of
     SMTLIB2
      | T.all p s   -> s

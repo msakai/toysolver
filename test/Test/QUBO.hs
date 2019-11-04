@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.QUBO (quboTestGroup) where
 
 import Control.Monad

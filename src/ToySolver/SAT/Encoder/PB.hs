@@ -1,14 +1,18 @@
-{-# LANGUAGE BangPatterns, ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.Encoder.PB
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- References:
 --

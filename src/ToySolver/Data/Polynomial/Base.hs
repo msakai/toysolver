@@ -1,14 +1,22 @@
-{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, BangPatterns, DeriveDataTypeable, CPP #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.Polynomial.Base
 -- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, BangPatterns, DeriveDataTypeable, CPP)
+-- Portability :  non-portable
 --
 -- Polynomials
 --
@@ -19,7 +27,7 @@
 -- * Polynomial class for Ruby <http://www.math.kobe-u.ac.jp/~kodama/tips-RubyPoly.html>
 --
 -- * constructive-algebra package <http://hackage.haskell.org/package/constructive-algebra>
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.Polynomial.Base
   (
@@ -314,7 +322,7 @@ ppI p = mapCoeff f p
 class ContPP k where
   type PPCoeff k
 
-  -- | Content of a polynomial  
+  -- | Content of a polynomial
   cont :: (Ord v) => Polynomial k v -> k
   -- constructive-algebra-0.3.0 では cont 0 は error になる
 
@@ -571,7 +579,7 @@ instance PrettyCoeff Integer where
 instance (PrettyCoeff a, Integral a) => PrettyCoeff (Ratio a) where
   pPrintCoeff lv p r
     | denominator r == 1 = pPrintCoeff lv p (numerator r)
-    | otherwise = 
+    | otherwise =
         maybeParens (p > ratPrec) $
           pPrintCoeff lv (ratPrec+1) (numerator r) <>
           PP.char '/' <>
@@ -883,7 +891,7 @@ lex = go `on` mindices
         EQ -> compare n1 n2 `mappend` go xs1 xs2
 
 -- | Reverse lexicographic order.
--- 
+--
 -- Note that revlex is /NOT/ a monomial order.
 revlex :: Ord v => Monomial v -> Monomial v -> Ordering
 revlex = go `on` (Map.toDescList . mindicesMap)
@@ -905,34 +913,3 @@ grlex = (compare `on` deg) `mappend` lex
 -- | Graded reverse lexicographic order
 grevlex :: Ord v => MonomialOrder v
 grevlex = (compare `on` deg) `mappend` revlex
-
-{--------------------------------------------------------------------
-  Helper
---------------------------------------------------------------------}
-
-#if !MIN_VERSION_hashable(1,2,0)
--- Copied from hashable-1.2.0.7:
--- Copyright   :  (c) Milan Straka 2010
---                (c) Johan Tibell 2011
---                (c) Bryan O'Sullivan 2011, 2012
-
--- | Transform a value into a 'Hashable' value, then hash the
--- transformed value using the given salt.
---
--- This is a useful shorthand in cases where a type can easily be
--- mapped to another type that is already an instance of 'Hashable'.
--- Example:
---
--- > data Foo = Foo | Bar
--- >          deriving (Enum)
--- >
--- > instance Hashable Foo where
--- >     hashWithSalt = hashUsing fromEnum
-hashUsing :: (Hashable b) =>
-             (a -> b)           -- ^ Transformation function.
-          -> Int                -- ^ Salt.
-          -> a                  -- ^ Value to transform.
-          -> Int
-hashUsing f salt x = hashWithSalt salt (f x)
-{-# INLINE hashUsing #-}
-#endif

@@ -1,6 +1,18 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Data.MIP.Solution.SCIP
+-- Copyright   :  (c) Masahiro Sakai 2017
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Solution.SCIP
   ( Solution (..)
   , parse
@@ -35,7 +47,7 @@ parse' (t1:t2:ts) = do
       Nothing -> throwError "first line must start with \"solution status:\""
       Just s -> return $ Map.findWithDefault MIP.StatusUnknown (TL.toStrict $ TL.strip s) statusTable
   if t2 == "no solution available" then do
-    return $ 
+    return $
       MIP.Solution
       { MIP.solStatus = status
       , MIP.solObjectiveValue = Nothing

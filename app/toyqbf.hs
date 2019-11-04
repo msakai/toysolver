@@ -1,14 +1,15 @@
-{-# LANGUAGE ScopedTypeVariables, CPP #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toyqbf
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (ScopedTypeVariables, CPP)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 

@@ -1,13 +1,14 @@
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE Rank2Types #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.AlgebraicNumber.Real
 -- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (Rank2Types)
+-- Portability :  non-portable
 --
 -- Algebraic reals
 --
@@ -15,7 +16,7 @@
 --
 -- * Why the concept of a field extension is a natural one
 --   <http://www.dpmms.cam.ac.uk/~wtg10/galois.html>
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.AlgebraicNumber.Real
   (
@@ -91,7 +92,7 @@ realRoots' p = do
   return $ realRoot' p i
 
 realRoot :: UPolynomial Rational -> Interval Rational -> AReal
-realRoot p i = 
+realRoot p i =
   case [q | (q,_) <- P.factor p, P.deg q > 0, Sturm.numRoots q i == 1] of
     p2:_ -> realRoot' p2 i
     []   -> error "ToySolver.Data.AlgebraicNumber.Real.realRoot: invalid interval"
@@ -274,7 +275,7 @@ truncate' = fst . properFraction'
 
 -- | Same as 'round'.
 round' :: Integral b => AReal -> b
-round' x = 
+round' x =
   case signum (abs r - 0.5) of
     -1 -> n
     0  -> if even n then n else m
@@ -378,7 +379,7 @@ isolatingInterval :: AReal -> Interval Rational
 isolatingInterval (RealRoot _ i) = i
 
 -- | Degree of the algebraic number.
--- 
+--
 -- If the algebraic number's 'minimalPolynomial' has degree @n@,
 -- then the algebraic number is said to be degree @n@.
 instance P.Degree AReal where
@@ -440,7 +441,7 @@ simpARealPoly p = rootSimpPoly minimalPolynomial p
   Misc
 --------------------------------------------------------------------}
 
--- | Golden ratio 
+-- | Golden ratio
 goldenRatio :: AReal
 goldenRatio = (1 + root5) / 2
   where

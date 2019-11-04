@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
@@ -6,7 +7,7 @@
 -- Module      :  ToySolver.Converter.PB2SMP
 -- Copyright   :  (c) Masahiro Sakai 2013,2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
 -- Portability :  non-portable
@@ -41,7 +42,7 @@ pb2smp isUnix formula =
       if isUnix
       then byteString "#include \"simple.h\"\nvoid ufun()\n{\n\n"
       else mempty
-    
+
     footer =
       if isUnix
       then "\n}\n"

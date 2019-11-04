@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -218,7 +219,7 @@ quadratizePB' (formula, maxObj) =
 
     degGe3Terms :: Set IntSet
     degGe3Terms = collectDegGe3Terms formula
- 
+
     m :: Map IntSet (IntSet,IntSet)
     m = Product.decomposeToBinaryProducts degGe3Terms
 
@@ -246,7 +247,7 @@ quadratizePB' (formula, maxObj) =
       where
         f t
           | IntSet.size t == 1 = head (IntSet.toList t)
-          | otherwise = 
+          | otherwise =
                case Map.lookup t toV of
                  Nothing -> error "quadratizePB.prodDefs: should not happen"
                  Just v -> v
@@ -485,7 +486,7 @@ wbo2pb :: PBFile.SoftFormula -> (PBFile.Formula, WBO2PBInfo)
 wbo2pb wbo = runST $ do
   let nv = PBFile.wboNumVars wbo
   db <- newPBStore
-  (obj, defs) <- addWBO db wbo 
+  (obj, defs) <- addWBO db wbo
   formula <- getPBFormula db
   return
     ( formula{ PBFile.pbObjectiveFunction = Just obj }
@@ -578,7 +579,7 @@ type PB2SATInfo = TseitinInfo
 -- * if M ⊨ φ then f(M) ⊨ ψ
 --
 -- * if M ⊨ ψ then g(M) ⊨ φ
--- 
+--
 pb2sat :: PBFile.Formula -> (CNF.CNF, PB2SATInfo)
 pb2sat formula = runST $ do
   db <- newCNFStore

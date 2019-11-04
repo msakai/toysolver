@@ -1,13 +1,15 @@
-{-# LANGUAGE BangPatterns, CPP #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Internal.TextUtil
 -- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Internal.TextUtil
@@ -49,7 +51,7 @@ readUnsignedInt str = go 0 str
 -- Many intermediate values in this implementation will be optimized
 -- away by worker-wrapper transformation and unboxing.
 {-# INLINABLE readUnsignedInteger #-}
-readUnsignedInteger :: String -> Integer 
+readUnsignedInteger :: String -> Integer
 readUnsignedInteger str = assert (result == read str) $ result
   where
     result :: Integer
@@ -57,8 +59,8 @@ readUnsignedInteger str = assert (result == read str) $ result
 
     lim :: Word
     lim = maxBound `div` 10
-  
-    go :: Integer -> [Char] -> Integer 
+
+    go :: Integer -> [Char] -> Integer
     go !r [] = r
     go !r ds =
       case go2 0 1 ds of

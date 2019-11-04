@@ -1,16 +1,17 @@
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.FOL.Formula
 -- Copyright   :  (c) Masahiro Sakai 2011-2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable
 --
 -- Formula of first order logic.
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.FOL.Formula
   (

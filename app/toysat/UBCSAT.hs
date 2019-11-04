@@ -89,7 +89,7 @@ ubcsatMany opt = do
               hSetBinaryMode h True
               hSetBuffering h (BlockBuffering Nothing)
               forM_ (split 10 (optVarInit opt)) $ \xs -> do
-                hPutStrLn h $ intercalate " "  (map show xs)
+                hPutStrLn h $ unwords (map show xs)
               hClose h
               ubcsat' opt fname (Just varInitFile)
 

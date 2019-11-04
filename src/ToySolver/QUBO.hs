@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -7,11 +8,11 @@
 -- Module      :  ToySolver.QUBO
 -- Copyright   :  (c) Masahiro Sakai 2018
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.QUBO
   ( -- * QUBO (quadratic unconstrained boolean optimization)
@@ -59,7 +60,7 @@ instance Functor Problem where
     }
 
 parseProblem :: (BS.ByteString -> a) -> BS.ByteString -> Either String (Problem a)
-parseProblem f s = 
+parseProblem f s =
   case BS.words l of
     ["p", filetype, topology, maxNodes, _nNodes, _nCouplers] ->
       if filetype /= "qubo" then

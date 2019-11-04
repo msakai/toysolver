@@ -1,13 +1,15 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Combinatorial.Knapsack.BB
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable
 --
 -- Simple 0-1 knapsack problem solver that uses branch-and-bound with LP-relaxation based upper bound.
 --

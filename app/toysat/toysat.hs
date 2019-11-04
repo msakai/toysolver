@@ -7,10 +7,10 @@
 -- Module      :  toysat
 -- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (ScopedTypeVariables, CPP)
+-- Portability :  non-portable
 --
 -- A toy-level SAT solver based on CDCL.
 --
@@ -49,9 +49,6 @@ import Options.Applicative hiding (info)
 import qualified Options.Applicative
 import System.IO
 import System.Exit
-#if !MIN_VERSION_time(1,5,0)
-import System.Locale (defaultTimeLocale)
-#endif
 import System.Clock
 import System.FilePath
 import qualified System.Info as SysInfo
@@ -156,7 +153,7 @@ optionsParser = Options
 
     modeOption :: Parser (Maybe Mode)
     -- modeOption = liftA msum $ T.sequenceA $ map optional $
-    modeOption = optional $ foldr (<|>) empty
+    modeOption = optional $ F.asum
       [ flag' ModeSAT    $ long "sat"     <> help "solve boolean satisfiability problem in .cnf file"
       , flag' ModeMUS    $ long "mus"     <> help "solve minimally unsatisfiable subset problem in .gcnf or .cnf file"
       , flag' ModeAllMUS $ long "all-mus" <> help "enumerate minimally unsatisfiable subset of .gcnf or .cnf file"
@@ -410,17 +407,6 @@ parserInfo = Options.Applicative.info (helper <*> versionOption <*> optionsParse
       <> long "version"
       <> help "Show version"
 
-#if !MIN_VERSION_optparse_applicative(0,13,0)
-
--- | Convert a function producing a 'Maybe' into a reader.
-maybeReader :: (String -> Maybe a) -> ReadM a
-maybeReader f = eitherReader $ \arg ->
-  case f arg of
-    Nothing -> Left $ "cannot parse value `" ++ arg ++ "'"
-    Just a -> Right a
-
-#endif
-
 main :: IO ()
 main = do
 #ifdef FORCE_CHAR8
@@ -454,7 +440,7 @@ main = do
   putCommentLine $ printf "command line = %s" (show fullArgs)
 
   let timelim = optTimeout opt * 10^(6::Int)
-  
+
   ret <- timeout (if timelim > 0 then timelim else (-1)) $ do
      solver <- newSolver opt
      case mode of
@@ -601,7 +587,7 @@ newSolver opts = do
 mainSAT :: Options -> SAT.Solver -> IO ()
 mainSAT opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           "-"   -> liftM FF.parse BS.getContents
            fname -> FF.parseFile fname
   case ret of
     Left err -> hPrint stderr err >> exitFailure
@@ -697,7 +683,7 @@ mainMUS :: Options -> SAT.Solver -> IO ()
 mainMUS opt solver = do
   gcnf <- case optInput opt of
            "-"   -> do
-             s <- BS.hGetContents stdin
+             s <- BS.getContents
              case FF.parse s of
                Left err   -> hPutStrLn stderr err >> exitFailure
                Right gcnf -> return gcnf
@@ -775,7 +761,7 @@ solveMUS opt solver gcnf = do
                          i <- readIORef mcsCounter
                          modifyIORef' mcsCounter (+1)
                          let mcs2 = sort $ map (sel2idx !) $ IntSet.toList mcs
-                         putCommentLine $ "MCS #" ++ show (i :: Int) ++ ": " ++ intercalate " " (map show mcs2)
+                         putCommentLine $ "MCS #" ++ show (i :: Int) ++ ": " ++ unwords (map show mcs2)
                      , MUSEnum.optOnMUSFound = \mus -> do
                          i <- readIORef musCounter
                          modifyIORef' musCounter (+1)
@@ -791,7 +777,7 @@ solveMUS opt solver gcnf = do
 mainPB :: Options -> SAT.Solver -> IO ()
 mainPB opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           "-"   -> liftM FF.parse BS.getContents
            fname -> FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
@@ -814,14 +800,14 @@ solvePB opt solver formula = do
       PBFile.Ge -> PBNLC.addPBNLAtLeast pbnlc lhs rhs
       PBFile.Eq -> PBNLC.addPBNLExactly pbnlc lhs rhs
 
-  spHighlyBiased <- 
+  spHighlyBiased <-
     if optInitSP opt then do
       let (cnf, _) = pb2sat formula
       initPolarityUsingSP solver nv (CNF.cnfNumVars cnf) [(1.0, clause) | clause <- CNF.cnfClauses cnf]
     else
       return IntMap.empty
 
-  initialModel <- 
+  initialModel <-
     if optLocalSearchInitial opt then do
       let (wbo,  info1) = pb2wbo formula
           (wcnf, info2) = wbo2maxsat wbo
@@ -845,7 +831,7 @@ solvePB opt solver formula = do
           forM_ (assocs m2) $ \(v, val) -> do
             SAT.setVarPolarity solver v val
           if obj < CNF.wcnfTopCost wcnf then
-            return $ Just m2 
+            return $ Just m2
           else
             return Nothing
     else
@@ -909,7 +895,7 @@ setupOptimizer pbo opt = do
 mainWBO :: Options -> SAT.Solver -> IO ()
 mainWBO opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM FF.parse $ BS.hGetContents stdin
+           "-"   -> liftM FF.parse BS.getContents
            fname -> FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
@@ -973,7 +959,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
                 [(v, SAT.evalPBConstraint a constr) | (v, constr) <- defsPB]
 
   let softConstrs = [(c, constr) | (Just c, constr) <- PBFile.wboConstraints formula]
-                
+
   pbo <- PBO.newOptimizer2 solver objLin $ \m ->
            sum [if SAT.evalPBConstraint m constr then 0 else w | (w,constr) <- softConstrs]
 
@@ -1007,7 +993,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
           putSLine "SATISFIABLE"
           pbPrintModel stdout m nv
           writeSOLFile opt m (Just val) nv
-        else 
+        else
           putSLine "UNKNOWN"
 
 -- ------------------------------------------------------------------------
@@ -1039,7 +1025,7 @@ mainMIP opt solver = do
     case optInput opt of
       fname@"-"   -> do
         F.mapM_ (\s -> hSetEncoding stdin =<< mkTextEncoding s) (optFileEncoding opt)
-        s <- hGetContents stdin
+        s <- getContents
         case MIP.parseLPString def fname s of
           Right mip -> return mip
           Left err ->
@@ -1076,7 +1062,7 @@ solveMIP opt solver mip = do
             forM_ (Map.toList m) $ \(v, val) -> do
               printf "v %s = %d\n" (MIP.fromVar v) val
             hFlush stdout
-  
+
           writeSol :: Map MIP.Var Integer -> Rational -> IO ()
           writeSol m objVal = do
             case optWriteFile opt of
@@ -1088,12 +1074,12 @@ solveMIP opt solver mip = do
                           , MIP.solVariables = Map.fromList [(v, fromIntegral val) | (v,val) <- Map.toList m]
                           }
                 GurobiSol.writeFile fname sol
-  
+
       pbo <- PBO.newOptimizer solver linObj
       setupOptimizer pbo opt
       PBO.setOnUpdateBestSolution pbo $ \_ val -> do
         putOLine $ showRational (optPrintRational opt) (transformObjValBackward val)
-  
+
       finally (PBO.optimize pbo) $ do
         ret' <- PBO.getBestSolution pbo
         case ret' of

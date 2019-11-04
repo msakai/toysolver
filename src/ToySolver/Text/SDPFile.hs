@@ -1,12 +1,17 @@
-{-# LANGUAGE CPP, ConstraintKinds, FlexibleContexts, GADTs, ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Text.SDPFile
 -- Copyright   :  (c) Masahiro Sakai 2012,2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable
@@ -42,7 +47,7 @@ module ToySolver.Text.SDPFile
   , denseMatrix
   , denseBlock
   , diagBlock
-  
+
     -- * Rendering
   , renderData
   , renderSparseData
@@ -66,9 +71,6 @@ import Data.List (intersperse)
 import Data.Monoid
 #endif
 import Data.Scientific (Scientific)
-#if !MIN_VERSION_megaparsec(5,0,0)
-import Data.Scientific (fromFloatDigits)
-#endif
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
@@ -101,12 +103,9 @@ type ParseError = MegaParsec.ParseErrorBundle BL.ByteString Void
 #elif MIN_VERSION_megaparsec(6,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Word8)
 type ParseError = MegaParsec.ParseError Word8 Void
-#elif MIN_VERSION_megaparsec(5,0,0)
+#else
 type C e s m = (MonadParsec e s m, Token s ~ Char)
 type ParseError = MegaParsec.ParseError Char Dec
-#else
-type C e s m = (MonadParsec s m Char)
-type ParseError = MegaParsec.ParseError
 #endif
 
 #if MIN_VERSION_megaparsec(7,0,0)
@@ -263,7 +262,7 @@ pBlockStruct = do
   let int' = int >>= \i -> optional sep >> return i
   xs <- many int'
   _ <- manyTill anyChar newline
-  return $ map fromIntegral xs 
+  return $ map fromIntegral xs
   where
     sep = some (oneOf " \t(){},")
 
@@ -334,10 +333,8 @@ int = Lexer.signed (return ()) Lexer.decimal
 real :: forall e s m. C e s m => m Scientific
 #if MIN_VERSION_megaparsec(6,0,0)
 real = Lexer.signed (return ()) Lexer.scientific
-#elif MIN_VERSION_megaparsec(5,0,0)
-real = Lexer.signed (return ()) Lexer.number
 #else
-real = liftM (either fromInteger fromFloatDigits) $ Lexer.signed (return ()) $ Lexer.number
+real = Lexer.signed (return ()) Lexer.number
 #endif
 
 #if MIN_VERSION_megaparsec(6,0,0)
@@ -395,7 +392,7 @@ renderImpl sparse prob = mconcat
               | (blkno, blk) <- zip [(1::Int)..] m, ((i,j),e) <- Map.toList blk, i <= j ]
 
     renderDenseMatrix :: Matrix -> Builder
-    renderDenseMatrix m = 
+    renderDenseMatrix m =
       "{\n" <>
       mconcat [renderDenseBlock b s <> "\n" | (b,s) <- zip m (blockStruct prob)] <>
       "}\n"
@@ -404,9 +401,9 @@ renderImpl sparse prob = mconcat
     renderDenseBlock b s
       | s < 0 =
           "  " <> renderVec [blockElem i i b | i <- [1 .. abs s]]
-      | otherwise = 
+      | otherwise =
           "  { " <>
-          sepByS [renderRow i | i <- [1..s]] ", " <>     
+          sepByS [renderRow i | i <- [1..s]] ", " <>
           " }"
       where
         renderRow i = renderVec [blockElem i j b | j <- [1..s]]

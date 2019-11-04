@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,13 +9,13 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable
 --
 -- Mixed-Integer Programming Problems with some commmonly used extensions
 --
 -----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Base
-  ( 
+  (
   -- * The MIP Problem type
     Problem (..)
   , Label
@@ -329,7 +330,7 @@ instance Functor SOSConstraint where
 -- ---------------------------------------------------------------------------
 
 -- | MIP status with the following partial order:
--- 
+--
 -- <<doc-images/MIP-Status-diagram.png>>
 data Status
   = StatusUnknown

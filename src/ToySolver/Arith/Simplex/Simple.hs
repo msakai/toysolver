@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.Arith.Simplex.Simple
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
@@ -40,7 +40,7 @@ check vs as = runST $ do
     Simplex.assertAtomEx solver (fmap (LA.applySubst s') a)
   ret <- Simplex.check solver
   if ret then do
-    m <- Simplex.getModel solver    
+    m <- Simplex.getModel solver
     return $ Just $ mtrans m
   else
     return Nothing

@@ -63,7 +63,7 @@ prop_mult_dist =
   forAll areals $ \c ->
     a * (b + c) == a * b + a * c
 
-prop_mult_zero = 
+prop_mult_zero =
   forAll areals $ \a ->
     0 * a ==  0
 

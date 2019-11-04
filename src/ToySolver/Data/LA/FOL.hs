@@ -1,4 +1,15 @@
 {-# OPTIONS_GHC -Wall #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Data.LA.FOL
+-- Copyright   :  (c) Masahiro Sakai 2013
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Data.LA.FOL
   ( fromFOLAtom
   , toFOLFormula

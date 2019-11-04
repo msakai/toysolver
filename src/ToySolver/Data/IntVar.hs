@@ -1,14 +1,16 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.IntVar
 -- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses)
--- 
+-- Portability :  non-portable
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.IntVar
   ( Var

@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.Delta (deltaTestGroup) where
 
 import Data.VectorSpace ((*^))
@@ -11,7 +12,7 @@ import qualified ToySolver.Data.Delta as Delta
 
 -- ---------------------------------------------------------------------
 -- Delta
-      
+
 instance Arbitrary r => Arbitrary (Delta r) where
   arbitrary = do
     r <- arbitrary
@@ -72,12 +73,12 @@ prop_Delta_mult_dist =
     a * (b + c) == a * b + a * c
 
 prop_Delta_mult_zero :: Property
-prop_Delta_mult_zero = 
+prop_Delta_mult_zero =
   forAll arbitrary $ \(a :: Delta Rational) ->
     0 * a ==  0
 
 prop_Delta_scale_mult :: Property
-prop_Delta_scale_mult = 
+prop_Delta_scale_mult =
   forAll arbitrary $ \(a :: Delta Rational) ->
   forAll arbitrary $ \b ->
     Delta.fromReal a * b ==  a *^ b

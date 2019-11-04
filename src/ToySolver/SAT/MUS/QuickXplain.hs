@@ -3,10 +3,10 @@
 -- Module      :  ToySolver.SAT.MUS.QuickXplain
 -- Copyright   :  (c) Masahiro Sakai 2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable
+-- Portability :  portable
 --
 -- Minimal Unsatifiable Subset (MUS) Finder based on QuickXplain algorithm.
 --

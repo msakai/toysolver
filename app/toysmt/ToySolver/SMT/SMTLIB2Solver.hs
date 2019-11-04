@@ -153,10 +153,10 @@ interpretFun (env,senv) t =
   case t of
     TermSpecConstant (SpecConstantNumeral n) -> SMT.EValue $ SMT.ValRational $ fromInteger n
     TermSpecConstant (SpecConstantDecimal s) -> SMT.EValue $ SMT.ValRational $ fst $ head $ readFloat s
-    TermSpecConstant (SpecConstantHexadecimal s) -> 
+    TermSpecConstant (SpecConstantHexadecimal s) ->
       let n = fst $ head $ readHex s
       in SMT.EValue $ SMT.ValBitVec $ BV.nat2bv (length s * 4) n
-    TermSpecConstant (SpecConstantBinary s) -> 
+    TermSpecConstant (SpecConstantBinary s) ->
       SMT.EValue $ SMT.ValBitVec $ BV.fromDescBits [c == '1' | c <- s]
     TermSpecConstant c@(SpecConstantString _s) -> E.throw $ SMT.Error (show c)
     TermQualIdentifier qid -> f qid []
@@ -218,7 +218,7 @@ valueToTerm (SMT.ValUninterpreted n s) =
   TermQualIdentifier $ QIdentifierAs (ISymbol $ "@" ++ show n) (sortToSortTerm s)
 
 fsymToIdentifier :: SMT.FSym -> Identifier
-fsymToIdentifier (SMT.FSym f indexes) = 
+fsymToIdentifier (SMT.FSym f indexes) =
   case indexes of
     [] -> ISymbol (T.unpack $ unintern f)
     _ -> I_Symbol (T.unpack $ unintern f) (map g indexes)
@@ -278,7 +278,7 @@ newSolver = do
   produceAssignmentRef <- newIORef False
   produceModelsRef <- newIORef False
   produceUnsatAssumptionsRef <- newIORef False
-  produceUnsatCoresRef <- newIORef False  
+  produceUnsatCoresRef <- newIORef False
   globalDeclarationsRef <- newIORef False
   unsatAssumptionsRef <- newIORef undefined
   return $
@@ -359,7 +359,7 @@ runCommand solver cmd = E.handle h $ do
     GetModel -> CmdGetModelResponse <$> getModel solver
     GetProof -> CmdGetProofResponse <$> getProof solver
     GetUnsatCore -> CmdGetUnsatCoreResponse <$> getUnsatCore solver
-    GetUnsatAssumptions -> CmdGetUnsatAssumptionsResponse <$> getUnsatAssumptions solver  
+    GetUnsatAssumptions -> CmdGetUnsatAssumptionsResponse <$> getUnsatAssumptions solver
     Reset -> const (CmdGenResponse Success) <$> reset solver
     ResetAssertions -> const (CmdGenResponse Success) <$> resetAssertions solver
     Echo s -> CmdEchoResponse <$> echo solver s
@@ -377,7 +377,7 @@ execCommandString solver cmd = do
 runCommandString :: Solver -> String -> IO CmdResponse
 runCommandString solver cmd =
   case Parsec.parse (Parsec.spaces >> CommandsParsers.parseCommand <* Parsec.eof) "" cmd of
-    Left err -> 
+    Left err ->
       -- GenResponse type uses strings in printed form.
       return $ CmdGenResponse $ Error $ "\"" ++ concat [if c == '"' then "\"\"" else [c] | c <- show err] ++ "\""
     Right cmd ->
@@ -518,7 +518,7 @@ getOption solver opt =
       return $ AttrValueSymbol (showSL b)
     ":print-success" -> do
       b <- readIORef (svPrintSuccessRef solver)
-      return $ AttrValueSymbol (showSL b) 
+      return $ AttrValueSymbol (showSL b)
     ":produce-assertions" -> do
       b <- readIORef (svProduceAssertionsRef solver)
       return $ AttrValueSymbol (showSL b)
@@ -739,7 +739,7 @@ checkSatAssuming solver xs = do
 
 getValue :: Solver -> [Term] -> IO GetValueResponse
 getValue solver ts = do
-  ts <- mapM (processNamed solver) ts  
+  ts <- mapM (processNamed solver) ts
   mode <- readIORef (svModeRef solver)
   unless (mode == ModeSat) $ do
     E.throwIO $ SMT.Error "get-value can only be used in sat mode"
@@ -792,7 +792,7 @@ getModel solver = do
                 args :: [Term]
                 args = [TermQualIdentifier (QIdentifier (ISymbol x)) | SV x _ <- argsSV]
                 f :: ([SMT.Value], SMT.Value) -> Term -> Term
-                f (vals,val) tm = 
+                f (vals,val) tm =
                   TermQualIdentifierT (QIdentifier (ISymbol "ite")) [cond, valueToTerm val, tm]
                   where
                     cond =

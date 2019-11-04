@@ -1,13 +1,15 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.Polynomial.Factorization.Integer
 -- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Data.Polynomial.Factorization.Integer () where

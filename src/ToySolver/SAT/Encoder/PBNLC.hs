@@ -1,15 +1,19 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE ExistentialQuantification, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.Encoder.PBNLC
 -- Copyright   :  (c) Masahiro Sakai 2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ExistentialQuantification, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses)
--- 
+-- Portability :  non-portable
+--
 -----------------------------------------------------------------------------
 module ToySolver.SAT.Encoder.PBNLC
   (
@@ -20,7 +24,7 @@ module ToySolver.SAT.Encoder.PBNLC
 
   -- * Adding constraints
   , addPBNLAtLeast
-  , addPBNLAtMost  
+  , addPBNLAtMost
   , addPBNLExactly
   , addPBNLAtLeastSoft
   , addPBNLAtMostSoft
@@ -113,7 +117,7 @@ linearizePBSum enc = linearizePBSumWithPolarity enc Tseitin.polarityBoth
 -- * If @'polarityPosOccurs' p@, the value of resulting 'PBLinSum' is /greater than/ or /equal to/ the value of original 'PBSum'.
 --
 -- * If @'polarityNegOccurs' p@, the value of resulting 'PBLinSum' is /lesser than/ or /equal to/ the value of original 'PBSum'.
--- 
+--
 linearizePBSumWithPolarity
   :: PrimMonad m
   => Encoder m

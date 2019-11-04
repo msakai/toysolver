@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.Arith.DifferenceLogic
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
 -- Portability :  portable

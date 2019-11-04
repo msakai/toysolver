@@ -3,13 +3,13 @@
 -- Module      :  ToySolver.Data.Polyhedron
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
 --
 -- Affine subspaces that are characterized by a set of linear (in)equalities.
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.Polyhedron
   ( Polyhedron
@@ -83,7 +83,7 @@ univ = Polyhedron Map.empty
 empty :: Polyhedron
 empty = Empty
 
--- | intersection of 
+-- | intersection of
 intersection :: Polyhedron -> Polyhedron -> Polyhedron
 intersection (Polyhedron m1) (Polyhedron m2) =
   normalize $ Polyhedron (Map.unionWith Interval.intersection m1 m2)
@@ -92,7 +92,7 @@ intersection _ _ = Empty
 -- | Create a set of 'Polyhedron's that are characterized by a given
 -- set of linear (in)equalities.
 fromConstraints :: [AtomR] -> [Polyhedron]
-fromConstraints cs = 
+fromConstraints cs =
   map (foldl' intersection univ) $ transpose $ map fromAtom cs
 
 fromAtom :: AtomR  -> [Polyhedron]

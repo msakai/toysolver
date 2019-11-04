@@ -1,4 +1,16 @@
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE TypeFamilies #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.SAT.Encoder.Integer
+-- Copyright   :  (c) Masahiro Sakai 2012
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.SAT.Encoder.Integer
   ( Expr (..)
   , newVar

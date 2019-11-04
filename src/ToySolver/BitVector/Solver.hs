@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -7,13 +8,14 @@
 -- Module      :  ToySolver.BitVector.Solver
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.BitVector.Solver
-  (    
+  (
   -- * BitVector solver
     Solver
   , newSolver
@@ -265,11 +267,7 @@ encodeSum enc w allowOverflow xss = do
         SQ.enqueue q x
 
   forM_ xss $ \xs -> do
-#if MIN_VERSION_vector(0,11,0)
     VG.imapM insert xs
-#else
-    VG.mapM (uncurry insert) (VG.indexed xs)
-#endif
 
   let loop i ret
         | i >= w = do
@@ -355,7 +353,7 @@ encodeShl enc s t = do
               e = bs VG.! j
           Tseitin.encodeITE enc b t e
   foldM go s (zip [(0::Int)..] (VG.toList t))
-  
+
 encodeLShr :: Tseitin.Encoder IO -> SBV -> SBV -> IO SBV
 encodeLShr enc s t = do
   let w = VG.length s
@@ -407,7 +405,7 @@ encodeSDiv solver s t = do
   when (w /= VG.length t) $ error "invalid width"
   if w == 0 then
     return VG.empty
-  else do    
+  else do
     s' <- encodeNegate (svTseitin solver) s
     t' <- encodeNegate (svTseitin solver) t
     let msb_s = VG.last s

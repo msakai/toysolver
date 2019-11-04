@@ -1,14 +1,17 @@
-{-# LANGUAGE BangPatterns, FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Internal.Data.Vec
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, FlexibleContexts, ScopedTypeVariables)
+-- Portability :  non-portable
 --
 -- Simple 1-dimentional resizable array
 --
@@ -30,7 +33,7 @@ module ToySolver.Internal.Data.Vec
   , read
   , write
   , modify
-  , modify'  
+  , modify'
   , unsafeRead
   , unsafeWrite
   , unsafeModify

@@ -1,13 +1,14 @@
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.EUF.EUFSolver
 -- Copyright   :  (c) Masahiro Sakai 2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  unstable
--- Portability :  non-portable (CPP)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.EUF.EUFSolver
@@ -87,7 +88,7 @@ newSolver = do
   expl <- newIORef undefined
   bp <- Vec.new
 
-  let solver = 
+  let solver =
         Solver
         { svCCSolver = cc
         , svDisequalities = deqs

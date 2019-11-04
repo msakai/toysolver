@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.GraphShortestPath (graphShortestPathTestGroup) where
 
 import Control.Monad
@@ -20,7 +21,7 @@ import qualified Data.HashSet as HashSet
 type Vertex = Int
 type Cost = Rational
 type Label = Char
-    
+
 genGraph :: Gen Cost -> Gen (HashMap Vertex [OutEdge Vertex Cost Label])
 genGraph genCost = do
   n <- choose (1, 20) -- inclusive
@@ -73,7 +74,7 @@ isValidResult
   -> [vertex]
   -> HashMap vertex (cost, Last (InEdge vertex cost label))
   -> Bool
-isValidResult g ss p = 
+isValidResult g ss p =
   and
   [ case m of
       Nothing -> tc == 0 && u `HashSet.member` ss'
@@ -562,7 +563,7 @@ case_bellmanFord_negativecost_cycle = do
             [(v, [(u,c,())]) | ((v,u),c) <- bellmanford_example_negativecost_cycle]
       m = bellmanFord lastInEdge g [25]
   case bellmanFordDetectNegativeCycle path g m of
-    Nothing -> assertFailure ("negative cost cycle should be found (" ++ show m ++ ")") 
+    Nothing -> assertFailure ("negative cost cycle should be found (" ++ show m ++ ")")
     Just cyclePath -> assertBool (show cyclePath ++ " should be valid negative cost cycle") $ isValidNegativeCostCycle g cyclePath
 
 bellmanford_example_negativecost_cycle :: [((Vertex, Vertex), Cost)]
@@ -970,13 +971,6 @@ floydWarshall_example = HashMap.fromList
   , (3, [(4,2,())])
   , (4, [(2,-1,())])
   ]
-
--- ------------------------------------------------------------------------
-
-#if !MIN_VERSION_QuickCheck(2,8,0)
-sublistOf :: [a] -> Gen [a]
-sublistOf xs = filterM (\_ -> choose (False, True)) xs
-#endif
 
 -- ------------------------------------------------------------------------
 -- Test harness

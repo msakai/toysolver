@@ -1,4 +1,20 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.SAT.Types
+-- Copyright   :  (c) Masahiro Sakai 2012
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.SAT.Types
   (
   -- * Variable
@@ -355,7 +371,7 @@ normalizePBLinExactly a =
     step3 :: PBLinExactly -> PBLinExactly
     step3 constr@(xs,n) =
       case SubsetSum.subsetSum (V.fromList [c | (c,_) <- xs]) n of
-        Just _ -> constr        
+        Just _ -> constr
         Nothing -> ([], 1) -- false
 
 {-# SPECIALIZE instantiatePBLinAtLeast :: (Lit -> IO LBool) -> PBLinAtLeast -> IO PBLinAtLeast #-}
@@ -538,7 +554,7 @@ class NewVar m a => AddClause m a | a -> m where
 class AddClause m a => AddCardinality m a | a -> m where
   {-# MINIMAL addAtLeast #-}
 
-  -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.  
+  -- | Add a cardinality constraints /atleast({l1,l2,..},n)/.
   addAtLeast
     :: a
     -> [Lit] -- ^ set of literals /{l1,l2,..}/ (duplicated elements are ignored)

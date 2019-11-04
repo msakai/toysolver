@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.Converter.PBSetObj
 -- Copyright   :  (c) Masahiro Sakai 2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
 -- Portability :  portable

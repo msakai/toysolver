@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.Combinatorial.HittingSet.Util
 -- Copyright   :  (c) Masahiro Sakai 2012-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable

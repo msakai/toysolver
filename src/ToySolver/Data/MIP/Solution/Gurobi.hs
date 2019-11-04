@@ -1,6 +1,18 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Data.MIP.Solution.Gurobi
+-- Copyright   :  (c) Masahiro Sakai 2012,2017
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Solution.Gurobi
   ( Solution (..)
   , render
@@ -43,7 +55,7 @@ writeFile fname sol = do
   TLIO.writeFile fname (render sol)
 
 parse :: TL.Text -> MIP.Solution Scientific
-parse t = 
+parse t =
   case foldl' f (Nothing,[]) $ TL.lines t of
     (obj, vs) ->
       def{ MIP.solStatus = MIP.StatusFeasible

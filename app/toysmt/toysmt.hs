@@ -8,7 +8,7 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (CPP)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module Main where
@@ -81,7 +81,7 @@ main = do
   solver <- newSolver
   if optInteractive opt then do
     mapM_ (loadFile solver) (optFiles opt)
-    repl solver        
+    repl solver
   else do
     if null (optFiles opt) then
       repl solver

@@ -1,35 +1,39 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.Encoder.Tseitin
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, ExistentialQuantification)
--- 
+-- Portability :  non-portable
+--
 -- Tseitin encoding
 --
 -- TODO:
--- 
+--
 -- * reduce variables.
 --
 -- References:
 --
 -- * [Tse83] G. Tseitin. On the complexity of derivation in propositional
 --   calculus. Automation of Reasoning: Classical Papers in Computational
---   Logic, 2:466-483, 1983. Springer-Verlag. 
+--   Logic, 2:466-483, 1983. Springer-Verlag.
 --
 -- * [For60] R. Fortet. Application de l'algèbre de Boole en rechercheop
 --   opérationelle. Revue Française de Recherche Opérationelle, 4:17-26,
---   1960. 
+--   1960.
 --
 -- * [BM84a] E. Balas and J. B. Mazzola. Nonlinear 0-1 programming:
 --   I. Linearization techniques. Mathematical Programming, 30(1):1-21,
 --   1984.
--- 
+--
 -- * [BM84b] E. Balas and J. B. Mazzola. Nonlinear 0-1 programming:
 --   II. Dominance relations and algorithms. Mathematical Programming,
 --   30(1):22-45, 1984.
@@ -345,7 +349,7 @@ encodeITEWithPolarity encoder polarity c t e = do
         SAT.addClause encoder [-x, -c, t]
         SAT.addClause encoder [-x, c, e]
         SAT.addClause encoder [t, e, -x] -- redundant, but will increase the strength of unit propagation.
-  
+
       defineNeg :: SAT.Lit -> m ()
       defineNeg x = do
         -- ite(c,t,e) → x

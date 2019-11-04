@@ -1,21 +1,27 @@
-{-# LANGUAGE ScopedTypeVariables, Rank2Types, TypeOperators, TypeSynonymInstances, FlexibleInstances, TypeFamilies, CPP #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.Simplex
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, Rank2Types, TypeOperators, TypeSynonymInstances, FlexibleInstances, TypeFamilies, CPP)
+-- Portability :  non-portable
 --
 -- Naïve implementation of Simplex method
--- 
+--
 -- Reference:
 --
 -- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
--- 
+--
 -- * Bruno Dutertre and Leonardo de Moura.
 --   A Fast Linear-Arithmetic Solver for DPLL(T).
 --   Computer Aided Verification In Computer Aided Verification, Vol. 4144 (2006), pp. 81-94.
@@ -500,7 +506,7 @@ simplifyAtom solver (OrdRel lhs op rhs) = do
         c = c1 * c2
         c1 = fromIntegral $ foldl' lcm 1 [denominator c | (c, _) <- LA.terms e]
         c2 = signum $ head ([c | (c,x) <- LA.terms e] ++ [1])
-             
+
 assertLower :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> v -> m ()
 assertLower solver x l = assertLB solver x (Just (l, IntSet.empty))
 
@@ -512,7 +518,7 @@ assertLB solver x Nothing = return ()
 assertLB solver x (Just (l, cidSet)) = do
   l0 <- getLB solver x
   u0 <- getUB solver x
-  case (l0,u0) of 
+  case (l0,u0) of
     (Just (l0', _), _) | l <= l0' -> return ()
     (_, Just (u0', cidSet2)) | u0' < l -> do
       setExplanation solver $ cidSet `IntSet.union` cidSet2
@@ -558,7 +564,7 @@ setRow :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> LA.Expr R
 setRow solver v e = do
   modifyMutVar (svTableau solver) $ \t ->
     IntMap.insert v (LA.applySubst t e) t
-  modifyMutVar (svModel solver) $ \m -> 
+  modifyMutVar (svModel solver) $ \m ->
     IntMap.insert v (LA.evalLinear m (toValue 1) e) m
 
 setOptDir :: PrimMonad m => GenericSolverM m v -> OptDir -> m ()
@@ -950,7 +956,7 @@ prune :: PrimMonad m => GenericSolverM m Rational -> Options -> m Bool
 prune solver opt =
   case objLimit opt of
     Nothing -> return False
-    Just lim -> do    
+    Just lim -> do
       o <- getObjValue solver
       dir <- getOptDir solver
       case dir of
@@ -1127,9 +1133,9 @@ recordTime solver act = do
   return result
 
 showDelta :: Bool -> Delta Rational -> String
-showDelta asRatio v = 
+showDelta asRatio v =
   case v of
-    (Delta r k) -> 
+    (Delta r k) ->
       f r ++
         case compare k 0 of
           EQ -> ""
@@ -1171,7 +1177,7 @@ enableTimeRecording solver = do
         endCPU <- getTime ProcessCPUTime
         endWC  <- getTime Monotonic
         let durationSecs :: TimeSpec -> TimeSpec -> Double
-            durationSecs start end = fromIntegral (toNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)      
+            durationSecs start end = fromIntegral (toNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)
         (log solver . printf "cpu time = %.3fs") (durationSecs startCPU endCPU)
         (log solver . printf "wall clock time = %.3fs") (durationSecs startWC endWC)
         return result
@@ -1257,7 +1263,7 @@ dump solver = do
   log solver "Assignments and Bounds:"
   objVal <- getValue solver objVar
   log solver $ printf "beta(obj) = %s" (showValue True objVal)
-  xs <- variables solver 
+  xs <- variables solver
   forM_ xs $ \x -> do
     l <- getLB solver x
     u <- getUB solver x
