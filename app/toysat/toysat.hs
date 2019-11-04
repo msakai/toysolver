@@ -49,9 +49,6 @@ import Options.Applicative hiding (info)
 import qualified Options.Applicative
 import System.IO
 import System.Exit
-#if !MIN_VERSION_time(1,5,0)
-import System.Locale (defaultTimeLocale)
-#endif
 import System.Clock
 import System.FilePath
 import qualified System.Info as SysInfo

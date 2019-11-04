@@ -202,6 +202,7 @@ Library
      template-haskell,
      temporary >=1.2,
      text >=1.1.0.0,
+     -- defaultTimeLocale is available on time >=1.5.0
      time >=1.5.0,
      transformers >=0.2,
      transformers-compat >=0.3,
