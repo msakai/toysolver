@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall #-}
+{-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE CPP #-}
 module ToySolver.Converter.PB.Internal.LargestIntersectionFinder
   ( Table
