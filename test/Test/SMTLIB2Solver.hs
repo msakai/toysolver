@@ -1,4 +1,5 @@
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.SMTLIB2Solver (smtlib2SolverTestGroup) where
 
 import Control.Applicative((<$>))

@@ -1,7 +1,14 @@
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
-{-# LANGUAGE BangPatterns, ScopedTypeVariables, CPP, DeriveDataTypeable, RecursiveDo, MultiParamTypeClasses, InstanceSigs #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 #ifdef __GLASGOW_HASKELL__
-{-# LANGUAGE UnboxedTuples, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
 #endif
 -----------------------------------------------------------------------------
 -- |

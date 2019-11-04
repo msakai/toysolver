@@ -1,4 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |

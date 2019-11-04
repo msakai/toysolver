@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.HittingSets (hittingSetsTestGroup) where
 
 import Prelude hiding (all)

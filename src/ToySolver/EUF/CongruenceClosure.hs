@@ -1,4 +1,7 @@
-{-# LANGUAGE CPP, BangPatterns, ScopedTypeVariables, FlexibleInstances #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |

@@ -1,5 +1,10 @@
-{-# LANGUAGE ScopedTypeVariables, Rank2Types, TypeOperators, FlexibleInstances, TypeFamilies, CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.Simplex

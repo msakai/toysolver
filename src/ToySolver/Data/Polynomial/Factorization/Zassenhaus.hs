@@ -1,4 +1,6 @@
-{-# LANGUAGE BangPatterns, ScopedTypeVariables, Rank2Types #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |

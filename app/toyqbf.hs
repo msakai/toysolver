@@ -1,4 +1,5 @@
-{-# LANGUAGE ScopedTypeVariables, CPP #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |

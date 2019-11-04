@@ -1,4 +1,6 @@
-{-# LANGUAGE BangPatterns, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.Polynomial.Factorization.SquareFree

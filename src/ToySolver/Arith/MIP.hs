@@ -1,4 +1,5 @@
-{-# LANGUAGE ScopedTypeVariables, Rank2Types #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |

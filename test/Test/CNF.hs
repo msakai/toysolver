@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.CNF (cnfTestGroup) where
 
 import Data.ByteString.Builder

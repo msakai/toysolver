@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.Converter (converterTestGroup) where
 
 import Control.Monad

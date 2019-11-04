@@ -1,4 +1,5 @@
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.AReal (arealTestGroup) where
 
 import Data.Maybe

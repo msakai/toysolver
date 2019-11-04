@@ -1,4 +1,7 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |

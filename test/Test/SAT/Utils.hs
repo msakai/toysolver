@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.SAT.Utils where
 
 import Control.Monad

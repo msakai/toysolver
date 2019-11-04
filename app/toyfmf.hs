@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE CPP, TypeFamilies, OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toyfmf

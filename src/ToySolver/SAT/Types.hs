@@ -1,4 +1,8 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module ToySolver.SAT.Types
   (
   -- * Variable

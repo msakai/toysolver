@@ -1,4 +1,8 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, BangPatterns, TypeSynonymInstances, CPP #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 #ifdef __GLASGOW_HASKELL__
 #define UNBOXED_COMPARISON_ARGUMENTS
 #endif
