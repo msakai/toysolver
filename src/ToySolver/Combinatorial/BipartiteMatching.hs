@@ -9,7 +9,7 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns)
+-- Portability :  non-portable
 --
 -- This module provides functions for computing several kind of bipartite
 -- matching. 

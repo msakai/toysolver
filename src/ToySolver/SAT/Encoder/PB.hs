@@ -11,7 +11,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- References:
 --

@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeFamilies)
+-- Portability :  non-portable
 --
 -- Augmenting number types with infinitesimal parameter δ.
 --

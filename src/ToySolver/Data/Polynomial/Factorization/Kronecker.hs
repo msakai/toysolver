@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns)
+-- Portability :  non-portable
 --
 -- Factoriation of integer-coefficient polynomial using Kronecker's method.
 --

@@ -8,7 +8,7 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (CPP)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module Main where

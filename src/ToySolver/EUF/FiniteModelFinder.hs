@@ -11,7 +11,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, MultiParamTypeClasses, OverloadedStrings)
+-- Portability :  non-portable
 --
 -- A simple model finder.
 --

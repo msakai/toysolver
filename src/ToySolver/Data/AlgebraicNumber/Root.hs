@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (Rank2Types, ScopedTypeVariables)
+-- Portability :  non-portable
 --
 -- Manipulating polynomials for corresponding operations for algebraic numbers.
 -- 

@@ -11,7 +11,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ExistentialQuantification, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 -- 
 -----------------------------------------------------------------------------
 module ToySolver.SAT.Encoder.PBNLC

@@ -9,7 +9,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (ScopedTypeVariables, CPP)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 

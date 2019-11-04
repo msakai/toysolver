@@ -10,7 +10,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, FlexibleContexts, ScopedTypeVariables)
+-- Portability :  non-portable
 --
 -- Simple 1-dimentional resizable array
 --

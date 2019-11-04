@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- Arithmetic language (not limited to linear ones).
 -- 

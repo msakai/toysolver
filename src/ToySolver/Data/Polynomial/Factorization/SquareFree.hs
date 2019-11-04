@@ -9,7 +9,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, TypeSynonymInstances, FlexibleInstances)
+-- Portability :  non-portable
 --
 -- References:
 --

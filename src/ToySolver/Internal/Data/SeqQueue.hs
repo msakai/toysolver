@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- Queue implemented using IORef and Sequence.
 -- 

@@ -11,7 +11,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns, TypeSynonymInstances, FlexibleInstances)
+-- Portability :  non-portable
 --
 -- Factoriation of polynomial over a finite field.
 --

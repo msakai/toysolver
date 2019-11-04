@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleInstances)
+-- Portability :  non-portable
 --
 -- Naive implementation of Cooper's algorithm
 --

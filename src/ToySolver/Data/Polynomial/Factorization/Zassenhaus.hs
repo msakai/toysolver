@@ -10,7 +10,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, ScopedTypeVariables, Rank2Types)
+-- Portability :  non-portable
 --
 -- Factoriation of integer-coefficient polynomial using Zassenhaus algorithm.
 --

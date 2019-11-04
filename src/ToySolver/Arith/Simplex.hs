@@ -13,7 +13,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, Rank2Types, TypeOperators, FlexibleInstances, TypeFamilies, CPP)
+-- Portability :  non-portable
 --
 -- Naïve implementation of Simplex method
 -- 

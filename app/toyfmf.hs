@@ -10,7 +10,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (CPP, TypeFamilies, OverloadedStrings)
+-- Portability :  non-portable
 --
 -- A toy-level model finder
 --

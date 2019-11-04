@@ -10,7 +10,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (FlexibleContexts, FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.SAT.Store.PB

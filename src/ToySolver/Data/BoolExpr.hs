@@ -11,7 +11,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses, DeriveDataTypeable, FlexibleContexts, FlexibleInstances)
+-- Portability :  non-portable
 --
 -- Boolean expression over a given type of atoms
 -- 

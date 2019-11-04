@@ -12,7 +12,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  unstable
--- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, CPP, OverloadedStrings, ScopedTypeVariables)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.SMT

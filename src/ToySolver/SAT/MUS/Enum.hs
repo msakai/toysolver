@@ -9,7 +9,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- In this module, we assume each soft constraint /C_i/ is represented as a literal.
 -- If a constraint /C_i/ is not a literal, we can represent it as a fresh variable /v/

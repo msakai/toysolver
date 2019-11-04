@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (Rank2Types)
+-- Portability :  non-portable
 --
 -- Algebraic reals
 --

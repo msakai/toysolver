@@ -10,7 +10,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- (incomplete) implementation of Omega Test
 --

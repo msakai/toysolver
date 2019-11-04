@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (DeriveDataTypeable)
+-- Portability :  non-portable
 -- 
 -- Wrapper for shd command.
 --

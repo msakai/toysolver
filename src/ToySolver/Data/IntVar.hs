@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses)
+-- Portability :  non-portable
 -- 
 -----------------------------------------------------------------------------
 module ToySolver.Data.IntVar

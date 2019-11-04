@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Data.Polynomial.Factorization.Integer () where

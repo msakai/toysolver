@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- Type classes for lattices and boolean algebras.
 -- 

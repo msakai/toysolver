@@ -18,7 +18,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses, FlexibleInstances, BangPatterns, TypeSynonymInstances)
+-- Portability :  non-portable
 --
 -- Priority queue implemented as array-based binary heap.
 --

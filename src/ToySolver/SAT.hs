@@ -18,7 +18,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, ScopedTypeVariables, CPP, DeriveDataTypeable, RecursiveDo)
+-- Portability :  non-portable
 --
 -- A CDCL SAT solver.
 --

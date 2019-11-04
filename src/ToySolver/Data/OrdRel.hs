@@ -10,7 +10,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances)
+-- Portability :  non-portable
 --
 -- Ordering relations
 -- 

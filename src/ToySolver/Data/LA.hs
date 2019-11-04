@@ -10,7 +10,7 @@
 -- 
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeFamilies, TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- Some definition for Theory of Linear Arithmetics.
 -- 
