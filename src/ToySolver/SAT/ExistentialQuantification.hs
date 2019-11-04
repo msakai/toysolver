@@ -1,5 +1,6 @@
 {-# Language BangPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 ----------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.ExistentialQuantification

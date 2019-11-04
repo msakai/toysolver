@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}

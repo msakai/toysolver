@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Version.TH

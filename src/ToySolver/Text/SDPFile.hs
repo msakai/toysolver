@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Text.SDPFile

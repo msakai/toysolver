@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -----------------------------------------------------------------------------

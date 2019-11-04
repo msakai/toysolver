@@ -10,6 +10,7 @@
 {-# LANGUAGE MagicHash #-}
 #endif
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Internal.Data.IndexedPriorityQueue

@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}

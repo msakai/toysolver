@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.PBO.BCD2
