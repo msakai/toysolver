@@ -265,11 +265,7 @@ encodeSum enc w allowOverflow xss = do
         SQ.enqueue q x
 
   forM_ xss $ \xs -> do
-#if MIN_VERSION_vector(0,11,0)
     VG.imapM insert xs
-#else
-    VG.mapM (uncurry insert) (VG.indexed xs)
-#endif
 
   let loop i ret
         | i >= w = do

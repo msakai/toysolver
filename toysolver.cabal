@@ -207,7 +207,8 @@ Library
      transformers >=0.2,
      transformers-compat >=0.3,
      unordered-containers >=0.2.3 && <0.3.0,
-     vector,
+     -- imapM and modify are available on vector >=0.11.0
+     vector >=0.11,
      vector-space >=0.8.6,
      xml-conduit
   if flag(WithZlib)

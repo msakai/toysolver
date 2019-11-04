@@ -120,11 +120,7 @@ newSolver outputMessage context dev nv clauses = do
     forM_ (SAT.unpackClause c) $ \lit -> do
       e <- readIORef ref
       modifyIORef' ref (+1)
-#if MIN_VERSION_vector(0,11,0)
       VGM.modify varEdgesTmp ((e,lit>0,w) :) (abs lit - 1)
-#else
-      VGM.write varEdgesTmp (abs lit - 1) =<< liftM ((e,lit>0,w) :) (VGM.read varEdgesTmp (abs lit - 1))
-#endif
 
   varOffset <- VGM.new nv
   varLength <- VGM.new nv
