@@ -169,7 +169,7 @@ Library
      -- IntMap.mergeWithKey and IntMap.toDescList require containers >=0.5.0
      containers >=0.5.0,
      data-default-class,
-     data-interval >=1.0.1 && <1.4.0,
+     data-interval >=2.0.1 && <2.1.0,
      deepseq,
      extended-reals >=0.1 && <1.0,
      filepath,

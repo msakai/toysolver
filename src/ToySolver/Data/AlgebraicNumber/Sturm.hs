@@ -148,8 +148,8 @@ halve' chain@(p:_) ival
     Finite lb = Interval.lowerBound ival
     Finite ub = Interval.upperBound ival
     mid = (lb + ub) / 2
-    ivalL = Interval.interval (Interval.lowerBound' ival) (Finite mid, True)
-    ivalR = Interval.interval (Finite mid, False) (Interval.upperBound' ival)
+    ivalL = Interval.interval (Interval.lowerBound' ival) (Finite mid, Interval.Closed)
+    ivalR = Interval.interval (Finite mid, Interval.Open) (Interval.upperBound' ival)
 
 narrow :: UPolynomial Rational -> Interval Rational -> Rational -> Interval Rational
 narrow p ival size = narrow' (sturmChain p) ival size
