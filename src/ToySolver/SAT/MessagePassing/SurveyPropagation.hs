@@ -71,6 +71,7 @@ import qualified Data.Vector.Unboxed.Mutable as VUM
 import Data.Vector.Generic ((!))
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VGM
+import Numeric
 import qualified Numeric.Log as L
 import qualified System.Random.MWC as Rand
 import qualified System.Random.MWC.Distributions as Rand
@@ -82,8 +83,8 @@ infixr 8 ^*
 (^*) :: Num a => L.Log a -> a -> L.Log a
 L.Exp a ^* b = L.Exp (a*b)
 
-comp :: (RealFloat a, L.Precise a) => L.Log a -> L.Log a
-comp (L.Exp a) = L.Exp $ L.log1p $ max (-1) $ negate (exp a)
+comp :: RealFloat a => L.Log a -> L.Log a
+comp (L.Exp a) = L.Exp $ log1p $ max (-1) $ negate (exp a)
 
 type ClauseIndex = Int
 type EdgeIndex   = Int
