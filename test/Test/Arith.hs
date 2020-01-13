@@ -230,7 +230,7 @@ End
 -}
 case_FourierMotzkinOptimization_test1 :: Assertion
 case_FourierMotzkinOptimization_test1 = do
-  Interval.upperBound' i @?= (3005/24, True)
+  Interval.upperBound' i @?= (3005/24, Interval.Closed)
   and [LA.eval m c | c <- cs] @?= True
   where
     (i, f) = FMOpt.optimize (IS.fromList vs) OptMax obj cs

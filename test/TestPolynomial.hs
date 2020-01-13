@@ -26,7 +26,7 @@ import qualified ToySolver.Data.Polynomial.Factorization.Zassenhaus as Zassenhau
 import qualified ToySolver.Data.Polynomial.Interpolation.Lagrange as LagrangeInterpolation
 
 import qualified Data.Interval as Interval
-import Data.Interval (Interval, EndPoint (..), (<=..<=), (<..<=), (<=..<), (<..<))
+import Data.Interval (Interval, Extended (..), (<=..<=), (<..<=), (<=..<), (<..<))
 
 {--------------------------------------------------------------------
   Polynomial type
