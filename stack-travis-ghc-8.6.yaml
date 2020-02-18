@@ -44,9 +44,9 @@ extra-deps:
 - multiset-0.3.4.1
 - queue-0.1.2
 - OptDir-0.0.3
-#- logic-TPTP-0.4.6.0
-- git: https://github.com/msakai/logic-TPTP.git
-  commit: 9041314569aff4117c0da677f2af04614caf1aa5
+- logic-TPTP-0.4.7.0
+#- git: https://github.com/msakai/logic-TPTP.git
+#  commit: 9041314569aff4117c0da677f2af04614caf1aa5
 - data-interval-2.0.1
 - extended-reals-0.2.3.0
 - finite-field-0.9.0
