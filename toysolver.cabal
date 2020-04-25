@@ -351,6 +351,7 @@ Library
      ToySolver.Data.Polynomial.Factorization.SquareFree
      ToySolver.Data.Polynomial.Factorization.Zassenhaus
      ToySolver.Data.Polynomial.GroebnerBasis
+     ToySolver.Data.Polynomial.Interpolation.Hermite
      ToySolver.Data.Polynomial.Interpolation.Lagrange
      ToySolver.FileFormat
      ToySolver.FileFormat.Base

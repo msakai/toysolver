@@ -23,6 +23,7 @@ import qualified ToySolver.Data.Polynomial.GroebnerBasis as GB
 import qualified ToySolver.Data.Polynomial.Factorization.FiniteField as FactorFF
 import qualified ToySolver.Data.Polynomial.Factorization.Hensel.Internal as Hensel
 import qualified ToySolver.Data.Polynomial.Factorization.Zassenhaus as Zassenhaus
+import qualified ToySolver.Data.Polynomial.Interpolation.Hermite as HermiteInterpolation
 import qualified ToySolver.Data.Polynomial.Interpolation.Lagrange as LagrangeInterpolation
 
 import qualified Data.Interval as Interval
@@ -909,6 +910,30 @@ case_Lagrange_interpolation_2 = p @?= q
         , (3, 27)
         ]
     q = 6*x^2 - 11*x + 6
+
+-- https://en.wikipedia.org/wiki/Hermite_interpolation
+case_Hermite_interpolation = p @?= q
+  where
+    x :: UPolynomial Rational
+    x = P.var X
+    p = HermiteInterpolation.interpolate
+        [ (-1, [2, -8, 56])
+        , (0, [1, 0, 0])
+        , (1, [2, 8, 56])
+        ]
+    q = x^8 + 1
+
+prop_Hermite_interpolation_random =
+  forAll upolynomials $ \p ->
+    forAll (choose (0, 2)) $ \m ->
+    let d = P.deg p
+        -- m = 2
+        n = (d + 1 + m) `div` (m+1)
+        -- d <= n (m + 1) - 1
+        xs = genericTake n [-1, 0 ..]
+        ds = [(x', genericTake (m+1) [P.eval (\_ -> x') q | q <- iterate (\q -> P.deriv q X) p]) | x' <- xs]
+        p' = HermiteInterpolation.interpolate ds
+    in counterexample (show (p, ds, p')) $ p == p'
 
 -- ---------------------------------------------------------------------
 
