@@ -14,7 +14,7 @@ platform:
 - x64
 
 install:
-- if %PLATFORM%==x86 (curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-i386) else (curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-x86_64)
+- if %PLATFORM%==x86 (curl -ostack.zip -L --insecure https://github.com/commercialhaskell/stack/releases/download/v2.1.3/stack-2.1.3-windows-i386.zip) else (curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-x86_64)
 - 7z x stack.zip stack.exe
 - stack setup > nul
 - curl -oCOIN-OR-1.8.0-win32-msvc12.zip -L --insecure https://www.coin-or.org/download/binary/OptimizationSuite/COIN-OR-1.8.0-win32-msvc12.zip
