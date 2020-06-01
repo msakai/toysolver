@@ -403,10 +403,10 @@ encodeFASumWithPolarity encoder polarity a b c = do
       definePos x = do
         -- x → FASum(a,b,c)
         -- ⇔ ¬FASum(a,b,c) → ¬x
-        SAT.addClause encoder [a,b,c,-x]   -- ¬a ∧ ¬b ∧ ¬c → -x
-        SAT.addClause encoder [a,-b,-c,-x] -- ¬a ∧  b ∧  c → -x
-        SAT.addClause encoder [-a,b,-c,-x] --  a ∧ ¬b ∧  c → -x
-        SAT.addClause encoder [-a,-b,c,-x] --  a ∧  b ∧ ¬c → -x
+        SAT.addClause encoder [a,b,c,-x]   -- ¬a ∧ ¬b ∧ ¬c → ¬x
+        SAT.addClause encoder [a,-b,-c,-x] -- ¬a ∧  b ∧  c → ¬x
+        SAT.addClause encoder [-a,b,-c,-x] --  a ∧ ¬b ∧  c → ¬x
+        SAT.addClause encoder [-a,-b,c,-x] --  a ∧  b ∧ ¬c → ¬x
   encodeWithPolarityHelper encoder (encFASumTable encoder) definePos defineNeg polarity (a,b,c)
 
 -- | Return an "carry"-pin of a full-adder.
