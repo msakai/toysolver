@@ -372,6 +372,7 @@ Library
      ToySolver.SAT.Encoder.Cardinality
      ToySolver.SAT.Encoder.Cardinality.Internal.Naive
      ToySolver.SAT.Encoder.Cardinality.Internal.ParallelCounter
+     ToySolver.SAT.Encoder.Cardinality.Internal.Totalizer
      ToySolver.SAT.Encoder.Tseitin
      ToySolver.SAT.ExistentialQuantification
      ToySolver.SAT.MessagePassing.SurveyPropagation
