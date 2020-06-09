@@ -175,7 +175,7 @@ prop_CardinalityEncoder_addAtLeast = QM.monadicIO $ do
     rhs <- choose (-1, nv+2)
     return $ (lhs, rhs)
   strategy <- QM.pick arbitrary
-  (cnf,defs) <- QM.run $ do
+  (cnf,defs,defs2) <- QM.run $ do
     db <- CNFStore.newCNFStore
     SAT.newVars_ db nv
     tseitin <- Tseitin.newEncoder db
@@ -183,10 +183,14 @@ prop_CardinalityEncoder_addAtLeast = QM.monadicIO $ do
     SAT.addAtLeast card lhs rhs
     cnf <- CNFStore.getCNFFormula db
     defs <- Tseitin.getDefinitions tseitin
-    return (cnf, defs)
+    defs2 <- Cardinality.getTotalizerDefinitions card
+    return (cnf, defs, defs2)
   forM_ (allAssignments nv) $ \m -> do
     let m2 :: Array SAT.Var Bool
-        m2 = array (1, CNF.cnfNumVars cnf) $ assocs m ++ [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs]
+        m2 = array (1, CNF.cnfNumVars cnf) $
+               assocs m ++
+               [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs] ++
+               Cardinality.evalTotalizerDefinitions m2 defs2
         b1 = SAT.evalAtLeast m (lhs,rhs)
         b2 = evalCNF (array (bounds m2) (assocs m2)) cnf
     QM.assert $ b1 == b2
