@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.Encoder.Cardinality.Internal
+-- Module      :  ToySolver.SAT.Encoder.Cardinality.Internal.ParallelCounter
 -- Copyright   :  (c) Masahiro Sakai 2019
 -- License     :  BSD-style
 --
