@@ -277,5 +277,38 @@ prop_Totalizer_backward_propagation = QM.monadicIO $ do
   QM.assert $ and [x `elem` xs1 || x `elem` xs2 || lbs !! (x-1) == liftBool e | x <- xs]
 
 
+prop_encodeAtLeast :: Property
+prop_encodeAtLeast = QM.monadicIO $ do
+  let nv = 4
+  (lhs,rhs) <- QM.pick $ do
+    lhs <- liftM catMaybes $ forM [1..nv] $ \i -> do
+      b <- arbitrary
+      if b then
+        Just <$> elements [i, -i]
+      else
+        return Nothing
+    rhs <- choose (-1, nv+2)
+    return $ (lhs, rhs)
+  strategy <- QM.pick arbitrary
+  (l,cnf,defs,defs2) <- QM.run $ do
+    db <- CNFStore.newCNFStore
+    SAT.newVars_ db nv
+    tseitin <- Tseitin.newEncoder db
+    card <- Cardinality.newEncoderWithStrategy tseitin strategy
+    l <- Cardinality.encodeAtLeast card (lhs, rhs)
+    cnf <- CNFStore.getCNFFormula db
+    defs <- Tseitin.getDefinitions tseitin
+    defs2 <- Cardinality.getTotalizerDefinitions card
+    return (l, cnf, defs, defs2)
+  forM_ (allAssignments nv) $ \m -> do
+    let m2 :: Array SAT.Var Bool
+        m2 = array (1, CNF.cnfNumVars cnf) $
+               assocs m ++
+               [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs] ++
+               Cardinality.evalTotalizerDefinitions m2 defs2
+        b1 = evalCNF (array (bounds m2) (assocs m2)) cnf
+    QM.assert $ not b1 || (SAT.evalLit m2 l == SAT.evalAtLeast m (lhs,rhs))
+
+
 satEncoderTestGroup :: TestTree
 satEncoderTestGroup = $(testGroupGenerator)
