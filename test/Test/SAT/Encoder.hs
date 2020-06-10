@@ -19,11 +19,13 @@ import qualified Test.QuickCheck.Monadic as QM
 
 import ToySolver.Data.BoolExpr
 import ToySolver.Data.Boolean
+import ToySolver.Data.LBool
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.Cardinality as Cardinality
+import qualified ToySolver.SAT.Encoder.Cardinality.Internal.Totalizer as Totalizer
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PB.Internal.Sorter as PBEncSorter
 import qualified ToySolver.SAT.Store.CNF as CNFStore
@@ -194,6 +196,86 @@ prop_CardinalityEncoder_addAtLeast = QM.monadicIO $ do
         b1 = SAT.evalAtLeast m (lhs,rhs)
         b2 = evalCNF (array (bounds m2) (assocs m2)) cnf
     QM.assert $ b1 == b2
+
+
+case_Totalizer_unary :: Assertion
+case_Totalizer_unary = do
+  solver <- SAT.newSolver
+  tseitin <- Tseitin.newEncoder solver
+  totalizer <- Totalizer.newEncoder tseitin
+  SAT.newVars_ solver 5
+  xs <- Totalizer.encodeSum totalizer [1,2,3,4,5]
+  SAT.addClause solver [xs !! 2]
+  SAT.addClause solver [- (xs !! 1)]
+  ret <- SAT.solve solver
+  ret @?= False
+
+
+-- -- This does not hold:
+-- case_Totalizer_pre_unary :: Assertion
+-- case_Totalizer_pre_unary = do
+--   solver <- SAT.newSolver
+--   tseitin <- Tseitin.newEncoder solver
+--   totalizer <- Totalizer.newEncoder tseitin
+--   SAT.newVars_ solver 5
+--   xs <- Totalizer.encodeSum totalizer [1,2,3,4,5]
+--   SAT.addClause solver [xs !! 2]
+--   v0 <- SAT.getLitFixed solver (xs !! 0)
+--   v1 <- SAT.getLitFixed solver (xs !! 1)
+--   v0 @?= lTrue
+--   v1 @?= lTrue
+
+
+prop_Totalizer_forward_propagation :: Property
+prop_Totalizer_forward_propagation = QM.monadicIO $ do
+  nv <- QM.pick $ choose (2, 10) -- inclusive range
+  let xs = [1..nv]
+  (xs1, xs2) <- QM.pick $ do
+    cs <- forM xs $ \x -> do
+      c <- arbitrary
+      return (x,c)
+    return ([x | (x, Just True) <- cs], [x | (x, Just False) <- cs])
+  let p = length xs1
+      q = length xs2
+  lbs <- QM.run $ do
+    solver <- SAT.newSolver
+    tseitin <- Tseitin.newEncoder solver
+    totalizer <- Totalizer.newEncoder tseitin
+    SAT.newVars_ solver nv
+    ys <- Totalizer.encodeSum totalizer xs
+    forM_ xs1 $ \x -> SAT.addClause solver [x]
+    forM_ xs2 $ \x -> SAT.addClause solver [-x]
+    forM ys $ SAT.getLitFixed solver
+  QM.monitor $ counterexample (show lbs)
+  QM.assert $ lbs == replicate p lTrue ++ replicate (nv - p - q) lUndef ++ replicate q lFalse
+
+
+prop_Totalizer_backward_propagation :: Property
+prop_Totalizer_backward_propagation = QM.monadicIO $ do
+  nv <- QM.pick $ choose (2, 10) -- inclusive range
+  let xs = [1..nv]
+  (xs1, xs2) <- QM.pick $ do
+    cs <- forM xs $ \x -> do
+      c <- arbitrary
+      return (x,c)
+    return ([x | (x, Just True) <- cs], [x | (x, Just False) <- cs])
+  let p = length xs1
+      q = length xs2
+  e <- QM.pick arbitrary
+  lbs <- QM.run $ do
+    solver <- SAT.newSolver
+    tseitin <- Tseitin.newEncoder solver
+    totalizer <- Totalizer.newEncoder tseitin
+    SAT.newVars_ solver nv
+    ys <- Totalizer.encodeSum totalizer xs
+    forM_ xs1 $ \x -> SAT.addClause solver [x]
+    forM_ xs2 $ \x -> SAT.addClause solver [-x]
+    forM_ (take (nv - p - q) (drop p ys)) $ \x -> do
+      SAT.addClause solver [if e then x else - x]
+    forM xs $ SAT.getLitFixed solver
+  QM.monitor $ counterexample (show lbs)
+  QM.assert $ and [x `elem` xs1 || x `elem` xs2 || lbs !! (x-1) == liftBool e | x <- xs]
+
 
 satEncoderTestGroup :: TestTree
 satEncoderTestGroup = $(testGroupGenerator)
