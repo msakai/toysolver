@@ -84,14 +84,14 @@ addAtLeast enc (lhs, rhs) = do
 addCardinality :: PrimMonad m => Encoder m -> [SAT.Lit] -> (Int, Int) -> m ()
 addCardinality enc lits (lb, ub) = do
   let n = length lits
-  if n < lb || ub < n then
-     SAT.addClause enc []
+  if lb <= 0 && n <= ub then
+    return ()
+  else if n < lb || ub < 0 then
+    SAT.addClause enc []
   else do
-    lits' <- encodeSumV enc $ V.fromList lits
-    forM_ [1..lb] $ \i ->
-      SAT.addClause enc [lits' V.! (i - 1)]
-    forM_ [ub+1 .. V.length lits'] $ \j -> do
-      SAT.addClause enc [- (lits' V.! (j - 1))]
+    lits' <- encodeSum enc lits
+    forM_ (take lb lits') $ \l -> SAT.addClause enc [l]
+    forM_ (drop ub lits') $ \l -> SAT.addClause enc [- l]
 
 
 -- TODO: consider polarity
@@ -104,11 +104,16 @@ encodeAtLeast enc (lhs,rhs) = do
 encodeCardinality :: PrimMonad m => Encoder m -> [SAT.Lit] -> (Int, Int) -> m SAT.Lit
 encodeCardinality enc@(Encoder tseitin _) lits (lb, ub) = do
   let n = length lits
-  if n < lb || ub < n then
+  if lb <= 0 && n <= ub then
+    Tseitin.encodeConj tseitin []
+  else if n < lb || ub < 0 then
     Tseitin.encodeDisj tseitin []
   else do
-    lits' <- encodeSumV enc $ V.fromList lits
-    Tseitin.encodeConj tseitin $ V.toList (V.take lb lits') ++ [- l | l <- V.toList (V.drop ub lits')]
+    lits' <- encodeSum enc lits
+    forM_ (zip lits' (tail lits')) $ \(l1, l2) -> do
+      SAT.addClause enc [-l2, l1] -- l2→l1 or equivalently ¬l1→¬l2
+    Tseitin.encodeConj tseitin $
+      [lits' !! (lb - 1) | lb > 0] ++ [- (lits' !! (ub + 1 - 1)) | ub < n]
 
 
 encodeSum :: PrimMonad m => Encoder m -> [SAT.Lit] -> m [SAT.Lit]
