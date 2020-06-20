@@ -531,20 +531,22 @@ addWBO db wbo = do
         case op of
           PBFile.Ge -> do
             case lhs of
-              [(1,ls)] | rhs == 1 -> do
+              [(c,ls)] | c > 0 && (rhs + c - 1) `div` c == 1 -> do
+                -- c ∧L ≥ rhs ⇔ ∧L ≥ ⌈rhs / c⌉
                 -- ∧L ≥ 1 ⇔ ∧L
                 -- obj += w * (1 - ∧L)
                 unless (null ls) $ do
                   modifyMutVar objRef (\obj -> (-w,ls) : obj)
                   modifyMutVar objOffsetRef (+ w)
-              [(-1,ls)] | rhs == 0 -> do
-                -- -1*∧L ≥ 0 ⇔ (1 - ∧L) ≥ 1 ⇔ ￢∧L
+              [(c,ls)] | c < 0 && (rhs + abs c - 1) `div` abs c + 1 == 1 -> do
+                -- c*∧L ≥ rhs ⇔ -1*∧L ≥ ⌈rhs / abs c⌉ ⇔ (1 - ∧L) ≥ ⌈rhs / abs c⌉ + 1 ⇔ ¬∧L ≥ ⌈rhs / abs c⌉ + 1
+                -- ￢∧L ≥ 1 ⇔ ￢∧L
                 -- obj += w * ∧L
                 if null ls then do
                   modifyMutVar objOffsetRef (+ w)
                 else do
                   modifyMutVar objRef ((w,ls) :)
-              _ | and [c==1 && length ls == 1 | (c,ls) <- lhs] && rhs == 1 -> do
+              _ | rhs > 0 && and [c >= rhs && length ls == 1 | (c,ls) <- lhs] -> do
                 -- ∑L ≥ 1 ⇔ ∨L ⇔ ￢∧￢L
                 -- obj += w * ∧￢L
                 if null lhs then do
