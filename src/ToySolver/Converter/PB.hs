@@ -512,29 +512,47 @@ addWBO db wbo = do
   SAT.newVars_ db $ PBFile.wboNumVars wbo
 
   objRef <- newMutVar []
+  objOffsetRef <- newMutVar 0
   defsRef <- newMutVar []
+  trueLitRef <- newMutVar SAT.litUndef
+
   forM_ (PBFile.wboConstraints wbo) $ \(cost, constr@(lhs,op,rhs)) -> do
     case cost of
       Nothing -> do
         case op of
           PBFile.Ge -> SAT.addPBNLAtLeast db lhs rhs
           PBFile.Eq -> SAT.addPBNLExactly db lhs rhs
+        trueLit <- readMutVar trueLitRef
+        when (trueLit == SAT.litUndef) $ do
+          case detectTrueLit constr of
+            Nothing -> return ()
+            Just l -> writeMutVar trueLitRef l
       Just w -> do
         case op of
           PBFile.Ge -> do
             case lhs of
-              [(1,ls)] | rhs == 1 -> do
+              [(c,ls)] | c > 0 && (rhs + c - 1) `div` c == 1 -> do
+                -- c ∧L ≥ rhs ⇔ ∧L ≥ ⌈rhs / c⌉
                 -- ∧L ≥ 1 ⇔ ∧L
                 -- obj += w * (1 - ∧L)
-                modifyMutVar objRef (\obj -> (w,[]) : (-w,ls) : obj)
-              [(-1,ls)] | rhs == 0 -> do
-                -- -1*∧L ≥ 0 ⇔ (1 - ∧L) ≥ 1 ⇔ ￢∧L
+                unless (null ls) $ do
+                  modifyMutVar objRef (\obj -> (-w,ls) : obj)
+                  modifyMutVar objOffsetRef (+ w)
+              [(c,ls)] | c < 0 && (rhs + abs c - 1) `div` abs c + 1 == 1 -> do
+                -- c*∧L ≥ rhs ⇔ -1*∧L ≥ ⌈rhs / abs c⌉ ⇔ (1 - ∧L) ≥ ⌈rhs / abs c⌉ + 1 ⇔ ¬∧L ≥ ⌈rhs / abs c⌉ + 1
+                -- ￢∧L ≥ 1 ⇔ ￢∧L
                 -- obj += w * ∧L
-                modifyMutVar objRef ((w,ls) :)
-              _ | and [c==1 && length ls == 1 | (c,ls) <- lhs] && rhs == 1 -> do
+                if null ls then do
+                  modifyMutVar objOffsetRef (+ w)
+                else do
+                  modifyMutVar objRef ((w,ls) :)
+              _ | rhs > 0 && and [c >= rhs && length ls == 1 | (c,ls) <- lhs] -> do
                 -- ∑L ≥ 1 ⇔ ∨L ⇔ ￢∧￢L
                 -- obj += w * ∧￢L
-                modifyMutVar objRef ((w, [-l | (_,[l]) <- lhs]) :)
+                if null lhs then do
+                  modifyMutVar objOffsetRef (+ w)
+                else do
+                  modifyMutVar objRef ((w, [-l | (_,[l]) <- lhs]) :)
               _ -> do
                 sel <- SAT.newVar db
                 SAT.addPBNLAtLeastSoft db sel lhs rhs
@@ -545,6 +563,20 @@ addWBO db wbo = do
             SAT.addPBNLExactlySoft db sel lhs rhs
             modifyMutVar objRef ((w,[-sel]) :)
             modifyMutVar defsRef ((sel,constr) :)
+
+  offset <- readMutVar objOffsetRef
+  when (offset /= 0) $ do
+    l <- readMutVar trueLitRef
+    trueLit <-
+      if l /= SAT.litUndef then
+        return l
+      else do
+        v <- SAT.newVar db
+        SAT.addClause db [v]
+        modifyMutVar defsRef ((v, ([], PBFile.Ge, 0)) :)
+        return v
+    modifyMutVar objRef ((offset,[trueLit]) :)
+
   obj <- liftM reverse $ readMutVar objRef
   defs <- liftM reverse $ readMutVar defsRef
 
@@ -553,6 +585,22 @@ addWBO db wbo = do
     Just t -> SAT.addPBNLAtMost db obj (t - 1)
 
   return (obj, defs)
+
+
+detectTrueLit :: PBFile.Constraint -> Maybe SAT.Lit
+detectTrueLit (lhs, op, rhs) =
+  case op of
+    PBFile.Ge -> f lhs rhs
+    PBFile.Eq -> f lhs rhs `mplus` f [(- c, ls) | (c,ls) <- lhs] (- rhs)
+  where
+    f [(c, [l])] rhs
+      | c > 0 && (rhs + c - 1) `div` c == 1 =
+          -- c l ≥ rhs ↔ l ≥ ⌈rhs / c⌉
+          return l
+      | c < 0 && rhs `div` c == 0 =
+          -- c l ≥ rhs ↔ l ≤ ⌊rhs / c⌋
+          return (- l)
+    f _ _ = Nothing
 
 -- -----------------------------------------------------------------------------
 

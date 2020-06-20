@@ -235,11 +235,19 @@ prop_wbo2pb = QM.monadicIO $ do
       cs2 = map f (PBFile.pbConstraints opb)
       pb = (PBFile.pbNumVars opb, obj, cs2)
 
+  QM.monitor $ counterexample (show wbo')
+  QM.monitor $ counterexample (show opb)
+
+  -- no constant terms in objective function
+  QM.assert $ all (\(_,ls) -> length ls > 0) obj
+
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
   method <- QM.pick arbitrary
   ret1 <- QM.run $ optimizeWBO solver1 method wbo
   ret2 <- QM.run $ optimizePBNLC solver2 method pb
+  QM.monitor $ counterexample (show ret1)
+  QM.monitor $ counterexample (show ret2)
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
     Nothing -> return ()
