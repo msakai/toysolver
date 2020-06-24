@@ -28,6 +28,8 @@ addons:
 
 matrix:
   include:
+    - env: STACK_YAML=stack-travis-ghc-8.10.yaml
+      compiler: ": #GHC 8.10.1"
     - env: STACK_YAML=stack-travis-ghc-8.8.yaml
       compiler: ": #GHC 8.8.1"
     - env: STACK_YAML=stack-travis-ghc-8.6.yaml RELEASE=1 HADDOCK=1 COVERAGE=1 SHC_GHCVER=8.0.1
