@@ -175,8 +175,7 @@ levelRoot = 0
 
 data VarData
   = VarData
-  { vdPolarity   :: !(IORef Bool)
-  , vdPosLitData :: !LitData
+  { vdPosLitData :: !LitData
   , vdNegLitData :: !LitData
   -- | will be invoked once when the variable is assigned
   , vdWatches    :: !(IORef [SomeConstraintHandler])
@@ -205,7 +204,6 @@ data LitData
 
 newVarData :: IO VarData
 newVarData = do
-  polarity <- newIORef True
   pos <- newLitData
   neg <- newLitData
   watches <- newIORef []
@@ -224,8 +222,7 @@ newVarData = do
 
   return $
     VarData
-    { vdPolarity = polarity
-    , vdPosLitData = pos
+    { vdPosLitData = pos
     , vdNegLitData = neg
     , vdWatches = watches
     , vdActivity = activity
@@ -344,7 +341,10 @@ data Solver
   , svTrailLimit   :: !(Vec.UVec Lit)
   , svTrailNPropagated :: !(IOURef Int)
 
+  -- variable information
   , svVarData      :: !(Vec.Vec VarData)
+  , svVarPolarity  :: !(Vec.UVec Bool)
+
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
 
@@ -480,7 +480,7 @@ unassign solver !v = assert (validVar v) $ do
   when (val == lUndef) $ error "unassign: should not happen"
 
   flag <- configEnablePhaseSaving <$> getConfig solver
-  when flag $ writeIORef (vdPolarity vd) $! fromJust (unliftBool val)
+  when flag $ Vec.unsafeWrite (svVarPolarity solver) (v - 1) $! fromJust (unliftBool val)
 
   writeIORef (vdValue vd) lUndef
   writeIOURef (vdTrailIndex vd) maxBound
@@ -711,7 +711,10 @@ newSolverWithConfig config = do
   trail <- Vec.new
   trail_lim <- Vec.new
   trail_nprop <- newIOURef 0
+
   vars <- Vec.new
+  varsPolarity <- Vec.new
+
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
   db2 <- newIORef (0,[])
@@ -762,7 +765,10 @@ newSolverWithConfig config = do
         , svTrail      = trail
         , svTrailLimit = trail_lim
         , svTrailNPropagated = trail_nprop
-        , svVarData    = vars
+
+        , svVarData     = vars
+        , svVarPolarity = varsPolarity
+        
         , svConstrDB   = db
         , svLearntDB   = db2
 
@@ -834,6 +840,7 @@ instance NewVar IO Solver where
     let v = n + 1
     vd <- newVarData
     Vec.push (svVarData solver) vd
+    Vec.push (svVarPolarity solver) True
     PQ.enqueue (svVarQueue solver) v
     Vec.push (svSeen solver) False
     return v
@@ -1473,9 +1480,7 @@ modifyConfig solver f = do
 
 -- | The default polarity of a variable.
 setVarPolarity :: Solver -> Var -> Bool -> IO ()
-setVarPolarity solver v val = do
-  vd <- varData solver v
-  writeIORef (vdPolarity vd) val
+setVarPolarity solver v val = Vec.unsafeWrite (svVarPolarity solver) (v - 1) val
 
 -- | Set random generator used by the random variable selection
 setRandomGen :: Solver -> Rand.GenIO -> IO ()
@@ -1533,9 +1538,8 @@ pickBranchLit !solver = do
   if var2==litUndef then
     return litUndef
   else do
-    vd <- varData solver var2
     -- TODO: random polarity
-    p <- readIORef (vdPolarity vd)
+    p <- Vec.unsafeRead (svVarPolarity solver) (var2 - 1)
     return $! literal var2 p
 
 decide :: Solver -> Lit -> IO ()
