@@ -179,7 +179,6 @@ data VarData
   , vdNegLitData :: !LitData
   -- | will be invoked once when the variable is assigned
   , vdWatches    :: !(IORef [SomeConstraintHandler])
-  , vdActivity   :: !(IOURef VarActivity)
   , vdValue :: !(IORef LBool)
   , vdTrailIndex :: !(IOURef Int)
   , vdLevel :: !(IOURef Level)
@@ -207,7 +206,6 @@ newVarData = do
   pos <- newLitData
   neg <- newLitData
   watches <- newIORef []
-  activity <- newIOURef 0
 
   val <- newIORef lUndef
   idx <- newIOURef maxBound
@@ -225,7 +223,6 @@ newVarData = do
     { vdPosLitData = pos
     , vdNegLitData = neg
     , vdWatches = watches
-    , vdActivity = activity
     , vdValue = val
     , vdTrailIndex = idx
     , vdLevel = lv
@@ -344,6 +341,7 @@ data Solver
   -- variable information
   , svVarData      :: !(Vec.Vec VarData)
   , svVarPolarity  :: !(Vec.UVec Bool)
+  , svVarActivity  :: !(Vec.UVec VarActivity)
 
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
@@ -599,9 +597,7 @@ reduceDB solver = do
 type VarActivity = Double
 
 varActivity :: Solver -> Var -> IO VarActivity
-varActivity solver !v = do
-  vd <- varData solver v
-  readIOURef (vdActivity vd)
+varActivity solver v = Vec.unsafeRead (svVarActivity solver) (v - 1)
 
 varDecayActivity :: Solver -> IO ()
 varDecayActivity solver = do
@@ -611,22 +607,21 @@ varDecayActivity solver = do
 varBumpActivity :: Solver -> Var -> IO ()
 varBumpActivity solver !v = do
   inc <- readIOURef (svVarInc solver)
-  vd <- varData solver v
-  modifyIOURef (vdActivity vd) (+inc)
+  Vec.unsafeModify (svVarActivity solver) (v - 1) (+inc)
   conf <- getConfig solver
   when (configBranchingStrategy conf == BranchingVSIDS) $ do
     PQ.update (svVarQueue solver) v
-  aval <- readIOURef (vdActivity vd)
+  aval <- Vec.unsafeRead (svVarActivity solver) (v - 1)
   when (aval > 1e20) $
     -- Rescale
     varRescaleAllActivity solver
 
 varRescaleAllActivity :: Solver -> IO ()
 varRescaleAllActivity solver = do
-  vs <- variables solver
-  forM_ vs $ \v -> do
-    vd <- varData solver v
-    modifyIOURef (vdActivity vd) (* 1e-20)
+  let a = svVarActivity solver
+  n <- getNVars solver
+  forLoop 0 (<n) (+1) $ \i -> 
+    Vec.unsafeModify a i (* 1e-20)
   modifyIOURef (svVarInc solver) (* 1e-20)
 
 varEMAScaled :: Solver -> Var -> IO Double
@@ -714,6 +709,7 @@ newSolverWithConfig config = do
 
   vars <- Vec.new
   varsPolarity <- Vec.new
+  varsActivity <- Vec.new
 
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
@@ -768,6 +764,7 @@ newSolverWithConfig config = do
 
         , svVarData     = vars
         , svVarPolarity = varsPolarity
+        , svVarActivity = varsActivity
         
         , svConstrDB   = db
         , svLearntDB   = db2
@@ -841,6 +838,7 @@ instance NewVar IO Solver where
     vd <- newVarData
     Vec.push (svVarData solver) vd
     Vec.push (svVarPolarity solver) True
+    Vec.push (svVarActivity solver) 0
     PQ.enqueue (svVarQueue solver) v
     Vec.push (svSeen solver) False
     return v
