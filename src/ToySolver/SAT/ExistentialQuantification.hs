@@ -67,12 +67,14 @@ dualRailEncoding vs cnf =
       CNF.CNF
       { CNF.cnfNumVars = CNF.cnfNumVars cnf + IntSet.size vs
       , CNF.cnfNumClauses = CNF.cnfNumClauses cnf + IntSet.size vs
-      , CNF.cnfClauses = [ VG.map f c | c <- CNF.cnfClauses cnf ] ++ [SAT.packClause [-xp,-xn] | (xp,xn) <- IntMap.elems forward]
+      , CNF.cnfClauses =
+          [ VG.map f c | c <- CNF.cnfClauses cnf ] ++
+          [ SAT.packClause [-xp,-xn] | (xp,xn) <- IntMap.elems forward ]
       }
     f x =
-      case IntMap.lookup (abs x) forward of
+      case IntMap.lookup (abs (SAT.unpackLit x)) forward of
         Nothing -> x
-        Just (xp,xn) -> if x > 0 then xp else xn
+        Just (xp,xn) -> SAT.packLit $ if x > 0 then xp else xn
     forward =
       IntMap.fromList
       [ (x, (x,x'))

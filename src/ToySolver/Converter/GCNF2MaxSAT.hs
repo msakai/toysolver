@@ -43,7 +43,9 @@ gcnf2maxsat
   =
   ( CNF.WCNF
     { CNF.wcnfTopCost = top
-    , CNF.wcnfClauses = [(top, if g==0 then c else VG.cons (-(nv+g)) c) | (g,c) <- cs] ++ [(1, SAT.packClause [v]) | v <- [nv+1..nv+lastg]]
+    , CNF.wcnfClauses =
+        [(top, if g==0 then c else VG.cons (- SAT.packLit (nv+g)) c) | (g,c) <- cs] ++
+        [(1, SAT.packClause [v]) | v <- [nv+1..nv+lastg]]
     , CNF.wcnfNumVars = nv + lastg
     , CNF.wcnfNumClauses = nc + lastg
     }

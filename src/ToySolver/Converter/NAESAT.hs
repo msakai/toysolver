@@ -55,11 +55,11 @@ type NAESAT = (Int, [NAEClause])
 evalNAESAT :: SAT.IModel m => m -> NAESAT -> Bool
 evalNAESAT m (_,cs) = all (evalNAEClause m) cs
 
-type NAEClause = VU.Vector SAT.Lit
+type NAEClause = VU.Vector SAT.PackedLit
 
 evalNAEClause :: SAT.IModel m => m -> NAEClause -> Bool
 evalNAEClause m c =
-  VG.any (SAT.evalLit m) c && VG.any (not . SAT.evalLit m) c
+  VG.any (SAT.evalLit m . SAT.unpackLit) c && VG.any (not . SAT.evalLit m . SAT.unpackLit) c
 
 -- ------------------------------------------------------------------------
 
@@ -75,7 +75,7 @@ sat2naesat cnf = (ret, SAT2NAESATInfo z)
     z = CNF.cnfNumVars cnf + 1
     ret =
       ( CNF.cnfNumVars cnf + 1
-      , [VG.snoc clause z | clause <- CNF.cnfClauses cnf]
+      , [VG.snoc clause (SAT.packLit z) | clause <- CNF.cnfClauses cnf]
       )
 
 instance Transformer SAT2NAESATInfo where
@@ -125,7 +125,7 @@ naesat2naeksat k (n,cs) = ((n', cs'), NAESAT2NAEKSATInfo n n' (reverse table))
                 (i, tbl) <- get
                 let w = i+1
                 seq w $ put (w, (w,cs1,cs2) : tbl)
-                go (VG.cons (-w) cs2) (VG.snoc cs1 w : r)
+                go (VG.cons (SAT.packLit (- w)) cs2) (VG.snoc cs1 (SAT.packLit w) : r)
         go c []
 
 instance Transformer NAESAT2NAEKSATInfo where
@@ -140,8 +140,8 @@ instance ForwardTransformer NAESAT2NAEKSATInfo where
       go im ((w,cs1,cs2) : tbl) = go (IntMap.insert w val im) tbl
         where
           ev x
-            | x > 0     = im IntMap.! x
-            | otherwise = not $ im IntMap.! (- x)
+            | x > 0     = im IntMap.! (SAT.unpackLit x)
+            | otherwise = not $ im IntMap.! (- SAT.unpackLit x)
           needTrue  = VG.all ev cs2 || VG.all (not . ev) cs1
           needFalse = VG.all ev cs1 || VG.all (not . ev) cs2
           val
@@ -196,7 +196,7 @@ nae3sat2max2sat (n,cs)
     nc' = length cs'
     (cs', t) = foldl f ([],0) cs
       where
-        f :: ([CNF.WeightedClause], Integer) -> VU.Vector SAT.Lit -> ([CNF.WeightedClause], Integer)
+        f :: ([CNF.WeightedClause], Integer) -> NAEClause -> ([CNF.WeightedClause], Integer)
         f (cs, !t) c =
           case SAT.unpackClause c of
             []  -> error "nae3sat2max2sat: should not happen"
