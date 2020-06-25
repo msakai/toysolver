@@ -132,6 +132,7 @@ import Data.Array.IO
 import Data.Array.Unsafe (unsafeFreeze)
 import Data.Array.Base (unsafeRead, unsafeWrite)
 import Data.Bits (xor) -- for defining 'combine' function
+import Data.Coerce
 import Data.Default.Class
 import Data.Either
 import Data.Function (on)
@@ -139,6 +140,7 @@ import Data.Hashable
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import Data.IORef
+import Data.Int
 import Data.List
 import Data.Maybe
 import Data.Ord
@@ -179,7 +181,6 @@ data VarData
   , vdNegLitData :: !LitData
   -- | will be invoked once when the variable is assigned
   , vdWatches    :: !(IORef [SomeConstraintHandler])
-  , vdValue :: !(IORef LBool)
   , vdTrailIndex :: !(IOURef Int)
   , vdLevel :: !(IOURef Level)
   , vdReason :: !(IORef (Maybe SomeConstraintHandler))
@@ -207,7 +208,6 @@ newVarData = do
   neg <- newLitData
   watches <- newIORef []
 
-  val <- newIORef lUndef
   idx <- newIOURef maxBound
   lv <- newIOURef maxBound
   reason <- newIORef Nothing
@@ -223,7 +223,6 @@ newVarData = do
     { vdPosLitData = pos
     , vdNegLitData = neg
     , vdWatches = watches
-    , vdValue = val
     , vdTrailIndex = idx
     , vdLevel = lv
     , vdReason = reason
@@ -256,9 +255,7 @@ litData solver !l =
 
 {-# INLINE varValue #-}
 varValue :: Solver -> Var -> IO LBool
-varValue solver !v = do
-  vd <- varData solver v
-  readIORef (vdValue vd)
+varValue solver v = liftM coerce $ Vec.unsafeRead (svVarValue solver) (v - 1)
 
 {-# INLINE litValue #-}
 litValue :: Solver -> Lit -> IO LBool
@@ -276,7 +273,7 @@ getVarFixed solver !v = do
   vd <- varData solver v
   lv <- readIOURef (vdLevel vd)
   if lv == levelRoot then
-    readIORef (vdValue vd)
+    varValue solver v
   else
     return lUndef
 
@@ -307,7 +304,7 @@ getFixedLiterals solver = do
 varLevel :: Solver -> Var -> IO Level
 varLevel solver !v = do
   vd <- varData solver v
-  val <- readIORef (vdValue vd)
+  val <- varValue solver v
   when (val == lUndef) $ error ("ToySolver.SAT.varLevel: unassigned var " ++ show v)
   readIOURef (vdLevel vd)
 
@@ -317,14 +314,14 @@ litLevel solver l = varLevel solver (litVar l)
 varReason :: Solver -> Var -> IO (Maybe SomeConstraintHandler)
 varReason solver !v = do
   vd <- varData solver v
-  val <- readIORef (vdValue vd)
+  val <- varValue solver v
   when (val == lUndef) $ error ("ToySolver.SAT.varReason: unassigned var " ++ show v)
   readIORef (vdReason vd)
 
 varAssignNo :: Solver -> Var -> IO Int
 varAssignNo solver !v = do
   vd <- varData solver v
-  val <- readIORef (vdValue vd)
+  val <- varValue solver v
   when (val == lUndef) $ error ("ToySolver.SAT.varAssignNo: unassigned var " ++ show v)
   readIOURef (vdTrailIndex vd)
 
@@ -340,6 +337,7 @@ data Solver
 
   -- variable information
   , svVarData      :: !(Vec.Vec VarData)
+  , svVarValue     :: !(Vec.UVec Int8) -- should be 'Vec.UVec LBool' but it's difficult to define MArray instance
   , svVarPolarity  :: !(Vec.UVec Bool)
   , svVarActivity  :: !(Vec.UVec VarActivity)
 
@@ -446,14 +444,14 @@ assign_ solver !lit reason = assert (validLit lit) $ do
   vd <- varData solver (litVar lit)
   let val = liftBool (litPolarity lit)
 
-  val0 <- readIORef (vdValue vd)
+  val0 <- varValue solver (litVar lit)
   if val0 /= lUndef then do
     return $ val == val0
   else do
     idx <- Vec.getSize (svTrail solver)
     lv <- getDecisionLevel solver
 
-    writeIORef (vdValue vd) val
+    Vec.unsafeWrite (svVarValue solver) (litVar lit - 1) (coerce val)
     writeIOURef (vdTrailIndex vd) idx
     writeIOURef (vdLevel vd) lv
     writeIORef (vdReason vd) reason
@@ -474,13 +472,13 @@ assign_ solver !lit reason = assert (validLit lit) $ do
 unassign :: Solver -> Var -> IO ()
 unassign solver !v = assert (validVar v) $ do
   vd <- varData solver v
-  val <- readIORef (vdValue vd)
+  val <- varValue solver v
   when (val == lUndef) $ error "unassign: should not happen"
 
   flag <- configEnablePhaseSaving <$> getConfig solver
   when flag $ Vec.unsafeWrite (svVarPolarity solver) (v - 1) $! fromJust (unliftBool val)
 
-  writeIORef (vdValue vd) lUndef
+  Vec.unsafeWrite (svVarValue solver) (v - 1) (coerce lUndef)
   writeIOURef (vdTrailIndex vd) maxBound
   writeIOURef (vdLevel vd) maxBound
   writeIORef (vdReason vd) Nothing
@@ -514,7 +512,7 @@ unassign solver !v = assert (validVar v) $ do
 addOnUnassigned :: Solver -> SomeConstraintHandler -> Lit -> IO ()
 addOnUnassigned solver constr !l = do
   vd <- varData solver (litVar l)
-  val <- readIORef (vdValue vd)
+  val <- varValue solver (litVar l)
   when (val == lUndef) $ error "addOnUnassigned: should not happen"
   modifyIORef (vdOnUnassigned vd) (constr :)
 
@@ -708,6 +706,7 @@ newSolverWithConfig config = do
   trail_nprop <- newIOURef 0
 
   vars <- Vec.new
+  varsValue <- Vec.new
   varsPolarity <- Vec.new
   varsActivity <- Vec.new
 
@@ -763,6 +762,7 @@ newSolverWithConfig config = do
         , svTrailNPropagated = trail_nprop
 
         , svVarData     = vars
+        , svVarValue    = varsValue
         , svVarPolarity = varsPolarity
         , svVarActivity = varsActivity
         
@@ -837,6 +837,7 @@ instance NewVar IO Solver where
     let v = n + 1
     vd <- newVarData
     Vec.push (svVarData solver) vd
+    Vec.push (svVarValue solver) (coerce lUndef)
     Vec.push (svVarPolarity solver) True
     Vec.push (svVarActivity solver) 0
     PQ.enqueue (svVarQueue solver) v
@@ -1922,8 +1923,7 @@ constructModel solver = do
   n <- getNVars solver
   (marr::IOUArray Var Bool) <- newArray_ (1,n)
   forLoop 1 (<=n) (+1) $ \v -> do
-    vd <- varData solver v
-    val <- readIORef (vdValue vd)
+    val <- varValue solver v
     writeArray marr v (fromJust (unliftBool val))
   m <- unsafeFreeze marr
   writeIORef (svModel solver) (Just m)

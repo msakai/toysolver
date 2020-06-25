@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Data.LBool
-  ( LBool
+  ( LBool (..)
   , lTrue
   , lFalse
   , lUndef
