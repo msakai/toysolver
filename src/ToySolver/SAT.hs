@@ -181,8 +181,6 @@ data VarData
   , vdNegLitData :: !LitData
   -- | will be invoked once when the variable is assigned
   , vdWatches    :: !(IORef [SomeConstraintHandler])
-  , vdTrailIndex :: !(IOURef Int)
-  , vdLevel :: !(IOURef Level)
   , vdReason :: !(IORef (Maybe SomeConstraintHandler))
   , vdOnUnassigned :: !(IORef [SomeConstraintHandler])
   -- | exponential moving average estimate
@@ -208,8 +206,6 @@ newVarData = do
   neg <- newLitData
   watches <- newIORef []
 
-  idx <- newIOURef maxBound
-  lv <- newIOURef maxBound
   reason <- newIORef Nothing
   onUnassigned <- newIORef []
 
@@ -223,8 +219,6 @@ newVarData = do
     { vdPosLitData = pos
     , vdNegLitData = neg
     , vdWatches = watches
-    , vdTrailIndex = idx
-    , vdLevel = lv
     , vdReason = reason
     , vdOnUnassigned = onUnassigned
     , vdEMAScaled = ema
@@ -270,8 +264,7 @@ litValue solver !l = do
 
 getVarFixed :: Solver -> Var -> IO LBool
 getVarFixed solver !v = do
-  vd <- varData solver v
-  lv <- readIOURef (vdLevel vd)
+  lv <- Vec.unsafeRead (svVarLevel solver) (v - 1)
   if lv == levelRoot then
     varValue solver v
   else
@@ -303,10 +296,9 @@ getFixedLiterals solver = do
 
 varLevel :: Solver -> Var -> IO Level
 varLevel solver !v = do
-  vd <- varData solver v
   val <- varValue solver v
   when (val == lUndef) $ error ("ToySolver.SAT.varLevel: unassigned var " ++ show v)
-  readIOURef (vdLevel vd)
+  Vec.unsafeRead (svVarLevel solver) (v - 1)
 
 litLevel :: Solver -> Lit -> IO Level
 litLevel solver l = varLevel solver (litVar l)
@@ -320,10 +312,9 @@ varReason solver !v = do
 
 varAssignNo :: Solver -> Var -> IO Int
 varAssignNo solver !v = do
-  vd <- varData solver v
   val <- varValue solver v
   when (val == lUndef) $ error ("ToySolver.SAT.varAssignNo: unassigned var " ++ show v)
-  readIOURef (vdTrailIndex vd)
+  Vec.unsafeRead (svVarTrailIndex solver) (v - 1)
 
 -- | Solver instance
 data Solver
@@ -336,10 +327,12 @@ data Solver
   , svTrailNPropagated :: !(IOURef Int)
 
   -- variable information
-  , svVarData      :: !(Vec.Vec VarData)
-  , svVarValue     :: !(Vec.UVec Int8) -- should be 'Vec.UVec LBool' but it's difficult to define MArray instance
-  , svVarPolarity  :: !(Vec.UVec Bool)
-  , svVarActivity  :: !(Vec.UVec VarActivity)
+  , svVarData       :: !(Vec.Vec VarData)
+  , svVarValue      :: !(Vec.UVec Int8) -- should be 'Vec.UVec LBool' but it's difficult to define MArray instance
+  , svVarPolarity   :: !(Vec.UVec Bool)
+  , svVarActivity   :: !(Vec.UVec VarActivity)
+  , svVarTrailIndex :: !(Vec.UVec Int)
+  , svVarLevel      :: !(Vec.UVec Int)
 
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
@@ -452,8 +445,8 @@ assign_ solver !lit reason = assert (validLit lit) $ do
     lv <- getDecisionLevel solver
 
     Vec.unsafeWrite (svVarValue solver) (litVar lit - 1) (coerce val)
-    writeIOURef (vdTrailIndex vd) idx
-    writeIOURef (vdLevel vd) lv
+    Vec.unsafeWrite (svVarTrailIndex solver) (litVar lit - 1) idx
+    Vec.unsafeWrite (svVarLevel solver) (litVar lit - 1) lv
     writeIORef (vdReason vd) reason
     writeIOURef (vdWhenAssigned vd) =<< readIOURef (svLearntCounter solver)
     writeIOURef (vdParticipated vd) 0
@@ -479,8 +472,8 @@ unassign solver !v = assert (validVar v) $ do
   when flag $ Vec.unsafeWrite (svVarPolarity solver) (v - 1) $! fromJust (unliftBool val)
 
   Vec.unsafeWrite (svVarValue solver) (v - 1) (coerce lUndef)
-  writeIOURef (vdTrailIndex vd) maxBound
-  writeIOURef (vdLevel vd) maxBound
+  Vec.unsafeWrite (svVarTrailIndex solver) (v - 1) maxBound
+  Vec.unsafeWrite (svVarLevel solver) (v - 1) maxBound
   writeIORef (vdReason vd) Nothing
 
   -- ERWA / LRB computation
@@ -709,6 +702,8 @@ newSolverWithConfig config = do
   varsValue <- Vec.new
   varsPolarity <- Vec.new
   varsActivity <- Vec.new
+  varsTrailIndex <- Vec.new
+  varsLevel <- Vec.new
 
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
@@ -765,6 +760,8 @@ newSolverWithConfig config = do
         , svVarValue    = varsValue
         , svVarPolarity = varsPolarity
         , svVarActivity = varsActivity
+        , svVarTrailIndex = varsTrailIndex
+        , svVarLevel = varsLevel
         
         , svConstrDB   = db
         , svLearntDB   = db2
@@ -840,6 +837,8 @@ instance NewVar IO Solver where
     Vec.push (svVarValue solver) (coerce lUndef)
     Vec.push (svVarPolarity solver) True
     Vec.push (svVarActivity solver) 0
+    Vec.push (svVarTrailIndex solver) maxBound
+    Vec.push (svVarLevel solver) maxBound
     PQ.enqueue (svVarQueue solver) v
     Vec.push (svSeen solver) False
     return v
