@@ -179,10 +179,6 @@ data VarData
   = VarData
   { vdPosLitData :: !LitData
   , vdNegLitData :: !LitData
-  -- | will be invoked once when the variable is assigned
-  , vdWatches    :: !(IORef [SomeConstraintHandler])
-  , vdReason :: !(IORef (Maybe SomeConstraintHandler))
-  , vdOnUnassigned :: !(IORef [SomeConstraintHandler])
   -- | exponential moving average estimate
   , vdEMAScaled :: !(IOURef Double)
   -- | When v was last assigned
@@ -204,10 +200,6 @@ newVarData :: IO VarData
 newVarData = do
   pos <- newLitData
   neg <- newLitData
-  watches <- newIORef []
-
-  reason <- newIORef Nothing
-  onUnassigned <- newIORef []
 
   ema <- newIOURef 0
   whenAssigned <- newIOURef (-1)
@@ -218,9 +210,6 @@ newVarData = do
     VarData
     { vdPosLitData = pos
     , vdNegLitData = neg
-    , vdWatches = watches
-    , vdReason = reason
-    , vdOnUnassigned = onUnassigned
     , vdEMAScaled = ema
     , vdWhenAssigned = whenAssigned
     , vdParticipated = participated
@@ -305,10 +294,9 @@ litLevel solver l = varLevel solver (litVar l)
 
 varReason :: Solver -> Var -> IO (Maybe SomeConstraintHandler)
 varReason solver !v = do
-  vd <- varData solver v
   val <- varValue solver v
   when (val == lUndef) $ error ("ToySolver.SAT.varReason: unassigned var " ++ show v)
-  readIORef (vdReason vd)
+  Vec.unsafeRead (svVarReason solver) (v - 1)
 
 varAssignNo :: Solver -> Var -> IO Int
 varAssignNo solver !v = do
@@ -333,6 +321,10 @@ data Solver
   , svVarActivity   :: !(Vec.UVec VarActivity)
   , svVarTrailIndex :: !(Vec.UVec Int)
   , svVarLevel      :: !(Vec.UVec Int)
+  -- | will be invoked once when the variable is assigned
+  , svVarWatches      :: !(Vec.Vec [SomeConstraintHandler])
+  , svVarOnUnassigned :: !(Vec.Vec [SomeConstraintHandler])
+  , svVarReason       :: !(Vec.Vec (Maybe SomeConstraintHandler))
 
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
@@ -447,7 +439,7 @@ assign_ solver !lit reason = assert (validLit lit) $ do
     Vec.unsafeWrite (svVarValue solver) (litVar lit - 1) (coerce val)
     Vec.unsafeWrite (svVarTrailIndex solver) (litVar lit - 1) idx
     Vec.unsafeWrite (svVarLevel solver) (litVar lit - 1) lv
-    writeIORef (vdReason vd) reason
+    Vec.unsafeWrite (svVarReason solver) (litVar lit - 1) reason
     writeIOURef (vdWhenAssigned vd) =<< readIOURef (svLearntCounter solver)
     writeIOURef (vdParticipated vd) 0
     writeIOURef (vdReasoned vd) 0
@@ -474,7 +466,7 @@ unassign solver !v = assert (validVar v) $ do
   Vec.unsafeWrite (svVarValue solver) (v - 1) (coerce lUndef)
   Vec.unsafeWrite (svVarTrailIndex solver) (v - 1) maxBound
   Vec.unsafeWrite (svVarLevel solver) (v - 1) maxBound
-  writeIORef (vdReason vd) Nothing
+  Vec.unsafeWrite (svVarReason solver) (v - 1) Nothing
 
   -- ERWA / LRB computation
   interval <- do
@@ -495,8 +487,8 @@ unassign solver !v = assert (validVar v) $ do
     PQ.update (svVarQueue solver) v
 
   let !l = if val == lTrue then v else -v
-  cs <- readIORef (vdOnUnassigned vd)
-  writeIORef (vdOnUnassigned vd) []
+  cs <- Vec.unsafeRead (svVarOnUnassigned solver) (v - 1)
+  Vec.unsafeWrite (svVarOnUnassigned solver) (v - 1) []
   forM_ cs $ \c ->
     constrOnUnassigned solver c c l
 
@@ -504,10 +496,9 @@ unassign solver !v = assert (validVar v) $ do
 
 addOnUnassigned :: Solver -> SomeConstraintHandler -> Lit -> IO ()
 addOnUnassigned solver constr !l = do
-  vd <- varData solver (litVar l)
   val <- varValue solver (litVar l)
   when (val == lUndef) $ error "addOnUnassigned: should not happen"
-  modifyIORef (vdOnUnassigned vd) (constr :)
+  Vec.unsafeModify (svVarOnUnassigned solver) (litVar l - 1) (constr :)
 
 -- | Register the constraint to be notified when the literal becames false.
 watchLit :: Solver -> Lit -> SomeConstraintHandler -> IO ()
@@ -517,9 +508,7 @@ watchLit solver !lit c = do
 
 -- | Register the constraint to be notified when the variable is assigned.
 watchVar :: Solver -> Var -> SomeConstraintHandler -> IO ()
-watchVar solver !var c = do
-  vd <- varData solver var
-  modifyIORef (vdWatches vd) (c : )
+watchVar solver !var c = Vec.unsafeModify (svVarWatches solver) (var - 1) (c :)
 
 unwatchLit :: Solver -> Lit -> SomeConstraintHandler -> IO ()
 unwatchLit solver !lit c = do
@@ -527,9 +516,7 @@ unwatchLit solver !lit c = do
   modifyIORef (ldWatches ld) (delete c)
 
 unwatchVar :: Solver -> Lit -> SomeConstraintHandler -> IO ()
-unwatchVar solver !lit c = do
-  vd <- varData solver lit
-  modifyIORef (vdWatches vd) (delete c)
+unwatchVar solver !var c = Vec.unsafeModify (svVarWatches solver) (var - 1) (delete c)
 
 addToDB :: ConstraintHandler c => Solver -> c -> IO ()
 addToDB solver c = do
@@ -704,6 +691,9 @@ newSolverWithConfig config = do
   varsActivity <- Vec.new
   varsTrailIndex <- Vec.new
   varsLevel <- Vec.new
+  varsWatches <- Vec.new
+  varsOnUnassigned <- Vec.new
+  varsReason <- Vec.new
 
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
@@ -762,6 +752,9 @@ newSolverWithConfig config = do
         , svVarActivity = varsActivity
         , svVarTrailIndex = varsTrailIndex
         , svVarLevel = varsLevel
+        , svVarWatches = varsWatches
+        , svVarOnUnassigned = varsOnUnassigned
+        , svVarReason = varsReason
         
         , svConstrDB   = db
         , svLearntDB   = db2
@@ -839,6 +832,9 @@ instance NewVar IO Solver where
     Vec.push (svVarActivity solver) 0
     Vec.push (svVarTrailIndex solver) maxBound
     Vec.push (svVarLevel solver) maxBound
+    Vec.push (svVarWatches solver) []
+    Vec.push (svVarOnUnassigned solver) []
+    Vec.push (svVarReason solver) Nothing
     PQ.enqueue (svVarQueue solver) v
     Vec.push (svSeen solver) False
     return v
@@ -1593,18 +1589,17 @@ deduceB solver = loop
     processVar :: Lit -> ExceptT SomeConstraintHandler IO ()
     processVar !lit = ExceptT $ liftM (maybe (Right ()) Left) $ do
       let falsifiedLit = litNot lit
-      vd <- varData solver (litVar lit)
-      let wsref = vdWatches vd
+          idx = litVar lit - 1
       let loop2 [] = return Nothing
           loop2 (w:ws) = do
             ok <- propagate solver w falsifiedLit
             if ok
               then loop2 ws
               else do
-                modifyIORef wsref (++ws)
+                Vec.unsafeModify (svVarWatches solver) idx (++ws)
                 return (Just w)
-      ws <- readIORef wsref
-      writeIORef wsref []
+      ws <- Vec.unsafeRead (svVarWatches solver) idx
+      Vec.unsafeWrite (svVarWatches solver) idx []
       loop2 ws
 
 analyzeConflict :: ConstraintHandler c => Solver -> c -> IO (Clause, Level)
