@@ -175,49 +175,17 @@ type Level = Int
 levelRoot :: Level
 levelRoot = 0
 
+litIndex :: Lit -> Int
+litIndex l = 2 * (litVar l - 1) + (if litPolarity l then 1 else 0)
+
 data VarData
   = VarData
-  { vdPosLitData :: !LitData
-  , vdNegLitData :: !LitData
-  }
-
-data LitData
-  = LitData
-  { -- | will be invoked when this literal is falsified
-    ldWatches   :: !(IORef [SomeConstraintHandler])
-  , ldOccurList :: !(IORef (HashSet SomeConstraintHandler))
-  }
 
 newVarData :: IO VarData
-newVarData = do
-  pos <- newLitData
-  neg <- newLitData
-
-  return $
-    VarData
-    { vdPosLitData = pos
-    , vdNegLitData = neg
-    }
-
-newLitData :: IO LitData
-newLitData = do
-  ws <- newIORef []
-  occ <- newIORef HashSet.empty
-  return $ LitData ws occ
+newVarData = return VarData
 
 varData :: Solver -> Var -> IO VarData
 varData solver !v = Vec.unsafeRead (svVarData solver) (v-1)
-
-litData :: Solver -> Lit -> IO LitData
-litData solver !l =
-  -- litVar による heap allocation を避けるために、
-  -- litPolarityによる分岐後にvarDataを呼ぶ。
-  if litPolarity l then do
-    vd <- varData solver l
-    return $ vdPosLitData vd
-  else do
-    vd <- varData solver (negate l)
-    return $ vdNegLitData vd
 
 {-# INLINE varValue #-}
 varValue :: Solver -> Var -> IO LBool
@@ -316,6 +284,10 @@ data Solver
   , svVarParticipated :: !(Vec.UVec Int)
   -- | The number of learnt clauses v reasoned in generating since Assigned.
   , svVarReasoned     :: !(Vec.UVec Int)
+
+  -- | will be invoked when this literal is falsified
+  , svLitWatches   :: !(Vec.Vec [SomeConstraintHandler])
+  , svLitOccurList :: !(Vec.Vec (HashSet SomeConstraintHandler))
 
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
@@ -491,18 +463,14 @@ addOnUnassigned solver constr !l = do
 
 -- | Register the constraint to be notified when the literal becames false.
 watchLit :: Solver -> Lit -> SomeConstraintHandler -> IO ()
-watchLit solver !lit c = do
-  ld <- litData solver lit
-  modifyIORef (ldWatches ld) (c : )
+watchLit solver !lit c = Vec.unsafeModify (svLitWatches solver) (litIndex lit) (c : )
 
 -- | Register the constraint to be notified when the variable is assigned.
 watchVar :: Solver -> Var -> SomeConstraintHandler -> IO ()
 watchVar solver !var c = Vec.unsafeModify (svVarWatches solver) (var - 1) (c :)
 
 unwatchLit :: Solver -> Lit -> SomeConstraintHandler -> IO ()
-unwatchLit solver !lit c = do
-  ld <- litData solver lit
-  modifyIORef (ldWatches ld) (delete c)
+unwatchLit solver !lit c = Vec.unsafeModify (svLitWatches solver) (litIndex lit) (delete c)
 
 unwatchVar :: Solver -> Lit -> SomeConstraintHandler -> IO ()
 unwatchVar solver !var c = Vec.unsafeModify (svVarWatches solver) (var - 1) (delete c)
@@ -519,8 +487,7 @@ addToDB solver c = do
   when b $ do
     (lhs,_) <- toPBLinAtLeast c
     forM_ lhs $ \(_,lit) -> do
-       ld <- litData solver lit
-       modifyIORef' (ldOccurList ld) (HashSet.insert c2)
+       Vec.unsafeModify (svLitOccurList solver) (litIndex lit) (HashSet.insert c2)
 
 addToLearntDB :: ConstraintHandler c => Solver -> c -> IO ()
 addToLearntDB solver c = do
@@ -680,6 +647,8 @@ newSolverWithConfig config = do
   varsWhenAssigned <- Vec.new
   varsParticipated <- Vec.new
   varsReasoned <- Vec.new
+  litWatches <- Vec.new
+  litOccurList <- Vec.new
 
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
@@ -745,7 +714,9 @@ newSolverWithConfig config = do
         , svVarWhenAssigned = varsWhenAssigned
         , svVarParticipated = varsParticipated
         , svVarReasoned = varsReasoned
-        
+        , svLitWatches = litWatches
+        , svLitOccurList = litOccurList
+
         , svConstrDB   = db
         , svLearntDB   = db2
 
@@ -829,6 +800,11 @@ instance NewVar IO Solver where
     Vec.push (svVarWhenAssigned solver) (-1)
     Vec.push (svVarParticipated solver) 0
     Vec.push (svVarReasoned solver) 0
+
+    Vec.push (svLitWatches solver) []
+    Vec.push (svLitWatches solver) []
+    Vec.push (svLitOccurList solver) HashSet.empty
+    Vec.push (svLitOccurList solver) HashSet.empty
 
     PQ.enqueue (svVarQueue solver) v
     Vec.push (svSeen solver) False
@@ -1414,8 +1390,7 @@ removeBackwardSubsumedBy solver pb = do
 backwardSubsumedBy :: Solver -> PBLinAtLeast -> IO (HashSet SomeConstraintHandler)
 backwardSubsumedBy solver pb@(lhs,_) = do
   xs <- forM lhs $ \(_,lit) -> do
-    ld <- litData solver lit
-    readIORef (ldOccurList ld)
+    Vec.unsafeRead (svLitOccurList solver) (litIndex lit) 
   case xs of
     [] -> return HashSet.empty
     s:ss -> do
@@ -1565,20 +1540,19 @@ deduceB solver = loop
 
     processLit :: Lit -> ExceptT SomeConstraintHandler IO ()
     processLit !lit = ExceptT $ liftM (maybe (Right ()) Left) $ do
-      let falsifiedLit =
-              litNot lit
-      ld <- litData solver falsifiedLit
-      let wsref = ldWatches ld
+      let falsifiedLit = litNot lit
+          a = svLitWatches solver
+          idx = litIndex falsifiedLit
       let loop2 [] = return Nothing
           loop2 (w:ws) = do
             ok <- propagate solver w falsifiedLit
             if ok then
               loop2 ws
             else do
-              modifyIORef wsref (++ws)
+              Vec.unsafeModify a idx (++ws)
               return (Just w)
-      ws <- readIORef wsref
-      writeIORef wsref []
+      ws <- Vec.unsafeRead a idx
+      Vec.unsafeWrite a idx []
       loop2 ws
 
     processVar :: Lit -> ExceptT SomeConstraintHandler IO ()
@@ -2082,8 +2056,7 @@ detach solver c = do
   when b $ do
     (lhs,_) <- toPBLinAtLeast c
     forM_ lhs $ \(_,lit) -> do
-      ld <- litData solver lit
-      modifyIORef' (ldOccurList ld) (HashSet.delete c)
+      Vec.unsafeModify (svLitOccurList solver) (litIndex lit) (HashSet.delete c)
 
 -- | invoked with the watched literal when the literal is falsified.
 propagate :: Solver -> SomeConstraintHandler -> Lit -> IO Bool
