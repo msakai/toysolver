@@ -168,26 +168,26 @@ import ToySolver.Internal.Util (revMapM)
   LitArray
 --------------------------------------------------------------------}
 
-type LitArray = IOUArray Int Lit
+newtype LitArray = LitArray (IOUArray Int Lit) deriving (Eq)
 
 newLitArray :: [Lit] -> IO LitArray
 newLitArray lits = do
   let size = length lits
-  newListArray (0, size-1) lits
+  liftM LitArray $ newListArray (0, size-1) lits
 
 readLitArray :: LitArray -> Int -> IO Lit
-readLitArray = unsafeRead
--- readLitArray = readArray
+readLitArray (LitArray a) i = unsafeRead a i
+-- readLitArray (LitArray a) i = readArray a i
 
 writeLitArray :: LitArray -> Int -> Lit -> IO ()
-writeLitArray = unsafeWrite
--- writeLitArray = writeArray
+writeLitArray (LitArray a) i lit = unsafeWrite a i lit
+-- writeLitArray (LitArray a) i lit = writeArray a i lit
 
 getLits :: LitArray -> IO [Lit]
-getLits = getElems
+getLits (LitArray a) = getElems a
 
 getLitArraySize :: LitArray -> IO Int
-getLitArraySize a = do
+getLitArraySize (LitArray a) = do
   (lb,ub) <- getBounds a
   assert (lb == 0) $ return ()
   return $! ub-lb+1
