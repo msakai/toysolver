@@ -624,18 +624,18 @@ newSolverWithConfig config = do
   trail_lim <- Vec.new
   trail_nprop <- newIOURef 0
 
-  varsValue <- Vec.new
-  varsPolarity <- Vec.new
-  varsActivity <- Vec.new
-  varsTrailIndex <- Vec.new
-  varsLevel <- Vec.new
-  varsWatches <- Vec.new
-  varsOnUnassigned <- Vec.new
-  varsReason <- Vec.new
-  varsEMAScaled <- Vec.new
-  varsWhenAssigned <- Vec.new
-  varsParticipated <- Vec.new
-  varsReasoned <- Vec.new
+  varValue <- Vec.new
+  varPolarity <- Vec.new
+  varActivity <- Vec.new
+  varTrailIndex <- Vec.new
+  varLevel <- Vec.new
+  varWatches <- Vec.new
+  varOnUnassigned <- Vec.new
+  varReason <- Vec.new
+  varEMAScaled <- Vec.new
+  varWhenAssigned <- Vec.new
+  varParticipated <- Vec.new
+  varReasoned <- Vec.new
   litWatches <- Vec.new
   litOccurList <- Vec.new
 
@@ -690,20 +690,20 @@ newSolverWithConfig config = do
         , svTrailLimit = trail_lim
         , svTrailNPropagated = trail_nprop
 
-        , svVarValue    = varsValue
-        , svVarPolarity = varsPolarity
-        , svVarActivity = varsActivity
-        , svVarTrailIndex = varsTrailIndex
-        , svVarLevel = varsLevel
-        , svVarWatches = varsWatches
-        , svVarOnUnassigned = varsOnUnassigned
-        , svVarReason = varsReason
-        , svVarEMAScaled = varsEMAScaled
-        , svVarWhenAssigned = varsWhenAssigned
-        , svVarParticipated = varsParticipated
-        , svVarReasoned = varsReasoned
-        , svLitWatches = litWatches
-        , svLitOccurList = litOccurList
+        , svVarValue        = varValue
+        , svVarPolarity     = varPolarity
+        , svVarActivity     = varActivity
+        , svVarTrailIndex   = varTrailIndex
+        , svVarLevel        = varLevel
+        , svVarWatches      = varWatches
+        , svVarOnUnassigned = varOnUnassigned
+        , svVarReason       = varReason
+        , svVarEMAScaled    = varEMAScaled
+        , svVarWhenAssigned = varWhenAssigned
+        , svVarParticipated = varParticipated
+        , svVarReasoned     = varReasoned
+        , svLitWatches      = litWatches
+        , svLitOccurList    = litOccurList
 
         , svConstrDB   = db
         , svLearntDB   = db2
