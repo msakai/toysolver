@@ -178,15 +178,6 @@ levelRoot = 0
 litIndex :: Lit -> Int
 litIndex l = 2 * (litVar l - 1) + (if litPolarity l then 1 else 0)
 
-data VarData
-  = VarData
-
-newVarData :: IO VarData
-newVarData = return VarData
-
-varData :: Solver -> Var -> IO VarData
-varData solver !v = Vec.unsafeRead (svVarData solver) (v-1)
-
 {-# INLINE varValue #-}
 varValue :: Solver -> Var -> IO LBool
 varValue solver v = liftM coerce $ Vec.unsafeRead (svVarValue solver) (v - 1)
@@ -195,7 +186,7 @@ varValue solver v = liftM coerce $ Vec.unsafeRead (svVarValue solver) (v - 1)
 litValue :: Solver -> Lit -> IO LBool
 litValue solver !l = do
   -- litVar による heap allocation を避けるために、
-  -- litPolarityによる分岐後にvarDataを呼ぶ。
+  -- litPolarityによる分岐後にvarValueを呼ぶ。
   if litPolarity l then
     varValue solver l
   else do
@@ -213,7 +204,7 @@ getVarFixed solver !v = do
 getLitFixed :: Solver -> Lit -> IO LBool
 getLitFixed solver !l = do
   -- litVar による heap allocation を避けるために、
-  -- litPolarityによる分岐後にvarDataを呼ぶ。
+  -- litPolarityによる分岐後にvarGetFixedを呼ぶ。
   if litPolarity l then
     getVarFixed solver l
   else do
@@ -266,7 +257,6 @@ data Solver
   , svTrailNPropagated :: !(IOURef Int)
 
   -- variable information
-  , svVarData       :: !(Vec.Vec VarData)
   , svVarValue      :: !(Vec.UVec Int8) -- should be 'Vec.UVec LBool' but it's difficult to define MArray instance
   , svVarPolarity   :: !(Vec.UVec Bool)
   , svVarActivity   :: !(Vec.UVec VarActivity)
@@ -594,7 +584,7 @@ variables solver = do
 
 -- | number of variables of the problem.
 getNVars :: Solver -> IO Int
-getNVars solver = Vec.getSize (svVarData solver)
+getNVars solver = Vec.getSize (svVarValue solver)
 
 -- | number of assigned
 getNAssigned :: Solver -> IO Int
@@ -634,7 +624,6 @@ newSolverWithConfig config = do
   trail_lim <- Vec.new
   trail_nprop <- newIOURef 0
 
-  vars <- Vec.new
   varsValue <- Vec.new
   varsPolarity <- Vec.new
   varsActivity <- Vec.new
@@ -701,7 +690,6 @@ newSolverWithConfig config = do
         , svTrailLimit = trail_lim
         , svTrailNPropagated = trail_nprop
 
-        , svVarData     = vars
         , svVarValue    = varsValue
         , svVarPolarity = varsPolarity
         , svVarActivity = varsActivity
@@ -784,10 +772,9 @@ ltVar solver !v1 !v2 = do
 instance NewVar IO Solver where
   newVar :: Solver -> IO Var
   newVar solver = do
-    n <- Vec.getSize (svVarData solver)
+    n <- Vec.getSize (svVarValue solver)
     let v = n + 1
-    vd <- newVarData
-    Vec.push (svVarData solver) vd
+
     Vec.push (svVarValue solver) (coerce lUndef)
     Vec.push (svVarPolarity solver) True
     Vec.push (svVarActivity solver) 0
@@ -825,7 +812,6 @@ instance NewVar IO Solver where
 -- |Pre-allocate internal buffer for @n@ variables.
 resizeVarCapacity :: Solver -> Int -> IO ()
 resizeVarCapacity solver n = do
-  Vec.resizeCapacity (svVarData solver) n
   Vec.resizeCapacity (svSeen solver) n
   PQ.resizeHeapCapacity (svVarQueue solver) n
   PQ.resizeTableCapacity (svVarQueue solver) (n+1)
