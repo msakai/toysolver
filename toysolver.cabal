@@ -16,6 +16,7 @@ Tested-With:
    GHC ==8.4.4
    GHC ==8.6.4
    GHC ==8.8.1
+   GHC ==8.10.1
 Extra-Source-Files:
    README.md
    CHANGELOG.markdown
@@ -511,7 +512,7 @@ Executable toysmt
     transformers,
     transformers-compat
   if flag(UseHaskeline)
-    Build-Depends: haskeline >=0.7 && <0.8
+    Build-Depends: haskeline >=0.7 && <0.9
     CPP-Options: "-DUSE_HASKELINE_PACKAGE"
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
