@@ -183,6 +183,9 @@ writeLitArray :: LitArray -> Int -> Lit -> IO ()
 writeLitArray = unsafeWrite
 -- writeLitArray = writeArray
 
+getLits :: LitArray -> IO [Lit]
+getLits = getElems
+
 {--------------------------------------------------------------------
   internal data structures
 --------------------------------------------------------------------}
@@ -2366,7 +2369,7 @@ instance ConstraintHandler ClauseHandler where
   toConstraintHandler = CHClause
 
   showConstraintHandler this = do
-    lits <- getElems (claLits this)
+    lits <- getLits (claLits this)
     return (show lits)
 
   constrAttach solver this this2 = do
@@ -2490,7 +2493,7 @@ instance ConstraintHandler ClauseHandler where
           writeLitArray a 1 l0
 
   constrReasonOf _ this l = do
-    lits <- getElems (claLits this)
+    lits <- getLits (claLits this)
     case l of
       Nothing -> return lits
       Just lit -> do
@@ -2502,7 +2505,7 @@ instance ConstraintHandler ClauseHandler where
   isPBRepresentable _ = return True
 
   toPBLinAtLeast this = do
-    lits <- getElems (claLits this)
+    lits <- getLits (claLits this)
     return ([(1,l) | l <- lits], 1)
 
   isSatisfied solver this = do
@@ -2522,7 +2525,7 @@ instance ConstraintHandler ClauseHandler where
 basicAttachClauseHandler :: Solver -> ClauseHandler -> IO Bool
 basicAttachClauseHandler solver this = do
   let constr = toConstraintHandler this
-  lits <- getElems (claLits this)
+  lits <- getLits (claLits this)
   case lits of
     [] -> do
       markBad solver
@@ -2563,7 +2566,7 @@ instance ConstraintHandler AtLeastHandler where
   toConstraintHandler = CHAtLeast
 
   showConstraintHandler this = do
-    lits <- getElems (atLeastLits this)
+    lits <- getLits (atLeastLits this)
     return $ show lits ++ " >= " ++ show (atLeastNum this)
 
   -- FIXME: simplify implementation
@@ -2656,7 +2659,7 @@ instance ConstraintHandler AtLeastHandler where
       f 0 n
 
   constrDetach solver this this2 = do
-    lits <- getElems (atLeastLits this2)
+    lits <- getLits (atLeastLits this2)
     let n = atLeastNum this2
     when (length lits > n) $ do
       forLoop 0 (<=n) (+1) $ \i -> do
@@ -2756,7 +2759,7 @@ instance ConstraintHandler AtLeastHandler where
         return $ lit : falsifiedLits
       Just lit -> do
         when debugMode $ do
-          es <- getElems (atLeastLits this)
+          es <- getLits (atLeastLits this)
           unless (lit `elem` take n es) $
             error $ printf "AtLeastHandler.constrReasonOf: cannot find %d in first %d elements" n
         return falsifiedLits
@@ -2766,7 +2769,7 @@ instance ConstraintHandler AtLeastHandler where
   isPBRepresentable _ = return True
 
   toPBLinAtLeast this = do
-    lits <- getElems (atLeastLits this)
+    lits <- getLits (atLeastLits this)
     return ([(1,l) | l <- lits], fromIntegral (atLeastNum this))
 
   isSatisfied solver this = do
@@ -2786,7 +2789,7 @@ instance ConstraintHandler AtLeastHandler where
 
 basicAttachAtLeastHandler :: Solver -> AtLeastHandler -> IO Bool
 basicAttachAtLeastHandler solver this = do
-  lits <- getElems (atLeastLits this)
+  lits <- getLits (atLeastLits this)
   let m = length lits
       n = atLeastNum this
       constr = toConstraintHandler this
@@ -3208,7 +3211,7 @@ instance ConstraintHandler XORClauseHandler where
   toConstraintHandler = CHXORClause
 
   showConstraintHandler this = do
-    lits <- getElems (xorLits this)
+    lits <- getLits (xorLits this)
     return ("XOR " ++ show lits)
 
   constrAttach solver this this2 = do
@@ -3353,7 +3356,7 @@ instance ConstraintHandler XORClauseHandler where
           writeLitArray a 1 l0
 
   constrReasonOf solver this l = do
-    lits <- getElems (xorLits this)
+    lits <- getLits (xorLits this)
     xs <-
       case l of
         Nothing -> mapM f lits
@@ -3378,7 +3381,7 @@ instance ConstraintHandler XORClauseHandler where
   toPBLinAtLeast _ = error "XORClauseHandler does not support toPBLinAtLeast"
 
   isSatisfied solver this = do
-    lits <- getElems (xorLits this)
+    lits <- getLits (xorLits this)
     vals <- mapM (litValue solver) lits
     let f x y
           | x == lUndef || y == lUndef = lUndef
@@ -3395,7 +3398,7 @@ instance ConstraintHandler XORClauseHandler where
 
 basicAttachXORClauseHandler :: Solver -> XORClauseHandler -> IO Bool
 basicAttachXORClauseHandler solver this = do
-  lits <- getElems (xorLits this)
+  lits <- getLits (xorLits this)
   let constr = toConstraintHandler this
   case lits of
     [] -> do
