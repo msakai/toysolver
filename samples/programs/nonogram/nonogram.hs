@@ -40,7 +40,7 @@ hReadCWD h = do
 checkSolution :: Problem -> Solution -> IO ()
 checkSolution (rows, cols) sol = do
   let nrows = length rows
-      ncols = length cols  
+      ncols = length cols
   forM_ [0..nrows-1] $ \i -> do
     let row_i_expected = rows !! i
         row_i_actual = [length g | g <- group [sol ! (i,j) | j <- [0..ncols-1]], head g]
@@ -65,13 +65,13 @@ solve (rows, cols) = do
 
   bTrue  <- Tseitin.encodeConj enc []
   bFalse <- Tseitin.encodeDisj enc []
-          
+
   (bs :: UArray (Int,Int) SAT.Lit) <- liftM (array ((0,0),(nrows-1,ncols-1)) . concat) $ forM [0..nrows-1] $ \i -> do
     forM [0..ncols-1] $ \j -> do
       b <- SAT.newVar solver
       return ((i,j),b)
 
-  forM_ (zip [0..] rows) $ \(i, xs) -> do         
+  forM_ (zip [0..] rows) $ \(i, xs) -> do
     ref <- newIORef Map.empty
     let f j []
           | j >= ncols = return bTrue
@@ -80,7 +80,7 @@ solve (rows, cols) = do
               case Map.lookup (j,[]) m of
                 Just b -> return b
                 Nothing -> do
-                  b' <- f (j+1) []                  
+                  b' <- f (j+1) []
                   b <- Tseitin.encodeConj enc [- (bs ! (i,j)), b']
                   writeIORef ref (Map.insert (j,[]) b m)
                   return b

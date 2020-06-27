@@ -40,16 +40,16 @@ removeComments = unlines . filter p . lines
     p _ = True
 
 readBoard :: String -> Array (Int,Int) (Maybe Int)
-readBoard s = array ((1,1),(9,9)) $ 
+readBoard s = array ((1,1),(9,9)) $
   [ (idx, if isDigit c then Just (read [c]) else Nothing)
   | (idx, c) <- zip [(i,j) | i <- [1..9], j <- [1..9]] s
   ]
 
 solve :: Array (Int,Int) (Maybe Int) -> IO (Maybe (Array (Int,Int) Int))
 solve board = do
-  solver <- SAT.newSolver 
+  solver <- SAT.newSolver
   SAT.setLogger solver (hPutStrLn stderr)
- 
+
   (vs :: Array (Int,Int,Int) SAT.Var) <-
     liftM (array ((1,1,1), (9,9,9))) $
       forM [(i,j,k) | i<-[1..9], j<-[1..9], k<-[1..9]] $ \idx -> do
@@ -57,7 +57,7 @@ solve board = do
         return (idx,v)
 
   forM_ (assocs board) $ \((i,j), m) -> do
-    case m of 
+    case m of
       Nothing -> return ()
       Just k -> SAT.addClause solver [vs ! (i,j,k)]
 

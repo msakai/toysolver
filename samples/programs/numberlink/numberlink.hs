@@ -170,7 +170,7 @@ encode enc opt Problem{ probSize = (w,h,d), probLineNum = n, probLines = ls, pro
         let v = vs!a!0
         -- v → deg(a)=0
         -- SAT.addPBAtMostSoft enc v [(1, evs Map.! e) | e <- adjacentEdges a] 0
-        forM_ (adjacentEdges a) $ \e -> SAT.addClause enc [-v, -(evs Map.! e)]     
+        forM_ (adjacentEdges a) $ \e -> SAT.addClause enc [-v, -(evs Map.! e)]
         -- ¬v → deg(a)=2
         SAT.addPBExactlySoft enc (-v) [(1, evs Map.! e) | e <- adjacentEdges a] 2
         -- ¬v → deg(a)>0
@@ -226,7 +226,7 @@ encodeObj enc opt Problem{ probSize = (w,h,d) } (cells,edges) = do
   let (o1, o2) = fromJust (optOptimize opt)
   obj1 <-
     if not o1 then do
-      return []   
+      return []
     else if optAssumeNoBlank opt then do
       v <- SAT.newVar enc
       SAT.addClause enc [v]
@@ -266,7 +266,7 @@ decode prob (vs, evs) m = (solCells, solEdges)
         k:_ -> return (a,k)
         [] -> mzero
     solEdges = Set.fromList [e | e@(a,_) <- edges, a `Set.member` usedCells]
-    
+
     edges = [e | (e,ev) <- Map.toList evs, SAT.evalLit m ev]
     adjacents = Map.fromListWith Set.union $ concat $ [[(a, Set.singleton b), (b, Set.singleton a)] | (a,b) <- edges]
     usedVias = Set.fromList [(x,y,z) | ((x,y),zs) <- Map.toList cs, z <- [Set.findMin zs .. Set.findMax zs]]

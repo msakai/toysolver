@@ -67,7 +67,7 @@ main = sh $ do
   let binDir = fromText (lineToText local_install_root) </> "bin"
   forM exe_files $ \name -> do
     cp (binDir </> addExeSuffix name) (pkg </> "bin" </> addExeSuffix name)
-  
+
   cptree "samples" (pkg </> "samples")
   cp "COPYING-GPL" (pkg </> "COPYING-GPL")
   cp "README.md" (pkg </> "README.md")

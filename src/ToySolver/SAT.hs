@@ -544,7 +544,7 @@ varRescaleAllActivity :: Solver -> IO ()
 varRescaleAllActivity solver = do
   let a = svVarActivity solver
   n <- getNVars solver
-  forLoop 0 (<n) (+1) $ \i -> 
+  forLoop 0 (<n) (+1) $ \i ->
     Vec.unsafeModify a i (* 1e-20)
   modifyIOURef (svVarInc solver) (* 1e-20)
 
@@ -1390,7 +1390,7 @@ removeBackwardSubsumedBy solver pb = do
 backwardSubsumedBy :: Solver -> PBLinAtLeast -> IO (HashSet SomeConstraintHandler)
 backwardSubsumedBy solver pb@(lhs,_) = do
   xs <- forM lhs $ \(_,lit) -> do
-    Vec.unsafeRead (svLitOccurList solver) (litIndex lit) 
+    Vec.unsafeRead (svLitOccurList solver) (litIndex lit)
   case xs of
     [] -> return HashSet.empty
     s:ss -> do

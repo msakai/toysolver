@@ -30,7 +30,7 @@ generate_packageVersions cabalFile = do
 #else
   pkgDesc <- readPackageDescription Verbosity.normal cabalFile
 #endif
-  let pkgs1 = 
+  let pkgs1 =
         case condLibrary pkgDesc of
           Nothing -> Set.empty
           Just tree -> Set.fromList [unPackageName pkgName | constr <- constrs tree, Dependency pkgName _verRange <- constr]
