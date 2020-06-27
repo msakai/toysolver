@@ -170,6 +170,11 @@ import ToySolver.Internal.Util (revMapM)
 
 type LitArray = IOUArray Int Lit
 
+newLitArray :: [Lit] -> IO LitArray
+newLitArray lits = do
+  let size = length lits
+  newListArray (0, size-1) lits
+
 readLitArray :: LitArray -> Int -> IO Lit
 readLitArray = unsafeRead
 -- readLitArray = readArray
@@ -2353,8 +2358,7 @@ instance Hashable ClauseHandler where
 
 newClauseHandler :: Clause -> Bool -> IO ClauseHandler
 newClauseHandler ls learnt = do
-  let size = length ls
-  a <- newListArray (0, size-1) ls
+  a <- newLitArray ls
   act <- newIORef $! (if learnt then 0 else -1)
   return (ClauseHandler a act (hash ls))
 
@@ -2551,8 +2555,7 @@ instance Hashable AtLeastHandler where
 
 newAtLeastHandler :: [Lit] -> Int -> Bool -> IO AtLeastHandler
 newAtLeastHandler ls n learnt = do
-  let size = length ls
-  a <- newListArray (0, size-1) ls
+  a <- newLitArray ls
   act <- newIORef $! (if learnt then 0 else -1)
   return (AtLeastHandler a n act (hash (ls,n)))
 
@@ -3197,8 +3200,7 @@ instance Hashable XORClauseHandler where
 
 newXORClauseHandler :: [Lit] -> Bool -> IO XORClauseHandler
 newXORClauseHandler ls learnt = do
-  let size = length ls
-  a <- newListArray (0, size-1) ls
+  a <- newLitArray ls
   act <- newIORef $! (if learnt then 0 else -1)
   return (XORClauseHandler a act (hash ls))
 
