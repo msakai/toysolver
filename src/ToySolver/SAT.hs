@@ -179,14 +179,6 @@ data VarData
   = VarData
   { vdPosLitData :: !LitData
   , vdNegLitData :: !LitData
-  -- | exponential moving average estimate
-  , vdEMAScaled :: !(IOURef Double)
-  -- | When v was last assigned
-  , vdWhenAssigned :: !(IOURef Int)
-  -- | The number of learnt clauses v participated in generating since Assigned.
-  , vdParticipated :: !(IOURef Int)
-  -- | The number of learnt clauses v reasoned in generating since Assigned.
-  , vdReasoned :: !(IOURef Int)
   }
 
 data LitData
@@ -201,19 +193,10 @@ newVarData = do
   pos <- newLitData
   neg <- newLitData
 
-  ema <- newIOURef 0
-  whenAssigned <- newIOURef (-1)
-  participated <- newIOURef 0
-  reasoned <- newIOURef 0
-
   return $
     VarData
     { vdPosLitData = pos
     , vdNegLitData = neg
-    , vdEMAScaled = ema
-    , vdWhenAssigned = whenAssigned
-    , vdParticipated = participated
-    , vdReasoned = reasoned
     }
 
 newLitData :: IO LitData
@@ -325,6 +308,14 @@ data Solver
   , svVarWatches      :: !(Vec.Vec [SomeConstraintHandler])
   , svVarOnUnassigned :: !(Vec.Vec [SomeConstraintHandler])
   , svVarReason       :: !(Vec.Vec (Maybe SomeConstraintHandler))
+  -- | exponential moving average estimate
+  , svVarEMAScaled    :: !(Vec.UVec Double)
+  -- | When v was last assigned
+  , svVarWhenAssigned :: !(Vec.UVec Int)
+  -- | The number of learnt clauses v participated in generating since Assigned.
+  , svVarParticipated :: !(Vec.UVec Int)
+  -- | The number of learnt clauses v reasoned in generating since Assigned.
+  , svVarReasoned     :: !(Vec.UVec Int)
 
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
@@ -426,7 +417,6 @@ assign solver lit = assign_ solver lit Nothing
 
 assign_ :: Solver -> Lit -> Maybe SomeConstraintHandler -> IO Bool
 assign_ solver !lit reason = assert (validLit lit) $ do
-  vd <- varData solver (litVar lit)
   let val = liftBool (litPolarity lit)
 
   val0 <- varValue solver (litVar lit)
@@ -440,9 +430,9 @@ assign_ solver !lit reason = assert (validLit lit) $ do
     Vec.unsafeWrite (svVarTrailIndex solver) (litVar lit - 1) idx
     Vec.unsafeWrite (svVarLevel solver) (litVar lit - 1) lv
     Vec.unsafeWrite (svVarReason solver) (litVar lit - 1) reason
-    writeIOURef (vdWhenAssigned vd) =<< readIOURef (svLearntCounter solver)
-    writeIOURef (vdParticipated vd) 0
-    writeIOURef (vdReasoned vd) 0
+    Vec.unsafeWrite (svVarWhenAssigned solver) (litVar lit - 1) =<< readIOURef (svLearntCounter solver)
+    Vec.unsafeWrite (svVarParticipated solver) (litVar lit - 1) 0
+    Vec.unsafeWrite (svVarReasoned solver) (litVar lit - 1) 0
 
     Vec.push (svTrail solver) lit
 
@@ -456,7 +446,6 @@ assign_ solver !lit reason = assert (validLit lit) $ do
 
 unassign :: Solver -> Var -> IO ()
 unassign solver !v = assert (validVar v) $ do
-  vd <- varData solver v
   val <- varValue solver v
   when (val == lUndef) $ error "unassign: should not happen"
 
@@ -471,18 +460,18 @@ unassign solver !v = assert (validVar v) $ do
   -- ERWA / LRB computation
   interval <- do
     t2 <- readIOURef (svLearntCounter solver)
-    t1 <- readIOURef (vdWhenAssigned vd)
+    t1 <- Vec.unsafeRead (svVarWhenAssigned solver) (v - 1)
     return (t2 - t1)
   -- Interval = 0 is possible due to restarts.
   when (interval > 0) $ do
-    participated <- readIOURef (vdParticipated vd)
-    reasoned <- readIOURef (vdReasoned vd)
+    participated <- Vec.unsafeRead (svVarParticipated solver) (v - 1)
+    reasoned <- Vec.unsafeRead (svVarReasoned solver) (v - 1)
     alpha <- readIOURef (svERWAStepSize solver)
     let learningRate = fromIntegral participated / fromIntegral interval
         reasonSideRate = fromIntegral reasoned / fromIntegral interval
     scale <- readIOURef (svEMAScale solver)
     -- ema := (1 - α)ema + α*r
-    modifyIOURef (vdEMAScaled vd) $ \orig -> (1 - alpha) * orig + alpha * scale * (learningRate + reasonSideRate)
+    Vec.unsafeModify (svVarEMAScaled solver) (v - 1) (\orig -> (1 - alpha) * orig + alpha * scale * (learningRate + reasonSideRate))
     -- If v is assigned by random decision, it's possible that v is still in the queue.
     PQ.update (svVarQueue solver) v
 
@@ -603,19 +592,13 @@ varRescaleAllActivity solver = do
   modifyIOURef (svVarInc solver) (* 1e-20)
 
 varEMAScaled :: Solver -> Var -> IO Double
-varEMAScaled solver v = do
-  vd <- varData solver v
-  readIOURef (vdEMAScaled vd)
+varEMAScaled solver v = Vec.unsafeRead (svVarEMAScaled solver) (v - 1)
 
 varIncrementParticipated :: Solver -> Var -> IO ()
-varIncrementParticipated solver v = do
-  vd <- varData solver v
-  modifyIOURef (vdParticipated vd) (+1)
+varIncrementParticipated solver v = Vec.unsafeModify (svVarParticipated solver) (v - 1) (+1)
 
 varIncrementReasoned :: Solver -> Var -> IO ()
-varIncrementReasoned solver v = do
-  vd <- varData solver v
-  modifyIOURef (vdReasoned vd) (+1)
+varIncrementReasoned solver v = Vec.unsafeModify (svVarReasoned solver) (v - 1) (+1)
 
 varEMADecay :: Solver -> IO ()
 varEMADecay solver = do
@@ -631,10 +614,9 @@ varEMADecay solver = do
       modifyIOURef (svEMAScale solver) (configEMADecay config *)
       scale <- readIOURef (svEMAScale solver)
       when (scale > 1e20) $ do
-        vs <- variables solver
-        forM_ vs $ \v -> do
-          vd <- varData solver v
-          modifyIOURef (vdEMAScaled vd) (/ scale)
+        n <- getNVars solver
+        let a = svVarEMAScaled solver
+        forLoop 0 (<n) (+1) $ \i -> Vec.unsafeModify a i (/ scale)
         writeIOURef (svEMAScale solver) 1.0
     _ -> return ()
 
@@ -694,6 +676,10 @@ newSolverWithConfig config = do
   varsWatches <- Vec.new
   varsOnUnassigned <- Vec.new
   varsReason <- Vec.new
+  varsEMAScaled <- Vec.new
+  varsWhenAssigned <- Vec.new
+  varsParticipated <- Vec.new
+  varsReasoned <- Vec.new
 
   vqueue <- PQ.newPriorityQueueBy (ltVar solver)
   db  <- newIORef []
@@ -755,6 +741,10 @@ newSolverWithConfig config = do
         , svVarWatches = varsWatches
         , svVarOnUnassigned = varsOnUnassigned
         , svVarReason = varsReason
+        , svVarEMAScaled = varsEMAScaled
+        , svVarWhenAssigned = varsWhenAssigned
+        , svVarParticipated = varsParticipated
+        , svVarReasoned = varsReasoned
         
         , svConstrDB   = db
         , svLearntDB   = db2
@@ -835,6 +825,11 @@ instance NewVar IO Solver where
     Vec.push (svVarWatches solver) []
     Vec.push (svVarOnUnassigned solver) []
     Vec.push (svVarReason solver) Nothing
+    Vec.push (svVarEMAScaled solver) 0
+    Vec.push (svVarWhenAssigned solver) (-1)
+    Vec.push (svVarParticipated solver) 0
+    Vec.push (svVarReasoned solver) 0
+
     PQ.enqueue (svVarQueue solver) v
     Vec.push (svSeen solver) False
     return v
