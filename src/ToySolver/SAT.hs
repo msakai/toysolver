@@ -165,6 +165,34 @@ import ToySolver.SAT.TheorySolver
 import ToySolver.Internal.Util (revMapM)
 
 {--------------------------------------------------------------------
+  LitArray
+--------------------------------------------------------------------}
+
+newtype LitArray = LitArray (IOUArray Int Lit) deriving (Eq)
+
+newLitArray :: [Lit] -> IO LitArray
+newLitArray lits = do
+  let size = length lits
+  liftM LitArray $ newListArray (0, size-1) lits
+
+readLitArray :: LitArray -> Int -> IO Lit
+readLitArray (LitArray a) i = unsafeRead a i
+-- readLitArray (LitArray a) i = readArray a i
+
+writeLitArray :: LitArray -> Int -> Lit -> IO ()
+writeLitArray (LitArray a) i lit = unsafeWrite a i lit
+-- writeLitArray (LitArray a) i lit = writeArray a i lit
+
+getLits :: LitArray -> IO [Lit]
+getLits (LitArray a) = getElems a
+
+getLitArraySize :: LitArray -> IO Int
+getLitArraySize (LitArray a) = do
+  (lb,ub) <- getBounds a
+  assert (lb == 0) $ return ()
+  return $! ub-lb+1
+
+{--------------------------------------------------------------------
   internal data structures
 --------------------------------------------------------------------}
 
@@ -2246,14 +2274,14 @@ isReasonOf solver c lit = do
       Just c2  -> return $! c == c2
 
 -- To avoid heap-allocation Maybe value, it returns -1 when not found.
-findForWatch :: Solver -> IOUArray Int Lit -> Int -> Int -> IO Int
+findForWatch :: Solver -> LitArray -> Int -> Int -> IO Int
 #ifndef __GLASGOW_HASKELL__
 findForWatch solver a beg end = go beg end
   where
     go :: Int -> Int -> IO Int
     go i end | i > end = return (-1)
     go i end = do
-      val <- litValue s =<< unsafeRead a i
+      val <- litValue s =<< readLitArray a i
       if val /= lFalse
         then return i
         else go (i+1) end
@@ -2270,7 +2298,7 @@ findForWatch solver a (I# beg) (I# end) = IO $ \w ->
     go# :: Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)
     go# i end' w | isTrue# (i ># end') = (# w, -1# #)
     go# i end' w =
-      case unIO (litValue solver =<< unsafeRead a (I# i)) w of
+      case unIO (litValue solver =<< readLitArray a (I# i)) w of
         (# w2, val #) ->
           if val /= lFalse
             then (# w2, i #)
@@ -2280,14 +2308,14 @@ findForWatch solver a (I# beg) (I# end) = IO $ \w ->
 #endif
 
 -- To avoid heap-allocating Maybe value, it returns -1 when not found.
-findForWatch2 :: Solver -> IOUArray Int Lit -> Int -> Int -> IO Int
+findForWatch2 :: Solver -> LitArray -> Int -> Int -> IO Int
 #ifndef __GLASGOW_HASKELL__
 findForWatch2 solver a beg end = go beg end
   where
     go :: Int -> Int -> IO Int
     go i end | i > end = return (-1)
     go i end = do
-      val <- litValue s =<< unsafeRead a i
+      val <- litValue s =<< readLitArray a i
       if val == lUndef
         then return i
         else go (i+1) end
@@ -2304,7 +2332,7 @@ findForWatch2 solver a (I# beg) (I# end) = IO $ \w ->
     go# :: Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)
     go# i end w | isTrue# (i ># end) = (# w, -1# #)
     go# i end w =
-      case unIO (litValue solver =<< unsafeRead a (I# i)) w of
+      case unIO (litValue solver =<< readLitArray a (I# i)) w of
         (# w2, val #) ->
           if val == lUndef
             then (# w2, i #)
@@ -2319,16 +2347,13 @@ findForWatch2 solver a (I# beg) (I# end) = IO $ \w ->
 
 data ClauseHandler
   = ClauseHandler
-  { claLits :: !(IOUArray Int Lit)
+  { claLits :: !LitArray
   , claActivity :: !(IORef Double)
   , claHash :: !Int
   }
 
 claGetSize :: ClauseHandler -> IO Int
-claGetSize cla = do
-  (lb,ub) <- getBounds (claLits cla)
-  assert (lb == 0) $ return ()
-  return $! ub-lb+1
+claGetSize cla = getLitArraySize (claLits cla)
 
 instance Eq ClauseHandler where
   (==) = (==) `on` claLits
@@ -2339,8 +2364,7 @@ instance Hashable ClauseHandler where
 
 newClauseHandler :: Clause -> Bool -> IO ClauseHandler
 newClauseHandler ls learnt = do
-  let size = length ls
-  a <- newListArray (0, size-1) ls
+  a <- newLitArray ls
   act <- newIORef $! (if learnt then 0 else -1)
   return (ClauseHandler a act (hash ls))
 
@@ -2348,7 +2372,7 @@ instance ConstraintHandler ClauseHandler where
   toConstraintHandler = CHClause
 
   showConstraintHandler this = do
-    lits <- getElems (claLits this)
+    lits <- getLits (claLits this)
     return (show lits)
 
   constrAttach solver this this2 = do
@@ -2361,12 +2385,12 @@ instance ConstraintHandler ClauseHandler where
       markBad solver
       return False
     else if size == 1 then do
-      lit0 <- unsafeRead (claLits this2) 0
+      lit0 <- readLitArray (claLits this2) 0
       assignBy solver lit0 this
     else do
       ref <- newIORef 1
       let f i = do
-            lit_i <- unsafeRead (claLits this2) i
+            lit_i <- readLitArray (claLits this2) i
             val_i <- litValue solver lit_i
             if val_i /= lFalse then
               return True
@@ -2377,42 +2401,42 @@ instance ConstraintHandler ClauseHandler where
                 -1 -> do
                   return False
                 _ -> do
-                  lit_k <- unsafeRead (claLits this2) k
-                  unsafeWrite (claLits this2) i lit_k
-                  unsafeWrite (claLits this2) k lit_i
+                  lit_k <- readLitArray (claLits this2) k
+                  writeLitArray (claLits this2) i lit_k
+                  writeLitArray (claLits this2) k lit_i
                   writeIORef ref $! (k+1)
                   return True
 
       b <- f 0
       if b then do
-        lit0 <- unsafeRead (claLits this2) 0
+        lit0 <- readLitArray (claLits this2) 0
         watchLit solver lit0 this
         b2 <- f 1
         if b2 then do
-          lit1 <- unsafeRead (claLits this2) 1
+          lit1 <- readLitArray (claLits this2) 1
           watchLit solver lit1 this
           return True
         else do -- UNIT
           -- We need to watch the most recently falsified literal
           (i,_) <- liftM (maximumBy (comparing snd)) $ forM [1..size-1] $ \l -> do
-            lit <- unsafeRead (claLits this2) l
+            lit <- readLitArray (claLits this2) l
             lv <- litLevel solver lit
             return (l,lv)
-          lit1 <- unsafeRead (claLits this2) 1
-          liti <- unsafeRead (claLits this2) i
-          unsafeWrite (claLits this2) 1 liti
-          unsafeWrite (claLits this2) i lit1
+          lit1 <- readLitArray (claLits this2) 1
+          liti <- readLitArray (claLits this2) i
+          writeLitArray (claLits this2) 1 liti
+          writeLitArray (claLits this2) i lit1
           watchLit solver liti this
           assignBy solver lit0 this -- should always succeed
       else do -- CONFLICT
         ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [0..size-1] $ \l -> do
-          lit <- unsafeRead (claLits this2) l
+          lit <- readLitArray (claLits this2) l
           lv <- litLevel solver lit
           return (l,lv)
         forM_ (zip [0..] ls) $ \(i,lit) -> do
-          unsafeWrite (claLits this2) i lit
-        lit0 <- unsafeRead (claLits this2) 0
-        lit1 <- unsafeRead (claLits this2) 1
+          writeLitArray (claLits this2) i lit
+        lit0 <- readLitArray (claLits this2) 0
+        lit1 <- readLitArray (claLits this2) 1
         watchLit solver lit0 this
         watchLit solver lit1 this
         return False
@@ -2420,8 +2444,8 @@ instance ConstraintHandler ClauseHandler where
   constrDetach solver this this2 = do
     size <- claGetSize this2
     when (size >= 2) $ do
-      lit0 <- unsafeRead (claLits this2) 0
-      lit1 <- unsafeRead (claLits this2) 1
+      lit0 <- readLitArray (claLits this2) 0
+      lit1 <- readLitArray (claLits this2) 1
       unwatchLit solver lit0 this
       unwatchLit solver lit1 this
 
@@ -2430,13 +2454,13 @@ instance ConstraintHandler ClauseHandler where
     if size < 2 then
       return False
     else do
-      lit <- unsafeRead (claLits this2) 0
+      lit <- readLitArray (claLits this2) 0
       isReasonOf solver this lit
 
   constrPropagate !solver this this2 !falsifiedLit = do
     preprocess
 
-    !lit0 <- unsafeRead a 0
+    !lit0 <- readLitArray a 0
     !val0 <- litValue solver lit0
     if val0 == lTrue then do
       watchLit solver falsifiedLit this
@@ -2452,10 +2476,10 @@ instance ConstraintHandler ClauseHandler where
           watchLit solver falsifiedLit this
           assignBy solver lit0 this
         _  -> do
-          !lit1 <- unsafeRead a 1
-          !liti <- unsafeRead a i
-          unsafeWrite a 1 liti
-          unsafeWrite a i lit1
+          !lit1 <- readLitArray a 1
+          !liti <- readLitArray a i
+          writeLitArray a 1 liti
+          writeLitArray a i lit1
           watchLit solver liti this
           return True
 
@@ -2464,15 +2488,15 @@ instance ConstraintHandler ClauseHandler where
 
       preprocess :: IO ()
       preprocess = do
-        !l0 <- unsafeRead a 0
-        !l1 <- unsafeRead a 1
+        !l0 <- readLitArray a 0
+        !l1 <- readLitArray a 1
         assert (l0==falsifiedLit || l1==falsifiedLit) $ return ()
         when (l0==falsifiedLit) $ do
-          unsafeWrite a 0 l1
-          unsafeWrite a 1 l0
+          writeLitArray a 0 l1
+          writeLitArray a 1 l0
 
   constrReasonOf _ this l = do
-    lits <- getElems (claLits this)
+    lits <- getLits (claLits this)
     case l of
       Nothing -> return lits
       Just lit -> do
@@ -2484,13 +2508,13 @@ instance ConstraintHandler ClauseHandler where
   isPBRepresentable _ = return True
 
   toPBLinAtLeast this = do
-    lits <- getElems (claLits this)
+    lits <- getLits (claLits this)
     return ([(1,l) | l <- lits], 1)
 
   isSatisfied solver this = do
-    (lb,ub) <- getBounds (claLits this)
-    liftM isLeft $ runExceptT $ numLoop lb ub $ \i -> do
-      v <- lift $ litValue solver =<< unsafeRead (claLits this) i
+    n <- getLitArraySize (claLits this)
+    liftM isLeft $ runExceptT $ forLoop 0 (<n) (+1) $ \i -> do
+      v <- lift $ litValue solver =<< readLitArray (claLits this) i
       when (v == lTrue) $ throwE ()
 
   constrIsProtected _ this = do
@@ -2504,7 +2528,7 @@ instance ConstraintHandler ClauseHandler where
 basicAttachClauseHandler :: Solver -> ClauseHandler -> IO Bool
 basicAttachClauseHandler solver this = do
   let constr = toConstraintHandler this
-  lits <- getElems (claLits this)
+  lits <- getLits (claLits this)
   case lits of
     [] -> do
       markBad solver
@@ -2522,7 +2546,7 @@ basicAttachClauseHandler solver this = do
 
 data AtLeastHandler
   = AtLeastHandler
-  { atLeastLits :: IOUArray Int Lit
+  { atLeastLits :: !LitArray
   , atLeastNum :: !Int
   , atLeastActivity :: !(IORef Double)
   , atLeastHash :: !Int
@@ -2537,8 +2561,7 @@ instance Hashable AtLeastHandler where
 
 newAtLeastHandler :: [Lit] -> Int -> Bool -> IO AtLeastHandler
 newAtLeastHandler ls n learnt = do
-  let size = length ls
-  a <- newListArray (0, size-1) ls
+  a <- newLitArray ls
   act <- newIORef $! (if learnt then 0 else -1)
   return (AtLeastHandler a n act (hash (ls,n)))
 
@@ -2546,7 +2569,7 @@ instance ConstraintHandler AtLeastHandler where
   toConstraintHandler = CHAtLeast
 
   showConstraintHandler this = do
-    lits <- getElems (atLeastLits this)
+    lits <- getLits (atLeastLits this)
     return $ show lits ++ " >= " ++ show (atLeastNum this)
 
   -- FIXME: simplify implementation
@@ -2556,104 +2579,101 @@ instance ConstraintHandler AtLeastHandler where
     bcpCheckEmpty solver
 
     let a = atLeastLits this2
-    (lb,ub) <- getBounds a
-    assert (lb == 0) $ return ()
-    let m = ub - lb + 1
-        n = atLeastNum this2
+    m <- getLitArraySize a
+    let n = atLeastNum this2
 
     if m < n then do
       markBad solver
       return False
     else if m == n then do
       let f i = do
-            lit <- unsafeRead a i
+            lit <- readLitArray a i
             assignBy solver lit this
       allM f [0..n-1]
     else do -- m > n
       let f !i !j
             | i == n = do
                 -- NOT VIOLATED: n literals (0 .. n-1) are watched
-                k <- findForWatch solver a j ub
+                k <- findForWatch solver a j (m - 1)
                 if k /= -1 then do
                   -- NOT UNIT
-                  lit_n <- unsafeRead a n
-                  lit_k <- unsafeRead a k
-                  unsafeWrite a n lit_k
-                  unsafeWrite a k lit_n
+                  lit_n <- readLitArray a n
+                  lit_k <- readLitArray a k
+                  writeLitArray a n lit_k
+                  writeLitArray a k lit_n
                   watchLit solver lit_k this
                   -- n+1 literals (0 .. n) are watched.
                 else do
                   -- UNIT
                   forLoop 0 (<n) (+1) $ \l -> do
-                    lit <- unsafeRead a l
+                    lit <- readLitArray a l
                     _ <- assignBy solver lit this -- should always succeed
                     return ()
                   -- We need to watch the most recently falsified literal
-                  (l,_) <- liftM (maximumBy (comparing snd)) $ forM [n..ub] $ \l -> do
-                    lit <- unsafeRead a l
+                  (l,_) <- liftM (maximumBy (comparing snd)) $ forM [n..m-1] $ \l -> do
+                    lit <- readLitArray a l
                     lv <- litLevel solver lit
                     when debugMode $ do
                       val <- litValue solver lit
                       unless (val == lFalse) $ error "AtLeastHandler.attach: should not happen"
                     return (l,lv)
-                  lit_n <- unsafeRead a n
-                  lit_l <- unsafeRead a l
-                  unsafeWrite a n lit_l
-                  unsafeWrite a l lit_n
+                  lit_n <- readLitArray a n
+                  lit_l <- readLitArray a l
+                  writeLitArray a n lit_l
+                  writeLitArray a l lit_n
                   watchLit solver lit_l this
                   -- n+1 literals (0 .. n) are watched.
                 return True
             | otherwise = do
                 assert (i < n && n <= j) $ return ()
-                lit_i <- unsafeRead a i
+                lit_i <- readLitArray a i
                 val_i <- litValue solver lit_i
                 if val_i /= lFalse then do
                   watchLit solver lit_i this
                   f (i+1) j
                 else do
-                  k <- findForWatch solver a j ub
+                  k <- findForWatch solver a j (m - 1)
                   if k /= -1 then do
-                    lit_k <- unsafeRead a k
-                    unsafeWrite a i lit_k
-                    unsafeWrite a k lit_i
+                    lit_k <- readLitArray a k
+                    writeLitArray a i lit_k
+                    writeLitArray a k lit_i
                     watchLit solver lit_k this
                     f (i+1) (k+1)
                   else do
                     -- CONFLICT
                     -- We need to watch unassigned literals or most recently falsified literals.
-                    do xs <- liftM (sortBy (flip (comparing snd))) $ forM [i..ub] $ \l -> do
-                         lit <- readArray a l
+                    do xs <- liftM (sortBy (flip (comparing snd))) $ forM [i..m-1] $ \l -> do
+                         lit <- readLitArray a l
                          val <- litValue solver lit
                          if val == lFalse then do
                            lv <- litLevel solver lit
                            return (lit, lv)
                          else do
                            return (lit, maxBound)
-                       forM_ (zip [i..ub] xs) $ \(l,(lit,_lv)) -> do
-                         writeArray a l lit
+                       forM_ (zip [i..m-1] xs) $ \(l,(lit,_lv)) -> do
+                         writeLitArray a l lit
                     forLoop i (<=n) (+1) $ \l -> do
-                      lit_l <- readArray a l
+                      lit_l <- readLitArray a l
                       watchLit solver lit_l this
                     -- n+1 literals (0 .. n) are watched.
                     return False
       f 0 n
 
   constrDetach solver this this2 = do
-    lits <- getElems (atLeastLits this2)
+    lits <- getLits (atLeastLits this2)
     let n = atLeastNum this2
     when (length lits > n) $ do
       forLoop 0 (<=n) (+1) $ \i -> do
-        lit <- unsafeRead (atLeastLits this2) i
+        lit <- readLitArray (atLeastLits this2) i
         unwatchLit solver lit this
 
   constrIsLocked solver this this2 = do
-    (lb,ub) <- getBounds (atLeastLits this2)
-    let size = ub - lb + 1
-        n = atLeastNum this2
+    size <- getLitArraySize (atLeastLits this2)
+    let n = atLeastNum this2
         loop i
           | i > n = return False
           | otherwise = do
-              l <- unsafeRead (atLeastLits this2) i
+              l <- readLitArray (atLeastLits this2) i
               b <- isReasonOf solver this l
               if b then return True else loop (i+1)
     if size >= n+1 then
@@ -2665,12 +2685,11 @@ instance ConstraintHandler AtLeastHandler where
     preprocess
 
     when debugMode $ do
-      litn <- readArray a n
+      litn <- readLitArray a n
       unless (litn == falsifiedLit) $ error "AtLeastHandler.constrPropagate: should not happen"
 
-    (lb,ub) <- getBounds a
-    assert (lb==0) $ return ()
-    i <- findForWatch solver a (n+1) ub
+    m <- getLitArraySize a
+    i <- findForWatch solver a (n+1) (m-1)
     case i of
       -1 -> do
         when debugMode $ logIO solver $ do
@@ -2681,17 +2700,17 @@ instance ConstraintHandler AtLeastHandler where
             loop j
               | j >= n = return True
               | otherwise = do
-                  litj <- unsafeRead a j
+                  litj <- readLitArray a j
                   ret2 <- assignBy solver litj this
                   if ret2
                     then loop (j+1)
                     else return False
         loop 0
       _ -> do
-        liti <- unsafeRead a i
-        litn <- unsafeRead a n
-        unsafeWrite a i litn
-        unsafeWrite a n liti
+        liti <- readLitArray a i
+        litn <- readLitArray a n
+        writeLitArray a i litn
+        writeLitArray a n liti
         watchLit solver liti this
         return True
 
@@ -2706,19 +2725,18 @@ instance ConstraintHandler AtLeastHandler where
           loop i
             | i >= n = return ()
             | otherwise = do
-              li <- unsafeRead a i
+              li <- readLitArray a i
               if (li /= falsifiedLit) then
                 loop (i+1)
               else do
-                ln <- unsafeRead a n
-                unsafeWrite a n li
-                unsafeWrite a i ln
+                ln <- readLitArray a n
+                writeLitArray a n li
+                writeLitArray a i ln
 
   constrReasonOf solver this concl = do
-    (lb,ub) <- getBounds (atLeastLits this)
-    assert (lb==0) $ return ()
+    m <- getLitArraySize (atLeastLits this)
     let n = atLeastNum this
-    falsifiedLits <- mapM (readArray (atLeastLits this)) [n..ub] -- drop first n elements
+    falsifiedLits <- mapM (readLitArray (atLeastLits this)) [n..m-1] -- drop first n elements
     when debugMode $ do
       forM_ falsifiedLits $ \lit -> do
         val <- litValue solver lit
@@ -2730,16 +2748,16 @@ instance ConstraintHandler AtLeastHandler where
             go i
               | i >= n = error $ printf "AtLeastHandler.constrReasonOf: cannot find falsified literal in first %d elements" n
               | otherwise = do
-                  lit <- readArray (atLeastLits this) i
+                  lit <- readLitArray (atLeastLits this) i
                   val <- litValue solver lit
                   if val == lFalse
                   then return lit
                   else go (i+1)
-        lit <- go lb
+        lit <- go 0
         return $ lit : falsifiedLits
       Just lit -> do
         when debugMode $ do
-          es <- getElems (atLeastLits this)
+          es <- getLits (atLeastLits this)
           unless (lit `elem` take n es) $
             error $ printf "AtLeastHandler.constrReasonOf: cannot find %d in first %d elements" n
         return falsifiedLits
@@ -2749,13 +2767,13 @@ instance ConstraintHandler AtLeastHandler where
   isPBRepresentable _ = return True
 
   toPBLinAtLeast this = do
-    lits <- getElems (atLeastLits this)
+    lits <- getLits (atLeastLits this)
     return ([(1,l) | l <- lits], fromIntegral (atLeastNum this))
 
   isSatisfied solver this = do
-    (lb,ub) <- getBounds (atLeastLits this)
-    liftM isLeft $ runExceptT $ numLoopState lb ub 0 $ \(!n) i -> do
-      v <- lift $ litValue solver =<< unsafeRead (atLeastLits this) i
+    m <- getLitArraySize (atLeastLits this)
+    liftM isLeft $ runExceptT $ numLoopState 0 (m-1) 0 $ \(!n) i -> do
+      v <- lift $ litValue solver =<< readLitArray (atLeastLits this) i
       if v /= lTrue then do
         return n
       else do
@@ -2769,7 +2787,7 @@ instance ConstraintHandler AtLeastHandler where
 
 basicAttachAtLeastHandler :: Solver -> AtLeastHandler -> IO Bool
 basicAttachAtLeastHandler solver this = do
-  lits <- getElems (atLeastLits this)
+  lits <- getLits (atLeastLits this)
   let m = length lits
       n = atLeastNum this
       constr = toConstraintHandler this
@@ -3169,7 +3187,7 @@ puebloUpdateWatchSum solver constr this = do
 
 data XORClauseHandler
   = XORClauseHandler
-  { xorLits :: !(IOUArray Int Lit)
+  { xorLits :: !LitArray
   , xorActivity :: !(IORef Double)
   , xorHash :: !Int
   }
@@ -3183,8 +3201,7 @@ instance Hashable XORClauseHandler where
 
 newXORClauseHandler :: [Lit] -> Bool -> IO XORClauseHandler
 newXORClauseHandler ls learnt = do
-  let size = length ls
-  a <- newListArray (0, size-1) ls
+  a <- newLitArray ls
   act <- newIORef $! (if learnt then 0 else -1)
   return (XORClauseHandler a act (hash ls))
 
@@ -3192,7 +3209,7 @@ instance ConstraintHandler XORClauseHandler where
   toConstraintHandler = CHXORClause
 
   showConstraintHandler this = do
-    lits <- getElems (xorLits this)
+    lits <- getLits (xorLits this)
     return ("XOR " ++ show lits)
 
   constrAttach solver this this2 = do
@@ -3201,90 +3218,87 @@ instance ConstraintHandler XORClauseHandler where
     bcpCheckEmpty solver
 
     let a = xorLits this2
-    (lb,ub) <- getBounds a
-    assert (lb == 0) $ return ()
-    let size = ub-lb+1
+    size <- getLitArraySize a
 
     if size == 0 then do
       markBad solver
       return False
     else if size == 1 then do
-      lit0 <- unsafeRead a 0
+      lit0 <- readLitArray a 0
       assignBy solver lit0 this
     else do
       ref <- newIORef 1
       let f i = do
-            lit_i <- unsafeRead a i
+            lit_i <- readLitArray a i
             val_i <- litValue solver lit_i
             if val_i == lUndef then
               return True
             else do
               j <- readIORef ref
-              k <- findForWatch2 solver a j ub
+              k <- findForWatch2 solver a j (size - 1)
               case k of
                 -1 -> do
                   return False
                 _ -> do
-                  lit_k <- unsafeRead a k
-                  unsafeWrite a i lit_k
-                  unsafeWrite a k lit_i
+                  lit_k <- readLitArray a k
+                  writeLitArray a i lit_k
+                  writeLitArray a k lit_i
                   writeIORef ref $! (k+1)
                   return True
 
       b <- f 0
       if b then do
-        lit0 <- unsafeRead a 0
+        lit0 <- readLitArray a 0
         watchVar solver (litVar lit0) this
         b2 <- f 1
         if b2 then do
-          lit1 <- unsafeRead a 1
+          lit1 <- readLitArray a 1
           watchVar solver (litVar lit1) this
           return True
         else do -- UNIT
           -- We need to watch the most recently falsified literal
-          (i,_) <- liftM (maximumBy (comparing snd)) $ forM [1..ub] $ \l -> do
-            lit <- unsafeRead a l
+          (i,_) <- liftM (maximumBy (comparing snd)) $ forM [1..size-1] $ \l -> do
+            lit <- readLitArray a l
             lv <- litLevel solver lit
             return (l,lv)
-          lit1 <- unsafeRead a 1
-          liti <- unsafeRead a i
-          unsafeWrite a 1 liti
-          unsafeWrite a i lit1
+          lit1 <- readLitArray a 1
+          liti <- readLitArray a i
+          writeLitArray a 1 liti
+          writeLitArray a i lit1
           watchVar solver (litVar liti) this
           -- lit0 ⊕ y
           y <- do
             ref' <- newIORef False
-            forLoop 1 (<=ub) (+1) $ \j -> do
-              lit_j <- unsafeRead a j
+            forLoop 1 (<size) (+1) $ \j -> do
+              lit_j <- readLitArray a j
               val_j <- litValue solver lit_j
               modifyIORef' ref' (/= fromJust (unliftBool val_j))
             readIORef ref'
           assignBy solver (if y then litNot lit0 else lit0) this -- should always succeed
       else do
-        ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [lb..ub] $ \l -> do
-          lit <- unsafeRead a l
+        ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [0..size-1] $ \l -> do
+          lit <- readLitArray a l
           lv <- litLevel solver lit
           return (l,lv)
         forM_ (zip [0..] ls) $ \(i,lit) -> do
-          unsafeWrite a i lit
-        lit0 <- unsafeRead a 0
-        lit1 <- unsafeRead a 1
+          writeLitArray a i lit
+        lit0 <- readLitArray a 0
+        lit1 <- readLitArray a 1
         watchVar solver (litVar lit0) this
         watchVar solver (litVar lit1) this
         isSatisfied solver this2
 
   constrDetach solver this this2 = do
-    (lb,ub) <- getBounds (xorLits this2)
-    let size = ub-lb+1
+    size <- getLitArraySize (xorLits this2)
     when (size >= 2) $ do
-      lit0 <- unsafeRead (xorLits this2) 0
-      lit1 <- unsafeRead (xorLits this2) 1
+      lit0 <- readLitArray (xorLits this2) 0
+      lit1 <- readLitArray (xorLits this2) 1
       unwatchVar solver (litVar lit0) this
       unwatchVar solver (litVar lit1) this
 
   constrIsLocked solver this this2 = do
-    lit0 <- unsafeRead (xorLits this2) 0
-    lit1 <- unsafeRead (xorLits this2) 1
+    lit0 <- readLitArray (xorLits this2) 0
+    lit1 <- readLitArray (xorLits this2) 1
     b0 <- isReasonOf solver this lit0
     b1 <- isReasonOf solver this lit1
     return $ b0 || b1
@@ -3296,10 +3310,9 @@ instance ConstraintHandler XORClauseHandler where
     else do
       preprocess
 
-      !lit0 <- unsafeRead a 0
-      (!lb,!ub) <- getBounds a
-      assert (lb==0) $ return ()
-      i <- findForWatch2 solver a 2 ub
+      !lit0 <- readLitArray a 0
+      !size <- getLitArraySize (xorLits this2)
+      i <- findForWatch2 solver a 2 (size - 1)
       case i of
         -1 -> do
           when debugMode $ logIO solver $ do
@@ -3309,17 +3322,17 @@ instance ConstraintHandler XORClauseHandler where
           -- lit0 ⊕ y
           y <- do
             ref <- newIORef False
-            forLoop 1 (<=ub) (+1) $ \j -> do
-              lit_j <- unsafeRead a j
+            forLoop 1 (<size) (+1) $ \j -> do
+              lit_j <- readLitArray a j
               val_j <- litValue solver lit_j
               modifyIORef' ref (/= fromJust (unliftBool val_j))
             readIORef ref
           assignBy solver (if y then litNot lit0 else lit0) this
         _  -> do
-          !lit1 <- unsafeRead a 1
-          !liti <- unsafeRead a i
-          unsafeWrite a 1 liti
-          unsafeWrite a i lit1
+          !lit1 <- readLitArray a 1
+          !liti <- readLitArray a i
+          writeLitArray a 1 liti
+          writeLitArray a i lit1
           watchVar solver (litVar liti) this
           return True
 
@@ -3329,15 +3342,15 @@ instance ConstraintHandler XORClauseHandler where
 
       preprocess :: IO ()
       preprocess = do
-        !l0 <- unsafeRead a 0
-        !l1 <- unsafeRead a 1
+        !l0 <- readLitArray a 0
+        !l1 <- readLitArray a 1
         assert (litVar l0 == v || litVar l1 == v) $ return ()
         when (litVar l0 == v) $ do
-          unsafeWrite a 0 l1
-          unsafeWrite a 1 l0
+          writeLitArray a 0 l1
+          writeLitArray a 1 l0
 
   constrReasonOf solver this l = do
-    lits <- getElems (xorLits this)
+    lits <- getLits (xorLits this)
     xs <-
       case l of
         Nothing -> mapM f lits
@@ -3362,7 +3375,7 @@ instance ConstraintHandler XORClauseHandler where
   toPBLinAtLeast _ = error "XORClauseHandler does not support toPBLinAtLeast"
 
   isSatisfied solver this = do
-    lits <- getElems (xorLits this)
+    lits <- getLits (xorLits this)
     vals <- mapM (litValue solver) lits
     let f x y
           | x == lUndef || y == lUndef = lUndef
@@ -3370,7 +3383,7 @@ instance ConstraintHandler XORClauseHandler where
     return $ foldl' f lFalse vals == lTrue
 
   constrIsProtected _ this = do
-    size <- liftM rangeSize (getBounds (xorLits this))
+    size <- getLitArraySize (xorLits this)
     return $! size <= 2
 
   constrReadActivity this = readIORef (xorActivity this)
@@ -3379,7 +3392,7 @@ instance ConstraintHandler XORClauseHandler where
 
 basicAttachXORClauseHandler :: Solver -> XORClauseHandler -> IO Bool
 basicAttachXORClauseHandler solver this = do
-  lits <- getElems (xorLits this)
+  lits <- getLits (xorLits this)
   let constr = toConstraintHandler this
   case lits of
     [] -> do
