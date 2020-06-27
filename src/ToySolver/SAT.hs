@@ -812,6 +812,20 @@ instance NewVar IO Solver where
 -- |Pre-allocate internal buffer for @n@ variables.
 resizeVarCapacity :: Solver -> Int -> IO ()
 resizeVarCapacity solver n = do
+  Vec.resizeCapacity (svVarValue solver) n
+  Vec.resizeCapacity (svVarPolarity solver) n
+  Vec.resizeCapacity (svVarActivity solver) n
+  Vec.resizeCapacity (svVarTrailIndex solver) n
+  Vec.resizeCapacity (svVarLevel solver) n
+  Vec.resizeCapacity (svVarWatches solver) n
+  Vec.resizeCapacity (svVarOnUnassigned solver) n
+  Vec.resizeCapacity (svVarReason solver) n
+  Vec.resizeCapacity (svVarEMAScaled solver) n
+  Vec.resizeCapacity (svVarWhenAssigned solver) n
+  Vec.resizeCapacity (svVarParticipated solver) n
+  Vec.resizeCapacity (svVarReasoned solver) n
+  Vec.resizeCapacity (svLitWatches solver) (n*2)
+  Vec.resizeCapacity (svLitOccurList solver) (n*2)
   Vec.resizeCapacity (svSeen solver) n
   PQ.resizeHeapCapacity (svVarQueue solver) n
   PQ.resizeTableCapacity (svVarQueue solver) (n+1)
