@@ -11,6 +11,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 #endif
+#include "MachDeps.h"
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT
@@ -859,6 +860,10 @@ instance NewVar IO Solver where
   newVar :: Solver -> IO Var
   newVar solver = do
     n <- Vec.getSize (svVarData solver)
+#if SIZEOF_HSINT > 4
+    when (n == fromIntegral (maxBound :: PackedLit)) $ do
+      error "cannot allocate more variables"
+#endif
     let v = n + 1
     vd <- newVarData
     Vec.push (svVarData solver) vd
@@ -869,12 +874,20 @@ instance NewVar IO Solver where
   newVars :: Solver -> Int -> IO [Var]
   newVars solver n = do
     nv <- getNVars solver
+#if SIZEOF_HSINT > 4
+    when (nv + n > fromIntegral (maxBound :: PackedLit)) $ do
+      error "cannot allocate more variables"
+#endif
     resizeVarCapacity solver (nv+n)
     replicateM n (newVar solver)
 
   newVars_ :: Solver -> Int -> IO ()
   newVars_ solver n = do
     nv <- getNVars solver
+#if SIZEOF_HSINT > 4
+    when (nv + n > fromIntegral (maxBound :: PackedLit)) $ do
+      error "cannot allocate more variables"
+#endif
     resizeVarCapacity solver (nv+n)
     replicateM_ n (newVar solver)
 
