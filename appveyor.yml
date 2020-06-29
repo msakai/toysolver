@@ -7,11 +7,22 @@ cache:
 environment:
   global:
     STACK_ROOT: "c:\\sr"
-    STACK_YAML: "stack.yaml"
 
 platform:
 - x86
 - x64
+
+for:
+- matrix:
+    only:
+      - platform: x86
+  environment:
+    STACK_YAML: "stack-windows-i386.yaml"
+- matrix:
+    only:
+      - platform: x64
+  environment:
+    STACK_YAML: "stack.yaml"
 
 install:
 - if %PLATFORM%==x86 (curl -ostack.zip -L --insecure https://github.com/commercialhaskell/stack/releases/download/v2.1.3/stack-2.1.3-windows-i386.zip) else (curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-x86_64)
