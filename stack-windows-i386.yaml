@@ -41,6 +41,8 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
 extra-deps:
+# https://github.com/corsis/clock/issues/50
+- clock-0.8
 - multiset-0.3.4.1
 - queue-0.1.2
 - OptDir-0.0.3
