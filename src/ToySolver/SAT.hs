@@ -11,6 +11,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 #endif
+#include "MachDeps.h"
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT
@@ -170,23 +171,23 @@ import ToySolver.Internal.Util (revMapM)
   LitArray
 --------------------------------------------------------------------}
 
-newtype LitArray = LitArray (IOUArray Int Lit) deriving (Eq)
+newtype LitArray = LitArray (IOUArray Int PackedLit) deriving (Eq)
 
 newLitArray :: [Lit] -> IO LitArray
 newLitArray lits = do
   let size = length lits
-  liftM LitArray $ newListArray (0, size-1) lits
+  liftM LitArray $ newListArray (0, size-1) (map packLit lits)
 
 readLitArray :: LitArray -> Int -> IO Lit
-readLitArray (LitArray a) i = unsafeRead a i
--- readLitArray (LitArray a) i = readArray a i
+readLitArray (LitArray a) i = liftM unpackLit $ unsafeRead a i
+-- readLitArray (LitArray a) i = liftM unpackLit $ readArray a i
 
 writeLitArray :: LitArray -> Int -> Lit -> IO ()
-writeLitArray (LitArray a) i lit = unsafeWrite a i lit
--- writeLitArray (LitArray a) i lit = writeArray a i lit
+writeLitArray (LitArray a) i lit = unsafeWrite a i (packLit lit)
+-- writeLitArray (LitArray a) i lit = writeArray a i (packLit lit)
 
 getLits :: LitArray -> IO [Lit]
-getLits (LitArray a) = getElems a
+getLits (LitArray a) = liftM (map unpackLit) $ getElems a
 
 getLitArraySize :: LitArray -> IO Int
 getLitArraySize (LitArray a) = do
@@ -801,6 +802,10 @@ instance NewVar IO Solver where
   newVar :: Solver -> IO Var
   newVar solver = do
     n <- Vec.getSize (svVarValue solver)
+#if SIZEOF_HSINT > 4
+    when (n == fromIntegral (maxBound :: PackedLit)) $ do
+      error "cannot allocate more variables"
+#endif
     let v = n + 1
 
     Vec.push (svVarValue solver) (coerce lUndef)
@@ -828,12 +833,20 @@ instance NewVar IO Solver where
   newVars :: Solver -> Int -> IO [Var]
   newVars solver n = do
     nv <- getNVars solver
+#if SIZEOF_HSINT > 4
+    when (nv + n > fromIntegral (maxBound :: PackedLit)) $ do
+      error "cannot allocate more variables"
+#endif
     resizeVarCapacity solver (nv+n)
     replicateM n (newVar solver)
 
   newVars_ :: Solver -> Int -> IO ()
   newVars_ solver n = do
     nv <- getNVars solver
+#if SIZEOF_HSINT > 4
+    when (nv + n > fromIntegral (maxBound :: PackedLit)) $ do
+      error "cannot allocate more variables"
+#endif
     resizeVarCapacity solver (nv+n)
     replicateM_ n (newVar solver)
 

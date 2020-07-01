@@ -49,6 +49,10 @@ module ToySolver.SAT.Types
   , clauseToPBLinAtLeast
 
   -- * Packed Clause
+  , PackedVar
+  , PackedLit
+  , packLit
+  , unpackLit
   , PackedClause
   , packClause
   , unpackClause
@@ -111,6 +115,7 @@ import Control.Exception
 import Data.Array.Unboxed
 import Data.Ord
 import Data.List
+import Data.Int
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
@@ -240,13 +245,22 @@ evalClause m cl = any (evalLit m) cl
 clauseToPBLinAtLeast :: Clause -> PBLinAtLeast
 clauseToPBLinAtLeast xs = ([(1,l) | l <- xs], 1)
 
-type PackedClause = VU.Vector Lit
+type PackedVar = PackedLit
+type PackedLit = Int32
+
+packLit :: Lit -> PackedLit
+packLit = fromIntegral
+
+unpackLit :: PackedLit -> Lit
+unpackLit = fromIntegral
+
+type PackedClause = VU.Vector PackedLit
 
 packClause :: Clause -> PackedClause
-packClause = VU.fromList
+packClause = VU.fromList . map packLit
 
 unpackClause :: PackedClause -> Clause
-unpackClause = VU.toList
+unpackClause = map unpackLit . VU.toList
 
 type AtLeast = ([Lit], Int)
 type Exactly = ([Lit], Int)

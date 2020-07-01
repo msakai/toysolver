@@ -83,7 +83,7 @@ nae3sat2maxcut (n,cs)
       , NAE3SAT2MaxCutInfo
       )
   where
-    cs' = map (VG.fromList . IntSet.toList . IntSet.fromList . VG.toList) cs
+    cs' = map (VG.fromList . IntSet.toList . IntSet.fromList . SAT.unpackClause) cs
 
     bigM = clauseEdgesObjMax + 1
 
