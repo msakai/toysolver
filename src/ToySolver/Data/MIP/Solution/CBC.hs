@@ -1,5 +1,18 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Data.MIP.Solution.CBC
+-- Copyright   :  (c) Masahiro Sakai 2017
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Solution.CBC
   ( Solution (..)
   , parse
@@ -7,7 +20,10 @@ module ToySolver.Data.MIP.Solution.CBC
   ) where
 
 import Prelude hiding (readFile, writeFile)
+#if !MIN_VERSION_base(4,8,0)
 import Control.Applicative
+#endif
+
 import Control.Monad.Except
 import Data.Interned (intern)
 import Data.Map (Map)
@@ -29,7 +45,7 @@ parse' :: [TL.Text] -> Either String (MIP.Solution Scientific)
 parse' (l1:ls) = do
   (status, obj) <-
     case TL.break ('-'==) l1 of
-      (s1,s2) -> 
+      (s1,s2) ->
         case TL.stripPrefix "- objective value " s2 of
           Nothing -> throwError "fail to parse header"
           Just s3 -> do

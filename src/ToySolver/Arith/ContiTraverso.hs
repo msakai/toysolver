@@ -3,7 +3,7 @@
 -- Module      :  ToySolver.Arith.ContiTraverso
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
@@ -13,7 +13,7 @@
 -- * P. Conti and C. Traverso, "Buchberger algorithm and integer programming,"
 --   Applied Algebra, Algebraic Algorithms and Error-Correcting Codes,
 --   Lecture Notes in Computer Science Volume 539, 1991, pp 130-139
---   <http://dx.doi.org/10.1007/3-540-54522-0_102>
+--   <https://doi.org/10.1007/3-540-54522-0_102>
 --   <http://posso.dm.unipi.it/users/traverso/conti-traverso-ip.ps>
 --
 -- * IKEGAMI Daisuke, "数列と多項式の愛しい関係," 2011,
@@ -21,7 +21,7 @@
 --
 -- * 伊藤雅史, , 平林 隆一, "整数計画問題のための b-Gröbner 基底変換アルゴリズム,"
 --   <http://www.kurims.kyoto-u.ac.jp/~kyodo/kokyuroku/contents/pdf/1295-27.pdf>
--- 
+--
 --
 -----------------------------------------------------------------------------
 module ToySolver.Arith.ContiTraverso

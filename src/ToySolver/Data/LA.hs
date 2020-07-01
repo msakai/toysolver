@@ -1,16 +1,20 @@
-{-# LANGUAGE TypeFamilies, TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.LA
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeFamilies, TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- Some definition for Theory of Linear Arithmetics.
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.LA
   (
@@ -222,7 +226,7 @@ extract :: Num r => Var -> Expr r -> (r, Expr r)
 extract v (Expr m) = (IntMap.findWithDefault 0 v m, Expr (IntMap.delete v m))
 {-
 -- Alternative implementation which may be faster but allocte more memory
-extract v (Expr m) = 
+extract v (Expr m) =
   case IntMap.updateLookupWithKey (\_ _ -> Nothing) v m of
     (Nothing, _) -> (0, Expr m)
     (Just c, m2) -> (c, Expr m2)

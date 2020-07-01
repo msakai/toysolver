@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.SAT.Types (satTypesTestGroup) where
 
 import Control.Monad
@@ -157,22 +159,54 @@ case_cardinalityReduction = (sort lhs, rhs) @?= ([1,2,3,4,5],4)
   where
     (lhs, rhs) = SAT.cardinalityReduction ([(6,1),(5,2),(4,3),(3,4),(2,5),(1,6)], 17)
 
-case_pbSubsume_clause :: Assertion
-case_pbSubsume_clause = SAT.pbSubsume ([(1,1),(1,-3)],1) ([(1,1),(1,2),(1,-3),(1,4)],1) @?= True
+prop_pbLinUpperBound :: Property
+prop_pbLinUpperBound =
+  forAll (choose (0,10)) $ \nv ->
+    forAll (arbitraryPBLinSum nv) $ \s ->
+      forAll (arbitraryAssignment nv) $ \m ->
+        let ub = SAT.pbLinUpperBound s
+         in counterexample (show ub) $ SAT.evalPBLinSum m s <= ub
 
-case_pbSubsume_1 :: Assertion
-case_pbSubsume_1 = SAT.pbSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)],1) @?= True
+prop_pbLinLowerBound :: Property
+prop_pbLinLowerBound =
+  forAll (choose (0,10)) $ \nv ->
+    forAll (arbitraryPBLinSum nv) $ \s ->
+      forAll (arbitraryAssignment nv) $ \m ->
+        let lb = SAT.pbLinLowerBound s
+         in counterexample (show lb) $ lb <= SAT.evalPBLinSum m s
 
-case_pbSubsume_2 :: Assertion
-case_pbSubsume_2 = SAT.pbSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)],3) @?= False
+case_pbLinSubsume_clause :: Assertion
+case_pbLinSubsume_clause = SAT.pbLinSubsume ([(1,1),(1,-3)],1) ([(1,1),(1,2),(1,-3),(1,4)],1) @?= True
+
+case_pbLinSubsume_1 :: Assertion
+case_pbLinSubsume_1 = SAT.pbLinSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)],1) @?= True
+
+case_pbLinSubsume_2 :: Assertion
+case_pbLinSubsume_2 = SAT.pbLinSubsume ([(1,1),(1,2),(1,-3)],2) ([(1,1),(2,2),(1,-3),(1,4)],3) @?= False
 
 prop_removeNegationFromPBSum :: Property
 prop_removeNegationFromPBSum =
   forAll (choose (0,10)) $ \nv ->
     forAll (arbitraryPBSum nv) $ \s ->
       let s' = SAT.removeNegationFromPBSum s
-       in counterexample (show s') $ 
+       in counterexample (show s') $
             forAll (arbitraryAssignment nv) $ \m -> SAT.evalPBSum m s === SAT.evalPBSum m s'
+
+prop_pbUpperBound :: Property
+prop_pbUpperBound =
+  forAll (choose (0,10)) $ \nv ->
+    forAll (arbitraryPBSum nv) $ \s ->
+      forAll (arbitraryAssignment nv) $ \m ->
+        let ub = SAT.pbUpperBound s
+         in counterexample (show ub) $ SAT.evalPBSum m s <= ub
+
+prop_pbLowerBound :: Property
+prop_pbLowerBound =
+  forAll (choose (0,10)) $ \nv ->
+    forAll (arbitraryPBSum nv) $ \s ->
+      forAll (arbitraryAssignment nv) $ \m ->
+        let lb = SAT.pbLowerBound s
+         in counterexample (show lb) $ lb <= SAT.evalPBSum m s
 
 ------------------------------------------------------------------------
 

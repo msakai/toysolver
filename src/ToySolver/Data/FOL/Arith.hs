@@ -1,16 +1,18 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.FOL.Arith
 -- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- Arithmetic language (not limited to linear ones).
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.FOL.Arith
   (

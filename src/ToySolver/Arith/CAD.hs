@@ -1,13 +1,15 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.CAD
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns)
+-- Portability :  non-portable
 --
 -- References:
 --
@@ -18,7 +20,7 @@
 -- *  Arnab Bhattacharyya.
 --    Something you should know about: Quantifier Elimination (Part I)
 --    <http://cstheory.blogoverflow.com/2011/11/something-you-should-know-about-quantifier-elimination-part-i/>
--- 
+--
 -- *  Arnab Bhattacharyya.
 --    Something you should know about: Quantifier Elimination (Part II)
 --    <http://cstheory.blogoverflow.com/2012/02/something-you-should-know-about-quantifier-elimination-part-ii/>
@@ -240,7 +242,7 @@ buildSignConf
 buildSignConf ps = do
   ps2 <- collectPolynomials ps
   -- normalizePoly後の多項式の次数でソートしておく必要があるので注意
-  let ts = sortBy (comparing P.deg) ps2
+  let ts = sortOn P.deg ps2
   --trace ("collected polynomials: " ++ prettyShow ts) $ return ()
   foldM (flip refineSignConf) emptySignConf ts
 
@@ -270,7 +272,7 @@ normalizePoly
   :: forall v. (Ord v, Show v, PrettyVar v)
   => UPolynomial (Polynomial Rational v)
   -> M v (UPolynomial (Polynomial Rational v))
-normalizePoly p = liftM P.fromTerms $ go $ sortBy (flip (comparing (P.deg . snd))) $ P.terms p
+normalizePoly p = liftM P.fromTerms $ go $ sortOn (Down . P.deg . snd) $ P.terms p
   where
     go [] = return []
     go xxs@((c,d):xs) =
@@ -281,10 +283,10 @@ normalizePoly p = liftM P.fromTerms $ go $ sortBy (flip (comparing (P.deg . snd)
 refineSignConf
   :: forall v. (Show v, Ord v, PrettyVar v)
   => UPolynomial (Polynomial Rational v)
-  -> SignConf (Polynomial Rational v) 
+  -> SignConf (Polynomial Rational v)
   -> M v (SignConf (Polynomial Rational v))
 refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
-  where 
+  where
     extendPoint
       :: (Cell (Polynomial Rational v), Map (UPolynomial (Polynomial Rational v)) Sign)
       -> M v (Cell (Polynomial Rational v), Map (UPolynomial (Polynomial Rational v)) Sign)
@@ -292,7 +294,7 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
       s <- signAt pt m
       return (Point pt, Map.insert p s m)
     extendPoint x = return x
- 
+
     extendIntervals
       :: Int
       -> [(Cell (Polynomial Rational v), Map (UPolynomial (Polynomial Rational v)) Sign)]
@@ -315,7 +317,7 @@ refineSignConf p conf = liftM (extendIntervals 0) $ mapM extendPoint conf
                           , n1 + 1
                           )
     extendIntervals _ xs = xs
- 
+
     signAt :: Point (Polynomial Rational v) -> Map (UPolynomial (Polynomial Rational v)) Sign -> M v Sign
     signAt PosInf _ = signCoeff (P.lc P.nat p)
     signAt NegInf _ = do
@@ -350,7 +352,7 @@ emptyAssumption :: Assumption v
 emptyAssumption = (Map.empty, [])
 
 propagate :: Ord v => Assumption v -> Maybe (Assumption v)
-propagate = go 
+propagate = go
   where
     go a = do
       a' <- f a
@@ -368,7 +370,7 @@ propagateEq (m, gb)
       return (m, gb)
   where
     f :: Assumption v -> Maybe (Assumption v)
-    f (m, gb) = 
+    f (m, gb) =
       case Map.partition (Set.singleton Zero ==) m of
         (m0, m) -> do
           let gb' = GB.basis P.grevlex (Map.keys m0 ++ gb)
@@ -420,7 +422,7 @@ type Model v = Map v AReal
 findSample :: Ord v => Model v -> Cell (Polynomial Rational v) -> Maybe AReal
 findSample m cell =
   case evalCell m cell of
-    Point (RootOf p n) -> 
+    Point (RootOf p n) ->
       Just $ AReal.realRoots p !! n
     Interval lb ub ->
       case I.simplestRationalWithin (f lb I.<..< f ub) of
@@ -460,7 +462,7 @@ projectN
 projectN vs cs = do
   (cs', mt) <- projectN' vs (map f cs)
   return (map g cs', mt)
-  where  
+  where
     f (OrdRel lhs op rhs) = (lhs - rhs, h op)
       where
         h Le  = [Zero, Neg]
@@ -491,7 +493,7 @@ projectN' vs = loop (Set.toList vs)
     loop [] cs = return (cs, id)
     loop (v:vs) cs = do
       (cs2, cell:_) <- project' [(P.toUPolynomialOf p v, ss) | (p, ss) <- cs]
-      let mt1 m = 
+      let mt1 m =
             let Just val = findSample m cell
             in seq val $ Map.insert v val m
       (cs3, mt2) <- loop vs cs2
@@ -569,7 +571,7 @@ dumpSignConf
      (Ord v, PrettyVar v, Show v)
   => [(SignConf (Polynomial Rational v), Assumption v)]
   -> IO ()
-dumpSignConf x = 
+dumpSignConf x =
   forM_ x $ \(conf, as) -> do
     putStrLn "============"
     mapM_ putStrLn $ showSignConf conf

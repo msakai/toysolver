@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.SAT.PBO.BCD
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
@@ -20,9 +20,9 @@
 --   Improvements to Core-Guided binary search for MaxSAT,
 --   in Theory and Applications of Satisfiability Testing (SAT 2012),
 --   pp. 284-297.
---   <http://dx.doi.org/10.1007/978-3-642-31612-8_22>
+--   <https://doi.org/10.1007/978-3-642-31612-8_22>
 --   <http://ulir.ul.ie/handle/10344/2771>
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.SAT.PBO.BCD
   ( solve
@@ -124,7 +124,7 @@ solveWBO cxt solver = do
                 relaxed'    = relaxed `IntSet.union` torelax
                 cores'      = mergedCore : rest
             if null intersected then do
-              C.logMessage cxt $ printf "BCD: found a new core of size %d" (IntSet.size torelax)              
+              C.logMessage cxt $ printf "BCD: found a new core of size %d" (IntSet.size torelax)
             else do
               C.logMessage cxt $ printf "BCD: merging cores"
             SAT.addPBAtLeast solver (coreCostFun mergedCore) (coreLB mergedCore) -- redundant, but useful for direct search

@@ -54,7 +54,6 @@ import Control.Arrow ((***))
 import Control.Exception (assert)
 import Control.Monad
 import Data.Foldable (all, any)
-import Data.Function
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.List hiding (all, any, intersect)
@@ -165,7 +164,7 @@ condition_2_1_solve f g =
 
 -- | @'isRedundant' F@ tests whether /F/ contains redundant implicants.
 isRedundant :: Set IntSet -> Bool
-isRedundant = loop . sortBy (compare `on` IntSet.size) . Set.toList
+isRedundant = loop . sortOn IntSet.size . Set.toList
   where
     loop :: [IntSet] -> Bool
     loop [] = False
@@ -176,7 +175,7 @@ isIrredundant = not . isRedundant
 
 -- | Removes redundant implicants from a given DNF.
 deleteRedundancy :: Set IntSet -> Set IntSet
-deleteRedundancy = foldl' f Set.empty . sortBy (compare `on` IntSet.size) . Set.toList
+deleteRedundancy = foldl' f Set.empty . sortOn IntSet.size . Set.toList
   where
     f :: Set IntSet -> IntSet -> Set IntSet
     f xss ys =
@@ -291,7 +290,7 @@ solveSmall f g
 -- If they are indeed mutually dual it returns @Nothing@, otherwise
 -- it returns @Just cs@ such that {xi ↦ (if xi∈cs then True else False) | i∈{1…n}}
 -- is a solution of f(x1,…,xn) = g(¬x1,…,xn)).
--- 
+--
 -- Note that this function does not care about redundancy of DNFs.
 --
 -- Complexity: /O(n^o(log n))/ where @n = 'Set.size' f + 'Set.size' g@.

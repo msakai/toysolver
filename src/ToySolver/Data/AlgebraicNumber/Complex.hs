@@ -3,13 +3,13 @@
 -- Module      :  ToySolver.Data.AlgebraicNumber.Complex
 -- Copyright   :  (c) Masahiro Sakai 2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
 --
 -- Algebraic Numbers
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.AlgebraicNumber.Complex
     (
@@ -112,7 +112,7 @@ minimalPolynomial z@(x :+ y) =
 -- | Roots of the polynomial
 roots :: UPolynomial Rational -> [AComplex]
 roots f = do
-  let cs1 = [ (u, [Sign.Zero]), (v, [Sign.Zero]) ] 
+  let cs1 = [ (u, [Sign.Zero]), (v, [Sign.Zero]) ]
   (cs2, cells2) <- CAD.project' [(P.toUPolynomialOf p 0, ss) | (p,ss) <- cs1]
   (cs3, cells3) <- CAD.project' [(P.toUPolynomialOf p 1, ss) | (p,ss) <- cs2]
   guard $ and [Sign.signOf v `elem` ss | (p,ss) <- cs3, let v = P.eval (\_ -> undefined) p]
@@ -129,7 +129,7 @@ roots f = do
     -- f(x + yi) = u(x,y) + v(x,y)i
     f1 :: P.Polynomial Rational Int
     f1 = P.subst f (\X -> P.var 0 + P.var 1 * P.var 2)
-    f2 = P.toUPolynomialOf (P.reduce P.grevlex f1 [P.var 2 * P.var 2 + 1]) 2 
+    f2 = P.toUPolynomialOf (P.reduce P.grevlex f1 [P.var 2 * P.var 2 + 1]) 2
     u = P.coeff P.mone f2
     v = P.coeff (P.var X) f2
 

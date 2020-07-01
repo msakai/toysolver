@@ -1,14 +1,15 @@
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Internal.ProcessUtil
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (CPP)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Internal.ProcessUtil

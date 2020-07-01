@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.Simplex.Textbook.MIPSolver.Simple
@@ -8,10 +9,10 @@
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables)
+-- Portability :  non-portable
 --
 -- References:
--- 
+--
 -- * [Gomory1960]
 --   Ralph E. Gomory.
 --   An Algorithm for the Mixed Integer Problem, Technical Report
@@ -78,7 +79,7 @@ minimize :: RealFrac r => LA.Expr r -> [LA.Atom r] -> VarSet -> OptResult r
 minimize = optimize OptMin
 
 optimize :: RealFrac r => OptDir -> LA.Expr r -> [LA.Atom r] -> VarSet -> OptResult r
-optimize optdir obj cs ivs = 
+optimize optdir obj cs ivs =
   case mkInitialNode optdir obj cs ivs of
     Left err ->
       case err of
@@ -97,8 +98,8 @@ optimize optdir obj cs ivs =
             -}
             case OmegaTest.solveQFLIRAConj def (vars cs `IS.union` ivs) (map conv cs) ivs of
               Nothing -> OptUnsat
-              Just _ -> Unbounded        
-    Right (node0, ivs2) -> 
+              Just _ -> Unbounded
+    Right (node0, ivs2) ->
       case traverseBBTree optdir obj ivs2 node0 of
         Left ErrUnbounded -> error "shoud not happen"
         Left ErrUnsat -> OptUnsat
@@ -200,7 +201,7 @@ traverseBBTree optdir obj ivs node0 = loop [node0] Nothing
                    ]
               svs = [execState (addConstraint c) (ndSolver node) | c <- cs]
           in Just $ [node{ ndSolver = sv, ndDepth = ndDepth node + 1 } | Just sv <- map reopt svs]
-        
+
       where
         tbl :: Simplex.Tableau r
         tbl = ndTableau node
@@ -236,16 +237,16 @@ example1 = (optdir, obj, cs, ivs)
       ]
     ivs = IS.singleton 4
 
-test1 :: Bool
-test1 = result==expected
+_test1 :: Bool
+_test1 = result==expected
   where
     (optdir, obj, cs, ivs) = example1
     result, expected :: OptResult Rational
     result = optimize optdir obj cs ivs
     expected = Optimum (245/2) (IM.fromList [(1,40),(2,21/2),(3,39/2),(4,3)])
 
-test1' :: Bool
-test1' = result==expected
+_test1' :: Bool
+_test1' = result==expected
   where
     (optdir, obj, cs, ivs) = example1
     f OptMin = OptMax
@@ -271,8 +272,8 @@ example2 = (optdir, obj, cs, ivs)
       ]
     ivs = IS.fromList [1,2]
 
-test2 :: Bool
-test2 = result == expected
+_test2 :: Bool
+_test2 = result == expected
   where
     result, expected :: OptResult Rational
     result = optimize optdir obj cs ivs

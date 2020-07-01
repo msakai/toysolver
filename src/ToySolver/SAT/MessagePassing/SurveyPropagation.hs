@@ -1,14 +1,17 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, TypeFamilies #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.MessagePassing.SurveyPropagation
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns, TypeFamilies)
+-- Portability :  non-portable
 --
 -- References:
 --
@@ -68,6 +71,7 @@ import qualified Data.Vector.Unboxed.Mutable as VUM
 import Data.Vector.Generic ((!))
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VGM
+import Numeric
 import qualified Numeric.Log as L
 import qualified System.Random.MWC as Rand
 import qualified System.Random.MWC.Distributions as Rand
@@ -79,8 +83,8 @@ infixr 8 ^*
 (^*) :: Num a => L.Log a -> a -> L.Log a
 L.Exp a ^* b = L.Exp (a*b)
 
-comp :: (RealFloat a, L.Precise a) => L.Log a -> L.Log a
-comp (L.Exp a) = L.Exp $ L.log1p $ max (-1) $ negate (exp a)
+comp :: RealFloat a => L.Log a -> L.Log a
+comp (L.Exp a) = L.Exp $ log1p $ max (-1) $ negate (exp a)
 
 type ClauseIndex = Int
 type EdgeIndex   = Int
@@ -135,13 +139,13 @@ newSolver nv clauses = do
 
   -- Initialize all surveys with non-zero values.
   -- If we initialize to zero, following trivial solution exists:
-  -- 
+  --
   -- η_{a→i} = 0 for all i and a.
-  -- 
+  --
   -- Π^0_{i→a} = 1, Π^u_{i→a} = Π^s_{i→a} = 0 for all i and a,
-  -- 
+  --
   -- \^{Π}^{0}_i = 1, \^{Π}^{+}_i = \^{Π}^{-}_i = 0
-  -- 
+  --
   edgeSurvey  <- VGM.replicate num_edges 0.5
   edgeProbU   <- VGM.new num_edges
 
@@ -316,7 +320,7 @@ propagateMT solver nthreads = do
                      loop
            restore loop `catch` \(e :: SomeException) -> atomically (tryPutTMVar ex e >> return ())
          return (th, reqVar, respVar, respVar2)
- 
+
     let loop !i
           | Just l <- lim, i >= l = return False
           | otherwise = do

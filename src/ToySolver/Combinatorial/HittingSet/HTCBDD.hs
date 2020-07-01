@@ -1,14 +1,15 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Combinatorial.HittingSet.HTCBDD
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (DeriveDataTypeable)
+-- Portability :  non-portable
 --
 -- Wrapper for htcbdd command.
 --
@@ -31,7 +32,6 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Typeable
@@ -77,7 +77,7 @@ minimalHittingSets :: Options -> Set IntSet -> IO (Set IntSet)
 minimalHittingSets opt es = do
   withSystemTempFile "htcbdd-input.dat" $ \fname1 h1 -> do
     forM_ (Set.toList es) $ \e -> do
-      hPutStrLn h1 $ intercalate " " [show (encTable IntMap.! v) | v <- IntSet.toList e]
+      hPutStrLn h1 $ unwords [show (encTable IntMap.! v) | v <- IntSet.toList e]
     hClose h1
     withSystemTempFile "htcbdd-out.dat" $ \fname2 h2 -> do
       hClose h2

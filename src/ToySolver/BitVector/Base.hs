@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -8,9 +9,10 @@
 -- Module      :  ToySolver.BitVector.Base
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.BitVector.Base
@@ -45,7 +47,9 @@ import Prelude hiding (repeat)
 import Data.Bits
 import Data.Map (Map)
 import qualified Data.Map as Map
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Ord
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Vector as V
@@ -118,7 +122,7 @@ class (IsBV a, IsEqRel a (ComparisonResult a), Complement (ComparisonResult a)) 
   {-# MINIMAL (bvule | bvult), (bvsle | bvslt) #-}
 
 -- ------------------------------------------------------------------------
-    
+
 newtype BV = BV (VU.Vector Bool)
   deriving (Eq)
 
@@ -171,7 +175,7 @@ instance Bits BV where
 
   bit = error "bit is not implemented"
 
-  setBit x@(BV bs) i 
+  setBit x@(BV bs) i
     | 0 <= i && i < w = BV $ bs VG.// [(i,True)]
     | otherwise = x
     where
@@ -211,7 +215,7 @@ instance IsBV BV where
   bvor (BV bs1) (BV bs2)
     | VG.length bs1 /= VG.length bs2 = error "width mismatch"
     | otherwise = BV $ VG.zipWith (||) bs1 bs2
-  bvxor (BV bs1) (BV bs2) 
+  bvxor (BV bs1) (BV bs2)
     | VG.length bs1 /= VG.length bs2 = error "width mismatch"
     | otherwise = BV $ VG.zipWith (/=) bs1 bs2
 

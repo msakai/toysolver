@@ -1,6 +1,19 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Data.MIP.Solution.CPLEX
+-- Copyright   :  (c) Masahiro Sakai 2017
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Solution.CPLEX
   ( Solution (..)
   , parse
@@ -8,7 +21,9 @@ module ToySolver.Data.MIP.Solution.CPLEX
   ) where
 
 import Prelude hiding (readFile)
+#if !MIN_VERSION_base(4,8,0)
 import Control.Applicative
+#endif
 import Data.Default.Class
 import Data.Interned
 import Data.IntMap (IntMap)
@@ -25,7 +40,7 @@ import ToySolver.Data.MIP (Solution)
 import qualified ToySolver.Data.MIP.Base as MIP
 
 parseDoc :: XML.Document -> MIP.Solution Scientific
-parseDoc doc = 
+parseDoc doc =
   MIP.Solution
   { MIP.solStatus = status
   , MIP.solObjectiveValue = obj

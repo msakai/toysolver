@@ -1,14 +1,16 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.MIP2SMT
 -- Copyright   :  (c) Masahiro Sakai 2012-2014,2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (OverloadedStrings)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.MIP2SMT
@@ -23,7 +25,9 @@ import Data.Default.Class
 import Data.Interned
 import Data.Ord
 import Data.List
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Ratio
 import qualified Data.Set as Set
 import Data.Map (Map)
@@ -242,7 +246,7 @@ conditions opt q env mip = bnds ++ cs ++ ss
           case optLanguage opt of
             -- In SMT-LIB2 format, inequalities can be chained.
             -- For example, "(<= 0 x 10)" is equivalent to "(and (<= 0 x) (<= x 10))".
-            -- 
+            --
             -- Supported solvers: cvc4-1.1, yices-2.2.1, z3-4.3.0
             -- Unsupported solvers: z3-4.0
             SMTLIB2
@@ -254,10 +258,10 @@ conditions opt q env mip = bnds ++ cs ++ ss
                     lb2 = case lb of
                             MIP.NegInf -> []
                             MIP.PosInf -> error "should not happen"
-                            MIP.Finite x 
+                            MIP.Finite x
                               | isInt mip v -> [intNum opt (ceiling x)]
                               | otherwise -> [realNum opt x]
-                    ub2 = case ub of 
+                    ub2 = case ub of
                             MIP.NegInf -> error "should not happen"
                             MIP.PosInf -> []
                             MIP.Finite x
@@ -374,7 +378,7 @@ mip2smt opt mip =
                     ]
 
 encode :: Options -> T.Text -> T.Text
-encode opt s = 
+encode opt s =
   case optLanguage opt of
     SMTLIB2
      | T.all p s   -> s
@@ -398,16 +402,16 @@ isInt mip v = vt == MIP.IntegerVariable || vt == MIP.SemiIntegerVariable
 
 -- ------------------------------------------------------------------------
 
-testFile :: FilePath -> IO ()
-testFile fname = do
+_testFile :: FilePath -> IO ()
+_testFile fname = do
   mip <- MIP.readLPFile def fname
   TLIO.putStrLn $ B.toLazyText $ mip2smt def (fmap toRational mip)
 
-test :: IO ()
-test = TLIO.putStrLn $ B.toLazyText $ mip2smt def testdata
+_test :: IO ()
+_test = TLIO.putStrLn $ B.toLazyText $ mip2smt def _testdata
 
-testdata :: MIP.Problem Rational
-Right testdata = fmap (fmap toRational) $ MIP.parseLPString def "test" $ unlines
+_testdata :: MIP.Problem Rational
+Right _testdata = fmap (fmap toRational) $ MIP.parseLPString def "test" $ unlines
   [ "Maximize"
   , " obj: x1 + 2 x2 + 3 x3 + x4"
   , "Subject To"

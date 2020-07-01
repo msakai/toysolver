@@ -1,13 +1,14 @@
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Combinatorial.Knapsack.DPDense
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables)
+-- Portability :  non-portable
 --
 -- Simple 0-1 knapsack problem solver that uses DP.
 --

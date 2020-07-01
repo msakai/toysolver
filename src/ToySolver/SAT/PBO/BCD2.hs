@@ -1,14 +1,15 @@
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wall -fno-warn-unused-do-bind #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.PBO.BCD2
 -- Copyright   :  (c) Masahiro Sakai 2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable
 --
 -- Reference:
 --
@@ -21,9 +22,9 @@
 --   Improvements to Core-Guided binary search for MaxSAT,
 --   in Theory and Applications of Satisfiability Testing (SAT 2012),
 --   pp. 284-297.
---   <http://dx.doi.org/10.1007/978-3-642-31612-8_22>
+--   <https://doi.org/10.1007/978-3-642-31612-8_22>
 --   <http://ulir.ul.ie/handle/10344/2771>
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.SAT.PBO.BCD2
   ( Options (..)
@@ -107,7 +108,7 @@ solveWBO cxt solver opt = do
   nsatRef   <- newIORef 1
   nunsatRef <- newIORef 1
 
-  lastUBRef <- newIORef $ SAT.pbUpperBound obj
+  lastUBRef <- newIORef $ SAT.pbLinUpperBound obj
 
   coresRef <- newIORef []
   let getLB = do
@@ -137,7 +138,7 @@ solveWBO cxt solver opt = do
 
         fin <- atomically $ C.isFinished cxt
         unless fin $ do
-               
+
           when (optEnableHardening opt) $ do
             deductedWeight <- readIORef deductedWeightRef
             hardened <- readIORef hardenedRef
@@ -148,28 +149,28 @@ solveWBO cxt solver opt = do
               modifyIORef unrelaxedRef (`IntSet.difference` lits)
               modifyIORef relaxedRef   (`IntSet.difference` lits)
               modifyIORef hardenedRef  (`IntSet.union` lits)
-  
-          ub0 <- readIORef lastUBRef  
+
+          ub0 <- readIORef lastUBRef
           when (ub < ub0) $ do
             C.logMessage cxt $ printf "BCD2: updating upper bound: %d -> %d" ub0 ub
             SAT.addPBAtMost solver obj ub
             writeIORef lastUBRef ub
 
-          cores     <- readIORef coresRef                     
+          cores     <- readIORef coresRef
           unrelaxed <- readIORef unrelaxedRef
           relaxed   <- readIORef relaxedRef
           hardened  <- readIORef hardenedRef
           nsat   <- readIORef nsatRef
           nunsat <- readIORef nunsatRef
           C.logMessage cxt $ printf "BCD2: %d <= obj <= %d" lb ub
-          C.logMessage cxt $ printf "BCD2: #cores=%d, #unrelaxed=%d, #relaxed=%d, #hardened=%d" 
+          C.logMessage cxt $ printf "BCD2: #cores=%d, #unrelaxed=%d, #relaxed=%d, #hardened=%d"
             (length cores) (IntSet.size unrelaxed) (IntSet.size relaxed) (IntSet.size hardened)
           C.logMessage cxt $ printf "BCD2: #sat=%d #unsat=%d bias=%d/%d" nsat nunsat nunsat (nunsat + nsat)
 
           lastModel <- atomically $ C.getBestModel cxt
-          sels <- liftM IntMap.fromList $ forM cores $ \core -> do                            
+          sels <- liftM IntMap.fromList $ forM cores $ \core -> do
             coreLB <- getCoreLB core
-            let coreUB = SAT.pbUpperBound (coreCostFun core)
+            let coreUB = SAT.pbLinUpperBound (coreCostFun core)
             if coreUB < coreLB then do
               -- Note: we have detected unsatisfiability
               C.logMessage cxt $ printf "BCD2: coreLB (%d) exceeds coreUB (%d)" coreLB coreUB
@@ -239,7 +240,7 @@ solveWBO cxt solver opt = do
                 else
                   C.logMessage cxt $ printf "BCD2: relaxing %d and merging with %d cores into a new core of size %d: cost of the new core is >=%d"
                     (IntSet.size torelax) (length intersected) (IntSet.size mergedCoreLits) mergedCoreLB'
-                when (mergedCoreLB /= mergedCoreLB') $ 
+                when (mergedCoreLB /= mergedCoreLB') $
                   C.logMessage cxt $ printf "BCD2: refineLB: %d -> %d" mergedCoreLB mergedCoreLB'
                 updateLB lb mergedCore
                 loop

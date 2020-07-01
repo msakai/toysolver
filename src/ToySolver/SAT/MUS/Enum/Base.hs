@@ -1,3 +1,14 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.SAT.MUS.Enum.Base
+-- Copyright   :  (c) Masahiro Sakai 2016
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.SAT.MUS.Enum.Base
   ( module ToySolver.SAT.MUS.Types
   , Method (..)

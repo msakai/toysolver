@@ -1,19 +1,21 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.Polynomial.Factorization.Hensel.Internal
 -- Copyright   :  (c) Masahiro Sakai 2013-2014
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns)
+-- Portability :  non-portable
 --
 -- References:
 --
 -- * <http://www.math.kobe-u.ac.jp/Asir/ca.pdf>
--- 
+--
 -- * <http://www14.in.tum.de/konferenzen/Jass07/courses/1/Bulwahn/Buhlwahn_Paper.pdf>
 --
 -----------------------------------------------------------------------------
@@ -39,7 +41,7 @@ hensel f fs1 k
   | otherwise = assert precondition $ go 1 (map (P.mapCoeff Data.FiniteField.toInteger) fs1)
   where
     precondition =
-      P.mapCoeff fromInteger f == product fs1 && 
+      P.mapCoeff fromInteger f == product fs1 &&
       P.deg f == P.deg (product fs1)
 
     p :: Integer
@@ -52,7 +54,7 @@ hensel f fs1 k
 
     check :: Integer -> [UPolynomial Integer] -> Bool
     check k' fs =
-        and 
+        and
         [ P.mapCoeff (`mod` pk) f == P.mapCoeff (`mod` pk) (product fs)
         , fs1 == map (P.mapCoeff fromInteger) fs
         , and [P.deg fi1 == P.deg fik | (fi1, fik) <- zip fs1 fs]

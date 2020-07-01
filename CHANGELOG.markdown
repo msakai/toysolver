@@ -1,3 +1,30 @@
+0.6.0
+-----
+* new solvers:
+  * `ToySolver.SAT.SLS.ProbSAT` and sample `probsat` program
+* new converters:
+  * `ToySolver.Converter.NAESAT`
+  * `ToySolver.Converter.SAT2MaxCut`
+  * `ToySolver.Converter.SAT2MaxSAT`: SAT and 3-SAT to Max-2-SAT converter
+  * `ToySolver.Converter.QBF2IPC`
+  * `ToySolver.Converter.QUBO`: QUBO↔IsingModel converter
+* new file format API:
+  * merge `ToySolver.Text.MaxSAT`, `ToySolver.Text.GCNF`, `ToySolver.Text.QDimacs`, and `ToySolver.Text.CNF`
+    info `ToySolver.FileFormat` and `ToySolver.FileFormat.CNF`
+  * allow reading/writing `gzip`ped CNF/WCNF/GCNF/QDimacs/LP/MPS files
+* rename modules:
+  *	`ToySolver.Arith.Simplex2` to `ToySolver.Arith.Simplex`
+  * `ToySolver.Arith.MIPSolver2` to `ToySolver.Arith.MIP`
+  * `ToySolver.Data.Var` to `ToySolver.Data.IntVar`
+* `ToySolver.SAT`:
+  * add `cancel` function for interruption
+  * introduce `PackedClause` type
+* `ToySolver.Arith.Simplex`
+  * introduce `Config` data type
+  * implement bound tightening
+* switch from `System.Console.GetOpt` to `optparse-applicative`
+* stop supporting GHC-7.8
+
 0.5.0
 -----
 * new solvers:

@@ -1,14 +1,16 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB2SMP
 -- Copyright   :  (c) Masahiro Sakai 2013,2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (OverloadedStrings)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 module ToySolver.Converter.PB2SMP
@@ -17,7 +19,9 @@ module ToySolver.Converter.PB2SMP
 
 import Data.ByteString.Builder
 import Data.List
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import qualified Data.PseudoBoolean as PBFile
 
 pb2smp :: Bool -> PBFile.Formula -> Builder
@@ -38,7 +42,7 @@ pb2smp isUnix formula =
       if isUnix
       then byteString "#include \"simple.h\"\nvoid ufun()\n{\n\n"
       else mempty
-    
+
     footer =
       if isUnix
       then "\n}\n"

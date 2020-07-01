@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -- {-# LANGUAGE BangPatterns #-}
 -- {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
@@ -6,7 +7,7 @@
 -- Module      :  ToySolver.Text.CNF
 -- Copyright   :  (c) Masahiro Sakai 2016-2018
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  non-portable

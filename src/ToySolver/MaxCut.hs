@@ -71,6 +71,6 @@ eval :: Num a => Solution -> Problem a -> a
 eval sol prob = sum [w | (a,b,w) <- edges prob, sol ! a /= sol ! b]
 
 evalEdge :: Num a => Solution -> (Int,Int,a) -> a
-evalEdge sol (a,b,w) 
+evalEdge sol (a,b,w)
   | sol ! a /= sol ! b = w
   | otherwise = 0

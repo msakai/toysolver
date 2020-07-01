@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.HittingSets (hittingSetsTestGroup) where
 
 import Prelude hiding (all)
@@ -180,7 +181,7 @@ prop_FredmanKhachiyan1996_to_selfDuality =
               [ Set.map (IntSet.insert y) f
               , Set.map (IntSet.insert z) g
               , Set.singleton (IntSet.fromList [y,z])
-              ] 
+              ]
     in HittingSet.minimalHittingSets h == h
 
 case_FredmanKhachiyan1996_condition_1_1_solve_L :: Assertion
@@ -254,7 +255,7 @@ case_FredmanKhachiyan1996_checkDualityB = FredmanKhachiyan1996.checkDualityB f g
 propGenerateCNFAndDNF
   :: (IntSet -> (IntSet -> Bool) -> Set IntSet -> Set IntSet -> (Set IntSet, Set IntSet))
   -> Property
-propGenerateCNFAndDNF impl = 
+propGenerateCNFAndDNF impl =
   forAll hyperGraph $ \g ->
     let vs = IntSet.unions $ Set.toList g
         f xs = any (\is -> not $ IntSet.null $ xs `IntSet.intersection` is) (Set.toList g)
@@ -267,8 +268,8 @@ propGenerateCNFAndDNF impl =
     in all (`isPrimeImplicantOf` f) (Set.toList dnf) &&
        all (`isPrimeImplicateOf` f) (Set.toList cnf)
 
-propMinimalHittingSetsMinimality :: (Set IntSet -> Set IntSet) -> Property
-propMinimalHittingSetsMinimality minimalHittingSets =
+_propMinimalHittingSetsMinimality :: (Set IntSet -> Set IntSet) -> Property
+_propMinimalHittingSetsMinimality minimalHittingSets =
   forAll hyperGraph $ \g ->
     forAll (elements (Set.toList (minimalHittingSets g))) $ \s ->
       if IntSet.null s then

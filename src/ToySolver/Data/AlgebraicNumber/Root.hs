@@ -1,20 +1,22 @@
-{-# LANGUAGE Rank2Types, ScopedTypeVariables #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.AlgebraicNumber.Root
 -- Copyright   :  (c) Masahiro Sakai 2012-2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (Rank2Types, ScopedTypeVariables)
+-- Portability :  non-portable
 --
 -- Manipulating polynomials for corresponding operations for algebraic numbers.
--- 
+--
 -- Reference:
 --
 -- * <http://www.dpmms.cam.ac.uk/~wtg10/galois.html>
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.AlgebraicNumber.Root where
 
@@ -94,7 +96,7 @@ lift2 f p1 p2 = findPoly f_a_b gbase
 -- findPoly P [P1..Pn] computes a non-zero polynomial Q such that Q[P] = 0 modulo {P1,…,Pn}.
 findPoly :: forall k. (Fractional k, Ord k) => Polynomial k Var -> [Polynomial k Var] -> UPolynomial k
 findPoly c ps = normalizePoly $ sum [P.constant coeff * (P.var X) ^ n | (n,coeff) <- zip [0..] coeffs]
-  where  
+  where
     vn :: Var
     vn = if Set.null vs then 0 else Set.findMax vs + 1
       where

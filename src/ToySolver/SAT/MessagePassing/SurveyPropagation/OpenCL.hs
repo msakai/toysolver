@@ -1,15 +1,18 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns, TypeFamilies)
+-- Portability :  non-portable
 --
 -- References:
 --
@@ -120,11 +123,7 @@ newSolver outputMessage context dev nv clauses = do
     forM_ (SAT.unpackClause c) $ \lit -> do
       e <- readIORef ref
       modifyIORef' ref (+1)
-#if MIN_VERSION_vector(0,11,0)
       VGM.modify varEdgesTmp ((e,lit>0,w) :) (abs lit - 1)
-#else
-      VGM.write varEdgesTmp (abs lit - 1) =<< liftM ((e,lit>0,w) :) (VGM.read varEdgesTmp (abs lit - 1))
-#endif
 
   varOffset <- VGM.new nv
   varLength <- VGM.new nv
@@ -147,13 +146,13 @@ newSolver outputMessage context dev nv clauses = do
 
   -- Initialize all surveys with non-zero values.
   -- If we initialize to zero, following trivial solution exists:
-  -- 
+  --
   -- η_{a→i} = 0 for all i and a.
-  -- 
+  --
   -- Π^0_{i→a} = 1, Π^u_{i→a} = Π^s_{i→a} = 0 for all i and a,
-  -- 
+  --
   -- \^{Π}^{0}_i = 1, \^{Π}^{+}_i = \^{Π}^{-}_i = 0
-  -- 
+  --
   edgeSurvey  <- VGM.replicate num_edges (L.Exp (log 0.5))
   edgeProbU   <- VGM.new num_edges
 
@@ -296,7 +295,7 @@ propagate solver = do
   forM_ infos $ \info -> do
     s <- clGetPlatformInfo platform info
     svOutputMessage solver $ show info ++ " = " ++ s
-  devname <- clGetDeviceName dev 
+  devname <- clGetDeviceName dev
   svOutputMessage solver $ "DEVICE = " ++ devname
 
   (maxComputeUnits :: Int) <- fromIntegral <$> clGetDeviceMaxComputeUnits dev
@@ -354,7 +353,7 @@ propagate solver = do
         VSM.unsafeWith vec $ \ptr -> do
           clEnqueueReadBuffer queue mem False
             0 (VSM.length vec * sizeOf (undefined :: a)) (castPtr ptr) []
-      
+
       readBufferToVector :: forall a. VSM.Storable a => CLMem -> VSM.IOVector a -> IO ()
       readBufferToVector mem vec = do
         VSM.unsafeWith vec $ \ptr -> do
@@ -407,14 +406,14 @@ propagate solver = do
   clSetKernelArgSto (svComputeVarProb solver) 4 var_edges
   clSetKernelArgSto (svComputeVarProb solver) 5 var_edges_weight
   clSetKernelArgSto (svComputeVarProb solver) 6 edge_survey
-  
+
   (group_max_delta_vec :: VSM.IOVector CFloat) <- VGM.new updateEdgeSurvey_num_groups
 
   let loop !i
         | Just l <- lim, i >= l = return (False,i)
         | otherwise = do
             _ <- clReleaseEvent =<< clEnqueueNDRangeKernel queue (svUpdateEdgeProb solver)
-                   [updateEdgeProb_global_size] [updateEdgeProb_local_size] []          
+                   [updateEdgeProb_global_size] [updateEdgeProb_local_size] []
             _ <- clReleaseEvent =<< clEnqueueNDRangeKernel queue (svUpdateEdgeSurvey solver)
                    [updateEdgeSurvey_global_size] [updateEdgeSurvey_local_size] []
             readBufferToVector group_max_delta group_max_delta_vec

@@ -3,10 +3,10 @@
 -- Module      :  ToySolver.SAT.MUS.Insertion
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable
+-- Portability :  portable
 --
 -- Minimal Unsatifiable Subset (MUS) Finder
 --

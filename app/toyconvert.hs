@@ -1,14 +1,15 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toyconvert
 -- Copyright   :  (c) Masahiro Sakai 2012-2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (CPP)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 
@@ -21,7 +22,9 @@ import Data.Char
 import Data.Default.Class
 import qualified Data.Foldable as F
 import Data.Maybe
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Scientific (Scientific)
 import qualified Data.Text.Lazy.Builder as TextBuilder
 import qualified Data.Text.Lazy.IO as TLIO
@@ -42,6 +45,7 @@ import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
 import qualified ToySolver.FileFormat as FF
+import qualified ToySolver.QUBO as QUBO
 import ToySolver.Version
 import ToySolver.Internal.Util (setEncodingChar8)
 
@@ -192,8 +196,8 @@ supportedFormatsDoc =
   PP.vsep
   [ PP.text "Supported formats:"
   , PP.indent 2 $ PP.vsep
-      [ PP.text "input:"  <+> (PP.align $ PP.fillSep $ map PP.text $ words ".cnf .wcnf .opb .wbo .gcnf .lp .mps")
-      , PP.text "output:" <+> (PP.align $ PP.fillSep $ map PP.text $ words ".cnf .wcnf .opb .wbo .lsp .lp .mps .smp .smt2 .ys")
+      [ PP.text "input:"  <+> (PP.align $ PP.fillSep $ map PP.text $ words ".cnf .wcnf .opb .wbo .gcnf .lp .mps .qubo")
+      , PP.text "output:" <+> (PP.align $ PP.fillSep $ map PP.text $ words ".cnf .wcnf .opb .wbo .lsp .lp .mps .smp .smt2 .ys .qubo")
       ]
   ]
 
@@ -219,6 +223,9 @@ readProblem o fname = do
       liftM (ProbWBO . fst . maxsat2wbo . fst . gcnf2maxsat) $ FF.readFile fname
     ".lp"   -> ProbMIP <$> MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
     ".mps"  -> ProbMIP <$> MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
+    ".qubo" -> do
+      (qubo :: QUBO.Problem Scientific) <- FF.readFile fname
+      return $ ProbOPB $ fst $ qubo2pb qubo
     ext ->
       error $ "unknown file extension: " ++ show ext
 
@@ -342,6 +349,9 @@ writeProblem o problem = do
             F.mapM_ (hSetEncoding h) enc
             TLIO.hPutStr h $ TextBuilder.toLazyText $
               MIP2SMT.mip2smt mip2smtOpt{ MIP2SMT.optLanguage = lang } (fmap toRational lp)
+        ".qubo" ->
+          case pb2qubo opb of
+            ((qubo, _th), _) -> FF.writeFile fname (fmap (fromInteger :: Integer -> Scientific) qubo)
         ext -> do
           error $ "unknown file extension: " ++ show ext
 

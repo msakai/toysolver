@@ -1,21 +1,23 @@
-{-# LANGUAGE ScopedTypeVariables, Rank2Types #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.MIP
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, Rank2Types)
+-- Portability :  non-portable
 --
 -- Naïve implementation of MIP solver based on Simplex module
--- 
+--
 -- Reference:
 --
 -- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
--- 
+--
 -- * Ralph E. Gomory.
 --   \"An Algorithm for the Mixed Integer Problem\", Technical Report
 --   RM-2597, 1960, The Rand Corporation, Santa Monica, CA.
@@ -25,12 +27,12 @@
 --   \"Outline of an algorithm for integer solutions to linear programs\".
 --   Bull. Amer. Math. Soc., Vol. 64, No. 5. (1958), pp. 275-278.
 --   <http://projecteuclid.org/euclid.bams/1183522679>
--- 
+--
 -- * R. C. Daniel and Martyn Jeffreys.
 --   \"Unboundedness in Integer and Discrete Programming L.P. Relaxations\"
 --   The Journal of the Operational Research Society, Vol. 30, No. 12. (1979)
 --   <http://www.jstor.org/stable/3009435>
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Arith.MIP
   (
@@ -303,7 +305,7 @@ branchAndBound solver rootLP update = do
                              else printf "%.2f%%" (fromRational (abs (dualBound - val) * 100 / abs val) :: Double)
                      return (p, g)
             d <- showValue solver dualBound
- 
+
             let range =
                   case dir of
                     OptMin -> p ++ " >= " ++ d

@@ -1,3 +1,14 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.SAT.Config
+-- Copyright   :  (c) Masahiro Sakai 2017
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.SAT.Config
   ( -- * Solver configulation
     Config (..)
@@ -33,7 +44,7 @@ data Config
     -- Negative value means computing default value from problem instance.
   , configLearntSizeInc :: !Double
     -- ^ The limit for learnt constraints is multiplied with this factor periodically. (default 1.1)
-    -- This must be @>1@.                     
+    -- This must be @>1@.
   , configCCMin :: !Int
     -- ^ Controls conflict constraint minimization (0=none, 1=local, 2=recursive)
   , configBranchingStrategy :: !BranchingStrategy
@@ -57,7 +68,7 @@ data Config
     -- Example from minisat+ paper:
     --
     -- * 4 x1 + 4 x2 + 4 x3 + 4 x4 + 2y1 + y2 + y3 ≥ 4
-    -- 
+    --
     -- would be split into
     --
     -- * x1 + x2 + x3 + x4 + ¬z ≥ 1 (clause part)
@@ -65,11 +76,11 @@ data Config
     -- * 2 y1 + y2 + y3 + 4 z ≥ 4 (PB part)
     --
     -- where z is a newly introduced variable, not present in any other constraint.
-    -- 
+    --
     -- Reference:
-    -- 
+    --
     -- * N . Eéen and N. Sörensson. Translating Pseudo-Boolean Constraints into SAT. JSAT 2:1–26, 2006.
-    --                               
+    --
   , configCheckModel :: !Bool
   , configVarDecay :: !Double
     -- ^ Inverse of the variable activity decay factor. (default 1 / 0.95)

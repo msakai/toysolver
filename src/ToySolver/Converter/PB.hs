@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -28,7 +29,16 @@ module ToySolver.Converter.PB
 
   -- * Quadratization of PB problems
   , quadratizePB
+  , quadratizePB'
   , PBQuadratizeInfo
+
+  -- * Converting inequality constraints into equality constraints
+  , inequalitiesToEqualitiesPB
+  , PBInequalitiesToEqualitiesInfo
+
+  -- * Converting constraints into penalty terms in objective function
+  , unconstrainPB
+  , PBUnconstrainInfo
 
   -- * PB↔WBO conversion
   , pb2wbo
@@ -48,12 +58,17 @@ module ToySolver.Converter.PB
   , MaxSAT2WBOInfo
   , wbo2maxsat
   , WBO2MaxSATInfo
+
+  -- * PB→QUBO conversion
+  , pb2qubo'
+  , PB2QUBOInfo'
   ) where
 
 import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Array.IArray
+import Data.Bits
 import qualified Data.Foldable as F
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -181,17 +196,22 @@ linearizeWBO formula usePB = runST $ do
 
 -- | Quandratize PBO/PBS problem without introducing additional constraints.
 quadratizePB :: PBFile.Formula -> ((PBFile.Formula, Integer), PBQuadratizeInfo)
-quadratizePB formula = 
+quadratizePB formula = quadratizePB' (formula, SAT.pbUpperBound obj)
+  where
+    obj = fromMaybe [] $ PBFile.pbObjectiveFunction formula
+
+-- | Quandratize PBO/PBS problem without introducing additional constraints.
+quadratizePB' :: (PBFile.Formula, Integer) -> ((PBFile.Formula, Integer), PBQuadratizeInfo)
+quadratizePB' (formula, maxObj) =
   ( ( PBFile.Formula
-      { PBFile.pbObjectiveFunction = Just $
-          conv (fromMaybe [] (PBFile.pbObjectiveFunction formula)) ++ penalty
+      { PBFile.pbObjectiveFunction = Just $ conv obj ++ penalty
       , PBFile.pbConstraints = [(conv lhs, op, rhs) | (lhs,op,rhs) <- PBFile.pbConstraints formula]
       , PBFile.pbNumVars = nv2
       , PBFile.pbNumConstraints = PBFile.pbNumConstraints formula
       }
     , maxObj
     )
-  , TseitinInfo nv1 nv2 [(v, And [Atom l1, Atom l2]) | (v, (l1,l2)) <- prodDefs]
+  , PBQuadratizeInfo $ TseitinInfo nv1 nv2 [(v, And [Atom l1, Atom l2]) | (v, (l1,l2)) <- prodDefs]
   )
   where
     nv1 = PBFile.pbNumVars formula
@@ -199,7 +219,7 @@ quadratizePB formula =
 
     degGe3Terms :: Set IntSet
     degGe3Terms = collectDegGe3Terms formula
- 
+
     m :: Map IntSet (IntSet,IntSet)
     m = Product.decomposeToBinaryProducts degGe3Terms
 
@@ -227,16 +247,16 @@ quadratizePB formula =
       where
         f t
           | IntSet.size t == 1 = head (IntSet.toList t)
-          | otherwise = 
+          | otherwise =
                case Map.lookup t toV of
                  Nothing -> error "quadratizePB.prodDefs: should not happen"
                  Just v -> v
 
-    maxObj :: Integer
-    maxObj = sum [max 0 w | (w,_) <- fromMaybe [] (PBFile.pbObjectiveFunction formula)]
+    obj :: PBFile.Sum
+    obj = fromMaybe [] $ PBFile.pbObjectiveFunction formula
 
     minObj :: Integer
-    minObj = sum [min 0 w | (w,_) <- fromMaybe [] (PBFile.pbObjectiveFunction formula)]
+    minObj = SAT.pbLowerBound obj
 
     penalty :: PBFile.Sum
     penalty = [(w * w2, ts) | (w,ts) <- concat [p x y z | (z,(x,y)) <- prodDefs]]
@@ -244,7 +264,7 @@ quadratizePB formula =
         -- The penalty function P(x,y,z) = xy − 2xz − 2yz + 3z is such that
         -- P(x,y,z)=0 when z⇔xy and P(x,y,z)>0 when z⇎xy.
         p x y z = [(1,[x,y]), (-2,[x,z]), (-2,[y,z]), (3,[z])]
-        w2 = maxObj - minObj + 1
+        w2 = max (maxObj - minObj) 0 + 1
 
     conv :: PBFile.Sum -> PBFile.Sum
     conv s = [(w, f t) | (w,t) <- s]
@@ -270,7 +290,172 @@ collectDegGe3Terms formula = Set.fromList [t' | t <- terms, let t' = IntSet.from
            [lhs | (lhs,_,_) <- PBFile.pbConstraints formula]
     terms = [t | s <- sums, (_,t) <- s]
 
-type PBQuadratizeInfo = TseitinInfo
+newtype PBQuadratizeInfo = PBQuadratizeInfo TseitinInfo
+  deriving (Eq, Show)
+
+instance Transformer PBQuadratizeInfo where
+  type Source PBQuadratizeInfo = SAT.Model
+  type Target PBQuadratizeInfo = SAT.Model
+
+instance ForwardTransformer PBQuadratizeInfo where
+  transformForward (PBQuadratizeInfo info) = transformForward info
+
+instance BackwardTransformer PBQuadratizeInfo where
+  transformBackward (PBQuadratizeInfo info) = transformBackward info
+
+instance ObjValueTransformer PBQuadratizeInfo where
+  type SourceObjValue PBQuadratizeInfo = Integer
+  type TargetObjValue PBQuadratizeInfo = Integer
+
+instance ObjValueForwardTransformer PBQuadratizeInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer PBQuadratizeInfo where
+  transformObjValueBackward _ = id
+
+-- -----------------------------------------------------------------------------
+
+-- | Convert inequality constraints into equality constraints by introducing surpass variables.
+inequalitiesToEqualitiesPB :: PBFile.Formula -> (PBFile.Formula, PBInequalitiesToEqualitiesInfo)
+inequalitiesToEqualitiesPB formula = runST $ do
+  db <- newPBStore
+  SAT.newVars_ db (PBFile.pbNumVars formula)
+
+  defs <- liftM catMaybes $ forM (PBFile.pbConstraints formula) $ \constr -> do
+    case constr of
+      (lhs, PBFile.Eq, rhs) -> do
+        SAT.addPBNLExactly db lhs rhs
+        return Nothing
+      (lhs, PBFile.Ge, rhs) -> do
+        case asClause (lhs,rhs) of
+          Just clause -> do
+            SAT.addPBNLExactly db [(1, [- l | l <- clause])] 0
+            return Nothing
+          Nothing -> do
+            let maxSurpass = max (SAT.pbUpperBound lhs - rhs) 0
+                maxSurpassNBits = head [i | i <- [0..], maxSurpass < bit i]
+            vs <- SAT.newVars db maxSurpassNBits
+            SAT.addPBNLExactly db (lhs ++ [(-c,[x]) | (c,x) <- zip (iterate (*2) 1) vs]) rhs
+            if maxSurpassNBits > 0 then do
+              return $ Just (lhs, rhs, vs)
+            else
+              return Nothing
+
+  formula' <- getPBFormula db
+  return
+    ( formula'{ PBFile.pbObjectiveFunction = PBFile.pbObjectiveFunction formula }
+    , PBInequalitiesToEqualitiesInfo (PBFile.pbNumVars formula) (PBFile.pbNumVars formula') defs
+    )
+  where
+    asLinSum :: SAT.PBSum -> Maybe (SAT.PBLinSum, Integer)
+    asLinSum s = do
+      ret <- forM s $ \(c, ls) -> do
+        case ls of
+          [] -> return (Nothing, c)
+          [l] -> return (Just (c,l), 0)
+          _ -> mzero
+      return (catMaybes (map fst ret), sum (map snd ret))
+
+    asClause :: (SAT.PBSum, Integer) -> Maybe SAT.Clause
+    asClause (lhs, rhs) = do
+      (lhs', off) <- asLinSum lhs
+      let rhs' = rhs - off
+      case SAT.normalizePBLinAtLeast (lhs', rhs') of
+        (lhs'', 1) | all (\(c,_) -> c == 1) lhs'' -> return (map snd lhs'')
+        _ -> mzero
+
+data PBInequalitiesToEqualitiesInfo
+  = PBInequalitiesToEqualitiesInfo !Int !Int [(PBFile.Sum, Integer, [SAT.Var])]
+  deriving (Eq, Show)
+
+instance Transformer PBInequalitiesToEqualitiesInfo where
+  type Source PBInequalitiesToEqualitiesInfo = SAT.Model
+  type Target PBInequalitiesToEqualitiesInfo = SAT.Model
+
+instance ForwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformForward (PBInequalitiesToEqualitiesInfo _nv1 nv2 defs) m =
+    array (1, nv2) $ assocs m ++ [(v, testBit n i) | (lhs, rhs, vs) <- defs, let n = SAT.evalPBSum m lhs - rhs, (i,v) <- zip [0..] vs]
+
+instance BackwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformBackward (PBInequalitiesToEqualitiesInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
+
+instance ObjValueTransformer PBInequalitiesToEqualitiesInfo where
+  type SourceObjValue PBInequalitiesToEqualitiesInfo = Integer
+  type TargetObjValue PBInequalitiesToEqualitiesInfo = Integer
+
+instance ObjValueForwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer PBInequalitiesToEqualitiesInfo where
+  transformObjValueBackward _ = id
+
+-- -----------------------------------------------------------------------------
+
+unconstrainPB :: PBFile.Formula -> ((PBFile.Formula, Integer), PBUnconstrainInfo)
+unconstrainPB formula = (unconstrainPB' formula', PBUnconstrainInfo info)
+  where
+    (formula', info) = inequalitiesToEqualitiesPB formula
+
+newtype PBUnconstrainInfo = PBUnconstrainInfo PBInequalitiesToEqualitiesInfo
+  deriving (Eq, Show)
+
+instance Transformer PBUnconstrainInfo where
+  -- type Source PBUnconstrainInfo = Source PBInequalitiesToEqualitiesInfo
+  type Source PBUnconstrainInfo = SAT.Model
+  -- type Target PBUnconstrainInfo = Target PBInequalitiesToEqualitiesInfo
+  type Target PBUnconstrainInfo = SAT.Model
+
+instance ForwardTransformer PBUnconstrainInfo where
+  transformForward (PBUnconstrainInfo info) = transformForward info
+
+instance BackwardTransformer PBUnconstrainInfo where
+  transformBackward (PBUnconstrainInfo info) = transformBackward info
+
+instance ObjValueTransformer PBUnconstrainInfo where
+  -- type SourceObjValue PBUnconstrainInfo = SourceObjValue PBInequalitiesToEqualitiesInfo
+  type SourceObjValue PBUnconstrainInfo = Integer
+  -- type TargetObjValue PBUnconstrainInfo = TargetObjValue PBInequalitiesToEqualitiesInfo
+  type TargetObjValue PBUnconstrainInfo = Integer
+
+instance ObjValueForwardTransformer PBUnconstrainInfo where
+  transformObjValueForward (PBUnconstrainInfo info) = transformObjValueForward info
+
+instance ObjValueBackwardTransformer PBUnconstrainInfo where
+  transformObjValueBackward (PBUnconstrainInfo info) = transformObjValueBackward info
+
+unconstrainPB' :: PBFile.Formula -> (PBFile.Formula, Integer)
+unconstrainPB' formula =
+  ( formula
+    { PBFile.pbObjectiveFunction = Just $ obj1 ++ obj2
+    , PBFile.pbConstraints = []
+    , PBFile.pbNumConstraints = 0
+    }
+  , obj1ub
+  )
+  where
+    obj1 = fromMaybe [] (PBFile.pbObjectiveFunction formula)
+    obj1ub = SAT.pbUpperBound obj1
+    obj1lb = SAT.pbLowerBound obj1
+    p = obj1ub - obj1lb + 1
+    obj2 = [(p*c, IntSet.toList ls) | (ls, c) <- Map.toList obj2', c /= 0]
+    obj2' = Map.unionsWith (+) [sq ((-rhs, []) : lhs) | (lhs, PBFile.Eq, rhs) <- PBFile.pbConstraints formula]
+    sq ts = Map.fromListWith (+) $ do
+              (c1,ls1) <- ts
+              (c2,ls2) <- ts
+              let ls3 = IntSet.fromList ls1 `IntSet.union` IntSet.fromList ls2
+              guard $ not $ isFalse ls3
+              return (ls3, c1*c2)
+    isFalse ls = not $ IntSet.null $ ls `IntSet.intersection` IntSet.map negate ls
+
+-- -----------------------------------------------------------------------------
+
+pb2qubo' :: PBFile.Formula -> ((PBFile.Formula, Integer), PB2QUBOInfo')
+pb2qubo' formula = ((formula2, th2), ComposedTransformer info1 info2)
+  where
+    ((formula1, th1), info1) = unconstrainPB formula
+    ((formula2, th2), info2) = quadratizePB' (formula1, th1)
+
+type PB2QUBOInfo' = ComposedTransformer PBUnconstrainInfo PBQuadratizeInfo
 
 -- -----------------------------------------------------------------------------
 
@@ -301,7 +486,7 @@ wbo2pb :: PBFile.SoftFormula -> (PBFile.Formula, WBO2PBInfo)
 wbo2pb wbo = runST $ do
   let nv = PBFile.wboNumVars wbo
   db <- newPBStore
-  (obj, defs) <- addWBO db wbo 
+  (obj, defs) <- addWBO db wbo
   formula <- getPBFormula db
   return
     ( formula{ PBFile.pbObjectiveFunction = Just obj }
@@ -327,29 +512,47 @@ addWBO db wbo = do
   SAT.newVars_ db $ PBFile.wboNumVars wbo
 
   objRef <- newMutVar []
+  objOffsetRef <- newMutVar 0
   defsRef <- newMutVar []
+  trueLitRef <- newMutVar SAT.litUndef
+
   forM_ (PBFile.wboConstraints wbo) $ \(cost, constr@(lhs,op,rhs)) -> do
     case cost of
       Nothing -> do
         case op of
           PBFile.Ge -> SAT.addPBNLAtLeast db lhs rhs
           PBFile.Eq -> SAT.addPBNLExactly db lhs rhs
+        trueLit <- readMutVar trueLitRef
+        when (trueLit == SAT.litUndef) $ do
+          case detectTrueLit constr of
+            Nothing -> return ()
+            Just l -> writeMutVar trueLitRef l
       Just w -> do
         case op of
           PBFile.Ge -> do
             case lhs of
-              [(1,ls)] | rhs == 1 -> do
+              [(c,ls)] | c > 0 && (rhs + c - 1) `div` c == 1 -> do
+                -- c ∧L ≥ rhs ⇔ ∧L ≥ ⌈rhs / c⌉
                 -- ∧L ≥ 1 ⇔ ∧L
                 -- obj += w * (1 - ∧L)
-                modifyMutVar objRef (\obj -> (w,[]) : (-w,ls) : obj)
-              [(-1,ls)] | rhs == 0 -> do
-                -- -1*∧L ≥ 0 ⇔ (1 - ∧L) ≥ 1 ⇔ ￢∧L
+                unless (null ls) $ do
+                  modifyMutVar objRef (\obj -> (-w,ls) : obj)
+                  modifyMutVar objOffsetRef (+ w)
+              [(c,ls)] | c < 0 && (rhs + abs c - 1) `div` abs c + 1 == 1 -> do
+                -- c*∧L ≥ rhs ⇔ -1*∧L ≥ ⌈rhs / abs c⌉ ⇔ (1 - ∧L) ≥ ⌈rhs / abs c⌉ + 1 ⇔ ¬∧L ≥ ⌈rhs / abs c⌉ + 1
+                -- ￢∧L ≥ 1 ⇔ ￢∧L
                 -- obj += w * ∧L
-                modifyMutVar objRef ((w,ls) :)
-              _ | and [c==1 && length ls == 1 | (c,ls) <- lhs] && rhs == 1 -> do
+                if null ls then do
+                  modifyMutVar objOffsetRef (+ w)
+                else do
+                  modifyMutVar objRef ((w,ls) :)
+              _ | rhs > 0 && and [c >= rhs && length ls == 1 | (c,ls) <- lhs] -> do
                 -- ∑L ≥ 1 ⇔ ∨L ⇔ ￢∧￢L
                 -- obj += w * ∧￢L
-                modifyMutVar objRef ((w, [-l | (_,[l]) <- lhs]) :)
+                if null lhs then do
+                  modifyMutVar objOffsetRef (+ w)
+                else do
+                  modifyMutVar objRef ((w, [-l | (_,[l]) <- lhs]) :)
               _ -> do
                 sel <- SAT.newVar db
                 SAT.addPBNLAtLeastSoft db sel lhs rhs
@@ -360,6 +563,20 @@ addWBO db wbo = do
             SAT.addPBNLExactlySoft db sel lhs rhs
             modifyMutVar objRef ((w,[-sel]) :)
             modifyMutVar defsRef ((sel,constr) :)
+
+  offset <- readMutVar objOffsetRef
+  when (offset /= 0) $ do
+    l <- readMutVar trueLitRef
+    trueLit <-
+      if l /= SAT.litUndef then
+        return l
+      else do
+        v <- SAT.newVar db
+        SAT.addClause db [v]
+        modifyMutVar defsRef ((v, ([], PBFile.Ge, 0)) :)
+        return v
+    modifyMutVar objRef ((offset,[trueLit]) :)
+
   obj <- liftM reverse $ readMutVar objRef
   defs <- liftM reverse $ readMutVar defsRef
 
@@ -368,6 +585,22 @@ addWBO db wbo = do
     Just t -> SAT.addPBNLAtMost db obj (t - 1)
 
   return (obj, defs)
+
+
+detectTrueLit :: PBFile.Constraint -> Maybe SAT.Lit
+detectTrueLit (lhs, op, rhs) =
+  case op of
+    PBFile.Ge -> f lhs rhs
+    PBFile.Eq -> f lhs rhs `mplus` f [(- c, ls) | (c,ls) <- lhs] (- rhs)
+  where
+    f [(c, [l])] rhs
+      | c > 0 && (rhs + c - 1) `div` c == 1 =
+          -- c l ≥ rhs ↔ l ≥ ⌈rhs / c⌉
+          return l
+      | c < 0 && rhs `div` c == 0 =
+          -- c l ≥ rhs ↔ l ≤ ⌊rhs / c⌋
+          return (- l)
+    f _ _ = Nothing
 
 -- -----------------------------------------------------------------------------
 
@@ -394,7 +627,7 @@ type PB2SATInfo = TseitinInfo
 -- * if M ⊨ φ then f(M) ⊨ ψ
 --
 -- * if M ⊨ ψ then g(M) ⊨ φ
--- 
+--
 pb2sat :: PBFile.Formula -> (CNF.CNF, PB2SATInfo)
 pb2sat formula = runST $ do
   db <- newCNFStore

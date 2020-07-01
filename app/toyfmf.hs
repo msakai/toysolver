@@ -1,14 +1,16 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE CPP, TypeFamilies, OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toyfmf
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (CPP, TypeFamilies, OverloadedStrings)
+-- Portability :  non-portable
 --
 -- A toy-level model finder
 --
@@ -19,7 +21,9 @@ import Control.Monad
 import Data.Interned (intern, unintern)
 import Data.IORef
 import qualified Data.Map as Map
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Ratio
 import Data.String
 import qualified Data.Text as Text
@@ -104,7 +108,7 @@ translateFormula = TPTP.foldF neg quant binop eq rel
     quant q vs phi = foldr q' (translateFormula phi) [fromString v | TPTP.V v <- vs]
       where
         q' =
-          case q of 
+          case q of
             TPTP.All    -> MF.Forall
             TPTP.Exists -> MF.Exists
     binop phi op psi = op' phi' psi'

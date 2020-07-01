@@ -31,7 +31,7 @@ main = Criterion.Main.defaultMain $
       ++
       [ bench "SubsetSum" $ nf (\lhs -> SubsetSum.maxSubsetSum (V.fromList (map fromIntegral lhs)) (fromIntegral rhs)) problem2_items ]
   | rhs <- [50 :: Int, 100, 200, 500, 1000, 2000, 5000, 10000, 50000, 100000, 150000]
-  ] ++ 
+  ] ++
   [ bgroup ("problem3_" ++ show rhs) $
       [ bench "KnapsackBB" $ nf (\lhs -> KnapsackBB.solve [(fromIntegral x, fromIntegral x) | x <- lhs] (fromIntegral rhs)) problem3_items
       , bench "SubsetSum" $ nf (\lhs -> SubsetSum.maxSubsetSum (V.fromList (map fromIntegral lhs)) (fromIntegral rhs)) problem3_items

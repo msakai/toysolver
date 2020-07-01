@@ -125,7 +125,7 @@ case_pd_example_5_7 = do
 ------------------------------------------------------------------------
 
 case_lp_example_5_7_twoPhaseSimplex :: Assertion
-case_lp_example_5_7_twoPhaseSimplex = do  
+case_lp_example_5_7_twoPhaseSimplex = do
   ret @?= LP.Optimum
   oval @?= -11
   assertBool "invalid tableau" (isValidTableau tbl)
@@ -135,7 +135,7 @@ case_lp_example_5_7_twoPhaseSimplex = do
     oval :: Rational
     ((ret,tbl,oval),result) = flip runState (LP.emptySolver IntSet.empty) $ do
       _ <- LP.newVar
-      x1 <- LP.newVar 
+      x1 <- LP.newVar
       x2 <- LP.newVar
       x3 <- LP.newVar
       LP.addConstraint (LA.fromTerms [(-1,x1),(-2,x2),(-3,x3)] .<=. LA.constant (-5))
@@ -148,7 +148,7 @@ case_lp_example_5_7_twoPhaseSimplex = do
       return (ret,tbl,oval)
 
 case_lp_example_5_7_primalDualSimplex :: Assertion
-case_lp_example_5_7_primalDualSimplex = do  
+case_lp_example_5_7_primalDualSimplex = do
   ret @?= LP.Optimum
   oval @?= -11
   assertBool "invalid tableau" (isValidTableau tbl)
@@ -158,7 +158,7 @@ case_lp_example_5_7_primalDualSimplex = do
     oval :: Rational
     ((ret,tbl,oval),result) = flip runState (LP.emptySolver IntSet.empty) $ do
       _ <- LP.newVar
-      x1 <- LP.newVar 
+      x1 <- LP.newVar
       x2 <- LP.newVar
       x3 <- LP.newVar
       LP.addConstraint (LA.fromTerms [(-1,x1),(-2,x2),(-3,x3)] .<=. LA.constant (-5))

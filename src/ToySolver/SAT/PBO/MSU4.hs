@@ -4,18 +4,18 @@
 -- Module      :  ToySolver.SAT.PBO.MSU4
 -- Copyright   :  (c) Masahiro Sakai 2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
--- 
+--
 -- Reference:
 --
 -- * João P. Marques-Silva and Jordi Planes.
 --   Algorithms for Maximum Satisfiability using Unsatisfiable Cores.
 --   In Design, Automation and Test in Europe, 2008 (DATE '08). March 2008.
 --   pp. 408-413, doi:10.1109/date.2008.4484715.
---   <http://dx.doi.org/10.1109/date.2008.4484715>
+--   <https://doi.org/10.1109/date.2008.4484715>
 --   <http://eprints.soton.ac.uk/265000/1/jpms-date08.pdf>
 --   <http://www.csi.ucd.ie/staff/jpms/talks/talksite/jpms-date08.pdf>
 --
@@ -50,7 +50,7 @@ solveWBO cxt solver = do
 
     weights :: SAT.LitMap Integer
     weights = IM.fromList sels
- 
+
     loop :: (SAT.LitSet, SAT.LitSet) -> Integer -> IO ()
     loop (unrelaxed, relaxed) lb = do
       ret <- SAT.solveWith solver (IS.toList unrelaxed)
@@ -70,7 +70,7 @@ solveWBO cxt solver = do
           SAT.addClause solver [-l | l <- core] -- optional constraint but sometimes useful
           let min_weight = minimum [weights IM.! l | l <- IS.toList ls]
               lb' = lb + min_weight
-          C.logMessage cxt $ printf "MSU4: found a core: size = %d, minimal weight = %d" (length core) min_weight 
+          C.logMessage cxt $ printf "MSU4: found a core: size = %d, minimal weight = %d" (length core) min_weight
           C.addLowerBound cxt lb'
           cont (unrelaxed `IS.difference` ls, relaxed `IS.union` ls) lb'
 

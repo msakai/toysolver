@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -51,7 +52,7 @@ sat2ksat k cnf = runST $ do
                 SAT.addClause db (toList (lits1 |> (-v)))
                 modifySTRef' defsRef (|> (v, toList lits1))
                 loop (v <| lits2)
-    loop $ Seq.fromList $ SAT.unpackClause clause    
+    loop $ Seq.fromList $ SAT.unpackClause clause
   cnf2 <- getCNFFormula db
   defs <- readSTRef defsRef
   return (cnf2, SAT2KSATInfo nv1 (CNF.cnfNumVars cnf2) defs)

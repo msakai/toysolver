@@ -1,4 +1,17 @@
-{-# LANGUAGE CPP, TemplateHaskell #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Version
+-- Copyright   :  (c) Masahiro Sakai 2013
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Version
   ( version
   , packageVersions
@@ -38,6 +51,12 @@ packageVersions = sort $ tail
 #endif
 #ifdef VERSION_bytestring_builder
   , ("bytestring-builder", VERSION_bytestring_builder)
+#endif
+#ifdef VERSION_bytestring_encoding
+  , ("bytestring-encoding", VERSION_bytestring_encoding)
+#endif
+#ifdef VERSION_case_insensitive
+  , ("case-insensitive", VERSION_case_insensitive)
 #endif
 #ifdef VERSION_clock
   , ("clock", VERSION_clock)
@@ -117,8 +136,8 @@ packageVersions = sort $ tail
 #ifdef VERSION_parsec
   , ("parsec", VERSION_parsec)
 #endif
-#ifdef VERSION_prettyclass
-  , ("prettyclass", VERSION_prettyclass)
+#ifdef VERSION_pretty
+  , ("pretty", VERSION_pretty)
 #endif
 #ifdef VERSION_primes
   , ("primes", VERSION_primes)
@@ -182,6 +201,9 @@ packageVersions = sort $ tail
 #endif
 #ifdef VERSION_xml_conduit
   , ("xml-conduit", VERSION_xml_conduit)
+#endif
+#ifdef VERSION_zlib
+  , ("zlib", VERSION_zlib)
 #endif
   ]
 

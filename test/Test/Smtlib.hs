@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.Smtlib (smtlibTestGroup) where
 
 import Control.DeepSeq
@@ -70,7 +71,7 @@ prop_parseGenResponse = forAll arbitrary $ \a ->
   parse parseGenResponse "" (showSL a) == Right a
 
 prop_parseGetInfoResponse :: Property
-prop_parseGetInfoResponse = forAll arbitrary $ \a ->  
+prop_parseGetInfoResponse = forAll arbitrary $ \a ->
   parse parseGetInfoResponse "" ("(" ++ joinA a ++ ")") == Right a
 
 prop_parseCheckSatResponse :: Property
@@ -133,7 +134,7 @@ prop_parse_string_literal =
     parse str "" s == Right s
 
 case_parseSexprKeyword_bug :: Assertion
-case_parseSexprKeyword_bug = 
+case_parseSexprKeyword_bug =
   parse parseSexprKeyword "" ":keyword" @?= Right (SexprKeyword ":keyword")
 
 case_parseHexadecimal :: Assertion
@@ -253,7 +254,7 @@ instance Arbitrary Term where
     , TermQualIdentifier <$> arbitrary
     ] ++ (if n > 0 then gs else [])
     where
-      gs = 
+      gs =
         [ liftM2 TermQualIdentifierT arbitrary (listOf1' arbitrary')
         , liftM2 TermLet (listOf1' arbitrary) arbitrary'
         , liftM2 TermForall (listOf1' arbitrary) arbitrary'
@@ -273,7 +274,7 @@ instance Arbitrary AttrValue where
     , AttrValueSymbol <$> genSymbol
     , AttrValueSexpr <$> listOf' arbitrary
     ]
-   
+
 instance Arbitrary Attribute where
   arbitrary = oneof
     [ Attribute <$> genKeyword
@@ -285,7 +286,7 @@ instance Arbitrary QualIdentifier where
     [ QIdentifier <$> arbitrary
     , liftM2 QIdentifierAs arbitrary arbitrary
     ]
-   
+
 instance Arbitrary Index where
   arbitrary = oneof
     [ IndexNumeral <$> abs <$> arbitrary
@@ -319,7 +320,7 @@ instance Arbitrary SpecConstant where
         s <- listOf $ arbitrary `suchThat` p
         return $ "\"" ++ concat [if c == '"' then "\"\"" else [c] | c <- s] ++ "\""
     ]
-   
+
 instance Arbitrary Sexpr where
   arbitrary = sized $ \n -> oneof $
     [ SexprSpecConstant <$> arbitrary
@@ -529,7 +530,7 @@ instance Arbitrary CmdResponse where
     ]
 
 instance Arbitrary GenResponse where
-  arbitrary = oneof 
+  arbitrary = oneof
     [ return Unsupported
     , return Success
     , Error <$> genStringLiteral
@@ -544,7 +545,7 @@ instance Arbitrary ReasonUnknown where
 instance Arbitrary CheckSatResponse where
   arbitrary = elements [Sat, Unsat, Unknown]
 
-instance Arbitrary InfoResponse where 
+instance Arbitrary InfoResponse where
   arbitrary = oneof
     [ ResponseErrorBehavior <$> arbitrary
     , ResponseName <$> genStringLiteral

@@ -1,5 +1,18 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Data.MIP.Solution.GLPK
+-- Copyright   :  (c) Masahiro Sakai 2017
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Data.MIP.Solution.GLPK
   ( Solution (..)
   , parse
@@ -7,7 +20,9 @@ module ToySolver.Data.MIP.Solution.GLPK
   ) where
 
 import Prelude hiding (readFile, writeFile)
+#if !MIN_VERSION_base(4,8,0)
 import Control.Applicative
+#endif
 import Data.Interned (intern)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -29,7 +44,7 @@ parse' ls =
         (vs, _) ->
           let status = Map.findWithDefault MIP.StatusUnknown (headers Map.! "Status") statusTable
               objstr = headers Map.! "Objective"
-              objstr2 = 
+              objstr2 =
                 case T.findIndex ('='==) objstr of
                   Nothing -> objstr
                   Just idx -> T.drop (idx+1) objstr

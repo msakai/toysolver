@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
@@ -57,7 +58,7 @@ import Data.Array.Unboxed
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
-import Data.List
+import Data.List hiding (insert)
 import Data.Monoid
 import Data.Set (Set)
 import qualified Data.Set as Set

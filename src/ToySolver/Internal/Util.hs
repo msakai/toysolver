@@ -4,13 +4,13 @@
 -- Module      :  ToySolver.Internal.Util
 -- Copyright   :  (c) Masahiro Sakai 2011-2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
 --
 -- Some utility functions.
--- 
+--
 -----------------------------------------------------------------------------
 
 module ToySolver.Internal.Util where
@@ -37,7 +37,7 @@ isInteger :: RealFrac a => a -> Bool
 isInteger x = fromInteger (round x) == x
 
 -- | fractional part
--- 
+--
 -- @
 --   fracPart x = x - fromInteger (floor x)
 -- @
@@ -55,7 +55,7 @@ showRationalAsFiniteDecimal x = do
   let a :: Integer
       (a,b) = properFraction (abs x)
       s1 = if x < 0 then "-" else ""
-      s2 = show a      
+      s2 = show a
   s3 <- if b == 0
         then return ".0"
         else liftM ("." ++ ) $ loop Set.empty b

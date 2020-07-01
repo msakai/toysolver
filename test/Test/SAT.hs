@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.SAT (satTestGroup) where
 
 import Control.Monad
@@ -369,7 +371,7 @@ case_getVarFixed = do
   ret @?= lUndef
 
   SAT.addClause solver [-x1]
-  
+
   ret <- SAT.getVarFixed solver x1
   ret @?= lFalse
 

@@ -1,11 +1,12 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB2IP
 -- Copyright   :  (c) Masahiro Sakai 2011-2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
 -- Portability :  non-portable
@@ -20,7 +21,7 @@ module ToySolver.Converter.PB2IP
   , sat2ip
   , SAT2IPInfo
   , maxsat2ip
-  , MaxSAT2IPInfo  
+  , MaxSAT2IPInfo
   ) where
 
 import Data.Array.IArray
@@ -126,7 +127,7 @@ wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) relax
       }
 
     topConstr :: [MIP.Constraint Integer]
-    topConstr = 
+    topConstr =
      case PBFile.wboTopCost formula of
        Nothing -> []
        Just t ->
@@ -166,7 +167,7 @@ splitConst e = (e2, c)
   where
     e2 = MIP.Expr [t | t@(MIP.Term _ (_:_)) <- MIP.terms e]
     c = sum [c | MIP.Term c [] <- MIP.terms e]
-             
+
 relaxGE :: MIP.Var -> (MIP.Expr Integer, Integer) -> (MIP.Expr Integer, Integer)
 relaxGE v (lhs, rhs) = (MIP.constExpr (rhs - lhs_lb) * MIP.varExpr v + lhs, rhs)
   where

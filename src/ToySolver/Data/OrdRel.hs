@@ -1,16 +1,20 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.OrdRel
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances)
+-- Portability :  non-portable
 --
 -- Ordering relations
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.OrdRel
   (
@@ -47,7 +51,7 @@ data RelOp = Lt | Le | Ge | Gt | Eql | NEq
 -- | flipping relational operator
 --
 -- @rel (flipOp op) a b@ is equivalent to @rel op b a@
-flipOp :: RelOp -> RelOp 
+flipOp :: RelOp -> RelOp
 flipOp Le = Ge
 flipOp Ge = Le
 flipOp Lt = Gt

@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.SAT.Utils where
 
 import Control.Monad
@@ -41,7 +43,7 @@ arbitraryAssignment nv = do
   bs <- replicateM nv arbitrary
   return $ array (1,nv) (zip [1..] bs)
 
--- ---------------------------------------------------------------------  
+-- ---------------------------------------------------------------------
 
 arbitraryCNF :: Gen CNF.CNF
 arbitraryCNF = do
@@ -268,7 +270,7 @@ arbitraryXOR = do
   nv <- choose (0,10)
   nc <- choose (0,50)
   cs <- replicateM nc $ do
-    len <- choose (0,10)    
+    len <- choose (0,10)
     lhs <-
       if nv == 0 then
         return []
@@ -541,8 +543,3 @@ instance Arbitrary PBFile.Op where
   arbitrary = arbitraryBoundedEnum
 
 -- ---------------------------------------------------------------------
-
-#if !MIN_VERSION_QuickCheck(2,8,0)
-sublistOf :: [a] -> Gen [a]
-sublistOf xs = filterM (\_ -> choose (False, True)) xs
-#endif

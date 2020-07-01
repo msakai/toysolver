@@ -1,14 +1,17 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Combinatorial.SubsetSum
 -- Copyright   :  (c) Masahiro Sakai 2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns, FlexibleContexts)
+-- Portability :  non-portable
 --
 -- References
 --
@@ -84,11 +87,11 @@ normalizeWeightsToPositive (w,c)
                   VM.write w2 i wi
                   loop (i+1) offset
       offset <- loop 0 (0::Integer)
-      w2 <- VG.unsafeFreeze w2
+      w2' <- VG.unsafeFreeze w2
       let trans (obj, bs) = (obj + offset, bs2)
             where
               bs2 = VU.imap (\i bi -> if w ! i < 0 then not bi else bi) bs
-      return (w2, c - offset, trans)
+      return (w2', c - offset, trans)
 
 normalize2
   :: (V.Vector Weight, Weight)
@@ -143,7 +146,7 @@ maxSubsetSum' !w !c
       maxSubsetSumInteger' w c wsum
   where
     wsum = VG.sum w
-                      
+
 maxSubsetSumInteger' :: V.Vector Weight -> Weight -> Weight -> (Weight, VU.Vector Bool)
 maxSubsetSumInteger' w !c wsum = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ runST $ do
   objRef <- newSTRef (wbar, [], [])
@@ -327,7 +330,7 @@ maxSubsetSumInt' w !c wsum = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ 
       case IntMap.splitLookup k m of
         (lo, Nothing, _) -> lo
         (lo, Just v, _) -> IntMap.insert k v lo
-                           
+
 -- | Minimize Σ_{i=1}^n wi xi subject to Σ_{i=1}^n wi x≥ l and xi ∈ {0,1}.
 --
 -- Note: 0 (resp. 1) is identified with False (resp. True) in the assignment.
@@ -346,7 +349,7 @@ minSubsetSum w l =
     Just (obj, bs) -> Just (wsum - obj, VG.map not bs)
   where
     wsum = VG.sum w
-  
+
 {-
 minimize Σ wi xi = Σ wi (1 - ¬xi) = Σ wi - (Σ wi ¬xi)
 subject to Σ wi xi ≥ n
@@ -364,7 +367,7 @@ subject to Σ wi ¬xi ≤ (Σ wi) - n
 --
 -- Note that this is different from usual definition of the subset sum problem,
 -- as this definition allows all xi to be zero.
--- 
+--
 -- Note: 0 (resp. 1) is identified with False (resp. True) in the assignment.
 subsetSum
   :: VG.Vector v Weight

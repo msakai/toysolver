@@ -1,21 +1,22 @@
 Name:		toysolver
-Version:	0.6.0
+Version:	0.7.0
 License:	BSD3
 License-File:	COPYING
 Author:		Masahiro Sakai (masahiro.sakai@gmail.com)
 Maintainer:	masahiro.sakai@gmail.com
 Category:	Algorithms, Optimisation, Optimization, Theorem Provers, Constraints, Logic, Formal Methods, SMT
-Cabal-Version:	>= 1.18
+Cabal-Version:	1.18
 Synopsis:	Assorted decision procedures for SAT, SMT, Max-SAT, PB, MIP, etc
-Description:	Toy-level implementation of some decision procedures
+Description:	Toy-level solver implementation of various problems including SAT, SMT, Max-SAT, PBS/PBO (Pseudo Boolean Satisfaction/Optimization), MILP (Mixed Integer Linear Programming) and non-linear real arithmetic.
 Homepage:	https://github.com/msakai/toysolver/
 Bug-Reports:	https://github.com/msakai/toysolver/issues
 Tested-With:
-   GHC ==7.10.3
    GHC ==8.0.2
    GHC ==8.2.2
-   GHC ==8.4.3
+   GHC ==8.4.4
    GHC ==8.6.4
+   GHC ==8.8.1
+   GHC ==8.10.1
 Extra-Source-Files:
    README.md
    CHANGELOG.markdown
@@ -28,12 +29,15 @@ Extra-Source-Files:
    misc/build_bdist_maxsat_evaluation.sh
    misc/build_bdist_pb_evaluation.sh
    misc/build_bdist_qbf_evaluation.sh
+   misc/build_bdist_smtcomp.sh
    misc/maxsat/toysat/README.md
    misc/maxsat/toysat/toysat
    misc/maxsat/toysat_ls/README.md
    misc/maxsat/toysat_ls/toysat_ls
    misc/pb/README.md
    misc/qbf/README.md
+   misc/smtcomp/bin/starexec_run_default
+   misc/smtcomp/starexec_description.txt
    src/ToySolver/Data/Polyhedron.hs
    src/ToySolver/SAT/MessagePassing/SurveyPropagation/sp.cl
    samples/gcnf/*.cnf
@@ -108,11 +112,6 @@ Flag BuildMiscPrograms
   Default: False
   Manual: True
 
-Flag LogicTPTP045
-  Description: use logic-TPTP >=0.4.5.0
-  Manual: False
-  Default: True
-
 Flag UseHaskeline
   Description: use haskeline package
   Manual: True
@@ -161,9 +160,9 @@ Library
   Exposed: True
   Hs-source-dirs: src
   Build-Depends:
-     array >=0.4.0.0,
-     -- GHC >=7.10
-     base >=4.8 && <5,
+     array >=0.5,
+     -- GHC >=8.0
+     base >=4.9 && <5,
      bytestring >=0.9.2.1 && <0.11,
      bytestring-builder,
      bytestring-encoding,
@@ -172,12 +171,13 @@ Library
      -- IntMap.mergeWithKey and IntMap.toDescList require containers >=0.5.0
      containers >=0.5.0,
      data-default-class,
-     data-interval >=1.0.1 && <1.4.0,
+     data-interval >=2.0.1 && <2.1.0,
      deepseq,
      extended-reals >=0.1 && <1.0,
      filepath,
      finite-field >=0.9.0 && <1.0.0,
-     hashable >=1.1.2.5 && <1.3.0.0,
+     -- hashUsing is available on hashable >=1.2
+     hashable >=1.2 && <1.4.0.0,
      hashtables,
      heaps,
      intern >=0.9.1.2 && <1.0.0.0,
@@ -190,7 +190,7 @@ Library
      mwc-random >=0.13.1 && <0.15,
      OptDir,
      lattices,
-     megaparsec >=4 && <8,
+     megaparsec >=5 && <9,
      -- Text.PrettyPrint.HughesPJClass is available on pretty >=1.1.2.0
      pretty >=1.1.2.0 && <1.2,
      primes,
@@ -205,11 +205,13 @@ Library
      template-haskell,
      temporary >=1.2,
      text >=1.1.0.0,
+     -- defaultTimeLocale is available on time >=1.5.0
      time >=1.5.0,
      transformers >=0.2,
      transformers-compat >=0.3,
      unordered-containers >=0.2.3 && <0.3.0,
-     vector,
+     -- imapM and modify are available on vector >=0.11.0
+     vector >=0.11,
      vector-space >=0.8.6,
      xml-conduit
   if flag(WithZlib)
@@ -224,23 +226,25 @@ Library
   Other-Extensions:
      BangPatterns
      CPP
+     ConstraintKinds
      DeriveDataTypeable
      ExistentialQuantification
      FlexibleContexts
      FlexibleInstances
      FunctionalDependencies
+     GADTs
      GeneralizedNewtypeDeriving
+     InstanceSigs
      MultiParamTypeClasses
      OverloadedStrings
-     RecursiveDo
      Rank2Types
+     RecursiveDo
      ScopedTypeVariables
      TemplateHaskell
      TypeFamilies
      TypeOperators
      TypeSynonymInstances
-     -- commented out because cabal-1.16 does not understand InstanceSigs extension
-     -- InstanceSigs
+     UndecidableInstances
   if impl(ghc)
      Other-Extensions:
         MagicHash
@@ -349,6 +353,7 @@ Library
      ToySolver.Data.Polynomial.Factorization.SquareFree
      ToySolver.Data.Polynomial.Factorization.Zassenhaus
      ToySolver.Data.Polynomial.GroebnerBasis
+     ToySolver.Data.Polynomial.Interpolation.Hermite
      ToySolver.Data.Polynomial.Interpolation.Lagrange
      ToySolver.FileFormat
      ToySolver.FileFormat.Base
@@ -368,6 +373,7 @@ Library
      ToySolver.SAT.Encoder.Cardinality
      ToySolver.SAT.Encoder.Cardinality.Internal.Naive
      ToySolver.SAT.Encoder.Cardinality.Internal.ParallelCounter
+     ToySolver.SAT.Encoder.Cardinality.Internal.Totalizer
      ToySolver.SAT.Encoder.Tseitin
      ToySolver.SAT.ExistentialQuantification
      ToySolver.SAT.MessagePassing.SurveyPropagation
@@ -429,7 +435,8 @@ Executable toysolver
     data-default-class,
     filepath,
     OptDir,
-    optparse-applicative,
+    -- maybeReader is available on optparse-applicative >=0.13.0.0
+    optparse-applicative >=0.13,
     pseudo-boolean,
     scientific,
     toysolver
@@ -458,7 +465,8 @@ Executable toysat
     filepath,
     megaparsec,
     mwc-random,
-    optparse-applicative,
+    -- maybeReader is available on optparse-applicative >=0.13.0.0
+    optparse-applicative >=0.13,
     process >=1.1.0.2,
     pseudo-boolean,
     scientific,
@@ -504,7 +512,7 @@ Executable toysmt
     transformers,
     transformers-compat
   if flag(UseHaskeline)
-    Build-Depends: haskeline >=0.7 && <0.8
+    Build-Depends: haskeline >=0.7 && <0.9
     CPP-Options: "-DUSE_HASKELINE_PACKAGE"
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
@@ -543,23 +551,10 @@ Executable toyfmf
       base,
       containers,
       intern,
-      -- logic-TPTP <=0.4.3 has build error on ghc <7.9 and transformers >=0.5.1.
-      -- https://github.com/DanielSchuessler/logic-TPTP/pull/4
-      logic-TPTP >=0.4.4.0,
+      logic-TPTP >=0.4.6.0 && <0.5,
       optparse-applicative,
       text,
       toysolver
-    -- logic-TPTP <=0.4.4.0 is not compatible with transformers-compat >=0.5
-    if impl(ghc <7.9)
-      if flag(LogicTPTP045)
-        Build-Depends:
-          logic-TPTP >=0.4.5.0
-      else
-        Build-Depends:
-          transformers-compat <0.5
-    -- for Semigroup (as superclass of) Monoid Proposal
-    if impl(ghc >=8.4)
-      Build-Depends: logic-TPTP >=0.4.6.0
   Default-Language: Haskell2010
   Other-Extensions: CPP
   GHC-Options: -rtsopts
@@ -965,7 +960,9 @@ Test-suite TestSuite
     OptDir,
     parsec >=3.1.2 && <4,
     pseudo-boolean,
-    QuickCheck >=2.5 && <3,
+    -- sublistOf is available on QuickCheck >=2.8
+    QuickCheck >=2.8 && <3,
+    scientific,
     tasty >=0.10.1,
     tasty-hunit >=0.9 && <0.11,
     tasty-quickcheck >=0.8 && <0.11,
@@ -978,7 +975,10 @@ Test-suite TestSuite
     vector,
     vector-space
   Default-Language: Haskell2010
-  Other-Extensions: TemplateHaskell, ScopedTypeVariables
+  Other-Extensions:
+    DataKinds
+    ScopedTypeVariables
+    TemplateHaskell
   if flag(TestCBC)
     CPP-Options: "-DTEST_CBC"
   if flag(TestCPLEX)

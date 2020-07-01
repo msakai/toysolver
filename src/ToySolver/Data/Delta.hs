@@ -1,23 +1,24 @@
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.Delta
 -- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeFamilies)
+-- Portability :  non-portable
 --
 -- Augmenting number types with infinitesimal parameter δ.
 --
 -- Reference:
--- 
+--
 -- * Bruno Dutertre and Leonardo de Moura,
 --   \"/A Fast Linear-Arithmetic Solver for DPLL(T)/\",
 --   Computer Aided Verification In Computer Aided Verification, Vol. 4144
 --   (2006), pp. 81-94.
---   <http://dx.doi.org/10.1007/11817963_11>
+--   <https://doi.org/10.1007/11817963_11>
 --   <http://yices.csl.sri.com/cav06.pdf>
 --
 -----------------------------------------------------------------------------
@@ -95,7 +96,7 @@ instance (Fractional r, Ord r) => Fractional (Delta r) where
   Delta r1 k1 / Delta r2 k2 =
     error "Fractional{ToySolver.Data.Delta.Delta}.(/): divisor must be a proper real"
   fromRational x = Delta (fromRational x) 0
-  
+
 instance (Real r, Eq r) => Real (Delta r) where
   toRational (Delta r 0) = toRational r
   toRational (Delta r k) =

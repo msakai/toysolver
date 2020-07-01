@@ -1,14 +1,15 @@
-{-# LANGUAGE ScopedTypeVariables, CPP #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toyqbf
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
--- Portability :  non-portable (ScopedTypeVariables, CPP)
+-- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
 
@@ -18,7 +19,9 @@ import Control.Monad
 import Data.Char
 import qualified Data.IntSet as IntSet
 import Data.List
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Ord
 import Data.Version
 import Options.Applicative

@@ -1,4 +1,15 @@
 {-# OPTIONS_GHC -Wall #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.Arith.FourierMotzkin.FOL
+-- Copyright   :  (c) Masahiro Sakai 2013
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-----------------------------------------------------------------------------
 module ToySolver.Arith.FourierMotzkin.FOL
     ( solveFormula
     , eliminateQuantifiers
@@ -21,14 +32,14 @@ import ToySolver.Arith.FourierMotzkin.Base
 
 -- ---------------------------------------------------------------------------
 
--- | 
+-- |
 --
 -- * @'solveFormula' {x1,…,xm} φ@ returns @'Sat' M@ such that @M ⊧_LRA φ@ when such @M@ exists,
 --
 -- * returns @'Unsat'@ when such @M@ does not exists, and
 --
 -- * returns @'Unknown'@ when @φ@ is beyond LRA.
--- 
+--
 solveFormula :: VarSet -> FOL.Formula (FOL.Atom Rational) -> FOL.SatResult Rational
 solveFormula vs formula =
   case eliminateQuantifiers' formula of
@@ -41,9 +52,9 @@ solveFormula vs formula =
 -- | Eliminate quantifiers and returns equivalent quantifier-free formula.
 --
 -- @'eliminateQuantifiers' φ@ returns @(ψ, lift)@ such that:
--- 
+--
 -- * ψ is a quantifier-free formula and @LRA ⊢ ∀y1, …, yn. φ ↔ ψ@ where @{y1, …, yn} = FV(φ) ⊇ FV(ψ)@, and
--- 
+--
 -- * if @M ⊧_LRA ψ@ then @lift M ⊧_LRA φ@.
 --
 -- φ may or may not be a closed formula.

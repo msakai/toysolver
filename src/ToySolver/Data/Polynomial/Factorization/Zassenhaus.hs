@@ -1,14 +1,17 @@
-{-# LANGUAGE BangPatterns, ScopedTypeVariables, Rank2Types #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.Polynomial.Factorization.Zassenhaus
 -- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns, ScopedTypeVariables, Rank2Types)
+-- Portability :  non-portable
 --
 -- Factoriation of integer-coefficient polynomial using Zassenhaus algorithm.
 --

@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.Converter (converterTestGroup) where
 
 import Control.Monad
@@ -33,21 +35,21 @@ import Test.SAT.Utils
 prop_sat2naesat_forward :: Property
 prop_sat2naesat_forward = forAll arbitraryCNF $ \cnf ->
   let ret@(nae,info) = sat2naesat cnf
-   in counterexample (show ret) $ 
+   in counterexample (show ret) $
         forAllAssignments (CNF.cnfNumVars cnf) $ \m ->
           evalCNF m cnf === evalNAESAT (transformForward info m) nae
 
 prop_sat2naesat_backward :: Property
 prop_sat2naesat_backward = forAll arbitraryCNF $ \cnf ->
   let ret@(nae,info) = sat2naesat cnf
-   in counterexample (show ret) $ 
+   in counterexample (show ret) $
         forAllAssignments (fst nae) $ \m ->
           evalCNF (transformBackward info m) cnf === evalNAESAT m nae
 
 prop_naesat2sat_forward :: Property
 prop_naesat2sat_forward = forAll arbitraryNAESAT $ \nae ->
   let ret@(cnf,info) = naesat2sat nae
-   in counterexample (show ret) $ 
+   in counterexample (show ret) $
         forAllAssignments (fst nae) $ \m ->
           evalNAESAT m nae === evalCNF (transformForward info m) cnf
 
@@ -233,11 +235,19 @@ prop_wbo2pb = QM.monadicIO $ do
       cs2 = map f (PBFile.pbConstraints opb)
       pb = (PBFile.pbNumVars opb, obj, cs2)
 
+  QM.monitor $ counterexample (show wbo')
+  QM.monitor $ counterexample (show opb)
+
+  -- no constant terms in objective function
+  QM.assert $ all (\(_,ls) -> length ls > 0) obj
+
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
   method <- QM.pick arbitrary
   ret1 <- QM.run $ optimizeWBO solver1 method wbo
   ret2 <- QM.run $ optimizePBNLC solver2 method pb
+  QM.monitor $ counterexample (show ret1)
+  QM.monitor $ counterexample (show ret2)
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
     Nothing -> return ()
@@ -293,7 +303,7 @@ prop_quadratizePB =
                 Just o -> SAT.evalPBFormula (transformBackward info m) pb === Just o
                 Nothing -> property True
           ]
-  where        
+  where
     collectTerms :: PBFile.Formula -> Set IntSet
     collectTerms formula = Set.fromList [t' | t <- terms, let t' = IntSet.fromList t, IntSet.size t' >= 3]
       where
@@ -306,6 +316,43 @@ prop_quadratizePB =
       o <- SAT.evalPBFormula m pb
       guard $ o <= th
       return o
+
+prop_inequalitiesToEqualitiesPB :: Property
+prop_inequalitiesToEqualitiesPB = QM.monadicIO $ do
+  pb@(nv,cs) <- QM.pick arbitraryPBNLC
+  let f (PBRelGE,lhs,rhs) = ([(c,ls) | (c,ls) <- lhs], PBFile.Ge, rhs)
+      f (PBRelLE,lhs,rhs) = ([(-c,ls) | (c,ls) <- lhs], PBFile.Ge, -rhs)
+      f (PBRelEQ,lhs,rhs) = ([(c,ls) | (c,ls) <- lhs], PBFile.Eq, rhs)
+  let opb = PBFile.Formula
+            { PBFile.pbObjectiveFunction = Nothing
+            , PBFile.pbNumVars = nv
+            , PBFile.pbNumConstraints = length cs
+            , PBFile.pbConstraints = map f cs
+            }
+  QM.monitor $ counterexample (show opb)
+  let (opb2, info) = inequalitiesToEqualitiesPB opb
+      pb2 = (PBFile.pbNumVars opb2, [(g op, lhs, rhs) | (lhs,op,rhs) <- PBFile.pbConstraints opb2])
+      g PBFile.Ge = PBRelGE
+      g PBFile.Eq = PBRelEQ
+  QM.monitor $ counterexample (show opb2)
+
+  solver1 <- arbitrarySolver
+  solver2 <- arbitrarySolver
+  ret1 <- QM.run $ solvePBNLC solver1 pb
+  ret2 <- QM.run $ solvePBNLC solver2 pb2
+  QM.assert $ isJust ret1 == isJust ret2
+  case ret1 of
+    Nothing -> return ()
+    Just m1 -> do
+      let m2 = transformForward info m1
+      QM.assert $ bounds m2 == (1, PBFile.pbNumVars opb2)
+      QM.assert $ evalPBNLC m2 pb2
+  case ret2 of
+    Nothing -> return ()
+    Just m2 -> do
+      let m1 = transformBackward info m2
+      QM.assert $ bounds m1 == (1, nv)
+      QM.assert $ evalPBNLC m1 pb
 
 
 converterTestGroup :: TestTree

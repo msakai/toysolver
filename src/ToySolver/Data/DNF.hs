@@ -1,16 +1,17 @@
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.DNF
 -- Copyright   :  (c) Masahiro Sakai 2011-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable
 --
 -- Disjunctive Normal Form
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.DNF
   ( DNF (..)

@@ -1,9 +1,10 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.Encoder.Cardinality.Internal
+-- Module      :  ToySolver.SAT.Encoder.Cardinality.Internal.ParallelCounter
 -- Copyright   :  (c) Masahiro Sakai 2019
 -- License     :  BSD-style
 --
@@ -33,10 +34,15 @@ addAtLeastParallelCounter enc constr = do
 -- TODO: consider polarity
 encodeAtLeastParallelCounter :: forall m. PrimMonad m => Tseitin.Encoder m -> SAT.AtLeast -> m SAT.Lit
 encodeAtLeastParallelCounter enc (lhs,rhs) = do
-  let rhs_bits = bits (fromIntegral rhs)
-  (cnt, overflowBits) <- encodeSumParallelCounter enc (length rhs_bits) lhs
-  isGE <- encodeGE enc cnt rhs_bits
-  Tseitin.encodeDisj enc $ isGE : overflowBits
+  if rhs <= 0 then
+    Tseitin.encodeConj enc []
+  else if length lhs < rhs then
+    Tseitin.encodeDisj enc []
+  else do
+    let rhs_bits = bits (fromIntegral rhs)
+    (cnt, overflowBits) <- encodeSumParallelCounter enc (length rhs_bits) lhs
+    isGE <- encodeGE enc cnt rhs_bits
+    Tseitin.encodeDisj enc $ isGE : overflowBits
   where
     bits :: Integer -> [Bool]
     bits n = f n 0

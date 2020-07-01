@@ -7,14 +7,25 @@ cache:
 environment:
   global:
     STACK_ROOT: "c:\\sr"
-    STACK_YAML: "stack-travis-ghc-8.2.yaml"
 
 platform:
 - x86
 - x64
 
+for:
+- matrix:
+    only:
+      - platform: x86
+  environment:
+    STACK_YAML: "stack-windows-i386.yaml"
+- matrix:
+    only:
+      - platform: x64
+  environment:
+    STACK_YAML: "stack.yaml"
+
 install:
-- if %PLATFORM%==x86 (curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-i386) else (curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-x86_64)
+- if %PLATFORM%==x86 (curl -ostack.zip -L --insecure https://github.com/commercialhaskell/stack/releases/download/v2.1.3/stack-2.1.3-windows-i386.zip) else (curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-x86_64)
 - 7z x stack.zip stack.exe
 - stack setup > nul
 - curl -oCOIN-OR-1.8.0-win32-msvc12.zip -L --insecure https://www.coin-or.org/download/binary/OptimizationSuite/COIN-OR-1.8.0-win32-msvc12.zip
@@ -38,10 +49,11 @@ artifacts:
 deploy:
 - provider: GitHub
   auth_token:
-    secure: F8cldz47mQ0lW3O9uCEneU5LRklWcKw8JbPuh5BDYA2TfyeqC//GO8vl8/wmBy3Z
+    secure: OtB2kBvcLy0dwCzILJI9U1yyLpqh31Tgs52BMI2eul9NnbwCCoxfLsCrI+7dZmWN
   artifact: /.*\.7z/
   release: $(appveyor_repo_tag_name)
   description: 'Release description'
+  draft: true
   force_update: true
   on:
     appveyor_repo_tag: true

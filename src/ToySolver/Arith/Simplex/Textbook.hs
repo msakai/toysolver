@@ -1,17 +1,18 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.Simplex.Textbook
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables)
+-- Portability :  non-portable
 --
 -- Naïve implementation of Simplex method
--- 
+--
 -- Reference:
 --
 -- * <http://www.math.cuhk.edu.hk/~wei/lpch3.pdf>
@@ -119,7 +120,7 @@ lookupRow r m = m IM.! r
 normalizeRow :: (Num r, Eq r) => Tableau r -> Row r -> Row r
 normalizeRow a (row0,val0) = obj'
   where
-    obj' = g $ foldl' f (IM.empty, val0) $ 
+    obj' = g $ foldl' f (IM.empty, val0) $
            [ case IM.lookup j a of
                Nothing -> (IM.singleton j x, 0)
                Just (row,val) -> (IM.map ((-x)*) (IM.delete j row), -x*val)
@@ -166,7 +167,7 @@ isValidTableau tbl =
     vs = IM.keysSet tbl'
 
 isFeasible :: Real r => Tableau r -> Bool
-isFeasible tbl = 
+isFeasible tbl =
   and [val >= 0 | (v, (_,val)) <- IM.toList tbl, v /= objRowIndex]
 
 isOptimal :: Real r => OptDir -> Tableau r -> Bool
@@ -178,7 +179,7 @@ isOptimal optdir tbl =
             OptMax -> (0>)
 
 isImproving :: Real r => OptDir -> Tableau r -> Tableau r -> Bool
-isImproving OptMin from to = currentObjValue to <= currentObjValue from 
+isImproving OptMin from to = currentObjValue to <= currentObjValue from
 isImproving OptMax from to = currentObjValue to >= currentObjValue from
 
 -- ---------------------------------------------------------------------------
@@ -262,7 +263,7 @@ phaseI tbl avs
     tbl1' = go tbl1
     go tbl2
       | currentObjValue tbl2 == 0 = tbl2
-      | otherwise = 
+      | otherwise =
         case primalPivot optdir tbl2 of
           PivotSuccess tbl2' -> assert (isImproving optdir tbl2 tbl2') $ go tbl2'
           PivotFinished -> assert (isOptimal optdir tbl2) tbl2

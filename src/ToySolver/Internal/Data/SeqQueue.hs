@@ -1,16 +1,18 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Internal.Data.SeqQueue
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- Queue implemented using IORef and Sequence.
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Internal.Data.SeqQueue
   (
@@ -20,7 +22,7 @@ module ToySolver.Internal.Data.SeqQueue
   -- * Constructors
   , NewFifo (..)
 
-  -- * Operators  
+  -- * Operators
   , Enqueue (..)
   , Dequeue (..)
   , QueueSize (..)

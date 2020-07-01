@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.Converter
 -- Copyright   :  (c) Masahiro Sakai 2018
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  experimental
 -- Portability :  portable

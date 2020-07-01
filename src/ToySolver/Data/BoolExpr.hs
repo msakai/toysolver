@@ -1,17 +1,21 @@
-{-# LANGUAGE DeriveDataTypeable, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.BoolExpr
 -- Copyright   :  (c) Masahiro Sakai 2014-2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (MultiParamTypeClasses, DeriveDataTypeable, FlexibleContexts, FlexibleInstances)
+-- Portability :  non-portable
 --
 -- Boolean expression over a given type of atoms
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.BoolExpr
   (
@@ -136,7 +140,7 @@ instance MonotoneBoolean (Simplify a) where
       ys = concat [f x | Simplify x <- xs]
       f (Or zs) = zs
       f z = [z]
-  andB xs 
+  andB xs
     | any isFalse ys = Simplify false
     | otherwise = Simplify $ And ys
     where

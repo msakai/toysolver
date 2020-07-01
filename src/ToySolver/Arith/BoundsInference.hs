@@ -1,16 +1,18 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.BoundsInference
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (ScopedTypeVariables, BangPatterns)
+-- Portability :  non-portable
 --
 -- Tightening variable bounds by constraint propagation.
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Arith.BoundsInference
   ( BoundsEnv
@@ -74,14 +76,14 @@ f b cs i = foldr intersection i $ do
       ub = upperBound' i'
   case op of
     Eql -> return i'
-    Le -> return $ interval (NegInf, False) ub
-    Ge -> return $ interval lb (PosInf, False)
-    Lt -> return $ interval (NegInf, False) (strict ub)
-    Gt -> return $ interval (strict ub) (PosInf, False)
+    Le -> return $ interval (NegInf, Open) ub
+    Ge -> return $ interval lb (PosInf, Open)
+    Lt -> return $ interval (NegInf, Open) (strict ub)
+    Gt -> return $ interval (strict ub) (PosInf, Open)
     NEq -> []
 
-strict :: (Extended r, Bool) -> (Extended r, Bool)
-strict (x, _) = (x, False)
+strict :: (Extended r, Boundary) -> (Extended r, Boundary)
+strict (x, _) = (x, Open)
 
 -- | tightening intervals by ceiling lower bounds and flooring upper bounds.
 tightenToInteger :: forall r. (RealFrac r) => Interval r -> Interval r
@@ -92,18 +94,18 @@ tightenToInteger ival = interval lb2 ub2
     lb2 =
       case x1 of
         Finite x ->
-          ( if isInteger x && not in1
+          ( if isInteger x && in1 == Open
             then Finite (x + 1)
             else Finite (fromInteger (ceiling x))
-          , True
+          , Closed
           )
         _ -> lb
     ub2 =
       case x2 of
         Finite x ->
-          ( if isInteger x && not in2
+          ( if isInteger x && in2 == Open
             then Finite (x - 1)
             else Finite (fromInteger (floor x))
-          , True
+          , Closed
           )
         _ -> ub

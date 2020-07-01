@@ -1,13 +1,18 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, MultiParamTypeClasses, OverloadedStrings #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.EUF.FiniteModelFinder
 -- Copyright   :  (c) Masahiro Sakai 2012, 2015
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, MultiParamTypeClasses, OverloadedStrings)
+-- Portability :  non-portable
 --
 -- A simple model finder.
 --
@@ -175,7 +180,7 @@ instance Vars a => Vars (GenFormula a) where
 
 toNNF :: Formula -> Formula
 toNNF = f
-  where 
+  where
     f (And phi psi)   = f phi .&&. f psi
     f (Or phi psi)    = f phi .||. f psi
     f (Not phi)       = g phi
@@ -198,9 +203,9 @@ toNNF = f
     g (Atom a)        = notB (Atom a)
 
 -- | normalize a formula into a skolem normal form.
--- 
+--
 -- TODO:
--- 
+--
 -- * Tseitin encoding
 toSkolemNF :: forall m. Monad m => (Var -> Int -> m FSym) -> Formula -> m [Clause]
 toSkolemNF skolem phi = f [] Map.empty (toNNF phi)
@@ -315,7 +320,7 @@ flatten c =
     flattenLit :: Lit -> M SLit
     flattenLit (Pos a) = liftM Pos $ flattenAtom a
     flattenLit (Neg a) = liftM Neg $ flattenAtom a
-    
+
     flattenAtom :: Atom -> M SAtom
     flattenAtom (PApp "=" [TmVar x, TmVar y])    = return $ SEq (STmVar x) y
     flattenAtom (PApp "=" [TmVar x, TmApp f ts]) = do
@@ -331,7 +336,7 @@ flatten c =
     flattenAtom (PApp p ts) = do
       xs <- mapM flattenTerm ts
       return $ SPApp p xs
-    
+
     flattenTerm :: Term -> M Var
     flattenTerm (TmVar x)    = return x
     flattenTerm (TmApp f ts) = do
@@ -353,7 +358,7 @@ flatten c =
         go r (l : ls) = go (l : r) ls
 
         substLit :: Var -> Var -> SLit -> SLit
-        substLit x y (Pos a) = Pos $ substAtom x y a 
+        substLit x y (Pos a) = Pos $ substAtom x y a
         substLit x y (Neg a) = Neg $ substAtom x y a
 
         substAtom :: Var -> Var -> SAtom -> SAtom
@@ -478,7 +483,7 @@ data Model
   }
 
 showModel :: Model -> [String]
-showModel m = 
+showModel m =
   printf "DOMAIN = {%s}" (intercalate ", " (map showEntity (mUniverse m))) :
   [ printf "%s = { %s }" (Text.unpack (unintern p)) s
   | (p, xss) <- Map.toList (mRelations m)

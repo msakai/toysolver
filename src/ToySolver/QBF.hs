@@ -1,21 +1,22 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.QBF
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (BangPatterns)
+-- Portability :  non-portable
 --
 -- Reference:
 --
 -- * Mikoláš Janota, William Klieber, Joao Marques-Silva, Edmund Clarke.
 --   Solving QBF with Counterexample Guided Refinement.
 --   In Theory and Applications of Satisfiability Testing (SAT 2012), pp. 114-128.
---   <http://dx.doi.org/10.1007/978-3-642-31612-8_10>
+--   <https://doi.org/10.1007/978-3-642-31612-8_10>
 --   <https://www.cs.cmu.edu/~wklieber/papers/qbf-cegar-sat-2012.pdf>
 --
 -----------------------------------------------------------------------------
@@ -23,7 +24,7 @@ module ToySolver.QBF
   ( Quantifier (..)
   , Prefix
   , normalizePrefix
-  , quantifyFreeVariables 
+  , quantifyFreeVariables
   , Matrix
   , solve
   , solveNaive
@@ -140,7 +141,7 @@ prenexAnd (nv1, prefix1, matrix1) (nv2, prefix2, matrix2) =
           subst2' = fmap BoolExpr.Atom s `IntMap.union` subst2
       f (prefix ++ [(q, xs')]) (bvs `IntSet.union` xs') subst1 subst2' prefix1 prefix2'
 
--- XXX     
+-- XXX
 prenexOr :: (Int, Prefix, Matrix) -> (Int, Prefix, Matrix) -> (Int, Prefix, Matrix)
 prenexOr (nv1, prefix1, matrix1) (nv2, prefix2, matrix2) =
   evalState (f [] IntSet.empty IntMap.empty IntMap.empty prefix1 prefix2) (nv1 `max` nv2)
@@ -249,7 +250,7 @@ solveNaive nv prefix matrix =
 
 -- ----------------------------------------------------------------------------
 
--- | Abstraction-Based Algorithm for a Winning Move                    
+-- | Abstraction-Based Algorithm for a Winning Move
 solveCEGAR :: Int -> Prefix -> Matrix -> IO (Bool, Maybe LitSet)
 solveCEGAR nv prefix matrix =
   case prefix' of
@@ -355,7 +356,7 @@ solveCEGARIncremental nv prefix matrix =
       solver <- SAT.newSolver
       SAT.newVars_ solver nv
       enc <- Tseitin.newEncoder solver
-      xs <-
+      _xs <-
         case last prefix of
           (E, xs) -> do
             Tseitin.addFormula enc matrix
@@ -365,13 +366,13 @@ solveCEGARIncremental nv prefix matrix =
             return xs
       let g :: Int -> LitSet -> Prefix -> Matrix -> IO (Maybe LitSet)
           g _nv _assumptions [] _matrix = error "should not happen"
-          g nv assumptions [(_q,xs)] matrix = do
+          g _nv assumptions [(_q,xs)] _matrix = do
             ret <- SAT.solveWith solver (IntSet.toList assumptions)
             if ret then do
               m <- SAT.getModel solver
               return $ Just $ IntSet.fromList [if SAT.evalLit m x then x else -x | x <- IntSet.toList xs]
             else
-              return Nothing            
+              return Nothing
           g nv assumptions ((q,xs) : prefix'@((_q2,_) : prefix'')) matrix = do
             let loop counterMoves = do
                   let ys = [(nv, prefix'', reduct matrix nu) | nu <- counterMoves]
@@ -473,16 +474,20 @@ solveQE_CNF nv prefix matrix = g (normalizePrefix prefix) matrix
 -- ----------------------------------------------------------------------------
 
 -- ∀y ∃x. x ∧ (y ∨ ¬x)
+_test :: IO (Bool, Maybe LitSet)
 _test = solveNaive 2 [(A, IntSet.singleton 2), (E, IntSet.singleton 1)] (x .&&. (y .||. notB x))
   where
     x  = BoolExpr.Atom 1
     y  = BoolExpr.Atom 2
 
+_test' :: IO (Bool, Maybe LitSet)
 _test' = solveCEGAR 2 [(A, IntSet.singleton 2), (E, IntSet.singleton 1)] (x .&&. (y .||. notB x))
   where
     x  = BoolExpr.Atom 1
     y  = BoolExpr.Atom 2
 
+_test1 :: (Int, Prefix, Matrix)
 _test1 = prenexAnd (1, [(A, IntSet.singleton 1)], BoolExpr.Atom 1) (1, [(A, IntSet.singleton 1)], notB (BoolExpr.Atom 1))
 
+_test2 :: (Int, Prefix, Matrix)
 _test2 = prenexOr (1, [(A, IntSet.singleton 1)], BoolExpr.Atom 1) (1, [(A, IntSet.singleton 1)], BoolExpr.Atom 1)

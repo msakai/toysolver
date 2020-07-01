@@ -1,14 +1,17 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Arith.OmegaTest.Base
 -- Copyright   :  (c) Masahiro Sakai 2011
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
--- Portability :  non-portable (TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses)
+-- Portability :  non-portable
 --
 -- (incomplete) implementation of Omega Test
 --
@@ -67,7 +70,7 @@ data Options
   -- ^ optCheckReal is used for checking whether real shadow is satisfiable.
   --
   -- * If it returns @True@, the real shadow may or may not be satisfiable.
-  -- 
+  --
   -- * If it returns @False@, the real shadow must be unsatisfiable
   }
 
@@ -159,8 +162,8 @@ type BoundsZ = ([Rat],[Rat])
 
 evalBoundsZ :: Model Integer -> BoundsZ -> IntervalZ
 evalBoundsZ model (ls,us) =
-  foldl' intersectZ univZ $ 
-    [ (Just (ceiling (LA.eval model x % c)), Nothing) | (x,c) <- ls ] ++ 
+  foldl' intersectZ univZ $
+    [ (Just (ceiling (LA.eval model x % c)), Nothing) | (x,c) <- ls ] ++
     [ (Nothing, Just (floor (LA.eval model x % c))) | (x,c) <- us ]
 
 collectBoundsZ :: Var -> [Constr] -> (BoundsZ, [Constr])
@@ -169,7 +172,7 @@ collectBoundsZ v = foldr phi (([],[]),[])
     phi :: Constr -> (BoundsZ,[Constr]) -> (BoundsZ,[Constr])
     phi constr@(IsNonneg t) ((ls,us),xs) =
       case LA.extract v t of
-        (c,t') -> 
+        (c,t') ->
           case c `compare` 0 of
             EQ -> ((ls, us), constr : xs)
             GT -> (((negateV t', c) : ls, us), xs) -- 0 ≤ cx + M ⇔ -M/c ≤ x
@@ -266,7 +269,7 @@ eliminateEq e vs cs = do
         xk_def = (- signum ak * m) *^ LA.var sigma ^+^
                    LA.fromTerms [(signum ak * (a `zmod` m), x) | (a,x) <- LA.terms e, x /= xk]
         -- e2 is normalized version of (LA.applySubst1 xk xk_def e).
-        e2 = (- abs ak) *^ LA.var sigma ^+^ 
+        e2 = (- abs ak) *^ LA.var sigma ^+^
                 LA.fromTerms [((floor (a%m + 1/2) + (a `zmod` m)), x) | (a,x) <- LA.terms e, x /= xk]
     assert (m *^ e2 == LA.applySubst1 xk xk_def e) $ return ()
     let mt :: Model Integer -> Model Integer
@@ -296,7 +299,7 @@ pickupZ (Just x, Just y) = if x <= y then return x else mzero
 -- such @M@ exists, returns @Nothing@ otherwise.
 --
 -- @FV(φ)@ must be a subset of @{x1,…,xn}@.
--- 
+--
 solve :: Options -> VarSet -> [LA.Atom Rational] -> Maybe (Model Integer)
 solve opt vs cs = msum [solve' opt vs cs | cs <- unDNF dnf]
   where
@@ -325,7 +328,7 @@ solve opt vs cs = msum [solve' opt vs cs | cs <- unDNF dnf]
 -- * @FV(φ)@ must be a subset of @{x1,…,xn}@.
 --
 -- * @I@ is a set of integer variables and must be a subset of @{x1,…,xn}@.
--- 
+--
 solveQFLIRAConj :: Options -> VarSet -> [LA.Atom Rational] -> VarSet -> Maybe (Model Rational)
 solveQFLIRAConj opt vs cs ivs = listToMaybe $ do
   (cs2, mt) <- FM.projectN rvs cs

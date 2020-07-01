@@ -3,19 +3,19 @@
 -- Module      :  ToySolver.Data.AlgebraicNumber.Graeffe
 -- Copyright   :  (c) Masahiro Sakai 2012
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
--- 
+--
 -- Graeffe's Method
 --
 -- Reference:
--- 
+--
 -- * <http://mathworld.wolfram.com/GraeffesMethod.html>
--- 
+--
 -- * <http://en.wikipedia.org/wiki/Graeffe's_method>
--- 
+--
 -----------------------------------------------------------------------------
 
 module ToySolver.Data.AlgebraicNumber.Graeffe

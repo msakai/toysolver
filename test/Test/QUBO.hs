@@ -1,11 +1,17 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test.QUBO (quboTestGroup) where
 
 import Control.Monad
 import Data.Array.IArray
+import Data.ByteString.Builder
 import qualified Data.IntMap.Strict as IntMap
-    
+import Data.Maybe
+import qualified Data.PseudoBoolean as PBFile
+import Data.Scientific
+
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
@@ -13,8 +19,12 @@ import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
 import ToySolver.Converter
+import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.QUBO as QUBO
 import ToySolver.Converter.QUBO
+import qualified ToySolver.SAT.Types as SAT
+
+import Test.SAT.Utils
 
 ------------------------------------------------------------------------
 
@@ -65,10 +75,46 @@ instance (Arbitrary a, Eq a, Num a) => Arbitrary (QUBO.IsingModel a) where
 
 ------------------------------------------------------------------------
 
-prop_qubo2pbo :: Property
-prop_qubo2pbo = forAll arbitrary $ \qubo ->
-  let (pbo,_) = qubo2pbo qubo
-   in Just qubo === fmap fst (pboAsQUBO pbo)
+prop_QUBO_ReadWrite_Invariance :: Property
+prop_QUBO_ReadWrite_Invariance = forAll g $ \qubo ->
+  let s = toLazyByteString (FF.render qubo)
+   in counterexample (show s) $ FF.parse s === Right qubo
+  where
+    g = do
+      qubo <- arbitrary
+      return $ fmap fromFloatDigits (qubo :: QUBO.Problem Double)
+
+------------------------------------------------------------------------
+
+prop_qubo2pb :: Property
+prop_qubo2pb = forAll arbitrary $ \(qubo :: QUBO.Problem Integer) ->
+  let (pbo,_) = qubo2pb qubo
+   in Just qubo === fmap fst (pbAsQUBO pbo)
+
+prop_pb2qubo :: Property
+prop_pb2qubo = forAll arbitraryPBFormula $ \formula ->
+  let ((qubo :: QUBO.Problem Integer, th), info) = pb2qubo formula
+   in counterexample (show (qubo,th,info)) $
+        conjoin
+        [ forAll (arbitraryAssignment (PBFile.pbNumVars formula)) $ \m ->
+            case SAT.evalPBFormula m formula of
+              Nothing ->
+                property (QUBO.eval (transformForward info m) qubo > th)
+              Just o ->
+                conjoin
+                [ QUBO.eval (transformForward info m) qubo === transformObjValueForward info o
+                , transformObjValueBackward info (transformObjValueForward info o) === o
+                , property (transformObjValueForward info o <= th)
+                ]
+        , forAll (arbitrarySolution (QUBO.quboNumVars qubo)) $ \sol ->
+            let o = QUBO.eval sol qubo
+             in if (o <= th) then
+                  (SAT.evalPBFormula (transformBackward info sol) formula === Just (transformObjValueBackward info o))
+                  .&&.
+                  transformObjValueForward info (transformObjValueBackward info o) === o
+                else
+                  property True
+        ]
 
 prop_qubo2ising :: Property
 prop_qubo2ising = forAll arbitrary $ \(qubo :: QUBO.Problem Rational) ->

@@ -66,7 +66,7 @@ getPlatform m = do
         devs <- clGetDeviceIDs platform CL_DEVICE_TYPE_ALL
         putStrLn $ "  " ++ s ++ " (" ++ show (length devs) ++ " devices)"
         forM_ (zip [0..] devs) $ \(i,dev) -> do
-          devname <- clGetDeviceName dev 
+          devname <- clGetDeviceName dev
           ts <- clGetDeviceType dev
           let f t =
                 case t of

@@ -4,7 +4,7 @@
 -- Module      :  ToySolver.Data.Polynomial
 -- Copyright   :  (c) Masahiro Sakai 2012-2013
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  masahiro.sakai@gmail.com
 -- Stability   :  provisional
 -- Portability :  portable
@@ -18,7 +18,7 @@
 -- * Polynomial class for Ruby <http://www.math.kobe-u.ac.jp/~kodama/tips-RubyPoly.html>
 --
 -- * constructive-algebra package <http://hackage.haskell.org/package/constructive-algebra>
--- 
+--
 -----------------------------------------------------------------------------
 module ToySolver.Data.Polynomial
   (

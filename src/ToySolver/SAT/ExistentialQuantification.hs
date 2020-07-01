@@ -1,5 +1,6 @@
 {-# Language BangPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 ----------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.ExistentialQuantification
@@ -66,12 +67,14 @@ dualRailEncoding vs cnf =
       CNF.CNF
       { CNF.cnfNumVars = CNF.cnfNumVars cnf + IntSet.size vs
       , CNF.cnfNumClauses = CNF.cnfNumClauses cnf + IntSet.size vs
-      , CNF.cnfClauses = [ VG.map f c | c <- CNF.cnfClauses cnf ] ++ [SAT.packClause [-xp,-xn] | (xp,xn) <- IntMap.elems forward]
+      , CNF.cnfClauses =
+          [ VG.map f c | c <- CNF.cnfClauses cnf ] ++
+          [ SAT.packClause [-xp,-xn] | (xp,xn) <- IntMap.elems forward ]
       }
     f x =
-      case IntMap.lookup (abs x) forward of
+      case IntMap.lookup (abs (SAT.unpackLit x)) forward of
         Nothing -> x
-        Just (xp,xn) -> if x > 0 then xp else xn
+        Just (xp,xn) -> SAT.packLit $ if x > 0 then xp else xn
     forward =
       IntMap.fromList
       [ (x, (x,x'))
@@ -103,7 +106,7 @@ cube info m = IntSet.fromList $ concat $
 blockingClause :: Info -> SAT.Model -> Clause
 blockingClause info m = [-y | y <- IntMap.keys (backwardMap info), SAT.evalLit m y]
 
-{-# DEPRECATED shortestImplicants "Use shortestImplicantsE instead" #-} 
+{-# DEPRECATED shortestImplicants "Use shortestImplicantsE instead" #-}
 -- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\),
 -- this function computes shortest implicants of \(\phi\) in terms of \(X\).
 -- Variables except \(X\) are treated as if they are existentially quantified.
