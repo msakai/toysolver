@@ -24,6 +24,7 @@ module ToySolver.Converter
   , module ToySolver.Converter.SAT2KSAT
   , module ToySolver.Converter.SAT2MaxCut
   , module ToySolver.Converter.SAT2MaxSAT
+  , module ToySolver.Converter.SAT2MIS
   , module ToySolver.Converter.Tseitin
   ) where
 
@@ -40,4 +41,5 @@ import ToySolver.Converter.QUBO
 import ToySolver.Converter.SAT2KSAT
 import ToySolver.Converter.SAT2MaxCut
 import ToySolver.Converter.SAT2MaxSAT
+import ToySolver.Converter.SAT2MIS
 import ToySolver.Converter.Tseitin
