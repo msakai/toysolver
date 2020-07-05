@@ -144,6 +144,27 @@ prop_maxSAT2ToSimpleMaxCut_forward =
 
 ------------------------------------------------------------------------
 
+prop_satToIS_forward :: Property
+prop_satToIS_forward =
+  forAll arbitraryCNF $ \cnf -> do
+    let r@((g,k), info) = satToIS cnf
+     in counterexample (show r) $ conjoin
+        [ counterexample (show m) $ counterexample (show set) $
+            not (evalCNF m cnf) || (IS.isIndependentSet g set && IntSet.size set >= k)
+        | m <- allAssignments (CNF.cnfNumVars cnf)
+        , let set = transformForward info m
+        ]
+
+prop_satToIS_backward :: Property
+prop_satToIS_backward =
+  forAll arbitraryCNF $ \cnf -> do
+    let r@((g,k), info) = satToIS cnf
+     in counterexample (show r) $
+          forAll (oneof [arbitraryIndependentSet g, arbitraryIndependentSet' g k]) $ \set -> do
+            let m = transformBackward info set
+             in counterexample (show m) $
+                  not (IntSet.size set >= k) || evalCNF m cnf
+
 prop_mis2MaxSAT_forward :: Property
 prop_mis2MaxSAT_forward =
   forAll arbitraryGraph $ \g -> do
@@ -182,6 +203,30 @@ arbitraryGraph = do
     vs <- sublistOf [0..n-1]
     return [(v1, v2) | v2 <- vs]
   return $ IS.graphFromEdges n es
+
+arbitraryIndependentSet :: IS.Graph -> Gen IntSet
+arbitraryIndependentSet g = do
+  s <- arbitraryMaximalIndependentSet g
+  liftM IntSet.fromList $ sublistOf $ IntSet.toList s
+
+arbitraryIndependentSet' :: IS.Graph -> Int -> Gen IntSet
+arbitraryIndependentSet' g k = go IntSet.empty (IntSet.fromList (range (bounds g)))
+  where
+    go s c
+      | IntSet.size s >= k = return s
+      | IntSet.null c = return s
+      | otherwise = do
+          a <- elements (IntSet.toList c)
+          go (IntSet.insert a s) (IntSet.delete a c IntSet.\\ (g ! a))
+
+arbitraryMaximalIndependentSet :: IS.Graph -> Gen IntSet
+arbitraryMaximalIndependentSet g = go IntSet.empty (IntSet.fromList (range (bounds g)))
+  where
+    go s c
+      | IntSet.null c = return s
+      | otherwise = do
+          a <- elements (IntSet.toList c)
+          go (IntSet.insert a s) (IntSet.delete a c IntSet.\\ (g ! a))
 
 ------------------------------------------------------------------------
 
