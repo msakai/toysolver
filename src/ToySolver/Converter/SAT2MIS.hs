@@ -86,7 +86,8 @@ sat3ToIS cnf = runST $ do
 
 
 data SAT3ToISInfo = SAT3ToISInfo Int [[Int]] (UArray Int SAT.Lit)
-  deriving (Eq, Show, Read)
+  deriving (Eq, Show)
+-- Note that array <0.5.4.0 did not provided Read instance of UArray
 
 instance Transformer SAT3ToISInfo where
   type Source SAT3ToISInfo = SAT.Model
