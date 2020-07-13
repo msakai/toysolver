@@ -306,6 +306,7 @@ Library
      ToySolver.Converter.PB2SMP
      ToySolver.Converter.QBF2IPC
      ToySolver.Converter.QUBO
+     ToySolver.Converter.SAT2MIS
      ToySolver.Converter.SAT2KSAT
      ToySolver.Converter.SAT2MaxCut
      ToySolver.Converter.SAT2MaxSAT
@@ -359,6 +360,7 @@ Library
      ToySolver.FileFormat.Base
      ToySolver.FileFormat.CNF
      ToySolver.Graph.ShortestPath
+     ToySolver.Graph.IndependentSet
      ToySolver.MaxCut
      ToySolver.QBF
      ToySolver.QUBO
