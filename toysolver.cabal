@@ -359,8 +359,8 @@ Library
      ToySolver.FileFormat
      ToySolver.FileFormat.Base
      ToySolver.FileFormat.CNF
+     ToySolver.Graph.Base
      ToySolver.Graph.ShortestPath
-     ToySolver.Graph.IndependentSet
      ToySolver.Graph.MaxCut
      ToySolver.QBF
      ToySolver.QUBO

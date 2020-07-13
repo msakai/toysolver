@@ -32,7 +32,7 @@ import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Converter.Base
 import ToySolver.Converter.SAT2KSAT
 import qualified ToySolver.FileFormat.CNF as CNF
-import ToySolver.Graph.IndependentSet
+import ToySolver.Graph.Base
 import ToySolver.SAT.Store.CNF
 import ToySolver.SAT.Store.PB
 import qualified ToySolver.SAT.Types as SAT
@@ -66,14 +66,14 @@ sat3ToIS cnf = runST $ do
 
   litToNodes <- readSTRef litToNodesRef
   let es = concat $
-        [pairs nodes | nodes <- clusters] ++
-        [ [(node1, node2) | node1 <- nodes1, node2 <- nodes2]
+        [ [(node1, node2, ()) | (node1, node2) <- pairs nodes] | nodes <- clusters ] ++
+        [ [(node1, node2, ()) | node1 <- nodes1, node2 <- nodes2]
         | (lit, nodes1) <- IntMap.toList litToNodes
         , let nodes2 = IntMap.findWithDefault [] (- lit) litToNodes
         ]
 
   n <- readSTRef nRef
-  let g = graphFromEdges n es
+  let g = graphFromUnorderedEdges n es
 
   xs <- readSTRef nodeToLitRef
   let nodeToLit = runSTUArray $ do
@@ -118,7 +118,7 @@ is2pb (g, k) = runST $ do
   let (lb, ub) = bounds g
   db <- newPBStore
   vs <- SAT.newVars db (rangeSize (bounds g))
-  forM_ (edges g) $ \(node1, node2) -> do
+  forM_ (graphToUnorderedEdges g) $ \(node1, node2, _) -> do
     SAT.addClause db [- (node1 - lb + 1), - (node2 - lb + 1)]
   SAT.addPBAtLeast db [(1,v) | v <- vs] (fromIntegral k)
   formula <- getPBFormula db
@@ -133,7 +133,7 @@ mis2MaxSAT g = runST $ do
       n = ub - lb + 1
   db <- newCNFStore
   vs <- SAT.newVars db n
-  forM_ (edges g) $ \(node1, node2) -> do
+  forM_ (graphToUnorderedEdges g) $ \(node1, node2, _) -> do
     SAT.addClause db [- (node1 - lb + 1), - (node2 - lb + 1)]
   cnf <- getCNFFormula db
   let top = fromIntegral n + 1
