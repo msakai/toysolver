@@ -38,6 +38,7 @@ import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
 
 import qualified ToySolver.FileFormat.CNF as CNF
+import ToySolver.Graph.Base
 import qualified ToySolver.Graph.MaxCut as MaxCut
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.Converter.Base
@@ -73,11 +74,11 @@ data NAE3SAT2MaxCutInfo = NAE3SAT2MaxCutInfo
 nae3sat2maxcut :: NAESAT -> ((MaxCut.Problem Integer, Integer), NAE3SAT2MaxCutInfo)
 nae3sat2maxcut (n,cs)
   | any (\c -> VG.length c < 2) cs' =
-      ( (MaxCut.fromEdges (n*2) [], 1)
+      ( (graphFromUnorderedEdges (n*2) [], 1)
       , NAE3SAT2MaxCutInfo
       )
   | otherwise =
-      ( ( MaxCut.fromEdges (n*2) (variableEdges ++ clauseEdges)
+      ( ( graphFromUnorderedEdgesWith (+) (n*2) (variableEdges ++ clauseEdges)
         , bigM * fromIntegral n + clauseEdgesObjMax
         )
       , NAE3SAT2MaxCutInfo
