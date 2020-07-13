@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.MaxCut
+-- Module      :  ToySolver.Graph.MaxCut
 -- Copyright   :  (c) Masahiro Sakai 2018
 -- License     :  BSD-style
 --
@@ -9,7 +9,7 @@
 -- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module ToySolver.MaxCut
+module ToySolver.Graph.MaxCut
   ( Problem (..)
   , fromEdges
   , edges
