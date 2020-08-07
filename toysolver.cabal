@@ -386,9 +386,9 @@ Library
      ToySolver.SAT.PBO.BCD2
      ToySolver.SAT.PBO.MSU4
      ToySolver.SAT.PBO.UnsatBased
-     ToySolver.SAT.SLS.ProbSAT
      ToySolver.SAT.Solver.CDCL
      ToySolver.SAT.Solver.CDCL.Config
+     ToySolver.SAT.Solver.SLS.ProbSAT
      ToySolver.SAT.Store.CNF
      ToySolver.SAT.Store.PB
      ToySolver.SAT.TheorySolver
