@@ -1,6 +1,6 @@
 Name:		toysolver
 Version:	0.7.0
-License:	BSD3
+License:	BSD-3-Clause
 License-File:	COPYING
 Author:		Masahiro Sakai (masahiro.sakai@gmail.com)
 Maintainer:	masahiro.sakai@gmail.com
@@ -938,11 +938,11 @@ Test-suite TestSuite
     Test.SMTLIB2Solver
     Test.Smtlib
     Test.SubsetSum
-    ToySolver.SMT.SMTLIB2Solver,
-    Smtlib.Parsers.CommonParsers,
-    Smtlib.Parsers.ResponseParsers,
-    Smtlib.Parsers.CommandsParsers,
-    Smtlib.Syntax.Syntax,
+    ToySolver.SMT.SMTLIB2Solver
+    Smtlib.Parsers.CommonParsers
+    Smtlib.Parsers.ResponseParsers
+    Smtlib.Parsers.CommandsParsers
+    Smtlib.Syntax.Syntax
     Smtlib.Syntax.ShowSL
   Build-depends:
     array,
@@ -978,6 +978,7 @@ Test-suite TestSuite
     vector-space
   Default-Language: Haskell2010
   Other-Extensions:
+    CPP
     DataKinds
     ScopedTypeVariables
     TemplateHaskell
