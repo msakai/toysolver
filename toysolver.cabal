@@ -170,9 +170,11 @@ Library
      clock >=0.7.1,
      -- IntMap.mergeWithKey and IntMap.toDescList require containers >=0.5.0
      containers >=0.5.0,
+     data-default,
      data-default-class,
      data-interval >=2.0.1 && <2.1.0,
      deepseq,
+     directory,
      extended-reals >=0.1 && <1.0,
      filepath,
      finite-field >=0.9.0 && <1.0.0,
@@ -389,6 +391,7 @@ Library
      ToySolver.SAT.Solver.CDCL.Config
      ToySolver.SAT.Solver.MessagePassing.SurveyPropagation
      ToySolver.SAT.Solver.SLS.ProbSAT
+     ToySolver.SAT.Solver.SLS.UBCSAT
      ToySolver.SAT.Store.CNF
      ToySolver.SAT.Store.PB
      ToySolver.SAT.TheorySolver
@@ -452,7 +455,6 @@ Executable toysolver
 
 Executable toysat
   Main-is: toysat.hs
-  Other-Modules: UBCSAT
   HS-Source-Dirs: app/toysat
   Build-Depends:
     array,
@@ -460,18 +462,14 @@ Executable toysat
     bytestring,
     containers,
     clock,
-    data-default,
     data-default-class,
-    directory,
     filepath,
     megaparsec,
     mwc-random,
     -- maybeReader is available on optparse-applicative >=0.13.0.0
     optparse-applicative >=0.13,
-    process >=1.1.0.2,
     pseudo-boolean,
     scientific,
-    temporary,
     time,
     toysolver,
     unbounded-delays,

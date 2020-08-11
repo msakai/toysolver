@@ -2,7 +2,21 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
-module UBCSAT
+{-# OPTIONS_HADDOCK show-extensions #-}
+----------------------------------------------------------------------
+-- |
+-- Module      :  ToySolver.SAT.Solver.SLS.UBCSAT
+-- Copyright   :  (c) Masahiro Sakai 2017
+-- License     :  BSD-style
+--
+-- Maintainer  :  masahiro.sakai@gmail.com
+-- Stability   :  provisional
+-- Portability :  non-portable
+--
+-- References:
+--
+----------------------------------------------------------------------
+module ToySolver.SAT.Solver.SLS.UBCSAT
   ( ubcsatBest
   , ubcsatBestFeasible
   , ubcsatMany
