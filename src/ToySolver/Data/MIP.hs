@@ -90,7 +90,7 @@ readTextFile :: FileOptions -> FilePath -> IO TL.Text
 #ifndef WITH_ZLIB
 readTextFile opt fname = do
   h <- openFile fname ReadMode
-  case MIP.optFileEncoding opt of
+  case optFileEncoding opt of
     Nothing -> return ()
     Just enc -> hSetEncoding h enc
   TLIO.hGetContents h
