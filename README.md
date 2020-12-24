@@ -127,3 +127,15 @@ Bindings
 
 * [ersatz-toysat](http://hackage.haskell.org/package/ersatz-toysat) -  toysat backend driver for [ersatz](http://hackage.haskell.org/package/ersatz)
 * [satchmo-toysat](http://hackage.haskell.org/package/satchmo-toysat) - toysat backend driver for [satchmo](http://hackage.haskell.org/package/satchmo)
+
+Spin-off projects and packages
+------------------------------
+
+* [bytestring-encoding](https://github.com/msakai/bytestring-encoding)
+* [data-interval](https://github.com/msakai/data-interval)	
+* [extended-reals](https://github.com/msakai/extended-reals)
+* [finite-field](https://github.com/msakai/finite-field)
+* [MIP](https://github.com/msakai/haskell-MIP)
+* [OptDir](https://github.com/msakai/haskell-optdir)
+* [pseudo-boolean](https://github.com/msakai/pseudo-boolean)
+* [sign](https://github.com/msakai/sign)
