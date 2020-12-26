@@ -10,10 +10,10 @@ import System.Exit
 import System.IO
 import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.FileFormat.CNF as CNF
-import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
+import qualified ToySolver.SAT.Solver.MessagePassing.SurveyPropagation as SP
 #ifdef ENABLE_OPENCL
 import Control.Parallel.OpenCL
-import qualified ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL as SPCL
+import qualified ToySolver.SAT.Solver.MessagePassing.SurveyPropagation.OpenCL as SPCL
 #endif
 
 data Options

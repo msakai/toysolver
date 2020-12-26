@@ -71,14 +71,15 @@ import qualified ToySolver.SAT.PBO as PBO
 import qualified ToySolver.SAT.Encoder.Integer as Integer
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
-import qualified ToySolver.SAT.MessagePassing.SurveyPropagation as SP
+import qualified ToySolver.SAT.Solver.MessagePassing.SurveyPropagation as SP
+import qualified ToySolver.SAT.Solver.SLS.UBCSAT as UBCSAT
 import qualified ToySolver.SAT.MUS as MUS
 import qualified ToySolver.SAT.MUS.Enum as MUSEnum
 import ToySolver.SAT.Printer
 import ToySolver.Version
 import ToySolver.Internal.Util (showRational, setEncodingChar8)
 
-import qualified UBCSAT
+
 
 -- ------------------------------------------------------------------------
 

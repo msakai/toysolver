@@ -6,7 +6,7 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL
+-- Module      :  ToySolver.SAT.Solver.MessagePassing.SurveyPropagation.OpenCL
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
 --
@@ -24,7 +24,7 @@
 --   <http://classes.soe.ucsc.edu/cmps290c/Winter06/proj/corriereport.pdf>.
 --
 -----------------------------------------------------------------------------
-module ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL
+module ToySolver.SAT.Solver.MessagePassing.SurveyPropagation.OpenCL
   (
   -- * The Solver type
     Solver
@@ -172,7 +172,7 @@ newSolver outputMessage context dev nv clauses = do
   let flags =
         ["-DUSE_CONSTANT_BUFFER" | maxConstantBufferSize >= reqConstantBufferSize]
   -- programSource <- openBinaryFile "sp.cl" ReadMode >>= hGetContents
-  let programSource = $(runIO (do{ h <- openFile "src/ToySolver/SAT/MessagePassing/SurveyPropagation/sp.cl" ReadMode; hSetEncoding h utf8; hGetContents h }) >>= \s -> addDependentFile "src/ToySolver/SAT/MessagePassing/SurveyPropagation/sp.cl" >> litE (stringL s))
+  let programSource = $(runIO (do{ h <- openFile "src/ToySolver/SAT/Solver/MessagePassing/SurveyPropagation/sp.cl" ReadMode; hSetEncoding h utf8; hGetContents h }) >>= \s -> addDependentFile "src/ToySolver/SAT/Solver/MessagePassing/SurveyPropagation/sp.cl" >> litE (stringL s))
   outputMessage $ "Compiling kernels with options: " ++ unwords flags
   program <- clCreateProgramWithSource context programSource
   finally (clBuildProgram program [dev] (unwords flags))

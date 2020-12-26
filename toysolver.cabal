@@ -39,7 +39,7 @@ Extra-Source-Files:
    misc/smtcomp/bin/starexec_run_default
    misc/smtcomp/starexec_description.txt
    src/ToySolver/Data/Polyhedron.hs
-   src/ToySolver/SAT/MessagePassing/SurveyPropagation/sp.cl
+   src/ToySolver/SAT/Solver/MessagePassing/SurveyPropagation/sp.cl
    samples/gcnf/*.cnf
    samples/gcnf/*.gcnf
    samples/gcnf/edn_20403_8.cnf_0.03000000.unsat.gcnf
@@ -170,9 +170,11 @@ Library
      clock >=0.7.1,
      -- IntMap.mergeWithKey and IntMap.toDescList require containers >=0.5.0
      containers >=0.5.0,
+     data-default,
      data-default-class,
      data-interval >=2.0.1 && <2.1.0,
      deepseq,
+     directory,
      extended-reals >=0.1 && <1.0,
      filepath,
      finite-field >=0.9.0 && <1.0.0,
@@ -219,7 +221,7 @@ Library
      CPP-Options: "-DWITH_ZLIB"
   if flag(OpenCL)
      Build-Depends: OpenCL >=1.0.3.4
-     Exposed-Modules: ToySolver.SAT.MessagePassing.SurveyPropagation.OpenCL
+     Exposed-Modules: ToySolver.SAT.Solver.MessagePassing.SurveyPropagation.OpenCL
   if impl(ghc)
      Build-Depends: ghc-prim
   Default-Language: Haskell2010
@@ -365,7 +367,6 @@ Library
      ToySolver.QBF
      ToySolver.QUBO
      ToySolver.SAT
-     ToySolver.SAT.Config
      ToySolver.SAT.Encoder.Integer
      ToySolver.SAT.Encoder.PB
      ToySolver.SAT.Encoder.PB.Internal.Adder
@@ -378,7 +379,6 @@ Library
      ToySolver.SAT.Encoder.Cardinality.Internal.Totalizer
      ToySolver.SAT.Encoder.Tseitin
      ToySolver.SAT.ExistentialQuantification
-     ToySolver.SAT.MessagePassing.SurveyPropagation
      ToySolver.SAT.MUS
      ToySolver.SAT.MUS.Enum
      ToySolver.SAT.MUS.Types
@@ -389,7 +389,11 @@ Library
      ToySolver.SAT.PBO.BCD2
      ToySolver.SAT.PBO.MSU4
      ToySolver.SAT.PBO.UnsatBased
-     ToySolver.SAT.SLS.ProbSAT
+     ToySolver.SAT.Solver.CDCL
+     ToySolver.SAT.Solver.CDCL.Config
+     ToySolver.SAT.Solver.MessagePassing.SurveyPropagation
+     ToySolver.SAT.Solver.SLS.ProbSAT
+     ToySolver.SAT.Solver.SLS.UBCSAT
      ToySolver.SAT.Store.CNF
      ToySolver.SAT.Store.PB
      ToySolver.SAT.TheorySolver
@@ -453,7 +457,6 @@ Executable toysolver
 
 Executable toysat
   Main-is: toysat.hs
-  Other-Modules: UBCSAT
   HS-Source-Dirs: app/toysat
   Build-Depends:
     array,
@@ -461,18 +464,14 @@ Executable toysat
     bytestring,
     containers,
     clock,
-    data-default,
     data-default-class,
-    directory,
     filepath,
     megaparsec,
     mwc-random,
     -- maybeReader is available on optparse-applicative >=0.13.0.0
     optparse-applicative >=0.13,
-    process >=1.1.0.2,
     pseudo-boolean,
     scientific,
-    temporary,
     time,
     toysolver,
     unbounded-delays,

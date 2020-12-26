@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.Config
+-- Module      :  ToySolver.SAT.Solver.CDCL.Config
 -- Copyright   :  (c) Masahiro Sakai 2017
 -- License     :  BSD-style
 --
@@ -9,7 +9,7 @@
 -- Portability :  portable
 --
 -----------------------------------------------------------------------------
-module ToySolver.SAT.Config
+module ToySolver.SAT.Solver.CDCL.Config
   ( -- * Solver configulation
     Config (..)
   , RestartStrategy (..)

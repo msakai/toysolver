@@ -13,7 +13,7 @@ import Text.Printf
 
 import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.FileFormat.CNF as CNF
-import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
+import qualified ToySolver.SAT.Solver.SLS.ProbSAT as ProbSAT
 import ToySolver.SAT.Printer (maxsatPrintModel)
 
 data Options = Options

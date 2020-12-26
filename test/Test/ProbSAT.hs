@@ -17,7 +17,7 @@ import qualified Test.QuickCheck.Monadic as QM
 import Test.QuickCheck.Modifiers
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
-import qualified ToySolver.SAT.SLS.ProbSAT as ProbSAT
+import qualified ToySolver.SAT.Solver.SLS.ProbSAT as ProbSAT
 
 import Test.SAT.Utils
 

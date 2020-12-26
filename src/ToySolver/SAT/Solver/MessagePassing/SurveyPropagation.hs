@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.MessagePassing.SurveyPropagation
+-- Module      :  ToySolver.SAT.Solver.MessagePassing.SurveyPropagation
 -- Copyright   :  (c) Masahiro Sakai 2016
 -- License     :  BSD-style
 --
@@ -23,7 +23,7 @@
 --   <http://classes.soe.ucsc.edu/cmps290c/Winter06/proj/corriereport.pdf>.
 --
 -----------------------------------------------------------------------------
-module ToySolver.SAT.MessagePassing.SurveyPropagation
+module ToySolver.SAT.Solver.MessagePassing.SurveyPropagation
   (
   -- * The Solver type
     Solver

@@ -6,7 +6,7 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
 ----------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.SAT.SLS.ProbSAT
+-- Module      :  ToySolver.SAT.Solver.SLS.ProbSAT
 -- Copyright   :  (c) Masahiro Sakai 2017
 -- License     :  BSD-style
 --
@@ -17,7 +17,7 @@
 -- References:
 --
 ----------------------------------------------------------------------
-module ToySolver.SAT.SLS.ProbSAT
+module ToySolver.SAT.Solver.SLS.ProbSAT
   ( Solver
   , newSolver
   , newSolverWeighted
