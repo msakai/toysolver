@@ -20,9 +20,6 @@ addons:
   apt:
     packages:
     - libgmp-dev
-    - coinor-cbc
-    - glpk-utils
-    - lp-solve
     - c2hs
     - ocl-icd-opencl-dev
 
@@ -64,7 +61,6 @@ install:
 - FLAGS="--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag=toysolver:OpenCL"
 - if [ -n "$COVERAGE" ]; then FLAGS="$FLAGS --coverage"; fi
 - if [ -n "$HADDOCK" ]; then FLAGS="$FLAGS --haddock --no-haddock-deps"; fi
-- if [ "$TRAVIS_OS_NAME" = "linux" ]; then FLAGS="$FLAGS --flag toysolver:TestCBC --flag toysolver:TestGlpsol --flag toysolver:TestLPSolve"; fi
 
 # Build dependencies
 - stack --jobs 2 --no-terminal --install-ghc build --test --bench --only-dependencies $FLAGS

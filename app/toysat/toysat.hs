@@ -60,8 +60,9 @@ import qualified GHC.Stats as Stats
 #endif
 
 import qualified Data.PseudoBoolean as PBFile
-import qualified ToySolver.Data.MIP as MIP
-import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
+import qualified Numeric.Optimization.MIP as MIP
+import qualified Numeric.Optimization.MIP.Solution.Gurobi as GurobiSol
+
 import ToySolver.Converter
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.FileFormat as FF

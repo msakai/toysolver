@@ -28,8 +28,6 @@ install:
 - if %PLATFORM%==x86 (curl -ostack.zip -L --insecure https://github.com/commercialhaskell/stack/releases/download/v2.1.3/stack-2.1.3-windows-i386.zip) else (curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-x86_64)
 - 7z x stack.zip stack.exe
 - stack setup > nul
-- curl -oCOIN-OR-1.8.0-win32-msvc12.zip -L --insecure https://www.coin-or.org/download/binary/OptimizationSuite/COIN-OR-1.8.0-win32-msvc12.zip
-- 7z e COIN-OR-1.8.0-win32-msvc12.zip COIN-OR/win32-msvc12/bin/cbc.exe
 
 build_script:
 - git submodule init
@@ -38,7 +36,7 @@ build_script:
 test_script:
 # The ugly echo "" hack is to avoid complaints about 0 being an invalid file
 # descriptor
-- echo "" | stack --no-terminal test --bench --no-run-benchmarks --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:TestCBC
+- echo "" | stack --no-terminal test --bench --no-run-benchmarks --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms
 
 after_test:
 - stack runghc --package turtle misc/build_artifacts.hs

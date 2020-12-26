@@ -1,3 +1,7 @@
+0.7.0 (Unreleased)
+-----
+* `ToySolver.Data.MIP.*` is separated into `MIP` package as `Numeric.Optimization.MIP`
+
 0.6.0
 -----
 * new solvers:

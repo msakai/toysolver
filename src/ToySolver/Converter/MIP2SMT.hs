@@ -39,7 +39,7 @@ import qualified Data.Text.Lazy.Builder as B
 import qualified Data.Text.Lazy.Builder.Int as B
 import Text.Printf
 
-import qualified ToySolver.Data.MIP as MIP
+import qualified Numeric.Optimization.MIP as MIP
 import ToySolver.Internal.Util (showRationalAsFiniteDecimal, isInteger)
 
 -- | Translation options.
