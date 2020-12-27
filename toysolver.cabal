@@ -869,7 +869,7 @@ Test-suite TestSuite
     Test.HittingSets
     Test.Knapsack
     Test.Misc
-    Test.MIPSolver2
+    Test.MIPSolver
     Test.ProbSAT
     Test.QBF
     Test.QUBO

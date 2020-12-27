@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Test.MIPSolver2 (mipSolver2TestGroup) where
+module Test.MIPSolver (mipSolverTestGroup) where
 
 import Control.Monad
 import Data.List
@@ -121,5 +121,5 @@ case_test2 = do
 ------------------------------------------------------------------------
 -- Test harness
 
-mipSolver2TestGroup :: TestTree
-mipSolver2TestGroup = $(testGroupGenerator)
+mipSolverTestGroup :: TestTree
+mipSolverTestGroup = $(testGroupGenerator)
