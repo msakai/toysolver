@@ -193,7 +193,7 @@ Library
      mwc-random >=0.13.1 && <0.15,
      OptDir,
      lattices,
-     megaparsec >=4 && <8,
+     megaparsec >=4 && <10,
      -- Text.PrettyPrint.HughesPJClass is available on pretty >=1.1.2.0
      pretty >=1.1.2.0 && <1.2,
      primes,
@@ -507,7 +507,7 @@ Executable toysmt
     transformers,
     transformers-compat
   if flag(UseHaskeline)
-    Build-Depends: haskeline >=0.7 && <0.8
+    Build-Depends: haskeline >=0.7 && <0.9
     CPP-Options: "-DUSE_HASKELINE_PACKAGE"
   Default-Language: Haskell2010
   Other-Extensions: ScopedTypeVariables, CPP
