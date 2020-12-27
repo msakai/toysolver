@@ -31,10 +31,11 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 import qualified Data.PseudoBoolean as PBFile
+import qualified Numeric.Optimization.MIP as MIP
+import Numeric.Optimization.MIP ((.==.), (.<=.), (.>=.))
+
 import ToySolver.Converter.Base
 import ToySolver.Converter.PB
-import qualified ToySolver.Data.MIP as MIP
-import ToySolver.Data.MIP ((.==.), (.<=.), (.>=.))
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
 

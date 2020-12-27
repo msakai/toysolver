@@ -16,11 +16,7 @@ import Test.FiniteModelFinder
 import Test.GraphShortestPath
 import Test.HittingSets
 import Test.Knapsack
-import Test.LPFile
-import Test.MIP
 import Test.MIPSolver
-import Test.MIPSolver2
-import Test.MPSFile
 import Test.ProbSAT
 import Test.SDPFile
 import Test.Misc
@@ -56,12 +52,8 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , graphShortestPathTestGroup
   , hittingSetsTestGroup
   , knapsackTestGroup
-  , lpTestGroup
   , miscTestGroup
-  , mipTestGroup
   , mipSolverTestGroup
-  , mipSolver2TestGroup
-  , mpsTestGroup
   , probSATTestGroup
   , qbfTestGroup
   , quboTestGroup

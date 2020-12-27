@@ -38,8 +38,8 @@ import Text.PrettyPrint.ANSI.Leijen ((<+>))
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
 
 import qualified Data.PseudoBoolean as PBFile
+import qualified Numeric.Optimization.MIP as MIP
 
-import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Converter
 import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT

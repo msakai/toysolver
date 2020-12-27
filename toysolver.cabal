@@ -77,9 +77,6 @@ Extra-Source-Files:
    samples/programs/numberlink/ADC2016/sample/01/*.txt
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
-   doc-images/MIP-Status-diagram.tex
-Extra-Doc-Files:
-   doc-images/MIP-Status-diagram.png
 Build-Type: Simple
 
 Flag ForceChar8
@@ -122,36 +119,6 @@ Flag OpenCL
   Manual: True
   Default: False
 
-Flag TestCBC
-  Description: run test cases that depends on cbc command
-  Manual: True
-  Default: False
-
-Flag TestCPLEX
-  Description: run test cases that depends on cplex command
-  Manual: True
-  Default: False
-
-Flag TestGlpsol
-  Description: run test cases that depends on glpsol command
-  Manual: True
-  Default: False
-
-Flag TestGurobiCl
-  Description: run test cases that depends on gurobi_cl command
-  Manual: True
-  Default: False
-
-Flag TestLPSolve
-  Description: run test cases that depends on lp_solve command
-  Manual: True
-  Default: False
-
-Flag TestSCIP
-  Description: run test cases that depends on scip command
-  Manual: True
-  Default: False
-
 source-repository head
   type:     git
   location: git://github.com/msakai/toysolver.git
@@ -186,6 +153,7 @@ Library
      log-domain,
      -- numLoopState requires loop >=0.3.0
      loop >=0.3.0 && < 1.0.0,
+     MIP >=0.1.1.0 && <0.2,
      mtl >=2.1.2,
      multiset,
      -- createSystemRandom requires mwc-random >=0.13.1.0
@@ -327,24 +295,6 @@ Library
      ToySolver.Data.LA
      ToySolver.Data.LA.FOL
      ToySolver.Data.LBool
-     ToySolver.Data.MIP
-     ToySolver.Data.MIP.Base
-     ToySolver.Data.MIP.FileUtils
-     ToySolver.Data.MIP.LPFile
-     ToySolver.Data.MIP.MPSFile
-     ToySolver.Data.MIP.Solution.CBC
-     ToySolver.Data.MIP.Solution.CPLEX
-     ToySolver.Data.MIP.Solution.GLPK
-     ToySolver.Data.MIP.Solution.Gurobi
-     ToySolver.Data.MIP.Solution.SCIP
-     ToySolver.Data.MIP.Solver
-     ToySolver.Data.MIP.Solver.Base
-     ToySolver.Data.MIP.Solver.CBC
-     ToySolver.Data.MIP.Solver.CPLEX
-     ToySolver.Data.MIP.Solver.Glpsol
-     ToySolver.Data.MIP.Solver.GurobiCl
-     ToySolver.Data.MIP.Solver.LPSolve
-     ToySolver.Data.MIP.Solver.SCIP
      ToySolver.Data.OrdRel
      ToySolver.Data.Polynomial
      ToySolver.Data.Polynomial.Factorization.FiniteField
@@ -440,6 +390,7 @@ Executable toysolver
     containers,
     data-default-class,
     filepath,
+    MIP,
     OptDir,
     -- maybeReader is available on optparse-applicative >=0.13.0.0
     optparse-applicative >=0.13,
@@ -467,6 +418,7 @@ Executable toysat
     data-default-class,
     filepath,
     megaparsec,
+    MIP,
     mwc-random,
     -- maybeReader is available on optparse-applicative >=0.13.0.0
     optparse-applicative >=0.13,
@@ -577,6 +529,7 @@ Executable toyconvert
     bytestring-builder,
     data-default-class,
     filepath,
+    MIP,
     optparse-applicative,
     pseudo-boolean,
     scientific,
@@ -757,6 +710,7 @@ Executable svm2lp
     base,
     containers,
     data-default-class,
+    MIP,
     scientific,
     split,
     text,
@@ -914,12 +868,8 @@ Test-suite TestSuite
     Test.GraphShortestPath
     Test.HittingSets
     Test.Knapsack
-    Test.LPFile
     Test.Misc
-    Test.MIP
     Test.MIPSolver
-    Test.MIPSolver2
-    Test.MPSFile
     Test.ProbSAT
     Test.QBF
     Test.QUBO
@@ -981,18 +931,6 @@ Test-suite TestSuite
     DataKinds
     ScopedTypeVariables
     TemplateHaskell
-  if flag(TestCBC)
-    CPP-Options: "-DTEST_CBC"
-  if flag(TestCPLEX)
-    CPP-Options: "-DTEST_CPLEX"
-  if flag(TestGlpsol)
-    CPP-Options: "-DTEST_GLPSOL"
-  if flag(TestGurobiCl)
-    CPP-Options: "-DTEST_GUROBI_CL"
-  if flag(TestLPSolve)
-    CPP-Options: "-DTEST_LP_SOLVE"
-  if flag(TestSCIP)
-    CPP-Options: "-DTEST_SCIP"
 
 Benchmark BenchmarkSATLIB
   type:             exitcode-stdio-1.0
