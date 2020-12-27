@@ -43,11 +43,11 @@ packages:
 extra-deps:
 - queue-0.1.2
 - OptDir-0.0.3
-- logic-TPTP-0.4.5.0
+- logic-TPTP-0.4.7.0
 - data-interval-1.3.1
 - extended-reals-0.2.3.0
 - finite-field-0.9.0
-- pseudo-boolean-0.1.8.0
+- pseudo-boolean-0.1.9.0@sha256:18be9ef79c2b81baa746672182afefd800f8b96fcac7946bbb0456ea652e0a74
 - sign-0.4.4
 - OpenCL-1.0.3.4
 # - git: https://github.com/msakai/opencl.git
