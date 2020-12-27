@@ -1,6 +1,14 @@
 0.7.0 (Unreleased)
 -----
+* `ToySolver.SAT`
+  * Restructure SAT solver modules under `ToySolver.SAT.Solver.*`
+  * add `SequentialCounter`, `ParallelCounter` and `Totalizer` as methods for encoding cardinality constraints
+  * add `PackedLit` type to reduce memory footprint
+  * use structure of array (SOA) approach to reduce memory footprint
 * `ToySolver.Data.MIP.*` is separated into `MIP` package as `Numeric.Optimization.MIP`
+* add `ToySolver.Data.Polynomial.Interpolation.Hermite`
+* add `ToySolver.Graph.IndependentSet` and `ToySolver.Converter.SAT2MIS`
+* stop supporting GHC-7.8
 
 0.6.0
 -----
