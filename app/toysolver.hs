@@ -41,13 +41,14 @@ import System.IO
 import Text.Printf
 import GHC.Conc (getNumProcessors)
 
+import qualified Numeric.Optimization.MIP as MIP
+import qualified Numeric.Optimization.MIP.Solution.Gurobi as GurobiSol
+
 import ToySolver.Data.OrdRel
 import ToySolver.Data.FOL.Arith as FOL
 import qualified ToySolver.Data.LA.FOL as LAFOL
 import qualified ToySolver.Data.Polynomial as P
 import qualified ToySolver.Data.AlgebraicNumber.Real as AReal
-import qualified ToySolver.Data.MIP as MIP
-import qualified ToySolver.Data.MIP.Solution.Gurobi as GurobiSol
 import qualified ToySolver.Arith.OmegaTest as OmegaTest
 import qualified ToySolver.Arith.Cooper as Cooper
 import qualified ToySolver.Arith.Simplex.Textbook.MIPSolver.Simple as TextbookMIP

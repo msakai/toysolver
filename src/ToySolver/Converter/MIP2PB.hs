@@ -32,8 +32,9 @@ import qualified Data.Set as Set
 import Data.VectorSpace
 
 import qualified Data.PseudoBoolean as PBFile
+import qualified Numeric.Optimization.MIP as MIP
+
 import ToySolver.Converter.Base
-import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Data.OrdRel
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Integer as Integer

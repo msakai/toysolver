@@ -11,13 +11,16 @@ import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import Data.Scientific
 import qualified Data.Text.Lazy.IO as TLIO
-import ToySolver.Data.MIP ((.==.), (.>=.))
-import qualified ToySolver.Data.MIP as MIP
 import System.Console.GetOpt
 import System.Environment
 import System.Exit
 import System.IO
+
+import Numeric.Optimization.MIP ((.==.), (.>=.))
+import qualified Numeric.Optimization.MIP as MIP
+
 import ToySolver.Internal.Util (setEncodingChar8)
+
 
 type Problem = [(Int, IntMap Double)]
 
