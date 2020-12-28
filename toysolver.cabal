@@ -16,7 +16,7 @@ Tested-With:
    GHC ==8.4.4
    GHC ==8.6.5
    GHC ==8.8.4
-   GHC ==8.10.1
+   GHC ==8.10.2
 Extra-Source-Files:
    README.md
    CHANGELOG.markdown
