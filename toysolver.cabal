@@ -313,7 +313,7 @@ Library
      ToySolver.FileFormat.CNF
      ToySolver.Graph.ShortestPath
      ToySolver.Graph.IndependentSet
-     ToySolver.MaxCut
+     ToySolver.Graph.MaxCut
      ToySolver.QBF
      ToySolver.QUBO
      ToySolver.SAT

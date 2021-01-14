@@ -38,7 +38,7 @@ import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
 
 import qualified ToySolver.FileFormat.CNF as CNF
-import qualified ToySolver.MaxCut as MaxCut
+import qualified ToySolver.Graph.MaxCut as MaxCut
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.Converter.Base
 import ToySolver.Converter.NAESAT (NAESAT)

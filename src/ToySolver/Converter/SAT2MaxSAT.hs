@@ -65,7 +65,7 @@ import qualified Data.Set as Set
 import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Converter.Base
 import ToySolver.Converter.SAT2KSAT
-import qualified ToySolver.MaxCut as MaxCut
+import qualified ToySolver.Graph.MaxCut as MaxCut
 import qualified ToySolver.SAT.Types as SAT
 
 -- ------------------------------------------------------------------------

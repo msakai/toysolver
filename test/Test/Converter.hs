@@ -24,7 +24,7 @@ import qualified Test.QuickCheck.Monadic as QM
 import ToySolver.Converter
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.Graph.IndependentSet as IS
-import qualified ToySolver.MaxCut as MaxCut
+import qualified ToySolver.Graph.MaxCut as MaxCut
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 
