@@ -1,0 +1,87 @@
+on: [push, pull_request]
+name: build
+jobs:
+  toysolver:
+    name: toysolver
+    runs-on: ${{ matrix.os }}
+    env:
+      STACK_YAML: ${{ matrix.stack_yaml }}
+    strategy:
+      matrix:
+        include:
+          - ghc: '8.8.4'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-8.8.yaml'
+            stack_args: '--coverage --haddock --no-haddock-deps'
+            stack_test_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
+            coveralls: true
+          #- ghc: '8.8.4'
+          #  os: macos-latest
+          #  stack_yaml: 'stack-ghc-8.8.yaml'
+          #  stack_args: ''
+          #  stack_test_args: ''
+          #  flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+          #  coveralls: false
+          - ghc: '8.8.4'
+            os: windows-latest
+            stack_yaml: 'stack-ghc-8.8.yaml'
+            stack_args: '--arch x86_64'
+            stack_test_args: '-j1'  # https://github.com/commercialhaskell/stack/issues/5024
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            coveralls: false
+          - ghc: '8.6.3'
+            os: windows-latest
+            stack_yaml: 'stack-windows-i386.yaml'
+            stack_args: '--arch i386'
+            stack_test_args: '-j1'  # https://github.com/commercialhaskell/stack/issues/5024
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            coveralls: false
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - uses: haskell/actions/setup@v1
+        name: Setup Haskell
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          enable-stack: true
+          stack-version: 'latest'
+          stack-no-global: true
+          stack-setup-ghc: true
+
+      - name: Install packages (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install ocl-icd-opencl-dev
+
+      - uses: actions/cache@v1
+        name: Cache ~/.stack
+        with:
+          path: ~/.stack
+          key: ${{ runner.os }}-${{ matrix.ghc }}-stack
+
+      # https://github.com/commercialhaskell/stack/issues/5405
+      - name: Clear setup-exe-cache directory
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        run: rm -r ~/.stack/setup-exe-cache
+
+      - name: Build
+        shell: bash
+        run: stack build --test --no-run-tests --bench --no-run-benchmarks ${{ matrix.stack_args }} ${{ matrix.flags }}
+
+      - name: Test
+        shell: bash
+        run: stack test ${{ matrix.stack_args }} ${{ matrix.stack_test_args }} ${{ matrix.flags }}
+
+      - name: Coveralls
+        if: matrix.coveralls
+        continue-on-error: true
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        run: |
+          curl -L https://github.com/lehins/stack-hpc-coveralls/releases/download/v0.0.6.0/shc.tar.gz | tar -xz
+          ./shc --repo-token="$COVERALLS_REPO_TOKEN" toysolver TestSuite TestPolynomial
