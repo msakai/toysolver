@@ -28,6 +28,9 @@ import Paths_toysolver
 packageVersions :: [(String, String)]
 packageVersions = sort $ tail
   [ (undefined, undefined) -- dummy
+#ifdef VERSION_MIP
+  , ("MIP", VERSION_MIP)
+#endif
 #ifdef VERSION_OpenCL
   , ("OpenCL", VERSION_OpenCL)
 #endif
