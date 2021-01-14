@@ -85,3 +85,6 @@ jobs:
         run: |
           curl -L https://github.com/lehins/stack-hpc-coveralls/releases/download/v0.0.6.0/shc.tar.gz | tar -xz
           ./shc --repo-token="$COVERALLS_REPO_TOKEN" toysolver TestSuite TestPolynomial
+
+      - name: Build Artifacts
+        run: stack runhaskell ${{ matrix.stack_args }} --package turtle misc/build_artifacts.hs
