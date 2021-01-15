@@ -8,7 +8,7 @@
 * `ToySolver.Data.MIP.*` is separated into `MIP` package as `Numeric.Optimization.MIP`
 * add `ToySolver.Data.Polynomial.Interpolation.Hermite`
 * add `ToySolver.Graph.IndependentSet` and `ToySolver.Converter.SAT2MIS`
-* stop supporting GHC-7.8
+* stop supporting GHC-7.10
 
 0.6.0
 -----
@@ -25,7 +25,7 @@
     info `ToySolver.FileFormat` and `ToySolver.FileFormat.CNF`
   * allow reading/writing `gzip`ped CNF/WCNF/GCNF/QDimacs/LP/MPS files
 * rename modules:
-  *	`ToySolver.Arith.Simplex2` to `ToySolver.Arith.Simplex`
+  * `ToySolver.Arith.Simplex2` to `ToySolver.Arith.Simplex`
   * `ToySolver.Arith.MIPSolver2` to `ToySolver.Arith.MIP`
   * `ToySolver.Data.Var` to `ToySolver.Data.IntVar`
 * `ToySolver.SAT`:
