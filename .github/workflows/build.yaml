@@ -26,14 +26,14 @@ jobs:
           - ghc: '8.8.4'
             os: windows-latest
             stack_yaml: 'stack-ghc-8.8.yaml'
-            stack_args: '--arch x86_64'
+            stack_args: ''
             stack_test_args: '-j1'  # https://github.com/commercialhaskell/stack/issues/5024
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
           - ghc: '8.6.3'
             os: windows-latest
             stack_yaml: 'stack-windows-i386.yaml'
-            stack_args: '--arch i386'
+            stack_args: ''
             stack_test_args: '-j1'  # https://github.com/commercialhaskell/stack/issues/5024
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
@@ -85,3 +85,6 @@ jobs:
         run: |
           curl -L https://github.com/lehins/stack-hpc-coveralls/releases/download/v0.0.6.0/shc.tar.gz | tar -xz
           ./shc --repo-token="$COVERALLS_REPO_TOKEN" toysolver TestSuite TestPolynomial
+
+      - name: Build Artifacts
+        run: stack runhaskell ${{ matrix.stack_args }} --package turtle misc/build_artifacts.hs
