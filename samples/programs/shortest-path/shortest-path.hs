@@ -60,7 +60,7 @@ main = do
           vs0 = map read vs'
           vs = if null vs0 then [1] else vs0
       es <- load fname
-      let g :: ShortestPath.Graph Int Int64 Int
+      let g :: ShortestPath.Graph Int64 Int
           g = fmap toList $ HashMap.fromListWith (<>) [(s, Seq.singleton (t,fromIntegral w,i)) | (i,(s,t,w)) <- zip [(1::Int)..] es]
       case filter (\c -> c /= '-' && c /= '_') (map toLower method) of
         "dijkstra" -> do

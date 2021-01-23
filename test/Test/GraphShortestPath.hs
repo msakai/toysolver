@@ -22,7 +22,7 @@ type Vertex = Int
 type Cost = Rational
 type Label = Char
 
-genGraph :: Gen Cost -> Gen (HashMap Vertex [OutEdge Vertex Cost Label])
+genGraph :: Gen Cost -> Gen (HashMap Vertex [OutEdge Cost Label])
 genGraph genCost = do
   n <- choose (1, 20) -- inclusive
   liftM HashMap.fromList $ forM [1..n] $ \i -> do
@@ -34,13 +34,13 @@ genGraph genCost = do
       return (j,c,l)
     return (i, ys)
 
-genGraphNonNegative :: Gen (HashMap Vertex [OutEdge Vertex Cost Label])
+genGraphNonNegative :: Gen (HashMap Vertex [OutEdge Cost Label])
 genGraphNonNegative = genGraph (liftM getNonNegative arbitrary)
 
 isValidEdge
-  :: (Eq vertex, Hashable vertex, Eq cost, Eq label)
-  => HashMap vertex [OutEdge vertex cost label]
-  -> Edge vertex cost label
+  :: (Eq cost, Eq label)
+  => HashMap Vertex [OutEdge cost label]
+  -> Edge cost label
   -> Bool
 isValidEdge g (v,u,c,l) =
   case HashMap.lookup  v g of
@@ -48,9 +48,9 @@ isValidEdge g (v,u,c,l) =
     Just outs -> (u,c,l) `elem` outs
 
 isValidPath
-  :: (Eq vertex, Hashable vertex, Eq cost, Num cost, Eq label)
-  => HashMap vertex [OutEdge vertex cost label]
-  -> Path vertex cost label
+  :: (Eq cost, Num cost, Eq label)
+  => HashMap Vertex [OutEdge cost label]
+  -> Path cost label
   -> Bool
 isValidPath g = f
   where
@@ -59,9 +59,9 @@ isValidPath g = f
     f (Append p1 p2 c) = f p1 && f p2 && pathTo p1 == pathFrom p2 && pathCost p1 + pathCost p2 == c
 
 isValidNegativeCostCycle
-  :: (Eq vertex, Hashable vertex, Num cost, Ord cost, Eq label)
-  => HashMap vertex [OutEdge vertex cost label]
-  -> Path vertex cost label
+  :: (Num cost, Ord cost, Eq label)
+  => HashMap Vertex [OutEdge cost label]
+  -> Path cost label
   -> Bool
 isValidNegativeCostCycle g cyclePath =
   isValidPath g cyclePath &&
@@ -69,10 +69,10 @@ isValidNegativeCostCycle g cyclePath =
   pathCost cyclePath < 0
 
 isValidResult
-  :: (Eq vertex, Hashable vertex, Eq cost, Num cost, Eq label)
-  => HashMap vertex [OutEdge vertex cost label]
-  -> [vertex]
-  -> HashMap vertex (cost, Last (InEdge vertex cost label))
+  :: (Eq cost, Num cost, Eq label)
+  => HashMap Vertex [OutEdge cost label]
+  -> [Vertex]
+  -> HashMap Vertex (cost, Last (InEdge cost label))
   -> Bool
 isValidResult g ss p =
   and
@@ -165,26 +165,27 @@ prop_floydWarshall_equals_bellmanFord =
 -- <https://www.coursera.org/course/linearopt>
 case_bellmanFord_test1 :: Assertion
 case_bellmanFord_test1 = do
-  let ret = bellmanFord lastInEdge g ['A']
+  let ret = bellmanFord lastInEdge g [vA]
   ret @?= expected
   bellmanFordDetectNegativeCycle path g ret @?= Nothing
   where
-    g :: HashMap Char [(Char, Int, ())]
+    g :: HashMap Vertex [(Vertex, Int, ())]
     g = HashMap.fromList
-        [ ('A', [('B',-7,()), ('C',-9,())])
-        , ('B', [('C',-8,()), ('D',-10,())])
-        , ('C', [('D',4,())])
-        , ('D', [('E',-3,())])
-        , ('E', [('F',5,())])
-        , ('F', [('C',-3,())])
+        [ (vA, [(vB,-7,()), (vC,-9,())])
+        , (vB, [(vC,-8,()), (vD,-10,())])
+        , (vC, [(vD,4,())])
+        , (vD, [(vE,-3,())])
+        , (vE, [(vF,5,())])
+        , (vF, [(vC,-3,())])
         ]
+    [vA, vB, vC, vD, vE, vF] = [0..5]
     expected = HashMap.fromList
-      [ ('A', (0, Last Nothing))
-      , ('B', (-7, Last (Just ('A',-7,()))))
-      , ('C', (-18, Last (Just ('F',-3,()))))
-      , ('D', (-17, Last (Just ('B',-10,()))))
-      , ('E', (-20, Last (Just ('D',-3,()))))
-      , ('F', (-15, Last (Just ('E',5,()))))
+      [ (vA, (0, Last Nothing))
+      , (vB, (-7, Last (Just (vA,-7,()))))
+      , (vC, (-18, Last (Just (vF,-3,()))))
+      , (vD, (-17, Last (Just (vB,-10,()))))
+      , (vE, (-20, Last (Just (vD,-3,()))))
+      , (vF, (-15, Last (Just (vE,5,()))))
       ]
 
 case_bellmanFord_normal :: Assertion
@@ -964,7 +965,7 @@ case_floydWarshall_normal = do
       ]
 
 -- https://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm
-floydWarshall_example :: HashMap Vertex [OutEdge Vertex Cost ()]
+floydWarshall_example :: HashMap Vertex [OutEdge Cost ()]
 floydWarshall_example = HashMap.fromList
   [ (1, [(3,-2,())])
   , (2, [(1,4,()), (3,3,())])
