@@ -24,8 +24,8 @@ module ToySolver.Arith.DifferenceLogic
   ) where
 
 import Data.Hashable
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import Data.Monoid
@@ -53,18 +53,18 @@ data SimpleAtom b = Diff :<= b
 solve
   :: (Hashable label, Eq label, Real b)
   => [(label, SimpleAtom b)]
-  -> Either (HashSet label) (HashMap Var b)
+  -> Either (HashSet label) (IntMap b)
 solve xs =
   case bellmanFordDetectNegativeCycle (monoid' (\(_,_,_,l) -> Endo (l:))) g d of
     Just f -> Left $ HashSet.fromList $ appEndo f []
     Nothing -> Right $ fmap (\(c,_) -> - c) d
   where
     vs = HashSet.toList $ HashSet.fromList [v | (_,(a :- b :<= _)) <- xs, v <- [a,b]]
-    g = HashMap.fromList [(a,[(b,k,l)]) | (l,(a :- b :<= k)) <- xs]
+    g = IntMap.fromList [(a,[(b,k,l)]) | (l,(a :- b :<= k)) <- xs]
     d = bellmanFord lastInEdge g vs
 
 -- M = {a−b ≤ 2, b−c ≤ 3, c−a ≤ −3}
-_test_sat :: Either (HashSet Int) (HashMap Var Int)
+_test_sat :: Either (HashSet Int) (IntMap Int)
 _test_sat = solve xs
   where
     xs :: [(Int, SimpleAtom Int)]
@@ -72,7 +72,7 @@ _test_sat = solve xs
     [a,b,c] = [0..2]
 
 -- M = {a−b ≤ 2, b−c ≤ 3, c−a ≤ −7}
-_test_unsat :: Either (HashSet Int) (HashMap Var Int)
+_test_unsat :: Either (HashSet Int) (IntMap Int)
 _test_unsat = solve xs
   where
     xs :: [(Int, SimpleAtom Int)]

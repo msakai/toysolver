@@ -12,9 +12,9 @@ import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
 import Test.Tasty.TH
 import ToySolver.Graph.ShortestPath
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.HashSet as HashSet
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntSet as IntSet
 
 -- ------------------------------------------------------------------------
 
@@ -22,10 +22,10 @@ type Vertex = Int
 type Cost = Rational
 type Label = Char
 
-genGraph :: Gen Cost -> Gen (HashMap Vertex [OutEdge Cost Label])
+genGraph :: Gen Cost -> Gen (IntMap [OutEdge Cost Label])
 genGraph genCost = do
   n <- choose (1, 20) -- inclusive
-  liftM HashMap.fromList $ forM [1..n] $ \i -> do
+  liftM IntMap.fromList $ forM [1..n] $ \i -> do
     m <- choose (0, min (n+1) 20)
     ys <- replicateM m $ do
       j <- choose (1, n)
@@ -34,33 +34,33 @@ genGraph genCost = do
       return (j,c,l)
     return (i, ys)
 
-genGraphNonNegative :: Gen (HashMap Vertex [OutEdge Cost Label])
+genGraphNonNegative :: Gen (IntMap [OutEdge Cost Label])
 genGraphNonNegative = genGraph (liftM getNonNegative arbitrary)
 
 isValidEdge
   :: (Eq cost, Eq label)
-  => HashMap Vertex [OutEdge cost label]
+  => IntMap [OutEdge cost label]
   -> Edge cost label
   -> Bool
 isValidEdge g (v,u,c,l) =
-  case HashMap.lookup  v g of
+  case IntMap.lookup  v g of
     Nothing -> False
     Just outs -> (u,c,l) `elem` outs
 
 isValidPath
   :: (Eq cost, Num cost, Eq label)
-  => HashMap Vertex [OutEdge cost label]
+  => IntMap [OutEdge cost label]
   -> Path cost label
   -> Bool
 isValidPath g = f
   where
-    f (Empty v) = v `HashMap.member` g
+    f (Empty v) = v `IntMap.member` g
     f (Singleton e) = isValidEdge g e
     f (Append p1 p2 c) = f p1 && f p2 && pathTo p1 == pathFrom p2 && pathCost p1 + pathCost p2 == c
 
 isValidNegativeCostCycle
   :: (Num cost, Ord cost, Eq label)
-  => HashMap Vertex [OutEdge cost label]
+  => IntMap [OutEdge cost label]
   -> Path cost label
   -> Bool
 isValidNegativeCostCycle g cyclePath =
@@ -70,42 +70,42 @@ isValidNegativeCostCycle g cyclePath =
 
 isValidResult
   :: (Eq cost, Num cost, Eq label)
-  => HashMap Vertex [OutEdge cost label]
+  => IntMap [OutEdge cost label]
   -> [Vertex]
-  -> HashMap Vertex (cost, Last (InEdge cost label))
+  -> IntMap (cost, Last (InEdge cost label))
   -> Bool
 isValidResult g ss p =
   and
   [ case m of
-      Nothing -> tc == 0 && u `HashSet.member` ss'
-      Just (v,c,l) -> isValidEdge g (v,u,c,l) && tc == fst (p HashMap.! v) + c
-  | (u, (tc,Last m)) <- HashMap.toList p
+      Nothing -> tc == 0 && u `IntSet.member` ss'
+      Just (v,c,l) -> isValidEdge g (v,u,c,l) && tc == fst (p IntMap.! v) + c
+  | (u, (tc,Last m)) <- IntMap.toList p
   ]
   where
-    ss' = HashSet.fromList ss
+    ss' = IntSet.fromList ss
 
 -- ------------------------------------------------------------------------
 
 prop_bellmanFord_valid_path :: Property
 prop_bellmanFord_valid_path =
   forAll (genGraph arbitrary) $ \g ->
-    forAll (sublistOf (HashMap.keys g)) $ \ss ->
+    forAll (sublistOf (IntMap.keys g)) $ \ss ->
       and
       [ isValidPath g p &&
         pathTo p == u &&
         pathFrom p `elem` ss
-      | (u, (_,p)) <- HashMap.toList $ bellmanFord path g ss
+      | (u, (_,p)) <- IntMap.toList $ bellmanFord path g ss
       ]
 
 prop_dijkstra_valid_path :: Property
 prop_dijkstra_valid_path =
   forAll (genGraphNonNegative) $ \g ->
-    forAll (sublistOf (HashMap.keys g)) $ \ss ->
+    forAll (sublistOf (IntMap.keys g)) $ \ss ->
       and
       [ isValidPath g p &&
         pathTo p == u &&
         pathFrom p `elem` ss
-      | (u, (_,p)) <- HashMap.toList $ dijkstra path g ss
+      | (u, (_,p)) <- IntMap.toList $ dijkstra path g ss
       ]
 
 prop_floydWarshall_valid_path :: Property
@@ -115,46 +115,46 @@ prop_floydWarshall_valid_path =
       [ isValidPath g p &&
         pathFrom p == u &&
         pathTo p == v
-      | (u,m) <- HashMap.toList (floydWarshall path g)
-      , (v,(_,p)) <- HashMap.toList m
+      | (u,m) <- IntMap.toList (floydWarshall path g)
+      , (v,(_,p)) <- IntMap.toList m
       ]
 
 prop_dijkstra_equals_bellmanFord :: Property
 prop_dijkstra_equals_bellmanFord =
   forAll (genGraphNonNegative) $ \g ->
-    let vs = HashMap.keys g
+    let vs = IntMap.keys g
     in forAll (elements vs) $ \v ->
        forAll (elements vs) $ \u ->
-         (fmap (pathCost . snd) . HashMap.lookup u $ dijkstra path g [v])
+         (fmap (pathCost . snd) . IntMap.lookup u $ dijkstra path g [v])
          ==
-         (fmap (pathCost . snd) . HashMap.lookup u $ bellmanFord path g [v])
+         (fmap (pathCost . snd) . IntMap.lookup u $ bellmanFord path g [v])
 
 prop_floydWarshall_equals_dijkstra :: Property
 prop_floydWarshall_equals_dijkstra =
   forAll (genGraphNonNegative) $ \g ->
-    let vs = HashMap.keys g
+    let vs = IntMap.keys g
         m  = floydWarshall path g
     in forAll (elements vs) $ \v ->
        forAll (elements vs) $ \u ->
-         fmap (pathCost . snd) (HashMap.lookup u =<< HashMap.lookup v m)
+         fmap (pathCost . snd) (IntMap.lookup u =<< IntMap.lookup v m)
          ==
-         fmap (pathCost . snd) (HashMap.lookup u $ dijkstra path g [v])
+         fmap (pathCost . snd) (IntMap.lookup u $ dijkstra path g [v])
 
 prop_floydWarshall_equals_bellmanFord :: Property
 prop_floydWarshall_equals_bellmanFord =
   forAll (genGraph arbitrary) $ \g ->
-    let vs = HashMap.keys g
+    let vs = IntMap.keys g
         ret1 = floydWarshall lastInEdge g
     in counterexample (show ret1) $ conjoin $
          [ counterexample (show v) $ counterexample (show ret2) $
              case bellmanFordDetectNegativeCycle path g ret2 of
                Just cyclePath ->
                  conjoin
-                 [ counterexample (show u) (fst (ret1 HashMap.! u HashMap.! u) < 0)
+                 [ counterexample (show u) (fst (ret1 IntMap.! u IntMap.! u) < 0)
                  | u <- pathVertexes cyclePath
                  ]
                Nothing ->
-                 fmap fst (HashMap.lookupDefault HashMap.empty v ret1)
+                 fmap fst (IntMap.findWithDefault IntMap.empty v ret1)
                  ===
                  fmap fst ret2
          | v <- vs
@@ -169,8 +169,8 @@ case_bellmanFord_test1 = do
   ret @?= expected
   bellmanFordDetectNegativeCycle path g ret @?= Nothing
   where
-    g :: HashMap Vertex [(Vertex, Int, ())]
-    g = HashMap.fromList
+    g :: IntMap [(Vertex, Int, ())]
+    g = IntMap.fromList
         [ (vA, [(vB,-7,()), (vC,-9,())])
         , (vB, [(vC,-8,()), (vD,-10,())])
         , (vC, [(vD,4,())])
@@ -179,7 +179,7 @@ case_bellmanFord_test1 = do
         , (vF, [(vC,-3,())])
         ]
     [vA, vB, vC, vD, vE, vF] = [0..5]
-    expected = HashMap.fromList
+    expected = IntMap.fromList
       [ (vA, (0, Last Nothing))
       , (vB, (-7, Last (Just (vA,-7,()))))
       , (vC, (-18, Last (Just (vF,-3,()))))
@@ -190,7 +190,7 @@ case_bellmanFord_test1 = do
 
 case_bellmanFord_normal :: Assertion
 case_bellmanFord_normal = do
-  let g = HashMap.fromListWith (++) $
+  let g = IntMap.fromListWith (++) $
             [(v,[(u,c,())]) | ((v,u),c) <- bellmanford_example_normal]
       m = bellmanFord lastInEdge g [24]
   assertBool (show m ++ " is not a valid result") $ isValidResult g [24] m
@@ -560,7 +560,7 @@ bellmanford_example_normal =
 
 case_bellmanFord_negativecost_cycle :: Assertion
 case_bellmanFord_negativecost_cycle = do
-  let g = HashMap.fromListWith (++) $
+  let g = IntMap.fromListWith (++) $
             [(v, [(u,c,())]) | ((v,u),c) <- bellmanford_example_negativecost_cycle]
       m = bellmanFord lastInEdge g [25]
   case bellmanFordDetectNegativeCycle path g m of
@@ -949,14 +949,14 @@ bellmanford_example_negativecost_cycle =
 case_floydWarshall_normal :: Assertion
 case_floydWarshall_normal = do
   fmap (fmap fst) m @?= expected
-  forM_ (HashMap.toList m) $ \(u,m1) -> do
-    forM_ (HashMap.toList m1) $ \(v,(_,p)) -> do
+  forM_ (IntMap.toList m) $ \(u,m1) -> do
+    forM_ (IntMap.toList m1) $ \(v,(_,p)) -> do
       pathFrom p @?= u
       pathTo p @?= v
       assertBool (show p ++ " is not a valid path") (isValidPath floydWarshall_example p)
   where
     m = floydWarshall path floydWarshall_example
-    expected = HashMap.fromListWith HashMap.union [(u, HashMap.singleton v c) | ((u,v),c) <- xs]
+    expected = IntMap.fromListWith IntMap.union [(u, IntMap.singleton v c) | ((u,v),c) <- xs]
     xs =
       [ ((1,1),0), ((1,2),-1), ((1,3),-2), ((1,4),0)
       , ((2,1),4), ((2,2),0),  ((2,3),2),  ((2,4),4)
@@ -965,8 +965,8 @@ case_floydWarshall_normal = do
       ]
 
 -- https://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm
-floydWarshall_example :: HashMap Vertex [OutEdge Cost ()]
-floydWarshall_example = HashMap.fromList
+floydWarshall_example :: IntMap [OutEdge Cost ()]
+floydWarshall_example = IntMap.fromList
   [ (1, [(3,-2,())])
   , (2, [(1,4,()), (3,3,())])
   , (3, [(4,2,())])

@@ -71,9 +71,9 @@ import Control.Monad.Trans.Except
 import Data.Hashable
 import qualified Data.HashTable.Class as H
 import qualified Data.HashTable.ST.Cuckoo as C
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.HashSet as HashSet
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntSet as IntSet
 import qualified Data.Heap as Heap -- http://hackage.haskell.org/package/heaps
 import Data.List (foldl')
 import Data.Monoid
@@ -85,7 +85,7 @@ import Data.STRef
 -- ------------------------------------------------------------------------
 
 -- | Graph represented as a map from vertexes to their outgoing edges
-type Graph cost label = HashMap Vertex [OutEdge cost label]
+type Graph cost label = IntMap [OutEdge cost label]
 
 -- | Vertex data type
 type Vertex = Int
@@ -290,33 +290,33 @@ bellmanFord
   -> Graph cost label
   -> [Vertex]
      -- ^ List of source vertexes @vs@
-  -> HashMap Vertex (cost, a)
+  -> IntMap (cost, a)
 bellmanFord (Fold fV fE fC fD) g ss = runST $ do
-  let n = HashMap.size g
+  let n = IntMap.size g
   d <- C.newSized n
   forM_ ss $ \s -> H.insert d s (Pair 0 (fV s))
 
-  updatedRef <- newSTRef (HashSet.fromList ss)
+  updatedRef <- newSTRef (IntSet.fromList ss)
   _ <- runExceptT $ replicateM_ n $ do
     us <- lift $ readSTRef updatedRef
-    when (HashSet.null us) $ throwE ()
+    when (IntSet.null us) $ throwE ()
     lift $ do
-      writeSTRef updatedRef HashSet.empty
-      forM_ (HashSet.toList us) $ \u -> do
-        -- modifySTRef' updatedRef (HashSet.delete u) -- possible optimization
+      writeSTRef updatedRef IntSet.empty
+      forM_ (IntSet.toList us) $ \u -> do
+        -- modifySTRef' updatedRef (IntSet.delete u) -- possible optimization
         Just (Pair du a) <- H.lookup d u
-        forM_ (HashMap.lookupDefault [] u g) $ \(v, c, l) -> do
+        forM_ (IntMap.findWithDefault [] u g) $ \(v, c, l) -> do
           m <- H.lookup d v
           case m of
             Just (Pair c0 _) | c0 <= du + c -> return ()
             _ -> do
               H.insert d v (Pair (du + c) (a `fC` fE (u,v,c,l)))
-              modifySTRef' updatedRef (HashSet.insert v)
+              modifySTRef' updatedRef (IntSet.insert v)
 
   liftM (fmap (\(Pair c x) -> (c, fD x))) $ freezeHashTable d
 
-freezeHashTable :: (H.HashTable h, Hashable k, Eq k) => h s k v -> ST s (HashMap k v)
-freezeHashTable h = H.foldM (\m (k,v) -> return $! HashMap.insert k v m) HashMap.empty h
+freezeHashTable :: H.HashTable h => h s Int v -> ST s (IntMap v)
+freezeHashTable h = H.foldM (\m (k,v) -> return $! IntMap.insert k v m) IntMap.empty h
 
 -- | Utility function for detecting a negative cycle.
 bellmanFordDetectNegativeCycle
@@ -324,18 +324,18 @@ bellmanFordDetectNegativeCycle
   => Fold cost label a
      -- ^ Operation used to fold a cycle
   -> Graph cost label
-  -> HashMap Vertex (cost, Last (InEdge cost label))
+  -> IntMap (cost, Last (InEdge cost label))
      -- ^ Result of @'bellmanFord' 'lastInEdge' vs@
   -> Maybe a
 bellmanFordDetectNegativeCycle (Fold fV fE fC fD) g d = either (Just . fD) (const Nothing) $ do
-  forM_ (HashMap.toList d) $ \(u,(du,_)) ->
-    forM_ (HashMap.lookupDefault [] u g) $ \(v, c, l) -> do
-      let (dv,_) = d HashMap.! v
+  forM_ (IntMap.toList d) $ \(u,(du,_)) ->
+    forM_ (IntMap.findWithDefault [] u g) $ \(v, c, l) -> do
+      let (dv,_) = d IntMap.! v
       when (du + c < dv) $ do
         -- a negative cycle is detected
-        let d' = HashMap.insert v (du + c, Last (Just (u, c, l))) d
+        let d' = IntMap.insert v (du + c, Last (Just (u, c, l))) d
             parent u = do
-              case HashMap.lookup u d' of
+              case IntMap.lookup u d' of
                 Just (_, Last (Just (v,_,_))) -> v
                 _ -> undefined
             u0 = go (parent (parent v)) (parent v)
@@ -344,7 +344,7 @@ bellmanFordDetectNegativeCycle (Fold fV fE fC fD) g d = either (Just . fD) (cons
                   | hare == tortoise = hare
                   | otherwise = go (parent (parent hare)) (parent tortoise)
         let go u result = do
-              let Just (_, Last (Just (v,c,l))) = HashMap.lookup u d'
+              let Just (_, Last (Just (v,c,l))) = IntMap.lookup u d'
               if v == u0 then
                 fC (fE (v,u,c,l)) result
               else
@@ -366,27 +366,27 @@ dijkstra
   -> Graph cost label
   -> [Vertex]
      -- ^ List of source vertexes
-  -> HashMap Vertex (cost, a)
+  -> IntMap (cost, a)
 dijkstra (Fold fV fE fC (fD :: x -> a)) g ss =
   fmap (\(Pair c x) -> (c, fD x)) $
-    loop (Heap.fromList [Heap.Entry 0 (Pair s (fV s)) | s <- ss]) HashMap.empty
+    loop (Heap.fromList [Heap.Entry 0 (Pair s (fV s)) | s <- ss]) IntMap.empty
   where
     loop
       :: Heap.Heap (Heap.Entry cost (Pair Vertex x))
-      -> HashMap Vertex (Pair cost x)
-      -> HashMap Vertex (Pair cost x)
+      -> IntMap (Pair cost x)
+      -> IntMap (Pair cost x)
     loop q visited =
       case Heap.viewMin q of
         Nothing -> visited
         Just (Heap.Entry c (Pair v a), q')
-          | v `HashMap.member` visited -> loop q' visited
+          | v `IntMap.member` visited -> loop q' visited
           | otherwise ->
               let q2 = Heap.fromList
                        [ Heap.Entry (c+c') (Pair ch (a `fC` fE (v,ch,c',l)))
-                       | (ch,c',l) <- HashMap.lookupDefault [] v g
-                       , not (ch `HashMap.member` visited)
+                       | (ch,c',l) <- IntMap.findWithDefault [] v g
+                       , not (ch `IntMap.member` visited)
                        ]
-              in loop (Heap.union q' q2) (HashMap.insert v (Pair c a) visited)
+              in loop (Heap.union q' q2) (IntMap.insert v (Pair c a) visited)
 
 -- ------------------------------------------------------------------------
 
@@ -400,35 +400,35 @@ floydWarshall
   => Fold cost label a
      -- ^ Operation used to fold shotest paths
   -> Graph cost label
-  -> HashMap Vertex (HashMap Vertex (cost, a))
+  -> IntMap (IntMap (cost, a))
 floydWarshall (Fold fV fE fC (fD :: x -> a)) g =
   fmap (fmap (\(Pair c x) -> (c, fD x))) $
-    HashMap.unionWith (HashMap.unionWith minP) (foldl' f tbl0 vs) paths0
+    IntMap.unionWith (IntMap.unionWith minP) (foldl' f tbl0 vs) paths0
   where
-    vs = HashMap.keys g
+    vs = IntMap.keys g
 
-    paths0 :: HashMap Vertex (HashMap Vertex (Pair cost x))
-    paths0 = HashMap.mapWithKey (\v _ -> HashMap.singleton v (Pair 0 (fV v))) g
+    paths0 :: IntMap (IntMap (Pair cost x))
+    paths0 = IntMap.mapWithKey (\v _ -> IntMap.singleton v (Pair 0 (fV v))) g
 
-    tbl0 :: HashMap Vertex (HashMap Vertex (Pair cost x))
-    tbl0 = HashMap.mapWithKey (\v es -> HashMap.fromListWith minP [(u, (Pair c (fE (v,u,c,l)))) | (u,c,l) <- es]) g
+    tbl0 :: IntMap (IntMap (Pair cost x))
+    tbl0 = IntMap.mapWithKey (\v es -> IntMap.fromListWith minP [(u, (Pair c (fE (v,u,c,l)))) | (u,c,l) <- es]) g
 
     minP :: Pair cost x -> Pair cost x -> Pair cost x
     minP = minBy (comparing (\(Pair c _) -> c))
 
-    f :: HashMap Vertex (HashMap Vertex (Pair cost x))
+    f :: IntMap (IntMap (Pair cost x))
       -> Vertex
-      -> HashMap Vertex (HashMap Vertex (Pair cost x))
+      -> IntMap (IntMap (Pair cost x))
     f tbl vk =
-      case HashMap.lookup vk tbl of
+      case IntMap.lookup vk tbl of
         Nothing -> tbl
-        Just hk -> HashMap.map h tbl
+        Just hk -> IntMap.map h tbl
           where
-            h :: HashMap Vertex (Pair cost x) -> HashMap Vertex (Pair cost x)
+            h :: IntMap (Pair cost x) -> IntMap (Pair cost x)
             h m =
-              case HashMap.lookup vk m of
+              case IntMap.lookup vk m of
                 Nothing -> m
-                Just (Pair c1 x1) -> HashMap.unionWith minP m (HashMap.map (\(Pair c2 x2) -> (Pair (c1+c2) (fC x1 x2))) hk)
+                Just (Pair c1 x1) -> IntMap.unionWith minP m (IntMap.map (\(Pair c2 x2) -> (Pair (c1+c2) (fC x1 x2))) hk)
 
 minBy :: (a -> a -> Ordering) -> a -> a -> a
 minBy f a b =
