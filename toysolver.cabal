@@ -22,6 +22,7 @@ Extra-Source-Files:
    CHANGELOG.markdown
    COPYING
    COPYING-GPL
+   app/toysat-ipasir/ipasir.h
    misc/build_bdist_linux.sh
    misc/build_bdist_macos.sh
    misc/build_bdist_win32.sh
@@ -439,6 +440,23 @@ Executable toysat
     CPP-Options: "-DWITH_ZLIB"
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
+
+Foreign-Library     toysat-ipasir
+  type:             native-shared
+  if os(Windows)
+    options: standalone
+    mod-def-file: app/toysat-ipasir/ipasir.def
+  build-depends:
+    base,
+    containers,
+    toysolver
+  hs-source-dirs:   app/toysat-ipasir
+  include-dirs:     app/toysat-ipasir
+  c-sources:        app/toysat-ipasir/cbits.c
+  cpp-options:      -DIPASIR_SHARED_LIB -DBUILDING_IPASIR_SHARED_LIB
+  includes:         ipasir.h
+  other-modules:    IPASIR
+  default-language: Haskell2010
 
 Executable toysmt
   HS-Source-Dirs: app/toysmt, Smtlib
