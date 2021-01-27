@@ -353,7 +353,7 @@ parsePivotStrategy s =
     "largest-coefficient" -> Just PivotStrategyLargestCoefficient
     _ -> Nothing
 
-{-# DEPRECATED nVars "Use setConfig instead" #-}
+{-# DEPRECATED setPivotStrategy "Use setConfig instead" #-}
 setPivotStrategy :: PrimMonad m => GenericSolverM m v -> PivotStrategy -> m ()
 setPivotStrategy solver ps = modifyConfig solver $ \config ->
   config{ configPivotStrategy = ps }
