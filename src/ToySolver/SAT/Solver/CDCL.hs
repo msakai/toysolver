@@ -104,11 +104,13 @@ module ToySolver.SAT.Solver.CDCL
   , setConfig
   , modifyConfig
   , setVarPolarity
-  , setLogger
-  , clearLogger
   , setRandomGen
   , getRandomGen
   , setConfBudget
+
+  -- * Callbacks
+  , setLogger
+  , clearLogger
   , setTerminateCallback
   , clearTerminateCallback
   , setLearnCallback
