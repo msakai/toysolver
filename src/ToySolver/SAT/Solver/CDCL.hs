@@ -110,8 +110,8 @@ module ToySolver.SAT.Solver.CDCL
   , setConfBudget
   , setTerminateCallback
   , clearTerminateCallback
-  , setLearntCallback
-  , clearLearntCallback
+  , setLearnCallback
+  , clearLearnCallback
 
   -- * Read state
   , getNVars
@@ -337,7 +337,7 @@ data Solver
   , svRandomGen  :: !(IORef Rand.GenIO)
   , svConfBudget :: !(IOURef Int)
   , svTerminateCallback :: !(IORef (Maybe (IO Bool)))
-  , svLearntCallback :: !(IORef (Maybe (Clause -> IO ())))
+  , svLearnCallback :: !(IORef (Maybe (Clause -> IO ())))
 
   -- Logging
   , svLogger :: !(IORef (Maybe (String -> IO ())))
@@ -767,7 +767,7 @@ newSolverWithConfig config = do
         , svRandomGen  = randgen
         , svConfBudget = confBudget
         , svTerminateCallback = terminateCallback
-        , svLearntCallback = learntCallback
+        , svLearnCallback = learntCallback
 
         -- Logging
         , svLogger = logger
@@ -1269,7 +1269,7 @@ search solver !conflict_lim onConflict = do
         printStat solver False
 
       if d == levelRoot then do
-        callLearntCallback solver []
+        callLearnCallback solver []
         markBad solver
         return $ Just (SRFinished False)
       else if confBudget==0 then
@@ -1523,11 +1523,11 @@ setTerminateCallback solver callback = writeIORef (svTerminateCallback solver) (
 clearTerminateCallback :: Solver -> IO ()
 clearTerminateCallback solver = writeIORef (svTerminateCallback solver) Nothing
 
-setLearntCallback :: Solver -> (Clause -> IO ()) -> IO ()
-setLearntCallback solver callback = writeIORef (svLearntCallback solver) (Just callback)
+setLearnCallback :: Solver -> (Clause -> IO ()) -> IO ()
+setLearnCallback solver callback = writeIORef (svLearnCallback solver) (Just callback)
 
-clearLearntCallback :: Solver -> IO ()
-clearLearntCallback solver = writeIORef (svLearntCallback solver) Nothing
+clearLearnCallback :: Solver -> IO ()
+clearLearnCallback solver = writeIORef (svLearnCallback solver) Nothing
 
 {--------------------------------------------------------------------
   API for implementation of @solve@
@@ -1758,7 +1758,7 @@ analyzeConflict solver constr = do
                 [_] -> levelRoot
                 _:(_,lv):_ -> lv
       clause = map fst xs
-  callLearntCallback solver clause
+  callLearnCallback solver clause
   return (clause, level)
 
 -- { p } ∪ { pにfalseを割り当てる原因のassumption }
@@ -1787,9 +1787,9 @@ analyzeFinal solver p = do
   n <- Vec.getSize (svTrail solver)
   go (n-1) (IS.singleton (litVar p)) [p]
 
-callLearntCallback :: Solver -> Clause -> IO ()
-callLearntCallback solver clause = do
-  cb <- readIORef (svLearntCallback solver)
+callLearnCallback :: Solver -> Clause -> IO ()
+callLearnCallback solver clause = do
+  cb <- readIORef (svLearnCallback solver)
   case cb of
     Nothing -> return ()
     Just callback -> callback clause
