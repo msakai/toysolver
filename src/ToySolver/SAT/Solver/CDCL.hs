@@ -1517,15 +1517,30 @@ setConfBudget :: Solver -> Maybe Int -> IO ()
 setConfBudget solver (Just b) | b >= 0 = writeIOURef (svConfBudget solver) b
 setConfBudget solver _ = writeIOURef (svConfBudget solver) (-1)
 
+-- | Set a callback function used to indicate a termination requirement to the solver.
+--
+-- The solver will periodically call this function and check its return value during
+-- the search. If the callback function returns `True` the solver terminates and throws
+-- 'Canceled' exception.
+--
+-- See also 'clearTerminateCallback' and
+-- [IPASIR](https://github.com/biotomas/ipasir)'s @ipasir_set_terminate()@ function.
 setTerminateCallback :: Solver -> IO Bool -> IO ()
 setTerminateCallback solver callback = writeIORef (svTerminateCallback solver) (Just callback)
 
+-- | Clear a callback function set by `setTerminateCallback`
 clearTerminateCallback :: Solver -> IO ()
 clearTerminateCallback solver = writeIORef (svTerminateCallback solver) Nothing
 
+-- | Set a callback function used to extract learned clauses from the solver.
+-- The solver will call this function for each learned clause.
+--
+-- See also 'clearLearnCallback' and
+-- [IPASIR](https://github.com/biotomas/ipasir)'s @ipasir_set_learn()@ function.
 setLearnCallback :: Solver -> (Clause -> IO ()) -> IO ()
 setLearnCallback solver callback = writeIORef (svLearnCallback solver) (Just callback)
 
+-- | Clear a callback function set by `setLearnCallback`
 clearLearnCallback :: Solver -> IO ()
 clearLearnCallback solver = writeIORef (svLearnCallback solver) Nothing
 
