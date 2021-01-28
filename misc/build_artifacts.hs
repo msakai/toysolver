@@ -62,11 +62,16 @@ main = sh $ do
       pkg = fromString $ "toysolver-" <> ver <> "-" <> package_platform
   b <- testfile pkg
   when b $ rmtree pkg
-  mktree (pkg </> "bin")
 
+  mktree (pkg </> "bin")
   let binDir = fromText (lineToText local_install_root) </> "bin"
   forM exe_files $ \name -> do
     cp (binDir </> addExeSuffix name) (pkg </> "bin" </> addExeSuffix name)
+
+  mktree (pkg </> "lib")
+  let libDir = fromText (lineToText local_install_root) </> "lib"
+  when (Info.os == "mingw32") $ do
+    cp (libDir </> "toysat-ipasir.dll") (pkg </> "bin" </> "toysat-ipasir.dll")
 
   cptree "samples" (pkg </> "samples")
   cp "COPYING-GPL" (pkg </> "COPYING-GPL")
