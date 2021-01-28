@@ -105,6 +105,7 @@ module ToySolver.SAT.Solver.CDCL
   , modifyConfig
   , setVarPolarity
   , setLogger
+  , clearLogger
   , setRandomGen
   , getRandomGen
   , setConfBudget
@@ -3653,6 +3654,11 @@ dumpConstrActivity solver = do
 setLogger :: Solver -> (String -> IO ()) -> IO ()
 setLogger solver logger = do
   writeIORef (svLogger solver) (Just logger)
+
+-- | Clear logger function set by 'setLogger'.
+clearLogger :: Solver -> IO ()
+clearLogger solver = do
+  writeIORef (svLogger solver) Nothing
 
 log :: Solver -> String -> IO ()
 log solver msg = logIO solver (return msg)
