@@ -104,10 +104,17 @@ module ToySolver.SAT.Solver.CDCL
   , setConfig
   , modifyConfig
   , setVarPolarity
-  , setLogger
   , setRandomGen
   , getRandomGen
   , setConfBudget
+
+  -- * Callbacks
+  , setLogger
+  , clearLogger
+  , setTerminateCallback
+  , clearTerminateCallback
+  , setLearnCallback
+  , clearLearnCallback
 
   -- * Read state
   , getNVars
@@ -332,6 +339,8 @@ data Solver
   , svConfig :: !(IORef Config)
   , svRandomGen  :: !(IORef Rand.GenIO)
   , svConfBudget :: !(IOURef Int)
+  , svTerminateCallback :: !(IORef (Maybe (IO Bool)))
+  , svLearnCallback :: !(IORef (Maybe (Clause -> IO ())))
 
   -- Logging
   , svLogger :: !(IORef (Maybe (String -> IO ())))
@@ -700,6 +709,8 @@ newSolverWithConfig config = do
   implied <- newIORef IS.empty
 
   confBudget <- newIOURef (-1)
+  terminateCallback <- newIORef Nothing
+  learntCallback <- newIORef Nothing
 
   tsolver <- newIORef Nothing
   tchecked <- newIOURef 0
@@ -758,6 +769,8 @@ newSolverWithConfig config = do
         , svConfig     = configRef
         , svRandomGen  = randgen
         , svConfBudget = confBudget
+        , svTerminateCallback = terminateCallback
+        , svLearnCallback = learntCallback
 
         -- Logging
         , svLogger = logger
@@ -1246,12 +1259,20 @@ search solver !conflict_lim onConflict = do
       modifyIOURef (svConfBudget solver) $ \confBudget ->
         if confBudget > 0 then confBudget - 1 else confBudget
       confBudget <- readIOURef (svConfBudget solver)
+      
+      terminateCallback' <- readIORef (svTerminateCallback solver)
+      case terminateCallback' of
+        Nothing -> return ()
+        Just terminateCallback -> do
+          ret <- terminateCallback
+          when ret $ writeIORef (svCanceled solver) True
       canceled <- readIORef (svCanceled solver)
 
       when (c `mod` 100 == 0) $ do
         printStat solver False
 
       if d == levelRoot then do
+        callLearnCallback solver []
         markBad solver
         return $ Just (SRFinished False)
       else if confBudget==0 then
@@ -1499,6 +1520,33 @@ setConfBudget :: Solver -> Maybe Int -> IO ()
 setConfBudget solver (Just b) | b >= 0 = writeIOURef (svConfBudget solver) b
 setConfBudget solver _ = writeIOURef (svConfBudget solver) (-1)
 
+-- | Set a callback function used to indicate a termination requirement to the solver.
+--
+-- The solver will periodically call this function and check its return value during
+-- the search. If the callback function returns `True` the solver terminates and throws
+-- 'Canceled' exception.
+--
+-- See also 'clearTerminateCallback' and
+-- [IPASIR](https://github.com/biotomas/ipasir)'s @ipasir_set_terminate()@ function.
+setTerminateCallback :: Solver -> IO Bool -> IO ()
+setTerminateCallback solver callback = writeIORef (svTerminateCallback solver) (Just callback)
+
+-- | Clear a callback function set by `setTerminateCallback`
+clearTerminateCallback :: Solver -> IO ()
+clearTerminateCallback solver = writeIORef (svTerminateCallback solver) Nothing
+
+-- | Set a callback function used to extract learned clauses from the solver.
+-- The solver will call this function for each learned clause.
+--
+-- See also 'clearLearnCallback' and
+-- [IPASIR](https://github.com/biotomas/ipasir)'s @ipasir_set_learn()@ function.
+setLearnCallback :: Solver -> (Clause -> IO ()) -> IO ()
+setLearnCallback solver callback = writeIORef (svLearnCallback solver) (Just callback)
+
+-- | Clear a callback function set by `setLearnCallback`
+clearLearnCallback :: Solver -> IO ()
+clearLearnCallback solver = writeIORef (svLearnCallback solver) Nothing
+
 {--------------------------------------------------------------------
   API for implementation of @solve@
 --------------------------------------------------------------------}
@@ -1727,7 +1775,9 @@ analyzeConflict solver constr = do
                 [] -> error "analyzeConflict: should not happen"
                 [_] -> levelRoot
                 _:(_,lv):_ -> lv
-  return (map fst xs, level)
+      clause = map fst xs
+  callLearnCallback solver clause
+  return (clause, level)
 
 -- { p } ∪ { pにfalseを割り当てる原因のassumption }
 analyzeFinal :: Solver -> Lit -> IO [Lit]
@@ -1754,6 +1804,13 @@ analyzeFinal solver p = do
               go (i-1) seen result
   n <- Vec.getSize (svTrail solver)
   go (n-1) (IS.singleton (litVar p)) [p]
+
+callLearnCallback :: Solver -> Clause -> IO ()
+callLearnCallback solver clause = do
+  cb <- readIORef (svLearnCallback solver)
+  case cb of
+    Nothing -> return ()
+    Just callback -> callback clause
 
 pbBacktrackLevel :: Solver -> PBLinAtLeast -> IO Level
 pbBacktrackLevel _ ([], rhs) = assert (rhs > 0) $ return levelRoot
@@ -3599,6 +3656,11 @@ dumpConstrActivity solver = do
 setLogger :: Solver -> (String -> IO ()) -> IO ()
 setLogger solver logger = do
   writeIORef (svLogger solver) (Just logger)
+
+-- | Clear logger function set by 'setLogger'.
+clearLogger :: Solver -> IO ()
+clearLogger solver = do
+  writeIORef (svLogger solver) Nothing
 
 log :: Solver -> String -> IO ()
 log solver msg = logIO solver (return msg)

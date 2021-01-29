@@ -5,9 +5,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Test.SAT (satTestGroup) where
 
+import Control.Exception
 import Control.Monad
 import Data.Array.IArray
 import Data.Default.Class
+import Data.IORef
+import qualified Data.Map.Strict as Map
 import qualified Data.Vector as V
 import qualified System.Random.MWC as Rand
 
@@ -591,6 +594,67 @@ deduce 4 by [4,-12]
 conflict: [-4,-12]
 conflict analysis yields [] and that causes error
 -}
+
+------------------------------------------------------------------------
+
+pigeonHole :: SAT.Solver -> Integer -> Integer -> IO ()
+pigeonHole solver p h = do
+  vs <- liftM Map.fromList $ forM [(i,j) | i <- [1..p], j <- [1..h]]  $ \(i,j) -> do
+    v <- SAT.newVar solver
+    return ((i,j), v)
+  forM_ [1..p] $ \i -> do
+    SAT.addAtLeast solver [vs Map.! (i,j) | j <- [1..h]] 1
+  forM_ [1..h] $ \j -> do
+    SAT.addAtMost solver [vs Map.! (i,j) | i<-[1..p]] 1
+  return ()
+
+case_setTerminateCallback :: IO ()
+case_setTerminateCallback = do
+  solver <- SAT.newSolver
+  SAT.setTerminateCallback solver (return True)
+
+  pigeonHole solver 5 4
+
+  m <- try (SAT.solve solver)
+  case m of
+    Left (e :: SAT.Canceled) -> return ()
+    Right x -> assertFailure ("Canceled should be thrown: " ++ show x)
+
+case_clearTerminateCallback :: IO ()
+case_clearTerminateCallback = do
+  solver <- SAT.newSolver
+  SAT.setTerminateCallback solver (return True)
+
+  pigeonHole solver 5 4
+
+  SAT.clearTerminateCallback solver
+  _ <- SAT.solve solver
+  return ()
+
+case_setLearnCallback :: IO ()
+case_setLearnCallback = do
+  solver <- SAT.newSolver
+  learntRef <- newIORef []
+  SAT.setLearnCallback solver (\clause -> modifyIORef learntRef (clause:))
+
+  pigeonHole solver 5 4
+
+  _ <- SAT.solve solver
+  learnt <- readIORef learntRef
+  assertBool "learn callback should have been called" (not (null learnt))
+
+case_clearLearnCallback :: IO ()
+case_clearLearnCallback = do
+  solver <- SAT.newSolver
+  learntRef <- newIORef []
+  SAT.setLearnCallback solver (\clause -> modifyIORef learntRef (clause:))
+
+  pigeonHole solver 5 4
+
+  SAT.clearLearnCallback solver
+  _ <- SAT.solve solver
+  learnt <- readIORef learntRef
+  assertBool "learn callback should not have been called" (null learnt)
 
 ------------------------------------------------------------------------
 -- Test harness
