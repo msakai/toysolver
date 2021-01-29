@@ -55,7 +55,7 @@ before_install:
     travis_retry curl -L https://www.stackage.org/stack/osx-x86_64 | tar xz --strip-components=1 -C ~/.local/bin '*/stack'
   else
     travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
-  fi  
+  fi
 
 install:
 - FLAGS="--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag=toysolver:OpenCL"
