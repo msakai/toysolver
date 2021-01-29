@@ -72,6 +72,14 @@ main = sh $ do
   let libDir = fromText (lineToText local_install_root) </> "lib"
   when (Info.os == "mingw32") $ do
     cp (libDir </> "toysat-ipasir.dll") (pkg </> "bin" </> "toysat-ipasir.dll")
+    proc "stack"
+      [ "exec", "--", "dlltool"
+      , "--dllname", "toysat-ipasir.dll"
+      , "--input-def", "app/toysat-ipasir/ipasir.def"
+      , "--output-lib", format fp (pkg </> "lib" </> "toysat-ipasir.dll.a")
+      ]
+      empty
+    return ()
 
   cptree "samples" (pkg </> "samples")
   cp "COPYING-GPL" (pkg </> "COPYING-GPL")
