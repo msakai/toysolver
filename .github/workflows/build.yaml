@@ -78,6 +78,18 @@ jobs:
         shell: bash
         run: stack test ${{ matrix.stack_args }} ${{ matrix.stack_test_args }} ${{ matrix.flags }}
 
+      - name: Check IPASIR DLL dependencies
+        continue-on-error: true
+        shell: bash
+        run: |
+          if [[ ${{ runner.os }} = "macOS" ]]; then
+            otool -L `stack path --local-install-root`/lib/libtoysat-ipasir.dylib
+          elif [[ ${{ runner.os }} = "Windows" ]]; then          
+            ldd `stack path --local-install-root`/lib/toysat-ipasir.dll
+          else
+            ldd `stack path --local-install-root`/lib/libtoysat-ipasir.so
+          fi
+
       - name: Coveralls
         if: matrix.coveralls
         continue-on-error: true
