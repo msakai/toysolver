@@ -41,6 +41,7 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
 extra-deps:
+- Cabal-2.4.1.0
 - multiset-0.3.4.3@sha256:968192524bd38ffa29856e1e3f9f6f8a5704f98899d4b25f8ebd425001594f61,1790
 - queue-0.1.2
 - OptDir-0.0.3
