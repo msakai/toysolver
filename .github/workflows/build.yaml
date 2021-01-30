@@ -77,6 +77,7 @@ jobs:
       - name: Test
         shell: bash
         run: stack test ${{ matrix.stack_args }} ${{ matrix.stack_test_args }} ${{ matrix.flags }}
+        timeout-minutes: 10
 
       - name: Coveralls
         if: matrix.coveralls
