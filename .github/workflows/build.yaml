@@ -14,28 +14,24 @@ jobs:
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.8.yaml'
             stack_args: '--coverage --haddock --no-haddock-deps'
-            stack_test_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
             coveralls: true
           - ghc: '8.8.4'
             os: macos-latest
             stack_yaml: 'stack-ghc-8.8.yaml'
             stack_args: ''
-            stack_test_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
           - ghc: '8.8.4'
             os: windows-latest
             stack_yaml: 'stack-ghc-8.8.yaml'
             stack_args: ''
-            stack_test_args: '-j1'  # https://github.com/commercialhaskell/stack/issues/5024
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
           - ghc: '8.6.3'
             os: windows-latest
             stack_yaml: 'stack-windows-i386.yaml'
             stack_args: ''
-            stack_test_args: '-j1'  # https://github.com/commercialhaskell/stack/issues/5024
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
     steps:
@@ -76,7 +72,8 @@ jobs:
 
       - name: Test
         shell: bash
-        run: stack test ${{ matrix.stack_args }} ${{ matrix.stack_test_args }} ${{ matrix.flags }}
+        # -j1 is for https://github.com/commercialhaskell/stack/issues/5024
+        run: stack test ${{ matrix.stack_args }} -j1 ${{ matrix.flags }}
         timeout-minutes: 10
 
       - name: Check IPASIR DLL dependencies
