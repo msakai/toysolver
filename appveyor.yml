@@ -39,6 +39,8 @@ test_script:
 - echo "" | stack --no-terminal test --bench --no-run-benchmarks --flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms
 
 after_test:
+- FOR /F "usebackq" %%i IN (`stack path --local-install-root`) DO set LOCAL_INSTALL_ROOT=%%i
+- stack exec -- ldd %LOCAL_INSTALL_ROOT%\lib\toysat-ipasir.dll
 - stack runghc --package turtle misc/build_artifacts.hs
 
 artifacts:

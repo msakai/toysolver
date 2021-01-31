@@ -55,7 +55,7 @@ before_install:
     travis_retry curl -L https://www.stackage.org/stack/osx-x86_64 | tar xz --strip-components=1 -C ~/.local/bin '*/stack'
   else
     travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
-  fi  
+  fi
 
 install:
 - FLAGS="--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag=toysolver:OpenCL"
@@ -71,6 +71,11 @@ script:
 
 after_script:
 - |
+  if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+    otool -L `stack path --local-install-root`/lib/libtoysat-ipasir.dylib
+  else
+    ldd `stack path --local-install-root`/lib/libtoysat-ipasir.so
+  fi
   if [ -n "$COVERAGE" ]; then
     travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$SHC_GHCVER.tar.bz2 | tar -xj
     ./shc toysolver TestSuite TestPolynomial

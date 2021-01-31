@@ -1,0 +1,15 @@
+Given a satisfiable formula F and a variable x, we say that x is
+essential for the satisfiability of F if a truth value (True or False)
+must be assigned to x in each satisfying assignment of F. This application
+finds all the variables essential for the satisfiability of a given formula.
+
+The algorithm tests each variable one by one on the dual-rail encoded
+formula. Each test is done using two assumptions which represent the
+constraint that the given variable must not be assigned.
+
+The same application is implemented in Java (in the APPJAVA folder) to
+demonstrate the usage of an IPASIR solver in a Java application.
+
+Tomas Balyo
+KIT, Karlsruhe
+3.2.2015

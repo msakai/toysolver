@@ -79,6 +79,32 @@ jobs:
         run: stack test ${{ matrix.stack_args }} ${{ matrix.stack_test_args }} ${{ matrix.flags }}
         timeout-minutes: 10
 
+      - name: Check IPASIR DLL dependencies
+        continue-on-error: true
+        shell: bash
+        run: |
+          if [[ ${{ runner.os }} = "macOS" ]]; then
+            otool -L `stack path --local-install-root`/lib/libtoysat-ipasir.dylib
+          elif [[ ${{ runner.os }} = "Windows" ]]; then          
+            ldd `stack path --local-install-root`/lib/toysat-ipasir.dll
+          else
+            ldd `stack path --local-install-root`/lib/libtoysat-ipasir.so
+          fi
+
+      - name: Test IPASIR DLL using genipaessentials
+        shell: bash
+        run: |
+          stack exec -- g++ -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root`/lib -ltoysat-ipasir -o genipaessentials
+          if [[ ${{ runner.os }} = "macOS" ]]; then
+            install_name_tool -add_rpath `stack path --local-install-root`/lib genipaessentials
+          elif [[ ${{ runner.os }} = "Windows" ]]; then
+            export PATH=$(cygpath -u $(stack path --local-install-root))/lib:$PATH
+          else
+            export LD_LIBRARY_PATH=`stack path --local-install-root`/lib:$LD_LIBRARY_PATH
+          fi
+          # "stack exec --" is necessary on windows-i386 for adding path of libstdc++
+          stack exec -- ./genipaessentials misc/genipaessentials/inputs/sat100.cnf
+
       - name: Coveralls
         if: matrix.coveralls
         continue-on-error: true
