@@ -9,7 +9,7 @@ import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Char
 import Data.Foldable (toList)
-import qualified Data.HashMap.Strict as HashMap
+import qualified Data.IntMap.Strict as IntMap
 import Data.Int
 import Data.List
 import Data.Maybe
@@ -60,27 +60,27 @@ main = do
           vs0 = map read vs'
           vs = if null vs0 then [1] else vs0
       es <- load fname
-      let g :: ShortestPath.Graph Int Int64 Int
-          g = fmap toList $ HashMap.fromListWith (<>) [(s, Seq.singleton (t,fromIntegral w,i)) | (i,(s,t,w)) <- zip [(1::Int)..] es]
+      let g :: ShortestPath.Graph Int64 Int
+          g = fmap toList $ IntMap.fromListWith (<>) [(s, Seq.singleton (t,fromIntegral w,i)) | (i,(s,t,w)) <- zip [(1::Int)..] es]
       case filter (\c -> c /= '-' && c /= '_') (map toLower method) of
         "dijkstra" -> do
           let ret = ShortestPath.dijkstra ShortestPath.unit g vs
           _ <- evaluate ret
           when (PrintResult `elem` o) $ do
-            forM_ (sortBy (comparing fst) (HashMap.toList ret)) $ \(v, (cost,_)) -> do
+            forM_ (sortBy (comparing fst) (IntMap.toList ret)) $ \(v, (cost,_)) -> do
               putStrLn $ show v ++ ": " ++ show cost
         "bellmanford" -> do
           let ret = ShortestPath.bellmanFord ShortestPath.unit g vs
           _ <- evaluate ret
           when (PrintResult `elem` o) $ do
-            forM_ (sortBy (comparing fst) (HashMap.toList ret)) $ \(v, (cost,_)) -> do
+            forM_ (sortBy (comparing fst) (IntMap.toList ret)) $ \(v, (cost,_)) -> do
               putStrLn $ show v ++ ": " ++ show cost
         "floydwarshall" -> do
           let ret = ShortestPath.floydWarshall ShortestPath.unit g
           _ <- evaluate ret
           when (PrintResult `elem` o) $ do
-            forM_ (sortBy (comparing fst) (HashMap.toList ret)) $ \(v, m) -> do
-              forM_ (sortBy (comparing fst) (HashMap.toList m)) $ \(u, (cost,_)) -> do
+            forM_ (sortBy (comparing fst) (IntMap.toList ret)) $ \(v, m) -> do
+              forM_ (sortBy (comparing fst) (IntMap.toList m)) $ \(u, (cost,_)) -> do
                 putStrLn $ show v ++ "-" ++ show u ++ ": " ++ show cost
         _ -> error ("unknown method: " ++ method)
     (_,_,errs) -> do
