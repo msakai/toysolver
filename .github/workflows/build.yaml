@@ -10,6 +10,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - ghc: '8.10.2'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-8.10.yaml'
+            stack_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
+            coveralls: false
+
           - ghc: '8.8.4'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.8.yaml'
@@ -33,6 +40,31 @@ jobs:
             stack_yaml: 'stack-windows-i386.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            coveralls: false
+
+          - ghc: '8.6.5'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-8.6.yaml'
+            stack_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
+            coveralls: false
+          - ghc: '8.4.4'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-8.4.yaml'
+            stack_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
+            coveralls: false
+          - ghc: '8.2.2'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-8.2.yaml'
+            stack_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
+            coveralls: false
+          - ghc: '8.0.2'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-8.0.yaml'
+            stack_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
             coveralls: false
     steps:
       - uses: actions/checkout@v2
