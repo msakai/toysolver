@@ -65,6 +65,7 @@ import qualified Data.Set as Set
 import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Converter.Base
 import ToySolver.Converter.SAT2KSAT
+import ToySolver.Graph.Base
 import qualified ToySolver.Graph.MaxCut as MaxCut
 import qualified ToySolver.SAT.Types as SAT
 
@@ -192,7 +193,7 @@ simpleMaxSAT2ToSimpleMaxCut
      , SimpleMaxSAT2ToSimpleMaxCutInfo
      )
 simpleMaxSAT2ToSimpleMaxCut (n, cs, threshold) =
-  ( ( MaxCut.fromEdges numNodes [(a,b,1) | (a,b) <- (basicFramework ++ additionalEdges)]
+  ( ( graphFromUnorderedEdgesWith (+) numNodes [(a,b,1) | (a,b) <- (basicFramework ++ additionalEdges)]
     , w
     )
   , SimpleMaxSAT2ToSimpleMaxCutInfo n p

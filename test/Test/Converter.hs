@@ -11,6 +11,7 @@ import qualified Data.Foldable as F
 import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Vector.Generic as VG
@@ -23,7 +24,7 @@ import qualified Test.QuickCheck.Monadic as QM
 
 import ToySolver.Converter
 import qualified ToySolver.FileFormat.CNF as CNF
-import qualified ToySolver.Graph.IndependentSet as IS
+import ToySolver.Graph.Base
 import qualified ToySolver.Graph.MaxCut as MaxCut
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
@@ -150,7 +151,7 @@ prop_satToIS_forward =
     let r@((g,k), info) = satToIS cnf
      in counterexample (show r) $ conjoin
         [ counterexample (show m) $ counterexample (show set) $
-            not (evalCNF m cnf) || (IS.isIndependentSet g set && IntSet.size set >= k)
+            not (evalCNF m cnf) || (isIndependentSet g set && IntSet.size set >= k)
         | m <- allAssignments (CNF.cnfNumVars cnf)
         , let set = transformForward info m
         ]
@@ -173,7 +174,7 @@ prop_mis2MaxSAT_forward =
         [ counterexample (show set) $ counterexample (show m) $ o1 === o2
         | set <- map IntSet.fromList $ allSubsets $ range $ bounds g
         , let m = transformForward info set
-              o1 = if IS.isIndependentSet g set
+              o1 = if isIndependentSet g set
                    then Just (transformObjValueForward info (IntSet.size set))
                    else Nothing
               o2 = evalWCNF m wcnf
@@ -190,26 +191,26 @@ prop_mis2MaxSAT_backward =
         [ counterexample (show m) $ counterexample (show set) $ o1 === o2
         | m <- allAssignments (CNF.wcnfNumVars wcnf)
         , let set = transformBackward info m
-              o1 = if IS.isIndependentSet g set
+              o1 = if isIndependentSet g set
                    then Just (IntSet.size set)
                    else Nothing
               o2 = fmap (transformObjValueBackward info) $ evalWCNF m wcnf
         ]
 
-arbitraryGraph :: Gen IS.Graph
+arbitraryGraph :: Gen Graph
 arbitraryGraph = do
   n <- choose (0, 8) -- inclusive range
   es <- liftM concat $ forM [0..n-1] $ \v1 -> do
     vs <- sublistOf [0..n-1]
-    return [(v1, v2) | v2 <- vs]
-  return $ IS.graphFromEdges n es
+    return [(v1, v2, ()) | v2 <- vs]
+  return $ graphFromUnorderedEdges n es
 
-arbitraryIndependentSet :: IS.Graph -> Gen IntSet
+arbitraryIndependentSet :: Graph -> Gen IntSet
 arbitraryIndependentSet g = do
   s <- arbitraryMaximalIndependentSet g
   liftM IntSet.fromList $ sublistOf $ IntSet.toList s
 
-arbitraryIndependentSet' :: IS.Graph -> Int -> Gen IntSet
+arbitraryIndependentSet' :: Graph -> Int -> Gen IntSet
 arbitraryIndependentSet' g k = go IntSet.empty (IntSet.fromList (range (bounds g)))
   where
     go s c
@@ -217,16 +218,16 @@ arbitraryIndependentSet' g k = go IntSet.empty (IntSet.fromList (range (bounds g
       | IntSet.null c = return s
       | otherwise = do
           a <- elements (IntSet.toList c)
-          go (IntSet.insert a s) (IntSet.delete a c IntSet.\\ (g ! a))
+          go (IntSet.insert a s) (IntSet.delete a c IntSet.\\ (IntMap.keysSet (g ! a)))
 
-arbitraryMaximalIndependentSet :: IS.Graph -> Gen IntSet
+arbitraryMaximalIndependentSet :: Graph -> Gen IntSet
 arbitraryMaximalIndependentSet g = go IntSet.empty (IntSet.fromList (range (bounds g)))
   where
     go s c
       | IntSet.null c = return s
       | otherwise = do
           a <- elements (IntSet.toList c)
-          go (IntSet.insert a s) (IntSet.delete a c IntSet.\\ (g ! a))
+          go (IntSet.insert a s) (IntSet.delete a c IntSet.\\ (IntMap.keysSet (g ! a)))
 
 ------------------------------------------------------------------------
 

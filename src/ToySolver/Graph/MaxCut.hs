@@ -11,8 +11,6 @@
 -----------------------------------------------------------------------------
 module ToySolver.Graph.MaxCut
   ( Problem (..)
-  , fromEdges
-  , edges
   , buildDSDPMaxCutGraph
   , buildDSDPMaxCutGraph'
   , Solution
@@ -20,6 +18,7 @@ module ToySolver.Graph.MaxCut
   , evalEdge
   ) where
 
+import Data.Array.IArray
 import Data.Array.Unboxed
 import Data.ByteString.Builder
 import Data.ByteString.Builder.Scientific
@@ -30,45 +29,27 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.Monoid
 import Data.Scientific (Scientific)
 
-data Problem a
-  = Problem
-  { numNodes :: !Int
-    -- ^ Number of nodes N. Nodes are numbered from 0 to N-1.
-  , numEdges :: !Int
-    -- ^ Number of edges.
-  , matrix :: IntMap (IntMap a)
-    -- ^ Non-zero entries of symmetric weight matrix
-  } deriving (Eq, Ord, Show)
+import ToySolver.Graph.Base
 
-instance Functor Problem where
-  fmap f Problem{ numNodes = n, numEdges = m, matrix = mat } =
-    Problem{ numNodes = n, numEdges = m, matrix = fmap (fmap f) mat }
+type Problem a = EdgeLabeledGraph a
 
-fromEdges :: Num a => Int -> [(Int,Int,a)] -> Problem a
-fromEdges n es = Problem n (length es) $ IntMap.unionsWith (IntMap.unionWith (+)) $
-  [IntMap.fromList [(v1, IntMap.singleton v2 w), (v2, IntMap.singleton v1 w)] | (v1,v2,w) <- es]
-
-edges :: Problem a -> [(Int,Int,a)]
-edges prob = do
-  (a,m) <- IntMap.toList $ matrix prob
-  (b,w) <- IntMap.toList $ snd $ IntMap.split a m
-  return (a,b,w)
-
-buildDSDPMaxCutGraph :: Problem Scientific -> Builder
+buildDSDPMaxCutGraph :: EdgeLabeledGraph Scientific -> Builder
 buildDSDPMaxCutGraph = buildDSDPMaxCutGraph' scientificBuilder
 
-buildDSDPMaxCutGraph' :: (a -> Builder) -> Problem a -> Builder
+buildDSDPMaxCutGraph' :: (a -> Builder) -> EdgeLabeledGraph a -> Builder
 buildDSDPMaxCutGraph' weightBuilder prob = header <> body
   where
-    header = intDec (numNodes prob) <> char7 ' ' <> intDec (numEdges prob) <> char7 '\n'
+    (lb,ub) = bounds prob
+    m = sum [IntMap.size m | m <- elems prob]
+    header = intDec (ub-lb+1) <> char7 ' ' <> intDec m <> char7 '\n'
     body = mconcat $ do
-      (a,b,w) <- edges prob
-      return $ intDec (a+1) <> char7 ' ' <> intDec (b+1) <> char7 ' ' <> weightBuilder w <> char7 '\n'
+      (a,b,w) <- graphToUnorderedEdges prob
+      return $ intDec (a-lb+1) <> char7 ' ' <> intDec (b-lb+1) <> char7 ' ' <> weightBuilder w <> char7 '\n'
 
 type Solution = UArray Int Bool
 
 eval :: Num a => Solution -> Problem a -> a
-eval sol prob = sum [w | (a,b,w) <- edges prob, sol ! a /= sol ! b]
+eval sol prob = sum [w | (a,b,w) <- graphToUnorderedEdges prob, sol ! a /= sol ! b]
 
 evalEdge :: Num a => Solution -> (Int,Int,a) -> a
 evalEdge sol (a,b,w)
