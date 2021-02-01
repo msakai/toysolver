@@ -324,7 +324,7 @@ data Solver
 
   -- Result
   , svModel        :: !(IORef (Maybe Model))
-  , svFailedAssumptions :: !(IORef [Lit])
+  , svFailedAssumptions :: !(IORef LitSet)
   , svAssumptionsImplications :: !(IORef LitSet)
 
   -- Statistics
@@ -705,7 +705,7 @@ newSolverWithConfig config = do
 
   randgen  <- newIORef =<< Rand.create
 
-  failed <- newIORef []
+  failed <- newIORef IS.empty
   implied <- newIORef IS.empty
 
   confBudget <- newIOURef (-1)
@@ -1061,7 +1061,7 @@ solve_ solver = do
   resetStat solver
   writeIORef (svCanceled solver) False
   writeIORef (svModel solver) Nothing
-  writeIORef (svFailedAssumptions solver) []
+  writeIORef (svFailedAssumptions solver) IS.empty
 
   ok <- readIORef (svOk solver)
   if not ok then
@@ -1233,7 +1233,7 @@ search solver !conflict_lim onConflict = do
                 else if val == lFalse then do
                   -- conflict with assumption
                   core <- analyzeFinal solver l
-                  writeIORef (svFailedAssumptions solver) core
+                  writeIORef (svFailedAssumptions solver) (IS.fromList core)
                   return Nothing
                 else
                   return (Just l)
@@ -1372,7 +1372,7 @@ getModel solver = do
 -- | After 'solveWith' returns False, it returns a set of assumptions
 -- that leads to contradiction. In particular, if it returns an empty
 -- set, the problem is unsatisiable without any assumptions.
-getFailedAssumptions :: Solver -> IO [Lit]
+getFailedAssumptions :: Solver -> IO LitSet
 getFailedAssumptions solver = readIORef (svFailedAssumptions solver)
 
 -- | __EXPERIMENTAL API__: After 'solveWith' returns True or failed with 'BudgetExceeded' exception,

@@ -39,7 +39,7 @@ findMUSAssumptions
   -> IO MUS
 findMUSAssumptions solver opt = do
   log "computing a minimal unsatisfiable core by QuickXplain"
-  core <- liftM IS.fromList $ SAT.getFailedAssumptions solver
+  core <- SAT.getFailedAssumptions solver
   log $ "initial core = " ++ showLits core
   update core
   if IS.null core then
@@ -84,7 +84,7 @@ findMUSAssumptions solver opt = do
                SAT.solveWith solver (IS.toList bs)
       if not ret then do
         log $ showLits bs ++ " is unsatisfiable"
-        bs' <- liftM IS.fromList $ SAT.getFailedAssumptions solver
+        bs' <- SAT.getFailedAssumptions solver
         log $ "new core = " ++ showLits bs'
         update bs'
         return (IS.empty, bs')
