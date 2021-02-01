@@ -25,13 +25,13 @@ addons:
 
 matrix:
   include:
-    #- env: STACK_YAML=stack-ghc-8.10.yaml
-    #  compiler: ": #GHC 8.10.3"
-    - env: STACK_YAML=stack-ghc-8.8.yaml RELEASE=1 HADDOCK=1 SHC_GHCVER=8.0.1
-      compiler: ": #GHC 8.8.4"
-    - env: STACK_YAML=stack-ghc-8.8.yaml RELEASE=1
-      compiler: ": #GHC 8.8.4"
+    - env: STACK_YAML=stack-ghc-8.10.yaml RELEASE=1 HADDOCK=1 SHC_GHCVER=8.0.1
+      compiler: ": #GHC 8.10.3"
+    - env: STACK_YAML=stack-ghc-8.10.yaml RELEASE=1
+      compiler: ": #GHC 8.10.3"
       os: osx
+    #- env: STACK_YAML=stack-ghc-8.8.yaml
+    #  compiler: ": #GHC 8.8.4"
     #- env: STACK_YAML=stack-ghc-8.6.yaml
     #  compiler: ": #GHC 8.6.5"
     #- env: STACK_YAML=stack-ghc-8.4.yaml
