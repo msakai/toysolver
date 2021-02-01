@@ -9,6 +9,7 @@ import Control.Exception
 import Control.Monad
 import Data.Array.IArray
 import Data.Default.Class
+import qualified Data.IntSet as IntSet
 import Data.IORef
 import qualified Data.Map.Strict as Map
 import qualified Data.Vector as V
@@ -396,7 +397,7 @@ case_getAssumptionsImplications_case1 = do
   ret <- SAT.solveWith solver [-x2]
   ret @?= True
   xs <- SAT.getAssumptionsImplications solver
-  xs @?= [x3]
+  xs @?= IntSet.singleton x3
 
 prop_getAssumptionsImplications :: Property
 prop_getAssumptionsImplications = QM.monadicIO $ do
@@ -408,7 +409,7 @@ prop_getAssumptionsImplications = QM.monadicIO $ do
     forM_ (CNF.cnfClauses cnf) $ \c -> SAT.addClause solver (SAT.unpackClause c)
     SAT.solveWith solver ls
   when ret $ do
-    xs <- QM.run $ SAT.getAssumptionsImplications solver
+    xs <- liftM IntSet.toList $ QM.run $ SAT.getAssumptionsImplications solver
     forM_ xs $ \x -> do
       ret2 <- QM.run $ SAT.solveWith solver (-x : ls)
       QM.assert $ not ret2

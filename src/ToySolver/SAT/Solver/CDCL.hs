@@ -1377,8 +1377,8 @@ getFailedAssumptions solver = readIORef (svFailedAssumptions solver)
 
 -- | __EXPERIMENTAL API__: After 'solveWith' returns True or failed with 'BudgetExceeded' exception,
 -- it returns a set of literals that are implied by assumptions.
-getAssumptionsImplications :: Solver -> IO [Lit]
-getAssumptionsImplications solver = liftM IS.toList $ readIORef (svAssumptionsImplications solver)
+getAssumptionsImplications :: Solver -> IO LitSet
+getAssumptionsImplications solver = readIORef (svAssumptionsImplications solver)
 
 {--------------------------------------------------------------------
   Simplification
