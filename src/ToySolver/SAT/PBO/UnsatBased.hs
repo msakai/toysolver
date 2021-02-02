@@ -27,6 +27,7 @@ module ToySolver.SAT.PBO.UnsatBased
 
 import Control.Monad
 import qualified Data.IntMap as IntMap
+import qualified Data.IntSet as IntSet
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO.Context as C
@@ -52,25 +53,25 @@ solveWBO cxt solver = do
         return ()
       else do
         core <- SAT.getFailedAssumptions solver
-        case core of
-          [] -> C.setFinished cxt
-          _  -> do
-            let !min_c = minimum [sels IntMap.! sel | sel <- core]
-                !lb' = lb + min_c
+        if IntSet.null core then
+          C.setFinished cxt
+        else do
+          let !min_c = minimum [sels IntMap.! sel | sel <- IntSet.toList core]
+              !lb' = lb + min_c
 
-            xs <- forM core $ \sel -> do
-              r <- SAT.newVar solver
-              return (sel, r)
-            SAT.addExactly solver (map snd xs) 1
-            SAT.addClause solver [-l | l <- core] -- optional constraint but sometimes useful
+          xs <- forM (IntSet.toList core) $ \sel -> do
+            r <- SAT.newVar solver
+            return (sel, r)
+          SAT.addExactly solver (map snd xs) 1
+          SAT.addClause solver [-l | l <- IntSet.toList core] -- optional constraint but sometimes useful
 
-            ys <- liftM IntMap.unions $ forM xs $ \(sel, r) -> do
-              sel' <- SAT.newVar solver
-              SAT.addClause solver [-sel', r, sel]
-              let c = sels IntMap.! sel
-              if c > min_c
-                then return $ IntMap.fromList [(sel', min_c), (sel, c - min_c)]
-                else return $ IntMap.singleton sel' min_c
-            let sels' = IntMap.union ys (IntMap.difference sels (IntMap.fromList [(sel, ()) | sel <- core]))
+          ys <- liftM IntMap.unions $ forM xs $ \(sel, r) -> do
+            sel' <- SAT.newVar solver
+            SAT.addClause solver [-sel', r, sel]
+            let c = sels IntMap.! sel
+            if c > min_c
+              then return $ IntMap.fromList [(sel', min_c), (sel, c - min_c)]
+              else return $ IntMap.singleton sel' min_c
+          let sels' = IntMap.union ys (IntMap.difference sels (IntMap.fromSet (const ()) core))
 
-            loop lb' sels'
+          loop lb' sels'

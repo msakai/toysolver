@@ -16,7 +16,7 @@ import qualified ToySolver.SAT as SAT
 
 type Solver = Ptr ()
 
-type SolverRep = (SAT.Solver, IORef [Int32], IORef [Int32], IORef IntSet)
+type SolverRep = (SAT.Solver, IORef [Int32], IORef [Int32])
 
 withSolverRep :: Solver -> (SolverRep -> IO a) -> IO a
 withSolverRep ptr k = do
@@ -48,8 +48,7 @@ ipasir_init = do
   solver <- SAT.newSolver
   addBuf <- newIORef []
   assumptionRef <- newIORef []
-  failedLitsRef <- newIORef IntSet.empty
-  sptr <- newStablePtr (solver, addBuf, assumptionRef, failedLitsRef)
+  sptr <- newStablePtr (solver, addBuf, assumptionRef)
   return (castStablePtrToPtr sptr)
 
 
@@ -88,7 +87,7 @@ foreign export ccall ipasir_add :: Solver -> Int32 -> IO ()
 -- negation overflow).  This applies to all the literal
 -- arguments in API functions.
 ipasir_add :: Solver -> Int32 -> IO ()
-ipasir_add ptr lit = withSolverRep ptr $ \(solver, addBuf, _assumptionRef, _failedLitsRef) -> do
+ipasir_add ptr lit = withSolverRep ptr $ \(solver, addBuf, _assumptionRef) -> do
   if lit == 0 then do
     lits <- readIORef addBuf
     ensureVars solver lits
@@ -109,7 +108,7 @@ foreign export ccall ipasir_assume :: Solver -> Int32 -> IO ()
 --
 -- State after: @INPUT@
 ipasir_assume :: Solver -> Int32 -> IO ()
-ipasir_assume ptr lit = withSolverRep ptr $ \(_solver, _addBuf, assumptionRef, _failedLitsRef) -> do
+ipasir_assume ptr lit = withSolverRep ptr $ \(_solver, _addBuf, assumptionRef) -> do
   modifyIORef assumptionRef (lit :)
 
 
@@ -128,18 +127,15 @@ foreign export ccall ipasir_solve :: Solver -> IO CInt
 --
 -- State after: @INPUT@ or @SAT@ or @UNSAT@
 ipasir_solve :: Solver -> IO CInt
-ipasir_solve ptr = withSolverRep ptr $ \(solver, _addBuf, assumptionRef, failedLitsRef) -> do
+ipasir_solve ptr = withSolverRep ptr $ \(solver, _addBuf, assumptionRef) -> do
   assumptions <- readIORef assumptionRef
   writeIORef assumptionRef []
   ensureVars solver (assumptions)
-  writeIORef failedLitsRef IntSet.empty
   handle (\(_ :: SAT.Canceled) -> return 0) $ do
     ret <- SAT.solveWith solver (map fromIntegral assumptions)
     if ret then do
       return 10
     else do
-      failedLits <- SAT.getFailedAssumptions solver
-      writeIORef failedLitsRef (IntSet.fromList failedLits)
       return 20
 
 foreign export ccall ipasir_val :: Solver -> Int32 -> IO CInt
@@ -159,7 +155,7 @@ foreign export ccall ipasir_val :: Solver -> Int32 -> IO CInt
 --
 -- State after: @SAT@
 ipasir_val :: Solver -> Int32 -> IO CInt
-ipasir_val ptr lit = withSolverRep ptr $ \(solver, _addBuf, _assumptionRef, _failedLitsRef) -> do
+ipasir_val ptr lit = withSolverRep ptr $ \(solver, _addBuf, _assumptionRef) -> do
   nv <- SAT.getNVars solver
   if nv < abs (fromIntegral lit) then do
     return 0
@@ -188,8 +184,8 @@ foreign export ccall ipasir_failed :: Solver -> Int32 -> IO CInt
 --
 -- State after: @UNSAT@
 ipasir_failed :: Solver -> Int32 -> IO CInt
-ipasir_failed ptr lit = withSolverRep ptr $ \(_solver, _addBuf, _assumptionRef, failedLitsRef) -> do
-  failedLits <- readIORef failedLitsRef
+ipasir_failed ptr lit = withSolverRep ptr $ \(solver, _addBuf, _assumptionRef) -> do
+  failedLits <- SAT.getFailedAssumptions solver
   return $ if IntSet.member (fromIntegral lit) failedLits then 1 else 0
 
 
@@ -211,7 +207,7 @@ foreign export ccall ipasir_set_terminate :: Solver -> Ptr a -> FunPtr (Ptr a ->
 --
 -- State after: @INPUT@ or @SAT@ or @UNSAT@
 ipasir_set_terminate :: Solver -> Ptr a -> FunPtr (Ptr a -> IO CInt) -> IO ()
-ipasir_set_terminate ptr info funptr = withSolverRep ptr $ \(solver, _addBuf, _assumptionRef, _failedLitsRef) -> do
+ipasir_set_terminate ptr info funptr = withSolverRep ptr $ \(solver, _addBuf, _assumptionRef) -> do
   if funptr == nullFunPtr then do
     SAT.clearTerminateCallback solver
   else do
@@ -240,7 +236,7 @@ foreign export ccall ipasir_set_learn :: Solver -> Ptr a -> CInt -> FunPtr (Ptr 
 --
 -- State after: @INPUT@ or @SAT@ or @UNSAT@
 ipasir_set_learn :: Solver -> Ptr a -> CInt -> FunPtr (Ptr a -> Ptr Int32 -> IO ()) -> IO ()
-ipasir_set_learn ptr info max_length funptr = withSolverRep ptr $ \(solver, _addBuf, _assumptionRef, _failedLitsRef) -> do
+ipasir_set_learn ptr info max_length funptr = withSolverRep ptr $ \(solver, _addBuf, _assumptionRef) -> do
   if funptr == nullFunPtr then do
     SAT.clearLearnCallback solver
   else do

@@ -50,7 +50,8 @@ case_getUnsatAssumptions = do
        [ TermQualIdentifierT (QIdentifier (ISymbol "not")) [TermQualIdentifier (QIdentifier (ISymbol "a"))]
        , TermQualIdentifierT (QIdentifier (ISymbol "not")) [TermQualIdentifier (QIdentifier (ISymbol "b"))]
        ]
-  r @?= expected
+  -- XXX: Term type is not Hashable nor Ord.
+  Set.fromList (map showSL r) @?= Set.fromList (map showSL expected)
 
 case_declareConst :: Assertion
 case_declareConst = do

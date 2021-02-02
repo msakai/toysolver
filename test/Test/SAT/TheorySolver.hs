@@ -59,7 +59,7 @@ newTheorySolver cnf = do
             SAT.solveWith solver xs
         , thExplain = \m -> do
             case m of
-              Nothing -> SAT.getFailedAssumptions solver
+              Nothing -> liftM IntSet.toList $ SAT.getFailedAssumptions solver
               Just _ -> return []
         , thPushBacktrackPoint = modifyIORef ref ([] :)
         , thPopBacktrackPoint = modifyIORef ref tail

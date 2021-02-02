@@ -1007,8 +1007,8 @@ checkSATAssuming solver xs = do
     m1 <- readIORef ref
     let m2 = IntMap.fromList [(lit, name) | (name, lit) <- Map.toList named]
     failed <- SAT.getFailedAssumptions (smtSAT solver)
-    writeIORef (smtUnsatAssumptions solver) $ catMaybes [IntMap.lookup l m1 | l <- failed]
-    writeIORef (smtUnsatCore solver) $ catMaybes [IntMap.lookup l m2 | l <- failed]
+    writeIORef (smtUnsatAssumptions solver) $ catMaybes [IntMap.lookup l m1 | l <- IntSet.toList failed]
+    writeIORef (smtUnsatCore solver) $ catMaybes [IntMap.lookup l m2 | l <- IntSet.toList failed]
   return ret
 
 getContextLit :: Solver -> IO SAT.Lit

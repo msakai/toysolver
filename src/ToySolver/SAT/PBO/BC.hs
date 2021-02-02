@@ -71,7 +71,7 @@ solveWBO cxt solver = do
           else do
             core <- SAT.getFailedAssumptions solver
             SAT.addClause solver [-sel] -- delete temporary constraint
-            let core2 = IntSet.fromList core `IntSet.intersection` unrelaxed
+            let core2 = core `IntSet.intersection` unrelaxed
             if IntSet.null core2 then do
               C.logMessage cxt $ printf "BC: updating lower bound: %d -> %d" lb (mid+1)
               C.addLowerBound cxt (mid+1)
