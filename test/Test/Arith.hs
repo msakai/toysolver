@@ -465,6 +465,52 @@ prop_Simplex_explain = QM.monadicIO $ do
          ret3 <- f (`IS.member` (IS.delete i e))
          QM.assert (isNothing ret3)
 
+
+case_Simplex_explain_1 :: Assertion
+case_Simplex_explain_1 = do
+   let vs = IS.fromList [1,2,3]
+       cs =
+           [ OrdRel (LA.fromTerms [(1746056284631 / 9826412301665,-1),(15203152363938 / 2590082592775,3)]) Lt (LA.fromTerms [((-10805767966036066790492005) / 2717766383823209137090944,1),((-6954371332529) / 2556884703077,3)])
+           , OrdRel (LA.fromTerms [((-46318513084543) / 2825954452605,-1),((-84836161104808) / 6821232664449,3)]) Lt (LA.fromTerms [((-32878986163057639423497343) / 6340282666298520092181187,-1),((-2102058562915) / 152354534193,2)])
+           , OrdRel (LA.fromTerms [(800927333029 / 343631592637,1)]) Eql (LA.fromTerms [(12974358287795 / 1163880192697,1),((-26182414536409) / 2543710855391,2)])
+           , OrdRel (LA.fromTerms [((-83492509556885) / 8651844058708,1)]) Ge (LA.fromTerms [((-356015815369) / 22673757336,2),((-27476085033935) / 4622007003834,3)])
+           , OrdRel (LA.fromTerms [((-39875095304489) / 3101412109143,-1),(28185656388712 / 2199966699027,2)]) Eql (LA.fromTerms [])
+           ]
+       config =
+           Simplex.Config
+           { Simplex.configPivotStrategy = Simplex.PivotStrategyBlandRule
+           , Simplex.configEnableBoundTightening = True
+           }
+
+   let f p = do
+         solver <- Simplex.newSolver
+         Simplex.setConfig solver config
+         m <- liftM IM.fromList $ forM (IS.toList vs) $ \v -> do
+           v2 <- Simplex.newVar solver
+           return (v, LA.var v2)
+         forM (zip [0..] cs) $ \(i,c) -> do
+           when (p i) $
+             Simplex.assertAtomEx' solver (LA.applySubstAtom m c) (Just i)
+         ret <- Simplex.check solver
+         if ret then do
+           return Nothing
+         else do
+           liftM Just $ Simplex.explain solver
+
+   ret <- f (const True)
+   case ret of
+     Nothing -> return ()
+     Just e -> do
+       ret2 <- f (`IS.member` e)
+       case ret2 of
+         Nothing -> assertFailure (show e ++ " should be unsatisfiable")
+         Just e2 -> do
+           e2 @?= e
+           forM_ (IS.toList e) $ \i -> do
+             ret3 <- f (`IS.member` (IS.delete i e))
+             assertBool (show i ++ " is redundant in " ++ show e) (isNothing ret3)
+
+
 instance Arbitrary Simplex.Config where
   arbitrary = do
     ps <- arbitrary
