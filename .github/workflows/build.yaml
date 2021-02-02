@@ -131,8 +131,12 @@ jobs:
           else
             export LD_LIBRARY_PATH=`stack path --local-install-root`/lib:$LD_LIBRARY_PATH
           fi
-          # "stack exec --" is necessary on windows-i386 for adding path of libstdc++
-          stack exec -- ./genipaessentials misc/genipaessentials/inputs/sat100.cnf
+          if [[ ${{ runner.os }} = "Linux" ]]; then
+            stack exec -- catchsegv ./genipaessentials misc/genipaessentials/inputs/sat100.cnf
+          else
+            # "stack exec --" is necessary on windows-i386 for adding path of libstdc++
+            stack exec -- ./genipaessentials misc/genipaessentials/inputs/sat100.cnf
+          fi
 
       - name: Coveralls
         if: matrix.coveralls
