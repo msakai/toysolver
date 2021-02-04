@@ -20,8 +20,8 @@ IPASIR_API
 void *ipasir_init(void)
 {
     if (initialized++ == 0) {
-        int argc = 0;
-        char *argv[] = { NULL };
+        int argc = 1;
+        char *argv[] = { "toysat-ipasir", NULL };
         char **pargv = argv;
 
 #if __GLASGOW_HASKELL__ >= 703
