@@ -13,7 +13,7 @@ jobs:
           - ghc: '8.10.3'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.10.yaml'
-            stack_args: '--coverage'
+            stack_args: ''
             flags: ''
             coveralls: false
     steps:
