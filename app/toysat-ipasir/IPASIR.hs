@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module IPASIR where
+module IPASIR () where
 
 import Control.Exception
 import Control.Monad
