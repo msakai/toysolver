@@ -22,7 +22,7 @@ void *ipasir_init(void)
     if (initialized++ == 0) {
         int argc = 0;
         char *argv[] = { NULL };
-	char **pargv = argv;
+        char **pargv = argv;
 
 #if __GLASGOW_HASKELL__ >= 703
         RtsConfig conf = defaultRtsConfig;
