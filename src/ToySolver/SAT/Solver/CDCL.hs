@@ -186,12 +186,12 @@ newLitArray lits = do
   liftM LitArray $ newListArray (0, size-1) (map packLit lits)
 
 readLitArray :: LitArray -> Int -> IO Lit
-readLitArray (LitArray a) i = liftM unpackLit $ unsafeRead a i
--- readLitArray (LitArray a) i = liftM unpackLit $ readArray a i
+-- readLitArray (LitArray a) i = liftM unpackLit $ unsafeRead a i
+readLitArray (LitArray a) i = liftM unpackLit $ readArray a i
 
 writeLitArray :: LitArray -> Int -> Lit -> IO ()
-writeLitArray (LitArray a) i lit = unsafeWrite a i (packLit lit)
--- writeLitArray (LitArray a) i lit = writeArray a i (packLit lit)
+-- writeLitArray (LitArray a) i lit = unsafeArray a i (packLit lit)
+writeLitArray (LitArray a) i lit = writeArray a i (packLit lit)
 
 getLits :: LitArray -> IO [Lit]
 getLits (LitArray a) = liftM (map unpackLit) $ getElems a
@@ -216,7 +216,7 @@ litIndex l = 2 * (litVar l - 1) + (if litPolarity l then 1 else 0)
 
 {-# INLINE varValue #-}
 varValue :: Solver -> Var -> IO LBool
-varValue solver v = liftM coerce $ Vec.unsafeRead (svVarValue solver) (v - 1)
+varValue solver v = liftM coerce $ Vec.read (svVarValue solver) (v - 1)
 
 {-# INLINE litValue #-}
 litValue :: Solver -> Lit -> IO LBool
@@ -231,7 +231,7 @@ litValue solver !l = do
 
 getVarFixed :: Solver -> Var -> IO LBool
 getVarFixed solver !v = do
-  lv <- Vec.unsafeRead (svVarLevel solver) (v - 1)
+  lv <- Vec.read (svVarLevel solver) (v - 1)
   if lv == levelRoot then
     varValue solver v
   else
@@ -253,19 +253,19 @@ getNFixed solver = do
   if lv == levelRoot then
     Vec.getSize (svTrail solver)
   else
-    Vec.unsafeRead (svTrailLimit solver) 0
+    Vec.read (svTrailLimit solver) 0
 
 -- | it returns a set of literals that are fixed without any assumptions.
 getFixedLiterals :: Solver -> IO [Lit]
 getFixedLiterals solver = do
   n <- getNFixed solver
-  revMapM (Vec.unsafeRead (svTrail solver)) [0..n-1]
+  revMapM (Vec.read (svTrail solver)) [0..n-1]
 
 varLevel :: Solver -> Var -> IO Level
 varLevel solver !v = do
   val <- varValue solver v
   when (val == lUndef) $ error ("ToySolver.SAT.varLevel: unassigned var " ++ show v)
-  Vec.unsafeRead (svVarLevel solver) (v - 1)
+  Vec.read (svVarLevel solver) (v - 1)
 
 litLevel :: Solver -> Lit -> IO Level
 litLevel solver l = varLevel solver (litVar l)
@@ -274,13 +274,13 @@ varReason :: Solver -> Var -> IO (Maybe SomeConstraintHandler)
 varReason solver !v = do
   val <- varValue solver v
   when (val == lUndef) $ error ("ToySolver.SAT.varReason: unassigned var " ++ show v)
-  Vec.unsafeRead (svVarReason solver) (v - 1)
+  Vec.read (svVarReason solver) (v - 1)
 
 varAssignNo :: Solver -> Var -> IO Int
 varAssignNo solver !v = do
   val <- varValue solver v
   when (val == lUndef) $ error ("ToySolver.SAT.varAssignNo: unassigned var " ++ show v)
-  Vec.unsafeRead (svVarTrailIndex solver) (v - 1)
+  Vec.read (svVarTrailIndex solver) (v - 1)
 
 -- | Solver instance
 data Solver
@@ -383,7 +383,7 @@ bcpDequeue solver = do
     return Nothing
   else do
     -- m < n
-    lit <- Vec.unsafeRead (svTrail solver) m
+    lit <- Vec.read (svTrail solver) m
     modifyIOURef (svTrailNPropagated solver) (+1)
     return (Just lit)
 
@@ -426,13 +426,13 @@ assign_ solver !lit reason = assert (validLit lit) $ do
     idx <- Vec.getSize (svTrail solver)
     lv <- getDecisionLevel solver
 
-    Vec.unsafeWrite (svVarValue solver) (litVar lit - 1) (coerce val)
-    Vec.unsafeWrite (svVarTrailIndex solver) (litVar lit - 1) idx
-    Vec.unsafeWrite (svVarLevel solver) (litVar lit - 1) lv
-    Vec.unsafeWrite (svVarReason solver) (litVar lit - 1) reason
-    Vec.unsafeWrite (svVarWhenAssigned solver) (litVar lit - 1) =<< readIOURef (svLearntCounter solver)
-    Vec.unsafeWrite (svVarParticipated solver) (litVar lit - 1) 0
-    Vec.unsafeWrite (svVarReasoned solver) (litVar lit - 1) 0
+    Vec.write (svVarValue solver) (litVar lit - 1) (coerce val)
+    Vec.write (svVarTrailIndex solver) (litVar lit - 1) idx
+    Vec.write (svVarLevel solver) (litVar lit - 1) lv
+    Vec.write (svVarReason solver) (litVar lit - 1) reason
+    Vec.write (svVarWhenAssigned solver) (litVar lit - 1) =<< readIOURef (svLearntCounter solver)
+    Vec.write (svVarParticipated solver) (litVar lit - 1) 0
+    Vec.write (svVarReasoned solver) (litVar lit - 1) 0
 
     Vec.push (svTrail solver) lit
 
@@ -450,34 +450,34 @@ unassign solver !v = assert (validVar v) $ do
   when (val == lUndef) $ error "unassign: should not happen"
 
   flag <- configEnablePhaseSaving <$> getConfig solver
-  when flag $ Vec.unsafeWrite (svVarPolarity solver) (v - 1) $! fromJust (unliftBool val)
+  when flag $ Vec.write (svVarPolarity solver) (v - 1) $! fromJust (unliftBool val)
 
-  Vec.unsafeWrite (svVarValue solver) (v - 1) (coerce lUndef)
-  Vec.unsafeWrite (svVarTrailIndex solver) (v - 1) maxBound
-  Vec.unsafeWrite (svVarLevel solver) (v - 1) maxBound
-  Vec.unsafeWrite (svVarReason solver) (v - 1) Nothing
+  Vec.write (svVarValue solver) (v - 1) (coerce lUndef)
+  Vec.write (svVarTrailIndex solver) (v - 1) maxBound
+  Vec.write (svVarLevel solver) (v - 1) maxBound
+  Vec.write (svVarReason solver) (v - 1) Nothing
 
   -- ERWA / LRB computation
   interval <- do
     t2 <- readIOURef (svLearntCounter solver)
-    t1 <- Vec.unsafeRead (svVarWhenAssigned solver) (v - 1)
+    t1 <- Vec.read (svVarWhenAssigned solver) (v - 1)
     return (t2 - t1)
   -- Interval = 0 is possible due to restarts.
   when (interval > 0) $ do
-    participated <- Vec.unsafeRead (svVarParticipated solver) (v - 1)
-    reasoned <- Vec.unsafeRead (svVarReasoned solver) (v - 1)
+    participated <- Vec.read (svVarParticipated solver) (v - 1)
+    reasoned <- Vec.read (svVarReasoned solver) (v - 1)
     alpha <- readIOURef (svERWAStepSize solver)
     let learningRate = fromIntegral participated / fromIntegral interval
         reasonSideRate = fromIntegral reasoned / fromIntegral interval
     scale <- readIOURef (svEMAScale solver)
     -- ema := (1 - α)ema + α*r
-    Vec.unsafeModify (svVarEMAScaled solver) (v - 1) (\orig -> (1 - alpha) * orig + alpha * scale * (learningRate + reasonSideRate))
+    Vec.modify (svVarEMAScaled solver) (v - 1) (\orig -> (1 - alpha) * orig + alpha * scale * (learningRate + reasonSideRate))
     -- If v is assigned by random decision, it's possible that v is still in the queue.
     PQ.update (svVarQueue solver) v
 
   let !l = if val == lTrue then v else -v
-  cs <- Vec.unsafeRead (svVarOnUnassigned solver) (v - 1)
-  Vec.unsafeWrite (svVarOnUnassigned solver) (v - 1) []
+  cs <- Vec.read (svVarOnUnassigned solver) (v - 1)
+  Vec.write (svVarOnUnassigned solver) (v - 1) []
   forM_ cs $ \c ->
     constrOnUnassigned solver c c l
 
@@ -487,21 +487,21 @@ addOnUnassigned :: Solver -> SomeConstraintHandler -> Lit -> IO ()
 addOnUnassigned solver constr !l = do
   val <- varValue solver (litVar l)
   when (val == lUndef) $ error "addOnUnassigned: should not happen"
-  Vec.unsafeModify (svVarOnUnassigned solver) (litVar l - 1) (constr :)
+  Vec.modify (svVarOnUnassigned solver) (litVar l - 1) (constr :)
 
 -- | Register the constraint to be notified when the literal becames false.
 watchLit :: Solver -> Lit -> SomeConstraintHandler -> IO ()
-watchLit solver !lit c = Vec.unsafeModify (svLitWatches solver) (litIndex lit) (c : )
+watchLit solver !lit c = Vec.modify (svLitWatches solver) (litIndex lit) (c : )
 
 -- | Register the constraint to be notified when the variable is assigned.
 watchVar :: Solver -> Var -> SomeConstraintHandler -> IO ()
-watchVar solver !var c = Vec.unsafeModify (svVarWatches solver) (var - 1) (c :)
+watchVar solver !var c = Vec.modify (svVarWatches solver) (var - 1) (c :)
 
 unwatchLit :: Solver -> Lit -> SomeConstraintHandler -> IO ()
-unwatchLit solver !lit c = Vec.unsafeModify (svLitWatches solver) (litIndex lit) (delete c)
+unwatchLit solver !lit c = Vec.modify (svLitWatches solver) (litIndex lit) (delete c)
 
 unwatchVar :: Solver -> Lit -> SomeConstraintHandler -> IO ()
-unwatchVar solver !var c = Vec.unsafeModify (svVarWatches solver) (var - 1) (delete c)
+unwatchVar solver !var c = Vec.modify (svVarWatches solver) (var - 1) (delete c)
 
 addToDB :: ConstraintHandler c => Solver -> c -> IO ()
 addToDB solver c = do
@@ -515,7 +515,7 @@ addToDB solver c = do
   when b $ do
     (lhs,_) <- toPBLinAtLeast c
     forM_ lhs $ \(_,lit) -> do
-       Vec.unsafeModify (svLitOccurList solver) (litIndex lit) (HashSet.insert c2)
+       Vec.modify (svLitOccurList solver) (litIndex lit) (HashSet.insert c2)
 
 addToLearntDB :: ConstraintHandler c => Solver -> c -> IO ()
 addToLearntDB solver c = do
@@ -559,7 +559,7 @@ reduceDB solver = do
 type VarActivity = Double
 
 varActivity :: Solver -> Var -> IO VarActivity
-varActivity solver v = Vec.unsafeRead (svVarActivity solver) (v - 1)
+varActivity solver v = Vec.read (svVarActivity solver) (v - 1)
 
 varDecayActivity :: Solver -> IO ()
 varDecayActivity solver = do
@@ -569,11 +569,11 @@ varDecayActivity solver = do
 varBumpActivity :: Solver -> Var -> IO ()
 varBumpActivity solver !v = do
   inc <- readIOURef (svVarInc solver)
-  Vec.unsafeModify (svVarActivity solver) (v - 1) (+inc)
+  Vec.modify (svVarActivity solver) (v - 1) (+inc)
   conf <- getConfig solver
   when (configBranchingStrategy conf == BranchingVSIDS) $ do
     PQ.update (svVarQueue solver) v
-  aval <- Vec.unsafeRead (svVarActivity solver) (v - 1)
+  aval <- Vec.read (svVarActivity solver) (v - 1)
   when (aval > 1e20) $
     -- Rescale
     varRescaleAllActivity solver
@@ -583,17 +583,17 @@ varRescaleAllActivity solver = do
   let a = svVarActivity solver
   n <- getNVars solver
   forLoop 0 (<n) (+1) $ \i ->
-    Vec.unsafeModify a i (* 1e-20)
+    Vec.modify a i (* 1e-20)
   modifyIOURef (svVarInc solver) (* 1e-20)
 
 varEMAScaled :: Solver -> Var -> IO Double
-varEMAScaled solver v = Vec.unsafeRead (svVarEMAScaled solver) (v - 1)
+varEMAScaled solver v = Vec.read (svVarEMAScaled solver) (v - 1)
 
 varIncrementParticipated :: Solver -> Var -> IO ()
-varIncrementParticipated solver v = Vec.unsafeModify (svVarParticipated solver) (v - 1) (+1)
+varIncrementParticipated solver v = Vec.modify (svVarParticipated solver) (v - 1) (+1)
 
 varIncrementReasoned :: Solver -> Var -> IO ()
-varIncrementReasoned solver v = Vec.unsafeModify (svVarReasoned solver) (v - 1) (+1)
+varIncrementReasoned solver v = Vec.modify (svVarReasoned solver) (v - 1) (+1)
 
 varEMADecay :: Solver -> IO ()
 varEMADecay solver = do
@@ -611,7 +611,7 @@ varEMADecay solver = do
       when (scale > 1e20) $ do
         n <- getNVars solver
         let a = svVarEMAScaled solver
-        forLoop 0 (<n) (+1) $ \i -> Vec.unsafeModify a i (/ scale)
+        forLoop 0 (<n) (+1) $ \i -> Vec.modify a i (/ scale)
         writeIOURef (svEMAScale solver) 1.0
     _ -> return ()
 
@@ -1224,7 +1224,7 @@ search solver !conflict_lim onConflict = do
               if not (d < s) then
                 return (Just litUndef)
               else do
-                l <- Vec.unsafeRead (svAssumptions solver) d
+                l <- Vec.read (svAssumptions solver) d
                 val <- litValue solver l
                 if val == lTrue then do
                   -- dummy decision level
@@ -1452,7 +1452,7 @@ removeBackwardSubsumedBy solver pb = do
 backwardSubsumedBy :: Solver -> PBLinAtLeast -> IO (HashSet SomeConstraintHandler)
 backwardSubsumedBy solver pb@(lhs,_) = do
   xs <- forM lhs $ \(_,lit) -> do
-    Vec.unsafeRead (svLitOccurList solver) (litIndex lit)
+    Vec.read (svLitOccurList solver) (litIndex lit)
   case xs of
     [] -> return HashSet.empty
     s:ss -> do
@@ -1506,7 +1506,7 @@ modifyConfig solver f = do
 
 -- | The default polarity of a variable.
 setVarPolarity :: Solver -> Var -> Bool -> IO ()
-setVarPolarity solver v val = Vec.unsafeWrite (svVarPolarity solver) (v - 1) val
+setVarPolarity solver v val = Vec.write (svVarPolarity solver) (v - 1) val
 
 -- | Set random generator used by the random variable selection
 setRandomGen :: Solver -> Rand.GenIO -> IO ()
@@ -1592,7 +1592,7 @@ pickBranchLit !solver = do
     return litUndef
   else do
     -- TODO: random polarity
-    p <- Vec.unsafeRead (svVarPolarity solver) (var2 - 1)
+    p <- Vec.read (svVarPolarity solver) (var2 - 1)
     return $! literal var2 p
 
 decide :: Solver -> Lit -> IO ()
@@ -1638,10 +1638,10 @@ deduceB solver = loop
             if ok then
               loop2 ws
             else do
-              Vec.unsafeModify a idx (++ws)
+              Vec.modify a idx (++ws)
               return (Just w)
-      ws <- Vec.unsafeRead a idx
-      Vec.unsafeWrite a idx []
+      ws <- Vec.read a idx
+      Vec.write a idx []
       loop2 ws
 
     processVar :: Lit -> ExceptT SomeConstraintHandler IO ()
@@ -1654,10 +1654,10 @@ deduceB solver = loop
             if ok
               then loop2 ws
               else do
-                Vec.unsafeModify (svVarWatches solver) idx (++ws)
+                Vec.modify (svVarWatches solver) idx (++ws)
                 return (Just w)
-      ws <- Vec.unsafeRead (svVarWatches solver) idx
-      Vec.unsafeWrite (svVarWatches solver) idx []
+      ws <- Vec.read (svVarWatches solver) idx
+      Vec.write (svVarWatches solver) idx []
       loop2 ws
 
 analyzeConflict :: ConstraintHandler c => Solver -> c -> IO (Clause, Level)
@@ -1676,12 +1676,12 @@ analyzeConflict solver constr = do
         forM_ lits $ \lit -> do
           let !v = litVar lit
           lv <- litLevel solver lit
-          b <- Vec.unsafeRead (svSeen solver) (v - 1)
+          b <- Vec.read (svSeen solver) (v - 1)
           when (not b && lv > levelRoot) $ do
             varBumpActivity solver v
             varIncrementParticipated solver v
             if lv >= d then do
-              Vec.unsafeWrite (svSeen solver) (v - 1) True
+              Vec.write (svSeen solver) (v - 1) True
               modifyIOURef pathC (+1)
             else do
               Vec.push out lit
@@ -1708,7 +1708,7 @@ analyzeConflict solver constr = do
       popUnseen = do
         l <- peekTrail solver
         let !v = litVar l
-        b <- Vec.unsafeRead (svSeen solver) (v - 1)
+        b <- Vec.read (svSeen solver) (v - 1)
         if b then do
           return ()
         else do
@@ -1724,7 +1724,7 @@ analyzeConflict solver constr = do
         popUnseen
         l <- peekTrail solver
         let !v = litVar l
-        Vec.unsafeWrite (svSeen solver) (v - 1) False
+        Vec.write (svSeen solver) (v - 1) False
         modifyIOURef pathC (subtract 1)
         c <- readIOURef pathC
         if c > 0 then do
@@ -1739,7 +1739,7 @@ analyzeConflict solver constr = do
           popTrail solver
           loop
         else do
-          Vec.unsafeWrite out 0 (litNot l)
+          Vec.write out 0 (litNot l)
 
   constrBumpActivity solver constr
   falsifiedLits <- reasonOf solver constr Nothing
@@ -1786,7 +1786,7 @@ analyzeFinal solver p = do
       go i seen result
         | i < 0 = return result
         | otherwise = do
-            l <- Vec.unsafeRead (svTrail solver) i
+            l <- Vec.read (svTrail solver) i
             lv <- litLevel solver l
             if lv == levelRoot then
               return result
@@ -1925,11 +1925,11 @@ incrementReasoned solver ls = do
 peekTrail :: Solver -> IO Lit
 peekTrail solver = do
   n <- Vec.getSize (svTrail solver)
-  Vec.unsafeRead (svTrail solver) (n-1)
+  Vec.read (svTrail solver) (n-1)
 
 popTrail :: Solver -> IO Lit
 popTrail solver = do
-  l <- Vec.unsafePop (svTrail solver)
+  l <- Vec.pop (svTrail solver)
   unassign solver (litVar l)
   return l
 
@@ -1946,7 +1946,7 @@ pushDecisionLevel solver = do
 
 popDecisionLevel :: Solver -> IO ()
 popDecisionLevel solver = do
-  n <- Vec.unsafePop (svTrailLimit solver)
+  n <- Vec.pop (svTrailLimit solver)
   let loop = do
         m <- Vec.getSize (svTrail solver)
         when (m > n) $ do
@@ -2154,7 +2154,7 @@ detach solver c = do
   when b $ do
     (lhs,_) <- toPBLinAtLeast c
     forM_ lhs $ \(_,lit) -> do
-      Vec.unsafeModify (svLitOccurList solver) (litIndex lit) (HashSet.delete c)
+      Vec.modify (svLitOccurList solver) (litIndex lit) (HashSet.delete c)
 
 -- | invoked with the watched literal when the literal is falsified.
 propagate :: Solver -> SomeConstraintHandler -> Lit -> IO Bool
@@ -3473,7 +3473,7 @@ deduceT solver = do
           callback l = assignBy solver l h
           loop i = do
             when (i < n) $ do
-              l <- liftIO $ Vec.unsafeRead (svTrail solver) i
+              l <- liftIO $ Vec.read (svTrail solver) i
               ok <- liftIO $ thAssertLit t callback l
               if ok then
                 loop (i+1)

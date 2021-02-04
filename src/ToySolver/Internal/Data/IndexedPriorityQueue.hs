@@ -140,7 +140,7 @@ instance Enqueue PriorityQueue IO Value where
       n <- Vec.getSize (heap q)
       Vec.push (heap q) val
       Vec.growTo (table q) (val+1)
-      Vec.unsafeWrite (table q) val n
+      Vec.write (table q) val n
       up q n
 
 instance Dequeue PriorityQueue IO Value where
@@ -150,14 +150,14 @@ instance Dequeue PriorityQueue IO Value where
       0 ->
         return Nothing
       _ -> do
-        val <- Vec.unsafeRead (heap q) 0
-        Vec.unsafeWrite (table q) val (-1)
+        val <- Vec.read (heap q) 0
+        Vec.write (table q) val (-1)
         if n == 1 then do
           Vec.resize (heap q) (n-1)
         else do
-          val1 <- Vec.unsafePop (heap q)
-          Vec.unsafeWrite (heap q) 0 val1
-          Vec.unsafeWrite (table q) val1 0
+          val1 <- Vec.pop (heap q)
+          Vec.write (heap q) 0 val1
+          Vec.write (table q) val1 0
           down q 0
         return (Just val)
 
@@ -179,38 +179,38 @@ member q v = do
   if n <= v then
     return False
   else do
-    i <- Vec.unsafeRead (table q) v
+    i <- Vec.read (table q) v
     return $! i /= -1
 
 update :: PriorityQueue -> Value -> IO ()
 update q v = do
-  i <- Vec.unsafeRead (table q) v
+  i <- Vec.read (table q) v
   unless (i == -1) $ do
     up q i
     down q i
 
 up :: PriorityQueue -> Index -> IO ()
 up q !i = do
-  val <- Vec.unsafeRead (heap q) i
+  val <- Vec.read (heap q) i
   let loop 0 = return 0
       loop j = do
         let p = parent j
-        val_p <- Vec.unsafeRead (heap q) p
+        val_p <- Vec.read (heap q) p
         b <- lt q val val_p
         if b
           then do
-            Vec.unsafeWrite (heap q) j val_p
-            Vec.unsafeWrite (table q) val_p j
+            Vec.write (heap q) j val_p
+            Vec.write (table q) val_p j
             loop p
           else return j
   j <- loop i
-  Vec.unsafeWrite (heap q) j val
-  Vec.unsafeWrite (table q) val j
+  Vec.write (heap q) j val
+  Vec.write (table q) val j
 
 down :: PriorityQueue -> Index -> IO ()
 down q !i = do
   n <- Vec.getSize (heap q)
-  val <- Vec.unsafeRead (heap q) i
+  val <- Vec.read (heap q) i
   let loop !j = do
         let !l = left j
             !r = right j
@@ -221,23 +221,23 @@ down q !i = do
              if r >= n
               then return l
               else do
-                val_l <- Vec.unsafeRead (heap q) l
-                val_r <- Vec.unsafeRead (heap q) r
+                val_l <- Vec.read (heap q) l
+                val_r <- Vec.read (heap q) r
                 b <- lt q val_r val_l
                 if b
                   then return r
                   else return l
-           val_child <- Vec.unsafeRead (heap q) child
+           val_child <- Vec.read (heap q) child
            b <- lt q val_child val
            if not b
              then return j
              else do
-               Vec.unsafeWrite (heap q) j val_child
-               Vec.unsafeWrite (table q) val_child j
+               Vec.write (heap q) j val_child
+               Vec.write (table q) val_child j
                loop child
   j <- loop i
-  Vec.unsafeWrite (heap q) j val
-  Vec.unsafeWrite (table q) val j
+  Vec.write (heap q) j val
+  Vec.write (table q) val j
 
 rebuild :: PriorityQueue -> IO ()
 rebuild q = do
