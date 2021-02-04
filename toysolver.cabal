@@ -23,6 +23,7 @@ Extra-Source-Files:
    COPYING
    COPYING-GPL
    app/toysat-ipasir/ipasir.h
+   app/toysat-ipasir/ipasir.map
    misc/build_bdist_linux.sh
    misc/build_bdist_macos.sh
    misc/build_bdist_win32.sh
