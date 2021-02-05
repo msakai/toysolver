@@ -391,8 +391,6 @@ Foreign-Library     toysat-ipasir
   if os(Windows)
     options: standalone
     mod-def-file: app/toysat-ipasir/ipasir.def
-  if os(Linux)
-    ld-options: -Wl,--version-script=app/toysat-ipasir/ipasir.map
   build-depends:
     base,
     containers,
