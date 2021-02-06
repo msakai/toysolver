@@ -5,7 +5,6 @@ module IPASIR () where
 import Control.Exception
 import Control.Monad
 import Data.Int
-import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.IORef
 import Foreign
