@@ -123,7 +123,7 @@ jobs:
       - name: Test IPASIR DLL using genipaessentials
         shell: bash
         run: |
-          stack exec -- g++ -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root`/lib -ltoysat-ipasir -o genipaessentials
+          stack exec -- g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root`/lib -ltoysat-ipasir -o genipaessentials
           if [[ ${{ runner.os }} = "macOS" ]]; then
             install_name_tool -add_rpath `stack path --local-install-root`/lib genipaessentials
           elif [[ ${{ runner.os }} = "Windows" ]]; then
