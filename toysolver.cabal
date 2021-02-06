@@ -23,6 +23,7 @@ Extra-Source-Files:
    COPYING
    COPYING-GPL
    app/toysat-ipasir/ipasir.h
+   app/toysat-ipasir/ipasir.map
    misc/build_bdist_linux.sh
    misc/build_bdist_macos.sh
    misc/build_bdist_win32.sh
@@ -457,6 +458,7 @@ Foreign-Library     toysat-ipasir
   hs-source-dirs:   app/toysat-ipasir
   include-dirs:     app/toysat-ipasir
   c-sources:        app/toysat-ipasir/cbits.c
+  cc-options:       -Wall
   cpp-options:      -DIPASIR_SHARED_LIB -DBUILDING_IPASIR_SHARED_LIB
   includes:         ipasir.h
   other-modules:    IPASIR
