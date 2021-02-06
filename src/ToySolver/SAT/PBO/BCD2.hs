@@ -202,7 +202,7 @@ solveWBO cxt solver opt = do
             modifyIORef' nunsatRef (+1)
             failed <- SAT.getFailedAssumptions solver
 
-            case failed of
+            case IntSet.toList failed of
               [] -> C.setFinished cxt
               [sel] | Just (core,mid) <- IntMap.lookup sel sels -> do
                 C.logMessage cxt $ printf "BCD2: updating lower bound of a core"
@@ -215,10 +215,9 @@ solveWBO cxt solver opt = do
                 updateLB lb core
                 loop
               _ -> do
-                let failed'     = IntSet.fromList failed
-                    torelax     = unrelaxed `IntSet.intersection` failed'
-                    intersected = [(core,mid) | (sel,(core,mid)) <- IntMap.toList sels, sel `IntSet.member` failed']
-                    disjoint    = [core | (sel,(core,_)) <- IntMap.toList sels, sel `IntSet.notMember` failed']
+                let torelax     = unrelaxed `IntSet.intersection` failed
+                    intersected = [(core,mid) | (sel,(core,mid)) <- IntMap.toList sels, sel `IntSet.member` failed]
+                    disjoint    = [core | (sel,(core,_)) <- IntMap.toList sels, sel `IntSet.notMember` failed]
                 modifyIORef unrelaxedRef (`IntSet.difference` torelax)
                 modifyIORef relaxedRef (`IntSet.union` torelax)
                 delta <- do

@@ -32,7 +32,7 @@ findMUSAssumptions
   -> IO MUS
 findMUSAssumptions solver opt = do
   log "computing a minimal unsatisfiable core by deletion method"
-  core <- liftM IS.fromList $ SAT.getFailedAssumptions solver
+  core <- SAT.getFailedAssumptions solver
   log $ "initial core = " ++ showLits core
   update core
   if IS.null core then
@@ -63,7 +63,7 @@ findMUSAssumptions solver opt = do
           log $ "trying to remove " ++ showLit l
           ret <- SAT.solveWith solver (IS.toList ls)
           if not ret then do
-            ls2 <- liftM IS.fromList $ SAT.getFailedAssumptions solver
+            ls2 <- SAT.getFailedAssumptions solver
             let removed = ls1 `IS.difference` ls2
             log $ "successed to remove " ++ showLits removed
             log $ "new core = " ++ showLits (ls2 `IS.union` fixed)
