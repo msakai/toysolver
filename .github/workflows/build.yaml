@@ -30,6 +30,12 @@ jobs:
             flags: ''
             coveralls: false
 
+          - ghc: '8.10.2'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-8.10.2.yaml'
+            stack_args: ''
+            flags: ''
+            coveralls: false
           - ghc: '8.8.4'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.8.yaml'
