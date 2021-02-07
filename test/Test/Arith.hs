@@ -459,11 +459,20 @@ prop_Simplex_explain = QM.monadicIO $ do
    case ret of
      Nothing -> return ()
      Just e -> do
+       QM.monitor (counterexample (show e))
        ret2 <- f (`IS.member` e)
-       QM.assert (ret2 == Just e)
-       forM_ (IS.toList e) $ \i -> do
-         ret3 <- f (`IS.member` (IS.delete i e))
-         QM.assert (isNothing ret3)
+       case ret2 of
+         Nothing -> QM.assert False
+         Just e2 -> do
+           QM.monitor (counterexample (show e2))
+           if Simplex.configEnableBoundTightening config then do
+             QM.assert (e2 `IS.isSubsetOf` e)
+           else do
+             -- minimality of e is ensured only when bound-tightening is disabled
+             QM.assert (e2 == e)
+             forM_ (IS.toList e) $ \i -> do
+               ret3 <- f (`IS.member` (IS.delete i e))
+               QM.assert (isNothing ret3)
 
 
 case_Simplex_explain_1 :: Assertion
@@ -505,10 +514,16 @@ case_Simplex_explain_1 = do
        case ret2 of
          Nothing -> assertFailure (show e ++ " should be unsatisfiable")
          Just e2 -> do
-           e2 @?= e
-           forM_ (IS.toList e) $ \i -> do
-             ret3 <- f (`IS.member` (IS.delete i e))
-             assertBool (show i ++ " is redundant in " ++ show e) (isNothing ret3)
+           if Simplex.configEnableBoundTightening config then do
+             assertBool (show e2 ++ " should be subset of " ++ show e) (e2 `IS.isSubsetOf` e)
+           else do
+             -- minimality of e is ensured only when bound-tightening is disabled
+             e2 @?= e
+             forM_ (IS.toList e) $ \i -> do
+               ret3 <- f (`IS.member` (IS.delete i e))
+               case ret3 of
+                 Nothing -> return ()
+                 Just e3 -> assertFailure (show i ++ " is redundant in " ++ show e ++ " (" ++ show e3 ++ " is smaller explanation)")
 
 
 instance Arbitrary Simplex.Config where
