@@ -93,10 +93,9 @@ prop_negate_involution =
 
 prop_divModMP =
   forAll polynomials $ \g ->
-    forAll (replicateM 3 polynomials) $ \fs ->
-      all (0/=) fs ==>
-        let (qs, r) = P.divModMP P.lex g fs
-        in sum (zipWith (*) fs qs) + r == g
+    forAll (replicateM 3 nonzeroPolynomials) $ \fs ->
+      let (qs, r) = P.divModMP P.lex g fs
+      in sum (zipWith (*) fs qs) + r == g
 
 case_prettyShow_test1 =
   prettyShow p @?= "-x1^2*x2 + 3*x1 - 2*x2"
@@ -133,10 +132,9 @@ case_deg_0 = assertBool "" $ (P.deg p < 0)
 
 prop_divMod =
   forAll upolynomials $ \a ->
-  forAll upolynomials $ \b ->
-    b /= 0 ==>
-      let (q,r) = P.divMod a b
-      in a == q*b + r && (r==0 || P.deg b > P.deg r)
+  forAll nonzeroUPolynomials $ \b ->
+    let (q,r) = P.divMod a b
+    in a == q*b + r && (r==0 || P.deg b > P.deg r)
 
 case_divMod_1 =  g*q + r @?= f
   where
@@ -147,11 +145,10 @@ case_divMod_1 =  g*q + r @?= f
     (q,r) = f `P.divMod` g
 
 prop_gcd_divisible =
-  forAll upolynomials $ \a ->
-  forAll upolynomials $ \b ->
-    (a /= 0 && b /= 0) ==>
-      let c = P.gcd a b
-      in a `P.mod` c == 0 && b `P.mod` c == 0
+  forAll nonzeroUPolynomials $ \a ->
+  forAll nonzeroUPolynomials $ \b ->
+    let c = P.gcd a b
+    in a `P.mod` c == 0 && b `P.mod` c == 0
 
 prop_gcd_comm =
   forAll upolynomials $ \a ->
@@ -159,11 +156,10 @@ prop_gcd_comm =
     P.gcd a b == P.gcd b a
 
 prop_gcd_euclid =
-  forAll upolynomials $ \p ->
-  forAll upolynomials $ \q ->
-  forAll upolynomials $ \r ->
-    (p /= 0 && q /= 0 && r /= 0) ==>
-      P.gcd p q == P.gcd p (q + p*r)
+  forAll nonzeroUPolynomials $ \p ->
+  forAll nonzeroUPolynomials $ \q ->
+  forAll nonzeroUPolynomials $ \r ->
+    P.gcd p q == P.gcd p (q + p*r)
 
 case_gcd_1 = P.gcd f1 f2 @?= 1
   where
@@ -201,11 +197,10 @@ prop_gcd'_comm =
     P.gcd' a b `eqUpToInvElem` P.gcd' b a
 
 prop_gcd'_euclid =
-  forAll upolynomialsZ $ \p ->
-  forAll upolynomialsZ $ \q ->
-  forAll upolynomialsZ $ \r ->
-    (p /= 0 && q /= 0 && r /= 0) ==>
-      P.gcd' p q `eqUpToInvElem` P.gcd' p (q + p*r)
+  forAll nonzeroUPolynomialsZ $ \p ->
+  forAll nonzeroUPolynomialsZ $ \q ->
+  forAll nonzeroUPolynomialsZ $ \r ->
+    P.gcd' p q `eqUpToInvElem` P.gcd' p (q + p*r)
 
 case_gcd'_1 = eqUpToInvElem (P.gcd' f1 f2) 1 @?= True
   where
@@ -215,11 +210,10 @@ case_gcd'_1 = eqUpToInvElem (P.gcd' f1 f2) 1 @?= True
     f2 = x^2 + 1
 
 prop_lcm_divisible =
-  forAll upolynomials $ \a ->
-  forAll upolynomials $ \b ->
-    (a /= 0 && b /= 0) ==>
-      let c = P.lcm a b
-      in c `P.mod` a == 0 && c `P.mod` b == 0
+  forAll nonzeroUPolynomials $ \a ->
+  forAll nonzeroUPolynomials $ \b ->
+    let c = P.lcm a b
+    in c `P.mod` a == 0 && c `P.mod` b == 0
 
 prop_lcm_comm =
   forAll upolynomials $ \a ->
@@ -243,10 +237,9 @@ prop_pp_cont =
     P.cont (P.pp p) == 1
 
 prop_cont_prod =
-  forAll polynomials $ \p ->
-    forAll polynomials $ \q ->
-      (p /= 0 && q /= 0) ==>
-        P.cont (p*q) == P.cont p * P.cont q
+  forAll nonzeroPolynomials $ \p ->
+    forAll nonzeroPolynomials $ \q ->
+      P.cont (p*q) == P.cont p * P.cont q
 
 case_cont_pp_Integer = do
   P.cont p @?= 5
@@ -267,24 +260,21 @@ case_cont_pp_Rational = do
 
 prop_pdivMod =
   forAll upolynomialsZ $ \f ->
-  forAll upolynomialsZ $ \g ->
-    g /= 0 ==>
-      let (b,q,r) = f `P.pdivMod` g
-      in P.constant b * f == q*g + r && P.deg r < P.deg g
+  forAll nonzeroUPolynomialsZ $ \g ->
+    let (b,q,r) = f `P.pdivMod` g
+    in P.constant b * f == q*g + r && P.deg r < P.deg g
 
 prop_pdiv =
   forAll upolynomialsZ $ \f ->
-  forAll upolynomialsZ $ \g ->
-    g /= 0 ==>
-      let (_,q,_) = f `P.pdivMod` g
-      in f `P.pdiv` g == q
+  forAll nonzeroUPolynomialsZ $ \g ->
+    let (_,q,_) = f `P.pdivMod` g
+    in f `P.pdiv` g == q
 
 prop_pmod =
   forAll upolynomialsZ $ \f ->
-  forAll upolynomialsZ $ \g ->
-    g /= 0 ==>
-      let (_,_,r) = f `P.pdivMod` g
-      in f `P.pmod` g == r
+  forAll nonzeroUPolynomialsZ $ \g ->
+    let (_,_,r) = f `P.pdivMod` g
+    in f `P.pmod` g == r
 
 {--------------------------------------------------------------------
   Term
@@ -579,6 +569,28 @@ polynomials = do
   xs <- replicateM size genTerms
   return $ sum $ map P.fromTerm xs
 
+nonzeroMonicMonomials :: Gen (Monomial Int)
+nonzeroMonicMonomials = do
+  size <- choose (1, 3)
+  xs <- replicateM size $ do
+    v <- choose (-5, 5)
+    e <- choose (1, 8)
+    return $ P.var v `P.mpow` e
+  return $ foldl' P.mmult P.mone xs
+
+genNonzeroTerms :: Gen (Term Rational Int)
+genNonzeroTerms = do
+  m <- nonzeroMonicMonomials
+  c <- arbitrary `suchThat` (/= 0)
+  return (c,m)
+
+nonzeroPolynomials  :: Gen (Polynomial Rational Int)
+nonzeroPolynomials = do
+  size <- choose (1, 5)
+  xs <- replicateM size genNonzeroTerms
+  let ret = sum $ map P.fromTerm xs
+  return ret `suchThat` (/= 0)
+
 umonicMonomials :: Gen UMonomial
 umonicMonomials = do
   size <- choose (0, 3)
@@ -599,6 +611,27 @@ upolynomials = do
   xs <- replicateM size genUTerms
   return $ sum $ map P.fromTerm xs
 
+nonzeroUMonicMonomials :: Gen UMonomial
+nonzeroUMonicMonomials = do
+  size <- choose (1, 3)
+  xs <- replicateM size $ do
+    e <- choose (1, 4)
+    return $ P.var X `P.mpow` e
+  return $ foldl' P.mmult P.mone xs
+
+genNonzeroUTerms :: Gen (UTerm Rational)
+genNonzeroUTerms = do
+  m <- nonzeroUMonicMonomials
+  c <- arbitrary `suchThat` (/= 0)
+  return (c,m)
+
+nonzeroUPolynomials :: Gen (UPolynomial Rational)
+nonzeroUPolynomials = do
+  size <- choose (1, 5)
+  xs <- replicateM size genNonzeroUTerms
+  let ret = sum $ map P.fromTerm xs
+  return ret `suchThat` (/= 0)
+
 genUTermsZ :: Gen (UTerm Integer)
 genUTermsZ = do
   m <- umonicMonomials
@@ -610,6 +643,19 @@ upolynomialsZ = do
   size <- choose (0, 5)
   xs <- replicateM size genUTermsZ
   return $ sum $ map P.fromTerm xs
+
+genNonzeroUTermsZ :: Gen (UTerm Integer)
+genNonzeroUTermsZ = do
+  m <- nonzeroUMonicMonomials
+  c <- arbitrary `suchThat` (/= 0)
+  return (c,m)
+
+nonzeroUPolynomialsZ :: Gen (UPolynomial Integer)
+nonzeroUPolynomialsZ = do
+  size <- choose (1, 5)
+  xs <- replicateM size genNonzeroUTermsZ
+  let ret = sum $ map P.fromTerm xs
+  return ret `suchThat` (/= 0)
 
 ------------------------------------------------------------------------
 
