@@ -563,7 +563,7 @@ monicMonomials = do
   size <- choose (0, 3)
   xs <- replicateM size $ do
     v <- choose (-5, 5)
-    e <- liftM ((+1) . abs) arbitrary
+    e <- choose (1, 8)
     return $ P.var v `P.mpow` e
   return $ foldl' P.mmult P.mone xs
 
