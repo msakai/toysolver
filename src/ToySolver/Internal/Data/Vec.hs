@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
@@ -73,6 +74,22 @@ type UVec e = GenericVec A.IOUArray e
 
 type Index = Int
 
+{- INLINE readArray #-}
+readArray :: A.MArray a e m => a Index e -> Index -> m e
+#ifdef EXTRA_BOUNDS_CHECKING
+readArray = A.readArray
+#else
+readArray = A.unsafeRead
+#endif
+
+{- INLINE writeArray #-}
+writeArray :: A.MArray a e m => a Index e -> Index -> e -> m ()
+#ifdef EXTRA_BOUNDS_CHECKING
+writeArray = A.writeArray
+#else
+writeArray = A.unsafeWrite
+#endif
+
 new :: A.MArray a e IO => IO (GenericVec a e)
 new = do
   sizeRef <- newIOURef 0
@@ -93,7 +110,7 @@ read !v !i = do
   a <- getArray v
   s <- getSize v
   if 0 <= i && i < s then
-    A.unsafeRead a i
+    readArray a i
   else
     error $ "ToySolver.Internal.Data.Vec.read: index " ++ show i ++ " out of bounds"
 
@@ -106,7 +123,7 @@ write !v !i e = do
   a <- getArray v
   s <- getSize v
   if 0 <= i && i < s then
-    A.unsafeWrite a i e
+    writeArray a i e
   else
     error $ "ToySolver.Internal.Data.Vec.write: index " ++ show i ++ " out of bounds"
 
@@ -116,8 +133,8 @@ modify !v !i f = do
   a <- getArray v
   s <- getSize v
   if 0 <= i && i < s then do
-    x <- A.unsafeRead a i
-    A.unsafeWrite a i (f x)
+    x <- readArray a i
+    writeArray a i (f x)
   else
     error $ "ToySolver.Internal.Data.Vec.modify: index " ++ show i ++ " out of bounds"
 
@@ -127,8 +144,8 @@ modify' !v !i f = do
   a <- getArray v
   s <- getSize v
   if 0 <= i && i < s then do
-    x <- A.unsafeRead a i
-    A.unsafeWrite a i $! f x
+    x <- readArray a i
+    writeArray a i $! f x
   else
     error $ "ToySolver.Internal.Data.Vec.modify': index " ++ show i ++ " out of bounds"
 
@@ -136,27 +153,27 @@ modify' !v !i f = do
 unsafeModify :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
 unsafeModify !v !i f = do
   a <- getArray v
-  x <- A.unsafeRead a i
-  A.unsafeWrite a i (f x)
+  x <- readArray a i
+  writeArray a i (f x)
 
 {-# INLINE unsafeModify' #-}
 unsafeModify' :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
 unsafeModify' !v !i f = do
   a <- getArray v
-  x <- A.unsafeRead a i
-  A.unsafeWrite a i $! f x
+  x <- readArray a i
+  writeArray a i $! f x
 
 {-# INLINE unsafeRead #-}
 unsafeRead :: A.MArray a e IO => GenericVec a e -> Int -> IO e
 unsafeRead !v !i = do
   a <- getArray v
-  A.unsafeRead a i
+  readArray a i
 
 {-# INLINE unsafeWrite #-}
 unsafeWrite :: A.MArray a e IO => GenericVec a e -> Int -> e -> IO ()
 unsafeWrite !v !i e = do
   a <- getArray v
-  A.unsafeWrite a i e
+  writeArray a i e
 
 {-# SPECIALIZE resize :: Vec e -> Int -> IO () #-}
 {-# SPECIALIZE resize :: UVec Int -> Int -> IO () #-}
@@ -307,5 +324,5 @@ cloneArray arr = do
 copyTo :: (A.MArray a e m) => a Index e -> a Index e -> (Index,Index) -> m ()
 copyTo fromArr toArr (!lb,!ub) = do
   forLoop lb (<=ub) (+1) $ \i -> do
-    val_i <- A.unsafeRead fromArr i
-    A.unsafeWrite toArr i val_i
+    val_i <- readArray fromArr i
+    writeArray toArr i val_i

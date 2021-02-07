@@ -121,6 +121,11 @@ Flag OpenCL
   Manual: True
   Default: False
 
+Flag ExtraBoundsChecking
+  Description: enable extra bounds checking for debugging
+  Manual: True
+  Default: False
+
 source-repository head
   type:     git
   location: git://github.com/msakai/toysolver.git
@@ -192,6 +197,8 @@ Library
   if flag(OpenCL)
      Build-Depends: OpenCL >=1.0.3.4
      Exposed-Modules: ToySolver.SAT.Solver.MessagePassing.SurveyPropagation.OpenCL
+  if flag(ExtraBoundsChecking)
+     CPP-Options: "-DEXTRA_BOUNDS_CHECKING"
   if impl(ghc)
      Build-Depends: ghc-prim
   Default-Language: Haskell2010

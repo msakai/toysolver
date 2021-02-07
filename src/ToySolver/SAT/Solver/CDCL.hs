@@ -186,12 +186,18 @@ newLitArray lits = do
   liftM LitArray $ newListArray (0, size-1) (map packLit lits)
 
 readLitArray :: LitArray -> Int -> IO Lit
+#if EXTRA_BOUNDS_CHECKING
+readLitArray (LitArray a) i = liftM unpackLit $ readArray a i
+#else
 readLitArray (LitArray a) i = liftM unpackLit $ unsafeRead a i
--- readLitArray (LitArray a) i = liftM unpackLit $ readArray a i
+#endif
 
 writeLitArray :: LitArray -> Int -> Lit -> IO ()
+#if EXTRA_BOUNDS_CHECKING
+writeLitArray (LitArray a) i lit = writeArray a i (packLit lit)
+#else
 writeLitArray (LitArray a) i lit = unsafeWrite a i (packLit lit)
--- writeLitArray (LitArray a) i lit = writeArray a i (packLit lit)
+#endif
 
 getLits :: LitArray -> IO [Lit]
 getLits (LitArray a) = liftM (map unpackLit) $ getElems a
