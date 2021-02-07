@@ -1,14 +1,23 @@
 0.7.0 (Unreleased)
 -----
+
+* add `toysat-ipasir` foreign library which implements [IPASIR](https://github.com/biotomas/ipasir) API for incremental SAT solving.
 * `ToySolver.SAT`
   * Restructure SAT solver modules under `ToySolver.SAT.Solver.*`
   * add `SequentialCounter`, `ParallelCounter` and `Totalizer` as methods for encoding cardinality constraints
   * add `PackedLit` type to reduce memory footprint
   * use structure of array (SOA) approach to reduce memory footprint
-* `ToySolver.Data.MIP.*` is separated into `MIP` package as `Numeric.Optimization.MIP`
+  * add `setLearnCallback`/`clearLearnCallback` and `setTerminateCallback`/`clearTerminateCallback` which correspond to [IPASIR](https://github.com/biotomas/ipasir)'s `ipasir_set_learn()` and `ipasir_set_terminate()`.
+  * add `clearLogger`
+  * change `getFailedAssumptions` and `getAssumptionsImplications` to return `IntSet` instead of `[Int]`
+* separate `ToySolver.Data.MIP.*` into new [MIP](http://hackage.haskell.org/package/MIP) package's `Numeric.Optimization.MIP.*`
 * add `ToySolver.Data.Polynomial.Interpolation.Hermite`
-* add `ToySolver.Graph.IndependentSet` and `ToySolver.Converter.SAT2MIS`
+* add `ToySolver.Graph.Base` and `ToySolver.Graph.MaxCut`
+* add `ToySolver.Converter.SAT2MIS`
+* `ToySolver.Graph.ShortestPath`: fix vertex type to `Int` instead of arbitrary `Hashable` type
 * stop supporting GHC-7.10
+* add `ExtraBoundsChecking` flag for debugging
+
 
 0.6.0
 -----
