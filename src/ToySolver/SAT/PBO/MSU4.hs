@@ -63,14 +63,14 @@ solveWBO cxt solver = do
         cont (unrelaxed, relaxed) lb
       else do
         core <- SAT.getFailedAssumptions solver
-        let ls = IS.fromList core `IS.intersection` unrelaxed
+        let ls = core `IS.intersection` unrelaxed
         if IS.null ls then do
           C.setFinished cxt
         else do
-          SAT.addClause solver [-l | l <- core] -- optional constraint but sometimes useful
+          SAT.addClause solver [-l | l <- IS.toList core] -- optional constraint but sometimes useful
           let min_weight = minimum [weights IM.! l | l <- IS.toList ls]
               lb' = lb + min_weight
-          C.logMessage cxt $ printf "MSU4: found a core: size = %d, minimal weight = %d" (length core) min_weight
+          C.logMessage cxt $ printf "MSU4: found a core: size = %d, minimal weight = %d" (IS.size core) min_weight
           C.addLowerBound cxt lb'
           cont (unrelaxed `IS.difference` ls, relaxed `IS.union` ls) lb'
 

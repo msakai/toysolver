@@ -172,7 +172,7 @@ explain solver = do
   xs <- SAT.getFailedAssumptions (svSATSolver solver)
   size <- Vec.getSize (svContexts solver)
   m <- Vec.read (svContexts solver) (size - 1)
-  return $ IntSet.fromList $ catMaybes [m IntMap.! x | x <- xs]
+  return $ IntSet.fromList $ catMaybes [m IntMap.! x | x <- IntSet.toList xs]
 
 pushBacktrackPoint :: Solver -> IO ()
 pushBacktrackPoint solver = do

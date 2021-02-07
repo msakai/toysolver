@@ -36,7 +36,7 @@ findMUSAssumptions
   -> IO MUS
 findMUSAssumptions solver opt = do
   log "computing a minimal unsatisfiable core by insertion method"
-  core <- liftM IntSet.fromList $ SAT.getFailedAssumptions solver
+  core <- SAT.getFailedAssumptions solver
   log $ "initial core = " ++ showLits core
   update core
   if IntSet.null core then
