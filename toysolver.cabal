@@ -391,6 +391,7 @@ Library
      Paths_toysolver
   autogen-modules:
      Paths_toysolver
+  ghc-options: -g2
   -- GHC-Prof-Options: -auto-all
 
 Foreign-Library     toysat-ipasir
@@ -407,6 +408,7 @@ Foreign-Library     toysat-ipasir
   c-sources:        app/toysat-ipasir/cbits.c
   cc-options:       -Wall
   cpp-options:      -DIPASIR_SHARED_LIB -DBUILDING_IPASIR_SHARED_LIB
+  ghc-options:      -g2 -debug
   includes:         ipasir.h
   other-modules:    IPASIR
   default-language: Haskell2010
