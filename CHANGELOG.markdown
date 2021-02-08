@@ -1,4 +1,4 @@
-0.7.0 (Unreleased)
+0.7.0
 -----
 
 * add `toysat-ipasir` foreign library which implements [IPASIR](https://github.com/biotomas/ipasir) API for incremental SAT solving.
@@ -17,7 +17,6 @@
 * `ToySolver.Graph.ShortestPath`: fix vertex type to `Int` instead of arbitrary `Hashable` type
 * stop supporting GHC-7.10
 * add `ExtraBoundsChecking` flag for debugging
-
 
 0.6.0
 -----
