@@ -68,6 +68,9 @@ install:
 script:
 # Build the package, its tests, and its docs and run the tests
 - stack --jobs 2 --no-terminal test --bench --no-run-benchmarks $FLAGS
+- if [ -n "$RELEASE" ]; then
+    stack runghc --package turtle misc/build_artifacts.hs
+  fi
 
 after_script:
 - |
@@ -79,9 +82,6 @@ after_script:
   if [ -n "$COVERAGE" ]; then
     travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$SHC_GHCVER.tar.bz2 | tar -xj
     ./shc toysolver TestSuite TestPolynomial
-  fi
-  if [ -n "$RELEASE" ]; then
-    stack runghc --package turtle misc/build_artifacts.hs
   fi
 
 deploy:
