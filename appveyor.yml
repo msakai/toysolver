@@ -49,7 +49,7 @@ artifacts:
 deploy:
 - provider: GitHub
   auth_token:
-    secure: OtB2kBvcLy0dwCzILJI9U1yyLpqh31Tgs52BMI2eul9NnbwCCoxfLsCrI+7dZmWN
+    secure: lFMaasLA09oBxLp6smlPWUtYYZktk5zm9mSTm2njrgRxFCqjWByxtgCrKi9Y3yCA
   artifact: /.*\.7z/
   release: $(appveyor_repo_tag_name)
   description: 'Release description'
