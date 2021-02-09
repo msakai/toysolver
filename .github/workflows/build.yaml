@@ -23,9 +23,9 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
-          - ghc: '8.6.5'
+          - ghc: '8.10.2'
             os: windows-latest
-            stack_yaml: 'stack-ghc-8.6.yaml'
+            stack_yaml: 'stack-ghc-8.10.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
@@ -79,6 +79,10 @@ jobs:
           stack-version: 'latest'
           stack-no-global: true
           stack-setup-ghc: true
+
+      - name: Fix ld path (Windows)
+        if: runner.os == 'Windows'
+        run: ruby misc/fix-x86_64-windows-ghc-8.10.2-settings.rb
 
       - name: Install packages (Linux)
         if: runner.os == 'Linux'
