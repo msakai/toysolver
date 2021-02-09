@@ -68,9 +68,7 @@ install:
 script:
 # Build the package, its tests, and its docs and run the tests
 - stack --jobs 2 --no-terminal test --bench --no-run-benchmarks $FLAGS
-- if [ -n "$RELEASE" ]; then
-    stack runghc --package turtle misc/build_artifacts.hs
-  fi
+- if [ -n "$RELEASE" ]; then stack runghc --package turtle misc/build_artifacts.hs; fi
 
 after_script:
 - |
