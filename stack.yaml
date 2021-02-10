@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-16.27
+resolver: nightly-2020-12-14
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -46,7 +46,6 @@ extra-deps:
 - logic-TPTP-0.4.7.0
 #- git: https://github.com/msakai/logic-TPTP.git
 #  commit: 9041314569aff4117c0da677f2af04614caf1aa5
-- extended-reals-0.2.3.0
 - finite-field-0.9.0
 - pseudo-boolean-0.1.9.0@sha256:18be9ef79c2b81baa746672182afefd800f8b96fcac7946bbb0456ea652e0a74
 - sign-0.4.4

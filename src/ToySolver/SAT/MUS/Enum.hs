@@ -117,7 +117,7 @@ instance I.IsProblem Problem IO where
       return $ I.InterestingSet $ IntSet.fromList [l | l <- IntSet.toList univ, optEvalConstr opt m l]
     else do
       zs <- SAT.getFailedAssumptions solver
-      return $ I.UninterestingSet $ IntSet.fromList zs
+      return $ I.UninterestingSet zs
 
   grow prob@(Problem _ _ opt) xs = do
     optLogger opt $ show (optMethod opt) ++ ": grow " ++ showLits prob xs

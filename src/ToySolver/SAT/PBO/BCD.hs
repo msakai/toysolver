@@ -106,7 +106,7 @@ solveWBO cxt solver = do
         cont (unrelaxed, relaxed) cores' ub'
       else do
         core <- SAT.getFailedAssumptions solver
-        case core of
+        case IntSet.toList core of
           [] -> return ()
           [sel] | Just info <- IntMap.lookup sel sels -> do
             let info'  = info{ coreLB = coreMidValue info + 1 }
@@ -115,10 +115,9 @@ solveWBO cxt solver = do
             SAT.addPBAtLeast solver (coreCostFun info') (coreLB info') -- redundant, but useful for direct search
             cont (unrelaxed, relaxed) cores' ub
           _ -> do
-            let coreSet     = IntSet.fromList core
-                torelax     = unrelaxed `IntSet.intersection` coreSet
-                intersected = [info | (sel,info) <- IntMap.toList sels, sel `IntSet.member` coreSet]
-                rest        = [info | (sel,info) <- IntMap.toList sels, sel `IntSet.notMember` coreSet]
+            let torelax     = unrelaxed `IntSet.intersection` core
+                intersected = [info | (sel,info) <- IntMap.toList sels, sel `IntSet.member` core]
+                rest        = [info | (sel,info) <- IntMap.toList sels, sel `IntSet.notMember` core]
                 mergedCore  = foldl' coreUnion (coreNew torelax) intersected
                 unrelaxed'  = unrelaxed `IntSet.difference` torelax
                 relaxed'    = relaxed `IntSet.union` torelax

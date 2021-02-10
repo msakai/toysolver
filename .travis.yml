@@ -25,21 +25,15 @@ addons:
 
 matrix:
   include:
-    - env: STACK_YAML=stack-ghc-8.10.yaml
+    - env: STACK_YAML=stack-ghc-8.10.yaml RELEASE=1 HADDOCK=1 SHC_GHCVER=8.0.1
       compiler: ": #GHC 8.10.2"
-    - env: STACK_YAML=stack-ghc-8.8.yaml RELEASE=1 HADDOCK=1 SHC_GHCVER=8.0.1
-      compiler: ": #GHC 8.8.4"
-    - env: STACK_YAML=stack-ghc-8.8.yaml RELEASE=1
-      compiler: ": #GHC 8.8.4"
+    - env: STACK_YAML=stack-ghc-8.10.yaml RELEASE=1
+      compiler: ": #GHC 8.10.2"
       os: osx
-    - env: STACK_YAML=stack-ghc-8.6.yaml
-      compiler: ": #GHC 8.6.5"
-    - env: STACK_YAML=stack-ghc-8.4.yaml
-      compiler: ": #GHC 8.4.4"
-    - env: STACK_YAML=stack-ghc-8.2.yaml
-      compiler: ": #GHC 8.2.2"
-    - env: STACK_YAML=stack-ghc-8.0.yaml
-      compiler: ": #GHC 8.0.2"
+    #- env: STACK_YAML=stack-ghc-8.8.yaml
+    #  compiler: ": #GHC 8.8.4"
+    #- env: STACK_YAML=stack-ghc-8.6.yaml
+    #  compiler: ": #GHC 8.6.5"
 
 # Caching so the next build will be fast too.
 cache:
@@ -68,6 +62,7 @@ install:
 script:
 # Build the package, its tests, and its docs and run the tests
 - stack --jobs 2 --no-terminal test --bench --no-run-benchmarks $FLAGS
+- if [ -n "$RELEASE" ]; then stack runghc --package turtle misc/build_artifacts.hs; fi
 
 after_script:
 - |
@@ -80,14 +75,11 @@ after_script:
     travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-$SHC_GHCVER.tar.bz2 | tar -xj
     ./shc toysolver TestSuite TestPolynomial
   fi
-  if [ -n "$RELEASE" ]; then
-    stack runghc --package turtle misc/build_artifacts.hs
-  fi
 
 deploy:
   provider: releases
   api_key:
-    secure: N3Gggk5lO32YKANw2M3XfNklyxIB6tCfrlfONOQFnoTIcVFemkNXjXnT+VUxrb0dYDYv4/0meuEBq38B4Rf7e4YQteWtb7dX092BDHPLW5sSlbvrUqxb3PSngqmKs1/fgmJFN5M8GZJqgnsvRVd3G5QQxmzNQKl2vx5bTo5j4tY=
+    secure: "5vnpI46rA4Uk1Ircf4AslxOYlnXMroW1511k1K6Ip9oDxla19xc2HViyHaegNP5utLDURdJShbfIUosQUzlcSVYamPLynrUCDBhwJKetnwjM6c/3ApkhzMsa9ZKn3v37i3joUD9zrkK6R0PHtD6Qkn/Ja15mqtfjf5XFl1tw7LY="
   file_glob: true
   file: '*.tar.xz'
   skip_cleanup: true

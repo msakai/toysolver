@@ -8,7 +8,7 @@
 extern void *toysat_ipasir_init();
 extern void toysat_ipasir_release(void * solver);
 
-static int initialized = 0;
+static _Bool initialized = 0;
 
 IPASIR_API
 const char *ipasir_signature()
@@ -19,10 +19,10 @@ const char *ipasir_signature()
 IPASIR_API
 void *ipasir_init(void)
 {
-    if (initialized++ == 0) {
-        int argc = 0;
-        char *argv[] = { NULL };
-	char **pargv = argv;
+    if (!initialized) {
+        int argc = 1;
+        char *argv[] = { "toysat-ipasir", NULL };
+        char **pargv = argv;
 
 #if __GLASGOW_HASKELL__ >= 703
         RtsConfig conf = defaultRtsConfig;
@@ -31,6 +31,8 @@ void *ipasir_init(void)
 #else
         hs_init(&argc, &argv);
 #endif
+
+        initialized = 1;
     }
 
     return toysat_ipasir_init();
@@ -41,7 +43,6 @@ void ipasir_release(void* solver)
 {
     toysat_ipasir_release(solver);
 
-    if (--initialized == 0) {
-        hs_exit();
-    }
+    // Note that we do not call hs_exit() here because GHC currently
+    // does not support reinitializing the RTS after shutdown.
 }

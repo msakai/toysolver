@@ -28,6 +28,9 @@ install:
 - if %PLATFORM%==x86 (curl -ostack.zip -L --insecure https://github.com/commercialhaskell/stack/releases/download/v2.1.3/stack-2.1.3-windows-i386.zip) else (curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-x86_64)
 - 7z x stack.zip stack.exe
 - stack setup > nul
+# https://gitlab.haskell.org/ghc/ghc/-/issues/18550q
+- if %PLATFORM%==x64 set PATH=c:\Ruby26-x64\bin;%PATH%
+- if %PLATFORM%==x64 ruby misc/fix-x86_64-windows-ghc-8.10.2-settings.rb
 
 build_script:
 - git submodule init
@@ -49,7 +52,7 @@ artifacts:
 deploy:
 - provider: GitHub
   auth_token:
-    secure: OtB2kBvcLy0dwCzILJI9U1yyLpqh31Tgs52BMI2eul9NnbwCCoxfLsCrI+7dZmWN
+    secure: lFMaasLA09oBxLp6smlPWUtYYZktk5zm9mSTm2njrgRxFCqjWByxtgCrKi9Y3yCA
   artifact: /.*\.7z/
   release: $(appveyor_repo_tag_name)
   description: 'Release description'

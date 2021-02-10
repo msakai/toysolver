@@ -186,12 +186,18 @@ newLitArray lits = do
   liftM LitArray $ newListArray (0, size-1) (map packLit lits)
 
 readLitArray :: LitArray -> Int -> IO Lit
+#if EXTRA_BOUNDS_CHECKING
+readLitArray (LitArray a) i = liftM unpackLit $ readArray a i
+#else
 readLitArray (LitArray a) i = liftM unpackLit $ unsafeRead a i
--- readLitArray (LitArray a) i = liftM unpackLit $ readArray a i
+#endif
 
 writeLitArray :: LitArray -> Int -> Lit -> IO ()
+#if EXTRA_BOUNDS_CHECKING
+writeLitArray (LitArray a) i lit = writeArray a i (packLit lit)
+#else
 writeLitArray (LitArray a) i lit = unsafeWrite a i (packLit lit)
--- writeLitArray (LitArray a) i lit = writeArray a i (packLit lit)
+#endif
 
 getLits :: LitArray -> IO [Lit]
 getLits (LitArray a) = liftM (map unpackLit) $ getElems a
@@ -324,7 +330,7 @@ data Solver
 
   -- Result
   , svModel        :: !(IORef (Maybe Model))
-  , svFailedAssumptions :: !(IORef [Lit])
+  , svFailedAssumptions :: !(IORef LitSet)
   , svAssumptionsImplications :: !(IORef LitSet)
 
   -- Statistics
@@ -705,7 +711,7 @@ newSolverWithConfig config = do
 
   randgen  <- newIORef =<< Rand.create
 
-  failed <- newIORef []
+  failed <- newIORef IS.empty
   implied <- newIORef IS.empty
 
   confBudget <- newIOURef (-1)
@@ -1061,7 +1067,7 @@ solve_ solver = do
   resetStat solver
   writeIORef (svCanceled solver) False
   writeIORef (svModel solver) Nothing
-  writeIORef (svFailedAssumptions solver) []
+  writeIORef (svFailedAssumptions solver) IS.empty
 
   ok <- readIORef (svOk solver)
   if not ok then
@@ -1233,7 +1239,7 @@ search solver !conflict_lim onConflict = do
                 else if val == lFalse then do
                   -- conflict with assumption
                   core <- analyzeFinal solver l
-                  writeIORef (svFailedAssumptions solver) core
+                  writeIORef (svFailedAssumptions solver) (IS.fromList core)
                   return Nothing
                 else
                   return (Just l)
@@ -1372,13 +1378,13 @@ getModel solver = do
 -- | After 'solveWith' returns False, it returns a set of assumptions
 -- that leads to contradiction. In particular, if it returns an empty
 -- set, the problem is unsatisiable without any assumptions.
-getFailedAssumptions :: Solver -> IO [Lit]
+getFailedAssumptions :: Solver -> IO LitSet
 getFailedAssumptions solver = readIORef (svFailedAssumptions solver)
 
 -- | __EXPERIMENTAL API__: After 'solveWith' returns True or failed with 'BudgetExceeded' exception,
 -- it returns a set of literals that are implied by assumptions.
-getAssumptionsImplications :: Solver -> IO [Lit]
-getAssumptionsImplications solver = liftM IS.toList $ readIORef (svAssumptionsImplications solver)
+getAssumptionsImplications :: Solver -> IO LitSet
+getAssumptionsImplications solver = readIORef (svAssumptionsImplications solver)
 
 {--------------------------------------------------------------------
   Simplification
