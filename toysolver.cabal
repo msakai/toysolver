@@ -11,9 +11,6 @@ Description:	Toy-level solver implementation of various problems including SAT, 
 Homepage:	https://github.com/msakai/toysolver/
 Bug-Reports:	https://github.com/msakai/toysolver/issues
 Tested-With:
-   GHC ==8.0.2
-   GHC ==8.2.2
-   GHC ==8.4.4
    GHC ==8.6.5
    GHC ==8.8.4
    GHC ==8.10.2
