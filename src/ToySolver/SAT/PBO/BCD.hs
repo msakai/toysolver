@@ -79,7 +79,7 @@ solveWBO cxt solver = do
     coreNew cs = CoreInfo{ coreLits = cs, coreLB = 0, coreUB = sum [weights IntMap.! lit | lit <- IntSet.toList cs] }
 
     coreCostFun :: CoreInfo -> SAT.PBLinSum
-    coreCostFun c = [(weights IntMap.! lit, -lit) | lit <- IntSet.toList (coreLits c)]
+    coreCostFun c = [(w, -lit)  | (lit, w) <- IntMap.toList (IntMap.restrictKeys weights (coreLits c))]
 
     loop :: (SAT.LitSet, SAT.LitSet) -> [CoreInfo] -> Integer -> IO ()
     loop (unrelaxed, relaxed) cores ub = do

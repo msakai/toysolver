@@ -118,7 +118,7 @@ solveWBO cxt solver opt = do
   deductedWeightRef <- newIORef weights
   let deductWeight d core =
         modifyIORef' deductedWeightRef $ IntMap.unionWith (+) $
-          IntMap.fromList [(lit, - d) | lit <- IntSet.toList (coreLits core)]
+          IntMap.fromSet (const (- d)) (coreLits core)
       updateLB oldLB core = do
         newLB <- getLB
         C.addLowerBound cxt newLB
@@ -207,7 +207,7 @@ solveWBO cxt solver opt = do
               [sel] | Just (core,mid) <- IntMap.lookup sel sels -> do
                 C.logMessage cxt $ printf "BCD2: updating lower bound of a core"
                 let newCoreLB  = mid + 1
-                    newCoreLB' = refineLB [weights IntMap.! lit | lit <- IntSet.toList (coreLits core)] newCoreLB
+                    newCoreLB' = refineLB (IntMap.elems (IntMap.restrictKeys weights (coreLits core))) newCoreLB
                 when (newCoreLB /= newCoreLB') $ C.logMessage cxt $
                   printf "BCD2: refineLB: %d -> %d" newCoreLB newCoreLB'
                 writeIORef (coreLBRef core) newCoreLB'
@@ -216,8 +216,8 @@ solveWBO cxt solver opt = do
                 loop
               _ -> do
                 let torelax     = unrelaxed `IntSet.intersection` failed
-                    intersected = [(core,mid) | (sel,(core,mid)) <- IntMap.toList sels, sel `IntSet.member` failed]
-                    disjoint    = [core | (sel,(core,_)) <- IntMap.toList sels, sel `IntSet.notMember` failed]
+                    intersected = IntMap.elems (IntMap.restrictKeys sels failed)
+                    disjoint    = [core | (sel,(core,_)) <- IntMap.toList (IntMap.withoutKeys sels failed)]
                 modifyIORef unrelaxedRef (`IntSet.difference` torelax)
                 modifyIORef relaxedRef (`IntSet.union` torelax)
                 delta <- do
@@ -228,7 +228,7 @@ solveWBO cxt solver opt = do
                   return $! minimum (xs1 ++ xs2)
                 let mergedCoreLits = IntSet.unions $ torelax : [coreLits core | (core,_) <- intersected]
                 mergedCoreLB <- liftM ((delta +) . sum) $ mapM (getCoreLB . fst) intersected
-                let mergedCoreLB' = refineLB [weights IntMap.! lit | lit <- IntSet.toList mergedCoreLits] mergedCoreLB
+                let mergedCoreLB' = refineLB (IntMap.elems (IntMap.restrictKeys weights mergedCoreLits)) mergedCoreLB
                 mergedCore <- newCoreInfo mergedCoreLits mergedCoreLB'
                 writeIORef coresRef (mergedCore : disjoint)
                 forM_ intersected $ \(core, _) -> deleteCoreInfo solver core

@@ -56,7 +56,7 @@ solveWBO cxt solver = do
         if IntSet.null core then
           C.setFinished cxt
         else do
-          let !min_c = minimum [sels IntMap.! sel | sel <- IntSet.toList core]
+          let !min_c = minimum $ IntMap.elems $ IntMap.restrictKeys sels core
               !lb' = lb + min_c
 
           xs <- forM (IntSet.toList core) $ \sel -> do
@@ -72,6 +72,6 @@ solveWBO cxt solver = do
             if c > min_c
               then return $ IntMap.fromList [(sel', min_c), (sel, c - min_c)]
               else return $ IntMap.singleton sel' min_c
-          let sels' = IntMap.union ys (IntMap.difference sels (IntMap.fromSet (const ()) core))
+          let sels' = IntMap.union ys (IntMap.withoutKeys sels core)
 
           loop lb' sels'
