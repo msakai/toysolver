@@ -129,5 +129,18 @@ jobs:
           curl -L https://github.com/lehins/stack-hpc-coveralls/releases/download/v0.0.6.0/shc.tar.gz | tar -xz
           ./shc --repo-token="$COVERALLS_REPO_TOKEN" toysolver TestSuite TestPolynomial
 
-      - name: Build Artifacts
+      - name: Build artifacts
         run: stack runhaskell ${{ matrix.stack_args }} --package turtle misc/build_artifacts.hs
+
+      - name: Upload artifacts to GitHub Release
+        if: startsWith(github.ref, 'refs/tags') && matrix.release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          assets=()
+          for asset in *.tar.xz *.7z; do
+            assets+=("-a" "$asset")
+          done
+          tag_name="${GITHUB_REF#refs/tags/}"
+          hub release create "${assets[@]}" -d -m "$tag_name" "$tag_name"
