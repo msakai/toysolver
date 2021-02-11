@@ -1,5 +1,4 @@
 -- stack --install-ghc runghc --package turtle build_artifacts.hs
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- script for building artifacts on AppVeyor and Travis-CI
@@ -9,12 +8,8 @@ import qualified Control.Foldl as L
 import Control.Monad
 import Distribution.Package
 import Distribution.PackageDescription
-#if MIN_VERSION_Cabal(2,2,0)
 import Distribution.PackageDescription.Parsec
 import Distribution.Pretty
-#else
-import Distribution.PackageDescription.Parse
-#endif
 import Distribution.Version
 import Distribution.Verbosity
 import qualified System.Info as Info
@@ -52,11 +47,7 @@ main = sh $ do
 
   Just local_install_root <- fold (inproc "stack"  ["path", "--local-install-root"] empty) L.head
 
-#if MIN_VERSION_Cabal(2,2,0)
   ver <- liftIO $ liftM (prettyShow . pkgVersion . package . packageDescription) $
-#else
-  ver <- liftIO $ liftM (showVersion . pkgVersion . package . packageDescription) $
-#endif
            readGenericPackageDescription silent "toysolver.cabal"
   let pkg :: Turtle.FilePath
       pkg = fromString $ "toysolver-" <> ver <> "-" <> package_platform
