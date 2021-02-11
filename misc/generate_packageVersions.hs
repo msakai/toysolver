@@ -1,5 +1,4 @@
 -- stack --install-ghc runghc --package Cabal generate_packageVersions.hs
-{-# LANGUAGE CPP #-}
 module Main where
 
 import Control.Monad
@@ -7,16 +6,10 @@ import Data.Maybe
 import qualified Data.Set as Set
 import Distribution.Package
 import Distribution.PackageDescription
-#if MIN_VERSION_Cabal(2,2,0)
 import Distribution.PackageDescription.Parsec
-#else
-import Distribution.PackageDescription.Parse
-#endif
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
-#if MIN_VERSION_Cabal(2,0,0)
 import Distribution.Types.CondTree
-#endif
 import qualified Distribution.Verbosity as Verbosity
 import System.Environment
 
@@ -25,11 +18,7 @@ main = generate_packageVersions "toysolver.cabal"
 
 generate_packageVersions :: FilePath -> IO ()
 generate_packageVersions cabalFile = do
-#if MIN_VERSION_Cabal(2,0,0)
   pkgDesc <- readGenericPackageDescription Verbosity.normal cabalFile
-#else
-  pkgDesc <- readPackageDescription Verbosity.normal cabalFile
-#endif
   let pkgs1 =
         case condLibrary pkgDesc of
           Nothing -> Set.empty
@@ -52,8 +41,4 @@ generate_packageVersions cabalFile = do
 
 constrs :: CondTree v c a -> [c]
 constrs (CondNode _a constr children) =
-#if MIN_VERSION_Cabal(2,0,0)
   constr : concat [constrs tree | CondBranch _cond thenTree elseTree <- children, tree <- thenTree : maybeToList elseTree]
-#else
-  constr : concat [constrs tree | (_cond, thenTree, elseTree) <- children, tree <- thenTree : maybeToList elseTree]
-#endif
