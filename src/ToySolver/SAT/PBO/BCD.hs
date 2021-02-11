@@ -116,8 +116,8 @@ solveWBO cxt solver = do
             cont (unrelaxed, relaxed) cores' ub
           _ -> do
             let torelax     = unrelaxed `IntSet.intersection` core
-                intersected = [info | (sel,info) <- IntMap.toList sels, sel `IntSet.member` core]
-                rest        = [info | (sel,info) <- IntMap.toList sels, sel `IntSet.notMember` core]
+                intersected = IntMap.elems $ IntMap.restrictKeys sels core
+                rest        = IntMap.elems $ IntMap.withoutKeys sels core
                 mergedCore  = foldl' coreUnion (coreNew torelax) intersected
                 unrelaxed'  = unrelaxed `IntSet.difference` torelax
                 relaxed'    = relaxed `IntSet.union` torelax
