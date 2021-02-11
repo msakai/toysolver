@@ -44,6 +44,16 @@ Binary distributions for Windows, Mac, and Linux, can be downloaded from [releas
 3. `cd toysolver`
 4. `cabal install`
 
+### Docker image
+
+The Docker images can be found at [dockerhub](https://hub.docker.com/repository/docker/msakai/toysolver).
+
+To run `toysat` using Docker for solving `samples/pbs/normalized-j3025_1-sat.opb`:
+
+```
+docker run -it --rm -v `pwd`:/data msakai/toysolver toysat samples/pbs/normalized-j3025_1-sat.opb`
+```
+
 Usage
 -----
 
