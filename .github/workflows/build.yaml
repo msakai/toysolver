@@ -13,9 +13,10 @@ jobs:
           - ghc: '8.10.2'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.10.yaml'
-            stack_args: '--coverage --haddock --no-haddock-deps'
+            stack_args: '--haddock --no-haddock-deps'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
-            coveralls: true
+            coveralls: false
+            release: true
 
           - ghc: '8.10.2'
             os: macos-latest
@@ -23,25 +24,28 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
+            release: true
           - ghc: '8.10.2'
             os: windows-latest
             stack_yaml: 'stack-ghc-8.10.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
+            release: true
           - ghc: '8.6.3'
             os: windows-latest
             stack_yaml: 'stack-windows-i386.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
+            release: true
 
           - ghc: '8.8.4'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.8.yaml'
-            stack_args: ''
+            stack_args: '--coverage'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
-            coveralls: false
+            coveralls: true
           - ghc: '8.6.5'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.6.yaml'
