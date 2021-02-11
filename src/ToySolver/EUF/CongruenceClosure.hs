@@ -562,7 +562,8 @@ getModel solver = do
       xs1 :: IntMap (Map EntityTuple Entity)
       xs1 = IntMap.fromListWith Map.union $
               [ (f, Map.singleton (reverse argsRev) (repr IntMap.! a))
-              | a <- IntMap.keys appRel, a `IntSet.notMember` partialApps, (f, argsRev) <- expand a
+              | a <- IntMap.keys (IntMap.withoutKeys appRel partialApps)
+              , (f, argsRev) <- expand a
               ]
         where
           expand :: FSym -> [(FSym, [FSym])]
@@ -575,8 +576,7 @@ getModel solver = do
                 return (f, repr IntMap.! d : xs)
 
       xs2 :: IntMap (Map EntityTuple Entity)
-      xs2 = IntMap.fromListWith Map.union $
-              [ (a, Map.singleton [] a') | (a, a') <- IntMap.toList repr, a `IntMap.notMember` xs1 ]
+      xs2 = fmap (Map.singleton []) (repr `IntMap.difference` xs1)
 
       funcs :: IntMap (Map EntityTuple Entity)
       funcs = IntMap.unionWith Map.union xs1 xs2

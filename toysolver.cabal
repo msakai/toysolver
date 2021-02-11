@@ -139,8 +139,8 @@ Library
      bytestring-encoding,
      case-insensitive,
      clock >=0.7.1,
-     -- IntMap.mergeWithKey and IntMap.toDescList require containers >=0.5.0
-     containers >=0.5.0,
+     -- IntMap.restrictKeys and IntMap.withoutKeys require containers >=0.5.8
+     containers >=0.5.8,
      data-default,
      data-default-class,
      data-interval >=2.0.1 && <2.1.0,

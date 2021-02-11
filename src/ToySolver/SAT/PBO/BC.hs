@@ -57,7 +57,7 @@ solveWBO cxt solver = do
           let mid = (lb + ub) `div` 2
           C.logMessage cxt $ printf "BC: %d <= obj <= %d; guessing obj <= %d" lb ub mid
           sel <- SAT.newVar solver
-          SAT.addPBAtMostSoft solver sel [(weights IntMap.! lit, -lit) | lit <- IntSet.toList relaxed] mid
+          SAT.addPBAtMostSoft solver sel [(w, -lit)  | (lit, w) <- IntMap.toList (IntMap.restrictKeys weights relaxed)] mid
           ret <- SAT.solveWith solver (sel : IntSet.toList unrelaxed)
           if ret then do
             m <- SAT.getModel solver
