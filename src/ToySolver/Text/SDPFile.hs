@@ -74,38 +74,26 @@ import Data.Scientific (Scientific)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
+import Data.Void
+import Data.Word
 import System.FilePath (takeExtension)
 import System.IO
 import qualified Text.Megaparsec as MegaParsec
+import Text.Megaparsec hiding (ParseError, oneOf)
 #if MIN_VERSION_megaparsec(7,0,0)
-import Data.Word
-import Data.Void
-import Text.Megaparsec hiding (ParseError, oneOf)
 import Text.Megaparsec.Byte
-import qualified Text.Megaparsec.Byte.Lexer as Lexer
-#elif MIN_VERSION_megaparsec(6,0,0)
-import Data.Word
-import Data.Void
-import Text.Megaparsec hiding (ParseError, oneOf)
+#else
 import Text.Megaparsec.Byte hiding (oneOf)
 import qualified Text.Megaparsec.Byte as MegaParsec
-import qualified Text.Megaparsec.Byte.Lexer as Lexer
-#else
-import qualified Data.ByteString.Lazy.Char8 as BL8
-import Text.Megaparsec hiding (ParseError, oneOf)
-import qualified Text.Megaparsec.Lexer as Lexer
-import Text.Megaparsec.Prim (MonadParsec ())
 #endif
+import qualified Text.Megaparsec.Byte.Lexer as Lexer
 
 #if MIN_VERSION_megaparsec(7,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Word8)
 type ParseError = MegaParsec.ParseErrorBundle BL.ByteString Void
-#elif MIN_VERSION_megaparsec(6,0,0)
+#else
 type C e s m = (MonadParsec e s m, Token s ~ Word8)
 type ParseError = MegaParsec.ParseError Word8 Void
-#else
-type C e s m = (MonadParsec e s m, Token s ~ Char)
-type ParseError = MegaParsec.ParseError Char Dec
 #endif
 
 #if MIN_VERSION_megaparsec(7,0,0)
@@ -250,11 +238,7 @@ pComment :: C e s m => m BL.ByteString
 pComment = do
   c <- oneOf "*\""
   cs <- manyTill anyChar newline
-#if MIN_VERSION_megaparsec(6,0,0)
   return $ BL.pack (c:cs)
-#else
-  return $ BL8.pack (c:cs)
-#endif
 
 pBlockStruct :: C e s m => m [Int]
 pBlockStruct = do
@@ -331,19 +315,10 @@ int :: C e s m => m Integer
 int = Lexer.signed (return ()) Lexer.decimal
 
 real :: forall e s m. C e s m => m Scientific
-#if MIN_VERSION_megaparsec(6,0,0)
 real = Lexer.signed (return ()) Lexer.scientific
-#else
-real = Lexer.signed (return ()) Lexer.number
-#endif
 
-#if MIN_VERSION_megaparsec(6,0,0)
 oneOf :: C e s m => [Char] -> m Word8
 oneOf = MegaParsec.oneOf . map (fromIntegral . fromEnum)
-#else
-oneOf :: C e s m => [Char] -> m Char
-oneOf = MegaParsec.oneOf
-#endif
 
 -- ---------------------------------------------------------------------------
 -- rendering
