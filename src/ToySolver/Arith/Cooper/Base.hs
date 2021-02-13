@@ -31,11 +31,9 @@ module ToySolver.Arith.Cooper.Base
     -- * Language of presburger arithmetics
       ExprZ
     , Lit (..)
-    , evalLit
     , QFFormula
     , fromLAAtom
     , (.|.)
-    , evalQFFormula
     , Model
     , Eval (..)
 
@@ -173,15 +171,6 @@ simplifyLit lit@(Divisible b c e)
     d  = abs $ foldl' gcd c [c2 | (c2,x) <- LA.terms e2, x /= LA.unitVar]
     c' = c `checkedDiv` d
     e' = LA.mapCoeff (`checkedDiv` d) e2
-
-{-# DEPRECATED evalQFFormula "Use Eval class instead" #-}
--- | @'evalQFFormula' M φ@ returns whether @M ⊧_LIA φ@ or not.
-evalQFFormula :: Model Integer -> QFFormula -> Bool
-evalQFFormula = eval
-
-{-# DEPRECATED evalLit "Use Eval class instead" #-}
-evalLit :: Model Integer -> Lit -> Bool
-evalLit = eval
 
 instance Eval (Model Integer) Lit Bool where
   eval m (IsPos e) = LA.eval m e > 0

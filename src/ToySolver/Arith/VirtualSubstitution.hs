@@ -22,7 +22,6 @@
 -----------------------------------------------------------------------------
 module ToySolver.Arith.VirtualSubstitution
   ( QFFormula
-  , evalQFFormula
   , Model
   , Eval (..)
 
@@ -56,11 +55,6 @@ import ToySolver.Data.IntVar
 
 -- | Quantifier-free formula of LRA
 type QFFormula = BoolExpr (LA.Atom Rational)
-
-{-# DEPRECATED evalQFFormula "Use Eval class instead" #-}
--- | @'evalQFFormula' M φ@ returns whether @M ⊧_LRA φ@ or not.
-evalQFFormula :: Model Rational -> QFFormula -> Bool
-evalQFFormula = eval
 
 {-| @'project' x φ@ returns @(ψ, lift)@ such that:
 
