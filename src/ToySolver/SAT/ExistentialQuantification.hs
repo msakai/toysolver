@@ -22,7 +22,6 @@
 ----------------------------------------------------------------------
 module ToySolver.SAT.ExistentialQuantification
   ( project
-  , shortestImplicants
   , shortestImplicantsE
   , negateCNF
   ) where
@@ -105,20 +104,6 @@ cube info m = IntSet.fromList $ concat $
 
 blockingClause :: Info -> SAT.Model -> Clause
 blockingClause info m = [-y | y <- IntMap.keys (backwardMap info), SAT.evalLit m y]
-
-{-# DEPRECATED shortestImplicants "Use shortestImplicantsE instead" #-}
--- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\),
--- this function computes shortest implicants of \(\phi\) in terms of \(X\).
--- Variables except \(X\) are treated as if they are existentially quantified.
---
--- Resulting shortest implicants form a DNF (disjunctive normal form) formula that is
--- equivalent to the original (existentially quantified) formula.
-shortestImplicants
-  :: SAT.VarSet  -- ^ \(X\)
-  -> CNF.CNF     -- ^ \(\phi\)
-  -> IO [LitSet]
-shortestImplicants xs formula =
-  shortestImplicantsE (IntSet.fromList [1 .. CNF.cnfNumVars formula] IntSet.\\ xs) formula
 
 -- | Given a set of variables \(X = \{x_1, \ldots, x_k\}\) and CNF formula \(\phi\),
 -- this function computes shortest implicants of \(\exists X. \phi\).
