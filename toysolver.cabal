@@ -354,11 +354,7 @@ Library
      ToySolver.SAT.Printer
      ToySolver.SDP
      ToySolver.SMT
-     ToySolver.Text.CNF
-     ToySolver.Text.GCNF
-     ToySolver.Text.QDimacs
      ToySolver.Text.SDPFile
-     ToySolver.Text.WCNF
      ToySolver.Internal.Data.IndexedPriorityQueue
      ToySolver.Internal.Data.IOURef
      ToySolver.Internal.Data.PriorityQueue
