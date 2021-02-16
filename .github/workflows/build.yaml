@@ -10,20 +10,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ghc: '8.10.2'
+          - ghc: '8.10.4'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.10.yaml'
             stack_args: '--coverage --haddock --no-haddock-deps'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
             coveralls: true
 
-          - ghc: '8.10.2'
+          - ghc: '8.10.4'
             os: macos-latest
             stack_yaml: 'stack-ghc-8.10.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
-          - ghc: '8.10.2'
+          - ghc: '8.10.4'
             os: windows-latest
             stack_yaml: 'stack-ghc-8.10.yaml'
             stack_args: ''
@@ -62,9 +62,9 @@ jobs:
           stack-no-global: true
           stack-setup-ghc: true
 
-      - name: Fix ld path (Windows)
-        if: runner.os == 'Windows'
-        run: ruby misc/fix-x86_64-windows-ghc-8.10.2-settings.rb
+      #- name: Fix ld path (Windows)
+      #  if: runner.os == 'Windows'
+      #  run: ruby misc/fix-x86_64-windows-ghc-8.10.2-settings.rb
 
       - name: Install packages (Linux)
         if: runner.os == 'Linux'
