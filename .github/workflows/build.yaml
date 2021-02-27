@@ -142,6 +142,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          shopt -s nullglob
           assets=()
           for asset in *.tar.xz *.7z; do
             assets+=("-a" "$asset")
