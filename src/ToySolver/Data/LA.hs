@@ -41,7 +41,6 @@ module ToySolver.Data.LA
   -- ** Operations
   , mapCoeff
   , mapCoeffWithVar
-  , evalExpr
   , evalLinear
   , lift1
   , applySubst
@@ -51,7 +50,6 @@ module ToySolver.Data.LA
   -- * Atomic formula of linear arithmetics
   , Atom (..)
   , showAtom
-  , evalAtom
   , applySubstAtom
   , applySubst1Atom
   , solveFor
@@ -174,11 +172,6 @@ instance Num r => Eval (Model r) (Expr r) r where
   eval m (Expr t) = sum [(m' IntMap.! v) * c | (v,c) <- IntMap.toList t]
     where m' = IntMap.insert unitVar 1 m
 
-{-# DEPRECATED evalExpr "Use Eval class instead" #-}
--- | evaluate the expression under the model.
-evalExpr :: Num r => Model r -> Expr r -> r
-evalExpr = eval
-
 -- | evaluate the expression under the model.
 evalLinear :: VectorSpace a => Model a -> a -> Expr (Scalar a) -> a
 evalLinear m u (Expr t) = sumV [c *^ (m' IntMap.! v) | (v,c) <- IntMap.toList t]
@@ -270,11 +263,6 @@ type Atom r = OrdRel (Expr r)
 showAtom :: (Num r, Eq r, Show r) => Atom r -> String
 showAtom (OrdRel lhs op rhs) = showExpr lhs ++ showOp op ++ showExpr rhs
 
-{-# DEPRECATED evalAtom "Use Eval class instead" #-}
--- | evaluate the formula under the model.
-evalAtom :: (Num r, Ord r) => Model r -> Atom r -> Bool
-evalAtom = eval
-
 applySubstAtom :: (Num r, Eq r) => VarMap (Expr r) -> Atom r -> Atom r
 applySubstAtom s (OrdRel lhs op rhs) = OrdRel (applySubst s lhs) op (applySubst s rhs)
 
@@ -299,6 +287,6 @@ type BoundsEnv r = VarMap (Interval r)
 
 -- | compute bounds for a @Expr@ with respect to @BoundsEnv@.
 computeInterval :: (Real r, Fractional r) => BoundsEnv r -> Expr r -> Interval r
-computeInterval b = evalExpr b . mapCoeff singleton
+computeInterval b = eval b . mapCoeff singleton
 
 -----------------------------------------------------------------------------

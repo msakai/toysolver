@@ -331,7 +331,7 @@ maxSubsetSumInt' w !c wsum = assert (wbar <= c) $ assert (wbar + (w ! b) > c) $ 
         (lo, Nothing, _) -> lo
         (lo, Just v, _) -> IntMap.insert k v lo
 
--- | Minimize Σ_{i=1}^n wi xi subject to Σ_{i=1}^n wi x≥ l and xi ∈ {0,1}.
+-- | Minimize Σ_{i=1}^n wi xi subject to Σ_{i=1}^n wi xi ≥ l and xi ∈ {0,1}.
 --
 -- Note: 0 (resp. 1) is identified with False (resp. True) in the assignment.
 minSubsetSum
@@ -363,7 +363,7 @@ subject to Σ wi ¬xi ≤ (Σ wi) - n
 (Σ wi ¬xi) ≤ (Σ wi) - n
 -}
 
--- | Solve Σ_{i=1}^n wi x = c and xi ∈ {0,1}.
+-- | Solve Σ_{i=1}^n wi xi = c and xi ∈ {0,1}.
 --
 -- Note that this is different from usual definition of the subset sum problem,
 -- as this definition allows all xi to be zero.
