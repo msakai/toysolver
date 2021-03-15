@@ -1,8 +1,8 @@
 on: [push, pull_request]
 name: build
 jobs:
-  toysolver:
-    name: toysolver
+  build:
+    name: build
     runs-on: ${{ matrix.os }}
     env:
       STACK_YAML: ${{ matrix.stack_yaml }}
@@ -149,7 +149,7 @@ jobs:
     name: github-release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags')
-    needs: toysolver
+    needs: build
     steps:
       - uses: actions/checkout@v2
         with:
