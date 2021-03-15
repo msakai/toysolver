@@ -160,9 +160,6 @@ jobs:
           name: binary-packages
           path: binary-packages
 
-      - name: Display structure of downloaded files
-        run: ls -R
-
       - name: Upload artifacts to GitHub Release
         shell: bash
         env:
