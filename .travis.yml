@@ -25,9 +25,9 @@ addons:
 
 matrix:
   include:
-    - env: STACK_YAML=stack-ghc-8.10.yaml RELEASE=1 HADDOCK=1 SHC_GHCVER=8.0.1
+    - env: STACK_YAML=stack-ghc-8.10.yaml HADDOCK=1 SHC_GHCVER=8.0.1
       compiler: ": #GHC 8.10.4"
-    - env: STACK_YAML=stack-ghc-8.10.yaml RELEASE=1
+    - env: STACK_YAML=stack-ghc-8.10.yaml
       compiler: ": #GHC 8.10.4"
       os: osx
     #- env: STACK_YAML=stack-ghc-8.8.yaml

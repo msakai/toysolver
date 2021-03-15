@@ -18,11 +18,13 @@ for:
       - platform: x86
   environment:
     STACK_YAML: "stack-windows-i386.yaml"
+    RELEASE: "0"
 - matrix:
     only:
       - platform: x64
   environment:
     STACK_YAML: "stack.yaml"
+    RELEASE: "0"
 
 install:
 - if %PLATFORM%==x86 (curl -ostack.zip -L --insecure https://github.com/commercialhaskell/stack/releases/download/v2.1.3/stack-2.1.3-windows-i386.zip) else (curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-x86_64)
@@ -60,3 +62,4 @@ deploy:
   force_update: true
   on:
     appveyor_repo_tag: true
+    RELEASE: 1

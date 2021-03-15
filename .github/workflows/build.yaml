@@ -1,8 +1,8 @@
 on: [push, pull_request]
 name: build
 jobs:
-  toysolver:
-    name: toysolver
+  build:
+    name: build
     runs-on: ${{ matrix.os }}
     env:
       STACK_YAML: ${{ matrix.stack_yaml }}
@@ -13,9 +13,10 @@ jobs:
           - ghc: '8.10.4'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.10.yaml'
-            stack_args: '--coverage --haddock --no-haddock-deps'
+            stack_args: '--haddock --no-haddock-deps'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
-            coveralls: true
+            coveralls: false
+            release: true
 
           - ghc: '8.10.4'
             os: macos-latest
@@ -23,25 +24,28 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
+            release: true
           - ghc: '8.10.4'
             os: windows-latest
             stack_yaml: 'stack-ghc-8.10.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
+            release: true
           - ghc: '8.6.3'
             os: windows-latest
             stack_yaml: 'stack-windows-i386.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
+            release: true
 
           - ghc: '8.8.4'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.8.yaml'
-            stack_args: ''
+            stack_args: '--coverage'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
-            coveralls: false
+            coveralls: true
           - ghc: '8.6.5'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.6.yaml'
@@ -129,5 +133,42 @@ jobs:
           curl -L https://github.com/lehins/stack-hpc-coveralls/releases/download/v0.0.6.0/shc.tar.gz | tar -xz
           ./shc --repo-token="$COVERALLS_REPO_TOKEN" toysolver TestSuite TestPolynomial
 
-      - name: Build Artifacts
+      - name: Build artifacts
         run: stack runhaskell ${{ matrix.stack_args }} --package turtle misc/build_artifacts.hs
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: binary-packages
+          path: |
+            *.tar.xz
+            *.7z
+          retention-days: 2
+
+  github-release:
+    name: github-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags')
+    needs: build
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: binary-packages
+          path: binary-packages
+
+      - name: Upload artifacts to GitHub Release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          assets=()
+          for asset in binary-packages/*; do
+            assets+=("-a" "$asset")
+          done
+          tag_name="${GITHUB_REF#refs/tags/}"
+          hub release create "${assets[@]}" -d -m "$tag_name" "$tag_name"
