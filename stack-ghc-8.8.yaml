@@ -52,7 +52,7 @@ extra-deps:
 - OpenCL-1.0.3.4
 # - git: https://github.com/msakai/opencl.git
 #   commit: 80d0cb9d235819cd53e6a36d7a9258bc19d564ab
-- bytestring-encoding-0.1.0.0
+- bytestring-encoding-0.1.1.0
 - MIP-0.1.1.0
 
 # hack for avoiding haddock error of MemoTrie-0.6.4
