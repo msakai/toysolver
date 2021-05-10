@@ -2,6 +2,7 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
@@ -29,6 +30,9 @@ module ToySolver.FileFormat.CNF
   , WeightedClause
   , Weight
 
+  -- * New WCNF format
+  , NewWCNF (..)
+
   -- * GCNF format
   , GCNF (..)
   , GroupIndex
@@ -50,9 +54,11 @@ module ToySolver.FileFormat.CNF
 
 import Prelude hiding (readFile, writeFile)
 import Control.DeepSeq
+import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Builder
 import Data.Char
+import Data.Maybe
 #if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
 #endif
@@ -147,40 +153,7 @@ type WeightedClause = (Weight, SAT.PackedClause)
 type Weight = Integer
 
 instance FileFormat WCNF where
-  parse s =
-    case BS.words l of
-      (["p","wcnf", nvar, nclause, top]) ->
-        Right $
-          WCNF
-          { wcnfNumVars    = read $ BS.unpack nvar
-          , wcnfNumClauses = read $ BS.unpack nclause
-          , wcnfTopCost    = read $ BS.unpack top
-          , wcnfClauses    = map parseWCNFLineBS ls
-          }
-      (["p","wcnf", nvar, nclause]) ->
-        Right $
-          WCNF
-          { wcnfNumVars    = read $ BS.unpack nvar
-          , wcnfNumClauses = read $ BS.unpack nclause
-            -- top must be greater than the sum of the weights of violated soft clauses.
-          , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
-          , wcnfClauses    = map parseWCNFLineBS ls
-          }
-      (["p","cnf", nvar, nclause]) ->
-        Right $
-          WCNF
-          { wcnfNumVars    = read $ BS.unpack nvar
-          , wcnfNumClauses = read $ BS.unpack nclause
-            -- top must be greater than the sum of the weights of violated soft clauses.
-          , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
-          , wcnfClauses    = map ((\c -> seq c (1,c)) . parseClauseBS)  ls
-          }
-      _ ->
-        Left "cannot find wcnf/cnf header"
-    where
-      l :: BS.ByteString
-      ls :: [BS.ByteString]
-      (l:ls) = filter (not . isCommentBS) (BS.lines s)
+  parse = liftM (either id toOldWCNF) . parse
 
   render wcnf = header <> mconcat (map f (wcnfClauses wcnf))
     where
@@ -199,6 +172,107 @@ parseWCNFLineBS s =
     Just (w, s') -> seq w $ seq xs $ (w, xs)
       where
         xs = parseClauseBS s'
+
+-- -------------------------------------------------------------------
+
+-- | New WCNF file format
+--
+-- This format is used for for MAX-SAT evaluations >=2020.
+--
+-- References:
+--
+-- * <https://maxsat-evaluations.github.io/2021/format.html>
+newtype NewWCNF
+  = NewWCNF
+  { nwcnfClauses :: [NewWeightedClause]
+    -- ^ Weighted clauses
+  }
+  deriving (Eq, Ord, Show, Read)
+
+type NewWeightedClause = (Maybe Weight, SAT.PackedClause)
+
+instance FileFormat NewWCNF where
+  parse = liftM (either toNewWCNF id) . parse
+     
+  render nwcnf = mconcat (map f (nwcnfClauses nwcnf))
+    where
+      f (Nothing, c) = char7 'h' <> mconcat [char7 ' ' <> intDec lit | lit <- SAT.unpackClause c] <> byteString " 0\n"
+      f (Just w, c) = integerDec w <> mconcat [char7 ' ' <> intDec lit | lit <- SAT.unpackClause c] <> byteString " 0\n"
+
+parseNewWCNFLineBS :: BS.ByteString -> NewWeightedClause
+parseNewWCNFLineBS s =
+  case BS.uncons s' of
+    Nothing -> error "ToySolver.FileFormat.CNF: no weight"
+    Just ('h', s'') ->
+      let xs = parseClauseBS s''
+       in seq xs $ (Nothing, xs)
+    Just _ ->
+      case BS.readInteger s' of
+        Nothing -> error "ToySolver.FileFormat.CNF: no weight"
+        Just (w, s'') ->
+          let xs = parseClauseBS s''
+           in seq w $ seq xs $ (Just w, xs)
+  where
+    s' = BS.dropWhile isSpace s  
+
+-- -------------------------------------------------------------------
+
+toOldWCNF :: NewWCNF -> WCNF
+toOldWCNF (NewWCNF cs)
+  = WCNF
+  { wcnfNumVars = maximum (0 : [abs l | (_, c) <- cs, l <- unpackClause c])
+  , wcnfNumClauses = length cs
+  , wcnfTopCost = top
+  , wcnfClauses = [(fromMaybe top w, c) | (w, c) <- cs]
+  }
+  where
+    top = sum [w | (Just w, c) <- cs] + 1
+
+toNewWCNF :: WCNF -> NewWCNF
+toNewWCNF wcnf = NewWCNF [(if w >= wcnfTopCost wcnf then Nothing else Just w, c) | (w, c) <- wcnfClauses wcnf]
+
+instance FileFormat (Either WCNF NewWCNF) where
+  parse s =
+    case BS.words l of
+      (["p","wcnf", nvar, nclause, top]) ->
+        Right $ Left $
+          WCNF
+          { wcnfNumVars    = read $ BS.unpack nvar
+          , wcnfNumClauses = read $ BS.unpack nclause
+          , wcnfTopCost    = read $ BS.unpack top
+          , wcnfClauses    = map parseWCNFLineBS ls
+          }
+      (["p","wcnf", nvar, nclause]) ->
+        Right $ Left $
+          WCNF
+          { wcnfNumVars    = read $ BS.unpack nvar
+          , wcnfNumClauses = read $ BS.unpack nclause
+            -- top must be greater than the sum of the weights of violated soft clauses.
+          , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
+          , wcnfClauses    = map parseWCNFLineBS ls
+          }
+      (["p","cnf", nvar, nclause]) ->
+        Right $ Left $
+          WCNF
+          { wcnfNumVars    = read $ BS.unpack nvar
+          , wcnfNumClauses = read $ BS.unpack nclause
+            -- top must be greater than the sum of the weights of violated soft clauses.
+          , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
+          , wcnfClauses    = map ((\c -> seq c (1,c)) . parseClauseBS)  ls
+          }
+      ("h" : _) ->
+        Right $ Right $ NewWCNF $ map parseNewWCNFLineBS (l:ls)
+      (s : _) | Just _ <- BS.readInteger s ->
+        Right $ Right $ NewWCNF $ map parseNewWCNFLineBS (l:ls)
+      _ ->
+        Left "cannot find wcnf/cnf header"
+    where
+      l :: BS.ByteString
+      ls :: [BS.ByteString]
+      (l:ls) = filter (not . isCommentBS) (BS.lines s)
+
+  render (Left wcnf) = render wcnf
+  render (Right nwcnf) = render nwcnf
 
 -- -------------------------------------------------------------------
 
