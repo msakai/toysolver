@@ -50,7 +50,7 @@ maxsatPrintModel h m n = do
     forM_ xs $ \(var,val) -> hPutStr h (' ' : show (literal var val))
     hPutStrLn h ""
   -- no terminating 0 is necessary
-  hFlush stdout
+  hFlush h
 
 -- | Print a 'Model' in a way specified for Pseudo-Boolean Competition.
 -- See <http://www.cril.univ-artois.fr/PB12/format.pdf> for details.
@@ -63,7 +63,7 @@ pbPrintModel h m n = do
     hPutStr h "v"
     forM_ xs $ \(var,val) -> hPutStr h (" " ++ (if val then "" else "-") ++ "x" ++ show var)
     hPutStrLn h ""
-  hFlush stdout
+  hFlush h
 
 musPrintSol :: Handle -> [Int] -> IO ()
 musPrintSol h is = do
