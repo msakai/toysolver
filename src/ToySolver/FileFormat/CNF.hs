@@ -2,7 +2,6 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
@@ -25,13 +24,18 @@ module ToySolver.FileFormat.CNF
   -- * CNF format
   , CNF (..)
 
-  -- * WCNF format
+  -- * WCNF formats
+
+  -- ** (Old) WCNF format
   , WCNF (..)
   , WeightedClause
   , Weight
 
-  -- * New WCNF format
+  -- ** New WCNF format
   , NewWCNF (..)
+
+  -- ** Old or new WCNF
+  , SomeWCNF (..)
 
   -- * GCNF format
   , GCNF (..)
@@ -153,7 +157,10 @@ type WeightedClause = (Weight, SAT.PackedClause)
 type Weight = Integer
 
 instance FileFormat WCNF where
-  parse = liftM (either id toOldWCNF) . parse
+  parse = liftM f . parse
+    where
+      f (SomeWCNFNew x) = toOldWCNF x
+      f (SomeWCNFOld x) = x
 
   render wcnf = header <> mconcat (map f (wcnfClauses wcnf))
     where
@@ -192,7 +199,10 @@ newtype NewWCNF
 type NewWeightedClause = (Maybe Weight, SAT.PackedClause)
 
 instance FileFormat NewWCNF where
-  parse = liftM (either toNewWCNF id) . parse
+  parse = liftM f . parse
+    where
+      f (SomeWCNFNew x) = x
+      f (SomeWCNFOld x) = toNewWCNF x
      
   render nwcnf = mconcat (map f (nwcnfClauses nwcnf))
     where
@@ -217,6 +227,11 @@ parseNewWCNFLineBS s =
 
 -- -------------------------------------------------------------------
 
+data SomeWCNF
+  = SomeWCNFOld WCNF
+  | SomeWCNFNew NewWCNF
+  deriving (Eq, Ord, Show, Read)
+
 toOldWCNF :: NewWCNF -> WCNF
 toOldWCNF (NewWCNF cs)
   = WCNF
@@ -231,11 +246,11 @@ toOldWCNF (NewWCNF cs)
 toNewWCNF :: WCNF -> NewWCNF
 toNewWCNF wcnf = NewWCNF [(if w >= wcnfTopCost wcnf then Nothing else Just w, c) | (w, c) <- wcnfClauses wcnf]
 
-instance FileFormat (Either WCNF NewWCNF) where
+instance FileFormat SomeWCNF where
   parse s =
     case BS.words l of
       (["p","wcnf", nvar, nclause, top]) ->
-        Right $ Left $
+        Right $ SomeWCNFOld $
           WCNF
           { wcnfNumVars    = read $ BS.unpack nvar
           , wcnfNumClauses = read $ BS.unpack nclause
@@ -243,7 +258,7 @@ instance FileFormat (Either WCNF NewWCNF) where
           , wcnfClauses    = map parseWCNFLineBS ls
           }
       (["p","wcnf", nvar, nclause]) ->
-        Right $ Left $
+        Right $ SomeWCNFOld $
           WCNF
           { wcnfNumVars    = read $ BS.unpack nvar
           , wcnfNumClauses = read $ BS.unpack nclause
@@ -252,7 +267,7 @@ instance FileFormat (Either WCNF NewWCNF) where
           , wcnfClauses    = map parseWCNFLineBS ls
           }
       (["p","cnf", nvar, nclause]) ->
-        Right $ Left $
+        Right $ SomeWCNFOld $
           WCNF
           { wcnfNumVars    = read $ BS.unpack nvar
           , wcnfNumClauses = read $ BS.unpack nclause
@@ -261,9 +276,9 @@ instance FileFormat (Either WCNF NewWCNF) where
           , wcnfClauses    = map ((\c -> seq c (1,c)) . parseClauseBS)  ls
           }
       ("h" : _) ->
-        Right $ Right $ NewWCNF $ map parseNewWCNFLineBS (l:ls)
+        Right $ SomeWCNFNew $ NewWCNF $ map parseNewWCNFLineBS (l:ls)
       (s : _) | Just _ <- BS.readInteger s ->
-        Right $ Right $ NewWCNF $ map parseNewWCNFLineBS (l:ls)
+        Right $ SomeWCNFNew $ NewWCNF $ map parseNewWCNFLineBS (l:ls)
       _ ->
         Left "cannot find wcnf/cnf header"
     where
@@ -271,8 +286,8 @@ instance FileFormat (Either WCNF NewWCNF) where
       ls :: [BS.ByteString]
       (l:ls) = filter (not . isCommentBS) (BS.lines s)
 
-  render (Left wcnf) = render wcnf
-  render (Right nwcnf) = render nwcnf
+  render (SomeWCNFOld wcnf) = render wcnf
+  render (SomeWCNFNew nwcnf) = render nwcnf
 
 -- -------------------------------------------------------------------
 
