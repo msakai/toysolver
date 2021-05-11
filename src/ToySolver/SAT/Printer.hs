@@ -14,6 +14,7 @@
 module ToySolver.SAT.Printer
   ( satPrintModel
   , maxsatPrintModel
+  , maxsatPrintModelCompact
   , pbPrintModel
   , musPrintSol
   ) where
@@ -50,6 +51,16 @@ maxsatPrintModel h m n = do
     forM_ xs $ \(var,val) -> hPutStr h (' ' : show (literal var val))
     hPutStrLn h ""
   -- no terminating 0 is necessary
+  hFlush h
+
+-- | Print a 'Model' in the new compact way specified for Max-SAT Evaluation >=2020.
+-- See <https://maxsat-evaluations.github.io/2020/vline.html> for details.
+maxsatPrintModelCompact :: Handle -> Model -> Int -> IO ()
+maxsatPrintModelCompact h m n = do
+  let vs = if n > 0
+           then take n $ elems m
+           else elems m
+  hPutStrLn h $ "v " ++ [if v then '1' else '0' | v <- vs]
   hFlush h
 
 -- | Print a 'Model' in a way specified for Pseudo-Boolean Competition.
