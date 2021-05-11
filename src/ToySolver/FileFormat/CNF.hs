@@ -156,6 +156,7 @@ type WeightedClause = (Weight, SAT.PackedClause)
 -- | Weigths must be greater than or equal to 1, and smaller than 2^63.
 type Weight = Integer
 
+-- | Note that 'parse' also accepts new WCNF files and (unweighted) CNF files and converts them into 'WCNF'.
 instance FileFormat WCNF where
   parse = liftM f . parse
     where
@@ -198,6 +199,7 @@ newtype NewWCNF
 
 type NewWeightedClause = (Maybe Weight, SAT.PackedClause)
 
+-- | Note that 'parse' also accepts (old) WCNF files and (unweighted) CNF files and converts them into 'NewWCNF'.
 instance FileFormat NewWCNF where
   parse = liftM f . parse
     where
