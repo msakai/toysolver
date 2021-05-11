@@ -80,6 +80,7 @@ data Options = Options
   , optNThread :: Int
   , optOmegaReal :: String
   , optFileEncoding :: Maybe String
+  , optMaxSATCompactVLine :: Bool
   } deriving (Eq, Show)
 
 optionsParser :: Parser Options
@@ -95,6 +96,7 @@ optionsParser = Options
   <*> nThreadOption
   <*> omegaRealOption
   <*> fileEncodingOption
+  <*> maxsatCompactVLineOption
   where
     fileInput :: Parser FilePath
     fileInput = argument str (metavar "FILE")
@@ -165,6 +167,11 @@ optionsParser = Options
       $  long "encoding"
       <> metavar "ENCODING"
       <> help "file encoding for LP/MPS files"
+
+    maxsatCompactVLineOption :: Parser Bool
+    maxsatCompactVLineOption = switch
+      $  long "maxsat-compact-v-line"
+      <> help "print Max-SAT solution in the new compact v-line format"
 
 parserInfo :: ParserInfo Options
 parserInfo = info (helper <*> versionOption <*> optionsParser)
@@ -485,7 +492,10 @@ main = do
       let (mip,info2) = maxsat2ip False wcnf
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
         let m2 = transformBackward info2 m
-        maxsatPrintModel stdout m2 0
+        if optMaxSATCompactVLine o then
+          maxsatPrintModelCompact stdout m2 0
+        else
+          maxsatPrintModel stdout m2 0
         writeSOLFileSAT o m2
     ModeMIP -> do
       enc <- T.mapM mkTextEncoding $ optFileEncoding o
