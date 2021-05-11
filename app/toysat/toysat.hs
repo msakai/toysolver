@@ -987,7 +987,7 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
         if b then do
           putSLine "OPTIMUM FOUND"
           if isMaxSat then
-            satPrintModel stdout m nv
+            maxsatPrintModel stdout m nv
           else
             pbPrintModel stdout m nv
           writeSOLFile opt m (Just val) nv
