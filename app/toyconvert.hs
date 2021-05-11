@@ -45,6 +45,7 @@ import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
 import qualified ToySolver.Converter.PBSetObj as PBSetObj
 import qualified ToySolver.FileFormat as FF
+import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.QUBO as QUBO
 import ToySolver.Version
 import ToySolver.Internal.Util (setEncodingChar8)
@@ -65,6 +66,7 @@ data Options = Options
   , optKSat :: Maybe Int
   , optFileEncoding :: Maybe String
   , optRemoveUserCuts :: Bool
+  , optNewWCNF :: Bool
   } deriving (Eq, Show)
 
 optionsParser :: Parser Options
@@ -84,6 +86,7 @@ optionsParser = Options
   <*> kSATOption
   <*> encodingOption
   <*> removeUserCutsOption
+  <*> newWCNFOption
   where
     fileInput :: Parser FilePath
     fileInput = argument str (metavar "FILE")
@@ -178,6 +181,11 @@ optionsParser = Options
     removeUserCutsOption = switch
       $  long "remove-usercuts"
       <> help "remove user-defined cuts from LP/MPS files"
+
+    newWCNFOption :: Parser Bool
+    newWCNFOption = switch
+      $  long "wcnf-new"
+      <> help "use new format for writing WCNF files"
 
 parserInfo :: ParserInfo Options
 parserInfo = info (helper <*> versionOption <*> optionsParser)
@@ -329,7 +337,11 @@ writeProblem o problem = do
                   in FF.writeFile fname cnf2
         ".wcnf" ->
           case wbo2maxsat wbo of
-            (wcnf, _) -> FF.writeFile fname wcnf
+            (wcnf, _) 
+              | optNewWCNF o -> do
+                  let nwcnf = CNF.NewWCNF [(if w >= CNF.wcnfTopCost wcnf then Nothing else Just w, c) | (w, c) <- CNF.wcnfClauses wcnf]
+                  FF.writeFile fname nwcnf
+              | otherwise -> FF.writeFile fname wcnf
         ".lsp" ->
           withBinaryFile fname WriteMode $ \h ->
             ByteStringBuilder.hPutBuilder h lsp
