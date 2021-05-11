@@ -248,43 +248,42 @@ toNewWCNF wcnf = NewWCNF [(if w >= wcnfTopCost wcnf then Nothing else Just w, c)
 
 instance FileFormat SomeWCNF where
   parse s =
-    case BS.words l of
-      (["p","wcnf", nvar, nclause, top]) ->
-        Right $ SomeWCNFOld $
-          WCNF
-          { wcnfNumVars    = read $ BS.unpack nvar
-          , wcnfNumClauses = read $ BS.unpack nclause
-          , wcnfTopCost    = read $ BS.unpack top
-          , wcnfClauses    = map parseWCNFLineBS ls
-          }
-      (["p","wcnf", nvar, nclause]) ->
-        Right $ SomeWCNFOld $
-          WCNF
-          { wcnfNumVars    = read $ BS.unpack nvar
-          , wcnfNumClauses = read $ BS.unpack nclause
-            -- top must be greater than the sum of the weights of violated soft clauses.
-          , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
-          , wcnfClauses    = map parseWCNFLineBS ls
-          }
-      (["p","cnf", nvar, nclause]) ->
-        Right $ SomeWCNFOld $
-          WCNF
-          { wcnfNumVars    = read $ BS.unpack nvar
-          , wcnfNumClauses = read $ BS.unpack nclause
-            -- top must be greater than the sum of the weights of violated soft clauses.
-          , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
-          , wcnfClauses    = map ((\c -> seq c (1,c)) . parseClauseBS)  ls
-          }
-      ("h" : _) ->
-        Right $ SomeWCNFNew $ NewWCNF $ map parseNewWCNFLineBS (l:ls)
-      (s : _) | Just _ <- BS.readInteger s ->
-        Right $ SomeWCNFNew $ NewWCNF $ map parseNewWCNFLineBS (l:ls)
-      _ ->
-        Left "cannot find wcnf/cnf header"
-    where
-      l :: BS.ByteString
-      ls :: [BS.ByteString]
-      (l:ls) = filter (not . isCommentBS) (BS.lines s)
+    case filter (not . isCommentBS) (BS.lines s) of
+      [] -> Right $ SomeWCNFNew $ NewWCNF []
+      lls@(l : ls) -> 
+        case BS.words l of
+          (["p","wcnf", nvar, nclause, top]) ->
+            Right $ SomeWCNFOld $
+              WCNF
+              { wcnfNumVars    = read $ BS.unpack nvar
+              , wcnfNumClauses = read $ BS.unpack nclause
+              , wcnfTopCost    = read $ BS.unpack top
+              , wcnfClauses    = map parseWCNFLineBS ls
+              }
+          (["p","wcnf", nvar, nclause]) ->
+            Right $ SomeWCNFOld $
+              WCNF
+              { wcnfNumVars    = read $ BS.unpack nvar
+              , wcnfNumClauses = read $ BS.unpack nclause
+                -- top must be greater than the sum of the weights of violated soft clauses.
+              , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
+              , wcnfClauses    = map parseWCNFLineBS ls
+              }
+          (["p","cnf", nvar, nclause]) ->
+            Right $ SomeWCNFOld $
+              WCNF
+              { wcnfNumVars    = read $ BS.unpack nvar
+              , wcnfNumClauses = read $ BS.unpack nclause
+                -- top must be greater than the sum of the weights of violated soft clauses.
+              , wcnfTopCost    = fromInteger $ 2^(63::Int) - 1
+              , wcnfClauses    = map ((\c -> seq c (1,c)) . parseClauseBS) ls
+              }
+          ("h" : _) ->
+            Right $ SomeWCNFNew $ NewWCNF $ map parseNewWCNFLineBS lls
+          (s : _) | Just _ <- BS.readInteger s ->
+            Right $ SomeWCNFNew $ NewWCNF $ map parseNewWCNFLineBS lls
+          _ ->
+            Left "cannot find wcnf/cnf header"
 
   render (SomeWCNFOld wcnf) = render wcnf
   render (SomeWCNFNew nwcnf) = render nwcnf
