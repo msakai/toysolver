@@ -139,7 +139,7 @@ Library
      containers >=0.5.8,
      data-default,
      data-default-class,
-     data-interval >=2.0.1 && <2.1.0,
+     data-interval >=2.0.1 && <2.2.0,
      deepseq,
      directory,
      extended-reals >=0.1 && <1.0,
