@@ -106,6 +106,7 @@ data Options
   , optInitSP :: Bool
   , optTempDir :: Maybe FilePath
   , optFileEncoding :: Maybe String
+  , optMaxSATCompactVLine :: Bool
   }
 
 instance Default Options where
@@ -128,6 +129,7 @@ instance Default Options where
     , optInitSP = False
     , optTempDir = Nothing
     , optFileEncoding = Nothing
+    , optMaxSATCompactVLine = False
     }
 
 optionsParser :: Parser Options
@@ -149,6 +151,7 @@ optionsParser = Options
   <*> initSPOption
   <*> tempDirOption
   <*> fileEncodingOption
+  <*> maxsatCompactVLineOption
   where
     fileInput :: Parser String
     fileInput = strArgument $ metavar "(FILE|-)"
@@ -246,6 +249,10 @@ optionsParser = Options
       $  long "encoding"
       <> metavar "ENCODING"
       <> help "file encoding for LP/MPS files"
+
+    maxsatCompactVLineOption = switch
+      $  long "maxsat-compact-v-line"
+      <> help "print Max-SAT solution in the new compact v-line format"
 
 
 satConfigParser :: Parser SAT.Config
@@ -987,7 +994,10 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
         if b then do
           putSLine "OPTIMUM FOUND"
           if isMaxSat then
-            maxsatPrintModel stdout m nv
+            if optMaxSATCompactVLine opt then
+              maxsatPrintModelCompact stdout m nv
+            else
+              maxsatPrintModel stdout m nv
           else
             pbPrintModel stdout m nv
           writeSOLFile opt m (Just val) nv
