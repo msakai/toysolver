@@ -137,6 +137,12 @@ evalWCNFCost m wcnf = sum $ do
   return w
 
 
+arbitraryNewWCNF :: Gen CNF.NewWCNF
+arbitraryNewWCNF = do
+  wcnf <- arbitraryWCNF
+  return $ CNF.NewWCNF [(if w >= CNF.wcnfTopCost wcnf then Nothing else Just w, c) | (w, c) <- CNF.wcnfClauses wcnf]
+
+
 arbitraryQDimacs :: Gen CNF.QDimacs
 arbitraryQDimacs = do
   nv <- choose (0,10)
