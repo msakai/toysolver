@@ -16,6 +16,7 @@ Tested-With:
    GHC ==8.10.4
 Extra-Source-Files:
    README.md
+   INSTALL.md
    CHANGELOG.markdown
    COPYING
    COPYING-GPL
