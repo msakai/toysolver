@@ -75,6 +75,7 @@ main = sh $ do
   cptree "samples" (pkg </> "samples")
   cp "COPYING-GPL" (pkg </> "COPYING-GPL")
   cp "README.md" (pkg </> "README.md")
+  cp "INSTALL.md" (pkg </> "INSTALL.md")
   cp "CHANGELOG.markdown" (pkg </> "CHANGELOG.markdown")
 
   archive pkg
