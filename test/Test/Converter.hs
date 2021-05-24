@@ -96,7 +96,7 @@ prop_naesat2max2sat_forward =
     let ret@((wcnf, threshold), info) = naesat2max2sat nae
      in counterexample (show ret) $
           forAllAssignments (fst nae) $ \m ->
-            case evalWCNF (transformForward info m) wcnf of
+            case evalWCNFMaybe (transformForward info m) wcnf of
               Nothing -> property False
               Just v -> evalNAESAT m nae === (v <= threshold)
 
@@ -110,7 +110,7 @@ prop_satToMaxSAT2_forward =
        [ evalCNF m cnf == b2
        | m <- allAssignments (CNF.cnfNumVars cnf)
        , let m2 = transformForward info m
-             b2 = case evalWCNF m2 wcnf of
+             b2 = case evalWCNFMaybe m2 wcnf of
                     Nothing -> False
                     Just v -> v <= threshold
        ]
@@ -122,7 +122,7 @@ prop_simplifyMaxSAT2_forward =
     in counterexample (show r) $ and
        [ b1 == b2
        | m1 <- allAssignments (CNF.wcnfNumVars wcnf)
-       , let o1 = fromJust $ evalWCNF m1 wcnf
+       , let o1 = fromJust $ evalWCNFMaybe m1 wcnf
              b1 = o1 <= th1
              m2 = transformForward info m1
              o2 = fromIntegral $ length [()| (l1,l2) <- Set.toList cs, not (SAT.evalLit m2 l1), not (SAT.evalLit m2 l2)]
@@ -136,7 +136,7 @@ prop_maxSAT2ToSimpleMaxCut_forward =
     in counterexample (show r) $ and
        [ b1 == b2
        | m <- allAssignments (CNF.wcnfNumVars wcnf)
-       , let o1 = fromJust $ evalWCNF m wcnf
+       , let o1 = fromJust $ evalWCNFMaybe m wcnf
              b1 = o1 <= th1
              sol2 = transformForward info m
              o2 = MaxCut.eval sol2 maxcut
@@ -177,7 +177,7 @@ prop_mis2MaxSAT_forward =
               o1 = if isIndependentSet g set
                    then Just (transformObjValueForward info (IntSet.size set))
                    else Nothing
-              o2 = evalWCNF m wcnf
+              o2 = evalWCNFMaybe m wcnf
         ]
   where
     allSubsets :: [a] -> [[a]]
@@ -194,7 +194,7 @@ prop_mis2MaxSAT_backward =
               o1 = if isIndependentSet g set
                    then Just (IntSet.size set)
                    else Nothing
-              o2 = fmap (transformObjValueBackward info) $ evalWCNF m wcnf
+              o2 = fmap (transformObjValueBackward info) $ evalWCNFMaybe m wcnf
         ]
 
 arbitraryGraph :: Gen Graph

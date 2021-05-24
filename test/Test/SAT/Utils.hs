@@ -118,11 +118,11 @@ arbitraryWCNF = do
     }
 
 
-evalWCNF :: SAT.Model -> CNF.WCNF -> Maybe Integer
-evalWCNF m wcnf = foldl' (liftM2 (+)) (Just 0)
+evalWCNFMaybe :: SAT.Model -> CNF.WCNF -> Maybe Integer
+evalWCNFMaybe m wcnf = foldl' (liftM2 (+)) (Just 0)
   [ if SAT.evalClause m (SAT.unpackClause c) then
       Just 0
-    else if w == CNF.wcnfTopCost wcnf then
+    else if w >= CNF.wcnfTopCost wcnf then
       Nothing
     else
       Just w
@@ -130,8 +130,8 @@ evalWCNF m wcnf = foldl' (liftM2 (+)) (Just 0)
   ]
 
 
-evalWCNFCost :: SAT.Model -> CNF.WCNF -> Integer
-evalWCNFCost m wcnf = sum $ do
+evalWCNF :: SAT.Model -> CNF.WCNF -> Integer
+evalWCNF m wcnf = sum $ do
   (w,c) <- CNF.wcnfClauses wcnf
   guard $ not $ SAT.evalClause m (SAT.unpackClause c)
   return w

@@ -68,7 +68,7 @@ prop_probSAT_weighted = QM.monadicIO $ do
     ProbSAT.getBestSolution solver
   QM.monitor (counterexample (show (obj,sol)))
   QM.assert (bounds sol == (1, CNF.wcnfNumVars wcnf))
-  QM.assert (obj == evalWCNFCost sol wcnf)
+  QM.assert (obj == evalWCNF sol wcnf)
 
 case_probSAT_case1 :: Assertion
 case_probSAT_case1 = do
