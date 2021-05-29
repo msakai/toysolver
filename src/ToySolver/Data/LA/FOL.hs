@@ -57,7 +57,7 @@ toFOLExpr e =
   case map f (LA.terms e) of
     []  -> Const 0
     [t] -> t
-    ts  -> foldr1 (*) ts
+    ts  -> foldr1 (+) ts
   where
     f (c,x)
       | x == LA.unitVar = Const c
