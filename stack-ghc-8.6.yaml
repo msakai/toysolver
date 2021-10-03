@@ -49,7 +49,7 @@ extra-deps:
 - data-interval-2.0.1
 - extended-reals-0.2.3.0
 - finite-field-0.9.0
-- pseudo-boolean-0.1.9.0@sha256:18be9ef79c2b81baa746672182afefd800f8b96fcac7946bbb0456ea652e0a74
+- pseudo-boolean-0.1.10.0@sha256:5fcb42223e77b08fb4cb8e75c049cfea76f8915d204a3ddeefac1d6194192938,2449
 - sign-0.4.4
 - OpenCL-1.0.3.4
 # - git: https://github.com/msakai/opencl.git
