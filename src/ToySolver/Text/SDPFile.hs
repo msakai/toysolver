@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
@@ -67,9 +66,6 @@ import qualified Data.ByteString.Builder.Scientific as B
 import Data.Char
 import qualified Data.Foldable as F
 import Data.List (intersperse)
-#if !MIN_VERSION_base(4,11,0)
-import Data.Monoid
-#endif
 import Data.Scientific (Scientific)
 import Data.Map (Map)
 import qualified Data.Map as Map

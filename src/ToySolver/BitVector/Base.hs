@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -47,9 +46,6 @@ import Prelude hiding (repeat)
 import Data.Bits
 import Data.Map (Map)
 import qualified Data.Map as Map
-#if !MIN_VERSION_base(4,11,0)
-import Data.Monoid
-#endif
 import Data.Ord
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Vector as V
@@ -135,9 +131,6 @@ instance Semigroup.Semigroup BV where
 
 instance Monoid BV where
   mempty = BV VG.empty
-#if !(MIN_VERSION_base(4,11,0))
-  mappend = (Semigroup.<>)
-#endif
 
 instance Show BV where
   show bv = "0b" ++ [if b then '1' else '0' | b <- toDescBits bv]
@@ -414,9 +407,6 @@ instance Semigroup.Semigroup Expr where
 
 instance Monoid Expr where
   mempty = EConst mempty
-#if !(MIN_VERSION_base(4,11,0))
-  mappend = (Semigroup.<>)
-#endif
 
 instance Bits Expr where
   (.&.) = bvand

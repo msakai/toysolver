@@ -129,8 +129,8 @@ Library
   Hs-source-dirs: src
   Build-Depends:
      array >=0.5,
-     -- GHC >=8.0
-     base >=4.9 && <5,
+     -- GHC >=8.6
+     base >=4.12 && <5,
      bytestring >=0.9.2.1 && <0.12,
      bytestring-builder,
      bytestring-encoding >=0.1.1.0,

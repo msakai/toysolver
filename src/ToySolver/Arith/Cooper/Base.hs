@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
@@ -369,9 +368,6 @@ instance Integral a => Semigroup.Semigroup (LCM a) where
 
 instance Integral a => Monoid (LCM a) where
   mempty = LCM 1
-#if !(MIN_VERSION_base(4,11,0))
-  mappend = (Semigroup.<>)
-#endif
 
 checkedDiv :: Integer -> Integer -> Integer
 checkedDiv a b =

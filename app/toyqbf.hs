@@ -19,9 +19,6 @@ import Control.Monad
 import Data.Char
 import qualified Data.IntSet as IntSet
 import Data.List
-#if !MIN_VERSION_base(4,11,0)
-import Data.Monoid
-#endif
 import Data.Ord
 import Data.Version
 import Options.Applicative

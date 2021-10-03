@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB.Internal.LargestIntersectionFinder
@@ -30,9 +29,6 @@ import qualified Data.IntSet as IntSet
 import Data.List hiding (insert)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-#if !MIN_VERSION_base(4,11,0)
-import Data.Monoid
-#endif
 import Data.Ord
 import Data.Set (Set)
 import qualified Data.Set as Set

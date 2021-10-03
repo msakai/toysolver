@@ -21,9 +21,6 @@ import Control.Monad
 import Data.Interned (intern, unintern)
 import Data.IORef
 import qualified Data.Map as Map
-#if !MIN_VERSION_base(4,11,0)
-import Data.Monoid
-#endif
 import Data.Ratio
 import Data.String
 import qualified Data.Text as Text

@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
@@ -25,9 +24,6 @@ import Data.Default.Class
 import Data.Interned
 import Data.Ord
 import Data.List
-#if !MIN_VERSION_base(4,11,0)
-import Data.Monoid
-#endif
 import Data.Ratio
 import qualified Data.Set as Set
 import Data.Map (Map)
