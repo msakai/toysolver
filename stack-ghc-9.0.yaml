@@ -49,9 +49,9 @@ extra-deps:
 - finite-field-0.9.0
 - pseudo-boolean-0.1.10.0@sha256:5fcb42223e77b08fb4cb8e75c049cfea76f8915d204a3ddeefac1d6194192938,2449
 - sign-0.4.4
-- OpenCL-1.0.3.4
-# - git: https://github.com/msakai/opencl.git
-#   commit: 80d0cb9d235819cd53e6a36d7a9258bc19d564ab
+# - OpenCL-1.0.3.4
+- git: https://github.com/msakai/opencl.git
+  commit: c979d0473f60efa0a3ebb5fb5986b32753390b7c
 - bytestring-encoding-0.1.1.0
 - MIP-0.1.1.0
 
