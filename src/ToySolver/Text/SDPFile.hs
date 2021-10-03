@@ -80,26 +80,14 @@ import System.FilePath (takeExtension)
 import System.IO
 import qualified Text.Megaparsec as MegaParsec
 import Text.Megaparsec hiding (ParseError, oneOf)
-#if MIN_VERSION_megaparsec(7,0,0)
 import Text.Megaparsec.Byte
-#else
-import Text.Megaparsec.Byte hiding (oneOf)
-import qualified Text.Megaparsec.Byte as MegaParsec
-#endif
 import qualified Text.Megaparsec.Byte.Lexer as Lexer
 
-#if MIN_VERSION_megaparsec(7,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Word8)
 type ParseError = MegaParsec.ParseErrorBundle BL.ByteString Void
-#else
-type C e s m = (MonadParsec e s m, Token s ~ Word8)
-type ParseError = MegaParsec.ParseError Word8 Void
-#endif
 
-#if MIN_VERSION_megaparsec(7,0,0)
 anyChar :: C e s m => m Word8
 anyChar = anySingle
-#endif
 
 -- ---------------------------------------------------------------------------
 -- problem description
