@@ -10,7 +10,6 @@ Hackage:
 [![Hackage CI](https://matrix.hackage.haskell.org/api/v2/packages/toysolver/badge)](https://matrix.hackage.haskell.org/#/package/toysolver)
 
 Dev:
-[![Build Status (Travis CI)](https://secure.travis-ci.org/msakai/toysolver.svg?branch=master)](http://travis-ci.org/msakai/toysolver)
 [![Build Status (AppVeyor)](https://ci.appveyor.com/api/projects/status/w7g615sp8ysiqk7w/branch/master?svg=true)](https://ci.appveyor.com/project/msakai/toysolver/branch/master)
 [![Build Status (GitHub Actions)](https://github.com/msakai/toysolver/workflows/build/badge.svg)](https://github.com/msakai/toysolver/actions)
 [![Coverage Status](https://coveralls.io/repos/msakai/toysolver/badge.svg)](https://coveralls.io/r/msakai/toysolver)
