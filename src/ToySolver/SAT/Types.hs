@@ -107,6 +107,8 @@ module ToySolver.SAT.Types
   , AddCardinality (..)
   , AddPBLin (..)
   , AddPBNL (..)
+  , SetPBLinObjective (..)
+  , SetPBNLObjective (..)
   , AddXORClause (..)
   ) where
 
@@ -713,6 +715,12 @@ class AddPBLin m a => AddPBNL m a | a -> m where
   addPBNLExactlySoft a sel lhs rhs = do
     addPBNLAtLeastSoft a sel lhs rhs
     addPBNLAtMostSoft a sel lhs rhs
+
+class AddPBLin m a => SetPBLinObjective m a | a -> m where
+  setPBObjectiveFunction :: a -> Maybe PBLinSum -> m ()
+
+class (AddPBNL m a, SetPBLinObjective m a) => SetPBNLObjective m a | a -> m where
+  setPBNLObjectiveFunction :: a -> Maybe PBSum -> m ()
 
 class AddClause m a => AddXORClause m a | a -> m where
   {-# MINIMAL addXORClause #-}
