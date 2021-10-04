@@ -287,6 +287,6 @@ type BoundsEnv r = VarMap (Interval r)
 
 -- | compute bounds for a @Expr@ with respect to @BoundsEnv@.
 computeInterval :: (Real r, Fractional r) => BoundsEnv r -> Expr r -> Interval r
-computeInterval b = eval b . mapCoeff singleton
+computeInterval b = eval b . mapCoeff Data.Interval.singleton
 
 -----------------------------------------------------------------------------
