@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
@@ -40,9 +39,6 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe
-#if !MIN_VERSION_base(4,11,0)
-import Data.Monoid
-#endif
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
 import Data.Sequence (Seq)

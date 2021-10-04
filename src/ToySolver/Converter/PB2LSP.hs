@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
@@ -20,9 +19,6 @@ module ToySolver.Converter.PB2LSP
 
 import Data.ByteString.Builder
 import Data.List
-#if !MIN_VERSION_base(4,11,0)
-import Data.Monoid
-#endif
 import qualified Data.PseudoBoolean as PBFile
 
 pb2lsp :: PBFile.Formula -> Builder

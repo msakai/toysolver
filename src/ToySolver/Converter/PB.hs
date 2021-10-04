@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -78,9 +77,6 @@ import Data.List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
-#if !MIN_VERSION_base(4,11,0)
-import Data.Monoid
-#endif
 import Data.Primitive.MutVar
 import qualified Data.Sequence as Seq
 import Data.Set (Set)

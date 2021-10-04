@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
@@ -67,9 +66,6 @@ import qualified Data.ByteString.Builder.Scientific as B
 import Data.Char
 import qualified Data.Foldable as F
 import Data.List (intersperse)
-#if !MIN_VERSION_base(4,11,0)
-import Data.Monoid
-#endif
 import Data.Scientific (Scientific)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -80,26 +76,14 @@ import System.FilePath (takeExtension)
 import System.IO
 import qualified Text.Megaparsec as MegaParsec
 import Text.Megaparsec hiding (ParseError, oneOf)
-#if MIN_VERSION_megaparsec(7,0,0)
 import Text.Megaparsec.Byte
-#else
-import Text.Megaparsec.Byte hiding (oneOf)
-import qualified Text.Megaparsec.Byte as MegaParsec
-#endif
 import qualified Text.Megaparsec.Byte.Lexer as Lexer
 
-#if MIN_VERSION_megaparsec(7,0,0)
 type C e s m = (MonadParsec e s m, Token s ~ Word8)
 type ParseError = MegaParsec.ParseErrorBundle BL.ByteString Void
-#else
-type C e s m = (MonadParsec e s m, Token s ~ Word8)
-type ParseError = MegaParsec.ParseError Word8 Void
-#endif
 
-#if MIN_VERSION_megaparsec(7,0,0)
 anyChar :: C e s m => m Word8
 anyChar = anySingle
-#endif
 
 -- ---------------------------------------------------------------------------
 -- problem description

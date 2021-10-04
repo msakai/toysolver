@@ -22,9 +22,6 @@ import Data.Char
 import Data.Default.Class
 import Data.List
 import Data.Maybe
-#if !MIN_VERSION_base(4,11,0)
-import Data.Monoid
-#endif
 import Data.Scientific (Scientific)
 import qualified Data.Scientific as Scientific
 import Data.String
