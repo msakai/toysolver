@@ -104,6 +104,7 @@ data Options
   , optTempDir :: Maybe FilePath
   , optFileEncoding :: Maybe String
   , optMaxSATCompactVLine :: Bool
+  , optPBParserMegaparsec :: Bool
   }
 
 instance Default Options where
@@ -127,6 +128,7 @@ instance Default Options where
     , optTempDir = Nothing
     , optFileEncoding = Nothing
     , optMaxSATCompactVLine = False
+    , optPBParserMegaparsec = False
     }
 
 optionsParser :: Parser Options
@@ -149,6 +151,7 @@ optionsParser = Options
   <*> tempDirOption
   <*> fileEncodingOption
   <*> maxsatCompactVLineOption
+  <*> pbParserMegaparsecOption
   where
     fileInput :: Parser String
     fileInput = strArgument $ metavar "(FILE|-)"
@@ -250,6 +253,10 @@ optionsParser = Options
     maxsatCompactVLineOption = switch
       $  long "maxsat-compact-v-line"
       <> help "print Max-SAT solution in the new compact v-line format"
+
+    pbParserMegaparsecOption = switch
+      $  long "pb-parser-megaparsec"
+      <> help "use megaparsec-based parser instead of attoparsec-based one for better error message"
 
 
 satConfigParser :: Parser SAT.Config
@@ -783,8 +790,16 @@ solveMUS opt solver gcnf = do
 mainPB :: Options -> SAT.Solver -> IO ()
 mainPB opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM FF.parse BS.getContents
-           fname -> FF.parseFile fname
+           "-"   ->
+             if optPBParserMegaparsec opt then
+               liftM (fmap FF.unWithMegaparsecParser . FF.parse) BS.getContents
+             else
+               liftM FF.parse BS.getContents
+           fname ->
+             if optPBParserMegaparsec opt then
+               liftM (fmap FF.unWithMegaparsecParser) $ FF.parseFile fname
+             else
+               FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right formula -> solvePB opt solver formula
@@ -901,8 +916,16 @@ setupOptimizer pbo opt = do
 mainWBO :: Options -> SAT.Solver -> IO ()
 mainWBO opt solver = do
   ret <- case optInput opt of
-           "-"   -> liftM FF.parse BS.getContents
-           fname -> FF.parseFile fname
+           "-"   ->
+             if optPBParserMegaparsec opt then
+               liftM (fmap FF.unWithMegaparsecParser . FF.parse) BS.getContents
+             else
+               liftM FF.parse BS.getContents
+           fname ->
+             if optPBParserMegaparsec opt then
+               liftM (fmap FF.unWithMegaparsecParser) $ FF.parseFile fname
+             else
+               FF.parseFile fname
   case ret of
     Left err -> hPutStrLn stderr err >> exitFailure
     Right formula -> solveWBO opt solver False formula

@@ -78,6 +78,7 @@ data Options = Options
   , optOmegaReal :: String
   , optFileEncoding :: Maybe String
   , optMaxSATCompactVLine :: Bool
+  , optPBParserMegaparsec :: Bool
   } deriving (Eq, Show)
 
 optionsParser :: Parser Options
@@ -94,6 +95,7 @@ optionsParser = Options
   <*> omegaRealOption
   <*> fileEncodingOption
   <*> maxsatCompactVLineOption
+  <*> pbParserMegaparsecOption
   where
     fileInput :: Parser FilePath
     fileInput = argument str (metavar "FILE")
@@ -169,6 +171,11 @@ optionsParser = Options
     maxsatCompactVLineOption = switch
       $  long "maxsat-compact-v-line"
       <> help "print Max-SAT solution in the new compact v-line format"
+
+    pbParserMegaparsecOption :: Parser Bool
+    pbParserMegaparsecOption = switch
+      $  long "pb-parser-megaparsec"
+      <> help "use megaparsec-based parser instead of attoparsec-based one for better error message"
 
 parserInfo :: ParserInfo Options
 parserInfo = info (helper <*> versionOption <*> optionsParser)
@@ -471,14 +478,22 @@ main = do
         satPrintModel stdout m2 0
         writeSOLFileSAT o m2
     ModePB -> do
-      pb <- FF.readFile (optInput o)
+      pb <-
+        if optPBParserMegaparsec o then
+          liftM FF.unWithMegaparsecParser $ FF.readFile (optInput o)
+        else
+          FF.readFile (optInput o)
       let (mip,info2) = pb2ip pb
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
         let m2 = transformBackward info2 m
         pbPrintModel stdout m2 0
         writeSOLFileSAT o m2
     ModeWBO -> do
-      wbo <- FF.readFile (optInput o)
+      wbo <-
+        if optPBParserMegaparsec o then
+          liftM FF.unWithMegaparsecParser $ FF.readFile (optInput o)
+        else
+          FF.readFile (optInput o)
       let (mip,info2) = wbo2ip False wbo
       run (optSolver o) o (fmap fromInteger mip) $ \m -> do
         let m2 = transformBackward info2 m
