@@ -1,6 +1,5 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Internal.TextUtil
@@ -16,8 +15,6 @@ module ToySolver.Internal.TextUtil
   ( readInt
   , readUnsignedInteger
   ) where
-
-#include "MachDeps.h"
 
 import Control.Exception
 import Data.Word
