@@ -337,9 +337,11 @@ inequalitiesToEqualitiesPB formula = runST $ do
             else
               return Nothing
 
+  SAT.setPBNLObjectiveFunction db (PBFile.pbObjectiveFunction formula)
+
   formula' <- getPBFormula db
   return
-    ( formula'{ PBFile.pbObjectiveFunction = PBFile.pbObjectiveFunction formula }
+    ( formula'
     , PBInequalitiesToEqualitiesInfo (PBFile.pbNumVars formula) (PBFile.pbNumVars formula') defs
     )
   where
@@ -482,10 +484,10 @@ wbo2pb :: PBFile.SoftFormula -> (PBFile.Formula, WBO2PBInfo)
 wbo2pb wbo = runST $ do
   let nv = PBFile.wboNumVars wbo
   db <- newPBStore
-  (obj, defs) <- addWBO db wbo
+  defs <- addWBO db wbo
   formula <- getPBFormula db
   return
-    ( formula{ PBFile.pbObjectiveFunction = Just obj }
+    ( formula
     , WBO2PBInfo nv (PBFile.pbNumVars formula) defs
     )
 
@@ -503,7 +505,7 @@ instance ForwardTransformer WBO2PBInfo where
 instance BackwardTransformer WBO2PBInfo where
   transformBackward (WBO2PBInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
 
-addWBO :: (PrimMonad m, SAT.AddPBNL m enc) => enc -> PBFile.SoftFormula -> m (SAT.PBSum, [(SAT.Var, PBFile.Constraint)])
+addWBO :: (PrimMonad m, SAT.AddPBNL m enc, SAT.SetPBNLObjective m enc) => enc -> PBFile.SoftFormula -> m [(SAT.Var, PBFile.Constraint)]
 addWBO db wbo = do
   SAT.newVars_ db $ PBFile.wboNumVars wbo
 
@@ -573,14 +575,16 @@ addWBO db wbo = do
         return v
     modifyMutVar objRef ((offset,[trueLit]) :)
 
-  obj <- liftM reverse $ readMutVar objRef
+  obj <- readMutVar objRef
+  SAT.setPBNLObjectiveFunction db (Just (reverse obj))
+
   defs <- liftM reverse $ readMutVar defsRef
 
   case PBFile.wboTopCost wbo of
     Nothing -> return ()
     Just t -> SAT.addPBNLAtMost db obj (t - 1)
 
-  return (obj, defs)
+  return defs
 
 
 detectTrueLit :: PBFile.Constraint -> Maybe SAT.Lit

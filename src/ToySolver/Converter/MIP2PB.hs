@@ -49,9 +49,9 @@ mip2pb mip = runST $ runExceptT $ m
     m :: ExceptT String (ST s) (PBFile.Formula, MIP2PBInfo)
     m = do
       db <- lift $ newPBStore
-      (Integer.Expr obj, info) <- addMIP' db mip
+      info <- addMIP' db mip
       formula <- lift $ getPBFormula db
-      return $ (formula{ PBFile.pbObjectiveFunction = Just obj }, info)
+      return (formula, info)
 
 data MIP2PBInfo = MIP2PBInfo (Map MIP.Var Integer.Expr) !Integer
   deriving (Eq, Show)
@@ -75,10 +75,10 @@ instance ObjValueBackwardTransformer MIP2PBInfo where
 
 -- -----------------------------------------------------------------------------
 
-addMIP :: SAT.AddPBNL m enc => enc -> MIP.Problem Rational -> m (Either String (Integer.Expr, MIP2PBInfo))
+addMIP :: (SAT.AddPBNL m enc, SAT.SetPBNLObjective m enc) => enc -> MIP.Problem Rational -> m (Either String MIP2PBInfo)
 addMIP enc mip = runExceptT $ addMIP' enc mip
 
-addMIP' :: SAT.AddPBNL m enc => enc -> MIP.Problem Rational -> ExceptT String m (Integer.Expr, MIP2PBInfo)
+addMIP' :: (SAT.AddPBNL m enc, SAT.SetPBNLObjective m enc) => enc -> MIP.Problem Rational -> ExceptT String m MIP2PBInfo
 addMIP' enc mip = do
   if not (Set.null nivs) then do
     throwE $ "cannot handle non-integer variables: " ++ intercalate ", " (map MIP.fromVar (Set.toList nivs))
@@ -131,9 +131,11 @@ addMIP' enc mip = do
     let obj = MIP.objectiveFunction mip
         d = foldl' lcm 1 [denominator r | MIP.Term r _ <- MIP.terms (MIP.objExpr obj)] *
             (if MIP.objDir obj == MIP.OptMin then 1 else -1)
-        obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms (MIP.objExpr obj)]
+        Integer.Expr obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms (MIP.objExpr obj)]
 
-    return (obj2, MIP2PBInfo vmap d)
+    lift $ SAT.setPBNLObjectiveFunction enc (Just obj2)
+
+    return (MIP2PBInfo vmap d)
 
   where
     ivs = MIP.integerVariables mip
