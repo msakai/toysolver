@@ -43,13 +43,13 @@ import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
-import ToySolver.Data.BoolExpr
 import ToySolver.Data.Boolean
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Internal.Data.SeqQueue as SQ
 import qualified ToySolver.Internal.Data.Vec as Vec
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import ToySolver.SAT.Encoder.Tseitin (Formula (..))
 
 import ToySolver.BitVector.Base
 
