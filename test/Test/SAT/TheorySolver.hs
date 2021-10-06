@@ -137,8 +137,8 @@ case_QF_LRA = do
           Ge  -> return (-vLt)
           NEq -> return (-vEq)
 
-      abstract :: BoolExpr (Either SAT.Lit (LA.Atom Rational)) -> IO (BoolExpr SAT.Lit)
-      abstract = Traversable.mapM f
+      abstract :: BoolExpr (Either SAT.Lit (LA.Atom Rational)) -> IO Tseitin.Formula
+      abstract e = liftM (fold Tseitin.Atom) $ Traversable.mapM f e
         where
           f (Left lit) = return lit
           f (Right atom) = abstractLAAtom atom
@@ -220,8 +220,8 @@ case_QF_EUF = do
             modifyIORef' defsRef $! IntMap.insert v (t1,t2)
             return v
 
-      abstract :: BoolExpr (Either SAT.Lit (EUF.Term, EUF.Term)) -> IO (BoolExpr SAT.Lit)
-      abstract = Traversable.mapM f
+      abstract :: BoolExpr (Either SAT.Lit (EUF.Term, EUF.Term)) -> IO Tseitin.Formula
+      abstract e = liftM (fold Tseitin.Atom) $ Traversable.mapM f e
         where
           f (Left lit) = return lit
           f (Right atom) = abstractEUFAtom atom
