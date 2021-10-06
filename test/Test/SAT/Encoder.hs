@@ -16,13 +16,13 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
-import ToySolver.Data.BoolExpr
 import ToySolver.Data.Boolean
 import ToySolver.Data.LBool
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import ToySolver.SAT.Encoder.Tseitin (Formula (..))
 import qualified ToySolver.SAT.Encoder.Cardinality as Cardinality
 import qualified ToySolver.SAT.Encoder.Cardinality.Internal.Totalizer as Totalizer
 import qualified ToySolver.SAT.Encoder.PB as PB
