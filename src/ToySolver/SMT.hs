@@ -95,13 +95,13 @@ import Data.VectorSpace
 
 import ToySolver.Data.Delta
 import ToySolver.Data.Boolean
-import ToySolver.Data.BoolExpr
 import ToySolver.Data.OrdRel
 import qualified ToySolver.Data.LA as LA
 import qualified ToySolver.Internal.Data.Vec as Vec
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.TheorySolver
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import ToySolver.SAT.Encoder.Tseitin (Formula (..))
 import qualified ToySolver.Arith.Simplex as Simplex
 import qualified ToySolver.BitVector as BV
 import qualified ToySolver.EUF.EUFSolver as EUF
