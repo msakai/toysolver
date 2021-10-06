@@ -45,10 +45,10 @@ import Data.Ord
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
-import ToySolver.Data.BoolExpr
 import ToySolver.Data.Boolean
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import ToySolver.SAT.Encoder.Tseitin (Formula (..))
 
 -- ------------------------------------------------------------------------
 -- Circuit-like implementation of Batcher's odd-even mergesort

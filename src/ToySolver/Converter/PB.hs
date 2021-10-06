@@ -86,10 +86,10 @@ import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Converter.Base
 import qualified ToySolver.Converter.PB.Internal.Product as Product
 import ToySolver.Converter.Tseitin
-import ToySolver.Data.BoolExpr
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import ToySolver.SAT.Encoder.Tseitin (Formula (..))
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 import ToySolver.SAT.Store.CNF

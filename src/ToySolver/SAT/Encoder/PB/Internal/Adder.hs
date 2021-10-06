@@ -32,10 +32,10 @@ import Data.Primitive.MutVar
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import ToySolver.Data.Boolean
-import ToySolver.Data.BoolExpr
 import qualified ToySolver.Internal.Data.SeqQueue as SQ
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import ToySolver.SAT.Encoder.Tseitin (Formula (..))
 
 addPBLinAtLeastAdder :: forall m. PrimMonad m => Tseitin.Encoder m -> SAT.PBLinAtLeast -> m ()
 addPBLinAtLeastAdder enc constr = do
