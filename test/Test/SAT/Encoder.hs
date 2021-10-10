@@ -6,9 +6,12 @@ module Test.SAT.Encoder (satEncoderTestGroup) where
 
 import Control.Monad
 import Data.Array.IArray
+import qualified Data.IntMap.Strict as IntMap
+import Data.IORef
 import Data.List
 import Data.Maybe
 import qualified Data.Vector as V
+import System.IO.Unsafe
 
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
@@ -30,6 +33,18 @@ import qualified ToySolver.SAT.Encoder.PB.Internal.Sorter as PBEncSorter
 import qualified ToySolver.SAT.Store.CNF as CNFStore
 
 import Test.SAT.Utils
+
+case_fold_sharing :: Assertion
+case_fold_sharing = do
+  ref <- newIORef IntMap.empty
+  let [x1, x2, x3, x4, x5] = map Atom [1..5]
+      formula = orB [x1 .=>. x3 .&&. x4, x2 .=>. x3 .&&. x5]
+      f x = unsafePerformIO $ do
+        modifyIORef' ref (IntMap.insertWith (+) x (1::Int))
+        return $ Atom x
+      formula' = Tseitin.fold f formula
+  ret <- seq formula' $ readIORef ref
+  ret @?= IntMap.fromList [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)]
 
 case_addFormula :: Assertion
 case_addFormula = do
