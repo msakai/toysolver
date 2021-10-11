@@ -22,9 +22,9 @@ generate_packageVersions cabalFile = do
   let pkgs1 =
         case condLibrary pkgDesc of
           Nothing -> Set.empty
-          Just tree -> Set.fromList [unPackageName pkgName | constr <- constrs tree, Dependency pkgName _verRange <- constr]
+          Just tree -> Set.fromList [unPackageName (depPkgName dep) | constr <- constrs tree, dep <- constr]
       pkgs2 = Set.unions $
-        [ Set.fromList [unPackageName pkgName | constr <- constrs tree, Dependency pkgName _verRange <- constr]
+        [ Set.fromList [unPackageName (depPkgName dep) | constr <- constrs tree, dep <- constr]
         | (_name, tree) <- condExecutables pkgDesc
         ]
       pkgs = Set.delete "toysolver" $ Set.union pkgs1 pkgs2
