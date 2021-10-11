@@ -13,7 +13,7 @@
 -----------------------------------------------------------------------------
 module ToySolver.FileFormat
   ( module ToySolver.FileFormat.Base
-  , WithMegaparsecParser (..)
+  , WithFastParser (..)
   ) where
 
 import qualified Data.PseudoBoolean as PBFile
@@ -26,31 +26,29 @@ import ToySolver.QUBO () -- importing instances
 import Text.Megaparsec.Error (errorBundlePretty)
 
 instance FileFormat PBFile.Formula where
-  parse = PBFileAttoparsec.parseOPBByteString
-  render = PBFileBB.opbBuilder
-
-instance FileFormat PBFile.SoftFormula where
-  parse = PBFileAttoparsec.parseWBOByteString
-  render = PBFileBB.wboBuilder
-
-
--- | Wrapper type for parsing opb/wbo files using megaparsec-based parser instead of attoparsec-based one.
-newtype WithMegaparsecParser a
-  = WithMegaparsecParser
-  { unWithMegaparsecParser :: a
-  }
-
-instance FileFormat (WithMegaparsecParser PBFile.Formula) where
   parse s =
     case PBFileMegaparsec.parseOPBByteString "-" s of
       Left err -> Left (errorBundlePretty err)
-      Right x -> Right (WithMegaparsecParser x)
-  render (WithMegaparsecParser x) = PBFileBB.opbBuilder x
+      Right x -> Right x
+  render x = PBFileBB.opbBuilder x
 
-instance FileFormat (WithMegaparsecParser PBFile.SoftFormula) where
+instance FileFormat PBFile.SoftFormula where
   parse s =
     case PBFileMegaparsec.parseWBOByteString "-" s of
       Left err -> Left (errorBundlePretty err)
-      Right x -> Right (WithMegaparsecParser x)
-  render (WithMegaparsecParser x) = PBFileBB.wboBuilder x
+      Right x -> Right x
+  render x = PBFileBB.wboBuilder x
 
+-- | Wrapper type for parsing opb/wbo files using attoparsec-based parser instead of megaparsec-based one.
+newtype WithFastParser a
+  = WithFastParser
+  { unWithFastParser :: a
+  }
+
+instance FileFormat (WithFastParser PBFile.Formula) where
+  parse = fmap WithFastParser . PBFileAttoparsec.parseOPBByteString
+  render (WithFastParser x) = PBFileBB.opbBuilder x
+
+instance FileFormat (WithFastParser PBFile.SoftFormula) where
+  parse = fmap WithFastParser . PBFileAttoparsec.parseWBOByteString
+  render (WithFastParser x) = PBFileBB.wboBuilder x

@@ -104,7 +104,7 @@ data Options
   , optTempDir :: Maybe FilePath
   , optFileEncoding :: Maybe String
   , optMaxSATCompactVLine :: Bool
-  , optPBParserMegaparsec :: Bool
+  , optPBFastParser :: Bool
   }
 
 instance Default Options where
@@ -128,7 +128,7 @@ instance Default Options where
     , optTempDir = Nothing
     , optFileEncoding = Nothing
     , optMaxSATCompactVLine = False
-    , optPBParserMegaparsec = False
+    , optPBFastParser = False
     }
 
 optionsParser :: Parser Options
@@ -151,7 +151,7 @@ optionsParser = Options
   <*> tempDirOption
   <*> fileEncodingOption
   <*> maxsatCompactVLineOption
-  <*> pbParserMegaparsecOption
+  <*> pbFastParserOption
   where
     fileInput :: Parser String
     fileInput = strArgument $ metavar "(FILE|-)"
@@ -254,9 +254,9 @@ optionsParser = Options
       $  long "maxsat-compact-v-line"
       <> help "print Max-SAT solution in the new compact v-line format"
 
-    pbParserMegaparsecOption = switch
-      $  long "pb-parser-megaparsec"
-      <> help "use megaparsec-based parser instead of attoparsec-based one for better error message"
+    pbFastParserOption = switch
+      $  long "pb-fast-parser"
+      <> help "use attoparsec-based parser instead of megaparsec-based one for speed"
 
 
 satConfigParser :: Parser SAT.Config
@@ -791,13 +791,13 @@ mainPB :: Options -> SAT.Solver -> IO ()
 mainPB opt solver = do
   ret <- case optInput opt of
            "-"   ->
-             if optPBParserMegaparsec opt then
-               liftM (fmap FF.unWithMegaparsecParser . FF.parse) BS.getContents
+             if optPBFastParser opt then
+               liftM (fmap FF.unWithFastParser . FF.parse) BS.getContents
              else
                liftM FF.parse BS.getContents
            fname ->
-             if optPBParserMegaparsec opt then
-               liftM (fmap FF.unWithMegaparsecParser) $ FF.parseFile fname
+             if optPBFastParser opt then
+               liftM (fmap FF.unWithFastParser) $ FF.parseFile fname
              else
                FF.parseFile fname
   case ret of
@@ -917,13 +917,13 @@ mainWBO :: Options -> SAT.Solver -> IO ()
 mainWBO opt solver = do
   ret <- case optInput opt of
            "-"   ->
-             if optPBParserMegaparsec opt then
-               liftM (fmap FF.unWithMegaparsecParser . FF.parse) BS.getContents
+             if optPBFastParser opt then
+               liftM (fmap FF.unWithFastParser . FF.parse) BS.getContents
              else
                liftM FF.parse BS.getContents
            fname ->
-             if optPBParserMegaparsec opt then
-               liftM (fmap FF.unWithMegaparsecParser) $ FF.parseFile fname
+             if optPBFastParser opt then
+               liftM (fmap FF.unWithFastParser) $ FF.parseFile fname
              else
                FF.parseFile fname
   case ret of

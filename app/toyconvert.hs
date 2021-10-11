@@ -64,7 +64,7 @@ data Options = Options
   , optFileEncoding :: Maybe String
   , optRemoveUserCuts :: Bool
   , optNewWCNF :: Bool
-  , optPBParserMegaparsec :: Bool
+  , optPBFastParser :: Bool
   } deriving (Eq, Show)
 
 optionsParser :: Parser Options
@@ -85,7 +85,7 @@ optionsParser = Options
   <*> encodingOption
   <*> removeUserCutsOption
   <*> newWCNFOption
-  <*> pbParserMegaparsecOption
+  <*> pbFastParserOption
   where
     fileInput :: Parser FilePath
     fileInput = argument str (metavar "FILE")
@@ -186,10 +186,10 @@ optionsParser = Options
       $  long "wcnf-new"
       <> help "use new format for writing WCNF files"
 
-    pbParserMegaparsecOption :: Parser Bool
-    pbParserMegaparsecOption = switch
-      $  long "pb-parser-megaparsec"
-      <> help "use megaparsec-based parser instead of attoparsec-based one for better error message"
+    pbFastParserOption :: Parser Bool
+    pbFastParserOption = switch
+      $  long "pb-fast-parser"
+      <> help "use attoparsec-based parser instead of megaparsec-based one for speed"
 
 parserInfo :: ParserInfo Options
 parserInfo = info (helper <*> versionOption <*> optionsParser)
@@ -230,13 +230,13 @@ readProblem o fname = do
     ".wcnf" ->
       liftM (ProbWBO . fst . maxsat2wbo) $ FF.readFile fname
     ".opb"  -> liftM ProbOPB $ do
-      if optPBParserMegaparsec o then
-        liftM FF.unWithMegaparsecParser $ FF.readFile fname
+      if optPBFastParser o then
+        liftM FF.unWithFastParser $ FF.readFile fname
       else
         FF.readFile fname
-    ".wbo"  -> liftM ProbWBO $
-      if optPBParserMegaparsec o then
-        liftM FF.unWithMegaparsecParser $ FF.readFile fname
+    ".wbo"  -> liftM ProbWBO $ do
+      if optPBFastParser o then
+        liftM FF.unWithFastParser $ FF.readFile fname
       else
         FF.readFile fname
     ".gcnf" ->

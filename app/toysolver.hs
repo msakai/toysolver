@@ -78,7 +78,7 @@ data Options = Options
   , optOmegaReal :: String
   , optFileEncoding :: Maybe String
   , optMaxSATCompactVLine :: Bool
-  , optPBParserMegaparsec :: Bool
+  , optPBFastParser :: Bool
   } deriving (Eq, Show)
 
 optionsParser :: Parser Options
@@ -95,7 +95,7 @@ optionsParser = Options
   <*> omegaRealOption
   <*> fileEncodingOption
   <*> maxsatCompactVLineOption
-  <*> pbParserMegaparsecOption
+  <*> pbFastParserOption
   where
     fileInput :: Parser FilePath
     fileInput = argument str (metavar "FILE")
@@ -172,10 +172,10 @@ optionsParser = Options
       $  long "maxsat-compact-v-line"
       <> help "print Max-SAT solution in the new compact v-line format"
 
-    pbParserMegaparsecOption :: Parser Bool
-    pbParserMegaparsecOption = switch
-      $  long "pb-parser-megaparsec"
-      <> help "use megaparsec-based parser instead of attoparsec-based one for better error message"
+    pbFastParserOption :: Parser Bool
+    pbFastParserOption = switch
+      $  long "pb-fast-parser"
+      <> help "use attoparsec-based parser instead of megaparsec-based one for speed"
 
 parserInfo :: ParserInfo Options
 parserInfo = info (helper <*> versionOption <*> optionsParser)
@@ -479,8 +479,8 @@ main = do
         writeSOLFileSAT o m2
     ModePB -> do
       pb <-
-        if optPBParserMegaparsec o then
-          liftM FF.unWithMegaparsecParser $ FF.readFile (optInput o)
+        if optPBFastParser o then
+          liftM FF.unWithFastParser $ FF.readFile (optInput o)
         else
           FF.readFile (optInput o)
       let (mip,info2) = pb2ip pb
@@ -490,8 +490,8 @@ main = do
         writeSOLFileSAT o m2
     ModeWBO -> do
       wbo <-
-        if optPBParserMegaparsec o then
-          liftM FF.unWithMegaparsecParser $ FF.readFile (optInput o)
+        if optPBFastParser o then
+          liftM FF.unWithFastParser $ FF.readFile (optInput o)
         else
           FF.readFile (optInput o)
       let (mip,info2) = wbo2ip False wbo
