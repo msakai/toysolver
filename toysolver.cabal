@@ -202,6 +202,7 @@ Library
      CPP
      ConstraintKinds
      DeriveDataTypeable
+     DeriveGeneric
      ExistentialQuantification
      FlexibleContexts
      FlexibleInstances
@@ -212,6 +213,7 @@ Library
      KindSignatures
      MultiParamTypeClasses
      OverloadedStrings
+     PatternSynonyms
      Rank2Types
      RecursiveDo
      ScopedTypeVariables
@@ -220,6 +222,7 @@ Library
      TypeOperators
      TypeSynonymInstances
      UndecidableInstances
+     ViewPatterns
   if impl(ghc)
      Other-Extensions:
         MagicHash

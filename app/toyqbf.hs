@@ -26,7 +26,6 @@ import System.Exit
 import System.IO
 
 import ToySolver.Data.Boolean
-import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.QBF as QBF
 import ToySolver.Internal.Util (setEncodingChar8)
@@ -79,7 +78,7 @@ main = do
       let nv = CNF.qdimacsNumVars qdimacs
           nc = CNF.qdimacsNumClauses qdimacs
           prefix' = QBF.quantifyFreeVariables nv [(q, IntSet.fromList xs) | (q,xs) <- CNF.qdimacsPrefix qdimacs]
-          matrix' = andB [orB [if lit > 0 then BoolExpr.Atom lit else notB (BoolExpr.Atom (abs lit)) | lit <- CNF.unpackClause clause] | clause <- CNF.qdimacsMatrix qdimacs]
+          matrix' = andB [orB [if lit > 0 then QBF.litToMatrix lit else notB (QBF.litToMatrix (abs lit)) | lit <- CNF.unpackClause clause] | clause <- CNF.qdimacsMatrix qdimacs]
       (ans, certificate) <-
         case map toLower (optAlgorithm opt) of
           "naive" -> QBF.solveNaive nv prefix' matrix'
