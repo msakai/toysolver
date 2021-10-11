@@ -1265,7 +1265,7 @@ search solver !conflict_lim onConflict = do
       modifyIOURef (svConfBudget solver) $ \confBudget ->
         if confBudget > 0 then confBudget - 1 else confBudget
       confBudget <- readIOURef (svConfBudget solver)
-      
+
       terminateCallback' <- readIORef (svTerminateCallback solver)
       case terminateCallback' of
         Nothing -> return ()

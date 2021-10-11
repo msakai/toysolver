@@ -201,7 +201,7 @@ instance FileFormat NewWCNF where
     where
       f (SomeWCNFNew x) = x
       f (SomeWCNFOld x) = toNewWCNF x
-     
+
   render nwcnf = mconcat (map f (nwcnfClauses nwcnf))
     where
       f (Nothing, c) = char7 'h' <> mconcat [char7 ' ' <> intDec lit | lit <- SAT.unpackClause c] <> byteString " 0\n"
@@ -221,7 +221,7 @@ parseNewWCNFLineBS s =
           let xs = parseClauseBS s''
            in seq w $ seq xs $ (Just w, xs)
   where
-    s' = BS.dropWhile isSpace s  
+    s' = BS.dropWhile isSpace s
 
 -- -------------------------------------------------------------------
 
@@ -248,7 +248,7 @@ instance FileFormat SomeWCNF where
   parse s =
     case filter (not . isCommentBS) (BS.lines s) of
       [] -> Right $ SomeWCNFNew $ NewWCNF []
-      lls@(l : ls) -> 
+      lls@(l : ls) ->
         case BS.words l of
           (["p","wcnf", nvar, nclause, top]) ->
             Right $ SomeWCNFOld $

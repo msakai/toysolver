@@ -119,8 +119,8 @@ foreign export ccall ipasir_solve :: Solver -> IO CInt
 -- * If the formula is unsatisfiable the function returns 20 and the state of the solver is changed to @UNSAT@.
 -- * If the search is interrupted (see 'ipasir_set_terminate') the function returns 0 and the state of the solver is changed to @INPUT@.
 --
--- This function can be called in any defined state of the solver. 
--- Note that the state of the solver _during_ execution of @ipasir_solve@ is undefined. 
+-- This function can be called in any defined state of the solver.
+-- Note that the state of the solver _during_ execution of @ipasir_solve@ is undefined.
 --
 -- Required state: @INPUT@ or @SAT@ or @UNSAT@
 --
@@ -142,10 +142,10 @@ foreign export ccall ipasir_val :: Solver -> Int32 -> IO CInt
 -- | Get the truth value of the given literal in the found satisfying
 -- assignment.
 --
--- Return @lit@ if True, @-lit@ if False; 
--- @ipasir_val(lit)@ may return 0 if the found assignment is satisfying for both valuations of lit. 
--- Each solution that agrees with all non-zero values of @ipasir_val@ is a model of the formula. 
--- 
+-- Return @lit@ if True, @-lit@ if False;
+-- @ipasir_val(lit)@ may return 0 if the found assignment is satisfying for both valuations of lit.
+-- Each solution that agrees with all non-zero values of @ipasir_val@ is a model of the formula.
+--
 -- This function can only be used if 'ipasir_solve' has returned @10@
 -- and no 'ipasir_add' nor 'ipasir_assume' has been called
 -- since then, i.e., the state of the solver is SAT.
@@ -171,10 +171,10 @@ foreign export ccall ipasir_failed :: Solver -> Int32 -> IO CInt
 -- | Check if the given assumption literal was used to prove the
 -- unsatisfiability of the formula under the assumptions
 -- used for the last SAT search. Return 1 if so, 0 otherwise.
--- 
--- The formula remains unsatisfiable even just under assumption literals for which @ipasir_failed@ returns 1. 
--- Note that for literals @lit@ which are not assumption literals, the behavior of @ipasir_failed(lit)@ is not specified. 
--- 
+--
+-- The formula remains unsatisfiable even just under assumption literals for which @ipasir_failed@ returns 1.
+-- Note that for literals @lit@ which are not assumption literals, the behavior of @ipasir_failed(lit)@ is not specified.
+--
 -- This function can only be used if 'ipasir_solve' has returned 20 and
 -- no 'ipasir_add' or 'ipasir_assume' has been called since then, i.e.,
 -- the state of the solver is @UNSAT@.

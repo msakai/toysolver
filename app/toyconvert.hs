@@ -334,7 +334,7 @@ writeProblem o problem = do
                   in FF.writeFile fname cnf2
         ".wcnf" ->
           case wbo2maxsat wbo of
-            (wcnf, _) 
+            (wcnf, _)
               | optNewWCNF o -> do
                   let nwcnf = CNF.NewWCNF [(if w >= CNF.wcnfTopCost wcnf then Nothing else Just w, c) | (w, c) <- CNF.wcnfClauses wcnf]
                   FF.writeFile fname nwcnf
