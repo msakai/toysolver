@@ -337,6 +337,7 @@ Library
      ToySolver.SAT.Encoder.Cardinality.Internal.Totalizer
      ToySolver.SAT.Encoder.Tseitin
      ToySolver.SAT.ExistentialQuantification
+     ToySolver.SAT.Formula
      ToySolver.SAT.MUS
      ToySolver.SAT.MUS.Enum
      ToySolver.SAT.MUS.Types
