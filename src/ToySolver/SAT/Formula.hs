@@ -36,6 +36,8 @@ import ToySolver.Data.Boolean
 import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.SAT.Types as SAT
 
+-- Should this module be merged into ToySolver.SAT.Types module?
+
 -- ------------------------------------------------------------------------
 
 -- | Arbitrary formula not restricted to CNF
