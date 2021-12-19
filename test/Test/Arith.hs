@@ -198,7 +198,7 @@ prop_FourierMotzkin_solve =
   forAll genQFLAConj $ \(vs,cs) ->
     case FourierMotzkin.solve vs cs of
       Nothing -> forAll (genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False
-      Just m  -> property $ all (LA.eval m) cs
+      Just m  -> conjoin [counterexample (show c) $ LA.eval m c | c <- cs]
 
 case_FourierMotzkin_test1 :: Assertion
 case_FourierMotzkin_test1 =
@@ -256,7 +256,7 @@ prop_VirtualSubstitution_solve =
    forAll genQFLAConj $ \(vs,cs) ->
      case VirtualSubstitution.solve vs cs of
        Nothing -> forAll (genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False
-       Just m  -> property $ all (LA.eval m) cs
+       Just m  -> conjoin [counterexample (show c) $ LA.eval m c | c <- cs]
 
 case_VirtualSubstitution_test1 :: Assertion
 case_VirtualSubstitution_test1 =
@@ -287,7 +287,7 @@ disabled_prop_CAD_solve =
             forAll (genModel vs) $ \m ->
               let m' = Map.fromAscList [(x, fromRational v) | (x,v) <- IM.toAscList m]
               in all (evalPAtom m') cs' == False
-          Just m  -> property $ all (evalPAtom m) cs'
+          Just m  -> conjoin [counterexample (show c) $ evalPAtom m c | c <- cs']
 
 case_CAD_test1 :: Assertion
 case_CAD_test1 =
@@ -344,7 +344,7 @@ prop_OmegaTest_solve =
      case OmegaTest.solve def vs cs of
        Nothing ->
          forAll (liftM (fmap fromInteger) $ genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False
-       Just m  -> property $ all (LA.eval (fmap fromInteger m :: Model Rational)) cs
+       Just m  -> conjoin [counterexample (show c) $ LA.eval (fmap fromInteger m :: Model Rational) c | c <- cs]
 
 case_OmegaTest_test1 :: Assertion
 case_OmegaTest_test1 =
@@ -365,7 +365,7 @@ prop_OmegaTest_zmod =
   forAll arbitrary $ \b ->
     b /= 0 ==>
       let c = a `OmegaTest.zmod` b
-      in (a - c) `mod` b == 0 && abs c <= abs b `div` 2
+      in (a - c) `mod` b === 0 QC..&&. property (abs c <= abs b `div` 2)
 
 ------------------------------------------------------------------------
 
@@ -376,8 +376,8 @@ prop_Cooper_solve =
        Nothing ->
          (forAll (liftM (fmap fromInteger) $ genModel vs) $ \(m :: Model Rational) -> all (LA.eval m) cs == False)
          QC..&&.
-         property (OmegaTest.solve def vs cs == Nothing)
-       Just m  -> property $ all (LA.eval (fmap fromInteger m :: Model Rational)) cs
+         OmegaTest.solve def vs cs === Nothing
+       Just m  -> conjoin [counterexample (show c) $ LA.eval (fmap fromInteger m :: Model Rational) c | c <- cs]
 
 case_Cooper_test1 :: Assertion
 case_Cooper_test1 =
@@ -398,8 +398,8 @@ case_Cooper_test2 =
 prop_Simplex_solve :: Property
 prop_Simplex_solve = forAll genQFLAConj $ \(vs,cs) -> do
   case SimplexSimple.check vs cs of
-    Nothing -> True
-    Just m -> all (LA.eval m) cs
+    Nothing -> property True
+    Just m -> conjoin [counterexample (show c) $ LA.eval m c | c <- cs]
 
 case_Simplex_test1 :: Assertion
 case_Simplex_test1 =

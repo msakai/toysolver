@@ -14,6 +14,7 @@ import Data.Ratio
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Test.Tasty
+import qualified Test.Tasty.QuickCheck as QC
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
 import Test.Tasty.HUnit
 import Test.Tasty.TH
@@ -54,7 +55,7 @@ prop_minimalHittingSets_duality :: Property
 prop_minimalHittingSets_duality =
   forAll hyperGraph $ \g ->
     let h = HittingSet.minimalHittingSets g
-    in h == HittingSet.minimalHittingSets (HittingSet.minimalHittingSets h)
+    in h === HittingSet.minimalHittingSets (HittingSet.minimalHittingSets h)
 
 prop_minimalHittingSets_isHittingSet :: Property
 prop_minimalHittingSets_isHittingSet =
@@ -111,7 +112,7 @@ pairOfDNFs = do
 prop_FredmanKhachiyan1996_checkDualityA_prop1 :: Property
 prop_FredmanKhachiyan1996_checkDualityA_prop1 =
   forAll mutuallyDualDNFs $ \(f,g) ->
-    FredmanKhachiyan1996.checkDualityA f g == Nothing
+    FredmanKhachiyan1996.checkDualityA f g === Nothing
 
 prop_FredmanKhachiyan1996_checkDualityA_prop2 :: Property
 prop_FredmanKhachiyan1996_checkDualityA_prop2 =
@@ -123,7 +124,7 @@ prop_FredmanKhachiyan1996_checkDualityA_prop2 =
 prop_FredmanKhachiyan1996_checkDualityB_prop1 :: Property
 prop_FredmanKhachiyan1996_checkDualityB_prop1 =
   forAll mutuallyDualDNFs $ \(f,g) ->
-    FredmanKhachiyan1996.checkDualityA f g == Nothing
+    FredmanKhachiyan1996.checkDualityA f g === Nothing
 
 prop_FredmanKhachiyan1996_checkDualityB_prop2 :: Property
 prop_FredmanKhachiyan1996_checkDualityB_prop2 =
@@ -168,8 +169,8 @@ prop_FredmanKhachiyan1996_lemma_3_a =
         (g0, g1) = Set.map (IntSet.delete x) *** id $ Set.partition (x `IntSet.member`) g
     in not (IntSet.null vs)
        ==>
-         HittingSet.minimalHittingSets f1 == FredmanKhachiyan1996.deleteRedundancy (g0 `Set.union` g1) &&
-         HittingSet.minimalHittingSets g1 == FredmanKhachiyan1996.deleteRedundancy (f0 `Set.union` f1)
+         HittingSet.minimalHittingSets f1 === FredmanKhachiyan1996.deleteRedundancy (g0 `Set.union` g1) QC..&&.
+         HittingSet.minimalHittingSets g1 === FredmanKhachiyan1996.deleteRedundancy (f0 `Set.union` f1)
 
 prop_FredmanKhachiyan1996_to_selfDuality :: Property
 prop_FredmanKhachiyan1996_to_selfDuality =
@@ -182,7 +183,7 @@ prop_FredmanKhachiyan1996_to_selfDuality =
               , Set.map (IntSet.insert z) g
               , Set.singleton (IntSet.fromList [y,z])
               ]
-    in HittingSet.minimalHittingSets h == h
+    in HittingSet.minimalHittingSets h === h
 
 case_FredmanKhachiyan1996_condition_1_1_solve_L :: Assertion
 case_FredmanKhachiyan1996_condition_1_1_solve_L = (xs `FredmanKhachiyan1996.isCounterExampleOf` (f,g)) @?= True
@@ -282,12 +283,12 @@ propMinimalHittingSetsDuality :: (Set IntSet -> Set IntSet) -> Property
 propMinimalHittingSetsDuality minimalHittingSets =
   forAll hyperGraph $ \g ->
     let h = minimalHittingSets g
-    in h == minimalHittingSets (minimalHittingSets h)
+    in h === minimalHittingSets (minimalHittingSets h)
 
 propMinimalHittingSetsIsHittingSet :: (Set IntSet -> Set IntSet) -> Property
 propMinimalHittingSetsIsHittingSet minimalHittingSets =
   forAll hyperGraph $ \g ->
-    all (`isHittingSetOf` g) (minimalHittingSets g)
+    conjoin [counterexample (show h) $ h `isHittingSetOf` g | h <- Set.toList (minimalHittingSets g)]
 
 prop_GurvichKhachiyan1999_generateCNFAndDNF :: Property
 prop_GurvichKhachiyan1999_generateCNFAndDNF = propGenerateCNFAndDNF GurvichKhachiyan1999.generateCNFAndDNF

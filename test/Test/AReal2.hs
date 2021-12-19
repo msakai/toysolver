@@ -22,50 +22,50 @@ import System.IO
 prop_add_comm =
   forAll areals $ \a ->
   forAll areals $ \b ->
-    a + b == b + a
+    a + b === b + a
 
 prop_add_assoc =
   forAll areals $ \a ->
   forAll areals $ \b ->
   forAll areals $ \c ->
-    a + (b + c) == (a + b) + c
+    a + (b + c) === (a + b) + c
 
 prop_add_unitL =
   forAll areals $ \a ->
-    0 + a == a
+    0 + a === a
 
 prop_add_unitR =
   forAll areals $ \a ->
-    a + 0 == a
+    a + 0 === a
 
 prop_mult_comm =
   forAll areals $ \a ->
   forAll areals $ \b ->
-    a * b == b * a
+    a * b === b * a
 
 prop_mult_assoc =
   forAll areals $ \a ->
   forAll areals $ \b ->
   forAll areals $ \c ->
-    a * (b * c) == (a * b) * c
+    a * (b * c) === (a * b) * c
 
 prop_mult_unitL =
   forAll areals $ \a ->
-    1 * a == a
+    1 * a === a
 
 prop_mult_unitR =
   forAll areals $ \a ->
-    a * 1 == a
+    a * 1 === a
 
 prop_mult_dist =
   forAll areals $ \a ->
   forAll areals $ \b ->
   forAll areals $ \c ->
-    a * (b + c) == a * b + a * c
+    a * (b + c) === a * b + a * c
 
 prop_mult_zero =
   forAll areals $ \a ->
-    0 * a ==  0
+    0 * a ===  0
 
 {--------------------------------------------------------------------
   Generators

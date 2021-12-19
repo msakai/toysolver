@@ -105,8 +105,8 @@ prop_satToMaxSAT2_forward :: Property
 prop_satToMaxSAT2_forward =
   forAll arbitraryCNF $ \cnf ->
     let ((wcnf, threshold), info) = satToMaxSAT2 cnf
-    in and
-       [ evalCNF m cnf == b2
+    in conjoin
+       [ evalCNF m cnf === b2
        | m <- allAssignments (CNF.cnfNumVars cnf)
        , let m2 = transformForward info m
              b2 = case evalWCNF m2 wcnf of
@@ -118,8 +118,8 @@ prop_simplifyMaxSAT2_forward :: Property
 prop_simplifyMaxSAT2_forward =
   forAll arbitraryMaxSAT2 $ \(wcnf, th1) ->
     let r@((_n,cs,th2), info) = simplifyMaxSAT2 (wcnf, th1)
-    in counterexample (show r) $ and
-       [ b1 == b2
+    in counterexample (show r) $ conjoin
+       [ b1 === b2
        | m1 <- allAssignments (CNF.wcnfNumVars wcnf)
        , let o1 = fromJust $ evalWCNF m1 wcnf
              b1 = o1 <= th1
@@ -132,8 +132,8 @@ prop_maxSAT2ToSimpleMaxCut_forward :: Property
 prop_maxSAT2ToSimpleMaxCut_forward =
   forAll arbitraryMaxSAT2 $ \(wcnf, th1) ->
     let r@((maxcut, th2), info) = maxSAT2ToSimpleMaxCut (wcnf, th1)
-    in counterexample (show r) $ and
-       [ b1 == b2
+    in counterexample (show r) $ conjoin
+       [ b1 === b2
        | m <- allAssignments (CNF.wcnfNumVars wcnf)
        , let o1 = fromJust $ evalWCNF m wcnf
              b1 = o1 <= th1

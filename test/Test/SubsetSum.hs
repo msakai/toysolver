@@ -7,6 +7,7 @@ import Control.Monad
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import Test.Tasty
+import qualified Test.Tasty.QuickCheck as QC
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
 import Test.Tasty.HUnit
 import Test.Tasty.TH
@@ -24,16 +25,21 @@ prop_maxSubsetSum_soundness =
   forAll arbitrary $ \c ->
     forAll arbitrary $ \ws ->
       case SubsetSum.maxSubsetSum (V.fromList ws) c of
-        Just (obj, bs) -> obj == evalSubsetSum ws (VU.toList bs) && obj <= c
-        Nothing -> True
+        Just (obj, bs) -> obj === evalSubsetSum ws (VU.toList bs) QC..&&. obj <= c
+        Nothing -> property True
 
 prop_maxSubsetSum_completeness :: Property
 prop_maxSubsetSum_completeness =
   forAll arbitrary $ \c ->
     forAll g $ \ws ->
       case SubsetSum.maxSubsetSum (V.fromList ws) c of
-        Just (obj, bs) -> VU.length bs == length ws && obj == evalSubsetSum ws (VU.toList bs) && obj <= c
-        Nothing -> and [c < evalSubsetSum ws bs | bs <- replicateM (length ws) [False,True]]
+        Just (obj, bs) ->
+          conjoin
+          [ VU.length bs === length ws
+          , obj === evalSubsetSum ws (VU.toList bs)
+          , property $ obj <= c
+          ]
+        Nothing -> conjoin [counterexample (show bs) $ c < evalSubsetSum ws bs | bs <- replicateM (length ws) [False,True]]
   where
     g = do
       n <- choose (0,10)
@@ -45,7 +51,7 @@ prop_maxSubsetSum_isEqualToKnapsackBBSolver =
     forAll (liftM (map abs) arbitrary) $ \ws ->
       let Just (obj1, _bs1) = SubsetSum.maxSubsetSum (V.fromList ws) c
           (obj2, _, _bs2) = KnapsackBB.solve [(fromIntegral w, fromIntegral w) | w <- ws] (fromIntegral c)
-      in fromIntegral obj1 == obj2
+      in fromIntegral obj1 === obj2
 
 case_maxSubsetSum_regression_test_1 :: Assertion
 case_maxSubsetSum_regression_test_1 =
@@ -60,16 +66,21 @@ prop_minSubsetSum_soundness =
   forAll arbitrary $ \c ->
     forAll arbitrary $ \ws ->
       case SubsetSum.minSubsetSum (V.fromList ws) c of
-        Just (obj, bs) -> obj == evalSubsetSum ws (VU.toList bs) && c <= obj
-        Nothing -> True
+        Just (obj, bs) -> obj === evalSubsetSum ws (VU.toList bs) QC..&&. c <= obj
+        Nothing -> property True
 
 prop_minSubsetSum_completeness :: Property
 prop_minSubsetSum_completeness =
   forAll arbitrary $ \c ->
     forAll g $ \ws ->
       case SubsetSum.minSubsetSum (V.fromList ws) c of
-        Just (obj, bs) -> VU.length bs == length ws && obj == evalSubsetSum ws (VU.toList bs) && c <= obj
-        Nothing -> and [evalSubsetSum ws bs < c | bs <- replicateM (length ws) [False,True]]
+        Just (obj, bs) ->
+          conjoin
+          [ VU.length bs === length ws
+          , obj === evalSubsetSum ws (VU.toList bs)
+          , property $ c <= obj
+          ]
+        Nothing -> conjoin [counterexample (show bs) $ evalSubsetSum ws bs < c | bs <- replicateM (length ws) [False,True]]
   where
     g = do
       n <- choose (0,10)
@@ -80,16 +91,16 @@ prop_subsetSum_soundness =
   forAll arbitrary $ \c ->
     forAll arbitrary $ \ws ->
       case SubsetSum.subsetSum (V.fromList ws) c of
-        Just bs -> VU.length bs == length ws && evalSubsetSum ws (VU.toList bs) == c
-        Nothing -> True
+        Just bs -> VU.length bs === length ws QC..&&. evalSubsetSum ws (VU.toList bs) === c
+        Nothing -> property True
 
 prop_subsetSum_completeness :: Property
 prop_subsetSum_completeness =
   forAll arbitrary $ \c ->
     forAll g $ \ws ->
       case SubsetSum.subsetSum (V.fromList ws) c of
-        Just bs -> VU.length bs == length ws && evalSubsetSum ws (VU.toList bs) == c
-        Nothing -> and [c /= evalSubsetSum ws bs | bs <- replicateM (length ws) [False,True]]
+        Just bs -> VU.length bs === length ws QC..&&. evalSubsetSum ws (VU.toList bs) === c
+        Nothing -> conjoin [counterexample (show bs) $ c /= evalSubsetSum ws bs | bs <- replicateM (length ws) [False,True]]
   where
     g = do
       n <- choose (0,10)

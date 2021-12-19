@@ -34,7 +34,7 @@ prop_knapsack_DPDense_equals_BB =
         lim' = fromIntegral lim
         (v1,_,_) = KnapsackBB.solve items' lim'
         (v2,_,_) = KnapsackDPDense.solve items lim
-    in v1 == v2
+    in v1 === v2
 
 case_knapsack_DPSparse_1 :: Assertion
 case_knapsack_DPSparse_1 = KnapsackDPSparse.solve [(5::Int,4::Int), (6,5), (3,2)] 9 @?= (11, 9, [True,True,False])
@@ -49,7 +49,7 @@ prop_knapsack_DPSparse_equals_BB =
         items' = [(v, fromIntegral w) | (v,w) <- items]
         (v1,_,_) = KnapsackBB.solve items' (fromIntegral lim)
         (v2,_,_) = KnapsackDPSparse.solve items' (fromIntegral lim)
-    in v1 == v2
+    in v1 === v2
 
 knapsackProblems :: Gen ([(KnapsackDPDense.Value, KnapsackDPDense.Weight)], KnapsackDPDense.Weight)
 knapsackProblems = do

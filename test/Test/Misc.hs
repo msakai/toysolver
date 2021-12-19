@@ -36,7 +36,7 @@ case_readUnsignedInteger_maxBound_bug =
 prop_readUnsignedInteger :: Property
 prop_readUnsignedInteger =
   forAll (choose (0, 2^(128::Int))) $ \i ->
-    readUnsignedInteger (show i) == i
+    readUnsignedInteger (show i) === i
 
 -- ---------------------------------------------------------------------
 -- Vec

@@ -22,97 +22,97 @@ import Text.Parsec (parse)
 
 prop_parseTerm :: Property
 prop_parseTerm = forAll arbitrary $ \(t :: Term) ->
-  parse parseTerm "" (showSL t) == Right t
+  parse parseTerm "" (showSL t) === Right t
 
 prop_parseAttribute :: Property
 prop_parseAttribute = forAll arbitrary $ \a ->
-  parse parseAttribute "" (showSL a) == Right a
+  parse parseAttribute "" (showSL a) === Right a
 
 prop_parseSort :: Property
 prop_parseSort = forAll arbitrary $ \s ->
-  parse parseSort "" (showSL s) == Right s
+  parse parseSort "" (showSL s) === Right s
 
 prop_parseIdentifier :: Property
 prop_parseIdentifier = forAll arbitrary $ \a ->
-  parse parseIdentifier "" (showSL a) == Right a
+  parse parseIdentifier "" (showSL a) === Right a
 
 prop_parseSexpr :: Property
 prop_parseSexpr = forAll arbitrary $ \a ->
-  parse parseSexpr "" (showSL a) == Right a
+  parse parseSexpr "" (showSL a) === Right a
 
 prop_parseSpecConstant :: Property
 prop_parseSpecConstant = forAll arbitrary $ \a ->
-  parse parseSpecConstant "" (showSL a) == Right a
+  parse parseSpecConstant "" (showSL a) === Right a
 
 prop_parseSource :: Property
 prop_parseSource = forAll arbitrary $ \a ->
-  parse parseSource "" (joinA a) == Right a
+  parse parseSource "" (joinA a) === Right a
 
 prop_parseCommand :: Property
 prop_parseCommand = forAll arbitrary $ \a ->
-  parse parseCommand "" (showSL a) == Right a
+  parse parseCommand "" (showSL a) === Right a
 
 prop_parseOption :: Property
 prop_parseOption = forAll arbitrary $ \a ->
-  parse parseOption "" (showSL a) == Right a
+  parse parseOption "" (showSL a) === Right a
 
 prop_parseInfoFlags :: Property
 prop_parseInfoFlags = forAll arbitrary $ \a ->
-  parse parseOption "" (showSL a) == Right a
+  parse parseOption "" (showSL a) === Right a
 
 prop_parseCmdResult :: Property
 prop_parseCmdResult = forAll arbitrary $ \(a :: CmdResponse) ->
   case parse parseCmdResult "" (showSL a) of
     Left err -> error (show err)
-    Right a' -> parse parseCmdResult "" (showSL a') == Right a'
+    Right a' -> parse parseCmdResult "" (showSL a') === Right a'
 
 prop_parseGenResponse :: Property
 prop_parseGenResponse = forAll arbitrary $ \a ->
-  parse parseGenResponse "" (showSL a) == Right a
+  parse parseGenResponse "" (showSL a) === Right a
 
 prop_parseGetInfoResponse :: Property
 prop_parseGetInfoResponse = forAll arbitrary $ \a ->
-  parse parseGetInfoResponse "" ("(" ++ joinA a ++ ")") == Right a
+  parse parseGetInfoResponse "" ("(" ++ joinA a ++ ")") === Right a
 
 prop_parseCheckSatResponse :: Property
 prop_parseCheckSatResponse = forAll arbitrary $ \a ->
-  parse parseCheckSatResponse "" (showSL a) == Right a
+  parse parseCheckSatResponse "" (showSL a) === Right a
 
 prop_parseGetAssertionsResponse :: Property
 prop_parseGetAssertionsResponse = forAll genGetAssertionsResponse $ \a ->
-  parse parseGetAssertionsResponse "" ("(" ++ joinA a ++ ")") == Right a
+  parse parseGetAssertionsResponse "" ("(" ++ joinA a ++ ")") === Right a
 
 prop_parseGetAssignmentResp :: Property
 prop_parseGetAssignmentResp = forAll arbitrary $ \a ->
-  parse parseGetAssignmentResp "" ("(" ++ joinA a ++ ")") == Right a
+  parse parseGetAssignmentResp "" ("(" ++ joinA a ++ ")") === Right a
 
 prop_parseGetProofResponse :: Property
 prop_parseGetProofResponse = forAll arbitrary $ \a ->
-  parse parseGetProofResponse "" (showSL a) == Right a
+  parse parseGetProofResponse "" (showSL a) === Right a
 
 prop_parseGetUnsatCoreResp :: Property
 prop_parseGetUnsatCoreResp = forAll genGetUnsatCoreResponse $ \a ->
-  parse parseGetUnsatCoreResp "" ("(" ++ unwords (fmap showSymbol a) ++ ")") == Right a
+  parse parseGetUnsatCoreResp "" ("(" ++ unwords (fmap showSymbol a) ++ ")") === Right a
 
 prop_parseGetUnsatAssumptionsResp :: Property
 prop_parseGetUnsatAssumptionsResp = forAll (listOf' genSymbol) $ \a ->
-  parse parseGetUnsatCoreResp "" ("(" ++ unwords (fmap showSymbol a) ++ ")") == Right a
+  parse parseGetUnsatCoreResp "" ("(" ++ unwords (fmap showSymbol a) ++ ")") === Right a
 
 prop_parseGetValueResponse :: Property
 prop_parseGetValueResponse = forAll genGetValueResponse $ \a ->
-  parse parseGetValueResponse "" ("(" ++ joinA a ++ ")") == Right a
+  parse parseGetValueResponse "" ("(" ++ joinA a ++ ")") === Right a
 
 prop_parseGetModelResponse :: Property
 prop_parseGetModelResponse = forAll genGetModelResponse $ \a ->
-  parse parseGetModelResponse "" ("(" ++ joinA a ++ ")") == Right a
+  parse parseGetModelResponse "" ("(" ++ joinA a ++ ")") === Right a
 
 prop_parseGetOptionResponse :: Property
 prop_parseGetOptionResponse = forAll arbitrary $ \a ->
-  parse parseGetOptionResponse "" (showSL a) == Right a
+  parse parseGetOptionResponse "" (showSL a) === Right a
 
 prop_parseEchoResponse :: Property
 prop_parseEchoResponse = forAll genEchoResponse $ \a ->
-  parse parseEchoResponse "" a == Right a
+  parse parseEchoResponse "" a === Right a
 
 case_bug_1 :: Assertion
 case_bug_1 = do
@@ -131,7 +131,7 @@ case_parse_string_literal_ascii = parse str "" s @?= Right s
 prop_parse_string_literal :: Property
 prop_parse_string_literal =
   forAll genStringLiteral $  \s ->
-    parse str "" s == Right s
+    parse str "" s === Right s
 
 case_parseSexprKeyword_bug :: Assertion
 case_parseSexprKeyword_bug =

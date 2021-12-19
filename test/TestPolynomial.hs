@@ -36,67 +36,67 @@ import Data.Interval (Interval, Extended (..), (<=..<=), (<..<=), (<=..<), (<..<
 prop_plus_comm =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
-    a + b == b + a
+    a + b === b + a
 
 prop_plus_assoc =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
   forAll polynomials $ \c ->
-    a + (b + c) == (a + b) + c
+    a + (b + c) === (a + b) + c
 
 prop_plus_unitL =
   forAll polynomials $ \a ->
-    P.constant 0 + a == a
+    P.constant 0 + a === a
 
 prop_plus_unitR =
   forAll polynomials $ \a ->
-    a + P.constant 0 == a
+    a + P.constant 0 === a
 
 prop_prod_comm =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
-    a * b == b * a
+    a * b === b * a
 
 prop_prod_assoc =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
   forAll polynomials $ \c ->
-    a * (b * c) == (a * b) * c
+    a * (b * c) === (a * b) * c
 
 prop_prod_unitL =
   forAll polynomials $ \a ->
-    P.constant 1 * a == a
+    P.constant 1 * a === a
 
 prop_prod_unitR =
   forAll polynomials $ \a ->
-    a * P.constant 1 == a
+    a * P.constant 1 === a
 
 prop_distL =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
   forAll polynomials $ \c ->
-    a * (b + c) == a * b + a * c
+    a * (b + c) === a * b + a * c
 
 prop_distR =
   forAll polynomials $ \a ->
   forAll polynomials $ \b ->
   forAll polynomials $ \c ->
-    (b + c) * a == b * a + c * a
+    (b + c) * a === b * a + c * a
 
 prop_negate =
   forAll polynomials $ \a ->
-    a + negate a == 0
+    a + negate a === 0
 
 prop_negate_involution =
   forAll polynomials $ \a ->
-    negate (negate a) == a
+    negate (negate a) === a
 
 prop_divModMP =
   forAll polynomials $ \g ->
     forAll (replicateM 3 polynomials) $ \fs ->
       all (0/=) fs ==>
         let (qs, r) = P.divModMP P.lex g fs
-        in sum (zipWith (*) fs qs) + r == g
+        in sum (zipWith (*) fs qs) + r === g
 
 case_prettyShow_test1 =
   prettyShow p @?= "-x1^2*x2 + 3*x1 - 2*x2"
@@ -136,7 +136,7 @@ prop_divMod =
   forAll upolynomials $ \b ->
     b /= 0 ==>
       let (q,r) = P.divMod a b
-      in a == q*b + r && (r==0 || P.deg b > P.deg r)
+      in a === q*b + r .&&. (r===0 .||. P.deg b > P.deg r)
 
 case_divMod_1 =  g*q + r @?= f
   where
@@ -151,19 +151,19 @@ prop_gcd_divisible =
   forAll upolynomials $ \b ->
     (a /= 0 && b /= 0) ==>
       let c = P.gcd a b
-      in a `P.mod` c == 0 && b `P.mod` c == 0
+      in a `P.mod` c === 0 .&&. b `P.mod` c === 0
 
 prop_gcd_comm =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
-    P.gcd a b == P.gcd b a
+    P.gcd a b === P.gcd b a
 
 prop_gcd_euclid =
   forAll upolynomials $ \p ->
   forAll upolynomials $ \q ->
   forAll upolynomials $ \r ->
     (p /= 0 && q /= 0 && r /= 0) ==>
-      P.gcd p q == P.gcd p (q + p*r)
+      P.gcd p q === P.gcd p (q + p*r)
 
 case_gcd_1 = P.gcd f1 f2 @?= 1
   where
@@ -176,7 +176,7 @@ prop_exgcd =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
     let (g,u,v) = P.exgcd a b
-    in a*u + b*v == g -- Bśzout's identity
+    in a*u + b*v === g -- Bśzout's identity
 
 case_exgcd_1 = P.exgcd p q @?= (expected_g, expected_u, expected_v)
   where
@@ -219,16 +219,16 @@ prop_lcm_divisible =
   forAll upolynomials $ \b ->
     (a /= 0 && b /= 0) ==>
       let c = P.lcm a b
-      in c `P.mod` a == 0 && c `P.mod` b == 0
+      in c `P.mod` a === 0 .&&. c `P.mod` b === 0
 
 prop_lcm_comm =
   forAll upolynomials $ \a ->
   forAll upolynomials $ \b ->
-    P.lcm a b == P.lcm b a
+    P.lcm a b === P.lcm b a
 
 prop_deriv_integral =
   forAll upolynomials $ \a ->
-    P.deriv (P.integral a x) x == a
+    P.deriv (P.integral a x) x === a
   where
     x = X
 
@@ -240,13 +240,13 @@ prop_integral_deriv =
 
 prop_pp_cont =
   forAll polynomials $ \p ->
-    P.cont (P.pp p) == 1
+    P.cont (P.pp p) === 1
 
 prop_cont_prod =
   forAll polynomials $ \p ->
     forAll polynomials $ \q ->
       (p /= 0 && q /= 0) ==>
-        P.cont (p*q) == P.cont p * P.cont q
+        P.cont (p*q) === P.cont p * P.cont q
 
 case_cont_pp_Integer = do
   P.cont p @?= 5
@@ -270,21 +270,21 @@ prop_pdivMod =
   forAll upolynomialsZ $ \g ->
     g /= 0 ==>
       let (b,q,r) = f `P.pdivMod` g
-      in P.constant b * f == q*g + r && P.deg r < P.deg g
+      in P.constant b * f === q*g + r .&&. P.deg r < P.deg g
 
 prop_pdiv =
   forAll upolynomialsZ $ \f ->
   forAll upolynomialsZ $ \g ->
     g /= 0 ==>
       let (_,q,_) = f `P.pdivMod` g
-      in f `P.pdiv` g == q
+      in f `P.pdiv` g === q
 
 prop_pmod =
   forAll upolynomialsZ $ \f ->
   forAll upolynomialsZ $ \g ->
     g /= 0 ==>
       let (_,_,r) = f `P.pdivMod` g
-      in f `P.pmod` g == r
+      in f `P.pmod` g === r
 
 {--------------------------------------------------------------------
   Term
@@ -297,29 +297,29 @@ prop_pmod =
 prop_degreeOfProduct =
   forAll monicMonomials $ \a ->
   forAll monicMonomials $ \b ->
-    P.deg (a `P.mmult` b) == P.deg a + P.deg b
+    P.deg (a `P.mmult` b) === P.deg a + P.deg b
 
 prop_degreeOfUnit =
-  P.deg P.mone == 0
+  P.deg P.mone === 0
 
 prop_mmult_unitL =
   forAll monicMonomials $ \a ->
-    P.mone `P.mmult` a == a
+    P.mone `P.mmult` a === a
 
 prop_mmult_unitR =
   forAll monicMonomials $ \a ->
-    a `P.mmult` P.mone == a
+    a `P.mmult` P.mone === a
 
 prop_mmult_comm =
   forAll monicMonomials $ \a ->
   forAll monicMonomials $ \b ->
-    a `P.mmult` b == b `P.mmult` a
+    a `P.mmult` b === b `P.mmult` a
 
 prop_mmult_assoc =
   forAll monicMonomials $ \a ->
   forAll monicMonomials $ \b ->
   forAll monicMonomials $ \c ->
-    a `P.mmult` (b `P.mmult` c) == (a `P.mmult` b) `P.mmult` c
+    a `P.mmult` (b `P.mmult` c) === (a `P.mmult` b) `P.mmult` c
 
 prop_mmult_Divisible =
   forAll monicMonomials $ \a ->
@@ -331,7 +331,7 @@ prop_mmult_Div =
   forAll monicMonomials $ \a ->
   forAll monicMonomials $ \b ->
     let c = a `P.mmult` b
-    in c `P.mdiv` a == b && c `P.mdiv` b == a
+    in c `P.mdiv` a === b .&&. c `P.mdiv` b === a
 
 case_mderiv = P.mderiv p 1 @?= (2, q)
   where
@@ -420,19 +420,19 @@ prop_monomial_order_property2_grlex   = monomialOrderProp2 P.grlex
 prop_monomial_order_property2_grevlex = monomialOrderProp2 P.grevlex
 
 propRefl cmp =
-  forAll monicMonomials $ \a -> cmp a a == EQ
+  forAll monicMonomials $ \a -> cmp a a === EQ
 
 propTrans cmp =
   forAll monicMonomials $ \a ->
   forAll monicMonomials $ \b ->
     cmp a b == LT ==>
       forAll monicMonomials $ \c ->
-        cmp b c == LT ==> cmp a c == LT
+        cmp b c == LT ==> cmp a c === LT
 
 propSym cmp =
   forAll monicMonomials $ \a ->
   forAll monicMonomials $ \b ->
-    cmp a b == flipOrdering (cmp b a)
+    cmp a b === flipOrdering (cmp b a)
   where
     flipOrdering EQ = EQ
     flipOrdering LT = GT
@@ -444,11 +444,11 @@ monomialOrderProp1 cmp =
     let r = cmp a b
     in cmp a b /= EQ ==>
          forAll monicMonomials $ \c ->
-           cmp (a `P.mmult` c) (b `P.mmult` c) == r
+           cmp (a `P.mmult` c) (b `P.mmult` c) === r
 
 monomialOrderProp2 cmp =
   forAll monicMonomials $ \a ->
-    a /= P.mone ==> cmp P.mone a == LT
+    a /= P.mone ==> cmp P.mone a === LT
 
 {--------------------------------------------------------------------
 -- Gröbner basis
@@ -933,7 +933,7 @@ prop_Hermite_interpolation_random =
         xs = genericTake n [-1, 0 ..]
         ds = [(x', genericTake (m+1) [P.eval (\_ -> x') q | q <- iterate (\q -> P.deriv q X) p]) | x' <- xs]
         p' = HermiteInterpolation.interpolate ds
-    in counterexample (show (p, ds, p')) $ p == p'
+    in counterexample (show (p, ds, p')) $ p === p'
 
 -- ---------------------------------------------------------------------
 

@@ -15,6 +15,7 @@ import Data.Set
 import qualified Data.Set as Set
 import ToySolver.Combinatorial.BipartiteMatching
 
+import qualified Test.QuickCheck as QC
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
@@ -35,10 +36,14 @@ prop_maximumWeightMatching =
     forAll (arbitrarySmallIntSet 7) $ \bs ->
       forAll (arbitraryWeight' as bs) $ \(w :: Map (Int,Int) Rational) ->
         let (obj, m) = maximumWeightMatching as bs [(a,b,w) | ((a,b),w) <- Map.toList w]
-        in isMatching m &&
-           obj == sum [w Map.! (a,b) | (a,b) <- IntMap.toList m] &&
-           and [ not (isMatching m') || obj >= sum [w Map.! (a,b) | (a,b) <- IntMap.toList m']
-               | m' <- allMatchings as bs (Map.keys w) ]
+        in conjoin
+             [ property $ isMatching m
+             , obj === sum [w Map.! (a,b) | (a,b) <- IntMap.toList m]
+             , conjoin
+                 [ not (isMatching m') || obj >= sum [w Map.! (a,b) | (a,b) <- IntMap.toList m']
+                 | m' <- allMatchings as bs (Map.keys w)
+                 ]
+             ]
   where
     isMatching m = IntSet.size (IntSet.fromList (IntMap.elems m)) == IntMap.size m
 
@@ -47,10 +52,14 @@ prop_maximumWeightMatchingComplete =
     forAll (arbitrarySmallIntSet 7) $ \bs ->
       forAll (arbitraryWeight as bs) $ \(w :: Map (Int,Int) Rational) ->
         let (obj, m) = maximumWeightMatchingComplete as bs (\a b -> w Map.! (a,b))
-        in isMatching m &&
-           obj == sum [w Map.! (a,b) | (a,b) <- IntMap.toList m] &&
-           and [ not (isMatching m') || obj >= sum [w Map.! (a,b) | (a,b) <- IntMap.toList m']
-               | m' <- allMatchings as bs (Map.keys w) ]
+        in conjoin
+             [ property (isMatching m)
+             , obj === sum [w Map.! (a,b) | (a,b) <- IntMap.toList m]
+             , conjoin
+                 [ not (isMatching m') || obj >= sum [w Map.! (a,b) | (a,b) <- IntMap.toList m']
+                 | m' <- allMatchings as bs (Map.keys w)
+                 ]
+             ]
   where
     isMatching m = IntSet.size (IntSet.fromList (IntMap.elems m)) == IntMap.size m
 
@@ -68,27 +77,31 @@ prop_minimumWeightPerfectMatchingComplete =
   forAll (choose (0,10)) $ \n ->
     let as = IntSet.fromList [1..n]
         bs = as
-        isPerfectMatching m = IntMap.keysSet m == as && IntSet.fromList (IntMap.elems m) == bs
+        isPerfectMatching m = IntMap.keysSet m === as QC..&&. IntSet.fromList (IntMap.elems m) === bs
     in forAll (arbitraryWeight as bs) $ \(w' :: Map (Int,Int) Rational) ->
          let w a b = w' ! (a,b)
              (obj, m, (ysA,ysB)) = minimumWeightPerfectMatchingComplete as bs w
-         in isPerfectMatching m &&
-            obj == sum [w a b | (a,b) <- IntMap.toList m] &&
-            obj == F.sum ysA + F.sum ysB &&
-            and [ya + yb <= w a b | (a,ya) <- IntMap.toList ysA, (b,yb) <- IntMap.toList ysB]
+         in conjoin
+            [ isPerfectMatching m
+            , obj === sum [w a b | (a,b) <- IntMap.toList m]
+            , obj === F.sum ysA + F.sum ysB
+            , conjoin [property $ ya + yb <= w a b | (a,ya) <- IntMap.toList ysA, (b,yb) <- IntMap.toList ysB]
+            ]
 
 prop_maximumWeightPerfectMatchingComplete =
   forAll (choose (0,10)) $ \n ->
     let as = IntSet.fromList [1..n]
         bs = as
-        isPerfectMatching m = IntMap.keysSet m == as && IntSet.fromList (IntMap.elems m) == bs
+        isPerfectMatching m = IntMap.keysSet m === as QC..&&. IntSet.fromList (IntMap.elems m) === bs
     in forAll (arbitraryWeight as as) $ \(w' :: Map (Int,Int) Rational) ->
          let w a b = w' ! (a,b)
              (obj, m, (ysA,ysB)) = maximumWeightPerfectMatchingComplete as as w
-         in isPerfectMatching m &&
-            obj == sum [w a b | (a,b) <- IntMap.toList m] &&
-            obj == F.sum ysA + F.sum ysB &&
-            and [ya + yb >= w a b | (a,ya) <- IntMap.toList ysA, (b,yb) <- IntMap.toList ysB]
+         in conjoin
+            [ isPerfectMatching m
+            , obj === sum [w a b | (a,b) <- IntMap.toList m]
+            , obj === F.sum ysA + F.sum ysB
+            , conjoin [property (ya + yb >= w a b) | (a,ya) <- IntMap.toList ysA, (b,yb) <- IntMap.toList ysB]
+            ]
 
 prop_minimumWeightPerfectMatching =
   forAll (arbitrarySmallIntSet 7) $ \as ->
@@ -97,17 +110,23 @@ prop_minimumWeightPerfectMatching =
       in forAll (arbitraryWeight' as bs) $ \(w :: Map (Int,Int) Rational) ->
            case minimumWeightPerfectMatching as bs [(a,b,w) | ((a,b),w) <- Map.toList w] of
              Nothing ->
-               and [not (isPerfectMatching m) | m <- allMatchings as bs (Map.keys w)]
+               conjoin [property (not (isPerfectMatching m)) | m <- allMatchings as bs (Map.keys w)]
              Just (obj, m, (ysA,ysB)) ->
-               isPerfectMatching m &&
-               obj == sum [w Map.! (a,b) | (a,b) <- IntMap.toList m] &&
-               obj == F.sum ysA + F.sum ysB &&
-               and [ case Map.lookup (a,b) w of
-                       Nothing -> True
-                       Just v -> ya + yb <= v
-                   | (a,ya) <- IntMap.toList ysA, (b,yb) <- IntMap.toList ysB ] &&
-               and [ not (isPerfectMatching m') || obj <= sum [w Map.! (a,b) | (a,b) <- IntMap.toList m']
-                   | m' <- allMatchings as bs (Map.keys w) ]
+               conjoin
+               [ property $ isPerfectMatching m
+               , obj === sum [w Map.! (a,b) | (a,b) <- IntMap.toList m]
+               , obj === F.sum ysA + F.sum ysB
+               , conjoin
+                 [ case Map.lookup (a,b) w of
+                     Nothing -> property True
+                     Just v -> property $ ya + yb <= v
+                 | (a,ya) <- IntMap.toList ysA, (b,yb) <- IntMap.toList ysB
+                 ]
+               , conjoin
+                 [ property (not (isPerfectMatching m') || (obj <= sum [w Map.! (a,b) | (a,b) <- IntMap.toList m']))
+                 | m' <- allMatchings as bs (Map.keys w)
+                 ]
+               ]
 
 prop_maximumWeightPerfectMatching =
   forAll (arbitrarySmallIntSet 7) $ \as ->
@@ -116,17 +135,23 @@ prop_maximumWeightPerfectMatching =
       in forAll (arbitraryWeight' as bs) $ \(w :: Map (Int,Int) Rational) ->
            case maximumWeightPerfectMatching as bs [(a,b,w) | ((a,b),w) <- Map.toList w] of
              Nothing ->
-               and [not (isPerfectMatching m) | m <- allMatchings as bs (Map.keys w)]
+               conjoin [property (not (isPerfectMatching m)) | m <- allMatchings as bs (Map.keys w)]
              Just (obj, m, (ysA,ysB)) ->
-               isPerfectMatching m &&
-               obj == sum [w Map.! (a,b) | (a,b) <- IntMap.toList m] &&
-               obj == F.sum ysA + F.sum ysB &&
-               and [ case Map.lookup (a,b) w of
-                       Nothing -> True
-                       Just v -> ya + yb >= v
-                   | (a,ya) <- IntMap.toList ysA, (b,yb) <- IntMap.toList ysB ] &&
-               and [ not (isPerfectMatching m') || obj >= sum [w Map.! (a,b) | (a,b) <- IntMap.toList m']
-                   | m' <- allMatchings as bs (Map.keys w) ]
+               conjoin
+               [ property (isPerfectMatching m)
+               , obj === sum [w Map.! (a,b) | (a,b) <- IntMap.toList m]
+               , obj === F.sum ysA + F.sum ysB
+               , conjoin
+                 [ case Map.lookup (a,b) w of
+                     Nothing -> property True
+                     Just v -> property $ ya + yb >= v
+                 | (a,ya) <- IntMap.toList ysA, (b,yb) <- IntMap.toList ysB
+                 ]
+               , conjoin
+                 [ property (not (isPerfectMatching m') || obj >= sum [w Map.! (a,b) | (a,b) <- IntMap.toList m'])
+                 | m' <- allMatchings as bs (Map.keys w)
+                 ]
+               ]
 
 prop_minimumCardinalityEdgeCover =
   forAll (arbitrarySmallIntSet 4) $ \as ->
@@ -153,10 +178,10 @@ prop_minimumWeightEdgeCover =
             obj cs = sum [w Map.! (a,b) | (a,b) <- Set.toList cs]
         in case minimumWeightEdgeCover as bs [(a,b,w) | ((a,b),w) <- Map.toList w] of
              Nothing ->
-               and [not (isEdgeCover cs') | cs' <- fmap Set.fromList $ subsetsOf es]
+               conjoin [property $ not (isEdgeCover cs') | cs' <- fmap Set.fromList $ subsetsOf es]
              Just cs ->
-               isEdgeCover cs &&
-               and [not (isEdgeCover cs') || obj cs <= obj cs' | cs' <- fmap Set.fromList $ subsetsOf es]
+               isEdgeCover cs QC..&&.
+               conjoin [property $ not (isEdgeCover cs') || obj cs <= obj cs' | cs' <- fmap Set.fromList $ subsetsOf es]
 
 prop_minimumWeightEdgeCoverComplete =
   forAll (arbitrarySmallIntSet 4) $ \as ->
@@ -169,10 +194,10 @@ prop_minimumWeightEdgeCoverComplete =
             obj cs = sum [w Map.! (a,b) | (a,b) <- Set.toList cs]
         in case minimumWeightEdgeCoverComplete as bs (\a b -> w Map.! (a,b)) of
              Nothing ->
-               and [not (isEdgeCover cs') | cs' <- fmap Set.fromList $ subsetsOf es]
+               conjoin [property $ not (isEdgeCover cs') | cs' <- fmap Set.fromList $ subsetsOf es]
              Just cs ->
-               isEdgeCover cs &&
-               and [not (isEdgeCover cs') || obj cs <= obj cs' | cs' <- fmap Set.fromList $ subsetsOf es]
+               isEdgeCover cs QC..&&.
+               conjoin [property $ not (isEdgeCover cs') || obj cs <= obj cs' | cs' <- fmap Set.fromList $ subsetsOf es]
 
 allMatchings :: IntSet -> IntSet -> [(Int,Int)] -> [IntMap Int]
 allMatchings as bs es = loop (IntSet.toList as) IntSet.empty IntMap.empty

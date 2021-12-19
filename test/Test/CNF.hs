@@ -19,55 +19,55 @@ import Test.SAT.Utils
 
 prop_CNF_ReadWrite_Invariance :: Property
 prop_CNF_ReadWrite_Invariance = forAll arbitraryCNF $ \cnf ->
-  CNF.parse (toLazyByteString (CNF.render cnf)) == Right cnf
+  CNF.parse (toLazyByteString (CNF.render cnf)) === Right cnf
 
 prop_GCNF_ReadWrite_Invariance :: Property
 prop_GCNF_ReadWrite_Invariance = forAll arbitraryGCNF $ \gcnf ->
-  CNF.parse (toLazyByteString (CNF.render gcnf)) == Right gcnf
+  CNF.parse (toLazyByteString (CNF.render gcnf)) === Right gcnf
 
 prop_WCNF_ReadWrite_Invariance :: Property
 prop_WCNF_ReadWrite_Invariance = forAll arbitraryWCNF $ \wcnf ->
-  CNF.parse (toLazyByteString (CNF.render wcnf)) == Right wcnf
+  CNF.parse (toLazyByteString (CNF.render wcnf)) === Right wcnf
 
 prop_NewWCNF_ReadWrite_Invariance :: Property
 prop_NewWCNF_ReadWrite_Invariance = forAll arbitraryNewWCNF $ \wcnf ->
-  CNF.parse (toLazyByteString (CNF.render wcnf)) == Right wcnf
+  CNF.parse (toLazyByteString (CNF.render wcnf)) === Right wcnf
 
 prop_QDimacs_ReadWrite_Invariance :: Property
 prop_QDimacs_ReadWrite_Invariance = forAll arbitraryQDimacs $ \qdimacs ->
-  CNF.parse (toLazyByteString (CNF.render qdimacs)) == Right qdimacs
+  CNF.parse (toLazyByteString (CNF.render qdimacs)) === Right qdimacs
 
 prop_GCNF_from_CNF :: Property
 prop_GCNF_from_CNF = forAll arbitraryCNF $ \cnf ->
   case CNF.parse (toLazyByteString (CNF.render cnf)) of
-    Left _ -> False
-    Right gcnf -> and
-      [ CNF.gcnfNumVars gcnf == CNF.cnfNumVars cnf
-      , CNF.gcnfNumClauses gcnf == CNF.cnfNumClauses cnf
-      , CNF.gcnfLastGroupIndex gcnf == CNF.cnfNumClauses cnf
-      , CNF.gcnfClauses gcnf == zip [1..] (CNF.cnfClauses cnf)
+    Left _ -> property False
+    Right gcnf -> conjoin
+      [ CNF.gcnfNumVars gcnf === CNF.cnfNumVars cnf
+      , CNF.gcnfNumClauses gcnf === CNF.cnfNumClauses cnf
+      , CNF.gcnfLastGroupIndex gcnf === CNF.cnfNumClauses cnf
+      , CNF.gcnfClauses gcnf === zip [1..] (CNF.cnfClauses cnf)
       ]
 
 prop_WCNF_from_CNF :: Property
 prop_WCNF_from_CNF = forAll arbitraryCNF $ \cnf ->
   case CNF.parse (toLazyByteString (CNF.render cnf)) of
-    Left _ -> False
-    Right wcnf -> and
-      [ CNF.wcnfNumVars wcnf == CNF.cnfNumVars cnf
-      , CNF.wcnfNumClauses wcnf == CNF.cnfNumClauses cnf
-      , CNF.wcnfTopCost wcnf > fromIntegral (CNF.cnfNumClauses cnf)
-      , CNF.wcnfClauses wcnf == map (\c -> (1,c)) (CNF.cnfClauses cnf)
+    Left _ -> property False
+    Right wcnf -> conjoin
+      [ CNF.wcnfNumVars wcnf === CNF.cnfNumVars cnf
+      , CNF.wcnfNumClauses wcnf === CNF.cnfNumClauses cnf
+      , property $ CNF.wcnfTopCost wcnf > fromIntegral (CNF.cnfNumClauses cnf)
+      , CNF.wcnfClauses wcnf === map (\c -> (1,c)) (CNF.cnfClauses cnf)
       ]
 
 prop_QDimacs_from_CNF :: Property
 prop_QDimacs_from_CNF = forAll arbitraryCNF $ \cnf ->
   case CNF.parse (toLazyByteString (CNF.render cnf)) of
-    Left _ -> False
-    Right qdimacs -> and
-      [ CNF.qdimacsNumVars qdimacs == CNF.cnfNumVars cnf
-      , CNF.qdimacsNumClauses qdimacs == CNF.cnfNumClauses cnf
-      , CNF.qdimacsPrefix qdimacs == []
-      , CNF.qdimacsMatrix qdimacs == CNF.cnfClauses cnf
+    Left _ -> property False
+    Right qdimacs -> conjoin
+      [ CNF.qdimacsNumVars qdimacs === CNF.cnfNumVars cnf
+      , CNF.qdimacsNumClauses qdimacs === CNF.cnfNumClauses cnf
+      , CNF.qdimacsPrefix qdimacs === []
+      , CNF.qdimacsMatrix qdimacs === CNF.cnfClauses cnf
       ]
 
 -- example from https://maxsat-evaluations.github.io/2021/format.html

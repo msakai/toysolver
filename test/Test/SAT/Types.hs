@@ -35,8 +35,10 @@ case_normalizePBLinSum_1 = do
 prop_normalizePBLinSum :: Property
 prop_normalizePBLinSum = forAll g $ \(nv, (s,n)) ->
     let (s2,n2) = SAT.normalizePBLinSum (s,n)
-    in flip all (allAssignments nv) $ \m ->
-         SAT.evalPBLinSum m s + n == SAT.evalPBLinSum m s2 + n2
+     in conjoin
+        [ SAT.evalPBLinSum m s + n === SAT.evalPBLinSum m s2 + n2
+        | m <- allAssignments nv
+        ]
   where
     g :: Gen (Int, (SAT.PBLinSum, Integer))
     g = do
@@ -64,8 +66,10 @@ case_normalizePBLinAtLeast_1 = (sort lhs, rhs) @?= (sort [(1,x1),(1,-x2)], 1)
 prop_normalizePBLinAtLeast :: Property
 prop_normalizePBLinAtLeast = forAll g $ \(nv, c) ->
     let c2 = SAT.normalizePBLinAtLeast c
-    in flip all (allAssignments nv) $ \m ->
-         SAT.evalPBLinAtLeast m c == SAT.evalPBLinAtLeast m c2
+     in conjoin
+        [ counterexample (show m) $ SAT.evalPBLinAtLeast m c === SAT.evalPBLinAtLeast m c2
+        | m <- allAssignments nv
+        ] 
   where
     g :: Gen (Int, SAT.PBLinAtLeast)
     g = do
@@ -95,8 +99,10 @@ case_normalizePBLinExactly_2 = (sort lhs, rhs) @?= ([], 1)
 prop_normalizePBLinExactly :: Property
 prop_normalizePBLinExactly = forAll g $ \(nv, c) ->
     let c2 = SAT.normalizePBLinExactly c
-    in flip all (allAssignments nv) $ \m ->
-         SAT.evalPBLinExactly m c == SAT.evalPBLinExactly m c2
+     in conjoin
+        [ counterexample (show m) $ SAT.evalPBLinExactly m c === SAT.evalPBLinExactly m c2
+        | m <- allAssignments nv
+        ]
   where
     g :: Gen (Int, SAT.PBLinExactly)
     g = do
@@ -114,8 +120,10 @@ prop_cutResolve =
     forAll (g nv True) $ \c1 ->
       forAll (g nv False) $ \c2 ->
         let c3 = SAT.cutResolve c1 c2 1
-        in flip all (allAssignments nv) $ \m ->
-             not (SAT.evalPBLinExactly m c1 && SAT.evalPBLinExactly m c2) || SAT.evalPBLinExactly m c3
+         in conjoin
+            [ counterexample (show m) $ not (SAT.evalPBLinExactly m c1 && SAT.evalPBLinExactly m c2) || SAT.evalPBLinExactly m c3
+            | m <- allAssignments nv
+            ]             
   where
     g :: Int -> Bool -> Gen SAT.PBLinExactly
     g nv b = do
@@ -230,8 +238,10 @@ case_normalizeXORClause_case2 =
 prop_normalizeXORClause :: Property
 prop_normalizeXORClause = forAll g $ \(nv, c) ->
     let c2 = SAT.normalizeXORClause c
-    in flip all (allAssignments nv) $ \m ->
-         SAT.evalXORClause m c == SAT.evalXORClause m c2
+     in conjoin
+        [ counterexample (show m) $ SAT.evalXORClause m c === SAT.evalXORClause m c2
+        | m <- allAssignments nv
+        ]
   where
     g :: Gen (Int, SAT.XORClause)
     g = do

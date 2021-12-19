@@ -23,70 +23,70 @@ prop_Delta_add_comm :: Property
 prop_Delta_add_comm =
   forAll arbitrary $ \(a :: Delta Rational) ->
   forAll arbitrary $ \b ->
-    a + b == b + a
+    a + b === b + a
 
 prop_Delta_add_assoc :: Property
 prop_Delta_add_assoc =
   forAll arbitrary $ \(a :: Delta Rational) ->
   forAll arbitrary $ \b ->
   forAll arbitrary $ \c ->
-    a + (b + c) == (a + b) + c
+    a + (b + c) === (a + b) + c
 
 prop_Delta_add_unitL :: Property
 prop_Delta_add_unitL =
   forAll arbitrary $ \(a :: Delta Rational) ->
-    0 + a == a
+    0 + a === a
 
 prop_Delta_add_unitR :: Property
 prop_Delta_add_unitR =
   forAll arbitrary $ \(a :: Delta Rational) ->
-    a + 0 == a
+    a + 0 === a
 
 prop_Delta_mult_comm :: Property
 prop_Delta_mult_comm =
   forAll arbitrary $ \(a :: Delta Rational) ->
   forAll arbitrary $ \b ->
-    a * b == b * a
+    a * b === b * a
 
 prop_Delta_mult_assoc :: Property
 prop_Delta_mult_assoc =
   forAll arbitrary $ \(a :: Delta Rational) ->
   forAll arbitrary $ \b ->
   forAll arbitrary $ \c ->
-    a * (b * c) == (a * b) * c
+    a * (b * c) === (a * b) * c
 
 prop_Delta_mult_unitL :: Property
 prop_Delta_mult_unitL =
   forAll arbitrary $ \(a :: Delta Rational) ->
-    1 * a == a
+    1 * a === a
 
 prop_Delta_mult_unitR :: Property
 prop_Delta_mult_unitR =
   forAll arbitrary $ \(a :: Delta Rational) ->
-    a * 1 == a
+    a * 1 === a
 
 prop_Delta_mult_dist :: Property
 prop_Delta_mult_dist =
   forAll arbitrary $ \(a :: Delta Rational) ->
   forAll arbitrary $ \b ->
   forAll arbitrary $ \c ->
-    a * (b + c) == a * b + a * c
+    a * (b + c) === a * b + a * c
 
 prop_Delta_mult_zero :: Property
 prop_Delta_mult_zero =
   forAll arbitrary $ \(a :: Delta Rational) ->
-    0 * a ==  0
+    0 * a ===  0
 
 prop_Delta_scale_mult :: Property
 prop_Delta_scale_mult =
   forAll arbitrary $ \(a :: Delta Rational) ->
   forAll arbitrary $ \b ->
-    Delta.fromReal a * b ==  a *^ b
+    Delta.fromReal a * b ===  a *^ b
 
 prop_Delta_signum_abs :: Property
 prop_Delta_signum_abs =
   forAll arbitrary $ \(x :: Delta Rational) ->
-    abs x * signum x == x
+    abs x * signum x === x
 
 prop_Delta_floor :: Property
 prop_Delta_floor =

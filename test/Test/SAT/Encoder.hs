@@ -165,9 +165,9 @@ prop_PBEncoder_addPBAtLeast = QM.monadicIO $ do
         b2 = evalCNF (array (bounds m2) (assocs m2)) cnf
     QM.assert $ b1 == b2
 
-prop_PBEncoder_Sorter_genSorter :: [Int] -> Bool
+prop_PBEncoder_Sorter_genSorter :: [Int] -> Property
 prop_PBEncoder_Sorter_genSorter xs =
-  V.toList (PBEncSorter.sortVector (V.fromList xs)) == sort xs
+  V.toList (PBEncSorter.sortVector (V.fromList xs)) === sort xs
 
 prop_PBEncoder_Sorter_decode_encode :: Property
 prop_PBEncoder_Sorter_decode_encode =
@@ -176,7 +176,7 @@ prop_PBEncoder_Sorter_decode_encode =
       let base = [b | Positive b <- base']
       in PBEncSorter.isRepresentable base x
          ==>
-         (PBEncSorter.decode base . PBEncSorter.encode base) x == x
+         (PBEncSorter.decode base . PBEncSorter.encode base) x === x
 
 prop_CardinalityEncoder_addAtLeast :: Property
 prop_CardinalityEncoder_addAtLeast = QM.monadicIO $ do
