@@ -148,7 +148,7 @@ Library
      filepath,
      finite-field >=0.9.0 && <1.0.0,
      -- hashUsing is available on hashable >=1.2
-     hashable >=1.2 && <1.4.0.0,
+     hashable >=1.2 && <1.5.0.0,
      hashtables,
      heaps,
      intern >=0.9.1.2 && <1.0.0.0,
