@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -88,10 +89,14 @@ module ToySolver.SAT.Encoder.Tseitin
 
 import Control.Monad
 import Control.Monad.Primitive
+import Data.Hashable
+import qualified Data.HashTable.Class as H
+import qualified Data.HashTable.ST.Cuckoo as C
 import Data.Primitive.MutVar
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntSet as IntSet
+import GHC.Generics (Generic)
 import ToySolver.Data.Boolean
 import ToySolver.SAT.Formula
 import qualified ToySolver.SAT.Types as SAT
@@ -110,6 +115,7 @@ data Encoder m =
   , encXORTable  :: !(MutVar (PrimState m) (Map (SAT.Lit, SAT.Lit) (SAT.Var, Bool, Bool)))
   , encFASumTable   :: !(MutVar (PrimState m) (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Var, Bool, Bool)))
   , encFACarryTable :: !(MutVar (PrimState m) (Map (SAT.Lit, SAT.Lit, SAT.Lit) (SAT.Var, Bool, Bool)))
+  , encFormulaTable :: !(C.HashTable (PrimState m) (Formula, Polarity) SAT.Lit)
   }
 
 instance Monad m => SAT.NewVar m (Encoder m) where
@@ -130,6 +136,7 @@ newEncoder solver = do
   tableXOR <- newMutVar Map.empty
   tableFASum <- newMutVar Map.empty
   tableFACarry <- newMutVar Map.empty
+  tableFormula <- stToPrim $ C.newSized 1024
   return $
     Encoder
     { encBase = solver
@@ -140,6 +147,7 @@ newEncoder solver = do
     , encXORTable = tableXOR
     , encFASumTable = tableFASum
     , encFACarryTable = tableFACarry
+    , encFormulaTable = tableFormula
     }
 
 -- | Create a @Encoder@ instance.
@@ -152,6 +160,7 @@ newEncoderWithPBLin solver = do
   tableXOR <- newMutVar Map.empty
   tableFASum <- newMutVar Map.empty
   tableFACarry <- newMutVar Map.empty
+  tableFormula <- stToPrim $ C.newSized 1024
   return $
     Encoder
     { encBase = solver
@@ -162,6 +171,7 @@ newEncoderWithPBLin solver = do
     , encXORTable = tableXOR
     , encFASumTable = tableFASum
     , encFACarryTable = tableFACarry
+    , encFormulaTable = tableFormula
     }
 
 -- | Use /pseudo boolean constraints/ or use only /clauses/.
@@ -244,23 +254,29 @@ encodeWithPolarityHelper encoder tableRef definePos defineNeg (Polarity pos neg)
 
 encodeFormulaWithPolarity :: PrimMonad m => Encoder m -> Polarity -> Formula -> m SAT.Lit
 encodeFormulaWithPolarity encoder p formula = do
-  case formula of
-    Atom l -> return l
-    And xs -> encodeConjWithPolarity encoder p =<< mapM (encodeFormulaWithPolarity encoder p) xs
-    Or xs  -> encodeDisjWithPolarity encoder p =<< mapM (encodeFormulaWithPolarity encoder p) xs
-    Not x -> liftM SAT.litNot $ encodeFormulaWithPolarity encoder (negatePolarity p) x
-    Imply x y -> do
-      encodeFormulaWithPolarity encoder p (notB x .||. y)
-    Equiv x y -> do
-      lit1 <- encodeFormulaWithPolarity encoder polarityBoth x
-      lit2 <- encodeFormulaWithPolarity encoder polarityBoth y
-      encodeFormulaWithPolarity encoder p $
-        (Atom lit1 .=>. Atom lit2) .&&. (Atom lit2 .=>. Atom lit1)
-    ITE c t e -> do
-      c' <- encodeFormulaWithPolarity encoder polarityBoth c
-      t' <- encodeFormulaWithPolarity encoder p t
-      e' <- encodeFormulaWithPolarity encoder p e
-      encodeITEWithPolarity encoder p c' t' e'
+  m <- stToPrim $ H.lookup (encFormulaTable encoder) (formula, p)
+  case m of
+    Just l -> return l
+    Nothing -> do
+      ret <- case formula of
+        Atom l -> return l
+        And xs -> encodeConjWithPolarity encoder p =<< mapM (encodeFormulaWithPolarity encoder p) xs
+        Or xs  -> encodeDisjWithPolarity encoder p =<< mapM (encodeFormulaWithPolarity encoder p) xs
+        Not x -> liftM SAT.litNot $ encodeFormulaWithPolarity encoder (negatePolarity p) x
+        Imply x y -> do
+          encodeFormulaWithPolarity encoder p (notB x .||. y)
+        Equiv x y -> do
+          lit1 <- encodeFormulaWithPolarity encoder polarityBoth x
+          lit2 <- encodeFormulaWithPolarity encoder polarityBoth y
+          encodeFormulaWithPolarity encoder p $
+            (Atom lit1 .=>. Atom lit2) .&&. (Atom lit2 .=>. Atom lit1)
+        ITE c t e -> do
+          c' <- encodeFormulaWithPolarity encoder polarityBoth c
+          t' <- encodeFormulaWithPolarity encoder p t
+          e' <- encodeFormulaWithPolarity encoder p e
+          encodeITEWithPolarity encoder p c' t' e'
+      stToPrim $ H.insert (encFormulaTable encoder) (formula, p) ret
+      return ret
 
 -- | Return an literal which is equivalent to a given conjunction.
 --
@@ -451,7 +467,9 @@ data Polarity
   { polarityPosOccurs :: Bool
   , polarityNegOccurs :: Bool
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
+
+instance Hashable Polarity
 
 negatePolarity :: Polarity -> Polarity
 negatePolarity (Polarity pos neg) = (Polarity neg pos)
