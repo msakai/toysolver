@@ -179,42 +179,42 @@ encodePBLinAtLeastSorter enc constr = do
   Tseitin.encodeFormula enc formula
 
 encodePBLinAtLeastSorter' :: PrimMonad m => Tseitin.Encoder m -> SAT.PBLinAtLeast -> m Tseitin.Formula
-encodePBLinAtLeastSorter' enc (lhs,rhs) = do
+encodePBLinAtLeastSorter' _enc (lhs,rhs) = do
   let base = optimizeBase [c | (c,_) <- lhs]
   if isRepresentable base rhs then do
-    sorters <- genSorters enc base [(encode base c, l) | (c,l) <- lhs] []
+    sorters <- genSorters base [(encode base c, l) | (c,l) <- lhs] []
     return $ lexComp base sorters (encode base rhs)
   else do
     return false
 
-genSorters :: PrimMonad m => Tseitin.Encoder m -> Base -> [(UNumber, SAT.Lit)] -> [SAT.Lit] -> m [Vector SAT.Lit]
-genSorters enc base lhs carry = do
-  let is = V.fromList carry <> V.concat [V.replicate (fromIntegral d) l | (d:_,l) <- lhs, d /= 0]
+genSorters :: PrimMonad m => Base -> [(UNumber, SAT.Lit)] -> [Tseitin.Formula] -> m [Vector Tseitin.Formula]
+genSorters base lhs carry = do
+  let is = V.fromList carry <> V.concat [V.replicate (fromIntegral d) (Tseitin.Atom l) | (d:_,l) <- lhs, d /= 0]
   buf <- V.thaw is
   forM_ (genSorterCircuit (V.length is)) $ \(i,j) -> do
     vi <- MV.read buf i
     vj <- MV.read buf j
-    MV.write buf i =<< Tseitin.encodeDisj enc [vi,vj]
-    MV.write buf j =<< Tseitin.encodeConj enc [vi,vj]
+    MV.write buf i (vi .||. vj)
+    MV.write buf j (vi .&&. vj)
   os <- V.freeze buf
   case base of
     [] -> return [os]
     b:bs -> do
-      oss <- genSorters enc bs [(ds,l) | (_:ds,l) <- lhs] [os!(i-1) | i <- takeWhile (<= V.length os) (iterate (+b) b)]
+      oss <- genSorters bs [(ds,l) | (_:ds,l) <- lhs] [os!(i-1) | i <- takeWhile (<= V.length os) (iterate (+b) b)]
       return $ os : oss
 
-isGE :: Vector SAT.Lit -> Int -> Tseitin.Formula
+isGE :: Vector Tseitin.Formula -> Int -> Tseitin.Formula
 isGE out lim
   | lim <= 0 = true
-  | lim - 1 < V.length out = Atom $ out ! (lim - 1)
+  | lim - 1 < V.length out = out ! (lim - 1)
   | otherwise = false
 
-isGEMod :: Int -> Vector SAT.Lit -> Int -> Tseitin.Formula
+isGEMod :: Int -> Vector Tseitin.Formula -> Int -> Tseitin.Formula
 isGEMod _n _out lim | lim <= 0 = true
 isGEMod n out lim =
   orB [isGE out (j + lim) .&&. notB isGE out (j + n) | j <- [0, n .. V.length out - 1]]
 
-lexComp :: Base -> [Vector SAT.Lit] -> UNumber -> Tseitin.Formula
+lexComp :: Base -> [Vector Tseitin.Formula] -> UNumber -> Tseitin.Formula
 lexComp base lhs rhs = f true base lhs rhs
   where
     f ret (b:bs) (out:os) ds = f (gt .||. (ge .&&. ret)) bs os (drop 1 ds)
