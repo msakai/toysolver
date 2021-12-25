@@ -57,6 +57,7 @@ module ToySolver.Converter.PB
   , maxsat2wbo
   , MaxSAT2WBOInfo
   , wbo2maxsat
+  , wbo2maxsatWith
   , WBO2MaxSATInfo
 
   -- * PB→QUBO conversion
@@ -675,11 +676,14 @@ maxsat2wbo
 type WBO2MaxSATInfo = TseitinInfo
 
 wbo2maxsat :: PBFile.SoftFormula -> (CNF.WCNF, WBO2MaxSATInfo)
-wbo2maxsat formula = runST $ do
+wbo2maxsat = wbo2maxsatWith def
+
+wbo2maxsatWith :: PB.Strategy -> PBFile.SoftFormula -> (CNF.WCNF, WBO2MaxSATInfo)
+wbo2maxsatWith strategy formula = runST $ do
   db <- newCNFStore
   SAT.newVars_ db (PBFile.wboNumVars formula)
   tseitin <-  Tseitin.newEncoder db
-  pb <- PB.newEncoder tseitin
+  pb <- PB.newEncoderWithStrategy tseitin strategy
   pbnlc <- PBNLC.newEncoder pb tseitin
 
   softClauses <- liftM mconcat $ forM (PBFile.wboConstraints formula) $ \(cost, (lhs,op,rhs)) -> do
