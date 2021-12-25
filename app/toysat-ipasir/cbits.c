@@ -24,7 +24,7 @@ void *ipasir_init(void)
         char *argv[] = { "toysat-ipasir", NULL };
         char **pargv = argv;
 
-#if __GLASGOW_HASKELL__ >= 703
+#ifdef __GLASGOW_HASKELL__
         RtsConfig conf = defaultRtsConfig;
         conf.rts_opts_enabled = RtsOptsAll;
         hs_init_ghc(&argc, &pargv, conf);
