@@ -242,7 +242,8 @@ prop_pb2sat = QM.monadicIO $ do
             , PBFile.pbNumConstraints = length cs
             , PBFile.pbConstraints = map f cs
             }
-  let (cnf, info) = pb2sat opb
+  strategy <- QM.pick arbitrary
+  let (cnf, info) = pb2satWith strategy opb
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
