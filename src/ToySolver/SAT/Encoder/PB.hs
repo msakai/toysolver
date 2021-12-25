@@ -22,13 +22,18 @@
 -----------------------------------------------------------------------------
 module ToySolver.SAT.Encoder.PB
   ( Encoder
-  , Strategy (..)
   , newEncoder
   , newEncoderWithStrategy
   , encodePBLinAtLeast
+
+  -- * Configulation
+  , Strategy (..)
+  , showStrategy
+  , parseStrategy
   ) where
 
 import Control.Monad.Primitive
+import Data.Char
 import Data.Default.Class
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
@@ -47,6 +52,21 @@ data Strategy
 
 instance Default Strategy where
   def = Hybrid
+
+showStrategy :: Strategy -> String
+showStrategy BDD = "bdd"
+showStrategy Adder = "adder"
+showStrategy Sorter = "sorter"
+showStrategy Hybrid = "hybrid"
+
+parseStrategy :: String -> Maybe Strategy
+parseStrategy s =
+  case map toLower s of
+    "bdd"    -> Just BDD
+    "adder"  -> Just Adder
+    "sorter" -> Just Sorter
+    "hybrid" -> Just Hybrid
+    _ -> Nothing
 
 newEncoder :: Monad m => Tseitin.Encoder m -> m (Encoder m)
 newEncoder tseitin = newEncoderWithStrategy tseitin Hybrid
