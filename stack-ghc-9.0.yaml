@@ -47,7 +47,7 @@ extra-deps:
 #- git: https://github.com/msakai/logic-TPTP.git
 #  commit: 9041314569aff4117c0da677f2af04614caf1aa5
 - finite-field-0.9.0
-- pseudo-boolean-0.1.10.0@sha256:5fcb42223e77b08fb4cb8e75c049cfea76f8915d204a3ddeefac1d6194192938,2449
+- pseudo-boolean-0.1.10.0@sha256:c6a8b6c23c84cce8cecb37683755bde54db80b1ca817ce72de772c98d31dae44,2552
 - sign-0.4.4
 # - OpenCL-1.0.3.4
 - git: https://github.com/msakai/opencl.git
