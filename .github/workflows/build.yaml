@@ -10,7 +10,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ghc: '9.0.1'
+          - ghc: '9.0.2'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.0.yaml'
             stack_args: '--haddock --no-haddock-deps'
