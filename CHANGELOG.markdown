@@ -1,13 +1,15 @@
 0.8.0 (Unreleased)
 -----
 
+* Separate Formula type from `ToySolver.SAT.Encoder.Tseitin` into `ToySolver.SAT.Formula` (#74)
+* Use `megaparsec` as default PB parser and add `--pb-fast-parser` option to use `attoparsec` (#71)
 * Update lower bounds of dependency packages
 * Add `--maxsat-compact-v-line` option for printing MaxSAT solution in the new compact format (#65)
 * Fix `ToySolver.SAT`.Printer and its toysat's output for Max-SAT problems  (#64)
 * Support new WCNF file format (#63)
 * Use bytestring-encoding-0.1.1.0 because bytestring-encoding-0.1.0.0 has a memory corruption bug (#62)
 * Remove deprecated API (#56)
-* Stop supporting GHC 8.0, 8.2, and 8.4 (#50)
+* Support GHC-9.2 (#76) and stop supporting GHC 8.0, 8.2, and 8.4 (#50)
 
 0.7.0
 -----
