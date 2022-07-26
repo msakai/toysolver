@@ -28,7 +28,7 @@ import Prelude hiding (readFile, writeFile)
 import Control.Exception
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Lazy.Char8 as BS
-import Data.ByteString.Builder
+import Data.ByteString.Builder hiding (writeFile)
 import Data.Typeable
 import System.IO hiding (readFile, writeFile)
 
