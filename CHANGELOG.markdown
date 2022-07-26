@@ -1,4 +1,4 @@
-0.8.0 (Unreleased)
+0.8.0
 -----
 
 * Separate Formula type from `ToySolver.SAT.Encoder.Tseitin` into `ToySolver.SAT.Formula` (#74)
