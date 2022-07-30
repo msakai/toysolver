@@ -7,7 +7,6 @@ toysolver
 Hackage:
 [![Hackage](https://img.shields.io/hackage/v/toysolver.svg)](https://hackage.haskell.org/package/toysolver)
 [![Hackage Deps](https://img.shields.io/hackage-deps/v/toysolver.svg)](https://packdeps.haskellers.com/feed?needle=toysolver)
-[![Hackage CI](https://matrix.hackage.haskell.org/api/v2/packages/toysolver/badge)](https://matrix.hackage.haskell.org/#/package/toysolver)
 
 Dev:
 [![Build Status](https://github.com/msakai/toysolver/workflows/build/badge.svg)](https://github.com/msakai/toysolver/actions)
