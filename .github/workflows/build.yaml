@@ -22,33 +22,20 @@ jobs:
             stack_yaml: 'stack-ghc-9.0.yaml'
             stack_args: '--haddock --no-haddock-deps'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
-            coveralls: false
-
-          - ghc: '8.10.7'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-8.10.yaml'
-            stack_args: '--haddock --no-haddock-deps'
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
-            coveralls: false
             release: true
-
-          - ghc: '8.10.7'
+          - ghc: '9.0.2'
             os: macos-latest
-            stack_yaml: 'stack-ghc-8.10.yaml'
+            stack_yaml: 'stack-ghc-9.0.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
             release: true
+
+          # Current version of stack (2.7.5) cannot build foreign libraries for windows on GHC >=9.0
+          # We need a stack built with Cabal-3.8.1 which contains the fix https://github.com/haskell/cabal/pull/7764 .
           - ghc: '8.10.7'
             os: windows-latest
             stack_yaml: 'stack-ghc-8.10.yaml'
-            stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
-            coveralls: false
-            release: true
-          - ghc: '8.6.3'
-            os: windows-latest
-            stack_yaml: 'stack-windows-i386.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
@@ -60,12 +47,14 @@ jobs:
             stack_args: '--coverage'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
             coveralls: true
-          - ghc: '8.6.5'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-8.6.yaml'
+
+          - ghc: '8.6.3'
+            os: windows-latest
+            stack_yaml: 'stack-windows-i386.yaml'
             stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:OpenCL'
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
+            release: true
     steps:
       - uses: actions/checkout@v2
         with:
