@@ -21,6 +21,7 @@ import qualified Data.ByteString.Builder as ByteStringBuilder
 import Data.Char
 import Data.Default.Class
 import qualified Data.Foldable as F
+import Data.List
 import Data.Maybe
 import Data.Scientific (Scientific)
 import qualified Data.Text.Lazy.Builder as TextBuilder
@@ -44,6 +45,7 @@ import qualified ToySolver.Converter.PBSetObj as PBSetObj
 import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.QUBO as QUBO
+import qualified ToySolver.SAT.Encoder.PB as PB
 import ToySolver.Version
 import ToySolver.Internal.Util (setEncodingChar8)
 
@@ -65,6 +67,7 @@ data Options = Options
   , optRemoveUserCuts :: Bool
   , optNewWCNF :: Bool
   , optPBFastParser :: Bool
+  , optPBEncoding :: PB.Strategy
   } deriving (Eq, Show)
 
 optionsParser :: Parser Options
@@ -86,6 +89,7 @@ optionsParser = Options
   <*> removeUserCutsOption
   <*> newWCNFOption
   <*> pbFastParserOption
+  <*> pbEncoding
   where
     fileInput :: Parser FilePath
     fileInput = argument str (metavar "FILE")
@@ -190,6 +194,14 @@ optionsParser = Options
     pbFastParserOption = switch
       $  long "pb-fast-parser"
       <> help "use attoparsec-based parser instead of megaparsec-based one for speed"
+
+    pbEncoding :: Parser PB.Strategy
+    pbEncoding = option (maybeReader PB.parseStrategy)
+      $  long "pb-encoding"
+      <> metavar "STR"
+      <> help ("PB to SAT encoding: " ++ intercalate ", " [PB.showStrategy m | m <- [minBound..maxBound]])
+      <> value def
+      <> showDefaultWith PB.showStrategy
 
 parserInfo :: ParserInfo Options
 parserInfo = info (helper <*> versionOption <*> optionsParser)
@@ -340,7 +352,7 @@ writeProblem o problem = do
         ".opb" -> FF.writeFile fname $ normalizePB opb
         ".wbo" -> FF.writeFile fname $ normalizeWBO wbo
         ".cnf" ->
-          case pb2sat opb of
+          case pb2satWith (optPBEncoding o) opb of
             (cnf, _) ->
               case optKSat o of
                 Nothing -> FF.writeFile fname cnf
@@ -348,7 +360,7 @@ writeProblem o problem = do
                   let (cnf2, _) = sat2ksat k cnf
                   in FF.writeFile fname cnf2
         ".wcnf" ->
-          case wbo2maxsat wbo of
+          case wbo2maxsatWith (optPBEncoding o) wbo of
             (wcnf, _)
               | optNewWCNF o -> do
                   let nwcnf = CNF.NewWCNF [(if w >= CNF.wcnfTopCost wcnf then Nothing else Just w, c) | (w, c) <- CNF.wcnfClauses wcnf]

@@ -50,12 +50,14 @@ module ToySolver.Converter.PB
   , sat2pb
   , SAT2PBInfo
   , pb2sat
+  , pb2satWith
   , PB2SATInfo
 
   -- * MaxSAT↔WBO conversion
   , maxsat2wbo
   , MaxSAT2WBOInfo
   , wbo2maxsat
+  , wbo2maxsatWith
   , WBO2MaxSATInfo
 
   -- * PB→QUBO conversion
@@ -68,6 +70,7 @@ import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Array.IArray
 import Data.Bits hiding (And (..))
+import Data.Default.Class
 import qualified Data.Foldable as F
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -625,12 +628,15 @@ type PB2SATInfo = TseitinInfo
 -- * if M ⊨ ψ then g(M) ⊨ φ
 --
 pb2sat :: PBFile.Formula -> (CNF.CNF, PB2SATInfo)
-pb2sat formula = runST $ do
+pb2sat = pb2satWith def
+
+pb2satWith :: PB.Strategy -> PBFile.Formula -> (CNF.CNF, PB2SATInfo)
+pb2satWith strategy formula = runST $ do
   db <- newCNFStore
   let nv1 = PBFile.pbNumVars formula
   SAT.newVars_ db nv1
   tseitin <-  Tseitin.newEncoder db
-  pb <- PB.newEncoder tseitin
+  pb <- PB.newEncoderWithStrategy tseitin strategy
   pbnlc <- PBNLC.newEncoder pb tseitin
   forM_ (PBFile.pbConstraints formula) $ \(lhs,op,rhs) -> do
     case op of
@@ -670,11 +676,14 @@ maxsat2wbo
 type WBO2MaxSATInfo = TseitinInfo
 
 wbo2maxsat :: PBFile.SoftFormula -> (CNF.WCNF, WBO2MaxSATInfo)
-wbo2maxsat formula = runST $ do
+wbo2maxsat = wbo2maxsatWith def
+
+wbo2maxsatWith :: PB.Strategy -> PBFile.SoftFormula -> (CNF.WCNF, WBO2MaxSATInfo)
+wbo2maxsatWith strategy formula = runST $ do
   db <- newCNFStore
   SAT.newVars_ db (PBFile.wboNumVars formula)
   tseitin <-  Tseitin.newEncoder db
-  pb <- PB.newEncoder tseitin
+  pb <- PB.newEncoderWithStrategy tseitin strategy
   pbnlc <- PBNLC.newEncoder pb tseitin
 
   softClauses <- liftM mconcat $ forM (PBFile.wboConstraints formula) $ \(cost, (lhs,op,rhs)) -> do
