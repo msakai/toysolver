@@ -44,6 +44,7 @@ import Control.Monad
 import Data.Default.Class
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Kind (Type)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified ToySolver.Combinatorial.HittingSet.Simple as HTC
@@ -150,7 +151,7 @@ defaultMinimalUninterestingSetOrMaximalInterestingSet prob xs = do
    UninterestingSet ys -> liftM UninterestingSet $ shrink prob ys
    InterestingSet ys -> liftM InterestingSet $ grow prob ys
 
-data SimpleProblem (m :: * -> *) = SimpleProblem IntSet (IntSet -> Bool)
+data SimpleProblem (m :: Type -> Type) = SimpleProblem IntSet (IntSet -> Bool)
 
 instance Monad m => IsProblem (SimpleProblem m) m where
   universe (SimpleProblem univ _) = univ
