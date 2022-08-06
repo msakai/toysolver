@@ -61,8 +61,12 @@ import ToySolver.SAT.Types
 
 -- ------------------------------------------------------------------------
 
+-- | \(\sum_{j=1}^i b_j s_j = \sum_{j=1}^i b_j (x_1, \ldots, x_j)\) is represented
+-- as a list of tuples consisting of \(b_j, j, [x_1, \ldots, x_j]\).
 type PrefixSum = [(Integer, Int, [Lit])]
 
+-- | Convert 'PBLinSum' to 'PrefixSum'.
+-- The 'PBLinSum' must be 'preprocess'ed before calling the function.
 toPrefixSum :: PBLinSum -> PrefixSum
 toPrefixSum s =
   assert (and [c > 0 | (c, _) <- s] && and (zipWith ((>=) `on` fst) s (tail s))) $
@@ -78,18 +82,28 @@ toPrefixSum s =
 
 -- ------------------------------------------------------------------------
 
+-- | A constraint \(s_i \ge c\) where \(s_i = x_1 + \ldots + x_i\) is represnted as
+-- a tuple of \(i\), \([x_1, \ldots, x_i]\), and \(c\).
 type BCLit = (Int, [Lit], Int)
+
+-- | Disjunction of 'BCLit'
 type BCClause = [BCLit]
+
+-- | Conjunction of 'BCClause'
 type BCCNF = [BCClause]
 
+-- | Forget \(s_i\) and returns \(x_1 + \ldots + x_i \ge c\).
 toAtLeast :: BCLit -> AtLeast
 toAtLeast (_, lhs, rhs) = (lhs, rhs)
 
+-- | \((s_i \ge a) \Rightarrow (s_j \ge b)\) is defined as
+-- \((i \le j \wedge a \ge b) \vee (i \ge b \wedge i - a \le j - b)\).
 implyBCLit :: BCLit -> BCLit -> Bool
 implyBCLit (i,_,a) (j,_,b)
   | i <= j = a >= b
   | otherwise = i - a <= j - b
 
+-- | Remove redundant literals based on 'implyBCLit'.
 reduceBCClause :: BCClause -> BCClause
 reduceBCClause lits = assert (isAsc lits2) $ lits2
   where
@@ -111,9 +125,12 @@ reduceBCClause lits = assert (isAsc lits2) $ lits2
       | a < b = f2 (l : r) a ls
       | otherwise = f2 r b ls
 
+-- | \(C \Rightarrow C'\) is defined as \(\forall l\in C \exists l' \in C' (l \Rightarrow l')\).
 implyBCClause :: BCClause -> BCClause -> Bool
 implyBCClause lits1 lits2 = all (\lit1 -> any (implyBCLit lit1) lits2) lits1
 
+-- | Reduce 'BCCNF' by reducing each clause using 'reduceBCClause' and then
+-- remove redundant clauses based on 'implyBCClause'.
 reduceBCCNF :: BCCNF -> BCCNF
 reduceBCCNF = reduceBCCNF' . map reduceBCClause
 
@@ -127,11 +144,15 @@ reduceBCCNF' = go []
 
 -- ------------------------------------------------------------------------
 
+-- | Encode a given pseudo boolean constraint \(\sum_i a_i x_i \ge c\)
+-- into an equilavent formula in the form of
+-- \(\bigwedge_j \bigvee_k \sum_{l \in L_{j,k}} l \ge d_{j,k}\).
 encode :: PBLinAtLeast -> [[AtLeast]]
 encode constr = map (map toAtLeast) $ reduceBCCNF $ encodePrefixSum (toPrefixSum lhs) rhs
   where
     (lhs, rhs) = preprocess constr
 
+-- | Perform 'normalizePBLinAtLeast' and sort the terms in descending order of coefficients
 preprocess :: PBLinAtLeast -> PBLinAtLeast
 preprocess constr = (lhs2, rhs1)
   where
