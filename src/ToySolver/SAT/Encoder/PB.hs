@@ -36,17 +36,20 @@ import Control.Monad.Primitive
 import Data.Char
 import Data.Default.Class
 import qualified ToySolver.SAT.Types as SAT
+import qualified ToySolver.SAT.Encoder.Cardinality as Card
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.SAT.Encoder.PB.Internal.Adder (addPBLinAtLeastAdder, encodePBLinAtLeastAdder)
+import ToySolver.SAT.Encoder.PB.Internal.BCCNF (addPBLinAtLeastBCCNF, encodePBLinAtLeastBCCNF)
 import ToySolver.SAT.Encoder.PB.Internal.BDD (addPBLinAtLeastBDD, encodePBLinAtLeastBDD)
 import ToySolver.SAT.Encoder.PB.Internal.Sorter (addPBLinAtLeastSorter, encodePBLinAtLeastSorter)
 
-data Encoder m = Encoder (Tseitin.Encoder m) Strategy
+data Encoder m = Encoder (Card.Encoder m) Strategy
 
 data Strategy
   = BDD
   | Adder
   | Sorter
+  | BCCNF
   | Hybrid -- not implemented yet
   deriving (Show, Eq, Ord, Enum, Bounded)
 
@@ -57,6 +60,7 @@ showStrategy :: Strategy -> String
 showStrategy BDD = "bdd"
 showStrategy Adder = "adder"
 showStrategy Sorter = "sorter"
+showStrategy BCCNF = "bccnf"
 showStrategy Hybrid = "hybrid"
 
 parseStrategy :: String -> Maybe Strategy
@@ -65,14 +69,17 @@ parseStrategy s =
     "bdd"    -> Just BDD
     "adder"  -> Just Adder
     "sorter" -> Just Sorter
+    "bccnf"  -> Just BCCNF
     "hybrid" -> Just Hybrid
     _ -> Nothing
 
-newEncoder :: Monad m => Tseitin.Encoder m -> m (Encoder m)
+newEncoder :: PrimMonad m => Tseitin.Encoder m -> m (Encoder m)
 newEncoder tseitin = newEncoderWithStrategy tseitin Hybrid
 
-newEncoderWithStrategy :: Monad m => Tseitin.Encoder m -> Strategy -> m (Encoder m)
-newEncoderWithStrategy tseitin strategy = return (Encoder tseitin strategy)
+newEncoderWithStrategy :: PrimMonad m => Tseitin.Encoder m -> Strategy -> m (Encoder m)
+newEncoderWithStrategy tseitin strategy = do
+  card <- Card.newEncoderWithStrategy tseitin Card.SequentialCounter
+  return (Encoder card strategy)
 
 instance Monad m => SAT.NewVar m (Encoder m) where
   newVar   (Encoder a _) = SAT.newVar a
@@ -100,17 +107,21 @@ encodePBLinAtLeast enc constr =
 -- -----------------------------------------------------------------------
 
 addPBLinAtLeast' :: PrimMonad m => Encoder m -> SAT.PBLinAtLeast -> m ()
-addPBLinAtLeast' (Encoder tseitin strategy) =
+addPBLinAtLeast' (Encoder card strategy) = do
+  let tseitin = Card.getTseitinEncoder card
   case strategy of
     Adder -> addPBLinAtLeastAdder tseitin
     Sorter -> addPBLinAtLeastSorter tseitin
+    BCCNF -> addPBLinAtLeastBCCNF card
     _ -> addPBLinAtLeastBDD tseitin
 
 encodePBLinAtLeast' :: PrimMonad m => Encoder m -> SAT.PBLinAtLeast -> m SAT.Lit
-encodePBLinAtLeast' (Encoder tseitin strategy) =
+encodePBLinAtLeast' (Encoder card strategy) = do
+  let tseitin = Card.getTseitinEncoder card
   case strategy of
     Adder -> encodePBLinAtLeastAdder tseitin
     Sorter -> encodePBLinAtLeastSorter tseitin
+    BCCNF -> encodePBLinAtLeastBCCNF card
     _ -> encodePBLinAtLeastBDD tseitin
 
 -- -----------------------------------------------------------------------

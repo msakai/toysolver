@@ -30,6 +30,7 @@ import qualified ToySolver.SAT.Encoder.Cardinality as Cardinality
 import qualified ToySolver.SAT.Encoder.Cardinality.Internal.Totalizer as Totalizer
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PB.Internal.Sorter as PBEncSorter
+import qualified ToySolver.SAT.Encoder.PB.Internal.BCCNF as BCCNF
 import qualified ToySolver.SAT.Store.CNF as CNFStore
 
 import Test.SAT.Utils
@@ -323,6 +324,135 @@ prop_encodeAtLeast = QM.monadicIO $ do
         b1 = evalCNF (array (bounds m2) (assocs m2)) cnf
     QM.assert $ not b1 || (SAT.evalLit m2 l == SAT.evalAtLeast m (lhs,rhs))
 
+-- ------------------------------------------------------------------------
+
+case_BCCNF_example :: Assertion
+case_BCCNF_example = do
+  let -- 5 x1 + 3 x2 + 3 x3 + 3 x4 + 3 x5 + x6 >= 9
+      input = ([(5,1),(3,2),(3,3),(3,4),(3,5),(1,6)], 9)
+      -- (s1 ≥ 1 ∨ s5 ≥ 3) ∧ (s6 ≥ 3)
+      expected =
+        [ [([1], 1), ([1,2,3,4,5], 3)]
+        , [([1,2,3,4,5,6], 3)]
+        ]
+
+  -- 2 s1 + 2 s5 + s6
+  let lhs' = [(2,1,[1]), (2,5,[1..5]), (1,6,[1..6])]
+  BCCNF.toPrefixSum (fst input) @?= lhs'
+
+  let _bccnf0, bccnf1 :: BCCNF.BCCNF
+      _bccnf0 =
+        [ [(1,[1..1],1), (2,[1..2],2)]
+        , [(1,[1..1],1), (5,[1..5],3), (6,[1..6],5)]
+        , [(1,[1..1],1), (5,[1..5],4), (6,[1..6],3)]
+        , [(1,[1..1],1), (5,[1..5],5), (6,[1..6],1)]
+        , [(5,[1..5],1)]
+        , [(5,[1..5],2), (6,[1..6],5)]
+        , [(5,[1..5],3), (6,[1..6],3)]
+        , [(5,[1..5],4), (6,[1..6],1)]
+        ]
+      bccnf1 =
+        [ [(1,[1..1],1), (5,[1..5],3)]
+        , [(5,[1..5],2)]
+        , [(5,[1..5],3), (6,[1..6],3)]
+        ]
+      bccnf2 =
+        [ [(1,[1..1],1), (5,[1..5],3)]
+        , [(6,[1..6],3)]
+        ]
+  BCCNF.encodePrefixSum lhs' 9 @?= bccnf1
+
+  assertBool "(s5 >= 3) should imply (s6 >= 3)" $ BCCNF.implyBCLit (5,[1..5],3) (6,[1..6],3)
+  assertBool "(s6 >= 3) should imply (s5 >= 2)" $ BCCNF.implyBCLit (6,[1..6],3) (5,[1..5],2)
+  assertBool "((s5 >= 3) or (s6 >= 3)) should imply (s5 >= 2) as clauses" $ BCCNF.implyBCClause [(5,[1..5],3), (6,[1..6],3)] [(5,[1..5],2)]
+  assertBool "(s6 >= 3) should imply (s5 >= 2) as clauses" $ BCCNF.implyBCClause [(6,[1..6],3)] [(5,[1..5],2)]
+
+  BCCNF.reduceBCCNF bccnf1 @?= bccnf2
+
+  BCCNF.encode input @?= expected
+
+case_BCCNF_algorithm2_bug :: Assertion
+case_BCCNF_algorithm2_bug = do
+  let lhs = [(7,1),(6,2),(5,3),(4,4),(3,5)]
+      rhs = 14
+      lhs' = BCCNF.toPrefixSum lhs
+      bccnf = BCCNF.encodePrefixSumBuggy lhs' rhs
+      m :: SAT.Model
+      m = array (1,5) [(1,True),(2,False),(3,False),(4,True),(5,True)]
+      a = SAT.evalPBLinAtLeast m (lhs,rhs)
+      b = eval m bccnf
+  assertBool ("Original constraint should be true under (" ++ show m ++ ")") a
+  assertBool ("Encoded BCNF is false under (" ++ show m ++ ") due to the bug of Algorithm 2") (not b)
+  where
+    eval m = and . map (or . map (SAT.evalAtLeast m . BCCNF.toAtLeast))
+
+case_BCCNF_algorithm2_bug_fixed :: Assertion
+case_BCCNF_algorithm2_bug_fixed = do
+  let lhs = [(7,1),(6,2),(5,3),(4,4),(3,5)]
+      rhs = 14
+      lhs' = BCCNF.toPrefixSum lhs
+      bccnf = BCCNF.encodePrefixSum lhs' rhs
+  forM_ (allAssignments 5) $ \m -> do
+    assertEqual ("evalution under " ++ show m)
+      (SAT.evalPBLinAtLeast m (lhs,rhs)) (eval m bccnf)
+  where
+    eval m = and . map (or . map (SAT.evalAtLeast m . BCCNF.toAtLeast))
+
+arbitraryPBLinSumForBCCNF :: Int -> Gen SAT.PBLinAtLeast
+arbitraryPBLinSumForBCCNF n = BCCNF.preprocess <$> ((,) <$> arbitraryPBLinSum n <*> arbitrary)
+{-
+arbitraryPBLinSumForBCCNF n = do
+  as <- vectorOf n (liftM getPositive arbitrary)
+  let bs = init $ scanr (+) 0 as
+  c <- arbitrary
+  return (zip bs [1..], c)  
+-}
+
+prop_BCCNF_encodePrefixSumNaive :: Property
+prop_BCCNF_encodePrefixSumNaive =
+  forAll (choose (1, 8)) $ \nv ->
+    forAll (arbitraryPBLinSumForBCCNF nv) $ \constr@(lhs, rhs) ->
+      let lhs' = BCCNF.toPrefixSum lhs
+          bccnf = BCCNF.encodePrefixSumNaive lhs' rhs
+       in counterexample (show lhs') $ counterexample (show bccnf) $ conjoin
+          [ counterexample (show m) $
+            counterexample (show (map (map (SAT.evalAtLeast m . BCCNF.toAtLeast)) bccnf)) $
+              eval m bccnf === SAT.evalPBLinAtLeast m constr
+          | m <- allAssignments nv
+          ]
+  where
+    eval m = and . map (or . map (SAT.evalAtLeast m . BCCNF.toAtLeast))
+
+prop_BCCNF_encodePrefixSum :: Property
+prop_BCCNF_encodePrefixSum =
+  forAll (choose (1, 10)) $ \nv ->
+    forAll (arbitraryPBLinSumForBCCNF nv) $ \constr@(lhs, rhs) ->
+      let lhs' = BCCNF.toPrefixSum lhs
+          bccnf = BCCNF.encodePrefixSum lhs' rhs
+       in counterexample (show lhs') $ counterexample (show bccnf) $ conjoin
+          [ counterexample (show m) $
+            counterexample (show (map (map (SAT.evalAtLeast m . BCCNF.toAtLeast)) bccnf)) $
+              eval m bccnf === SAT.evalPBLinAtLeast m constr
+          | m <- allAssignments nv
+          ]
+  where
+    eval m = and . map (or . map (SAT.evalAtLeast m . BCCNF.toAtLeast))
+
+prop_BCCNF_encode :: Property
+prop_BCCNF_encode =
+  forAll (choose (1, 6)) $ \nv ->
+    forAll (arbitraryPBLinSumForBCCNF nv) $ \constr ->
+      let bccnf = BCCNF.encode constr
+       in counterexample (show bccnf) $ conjoin
+          [ counterexample (show m) $
+            counterexample (show (map (map (SAT.evalAtLeast m)) bccnf)) $
+              eval m bccnf === SAT.evalPBLinAtLeast m constr
+          | m <- allAssignments nv
+          ]
+  where
+    eval m = and . map (or . map (SAT.evalAtLeast m))
+
+-- ------------------------------------------------------------------------
 
 satEncoderTestGroup :: TestTree
 satEncoderTestGroup = $(testGroupGenerator)

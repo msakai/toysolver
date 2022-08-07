@@ -329,6 +329,7 @@ Library
      ToySolver.SAT.Encoder.Integer
      ToySolver.SAT.Encoder.PB
      ToySolver.SAT.Encoder.PB.Internal.Adder
+     ToySolver.SAT.Encoder.PB.Internal.BCCNF
      ToySolver.SAT.Encoder.PB.Internal.BDD
      ToySolver.SAT.Encoder.PB.Internal.Sorter
      ToySolver.SAT.Encoder.PBNLC
