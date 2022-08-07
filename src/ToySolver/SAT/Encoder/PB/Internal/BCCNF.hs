@@ -23,8 +23,12 @@
 -----------------------------------------------------------------------------
 module ToySolver.SAT.Encoder.PB.Internal.BCCNF
   (
+  -- * Monadic interface
+    addPBLinAtLeastBCCNF
+  , encodePBLinAtLeastBCCNF
+    
   -- * High-level pure encoder
-    encode
+  , encode
 
   -- * Low-level implementation
   , preprocess
@@ -52,12 +56,16 @@ module ToySolver.SAT.Encoder.PB.Internal.BCCNF
   ) where
 
 import Control.Exception (assert)
+import Control.Monad
+import Control.Monad.Primitive
 import Data.Function (on)
 import Data.List (sortBy)
 import Data.Maybe (listToMaybe)
 import Data.Ord (comparing)
 
 import ToySolver.SAT.Types
+import qualified ToySolver.SAT.Encoder.Cardinality as Card
+import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
 -- ------------------------------------------------------------------------
 
@@ -212,5 +220,19 @@ encodePrefixSumNaive = f
         bssMin = 0
         ds  = [d | d <- [0..i], let bd = b * fromIntegral d, c - bssMax <= bd, bd < c - bssMin]
         ds' = [d | d <- [0..i], b * fromIntegral d < c - bssMax]
+
+-- ------------------------------------------------------------------------
+
+addPBLinAtLeastBCCNF :: PrimMonad m => Card.Encoder m -> PBLinAtLeast -> m ()
+addPBLinAtLeastBCCNF enc constr = do
+  forM_ (encode constr) $ \clause -> do
+    addClause enc =<< mapM (Card.encodeAtLeast enc) clause
+
+encodePBLinAtLeastBCCNF :: PrimMonad m => Card.Encoder m -> PBLinAtLeast -> m Lit
+encodePBLinAtLeastBCCNF enc constr = do
+  let tseitin = Card.getTseitinEncoder enc
+  ls <- forM (encode constr) $ \clause -> do
+    Tseitin.encodeDisjWithPolarity tseitin Tseitin.polarityPos =<< mapM (Card.encodeAtLeast enc) clause
+  Tseitin.encodeConjWithPolarity tseitin Tseitin.polarityPos ls
 
 -- ------------------------------------------------------------------------

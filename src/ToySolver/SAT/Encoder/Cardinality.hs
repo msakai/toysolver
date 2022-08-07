@@ -20,6 +20,7 @@ module ToySolver.SAT.Encoder.Cardinality
   , newEncoder
   , newEncoderWithStrategy
   , encodeAtLeast
+  , getTseitinEncoder
 
     -- XXX
   , TotalizerDefinitions
@@ -72,8 +73,8 @@ getTotalizerDefinitions (Encoder base _) = Totalizer.getDefinitions base
 evalTotalizerDefinitions :: SAT.IModel m => m -> TotalizerDefinitions -> [(SAT.Var, Bool)]
 evalTotalizerDefinitions m defs = Totalizer.evalDefinitions m defs
 
--- getTseitinEncoder :: Encoder m -> Tseitin.Encoder m
--- getTseitinEncoder (Encoder tseitin _) = tseitin
+getTseitinEncoder :: Encoder m -> Tseitin.Encoder m
+getTseitinEncoder (Encoder (Totalizer.Encoder tseitin _) _) = tseitin
 
 instance Monad m => SAT.NewVar m (Encoder m) where
   newVar   (Encoder base _) = SAT.newVar base
