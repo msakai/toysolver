@@ -21,7 +21,7 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.SAT.Encoder.PB
-  ( Encoder
+  ( Encoder (..)
   , newEncoder
   , newEncoderWithStrategy
   , encodePBLinAtLeast
