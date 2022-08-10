@@ -108,9 +108,9 @@ encodeAtLeast :: PrimMonad m => Encoder m -> SAT.AtLeast -> m SAT.Lit
 encodeAtLeast enc = encodeAtLeastWithPolarity enc polarityBoth
 
 encodeAtLeastWithPolarity :: PrimMonad m => Encoder m -> Polarity -> SAT.AtLeast -> m SAT.Lit
-encodeAtLeastWithPolarity (Encoder base@(Totalizer.Encoder tseitin _) strategy) _polarity =
+encodeAtLeastWithPolarity (Encoder base@(Totalizer.Encoder tseitin _) strategy) polarity =
   case strategy of
-    Naive -> encodeAtLeastNaive tseitin
+    Naive -> encodeAtLeastWithPolarityNaive tseitin polarity
     ParallelCounter -> encodeAtLeastParallelCounter tseitin
     SequentialCounter -> \(lhs,rhs) -> BDD.encodePBLinAtLeastBDD tseitin ([(1,l) | l <- lhs], fromIntegral rhs)
     Totalizer -> Totalizer.encodeAtLeast base
