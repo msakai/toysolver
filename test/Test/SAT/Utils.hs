@@ -547,4 +547,12 @@ arbitraryPBFormula = do
 instance Arbitrary PBFile.Op where
   arbitrary = arbitraryBoundedEnum
 
+instance Arbitrary Tseitin.Polarity where
+  arbitrary = elements
+    [ Tseitin.polarityPos
+    , Tseitin.polarityNeg
+    , Tseitin.polarityBoth
+    , Tseitin.polarityNone
+    ]
+
 -- ---------------------------------------------------------------------
