@@ -166,20 +166,21 @@ prop_PBEncoder_addPBAtLeast = QM.monadicIO $ do
         b2 = evalCNF (array (bounds m2) (assocs m2)) cnf
     QM.assert $ b1 == b2
 
-prop_PBEncoder_encodePBLinAtLeast :: Property
-prop_PBEncoder_encodePBLinAtLeast = QM.monadicIO $ do
+prop_PBEncoder_encodePBLinAtLeastWithPolarity :: Property
+prop_PBEncoder_encodePBLinAtLeastWithPolarity = QM.monadicIO $ do
   let nv = 4
   constr <- QM.pick $ do
     lhs <- arbitraryPBLinSum nv
     rhs <- arbitrary
     return (lhs, rhs)
   strategy <- QM.pick arbitrary
+  polarity <- QM.pick arbitrary
   (l,cnf,defs,defs2) <- QM.run $ do
     db <- CNFStore.newCNFStore
     SAT.newVars_ db nv
     tseitin <- Tseitin.newEncoder db
     encoder@(PB.Encoder card _) <- PB.newEncoderWithStrategy tseitin strategy
-    l <- PB.encodePBLinAtLeast encoder constr
+    l <- PB.encodePBLinAtLeastWithPolarity encoder polarity constr
     cnf <- CNFStore.getCNFFormula db
     defs <- Tseitin.getDefinitions tseitin
     defs2 <- Cardinality.getTotalizerDefinitions card
@@ -191,7 +192,10 @@ prop_PBEncoder_encodePBLinAtLeast = QM.monadicIO $ do
                [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs] ++
                Cardinality.evalTotalizerDefinitions m2 defs2
         b1 = evalCNF (array (bounds m2) (assocs m2)) cnf
-    QM.assert $ not b1 || (SAT.evalLit m2 l == SAT.evalPBLinAtLeast m constr)
+        cmp a b = isJust $ do
+          when (Tseitin.polarityPosOccurs polarity) $ guard (not a || b)
+          when (Tseitin.polarityNegOccurs polarity) $ guard (not b || a)
+    QM.assert $ not b1 || (SAT.evalLit m2 l `cmp` SAT.evalPBLinAtLeast m constr)
 
 prop_PBEncoder_Sorter_genSorter :: [Int] -> Bool
 prop_PBEncoder_Sorter_genSorter xs =
@@ -319,8 +323,8 @@ prop_Totalizer_backward_propagation = QM.monadicIO $ do
   QM.assert $ and [x `elem` xs1 || x `elem` xs2 || lbs !! (x-1) == liftBool e | x <- xs]
 
 
-prop_encodeAtLeast :: Property
-prop_encodeAtLeast = QM.monadicIO $ do
+prop_encodeAtLeastWithPolarity :: Property
+prop_encodeAtLeastWithPolarity = QM.monadicIO $ do
   let nv = 4
   (lhs,rhs) <- QM.pick $ do
     lhs <- liftM catMaybes $ forM [1..nv] $ \i -> do
@@ -332,12 +336,13 @@ prop_encodeAtLeast = QM.monadicIO $ do
     rhs <- choose (-1, nv+2)
     return $ (lhs, rhs)
   strategy <- QM.pick arbitrary
+  polarity <- QM.pick arbitrary
   (l,cnf,defs,defs2) <- QM.run $ do
     db <- CNFStore.newCNFStore
     SAT.newVars_ db nv
     tseitin <- Tseitin.newEncoder db
     card <- Cardinality.newEncoderWithStrategy tseitin strategy
-    l <- Cardinality.encodeAtLeast card (lhs, rhs)
+    l <- Cardinality.encodeAtLeastWithPolarity card polarity (lhs, rhs)
     cnf <- CNFStore.getCNFFormula db
     defs <- Tseitin.getDefinitions tseitin
     defs2 <- Cardinality.getTotalizerDefinitions card
@@ -349,7 +354,10 @@ prop_encodeAtLeast = QM.monadicIO $ do
                [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs] ++
                Cardinality.evalTotalizerDefinitions m2 defs2
         b1 = evalCNF (array (bounds m2) (assocs m2)) cnf
-    QM.assert $ not b1 || (SAT.evalLit m2 l == SAT.evalAtLeast m (lhs,rhs))
+        cmp a b = isJust $ do
+          when (Tseitin.polarityPosOccurs polarity) $ guard (not a || b)
+          when (Tseitin.polarityNegOccurs polarity) $ guard (not b || a)
+    QM.assert $ not b1 || (SAT.evalLit m2 l `cmp` SAT.evalAtLeast m (lhs,rhs))
 
 -- ------------------------------------------------------------------------
 

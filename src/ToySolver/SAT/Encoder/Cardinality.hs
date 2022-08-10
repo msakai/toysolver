@@ -20,17 +20,27 @@ module ToySolver.SAT.Encoder.Cardinality
   , newEncoder
   , newEncoderWithStrategy
   , encodeAtLeast
+  , encodeAtLeastWithPolarity
   , getTseitinEncoder
 
     -- XXX
   , TotalizerDefinitions
   , getTotalizerDefinitions
   , evalTotalizerDefinitions
+
+  -- * Polarity
+  , Polarity (..)
+  , negatePolarity
+  , polarityPos
+  , polarityNeg
+  , polarityBoth
+  , polarityNone
   ) where
 
 import Control.Monad.Primitive
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
+import ToySolver.SAT.Encoder.Tseitin (Polarity (..), negatePolarity, polarityPos, polarityNeg, polarityBoth, polarityNone)
 import ToySolver.SAT.Encoder.Cardinality.Internal.Naive
 import ToySolver.SAT.Encoder.Cardinality.Internal.ParallelCounter
 import ToySolver.SAT.Encoder.PB.Internal.BDD as BDD
@@ -95,7 +105,10 @@ instance PrimMonad m => SAT.AddCardinality m (Encoder m) where
           Totalizer -> Totalizer.addAtLeast base (lhs,rhs)
 
 encodeAtLeast :: PrimMonad m => Encoder m -> SAT.AtLeast -> m SAT.Lit
-encodeAtLeast (Encoder base@(Totalizer.Encoder tseitin _) strategy) =
+encodeAtLeast enc = encodeAtLeastWithPolarity enc polarityBoth
+
+encodeAtLeastWithPolarity :: PrimMonad m => Encoder m -> Polarity -> SAT.AtLeast -> m SAT.Lit
+encodeAtLeastWithPolarity (Encoder base@(Totalizer.Encoder tseitin _) strategy) _polarity =
   case strategy of
     Naive -> encodeAtLeastNaive tseitin
     ParallelCounter -> encodeAtLeastParallelCounter tseitin
