@@ -112,5 +112,5 @@ encodeAtLeastWithPolarity (Encoder base@(Totalizer.Encoder tseitin _) strategy) 
   case strategy of
     Naive -> encodeAtLeastWithPolarityNaive tseitin polarity
     ParallelCounter -> encodeAtLeastParallelCounter tseitin
-    SequentialCounter -> \(lhs,rhs) -> BDD.encodePBLinAtLeastBDD tseitin ([(1,l) | l <- lhs], fromIntegral rhs)
+    SequentialCounter -> \(lhs,rhs) -> BDD.encodePBLinAtLeastWithPolarityBDD tseitin polarity ([(1,l) | l <- lhs], fromIntegral rhs)
     Totalizer -> Totalizer.encodeAtLeast base
