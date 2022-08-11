@@ -210,18 +210,23 @@ prop_PBEncoder_Sorter_decode_encode =
          ==>
          (PBEncSorter.decode base . PBEncSorter.encode base) x == x
 
+
+arbitraryAtLeast :: Int -> Gen SAT.AtLeast
+arbitraryAtLeast nv = do
+  lhs <- liftM catMaybes $ forM [1..nv] $ \i -> do
+    b <- arbitrary
+    if b then
+      Just <$> elements [i, -i]
+    else
+      return Nothing
+  rhs <- choose (-1, nv+2)
+  return $ (lhs, rhs)
+
+
 prop_CardinalityEncoder_addAtLeast :: Property
 prop_CardinalityEncoder_addAtLeast = QM.monadicIO $ do
   let nv = 4
-  (lhs,rhs) <- QM.pick $ do
-    lhs <- liftM catMaybes $ forM [1..nv] $ \i -> do
-      b <- arbitrary
-      if b then
-        Just <$> elements [i, -i]
-      else
-        return Nothing
-    rhs <- choose (-1, nv+2)
-    return $ (lhs, rhs)
+  (lhs,rhs) <- QM.pick $ arbitraryAtLeast nv
   strategy <- QM.pick arbitrary
   (cnf,defs,defs2) <- QM.run $ do
     db <- CNFStore.newCNFStore
@@ -326,15 +331,7 @@ prop_Totalizer_backward_propagation = QM.monadicIO $ do
 prop_encodeAtLeastWithPolarity :: Property
 prop_encodeAtLeastWithPolarity = QM.monadicIO $ do
   let nv = 4
-  (lhs,rhs) <- QM.pick $ do
-    lhs <- liftM catMaybes $ forM [1..nv] $ \i -> do
-      b <- arbitrary
-      if b then
-        Just <$> elements [i, -i]
-      else
-        return Nothing
-    rhs <- choose (-1, nv+2)
-    return $ (lhs, rhs)
+  (lhs,rhs) <- QM.pick $ arbitraryAtLeast nv
   strategy <- QM.pick arbitrary
   polarity <- QM.pick arbitrary
   (l,cnf,defs,defs2) <- QM.run $ do
