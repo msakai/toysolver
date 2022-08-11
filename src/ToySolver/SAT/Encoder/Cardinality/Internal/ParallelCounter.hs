@@ -15,7 +15,7 @@
 -----------------------------------------------------------------------------
 module ToySolver.SAT.Encoder.Cardinality.Internal.ParallelCounter
   ( addAtLeastParallelCounter
-  , encodeAtLeastParallelCounter
+  , encodeAtLeastWithPolarityParallelCounter
   ) where
 
 import Control.Monad.Primitive
@@ -28,21 +28,20 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
 addAtLeastParallelCounter :: PrimMonad m => Tseitin.Encoder m -> SAT.AtLeast -> m ()
 addAtLeastParallelCounter enc constr = do
-  l <- encodeAtLeastParallelCounter enc constr
+  l <- encodeAtLeastWithPolarityParallelCounter enc Tseitin.polarityPos constr
   SAT.addClause enc [l]
 
--- TODO: consider polarity
-encodeAtLeastParallelCounter :: forall m. PrimMonad m => Tseitin.Encoder m -> SAT.AtLeast -> m SAT.Lit
-encodeAtLeastParallelCounter enc (lhs,rhs) = do
+encodeAtLeastWithPolarityParallelCounter :: forall m. PrimMonad m => Tseitin.Encoder m -> Tseitin.Polarity -> SAT.AtLeast -> m SAT.Lit
+encodeAtLeastWithPolarityParallelCounter enc polarity (lhs,rhs) = do
   if rhs <= 0 then
-    Tseitin.encodeConj enc []
+    Tseitin.encodeConjWithPolarity enc polarity []
   else if length lhs < rhs then
-    Tseitin.encodeDisj enc []
+    Tseitin.encodeDisjWithPolarity enc polarity []
   else do
     let rhs_bits = bits (fromIntegral rhs)
     (cnt, overflowBits) <- encodeSumParallelCounter enc (length rhs_bits) lhs
-    isGE <- encodeGE enc cnt rhs_bits
-    Tseitin.encodeDisj enc $ isGE : overflowBits
+    isGE <- encodeGE enc polarity cnt rhs_bits
+    Tseitin.encodeDisjWithPolarity enc polarity $ isGE : overflowBits
   where
     bits :: Integer -> [Bool]
     bits n = f n 0
@@ -81,17 +80,17 @@ encodeSumParallelCounter enc w lits = do
 
   runStateT (f (V.fromList lits)) []
 
-encodeGE :: forall m. PrimMonad m => Tseitin.Encoder m -> [SAT.Lit] -> [Bool] -> m SAT.Lit
-encodeGE enc lhs rhs = do
+encodeGE :: forall m. PrimMonad m => Tseitin.Encoder m -> Tseitin.Polarity -> [SAT.Lit] -> [Bool] -> m SAT.Lit
+encodeGE enc polarity lhs rhs = do
   let f :: [SAT.Lit] -> [Bool] -> SAT.Lit -> m SAT.Lit
       f [] [] r = return r
-      f [] (True  : _) _ = Tseitin.encodeDisj enc [] -- false
+      f [] (True  : _) _ = Tseitin.encodeDisjWithPolarity enc polarity [] -- false
       f [] (False : bs) r = f [] bs r
       f (l : ls) (True  : bs) r = do
-        f ls bs =<< Tseitin.encodeConj enc [l, r]
+        f ls bs =<< Tseitin.encodeConjWithPolarity enc polarity [l, r]
       f (l : ls) (False : bs) r = do
-        f ls bs =<< Tseitin.encodeDisj enc [l, r]
+        f ls bs =<< Tseitin.encodeDisjWithPolarity enc polarity [l, r]
       f (l : ls) [] r = do
-        f ls [] =<< Tseitin.encodeDisj enc [l, r]
-  t <- Tseitin.encodeConj enc [] -- true
+        f ls [] =<< Tseitin.encodeDisjWithPolarity enc polarity [l, r]
+  t <- Tseitin.encodeConjWithPolarity enc polarity [] -- true
   f lhs rhs t
