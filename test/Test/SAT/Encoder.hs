@@ -197,6 +197,33 @@ prop_PBEncoder_encodePBLinAtLeastWithPolarity = QM.monadicIO $ do
           when (Tseitin.polarityNegOccurs polarity) $ guard (not b || a)
     QM.assert $ not b1 || (SAT.evalLit m2 l `cmp` SAT.evalPBLinAtLeast m constr)
 
+prop_PBEncoder_encodePBLinAtLeastWithPolarity_2 :: Property
+prop_PBEncoder_encodePBLinAtLeastWithPolarity_2 = QM.monadicIO $ do
+  nv <- QM.pick $ choose (1, 10)
+  constr <- QM.pick $ do
+    lhs <- arbitraryPBLinSum nv
+    rhs <- arbitrary
+    return (lhs, rhs)
+  strategy <- QM.pick arbitrary
+  polarity <- QM.pick arbitrary
+  join $ QM.run $ do
+    solver <- SAT.newSolver
+    SAT.newVars_ solver nv
+    tseitin <- Tseitin.newEncoder solver
+    encoder <- PB.newEncoderWithStrategy tseitin strategy
+    l <- PB.encodePBLinAtLeastWithPolarity encoder polarity constr
+    ret <- SAT.solve solver
+    if not ret then do
+      return $ QM.assert False
+    else do
+      m <- SAT.getModel solver
+      let a = SAT.evalLit m l
+          b = SAT.evalPBLinAtLeast m constr
+      return $ do
+        QM.monitor $ counterexample (show (a,b))
+        when (Tseitin.polarityPosOccurs polarity) $ QM.assert (not a || b)
+        when (Tseitin.polarityNegOccurs polarity) $ QM.assert (not b || a)
+
 prop_PBEncoder_Sorter_genSorter :: [Int] -> Bool
 prop_PBEncoder_Sorter_genSorter xs =
   V.toList (PBEncSorter.sortVector (V.fromList xs)) == sort xs
@@ -355,6 +382,30 @@ prop_encodeAtLeastWithPolarity = QM.monadicIO $ do
           when (Tseitin.polarityPosOccurs polarity) $ guard (not a || b)
           when (Tseitin.polarityNegOccurs polarity) $ guard (not b || a)
     QM.assert $ not b1 || (SAT.evalLit m2 l `cmp` SAT.evalAtLeast m (lhs,rhs))
+
+prop_encodeAtLeastWithPolarity_2 :: Property
+prop_encodeAtLeastWithPolarity_2 = QM.monadicIO $ do
+  nv <- QM.pick $ choose (1, 10)
+  constr <- QM.pick $ arbitraryAtLeast nv
+  strategy <- QM.pick arbitrary
+  polarity <- QM.pick arbitrary
+  join $ QM.run $ do
+    solver <- SAT.newSolver
+    SAT.newVars_ solver nv
+    tseitin <- Tseitin.newEncoder solver
+    card <- Cardinality.newEncoderWithStrategy tseitin strategy
+    l <- Cardinality.encodeAtLeastWithPolarity card polarity constr
+    ret <- SAT.solve solver
+    if not ret then do
+      return $ QM.assert False
+    else do
+      m <- SAT.getModel solver
+      let a = SAT.evalLit m l
+          b = SAT.evalAtLeast m constr
+      return $ do
+        QM.monitor $ counterexample (show (a,b))
+        when (Tseitin.polarityPosOccurs polarity) $ QM.assert (not a || b)
+        when (Tseitin.polarityNegOccurs polarity) $ QM.assert (not b || a)
 
 -- ------------------------------------------------------------------------
 
