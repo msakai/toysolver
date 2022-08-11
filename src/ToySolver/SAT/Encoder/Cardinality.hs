@@ -113,4 +113,4 @@ encodeAtLeastWithPolarity (Encoder base@(Totalizer.Encoder tseitin _) strategy) 
     Naive -> encodeAtLeastWithPolarityNaive tseitin polarity
     ParallelCounter -> encodeAtLeastWithPolarityParallelCounter tseitin polarity
     SequentialCounter -> \(lhs,rhs) -> BDD.encodePBLinAtLeastWithPolarityBDD tseitin polarity ([(1,l) | l <- lhs], fromIntegral rhs)
-    Totalizer -> Totalizer.encodeAtLeast base
+    Totalizer -> Totalizer.encodeAtLeastWithPolarity base polarity
