@@ -49,7 +49,7 @@ import qualified ToySolver.SAT.Encoder.Cardinality as Card
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.SAT.Encoder.Tseitin (Polarity (..), negatePolarity, polarityPos, polarityNeg, polarityBoth, polarityNone)
 import ToySolver.SAT.Encoder.PB.Internal.Adder (addPBLinAtLeastAdder, encodePBLinAtLeastAdder)
-import ToySolver.SAT.Encoder.PB.Internal.BCCNF (addPBLinAtLeastBCCNF, encodePBLinAtLeastBCCNF)
+import ToySolver.SAT.Encoder.PB.Internal.BCCNF (addPBLinAtLeastBCCNF, encodePBLinAtLeastWithPolarityBCCNF)
 import ToySolver.SAT.Encoder.PB.Internal.BDD (addPBLinAtLeastBDD, encodePBLinAtLeastWithPolarityBDD)
 import ToySolver.SAT.Encoder.PB.Internal.Sorter (addPBLinAtLeastSorter, encodePBLinAtLeastSorter)
 
@@ -134,7 +134,7 @@ encodePBLinAtLeastWithPolarity' (Encoder card strategy) polarity constr = do
   case strategy of
     Adder -> encodePBLinAtLeastAdder tseitin constr
     Sorter -> encodePBLinAtLeastSorter tseitin constr
-    BCCNF -> encodePBLinAtLeastBCCNF card constr
+    BCCNF -> encodePBLinAtLeastWithPolarityBCCNF card polarity constr
     _ -> encodePBLinAtLeastWithPolarityBDD tseitin polarity constr
 
 -- -----------------------------------------------------------------------
