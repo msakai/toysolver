@@ -48,7 +48,7 @@ import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Cardinality as Card
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.SAT.Encoder.Tseitin (Polarity (..), negatePolarity, polarityPos, polarityNeg, polarityBoth, polarityNone)
-import ToySolver.SAT.Encoder.PB.Internal.Adder (addPBLinAtLeastAdder, encodePBLinAtLeastAdder)
+import ToySolver.SAT.Encoder.PB.Internal.Adder (addPBLinAtLeastAdder, encodePBLinAtLeastWithPolarityAdder)
 import ToySolver.SAT.Encoder.PB.Internal.BCCNF (addPBLinAtLeastBCCNF, encodePBLinAtLeastWithPolarityBCCNF)
 import ToySolver.SAT.Encoder.PB.Internal.BDD (addPBLinAtLeastBDD, encodePBLinAtLeastWithPolarityBDD)
 import ToySolver.SAT.Encoder.PB.Internal.Sorter (addPBLinAtLeastSorter, encodePBLinAtLeastSorter)
@@ -132,7 +132,7 @@ encodePBLinAtLeastWithPolarity' :: PrimMonad m => Encoder m -> Polarity -> SAT.P
 encodePBLinAtLeastWithPolarity' (Encoder card strategy) polarity constr = do
   let tseitin = Card.getTseitinEncoder card
   case strategy of
-    Adder -> encodePBLinAtLeastAdder tseitin constr
+    Adder -> encodePBLinAtLeastWithPolarityAdder tseitin polarity constr
     Sorter -> encodePBLinAtLeastSorter tseitin constr
     BCCNF -> encodePBLinAtLeastWithPolarityBCCNF card polarity constr
     _ -> encodePBLinAtLeastWithPolarityBDD tseitin polarity constr

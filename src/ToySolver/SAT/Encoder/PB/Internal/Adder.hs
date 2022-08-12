@@ -21,7 +21,7 @@
 -----------------------------------------------------------------------------
 module ToySolver.SAT.Encoder.PB.Internal.Adder
   ( addPBLinAtLeastAdder
-  , encodePBLinAtLeastAdder
+  , encodePBLinAtLeastWithPolarityAdder
   ) where
 
 import Control.Monad
@@ -42,10 +42,10 @@ addPBLinAtLeastAdder enc constr = do
   formula <- encodePBLinAtLeastAdder' enc constr
   Tseitin.addFormula enc formula
 
-encodePBLinAtLeastAdder :: PrimMonad m => Tseitin.Encoder m -> SAT.PBLinAtLeast -> m SAT.Lit
-encodePBLinAtLeastAdder enc constr = do
+encodePBLinAtLeastWithPolarityAdder :: PrimMonad m => Tseitin.Encoder m -> Tseitin.Polarity -> SAT.PBLinAtLeast -> m SAT.Lit
+encodePBLinAtLeastWithPolarityAdder enc polarity constr = do
   formula <- encodePBLinAtLeastAdder' enc constr
-  Tseitin.encodeFormula enc formula
+  Tseitin.encodeFormulaWithPolarity enc polarity formula
 
 encodePBLinAtLeastAdder' :: PrimMonad m => Tseitin.Encoder m -> SAT.PBLinAtLeast -> m Tseitin.Formula
 encodePBLinAtLeastAdder' _ (_,rhs) | rhs <= 0 = return true
