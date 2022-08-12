@@ -166,6 +166,64 @@ prop_PBEncoder_addPBAtLeast = QM.monadicIO $ do
         b2 = evalCNF (array (bounds m2) (assocs m2)) cnf
     QM.assert $ b1 == b2
 
+prop_PBEncoder_encodePBLinAtLeastWithPolarity :: Property
+prop_PBEncoder_encodePBLinAtLeastWithPolarity = QM.monadicIO $ do
+  let nv = 4
+  constr <- QM.pick $ do
+    lhs <- arbitraryPBLinSum nv
+    rhs <- arbitrary
+    return (lhs, rhs)
+  strategy <- QM.pick arbitrary
+  polarity <- QM.pick arbitrary
+  (l,cnf,defs,defs2) <- QM.run $ do
+    db <- CNFStore.newCNFStore
+    SAT.newVars_ db nv
+    tseitin <- Tseitin.newEncoder db
+    encoder@(PB.Encoder card _) <- PB.newEncoderWithStrategy tseitin strategy
+    l <- PB.encodePBLinAtLeastWithPolarity encoder polarity constr
+    cnf <- CNFStore.getCNFFormula db
+    defs <- Tseitin.getDefinitions tseitin
+    defs2 <- Cardinality.getTotalizerDefinitions card
+    return (l, cnf, defs, defs2)
+  forM_ (allAssignments nv) $ \m -> do
+    let m2 :: Array SAT.Var Bool
+        m2 = array (1, CNF.cnfNumVars cnf) $
+               assocs m ++
+               [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs] ++
+               Cardinality.evalTotalizerDefinitions m2 defs2
+        b1 = evalCNF (array (bounds m2) (assocs m2)) cnf
+        cmp a b = isJust $ do
+          when (Tseitin.polarityPosOccurs polarity) $ guard (not a || b)
+          when (Tseitin.polarityNegOccurs polarity) $ guard (not b || a)
+    QM.assert $ not b1 || (SAT.evalLit m2 l `cmp` SAT.evalPBLinAtLeast m constr)
+
+prop_PBEncoder_encodePBLinAtLeastWithPolarity_2 :: Property
+prop_PBEncoder_encodePBLinAtLeastWithPolarity_2 = QM.monadicIO $ do
+  nv <- QM.pick $ choose (1, 10)
+  constr <- QM.pick $ do
+    lhs <- arbitraryPBLinSum nv
+    rhs <- arbitrary
+    return (lhs, rhs)
+  strategy <- QM.pick arbitrary
+  polarity <- QM.pick arbitrary
+  join $ QM.run $ do
+    solver <- SAT.newSolver
+    SAT.newVars_ solver nv
+    tseitin <- Tseitin.newEncoder solver
+    encoder <- PB.newEncoderWithStrategy tseitin strategy
+    l <- PB.encodePBLinAtLeastWithPolarity encoder polarity constr
+    ret <- SAT.solve solver
+    if not ret then do
+      return $ QM.assert False
+    else do
+      m <- SAT.getModel solver
+      let a = SAT.evalLit m l
+          b = SAT.evalPBLinAtLeast m constr
+      return $ do
+        QM.monitor $ counterexample (show (a,b))
+        when (Tseitin.polarityPosOccurs polarity) $ QM.assert (not a || b)
+        when (Tseitin.polarityNegOccurs polarity) $ QM.assert (not b || a)
+
 prop_PBEncoder_Sorter_genSorter :: [Int] -> Bool
 prop_PBEncoder_Sorter_genSorter xs =
   V.toList (PBEncSorter.sortVector (V.fromList xs)) == sort xs
@@ -179,18 +237,23 @@ prop_PBEncoder_Sorter_decode_encode =
          ==>
          (PBEncSorter.decode base . PBEncSorter.encode base) x == x
 
+
+arbitraryAtLeast :: Int -> Gen SAT.AtLeast
+arbitraryAtLeast nv = do
+  lhs <- liftM catMaybes $ forM [1..nv] $ \i -> do
+    b <- arbitrary
+    if b then
+      Just <$> elements [i, -i]
+    else
+      return Nothing
+  rhs <- choose (-1, nv+2)
+  return $ (lhs, rhs)
+
+
 prop_CardinalityEncoder_addAtLeast :: Property
 prop_CardinalityEncoder_addAtLeast = QM.monadicIO $ do
   let nv = 4
-  (lhs,rhs) <- QM.pick $ do
-    lhs <- liftM catMaybes $ forM [1..nv] $ \i -> do
-      b <- arbitrary
-      if b then
-        Just <$> elements [i, -i]
-      else
-        return Nothing
-    rhs <- choose (-1, nv+2)
-    return $ (lhs, rhs)
+  (lhs,rhs) <- QM.pick $ arbitraryAtLeast nv
   strategy <- QM.pick arbitrary
   (cnf,defs,defs2) <- QM.run $ do
     db <- CNFStore.newCNFStore
@@ -292,25 +355,18 @@ prop_Totalizer_backward_propagation = QM.monadicIO $ do
   QM.assert $ and [x `elem` xs1 || x `elem` xs2 || lbs !! (x-1) == liftBool e | x <- xs]
 
 
-prop_encodeAtLeast :: Property
-prop_encodeAtLeast = QM.monadicIO $ do
+prop_encodeAtLeastWithPolarity :: Property
+prop_encodeAtLeastWithPolarity = QM.monadicIO $ do
   let nv = 4
-  (lhs,rhs) <- QM.pick $ do
-    lhs <- liftM catMaybes $ forM [1..nv] $ \i -> do
-      b <- arbitrary
-      if b then
-        Just <$> elements [i, -i]
-      else
-        return Nothing
-    rhs <- choose (-1, nv+2)
-    return $ (lhs, rhs)
+  (lhs,rhs) <- QM.pick $ arbitraryAtLeast nv
   strategy <- QM.pick arbitrary
+  polarity <- QM.pick arbitrary
   (l,cnf,defs,defs2) <- QM.run $ do
     db <- CNFStore.newCNFStore
     SAT.newVars_ db nv
     tseitin <- Tseitin.newEncoder db
     card <- Cardinality.newEncoderWithStrategy tseitin strategy
-    l <- Cardinality.encodeAtLeast card (lhs, rhs)
+    l <- Cardinality.encodeAtLeastWithPolarity card polarity (lhs, rhs)
     cnf <- CNFStore.getCNFFormula db
     defs <- Tseitin.getDefinitions tseitin
     defs2 <- Cardinality.getTotalizerDefinitions card
@@ -322,7 +378,34 @@ prop_encodeAtLeast = QM.monadicIO $ do
                [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs] ++
                Cardinality.evalTotalizerDefinitions m2 defs2
         b1 = evalCNF (array (bounds m2) (assocs m2)) cnf
-    QM.assert $ not b1 || (SAT.evalLit m2 l == SAT.evalAtLeast m (lhs,rhs))
+        cmp a b = isJust $ do
+          when (Tseitin.polarityPosOccurs polarity) $ guard (not a || b)
+          when (Tseitin.polarityNegOccurs polarity) $ guard (not b || a)
+    QM.assert $ not b1 || (SAT.evalLit m2 l `cmp` SAT.evalAtLeast m (lhs,rhs))
+
+prop_encodeAtLeastWithPolarity_2 :: Property
+prop_encodeAtLeastWithPolarity_2 = QM.monadicIO $ do
+  nv <- QM.pick $ choose (1, 10)
+  constr <- QM.pick $ arbitraryAtLeast nv
+  strategy <- QM.pick arbitrary
+  polarity <- QM.pick arbitrary
+  join $ QM.run $ do
+    solver <- SAT.newSolver
+    SAT.newVars_ solver nv
+    tseitin <- Tseitin.newEncoder solver
+    card <- Cardinality.newEncoderWithStrategy tseitin strategy
+    l <- Cardinality.encodeAtLeastWithPolarity card polarity constr
+    ret <- SAT.solve solver
+    if not ret then do
+      return $ QM.assert False
+    else do
+      m <- SAT.getModel solver
+      let a = SAT.evalLit m l
+          b = SAT.evalAtLeast m constr
+      return $ do
+        QM.monitor $ counterexample (show (a,b))
+        when (Tseitin.polarityPosOccurs polarity) $ QM.assert (not a || b)
+        when (Tseitin.polarityNegOccurs polarity) $ QM.assert (not b || a)
 
 -- ------------------------------------------------------------------------
 

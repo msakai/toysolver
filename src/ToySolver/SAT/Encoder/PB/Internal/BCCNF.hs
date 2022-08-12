@@ -25,7 +25,7 @@ module ToySolver.SAT.Encoder.PB.Internal.BCCNF
   (
   -- * Monadic interface
     addPBLinAtLeastBCCNF
-  , encodePBLinAtLeastBCCNF
+  , encodePBLinAtLeastWithPolarityBCCNF
     
   -- * High-level pure encoder
   , encode
@@ -228,11 +228,11 @@ addPBLinAtLeastBCCNF enc constr = do
   forM_ (encode constr) $ \clause -> do
     addClause enc =<< mapM (Card.encodeAtLeast enc) clause
 
-encodePBLinAtLeastBCCNF :: PrimMonad m => Card.Encoder m -> PBLinAtLeast -> m Lit
-encodePBLinAtLeastBCCNF enc constr = do
+encodePBLinAtLeastWithPolarityBCCNF :: PrimMonad m => Card.Encoder m -> Tseitin.Polarity -> PBLinAtLeast -> m Lit
+encodePBLinAtLeastWithPolarityBCCNF enc polarity constr = do
   let tseitin = Card.getTseitinEncoder enc
   ls <- forM (encode constr) $ \clause -> do
-    Tseitin.encodeDisjWithPolarity tseitin Tseitin.polarityPos =<< mapM (Card.encodeAtLeast enc) clause
-  Tseitin.encodeConjWithPolarity tseitin Tseitin.polarityPos ls
+    Tseitin.encodeDisjWithPolarity tseitin polarity =<< mapM (Card.encodeAtLeastWithPolarity enc polarity) clause
+  Tseitin.encodeConjWithPolarity tseitin polarity ls
 
 -- ------------------------------------------------------------------------

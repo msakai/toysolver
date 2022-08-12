@@ -20,7 +20,7 @@
 -----------------------------------------------------------------------------
 module ToySolver.SAT.Encoder.PB.Internal.BDD
   ( addPBLinAtLeastBDD
-  , encodePBLinAtLeastBDD
+  , encodePBLinAtLeastWithPolarityBDD
   ) where
 
 import Control.Monad.State.Strict
@@ -34,17 +34,17 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
 addPBLinAtLeastBDD :: PrimMonad m => Tseitin.Encoder m -> SAT.PBLinAtLeast -> m ()
 addPBLinAtLeastBDD enc constr = do
-  l <- encodePBLinAtLeastBDD enc constr
+  l <- encodePBLinAtLeastWithPolarityBDD enc Tseitin.polarityPos constr
   SAT.addClause enc [l]
 
-encodePBLinAtLeastBDD :: forall m. PrimMonad m => Tseitin.Encoder m -> SAT.PBLinAtLeast -> m SAT.Lit
-encodePBLinAtLeastBDD enc (lhs,rhs) = do
+encodePBLinAtLeastWithPolarityBDD :: forall m. PrimMonad m => Tseitin.Encoder m -> Tseitin.Polarity -> SAT.PBLinAtLeast -> m SAT.Lit
+encodePBLinAtLeastWithPolarityBDD enc polarity (lhs,rhs) = do
   let lhs' = sortBy (flip (comparing fst)) lhs
   flip evalStateT Map.empty $ do
     let f :: SAT.PBLinSum -> Integer -> Integer -> StateT (Map (SAT.PBLinSum, Integer) SAT.Lit) m SAT.Lit
         f xs rhs slack
-          | rhs <= 0  = lift $ Tseitin.encodeConj enc [] -- true
-          | slack < 0 = lift $ Tseitin.encodeDisj enc [] -- false
+          | rhs <= 0  = lift $ Tseitin.encodeConjWithPolarity enc polarity [] -- true
+          | slack < 0 = lift $ Tseitin.encodeDisjWithPolarity enc polarity [] -- false
           | otherwise = do
               m <- get
               case Map.lookup (xs,rhs) m of
@@ -55,12 +55,12 @@ encodePBLinAtLeastBDD enc (lhs,rhs) = do
                     [(_,l)] -> return l
                     (c,l) : xs' -> do
                       thenLit <- f xs' (rhs - c) slack
-                      l2 <- lift $ Tseitin.encodeConjWithPolarity enc Tseitin.polarityPos [l, thenLit]
+                      l2 <- lift $ Tseitin.encodeConjWithPolarity enc polarity [l, thenLit]
                       l3 <- if c > slack then
                               return l2
                             else do
                               elseLit <- f xs' rhs (slack - c)
-                              lift $ Tseitin.encodeDisjWithPolarity enc Tseitin.polarityPos [l2, elseLit]
+                              lift $ Tseitin.encodeDisjWithPolarity enc polarity [l2, elseLit]
                       modify (Map.insert (xs,rhs) l3)
                       return l3
     f lhs' rhs (sum [c | (c,_) <- lhs'] - rhs)

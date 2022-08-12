@@ -24,10 +24,10 @@ module ToySolver.SAT.Encoder.Cardinality.Internal.Totalizer
   , evalDefinitions
 
   , addAtLeast
-  , encodeAtLeast
+  , encodeAtLeastWithPolarity
 
   , addCardinality
-  , encodeCardinality
+  , encodeCardinalityWithPolarity
 
   , encodeSum
   ) where
@@ -94,25 +94,24 @@ addCardinality enc lits (lb, ub) = do
     forM_ (drop ub lits') $ \l -> SAT.addClause enc [- l]
 
 
--- TODO: consider polarity
-encodeAtLeast :: PrimMonad m => Encoder m -> SAT.AtLeast -> m SAT.Lit
-encodeAtLeast enc (lhs,rhs) = do
-  encodeCardinality enc lhs (rhs, length lhs)
+
+encodeAtLeastWithPolarity :: PrimMonad m => Encoder m -> Tseitin.Polarity -> SAT.AtLeast -> m SAT.Lit
+encodeAtLeastWithPolarity enc polarity (lhs,rhs) = do
+  encodeCardinalityWithPolarity enc polarity lhs (rhs, length lhs)
 
 
--- TODO: consider polarity
-encodeCardinality :: PrimMonad m => Encoder m -> [SAT.Lit] -> (Int, Int) -> m SAT.Lit
-encodeCardinality enc@(Encoder tseitin _) lits (lb, ub) = do
+encodeCardinalityWithPolarity :: PrimMonad m => Encoder m -> Tseitin.Polarity -> [SAT.Lit] -> (Int, Int) -> m SAT.Lit
+encodeCardinalityWithPolarity enc@(Encoder tseitin _) polarity lits (lb, ub) = do
   let n = length lits
   if lb <= 0 && n <= ub then
-    Tseitin.encodeConj tseitin []
+    Tseitin.encodeConjWithPolarity tseitin polarity []
   else if n < lb || ub < 0 then
-    Tseitin.encodeDisj tseitin []
+    Tseitin.encodeDisjWithPolarity tseitin polarity []
   else do
     lits' <- encodeSum enc lits
     forM_ (zip lits' (tail lits')) $ \(l1, l2) -> do
       SAT.addClause enc [-l2, l1] -- l2→l1 or equivalently ¬l1→¬l2
-    Tseitin.encodeConj tseitin $
+    Tseitin.encodeConjWithPolarity tseitin polarity $
       [lits' !! (lb - 1) | lb > 0] ++ [- (lits' !! (ub + 1 - 1)) | ub < n]
 
 
