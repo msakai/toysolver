@@ -41,7 +41,6 @@ Extra-Source-Files:
    misc/smtcomp/bin/starexec_run_default
    misc/smtcomp/starexec_description.txt
    src/ToySolver/Data/Polyhedron.hs
-   src/ToySolver/SAT/Solver/MessagePassing/SurveyPropagation/sp.cl
    samples/gcnf/*.cnf
    samples/gcnf/*.gcnf
    samples/lp/*.lp
@@ -113,7 +112,7 @@ Flag UseHaskeline
   Default: True
 
 Flag OpenCL
-  Description: use opencl package
+  Description: use opencl package (deprecated)
   Manual: True
   Default: False
 
@@ -190,9 +189,6 @@ Library
   if flag(WithZlib)
      Build-Depends: zlib
      CPP-Options: "-DWITH_ZLIB"
-  if flag(OpenCL)
-     Build-Depends: OpenCL >=1.0.3.4
-     Exposed-Modules: ToySolver.SAT.Solver.MessagePassing.SurveyPropagation.OpenCL
   if flag(ExtraBoundsChecking)
      CPP-Options: "-DEXTRA_BOUNDS_CHECKING"
   if impl(ghc)
@@ -762,14 +758,9 @@ Executable survey-propagation
     base,
     data-default-class,
     toysolver
-  if flag(OpenCL)
-    Build-Depends: OpenCL
-    CPP-Options: "-DENABLE_OPENCL"
   Default-Language: Haskell2010
   Other-Extensions: CPP
-  -- We use threaded RTS to avoid the error "schedule: re-entered unsafely.
-  -- Perhaps a 'foreign import unsafe' should be 'safe'?" on NVIDIA CUDA.
-  GHC-Options: -rtsopts -threaded
+  GHC-Options: -rtsopts
   -- GHC-Prof-Options: -auto-all
   if flag(ForceChar8)
     CPP-Options: "-DFORCE_CHAR8"

@@ -31,9 +31,6 @@ packageVersions = sort $ tail
 #ifdef VERSION_MIP
   , ("MIP", VERSION_MIP)
 #endif
-#ifdef VERSION_OpenCL
-  , ("OpenCL", VERSION_OpenCL)
-#endif
 #ifdef VERSION_OptDir
   , ("OptDir", VERSION_OptDir)
 #endif

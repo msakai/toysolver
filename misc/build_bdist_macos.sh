@@ -10,8 +10,7 @@ PATH=$HOME/.local/bin:$PATH
 
 stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER --install-ghc build \
   --flag toysolver:BuildToyFMF \
-  --flag toysolver:BuildSamplePrograms \
-  --flag toysolver:OpenCL
+  --flag toysolver:BuildSamplePrograms
 
 VER=`stack exec ghc -- -ignore-dot-ghci -e ":m + Control.Monad Distribution.Package Distribution.PackageDescription Distribution.PackageDescription.Parse Distribution.Verbosity Data.Version" -e 'putStrLn =<< liftM (showVersion . pkgVersion . package . packageDescription) (readPackageDescription silent "toysolver.cabal")'`
 STACK_LOCAL_INSTALL_ROOT=`stack --stack-yaml=$STACK_YAML --resolver=$RESOLVER path --local-install-root`
