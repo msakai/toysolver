@@ -2,6 +2,7 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.Base
