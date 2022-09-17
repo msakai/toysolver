@@ -76,6 +76,7 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Heap as Heap -- http://hackage.haskell.org/package/heaps
 import Data.List (foldl')
+import Data.Maybe (fromJust)
 import Data.Monoid
 import Data.Ord
 import Data.Sequence (Seq)
@@ -304,7 +305,7 @@ bellmanFord (Fold fV fE fC fD) g ss = runST $ do
       writeSTRef updatedRef IntSet.empty
       forM_ (IntSet.toList us) $ \u -> do
         -- modifySTRef' updatedRef (IntSet.delete u) -- possible optimization
-        Just (Pair du a) <- H.lookup d u
+        Pair du a <- liftM fromJust $ H.lookup d u
         forM_ (IntMap.findWithDefault [] u g) $ \(v, c, l) -> do
           m <- H.lookup d v
           case m of
