@@ -71,7 +71,8 @@ encodePBLinAtLeastAdder' enc (lhs,rhs) = do
 encodePBLinSumAdder :: forall m. PrimMonad m => Tseitin.Encoder m -> SAT.PBLinSum -> m [SAT.Lit]
 encodePBLinSumAdder enc lhs = do
   (buckets :: MutVar (PrimState m) (Seq (SQ.SeqQueue m SAT.Lit))) <- newMutVar Seq.empty
-  let insert i x = do
+  let insert :: Int -> Int -> m ()
+      insert i x = do
         bs <- readMutVar buckets
         let n = Seq.length bs
         q <- if i < n then do
