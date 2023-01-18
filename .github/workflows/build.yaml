@@ -10,6 +10,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - ghc: '9.4.4'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-9.4.yaml'
+            stack_args: '--haddock --no-haddock-deps'
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            coveralls: false
+
           - ghc: '9.2.5'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.2.yaml'
