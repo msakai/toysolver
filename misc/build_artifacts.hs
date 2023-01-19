@@ -1,4 +1,5 @@
 -- stack --install-ghc runghc --package turtle build_artifacts.hs
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- script for building artifacts on AppVeyor and Travis-CI
@@ -10,6 +11,9 @@ import Distribution.Package
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parsec
 import Distribution.Pretty
+#if MIN_VERSION_Cabal(3,8,0)
+import Distribution.Simple.PackageDescription (readGenericPackageDescription)
+#endif
 import Distribution.Version
 import Distribution.Verbosity
 import qualified System.Info as Info
