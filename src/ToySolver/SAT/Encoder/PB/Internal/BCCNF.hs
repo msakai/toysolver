@@ -26,7 +26,7 @@ module ToySolver.SAT.Encoder.PB.Internal.BCCNF
   -- * Monadic interface
     addPBLinAtLeastBCCNF
   , encodePBLinAtLeastWithPolarityBCCNF
-    
+
   -- * High-level pure encoder
   , encode
 

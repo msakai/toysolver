@@ -488,7 +488,7 @@ arbitraryPBLinSumForBCCNF n = do
   as <- vectorOf n (liftM getPositive arbitrary)
   let bs = init $ scanr (+) 0 as
   c <- arbitrary
-  return (zip bs [1..], c)  
+  return (zip bs [1..], c)
 -}
 
 prop_BCCNF_encodePrefixSumNaive :: Property
