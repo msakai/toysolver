@@ -1,4 +1,5 @@
 -- stack --install-ghc runghc --package Cabal generate_packageVersions.hs
+{-# LANGUAGE CPP #-}
 module Main where
 
 import Control.Monad
@@ -9,6 +10,9 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Parsec
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
+#if MIN_VERSION_Cabal(3,8,0)
+import Distribution.Simple.PackageDescription (readGenericPackageDescription)
+#endif
 import Distribution.Types.CondTree
 import qualified Distribution.Verbosity as Verbosity
 import System.Environment
