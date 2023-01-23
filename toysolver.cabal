@@ -183,6 +183,7 @@ Library
      time >=1.5.0,
      transformers >=0.2,
      transformers-compat >=0.3,
+     unbounded-delays,
      unordered-containers >=0.2.3 && <0.3.0,
      -- imapM and modify are available on vector >=0.11.0
      vector >=0.11,

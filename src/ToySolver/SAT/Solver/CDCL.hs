@@ -132,6 +132,7 @@ module ToySolver.SAT.Solver.CDCL
 import Prelude hiding (log)
 import Control.Concurrent
 import Control.Concurrent.Async (withAsync)
+import Control.Concurrent.Thread.Delay (delay)
 import Control.Loop
 import Control.Monad
 import Control.Monad.IO.Class
@@ -1135,7 +1136,10 @@ solve_ solver = do
     startWC  <- getTime Monotonic
     writeIORef (svStartWC solver) startWC
     writeIORef (svPrintStatFlag solver) False
-    result <- withAsync (forever (threadDelay (1*1000*1000) >> writeIORef (svPrintStatFlag solver) True)) $ \_ -> loop restartSeq
+    let timer = forever $ do
+          delay $ fromIntegral (configUpdateStatisticsInterval config) * 1000 * 1000
+          writeIORef (svPrintStatFlag solver) True
+    result <- withAsync timer $ \_ -> loop restartSeq
     endCPU <- getTime ProcessCPUTime
     endWC  <- getTime Monotonic
 

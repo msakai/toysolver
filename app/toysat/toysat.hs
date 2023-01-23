@@ -283,6 +283,7 @@ satConfigParser = SAT.Config
   <*> checkModelOption
   <*> pure (SAT.configVarDecay def)
   <*> pure (SAT.configConstrDecay def)
+  <*> updateStatisticsIntervval
   where
     restartOption = option (maybeReader SAT.parseRestartStrategy)
       $  long "restart"
@@ -409,6 +410,14 @@ satConfigParser = SAT.Config
     checkModelOption = switch
       $  long "check-model"
       <> help "check model for debugging"
+
+    updateStatisticsIntervval = option auto
+      $  long "update-statistics-interval"
+      <> metavar "INT"
+      <> help "Interval for updating statistics (seconds)"
+      <> value (SAT.configUpdateStatisticsInterval def)
+      <> showDefault
+      
 
 parserInfo :: ParserInfo Options
 parserInfo = Options.Applicative.info (helper <*> versionOption <*> optionsParser)

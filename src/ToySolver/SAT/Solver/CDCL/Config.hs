@@ -86,6 +86,8 @@ data Config
     -- ^ Inverse of the variable activity decay factor. (default 1 / 0.95)
   , configConstrDecay :: !Double
     -- ^ Inverse of the constraint activity decay factor. (1 / 0.999)
+  , configUpdateStatisticsInterval :: !Int
+    -- ^ Interval for updating statistics (seconds). (default 1 second)
   } deriving (Show, Eq, Ord)
 
 instance Default Config where
@@ -112,6 +114,7 @@ instance Default Config where
     , configCheckModel = False
     , configVarDecay = 1 / 0.95
     , configConstrDecay = 1 / 0.999
+    , configUpdateStatisticsInterval = 1
     }
 
 -- | Restart strategy.
