@@ -413,7 +413,7 @@ satConfigParser = SAT.Config
 
     updateStatisticsIntervval = option auto
       $  long "update-statistics-interval"
-      <> metavar "INT"
+      <> metavar "REAL"
       <> help "Interval for updating statistics (seconds)"
       <> value (SAT.configUpdateStatisticsInterval def)
       <> showDefault

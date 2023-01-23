@@ -1137,7 +1137,7 @@ solve_ solver = do
     writeIORef (svStartWC solver) startWC
     writeIORef (svPrintStatFlag solver) False
     let timer = forever $ do
-          delay $ fromIntegral (configUpdateStatisticsInterval config) * 1000 * 1000
+          delay $ floor (configUpdateStatisticsInterval config * 1000 * 1000)
           writeIORef (svPrintStatFlag solver) True
     result <- withAsync timer $ \_ -> loop restartSeq
     endCPU <- getTime ProcessCPUTime

@@ -86,7 +86,7 @@ data Config
     -- ^ Inverse of the variable activity decay factor. (default 1 / 0.95)
   , configConstrDecay :: !Double
     -- ^ Inverse of the constraint activity decay factor. (1 / 0.999)
-  , configUpdateStatisticsInterval :: !Int
+  , configUpdateStatisticsInterval :: !Double
     -- ^ Interval for updating statistics (seconds). (default 1 second)
   } deriving (Show, Eq, Ord)
 
