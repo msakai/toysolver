@@ -97,6 +97,11 @@ Flag BuildToyFMF
   Default: False
   Manual: True
 
+Flag BuildForeignLibraries
+  Description: build foreign libraries
+  Default: True
+  Manual: True  
+
 Flag BuildSamplePrograms
   Description: build sample programs
   Default: False
@@ -447,6 +452,8 @@ Executable toysat
 
 Foreign-Library     toysat-ipasir
   type:             native-shared
+  if !flag(BuildForeignLibraries)
+    buildable: False
   if os(Windows)
     options: standalone
     mod-def-file: app/toysat-ipasir/ipasir.def
