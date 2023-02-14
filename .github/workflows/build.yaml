@@ -86,7 +86,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install ocl-icd-opencl-dev
 
-      - uses: actions/cache@v1
+      - uses: actions/cache@v3
         name: Cache ~/.stack
         with:
           path: ~/.stack
