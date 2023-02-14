@@ -1,4 +1,3 @@
--- stack --install-ghc runghc --package turtle build_artifacts.hs
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
