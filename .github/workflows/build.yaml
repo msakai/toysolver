@@ -68,6 +68,7 @@ jobs:
           submodules: true
 
       - uses: haskell/actions/setup@v1
+        id: setup-haskell
         name: Setup Haskell
         with:
           ghc-version: ${{ matrix.ghc }}
@@ -89,7 +90,7 @@ jobs:
       - uses: actions/cache@v3
         name: Cache ~/.stack
         with:
-          path: ~/.stack
+          path: ${{ steps.setup-haskell.outputs.stack-root }}
           key: ${{ runner.os }}-${{ matrix.ghc }}-stack
 
       # https://github.com/commercialhaskell/stack/issues/5405
