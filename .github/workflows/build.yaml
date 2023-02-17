@@ -74,7 +74,7 @@ jobs:
       - name: Test
         shell: bash
         # -j1 is for https://github.com/commercialhaskell/stack/issues/5024
-        run: stack test ${{ matrix.stack_args }} --test-arguments "+RTS -T -RTS" -j1 ${{ matrix.flags }}
+        run: stack test ${{ matrix.stack_args }} --test-arguments "+RTS -T -s -RTS" -j1 ${{ matrix.flags }}
         timeout-minutes: 10
 
       - name: Check IPASIR DLL dependencies
