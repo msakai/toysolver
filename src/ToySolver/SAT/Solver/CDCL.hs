@@ -131,7 +131,7 @@ module ToySolver.SAT.Solver.CDCL
 
 import Prelude hiding (log)
 import Control.Concurrent
-import Control.Concurrent.Async (withAsync)
+import Control.Concurrent.Async (async, withAsync, uninterruptibleCancel)
 import Control.Concurrent.Thread.Delay (delay)
 import Control.Loop
 import Control.Monad
@@ -1136,12 +1136,19 @@ solve_ solver = do
     startWC  <- getTime Monotonic
     writeIORef (svStartWC solver) startWC
     writeIORef (svPrintStatFlag solver) False
+    hogeRef <- newIORef False
     let timer = forever $ do
           delay $ floor (configUpdateStatisticsInterval config * 1000 * 1000)
           writeIORef (svPrintStatFlag solver) True
-    result <- withAsync timer $ \_ -> loop restartSeq
+    -- result <- withAsync timer $ \_ -> loop restartSeq
+    result <- mask $ \restore -> do
+      a <- async (restore timer `finally` writeIORef hogeRef True)
+      restore (loop restartSeq) `finally` uninterruptibleCancel a
     endCPU <- getTime ProcessCPUTime
     endWC  <- getTime Monotonic
+
+    hoge <- readIORef hogeRef
+    unless hoge $ error "XXX"
 
     case result of
       Right True -> do
