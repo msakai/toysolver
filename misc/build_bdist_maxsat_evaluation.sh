@@ -1,44 +1,39 @@
 #!/bin/bash
-export CABALVER=1.22
-export GHCVER=7.10.3
+set -eux
 
-sudo add-apt-repository -y ppa:hvr/ghc
-sudo apt-get update
+STACK_ARGS="--docker"
+FLAGS="--flag toysolver:LinuxStatic --flag toysolver:ForceChar8 --flag toysolver:-WithZlib --flag toysolver:-BuildForeignLibraries"
 
-sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER
-export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:~/.cabal/bin:$PATH
-
-sudo apt-get install happy-1.19.4 alex-3.1.3
-export PATH=/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:$PATH
-
-cabal sandbox init
-cabal update
-cabal install --only-dependencies
-#cabal configure --disable-shared --ghc-options="-static -optl-static -optl-pthread"
-cabal configure -fLinuxStatic -fForceChar8
-cabal build
+stack build $STACK_ARGS $FLAGS
+LOCAL_INSTALL_ROOT=`stack path $STACK_ARGS --local-install-root`
 
 PKG=toysat-maxsat`date +%Y`-`date +%Y%m%d`-`git rev-parse --short HEAD`
-rm -r $PKG
+if [ -d $PKG ]; then
+  rm -r $PKG
+fi
 mkdir $PKG
-cp dist/build/toysat/toysat $PKG/toysat_main
+cp $LOCAL_INSTALL_ROOT/bin/toysat $PKG/toysat_main
 cp COPYING misc/maxsat/toysat/README.md misc/maxsat/toysat/toysat $PKG/
-tar Jcf $PKG.tar.xz $PKG --owner=sakai --group=sakai
+tar Jcf $PKG.tar.xz $PKG
 
 if [ ! -f ubcsat-beta-12-b18.tar.gz ]; then
   wget http://ubcsat.dtompkins.com/downloads/ubcsat-beta-12-b18.tar.gz
 fi
-rm -r ubcsat-beta-12-b18
+if [ -d ubcsat-beta-12-b18 ]; then
+  rm -r ubcsat-beta-12-b18
+fi
 mkdir ubcsat-beta-12-b18
 cd ubcsat-beta-12-b18
 tar zxf ../ubcsat-beta-12-b18.tar.gz
-gcc -Wall -O3 -static -o ubcsat src/adaptnovelty.c src/algorithms.c src/ddfw.c src/derandomized.c src/g2wsat.c src/gsat-tabu.c src/gsat.c src/gwsat.c src/hsat.c src/hwsat.c src/irots.c src/jack.c src/mt19937ar.c src/mylocal.c src/novelty+p.c src/novelty.c src/parameters.c src/paws.c src/random.c src/reports.c src/rgsat.c src/rnovelty.c src/rots.c src/samd.c src/saps.c src/sparrow.c src/ubcsat-help.c src/ubcsat-internal.c src/ubcsat-io.c src/ubcsat-mem.c src/ubcsat-reports.c src/ubcsat-time.c src/ubcsat-triggers.c src/ubcsat-version.c src/ubcsat.c src/vw.c src/walksat-tabu.c src/walksat.c src/weighted.c -lm
+docker run --rm --platform linux/amd64 -v `pwd`:/work -w /work gcc:12.2.0 gcc -Wall -O3 -static -o ubcsat src/adaptnovelty.c src/algorithms.c src/ddfw.c src/derandomized.c src/g2wsat.c src/gsat-tabu.c src/gsat.c src/gwsat.c src/hsat.c src/hwsat.c src/irots.c src/jack.c src/mt19937ar.c src/mylocal.c src/novelty+p.c src/novelty.c src/parameters.c src/paws.c src/random.c src/reports.c src/rgsat.c src/rnovelty.c src/rots.c src/samd.c src/saps.c src/sparrow.c src/ubcsat-help.c src/ubcsat-internal.c src/ubcsat-io.c src/ubcsat-mem.c src/ubcsat-reports.c src/ubcsat-time.c src/ubcsat-triggers.c src/ubcsat-version.c src/ubcsat.c src/vw.c src/walksat-tabu.c src/walksat.c src/weighted.c -lm
 cd ..
 
 PKG=toysat_ls-maxsat`date +%Y`-`date +%Y%m%d`-`git rev-parse --short HEAD`
-rm -r $PKG
+if [ -d $PKG ]; then
+  rm -r $PKG
+fi
 mkdir $PKG
-cp dist/build/toysat/toysat $PKG/toysat_main
+cp $LOCAL_INSTALL_ROOT/bin/toysat $PKG/toysat_main
 cp COPYING misc/maxsat/toysat_ls/README.md misc/maxsat/toysat_ls/toysat_ls $PKG/
 cp ubcsat-beta-12-b18/ubcsat $PKG/
-tar Jcf $PKG.tar.xz $PKG --owner=sakai --group=sakai
+tar Jcf $PKG.tar.xz $PKG

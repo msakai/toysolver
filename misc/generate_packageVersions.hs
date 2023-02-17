@@ -1,4 +1,3 @@
--- stack --install-ghc runghc --package Cabal generate_packageVersions.hs
 {-# LANGUAGE CPP #-}
 module Main where
 

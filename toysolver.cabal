@@ -25,10 +25,6 @@ Extra-Source-Files:
    COPYING-GPL
    app/toysat-ipasir/ipasir.h
    app/toysat-ipasir/ipasir.map
-   misc/build_bdist_linux.sh
-   misc/build_bdist_macos.sh
-   misc/build_bdist_win32.sh
-   misc/build_bdist_win64.sh
    misc/build_bdist_maxsat_evaluation.sh
    misc/build_bdist_pb_evaluation.sh
    misc/build_bdist_qbf_evaluation.sh
@@ -96,6 +92,11 @@ Flag BuildToyFMF
   Description: build toyfmf command
   Default: False
   Manual: True
+
+Flag BuildForeignLibraries
+  Description: build foreign libraries
+  Default: True
+  Manual: True  
 
 Flag BuildSamplePrograms
   Description: build sample programs
@@ -449,6 +450,8 @@ Executable toysat
 
 Foreign-Library     toysat-ipasir
   type:             native-shared
+  if !flag(BuildForeignLibraries)
+    buildable: False
   if os(Windows)
     options: standalone
     mod-def-file: app/toysat-ipasir/ipasir.def

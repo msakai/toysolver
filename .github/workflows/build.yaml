@@ -68,6 +68,7 @@ jobs:
           submodules: true
 
       - uses: haskell/actions/setup@v1
+        id: setup-haskell
         name: Setup Haskell
         with:
           ghc-version: ${{ matrix.ghc }}
@@ -86,10 +87,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install ocl-icd-opencl-dev
 
-      - uses: actions/cache@v1
+      - uses: actions/cache@v3
         name: Cache ~/.stack
         with:
-          path: ~/.stack
+          path: ${{ steps.setup-haskell.outputs.stack-root }}
           key: ${{ runner.os }}-${{ matrix.ghc }}-stack
 
       # https://github.com/commercialhaskell/stack/issues/5405
@@ -146,6 +147,10 @@ jobs:
         run: |
           curl -L https://github.com/lehins/stack-hpc-coveralls/releases/download/v0.0.6.0/shc.tar.gz | tar -xz
           ./shc --repo-token="$COVERALLS_REPO_TOKEN" toysolver TestSuite TestPolynomial
+
+      - name: Test scripts
+        shell: bash
+        run: stack runhaskell ${{ matrix.stack_args }} misc/generate_packageVersions.hs > /dev/null
 
       - name: Build artifacts
         run: stack runhaskell ${{ matrix.stack_args }} --package turtle misc/build_artifacts.hs
