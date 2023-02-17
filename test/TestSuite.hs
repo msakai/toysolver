@@ -36,8 +36,18 @@ import Test.Smtlib
 import Test.SubsetSum
 import Test.BipartiteMatching
 
+import Control.Concurrent
+import Control.Monad
+import GHC.Stats
+
 main :: IO ()
-main = defaultMain $ testGroup "ToySolver test suite"
+main = do
+ forkIO $ forever $ do
+   threadDelay $ 1 * 1000 * 1000
+   stats <- getRTSStats
+   putStrLn $ "gcdetails_live_bytes = " ++ show (gcdetails_live_bytes (gc stats))
+   
+ defaultMain $ testGroup "ToySolver test suite"
   [ arealTestGroup
 --  , areal2TestGroup
   , arithTestGroup
