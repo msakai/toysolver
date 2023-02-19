@@ -51,6 +51,9 @@ extra-deps:
 - sign-0.4.4
 - bytestring-encoding-0.1.2.0
 - MIP-0.1.1.0
+# Patched version of tasty-th for reading UTF-8 files on non UTF-8 environment.
+- git: https://github.com/msakai/tasty-th/
+  commit: ebbe5a79b3c7a537ceafc6291744c4d531bef63c
 
 # hack for avoiding haddock error of MemoTrie-0.6.4
 #- MemoTrie-0.6.7
