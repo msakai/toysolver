@@ -130,6 +130,9 @@ module ToySolver.SAT.Solver.CDCL
   ) where
 
 import Prelude hiding (log)
+import Control.Concurrent
+import Control.Concurrent.Async (withAsync)
+import Control.Concurrent.Thread.Delay (delay)
 import Control.Loop
 import Control.Monad
 import Control.Monad.IO.Class
@@ -350,8 +353,8 @@ data Solver
 
   -- Logging
   , svLogger :: !(IORef (Maybe (String -> IO ())))
-  , svStartWC    :: !(IORef TimeSpec)
-  , svLastStatWC :: !(IORef TimeSpec)
+  , svStartWC :: !(IORef TimeSpec)
+  , svPrintStatFlag :: !(IORef Bool)
 
   -- Working spaces
   , svCanceled        :: !(IORef Bool)
@@ -707,7 +710,7 @@ newSolverWithConfig config = do
 
   logger <- newIORef Nothing
   startWC    <- newIORef undefined
-  lastStatWC <- newIORef undefined
+  printStatFlag <- newIORef False
 
   randgen  <- newIORef =<< Rand.create
 
@@ -780,8 +783,8 @@ newSolverWithConfig config = do
 
         -- Logging
         , svLogger = logger
-        , svStartWC    = startWC
-        , svLastStatWC = lastStatWC
+        , svStartWC = startWC
+        , svPrintStatFlag = printStatFlag
 
         -- Working space
         , svCanceled        = canceled
@@ -1116,7 +1119,7 @@ solve_ solver = do
 
     let loop [] = error "solve_: should not happen"
         loop (conflict_lim:rs) = do
-          printStat solver True
+          printStat solver
           ret <- search solver conflict_lim onConflict
           case ret of
             SRFinished x -> return $ Right x
@@ -1132,7 +1135,11 @@ solve_ solver = do
     startCPU <- getTime ProcessCPUTime
     startWC  <- getTime Monotonic
     writeIORef (svStartWC solver) startWC
-    result <- loop restartSeq
+    writeIORef (svPrintStatFlag solver) False
+    let timer = forever $ do
+          delay $ floor (configUpdateStatisticsInterval config * 1000 * 1000)
+          writeIORef (svPrintStatFlag solver) True
+    result <- withAsync timer $ \_ -> loop restartSeq
     endCPU <- getTime ProcessCPUTime
     endWC  <- getTime Monotonic
 
@@ -1153,7 +1160,7 @@ solve_ solver = do
 
     when debugMode $ dumpVarActivity solver
     when debugMode $ dumpConstrActivity solver
-    printStat solver True
+    printStat solver
     let durationSecs :: TimeSpec -> TimeSpec -> Double
         durationSecs start end = fromIntegral (toNanoSecs (end `diffTimeSpec` start)) / 10^(9::Int)
     (log solver . printf "#cpu_time = %.3fs") (durationSecs startCPU endCPU)
@@ -1274,8 +1281,10 @@ search solver !conflict_lim onConflict = do
           when ret $ writeIORef (svCanceled solver) True
       canceled <- readIORef (svCanceled solver)
 
-      when (c `mod` 100 == 0) $ do
-        printStat solver False
+      printStatFlag <- readIORef (svPrintStatFlag solver)
+      when printStatFlag $ do
+        writeIORef (svPrintStatFlag solver) False
+        printStat solver
 
       if d == levelRoot then do
         callLearnCallback solver []
@@ -2059,27 +2068,20 @@ printStatHeader solver = do
   log solver $ "      |         |          |          |    Limit     GC | Var      | Constra "
   log solver $ "============================================================================="
 
-printStat :: Solver -> Bool -> IO ()
-printStat solver force = do
+printStat :: Solver -> IO ()
+printStat solver = do
   nowWC <- getTime Monotonic
-  b <- if force
-       then return True
-       else do
-         lastWC <- readIORef (svLastStatWC solver)
-         return $ sec (nowWC `diffTimeSpec` lastWC) > 1
-  when b $ do
-    startWC   <- readIORef (svStartWC solver)
-    let tm = showTimeDiff $ nowWC `diffTimeSpec` startWC
-    restart   <- readIOURef (svNRestart solver)
-    dec       <- readIOURef (svNDecision solver)
-    conflict  <- readIOURef (svNConflict solver)
-    learntLim <- readIORef (svLearntLim solver)
-    learntGC  <- readIOURef (svNLearntGC solver)
-    fixed     <- getNFixed solver
-    removed   <- readIOURef (svNRemovedConstr solver)
-    log solver $ printf "%s | %7d | %8d | %8d | %8d %6d | %8d | %8d"
-      tm restart dec conflict learntLim learntGC fixed removed
-    writeIORef (svLastStatWC solver) nowWC
+  startWC   <- readIORef (svStartWC solver)
+  let tm = showTimeDiff $ nowWC `diffTimeSpec` startWC
+  restart   <- readIOURef (svNRestart solver)
+  dec       <- readIOURef (svNDecision solver)
+  conflict  <- readIOURef (svNConflict solver)
+  learntLim <- readIORef (svLearntLim solver)
+  learntGC  <- readIOURef (svNLearntGC solver)
+  fixed     <- getNFixed solver
+  removed   <- readIOURef (svNRemovedConstr solver)
+  log solver $ printf "%s | %7d | %8d | %8d | %8d %6d | %8d | %8d"
+    tm restart dec conflict learntLim learntGC fixed removed
 
 showTimeDiff :: TimeSpec -> String
 showTimeDiff t
