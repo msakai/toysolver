@@ -875,6 +875,8 @@ Test-suite TestSuite
   Type:              exitcode-stdio-1.0
   HS-Source-Dirs:    test Smtlib app/toysmt
   Main-is:           TestSuite.hs
+  if os(windows)
+    C-Sources: GetNumThreads.c
   Other-Modules:
     Test.AReal
     Test.AReal2

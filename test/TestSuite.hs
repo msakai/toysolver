@@ -1,5 +1,8 @@
 module Main where
 
+import Control.Concurrent
+import Control.Monad
+
 import Test.Tasty (defaultMain, testGroup)
 
 import Test.AReal
@@ -36,8 +39,19 @@ import Test.Smtlib
 import Test.SubsetSum
 import Test.BipartiteMatching
 
+
+foreign import ccall "GetNumThreads" getNumThreads :: IO Int
+
+
 main :: IO ()
-main = defaultMain $ testGroup "ToySolver test suite"
+main = do
+ forkIO $ do
+    forever $ do
+      n <- getNumThreads
+      putStrLn $ "NumThreads = " ++ show n
+      threadDelay $ 1*1000*1000
+
+ defaultMain $ testGroup "ToySolver test suite"
   [ arealTestGroup
 --  , areal2TestGroup
   , arithTestGroup
