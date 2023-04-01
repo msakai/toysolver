@@ -11,32 +11,18 @@ jobs:
       matrix:
         include:
           - ghc: '9.4.4'
-            os: ubuntu-latest
+            os: windows-latest
             stack_yaml: 'stack-ghc-9.4.yaml'
-            stack_args: '--haddock --no-haddock-deps'
+            stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
 
           - ghc: '9.2.5'
-            os: ubuntu-latest
+            os: windows-latest
             stack_yaml: 'stack-ghc-9.2.yaml'
-            stack_args: '--haddock --no-haddock-deps'
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
-            coveralls: false
-
-          - ghc: '9.0.2'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-9.0.yaml'
-            stack_args: '--haddock --no-haddock-deps'
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
-            release: true
-          - ghc: '9.0.2'
-            os: macos-latest
-            stack_yaml: 'stack-ghc-9.0.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
-            release: true
 
           # Current version of stack (2.7.5) cannot build foreign libraries for windows on GHC >=9.0
           # We need a stack built with Cabal-3.8.1 which contains the fix https://github.com/haskell/cabal/pull/7764 .
@@ -46,14 +32,6 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
-            release: true
-
-          - ghc: '8.8.4'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-8.8.yaml'
-            stack_args: '--coverage'
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
-            coveralls: true
 
           - ghc: '8.6.3'
             os: windows-latest
@@ -61,7 +39,6 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             coveralls: false
-            release: true
     steps:
       - uses: actions/checkout@v2
         with:
