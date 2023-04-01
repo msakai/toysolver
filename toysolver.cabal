@@ -447,25 +447,25 @@ Executable toysat
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
 
-Foreign-Library     toysat-ipasir
-  type:             native-shared
-  if os(Windows)
-    options: standalone
-    mod-def-file: app/toysat-ipasir/ipasir.def
-  if os(Linux)
-    ld-options: -Wl,--version-script=app/toysat-ipasir/ipasir.map
-  build-depends:
-    base,
-    containers,
-    toysolver
-  hs-source-dirs:   app/toysat-ipasir
-  include-dirs:     app/toysat-ipasir
-  c-sources:        app/toysat-ipasir/cbits.c
-  cc-options:       -Wall
-  cpp-options:      -DIPASIR_SHARED_LIB -DBUILDING_IPASIR_SHARED_LIB
-  includes:         ipasir.h
-  other-modules:    IPASIR
-  default-language: Haskell2010
+-- Foreign-Library     toysat-ipasir
+--   type:             native-shared
+--   if os(Windows)
+--     options: standalone
+--     mod-def-file: app/toysat-ipasir/ipasir.def
+--   if os(Linux)
+--     ld-options: -Wl,--version-script=app/toysat-ipasir/ipasir.map
+--   build-depends:
+--     base,
+--     containers,
+--     toysolver
+--   hs-source-dirs:   app/toysat-ipasir
+--   include-dirs:     app/toysat-ipasir
+--   c-sources:        app/toysat-ipasir/cbits.c
+--   cc-options:       -Wall
+--   cpp-options:      -DIPASIR_SHARED_LIB -DBUILDING_IPASIR_SHARED_LIB
+--   includes:         ipasir.h
+--   other-modules:    IPASIR
+--   default-language: Haskell2010
 
 Executable toysmt
   HS-Source-Dirs: app/toysmt, Smtlib
