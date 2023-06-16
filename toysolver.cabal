@@ -111,6 +111,11 @@ Flag ExtraBoundsChecking
   Manual: True
   Default: False
 
+Flag optparse-applicative-018
+  Description: use optparse-applicative >=0.18
+  Manual: False
+  Default: False
+
 source-repository head
   type:     git
   location: git://github.com/msakai/toysolver.git
@@ -541,17 +546,23 @@ Executable toyconvert
   HS-Source-Dirs: app
   Build-Depends:
     base,
-    ansi-wl-pprint,
     bytestring,
     bytestring-builder,
     data-default-class,
     filepath,
     MIP,
-    optparse-applicative,
     pseudo-boolean,
     scientific,
     text,
     toysolver
+  if flag(optparse-applicative-018)
+    Build-Depends:
+      optparse-applicative >=0.18,
+      ansi-wl-pprint >=1.0
+  else
+    Build-Depends:
+      optparse-applicative <0.18,
+      ansi-wl-pprint
   Default-Language: Haskell2010
   Other-Extensions: CPP
   GHC-Options: -rtsopts
