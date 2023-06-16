@@ -25,18 +25,6 @@ Extra-Source-Files:
    COPYING-GPL
    app/toysat-ipasir/ipasir.h
    app/toysat-ipasir/ipasir.map
-   misc/build_bdist_maxsat_evaluation.sh
-   misc/build_bdist_pb_evaluation.sh
-   misc/build_bdist_qbf_evaluation.sh
-   misc/build_bdist_smtcomp.sh
-   misc/maxsat/toysat/README.md
-   misc/maxsat/toysat/toysat
-   misc/maxsat/toysat_ls/README.md
-   misc/maxsat/toysat_ls/toysat_ls
-   misc/pb/README.md
-   misc/qbf/README.md
-   misc/smtcomp/bin/starexec_run_default
-   misc/smtcomp/starexec_description.txt
    src/ToySolver/Data/Polyhedron.hs
    samples/gcnf/*.cnf
    samples/gcnf/*.gcnf
