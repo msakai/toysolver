@@ -560,7 +560,7 @@ Executable toyconvert
   if flag(optparse-applicative-018)
     Build-Depends:
       optparse-applicative >=0.18,
-      ansi-wl-pprint >=1.0
+      prettyprinter >=1
   else
     Build-Depends:
       optparse-applicative <0.18,
