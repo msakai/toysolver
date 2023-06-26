@@ -1,5 +1,11 @@
 # Release process
 
+## Update `CHANGELOG.markdown`
+
+.
+
+## Set environment variables
+
 Bump version in `toysolver.cabal` if necessary.
 
 ```shell-session
