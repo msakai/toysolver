@@ -1,12 +1,14 @@
 # Release process
 
-## Update `CHANGELOG.markdown`
+## Preparation
 
-.
+* Run `ruby misc/remove-trailing-space.rb`
+* Run `ruby misc/collect-language-pragmas.rb` and update `Other-Extensions` in `.cabal` if necesary
+* Run `ruby misc/collect-min-version-macro.rb` and remove `#if`s that are always satisfied by the versions specified by `Build-Depends`
+* Update `CHANGELOG.markdown`
+* Bump version in `toysolver.cabal` if necessary.
 
 ## Set environment variables
-
-Bump version in `toysolver.cabal` if necessary.
 
 ```shell-session
 $ export GHC_VERSION=9.4
