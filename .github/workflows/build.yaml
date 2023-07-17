@@ -67,15 +67,17 @@ jobs:
         with:
           submodules: true
 
-      - uses: haskell/actions/setup@v1
+      - uses: haskell/actions/setup@v2
         id: setup-haskell
         name: Setup Haskell
         with:
           ghc-version: ${{ matrix.ghc }}
           enable-stack: true
           stack-version: 'latest'
-          stack-no-global: true
-          stack-setup-ghc: true
+          cabal-update: false
+
+      - name: Setup stack
+        run: stack config set system-ghc --global true
 
       #- name: Fix ld path (Windows)
       #  if: runner.os == 'Windows'
