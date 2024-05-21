@@ -15,8 +15,8 @@ Tested-With:
    GHC ==8.8.4
    GHC ==8.10.7
    GHC ==9.0.2
-   GHC ==9.2.5
-   GHC ==9.4.4
+   GHC ==9.2.8
+   GHC ==9.4.5
 Extra-Source-Files:
    README.md
    INSTALL.md
@@ -25,18 +25,6 @@ Extra-Source-Files:
    COPYING-GPL
    app/toysat-ipasir/ipasir.h
    app/toysat-ipasir/ipasir.map
-   misc/build_bdist_maxsat_evaluation.sh
-   misc/build_bdist_pb_evaluation.sh
-   misc/build_bdist_qbf_evaluation.sh
-   misc/build_bdist_smtcomp.sh
-   misc/maxsat/toysat/README.md
-   misc/maxsat/toysat/toysat
-   misc/maxsat/toysat_ls/README.md
-   misc/maxsat/toysat_ls/toysat_ls
-   misc/pb/README.md
-   misc/qbf/README.md
-   misc/smtcomp/bin/starexec_run_default
-   misc/smtcomp/starexec_description.txt
    src/ToySolver/Data/Polyhedron.hs
    samples/gcnf/*.cnf
    samples/gcnf/*.gcnf
@@ -123,6 +111,11 @@ Flag ExtraBoundsChecking
   Manual: True
   Default: False
 
+Flag optparse-applicative-018
+  Description: use optparse-applicative >=0.18
+  Manual: False
+  Default: False
+
 source-repository head
   type:     git
   location: git://github.com/msakai/toysolver.git
@@ -132,8 +125,8 @@ Library
   Hs-source-dirs: src
   Build-Depends:
      array >=0.5,
-     -- GHC >=8.6 && <9.5
-     base >=4.12 && <4.18,
+     -- GHC >=8.6 && <9.7
+     base >=4.12 && <4.19,
      bytestring >=0.9.2.1 && <0.12,
      bytestring-builder,
      bytestring-encoding >=0.1.1.0,
@@ -553,17 +546,23 @@ Executable toyconvert
   HS-Source-Dirs: app
   Build-Depends:
     base,
-    ansi-wl-pprint,
     bytestring,
     bytestring-builder,
     data-default-class,
     filepath,
     MIP,
-    optparse-applicative,
     pseudo-boolean,
     scientific,
     text,
     toysolver
+  if flag(optparse-applicative-018)
+    Build-Depends:
+      optparse-applicative >=0.18,
+      ansi-wl-pprint >=1.0
+  else
+    Build-Depends:
+      optparse-applicative <0.18,
+      ansi-wl-pprint
   Default-Language: Haskell2010
   Other-Extensions: CPP
   GHC-Options: -rtsopts
