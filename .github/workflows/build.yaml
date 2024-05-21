@@ -180,6 +180,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: true
+      - uses: geertvdc/setup-hub@master
 
       - uses: actions/download-artifact@v2
         with:
