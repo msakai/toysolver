@@ -192,9 +192,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           shopt -s nullglob
-          assets=()
-          for asset in binary-packages/*; do
-            assets+=("-a" "$asset")
-          done
           tag_name="${GITHUB_REF#refs/tags/}"
-          hub release create "${assets[@]}" -d -m "$tag_name" "$tag_name"
+          gh release create --draft --title "${tag_name}" "${tag_name}" binary-packages/*
