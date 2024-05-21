@@ -22,6 +22,7 @@ jobs:
             stack_yaml: 'stack-ghc-9.4.yaml'
             stack_args: '--haddock --no-haddock-deps'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            platform: linux-x86_64
             coveralls: false
 
           - ghc: '9.2.8'
@@ -29,6 +30,7 @@ jobs:
             stack_yaml: 'stack-ghc-9.2.yaml'
             stack_args: '--haddock --no-haddock-deps'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            platform: linux-x86_64
             coveralls: false
 
           - ghc: '9.0.2'
@@ -36,12 +38,14 @@ jobs:
             stack_yaml: 'stack-ghc-9.0.yaml'
             stack_args: '--haddock --no-haddock-deps'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            platform: linux-x86_64
             release: true
           - ghc: '9.0.2'
             os: macos-13  # Intel Mac
             stack_yaml: 'stack-ghc-9.0.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            platform: macos
             coveralls: false
             release: true
 
@@ -52,6 +56,7 @@ jobs:
             stack_yaml: 'stack-ghc-8.10.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            platform: win64
             coveralls: false
             release: true
 
@@ -60,6 +65,7 @@ jobs:
             stack_yaml: 'stack-ghc-8.8.yaml'
             stack_args: '--coverage'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            platform: linux-x86_64
             coveralls: true
 
           - ghc: '8.6.3'
@@ -67,14 +73,15 @@ jobs:
             stack_yaml: 'stack-windows-i386.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            platform: win32
             coveralls: false
             release: true
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
-      - uses: haskell/actions/setup@v1
+      - uses: haskell-actions/setup@v2
         id: setup-haskell
         name: Setup Haskell
         with:
@@ -94,7 +101,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install ocl-icd-opencl-dev
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         name: Cache ~/.stack
         with:
           path: ${{ steps.setup-haskell.outputs.stack-root }}
@@ -160,12 +167,14 @@ jobs:
         run: stack runhaskell ${{ matrix.stack_args }} misc/generate_packageVersions.hs > /dev/null
 
       - name: Build artifacts
+        id: build-artifact
         run: stack runhaskell ${{ matrix.stack_args }} --package turtle misc/build_artifacts.hs
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
+        if: matrix.release
         with:
-          name: binary-packages
+          name: binary-packages-${{ matrix.platform }}
           path: |
             *.tar.xz
             *.7z
@@ -177,13 +186,25 @@ jobs:
     if: startsWith(github.ref, 'refs/tags')
     needs: build
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
-          name: binary-packages
+          name: binary-packages-linux-x86_64
+          path: binary-packages
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-packages-macos
+          path: binary-packages
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-packages-win32
+          path: binary-packages
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-packages-win64
           path: binary-packages
 
       - name: Upload artifacts to GitHub Release
