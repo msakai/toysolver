@@ -31,7 +31,7 @@ jobs:
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             release: true
           - ghc: '9.0.2'
-            os: macos-latest
+            os: macos-13  # Intel Mac
             stack_yaml: 'stack-ghc-9.0.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
