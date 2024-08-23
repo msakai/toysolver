@@ -107,7 +107,9 @@ jobs:
         name: Cache ~/.stack
         with:
           path: ${{ steps.setup-haskell.outputs.stack-root }}
-          key: ${{ runner.os }}-${{ matrix.ghc }}-stack
+          key: ${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('toysolver.cabal') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.ghc }}-
 
       # https://github.com/commercialhaskell/stack/issues/5405
       - name: Clear setup-exe-cache directory
