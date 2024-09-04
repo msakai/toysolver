@@ -35,6 +35,7 @@ module ToySolver.Arith.Simplex.Textbook.MIPSolver.Simple
   ) where
 
 import Control.Exception
+import Control.Monad
 import Control.Monad.State
 import Data.Default.Class
 import Data.Ord

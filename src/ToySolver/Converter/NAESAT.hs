@@ -41,6 +41,7 @@ module ToySolver.Converter.NAESAT
   , nae3sat2max2sat
   ) where
 
+import Control.Monad
 import Control.Monad.State.Strict
 import Data.Array.Unboxed
 import qualified Data.IntMap as IntMap

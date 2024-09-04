@@ -50,6 +50,7 @@ module ToySolver.Arith.CAD
   ) where
 
 import Control.Exception
+import Control.Monad
 import Control.Monad.State
 import Data.List
 import Data.Maybe
