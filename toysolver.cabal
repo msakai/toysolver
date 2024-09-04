@@ -127,7 +127,7 @@ Library
      array >=0.5,
      -- GHC >=8.6 && <9.7
      base >=4.12 && <4.19,
-     bytestring >=0.9.2.1 && <0.12,
+     bytestring >=0.9.2.1 && <0.13,
      bytestring-builder,
      bytestring-encoding >=0.1.1.0,
      case-insensitive,
@@ -526,7 +526,7 @@ Executable toyfmf
       base,
       containers,
       intern,
-      logic-TPTP >=0.4.6.0 && <0.5,
+      logic-TPTP >=0.4.6.0 && <0.6,
       optparse-applicative,
       text,
       toysolver
@@ -865,7 +865,7 @@ Test-suite TestPolynomial
     pretty,
     tasty >=0.10.1,
     tasty-hunit >=0.9 && <0.11,
-    tasty-quickcheck >=0.8 && <0.11,
+    tasty-quickcheck >=0.8 && <0.12,
     tasty-th,
     toysolver
   Default-Language: Haskell2010
@@ -939,7 +939,7 @@ Test-suite TestSuite
     scientific,
     tasty >=0.10.1,
     tasty-hunit >=0.9 && <0.11,
-    tasty-quickcheck >=0.8 && <0.11,
+    tasty-quickcheck >=0.8 && <0.12,
     tasty-th,
     text,
     toysolver,
