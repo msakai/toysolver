@@ -17,7 +17,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ghc: '9.4.5'
+          - ghc: '9.6.6'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-9.6.yaml'
+            stack_args: '--haddock --no-haddock-deps'
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            platform: linux-x86_64
+            coveralls: false
+
+          - ghc: '9.4.8'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.4.yaml'
             stack_args: '--haddock --no-haddock-deps'
