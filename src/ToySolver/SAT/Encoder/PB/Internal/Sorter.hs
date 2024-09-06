@@ -36,6 +36,7 @@ module ToySolver.SAT.Encoder.PB.Internal.Sorter
   , encodePBLinAtLeastSorter
   ) where
 
+import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.State
 import Control.Monad.Writer

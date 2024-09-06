@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -528,11 +529,15 @@ walksat solver opt cb p = do
 
 -- -------------------------------------------------------------------
 
+#if !MIN_VERSION_array(0,5,6)
+
 {-# INLINE modifyArray #-}
 modifyArray :: (MArray a e m, Ix i) => a i e -> i -> (e -> e) -> m ()
 modifyArray a i f = do
   e <- readArray a i
   writeArray a i (f e)
+
+#endif
 
 {-# INLINE forAssocsM_ #-}
 forAssocsM_ :: (IArray a e, Monad m) => a Int e -> ((Int,e) -> m ()) -> m ()

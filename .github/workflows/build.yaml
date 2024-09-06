@@ -17,7 +17,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ghc: '9.4.5'
+          - ghc: '9.6.6'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-9.6.yaml'
+            stack_args: '--haddock --no-haddock-deps'
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            platform: linux-x86_64
+            coveralls: false
+            release: true
+          - ghc: '9.6.6'
+            os: macos-13  # Intel Mac
+            stack_yaml: 'stack-ghc-9.6.yaml'
+            stack_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            platform: macos
+            coveralls: false
+            release: true
+
+          - ghc: '9.4.8'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.4.yaml'
             stack_args: '--haddock --no-haddock-deps'
@@ -39,15 +56,7 @@ jobs:
             stack_args: '--haddock --no-haddock-deps'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             platform: linux-x86_64
-            release: true
-          - ghc: '9.0.2'
-            os: macos-13  # Intel Mac
-            stack_yaml: 'stack-ghc-9.0.yaml'
-            stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
-            platform: macos
             coveralls: false
-            release: true
 
           # Current version of stack (2.7.5) cannot build foreign libraries for windows on GHC >=9.0
           # We need a stack built with Cabal-3.8.1 which contains the fix https://github.com/haskell/cabal/pull/7764 .

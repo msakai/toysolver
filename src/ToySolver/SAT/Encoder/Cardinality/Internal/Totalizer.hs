@@ -32,6 +32,7 @@ module ToySolver.SAT.Encoder.Cardinality.Internal.Totalizer
   , encodeSum
   ) where
 
+import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.State.Strict
 import qualified Data.IntSet as IntSet
