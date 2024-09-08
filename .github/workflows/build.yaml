@@ -60,6 +60,9 @@ jobs:
 
           # Current version of stack (2.7.5) cannot build foreign libraries for windows on GHC >=9.0
           # We need a stack built with Cabal-3.8.1 which contains the fix https://github.com/haskell/cabal/pull/7764 .
+          #
+          # Also, GHC 9.6.5/Cabal-3.10.3.0 has a different problem regarding foreign libraries for windows
+          # https://github.com/haskell/cabal/issues/9982
           - ghc: '8.10.7'
             os: windows-latest
             stack_yaml: 'stack-ghc-8.10.yaml'
