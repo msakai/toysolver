@@ -17,11 +17,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - ghc: '9.8.2'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-9.8.yaml'
+            stack_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
+            platform: linux-x86_64
+            coveralls: false
+
           - ghc: '9.6.6'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.6.yaml'
             stack_args: '--haddock --no-haddock-deps'
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: linux-x86_64
             coveralls: false
             release: true
@@ -29,7 +37,7 @@ jobs:
             os: macos-13  # Intel Mac
             stack_yaml: 'stack-ghc-9.6.yaml'
             stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: macos
             coveralls: false
             release: true

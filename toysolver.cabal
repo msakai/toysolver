@@ -18,6 +18,7 @@ Tested-With:
    GHC ==9.2.8
    GHC ==9.4.8
    GHC ==9.6.6
+   GHC ==9.8.2
 Extra-Source-Files:
    README.md
    INSTALL.md

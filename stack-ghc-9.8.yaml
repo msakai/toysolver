@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-16.31
+resolver: nightly-2024-10-21
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -43,18 +43,20 @@ packages:
 extra-deps:
 - queue-0.1.2
 - OptDir-0.0.3
-- logic-TPTP-0.4.7.0
+- logic-TPTP-0.6.0.0
 - finite-field-0.9.0
-- pseudo-boolean-0.1.10.0@sha256:c6a8b6c23c84cce8cecb37683755bde54db80b1ca817ce72de772c98d31dae44,2552
-- sign-0.4.4
-- bytestring-encoding-0.1.1.0
-- MIP-0.1.1.0
+- pseudo-boolean-0.1.11.0
+- sign-0.4.4@sha256:e97cc7f11e67a99b1eeeefb9d7552ec867bf29d3c8ce11338850c31fc09637fb
+- bytestring-encoding-0.1.2.0
+- MIP-0.1.2.0
 # Patched version of tasty-th for reading UTF-8 files on non UTF-8 environment.
 - git: https://github.com/msakai/tasty-th/
   commit: ebbe5a79b3c7a537ceafc6291744c4d531bef63c
 
 # Override default flag values for local packages and extra-deps
-flags: {}
+flags:
+  toysolver:
+    optparse-applicative-018: true
 
 # Extra package databases containing global packages
 extra-package-dbs: []

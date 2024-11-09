@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-22.33
+resolver: lts-22.40
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -43,7 +43,7 @@ packages:
 extra-deps:
 - queue-0.1.2
 - OptDir-0.0.3
-- logic-TPTP-0.5.1.0
+- logic-TPTP-0.6.0.0
 - finite-field-0.9.0
 - pseudo-boolean-0.1.11.0@sha256:3e03a1fd845c70397d4e47c0da79a126c747bf4c3b0e4553eb4026297376dfd7
 - sign-0.4.4
@@ -53,19 +53,10 @@ extra-deps:
 - git: https://github.com/msakai/tasty-th/
   commit: ebbe5a79b3c7a537ceafc6291744c4d531bef63c
 
-- ansi-wl-pprint-0.6.9@sha256:fb737bc96e2aef34ad595d54ced7a73f648c521ebcb00fe0679aff45ccd49212,2448
-- base-compat-0.12.3@sha256:4ef57766629fda9a5a6e41777e5279beb48a37b9d6cf5904c78643ad11a8a1ee,7490
-- base-compat-batteries-0.12.3@sha256:398c0d3c01407d5f79d7737961e79d0da1272ea11285238c6082850afc60dd9d,9666
-- criterion-1.5.13.0@sha256:6d627a4c269981d3c94bff5aca7c377e838336faf666ac5a4447863bf1044727,5650
-- criterion-measurement-0.1.4.0@sha256:a1e16321f63bb2de4eb9fe2ad9982479d0fed590be82ec0b99cfa082f4ed1821,2121
-- optparse-applicative-0.17.1.0@sha256:cb5f5f0dc9749846fc0e3df0041a8efee6368cc1cff07336acd4c3b02a951ed6,5147
-
-# hack for avoiding haddock error of MemoTrie-0.6.4
-#- MemoTrie-0.6.7
-#- newtype-generics-0.5
-
 # Override default flag values for local packages and extra-deps
-flags: {}
+flags:
+  toysolver:
+    optparse-applicative-018: true
 
 # Extra package databases containing global packages
 extra-package-dbs: []
