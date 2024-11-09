@@ -44,8 +44,6 @@ extra-deps:
 - queue-0.1.2
 - OptDir-0.0.3
 - logic-TPTP-0.4.7.0
-#- git: https://github.com/msakai/logic-TPTP.git
-#  commit: 9041314569aff4117c0da677f2af04614caf1aa5
 - finite-field-0.9.0
 - pseudo-boolean-0.1.10.0@sha256:c6a8b6c23c84cce8cecb37683755bde54db80b1ca817ce72de772c98d31dae44,2552
 - sign-0.4.4
@@ -54,10 +52,6 @@ extra-deps:
 # Patched version of tasty-th for reading UTF-8 files on non UTF-8 environment.
 - git: https://github.com/msakai/tasty-th/
   commit: ebbe5a79b3c7a537ceafc6291744c4d531bef63c
-
-# hack for avoiding haddock error of MemoTrie-0.6.4
-#- MemoTrie-0.6.7
-#- newtype-generics-0.5
 
 # Override default flag values for local packages and extra-deps
 flags: {}
