@@ -34,11 +34,19 @@ jobs:
             coveralls: false
             release: true
           - ghc: '9.6.6'
-            os: macos-13  # Intel Mac
+            os: macos-latest
             stack_yaml: 'stack-ghc-9.6.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
-            platform: macos
+            platform: macos-aarch64
+            coveralls: false
+            release: true
+          - ghc: '9.6.6'
+            os: macos-latest
+            stack_yaml: 'stack-ghc-9.6.yaml'
+            stack_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
+            platform: macos-x86_64
             coveralls: false
             release: true
 
@@ -101,6 +109,11 @@ jobs:
         with:
           submodules: true
 
+      - name: Write arch to stack.yaml (macos-x86_64)
+        if: matrix.platform == 'macos-x86_64'
+        run: |
+          echo "arch: x86_64" >> ${STACK_YAML}
+
       - uses: haskell-actions/setup@v2
         id: setup-haskell
         name: Setup Haskell
@@ -108,9 +121,11 @@ jobs:
           ghc-version: ${{ matrix.ghc }}
           enable-stack: true
           stack-version: 'latest'
+          stack-no-global: ${{ (matrix.platform == 'macos-x86_64' || matrix.platform == 'win32') && 'true' || '' }}
           cabal-update: false
 
-      - name: Setup stack
+      - name: Setup stack to use system GHC
+        if: matrix.platform != 'macos-x86_64' && matrix.platform != 'win32'
         run: stack config set system-ghc --global true
 
       #- name: Fix ld path (Windows)
@@ -166,7 +181,11 @@ jobs:
       - name: Test IPASIR DLL using genipaessentials
         shell: bash
         run: |
-          stack exec -- g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root`/lib -ltoysat-ipasir -o genipaessentials
+          if [[ ${{ matrix.platform }} = "macos-x86_64" ]]; then
+            stack exec -- arch -x86_64 g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root`/lib -ltoysat-ipasir -o genipaessentials
+          else
+            stack exec -- g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root`/lib -ltoysat-ipasir -o genipaessentials
+          fi
           if [[ ${{ runner.os }} = "macOS" ]]; then
             install_name_tool -add_rpath `stack path --local-install-root`/lib genipaessentials
           elif [[ ${{ runner.os }} = "Windows" ]]; then
@@ -220,7 +239,11 @@ jobs:
           path: binary-packages
       - uses: actions/download-artifact@v4
         with:
-          name: binary-packages-macos
+          name: binary-packages-macos-aarch64
+          path: binary-packages
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-packages-macos-x86_64
           path: binary-packages
       - uses: actions/download-artifact@v4
         with:
