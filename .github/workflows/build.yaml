@@ -127,7 +127,7 @@ jobs:
         name: Cache ~/.stack
         with:
           path: ${{ steps.setup-haskell.outputs.stack-root }}
-          key: ${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('toysolver.cabal') }}
+          key: ${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('toysolver.cabal', matrix.stack_yaml) }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.ghc }}-
 
