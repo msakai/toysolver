@@ -32,8 +32,13 @@ import Options.Applicative
 import System.IO
 import System.Exit
 import System.FilePath
+#if MIN_VERSION_optparse_applicative(0,18,0)
+import Prettyprinter ((<+>))
+import qualified Prettyprinter as PP
+#else
 import Text.PrettyPrint.ANSI.Leijen ((<+>))
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
+#endif
 
 import qualified Data.PseudoBoolean as PBFile
 import qualified Numeric.Optimization.MIP as MIP
@@ -215,6 +220,20 @@ parserInfo = info (helper <*> versionOption <*> optionsParser)
       <> long "version"
       <> help "Show version"
 
+#if MIN_VERSION_optparse_applicative(0,18,0)
+
+supportedFormatsDoc :: PP.Doc ann
+supportedFormatsDoc =
+  PP.vsep
+  [ PP.pretty "Supported formats:"
+  , PP.indent 2 $ PP.vsep
+      [ PP.pretty "input:"  <+> (PP.align $ PP.fillSep $ map PP.pretty $ words ".cnf .wcnf .opb .wbo .gcnf .lp .mps .qubo")
+      , PP.pretty "output:" <+> (PP.align $ PP.fillSep $ map PP.pretty $ words ".cnf .wcnf .opb .wbo .lsp .lp .mps .smp .smt2 .ys .qubo")
+      ]
+  ]
+
+#else
+
 supportedFormatsDoc :: PP.Doc
 supportedFormatsDoc =
   PP.vsep
@@ -224,6 +243,8 @@ supportedFormatsDoc =
       , PP.text "output:" <+> (PP.align $ PP.fillSep $ map PP.text $ words ".cnf .wcnf .opb .wbo .lsp .lp .mps .smp .smt2 .ys .qubo")
       ]
   ]
+
+#endif
 
 data Problem
   = ProbOPB PBFile.Formula
