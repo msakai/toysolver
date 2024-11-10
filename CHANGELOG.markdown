@@ -1,6 +1,14 @@
 0.9.0 (Unreleased)
 -----
 
+* Add `BuildForeignLibraries` flag (#94)
+* Support GHC 9.4 (#92), 9.6, 9.8, 9.10
+* Remove features that depend on OpenCL (#90)
+* Consider polarity in encoding of pseudo-boolean and cardinality constraints (#88)
+* Add BC-CNF pseudo boolean constraint encoder (#85)
+* Do not rely on `StarIsType` extension (#84)
+* Support specifying PB encoding strategy (#77)
+
 0.8.0
 -----
 
