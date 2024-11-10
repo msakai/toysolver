@@ -19,12 +19,13 @@ Tested-With:
    GHC ==9.4.8
    GHC ==9.6.6
    GHC ==9.8.2
-Extra-Source-Files:
+Extra-Doc-Files:
    README.md
    INSTALL.md
    CHANGELOG.markdown
    COPYING
    COPYING-GPL
+Extra-Source-Files:
    app/toysat-ipasir/ipasir.h
    app/toysat-ipasir/ipasir.map
    src/ToySolver/Data/Polyhedron.hs
