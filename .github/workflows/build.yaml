@@ -23,7 +23,6 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: linux-x86_64
-            coveralls: false
 
           - ghc: '9.6.6'
             os: ubuntu-latest
@@ -31,7 +30,6 @@ jobs:
             stack_args: '--haddock --no-haddock-deps'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: linux-x86_64
-            coveralls: false
             release: true
           - ghc: '9.6.6'
             os: macos-latest
@@ -39,7 +37,6 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: macos-aarch64
-            coveralls: false
             release: true
           - ghc: '9.6.6'
             os: macos-latest
@@ -47,32 +44,29 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: macos-x86_64
-            coveralls: false
             release: true
 
           - ghc: '9.4.8'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.4.yaml'
-            stack_args: '--haddock --no-haddock-deps'
+            stack_args: '--coverage'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             platform: linux-x86_64
-            coveralls: false
+            coveralls: true
 
           - ghc: '9.2.8'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.2.yaml'
-            stack_args: '--haddock --no-haddock-deps'
+            stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             platform: linux-x86_64
-            coveralls: false
 
           - ghc: '9.0.2'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.0.yaml'
-            stack_args: '--haddock --no-haddock-deps'
+            stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             platform: linux-x86_64
-            coveralls: false
 
           # Current version of stack (2.7.5) cannot build foreign libraries for windows on GHC >=9.0
           # We need a stack built with Cabal-3.8.1 which contains the fix https://github.com/haskell/cabal/pull/7764 .
@@ -85,16 +79,14 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             platform: win64
-            coveralls: false
             release: true
 
           - ghc: '8.8.4'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-8.8.yaml'
-            stack_args: '--coverage'
+            stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             platform: linux-x86_64
-            coveralls: true
 
           - ghc: '8.6.3'
             os: windows-latest
@@ -102,7 +94,6 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             platform: win32
-            coveralls: false
             release: true
     steps:
       - uses: actions/checkout@v4
