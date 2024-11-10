@@ -23,7 +23,7 @@ main = sh $ do
         case Info.os of
           "mingw32" -> (if Info.arch == "x86_64" then "win64" else "win32", Just "exe", archive7z)
           "linux"   -> ("linux-" ++ Info.arch, Nothing, archiveTarXz)
-          "darwin"  -> ("macos", Nothing, archiveTarXz)
+          "darwin"  -> ("macos-" ++ Info.arch, Nothing, archiveTarXz)
           _ -> error ("unknown os: " ++ Info.os)
       exe_files =
         [ "toyconvert"
