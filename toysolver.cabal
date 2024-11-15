@@ -551,6 +551,7 @@ Executable toyconvert
     base,
     bytestring,
     bytestring-builder,
+    containers,
     data-default-class,
     filepath,
     MIP,
