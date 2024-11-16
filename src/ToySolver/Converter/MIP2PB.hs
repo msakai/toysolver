@@ -57,11 +57,11 @@ data MIP2PBInfo = MIP2PBInfo (Map MIP.Var Integer.Expr) !Integer
   deriving (Eq, Show)
 
 instance Transformer MIP2PBInfo where
-  type Source MIP2PBInfo = Map MIP.Var Integer
+  type Source MIP2PBInfo = Map MIP.Var Rational
   type Target MIP2PBInfo = SAT.Model
 
 instance BackwardTransformer MIP2PBInfo where
-  transformBackward (MIP2PBInfo vmap _d) m = fmap (Integer.eval m) vmap
+  transformBackward (MIP2PBInfo vmap _d) m = fmap (toRational . Integer.eval m) vmap
 
 instance ObjValueTransformer MIP2PBInfo where
   type SourceObjValue MIP2PBInfo = Rational

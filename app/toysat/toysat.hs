@@ -41,6 +41,7 @@ import Data.Maybe
 import Data.Ord
 import qualified Data.Vector.Unboxed as V
 import Data.Version
+import Data.Ratio
 import Data.Scientific as Scientific
 import Data.Time
 import Options.Applicative hiding (info)
@@ -1064,13 +1065,13 @@ solveMIP opt solver mip = do
       let transformObjValBackward :: Integer -> Rational
           transformObjValBackward val = transformObjValueBackward info (val + linObjOffset)
 
-          printModel :: Map MIP.Var Integer -> IO ()
+          printModel :: Map MIP.Var Rational -> IO ()
           printModel m = do
             forM_ (Map.toList m) $ \(v, val) -> do
-              printf "v %s = %d\n" (MIP.fromVar v) val
+              printf "v %s = %d\n" (MIP.fromVar v) (asInteger val)
             hFlush stdout
 
-          writeSol :: Map MIP.Var Integer -> Rational -> IO ()
+          writeSol :: Map MIP.Var Rational -> Rational -> IO ()
           writeSol m objVal = do
             case optWriteFile opt of
               Nothing -> return ()
@@ -1078,9 +1079,14 @@ solveMIP opt solver mip = do
                 let sol = MIP.Solution
                           { MIP.solStatus = MIP.StatusUnknown
                           , MIP.solObjectiveValue = Just $ Scientific.fromFloatDigits (fromRational objVal :: Double)
-                          , MIP.solVariables = Map.fromList [(v, fromIntegral val) | (v,val) <- Map.toList m]
+                          , MIP.solVariables = Map.fromList [(v, fromIntegral (asInteger val)) | (v,val) <- Map.toList m]
                           }
                 GurobiSol.writeFile fname sol
+
+          asInteger :: Rational -> Integer
+          asInteger r
+            | denominator r /= 1 = error (show r ++ " is not integer")
+            | otherwise = numerator r
 
       pbo <- PBO.newOptimizer solver linObj
       setupOptimizer pbo opt

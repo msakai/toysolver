@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
@@ -22,13 +23,15 @@ import Data.Char
 import Data.Default.Class
 import qualified Data.Foldable as F
 import Data.List
+import Data.Map.Lazy (Map)
 import Data.Maybe
 import Data.Scientific (Scientific)
 import qualified Data.Text.Lazy.Builder as TextBuilder
 import qualified Data.Text.Lazy.IO as TLIO
 import qualified Data.Traversable as T
 import qualified Data.Version as V
-import Options.Applicative
+import Options.Applicative hiding (info)
+import qualified Options.Applicative
 import System.IO
 import System.Exit
 import System.FilePath
@@ -50,6 +53,7 @@ import qualified ToySolver.Converter.PBSetObj as PBSetObj
 import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.QUBO as QUBO
+import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Encoder.PB as PB
 import ToySolver.Version
 import ToySolver.Internal.Util (setEncodingChar8)
@@ -57,6 +61,7 @@ import ToySolver.Internal.Util (setEncodingChar8)
 data Options = Options
   { optInput  :: FilePath
   , optOutput :: Maybe FilePath
+  , optInfoOutput :: Maybe FilePath
   , optAsMaxSAT :: Bool
   , optObjType :: ObjType
   , optIndicatorConstraint :: Bool
@@ -79,6 +84,7 @@ optionsParser :: Parser Options
 optionsParser = Options
   <$> fileInput
   <*> outputOption
+  <*> infoOutputOption
   <*> maxsatOption
   <*> objOption
   <*> indicatorConstraintOption
@@ -105,6 +111,12 @@ optionsParser = Options
       <> short 'o'
       <> metavar "FILE"
       <> help "output filename"
+
+    infoOutputOption :: Parser (Maybe FilePath)
+    infoOutputOption = optional $ strOption
+      $  long "dump-info"
+      <> metavar "FILE"
+      <> help "filename for dumping conversion information"
 
     maxsatOption :: Parser Bool
     maxsatOption = switch
@@ -209,7 +221,7 @@ optionsParser = Options
       <> showDefaultWith PB.showStrategy
 
 parserInfo :: ParserInfo Options
-parserInfo = info (helper <*> versionOption <*> optionsParser)
+parserInfo = Options.Applicative.info (helper <*> versionOption <*> optionsParser)
   $  fullDesc
   <> header "toyconvert - converter between various kind of problem files"
   <> footerDoc (Just supportedFormatsDoc)
@@ -246,39 +258,63 @@ supportedFormatsDoc =
 
 #endif
 
+data Trail sol where
+  Trail :: Transformer a => a -> Trail (Target a)
+
 data Problem
-  = ProbOPB PBFile.Formula
-  | ProbWBO PBFile.SoftFormula
-  | ProbMIP (MIP.Problem Scientific)
+  = ProbOPB PBFile.Formula (Trail SAT.Model)
+  | ProbWBO PBFile.SoftFormula (Trail SAT.Model)
+  | ProbMIP (MIP.Problem Scientific) (Trail (Map MIP.Var Rational))
 
 readProblem :: Options -> String -> IO Problem
 readProblem o fname = do
   enc <- T.mapM mkTextEncoding (optFileEncoding o)
   case getExt fname of
     ".cnf"
-      | optAsMaxSAT o ->
-          liftM (ProbWBO . fst . maxsat2wbo) $ FF.readFile fname
+      | optAsMaxSAT o -> do
+          prob <- FF.readFile fname
+          case maxsat2wbo prob of
+            (prob', info) -> return $ ProbWBO prob' (Trail info)
       | otherwise -> do
-          liftM (ProbOPB . fst . sat2pb) $ FF.readFile fname
-    ".wcnf" ->
-      liftM (ProbWBO . fst . maxsat2wbo) $ FF.readFile fname
-    ".opb"  -> liftM ProbOPB $ do
-      if optPBFastParser o then
-        liftM FF.unWithFastParser $ FF.readFile fname
-      else
-        FF.readFile fname
-    ".wbo"  -> liftM ProbWBO $ do
-      if optPBFastParser o then
-        liftM FF.unWithFastParser $ FF.readFile fname
-      else
-        FF.readFile fname
-    ".gcnf" ->
-      liftM (ProbWBO . fst . maxsat2wbo . fst . gcnf2maxsat) $ FF.readFile fname
-    ".lp"   -> ProbMIP <$> MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
-    ".mps"  -> ProbMIP <$> MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
+          prob <- FF.readFile fname
+          case sat2pb prob of
+            (prob', info) -> return $ ProbOPB  prob' (Trail info)
+    ".wcnf" -> do
+      prob <- FF.readFile fname
+      case maxsat2wbo prob of
+        (prob', info) -> return $ ProbWBO prob' (Trail info)
+    ".opb"  -> do
+      prob <-
+        if optPBFastParser o then
+          liftM FF.unWithFastParser $ FF.readFile fname
+        else
+          FF.readFile fname
+      return $ ProbOPB prob (Trail IdentityTransformer)
+    ".wbo"  -> do
+      prob <-
+        if optPBFastParser o then
+          liftM FF.unWithFastParser $ FF.readFile fname
+        else
+          FF.readFile fname
+      return $ ProbWBO prob (Trail IdentityTransformer)
+    ".gcnf" -> do
+      prob <- FF.readFile fname
+      case gcnf2maxsat prob of
+        (prob1, info1) ->
+          case maxsat2wbo prob1 of
+            (prob2, info2) ->
+              return $ ProbWBO prob2 (Trail (ComposedTransformer info1 info2))
+    ".lp"   -> do
+      prob <- MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
+      return $ ProbMIP prob (Trail IdentityTransformer)
+    ".mps"  -> do
+      prob <- MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
+      return $ ProbMIP prob (Trail IdentityTransformer)
     ".qubo" -> do
       (qubo :: QUBO.Problem Scientific) <- FF.readFile fname
-      return $ ProbOPB $ fst $ qubo2pb qubo
+      case qubo2pb qubo of
+        (prob', info) ->
+          return $ ProbOPB prob' (Trail info)
     ext ->
       error $ "unknown file extension: " ++ show ext
 
@@ -296,25 +332,52 @@ transformProblem o = transformObj o . transformPBLinearization o . transformMIPR
 transformObj :: Options -> Problem -> Problem
 transformObj o problem =
   case problem of
-    ProbOPB opb | isNothing (PBFile.pbObjectiveFunction opb) -> ProbOPB $ PBSetObj.setObj (optObjType o) opb
+    ProbOPB opb info | isNothing (PBFile.pbObjectiveFunction opb) -> ProbOPB (PBSetObj.setObj (optObjType o) opb) info
     _ -> problem
 
 transformPBLinearization :: Options -> Problem -> Problem
 transformPBLinearization o problem
   | optLinearization o =
       case problem of
-        ProbOPB opb -> ProbOPB $ fst $ linearizePB  opb (optLinearizationUsingPB o)
-        ProbWBO wbo -> ProbWBO $ fst $ linearizeWBO wbo (optLinearizationUsingPB o)
-        ProbMIP mip -> ProbMIP mip
+        ProbOPB opb (Trail info) ->
+          case linearizePB  opb (optLinearizationUsingPB o) of
+            (opb', info') -> ProbOPB opb' (Trail (ComposedTransformer info info'))
+        ProbWBO wbo (Trail info) ->
+          case linearizeWBO wbo (optLinearizationUsingPB o) of
+            (wbo', info') -> ProbWBO wbo' (Trail (ComposedTransformer info info'))
+        ProbMIP mip info -> ProbMIP mip info
   | otherwise = problem
 
 transformMIPRemoveUserCuts :: Options -> Problem -> Problem
 transformMIPRemoveUserCuts o problem
   | optRemoveUserCuts o =
       case problem of
-        ProbMIP mip -> ProbMIP $ mip{ MIP.userCuts = [] }
+        ProbMIP mip info -> ProbMIP (mip{ MIP.userCuts = [] }) info
         _ -> problem
   | otherwise = problem
+
+transformKSat :: Options -> (CNF.CNF, Trail SAT.Model) -> (CNF.CNF, Trail SAT.Model)
+transformKSat o (cnf, Trail info) =
+  case optKSat o of
+    Nothing -> (cnf, Trail info)
+    Just k ->
+      case sat2ksat k cnf of
+        (cnf2, info2) -> (cnf2, Trail (ComposedTransformer info info2))
+
+transformPB2SAT :: Options -> (PBFile.Formula, Trail SAT.Model) -> (CNF.CNF, Trail SAT.Model)
+transformPB2SAT o (opb, Trail info) =
+  case pb2satWith (optPBEncoding o) opb of
+    (cnf, info') -> (cnf, Trail (ComposedTransformer info info'))
+
+transformWBO2MaxSAT :: Options -> (PBFile.SoftFormula, Trail SAT.Model) -> (CNF.WCNF, Trail SAT.Model)
+transformWBO2MaxSAT o (wbo, Trail info) =
+  case wbo2maxsatWith (optPBEncoding o) wbo of
+    (wcnf, info') -> (wcnf, Trail (ComposedTransformer info info'))
+
+transformPB2QUBO :: (PBFile.Formula, Trail SAT.Model) -> ((QUBO.Problem Integer, Integer), Trail QUBO.Solution)
+transformPB2QUBO (opb, Trail info) =
+  case pb2qubo opb of
+    ((qubo, th), info') -> ((qubo, th), Trail (ComposedTransformer info info'))
 
 writeProblem :: Options -> Problem -> IO ()
 writeProblem o problem = do
@@ -326,89 +389,129 @@ writeProblem o problem = do
         , MIP2SMT.optProduceModel = not (optSMTNoProduceModel o)
         , MIP2SMT.optOptimize     = optSMTOptimize o
         }
+
+      writeInfo :: Transformer a => a -> IO ()
+      writeInfo info =
+        case optInfoOutput o of
+          Just fname -> writeFile fname (show info)
+          Nothing -> return ()
+
+      writeInfo' :: Trail a -> IO ()
+      writeInfo' (Trail info) = writeInfo info
+
   case optOutput o of
     Nothing -> do
       hSetBinaryMode stdout True
       hSetBuffering stdout (BlockBuffering Nothing)
       case problem of
-        ProbOPB opb -> ByteStringBuilder.hPutBuilder stdout $ FF.render opb
-        ProbWBO wbo -> ByteStringBuilder.hPutBuilder stdout $ FF.render wbo
-        ProbMIP mip -> do
+        ProbOPB opb (Trail info) -> do
+          ByteStringBuilder.hPutBuilder stdout $ FF.render opb
+          writeInfo info
+        ProbWBO wbo (Trail info) -> do
+          ByteStringBuilder.hPutBuilder stdout $ FF.render wbo
+          writeInfo info
+        ProbMIP mip (Trail info) -> do
           case MIP.toLPString def mip of
             Left err -> hPutStrLn stderr ("conversion failure: " ++ err) >> exitFailure
             Right s -> do
               F.mapM_ (hSetEncoding stdout) enc
               TLIO.hPutStr stdout s
+              writeInfo info
+
     Just fname -> do
-      let opb = case problem of
-                  ProbOPB opb -> opb
-                  ProbWBO wbo ->
-                    case wbo2pb wbo of
-                      (opb, _)
-                        | optLinearization o ->
-                            -- WBO->OPB conversion may have introduced non-linearity
-                            fst $ linearizePB opb (optLinearizationUsingPB o)
-                        | otherwise -> opb
-                  ProbMIP mip ->
-                    case mip2pb (fmap toRational mip) of
-                      Left err -> error err
-                      Right (opb, _) -> opb
-          wbo = case problem of
-                  ProbOPB opb -> fst $ pb2wbo opb
-                  ProbWBO wbo -> wbo
-                  ProbMIP _   -> fst $ pb2wbo opb
-          lp  = case problem of
-                  ProbOPB opb ->
-                    case pb2ip opb of
-                      (ip, _) -> fmap fromInteger ip
-                  ProbWBO wbo ->
-                    case wbo2ip (optIndicatorConstraint o) wbo of
-                      (ip, _) -> fmap fromInteger ip
-                  ProbMIP mip -> mip
-          lsp = case problem of
-                  ProbOPB opb -> pb2lsp opb
-                  ProbWBO wbo -> wbo2lsp wbo
-                  ProbMIP _   -> pb2lsp opb
+      let opbAndTrail =
+            case problem of
+              ProbOPB opb info -> (opb, info)
+              ProbWBO wbo (Trail info) ->
+                case wbo2pb wbo of
+                  (opb, info')
+                    | optLinearization o ->
+                        -- WBO->OPB conversion may have introduced non-linearity
+                        case linearizePB opb (optLinearizationUsingPB o) of
+                          (opb', info'') -> (opb', Trail (ComposedTransformer info (ComposedTransformer info' info'')))
+                    | otherwise -> (opb, Trail (ComposedTransformer info info'))
+              ProbMIP mip (Trail info) ->
+                case mip2pb (fmap toRational mip) of
+                  Left err -> error err
+                  Right (opb, info') -> (opb, Trail (ComposedTransformer info info'))
+          wboAndTrail =
+            case problem of
+              ProbOPB opb (Trail info) ->
+                case pb2wbo opb of
+                  (wbo, info') -> (wbo, Trail (ComposedTransformer info info'))
+              ProbWBO wbo info -> (wbo, info)
+              ProbMIP _   _ ->
+                case (pb2wbo (fst opbAndTrail), snd opbAndTrail) of
+                    ((wbo, info'), Trail info) -> (wbo, Trail (ComposedTransformer info info'))
+          mipAndTrail =
+            case problem of
+               ProbOPB opb (Trail info) ->
+                 case pb2ip opb of
+                   (ip, info') -> (fmap fromInteger ip, Trail (ComposedTransformer info info'))
+               ProbWBO wbo (Trail info) ->
+                 case wbo2ip (optIndicatorConstraint o) wbo of
+                   (ip, info') -> (fmap fromInteger ip, Trail (ComposedTransformer info info'))
+               ProbMIP mip info -> (mip, info)
+          lsp =
+            case problem of
+              ProbOPB opb _ -> pb2lsp opb
+              ProbWBO wbo _ -> wbo2lsp wbo
+              ProbMIP _ _   -> pb2lsp (fst opbAndTrail)
       case getExt fname of
-        ".opb" -> FF.writeFile fname $ normalizePB opb
-        ".wbo" -> FF.writeFile fname $ normalizeWBO wbo
+        ".opb" -> do
+          FF.writeFile fname $ normalizePB (fst opbAndTrail)
+          writeInfo' (snd opbAndTrail)
+        ".wbo" -> do
+          FF.writeFile fname $ normalizeWBO (fst wboAndTrail)
+          writeInfo' (snd wboAndTrail)
         ".cnf" ->
-          case pb2satWith (optPBEncoding o) opb of
-            (cnf, _) ->
-              case optKSat o of
-                Nothing -> FF.writeFile fname cnf
-                Just k ->
-                  let (cnf2, _) = sat2ksat k cnf
-                  in FF.writeFile fname cnf2
+          case transformKSat o $ transformPB2SAT o opbAndTrail of
+            (cnf, Trail info) -> do
+              FF.writeFile fname cnf
+              writeInfo info
         ".wcnf" ->
-          case wbo2maxsatWith (optPBEncoding o) wbo of
-            (wcnf, _)
-              | optNewWCNF o -> do
-                  let nwcnf = CNF.NewWCNF [(if w >= CNF.wcnfTopCost wcnf then Nothing else Just w, c) | (w, c) <- CNF.wcnfClauses wcnf]
-                  FF.writeFile fname nwcnf
-              | otherwise -> FF.writeFile fname wcnf
-        ".lsp" ->
+          case transformWBO2MaxSAT o wboAndTrail of
+            (wcnf, Trail info) -> do
+              if optNewWCNF o then do
+                let nwcnf = CNF.NewWCNF [(if w >= CNF.wcnfTopCost wcnf then Nothing else Just w, c) | (w, c) <- CNF.wcnfClauses wcnf]
+                FF.writeFile fname nwcnf
+              else do
+                FF.writeFile fname wcnf
+              writeInfo info
+        ".lsp" -> do
           withBinaryFile fname WriteMode $ \h ->
             ByteStringBuilder.hPutBuilder h lsp
-        ".lp" -> MIP.writeLPFile def{ MIP.optFileEncoding = enc } fname lp
-        ".mps" -> MIP.writeMPSFile def{ MIP.optFileEncoding = enc } fname lp
+          case optInfoOutput o of
+            Just _ -> error "--dump-info is not supported for LSP output"
+            Nothing -> return ()
+        ".lp" -> do
+          MIP.writeLPFile def{ MIP.optFileEncoding = enc } fname (fst mipAndTrail)
+          writeInfo' (snd mipAndTrail)
+        ".mps" -> do
+          MIP.writeMPSFile def{ MIP.optFileEncoding = enc } fname (fst mipAndTrail)
+          writeInfo' (snd mipAndTrail)
         ".smp" -> do
           withBinaryFile fname WriteMode $ \h ->
-            ByteStringBuilder.hPutBuilder h (pb2smp False opb)
+            ByteStringBuilder.hPutBuilder h (pb2smp False (fst opbAndTrail))
+          writeInfo' (snd opbAndTrail)
         ".smt2" -> do
           withFile fname WriteMode $ \h -> do
             F.mapM_ (hSetEncoding h) enc
             TLIO.hPutStr h $ TextBuilder.toLazyText $
-              MIP2SMT.mip2smt mip2smtOpt (fmap toRational lp)
+              MIP2SMT.mip2smt mip2smtOpt (fmap toRational (fst mipAndTrail))
+          writeInfo' (snd mipAndTrail)
         ".ys" -> do
           let lang = MIP2SMT.YICES (if optYices2 o then MIP2SMT.Yices2 else MIP2SMT.Yices1)
           withFile fname WriteMode $ \h -> do
             F.mapM_ (hSetEncoding h) enc
             TLIO.hPutStr h $ TextBuilder.toLazyText $
-              MIP2SMT.mip2smt mip2smtOpt{ MIP2SMT.optLanguage = lang } (fmap toRational lp)
+              MIP2SMT.mip2smt mip2smtOpt{ MIP2SMT.optLanguage = lang } (fmap toRational (fst mipAndTrail))
+          writeInfo' (snd mipAndTrail)
         ".qubo" ->
-          case pb2qubo opb of
-            ((qubo, _th), _) -> FF.writeFile fname (fmap (fromInteger :: Integer -> Scientific) qubo)
+          case transformPB2QUBO opbAndTrail of
+            ((qubo, _th), Trail info) -> do
+              FF.writeFile fname (fmap (fromInteger :: Integer -> Scientific) qubo)
+              writeInfo info
         ext -> do
           error $ "unknown file extension: " ++ show ext
 
