@@ -16,7 +16,7 @@
 -----------------------------------------------------------------------------
 module ToySolver.Converter.SAT2KSAT
   ( sat2ksat
-  , SAT2KSATInfo (..)
+  , SAT2KSATInfo
   ) where
 
 import Control.Monad
@@ -29,7 +29,9 @@ import qualified Data.Sequence as Seq
 import Data.STRef
 
 import ToySolver.Converter.Base
+import ToySolver.Converter.Tseitin
 import qualified ToySolver.FileFormat.CNF as CNF
+import ToySolver.SAT.Formula
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.SAT.Store.CNF
 
@@ -55,32 +57,9 @@ sat2ksat k cnf = runST $ do
     loop $ Seq.fromList $ SAT.unpackClause clause
   cnf2 <- getCNFFormula db
   defs <- readSTRef defsRef
-  return (cnf2, SAT2KSATInfo nv1 (CNF.cnfNumVars cnf2) defs)
+  return (cnf2, TseitinInfo nv1 (CNF.cnfNumVars cnf2) [(v, Or [Atom lit | lit <- clause]) | (v, clause) <- toList defs])
 
 
-data SAT2KSATInfo = SAT2KSATInfo !Int !Int (Seq.Seq (SAT.Var, [SAT.Lit]))
-  deriving (Eq, Show, Read)
-
-instance Transformer SAT2KSATInfo where
-  type Source SAT2KSATInfo = SAT.Model
-  type Target SAT2KSATInfo = SAT.Model
-
-instance ForwardTransformer SAT2KSATInfo where
-  transformForward (SAT2KSATInfo nv1 nv2 defs) m = runSTUArray $ do
-    m2 <- newArray_ (1,nv2)
-    forM_ [1..nv1] $ \v -> do
-      writeArray m2 v (SAT.evalVar m v)
-    forM_ (toList defs) $ \(v, clause) -> do
-      let f lit =
-            if lit > 0 then
-              readArray m2 lit
-            else
-              liftM not (readArray m2 (- lit))
-      val <- liftM or (mapM f clause)
-      writeArray m2 v val
-    return m2
-
-instance BackwardTransformer SAT2KSATInfo where
-  transformBackward (SAT2KSATInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
+type SAT2KSATInfo = TseitinInfo
 
 -- -----------------------------------------------------------------------------
