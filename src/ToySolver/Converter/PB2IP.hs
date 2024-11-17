@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -24,11 +25,14 @@ module ToySolver.Converter.PB2IP
   , MaxSAT2IPInfo
   ) where
 
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 import Data.Array.IArray
 import Data.Default.Class
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.String
 
 import qualified Data.PseudoBoolean as PBFile
 import qualified Numeric.Optimization.MIP as MIP
@@ -37,6 +41,7 @@ import Numeric.Optimization.MIP ((.==.), (.<=.), (.>=.))
 import ToySolver.Converter.Base
 import ToySolver.Converter.PB
 import qualified ToySolver.FileFormat.CNF as CNF
+import ToySolver.SAT.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
 
 -- -----------------------------------------------------------------------------
@@ -54,6 +59,13 @@ instance ForwardTransformer PB2IPInfo where
 
 instance BackwardTransformer PB2IPInfo where
   transformBackward (PB2IPInfo nv) = mtrans nv
+
+instance J.ToJSON PB2IPInfo where
+  toJSON (PB2IPInfo nv) =
+    J.object
+    [ "type" .= J.String "PB2IPInfo"
+    , "num_original_variables" .= nv
+    ]
 
 pb2ip :: PBFile.Formula -> (MIP.Problem Integer, PB2IPInfo)
 pb2ip formula = (mip, PB2IPInfo (PBFile.pbNumVars formula))
@@ -109,6 +121,17 @@ instance ForwardTransformer WBO2IPInfo where
 
 instance BackwardTransformer WBO2IPInfo where
   transformBackward (WBO2IPInfo nv _relaxVariables) = mtrans nv
+
+instance J.ToJSON WBO2IPInfo where
+  toJSON (WBO2IPInfo nv relaxVariables) =
+    J.object
+    [ "type" .= J.String "WBO2IPInfo"
+    , "num_original_variables" .= nv
+    , "relax_variables" .= J.object
+        [ fromString (MIP.fromVar v) .= jPBConstraint constr
+        | (v, constr) <- relaxVariables
+        ]
+    ]
 
 wbo2ip :: Bool -> PBFile.SoftFormula -> (MIP.Problem Integer, WBO2IPInfo)
 wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) [(r, c) | (r, (Just _, c)) <- relaxVariables])

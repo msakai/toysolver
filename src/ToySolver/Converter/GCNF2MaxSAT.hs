@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -17,6 +18,8 @@ module ToySolver.Converter.GCNF2MaxSAT
   , GCNF2MaxSATInfo (..)
   ) where
 
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 import qualified Data.Vector.Generic as VG
 import ToySolver.Converter.Base
 import qualified ToySolver.FileFormat.CNF as CNF
@@ -31,6 +34,13 @@ instance Transformer GCNF2MaxSATInfo where
 
 instance BackwardTransformer GCNF2MaxSATInfo where
   transformBackward (GCNF2MaxSATInfo nv1) = SAT.restrictModel nv1
+
+instance J.ToJSON GCNF2MaxSATInfo where
+  toJSON (GCNF2MaxSATInfo nv) =
+    J.object
+    [ "type" .= J.String "GCNF2MaxSATInfo"
+    , "num_original_variables" .= nv
+    ]
 
 gcnf2maxsat :: CNF.GCNF -> (CNF.WCNF, GCNF2MaxSATInfo)
 gcnf2maxsat

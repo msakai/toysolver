@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -27,14 +28,18 @@ module ToySolver.SAT.Formula
   ) where
 
 import Control.Monad.ST
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 import Data.Hashable
 import qualified Data.HashTable.Class as H
 import qualified Data.HashTable.ST.Cuckoo as C
 import Data.Interned
+import qualified Data.Vector as V
 import GHC.Generics
 import ToySolver.Data.Boolean
 import qualified ToySolver.Data.BoolExpr as BoolExpr
 import qualified ToySolver.SAT.Types as SAT
+import ToySolver.SAT.Internal.JSON
 
 -- Should this module be merged into ToySolver.SAT.Types module?
 
@@ -222,5 +227,46 @@ isTrue _ = False
 isFalse :: Formula -> Bool
 isFalse (Or []) = True
 isFalse _ = False
+
+-- ------------------------------------------------------------------------
+
+newtype JSON = JSON{ getJSON :: J.Value }
+
+instance Complement JSON where
+  notB (JSON x) = JSON $ jNot x
+
+instance MonotoneBoolean JSON where
+  andB xs = JSON $ J.object
+    [ "type" .= J.String "operator"
+    , "name" .= J.String "and"
+    , "operands" .= J.Array (V.fromList [x | JSON x <- xs])
+    ]
+  orB xs = JSON $ J.object
+    [ "type" .= J.String "operator"
+    , "name" .= J.String "or"
+    , "operands" .= J.Array (V.fromList [x | JSON x <- xs])
+    ]
+
+instance IfThenElse JSON JSON where
+  ite (JSON c) (JSON t) (JSON e) = JSON $ J.object
+    [ "type" .= J.String "operator"
+    , "name" .= J.String "ite"
+    , "operands" .= J.Array (V.fromList [c, t, e])
+    ]
+
+instance Boolean JSON where
+  (.=>.) (JSON p) (JSON q) = JSON $ J.object
+    [ "type" .= J.String "operator"
+    , "name" .= J.String "=>"
+    , "operands" .= J.Array (V.fromList [p, q])
+    ]
+  (.<=>.) (JSON p) (JSON q) = JSON $ J.object
+    [ "type" .= J.String "operator"
+    , "name" .= J.String "<=>"
+    , "operands" .= J.Array (V.fromList [p, q])
+    ]
+
+instance J.ToJSON Formula where
+  toJSON = getJSON . fold (JSON . jLit)
 
 -- ------------------------------------------------------------------------

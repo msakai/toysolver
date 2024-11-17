@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -23,12 +24,15 @@ import Control.Monad
 import Control.Monad.ST
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 import Data.List (intercalate, foldl', sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Ord
 import Data.Ratio
 import qualified Data.Set as Set
+import Data.String
 import Data.VectorSpace
 
 import qualified Data.PseudoBoolean as PBFile
@@ -38,6 +42,7 @@ import ToySolver.Converter.Base
 import ToySolver.Data.OrdRel
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Integer as Integer
+import ToySolver.SAT.Internal.JSON
 import ToySolver.SAT.Store.PB
 import ToySolver.Internal.Util (revForM)
 
@@ -72,6 +77,17 @@ instance ObjValueForwardTransformer MIP2PBInfo where
 
 instance ObjValueBackwardTransformer MIP2PBInfo where
   transformObjValueBackward (MIP2PBInfo _vmap d) val = fromIntegral val / fromIntegral d
+
+instance J.ToJSON MIP2PBInfo where
+  toJSON (MIP2PBInfo vmap d) =
+    J.object
+    [ "type" .= J.String "MIP2PBInfo"
+    , "substitutions" .= J.object
+        [ fromString (MIP.fromVar v) .= jPBSum s
+        | (v, Integer.Expr s) <- Map.toList vmap
+        ]
+    , "objective_function_scale_factor" .= d
+    ]
 
 -- -----------------------------------------------------------------------------
 

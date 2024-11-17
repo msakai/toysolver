@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -68,6 +69,8 @@ module ToySolver.Converter.PB
 import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.ST
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 import Data.Array.IArray
 import Data.Bits hiding (And (..))
 import Data.Default.Class
@@ -84,6 +87,7 @@ import Data.Primitive.MutVar
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.String
 import qualified Data.PseudoBoolean as PBFile
 
 import ToySolver.Converter.Base
@@ -95,6 +99,7 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.SAT.Encoder.Tseitin (Formula (..))
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
+import ToySolver.SAT.Internal.JSON
 import ToySolver.SAT.Store.CNF
 import ToySolver.SAT.Store.PB
 
@@ -312,6 +317,13 @@ instance ObjValueForwardTransformer PBQuadratizeInfo where
 instance ObjValueBackwardTransformer PBQuadratizeInfo where
   transformObjValueBackward _ = id
 
+instance J.ToJSON PBQuadratizeInfo where
+  toJSON (PBQuadratizeInfo info) =
+    J.object
+    [ "type" .= J.String "PBQuadratizeInfo"
+    , "base" .= info
+    ]
+
 -- -----------------------------------------------------------------------------
 
 -- | Convert inequality constraints into equality constraints by introducing surpass variables.
@@ -388,6 +400,22 @@ instance ObjValueForwardTransformer PBInequalitiesToEqualitiesInfo where
 instance ObjValueBackwardTransformer PBInequalitiesToEqualitiesInfo where
   transformObjValueBackward _ = id
 
+instance J.ToJSON PBInequalitiesToEqualitiesInfo where
+  toJSON (PBInequalitiesToEqualitiesInfo nv1 nv2 defs) =
+    J.object
+    [ "type" .= J.String "PBInequalitiesToEqualitiesInfo"
+    , "num_original_variables" .= nv1
+    , "num_transformed_variables" .= nv2
+    , "slack" .=
+        [ J.object
+          [ "lhs" .= jPBSum lhs
+          , "rhs" .= rhs
+          , "slack" .= [fromString ("x" ++ show v) :: J.Value | v <- vs]
+          ]
+        | (lhs, rhs, vs) <- defs
+        ]
+    ]
+
 -- -----------------------------------------------------------------------------
 
 unconstrainPB :: PBFile.Formula -> ((PBFile.Formula, Integer), PBUnconstrainInfo)
@@ -421,6 +449,13 @@ instance ObjValueForwardTransformer PBUnconstrainInfo where
 
 instance ObjValueBackwardTransformer PBUnconstrainInfo where
   transformObjValueBackward (PBUnconstrainInfo info) = transformObjValueBackward info
+
+instance J.ToJSON PBUnconstrainInfo where
+  toJSON (PBUnconstrainInfo info) =
+    J.object
+    [ "type" .= J.String "PBUnconstrainInfo"
+    , "base" .= info
+    ]
 
 unconstrainPB' :: PBFile.Formula -> (PBFile.Formula, Integer)
 unconstrainPB' formula =
@@ -505,6 +540,18 @@ instance ForwardTransformer WBO2PBInfo where
 
 instance BackwardTransformer WBO2PBInfo where
   transformBackward (WBO2PBInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
+
+instance J.ToJSON WBO2PBInfo where
+  toJSON (WBO2PBInfo nv1 nv2 defs) =
+    J.object
+    [ "type" .= J.String "WBO2PBInfo"
+    , "num_original_variables" .= nv1
+    , "num_transformed_variables" .= nv2
+    , "definitions" .= J.object
+        [ fromString ("x" ++ show v) .= jPBConstraint constr
+        | (v, constr) <- defs
+        ]
+    ]
 
 addWBO :: (PrimMonad m, SAT.AddPBNL m enc) => enc -> PBFile.SoftFormula -> m (SAT.PBSum, [(SAT.Var, PBFile.Constraint)])
 addWBO db wbo = do

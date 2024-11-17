@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 module ToySolver.Converter.SAT2MIS
   (
   -- * SAT to independent set problem conversion
@@ -18,6 +19,8 @@ module ToySolver.Converter.SAT2MIS
 
 import Control.Monad
 import Control.Monad.ST
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 import Data.Array.IArray
 import Data.Array.ST
 import Data.Array.Unboxed
@@ -33,6 +36,7 @@ import ToySolver.Converter.Base
 import ToySolver.Converter.SAT2KSAT
 import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Graph.Base
+import ToySolver.SAT.Internal.JSON
 import ToySolver.SAT.Store.CNF
 import ToySolver.SAT.Store.PB
 import qualified ToySolver.SAT.Types as SAT
@@ -111,6 +115,18 @@ instance BackwardTransformer SAT3ToISInfo where
     where
       lits = IntSet.map (nodeToLit !) indep_set
 
+instance J.ToJSON SAT3ToISInfo where
+  toJSON (SAT3ToISInfo nv clusters nodeToLit) =
+    J.object
+    [ "type" .= J.String "SAT3ToISInfo"
+    , "num_original_variables" .= nv
+    , "clusters" .= clusters
+    , "node_to_literal" .= (J.toJSONList
+        [ (node, jLit lit)
+        | (node, lit) <- assocs nodeToLit
+        ])
+    ]
+
 -- ------------------------------------------------------------------------
 
 is2pb :: (Graph, Int) -> (PBFile.Formula, IS2SATInfo)
@@ -177,6 +193,13 @@ instance ObjValueForwardTransformer IS2SATInfo where
 
 instance ObjValueBackwardTransformer IS2SATInfo where
   transformObjValueBackward (IS2SATInfo (lb, ub)) k = (ub - lb + 1) - fromIntegral k
+
+instance J.ToJSON IS2SATInfo where
+  toJSON (IS2SATInfo (lb, ub)) =
+    J.object
+    [ "type" .= J.String "IS2SATInfo"
+    , "node_bounds" .= (lb, ub)
+    ]
 
 -- ------------------------------------------------------------------------
 

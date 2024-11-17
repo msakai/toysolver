@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -23,6 +24,8 @@ module ToySolver.SDP
   , DualizeInfo (..)
   ) where
 
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 import qualified Data.Map.Strict as Map
 import Data.Scientific (Scientific)
 import ToySolver.Converter.Base
@@ -185,6 +188,14 @@ instance BackwardTransformer DualizeInfo where
                 case splitAt (blockIndexesLen block) zV1 of
                   (vals, zV2) -> symblock (zip (blockIndexes block) vals) : f blocks zV2
       _ -> error "ToySolver.SDP.transformSolutionBackward: invalid solution"
+
+instance J.ToJSON DualizeInfo where
+  toJSON (DualizeInfo origM origBlockStruct) =
+    J.object
+    [ "type" .= J.String "DualizeInfo"
+    , "num_original_matrices" .= origM
+    , "original_block_structure" .= origBlockStruct
+    ] 
 
 symblock :: [((Int,Int), Scientific)] -> SDPFile.Block
 symblock es = Map.fromList $ do

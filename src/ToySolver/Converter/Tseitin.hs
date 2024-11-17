@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -16,7 +17,10 @@ module ToySolver.Converter.Tseitin
   ( TseitinInfo (..)
   ) where
 
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 import Data.Array.IArray
+import Data.String
 import ToySolver.Converter.Base
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
@@ -38,5 +42,17 @@ instance ForwardTransformer TseitinInfo where
 
 instance BackwardTransformer TseitinInfo where
   transformBackward (TseitinInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
+
+instance J.ToJSON TseitinInfo where
+  toJSON (TseitinInfo nv1 nv2 defs) =
+    J.object
+    [ "type" .= J.String "TseitinInfo"
+    , "num_original_variables" .= nv1
+    , "num_transformed_variables" .= nv2
+    , "definitions" .= J.object
+        [ fromString ("x" ++ show v) .= formula
+        | (v, formula) <- defs
+        ]
+    ]
 
 -- -----------------------------------------------------------------------------

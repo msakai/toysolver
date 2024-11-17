@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -51,6 +52,8 @@ module ToySolver.Converter.SAT2MaxSAT
   , simpleMaxSAT2ToSimpleMaxCut
   ) where
 
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 import Data.Array.Unboxed
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
@@ -237,6 +240,14 @@ instance BackwardTransformer SimpleMaxSAT2ToSimpleMaxCutInfo where
     where
       (_numNodes, _tt, ff, _t, _f ,xp, _xn, _l) = simpleMaxSAT2ToSimpleMaxCutNodes n p
       b = not (sol ! ff 0)
+
+instance J.ToJSON SimpleMaxSAT2ToSimpleMaxCutInfo where
+  toJSON (SimpleMaxSAT2ToSimpleMaxCutInfo n p) =
+    J.object
+    [ "type" .= J.String "SimpleMaxSAT2ToSimpleMaxCutInfo"
+    , "num_original_variables" .= n
+    , "num_transformed_nodes" .= p
+    ]
 
 -- ------------------------------------------------------------------------
 

@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
@@ -32,6 +33,8 @@ module ToySolver.Converter.QUBO
 
 import Control.Monad
 import Control.Monad.State
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 import Data.Array.Unboxed
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -92,6 +95,13 @@ instance (Eq a, Show a, Read a, Real a) => ObjValueForwardTransformer (QUBO2PBIn
 instance (Eq a, Show a, Read a, Num a) => ObjValueBackwardTransformer (QUBO2PBInfo a) where
   transformObjValueBackward (QUBO2PBInfo d) obj = fromInteger $ (obj + d - 1) `div` d
 
+instance J.ToJSON (QUBO2PBInfo a) where
+  toJSON (QUBO2PBInfo d) =
+    J.object
+    [ "type" .= J.String "QUBO2PBInfo"
+    , "objective_function_scale_factor" .= d
+    ]
+
 -- -----------------------------------------------------------------------------
 
 pbAsQUBO :: forall a. Real a => PBFile.Formula -> Maybe (QUBO.Problem a, PBAsQUBOInfo a)
@@ -143,6 +153,13 @@ instance Num a => ObjValueForwardTransformer (PBAsQUBOInfo a) where
 
 instance Real a => ObjValueBackwardTransformer (PBAsQUBOInfo a) where
   transformObjValueBackward (PBAsQUBOInfo offset) obj = round (toRational obj) + offset
+
+instance J.ToJSON (PBAsQUBOInfo a) where
+  toJSON (PBAsQUBOInfo offset) =
+    J.object
+    [ "type" .= J.String "PBAsQUBOInfo"
+    , "objective_function_offset" .= (- offset)
+    ]
 
 -- -----------------------------------------------------------------------------
 
@@ -225,6 +242,13 @@ instance (Eq a, Show a, Num a) => ObjValueForwardTransformer (QUBO2IsingInfo a) 
 instance (Eq a, Show a, Num a) => ObjValueBackwardTransformer (QUBO2IsingInfo a) where
   transformObjValueBackward (QUBO2IsingInfo offset) obj = obj + offset
 
+instance (Num a, J.ToJSON a) => J.ToJSON (QUBO2IsingInfo a) where
+  toJSON (QUBO2IsingInfo offset) =
+    J.object
+    [ "type" .= J.String "QUBO2IsingInfo"
+    , "objective_function_offset" .= (- offset)
+    ]
+
 -- -----------------------------------------------------------------------------
 
 ising2qubo :: (Eq a, Num a) => QUBO.IsingModel a -> (QUBO.Problem a, Ising2QUBOInfo a)
@@ -283,6 +307,13 @@ instance (Eq a, Show a, Num a) => ObjValueForwardTransformer (Ising2QUBOInfo a) 
 
 instance (Eq a, Show a, Num a) => ObjValueBackwardTransformer (Ising2QUBOInfo a) where
   transformObjValueBackward (Ising2QUBOInfo offset) obj = obj + offset
+
+instance (Num a, J.ToJSON a) => J.ToJSON (Ising2QUBOInfo a) where
+  toJSON (Ising2QUBOInfo offset) =
+    J.object
+    [ "type" .= J.String "Ising2QUBOInfo"
+    , "objective_function_offset" .= (- offset)
+    ]
 
 -- -----------------------------------------------------------------------------
 

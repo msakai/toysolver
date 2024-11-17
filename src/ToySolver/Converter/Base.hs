@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 -----------------------------------------------------------------------------
@@ -26,6 +27,8 @@ module ToySolver.Converter.Base
   , ReversedTransformer (..)
   ) where
 
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 
 class (Eq a, Show a) => Transformer a where
   type Source a
@@ -78,6 +81,13 @@ instance (ObjValueBackwardTransformer a, ObjValueBackwardTransformer b, TargetOb
   => ObjValueBackwardTransformer (ComposedTransformer a b) where
   transformObjValueBackward (ComposedTransformer a b) = transformObjValueBackward a . transformObjValueBackward b
 
+instance (J.ToJSON a, J.ToJSON b) => J.ToJSON (ComposedTransformer a b) where
+  toJSON (ComposedTransformer a b) =
+    J.object
+    [ "type" .= J.String "ComposedTransformer"
+    , "first" .= a
+    , "second" .= b
+    ]
 
 
 data IdentityTransformer a = IdentityTransformer
@@ -92,6 +102,12 @@ instance ForwardTransformer (IdentityTransformer a) where
 
 instance BackwardTransformer (IdentityTransformer a) where
   transformBackward IdentityTransformer = id
+
+instance J.ToJSON (IdentityTransformer a) where
+  toJSON IdentityTransformer =
+    J.object
+    [ "type" .= J.String "IdentityTransformer"
+    ]
 
 
 data ReversedTransformer t = ReversedTransformer t
@@ -116,3 +132,10 @@ instance ObjValueBackwardTransformer t => ObjValueForwardTransformer (ReversedTr
 
 instance ObjValueForwardTransformer t => ObjValueBackwardTransformer (ReversedTransformer t) where
   transformObjValueBackward (ReversedTransformer t) = transformObjValueForward t
+
+instance J.ToJSON t => J.ToJSON (ReversedTransformer t) where
+  toJSON (ReversedTransformer t) =
+    J.object
+    [ "type" .= J.String "ReversedTransformer"
+    , "base" .= t
+    ]
