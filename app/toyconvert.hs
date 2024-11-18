@@ -18,6 +18,7 @@ module Main where
 
 import Control.Applicative
 import Control.Monad
+import qualified Data.Aeson as J
 import qualified Data.ByteString.Builder as ByteStringBuilder
 import Data.Char
 import Data.Default.Class
@@ -259,7 +260,7 @@ supportedFormatsDoc =
 #endif
 
 data Trail sol where
-  Trail :: Transformer a => a -> Trail (Target a)
+  Trail :: (Transformer a, J.ToJSON a) => a -> Trail (Target a)
 
 data Problem
   = ProbOPB PBFile.Formula (Trail SAT.Model)
@@ -390,10 +391,10 @@ writeProblem o problem = do
         , MIP2SMT.optOptimize     = optSMTOptimize o
         }
 
-      writeInfo :: Transformer a => a -> IO ()
+      writeInfo :: (Transformer a, J.ToJSON a) => a -> IO ()
       writeInfo info =
         case optInfoOutput o of
-          Just fname -> writeFile fname (show info)
+          Just fname -> J.encodeFile fname info
           Nothing -> return ()
 
       writeInfo' :: Trail a -> IO ()
