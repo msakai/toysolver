@@ -617,7 +617,7 @@ case_setTerminateCallback = do
 
   m <- try (SAT.solve solver)
   case m of
-    Left (e :: SAT.Canceled) -> return ()
+    Left (_ :: SAT.Canceled) -> return ()
     Right x -> assertFailure ("Canceled should be thrown: " ++ show x)
 
 case_clearTerminateCallback :: IO ()

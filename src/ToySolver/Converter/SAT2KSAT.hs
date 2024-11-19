@@ -21,14 +21,11 @@ module ToySolver.Converter.SAT2KSAT
 
 import Control.Monad
 import Control.Monad.ST
-import Data.Array.MArray
-import Data.Array.ST
 import Data.Foldable (toList)
 import Data.Sequence ((<|), (|>))
 import qualified Data.Sequence as Seq
 import Data.STRef
 
-import ToySolver.Converter.Base
 import ToySolver.Converter.Tseitin
 import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.SAT.Formula

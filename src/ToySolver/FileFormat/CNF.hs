@@ -239,7 +239,7 @@ toOldWCNF (NewWCNF cs)
   , wcnfClauses = [(fromMaybe top w, c) | (w, c) <- cs]
   }
   where
-    top = sum [w | (Just w, c) <- cs] + 1
+    top = sum [w | (Just w, _c) <- cs] + 1
 
 toNewWCNF :: WCNF -> NewWCNF
 toNewWCNF wcnf = NewWCNF [(if w >= wcnfTopCost wcnf then Nothing else Just w, c) | (w, c) <- wcnfClauses wcnf]

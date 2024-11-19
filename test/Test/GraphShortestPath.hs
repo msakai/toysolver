@@ -4,7 +4,6 @@
 module Test.GraphShortestPath (graphShortestPathTestGroup) where
 
 import Control.Monad
-import Data.Hashable
 import Data.Monoid
 import Test.Tasty
 import Test.Tasty.HUnit

@@ -217,7 +217,7 @@ solveWBO cxt solver opt = do
               _ -> do
                 let torelax     = unrelaxed `IntSet.intersection` failed
                     intersected = IntMap.elems (IntMap.restrictKeys sels failed)
-                    disjoint    = [core | (sel,(core,_)) <- IntMap.toList (IntMap.withoutKeys sels failed)]
+                    disjoint    = [core | (_sel,(core,_)) <- IntMap.toList (IntMap.withoutKeys sels failed)]
                 modifyIORef unrelaxedRef (`IntSet.difference` torelax)
                 modifyIORef relaxedRef (`IntSet.union` torelax)
                 delta <- do
