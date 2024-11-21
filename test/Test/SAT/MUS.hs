@@ -215,7 +215,7 @@ case_allMUSAssumptions_2_HYCAM = do
         , [y2,y3,y5,y7,y8,y11]
         , [y2,y4,y5,y6,y7,y8]  -- (*)
         ]
-      mcses =
+      _mcses =
         [ [y0,y1,y7]
         , [y0,y1,y8]
         , [y0,y3,y4]

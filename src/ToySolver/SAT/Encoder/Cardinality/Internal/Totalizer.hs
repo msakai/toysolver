@@ -34,7 +34,6 @@ module ToySolver.SAT.Encoder.Cardinality.Internal.Totalizer
 
 import Control.Monad
 import Control.Monad.Primitive
-import Control.Monad.State.Strict
 import qualified Data.IntSet as IntSet
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
