@@ -43,7 +43,7 @@ module ToySolver.Converter.SAT2MaxSAT
 
   -- ** Max-2-SAT to SimpleMaxSAT2 conversion
   , SimpleMaxSAT2
-  , SimplifyMaxSAT2Info (..)
+  , SimplifyMaxSAT2Info
   , simplifyMaxSAT2
 
   -- ** SimpleMaxSAT2 to simple Max-Cut conversion
@@ -51,9 +51,6 @@ module ToySolver.Converter.SAT2MaxSAT
   , simpleMaxSAT2ToSimpleMaxCut
   ) where
 
-import Control.Monad
-import Data.Array.MArray
-import Data.Array.ST
 import Data.Array.Unboxed
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
