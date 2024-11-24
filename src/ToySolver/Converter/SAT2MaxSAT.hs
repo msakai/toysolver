@@ -38,7 +38,7 @@ module ToySolver.Converter.SAT2MaxSAT
   -- * Low-level conversion
 
   -- ** 3-SAT to Max-2-SAT conversion
-  , SAT3ToMaxSAT2Info (..)
+  , SAT3ToMaxSAT2Info
   , sat3ToMaxSAT2
 
   -- ** Max-2-SAT to SimpleMaxSAT2 conversion
@@ -65,9 +65,11 @@ import qualified Data.Set as Set
 import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Converter.Base
 import ToySolver.Converter.SAT2KSAT
+import ToySolver.Converter.Tseitin
 import ToySolver.Graph.Base
 import qualified ToySolver.Graph.MaxCut as MaxCut
 import qualified ToySolver.SAT.Types as SAT
+import qualified ToySolver.SAT.Formula as SAT
 
 -- ------------------------------------------------------------------------
 
@@ -92,7 +94,11 @@ sat3ToMaxSAT2 cnf =
           }
         , t
         )
-      , SAT3ToMaxSAT2Info (CNF.cnfNumVars cnf) nv (IntMap.fromList ds)
+      , TseitinInfo (CNF.cnfNumVars cnf) nv
+          [ (d, SAT.And [SAT.Atom a, SAT.Atom b, SAT.Atom c])
+            -- we define d as "a && b && c", but "a + b + c >= 2" is also fine.
+          | (d, (a,b,c)) <- ds
+          ]
       )
   where
     f :: (Int, Int, [CNF.WeightedClause], [(SAT.Var,(SAT.Lit,SAT.Lit,SAT.Lit))], Integer)
@@ -109,31 +115,7 @@ sat3ToMaxSAT2 cnf =
           in (nv+1, nc + length cs2, map (\clause' -> (1, SAT.packClause clause')) cs2 ++ cs, (d, (a,b,c)) : ds, t + 3)
         _ -> error "not a 3-SAT instance"
 
-data SAT3ToMaxSAT2Info = SAT3ToMaxSAT2Info !Int !Int (IntMap (SAT.Lit,SAT.Lit,SAT.Lit))
-  deriving (Eq, Show, Read)
-
-instance Transformer SAT3ToMaxSAT2Info where
-  type Source SAT3ToMaxSAT2Info = SAT.Model
-  type Target SAT3ToMaxSAT2Info = SAT.Model
-
-instance ForwardTransformer SAT3ToMaxSAT2Info where
-  transformForward (SAT3ToMaxSAT2Info nv1 nv2 ds) m = runSTUArray $ do
-    m2 <- newArray_ (1,nv2)
-    forM_ [1..nv1] $ \v -> do
-      writeArray m2 v (SAT.evalVar m v)
-    forM_ (IntMap.toList ds) $ \(d, (a,b,c)) -> do
-      let n :: Int
-          n = sum [1 | l <- [a,b,c], SAT.evalLit m l]
-      writeArray m2 d $
-        case n of
-          1 -> False
-          2 -> False -- True is also OK
-          3 -> True
-          _ -> False -- precondition is violated
-    return m2
-
-instance BackwardTransformer SAT3ToMaxSAT2Info where
-  transformBackward (SAT3ToMaxSAT2Info nv1 _nv2 _ds) = SAT.restrictModel nv1
+type SAT3ToMaxSAT2Info = TseitinInfo
 
 -- ------------------------------------------------------------------------
 
