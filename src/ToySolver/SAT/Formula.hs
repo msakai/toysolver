@@ -27,6 +27,7 @@ module ToySolver.SAT.Formula
   , simplify
   ) where
 
+import Control.Monad
 import Control.Monad.ST
 import qualified Data.Aeson as J
 import Data.Aeson ((.=))
@@ -268,5 +269,16 @@ instance Boolean JSON where
 
 instance J.ToJSON Formula where
   toJSON = getJSON . fold (JSON . jLit)
+
+instance J.FromJSON Formula where
+  parseJSON x = msum
+    [ Atom <$> parseVar x
+    , withNot (\y -> Not <$> J.parseJSON y) x
+    , withAnd (\xs -> And <$> mapM J.parseJSON xs) x
+    , withOr (\xs -> Or <$> mapM J.parseJSON xs) x
+    , withITE (\c t e -> ITE <$> J.parseJSON c <*> J.parseJSON t <*> J.parseJSON e) x
+    , withImply (\a b -> Imply <$> J.parseJSON a <*> J.parseJSON b) x
+    , withEquiv (\a b -> Equiv <$> J.parseJSON a <*> J.parseJSON b) x
+    ]
 
 -- ------------------------------------------------------------------------

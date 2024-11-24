@@ -45,12 +45,13 @@ module ToySolver.Converter.NAESAT
 import Control.Monad
 import Control.Monad.State.Strict
 import qualified Data.Aeson as J
-import Data.Aeson ((.=))
+import Data.Aeson ((.=), (.:))
 import Data.Array.Unboxed
 import qualified Data.IntMap as IntMap
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
 import ToySolver.Converter.Base
+import ToySolver.Internal.JSON
 import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.SAT.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
@@ -101,6 +102,10 @@ instance J.ToJSON SAT2NAESATInfo where
     [ "type" .= J.String "SAT2NAESATInfo"
     , "special_variable" .= z
     ]
+
+instance J.FromJSON SAT2NAESATInfo where
+  parseJSON = withTypedObject "SAT2NAESATInfo" $ \obj ->
+    SAT2NAESATInfo <$> obj .: "special_variable" -- TODO: use Text instead of Int
 
 -- | Information of 'naesat2sat' conversion
 type NAESAT2SATInfo = IdentityTransformer SAT.Model
@@ -180,6 +185,19 @@ instance J.ToJSON NAESAT2NAEKSATInfo where
       f lit
         | lit < 0   = "~x" ++ show (- lit)
         | otherwise = "x" ++ show lit
+
+instance J.FromJSON NAESAT2NAEKSATInfo where
+  parseJSON = withTypedObject "NAESAT2NAEKSATInfo" $ \obj -> do
+    NAESAT2NAEKSATInfo
+      <$> obj .: "num_original_variables"
+      <*> obj .: "num_transformed_variables"
+      <*> (mapM f =<< obj .: "table")
+    where
+      f (v, cs1, cs2) = do
+        v' <- parseVarNameText v
+        cs1' <- mapM parseLitNameText cs1
+        cs2' <- mapM parseLitNameText cs2
+        return (v', VG.fromList (map SAT.packLit cs1'), VG.fromList (map SAT.packLit cs2'))
 
 -- ------------------------------------------------------------------------
 

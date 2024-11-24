@@ -34,7 +34,7 @@ module ToySolver.Converter.QUBO
 import Control.Monad
 import Control.Monad.State
 import qualified Data.Aeson as J
-import Data.Aeson ((.=))
+import Data.Aeson ((.=), (.:))
 import Data.Array.Unboxed
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -44,6 +44,7 @@ import qualified Data.PseudoBoolean as PBFile
 import Data.Ratio
 import ToySolver.Converter.Base
 import ToySolver.Converter.PB (pb2qubo', PB2QUBOInfo')
+import ToySolver.Internal.JSON (withTypedObject)
 import qualified ToySolver.QUBO as QUBO
 import qualified ToySolver.SAT.Types as SAT
 
@@ -101,6 +102,11 @@ instance J.ToJSON (QUBO2PBInfo a) where
     [ "type" .= J.String "QUBO2PBInfo"
     , "objective_function_scale_factor" .= d
     ]
+
+instance J.FromJSON (QUBO2PBInfo a) where
+  parseJSON =
+    withTypedObject "QUBO2PBInfo" $ \obj ->
+      QUBO2PBInfo <$> obj .: "objective_function_scale_factor"
 
 -- -----------------------------------------------------------------------------
 
@@ -160,6 +166,12 @@ instance J.ToJSON (PBAsQUBOInfo a) where
     [ "type" .= J.String "PBAsQUBOInfo"
     , "objective_function_offset" .= (- offset)
     ]
+
+instance J.FromJSON (PBAsQUBOInfo a) where
+  parseJSON =
+    withTypedObject "PBAsQUBOInfo" $ \obj -> do
+      offset <- obj .: "objective_function_offset"
+      pure (PBAsQUBOInfo (- offset))
 
 -- -----------------------------------------------------------------------------
 
@@ -249,6 +261,12 @@ instance (Num a, J.ToJSON a) => J.ToJSON (QUBO2IsingInfo a) where
     , "objective_function_offset" .= (- offset)
     ]
 
+instance (Num a, J.FromJSON a) => J.FromJSON (QUBO2IsingInfo a) where
+  parseJSON =
+    withTypedObject "QUBO2IsingInfo" $ \obj -> do
+      offset <- obj .: "objective_function_offset"
+      pure (QUBO2IsingInfo (- offset))
+
 -- -----------------------------------------------------------------------------
 
 ising2qubo :: (Eq a, Num a) => QUBO.IsingModel a -> (QUBO.Problem a, Ising2QUBOInfo a)
@@ -314,6 +332,12 @@ instance (Num a, J.ToJSON a) => J.ToJSON (Ising2QUBOInfo a) where
     [ "type" .= J.String "Ising2QUBOInfo"
     , "objective_function_offset" .= (- offset)
     ]
+
+instance (Num a, J.FromJSON a) => J.FromJSON (Ising2QUBOInfo a) where
+  parseJSON =
+    withTypedObject "Ising2QUBOInfo" $ \obj -> do
+      offset <- obj .: "objective_function_offset"
+      pure (Ising2QUBOInfo (- offset))
 
 -- -----------------------------------------------------------------------------
 

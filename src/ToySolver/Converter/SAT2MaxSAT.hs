@@ -53,7 +53,7 @@ module ToySolver.Converter.SAT2MaxSAT
   ) where
 
 import qualified Data.Aeson as J
-import Data.Aeson ((.=))
+import Data.Aeson ((.=), (.:))
 import Data.Array.Unboxed
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
@@ -67,6 +67,7 @@ import ToySolver.Converter.SAT2KSAT
 import ToySolver.Converter.Tseitin
 import ToySolver.Graph.Base
 import qualified ToySolver.Graph.MaxCut as MaxCut
+import ToySolver.Internal.JSON (withTypedObject)
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Formula as SAT
 
@@ -248,6 +249,13 @@ instance J.ToJSON SimpleMaxSAT2ToSimpleMaxCutInfo where
     , "num_original_variables" .= n
     , "num_transformed_nodes" .= p
     ]
+
+instance J.FromJSON SimpleMaxSAT2ToSimpleMaxCutInfo where
+  parseJSON =
+    withTypedObject "SimpleMaxSAT2ToSimpleMaxCutInfo" $ \obj ->
+      SimpleMaxSAT2ToSimpleMaxCutInfo
+        <$> obj .: "num_original_variables"
+        <*> obj .: "num_transformed_nodes"
 
 -- ------------------------------------------------------------------------
 

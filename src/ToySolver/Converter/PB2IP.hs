@@ -26,7 +26,8 @@ module ToySolver.Converter.PB2IP
   ) where
 
 import qualified Data.Aeson as J
-import Data.Aeson ((.=))
+import qualified Data.Aeson.Types as J
+import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
 import Data.Default.Class
 import Data.Maybe
@@ -41,6 +42,7 @@ import Numeric.Optimization.MIP ((.==.), (.<=.), (.>=.))
 import ToySolver.Converter.Base
 import ToySolver.Converter.PB
 import qualified ToySolver.FileFormat.CNF as CNF
+import ToySolver.Internal.JSON
 import ToySolver.SAT.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
 
@@ -66,6 +68,11 @@ instance J.ToJSON PB2IPInfo where
     [ "type" .= J.String "PB2IPInfo"
     , "num_original_variables" .= nv
     ]
+
+instance J.FromJSON PB2IPInfo where
+  parseJSON =
+    withTypedObject "PB2IPInfo" $ \obj ->
+      PB2IPInfo <$> obj .: "num_original_variables"
 
 pb2ip :: PBFile.Formula -> (MIP.Problem Integer, PB2IPInfo)
 pb2ip formula = (mip, PB2IPInfo (PBFile.pbNumVars formula))
@@ -132,6 +139,19 @@ instance J.ToJSON WBO2IPInfo where
         | (v, constr) <- relaxVariables
         ]
     ]
+
+instance J.FromJSON WBO2IPInfo where
+  parseJSON =
+    withTypedObject "WBO2IPInfo" $ \obj -> do
+      xs <- obj .: "relax_variables"
+      WBO2IPInfo
+        <$> obj .: "num_original_variables"
+        <*> mapM f (Map.toList xs)
+    where
+      f :: (String, J.Value) -> J.Parser (MIP.Var, PBFile.Constraint)
+      f (name, val) = do
+        constr <- parsePBConstraint val
+        pure (MIP.toVar name, constr)
 
 wbo2ip :: Bool -> PBFile.SoftFormula -> (MIP.Problem Integer, WBO2IPInfo)
 wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) [(r, c) | (r, (Just _, c)) <- relaxVariables])

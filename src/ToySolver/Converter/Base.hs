@@ -28,7 +28,8 @@ module ToySolver.Converter.Base
   ) where
 
 import qualified Data.Aeson as J
-import Data.Aeson ((.=))
+import Data.Aeson ((.=), (.:))
+import ToySolver.Internal.JSON (withTypedObject)
 
 class (Eq a, Show a) => Transformer a where
   type Source a
@@ -89,6 +90,12 @@ instance (J.ToJSON a, J.ToJSON b) => J.ToJSON (ComposedTransformer a b) where
     , "second" .= b
     ]
 
+instance (J.FromJSON a, J.FromJSON b) => J.FromJSON (ComposedTransformer a b) where
+  parseJSON = withTypedObject "ComposedTransformer" $ \obj -> do
+    ComposedTransformer
+      <$> obj .: "first"
+      <*> obj .: "second"
+
 
 data IdentityTransformer a = IdentityTransformer
   deriving (Eq, Show, Read)
@@ -108,6 +115,9 @@ instance J.ToJSON (IdentityTransformer a) where
     J.object
     [ "type" .= J.String "IdentityTransformer"
     ]
+
+instance J.FromJSON (IdentityTransformer a) where
+  parseJSON = withTypedObject "IdentityTransformer" $ \_ -> pure IdentityTransformer
 
 
 data ReversedTransformer t = ReversedTransformer t
@@ -139,3 +149,7 @@ instance J.ToJSON t => J.ToJSON (ReversedTransformer t) where
     [ "type" .= J.String "ReversedTransformer"
     , "base" .= t
     ]
+
+instance J.FromJSON t => J.FromJSON (ReversedTransformer t) where
+  parseJSON = withTypedObject "ReversedTransformer" $ \v ->
+    ReversedTransformer <$> v .: "base"

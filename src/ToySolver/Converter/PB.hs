@@ -70,7 +70,7 @@ import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.ST
 import qualified Data.Aeson as J
-import Data.Aeson ((.=))
+import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
 import Data.Bits hiding (And (..))
 import Data.Default.Class
@@ -94,6 +94,7 @@ import ToySolver.Converter.Base
 import qualified ToySolver.Converter.PB.Internal.Product as Product
 import ToySolver.Converter.Tseitin
 import qualified ToySolver.FileFormat.CNF as CNF
+import ToySolver.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.SAT.Encoder.Tseitin (Formula (..))
@@ -324,6 +325,10 @@ instance J.ToJSON PBQuadratizeInfo where
     , "base" .= info
     ]
 
+instance J.FromJSON PBQuadratizeInfo where
+  parseJSON = withTypedObject "PBQuadratizeInfo" $ \obj ->
+    PBQuadratizeInfo <$> obj .: "base"
+
 -- -----------------------------------------------------------------------------
 
 -- | Convert inequality constraints into equality constraints by introducing surpass variables.
@@ -416,6 +421,21 @@ instance J.ToJSON PBInequalitiesToEqualitiesInfo where
         ]
     ]
 
+instance J.FromJSON PBInequalitiesToEqualitiesInfo where
+  parseJSON = withTypedObject "PBInequalitiesToEqualitiesInfo" $ \obj -> do
+    PBInequalitiesToEqualitiesInfo
+      <$> obj .: "num_original_variables"
+      <*> obj .: "num_transformed_variables"
+      <*> (mapM f =<< obj .: "slack")
+    where
+      f = J.withObject "slack" $ \obj -> do
+        lhs <- parsePBSum =<< obj .: "lhs"
+        rhs <- obj .: "rhs"
+        vs <- mapM g =<< obj .: "slack"
+        return (lhs, rhs, vs)
+      g ('x' : rest) = pure $! read rest
+      g s = fail ("fail to parse variable: " ++ show s)
+
 -- -----------------------------------------------------------------------------
 
 unconstrainPB :: PBFile.Formula -> ((PBFile.Formula, Integer), PBUnconstrainInfo)
@@ -456,6 +476,10 @@ instance J.ToJSON PBUnconstrainInfo where
     [ "type" .= J.String "PBUnconstrainInfo"
     , "base" .= info
     ]
+
+instance J.FromJSON PBUnconstrainInfo where
+  parseJSON = withTypedObject "PBUnconstrainInfo" $ \obj ->
+    PBUnconstrainInfo <$> obj .: "base"
 
 unconstrainPB' :: PBFile.Formula -> (PBFile.Formula, Integer)
 unconstrainPB' formula =
@@ -552,6 +576,19 @@ instance J.ToJSON WBO2PBInfo where
         | (v, constr) <- defs
         ]
     ]
+
+instance J.FromJSON WBO2PBInfo where
+  parseJSON = withTypedObject "WBO2PBInfo" $ \obj -> do
+    defs <- obj .: "definitions"
+    WBO2PBInfo
+      <$> obj .: "num_original_variables"
+      <*> obj .: "num_transformed_variables"
+      <*> mapM f (Map.toList defs)
+    where
+      f (name, constr) = do
+        v <- parseVarNameText name
+        constr' <- parsePBConstraint constr
+        return (v, constr')
 
 addWBO :: (PrimMonad m, SAT.AddPBNL m enc) => enc -> PBFile.SoftFormula -> m (SAT.PBSum, [(SAT.Var, PBFile.Constraint)])
 addWBO db wbo = do

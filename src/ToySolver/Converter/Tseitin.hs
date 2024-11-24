@@ -18,10 +18,16 @@ module ToySolver.Converter.Tseitin
   ) where
 
 import qualified Data.Aeson as J
-import Data.Aeson ((.=))
+import qualified Data.Aeson.Types as J
+import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
+import qualified Data.Map.Lazy as Map
 import Data.String
+import qualified Data.Text as T
 import ToySolver.Converter.Base
+import ToySolver.Internal.JSON
+import qualified ToySolver.SAT.Formula as SAT
+import ToySolver.SAT.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
@@ -54,5 +60,18 @@ instance J.ToJSON TseitinInfo where
         | (v, formula) <- defs
         ]
     ]
+
+instance J.FromJSON TseitinInfo where
+  parseJSON = withTypedObject "TseitinInfo" $ \obj -> do
+    defs <- obj .: "definitions"
+    TseitinInfo
+      <$> obj .: "num_original_variables"
+      <*> obj .: "num_transformed_variables"
+      <*> mapM f (Map.toList defs)
+    where
+      f :: (T.Text, SAT.Formula) -> J.Parser (SAT.Var, SAT.Formula)
+      f (name, formula) = do
+        x <- parseVarNameText name
+        pure (x, formula)
 
 -- -----------------------------------------------------------------------------

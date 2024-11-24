@@ -19,10 +19,11 @@ module ToySolver.Converter.GCNF2MaxSAT
   ) where
 
 import qualified Data.Aeson as J
-import Data.Aeson ((.=))
+import Data.Aeson ((.=), (.:))
 import qualified Data.Vector.Generic as VG
 import ToySolver.Converter.Base
 import qualified ToySolver.FileFormat.CNF as CNF
+import ToySolver.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
 
 data GCNF2MaxSATInfo = GCNF2MaxSATInfo !Int
@@ -41,6 +42,10 @@ instance J.ToJSON GCNF2MaxSATInfo where
     [ "type" .= J.String "GCNF2MaxSATInfo"
     , "num_original_variables" .= nv
     ]
+
+instance J.FromJSON GCNF2MaxSATInfo where
+  parseJSON = withTypedObject "GCNF2MaxSATInfo" $ \obj ->
+    GCNF2MaxSATInfo <$> obj .: "num_original_variables"
 
 gcnf2maxsat :: CNF.GCNF -> (CNF.WCNF, GCNF2MaxSATInfo)
 gcnf2maxsat

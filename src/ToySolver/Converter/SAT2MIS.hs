@@ -17,10 +17,11 @@ module ToySolver.Converter.SAT2MIS
   , IS2SATInfo
   ) where
 
+import Control.Arrow ((&&&))
 import Control.Monad
 import Control.Monad.ST
 import qualified Data.Aeson as J
-import Data.Aeson ((.=))
+import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
 import Data.Array.ST
 import Data.Array.Unboxed
@@ -36,6 +37,7 @@ import ToySolver.Converter.Base
 import ToySolver.Converter.SAT2KSAT
 import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Graph.Base
+import ToySolver.Internal.JSON
 import ToySolver.SAT.Internal.JSON
 import ToySolver.SAT.Store.CNF
 import ToySolver.SAT.Store.PB
@@ -127,6 +129,19 @@ instance J.ToJSON SAT3ToISInfo where
         ])
     ]
 
+instance J.FromJSON SAT3ToISInfo where
+  parseJSON =
+    withTypedObject "SAT3ToISInfo" $ \obj -> do
+      xs <- obj .: "node_to_literal"
+      SAT3ToISInfo
+        <$> obj .: "num_original_variables"
+        <*> obj .: "clusters"
+        <*> (if null xs then pure (array (0, -1) []) else (array ((minimum &&& maximum) (map fst xs)) <$> mapM f xs))
+    where
+      f (node, val) = do
+        lit <- parseLit val
+        pure (node, lit)
+
 -- ------------------------------------------------------------------------
 
 is2pb :: (Graph, Int) -> (PBFile.Formula, IS2SATInfo)
@@ -200,6 +215,11 @@ instance J.ToJSON IS2SATInfo where
     [ "type" .= J.String "IS2SATInfo"
     , "node_bounds" .= (lb, ub)
     ]
+
+instance J.FromJSON IS2SATInfo where
+  parseJSON =
+    withTypedObject "IS2SATInfo" $ \obj ->
+      IS2SATInfo <$> obj .: "node_bounds"
 
 -- ------------------------------------------------------------------------
 

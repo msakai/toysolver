@@ -25,7 +25,7 @@ import Control.Monad.ST
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import qualified Data.Aeson as J
-import Data.Aeson ((.=))
+import Data.Aeson ((.=), (.:))
 import Data.List (intercalate, foldl', sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -40,6 +40,7 @@ import qualified Numeric.Optimization.MIP as MIP
 
 import ToySolver.Converter.Base
 import ToySolver.Data.OrdRel
+import ToySolver.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Integer as Integer
 import ToySolver.SAT.Internal.JSON
@@ -88,6 +89,14 @@ instance J.ToJSON MIP2PBInfo where
         ]
     , "objective_function_scale_factor" .= d
     ]
+
+instance J.FromJSON MIP2PBInfo where
+  parseJSON = withTypedObject "MIP2PBInfo" $ \obj -> do
+    subst <- obj .: "substitutions"
+    d <- obj .: "objective_function_scale_factor"
+    pure $ MIP2PBInfo
+      (Map.fromList [(MIP.toVar name, Integer.Expr expr) | (name, expr) <- Map.toList subst])
+      d
 
 -- -----------------------------------------------------------------------------
 

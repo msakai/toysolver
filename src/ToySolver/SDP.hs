@@ -25,10 +25,11 @@ module ToySolver.SDP
   ) where
 
 import qualified Data.Aeson as J
-import Data.Aeson ((.=))
+import Data.Aeson ((.=), (.:))
 import qualified Data.Map.Strict as Map
 import Data.Scientific (Scientific)
 import ToySolver.Converter.Base
+import ToySolver.Internal.JSON (withTypedObject)
 import qualified ToySolver.Text.SDPFile as SDPFile
 
 -- | Given a primal-dual pair (P), (D), it returns another primal-dual pair (P'), (D')
@@ -196,6 +197,13 @@ instance J.ToJSON DualizeInfo where
     , "num_original_matrices" .= origM
     , "original_block_structure" .= origBlockStruct
     ] 
+
+instance J.FromJSON DualizeInfo where
+  parseJSON =
+    withTypedObject "DualizeInfo" $ \obj ->
+      DualizeInfo
+        <$> obj .: "num_original_matrices"
+        <*> obj .: "original_block_structure"
 
 symblock :: [((Int,Int), Scientific)] -> SDPFile.Block
 symblock es = Map.fromList $ do

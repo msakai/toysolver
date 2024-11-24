@@ -43,6 +43,7 @@ import qualified Data.Vector.Unboxed as VU
 import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Graph.Base
 import qualified ToySolver.Graph.MaxCut as MaxCut
+import ToySolver.Internal.JSON (withTypedObject)
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.Converter.Base
 import ToySolver.Converter.NAESAT (NAESAT)
@@ -127,6 +128,9 @@ instance J.ToJSON NAE3SAT2MaxCutInfo where
     J.object
     [ "type" .= J.String "NAE3SAT2MaxCutInfo"
     ]
+
+instance J.FromJSON NAE3SAT2MaxCutInfo where
+  parseJSON = withTypedObject "NAE3SAT2MaxCutInfo" $ \_ -> pure NAE3SAT2MaxCutInfo
 
 -- ------------------------------------------------------------------------
 
