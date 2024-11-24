@@ -68,7 +68,7 @@ evalNAEClause m c =
 newtype SAT2NAESATInfo = SAT2NAESATInfo SAT.Var
   deriving (Eq, Show, Read)
 
--- | Convert a CNF formula φ to an equisatifiable NAE-SAT formula ψ,
+-- | Convert a CNF formula φ to an equisatisfiable NAE-SAT formula ψ,
 -- together with a 'SAT2NAESATInfo'
 sat2naesat :: CNF.CNF -> (NAESAT, SAT2NAESATInfo)
 sat2naesat cnf = (ret, SAT2NAESATInfo z)
@@ -94,7 +94,7 @@ instance BackwardTransformer SAT2NAESATInfo where
 -- | Information of 'naesat2sat' conversion
 type NAESAT2SATInfo = IdentityTransformer SAT.Model
 
--- | Convert a NAE-SAT formula φ to an equisatifiable CNF formula ψ,
+-- | Convert a NAE-SAT formula φ to an equisatisfiable CNF formula ψ,
 -- together with a 'NAESAT2SATInfo'
 naesat2sat :: NAESAT -> (CNF.CNF, NAESAT2SATInfo)
 naesat2sat (n,cs) =
