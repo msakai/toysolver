@@ -38,7 +38,7 @@ module ToySolver.Converter.SAT2MaxSAT
   -- * Low-level conversion
 
   -- ** 3-SAT to Max-2-SAT conversion
-  , SAT3ToMaxSAT2Info (..)
+  , SAT3ToMaxSAT2Info
   , sat3ToMaxSAT2
 
   -- ** Max-2-SAT to SimpleMaxSAT2 conversion
@@ -55,7 +55,6 @@ import Control.Monad
 import Data.Array.MArray
 import Data.Array.ST
 import Data.Array.Unboxed
-import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.List hiding (insert)
@@ -65,9 +64,11 @@ import qualified Data.Set as Set
 import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Converter.Base
 import ToySolver.Converter.SAT2KSAT
+import ToySolver.Converter.Tseitin
 import ToySolver.Graph.Base
 import qualified ToySolver.Graph.MaxCut as MaxCut
 import qualified ToySolver.SAT.Types as SAT
+import qualified ToySolver.SAT.Formula as SAT
 
 -- ------------------------------------------------------------------------
 
@@ -92,7 +93,11 @@ sat3ToMaxSAT2 cnf =
           }
         , t
         )
-      , SAT3ToMaxSAT2Info (CNF.cnfNumVars cnf) nv (IntMap.fromList ds)
+      , TseitinInfo (CNF.cnfNumVars cnf) nv
+          [ (d, SAT.And [SAT.Atom a, SAT.Atom b, SAT.Atom c])
+            -- we define d as "a && b && c", but "a + b + c >= 2" is also fine.
+          | (d, (a,b,c)) <- ds
+          ]
       )
   where
     f :: (Int, Int, [CNF.WeightedClause], [(SAT.Var,(SAT.Lit,SAT.Lit,SAT.Lit))], Integer)
@@ -109,31 +114,7 @@ sat3ToMaxSAT2 cnf =
           in (nv+1, nc + length cs2, map (\clause' -> (1, SAT.packClause clause')) cs2 ++ cs, (d, (a,b,c)) : ds, t + 3)
         _ -> error "not a 3-SAT instance"
 
-data SAT3ToMaxSAT2Info = SAT3ToMaxSAT2Info !Int !Int (IntMap (SAT.Lit,SAT.Lit,SAT.Lit))
-  deriving (Eq, Show, Read)
-
-instance Transformer SAT3ToMaxSAT2Info where
-  type Source SAT3ToMaxSAT2Info = SAT.Model
-  type Target SAT3ToMaxSAT2Info = SAT.Model
-
-instance ForwardTransformer SAT3ToMaxSAT2Info where
-  transformForward (SAT3ToMaxSAT2Info nv1 nv2 ds) m = runSTUArray $ do
-    m2 <- newArray_ (1,nv2)
-    forM_ [1..nv1] $ \v -> do
-      writeArray m2 v (SAT.evalVar m v)
-    forM_ (IntMap.toList ds) $ \(d, (a,b,c)) -> do
-      let n :: Int
-          n = sum [1 | l <- [a,b,c], SAT.evalLit m l]
-      writeArray m2 d $
-        case n of
-          1 -> False
-          2 -> False -- True is also OK
-          3 -> True
-          _ -> False -- precondition is violated
-    return m2
-
-instance BackwardTransformer SAT3ToMaxSAT2Info where
-  transformBackward (SAT3ToMaxSAT2Info nv1 _nv2 _ds) = SAT.restrictModel nv1
+type SAT3ToMaxSAT2Info = TseitinInfo
 
 -- ------------------------------------------------------------------------
 
@@ -152,7 +133,11 @@ type SimpleMaxSAT2 = (Int, Set (Int, Int), Integer)
 simplifyMaxSAT2 :: (CNF.WCNF, Integer) -> (SimpleMaxSAT2, SimplifyMaxSAT2Info)
 simplifyMaxSAT2 (wcnf, threshold) =
   case foldl' f (nv1, Set.empty, IntMap.empty, threshold) (CNF.wcnfClauses wcnf) of
-    (nv2, cs, defs, threshold2) -> ((nv2, cs, threshold2), SimplifyMaxSAT2Info nv1 nv2 defs)
+    (nv2, cs, defs, threshold2) ->
+      ( (nv2, cs, threshold2)
+      , TseitinInfo nv1 nv2 [(v, SAT.Not (SAT.Atom a)) | (v, (a, _b)) <- IntMap.toList defs]
+        -- we deine v as "~a" but "~b" is also fine.
+      )
   where
     nv1 = CNF.wcnfNumVars wcnf
     f r@(nv, cs, defs, t) (w, clause) =
@@ -170,20 +155,7 @@ simplifyMaxSAT2 (wcnf, threshold) =
 applyN :: Integral n => n -> (a -> a) -> (a -> a)
 applyN n f = appEndo $ mconcat $ genericReplicate n (Endo f)
 
-data SimplifyMaxSAT2Info
-  = SimplifyMaxSAT2Info !Int !Int (IntMap (SAT.Lit, SAT.Lit))
-  deriving (Eq, Show, Read)
-
-instance Transformer SimplifyMaxSAT2Info where
-  type Source SimplifyMaxSAT2Info = SAT.Model
-  type Target SimplifyMaxSAT2Info = SAT.Model
-
-instance ForwardTransformer SimplifyMaxSAT2Info where
-  transformForward (SimplifyMaxSAT2Info _nv1 nv2 defs) m =
-    array (1,nv2) $ assocs m ++ [(v, if SAT.evalLit m a then False else True) | (v,(a,_b)) <- IntMap.toList defs]
-
-instance BackwardTransformer SimplifyMaxSAT2Info where
-  transformBackward (SimplifyMaxSAT2Info nv1 _nv2 _defs) m = SAT.restrictModel nv1 m
+type SimplifyMaxSAT2Info = TseitinInfo
 
 -- ------------------------------------------------------------------------
 
