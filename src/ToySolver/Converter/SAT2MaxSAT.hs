@@ -55,7 +55,6 @@ import Control.Monad
 import Data.Array.MArray
 import Data.Array.ST
 import Data.Array.Unboxed
-import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.List hiding (insert)
@@ -134,7 +133,11 @@ type SimpleMaxSAT2 = (Int, Set (Int, Int), Integer)
 simplifyMaxSAT2 :: (CNF.WCNF, Integer) -> (SimpleMaxSAT2, SimplifyMaxSAT2Info)
 simplifyMaxSAT2 (wcnf, threshold) =
   case foldl' f (nv1, Set.empty, IntMap.empty, threshold) (CNF.wcnfClauses wcnf) of
-    (nv2, cs, defs, threshold2) -> ((nv2, cs, threshold2), SimplifyMaxSAT2Info nv1 nv2 defs)
+    (nv2, cs, defs, threshold2) ->
+      ( (nv2, cs, threshold2)
+      , TseitinInfo nv1 nv2 [(v, SAT.Not (SAT.Atom a)) | (v, (a, _b)) <- IntMap.toList defs]
+        -- we deine v as "~a" but "~b" is also fine.
+      )
   where
     nv1 = CNF.wcnfNumVars wcnf
     f r@(nv, cs, defs, t) (w, clause) =
@@ -152,20 +155,7 @@ simplifyMaxSAT2 (wcnf, threshold) =
 applyN :: Integral n => n -> (a -> a) -> (a -> a)
 applyN n f = appEndo $ mconcat $ genericReplicate n (Endo f)
 
-data SimplifyMaxSAT2Info
-  = SimplifyMaxSAT2Info !Int !Int (IntMap (SAT.Lit, SAT.Lit))
-  deriving (Eq, Show, Read)
-
-instance Transformer SimplifyMaxSAT2Info where
-  type Source SimplifyMaxSAT2Info = SAT.Model
-  type Target SimplifyMaxSAT2Info = SAT.Model
-
-instance ForwardTransformer SimplifyMaxSAT2Info where
-  transformForward (SimplifyMaxSAT2Info _nv1 nv2 defs) m =
-    array (1,nv2) $ assocs m ++ [(v, if SAT.evalLit m a then False else True) | (v,(a,_b)) <- IntMap.toList defs]
-
-instance BackwardTransformer SimplifyMaxSAT2Info where
-  transformBackward (SimplifyMaxSAT2Info nv1 _nv2 _defs) m = SAT.restrictModel nv1 m
+type SimplifyMaxSAT2Info = TseitinInfo
 
 -- ------------------------------------------------------------------------
 
