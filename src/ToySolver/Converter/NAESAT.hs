@@ -108,7 +108,7 @@ naesat2sat (n,cs) =
 
 -- ------------------------------------------------------------------------
 
--- Information of 'naesat2naeksta' conversion
+-- Information of 'naesat2naeksat' conversion
 data NAESAT2NAEKSATInfo = NAESAT2NAEKSATInfo !Int !Int [(SAT.Var, NAEClause, NAEClause)]
   deriving (Eq, Show, Read)
 
