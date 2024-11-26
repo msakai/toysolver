@@ -94,7 +94,7 @@ convVar x = MIP.toVar ("x" ++ show x)
 
 -- -----------------------------------------------------------------------------
 
-data WBO2IPInfo = WBO2IPInfo !Int [(MIP.Var, PBFile.SoftConstraint)]
+data WBO2IPInfo = WBO2IPInfo !Int [(MIP.Var, PBFile.Constraint)]
   deriving (Eq, Show)
 
 instance Transformer WBO2IPInfo where
@@ -105,13 +105,13 @@ instance ForwardTransformer WBO2IPInfo where
   transformForward (WBO2IPInfo _nv relaxVariables) m = Map.union m1 m2
       where
         m1 = Map.fromList $ [(convVar v, if val then 1 else 0) | (v,val) <- assocs m]
-        m2 = Map.fromList $ [(v, if SAT.evalPBConstraint m c then 0 else 1) | (v, (Just _, c)) <- relaxVariables]
+        m2 = Map.fromList $ [(v, if SAT.evalPBConstraint m c then 0 else 1) | (v, c) <- relaxVariables]
 
 instance BackwardTransformer WBO2IPInfo where
   transformBackward (WBO2IPInfo nv _relaxVariables) = mtrans nv
 
 wbo2ip :: Bool -> PBFile.SoftFormula -> (MIP.Problem Integer, WBO2IPInfo)
-wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) relaxVariables)
+wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) [(r, c) | (r, (Just _, c)) <- relaxVariables])
   where
     mip = def
       { MIP.objectiveFunction = obj2
