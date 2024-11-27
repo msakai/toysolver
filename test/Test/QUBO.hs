@@ -4,6 +4,7 @@
 module Test.QUBO (quboTestGroup) where
 
 import Control.Monad
+import qualified Data.Aeson as J
 import Data.Array.IArray
 import Data.ByteString.Builder
 import qualified Data.IntMap.Strict as IntMap
@@ -90,6 +91,13 @@ prop_qubo2pb = forAll arbitrary $ \(qubo :: QUBO.Problem Integer) ->
   let (pbo,_) = qubo2pb qubo
    in Just qubo === fmap fst (pbAsQUBO pbo)
 
+prop_qubo2pb_json :: Property
+prop_qubo2pb_json = forAll arbitrary $ \(qubo :: QUBO.Problem Integer) ->
+  let ret@(pbo, info) = qubo2pb qubo
+      json = J.encode info
+   in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
 prop_pb2qubo :: Property
 prop_pb2qubo = forAll arbitraryPBFormula $ \formula ->
   let ((qubo :: QUBO.Problem Integer, th), info) = pb2qubo formula
@@ -115,6 +123,13 @@ prop_pb2qubo = forAll arbitraryPBFormula $ \formula ->
                   property True
         ]
 
+prop_pb2qubo_json :: Property
+prop_pb2qubo_json = forAll arbitraryPBFormula $ \formula ->
+  let ret@(_, info) = pb2qubo formula
+      json = J.encode info
+   in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
 prop_qubo2ising :: Property
 prop_qubo2ising = forAll arbitrary $ \(qubo :: QUBO.Problem Rational) ->
   let (ising, info) = qubo2ising qubo
@@ -122,12 +137,26 @@ prop_qubo2ising = forAll arbitrary $ \(qubo :: QUBO.Problem Rational) ->
         forAll (arbitrarySolution (QUBO.quboNumVars qubo)) $ \sol ->
           transformObjValueForward info (QUBO.eval sol qubo) === QUBO.evalIsingModel sol ising
 
+prop_qubo2ising_json :: Property
+prop_qubo2ising_json = forAll arbitrary $ \(qubo :: QUBO.Problem Rational) ->
+  let ret@(_, info) = qubo2ising qubo
+      json = J.encode info
+   in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
 prop_ising2qubo :: Property
 prop_ising2qubo = forAll arbitrary $ \(ising :: QUBO.IsingModel Integer) ->
   let (qubo, info) = ising2qubo ising
    in counterexample (show qubo) $
         forAll (arbitrarySolution (QUBO.isingNumVars ising)) $ \sol ->
           transformObjValueForward info (QUBO.evalIsingModel sol ising) === QUBO.eval sol qubo
+
+prop_ising2qubo_json :: Property
+prop_ising2qubo_json = forAll arbitrary $ \(ising :: QUBO.IsingModel Integer) ->
+  let ret@(_, info) = ising2qubo ising
+      json = J.encode info
+   in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
 
 ------------------------------------------------------------------------
 -- Test harness

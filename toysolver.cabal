@@ -924,6 +924,7 @@ Test-suite TestSuite
     Smtlib.Syntax.Syntax
     Smtlib.Syntax.ShowSL
   Build-depends:
+    aeson,
     array,
     base,
     bytestring,
