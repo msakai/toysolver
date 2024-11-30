@@ -21,6 +21,7 @@ import qualified Data.Aeson as J
 import qualified Data.Aeson.Types as J
 import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
+import Data.List (sortOn)
 import qualified Data.Map.Lazy as Map
 import Data.String
 import qualified Data.Text as T
@@ -32,7 +33,12 @@ import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
 data TseitinInfo = TseitinInfo !Int !Int [(SAT.Var, Tseitin.Formula)]
-  deriving (Eq, Show, Read)
+  deriving (Show, Read)
+
+-- TODO: change defs representation to SAT.VarMap
+instance Eq TseitinInfo where
+  TseitinInfo nv1 nv2 defs == TseitinInfo nv1' nv2' defs' =
+    nv1 == nv1' && nv2 == nv2' && sortOn fst defs == sortOn fst defs'
 
 instance Transformer TseitinInfo where
   type Source TseitinInfo = SAT.Model
