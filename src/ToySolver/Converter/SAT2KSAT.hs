@@ -54,7 +54,11 @@ sat2ksat k cnf = runST $ do
     loop $ Seq.fromList $ SAT.unpackClause clause
   cnf2 <- getCNFFormula db
   defs <- readSTRef defsRef
-  return (cnf2, TseitinInfo nv1 (CNF.cnfNumVars cnf2) [(v, Or [Atom lit | lit <- clause]) | (v, clause) <- toList defs])
+  return (cnf2, TseitinInfo nv1 (CNF.cnfNumVars cnf2) [(v, Or [atom lit | lit <- clause]) | (v, clause) <- toList defs])
+  where
+    atom l
+      | l < 0 = Not (Atom (- l))
+      | otherwise = Atom l
 
 
 type SAT2KSATInfo = TseitinInfo

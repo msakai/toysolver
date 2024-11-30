@@ -436,12 +436,15 @@ getDefinitions encoder = do
   tableXOR <- readMutVar (encXORTable encoder)
   tableFASum <- readMutVar (encFASumTable encoder)
   tableFACarry <- readMutVar (encFACarryTable encoder)
-  let m1 = [(v, andB [Atom l1 | l1 <- IntSet.toList ls]) | (ls, (v, _, _)) <- Map.toList tableConj]
-      m2 = [(v, ite (Atom c) (Atom t) (Atom e)) | ((c,t,e), (v, _, _)) <- Map.toList tableITE]
-      m3 = [(v, (Atom a .||. Atom b) .&&. (Atom (-a) .||. Atom (-b))) | ((a,b), (v, _, _)) <- Map.toList tableXOR]
-      m4 = [(v, orB [andB [Atom l | l <- ls] | ls <- [[a,b,c],[a,-b,-c],[-a,b,-c],[-a,-b,c]]])
+  let atom l
+        | l < 0 = Not (Atom (- l))
+        | otherwise = Atom l
+      m1 = [(v, andB [atom l1 | l1 <- IntSet.toList ls]) | (ls, (v, _, _)) <- Map.toList tableConj]
+      m2 = [(v, ite (atom c) (atom t) (atom e)) | ((c,t,e), (v, _, _)) <- Map.toList tableITE]
+      m3 = [(v, (atom a .||. atom b) .&&. (atom (-a) .||. atom (-b))) | ((a,b), (v, _, _)) <- Map.toList tableXOR]
+      m4 = [(v, orB [andB [atom l | l <- ls] | ls <- [[a,b,c],[a,-b,-c],[-a,b,-c],[-a,-b,c]]])
              | ((a,b,c), (v, _, _)) <- Map.toList tableFASum]
-      m5 = [(v, orB [andB [Atom l | l <- ls] | ls <- [[a,b],[a,c],[b,c]]])
+      m5 = [(v, orB [andB [atom l | l <- ls] | ls <- [[a,b],[a,c],[b,c]]])
              | ((a,b,c), (v, _, _)) <- Map.toList tableFACarry]
   return $ concat [m1, m2, m3, m4, m5]
 

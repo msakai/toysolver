@@ -216,7 +216,7 @@ quadratizePB' (formula, maxObj) =
       }
     , maxObj
     )
-  , PBQuadratizeInfo $ TseitinInfo nv1 nv2 [(v, And [Atom l1, Atom l2]) | (v, (l1,l2)) <- prodDefs]
+  , PBQuadratizeInfo $ TseitinInfo nv1 nv2 [(v, And [atom l1, atom l2]) | (v, (l1,l2)) <- prodDefs]
   )
   where
     nv1 = PBFile.pbNumVars formula
@@ -286,6 +286,11 @@ quadratizePB' (formula, maxObj) =
         g t
           | IntSet.size t == 1 = head $ IntSet.toList t
           | otherwise = toV Map.! t
+
+    atom :: SAT.Lit -> Formula
+    atom l
+      | l < 0 = Not (Atom (- l))
+      | otherwise = Atom l
 
 
 collectDegGe3Terms :: PBFile.Formula -> Set IntSet

@@ -95,7 +95,7 @@ sat3ToMaxSAT2 cnf =
         , t
         )
       , TseitinInfo (CNF.cnfNumVars cnf) nv
-          [ (d, SAT.And [SAT.Atom a, SAT.Atom b, SAT.Atom c])
+          [ (d, SAT.And [atom a, atom b, atom c])
             -- we define d as "a && b && c", but "a + b + c >= 2" is also fine.
           | (d, (a,b,c)) <- ds
           ]
@@ -114,6 +114,12 @@ sat3ToMaxSAT2 cnf =
               cs2 = [[a], [b], [c], [d], [-a,-b], [-a,-c], [-b,-c], [a,-d], [b,-d], [c,-d]]
           in (nv+1, nc + length cs2, map (\clause' -> (1, SAT.packClause clause')) cs2 ++ cs, (d, (a,b,c)) : ds, t + 3)
         _ -> error "not a 3-SAT instance"
+
+    atom :: SAT.Lit -> SAT.Formula
+    atom l
+      | l < 0 = SAT.Not (SAT.Atom (- l))
+      | otherwise = SAT.Atom l
+
 
 type SAT3ToMaxSAT2Info = TseitinInfo
 
@@ -136,7 +142,7 @@ simplifyMaxSAT2 (wcnf, threshold) =
   case foldl' f (nv1, Set.empty, IntMap.empty, threshold) (CNF.wcnfClauses wcnf) of
     (nv2, cs, defs, threshold2) ->
       ( (nv2, cs, threshold2)
-      , TseitinInfo nv1 nv2 [(v, SAT.Not (SAT.Atom a)) | (v, (a, _b)) <- IntMap.toList defs]
+      , TseitinInfo nv1 nv2 [(v, atom (- a)) | (v, (a, _b)) <- IntMap.toList defs]
         -- we deine v as "~a" but "~b" is also fine.
       )
   where
@@ -152,6 +158,11 @@ simplifyMaxSAT2 (wcnf, threshold) =
       | otherwise         = (nv, Set.insert c cs, defs, t)
       where
         v = nv + 1
+
+    atom :: SAT.Lit -> SAT.Formula
+    atom l
+      | l < 0 = SAT.Not (SAT.Atom (- l))
+      | otherwise = SAT.Atom l
 
 applyN :: Integral n => n -> (a -> a) -> (a -> a)
 applyN n f = appEndo $ mconcat $ genericReplicate n (Endo f)
