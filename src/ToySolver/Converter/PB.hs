@@ -557,7 +557,12 @@ wbo2pb wbo = runST $ do
     )
 
 data WBO2PBInfo = WBO2PBInfo !Int !Int [(SAT.Var, PBFile.Constraint)]
-  deriving (Eq, Show)
+  deriving (Show)
+
+-- TODO: change defs representation to SAT.VarMap
+instance Eq WBO2PBInfo where
+  WBO2PBInfo nv1 nv2 defs == WBO2PBInfo nv1' nv2' defs' =
+    nv1 == nv1' && nv2 == nv2' && sortOn fst defs == sortOn fst defs'  
 
 instance Transformer WBO2PBInfo where
   type Source WBO2PBInfo = SAT.Model
