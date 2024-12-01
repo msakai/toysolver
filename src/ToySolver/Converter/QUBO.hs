@@ -119,7 +119,7 @@ pbAsQUBO formula = do
     body = do
       guard $ null (PBFile.pbConstraints formula)
       let f :: PBFile.WeightedTerm -> StateT Integer Maybe [(Integer, Int, Int)]
-          f (c,[]) = modify (+c) >> return []
+          f (c,[]) = modify (subtract c) >> return []
           f (c,[x]) = return [(c,x,x)]
           f (c,[x1,x2]) = return [(c,x1,x2)]
           f _ = mzero
@@ -155,31 +155,31 @@ instance ObjValueTransformer (PBAsQUBOInfo a) where
   type TargetObjValue (PBAsQUBOInfo a) = a
 
 instance Num a => ObjValueForwardTransformer (PBAsQUBOInfo a) where
-  transformObjValueForward (PBAsQUBOInfo offset) obj = fromInteger (obj - offset)
+  transformObjValueForward (PBAsQUBOInfo offset) obj = fromInteger (obj + offset)
 
 instance Real a => ObjValueBackwardTransformer (PBAsQUBOInfo a) where
-  transformObjValueBackward (PBAsQUBOInfo offset) obj = round (toRational obj) + offset
+  transformObjValueBackward (PBAsQUBOInfo offset) obj = round (toRational obj) - offset
 
 instance J.ToJSON (PBAsQUBOInfo a) where
   toJSON (PBAsQUBOInfo offset) =
     J.object
     [ "type" .= J.String "PBAsQUBOInfo"
-    , "objective_function_offset" .= (- offset)
+    , "objective_function_offset" .= offset
     ]
 
 instance J.FromJSON (PBAsQUBOInfo a) where
   parseJSON =
     withTypedObject "PBAsQUBOInfo" $ \obj -> do
       offset <- obj .: "objective_function_offset"
-      pure (PBAsQUBOInfo (- offset))
+      pure (PBAsQUBOInfo offset)
 
 -- -----------------------------------------------------------------------------
 
 pb2qubo :: Real a => PBFile.Formula -> ((QUBO.Problem a, a), PB2QUBOInfo a)
-pb2qubo formula = ((qubo, fromInteger (th - offset)), ComposedTransformer info1 info2)
+pb2qubo formula = ((qubo, transformObjValueForward info2 th), ComposedTransformer info1 info2)
   where
     ((qubo', th), info1) = pb2qubo' formula
-    Just (qubo, info2@(PBAsQUBOInfo offset)) = pbAsQUBO qubo'
+    Just (qubo, info2) = pbAsQUBO qubo'
 
 type PB2QUBOInfo a = ComposedTransformer PB2QUBOInfo' (PBAsQUBOInfo a)
 
@@ -192,7 +192,7 @@ qubo2ising QUBO.Problem{ QUBO.quboNumVars = n, QUBO.quboMatrix = qq } =
     , QUBO.isingInteraction = normalizeMat $ jj'
     , QUBO.isingExternalMagneticField = normalizeVec h'
     }
-  , QUBO2IsingInfo c'
+  , QUBO2IsingInfo (- c')
   )
   where
     {-
@@ -249,23 +249,23 @@ instance ObjValueTransformer (QUBO2IsingInfo a) where
   type TargetObjValue (QUBO2IsingInfo a) = a
 
 instance (Eq a, Show a, Num a) => ObjValueForwardTransformer (QUBO2IsingInfo a) where
-  transformObjValueForward (QUBO2IsingInfo offset) obj = obj - offset
+  transformObjValueForward (QUBO2IsingInfo offset) obj = obj + offset
 
 instance (Eq a, Show a, Num a) => ObjValueBackwardTransformer (QUBO2IsingInfo a) where
-  transformObjValueBackward (QUBO2IsingInfo offset) obj = obj + offset
+  transformObjValueBackward (QUBO2IsingInfo offset) obj = obj - offset
 
-instance (Num a, J.ToJSON a) => J.ToJSON (QUBO2IsingInfo a) where
+instance J.ToJSON a => J.ToJSON (QUBO2IsingInfo a) where
   toJSON (QUBO2IsingInfo offset) =
     J.object
     [ "type" .= J.String "QUBO2IsingInfo"
-    , "objective_function_offset" .= (- offset)
+    , "objective_function_offset" .= offset
     ]
 
-instance (Num a, J.FromJSON a) => J.FromJSON (QUBO2IsingInfo a) where
+instance J.FromJSON a => J.FromJSON (QUBO2IsingInfo a) where
   parseJSON =
     withTypedObject "QUBO2IsingInfo" $ \obj -> do
       offset <- obj .: "objective_function_offset"
-      pure (QUBO2IsingInfo (- offset))
+      pure (QUBO2IsingInfo offset)
 
 -- -----------------------------------------------------------------------------
 
@@ -275,7 +275,7 @@ ising2qubo QUBO.IsingModel{ QUBO.isingNumVars = n, QUBO.isingInteraction = jj, Q
     { QUBO.quboNumVars = n
     , QUBO.quboMatrix = mkMat m
     }
-  , Ising2QUBOInfo offset
+  , Ising2QUBOInfo (- offset)
   )
   where
     {-
@@ -321,23 +321,23 @@ instance (Eq a, Show a) => ObjValueTransformer (Ising2QUBOInfo a) where
   type TargetObjValue (Ising2QUBOInfo a) = a
 
 instance (Eq a, Show a, Num a) => ObjValueForwardTransformer (Ising2QUBOInfo a) where
-  transformObjValueForward (Ising2QUBOInfo offset) obj = obj - offset
+  transformObjValueForward (Ising2QUBOInfo offset) obj = obj + offset
 
 instance (Eq a, Show a, Num a) => ObjValueBackwardTransformer (Ising2QUBOInfo a) where
-  transformObjValueBackward (Ising2QUBOInfo offset) obj = obj + offset
+  transformObjValueBackward (Ising2QUBOInfo offset) obj = obj - offset
 
-instance (Num a, J.ToJSON a) => J.ToJSON (Ising2QUBOInfo a) where
+instance J.ToJSON a => J.ToJSON (Ising2QUBOInfo a) where
   toJSON (Ising2QUBOInfo offset) =
     J.object
     [ "type" .= J.String "Ising2QUBOInfo"
-    , "objective_function_offset" .= (- offset)
+    , "objective_function_offset" .= offset
     ]
 
-instance (Num a, J.FromJSON a) => J.FromJSON (Ising2QUBOInfo a) where
+instance J.FromJSON a => J.FromJSON (Ising2QUBOInfo a) where
   parseJSON =
     withTypedObject "Ising2QUBOInfo" $ \obj -> do
       offset <- obj .: "objective_function_offset"
-      pure (Ising2QUBOInfo (- offset))
+      pure (Ising2QUBOInfo offset)
 
 -- -----------------------------------------------------------------------------
 
