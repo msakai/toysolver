@@ -22,6 +22,7 @@ module ToySolver.Converter.SAT2KSAT
 import Control.Monad
 import Control.Monad.ST
 import Data.Foldable (toList)
+import qualified Data.IntMap.Lazy as IntMap
 import Data.Sequence ((<|), (|>))
 import qualified Data.Sequence as Seq
 import Data.STRef
@@ -38,7 +39,7 @@ sat2ksat k _ | k < 3 = error "ToySolver.Converter.SAT2KSAT.sat2ksat: k must be >
 sat2ksat k cnf = runST $ do
   let nv1 = CNF.cnfNumVars cnf
   db <- newCNFStore
-  defsRef <- newSTRef Seq.empty
+  defsRef <- newSTRef IntMap.empty
   SAT.newVars_ db nv1
   forM_ (CNF.cnfClauses cnf) $ \clause -> do
     let loop lits = do
@@ -49,12 +50,12 @@ sat2ksat k cnf = runST $ do
             case Seq.splitAt (k-1) lits of
               (lits1, lits2) -> do
                 SAT.addClause db (toList (lits1 |> (-v)))
-                modifySTRef' defsRef (|> (v, toList lits1))
+                modifySTRef' defsRef (IntMap.insert v (toList lits1))
                 loop (v <| lits2)
     loop $ Seq.fromList $ SAT.unpackClause clause
   cnf2 <- getCNFFormula db
   defs <- readSTRef defsRef
-  return (cnf2, TseitinInfo nv1 (CNF.cnfNumVars cnf2) [(v, Or [atom lit | lit <- clause]) | (v, clause) <- toList defs])
+  return (cnf2, TseitinInfo nv1 (CNF.cnfNumVars cnf2) (fmap (\clause -> Or [atom lit | lit <- clause]) defs))
   where
     atom l
       | l < 0 = Not (Atom (- l))

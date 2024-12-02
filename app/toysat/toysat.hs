@@ -853,7 +853,7 @@ solvePB opt solver formula = do
             where
               -- Use BOXED array to tie the knot
               a :: Array SAT.Var Bool
-              a = array (1,nv') $ assocs m ++ [(v, Tseitin.evalFormula a phi) | (v,phi) <- defs]
+              a = array (1,nv') $ assocs m ++ [(v, Tseitin.evalFormula a phi) | (v,phi) <- IntMap.toList defs]
 
       pbo <- PBO.newOptimizer2 solver obj'' (\m -> SAT.evalPBSum m obj')
       setupOptimizer pbo opt
@@ -960,8 +960,8 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
           a :: Array SAT.Var Bool
           a = array (1,nv') $
                 assocs m ++
-                [(v, Tseitin.evalFormula a phi) | (v, phi) <- defsTseitin] ++
-                [(v, SAT.evalPBConstraint a constr) | (v, constr) <- defsPB]
+                [(v, Tseitin.evalFormula a phi) | (v, phi) <- IntMap.toList defsTseitin] ++
+                [(v, SAT.evalPBConstraint a constr) | (v, constr) <- IntMap.toList defsPB]
 
   let softConstrs = [(c, constr) | (Just c, constr) <- PBFile.wboConstraints formula]
 

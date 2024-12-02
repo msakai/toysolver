@@ -21,7 +21,7 @@ import qualified Data.Aeson as J
 import qualified Data.Aeson.Types as J
 import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
-import Data.List (sortOn)
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map.Lazy as Map
 import Data.String
 import qualified Data.Text as T
@@ -32,13 +32,8 @@ import ToySolver.SAT.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
-data TseitinInfo = TseitinInfo !Int !Int [(SAT.Var, Tseitin.Formula)]
-  deriving (Show, Read)
-
--- TODO: change defs representation to SAT.VarMap
-instance Eq TseitinInfo where
-  TseitinInfo nv1 nv2 defs == TseitinInfo nv1' nv2' defs' =
-    nv1 == nv1' && nv2 == nv2' && sortOn fst defs == sortOn fst defs'
+data TseitinInfo = TseitinInfo !Int !Int (SAT.VarMap Tseitin.Formula)
+  deriving (Show, Read, Eq)
 
 instance Transformer TseitinInfo where
   type Source TseitinInfo = SAT.Model
@@ -50,7 +45,7 @@ instance ForwardTransformer TseitinInfo where
       -- Use BOXED array to tie the knot
       a :: Array SAT.Var Bool
       a = array (1, nv2) $
-            assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- defs]
+            assocs m ++ [(v, Tseitin.evalFormula a phi) | (v, phi) <- IntMap.toList defs]
 
 instance BackwardTransformer TseitinInfo where
   transformBackward (TseitinInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
@@ -63,7 +58,7 @@ instance J.ToJSON TseitinInfo where
     , "num_transformed_variables" .= nv2
     , "definitions" .= J.object
         [ fromString ("x" ++ show v) .= formula
-        | (v, formula) <- defs
+        | (v, formula) <- IntMap.toList defs
         ]
     ]
 
@@ -73,7 +68,7 @@ instance J.FromJSON TseitinInfo where
     TseitinInfo
       <$> obj .: "num_original_variables"
       <*> obj .: "num_transformed_variables"
-      <*> mapM f (Map.toList defs)
+      <*> (IntMap.fromList <$> mapM f (Map.toList defs))
     where
       f :: (T.Text, SAT.Formula) -> J.Parser (SAT.Var, SAT.Formula)
       f (name, formula) = do

@@ -89,6 +89,7 @@ module ToySolver.SAT.Encoder.Tseitin
 import Control.Monad
 import Control.Monad.Primitive
 import Data.Primitive.MutVar
+import qualified Data.IntMap.Lazy as IntMap
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntSet as IntSet
@@ -429,7 +430,7 @@ encodeFACarryWithPolarity encoder polarity a b c = do
   encodeWithPolarityHelper encoder (encFACarryTable encoder) definePos defineNeg polarity (a,b,c)
 
 
-getDefinitions :: PrimMonad m => Encoder m -> m [(SAT.Var, Formula)]
+getDefinitions :: PrimMonad m => Encoder m -> m (SAT.VarMap Formula)
 getDefinitions encoder = do
   tableConj <- readMutVar (encConjTable encoder)
   tableITE <- readMutVar (encITETable encoder)
@@ -439,14 +440,18 @@ getDefinitions encoder = do
   let atom l
         | l < 0 = Not (Atom (- l))
         | otherwise = Atom l
-      m1 = [(v, andB [atom l1 | l1 <- IntSet.toList ls]) | (ls, (v, _, _)) <- Map.toList tableConj]
-      m2 = [(v, ite (atom c) (atom t) (atom e)) | ((c,t,e), (v, _, _)) <- Map.toList tableITE]
-      m3 = [(v, (atom a .||. atom b) .&&. (atom (-a) .||. atom (-b))) | ((a,b), (v, _, _)) <- Map.toList tableXOR]
-      m4 = [(v, orB [andB [atom l | l <- ls] | ls <- [[a,b,c],[a,-b,-c],[-a,b,-c],[-a,-b,c]]])
-             | ((a,b,c), (v, _, _)) <- Map.toList tableFASum]
-      m5 = [(v, orB [andB [atom l | l <- ls] | ls <- [[a,b],[a,c],[b,c]]])
-             | ((a,b,c), (v, _, _)) <- Map.toList tableFACarry]
-  return $ concat [m1, m2, m3, m4, m5]
+      m1 = IntMap.fromList [(v, andB [atom l1 | l1 <- IntSet.toList ls]) | (ls, (v, _, _)) <- Map.toList tableConj]
+      m2 = IntMap.fromList [(v, ite (atom c) (atom t) (atom e)) | ((c,t,e), (v, _, _)) <- Map.toList tableITE]
+      m3 = IntMap.fromList [(v, (atom a .||. atom b) .&&. (atom (-a) .||. atom (-b))) | ((a,b), (v, _, _)) <- Map.toList tableXOR]
+      m4 = IntMap.fromList
+             [ (v, orB [andB [atom l | l <- ls] | ls <- [[a,b,c],[a,-b,-c],[-a,b,-c],[-a,-b,c]]])
+             | ((a,b,c), (v, _, _)) <- Map.toList tableFASum
+             ]
+      m5 = IntMap.fromList
+             [ (v, orB [andB [atom l | l <- ls] | ls <- [[a,b],[a,c],[b,c]]])
+             | ((a,b,c), (v, _, _)) <- Map.toList tableFACarry
+             ]
+  return $ IntMap.unions [m1, m2, m3, m4, m5]
 
 
 data Polarity

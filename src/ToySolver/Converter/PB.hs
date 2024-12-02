@@ -216,7 +216,7 @@ quadratizePB' (formula, maxObj) =
       }
     , maxObj
     )
-  , PBQuadratizeInfo $ TseitinInfo nv1 nv2 [(v, And [atom l1, atom l2]) | (v, (l1,l2)) <- prodDefs]
+  , PBQuadratizeInfo $ TseitinInfo nv1 nv2 (IntMap.fromList [(v, And [atom l1, atom l2]) | (v, (l1,l2)) <- prodDefs])
   )
   where
     nv1 = PBFile.pbNumVars formula
@@ -556,13 +556,8 @@ wbo2pb wbo = runST $ do
     , WBO2PBInfo nv (PBFile.pbNumVars formula) defs
     )
 
-data WBO2PBInfo = WBO2PBInfo !Int !Int [(SAT.Var, PBFile.Constraint)]
-  deriving (Show)
-
--- TODO: change defs representation to SAT.VarMap
-instance Eq WBO2PBInfo where
-  WBO2PBInfo nv1 nv2 defs == WBO2PBInfo nv1' nv2' defs' =
-    nv1 == nv1' && nv2 == nv2' && sortOn fst defs == sortOn fst defs'  
+data WBO2PBInfo = WBO2PBInfo !Int !Int (SAT.VarMap PBFile.Constraint)
+  deriving (Show, Eq)
 
 instance Transformer WBO2PBInfo where
   type Source WBO2PBInfo = SAT.Model
@@ -570,7 +565,7 @@ instance Transformer WBO2PBInfo where
 
 instance ForwardTransformer WBO2PBInfo where
   transformForward (WBO2PBInfo _nv1 nv2 defs) m =
-    array (1, nv2) $ assocs m ++ [(v, SAT.evalPBConstraint m constr) | (v, constr) <- defs]
+    array (1, nv2) $ assocs m ++ [(v, SAT.evalPBConstraint m constr) | (v, constr) <- IntMap.toList defs]
 
 instance BackwardTransformer WBO2PBInfo where
   transformBackward (WBO2PBInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
@@ -583,7 +578,7 @@ instance J.ToJSON WBO2PBInfo where
     , "num_transformed_variables" .= nv2
     , "definitions" .= J.object
         [ fromString ("x" ++ show v) .= jPBConstraint constr
-        | (v, constr) <- defs
+        | (v, constr) <- IntMap.toList defs
         ]
     ]
 
@@ -593,14 +588,14 @@ instance J.FromJSON WBO2PBInfo where
     WBO2PBInfo
       <$> obj .: "num_original_variables"
       <*> obj .: "num_transformed_variables"
-      <*> mapM f (Map.toList defs)
+      <*> (IntMap.fromList <$> mapM f (Map.toList defs))
     where
       f (name, constr) = do
         v <- parseVarNameText name
         constr' <- parsePBConstraint constr
         return (v, constr')
 
-addWBO :: (PrimMonad m, SAT.AddPBNL m enc) => enc -> PBFile.SoftFormula -> m (SAT.PBSum, [(SAT.Var, PBFile.Constraint)])
+addWBO :: (PrimMonad m, SAT.AddPBNL m enc) => enc -> PBFile.SoftFormula -> m (SAT.PBSum, (SAT.VarMap PBFile.Constraint))
 addWBO db wbo = do
   SAT.newVars_ db $ PBFile.wboNumVars wbo
 
@@ -671,7 +666,7 @@ addWBO db wbo = do
     modifyMutVar objRef ((offset,[trueLit]) :)
 
   obj <- liftM reverse $ readMutVar objRef
-  defs <- liftM reverse $ readMutVar defsRef
+  defs <- liftM IntMap.fromList $ readMutVar defsRef
 
   case PBFile.wboTopCost wbo of
     Nothing -> return ()
