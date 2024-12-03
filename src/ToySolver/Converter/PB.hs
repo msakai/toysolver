@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -68,6 +69,8 @@ module ToySolver.Converter.PB
 import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.ST
+import qualified Data.Aeson as J
+import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
 import Data.Bits hiding (And (..))
 import Data.Default.Class
@@ -84,17 +87,20 @@ import Data.Primitive.MutVar
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.String
 import qualified Data.PseudoBoolean as PBFile
 
 import ToySolver.Converter.Base
 import qualified ToySolver.Converter.PB.Internal.Product as Product
 import ToySolver.Converter.Tseitin
 import qualified ToySolver.FileFormat.CNF as CNF
+import ToySolver.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.SAT.Encoder.Tseitin (Formula (..))
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
+import ToySolver.SAT.Internal.JSON
 import ToySolver.SAT.Store.CNF
 import ToySolver.SAT.Store.PB
 
@@ -210,7 +216,7 @@ quadratizePB' (formula, maxObj) =
       }
     , maxObj
     )
-  , PBQuadratizeInfo $ TseitinInfo nv1 nv2 [(v, And [Atom l1, Atom l2]) | (v, (l1,l2)) <- prodDefs]
+  , PBQuadratizeInfo $ TseitinInfo nv1 nv2 [(v, And [atom l1, atom l2]) | (v, (l1,l2)) <- prodDefs]
   )
   where
     nv1 = PBFile.pbNumVars formula
@@ -281,6 +287,11 @@ quadratizePB' (formula, maxObj) =
           | IntSet.size t == 1 = head $ IntSet.toList t
           | otherwise = toV Map.! t
 
+    atom :: SAT.Lit -> Formula
+    atom l
+      | l < 0 = Not (Atom (- l))
+      | otherwise = Atom l
+
 
 collectDegGe3Terms :: PBFile.Formula -> Set IntSet
 collectDegGe3Terms formula = Set.fromList [t' | t <- terms, let t' = IntSet.fromList t, IntSet.size t' >= 3]
@@ -311,6 +322,17 @@ instance ObjValueForwardTransformer PBQuadratizeInfo where
 
 instance ObjValueBackwardTransformer PBQuadratizeInfo where
   transformObjValueBackward _ = id
+
+instance J.ToJSON PBQuadratizeInfo where
+  toJSON (PBQuadratizeInfo info) =
+    J.object
+    [ "type" .= J.String "PBQuadratizeInfo"
+    , "base" .= info
+    ]
+
+instance J.FromJSON PBQuadratizeInfo where
+  parseJSON = withTypedObject "PBQuadratizeInfo" $ \obj ->
+    PBQuadratizeInfo <$> obj .: "base"
 
 -- -----------------------------------------------------------------------------
 
@@ -388,6 +410,37 @@ instance ObjValueForwardTransformer PBInequalitiesToEqualitiesInfo where
 instance ObjValueBackwardTransformer PBInequalitiesToEqualitiesInfo where
   transformObjValueBackward _ = id
 
+instance J.ToJSON PBInequalitiesToEqualitiesInfo where
+  toJSON (PBInequalitiesToEqualitiesInfo nv1 nv2 defs) =
+    J.object
+    [ "type" .= J.String "PBInequalitiesToEqualitiesInfo"
+    , "num_original_variables" .= nv1
+    , "num_transformed_variables" .= nv2
+    , "slack" .=
+        [ J.object
+          [ "lhs" .= jPBSum lhs
+          , "rhs" .= rhs
+          , "slack" .= [fromString ("x" ++ show v) :: J.Value | v <- vs]
+          ]
+        | (lhs, rhs, vs) <- defs
+        ]
+    ]
+
+instance J.FromJSON PBInequalitiesToEqualitiesInfo where
+  parseJSON = withTypedObject "PBInequalitiesToEqualitiesInfo" $ \obj -> do
+    PBInequalitiesToEqualitiesInfo
+      <$> obj .: "num_original_variables"
+      <*> obj .: "num_transformed_variables"
+      <*> (mapM f =<< obj .: "slack")
+    where
+      f = J.withObject "slack" $ \obj -> do
+        lhs <- parsePBSum =<< obj .: "lhs"
+        rhs <- obj .: "rhs"
+        vs <- mapM g =<< obj .: "slack"
+        return (lhs, rhs, vs)
+      g ('x' : rest) = pure $! read rest
+      g s = fail ("fail to parse variable: " ++ show s)
+
 -- -----------------------------------------------------------------------------
 
 unconstrainPB :: PBFile.Formula -> ((PBFile.Formula, Integer), PBUnconstrainInfo)
@@ -421,6 +474,17 @@ instance ObjValueForwardTransformer PBUnconstrainInfo where
 
 instance ObjValueBackwardTransformer PBUnconstrainInfo where
   transformObjValueBackward (PBUnconstrainInfo info) = transformObjValueBackward info
+
+instance J.ToJSON PBUnconstrainInfo where
+  toJSON (PBUnconstrainInfo info) =
+    J.object
+    [ "type" .= J.String "PBUnconstrainInfo"
+    , "base" .= info
+    ]
+
+instance J.FromJSON PBUnconstrainInfo where
+  parseJSON = withTypedObject "PBUnconstrainInfo" $ \obj ->
+    PBUnconstrainInfo <$> obj .: "base"
 
 unconstrainPB' :: PBFile.Formula -> (PBFile.Formula, Integer)
 unconstrainPB' formula =
@@ -493,7 +557,12 @@ wbo2pb wbo = runST $ do
     )
 
 data WBO2PBInfo = WBO2PBInfo !Int !Int [(SAT.Var, PBFile.Constraint)]
-  deriving (Eq, Show)
+  deriving (Show)
+
+-- TODO: change defs representation to SAT.VarMap
+instance Eq WBO2PBInfo where
+  WBO2PBInfo nv1 nv2 defs == WBO2PBInfo nv1' nv2' defs' =
+    nv1 == nv1' && nv2 == nv2' && sortOn fst defs == sortOn fst defs'  
 
 instance Transformer WBO2PBInfo where
   type Source WBO2PBInfo = SAT.Model
@@ -505,6 +574,31 @@ instance ForwardTransformer WBO2PBInfo where
 
 instance BackwardTransformer WBO2PBInfo where
   transformBackward (WBO2PBInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
+
+instance J.ToJSON WBO2PBInfo where
+  toJSON (WBO2PBInfo nv1 nv2 defs) =
+    J.object
+    [ "type" .= J.String "WBO2PBInfo"
+    , "num_original_variables" .= nv1
+    , "num_transformed_variables" .= nv2
+    , "definitions" .= J.object
+        [ fromString ("x" ++ show v) .= jPBConstraint constr
+        | (v, constr) <- defs
+        ]
+    ]
+
+instance J.FromJSON WBO2PBInfo where
+  parseJSON = withTypedObject "WBO2PBInfo" $ \obj -> do
+    defs <- obj .: "definitions"
+    WBO2PBInfo
+      <$> obj .: "num_original_variables"
+      <*> obj .: "num_transformed_variables"
+      <*> mapM f (Map.toList defs)
+    where
+      f (name, constr) = do
+        v <- parseVarNameText name
+        constr' <- parsePBConstraint constr
+        return (v, constr')
 
 addWBO :: (PrimMonad m, SAT.AddPBNL m enc) => enc -> PBFile.SoftFormula -> m (SAT.PBSum, [(SAT.Var, PBFile.Constraint)])
 addWBO db wbo = do

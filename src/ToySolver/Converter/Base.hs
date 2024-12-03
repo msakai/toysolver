@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 -----------------------------------------------------------------------------
@@ -26,6 +27,9 @@ module ToySolver.Converter.Base
   , ReversedTransformer (..)
   ) where
 
+import qualified Data.Aeson as J
+import Data.Aeson ((.=), (.:))
+import ToySolver.Internal.JSON (withTypedObject)
 
 class (Eq a, Show a) => Transformer a where
   type Source a
@@ -78,6 +82,19 @@ instance (ObjValueBackwardTransformer a, ObjValueBackwardTransformer b, TargetOb
   => ObjValueBackwardTransformer (ComposedTransformer a b) where
   transformObjValueBackward (ComposedTransformer a b) = transformObjValueBackward a . transformObjValueBackward b
 
+instance (J.ToJSON a, J.ToJSON b) => J.ToJSON (ComposedTransformer a b) where
+  toJSON (ComposedTransformer a b) =
+    J.object
+    [ "type" .= J.String "ComposedTransformer"
+    , "first" .= a
+    , "second" .= b
+    ]
+
+instance (J.FromJSON a, J.FromJSON b) => J.FromJSON (ComposedTransformer a b) where
+  parseJSON = withTypedObject "ComposedTransformer" $ \obj -> do
+    ComposedTransformer
+      <$> obj .: "first"
+      <*> obj .: "second"
 
 
 data IdentityTransformer a = IdentityTransformer
@@ -92,6 +109,15 @@ instance ForwardTransformer (IdentityTransformer a) where
 
 instance BackwardTransformer (IdentityTransformer a) where
   transformBackward IdentityTransformer = id
+
+instance J.ToJSON (IdentityTransformer a) where
+  toJSON IdentityTransformer =
+    J.object
+    [ "type" .= J.String "IdentityTransformer"
+    ]
+
+instance J.FromJSON (IdentityTransformer a) where
+  parseJSON = withTypedObject "IdentityTransformer" $ \_ -> pure IdentityTransformer
 
 
 data ReversedTransformer t = ReversedTransformer t
@@ -116,3 +142,14 @@ instance ObjValueBackwardTransformer t => ObjValueForwardTransformer (ReversedTr
 
 instance ObjValueForwardTransformer t => ObjValueBackwardTransformer (ReversedTransformer t) where
   transformObjValueBackward (ReversedTransformer t) = transformObjValueForward t
+
+instance J.ToJSON t => J.ToJSON (ReversedTransformer t) where
+  toJSON (ReversedTransformer t) =
+    J.object
+    [ "type" .= J.String "ReversedTransformer"
+    , "base" .= t
+    ]
+
+instance J.FromJSON t => J.FromJSON (ReversedTransformer t) where
+  parseJSON = withTypedObject "ReversedTransformer" $ \v ->
+    ReversedTransformer <$> v .: "base"

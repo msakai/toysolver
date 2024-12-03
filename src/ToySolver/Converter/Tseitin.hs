@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -16,13 +17,28 @@ module ToySolver.Converter.Tseitin
   ( TseitinInfo (..)
   ) where
 
+import qualified Data.Aeson as J
+import qualified Data.Aeson.Types as J
+import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
+import Data.List (sortOn)
+import qualified Data.Map.Lazy as Map
+import Data.String
+import qualified Data.Text as T
 import ToySolver.Converter.Base
+import ToySolver.Internal.JSON
+import qualified ToySolver.SAT.Formula as SAT
+import ToySolver.SAT.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 
 data TseitinInfo = TseitinInfo !Int !Int [(SAT.Var, Tseitin.Formula)]
-  deriving (Eq, Show, Read)
+  deriving (Show, Read)
+
+-- TODO: change defs representation to SAT.VarMap
+instance Eq TseitinInfo where
+  TseitinInfo nv1 nv2 defs == TseitinInfo nv1' nv2' defs' =
+    nv1 == nv1' && nv2 == nv2' && sortOn fst defs == sortOn fst defs'
 
 instance Transformer TseitinInfo where
   type Source TseitinInfo = SAT.Model
@@ -38,5 +54,30 @@ instance ForwardTransformer TseitinInfo where
 
 instance BackwardTransformer TseitinInfo where
   transformBackward (TseitinInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
+
+instance J.ToJSON TseitinInfo where
+  toJSON (TseitinInfo nv1 nv2 defs) =
+    J.object
+    [ "type" .= J.String "TseitinInfo"
+    , "num_original_variables" .= nv1
+    , "num_transformed_variables" .= nv2
+    , "definitions" .= J.object
+        [ fromString ("x" ++ show v) .= formula
+        | (v, formula) <- defs
+        ]
+    ]
+
+instance J.FromJSON TseitinInfo where
+  parseJSON = withTypedObject "TseitinInfo" $ \obj -> do
+    defs <- obj .: "definitions"
+    TseitinInfo
+      <$> obj .: "num_original_variables"
+      <*> obj .: "num_transformed_variables"
+      <*> mapM f (Map.toList defs)
+    where
+      f :: (T.Text, SAT.Formula) -> J.Parser (SAT.Var, SAT.Formula)
+      f (name, formula) = do
+        x <- parseVarNameText name
+        pure (x, formula)
 
 -- -----------------------------------------------------------------------------

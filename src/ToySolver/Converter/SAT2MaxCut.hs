@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -32,6 +33,8 @@ module ToySolver.Converter.SAT2MaxCut
   , nae3sat2maxcut
   ) where
 
+import qualified Data.Aeson as J
+import Data.Aeson ((.=))
 import Data.Array.Unboxed
 import qualified Data.IntSet as IntSet
 import qualified Data.Vector.Generic as VG
@@ -40,6 +43,7 @@ import qualified Data.Vector.Unboxed as VU
 import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Graph.Base
 import qualified ToySolver.Graph.MaxCut as MaxCut
+import ToySolver.Internal.JSON (withTypedObject)
 import qualified ToySolver.SAT.Types as SAT
 import ToySolver.Converter.Base
 import ToySolver.Converter.NAESAT (NAESAT)
@@ -118,6 +122,15 @@ instance BackwardTransformer NAE3SAT2MaxCutInfo where
     where
       (_,n') = bounds sol
       n = (n'+1) `div` 2
+
+instance J.ToJSON NAE3SAT2MaxCutInfo where
+  toJSON _ =
+    J.object
+    [ "type" .= J.String "NAE3SAT2MaxCutInfo"
+    ]
+
+instance J.FromJSON NAE3SAT2MaxCutInfo where
+  parseJSON = withTypedObject "NAE3SAT2MaxCutInfo" $ \_ -> pure NAE3SAT2MaxCutInfo
 
 -- ------------------------------------------------------------------------
 

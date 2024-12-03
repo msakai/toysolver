@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -51,6 +52,8 @@ module ToySolver.Converter.SAT2MaxSAT
   , simpleMaxSAT2ToSimpleMaxCut
   ) where
 
+import qualified Data.Aeson as J
+import Data.Aeson ((.=), (.:))
 import Data.Array.Unboxed
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
@@ -64,6 +67,7 @@ import ToySolver.Converter.SAT2KSAT
 import ToySolver.Converter.Tseitin
 import ToySolver.Graph.Base
 import qualified ToySolver.Graph.MaxCut as MaxCut
+import ToySolver.Internal.JSON (withTypedObject)
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Formula as SAT
 
@@ -91,7 +95,7 @@ sat3ToMaxSAT2 cnf =
         , t
         )
       , TseitinInfo (CNF.cnfNumVars cnf) nv
-          [ (d, SAT.And [SAT.Atom a, SAT.Atom b, SAT.Atom c])
+          [ (d, SAT.And [atom a, atom b, atom c])
             -- we define d as "a && b && c", but "a + b + c >= 2" is also fine.
           | (d, (a,b,c)) <- ds
           ]
@@ -110,6 +114,12 @@ sat3ToMaxSAT2 cnf =
               cs2 = [[a], [b], [c], [d], [-a,-b], [-a,-c], [-b,-c], [a,-d], [b,-d], [c,-d]]
           in (nv+1, nc + length cs2, map (\clause' -> (1, SAT.packClause clause')) cs2 ++ cs, (d, (a,b,c)) : ds, t + 3)
         _ -> error "not a 3-SAT instance"
+
+    atom :: SAT.Lit -> SAT.Formula
+    atom l
+      | l < 0 = SAT.Not (SAT.Atom (- l))
+      | otherwise = SAT.Atom l
+
 
 type SAT3ToMaxSAT2Info = TseitinInfo
 
@@ -132,7 +142,7 @@ simplifyMaxSAT2 (wcnf, threshold) =
   case foldl' f (nv1, Set.empty, IntMap.empty, threshold) (CNF.wcnfClauses wcnf) of
     (nv2, cs, defs, threshold2) ->
       ( (nv2, cs, threshold2)
-      , TseitinInfo nv1 nv2 [(v, SAT.Not (SAT.Atom a)) | (v, (a, _b)) <- IntMap.toList defs]
+      , TseitinInfo nv1 nv2 [(v, atom (- a)) | (v, (a, _b)) <- IntMap.toList defs]
         -- we deine v as "~a" but "~b" is also fine.
       )
   where
@@ -148,6 +158,11 @@ simplifyMaxSAT2 (wcnf, threshold) =
       | otherwise         = (nv, Set.insert c cs, defs, t)
       where
         v = nv + 1
+
+    atom :: SAT.Lit -> SAT.Formula
+    atom l
+      | l < 0 = SAT.Not (SAT.Atom (- l))
+      | otherwise = SAT.Atom l
 
 applyN :: Integral n => n -> (a -> a) -> (a -> a)
 applyN n f = appEndo $ mconcat $ genericReplicate n (Endo f)
@@ -237,6 +252,21 @@ instance BackwardTransformer SimpleMaxSAT2ToSimpleMaxCutInfo where
     where
       (_numNodes, _tt, ff, _t, _f ,xp, _xn, _l) = simpleMaxSAT2ToSimpleMaxCutNodes n p
       b = not (sol ! ff 0)
+
+instance J.ToJSON SimpleMaxSAT2ToSimpleMaxCutInfo where
+  toJSON (SimpleMaxSAT2ToSimpleMaxCutInfo n p) =
+    J.object
+    [ "type" .= J.String "SimpleMaxSAT2ToSimpleMaxCutInfo"
+    , "num_original_variables" .= n
+    , "num_transformed_nodes" .= p
+    ]
+
+instance J.FromJSON SimpleMaxSAT2ToSimpleMaxCutInfo where
+  parseJSON =
+    withTypedObject "SimpleMaxSAT2ToSimpleMaxCutInfo" $ \obj ->
+      SimpleMaxSAT2ToSimpleMaxCutInfo
+        <$> obj .: "num_original_variables"
+        <*> obj .: "num_transformed_nodes"
 
 -- ------------------------------------------------------------------------
 

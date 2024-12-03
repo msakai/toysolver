@@ -127,6 +127,7 @@ Library
   Exposed: True
   Hs-source-dirs: src
   Build-Depends:
+     aeson >=1.4.2.0 && <2.3,
      array >=0.5,
      -- GHC >=8.6 && <9.11
      base >=4.12 && <4.21,
@@ -372,6 +373,8 @@ Library
      ToySolver.Converter.PB.Internal.Product
      ToySolver.Data.AlgebraicNumber.Graeffe
      ToySolver.Data.Polynomial.Base
+     ToySolver.Internal.JSON
+     ToySolver.SAT.Internal.JSON
      ToySolver.SAT.MUS.Base
      ToySolver.SAT.MUS.Deletion
      ToySolver.SAT.MUS.Insertion
@@ -921,6 +924,7 @@ Test-suite TestSuite
     Smtlib.Syntax.Syntax
     Smtlib.Syntax.ShowSL
   Build-depends:
+    aeson,
     array,
     base,
     bytestring,
