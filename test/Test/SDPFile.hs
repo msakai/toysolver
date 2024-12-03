@@ -2,6 +2,7 @@
 module Test.SDPFile (sdpTestGroup) where
 
 import Control.Monad
+import qualified Data.Aeson as J
 import Data.List
 import Data.Maybe
 import Data.ByteString.Builder (toLazyByteString)
@@ -9,6 +10,8 @@ import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
 import Test.Tasty.TH
+
+import qualified ToySolver.SDP as SDP
 import ToySolver.Text.SDPFile
 
 ------------------------------------------------------------------------
@@ -73,6 +76,20 @@ checkParsed actual expected =
   case actual of
     Left err -> assertFailure $ show err
     Right prob -> prob @?= expected
+
+------------------------------------------------------------------------
+
+case_dualize_json_example1 :: Assertion
+case_dualize_json_example1 = do
+  let ret@(_, info) = SDP.dualize example1
+      json = J.encode info
+  J.eitherDecode json @?= Right info
+
+case_dualize_json_example2 :: Assertion
+case_dualize_json_example2 = do
+  let ret@(_, info) = SDP.dualize example2
+      json = J.encode info
+  J.eitherDecode json @?= Right info
 
 ------------------------------------------------------------------------
 -- Test harness
