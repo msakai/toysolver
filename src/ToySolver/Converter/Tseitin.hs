@@ -58,7 +58,7 @@ instance BackwardTransformer TseitinInfo where
 instance J.ToJSON TseitinInfo where
   toJSON (TseitinInfo nv1 nv2 defs) =
     J.object
-    [ "type" .= J.String "TseitinInfo"
+    [ "type" .= ("TseitinInfo" :: J.Value)
     , "num_original_variables" .= nv1
     , "num_transformed_variables" .= nv2
     , "definitions" .= J.object

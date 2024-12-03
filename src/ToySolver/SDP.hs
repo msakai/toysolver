@@ -193,7 +193,7 @@ instance BackwardTransformer DualizeInfo where
 instance J.ToJSON DualizeInfo where
   toJSON (DualizeInfo origM origBlockStruct) =
     J.object
-    [ "type" .= J.String "DualizeInfo"
+    [ "type" .= ("DualizeInfo" :: J.Value)
     , "num_original_matrices" .= origM
     , "original_block_structure" .= origBlockStruct
     ] 

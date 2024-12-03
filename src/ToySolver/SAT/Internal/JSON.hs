@@ -10,9 +10,7 @@ import Control.Monad
 import qualified Data.Aeson as J
 import qualified Data.Aeson.Types as J
 import Data.Aeson ((.=), (.:))
-import Data.String
 import qualified Data.Text as T
-import qualified Data.Vector as V
 
 import qualified Data.PseudoBoolean as PBFile
 import ToySolver.Internal.JSON
@@ -20,8 +18,8 @@ import qualified ToySolver.SAT.Types as SAT
 
 jVar :: SAT.Var -> J.Value
 jVar v = J.object
-  [ "type" .= J.String "variable"
-  , "name" .= (fromString ("x" <> show v) :: J.Value)
+  [ "type" .= ("variable" :: J.Value)
+  , "name" .= ("x" ++ show v)
   ]
 
 parseVar :: J.Value -> J.Parser SAT.Var
@@ -38,9 +36,9 @@ parseVarNameText name =
 
 jNot :: J.Value -> J.Value
 jNot x = J.object
-  [ "type" .= J.String "operator"
-  , "name" .= J.String "not"
-  , "operands" .= J.Array (V.singleton x)
+  [ "type" .= ("operator" :: J.Value)
+  , "name" .= ("not" :: J.Value)
+  , "operands" .= [x]
   ]
 
 jLit :: SAT.Lit -> J.Value
@@ -61,19 +59,19 @@ parseLitNameText name =
     _ -> parseVarNameText name
 
 jConst :: J.ToJSON a => a -> J.Value
-jConst x = J.object ["type" .= J.String "constant", "value" .= x]
+jConst x = J.object ["type" .= ("constant" :: J.Value), "value" .= x]
 
 parseConst :: J.FromJSON a => J.Value -> J.Parser a
 parseConst = withTypedObject "constant" $ \obj -> obj .: "value"
 
 jPBSum :: SAT.PBSum -> J.Value
 jPBSum s = J.object
-  [ "type" .= J.String "operator"
-  , "name" .= J.String "+"
+  [ "type" .= ("operator" :: J.Value)
+  , "name" .= ("+" :: J.Value)
   , "operands" .=
       [ J.object
-          [ "type" .= J.String "operator"
-          , "name" .= J.String "*"
+          [ "type" .= ("operator" :: J.Value)
+          , "name" .= ("*" :: J.Value)
           , "operands" .= (jConst c : [jLit lit | lit <- lits])
           ]
       | (c, lits) <- s
@@ -96,8 +94,8 @@ parsePBSum x = msum
 jPBConstraint :: PBFile.Constraint -> J.Value
 jPBConstraint (lhs, op, rhs) =
   J.object
-  [ "type" .= J.String "operator"
-  , "name" .= J.String (case op of{ PBFile.Ge -> ">="; PBFile.Eq -> "=" })
+  [ "type" .= ("operator" :: J.Value)
+  , "name" .= (case op of{ PBFile.Ge -> ">="; PBFile.Eq -> "=" } :: J.Value)
   , "operands" .= [jPBSum lhs, jConst rhs]
   ]
 

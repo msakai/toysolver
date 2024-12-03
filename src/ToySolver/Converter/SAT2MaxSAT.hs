@@ -256,7 +256,7 @@ instance BackwardTransformer SimpleMaxSAT2ToSimpleMaxCutInfo where
 instance J.ToJSON SimpleMaxSAT2ToSimpleMaxCutInfo where
   toJSON (SimpleMaxSAT2ToSimpleMaxCutInfo n p) =
     J.object
-    [ "type" .= J.String "SimpleMaxSAT2ToSimpleMaxCutInfo"
+    [ "type" .= ("SimpleMaxSAT2ToSimpleMaxCutInfo" :: J.Value)
     , "num_original_variables" .= n
     , "num_transformed_nodes" .= p
     ]

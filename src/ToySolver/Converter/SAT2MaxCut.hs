@@ -126,7 +126,7 @@ instance BackwardTransformer NAE3SAT2MaxCutInfo where
 instance J.ToJSON NAE3SAT2MaxCutInfo where
   toJSON _ =
     J.object
-    [ "type" .= J.String "NAE3SAT2MaxCutInfo"
+    [ "type" .= ("NAE3SAT2MaxCutInfo" :: J.Value)
     ]
 
 instance J.FromJSON NAE3SAT2MaxCutInfo where

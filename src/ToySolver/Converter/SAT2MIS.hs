@@ -120,7 +120,7 @@ instance BackwardTransformer SAT3ToISInfo where
 instance J.ToJSON SAT3ToISInfo where
   toJSON (SAT3ToISInfo nv clusters nodeToLit) =
     J.object
-    [ "type" .= J.String "SAT3ToISInfo"
+    [ "type" .= ("SAT3ToISInfo" :: J.Value)
     , "num_original_variables" .= nv
     , "clusters" .= clusters
     , "node_to_literal" .= (J.toJSONList
@@ -212,7 +212,7 @@ instance ObjValueBackwardTransformer IS2SATInfo where
 instance J.ToJSON IS2SATInfo where
   toJSON (IS2SATInfo (lb, ub)) =
     J.object
-    [ "type" .= J.String "IS2SATInfo"
+    [ "type" .= ("IS2SATInfo" :: J.Value)
     , "node_bounds" .= (lb, ub)
     ]
 

@@ -99,7 +99,7 @@ instance BackwardTransformer SAT2NAESATInfo where
 instance J.ToJSON SAT2NAESATInfo where
   toJSON (SAT2NAESATInfo z) =
     J.object
-    [ "type" .= J.String "SAT2NAESATInfo"
+    [ "type" .= ("SAT2NAESATInfo" :: J.Value)
     , "special_variable" .= z
     ]
 

@@ -82,7 +82,7 @@ instance ObjValueBackwardTransformer MIP2PBInfo where
 instance J.ToJSON MIP2PBInfo where
   toJSON (MIP2PBInfo vmap d) =
     J.object
-    [ "type" .= J.String "MIP2PBInfo"
+    [ "type" .= ("MIP2PBInfo" :: J.Value)
     , "substitutions" .= J.object
         [ fromString (MIP.fromVar v) .= jPBSum s
         | (v, Integer.Expr s) <- Map.toList vmap
