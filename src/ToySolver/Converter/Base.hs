@@ -146,7 +146,7 @@ instance ObjValueForwardTransformer t => ObjValueBackwardTransformer (ReversedTr
 instance J.ToJSON t => J.ToJSON (ReversedTransformer t) where
   toJSON (ReversedTransformer t) =
     J.object
-    [ "type" .= J.String "ReversedTransformer"
+    [ "type" .= ("ReversedTransformer" :: J.Value)
     , "base" .= t
     ]
 

@@ -39,7 +39,7 @@ instance BackwardTransformer GCNF2MaxSATInfo where
 instance J.ToJSON GCNF2MaxSATInfo where
   toJSON (GCNF2MaxSATInfo nv) =
     J.object
-    [ "type" .= J.String "GCNF2MaxSATInfo"
+    [ "type" .= ("GCNF2MaxSATInfo" :: J.Value)
     , "num_original_variables" .= nv
     ]
 

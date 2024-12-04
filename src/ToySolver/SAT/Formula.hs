@@ -35,7 +35,6 @@ import Data.Hashable
 import qualified Data.HashTable.Class as H
 import qualified Data.HashTable.ST.Cuckoo as C
 import Data.Interned
-import qualified Data.Vector as V
 import GHC.Generics
 import ToySolver.Data.Boolean
 import qualified ToySolver.Data.BoolExpr as BoolExpr
@@ -238,33 +237,33 @@ instance Complement JSON where
 
 instance MonotoneBoolean JSON where
   andB xs = JSON $ J.object
-    [ "type" .= J.String "operator"
-    , "name" .= J.String "and"
-    , "operands" .= J.Array (V.fromList [x | JSON x <- xs])
+    [ "type" .= ("operator" :: J.Value)
+    , "name" .= ("and" :: J.Value)
+    , "operands" .= [x | JSON x <- xs]
     ]
   orB xs = JSON $ J.object
-    [ "type" .= J.String "operator"
-    , "name" .= J.String "or"
-    , "operands" .= J.Array (V.fromList [x | JSON x <- xs])
+    [ "type" .= ("operator" :: J.Value)
+    , "name" .= ("or" :: J.Value)
+    , "operands" .= [x | JSON x <- xs]
     ]
 
 instance IfThenElse JSON JSON where
   ite (JSON c) (JSON t) (JSON e) = JSON $ J.object
-    [ "type" .= J.String "operator"
-    , "name" .= J.String "ite"
-    , "operands" .= J.Array (V.fromList [c, t, e])
+    [ "type" .= ("operator" :: J.Value)
+    , "name" .= ("ite" :: J.Value)
+    , "operands" .= [c, t, e]
     ]
 
 instance Boolean JSON where
   (.=>.) (JSON p) (JSON q) = JSON $ J.object
-    [ "type" .= J.String "operator"
-    , "name" .= J.String "=>"
-    , "operands" .= J.Array (V.fromList [p, q])
+    [ "type" .= ("operator" :: J.Value)
+    , "name" .= ("=>" :: J.Value)
+    , "operands" .= [p, q]
     ]
   (.<=>.) (JSON p) (JSON q) = JSON $ J.object
-    [ "type" .= J.String "operator"
-    , "name" .= J.String "<=>"
-    , "operands" .= J.Array (V.fromList [p, q])
+    [ "type" .= ("operator" :: J.Value)
+    , "name" .= ("<=>" :: J.Value)
+    , "operands" .= [p, q]
     ]
 
 instance J.ToJSON Formula where

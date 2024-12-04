@@ -65,7 +65,7 @@ instance BackwardTransformer PB2IPInfo where
 instance J.ToJSON PB2IPInfo where
   toJSON (PB2IPInfo nv) =
     J.object
-    [ "type" .= J.String "PB2IPInfo"
+    [ "type" .= ("PB2IPInfo" :: J.Value)
     , "num_original_variables" .= nv
     ]
 
@@ -132,7 +132,7 @@ instance BackwardTransformer WBO2IPInfo where
 instance J.ToJSON WBO2IPInfo where
   toJSON (WBO2IPInfo nv relaxVariables) =
     J.object
-    [ "type" .= J.String "WBO2IPInfo"
+    [ "type" .= ("WBO2IPInfo" :: J.Value)
     , "num_original_variables" .= nv
     , "relax_variables" .= J.object
         [ fromString (MIP.fromVar v) .= jPBConstraint constr

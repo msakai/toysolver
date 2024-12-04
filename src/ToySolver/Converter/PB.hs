@@ -326,7 +326,7 @@ instance ObjValueBackwardTransformer PBQuadratizeInfo where
 instance J.ToJSON PBQuadratizeInfo where
   toJSON (PBQuadratizeInfo info) =
     J.object
-    [ "type" .= J.String "PBQuadratizeInfo"
+    [ "type" .= ("PBQuadratizeInfo" :: J.Value)
     , "base" .= info
     ]
 
@@ -413,7 +413,7 @@ instance ObjValueBackwardTransformer PBInequalitiesToEqualitiesInfo where
 instance J.ToJSON PBInequalitiesToEqualitiesInfo where
   toJSON (PBInequalitiesToEqualitiesInfo nv1 nv2 defs) =
     J.object
-    [ "type" .= J.String "PBInequalitiesToEqualitiesInfo"
+    [ "type" .= ("PBInequalitiesToEqualitiesInfo" :: J.Value)
     , "num_original_variables" .= nv1
     , "num_transformed_variables" .= nv2
     , "slack" .=
@@ -478,7 +478,7 @@ instance ObjValueBackwardTransformer PBUnconstrainInfo where
 instance J.ToJSON PBUnconstrainInfo where
   toJSON (PBUnconstrainInfo info) =
     J.object
-    [ "type" .= J.String "PBUnconstrainInfo"
+    [ "type" .= ("PBUnconstrainInfo" :: J.Value)
     , "base" .= info
     ]
 

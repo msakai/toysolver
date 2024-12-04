@@ -99,7 +99,7 @@ instance (Eq a, Show a, Read a, Num a) => ObjValueBackwardTransformer (QUBO2PBIn
 instance J.ToJSON (QUBO2PBInfo a) where
   toJSON (QUBO2PBInfo d) =
     J.object
-    [ "type" .= J.String "QUBO2PBInfo"
+    [ "type" .= ("QUBO2PBInfo" :: J.Value)
     , "objective_function_scale_factor" .= d
     ]
 
@@ -163,7 +163,7 @@ instance Real a => ObjValueBackwardTransformer (PBAsQUBOInfo a) where
 instance J.ToJSON (PBAsQUBOInfo a) where
   toJSON (PBAsQUBOInfo offset) =
     J.object
-    [ "type" .= J.String "PBAsQUBOInfo"
+    [ "type" .= ("PBAsQUBOInfo" :: J.Value)
     , "objective_function_offset" .= offset
     ]
 
