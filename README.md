@@ -14,7 +14,7 @@ Dev:
 
 It provides solver implementations of various problems including SAT, SMT, Max-SAT, PBS (Pseudo Boolean Satisfaction), PBO (Pseudo Boolean Optimization), MILP (Mixed Integer Linear Programming) and non-linear real arithmetic.
 
-In particular it contains moderately-fast pure-Haskell SAT solver 'toysat'.
+In particular, it contains moderately-fast pure-Haskell SAT solver 'toysat'.
 
 Installation
 ------------
@@ -30,7 +30,7 @@ This package includes several commands.
 
 Arithmetic solver for the following problems:
 
-* Mixed Integer Liner Programming (MILP or MIP)
+* Mixed Integer Linear Programming (MILP or MIP)
 * Boolean SATisfiability problem (SAT)
 * PB
     * Pseudo Boolean Satisfaction (PBS)
