@@ -1,13 +1,23 @@
 0.9.0 (Unreleased)
 -----
 
-* Add `BuildForeignLibraries` flag (#94)
-* Support GHC 9.4 (#92), 9.6, 9.8, 9.10
+* Converters updates
+  * Add `--dump-info` option to `toyconvert` (#119, #120, #125)
+  * Change the signs of QUBO-related converter's representation of offset (#126)
+  * Change `WBO2IPInfo` not to store weights (#124)
+  * Change `SAT2KSATInfo`, `SimplifyMaxSAT2Info` and `SAT3ToMaxSAT2Info` to be synonyms of `TseitinInfo` (#121, #123)
+  * Use `SAT.VarMap` to represent definitions in SAT-related encoders/converters (#127)
+* Pseudo-boolean and cardinality constarint encoder updates
+  * Consider polarity in encoding of pseudo-boolean and cardinality constraints (#88)
+  * Add BC-CNF pseudo boolean constraint encoder (#85)
+  * Support specifying PB encoding strategy (#77)
+* Compatibility
+  * Support GHC 9.4 (#92), 9.6, 9.8, 9.10
+  * Use prettyprinter package if `optparse-applicative` is `>=0.18` (#106)
+  * Do not rely on `StarIsType` extension (#84)
+  * Add `BuildForeignLibraries` flag (#94)
 * Remove features that depend on OpenCL (#90)
-* Consider polarity in encoding of pseudo-boolean and cardinality constraints (#88)
-* Add BC-CNF pseudo boolean constraint encoder (#85)
-* Do not rely on `StarIsType` extension (#84)
-* Support specifying PB encoding strategy (#77)
+
 
 0.8.0
 -----
