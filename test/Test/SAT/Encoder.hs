@@ -161,7 +161,7 @@ prop_PBEncoder_addPBAtLeast = QM.monadicIO $ do
     return (cnf, defs)
   forM_ (allAssignments 4) $ \m -> do
     let m2 :: Array SAT.Var Bool
-        m2 = array (1, CNF.cnfNumVars cnf) $ assocs m ++ [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs]
+        m2 = array (1, CNF.cnfNumVars cnf) $ assocs m ++ [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- IntMap.toList defs]
         b1 = SAT.evalPBLinAtLeast m (lhs,rhs)
         b2 = evalCNF (array (bounds m2) (assocs m2)) cnf
     QM.assert $ b1 == b2
@@ -189,7 +189,7 @@ prop_PBEncoder_encodePBLinAtLeastWithPolarity = QM.monadicIO $ do
     let m2 :: Array SAT.Var Bool
         m2 = array (1, CNF.cnfNumVars cnf) $
                assocs m ++
-               [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs] ++
+               [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- IntMap.toList defs] ++
                Cardinality.evalTotalizerDefinitions m2 defs2
         b1 = evalCNF (array (bounds m2) (assocs m2)) cnf
         cmp a b = isJust $ do
@@ -269,7 +269,7 @@ prop_CardinalityEncoder_addAtLeast = QM.monadicIO $ do
     let m2 :: Array SAT.Var Bool
         m2 = array (1, CNF.cnfNumVars cnf) $
                assocs m ++
-               [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs] ++
+               [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- IntMap.toList defs] ++
                Cardinality.evalTotalizerDefinitions m2 defs2
         b1 = SAT.evalAtLeast m (lhs,rhs)
         b2 = evalCNF (array (bounds m2) (assocs m2)) cnf
@@ -375,7 +375,7 @@ prop_encodeAtLeastWithPolarity = QM.monadicIO $ do
     let m2 :: Array SAT.Var Bool
         m2 = array (1, CNF.cnfNumVars cnf) $
                assocs m ++
-               [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- defs] ++
+               [(v, Tseitin.evalFormula m2 phi) | (v,phi) <- IntMap.toList defs] ++
                Cardinality.evalTotalizerDefinitions m2 defs2
         b1 = evalCNF (array (bounds m2) (assocs m2)) cnf
         cmp a b = isJust $ do

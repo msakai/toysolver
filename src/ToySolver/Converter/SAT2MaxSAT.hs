@@ -94,7 +94,7 @@ sat3ToMaxSAT2 cnf =
           }
         , t
         )
-      , TseitinInfo (CNF.cnfNumVars cnf) nv
+      , TseitinInfo (CNF.cnfNumVars cnf) nv $ IntMap.fromList
           [ (d, SAT.And [atom a, atom b, atom c])
             -- we define d as "a && b && c", but "a + b + c >= 2" is also fine.
           | (d, (a,b,c)) <- ds
@@ -142,7 +142,7 @@ simplifyMaxSAT2 (wcnf, threshold) =
   case foldl' f (nv1, Set.empty, IntMap.empty, threshold) (CNF.wcnfClauses wcnf) of
     (nv2, cs, defs, threshold2) ->
       ( (nv2, cs, threshold2)
-      , TseitinInfo nv1 nv2 [(v, atom (- a)) | (v, (a, _b)) <- IntMap.toList defs]
+      , TseitinInfo nv1 nv2 (fmap (\(a, _b) -> atom (- a)) defs)
         -- we deine v as "~a" but "~b" is also fine.
       )
   where
