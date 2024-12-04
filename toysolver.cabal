@@ -551,6 +551,7 @@ Executable toyconvert
   Main-is: toyconvert.hs
   HS-Source-Dirs: app
   Build-Depends:
+    aeson,
     base,
     bytestring,
     bytestring-builder,
