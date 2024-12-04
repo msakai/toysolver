@@ -100,12 +100,13 @@ instance J.ToJSON SAT2NAESATInfo where
   toJSON (SAT2NAESATInfo z) =
     J.object
     [ "type" .= ("SAT2NAESATInfo" :: J.Value)
-    , "special_variable" .= z
+    , "special_variable" .= (jVarName z :: J.Value)
     ]
 
 instance J.FromJSON SAT2NAESATInfo where
-  parseJSON = withTypedObject "SAT2NAESATInfo" $ \obj ->
-    SAT2NAESATInfo <$> obj .: "special_variable" -- TODO: use Text instead of Int
+  parseJSON = withTypedObject "SAT2NAESATInfo" $ \obj -> do
+    z <- parseVarName =<< (obj .: "special_variable")
+    pure $ SAT2NAESATInfo z
 
 -- | Information of 'naesat2sat' conversion
 type NAESAT2SATInfo = IdentityTransformer SAT.Model
