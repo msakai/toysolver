@@ -23,7 +23,6 @@ import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map.Lazy as Map
-import Data.String
 import qualified Data.Text as T
 import ToySolver.Converter.Base
 import ToySolver.Internal.JSON
@@ -57,7 +56,7 @@ instance J.ToJSON TseitinInfo where
     , "num_original_variables" .= nv1
     , "num_transformed_variables" .= nv2
     , "definitions" .= J.object
-        [ fromString ("x" ++ show v) .= formula
+        [ jVarName v .= formula
         | (v, formula) <- IntMap.toList defs
         ]
     ]

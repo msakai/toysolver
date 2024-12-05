@@ -87,7 +87,6 @@ import Data.Primitive.MutVar
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.String
 import qualified Data.PseudoBoolean as PBFile
 
 import ToySolver.Converter.Base
@@ -420,7 +419,7 @@ instance J.ToJSON PBInequalitiesToEqualitiesInfo where
         [ J.object
           [ "lhs" .= jPBSum lhs
           , "rhs" .= rhs
-          , "slack" .= [fromString ("x" ++ show v) :: J.Value | v <- vs]
+          , "slack" .= [jVarName v :: J.Value | v <- vs]
           ]
         | (lhs, rhs, vs) <- defs
         ]
@@ -577,7 +576,7 @@ instance J.ToJSON WBO2PBInfo where
     , "num_original_variables" .= nv1
     , "num_transformed_variables" .= nv2
     , "definitions" .= J.object
-        [ fromString ("x" ++ show v) .= jPBConstraint constr
+        [ jVarName v .= jPBConstraint constr
         | (v, constr) <- IntMap.toList defs
         ]
     ]

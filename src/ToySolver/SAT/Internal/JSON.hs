@@ -10,6 +10,7 @@ import Control.Monad
 import qualified Data.Aeson as J
 import qualified Data.Aeson.Types as J
 import Data.Aeson ((.=), (.:))
+import Data.String
 import qualified Data.Text as T
 
 import qualified Data.PseudoBoolean as PBFile
@@ -19,8 +20,16 @@ import qualified ToySolver.SAT.Types as SAT
 jVar :: SAT.Var -> J.Value
 jVar v = J.object
   [ "type" .= ("variable" :: J.Value)
-  , "name" .= ("x" ++ show v)
+  , "name" .= (jVarName v :: J.Value)
   ]
+
+jVarName :: IsString a => SAT.Var -> a
+jVarName v = fromString ("x" ++ show v)
+
+jLitName :: IsString a => SAT.Var -> a
+jLitName v
+  | v >= 0 = jVarName v
+  | otherwise = fromString ("~x" ++ show (- v))
 
 parseVar :: J.Value -> J.Parser SAT.Var
 parseVar = withTypedObject "variable" $ \obj -> parseVarName =<< obj .: "name"
