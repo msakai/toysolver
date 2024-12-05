@@ -177,14 +177,13 @@ instance J.ToJSON NAESAT2NAEKSATInfo where
     , "num_original_variables" .= nv1
     , "num_transformed_variables" .= nv2
     , "table" .=
-        [ (f v, map (f . SAT.unpackLit) (VG.toList cs1), map (f . SAT.unpackLit) (VG.toList cs2))
+        [ ( jVarName v :: J.Value
+          , map (jLitName . SAT.unpackLit) (VG.toList cs1) :: [J.Value]
+          , map (jLitName . SAT.unpackLit) (VG.toList cs2) :: [J.Value]
+          )
         | (v, cs1, cs2) <- table
         ]
     ]
-    where
-      f lit
-        | lit < 0   = "~x" ++ show (- lit)
-        | otherwise = "x" ++ show lit
 
 instance J.FromJSON NAESAT2NAEKSATInfo where
   parseJSON = withTypedObject "NAESAT2NAEKSATInfo" $ \obj -> do
