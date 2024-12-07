@@ -17,6 +17,7 @@ module ToySolver.Graph.Base
   , graphFromUnorderedEdges
   , graphFromUnorderedEdgesWith
   , isIndependentSet
+  , isIndependentSetOf
   ) where
 
 import Control.Monad
@@ -51,8 +52,12 @@ graphFromUnorderedEdgesWith f n es = runSTArray $ do
     ins node2 node1 a
   return a
 
+{-# DEPRECATED isIndependentSet "Use isIndependentSetOf instead" #-}
 isIndependentSet :: EdgeLabeledGraph a -> IntSet -> Bool
-isIndependentSet g s = null $ do
+isIndependentSet = flip isIndependentSetOf
+
+isIndependentSetOf :: IntSet -> EdgeLabeledGraph a -> Bool
+isIndependentSetOf s g = null $ do
   (node1, node2, _) <- graphToUnorderedEdges g
   guard $ node1 `IntSet.member` s
   guard $ node2 `IntSet.member` s
