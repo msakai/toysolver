@@ -16,8 +16,11 @@ module ToySolver.Graph.Base
   , graphToUnorderedEdges
   , graphFromUnorderedEdges
   , graphFromUnorderedEdgesWith
+  , complementGraph
+  , complementSimpleGraph
   , isIndependentSet
   , isIndependentSetOf
+  , isCliqueOf
   ) where
 
 import Control.Monad
@@ -52,6 +55,16 @@ graphFromUnorderedEdgesWith f n es = runSTArray $ do
     ins node2 node1 a
   return a
 
+complementGraph :: EdgeLabeledGraph a -> EdgeLabeledGraph ()
+complementGraph g = array (bounds g) [(node, toAllNodes IntMap.\\ outEdges) | (node, outEdges) <- assocs g]
+  where
+    toAllNodes = IntMap.fromAscList [(node, ()) | node <- indices g]
+
+complementSimpleGraph :: EdgeLabeledGraph a -> EdgeLabeledGraph ()
+complementSimpleGraph g = array (bounds g) [(node, IntMap.delete node toAllNodes IntMap.\\ outEdges) | (node, outEdges) <- assocs g]
+  where
+    toAllNodes = IntMap.fromAscList [(node, ()) | node <- indices g]
+
 {-# DEPRECATED isIndependentSet "Use isIndependentSetOf instead" #-}
 isIndependentSet :: EdgeLabeledGraph a -> IntSet -> Bool
 isIndependentSet = flip isIndependentSetOf
@@ -62,3 +75,6 @@ isIndependentSetOf s g = null $ do
   guard $ node1 `IntSet.member` s
   guard $ node2 `IntSet.member` s
   return ()
+
+isCliqueOf :: IntSet -> EdgeLabeledGraph a -> Bool
+isCliqueOf s g = all (\node -> IntSet.delete node s `IntSet.isSubsetOf` IntMap.keysSet (g ! node)) (IntSet.toList s)
