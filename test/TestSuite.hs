@@ -13,6 +13,7 @@ import Test.Converter
 import Test.CNF
 import Test.Delta
 import Test.FiniteModelFinder
+import Test.Graph
 import Test.GraphShortestPath
 import Test.HittingSets
 import Test.Knapsack
@@ -49,6 +50,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , ctTestGroup
   , deltaTestGroup
   , fmfTestGroup
+  , graphTestGroup
   , graphShortestPathTestGroup
   , hittingSetsTestGroup
   , knapsackTestGroup
