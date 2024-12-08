@@ -232,7 +232,7 @@ prop_satToIS_forward =
     let r@((g,k), info) = satToIS cnf
      in counterexample (show r) $ conjoin
         [ counterexample (show m) $ counterexample (show set) $
-            not (evalCNF m cnf) || (isIndependentSet g set && IntSet.size set >= k)
+            not (evalCNF m cnf) || (set `isIndependentSetOf` g  && IntSet.size set >= k)
         | m <- allAssignments (CNF.cnfNumVars cnf)
         , let set = transformForward info m
         ]
@@ -263,7 +263,7 @@ prop_mis2MaxSAT_forward =
         [ counterexample (show set) $ counterexample (show m) $ o1 === o2
         | set <- map IntSet.fromList $ allSubsets $ range $ bounds g
         , let m = transformForward info set
-              o1 = if isIndependentSet g set
+              o1 = if set `isIndependentSetOf` g
                    then Just (transformObjValueForward info (IntSet.size set))
                    else Nothing
               o2 = evalWCNF m wcnf
@@ -280,7 +280,7 @@ prop_mis2MaxSAT_backward =
         [ counterexample (show m) $ counterexample (show set) $ o1 === o2
         | m <- allAssignments (CNF.wcnfNumVars wcnf)
         , let set = transformBackward info m
-              o1 = if isIndependentSet g set
+              o1 = if set `isIndependentSetOf` g
                    then Just (IntSet.size set)
                    else Nothing
               o2 = fmap (transformObjValueBackward info) $ evalWCNF m wcnf

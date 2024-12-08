@@ -896,6 +896,7 @@ Test-suite TestSuite
     Test.Converter
     Test.Delta
     Test.FiniteModelFinder
+    Test.Graph
     Test.GraphShortestPath
     Test.HittingSets
     Test.Knapsack
