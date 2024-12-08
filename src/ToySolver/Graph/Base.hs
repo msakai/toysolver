@@ -55,20 +55,30 @@ graphFromUnorderedEdgesWith f n es = runSTArray $ do
     ins node2 node1 a
   return a
 
+-- | Complement of a graph
+--
+-- Note that applying it to a graph with no self-loops result in a graph with self-loops on all vertices.
 complementGraph :: EdgeLabeledGraph a -> EdgeLabeledGraph ()
 complementGraph g = array (bounds g) [(node, toAllNodes IntMap.\\ outEdges) | (node, outEdges) <- assocs g]
   where
     toAllNodes = IntMap.fromAscList [(node, ()) | node <- indices g]
 
+-- | Complement of a simple graph
+--
+-- It ignores self-loops in the input graph and also does not add self-loops to the output graph.
 complementSimpleGraph :: EdgeLabeledGraph a -> EdgeLabeledGraph ()
 complementSimpleGraph g = array (bounds g) [(node, IntMap.delete node toAllNodes IntMap.\\ outEdges) | (node, outEdges) <- assocs g]
   where
     toAllNodes = IntMap.fromAscList [(node, ()) | node <- indices g]
 
+-- | Alias of 'isIndependentSetOf'
 {-# DEPRECATED isIndependentSet "Use isIndependentSetOf instead" #-}
 isIndependentSet :: EdgeLabeledGraph a -> IntSet -> Bool
 isIndependentSet = flip isIndependentSetOf
 
+-- | An independent set of a graph is is a set of vertices such that no two vertices in the set are adjacent.
+--
+-- This function ignores self-loops in the input graph.
 isIndependentSetOf :: IntSet -> EdgeLabeledGraph a -> Bool
 isIndependentSetOf s g = null $ do
   (node1, node2, _) <- graphToUnorderedEdges g
@@ -76,5 +86,6 @@ isIndependentSetOf s g = null $ do
   guard $ node2 `IntSet.member` s
   return ()
 
+-- | A clique of a graph is a subset of vertices such that every two distinct vertices in the clique are adjacent.
 isCliqueOf :: IntSet -> EdgeLabeledGraph a -> Bool
 isCliqueOf s g = all (\node -> IntSet.delete node s `IntSet.isSubsetOf` IntMap.keysSet (g ! node)) (IntSet.toList s)
