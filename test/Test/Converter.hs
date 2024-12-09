@@ -335,11 +335,6 @@ prop_pb2sat = QM.monadicIO $ do
   strategy <- QM.pick arbitrary
   let (cnf, info) = pb2satWith strategy opb
 
-  let json = J.encode info
-  QM.monitor $ counterexample (show json)
-  QM.monitor $ counterexample (show (J.eitherDecode json :: Either String PB2SATInfo))
-  QM.assert $ J.eitherDecode (J.encode info) == Right info
-
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
   ret1 <- QM.run $ solvePBFormula solver1 opb
@@ -358,6 +353,15 @@ prop_pb2sat = QM.monadicIO $ do
       QM.assert $ bounds m1 == (1, PBFile.pbNumVars opb)
       QM.assert $ isJust $ SAT.evalPBFormula m1 opb
 
+prop_pb2sat_json :: Property
+prop_pb2sat_json =
+  forAll arbitraryPBFormula $ \opb -> 
+  forAll arbitrary $ \strategy ->
+    let ret@(_, info) = pb2satWith strategy opb
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
 prop_wbo2maxsat :: Property
 prop_wbo2maxsat = QM.monadicIO $ do
   wbo1 <- QM.pick arbitraryPBSoftFormula
@@ -374,11 +378,6 @@ prop_wbo2maxsat = QM.monadicIO $ do
             ]
         , PBFile.wboTopCost = Nothing
         }
-
-  let json = J.encode info
-  QM.monitor $ counterexample (show json)
-  QM.monitor $ counterexample (show (J.eitherDecode json :: Either String WBO2MaxSATInfo))
-  QM.assert $ J.eitherDecode (J.encode info) == Right info
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
@@ -399,16 +398,19 @@ prop_wbo2maxsat = QM.monadicIO $ do
       QM.assert $ bounds m1 == (1, PBFile.wboNumVars wbo1)
       QM.assert $ SAT.evalPBSoftFormula m1 wbo1 == Just val
 
+prop_wbo2maxsat_json :: Property
+prop_wbo2maxsat_json =
+  forAll arbitraryPBSoftFormula $ \wbo -> 
+    let ret@(_, info) = wbo2maxsat wbo
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
 prop_wbo2pb :: Property
 prop_wbo2pb = QM.monadicIO $ do
   wbo <- QM.pick arbitraryPBSoftFormula
   let (opb, info) = wbo2pb wbo
   QM.monitor $ counterexample (show opb)
-
-  let json = J.encode info
-  QM.monitor $ counterexample (show json)
-  QM.monitor $ counterexample (show (J.eitherDecode json :: Either String WBO2PBInfo))
-  QM.assert $ J.eitherDecode (J.encode info) == Right info
 
   -- no constant terms in objective function
   QM.assert $ all (\(_,ls) -> length ls > 0) $ fromMaybe [] (PBFile.pbObjectiveFunction opb)
@@ -434,17 +436,20 @@ prop_wbo2pb = QM.monadicIO $ do
       QM.assert $ bounds m1 == (1, PBFile.wboNumVars wbo)
       QM.assert $ SAT.evalPBSoftFormula m1 wbo == Just val2
 
+prop_wbo2pb_json :: Property
+prop_wbo2pb_json =
+  forAll arbitraryPBSoftFormula $ \wbo -> 
+    let ret@(_, info) = wbo2pb wbo
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
 prop_sat2ksat :: Property
 prop_sat2ksat = QM.monadicIO $ do
   k <- QM.pick $ choose (3,10)
 
   cnf1 <- QM.pick arbitraryCNF
   let (cnf2, info) = sat2ksat k cnf1
-
-  let json = J.encode info
-  QM.monitor $ counterexample (show json)
-  QM.monitor $ counterexample (show (J.eitherDecode json :: Either String SAT2KSATInfo))
-  QM.assert $ J.eitherDecode (J.encode info) == Right info
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
@@ -463,6 +468,15 @@ prop_sat2ksat = QM.monadicIO $ do
       let m1 = transformBackward info m2
       QM.assert $ bounds m1 == (1, CNF.cnfNumVars cnf1)
       QM.assert $ evalCNF m1 cnf1
+
+prop_sat2ksat_json :: Property
+prop_sat2ksat_json =
+  forAll (choose (3,10)) $ \k ->
+  forAll arbitraryCNF $ \cnf1 -> 
+    let ret@(_, info) = sat2ksat k cnf1
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
 
 prop_quadratizePB :: Property
 prop_quadratizePB =
@@ -496,20 +510,15 @@ prop_quadratizePB =
 prop_quadratizePB_json :: Property
 prop_quadratizePB_json =
   forAll arbitraryPBFormula $ \pb ->
-    let r@(_, info) = quadratizePB pb
+    let ret@(_, info) = quadratizePB pb
         json = J.encode info
-     in counterexample (show r) $ counterexample (show json) $
+     in counterexample (show ret) $ counterexample (show json) $
           J.eitherDecode json === Right info
 
 prop_inequalitiesToEqualitiesPB :: Property
 prop_inequalitiesToEqualitiesPB = QM.monadicIO $ do
   opb <- QM.pick arbitraryPBFormula
   let (opb2, info) = inequalitiesToEqualitiesPB opb
-
-  let json = J.encode info
-  QM.monitor $ counterexample (show json)
-  QM.monitor $ counterexample (show (J.eitherDecode json :: Either String PBInequalitiesToEqualitiesInfo))
-  QM.assert $ J.eitherDecode json == Right info
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
@@ -529,6 +538,12 @@ prop_inequalitiesToEqualitiesPB = QM.monadicIO $ do
       QM.assert $ bounds m1 == (1, PBFile.pbNumVars opb)
       QM.assert $ isJust $ SAT.evalPBFormula m1 opb
 
+prop_inequalitiesToEqualitiesPB_json :: Property
+prop_inequalitiesToEqualitiesPB_json = forAll arbitraryPBFormula $ \opb ->
+  let ret@(_, info) = inequalitiesToEqualitiesPB opb
+      json = J.encode info
+   in counterexample (show ret) $ counterexample (show json) $
+      J.eitherDecode json == Right info
 
 converterTestGroup :: TestTree
 converterTestGroup = $(testGroupGenerator)
