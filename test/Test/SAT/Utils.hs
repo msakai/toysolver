@@ -544,6 +544,25 @@ arbitraryPBFormula = do
     , PBFile.pbConstraints = cs
     }
 
+arbitraryPBSoftFormula :: Gen PBFile.SoftFormula
+arbitraryPBSoftFormula = do
+  nv <- choose (0,10)
+  nc <- choose (0,10)
+  cs <- replicateM nc $ do
+    cost <- fmap getPositive <$> arbitrary
+    lhs <- arbitraryPBSum nv
+    op <- arbitrary
+    rhs <- arbitrary
+    return (cost, (lhs,op,rhs))
+  top <- fmap getPositive <$> arbitrary
+  return $
+    PBFile.SoftFormula
+    { PBFile.wboNumVars = nv
+    , PBFile.wboNumConstraints = nc
+    , PBFile.wboConstraints = cs
+    , PBFile.wboTopCost = top
+    }
+
 instance Arbitrary PBFile.Op where
   arbitrary = arbitraryBoundedEnum
 
