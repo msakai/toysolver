@@ -330,16 +330,8 @@ arbitraryMaximalIndependentSet g = go IntSet.empty (IntSet.fromList (range (boun
 
 prop_pb2sat :: Property
 prop_pb2sat = QM.monadicIO $ do
-  pb@(nv,cs) <- QM.pick arbitraryPB
-  let f (PBRelGE,lhs,rhs) = ([(c,[l]) | (c,l) <- lhs], PBFile.Ge, rhs)
-      f (PBRelLE,lhs,rhs) = ([(-c,[l]) | (c,l) <- lhs], PBFile.Ge, -rhs)
-      f (PBRelEQ,lhs,rhs) = ([(c,[l]) | (c,l) <- lhs], PBFile.Eq, rhs)
-  let opb = PBFile.Formula
-            { PBFile.pbObjectiveFunction = Nothing
-            , PBFile.pbNumVars = nv
-            , PBFile.pbNumConstraints = length cs
-            , PBFile.pbConstraints = map f cs
-            }
+  opb <- QM.pick arbitraryPBFormula
+
   strategy <- QM.pick arbitrary
   let (cnf, info) = pb2satWith strategy opb
 
@@ -350,7 +342,7 @@ prop_pb2sat = QM.monadicIO $ do
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
-  ret1 <- QM.run $ solvePB solver1 pb
+  ret1 <- QM.run $ solvePBFormula solver1 opb
   ret2 <- QM.run $ solveCNF solver2 cnf
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
@@ -363,30 +355,25 @@ prop_pb2sat = QM.monadicIO $ do
     Nothing -> return ()
     Just m2 -> do
       let m1 = transformBackward info m2
-      QM.assert $ bounds m1 == (1, nv)
-      QM.assert $ evalPB m1 pb
+      QM.assert $ bounds m1 == (1, PBFile.pbNumVars opb)
+      QM.assert $ isJust $ SAT.evalPBFormula m1 opb
 
 prop_wbo2maxsat :: Property
 prop_wbo2maxsat = QM.monadicIO $ do
-  wbo1@(nv,cs,top) <- QM.pick arbitraryWBO
-  let f (w,(PBRelGE,lhs,rhs)) = (w,([(c,[l]) | (c,l) <- lhs], PBFile.Ge, rhs))
-      f (w,(PBRelLE,lhs,rhs)) = (w,([(-c,[l]) | (c,l) <- lhs], PBFile.Ge, -rhs))
-      f (w,(PBRelEQ,lhs,rhs)) = (w,([(c,[l]) | (c,l) <- lhs], PBFile.Eq, rhs))
-  let wbo1' = PBFile.SoftFormula
-            { PBFile.wboNumVars = nv
-            , PBFile.wboNumConstraints = length cs
-            , PBFile.wboConstraints = map f cs
-            , PBFile.wboTopCost = top
-            }
-  let (wcnf, info) = wbo2maxsat wbo1'
-      wbo2 = ( CNF.wcnfNumVars wcnf
-             , [ ( if w == CNF.wcnfTopCost wcnf then Nothing else Just w
-                 , (PBRelGE, [(1,l) | l <- SAT.unpackClause clause], 1)
-                 )
-               | (w,clause) <- CNF.wcnfClauses wcnf
-               ]
-             , Nothing
-             )
+  wbo1 <- QM.pick arbitraryPBSoftFormula
+
+  let (wcnf, info) = wbo2maxsat wbo1
+      wbo2 = PBFile.SoftFormula
+        { PBFile.wboNumVars = CNF.wcnfNumVars wcnf
+        , PBFile.wboNumConstraints = CNF.wcnfNumClauses wcnf
+        , PBFile.wboConstraints =
+            [ ( if w == CNF.wcnfTopCost wcnf then Nothing else Just w
+              , ([(1, [l]) | l <- SAT.unpackClause clause], PBFile.Ge, 1)
+              )
+            | (w,clause) <- CNF.wcnfClauses wcnf
+            ]
+        , PBFile.wboTopCost = Nothing
+        }
 
   let json = J.encode info
   QM.monitor $ counterexample (show json)
@@ -396,57 +383,41 @@ prop_wbo2maxsat = QM.monadicIO $ do
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
   method <- QM.pick arbitrary
-  ret1 <- QM.run $ optimizeWBO solver1 method wbo1
-  ret2 <- QM.run $ optimizeWBO solver2 method wbo2
+  ret1 <- QM.run $ optimizePBSoftFormula solver1 method wbo1
+  ret2 <- QM.run $ optimizePBSoftFormula solver2 method wbo2
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
     Nothing -> return ()
     Just (m1,val) -> do
       let m2 = transformForward info m1
       QM.assert $ bounds m2 == (1, CNF.wcnfNumVars wcnf)
-      QM.assert $ evalWBO m2 wbo2 == Just val
+      QM.assert $ SAT.evalPBSoftFormula m2 wbo2 == Just val
   case ret2 of
     Nothing -> return ()
     Just (m2,val) -> do
       let m1 = transformBackward info m2
-      QM.assert $ bounds m1 == (1, nv)
-      QM.assert $ evalWBO m1 wbo1 == Just val
+      QM.assert $ bounds m1 == (1, PBFile.wboNumVars wbo1)
+      QM.assert $ SAT.evalPBSoftFormula m1 wbo1 == Just val
 
 prop_wbo2pb :: Property
 prop_wbo2pb = QM.monadicIO $ do
-  wbo@(nv,cs,top) <- QM.pick arbitraryWBO
-  let f (w,(PBRelGE,lhs,rhs)) = (w,([(c,[l]) | (c,l) <- lhs], PBFile.Ge, rhs))
-      f (w,(PBRelLE,lhs,rhs)) = (w,([(-c,[l]) | (c,l) <- lhs], PBFile.Ge, -rhs))
-      f (w,(PBRelEQ,lhs,rhs)) = (w,([(c,[l]) | (c,l) <- lhs], PBFile.Eq, rhs))
-  let wbo' = PBFile.SoftFormula
-            { PBFile.wboNumVars = nv
-            , PBFile.wboNumConstraints = length cs
-            , PBFile.wboConstraints = map f cs
-            , PBFile.wboTopCost = top
-            }
-  let (opb, info) = wbo2pb wbo'
-      obj = fromMaybe [] $ PBFile.pbObjectiveFunction opb
-      f (lhs, PBFile.Ge, rhs) = (PBRelGE, lhs, rhs)
-      f (lhs, PBFile.Eq, rhs) = (PBRelEQ, lhs, rhs)
-      cs2 = map f (PBFile.pbConstraints opb)
-      pb = (PBFile.pbNumVars opb, obj, cs2)
+  wbo <- QM.pick arbitraryPBSoftFormula
+  let (opb, info) = wbo2pb wbo
+  QM.monitor $ counterexample (show opb)
 
   let json = J.encode info
   QM.monitor $ counterexample (show json)
   QM.monitor $ counterexample (show (J.eitherDecode json :: Either String WBO2PBInfo))
   QM.assert $ J.eitherDecode (J.encode info) == Right info
 
-  QM.monitor $ counterexample (show wbo')
-  QM.monitor $ counterexample (show opb)
-
   -- no constant terms in objective function
-  QM.assert $ all (\(_,ls) -> length ls > 0) obj
+  QM.assert $ all (\(_,ls) -> length ls > 0) $ fromMaybe [] (PBFile.pbObjectiveFunction opb)
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
   method <- QM.pick arbitrary
-  ret1 <- QM.run $ optimizeWBO solver1 method wbo
-  ret2 <- QM.run $ optimizePBNLC solver2 method pb
+  ret1 <- QM.run $ optimizePBSoftFormula solver1 method wbo
+  ret2 <- QM.run $ optimizePBFormula solver2 method opb
   QM.monitor $ counterexample (show ret1)
   QM.monitor $ counterexample (show ret2)
   QM.assert $ isJust ret1 == isJust ret2
@@ -455,14 +426,13 @@ prop_wbo2pb = QM.monadicIO $ do
     Just (m1,val1) -> do
       let m2 = transformForward info m1
       QM.assert $ bounds m2 == (1, PBFile.pbNumVars opb)
-      QM.assert $ evalPBNLC m2 (PBFile.pbNumVars opb, cs2)
-      QM.assert $ SAT.evalPBSum m2 obj == val1
+      QM.assert $ SAT.evalPBFormula m2 opb == Just val1
   case ret2 of
     Nothing -> return ()
     Just (m2,val2) -> do
       let m1 = transformBackward info m2
-      QM.assert $ bounds m1 == (1,nv)
-      QM.assert $ evalWBO m1 wbo == Just val2
+      QM.assert $ bounds m1 == (1, PBFile.wboNumVars wbo)
+      QM.assert $ SAT.evalPBSoftFormula m1 wbo == Just val2
 
 prop_sat2ksat :: Property
 prop_sat2ksat = QM.monadicIO $ do
@@ -533,22 +503,8 @@ prop_quadratizePB_json =
 
 prop_inequalitiesToEqualitiesPB :: Property
 prop_inequalitiesToEqualitiesPB = QM.monadicIO $ do
-  pb@(nv,cs) <- QM.pick arbitraryPBNLC
-  let f (PBRelGE,lhs,rhs) = ([(c,ls) | (c,ls) <- lhs], PBFile.Ge, rhs)
-      f (PBRelLE,lhs,rhs) = ([(-c,ls) | (c,ls) <- lhs], PBFile.Ge, -rhs)
-      f (PBRelEQ,lhs,rhs) = ([(c,ls) | (c,ls) <- lhs], PBFile.Eq, rhs)
-  let opb = PBFile.Formula
-            { PBFile.pbObjectiveFunction = Nothing
-            , PBFile.pbNumVars = nv
-            , PBFile.pbNumConstraints = length cs
-            , PBFile.pbConstraints = map f cs
-            }
-  QM.monitor $ counterexample (show opb)
+  opb <- QM.pick arbitraryPBFormula
   let (opb2, info) = inequalitiesToEqualitiesPB opb
-      pb2 = (PBFile.pbNumVars opb2, [(g op, lhs, rhs) | (lhs,op,rhs) <- PBFile.pbConstraints opb2])
-      g PBFile.Ge = PBRelGE
-      g PBFile.Eq = PBRelEQ
-  QM.monitor $ counterexample (show opb2)
 
   let json = J.encode info
   QM.monitor $ counterexample (show json)
@@ -557,21 +513,21 @@ prop_inequalitiesToEqualitiesPB = QM.monadicIO $ do
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
-  ret1 <- QM.run $ solvePBNLC solver1 pb
-  ret2 <- QM.run $ solvePBNLC solver2 pb2
+  ret1 <- QM.run $ solvePBFormula solver1 opb
+  ret2 <- QM.run $ solvePBFormula solver2 opb2
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
     Nothing -> return ()
     Just m1 -> do
       let m2 = transformForward info m1
       QM.assert $ bounds m2 == (1, PBFile.pbNumVars opb2)
-      QM.assert $ evalPBNLC m2 pb2
+      QM.assert $ isJust $ SAT.evalPBFormula m2 opb2
   case ret2 of
     Nothing -> return ()
     Just m2 -> do
       let m1 = transformBackward info m2
-      QM.assert $ bounds m1 == (1, nv)
-      QM.assert $ evalPBNLC m1 pb
+      QM.assert $ bounds m1 == (1, PBFile.pbNumVars opb)
+      QM.assert $ isJust $ SAT.evalPBFormula m1 opb
 
 
 converterTestGroup :: TestTree
