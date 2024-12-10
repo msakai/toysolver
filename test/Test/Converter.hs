@@ -406,6 +406,41 @@ prop_wbo2maxsat_json =
      in counterexample (show ret) $ counterexample (show json) $
         J.eitherDecode json === Right info
 
+prop_pb2wbo :: Property
+prop_pb2wbo = QM.monadicIO $ do
+  opb <- QM.pick arbitraryPBFormula
+  let (wbo, info) = pb2wbo opb
+  QM.monitor $ counterexample (show wbo)
+
+  solver1 <- arbitrarySolver
+  solver2 <- arbitrarySolver
+  method <- QM.pick arbitrary
+  ret1 <- QM.run $ optimizePBFormula solver2 method opb
+  ret2 <- QM.run $ optimizePBSoftFormula solver1 method wbo
+  QM.monitor $ counterexample (show ret1)
+  QM.monitor $ counterexample (show ret2)
+  QM.assert $ isJust ret1 == isJust ret2
+  case ret1 of
+    Nothing -> return ()
+    Just (m1,val1) -> do
+      let m2 = transformForward info m1
+      QM.assert $ bounds m2 == (1, PBFile.wboNumVars wbo)
+      QM.assert $ SAT.evalPBSoftFormula m2 wbo == Just (transformObjValueForward info val1)
+  case ret2 of
+    Nothing -> return ()
+    Just (m2,val2) -> do
+      let m1 = transformBackward info m2
+      QM.assert $ bounds m1 == (1, PBFile.wboNumVars wbo)
+      QM.assert $ SAT.evalPBFormula m1 opb == Just (transformObjValueBackward info val2)
+
+prop_pb2wbo_json :: Property
+prop_pb2wbo_json =
+  forAll arbitraryPBFormula $ \opb -> 
+    let ret@(_, info) = pb2wbo opb
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
 prop_wbo2pb :: Property
 prop_wbo2pb = QM.monadicIO $ do
   wbo <- QM.pick arbitraryPBSoftFormula
