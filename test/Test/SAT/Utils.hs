@@ -426,6 +426,73 @@ optimizePBNLC solver method (nv,obj,cs) = do
   PBO.optimize opt
   liftM (fmap (\(m, val) -> (SAT.restrictModel nv m, val))) $ PBO.getBestSolution opt
 
+
+solvePBFormula :: SAT.Solver -> PBFile.Formula -> IO (Maybe SAT.Model)
+solvePBFormula solver opb = do
+  SAT.newVars_ solver (PBFile.pbNumVars opb)
+  enc <- PBNLC.newEncoder solver =<< Tseitin.newEncoder solver
+  forM_ (PBFile.pbConstraints opb) $ \(lhs, op, rhs) -> do
+    case op of
+      PBFile.Ge -> PBNLC.addPBNLAtLeast enc lhs rhs
+      PBFile.Eq -> PBNLC.addPBNLExactly enc lhs rhs
+  ret <- SAT.solve solver
+  if ret then do
+    m <- SAT.getModel solver
+    return $ Just $ SAT.restrictModel (PBFile.pbNumVars opb) m
+  else do
+    return Nothing
+
+
+optimizePBFormula
+  :: SAT.Solver
+  -> PBO.Method
+  -> PBFile.Formula
+  -> IO (Maybe (SAT.Model, Integer))
+optimizePBFormula solver method opb = do
+  SAT.newVars_ solver (PBFile.pbNumVars opb)
+  enc <- PBNLC.newEncoder solver =<< Tseitin.newEncoder solver
+  forM_ (PBFile.pbConstraints opb) $ \(lhs, op, rhs) -> do
+    case op of
+      PBFile.Ge -> PBNLC.addPBNLAtLeast enc lhs rhs
+      PBFile.Eq -> PBNLC.addPBNLExactly enc lhs rhs
+  let obj = fromMaybe [] $ PBFile.pbObjectiveFunction opb
+  obj2 <- PBNLC.linearizePBSumWithPolarity enc Tseitin.polarityNeg obj
+  opt <- PBO.newOptimizer2 solver obj2 (\m -> SAT.evalPBSum m obj)
+  PBO.setMethod opt method
+  PBO.optimize opt
+  liftM (fmap (\(m, val) -> (SAT.restrictModel (PBFile.pbNumVars opb) m, val))) $ PBO.getBestSolution opt
+
+
+optimizePBSoftFormula
+  :: SAT.Solver
+  -> PBO.Method
+  -> PBFile.SoftFormula
+  -> IO (Maybe (SAT.Model, Integer))
+optimizePBSoftFormula solver method wbo = do
+  SAT.newVars_ solver (PBFile.wboNumVars wbo)
+  enc <- PBNLC.newEncoder solver =<< Tseitin.newEncoder solver
+  obj <- liftM catMaybes $ forM (PBFile.wboConstraints wbo) $ \(cost, (lhs,op,rhs)) -> do
+    case cost of
+      Nothing -> do
+        case op of
+          PBFile.Ge -> PBNLC.addPBNLAtLeast enc lhs rhs
+          PBFile.Eq -> PBNLC.addPBNLExactly enc lhs rhs
+        return Nothing
+      Just w -> do
+        sel <- SAT.newVar solver
+        case op of
+          PBFile.Ge -> PBNLC.addPBNLAtLeastSoft enc sel lhs rhs
+          PBFile.Eq -> PBNLC.addPBNLExactlySoft enc sel lhs rhs
+        return $ Just (w,-sel)
+  case PBFile.wboTopCost wbo of
+    Nothing -> return ()
+    Just c -> SAT.addPBAtMost solver obj (c-1)
+  opt <- PBO.newOptimizer solver obj
+  PBO.setMethod opt method
+  PBO.optimize opt
+  liftM (fmap (\(m, val) -> (SAT.restrictModel (PBFile.wboNumVars wbo) m, val))) $ PBO.getBestSolution opt
+
+
 ------------------------------------------------------------------------
 
 instance Arbitrary SAT.LearningStrategy where
@@ -542,6 +609,25 @@ arbitraryPBFormula = do
     , PBFile.pbNumVars = nv
     , PBFile.pbNumConstraints = nc
     , PBFile.pbConstraints = cs
+    }
+
+arbitraryPBSoftFormula :: Gen PBFile.SoftFormula
+arbitraryPBSoftFormula = do
+  nv <- choose (0,10)
+  nc <- choose (0,10)
+  cs <- replicateM nc $ do
+    cost <- fmap getPositive <$> arbitrary
+    lhs <- arbitraryPBSum nv
+    op <- arbitrary
+    rhs <- arbitrary
+    return (cost, (lhs,op,rhs))
+  top <- fmap getPositive <$> arbitrary
+  return $
+    PBFile.SoftFormula
+    { PBFile.wboNumVars = nv
+    , PBFile.wboNumConstraints = nc
+    , PBFile.wboConstraints = cs
+    , PBFile.wboTopCost = top
     }
 
 instance Arbitrary PBFile.Op where

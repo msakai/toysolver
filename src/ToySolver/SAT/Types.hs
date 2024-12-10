@@ -91,6 +91,7 @@ module ToySolver.SAT.Types
   , evalPBSum
   , evalPBConstraint
   , evalPBFormula
+  , evalPBSoftFormula
   , pbLowerBound
   , pbUpperBound
   , removeNegationFromPBSum
@@ -476,6 +477,21 @@ evalPBFormula :: IModel m => m -> PBFile.Formula -> Maybe Integer
 evalPBFormula m formula = do
   guard $ all (evalPBConstraint m) $ PBFile.pbConstraints formula
   return $ evalPBSum m $ fromMaybe [] $ PBFile.pbObjectiveFunction formula
+
+evalPBSoftFormula :: IModel m => m -> PBFile.SoftFormula -> Maybe Integer
+evalPBSoftFormula m formula = do
+  obj <- liftM sum $ forM (PBFile.wboConstraints formula) $ \(cost, constr) -> do
+    case cost of 
+      Nothing -> do
+        guard $ evalPBConstraint m constr
+        return 0
+      Just w
+        | evalPBConstraint m constr -> return 0
+        | otherwise -> return w
+  case PBFile.wboTopCost formula of
+    Nothing -> return ()
+    Just c -> guard (obj < c)
+  return obj
 
 pbLowerBound :: PBSum -> Integer
 pbLowerBound xs = sum [c | (c,ls) <- xs, c < 0 || null ls]
