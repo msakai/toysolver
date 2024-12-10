@@ -42,7 +42,7 @@ module ToySolver.Converter.PB
 
   -- * PB↔WBO conversion
   , pb2wbo
-  , PB2WBOInfo
+  , PB2WBOInfo (..)
   , wbo2pb
   , WBO2PBInfo (..)
   , addWBO
@@ -521,8 +521,6 @@ type PB2QUBOInfo' = ComposedTransformer PBUnconstrainInfo PBQuadratizeInfo
 
 -- -----------------------------------------------------------------------------
 
-type PB2WBOInfo = IdentityTransformer SAT.Model
-
 pb2wbo :: PBFile.Formula -> (PBFile.SoftFormula, PB2WBOInfo)
 pb2wbo formula
   = ( PBFile.SoftFormula
@@ -531,18 +529,57 @@ pb2wbo formula
       , PBFile.wboNumVars = PBFile.pbNumVars formula
       , PBFile.wboNumConstraints = PBFile.pbNumConstraints formula + length cs2
       }
-    , IdentityTransformer
+    , PB2WBOInfo offset
     )
   where
     cs1 = [(Nothing, c) | c <- PBFile.pbConstraints formula]
-    cs2 = case PBFile.pbObjectiveFunction formula of
-            Nothing -> []
-            Just e  ->
-              [ if w >= 0
-                then (Just w,       ([(-1,ls)], PBFile.Ge, 0))
-                else (Just (abs w), ([(1,ls)],  PBFile.Ge, 1))
-              | (w,ls) <- e
-              ]
+    (cs2, offset) =
+      case PBFile.pbObjectiveFunction formula of
+        Nothing -> ([], 0)
+        Just e  ->
+          ( [ if w >= 0
+              then (Just w,       ([(-1,ls)], PBFile.Ge, 0))
+              else (Just (abs w), ([(1,ls)],  PBFile.Ge, 1))
+            | (w,ls) <- e
+            ]
+          , sum [if w >= 0 then 0 else - w | (w, _) <- e]
+          )
+
+newtype PB2WBOInfo = PB2WBOInfo Integer
+  deriving (Eq, Show)
+
+instance Transformer PB2WBOInfo where
+  type Source PB2WBOInfo = SAT.Model
+  type Target PB2WBOInfo = SAT.Model
+
+instance ForwardTransformer PB2WBOInfo where
+  transformForward _ = id
+
+instance BackwardTransformer PB2WBOInfo where
+  transformBackward _ = id
+
+instance ObjValueTransformer PB2WBOInfo where
+  type SourceObjValue PB2WBOInfo = Integer
+  type TargetObjValue PB2WBOInfo = Integer
+
+instance ObjValueForwardTransformer PB2WBOInfo where
+  transformObjValueForward (PB2WBOInfo offset) obj = obj + offset
+
+instance ObjValueBackwardTransformer PB2WBOInfo where
+  transformObjValueBackward (PB2WBOInfo offset) obj = obj - offset
+
+instance J.ToJSON PB2WBOInfo where
+  toJSON (PB2WBOInfo offset) =
+    J.object
+    [ "type" .= J.String "PB2WBOInfo"
+    , "objective_function_offset" .= offset
+    ]
+
+instance J.FromJSON PB2WBOInfo where
+  parseJSON =
+    withTypedObject "PB2WBOInfo" $ \obj -> do
+      offset <- obj .: "objective_function_offset"
+      pure (PB2WBOInfo offset)
 
 wbo2pb :: PBFile.SoftFormula -> (PBFile.Formula, WBO2PBInfo)
 wbo2pb wbo = runST $ do
@@ -568,6 +605,16 @@ instance ForwardTransformer WBO2PBInfo where
 
 instance BackwardTransformer WBO2PBInfo where
   transformBackward (WBO2PBInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
+
+instance ObjValueTransformer WBO2PBInfo where
+  type SourceObjValue WBO2PBInfo = Integer
+  type TargetObjValue WBO2PBInfo = Integer
+
+instance ObjValueForwardTransformer WBO2PBInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer WBO2PBInfo where
+  transformObjValueBackward _ = id
 
 instance J.ToJSON WBO2PBInfo where
   toJSON (WBO2PBInfo nv1 nv2 defs) =
