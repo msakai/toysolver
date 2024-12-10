@@ -569,6 +569,16 @@ instance ForwardTransformer WBO2PBInfo where
 instance BackwardTransformer WBO2PBInfo where
   transformBackward (WBO2PBInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
 
+instance ObjValueTransformer WBO2PBInfo where
+  type SourceObjValue WBO2PBInfo = Integer
+  type TargetObjValue WBO2PBInfo = Integer
+
+instance ObjValueForwardTransformer WBO2PBInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer WBO2PBInfo where
+  transformObjValueBackward _ = id
+
 instance J.ToJSON WBO2PBInfo where
   toJSON (WBO2PBInfo nv1 nv2 defs) =
     J.object

@@ -428,13 +428,13 @@ prop_wbo2pb = QM.monadicIO $ do
     Just (m1,val1) -> do
       let m2 = transformForward info m1
       QM.assert $ bounds m2 == (1, PBFile.pbNumVars opb)
-      QM.assert $ SAT.evalPBFormula m2 opb == Just val1
+      QM.assert $ SAT.evalPBFormula m2 opb == Just (transformObjValueForward info val1)
   case ret2 of
     Nothing -> return ()
     Just (m2,val2) -> do
       let m1 = transformBackward info m2
       QM.assert $ bounds m1 == (1, PBFile.wboNumVars wbo)
-      QM.assert $ SAT.evalPBSoftFormula m1 wbo == Just val2
+      QM.assert $ SAT.evalPBSoftFormula m1 wbo == Just (transformObjValueBackward info val2)
 
 prop_wbo2pb_json :: Property
 prop_wbo2pb_json =
