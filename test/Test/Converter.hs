@@ -131,6 +131,16 @@ prop_naesat2maxcut_forward =
           forAllAssignments (fst nae) $ \m ->
             evalNAESAT m nae === (MaxCut.eval (transformForward info m) maxcut >= threshold)
 
+prop_naesat2maxcut_backward :: Property
+prop_naesat2maxcut_backward = forAll arbitraryNAESAT $ \nae ->
+  let ret@((g, threshold),info) = naesat2maxcut nae
+   in counterexample (show ret) $
+        forAll (arbitraryCut g) $ \cut ->
+          if MaxCut.eval cut g >= threshold then
+            evalNAESAT (transformBackward info cut) nae
+          else
+            True
+
 prop_naesat2maxcut_json :: Property
 prop_naesat2maxcut_json =
   forAll arbitraryNAESAT $ \nae ->
