@@ -294,6 +294,44 @@ prop_mis2MaxSAT_json =
      in counterexample (show r) $ counterexample (show json) $
           J.eitherDecode json === Right info
 
+prop_is2pb_forward :: Property
+prop_is2pb_forward =
+  forAll arbitraryGraph $ \g ->
+  forAll arbitrary $ \(Positive k) ->
+    let ret@(opb,info) = is2pb (g, k)
+     in counterexample (show ret) $ conjoin
+        [ counterexample (show set) $ counterexample (show m) $ o1 === o2
+        | set <- map IntSet.fromList $ allSubsets $ range $ bounds g
+        , let m = transformForward info set
+              o1 = set `isIndependentSetOf` g && IntSet.size set >= k
+              o2 = isJust $ SAT.evalPBFormula m opb
+        ]
+  where
+    allSubsets :: [a] -> [[a]]
+    allSubsets = filterM (const [False, True])
+
+prop_is2pb_backward :: Property
+prop_is2pb_backward =
+  forAll arbitraryGraph $ \g ->
+  forAll arbitrary $ \(Positive k) ->
+    let ret@(opb,info) = is2pb (g, k)
+     in counterexample (show ret) $ conjoin
+        [ counterexample (show m) $ counterexample (show set) $ o1 === o2
+        | m <- allAssignments (PBFile.pbNumVars opb)
+        , let set = transformBackward info m
+              o1 = set `isIndependentSetOf` g && IntSet.size set >= k
+              o2 = isJust $ SAT.evalPBFormula m opb
+        ]
+
+prop_is2pb_json :: Property
+prop_is2pb_json =
+  forAll arbitraryGraph $ \g ->
+  forAll arbitrary $ \(Positive k) ->
+    let ret@(_,info) = is2pb (g, k)
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+          J.eitherDecode json === Right info
+
 arbitraryGraph :: Gen Graph
 arbitraryGraph = do
   n <- choose (0, 8) -- inclusive range
