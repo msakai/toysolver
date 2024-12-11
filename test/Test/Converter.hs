@@ -157,6 +157,38 @@ prop_naesat2max2sat_json =
      in counterexample (show ret) $ counterexample (show json) $
           J.eitherDecode json === Right info
 
+prop_sat2maxcut_forward :: Property
+prop_sat2maxcut_forward =
+  forAll arbitraryCNF $ \cnf ->
+    let ret@((g, threshold), info) = sat2maxcut cnf
+     in counterexample (show ret) $
+          forAllAssignments (CNF.cnfNumVars cnf) $ \m ->
+            evalCNF m cnf === (MaxCut.eval (transformForward info m) g >= threshold)
+
+prop_sat2maxcut_backward :: Property
+prop_sat2maxcut_backward = forAll arbitraryCNF $ \cnf ->
+  let ret@((g, threshold),info) = sat2maxcut cnf
+   in counterexample (show ret) $
+        forAll (arbitraryCut g) $ \cut ->
+          if MaxCut.eval cut g >= threshold then
+            evalCNF (transformBackward info cut) cnf
+          else
+            True
+
+prop_sat2maxcut_json :: Property
+prop_sat2maxcut_json =
+  forAll arbitraryCNF $ \cnf ->
+    let ret@(_, info) = sat2maxcut cnf
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+          J.eitherDecode json === Right info
+
+arbitraryCut :: MaxCut.Problem a -> Gen MaxCut.Solution
+arbitraryCut g = do
+  let b = bounds g
+  xs <- replicateM (rangeSize b) arbitrary
+  return $ array b (zip (range b) xs)
+
 ------------------------------------------------------------------------
 
 prop_satToMaxSAT2_forward :: Property
