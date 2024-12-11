@@ -435,7 +435,7 @@ prop_pb2sat = QM.monadicIO $ do
 
 prop_pb2sat_json :: Property
 prop_pb2sat_json =
-  forAll arbitraryPBFormula $ \opb -> 
+  forAll arbitraryPBFormula $ \opb ->
   forAll arbitrary $ \strategy ->
     let ret@(_, info) = pb2satWith strategy opb
         json = J.encode info
@@ -480,7 +480,7 @@ prop_wbo2maxsat = QM.monadicIO $ do
 
 prop_wbo2maxsat_json :: Property
 prop_wbo2maxsat_json =
-  forAll arbitraryPBSoftFormula $ \wbo -> 
+  forAll arbitraryPBSoftFormula $ \wbo ->
     let ret@(_, info) = wbo2maxsat wbo
         json = J.encode info
      in counterexample (show ret) $ counterexample (show json) $
@@ -515,7 +515,7 @@ prop_pb2wbo = QM.monadicIO $ do
 
 prop_pb2wbo_json :: Property
 prop_pb2wbo_json =
-  forAll arbitraryPBFormula $ \opb -> 
+  forAll arbitraryPBFormula $ \opb ->
     let ret@(_, info) = pb2wbo opb
         json = J.encode info
      in counterexample (show ret) $ counterexample (show json) $
@@ -553,7 +553,7 @@ prop_wbo2pb = QM.monadicIO $ do
 
 prop_wbo2pb_json :: Property
 prop_wbo2pb_json =
-  forAll arbitraryPBSoftFormula $ \wbo -> 
+  forAll arbitraryPBSoftFormula $ \wbo ->
     let ret@(_, info) = wbo2pb wbo
         json = J.encode info
      in counterexample (show ret) $ counterexample (show json) $
@@ -587,7 +587,7 @@ prop_sat2ksat = QM.monadicIO $ do
 prop_sat2ksat_json :: Property
 prop_sat2ksat_json =
   forAll (choose (3,10)) $ \k ->
-  forAll arbitraryCNF $ \cnf1 -> 
+  forAll arbitraryCNF $ \cnf1 ->
     let ret@(_, info) = sat2ksat k cnf1
         json = J.encode info
      in counterexample (show ret) $ counterexample (show json) $
@@ -659,6 +659,8 @@ prop_inequalitiesToEqualitiesPB_json = forAll arbitraryPBFormula $ \opb ->
       json = J.encode info
    in counterexample (show ret) $ counterexample (show json) $
       J.eitherDecode json == Right info
+
+------------------------------------------------------------------------
 
 converterTestGroup :: TestTree
 converterTestGroup = $(testGroupGenerator)
