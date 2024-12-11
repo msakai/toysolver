@@ -328,6 +328,27 @@ arbitraryMaximalIndependentSet g = go IntSet.empty (IntSet.fromList (range (boun
 
 ------------------------------------------------------------------------
 
+prop_sat2pb_forward :: Property
+prop_sat2pb_forward = forAll arbitraryCNF $ \cnf ->
+  let ret@(opb,info) = sat2pb cnf
+   in counterexample (show ret) $
+        forAllAssignments (CNF.cnfNumVars cnf) $ \m ->
+          evalCNF m cnf === isJust (SAT.evalPBFormula (transformForward info m) opb)
+
+prop_sat2pb_backward :: Property
+prop_sat2pb_backward = forAll arbitraryCNF $ \cnf ->
+  let ret@(opb,info) = sat2pb cnf
+   in counterexample (show ret) $
+        forAllAssignments (PBFile.pbNumVars opb) $ \m ->
+          evalCNF (transformBackward info m) cnf === isJust (SAT.evalPBFormula m opb)
+
+prop_sat2pb_json :: Property
+prop_sat2pb_json = forAll arbitraryCNF $ \cnf ->
+  let ret@(_,info) = sat2pb cnf
+      json = J.encode info
+   in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
 prop_pb2sat :: Property
 prop_pb2sat = QM.monadicIO $ do
   opb <- QM.pick arbitraryPBFormula
