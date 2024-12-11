@@ -349,6 +349,27 @@ prop_sat2pb_json = forAll arbitraryCNF $ \cnf ->
    in counterexample (show ret) $ counterexample (show json) $
         J.eitherDecode json === Right info
 
+prop_maxsat2wbo_forward :: Property
+prop_maxsat2wbo_forward = forAll arbitraryWCNF $ \cnf ->
+  let ret@(wbo,info) = maxsat2wbo cnf
+   in counterexample (show ret) $
+        forAllAssignments (CNF.wcnfNumVars cnf) $ \m ->
+          evalWCNF m cnf === SAT.evalPBSoftFormula (transformForward info m) wbo
+
+prop_maxsat2wbo_backward :: Property
+prop_maxsat2wbo_backward = forAll arbitraryWCNF $ \cnf ->
+  let ret@(wbo,info) = maxsat2wbo cnf
+   in counterexample (show ret) $
+        forAllAssignments (PBFile.wboNumVars wbo) $ \m ->
+          evalWCNF (transformBackward info m) cnf === SAT.evalPBSoftFormula m wbo
+
+prop_maxsat2wbo_json :: Property
+prop_maxsat2wbo_json = forAll arbitraryWCNF $ \cnf ->
+  let ret@(_,info) = maxsat2wbo cnf
+      json = J.encode info
+   in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
 prop_pb2sat :: Property
 prop_pb2sat = QM.monadicIO $ do
   opb <- QM.pick arbitraryPBFormula
