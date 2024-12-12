@@ -665,6 +665,36 @@ prop_linearizePB_json =
      in counterexample (show ret) $ counterexample (show json) $
         J.eitherDecode json === Right info
 
+prop_linearizeWBO_forward :: Property
+prop_linearizeWBO_forward =
+  forAll arbitraryPBSoftFormula $ \wbo ->
+  forAll arbitrary $ \b ->
+    let ret@(wbo2, info) = linearizeWBO wbo b
+     in counterexample (show ret) $
+        forAllAssignments (PBFile.wboNumVars wbo) $ \m ->
+          SAT.evalPBSoftFormula m wbo === SAT.evalPBSoftFormula (transformForward info m) wbo2
+
+prop_linearizeWBO_backward :: Property
+prop_linearizeWBO_backward =
+  forAll arbitraryPBSoftFormula $ \wbo ->
+  forAll arbitrary $ \b ->
+    let ret@(wbo2, info) = linearizeWBO wbo b
+     in counterexample (show ret) $
+        forAll (arbitraryAssignment (PBFile.wboNumVars wbo2)) $ \m2 ->
+          if isJust (SAT.evalPBSoftFormula m2 wbo2) then
+            isJust (SAT.evalPBSoftFormula (transformBackward info m2) wbo)
+          else
+            True
+
+prop_linearizeWBO_json :: Property
+prop_linearizeWBO_json =
+  forAll arbitraryPBSoftFormula $ \wbo ->
+  forAll arbitrary $ \b ->
+    let ret@(_, info) = linearizeWBO wbo b
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
 prop_quadratizePB :: Property
 prop_quadratizePB =
   forAll arbitraryPBFormula $ \pb ->
