@@ -266,6 +266,34 @@ prop_maxSAT2ToSimpleMaxCut_json =
      in counterexample (show ret) $ counterexample (show json) $
           J.eitherDecode json === Right info
 
+-- -- Too Slow
+-- prop_satToSimpleMaxCut_forward :: Property
+-- prop_satToSimpleMaxCut_forward =
+--   forAll arbitraryCNF $ \cnf ->
+--     let ret@((g, threshold), info) = satToSimpleMaxCut cnf
+--      in counterexample (show ret) $
+--           forAllAssignments (CNF.cnfNumVars cnf) $ \m ->
+--             evalCNF m cnf === (MaxCut.eval (transformForward info m) g >= threshold)
+
+-- -- Too Slow
+-- prop_satToSimpleMaxCut_backward :: Property
+-- prop_satToSimpleMaxCut_backward = forAll arbitraryCNF $ \cnf ->
+--   let ret@((g, threshold),info) = satToSimpleMaxCut cnf
+--    in counterexample (show ret) $
+--         forAll (arbitraryCut g) $ \cut ->
+--           if MaxCut.eval cut g >= threshold then
+--             evalCNF (transformBackward info cut) cnf
+--           else
+--             True
+
+prop_satToSimpleMaxCut_json :: Property
+prop_satToSimpleMaxCut_json =
+  forAll arbitraryCNF $ \cnf ->
+    let ret@(_, info) = satToSimpleMaxCut cnf
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+          J.eitherDecode json === Right info
+
 ------------------------------------------------------------------------
 
 prop_satToIS_forward :: Property
