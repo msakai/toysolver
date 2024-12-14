@@ -170,12 +170,19 @@ prop_qubo2ising_json = forAll arbitrary $ \(qubo :: QUBO.Problem Rational) ->
    in counterexample (show ret) $ counterexample (show json) $
         J.eitherDecode json === Right info
 
-prop_ising2qubo :: Property
-prop_ising2qubo = forAll arbitrary $ \(ising :: QUBO.IsingModel Integer) ->
+prop_ising2qubo_forward :: Property
+prop_ising2qubo_forward = forAll arbitrary $ \(ising :: QUBO.IsingModel Integer) ->
   let (qubo, info) = ising2qubo ising
    in counterexample (show qubo) $
         forAll (arbitrarySolution (QUBO.isingNumVars ising)) $ \sol ->
-          transformObjValueForward info (QUBO.evalIsingModel sol ising) === QUBO.eval sol qubo
+          transformObjValueForward info (QUBO.evalIsingModel sol ising) === QUBO.eval (transformForward info sol) qubo
+
+prop_ising2qubo_backward :: Property
+prop_ising2qubo_backward = forAll arbitrary $ \(ising :: QUBO.IsingModel Integer) ->
+  let (qubo, info) = ising2qubo ising
+   in counterexample (show qubo) $
+        forAll (arbitrarySolution (QUBO.quboNumVars qubo)) $ \sol ->
+          QUBO.evalIsingModel (transformBackward info sol) ising === transformObjValueBackward info (QUBO.eval sol qubo)
 
 prop_ising2qubo_json :: Property
 prop_ising2qubo_json = forAll arbitrary $ \(ising :: QUBO.IsingModel Integer) ->
