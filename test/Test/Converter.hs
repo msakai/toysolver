@@ -491,14 +491,14 @@ prop_maxsat2wbo_forward = forAll arbitraryWCNF $ \cnf ->
   let ret@(wbo,info) = maxsat2wbo cnf
    in counterexample (show ret) $
         forAllAssignments (CNF.wcnfNumVars cnf) $ \m ->
-          evalWCNF m cnf === SAT.evalPBSoftFormula (transformForward info m) wbo
+          fmap (transformObjValueForward info) (evalWCNF m cnf) === SAT.evalPBSoftFormula (transformForward info m) wbo
 
 prop_maxsat2wbo_backward :: Property
 prop_maxsat2wbo_backward = forAll arbitraryWCNF $ \cnf ->
   let ret@(wbo,info) = maxsat2wbo cnf
    in counterexample (show ret) $
         forAllAssignments (PBFile.wboNumVars wbo) $ \m ->
-          evalWCNF (transformBackward info m) cnf === SAT.evalPBSoftFormula m wbo
+          evalWCNF (transformBackward info m) cnf === fmap (transformObjValueBackward info) (SAT.evalPBSoftFormula m wbo)
 
 prop_maxsat2wbo_json :: Property
 prop_maxsat2wbo_json = forAll arbitraryWCNF $ \cnf ->
