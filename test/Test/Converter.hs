@@ -191,6 +191,7 @@ prop_sat2maxcut_backward = forAll arbitraryCNF $ \cnf ->
    in counterexample (show ret) $
         forAll (arbitraryCut g) $ \cut ->
           if MaxCut.eval cut g >= threshold then
+            -- TODO: maybe it's difficult to come here
             evalCNF (transformBackward info cut) cnf
           else
             True
