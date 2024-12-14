@@ -131,6 +131,16 @@ prop_naesat2maxcut_forward =
           forAllAssignments (fst nae) $ \m ->
             evalNAESAT m nae === (MaxCut.eval (transformForward info m) maxcut >= threshold)
 
+prop_naesat2maxcut_backward :: Property
+prop_naesat2maxcut_backward = forAll arbitraryNAESAT $ \nae ->
+  let ret@((g, threshold),info) = naesat2maxcut nae
+   in counterexample (show ret) $
+        forAll (arbitraryCut g) $ \cut ->
+          if MaxCut.eval cut g >= threshold then
+            evalNAESAT (transformBackward info cut) nae
+          else
+            True
+
 prop_naesat2maxcut_json :: Property
 prop_naesat2maxcut_json =
   forAll arbitraryNAESAT $ \nae ->
@@ -149,6 +159,16 @@ prop_naesat2max2sat_forward =
               Nothing -> property False
               Just v -> evalNAESAT m nae === (v <= threshold)
 
+prop_naesat2max2sat_backward :: Property
+prop_naesat2max2sat_backward =
+  forAll arbitraryNAESAT $ \nae ->
+    let ret@((wcnf, threshold), info) = naesat2max2sat nae
+     in counterexample (show ret) $
+          forAll (arbitraryAssignment (CNF.wcnfNumVars wcnf)) $ \m ->
+            case evalWCNF m wcnf of
+              Just v | v <= threshold -> evalNAESAT (transformBackward info m) nae
+              _ -> True
+
 prop_naesat2max2sat_json :: Property
 prop_naesat2max2sat_json =
   forAll arbitraryNAESAT $ \nae ->
@@ -156,6 +176,39 @@ prop_naesat2max2sat_json =
         json = J.encode info
      in counterexample (show ret) $ counterexample (show json) $
           J.eitherDecode json === Right info
+
+prop_sat2maxcut_forward :: Property
+prop_sat2maxcut_forward =
+  forAll arbitraryCNF $ \cnf ->
+    let ret@((g, threshold), info) = sat2maxcut cnf
+     in counterexample (show ret) $
+          forAllAssignments (CNF.cnfNumVars cnf) $ \m ->
+            evalCNF m cnf === (MaxCut.eval (transformForward info m) g >= threshold)
+
+prop_sat2maxcut_backward :: Property
+prop_sat2maxcut_backward = forAll arbitraryCNF $ \cnf ->
+  let ret@((g, threshold),info) = sat2maxcut cnf
+   in counterexample (show ret) $
+        forAll (arbitraryCut g) $ \cut ->
+          if MaxCut.eval cut g >= threshold then
+            -- TODO: maybe it's difficult to come here
+            evalCNF (transformBackward info cut) cnf
+          else
+            True
+
+prop_sat2maxcut_json :: Property
+prop_sat2maxcut_json =
+  forAll arbitraryCNF $ \cnf ->
+    let ret@(_, info) = sat2maxcut cnf
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+          J.eitherDecode json === Right info
+
+arbitraryCut :: MaxCut.Problem a -> Gen MaxCut.Solution
+arbitraryCut g = do
+  let b = bounds g
+  xs <- replicateM (rangeSize b) arbitrary
+  return $ array b (zip (range b) xs)
 
 ------------------------------------------------------------------------
 
@@ -216,10 +269,51 @@ prop_maxSAT2ToSimpleMaxCut_forward =
              b2 = o2 >= th2
        ]
 
+prop_maxSAT2ToSimpleMaxCut_backward :: Property
+prop_maxSAT2ToSimpleMaxCut_backward =
+  forAll arbitraryMaxSAT2 $ \(wcnf, th1) ->
+    let r@((g, th2), info) = maxSAT2ToSimpleMaxCut (wcnf, th1)
+    in counterexample (show r) $
+        forAll (arbitraryCut g) $ \cut ->
+          if MaxCut.eval cut g >= th2 then
+            case evalWCNF (transformBackward info cut) wcnf of
+              Nothing -> False
+              Just v -> v <= th1
+          else
+            True
+
 prop_maxSAT2ToSimpleMaxCut_json :: Property
 prop_maxSAT2ToSimpleMaxCut_json =
   forAll arbitraryMaxSAT2 $ \(wcnf, th1) ->
     let ret@(_, info) = maxSAT2ToSimpleMaxCut (wcnf, th1)
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+          J.eitherDecode json === Right info
+
+-- -- Too Slow
+-- prop_satToSimpleMaxCut_forward :: Property
+-- prop_satToSimpleMaxCut_forward =
+--   forAll arbitraryCNF $ \cnf ->
+--     let ret@((g, threshold), info) = satToSimpleMaxCut cnf
+--      in counterexample (show ret) $
+--           forAllAssignments (CNF.cnfNumVars cnf) $ \m ->
+--             evalCNF m cnf === (MaxCut.eval (transformForward info m) g >= threshold)
+
+-- -- Too Slow
+-- prop_satToSimpleMaxCut_backward :: Property
+-- prop_satToSimpleMaxCut_backward = forAll arbitraryCNF $ \cnf ->
+--   let ret@((g, threshold),info) = satToSimpleMaxCut cnf
+--    in counterexample (show ret) $
+--         forAll (arbitraryCut g) $ \cut ->
+--           if MaxCut.eval cut g >= threshold then
+--             evalCNF (transformBackward info cut) cnf
+--           else
+--             True
+
+prop_satToSimpleMaxCut_json :: Property
+prop_satToSimpleMaxCut_json =
+  forAll arbitraryCNF $ \cnf ->
+    let ret@(_, info) = satToSimpleMaxCut cnf
         json = J.encode info
      in counterexample (show ret) $ counterexample (show json) $
           J.eitherDecode json === Right info
@@ -294,6 +388,44 @@ prop_mis2MaxSAT_json =
      in counterexample (show r) $ counterexample (show json) $
           J.eitherDecode json === Right info
 
+prop_is2pb_forward :: Property
+prop_is2pb_forward =
+  forAll arbitraryGraph $ \g ->
+  forAll arbitrary $ \(Positive k) ->
+    let ret@(opb,info) = is2pb (g, k)
+     in counterexample (show ret) $ conjoin
+        [ counterexample (show set) $ counterexample (show m) $ o1 === o2
+        | set <- map IntSet.fromList $ allSubsets $ range $ bounds g
+        , let m = transformForward info set
+              o1 = set `isIndependentSetOf` g && IntSet.size set >= k
+              o2 = isJust $ SAT.evalPBFormula m opb
+        ]
+  where
+    allSubsets :: [a] -> [[a]]
+    allSubsets = filterM (const [False, True])
+
+prop_is2pb_backward :: Property
+prop_is2pb_backward =
+  forAll arbitraryGraph $ \g ->
+  forAll arbitrary $ \(Positive k) ->
+    let ret@(opb,info) = is2pb (g, k)
+     in counterexample (show ret) $ conjoin
+        [ counterexample (show m) $ counterexample (show set) $ o1 === o2
+        | m <- allAssignments (PBFile.pbNumVars opb)
+        , let set = transformBackward info m
+              o1 = set `isIndependentSetOf` g && IntSet.size set >= k
+              o2 = isJust $ SAT.evalPBFormula m opb
+        ]
+
+prop_is2pb_json :: Property
+prop_is2pb_json =
+  forAll arbitraryGraph $ \g ->
+  forAll arbitrary $ \(Positive k) ->
+    let ret@(_,info) = is2pb (g, k)
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+          J.eitherDecode json === Right info
+
 arbitraryGraph :: Gen Graph
 arbitraryGraph = do
   n <- choose (0, 8) -- inclusive range
@@ -328,6 +460,48 @@ arbitraryMaximalIndependentSet g = go IntSet.empty (IntSet.fromList (range (boun
 
 ------------------------------------------------------------------------
 
+prop_sat2pb_forward :: Property
+prop_sat2pb_forward = forAll arbitraryCNF $ \cnf ->
+  let ret@(opb,info) = sat2pb cnf
+   in counterexample (show ret) $
+        forAllAssignments (CNF.cnfNumVars cnf) $ \m ->
+          evalCNF m cnf === isJust (SAT.evalPBFormula (transformForward info m) opb)
+
+prop_sat2pb_backward :: Property
+prop_sat2pb_backward = forAll arbitraryCNF $ \cnf ->
+  let ret@(opb,info) = sat2pb cnf
+   in counterexample (show ret) $
+        forAllAssignments (PBFile.pbNumVars opb) $ \m ->
+          evalCNF (transformBackward info m) cnf === isJust (SAT.evalPBFormula m opb)
+
+prop_sat2pb_json :: Property
+prop_sat2pb_json = forAll arbitraryCNF $ \cnf ->
+  let ret@(_,info) = sat2pb cnf
+      json = J.encode info
+   in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
+prop_maxsat2wbo_forward :: Property
+prop_maxsat2wbo_forward = forAll arbitraryWCNF $ \cnf ->
+  let ret@(wbo,info) = maxsat2wbo cnf
+   in counterexample (show ret) $
+        forAllAssignments (CNF.wcnfNumVars cnf) $ \m ->
+          evalWCNF m cnf === SAT.evalPBSoftFormula (transformForward info m) wbo
+
+prop_maxsat2wbo_backward :: Property
+prop_maxsat2wbo_backward = forAll arbitraryWCNF $ \cnf ->
+  let ret@(wbo,info) = maxsat2wbo cnf
+   in counterexample (show ret) $
+        forAllAssignments (PBFile.wboNumVars wbo) $ \m ->
+          evalWCNF (transformBackward info m) cnf === SAT.evalPBSoftFormula m wbo
+
+prop_maxsat2wbo_json :: Property
+prop_maxsat2wbo_json = forAll arbitraryWCNF $ \cnf ->
+  let ret@(_,info) = maxsat2wbo cnf
+      json = J.encode info
+   in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
 prop_pb2sat :: Property
 prop_pb2sat = QM.monadicIO $ do
   opb <- QM.pick arbitraryPBFormula
@@ -355,7 +529,7 @@ prop_pb2sat = QM.monadicIO $ do
 
 prop_pb2sat_json :: Property
 prop_pb2sat_json =
-  forAll arbitraryPBFormula $ \opb -> 
+  forAll arbitraryPBFormula $ \opb ->
   forAll arbitrary $ \strategy ->
     let ret@(_, info) = pb2satWith strategy opb
         json = J.encode info
@@ -400,7 +574,7 @@ prop_wbo2maxsat = QM.monadicIO $ do
 
 prop_wbo2maxsat_json :: Property
 prop_wbo2maxsat_json =
-  forAll arbitraryPBSoftFormula $ \wbo -> 
+  forAll arbitraryPBSoftFormula $ \wbo ->
     let ret@(_, info) = wbo2maxsat wbo
         json = J.encode info
      in counterexample (show ret) $ counterexample (show json) $
@@ -435,7 +609,7 @@ prop_pb2wbo = QM.monadicIO $ do
 
 prop_pb2wbo_json :: Property
 prop_pb2wbo_json =
-  forAll arbitraryPBFormula $ \opb -> 
+  forAll arbitraryPBFormula $ \opb ->
     let ret@(_, info) = pb2wbo opb
         json = J.encode info
      in counterexample (show ret) $ counterexample (show json) $
@@ -473,7 +647,7 @@ prop_wbo2pb = QM.monadicIO $ do
 
 prop_wbo2pb_json :: Property
 prop_wbo2pb_json =
-  forAll arbitraryPBSoftFormula $ \wbo -> 
+  forAll arbitraryPBSoftFormula $ \wbo ->
     let ret@(_, info) = wbo2pb wbo
         json = J.encode info
      in counterexample (show ret) $ counterexample (show json) $
@@ -507,8 +681,68 @@ prop_sat2ksat = QM.monadicIO $ do
 prop_sat2ksat_json :: Property
 prop_sat2ksat_json =
   forAll (choose (3,10)) $ \k ->
-  forAll arbitraryCNF $ \cnf1 -> 
+  forAll arbitraryCNF $ \cnf1 ->
     let ret@(_, info) = sat2ksat k cnf1
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
+prop_linearizePB_forward :: Property
+prop_linearizePB_forward =
+  forAll arbitraryPBFormula $ \pb ->
+  forAll arbitrary $ \b ->
+    let ret@(pb2, info) = linearizePB pb b
+     in counterexample (show ret) $
+        forAllAssignments (PBFile.pbNumVars pb) $ \m ->
+          SAT.evalPBFormula m pb === SAT.evalPBFormula (transformForward info m) pb2
+
+prop_linearizePB_backward :: Property
+prop_linearizePB_backward =
+  forAll arbitraryPBFormula $ \pb ->
+  forAll arbitrary $ \b ->
+    let ret@(pb2, info) = linearizePB pb b
+     in counterexample (show ret) $
+        forAll (arbitraryAssignment (PBFile.pbNumVars pb2)) $ \m2 ->
+          if isJust (SAT.evalPBFormula m2 pb2) then
+            isJust (SAT.evalPBFormula (transformBackward info m2) pb)
+          else
+            True
+
+prop_linearizePB_json :: Property
+prop_linearizePB_json =
+  forAll arbitraryPBFormula $ \pb ->
+  forAll arbitrary $ \b ->
+    let ret@(_, info) = linearizePB pb b
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+        J.eitherDecode json === Right info
+
+prop_linearizeWBO_forward :: Property
+prop_linearizeWBO_forward =
+  forAll arbitraryPBSoftFormula $ \wbo ->
+  forAll arbitrary $ \b ->
+    let ret@(wbo2, info) = linearizeWBO wbo b
+     in counterexample (show ret) $
+        forAllAssignments (PBFile.wboNumVars wbo) $ \m ->
+          SAT.evalPBSoftFormula m wbo === SAT.evalPBSoftFormula (transformForward info m) wbo2
+
+prop_linearizeWBO_backward :: Property
+prop_linearizeWBO_backward =
+  forAll arbitraryPBSoftFormula $ \wbo ->
+  forAll arbitrary $ \b ->
+    let ret@(wbo2, info) = linearizeWBO wbo b
+     in counterexample (show ret) $
+        forAll (arbitraryAssignment (PBFile.wboNumVars wbo2)) $ \m2 ->
+          if isJust (SAT.evalPBSoftFormula m2 wbo2) then
+            isJust (SAT.evalPBSoftFormula (transformBackward info m2) wbo)
+          else
+            True
+
+prop_linearizeWBO_json :: Property
+prop_linearizeWBO_json =
+  forAll arbitraryPBSoftFormula $ \wbo ->
+  forAll arbitrary $ \b ->
+    let ret@(_, info) = linearizeWBO wbo b
         json = J.encode info
      in counterexample (show ret) $ counterexample (show json) $
         J.eitherDecode json === Right info
@@ -579,6 +813,8 @@ prop_inequalitiesToEqualitiesPB_json = forAll arbitraryPBFormula $ \opb ->
       json = J.encode info
    in counterexample (show ret) $ counterexample (show json) $
       J.eitherDecode json == Right info
+
+------------------------------------------------------------------------
 
 converterTestGroup :: TestTree
 converterTestGroup = $(testGroupGenerator)
