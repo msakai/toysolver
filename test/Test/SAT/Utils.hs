@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Test.SAT.Utils where
 
+import Control.Arrow ((***))
 import Control.Monad
 import Data.Array.IArray
 import Data.Default.Class
@@ -492,6 +493,22 @@ optimizePBSoftFormula solver method wbo = do
   PBO.optimize opt
   liftM (fmap (\(m, val) -> (SAT.restrictModel (PBFile.wboNumVars wbo) m, val))) $ PBO.getBestSolution opt
 
+
+optimizeWCNF
+  :: SAT.Solver
+  -> PBO.Method
+  -> CNF.WCNF
+  -> IO (Maybe (SAT.Model, Integer))
+optimizeWCNF solver method wcnf = do
+  let (wbo, info) = maxsat2wbo wcnf
+  ret <- optimizePBSoftFormula solver method wbo
+  case ret of
+    Nothing -> return Nothing
+    Just (m, _) -> do
+      let m' = transformBackward info m
+          -- TODO: MaxSAT2WBOInfo should be instance of ObjValueBackwardTransformer
+          Just obj' = evalWCNF m' wcnf
+      return $ Just (m', obj')
 
 ------------------------------------------------------------------------
 
