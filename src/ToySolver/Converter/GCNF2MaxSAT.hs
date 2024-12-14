@@ -26,7 +26,7 @@ import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
 
-data GCNF2MaxSATInfo = GCNF2MaxSATInfo !Int
+newtype GCNF2MaxSATInfo = GCNF2MaxSATInfo Int
   deriving (Eq, Show, Read)
 
 instance Transformer GCNF2MaxSATInfo where

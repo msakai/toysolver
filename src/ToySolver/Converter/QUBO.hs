@@ -133,7 +133,7 @@ pbAsQUBO formula = do
             ]
         }
 
-data PBAsQUBOInfo a = PBAsQUBOInfo !Integer
+newtype PBAsQUBOInfo a = PBAsQUBOInfo Integer
   deriving (Eq, Show, Read)
 
 instance Transformer (PBAsQUBOInfo a) where
@@ -231,7 +231,7 @@ qubo2ising QUBO.Problem{ QUBO.quboNumVars = n, QUBO.quboMatrix = qq } =
       , c1+c2
       )
 
-data QUBO2IsingInfo a = QUBO2IsingInfo a
+newtype QUBO2IsingInfo a = QUBO2IsingInfo a
   deriving (Eq, Show, Read)
 
 instance (Eq a, Show a) => Transformer (QUBO2IsingInfo a) where
@@ -303,7 +303,7 @@ ising2qubo QUBO.IsingModel{ QUBO.isingNumVars = n, QUBO.isingInteraction = jj, Q
         sum [jj_ij | row <- IntMap.elems jj, jj_ij <- IntMap.elems row]
       - sum (IntMap.elems h)
 
-data Ising2QUBOInfo a = Ising2QUBOInfo a
+newtype Ising2QUBOInfo a = Ising2QUBOInfo a
   deriving (Eq, Show, Read)
 
 instance (Eq a, Show a) => Transformer (Ising2QUBOInfo a) where
