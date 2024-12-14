@@ -146,10 +146,22 @@ prop_pb2qubo_json = forAll arbitraryPBFormula $ \formula ->
 
 prop_qubo2ising :: Property
 prop_qubo2ising = forAll arbitrary $ \(qubo :: QUBO.Problem Rational) ->
+  let (ising, _) = qubo2ising qubo
+   in qubo === fst (ising2qubo ising)
+
+prop_qubo2ising_forward :: Property
+prop_qubo2ising_forward = forAll arbitrary $ \(qubo :: QUBO.Problem Rational) ->
   let (ising, info) = qubo2ising qubo
    in counterexample (show ising) $
         forAll (arbitrarySolution (QUBO.quboNumVars qubo)) $ \sol ->
-          transformObjValueForward info (QUBO.eval sol qubo) === QUBO.evalIsingModel sol ising
+          transformObjValueForward info (QUBO.eval sol qubo) === QUBO.evalIsingModel (transformForward info sol) ising
+
+prop_qubo2ising_backward :: Property
+prop_qubo2ising_backward = forAll arbitrary $ \(qubo :: QUBO.Problem Rational) ->
+  let (ising, info) = qubo2ising qubo
+   in counterexample (show ising) $
+        forAll (arbitrarySolution (QUBO.isingNumVars ising)) $ \sol ->
+          QUBO.eval (transformBackward info sol) qubo === transformObjValueBackward info (QUBO.evalIsingModel sol ising)
 
 prop_qubo2ising_json :: Property
 prop_qubo2ising_json = forAll arbitrary $ \(qubo :: QUBO.Problem Rational) ->
