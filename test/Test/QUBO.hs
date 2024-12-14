@@ -91,6 +91,20 @@ prop_qubo2pb = forAll arbitrary $ \(qubo :: QUBO.Problem Integer) ->
   let (pbo,_) = qubo2pb qubo
    in Just qubo === fmap fst (pbAsQUBO pbo)
 
+prop_qubo2pb_forward :: Property
+prop_qubo2pb_forward = forAll arbitrary $ \(qubo :: QUBO.Problem Integer) ->
+  let (pbo, info) = qubo2pb qubo
+   in counterexample (show pbo) $
+        forAll (arbitrarySolution (QUBO.quboNumVars qubo)) $ \sol ->
+          Just (transformObjValueForward info (QUBO.eval sol qubo)) === SAT.evalPBFormula (transformForward info sol) pbo
+
+prop_qubo2pb_backward :: Property
+prop_qubo2pb_backward = forAll arbitrary $ \(qubo :: QUBO.Problem Integer) ->
+  let (pbo, info) = qubo2pb qubo
+   in counterexample (show pbo) $
+        forAll (arbitraryAssignment (PBFile.pbNumVars pbo)) $ \m ->
+          Just (QUBO.eval (transformBackward info m) qubo) === fmap (transformObjValueBackward info) (SAT.evalPBFormula m pbo)
+
 prop_qubo2pb_json :: Property
 prop_qubo2pb_json = forAll arbitrary $ \(qubo :: QUBO.Problem Integer) ->
   let ret@(pbo, info) = qubo2pb qubo
