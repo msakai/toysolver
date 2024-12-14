@@ -120,7 +120,7 @@ instance J.FromJSON (IdentityTransformer a) where
   parseJSON = withTypedObject "IdentityTransformer" $ \_ -> pure IdentityTransformer
 
 
-data ReversedTransformer t = ReversedTransformer t
+newtype ReversedTransformer t = ReversedTransformer t
   deriving (Eq, Show, Read)
 
 instance Transformer t => Transformer (ReversedTransformer t) where
