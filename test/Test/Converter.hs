@@ -159,6 +159,16 @@ prop_naesat2max2sat_forward =
               Nothing -> property False
               Just v -> evalNAESAT m nae === (v <= threshold)
 
+prop_naesat2max2sat_backward :: Property
+prop_naesat2max2sat_backward =
+  forAll arbitraryNAESAT $ \nae ->
+    let ret@((wcnf, threshold), info) = naesat2max2sat nae
+     in counterexample (show ret) $
+          forAll (arbitraryAssignment (CNF.wcnfNumVars wcnf)) $ \m ->
+            case evalWCNF m wcnf of
+              Just v | v <= threshold -> evalNAESAT (transformBackward info m) nae
+              _ -> True
+
 prop_naesat2max2sat_json :: Property
 prop_naesat2max2sat_json =
   forAll arbitraryNAESAT $ \nae ->
