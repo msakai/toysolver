@@ -543,39 +543,27 @@ prop_pb2sat_json =
 
 prop_wbo2maxsat :: Property
 prop_wbo2maxsat = QM.monadicIO $ do
-  wbo1 <- QM.pick arbitraryPBSoftFormula
-
-  let (wcnf, info) = wbo2maxsat wbo1
-      wbo2 = PBFile.SoftFormula
-        { PBFile.wboNumVars = CNF.wcnfNumVars wcnf
-        , PBFile.wboNumConstraints = CNF.wcnfNumClauses wcnf
-        , PBFile.wboConstraints =
-            [ ( if w == CNF.wcnfTopCost wcnf then Nothing else Just w
-              , ([(1, [l]) | l <- SAT.unpackClause clause], PBFile.Ge, 1)
-              )
-            | (w,clause) <- CNF.wcnfClauses wcnf
-            ]
-        , PBFile.wboTopCost = Nothing
-        }
+  wbo <- QM.pick arbitraryPBSoftFormula
+  let (wcnf, info) = wbo2maxsat wbo
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
   method <- QM.pick arbitrary
-  ret1 <- QM.run $ optimizePBSoftFormula solver1 method wbo1
-  ret2 <- QM.run $ optimizePBSoftFormula solver2 method wbo2
+  ret1 <- QM.run $ optimizePBSoftFormula solver1 method wbo
+  ret2 <- QM.run $ optimizeWCNF solver2 method wcnf
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
     Nothing -> return ()
     Just (m1,val) -> do
       let m2 = transformForward info m1
       QM.assert $ bounds m2 == (1, CNF.wcnfNumVars wcnf)
-      QM.assert $ SAT.evalPBSoftFormula m2 wbo2 == Just val
+      QM.assert $ evalWCNF m2 wcnf == Just (transformObjValueForward info val)
   case ret2 of
     Nothing -> return ()
     Just (m2,val) -> do
       let m1 = transformBackward info m2
-      QM.assert $ bounds m1 == (1, PBFile.wboNumVars wbo1)
-      QM.assert $ SAT.evalPBSoftFormula m1 wbo1 == Just val
+      QM.assert $ bounds m1 == (1, PBFile.wboNumVars wbo)
+      QM.assert $ SAT.evalPBSoftFormula m1 wbo == Just (transformObjValueBackward info val)
 
 prop_wbo2maxsat_json :: Property
 prop_wbo2maxsat_json =
