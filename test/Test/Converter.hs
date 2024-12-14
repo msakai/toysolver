@@ -268,6 +268,19 @@ prop_maxSAT2ToSimpleMaxCut_forward =
              b2 = o2 >= th2
        ]
 
+prop_maxSAT2ToSimpleMaxCut_backward :: Property
+prop_maxSAT2ToSimpleMaxCut_backward =
+  forAll arbitraryMaxSAT2 $ \(wcnf, th1) ->
+    let r@((g, th2), info) = maxSAT2ToSimpleMaxCut (wcnf, th1)
+    in counterexample (show r) $
+        forAll (arbitraryCut g) $ \cut ->
+          if MaxCut.eval cut g >= th2 then
+            case evalWCNF (transformBackward info cut) wcnf of
+              Nothing -> False
+              Just v -> v <= th1
+          else
+            True
+
 prop_maxSAT2ToSimpleMaxCut_json :: Property
 prop_maxSAT2ToSimpleMaxCut_json =
   forAll arbitraryMaxSAT2 $ \(wcnf, th1) ->
