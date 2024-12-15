@@ -17,7 +17,7 @@
 --   "Existential quantification as incremental SAT," in Computer Aided
 --   Verification (CAV 2011), G. Gopalakrishnan and S. Qadeer, Eds.
 --   pp. 191-207.
---   <https://www.embedded.rwth-aachen.de/lib/exe/fetch.php?media=bib:bkk11a.pdf>
+--   <https://www.cs.kent.ac.uk/pubs/2011/3094/content.pdf>
 --
 ----------------------------------------------------------------------
 module ToySolver.SAT.ExistentialQuantification
