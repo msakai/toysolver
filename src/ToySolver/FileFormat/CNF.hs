@@ -294,7 +294,7 @@ instance FileFormat SomeWCNF where
 --
 -- References:
 --
--- * <http://www.satcompetition.org/2011/rules.pdf>
+-- * <https://web.archive.org/web/20131116055022/http://www.satcompetition.org/2011/rules.pdf>
 data GCNF
   = GCNF
   { gcnfNumVars        :: !Int
