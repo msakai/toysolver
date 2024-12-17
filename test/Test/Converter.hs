@@ -827,7 +827,7 @@ prop_pb2ip_forward =
     let ret@(mip, info) = pb2ip pb
      in counterexample (show ret) $
         forAll (arbitraryAssignment (PBFile.pbNumVars pb)) $ \m ->
-          fmap fromIntegral (SAT.evalPBFormula m pb)
+          fmap (transformObjValueForward info) (SAT.evalPBFormula m pb)
           ===
           evalMIP (transformForward info m) (fmap fromIntegral mip)
 
@@ -837,9 +837,9 @@ prop_pb2ip_backward =
     let ret@(mip, info) = pb2ip pb
      in counterexample (show ret) $
         forAll (arbitraryAssignments mip) $ \sol ->
-          fmap fromIntegral (SAT.evalPBFormula (transformBackward info sol) pb)
+          SAT.evalPBFormula (transformBackward info sol) pb
           ===
-          evalMIP sol (fmap fromIntegral mip)
+          fmap (transformObjValueBackward info) (evalMIP sol (fmap fromIntegral mip))
   where
     arbitraryAssignments mip = liftM Map.fromList $ do
       forM (Map.keys (MIP.varType mip)) $ \v -> do
