@@ -8,13 +8,18 @@ import Control.Monad
 import qualified Data.Aeson as J
 import Data.Array.IArray
 import qualified Data.Foldable as F
+import Data.List (sortBy)
+import Data.Map.Lazy (Map)
+import qualified Data.Map.Lazy as Map
 import Data.Maybe
+import Data.Ord (comparing)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Vector.Generic as VG
+import qualified Numeric.Optimization.MIP as MIP
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -813,6 +818,89 @@ prop_inequalitiesToEqualitiesPB_json = forAll arbitraryPBFormula $ \opb ->
       json = J.encode info
    in counterexample (show ret) $ counterexample (show json) $
       J.eitherDecode json == Right info
+
+------------------------------------------------------------------------
+
+prop_pb2ip_forward :: Property
+prop_pb2ip_forward =
+  forAll arbitraryPBFormula $ \pb ->
+    let ret@(mip, info) = pb2ip pb
+     in counterexample (show ret) $
+        forAll (arbitraryAssignment (PBFile.pbNumVars pb)) $ \m ->
+          fmap fromIntegral (SAT.evalPBFormula m pb)
+          ===
+          evalMIP (transformForward info m) (fmap fromIntegral mip)
+
+prop_pb2ip_backward :: Property
+prop_pb2ip_backward =
+  forAll arbitraryPBFormula $ \pb ->
+    let ret@(mip, info) = pb2ip pb
+     in counterexample (show ret) $
+        forAll (arbitraryAssignments mip) $ \sol ->
+          fmap fromIntegral (SAT.evalPBFormula (transformBackward info sol) pb)
+          ===
+          evalMIP sol (fmap fromIntegral mip)
+  where
+    arbitraryAssignments mip = liftM Map.fromList $ do
+      forM (Map.keys (MIP.varType mip)) $ \v -> do
+        val <- choose (0, 1)
+        pure (v, fromInteger val)
+
+prop_pb2ip_json :: Property
+prop_pb2ip_json =
+  forAll arbitraryPBFormula $ \pb ->
+    let ret@(_, info) = pb2ip pb
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+          J.eitherDecode json === Right info
+
+evalMIP :: Map MIP.Var Rational -> MIP.Problem Rational -> Maybe Rational
+evalMIP sol prob = do
+  forM_ (MIP.constraints prob) $ \constr -> do
+    guard $ evalConstraint constr
+  forM_ (MIP.sosConstraints prob) $ \constr -> do
+    guard $ evalSOSConstraint constr
+  forM_ (Map.toList (MIP.varBounds prob)) $ \(v, (lb, ub)) -> do
+    let val = sol Map.! v
+    case MIP.varType prob Map.! v of
+      MIP.ContinuousVariable -> do
+        guard $ lb <= MIP.Finite val && MIP.Finite val <= ub
+      MIP.IntegerVariable -> do
+        guard $ lb <= MIP.Finite val && MIP.Finite val <= ub
+        guard $ fromIntegral (round val :: Integer) == val
+      MIP.SemiContinuousVariable -> do
+        guard $ val == 0 || lb <= MIP.Finite val && MIP.Finite val <= ub
+      MIP.SemiIntegerVariable -> do
+        guard $ val == 0 || lb <= MIP.Finite val && MIP.Finite val <= ub
+        guard $ fromIntegral (round val :: Integer) == val
+  return $ evalExpr $ MIP.objExpr $ MIP.objectiveFunction prob
+  where
+    evalExpr :: MIP.Expr Rational -> Rational
+    evalExpr expr = sum [product (c : [sol Map.! v | v <- vs]) | MIP.Term c vs <- MIP.terms expr]
+
+    evalIndicator :: Maybe (MIP.Var, Rational) -> Bool
+    evalIndicator Nothing = True
+    evalIndicator (Just (v, val)) = (sol Map.! v) == val
+
+    evalConstraint :: MIP.Constraint Rational -> Bool
+    evalConstraint constr =
+      not (evalIndicator (MIP.constrIndicator constr)) ||
+      MIP.constrLB constr <= val && val <= MIP.constrUB constr
+      where
+        val = MIP.Finite $ evalExpr (MIP.constrExpr constr)
+
+    evalSOSConstraint :: MIP.SOSConstraint Rational -> Bool
+    evalSOSConstraint sos =
+      case MIP.sosType sos of
+        MIP.S1 -> length [() | val <- body, val > 0] <= 1
+        MIP.S2 -> f body
+      where
+        body = map ((sol Map.!) . fst) $ sortBy (comparing snd) $ (MIP.sosBody sos)
+        f [] = True
+        f [_] = True
+        f (x1 : x2 : xs)
+          | x1 > 0 = all (0==) xs
+          | otherwise = f (x2 : xs)
 
 ------------------------------------------------------------------------
 
