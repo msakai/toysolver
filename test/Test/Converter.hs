@@ -854,6 +854,45 @@ prop_pb2ip_json =
      in counterexample (show ret) $ counterexample (show json) $
           J.eitherDecode json === Right info
 
+prop_wbo2ip_forward :: Property
+prop_wbo2ip_forward =
+  forAll arbitraryPBSoftFormula $ \wbo ->
+  forAll arbitrary $ \b ->
+    let ret@(mip, info) = wbo2ip b wbo
+     in counterexample (show ret) $
+        forAll (arbitraryAssignment (PBFile.wboNumVars wbo)) $ \m ->
+          fmap (transformObjValueForward info) (SAT.evalPBSoftFormula m wbo)
+          ===
+          evalMIP (transformForward info m) (fmap fromIntegral mip)
+
+prop_wbo2ip_backward :: Property
+prop_wbo2ip_backward =
+  forAll arbitraryPBSoftFormula $ \wbo ->
+  forAll arbitrary $ \b ->
+    let ret@(mip, info) = wbo2ip b wbo
+     in counterexample (show ret) $
+        forAll (arbitraryAssignments mip) $ \sol ->
+          case evalMIP sol (fmap fromIntegral mip) of
+            Nothing -> True
+            Just val2 ->
+              case SAT.evalPBSoftFormula (transformBackward info sol) wbo of
+                Nothing -> False
+                Just val1 -> val1 <= transformObjValueBackward info val2
+  where
+    arbitraryAssignments mip = liftM Map.fromList $ do
+      forM (Map.keys (MIP.varType mip)) $ \v -> do
+        val <- choose (0, 1)
+        pure (v, fromInteger val)
+
+prop_wbo2ip_json :: Property
+prop_wbo2ip_json =
+  forAll arbitraryPBSoftFormula $ \wbo ->
+  forAll arbitrary $ \b ->
+    let ret@(_, info) = wbo2ip b wbo
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+          J.eitherDecode json === Right info
+
 evalMIP :: Map MIP.Var Rational -> MIP.Problem Rational -> Maybe Rational
 evalMIP sol prob = do
   forM_ (MIP.constraints prob) $ \constr -> do
