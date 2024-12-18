@@ -139,6 +139,16 @@ instance ForwardTransformer WBO2IPInfo where
 instance BackwardTransformer WBO2IPInfo where
   transformBackward (WBO2IPInfo nv _relaxVariables) = mtrans nv
 
+instance ObjValueTransformer WBO2IPInfo where
+  type SourceObjValue WBO2IPInfo = Integer
+  type TargetObjValue WBO2IPInfo = Rational
+
+instance ObjValueForwardTransformer WBO2IPInfo where
+  transformObjValueForward _ = fromIntegral
+
+instance ObjValueBackwardTransformer WBO2IPInfo where
+  transformObjValueBackward _ = round
+
 instance J.ToJSON WBO2IPInfo where
   toJSON (WBO2IPInfo nv relaxVariables) =
     J.object
