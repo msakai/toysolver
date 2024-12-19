@@ -133,15 +133,24 @@ addMIP' enc mip = do
                   1 -> lift $ Integer.addConstraintSoft enc var' c2
                   0 -> lift $ Integer.addConstraintSoft enc (SAT.litNot var') c2
                   _ -> return ()
+          g = do
+            case MIP.constrIndicator c of
+              Nothing -> lift $ SAT.addClause enc []
+              Just (var, val) -> do
+                let var' = asBin (vmap Map.! var)
+                case val of
+                  1 -> lift $ SAT.addClause enc [- var']
+                  0 -> lift $ SAT.addClause enc [var']
+                  _ -> return ()
       case (MIP.constrLB c, MIP.constrUB c) of
         (MIP.Finite x1, MIP.Finite x2) | x1==x2 -> f MIP.Eql x2
         (lb, ub) -> do
           case lb of
             MIP.NegInf -> return ()
             MIP.Finite x -> f MIP.Ge x
-            MIP.PosInf -> lift $ SAT.addClause enc []
+            MIP.PosInf -> g
           case ub of
-            MIP.NegInf -> lift $ SAT.addClause enc []
+            MIP.NegInf -> g
             MIP.Finite x -> f MIP.Le x
             MIP.PosInf -> return ()
 
