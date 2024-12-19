@@ -881,6 +881,110 @@ prop_wbo2ip_json =
      in counterexample (show ret) $ counterexample (show json) $
           J.eitherDecode json === Right info
 
+prop_mip2pb_forward :: Property
+prop_mip2pb_forward =
+  forAll arbitraryBoundedIP $ \ip ->
+    case mip2pb ip of
+      Left err -> counterexample err $ property False
+      Right ret@(pb, info) ->
+        counterexample (show ret) $
+          forAll (arbitraryAssignment ip) $ \sol ->
+            fmap (transformObjValueForward info) (evalMIP sol ip)
+            ===
+            SAT.evalPBFormula (transformForward info sol) pb
+  where
+    arbitraryAssignment mip = liftM Map.fromList $ do
+      forM (Map.toList (MIP.varBounds mip)) $ \(v, (MIP.Finite lb, MIP.Finite ub))  -> do
+        val <- choose (ceiling lb, floor ub)
+        pure (v, fromInteger val)
+
+prop_mip2pb_backward :: Property
+prop_mip2pb_backward =
+  forAll arbitraryBoundedIP $ \ip ->
+    case mip2pb ip of
+      Left err -> counterexample err $ property False
+      Right ret@(pb, info) ->
+        counterexample (show ret) $
+          forAll (arbitraryAssignment (PBFile.pbNumVars pb)) $ \m ->
+            fmap (transformObjValueBackward info) (SAT.evalPBFormula m pb)
+            ===
+            evalMIP (transformBackward info m) ip
+
+prop_mip2pb_json :: Property
+prop_mip2pb_json =
+  forAll arbitraryBoundedIP $ \ip ->
+    case mip2pb ip of
+      Left err -> counterexample err $ property False
+      Right ret@(_, info) ->
+        let json = J.encode info
+         in counterexample (show ret) $ counterexample (show json) $
+              J.eitherDecode json === Right info
+
+arbitraryBoundedIP :: Gen (MIP.Problem Rational)
+arbitraryBoundedIP = do
+  nv <- choose (0,10)
+  bs <- liftM Map.fromList $ forM [0..nv-1] $ \(i :: Int) -> do
+    let v = MIP.toVar ("z" ++ show i)
+    b <- arbitrary
+    if b then
+      pure (v, (MIP.Finite 0, MIP.Finite 1))
+    else do
+      lb <- arbitrary
+      Positive w <- arbitrary
+      let ub = lb + 1 + w
+      return (v, (MIP.Finite lb, MIP.Finite ub))
+  let vs = Map.keys bs
+      vs_bin = [v | (v, (MIP.Finite 0, MIP.Finite 1)) <- Map.toList bs]
+
+  dir <- elements [MIP.OptMin, MIP.OptMax]
+  obj <- arbitraryMIPExpr vs
+
+  nc <- choose (0,10)
+  cs <- replicateM nc $ do
+    ind <-
+      if null vs_bin then
+        pure Nothing
+      else do
+        b <- arbitrary
+        if b then
+          pure Nothing
+        else do
+          v <- elements vs_bin
+          rhs <- elements [0, 1]
+          pure $ Just (v, rhs)
+    e <- arbitraryMIPExpr vs
+    lb <- oneof [pure MIP.NegInf, MIP.Finite <$> arbitrary, pure MIP.PosInf]
+    ub <- oneof [pure MIP.NegInf, MIP.Finite <$> arbitrary, pure MIP.PosInf]
+    isLazy <- arbitrary
+    return $ MIP.def
+      { MIP.constrIndicator = ind
+      , MIP.constrExpr = e
+      , MIP.constrLB = lb
+      , MIP.constrUB = ub
+      , MIP.constrIsLazy = isLazy
+      }
+
+  return $ MIP.def
+    { MIP.objectiveFunction = MIP.def{ MIP.objDir = dir, MIP.objExpr = obj }
+    , MIP.varType = fmap (\_ -> MIP.IntegerVariable) bs
+    , MIP.varBounds = bs
+    , MIP.constraints = cs
+    }
+
+arbitraryMIPExpr :: [MIP.Var] -> Gen (MIP.Expr Rational)
+arbitraryMIPExpr vs = do
+  let nv = length vs
+  nt <- choose (0,3)
+  liftM MIP.Expr $ replicateM nt $ do
+    ls <-
+      if nv==0
+      then return []
+      else do
+        m <- choose (0,nv)
+        replicateM m (elements vs)
+    c <- arbitrary
+    return $ MIP.Term c ls
+
 evalMIP :: Map MIP.Var Rational -> MIP.Problem Rational -> Maybe Rational
 evalMIP sol prob = do
   forM_ (MIP.constraints prob) $ \constr -> do
