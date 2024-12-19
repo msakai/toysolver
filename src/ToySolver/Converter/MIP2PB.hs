@@ -92,11 +92,12 @@ instance J.ToJSON MIP2PBInfo where
 
 instance J.FromJSON MIP2PBInfo where
   parseJSON = withTypedObject "MIP2PBInfo" $ \obj -> do
-    subst <- obj .: "substitutions"
+    tmp <- obj .: "substitutions"
+    subst <- liftM Map.fromList $ forM (Map.toList tmp) $ \(name, expr) -> do
+      s <- parsePBSum expr
+      return (MIP.toVar name, Integer.Expr s)
     d <- obj .: "objective_function_scale_factor"
-    pure $ MIP2PBInfo
-      (Map.fromList [(MIP.toVar name, Integer.Expr expr) | (name, expr) <- Map.toList subst])
-      d
+    pure $ MIP2PBInfo subst d
 
 -- -----------------------------------------------------------------------------
 
