@@ -939,6 +939,7 @@ Test-suite TestSuite
     intern,
     lattices,
     megaparsec,
+    MIP,
     mtl,
     mwc-random,
     OptDir,

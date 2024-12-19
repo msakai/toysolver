@@ -62,6 +62,16 @@ instance ForwardTransformer PB2IPInfo where
 instance BackwardTransformer PB2IPInfo where
   transformBackward (PB2IPInfo nv) = mtrans nv
 
+instance ObjValueTransformer PB2IPInfo where
+  type SourceObjValue PB2IPInfo = Integer
+  type TargetObjValue PB2IPInfo = Rational
+
+instance ObjValueForwardTransformer PB2IPInfo where
+  transformObjValueForward _ = fromIntegral
+
+instance ObjValueBackwardTransformer PB2IPInfo where
+  transformObjValueBackward _ = round
+
 instance J.ToJSON PB2IPInfo where
   toJSON (PB2IPInfo nv) =
     J.object
@@ -128,6 +138,16 @@ instance ForwardTransformer WBO2IPInfo where
 
 instance BackwardTransformer WBO2IPInfo where
   transformBackward (WBO2IPInfo nv _relaxVariables) = mtrans nv
+
+instance ObjValueTransformer WBO2IPInfo where
+  type SourceObjValue WBO2IPInfo = Integer
+  type TargetObjValue WBO2IPInfo = Rational
+
+instance ObjValueForwardTransformer WBO2IPInfo where
+  transformObjValueForward _ = fromIntegral
+
+instance ObjValueBackwardTransformer WBO2IPInfo where
+  transformObjValueBackward _ = round
 
 instance J.ToJSON WBO2IPInfo where
   toJSON (WBO2IPInfo nv relaxVariables) =
