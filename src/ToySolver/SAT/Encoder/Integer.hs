@@ -45,7 +45,7 @@ newVar enc lo hi
       vs <- SAT.newVars enc bitWidth
       let xs = zip (iterate (2*) 1) vs
       SAT.addPBAtMost enc xs hi'
-      return $ Expr ((lo,[]) : [(c,[x]) | (c,x) <- xs])
+      return $ Expr $ [(lo,[]) | lo /= 0] ++ [(c,[x]) | (c,x) <- xs]
 
 instance AdditiveGroup Expr where
   Expr xs1 ^+^ Expr xs2 = Expr (xs1++xs2)
