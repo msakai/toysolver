@@ -856,10 +856,10 @@ instance ObjValueTransformer WBO2MaxSATInfo where
   type TargetObjValue WBO2MaxSATInfo = Integer
 
 instance ObjValueForwardTransformer WBO2MaxSATInfo where
-  transformObjValueForward (WBO2MaxSATInfo info) = id
+  transformObjValueForward (WBO2MaxSATInfo _) = id
 
 instance ObjValueBackwardTransformer WBO2MaxSATInfo where
-  transformObjValueBackward (WBO2MaxSATInfo info) = id
+  transformObjValueBackward (WBO2MaxSATInfo _) = id
 
 instance J.ToJSON WBO2MaxSATInfo where
   toJSON (WBO2MaxSATInfo info) =
