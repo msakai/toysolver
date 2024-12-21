@@ -64,6 +64,9 @@ module ToySolver.Converter.PB
   -- * PB→QUBO conversion
   , pb2qubo'
   , PB2QUBOInfo'
+
+  -- * General data types
+  , PBTseitinInfo (..)
   ) where
 
 import Control.Monad
@@ -137,7 +140,43 @@ normalizePBConstraint (lhs,op,rhs) =
 
 -- -----------------------------------------------------------------------------
 
-type PBLinearizeInfo = TseitinInfo
+newtype PBTseitinInfo = PBTseitinInfo TseitinInfo
+  deriving (Eq, Show)
+
+instance Transformer PBTseitinInfo where
+  type Source PBTseitinInfo = SAT.Model
+  type Target PBTseitinInfo = SAT.Model
+
+instance ForwardTransformer PBTseitinInfo where
+  transformForward (PBTseitinInfo info) = transformForward info
+
+instance BackwardTransformer PBTseitinInfo where
+  transformBackward (PBTseitinInfo info) = transformBackward info
+
+instance ObjValueTransformer PBTseitinInfo where
+  type SourceObjValue PBTseitinInfo = Integer
+  type TargetObjValue PBTseitinInfo = Integer
+
+instance ObjValueForwardTransformer PBTseitinInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer PBTseitinInfo where
+  transformObjValueBackward _ = id
+
+instance J.ToJSON PBTseitinInfo where
+  toJSON (PBTseitinInfo info) =
+    J.object
+    [ "type" .= ("PBTseitinInfo" :: J.Value)
+    , "base" .= info
+    ]
+
+instance J.FromJSON PBTseitinInfo where
+  parseJSON = withTypedObject "PBTseitinInfo" $ \obj ->
+    PBTseitinInfo <$> obj .: "base"
+
+-- -----------------------------------------------------------------------------
+
+type PBLinearizeInfo = PBTseitinInfo
 
 linearizePB :: PBFile.Formula -> Bool -> (PBFile.Formula, PBLinearizeInfo)
 linearizePB formula usePB = runST $ do
@@ -166,7 +205,7 @@ linearizePB formula usePB = runST $ do
       , PBFile.pbConstraints = cs' ++ PBFile.pbConstraints formula'
       , PBFile.pbNumConstraints = PBFile.pbNumConstraints formula + PBFile.pbNumConstraints formula'
       }
-    , TseitinInfo (PBFile.pbNumVars formula) (PBFile.pbNumVars formula') defs
+    , PBTseitinInfo $ TseitinInfo (PBFile.pbNumVars formula) (PBFile.pbNumVars formula') defs
     )
 
 -- -----------------------------------------------------------------------------
@@ -193,10 +232,12 @@ linearizeWBO formula usePB = runST $ do
       , PBFile.wboNumVars = PBFile.pbNumVars formula'
       , PBFile.wboNumConstraints = PBFile.wboNumConstraints formula + PBFile.pbNumConstraints formula'
       }
-    , TseitinInfo (PBFile.wboNumVars formula) (PBFile.pbNumVars formula') defs
+    , PBTseitinInfo $ TseitinInfo (PBFile.wboNumVars formula) (PBFile.pbNumVars formula') defs
     )
 
 -- -----------------------------------------------------------------------------
+
+type PBQuadratizeInfo = PBTseitinInfo
 
 -- | Quandratize PBO/PBS problem without introducing additional constraints.
 quadratizePB :: PBFile.Formula -> ((PBFile.Formula, Integer), PBQuadratizeInfo)
@@ -215,7 +256,7 @@ quadratizePB' (formula, maxObj) =
       }
     , maxObj
     )
-  , PBQuadratizeInfo $ TseitinInfo nv1 nv2 (IntMap.fromList [(v, And [atom l1, atom l2]) | (v, (l1,l2)) <- prodDefs])
+  , PBTseitinInfo $ TseitinInfo nv1 nv2 (IntMap.fromList [(v, And [atom l1, atom l2]) | (v, (l1,l2)) <- prodDefs])
   )
   where
     nv1 = PBFile.pbNumVars formula
@@ -298,40 +339,6 @@ collectDegGe3Terms formula = Set.fromList [t' | t <- terms, let t' = IntSet.from
     sums = maybeToList (PBFile.pbObjectiveFunction formula) ++
            [lhs | (lhs,_,_) <- PBFile.pbConstraints formula]
     terms = [t | s <- sums, (_,t) <- s]
-
-newtype PBQuadratizeInfo = PBQuadratizeInfo TseitinInfo
-  deriving (Eq, Show)
-
-instance Transformer PBQuadratizeInfo where
-  type Source PBQuadratizeInfo = SAT.Model
-  type Target PBQuadratizeInfo = SAT.Model
-
-instance ForwardTransformer PBQuadratizeInfo where
-  transformForward (PBQuadratizeInfo info) = transformForward info
-
-instance BackwardTransformer PBQuadratizeInfo where
-  transformBackward (PBQuadratizeInfo info) = transformBackward info
-
-instance ObjValueTransformer PBQuadratizeInfo where
-  type SourceObjValue PBQuadratizeInfo = Integer
-  type TargetObjValue PBQuadratizeInfo = Integer
-
-instance ObjValueForwardTransformer PBQuadratizeInfo where
-  transformObjValueForward _ = id
-
-instance ObjValueBackwardTransformer PBQuadratizeInfo where
-  transformObjValueBackward _ = id
-
-instance J.ToJSON PBQuadratizeInfo where
-  toJSON (PBQuadratizeInfo info) =
-    J.object
-    [ "type" .= ("PBQuadratizeInfo" :: J.Value)
-    , "base" .= info
-    ]
-
-instance J.FromJSON PBQuadratizeInfo where
-  parseJSON = withTypedObject "PBQuadratizeInfo" $ \obj ->
-    PBQuadratizeInfo <$> obj .: "base"
 
 -- -----------------------------------------------------------------------------
 

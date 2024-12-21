@@ -687,7 +687,7 @@ prop_linearizePB_forward =
     let ret@(pb2, info) = linearizePB pb b
      in counterexample (show ret) $
         forAllAssignments (PBFile.pbNumVars pb) $ \m ->
-          SAT.evalPBFormula m pb === SAT.evalPBFormula (transformForward info m) pb2
+          fmap (transformObjValueForward info) (SAT.evalPBFormula m pb) === SAT.evalPBFormula (transformForward info m) pb2
 
 prop_linearizePB_backward :: Property
 prop_linearizePB_backward =
@@ -696,10 +696,10 @@ prop_linearizePB_backward =
     let ret@(pb2, info) = linearizePB pb b
      in counterexample (show ret) $
         forAll (arbitraryAssignment (PBFile.pbNumVars pb2)) $ \m2 ->
-          if isJust (SAT.evalPBFormula m2 pb2) then
-            isJust (SAT.evalPBFormula (transformBackward info m2) pb)
-          else
-            True
+          case (SAT.evalPBFormula (transformBackward info m2) pb, SAT.evalPBFormula m2 pb2) of
+            pair@(Just val1, Just val2) -> counterexample (show pair) $ val1 <= transformObjValueBackward info val2
+            pair@(Nothing, Just _) -> counterexample (show pair) $ False
+            (_, Nothing) -> property True
 
 prop_linearizePB_json :: Property
 prop_linearizePB_json =
@@ -717,7 +717,7 @@ prop_linearizeWBO_forward =
     let ret@(wbo2, info) = linearizeWBO wbo b
      in counterexample (show ret) $
         forAllAssignments (PBFile.wboNumVars wbo) $ \m ->
-          SAT.evalPBSoftFormula m wbo === SAT.evalPBSoftFormula (transformForward info m) wbo2
+          fmap (transformObjValueForward info) (SAT.evalPBSoftFormula m wbo) === SAT.evalPBSoftFormula (transformForward info m) wbo2
 
 prop_linearizeWBO_backward :: Property
 prop_linearizeWBO_backward =
@@ -726,10 +726,10 @@ prop_linearizeWBO_backward =
     let ret@(wbo2, info) = linearizeWBO wbo b
      in counterexample (show ret) $
         forAll (arbitraryAssignment (PBFile.wboNumVars wbo2)) $ \m2 ->
-          if isJust (SAT.evalPBSoftFormula m2 wbo2) then
-            isJust (SAT.evalPBSoftFormula (transformBackward info m2) wbo)
-          else
-            True
+          case (SAT.evalPBSoftFormula (transformBackward info m2) wbo, SAT.evalPBSoftFormula m2 wbo2) of
+            pair@(Just val1, Just val2) -> counterexample (show pair) $ val1 <= transformObjValueBackward info val2
+            pair@(Nothing, Just _) -> counterexample (show pair) $ False
+            (_, Nothing) -> property True
 
 prop_linearizeWBO_json :: Property
 prop_linearizeWBO_json =
@@ -749,10 +749,10 @@ prop_quadratizePB =
           [ property $ F.all (\t -> IntSet.size t <= 2) $ collectTerms pb2
           , property $ PBFile.pbNumConstraints pb === PBFile.pbNumConstraints pb2
           , forAll (arbitraryAssignment (PBFile.pbNumVars pb)) $ \m ->
-              SAT.evalPBFormula m pb === eval2 (transformForward info m) (pb2,th)
+              fmap (transformObjValueForward info) (SAT.evalPBFormula m pb) === eval2 (transformForward info m) (pb2,th)
           , forAll (arbitraryAssignment (PBFile.pbNumVars pb2)) $ \m ->
               case eval2 m (pb2,th) of
-                Just o -> SAT.evalPBFormula (transformBackward info m) pb === Just o
+                Just o -> SAT.evalPBFormula (transformBackward info m) pb === Just (transformObjValueBackward info o)
                 Nothing -> property True
           ]
   where
