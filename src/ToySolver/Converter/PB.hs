@@ -56,7 +56,7 @@ module ToySolver.Converter.PB
 
   -- * MaxSAT↔WBO conversion
   , maxsat2wbo
-  , MaxSAT2WBOInfo
+  , MaxSAT2WBOInfo (..)
   , wbo2maxsat
   , wbo2maxsatWith
   , WBO2MaxSATInfo
@@ -137,7 +137,43 @@ normalizePBConstraint (lhs,op,rhs) =
 
 -- -----------------------------------------------------------------------------
 
-type PBLinearizeInfo = TseitinInfo
+newtype PBTseitinInfo = PBTseitinInfo TseitinInfo
+  deriving (Eq, Show)
+
+instance Transformer PBTseitinInfo where
+  type Source PBTseitinInfo = SAT.Model
+  type Target PBTseitinInfo = SAT.Model
+
+instance ForwardTransformer PBTseitinInfo where
+  transformForward (PBTseitinInfo info) = transformForward info
+
+instance BackwardTransformer PBTseitinInfo where
+  transformBackward (PBTseitinInfo info) = transformBackward info
+
+instance ObjValueTransformer PBTseitinInfo where
+  type SourceObjValue PBTseitinInfo = Integer
+  type TargetObjValue PBTseitinInfo = Integer
+
+instance ObjValueForwardTransformer PBTseitinInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer PBTseitinInfo where
+  transformObjValueBackward _ = id
+
+instance J.ToJSON PBTseitinInfo where
+  toJSON (PBTseitinInfo info) =
+    J.object
+    [ "type" .= ("PBTseitinInfo" :: J.Value)
+    , "base" .= info
+    ]
+
+instance J.FromJSON PBTseitinInfo where
+  parseJSON = withTypedObject "PBTseitinInfo" $ \obj ->
+    PBTseitinInfo <$> obj .: "base"
+
+-- -----------------------------------------------------------------------------
+
+type PBLinearizeInfo = PBTseitinInfo
 
 linearizePB :: PBFile.Formula -> Bool -> (PBFile.Formula, PBLinearizeInfo)
 linearizePB formula usePB = runST $ do
@@ -166,7 +202,7 @@ linearizePB formula usePB = runST $ do
       , PBFile.pbConstraints = cs' ++ PBFile.pbConstraints formula'
       , PBFile.pbNumConstraints = PBFile.pbNumConstraints formula + PBFile.pbNumConstraints formula'
       }
-    , TseitinInfo (PBFile.pbNumVars formula) (PBFile.pbNumVars formula') defs
+    , PBTseitinInfo $ TseitinInfo (PBFile.pbNumVars formula) (PBFile.pbNumVars formula') defs
     )
 
 -- -----------------------------------------------------------------------------
@@ -193,10 +229,12 @@ linearizeWBO formula usePB = runST $ do
       , PBFile.wboNumVars = PBFile.pbNumVars formula'
       , PBFile.wboNumConstraints = PBFile.wboNumConstraints formula + PBFile.pbNumConstraints formula'
       }
-    , TseitinInfo (PBFile.wboNumVars formula) (PBFile.pbNumVars formula') defs
+    , PBTseitinInfo $ TseitinInfo (PBFile.wboNumVars formula) (PBFile.pbNumVars formula') defs
     )
 
 -- -----------------------------------------------------------------------------
+
+type PBQuadratizeInfo = PBTseitinInfo
 
 -- | Quandratize PBO/PBS problem without introducing additional constraints.
 quadratizePB :: PBFile.Formula -> ((PBFile.Formula, Integer), PBQuadratizeInfo)
@@ -215,7 +253,7 @@ quadratizePB' (formula, maxObj) =
       }
     , maxObj
     )
-  , PBQuadratizeInfo $ TseitinInfo nv1 nv2 (IntMap.fromList [(v, And [atom l1, atom l2]) | (v, (l1,l2)) <- prodDefs])
+  , PBTseitinInfo $ TseitinInfo nv1 nv2 (IntMap.fromList [(v, And [atom l1, atom l2]) | (v, (l1,l2)) <- prodDefs])
   )
   where
     nv1 = PBFile.pbNumVars formula
@@ -298,40 +336,6 @@ collectDegGe3Terms formula = Set.fromList [t' | t <- terms, let t' = IntSet.from
     sums = maybeToList (PBFile.pbObjectiveFunction formula) ++
            [lhs | (lhs,_,_) <- PBFile.pbConstraints formula]
     terms = [t | s <- sums, (_,t) <- s]
-
-newtype PBQuadratizeInfo = PBQuadratizeInfo TseitinInfo
-  deriving (Eq, Show)
-
-instance Transformer PBQuadratizeInfo where
-  type Source PBQuadratizeInfo = SAT.Model
-  type Target PBQuadratizeInfo = SAT.Model
-
-instance ForwardTransformer PBQuadratizeInfo where
-  transformForward (PBQuadratizeInfo info) = transformForward info
-
-instance BackwardTransformer PBQuadratizeInfo where
-  transformBackward (PBQuadratizeInfo info) = transformBackward info
-
-instance ObjValueTransformer PBQuadratizeInfo where
-  type SourceObjValue PBQuadratizeInfo = Integer
-  type TargetObjValue PBQuadratizeInfo = Integer
-
-instance ObjValueForwardTransformer PBQuadratizeInfo where
-  transformObjValueForward _ = id
-
-instance ObjValueBackwardTransformer PBQuadratizeInfo where
-  transformObjValueBackward _ = id
-
-instance J.ToJSON PBQuadratizeInfo where
-  toJSON (PBQuadratizeInfo info) =
-    J.object
-    [ "type" .= ("PBQuadratizeInfo" :: J.Value)
-    , "base" .= info
-    ]
-
-instance J.FromJSON PBQuadratizeInfo where
-  parseJSON = withTypedObject "PBQuadratizeInfo" $ \obj ->
-    PBQuadratizeInfo <$> obj .: "base"
 
 -- -----------------------------------------------------------------------------
 
@@ -783,7 +787,37 @@ pb2satWith strategy formula = runST $ do
 
 -- -----------------------------------------------------------------------------
 
-type MaxSAT2WBOInfo = IdentityTransformer SAT.Model
+data MaxSAT2WBOInfo = MaxSAT2WBOInfo
+  deriving (Show, Eq)
+
+instance Transformer MaxSAT2WBOInfo where
+  type Source MaxSAT2WBOInfo = SAT.Model
+  type Target MaxSAT2WBOInfo = SAT.Model
+
+instance ForwardTransformer MaxSAT2WBOInfo where
+  transformForward _ = id
+
+instance BackwardTransformer MaxSAT2WBOInfo where
+  transformBackward _ = id
+
+instance ObjValueTransformer MaxSAT2WBOInfo where
+  type SourceObjValue MaxSAT2WBOInfo = Integer
+  type TargetObjValue MaxSAT2WBOInfo = Integer
+
+instance ObjValueForwardTransformer MaxSAT2WBOInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer MaxSAT2WBOInfo where
+  transformObjValueBackward _ = id
+
+instance J.ToJSON MaxSAT2WBOInfo where
+  toJSON MaxSAT2WBOInfo =
+    J.object
+    [ "type" .= ("MaxSAT2WBOInfo" :: J.Value)
+    ]
+
+instance J.FromJSON MaxSAT2WBOInfo where
+  parseJSON = withTypedObject "MaxSAT2WBOInfo" $ \_ -> pure MaxSAT2WBOInfo
 
 maxsat2wbo :: CNF.WCNF -> (PBFile.SoftFormula, MaxSAT2WBOInfo)
 maxsat2wbo
@@ -799,7 +833,7 @@ maxsat2wbo
     , PBFile.wboNumVars = nv
     , PBFile.wboNumConstraints = nc
     }
-  , IdentityTransformer
+  , MaxSAT2WBOInfo
   )
   where
     f (w,c)
@@ -808,7 +842,39 @@ maxsat2wbo
      where
        p = ([(1,[l]) | l <- SAT.unpackClause c], PBFile.Ge, 1)
 
-type WBO2MaxSATInfo = TseitinInfo
+newtype WBO2MaxSATInfo = WBO2MaxSATInfo TseitinInfo
+  deriving (Show, Eq)
+
+instance Transformer WBO2MaxSATInfo where
+  type Source WBO2MaxSATInfo = SAT.Model
+  type Target WBO2MaxSATInfo = SAT.Model
+
+instance ForwardTransformer WBO2MaxSATInfo where
+  transformForward (WBO2MaxSATInfo info) = transformForward info
+
+instance BackwardTransformer WBO2MaxSATInfo where
+  transformBackward (WBO2MaxSATInfo info) = transformBackward info
+
+instance ObjValueTransformer WBO2MaxSATInfo where
+  type SourceObjValue WBO2MaxSATInfo = Integer
+  type TargetObjValue WBO2MaxSATInfo = Integer
+
+instance ObjValueForwardTransformer WBO2MaxSATInfo where
+  transformObjValueForward (WBO2MaxSATInfo _) = id
+
+instance ObjValueBackwardTransformer WBO2MaxSATInfo where
+  transformObjValueBackward (WBO2MaxSATInfo _) = id
+
+instance J.ToJSON WBO2MaxSATInfo where
+  toJSON (WBO2MaxSATInfo info) =
+    J.object
+    [ "type" .= ("WBO2MaxSATInfo" :: J.Value)
+    , "base" .= info
+    ]
+
+instance J.FromJSON WBO2MaxSATInfo where
+  parseJSON = withTypedObject "WBO2MaxSATInfo" $ \obj ->
+    WBO2MaxSATInfo <$> (obj .: "base")
 
 wbo2maxsat :: PBFile.SoftFormula -> (CNF.WCNF, WBO2MaxSATInfo)
 wbo2maxsat = wbo2maxsatWith def
@@ -858,6 +924,6 @@ wbo2maxsatWith strategy formula = runST $ do
              , CNF.wcnfClauses = F.toList cs
              }
   defs <- Tseitin.getDefinitions tseitin
-  return (wcnf, TseitinInfo (PBFile.wboNumVars formula) (CNF.cnfNumVars cnf) defs)
+  return (wcnf, WBO2MaxSATInfo (TseitinInfo (PBFile.wboNumVars formula) (CNF.cnfNumVars cnf) defs))
 
 -- -----------------------------------------------------------------------------

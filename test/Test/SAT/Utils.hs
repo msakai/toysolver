@@ -4,7 +4,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Test.SAT.Utils where
 
-import Control.Arrow ((***))
 import Control.Monad
 import Data.Array.IArray
 import Data.Default.Class
@@ -504,10 +503,9 @@ optimizeWCNF solver method wcnf = do
   ret <- optimizePBSoftFormula solver method wbo
   case ret of
     Nothing -> return Nothing
-    Just (m, _) -> do
+    Just (m, obj) -> do
       let m' = transformBackward info m
-          -- TODO: MaxSAT2WBOInfo should be instance of ObjValueBackwardTransformer
-          Just obj' = evalWCNF m' wcnf
+          obj' = transformObjValueBackward info obj
       return $ Just (m', obj')
 
 ------------------------------------------------------------------------

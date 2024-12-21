@@ -491,14 +491,14 @@ prop_maxsat2wbo_forward = forAll arbitraryWCNF $ \cnf ->
   let ret@(wbo,info) = maxsat2wbo cnf
    in counterexample (show ret) $
         forAllAssignments (CNF.wcnfNumVars cnf) $ \m ->
-          evalWCNF m cnf === SAT.evalPBSoftFormula (transformForward info m) wbo
+          fmap (transformObjValueForward info) (evalWCNF m cnf) === SAT.evalPBSoftFormula (transformForward info m) wbo
 
 prop_maxsat2wbo_backward :: Property
 prop_maxsat2wbo_backward = forAll arbitraryWCNF $ \cnf ->
   let ret@(wbo,info) = maxsat2wbo cnf
    in counterexample (show ret) $
         forAllAssignments (PBFile.wboNumVars wbo) $ \m ->
-          evalWCNF (transformBackward info m) cnf === SAT.evalPBSoftFormula m wbo
+          evalWCNF (transformBackward info m) cnf === fmap (transformObjValueBackward info) (SAT.evalPBSoftFormula m wbo)
 
 prop_maxsat2wbo_json :: Property
 prop_maxsat2wbo_json = forAll arbitraryWCNF $ \cnf ->
@@ -543,39 +543,27 @@ prop_pb2sat_json =
 
 prop_wbo2maxsat :: Property
 prop_wbo2maxsat = QM.monadicIO $ do
-  wbo1 <- QM.pick arbitraryPBSoftFormula
-
-  let (wcnf, info) = wbo2maxsat wbo1
-      wbo2 = PBFile.SoftFormula
-        { PBFile.wboNumVars = CNF.wcnfNumVars wcnf
-        , PBFile.wboNumConstraints = CNF.wcnfNumClauses wcnf
-        , PBFile.wboConstraints =
-            [ ( if w == CNF.wcnfTopCost wcnf then Nothing else Just w
-              , ([(1, [l]) | l <- SAT.unpackClause clause], PBFile.Ge, 1)
-              )
-            | (w,clause) <- CNF.wcnfClauses wcnf
-            ]
-        , PBFile.wboTopCost = Nothing
-        }
+  wbo <- QM.pick arbitraryPBSoftFormula
+  let (wcnf, info) = wbo2maxsat wbo
 
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
   method <- QM.pick arbitrary
-  ret1 <- QM.run $ optimizePBSoftFormula solver1 method wbo1
-  ret2 <- QM.run $ optimizePBSoftFormula solver2 method wbo2
+  ret1 <- QM.run $ optimizePBSoftFormula solver1 method wbo
+  ret2 <- QM.run $ optimizeWCNF solver2 method wcnf
   QM.assert $ isJust ret1 == isJust ret2
   case ret1 of
     Nothing -> return ()
     Just (m1,val) -> do
       let m2 = transformForward info m1
       QM.assert $ bounds m2 == (1, CNF.wcnfNumVars wcnf)
-      QM.assert $ SAT.evalPBSoftFormula m2 wbo2 == Just val
+      QM.assert $ evalWCNF m2 wcnf == Just (transformObjValueForward info val)
   case ret2 of
     Nothing -> return ()
     Just (m2,val) -> do
       let m1 = transformBackward info m2
-      QM.assert $ bounds m1 == (1, PBFile.wboNumVars wbo1)
-      QM.assert $ SAT.evalPBSoftFormula m1 wbo1 == Just val
+      QM.assert $ bounds m1 == (1, PBFile.wboNumVars wbo)
+      QM.assert $ SAT.evalPBSoftFormula m1 wbo == Just (transformObjValueBackward info val)
 
 prop_wbo2maxsat_json :: Property
 prop_wbo2maxsat_json =
@@ -699,7 +687,7 @@ prop_linearizePB_forward =
     let ret@(pb2, info) = linearizePB pb b
      in counterexample (show ret) $
         forAllAssignments (PBFile.pbNumVars pb) $ \m ->
-          SAT.evalPBFormula m pb === SAT.evalPBFormula (transformForward info m) pb2
+          fmap (transformObjValueForward info) (SAT.evalPBFormula m pb) === SAT.evalPBFormula (transformForward info m) pb2
 
 prop_linearizePB_backward :: Property
 prop_linearizePB_backward =
@@ -708,10 +696,10 @@ prop_linearizePB_backward =
     let ret@(pb2, info) = linearizePB pb b
      in counterexample (show ret) $
         forAll (arbitraryAssignment (PBFile.pbNumVars pb2)) $ \m2 ->
-          if isJust (SAT.evalPBFormula m2 pb2) then
-            isJust (SAT.evalPBFormula (transformBackward info m2) pb)
-          else
-            True
+          case (SAT.evalPBFormula (transformBackward info m2) pb, SAT.evalPBFormula m2 pb2) of
+            pair@(Just val1, Just val2) -> counterexample (show pair) $ val1 <= transformObjValueBackward info val2
+            pair@(Nothing, Just _) -> counterexample (show pair) $ False
+            (_, Nothing) -> property True
 
 prop_linearizePB_json :: Property
 prop_linearizePB_json =
@@ -729,7 +717,7 @@ prop_linearizeWBO_forward =
     let ret@(wbo2, info) = linearizeWBO wbo b
      in counterexample (show ret) $
         forAllAssignments (PBFile.wboNumVars wbo) $ \m ->
-          SAT.evalPBSoftFormula m wbo === SAT.evalPBSoftFormula (transformForward info m) wbo2
+          fmap (transformObjValueForward info) (SAT.evalPBSoftFormula m wbo) === SAT.evalPBSoftFormula (transformForward info m) wbo2
 
 prop_linearizeWBO_backward :: Property
 prop_linearizeWBO_backward =
@@ -738,10 +726,10 @@ prop_linearizeWBO_backward =
     let ret@(wbo2, info) = linearizeWBO wbo b
      in counterexample (show ret) $
         forAll (arbitraryAssignment (PBFile.wboNumVars wbo2)) $ \m2 ->
-          if isJust (SAT.evalPBSoftFormula m2 wbo2) then
-            isJust (SAT.evalPBSoftFormula (transformBackward info m2) wbo)
-          else
-            True
+          case (SAT.evalPBSoftFormula (transformBackward info m2) wbo, SAT.evalPBSoftFormula m2 wbo2) of
+            pair@(Just val1, Just val2) -> counterexample (show pair) $ val1 <= transformObjValueBackward info val2
+            pair@(Nothing, Just _) -> counterexample (show pair) $ False
+            (_, Nothing) -> property True
 
 prop_linearizeWBO_json :: Property
 prop_linearizeWBO_json =
@@ -761,10 +749,10 @@ prop_quadratizePB =
           [ property $ F.all (\t -> IntSet.size t <= 2) $ collectTerms pb2
           , property $ PBFile.pbNumConstraints pb === PBFile.pbNumConstraints pb2
           , forAll (arbitraryAssignment (PBFile.pbNumVars pb)) $ \m ->
-              SAT.evalPBFormula m pb === eval2 (transformForward info m) (pb2,th)
+              fmap (transformObjValueForward info) (SAT.evalPBFormula m pb) === eval2 (transformForward info m) (pb2,th)
           , forAll (arbitraryAssignment (PBFile.pbNumVars pb2)) $ \m ->
               case eval2 m (pb2,th) of
-                Just o -> SAT.evalPBFormula (transformBackward info m) pb === Just o
+                Just o -> SAT.evalPBFormula (transformBackward info m) pb === Just (transformObjValueBackward info o)
                 Nothing -> property True
           ]
   where
@@ -892,6 +880,110 @@ prop_wbo2ip_json =
         json = J.encode info
      in counterexample (show ret) $ counterexample (show json) $
           J.eitherDecode json === Right info
+
+prop_mip2pb_forward :: Property
+prop_mip2pb_forward =
+  forAll arbitraryBoundedIP $ \ip ->
+    case mip2pb ip of
+      Left err -> counterexample err $ property False
+      Right ret@(pb, info) ->
+        counterexample (show ret) $
+          forAll (arbitraryAssignment ip) $ \sol ->
+            fmap (transformObjValueForward info) (evalMIP sol ip)
+            ===
+            SAT.evalPBFormula (transformForward info sol) pb
+  where
+    arbitraryAssignment mip = liftM Map.fromList $ do
+      forM (Map.toList (MIP.varBounds mip)) $ \(v, (MIP.Finite lb, MIP.Finite ub))  -> do
+        val <- choose (ceiling lb, floor ub)
+        pure (v, fromInteger val)
+
+prop_mip2pb_backward :: Property
+prop_mip2pb_backward =
+  forAll arbitraryBoundedIP $ \ip ->
+    case mip2pb ip of
+      Left err -> counterexample err $ property False
+      Right ret@(pb, info) ->
+        counterexample (show ret) $
+          forAll (arbitraryAssignment (PBFile.pbNumVars pb)) $ \m ->
+            fmap (transformObjValueBackward info) (SAT.evalPBFormula m pb)
+            ===
+            evalMIP (transformBackward info m) ip
+
+prop_mip2pb_json :: Property
+prop_mip2pb_json =
+  forAll arbitraryBoundedIP $ \ip ->
+    case mip2pb ip of
+      Left err -> counterexample err $ property False
+      Right ret@(_, info) ->
+        let json = J.encode info
+         in counterexample (show ret) $ counterexample (show json) $
+              J.eitherDecode json === Right info
+
+arbitraryBoundedIP :: Gen (MIP.Problem Rational)
+arbitraryBoundedIP = do
+  nv <- choose (0,10)
+  bs <- liftM Map.fromList $ forM [0..nv-1] $ \(i :: Int) -> do
+    let v = MIP.toVar ("z" ++ show i)
+    b <- arbitrary
+    if b then
+      pure (v, (MIP.Finite 0, MIP.Finite 1))
+    else do
+      lb <- arbitrary
+      Positive w <- arbitrary
+      let ub = lb + 1 + w
+      return (v, (MIP.Finite lb, MIP.Finite ub))
+  let vs = Map.keys bs
+      vs_bin = [v | (v, (MIP.Finite 0, MIP.Finite 1)) <- Map.toList bs]
+
+  dir <- elements [MIP.OptMin, MIP.OptMax]
+  obj <- arbitraryMIPExpr vs
+
+  nc <- choose (0,10)
+  cs <- replicateM nc $ do
+    ind <-
+      if null vs_bin then
+        pure Nothing
+      else do
+        b <- arbitrary
+        if b then
+          pure Nothing
+        else do
+          v <- elements vs_bin
+          rhs <- elements [0, 1]
+          pure $ Just (v, rhs)
+    e <- arbitraryMIPExpr vs
+    lb <- oneof [pure MIP.NegInf, MIP.Finite <$> arbitrary, pure MIP.PosInf]
+    ub <- oneof [pure MIP.NegInf, MIP.Finite <$> arbitrary, pure MIP.PosInf]
+    isLazy <- arbitrary
+    return $ MIP.def
+      { MIP.constrIndicator = ind
+      , MIP.constrExpr = e
+      , MIP.constrLB = lb
+      , MIP.constrUB = ub
+      , MIP.constrIsLazy = isLazy
+      }
+
+  return $ MIP.def
+    { MIP.objectiveFunction = MIP.def{ MIP.objDir = dir, MIP.objExpr = obj }
+    , MIP.varType = fmap (\_ -> MIP.IntegerVariable) bs
+    , MIP.varBounds = bs
+    , MIP.constraints = cs
+    }
+
+arbitraryMIPExpr :: [MIP.Var] -> Gen (MIP.Expr Rational)
+arbitraryMIPExpr vs = do
+  let nv = length vs
+  nt <- choose (0,3)
+  liftM MIP.Expr $ replicateM nt $ do
+    ls <-
+      if nv==0
+      then return []
+      else do
+        m <- choose (0,nv)
+        replicateM m (elements vs)
+    c <- arbitrary
+    return $ MIP.Term c ls
 
 evalMIP :: Map MIP.Var Rational -> MIP.Problem Rational -> Maybe Rational
 evalMIP sol prob = do

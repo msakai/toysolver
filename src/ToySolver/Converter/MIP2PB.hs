@@ -26,6 +26,8 @@ import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import qualified Data.Aeson as J
 import Data.Aeson ((.=), (.:))
+import Data.Array.IArray
+import qualified Data.IntSet as IntSet
 import Data.List (intercalate, foldl', sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -65,6 +67,41 @@ data MIP2PBInfo = MIP2PBInfo (Map MIP.Var Integer.Expr) !Integer
 instance Transformer MIP2PBInfo where
   type Source MIP2PBInfo = Map MIP.Var Rational
   type Target MIP2PBInfo = SAT.Model
+
+instance ForwardTransformer MIP2PBInfo where
+  transformForward (MIP2PBInfo vmap _d) sol
+    | Map.keysSet vmap /= Map.keysSet sol = error "variables mismatch"
+    | IntSet.null xs = array (1,0) []
+    | otherwise = array (1, x_max) [(x, val) | (var, Integer.Expr s) <- Map.toList vmap, (x, val) <- f s (sol Map.! var)]
+    where
+      xs = IntSet.unions [IntSet.fromList (map SAT.litVar lits) | Integer.Expr s <- Map.elems vmap, (_, lits) <- s]
+
+      x_max :: SAT.Var
+      x_max = IntSet.findMax xs
+
+      f :: SAT.PBSum -> Rational -> [(SAT.Var, Bool)]
+      f s val
+        | denominator val /= 1 = error "value should be integer"
+        | otherwise = g (numerator val - sum [c | (c, []) <- s]) (Map.toDescList tmp)
+        where
+          tmp :: Map Integer SAT.Var
+          tmp =
+            Map.fromList
+            [ if c < 0 then
+                error "coefficient should be non-negative"
+              else if length ls > 1 then
+                error "variable definition should be linear"
+              else
+                (c, head ls)
+            | (c, ls) <- s, not (null ls), c /= 0
+            ]
+
+          g :: Integer -> [(Integer, SAT.Var)] -> [(SAT.Var, Bool)]
+          g 0 [] = []
+          g _ [] = error "no more variables"
+          g v ((c,l) : ys)
+            | v >= c    = (l, True)  : g (v - c) ys
+            | otherwise = (l, False) : g v ys
 
 instance BackwardTransformer MIP2PBInfo where
   transformBackward (MIP2PBInfo vmap _d) m = fmap (toRational . Integer.eval m) vmap
