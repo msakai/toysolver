@@ -845,39 +845,7 @@ maxsat2wbo
      where
        p = ([(1,[l]) | l <- SAT.unpackClause c], PBFile.Ge, 1)
 
-newtype WBO2MaxSATInfo = WBO2MaxSATInfo TseitinInfo
-  deriving (Show, Eq)
-
-instance Transformer WBO2MaxSATInfo where
-  type Source WBO2MaxSATInfo = SAT.Model
-  type Target WBO2MaxSATInfo = SAT.Model
-
-instance ForwardTransformer WBO2MaxSATInfo where
-  transformForward (WBO2MaxSATInfo info) = transformForward info
-
-instance BackwardTransformer WBO2MaxSATInfo where
-  transformBackward (WBO2MaxSATInfo info) = transformBackward info
-
-instance ObjValueTransformer WBO2MaxSATInfo where
-  type SourceObjValue WBO2MaxSATInfo = Integer
-  type TargetObjValue WBO2MaxSATInfo = Integer
-
-instance ObjValueForwardTransformer WBO2MaxSATInfo where
-  transformObjValueForward (WBO2MaxSATInfo _) = id
-
-instance ObjValueBackwardTransformer WBO2MaxSATInfo where
-  transformObjValueBackward (WBO2MaxSATInfo _) = id
-
-instance J.ToJSON WBO2MaxSATInfo where
-  toJSON (WBO2MaxSATInfo info) =
-    J.object
-    [ "type" .= ("WBO2MaxSATInfo" :: J.Value)
-    , "base" .= info
-    ]
-
-instance J.FromJSON WBO2MaxSATInfo where
-  parseJSON = withTypedObject "WBO2MaxSATInfo" $ \obj ->
-    WBO2MaxSATInfo <$> (obj .: "base")
+type WBO2MaxSATInfo = PBTseitinInfo
 
 wbo2maxsat :: PBFile.SoftFormula -> (CNF.WCNF, WBO2MaxSATInfo)
 wbo2maxsat = wbo2maxsatWith def
@@ -927,6 +895,6 @@ wbo2maxsatWith strategy formula = runST $ do
              , CNF.wcnfClauses = F.toList cs
              }
   defs <- Tseitin.getDefinitions tseitin
-  return (wcnf, WBO2MaxSATInfo (TseitinInfo (PBFile.wboNumVars formula) (CNF.cnfNumVars cnf) defs))
+  return (wcnf, PBTseitinInfo (TseitinInfo (PBFile.wboNumVars formula) (CNF.cnfNumVars cnf) defs))
 
 -- -----------------------------------------------------------------------------
