@@ -964,11 +964,24 @@ arbitraryBoundedIP = do
       , MIP.constrIsLazy = isLazy
       }
 
+  sos <-
+    if length vs_bin == 0 then
+      pure []
+    else do
+      n <- choose (0, 1)
+      replicateM n $ do
+        t <- elements [MIP.S1, MIP.S2]
+        m <- choose (0, length vs_bin `div` 2)
+        xs <- liftM (take m) $ shuffle vs_bin
+        ns <- shuffle (map fromIntegral [0 .. length xs - 1])
+        pure (MIP.SOSConstraint{ MIP.sosLabel = Nothing, MIP.sosType = t, MIP.sosBody = zip xs ns })
+
   return $ MIP.def
     { MIP.objectiveFunction = MIP.def{ MIP.objDir = dir, MIP.objExpr = obj }
     , MIP.varType = fmap (\_ -> MIP.IntegerVariable) bs
     , MIP.varBounds = bs
     , MIP.constraints = cs
+    , MIP.sosConstraints = sos
     }
 
 arbitraryMIPExpr :: [MIP.Var] -> Gen (MIP.Expr Rational)
