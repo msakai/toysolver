@@ -34,11 +34,11 @@ module ToySolver.Converter.PB
 
   -- * Converting inequality constraints into equality constraints
   , inequalitiesToEqualitiesPB
-  , PBInequalitiesToEqualitiesInfo
+  , PBInequalitiesToEqualitiesInfo (..)
 
   -- * Converting constraints into penalty terms in objective function
   , unconstrainPB
-  , PBUnconstrainInfo
+  , PBUnconstrainInfo (..)
 
   -- * PB↔WBO conversion
   , pb2wbo
@@ -56,7 +56,7 @@ module ToySolver.Converter.PB
 
   -- * MaxSAT↔WBO conversion
   , maxsat2wbo
-  , MaxSAT2WBOInfo (..)
+  , MaxSAT2WBOInfo
   , wbo2maxsat
   , wbo2maxsatWith
   , WBO2MaxSATInfo
@@ -66,6 +66,7 @@ module ToySolver.Converter.PB
   , PB2QUBOInfo'
 
   -- * General data types
+  , PBIdentityInfo (..)
   , PBTseitinInfo (..)
   ) where
 
@@ -139,6 +140,39 @@ normalizePBConstraint (lhs,op,rhs) =
     h s t = (s,t)
 
 -- -----------------------------------------------------------------------------
+
+data PBIdentityInfo = PBIdentityInfo
+  deriving (Show, Eq)
+
+instance Transformer PBIdentityInfo where
+  type Source PBIdentityInfo = SAT.Model
+  type Target PBIdentityInfo = SAT.Model
+
+instance ForwardTransformer PBIdentityInfo where
+  transformForward _ = id
+
+instance BackwardTransformer PBIdentityInfo where
+  transformBackward _ = id
+
+instance ObjValueTransformer PBIdentityInfo where
+  type SourceObjValue PBIdentityInfo = Integer
+  type TargetObjValue PBIdentityInfo = Integer
+
+instance ObjValueForwardTransformer PBIdentityInfo where
+  transformObjValueForward _ = id
+
+instance ObjValueBackwardTransformer PBIdentityInfo where
+  transformObjValueBackward _ = id
+
+instance J.ToJSON PBIdentityInfo where
+  toJSON PBIdentityInfo =
+    J.object
+    [ "type" .= ("PBIdentityInfo" :: J.Value)
+    ]
+
+instance J.FromJSON PBIdentityInfo where
+  parseJSON = withTypedObject "PBIdentityInfo" $ \_ -> pure PBIdentityInfo
+
 
 newtype PBTseitinInfo = PBTseitinInfo TseitinInfo
   deriving (Eq, Show)
@@ -790,37 +824,7 @@ pb2satWith strategy formula = runST $ do
 
 -- -----------------------------------------------------------------------------
 
-data MaxSAT2WBOInfo = MaxSAT2WBOInfo
-  deriving (Show, Eq)
-
-instance Transformer MaxSAT2WBOInfo where
-  type Source MaxSAT2WBOInfo = SAT.Model
-  type Target MaxSAT2WBOInfo = SAT.Model
-
-instance ForwardTransformer MaxSAT2WBOInfo where
-  transformForward _ = id
-
-instance BackwardTransformer MaxSAT2WBOInfo where
-  transformBackward _ = id
-
-instance ObjValueTransformer MaxSAT2WBOInfo where
-  type SourceObjValue MaxSAT2WBOInfo = Integer
-  type TargetObjValue MaxSAT2WBOInfo = Integer
-
-instance ObjValueForwardTransformer MaxSAT2WBOInfo where
-  transformObjValueForward _ = id
-
-instance ObjValueBackwardTransformer MaxSAT2WBOInfo where
-  transformObjValueBackward _ = id
-
-instance J.ToJSON MaxSAT2WBOInfo where
-  toJSON MaxSAT2WBOInfo =
-    J.object
-    [ "type" .= ("MaxSAT2WBOInfo" :: J.Value)
-    ]
-
-instance J.FromJSON MaxSAT2WBOInfo where
-  parseJSON = withTypedObject "MaxSAT2WBOInfo" $ \_ -> pure MaxSAT2WBOInfo
+type MaxSAT2WBOInfo = PBIdentityInfo
 
 maxsat2wbo :: CNF.WCNF -> (PBFile.SoftFormula, MaxSAT2WBOInfo)
 maxsat2wbo
@@ -836,7 +840,7 @@ maxsat2wbo
     , PBFile.wboNumVars = nv
     , PBFile.wboNumConstraints = nc
     }
-  , MaxSAT2WBOInfo
+  , PBIdentityInfo
   )
   where
     f (w,c)
