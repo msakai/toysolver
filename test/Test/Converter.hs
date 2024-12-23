@@ -910,6 +910,22 @@ prop_mip2pb_backward =
             ===
             evalMIP (transformBackward info m) ip
 
+prop_mip2pb_backward' :: Property
+prop_mip2pb_backward' =
+  forAll arbitraryBoundedIP $ \ip ->
+    case mip2pb ip of
+      Left err -> counterexample err $ property False
+      Right ret@(pb, info) ->
+        counterexample (show ret) $
+          QM.monadicIO $ do
+            solver <- arbitrarySolver
+            method <- QM.pick arbitrary
+            ret <- QM.run $ optimizePBFormula solver method pb
+            case ret of
+              Nothing -> return ()
+              Just (m, val) -> do
+                QM.assert $ Just (transformObjValueBackward info val) == evalMIP (transformBackward info m) ip
+
 prop_mip2pb_json :: Property
 prop_mip2pb_json =
   forAll arbitraryBoundedIP $ \ip ->
@@ -930,8 +946,8 @@ arbitraryBoundedIP = do
       pure (v, (MIP.Finite 0, MIP.Finite 1))
     else do
       lb <- arbitrary
-      Positive w <- arbitrary
-      let ub = lb + 1 + w
+      NonNegative w <- arbitrary
+      let ub = fromInteger (ceiling lb) + w
       return (v, (MIP.Finite lb, MIP.Finite ub))
   let vs = Map.keys bs
       vs_bin = [v | (v, (MIP.Finite 0, MIP.Finite 1)) <- Map.toList bs]
@@ -939,7 +955,7 @@ arbitraryBoundedIP = do
   dir <- elements [MIP.OptMin, MIP.OptMax]
   obj <- arbitraryMIPExpr vs
 
-  nc <- choose (0,10)
+  nc <- choose (0,5)
   cs <- replicateM nc $ do
     ind <-
       if null vs_bin then
@@ -954,7 +970,7 @@ arbitraryBoundedIP = do
           pure $ Just (v, rhs)
     e <- arbitraryMIPExpr vs
     lb <- oneof [pure MIP.NegInf, MIP.Finite <$> arbitrary, pure MIP.PosInf]
-    ub <- oneof [pure MIP.NegInf, MIP.Finite <$> arbitrary, pure MIP.PosInf]
+    ub <- oneof $ [pure MIP.NegInf, MIP.Finite <$> arbitrary, pure MIP.PosInf] ++ [pure lb | case lb of{ MIP.Finite _ -> True; _ -> False }]
     isLazy <- arbitrary
     return $ MIP.def
       { MIP.constrIndicator = ind
@@ -993,7 +1009,7 @@ arbitraryMIPExpr vs = do
       if nv==0
       then return []
       else do
-        m <- choose (0,nv)
+        m <- choose (0,2)
         replicateM m (elements vs)
     c <- arbitrary
     return $ MIP.Term c ls
