@@ -2,6 +2,7 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -21,6 +22,7 @@ module ToySolver.Converter.MIP2PB
   ) where
 
 import Control.Monad
+import Control.Monad.Primitive
 import Control.Monad.ST
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
@@ -32,6 +34,7 @@ import Data.List (intercalate, foldl', sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Ord
+import Data.Primitive.MutVar
 import Data.Ratio
 import qualified Data.Set as Set
 import Data.String
@@ -61,7 +64,7 @@ mip2pb mip = runST $ runExceptT $ m
       formula <- lift $ getPBFormula db
       return $ (formula{ PBFile.pbObjectiveFunction = Just obj }, info)
 
-data MIP2PBInfo = MIP2PBInfo (Map MIP.Var Integer.Expr) !Integer
+data MIP2PBInfo = MIP2PBInfo (Map MIP.Var Integer.Expr) (Map MIP.Var SAT.Lit) !Integer
   deriving (Eq, Show)
 
 instance Transformer MIP2PBInfo where
@@ -69,15 +72,19 @@ instance Transformer MIP2PBInfo where
   type Target MIP2PBInfo = SAT.Model
 
 instance ForwardTransformer MIP2PBInfo where
-  transformForward (MIP2PBInfo vmap _d) sol
+  transformForward (MIP2PBInfo vmap nonZeroTable _d) sol
     | Map.keysSet vmap /= Map.keysSet sol = error "variables mismatch"
-    | IntSet.null xs = array (1,0) []
-    | otherwise = array (1, x_max) [(x, val) | (var, Integer.Expr s) <- Map.toList vmap, (x, val) <- f s (sol Map.! var)]
+    | otherwise = array (1, x_max) $
+        [(x, val) | (var, Integer.Expr s) <- Map.toList vmap, (x, val) <- f s (sol Map.! var)] ++
+        [(y, (sol Map.! var) /= 0) | (var, y) <- Map.toList nonZeroTable]
     where
-      xs = IntSet.unions [IntSet.fromList (map SAT.litVar lits) | Integer.Expr s <- Map.elems vmap, (_, lits) <- s]
-
       x_max :: SAT.Var
       x_max = IntSet.findMax xs
+        where
+          xs = IntSet.unions $
+               [IntSet.fromList (map SAT.litVar lits) | Integer.Expr s <- Map.elems vmap, (_, lits) <- s] ++
+               [IntSet.fromList (map SAT.litVar (Map.elems nonZeroTable))] ++
+               [IntSet.singleton 0]
 
       f :: SAT.PBSum -> Rational -> [(SAT.Var, Bool)]
       f s val
@@ -104,44 +111,52 @@ instance ForwardTransformer MIP2PBInfo where
             | otherwise = (l, False) : g v ys
 
 instance BackwardTransformer MIP2PBInfo where
-  transformBackward (MIP2PBInfo vmap _d) m = fmap (toRational . Integer.eval m) vmap
+  transformBackward (MIP2PBInfo vmap _nonZeroTable _d) m = fmap (toRational . Integer.eval m) vmap
 
 instance ObjValueTransformer MIP2PBInfo where
   type SourceObjValue MIP2PBInfo = Rational
   type TargetObjValue MIP2PBInfo = Integer
 
 instance ObjValueForwardTransformer MIP2PBInfo where
-  transformObjValueForward (MIP2PBInfo _vmap d) val = asInteger (val * fromIntegral d)
+  transformObjValueForward (MIP2PBInfo _vmap _nonZeroTable d) val = asInteger (val * fromIntegral d)
 
 instance ObjValueBackwardTransformer MIP2PBInfo where
-  transformObjValueBackward (MIP2PBInfo _vmap d) val = fromIntegral val / fromIntegral d
+  transformObjValueBackward (MIP2PBInfo _vmap _nonZeroTable d) val = fromIntegral val / fromIntegral d
 
 instance J.ToJSON MIP2PBInfo where
-  toJSON (MIP2PBInfo vmap d) =
+  toJSON (MIP2PBInfo vmap nonZeroTable d) =
     J.object
     [ "type" .= ("MIP2PBInfo" :: J.Value)
     , "substitutions" .= J.object
         [ fromString (MIP.fromVar v) .= jPBSum s
         | (v, Integer.Expr s) <- Map.toList vmap
         ]
+    , "nonzero_indicators" .= J.object
+        [ fromString (MIP.fromVar v) .= (jLitName lit :: J.Value)
+        | (v, lit) <- Map.toList nonZeroTable
+        ]
     , "objective_function_scale_factor" .= d
     ]
 
 instance J.FromJSON MIP2PBInfo where
   parseJSON = withTypedObject "MIP2PBInfo" $ \obj -> do
-    tmp <- obj .: "substitutions"
-    subst <- liftM Map.fromList $ forM (Map.toList tmp) $ \(name, expr) -> do
+    tmp1 <- obj .: "substitutions"
+    subst <- liftM Map.fromList $ forM (Map.toList tmp1) $ \(name, expr) -> do
       s <- parsePBSum expr
       return (MIP.toVar name, Integer.Expr s)
+    tmp2 <- obj .: "nonzero_indicators"
+    nonZeroTable <- liftM Map.fromList $ forM (Map.toList tmp2) $ \(name, s) -> do
+      lit <- parseLitName s
+      return (MIP.toVar name, lit)
     d <- obj .: "objective_function_scale_factor"
-    pure $ MIP2PBInfo subst d
+    pure $ MIP2PBInfo subst nonZeroTable d
 
 -- -----------------------------------------------------------------------------
 
-addMIP :: SAT.AddPBNL m enc => enc -> MIP.Problem Rational -> m (Either String (Integer.Expr, MIP2PBInfo))
+addMIP :: (SAT.AddPBNL m enc, PrimMonad m) => enc -> MIP.Problem Rational -> m (Either String (Integer.Expr, MIP2PBInfo))
 addMIP enc mip = runExceptT $ addMIP' enc mip
 
-addMIP' :: SAT.AddPBNL m enc => enc -> MIP.Problem Rational -> ExceptT String m (Integer.Expr, MIP2PBInfo)
+addMIP' :: forall m enc. (SAT.AddPBNL m enc, PrimMonad m) => enc -> MIP.Problem Rational -> ExceptT String m (Integer.Expr, MIP2PBInfo)
 addMIP' enc mip = do
   if not (Set.null nivs) then do
     throwE $ "cannot handle non-integer variables: " ++ intercalate ", " (map MIP.fromVar (Set.toList nivs))
@@ -192,20 +207,46 @@ addMIP' enc mip = do
             MIP.Finite x -> f MIP.Le x
             MIP.PosInf -> return ()
 
+    nonZeroTableRef <- lift $ newMutVar Map.empty
+    let isNonZero :: MIP.Var -> ExceptT String m SAT.Lit
+        isNonZero v = do
+          tbl <- lift $ readMutVar nonZeroTableRef
+          case Map.lookup v tbl of
+            Just lit -> pure lit
+            Nothing -> do
+              let (MIP.Finite lb, MIP.Finite ub) = MIP.getBounds mip v
+                  e@(Integer.Expr s) = vmap Map.! v
+              lit <-
+                if lb == 0 && ub == 1 then do
+                  return (asBin e)
+                else do
+                  v <- lift $ SAT.newVar enc
+                  -- F(v) → F(s ≠ 0)
+                  -- ⇐ s≠0 → v
+                  -- ⇔ ¬v → s=0
+                  lift $ SAT.addPBNLExactlySoft enc (- v) s 0
+                  return v
+              lift $ writeMutVar nonZeroTableRef (Map.insert v lit tbl)
+              pure lit
+
     forM_ (MIP.sosConstraints mip) $ \MIP.SOSConstraint{ MIP.sosType = typ, MIP.sosBody = xs } -> do
       case typ of
-        MIP.S1 -> lift $ SAT.addAtMost enc (map (asBin . (vmap Map.!) . fst) xs) 1
+        MIP.S1 -> do
+          ys <- mapM (isNonZero . fst) xs
+          lift $ SAT.addAtMost enc ys 1
         MIP.S2 -> do
-          let ps = nonAdjacentPairs $ map fst $ sortBy (comparing snd) $ xs
-          forM_ ps $ \(x1,x2) -> do
-            lift $ SAT.addClause enc [SAT.litNot $ asBin $ vmap Map.! v | v <- [x1,x2]]
+          ys <- mapM (isNonZero . fst) $ sortBy (comparing snd) xs
+          forM_ (nonAdjacentPairs ys) $ \(x1,x2) -> do
+            lift $ SAT.addClause enc [SAT.litNot v | v <- [x1,x2]]
 
     let obj = MIP.objectiveFunction mip
         d = foldl' lcm 1 [denominator r | MIP.Term r _ <- MIP.terms (MIP.objExpr obj)] *
             (if MIP.objDir obj == MIP.OptMin then 1 else -1)
         obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms (MIP.objExpr obj)]
 
-    return (obj2, MIP2PBInfo vmap d)
+    nonZeroTable <- readMutVar nonZeroTableRef
+
+    return (obj2, MIP2PBInfo vmap nonZeroTable d)
 
   where
     ivs = MIP.integerVariables mip
