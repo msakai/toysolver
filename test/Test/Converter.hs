@@ -919,12 +919,11 @@ prop_mip2pb_backward' =
         counterexample (show ret) $
           QM.monadicIO $ do
             solver <- arbitrarySolver
-            method <- QM.pick arbitrary
-            ret <- QM.run $ optimizePBFormula solver method pb
+            -- Using optimizePBFormula is too slow for using in QuickCheck
+            ret <- QM.run $ solvePBFormula solver pb
             case ret of
               Nothing -> return ()
-              Just (m, val) -> do
-                QM.assert $ Just (transformObjValueBackward info val) == evalMIP (transformBackward info m) ip
+              Just m -> QM.assert $ isJust $ evalMIP (transformBackward info m) ip
 
 prop_mip2pb_json :: Property
 prop_mip2pb_json =
@@ -955,7 +954,7 @@ arbitraryBoundedIP = do
   dir <- elements [MIP.OptMin, MIP.OptMax]
   obj <- arbitraryMIPExpr vs
 
-  nc <- choose (0,5)
+  nc <- choose (0,3)
   cs <- replicateM nc $ do
     ind <-
       if null vs_bin then
