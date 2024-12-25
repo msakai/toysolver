@@ -269,14 +269,12 @@ Library
      ToySolver.Converter
      ToySolver.Converter.Base
      ToySolver.Converter.GCNF2MaxSAT
-     ToySolver.Converter.ObjType
      ToySolver.Converter.MIP2PB
      ToySolver.Converter.MIP2SMT
      ToySolver.Converter.NAESAT
      ToySolver.Converter.PB
      ToySolver.Converter.PB2IP
      ToySolver.Converter.PB2LSP
-     ToySolver.Converter.PBSetObj
      ToySolver.Converter.PB2SMP
      ToySolver.Converter.QBF2IPC
      ToySolver.Converter.QUBO

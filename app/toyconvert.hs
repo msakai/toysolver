@@ -48,9 +48,7 @@ import qualified Data.PseudoBoolean as PBFile
 import qualified Numeric.Optimization.MIP as MIP
 
 import ToySolver.Converter
-import ToySolver.Converter.ObjType
 import qualified ToySolver.Converter.MIP2SMT as MIP2SMT
-import qualified ToySolver.Converter.PBSetObj as PBSetObj
 import qualified ToySolver.FileFormat as FF
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.QUBO as QUBO
@@ -333,7 +331,7 @@ transformProblem o = transformObj o . transformPBLinearization o . transformMIPR
 transformObj :: Options -> Problem -> Problem
 transformObj o problem =
   case problem of
-    ProbOPB opb info | isNothing (PBFile.pbObjectiveFunction opb) -> ProbOPB (PBSetObj.setObj (optObjType o) opb) info
+    ProbOPB opb info | isNothing (PBFile.pbObjectiveFunction opb) -> ProbOPB (setObj (optObjType o) opb) info
     _ -> problem
 
 transformPBLinearization :: Options -> Problem -> Problem

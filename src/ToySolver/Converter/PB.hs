@@ -6,7 +6,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB
--- Copyright   :  (c) Masahiro Sakai 2013,2016-2018
+-- Copyright   :  (c) Masahiro Sakai 2011-2013,2016-2018
 -- License     :  BSD-style
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -21,6 +21,10 @@ module ToySolver.Converter.PB
   -- * Normalization of PB/WBO problems
   , normalizePB
   , normalizeWBO
+
+  -- * Modify objective function
+  , ObjType (..)
+  , setObj
 
   -- * Linealization of PB/WBO problems
   , linearizePB
@@ -138,6 +142,23 @@ normalizePBConstraint (lhs,op,rhs) =
   where
     h s (w,[x]) | x < 0 = (s+w, (-w,[-x]))
     h s t = (s,t)
+
+-- -----------------------------------------------------------------------------
+
+data ObjType = ObjNone | ObjMaxOne | ObjMaxZero
+  deriving (Eq, Ord, Enum, Bounded, Show)
+
+setObj :: ObjType -> PBFile.Formula -> PBFile.Formula
+setObj objType formula = formula{ PBFile.pbObjectiveFunction = Just obj2 }
+  where
+    obj2 = genObj objType formula
+
+genObj :: ObjType -> PBFile.Formula -> PBFile.Sum
+genObj objType formula =
+  case objType of
+    ObjNone    -> []
+    ObjMaxOne  -> [(1,[-v]) | v <- [1 .. PBFile.pbNumVars formula]] -- minimize false literals
+    ObjMaxZero -> [(1,[ v]) | v <- [1 .. PBFile.pbNumVars formula]] -- minimize true literals
 
 -- -----------------------------------------------------------------------------
 
