@@ -109,6 +109,10 @@ module ToySolver.SAT.Types
   , AddPBLin (..)
   , AddPBNL (..)
   , AddXORClause (..)
+
+  -- * Type-2 SOS constraints
+  , addSOS2
+  , evalSOS2
   ) where
 
 import Control.Monad
@@ -751,3 +755,25 @@ class AddClause m a => AddXORClause m a | a -> m where
     reified <- newVar a
     addXORClause a (litNot reified : lits) rhs
     addClause a [litNot sel, reified] -- sel ⇒ reified
+
+-- | Add a type-2 SOS constraint
+--
+-- At most two adjacnt literals can be true.
+addSOS2 :: AddClause m a => a -> [Lit] -> m ()
+addSOS2 a xs =
+  forM_ (nonAdjacentPairs xs) $ \(x1,x2) -> do
+    addClause a [litNot v | v <- [x1,x2]]
+  where
+    nonAdjacentPairs :: [a] -> [(a,a)]
+    nonAdjacentPairs (x1:x2:xs) = [(x1,x3) | x3 <- xs] ++ nonAdjacentPairs (x2:xs)
+    nonAdjacentPairs _ = []
+
+-- | Evaluate type-2 SOS constraint
+evalSOS2 :: IModel m => m -> [Lit] -> Bool
+evalSOS2 m = f
+  where
+    f [] = True
+    f [_] = True
+    f (l1 : l2 : ls)
+      | evalLit m l1 = all (not . evalLit m) ls
+      | otherwise = f (l2 : ls)

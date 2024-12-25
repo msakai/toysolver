@@ -81,6 +81,9 @@ module ToySolver.SAT.Solver.CDCL
   , AddXORClause (..)
   , XORClause
   , evalXORClause
+  -- ** Type-2 SOS constraints
+  , addSOS2
+  , evalSOS2
   -- ** Theory
   , setTheory
 

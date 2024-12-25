@@ -236,8 +236,7 @@ addMIP' enc mip = do
           lift $ SAT.addAtMost enc ys 1
         MIP.S2 -> do
           ys <- mapM (isNonZero . fst) $ sortBy (comparing snd) xs
-          forM_ (nonAdjacentPairs ys) $ \(x1,x2) -> do
-            lift $ SAT.addClause enc [SAT.litNot v | v <- [x1,x2]]
+          lift $ SAT.addSOS2 enc ys
 
     let obj = MIP.objectiveFunction mip
         d = foldl' lcm 1 [denominator r | MIP.Term r _ <- MIP.terms (MIP.objExpr obj)] *
@@ -251,10 +250,6 @@ addMIP' enc mip = do
   where
     ivs = MIP.integerVariables mip
     nivs = MIP.variables mip `Set.difference` ivs
-
-    nonAdjacentPairs :: [a] -> [(a,a)]
-    nonAdjacentPairs (x1:x2:xs) = [(x1,x3) | x3 <- xs] ++ nonAdjacentPairs (x2:xs)
-    nonAdjacentPairs _ = []
 
     asBin :: Integer.Expr -> SAT.Lit
     asBin (Integer.Expr [(1,[lit])]) = lit
