@@ -42,6 +42,9 @@ arbitraryAssignment nv = do
   bs <- replicateM nv arbitrary
   return $ array (1,nv) (zip [1..] bs)
 
+arbitraryLit :: Int -> Gen SAT.Lit
+arbitraryLit nv = choose (-nv, nv) `suchThat` (/= 0)
+
 -- ---------------------------------------------------------------------
 
 arbitraryCNF :: Gen CNF.CNF
@@ -53,7 +56,7 @@ arbitraryCNF = do
     if nv == 0 then
       return $ SAT.packClause []
     else
-      SAT.packClause <$> (replicateM len $ choose (-nv, nv) `suchThat` (/= 0))
+      SAT.packClause <$> replicateM len (arbitraryLit nv)
   return $
     CNF.CNF
     { CNF.cnfNumVars = nv
@@ -83,7 +86,7 @@ arbitraryGCNF = do
         return $ SAT.packClause []
       else do
         len <- choose (0,10)
-        SAT.packClause <$> (replicateM len $ choose (-nv, nv) `suchThat` (/= 0))
+        SAT.packClause <$> replicateM len (arbitraryLit nv)
     return (g,c)
   return $
     CNF.GCNF
@@ -105,7 +108,7 @@ arbitraryWCNF = do
         return $ SAT.packClause []
       else do
         len <- choose (0,10)
-        SAT.packClause <$> (replicateM len $ choose (-nv, nv) `suchThat` (/= 0))
+        SAT.packClause <$> replicateM len (arbitraryLit nv)
     return (fmap getPositive w, c)
   let topCost = sum [w | (Just w, _) <- cs] + 1
   return $
@@ -153,7 +156,7 @@ arbitraryQDimacs = do
       return $ SAT.packClause []
     else do
       len <- choose (0,10)
-      SAT.packClause <$> (replicateM len $ choose (-nv, nv) `suchThat` (/= 0))
+      SAT.packClause <$> replicateM len (arbitraryLit nv)
   return $
     CNF.QDimacs
     { CNF.qdimacsNumVars = nv
@@ -211,7 +214,7 @@ arbitraryPBLinSum nv = do
     return []
   else
     replicateM len $ do
-      l <- choose (-nv, nv) `suchThat` (/= 0)
+      l <- arbitraryLit nv
       c <- arbitrary
       return (c,l)
 
@@ -259,7 +262,7 @@ arbitraryPBNLC = do
         return []
       else
         replicateM len $ do
-          ls <- listOf $ choose (-nv, nv) `suchThat` (/= 0)
+          ls <- listOf (arbitraryLit nv)
           c <- arbitrary
           return (c,ls)
     rhs <- arbitrary
@@ -280,7 +283,7 @@ arbitraryXOR = do
       if nv == 0 then
         return []
       else
-        replicateM len $ choose (-nv, nv) `suchThat` (/= 0)
+        replicateM len $ arbitraryLit nv
     rhs <- arbitrary
     return (lhs,rhs)
   return (nv, cs)
@@ -304,7 +307,7 @@ arbitraryMaxSAT2 = do
     c <- if nv == 0 then
            return $ SAT.packClause []
          else
-           SAT.packClause <$> (replicateM len $ choose (-nv, nv) `suchThat` (/= 0))
+           SAT.packClause <$> replicateM len (arbitraryLit nv)
     return (1,c)
   th <- choose (0,nc)
   return $
