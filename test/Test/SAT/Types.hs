@@ -237,7 +237,7 @@ prop_normalizeXORClause = forAll g $ \(nv, c) ->
     g = do
       nv <- choose (0, 10)
       len <- choose (0, nv)
-      lhs <- replicateM len $ choose (-nv, nv) `suchThat` (/= 0)
+      lhs <- replicateM len $ arbitraryLit nv
       rhs <- arbitrary
       return (nv, (lhs,rhs))
 

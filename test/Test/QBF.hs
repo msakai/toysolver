@@ -18,6 +18,8 @@ import ToySolver.Data.Boolean
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import qualified ToySolver.QBF as QBF
 
+import Test.SAT.Utils (arbitraryLit)
+
 -- -------------------------------------------------------------------
 
 prop_solveCEGAR :: Property
@@ -136,7 +138,7 @@ arbitrarySmallQBF' = do
     if nv == 0 then
       return []
     else
-      replicateM len $ choose (-nv, nv) `suchThat` (/= 0)
+      replicateM len $ arbitraryLit nv
 
   return
     ( nv

@@ -657,6 +657,33 @@ case_clearLearnCallback = do
   assertBool "learn callback should not have been called" (null learnt)
 
 ------------------------------------------------------------------------
+
+prop_SOS2 :: Property
+prop_SOS2 = QM.monadicIO $ do
+  cnf <- QM.pick arbitraryCNF
+  sos2 <- QM.pick $ do
+    n <- choose (0, CNF.cnfNumVars cnf)
+    replicateM n (arbitraryLit (CNF.cnfNumVars cnf))
+
+  solver <- arbitrarySolver
+  ret <- QM.run $ do
+    SAT.newVars_ solver (CNF.cnfNumVars cnf)
+    forM_ (CNF.cnfClauses cnf) $ \c -> SAT.addClause solver (SAT.unpackClause c)
+    SAT.addSOS2 solver sos2
+    ret <- SAT.solve solver
+    if ret then do
+      m <- SAT.getModel solver
+      return (Just m)
+    else do
+      return Nothing
+
+  case ret of
+    Just m -> QM.assert $ evalCNF m cnf && SAT.evalSOS2 m sos2
+    Nothing -> do
+      forM_ (allAssignments (CNF.cnfNumVars cnf)) $ \m -> do
+        QM.assert $ not (evalCNF m cnf && SAT.evalSOS2 m sos2)
+
+------------------------------------------------------------------------
 -- Test harness
 
 satTestGroup :: TestTree

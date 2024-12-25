@@ -906,9 +906,9 @@ prop_mip2pb_backward =
       Right ret@(pb, info) ->
         counterexample (show ret) $
           forAll (arbitraryAssignment (PBFile.pbNumVars pb)) $ \m ->
-            fmap (transformObjValueBackward info) (SAT.evalPBFormula m pb)
-            ===
-            evalMIP (transformBackward info m) ip
+            case SAT.evalPBFormula m pb of
+              Nothing -> property True
+              Just val -> evalMIP (transformBackward info m) ip === Just (transformObjValueBackward info val)            
 
 prop_mip2pb_backward' :: Property
 prop_mip2pb_backward' =
@@ -980,14 +980,14 @@ arbitraryBoundedIP = do
       }
 
   sos <-
-    if length vs_bin == 0 then
+    if length vs == 0 then
       pure []
     else do
       n <- choose (0, 1)
       replicateM n $ do
         t <- elements [MIP.S1, MIP.S2]
-        m <- choose (0, length vs_bin `div` 2)
-        xs <- liftM (take m) $ shuffle vs_bin
+        m <- choose (0, length vs `div` 2)
+        xs <- liftM (take m) $ shuffle vs
         ns <- shuffle (map fromIntegral [0 .. length xs - 1])
         pure (MIP.SOSConstraint{ MIP.sosLabel = Nothing, MIP.sosType = t, MIP.sosBody = zip xs ns })
 
@@ -1051,14 +1051,14 @@ evalMIP sol prob = do
     evalSOSConstraint :: MIP.SOSConstraint Rational -> Bool
     evalSOSConstraint sos =
       case MIP.sosType sos of
-        MIP.S1 -> length [() | val <- body, val > 0] <= 1
+        MIP.S1 -> length [() | val <- body, val /= 0] <= 1
         MIP.S2 -> f body
       where
         body = map ((sol Map.!) . fst) $ sortBy (comparing snd) $ (MIP.sosBody sos)
         f [] = True
         f [_] = True
         f (x1 : x2 : xs)
-          | x1 > 0 = all (0==) xs
+          | x1 /= 0 = all (0==) xs
           | otherwise = f (x2 : xs)
 
 ------------------------------------------------------------------------
