@@ -274,8 +274,6 @@ Library
      ToySolver.Converter.NAESAT
      ToySolver.Converter.PB
      ToySolver.Converter.PB2IP
-     ToySolver.Converter.PB2LSP
-     ToySolver.Converter.PB2SMP
      ToySolver.Converter.QBF2IPC
      ToySolver.Converter.QUBO
      ToySolver.Converter.SAT2MIS
