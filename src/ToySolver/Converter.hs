@@ -16,7 +16,7 @@ module ToySolver.Converter
   , module ToySolver.Converter.MIP2PB
   , module ToySolver.Converter.NAESAT
   , module ToySolver.Converter.PB
-  , module ToySolver.Converter.PB2IP
+  , module ToySolver.Converter.MIP
   , module ToySolver.Converter.QBF2IPC
   , module ToySolver.Converter.QUBO
   , module ToySolver.Converter.SAT2KSAT
@@ -31,7 +31,7 @@ import ToySolver.Converter.GCNF2MaxSAT
 import ToySolver.Converter.MIP2PB
 import ToySolver.Converter.NAESAT
 import ToySolver.Converter.PB
-import ToySolver.Converter.PB2IP
+import ToySolver.Converter.MIP
 import ToySolver.Converter.QBF2IPC
 import ToySolver.Converter.QUBO
 import ToySolver.Converter.SAT2KSAT

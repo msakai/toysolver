@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ToySolver.Converter.PB2IP
+-- Module      :  ToySolver.Converter.MIP
 -- Copyright   :  (c) Masahiro Sakai 2011-2015
 -- License     :  BSD-style
 --
@@ -13,7 +13,7 @@
 -- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
-module ToySolver.Converter.PB2IP
+module ToySolver.Converter.MIP
   ( pb2ip
   , PB2IPInfo
   , wbo2ip
