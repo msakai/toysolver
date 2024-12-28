@@ -68,7 +68,6 @@ import Control.Monad
 import Control.Monad.ST
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
-import Data.Hashable
 import qualified Data.HashTable.Class as H
 import qualified Data.HashTable.ST.Cuckoo as C
 import Data.IntMap.Strict (IntMap)
