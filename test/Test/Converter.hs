@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.Converter (converterTestGroup) where
@@ -824,15 +825,10 @@ prop_pb2ip_backward =
   forAll arbitraryPBFormula $ \pb ->
     let ret@(mip, info) = pb2ip pb
      in counterexample (show ret) $
-        forAll (arbitraryAssignments mip) $ \sol ->
+        forAll (arbitraryAssignmentBinaryIP mip) $ \sol ->
           SAT.evalPBFormula (transformBackward info sol) pb
           ===
           fmap (transformObjValueBackward info) (evalMIP sol (fmap fromIntegral mip))
-  where
-    arbitraryAssignments mip = liftM Map.fromList $ do
-      forM (Map.keys (MIP.varType mip)) $ \v -> do
-        val <- choose (0, 1)
-        pure (v, fromInteger val)
 
 prop_pb2ip_json :: Property
 prop_pb2ip_json =
@@ -859,18 +855,13 @@ prop_wbo2ip_backward =
   forAll arbitrary $ \b ->
     let ret@(mip, info) = wbo2ip b wbo
      in counterexample (show ret) $
-        forAll (arbitraryAssignments mip) $ \sol ->
+        forAll (arbitraryAssignmentBinaryIP mip) $ \sol ->
           case evalMIP sol (fmap fromIntegral mip) of
             Nothing -> True
             Just val2 ->
               case SAT.evalPBSoftFormula (transformBackward info sol) wbo of
                 Nothing -> False
                 Just val1 -> val1 <= transformObjValueBackward info val2
-  where
-    arbitraryAssignments mip = liftM Map.fromList $ do
-      forM (Map.keys (MIP.varType mip)) $ \v -> do
-        val <- choose (0, 1)
-        pure (v, fromInteger val)
 
 prop_wbo2ip_json :: Property
 prop_wbo2ip_json =
@@ -888,15 +879,10 @@ prop_mip2pb_forward =
       Left err -> counterexample err $ property False
       Right ret@(pb, info) ->
         counterexample (show ret) $
-          forAll (arbitraryAssignment ip) $ \sol ->
+          forAll (arbitraryAssignmentBoundedIP ip) $ \sol ->
             fmap (transformObjValueForward info) (evalMIP sol ip)
             ===
             SAT.evalPBFormula (transformForward info sol) pb
-  where
-    arbitraryAssignment mip = liftM Map.fromList $ do
-      forM (Map.toList (MIP.varBounds mip)) $ \(v, (MIP.Finite lb, MIP.Finite ub))  -> do
-        val <- choose (ceiling lb, floor ub)
-        pure (v, fromInteger val)
 
 prop_mip2pb_backward :: Property
 prop_mip2pb_backward =
@@ -920,8 +906,8 @@ prop_mip2pb_backward' =
           QM.monadicIO $ do
             solver <- arbitrarySolver
             -- Using optimizePBFormula is too slow for using in QuickCheck
-            ret <- QM.run $ solvePBFormula solver pb
-            case ret of
+            ret2 <- QM.run $ solvePBFormula solver pb
+            case ret2 of
               Nothing -> return ()
               Just m -> QM.assert $ isJust $ evalMIP (transformBackward info m) ip
 
@@ -1012,6 +998,20 @@ arbitraryMIPExpr vs = do
         replicateM m (elements vs)
     c <- arbitrary
     return $ MIP.Term c ls
+
+arbitraryAssignmentBinaryIP :: MIP.Problem a -> Gen (Map MIP.Var Rational)
+arbitraryAssignmentBinaryIP mip = liftM Map.fromList $ do
+  forM (Map.keys (MIP.varType mip)) $ \v -> do
+    val <- choose (0, 1)
+    pure (v, fromInteger val)
+
+arbitraryAssignmentBoundedIP :: RealFrac a => MIP.Problem a -> Gen (Map MIP.Var Rational)
+arbitraryAssignmentBoundedIP mip = liftM Map.fromList $ do
+  forM (Map.toList (MIP.varBounds mip)) $ \case
+    (v, (MIP.Finite lb, MIP.Finite ub))  -> do
+      val <- choose (ceiling lb, floor ub)
+      pure (v, fromInteger val)
+    _ -> error "should not happen"
 
 evalMIP :: Map MIP.Var Rational -> MIP.Problem Rational -> Maybe Rational
 evalMIP sol prob = do
