@@ -13,7 +13,6 @@
 module ToySolver.Converter
   ( module ToySolver.Converter.Base
   , module ToySolver.Converter.GCNF2MaxSAT
-  , module ToySolver.Converter.MIP2PB
   , module ToySolver.Converter.NAESAT
   , module ToySolver.Converter.PB
   , module ToySolver.Converter.MIP
@@ -28,7 +27,6 @@ module ToySolver.Converter
 
 import ToySolver.Converter.Base
 import ToySolver.Converter.GCNF2MaxSAT
-import ToySolver.Converter.MIP2PB
 import ToySolver.Converter.NAESAT
 import ToySolver.Converter.PB
 import ToySolver.Converter.MIP
