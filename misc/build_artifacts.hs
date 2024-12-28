@@ -6,6 +6,9 @@
 import Turtle
 import qualified Control.Foldl as L
 import Control.Monad
+#if MIN_VERSION_turtle(1,6,0)
+import qualified Data.Text as T
+#endif
 import Distribution.Package
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parsec
@@ -58,12 +61,20 @@ main = sh $ do
   when b $ rmtree pkg
 
   mktree (pkg </> "bin")
+#if MIN_VERSION_turtle(1,6,0)
+  let binDir = T.unpack (lineToText local_install_root) </> "bin"
+#else
   let binDir = fromText (lineToText local_install_root) </> "bin"
+#endif
   forM exe_files $ \name -> do
     cp (binDir </> addExeSuffix name) (pkg </> "bin" </> addExeSuffix name)
 
   mktree (pkg </> "lib")
+#if MIN_VERSION_turtle(1,6,0)
+  let libDir = T.unpack (lineToText local_install_root) </> "lib"
+#else
   let libDir = fromText (lineToText local_install_root) </> "lib"
+#endif
   when (Info.os == "mingw32") $ do
     cp (libDir </> "toysat-ipasir.dll") (pkg </> "bin" </> "toysat-ipasir.dll")
     proc "stack"
