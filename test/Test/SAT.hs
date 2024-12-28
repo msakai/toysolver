@@ -148,8 +148,8 @@ case_incremental_solving = do
   ret @?= True
 
   SAT.addClause solver [-x1, x2]  -- not x1 or x2
-  ret <- SAT.solve solver -- unsat
-  ret @?= False
+  ret2 <- SAT.solve solver -- unsat
+  ret2 @?= False
 
 -- 制約なし
 case_empty_constraint :: Assertion
@@ -209,8 +209,8 @@ case_instantiateAtLeast = do
   ret @?= True
 
   SAT.addAtLeast solver [-x1,-x2,-x3,-x4] 2
-  ret <- SAT.solve solver
-  ret @?= True
+  ret2 <- SAT.solve solver
+  ret2 @?= True
 
 case_inconsistent_AtLeast :: Assertion
 case_inconsistent_AtLeast = do
@@ -223,19 +223,20 @@ case_inconsistent_AtLeast = do
 
 case_trivial_AtLeast :: Assertion
 case_trivial_AtLeast = do
-  solver <- SAT.newSolver
-  x1 <- SAT.newVar solver
-  x2 <- SAT.newVar solver
-  SAT.addAtLeast solver [x1,x2] 0
-  ret <- SAT.solve solver
-  ret @?= True
-
-  solver <- SAT.newSolver
-  x1 <- SAT.newVar solver
-  x2 <- SAT.newVar solver
-  SAT.addAtLeast solver [x1,x2] (-1)
-  ret <- SAT.solve solver
-  ret @?= True
+  do
+    solver <- SAT.newSolver
+    x1 <- SAT.newVar solver
+    x2 <- SAT.newVar solver
+    SAT.addAtLeast solver [x1,x2] 0
+    ret <- SAT.solve solver
+    ret @?= True
+  do
+    solver <- SAT.newSolver
+    x1 <- SAT.newVar solver
+    x2 <- SAT.newVar solver
+    SAT.addAtLeast solver [x1,x2] (-1)
+    ret <- SAT.solve solver
+    ret @?= True
 
 case_AtLeast_1 :: Assertion
 case_AtLeast_1 = do
@@ -340,14 +341,14 @@ case_solveWith_1 = do
   SAT.addClause solver [-x1, -x2]     -- not x1 or not x2
   SAT.addClause solver [-x3, -x1, x2] -- not x3 or not x1 or x2
 
-  ret <- SAT.solve solver -- sat
-  ret @?= True
+  ret2 <- SAT.solve solver -- sat
+  ret2 @?= True
 
-  ret <- SAT.solveWith solver [x3] -- unsat
-  ret @?= False
+  ret3 <- SAT.solveWith solver [x3] -- unsat
+  ret3 @?= False
 
-  ret <- SAT.solve solver -- sat
-  ret @?= True
+  ret4 <- SAT.solve solver -- sat
+  ret4 @?= True
 
 case_solveWith_2 :: Assertion
 case_solveWith_2 = do
@@ -360,8 +361,8 @@ case_solveWith_2 = do
   ret <- SAT.solveWith solver [x2]
   ret @?= True
 
-  ret <- SAT.solveWith solver [-x2]
-  ret @?= False
+  ret2 <- SAT.solveWith solver [-x2]
+  ret2 @?= False
 
 case_getVarFixed :: Assertion
 case_getVarFixed = do
@@ -375,14 +376,14 @@ case_getVarFixed = do
 
   SAT.addClause solver [-x1]
 
-  ret <- SAT.getVarFixed solver x1
-  ret @?= lFalse
+  ret2 <- SAT.getVarFixed solver x1
+  ret2 @?= lFalse
 
-  ret <- SAT.getLitFixed solver (-x1)
-  ret @?= lTrue
+  ret3 <- SAT.getLitFixed solver (-x1)
+  ret3 @?= lTrue
 
-  ret <- SAT.getLitFixed solver x2
-  ret @?= lTrue
+  ret4 <- SAT.getLitFixed solver x2
+  ret4 @?= lTrue
 
 case_getAssumptionsImplications_case1 :: Assertion
 case_getAssumptionsImplications_case1 = do
