@@ -43,6 +43,7 @@ import qualified Data.Vector.Unboxed as V
 import Data.Version
 import Data.Ratio
 import Data.Scientific as Scientific
+import Data.String
 import Data.Time
 import Options.Applicative hiding (info)
 import qualified Options.Applicative
@@ -1068,7 +1069,7 @@ solveMIP opt solver mip = do
           printModel :: Map MIP.Var Rational -> IO ()
           printModel m = do
             forM_ (Map.toList m) $ \(v, val) -> do
-              printf "v %s = %d\n" (MIP.fromVar v) (asInteger val)
+              printf "v %s = %d\n" (MIP.varName v) (asInteger val)
             hFlush stdout
 
           writeSol :: Map MIP.Var Rational -> Rational -> IO ()
@@ -1121,7 +1122,7 @@ writeSOLFile opt m obj nbvar = do
       let sol = MIP.Solution
                 { MIP.solStatus = MIP.StatusUnknown
                 , MIP.solObjectiveValue = fmap fromIntegral obj
-                , MIP.solVariables = Map.fromList [(MIP.toVar ("x" ++ show x), if b then 1.0 else 0.0) | (x,b) <- assocs m, x <= nbvar]
+                , MIP.solVariables = Map.fromList [(fromString ("x" ++ show x), if b then 1.0 else 0.0) | (x,b) <- assocs m, x <= nbvar]
                 }
       GurobiSol.writeFile fname sol
 

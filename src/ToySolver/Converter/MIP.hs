@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -42,6 +43,9 @@ import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import qualified Data.Aeson as J
 import qualified Data.Aeson.Types as J
+#if MIN_VERSION_aeson(2,0,0)
+import qualified Data.Aeson.Key as Key
+#endif
 import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
 import Data.Default.Class
@@ -55,6 +59,7 @@ import Data.Primitive.MutVar
 import Data.Ratio
 import qualified Data.Set as Set
 import Data.String
+import qualified Data.Text as T
 import Data.VectorSpace
 
 import qualified Data.PseudoBoolean as PBFile
@@ -115,8 +120,7 @@ pb2ip formula = (mip, PB2IPInfo (PBFile.pbNumVars formula))
     mip = def
       { MIP.objectiveFunction = obj2
       , MIP.constraints = cs2
-      , MIP.varType = Map.fromList [(v, MIP.IntegerVariable) | v <- vs]
-      , MIP.varBounds = Map.fromList [(v, (0,1)) | v <- vs]
+      , MIP.varDomains = Map.fromList [(v, (MIP.IntegerVariable, (0,1))) | v <- vs]
       }
 
     vs = [convVar v | v <- [1..PBFile.pbNumVars formula]]
@@ -144,7 +148,7 @@ convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
       | otherwise = 1 - MIP.varExpr (convVar (abs x))
 
 convVar :: PBFile.Var -> MIP.Var
-convVar x = MIP.toVar ("x" ++ show x)
+convVar x = fromString ("x" ++ show x)
 
 -- -----------------------------------------------------------------------------
 
@@ -180,10 +184,16 @@ instance J.ToJSON WBO2IPInfo where
     [ "type" .= ("WBO2IPInfo" :: J.Value)
     , "num_original_variables" .= nv
     , "relax_variables" .= J.object
-        [ fromString (MIP.fromVar v) .= jPBConstraint constr
+        [ toKey (MIP.varName v) .= jPBConstraint constr
         | (v, constr) <- relaxVariables
         ]
     ]
+    where
+#if MIN_VERSION_aeson(2,0,0)
+      toKey = Key.fromText
+#else
+      toKey = id
+#endif
 
 instance J.FromJSON WBO2IPInfo where
   parseJSON =
@@ -193,10 +203,10 @@ instance J.FromJSON WBO2IPInfo where
         <$> obj .: "num_original_variables"
         <*> mapM f (Map.toList xs)
     where
-      f :: (String, J.Value) -> J.Parser (MIP.Var, PBFile.Constraint)
+      f :: (T.Text, J.Value) -> J.Parser (MIP.Var, PBFile.Constraint)
       f (name, val) = do
         constr <- parsePBConstraint val
-        pure (MIP.toVar name, constr)
+        pure (MIP.Var name, constr)
 
 wbo2ip :: Bool -> PBFile.SoftFormula -> (MIP.Problem Integer, WBO2IPInfo)
 wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) [(r, c) | (r, (Just _, c)) <- relaxVariables])
@@ -204,8 +214,7 @@ wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) [(r, 
     mip = def
       { MIP.objectiveFunction = obj2
       , MIP.constraints = topConstr ++ map snd cs2
-      , MIP.varType = Map.fromList [(v, MIP.IntegerVariable) | v <- vs]
-      , MIP.varBounds = Map.fromList [(v, (0,1)) | v <- vs]
+      , MIP.varDomains = Map.fromList [(v, (MIP.IntegerVariable, (0,1))) | v <- vs]
       }
 
     vs = [convVar v | v <- [1..PBFile.wboNumVars formula]] ++ [v | (ts, _) <- cs2, (_, v) <- ts]
@@ -223,7 +232,7 @@ wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) [(r, 
           [ def{ MIP.constrExpr = MIP.objExpr obj2, MIP.constrUB = MIP.Finite (fromInteger t - 1) } ]
 
     relaxVariables :: [(MIP.Var, PBFile.SoftConstraint)]
-    relaxVariables = [(MIP.toVar ("r" ++ show n), c) | (n, c) <- zip [(0::Int)..] (PBFile.wboConstraints formula)]
+    relaxVariables = [(fromString ("r" ++ show n), c) | (n, c) <- zip [(0::Int)..] (PBFile.wboConstraints formula)]
 
     cs2 :: [([(Integer, MIP.Var)], MIP.Constraint Integer)]
     cs2 = do
@@ -373,26 +382,33 @@ instance J.ToJSON MIP2PBInfo where
     J.object
     [ "type" .= ("MIP2PBInfo" :: J.Value)
     , "substitutions" .= J.object
-        [ fromString (MIP.fromVar v) .= jPBSum s
+        [ toKey (MIP.varName v) .= jPBSum s
         | (v, Integer.Expr s) <- Map.toList vmap
         ]
     , "nonzero_indicators" .= J.object
-        [ fromString (MIP.fromVar v) .= (jLitName lit :: J.Value)
+        [ toKey (MIP.varName v) .= (jLitName lit :: J.Value)
         | (v, lit) <- Map.toList nonZeroTable
         ]
     , "objective_function_scale_factor" .= d
     ]
+    where
+#if MIN_VERSION_aeson(2,0,0)
+      toKey = Key.fromText
+#else
+      toKey = id
+#endif
+    
 
 instance J.FromJSON MIP2PBInfo where
   parseJSON = withTypedObject "MIP2PBInfo" $ \obj -> do
     tmp1 <- obj .: "substitutions"
     subst <- liftM Map.fromList $ forM (Map.toList tmp1) $ \(name, expr) -> do
       s <- parsePBSum expr
-      return (MIP.toVar name, Integer.Expr s)
+      return (MIP.Var name, Integer.Expr s)
     tmp2 <- obj .: "nonzero_indicators"
     nonZeroTable <- liftM Map.fromList $ forM (Map.toList tmp2) $ \(name, s) -> do
       lit <- parseLitName s
-      return (MIP.toVar name, lit)
+      return (MIP.Var name, lit)
     d <- obj .: "objective_function_scale_factor"
     pure $ MIP2PBInfo subst nonZeroTable d
 
@@ -402,7 +418,7 @@ addMIP enc mip = runExceptT $ addMIP' enc mip
 addMIP' :: forall m enc. (SAT.AddPBNL m enc, PrimMonad m) => enc -> MIP.Problem Rational -> ExceptT String m (Integer.Expr, MIP2PBInfo)
 addMIP' enc mip = do
   if not (Set.null nivs) then do
-    throwE $ "cannot handle non-integer variables: " ++ intercalate ", " (map MIP.fromVar (Set.toList nivs))
+    throwE $ "cannot handle non-integer variables: " ++ intercalate ", " (map (T.unpack . MIP.varName) (Set.toList nivs))
   else do
     vmap <- liftM Map.fromList $ revForM (Set.toList ivs) $ \v -> do
       case MIP.getBounds mip v of
@@ -410,7 +426,7 @@ addMIP' enc mip = do
           v2 <- lift $ Integer.newVar enc (ceiling lb) (floor ub)
           return (v,v2)
         _ -> do
-          throwE $ "cannot handle unbounded variable: " ++ MIP.fromVar v
+          throwE $ "cannot handle unbounded variable: " ++ T.unpack (MIP.varName v)
     forM_ (MIP.constraints mip) $ \c -> do
       let lhs = MIP.constrExpr c
       let f op rhs = do

@@ -9,16 +9,15 @@ import Control.Monad
 import qualified Data.Aeson as J
 import Data.Array.IArray
 import qualified Data.Foldable as F
-import Data.List (sortBy)
 import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as Map
 import Data.Maybe
-import Data.Ord (comparing)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.String
 import qualified Data.Vector.Generic as VG
 import qualified Numeric.Optimization.MIP as MIP
 
@@ -925,7 +924,7 @@ arbitraryBoundedIP :: Gen (MIP.Problem Rational)
 arbitraryBoundedIP = do
   nv <- choose (0,10)
   bs <- liftM Map.fromList $ forM [0..nv-1] $ \(i :: Int) -> do
-    let v = MIP.toVar ("z" ++ show i)
+    let v = fromString ("z" ++ show i)
     b <- arbitrary
     if b then
       pure (v, (MIP.Finite 0, MIP.Finite 1))
@@ -979,8 +978,7 @@ arbitraryBoundedIP = do
 
   return $ MIP.def
     { MIP.objectiveFunction = MIP.def{ MIP.objDir = dir, MIP.objExpr = obj }
-    , MIP.varType = fmap (\_ -> MIP.IntegerVariable) bs
-    , MIP.varBounds = bs
+    , MIP.varDomains = fmap (\b -> (MIP.IntegerVariable, b)) bs
     , MIP.constraints = cs
     , MIP.sosConstraints = sos
     }
@@ -1001,7 +999,7 @@ arbitraryMIPExpr vs = do
 
 arbitraryAssignmentBinaryIP :: MIP.Problem a -> Gen (Map MIP.Var Rational)
 arbitraryAssignmentBinaryIP mip = liftM Map.fromList $ do
-  forM (Map.keys (MIP.varType mip)) $ \v -> do
+  forM (Map.keys (MIP.varTypes mip)) $ \v -> do
     val <- choose (0, 1)
     pure (v, fromInteger val)
 
@@ -1014,52 +1012,7 @@ arbitraryAssignmentBoundedIP mip = liftM Map.fromList $ do
     _ -> error "should not happen"
 
 evalMIP :: Map MIP.Var Rational -> MIP.Problem Rational -> Maybe Rational
-evalMIP sol prob = do
-  forM_ (MIP.constraints prob) $ \constr -> do
-    guard $ evalConstraint constr
-  forM_ (MIP.sosConstraints prob) $ \constr -> do
-    guard $ evalSOSConstraint constr
-  forM_ (Map.toList (MIP.varBounds prob)) $ \(v, (lb, ub)) -> do
-    let val = sol Map.! v
-    case MIP.varType prob Map.! v of
-      MIP.ContinuousVariable -> do
-        guard $ lb <= MIP.Finite val && MIP.Finite val <= ub
-      MIP.IntegerVariable -> do
-        guard $ lb <= MIP.Finite val && MIP.Finite val <= ub
-        guard $ fromIntegral (round val :: Integer) == val
-      MIP.SemiContinuousVariable -> do
-        guard $ val == 0 || lb <= MIP.Finite val && MIP.Finite val <= ub
-      MIP.SemiIntegerVariable -> do
-        guard $ val == 0 || lb <= MIP.Finite val && MIP.Finite val <= ub
-        guard $ fromIntegral (round val :: Integer) == val
-  return $ evalExpr $ MIP.objExpr $ MIP.objectiveFunction prob
-  where
-    evalExpr :: MIP.Expr Rational -> Rational
-    evalExpr expr = sum [product (c : [sol Map.! v | v <- vs]) | MIP.Term c vs <- MIP.terms expr]
-
-    evalIndicator :: Maybe (MIP.Var, Rational) -> Bool
-    evalIndicator Nothing = True
-    evalIndicator (Just (v, val)) = (sol Map.! v) == val
-
-    evalConstraint :: MIP.Constraint Rational -> Bool
-    evalConstraint constr =
-      not (evalIndicator (MIP.constrIndicator constr)) ||
-      MIP.constrLB constr <= val && val <= MIP.constrUB constr
-      where
-        val = MIP.Finite $ evalExpr (MIP.constrExpr constr)
-
-    evalSOSConstraint :: MIP.SOSConstraint Rational -> Bool
-    evalSOSConstraint sos =
-      case MIP.sosType sos of
-        MIP.S1 -> length [() | val <- body, val /= 0] <= 1
-        MIP.S2 -> f body
-      where
-        body = map ((sol Map.!) . fst) $ sortBy (comparing snd) $ (MIP.sosBody sos)
-        f [] = True
-        f [_] = True
-        f (x1 : x2 : xs)
-          | x1 /= 0 = all (0==) xs
-          | otherwise = f (x2 : xs)
+evalMIP = MIP.eval MIP.zeroTol
 
 ------------------------------------------------------------------------
 

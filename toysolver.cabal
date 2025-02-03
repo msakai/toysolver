@@ -154,7 +154,7 @@ Library
      log-domain,
      -- numLoopState requires loop >=0.3.0
      loop >=0.3.0 && < 1.0.0,
-     MIP >=0.1.1.0 && <0.2,
+     MIP >=0.2.0.0 && <0.3,
      mtl >=2.1.2,
      multiset,
      -- createSystemRandom requires mwc-random >=0.13.1.0
