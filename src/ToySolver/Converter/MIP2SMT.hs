@@ -21,7 +21,6 @@ module ToySolver.Converter.MIP2SMT
 
 import Data.Char
 import Data.Default.Class
-import Data.Interned
 import Data.Ord
 import Data.List
 import Data.Ratio
@@ -335,10 +334,10 @@ mip2smt opt mip =
         YICES _ -> "int"
     ts = [(v, realType) | v <- Set.toList real_vs] ++ [(v, intType) | v <- Set.toList int_vs]
     obj = MIP.objectiveFunction mip
-    env = Map.fromList [(v, encode opt (unintern v)) | v <- Set.toList vs]
+    env = Map.fromList [(v, encode opt (MIP.varName v)) | v <- Set.toList vs]
     -- Note that identifiers of LPFile does not contain '-'.
     -- So that there are no name crash.
-    env2 = Map.fromList [(v, encode opt (unintern v <> "-2")) | v <- Set.toList vs]
+    env2 = Map.fromList [(v, encode opt (MIP.varName v <> "-2")) | v <- Set.toList vs]
 
     options =
       [ case optLanguage opt of
@@ -358,7 +357,7 @@ mip2smt opt mip =
       return $
         case optLanguage opt of
           SMTLIB2 -> "(declare-fun " <> B.fromText v2 <> " () " <> B.fromString t <> ")"
-          YICES _ -> "(define " <> B.fromText v2 <> "::" <> B.fromString t <> ") ; " <> B.fromString  (MIP.fromVar v)
+          YICES _ -> "(define " <> B.fromText v2 <> "::" <> B.fromString t <> ") ; " <> B.fromText  (MIP.varName v)
 
     optimality = list ["forall", decl, body]
       where

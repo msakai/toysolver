@@ -48,7 +48,7 @@ extra-deps:
 - pseudo-boolean-0.1.10.0@sha256:50b8b5b4403c282d00d9951216106b64738767b154b43fa1633db58972dac732,2552
 - sign-0.4.4
 - bytestring-encoding-0.1.2.0
-- MIP-0.1.1.0
+- MIP-0.2.0.0@sha256:badc69dc1a72453af332175f998a6ba91f03844dea1fd2d4841852e8dcee6ca3,6363
 # Patched version of tasty-th for reading UTF-8 files on non UTF-8 environment.
 - git: https://github.com/msakai/tasty-th/
   commit: ebbe5a79b3c7a537ceafc6291744c4d531bef63c

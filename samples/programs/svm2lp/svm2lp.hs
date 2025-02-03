@@ -10,6 +10,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import Data.Scientific
+import Data.String
 import qualified Data.Text.Lazy.IO as TLIO
 import System.Console.GetOpt
 import System.Environment
@@ -49,20 +50,19 @@ primal c prob
         .>=. 1 - (if isJust c then MIP.varExpr xi_i else 0)
       | ((y_i, xs_i), xi_i) <- zip prob xi
       ]
-  , MIP.varType = Map.fromList [(x, MIP.ContinuousVariable) | x <- b : [w_j | w_j <- IntMap.elems w] ++ [xi_i | isJust c, xi_i <- xi]]
-  , MIP.varBounds =
+  , MIP.varDomains =
       Map.unions
-      [ Map.singleton b (MIP.NegInf, MIP.PosInf)
-      , Map.fromList [(w_j, (MIP.NegInf, MIP.PosInf)) | w_j <- IntMap.elems w]
-      , Map.fromList [(xi_i, (0, MIP.PosInf)) | isJust c, xi_i <- xi]
+      [ Map.singleton b (MIP.ContinuousVariable, (MIP.NegInf, MIP.PosInf))
+      , Map.fromList [(w_j, (MIP.ContinuousVariable, (MIP.NegInf, MIP.PosInf))) | w_j <- IntMap.elems w]
+      , Map.fromList [(xi_i, (MIP.ContinuousVariable, (0, MIP.PosInf))) | isJust c, xi_i <- xi]
       ]
   }
   where
     m = length prob
     n = fst $ IntMap.findMax $ IntMap.unions (map snd prob)
-    w = IntMap.fromList [(j, MIP.toVar ("w_" ++ show j)) | j <- [1..n]]
-    b = MIP.toVar "b"
-    xi = [MIP.toVar ("xi_" ++ show i) | i <- [1..m]]
+    w = IntMap.fromList [(j, fromString ("w_" ++ show j)) | j <- [1..n]]
+    b = fromString "b"
+    xi = [fromString ("xi_" ++ show i) | i <- [1..m]]
 
 dual
   :: Maybe Double
@@ -82,12 +82,11 @@ dual c kernel prob
       }
   , MIP.constraints =
       [ MIP.Expr [ MIP.Term (fromIntegral y_i) [a_i] | ((y_i, _xs_i), a_i) <- zip prob a ] .==. 0 ]
-  , MIP.varType = Map.fromList [(a_i, MIP.ContinuousVariable) | a_i <- a]
-  , MIP.varBounds = Map.fromList [(a_i, (0, if isJust c then MIP.Finite (realToFrac (fromJust c)) else MIP.PosInf)) | a_i <- a]
+  , MIP.varDomains = Map.fromList [(a_i, (MIP.ContinuousVariable, (0, if isJust c then MIP.Finite (realToFrac (fromJust c)) else MIP.PosInf))) | a_i <- a]
   }
   where
     m = length prob
-    a = [MIP.toVar ("a_" ++ show i) | i <- [1..m]]
+    a = [fromString ("a_" ++ show i) | i <- [1..m]]
 
 dot :: Num a => IntMap a -> IntMap a -> a
 dot a b = sum $ IntMap.elems $ IntMap.intersectionWith (*) a b
