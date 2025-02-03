@@ -6,7 +6,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Converter.PB
--- Copyright   :  (c) Masahiro Sakai 2013,2016-2018
+-- Copyright   :  (c) Masahiro Sakai 2011-2014,2016-2018
 -- License     :  BSD-style
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -21,6 +21,10 @@ module ToySolver.Converter.PB
   -- * Normalization of PB/WBO problems
   , normalizePB
   , normalizeWBO
+
+  -- * Modify objective function
+  , ObjType (..)
+  , setObj
 
   -- * Linealization of PB/WBO problems
   , linearizePB
@@ -68,6 +72,11 @@ module ToySolver.Converter.PB
   -- * General data types
   , PBIdentityInfo (..)
   , PBTseitinInfo (..)
+
+  -- * misc
+  , pb2lsp
+  , wbo2lsp
+  , pb2smp
   ) where
 
 import Control.Monad
@@ -77,6 +86,7 @@ import qualified Data.Aeson as J
 import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
 import Data.Bits hiding (And (..))
+import Data.ByteString.Builder
 import Data.Default.Class
 import qualified Data.Foldable as F
 import Data.IntMap.Strict (IntMap)
@@ -138,6 +148,23 @@ normalizePBConstraint (lhs,op,rhs) =
   where
     h s (w,[x]) | x < 0 = (s+w, (-w,[-x]))
     h s t = (s,t)
+
+-- -----------------------------------------------------------------------------
+
+data ObjType = ObjNone | ObjMaxOne | ObjMaxZero
+  deriving (Eq, Ord, Enum, Bounded, Show)
+
+setObj :: ObjType -> PBFile.Formula -> PBFile.Formula
+setObj objType formula = formula{ PBFile.pbObjectiveFunction = Just obj2 }
+  where
+    obj2 = genObj objType formula
+
+genObj :: ObjType -> PBFile.Formula -> PBFile.Sum
+genObj objType formula =
+  case objType of
+    ObjNone    -> []
+    ObjMaxOne  -> [(1,[-v]) | v <- [1 .. PBFile.pbNumVars formula]] -- minimize false literals
+    ObjMaxZero -> [(1,[ v]) | v <- [1 .. PBFile.pbNumVars formula]] -- minimize true literals
 
 -- -----------------------------------------------------------------------------
 
@@ -900,5 +927,157 @@ wbo2maxsatWith strategy formula = runST $ do
              }
   defs <- Tseitin.getDefinitions tseitin
   return (wcnf, PBTseitinInfo (TseitinInfo (PBFile.wboNumVars formula) (CNF.cnfNumVars cnf) defs))
+
+-- -----------------------------------------------------------------------------
+
+pb2lsp :: PBFile.Formula -> Builder
+pb2lsp formula =
+  byteString "function model() {\n" <>
+  decls <>
+  constrs <>
+  obj2 <>
+  "}\n"
+  where
+    nv = PBFile.pbNumVars formula
+
+    decls = byteString "  for [i in 1.." <> intDec nv <> byteString "] x[i] <- bool();\n"
+
+    constrs = mconcat
+      [ byteString "  constraint " <>
+        showConstrLSP c <>
+        ";\n"
+      | c <- PBFile.pbConstraints formula
+      ]
+
+    obj2 =
+      case PBFile.pbObjectiveFunction formula of
+        Just obj' -> byteString "  minimize " <> showSumLSP obj' <> ";\n"
+        Nothing -> mempty
+
+wbo2lsp :: PBFile.SoftFormula -> Builder
+wbo2lsp softFormula =
+  byteString "function model() {\n" <>
+  decls <>
+  constrs <>
+  costDef <>
+  topConstr <>
+  byteString "  minimize cost;\n}\n"
+  where
+    nv = PBFile.wboNumVars softFormula
+
+    decls = byteString "  for [i in 1.." <> intDec nv <> byteString "] x[i] <- bool();\n"
+
+    constrs = mconcat
+      [ byteString "  constraint " <>
+        showConstrLSP c <>
+        ";\n"
+      | (Nothing, c) <- PBFile.wboConstraints softFormula
+      ]
+
+    costDef = byteString "  cost <- sum(\n" <> s <> ");\n"
+      where
+        s = mconcat . intersperse (",\n") $ xs
+        xs = ["    " <> integerDec w <> "*!(" <> showConstrLSP c <> ")"
+             | (Just w, c) <- PBFile.wboConstraints softFormula]
+
+    topConstr =
+      case PBFile.wboTopCost softFormula of
+        Nothing -> mempty
+        Just t -> byteString "  constraint cost <= " <> integerDec t <> ";\n"
+
+showConstrLSP :: PBFile.Constraint -> Builder
+showConstrLSP (lhs, PBFile.Ge, 1) | and [c==1 | (c,_) <- lhs] =
+  "or(" <> mconcat (intersperse "," (map (f . snd) lhs)) <> ")"
+  where
+    f [l] = showLitLSP l
+    f ls  = "and(" <> mconcat (intersperse "," (map showLitLSP ls)) <> ")"
+showConstrLSP (lhs, op, rhs) = showSumLSP lhs  <> op2 <> integerDec rhs
+  where
+    op2 = case op of
+            PBFile.Ge -> " >= "
+            PBFile.Eq -> " == "
+
+sum' :: [Builder] -> Builder
+sum' xs = "sum(" <> mconcat (intersperse ", " xs) <> ")"
+
+showSumLSP :: PBFile.Sum -> Builder
+showSumLSP = sum' . map showTermLSP
+
+showTermLSP :: PBFile.WeightedTerm -> Builder
+showTermLSP (n,ls) = mconcat $ intersperse "*" $ [integerDec n | n /= 1] ++ [showLitLSP l | l<-ls]
+
+showLitLSP :: PBFile.Lit -> Builder
+showLitLSP l =
+  if l < 0
+  then "!x[" <> intDec (abs l) <> "]"
+  else "x[" <> intDec l <> "]"
+
+-- -----------------------------------------------------------------------------
+
+pb2smp :: Bool -> PBFile.Formula -> Builder
+pb2smp isUnix formula =
+  header <>
+  decls <>
+  char7 '\n' <>
+  obj2 <>
+  char7 '\n' <>
+  constrs <>
+  char7 '\n' <>
+  actions <>
+  footer
+  where
+    nv = PBFile.pbNumVars formula
+
+    header =
+      if isUnix
+      then byteString "#include \"simple.h\"\nvoid ufun()\n{\n\n"
+      else mempty
+
+    footer =
+      if isUnix
+      then "\n}\n"
+      else mempty
+
+    actions = byteString $
+      "solve();\n" <>
+      "x[i].val.print();\n" <>
+      "cost.val.print();\n"
+
+    decls =
+      byteString "Element i(set=\"1 .. " <> intDec nv <>
+      byteString "\");\nIntegerVariable x(type=binary, index=i);\n"
+
+    constrs = mconcat
+      [ showSum lhs <>
+        op2 <>
+        integerDec rhs <>
+        ";\n"
+      | (lhs, op, rhs) <- PBFile.pbConstraints formula
+      , let op2 = case op of
+                    PBFile.Ge -> " >= "
+                    PBFile.Eq -> " == "
+      ]
+
+    showSum :: PBFile.Sum -> Builder
+    showSum [] = char7 '0'
+    showSum xs = mconcat $ intersperse " + " $ map showTerm xs
+
+    showTerm (n,ls) = mconcat $ intersperse (char7 '*') $ showCoeff n ++ [showLit l | l<-ls]
+
+    showCoeff n
+      | n == 1    = []
+      | n < 0     = [char7 '(' <> integerDec n <> char7 ')']
+      | otherwise = [integerDec n]
+
+    showLit l =
+      if l < 0
+      then "(1-x[" <> intDec (abs l) <> "])"
+      else "x[" <> intDec l <> "]"
+
+    obj2 =
+      case PBFile.pbObjectiveFunction formula of
+        Just obj' ->
+          byteString "Objective cost(type=minimize);\ncost = " <> showSum obj' <> ";\n"
+        Nothing -> mempty
 
 -- -----------------------------------------------------------------------------
