@@ -62,7 +62,11 @@ Extra-Source-Files:
    samples/programs/numberlink/ADC2016/sample/01/*.txt
    benchmarks/UF250.1065.100/*.cnf
    benchmarks/UUF250.1065.100/*.cnf
-Build-Type: Simple
+
+if os(windows)
+  Build-Type: Custom
+else
+  Build-Type: Simple
 
 Flag ForceChar8
   Description: set default encoding to char8 (not to use iconv)
@@ -122,6 +126,14 @@ Flag optparse-applicative-018
 source-repository head
   type:     git
   location: git://github.com/msakai/toysolver.git
+
+-- https://github.com/haskell/cabal/issues/9982
+if os(windows)
+  custom-setup
+    setup-depends:
+      base >= 4.7 && < 5,
+      Cabal ==3.10.1.0,
+      Cabal-syntax ==3.10.1.0
 
 Library
   Exposed: True
