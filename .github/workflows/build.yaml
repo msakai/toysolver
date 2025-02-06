@@ -17,7 +17,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ghc: '9.8.2'
+          - ghc: '9.10.1'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-9.10.yaml'
+            stack_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
+            platform: linux-x86_64
+          - ghc: '9.8.4'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.8.yaml'
             stack_args: ''
