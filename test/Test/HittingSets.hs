@@ -106,7 +106,9 @@ pairOfDNFs = do
                return $ Set.singleton $ IntSet.delete x is
           | not (IntSet.null is)
           ]
-  return (f,g)
+  f' <- mutate f
+  g' <- mutate g
+  return (f', g')
 
 prop_FredmanKhachiyan1996_checkDualityA_prop1 :: Property
 prop_FredmanKhachiyan1996_checkDualityA_prop1 =
