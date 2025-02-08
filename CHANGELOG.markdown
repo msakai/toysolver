@@ -7,17 +7,25 @@
   * Change `WBO2IPInfo` not to store weights (#124)
   * Change `SAT2KSATInfo`, `SimplifyMaxSAT2Info` and `SAT3ToMaxSAT2Info` to be synonyms of `TseitinInfo` (#121, #123)
   * Use `SAT.VarMap` to represent definitions in SAT-related encoders/converters (#127)
+  * Add instances for transforming objective function values between PB↔WBO conversion (#132)
+  * Change `ReversedTransformer`, `GCNF2MaxSATInfo`, `PBAsQUBOInfo`, `QUBO2IsingInfo`, `Ising2QUBOInfo` from `data` to `newtype` (#134)
+  * Fix `mip2pb`’s handling of indicator constraints (#137)
+  * Add more converter instances (#138)
+  * Restructure converter modules (#142)
+  * Support SOS constraints over non-binary variables in `mip2pb` (#140)
 * Pseudo-boolean and cardinality constarint encoder updates
   * Consider polarity in encoding of pseudo-boolean and cardinality constraints (#88)
   * Add BC-CNF pseudo boolean constraint encoder (#85)
   * Support specifying PB encoding strategy (#77)
-* Compatibility
+* Dependencies
   * Support GHC 9.4 (#92), 9.6, 9.8, 9.10
-  * Use prettyprinter package if `optparse-applicative` is `>=0.18` (#106)
+  * Use `prettyprinter` package if `optparse-applicative` is `>=0.18` (#106)
+  * Upgrade `MIP` package to 0.2.* (#144)
+* Misc
   * Do not rely on `StarIsType` extension (#84)
   * Add `BuildForeignLibraries` flag (#94)
-* Remove features that depend on OpenCL (#90)
-
+  * Remove features that depend on OpenCL (#90)
+  * Add `isCliqueOf` and `complementGraph` to `ToySolver.Graph.Base` (#130)
 
 0.8.0
 -----
