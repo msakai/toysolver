@@ -872,7 +872,9 @@ Test-suite TestPolynomial
     tasty-th,
     toysolver
   Default-Language: Haskell2010
-  Other-Extensions: TemplateHaskell
+  Other-Extensions:
+    DataKinds
+    TemplateHaskell
 
 Test-suite TestSuite
   Type:              exitcode-stdio-1.0
@@ -958,8 +960,11 @@ Test-suite TestSuite
   Other-Extensions:
     CPP
     DataKinds
+    FlexibleContexts
+    LambdaCase
     ScopedTypeVariables
     TemplateHaskell
+    TupleSections
 
 Benchmark BenchmarkSATLIB
   type:             exitcode-stdio-1.0
