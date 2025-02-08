@@ -76,7 +76,7 @@ complementSimpleGraph g = array (bounds g) [(node, IntMap.delete node toAllNodes
 isIndependentSet :: EdgeLabeledGraph a -> IntSet -> Bool
 isIndependentSet = flip isIndependentSetOf
 
--- | An independent set of a graph is is a set of vertices such that no two vertices in the set are adjacent.
+-- | An independent set of a graph is a set of vertices such that no two vertices in the set are adjacent.
 --
 -- This function ignores self-loops in the input graph.
 isIndependentSetOf :: IntSet -> EdgeLabeledGraph a -> Bool
