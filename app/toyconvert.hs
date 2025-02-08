@@ -430,7 +430,7 @@ writeProblem o problem = do
                           (opb', info'') -> (opb', Trail (ComposedTransformer info (ComposedTransformer info' info'')))
                     | otherwise -> (opb, Trail (ComposedTransformer info info'))
               ProbMIP mip (Trail info) ->
-                case mip2pb (fmap toRational mip) of
+                case ip2pb (fmap toRational mip) of
                   Left err -> error err
                   Right (opb, info') -> (opb, Trail (ComposedTransformer info info'))
           wboAndTrail =
