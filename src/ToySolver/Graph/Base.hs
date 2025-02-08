@@ -30,6 +30,7 @@ import qualified Data.IntMap.Lazy as IntMap
 import Data.IntMap.Lazy (IntMap)
 import qualified Data.IntSet as IntSet
 import Data.IntSet (IntSet)
+import GHC.Stack (HasCallStack)
 
 type EdgeLabeledGraph a = Array Int (IntMap a)
 
@@ -41,10 +42,11 @@ graphToUnorderedEdges g = do
   (node2, a) <- IntMap.toList $ snd $ IntMap.split node1 nodes
   return (node1, node2, a)
 
-graphFromUnorderedEdges :: Int -> [(Int, Int, a)] -> EdgeLabeledGraph a
+graphFromUnorderedEdges :: HasCallStack => Int -> [(Int, Int, a)] -> EdgeLabeledGraph a
 graphFromUnorderedEdges = graphFromUnorderedEdgesWith const
 
-graphFromUnorderedEdgesWith :: (a -> a -> a) -> Int -> [(Int, Int, a)] -> EdgeLabeledGraph a
+graphFromUnorderedEdgesWith :: HasCallStack => (a -> a -> a) -> Int -> [(Int, Int, a)] -> EdgeLabeledGraph a
+graphFromUnorderedEdgesWith _ n _ | n < 0 = error "graphFromUnorderedEdgesWith: number of vertexes should be non-negative"
 graphFromUnorderedEdgesWith f n es = runSTArray $ do
   a <- newArray (0, n-1) IntMap.empty
   let ins i x l = do
