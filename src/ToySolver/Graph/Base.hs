@@ -30,6 +30,7 @@ import qualified Data.IntMap.Lazy as IntMap
 import Data.IntMap.Lazy (IntMap)
 import qualified Data.IntSet as IntSet
 import Data.IntSet (IntSet)
+import Data.Maybe (maybeToList)
 import GHC.Stack (HasCallStack)
 
 -- | Labelled directed graph without multiple edges
@@ -46,8 +47,10 @@ type Graph = EdgeLabeledGraph ()
 graphToUnorderedEdges :: EdgeLabeledGraph a -> [(Int, Int, a)]
 graphToUnorderedEdges g = do
   (node1, nodes) <- assocs g
-  (node2, a) <- IntMap.toList $ snd $ IntMap.split node1 nodes
-  return (node1, node2, a)
+  case IntMap.splitLookup node1 nodes of
+    (_, m, nodes2) ->
+      [(node1, node1, a) | a <- maybeToList m] ++
+      [(node1, node2, a) | (node2, a) <- IntMap.toList nodes2]
 
 -- | Construct a symmetric directed graph from unordered edges.
 --
@@ -69,7 +72,7 @@ graphFromUnorderedEdgesWith f n es = runSTArray $ do
         writeArray a i $! IntMap.insertWith f x l m
   forM_ es $ \(node1, node2, a) -> do
     ins node1 node2 a
-    ins node2 node1 a
+    unless (node1 == node2) $ ins node2 node1 a
   return a
 
 -- | Complement of a graph
