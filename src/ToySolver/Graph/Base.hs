@@ -32,19 +32,34 @@ import qualified Data.IntSet as IntSet
 import Data.IntSet (IntSet)
 import GHC.Stack (HasCallStack)
 
+-- | Labelled directed graph without multiple edges
+--
+-- We also represent undirected graphs as symmetric directed graphs.
 type EdgeLabeledGraph a = Array Int (IntMap a)
 
+-- | Directed graph without multiple edges
+--
+-- We also represent undirected graphs as symmetric directed graphs.
 type Graph = EdgeLabeledGraph ()
 
+-- | Set of edges of undirected graph represented as a symmetric directed graph.
 graphToUnorderedEdges :: EdgeLabeledGraph a -> [(Int, Int, a)]
 graphToUnorderedEdges g = do
   (node1, nodes) <- assocs g
   (node2, a) <- IntMap.toList $ snd $ IntMap.split node1 nodes
   return (node1, node2, a)
 
+-- | Construct a symmetric directed graph from unordered edges.
+--
+-- If there are multiple edges with the same starting and ending
+-- vertexes, the first label is used.
 graphFromUnorderedEdges :: HasCallStack => Int -> [(Int, Int, a)] -> EdgeLabeledGraph a
 graphFromUnorderedEdges = graphFromUnorderedEdgesWith const
 
+-- | Construct a symmetric directed graph from unordered edges.
+--
+-- If there are multiple edges with the same starting and ending
+-- vertexes, the labels are combined using the given function.
 graphFromUnorderedEdgesWith :: HasCallStack => (a -> a -> a) -> Int -> [(Int, Int, a)] -> EdgeLabeledGraph a
 graphFromUnorderedEdgesWith _ n _ | n < 0 = error "graphFromUnorderedEdgesWith: number of vertexes should be non-negative"
 graphFromUnorderedEdgesWith f n es = runSTArray $ do
