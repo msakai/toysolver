@@ -31,8 +31,8 @@ module ToySolver.Converter.MIP
   , MaxSAT2IPInfo
 
   -- * IP to PB
-  , mip2pb
-  , MIP2PBInfo (..)
+  , ip2pb
+  , IP2PBInfo (..)
   , addMIP
   ) where
 
@@ -308,25 +308,25 @@ maxsat2ip useIndicator wcnf = (ip, ComposedTransformer info1 info2)
 
 -- -----------------------------------------------------------------------------
 
-mip2pb :: MIP.Problem Rational -> Either String (PBFile.Formula, MIP2PBInfo)
-mip2pb mip = runST $ runExceptT $ m
+ip2pb :: MIP.Problem Rational -> Either String (PBFile.Formula, IP2PBInfo)
+ip2pb mip = runST $ runExceptT $ m
   where
-    m :: ExceptT String (ST s) (PBFile.Formula, MIP2PBInfo)
+    m :: ExceptT String (ST s) (PBFile.Formula, IP2PBInfo)
     m = do
       db <- lift $ newPBStore
       (Integer.Expr obj, info) <- addMIP' db mip
       formula <- lift $ getPBFormula db
       return $ (formula{ PBFile.pbObjectiveFunction = Just obj }, info)
 
-data MIP2PBInfo = MIP2PBInfo (Map MIP.Var Integer.Expr) (Map MIP.Var SAT.Lit) !Integer
+data IP2PBInfo = IP2PBInfo (Map MIP.Var Integer.Expr) (Map MIP.Var SAT.Lit) !Integer
   deriving (Eq, Show)
 
-instance Transformer MIP2PBInfo where
-  type Source MIP2PBInfo = Map MIP.Var Rational
-  type Target MIP2PBInfo = SAT.Model
+instance Transformer IP2PBInfo where
+  type Source IP2PBInfo = Map MIP.Var Rational
+  type Target IP2PBInfo = SAT.Model
 
-instance ForwardTransformer MIP2PBInfo where
-  transformForward (MIP2PBInfo vmap nonZeroTable _d) sol
+instance ForwardTransformer IP2PBInfo where
+  transformForward (IP2PBInfo vmap nonZeroTable _d) sol
     | Map.keysSet vmap /= Map.keysSet sol = error "variables mismatch"
     | otherwise = array (1, x_max) $
         [(x, val) | (var, Integer.Expr s) <- Map.toList vmap, (x, val) <- f s (sol Map.! var)] ++
@@ -364,23 +364,23 @@ instance ForwardTransformer MIP2PBInfo where
             | v >= c    = (l, True)  : g (v - c) ys
             | otherwise = (l, False) : g v ys
 
-instance BackwardTransformer MIP2PBInfo where
-  transformBackward (MIP2PBInfo vmap _nonZeroTable _d) m = fmap (toRational . Integer.eval m) vmap
+instance BackwardTransformer IP2PBInfo where
+  transformBackward (IP2PBInfo vmap _nonZeroTable _d) m = fmap (toRational . Integer.eval m) vmap
 
-instance ObjValueTransformer MIP2PBInfo where
-  type SourceObjValue MIP2PBInfo = Rational
-  type TargetObjValue MIP2PBInfo = Integer
+instance ObjValueTransformer IP2PBInfo where
+  type SourceObjValue IP2PBInfo = Rational
+  type TargetObjValue IP2PBInfo = Integer
 
-instance ObjValueForwardTransformer MIP2PBInfo where
-  transformObjValueForward (MIP2PBInfo _vmap _nonZeroTable d) val = asInteger (val * fromIntegral d)
+instance ObjValueForwardTransformer IP2PBInfo where
+  transformObjValueForward (IP2PBInfo _vmap _nonZeroTable d) val = asInteger (val * fromIntegral d)
 
-instance ObjValueBackwardTransformer MIP2PBInfo where
-  transformObjValueBackward (MIP2PBInfo _vmap _nonZeroTable d) val = fromIntegral val / fromIntegral d
+instance ObjValueBackwardTransformer IP2PBInfo where
+  transformObjValueBackward (IP2PBInfo _vmap _nonZeroTable d) val = fromIntegral val / fromIntegral d
 
-instance J.ToJSON MIP2PBInfo where
-  toJSON (MIP2PBInfo vmap nonZeroTable d) =
+instance J.ToJSON IP2PBInfo where
+  toJSON (IP2PBInfo vmap nonZeroTable d) =
     J.object
-    [ "type" .= ("MIP2PBInfo" :: J.Value)
+    [ "type" .= ("IP2PBInfo" :: J.Value)
     , "substitutions" .= J.object
         [ toKey (MIP.varName v) .= jPBSum s
         | (v, Integer.Expr s) <- Map.toList vmap
@@ -398,8 +398,8 @@ instance J.ToJSON MIP2PBInfo where
       toKey = id
 #endif
 
-instance J.FromJSON MIP2PBInfo where
-  parseJSON = withTypedObject "MIP2PBInfo" $ \obj -> do
+instance J.FromJSON IP2PBInfo where
+  parseJSON = withTypedObject "IP2PBInfo" $ \obj -> do
     tmp1 <- obj .: "substitutions"
     subst <- liftM Map.fromList $ forM (Map.toList tmp1) $ \(name, expr) -> do
       s <- parsePBSum expr
@@ -409,12 +409,12 @@ instance J.FromJSON MIP2PBInfo where
       lit <- parseLitName s
       return (MIP.Var name, lit)
     d <- obj .: "objective_function_scale_factor"
-    pure $ MIP2PBInfo subst nonZeroTable d
+    pure $ IP2PBInfo subst nonZeroTable d
 
-addMIP :: (SAT.AddPBNL m enc, PrimMonad m) => enc -> MIP.Problem Rational -> m (Either String (Integer.Expr, MIP2PBInfo))
+addMIP :: (SAT.AddPBNL m enc, PrimMonad m) => enc -> MIP.Problem Rational -> m (Either String (Integer.Expr, IP2PBInfo))
 addMIP enc mip = runExceptT $ addMIP' enc mip
 
-addMIP' :: forall m enc. (SAT.AddPBNL m enc, PrimMonad m) => enc -> MIP.Problem Rational -> ExceptT String m (Integer.Expr, MIP2PBInfo)
+addMIP' :: forall m enc. (SAT.AddPBNL m enc, PrimMonad m) => enc -> MIP.Problem Rational -> ExceptT String m (Integer.Expr, IP2PBInfo)
 addMIP' enc mip = do
   if not (Set.null nivs) then do
     throwE $ "cannot handle non-integer variables: " ++ intercalate ", " (map (T.unpack . MIP.varName) (Set.toList nivs))
@@ -503,7 +503,7 @@ addMIP' enc mip = do
 
     nonZeroTable <- readMutVar nonZeroTableRef
 
-    return (obj2, MIP2PBInfo vmap nonZeroTable d)
+    return (obj2, IP2PBInfo vmap nonZeroTable d)
 
   where
     ivs = MIP.integerVariables mip

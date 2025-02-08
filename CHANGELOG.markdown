@@ -13,6 +13,7 @@
   * Add more converter instances (#138)
   * Restructure converter modules (#142)
   * Support SOS constraints over non-binary variables in `mip2pb` (#140)
+  * Rename `mip2pb` to `ip2pb`
 * Pseudo-boolean and cardinality constarint encoder updates
   * Consider polarity in encoding of pseudo-boolean and cardinality constraints (#88)
   * Add BC-CNF pseudo boolean constraint encoder (#85)

@@ -871,10 +871,10 @@ prop_wbo2ip_json =
      in counterexample (show ret) $ counterexample (show json) $
           J.eitherDecode json === Right info
 
-prop_mip2pb_forward :: Property
-prop_mip2pb_forward =
+prop_ip2pb_forward :: Property
+prop_ip2pb_forward =
   forAll arbitraryBoundedIP $ \ip ->
-    case mip2pb ip of
+    case ip2pb ip of
       Left err -> counterexample err $ property False
       Right ret@(pb, info) ->
         counterexample (show ret) $
@@ -883,10 +883,10 @@ prop_mip2pb_forward =
             ===
             SAT.evalPBFormula (transformForward info sol) pb
 
-prop_mip2pb_backward :: Property
-prop_mip2pb_backward =
+prop_ip2pb_backward :: Property
+prop_ip2pb_backward =
   forAll arbitraryBoundedIP $ \ip ->
-    case mip2pb ip of
+    case ip2pb ip of
       Left err -> counterexample err $ property False
       Right ret@(pb, info) ->
         counterexample (show ret) $
@@ -895,10 +895,10 @@ prop_mip2pb_backward =
               Nothing -> property True
               Just val -> evalMIP (transformBackward info m) ip === Just (transformObjValueBackward info val)
 
-prop_mip2pb_backward' :: Property
-prop_mip2pb_backward' =
+prop_ip2pb_backward' :: Property
+prop_ip2pb_backward' =
   forAll arbitraryBoundedIP $ \ip ->
-    case mip2pb ip of
+    case ip2pb ip of
       Left err -> counterexample err $ property False
       Right ret@(pb, info) ->
         counterexample (show ret) $
@@ -910,10 +910,10 @@ prop_mip2pb_backward' =
               Nothing -> return ()
               Just m -> QM.assert $ isJust $ evalMIP (transformBackward info m) ip
 
-prop_mip2pb_json :: Property
-prop_mip2pb_json =
+prop_ip2pb_json :: Property
+prop_ip2pb_json =
   forAll arbitraryBoundedIP $ \ip ->
-    case mip2pb ip of
+    case ip2pb ip of
       Left err -> counterexample err $ property False
       Right ret@(_, info) ->
         let json = J.encode info
