@@ -17,6 +17,14 @@ import ToySolver.Graph.Base
 
 -- ------------------------------------------------------------------------
 
+arbitraryGraph :: Int -> Gen Graph
+arbitraryGraph n = do
+  m <- choose (0, n*n-1)
+  fmap (graphFromUnorderedEdges n) $ replicateM m $ do
+    node1 <- choose (0, n-1)
+    node2 <- fmap (\i -> (node1 + i) `mod` n) $ choose (0, n-1)
+    return (node1, node2, ())
+
 arbitrarySimpleGraph :: Int -> Gen Graph
 arbitrarySimpleGraph n = do
   m <- choose (0, n*n-1)
@@ -32,6 +40,12 @@ arbitrarySubset :: IntSet -> Gen IntSet
 arbitrarySubset = fmap IntSet.fromAscList . sublistOf . IntSet.toAscList
 
 -- ------------------------------------------------------------------------
+
+prop_graphToUnorderedEdges :: Property
+prop_graphToUnorderedEdges =
+  forAll arbitrary $ \(NonNegative n) -> do
+    forAll (arbitraryGraph n) $ \g ->
+      g === graphFromUnorderedEdges n (graphToUnorderedEdges g)
 
 prop_indepndent_set_and_clique :: Property
 prop_indepndent_set_and_clique =
