@@ -893,7 +893,7 @@ prop_mip2pb_backward =
           forAll (arbitraryAssignment (PBFile.pbNumVars pb)) $ \m ->
             case SAT.evalPBFormula m pb of
               Nothing -> property True
-              Just val -> evalMIP (transformBackward info m) ip === Just (transformObjValueBackward info val)            
+              Just val -> evalMIP (transformBackward info m) ip === Just (transformObjValueBackward info val)
 
 prop_mip2pb_backward' :: Property
 prop_mip2pb_backward' =

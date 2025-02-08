@@ -196,7 +196,7 @@ instance J.ToJSON DualizeInfo where
     [ "type" .= ("DualizeInfo" :: J.Value)
     , "num_original_matrices" .= origM
     , "original_block_structure" .= origBlockStruct
-    ] 
+    ]
 
 instance J.FromJSON DualizeInfo where
   parseJSON =

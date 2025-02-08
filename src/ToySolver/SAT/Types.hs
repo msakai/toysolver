@@ -485,7 +485,7 @@ evalPBFormula m formula = do
 evalPBSoftFormula :: IModel m => m -> PBFile.SoftFormula -> Maybe Integer
 evalPBSoftFormula m formula = do
   obj <- liftM sum $ forM (PBFile.wboConstraints formula) $ \(cost, constr) -> do
-    case cost of 
+    case cost of
       Nothing -> do
         guard $ evalPBConstraint m constr
         return 0

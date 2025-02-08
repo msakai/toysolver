@@ -397,7 +397,6 @@ instance J.ToJSON MIP2PBInfo where
 #else
       toKey = id
 #endif
-    
 
 instance J.FromJSON MIP2PBInfo where
   parseJSON = withTypedObject "MIP2PBInfo" $ \obj -> do

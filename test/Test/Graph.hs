@@ -38,7 +38,7 @@ prop_indepndent_set_and_clique :: Property
 prop_indepndent_set_and_clique =
   forAll arbitrarySimpleGraph $ \g ->
     forAll (arbitrarySubset (vertexes g)) $ \s -> do
-      counterexample (show (graphToUnorderedEdges g)) $ 
+      counterexample (show (graphToUnorderedEdges g)) $
         s `isIndependentSetOf` g === s `isCliqueOf` complementSimpleGraph g
 
 -- ------------------------------------------------------------------------
