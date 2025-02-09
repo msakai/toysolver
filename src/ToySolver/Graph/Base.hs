@@ -15,6 +15,8 @@ module ToySolver.Graph.Base
   -- * Graph data types
     EdgeLabeledGraph
   , Graph
+  , Vertex
+  , Edge
 
   -- * Conversion
   , graphFromUnorderedEdges
@@ -44,15 +46,21 @@ import GHC.Stack (HasCallStack)
 -- | Labelled directed graph without multiple edges
 --
 -- We also represent undirected graphs as symmetric directed graphs.
-type EdgeLabeledGraph a = Array Int (IntMap a)
+type EdgeLabeledGraph a = Array Vertex (IntMap a)
 
 -- | Directed graph without multiple edges
 --
 -- We also represent undirected graphs as symmetric directed graphs.
 type Graph = EdgeLabeledGraph ()
 
+-- | Vertex data type
+type Vertex = Int
+
+-- | Edge data type
+type Edge a = (Vertex, Vertex, a)
+
 -- | Set of edges of undirected graph represented as a symmetric directed graph.
-graphToUnorderedEdges :: EdgeLabeledGraph a -> [(Int, Int, a)]
+graphToUnorderedEdges :: EdgeLabeledGraph a -> [Edge a]
 graphToUnorderedEdges g = do
   (node1, nodes) <- assocs g
   case IntMap.splitLookup node1 nodes of
@@ -64,14 +72,14 @@ graphToUnorderedEdges g = do
 --
 -- If there are multiple edges with the same starting and ending
 -- vertexes, the first label is used.
-graphFromUnorderedEdges :: HasCallStack => Int -> [(Int, Int, a)] -> EdgeLabeledGraph a
+graphFromUnorderedEdges :: HasCallStack => Int -> [Edge a] -> EdgeLabeledGraph a
 graphFromUnorderedEdges = graphFromUnorderedEdgesWith const
 
 -- | Construct a symmetric directed graph from unordered edges.
 --
 -- If there are multiple edges with the same starting and ending
 -- vertexes, the labels are combined using the given function.
-graphFromUnorderedEdgesWith :: HasCallStack => (a -> a -> a) -> Int -> [(Int, Int, a)] -> EdgeLabeledGraph a
+graphFromUnorderedEdgesWith :: HasCallStack => (a -> a -> a) -> Int -> [Edge a] -> EdgeLabeledGraph a
 graphFromUnorderedEdgesWith _ n _ | n < 0 = error "graphFromUnorderedEdgesWith: number of vertexes should be non-negative"
 graphFromUnorderedEdgesWith f n es = runSTArray $ do
   a <- newArray (0, n-1) IntMap.empty
