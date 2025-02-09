@@ -28,6 +28,7 @@ module ToySolver.Graph.Base
   , complementSimpleGraph
 
   -- * Properties
+  , isSimpleGraph
   , isIndependentSet
   , isIndependentSetOf
   , isCliqueOf
@@ -106,6 +107,10 @@ complementSimpleGraph :: EdgeLabeledGraph a -> EdgeLabeledGraph ()
 complementSimpleGraph g = array (bounds g) [(node, IntMap.delete node toAllNodes IntMap.\\ outEdges) | (node, outEdges) <- assocs g]
   where
     toAllNodes = IntMap.fromAscList [(node, ()) | node <- indices g]
+
+-- | A graph is /simple/ if it contains no self-loops.
+isSimpleGraph :: EdgeLabeledGraph a -> Bool
+isSimpleGraph g = and [v `IntMap.notMember` es | (v, es) <- assocs g]
 
 -- | Alias of 'isIndependentSetOf'
 {-# DEPRECATED isIndependentSet "Use isIndependentSetOf instead" #-}
