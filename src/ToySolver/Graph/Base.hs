@@ -11,13 +11,21 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.Graph.Base
-  ( EdgeLabeledGraph
+  (
+  -- * Graph data types
+    EdgeLabeledGraph
   , Graph
-  , graphToUnorderedEdges
+
+  -- * Conversion
   , graphFromUnorderedEdges
   , graphFromUnorderedEdgesWith
+  , graphToUnorderedEdges
+
+  -- * Operations
   , complementGraph
   , complementSimpleGraph
+
+  -- * Properties
   , isIndependentSet
   , isIndependentSetOf
   , isCliqueOf
