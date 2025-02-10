@@ -66,6 +66,18 @@ prop_graphToEdges =
     forAll (arbitraryDiGraph n) $ \g ->
       g === graphFromEdges n (graphToEdges g)
 
+prop_converseGraph_involution :: Property
+prop_converseGraph_involution =
+  forAll arbitrary $ \(NonNegative n) -> do
+    forAll (arbitraryDiGraph n) $ \g ->
+      g === converseGraph (converseGraph g)
+
+prop_converseGraph_unordered :: Property
+prop_converseGraph_unordered =
+  forAll arbitrary $ \(NonNegative n) -> do
+    forAll (arbitraryGraph n) $ \g ->
+      g === converseGraph g
+
 prop_graphToUnorderedEdges :: Property
 prop_graphToUnorderedEdges =
   forAll arbitrary $ \(NonNegative n) -> do

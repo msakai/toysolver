@@ -31,6 +31,7 @@ module ToySolver.Graph.Base
   , graphToUnorderedEdges
 
   -- * Operations
+  , converseGraph
   , complementGraph
   , complementSimpleGraph
 
@@ -126,6 +127,13 @@ graphFromUnorderedEdgesWith f n es = runSTArray $ do
     ins node1 node2 a
     unless (node1 == node2) $ ins node2 node1 a
   return a
+
+-- | Converse of a graph.
+--
+-- Another directed graph on the same set of vertices with all of the edges reversed.
+-- This is also called /transpose/ or /reverse/ of a graph.
+converseGraph :: EdgeLabeledGraph a -> EdgeLabeledGraph a
+converseGraph g = graphFromEdges (numVertexes g) [(n2, n1, l) | (n1, n2, l) <- graphToEdges g]
 
 -- | Complement of a graph
 --
