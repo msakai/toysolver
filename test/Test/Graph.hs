@@ -9,6 +9,7 @@ import Data.Array
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Test.Tasty
+import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 import Test.Tasty.TH
 
@@ -40,6 +41,11 @@ arbitrarySubset :: IntSet -> Gen IntSet
 arbitrarySubset = fmap IntSet.fromAscList . sublistOf . IntSet.toAscList
 
 -- ------------------------------------------------------------------------
+
+case_graphFromUnorderedEdgesWith :: Assertion
+case_graphFromUnorderedEdgesWith = do
+  let g = graphFromUnorderedEdgesWith (++) 2 [(0, 1, ["world"]), (1, 0, ["hello"])]
+  graphToUnorderedEdges g @?= [(0, 1, ["hello", "world"])]
 
 prop_graphToUnorderedEdges :: Property
 prop_graphToUnorderedEdges =

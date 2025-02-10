@@ -72,7 +72,7 @@ graphToUnorderedEdges g = do
 -- | Construct a symmetric directed graph from unordered edges.
 --
 -- If there are multiple edges with the same starting and ending
--- vertexes, the first label is used.
+-- vertexes, the last label is used.
 graphFromUnorderedEdges :: HasCallStack => Int -> [Edge a] -> EdgeLabeledGraph a
 graphFromUnorderedEdges = graphFromUnorderedEdgesWith const
 
