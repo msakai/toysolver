@@ -19,6 +19,13 @@ module ToySolver.Graph.Base
   , Edge
 
   -- * Conversion
+
+  -- ** Directed graphs
+  , graphFromEdges
+  , graphFromEdgesWith
+  , graphToEdges
+
+  -- ** Undirected graphs
   , graphFromUnorderedEdges
   , graphFromUnorderedEdgesWith
   , graphToUnorderedEdges
@@ -59,6 +66,33 @@ type Vertex = Int
 
 -- | Edge data type
 type Edge a = (Vertex, Vertex, a)
+
+-- | Set of edges of directed graph
+graphToEdges :: EdgeLabeledGraph a -> [Edge a]
+graphToEdges g = do
+  (node1, nodes) <- assocs g
+  (node2, a) <- IntMap.toList nodes
+  return (node1, node2, a)
+
+-- | Construct a directed graph from edges.
+--
+-- If there are multiple edges with the same starting and ending
+-- vertexes, the last label is used.
+graphFromEdges :: HasCallStack => Int -> [Edge a] -> EdgeLabeledGraph a
+graphFromEdges = graphFromEdgesWith const
+
+-- | Construct a directed graph from edges.
+--
+-- If there are multiple edges with the same starting and ending
+-- vertexes, the labels are combined using the given function.
+graphFromEdgesWith :: HasCallStack => (a -> a -> a) -> Int -> [Edge a] -> EdgeLabeledGraph a
+graphFromEdgesWith _ n _ | n < 0 = error "graphFromEdgesWith: number of vertexes should be non-negative"
+graphFromEdgesWith f n es = runSTArray $ do
+  g <- newArray (0, n-1) IntMap.empty
+  forM_ es $ \(node1, node2, a) -> do
+    m <- readArray g node1
+    writeArray g node1 $! IntMap.insertWith f node2 a m
+  return g
 
 -- | Set of edges of undirected graph represented as a symmetric directed graph.
 graphToUnorderedEdges :: EdgeLabeledGraph a -> [Edge a]
