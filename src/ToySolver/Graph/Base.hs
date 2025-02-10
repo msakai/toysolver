@@ -35,6 +35,7 @@ module ToySolver.Graph.Base
   , complementSimpleGraph
 
   -- * Properties
+  , numVertexes
   , isSimpleGraph
   , isIndependentSet
   , isIndependentSetOf
@@ -141,6 +142,13 @@ complementSimpleGraph :: EdgeLabeledGraph a -> EdgeLabeledGraph ()
 complementSimpleGraph g = array (bounds g) [(node, IntMap.delete node toAllNodes IntMap.\\ outEdges) | (node, outEdges) <- assocs g]
   where
     toAllNodes = IntMap.fromAscList [(node, ()) | node <- indices g]
+
+numVertexes :: EdgeLabeledGraph a -> Int
+numVertexes g =
+  case bounds g of
+    (lb, ub)
+      | lb /= 0 -> error "numVertexes: lower bound should be 0"
+      | otherwise -> ub + 1
 
 -- | A graph is /simple/ if it contains no self-loops.
 isSimpleGraph :: EdgeLabeledGraph a -> Bool
