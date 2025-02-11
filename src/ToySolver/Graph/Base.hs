@@ -130,14 +130,14 @@ graphFromUnorderedEdgesWith f n es = runSTArray $ do
 
 -- | Converse of a graph.
 --
--- Another directed graph on the same set of vertices with all of the edges reversed.
+-- It returns another directed graph on the same set of vertices with all of the edges reversed.
 -- This is also called /transpose/ or /reverse/ of a graph.
 converseGraph :: EdgeLabeledGraph a -> EdgeLabeledGraph a
 converseGraph g = graphFromEdges (numVertexes g) [(n2, n1, l) | (n1, n2, l) <- graphToEdges g]
 
 -- | Complement of a graph
 --
--- Note that applying it to a graph with no self-loops result in a graph with self-loops on all vertices.
+-- Note that applying it to a graph with no self-loops results in a graph with self-loops on all vertices.
 complementGraph :: EdgeLabeledGraph a -> EdgeLabeledGraph ()
 complementGraph g = array (bounds g) [(node, toAllNodes IntMap.\\ outEdges) | (node, outEdges) <- assocs g]
   where
@@ -151,6 +151,7 @@ complementSimpleGraph g = array (bounds g) [(node, IntMap.delete node toAllNodes
   where
     toAllNodes = IntMap.fromAscList [(node, ()) | node <- indices g]
 
+-- | Number of vertexes of a graph
 numVertexes :: EdgeLabeledGraph a -> Int
 numVertexes g =
   case bounds g of
