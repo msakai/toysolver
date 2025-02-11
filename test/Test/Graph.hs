@@ -84,8 +84,8 @@ prop_graphToUnorderedEdges =
     forAll (arbitraryGraph n) $ \g ->
       g === graphFromUnorderedEdges n (graphToUnorderedEdges g)
 
-prop_indepndent_set_and_clique :: Property
-prop_indepndent_set_and_clique =
+prop_independent_set_and_clique :: Property
+prop_independent_set_and_clique =
   forAll arbitrary $ \(NonNegative n) -> do
     forAll (arbitrarySimpleGraph n) $ \g ->
       forAll (arbitrarySubset (vertexes g)) $ \s -> do
