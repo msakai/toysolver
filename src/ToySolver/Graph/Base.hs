@@ -16,6 +16,7 @@ module ToySolver.Graph.Base
     EdgeLabeledGraph
   , Graph
   , Vertex
+  , VertexSet
   , Edge
 
   -- * Conversion
@@ -65,6 +66,9 @@ type Graph = EdgeLabeledGraph ()
 
 -- | Vertex data type
 type Vertex = Int
+
+-- | Set of vertexes
+type VertexSet = IntSet
 
 -- | Edge data type
 type Edge a = (Vertex, Vertex, a)
@@ -165,13 +169,13 @@ isSimpleGraph g = and [v `IntMap.notMember` es | (v, es) <- assocs g]
 
 -- | Alias of 'isIndependentSetOf'
 {-# DEPRECATED isIndependentSet "Use isIndependentSetOf instead" #-}
-isIndependentSet :: EdgeLabeledGraph a -> IntSet -> Bool
+isIndependentSet :: EdgeLabeledGraph a -> VertexSet -> Bool
 isIndependentSet = flip isIndependentSetOf
 
 -- | An independent set of a graph is a set of vertices such that no two vertices in the set are adjacent.
 --
 -- This function ignores self-loops in the input graph.
-isIndependentSetOf :: IntSet -> EdgeLabeledGraph a -> Bool
+isIndependentSetOf :: VertexSet -> EdgeLabeledGraph a -> Bool
 isIndependentSetOf s g = null $ do
   (node1, node2, _) <- graphToUnorderedEdges g
   guard $ node1 `IntSet.member` s
@@ -179,5 +183,5 @@ isIndependentSetOf s g = null $ do
   return ()
 
 -- | A clique of a graph is a subset of vertices such that every two distinct vertices in the clique are adjacent.
-isCliqueOf :: IntSet -> EdgeLabeledGraph a -> Bool
+isCliqueOf :: VertexSet -> EdgeLabeledGraph a -> Bool
 isCliqueOf s g = all (\node -> IntSet.delete node s `IntSet.isSubsetOf` IntMap.keysSet (g ! node)) (IntSet.toList s)
