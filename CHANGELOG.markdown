@@ -26,7 +26,7 @@
   * Do not rely on `StarIsType` extension (#84)
   * Add `BuildForeignLibraries` flag (#94)
   * Remove features that depend on OpenCL (#90)
-  * Add `isCliqueOf` and `complementGraph` to `ToySolver.Graph.Base` (#130)
+  * Improve `ToySolver.Graph` module (#130, #150)
 
 0.8.0
 -----
