@@ -1,4 +1,4 @@
-0.9.0 (Unreleased)
+0.9.0 (2025-02-18)
 -----
 
 * Converters updates
