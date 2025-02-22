@@ -60,6 +60,8 @@ $ docker build --platform linux/arm64 \
 $ docker push msakai/toysolver:${TOYSOLVER_VERSION}-arm64
 ```
 
+On any machine:
+
 ```shell-session
 $ docker manifest create msakai/toysolver:${TOYSOLVER_VERSION} \
   --amend msakai/toysolver:${TOYSOLVER_VERSION}-amd64 \
@@ -70,3 +72,8 @@ $ docker manifest create msakai/toysolver:latest \
   --amend msakai/toysolver:${TOYSOLVER_VERSION}-arm64
 $ docker manifest push msakai/toysolver:latest
 ```
+
+## Update `ersatz-toysat` and `satchmo-toysat`  if necessary
+
+.
+
