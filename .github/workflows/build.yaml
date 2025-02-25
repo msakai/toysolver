@@ -23,6 +23,16 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: linux-x86_64
+	  # Use GHC 9.10 on windows to avoid the issue with foreign-library
+	  # https://github.com/haskell/cabal/issues/9982
+          - ghc: '9.10.1'
+            os: windows-latest
+            stack_yaml: 'stack-ghc-9.10.yaml'
+            stack_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
+            platform: win64
+            release: true
+
           - ghc: '9.8.4'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.8.yaml'
@@ -73,19 +83,6 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             platform: linux-x86_64
-
-          # Current version of stack (2.7.5) cannot build foreign libraries for windows on GHC >=9.0
-          # We need a stack built with Cabal-3.8.1 which contains the fix https://github.com/haskell/cabal/pull/7764 .
-          #
-          # Also, GHC 9.6.5/Cabal-3.10.3.0 has a different problem regarding foreign libraries for windows
-          # https://github.com/haskell/cabal/issues/9982
-          - ghc: '8.10.7'
-            os: windows-latest
-            stack_yaml: 'stack-ghc-8.10.yaml'
-            stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
-            platform: win64
-            release: true
 
           - ghc: '8.8.4'
             os: ubuntu-latest
