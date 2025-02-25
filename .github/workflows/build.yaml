@@ -23,8 +23,8 @@ jobs:
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: linux-x86_64
-	  # Use GHC 9.10 on windows to avoid the issue with foreign-library
-	  # https://github.com/haskell/cabal/issues/9982
+          # Use GHC 9.10 on windows to avoid the issue with foreign-library
+          # https://github.com/haskell/cabal/issues/9982
           - ghc: '9.10.1'
             os: windows-latest
             stack_yaml: 'stack-ghc-9.10.yaml'
