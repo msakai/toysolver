@@ -91,13 +91,6 @@ jobs:
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             platform: linux-x86_64
 
-          - ghc: '8.6.3'
-            os: windows-latest
-            stack_yaml: 'stack-windows-i386.yaml'
-            stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
-            platform: win32
-            release: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -115,11 +108,11 @@ jobs:
           ghc-version: ${{ matrix.ghc }}
           enable-stack: true
           stack-version: 'latest'
-          stack-no-global: ${{ (matrix.platform == 'macos-x86_64' || matrix.platform == 'win32') && 'true' || '' }}
+          stack-no-global: ${{ (matrix.platform == 'macos-x86_64') && 'true' || '' }}
           cabal-update: false
 
       - name: Setup stack to use system GHC
-        if: matrix.platform != 'macos-x86_64' && matrix.platform != 'win32'
+        if: matrix.platform != 'macos-x86_64'
         run: stack config set system-ghc --global true
 
       #- name: Fix ld path (Windows)
@@ -238,10 +231,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: binary-packages-macos-x86_64
-          path: binary-packages
-      - uses: actions/download-artifact@v4
-        with:
-          name: binary-packages-win32
           path: binary-packages
       - uses: actions/download-artifact@v4
         with:
