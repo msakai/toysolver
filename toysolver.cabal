@@ -124,6 +124,9 @@ Common common-options
   Default-Language: Haskell2010
   GHC-Options: -rtsopts
   -- GHC-Prof-Options: -auto-all
+  Build-Depends:
+     -- GHC >=9.2 && <9.13
+     base >=4.16 && <4.22
 
 Common exe-options
   Import: common-options
@@ -140,8 +143,6 @@ Library
   Build-Depends:
      aeson >=1.4.2.0 && <2.3,
      array >=0.5,
-     -- GHC >=9.2 && <9.13
-     base >=4.16 && <4.22,
      bytestring >=0.9.2.1 && <0.13,
      bytestring-builder,
      bytestring-encoding >=0.1.1.0,
@@ -397,7 +398,6 @@ Executable toysolver
   HS-Source-Dirs: app
   Build-Depends:
     array,
-    base >=4.16 && <4.22,
     containers,
     data-default-class,
     filepath,
@@ -416,7 +416,6 @@ Executable toysat
   HS-Source-Dirs: app/toysat
   Build-Depends:
     array,
-    base >=4.16 && <4.22,
     bytestring,
     containers,
     clock,
@@ -439,6 +438,7 @@ Executable toysat
     CPP-Options: "-DWITH_ZLIB"
 
 Foreign-Library     toysat-ipasir
+  import:           common-options
   type:             native-shared
   if !flag(BuildForeignLibraries)
     buildable: False
@@ -448,7 +448,6 @@ Foreign-Library     toysat-ipasir
   if os(Linux)
     ld-options: -Wl,--version-script=app/toysat-ipasir/ipasir.map
   build-depends:
-    base >=4.16 && <4.22,
     containers,
     toysolver
   hs-source-dirs:   app/toysat-ipasir
@@ -475,7 +474,6 @@ Executable toysmt
      Smtlib.Syntax.Syntax,
      Smtlib.Syntax.ShowSL
   Build-Depends:
-    base >=4.16 && <4.22,
     containers,
     -- TODO: remove intern dependency
     intern,
@@ -496,7 +494,6 @@ Executable toyqbf
   Main-is: toyqbf.hs
   HS-Source-Dirs: app
   Build-Depends:
-    base >=4.16 && <4.22,
     containers,
     data-default-class,
     optparse-applicative,
@@ -511,8 +508,7 @@ Executable toyfmf
   HS-Source-Dirs: app
   If flag(BuildToyFMF)
     Build-Depends:
-      base >=4.16 && <4.22,
-      containers,
+        containers,
       intern,
       logic-TPTP >=0.4.6.0 && <0.7,
       optparse-applicative,
@@ -527,7 +523,6 @@ Executable toyconvert
   HS-Source-Dirs: app
   Build-Depends:
     aeson,
-    base >=4.16 && <4.22,
     bytestring,
     bytestring-builder,
     containers,
@@ -560,7 +555,6 @@ Executable sudoku
   HS-Source-Dirs: samples/programs/sudoku
   Build-Depends:
     array,
-    base >=4.16 && <4.22,
     toysolver
 
 Executable nonogram
@@ -571,7 +565,6 @@ Executable nonogram
   HS-Source-Dirs: samples/programs/nonogram
   Build-Depends:
     array,
-    base >=4.16 && <4.22,
     containers,
     toysolver
 
@@ -583,7 +576,6 @@ Executable nqueens
   HS-Source-Dirs: samples/programs/nqueens
   Build-Depends:
     array,
-    base >=4.16 && <4.22,
     toysolver
 
 Executable numberlink
@@ -594,7 +586,6 @@ Executable numberlink
   HS-Source-Dirs: samples/programs/numberlink
   Build-Depends:
     array,
-    base >=4.16 && <4.22,
     bytestring,
     containers,
     data-default-class,
@@ -609,7 +600,6 @@ Executable knapsack
   Main-is: knapsack.hs
   HS-Source-Dirs: samples/programs/knapsack
   Build-Depends:
-    base >=4.16 && <4.22,
     toysolver
 
 Executable assign
@@ -620,7 +610,6 @@ Executable assign
   HS-Source-Dirs: samples/programs/assign
   Build-Depends:
     attoparsec,
-    base >=4.16 && <4.22,
     bytestring,
     containers,
     toysolver,
@@ -633,7 +622,6 @@ Executable shortest-path
   Main-is: shortest-path.hs
   HS-Source-Dirs: samples/programs/shortest-path
   Build-Depends:
-    base >=4.16 && <4.22,
     bytestring,
     containers,
     unordered-containers,
@@ -646,7 +634,6 @@ Executable htc
   Main-is: htc.hs
   HS-Source-Dirs: samples/programs/htc
   Build-Depends:
-    base >=4.16 && <4.22,
     containers,
     toysolver
 
@@ -657,7 +644,6 @@ Executable svm2lp
   Main-is: svm2lp.hs
   HS-Source-Dirs: samples/programs/svm2lp
   Build-Depends:
-    base >=4.16 && <4.22,
     containers,
     data-default-class,
     MIP,
@@ -673,7 +659,6 @@ Executable survey-propagation
   Main-is: survey-propagation.hs
   HS-Source-Dirs: samples/programs/survey-propagation
   Build-Depends:
-    base >=4.16 && <4.22,
     data-default-class,
     toysolver
   GHC-Options: -rtsopts
@@ -685,7 +670,6 @@ Executable probsat
   Main-is: probsat.hs
   HS-Source-Dirs: samples/programs/probsat
   Build-Depends:
-    base >=4.16 && <4.22,
     clock,
     data-default-class,
     mwc-random,
@@ -702,7 +686,6 @@ Executable pigeonhole
   Main-is: pigeonhole.hs
   HS-Source-Dirs: app
   Build-Depends:
-    base >=4.16 && <4.22,
     bytestring,
     containers,
     pseudo-boolean,
@@ -716,7 +699,6 @@ Executable maxsatverify
   HS-Source-Dirs: app
   Build-Depends:
     array,
-    base >=4.16 && <4.22,
     toysolver
 
 Executable pbverify
@@ -727,7 +709,6 @@ Executable pbverify
   HS-Source-Dirs: app
   Build-Depends:
     array,
-    base >=4.16 && <4.22,
     pseudo-boolean,
     toysolver
 
@@ -739,7 +720,6 @@ Test-suite TestPolynomial
   HS-Source-Dirs:    test
   Main-is:           TestPolynomial.hs
   Build-depends:
-    base >=4.16 && <4.22,
     containers,
     data-interval,
     finite-field >=0.7.0 && <1.0.0,
@@ -803,7 +783,6 @@ Test-suite TestSuite
   Build-depends:
     aeson,
     array,
-    base >=4.16 && <4.22,
     bytestring,
     bytestring-builder,
     containers,
@@ -850,7 +829,6 @@ Benchmark BenchmarkSATLIB
   main-is:          BenchmarkSATLIB.hs
   build-depends:
     array,
-    base >=4.16 && <4.22,
     criterion >=1.0 && <1.7,
     data-default-class,
     toysolver
@@ -861,7 +839,6 @@ Benchmark BenchmarkKnapsack
   hs-source-dirs:   benchmarks
   main-is:          BenchmarkKnapsack.hs
   build-depends:
-    base >=4.16 && <4.22,
     criterion >=1.0 && <1.7,
     toysolver
 
@@ -871,7 +848,6 @@ Benchmark BenchmarkSubsetSum
   hs-source-dirs:   benchmarks
   main-is:          BenchmarkSubsetSum.hs
   build-depends:
-    base >=4.16 && <4.22,
     criterion >=1.0 && <1.7,
     toysolver,
     vector
