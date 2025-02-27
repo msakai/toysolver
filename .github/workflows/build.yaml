@@ -77,20 +77,6 @@ jobs:
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
             platform: linux-x86_64
 
-          - ghc: '9.0.2'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-9.0.yaml'
-            stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
-            platform: linux-x86_64
-
-          - ghc: '8.8.4'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-8.8.yaml'
-            stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
-            platform: linux-x86_64
-
     steps:
       - uses: actions/checkout@v4
         with:
