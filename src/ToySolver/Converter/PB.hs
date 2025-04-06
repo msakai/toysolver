@@ -783,8 +783,8 @@ addWBO db wbo = do
   defs <- liftM IntMap.fromList $ readMutVar defsRef
 
   case PBFile.wboTopCost wbo of
-    Nothing -> return ()
-    Just t -> SAT.addPBNLAtMost db obj (t - 1)
+    Just t | t <= sum [w | (Just w, _) <- PBFile.wboConstraints wbo] -> SAT.addPBNLAtMost db obj (t - 1)
+    _ -> return ()
 
   return (obj, defs)
 
