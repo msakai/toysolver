@@ -179,7 +179,7 @@ Library
      primes,
      primitive >=0.6,
      process >=1.1.0.2,
-     pseudo-boolean >=0.1.3.0 && <0.2.0.0,
+     pseudo-boolean >=0.1.12.0 && <0.2.0.0,
      queue,
      scientific,
      semigroups >=0.17,

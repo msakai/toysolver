@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: nightly-2025-02-04
+resolver: nightly-2025-04-05
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -45,7 +45,7 @@ extra-deps:
 - OptDir-0.0.3
 - logic-TPTP-0.6.0.0
 - finite-field-0.9.0
-- pseudo-boolean-0.1.11.0
+- pseudo-boolean-0.1.12.0@sha256:facdc2b5baba904b79ee990bf4d90ea13b71fda3b4e80a1e0f6ff184ba18a8df,2550
 - sign-0.4.4@sha256:cec939cf1d1df68365a116f795039cb196b16a8f19ea295ed025d7075900e258,2088
 - bytestring-encoding-0.1.2.0
 - MIP-0.2.0.0@sha256:badc69dc1a72453af332175f998a6ba91f03844dea1fd2d4841852e8dcee6ca3,6363
