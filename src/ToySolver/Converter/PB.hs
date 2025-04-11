@@ -570,12 +570,19 @@ unconstrainPB' formula =
     obj2 = [(p*c, IntSet.toList ls) | (ls, c) <- Map.toList obj2', c /= 0]
     obj2' = Map.unionsWith (+) [sq ((-rhs, []) : lhs) | (lhs, PBFile.Eq, rhs) <- PBFile.pbConstraints formula]
     sq ts = Map.fromListWith (+) $ do
-              (c1,ls1) <- ts
-              (c2,ls2) <- ts
-              let ls3 = IntSet.fromList ls1 `IntSet.union` IntSet.fromList ls2
-              guard $ not $ isFalse ls3
-              return (ls3, c1*c2)
-    isFalse ls = not $ IntSet.null $ ls `IntSet.intersection` IntSet.map negate ls
+              (c1, ls1, neg1, pos1) <- ts'
+              (c2, ls2, neg2, pos2) <- ts'
+              guard $ not $ contradict neg1 pos2
+              guard $ not $ contradict neg2 pos1
+              return (ls1 `IntSet.union` ls2, c1*c2)
+      where
+        ts' = [ (c, ls', neg, pos)
+              | (c, ls) <- ts, c /= 0
+              , let ls' = IntSet.fromList ls, let (neg, pos) = IntSet.split 0 ls'
+              , not (contradict neg pos)
+              ]
+    contradict ls1 ls2 =
+      not $ IntSet.null $ IntSet.fromAscList (map negate (IntSet.toDescList ls1)) `IntSet.intersection` ls2
 
 -- -----------------------------------------------------------------------------
 
