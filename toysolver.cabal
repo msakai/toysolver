@@ -122,8 +122,7 @@ source-repository head
 
 Common common-options
   Default-Language: Haskell2010
-  GHC-Options: -rtsopts
-  -- GHC-Prof-Options: -auto-all
+  -- GHC-Prof-Options: -fprof-auto
   Build-Depends:
      -- GHC >=9.2 && <9.13
      base >=4.16 && <4.22
@@ -132,6 +131,7 @@ Common exe-options
   Import: common-options
   if flag(ForceChar8)
     CPP-OPtions: "-DFORCE_CHAR8"
+  GHC-Options: -rtsopts
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
   Other-Extensions: CPP
