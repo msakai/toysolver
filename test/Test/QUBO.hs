@@ -129,7 +129,7 @@ prop_pb2qubo = forAll arbitraryPBFormula $ \formula ->
                 ]
         , forAll (arbitrarySolution (QUBO.quboNumVars qubo)) $ \sol ->
             let o = QUBO.eval sol qubo
-             in if (o <= th) then
+             in if o <= th then
                   (SAT.evalPBFormula (transformBackward info sol) formula === Just (transformObjValueBackward info o))
                   .&&.
                   transformObjValueForward info (transformObjValueBackward info o) === o
