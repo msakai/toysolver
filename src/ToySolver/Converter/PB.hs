@@ -403,7 +403,7 @@ collectDegGe3Terms formula = Set.fromList [t' | t <- terms, let t' = IntSet.from
 
 -- -----------------------------------------------------------------------------
 
--- | Convert inequality constraints into equality constraints by introducing surpass variables.
+-- | Convert inequality constraints into equality constraints by introducing surplus variables.
 inequalitiesToEqualitiesPB :: PBFile.Formula -> (PBFile.Formula, PBInequalitiesToEqualitiesInfo)
 inequalitiesToEqualitiesPB formula = runST $ do
   db <- newPBStore
@@ -420,11 +420,11 @@ inequalitiesToEqualitiesPB formula = runST $ do
             SAT.addPBNLExactly db [(1, [- l | l <- clause])] 0
             return Nothing
           Nothing -> do
-            let maxSurpass = max (SAT.pbUpperBound lhs - rhs) 0
-                maxSurpassNBits = head [i | i <- [0..], maxSurpass < bit i]
-            vs <- SAT.newVars db maxSurpassNBits
+            let maxSurplus = max (SAT.pbUpperBound lhs - rhs) 0
+                maxSurplusNBits = head [i | i <- [0..], maxSurplus < bit i]
+            vs <- SAT.newVars db maxSurplusNBits
             SAT.addPBNLExactly db (lhs ++ [(-c,[x]) | (c,x) <- zip (iterate (*2) 1) vs]) rhs
-            if maxSurpassNBits > 0 then do
+            if maxSurplusNBits > 0 then do
               return $ Just (lhs, rhs, vs)
             else
               return Nothing
