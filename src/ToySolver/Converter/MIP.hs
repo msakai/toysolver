@@ -60,11 +60,14 @@ import Data.Ratio
 import qualified Data.Set as Set
 import Data.String
 import qualified Data.Text as T
+import qualified Data.Vector as V
+import qualified Data.Vector.Generic as VG
 import Data.VectorSpace
 
 import qualified Data.PseudoBoolean as PBFile
 import qualified Numeric.Optimization.MIP as MIP
 
+import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
 import ToySolver.Converter.Base
 import ToySolver.Converter.PB
 import ToySolver.Data.OrdRel
@@ -343,26 +346,13 @@ instance ForwardTransformer IP2PBInfo where
       f :: SAT.PBSum -> Rational -> [(SAT.Var, Bool)]
       f s val
         | denominator val /= 1 = error "value should be integer"
-        | otherwise = g (numerator val - sum [c | (c, []) <- s]) (Map.toDescList tmp)
+        | otherwise =
+            case SubsetSum.subsetSum (V.fromList (map fst s')) d of
+              Nothing -> error "failed to reconstruct boolean assignment"
+              Just sol -> [if l > 0 then (l, v) else (- l, not v) | (l, v) <- zip (map snd s') (VG.toList sol)]
         where
-          tmp :: Map Integer SAT.Var
-          tmp =
-            Map.fromList
-            [ if c < 0 then
-                error "coefficient should be non-negative"
-              else if length ls > 1 then
-                error "variable definition should be linear"
-              else
-                (c, head ls)
-            | (c, ls) <- s, not (null ls), c /= 0
-            ]
-
-          g :: Integer -> [(Integer, SAT.Var)] -> [(SAT.Var, Bool)]
-          g 0 [] = []
-          g _ [] = error "no more variables"
-          g v ((c,l) : ys)
-            | v >= c    = (l, True)  : g (v - c) ys
-            | otherwise = (l, False) : g v ys
+          s' = [if length ls > 1 then error "variable definition should be linear" else (c, head ls) | (c, ls@(_:_)) <- s]
+          d = numerator val - sum [c | (c, []) <- s]
 
 instance BackwardTransformer IP2PBInfo where
   transformBackward (IP2PBInfo vmap _nonZeroTable _d) m = fmap (toRational . Integer.eval m) vmap

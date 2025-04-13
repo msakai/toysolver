@@ -10,6 +10,7 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.IORef
 import Data.List
 import Data.Maybe
+import qualified Data.PseudoBoolean as PBFile
 import qualified Data.Vector as V
 import System.IO.Unsafe
 
@@ -28,10 +29,12 @@ import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.SAT.Encoder.Tseitin (Formula (..))
 import qualified ToySolver.SAT.Encoder.Cardinality as Cardinality
 import qualified ToySolver.SAT.Encoder.Cardinality.Internal.Totalizer as Totalizer
+import qualified ToySolver.SAT.Encoder.Integer as Integer
 import qualified ToySolver.SAT.Encoder.PB as PB
 import qualified ToySolver.SAT.Encoder.PB.Internal.Sorter as PBEncSorter
 import qualified ToySolver.SAT.Encoder.PB.Internal.BCCNF as BCCNF
 import qualified ToySolver.SAT.Store.CNF as CNFStore
+import qualified ToySolver.SAT.Store.PB as PBStore
 
 import Test.SAT.Utils
 
@@ -534,6 +537,21 @@ prop_BCCNF_encode =
           ]
   where
     eval m = and . map (or . map (SAT.evalAtLeast m))
+
+-- ------------------------------------------------------------------------
+
+prop_Integer_newVar :: Property
+prop_Integer_newVar =
+  forAll arbitrary $ \lb ->
+    forAll (arbitrary >>= \(NonNegative w) -> return (lb + w)) $ \ub ->
+      QM.monadicST $ do
+        store <- QM.run $ PBStore.newPBStore
+        Integer.Expr s <- QM.run $ Integer.newVar store lb ub
+        QM.assert (SAT.pbLowerBound s == lb)
+        QM.assert (SAT.pbUpperBound s == ub)
+        formula <- QM.run $ PBStore.getPBFormula store
+        QM.assert (null (PBFile.pbConstraints formula))
+        return ()
 
 -- ------------------------------------------------------------------------
 
