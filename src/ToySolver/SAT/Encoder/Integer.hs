@@ -42,10 +42,9 @@ newVar enc lo hi
   | otherwise = do
       let hi' = hi - lo
           bitWidth = head $ [w | w <- [1..], let mx = 2 ^ w - 1, hi' <= mx]
-      vs <- SAT.newVars enc bitWidth
-      let xs = zip (iterate (2*) 1) vs
-      SAT.addPBAtMost enc xs hi'
-      return $ Expr $ [(lo,[]) | lo /= 0] ++ [(c,[x]) | (c,x) <- xs]
+      vs <- SAT.newVars enc (bitWidth - 1)
+      v <- SAT.newVar enc
+      return $ Expr $ [(lo,[]) | lo /= 0] ++ [(c,[x]) | (c,x) <- zip (iterate (2*) 1) vs] ++ [(hi' - (2 ^ (bitWidth - 1) - 1), [v])]
 
 instance AdditiveGroup Expr where
   Expr xs1 ^+^ Expr xs2 = Expr (xs1++xs2)
