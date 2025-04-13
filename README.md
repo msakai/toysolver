@@ -128,7 +128,7 @@ Supported formats:
 |LP File|`.lp`|✅|✅|Linear programming (LP) and mixed integer programming (MIP) problems|
 |MPS File|`.mps`|✅|✅|Linear programming (LP) and mixed integer programming (MIP) problems|
 |LSP format|`.lsp`|-|✅|Input format for [LocalSolver](http://www.localsolver.com/) (only binary variables are supported)|
-|SMP format|`.smp`|-|✅|Input format for [Nuorium Optimizer（NUOPT)](https://www.msi.co.jp/solution/nuopt/top.html) (only binary variables are supported)|
+|SMP format|`.smp`|-|✅|Input format for [Nuorium Optimizer (NUOPT)](https://www.msi.co.jp/solution/nuopt/top.html) (only binary variables are supported)|
 |SMT-LIB 2|`.smt2`|-|✅|Satisfiability Modulo Theories (SMT) problem instances ([website](https://smt-lib.org/))|
 |Yices input language|`.ys`|-|✅|SMT problem instances for SMT solver [Yices](https://yices.csl.sri.com/)|
 
