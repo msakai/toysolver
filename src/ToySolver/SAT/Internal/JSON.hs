@@ -100,6 +100,17 @@ parsePBSum x = msum
       , withOperator "*" (fmap ((product *** concat) . unzip) . mapM f) y
       ]
 
+jPBLinSum :: SAT.PBLinSum -> J.Value
+jPBLinSum s = jPBSum [(c, [l]) | (c,l) <- s]
+
+parsePBLinSum :: J.Value -> J.Parser SAT.PBLinSum
+parsePBLinSum x = do
+  s <- parsePBSum x
+  forM s $ \(c, ls) ->
+    case ls of
+      [l] -> pure (c, l)
+      _ -> fail "non-linear expression (linear expression expected)"
+
 jPBConstraint :: PBFile.Constraint -> J.Value
 jPBConstraint (lhs, op, rhs) =
   J.object

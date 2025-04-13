@@ -102,8 +102,11 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.PseudoBoolean as PBFile
+import qualified Data.Vector as V
+import qualified Data.Vector.Generic as VG
 
 import ToySolver.Converter.Base
+import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
 import qualified ToySolver.Converter.PB.Internal.Product as Product
 import ToySolver.Converter.Tseitin
 import qualified ToySolver.FileFormat.CNF as CNF
@@ -423,9 +426,10 @@ inequalitiesToEqualitiesPB formula = runST $ do
             let maxSurplus = max (SAT.pbUpperBound lhs - rhs) 0
                 maxSurplusNBits = head [i | i <- [0..], maxSurplus < bit i]
             vs <- SAT.newVars db maxSurplusNBits
-            SAT.addPBNLExactly db (lhs ++ [(-c,[x]) | (c,x) <- zip (iterate (*2) 1) vs]) rhs
+            let surplus = zip (iterate (*2) 1) vs
+            SAT.addPBNLExactly db (lhs ++ [(-c,[l]) | (c,l) <- surplus]) rhs
             if maxSurplusNBits > 0 then do
-              return $ Just (lhs, rhs, vs)
+              return $ Just (lhs, rhs, surplus)
             else
               return Nothing
 
@@ -453,7 +457,7 @@ inequalitiesToEqualitiesPB formula = runST $ do
         _ -> mzero
 
 data PBInequalitiesToEqualitiesInfo
-  = PBInequalitiesToEqualitiesInfo !Int !Int [(PBFile.Sum, Integer, [SAT.Var])]
+  = PBInequalitiesToEqualitiesInfo !Int !Int [(PBFile.Sum, Integer, SAT.PBLinSum)]
   deriving (Eq, Show)
 
 instance Transformer PBInequalitiesToEqualitiesInfo where
@@ -462,7 +466,16 @@ instance Transformer PBInequalitiesToEqualitiesInfo where
 
 instance ForwardTransformer PBInequalitiesToEqualitiesInfo where
   transformForward (PBInequalitiesToEqualitiesInfo _nv1 nv2 defs) m =
-    array (1, nv2) $ assocs m ++ [(v, testBit n i) | (lhs, rhs, vs) <- defs, let n = SAT.evalPBSum m lhs - rhs, (i,v) <- zip [0..] vs]
+    array (1, nv2) $ assocs m ++ concat
+      [ if lhsVal >= rhs then
+          case SubsetSum.subsetSum (V.fromList (map fst surplus)) (lhsVal - rhs) of
+            Nothing -> error ("failed to construct surplus assignment")
+            Just sol -> [if l > 0 then (l, v) else (- l, not v) | (l, v) <- zip (map snd surplus) (VG.toList sol)]
+        else
+          [if l > 0 then (l, False) else (-l, True) | (c, l) <- surplus]
+      | (lhs, rhs, surplus) <- defs
+      , let lhsVal = SAT.evalPBSum m lhs
+      ]
 
 instance BackwardTransformer PBInequalitiesToEqualitiesInfo where
   transformBackward (PBInequalitiesToEqualitiesInfo nv1 _nv2 _defs) = SAT.restrictModel nv1
@@ -483,13 +496,13 @@ instance J.ToJSON PBInequalitiesToEqualitiesInfo where
     [ "type" .= ("PBInequalitiesToEqualitiesInfo" :: J.Value)
     , "num_original_variables" .= nv1
     , "num_transformed_variables" .= nv2
-    , "slack" .=
+    , "definitions" .=
         [ J.object
           [ "lhs" .= jPBSum lhs
           , "rhs" .= rhs
-          , "slack" .= [jVarName v :: J.Value | v <- vs]
+          , "surplus" .= jPBLinSum surplus
           ]
-        | (lhs, rhs, vs) <- defs
+        | (lhs, rhs, surplus) <- defs
         ]
     ]
 
@@ -498,15 +511,13 @@ instance J.FromJSON PBInequalitiesToEqualitiesInfo where
     PBInequalitiesToEqualitiesInfo
       <$> obj .: "num_original_variables"
       <*> obj .: "num_transformed_variables"
-      <*> (mapM f =<< obj .: "slack")
+      <*> (mapM f =<< obj .: "definitions")
     where
-      f = J.withObject "slack" $ \obj -> do
+      f = J.withObject "definition" $ \obj -> do
         lhs <- parsePBSum =<< obj .: "lhs"
         rhs <- obj .: "rhs"
-        vs <- mapM g =<< obj .: "slack"
-        return (lhs, rhs, vs)
-      g ('x' : rest) = pure $! read rest
-      g s = fail ("fail to parse variable: " ++ show s)
+        surplus <- parsePBLinSum =<< obj .: "surplus"
+        return (lhs, rhs, surplus)
 
 -- -----------------------------------------------------------------------------
 
