@@ -438,7 +438,7 @@ run solver opt prob printModel = do
 mipPrintModel :: Handle -> Bool -> Map MIP.Var Rational -> IO ()
 mipPrintModel h asRat m =
   forM_ (Map.toList m) $ \(v, val) ->
-    hPrintf h "v %s = %s\n" (MIP.fromVar v) (showRational asRat val)
+    hPrintf h "v %s = %s\n" (MIP.varName v) (showRational asRat val)
 
 
 putCommentLine :: String -> IO ()
