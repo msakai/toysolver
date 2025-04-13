@@ -118,8 +118,8 @@ Usage:
 
 Supported formats:
 
-* Input formats: .cnf .wcnf .opb .wbo .gcnf .lp .mps
-* Output formats: .cnf .wcnf .opb .wbo .lsp .lp .mps .smp .smt2 .ys
+* Input formats: .cnf .wcnf .opb .wbo .gcnf .lp .mps .qubo
+* Output formats: .cnf .wcnf .opb .wbo .lsp .lp .mps .smp .smt2 .ys .qubo
 
 Bindings
 --------
