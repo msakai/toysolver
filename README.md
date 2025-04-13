@@ -118,8 +118,19 @@ Usage:
 
 Supported formats:
 
-* Input formats: .cnf .wcnf .opb .wbo .gcnf .lp .mps .qubo
-* Output formats: .cnf .wcnf .opb .wbo .lsp .lp .mps .smp .smt2 .ys .qubo
+|Format Name|File Extension|Input|Output|Description|
+|-|-|-|-|-|
+|DIMACS CNF|`.cnf`|✅|✅|Standard file format for SAT instances|
+|WCNF Format|`.wcnf`|✅|✅|Standard file format for Max-SAT instances ([specification](https://maxsat-evaluations.github.io/2024/rules.html#input))|
+|OPB Format|`.opb`|✅|✅|PBS (Pseudo-Boolean Satisfaction) and PBO (Pseudo-Boolean Optimization) instances ([specification](https://www.cril.univ-artois.fr/PB24/OPBcompetition.pdf))|
+|WBO Format|`.wbo`|✅|✅|WBO (Weighted-Boolean Optimization) instances ([specification](https://www.cril.univ-artois.fr/PB24/OPBcompetition.pdf))|
+|Group oriented CNF Input Format|`.gcnf`|✅|-|Used in Group oriented MUS track of the SAT Competition 2011 ([specification](https://web.archive.org/web/20131116055022/http://www.satcompetition.org/2011/rules.pdf))|
+|LP File|`.lp`|✅|✅|Linear programming (LP) and mixed integer programming (MIP) problems|
+|MPS File|`.mps`|✅|✅|Linear programming (LP) and mixed integer programming (MIP) problems|
+|LSP format|`.lsp`|-|✅|Input format for [LocalSolver](http://www.localsolver.com/) (only binary variables are supported)|
+|SMP format|`.smp`|-|✅|Input format for [Nuorium Optimizer（NUOPT)](https://www.msi.co.jp/solution/nuopt/top.html) (only binary variables are supported)|
+|SMT-LIB 2|`.smt2`|-|✅|Satisfiability Modulo Theories (SMT) problem instances ([website](https://smt-lib.org/))|
+|Yices input language|`.ys`|-|✅|SMT problem instances for SMT solver [Yices](https://yices.csl.sri.com/)|
 
 Bindings
 --------
