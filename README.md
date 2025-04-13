@@ -131,6 +131,7 @@ Supported formats:
 |SMP format|`.smp`|-|✅|Input format for [Nuorium Optimizer (NUOPT)](https://www.msi.co.jp/solution/nuopt/top.html) (only binary variables are supported)|
 |SMT-LIB 2|`.smt2`|-|✅|Satisfiability Modulo Theories (SMT) problem instances ([website](https://smt-lib.org/))|
 |Yices input language|`.ys`|-|✅|SMT problem instances for SMT solver [Yices](https://yices.csl.sri.com/)|
+|qbsolv QUBO Input File Format|`.qubo`|✅|✅|Unconstrained quadratic binary optimization problems ([specification](https://github.com/dwavesystems/qbsolv?tab=readme-ov-file#qbsolv-qubo-input-file-format))|
 
 Bindings
 --------
