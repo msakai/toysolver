@@ -25,6 +25,7 @@ import Control.Monad
 import Control.Monad.Primitive
 import Data.Array.IArray
 import Data.VectorSpace
+import Math.NumberTheory.Logarithms (integerLog2)
 import Text.Printf
 
 import ToySolver.Data.OrdRel
@@ -65,7 +66,7 @@ newVarPBLinSum enc hi
       return []
   | hi == 0 = return []
   | otherwise = do
-      let bitWidth = head $ [w | w <- [1..], let mx = 2 ^ w - 1, hi <= mx]
+      let bitWidth = integerLog2 hi + 1
       vs <- SAT.newVars enc (bitWidth - 1)
       v <- SAT.newVar enc
       return $ [(c,x) | (c,x) <- zip (iterate (2*) 1) vs] ++ [(hi - (2 ^ (bitWidth - 1) - 1), v)]
