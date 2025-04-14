@@ -20,6 +20,7 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
+import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
 import ToySolver.Data.Boolean
 import ToySolver.Data.LBool
 import qualified ToySolver.FileFormat.CNF as CNF
@@ -543,15 +544,22 @@ prop_BCCNF_encode =
 prop_Integer_newVar :: Property
 prop_Integer_newVar =
   forAll arbitrary $ \lb ->
-    forAll (arbitrary >>= \(NonNegative w) -> return (lb + w)) $ \ub ->
+    forAll (fmap (\(NonNegative w) -> lb + w) arbitrary) $ \ub ->
       QM.monadicST $ do
         store <- QM.run $ PBStore.newPBStore
-        Integer.Expr s <- QM.run $ Integer.newVar store lb ub
+        e@(Integer.Expr s) <- QM.run $ Integer.newVar store lb ub
+        QM.monitor (counterexample (show e))
         QM.assert (SAT.pbLowerBound s == lb)
         QM.assert (SAT.pbUpperBound s == ub)
+        QM.assert (all (\(_,ls) -> length ls <= 1) s)
+
         formula <- QM.run $ PBStore.getPBFormula store
         QM.assert (null (PBFile.pbConstraints formula))
-        return ()
+
+        val <- QM.pick $ choose (lb,ub)
+        case SubsetSum.subsetSum (V.fromList [c | (c,[_]) <- s]) (val - sum [c | (c,[]) <- s]) of
+          Just _ -> return ()
+          Nothing -> fail "fail to find an assignment"
 
 -- ------------------------------------------------------------------------
 
