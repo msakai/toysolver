@@ -14,6 +14,7 @@
 module ToySolver.SAT.Encoder.Integer
   ( Expr (..)
   , newVar
+  , newVarPBLinSum
   , linearize
   , addConstraint
   , addConstraintSoft
@@ -24,6 +25,7 @@ import Control.Monad
 import Control.Monad.Primitive
 import Data.Array.IArray
 import Data.VectorSpace
+import Math.NumberTheory.Logarithms (integerLog2)
 import Text.Printf
 
 import ToySolver.Data.OrdRel
@@ -33,18 +35,41 @@ import qualified ToySolver.SAT.Encoder.PBNLC as PBNLC
 newtype Expr = Expr SAT.PBSum
   deriving (Eq, Show, Read)
 
-newVar :: SAT.AddPBNL m enc => enc -> Integer -> Integer -> m Expr
+newVar
+  :: SAT.AddPBNL m enc
+  => enc
+  -> Integer -- ^ lower bound
+  -> Integer -- ^ upper bound
+  -> m Expr
 newVar enc lo hi
   | lo > hi = do
       SAT.addClause enc [] -- assert inconsistency
       return 0
-  | lo == hi = return $ fromInteger lo
   | otherwise = do
-      let hi' = hi - lo
-          bitWidth = head $ [w | w <- [1..], let mx = 2 ^ w - 1, hi' <= mx]
+      s <- newVarPBLinSum enc (hi - lo)
+      return $ Expr $ [(lo,[]) | lo /= 0] ++ [(c, [l]) | (c,l) <- s]
+
+-- | Lower-level version of 'newVar'
+--
+-- * It takes only upper bound. Lower bound is always 0.
+--
+-- * Return type is 'SAT.PBLinSum'. It is inconvenient for performing operations,
+--   but it is sometimes useful to be guaranteed to be in a linear form.
+newVarPBLinSum
+  :: SAT.AddPBNL m enc
+  => enc
+  -> Integer -- ^ upper bound
+  -> m SAT.PBLinSum
+newVarPBLinSum enc hi
+  | hi < 0 = do
+      SAT.addClause enc [] -- assert inconsistency
+      return []
+  | hi == 0 = return []
+  | otherwise = do
+      let bitWidth = integerLog2 hi + 1
       vs <- SAT.newVars enc (bitWidth - 1)
       v <- SAT.newVar enc
-      return $ Expr $ [(lo,[]) | lo /= 0] ++ [(c,[x]) | (c,x) <- zip (iterate (2*) 1) vs] ++ [(hi' - (2 ^ (bitWidth - 1) - 1), [v])]
+      return $ [(c,x) | (c,x) <- zip (iterate (2*) 1) vs] ++ [(hi - (2 ^ (bitWidth - 1) - 1), v)]
 
 instance AdditiveGroup Expr where
   Expr xs1 ^+^ Expr xs2 = Expr (xs1++xs2)
