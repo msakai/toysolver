@@ -85,7 +85,6 @@ import Control.Monad.ST
 import qualified Data.Aeson as J
 import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
-import Data.Bits hiding (And (..))
 import Data.ByteString.Builder
 import Data.Default.Class
 import qualified Data.Foldable as F
@@ -112,6 +111,7 @@ import ToySolver.Converter.Tseitin
 import qualified ToySolver.FileFormat.CNF as CNF
 import ToySolver.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
+import qualified ToySolver.SAT.Encoder.Integer as Integer
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
 import ToySolver.SAT.Encoder.Tseitin (Formula (..))
 import qualified ToySolver.SAT.Encoder.PB as PB
@@ -424,16 +424,15 @@ inequalitiesToEqualitiesPB formula = runST $ do
             return Nothing
           Nothing -> do
             let maxSurplus = max (SAT.pbUpperBound lhs - rhs) 0
-                maxSurplusNBits = head [i | i <- [0..], maxSurplus < bit i]
-            vs <- SAT.newVars db maxSurplusNBits
-            let surplus = zip (iterate (*2) 1) vs
+            surplus <- Integer.newVarPBLinSum db maxSurplus
             SAT.addPBNLExactly db (lhs ++ [(-c,[l]) | (c,l) <- surplus]) rhs
-            if maxSurplusNBits > 0 then do
+            if maxSurplus > 0 then do
               return $ Just (lhs, rhs, surplus)
             else
               return Nothing
 
   formula' <- getPBFormula db
+  unless (all (\(_, op, _) -> op == PBFile.Eq) (PBFile.pbConstraints formula')) $ error "should not happen"
   return
     ( formula'{ PBFile.pbObjectiveFunction = PBFile.pbObjectiveFunction formula }
     , PBInequalitiesToEqualitiesInfo (PBFile.pbNumVars formula) (PBFile.pbNumVars formula') defs
