@@ -422,14 +422,17 @@ inequalitiesToEqualitiesPB formula = runST $ do
           Just clause -> do
             SAT.addPBNLExactly db [(1, [- l | l <- clause])] 0
             return Nothing
-          Nothing -> do
-            let maxSurplus = max (SAT.pbUpperBound lhs - rhs) 0
-            surplus <- Integer.newVarPBLinSum db maxSurplus
-            SAT.addPBNLExactly db (lhs ++ [(-c,[l]) | (c,l) <- surplus]) rhs
-            if maxSurplus > 0 then do
-              return $ Just (lhs, rhs, surplus)
-            else
-              return Nothing
+          Nothing
+            | SAT.pbLowerBound lhs > rhs -> return Nothing
+            | otherwise -> do
+                let (lhs', rhs') = simplifyPBAtLeast (lhs, rhs)
+                    maxSurplus = max (SAT.pbUpperBound lhs' - rhs') 0
+                surplus <- Integer.newVarPBLinSum db maxSurplus
+                SAT.addPBNLExactly db (lhs' ++ [(-c,[l]) | (c,l) <- surplus]) rhs'
+                if maxSurplus > 0 then do
+                  return $ Just (lhs', rhs', surplus)
+                else
+                  return Nothing
 
   formula' <- getPBFormula db
   unless (all (\(_, op, _) -> op == PBFile.Eq) (PBFile.pbConstraints formula')) $ error "should not happen"
@@ -454,6 +457,19 @@ inequalitiesToEqualitiesPB formula = runST $ do
       case SAT.normalizePBLinAtLeast (lhs', rhs') of
         (lhs'', 1) | all (\(c,_) -> c == 1) lhs'' -> return (map snd lhs'')
         _ -> mzero
+
+    simplifyPBAtLeast :: (SAT.PBSum, Integer) -> (SAT.PBSum, Integer)
+    simplifyPBAtLeast (lhs, rhs) = 
+      case splitConst lhs of
+        (lhs', offset) ->
+          let rhs' = rhs - offset
+              d = case lhs' of
+                    [] -> 1
+                    _ -> abs $ foldl1' gcd (map fst lhs')
+           in ([(c `div` d, ls) | (c,ls) <- lhs'], (rhs' + d - 1) `div` d)
+
+    splitConst :: SAT.PBSum -> (SAT.PBSum, Integer)
+    splitConst s = ([t | t@(c, _:_) <- s, c /= 0], sum [c | (c, []) <- s])
 
 data PBInequalitiesToEqualitiesInfo
   = PBInequalitiesToEqualitiesInfo !Int !Int [(PBFile.Sum, Integer, SAT.PBLinSum)]
