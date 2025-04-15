@@ -471,7 +471,7 @@ instance ForwardTransformer PBInequalitiesToEqualitiesInfo where
             Nothing -> error ("failed to construct surplus assignment")
             Just sol -> [if l > 0 then (l, v) else (- l, not v) | (l, v) <- zip (map snd surplus) (VG.toList sol)]
         else
-          [if l > 0 then (l, False) else (-l, True) | (c, l) <- surplus]
+          [if l > 0 then (l, False) else (-l, True) | (_, l) <- surplus]
       | (lhs, rhs, surplus) <- defs
       , let lhsVal = SAT.evalPBSum m lhs
       ]
