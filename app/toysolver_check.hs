@@ -133,30 +133,38 @@ main = do
           FF.readFile (optInputFile opt)
       model <- liftM parsePBLog (readFile (optSolutionFile opt))
 
-      obj <- fmap sum $ forM (PBFile.wboConstraints wbo) $ \(w, constr) -> do
+      cost <- fmap sum $ forM (PBFile.wboConstraints wbo) $ \(w, constr) -> do
         if SAT.evalPBConstraint model constr then
           return 0
         else do
           case w of
             Nothing -> do
-              printf "violated: %s\n" (showPBConstraint constr :: String)
+              printf "violated hard constraint: %s\n" (showPBConstraint constr :: String)
               writeIORef errorRef True
               return 0
             Just w' -> do
               return w'
-      putStrLn $ "objective value = " ++ show obj
+      putStrLn $ "total cost = " ++ show cost
 
       case PBFile.wboTopCost wbo of
-        Just top | top <= obj -> do
-          printf "objective value is greater than or equal to top cost (%d)\n" top
+        Just top | top <= cost -> do
+          printf "total cost is greater than or equal to top cost (%d)\n" top
           writeIORef errorRef True
         _ -> return ()
-      
-      return ()
 
     ModeMaxSAT -> do
-      (wcnf :: CNF.WCNF)  <- FF.readFile (optInputFile opt)
-      return ()
+      wcnf  <- FF.readFile (optInputFile opt)
+      model <- liftM parseMaxSATLog (readFile (optSolutionFile opt))
+
+      cost <- fmap sum $ forM (CNF.wcnfClauses wcnf) $ \(w, constr) ->
+        if SAT.evalClause model (SAT.unpackClause constr) then do
+          return 0
+        else if w == CNF.wcnfTopCost wcnf then do
+          printf "violated hard constraint: %s\n" (show constr)
+          return 0
+        else do
+          return w
+      putStrLn $ "total cost = " ++ show cost
 
     ModeMIP -> do
       enc <- mapM mkTextEncoding $ optFileEncoding opt
@@ -207,4 +215,18 @@ parsePBLog s = array (1, maximum (0 : map fst ls2)) ls2
           case w of
             '-':'x':ys -> return (read ys, False)
             'x':ys -> return (read ys, True)
+        _ -> mzero
+
+parseMaxSATLog :: String -> SAT.Model
+parseMaxSATLog s = array (1, maximum (0 : map fst ls2)) ls2
+  where
+    ls = lines s
+    ls2 = do
+      l <- ls
+      case l of
+        'v':xs -> do
+          w <- words xs
+          case w of
+            '-':ys -> return (read ys, False)
+            ys -> return (read ys, True)
         _ -> mzero
