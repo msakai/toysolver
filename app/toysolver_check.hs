@@ -6,14 +6,16 @@ import Control.Monad
 import Data.Array.IArray
 import Data.Char
 import Data.Default.Class
-import Data.Ord
+import Data.IORef
 import Data.List (sortBy)
+import Data.Ord
 import qualified Data.PseudoBoolean as PBFile
 import Data.String
 import qualified Data.Version as V
 import qualified Numeric.Optimization.MIP as MIP
 import Options.Applicative hiding (Const)
 import System.Environment
+import System.Exit
 import System.FilePath
 import System.IO
 import Text.Printf
@@ -29,7 +31,7 @@ data Mode = ModeSAT | ModePB | ModeWBO | ModeMaxSAT | ModeMIP
   deriving (Eq, Ord, Show)
 
 data Options = Options
-  { optInput :: FilePath
+  { optInputFile :: FilePath
   , optSolutionFile :: FilePath
   , optMode :: Maybe Mode
   , optFileEncoding :: Maybe String
@@ -86,12 +88,14 @@ main = do
   setEncodingChar8
 #endif
 
+  errorRef <- newIORef False
+
   opt <- execParser parserInfo
   let mode =
         case optMode opt of
           Just m  -> m
           Nothing ->
-            case getExt (optInput opt) of
+            case getExt (optInputFile opt) of
               ".cnf"  -> ModeSAT
               ".opb"  -> ModePB
               ".wbo"  -> ModeWBO
@@ -102,32 +106,65 @@ main = do
 
   case mode of
     ModeSAT -> do
-      (cnf :: CNF.CNF) <- FF.readFile (optInput opt)
+      (cnf :: CNF.CNF) <- FF.readFile (optInputFile opt)
       return ()
+
     ModePB -> do
       opb <-
         if optPBFastParser opt then
-          liftM FF.unWithFastParser $ FF.readFile (optInput opt)
+          liftM FF.unWithFastParser $ FF.readFile (optInputFile opt)
         else
-          FF.readFile (optInput opt)
+          FF.readFile (optInputFile opt)
       model <- liftM parsePBLog (readFile (optSolutionFile opt))
-      forM_ (PBFile.pbConstraints opb) $ \c ->
-        unless (SAT.evalPBConstraint model c) $
-          printf "violated: %s\n" (showPBConstraint c :: String)
+
+      case PBFile.pbObjectiveFunction opb of
+        Nothing -> return ()
+        Just obj -> putStrLn $ "objective value = " ++ show (SAT.evalPBSum model obj)
+      forM_ (PBFile.pbConstraints opb) $ \constr -> do
+        unless (SAT.evalPBConstraint model constr) $ do
+          printf "violated: %s\n" (showPBConstraint constr :: String)
+          writeIORef errorRef True
+
     ModeWBO -> do
-      (wbo :: PBFile.SoftFormula) <-
+      wbo <-
         if optPBFastParser opt then
-          liftM FF.unWithFastParser $ FF.readFile (optInput opt)
+          liftM FF.unWithFastParser $ FF.readFile (optInputFile opt)
         else
-          FF.readFile (optInput opt)
+          FF.readFile (optInputFile opt)
+      model <- liftM parsePBLog (readFile (optSolutionFile opt))
+
+      obj <- fmap sum $ forM (PBFile.wboConstraints wbo) $ \(w, constr) -> do
+        if SAT.evalPBConstraint model constr then
+          return 0
+        else do
+          case w of
+            Nothing -> do
+              printf "violated: %s\n" (showPBConstraint constr :: String)
+              writeIORef errorRef True
+              return 0
+            Just w' -> do
+              return w'
+      putStrLn $ "objective value = " ++ show obj
+
+      case PBFile.wboTopCost wbo of
+        Just top | top <= obj -> do
+          printf "objective value is greater than or equal to top cost (%d)\n" top
+          writeIORef errorRef True
+        _ -> return ()
+      
       return ()
+
     ModeMaxSAT -> do
-      (wcnf :: CNF.WCNF)  <- FF.readFile (optInput opt)
+      (wcnf :: CNF.WCNF)  <- FF.readFile (optInputFile opt)
       return ()
+
     ModeMIP -> do
       enc <- mapM mkTextEncoding $ optFileEncoding opt
-      mip <- MIP.readFile def{ MIP.optFileEncoding = enc } (optInput opt)
+      mip <- MIP.readFile def{ MIP.optFileEncoding = enc } (optInputFile opt)
       return ()
+
+  errored <- readIORef errorRef
+  when errored $ exitFailure
 
 getExt :: String -> String
 getExt name | (base, ext) <- splitExtension name =
@@ -145,7 +182,7 @@ showPBSum = mconcat . map showWeightedTerm
       where
         x = if c >= 0 then fromString "+" <> fromString (show c) else fromString (show c)
         xs = map showLit $ sortBy (comparing abs) lits
-    
+
     showLit :: (Monoid a, IsString a) => PBFile.Lit -> a
     showLit lit = if lit > 0 then v else fromString "~" <> v
       where
