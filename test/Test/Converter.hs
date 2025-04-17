@@ -800,6 +800,30 @@ prop_inequalitiesToEqualitiesPB = QM.monadicIO $ do
       QM.assert $ bounds m1 == (1, PBFile.pbNumVars opb)
       QM.assert $ isJust $ SAT.evalPBFormula m1 opb
 
+case_inequalitiesToEqualitiesPB_taut :: Assertion
+case_inequalitiesToEqualitiesPB_taut = PBFile.pbNumConstraints opb2 @?= 0
+  where
+    opb =
+      PBFile.Formula
+      { PBFile.pbObjectiveFunction = Nothing
+      , PBFile.pbConstraints = [([(1,[1]), (1,[])], PBFile.Ge, 0)] -- x1 + 1 >= 0
+      , PBFile.pbNumVars = 1
+      , PBFile.pbNumConstraints = 1
+      }
+    (opb2, _info) = inequalitiesToEqualitiesPB opb
+
+case_inequalitiesToEqualitiesPB_num_surplus_vars :: Assertion
+case_inequalitiesToEqualitiesPB_num_surplus_vars = (PBFile.pbNumVars opb2 @?= 3+2)
+  where
+    opb =
+      PBFile.Formula
+      { PBFile.pbObjectiveFunction = Nothing
+      , PBFile.pbConstraints = [([(4,[1]), (4,[2]), (6,[3])], PBFile.Ge, 8)] -- 4 x1 + 4 x2 + 6 x3 >= 8
+      , PBFile.pbNumVars = 3
+      , PBFile.pbNumConstraints = 1
+      }
+    (opb2, _info) = inequalitiesToEqualitiesPB opb
+
 prop_inequalitiesToEqualitiesPB_json :: Property
 prop_inequalitiesToEqualitiesPB_json = forAll arbitraryPBFormula $ \opb ->
   let ret@(_, info) = inequalitiesToEqualitiesPB opb
