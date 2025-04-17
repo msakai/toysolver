@@ -10,9 +10,12 @@ import Data.IORef
 import Data.List (sortBy)
 import Data.Ord
 import qualified Data.PseudoBoolean as PBFile
+import Data.Scientific
 import Data.String
+import qualified Data.Text as T
 import qualified Data.Version as V
 import qualified Numeric.Optimization.MIP as MIP
+import qualified Numeric.Optimization.MIP.Solution.Gurobi as GurobiSol
 import Options.Applicative hiding (Const)
 import System.Environment
 import System.Exit
@@ -174,6 +177,17 @@ main = do
     ModeMIP -> do
       enc <- mapM mkTextEncoding $ optFileEncoding opt
       mip <- MIP.readFile def{ MIP.optFileEncoding = enc } (optInputFile opt)
+
+      sol <- GurobiSol.readFile (optSolutionFile opt)
+      let m = MIP.solVariables sol
+          tol = def
+      forM_ (MIP.constraints mip) $ \constr -> do
+        unless (MIP.eval tol m constr) $ do
+          writeIORef errorRef True
+          case MIP.constrLabel constr of
+            Just name -> printf "violated: %s\n" (T.unpack name)
+            Nothing -> printf "violated: %s\n" (showMIPConstraint constr)
+
       return ()
 
   errored <- readIORef errorRef
@@ -210,6 +224,30 @@ showPBConstraint (lhs, op, rhs) =
   where
     f PBFile.Eq = fromString "="
     f PBFile.Ge = fromString ">="
+
+showMIPConstraint :: MIP.Constraint Scientific -> String
+showMIPConstraint constr = concat
+  [ case MIP.constrIndicator constr of
+      Nothing -> ""
+      Just (MIP.Var var, val) ->
+        let rhs =
+              case floatingOrInteger val of
+                Right (i :: Integer) -> show i
+                Left (_ :: Double) -> show val  -- should be error?
+         in T.unpack var ++ " = " ++ rhs ++ " -> "
+  , case MIP.constrLB constr of
+      MIP.NegInf -> ""
+      MIP.PosInf -> "+inf <= "
+      MIP.Finite x -> show x ++ " <= "
+  , showMIPExpr (MIP.constrExpr constr)
+  , case MIP.constrUB constr of
+      MIP.NegInf -> "<= -inf"
+      MIP.PosInf -> ""
+      MIP.Finite x -> " <= " ++ show x
+  ]
+
+showMIPExpr :: MIP.Expr Scientific -> String
+showMIPExpr = undefined
 
 parsePBLog :: String -> SAT.Model
 parsePBLog s = array (1, maximum (0 : map fst ls2)) ls2
