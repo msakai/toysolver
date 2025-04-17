@@ -106,8 +106,13 @@ main = do
 
   case mode of
     ModeSAT -> do
-      (cnf :: CNF.CNF) <- FF.readFile (optInputFile opt)
-      return ()
+      cnf  <- FF.readFile (optInputFile opt)
+      model <- liftM parseSATLog (readFile (optSolutionFile opt))
+
+      forM_ (CNF.cnfClauses cnf) $ \constr ->
+        unless (SAT.evalClause model (SAT.unpackClause constr)) $ do
+          printf "violated: %s\n" (showClause constr :: String)
+          writeIORef errorRef True
 
     ModePB -> do
       opb <-
@@ -160,7 +165,7 @@ main = do
         if SAT.evalClause model (SAT.unpackClause constr) then do
           return 0
         else if w == CNF.wcnfTopCost wcnf then do
-          printf "violated hard constraint: %s\n" (show constr)
+          printf "violated hard constraint: %s\n" (showClause constr :: String)
           return 0
         else do
           return w
@@ -181,6 +186,9 @@ getExt name | (base, ext) <- splitExtension name =
     ".gz" -> getExt base
 #endif
     s -> s
+
+showClause :: (Monoid a, IsString a) => SAT.PackedClause -> a
+showClause = foldr (\f g -> f <> fromString " " <> g) mempty . map (fromString . show) . SAT.unpackClause
 
 showPBSum :: (Monoid a, IsString a) => PBFile.Sum -> a
 showPBSum = mconcat . map showWeightedTerm
@@ -218,15 +226,30 @@ parsePBLog s = array (1, maximum (0 : map fst ls2)) ls2
         _ -> mzero
 
 parseMaxSATLog :: String -> SAT.Model
-parseMaxSATLog s = array (1, maximum (0 : map fst ls2)) ls2
+parseMaxSATLog s =
+  case f (lines s) Nothing [] of
+    (obj, vlines) ->
+      let tmp = [c | c <- concat vlines, not (isSpace c)]
+       in if all (\c -> c == '0' || c == '1') tmp then
+            array (1, length tmp) [(v, c=='1') | (v, c) <- zip [1..] tmp]
+          else
+            let ys = [if l > 0 then (l, True) else (-l, False) | vline <- vlines, w <- words vline, let l = read w]
+             in array (1, maximum (0 : map fst ys)) ys
   where
-    ls = lines s
-    ls2 = do
-      l <- ls
+    f :: [String] -> Maybe Integer -> [String] -> (Maybe Integer, [String])
+    f [] obj vlines = (obj, reverse vlines)
+    f (l : ls) obj vlines =
       case l of
-        'v':xs -> do
-          w <- words xs
-          case w of
-            '-':ys -> return (read ys, False)
-            ys -> return (read ys, True)
+        'o':xs -> f ls (Just (read (dropWhile isSpace xs))) []
+        'v':xs -> f ls obj (dropWhile isSpace xs : vlines)
+        _ -> f ls obj vlines
+
+parseSATLog :: String -> SAT.Model
+parseSATLog s = array (1, maximum (0 : map fst ys)) ys
+  where
+    xs = do
+      l <- lines s
+      case l of
+        'v':xs -> map read (words xs)
         _ -> mzero
+    ys = [if y > 0 then (y, True) else (-y, False) | y <- takeWhile (0 /=) xs]
