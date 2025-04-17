@@ -7,7 +7,7 @@ import Data.Array.IArray
 import Data.Char
 import Data.Default.Class
 import Data.IORef
-import Data.List (sortBy)
+import Data.List (intercalate, intersperse, sortBy)
 import Data.Ord
 import qualified Data.PseudoBoolean as PBFile
 import Data.Scientific
@@ -181,6 +181,7 @@ main = do
       sol <- GurobiSol.readFile (optSolutionFile opt)
       let m = MIP.solVariables sol
           tol = def
+
       forM_ (MIP.constraints mip) $ \constr -> do
         unless (MIP.eval tol m constr) $ do
           writeIORef errorRef True
@@ -247,7 +248,10 @@ showMIPConstraint constr = concat
   ]
 
 showMIPExpr :: MIP.Expr Scientific -> String
-showMIPExpr = undefined
+showMIPExpr e = intercalate " "
+  [ intercalate "*" (((if c >= 0 then "+" ++ show c else show c) : map (T.unpack . MIP.varName) vs))
+  | MIP.Term c vs <- MIP.terms e
+  ]
 
 parsePBLog :: String -> SAT.Model
 parsePBLog s = array (1, maximum (0 : map fst ls2)) ls2
