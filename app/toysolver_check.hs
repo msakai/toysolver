@@ -8,6 +8,7 @@ import Data.Char
 import Data.Default.Class
 import Data.IORef
 import Data.List (intercalate, intersperse, sortBy)
+import qualified Data.Map.Lazy as Map
 import Data.Ord
 import qualified Data.PseudoBoolean as PBFile
 import Data.Scientific
@@ -182,12 +183,52 @@ main = do
       let m = MIP.solVariables sol
           tol = def
 
+      let objVal = MIP.eval tol m (MIP.objExpr (MIP.objectiveFunction mip))
+      putStrLn $ "objective value = " ++ show objVal
+      case MIP.solObjectiveValue sol of
+        Nothing -> return ()
+        Just declaredObjVal -> do
+          unless (abs (objVal - declaredObjVal) <= MIP.feasibilityTol tol) $ do
+            printf "declared objective value (%s) does not match to the computed value (%s)\n"
+              (show declaredObjVal) (show objVal)
+
+      forM (Map.toList (MIP.varDomains mip)) $ \(v, (vt, bounds@(lb,ub))) -> do
+        let val = MIP.eval tol m v
+            flag1 =
+              case vt of
+                MIP.ContinuousVariable -> True
+                MIP.SemiContinuousVariable -> True
+                MIP.IntegerVariable -> isIntegral tol val
+                MIP.SemiIntegerVariable -> isIntegral tol val
+            flag2 =
+              case vt of
+                MIP.ContinuousVariable -> isInBounds tol bounds val
+                MIP.IntegerVariable -> isInBounds tol bounds val
+                MIP.SemiIntegerVariable -> isInBounds tol (0,0) val || isInBounds tol bounds val
+                MIP.SemiContinuousVariable -> isInBounds tol (0,0) val || isInBounds tol bounds val
+        unless flag1 $ do
+          writeIORef errorRef True
+          printf "variable %s is not integral\n" (T.unpack (MIP.varName v))
+        unless flag2 $ do
+          writeIORef errorRef True
+          let f MIP.NegInf = "-inf"
+              f MIP.PosInf = "+inf"
+              f (MIP.Finite x) = show x
+          printf "variable %s is out of bounds lb=%s ub=%s\n" (T.unpack (MIP.varName v)) (f lb) (f ub)
+
       forM_ (MIP.constraints mip) $ \constr -> do
         unless (MIP.eval tol m constr) $ do
           writeIORef errorRef True
           case MIP.constrLabel constr of
             Just name -> printf "violated: %s\n" (T.unpack name)
             Nothing -> printf "violated: %s\n" (showMIPConstraint constr)
+
+      forM_ (MIP.sosConstraints mip) $ \constr -> do
+        unless (MIP.eval tol m constr) $ do
+          writeIORef errorRef True
+          case MIP.sosLabel constr of
+            Just name -> printf "violated: %s\n" (T.unpack name)
+            Nothing -> printf "violated: %s\n" (showMIPSOSConstraint constr)
 
       return ()
 
@@ -247,6 +288,13 @@ showMIPConstraint constr = concat
       MIP.Finite x -> " <= " ++ show x
   ]
 
+showMIPSOSConstraint :: MIP.SOSConstraint Scientific -> String
+showMIPSOSConstraint constr = concat $
+  [show (MIP.sosType constr), " ::"] ++ [
+    " " ++ T.unpack (MIP.varName v) ++ " : " ++ show r
+  | (v, r) <- MIP.sosBody constr
+  ]
+
 showMIPExpr :: MIP.Expr Scientific -> String
 showMIPExpr e = intercalate " "
   [ intercalate "*" (((if c >= 0 then "+" ++ show c else show c) : map (T.unpack . MIP.varName) vs))
@@ -295,3 +343,11 @@ parseSATLog s = array (1, maximum (0 : map fst ys)) ys
         'v':xs -> map read (words xs)
         _ -> mzero
     ys = [if y > 0 then (y, True) else (-y, False) | y <- takeWhile (0 /=) xs]
+
+isIntegral :: RealFrac r => MIP.Tol r -> r -> Bool
+isIntegral tol x = abs (x - fromIntegral (floor (x + 0.5) :: Integer)) <= MIP.integralityTol tol
+
+isInBounds :: (Num r, Ord r) => MIP.Tol r -> MIP.Bounds r -> r -> Bool
+isInBounds tol (lb, ub) x =
+  lb - MIP.Finite (MIP.feasibilityTol tol) <= MIP.Finite x &&
+  MIP.Finite x <= ub + MIP.Finite (MIP.feasibilityTol tol)

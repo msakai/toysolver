@@ -550,11 +550,13 @@ Executable toysolver-check
   HS-Source-Dirs: app
   Build-Depends:
     array,
+    containers,
     data-default-class,
     filepath,
     MIP,
     optparse-applicative,
     pseudo-boolean,
+    scientific,
     text,
     toysolver
 
