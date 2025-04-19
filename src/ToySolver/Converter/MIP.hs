@@ -63,6 +63,7 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
 import Data.VectorSpace
+import Text.Printf
 
 import qualified Data.PseudoBoolean as PBFile
 import qualified Numeric.Optimization.MIP as MIP
@@ -406,94 +407,105 @@ addMIP enc mip = runExceptT $ addMIP' enc mip
 
 addMIP' :: forall m enc. (SAT.AddPBNL m enc, PrimMonad m) => enc -> MIP.Problem Rational -> ExceptT String m (Integer.Expr, IP2PBInfo)
 addMIP' enc mip = do
-  if not (Set.null nivs) then do
-    throwE $ "cannot handle non-integer variables: " ++ intercalate ", " (map (T.unpack . MIP.varName) (Set.toList nivs))
-  else do
-    vmap <- liftM Map.fromList $ revForM (Set.toList ivs) $ \v -> do
-      case MIP.getBounds mip v of
-        (MIP.Finite lb, MIP.Finite ub) -> do
-          v2 <- lift $ Integer.newVar enc (ceiling lb) (floor ub)
-          return (v,v2)
-        _ -> do
-          throwE $ "cannot handle unbounded variable: " ++ T.unpack (MIP.varName v)
-    forM_ (MIP.constraints mip) $ \c -> do
-      let lhs = MIP.constrExpr c
-      let f op rhs = do
-            let d = foldl' lcm 1 (map denominator  (rhs:[r | MIP.Term r _ <- MIP.terms lhs]))
-                lhs' = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms lhs]
-                rhs' = asInteger (rhs * fromIntegral d)
-                c2 = case op of
-                       MIP.Le  -> lhs' .<=. fromInteger rhs'
-                       MIP.Ge  -> lhs' .>=. fromInteger rhs'
-                       MIP.Eql -> lhs' .==. fromInteger rhs'
-            case MIP.constrIndicator c of
-              Nothing -> lift $ Integer.addConstraint enc c2
-              Just (var, val) -> do
-                let var' = asBin (vmap Map.! var)
-                case val of
-                  1 -> lift $ Integer.addConstraintSoft enc var' c2
-                  0 -> lift $ Integer.addConstraintSoft enc (SAT.litNot var') c2
-                  _ -> return ()
-          g = do
-            case MIP.constrIndicator c of
-              Nothing -> lift $ SAT.addClause enc []
-              Just (var, val) -> do
-                let var' = asBin (vmap Map.! var)
-                case val of
-                  1 -> lift $ SAT.addClause enc [- var']
-                  0 -> lift $ SAT.addClause enc [var']
-                  _ -> return ()
-      case (MIP.constrLB c, MIP.constrUB c) of
-        (MIP.Finite x1, MIP.Finite x2) | x1==x2 -> f MIP.Eql x2
-        (lb, ub) -> do
-          case lb of
-            MIP.NegInf -> return ()
-            MIP.Finite x -> f MIP.Ge x
-            MIP.PosInf -> g
-          case ub of
-            MIP.NegInf -> g
-            MIP.Finite x -> f MIP.Le x
-            MIP.PosInf -> return ()
+  unless (Set.null nivs) $ do
+    let n = Set.size nivs
+        vars = intercalate ", " (map (T.unpack . MIP.varName) (take 10 (Set.toList nivs)) ++ ["..." | n > 10])
+        msg = printf "Unsupported problem: %d non-integer variables (%s)" n vars
+    throwE msg
 
-    nonZeroTableRef <- lift $ newMutVar Map.empty
-    let isNonZero :: MIP.Var -> ExceptT String m SAT.Lit
-        isNonZero v = do
-          tbl <- lift $ readMutVar nonZeroTableRef
-          case Map.lookup v tbl of
-            Just lit -> pure lit
-            Nothing -> do
-              let (MIP.Finite lb, MIP.Finite ub) = MIP.getBounds mip v
-                  e@(Integer.Expr s) = vmap Map.! v
-              lit <-
-                if lb == 0 && ub == 1 then do
-                  return (asBin e)
-                else do
-                  v <- lift $ SAT.newVar enc
-                  -- F(v) → F(s ≠ 0)
-                  -- ⇐ s≠0 → v
-                  -- ⇔ ¬v → s=0
-                  lift $ SAT.addPBNLExactlySoft enc (- v) s 0
-                  return v
-              lift $ writeMutVar nonZeroTableRef (Map.insert v lit tbl)
-              pure lit
+  let isBounded (_, (MIP.Finite _, MIP.Finite _)) = True
+      isBounded (_, _) = False
+      (bounded, unbounded) = Map.partition isBounded (MIP.varDomains mip)
+  unless (Map.null unbounded) $ do
+    let n = Set.size nivs
+        vars = intercalate ", " (map (T.unpack . MIP.varName) (take 10 (Map.keys unbounded)) ++ ["..." | n > 10])
+        msg = printf "Unsupported problem: %d unbounded variables (%s)" n vars
+    throwE msg
+  vmap <- fmap Map.fromDistinctAscList $ forM (Map.toAscList bounded) $ \(v, (vt, bounds)) ->
+    case bounds of
+      (MIP.Finite lb, MIP.Finite ub) -> do
+        v2 <- lift $ Integer.newVar enc (ceiling lb) (floor ub)
+        return (v,v2)
+      _ -> error "should not happen"
 
-    forM_ (MIP.sosConstraints mip) $ \MIP.SOSConstraint{ MIP.sosType = typ, MIP.sosBody = xs } -> do
-      case typ of
-        MIP.S1 -> do
-          ys <- mapM (isNonZero . fst) xs
-          lift $ SAT.addAtMost enc ys 1
-        MIP.S2 -> do
-          ys <- mapM (isNonZero . fst) $ sortBy (comparing snd) xs
-          lift $ SAT.addSOS2 enc ys
+  forM_ (MIP.constraints mip) $ \c -> do
+    let lhs = MIP.constrExpr c
+    let f op rhs = do
+          let d = foldl' lcm 1 (map denominator  (rhs:[r | MIP.Term r _ <- MIP.terms lhs]))
+              lhs' = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms lhs]
+              rhs' = asInteger (rhs * fromIntegral d)
+              c2 = case op of
+                     MIP.Le  -> lhs' .<=. fromInteger rhs'
+                     MIP.Ge  -> lhs' .>=. fromInteger rhs'
+                     MIP.Eql -> lhs' .==. fromInteger rhs'
+          case MIP.constrIndicator c of
+            Nothing -> lift $ Integer.addConstraint enc c2
+            Just (var, val) -> do
+              let var' = asBin (vmap Map.! var)
+              case val of
+                1 -> lift $ Integer.addConstraintSoft enc var' c2
+                0 -> lift $ Integer.addConstraintSoft enc (SAT.litNot var') c2
+                _ -> return ()
+        g = do
+          case MIP.constrIndicator c of
+            Nothing -> lift $ SAT.addClause enc []
+            Just (var, val) -> do
+              let var' = asBin (vmap Map.! var)
+              case val of
+                1 -> lift $ SAT.addClause enc [- var']
+                0 -> lift $ SAT.addClause enc [var']
+                _ -> return ()
+    case (MIP.constrLB c, MIP.constrUB c) of
+      (MIP.Finite x1, MIP.Finite x2) | x1==x2 -> f MIP.Eql x2
+      (lb, ub) -> do
+        case lb of
+          MIP.NegInf -> return ()
+          MIP.Finite x -> f MIP.Ge x
+          MIP.PosInf -> g
+        case ub of
+          MIP.NegInf -> g
+          MIP.Finite x -> f MIP.Le x
+          MIP.PosInf -> return ()
 
-    let obj = MIP.objectiveFunction mip
-        d = foldl' lcm 1 [denominator r | MIP.Term r _ <- MIP.terms (MIP.objExpr obj)] *
-            (if MIP.objDir obj == MIP.OptMin then 1 else -1)
-        obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms (MIP.objExpr obj)]
+  nonZeroTableRef <- lift $ newMutVar Map.empty
+  let isNonZero :: MIP.Var -> ExceptT String m SAT.Lit
+      isNonZero v = do
+        tbl <- lift $ readMutVar nonZeroTableRef
+        case Map.lookup v tbl of
+          Just lit -> pure lit
+          Nothing -> do
+            let (MIP.Finite lb, MIP.Finite ub) = MIP.getBounds mip v
+                e@(Integer.Expr s) = vmap Map.! v
+            lit <-
+              if lb == 0 && ub == 1 then do
+                return (asBin e)
+              else do
+                v <- lift $ SAT.newVar enc
+                -- F(v) → F(s ≠ 0)
+                -- ⇐ s≠0 → v
+                -- ⇔ ¬v → s=0
+                lift $ SAT.addPBNLExactlySoft enc (- v) s 0
+                return v
+            lift $ writeMutVar nonZeroTableRef (Map.insert v lit tbl)
+            pure lit
 
-    nonZeroTable <- readMutVar nonZeroTableRef
+  forM_ (MIP.sosConstraints mip) $ \MIP.SOSConstraint{ MIP.sosType = typ, MIP.sosBody = xs } -> do
+    case typ of
+      MIP.S1 -> do
+        ys <- mapM (isNonZero . fst) xs
+        lift $ SAT.addAtMost enc ys 1
+      MIP.S2 -> do
+        ys <- mapM (isNonZero . fst) $ sortBy (comparing snd) xs
+        lift $ SAT.addSOS2 enc ys
 
-    return (obj2, IP2PBInfo vmap nonZeroTable d)
+  let obj = MIP.objectiveFunction mip
+      d = foldl' lcm 1 [denominator r | MIP.Term r _ <- MIP.terms (MIP.objExpr obj)] *
+          (if MIP.objDir obj == MIP.OptMin then 1 else -1)
+      obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms (MIP.objExpr obj)]
+
+  nonZeroTable <- readMutVar nonZeroTableRef
+
+  return (obj2, IP2PBInfo vmap nonZeroTable d)
 
   where
     ivs = MIP.integerVariables mip
