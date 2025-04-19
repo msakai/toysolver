@@ -373,6 +373,11 @@ transformWBO2MaxSAT o (wbo, Trail info) =
   case wbo2maxsatWith (optPBEncoding o) wbo of
     (wcnf, info') -> (wcnf, Trail (ComposedTransformer info info'))
 
+transformNormalizeOPB :: (PBFile.Formula, Trail SAT.Model) -> (PBFile.Formula, Trail SAT.Model)
+transformNormalizeOPB (opb, Trail info) =
+  case normalizePB opb of
+    (opb', info') -> (opb', Trail (ComposedTransformer info info'))
+
 transformPB2QUBO :: (PBFile.Formula, Trail SAT.Model) -> ((QUBO.Problem Integer, Integer), Trail QUBO.Solution)
 transformPB2QUBO (opb, Trail info) =
   case pb2qubo opb of
@@ -458,8 +463,10 @@ writeProblem o problem = do
               ProbMIP _ _   -> pb2lsp (fst opbAndTrail)
       case getExt fname of
         ".opb" -> do
-          FF.writeFile fname $ normalizePB (fst opbAndTrail)
-          writeInfo' (snd opbAndTrail)
+          case transformNormalizeOPB opbAndTrail of
+            (opb, trail) -> do
+              FF.writeFile fname opb
+              writeInfo' trail
         ".wbo" -> do
           FF.writeFile fname $ normalizeWBO (fst wboAndTrail)
           writeInfo' (snd wboAndTrail)

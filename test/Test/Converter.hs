@@ -614,9 +614,6 @@ prop_wbo2pb = QM.monadicIO $ do
   let (opb, info) = wbo2pb wbo
   QM.monitor $ counterexample (show opb)
 
-  -- no constant terms in objective function
-  QM.assert $ all (\(_,ls) -> length ls > 0) $ fromMaybe [] (PBFile.pbObjectiveFunction opb)
-
   solver1 <- arbitrarySolver
   solver2 <- arbitrarySolver
   method <- QM.pick arbitrary
@@ -830,6 +827,113 @@ prop_inequalitiesToEqualitiesPB_json = forAll arbitraryPBFormula $ \opb ->
       json = J.encode info
    in counterexample (show ret) $ counterexample (show json) $
       J.eitherDecode json == Right info
+
+prop_normalizePB :: Property
+prop_normalizePB = QM.monadicIO $ do
+  opb <- QM.pick arbitraryPBFormula
+  let (opb2, info) = normalizePB opb
+  QM.monitor $ counterexample (show opb2)
+
+  QM.assert $
+    PBFile.pbNumVars opb2 == PBFile.pbNumVars opb ||
+    PBFile.pbNumVars opb2 == PBFile.pbNumVars opb + 1
+  QM.assert $ and
+    [ case t of
+        (_, []) -> False
+        (_, [l]) -> l > 0
+        _ -> True
+    | s <- maybeToList (PBFile.pbObjectiveFunction opb2) ++ [lhs | (lhs,_,_) <- PBFile.pbConstraints opb2]
+    , t <- s
+    ]
+
+  solver1 <- arbitrarySolver
+  solver2 <- arbitrarySolver
+  ret1 <- QM.run $ solvePBFormula solver1 opb
+  ret2 <- QM.run $ solvePBFormula solver2 opb2
+  QM.assert $ isJust ret1 == isJust ret2
+  case ret1 of
+    Nothing -> return ()
+    Just m1 -> do
+      let m2 = transformForward info m1
+      QM.assert $ bounds m2 == (1, PBFile.pbNumVars opb2)
+      QM.assert $ isJust $ SAT.evalPBFormula m2 opb2
+  case ret2 of
+    Nothing -> return ()
+    Just m2 -> do
+      let m1 = transformBackward info m2
+      QM.assert $ bounds m1 == (1, PBFile.pbNumVars opb)
+      QM.assert $ isJust $ SAT.evalPBFormula m1 opb    
+
+case_normalizePB_1 :: Assertion
+case_normalizePB_1 = fst (normalizePB opb) @?= expected
+  where
+    opb =
+      PBFile.Formula
+      { PBFile.pbNumVars = 2
+      , PBFile.pbNumConstraints = 1
+      , PBFile.pbObjectiveFunction = Just [(1, [1,2]), (1, [-1]), (1, [])]
+      , PBFile.pbConstraints =
+          [ ([(1, [1,2]), (1, [-1]), (1, [])], PBFile.Ge, 2)
+          ]
+      }
+    expected =
+      PBFile.Formula
+      { PBFile.pbNumVars = 3
+      , PBFile.pbNumConstraints = 1
+      , PBFile.pbObjectiveFunction = Just [(1, [1,2]), (-1, [1]), (2, [3])]
+      , PBFile.pbConstraints =
+          [ ([(1, [1,2]), (-1, [1])], PBFile.Ge, 0)
+          , ([(1, [3])], PBFile.Ge, 1)
+          ]
+      }
+
+case_normalizePB_2 :: Assertion
+case_normalizePB_2 = fst (normalizePB opb) @?= expected
+  where
+    opb =
+      PBFile.Formula
+      { PBFile.pbNumVars = 2
+      , PBFile.pbNumConstraints = 1
+      , PBFile.pbObjectiveFunction = Just [(1, [1,2]), (1, [-1]), (1, [])]
+      , PBFile.pbConstraints =
+          [ ([(1, [1,2]), (1, [-1]), (1, [])], PBFile.Ge, 2)
+          , ([(3, [2])], PBFile.Ge, 2)
+          ]
+      }
+    expected =
+      PBFile.Formula
+      { PBFile.pbNumVars = 2
+      , PBFile.pbNumConstraints = 1
+      , PBFile.pbObjectiveFunction = Just [(1, [1,2]), (-1, [1]), (2, [2])]
+      , PBFile.pbConstraints =
+          [ ([(1, [1,2]), (-1, [1])], PBFile.Ge, 0)
+          , ([(3, [2])], PBFile.Ge, 2)
+          ]
+      }
+
+case_normalizePB_3 :: Assertion
+case_normalizePB_3 = fst (normalizePB opb) @?= expected
+  where
+    opb =
+      PBFile.Formula
+      { PBFile.pbNumVars = 2
+      , PBFile.pbNumConstraints = 1
+      , PBFile.pbObjectiveFunction = Just [(1, [1,2]), (1, [-1]), (1, [])]
+      , PBFile.pbConstraints =
+          [ ([(1, [1,2]), (1, [-1]), (1, [])], PBFile.Ge, 2)
+          , ([(-2, [-2])], PBFile.Ge, -1)
+          ]
+      }
+    expected =
+      PBFile.Formula
+      { PBFile.pbNumVars = 2
+      , PBFile.pbNumConstraints = 1
+      , PBFile.pbObjectiveFunction = Just [(1, [1,2]), (-1, [1]), (2, [2])]
+      , PBFile.pbConstraints =
+          [ ([(1, [1,2]), (-1, [1])], PBFile.Ge, 0)
+          , ([(2, [2])], PBFile.Ge, 1)
+          ]
+      }
 
 ------------------------------------------------------------------------
 
