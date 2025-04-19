@@ -40,7 +40,8 @@ data Options = Options
   , optMode :: Maybe Mode
   , optFileEncoding :: Maybe String
   , optPBFastParser :: Bool
-  } deriving (Eq, Show)
+  , optMIPTol :: MIP.Tol Scientific
+  }
 
 optionsParser :: Parser Options
 optionsParser = Options
@@ -49,6 +50,7 @@ optionsParser = Options
   <*> modeOption
   <*> fileEncodingOption
   <*> pbFastParserOption
+  <*> mipTolOptions
   where
     fileInput :: Parser FilePath
     fileInput = argument str (metavar "FILE")
@@ -74,6 +76,28 @@ optionsParser = Options
     pbFastParserOption = switch
       $  long "pb-fast-parser"
       <> help "use attoparsec-based parser instead of megaparsec-based one for speed"
+
+    mipTolOptions :: Parser (MIP.Tol Scientific)
+    mipTolOptions = MIP.Tol <$> intTol <*> feasTol <*> optTol
+      where
+        intTol = option auto
+          $  long "tol-integrality"
+          <> metavar "REAL"
+          <> help "If a value of integer variable is within this amount from its nearest integer, it is considered feasible."
+          <> value (MIP.integralityTol def)
+          <> showDefault
+        feasTol = option auto
+          $  long "tol-feasibility"
+          <> metavar "REAL"
+          <> help "If the amount of violation of constraints is within this amount, it is considered feasible."
+          <> value (MIP.feasibilityTol def)
+          <> showDefault
+        optTol = option auto
+          $  long "tol-optimality"
+          <> metavar "REAL"
+          <> help "Feasiblity tolerance of dual constraints."
+          <> value (MIP.optimalityTol def)
+          <> showDefault
 
 parserInfo :: ParserInfo Options
 parserInfo = info (helper <*> versionOption <*> optionsParser)
@@ -181,7 +205,7 @@ main = do
 
       sol <- GurobiSol.readFile (optSolutionFile opt)
       let m = MIP.solVariables sol
-          tol = def
+          tol = optMIPTol opt
 
       let objVal = MIP.eval tol m (MIP.objExpr (MIP.objectiveFunction mip))
       putStrLn $ "objective value = " ++ show objVal
