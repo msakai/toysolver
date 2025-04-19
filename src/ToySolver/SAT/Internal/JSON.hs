@@ -74,18 +74,24 @@ parseConst :: J.FromJSON a => J.Value -> J.Parser a
 parseConst = withTypedObject "constant" $ \obj -> obj .: "value"
 
 jPBSum :: SAT.PBSum -> J.Value
+jPBSum [t] = jPBWeightedTerm t
 jPBSum s = J.object
   [ "type" .= ("operator" :: J.Value)
   , "name" .= ("+" :: J.Value)
-  , "operands" .=
-      [ J.object
-          [ "type" .= ("operator" :: J.Value)
-          , "name" .= ("*" :: J.Value)
-          , "operands" .= (jConst c : [jLit lit | lit <- lits])
-          ]
-      | (c, lits) <- s
-      ]
+  , "operands" .= map jPBWeightedTerm s
   ]
+
+jPBWeightedTerm :: PBFile.WeightedTerm -> J.Value
+jPBWeightedTerm (c, lits) =
+  case [jConst c | c /= 1] ++ [jLit lit | lit <- lits] of
+    [] -> jConst (1 :: Int)
+    [x] -> x
+    xs ->
+      J.object
+        [ "type" .= ("operator" :: J.Value)
+        , "name" .= ("*" :: J.Value)
+        , "operands" .= xs
+        ]
 
 parsePBSum :: J.Value -> J.Parser SAT.PBSum
 parsePBSum x = msum
