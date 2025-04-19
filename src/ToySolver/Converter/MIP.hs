@@ -50,7 +50,7 @@ import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
 import Data.Default.Class
 import qualified Data.IntSet as IntSet
-import Data.List (intercalate, foldl', sortBy)
+import Data.List (intercalate, foldl', foldl1',  sortBy)
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -322,7 +322,7 @@ ip2pb mip = runST $ runExceptT $ m
       formula <- lift $ getPBFormula db
       return $ (formula{ PBFile.pbObjectiveFunction = Just obj }, info)
 
-data IP2PBInfo = IP2PBInfo (Map MIP.Var Integer.Expr) (Map MIP.Var SAT.Lit) !Integer
+data IP2PBInfo = IP2PBInfo (Map MIP.Var Integer.Expr) (Map MIP.Var SAT.Lit) !Rational
   deriving (Eq, Show)
 
 instance Transformer IP2PBInfo where
@@ -330,7 +330,7 @@ instance Transformer IP2PBInfo where
   type Target IP2PBInfo = SAT.Model
 
 instance ForwardTransformer IP2PBInfo where
-  transformForward (IP2PBInfo vmap nonZeroTable _d) sol
+  transformForward (IP2PBInfo vmap nonZeroTable _s) sol
     | Map.keysSet vmap /= Map.keysSet sol = error "variables mismatch"
     | otherwise = array (1, x_max) $
         [(x, val) | (var, Integer.Expr s) <- Map.toList vmap, (x, val) <- f s (sol Map.! var)] ++
@@ -356,20 +356,20 @@ instance ForwardTransformer IP2PBInfo where
           d = numerator val - sum [c | (c, []) <- s]
 
 instance BackwardTransformer IP2PBInfo where
-  transformBackward (IP2PBInfo vmap _nonZeroTable _d) m = fmap (toRational . Integer.eval m) vmap
+  transformBackward (IP2PBInfo vmap _nonZeroTable _s) m = fmap (toRational . Integer.eval m) vmap
 
 instance ObjValueTransformer IP2PBInfo where
   type SourceObjValue IP2PBInfo = Rational
   type TargetObjValue IP2PBInfo = Integer
 
 instance ObjValueForwardTransformer IP2PBInfo where
-  transformObjValueForward (IP2PBInfo _vmap _nonZeroTable d) val = asInteger (val * fromIntegral d)
+  transformObjValueForward (IP2PBInfo _vmap _nonZeroTable s) val = asInteger (val * s)
 
 instance ObjValueBackwardTransformer IP2PBInfo where
-  transformObjValueBackward (IP2PBInfo _vmap _nonZeroTable d) val = fromIntegral val / fromIntegral d
+  transformObjValueBackward (IP2PBInfo _vmap _nonZeroTable s) val = fromIntegral val / s
 
 instance J.ToJSON IP2PBInfo where
-  toJSON (IP2PBInfo vmap nonZeroTable d) =
+  toJSON (IP2PBInfo vmap nonZeroTable s) =
     J.object
     [ "type" .= ("IP2PBInfo" :: J.Value)
     , "substitutions" .= J.object
@@ -380,7 +380,11 @@ instance J.ToJSON IP2PBInfo where
         [ toKey (MIP.varName v) .= (jLitName lit :: J.Value)
         | (v, lit) <- Map.toList nonZeroTable
         ]
-    , "objective_function_scale_factor" .= d
+    , "objective_function_scale_factor" .=
+        J.object
+        [ "numerator" .= numerator s
+        , "denominator" .= denominator s
+        ]
     ]
     where
 #if MIN_VERSION_aeson(2,0,0)
@@ -399,8 +403,13 @@ instance J.FromJSON IP2PBInfo where
     nonZeroTable <- liftM Map.fromList $ forM (Map.toList tmp2) $ \(name, s) -> do
       lit <- parseLitName s
       return (MIP.Var name, lit)
-    d <- obj .: "objective_function_scale_factor"
-    pure $ IP2PBInfo subst nonZeroTable d
+    v <- obj .: "objective_function_scale_factor"
+    s <- fmap fromInteger (J.parseJSON v) `mplus` parseRat v
+    pure $ IP2PBInfo subst nonZeroTable s
+    where
+      parseRat = J.withObject "Rational" $ \obj -> (%)
+        <$> obj .: "numerator"
+        <*> obj .: "denominator"
 
 addMIP :: (SAT.AddPBNL m enc, PrimMonad m) => enc -> MIP.Problem Rational -> m (Either String (Integer.Expr, IP2PBInfo))
 addMIP enc mip = runExceptT $ addMIP' enc mip
@@ -452,9 +461,12 @@ addMIP' enc mip = do
   forM_ (MIP.constraints mip) $ \c -> do
     let lhs = MIP.constrExpr c
     let f op rhs = do
-          let d = foldl' lcm 1 (map denominator  (rhs:[r | MIP.Term r _ <- MIP.terms lhs]))
-              lhs' = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms lhs]
-              rhs' = asInteger (rhs * fromIntegral d)
+          let m = foldl' lcm 1 (map denominator (rhs:[r | MIP.Term r _ <- MIP.terms lhs]))
+              d = foldl1' gcd (map (abs . numerator) (rhs:[r | MIP.Term r _ <- MIP.terms lhs]))
+              -- For ease of understanding, no scaling is performed if the values were already integers
+              s = if m == 1 then 1 else m % d
+              lhs' = sumV [asInteger (r * s) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms lhs]
+              rhs' = asInteger (rhs * s)
               c2 = case op of
                      MIP.Le  -> lhs' .<=. fromInteger rhs'
                      MIP.Ge  -> lhs' .>=. fromInteger rhs'
@@ -519,13 +531,16 @@ addMIP' enc mip = do
         lift $ SAT.addSOS2 enc ys
 
   let obj = MIP.objectiveFunction mip
-      d = foldl' lcm 1 [denominator r | MIP.Term r _ <- MIP.terms (MIP.objExpr obj)] *
-          (if MIP.objDir obj == MIP.OptMin then 1 else -1)
-      obj2 = sumV [asInteger (r * fromIntegral d) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms (MIP.objExpr obj)]
+      m = foldl' lcm 1 [denominator r | MIP.Term r _ <- MIP.terms (MIP.objExpr obj)]
+      d = if null (MIP.terms (MIP.objExpr obj)) then 1
+          else foldl1' gcd [abs (numerator r) | MIP.Term r _ <- MIP.terms (MIP.objExpr obj)]
+      -- For ease of understanding, no scaling is performed if the values were already integers
+      s = (if MIP.objDir obj == MIP.OptMin then 1 else -1) * (if m == 1 then 1 else m % d)
+      obj2 = sumV [asInteger (r * s) *^ product [vmap Map.! v | v <- vs] | MIP.Term r vs <- MIP.terms (MIP.objExpr obj)]
 
   nonZeroTable <- readMutVar nonZeroTableRef
 
-  return (obj2, IP2PBInfo vmap nonZeroTable d)
+  return (obj2, IP2PBInfo vmap nonZeroTable s)
 
   where
     asBin :: Integer.Expr -> SAT.Lit
