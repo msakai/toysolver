@@ -104,6 +104,7 @@ import qualified Data.PseudoBoolean as PBFile
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
 
+import ToySolver.Data.Boolean (true)
 import ToySolver.Converter.Base
 import qualified ToySolver.Combinatorial.SubsetSum as SubsetSum
 import qualified ToySolver.Converter.PB.Internal.Product as Product
@@ -122,21 +123,59 @@ import ToySolver.SAT.Store.PB
 
 -- -----------------------------------------------------------------------------
 
--- XXX: we do not normalize objective function, because normalization might
--- introduce constant terms, but OPB file format does not allow constant terms.
+-- | Normalize 'PBFile.Formula' to be suitable for writing as OPB file.
 --
--- Options:
--- (1) not normalize objective function (current implementation),
--- (2) normalize and simply delete constant terms (in pseudo-boolean package?),
--- (3) normalize and introduce dummy variable to make constant terms
---     into non-constant terms (in pseudo-boolean package?).
-normalizePB :: PBFile.Formula -> PBFile.Formula
+-- This may introduce a new variable.
+normalizePB :: PBFile.Formula -> (PBFile.Formula, PBTseitinInfo)
 normalizePB formula =
-  formula
-  { PBFile.pbConstraints =
-      map normalizePBConstraint (PBFile.pbConstraints formula)
-  }
+  case PBFile.pbObjectiveFunction formula of
+    Nothing ->
+      ( formula{ PBFile.pbConstraints = cs }
+      , PBTseitinInfo (TseitinInfo nv nv IntMap.empty)
+      )
+    Just obj | (obj', offset) <- normalizePBSum obj ->
+      if offset == 0 then
+        ( formula
+          { PBFile.pbObjectiveFunction = Just obj'
+          , PBFile.pbConstraints = cs
+          }
+        , PBTseitinInfo (TseitinInfo nv nv IntMap.empty)
+        )
+      else
+        case msum [detectTrueVar c | c <- cs] of
+          Just v ->
+            ( formula
+              { PBFile.pbObjectiveFunction = Just (obj' ++ [(offset, [v])])
+              , PBFile.pbConstraints = cs
+              }
+            , PBTseitinInfo (TseitinInfo nv nv IntMap.empty)
+            )
+          Nothing ->
+            let v = nv + 1
+             in ( formula
+                  { PBFile.pbObjectiveFunction = Just (obj' ++ [(offset, [v])])
+                  , PBFile.pbConstraints = cs ++ [([(1, [v])], PBFile.Ge, 1)]
+                  , PBFile.pbNumVars = v
+                  }
+                , PBTseitinInfo (TseitinInfo nv v (IntMap.singleton v true))
+                )
+  where
+    cs = map normalizePBConstraint (PBFile.pbConstraints formula)
+    nv = PBFile.pbNumVars formula
 
+detectTrueVar :: PBFile.Constraint -> Maybe SAT.Var
+detectTrueVar (lhs, op, rhs) =
+  case op of
+    PBFile.Ge -> f lhs rhs
+    PBFile.Eq -> f lhs rhs `mplus` f [(- c, ls) | (c,ls) <- lhs] (- rhs)
+  where
+    f [(c, ls)] rhs
+      | c > 0 && (rhs + c - 1) `div` c >= 1 =
+          -- c L ≥ rhs ↔ L ≥ ⌈rhs / c⌉
+          listToMaybe [l | l <- ls, l > 0]
+    f _ _ = Nothing
+
+-- | Normalize 'PBFile.SoftFormula' to be suitable for writing as WBO file.
 normalizeWBO :: PBFile.SoftFormula -> PBFile.SoftFormula
 normalizeWBO formula =
   formula
@@ -146,11 +185,18 @@ normalizeWBO formula =
 
 normalizePBConstraint :: PBFile.Constraint -> PBFile.Constraint
 normalizePBConstraint (lhs,op,rhs) =
-  case mapAccumL h 0 lhs of
-    (offset, lhs') -> (lhs', op, rhs - offset)
+  case normalizePBSum lhs of
+    (lhs', offset) -> (lhs', op, rhs - offset)
+
+normalizePBSum :: PBFile.Sum -> (PBFile.Sum, Integer)
+normalizePBSum s =
+  case foldl' h ([], 0) s of
+    (s', offset) -> (reverse s', offset)
   where
-    h s (w,[x]) | x < 0 = (s+w, (-w,[-x]))
-    h s t = (s,t)
+    h (s', offset) (0,_) = (s', offset)
+    h (s', offset) (w,[x]) | x < 0 = ((-w,[-x]) : s', offset+w)
+    h (s', offset) (w,[]) = (s', offset + w)
+    h (s', offset) t = (t : s', offset)
 
 -- -----------------------------------------------------------------------------
 
@@ -754,7 +800,6 @@ addWBO db wbo = do
   objRef <- newMutVar []
   objOffsetRef <- newMutVar 0
   defsRef <- newMutVar []
-  trueLitRef <- newMutVar SAT.litUndef
 
   forM_ (PBFile.wboConstraints wbo) $ \(cost, constr@(lhs,op,rhs)) -> do
     case cost of
@@ -762,11 +807,6 @@ addWBO db wbo = do
         case op of
           PBFile.Ge -> SAT.addPBNLAtLeast db lhs rhs
           PBFile.Eq -> SAT.addPBNLExactly db lhs rhs
-        trueLit <- readMutVar trueLitRef
-        when (trueLit == SAT.litUndef) $ do
-          case detectTrueLit constr of
-            Nothing -> return ()
-            Just l -> writeMutVar trueLitRef l
       Just w -> do
         case op of
           PBFile.Ge -> do
@@ -805,17 +845,7 @@ addWBO db wbo = do
             modifyMutVar defsRef ((sel,constr) :)
 
   offset <- readMutVar objOffsetRef
-  when (offset /= 0) $ do
-    l <- readMutVar trueLitRef
-    trueLit <-
-      if l /= SAT.litUndef then
-        return l
-      else do
-        v <- SAT.newVar db
-        SAT.addClause db [v]
-        modifyMutVar defsRef ((v, ([], PBFile.Ge, 0)) :)
-        return v
-    modifyMutVar objRef ((offset,[trueLit]) :)
+  when (offset /= 0) $ modifyMutVar objRef ((offset,[]) :)
 
   obj <- liftM reverse $ readMutVar objRef
   defs <- liftM IntMap.fromList $ readMutVar defsRef
@@ -826,21 +856,6 @@ addWBO db wbo = do
 
   return (obj, defs)
 
-
-detectTrueLit :: PBFile.Constraint -> Maybe SAT.Lit
-detectTrueLit (lhs, op, rhs) =
-  case op of
-    PBFile.Ge -> f lhs rhs
-    PBFile.Eq -> f lhs rhs `mplus` f [(- c, ls) | (c,ls) <- lhs] (- rhs)
-  where
-    f [(c, [l])] rhs
-      | c > 0 && (rhs + c - 1) `div` c == 1 =
-          -- c l ≥ rhs ↔ l ≥ ⌈rhs / c⌉
-          return l
-      | c < 0 && rhs `div` c == 0 =
-          -- c l ≥ rhs ↔ l ≤ ⌊rhs / c⌋
-          return (- l)
-    f _ _ = Nothing
 
 -- -----------------------------------------------------------------------------
 
