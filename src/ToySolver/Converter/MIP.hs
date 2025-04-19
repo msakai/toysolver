@@ -407,25 +407,46 @@ addMIP enc mip = runExceptT $ addMIP' enc mip
 
 addMIP' :: forall m enc. (SAT.AddPBNL m enc, PrimMonad m) => enc -> MIP.Problem Rational -> ExceptT String m (Integer.Expr, IP2PBInfo)
 addMIP' enc mip = do
-  unless (Set.null nivs) $ do
-    let n = Set.size nivs
-        vars = intercalate ", " (map (T.unpack . MIP.varName) (take 10 (Set.toList nivs)) ++ ["..." | n > 10])
-        msg = printf "Unsupported problem: %d non-integer variables (%s)" n vars
+  let contVars = Map.filter p (MIP.varDomains mip)
+        where
+          p (MIP.ContinuousVariable, _) = True
+          p (MIP.SemiContinuousVariable, _) = True
+          p (_, _) = False  
+  unless (Map.null contVars) $ do
+    let n = Map.size contVars
+        vars = intercalate ", " (map (T.unpack . MIP.varName) (take 10 (Map.keys contVars)) ++ ["..." | n > 10])
+        msg = printf "Unsupported problem: %d (semi-)continuous variables (%s)" n vars
     throwE msg
 
-  let isBounded (_, (MIP.Finite _, MIP.Finite _)) = True
-      isBounded (_, _) = False
-      (bounded, unbounded) = Map.partition isBounded (MIP.varDomains mip)
-  unless (Map.null unbounded) $ do
-    let n = Set.size nivs
-        vars = intercalate ", " (map (T.unpack . MIP.varName) (take 10 (Map.keys unbounded)) ++ ["..." | n > 10])
+  let unboundedVars = Map.filter p (MIP.varDomains mip)
+        where
+          p (_, (MIP.Finite _, MIP.Finite _)) = False
+          p (_, _) = True
+  unless (Map.null unboundedVars) $ do
+    let n = Map.size unboundedVars
+        vars = intercalate ", " (map (T.unpack . MIP.varName) (take 10 (Map.keys unboundedVars)) ++ ["..." | n > 10])
         msg = printf "Unsupported problem: %d unbounded variables (%s)" n vars
     throwE msg
-  vmap <- fmap Map.fromDistinctAscList $ forM (Map.toAscList bounded) $ \(v, (vt, bounds)) ->
-    case bounds of
-      (MIP.Finite lb, MIP.Finite ub) -> do
-        v2 <- lift $ Integer.newVar enc (ceiling lb) (floor ub)
-        return (v,v2)
+
+  nonZeroTableRef <- lift $ newMutVar Map.empty
+
+  vmap <- fmap Map.fromDistinctAscList $ forM (Map.toAscList (MIP.varDomains mip)) $ \(v, dom) ->
+    case dom of
+      (vt, (MIP.Finite lb, MIP.Finite ub)) -> do
+        let lb' = ceiling lb
+            ub' = floor ub
+        if vt == MIP.IntegerVariable || lb' <= 0 && 0 <= ub' then do
+          v2 <- lift $ Integer.newVar enc lb' ub'
+          return (v,v2)
+        else do
+          -- vt == MIP.IntegerVariable && (0 <= lb' || ub' <= 0)
+          v2@(Integer.Expr s) <- lift $ Integer.newVar enc (min 0 lb') (max 0 ub')
+          lift $ do
+            y <- SAT.newVar enc
+            SAT.addPBNLAtLeast enc (s ++ [(- lb', [y])]) 0
+            SAT.addPBNLAtMost enc (s ++ [(- ub', [y])]) 0
+            modifyMutVar nonZeroTableRef (Map.insert v y)
+          return (v,v2)
       _ -> error "should not happen"
 
   forM_ (MIP.constraints mip) $ \c -> do
@@ -467,7 +488,6 @@ addMIP' enc mip = do
           MIP.Finite x -> f MIP.Le x
           MIP.PosInf -> return ()
 
-  nonZeroTableRef <- lift $ newMutVar Map.empty
   let isNonZero :: MIP.Var -> ExceptT String m SAT.Lit
       isNonZero v = do
         tbl <- lift $ readMutVar nonZeroTableRef
@@ -508,9 +528,6 @@ addMIP' enc mip = do
   return (obj2, IP2PBInfo vmap nonZeroTable d)
 
   where
-    ivs = MIP.integerVariables mip
-    nivs = MIP.variables mip `Set.difference` ivs
-
     asBin :: Integer.Expr -> SAT.Lit
     asBin (Integer.Expr [(1,[lit])]) = lit
     asBin _ = error "asBin: failure"
