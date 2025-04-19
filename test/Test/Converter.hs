@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.Converter (converterTestGroup) where
@@ -1048,6 +1049,78 @@ prop_ip2pb_json =
          in counterexample (show ret) $ counterexample (show json) $
               J.eitherDecode json === Right info
 
+case_ip2pb_continuous_error :: Assertion
+case_ip2pb_continuous_error =
+  case ip2pb prob of
+    Left _ -> return ()
+    Right _ -> assertFailure "should be error"
+  where
+    prob :: MIP.Problem Rational
+    prob =
+      MIP.def
+      { MIP.constraints =
+          [ MIP.def
+            { MIP.constrExpr = MIP.varExpr "x"
+            , MIP.constrLB = 1/2
+            }
+          ]
+      , MIP.varDomains = Map.fromList [("x", (MIP.ContinuousVariable, (0, 1)))]
+      }
+
+case_ip2pb_semi_continuous_error :: Assertion
+case_ip2pb_semi_continuous_error =
+  case ip2pb prob of
+    Left _ -> return ()
+    Right _ -> assertFailure "should be error"
+  where
+    prob :: MIP.Problem Rational
+    prob =
+      MIP.def
+      { MIP.constraints =
+          [ MIP.def
+            { MIP.constrExpr = MIP.varExpr "x"
+            , MIP.constrUB = 50
+            }
+          ]
+      , MIP.varDomains = Map.fromList [("x", (MIP.SemiContinuousVariable, (10, 100)))]
+      }
+
+case_ip2pb_unbounded_error_1 :: Assertion
+case_ip2pb_unbounded_error_1 =
+  case ip2pb prob of
+    Left _ -> return ()
+    Right _ -> assertFailure "should be error"
+  where
+    prob :: MIP.Problem Rational
+    prob =
+      MIP.def
+      { MIP.constraints =
+          [ MIP.def
+            { MIP.constrExpr = MIP.varExpr "x"
+            , MIP.constrUB = 50
+            }
+          ]
+      , MIP.varDomains = Map.fromList [("x", (MIP.IntegerVariable, (0, MIP.PosInf)))]
+      }
+
+case_ip2pb_unbounded_error_2 :: Assertion
+case_ip2pb_unbounded_error_2 =
+  case ip2pb prob of
+    Left _ -> return ()
+    Right _ -> assertFailure "should be error"
+  where
+    prob :: MIP.Problem Rational
+    prob =
+      MIP.def
+      { MIP.constraints =
+          [ MIP.def
+            { MIP.constrExpr = MIP.varExpr "x"
+            , MIP.constrUB = -50
+            }
+          ]
+      , MIP.varDomains = Map.fromList [("x", (MIP.IntegerVariable, (MIP.NegInf, 0)))]
+      }
+
 arbitraryBoundedIP :: Gen (MIP.Problem Rational)
 arbitraryBoundedIP = do
   nv <- choose (0,10)
@@ -1055,14 +1128,16 @@ arbitraryBoundedIP = do
     let v = fromString ("z" ++ show i)
     b <- arbitrary
     if b then
-      pure (v, (MIP.Finite 0, MIP.Finite 1))
+      pure (v, (MIP.IntegerVariable, (MIP.Finite 0, MIP.Finite 1)))
     else do
       lb <- arbitrary
       NonNegative w <- arbitrary
       let ub = fromInteger (ceiling lb) + w
-      return (v, (MIP.Finite lb, MIP.Finite ub))
+      b2 <- arbitrary
+      return (v, (if b2 then MIP.IntegerVariable else MIP.SemiIntegerVariable, (MIP.Finite lb, MIP.Finite ub)))
+
   let vs = Map.keys bs
-      vs_bin = [v | (v, (MIP.Finite 0, MIP.Finite 1)) <- Map.toList bs]
+      vs_bin = [v | (v, (MIP.IntegerVariable, (MIP.Finite 0, MIP.Finite 1))) <- Map.toList bs]
 
   dir <- elements [MIP.OptMin, MIP.OptMax]
   obj <- arbitraryMIPExpr vs
@@ -1106,7 +1181,7 @@ arbitraryBoundedIP = do
 
   return $ MIP.def
     { MIP.objectiveFunction = MIP.def{ MIP.objDir = dir, MIP.objExpr = obj }
-    , MIP.varDomains = fmap (\b -> (MIP.IntegerVariable, b)) bs
+    , MIP.varDomains = bs
     , MIP.constraints = cs
     , MIP.sosConstraints = sos
     }
