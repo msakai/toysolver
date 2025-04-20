@@ -57,7 +57,6 @@ import qualified Data.Map as Map
 import Data.Ord
 import Data.Primitive.MutVar
 import Data.Ratio
-import qualified Data.Set as Set
 import Data.String
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -78,7 +77,6 @@ import ToySolver.SAT.Internal.JSON
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Integer as Integer
 import ToySolver.SAT.Store.PB
-import ToySolver.Internal.Util (revForM)
 
 -- -----------------------------------------------------------------------------
 
