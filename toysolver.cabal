@@ -342,6 +342,7 @@ Library
      ToySolver.SAT.Encoder.Tseitin
      ToySolver.SAT.ExistentialQuantification
      ToySolver.SAT.Formula
+     ToySolver.SAT.LogParser
      ToySolver.SAT.MUS
      ToySolver.SAT.MUS.Enum
      ToySolver.SAT.MUS.Types
@@ -778,6 +779,7 @@ Test-suite TestSuite
     Test.SAT
     Test.SAT.Encoder
     Test.SAT.ExistentialQuantification
+    Test.SAT.LogParser
     Test.SAT.MUS
     Test.SAT.TheorySolver
     Test.SAT.Types

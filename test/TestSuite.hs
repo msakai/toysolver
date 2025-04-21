@@ -26,6 +26,7 @@ import Test.QUBO
 import Test.SAT
 import Test.SAT.Encoder
 import Test.SAT.ExistentialQuantification
+import Test.SAT.LogParser
 import Test.SAT.MUS
 import Test.SAT.TheorySolver
 import Test.SAT.Types
@@ -62,6 +63,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , satTestGroup
   , satEncoderTestGroup
   , satExistentialQuantificationTestGroup
+  , satLogParserTestGroup
   , satMUSTestGroup
   , satTheorySolverTestGroup
   , satTypesTestGroup
