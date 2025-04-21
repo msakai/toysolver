@@ -707,27 +707,6 @@ Executable pigeonhole
     pseudo-boolean,
     toysolver
 
-Executable maxsatverify
-  Import: exe-options
-  If !flag(BuildMiscPrograms)
-    Buildable: False
-  Main-is: maxsatverify.hs
-  HS-Source-Dirs: app
-  Build-Depends:
-    array,
-    toysolver
-
-Executable pbverify
-  Import: exe-options
-  Main-is: pbverify.hs
-  If !flag(BuildMiscPrograms)
-    Buildable: False
-  HS-Source-Dirs: app
-  Build-Depends:
-    array,
-    pseudo-boolean,
-    toysolver
-
 -- Test suites and benchmarks
 
 Test-suite TestPolynomial
