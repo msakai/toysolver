@@ -1,4 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SAT.LogParser
@@ -16,52 +19,103 @@ module ToySolver.SAT.LogParser
   , parsePBLog
   ) where
 
-import Control.Monad
 import Data.Array.IArray
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Char
+import Data.Maybe (fromMaybe)
+import qualified Data.Vector.Unboxed as VU
 
 import ToySolver.SAT.Types as SAT
 
-parseSATLog :: String -> SAT.Model
-parseSATLog s = array (1, maximum (0 : map fst ys)) ys
+parseSATLog :: BL.ByteString -> (BS.ByteString, Maybe SAT.Model)
+parseSATLog s = f "UNKNOWN" Nothing (BL.lines s)
   where
-    xs = do
-      l <- lines s
-      case l of
-        'v':l' -> map read (words l')
-        _ -> mzero
-    ys = [if y > 0 then (y, True) else (-y, False) | y <- takeWhile (0 /=) xs]
+    f :: BS.ByteString -> Maybe [BL.ByteString] -> [BL.ByteString] -> (BS.ByteString, Maybe SAT.Model)
+    f !status vlines (l : ls) =
+      case BL.uncons l of
+        Just ('c', _) -> f status vlines ls
+        Just ('s', BS.toStrict -> BS.strip -> rest) -> f rest vlines ls
+        Just ('v', rest) ->
+          let vlines' = Just $ rest : fromMaybe [] vlines
+           in f status vlines' ls
+        Just (c, _) -> error ("unknown line type: " ++ show c)
+        Nothing -> f status vlines ls
+    f !status vlines [] =
+      ( status
+      , case vlines of
+          Nothing -> Nothing
+          Just lss ->
+            let xs = VU.fromList $ map (read . BL.unpack) $ concat $ map BL.words $ reverse lss
+                xs' = VU.init xs
+                n = maximum $ map abs $ VU.toList xs'
+             in if VU.last xs /= 0 then
+                  error "vlines are not terminated with zero"
+                else if 0 `VU.elem` xs' then
+                  error "multiple zeros in vlines"
+                else
+                  Just $ array (1, n) [if lit > 0 then (lit, True) else (- lit, False) | lit <- VU.toList xs']
+      )
 
-parseMaxSATLog :: String -> SAT.Model
-parseMaxSATLog s =
-  case f (lines s) Nothing [] of
-    (_obj, vlines) ->
-      let tmp = [c | c <- concat vlines, not (isSpace c)]
-       in if all (\c -> c == '0' || c == '1') tmp then
-            array (1, length tmp) [(v, c=='1') | (v, c) <- zip [1..] tmp]
-          else
-            let ys = [if l > 0 then (l, True) else (-l, False) | vline <- vlines, w <- words vline, let l = read w]
-             in array (1, maximum (0 : map fst ys)) ys
+parseMaxSATLog :: BL.ByteString -> (BS.ByteString, Maybe Integer, Maybe SAT.Model)
+parseMaxSATLog s = f "UNKNOWN" Nothing Nothing (BL.lines s)
   where
-    f :: [String] -> Maybe Integer -> [String] -> (Maybe Integer, [String])
-    f [] obj vlines = (obj, reverse vlines)
-    f (l : ls) obj vlines =
-      case l of
-        'o':xs -> f ls (Just (read (dropWhile isSpace xs))) []
-        'v':xs -> f ls obj (dropWhile isSpace xs : vlines)
-        _ -> f ls obj vlines
+    f :: BS.ByteString -> Maybe Integer -> Maybe [BL.ByteString] -> [BL.ByteString] -> (BS.ByteString, Maybe Integer, Maybe SAT.Model)
+    f !status obj vlines (l : ls) =
+      case BL.uncons l of
+        Just ('c', _) -> f status obj vlines ls
+        Just ('s', BL.toStrict -> BS.strip -> rest) -> f rest obj vlines ls
+        Just ('v', rest) ->
+          let vlines' = Just $ rest : fromMaybe [] vlines
+           in f status obj vlines' ls
+        Just ('o', BL.toStrict -> BS.strip -> rest) ->
+          case BS.readInteger rest of
+            Just (!val, "") -> f status (Just val) Nothing ls
+            _ -> error "failed to parse o-line"
+        Just (c, _) -> error ("unknown line type: " ++ show c)
+        Nothing -> f status obj vlines ls
+    f !status obj vlines [] =
+      ( status
+      , obj
+      , case vlines of
+          Nothing -> Nothing
+          Just lss ->
+            let tmp1 = BL.filter (not . isSpace) $ BL.concat $ reverse lss
+                tmp2 = map (read . BL.unpack) $ concat $ map BL.words $ reverse lss
+             in if BL.all (\c -> c == '0' || c == '1') tmp1 then
+                  Just $ array (1, fromIntegral (BL.length tmp1)) [(v, c=='1') | (v, c) <- zip [1..] (BL.unpack tmp1)]
+                else
+                  Just $ array (1, maximum (map abs tmp2)) [if lit > 0 then (lit, True) else (- lit, False) | lit <- tmp2]
+      )
 
-parsePBLog :: String -> SAT.Model
-parsePBLog s = array (1, maximum (0 : map fst ls2)) ls2
+parsePBLog :: BL.ByteString -> (BS.ByteString, Maybe Integer, Maybe SAT.Model)
+parsePBLog s = f "UNKNOWN" Nothing Nothing (BL.lines s)
   where
-    ls = lines s
-    ls2 = do
-      l <- ls
-      case l of
-        'v':xs -> do
-          w <- words xs
-          case w of
-            '-':'x':ys -> return (read ys, False)
-            'x':ys -> return (read ys, True)
-            _ -> error "should not happen"
-        _ -> mzero
+    f :: BS.ByteString -> Maybe Integer -> Maybe [BL.ByteString] -> [BL.ByteString] -> (BS.ByteString, Maybe Integer, Maybe SAT.Model)
+    f !status obj vlines (l : ls) =
+      case BL.uncons l of
+        Just ('c', _) -> f status obj vlines ls
+        Just ('s', BL.toStrict -> BS.strip -> rest) -> f rest obj vlines ls
+        Just ('v', rest) ->
+          let vlines' = Just $ rest : fromMaybe [] vlines
+           in f status obj vlines' ls
+        Just ('o', BL.toStrict -> BS.strip -> rest) ->
+          case BS.readInteger rest of
+            Just (!val, "") -> f status (Just val) Nothing ls
+            _ -> error "failed to parse o-line"
+        Just (c, _) -> error ("unknown line type: " ++ show c)
+        Nothing -> f status obj vlines ls
+    f !status obj vlines [] =
+      ( status
+      , obj
+      , case vlines of
+          Nothing -> Nothing
+          Just lss ->
+            let lits = map (parseLit . BL.unpack) $ concat $ map BL.words $ reverse lss
+             in Just $ array (1, maximum (map abs lits)) [if lit > 0 then (lit, True) else (- lit, False) | lit <- lits]
+      )
+
+    parseLit :: String -> SAT.Lit
+    parseLit ('-' : 'x' : rest) | [(v, "")] <- reads rest = - v
+    parseLit ('x' : rest) | [(v, "")] <- reads rest = v
+    parseLit w = error ("failed to parse a literal: " ++ show w)

@@ -1,10 +1,12 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.SAT.LogParser (satLogParserTestGroup) where
 
 import Data.Array.IArray
+import qualified Data.ByteString.Lazy.Char8 as BL
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.TH
@@ -15,7 +17,7 @@ import ToySolver.SAT.LogParser
 case_parseSATLog :: Assertion
 case_parseSATLog = parseSATLog input @?= expected
   where
-    input = unlines
+    input = BL.unlines
       [ "c foo"
       , "s SATISFIABLE"
       , "c bar"
@@ -25,12 +27,16 @@ case_parseSATLog = parseSATLog input @?= expected
       , "c quz"
       , "v 0"
       ]
-    expected = array (1, 10) [(1, False), (2, False), (3, True), (4, True), (5, False), (6, True), (7, False), (8, True), (9, True), (10, False)]
+    expected =
+      ( "SATISFIABLE"
+      , Just $ array (1, 10) [(1, False), (2, False), (3, True), (4, True), (5, False), (6, True), (7, False), (8, True), (9, True), (10, False)]
+      )
+      
 
 case_parseMaxSatLog_old :: Assertion
 case_parseMaxSatLog_old = parseMaxSATLog input @?= expected
   where
-    input = unlines
+    input = BL.unlines
       [ "c foo"
       , "o 4750"
       , "o 232"
@@ -41,12 +47,16 @@ case_parseMaxSatLog_old = parseMaxSATLog input @?= expected
       , "v 6 -7 8 9 -10"
       , "c quz"
       ]
-    expected = array (1, 10) [(1, False), (2, False), (3, True), (4, True), (5, False), (6, True), (7, False), (8, True), (9, True), (10, False)]
+    expected =
+      ( "OPTIMUM FOUND"
+      , Just 232
+      , Just $ array (1, 10) [(1, False), (2, False), (3, True), (4, True), (5, False), (6, True), (7, False), (8, True), (9, True), (10, False)]
+      )
 
 case_parseMaxSatLog_new :: Assertion
 case_parseMaxSatLog_new = parseMaxSATLog input @?= expected
   where
-    input = unlines
+    input = BL.unlines
       [ "c foo"
       , "o 4750"
       , "o 232"
@@ -57,12 +67,16 @@ case_parseMaxSatLog_new = parseMaxSATLog input @?= expected
       , "v 10110"
       , "c quz"
       ]
-    expected = array (1, 10) [(1, False), (2, False), (3, True), (4, True), (5, False), (6, True), (7, False), (8, True), (9, True), (10, False)]
+    expected =
+      ( "OPTIMUM FOUND"
+      , Just 232
+      , Just $ array (1, 10) [(1, False), (2, False), (3, True), (4, True), (5, False), (6, True), (7, False), (8, True), (9, True), (10, False)]
+      )
 
 case_parsePBLog :: Assertion
 case_parsePBLog = parsePBLog input @?= expected
   where
-    input = unlines
+    input = BL.unlines
       [ "c foo"
       , "o 4750"
       , "o 232"
@@ -73,7 +87,11 @@ case_parsePBLog = parsePBLog input @?= expected
       , "v x6 -x7 x8 x9 -x10"
       , "c quz"
       ]
-    expected = array (1, 10) [(1, False), (2, False), (3, True), (4, True), (5, False), (6, True), (7, False), (8, True), (9, True), (10, False)]
+    expected =
+      ( "OPTIMUM FOUND"
+      , Just 232
+      , Just $ array (1, 10) [(1, False), (2, False), (3, True), (4, True), (5, False), (6, True), (7, False), (8, True), (9, True), (10, False)]
+      )
 
 satLogParserTestGroup :: TestTree
 satLogParserTestGroup = $(testGroupGenerator)

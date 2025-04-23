@@ -1,14 +1,18 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
 import Control.Monad
 import Data.Array.IArray
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Char
 import Data.Default.Class
 import Data.IORef
 import Data.List (intercalate, intersperse, sortBy)
 import qualified Data.Map.Lazy as Map
+import Data.Maybe
 import Data.Ord
 import qualified Data.PseudoBoolean as PBFile
 import Data.Scientific
@@ -136,12 +140,29 @@ main = do
   case mode of
     ModeSAT -> do
       cnf  <- FF.readFile (optInputFile opt)
-      model <- liftM parseSATLog (readFile (optSolutionFile opt))
+      (status, m) <- liftM parseSATLog (BL.readFile (optSolutionFile opt))
 
-      forM_ (CNF.cnfClauses cnf) $ \constr ->
-        unless (SAT.evalClause model (SAT.unpackClause constr)) $ do
-          printf "violated: %s\n" (showClause constr :: String)
+      case status of
+        "SATISFIABLE" -> do
+          when (isNothing m) $ do
+            putStrLn "SATISFIABLE but a model is missing"
+            writeIORef errorRef True
+        "UNSATISFIABLE" -> do
+          when (isJust m) $ do
+            putStrLn "UNSATISFIABLE but a model is missing"
+            writeIORef errorRef True
+        "UNKNOWN" -> return ()
+        _ -> do
+          putStrLn $ "unknown status: " ++ BS.unpack status
           writeIORef errorRef True
+
+      case m of
+        Nothing -> return ()
+        Just model -> do
+          forM_ (CNF.cnfClauses cnf) $ \constr ->
+            unless (SAT.evalClause model (SAT.unpackClause constr)) $ do
+              printf "violated: %s\n" (showClause constr :: String)
+              writeIORef errorRef True
 
     ModePB -> do
       opb <-
@@ -149,15 +170,44 @@ main = do
           liftM FF.unWithFastParser $ FF.readFile (optInputFile opt)
         else
           FF.readFile (optInputFile opt)
-      model <- liftM parsePBLog (readFile (optSolutionFile opt))
+      (status, o, m) <- liftM parsePBLog (BL.readFile (optSolutionFile opt))
 
-      case PBFile.pbObjectiveFunction opb of
-        Nothing -> return ()
-        Just obj -> putStrLn $ "objective value = " ++ show (SAT.evalPBSum model obj)
-      forM_ (PBFile.pbConstraints opb) $ \constr -> do
-        unless (SAT.evalPBConstraint model constr) $ do
-          printf "violated: %s\n" (showPBConstraint constr :: String)
+      case status of
+        "SATISFIABLE" -> do
+          when (isNothing m) $ do
+            putStrLn "SATISFIABLE, but a model is missing"
+            writeIORef errorRef True
+        "OPTIMUM FOUND" -> do
+          when (isNothing m) $ do
+            putStrLn "OPTIMUM FOUND, but a model is missing"
+            writeIORef errorRef True
+        "UNSATISFIABLE" -> do
+          when (isJust m) $ do
+            putStrLn "UNSATISFIABLE, but a model is provided"
+            writeIORef errorRef True
+        "UNSUPPORTED" -> return ()
+        "UNKNOWN" -> return ()
+        _ -> do
+          putStrLn $ "unknown status: " ++ BS.unpack status
           writeIORef errorRef True
+
+      case m of
+        Nothing -> return ()
+        Just model -> do
+          case PBFile.pbObjectiveFunction opb of
+            Nothing -> return ()
+            Just objFunc -> do
+              let val = SAT.evalPBSum model objFunc
+              putStrLn $ "objective function value = " ++ show val
+              case o of
+                Just oVal | val /= oVal -> do
+                  printf "o-line value (%d) is inconsistent\n" oVal
+                _ -> return ()
+
+          forM_ (PBFile.pbConstraints opb) $ \constr -> do
+            unless (SAT.evalPBConstraint model constr) $ do
+              printf "violated: %s\n" (showPBConstraint constr :: String)
+              writeIORef errorRef True
 
     ModeWBO -> do
       wbo <-
@@ -165,40 +215,89 @@ main = do
           liftM FF.unWithFastParser $ FF.readFile (optInputFile opt)
         else
           FF.readFile (optInputFile opt)
-      model <- liftM parsePBLog (readFile (optSolutionFile opt))
+      (status, o, m) <- liftM parsePBLog (BL.readFile (optSolutionFile opt))
 
-      cost <- fmap sum $ forM (PBFile.wboConstraints wbo) $ \(w, constr) -> do
-        if SAT.evalPBConstraint model constr then
-          return 0
-        else do
-          case w of
-            Nothing -> do
-              printf "violated hard constraint: %s\n" (showPBConstraint constr :: String)
-              writeIORef errorRef True
-              return 0
-            Just w' -> do
-              return w'
-      putStrLn $ "total cost = " ++ show cost
-
-      case PBFile.wboTopCost wbo of
-        Just top | top <= cost -> do
-          printf "total cost is greater than or equal to top cost (%d)\n" top
+      case status of
+        "SATISFIABLE" -> do
+          when (isNothing m) $ do
+            putStrLn "SATISFIABLE, but a model is missing"
+            writeIORef errorRef True
+        "OPTIMUM FOUND" -> do
+          when (isNothing m) $ do
+            putStrLn "OPTIMUM FOUND, but a model is missing"
+            writeIORef errorRef True
+        "UNSATISFIABLE" -> do
+          when (isJust m) $ do
+            putStrLn "UNSATISFIABLE, but a model is provided"
+            writeIORef errorRef True
+        "UNSUPPORTED" -> return ()
+        "UNKNOWN" -> return ()
+        _ -> do
+          putStrLn $ "unknown status: " ++ BS.unpack status
           writeIORef errorRef True
-        _ -> return ()
+
+      case m of
+        Nothing -> return ()
+        Just model -> do
+          cost <- fmap sum $ forM (PBFile.wboConstraints wbo) $ \(w, constr) -> do
+            if SAT.evalPBConstraint model constr then
+              return 0
+            else do
+              case w of
+                Nothing -> do
+                  printf "violated hard constraint: %s\n" (showPBConstraint constr :: String)
+                  writeIORef errorRef True
+                  return 0
+                Just w' -> do
+                  return w'
+          putStrLn $ "total cost = " ++ show cost
+
+          case PBFile.wboTopCost wbo of
+            Just top | top <= cost -> do
+              printf "total cost (%d) is greater than or equal to top cost (%d)\n" cost top
+              writeIORef errorRef True
+            _ -> return ()
+
+          case o of
+            Just oVal | oVal /= cost -> do
+              printf "o-line value (%d) is inconsistent\n" oVal
+            _ -> return ()
 
     ModeMaxSAT -> do
       wcnf  <- FF.readFile (optInputFile opt)
-      model <- liftM parseMaxSATLog (readFile (optSolutionFile opt))
+      (status, o, m) <- liftM parseMaxSATLog (BL.readFile (optSolutionFile opt))
 
-      cost <- fmap sum $ forM (CNF.wcnfClauses wcnf) $ \(w, constr) ->
-        if SAT.evalClause model (SAT.unpackClause constr) then do
-          return 0
-        else if w == CNF.wcnfTopCost wcnf then do
-          printf "violated hard constraint: %s\n" (showClause constr :: String)
-          return 0
-        else do
-          return w
-      putStrLn $ "total cost = " ++ show cost
+      case status of
+        "OPTIMUM FOUND" -> do
+          when (isNothing m) $ do
+            putStrLn "OPTIMUM FOUND, but a model is missing"
+            writeIORef errorRef True
+        "UNSATISFIABLE" -> do
+          when (isJust m) $ do
+            putStrLn "UNSATISFIABLE, but a model is provided"
+            writeIORef errorRef True
+        "UNKNOWN" -> return ()
+        _ -> do
+          putStrLn $ "unknown status: " ++ BS.unpack status
+          writeIORef errorRef True
+
+      case m of
+        Nothing -> return ()
+        Just model -> do
+          cost <- fmap sum $ forM (CNF.wcnfClauses wcnf) $ \(w, constr) ->
+            if SAT.evalClause model (SAT.unpackClause constr) then do
+              return 0
+            else if w == CNF.wcnfTopCost wcnf then do
+              printf "violated hard constraint: %s\n" (showClause constr :: String)
+              return 0
+            else do
+              return w
+          putStrLn $ "total cost = " ++ show cost
+
+          case o of
+            Just oVal | oVal /= cost -> do
+              printf "o-line value (%d) is inconsistent\n" oVal
+            _ -> return ()
 
     ModeMIP -> do
       enc <- mapM mkTextEncoding $ optFileEncoding opt

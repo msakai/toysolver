@@ -551,6 +551,7 @@ Executable toysolver-check
   HS-Source-Dirs: app
   Build-Depends:
     array,
+    bytestring,
     containers,
     data-default-class,
     filepath,
