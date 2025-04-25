@@ -807,6 +807,7 @@ Test-suite TestSuite
     tasty-hunit >=0.9 && <0.11,
     tasty-quickcheck >=0.8 && <0.12,
     tasty-th,
+    temporary,
     text,
     toysolver,
     transformers,

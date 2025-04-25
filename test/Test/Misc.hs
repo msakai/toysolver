@@ -1,9 +1,13 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.Misc (miscTestGroup) where
 
+import qualified Data.ByteString.Char8 as BS
 import Control.Monad
+import System.IO
+import System.IO.Temp
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
 import Test.Tasty.HUnit
@@ -129,6 +133,18 @@ case_Wang_Peirces_Law =
     x1, x2 :: BoolExpr Int
     x1 = Atom 1
     x2 = Atom 2
+
+------------------------------------------------------------------------
+-- Test harness
+
+-- We assume that bytestring IO does not convrert new lines even on text mode on Windows.
+case_bytestring_newline :: Assertion
+case_bytestring_newline = do
+  withSystemTempDirectory "toysolver-test-" $ \dir -> do
+    withFile (dir ++ "/test.txt") WriteMode $ \h -> do
+      BS.hPutStr h "foo\nbar"
+    s <- BS.readFile (dir ++ "/test.txt")
+    s @?= "foo\nbar"
 
 ------------------------------------------------------------------------
 -- Test harness
