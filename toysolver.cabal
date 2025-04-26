@@ -372,6 +372,7 @@ Library
      ToySolver.Internal.Data.SeqQueue
      ToySolver.Internal.Data.Vec
      ToySolver.Internal.ProcessUtil
+     ToySolver.Internal.SolutionChecker
      ToySolver.Internal.TextUtil
      ToySolver.Internal.Util
      ToySolver.Wang
