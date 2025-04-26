@@ -214,7 +214,7 @@ checkMIPResult tol mip sol = do
         printf "declared objective value (%s) does not match to the computed value (%s)\n"
           (show declaredObjVal) (show objVal)
 
-  forM (Map.toList (MIP.varDomains mip)) $ \(v, (vt, bounds@(lb,ub))) -> do
+  forM_ (Map.toList (MIP.varDomains mip)) $ \(v, (vt, bounds@(lb,ub))) -> do
     let val = MIP.eval tol m v
         flag1 =
           case vt of
