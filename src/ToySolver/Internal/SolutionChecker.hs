@@ -45,11 +45,11 @@ checkSATResult cnf (status, m) = do
   case status of
     "SATISFIABLE" -> do
       when (isNothing m) $ do
-        putStrLn "SATISFIABLE but a model is missing"
+        putStrLn "SATISFIABLE, but a model is missing"
         writeIORef errorRef True
     "UNSATISFIABLE" -> do
       when (isJust m) $ do
-        putStrLn "UNSATISFIABLE but a model is missing"
+        putStrLn "UNSATISFIABLE, but a model is provided"
         writeIORef errorRef True
     "UNKNOWN" -> return ()
     _ -> do
