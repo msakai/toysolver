@@ -123,11 +123,11 @@ main = do
               ".mps"  -> ModeMIP
               _ -> ModeSAT
 
-  errored <- case mode of
+  (errored, ls) <- case mode of
     ModeSAT -> do
       cnf  <- FF.readFile (optInputFile opt)
       (status, m) <- liftM parseSATLog (BL.readFile (optSolutionFile opt))
-      checkSATResult cnf (status, m)
+      pure $ checkSATResult cnf (status, m)
 
     ModePB -> do
       opb <-
@@ -136,7 +136,7 @@ main = do
         else
           FF.readFile (optInputFile opt)
       (status, o, m) <- liftM parsePBLog (BL.readFile (optSolutionFile opt))
-      checkPBResult opb (status, o, m)
+      pure $ checkPBResult opb (status, o, m)
 
     ModeWBO -> do
       wbo <-
@@ -145,19 +145,21 @@ main = do
         else
           FF.readFile (optInputFile opt)
       (status, o, m) <- liftM parsePBLog (BL.readFile (optSolutionFile opt))
-      checkWBOResult wbo (status, o, m)
+      pure $ checkWBOResult wbo (status, o, m)
 
     ModeMaxSAT -> do
       wcnf  <- FF.readFile (optInputFile opt)
       (status, o, m) <- liftM parseMaxSATLog (BL.readFile (optSolutionFile opt))
-      checkMaxSATResult wcnf (status, o, m)
+      pure $ checkMaxSATResult wcnf (status, o, m)
 
     ModeMIP -> do
       enc <- mapM mkTextEncoding $ optFileEncoding opt
       mip <- MIP.readFile def{ MIP.optFileEncoding = enc } (optInputFile opt)
       sol <- GurobiSol.readFile (optSolutionFile opt)
       let tol = optMIPTol opt
-      checkMIPResult tol mip sol
+      pure $ checkMIPResult tol mip sol
+
+  mapM_ putStrLn ls
 
   when errored $ exitFailure
 

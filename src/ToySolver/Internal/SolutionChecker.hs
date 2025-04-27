@@ -22,8 +22,8 @@ module ToySolver.Internal.SolutionChecker
   ) where
 
 import Control.Monad
+import Control.Monad.RWS.Lazy
 import qualified Data.ByteString.Char8 as BS
-import Data.IORef
 import Data.List (intercalate, sortBy)
 import qualified Data.Map.Lazy as Map
 import Data.Maybe
@@ -38,51 +38,53 @@ import Text.Printf
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT.Types as SAT
 
-checkSATResult :: CNF.CNF -> (BS.ByteString, Maybe SAT.Model) -> IO Bool
-checkSATResult cnf (status, m) = do
-  errorRef <- newIORef False
+-- ------------------------------------------------------------------------
 
+type M = RWS () [String] Bool
+
+execM :: M () -> (Bool, [String])
+execM m = execRWS m () False
+
+addInfo :: String -> M ()
+addInfo s = tell [s]
+
+addError :: String -> M ()
+addError s = tell [s] >> put True
+
+-- ------------------------------------------------------------------------
+
+checkSATResult :: CNF.CNF -> (BS.ByteString, Maybe SAT.Model) -> (Bool, [String])
+checkSATResult cnf (status, m) = execM $ do
   case status of
     "SATISFIABLE" -> do
       when (isNothing m) $ do
-        putStrLn "SATISFIABLE, but a model is missing"
-        writeIORef errorRef True
+        addError "SATISFIABLE, but a model is missing"
     "UNSATISFIABLE" -> do
       when (isJust m) $ do
-        putStrLn "UNSATISFIABLE, but a model is provided"
-        writeIORef errorRef True
+        addError "UNSATISFIABLE, but a model is provided"
     "UNKNOWN" -> return ()
     _ -> do
-      putStrLn $ "unknown status: " ++ BS.unpack status
-      writeIORef errorRef True
+      addError $ "unknown status: " ++ BS.unpack status
 
   case m of
     Nothing -> return ()
     Just model -> do
       forM_ (CNF.cnfClauses cnf) $ \constr ->
         unless (SAT.evalClause model (SAT.unpackClause constr)) $ do
-          printf "violated: %s\n" (showClause constr :: String)
-          writeIORef errorRef True
+          addError $ printf "violated: %s" (showClause constr :: String)
 
-  readIORef errorRef
-
-checkMaxSATResult :: CNF.WCNF -> (BS.ByteString, Maybe Integer, Maybe SAT.Model) -> IO Bool
-checkMaxSATResult wcnf (status, o, m) = do
-  errorRef <- newIORef False
-
+checkMaxSATResult :: CNF.WCNF -> (BS.ByteString, Maybe Integer, Maybe SAT.Model) -> (Bool, [String])
+checkMaxSATResult wcnf (status, o, m) = execM $ do
   case status of
     "OPTIMUM FOUND" -> do
       when (isNothing m) $ do
-        putStrLn "OPTIMUM FOUND, but a model is missing"
-        writeIORef errorRef True
+        addError "OPTIMUM FOUND, but a model is missing"
     "UNSATISFIABLE" -> do
       when (isJust m) $ do
-        putStrLn "UNSATISFIABLE, but a model is provided"
-        writeIORef errorRef True
+        addError "UNSATISFIABLE, but a model is provided"
     "UNKNOWN" -> return ()
     _ -> do
-      putStrLn $ "unknown status: " ++ BS.unpack status
-      writeIORef errorRef True
+      addError $ "unknown status: " ++ BS.unpack status
 
   case m of
     Nothing -> return ()
@@ -91,41 +93,33 @@ checkMaxSATResult wcnf (status, o, m) = do
         if SAT.evalClause model (SAT.unpackClause constr) then do
           return 0
         else if w == CNF.wcnfTopCost wcnf then do
-          printf "violated hard constraint: %s\n" (showClause constr :: String)
+          addError $ printf "violated hard constraint: %s" (showClause constr :: String)
           return 0
         else do
           return w
-      putStrLn $ "total cost = " ++ show cost
+      addInfo $ "total cost = " ++ show cost
 
       case o of
         Just oVal | oVal /= cost -> do
-          printf "o-line value (%d) is inconsistent\n" oVal
+          addError $ printf "o-line value (%d) is inconsistent" oVal
         _ -> return ()
 
-  readIORef errorRef
-
-checkPBResult :: PBFile.Formula -> (BS.ByteString, Maybe Integer, Maybe SAT.Model) -> IO Bool
-checkPBResult opb (status, o, m) = do
-  errorRef <- newIORef False
-
+checkPBResult :: PBFile.Formula -> (BS.ByteString, Maybe Integer, Maybe SAT.Model) -> (Bool, [String])
+checkPBResult opb (status, o, m) = execM $ do
   case status of
     "SATISFIABLE" -> do
       when (isNothing m) $ do
-        putStrLn "SATISFIABLE, but a model is missing"
-        writeIORef errorRef True
+        addError "SATISFIABLE, but a model is missing"
     "OPTIMUM FOUND" -> do
       when (isNothing m) $ do
-        putStrLn "OPTIMUM FOUND, but a model is missing"
-        writeIORef errorRef True
+        addError "OPTIMUM FOUND, but a model is missing"
     "UNSATISFIABLE" -> do
       when (isJust m) $ do
-        putStrLn "UNSATISFIABLE, but a model is provided"
-        writeIORef errorRef True
+        addError "UNSATISFIABLE, but a model is provided"
     "UNSUPPORTED" -> return ()
     "UNKNOWN" -> return ()
     _ -> do
-      putStrLn $ "unknown status: " ++ BS.unpack status
-      writeIORef errorRef True
+      addError $ "unknown status: " ++ BS.unpack status
 
   case m of
     Nothing -> return ()
@@ -134,41 +128,32 @@ checkPBResult opb (status, o, m) = do
         Nothing -> return ()
         Just objFunc -> do
           let val = SAT.evalPBSum model objFunc
-          putStrLn $ "objective function value = " ++ show val
+          addInfo $ "objective function value = " ++ show val
           case o of
             Just oVal | val /= oVal -> do
-              printf "o-line value (%d) is inconsistent\n" oVal
+              addError $ printf "o-line value (%d) is inconsistent" oVal
             _ -> return ()
 
       forM_ (PBFile.pbConstraints opb) $ \constr -> do
         unless (SAT.evalPBConstraint model constr) $ do
-          printf "violated: %s\n" (showPBConstraint constr :: String)
-          writeIORef errorRef True
+          addError $ printf "violated: %s" (showPBConstraint constr :: String)
 
-  readIORef errorRef
-
-checkWBOResult :: PBFile.SoftFormula -> (BS.ByteString, Maybe Integer, Maybe SAT.Model) -> IO Bool
-checkWBOResult wbo (status, o, m) = do
-  errorRef <- newIORef False
-
+checkWBOResult :: PBFile.SoftFormula -> (BS.ByteString, Maybe Integer, Maybe SAT.Model) -> (Bool, [String])
+checkWBOResult wbo (status, o, m) = execM $ do
   case status of
     "SATISFIABLE" -> do
       when (isNothing m) $ do
-        putStrLn "SATISFIABLE, but a model is missing"
-        writeIORef errorRef True
+        addError "SATISFIABLE, but a model is missing"
     "OPTIMUM FOUND" -> do
       when (isNothing m) $ do
-        putStrLn "OPTIMUM FOUND, but a model is missing"
-        writeIORef errorRef True
+        addError "OPTIMUM FOUND, but a model is missing"
     "UNSATISFIABLE" -> do
       when (isJust m) $ do
-        putStrLn "UNSATISFIABLE, but a model is provided"
-        writeIORef errorRef True
+        addError "UNSATISFIABLE, but a model is provided"
     "UNSUPPORTED" -> return ()
     "UNKNOWN" -> return ()
     _ -> do
-      putStrLn $ "unknown status: " ++ BS.unpack status
-      writeIORef errorRef True
+      addError $ "unknown status: " ++ BS.unpack status
 
   case m of
     Nothing -> return ()
@@ -179,39 +164,33 @@ checkWBOResult wbo (status, o, m) = do
         else do
           case w of
             Nothing -> do
-              printf "violated hard constraint: %s\n" (showPBConstraint constr :: String)
-              writeIORef errorRef True
+              addError $ printf "violated hard constraint: %s" (showPBConstraint constr :: String)
               return 0
             Just w' -> do
               return w'
-      putStrLn $ "total cost = " ++ show cost
+      addInfo $ "total cost = " ++ show cost
 
       case PBFile.wboTopCost wbo of
         Just top | top <= cost -> do
-          printf "total cost (%d) is greater than or equal to top cost (%d)\n" cost top
-          writeIORef errorRef True
+          addError $ printf "total cost (%d) is greater than or equal to top cost (%d)" cost top
         _ -> return ()
 
       case o of
         Just oVal | oVal /= cost -> do
-          printf "o-line value (%d) is inconsistent\n" oVal
+          addError $ printf "o-line value (%d) is inconsistent" oVal
         _ -> return ()
 
-  readIORef errorRef
-
-checkMIPResult :: MIP.Tol Scientific -> MIP.Problem Scientific -> MIP.Solution Scientific -> IO Bool
-checkMIPResult tol mip sol = do
-  errorRef <- newIORef False
-
+checkMIPResult :: MIP.Tol Scientific -> MIP.Problem Scientific -> MIP.Solution Scientific -> (Bool, [String])
+checkMIPResult tol mip sol = execM $ do
   let m = MIP.solVariables sol
 
   let objVal = MIP.eval tol m (MIP.objExpr (MIP.objectiveFunction mip))
-  putStrLn $ "objective value = " ++ show objVal
+  addInfo $ "objective value = " ++ show objVal
   case MIP.solObjectiveValue sol of
     Nothing -> return ()
     Just declaredObjVal -> do
       unless (abs (objVal - declaredObjVal) <= MIP.feasibilityTol tol) $ do
-        printf "declared objective value (%s) does not match to the computed value (%s)\n"
+        addError $ printf "declared objective value (%s) does not match to the computed value (%s)"
           (show declaredObjVal) (show objVal)
 
   forM_ (Map.toList (MIP.varDomains mip)) $ \(v, (vt, bounds@(lb,ub))) -> do
@@ -229,30 +208,26 @@ checkMIPResult tol mip sol = do
             MIP.SemiIntegerVariable -> isInBounds tol (0,0) val || isInBounds tol bounds val
             MIP.SemiContinuousVariable -> isInBounds tol (0,0) val || isInBounds tol bounds val
     unless flag1 $ do
-      writeIORef errorRef True
-      printf "variable %s is not integral\n" (T.unpack (MIP.varName v))
+      addError $ printf "variable %s is not integral" (T.unpack (MIP.varName v))
     unless flag2 $ do
-      writeIORef errorRef True
       let f MIP.NegInf = "-inf"
           f MIP.PosInf = "+inf"
           f (MIP.Finite x) = show x
-      printf "variable %s is out of bounds lb=%s ub=%s\n" (T.unpack (MIP.varName v)) (f lb) (f ub)
+      addError $ printf "variable %s is out of bounds lb=%s ub=%s" (T.unpack (MIP.varName v)) (f lb) (f ub)
 
   forM_ (MIP.constraints mip) $ \constr -> do
     unless (MIP.eval tol m constr) $ do
-      writeIORef errorRef True
-      case MIP.constrLabel constr of
-        Just name -> printf "violated: %s\n" (T.unpack name)
-        Nothing -> printf "violated: %s\n" (showMIPConstraint constr)
+      addError $ case MIP.constrLabel constr of
+        Just name -> printf "violated: %s" (T.unpack name)
+        Nothing -> printf "violated: %s" (showMIPConstraint constr)
 
   forM_ (MIP.sosConstraints mip) $ \constr -> do
     unless (MIP.eval tol m constr) $ do
-      writeIORef errorRef True
-      case MIP.sosLabel constr of
-        Just name -> printf "violated: %s\n" (T.unpack name)
-        Nothing -> printf "violated: %s\n" (showMIPSOSConstraint constr)
+      addError $ case MIP.sosLabel constr of
+        Just name -> printf "violated: %s" (T.unpack name)
+        Nothing -> printf "violated: %s" (showMIPSOSConstraint constr)
 
-  readIORef errorRef
+-- ------------------------------------------------------------------------
 
 showClause :: (Monoid a, IsString a) => SAT.PackedClause -> a
 showClause = foldr (\f g -> f <> fromString " " <> g) mempty . map (fromString . show) . SAT.unpackClause
@@ -319,3 +294,5 @@ isInBounds :: (Num r, Ord r) => MIP.Tol r -> MIP.Bounds r -> r -> Bool
 isInBounds tol (lb, ub) x =
   lb - MIP.Finite (MIP.feasibilityTol tol) <= MIP.Finite x &&
   MIP.Finite x <= ub + MIP.Finite (MIP.feasibilityTol tol)
+
+-- ------------------------------------------------------------------------
