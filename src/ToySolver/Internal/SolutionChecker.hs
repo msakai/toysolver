@@ -43,13 +43,13 @@ import qualified ToySolver.SAT.Types as SAT
 type M = RWS () [String] Bool
 
 execM :: M () -> (Bool, [String])
-execM m = execRWS m () False
+execM m = execRWS m () True
 
 addInfo :: String -> M ()
 addInfo s = tell [s]
 
 addError :: String -> M ()
-addError s = tell [s] >> put True
+addError s = tell [s] >> put False
 
 -- ------------------------------------------------------------------------
 

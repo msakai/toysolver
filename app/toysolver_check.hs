@@ -123,7 +123,7 @@ main = do
               ".mps"  -> ModeMIP
               _ -> ModeSAT
 
-  (errored, ls) <- case mode of
+  (ok, ls) <- case mode of
     ModeSAT -> do
       cnf  <- FF.readFile (optInputFile opt)
       (status, m) <- liftM parseSATLog (BL.readFile (optSolutionFile opt))
@@ -161,7 +161,7 @@ main = do
 
   mapM_ putStrLn ls
 
-  when errored $ exitFailure
+  unless ok $ exitFailure
 
 getExt :: String -> String
 getExt name | (base, ext) <- splitExtension name =
