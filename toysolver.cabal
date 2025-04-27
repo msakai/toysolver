@@ -771,6 +771,7 @@ Test-suite TestSuite
     Test.SMT
     Test.SMTLIB2Solver
     Test.Smtlib
+    Test.SolutionChecker
     Test.SubsetSum
     ToySolver.SMT.SMTLIB2Solver
     Smtlib.Parsers.CommonParsers

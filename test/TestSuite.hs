@@ -35,6 +35,7 @@ import Test.SimplexTextbook
 import Test.SMT
 import Test.SMTLIB2Solver
 import Test.Smtlib
+import Test.SolutionChecker
 import Test.SubsetSum
 import Test.BipartiteMatching
 
@@ -73,6 +74,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , smtTestGroup
   , smtlib2SolverTestGroup
   , smtlibTestGroup
+  , solutionCheckerTestGroup
   , subsetSumTestGroup
   , bipartiteMatchingTestGroup
   ]
