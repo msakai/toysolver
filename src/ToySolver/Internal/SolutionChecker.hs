@@ -248,7 +248,7 @@ showPBSum = mconcat . map showWeightedTerm
 
 showPBConstraint :: (Monoid a, IsString a) => PBFile.Constraint -> a
 showPBConstraint (lhs, op, rhs) =
-  showPBSum lhs <> f op <>  fromString " " <> fromString (show rhs) <> fromString ";\n"
+  showPBSum lhs <> f op <>  fromString " " <> fromString (show rhs)
   where
     f PBFile.Eq = fromString "="
     f PBFile.Ge = fromString ">="
