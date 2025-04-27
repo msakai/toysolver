@@ -79,6 +79,9 @@ checkMaxSATResult wcnf (status, o, m) = execM $ do
     "OPTIMUM FOUND" -> do
       when (isNothing m) $ do
         addError "OPTIMUM FOUND, but a model is missing"
+    "SATISFIABLE" -> do
+      when (isNothing m) $ do
+        addError "SATISFIABLE, but a model is missing"
     "UNSATISFIABLE" -> do
       when (isJust m) $ do
         addError "UNSATISFIABLE, but a model is provided"
