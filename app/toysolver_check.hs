@@ -88,7 +88,7 @@ optionsParser = Options
         optTol = option auto
           $  long "tol-optimality"
           <> metavar "REAL"
-          <> help "Feasiblity tolerance of dual constraints."
+          <> help "Feasibility tolerance of dual constraints."
           <> value (MIP.optimalityTol def)
           <> showDefault
 
