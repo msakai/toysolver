@@ -101,6 +101,97 @@ case_checkSATResult_bad_solution_status =
 
 -- ----------------------------------------------------------------------
 
+case_checkMaxSATResult_SATISFIABLE :: Assertion
+case_checkMaxSATResult_SATISFIABLE = do
+  check True  $ checkMaxSATResult wcnf ("SATISFIABLE", Just 1, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkMaxSATResult wcnf ("SATISFIABLE", Just 0, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkMaxSATResult wcnf ("SATISFIABLE", Just 0, Just $ array (1, 2) [(1, False), (2, False)])
+  check False $ checkMaxSATResult wcnf ("SATISFIABLE", Nothing, Nothing)
+  where
+    wcnf = CNF.WCNF
+      { CNF.wcnfNumVars = 2
+      , CNF.wcnfNumClauses = 3
+      , CNF.wcnfTopCost = 100
+      , CNF.wcnfClauses =
+          [ (100, [1, 2])
+          , (2, [1, -2])
+          , (1, [-1, 2])
+          , (3, [-1, -2])
+          ]
+      }
+
+case_checkMaxSATResult_OPTIMUM_FOUND :: Assertion
+case_checkMaxSATResult_OPTIMUM_FOUND = do
+  check True  $ checkMaxSATResult wcnf ("OPTIMUM FOUND", Just 1, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkMaxSATResult wcnf ("OPTIMUM FOUND", Just 0, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkMaxSATResult wcnf ("OPTIMUM FOUND", Just 0, Just $ array (1, 2) [(1, False), (2, False)])
+  check False $ checkMaxSATResult wcnf ("OPTIMUM FOUND", Nothing, Nothing)
+  where
+    wcnf = CNF.WCNF
+      { CNF.wcnfNumVars = 2
+      , CNF.wcnfNumClauses = 3
+      , CNF.wcnfTopCost = 100
+      , CNF.wcnfClauses =
+          [ (100, [1, 2])
+          , (2, [1, -2])
+          , (1, [-1, 2])
+          , (3, [-1, -2])
+          ]
+      }
+
+case_checkMaxSATResult_UNSATISFIABLE :: Assertion
+case_checkMaxSATResult_UNSATISFIABLE = do
+  check True  $ checkMaxSATResult wcnf ("UNSATISFIABLE", Nothing, Nothing)
+  check False $ checkMaxSATResult wcnf ("UNSATISFIABLE", Just 3, Just $ array (1, 2) [(1, True), (2, True)])
+  where
+    wcnf = CNF.WCNF
+      { CNF.wcnfNumVars = 2
+      , CNF.wcnfNumClauses = 3
+      , CNF.wcnfTopCost = 100
+      , CNF.wcnfClauses =
+          [ (100, [1, 2])
+          , (2, [1, -2])
+          , (1, [-1, 2])
+          , (3, [-1, -2])
+          ]
+      }
+
+case_checkMaxSATResult_UNKNOWN :: Assertion
+case_checkMaxSATResult_UNKNOWN = do
+  check True  $ checkMaxSATResult wcnf ("UNKNOWN", Just 1, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkMaxSATResult wcnf ("UNKNOWN", Just 0, Just $ array (1, 2) [(1, True), (2, False)])
+  check True  $ checkMaxSATResult wcnf ("UNKNOWN", Nothing, Nothing)
+  where
+    wcnf = CNF.WCNF
+      { CNF.wcnfNumVars = 2
+      , CNF.wcnfNumClauses = 3
+      , CNF.wcnfTopCost = 100
+      , CNF.wcnfClauses =
+          [ (100, [1, 2])
+          , (2, [1, -2])
+          , (1, [-1, 2])
+          , (3, [-1, -2])
+          ]
+      }
+
+case_checkMaxSATResult_bad_solution_status :: Assertion
+case_checkMaxSATResult_bad_solution_status =
+  check False $ checkMaxSATResult wcnf ("FOO BAR", Just 0, Just $ array (1, 2) [(1, True), (2, True)])
+  where
+    wcnf = CNF.WCNF
+      { CNF.wcnfNumVars = 2
+      , CNF.wcnfNumClauses = 3
+      , CNF.wcnfTopCost = 100
+      , CNF.wcnfClauses =
+          [ (100, [1, 2])
+          , (2, [1, -2])
+          , (1, [-1, 2])
+          , (3, [-1, -2])
+          ]
+      }
+
+-- ----------------------------------------------------------------------
+
 case_checkMIPResult_objective_value :: Assertion
 case_checkMIPResult_objective_value = do
   check True  $ checkMIPResult def prob sol{ MIP.solObjectiveValue = Just (8 + 1e-6) }
