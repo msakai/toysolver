@@ -41,8 +41,8 @@ case_checkSATResult_SATISFIABLE_ok = do
       }
     (ok, messages) = checkSATResult cnf ("SATISFIABLE", Just $ array (1, 2) [(1, True), (2, False)])
 
-case_checkSATResult_SATISFIABLE_ng :: Assertion
-case_checkSATResult_SATISFIABLE_ng = do
+case_checkSATResult_SATISFIABLE_ng_1 :: Assertion
+case_checkSATResult_SATISFIABLE_ng_1 = do
   ok @?= False
   _ <- evaluate $ force messages
   assertBool "messages should not be empty" (not (null messages))
@@ -57,6 +57,23 @@ case_checkSATResult_SATISFIABLE_ng = do
           ]
       }
     (ok, messages) = checkSATResult cnf ("SATISFIABLE", Just $ array (1, 2) [(1, False), (2, True)])
+
+case_checkSATResult_SATISFIABLE_ng_2 :: Assertion
+case_checkSATResult_SATISFIABLE_ng_2 = do
+  ok @?= False
+  _ <- evaluate $ force messages
+  assertBool "messages should not be empty" (not (null messages))
+  where
+    cnf = CNF.CNF
+      { CNF.cnfNumVars = 2
+      , CNF.cnfNumClauses = 3
+      , CNF.cnfClauses =
+          [ [1, 2]
+          , [1, -2]
+          , [-1, -2]
+          ]
+      }
+    (ok, messages) = checkSATResult cnf ("SATISFIABLE", Nothing)
 
 case_checkSATResult_UNSATISFIABLE_ok :: Assertion
 case_checkSATResult_UNSATISFIABLE_ok = do
