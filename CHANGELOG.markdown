@@ -1,3 +1,23 @@
+0.10.0 (Unreleased)
+-----
+
+* Converter updates
+  * Do not produce `obj<T` constraint in wbo2pb when all interpretations are admissible (#157)
+  * Optimize `unconstrainPB` a little (#159, #161)
+  * Change `ToySolver.SAT.Encoder.Integer` to encode integer variables without introducing `<=` constraints (#162)
+  * Store surplus expression instead of raw variables in `inequalitiesToEqualitiesPB` (#164)
+  * Refactor `ToySolver.SAT.Encoder.Integer` (#167)
+  * Improve `inequalitiesToEqualitiesPB` to produce more compact output (#168)
+  * Extend `normalizePB` to transform constant terms in the objective function into non-constant terms (#169)
+  * Support semi-integer variables in IP→PB conversion and improve error messages (#170)
+  * Simplify JSON that represents PBSum (#171)
+  * Scale objective function and constraints using rational instead of integer in IP→PB transformation (#172)
+  * Add `toysolver-check` command
+* Dependencies
+  * Stop supporting 32-bit Windows (#154)
+  * Stop supporting GHC 9.0 and below (#156)
+  * Use pseudo-boolean-0.1.12.0 (#158)
+
 0.9.0 (2025-02-18)
 -----
 
