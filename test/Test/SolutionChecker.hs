@@ -15,6 +15,7 @@ import Control.Monad
 import Data.Array.IArray
 import Data.Default.Class
 import qualified Data.Map.Lazy as Map
+import qualified Data.PseudoBoolean as PBFile
 import Data.Scientific (Scientific)
 import qualified Numeric.Optimization.MIP as MIP
 
@@ -187,6 +188,121 @@ case_checkMaxSATResult_bad_solution_status =
           , (2, [1, -2])
           , (1, [-1, 2])
           , (3, [-1, -2])
+          ]
+      }
+
+-- ----------------------------------------------------------------------
+
+case_checkWBOResult_SATISFIABLE :: Assertion
+case_checkWBOResult_SATISFIABLE = do
+  check True  $ checkWBOResult wbo ("SATISFIABLE", Just 1, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkWBOResult wbo ("SATISFIABLE", Just 0, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkWBOResult wbo ("SATISFIABLE", Just 0, Just $ array (1, 2) [(1, False), (2, False)])
+  check False $ checkWBOResult wbo ("SATISFIABLE", Just 2, Just $ array (1, 2) [(1, False), (2, True)])
+  check False $ checkWBOResult wbo ("SATISFIABLE", Nothing, Nothing)
+  where
+    (x1,x2) = (1,2)
+    wbo = PBFile.SoftFormula
+      { PBFile.wboNumVars = 2
+      , PBFile.wboNumConstraints = 3
+      , PBFile.wboTopCost = Just 2
+      , PBFile.wboConstraints =
+          [ (Nothing, ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 2,  ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1))
+          , (Just 1,  ([(1, [-x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 3,  ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1))
+          ]
+      }
+
+case_checkWBOResult_OPTIMUM_FOUND :: Assertion
+case_checkWBOResult_OPTIMUM_FOUND = do
+  check True  $ checkWBOResult wbo ("OPTIMUM FOUND", Just 1, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkWBOResult wbo ("OPTIMUM FOUND", Just 0, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkWBOResult wbo ("OPTIMUM FOUND", Just 0, Just $ array (1, 2) [(1, False), (2, False)])
+  check False $ checkWBOResult wbo ("OPTIMUM FOUND", Just 2, Just $ array (1, 2) [(1, False), (2, True)])
+  check False $ checkWBOResult wbo ("OPTIMUM FOUND", Nothing, Nothing)
+  where
+    (x1,x2) = (1,2)
+    wbo = PBFile.SoftFormula
+      { PBFile.wboNumVars = 2
+      , PBFile.wboNumConstraints = 3
+      , PBFile.wboTopCost = Just 2
+      , PBFile.wboConstraints =
+          [ (Nothing, ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 2,  ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1))
+          , (Just 1,  ([(1, [-x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 3,  ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1))
+          ]
+      }
+
+case_checkWBOResult_UNSATISFIABLE :: Assertion
+case_checkWBOResult_UNSATISFIABLE = do
+  check True  $ checkWBOResult wbo ("UNSATISFIABLE", Nothing, Nothing)
+  check False $ checkWBOResult wbo ("UNSATISFIABLE", Just 3, Just $ array (1, 2) [(1, True), (2, True)])
+  where
+    (x1,x2) = (1,2)
+    wbo = PBFile.SoftFormula
+      { PBFile.wboNumVars = 2
+      , PBFile.wboNumConstraints = 3
+      , PBFile.wboTopCost = Just 2
+      , PBFile.wboConstraints =
+          [ (Nothing, ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 2,  ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1))
+          , (Just 1,  ([(1, [-x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 3,  ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1))
+          ]
+      }
+
+case_checkWBOResult_UNKNOWN :: Assertion
+case_checkWBOResult_UNKNOWN = do
+  check True  $ checkWBOResult wbo ("UNKNOWN", Just 1, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkWBOResult wbo ("UNKNOWN", Just 0, Just $ array (1, 2) [(1, True), (2, False)])
+  check True  $ checkWBOResult wbo ("UNKNOWN", Nothing, Nothing)
+  where
+    (x1,x2) = (1,2)
+    wbo = PBFile.SoftFormula
+      { PBFile.wboNumVars = 2
+      , PBFile.wboNumConstraints = 3
+      , PBFile.wboTopCost = Just 2
+      , PBFile.wboConstraints =
+          [ (Nothing, ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 2,  ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1))
+          , (Just 1,  ([(1, [-x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 3,  ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1))
+          ]
+      }
+
+case_checkWBOResult_UNSUPPORTED :: Assertion
+case_checkWBOResult_UNSUPPORTED = do
+  check True  $ checkWBOResult wbo ("UNSUPPORTED", Nothing, Nothing)
+  where
+    (x1,x2) = (1,2)
+    wbo = PBFile.SoftFormula
+      { PBFile.wboNumVars = 2
+      , PBFile.wboNumConstraints = 3
+      , PBFile.wboTopCost = Just 2
+      , PBFile.wboConstraints =
+          [ (Nothing, ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 2,  ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1))
+          , (Just 1,  ([(1, [-x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 3,  ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1))
+          ]
+      }
+
+case_checkWBOResult_bad_solution_status :: Assertion
+case_checkWBOResult_bad_solution_status =
+  check False $ checkWBOResult wbo ("FOO BAR", Just 0, Just $ array (1, 2) [(1, True), (2, True)])
+  where
+    (x1,x2) = (1,2)
+    wbo = PBFile.SoftFormula
+      { PBFile.wboNumVars = 2
+      , PBFile.wboNumConstraints = 3
+      , PBFile.wboTopCost = Just 2
+      , PBFile.wboConstraints =
+          [ (Nothing, ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 2,  ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1))
+          , (Just 1,  ([(1, [-x1]), (1, [ x2])], PBFile.Ge, 1))
+          , (Just 3,  ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1))
           ]
       }
 
