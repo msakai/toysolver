@@ -10,6 +10,8 @@ import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
 import Test.Tasty.TH
 
+import Control.DeepSeq
+import Control.Exception (evaluate)
 import Control.Monad
 import Data.Array.IArray
 import Data.Default.Class
@@ -25,6 +27,7 @@ import ToySolver.Internal.SolutionChecker
 case_checkSATResult_SATISFIABLE_ok :: Assertion
 case_checkSATResult_SATISFIABLE_ok = do
   ok @?= True
+  _ <- evaluate $ force messages
   assertBool "messages should be empty" (null messages)
   where
     cnf = CNF.CNF
@@ -41,6 +44,7 @@ case_checkSATResult_SATISFIABLE_ok = do
 case_checkSATResult_SATISFIABLE_ng :: Assertion
 case_checkSATResult_SATISFIABLE_ng = do
   ok @?= False
+  _ <- evaluate $ force messages
   assertBool "messages should not be empty" (not (null messages))
   where
     cnf = CNF.CNF
@@ -57,6 +61,7 @@ case_checkSATResult_SATISFIABLE_ng = do
 case_checkSATResult_UNSATISFIABLE_ok :: Assertion
 case_checkSATResult_UNSATISFIABLE_ok = do
   ok @?= True
+  _ <- evaluate $ force messages
   assertBool "messages should be empty" (null messages)
   where
     cnf = CNF.CNF
@@ -74,6 +79,7 @@ case_checkSATResult_UNSATISFIABLE_ok = do
 case_checkSATResult_UNSATISFIABLE_ng :: Assertion
 case_checkSATResult_UNSATISFIABLE_ng = do
   ok @?= False
+  _ <- evaluate $ force messages
   assertBool "messages should not be empty" (not (null messages))
   where
     cnf = CNF.CNF
@@ -92,6 +98,7 @@ case_checkSATResult_UNSATISFIABLE_ng = do
 case_checkSATResult_UNKNOWN_ok_1 :: Assertion
 case_checkSATResult_UNKNOWN_ok_1 = do
   ok @?= True
+  _ <- evaluate $ force messages
   assertBool "messages should be empty" (null messages)
   where
     cnf = CNF.CNF
@@ -108,6 +115,7 @@ case_checkSATResult_UNKNOWN_ok_1 = do
 case_checkSATResult_UNKNOWN_ok_2 :: Assertion
 case_checkSATResult_UNKNOWN_ok_2 = do
   ok @?= True
+  _ <- evaluate $ force messages
   assertBool "messages should be empty" (null messages)
   where
     cnf = CNF.CNF
@@ -124,6 +132,7 @@ case_checkSATResult_UNKNOWN_ok_2 = do
 case_checkSATResult_UNKNOWN_ng_1 :: Assertion
 case_checkSATResult_UNKNOWN_ng_1 = do
   ok @?= False
+  _ <- evaluate $ force messages
   assertBool "messages should not be empty" (not (null messages))
   where
     cnf = CNF.CNF
@@ -141,6 +150,7 @@ case_checkSATResult_UNKNOWN_ng_1 = do
 case_checkSATResult_bad_solution_status :: Assertion
 case_checkSATResult_bad_solution_status = do
   ok @?= False
+  _ <- evaluate $ force messages
   assertBool "messages should not be empty" (not (null messages))
   where
     cnf = CNF.CNF
