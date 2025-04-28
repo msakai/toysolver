@@ -1,6 +1,6 @@
 cabal-version: 3.0
 Name:		toysolver
-Version:	0.9.0
+Version:	0.10.0
 License:	BSD-3-Clause
 License-File:	COPYING
 Author:		Masahiro Sakai (masahiro.sakai@gmail.com)
