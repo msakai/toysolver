@@ -135,8 +135,7 @@ Supported formats:
 
 ### toysolver-check
 
-Solution checker for variout problem files.
-
+Solution checker for various problem files.
 Usage:
 
     toysolver-check [OPTION...] [problem_file] [solution_file]
@@ -155,7 +154,7 @@ Usage:
     --tol-feasibility REAL   If the amount of violation of constraints is within
                              this amount, it is considered feasible.
                              (default: 1.0e-6)
-    --tol-optimality REAL    Feasiblity tolerance of dual constraints.
+    --tol-optimality REAL    Feasibility tolerance of dual constraints.
                              (default: 1.0e-6)
 
 Bindings
