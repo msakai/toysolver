@@ -987,23 +987,24 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
           then putSLine "UNSATISFIABLE"
           else putSLine "UNKNOWN"
       Just (m, val) -> do
+        let printModel =
+              if isMaxSat then
+                if optMaxSATCompactVLine opt then
+                  maxsatPrintModelCompact
+                else
+                  maxsatPrintModel
+              else
+                pbPrintModel
+
         b <- PBO.isOptimum pbo
         if b then do
           putSLine "OPTIMUM FOUND"
-          if isMaxSat then
-            if optMaxSATCompactVLine opt then
-              maxsatPrintModelCompact stdout m nv
-            else
-              maxsatPrintModel stdout m nv
-          else
-            pbPrintModel stdout m nv
+          printModel stdout m nv
           writeSOLFile opt m (Just val) nv
-        else if not isMaxSat then do
+        else do
           putSLine "SATISFIABLE"
-          pbPrintModel stdout m nv
+          printModel stdout m nv
           writeSOLFile opt m (Just val) nv
-        else
-          putSLine "UNKNOWN"
 
 -- ------------------------------------------------------------------------
 
