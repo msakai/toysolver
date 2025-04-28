@@ -12,9 +12,9 @@ Dev:
 [![Build Status](https://github.com/msakai/toysolver/workflows/build/badge.svg)](https://github.com/msakai/toysolver/actions)
 [![Coverage Status](https://coveralls.io/repos/msakai/toysolver/badge.svg)](https://coveralls.io/r/msakai/toysolver)
 
-It provides solver implementations of various problems including SAT, SMT, Max-SAT, PBS (Pseudo Boolean Satisfaction), PBO (Pseudo Boolean Optimization), MILP (Mixed Integer Linear Programming) and non-linear real arithmetic.
+It provides solver implementations of various problems, including SAT, SMT, Max-SAT, PBS (Pseudo Boolean Satisfaction), PBO (Pseudo Boolean Optimization), MILP (Mixed Integer Linear Programming), and non-linear real arithmetic.
 
-In particular, it contains moderately-fast pure-Haskell SAT solver 'toysat'.
+In particular, it contains a moderately fast pure-Haskell SAT solver `toysat`.
 
 Installation
 ------------
@@ -33,8 +33,8 @@ Arithmetic solver for the following problems:
 * Mixed Integer Linear Programming (MILP or MIP)
 * Boolean SATisfiability problem (SAT)
 * PB
-    * Pseudo Boolean Satisfaction (PBS)
-    * Pseudo Boolean Optimization (PBO)
+    * Pseudo-Boolean Satisfaction (PBS)
+    * Pseudo-Boolean Optimization (PBO)
     * Weighted Boolean Optimization (WBO)
 * Max-SAT families
     * Max-SAT
@@ -65,8 +65,8 @@ SAT-based solver for the following problems:
     * Minimally Unsatisfiable Subset (MUS)
     * Group-Oriented MUS (GMUS)
 * PB
-    * Pseudo Boolean Satisfaction (PBS)
-    * Pseudo Boolean Optimization (PBO)
+    * Pseudo-Boolean Satisfaction (PBS)
+    * Pseudo-Boolean Optimization (PBO)
     * Weighted Boolean Optimization (WBO)
 * Max-SAT families
     * Max-SAT
@@ -93,7 +93,7 @@ PB'12 competition result:
 
 ### toysmt
 
-SMT solver based on toysat.
+SMT solver based on `toysat`.
 
 Usage:
 
@@ -103,7 +103,7 @@ Currently only QF_UF, QF_RDL, QF_LRA, QF_UFRDL and QF_UFLRA logic are supported.
 
 ### toyfmf
 
-SAT-based finite model finder for first order logic (FOL).
+SAT-based finite model finder for first-order logic (FOL).
 
 Usage:
 
