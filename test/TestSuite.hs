@@ -26,6 +26,7 @@ import Test.QUBO
 import Test.SAT
 import Test.SAT.Encoder
 import Test.SAT.ExistentialQuantification
+import Test.SAT.LogParser
 import Test.SAT.MUS
 import Test.SAT.TheorySolver
 import Test.SAT.Types
@@ -34,6 +35,7 @@ import Test.SimplexTextbook
 import Test.SMT
 import Test.SMTLIB2Solver
 import Test.Smtlib
+import Test.SolutionChecker
 import Test.SubsetSum
 import Test.BipartiteMatching
 
@@ -62,6 +64,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , satTestGroup
   , satEncoderTestGroup
   , satExistentialQuantificationTestGroup
+  , satLogParserTestGroup
   , satMUSTestGroup
   , satTheorySolverTestGroup
   , satTypesTestGroup
@@ -71,6 +74,7 @@ main = defaultMain $ testGroup "ToySolver test suite"
   , smtTestGroup
   , smtlib2SolverTestGroup
   , smtlibTestGroup
+  , solutionCheckerTestGroup
   , subsetSumTestGroup
   , bipartiteMatchingTestGroup
   ]

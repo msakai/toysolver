@@ -342,6 +342,7 @@ Library
      ToySolver.SAT.Encoder.Tseitin
      ToySolver.SAT.ExistentialQuantification
      ToySolver.SAT.Formula
+     ToySolver.SAT.LogParser
      ToySolver.SAT.MUS
      ToySolver.SAT.MUS.Enum
      ToySolver.SAT.MUS.Types
@@ -371,6 +372,7 @@ Library
      ToySolver.Internal.Data.SeqQueue
      ToySolver.Internal.Data.Vec
      ToySolver.Internal.ProcessUtil
+     ToySolver.Internal.SolutionChecker
      ToySolver.Internal.TextUtil
      ToySolver.Internal.Util
      ToySolver.Wang
@@ -516,8 +518,6 @@ Executable toyfmf
       text,
       toysolver
 
--- Converters
-
 Executable toyconvert
   Import: exe-options
   Main-is: toyconvert.hs
@@ -545,6 +545,23 @@ Executable toyconvert
   GHC-Options: -rtsopts
   if flag(WithZlib)
     CPP-Options: "-DWITH_ZLIB"
+
+Executable toysolver-check
+  Import: exe-options
+  Main-is: toysolver_check.hs
+  HS-Source-Dirs: app
+  Build-Depends:
+    array,
+    bytestring,
+    containers,
+    data-default-class,
+    filepath,
+    MIP,
+    optparse-applicative,
+    pseudo-boolean,
+    scientific,
+    text,
+    toysolver
 
 -- Sample Programs
 
@@ -692,27 +709,6 @@ Executable pigeonhole
     pseudo-boolean,
     toysolver
 
-Executable maxsatverify
-  Import: exe-options
-  If !flag(BuildMiscPrograms)
-    Buildable: False
-  Main-is: maxsatverify.hs
-  HS-Source-Dirs: app
-  Build-Depends:
-    array,
-    toysolver
-
-Executable pbverify
-  Import: exe-options
-  Main-is: pbverify.hs
-  If !flag(BuildMiscPrograms)
-    Buildable: False
-  HS-Source-Dirs: app
-  Build-Depends:
-    array,
-    pseudo-boolean,
-    toysolver
-
 -- Test suites and benchmarks
 
 Test-suite TestPolynomial
@@ -764,6 +760,7 @@ Test-suite TestSuite
     Test.SAT
     Test.SAT.Encoder
     Test.SAT.ExistentialQuantification
+    Test.SAT.LogParser
     Test.SAT.MUS
     Test.SAT.TheorySolver
     Test.SAT.Types
@@ -774,6 +771,7 @@ Test-suite TestSuite
     Test.SMT
     Test.SMTLIB2Solver
     Test.Smtlib
+    Test.SolutionChecker
     Test.SubsetSum
     ToySolver.SMT.SMTLIB2Solver
     Smtlib.Parsers.CommonParsers

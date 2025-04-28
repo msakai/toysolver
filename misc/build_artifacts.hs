@@ -35,6 +35,7 @@ main = sh $ do
         , "toysat"
         , "toysmt"
         , "toysolver"
+        , "toysolver-check"
         ] ++
         [ "assign"
         , "htc"
