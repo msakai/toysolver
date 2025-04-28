@@ -21,7 +21,7 @@
 0.9.0 (2025-02-18)
 -----
 
-* Converters updates
+* Converter updates
   * Add `--dump-info` option to `toyconvert` (#119, #120, #125)
   * Change the signs of QUBO-related converter's representation of offset (#126)
   * Change `WBO2IPInfo` not to store weights (#124)
@@ -34,9 +34,9 @@
   * Restructure converter modules (#142)
   * Support SOS constraints over non-binary variables in `mip2pb` (#140)
   * Rename `mip2pb` to `ip2pb`
-* Pseudo-boolean and cardinality constarint encoder updates
+* Pseudo-boolean and cardinality constraint encoder updates
   * Consider polarity in encoding of pseudo-boolean and cardinality constraints (#88)
-  * Add BC-CNF pseudo boolean constraint encoder (#85)
+  * Add BC-CNF pseudo-boolean constraint encoder (#85)
   * Support specifying PB encoding strategy (#77)
 * Dependencies
   * Support GHC 9.4 (#92), 9.6, 9.8, 9.10
@@ -67,9 +67,9 @@
 * add `toysat-ipasir` foreign library which implements [IPASIR](https://github.com/biotomas/ipasir) API for incremental SAT solving.
 * `ToySolver.SAT`
   * Restructure SAT solver modules under `ToySolver.SAT.Solver.*`
-  * add `SequentialCounter`, `ParallelCounter` and `Totalizer` as methods for encoding cardinality constraints
+  * add `SequentialCounter`, `ParallelCounter`, and `Totalizer` as methods for encoding cardinality constraints
   * add `PackedLit` type to reduce memory footprint
-  * use structure of array (SOA) approach to reduce memory footprint
+  * use structure of array (SOA) approach to reducethe memory footprint
   * add `setLearnCallback`/`clearLearnCallback` and `setTerminateCallback`/`clearTerminateCallback` which correspond to [IPASIR](https://github.com/biotomas/ipasir)'s `ipasir_set_learn()` and `ipasir_set_terminate()`.
   * add `clearLogger`
   * change `getFailedAssumptions` and `getAssumptionsImplications` to return `IntSet` instead of `[Int]`
@@ -122,7 +122,7 @@
   * add `--init-sp` option to initialize variable state using survey propagation
   * allow using `UBCSAT` when solving PBO/WBO problems
 * `toysmt`
-  * suport bit-vector logic
+  * support bit-vector logic
 * `toyconvert`
   * `pbconvert` and `lpconvert` were merged into a single command `toyconvert`
   * add `--ksat=NUMBER` option to convert to k-SAT formula
@@ -155,16 +155,16 @@
 
 0.4.0
 -----
-* add experimental SMT (Satisfiablity Modulo Theories) solver 'toysmt', which supports theory of uninterpreted functions and linear real arithmetics.
+* add experimental SMT (Satisfiability Modulo Theories) solver 'toysmt', which supports theory of uninterpreted functions and linear real arithmetics.
 * fix toysat to output model in Max-SAT format instead of PB/WBO format when solving Max-SAT problems
 * add experimental getAssumptionsImplications functions to ToySolver.SAT module.
 * add getFixedLiterals to ToySolver.SAT module.
 * use 'mwc-random' package instead of 'random' package.
-* introduce 'Config' data type in ToySolver.SAT to simplify configulation management.
+* introduce 'Config' data type in ToySolver.SAT to simplify configuration management.
 * add subset-sum problem solver
-* implement backracking and explanation generation in simplex solver and congruence closure solver.
+* implement backtracking and explanation generation in simplex solver and congruence closure solver.
 
 0.3.0
 -----
-* split OPB/WBO file library into a serarate 'pseudo-boolean' library.
+* split OPB/WBO file library into a separate 'pseudo-boolean' library.
 
