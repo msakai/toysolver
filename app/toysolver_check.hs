@@ -114,7 +114,7 @@ main = do
         case optMode opt of
           Just m  -> m
           Nothing ->
-            case getExt (optInputFile opt) of
+            case FF.getBaseExt (optInputFile opt) of
               ".cnf"  -> ModeSAT
               ".opb"  -> ModePB
               ".wbo"  -> ModeWBO
@@ -162,11 +162,3 @@ main = do
   mapM_ putStrLn ls
 
   unless ok $ exitFailure
-
-getExt :: String -> String
-getExt name | (base, ext) <- splitExtension name =
-  case map toLower ext of
-#ifdef WITH_ZLIB
-    ".gz" -> getExt base
-#endif
-    s -> s
