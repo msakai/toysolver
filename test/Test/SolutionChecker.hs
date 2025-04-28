@@ -421,7 +421,7 @@ case_checkMIPResult_objective_value = do
   check False $ checkMIPResult def prob sol{ MIP.solObjectiveValue = Just (8 + 1e-5) }
 
   where
-    [x1, x2] = map MIP.varExpr ["x1", "x2"]
+    (x1, x2) = (MIP.varExpr "x1", MIP.varExpr "x2")
 
     prob :: MIP.Problem Scientific
     prob = def
@@ -510,7 +510,7 @@ case_checkMIPResult_constraints = do
   check True  $ checkMIPResult def prob sol
   check False $ checkMIPResult def{ MIP.feasibilityTol = 1e-7 } prob sol
   where
-    [x1, x2] = map MIP.varExpr ["x1", "x2"]
+    (x1, x2) = (MIP.varExpr "x1", MIP.varExpr "x2")
 
     prob :: MIP.Problem Scientific
     prob = def
