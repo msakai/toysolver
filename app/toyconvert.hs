@@ -268,7 +268,7 @@ data Problem
 readProblem :: Options -> String -> IO Problem
 readProblem o fname = do
   enc <- T.mapM mkTextEncoding (optFileEncoding o)
-  case getExt fname of
+  case FF.getBaseExt fname of
     ".cnf"
       | optAsMaxSAT o -> do
           prob <- FF.readFile fname
@@ -316,14 +316,6 @@ readProblem o fname = do
           return $ ProbOPB prob' (Trail info)
     ext ->
       error $ "unknown file extension: " ++ show ext
-
-getExt :: String -> String
-getExt name | (base, ext) <- splitExtension name =
-  case map toLower ext of
-#ifdef WITH_ZLIB
-    ".gz" -> getExt base
-#endif
-    s -> s
 
 transformProblem :: Options -> Problem -> Problem
 transformProblem o = transformObj o . transformPBLinearization o . transformMIPRemoveUserCuts o
@@ -461,7 +453,7 @@ writeProblem o problem = do
               ProbOPB opb _ -> pb2lsp opb
               ProbWBO wbo _ -> wbo2lsp wbo
               ProbMIP _ _   -> pb2lsp (fst opbAndTrail)
-      case getExt fname of
+      case FF.getBaseExt fname of
         ".opb" -> do
           case transformNormalizeOPB opbAndTrail of
             (opb, trail) -> do

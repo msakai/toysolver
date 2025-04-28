@@ -22,6 +22,9 @@ module ToySolver.FileFormat.Base
   , parseFile
   , readFile
   , writeFile
+
+  -- * Utility functions
+  , getBaseExt
   ) where
 
 import Prelude hiding (readFile, writeFile)
@@ -29,6 +32,7 @@ import Control.Exception
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Builder hiding (writeFile)
+import Data.Char
 import Data.Typeable
 import System.IO hiding (readFile, writeFile)
 
@@ -87,3 +91,16 @@ writeFile filepath a = liftIO $ do
 #else
     hPutBuilder h (render a)
 #endif
+
+-- | Get base extension of a filename
+--
+-- Supported compression format extensions (e.g. @.gz@) are removed, and extensions such as @.cnf@ are returned.
+--
+-- @since 0.10.0
+getBaseExt :: FilePath -> String
+getBaseExt name | (base, ext) <- splitExtension name =
+  case map toLower ext of
+#ifdef WITH_ZLIB
+    ".gz" -> getBaseExt base
+#endif
+    s -> s
