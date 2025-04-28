@@ -133,6 +133,31 @@ Supported formats:
 |Yices Input Language|`.ys`|-|✅|SMT problem instances for SMT solver [Yices](https://yices.csl.sri.com/)|
 |qbsolv QUBO Input File Format|`.qubo`|✅|✅|Unconstrained quadratic binary optimization problems ([specification](https://github.com/dwavesystems/qbsolv?tab=readme-ov-file#qbsolv-qubo-input-file-format))|
 
+### toysolver-check
+
+Solution checker for variout problem files.
+
+Usage:
+
+    toysolver-check [OPTION...] [problem_file] [solution_file]
+    toysolver-check --lp [OPTION...] [file.lp|file.mps] [file.sol]
+    toysolver-check --sat [OPTION...] [file.cnf] [file.log]
+    toysolver-check --pb [OPTION...] [file.opb] [file.log]
+    toysolver-check --wbo [OPTION...] [file.wbo] [file.log]
+    toysolver-check --maxsat [OPTION...] [file.cnf|file.wcnf] [file.log]
+
+    --encoding ENCODING      file encoding for LP/MPS files
+    --pb-fast-parser         use attoparsec-based parser instead of
+                             megaparsec-based one for speed
+    --tol-integrality REAL   If a value of integer variable is within this amount
+                             from its nearest integer, it is considered feasible.
+                             (default: 1.0e-5)
+    --tol-feasibility REAL   If the amount of violation of constraints is within
+                             this amount, it is considered feasible.
+                             (default: 1.0e-6)
+    --tol-optimality REAL    Feasiblity tolerance of dual constraints.
+                             (default: 1.0e-6)
+
 Bindings
 --------
 
