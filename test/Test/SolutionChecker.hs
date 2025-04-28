@@ -37,36 +37,10 @@ check expected (ok, messages) = do
 
 -- ----------------------------------------------------------------------
 
-case_checkSATResult_SATISFIABLE_ok :: Assertion
-case_checkSATResult_SATISFIABLE_ok =
+case_checkSATResult_SATISFIABLE :: Assertion
+case_checkSATResult_SATISFIABLE = do
   checkOkAndEmpty $ checkSATResult cnf ("SATISFIABLE", Just $ array (1, 2) [(1, True), (2, False)])
-  where
-    cnf = CNF.CNF
-      { CNF.cnfNumVars = 2
-      , CNF.cnfNumClauses = 3
-      , CNF.cnfClauses =
-          [ [1, 2]
-          , [1, -2]
-          , [-1, -2]
-          ]
-      }
-
-case_checkSATResult_SATISFIABLE_ng_1 :: Assertion
-case_checkSATResult_SATISFIABLE_ng_1 =
   check False $ checkSATResult cnf ("SATISFIABLE", Just $ array (1, 2) [(1, False), (2, True)])
-  where
-    cnf = CNF.CNF
-      { CNF.cnfNumVars = 2
-      , CNF.cnfNumClauses = 3
-      , CNF.cnfClauses =
-          [ [1, 2]
-          , [1, -2]
-          , [-1, -2]
-          ]
-      }
-
-case_checkSATResult_SATISFIABLE_ng_2 :: Assertion
-case_checkSATResult_SATISFIABLE_ng_2 =
   check False $ checkSATResult cnf ("SATISFIABLE", Nothing)
   where
     cnf = CNF.CNF
@@ -79,23 +53,9 @@ case_checkSATResult_SATISFIABLE_ng_2 =
           ]
       }
 
-case_checkSATResult_UNSATISFIABLE_ok :: Assertion
-case_checkSATResult_UNSATISFIABLE_ok = do
+case_checkSATResult_UNSATISFIABLE :: Assertion
+case_checkSATResult_UNSATISFIABLE = do
   checkOkAndEmpty $ checkSATResult cnf ("UNSATISFIABLE", Nothing)
-  where
-    cnf = CNF.CNF
-      { CNF.cnfNumVars = 2
-      , CNF.cnfNumClauses = 3
-      , CNF.cnfClauses =
-          [ [1, 2]
-          , [1, -2]
-          , [-1, 2]
-          , [-1, -2]
-          ]
-      }
-
-case_checkSATResult_UNSATISFIABLE_ng :: Assertion
-case_checkSATResult_UNSATISFIABLE_ng =
   check False $ checkSATResult cnf ("UNSATISFIABLE", Just $ array (1, 2) [(1, True), (2, True)])
   where
     cnf = CNF.CNF
@@ -109,36 +69,10 @@ case_checkSATResult_UNSATISFIABLE_ng =
           ]
       }
 
-case_checkSATResult_UNKNOWN_ok_1 :: Assertion
-case_checkSATResult_UNKNOWN_ok_1 =
+case_checkSATResult_UNKNOWN :: Assertion
+case_checkSATResult_UNKNOWN = do
   checkOkAndEmpty $ checkSATResult cnf ("UNKNOWN", Just $ array (1, 2) [(1, True), (2, False)])
-  where
-    cnf = CNF.CNF
-      { CNF.cnfNumVars = 2
-      , CNF.cnfNumClauses = 3
-      , CNF.cnfClauses =
-          [ [1, 2]
-          , [1, -2]
-          , [-1, -2]
-          ]
-      }
-
-case_checkSATResult_UNKNOWN_ok_2 :: Assertion
-case_checkSATResult_UNKNOWN_ok_2 = do
   checkOkAndEmpty $ checkSATResult cnf ("UNKNOWN", Nothing)
-  where
-    cnf = CNF.CNF
-      { CNF.cnfNumVars = 2
-      , CNF.cnfNumClauses = 3
-      , CNF.cnfClauses =
-          [ [1, 2]
-          , [1, -2]
-          , [-1, 2]
-          ]
-      }
-
-case_checkSATResult_UNKNOWN_ng_1 :: Assertion
-case_checkSATResult_UNKNOWN_ng_1 =
   check False $ checkSATResult cnf ("UNKNOWN", Just $ array (1, 2) [(1, True), (2, True)])
   where
     cnf = CNF.CNF
@@ -147,7 +81,6 @@ case_checkSATResult_UNKNOWN_ng_1 =
       , CNF.cnfClauses =
           [ [1, 2]
           , [1, -2]
-          , [-1, 2]
           , [-1, -2]
           ]
       }
