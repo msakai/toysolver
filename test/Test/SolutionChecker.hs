@@ -193,6 +193,113 @@ case_checkMaxSATResult_bad_solution_status =
 
 -- ----------------------------------------------------------------------
 
+case_checkPBResult_SATISFIABLE :: Assertion
+case_checkPBResult_SATISFIABLE = do
+  check True  $ checkPBResult opb ("SATISFIABLE", Just 1, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkPBResult opb ("SATISFIABLE", Just 0, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkPBResult opb ("SATISFIABLE", Just 2, Just $ array (1, 2) [(1, False), (2, True)])
+  check False $ checkPBResult opb ("SATISFIABLE", Nothing, Nothing)
+  where
+    (x1,x2) = (1,2)
+    opb = PBFile.Formula
+      { PBFile.pbNumVars = 2
+      , PBFile.pbNumConstraints = 3
+      , PBFile.pbObjectiveFunction = Just [(1, [x1]), (2, [x2])]
+      , PBFile.pbConstraints =
+          [ ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1)
+          , ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1)
+          , ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1)
+          ]
+      }
+
+case_checkPBResult_OPTIMUM_FOUND :: Assertion
+case_checkPBResult_OPTIMUM_FOUND = do
+  check True  $ checkPBResult opb ("OPTIMUM FOUND", Just 1, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkPBResult opb ("OPTIMUM FOUND", Just 0, Just $ array (1, 2) [(1, True), (2, False)])
+  check False $ checkPBResult opb ("OPTIMUM FOUND", Just 2, Just $ array (1, 2) [(1, False), (2, True)])
+  check False $ checkPBResult opb ("OPTIMUM FOUND", Nothing, Nothing)
+  where
+    (x1,x2) = (1,2)
+    opb = PBFile.Formula
+      { PBFile.pbNumVars = 2
+      , PBFile.pbNumConstraints = 3
+      , PBFile.pbObjectiveFunction = Just [(1, [x1]), (2, [x2])]
+      , PBFile.pbConstraints =
+          [ ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1)
+          , ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1)
+          , ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1)
+          ]
+      }
+
+case_checkPBResult_UNSATISFIABLE :: Assertion
+case_checkPBResult_UNSATISFIABLE = do
+  check True  $ checkPBResult opb ("UNSATISFIABLE", Nothing, Nothing)
+  check False $ checkPBResult opb ("UNSATISFIABLE", Just 3, Just $ array (1, 2) [(1, True), (2, True)])
+  where
+    (x1,x2) = (1,2)
+    opb = PBFile.Formula
+      { PBFile.pbNumVars = 2
+      , PBFile.pbNumConstraints = 3
+      , PBFile.pbObjectiveFunction = Just [(1, [x1]), (2, [x2])]
+      , PBFile.pbConstraints =
+          [ ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1)
+          , ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1)
+          , ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1)
+          ]
+      }
+
+case_checkPBResult_UNKNOWN :: Assertion
+case_checkPBResult_UNKNOWN = do
+  check True  $ checkPBResult opb ("UNKNOWN", Just 1, Just $ array (1, 2) [(1, True), (2, False)])
+  check True  $ checkPBResult opb ("UNKNOWN", Nothing, Nothing)
+  check False $ checkPBResult opb ("UNKNOWN", Just 3, Just $ array (1, 2) [(1, True), (2, True)])
+  where
+    (x1,x2) = (1,2)
+    opb = PBFile.Formula
+      { PBFile.pbNumVars = 2
+      , PBFile.pbNumConstraints = 3
+      , PBFile.pbObjectiveFunction = Just [(1, [x1]), (2, [x2])]
+      , PBFile.pbConstraints =
+          [ ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1)
+          , ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1)
+          , ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1)
+          ]
+      }
+
+case_checkPBResult_UNSUPPORTED :: Assertion
+case_checkPBResult_UNSUPPORTED = do
+  check True  $ checkPBResult opb ("UNSUPPORTED", Nothing, Nothing)
+  where
+    (x1,x2) = (1,2)
+    opb = PBFile.Formula
+      { PBFile.pbNumVars = 2
+      , PBFile.pbNumConstraints = 3
+      , PBFile.pbObjectiveFunction = Just [(1, [x1]), (2, [x2])]
+      , PBFile.pbConstraints =
+          [ ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1)
+          , ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1)
+          , ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1)
+          ]
+      }
+
+case_checkPBResult_bad_solution_status :: Assertion
+case_checkPBResult_bad_solution_status =
+  check False $ checkPBResult opb ("FOO BAR", Just 3, Just $ array (1, 2) [(1, True), (2, True)])
+  where
+    (x1,x2) = (1,2)
+    opb = PBFile.Formula
+      { PBFile.pbNumVars = 2
+      , PBFile.pbNumConstraints = 3
+      , PBFile.pbObjectiveFunction = Just [(1, [x1]), (2, [x2])]
+      , PBFile.pbConstraints =
+          [ ([(1, [ x1]), (1, [ x2])], PBFile.Ge, 1)
+          , ([(1, [ x1]), (1, [-x2])], PBFile.Ge, 1)
+          , ([(1, [-x1]), (1, [-x2])], PBFile.Ge, 1)
+          ]
+      }
+
+-- ----------------------------------------------------------------------
+
 case_checkWBOResult_SATISFIABLE :: Assertion
 case_checkWBOResult_SATISFIABLE = do
   check True  $ checkWBOResult wbo ("SATISFIABLE", Just 1, Just $ array (1, 2) [(1, True), (2, False)])
