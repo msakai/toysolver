@@ -108,6 +108,7 @@ data Options
   , optFileEncoding :: Maybe String
   , optMaxSATCompactVLine :: Bool
   , optPBFastParser :: Bool
+  , optExitCode :: Bool
   }
 
 instance Default Options where
@@ -132,6 +133,7 @@ instance Default Options where
     , optFileEncoding = Nothing
     , optMaxSATCompactVLine = False
     , optPBFastParser = False
+    , optExitCode = False
     }
 
 optionsParser :: Parser Options
@@ -155,6 +157,7 @@ optionsParser = Options
   <*> fileEncodingOption
   <*> maxsatCompactVLineOption
   <*> pbFastParserOption
+  <*> exitCodeOption
   where
     fileInput :: Parser String
     fileInput = strArgument $ metavar "(FILE|-)"
@@ -261,6 +264,9 @@ optionsParser = Options
       $  long "pb-fast-parser"
       <> help "use attoparsec-based parser instead of megaparsec-based one for speed"
 
+    exitCodeOption = switch
+      $  long "exit-code"
+      <> help "exit with an exit code based on solution status (only for SAT and MaxSAT mode)"
 
 satConfigParser :: Parser SAT.Config
 satConfigParser = SAT.Config
@@ -631,11 +637,15 @@ solveSAT opt solver cnf cnfFileName = do
           SAT.setVarPolarity solver v val
 
   result <- SAT.solve solver
-  putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
-  when result $ do
+  if result then do
+    putSLine "SATISFIABLE"
     m <- SAT.getModel solver
     satPrintModel stdout m (CNF.cnfNumVars cnf)
     writeSOLFile opt m Nothing (CNF.cnfNumVars cnf)
+    when (optExitCode opt) $ exitWith (ExitFailure 10)
+  else do
+    putSLine "UNSATISFIABLE"
+    when (optExitCode opt) $ exitWith (ExitFailure 20)
 
 initPolarityUsingSP :: SAT.Solver -> Int -> Int -> [(Double, SAT.PackedClause)] -> IO (IntMap Double)
 initPolarityUsingSP solver nvOrig nv clauses = do
@@ -983,9 +993,12 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
     case ret of
       Nothing -> do
         b <- PBO.isUnsat pbo
-        if b
-          then putSLine "UNSATISFIABLE"
-          else putSLine "UNKNOWN"
+        if b then do
+          putSLine "UNSATISFIABLE"
+          when (isMaxSat && optExitCode opt) $ exitWith (ExitFailure 20)
+        else do
+          putSLine "UNKNOWN"
+          when (isMaxSat && optExitCode opt) $ exitWith (ExitSuccess) -- ExitFailure 0 is prohibited
       Just (m, val) -> do
         let printModel =
               if isMaxSat then
@@ -1001,10 +1014,12 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
           putSLine "OPTIMUM FOUND"
           printModel stdout m nv
           writeSOLFile opt m (Just val) nv
+          when (isMaxSat && optExitCode opt) $ exitWith (ExitFailure 30)
         else do
           putSLine "SATISFIABLE"
           printModel stdout m nv
           writeSOLFile opt m (Just val) nv
+          when (isMaxSat && optExitCode opt) $ exitWith (ExitFailure 10)
 
 -- ------------------------------------------------------------------------
 
