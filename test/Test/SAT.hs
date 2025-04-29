@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.SAT (satTestGroup) where
@@ -7,11 +8,13 @@ module Test.SAT (satTestGroup) where
 import Control.Exception
 import Control.Monad
 import Data.Array.IArray
+import qualified Data.ByteString.Builder as Builder
 import Data.Default.Class
 import qualified Data.IntSet as IntSet
 import Data.IORef
 import qualified Data.Map.Strict as Map
 import qualified Data.Vector as V
+import System.IO
 import qualified System.Random.MWC as Rand
 
 import Test.Tasty
@@ -23,6 +26,7 @@ import qualified Test.QuickCheck.Monadic as QM
 import ToySolver.Data.LBool
 import qualified ToySolver.FileFormat.CNF as CNF
 import qualified ToySolver.SAT as SAT
+import qualified ToySolver.SAT.Printer as Printer
 
 import Test.SAT.Utils
 
@@ -683,6 +687,53 @@ prop_SOS2 = QM.monadicIO $ do
     Nothing -> do
       forM_ (allAssignments (CNF.cnfNumVars cnf)) $ \m -> do
         QM.assert $ not (evalCNF m cnf && SAT.evalSOS2 m sos2)
+
+------------------------------------------------------------------------
+-- Printer
+
+case_Printer_satModel :: Assertion
+case_Printer_satModel = do
+  let m1 = array (1,3) [(1, True), (2, False), (3, True)]
+  Builder.toLazyByteString (Printer.satModel m1 0 LF  ) @?= "v 1 -2 3\nv 0\n"
+  Builder.toLazyByteString (Printer.satModel m1 0 CRLF) @?= "v 1 -2 3\r\nv 0\r\n"
+  let m2 = array (1,11) (zip [1..11] (repeat True))
+  Builder.toLazyByteString (Printer.satModel m2 0 LF  ) @?= "v 1 2 3 4 5 6 7 8 9 10\nv 11\nv 0\n"
+  Builder.toLazyByteString (Printer.satModel m2 3 LF  ) @?= "v 1 2 3\nv 0\n"
+
+case_Printer_maxsatModel :: Assertion
+case_Printer_maxsatModel = do
+  let m1 = array (1,3) [(1, True), (2, False), (3, True)]
+  Builder.toLazyByteString (Printer.maxsatModel m1 0 LF  ) @?= "v 1 -2 3\n"
+  Builder.toLazyByteString (Printer.maxsatModel m1 0 CRLF) @?= "v 1 -2 3\r\n"
+  let m2 = array (1,11) (zip [1..11] (repeat True))
+  Builder.toLazyByteString (Printer.maxsatModel m2 0 LF  ) @?= "v 1 2 3 4 5 6 7 8 9 10\nv 11\n"
+  Builder.toLazyByteString (Printer.maxsatModel m2 3 LF  ) @?= "v 1 2 3\n"
+
+case_Printer_maxsatModelCompact :: Assertion
+case_Printer_maxsatModelCompact = do
+  let m1 = array (1,3) [(1, True), (2, False), (3, True)]
+  Builder.toLazyByteString (Printer.maxsatModelCompact m1 0 LF  ) @?= "v 101\n"
+  Builder.toLazyByteString (Printer.maxsatModelCompact m1 0 CRLF) @?= "v 101\r\n"
+  let m2 = array (1,11) (zip [1..11] (repeat True))
+  Builder.toLazyByteString (Printer.maxsatModelCompact m2 0 LF  ) @?= "v 11111111111\n"
+  Builder.toLazyByteString (Printer.maxsatModelCompact m2 3 LF  ) @?= "v 111\n"
+
+case_Printer_pbModel :: Assertion
+case_Printer_pbModel = do
+  let m1 = array (1,3) [(1, True), (2, False), (3, True)]
+  Builder.toLazyByteString (Printer.pbModel m1 0 LF  ) @?= "v x1 -x2 x3\n"
+  Builder.toLazyByteString (Printer.pbModel m1 0 CRLF) @?= "v x1 -x2 x3\r\n"
+  let m2 = array (1,11) (zip [1..11] (repeat True))
+  Builder.toLazyByteString (Printer.pbModel m2 0 LF  ) @?= "v x1 x2 x3 x4 x5 x6 x7 x8 x9 x10\nv x11\n"
+  Builder.toLazyByteString (Printer.pbModel m2 3 LF  ) @?= "v x1 x2 x3\n"
+
+case_Printer_musSol :: Assertion
+case_Printer_musSol = do
+  let is1 = [1, 5, 8]
+  Builder.toLazyByteString (Printer.musSol is1 LF  ) @?= "v 1 5 8\nv 0\n"
+  Builder.toLazyByteString (Printer.musSol is1 CRLF) @?= "v 1 5 8\r\nv 0\r\n"
+  let is2 = [1..11]
+  Builder.toLazyByteString (Printer.musSol is2 LF  ) @?= "v 1 2 3 4 5 6 7 8 9 10\nv 11\nv 0\n"
 
 ------------------------------------------------------------------------
 -- Test harness
