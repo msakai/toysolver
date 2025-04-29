@@ -108,6 +108,7 @@ data Options
   , optFileEncoding :: Maybe String
   , optMaxSATCompactVLine :: Bool
   , optPBFastParser :: Bool
+  , optExitCode :: Bool
   }
 
 instance Default Options where
@@ -132,6 +133,7 @@ instance Default Options where
     , optFileEncoding = Nothing
     , optMaxSATCompactVLine = False
     , optPBFastParser = False
+    , optExitCode = False
     }
 
 optionsParser :: Parser Options
@@ -155,6 +157,7 @@ optionsParser = Options
   <*> fileEncodingOption
   <*> maxsatCompactVLineOption
   <*> pbFastParserOption
+  <*> exitCodeOption
   where
     fileInput :: Parser String
     fileInput = strArgument $ metavar "(FILE|-)"
@@ -261,6 +264,9 @@ optionsParser = Options
       $  long "pb-fast-parser"
       <> help "use attoparsec-based parser instead of megaparsec-based one for speed"
 
+    exitCodeOption = switch
+      $  long "exit-code"
+      <> help "exit with an exit code based on solution status (only for SAT and MaxSAT mode)"
 
 satConfigParser :: Parser SAT.Config
 satConfigParser = SAT.Config
@@ -623,11 +629,15 @@ solveSAT opt solver cnf cnfFileName = do
           SAT.setVarPolarity solver v val
 
   result <- SAT.solve solver
-  putSLine $ if result then "SATISFIABLE" else "UNSATISFIABLE"
-  when result $ do
+  if result then do
+    putSLine "SATISFIABLE"
     m <- SAT.getModel solver
     satPrintModel stdout m (CNF.cnfNumVars cnf)
     writeSOLFile opt m Nothing (CNF.cnfNumVars cnf)
+    when (optExitCode opt) $ exitWith (ExitFailure 10)
+  else do
+    putSLine "UNSATISFIABLE"
+    when (optExitCode opt) $ exitWith (ExitFailure 20)
 
 initPolarityUsingSP :: SAT.Solver -> Int -> Int -> [(Double, SAT.PackedClause)] -> IO (IntMap Double)
 initPolarityUsingSP solver nvOrig nv clauses = do
@@ -975,27 +985,36 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
     case ret of
       Nothing -> do
         b <- PBO.isUnsat pbo
-        if b
-          then putSLine "UNSATISFIABLE"
-          else putSLine "UNKNOWN"
+        if b then do
+          putSLine "UNSATISFIABLE"
+          when (isMaxSat && optExitCode opt) $ exitWith (ExitFailure 20)
+        else do
+          putSLine "UNKNOWN"
+          if isMaxSat && optExitCode opt then
+            exitWith ExitSuccess -- ExitFailure 0 is prohibited
+          else
+            exitFailure
       Just (m, val) -> do
+        let printModel =
+              if isMaxSat then
+                if optMaxSATCompactVLine opt then
+                  maxsatPrintModelCompact
+                else
+                  maxsatPrintModel
+              else
+                pbPrintModel
+
         b <- PBO.isOptimum pbo
         if b then do
           putSLine "OPTIMUM FOUND"
-          if isMaxSat then
-            if optMaxSATCompactVLine opt then
-              maxsatPrintModelCompact stdout m nv
-            else
-              maxsatPrintModel stdout m nv
-          else
-            pbPrintModel stdout m nv
+          printModel stdout m nv
           writeSOLFile opt m (Just val) nv
-        else if not isMaxSat then do
+          when (isMaxSat && optExitCode opt) $ exitWith (ExitFailure 30)
+        else do
           putSLine "SATISFIABLE"
-          pbPrintModel stdout m nv
+          printModel stdout m nv
           writeSOLFile opt m (Just val) nv
-        else
-          putSLine "UNKNOWN"
+          when (isMaxSat && optExitCode opt) $ exitWith (ExitFailure 10)
 
 -- ------------------------------------------------------------------------
 
@@ -1050,7 +1069,7 @@ solveMIP opt solver mip = do
   case ret of
     Left msg -> do
       putCommentLine msg
-      putSLine "UNKNOWN"
+      putSLine "UNSUPPORTED"
       exitFailure
     Right (obj, info) -> do
       (linObj, linObjOffset) <- Integer.linearize pbnlc obj
@@ -1093,7 +1112,7 @@ solveMIP opt solver mip = do
             b <- PBO.isUnsat pbo
             if b
               then putSLine "UNSATISFIABLE"
-              else putSLine "UNKNOWN"
+              else putSLine "UNKNOWN" >> exitFailure
           Just (m,val) -> do
             b <- PBO.isOptimum pbo
             if b

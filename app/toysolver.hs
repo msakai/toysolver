@@ -20,6 +20,7 @@ import Control.Concurrent
 import Data.Array.IArray
 import Data.Char
 import Data.Default.Class
+import Data.IORef
 import Data.List
 import Data.Maybe
 import Data.Scientific (Scientific)
@@ -79,6 +80,7 @@ data Options = Options
   , optFileEncoding :: Maybe String
   , optMaxSATCompactVLine :: Bool
   , optPBFastParser :: Bool
+  , optExitCode :: Bool
   } deriving (Eq, Show)
 
 optionsParser :: Parser Options
@@ -96,6 +98,7 @@ optionsParser = Options
   <*> fileEncodingOption
   <*> maxsatCompactVLineOption
   <*> pbFastParserOption
+  <*> exitCodeOption
   where
     fileInput :: Parser FilePath
     fileInput = argument str (metavar "FILE")
@@ -177,6 +180,11 @@ optionsParser = Options
       $  long "pb-fast-parser"
       <> help "use attoparsec-based parser instead of megaparsec-based one for speed"
 
+    exitCodeOption :: Parser Bool
+    exitCodeOption = switch
+      $  long "exit-code"
+      <> help "exit with an exit code based on solution status (only for SAT and MaxSAT mode)"
+
 parserInfo :: ParserInfo Options
 parserInfo = info (helper <*> versionOption <*> optionsParser)
   $  fullDesc
@@ -190,13 +198,23 @@ parserInfo = info (helper <*> versionOption <*> optionsParser)
 
 -- ---------------------------------------------------------------------------
 
+data SolutionStatus
+  = UNKNOWN
+  | UNSUPPORTED
+  | SATISFIABLE
+  | UNSATISFIABLE
+  | OPTIMUM_FOUND
+  | UNBOUNDED
+  deriving (Show, Eq, Ord, Bounded, Enum)
+
 run
   :: String
   -> Options
   -> MIP.Problem Rational
+  -> (SolutionStatus -> IO ())
   -> (Map MIP.Var Rational -> IO ())
   -> IO ()
-run solver opt prob printModel = do
+run solver opt prob setSolutionStatus printModel = do
   unless (Set.null (MIP.semiContinuousVariables prob)) $ do
     hPutStrLn stderr "semi-continuous variables are not supported."
     exitFailure
@@ -259,16 +277,14 @@ run solver opt prob printModel = do
     solveByQE =
       case mapM LAFOL.fromFOLAtom (cs1 ++ cs2) of
         Nothing -> do
-          putSLine "UNKNOWN"
-          exitFailure
+          setSolutionStatus UNKNOWN
         Just cs ->
           case f vs2 cs ivs2 of
             Nothing -> do
-              putSLine "UNSATISFIABLE"
-              exitFailure
+              setSolutionStatus UNSATISFIABLE
             Just m -> do
               putOLine $ showValue (FOL.evalExpr m obj)
-              putSLine "SATISFIABLE"
+              setSolutionStatus SATISFIABLE
               let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m2
        where
@@ -300,19 +316,16 @@ run solver opt prob printModel = do
             return (cs',obj')
       case prob2 of
         Nothing -> do
-          putSLine "UNKNOWN"
-          exitFailure
+          setSolutionStatus UNSUPPORTED
         Just (cs',obj') ->
           case TextbookMIP.optimize (MIP.objDir $ MIP.objectiveFunction prob) obj' cs' ivs2 of
             TextbookMIP.OptUnsat -> do
-              putSLine "UNSATISFIABLE"
-              exitFailure
+              setSolutionStatus UNSATISFIABLE
             TextbookMIP.Unbounded -> do
-              putSLine "UNBOUNDED"
-              exitFailure
+              setSolutionStatus UNBOUNDED
             TextbookMIP.Optimum r m -> do
               putOLine $ showValue r
-              putSLine "OPTIMUM FOUND"
+              setSolutionStatus OPTIMUM_FOUND
               let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m2
 
@@ -355,17 +368,15 @@ run solver opt prob printModel = do
       ret <- MIPSolver.optimize mip
       case ret of
         Simplex.Unsat -> do
-          putSLine "UNSATISFIABLE"
-          exitFailure
+          setSolutionStatus UNSATISFIABLE
         Simplex.Unbounded -> do
-          putSLine "UNBOUNDED"
+          setSolutionStatus UNBOUNDED
           Just m <- MIPSolver.getBestModel mip
           let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2
-          exitFailure
         Simplex.Optimum -> do
           Just m <- MIPSolver.getBestModel mip
-          putSLine "OPTIMUM FOUND"
+          setSolutionStatus OPTIMUM_FOUND
           let m2 = Map.fromAscList [(v, m IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
           printModel m2
         Simplex.ObjLimit -> do
@@ -373,21 +384,19 @@ run solver opt prob printModel = do
 
     solveByCAD
       | not (IntSet.null ivs2) = do
-          putSLine "UNKNOWN"
+          setSolutionStatus UNSUPPORTED
           putCommentLine "integer variables are not supported by CAD"
-          exitFailure
       | otherwise = do
           let cs = map (fmap f) $ cs1 ++ cs2
               vs3 = Set.fromAscList $ IntSet.toAscList vs2
           case CAD.solve vs3 cs of
             Nothing -> do
-              putSLine "UNSATISFIABLE"
-              exitFailure
+              setSolutionStatus UNSATISFIABLE
             Just m -> do
               let m2 = IntMap.map (\x -> AReal.approx x (2^^(-64::Int))) $
                          IntMap.fromAscList $ Map.toAscList $ m
               putOLine $ showValue (FOL.evalExpr m2 obj)
-              putSLine "SATISFIABLE"
+              setSolutionStatus SATISFIABLE
               let m3 = Map.fromAscList [(v, m2 IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
               printModel m3
       where
@@ -404,9 +413,8 @@ run solver opt prob printModel = do
 
     solveByContiTraverso
       | not (vs `Set.isSubsetOf` ivs) = do
-          putSLine "UNKNOWN"
+          setSolutionStatus UNSUPPORTED
           putCommentLine "continuous variables are not supported by Conti-Traverso algorithm"
-          exitFailure
       | otherwise = do
           let tmp = do
                 linObj <- LAFOL.fromFOLExpr obj
@@ -414,18 +422,16 @@ run solver opt prob printModel = do
                 return (linObj, linCon)
           case tmp of
             Nothing -> do
-              putSLine "UNKNOWN"
+              setSolutionStatus UNSUPPORTED
               putCommentLine "non-linear expressions are not supported by Conti-Traverso algorithm"
-              exitFailure
             Just (linObj, linCon) ->
               case ContiTraverso.solve P.grlex vs2 (MIP.objDir $ MIP.objectiveFunction prob) linObj linCon of
                 Nothing -> do
-                  putSLine "UNSATISFIABLE"
-                  exitFailure
+                  setSolutionStatus UNSATISFIABLE
                 Just m -> do
                   let m2 = IntMap.map fromInteger m
                   putOLine $ showValue (FOL.evalExpr m2 obj)
-                  putSLine "OPTIMUM FOUND"
+                  setSolutionStatus OPTIMUM_FOUND
                   let m3 = Map.fromAscList [(v, m2 IntMap.! (nameToVar Map.! v)) | v <- Set.toList vs]
                   printModel m3
 
@@ -439,7 +445,6 @@ mipPrintModel :: Handle -> Bool -> Map MIP.Var Rational -> IO ()
 mipPrintModel h asRat m =
   forM_ (Map.toList m) $ \(v, val) ->
     hPrintf h "v %s = %s\n" (MIP.varName v) (showRational asRat val)
-
 
 putCommentLine :: String -> IO ()
 putCommentLine s = do
@@ -469,14 +474,63 @@ main = do
 
   o <- execParser parserInfo
 
+  ref <- newIORef Nothing
+  let putStatus status = do
+        m <- readIORef ref
+        case m of
+          Just _ -> error "solution status is already set"
+          Nothing -> writeIORef ref (Just status)
+
+      setSolutionStatusSAT status = do
+        putStatus status
+        case status of
+          UNKNOWN       -> putSLine "UNKNOWN"
+          UNSUPPORTED   -> putSLine "UNKNOWN"
+          SATISFIABLE   -> putSLine "SATISFIABLE"  
+          UNSATISFIABLE -> putSLine "UNSATISFIABLE"
+          OPTIMUM_FOUND -> putSLine "SATISFIABLE"
+          UNBOUNDED     -> putSLine "UNKNOWN"
+
+      setSolutionStatusMaxSAT status = do
+        putStatus status
+        case status of
+          UNKNOWN       -> putSLine "UNKNOWN"
+          UNSUPPORTED   -> putSLine "UNKNOWN"
+          SATISFIABLE   -> putSLine "SATISFIABLE"  
+          UNSATISFIABLE -> putSLine "UNSATISFIABLE"
+          OPTIMUM_FOUND -> putSLine "OPTIMUM FOUND"
+          UNBOUNDED     -> putSLine "UNKNOWN"
+
+      setSolutionStatusPB status = do
+        putStatus status
+        case status of
+          UNKNOWN       -> putSLine "UNKNOWN"
+          UNSUPPORTED   -> putSLine "UNSUPPORTED"
+          SATISFIABLE   -> putSLine "SATISFIABLE"  
+          UNSATISFIABLE -> putSLine "UNSATISFIABLE"
+          OPTIMUM_FOUND -> putSLine "OPTIMUM FOUND"
+          UNBOUNDED     -> putSLine "UNKNOWN"
+
   case fromMaybe ModeMIP (optMode o) of
     ModeSAT -> do
       cnf <- FF.readFile (optInput o)
       let (mip,info2) = sat2ip cnf
-      run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+
+      run (optSolver o) o (fmap fromInteger mip) setSolutionStatusSAT $ \m -> do
         let m2 = transformBackward info2 m
         satPrintModel stdout m2 0
         writeSOLFileSAT o m2
+
+      when (optExitCode o) $ do
+        status <- readIORef ref
+        case fromMaybe UNKNOWN status of
+          UNKNOWN       -> exitSuccess
+          UNSUPPORTED   -> exitSuccess
+          SATISFIABLE   -> exitWith (ExitFailure 10)
+          UNSATISFIABLE -> exitWith (ExitFailure 20)
+          OPTIMUM_FOUND -> exitWith (ExitFailure 10)
+          UNBOUNDED     -> exitSuccess
+
     ModePB -> do
       pb <-
         if optPBFastParser o then
@@ -484,10 +538,11 @@ main = do
         else
           FF.readFile (optInput o)
       let (mip,info2) = pb2ip pb
-      run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+      run (optSolver o) o (fmap fromInteger mip) setSolutionStatusPB $ \m -> do
         let m2 = transformBackward info2 m
         pbPrintModel stdout m2 0
         writeSOLFileSAT o m2
+
     ModeWBO -> do
       wbo <-
         if optPBFastParser o then
@@ -495,26 +550,44 @@ main = do
         else
           FF.readFile (optInput o)
       let (mip,info2) = wbo2ip False wbo
-      run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+      run (optSolver o) o (fmap fromInteger mip) setSolutionStatusPB $ \m -> do
         let m2 = transformBackward info2 m
         pbPrintModel stdout m2 0
         writeSOLFileSAT o m2
+
     ModeMaxSAT -> do
       wcnf <- FF.readFile (optInput o)
       let (mip,info2) = maxsat2ip False wcnf
-      run (optSolver o) o (fmap fromInteger mip) $ \m -> do
+      run (optSolver o) o (fmap fromInteger mip) setSolutionStatusMaxSAT $ \m -> do
         let m2 = transformBackward info2 m
         if optMaxSATCompactVLine o then
           maxsatPrintModelCompact stdout m2 0
         else
           maxsatPrintModel stdout m2 0
         writeSOLFileSAT o m2
+
+      when (optExitCode o) $ do
+        status <- readIORef ref
+        case fromMaybe UNKNOWN status of
+          UNKNOWN       -> exitSuccess
+          UNSUPPORTED   -> exitSuccess
+          SATISFIABLE   -> exitWith (ExitFailure 10)
+          UNSATISFIABLE -> exitWith (ExitFailure 20)
+          OPTIMUM_FOUND -> exitWith (ExitFailure 30)
+          UNBOUNDED     -> exitSuccess
+
     ModeMIP -> do
       enc <- T.mapM mkTextEncoding $ optFileEncoding o
       mip <- MIP.readFile def{ MIP.optFileEncoding = enc } (optInput o)
-      run (optSolver o) o (fmap toRational mip) $ \m -> do
+      run (optSolver o) o (fmap toRational mip) setSolutionStatusPB $ \m -> do
         mipPrintModel stdout (optPrintRational o) m
         writeSOLFileMIP o m
+
+  status <- readIORef ref
+  case fromMaybe UNKNOWN status of
+    UNKNOWN       -> exitFailure
+    UNSUPPORTED   -> exitFailure
+    _ -> exitSuccess
 
 -- FIXME: 目的関数値を表示するように
 writeSOLFileMIP :: Options -> Map MIP.Var Rational -> IO ()
