@@ -48,7 +48,7 @@
   * Remove features that depend on OpenCL (#90)
   * Improve `ToySolver.Graph` module (#130, #150)
 
-0.8.0
+0.8.0 (2022-07-26)
 -----
 
 * Separate Formula type from `ToySolver.SAT.Encoder.Tseitin` into `ToySolver.SAT.Formula` (#74)
@@ -61,7 +61,7 @@
 * Remove deprecated API (#56)
 * Support GHC-9.2 (#76) and stop supporting GHC 8.0, 8.2, and 8.4 (#50)
 
-0.7.0
+0.7.0 (2021-02-08)
 -----
 
 * add `toysat-ipasir` foreign library which implements [IPASIR](https://github.com/biotomas/ipasir) API for incremental SAT solving.
@@ -81,7 +81,7 @@
 * stop supporting GHC-7.10
 * add `ExtraBoundsChecking` flag for debugging
 
-0.6.0
+0.6.0 (2019-10-04)
 -----
 * new solvers:
   * `ToySolver.SAT.SLS.ProbSAT` and sample `probsat` program
@@ -108,7 +108,7 @@
 * switch from `System.Console.GetOpt` to `optparse-applicative`
 * stop supporting GHC-7.8
 
-0.5.0
+0.5.0 (2017-10-09)
 -----
 * new solvers:
   * `ToySolver.BitVector`
@@ -153,7 +153,7 @@
 * use `clock` package for measuring duration
 * add simple numberlink solver sample
 
-0.4.0
+0.4.0 (2016-06-25)
 -----
 * add experimental SMT (Satisfiability Modulo Theories) solver 'toysmt', which supports theory of uninterpreted functions and linear real arithmetics.
 * fix toysat to output model in Max-SAT format instead of PB/WBO format when solving Max-SAT problems
@@ -164,7 +164,7 @@
 * add subset-sum problem solver
 * implement backtracking and explanation generation in simplex solver and congruence closure solver.
 
-0.3.0
+0.3.0 (2015-05-31)
 -----
 * split OPB/WBO file library into a separate 'pseudo-boolean' library.
 
