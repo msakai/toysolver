@@ -998,7 +998,10 @@ solveWBO' opt solver isMaxSat formula (wcnf, wbo2maxsat_info) wcnfFileName = do
           when (isMaxSat && optExitCode opt) $ exitWith (ExitFailure 20)
         else do
           putSLine "UNKNOWN"
-          when (isMaxSat && optExitCode opt) $ exitWith (ExitSuccess) -- ExitFailure 0 is prohibited
+          if isMaxSat && optExitCode opt then
+            exitWith ExitSuccess -- ExitFailure 0 is prohibited
+          else
+            exitFailure
       Just (m, val) -> do
         let printModel =
               if isMaxSat then
@@ -1074,7 +1077,7 @@ solveMIP opt solver mip = do
   case ret of
     Left msg -> do
       putCommentLine msg
-      putSLine "UNKNOWN"
+      putSLine "UNSUPPORTED"
       exitFailure
     Right (obj, info) -> do
       (linObj, linObjOffset) <- Integer.linearize pbnlc obj
@@ -1117,7 +1120,7 @@ solveMIP opt solver mip = do
             b <- PBO.isUnsat pbo
             if b
               then putSLine "UNSATISFIABLE"
-              else putSLine "UNKNOWN"
+              else putSLine "UNKNOWN" >> exitFailure
           Just (m,val) -> do
             b <- PBO.isOptimum pbo
             if b

@@ -583,6 +583,12 @@ main = do
         mipPrintModel stdout (optPrintRational o) m
         writeSOLFileMIP o m
 
+  status <- readIORef ref
+  case fromMaybe UNKNOWN status of
+    UNKNOWN       -> exitFailure
+    UNSUPPORTED   -> exitFailure
+    _ -> exitSuccess
+
 -- FIXME: 目的関数値を表示するように
 writeSOLFileMIP :: Options -> Map MIP.Var Rational -> IO ()
 writeSOLFileMIP opt m = do
