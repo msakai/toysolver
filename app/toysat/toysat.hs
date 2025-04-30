@@ -443,7 +443,7 @@ main = do
         case optMode opt of
           Just m  -> m
           Nothing ->
-            case FF.getBaseExt (optInput opt) of
+            case FF.getBaseExtension (optInput opt) of
               ".cnf"  -> ModeSAT
               ".gcnf" -> ModeMUS
               ".opb"  -> ModePB
