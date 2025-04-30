@@ -472,7 +472,7 @@ main = do
   setEncodingChar8
 #endif
 
-  o <- execParser parserInfo
+  opt <- execParser parserInfo
 
   ref <- newIORef Nothing
   let putStatus status = do
@@ -511,17 +511,17 @@ main = do
           OPTIMUM_FOUND -> putSLine "OPTIMUM FOUND"
           UNBOUNDED     -> putSLine "UNKNOWN"
 
-  case fromMaybe ModeMIP (optMode o) of
+  case fromMaybe ModeMIP (optMode opt) of
     ModeSAT -> do
-      cnf <- FF.readFile (optInput o)
+      cnf <- FF.readFile (optInput opt)
       let (mip,info2) = sat2ip cnf
 
-      run (optSolver o) o (fmap fromInteger mip) setSolutionStatusSAT $ \m -> do
+      run (optSolver opt) opt (fmap fromInteger mip) setSolutionStatusSAT $ \m -> do
         let m2 = transformBackward info2 m
         satPrintModel stdout m2 0
-        writeSOLFileSAT o m2
+        writeSOLFileSAT opt m2
 
-      when (optExitCode o) $ do
+      when (optExitCode opt) $ do
         status <- readIORef ref
         case fromMaybe UNKNOWN status of
           UNKNOWN       -> exitSuccess
@@ -533,40 +533,40 @@ main = do
 
     ModePB -> do
       pb <-
-        if optPBFastParser o then
-          liftM FF.unWithFastParser $ FF.readFile (optInput o)
+        if optPBFastParser opt then
+          liftM FF.unWithFastParser $ FF.readFile (optInput opt)
         else
-          FF.readFile (optInput o)
+          FF.readFile (optInput opt)
       let (mip,info2) = pb2ip pb
-      run (optSolver o) o (fmap fromInteger mip) setSolutionStatusPB $ \m -> do
+      run (optSolver opt) opt (fmap fromInteger mip) setSolutionStatusPB $ \m -> do
         let m2 = transformBackward info2 m
         pbPrintModel stdout m2 0
-        writeSOLFileSAT o m2
+        writeSOLFileSAT opt m2
 
     ModeWBO -> do
       wbo <-
-        if optPBFastParser o then
-          liftM FF.unWithFastParser $ FF.readFile (optInput o)
+        if optPBFastParser opt then
+          liftM FF.unWithFastParser $ FF.readFile (optInput opt)
         else
-          FF.readFile (optInput o)
+          FF.readFile (optInput opt)
       let (mip,info2) = wbo2ip False wbo
-      run (optSolver o) o (fmap fromInteger mip) setSolutionStatusPB $ \m -> do
+      run (optSolver opt) opt (fmap fromInteger mip) setSolutionStatusPB $ \m -> do
         let m2 = transformBackward info2 m
         pbPrintModel stdout m2 0
-        writeSOLFileSAT o m2
+        writeSOLFileSAT opt m2
 
     ModeMaxSAT -> do
-      wcnf <- FF.readFile (optInput o)
+      wcnf <- FF.readFile (optInput opt)
       let (mip,info2) = maxsat2ip False wcnf
-      run (optSolver o) o (fmap fromInteger mip) setSolutionStatusMaxSAT $ \m -> do
+      run (optSolver opt) opt (fmap fromInteger mip) setSolutionStatusMaxSAT $ \m -> do
         let m2 = transformBackward info2 m
-        if optMaxSATCompactVLine o then
+        if optMaxSATCompactVLine opt then
           maxsatPrintModelCompact stdout m2 0
         else
           maxsatPrintModel stdout m2 0
-        writeSOLFileSAT o m2
+        writeSOLFileSAT opt m2
 
-      when (optExitCode o) $ do
+      when (optExitCode opt) $ do
         status <- readIORef ref
         case fromMaybe UNKNOWN status of
           UNKNOWN       -> exitSuccess
@@ -577,11 +577,11 @@ main = do
           UNBOUNDED     -> exitSuccess
 
     ModeMIP -> do
-      enc <- T.mapM mkTextEncoding $ optFileEncoding o
-      mip <- MIP.readFile def{ MIP.optFileEncoding = enc } (optInput o)
-      run (optSolver o) o (fmap toRational mip) setSolutionStatusPB $ \m -> do
-        mipPrintModel stdout (optPrintRational o) m
-        writeSOLFileMIP o m
+      enc <- T.mapM mkTextEncoding $ optFileEncoding opt
+      mip <- MIP.readFile def{ MIP.optFileEncoding = enc } (optInput opt)
+      run (optSolver opt) opt (fmap toRational mip) setSolutionStatusPB $ \m -> do
+        mipPrintModel stdout (optPrintRational opt) m
+        writeSOLFileMIP opt m
 
   status <- readIORef ref
   case fromMaybe UNKNOWN status of
