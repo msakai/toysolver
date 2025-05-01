@@ -24,7 +24,7 @@ module ToySolver.FileFormat.Base
   , writeFile
 
   -- * Utility functions
-  , getBaseExt
+  , getBaseExtension
   ) where
 
 import Prelude hiding (readFile, writeFile)
@@ -97,10 +97,10 @@ writeFile filepath a = liftIO $ do
 -- Supported compression format extensions (e.g. @.gz@) are removed, and extensions such as @.cnf@ are returned.
 --
 -- @since 0.10.0
-getBaseExt :: FilePath -> String
-getBaseExt name | (base, ext) <- splitExtension name =
+getBaseExtension :: FilePath -> String
+getBaseExtension name | (base, ext) <- splitExtension name =
   case map toLower ext of
 #ifdef WITH_ZLIB
-    ".gz" -> getBaseExt base
+    ".gz" -> getBaseExtension base
 #endif
     s -> s

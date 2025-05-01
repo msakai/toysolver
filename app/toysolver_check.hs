@@ -114,7 +114,7 @@ main = do
         case optMode opt of
           Just m  -> m
           Nothing ->
-            case FF.getBaseExt (optInputFile opt) of
+            case FF.getBaseExtension (optInputFile opt) of
               ".cnf"  -> ModeSAT
               ".opb"  -> ModePB
               ".wbo"  -> ModeWBO

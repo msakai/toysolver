@@ -268,7 +268,7 @@ data Problem
 readProblem :: Options -> String -> IO Problem
 readProblem o fname = do
   enc <- T.mapM mkTextEncoding (optFileEncoding o)
-  case FF.getBaseExt fname of
+  case FF.getBaseExtension fname of
     ".cnf"
       | optAsMaxSAT o -> do
           prob <- FF.readFile fname
@@ -453,7 +453,7 @@ writeProblem o problem = do
               ProbOPB opb _ -> pb2lsp opb
               ProbWBO wbo _ -> wbo2lsp wbo
               ProbMIP _ _   -> pb2lsp (fst opbAndTrail)
-      case FF.getBaseExt fname of
+      case FF.getBaseExtension fname of
         ".opb" -> do
           case transformNormalizeOPB opbAndTrail of
             (opb, trail) -> do
