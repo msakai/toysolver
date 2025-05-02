@@ -34,6 +34,10 @@ module ToySolver.Converter.MIP
   , ip2pb
   , IP2PBInfo (..)
   , addMIP
+
+  -- * Linearization of the constant term in objective function
+  , normalizeMIPObjective
+  , NormalizeMIPObjectiveInfo (..)
   ) where
 
 import Control.Monad
@@ -57,6 +61,7 @@ import qualified Data.Map as Map
 import Data.Ord
 import Data.Primitive.MutVar
 import Data.Ratio
+import qualified Data.Set as Set
 import Data.String
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -549,5 +554,60 @@ asInteger :: Rational -> Integer
 asInteger r
   | denominator r /= 1 = error (show r ++ " is not integer")
   | otherwise = numerator r
+
+-- -----------------------------------------------------------------------------
+
+normalizeMIPObjective :: (Num c, Eq c) => MIP.Problem c -> (MIP.Problem c, NormalizeMIPObjectiveInfo r)
+normalizeMIPObjective prob@MIP.Problem{ MIP.objectiveFunction = obj }
+  | offset == 0 = (prob{ MIP.objectiveFunction = obj{ MIP.objExpr = e }}, NormalizeMIPObjectiveInfo Nothing)
+  | otherwise =
+      ( prob
+        { MIP.objectiveFunction = obj{ MIP.objExpr = e + MIP.Expr [MIP.Term offset [unit_var]] }
+        , MIP.varDomains = Map.insert unit_var (MIP.IntegerVariable, (MIP.Finite 1, MIP.Finite 1)) (MIP.varDomains prob)
+        }
+      , NormalizeMIPObjectiveInfo (Just unit_var)
+      )
+  where
+    offset = sum [c | MIP.Term c [] <- MIP.terms (MIP.objExpr obj)]
+    e = MIP.Expr [t | t@(MIP.Term _ (_:_)) <- MIP.terms (MIP.objExpr obj)]
+    used = MIP.variables prob
+    candidates = map MIP.Var $ "unit" : [T.pack ("unit" ++ show i) | i <- [1..]]
+    unit_var = head [name | name <- candidates, name `Set.notMember` used]
+
+newtype NormalizeMIPObjectiveInfo r = NormalizeMIPObjectiveInfo (Maybe MIP.Var)
+  deriving (Eq, Show)
+
+instance Transformer (NormalizeMIPObjectiveInfo r) where
+  type Source (NormalizeMIPObjectiveInfo r) = Map MIP.Var r
+  type Target (NormalizeMIPObjectiveInfo r) = Map MIP.Var r
+
+instance Num r => ForwardTransformer (NormalizeMIPObjectiveInfo r) where
+  transformForward (NormalizeMIPObjectiveInfo Nothing) sol = sol
+  transformForward (NormalizeMIPObjectiveInfo (Just v)) sol = Map.insert v 1 sol
+
+instance BackwardTransformer (NormalizeMIPObjectiveInfo r) where
+  transformBackward (NormalizeMIPObjectiveInfo Nothing) sol = sol
+  transformBackward (NormalizeMIPObjectiveInfo (Just v)) sol = Map.delete v sol
+
+instance ObjValueTransformer (NormalizeMIPObjectiveInfo r) where
+  type SourceObjValue (NormalizeMIPObjectiveInfo r) = r
+  type TargetObjValue (NormalizeMIPObjectiveInfo r) = r
+
+instance ObjValueForwardTransformer (NormalizeMIPObjectiveInfo r) where
+  transformObjValueForward (NormalizeMIPObjectiveInfo _) val = val
+
+instance ObjValueBackwardTransformer (NormalizeMIPObjectiveInfo r) where
+  transformObjValueBackward (NormalizeMIPObjectiveInfo _) val = val
+
+instance J.ToJSON (NormalizeMIPObjectiveInfo r) where
+  toJSON (NormalizeMIPObjectiveInfo m) =
+    J.object
+    [ "type" .= ("NormalizeMIPObjectiveInfo" :: J.Value)
+    , "unit_var" .= fmap MIP.varName m
+    ]
+
+instance J.FromJSON (NormalizeMIPObjectiveInfo r) where
+  parseJSON = withTypedObject "NormalizeMIPObjectiveInfo" $ \obj -> do
+    (NormalizeMIPObjectiveInfo . fmap MIP.Var) <$> obj .: "unit_var"
 
 -- -----------------------------------------------------------------------------

@@ -1121,6 +1121,38 @@ case_ip2pb_unbounded_error_2 =
       , MIP.varDomains = Map.fromList [("x", (MIP.IntegerVariable, (MIP.NegInf, 0)))]
       }
 
+prop_normalizeMIPObjective :: Property
+prop_normalizeMIPObjective =
+  forAll arbitraryBoundedIP $ \prob ->
+    let ret@(prob', _) = normalizeMIPObjective prob
+     in counterexample (show ret) $
+          all (\(MIP.Term _ vs) -> not (null vs)) (MIP.terms (MIP.objExpr (MIP.objectiveFunction prob')))
+
+prop_normalizeMIPObjective_round_trip :: Property
+prop_normalizeMIPObjective_round_trip =
+  forAll arbitraryBoundedIP $ \prob ->
+    let ret@(prob', info) = normalizeMIPObjective prob
+     in counterexample (show ret) $
+          forAll (arbitraryAssignmentBoundedIP prob) $ \sol ->
+            let result1 = evalMIP sol prob
+                result2 = evalMIP (transformForward info sol) prob'
+                result3 = fmap (transformObjValueForward info) result1
+                result4 = fmap (transformObjValueBackward info . transformObjValueForward info) result1
+             in conjoin
+                [ sol === transformBackward info (transformForward info sol)
+                , result1 === result2
+                , result1 === result3
+                , result1 === result4
+                ]
+
+prop_normalizeMIPObjective_json :: Property
+prop_normalizeMIPObjective_json =
+  forAll arbitraryBoundedIP $ \prob ->
+    let ret@(_, info) = normalizeMIPObjective prob
+        json = J.encode info
+     in counterexample (show ret) $ counterexample (show json) $
+          J.eitherDecode json === Right info
+
 arbitraryBoundedIP :: Gen (MIP.Problem Rational)
 arbitraryBoundedIP = do
   nv <- choose (0,10)
