@@ -375,6 +375,11 @@ transformPB2QUBO (opb, Trail info) =
   case pb2qubo opb of
     ((qubo, th), info') -> ((qubo, th), Trail (ComposedTransformer info info'))
 
+transformNormalizeMIP :: (MIP.Problem Scientific, Trail (Map MIP.Var Rational)) -> (MIP.Problem Scientific, Trail (Map MIP.Var Rational))
+transformNormalizeMIP (ip, Trail info) =
+  case normalizeMIPObjective ip of
+    (ip', info') -> (ip', Trail (ComposedTransformer info info'))
+
 writeProblem :: Options -> Problem -> IO ()
 writeProblem o problem = do
   enc <- T.mapM mkTextEncoding (optFileEncoding o)
@@ -483,11 +488,15 @@ writeProblem o problem = do
             Just _ -> error "--dump-info is not supported for LSP output"
             Nothing -> return ()
         ".lp" -> do
-          MIP.writeLPFile def{ MIP.optFileEncoding = enc } fname (fst mipAndTrail)
-          writeInfo' (snd mipAndTrail)
+          case transformNormalizeMIP mipAndTrail of
+             (mip, Trail info) -> do
+               MIP.writeLPFile def{ MIP.optFileEncoding = enc } fname mip
+               writeInfo info
         ".mps" -> do
-          MIP.writeMPSFile def{ MIP.optFileEncoding = enc } fname (fst mipAndTrail)
-          writeInfo' (snd mipAndTrail)
+          case transformNormalizeMIP mipAndTrail of
+             (mip, Trail info) -> do
+               MIP.writeMPSFile def{ MIP.optFileEncoding = enc } fname mip
+               writeInfo info
         ".smp" -> do
           withBinaryFile fname WriteMode $ \h ->
             ByteStringBuilder.hPutBuilder h (pb2smp False (fst opbAndTrail))
