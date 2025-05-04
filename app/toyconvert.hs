@@ -35,7 +35,6 @@ import Options.Applicative hiding (info)
 import qualified Options.Applicative
 import System.IO
 import System.Exit
-import System.FilePath
 #if MIN_VERSION_optparse_applicative(0,18,0)
 import Prettyprinter ((<+>))
 import qualified Prettyprinter as PP

@@ -50,7 +50,6 @@ import qualified Options.Applicative
 import System.IO
 import System.Exit
 import System.Clock
-import System.FilePath
 import qualified System.Info as SysInfo
 import qualified System.Random.MWC as Rand
 import Text.Printf
