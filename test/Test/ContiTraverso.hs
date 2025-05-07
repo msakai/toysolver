@@ -2,7 +2,6 @@
 module Test.ContiTraverso (ctTestGroup) where
 
 import Control.Monad
-import Data.List
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Map as Map

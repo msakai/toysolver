@@ -26,7 +26,7 @@ module ToySolver.SAT.Encoder.PB.Internal.BDD
 import Control.Monad.State.Strict
 import Control.Monad.Primitive
 import Data.Ord
-import Data.List
+import Data.List (sortBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified ToySolver.SAT.Types as SAT

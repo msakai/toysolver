@@ -3,7 +3,6 @@
 import Control.Exception
 import Control.Monad
 import Data.Default.Class
-import Data.List
 import System.Console.GetOpt
 import System.Environment
 import System.Exit

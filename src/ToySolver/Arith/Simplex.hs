@@ -127,7 +127,7 @@ import Control.Monad.Primitive
 import Data.Char
 import Data.Default.Class
 import Data.Ord
-import Data.List
+import Data.List (foldl', maximumBy, minimumBy)
 import Data.Maybe
 import Data.Monoid
 import Data.Primitive.MutVar

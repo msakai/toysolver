@@ -8,7 +8,7 @@ import Data.Array.IArray
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Char
 import Data.Default.Class
-import Data.List
+import Data.List (intersperse)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe

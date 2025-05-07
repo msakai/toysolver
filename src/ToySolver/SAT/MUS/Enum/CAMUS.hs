@@ -38,7 +38,6 @@ import Control.Monad
 import Data.Array.IArray
 import Data.Default.Class
 import qualified Data.IntSet as IS
-import Data.List
 import Data.IORef
 import Data.Set (Set)
 import qualified Data.Set as Set

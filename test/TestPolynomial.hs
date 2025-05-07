@@ -7,7 +7,7 @@ import Prelude hiding (lex)
 import qualified Control.Exception as E
 import Control.Monad
 import qualified Data.FiniteField as FF
-import Data.List
+import Data.List (foldl', genericTake, sort, sortBy)
 import Data.Ratio
 import qualified Data.Set as Set
 import qualified Data.Map as Map

@@ -25,7 +25,7 @@ import Control.Monad.State.Strict
 import Data.Function (on)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.List
+import Data.List (sortBy)
 
 type Weight = Rational
 type Value  = Rational

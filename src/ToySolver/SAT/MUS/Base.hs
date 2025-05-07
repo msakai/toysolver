@@ -17,7 +17,6 @@ module ToySolver.SAT.MUS.Base
 
 import Control.Monad
 import Data.Default.Class
-import Data.List
 import qualified Data.IntSet as IS
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types

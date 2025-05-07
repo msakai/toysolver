@@ -11,7 +11,7 @@ import Data.Char
 import Data.Foldable (toList)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Int
-import Data.List
+import Data.List (sortBy)
 import Data.Maybe
 import Data.Ord
 import qualified Data.Sequence as Seq

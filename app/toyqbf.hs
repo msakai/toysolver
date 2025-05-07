@@ -18,7 +18,7 @@ module Main where
 import Control.Monad
 import Data.Char
 import qualified Data.IntSet as IntSet
-import Data.List
+import Data.List (sortBy)
 import Data.Ord
 import Data.Version
 import Options.Applicative

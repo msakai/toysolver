@@ -36,7 +36,7 @@ import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 import Data.Char
 import Data.IORef
-import Data.List
+import Data.List (intercalate, isSuffixOf, sort, sortBy)
 import Data.Maybe
 import Data.Ord
 import qualified Data.Vector.Unboxed as V

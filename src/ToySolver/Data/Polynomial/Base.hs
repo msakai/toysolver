@@ -139,7 +139,7 @@ import Data.Data
 import qualified Data.FiniteField as FF
 import Data.Function
 import Data.Hashable
-import Data.List
+import Data.List (foldl', foldl1', group, intersperse, maximumBy, sortBy)
 import Data.Numbers.Primes (primeFactors)
 import Data.Ratio
 import Data.String (IsString (..))

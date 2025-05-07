@@ -23,7 +23,7 @@ import qualified Data.ByteString.Builder as ByteStringBuilder
 import Data.Char
 import Data.Default.Class
 import qualified Data.Foldable as F
-import Data.List
+import Data.List (intercalate)
 import Data.Map.Lazy (Map)
 import Data.Maybe
 import Data.Scientific (Scientific)

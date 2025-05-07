@@ -8,7 +8,7 @@ import Control.Monad
 import Data.Array.IArray
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef
-import Data.List
+import Data.List (sort)
 import Data.Maybe
 import qualified Data.PseudoBoolean as PBFile
 import qualified Data.Vector as V

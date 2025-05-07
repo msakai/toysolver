@@ -50,7 +50,7 @@ module ToySolver.Arith.Cooper.Base
 
 import Control.Monad
 import qualified Data.Foldable as Foldable
-import Data.List
+import Data.List (foldl', foldl1')
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS

@@ -40,7 +40,7 @@ import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.State
 import Control.Monad.Writer
-import Data.List
+import Data.List (sortBy)
 import Data.Maybe
 import Data.Ord
 import Data.Vector (Vector, (!))

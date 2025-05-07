@@ -20,7 +20,7 @@ module ToySolver.Data.Polyhedron
   , toConstraints
   ) where
 
-import Data.List
+import Data.List (foldl', transpose)
 import Data.Ratio
 import qualified Data.IntSet as IntSet
 import Data.Map (Map)

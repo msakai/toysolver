@@ -65,7 +65,7 @@ module ToySolver.Data.LA
 
 import Control.Monad
 import Control.DeepSeq
-import Data.List
+import Data.List (intersperse)
 import Data.Maybe
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap

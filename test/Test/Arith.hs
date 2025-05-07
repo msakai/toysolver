@@ -3,7 +3,6 @@
 module Test.Arith (arithTestGroup) where
 
 import Control.Monad
-import Data.List
 import Data.Default.Class
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS

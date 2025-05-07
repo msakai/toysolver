@@ -154,7 +154,7 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import Data.IORef
 import Data.Int
-import Data.List
+import Data.List (delete, find, foldl', maximumBy, partition, sortBy)
 import Data.Maybe
 import Data.Ord
 import qualified Data.IntMap.Strict as IM

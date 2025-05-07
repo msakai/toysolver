@@ -22,7 +22,7 @@ module ToySolver.Combinatorial.Knapsack.DPSparse
   , solveGeneric
   ) where
 
-import Data.List
+import Data.List (foldl', foldl1')
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)

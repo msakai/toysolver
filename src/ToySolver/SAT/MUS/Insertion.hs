@@ -22,7 +22,7 @@ module ToySolver.SAT.MUS.Insertion
 
 import Control.Monad
 import Data.Default.Class
-import Data.List
+import Data.List (intercalate)
 import qualified Data.IntSet as IntSet
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types

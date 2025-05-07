@@ -3,7 +3,6 @@ module Test.Simplex (simplexTestGroup) where
 
 import Control.Monad
 import Data.Default.Class
-import Data.List
 import Data.Ratio
 import Data.VectorSpace
 import Test.Tasty

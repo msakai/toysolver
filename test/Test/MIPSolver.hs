@@ -2,7 +2,6 @@
 module Test.MIPSolver (mipSolverTestGroup) where
 
 import Control.Monad
-import Data.List
 import Data.Ratio
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS

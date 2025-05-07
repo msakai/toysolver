@@ -22,7 +22,7 @@ module ToySolver.Converter.MIP2SMT
 import Data.Char
 import Data.Default.Class
 import Data.Ord
-import Data.List
+import Data.List (intersperse, sortBy)
 import Data.Ratio
 import qualified Data.Set as Set
 import Data.Map (Map)

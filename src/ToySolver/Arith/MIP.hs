@@ -62,7 +62,7 @@ import Control.Exception
 import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Default.Class
-import Data.List
+import Data.List (maximumBy)
 import Data.OptDir
 import Data.Ord
 import Data.IORef

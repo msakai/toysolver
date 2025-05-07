@@ -29,7 +29,7 @@ import Data.Char
 import Data.Default
 import Data.Either
 import Data.Function
-import Data.List
+import Data.List (isSuffixOf, minimumBy)
 import Data.Void
 import System.Directory
 import System.IO

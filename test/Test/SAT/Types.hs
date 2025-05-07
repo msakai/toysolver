@@ -6,7 +6,7 @@ module Test.SAT.Types (satTypesTestGroup) where
 
 import Control.Monad
 import Data.Array.IArray
-import Data.List
+import Data.List (sort)
 
 import Test.Tasty
 import Test.Tasty.QuickCheck

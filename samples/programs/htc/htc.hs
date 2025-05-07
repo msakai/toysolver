@@ -5,7 +5,7 @@ module Main where
 
 import Control.Monad
 import Data.Char
-import Data.List
+import Data.List (intercalate)
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import System.Environment

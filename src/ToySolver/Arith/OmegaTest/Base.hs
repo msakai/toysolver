@@ -43,7 +43,7 @@ module ToySolver.Arith.OmegaTest.Base
 import Control.Exception (assert)
 import Control.Monad
 import Data.Default.Class
-import Data.List
+import Data.List (foldl', foldl1', minimumBy)
 import Data.Maybe
 import Data.Ord
 import Data.Ratio

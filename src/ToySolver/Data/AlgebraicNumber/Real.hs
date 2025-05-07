@@ -50,7 +50,7 @@ module ToySolver.Data.AlgebraicNumber.Real
 
 import Control.Exception (assert)
 import Control.Monad
-import Data.List
+import Data.List (delete, elemIndex, sort)
 import Data.Ratio
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJClass as PP

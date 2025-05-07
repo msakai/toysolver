@@ -53,7 +53,7 @@ module ToySolver.Arith.Simplex.Textbook
   ) where
 
 import Data.Ord
-import Data.List
+import Data.List (foldl', intersperse, maximumBy, minimumBy)
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import Data.OptDir

@@ -25,7 +25,6 @@ import Control.Monad
 import Control.Monad.ST
 import Data.Array.ST
 import Data.Function (on)
-import Data.List
 
 type Weight = Int
 type Value = Rational
