@@ -22,10 +22,10 @@ module ToySolver.Combinatorial.Knapsack.BB
 
 import Control.Monad
 import Control.Monad.State.Strict
-import Data.Function (on)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.List (sortBy)
+import Data.Ord
 
 type Weight = Rational
 type Value  = Rational
@@ -41,7 +41,7 @@ solve items limit =
   )
   where
     items' :: [(Value, Weight, Int)]
-    items' = map fst $ sortBy (flip compare `on` snd) [((v, w, n), (v / w, v)) | (n, (v, w)) <- zip [0..] items, w > 0, v > 0]
+    items' = map fst $ sortBy (comparing (Down . snd)) [((v, w, n), (v / w, v)) | (n, (v, w)) <- zip [0..] items, w > 0, v > 0]
 
     sol :: IntSet
     sol = IntSet.fromList [n | (n, (v, w)) <- zip [0..] items, w == 0, v > 0] `IntSet.union`
