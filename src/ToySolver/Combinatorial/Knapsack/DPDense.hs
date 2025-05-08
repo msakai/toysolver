@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
@@ -24,7 +25,6 @@ import Control.Loop
 import Control.Monad
 import Control.Monad.ST
 import Data.Array.ST
-import Data.Function (on)
 
 type Weight = Int
 type Value = Rational
