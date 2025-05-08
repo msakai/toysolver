@@ -73,6 +73,7 @@ data Options = Options
   , optLinearizationUsingPB :: Bool
   , optKSat :: Maybe Int
   , optFileEncoding :: Maybe String
+  , optMPSObjName :: Bool
   , optRemoveUserCuts :: Bool
   , optNewWCNF :: Bool
   , optPBFastParser :: Bool
@@ -96,6 +97,7 @@ optionsParser = Options
   <*> linearizationPBOption
   <*> kSATOption
   <*> encodingOption
+  <*> mpsObjNameOption
   <*> removeUserCutsOption
   <*> newWCNFOption
   <*> pbFastParserOption
@@ -196,6 +198,17 @@ optionsParser = Options
       <> metavar "ENCODING"
       <> help "file encoding for LP/MPS files"
 
+    mpsObjNameOption :: Parser Bool
+    mpsObjNameOption = asum
+      [ flag' True
+          (  long "mps-obj-name"
+          <> help ("Write OBJNAME section in MPS file" ++ (if MIP.optMPSWriteObjName def then " (default)" else "")))
+      , flag' False
+          (  long "no-mps-obj-name"
+          <> help ("Do not write OBJNAME section in MPS file" ++ (if MIP.optMPSWriteObjName def then "" else " (default)")))
+      , pure (MIP.optMPSWriteObjName def)
+      ]
+
     removeUserCutsOption :: Parser Bool
     removeUserCutsOption = switch
       $  long "remove-usercuts"
@@ -268,6 +281,8 @@ data Problem
 readProblem :: Options -> String -> IO Problem
 readProblem o fname = do
   enc <- T.mapM mkTextEncoding (optFileEncoding o)
+  let mipOpt = def{ MIP.optFileEncoding = enc, MIP.optMPSWriteObjName = optMPSObjName o }
+  
   case FF.getBaseExtension fname of
     ".cnf"
       | optAsMaxSAT o -> do
@@ -304,10 +319,10 @@ readProblem o fname = do
             (prob2, info2) ->
               return $ ProbWBO prob2 (Trail (ComposedTransformer info1 info2))
     ".lp"   -> do
-      prob <- MIP.readLPFile def{ MIP.optFileEncoding = enc } fname
+      prob <- MIP.readLPFile mipOpt fname
       return $ ProbMIP prob (Trail IdentityTransformer)
     ".mps"  -> do
-      prob <- MIP.readMPSFile def{ MIP.optFileEncoding = enc } fname
+      prob <- MIP.readMPSFile mipOpt fname
       return $ ProbMIP prob (Trail IdentityTransformer)
     ".qubo" -> do
       (qubo :: QUBO.Problem Scientific) <- FF.readFile fname
@@ -383,6 +398,8 @@ transformNormalizeMIP (ip, Trail info) =
 writeProblem :: Options -> Problem -> IO ()
 writeProblem o problem = do
   enc <- T.mapM mkTextEncoding (optFileEncoding o)
+  let mipOpt = def{ MIP.optFileEncoding = enc, MIP.optMPSWriteObjName = optMPSObjName o }
+
   let mip2smtOpt =
         def
         { MIP2SMT.optSetLogic     = optSMTSetLogic o
@@ -490,12 +507,12 @@ writeProblem o problem = do
         ".lp" -> do
           case transformNormalizeMIP mipAndTrail of
              (mip, Trail info) -> do
-               MIP.writeLPFile def{ MIP.optFileEncoding = enc } fname mip
+               MIP.writeLPFile mipOpt fname mip
                writeInfo info
         ".mps" -> do
           case transformNormalizeMIP mipAndTrail of
              (mip, Trail info) -> do
-               MIP.writeMPSFile def{ MIP.optFileEncoding = enc } fname mip
+               MIP.writeMPSFile mipOpt fname mip
                writeInfo info
         ".smp" -> do
           withBinaryFile fname WriteMode $ \h ->
