@@ -11,9 +11,7 @@ import Data.Char
 import Data.Foldable (toList)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Int
-import Data.List (sortBy)
 import Data.Maybe
-import Data.Ord
 import qualified Data.Sequence as Seq
 import System.Console.GetOpt
 import System.Environment
@@ -64,20 +62,20 @@ main = do
           let ret = ShortestPath.dijkstra ShortestPath.unit g vs
           _ <- evaluate ret
           when (PrintResult `elem` o) $ do
-            forM_ (sortBy (comparing fst) (IntMap.toList ret)) $ \(v, (cost,_)) -> do
+            forM_ (IntMap.toAscList ret) $ \(v, (cost,_)) -> do
               putStrLn $ show v ++ ": " ++ show cost
         "bellmanford" -> do
           let ret = ShortestPath.bellmanFord ShortestPath.unit g vs
           _ <- evaluate ret
           when (PrintResult `elem` o) $ do
-            forM_ (sortBy (comparing fst) (IntMap.toList ret)) $ \(v, (cost,_)) -> do
+            forM_ (IntMap.toAscList ret) $ \(v, (cost,_)) -> do
               putStrLn $ show v ++ ": " ++ show cost
         "floydwarshall" -> do
           let ret = ShortestPath.floydWarshall ShortestPath.unit g
           _ <- evaluate ret
           when (PrintResult `elem` o) $ do
-            forM_ (sortBy (comparing fst) (IntMap.toList ret)) $ \(v, m) -> do
-              forM_ (sortBy (comparing fst) (IntMap.toList m)) $ \(u, (cost,_)) -> do
+            forM_ (IntMap.toAscList ret) $ \(v, m) -> do
+              forM_ (IntMap.toAscList m) $ \(u, (cost,_)) -> do
                 putStrLn $ show v ++ "-" ++ show u ++ ": " ++ show cost
         _ -> error ("unknown method: " ++ method)
     (_,_,errs) -> do
