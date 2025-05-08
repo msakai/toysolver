@@ -88,10 +88,7 @@ load :: FilePath -> IO [(Int,Int,Int)]
 load fname = do
   s <- BL.readFile fname
   let f l = do
-        -- 'BL.stripPrefix' is available only on bytestring >=0.10.8.0,
-        -- But we still want to support bytestring-0.10.4.0 (lts-2.22) and bytestring-0.10.6.0 (lts-3.22).
-        (c,l2) <- BL.uncons l
-        guard $ c == 'a'
+        l2 <- BL.stripPrefix "a" l
         (v,l3) <- BL.readInt $ BL.dropWhile isSpace l2
         (u,l4) <- BL.readInt $ BL.dropWhile isSpace l3
         (w,_)  <- BL.readInt $ BL.dropWhile isSpace l4
