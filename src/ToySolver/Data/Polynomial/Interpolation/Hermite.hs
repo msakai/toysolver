@@ -12,7 +12,7 @@
 --
 -- References:
 --
--- * Lagrange polynomial <https://en.wikipedia.org/wiki/Hermite_interpolation>
+-- * Hermite interpolation, <https://en.wikipedia.org/wiki/Hermite_interpolation>
 --
 -----------------------------------------------------------------------------
 module ToySolver.Data.Polynomial.Interpolation.Hermite
