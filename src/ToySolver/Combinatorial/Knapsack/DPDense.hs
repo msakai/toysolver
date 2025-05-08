@@ -55,5 +55,8 @@ solve items limit = runST m
       (obj, w, sol) <- readArray table limit
       return (obj, w, reverse sol)
 
-test1 = solve [(5,4), (4,5), (3,2)] 9
-test2 = solve [(45,5), (48,8), (35,3)] 10
+_test1 :: (Value, Weight, [Bool])
+_test1 = solve [(5,4), (4,5), (3,2)] 9
+
+_test2 :: (Value, Weight, [Bool])
+_test2 = solve [(45,5), (48,8), (35,3)] 10
