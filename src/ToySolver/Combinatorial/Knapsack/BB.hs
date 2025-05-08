@@ -24,7 +24,7 @@ import Control.Monad
 import Control.Monad.State.Strict
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.List (sortBy)
+import Data.List (sortOn)
 import Data.Ord
 
 type Weight = Rational
@@ -41,7 +41,7 @@ solve items limit =
   )
   where
     items' :: [(Value, Weight, Int)]
-    items' = map fst $ sortBy (comparing (Down . snd)) [((v, w, n), (v / w, v)) | (n, (v, w)) <- zip [0..] items, w > 0, v > 0]
+    items' = sortOn (\(v, w, _) -> Down ((v / w, v))) [(v, w, n) | (n, (v, w)) <- zip [0..] items, w > 0, v > 0]
 
     sol :: IntSet
     sol = IntSet.fromList [n | (n, (v, w)) <- zip [0..] items, w == 0, v > 0] `IntSet.union`

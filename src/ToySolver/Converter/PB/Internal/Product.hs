@@ -16,10 +16,9 @@ module ToySolver.Converter.PB.Internal.Product
 
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.List hiding (insert)
+import Data.List (foldl', sortOn)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -31,7 +30,7 @@ decomposeToBinaryProducts = decompose2 . decompose1
 decompose1 :: Set IntSet -> Map IntSet (Maybe (IntSet,IntSet))
 decompose1 ss = snd $ foldl' (flip f) (LargestIntersectionFinder.empty, Map.empty) ss'
   where
-    ss' = map fst $ sortBy (comparing snd) [(s, IntSet.size s) | s <- Set.toList ss]
+    ss' = sortOn IntSet.size (Set.toList ss)
 
     f :: IntSet
       -> (LargestIntersectionFinder.Table, Map IntSet (Maybe (IntSet,IntSet)))
