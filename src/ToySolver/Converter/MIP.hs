@@ -350,7 +350,7 @@ instance ForwardTransformer IP2PBInfo where
               Nothing -> error "failed to reconstruct boolean assignment"
               Just sol -> [if l > 0 then (l, v) else (- l, not v) | (l, v) <- zip (map snd s') (VG.toList sol)]
         where
-          s' = [if length ls > 1 then error "variable definition should be linear" else (c, head ls) | (c, ls@(_:_)) <- s]
+          s' = [if null ls then (c, l) else error "variable definition should be linear" | (c, l : ls) <- s]
           d = numerator val - sum [c | (c, []) <- s]
 
 instance BackwardTransformer IP2PBInfo where

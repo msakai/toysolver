@@ -504,7 +504,7 @@ simplifyAtom solver (OrdRel lhs op rhs) = do
       where
         c = c1 * c2
         c1 = fromIntegral $ foldl' lcm 1 [denominator c | (c, _) <- LA.terms e]
-        c2 = signum $ head ([c | (c,x) <- LA.terms e] ++ [1])
+        c2 = signum $ fromMaybe 1 (listToMaybe [c | (c,_) <- LA.terms e])
 
 assertLower :: (PrimMonad m, SolverValue v) => GenericSolverM m v -> Var -> v -> m ()
 assertLower solver x l = assertLB solver x (Just (l, IntSet.empty))
