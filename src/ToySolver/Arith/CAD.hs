@@ -74,8 +74,6 @@ import ToySolver.Data.Polynomial (Polynomial, UPolynomial, X (..), PrettyVar, Pr
 import qualified ToySolver.Data.Polynomial as P
 import qualified ToySolver.Data.Polynomial.GroebnerBasis as GB
 
-import Debug.Trace
-
 -- ---------------------------------------------------------------------------
 
 data Point c = NegInf | RootOf (UPolynomial c) Int | PosInf
