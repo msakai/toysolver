@@ -139,7 +139,8 @@ import Data.Data
 import qualified Data.FiniteField as FF
 import Data.Function
 import Data.Hashable
-import Data.List
+import Data.List (foldl', foldl1', intersperse, maximumBy, sortBy)
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Numbers.Primes (primeFactors)
 import Data.Ratio
 import Data.String (IsString (..))
@@ -445,7 +446,10 @@ reduce
 reduce cmp p fs = go p
   where
     ls = [(lt cmp f, f) | f <- fs]
-    go g = if null xs then g else go (head xs)
+    go g =
+      case xs of
+       [] -> g
+       x : _ -> go x
       where
         ms = sortBy (flip cmp `on` snd) (terms g)
         xs = do
@@ -486,7 +490,7 @@ eisensteinsCriterion p
   | otherwise  = eisensteinsCriterion' (pp p)
 
 eisensteinsCriterion' :: UPolynomial Integer -> Bool
-eisensteinsCriterion' p = or [criterion prime | prime <- map head $ group $ primeFactors c]
+eisensteinsCriterion' p = or [criterion prime | prime <- map NonEmpty.head $ NonEmpty.group $ primeFactors c]
   where
     Just ((_,an), ts) = Map.maxViewWithKey (coeffMap p)
     a0 = coeff mone p

@@ -6,7 +6,6 @@ module Main where
 
 import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as BL
-import Data.Char
 import Data.Default.Class
 import Data.Scientific
 import qualified Data.Version as V
@@ -14,7 +13,6 @@ import qualified Numeric.Optimization.MIP as MIP
 import qualified Numeric.Optimization.MIP.Solution.Gurobi as GurobiSol
 import Options.Applicative hiding (Const)
 import System.Exit
-import System.FilePath
 import System.IO
 
 import qualified ToySolver.FileFormat as FF

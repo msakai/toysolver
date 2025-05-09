@@ -53,7 +53,7 @@ module ToySolver.Arith.FourierMotzkin.Base
     ) where
 
 import Control.Monad
-import Data.List
+import Data.List (foldl', foldl1')
 import Data.Maybe
 import Data.Ratio
 import qualified Data.IntMap as IM

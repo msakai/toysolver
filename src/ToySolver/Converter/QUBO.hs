@@ -38,7 +38,7 @@ import Data.Aeson ((.=), (.:))
 import Data.Array.Unboxed
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-import Data.List
+import Data.List (foldl')
 import Data.Maybe
 import qualified Data.PseudoBoolean as PBFile
 import Data.Ratio

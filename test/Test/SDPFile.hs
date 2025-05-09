@@ -3,7 +3,6 @@ module Test.SDPFile (sdpTestGroup) where
 
 import Control.Monad
 import qualified Data.Aeson as J
-import Data.List
 import Data.Maybe
 import Data.ByteString.Builder (toLazyByteString)
 import Test.Tasty

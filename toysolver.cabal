@@ -403,7 +403,6 @@ Executable toysolver
     array,
     containers,
     data-default-class,
-    filepath,
     MIP,
     OptDir,
     -- maybeReader is available on optparse-applicative >=0.13.0.0
@@ -423,7 +422,6 @@ Executable toysat
     containers,
     clock,
     data-default-class,
-    filepath,
     megaparsec,
     MIP,
     mwc-random,
@@ -437,8 +435,6 @@ Executable toysat
     vector
   Other-Extensions: ScopedTypeVariables
   GHC-Options: -threaded
-  if flag(WithZlib)
-    CPP-Options: "-DWITH_ZLIB"
 
 Foreign-Library     toysat-ipasir
   import:           common-options
@@ -528,7 +524,6 @@ Executable toyconvert
     bytestring-builder,
     containers,
     data-default-class,
-    filepath,
     MIP,
     pseudo-boolean,
     scientific,
@@ -543,8 +538,6 @@ Executable toyconvert
       optparse-applicative <0.18,
       ansi-wl-pprint
   GHC-Options: -rtsopts
-  if flag(WithZlib)
-    CPP-Options: "-DWITH_ZLIB"
 
 Executable toysolver-check
   Import: exe-options
@@ -555,7 +548,6 @@ Executable toysolver-check
     bytestring,
     containers,
     data-default-class,
-    filepath,
     MIP,
     optparse-applicative,
     pseudo-boolean,

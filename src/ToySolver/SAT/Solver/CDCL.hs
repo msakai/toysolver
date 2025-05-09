@@ -154,7 +154,7 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import Data.IORef
 import Data.Int
-import Data.List
+import Data.List (delete, find, foldl', maximumBy, partition, sortBy)
 import Data.Maybe
 import Data.Ord
 import qualified Data.IntMap.Strict as IM
@@ -1771,7 +1771,7 @@ analyzeConflict solver constr = do
 
   incrementReasoned solver (IS.toList lits2)
 
-  xs <- liftM (sortBy (flip (comparing snd))) $
+  xs <- liftM (sortBy (comparing (Down . snd))) $
     forM (IS.toList lits2) $ \l -> do
       lv <- litLevel solver l
       return (l,lv)
@@ -2474,7 +2474,7 @@ instance ConstraintHandler ClauseHandler where
           watchLit solver liti this
           assignBy solver lit0 this -- should always succeed
       else do -- CONFLICT
-        ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [0..size-1] $ \l -> do
+        ls <- liftM (map fst . sortBy (comparing (Down . snd))) $ forM [0..size-1] $ \l -> do
           lit <- readLitArray (claLits this2) l
           lv <- litLevel solver lit
           return (l,lv)
@@ -2687,7 +2687,7 @@ instance ConstraintHandler AtLeastHandler where
                   else do
                     -- CONFLICT
                     -- We need to watch unassigned literals or most recently falsified literals.
-                    do xs <- liftM (sortBy (flip (comparing snd))) $ forM [i..m-1] $ \l -> do
+                    do xs <- liftM (sortBy (comparing (Down . snd))) $ forM [i..m-1] $ \l -> do
                          lit <- readLitArray a l
                          val <- litValue solver lit
                          if val == lFalse then do
@@ -2918,7 +2918,7 @@ instance Hashable PBHandlerCounter where
 
 newPBHandlerCounter :: PBLinSum -> Integer -> Bool -> IO PBHandlerCounter
 newPBHandlerCounter ts degree learnt = do
-  let ts' = sortBy (flip compare `on` fst) ts
+  let ts' = sortBy (comparing (Down . fst)) ts
       slack = sum (map fst ts) - degree
       m = IM.fromList [(l,c) | (c,l) <- ts]
   s <- newIORef slack
@@ -3063,7 +3063,7 @@ puebloAMax this =
 
 newPBHandlerPueblo :: PBLinSum -> Integer -> Bool -> IO PBHandlerPueblo
 newPBHandlerPueblo ts degree learnt = do
-  let ts' = sortBy (flip compare `on` fst) ts
+  let ts' = sortBy (comparing (Down . fst)) ts
       slack = sum [c | (c,_) <- ts'] - degree
   ws   <- newIORef IS.empty
   wsum <- newIORef 0
@@ -3321,7 +3321,7 @@ instance ConstraintHandler XORClauseHandler where
             readIORef ref'
           assignBy solver (if y then litNot lit0 else lit0) this -- should always succeed
       else do
-        ls <- liftM (map fst . sortBy (flip (comparing snd))) $ forM [0..size-1] $ \l -> do
+        ls <- liftM (map fst . sortBy (comparing (Down . snd))) $ forM [0..size-1] $ \l -> do
           lit <- readLitArray a l
           lv <- litLevel solver lit
           return (l,lv)

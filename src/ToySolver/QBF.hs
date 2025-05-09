@@ -41,7 +41,8 @@ import Control.Monad.Trans.Except
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Function (on)
-import Data.List (groupBy, foldl')
+import Data.List (foldl')
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe
 
 import ToySolver.Data.Boolean
@@ -65,9 +66,9 @@ removeEmptyQuantifiers :: Prefix -> Prefix
 removeEmptyQuantifiers = filter (\(_,xs) -> not (IntSet.null xs))
 
 groupQuantifiers :: Prefix -> Prefix
-groupQuantifiers = map f . groupBy ((==) `on` fst)
+groupQuantifiers = map f . NonEmpty.groupBy ((==) `on` fst)
   where
-    f qs = (fst (head qs), IntSet.unions [xs | (_,xs) <- qs])
+    f qs = (fst (NonEmpty.head qs), IntSet.unions [xs | (_,xs) <- NonEmpty.toList qs])
 
 quantifyFreeVariables :: Int -> Prefix -> Prefix
 quantifyFreeVariables nv prefix

@@ -21,7 +21,7 @@ module ToySolver.Data.Polynomial.Factorization.Kronecker
   ( factor
   ) where
 
-import Data.List
+import Data.List (find)
 import Data.MultiSet (MultiSet)
 import qualified Data.MultiSet as MultiSet
 import Data.Numbers.Primes (primes)

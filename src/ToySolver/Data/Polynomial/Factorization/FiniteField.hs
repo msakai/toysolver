@@ -34,7 +34,7 @@ module ToySolver.Data.Polynomial.Factorization.FiniteField
 
 import Control.Exception (assert)
 import Data.FiniteField
-import Data.List
+import Data.List (sortOn)
 import Data.Ord
 import Data.Set (Set)
 import qualified Data.Set as Set

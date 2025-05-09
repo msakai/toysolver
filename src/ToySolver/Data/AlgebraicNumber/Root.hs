@@ -20,7 +20,7 @@
 -----------------------------------------------------------------------------
 module ToySolver.Data.AlgebraicNumber.Root where
 
-import Data.List
+import Data.List (inits)
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map

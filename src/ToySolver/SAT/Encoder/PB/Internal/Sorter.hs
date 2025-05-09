@@ -40,12 +40,13 @@ import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.State
 import Control.Monad.Writer
-import Data.List
+import Data.List (sortBy)
 import Data.Maybe
 import Data.Ord
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
+import Math.NumberTheory.Logarithms (intLog2)
 import ToySolver.Data.Boolean
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.Encoder.Tseitin as Tseitin
@@ -85,8 +86,7 @@ halve v
   | V.length v <= 1 = (v, V.empty)
   | otherwise = (V.slice 0 len1 v, V.slice len1 len2 v)
       where
-        n = head $ dropWhile (< V.length v) $ iterate (*2) 1
-        len1 = n `div` 2
+        len1 = 2 ^ intLog2 (V.length v - 1)
         len2 = V.length v - len1
 
 splitOddEven :: Vector a -> (Vector a, Vector a)

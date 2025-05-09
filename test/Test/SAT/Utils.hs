@@ -9,7 +9,7 @@ import Data.Array.IArray
 import Data.Default.Class
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.List
+import Data.List (foldl')
 import Data.Maybe
 import qualified Data.Vector as V
 import qualified System.Random.MWC as Rand

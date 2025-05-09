@@ -61,7 +61,7 @@ import Control.Monad.Primitive
 import Data.Function (on)
 import Data.List (sortBy)
 import Data.Maybe (listToMaybe)
-import Data.Ord (comparing)
+import Data.Ord (comparing, Down (..))
 
 import ToySolver.SAT.Types
 import qualified ToySolver.SAT.Encoder.Cardinality as Card
@@ -165,7 +165,7 @@ preprocess :: PBLinAtLeast -> PBLinAtLeast
 preprocess constr = (lhs2, rhs1)
   where
     (lhs1, rhs1) = normalizePBLinAtLeast constr
-    lhs2 = sortBy (flip (comparing fst) <> comparing (abs . snd)) lhs1
+    lhs2 = sortBy (comparing (Down . fst) <> comparing (abs . snd)) lhs1
 
 -- | Algorithm 2 in the paper but with a bug fixed
 encodePrefixSum :: PrefixSum -> Integer -> [[BCLit]]

@@ -18,7 +18,7 @@ module ToySolver.SAT.MUS.Deletion
 
 import Control.Monad
 import Data.Default.Class
-import Data.List
+import Data.List (intercalate)
 import qualified Data.IntSet as IS
 import qualified ToySolver.SAT as SAT
 import ToySolver.SAT.Types

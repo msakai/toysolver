@@ -119,7 +119,7 @@ import Control.Monad
 import Control.Exception
 import Data.Array.Unboxed
 import Data.Ord
-import Data.List
+import Data.List (foldl', foldl1', sortBy)
 import Data.Int
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap

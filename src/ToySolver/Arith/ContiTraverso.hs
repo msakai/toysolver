@@ -34,7 +34,7 @@ import Data.Function
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Map as Map
-import Data.List
+import Data.List (foldl')
 import Data.Monoid
 import Data.Ratio
 import Data.VectorSpace

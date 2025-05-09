@@ -4,7 +4,7 @@
 module Main where
 
 import Control.Monad
-import Data.List
+import Data.List (intersperse)
 import System.Environment
 import System.IO
 import Text.Printf

@@ -102,11 +102,9 @@ instance Transformer SAT3ToISInfo where
 instance ForwardTransformer SAT3ToISInfo where
   transformForward (SAT3ToISInfo _nv clusters nodeToLit) m = IntSet.fromList $ do
     nodes <- clusters
-    let xs = [node | node <- nodes, SAT.evalLit m (nodeToLit ! node)]
-    if null xs then
-      error "not a model"
-    else
-      return (head xs)
+    case [node | node <- nodes, SAT.evalLit m (nodeToLit ! node)] of
+      [] -> error "not a model"
+      x : _ -> return x
 
 instance BackwardTransformer SAT3ToISInfo where
   transformBackward (SAT3ToISInfo nv _clusters nodeToLit) indep_set = runSTUArray $ do

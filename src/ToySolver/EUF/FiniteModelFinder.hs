@@ -63,7 +63,7 @@ import Data.Array.IArray
 import Data.Interned (intern, unintern)
 import Data.Interned.Text
 import Data.IORef
-import Data.List
+import Data.List (intercalate)
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map

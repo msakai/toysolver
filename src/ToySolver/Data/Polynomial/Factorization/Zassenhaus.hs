@@ -28,7 +28,7 @@ module ToySolver.Data.Polynomial.Factorization.Zassenhaus
 import Control.Monad
 import Control.Monad.ST
 import Control.Exception (assert)
-import Data.List
+import Data.List ((\\))
 import Data.Maybe
 import Data.Numbers.Primes (primes)
 import Data.Ratio

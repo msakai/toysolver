@@ -21,7 +21,7 @@ import Data.Array.IArray
 import Data.Char
 import Data.Default.Class
 import Data.IORef
-import Data.List
+import Data.List (intercalate)
 import Data.Maybe
 import Data.Scientific (Scientific)
 import qualified Data.Scientific as Scientific

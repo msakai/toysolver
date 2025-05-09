@@ -52,7 +52,7 @@ module ToySolver.Arith.CAD
 import Control.Exception
 import Control.Monad
 import Control.Monad.State
-import Data.List
+import Data.List (intercalate, sortOn)
 import Data.Maybe
 import Data.Ord
 import Data.Map (Map)
@@ -73,8 +73,6 @@ import ToySolver.Data.DNF
 import ToySolver.Data.Polynomial (Polynomial, UPolynomial, X (..), PrettyVar, PrettyCoeff)
 import qualified ToySolver.Data.Polynomial as P
 import qualified ToySolver.Data.Polynomial.GroebnerBasis as GB
-
-import Debug.Trace
 
 -- ---------------------------------------------------------------------------
 

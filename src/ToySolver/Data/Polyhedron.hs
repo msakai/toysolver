@@ -20,7 +20,7 @@ module ToySolver.Data.Polyhedron
   , toConstraints
   ) where
 
-import Data.List
+import Data.List (foldl', transpose)
 import Data.Ratio
 import qualified Data.IntSet as IntSet
 import Data.Map (Map)
@@ -52,24 +52,19 @@ instance Variables Polyhedron where
   vars (Polyhedron m) = IntSet.unions [vars e | e <- Map.keys m]
   vars Empty = IntSet.empty
 
-instance JoinSemiLattice Polyhedron where
-  join Empty b = b
-  join a Empty = a
-  join (Polyhedron m1) (Polyhedron m2) =
-    normalize $ Polyhedron (Map.intersectionWith Interval.join m1 m2)
+instance Lattice Polyhedron where
+  Empty \/ b = b
+  a \/ Empty = a
+  Polyhedron m1 \/ Polyhedron m2 =
+    normalize $ Polyhedron (Map.intersectionWith Interval.hull m1 m2)
 
-instance MeetSemiLattice Polyhedron where
-  meet = intersection
-
-instance Lattice Polyhedron
+  (/\) = intersection
 
 instance BoundedJoinSemiLattice Polyhedron where
   bottom = empty
 
 instance BoundedMeetSemiLattice Polyhedron where
   top = univ
-
-instance BoundedLattice Polyhedron
 
 normalize :: Polyhedron -> Polyhedron
 normalize (Polyhedron m) | any Interval.null (Map.elems m) = Empty
@@ -96,10 +91,10 @@ fromConstraints cs =
   map (foldl' intersection univ) $ transpose $ map fromAtom cs
 
 fromAtom :: AtomR  -> [Polyhedron]
-fromAtom (Rel lhs NEq rhs) =
+fromAtom (OrdRel lhs NEq rhs) =
   fromAtom (lhs .<. rhs) ++ fromAtom (lhs .>. rhs)
-fromAtom (Rel lhs op rhs) =
-  case LA.extract LA.unitVar (lhs .-. rhs) of
+fromAtom (OrdRel lhs op rhs) =
+  case LA.extract LA.unitVar (lhs ^-^ rhs) of
     (c, e1) ->
       case toRat e1 of
         (lhs1, d) ->
@@ -110,10 +105,10 @@ fromAtom (Rel lhs op rhs) =
                 else (lhs1, op, rhs1)
               ival =
                 case op of
-                  Lt  -> Interval.interval Nothing (Just (False, rhs2))
-                  Le  -> Interval.interval Nothing (Just (True, rhs2))
-                  Ge  -> Interval.interval (Just (True, rhs2)) Nothing
-                  Gt  -> Interval.interval (Just (False, rhs2)) Nothing
+                  Lt  -> Interval.NegInf Interval.<..<  Interval.Finite rhs2
+                  Le  -> Interval.NegInf Interval.<..<= Interval.Finite rhs2
+                  Ge  -> Interval.Finite rhs2 Interval.<=..< Interval.PosInf
+                  Gt  -> Interval.Finite rhs2 Interval.<..<  Interval.PosInf
                   Eql -> Interval.singleton rhs2
                   NEq -> error "should not happen"
           in filter (Empty /=) [normalize $ Polyhedron (Map.singleton lhs2 ival)]
@@ -124,14 +119,16 @@ toConstraints Empty = [LA.constant 0 .<. LA.constant 0]
 toConstraints (Polyhedron m) = do
   (e, ival) <- Map.toList m
   let e' = LA.mapCoeff fromIntegral e
-      xs = case Interval.lowerBound ival of
-             Nothing -> []
-             Just (True,c)  -> [LA.constant c .<=. e']
-             Just (False,c) -> [LA.constant c .<.  e']
-      ys = case Interval.upperBound ival of
-             Nothing -> []
-             Just (True,c)  -> [e' .<=. LA.constant c]
-             Just (False,c) -> [e' .<.  LA.constant c]
+      xs = case Interval.lowerBound' ival of
+             (Interval.NegInf, _) -> []
+             (Interval.PosInf, _) -> undefined
+             (Interval.Finite c, Interval.Closed) -> [LA.constant c .<=. e']
+             (Interval.Finite c, Interval.Open)   -> [LA.constant c .<.  e']
+      ys = case Interval.upperBound' ival of
+             (Interval.NegInf, _) -> undefined
+             (Interval.PosInf, _) -> []
+             (Interval.Finite c, Interval.Closed) -> [e' .<=. LA.constant c]
+             (Interval.Finite c, Interval.Open)   -> [e' .<.  LA.constant c]
   xs ++ ys
 
 p :: ExprZ -> Bool

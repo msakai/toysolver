@@ -11,9 +11,7 @@ import Data.Char
 import Data.Foldable (toList)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Int
-import Data.List
 import Data.Maybe
-import Data.Ord
 import qualified Data.Sequence as Seq
 import System.Console.GetOpt
 import System.Environment
@@ -64,20 +62,20 @@ main = do
           let ret = ShortestPath.dijkstra ShortestPath.unit g vs
           _ <- evaluate ret
           when (PrintResult `elem` o) $ do
-            forM_ (sortBy (comparing fst) (IntMap.toList ret)) $ \(v, (cost,_)) -> do
+            forM_ (IntMap.toAscList ret) $ \(v, (cost,_)) -> do
               putStrLn $ show v ++ ": " ++ show cost
         "bellmanford" -> do
           let ret = ShortestPath.bellmanFord ShortestPath.unit g vs
           _ <- evaluate ret
           when (PrintResult `elem` o) $ do
-            forM_ (sortBy (comparing fst) (IntMap.toList ret)) $ \(v, (cost,_)) -> do
+            forM_ (IntMap.toAscList ret) $ \(v, (cost,_)) -> do
               putStrLn $ show v ++ ": " ++ show cost
         "floydwarshall" -> do
           let ret = ShortestPath.floydWarshall ShortestPath.unit g
           _ <- evaluate ret
           when (PrintResult `elem` o) $ do
-            forM_ (sortBy (comparing fst) (IntMap.toList ret)) $ \(v, m) -> do
-              forM_ (sortBy (comparing fst) (IntMap.toList m)) $ \(u, (cost,_)) -> do
+            forM_ (IntMap.toAscList ret) $ \(v, m) -> do
+              forM_ (IntMap.toAscList m) $ \(u, (cost,_)) -> do
                 putStrLn $ show v ++ "-" ++ show u ++ ": " ++ show cost
         _ -> error ("unknown method: " ++ method)
     (_,_,errs) -> do
@@ -88,10 +86,7 @@ load :: FilePath -> IO [(Int,Int,Int)]
 load fname = do
   s <- BL.readFile fname
   let f l = do
-        -- 'BL.stripPrefix' is available only on bytestring >=0.10.8.0,
-        -- But we still want to support bytestring-0.10.4.0 (lts-2.22) and bytestring-0.10.6.0 (lts-3.22).
-        (c,l2) <- BL.uncons l
-        guard $ c == 'a'
+        l2 <- BL.stripPrefix "a" l
         (v,l3) <- BL.readInt $ BL.dropWhile isSpace l2
         (u,l4) <- BL.readInt $ BL.dropWhile isSpace l3
         (w,_)  <- BL.readInt $ BL.dropWhile isSpace l4

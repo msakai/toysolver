@@ -19,7 +19,7 @@ module ToySolver.Version
   , compilationTime
   ) where
 
-import Data.List
+import Data.List (sort)
 import Data.Time
 import Data.Version
 import ToySolver.Version.TH

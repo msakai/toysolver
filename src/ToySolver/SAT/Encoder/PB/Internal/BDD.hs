@@ -26,7 +26,7 @@ module ToySolver.SAT.Encoder.PB.Internal.BDD
 import Control.Monad.State.Strict
 import Control.Monad.Primitive
 import Data.Ord
-import Data.List
+import Data.List (sortBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified ToySolver.SAT.Types as SAT
@@ -39,7 +39,7 @@ addPBLinAtLeastBDD enc constr = do
 
 encodePBLinAtLeastWithPolarityBDD :: forall m. PrimMonad m => Tseitin.Encoder m -> Tseitin.Polarity -> SAT.PBLinAtLeast -> m SAT.Lit
 encodePBLinAtLeastWithPolarityBDD enc polarity (lhs,rhs) = do
-  let lhs' = sortBy (flip (comparing fst)) lhs
+  let lhs' = sortBy (comparing (Down . fst)) lhs
   flip evalStateT Map.empty $ do
     let f :: SAT.PBLinSum -> Integer -> Integer -> StateT (Map (SAT.PBLinSum, Integer) SAT.Lit) m SAT.Lit
         f xs rhs slack

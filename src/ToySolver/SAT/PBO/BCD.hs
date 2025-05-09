@@ -32,7 +32,7 @@ import Control.Concurrent.STM
 import Control.Monad
 import qualified Data.IntSet as IntSet
 import qualified Data.IntMap as IntMap
-import Data.List
+import Data.List (foldl')
 import qualified ToySolver.SAT as SAT
 import qualified ToySolver.SAT.Types as SAT
 import qualified ToySolver.SAT.PBO.Context as C

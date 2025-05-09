@@ -23,7 +23,7 @@ import qualified Data.ByteString.Builder as ByteStringBuilder
 import Data.Char
 import Data.Default.Class
 import qualified Data.Foldable as F
-import Data.List
+import Data.List (intercalate)
 import Data.Map.Lazy (Map)
 import Data.Maybe
 import Data.Scientific (Scientific)
@@ -35,7 +35,6 @@ import Options.Applicative hiding (info)
 import qualified Options.Applicative
 import System.IO
 import System.Exit
-import System.FilePath
 #if MIN_VERSION_optparse_applicative(0,18,0)
 import Prettyprinter ((<+>))
 import qualified Prettyprinter as PP

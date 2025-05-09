@@ -2,7 +2,6 @@
 module Main where
 
 import qualified Data.ByteString.Builder as ByteStringBuilder
-import Data.List
 import qualified Data.Map as Map
 import Data.Map (Map)
 import System.Environment
