@@ -55,7 +55,8 @@ optionsParser = Options
       <|> flag' ModePB     (long "pb"     <> help "load pseudo boolean problem in .opb file")
       <|> flag' ModeWBO    (long "wbo"    <> help "load weighted boolean optimization problem in .wbo file")
       <|> flag' ModeMaxSAT (long "maxsat" <> help "load MaxSAT problem in .cnf or .wcnf file")
-      <|> flag' ModeMIP    (long "lp"     <> help "load LP/MIP problem in .lp or .mps file")
+      <|> flag' ModeMIP    (long "mip"    <> help "load LP/MIP problem in .lp or .mps file")
+      <|> flag' ModeMIP    (long "lp"     <> help "alias for --mip (deprecated)")
 
     fileEncodingOption :: Parser (Maybe String)
     fileEncodingOption = optional $ strOption

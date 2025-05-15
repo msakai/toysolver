@@ -46,6 +46,7 @@ Arithmetic solver for the following problems:
 Usage:
 
     toysolver [OPTION...] [file.lp|file.mps]
+    toysolver --mip [OPTION...] [file.lp|file.mps]
     toysolver --lp [OPTION...] [file.lp|file.mps]
     toysolver --sat [OPTION...] [file.cnf]
     toysolver --pb [OPTION...] [file.opb]
@@ -83,6 +84,7 @@ Usage:
     toysat --pb [file.opb|-]
     toysat --wbo [file.wbo|-]
     toysat --maxsat [file.cnf|file.wcnf|-]
+    toysat --mip [file.lp|file.mps|-]
     toysat --lp [file.lp|file.mps|-]
 
 PB'12 competition result: 
@@ -140,6 +142,7 @@ Solution checker for various problem files.
 Usage:
 
     toysolver-check [OPTION...] [problem_file] [solution_file]
+    toysolver-check --mip [OPTION...] [file.lp|file.mps] [file.sol]
     toysolver-check --lp [OPTION...] [file.lp|file.mps] [file.sol]
     toysolver-check --sat [OPTION...] [file.cnf] [file.log]
     toysolver-check --pb [OPTION...] [file.opb] [file.log]

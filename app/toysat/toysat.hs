@@ -170,7 +170,8 @@ optionsParser = Options
       , flag' ModePB     $ long "pb"      <> help "solve pseudo boolean problem in .opb file"
       , flag' ModeWBO    $ long "wbo"     <> help "solve weighted boolean optimization problem in .wbo file"
       , flag' ModeMaxSAT $ long "maxsat"  <> help "solve MaxSAT problem in .cnf or .wcnf file"
-      , flag' ModeMIP    $ long "lp"      <> help "solve LP/MIP problem in .lp or .mps file"
+      , flag' ModeMIP    $ long "mip"     <> help "solve LP/MIP problem in .lp or .mps file"
+      , flag' ModeMIP    $ long "lp"      <> help "alias for --mip (deprecated)"
       ]
 
     randomSeedOption = optional $ fmap (Rand.toSeed . V.fromList . map read . words) $ strOption
