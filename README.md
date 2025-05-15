@@ -47,7 +47,7 @@ Usage:
 
     toysolver [OPTION...] [file.lp|file.mps]
     toysolver --mip [OPTION...] [file.lp|file.mps]
-    toysolver --lp [OPTION...] [file.lp|file.mps]
+    toysolver --lp [OPTION...] [file.lp|file.mps] # deprecated alias
     toysolver --sat [OPTION...] [file.cnf]
     toysolver --pb [OPTION...] [file.opb]
     toysolver --wbo [OPTION...] [file.wbo]
