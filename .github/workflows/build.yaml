@@ -101,16 +101,6 @@ jobs:
         if: matrix.platform != 'macos-x86_64'
         run: stack config set system-ghc --global true
 
-      #- name: Fix ld path (Windows)
-      #  if: runner.os == 'Windows'
-      #  run: ruby misc/fix-x86_64-windows-ghc-8.10.2-settings.rb
-
-      - name: Install packages (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install ocl-icd-opencl-dev
-
       - uses: actions/cache@v4
         name: Cache ~/.stack
         with:
