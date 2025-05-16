@@ -47,7 +47,6 @@ Usage:
 
     toysolver [OPTION...] [file.lp|file.mps]
     toysolver --mip [OPTION...] [file.lp|file.mps]
-    toysolver --lp [OPTION...] [file.lp|file.mps] # deprecated alias
     toysolver --sat [OPTION...] [file.cnf]
     toysolver --pb [OPTION...] [file.opb]
     toysolver --wbo [OPTION...] [file.wbo]
@@ -85,7 +84,6 @@ Usage:
     toysat --wbo [file.wbo|-]
     toysat --maxsat [file.cnf|file.wcnf|-]
     toysat --mip [file.lp|file.mps|-]
-    toysat --lp [file.lp|file.mps|-]
 
 PB'12 competition result: 
 
@@ -143,7 +141,6 @@ Usage:
 
     toysolver-check [OPTION...] [problem_file] [solution_file]
     toysolver-check --mip [OPTION...] [file.lp|file.mps] [file.sol]
-    toysolver-check --lp [OPTION...] [file.lp|file.mps] [file.sol]
     toysolver-check --sat [OPTION...] [file.cnf] [file.log]
     toysolver-check --pb [OPTION...] [file.opb] [file.log]
     toysolver-check --wbo [OPTION...] [file.wbo] [file.log]
