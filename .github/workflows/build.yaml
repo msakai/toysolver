@@ -41,6 +41,13 @@ jobs:
             platform: linux-x86_64
             release: true
           - ghc: '9.8.4'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-9.8.yaml'
+            stack_args: '--docker --docker-image "quay.io/benz0li/ghc-musl:9.8.4"'
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018 --flag toysolver:LinuxStatic'
+            platform: linux-x86_64-static
+            release: true
+          - ghc: '9.8.4'
             os: macos-latest
             stack_yaml: 'stack-ghc-9.8.yaml'
             stack_args: ''
@@ -94,7 +101,7 @@ jobs:
           ghc-version: ${{ matrix.ghc }}
           enable-stack: true
           stack-version: 'latest'
-          stack-no-global: ${{ (matrix.platform == 'macos-x86_64') && 'true' || '' }}
+          stack-no-global: ${{ (matrix.platform == 'macos-x86_64' || matrix.platform == 'linux-x86_64-static') && 'true' || '' }}
           cabal-update: false
 
       - name: Setup stack to use system GHC
