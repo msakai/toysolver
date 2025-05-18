@@ -132,27 +132,30 @@ pb2ip formula = (mip, PB2IPInfo (PBFile.pbNumVars formula))
 
     vs = [convVar v | v <- [1..PBFile.pbNumVars formula]]
 
+    varTable :: Array SAT.Var MIP.Var
+    varTable = listArray (1, PBFile.pbNumVars formula) vs
+
     obj2 =
       case PBFile.pbObjectiveFunction formula of
-        Just obj' -> def{ MIP.objDir = MIP.OptMin, MIP.objExpr = convExpr obj' }
+        Just obj' -> def{ MIP.objDir = MIP.OptMin, MIP.objExpr = convExpr varTable obj' }
         Nothing   -> def{ MIP.objDir = MIP.OptMin, MIP.objExpr = 0 }
 
     cs2 = do
       (lhs,op,rhs) <- PBFile.pbConstraints formula
-      let (lhs2,c) = splitConst $ convExpr lhs
+      let (lhs2,c) = splitConst $ convExpr varTable lhs
           rhs2 = rhs - c
       return $ case op of
         PBFile.Ge -> def{ MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2 }
         PBFile.Eq -> def{ MIP.constrExpr = lhs2, MIP.constrLB = MIP.Finite rhs2, MIP.constrUB = MIP.Finite rhs2 }
 
 
-convExpr :: PBFile.Sum -> MIP.Expr Integer
-convExpr s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
+convExpr :: Array SAT.Var MIP.Var -> PBFile.Sum -> MIP.Expr Integer
+convExpr varTable s = sum [product (fromIntegral w : map f tm) | (w,tm) <- s]
   where
     f :: PBFile.Lit -> MIP.Expr Integer
     f x
-      | x > 0     = MIP.varExpr (convVar x)
-      | otherwise = 1 - MIP.varExpr (convVar (abs x))
+      | x > 0     = MIP.varExpr (varTable ! x)
+      | otherwise = 1 - MIP.varExpr (varTable ! abs x)
 
 convVar :: PBFile.Var -> MIP.Var
 convVar x = fromString ("x" ++ show x)
@@ -224,7 +227,12 @@ wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) [(r, 
       , MIP.varDomains = Map.fromList [(v, (MIP.IntegerVariable, (0,1))) | v <- vs]
       }
 
-    vs = [convVar v | v <- [1..PBFile.wboNumVars formula]] ++ [v | (ts, _) <- cs2, (_, v) <- ts]
+    vs1 = [convVar v | v <- [1..PBFile.wboNumVars formula]]
+    vs2 = [v | (ts, _) <- cs2, (_, v) <- ts]
+    vs = vs1 ++ vs2
+
+    varTable :: Array SAT.Var MIP.Var
+    varTable = listArray (1, PBFile.wboNumVars formula) vs1
 
     obj2 = def
       { MIP.objDir = MIP.OptMin
@@ -244,7 +252,7 @@ wbo2ip useIndicator formula = (mip, WBO2IPInfo (PBFile.wboNumVars formula) [(r, 
     cs2 :: [([(Integer, MIP.Var)], MIP.Constraint Integer)]
     cs2 = do
       (v, (w, (lhs,op,rhs))) <- relaxVariables
-      let (lhs2,c) = splitConst $ convExpr lhs
+      let (lhs2,c) = splitConst $ convExpr varTable lhs
           rhs2 = rhs - c
           (ts,ind) =
             case w of
