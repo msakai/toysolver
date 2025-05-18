@@ -579,7 +579,7 @@ normalizeMIPObjective prob@MIP.Problem{ MIP.objectiveFunction = obj }
     offset = sum [c | MIP.Term c [] <- MIP.terms (MIP.objExpr obj)]
     e = MIP.Expr [t | t@(MIP.Term _ (_:_)) <- MIP.terms (MIP.objExpr obj)]
     used = MIP.variables prob
-    candidates = map MIP.Var $ "unit" : [T.pack ("unit" ++ show i) | i <- [1..]]
+    candidates = map MIP.Var $ "unit" : [T.pack ("unit" ++ show i) | i <- [(1::Int)..]]
     unit_var = head [name | name <- candidates, name `Set.notMember` used]
 
 newtype NormalizeMIPObjectiveInfo r = NormalizeMIPObjectiveInfo (Maybe MIP.Var)
