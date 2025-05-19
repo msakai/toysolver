@@ -52,7 +52,9 @@ main = sh $ do
           Just s -> name <.> s
           Nothing -> name
 
-  Just local_install_root <- fold (inproc "stack"  ["path", "--local-install-root"] empty) L.head
+  args <- arguments
+
+  Just local_install_root <- fold (inproc "stack" (["path", "--local-install-root"] ++ args) empty) L.head
 
   ver <- liftIO $ liftM (prettyShow . pkgVersion . package . packageDescription) $
            readGenericPackageDescription silent "toysolver.cabal"
@@ -78,12 +80,13 @@ main = sh $ do
 #endif
   when (Info.os == "mingw32") $ do
     cp (libDir </> "toysat-ipasir.dll") (pkg </> "bin" </> "toysat-ipasir.dll")
-    proc "stack"
-      [ "exec", "--", "dlltool"
+    proc "stack" (
+      [ "exec" ] ++ args ++
+      [ "--", "dlltool"
       , "--dllname", "toysat-ipasir.dll"
       , "--input-def", "app/toysat-ipasir/ipasir.def"
       , "--output-lib", format fp (pkg </> "lib" </> "toysat-ipasir.dll.a")
-      ]
+      ])
       empty
     return ()
 
