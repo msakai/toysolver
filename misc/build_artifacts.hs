@@ -20,6 +20,9 @@ import Distribution.Version
 import Distribution.Verbosity
 import qualified System.Info as Info
 
+parser :: Parser Text
+parser = optText "local-install-root" 'l' "Local project installation root"
+
 main :: IO ()
 main = sh $ do
   let (package_platform, exeSuffix, archive) =
@@ -52,9 +55,7 @@ main = sh $ do
           Just s -> name <.> s
           Nothing -> name
 
-  args <- arguments
-
-  Just local_install_root <- fold (inproc "stack" (["path", "--local-install-root"] ++ args) empty) L.head
+  local_install_root <- Turtle.options "artifacts builder" parser
 
   ver <- liftIO $ liftM (prettyShow . pkgVersion . package . packageDescription) $
            readGenericPackageDescription silent "toysolver.cabal"
@@ -65,28 +66,26 @@ main = sh $ do
 
   mktree (pkg </> "bin")
 #if MIN_VERSION_turtle(1,6,0)
-  let binDir = T.unpack (lineToText local_install_root) </> "bin"
+  let binDir = T.unpack local_install_root </> "bin"
 #else
-  let binDir = fromText (lineToText local_install_root) </> "bin"
+  let binDir = fromText local_install_root </> "bin"
 #endif
   forM exe_files $ \name -> do
     cp (binDir </> addExeSuffix name) (pkg </> "bin" </> addExeSuffix name)
 
   mktree (pkg </> "lib")
 #if MIN_VERSION_turtle(1,6,0)
-  let libDir = T.unpack (lineToText local_install_root) </> "lib"
+  let libDir = T.unpack local_install_root </> "lib"
 #else
-  let libDir = fromText (lineToText local_install_root) </> "lib"
+  let libDir = fromText local_install_root </> "lib"
 #endif
   when (Info.os == "mingw32") $ do
     cp (libDir </> "toysat-ipasir.dll") (pkg </> "bin" </> "toysat-ipasir.dll")
-    proc "stack" (
-      [ "exec" ] ++ args ++
-      [ "--", "dlltool"
-      , "--dllname", "toysat-ipasir.dll"
+    proc "dlltool"
+      [ "--dllname", "toysat-ipasir.dll"
       , "--input-def", "app/toysat-ipasir/ipasir.def"
       , "--output-lib", format fp (pkg </> "lib" </> "toysat-ipasir.dll.a")
-      ])
+      ]
       empty
     return ()
 

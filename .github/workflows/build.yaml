@@ -183,7 +183,10 @@ jobs:
 
       - name: Build artifacts
         id: build-artifact
-        run: stack runhaskell --package turtle -- misc/build_artifacts.hs ${{ matrix.stack_args }}
+        shell: bash
+        run: |
+          local_install_root=$(stack path --local-install-root ${{ matrix.stack_args }})
+          stack runhaskell --package turtle -- misc/build_artifacts.hs --local-install-root "${local_install_root}"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
