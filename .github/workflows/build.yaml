@@ -122,6 +122,9 @@ jobs:
         continue-on-error: true
         run: rm -r ~/.stack/setup-exe-cache
 
+      - name: Print GHC info
+        run: stack exec ${{ matrix.stack_args }} -- ghc --info
+
       - name: Build dependencies
         shell: bash
         run: stack build --test --no-run-tests --bench --no-run-benchmarks --only-dependencies ${{ matrix.stack_args }} ${{ matrix.flags }}
