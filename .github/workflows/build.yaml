@@ -101,7 +101,7 @@ jobs:
           ghc-version: ${{ matrix.ghc }}
           enable-stack: true
           stack-version: 'latest'
-          stack-no-global: ${{ (matrix.platform == 'macos-x86_64' || matrix.platform == 'linux-x86_64-static') && 'true' || '' }}
+          stack-no-global: ${{ (matrix.platform == 'macos-x86_64') && 'true' || '' }}
           cabal-update: false
 
       - name: Setup stack to use system GHC
