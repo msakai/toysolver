@@ -134,30 +134,30 @@ jobs:
         shell: bash
         run: |
           if [[ ${{ runner.os }} = "macOS" ]]; then
-            otool -L `stack path --local-install-root`/lib/libtoysat-ipasir.dylib
+            otool -L `stack path --local-install-root ${{ matrix.stack_args }}`/lib/libtoysat-ipasir.dylib
           elif [[ ${{ runner.os }} = "Windows" ]]; then          
-            ldd `stack path --local-install-root`/lib/toysat-ipasir.dll
+            ldd `stack path --local-install-root ${{ matrix.stack_args }}`/lib/toysat-ipasir.dll
           else
-            ldd `stack path --local-install-root`/lib/libtoysat-ipasir.so
+            ldd `stack path --local-install-root ${{ matrix.stack_args }}`/lib/libtoysat-ipasir.so
           fi
 
       - name: Test IPASIR DLL using genipaessentials
         shell: bash
         run: |
           if [[ ${{ matrix.platform }} = "macos-x86_64" ]]; then
-            stack exec -- arch -x86_64 g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root`/lib -ltoysat-ipasir -o genipaessentials
+            stack exec ${{ matrix.stack_args }} -- arch -x86_64 g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root ${{ matrix.stack_args }}`/lib -ltoysat-ipasir -o genipaessentials
           else
-            stack exec -- g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root`/lib -ltoysat-ipasir -o genipaessentials
+            stack exec ${{ matrix.stack_args }} -- g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root ${{ matrix.stack_args }}`/lib -ltoysat-ipasir -o genipaessentials
           fi
           if [[ ${{ runner.os }} = "macOS" ]]; then
-            install_name_tool -add_rpath `stack path --local-install-root`/lib genipaessentials
+            install_name_tool -add_rpath `stack path --local-install-root ${{ matrix.stack_args }}`/lib genipaessentials
           elif [[ ${{ runner.os }} = "Windows" ]]; then
-            export PATH=$(cygpath -u $(stack path --local-install-root))/lib:$PATH
+            export PATH=$(cygpath -u $(stack path --local-install-root ${{ matrix.stack_args }}))/lib:$PATH
           else
-            export LD_LIBRARY_PATH=`stack path --local-install-root`/lib:$LD_LIBRARY_PATH
+            export LD_LIBRARY_PATH=`stack path --local-install-root ${{ matrix.stack_args }}`/lib:$LD_LIBRARY_PATH
           fi
           # "stack exec --" is necessary on windows-i386 for adding path of libstdc++
-          stack exec -- ./genipaessentials misc/genipaessentials/inputs/sat100.cnf
+          stack exec ${{ matrix.stack_args }} -- ./genipaessentials misc/genipaessentials/inputs/sat100.cnf
 
       - name: Coveralls
         if: matrix.coveralls
