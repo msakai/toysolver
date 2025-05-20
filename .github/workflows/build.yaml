@@ -217,6 +217,10 @@ jobs:
           path: binary-packages
       - uses: actions/download-artifact@v4
         with:
+          name: binary-packages-linux-x86_64-static
+          path: binary-packages
+      - uses: actions/download-artifact@v4
+        with:
           name: binary-packages-macos-aarch64
           path: binary-packages
       - uses: actions/download-artifact@v4
