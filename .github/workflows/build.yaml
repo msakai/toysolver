@@ -189,7 +189,7 @@ jobs:
         shell: bash
         run: |
           local_install_root=$(stack path --local-install-root ${{ matrix.stack_args }})
-          stack runhaskell --package turtle -- misc/build_artifacts.hs --local-install-root "${local_install_root}"
+          stack runhaskell --package turtle -- misc/build_artifacts.hs --local-install-root "${local_install_root}" --platform ${{ matrix.platform }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

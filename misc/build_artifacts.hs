@@ -6,9 +6,8 @@
 import Turtle
 import qualified Control.Foldl as L
 import Control.Monad
-#if MIN_VERSION_turtle(1,6,0)
+import Data.Maybe
 import qualified Data.Text as T
-#endif
 import Distribution.Package
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parsec
@@ -20,12 +19,14 @@ import Distribution.Version
 import Distribution.Verbosity
 import qualified System.Info as Info
 
-parser :: Parser Text
-parser = optText "local-install-root" 'l' "Local project installation root"
+parser :: Parser (Text, Maybe String)
+parser =
+  (,) <$> optText "local-install-root" 'l' "Local project installation root"
+      <*> optional (T.unpack <$> (optText "platform" 'p' "Platform name"))
 
 main :: IO ()
 main = sh $ do
-  let (package_platform, exeSuffix, archive) =
+  let (platform_default, exeSuffix, archive) =
         case Info.os of
           "mingw32" -> (if Info.arch == "x86_64" then "win64" else "win32", Just "exe", archive7z)
           "linux"   -> ("linux-" ++ Info.arch, Nothing, archiveTarXz)
@@ -55,7 +56,9 @@ main = sh $ do
           Just s -> name <.> s
           Nothing -> name
 
-  local_install_root <- Turtle.options "artifacts builder" parser
+  (local_install_root, arg_platform) <- Turtle.options "artifacts builder" parser
+
+  let package_platform = fromMaybe platform_default arg_platform
 
   ver <- liftIO $ liftM (prettyShow . pkgVersion . package . packageDescription) $
            readGenericPackageDescription silent "toysolver.cabal"
