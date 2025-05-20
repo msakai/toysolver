@@ -41,6 +41,13 @@ jobs:
             platform: linux-x86_64
             release: true
           - ghc: '9.8.4'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-9.8.yaml'
+            stack_args: '--docker --docker-image "quay.io/benz0li/ghc-musl:9.8.4"'
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018 --flag toysolver:LinuxStatic'
+            platform: linux-x86_64-static
+            release: true
+          - ghc: '9.8.4'
             os: macos-latest
             stack_yaml: 'stack-ghc-9.8.yaml'
             stack_args: ''
@@ -105,15 +112,18 @@ jobs:
         name: Cache ~/.stack
         with:
           path: ${{ steps.setup-haskell.outputs.stack-root }}
-          key: ${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('toysolver.cabal', matrix.stack_yaml) }}
+          key: ${{ matrix.platform }}-${{ matrix.ghc }}-${{ hashFiles('toysolver.cabal', matrix.stack_yaml) }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.ghc }}-
+            ${{ matrix.platform }}-${{ matrix.ghc }}-
 
       # https://github.com/commercialhaskell/stack/issues/5405
       - name: Clear setup-exe-cache directory
         if: runner.os == 'macOS'
         continue-on-error: true
         run: rm -r ~/.stack/setup-exe-cache
+
+      - name: Print GHC info
+        run: stack exec ${{ matrix.stack_args }} -- ghc --info
 
       - name: Build dependencies
         shell: bash
@@ -130,34 +140,36 @@ jobs:
         timeout-minutes: 10
 
       - name: Check IPASIR DLL dependencies
+        if: ${{ !endsWith(matrix.platform, '-static') }}
         continue-on-error: true
         shell: bash
         run: |
           if [[ ${{ runner.os }} = "macOS" ]]; then
-            otool -L `stack path --local-install-root`/lib/libtoysat-ipasir.dylib
+            otool -L `stack path --local-install-root ${{ matrix.stack_args }}`/lib/libtoysat-ipasir.dylib
           elif [[ ${{ runner.os }} = "Windows" ]]; then          
-            ldd `stack path --local-install-root`/lib/toysat-ipasir.dll
+            ldd `stack path --local-install-root ${{ matrix.stack_args }}`/lib/toysat-ipasir.dll
           else
-            ldd `stack path --local-install-root`/lib/libtoysat-ipasir.so
+            ldd `stack path --local-install-root ${{ matrix.stack_args }}`/lib/libtoysat-ipasir.so
           fi
 
       - name: Test IPASIR DLL using genipaessentials
+        if: ${{ !endsWith(matrix.platform, '-static') }}
         shell: bash
         run: |
           if [[ ${{ matrix.platform }} = "macos-x86_64" ]]; then
-            stack exec -- arch -x86_64 g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root`/lib -ltoysat-ipasir -o genipaessentials
+            stack exec ${{ matrix.stack_args }} -- arch -x86_64 g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root ${{ matrix.stack_args }}`/lib -ltoysat-ipasir -o genipaessentials
           else
-            stack exec -- g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root`/lib -ltoysat-ipasir -o genipaessentials
+            stack exec ${{ matrix.stack_args }} -- g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root ${{ matrix.stack_args }}`/lib -ltoysat-ipasir -o genipaessentials
           fi
           if [[ ${{ runner.os }} = "macOS" ]]; then
-            install_name_tool -add_rpath `stack path --local-install-root`/lib genipaessentials
+            install_name_tool -add_rpath `stack path --local-install-root ${{ matrix.stack_args }}`/lib genipaessentials
           elif [[ ${{ runner.os }} = "Windows" ]]; then
-            export PATH=$(cygpath -u $(stack path --local-install-root))/lib:$PATH
+            export PATH=$(cygpath -u $(stack path --local-install-root ${{ matrix.stack_args }}))/lib:$PATH
           else
-            export LD_LIBRARY_PATH=`stack path --local-install-root`/lib:$LD_LIBRARY_PATH
+            export LD_LIBRARY_PATH=`stack path --local-install-root ${{ matrix.stack_args }}`/lib:$LD_LIBRARY_PATH
           fi
           # "stack exec --" is necessary on windows-i386 for adding path of libstdc++
-          stack exec -- ./genipaessentials misc/genipaessentials/inputs/sat100.cnf
+          stack exec ${{ matrix.stack_args }} -- ./genipaessentials misc/genipaessentials/inputs/sat100.cnf
 
       - name: Coveralls
         if: matrix.coveralls
@@ -174,7 +186,10 @@ jobs:
 
       - name: Build artifacts
         id: build-artifact
-        run: stack runhaskell ${{ matrix.stack_args }} --package turtle misc/build_artifacts.hs
+        shell: bash
+        run: |
+          local_install_root=$(stack path --local-install-root ${{ matrix.stack_args }})
+          stack runhaskell --package turtle -- misc/build_artifacts.hs --local-install-root "${local_install_root}" --platform ${{ matrix.platform }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -199,6 +214,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: binary-packages-linux-x86_64
+          path: binary-packages
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-packages-linux-x86_64-static
           path: binary-packages
       - uses: actions/download-artifact@v4
         with:
