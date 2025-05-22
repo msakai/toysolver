@@ -124,6 +124,12 @@ checkPBResult opb (status, o, m) = execM $ do
     _ -> do
       addError $ "unknown status: " ++ BS.unpack status
 
+
+  case (PBFile.pbObjectiveFunction opb, o) of
+    (Nothing, Just _) -> do
+      addInfo $ "o-line(s) exist even though it is a PBS problem. (will be ignored)"
+    _ -> pure ()
+
   case m of
     Nothing -> return ()
     Just model -> do
