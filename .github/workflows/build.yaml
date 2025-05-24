@@ -218,7 +218,7 @@ jobs:
 
           mkdir -p ${pkg}/bin
           for exe_name in "${exe_names[@]}" ; do
-            cp -a ${local_install_root}/bin/${exe_name}${exe_suffix} ${pkg}/bin/
+            cp -a "${local_install_root}/bin/${exe_name}${exe_suffix}" "${pkg}/bin/"
           done
 
           mkdir ${pkg}/lib
