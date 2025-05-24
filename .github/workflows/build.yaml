@@ -123,7 +123,11 @@ jobs:
         run: rm -r ~/.stack/setup-exe-cache
 
       - name: Print GHC info
-        run: stack exec ${{ matrix.stack_args }} -- ghc --info
+        run: |
+          set -x
+          stack exec ${{ matrix.stack_args }} -- ghc --info
+          stack exec ${{ matrix.stack_args }} -- nproc
+          stack exec ${{ matrix.stack_args }} -- nproc --all
 
       - name: Build dependencies
         shell: bash
