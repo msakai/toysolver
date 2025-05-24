@@ -131,7 +131,7 @@ jobs:
 
       - name: Build
         shell: bash
-        run: stack build --test --no-run-tests --bench --no-run-benchmarks ${{ matrix.stack_args }} ${{ matrix.flags }}
+        run: stack build --test --no-run-tests --bench --no-run-benchmarks --ghc-options=-j ${{ matrix.stack_args }} ${{ matrix.flags }}
 
       - name: Test
         shell: bash
