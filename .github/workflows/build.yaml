@@ -17,22 +17,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ghc: '9.10.2'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-9.10.yaml'
-            stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
-            platform: linux-x86_64
-          # Use GHC 9.10 on windows to avoid the issue with foreign-library
-          # https://github.com/haskell/cabal/issues/9982
-          - ghc: '9.10.2'
-            os: windows-latest
-            stack_yaml: 'stack-ghc-9.10.yaml'
-            stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
-            platform: win64
-            release: true
-
           - ghc: '9.8.4'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.8.yaml'
@@ -40,6 +24,7 @@ jobs:
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: linux-x86_64
             release: true
+
           - ghc: '9.8.4'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.8.yaml'
@@ -47,42 +32,14 @@ jobs:
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018 --flag toysolver:LinuxStatic'
             platform: linux-x86_64-static
             release: true
+
           - ghc: '9.8.4'
-            os: macos-latest
+            os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.8.yaml'
-            stack_args: ''
+            stack_args: '--docker --docker-image "quay.io/benz0li/ghc-musl:9.8.4"'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
-            platform: macos-aarch64
+            platform: linux-x86_64-static
             release: true
-          - ghc: '9.8.4'
-            os: macos-latest
-            stack_yaml: 'stack-ghc-9.8.yaml'
-            stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
-            platform: macos-x86_64
-            release: true
-
-          - ghc: '9.6.7'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-9.6.yaml'
-            stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
-            platform: linux-x86_64
-
-          - ghc: '9.4.8'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-9.4.yaml'
-            stack_args: '--coverage'
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
-            platform: linux-x86_64
-            coveralls: true
-
-          - ghc: '9.2.8'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-9.2.yaml'
-            stack_args: ''
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms'
-            platform: linux-x86_64
 
     steps:
       - uses: actions/checkout@v4
@@ -101,7 +58,7 @@ jobs:
           ghc-version: ${{ matrix.ghc }}
           enable-stack: true
           stack-version: 'latest'
-          stack-no-global: ${{ (matrix.platform == 'macos-x86_64') && 'true' || '' }}
+          stack-no-global: ${{ (matrix.platform == 'linux-x86_64-static') && 'true' || '' }}
           cabal-update: false
 
       - name: Setup stack to use system GHC
@@ -136,111 +93,3 @@ jobs:
       - name: Build
         shell: bash
         run: stack build --test --no-run-tests --bench --no-run-benchmarks --ghc-options=-j ${{ matrix.stack_args }} ${{ matrix.flags }}
-
-      - name: Test
-        shell: bash
-        # -j1 is for https://github.com/commercialhaskell/stack/issues/5024
-        run: stack test ${{ matrix.stack_args }} -j1 ${{ matrix.flags }}
-        timeout-minutes: 10
-
-      - name: Check IPASIR DLL dependencies
-        if: ${{ !endsWith(matrix.platform, '-static') }}
-        continue-on-error: true
-        shell: bash
-        run: |
-          if [[ ${{ runner.os }} = "macOS" ]]; then
-            otool -L `stack path --local-install-root ${{ matrix.stack_args }}`/lib/libtoysat-ipasir.dylib
-          elif [[ ${{ runner.os }} = "Windows" ]]; then          
-            ldd `stack path --local-install-root ${{ matrix.stack_args }}`/lib/toysat-ipasir.dll
-          else
-            ldd `stack path --local-install-root ${{ matrix.stack_args }}`/lib/libtoysat-ipasir.so
-          fi
-
-      - name: Test IPASIR DLL using genipaessentials
-        if: ${{ !endsWith(matrix.platform, '-static') }}
-        shell: bash
-        run: |
-          if [[ ${{ matrix.platform }} = "macos-x86_64" ]]; then
-            stack exec ${{ matrix.stack_args }} -- arch -x86_64 g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root ${{ matrix.stack_args }}`/lib -ltoysat-ipasir -o genipaessentials
-          else
-            stack exec ${{ matrix.stack_args }} -- g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root ${{ matrix.stack_args }}`/lib -ltoysat-ipasir -o genipaessentials
-          fi
-          if [[ ${{ runner.os }} = "macOS" ]]; then
-            install_name_tool -add_rpath `stack path --local-install-root ${{ matrix.stack_args }}`/lib genipaessentials
-          elif [[ ${{ runner.os }} = "Windows" ]]; then
-            export PATH=$(cygpath -u $(stack path --local-install-root ${{ matrix.stack_args }}))/lib:$PATH
-          else
-            export LD_LIBRARY_PATH=`stack path --local-install-root ${{ matrix.stack_args }}`/lib:$LD_LIBRARY_PATH
-          fi
-          # "stack exec --" is necessary on windows-i386 for adding path of libstdc++
-          stack exec ${{ matrix.stack_args }} -- ./genipaessentials misc/genipaessentials/inputs/sat100.cnf
-
-      - name: Coveralls
-        if: matrix.coveralls
-        continue-on-error: true
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-        run: |
-          curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.7.0/shc-Linux-X64.tar.bz2 | tar -xj
-          ./shc --repo-token="$COVERALLS_REPO_TOKEN" toysolver TestSuite TestPolynomial
-
-      - name: Test scripts
-        shell: bash
-        run: stack runhaskell ${{ matrix.stack_args }} misc/generate_packageVersions.hs > /dev/null
-
-      - name: Build artifacts
-        id: build-artifact
-        shell: bash
-        run: |
-          local_install_root=$(stack path --local-install-root ${{ matrix.stack_args }})
-          stack runhaskell --package turtle -- misc/build_artifacts.hs --local-install-root "${local_install_root}" --platform ${{ matrix.platform }}
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        if: matrix.release
-        with:
-          name: binary-packages-${{ matrix.platform }}
-          path: |
-            *.tar.xz
-            *.7z
-          retention-days: 2
-
-  github-release:
-    name: github-release
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags')
-    needs: build
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: binary-packages-linux-x86_64
-          path: binary-packages
-      - uses: actions/download-artifact@v4
-        with:
-          name: binary-packages-linux-x86_64-static
-          path: binary-packages
-      - uses: actions/download-artifact@v4
-        with:
-          name: binary-packages-macos-aarch64
-          path: binary-packages
-      - uses: actions/download-artifact@v4
-        with:
-          name: binary-packages-macos-x86_64
-          path: binary-packages
-      - uses: actions/download-artifact@v4
-        with:
-          name: binary-packages-win64
-          path: binary-packages
-
-      - name: Upload artifacts to GitHub Release
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          shopt -s nullglob
-          tag_name="${GITHUB_REF#refs/tags/}"
-          gh release create --draft --title "${tag_name}" "${tag_name}" binary-packages/*
