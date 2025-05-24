@@ -101,7 +101,7 @@ jobs:
           ghc-version: ${{ matrix.ghc }}
           enable-stack: true
           stack-version: 'latest'
-          stack-no-global: ${{ (matrix.platform == 'macos-x86_64') && 'true' || '' }}
+          stack-no-global: ${{ (matrix.platform == 'macos-x86_64' || matrix.platform == 'linux-x86_64-static') && 'true' || '' }}
           cabal-update: false
 
       - name: Setup stack to use system GHC
@@ -188,8 +188,54 @@ jobs:
         id: build-artifact
         shell: bash
         run: |
-          local_install_root=$(stack path --local-install-root ${{ matrix.stack_args }})
-          stack runhaskell --package turtle -- misc/build_artifacts.hs --local-install-root "${local_install_root}" --platform ${{ matrix.platform }}
+          exe_names=(
+            assign
+            htc
+            knapsack
+            nonogram
+            nqueens
+            numberlink
+            shortest-path
+            sudoku
+            toyconvert
+            toyfmf
+            toyqbf
+            toysat
+            toysmt
+            toysolver
+            toysolver-check
+          )
+
+          version=$(sed -n 's/^Version:[[:space:]]\([^[:space:]]*\)/\1/p' toysolver.cabal)
+          if [[ ${{ runner.os }} = "Windows" ]]; then
+            local_install_root=$(cygpath -u $(stack path --local-install-root ${{ matrix.stack_args }}))
+            exe_suffix=.exe
+          else
+            local_install_root=$(stack path --local-install-root ${{ matrix.stack_args }})
+            exe_suffix=
+          fi
+          pkg=toysolver-${version}-${{matrix.platform}}
+
+          mkdir -p ${pkg}/bin
+          for exe_name in "${exe_names[@]}" ; do
+            cp -a "${local_install_root}/bin/${exe_name}${exe_suffix}" "${pkg}/bin/"
+          done
+
+          mkdir ${pkg}/lib
+          if [[ ${{ runner.os }} = "Windows" ]]; then
+            cp ${local_install_root}/lib/toysat-ipasir.dll ${pkg}/bin/
+            dlltool --dllname toysat-ipasir.dll --input-def app/toysat-ipasir/ipasir.def --output-lib ${pkg}/lib/toysat-ipasir.dll.a
+          fi
+
+          cp -a samples ${pkg}/samples
+          cp COPYING-GPL README.md INSTALL.md CHANGELOG.markdown ${pkg}
+
+          ls -lR ${pkg}
+          if [[ ${{ runner.os }} = "Windows" ]]; then
+            7z a ${pkg}.7z ${pkg}
+          else
+            tar Jcf ${pkg}.tar.xz ${pkg}
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
