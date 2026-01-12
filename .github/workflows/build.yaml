@@ -164,13 +164,18 @@ jobs:
         if: ${{ !endsWith(matrix.platform, '-static') }}
         shell: bash
         run: |
-          if [[ ${{ matrix.platform }} = "macos-x86_64" ]]; then
-            stack exec ${{ matrix.stack_args }} -- arch -x86_64 g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root ${{ matrix.stack_args }}`/lib -ltoysat-ipasir -o genipaessentials
+          if [[ ${{ runner.os }} = "macOS" ]]; then
+            rpath_opts="-Wl,-rpath,$(stack path --local-install-root ${{ matrix.stack_args }})/lib"
           else
-            stack exec ${{ matrix.stack_args }} -- g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root ${{ matrix.stack_args }}`/lib -ltoysat-ipasir -o genipaessentials
+            rpath_opts=""
+          fi
+          if [[ ${{ matrix.platform }} = "macos-x86_64" ]]; then
+            stack exec ${{ matrix.stack_args }} -- arch -x86_64 g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root ${{ matrix.stack_args }}`/lib -ltoysat-ipasir -o genipaessentials ${rpath_opts}
+          else
+            stack exec ${{ matrix.stack_args }} -- g++ -Wall -Iapp/toysat-ipasir/ misc/genipaessentials/genipaessentials.cpp -L`stack path --local-install-root ${{ matrix.stack_args }}`/lib -ltoysat-ipasir -o genipaessentials ${rpath_opts}
           fi
           if [[ ${{ runner.os }} = "macOS" ]]; then
-            install_name_tool -add_rpath `stack path --local-install-root ${{ matrix.stack_args }}`/lib genipaessentials
+            :
           elif [[ ${{ runner.os }} = "Windows" ]]; then
             export PATH=$(cygpath -u $(stack path --local-install-root ${{ matrix.stack_args }}))/lib:$PATH
           else
