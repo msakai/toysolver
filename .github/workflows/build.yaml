@@ -27,9 +27,18 @@ jobs:
           - ghc: '9.10.3'
             os: ubuntu-latest
             stack_yaml: 'stack-ghc-9.10.yaml'
-            stack_args: ''
+            stack_args: '--haddock --no-haddock-deps'
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: linux-x86_64
+            release: true
+          # Use GHC 9.10 because hashtables-1.3.1 failed to compile on ghc-musl:9.8.4
+          - ghc: '9.10.3'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-9.10.yaml'
+            stack_args: '--docker --docker-image "quay.io/benz0li/ghc-musl:9.10.3"'
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018 --flag toysolver:LinuxStatic'
+            platform: linux-x86_64-static
+            release: true
           # Use GHC 9.10 on windows to avoid the issue with foreign-library
           # https://github.com/haskell/cabal/issues/9982
           - ghc: '9.10.3'
@@ -39,35 +48,27 @@ jobs:
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: win64
             release: true
-
-          - ghc: '9.8.4'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-9.8.yaml'
-            stack_args: '--haddock --no-haddock-deps'
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
-            platform: linux-x86_64
-            release: true
-          - ghc: '9.8.4'
-            os: ubuntu-latest
-            stack_yaml: 'stack-ghc-9.8.yaml'
-            stack_args: '--docker --docker-image "quay.io/benz0li/ghc-musl:9.8.4"'
-            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018 --flag toysolver:LinuxStatic'
-            platform: linux-x86_64-static
-            release: true
-          - ghc: '9.8.4'
+          - ghc: '9.10.3'
             os: macos-latest
-            stack_yaml: 'stack-ghc-9.8.yaml'
+            stack_yaml: 'stack-ghc-9.10.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: macos-aarch64
             release: true
-          - ghc: '9.8.4'
+          - ghc: '9.10.3'
             os: macos-latest
-            stack_yaml: 'stack-ghc-9.8.yaml'
+            stack_yaml: 'stack-ghc-9.10.yaml'
             stack_args: ''
             flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
             platform: macos-x86_64
             release: true
+
+          - ghc: '9.8.4'
+            os: ubuntu-latest
+            stack_yaml: 'stack-ghc-9.8.yaml'
+            stack_args: ''
+            flags: '--flag toysolver:BuildToyFMF --flag toysolver:BuildSamplePrograms --flag toysolver:BuildMiscPrograms --flag toysolver:optparse-applicative-018'
+            platform: linux-x86_64
 
           - ghc: '9.6.7'
             os: ubuntu-latest
