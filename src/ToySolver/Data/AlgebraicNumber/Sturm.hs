@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.Data.AlgebraicNumber.Sturm
--- Copyright   :  (c) Masahiro Sakai 2012
+-- Copyright   :  (c) Masahiro Sakai 2012-2026
 -- License     :  BSD-style
 --
 -- Maintainer  :  masahiro.sakai@gmail.com
@@ -95,14 +95,16 @@ countChanges (x:xs) = go x xs 0
       | otherwise = go x2 xs (r+1)
 
 -- | Closed interval that contains all real roots of a given polynomial.
--- 根の限界
--- <http://aozoragakuen.sakura.ne.jp/taiwa/taiwaNch02/node26.html>
+--
+-- Currently Cauchy's bounds is used.
+--
+-- <https://en.wikipedia.org/wiki/Geometrical_properties_of_polynomial_roots>
 bounds :: UPolynomial Rational -> (Rational, Rational)
 bounds p = (-m, m)
   where
-    m = if p==0
+    m = if P.deg p == 0
         then 0
-        else max 1 (sum [abs (c/s) | (c,_) <- P.terms p] - 1)
+        else 1 + maximum (0 : [abs (c/s) | (c,xs) <- P.terms p, P.deg xs /= P.deg p])
     s = P.lc P.nat p
 
 boundInterval :: UPolynomial Rational -> Interval Rational -> Interval Rational
