@@ -31,6 +31,8 @@ module ToySolver.Data.AlgebraicNumber.Sturm
   , narrow'
   , approx
   , approx'
+
+  , cauchysBounds
   ) where
 
 import Data.Maybe
@@ -96,15 +98,20 @@ countChanges (x:xs) = go x xs 0
 
 -- | Closed interval that contains all real roots of a given polynomial.
 --
--- Currently Cauchy's bounds is used.
---
--- <https://en.wikipedia.org/wiki/Geometrical_properties_of_polynomial_roots>
+-- Currently Cauchy's bounds ('cauchysBounds') is used.
 bounds :: UPolynomial Rational -> (Rational, Rational)
 bounds p = (-m, m)
   where
-    m = if P.deg p == 0
-        then 0
-        else 1 + maximum (0 : [abs (c/s) | (c,xs) <- P.terms p, P.deg xs /= P.deg p])
+    m = cauchysBounds p
+
+-- | Cauchy's upper bounds for the magnitudes of all roots
+--
+-- <https://en.wikipedia.org/wiki/Geometrical_properties_of_polynomial_roots>
+cauchysBounds :: UPolynomial Rational -> Rational
+cauchysBounds p
+  | P.deg p == 0 = 0
+  | otherwise = 1 + maximum (0 : [abs (c/s) | (c,xs) <- P.terms p, P.deg xs /= P.deg p])
+  where
     s = P.lc P.nat p
 
 boundInterval :: UPolynomial Rational -> Interval Rational -> Interval Rational

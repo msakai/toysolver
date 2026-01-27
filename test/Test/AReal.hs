@@ -286,6 +286,38 @@ case_separate = do
     intervals = Sturm.separate p
     vals = [-1.21465, -0.334734, 1.38879]
 
+case_cauchysBounds_constant = do
+  m @?= 0
+  Sturm.numRoots p (Finite (-m) <=..<= Finite m) @?= 0
+  where
+    p = 1
+    m = Sturm.cauchysBounds p
+
+case_cauchysBounds_linear_1 = do
+  m @?= (1 + 1/2)
+  Sturm.numRoots p (Finite (-m) <=..<= Finite m) @?= 1
+  where
+    x = P.var X
+    p = 2*x + 1
+    m = Sturm.cauchysBounds p
+
+case_cauchysBounds_linear_2 = do
+  m @?= 1
+  Sturm.numRoots p (Finite (-m) <=..<= Finite m) @?= 1
+  where
+    x = P.var X
+    p = 2*x
+    m = Sturm.cauchysBounds p
+
+-- https://x.com/Pajoca_/status/1969404597845573723
+case_cauchysBounds_pajoca = do
+  m @?= 3
+  Sturm.numRoots p (Finite (-m) <=..<= Finite m) @?= 1
+  where
+    x = P.var X
+    p = 2*x^3 - 3*x^2 - 4
+    m = Sturm.cauchysBounds p
+
 ------------------------------------------------------------------------
 -- Test harness
 
