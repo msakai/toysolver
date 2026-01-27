@@ -2,12 +2,12 @@
   "hooks": {
     "SessionStart": [
       {
-        "type": "command",
-        "command": "command -v ghcup > /dev/null 2>&1 || (curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 BOOTSTRAP_HASKELL_INSTALL_STACK=1 sh)"
-      },
-      {
-        "type": "command",
-        "command": "command -v stack > /dev/null 2>&1 || (export PATH=\"$HOME/.ghcup/bin:$PATH\" && ghcup install stack)"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "export PATH=\"$HOME/.ghcup/bin:$HOME/.local/bin:$PATH\" && (command -v ghcup > /dev/null 2>&1 || (curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 BOOTSTRAP_HASKELL_INSTALL_STACK=1 sh && echo 'GHCup and stack installed successfully')) && (command -v stack > /dev/null 2>&1 && echo 'Haskell tools ready' || echo 'Warning: stack not found in PATH')"
+          }
+        ]
       }
     ]
   }
