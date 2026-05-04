@@ -125,8 +125,8 @@ Common common-options
   Default-Language: Haskell2010
   -- GHC-Prof-Options: -fprof-auto
   Build-Depends:
-     -- GHC >=9.2 && <9.13
-     base >=4.16 && <4.22
+     -- GHC >=9.2 && <9.15
+     base >=4.16 && <4.23
 
 Common exe-options
   Import: common-options
