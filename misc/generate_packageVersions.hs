@@ -13,6 +13,9 @@ import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.PackageDescription (readGenericPackageDescription)
 #endif
 import Distribution.Types.CondTree
+#if MIN_VERSION_Cabal(3,14,0)
+import Distribution.Utils.Path
+#endif
 import qualified Distribution.Verbosity as Verbosity
 import System.Environment
 
@@ -21,7 +24,11 @@ main = generate_packageVersions "toysolver.cabal"
 
 generate_packageVersions :: FilePath -> IO ()
 generate_packageVersions cabalFile = do
+#if MIN_VERSION_Cabal(3,14,0)
+  pkgDesc <- readGenericPackageDescription Verbosity.normal Nothing (makeSymbolicPath cabalFile)
+#else
   pkgDesc <- readGenericPackageDescription Verbosity.normal cabalFile
+#endif
   let pkgs1 =
         case condLibrary pkgDesc of
           Nothing -> Set.empty
