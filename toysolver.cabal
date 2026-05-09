@@ -11,8 +11,6 @@ Description:	Toy-level solver implementation of various problems including SAT, 
 Homepage:	https://github.com/msakai/toysolver/
 Bug-Reports:	https://github.com/msakai/toysolver/issues
 Tested-With:
-   GHC ==9.2.8
-   GHC ==9.4.8
    GHC ==9.6.7
    GHC ==9.8.4
    GHC ==9.10.3
@@ -125,8 +123,8 @@ Common common-options
   Default-Language: Haskell2010
   -- GHC-Prof-Options: -fprof-auto
   Build-Depends:
-     -- GHC >=9.2 && <9.15
-     base >=4.16 && <4.23
+     -- GHC >=9.6 && <9.15
+     base >=4.18 && <4.23
 
 Common exe-options
   Import: common-options
