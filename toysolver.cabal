@@ -163,6 +163,7 @@ Library
      heaps,
      integer-logarithms >=1.0.3.1 && <1.1,
      intern >=0.9.1.2 && <1.0.0.0,
+     language-smtlib,
      log-domain,
      -- numLoopState requires loop >=0.3.0
      loop >=0.3.0 && < 1.0.0,
@@ -364,6 +365,7 @@ Library
      ToySolver.SAT.Printer
      ToySolver.SDP
      ToySolver.SMT
+     ToySolver.SMT.SMTLIB2Solver
      ToySolver.Text.SDPFile
      ToySolver.Internal.Data.IndexedPriorityQueue
      ToySolver.Internal.Data.IOURef
@@ -461,19 +463,11 @@ Executable toysmt
   Import: exe-options
   HS-Source-Dirs: app/toysmt
   Main-is: toysmt.hs
-  Other-Modules:
-     ToySolver.SMT.SMTLIB2Solver
   Build-Depends:
-    containers,
-    -- TODO: remove intern dependency
-    intern,
     language-smtlib,
-    mtl,
     optparse-applicative,
     toysolver,
-    text,
-    transformers,
-    transformers-compat
+    text
   if flag(UseHaskeline)
     Build-Depends: haskeline >=0.7 && <0.9
     CPP-Options: "-DUSE_HASKELINE_PACKAGE"
@@ -716,7 +710,7 @@ Test-suite TestPolynomial
 Test-suite TestSuite
   Import:            common-options
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    test app/toysmt
+  HS-Source-Dirs:    test
   Main-is:           TestSuite.hs
   Other-Modules:
     Test.AReal
@@ -755,7 +749,6 @@ Test-suite TestSuite
     Test.SMTLIB2Solver
     Test.SolutionChecker
     Test.SubsetSum
-    ToySolver.SMT.SMTLIB2Solver
   Build-depends:
     aeson,
     array,

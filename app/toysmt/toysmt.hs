@@ -20,7 +20,7 @@ import Options.Applicative hiding (Parser)
 import qualified Options.Applicative as Opt
 import qualified Data.Text.IO as T
 #ifdef USE_HASKELINE_PACKAGE
-import Control.Monad.Trans
+import Control.Monad.IO.Class (liftIO)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified System.Console.Haskeline as Haskeline
@@ -151,13 +151,13 @@ replHaskeline solver = Haskeline.runInputT Haskeline.defaultSettings $ loop T.em
       case frameCommand buf of
         Partial _ -> loop buf  -- incomplete command: prompt for more input
         Done (Right cmd) rest -> do
-          lift $ execCommand solver (noAnn cmd)
+          liftIO $ execCommand solver (noAnn cmd)
           continue rest
         Done (Left err) rest -> do
-          lift $ hPutStr stderr (errorBundlePretty err)
+          liftIO $ hPutStr stderr (errorBundlePretty err)
           continue rest
         Failed err rest -> do
-          lift $ hPutStrLn stderr ("framing error: " ++ show err)
+          liftIO $ hPutStrLn stderr ("framing error: " ++ show err)
           continue rest
 
     continue :: Text -> Haskeline.InputT IO ()
