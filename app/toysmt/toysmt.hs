@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  toysmt
@@ -14,24 +15,31 @@
 module Main where
 
 import Control.Applicative
-import Control.Monad
-import Control.Monad.Trans
 import Data.Version
 import Options.Applicative hiding (Parser)
 import qualified Options.Applicative as Opt
+import qualified Data.Text.IO as T
 #ifdef USE_HASKELINE_PACKAGE
+import Control.Monad.Trans
+import Data.Text (Text)
+import qualified Data.Text as T
 import qualified System.Console.Haskeline as Haskeline
+import Language.SMTLIB.Parser (frameCommand, Result (..))
+#else
+import Language.SMTLIB.Reader.Handle (newHandleReader, readCommand)
 #endif
 import System.Exit
 import System.IO
-import Text.Parsec hiding (many)
-import Text.Parsec.String
 
-import Smtlib.Parsers.CommandsParsers
+import Language.SMTLIB (errorBundlePretty)
+import Language.SMTLIB.Parser (parseScript')
 
 import ToySolver.Version
+-- 'noAnn' is re-exported by ToySolver.SMT.SMTLIB2Solver (via Language.SMTLIB.Syntax).
 import ToySolver.SMT.SMTLIB2Solver
+#ifdef FORCE_CHAR8
 import ToySolver.Internal.Util (setEncodingChar8)
+#endif
 
 data Mode
   = ModeHelp
@@ -87,14 +95,13 @@ main = do
 
 loadFile :: Solver -> FilePath -> IO ()
 loadFile solver fname = do
-  ret <- parseFromFile (parseSource <* eof) fname
-  case ret of
+  txt <- T.readFile fname
+  case parseScript' fname txt of
     Left err -> do
-      hPrint stderr err
+      hPutStr stderr (errorBundlePretty err)
       exitFailure
-    Right source -> do
-      forM_ source $ \cmd -> do
-        execCommand solver cmd
+    Right script -> do
+      mapM_ (execCommand solver) script
 
 repl :: Solver -> IO ()
 repl solver = do
@@ -104,31 +111,58 @@ repl solver = do
   replSimple solver
 #endif
 
+#ifndef USE_HASKELINE_PACKAGE
+
 replSimple :: Solver -> IO ()
 replSimple solver = do
   hSetBuffering stdin LineBuffering
-  forever $ do
-    putStr "toysmt> "
-    hFlush stdout
-    s <- getLine
-    case parse (spaces >> parseCommand <* eof) "<stdin>" s of
-      Left err -> do
-        hPrint stderr err
-      Right cmd -> do
-        execCommand solver cmd
+  hr <- newHandleReader stdin
+  let loop = do
+        putStr "toysmt> "
+        hFlush stdout
+        r <- readCommand hr
+        case r of
+          Left err -> do
+            hPutStrLn stderr err
+            loop
+          Right Nothing -> return ()
+          Right (Just cmd) -> do
+            execCommand solver (noAnn cmd)
+            loop
+  loop
+
+#endif
 
 #ifdef USE_HASKELINE_PACKAGE
 
 replHaskeline :: Solver -> IO ()
-replHaskeline solver = Haskeline.runInputT Haskeline.defaultSettings $ forever $ do
-  m <- Haskeline.getInputLine "toysmt> "
-  case m of
-    Nothing -> return ()
-    Just s -> do
-      case parse (spaces >> parseCommand) "<stdin>" s of
-        Left err -> do
-          lift $ hPrint stderr err
-        Right cmd -> do
-          lift $ execCommand solver cmd
+replHaskeline solver = Haskeline.runInputT Haskeline.defaultSettings $ loop T.empty
+  where
+    loop :: Text -> Haskeline.InputT IO ()
+    loop buf = do
+      let prompt = if T.null (T.strip buf) then "toysmt> " else "... "
+      m <- Haskeline.getInputLine prompt
+      case m of
+        Nothing -> return ()
+        Just s -> process (buf <> T.pack s <> "\n")
+
+    process :: Text -> Haskeline.InputT IO ()
+    process buf =
+      case frameCommand buf of
+        Partial _ -> loop buf  -- incomplete command: prompt for more input
+        Done (Right cmd) rest -> do
+          lift $ execCommand solver (noAnn cmd)
+          continue rest
+        Done (Left err) rest -> do
+          lift $ hPutStr stderr (errorBundlePretty err)
+          continue rest
+        Failed err rest -> do
+          lift $ hPutStrLn stderr ("framing error: " ++ show err)
+          continue rest
+
+    continue :: Text -> Haskeline.InputT IO ()
+    continue rest
+      | T.null (T.strip rest) = loop T.empty
+      | otherwise             = process rest
 
 #endif

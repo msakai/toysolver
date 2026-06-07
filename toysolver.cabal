@@ -459,25 +459,17 @@ Foreign-Library     toysat-ipasir
 
 Executable toysmt
   Import: exe-options
-  HS-Source-Dirs: app/toysmt, Smtlib
+  HS-Source-Dirs: app/toysmt
   Main-is: toysmt.hs
   Other-Modules:
-     ToySolver.SMT.SMTLIB2Solver,
-     -- Following modules are copied from SmtLib package.
-     -- http://hackage.haskell.org/package/SmtLib
-     -- https://github.com/MfesGA/Smtlib
-     Smtlib.Parsers.CommonParsers,
-     Smtlib.Parsers.ResponseParsers,
-     Smtlib.Parsers.CommandsParsers,
-     Smtlib.Syntax.Syntax,
-     Smtlib.Syntax.ShowSL
+     ToySolver.SMT.SMTLIB2Solver
   Build-Depends:
     containers,
     -- TODO: remove intern dependency
     intern,
+    language-smtlib,
     mtl,
     optparse-applicative,
-    parsec >=3.1.2 && <4,
     toysolver,
     text,
     transformers,
@@ -724,7 +716,7 @@ Test-suite TestPolynomial
 Test-suite TestSuite
   Import:            common-options
   Type:              exitcode-stdio-1.0
-  HS-Source-Dirs:    test Smtlib app/toysmt
+  HS-Source-Dirs:    test app/toysmt
   Main-is:           TestSuite.hs
   Other-Modules:
     Test.AReal
@@ -761,15 +753,9 @@ Test-suite TestSuite
     Test.SimplexTextbook
     Test.SMT
     Test.SMTLIB2Solver
-    Test.Smtlib
     Test.SolutionChecker
     Test.SubsetSum
     ToySolver.SMT.SMTLIB2Solver
-    Smtlib.Parsers.CommonParsers
-    Smtlib.Parsers.ResponseParsers
-    Smtlib.Parsers.CommandsParsers
-    Smtlib.Syntax.Syntax
-    Smtlib.Syntax.ShowSL
   Build-depends:
     aeson,
     array,
@@ -781,13 +767,13 @@ Test-suite TestSuite
     deepseq,
     hashable,
     intern,
+    language-smtlib,
     lattices,
     megaparsec,
     MIP,
     mtl,
     mwc-random,
     OptDir,
-    parsec >=3.1.2 && <4,
     pseudo-boolean,
     -- sublistOf is available on QuickCheck >=2.8
     QuickCheck >=2.8 && <3,

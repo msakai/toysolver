@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.SMT.SMTLIB2Solver
@@ -11,8 +12,8 @@
 --
 -----------------------------------------------------------------------------
 module ToySolver.SMT.SMTLIB2Solver
-  ( module Smtlib.Syntax.Syntax
-  , ShowSL (..)
+  ( module Language.SMTLIB.Syntax
+  , showSL
 
   -- * The solver type
   , Solver
@@ -84,19 +85,23 @@ import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import Data.Ratio
 import Data.String
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Version as V
 import Numeric (readDec, readFloat, readHex)
 import System.Exit
 import System.IO
-import qualified Text.Parsec as Parsec
 
 import qualified ToySolver.BitVector as BV
 import qualified ToySolver.SMT as SMT
 import ToySolver.Version
-import Smtlib.Syntax.Syntax
-import Smtlib.Syntax.ShowSL
-import qualified Smtlib.Parsers.CommandsParsers as CommandsParsers
+import Language.SMTLIB.Syntax
+import Language.SMTLIB.Parser (parseCommand')
+import Language.SMTLIB.Printer (Pretty, renderText)
+
+-- | Render an SMT-LIB AST node back to its concrete syntax as a 'String'.
+showSL :: Pretty a => a -> String
+showSL = T.unpack . renderText
 
 -- ----------------------------------------------------------------------
 
@@ -115,27 +120,24 @@ data EEntry
   = EFSymBuiltin InternedText
   | EFSymDeclared SMT.FSym [SMT.Sort] SMT.Sort
   | EExpr SMT.Expr Bool
-  | EFunDef EEnv [(String, SMT.Sort)] SMT.Sort Term
+  | EFunDef EEnv [(String, SMT.Sort)] SMT.Sort (Term ())
 
 data SortEntry
   = SortSym SMT.SSym
   | SortExpr SMT.Sort
-  | SortDef SortEnv [String] Sort
+  | SortDef SortEnv [String] (Sort ())
 
-interpretSort :: SortEnv -> Sort -> SMT.Sort
-interpretSort env s =
-  case s of
-    SortId ident -> f ident []
-    SortIdentifiers ident args -> f ident args
-  where
-    f ident@(I_Symbol "BitVec" indexes) args
-      | not (null args) = E.throw $ SMT.Error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for 0)")
-      | [IndexNumeral n] <- indexes = SMT.sBitVec n
-      | otherwise = E.throw $ SMT.Error ("BitVec: wrong number of indexes (" ++ show (length indexes) ++ " for 1)")
-    f ident@(I_Symbol _ _) _ =
+interpretSort :: SortEnv -> Sort () -> SMT.Sort
+interpretSort env (Sort ident args ()) =
+  case ident of
+    Identifier "BitVec" indexes ()
+      | not (null args) -> E.throw $ SMT.Error (showSL ident ++ ": wrong number of arguments (" ++ show (length args) ++ " for 0)")
+      | [IxNumeral n ()] <- indexes -> SMT.sBitVec (fromInteger n)
+      | otherwise -> E.throw $ SMT.Error ("BitVec: wrong number of indexes (" ++ show (length indexes) ++ " for 1)")
+    Identifier _ (_:_) () ->
       E.throw $ SMT.Error ("unknown sort: " ++ showSL ident)
-    f ident@(ISymbol name) args =
-      case Map.lookup name env of
+    Identifier name [] () ->
+      case Map.lookup (T.unpack name) env of
         Nothing -> E.throw $ SMT.Error ("unknown sort: " ++ showSL ident)
         Just (SortSym ssym)
           | SMT.ssymArity ssym == length args -> SMT.Sort ssym args'
@@ -148,42 +150,44 @@ interpretSort env s =
       where
         args' = map (interpretSort env) args
 
-interpretFun :: Env -> Term -> SMT.Expr
+interpretFun :: Env -> Term () -> SMT.Expr
 interpretFun (env,senv) t =
   case t of
-    TermSpecConstant (SpecConstantNumeral n) -> SMT.EValue $ SMT.ValRational $ fromInteger n
-    TermSpecConstant (SpecConstantDecimal s) -> SMT.EValue $ SMT.ValRational $ fst $ head $ readFloat s
-    TermSpecConstant (SpecConstantHexadecimal s) ->
-      let n = fst $ head $ readHex s
-      in SMT.EValue $ SMT.ValBitVec $ BV.nat2bv (length s * 4) n
-    TermSpecConstant (SpecConstantBinary s) ->
-      SMT.EValue $ SMT.ValBitVec $ BV.fromDescBits [c == '1' | c <- s]
-    TermSpecConstant c@(SpecConstantString _s) -> E.throw $ SMT.Error (show c)
-    TermQualIdentifier qid -> f qid []
-    TermQualIdentifierT  qid args -> f qid args
-    TermLet bindings body ->
-      interpretFun (Map.fromList [(v, EExpr (interpretFun (env,senv) t2) False) | VB v t2 <- bindings] `Map.union` env, senv) body
-    TermForall _bindings _body -> E.throw $ SMT.Error "universal quantifiers are not supported yet"
-    TermExists _bindings _body -> E.throw $ SMT.Error "existential quantifiers are not supported yet"
-    TermAnnot t2 _ -> interpretFun (env,senv) t2 -- annotations are not supported yet
+    TConstant (SCNumeral n ()) () -> SMT.EValue $ SMT.ValRational $ fromInteger n
+    TConstant (SCDecimal s ()) () -> SMT.EValue $ SMT.ValRational $ fst $ head $ readFloat $ T.unpack s
+    TConstant (SCHexadecimal s ()) () ->
+      let n = fst $ head $ readHex $ T.unpack s
+      in SMT.EValue $ SMT.ValBitVec $ BV.nat2bv (T.length s * 4) n
+    TConstant (SCBinary s ()) () ->
+      SMT.EValue $ SMT.ValBitVec $ BV.fromDescBits [c == '1' | c <- T.unpack s]
+    TConstant c@(SCString _s ()) () -> E.throw $ SMT.Error (show c)
+    TQualIdent qid () -> f qid []
+    TApp qid args () -> f qid args
+    TLet bindings body () ->
+      interpretFun (Map.fromList [(T.unpack v, EExpr (interpretFun (env,senv) t2) False) | VarBinding v t2 () <- bindings] `Map.union` env, senv) body
+    TLambda _bindings _body () -> E.throw $ SMT.Error "lambda abstractions are not supported yet"
+    TForall _bindings _body () -> E.throw $ SMT.Error "universal quantifiers are not supported yet"
+    TExists _bindings _body () -> E.throw $ SMT.Error "existential quantifiers are not supported yet"
+    TMatch _e _cases () -> E.throw $ SMT.Error "match expressions are not supported yet"
+    TAnnot t2 _ () -> interpretFun (env,senv) t2 -- annotations are not supported yet
   where
-    unIdentifier :: Identifier -> (String, [Index])
-    unIdentifier (ISymbol name) = (name, [])
-    unIdentifier (I_Symbol name indexes) = (name, indexes)
+    unIdentifier :: Identifier () -> (String, [Index ()])
+    unIdentifier (Identifier name indexes ()) = (T.unpack name, indexes)
 
-    f (QIdentifierAs ident sort) args =
+    f (QIdentifierAs ident sort ()) args =
       case ident of
-        ISymbol ('@':s) | (n,[]):_ <- reads s ->
-          SMT.EValue $ SMT.ValUninterpreted n (interpretSort senv sort)
-        _ -> f (QIdentifier ident) args
-    f (QIdentifier ident) args
-      | ('b':'v':xs, [IndexNumeral n]) <- unIdentifier ident
+        Identifier sym [] ()
+          | Just s <- T.stripPrefix "@" sym, ((n,[]):_) <- reads (T.unpack s) ->
+              SMT.EValue $ SMT.ValUninterpreted n (interpretSort senv sort)
+        _ -> f (QIdentifier ident ()) args
+    f (QIdentifier ident ()) args
+      | ('b':'v':xs, [IxNumeral n ()]) <- unIdentifier ident
       , ((x,_):_) <- readDec xs
       , x < 2^n
       = if not (null args)
         then E.throw $ SMT.Error (showSL ident ++ " does not take indexes")
-        else SMT.EValue $ SMT.ValBitVec $ BV.nat2bv n x
-    f qid@(QIdentifier ident) args =
+        else SMT.EValue $ SMT.ValBitVec $ BV.nat2bv (fromInteger n) x
+    f qid@(QIdentifier ident ()) args =
       case Map.lookup name env of
         Nothing -> E.throw $ SMT.Error ("unknown function symbol: " ++ showSL qid)
         Just (EFSymBuiltin name') ->
@@ -192,54 +196,43 @@ interpretFun (env,senv) t =
         Just (EExpr e _) -> e
         Just (EFSymDeclared fsym _ _) -> SMT.EAp fsym (map (interpretFun (env,senv)) args)
         Just (EFunDef env' params _y body) ->
-          interpretFun (Map.fromList [(p,a) | ((p,_s),a) <- zip params (map (\t -> EExpr (interpretFun (env,senv) t) False) args) ] `Map.union` env', senv) body
+          interpretFun (Map.fromList [(p,a) | ((p,_s),a) <- zip params (map (\u -> EExpr (interpretFun (env,senv) u) False) args) ] `Map.union` env', senv) body
       where
         (name, indexes) = unIdentifier ident
         indexes' = map g indexes
-        g (IndexNumeral n) = SMT.IndexNumeral (fromIntegral n)
-        g (IndexSymbol s) = SMT.IndexSymbol (fromString s)
+        g (IxNumeral n ()) = SMT.IndexNumeral (fromIntegral n)
+        g (IxSymbol s ()) = SMT.IndexSymbol (fromString (T.unpack s))
 
-valueToTerm :: SMT.Value -> Term
+valueToTerm :: SMT.Value -> Term ()
 valueToTerm (SMT.ValRational v) =
   case v `compare` 0 of
     GT -> f v
-    EQ -> TermSpecConstant (SpecConstantNumeral 0)
-    LT -> TermQualIdentifierT (QIdentifier $ ISymbol "-") [ f (negate v) ]
+    EQ -> TConstant (SCNumeral 0 ()) ()
+    LT -> TApp (QIdentifier (simpleId "-") ()) [ f (negate v) ] ()
   where
-    f v = TermQualIdentifierT (QIdentifier $ ISymbol "/")
-          [ TermSpecConstant (SpecConstantNumeral (numerator v))
-          , TermSpecConstant (SpecConstantNumeral (denominator v))
-          ]
+    f w = TApp (QIdentifier (simpleId "/") ())
+          [ TConstant (SCNumeral (numerator w) ()) ()
+          , TConstant (SCNumeral (denominator w) ()) ()
+          ] ()
 valueToTerm (SMT.ValBool b) =
-  TermQualIdentifier $ QIdentifier $ ISymbol $ if b then "true" else "false"
+  TQualIdent (QIdentifier (simpleId (if b then "true" else "false")) ()) ()
 valueToTerm (SMT.ValBitVec bv) =
-  TermSpecConstant (SpecConstantBinary $ [if b then '1' else '0' | b <- BV.toDescBits bv])
+  TConstant (SCBinary (T.pack [if b then '1' else '0' | b <- BV.toDescBits bv]) ()) ()
 valueToTerm (SMT.ValUninterpreted n s) =
-  TermQualIdentifier $ QIdentifierAs (ISymbol $ "@" ++ show n) (sortToSortTerm s)
+  TQualIdent (QIdentifierAs (simpleId (T.pack ("@" ++ show n))) (sortToSortTerm s) ()) ()
 
-fsymToIdentifier :: SMT.FSym -> Identifier
-fsymToIdentifier (SMT.FSym f indexes) =
-  case indexes of
-    [] -> ISymbol (T.unpack $ unintern f)
-    _ -> I_Symbol (T.unpack $ unintern f) (map g indexes)
-  where
-    g (SMT.IndexNumeral n) =  IndexNumeral (fromIntegral n)
-    g (SMT.IndexSymbol s)  = IndexSymbol (T.unpack $ unintern s)
+ssymToSymbol :: SMT.SSym -> Identifier ()
+ssymToSymbol SMT.SSymBool = simpleId "Bool"
+ssymToSymbol SMT.SSymReal = simpleId "Real"
+ssymToSymbol (SMT.SSymBitVec n) = Identifier "BitVec" [IxNumeral (fromIntegral n) ()] ()
+ssymToSymbol (SMT.SSymUninterpreted name _) = simpleId (unintern name)
 
-exprToTerm :: SMT.Expr -> Term
-exprToTerm (SMT.EValue v) = valueToTerm v
-exprToTerm (SMT.EAp f []) = TermQualIdentifier (QIdentifier (fsymToIdentifier f))
-exprToTerm (SMT.EAp f xs) = TermQualIdentifierT (QIdentifier (fsymToIdentifier f)) (map exprToTerm xs)
+sortToSortTerm :: SMT.Sort -> Sort ()
+sortToSortTerm (SMT.Sort s xs) = Sort (ssymToSymbol s) (map sortToSortTerm xs) ()
 
-ssymToSymbol :: SMT.SSym -> Identifier
-ssymToSymbol SMT.SSymBool = ISymbol "Bool"
-ssymToSymbol SMT.SSymReal = ISymbol "Real"
-ssymToSymbol (SMT.SSymBitVec n) = I_Symbol "BitVec" [IndexNumeral n]
-ssymToSymbol (SMT.SSymUninterpreted name _) = ISymbol (T.unpack (unintern name))
-
-sortToSortTerm :: SMT.Sort -> Sort
-sortToSortTerm (SMT.Sort s []) = SortId (ssymToSymbol s)
-sortToSortTerm (SMT.Sort s xs) = SortIdentifiers (ssymToSymbol s) (map sortToSortTerm xs)
+-- | A simple (non-indexed) identifier with a unit annotation.
+simpleId :: Text -> Identifier ()
+simpleId name = Identifier name [] ()
 
 -- ----------------------------------------------------------------------
 
@@ -248,9 +241,9 @@ data Solver
   { svSMTSolverRef :: !(IORef SMT.Solver)
   , svEnvRef :: !(IORef Env)
   , svModeRef :: !(IORef Mode)
-  , svSavedContextsRef :: !(IORef [(Maybe (EEnv, SortEnv), [Term])])
+  , svSavedContextsRef :: !(IORef [(Maybe (EEnv, SortEnv), [Term ()])])
   , svStatusRef :: IORef (Maybe Bool)
-  , svAssertionsRef :: IORef [Term]
+  , svAssertionsRef :: IORef [Term ()]
   , svRegularOutputChannelRef :: !(IORef (String, Handle))
   , svDiagnosticOutputChannelRef :: !(IORef (String, Handle))
   , svPrintSuccessRef :: !(IORef Bool)
@@ -260,7 +253,7 @@ data Solver
   , svProduceUnsatAssumptionsRef :: !(IORef Bool)
   , svProduceUnsatCoresRef :: !(IORef Bool)
   , svGlobalDeclarationsRef :: !(IORef Bool)
-  , svUnsatAssumptionsRef :: !(IORef [Term])
+  , svUnsatAssumptionsRef :: !(IORef [Term ()])
   }
 
 newSolver :: IO Solver
@@ -270,7 +263,7 @@ newSolver = do
   modeRef <- newIORef ModeStart
   savedContextsRef <- newIORef []
   statusRef <- newIORef Nothing
-  assertionsRef <- newIORef ([] :: [Term])
+  assertionsRef <- newIORef ([] :: [Term ()])
   regOutputRef <- newIORef ("stdout", stdout)
   diagOutputRef <- newIORef ("stderr", stderr)
   printSuccessRef <- newIORef True
@@ -321,71 +314,73 @@ initialEnv = (fenv, senv)
       , ("Bool", SortSym SMT.SSymBool)
       ]
 
-execCommand :: Solver -> Command -> IO ()
+execCommand :: Solver -> Command () -> IO ()
 execCommand solver cmd = do
   -- putStrLn $ showSL cmd
   printResponse solver =<< runCommand solver cmd
 
-printResponse :: Solver -> CmdResponse -> IO ()
+printResponse :: Solver -> CommandResponse () -> IO ()
 printResponse solver rsp = do
   b <- readIORef (svPrintSuccessRef solver)
-  unless (rsp == CmdGenResponse Success && not b) $ do
+  unless (rsp == RSuccess && not b) $ do
     (_,h) <- readIORef (svRegularOutputChannelRef solver)
     hPutStrLn h (showSL rsp)
 
-runCommand :: Solver -> Command -> IO CmdResponse
+runCommand :: Solver -> Command () -> IO (CommandResponse ())
 runCommand solver cmd = E.handle h $ do
   case cmd of
-    SetLogic logic -> const (CmdGenResponse Success) <$> setLogic solver logic
-    SetOption opt -> const (CmdGenResponse Success) <$> setOption solver opt
-    GetOption s -> CmdGetOptionResponse <$> getOption solver s
-    SetInfo attr -> const (CmdGenResponse Success) <$> setInfo solver attr
-    GetInfo flags -> CmdGetInfoResponse <$> getInfo solver flags
-    Push n -> const (CmdGenResponse Success) <$> push solver n
-    Pop n -> const (CmdGenResponse Success) <$> pop solver n
-    DeclareSort name arity -> const (CmdGenResponse Success) <$> declareSort solver name arity
-    DefineSort name xs body -> const (CmdGenResponse Success) <$> defineSort solver name xs body
-    DeclareConst name y -> const (CmdGenResponse Success) <$> declareConst solver name y
-    DeclareFun name xs y -> const (CmdGenResponse Success) <$> declareFun solver name xs y
-    DefineFun name xs y body -> const (CmdGenResponse Success) <$> defineFun solver name xs y body
-    DefineFunRec name xs y body -> const (CmdGenResponse Success) <$> defineFunRec solver name xs y body
-    DefineFunsRec fundecs terms -> const (CmdGenResponse Success) <$> defineFunsRec solver fundecs terms
-    Assert tm -> const (CmdGenResponse Success) <$> assert solver tm
-    GetAssertions -> CmdGetAssertionsResponse <$> getAssertions solver
-    CheckSat -> CmdCheckSatResponse <$> checkSat solver
-    CheckSatAssuming ts -> CmdCheckSatResponse <$> checkSatAssuming solver ts
-    GetValue ts -> CmdGetValueResponse <$> getValue solver ts
-    GetAssignment -> CmdGetAssignmentResponse <$> getAssignment solver
-    GetModel -> CmdGetModelResponse <$> getModel solver
-    GetProof -> CmdGetProofResponse <$> getProof solver
-    GetUnsatCore -> CmdGetUnsatCoreResponse <$> getUnsatCore solver
-    GetUnsatAssumptions -> CmdGetUnsatAssumptionsResponse <$> getUnsatAssumptions solver
-    Reset -> const (CmdGenResponse Success) <$> reset solver
-    ResetAssertions -> const (CmdGenResponse Success) <$> resetAssertions solver
-    Echo s -> CmdEchoResponse <$> echo solver s
-    Exit -> const (CmdGenResponse Success) <$> exit solver
+    SetLogic logic () -> const RSuccess <$> setLogic solver (T.unpack logic)
+    SetOption opt () -> const RSuccess <$> setOption solver opt
+    GetOption k () -> RGetOption <$> getOption solver (':' : T.unpack k)
+    SetInfo attr () -> const RSuccess <$> setInfo solver attr
+    GetInfo flags () -> RGetInfo <$> getInfo solver flags
+    Push n () -> const RSuccess <$> push solver (fromInteger n)
+    Pop n () -> const RSuccess <$> pop solver (fromInteger n)
+    DeclareSort name arity () -> const RSuccess <$> declareSort solver (T.unpack name) (fromInteger arity)
+    DefineSort name xs body () -> const RSuccess <$> defineSort solver (T.unpack name) (map T.unpack xs) body
+    DeclareConst name y () -> const RSuccess <$> declareConst solver (T.unpack name) y
+    DeclareFun name xs y () -> const RSuccess <$> declareFun solver (T.unpack name) xs y
+    DefineFun (FunctionDef name xs y body ()) () -> const RSuccess <$> defineFun solver (T.unpack name) xs y body
+    DefineFunRec (FunctionDef name xs y body ()) () -> const RSuccess <$> defineFunRec solver (T.unpack name) xs y body
+    DefineFunsRec fundecs terms () -> const RSuccess <$> defineFunsRec solver fundecs terms
+    Assert tm () -> const RSuccess <$> assert solver tm
+    GetAssertions () -> RGetAssertions <$> getAssertions solver
+    CheckSat () -> RCheckSat <$> checkSat solver
+    CheckSatAssuming ts () -> RCheckSat <$> checkSatAssuming solver ts
+    GetValue ts () -> RGetValue <$> getValue solver ts
+    GetAssignment () -> RGetAssignment <$> getAssignment solver
+    GetModel () -> RGetModel <$> getModel solver
+    GetProof () -> RGetProof <$> getProof solver
+    GetUnsatCore () -> RGetUnsatCore <$> getUnsatCore solver
+    GetUnsatAssumptions () -> RGetUnsatAssumptions <$> getUnsatAssumptions solver
+    Reset () -> const RSuccess <$> reset solver
+    ResetAssertions () -> const RSuccess <$> resetAssertions solver
+    Echo s () -> REcho <$> echo solver s
+    Exit () -> const RSuccess <$> exit solver
+    -- Commands without solver support
+    DefineConst _ _ _ () -> E.throwIO SMT.Unsupported
+    DeclareDatatype _ _ () -> E.throwIO SMT.Unsupported
+    DeclareDatatypes _ _ () -> E.throwIO SMT.Unsupported
+    DeclareSortParameter _ () -> E.throwIO SMT.Unsupported
   where
-    h SMT.Unsupported = return (CmdGenResponse Unsupported)
-    h (SMT.Error s) = return $ CmdGenResponse $
-     -- GenResponse type uses strings in printed form.
-     Error $ "\"" ++ concat [if c == '"' then "\"\"" else [c] | c <- s] ++ "\""
+    h SMT.Unsupported = return RUnsupported
+    h (SMT.Error s) = return $ RError $ T.pack s
 
 execCommandString :: Solver -> String -> IO ()
 execCommandString solver cmd = do
   printResponse solver =<< runCommandString solver cmd
 
-runCommandString :: Solver -> String -> IO CmdResponse
+runCommandString :: Solver -> String -> IO (CommandResponse ())
 runCommandString solver cmd =
-  case Parsec.parse (Parsec.spaces >> CommandsParsers.parseCommand <* Parsec.eof) "" cmd of
+  case parseCommand' "<string>" (T.pack cmd) of
     Left err ->
-      -- GenResponse type uses strings in printed form.
-      return $ CmdGenResponse $ Error $ "\"" ++ concat [if c == '"' then "\"\"" else [c] | c <- show err] ++ "\""
-    Right cmd ->
-      runCommand solver cmd
+      return $ RError $ T.pack $ show err
+    Right cmd' ->
+      runCommand solver cmd'
 
 -- ----------------------------------------------------------------------
 
-reset :: Solver -> IO GenResponse
+reset :: Solver -> IO ()
 reset solver = do
   writeIORef (svSMTSolverRef solver) =<< SMT.newSolver
   writeIORef (svEnvRef solver) initialEnv
@@ -401,7 +396,6 @@ reset solver = do
   writeIORef (svProduceUnsatAssumptionsRef solver) False
   writeIORef (svProduceUnsatCoresRef solver) False
   writeIORef (svUnsatAssumptionsRef solver) undefined
-  return Success
 
 setLogic :: Solver -> String -> IO ()
 setLogic solver logic = do
@@ -422,170 +416,169 @@ setLogic solver logic = do
       "ALL_SUPPORTED" -> return ()
       _ -> E.throwIO SMT.Unsupported
 
-setOption :: Solver -> Option -> IO ()
+setOption :: Solver -> Option () -> IO ()
 setOption solver opt = do
   mode <- readIORef (svModeRef solver)
   case opt of
-    PrintSuccess b -> do
+    PrintSuccess b () -> do
       writeIORef (svPrintSuccessRef solver) b
-    ExpandDefinitions _b -> do
-      -- expand-definitions has been removed in SMT-LIB 2.5.
-      E.throwIO SMT.Unsupported
-    InteractiveMode b -> do
+    InteractiveMode b () -> do
       -- interactive-mode is the old name for produce-assertions. Deprecated.
       unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "interactive-mode option can be set only in start mode"
       writeIORef (svProduceAssertionsRef solver) b
       return ()
-    ProduceProofs b -> do
+    ProduceProofs b () -> do
       if mode /= ModeStart then
         E.throwIO $ SMT.Error "produce-proofs option can be set only in start mode"
       else if b then
         E.throwIO SMT.Unsupported
       else
         return ()
-    ProduceUnsatCores b -> do
+    ProduceUnsatCores b () -> do
       unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-unsat-cores option can be set only in start mode"
       writeIORef (svProduceUnsatCoresRef solver) b
       return ()
-    ProduceUnsatAssumptions b -> do
+    ProduceUnsatAssumptions b () -> do
       unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-unsat-assumptions option can be set only in start mode"
       writeIORef (svProduceUnsatAssumptionsRef solver) b
       return ()
-    ProduceModels b -> do
+    ProduceModels b () -> do
       unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-models option can be set only in start mode"
       writeIORef (svProduceModelsRef solver) b
       return ()
-    ProduceAssignments b -> do
+    ProduceAssignments b () -> do
       unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-assignments option can be set only in start mode"
       writeIORef (svProduceAssignmentRef solver) b
       return ()
-    ProduceAssertions b -> do
+    ProduceAssertions b () -> do
       unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "produce-assertions option can be set only in start mode"
       writeIORef (svProduceAssertionsRef solver) b
       return ()
-    GlobalDeclarations b -> do
+    GlobalDeclarations b () -> do
       unless (mode == ModeStart) $ do
         E.throwIO $ SMT.Error "global-declarations option can be set only in start mode"
       writeIORef (svGlobalDeclarationsRef solver) b
       smt <- readIORef (svSMTSolverRef solver)
       SMT.setGlobalDeclarations smt b
-    RegularOutputChannel fname -> do
-      h <- if fname == "stdout" then
-             return stdout
-           else
-             openFile fname AppendMode
-      writeIORef (svRegularOutputChannelRef solver) (fname, h)
+    RegularOutputChannel fname () -> do
+      let fname' = T.unpack fname
+      hdl <- if fname' == "stdout" then
+               return stdout
+             else
+               openFile fname' AppendMode
+      writeIORef (svRegularOutputChannelRef solver) (fname', hdl)
       return ()
-    DiagnosticOutputChannel fname -> do
-      h <- if fname == "stderr" then
-             return stderr
-           else
-             openFile fname AppendMode
-      writeIORef (svDiagnosticOutputChannelRef solver) (fname, h)
+    DiagnosticOutputChannel fname () -> do
+      let fname' = T.unpack fname
+      hdl <- if fname' == "stderr" then
+               return stderr
+             else
+               openFile fname' AppendMode
+      writeIORef (svDiagnosticOutputChannelRef solver) (fname', hdl)
       return ()
-    RandomSeed _i ->
+    RandomSeed _i () ->
       if mode /= ModeStart then
         E.throwIO $ SMT.Error "random-seed option can be set only in start mode"
       else
         E.throwIO SMT.Unsupported
-    Verbosity _lv -> E.throwIO SMT.Unsupported
-    ReproducibleResourceLimit _val -> do
+    Verbosity _lv () -> E.throwIO SMT.Unsupported
+    ReproducibleResourceLimit _val () -> do
       if mode /= ModeStart then
         E.throwIO $ SMT.Error "reproducible-resource-limit option can be set only in start mode"
       else
         E.throwIO SMT.Unsupported
-    OptionAttr _attr -> E.throwIO SMT.Unsupported
+    OptionAttribute _attr () -> E.throwIO SMT.Unsupported
 
-getOption :: Solver -> String -> IO GetOptionResponse
+getOption :: Solver -> String -> IO (AttributeValue ())
 getOption solver opt =
   case opt of
     ":expand-definitions" -> do
       -- expand-definitions has been removed in SMT-LIB 2.5.
-      let b = False
-      return $ AttrValueSymbol (showSL b)
+      return $ boolValue False
     ":global-declarations" -> do
       b <- readIORef (svGlobalDeclarationsRef solver)
-      return $ AttrValueSymbol (showSL b)
+      return $ boolValue b
     ":interactive-mode" -> do
       -- interactive-mode is the old name for produce-assertions. Deprecated.
       b <- readIORef (svProduceAssertionsRef solver)
-      return $ AttrValueSymbol (showSL b)
+      return $ boolValue b
     ":print-success" -> do
       b <- readIORef (svPrintSuccessRef solver)
-      return $ AttrValueSymbol (showSL b)
+      return $ boolValue b
     ":produce-assertions" -> do
       b <- readIORef (svProduceAssertionsRef solver)
-      return $ AttrValueSymbol (showSL b)
+      return $ boolValue b
     ":produce-assignments" -> do
       b <- readIORef (svProduceAssignmentRef solver)
-      return $ AttrValueSymbol (showSL b)
+      return $ boolValue b
     ":produce-models" -> do
       b <- readIORef (svProduceModelsRef solver)
-      return $ AttrValueSymbol (showSL b)
+      return $ boolValue b
     ":produce-proofs" -> do
       let b = False -- default value
-      return $ AttrValueSymbol (showSL b)
+      return $ boolValue b
     ":produce-unsat-cores" -> do
       b <- readIORef (svProduceUnsatCoresRef solver)
-      return $ AttrValueSymbol (showSL b)
+      return $ boolValue b
     ":produce-unsat-assumptions" -> do
       b <- readIORef (svProduceUnsatAssumptionsRef solver)
-      return $ AttrValueSymbol (showSL b)
+      return $ boolValue b
     ":regular-output-channel" -> do
       (fname,_) <- readIORef (svRegularOutputChannelRef solver)
-      return $ AttrValueConstant (SpecConstantString fname)
+      return $ AVConstant (SCString (T.pack fname) ()) ()
     ":diagnostic-output-channel" -> do
       (fname,_) <- readIORef (svDiagnosticOutputChannelRef solver)
-      return $ AttrValueConstant (SpecConstantString fname)
+      return $ AVConstant (SCString (T.pack fname) ()) ()
     ":random-seed" -> do
-      return $ AttrValueConstant (SpecConstantNumeral 0) -- default value
+      return $ AVConstant (SCNumeral 0 ()) () -- default value
     ":reproducible-resource-limit" -> do
-      return $ AttrValueConstant (SpecConstantNumeral 0) -- default value
+      return $ AVConstant (SCNumeral 0 ()) () -- default value
     ":verbosity" -> do
-      return $ AttrValueConstant (SpecConstantNumeral 0) -- default value
+      return $ AVConstant (SCNumeral 0 ()) () -- default value
     _ -> do
       E.throwIO SMT.Unsupported
+  where
+    boolValue b = AVSymbol (if b then "true" else "false") ()
 
-setInfo :: Solver -> Attribute -> IO ()
-setInfo solver (AttributeVal ":status" (AttrValueSymbol s)) = do
+setInfo :: Solver -> Attribute () -> IO ()
+setInfo solver (AttributeWith "status" (AVSymbol s ()) ()) = do
   v <- case s of
          "sat" -> return $ Just True
          "unsat" -> return $ Just False
          "unknown" -> return $ Nothing
-         _ -> E.throwIO $ SMT.Error $ "invalid status value: " ++ s
+         _ -> E.throwIO $ SMT.Error $ "invalid status value: " ++ T.unpack s
   writeIORef (svStatusRef solver) v
 setInfo _solver _ = return ()
 
-getInfo :: Solver -> InfoFlags -> IO GetInfoResponse
-getInfo solver flags = do
+getInfo :: Solver -> InfoFlag () -> IO [InfoResponse ()]
+getInfo solver flag = do
   mode <- readIORef (svModeRef solver)
-  case flags of
-    ErrorBehavior -> return [ResponseErrorBehavior ContinuedExecution]
-    Name -> return [ResponseName "toysmt"]
-    Authors -> return [ResponseName "Masahiro Sakai"]
-    Version -> return [ResponseVersion (V.showVersion version)]
-    Status -> E.throwIO SMT.Unsupported
-    ReasonUnknown -> do
+  case flag of
+    ErrorBehaviorFlag () -> return [IRErrorBehavior ContinuedExecution]
+    InfoName () -> return [IRName "toysmt"]
+    Authors () -> return [IRAuthors "Masahiro Sakai"]
+    InfoVersion () -> return [IRVersion (T.pack (V.showVersion version))]
+    ReasonUnknownFlag () -> do
       if mode /= ModeSat then
         E.throwIO $ SMT.Error "Executions of get-info with :reason-unknown are allowed only when the solver is in sat mode following a check command whose response was unknown."
       else
-        return [ResponseReasonUnknown Incomplete]
-    AllStatistics -> do
+        return [IRReasonUnknown RUIncomplete]
+    AllStatistics () -> do
       if not (mode == ModeSat || mode == ModeUnsat) then
         E.throwIO $ SMT.Error "Executions of get-info with :all-statistics are allowed only when the solver is in sat or unsat mode."
       else
         E.throwIO SMT.Unsupported
-    AssertionStackLevels -> do
+    AssertionStackLevels () -> do
       saved <- readIORef (svSavedContextsRef solver)
       let n = length saved
-      n `seq` return [ResponseAssertionStackLevels n]
-    InfoFlags _s -> do
+      n `seq` return [IRAssertionStackLevels (fromIntegral n)]
+    InfoFlagKeyword _s () -> do
       E.throwIO SMT.Unsupported
 
 push :: Solver -> Int -> IO ()
@@ -607,12 +600,12 @@ pop solver n = do
     cs <- readIORef (svSavedContextsRef solver)
     case cs of
       [] -> E.throwIO $ SMT.Error "pop from empty context"
-      ((m,assertions) : cs) -> do
+      ((m,assertions) : cs') -> do
         case m of
           Just (env,senv) -> writeIORef (svEnvRef solver) (env,senv)
           Nothing -> return ()
         writeIORef (svAssertionsRef solver) assertions
-        writeIORef (svSavedContextsRef solver) cs
+        writeIORef (svSavedContextsRef solver) cs'
         SMT.pop =<< readIORef (svSMTSolverRef solver)
         writeIORef (svModeRef solver) ModeAssert
 
@@ -621,7 +614,7 @@ resetAssertions solver = do
   cs <- readIORef (svSavedContextsRef solver)
   pop solver (length cs)
 
-echo :: Solver -> String -> IO String
+echo :: Solver -> Text -> IO Text
 echo _solver s = return s
 
 declareSort :: Solver -> String -> Int -> IO ()
@@ -631,16 +624,16 @@ declareSort solver name arity = do
   insertSort solver name (SortSym s)
   writeIORef (svModeRef solver) ModeAssert
 
-defineSort :: Solver -> String -> [String] -> Sort -> IO ()
+defineSort :: Solver -> String -> [String] -> Sort () -> IO ()
 defineSort solver name xs body = do
   (_, senv) <- readIORef (svEnvRef solver)
   insertSort solver name (SortDef senv xs body)
   writeIORef (svModeRef solver) ModeAssert
 
-declareConst :: Solver -> String -> Sort -> IO ()
+declareConst :: Solver -> String -> Sort () -> IO ()
 declareConst solver name y = declareFun solver name [] y
 
-declareFun :: Solver -> String -> [Sort] -> Sort -> IO ()
+declareFun :: Solver -> String -> [Sort ()] -> Sort () -> IO ()
 declareFun solver name xs y = do
   smt <- readIORef (svSMTSolverRef solver)
   (_, senv) <- readIORef (svEnvRef solver)
@@ -650,11 +643,11 @@ declareFun solver name xs y = do
   insertFun solver name (EFSymDeclared f argsSorts resultSort)
   writeIORef (svModeRef solver) ModeAssert
 
-defineFun :: Solver -> String -> [SortedVar] -> Sort -> Term -> IO ()
+defineFun :: Solver -> String -> [SortedVar ()] -> Sort () -> Term () -> IO ()
 defineFun solver name xs y body = do
   writeIORef (svModeRef solver) ModeAssert
   (_, senv) <- readIORef (svEnvRef solver)
-  let xs' = map (\(SV x s) -> (x, interpretSort senv s)) xs
+  let xs' = map (\(SortedVar x s ()) -> (T.unpack x, interpretSort senv s)) xs
       y'  = interpretSort senv y
   if null xs' then do
     body' <- processNamed solver body
@@ -666,21 +659,21 @@ defineFun solver name xs y body = do
     insertFun solver name (EFunDef fenv xs' y' body)
   writeIORef (svModeRef solver) ModeAssert
 
-defineFunRec :: Solver -> String -> [SortedVar] -> Sort -> Term -> IO ()
+defineFunRec :: Solver -> String -> [SortedVar ()] -> Sort () -> Term () -> IO ()
 defineFunRec _solver _name _xs _y _body = do
   E.throwIO SMT.Unsupported
 
-defineFunsRec :: Solver -> [FunDec] -> [Term] -> IO ()
+defineFunsRec :: Solver -> [FunctionDec ()] -> [Term ()] -> IO ()
 defineFunsRec _solver _fundecs _terms = do
   E.throwIO SMT.Unsupported
 
-assert :: Solver -> Term -> IO ()
+assert :: Solver -> Term () -> IO ()
 assert solver tm = do
   let mname =
         case tm of
-          TermAnnot _body attrs
-            | name:_ <- [name | AttributeVal ":named" (AttrValueSymbol name) <- attrs] ->
-                Just name
+          TAnnot _body attrs ()
+            | name:_ <- [name | AttributeWith "named" (AVSymbol name ()) () <- attrs] ->
+                Just (T.unpack name)
           _ -> Nothing
   tm' <- processNamed solver tm
   smt <- readIORef (svSMTSolverRef solver)
@@ -692,7 +685,7 @@ assert solver tm = do
      when b $ modifyIORef (svAssertionsRef solver) (tm :)
   writeIORef (svModeRef solver) ModeAssert
 
-getAssertions :: Solver -> IO GetAssertionsResponse
+getAssertions :: Solver -> IO [Term ()]
 getAssertions solver = do
   mode <- readIORef (svModeRef solver)
   when (mode == ModeStart) $ do
@@ -705,7 +698,7 @@ getAssertions solver = do
 checkSat :: Solver -> IO CheckSatResponse
 checkSat solver = checkSatAssuming solver []
 
-checkSatAssuming :: Solver -> [Term] -> IO CheckSatResponse
+checkSatAssuming :: Solver -> [Term ()] -> IO CheckSatResponse
 checkSatAssuming solver xs = do
   smt <- readIORef (svSMTSolverRef solver)
 
@@ -737,21 +730,21 @@ checkSatAssuming solver xs = do
     writeIORef (svUnsatAssumptionsRef solver) [m Map.! e | e <- es]
     return Unsat
 
-getValue :: Solver -> [Term] -> IO GetValueResponse
+getValue :: Solver -> [Term ()] -> IO [ValuationPair ()]
 getValue solver ts = do
-  ts <- mapM (processNamed solver) ts
+  ts' <- mapM (processNamed solver) ts
   mode <- readIORef (svModeRef solver)
   unless (mode == ModeSat) $ do
     E.throwIO $ SMT.Error "get-value can only be used in sat mode"
   smt <- readIORef (svSMTSolverRef solver)
   m <- SMT.getModel smt
   env <- readIORef (svEnvRef solver)
-  forM ts $ \t -> do
+  forM ts' $ \t -> do
     let e = interpretFun env t
     let v = SMT.eval m e
     return $ ValuationPair t (valueToTerm v)
 
-getAssignment :: Solver -> IO GetAssignmentResponse
+getAssignment :: Solver -> IO [(Symbol, Bool)]
 getAssignment solver = do
   mode <- readIORef (svModeRef solver)
   unless (mode == ModeSat) $ do
@@ -768,11 +761,11 @@ getAssignment solver = do
         else do
           let v = SMT.eval m e
           case v of
-            (SMT.ValBool b) -> return [TValuationPair name b]
+            (SMT.ValBool b) -> return [(T.pack name, b)]
             _ -> E.throwIO $ SMT.Error "get-assignment: should not happen"
       _ -> return []
 
-getModel :: Solver -> IO GetModelResponse
+getModel :: Solver -> IO [ModelResponse ()]
 getModel solver = do
   mode <- readIORef (svModeRef solver)
   unless (mode == ModeSat) $ do
@@ -780,31 +773,30 @@ getModel solver = do
   smt <- readIORef (svSMTSolverRef solver)
   m <- SMT.getModel smt
   (env, _) <- readIORef (svEnvRef solver)
-  defs <- liftM catMaybes $ forM (Map.toList env) $ \(name, entry) -> do
+  liftM catMaybes $ forM (Map.toList env) $ \(name, entry) -> do
     case entry of
       EFSymDeclared sym argsSorts resultSort -> do
         case SMT.evalFSym m sym of
           SMT.FunDef [] val ->  do -- constant
-            return $ Just $ DefineFun name [] (sortToSortTerm resultSort) (valueToTerm val)
+            return $ Just $ MRDefineFun (FunctionDef (T.pack name) [] (sortToSortTerm resultSort) (valueToTerm val) ())
           SMT.FunDef tbl defaultVal -> do -- proper function
-            let argsSV :: [SortedVar]
-                argsSV = [SV ("x!" ++ show i) (sortToSortTerm s) | (i,s) <- zip [(1::Int)..] argsSorts]
-                args :: [Term]
-                args = [TermQualIdentifier (QIdentifier (ISymbol x)) | SV x _ <- argsSV]
-                f :: ([SMT.Value], SMT.Value) -> Term -> Term
+            let argsSV :: [SortedVar ()]
+                argsSV = [SortedVar (T.pack ("x!" ++ show i)) (sortToSortTerm s) () | (i,s) <- zip [(1::Int)..] argsSorts]
+                args :: [Term ()]
+                args = [TQualIdent (QIdentifier (simpleId x) ()) () | SortedVar x _ () <- argsSV]
+                f :: ([SMT.Value], SMT.Value) -> Term () -> Term ()
                 f (vals,val) tm =
-                  TermQualIdentifierT (QIdentifier (ISymbol "ite")) [cond, valueToTerm val, tm]
+                  TApp (QIdentifier (simpleId "ite") ()) [cond, valueToTerm val, tm] ()
                   where
                     cond =
-                      case zipWith (\arg val -> TermQualIdentifierT (QIdentifier (ISymbol "=")) [arg, valueToTerm val]) args vals of
+                      case zipWith (\arg val' -> TApp (QIdentifier (simpleId "=") ()) [arg, valueToTerm val'] ()) args vals of
                         [c] -> c
-                        cs -> TermQualIdentifierT (QIdentifier (ISymbol "and")) cs
-            return $ Just $ DefineFun name argsSV (sortToSortTerm resultSort) $
-              foldr f (valueToTerm defaultVal) tbl
+                        cs -> TApp (QIdentifier (simpleId "and") ()) cs ()
+            return $ Just $ MRDefineFun $ FunctionDef (T.pack name) argsSV (sortToSortTerm resultSort)
+              (foldr f (valueToTerm defaultVal) tbl) ()
       _ -> return Nothing
-  return $ defs ++ [Assert (exprToTerm x) | x <- SMT.modelGetAssertions m]
 
-getProof :: Solver -> IO GetProofResponse
+getProof :: Solver -> IO (SExpr ())
 getProof solver = do
   mode <- readIORef (svModeRef solver)
   if mode /= ModeUnsat then
@@ -812,15 +804,15 @@ getProof solver = do
   else
     E.throwIO SMT.Unsupported
 
-getUnsatCore :: Solver -> IO GetUnsatCoreResponse
+getUnsatCore :: Solver -> IO [Symbol]
 getUnsatCore solver = do
   smt <- readIORef (svSMTSolverRef solver)
   mode <- readIORef (svModeRef solver)
   unless (mode == ModeUnsat) $ do
     E.throwIO $ SMT.Error "get-unsat-core can only be used in unsat mode"
-  SMT.getUnsatCore smt
+  map T.pack <$> SMT.getUnsatCore smt
 
-getUnsatAssumptions :: Solver -> IO [Term]
+getUnsatAssumptions :: Solver -> IO [Term ()]
 getUnsatAssumptions solver = do
   mode <- readIORef (svModeRef solver)
   unless (mode == ModeUnsat) $ do
@@ -847,42 +839,46 @@ insertFun solver name fdef = do
     Just _ -> E.throwIO $ SMT.Error (name ++ " is already used")
 
 -- TODO: check closedness of terms
-processNamed :: Solver -> Term -> IO Term
+processNamed :: Solver -> Term () -> IO (Term ())
 processNamed solver = f
   where
-    f t@(TermSpecConstant _) = return t
-    f t@(TermQualIdentifier _) = return t
-    f (TermQualIdentifierT qid args) = do
+    f t@(TConstant _ ()) = return t
+    f t@(TQualIdent _ ()) = return t
+    f (TApp qid args ()) = do
       args' <- mapM f args
-      return $ TermQualIdentifierT qid args'
-    f (TermLet bindings body) = do
+      return $ TApp qid args' ()
+    f (TLet bindings body ()) = do
       body' <- f body
-      return $ TermLet bindings body'
-    f (TermForall bindings body) = do
+      return $ TLet bindings body' ()
+    f (TLambda bindings body ()) = do
       body' <- f body
-      return $ TermForall bindings body'
-    f (TermExists bindings body) = do
+      return $ TLambda bindings body' ()
+    f (TForall bindings body ()) = do
       body' <- f body
-      return $ TermExists bindings body'
-    f (TermAnnot body attrs) = do
+      return $ TForall bindings body' ()
+    f (TExists bindings body ()) = do
+      body' <- f body
+      return $ TExists bindings body' ()
+    f t@(TMatch _ _ ()) = return t
+    f (TAnnot body attrs ()) = do
       body' <- f body
       forM_ attrs $ \attr -> do
         case attr of
-          AttributeVal ":named" val ->
+          AttributeWith "named" val () ->
             case val of
-              AttrValueSymbol name -> do
+              AVSymbol name () -> do
                 env <- readIORef (svEnvRef solver)
                 let e = interpretFun env body'
                 -- smt <- readIORef (svSMTSolverRef solver)
                 -- s <- SMT.exprSort smt e
-                insertFun solver name (EExpr e True)
+                insertFun solver (T.unpack name) (EExpr e True)
               _ -> E.throwIO $ SMT.Error ":named attribute value should be a symbol"
           _ -> return ()
-      let attrs' = [attr | attr <- attrs, attrName attr /= ":named"]
+      let attrs' = [attr | attr <- attrs, attrName attr /= "named"]
             where
-              attrName (Attribute s) = s
-              attrName (AttributeVal s _v) = s
+              attrName (Attribute s ()) = s
+              attrName (AttributeWith s _v ()) = s
       if null attrs' then
         return body'
       else
-        return $ TermAnnot body' attrs'
+        return $ TAnnot body' attrs' ()

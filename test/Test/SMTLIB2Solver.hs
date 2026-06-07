@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.SMTLIB2Solver (smtlib2SolverTestGroup) where
@@ -11,6 +12,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Text as T
 
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
@@ -24,34 +26,34 @@ case_assertionStackLevels :: Assertion
 case_assertionStackLevels = do
   solver <- SMTLIB2.newSolver
   SMTLIB2.setLogic solver "QF_UF"
-  lv1 <- SMTLIB2.getInfo solver AssertionStackLevels
-  lv1 @?= [ResponseAssertionStackLevels 0]
+  lv1 <- SMTLIB2.getInfo solver (AssertionStackLevels ())
+  lv1 @?= [IRAssertionStackLevels 0]
   SMTLIB2.push solver 1
-  lv2 <- SMTLIB2.getInfo solver AssertionStackLevels
-  lv2 @?= [ResponseAssertionStackLevels 1]
+  lv2 <- SMTLIB2.getInfo solver (AssertionStackLevels ())
+  lv2 @?= [IRAssertionStackLevels 1]
   SMTLIB2.pop solver 1
-  lv3 <- SMTLIB2.getInfo solver AssertionStackLevels
-  lv3 @?= [ResponseAssertionStackLevels 0]
+  lv3 <- SMTLIB2.getInfo solver (AssertionStackLevels ())
+  lv3 @?= [IRAssertionStackLevels 0]
 
 case_getUnsatAssumptions :: Assertion
 case_getUnsatAssumptions = do
   solver <- SMTLIB2.newSolver
-  SMTLIB2.setOption solver (ProduceUnsatAssumptions True)
+  SMTLIB2.setOption solver (ProduceUnsatAssumptions True ())
   o <- SMTLIB2.getOption solver ":produce-unsat-assumptions"
-  o @?= AttrValueSymbol "true"
+  o @?= AVSymbol "true" ()
   SMTLIB2.setLogic solver "QF_UF"
-  SMTLIB2.declareFun solver "a" [] (SortId (ISymbol "Bool"))
-  SMTLIB2.declareFun solver "b" [] (SortId (ISymbol "Bool"))
-  SMTLIB2.runCommandString solver "(assert (or a b))"
+  SMTLIB2.declareFun solver "a" [] (Sort (Symbol "Bool") [] ())
+  SMTLIB2.declareFun solver "b" [] (Sort (Symbol "Bool") [] ())
+  _ <- SMTLIB2.runCommandString solver "(assert (or a b))"
   r <- SMTLIB2.runCommandString solver "(check-sat-assuming ((not a) (not b)))"
-  r @?= CmdCheckSatResponse Unsat
-  r <- SMTLIB2.getUnsatAssumptions solver
+  r @?= RCheckSat Unsat
+  r2 <- SMTLIB2.getUnsatAssumptions solver
   let expected =
-       [ TermQualIdentifierT (QIdentifier (ISymbol "not")) [TermQualIdentifier (QIdentifier (ISymbol "a"))]
-       , TermQualIdentifierT (QIdentifier (ISymbol "not")) [TermQualIdentifier (QIdentifier (ISymbol "b"))]
+       [ TApp (QIdentifier (Symbol "not") ()) [TQualIdent (QIdentifier (Symbol "a") ()) ()] ()
+       , TApp (QIdentifier (Symbol "not") ()) [TQualIdent (QIdentifier (Symbol "b") ()) ()] ()
        ]
   -- XXX: Term type is not Hashable nor Ord.
-  Set.fromList (map showSL r) @?= Set.fromList (map showSL expected)
+  Set.fromList (map showSL r2) @?= Set.fromList (map showSL expected)
 
 case_declareConst :: Assertion
 case_declareConst = do
@@ -64,7 +66,7 @@ case_declareConst = do
 case_divisionByZero :: Assertion
 case_divisionByZero = do
   solver <- SMTLIB2.newSolver
-  SMTLIB2.setOption solver (ProduceUnsatAssumptions True)
+  SMTLIB2.setOption solver (ProduceUnsatAssumptions True ())
   SMTLIB2.setLogic solver "QF_LRA"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const x1 Real)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const x2 Real)"
@@ -75,19 +77,19 @@ case_divisionByZero = do
   r @?= Sat
 
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (not (= y1 y2)))"
-  r <- SMTLIB2.checkSat solver
-  r @?= Sat
+  r2 <- SMTLIB2.checkSat solver
+  r2 @?= Sat
 
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (= x1 x2))"
-  r <- SMTLIB2.checkSat solver
-  r @?= Unsat
+  r3 <- SMTLIB2.checkSat solver
+  r3 @?= Unsat
 
 case_getAssertions :: Assertion
 case_getAssertions = do
   solver <- SMTLIB2.newSolver
-  SMTLIB2.setOption solver (ProduceAssertions True)
+  SMTLIB2.setOption solver (ProduceAssertions True ())
   o <- SMTLIB2.getOption solver ":produce-assertions"
-  o @?= AttrValueSymbol "true"
+  o @?= AVSymbol "true" ()
   SMTLIB2.setLogic solver "QF_UF"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun a () Bool)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun b () Bool)"
@@ -96,18 +98,18 @@ case_getAssertions = do
   showSL r @?= "((or (! a :named aa) (! b :named bb)))"
   SMTLIB2.push solver 1
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (not (and a bb)))"
-  r <- SMTLIB2.runCommandString solver "(get-assertions)"
-  showSL r @?= "((or (! a :named aa) (! b :named bb)) (not (and a bb)))"
+  r2 <- SMTLIB2.runCommandString solver "(get-assertions)"
+  showSL r2 @?= "((or (! a :named aa) (! b :named bb)) (not (and a bb)))"
   SMTLIB2.pop solver 1
-  r <- SMTLIB2.runCommandString solver "(get-assertions)"
-  showSL r @?= "((or (! a :named aa) (! b :named bb)))"
+  r3 <- SMTLIB2.runCommandString solver "(get-assertions)"
+  showSL r3 @?= "((or (! a :named aa) (! b :named bb)))"
 
 case_getAssignment :: Assertion
 case_getAssignment = do
   solver <- SMTLIB2.newSolver
-  SMTLIB2.setOption solver (ProduceAssignments True)
+  SMTLIB2.setOption solver (ProduceAssignments True ())
   o <- SMTLIB2.getOption solver ":produce-assignments"
-  o @?= AttrValueSymbol "true"
+  o @?= AVSymbol "true" ()
   SMTLIB2.setLogic solver "QF_UFLRA"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun a () Bool)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun b () Bool)"
@@ -115,24 +117,24 @@ case_getAssignment = do
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (or (! a :named aa) (! b :named bb)))"
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (>= (! c :named cc) 0))"
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (not (and a bb)))"
-  SMTLIB2.checkSat solver
+  _ <- SMTLIB2.checkSat solver
   r <- SMTLIB2.getAssignment solver
-  let m = Map.fromList [(s, b) | TValuationPair s b <- r]
+  let m = Map.fromList r
   unless (m == Map.fromList [("aa",True), ("bb",False)] || m == Map.fromList [("aa",False), ("bb",True)]) $ do
     assertFailure (show r)
 
 case_getModel :: Assertion
 case_getModel = do
   solver <- SMTLIB2.newSolver
-  SMTLIB2.setOption solver (ProduceModels True)
+  SMTLIB2.setOption solver (ProduceModels True ())
   o <- SMTLIB2.getOption solver ":produce-models"
-  o @?= AttrValueSymbol "true"
+  o @?= AVSymbol "true" ()
   SMTLIB2.setLogic solver "QF_UF"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun a () Bool)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun b () Bool)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (or a b))"
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (not (and a b)))"
-  SMTLIB2.checkSat solver
+  _ <- SMTLIB2.checkSat solver
   r <- SMTLIB2.getModel solver
   let m = sort $ map showSL r
   unless (m == ["(define-fun a () Bool true)", "(define-fun b () Bool false)"] ||
@@ -142,9 +144,9 @@ case_getModel = do
 case_getValue :: Assertion
 case_getValue = do
   solver <- SMTLIB2.newSolver
-  SMTLIB2.setOption solver (ProduceModels True)
+  SMTLIB2.setOption solver (ProduceModels True ())
   o <- SMTLIB2.getOption solver ":produce-models"
-  o @?= AttrValueSymbol "true"
+  o @?= AVSymbol "true" ()
   SMTLIB2.setLogic solver "QF_UF"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-sort U 0)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun f (U) U)"
@@ -152,19 +154,19 @@ case_getValue = do
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun A () Bool)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun x () U)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun y () U)"
-  SMTLIB2.checkSat solver
+  _ <- SMTLIB2.checkSat solver
   r <- SMTLIB2.runCommandString solver "(get-value (x A (f x) (g y)))"
   case r of
-    CmdGetValueResponse xs -> return () -- fixme
+    RGetValue _xs -> return () -- fixme
     _ -> assertFailure (show r)
 
 case_GlobalDeclarations :: Assertion
 case_GlobalDeclarations = do
   solver <- SMTLIB2.newSolver
 
-  SMTLIB2.setOption solver (GlobalDeclarations False)
+  SMTLIB2.setOption solver (GlobalDeclarations False ())
   o <- SMTLIB2.getOption solver ":global-declarations"
-  o @?= AttrValueSymbol "false"
+  o @?= AVSymbol "false" ()
   SMTLIB2.setLogic solver "QF_UFLRA"
   SMTLIB2.push solver 1
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const x1 Bool)"
@@ -173,15 +175,15 @@ case_GlobalDeclarations = do
 
   SMTLIB2.reset solver
 
-  SMTLIB2.setOption solver (GlobalDeclarations True)
-  o <- SMTLIB2.getOption solver ":global-declarations"
-  o @?= AttrValueSymbol "true"
+  SMTLIB2.setOption solver (GlobalDeclarations True ())
+  o2 <- SMTLIB2.getOption solver ":global-declarations"
+  o2 @?= AVSymbol "true" ()
   SMTLIB2.setLogic solver "QF_UFLRA"
   SMTLIB2.push solver 1
   assertSuccess =<< SMTLIB2.runCommandString solver "(define-fun x2 () Real 1.0)"
   SMTLIB2.pop solver 1
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (= x2 1.0))"
-  SMTLIB2.checkSat solver
+  _ <- SMTLIB2.checkSat solver
 
   return ()
 
@@ -215,8 +217,8 @@ case_reset = do
 
   SMTLIB2.reset solver
 
-  r <- SMTLIB2.checkSat solver
-  r @?= Sat
+  r2 <- SMTLIB2.checkSat solver
+  r2 @?= Sat
 
 case_resetAssertions :: Assertion
 case_resetAssertions = do
@@ -239,8 +241,8 @@ case_resetAssertions = do
 
   SMTLIB2.resetAssertions solver
 
-  r <- SMTLIB2.checkSat solver
-  r @?= Sat
+  r2 <- SMTLIB2.checkSat solver
+  r2 @?= Sat
 
 -- http://sun.iwu.edu/~mliffito/publications/jar_liffiton_CAMUS.pdf
 -- φ= (x1) ∧ (¬x1) ∧ (¬x1∨x2) ∧ (¬x2) ∧ (¬x1∨x3) ∧ (¬x3)
@@ -250,9 +252,9 @@ case_getUnsatCore :: Assertion
 case_getUnsatCore = do
   solver <- SMTLIB2.newSolver
 
-  SMTLIB2.setOption solver (ProduceUnsatCores True)
+  SMTLIB2.setOption solver (ProduceUnsatCores True ())
   o <- SMTLIB2.getOption solver ":produce-unsat-cores"
-  o @?= AttrValueSymbol "true"
+  o @?= AVSymbol "true" ()
 
   SMTLIB2.setLogic solver "QF_UF"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun x1 () Bool)"
@@ -266,9 +268,9 @@ case_getUnsatCore = do
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (! (not x3) :named C6))"
   r <- SMTLIB2.checkSat solver
   r @?= Unsat
-  r <- SMTLIB2.getUnsatCore solver
+  r2 <- SMTLIB2.getUnsatCore solver
   let expected = map Set.fromList [["C1", "C2"], ["C1", "C3", "C4"], ["C1", "C5", "C6"]]
-  Set.fromList r `elem` expected @?= True
+  Set.fromList r2 `elem` expected @?= True
 
 case_echo :: Assertion
 case_echo = do
@@ -305,7 +307,7 @@ case_defineSort = do
 case_defineFun :: Assertion
 case_defineFun = do
   solver <- SMTLIB2.newSolver
-  SMTLIB2.setOption solver (ProduceModels True)
+  SMTLIB2.setOption solver (ProduceModels True ())
   SMTLIB2.setLogic solver "QF_UFLRA"
   assertSuccess =<< SMTLIB2.runCommandString solver "(define-fun f ((b Bool) (x Real)) Bool (ite b (>= x 0) (>= 0 x)))"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const bb Bool)"
@@ -314,16 +316,16 @@ case_defineFun = do
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (f bb xx))"
   r <- SMTLIB2.checkSat solver
   r @?= Sat
-  r <- SMTLIB2.runCommandString solver "(get-value (bb))"
-  showSL r @?= "((bb true))"
+  r2 <- SMTLIB2.runCommandString solver "(get-value (bb))"
+  showSL r2 @?= "((bb true))"
 
 case_getInfo :: Assertion
 case_getInfo = do
   solver <- SMTLIB2.newSolver
-  _ <- SMTLIB2.getInfo solver ErrorBehavior
-  _ <- SMTLIB2.getInfo solver Name
-  _ <- SMTLIB2.getInfo solver Authors
-  _ <- SMTLIB2.getInfo solver Version
+  _ <- SMTLIB2.getInfo solver (ErrorBehaviorFlag ())
+  _ <- SMTLIB2.getInfo solver (InfoName ())
+  _ <- SMTLIB2.getInfo solver (Authors ())
+  _ <- SMTLIB2.getInfo solver (InfoVersion ())
   return ()
 
 case_setInfo :: Assertion
@@ -336,10 +338,11 @@ case_setInfo = do
 
 -- ---------------------------------------------------------------------
 
-assertSuccess :: CmdResponse -> Assertion
-assertSuccess (CmdGenResponse SMTLIB2.Success) = return ()
-assertSuccess (CmdGenResponse Unsupported) = assertFailure "unsupported"
-assertSuccess (CmdGenResponse (Error str)) = assertFailure ("(error " ++ str ++ ")")
+assertSuccess :: CommandResponse () -> Assertion
+assertSuccess RSuccess = return ()
+assertSuccess RUnsupported = assertFailure "unsupported"
+assertSuccess (RError str) = assertFailure ("(error " ++ T.unpack str ++ ")")
+assertSuccess r = assertFailure (showSL r)
 
 -- ---------------------------------------------------------------------
 -- Test harness
