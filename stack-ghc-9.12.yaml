@@ -55,9 +55,7 @@ extra-deps:
   commit: ebbe5a79b3c7a537ceafc6291744c4d531bef63c
 
 # Override default flag values for local packages and extra-deps
-flags:
-  toysolver:
-    optparse-applicative-018: true
+flags: {}
 
 # Extra package databases containing global packages
 extra-package-dbs: []
