@@ -1,5 +1,4 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -----------------------------------------------------------------------------
 -- |
@@ -17,11 +16,10 @@ module ToySolver.Data.BoolRing
   ) where
 
 import Data.Ix
-import Data.Typeable
 import Data.Generics
 
 newtype BoolRing = BoolRing Bool
-  deriving (Eq, Show, Read, Enum, Ord, Ix, Data, Typeable)
+  deriving (Eq, Show, Read, Enum, Ord, Ix, Data)
 
 instance Num BoolRing where
   BoolRing a + BoolRing b = BoolRing (a /= b) -- xor

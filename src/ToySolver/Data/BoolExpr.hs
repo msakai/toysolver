@@ -44,7 +44,7 @@ data BoolExpr a
   | Imply (BoolExpr a) (BoolExpr a)
   | Equiv (BoolExpr a) (BoolExpr a)
   | ITE (BoolExpr a) (BoolExpr a) (BoolExpr a)
-  deriving (Eq, Ord, Show, Read, Typeable, Data)
+  deriving (Eq, Ord, Show, Read, Data)
 
 instance Functor BoolExpr where
   fmap = fmapDefault
