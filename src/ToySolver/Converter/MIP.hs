@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -47,9 +46,7 @@ import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import qualified Data.Aeson as J
 import qualified Data.Aeson.Types as J
-#if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.Key as Key
-#endif
 import Data.Aeson ((.=), (.:))
 import Data.Array.IArray
 import Data.Default.Class
@@ -194,16 +191,10 @@ instance J.ToJSON WBO2IPInfo where
     [ "type" .= ("WBO2IPInfo" :: J.Value)
     , "num_original_variables" .= nv
     , "relax_variables" .= J.object
-        [ toKey (MIP.varName v) .= jPBConstraint constr
+        [ Key.fromText (MIP.varName v) .= jPBConstraint constr
         | (v, constr) <- relaxVariables
         ]
     ]
-    where
-#if MIN_VERSION_aeson(2,0,0)
-      toKey = Key.fromText
-#else
-      toKey = id
-#endif
 
 instance J.FromJSON WBO2IPInfo where
   parseJSON =
@@ -384,11 +375,11 @@ instance J.ToJSON IP2PBInfo where
     J.object
     [ "type" .= ("IP2PBInfo" :: J.Value)
     , "substitutions" .= J.object
-        [ toKey (MIP.varName v) .= jPBSum s
+        [ Key.fromText (MIP.varName v) .= jPBSum s
         | (v, Integer.Expr s) <- Map.toList vmap
         ]
     , "nonzero_indicators" .= J.object
-        [ toKey (MIP.varName v) .= (jLitName lit :: J.Value)
+        [ Key.fromText (MIP.varName v) .= (jLitName lit :: J.Value)
         | (v, lit) <- Map.toList nonZeroTable
         ]
     , "objective_function_scale_factor" .=
@@ -397,12 +388,6 @@ instance J.ToJSON IP2PBInfo where
         , "denominator" .= denominator s
         ]
     ]
-    where
-#if MIN_VERSION_aeson(2,0,0)
-      toKey = Key.fromText
-#else
-      toKey = id
-#endif
 
 instance J.FromJSON IP2PBInfo where
   parseJSON = withTypedObject "IP2PBInfo" $ \obj -> do
