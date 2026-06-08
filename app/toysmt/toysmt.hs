@@ -14,7 +14,6 @@
 -----------------------------------------------------------------------------
 module Main where
 
-import Control.Applicative
 import Data.Version
 import Options.Applicative hiding (Parser)
 import qualified Options.Applicative as Opt

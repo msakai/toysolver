@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -6,7 +7,6 @@ module Test.SMTLIB2Solver (smtlib2SolverTestGroup) where
 import Control.Applicative((<$>))
 import Control.Exception (evaluate)
 import Control.Monad
-import Control.Monad.State.Strict
 import Data.List (sort)
 import Data.Map (Map)
 import qualified Data.Map as Map
