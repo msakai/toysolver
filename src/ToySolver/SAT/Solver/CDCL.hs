@@ -2,7 +2,6 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecursiveDo #-}
@@ -160,7 +159,6 @@ import qualified Data.Set as Set
 import ToySolver.Internal.Data.IOURef
 import qualified ToySolver.Internal.Data.IndexedPriorityQueue as PQ
 import qualified ToySolver.Internal.Data.Vec as Vec
-import Data.Typeable
 import System.Clock
 import qualified System.Random.MWC as Rand
 import Text.Printf
@@ -1170,12 +1168,12 @@ solve_ solver = do
       Left m -> m
 
 data BudgetExceeded = BudgetExceeded
-  deriving (Show, Typeable)
+  deriving (Show)
 
 instance Exception BudgetExceeded
 
 data Canceled = Canceled
-  deriving (Show, Typeable)
+  deriving (Show)
 
 instance Exception Canceled
 

@@ -1,5 +1,4 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -90,7 +89,6 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.String
 import qualified Data.Text as T
-import Data.Typeable
 import Data.VectorSpace
 
 import ToySolver.Data.Delta
@@ -200,7 +198,7 @@ data FDef
 data Exception
   = Error String
   | Unsupported
-  deriving (Show, Typeable)
+  deriving (Show)
 
 instance E.Exception Exception
 

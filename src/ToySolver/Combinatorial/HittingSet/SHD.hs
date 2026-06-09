@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
@@ -33,7 +32,6 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Typeable
 import System.Exit
 import System.IO
 import System.IO.Temp
@@ -60,7 +58,7 @@ instance Default Options where
     }
 
 data Failure = Failure !Int
-  deriving (Show, Typeable)
+  deriving (Show)
 
 instance Exception Failure
 

@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
@@ -33,7 +32,6 @@ import Control.Monad.IO.Class
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Builder hiding (writeFile)
 import Data.Char
-import Data.Typeable
 import System.IO hiding (readFile, writeFile)
 
 #ifdef WITH_ZLIB
@@ -52,7 +50,7 @@ class FileFormat a where
 
 -- | 'ParseError' represents a parse error and it wraps a error message.
 data ParseError = ParseError String
-  deriving (Show, Typeable)
+  deriving (Show)
 
 instance Exception ParseError
 

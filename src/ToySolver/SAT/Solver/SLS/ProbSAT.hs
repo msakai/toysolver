@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -57,7 +56,6 @@ import Data.IORef
 import Data.Maybe
 import Data.Sequence ((|>))
 import qualified Data.Sequence as Seq
-import Data.Typeable
 import Data.Word
 import System.Clock
 import qualified System.Random.MWC as Rand
@@ -374,7 +372,7 @@ rand n gen
       return $ (a `shiftL` 32) .|. toInteger b
 
 data Finished = Finished
-  deriving (Show, Typeable)
+  deriving (Show)
 
 instance Exception Finished
 

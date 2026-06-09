@@ -176,7 +176,7 @@ class Degree t where
 
 -- | Polynomial over commutative ring r
 newtype Polynomial r v = Polynomial{ coeffMap :: Map (Monomial v) r }
-  deriving (Eq, Ord, Typeable)
+  deriving (Eq, Ord)
 
 instance (Eq k, Num k, Ord v) => Num (Polynomial k v) where
   (+)      = plus
@@ -619,7 +619,7 @@ type UPolynomial r = Polynomial r X
 
 -- | Variable "x"
 data X = X
-  deriving (Eq, Ord, Bounded, Enum, Show, Read, Typeable, Data)
+  deriving (Eq, Ord, Bounded, Enum, Show, Read, Data)
 
 instance NFData X where
    rnf a = a `seq` ()
@@ -782,7 +782,7 @@ tintegral (c,xs) x =
 
 -- | Monic monomials
 newtype Monomial v = Monomial{ mindicesMap :: Map v Integer }
-  deriving (Eq, Ord, Typeable)
+  deriving (Eq, Ord)
 
 type UMonomial = Monomial X
 
