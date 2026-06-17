@@ -61,7 +61,6 @@ data Solver
   , svSATSolver :: SAT.Solver
   , svTseitin :: Tseitin.Encoder IO
   , svEncTable :: IORef (Map Expr (VU.Vector SAT.Lit))
-  , svDivRemTable :: IORef [(VU.Vector SAT.Lit, VU.Vector SAT.Lit, VU.Vector SAT.Lit, VU.Vector SAT.Lit)]
   , svAtomTable :: IORef (Map NormalizedAtom SAT.Lit)
   , svContexts :: Vec.Vec (IntMap (Maybe Int))
   }
@@ -72,7 +71,6 @@ newSolver = do
   sat <- SAT.newSolver
   tseitin <- Tseitin.newEncoder sat
   table <- newIORef Map.empty
-  divRemTable <- newIORef []
   atomTable <- newIORef Map.empty
   contexts <- Vec.new
   Vec.push contexts IntMap.empty
@@ -82,7 +80,6 @@ newSolver = do
     , svSATSolver = sat
     , svTseitin = tseitin
     , svEncTable = table
-    , svDivRemTable = divRemTable
     , svAtomTable = atomTable
     , svContexts = contexts
     }
@@ -158,10 +155,7 @@ getModel solver = do
   let f = fromAscBits . map (SAT.evalLit m) . VG.toList
       isZero' = not . or . toAscBits
       env = VG.fromList [f vs | vs <- vss]
-  xs <- readIORef (svDivRemTable solver)
-  let divTable = Map.fromList [(f s, f d) | (s,t,d,_r) <- xs, isZero' (f t)]
-      remTable = Map.fromList [(f s, f r) | (s,t,_d,r) <- xs, isZero' (f t)]
-  return (env, divTable, remTable)
+  return env
 
 explain :: Solver -> IO IntSet
 explain solver = do
@@ -387,12 +381,12 @@ encodeDivRem solver s t = do
   c <- do
     tmp <- encodeMul (svTseitin solver) False d t
     encodeSum (svTseitin solver) w False [tmp, r]
-  tbl <- readIORef (svDivRemTable solver)
+  -- Semantics of division and remainder operators has been changed in SMT-LIB 2.6.
+  -- 
   Tseitin.addFormula (svTseitin solver) $
     ite (isZero t)
-        (And [(isEQ s s' .&&. isZero t') .=>. (isEQ d d' .&&. isEQ r r') | (s',t',d',r') <- tbl, w == VG.length s'])
+        (And [Atom l | l <- VG.toList d] .&&. And ([Atom a .<=>. Atom b | (a,b) <- zip (VG.toList s) (VG.toList r)]))
         (isEQ s c .&&. isULT r t)
-  modifyIORef (svDivRemTable solver) ((s,t,d,r) :)
   return (d,r)
 
 encodeSDiv :: Solver -> SBV -> SBV -> IO SBV

@@ -44,8 +44,6 @@ module ToySolver.BitVector.Base
 
 import Prelude hiding (repeat)
 import Data.Bits
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.Ord
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Vector as V
@@ -490,10 +488,10 @@ instance BVComparison Expr where
 
 -- ------------------------------------------------------------------------
 
-type Model = (V.Vector BV, Map BV BV, Map BV BV)
+type Model = V.Vector BV
 
 evalExpr :: Model -> Expr -> BV
-evalExpr (env, divTable, remTable) = f
+evalExpr env = f
   where
     f (EConst bv) = bv
     f (EVar v) = env VG.! varId v
@@ -511,23 +509,11 @@ evalExpr (env, divTable, remTable) = f
     evalOp2 OpAdd x y = bvadd x y
     evalOp2 OpMul x y = bvmul x y
     evalOp2 OpUDiv x y
-      | y' /= 0 = bvudiv x y
-      | otherwise =
-          case Map.lookup x divTable of
-            Just d -> d
-            Nothing -> nat2bv (width x) 0
-      where
-        y' :: Integer
-        y' = bv2nat y
+      | bv2nat y /= (0 :: Integer) = bvudiv x y
+      | otherwise = fromAscBits (replicate (width x) True)
     evalOp2 OpURem x y
-      | y' /= 0 = bvurem x y
-      | otherwise =
-          case Map.lookup x remTable of
-            Just r -> r
-            Nothing -> nat2bv (width x) 0
-      where
-        y' :: Integer
-        y' = bv2nat y
+      | bv2nat y /= (0 :: Integer) = bvurem x y
+      | otherwise = x
     evalOp2 OpSDiv x y
       | width x < 1 || width y < 1 || width x /= width y = error "invalid width"
       | not msb_x && not msb_y = evalOp2 OpUDiv x y
