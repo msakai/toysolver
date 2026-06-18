@@ -2,9 +2,10 @@
 -----
 
 * SMT
+  * Migrate toysmt to use newly developed [language-smtlib](https://hackage.haskell.org/package/language-smtlib) from `Smtlib` fork (#206)
   * Update the semantics of zero division on bitvectors to conform to SMT-LIB >=2.6 (#209)
-* Converter updates
-  * Do not produce `obj<T` constraint in wbo2pb when all interpretations are admissible (#157)
+* Converter and `toyconvert` command
+  * Do not produce `obj<T` constraint in `wbo2pb` when all interpretations are admissible (#157)
   * Optimize `unconstrainPB` a little (#159, #161)
   * Change `ToySolver.SAT.Encoder.Integer` to encode integer variables without introducing `<=` constraints (#162)
   * Store surplus expression instead of raw variables in `inequalitiesToEqualitiesPB` (#164)
@@ -14,11 +15,23 @@
   * Support semi-integer variables in IP→PB conversion and improve error messages (#170)
   * Simplify JSON that represents PBSum (#171)
   * Scale objective function and constraints using rational instead of integer in IP→PB transformation (#172)
-  * Add `toysolver-check` command
+  * Linearize constant term in objective function when writing LP/MPS file (#185)
+  * Add `--[no-]mps-obj-name` option to `toyconvert` (#188)
+  * Rename `--lp` option to `--mip` and keep `--lp` as an alisa (#189)
+* toysat
+  * Conform to MaxSAT Evaluation 2024 (#177)
+    * It output `SATISFIABLE` in MaxSAT mode if it found a model but failed to prove optimality
+    * Add `--exit-code` option to set exit code
 * Dependencies
   * Stop supporting 32-bit Windows (#154)
-  * Stop supporting GHC 9.0 and below (#156)
+  * Stop supporting GHC 9.4 and below (#156, #205)
   * Use pseudo-boolean-0.1.12.0 (#158)
+  * require `aeson >=2.0`, `array >=0.5.6`, `hashable >=1.4.3`, and `optparse-applicative >=0.18` (#208)
+* Misc
+  * Add `toysolver-check` command to check solution (#174, #196)
+  * Improve model output speed by printing using `ByteString` (#175)
+  * Build statically linked Linux binaries (#194)
+  * Use Cauchy's bounds instead of Lagrange's bounds as the bounds for all roots (#203)
 
 0.9.0 (2025-02-18)
 -----
