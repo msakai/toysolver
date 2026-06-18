@@ -40,18 +40,19 @@ prop_BVSolver = QM.monadicIO $ do
       QM.monitor (counterexample $ show m)
       QM.assert $ and [BV.evalAtom m c | c <- cs]
 
-case_division_by_zero_cong :: IO ()
-case_division_by_zero_cong = do
+-- Since SMT-LIB 2.6, the result of division by zero has been fixed to be a bit vector with all bits set to 1.
+-- Before SMT-LIB 2.6, this was satisfiable.
+case_division_by_zero :: IO ()
+case_division_by_zero = do
   solver <- BV.newSolver
   v1 <- BV.newVar solver 8
   v2 <- BV.newVar solver 8
   let z = BV.nat2bv 8 0
+  BV.assertAtom solver (BV.bvudiv v1 z .==. BV.nat2bv 8 255) Nothing
+  BV.assertAtom solver (BV.bvurem v1 z .==. v1) Nothing
   BV.assertAtom solver (BV.bvudiv v1 z ./=. BV.bvudiv v2 z) Nothing
   ret <- BV.check solver
-  ret @?= True
-  BV.assertAtom solver (v1 .==. v2) Nothing
-  ret2 <- BV.check solver
-  ret2 @?= False
+  ret @?= False
 
 -- ------------------------------------------------------------------------
 -- Generators

@@ -1269,28 +1269,6 @@ modelGetAssertions m =
   | let FEUFFun _ sym = mDefs m Map.! "_/0"
   , ([arg], result) <- Map.toList $ EUF.mFunctions (mEUFModel m) IntMap.! sym
   ]
-  ++
-  [ EAp "="
-      [ EAp "bvudiv"
-        [ EValue (ValBitVec s)
-        , EValue (ValBitVec (BV.nat2bv (BV.width s) 0))
-        ]
-      , EValue (ValBitVec t)
-      ]
-  | (s,t) <- Map.toList bvDivTable
-  ]
-  ++
-  [ EAp "="
-      [ EAp "bvurem"
-        [ EValue (ValBitVec s)
-        , EValue (ValBitVec (BV.nat2bv (BV.width s) 0))
-        ]
-      , EValue (ValBitVec t)
-      ]
-  | (s,t) <- Map.toList bvRemTable
-  ]
-  where
-    (_, bvDivTable, bvRemTable) = mBVModel m
 
 -- -------------------------------------------------------------------
 
