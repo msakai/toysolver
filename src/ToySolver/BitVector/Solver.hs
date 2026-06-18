@@ -153,7 +153,6 @@ getModel solver = do
   m <- SAT.getModel (svSATSolver solver)
   vss <- Vec.getElems (svVars solver)
   let f = fromAscBits . map (SAT.evalLit m) . VG.toList
-      isZero' = not . or . toAscBits
       env = VG.fromList [f vs | vs <- vss]
   return env
 
@@ -382,10 +381,9 @@ encodeDivRem solver s t = do
     tmp <- encodeMul (svTseitin solver) False d t
     encodeSum (svTseitin solver) w False [tmp, r]
   -- Semantics of division and remainder operators has been changed in SMT-LIB 2.6.
-  -- 
   Tseitin.addFormula (svTseitin solver) $
     ite (isZero t)
-        (And [Atom l | l <- VG.toList d] .&&. And ([Atom a .<=>. Atom b | (a,b) <- zip (VG.toList s) (VG.toList r)]))
+        (And [Atom l | l <- VG.toList d] .&&. isEQ s r)
         (isEQ s c .&&. isULT r t)
   return (d,r)
 
