@@ -1,6 +1,8 @@
 0.10.0 (Unreleased)
 -----
 
+* SMT
+  * Update the semantics of zero division on bitvectors to conform to SMT-LIB >=2.6 (#209)
 * Converter updates
   * Do not produce `obj<T` constraint in wbo2pb when all interpretations are admissible (#157)
   * Optimize `unconstrainPB` a little (#159, #161)
