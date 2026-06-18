@@ -3,6 +3,7 @@
 
 * SMT
   * Update the semantics of zero division on bitvectors to conform to SMT-LIB >=2.6 (#209)
+  * `toysmt` now suppresses the prompt and does not use haskeline when stdin is not a terminal
 * Converter updates
   * Do not produce `obj<T` constraint in wbo2pb when all interpretations are admissible (#157)
   * Optimize `unconstrainPB` a little (#159, #161)
