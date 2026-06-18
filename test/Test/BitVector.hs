@@ -48,6 +48,8 @@ case_division_by_zero = do
   v1 <- BV.newVar solver 8
   v2 <- BV.newVar solver 8
   let z = BV.nat2bv 8 0
+  BV.assertAtom solver (BV.bvudiv v1 z .==. BV.nat2bv 8 255) Nothing
+  BV.assertAtom solver (BV.bvurem v1 z .==. v1) Nothing
   BV.assertAtom solver (BV.bvudiv v1 z ./=. BV.bvudiv v2 z) Nothing
   ret <- BV.check solver
   ret @?= False
