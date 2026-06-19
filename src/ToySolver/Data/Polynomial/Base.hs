@@ -405,7 +405,7 @@ toUPolynomialOf p v = fromTerms $ do
 divModMP
   :: forall k v. (Eq k, Fractional k, Ord v)
   => MonomialOrder v -> Polynomial k v -> [Polynomial k v] -> ([Polynomial k v], Polynomial k v)
-divModMP cmp p fs = go IntMap.empty (terms' p)
+divModMP cmp p fs = go IntMap.empty [] (terms' p)
   where
     terms' :: Polynomial k v -> [Term k v]
     terms' g = sortBy (flip cmp `on` snd) (terms g)
@@ -422,20 +422,26 @@ divModMP cmp p fs = go IntMap.empty (terms' p)
             0 -> merge xs ys
             c -> (c, snd x) : merge xs ys
 
-    ls = zip [0..] [(lt cmp f, terms' f) | f <- fs]
+    -- For each divisor: its index, its leading term, and its remaining
+    -- (lower) terms in descending order with respect to @cmp@.
+    -- Zero divisors have no terms and are simply skipped.
+    ls :: [(Int, Term k v, [Term k v])]
+    ls = [(i, a, rest) | (i, f) <- zip [0..] fs, (a : rest) <- [terms' f]]
 
-    go :: IntMap (Polynomial k v) -> [Term k v] -> ([Polynomial k v], Polynomial k v)
-    go qs g =
-      case xs of
-        [] -> ([IntMap.findWithDefault 0 i qs | i <- [0 .. length fs - 1]], fromTerms g)
-        (i, b, g') : _ -> go (IntMap.insertWith (+) i b qs) g'
-      where
-        xs = do
-          (i,(a,f)) <- ls
-          h <- g
-          guard $ a `tdivides` h
-          let b = tdiv h a
-          return (i, fromTerm b, merge g [(tscale (-1) b `tmult` m) | m <- f])
+    -- @g@ holds the terms of the dividend not yet processed, kept sorted in
+    -- descending order with respect to @cmp@; @rs@ accumulates the terms of
+    -- the remainder. At each step we look at the leading term @h@ of @g@ and
+    -- either reduce it by a divisor or, if no divisor's leading term divides
+    -- it, move it to the remainder.
+    go :: IntMap (Polynomial k v) -> [Term k v] -> [Term k v]
+       -> ([Polynomial k v], Polynomial k v)
+    go qs rs [] = ([IntMap.findWithDefault 0 i qs | i <- [0 .. length fs - 1]], fromTerms rs)
+    go qs rs (h : g) =
+      case [(i, b, rest) | (i, a, rest) <- ls, a `tdivides` h, let b = tdiv h a] of
+        [] -> go qs (h : rs) g
+        (i, b, rest) : _ ->
+          go (IntMap.insertWith (+) i (fromTerm b) qs) rs
+             (merge g [tscale (-1) b `tmult` m | m <- rest])
 
 -- | Multivariate division algorithm
 --
