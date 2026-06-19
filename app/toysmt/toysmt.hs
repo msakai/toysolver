@@ -17,6 +17,7 @@ module Main where
 import Data.Version
 import Options.Applicative hiding (Parser)
 import qualified Options.Applicative as Opt
+import Control.Monad (when)
 import qualified Data.Text.IO as T
 #ifdef USE_HASKELINE_PACKAGE
 import Control.Monad.IO.Class (liftIO)
@@ -24,9 +25,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified System.Console.Haskeline as Haskeline
 import Language.SMTLIB.Parser (frameCommand, Result (..))
-#else
-import Language.SMTLIB.Reader.Handle (newHandleReader, readCommand)
 #endif
+import Language.SMTLIB.Reader.Handle (newHandleReader, readCommand)
 import System.Exit
 import System.IO
 
@@ -104,21 +104,29 @@ loadFile solver fname = do
 
 repl :: Solver -> IO ()
 repl solver = do
+  -- Use the interactive frontend (prompt, and line editing via haskeline if
+  -- available) only when stdin is connected to a terminal. When stdin is a pipe
+  -- or a regular file, toysmt is typically driven by another program over the
+  -- SMT-LIB protocol; in that case we suppress the prompt so that it does not
+  -- pollute the response stream on stdout, and we avoid haskeline entirely.
+  tty <- hIsTerminalDevice stdin
 #ifdef USE_HASKELINE_PACKAGE
-  replHaskeline solver
+  if tty then
+    replHaskeline solver
+  else
+    replSimple False solver
 #else
-  replSimple solver
+  replSimple tty solver
 #endif
 
-#ifndef USE_HASKELINE_PACKAGE
-
-replSimple :: Solver -> IO ()
-replSimple solver = do
+replSimple :: Bool -> Solver -> IO ()
+replSimple showPrompt solver = do
   hSetBuffering stdin LineBuffering
   hr <- newHandleReader stdin
   let loop = do
-        putStr "toysmt> "
-        hFlush stdout
+        when showPrompt $ do
+          putStr "toysmt> "
+          hFlush stdout
         r <- readCommand hr
         case r of
           Left err -> do
@@ -129,8 +137,6 @@ replSimple solver = do
             execCommand solver (noAnn cmd)
             loop
   loop
-
-#endif
 
 #ifdef USE_HASKELINE_PACKAGE
 
