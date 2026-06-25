@@ -161,9 +161,12 @@ replHaskeline solver = Haskeline.runInputT Haskeline.defaultSettings $ loop T.em
         Done (Left err) rest -> do
           liftIO $ hPutStr stderr (errorBundlePretty err)
           continue rest
-        Failed err rest -> do
+        Failed err _ -> do
+          -- A framing error (e.g. a stray top-level ')') is not consumed by the
+          -- framer, so its leftover would re-trigger the same error forever.
+          -- Discard the buffer and prompt afresh.
           liftIO $ hPutStrLn stderr ("framing error: " ++ show err)
-          continue rest
+          loop T.empty
 
     continue :: Text -> Haskeline.InputT IO ()
     continue rest
