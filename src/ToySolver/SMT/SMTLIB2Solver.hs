@@ -362,6 +362,7 @@ runCommand solver cmd = E.handle h $ do
     DeclareDatatype _ _ () -> E.throwIO SMT.Unsupported
     DeclareDatatypes _ _ () -> E.throwIO SMT.Unsupported
     DeclareSortParameter _ () -> E.throwIO SMT.Unsupported
+    UnknownCommand _ _ () -> E.throwIO SMT.Unsupported
   where
     h SMT.Unsupported = return RUnsupported
     h (SMT.Error s) = return $ RError $ T.pack s
