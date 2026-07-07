@@ -4,21 +4,15 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Test.SMTLIB2Solver (smtlib2SolverTestGroup) where
 
-import Control.Applicative((<$>))
-import Control.Exception (evaluate)
 import Control.Monad
 import Data.List (sort)
-import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 
 import Test.Tasty
-import Test.Tasty.QuickCheck hiding ((.&&.), (.||.))
 import Test.Tasty.HUnit
 import Test.Tasty.TH
-import qualified Test.QuickCheck.Monadic as QM
 
 import ToySolver.SMT.SMTLIB2Solver as SMTLIB2
 
