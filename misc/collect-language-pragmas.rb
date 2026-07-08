@@ -4,8 +4,6 @@ base = ARGV[0] || "."
 exts = {}
 
 Dir.glob("**/*.hs", base: base){|fname|
-  next if /^dist-newstyle/ =~ fname
-  
   src = File.read(File.join(base, fname), encoding: "utf-8")
   src.scan(/{-# LANGUAGE([^#]*)#-}/){
     $1.strip().split(/\s*,\s*/).each{|ext|

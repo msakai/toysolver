@@ -124,7 +124,7 @@ Common common-options
 Common exe-options
   Import: common-options
   if flag(ForceChar8)
-    CPP-OPtions: "-DFORCE_CHAR8"
+    CPP-Options: "-DFORCE_CHAR8"
   GHC-Options: -rtsopts
   if flag(LinuxStatic)
     GHC-Options: -static -optl-static -optl-pthread
@@ -521,7 +521,6 @@ Executable toyconvert
     scientific,
     text,
     toysolver
-  GHC-Options: -rtsopts
   Other-Extensions:
     GADTs
     OverloadedStrings
@@ -673,7 +672,6 @@ Executable survey-propagation
   Build-Depends:
     data-default-class,
     toysolver
-  GHC-Options: -rtsopts
   Other-Extensions:
     ScopedTypeVariables
 
