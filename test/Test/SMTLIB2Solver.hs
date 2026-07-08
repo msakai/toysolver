@@ -46,8 +46,7 @@ case_getUnsatAssumptions = do
        [ TApp (QIdentifier (Symbol "not") ()) [TQualIdent (QIdentifier (Symbol "a") ()) ()] ()
        , TApp (QIdentifier (Symbol "not") ()) [TQualIdent (QIdentifier (Symbol "b") ()) ()] ()
        ]
-  -- XXX: Term type is not Hashable nor Ord.
-  Set.fromList (map showSL r2) @?= Set.fromList (map showSL expected)
+  Set.fromList r2 @?= Set.fromList expected
 
 case_declareConst :: Assertion
 case_declareConst = do
