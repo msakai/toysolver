@@ -416,7 +416,7 @@ addMIP' enc mip = do
         where
           p (MIP.ContinuousVariable, _) = True
           p (MIP.SemiContinuousVariable, _) = True
-          p (_, _) = False  
+          p (_, _) = False
   unless (Map.null contVars) $ do
     let n = Map.size contVars
         vars = intercalate ", " (map (T.unpack . MIP.varName) (take 10 (Map.keys contVars)) ++ ["..." | n > 10])

@@ -505,7 +505,7 @@ inequalitiesToEqualitiesPB formula = runST $ do
         _ -> mzero
 
     simplifyPBAtLeast :: (SAT.PBSum, Integer) -> (SAT.PBSum, Integer)
-    simplifyPBAtLeast (lhs, rhs) = 
+    simplifyPBAtLeast (lhs, rhs) =
       case splitConst lhs of
         (lhs', offset) ->
           let rhs' = rhs - offset

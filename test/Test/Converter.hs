@@ -863,7 +863,7 @@ prop_normalizePB = QM.monadicIO $ do
     Just m2 -> do
       let m1 = transformBackward info m2
       QM.assert $ bounds m1 == (1, PBFile.pbNumVars opb)
-      QM.assert $ isJust $ SAT.evalPBFormula m1 opb    
+      QM.assert $ isJust $ SAT.evalPBFormula m1 opb
 
 case_normalizePB_1 :: Assertion
 case_normalizePB_1 = fst (normalizePB opb) @?= expected
