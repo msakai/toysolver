@@ -9,9 +9,7 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Parsec
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
-#if MIN_VERSION_Cabal(3,8,0)
 import Distribution.Simple.PackageDescription (readGenericPackageDescription)
-#endif
 import Distribution.Types.CondTree
 #if MIN_VERSION_Cabal(3,14,0)
 import Distribution.Utils.Path
