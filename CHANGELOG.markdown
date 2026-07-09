@@ -27,7 +27,7 @@
   * Stop supporting 32-bit Windows (#154)
   * Stop supporting GHC 9.4 and below (#156, #205)
   * Use pseudo-boolean-0.1.12.0 (#158)
-  * require `aeson >=2.0`, `array >=0.5.6`, `hashable >=1.4.3`, and `optparse-applicative >=0.18` (#208)
+  * Require `aeson >=2.0`, `array >=0.5.6`, `hashable >=1.4.3`, and `optparse-applicative >=0.18` (#208)
 * Misc
   * Add `toysolver-check` command to check solution (#174, #196)
   * Improve model output speed by printing using `ByteString` (#175)
