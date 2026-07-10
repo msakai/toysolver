@@ -56,6 +56,43 @@ case_declareConst = do
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const x Bool)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const y Bool)"
 
+case_defineConst :: Assertion
+case_defineConst = do
+  solver <- SMTLIB2.newSolver
+  SMTLIB2.setLogic solver "QF_LRA"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(define-const x Real 3)"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(assert (not (= x 3)))"
+  r <- SMTLIB2.checkSat solver
+  r @?= Unsat
+
+case_lambda :: Assertion
+case_lambda = do
+  solver <- SMTLIB2.newSolver
+  SMTLIB2.setLogic solver "QF_LRA"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(define-fun x () Real (let ((f (lambda ((y Real)) (+ y 2)))) (f 1)))"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(assert (not (= x 3)))"
+  r <- SMTLIB2.checkSat solver
+  r @?= Unsat
+
+case_lambda_multiple_arguments :: Assertion
+case_lambda_multiple_arguments = do
+  solver <- SMTLIB2.newSolver
+  SMTLIB2.setLogic solver "QF_LRA"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(define-const x Real (let ((f (lambda ((a Real) (b Real)) (- a b)))) (f 5 2)))"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(assert (not (= x 3)))"
+  r <- SMTLIB2.checkSat solver
+  r @?= Unsat
+
+case_lambda_wrong_arity :: Assertion
+case_lambda_wrong_arity = do
+  solver <- SMTLIB2.newSolver
+  SMTLIB2.setLogic solver "QF_LRA"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(define-fun x () Real (let ((f (lambda ((y Real)) (+ y 2)))) (f 1 2)))"
+  r <- SMTLIB2.runCommandString solver "(assert (= x 3))"
+  case r of
+    RError _ -> return ()
+    _ -> assertFailure (showSL r)
+
 case_divisionByZero :: Assertion
 case_divisionByZero = do
   solver <- SMTLIB2.newSolver

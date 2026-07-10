@@ -44,6 +44,7 @@ module ToySolver.SMT.SMTLIB2Solver
   , defineSort
   , declareConst
   , declareFun
+  , defineConst
   , defineFun
   , defineFunRec
   , defineFunsRec
@@ -121,6 +122,7 @@ data EEntry
   | EFSymDeclared SMT.FSym [SMT.Sort] SMT.Sort
   | EExpr SMT.Expr Bool
   | EFunDef EEnv [(String, SMT.Sort)] SMT.Sort (Term ())
+  | ELambda EEnv [(String, SMT.Sort)] (Term ())
 
 data SortEntry
   = SortSym SMT.SSym
@@ -164,13 +166,23 @@ interpretFun (env,senv) t =
     TQualIdent qid () -> f qid []
     TApp qid args () -> f qid args
     TLet bindings body () ->
-      interpretFun (Map.fromList [(T.unpack v, EExpr (interpretFun (env,senv) t2) False) | VarBinding v t2 () <- bindings] `Map.union` env, senv) body
-    TLambda _bindings _body () -> E.throw $ SMT.Error "lambda abstractions are not supported yet"
+      interpretFun (Map.fromList [(T.unpack v, bindingEntry t2) | VarBinding v t2 () <- bindings] `Map.union` env, senv) body
+    TLambda _bindings _body () ->
+      E.throw $ SMT.Error "lambda abstraction cannot be used as a first-order value; it can only be bound to a symbol and applied"
     TForall _bindings _body () -> E.throw $ SMT.Error "universal quantifiers are not supported yet"
     TExists _bindings _body () -> E.throw $ SMT.Error "existential quantifiers are not supported yet"
     TMatch _e _cases () -> E.throw $ SMT.Error "match expressions are not supported yet"
     TAnnot t2 _ () -> interpretFun (env,senv) t2 -- annotations are not supported yet
   where
+    -- Build an environment entry for a term bound to a symbol (by 'let' or as
+    -- the argument of a lambda/function application).  A 'lambda' abstraction is
+    -- kept as a closure so that it can be beta-reduced when applied, while any
+    -- other term is interpreted eagerly as a first-order expression.
+    bindingEntry :: Term () -> EEntry
+    bindingEntry (TLambda vars lbody ()) =
+      ELambda env [(T.unpack x, interpretSort senv s) | SortedVar x s () <- vars] lbody
+    bindingEntry t2 = EExpr (interpretFun (env,senv) t2) False
+
     unIdentifier :: Identifier () -> (String, [Index ()])
     unIdentifier (Identifier name indexes ()) = (T.unpack name, indexes)
 
@@ -197,6 +209,11 @@ interpretFun (env,senv) t =
         Just (EFSymDeclared fsym _ _) -> SMT.EAp fsym (map (interpretFun (env,senv)) args)
         Just (EFunDef env' params _y body) ->
           interpretFun (Map.fromList [(p,a) | ((p,_s),a) <- zip params (map (\u -> EExpr (interpretFun (env,senv) u) False) args) ] `Map.union` env', senv) body
+        Just (ELambda env' params body)
+          | length args == length params ->
+              interpretFun (Map.fromList [(p, bindingEntry a) | ((p,_s),a) <- zip params args] `Map.union` env', senv) body
+          | otherwise ->
+              E.throw $ SMT.Error (showSL qid ++ ": lambda applied to wrong number of arguments (" ++ show (length args) ++ " for " ++ show (length params) ++ ")")
       where
         (name, indexes) = unIdentifier ident
         indexes' = map g indexes
@@ -339,6 +356,7 @@ runCommand solver cmd = E.handle h $ do
     DeclareSort name arity () -> const RSuccess <$> declareSort solver (T.unpack name) (fromInteger arity)
     DefineSort name xs body () -> const RSuccess <$> defineSort solver (T.unpack name) (map T.unpack xs) body
     DeclareConst name y () -> const RSuccess <$> declareConst solver (T.unpack name) y
+    DefineConst name y body () -> const RSuccess <$> defineConst solver (T.unpack name) y body
     DeclareFun name xs y () -> const RSuccess <$> declareFun solver (T.unpack name) xs y
     DefineFun (FunctionDef name xs y body ()) () -> const RSuccess <$> defineFun solver (T.unpack name) xs y body
     DefineFunRec (FunctionDef name xs y body ()) () -> const RSuccess <$> defineFunRec solver (T.unpack name) xs y body
@@ -358,7 +376,6 @@ runCommand solver cmd = E.handle h $ do
     Echo s () -> REcho <$> echo solver s
     Exit () -> const RSuccess <$> exit solver
     -- Commands without solver support
-    DefineConst _ _ _ () -> E.throwIO SMT.Unsupported
     DeclareDatatype _ _ () -> E.throwIO SMT.Unsupported
     DeclareDatatypes _ _ () -> E.throwIO SMT.Unsupported
     DeclareSortParameter _ () -> E.throwIO SMT.Unsupported
@@ -633,6 +650,10 @@ defineSort solver name xs body = do
 
 declareConst :: Solver -> String -> Sort () -> IO ()
 declareConst solver name y = declareFun solver name [] y
+
+-- | @(define-const c σ t)@ is syntactic sugar for @(define-fun c () σ t)@.
+defineConst :: Solver -> String -> Sort () -> Term () -> IO ()
+defineConst solver name y body = defineFun solver name [] y body
 
 declareFun :: Solver -> String -> [Sort ()] -> Sort () -> IO ()
 declareFun solver name xs y = do
