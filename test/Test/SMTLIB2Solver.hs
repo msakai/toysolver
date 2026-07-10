@@ -56,6 +56,15 @@ case_declareConst = do
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const x Bool)"
   assertSuccess =<< SMTLIB2.runCommandString solver "(declare-const y Bool)"
 
+case_defineConst :: Assertion
+case_defineConst = do
+  solver <- SMTLIB2.newSolver
+  SMTLIB2.setLogic solver "QF_LRA"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(define-const x Real 3)"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(assert (not (= x 3)))"
+  r <- SMTLIB2.checkSat solver
+  r @?= Unsat
+
 case_divisionByZero :: Assertion
 case_divisionByZero = do
   solver <- SMTLIB2.newSolver

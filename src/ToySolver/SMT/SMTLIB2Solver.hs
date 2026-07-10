@@ -44,6 +44,7 @@ module ToySolver.SMT.SMTLIB2Solver
   , defineSort
   , declareConst
   , declareFun
+  , defineConst
   , defineFun
   , defineFunRec
   , defineFunsRec
@@ -339,6 +340,7 @@ runCommand solver cmd = E.handle h $ do
     DeclareSort name arity () -> const RSuccess <$> declareSort solver (T.unpack name) (fromInteger arity)
     DefineSort name xs body () -> const RSuccess <$> defineSort solver (T.unpack name) (map T.unpack xs) body
     DeclareConst name y () -> const RSuccess <$> declareConst solver (T.unpack name) y
+    DefineConst name y body () -> const RSuccess <$> defineConst solver (T.unpack name) y body
     DeclareFun name xs y () -> const RSuccess <$> declareFun solver (T.unpack name) xs y
     DefineFun (FunctionDef name xs y body ()) () -> const RSuccess <$> defineFun solver (T.unpack name) xs y body
     DefineFunRec (FunctionDef name xs y body ()) () -> const RSuccess <$> defineFunRec solver (T.unpack name) xs y body
@@ -358,7 +360,6 @@ runCommand solver cmd = E.handle h $ do
     Echo s () -> REcho <$> echo solver s
     Exit () -> const RSuccess <$> exit solver
     -- Commands without solver support
-    DefineConst _ _ _ () -> E.throwIO SMT.Unsupported
     DeclareDatatype _ _ () -> E.throwIO SMT.Unsupported
     DeclareDatatypes _ _ () -> E.throwIO SMT.Unsupported
     DeclareSortParameter _ () -> E.throwIO SMT.Unsupported
@@ -633,6 +634,10 @@ defineSort solver name xs body = do
 
 declareConst :: Solver -> String -> Sort () -> IO ()
 declareConst solver name y = declareFun solver name [] y
+
+-- | @(define-const c σ t)@ is syntactic sugar for @(define-fun c () σ t)@.
+defineConst :: Solver -> String -> Sort () -> Term () -> IO ()
+defineConst solver name y body = defineFun solver name [] y body
 
 declareFun :: Solver -> String -> [Sort ()] -> Sort () -> IO ()
 declareFun solver name xs y = do
