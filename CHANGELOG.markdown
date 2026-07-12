@@ -3,6 +3,7 @@
 
 * SMT
   * Migrate toysmt to use newly developed [language-smtlib](https://hackage.haskell.org/package/language-smtlib) from `Smtlib` fork (#206, #214)
+  * Support `define-const` command in `ToySolver.SMT.SMTLIB2Solver`
   * Update the semantics of zero division on bitvectors to conform to SMT-LIB >=2.6 (#209)
   * `toysmt` now suppresses the prompt and does not use haskeline when stdin is not a terminal
 * Converter and `toyconvert` command
