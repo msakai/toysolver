@@ -143,6 +143,33 @@ case_getModel = do
           m == ["(define-fun a () Bool false)", "(define-fun b () Bool true)"]) $ do
     assertFailure (show r)
 
+case_getModel_division_by_zero :: Assertion
+case_getModel_division_by_zero = do
+  solver <- SMTLIB2.newSolver
+  SMTLIB2.setOption solver (ProduceModels True ())
+  SMTLIB2.setLogic solver "QF_LRA"
+
+  assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun x1 () Real)"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(declare-fun x2 () Real)"
+  status1 <- SMTLIB2.checkSat solver
+  status1 @?= Sat
+  RGetModel model1 <- SMTLIB2.runCommandString solver "(get-model)"
+  assertBool ("_/0 should not be in the model: " ++ showSL (RGetModel model1))
+    (null [() | MRDefineFun (FunctionDef "_/0" _ _ _ _) <- model1])
+
+  assertSuccess =<< SMTLIB2.runCommandString solver "(define-fun y1 () Real (/ x1 0))"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(define-fun y2 () Real (/ x2 0))"
+  assertSuccess =<< SMTLIB2.runCommandString solver "(assert (not (= y1 y2)))"
+  status2 <- SMTLIB2.checkSat solver
+  status2 @?= Sat
+  RGetModel model2 <- SMTLIB2.runCommandString solver "(get-model)"
+  assertBool ("_/0 should be in the model: " ++ showSL (RGetModel model2))
+    (not (null [() | MRDefineFun (FunctionDef "_/0" _ _ _ _) <- model2]))
+
+  assertSuccess =<< SMTLIB2.runCommandString solver "(assert (= x1 x2))"
+  status3 <- SMTLIB2.checkSat solver
+  status3 @?= Unsat
+
 case_getValue :: Assertion
 case_getValue = do
   solver <- SMTLIB2.newSolver

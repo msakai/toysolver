@@ -779,7 +779,13 @@ getModel solver = do
   smt <- readIORef (svSMTSolverRef solver)
   m <- SMT.getModel smt
   (env, _) <- readIORef (svEnvRef solver)
-  liftM catMaybes $ forM (Map.toList env) $ \(name, entry) -> do
+
+  let env2 =
+        case SMT.evalFSym m "_/0" of
+          SMT.FunDef tbl _defaultVal | not (null tbl) -> Map.insert "_/0" (EFSymDeclared "_/0" [SMT.sReal] SMT.sReal) env
+          _ -> env
+
+  liftM catMaybes $ forM (Map.toList env2) $ \(name, entry) -> do
     case entry of
       EFSymDeclared sym argsSorts resultSort -> do
         case SMT.evalFSym m sym of
