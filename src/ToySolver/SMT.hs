@@ -1247,8 +1247,14 @@ evalFSym m f =
               Sort SSymBool _ -> ValBool False
               Sort (SSymBitVec w) _ -> ValBitVec (BV.nat2bv w 0)
               Sort (SSymUninterpreted _s _ar) _ -> ValUninterpreted (EUF.mUnspecified (mEUFModel m)) resultSort
-      in FunDef [ (zipWith (entityToValue m) args argsSorts, entityToValue m result resultSort)
-                | (args, result) <- Map.toList tbl ]
+      in -- Since our EUF solver does not know function arity, a
+         -- function symbol @f@ is treated as a constant if it has not
+         -- been applied to any arguments and @EUF.mFunctions (mEUFModel m)@
+         -- contains (f ↦ ([] ↦ e)) in such case.  But we know @f@ is
+         -- a proper function symbol, we can ignore such entry in the
+         -- table.
+         FunDef [ (zipWith (entityToValue m) args argsSorts, entityToValue m result resultSort)
+                | (args, result) <- Map.toList tbl, not (null args) ]
                 defaultVal
     Just _ -> FunDef [] $ eval m (EAp f []) -- constant symbol
     Nothing -> E.throw $ Error $ "unknown function symbol: " ++ show f
