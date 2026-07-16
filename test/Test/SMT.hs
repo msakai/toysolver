@@ -362,6 +362,35 @@ prop_getModel_evalFSym = QM.monadicIO $ do
         evaluate $ force $ show $ SMT.evalFSym m f
       return ()
 
+case_getModel_evalFSym_case_1 :: Assertion
+case_getModel_evalFSym_case_1 = do
+  solver <- SMT.newSolver
+  (sU :: SMT.Sort) <- SMT.declareSort solver "U" 0
+  f <- SMT.declareFSym solver "f" [sU] sU
+  c <- SMT.declareFSym solver "c" [] sU
+
+  ret <- SMT.checkSAT solver
+  ret @?= True
+  m <- SMT.getModel solver
+  case SMT.evalFSym m f of
+    SMT.FunDef table _defaultValue -> table @?= []
+  -- Table is always empty for constant symbol and defaultValue is used.
+  case SMT.evalFSym m c of
+    SMT.FunDef table _defaultValue -> table @?= []
+
+  SMT.assert solver (SMT.EAp f [SMT.EAp c []] .==. SMT.EAp c [])
+  ret <- SMT.checkSAT solver
+  ret @?= True
+  m <- SMT.getModel solver
+  case SMT.evalFSym m f of
+    fdef@(SMT.FunDef table _defaultValue) ->
+      case table of
+        [([arg], ret)] -> ret @?= arg
+        _ -> assertFailure ("unexpected FunDef value: " ++ show fdef)
+  -- Table is always empty for constant symbol and defaultValue is used.
+  case SMT.evalFSym m c of
+    SMT.FunDef table _defaultValue -> table @?= []
+
 -- https://github.com/msakai/toysolver/issues/21
 case_issue21_32bit :: Assertion
 case_issue21_32bit = do
