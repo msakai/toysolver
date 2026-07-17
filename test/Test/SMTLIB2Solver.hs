@@ -154,8 +154,8 @@ case_getModel_division_by_zero = do
   status1 <- SMTLIB2.checkSat solver
   status1 @?= Sat
   RGetModel model1 <- SMTLIB2.runCommandString solver "(get-model)"
-  assertBool ("_/0 should not be in the model: " ++ showSL (RGetModel model1))
-    (null [() | MRDefineFun (FunctionDef "_/0" _ _ _ _) <- model1])
+  assertBool ("/0 should not be in the model: " ++ showSL (RGetModel model1))
+    (null [() | MRDefineFun (FunctionDef "/0" _ _ _ _) <- model1])
 
   assertSuccess =<< SMTLIB2.runCommandString solver "(define-fun y1 () Real (/ x1 0))"
   assertSuccess =<< SMTLIB2.runCommandString solver "(define-fun y2 () Real (/ x2 0))"
@@ -163,8 +163,8 @@ case_getModel_division_by_zero = do
   status2 <- SMTLIB2.checkSat solver
   status2 @?= Sat
   RGetModel model2 <- SMTLIB2.runCommandString solver "(get-model)"
-  assertBool ("_/0 should be in the model: " ++ showSL (RGetModel model2))
-    (not (null [() | MRDefineFun (FunctionDef "_/0" _ _ _ _) <- model2]))
+  assertBool ("/0 should be in the model: " ++ showSL (RGetModel model2))
+    (not (null [() | MRDefineFun (FunctionDef "/0" _ _ _ _) <- model2]))
 
   assertSuccess =<< SMTLIB2.runCommandString solver "(assert (= x1 x2))"
   status3 <- SMTLIB2.checkSat solver

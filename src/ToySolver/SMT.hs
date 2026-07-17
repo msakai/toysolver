@@ -276,7 +276,7 @@ newSolver = do
   bvModelRef <- newIORef (undefined :: BV.Model)
 
   globalDeclarationsRef <- newIORef False
-  fdefs <- newIORef $ Map.singleton "_/0" (FEUFFun ([sReal], sReal) divByZero)
+  fdefs <- newIORef $ Map.singleton "/0" (FEUFFun ([sReal], sReal) divByZero)
 
   conflictTheory <- newIORef undefined
 
@@ -660,7 +660,7 @@ exprToLRAExpr solver (EAp "/" [x,y]) = do
   case LA.asConst y' of
     Nothing -> E.throwIO $ Error "division by non-constant is not supported"
     Just 0 -> do
-      lraExprFromTerm solver =<< exprToEUFTerm solver "_/0" [x]
+      lraExprFromTerm solver =<< exprToEUFTerm solver "/0" [x]
     Just c -> do
       x' <- exprToLRAExpr solver x
       return $ (1/c) *^ x'
@@ -1121,7 +1121,7 @@ eval m (EAp "-" [x])     = ValRational $ negate $ valToRational m (eval m x)
 eval m (EAp "-" [x,y])   = ValRational $ valToRational m (eval m x) - valToRational m (eval m y)
 eval m (EAp "*" xs)      = ValRational $ product $ map (valToRational m . eval m) xs
 eval m (EAp "/" [x,y])
-  | y' == 0   = eval m (EAp "_/0" [x])
+  | y' == 0   = eval m (EAp "/0" [x])
   | otherwise = ValRational $ valToRational m (eval m x) / y'
   where
     y' = valToRational m (eval m y)
@@ -1272,7 +1272,7 @@ modelGetAssertions m =
         ]
       , EValue (entityToValue m result sReal)
       ]
-  | let FEUFFun _ sym = mDefs m Map.! "_/0"
+  | let FEUFFun _ sym = mDefs m Map.! "/0"
   , ([arg], result) <- Map.toList $ EUF.mFunctions (mEUFModel m) IntMap.! sym
   ]
 
