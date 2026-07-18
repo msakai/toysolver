@@ -487,7 +487,7 @@ main = do
         case status of
           UNKNOWN       -> putSLine "UNKNOWN"
           UNSUPPORTED   -> putSLine "UNKNOWN"
-          SATISFIABLE   -> putSLine "SATISFIABLE"  
+          SATISFIABLE   -> putSLine "SATISFIABLE"
           UNSATISFIABLE -> putSLine "UNSATISFIABLE"
           OPTIMUM_FOUND -> putSLine "SATISFIABLE"
           UNBOUNDED     -> putSLine "UNKNOWN"
@@ -497,7 +497,7 @@ main = do
         case status of
           UNKNOWN       -> putSLine "UNKNOWN"
           UNSUPPORTED   -> putSLine "UNKNOWN"
-          SATISFIABLE   -> putSLine "SATISFIABLE"  
+          SATISFIABLE   -> putSLine "SATISFIABLE"
           UNSATISFIABLE -> putSLine "UNSATISFIABLE"
           OPTIMUM_FOUND -> putSLine "OPTIMUM FOUND"
           UNBOUNDED     -> putSLine "UNKNOWN"
@@ -507,7 +507,7 @@ main = do
         case status of
           UNKNOWN       -> putSLine "UNKNOWN"
           UNSUPPORTED   -> putSLine "UNSUPPORTED"
-          SATISFIABLE   -> putSLine "SATISFIABLE"  
+          SATISFIABLE   -> putSLine "SATISFIABLE"
           UNSATISFIABLE -> putSLine "UNSATISFIABLE"
           OPTIMUM_FOUND -> putSLine "OPTIMUM FOUND"
           UNBOUNDED     -> putSLine "UNKNOWN"

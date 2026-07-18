@@ -260,7 +260,7 @@ readProblem :: Options -> String -> IO Problem
 readProblem o fname = do
   enc <- T.mapM mkTextEncoding (optFileEncoding o)
   let mipOpt = def{ MIP.optFileEncoding = enc, MIP.optMPSWriteObjName = optMPSObjName o }
-  
+
   case FF.getBaseExtension fname of
     ".cnf"
       | optAsMaxSAT o -> do
