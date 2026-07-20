@@ -112,7 +112,7 @@ Flag ExtraBoundsChecking
 
 source-repository head
   type:     git
-  location: git://github.com/msakai/toysolver.git
+  location: https://github.com/msakai/toysolver.git
 
 Common common-options
   Default-Language: Haskell2010
