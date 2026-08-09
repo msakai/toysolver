@@ -174,4 +174,5 @@ Spin-off projects and packages
 * [MIP](https://github.com/msakai/haskell-MIP)
 * [OptDir](https://github.com/msakai/haskell-optdir)
 * [pseudo-boolean](https://github.com/msakai/pseudo-boolean)
+* [language-smtlib](https://github.com/msakai/language-smtlib)
 * [sign](https://github.com/msakai/sign)
