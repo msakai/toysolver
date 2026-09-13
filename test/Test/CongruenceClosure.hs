@@ -105,6 +105,16 @@ case_NO2007_Example_16 = do
   -- d = c = e = b = h
   -- a = f(g,d) = f(g,h) = d = c = e = b
 
+case_gcd_example :: Assertion
+case_gcd_example = do
+  solver <- newSolver
+  a <- newConst solver
+  f <- newFun solver
+  merge solver (f (f (f a))) a
+  merge solver (f (f (f (f (f a))))) a
+  ret <- areCongruent solver (f a) a
+  ret @?= True
+
 case_backtracking_1 :: Assertion
 case_backtracking_1 = do
   solver <- newSolver
