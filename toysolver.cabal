@@ -259,6 +259,7 @@ Library
      ToySolver.BitVector.Base
      ToySolver.BitVector.Solver
      ToySolver.EUF.CongruenceClosure
+     ToySolver.EUF.CongruenceClosure.DowneySethiTarjan
      ToySolver.EUF.EUFSolver
      ToySolver.EUF.FiniteModelFinder
      ToySolver.Combinatorial.BipartiteMatching
