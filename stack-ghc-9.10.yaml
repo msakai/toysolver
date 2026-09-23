@@ -77,3 +77,10 @@ extra-package-dbs: []
 # 
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
+
+# https://github.com/msakai/toysolver/issues/219
+configure-options:
+  alex:
+  - --disable-executable-stripping
+  happy:
+  - --disable-executable-stripping
