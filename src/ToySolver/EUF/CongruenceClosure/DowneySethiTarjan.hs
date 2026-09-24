@@ -38,11 +38,13 @@ module ToySolver.EUF.CongruenceClosure.DowneySethiTarjan
 
   -- * Union-find core
   , representative
-  , areEqual
+  , areCongruent
+  , areCongruentNodes
   , classMembers
 
   -- * Merging an equation
   , merge
+  , mergeNodes
 
   -- * For debugging
   , termOf
@@ -181,8 +183,14 @@ find solver x = do
   compressPath x
   pure root
 
-areEqual :: Solver -> NodeID -> NodeID -> IO Bool
-areEqual solver a b = do
+areCongruent :: Solver -> Term -> Term -> IO Bool
+areCongruent solver a b = do
+  a' <- addTerm solver a
+  b' <- addTerm solver b
+  areCongruentNodes solver a' b'
+
+areCongruentNodes :: Solver -> NodeID -> NodeID -> IO Bool
+areCongruentNodes solver a b = do
   a' <- find solver a
   b' <- find solver b
   pure $ a' == b'
@@ -196,8 +204,14 @@ classMembers solver x = do
 -- Merging an equation (entry point for asserting a = b from outside)
 -- ------------------------------------------------------------------
 
-merge :: Solver -> NodeID -> NodeID -> IO ()
+merge :: Solver -> Term -> Term -> IO ()
 merge solver a b = do
+  a' <- addTerm solver a
+  b' <- addTerm solver b
+  mergeNodes solver a' b'
+
+mergeNodes :: Solver -> NodeID -> NodeID -> IO ()
+mergeNodes solver a b = do
   Vec.push (svPending solver) (a, b)
   propagate solver
 
@@ -246,16 +260,3 @@ termOf solver = worker
       args <- Vec.read (svArgs solver) node
       args' <- mapM worker (VG.toList args)
       pure (TApp f args')
-
--- ------------------------------------------------------------------
--- test
--- ------------------------------------------------------------------
-
-_test :: IO Bool
-_test = do
-  let a = TApp 0 []
-      f x = TApp 1 [x]
-  solver <- newSolver
-  join $ liftM2 (merge solver) (addTerm solver (f (f (f a)))) (addTerm solver a)
-  join $ liftM2 (merge solver) (addTerm solver (f (f (f (f (f a)))))) (addTerm solver a)
-  join $ liftM2 (areEqual solver) (addTerm solver (f a)) (addTerm solver a)

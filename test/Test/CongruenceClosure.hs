@@ -17,6 +17,7 @@ import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
 import ToySolver.EUF.CongruenceClosure
+import qualified ToySolver.EUF.CongruenceClosure.DowneySethiTarjan as DowneySethiTarjan
 import qualified ToySolver.EUF.EUFSolver as EUF
 
 ------------------------------------------------------------------------
@@ -326,6 +327,19 @@ prop_getModel_eval_2 = QM.monadicIO $ do
       return $ QM.assert (eval m lhs == eval m rhs)
     else
       return $ return ()
+
+------------------------------------------------------------------------
+-- Downey-Sethi-Tarjan
+
+case_DowneySethiTarjan_gcd_example :: Assertion
+case_DowneySethiTarjan_gcd_example = do
+  solver <- DowneySethiTarjan.newSolver
+  let a = TApp 0 []
+      f x = TApp 1 [x]
+  DowneySethiTarjan.merge solver (f (f (f a))) a
+  DowneySethiTarjan.merge solver (f (f (f (f (f a))))) a
+  ret <- DowneySethiTarjan.areCongruent solver (f a) a
+  ret @?= True
 
 ------------------------------------------------------------------------
 -- Test harness
