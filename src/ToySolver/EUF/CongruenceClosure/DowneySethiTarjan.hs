@@ -11,7 +11,7 @@
 -- Portability :  portable
 --
 -- Downey-Sethi-Tarjan (1980) style congruence closure.
--- 
+--
 -- * no backtracking
 --
 -- * no explanation (proof) generation
@@ -51,7 +51,6 @@ module ToySolver.EUF.CongruenceClosure.DowneySethiTarjan
   ) where
 
 import Control.Monad
-import qualified Data.Foldable as F
 import Data.IORef
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
@@ -59,8 +58,6 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
-import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
 
 import ToySolver.EUF.CongruenceClosure (FSym, Term (..))
 import qualified ToySolver.Internal.Data.Vec as Vec
@@ -80,8 +77,8 @@ data Solver
   , svRepr :: !(Vec.Vec (FSym, VU.Vector NodeID))
 
   -- auxiliary info that is only valid for root nodes
-  , svUseList :: !(Vec.Vec (Seq NodeID))
-  , svMembers :: !(Vec.Vec (Seq NodeID))
+  , svUseList :: !(Vec.Vec (Vec.UVec NodeID))
+  , svMembers :: !(Vec.Vec (Vec.UVec NodeID))
 
   -- signature -> representative application node (need not be a root)
   , svSigTable :: !(IORef (Map Sig NodeID))
@@ -127,14 +124,15 @@ newNode :: Solver -> FSym -> [NodeID] -> IO NodeID
 newNode solver f args = do
   node <- Vec.getSize (svParent solver)
   Vec.push (svParent solver) node
-  Vec.push (svUseList solver) Seq.empty
-  Vec.push (svMembers solver) (Seq.singleton node)
+  Vec.push (svUseList solver) =<< Vec.new
+  Vec.push (svMembers solver) =<< (Vec.new >>= \m -> Vec.push m node >> pure m)
   Vec.push (svRepr solver) (f, VG.fromList args)
 
   -- register this node in the use-list of each argument's current root
   forM_ args $ \a -> do
     ra <- find solver a
-    Vec.modify' (svUseList solver) ra (node Seq.<|)
+    ua <- Vec.read (svUseList solver) ra
+    Vec.push ua node
 
   -- for an application node, compute its signature and check for a collision
   unless (null args) $ do
@@ -193,7 +191,8 @@ areCongruentNodes solver a b = do
 classMembers :: Solver -> NodeID -> IO IntSet
 classMembers solver x = do
   x' <- find solver x
-  (IntSet.fromList . F.toList) <$> Vec.read (svMembers solver) x'
+  mx <- Vec.read (svMembers solver) x'
+  IntSet.fromList <$> Vec.getElems mx
 
 -- ------------------------------------------------------------------
 -- Merging an equation (entry point for asserting a = b from outside)
@@ -221,26 +220,40 @@ propagate solver = do
       unless (ra == rb) $ do
         ma <- Vec.read (svMembers solver) ra
         mb <- Vec.read (svMembers solver) rb
-        -- absorb the smaller class (rb) into the larger one (ra)
-        (ra, rb, ma, mb) <-
-          if Seq.length ma < Seq.length mb then
-            pure (rb, ra, mb, ma)
+        sa <- Vec.getSize ma
+        sb <- Vec.getSize mb
+        (ra, rb, ma, mb, _sa, sb) <-
+          if sa < sb then
+            pure (rb, ra, mb, ma, sb, sa)
           else
-            pure (ra, rb, ma, mb)
+            pure (ra, rb, ma, mb, sa, sb)
+
+        -- absorb the smaller class (rb) into the larger one (ra)
         Vec.write (svParent solver) rb ra
-        Vec.write (svMembers solver) ra (ma <> mb)
+        forM_ [0..sb-1] $ \i -> do
+          x <- Vec.read mb i
+          Vec.push ma x
+        Vec.clear mb
+
         -- This is the core DST trick: only rehash the use-list of
         -- the absorbed side (rb). The use-list on the ra side is
         -- untouched since its keys (root ids) haven't changed.
-        moved <- Vec.read (svUseList solver) rb
-        Vec.write (svUseList solver) rb Seq.empty
-        Vec.modify' (svUseList solver) ra (<> moved)
-        forM_ moved $ \p -> do
-          sig <- signature solver p
-          sigTable <- readIORef (svSigTable solver)
-          case Map.lookup sig sigTable of
-            Nothing -> writeIORef (svSigTable solver) $! Map.insert sig p sigTable
-            Just q -> Vec.push (svPending solver) (p, q)
+        ua <- Vec.read (svUseList solver) ra
+        ub <- Vec.read (svUseList solver) rb
+        let loop = do
+              ret <- Vec.popMaybe ub
+              case ret of
+                Nothing -> pure ()
+                Just p -> do
+                  Vec.push ua p
+                  sig <- signature solver p
+                  sigTable <- readIORef (svSigTable solver)
+                  case Map.lookup sig sigTable of
+                    Nothing -> writeIORef (svSigTable solver) $! Map.insert sig p sigTable
+                    Just q -> Vec.push (svPending solver) (p, q)
+                  loop
+        loop
+
       propagate solver
 
 -- ------------------------------------------------------------------
