@@ -77,8 +77,7 @@ data Solver
     svParent :: !(Vec.Vec NodeID)
 
   -- structural info for every node (root or not)
-  , svFunc :: !(Vec.UVec FSym)
-  , svArgs :: !(Vec.Vec (VU.Vector NodeID))
+  , svRepr :: !(Vec.Vec (FSym, VU.Vector NodeID))
 
   -- auxiliary info that is only valid for root nodes
   , svUseList :: !(Vec.Vec (Seq NodeID))
@@ -96,8 +95,7 @@ data Solver
 newSolver :: IO Solver
 newSolver = do
   parent <- Vec.new
-  func <- Vec.new
-  args <- Vec.new
+  repr <- Vec.new
   useList <- Vec.new
   members <- Vec.new
   sigTable <- newIORef Map.empty
@@ -105,8 +103,7 @@ newSolver = do
   pending <- Vec.new
   pure $ Solver
     { svParent = parent
-    , svFunc = func
-    , svArgs = args
+    , svRepr = repr
     , svUseList = useList
     , svMembers = members
     , svSigTable = sigTable
@@ -132,8 +129,7 @@ newNode solver f args = do
   Vec.push (svParent solver) node
   Vec.push (svUseList solver) Seq.empty
   Vec.push (svMembers solver) (Seq.singleton node)
-  Vec.push (svFunc solver) f
-  Vec.push (svArgs solver) (VG.fromList args)
+  Vec.push (svRepr solver) (f, VG.fromList args)
 
   -- register this node in the use-list of each argument's current root
   forM_ args $ \a -> do
@@ -152,8 +148,7 @@ newNode solver f args = do
 
 signature :: Solver -> NodeID -> IO Sig
 signature solver node = do
-  f <- Vec.read (svFunc solver) node
-  args <- Vec.read (svArgs solver) node
+  (f, args) <- Vec.read (svRepr solver) node
   args' <- VG.mapM (find solver) args
   pure (f, args')
 
@@ -256,7 +251,6 @@ termOf :: Solver -> NodeID -> IO Term
 termOf solver = worker
   where
     worker node = do
-      f <- Vec.read (svFunc solver) node
-      args <- Vec.read (svArgs solver) node
+      (f, args) <- Vec.read (svRepr solver) node
       args' <- mapM worker (VG.toList args)
       pure (TApp f args')
