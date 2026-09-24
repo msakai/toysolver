@@ -32,6 +32,11 @@ module ToySolver.EUF.CongruenceClosure.DowneySethiTarjan
   , Solver (..)
   , newSolver
 
+  -- * Introduction of new symbols
+  , newFSym
+  , newFun
+  , newConst
+
   -- * Registering a term (builds internal nodes with hash-consing)
   , NodeID
   , addTerm
@@ -59,7 +64,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
 
-import ToySolver.EUF.CongruenceClosure (FSym, Term (..))
+import ToySolver.EUF.CongruenceClosure (FSym, Term (..), VAFun (..))
 import qualified ToySolver.Internal.Data.Vec as Vec
 
 
@@ -87,6 +92,8 @@ data Solver
   , svNodeOf :: !(IORef (Map Term NodeID))
 
   , svPending :: !(Vec.Vec (NodeID, NodeID))
+
+  , svSymCounter :: IORef Int
   }
 
 newSolver :: IO Solver
@@ -98,6 +105,7 @@ newSolver = do
   sigTable <- newIORef Map.empty
   nodeOf <- newIORef Map.empty
   pending <- Vec.new
+  counter <- newIORef 0
   pure $ Solver
     { svParent = parent
     , svRepr = repr
@@ -106,7 +114,22 @@ newSolver = do
     , svSigTable = sigTable
     , svNodeOf = nodeOf
     , svPending = pending
+    , svSymCounter = counter
     }
+
+newFSym :: Solver -> IO FSym
+newFSym solver = do
+  n <- readIORef (svSymCounter solver)
+  writeIORef (svSymCounter solver) $! n + 1
+  return n
+
+newFun :: VAFun a => Solver -> IO a
+newFun solver = do
+  c <- newFSym solver
+  return $ withVArgs (TApp c)
+
+newConst :: Solver -> IO Term
+newConst = newFun
 
 addTerm :: Solver -> Term -> IO NodeID
 addTerm solver term@(TApp f args) = do

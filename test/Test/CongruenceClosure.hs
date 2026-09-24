@@ -334,8 +334,8 @@ prop_getModel_eval_2 = QM.monadicIO $ do
 case_DowneySethiTarjan_gcd_example :: Assertion
 case_DowneySethiTarjan_gcd_example = do
   solver <- DowneySethiTarjan.newSolver
-  let a = TApp 0 []
-      f x = TApp 1 [x]
+  a <- DowneySethiTarjan.newConst solver
+  f <- DowneySethiTarjan.newFun solver
   DowneySethiTarjan.merge solver (f (f (f a))) a
   DowneySethiTarjan.merge solver (f (f (f (f (f a))))) a
   ret <- DowneySethiTarjan.areCongruent solver (f a) a
