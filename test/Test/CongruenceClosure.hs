@@ -17,6 +17,7 @@ import Test.Tasty.TH
 import qualified Test.QuickCheck.Monadic as QM
 
 import ToySolver.EUF.CongruenceClosure
+import qualified ToySolver.EUF.CongruenceClosure.DowneySethiTarjan as DST
 import qualified ToySolver.EUF.EUFSolver as EUF
 
 ------------------------------------------------------------------------
@@ -114,6 +115,26 @@ case_gcd_example = do
   merge solver (f (f (f (f (f a))))) a
   ret <- areCongruent solver (f a) a
   ret @?= True
+
+case_upward :: Assertion
+case_upward = do
+  solver <- newSolver
+  a <- newConst solver
+  b <- newConst solver
+  f <- newFun solver
+  merge solver a b
+  ret <- areCongruent solver (f a) (f b)
+  ret @?= True
+
+case_downward :: Assertion
+case_downward = do
+  solver <- newSolver
+  a <- newConst solver
+  b <- newConst solver
+  f <- newFun solver
+  merge solver (f a) (f b)
+  ret <- areCongruent solver a b
+  ret @?= False
 
 case_backtracking_1 :: Assertion
 case_backtracking_1 = do
@@ -326,6 +347,39 @@ prop_getModel_eval_2 = QM.monadicIO $ do
       return $ QM.assert (eval m lhs == eval m rhs)
     else
       return $ return ()
+
+------------------------------------------------------------------------
+-- Downey-Sethi-Tarjan
+
+case_DowneySethiTarjan_gcd_example :: Assertion
+case_DowneySethiTarjan_gcd_example = do
+  solver <- DST.newSolver
+  a <- DST.newConst solver
+  f <- DST.newFun solver
+  DST.merge solver (f (f (f a))) a
+  DST.merge solver (f (f (f (f (f a))))) a
+  ret <- DST.areCongruent solver (f a) a
+  ret @?= True
+
+case_DowneySethiTarjan_upward :: Assertion
+case_DowneySethiTarjan_upward = do
+  solver <- DST.newSolver
+  a <- DST.newConst solver
+  b <- DST.newConst solver
+  f <- DST.newFun solver
+  DST.merge solver a b
+  ret <- DST.areCongruent solver (f a) (f b)
+  ret @?= True
+
+case_DowneySethiTarjan_downward :: Assertion
+case_DowneySethiTarjan_downward = do
+  solver <- DST.newSolver
+  a <- DST.newConst solver
+  b <- DST.newConst solver
+  f <- DST.newFun solver
+  DST.merge solver (f a) (f b)
+  ret <- DST.areCongruent solver a b
+  ret @?= False
 
 ------------------------------------------------------------------------
 -- Test harness
