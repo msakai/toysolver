@@ -84,12 +84,8 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 
+import ToySolver.EUF.CongruenceClosure.Base
 import qualified ToySolver.Internal.Data.Vec as Vec
-
-type FSym = Int
-
-data Term = TApp FSym [Term]
-  deriving (Ord, Eq, Show)
 
 data FlatTerm
   = FTConst !FSym
@@ -222,15 +218,6 @@ newFSym solver = do
   Vec.push (svEClassList solver) undefined
   Vec.push (svEHighestNodeTable solver) v
   return v
-
-class VAFun a where
-  withVArgs :: ([Term] -> Term) -> a
-
-instance VAFun Term where
-  withVArgs k = k []
-
-instance VAFun a => VAFun (Term -> a) where
-  withVArgs k x = withVArgs (\xs -> k (x : xs))
 
 newFun :: VAFun a => Solver -> IO a
 newFun solver = do

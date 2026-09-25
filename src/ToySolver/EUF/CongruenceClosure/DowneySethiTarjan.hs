@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall -Wno-name-shadowing #-}
-
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  ToySolver.EUF.CongruenceClosure.DowneySethiTarjan
@@ -64,7 +64,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
 
-import ToySolver.EUF.CongruenceClosure (FSym, Term (..), VAFun (..))
+import ToySolver.EUF.CongruenceClosure.Base
 import qualified ToySolver.Internal.Data.Vec as Vec
 
 
