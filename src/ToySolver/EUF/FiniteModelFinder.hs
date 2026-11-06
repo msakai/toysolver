@@ -63,7 +63,7 @@ import Data.Array.IArray
 import Data.Interned (intern, unintern)
 import Data.Interned.Text
 import Data.IORef
-import Data.List (intercalate)
+import Data.List (intercalate, sortOn)
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -539,6 +539,7 @@ findModel size cs = do
   let cs2 = mapMaybe flatten cs
       fs = Set.unions $ map collectFSym cs
       ps = Set.unions $ map collectPSym cs
+      fs' = if Set.null fs then Set.singleton ("c", 0) else fs
 
   solver <- SAT.newSolver
 
@@ -570,7 +571,7 @@ findModel size cs = do
         Just c' -> SAT.addClause solver =<< translateClause c'
 
   -- Functional definitions
-  forM_ (Set.toList fs) $ \(f, arity) -> do
+  forM_ (Set.toList fs') $ \(f, arity) -> do
     forM_ (replicateM arity univ) $ \args ->
       forM_ [(y1,y2) | y1 <- univ, y2 <- univ, y1 < y2] $ \(y1,y2) -> do
         let c = [Neg (SEq (STmApp f args) y1), Neg (SEq (STmApp f args) y2)]
@@ -578,11 +579,28 @@ findModel size cs = do
         SAT.addClause solver c'
 
   -- Totality definitions
-  forM_ (Set.toList fs) $ \(f, arity) -> do
+  forM_ (Set.toList fs') $ \(f, arity) -> do
     forM_ (replicateM arity univ) $ \args -> do
         let c = [Pos (SEq (STmApp f args) y) | y <- univ]
         c' <- translateClause c
         SAT.addClause solver c'
+
+  -- Static Symmetry Reduction
+  do let cs1 = [STmApp f [] | (f, arity) <- Set.toList fs', arity == 0]
+         cs2 =
+           case sortOn snd [(f, arity) | (f, arity) <- Set.toList fs', arity > 0] of
+             [] -> []
+             (f, arity) : _ -> [STmApp f (replicate arity u) | u <- univ]
+         cs = take size (cs1 ++ cs2)
+     forM_ (zip [0..] cs) $ \(i, ai) -> do
+       let c = [Pos (SEq ai d) | d <- [0..i]]
+       c' <- translateClause c
+       SAT.addClause solver c'
+       -- Canonicity requirement
+       forM [1..i] $ \d -> do
+         let c = Neg (SEq ai d) : [Pos (SEq aj (d - 1)) | aj <- take i cs]
+         c' <- translateClause c
+         SAT.addClause solver c'
 
   ret <- SAT.solve solver
   if ret
