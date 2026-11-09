@@ -1,6 +1,10 @@
 0.11.0 (Unreleased)
 -----
 
+* Dependencies
+  * Require `hashtables >=1.4.2`
+
+
 0.10.0 (2026-07-21)
 -----
 
