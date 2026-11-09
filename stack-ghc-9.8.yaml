@@ -50,6 +50,8 @@ extra-deps:
 - bytestring-encoding-0.1.2.0
 - MIP-0.2.0.0@sha256:badc69dc1a72453af332175f998a6ba91f03844dea1fd2d4841852e8dcee6ca3,6363
 - language-smtlib-0.2.0.0@sha256:c46bf3f2e49f544548b66da06aa0c352e5194fefd279e45de1217d460b6e7b49,7985
+# https://github.com/gregorycollins/hashtables/issues/98
+- hashtables-1.4.2@sha256:4940cab94a15d469845ccf5225f9cb3d354c15e8127ebb58425c8b681f7721d9,10386
 # Patched version of tasty-th for reading UTF-8 files on non UTF-8 environment.
 - git: https://github.com/msakai/tasty-th/
   commit: ebbe5a79b3c7a537ceafc6291744c4d531bef63c
