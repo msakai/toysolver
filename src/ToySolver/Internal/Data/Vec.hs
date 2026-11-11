@@ -60,13 +60,14 @@ import Prelude hiding (read)
 
 import Control.Loop
 import Control.Monad
+import Control.Monad.Primitive
 import Data.Ix
 import qualified Data.Array.Base as A
 import qualified Data.Array.IO as A
-import Data.IORef
-import ToySolver.Internal.Data.IOURef
+import Data.Primitive.MutVar
+import Data.Primitive.PrimVar
 
-data GenericVec a e = GenericVec {-# UNPACK #-} !(IOURef Int) {-# UNPACK #-} !(IORef (a Index e))
+data GenericVec a e = GenericVec {-# UNPACK #-} !(PrimVar (PrimState IO) Int) {-# UNPACK #-} !(MutVar (PrimState IO) (a Index e))
   deriving Eq
 
 type Vec e = GenericVec A.IOArray e
@@ -92,14 +93,14 @@ writeArray = A.unsafeWrite
 
 new :: A.MArray a e IO => IO (GenericVec a e)
 new = do
-  sizeRef <- newIOURef 0
-  arrayRef <- newIORef =<< A.newArray_ (0,-1)
+  sizeRef <- newPrimVar 0
+  arrayRef <- newMutVar =<< A.newArray_ (0,-1)
   return $ GenericVec sizeRef arrayRef
 
 {- INLINE getSize #-}
 -- | Get the internal representation array
 getSize :: GenericVec a e -> IO Int
-getSize (GenericVec sizeRef _) = readIOURef sizeRef
+getSize (GenericVec sizeRef _) = readPrimVar sizeRef
 
 {-# SPECIALIZE read :: Vec e -> Int -> IO e #-}
 {-# SPECIALIZE read :: UVec Int -> Int -> IO Int #-}
@@ -187,8 +188,8 @@ resize v@(GenericVec sizeRef arrayRef) !n = do
     let capa' = max 2 (capa * 3 `div` 2)
     a' <- A.newArray_ (0, capa'-1)
     copyTo a a' (0,capa-1)
-    writeIORef arrayRef a'
-  writeIOURef sizeRef n
+    writeMutVar arrayRef a'
+  writePrimVar sizeRef n
 
 {-# SPECIALIZE growTo :: Vec e -> Int -> IO () #-}
 {-# SPECIALIZE growTo :: UVec Int -> Int -> IO () #-}
@@ -273,9 +274,9 @@ getElems v = do
 {-# SPECIALIZE clone :: UVec Bool -> IO (UVec Bool) #-}
 clone :: A.MArray a e IO => GenericVec a e -> IO (GenericVec a e)
 clone (GenericVec sizeRef arrayRef) = do
-  a <- readIORef arrayRef
-  arrayRef' <- newIORef =<< cloneArray a
-  sizeRef'  <- newIOURef =<< readIOURef sizeRef
+  a <- readMutVar arrayRef
+  arrayRef' <- newMutVar =<< cloneArray a
+  sizeRef'  <- newPrimVar =<< readPrimVar sizeRef
   return $ GenericVec sizeRef' arrayRef'
 
 {--------------------------------------------------------------------
@@ -285,7 +286,7 @@ clone (GenericVec sizeRef arrayRef) = do
 {-# INLINE getArray #-}
 -- | Get the internal representation array
 getArray :: GenericVec a e -> IO (a Index e)
-getArray (GenericVec _ arrayRef) = readIORef arrayRef
+getArray (GenericVec _ arrayRef) = readMutVar arrayRef
 
 {-# INLINE getCapacity #-}
 -- | Get the internal representation array
@@ -299,14 +300,14 @@ getCapacity vec = liftM rangeSize $ A.getBounds =<< getArray vec
 -- | Pre-allocate internal buffer for @n@ elements.
 resizeCapacity :: A.MArray a e IO => GenericVec a e -> Int -> IO ()
 resizeCapacity (GenericVec sizeRef arrayRef) capa = do
-  n <- readIOURef sizeRef
-  arr <- readIORef arrayRef
+  n <- readPrimVar sizeRef
+  arr <- readMutVar arrayRef
   capa0 <- liftM rangeSize $ A.getBounds arr
   when (capa0 < capa) $ do
     let capa' = max capa (n * 3 `div` 2)
     arr' <- A.newArray_ (0, capa'-1)
     copyTo arr arr' (0, n-1)
-    writeIORef arrayRef arr'
+    writeMutVar arrayRef arr'
 
 {--------------------------------------------------------------------
   utility
