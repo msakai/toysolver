@@ -176,7 +176,7 @@ Library
      -- Text.PrettyPrint.HughesPJClass is available on pretty >=1.1.2.0
      pretty >=1.1.2.0 && <1.2,
      primes,
-     primitive >=0.6,
+     primitive >=0.8,
      process >=1.1.0.2,
      pseudo-boolean >=0.1.12.0 && <0.2.0.0,
      queue,
