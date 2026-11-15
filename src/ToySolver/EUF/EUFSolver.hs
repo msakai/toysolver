@@ -77,7 +77,7 @@ data Solver
   { svCCSolver :: !CC.Solver
   , svDisequalities :: IORef (Map (Term, Term) (Maybe ConstrID))
   , svExplanation :: IORef IntSet
-  , svBacktrackPoints :: !(Vec.Vec (Map (Term, Term) ()))
+  , svBacktrackPoints :: !(Vec.IOVec (Map (Term, Term) ()))
   }
 
 newSolver :: IO Solver

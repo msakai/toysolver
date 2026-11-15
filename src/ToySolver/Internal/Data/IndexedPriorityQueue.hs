@@ -57,6 +57,7 @@ module ToySolver.Internal.Data.IndexedPriorityQueue
 import Control.Loop
 import Control.Monad
 import qualified Data.Array.IO as A
+import qualified Data.Array.IO.Internals as A
 import Data.Queue.Classes
 import qualified ToySolver.Internal.Data.Vec as Vec
 #ifdef UNBOXED_COMPARISON_ARGUMENTS
@@ -74,8 +75,8 @@ data PriorityQueue
 #else
   { lt   :: !(Value -> Value -> IO Bool)
 #endif
-  , heap :: !(Vec.UVec Value)
-  , table  :: !(Vec.UVec Index)
+  , heap :: !(Vec.IOUVec Value)
+  , table  :: !(Vec.IOUVec Index)
   }
 
 -- | Build a priority queue with default ordering ('(<)' of 'Ord' class)
@@ -247,10 +248,10 @@ rebuild q = do
 
 -- | Get the internal representation of a given priority queue.
 getHeapArray :: PriorityQueue -> IO (A.IOUArray Index Value)
-getHeapArray q = Vec.getArray (heap q)
+getHeapArray q = A.IOUArray <$> Vec.getArray (heap q)
 
 -- | Get the internal representation of a given priority queue.
-getHeapVec :: PriorityQueue -> IO (Vec.UVec Value)
+getHeapVec :: PriorityQueue -> IO (Vec.IOUVec Value)
 getHeapVec q = return (heap q)
 
 -- | Pre-allocate internal buffer for @n@ elements.

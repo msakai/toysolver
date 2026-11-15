@@ -139,24 +139,24 @@ classForM_ xs f = g xs
 data Solver
   = Solver
   { svDefs                 :: !(IORef (IntMap (FSym,FSym), Map (FSym,FSym) FSym))
-  , svRepresentativeTable  :: !(Vec.UVec FSym)
-  , svClassList            :: !(Vec.Vec Class)
+  , svRepresentativeTable  :: !(Vec.IOUVec FSym)
+  , svClassList            :: !(Vec.IOVec Class)
   , svParent               :: !(IORef (IntMap (FSym, Eqn)))
   , svUseList              :: !(IORef (IntMap [(Eqn1, Level, Gen)]))
   , svLookupTable          :: !(IORef (IntMap (IntMap Eqn1)))
 
   -- workspace for constraint propagation
-  , svPending :: !(Vec.Vec Eqn)
+  , svPending :: !(Vec.IOVec Eqn)
 
   -- workspace for explanation generation
-  , svERepresentativeTable :: !(Vec.UVec FSym)
-  , svEClassList           :: !(Vec.Vec Class)
-  , svEHighestNodeTable    :: !(Vec.UVec FSym)
-  , svEPendingProofs       :: !(Vec.Vec (FSym,FSym))
+  , svERepresentativeTable :: !(Vec.IOUVec FSym)
+  , svEClassList           :: !(Vec.IOVec Class)
+  , svEHighestNodeTable    :: !(Vec.IOUVec FSym)
+  , svEPendingProofs       :: !(Vec.IOVec (FSym,FSym))
 
   -- for backtracking
-  , svTrail :: !(Vec.Vec [TrailItem])
-  , svLevelGen :: !(Vec.UVec Int)
+  , svTrail :: !(Vec.IOVec [TrailItem])
+  , svLevelGen :: !(Vec.IOUVec Int)
   , svIsAfterBacktracking :: !(IORef Bool)
   }
 
