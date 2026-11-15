@@ -45,6 +45,7 @@ module ToySolver.Internal.Data.PriorityQueue
 
 import Control.Loop
 import qualified Data.Array.IO as A
+import qualified Data.Array.IO.Internals as A
 import Data.Queue.Classes
 import qualified ToySolver.Internal.Data.Vec as Vec
 
@@ -54,7 +55,7 @@ type Index = Int
 data PriorityQueue a
   = PriorityQueue
   { lt   :: !(a -> a -> IO Bool)
-  , heap :: !(Vec.Vec a)
+  , heap :: !(Vec.IOVec a)
   }
 
 -- | Build a priority queue with default ordering ('(<)' of 'Ord' class)
@@ -172,10 +173,10 @@ rebuild q = do
 
 -- | Get the internal representation of a given priority queue.
 getHeapArray :: PriorityQueue a -> IO (A.IOArray Index a)
-getHeapArray q = Vec.getArray (heap q)
+getHeapArray q = A.IOArray <$> Vec.getArray (heap q)
 
 -- | Get the internal representation of a given priority queue.
-getHeapVec :: PriorityQueue a -> IO (Vec.Vec a)
+getHeapVec :: PriorityQueue a -> IO (Vec.IOVec a)
 getHeapVec q = return (heap q)
 
 -- | Pre-allocate internal buffer for @n@ elements.

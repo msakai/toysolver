@@ -294,32 +294,32 @@ data Solver
   { svOk           :: !(IORef Bool)
 
   , svVarQueue     :: !PQ.PriorityQueue
-  , svTrail        :: !(Vec.UVec Lit)
-  , svTrailLimit   :: !(Vec.UVec Lit)
+  , svTrail        :: !(Vec.IOUVec Lit)
+  , svTrailLimit   :: !(Vec.IOUVec Lit)
   , svTrailNPropagated :: !(IOURef Int)
 
   -- variable information
-  , svVarValue      :: !(Vec.UVec Int8) -- should be 'Vec.UVec LBool' but it's difficult to define MArray instance
-  , svVarPolarity   :: !(Vec.UVec Bool)
-  , svVarActivity   :: !(Vec.UVec VarActivity)
-  , svVarTrailIndex :: !(Vec.UVec Int)
-  , svVarLevel      :: !(Vec.UVec Int)
+  , svVarValue      :: !(Vec.IOUVec Int8) -- should be 'Vec.IOUVec LBool' but it's difficult to define MArray instance
+  , svVarPolarity   :: !(Vec.IOUVec Bool)
+  , svVarActivity   :: !(Vec.IOUVec VarActivity)
+  , svVarTrailIndex :: !(Vec.IOUVec Int)
+  , svVarLevel      :: !(Vec.IOUVec Int)
   -- | will be invoked once when the variable is assigned
-  , svVarWatches      :: !(Vec.Vec [SomeConstraintHandler])
-  , svVarOnUnassigned :: !(Vec.Vec [SomeConstraintHandler])
-  , svVarReason       :: !(Vec.Vec (Maybe SomeConstraintHandler))
+  , svVarWatches      :: !(Vec.IOVec [SomeConstraintHandler])
+  , svVarOnUnassigned :: !(Vec.IOVec [SomeConstraintHandler])
+  , svVarReason       :: !(Vec.IOVec (Maybe SomeConstraintHandler))
   -- | exponential moving average estimate
-  , svVarEMAScaled    :: !(Vec.UVec Double)
+  , svVarEMAScaled    :: !(Vec.IOUVec Double)
   -- | When v was last assigned
-  , svVarWhenAssigned :: !(Vec.UVec Int)
+  , svVarWhenAssigned :: !(Vec.IOUVec Int)
   -- | The number of learnt clauses v participated in generating since Assigned.
-  , svVarParticipated :: !(Vec.UVec Int)
+  , svVarParticipated :: !(Vec.IOUVec Int)
   -- | The number of learnt clauses v reasoned in generating since Assigned.
-  , svVarReasoned     :: !(Vec.UVec Int)
+  , svVarReasoned     :: !(Vec.IOUVec Int)
 
   -- | will be invoked when this literal is falsified
-  , svLitWatches   :: !(Vec.Vec [SomeConstraintHandler])
-  , svLitOccurList :: !(Vec.Vec (HashSet SomeConstraintHandler))
+  , svLitWatches   :: !(Vec.IOVec [SomeConstraintHandler])
+  , svLitOccurList :: !(Vec.IOVec (HashSet SomeConstraintHandler))
 
   , svConstrDB     :: !(IORef [SomeConstraintHandler])
   , svLearntDB     :: !(IORef (Int,[SomeConstraintHandler]))
@@ -355,11 +355,11 @@ data Solver
 
   -- Working spaces
   , svCanceled        :: !(IORef Bool)
-  , svAssumptions     :: !(Vec.UVec Lit)
+  , svAssumptions     :: !(Vec.IOUVec Lit)
   , svLearntLim       :: !(IORef Int)
   , svLearntLimAdjCnt :: !(IORef Int)
   , svLearntLimSeq    :: !(IORef [(Int,Int)])
-  , svSeen :: !(Vec.UVec Bool)
+  , svSeen :: !(Vec.IOUVec Bool)
   , svPBLearnt :: !(IORef (Maybe PBLinAtLeast))
 
   -- | Amount to bump next variable with.
@@ -1672,7 +1672,7 @@ analyzeConflict solver constr = do
   let isHybrid = configLearningStrategy config == LearningHybrid
 
   d <- getDecisionLevel solver
-  (out :: Vec.UVec Lit) <- Vec.new
+  (out :: Vec.IOUVec Lit) <- Vec.new
   Vec.push out 0 -- (leave room for the asserting literal)
   (pathC :: IOURef Int) <- newIOURef 0
 

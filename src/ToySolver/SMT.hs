@@ -226,7 +226,7 @@ data Solver
   , smtGlobalDeclarationsRef :: !(IORef Bool)
   , smtFDefs :: !(IORef (Map FSym FDef))
   , smtNamedAssertions :: !(IORef (Map String SAT.Lit))
-  , smtAssertionStack :: !(Vec.Vec AssertionLevel)
+  , smtAssertionStack :: !(Vec.IOVec AssertionLevel)
 
   , smtUnsatAssumptions :: !(IORef [Expr])
   , smtUnsatCore :: !(IORef [String])

@@ -76,14 +76,14 @@ data Solver
   = Solver
   {
   -- core union-find
-    svParent :: !(Vec.Vec NodeID)
+    svParent :: !(Vec.IOVec NodeID)
 
   -- structural info for every node (root or not)
-  , svRepr :: !(Vec.Vec (FSym, VU.Vector NodeID))
+  , svRepr :: !(Vec.IOVec (FSym, VU.Vector NodeID))
 
   -- auxiliary info that is only valid for root nodes
-  , svUseList :: !(Vec.Vec (Vec.UVec NodeID))
-  , svMembers :: !(Vec.Vec (Vec.UVec NodeID))
+  , svUseList :: !(Vec.IOVec (Vec.IOUVec NodeID))
+  , svMembers :: !(Vec.IOVec (Vec.IOUVec NodeID))
 
   -- signature -> representative application node (need not be a root)
   , svSigTable :: !(IORef (Map Sig NodeID))
@@ -91,7 +91,7 @@ data Solver
   -- for hash-consing: original Term object -> node id
   , svNodeOf :: !(IORef (Map Term NodeID))
 
-  , svPending :: !(Vec.Vec (NodeID, NodeID))
+  , svPending :: !(Vec.IOVec (NodeID, NodeID))
 
   , svSymCounter :: IORef Int
   }

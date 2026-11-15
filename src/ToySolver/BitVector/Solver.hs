@@ -57,12 +57,12 @@ import ToySolver.BitVector.Base
 
 data Solver
   = Solver
-  { svVars :: Vec.Vec (VU.Vector SAT.Lit)
+  { svVars :: Vec.IOVec (VU.Vector SAT.Lit)
   , svSATSolver :: SAT.Solver
   , svTseitin :: Tseitin.Encoder IO
   , svEncTable :: IORef (Map Expr (VU.Vector SAT.Lit))
   , svAtomTable :: IORef (Map NormalizedAtom SAT.Lit)
-  , svContexts :: Vec.Vec (IntMap (Maybe Int))
+  , svContexts :: Vec.IOVec (IntMap (Maybe Int))
   }
 
 newSolver :: IO Solver
