@@ -135,6 +135,7 @@ import Prelude hiding (log)
 import Control.Loop
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.ST (stToIO)
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import Control.Exception
@@ -293,7 +294,7 @@ data Solver
   = Solver
   { svOk           :: !(IORef Bool)
 
-  , svVarQueue     :: !PQ.PriorityQueue
+  , svVarQueue     :: !(PQ.PriorityQueue RealWorld)
   , svTrail        :: !(Vec.IOUVec Lit)
   , svTrailLimit   :: !(Vec.IOUVec Lit)
   , svTrailNPropagated :: !(IOURef Int)
@@ -1569,7 +1570,7 @@ pickBranchLit !solver = do
     if (r < randfreq && size >= 2) then do
       a <- PQ.getHeapArray vqueue
       i <- Rand.uniformR (0, size-1) gen
-      var <- readArray a i
+      var <- stToIO $ readArray a i
       val <- varValue solver var
       if val == lUndef then do
         modifyIOURef (svNRandomDecision solver) (1+)
