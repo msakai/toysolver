@@ -74,13 +74,15 @@ import Prelude hiding (lookup)
 import Control.Exception (assert)
 import Control.Loop
 import Control.Monad
-import Data.IORef
+import Control.Monad.ST
+import Control.Monad.Primitive
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Primitive.MutVar
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -136,38 +138,38 @@ classForM_ xs f = g xs
     g (ClassSingleton v) = f v
     g (ClassUnion _ xs ys) = g xs >> g ys
 
-data Solver
+data Solver s
   = Solver
-  { svDefs                 :: !(IORef (IntMap (FSym,FSym), Map (FSym,FSym) FSym))
-  , svRepresentativeTable  :: !(Vec.IOUVec FSym)
-  , svClassList            :: !(Vec.IOVec Class)
-  , svParent               :: !(IORef (IntMap (FSym, Eqn)))
-  , svUseList              :: !(IORef (IntMap [(Eqn1, Level, Gen)]))
-  , svLookupTable          :: !(IORef (IntMap (IntMap Eqn1)))
+  { svDefs                 :: !(MutVar s (IntMap (FSym,FSym), Map (FSym,FSym) FSym))
+  , svRepresentativeTable  :: !(Vec.UVec s FSym)
+  , svClassList            :: !(Vec.Vec s Class)
+  , svParent               :: !(MutVar s (IntMap (FSym, Eqn)))
+  , svUseList              :: !(MutVar s (IntMap [(Eqn1, Level, Gen)]))
+  , svLookupTable          :: !(MutVar s (IntMap (IntMap Eqn1)))
 
   -- workspace for constraint propagation
-  , svPending :: !(Vec.IOVec Eqn)
+  , svPending :: !(Vec.Vec s Eqn)
 
   -- workspace for explanation generation
-  , svERepresentativeTable :: !(Vec.IOUVec FSym)
-  , svEClassList           :: !(Vec.IOVec Class)
-  , svEHighestNodeTable    :: !(Vec.IOUVec FSym)
-  , svEPendingProofs       :: !(Vec.IOVec (FSym,FSym))
+  , svERepresentativeTable :: !(Vec.UVec s FSym)
+  , svEClassList           :: !(Vec.Vec s Class)
+  , svEHighestNodeTable    :: !(Vec.UVec s FSym)
+  , svEPendingProofs       :: !(Vec.Vec s (FSym,FSym))
 
   -- for backtracking
-  , svTrail :: !(Vec.IOVec [TrailItem])
-  , svLevelGen :: !(Vec.IOUVec Int)
-  , svIsAfterBacktracking :: !(IORef Bool)
+  , svTrail :: !(Vec.Vec s [TrailItem])
+  , svLevelGen :: !(Vec.UVec s Int)
+  , svIsAfterBacktracking :: !(MutVar s Bool)
   }
 
-newSolver :: IO Solver
-newSolver = do
-  defs     <- newIORef (IntMap.empty, Map.empty)
+newSolver :: PrimMonad m => m (Solver (PrimState m))
+newSolver = stToPrim $ do
+  defs     <- newMutVar (IntMap.empty, Map.empty)
   rep      <- Vec.new
   classes  <- Vec.new
-  parent   <- newIORef IntMap.empty
-  useList  <- newIORef IntMap.empty
-  lookup   <- newIORef IntMap.empty
+  parent   <- newMutVar IntMap.empty
+  useList  <- newMutVar IntMap.empty
+  lookup   <- newMutVar IntMap.empty
 
   pending  <- Vec.new
 
@@ -179,7 +181,7 @@ newSolver = do
   trail <- Vec.new
   gen <- Vec.new
   Vec.push gen 0
-  isAfterBT <- newIORef False
+  isAfterBT <- newMutVar False
 
   return $
     Solver
@@ -205,33 +207,33 @@ newSolver = do
     , svIsAfterBacktracking = isAfterBT
     }
 
-getNFSyms :: Solver -> IO Int
+getNFSyms :: PrimMonad m => Solver (PrimState m) -> m Int
 getNFSyms solver = Vec.getSize (svRepresentativeTable solver)
 
-newFSym :: Solver -> IO FSym
-newFSym solver = do
+newFSym :: PrimMonad m => Solver (PrimState m) -> m FSym
+newFSym solver = stToPrim $ do
   v <- getNFSyms solver
   Vec.push (svRepresentativeTable solver) v
   Vec.push (svClassList solver) (ClassSingleton v)
-  modifyIORef' (svUseList solver) (IntMap.insert v [])
+  modifyMutVar' (svUseList solver) (IntMap.insert v [])
   Vec.push (svERepresentativeTable solver) v
   Vec.push (svEClassList solver) undefined
   Vec.push (svEHighestNodeTable solver) v
   return v
 
-newFun :: VAFun a => Solver -> IO a
-newFun solver = do
+newFun :: (PrimMonad m, VAFun a) => Solver (PrimState m) -> m a
+newFun solver = stToPrim $ do
   c <- newFSym solver
   return $ withVArgs (TApp c)
 
-newConst :: Solver -> IO Term
+newConst :: PrimMonad m => Solver (PrimState m) -> m Term
 newConst = newFun
 
-merge :: Solver -> Term -> Term -> IO ()
-merge solver t u = merge' solver t u Nothing
+merge :: PrimMonad m => Solver (PrimState m) -> Term -> Term -> m ()
+merge solver t u = stToPrim $ merge' solver t u Nothing
 
-merge' :: Solver -> Term -> Term -> Maybe ConstrID -> IO ()
-merge' solver t u cid = do
+merge' :: PrimMonad m => Solver (PrimState m) -> Term -> Term -> Maybe ConstrID -> m ()
+merge' solver t u cid = stToPrim $ do
   t' <- termToFlatTerm solver t
   u' <- termToFlatTerm solver u
   case (t', u') of
@@ -241,11 +243,11 @@ merge' solver t u cid = do
       c <- flatTermToFSym solver u'
       mergeFlatTerm' solver t' c cid
 
-mergeFlatTerm :: Solver -> FlatTerm -> FSym -> IO ()
-mergeFlatTerm solver s a = mergeFlatTerm' solver s a Nothing
+mergeFlatTerm :: PrimMonad m => Solver (PrimState m) -> FlatTerm -> FSym -> m ()
+mergeFlatTerm solver s a = stToPrim $ mergeFlatTerm' solver s a Nothing
 
-mergeFlatTerm' :: Solver -> FlatTerm -> FSym -> Maybe ConstrID -> IO ()
-mergeFlatTerm' solver s a cid = do
+mergeFlatTerm' :: PrimMonad m => Solver (PrimState m) -> FlatTerm -> FSym -> Maybe ConstrID -> m ()
+mergeFlatTerm' solver s a cid = stToPrim $ do
   initAfterBacktracking solver
   case s of
     FTConst c -> do
@@ -267,13 +269,13 @@ mergeFlatTerm' solver s a cid = do
           setLookup solver a1' a2' eq1
           lv <- getCurrentLevel solver
           gen <- getLevelGen solver lv
-          modifyIORef' (svUseList solver) $
+          modifyMutVar' (svUseList solver) $
             IntMap.adjust ((eq1, lv, gen) :) a1' .
             IntMap.adjust ((eq1, lv, gen) :) a2'
           checkInvariant solver
 
-propagate :: Solver -> IO ()
-propagate solver = go
+propagate :: PrimMonad m => Solver (PrimState m) -> m ()
+propagate solver = stToPrim $ go
   where
     go = do
       checkInvariant solver
@@ -307,7 +309,7 @@ propagate solver = go
 
       lv <- getCurrentLevel solver
       lv_gen <- getLevelGen solver lv
-      useList <- readIORef (svUseList solver)
+      useList <- readMutVar (svUseList solver)
       useList_a' <- flip filterM (useList IntMap.! a') $ \(eq1@(Eqn1 _ c1 c2 _), lv2, lv2_gen2) -> do
         lv2_gen <- getLevelGen solver lv2
         if lv2 <= lv && lv2_gen2 == lv2_gen then do
@@ -321,40 +323,40 @@ propagate solver = go
               addToPending solver $ Right (eq1, eq2)
             Nothing -> do
               setLookup solver c1' c2' eq1
-              modifyIORef (svUseList solver) $ IntMap.adjust ((eq1, lv, lv_gen) :) b'
+              modifyMutVar (svUseList solver) $ IntMap.adjust ((eq1, lv, lv_gen) :) b'
               return ()
           return True
         else do
           -- out-of-date entry
           return False
-      modifyIORef' (svUseList solver) (IntMap.insert a' useList_a')
+      modifyMutVar' (svUseList solver) (IntMap.insert a' useList_a')
 
     -- Insert edge a→b labelled with a_eq_b into the proof forest, and re-orient its original ancestors.
     updateParent a b a_eq_b = do
       let loop d (c, c_eq_d) = do
-            tbl <- readIORef (svParent solver)
-            writeIORef (svParent solver) (IntMap.insert d (c, c_eq_d) tbl)
+            tbl <- readMutVar (svParent solver)
+            writeMutVar (svParent solver) (IntMap.insert d (c, c_eq_d) tbl)
             case IntMap.lookup d tbl of
               Nothing -> return d
               Just (e, d_eq_e) -> loop e (d, d_eq_e)
       loop a (b, a_eq_b)
 
-areCongruent :: Solver -> Term -> Term -> IO Bool
-areCongruent solver t1 t2 = do
+areCongruent :: PrimMonad m => Solver (PrimState m) -> Term -> Term -> m Bool
+areCongruent solver t1 t2 = stToPrim $ do
   u1 <- termToFlatTerm solver t1
   u2 <- termToFlatTerm solver t2
   areCongruentFlatTerm solver u1 u2
 
-areCongruentFlatTerm :: Solver -> FlatTerm -> FlatTerm -> IO Bool
-areCongruentFlatTerm solver t1 t2 = do
+areCongruentFlatTerm :: PrimMonad m => Solver (PrimState m) -> FlatTerm -> FlatTerm -> m Bool
+areCongruentFlatTerm solver t1 t2 = stToPrim $ do
   initAfterBacktracking solver
   u1 <- normalize solver t1
   u2 <- normalize solver t2
   return $ u1 == u2
 
-normalize :: Solver -> FlatTerm -> IO FlatTerm
-normalize solver (FTConst c) = liftM FTConst $ getRepresentative solver c
-normalize solver (FTApp t1 t2) = do
+normalize :: PrimMonad m => Solver (PrimState m) -> FlatTerm -> m FlatTerm
+normalize solver (FTConst c) = stToPrim $ liftM FTConst $ getRepresentative solver c
+normalize solver (FTApp t1 t2) = stToPrim $ do
   u1 <- getRepresentative solver t1
   u2 <- getRepresentative solver t2
   ret <- lookup solver u1 u2
@@ -362,23 +364,23 @@ normalize solver (FTApp t1 t2) = do
     Just (Eqn1 _ _ _ a) -> liftM FTConst $ getRepresentative solver a
     Nothing -> return $ FTApp u1 u2
 
-checkInvariant :: Solver -> IO ()
+checkInvariant :: PrimMonad m => Solver (PrimState m) -> m ()
 checkInvariant _ | True = return ()
-checkInvariant solver = do
+checkInvariant solver = stToPrim $ do
   nv <- getNFSyms solver
 
   representatives <- liftM IntSet.fromList $ Vec.getElems (svRepresentativeTable solver)
 
-  ref <- newIORef IntSet.empty
+  ref <- newMutVar IntSet.empty
   forM_ (IntSet.toList representatives) $ \a' -> do
     bs <- Vec.read (svClassList solver) a'
     forM_ (classToList bs) $ \b -> do
       b' <- getRepresentative solver b
       unless (a' == b') $
         error "ToySolver.EUF.CongruenceClosure.checkInvariant: inconsistency between classList and representativeTable"
-      modifyIORef' ref (IntSet.insert b)
+      modifyMutVar' ref (IntSet.insert b)
 
-  xs <- readIORef ref
+  xs <- readMutVar ref
   unless (xs == IntSet.fromList [0..nv-1]) $
     error "ToySolver.EUF.CongruenceClosure.checkInvariant: classList is not exhaustive"
 
@@ -394,7 +396,7 @@ checkInvariant solver = do
         unless (a1' == b1' && a2' == b2') $
           error "ToySolver.EUF.CongruenceClosure.checkInvariant: error in pendingList"
 
-  useList <- readIORef (svUseList solver)
+  useList <- readMutVar (svUseList solver)
   lv <- getCurrentLevel solver
   forM_ (IntSet.toList representatives) $ \a -> do
     forM_ (useList IntMap.! a) $ \(Eqn1 _ b1 b2 _, lv2, lv2_gen2) -> do
@@ -420,20 +422,20 @@ checkInvariant solver = do
 -- Explanation
 -- -------------------------------------------------------------------
 
-explain :: Solver -> Term -> Term -> IO (Maybe IntSet)
-explain solver t1 t2 = do
+explain :: PrimMonad m => Solver (PrimState m) -> Term -> Term -> m (Maybe IntSet)
+explain solver t1 t2 = stToPrim $ do
   c1 <- termToFlatTerm solver t1
   c2 <- termToFlatTerm solver t2
   explainFlatTerm solver c1 c2
 
-explainFlatTerm :: Solver -> FlatTerm -> FlatTerm -> IO (Maybe IntSet)
-explainFlatTerm solver t1 t2 = do
+explainFlatTerm :: PrimMonad m => Solver (PrimState m) -> FlatTerm -> FlatTerm -> m (Maybe IntSet)
+explainFlatTerm solver t1 t2 = stToPrim $ do
   c1 <- flatTermToFSym solver t1
   c2 <- flatTermToFSym solver t2
   explainConst solver c1 c2
 
-explainConst :: Solver -> FSym -> FSym -> IO (Maybe IntSet)
-explainConst solver c1 c2 = do
+explainConst :: forall m. PrimMonad m => Solver (PrimState m) -> FSym -> FSym -> m (Maybe IntSet)
+explainConst solver c1 c2 = stToPrim $ do
   initAfterBacktracking solver
   n <- getNFSyms solver
 
@@ -443,7 +445,7 @@ explainConst solver c1 c2 = do
     Vec.unsafeWrite (svEClassList solver) a (ClassSingleton a)
     Vec.unsafeWrite (svEHighestNodeTable solver) a a
 
-  let union :: FSym -> FSym -> IO ()
+  let union :: FSym -> FSym -> ST (PrimState m) ()
       union a b = do
         a' <- getERepresentative solver a
         b' <- getERepresentative solver b
@@ -462,7 +464,7 @@ explainConst solver c1 c2 = do
 
   Vec.clear (svEPendingProofs solver)
   Vec.push (svEPendingProofs solver) (c1,c2)
-  result <- newIORef IntSet.empty
+  result <- newMutVar IntSet.empty
 
   let loop = do
         n <- Vec.getSize (svEPendingProofs solver)
@@ -478,27 +480,30 @@ explainConst solver c1 c2 = do
               explainAlongPath b c
               loop
 
-      explainAlongPath :: FSym -> FSym -> IO ()
+      explainAlongPath :: FSym -> FSym -> ST (PrimState m) ()
       explainAlongPath a c = do
         a <- getHighestNode solver a
         -- note that c is already @getHighestNode solver c@
         let loop a =
               unless (a == c) $ do
-                Just (b, eq) <- getParent solver a
-                case eq of
-                  Left (Eqn0 cid _ _) -> do
-                    modifyIORef' result (maybeToIntSet cid <>)
-                  Right (Eqn1 cid1 a1 a2 _, Eqn1 cid2 b1 b2 _) -> do
-                    modifyIORef' result ((maybeToIntSet cid1 <> maybeToIntSet cid2) <>)
-                    Vec.push (svEPendingProofs solver) (a1,b1)
-                    Vec.push (svEPendingProofs solver) (a2,b2)
-                union a b
-                loop =<< getHighestNode solver b
+                ret <- getParent solver a
+                case ret of
+                  Nothing -> error "should not happen"
+                  Just (b, eq) -> do
+                    case eq of
+                      Left (Eqn0 cid _ _) -> do
+                        modifyMutVar' result (maybeToIntSet cid <>)
+                      Right (Eqn1 cid1 a1 a2 _, Eqn1 cid2 b1 b2 _) -> do
+                        modifyMutVar' result ((maybeToIntSet cid1 <> maybeToIntSet cid2) <>)
+                        Vec.push (svEPendingProofs solver) (a1,b1)
+                        Vec.push (svEPendingProofs solver) (a2,b2)
+                    union a b
+                    loop =<< getHighestNode solver b
         loop a
 
   b <- loop
   if b
-  then liftM Just $ readIORef result
+  then liftM Just $ readMutVar result
   else return Nothing
 
 -- -------------------------------------------------------------------
@@ -517,20 +522,20 @@ data Model
   }
   deriving (Show)
 
-getModel :: Solver -> IO Model
-getModel solver = do
+getModel :: PrimMonad m => Solver (PrimState m) -> m Model
+getModel solver = stToPrim $ do
   n <- Vec.getSize (svRepresentativeTable solver)
-  univRef <- newIORef IntSet.empty
-  reprRef <- newIORef IntMap.empty
+  univRef <- newMutVar IntSet.empty
+  reprRef <- newMutVar IntMap.empty
   forM_ [0..n-1] $ \a -> do
     a' <- Vec.unsafeRead (svRepresentativeTable solver) a
-    when (a == a') $ modifyIORef' univRef (IntSet.insert a)
-    modifyIORef' reprRef (IntMap.insert a a')
-  -- univ <- readIORef univRef
-  repr <- readIORef reprRef
+    when (a == a') $ modifyMutVar' univRef (IntSet.insert a)
+    modifyMutVar' reprRef (IntMap.insert a a')
+  -- univ <- readMutVar univRef
+  repr <- readMutVar reprRef
 
-  lookups <- readIORef (svLookupTable solver)
-  -- (defs1,_) <- readIORef (svDefs solver)
+  lookups <- readMutVar (svLookupTable solver)
+  -- (defs1,_) <- readMutVar (svDefs solver)
 
   let -- "(b,c) ∈ appRel[a]" means f(b,c)=a
       appRel :: IntMap (Set (FSym, FSym))
@@ -620,20 +625,20 @@ data TrailItem
   | TrailSetLookup !FSym !FSym
   deriving (Show)
 
-addToTrail :: Solver -> TrailItem -> IO ()
-addToTrail solver item = do
+addToTrail :: PrimMonad m => Solver (PrimState m) -> TrailItem -> m ()
+addToTrail solver item = stToPrim $ do
   lv <- getCurrentLevel solver
   when (lv /= 0) $ do
     seq item $ Vec.unsafeModify (svTrail solver) (lv - 1) (item :)
 
-getCurrentLevel :: Solver -> IO Level
+getCurrentLevel :: PrimMonad m => Solver (PrimState m) -> m Level
 getCurrentLevel solver = Vec.getSize (svTrail solver)
 
-getLevelGen :: Solver -> Level -> IO Gen
+getLevelGen :: PrimMonad m => Solver (PrimState m) -> Level -> m Gen
 getLevelGen solver lv = Vec.unsafeRead (svLevelGen solver) lv
 
-pushBacktrackPoint :: Solver -> IO ()
-pushBacktrackPoint solver = do
+pushBacktrackPoint :: PrimMonad m => Solver (PrimState m) -> m ()
+pushBacktrackPoint solver = stToPrim $ do
   Vec.push (svTrail solver) []
   lv <- getCurrentLevel solver
   size <- Vec.getSize (svLevelGen solver)
@@ -643,36 +648,39 @@ pushBacktrackPoint solver = do
   else
     Vec.push (svLevelGen solver) 0
 
-popBacktrackPoint :: Solver -> IO ()
-popBacktrackPoint solver = do
-  writeIORef (svIsAfterBacktracking solver) True
+popBacktrackPoint :: PrimMonad m => Solver (PrimState m) -> m ()
+popBacktrackPoint solver = stToPrim $ do
+  writeMutVar (svIsAfterBacktracking solver) True
   xs <- Vec.unsafePop (svTrail solver)
   forM_ xs $ \item -> do
     case item of
       TrailSetLookup a' b' -> do
-        modifyIORef' (svLookupTable solver) (IntMap.adjust (IntMap.delete b') a')
+        modifyMutVar' (svLookupTable solver) (IntMap.adjust (IntMap.delete b') a')
       TrailMerge a' b' a origRootA -> do
         -- Revert changes to Union-Find data strucutres
-        ClassUnion _ origClassA origClassB <- Vec.unsafeRead (svClassList solver) b'
-        classForM_ origClassA $ \c -> do
-          Vec.unsafeWrite (svRepresentativeTable solver) c a'
-        Vec.unsafeWrite (svClassList solver) b' origClassB
+        ret <- Vec.unsafeRead (svClassList solver) b'
+        case ret of
+          ClassSingleton _ -> error "should not happen"
+          ClassUnion _ origClassA origClassB -> do
+            classForM_ origClassA $ \c -> do
+              Vec.unsafeWrite (svRepresentativeTable solver) c a'
+            Vec.unsafeWrite (svClassList solver) b' origClassB
 
         -- Revert changes to proof-forest data strucutres
         let loop c p = do
-              tbl <- readIORef (svParent solver)
-              writeIORef (svParent solver) (IntMap.update (const p) c tbl)
+              tbl <- readMutVar (svParent solver)
+              writeMutVar (svParent solver) (IntMap.update (const p) c tbl)
               unless (c == a) $ do
                 let (d, c_eq_d) = tbl IntMap.! c
                 loop d (Just (c, c_eq_d))
         loop origRootA Nothing
 
-initAfterBacktracking :: Solver -> IO ()
-initAfterBacktracking solver = do
-  b <- readIORef (svIsAfterBacktracking solver)
+initAfterBacktracking :: PrimMonad m => Solver (PrimState m) -> m ()
+initAfterBacktracking solver = stToPrim $ do
+  b <- readMutVar (svIsAfterBacktracking solver)
   when b $ do
-    writeIORef (svIsAfterBacktracking solver) False
-    (defs, _) <- readIORef (svDefs solver)
+    writeMutVar (svIsAfterBacktracking solver) False
+    (defs, _) <- readMutVar (svDefs solver)
     forM_ (IntMap.toList defs) $ \(a,(a1,a2)) -> do
       mergeFlatTerm solver (FTApp a1 a2) a
 
@@ -680,39 +688,39 @@ initAfterBacktracking solver = do
   Helper funcions
 --------------------------------------------------------------------}
 
-lookup :: Solver -> FSym -> FSym -> IO (Maybe Eqn1)
+lookup :: Solver s -> FSym -> FSym -> ST s (Maybe Eqn1)
 lookup solver c1 c2 = do
-  tbl <- readIORef $ svLookupTable solver
+  tbl <- readMutVar $ svLookupTable solver
   return $ do
      m <- IntMap.lookup c1 tbl
      IntMap.lookup c2 m
 
-setLookup :: Solver -> FSym -> FSym -> Eqn1 -> IO ()
+setLookup :: Solver s -> FSym -> FSym -> Eqn1 -> ST s ()
 setLookup solver a1 a2 eqn = do
-  modifyIORef' (svLookupTable solver) $
+  modifyMutVar' (svLookupTable solver) $
     IntMap.insertWith IntMap.union a1 (IntMap.singleton a2 eqn)
   addToTrail solver (TrailSetLookup a1 a2)
 
-addToPending :: Solver -> Eqn -> IO ()
+addToPending :: Solver s -> Eqn -> ST s ()
 addToPending solver eqn = Vec.push (svPending solver) eqn
 
-getRepresentative :: Solver -> FSym -> IO FSym
+getRepresentative :: Solver s -> FSym -> ST s FSym
 getRepresentative solver c = Vec.unsafeRead (svRepresentativeTable solver) c
 
-getParent :: Solver -> FSym -> IO (Maybe (FSym, Eqn))
+getParent :: Solver s -> FSym -> ST s (Maybe (FSym, Eqn))
 getParent solver c = do
-  m <- readIORef $ svParent solver
+  m <- readMutVar $ svParent solver
   return $ IntMap.lookup c m
 
-getERepresentative :: Solver -> FSym -> IO FSym
+getERepresentative :: Solver s -> FSym -> ST s FSym
 getERepresentative solver a = Vec.unsafeRead (svERepresentativeTable solver) a
 
-getHighestNode :: Solver -> FSym -> IO FSym
-getHighestNode solver c = do
+getHighestNode :: Solver s -> FSym -> ST s FSym
+getHighestNode solver c = stToPrim $ do
   d <- getERepresentative solver c
   Vec.unsafeRead (svEHighestNodeTable solver) d
 
-nearestCommonAncestor :: Solver -> FSym -> FSym -> IO (Maybe FSym)
+nearestCommonAncestor :: Solver s -> FSym -> FSym -> ST s (Maybe FSym)
 nearestCommonAncestor solver a b = do
   let loop c !ret = do
         m <- getParent solver c
@@ -731,8 +739,8 @@ nearestCommonAncestor solver a b = do
             Just (d,_) -> loop2 d
   loop2 b
 
-termToFlatTerm :: Solver -> Term -> IO FlatTerm
-termToFlatTerm solver (TApp f xs) = do
+termToFlatTerm :: PrimMonad m => Solver (PrimState m) -> Term -> m FlatTerm
+termToFlatTerm solver (TApp f xs) = stToPrim $ do
   xs' <- mapM (termToFlatTerm solver) xs
   let phi t u = do
         t' <- flatTermToFSym solver t
@@ -740,32 +748,32 @@ termToFlatTerm solver (TApp f xs) = do
         return $ FTApp t' u'
   foldM phi (FTConst f) xs'
 
-flatTermToFSym :: Solver -> FlatTerm -> IO FSym
+flatTermToFSym :: PrimMonad m => Solver (PrimState m) -> FlatTerm -> m FSym
 flatTermToFSym _ (FTConst c) = return c
-flatTermToFSym solver (FTApp c d) = do
-  (defs1,defs2) <- readIORef $ svDefs solver
+flatTermToFSym solver (FTApp c d) = stToPrim $ do
+  (defs1,defs2) <- readMutVar $ svDefs solver
   a <- case Map.lookup (c,d) defs2 of
          Just a -> return a
          Nothing -> do
            a <- newFSym solver
-           writeIORef (svDefs solver) (IntMap.insert a (c,d) defs1, Map.insert (c,d) a defs2)
+           writeMutVar (svDefs solver) (IntMap.insert a (c,d) defs1, Map.insert (c,d) a defs2)
            mergeFlatTerm solver (FTApp c d) a
            return a
   return a
 
-fsymToFlatTerm :: Solver -> FSym -> IO FlatTerm
-fsymToFlatTerm solver a = do
-  (defs1,_) <- readIORef $ svDefs solver
+fsymToFlatTerm :: PrimMonad m => Solver (PrimState m) -> FSym -> m FlatTerm
+fsymToFlatTerm solver a = stToPrim $ do
+  (defs1,_) <- readMutVar $ svDefs solver
   case IntMap.lookup a defs1 of
     Just (c,d) -> return (FTApp c d)
     Nothing -> return (FTConst a)
 
-termToFSym :: Solver -> Term -> IO FSym
-termToFSym solver t = flatTermToFSym solver =<< termToFlatTerm solver t
+termToFSym :: PrimMonad m => Solver (PrimState m) -> Term -> m FSym
+termToFSym solver t = stToPrim $ flatTermToFSym solver =<< termToFlatTerm solver t
 
-fsymToTerm :: Solver -> FSym -> IO Term
-fsymToTerm solver a = do
-  (defs1,_) <- readIORef $ svDefs solver
+fsymToTerm :: PrimMonad m => Solver (PrimState m) -> FSym -> m Term
+fsymToTerm solver a = stToPrim $ do
+  (defs1,_) <- readMutVar $ svDefs solver
   let convert :: FSym -> Term
       convert a =
         case convert' a of
