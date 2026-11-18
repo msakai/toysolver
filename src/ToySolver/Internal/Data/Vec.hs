@@ -23,6 +23,8 @@ module ToySolver.Internal.Data.Vec
     GenericVec
   , Vec
   , UVec
+  , IOVec
+  , IOUVec
   , Index
 
   -- * Constructors
@@ -60,17 +62,22 @@ import Prelude hiding (read)
 
 import Control.Loop
 import Control.Monad
+import Control.Monad.Primitive
+import Control.Monad.ST
 import Data.Ix
 import qualified Data.Array.Base as A
-import qualified Data.Array.IO as A
-import Data.IORef
-import ToySolver.Internal.Data.IOURef
+import qualified Data.Array.ST as A
+import Data.Primitive.MutVar
+import Data.Primitive.PrimVar
 
-data GenericVec a e = GenericVec {-# UNPACK #-} !(IOURef Int) {-# UNPACK #-} !(IORef (a Index e))
+data GenericVec s a e = GenericVec {-# UNPACK #-} !(PrimVar s Int) {-# UNPACK #-} !(MutVar s (a Index e))
   deriving Eq
 
-type Vec e = GenericVec A.IOArray e
-type UVec e = GenericVec A.IOUArray e
+type Vec s e = GenericVec s (A.STArray s) e
+type UVec s e = GenericVec s (A.STUArray s) e
+
+type IOVec e = Vec RealWorld e
+type IOUVec e = UVec RealWorld e
 
 type Index = Int
 
@@ -90,23 +97,23 @@ writeArray = A.writeArray
 writeArray = A.unsafeWrite
 #endif
 
-new :: A.MArray a e IO => IO (GenericVec a e)
-new = do
-  sizeRef <- newIOURef 0
-  arrayRef <- newIORef =<< A.newArray_ (0,-1)
+new :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => m (GenericVec (PrimState m) a e)
+new = stToPrim $ do
+  sizeRef <- newPrimVar 0
+  arrayRef <- newMutVar =<< A.newArray_ (0,-1)
   return $ GenericVec sizeRef arrayRef
 
 {- INLINE getSize #-}
 -- | Get the internal representation array
-getSize :: GenericVec a e -> IO Int
-getSize (GenericVec sizeRef _) = readIOURef sizeRef
+getSize :: PrimMonad m => GenericVec (PrimState m) a e -> m Int
+getSize (GenericVec sizeRef _) = stToPrim $ readPrimVar sizeRef
 
-{-# SPECIALIZE read :: Vec e -> Int -> IO e #-}
-{-# SPECIALIZE read :: UVec Int -> Int -> IO Int #-}
-{-# SPECIALIZE read :: UVec Double -> Int -> IO Double #-}
-{-# SPECIALIZE read :: UVec Bool -> Int -> IO Bool #-}
-read :: A.MArray a e IO => GenericVec a e -> Int -> IO e
-read !v !i = do
+{-# SPECIALIZE read :: PrimMonad m => Vec (PrimState m) e -> Int -> m e #-}
+{-# SPECIALIZE read :: PrimMonad m => UVec (PrimState m) Int -> Int -> m Int #-}
+{-# SPECIALIZE read :: PrimMonad m => UVec (PrimState m) Double -> Int -> m Double #-}
+{-# SPECIALIZE read :: PrimMonad m => UVec (PrimState m) Bool -> Int -> m Bool #-}
+read :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> Int -> m e
+read !v !i = stToPrim $ do
   a <- getArray v
   s <- getSize v
   if 0 <= i && i < s then
@@ -114,12 +121,12 @@ read !v !i = do
   else
     error $ "ToySolver.Internal.Data.Vec.read: index " ++ show i ++ " out of bounds"
 
-{-# SPECIALIZE write :: Vec e -> Int -> e -> IO () #-}
-{-# SPECIALIZE write :: UVec Int -> Int -> Int -> IO () #-}
-{-# SPECIALIZE write :: UVec Double -> Int -> Double -> IO () #-}
-{-# SPECIALIZE write :: UVec Bool -> Int -> Bool -> IO () #-}
-write :: A.MArray a e IO => GenericVec a e -> Int -> e -> IO ()
-write !v !i e = do
+{-# SPECIALIZE write :: PrimMonad m => Vec (PrimState m) e -> Int -> e -> m () #-}
+{-# SPECIALIZE write :: PrimMonad m => UVec (PrimState m) Int -> Int -> Int -> m () #-}
+{-# SPECIALIZE write :: PrimMonad m => UVec (PrimState m) Double -> Int -> Double -> m () #-}
+{-# SPECIALIZE write :: PrimMonad m => UVec (PrimState m) Bool -> Int -> Bool -> m () #-}
+write :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> Int -> e -> m ()
+write !v !i e = stToPrim $ do
   a <- getArray v
   s <- getSize v
   if 0 <= i && i < s then
@@ -128,8 +135,8 @@ write !v !i e = do
     error $ "ToySolver.Internal.Data.Vec.write: index " ++ show i ++ " out of bounds"
 
 {-# INLINE modify #-}
-modify :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
-modify !v !i f = do
+modify :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> Int -> (e -> e) -> m ()
+modify !v !i f = stToPrim $ do
   a <- getArray v
   s <- getSize v
   if 0 <= i && i < s then do
@@ -139,8 +146,8 @@ modify !v !i f = do
     error $ "ToySolver.Internal.Data.Vec.modify: index " ++ show i ++ " out of bounds"
 
 {-# INLINE modify' #-}
-modify' :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
-modify' !v !i f = do
+modify' :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> Int -> (e -> e) -> m ()
+modify' !v !i f = stToPrim $ do
   a <- getArray v
   s <- getSize v
   if 0 <= i && i < s then do
@@ -150,67 +157,67 @@ modify' !v !i f = do
     error $ "ToySolver.Internal.Data.Vec.modify': index " ++ show i ++ " out of bounds"
 
 {-# INLINE unsafeModify #-}
-unsafeModify :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
-unsafeModify !v !i f = do
+unsafeModify :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> Int -> (e -> e) -> m ()
+unsafeModify !v !i f = stToPrim $ do
   a <- getArray v
   x <- readArray a i
   writeArray a i (f x)
 
 {-# INLINE unsafeModify' #-}
-unsafeModify' :: A.MArray a e IO => GenericVec a e -> Int -> (e -> e) -> IO ()
-unsafeModify' !v !i f = do
+unsafeModify' :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> Int -> (e -> e) -> m ()
+unsafeModify' !v !i f = stToPrim $ do
   a <- getArray v
   x <- readArray a i
   writeArray a i $! f x
 
 {-# INLINE unsafeRead #-}
-unsafeRead :: A.MArray a e IO => GenericVec a e -> Int -> IO e
-unsafeRead !v !i = do
+unsafeRead :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> Int -> m e
+unsafeRead !v !i = stToPrim $ do
   a <- getArray v
   readArray a i
 
 {-# INLINE unsafeWrite #-}
-unsafeWrite :: A.MArray a e IO => GenericVec a e -> Int -> e -> IO ()
-unsafeWrite !v !i e = do
+unsafeWrite :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> Int -> e -> m ()
+unsafeWrite !v !i e = stToPrim $ do
   a <- getArray v
   writeArray a i e
 
-{-# SPECIALIZE resize :: Vec e -> Int -> IO () #-}
-{-# SPECIALIZE resize :: UVec Int -> Int -> IO () #-}
-{-# SPECIALIZE resize :: UVec Double -> Int -> IO () #-}
-{-# SPECIALIZE resize :: UVec Bool -> Int -> IO () #-}
-resize :: A.MArray a e IO => GenericVec a e -> Int -> IO ()
-resize v@(GenericVec sizeRef arrayRef) !n = do
+{-# SPECIALIZE resize :: PrimMonad m => Vec (PrimState m) e -> Int -> m () #-}
+{-# SPECIALIZE resize :: PrimMonad m => UVec (PrimState m) Int -> Int -> m () #-}
+{-# SPECIALIZE resize :: PrimMonad m => UVec (PrimState m) Double -> Int -> m () #-}
+{-# SPECIALIZE resize :: PrimMonad m => UVec (PrimState m) Bool -> Int -> m () #-}
+resize :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> Int -> m ()
+resize v@(GenericVec sizeRef arrayRef) !n = stToPrim $ do
   a <- getArray v
   capa <- getCapacity v
   unless (n <= capa) $ do
     let capa' = max 2 (capa * 3 `div` 2)
     a' <- A.newArray_ (0, capa'-1)
     copyTo a a' (0,capa-1)
-    writeIORef arrayRef a'
-  writeIOURef sizeRef n
+    writeMutVar arrayRef a'
+  writePrimVar sizeRef n
 
-{-# SPECIALIZE growTo :: Vec e -> Int -> IO () #-}
-{-# SPECIALIZE growTo :: UVec Int -> Int -> IO () #-}
-{-# SPECIALIZE growTo :: UVec Double -> Int -> IO () #-}
-{-# SPECIALIZE growTo :: UVec Bool -> Int -> IO () #-}
-growTo :: A.MArray a e IO => GenericVec a e -> Int -> IO ()
-growTo v !n = do
+{-# SPECIALIZE growTo :: PrimMonad m => Vec (PrimState m) e -> Int -> m () #-}
+{-# SPECIALIZE growTo :: PrimMonad m => UVec (PrimState m) Int -> Int -> m () #-}
+{-# SPECIALIZE growTo :: PrimMonad m => UVec (PrimState m) Double -> Int -> m () #-}
+{-# SPECIALIZE growTo :: PrimMonad m => UVec (PrimState m) Bool -> Int -> m () #-}
+growTo :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> Int -> m ()
+growTo v !n = stToPrim $ do
   m <- getSize v
   when (m < n) $ resize v n
 
-{-# SPECIALIZE push :: Vec e -> e -> IO () #-}
-{-# SPECIALIZE push :: UVec Int -> Int -> IO () #-}
-{-# SPECIALIZE push :: UVec Double -> Double -> IO () #-}
-{-# SPECIALIZE push :: UVec Bool -> Bool -> IO () #-}
-push :: A.MArray a e IO => GenericVec a e -> e -> IO ()
-push v e = do
+{-# SPECIALIZE push :: PrimMonad m => Vec (PrimState m) e -> e -> m () #-}
+{-# SPECIALIZE push :: PrimMonad m => UVec (PrimState m) Int -> Int -> m () #-}
+{-# SPECIALIZE push :: PrimMonad m => UVec (PrimState m) Double -> Double -> m () #-}
+{-# SPECIALIZE push :: PrimMonad m => UVec (PrimState m) Bool -> Bool -> m () #-}
+push :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> e -> m ()
+push v e = stToPrim $ do
   s <- getSize v
   resize v (s+1)
   unsafeWrite v s e
 
-popMaybe :: A.MArray a e IO => GenericVec a e -> IO (Maybe e)
-popMaybe v = do
+popMaybe :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> m (Maybe e)
+popMaybe v = stToPrim $ do
   s <- getSize v
   if s == 0 then
     return Nothing
@@ -219,12 +226,12 @@ popMaybe v = do
     resize v (s-1)
     return (Just e)
 
-{-# SPECIALIZE unsafePop :: Vec e -> IO e #-}
-{-# SPECIALIZE unsafePop :: UVec Int -> IO Int #-}
-{-# SPECIALIZE unsafePop :: UVec Double -> IO Double #-}
-{-# SPECIALIZE unsafePop :: UVec Bool -> IO Bool #-}
-pop :: A.MArray a e IO => GenericVec a e -> IO e
-pop v = do
+{-# SPECIALIZE unsafePop :: PrimMonad m => Vec (PrimState m) e -> m e #-}
+{-# SPECIALIZE unsafePop :: PrimMonad m => UVec (PrimState m) Int -> m Int #-}
+{-# SPECIALIZE unsafePop :: PrimMonad m => UVec (PrimState m) Double -> m Double #-}
+{-# SPECIALIZE unsafePop :: PrimMonad m => UVec (PrimState m) Bool -> m Bool #-}
+pop :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> m e
+pop v = stToPrim $ do
   s <- getSize v
   if s == 0 then
     error $ "ToySolver.Internal.Data.Vec.pop: empty Vec"
@@ -233,20 +240,20 @@ pop v = do
     resize v (s-1)
     return e
 
-{-# SPECIALIZE unsafePop :: Vec e -> IO e #-}
-{-# SPECIALIZE unsafePop :: UVec Int -> IO Int #-}
-{-# SPECIALIZE unsafePop :: UVec Double -> IO Double #-}
-{-# SPECIALIZE unsafePop :: UVec Bool -> IO Bool #-}
-unsafePop :: A.MArray a e IO => GenericVec a e -> IO e
-unsafePop v = do
+{-# SPECIALIZE unsafePop :: PrimMonad m => Vec (PrimState m) e -> m e #-}
+{-# SPECIALIZE unsafePop :: PrimMonad m => UVec (PrimState m) Int -> m Int #-}
+{-# SPECIALIZE unsafePop :: PrimMonad m => UVec (PrimState m) Double -> m Double #-}
+{-# SPECIALIZE unsafePop :: PrimMonad m => UVec (PrimState m) Bool -> m Bool #-}
+unsafePop :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> m e
+unsafePop v = stToPrim $ do
   s <- getSize v
   e <- unsafeRead v (s-1)
   resize v (s-1)
   return e
 
 {-# INLINE peek #-}
-peek :: A.MArray a e IO => GenericVec a e -> IO e
-peek v = do
+peek :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> m e
+peek v = stToPrim $ do
   s <- getSize v
   if s == 0 then
     error $ "ToySolver.Internal.Data.Vec.peek: empty Vec"
@@ -254,28 +261,28 @@ peek v = do
     unsafeRead v (s-1)
 
 {-# INLINE unsafePeek #-}
-unsafePeek :: A.MArray a e IO => GenericVec a e -> IO e
-unsafePeek v = do
+unsafePeek :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> m e
+unsafePeek v = stToPrim $ do
   s <- getSize v
   unsafeRead v (s-1)
 
-clear :: A.MArray a e IO => GenericVec a e -> IO ()
+clear :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> m ()
 clear v = resize v 0
 
-getElems :: A.MArray a e IO => GenericVec a e -> IO [e]
-getElems v = do
+getElems :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> m [e]
+getElems v = stToPrim $ do
   s <- getSize v
   forM [0..s-1] $ \i -> unsafeRead v i
 
-{-# SPECIALIZE clone :: Vec e -> IO (Vec e) #-}
-{-# SPECIALIZE clone :: UVec Int -> IO (UVec Int) #-}
-{-# SPECIALIZE clone :: UVec Double -> IO (UVec Double) #-}
-{-# SPECIALIZE clone :: UVec Bool -> IO (UVec Bool) #-}
-clone :: A.MArray a e IO => GenericVec a e -> IO (GenericVec a e)
-clone (GenericVec sizeRef arrayRef) = do
-  a <- readIORef arrayRef
-  arrayRef' <- newIORef =<< cloneArray a
-  sizeRef'  <- newIOURef =<< readIOURef sizeRef
+{-# SPECIALIZE clone :: PrimMonad m => Vec (PrimState m) e -> m (Vec (PrimState m) e) #-}
+{-# SPECIALIZE clone :: PrimMonad m => UVec (PrimState m) Int -> m (UVec (PrimState m) Int) #-}
+{-# SPECIALIZE clone :: PrimMonad m => UVec (PrimState m) Double -> m (UVec (PrimState m) Double) #-}
+{-# SPECIALIZE clone :: PrimMonad m => UVec (PrimState m) Bool -> m (UVec (PrimState m) Bool) #-}
+clone :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> m (GenericVec (PrimState m) a e)
+clone (GenericVec sizeRef arrayRef) = stToPrim $ do
+  a <- readMutVar arrayRef
+  arrayRef' <- newMutVar =<< cloneArray a
+  sizeRef'  <- newPrimVar =<< readPrimVar sizeRef
   return $ GenericVec sizeRef' arrayRef'
 
 {--------------------------------------------------------------------
@@ -284,29 +291,29 @@ clone (GenericVec sizeRef arrayRef) = do
 
 {-# INLINE getArray #-}
 -- | Get the internal representation array
-getArray :: GenericVec a e -> IO (a Index e)
-getArray (GenericVec _ arrayRef) = readIORef arrayRef
+getArray :: PrimMonad m => GenericVec (PrimState m) a e -> m (a Index e)
+getArray (GenericVec _ arrayRef) = stToPrim $ readMutVar arrayRef
 
 {-# INLINE getCapacity #-}
 -- | Get the internal representation array
-getCapacity :: A.MArray a e IO => GenericVec a e -> IO Int
-getCapacity vec = liftM rangeSize $ A.getBounds =<< getArray vec
+getCapacity :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> m Int
+getCapacity vec = stToPrim $ liftM rangeSize $ A.getBounds =<< getArray vec
 
-{-# SPECIALIZE resizeCapacity :: Vec e -> Int -> IO () #-}
-{-# SPECIALIZE resizeCapacity :: UVec Int -> Int -> IO () #-}
-{-# SPECIALIZE resizeCapacity :: UVec Double -> Int -> IO () #-}
-{-# SPECIALIZE resizeCapacity :: UVec Bool -> Int -> IO () #-}
+{-# SPECIALIZE resizeCapacity :: PrimMonad m => Vec (PrimState m) e -> Int -> m () #-}
+{-# SPECIALIZE resizeCapacity :: PrimMonad m => UVec (PrimState m) Int -> Int -> m () #-}
+{-# SPECIALIZE resizeCapacity :: PrimMonad m => UVec (PrimState m) Double -> Int -> m () #-}
+{-# SPECIALIZE resizeCapacity :: PrimMonad m => UVec (PrimState m) Bool -> Int -> m () #-}
 -- | Pre-allocate internal buffer for @n@ elements.
-resizeCapacity :: A.MArray a e IO => GenericVec a e -> Int -> IO ()
-resizeCapacity (GenericVec sizeRef arrayRef) capa = do
-  n <- readIOURef sizeRef
-  arr <- readIORef arrayRef
+resizeCapacity :: (PrimMonad m, A.MArray a e (ST (PrimState m))) => GenericVec (PrimState m) a e -> Int -> m ()
+resizeCapacity (GenericVec sizeRef arrayRef) capa = stToPrim $ do
+  n <- readPrimVar sizeRef
+  arr <- readMutVar arrayRef
   capa0 <- liftM rangeSize $ A.getBounds arr
   when (capa0 < capa) $ do
     let capa' = max capa (n * 3 `div` 2)
     arr' <- A.newArray_ (0, capa'-1)
     copyTo arr arr' (0, n-1)
-    writeIORef arrayRef arr'
+    writeMutVar arrayRef arr'
 
 {--------------------------------------------------------------------
   utility

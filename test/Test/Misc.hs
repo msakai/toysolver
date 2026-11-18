@@ -47,7 +47,7 @@ prop_readUnsignedInteger =
 
 case_Vec :: Assertion
 case_Vec = do
-  (v::Vec.UVec Int) <- Vec.new
+  (v::Vec.IOUVec Int) <- Vec.new
   let xs = [0..100]
   forM_ xs $ \i -> Vec.push v i
   ys <- Vec.getElems v
@@ -73,7 +73,7 @@ case_Vec = do
 
 case_Vec_clone :: Assertion
 case_Vec_clone = do
-  (v::Vec.UVec Int) <- Vec.new
+  (v::Vec.IOUVec Int) <- Vec.new
   Vec.push v 0
   v2 <- Vec.clone v
   Vec.write v2 0 1

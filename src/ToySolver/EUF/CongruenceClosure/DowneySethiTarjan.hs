@@ -56,11 +56,12 @@ module ToySolver.EUF.CongruenceClosure.DowneySethiTarjan
   ) where
 
 import Control.Monad
-import Data.IORef
+import Control.Monad.Primitive
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Primitive.MutVar
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Unboxed as VU
 
@@ -72,40 +73,40 @@ type NodeID = Int
 
 type Sig = (FSym, VU.Vector NodeID)
 
-data Solver
+data Solver s
   = Solver
   {
   -- core union-find
-    svParent :: !(Vec.Vec NodeID)
+    svParent :: !(Vec.Vec s NodeID)
 
   -- structural info for every node (root or not)
-  , svRepr :: !(Vec.Vec (FSym, VU.Vector NodeID))
+  , svRepr :: !(Vec.Vec s (FSym, VU.Vector NodeID))
 
   -- auxiliary info that is only valid for root nodes
-  , svUseList :: !(Vec.Vec (Vec.UVec NodeID))
-  , svMembers :: !(Vec.Vec (Vec.UVec NodeID))
+  , svUseList :: !(Vec.Vec s (Vec.UVec s NodeID))
+  , svMembers :: !(Vec.Vec s (Vec.UVec s NodeID))
 
   -- signature -> representative application node (need not be a root)
-  , svSigTable :: !(IORef (Map Sig NodeID))
+  , svSigTable :: !(MutVar s (Map Sig NodeID))
 
   -- for hash-consing: original Term object -> node id
-  , svNodeOf :: !(IORef (Map Term NodeID))
+  , svNodeOf :: !(MutVar s (Map Term NodeID))
 
-  , svPending :: !(Vec.Vec (NodeID, NodeID))
+  , svPending :: !(Vec.Vec s (NodeID, NodeID))
 
-  , svSymCounter :: IORef Int
+  , svSymCounter :: MutVar s Int
   }
 
-newSolver :: IO Solver
-newSolver = do
+newSolver :: PrimMonad m => m (Solver (PrimState m))
+newSolver = stToPrim $ do
   parent <- Vec.new
   repr <- Vec.new
   useList <- Vec.new
   members <- Vec.new
-  sigTable <- newIORef Map.empty
-  nodeOf <- newIORef Map.empty
+  sigTable <- newMutVar Map.empty
+  nodeOf <- newMutVar Map.empty
   pending <- Vec.new
-  counter <- newIORef 0
+  counter <- newMutVar 0
   pure $ Solver
     { svParent = parent
     , svRepr = repr
@@ -117,34 +118,34 @@ newSolver = do
     , svSymCounter = counter
     }
 
-newFSym :: Solver -> IO FSym
-newFSym solver = do
-  n <- readIORef (svSymCounter solver)
-  writeIORef (svSymCounter solver) $! n + 1
+newFSym :: PrimMonad m => Solver (PrimState m) -> m FSym
+newFSym solver = stToPrim $ do
+  n <- readMutVar (svSymCounter solver)
+  writeMutVar (svSymCounter solver) $! n + 1
   return n
 
-newFun :: VAFun a => Solver -> IO a
-newFun solver = do
+newFun :: (PrimMonad m, VAFun a) => Solver (PrimState m) -> m a
+newFun solver = stToPrim $ do
   c <- newFSym solver
   return $ withVArgs (TApp c)
 
-newConst :: Solver -> IO Term
+newConst :: PrimMonad m => Solver (PrimState m) -> m Term
 newConst = newFun
 
-addTerm :: Solver -> Term -> IO NodeID
-addTerm solver term@(TApp f args) = do
-  nodeOf <- readIORef (svNodeOf solver)
+addTerm :: PrimMonad m => Solver (PrimState m) -> Term -> m NodeID
+addTerm solver term@(TApp f args) = stToPrim $ do
+  nodeOf <- readMutVar (svNodeOf solver)
   case Map.lookup term nodeOf of
     Just node -> pure node
     Nothing -> do
       argNodes <- mapM (addTerm solver) args
       node <- newNode solver f argNodes
-      modifyIORef' (svNodeOf solver) (Map.insert term node)
+      modifyMutVar' (svNodeOf solver) (Map.insert term node)
       propagate solver
       pure node
 
-newNode :: Solver -> FSym -> [NodeID] -> IO NodeID
-newNode solver f args = do
+newNode :: PrimMonad m => Solver (PrimState m) -> FSym -> [NodeID] -> m NodeID
+newNode solver f args = stToPrim $ do
   node <- Vec.getSize (svParent solver)
   Vec.push (svParent solver) node
   Vec.push (svUseList solver) =<< Vec.new
@@ -160,15 +161,15 @@ newNode solver f args = do
   -- for an application node, compute its signature and check for a collision
   unless (null args) $ do
     sig <- signature solver node
-    sigTable <- readIORef (svSigTable solver)
+    sigTable <- readMutVar (svSigTable solver)
     case Map.lookup sig sigTable of
-      Nothing -> writeIORef (svSigTable solver) $! Map.insert sig node sigTable
+      Nothing -> writeMutVar (svSigTable solver) $! Map.insert sig node sigTable
       Just node' -> Vec.push (svPending solver) (node, node')
 
   pure node
 
-signature :: Solver -> NodeID -> IO Sig
-signature solver node = do
+signature :: PrimMonad m => Solver (PrimState m) -> NodeID -> m Sig
+signature solver node = stToPrim $ do
   (f, args) <- Vec.read (svRepr solver) node
   args' <- VG.mapM (find solver) args
   pure (f, args')
@@ -177,11 +178,11 @@ signature solver node = do
 -- union-find core
 -- ------------------------------------------------------------------
 
-representative :: Solver -> NodeID -> IO NodeID
+representative :: PrimMonad m => Solver (PrimState m) -> NodeID -> m NodeID
 representative = find
 
-find :: Solver -> NodeID -> IO NodeID
-find solver x = do
+find :: PrimMonad m => Solver (PrimState m) -> NodeID -> m NodeID
+find solver x = stToPrim $ do
   let findRoot root = do
         root' <- Vec.read (svParent solver) root
         if root /= root' then do
@@ -199,20 +200,20 @@ find solver x = do
   compressPath x
   pure root
 
-areCongruent :: Solver -> Term -> Term -> IO Bool
-areCongruent solver a b = do
+areCongruent :: PrimMonad m => Solver (PrimState m) -> Term -> Term -> m Bool
+areCongruent solver a b = stToPrim $ do
   a' <- addTerm solver a
   b' <- addTerm solver b
   areCongruentNodes solver a' b'
 
-areCongruentNodes :: Solver -> NodeID -> NodeID -> IO Bool
-areCongruentNodes solver a b = do
+areCongruentNodes :: PrimMonad m => Solver (PrimState m) -> NodeID -> NodeID -> m Bool
+areCongruentNodes solver a b = stToPrim $ do
   a' <- find solver a
   b' <- find solver b
   pure $ a' == b'
 
-classMembers :: Solver -> NodeID -> IO IntSet
-classMembers solver x = do
+classMembers :: PrimMonad m => Solver (PrimState m) -> NodeID -> m IntSet
+classMembers solver x = stToPrim $ do
   x' <- find solver x
   mx <- Vec.read (svMembers solver) x'
   IntSet.fromList <$> Vec.getElems mx
@@ -221,19 +222,19 @@ classMembers solver x = do
 -- Merging an equation (entry point for asserting a = b from outside)
 -- ------------------------------------------------------------------
 
-merge :: Solver -> Term -> Term -> IO ()
-merge solver a b = do
+merge :: PrimMonad m => Solver (PrimState m) -> Term -> Term -> m ()
+merge solver a b = stToPrim $ do
   a' <- addTerm solver a
   b' <- addTerm solver b
   mergeNodes solver a' b'
 
-mergeNodes :: Solver -> NodeID -> NodeID -> IO ()
-mergeNodes solver a b = do
+mergeNodes :: PrimMonad m => Solver (PrimState m) -> NodeID -> NodeID -> m ()
+mergeNodes solver a b = stToPrim $ do
   Vec.push (svPending solver) (a, b)
   propagate solver
 
-propagate :: Solver -> IO ()
-propagate solver = do
+propagate :: PrimMonad m => Solver (PrimState m) -> m ()
+propagate solver = stToPrim $ do
   m <- Vec.popMaybe (svPending solver)
   case m of
     Nothing -> pure ()
@@ -270,9 +271,9 @@ propagate solver = do
                 Just p -> do
                   Vec.push ua p
                   sig <- signature solver p
-                  sigTable <- readIORef (svSigTable solver)
+                  sigTable <- readMutVar (svSigTable solver)
                   case Map.lookup sig sigTable of
-                    Nothing -> writeIORef (svSigTable solver) $! Map.insert sig p sigTable
+                    Nothing -> writeMutVar (svSigTable solver) $! Map.insert sig p sigTable
                     Just q -> Vec.push (svPending solver) (p, q)
                   loop
         loop
@@ -283,8 +284,8 @@ propagate solver = do
 -- For debugging
 -- ------------------------------------------------------------------
 
-termOf :: Solver -> NodeID -> IO Term
-termOf solver = worker
+termOf :: PrimMonad m => Solver (PrimState m) -> NodeID -> m Term
+termOf solver x = stToPrim $ worker x
   where
     worker node = do
       (f, args) <- Vec.read (svRepr solver) node

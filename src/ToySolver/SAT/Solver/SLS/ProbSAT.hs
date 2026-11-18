@@ -74,7 +74,7 @@ data Solver
   , svClauseWeightsF         :: !(UArray ClauseId Double)
   , svClauseNumTrueLits      :: !(IOUArray ClauseId Int32)
   , svClauseUnsatClauseIndex :: !(IOUArray ClauseId Int)
-  , svUnsatClauses           :: !(Vec.UVec ClauseId)
+  , svUnsatClauses           :: !(Vec.IOUVec ClauseId)
 
   , svVarOccurs         :: !(Array SAT.Var (UArray Int ClauseId))
   , svVarOccursState    :: !(Array SAT.Var (IOUArray Int Bool))
@@ -452,7 +452,7 @@ probsat solver opt cb f = do
 walksat :: Solver -> Options -> Callbacks -> Double -> IO ()
 walksat solver opt cb p = do
   gen <- getRandomGen solver
-  (buf :: Vec.UVec SAT.Var) <- Vec.new
+  (buf :: Vec.IOUVec SAT.Var) <- Vec.new
 
   let pickVar :: PackedClause -> IO SAT.Var
       pickVar c = do
