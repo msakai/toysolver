@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
@@ -44,54 +45,57 @@ module ToySolver.Internal.Data.PriorityQueue
   ) where
 
 import Control.Loop
-import qualified Data.Array.IO as A
+import Control.Monad
+import Control.Monad.Primitive
+import Control.Monad.ST
+import qualified Data.Array.ST as A
 import Data.Queue.Classes
 import qualified ToySolver.Internal.Data.Vec as Vec
 
 type Index = Int
 
 -- | Priority queue implemented as array-based binary heap.
-data PriorityQueue a
+data PriorityQueue s a
   = PriorityQueue
-  { lt   :: !(a -> a -> IO Bool)
-  , heap :: !(Vec.Vec a)
+  { lt   :: !(a -> a -> ST s Bool)
+  , heap :: !(Vec.Vec s a)
   }
 
 -- | Build a priority queue with default ordering ('(<)' of 'Ord' class)
-newPriorityQueue :: Ord a => IO (PriorityQueue a)
-newPriorityQueue = newPriorityQueueBy (\a b -> return (a < b))
+newPriorityQueue :: forall m a. (PrimMonad m, Ord a) => m (PriorityQueue (PrimState m) a)
+newPriorityQueue = newPriorityQueueBy (\a b -> return (a < b) :: ST (PrimState m) Bool)
 
 -- | Build a priority queue with a given /less than/ operator.
-newPriorityQueueBy :: (a -> a -> IO Bool) -> IO (PriorityQueue a)
-newPriorityQueueBy cmp = do
+newPriorityQueueBy :: (PrimMonad m, PrimBase m1, PrimState m ~ PrimState m1) => (a -> a -> m1 Bool) -> m (PriorityQueue (PrimState m) a)
+newPriorityQueueBy cmp = stToPrim $ do
   vec <- Vec.new
-  return $ PriorityQueue{ lt = cmp, heap = vec }
+  return $ PriorityQueue{ lt = \a b -> primToST (cmp a b), heap = vec }
 
 -- | Return a list of all the elements of a priority queue. (not sorted)
-getElems :: PriorityQueue a -> IO [a]
+getElems :: PrimMonad m => PriorityQueue (PrimState m) a -> m [a]
 getElems q = Vec.getElems (heap q)
 
 -- | Remove all elements from a priority queue.
-clear :: PriorityQueue a -> IO ()
+clear :: PrimMonad m => PriorityQueue (PrimState m) a -> m ()
 clear q = Vec.clear (heap q)
 
 -- | Create a copy of a priority queue.
-clone :: PriorityQueue a -> IO (PriorityQueue a)
-clone q = do
+clone :: PrimMonad m => PriorityQueue (PrimState m) a -> m (PriorityQueue (PrimState m) a)
+clone q = stToPrim $ do
   h2 <- Vec.clone (heap q)
   return $ PriorityQueue{ lt = lt q, heap = h2 }
 
-instance Ord a => NewFifo (PriorityQueue a) IO where
+instance (PrimMonad m, Ord a, s ~ PrimState m) => NewFifo (PriorityQueue s a) m where
   newFifo = newPriorityQueue
 
-instance Enqueue (PriorityQueue a) IO a where
-  enqueue q val = do
+instance (PrimMonad m, s ~ PrimState m) => Enqueue (PriorityQueue s a) m a where
+  enqueue q val = stToPrim $ do
     n <- Vec.getSize (heap q)
     Vec.push (heap q) val
     up q n
 
-instance Dequeue (PriorityQueue a) IO a where
-  dequeue q = do
+instance (PrimMonad m, s ~ PrimState m) => Dequeue (PriorityQueue s a) m a where
+  dequeue q = stToPrim $ do
     n <- Vec.getSize (heap q)
     case n of
       0 ->
@@ -106,19 +110,19 @@ instance Dequeue (PriorityQueue a) IO a where
           down q 0
         return (Just val)
 
-  dequeueBatch q = go []
+  dequeueBatch q = stToPrim $ go []
     where
-      go :: [a] -> IO [a]
+      go :: [a] -> ST (PrimState m) [a]
       go xs = do
         r <- dequeue q
         case r of
           Nothing -> return (reverse xs)
           Just x -> go (x:xs)
 
-instance QueueSize (PriorityQueue a) IO where
+instance (PrimMonad m, s ~ PrimState m) => QueueSize (PriorityQueue s a) m where
   queueSize q = Vec.getSize (heap q)
 
-up :: PriorityQueue a -> Index -> IO ()
+up :: PriorityQueue s a -> Index -> ST s ()
 up q !i = do
   val <- Vec.unsafeRead (heap q) i
   let loop 0 = return 0
@@ -134,7 +138,7 @@ up q !i = do
   j <- loop i
   Vec.unsafeWrite (heap q) j val
 
-down :: PriorityQueue a -> Index -> IO ()
+down :: PriorityQueue s a -> Index -> ST s ()
 down q !i = do
   n <- Vec.getSize (heap q)
   val <- Vec.unsafeRead (heap q) i
@@ -164,22 +168,22 @@ down q !i = do
   j <- loop i
   Vec.unsafeWrite (heap q) j val
 
-rebuild :: PriorityQueue a -> IO ()
-rebuild q = do
+rebuild :: PrimMonad m => PriorityQueue (PrimState m) a -> m ()
+rebuild q = stToPrim $ do
   n <- Vec.getSize (heap q)
   forLoop 0 (<n) (+1) $ \i -> do
     up q i
 
 -- | Get the internal representation of a given priority queue.
-getHeapArray :: PriorityQueue a -> IO (A.IOArray Index a)
+getHeapArray :: PrimMonad m => PriorityQueue (PrimState m) a -> m (A.STArray (PrimState m) Index a)
 getHeapArray q = Vec.getArray (heap q)
 
 -- | Get the internal representation of a given priority queue.
-getHeapVec :: PriorityQueue a -> IO (Vec.Vec a)
+getHeapVec :: PrimMonad m => PriorityQueue (PrimState m) a -> m (Vec.Vec (PrimState m) a)
 getHeapVec q = return (heap q)
 
 -- | Pre-allocate internal buffer for @n@ elements.
-resizeHeapCapacity :: PriorityQueue a -> Int -> IO ()
+resizeHeapCapacity :: PrimMonad m => PriorityQueue (PrimState m) a -> Int -> m ()
 resizeHeapCapacity q capa = Vec.resizeCapacity (heap q) capa
 
 {--------------------------------------------------------------------
@@ -202,18 +206,16 @@ parent i = (i-1) `div` 2
   test
 --------------------------------------------------------------------}
 
-{-
-checkHeapProperty :: String -> PriorityQueue a -> IO ()
-checkHeapProperty str q = do
-  (n,arr) <- readIORef (heap q)
+_checkHeapProperty :: PrimMonad m => String -> PriorityQueue (PrimState m) a -> m ()
+_checkHeapProperty str q = stToPrim $ do
+  n <- Vec.getSize (heap q)
   let go i = do
-        val <- A.readArray arr i
+        val <- Vec.read (heap q) i
         forM_ [left i, right i] $ \j ->
           when (j < n) $ do
-            val2 <- A.readArray arr j
+            val2 <- Vec.read (heap q) j
             b <- lt q val2 val
             when b $ do
               error (str ++ ": invalid heap " ++ show j)
             go j
   when (n > 0) $ go 0
--}

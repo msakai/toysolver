@@ -69,6 +69,7 @@ module ToySolver.SMT
 import Control.Applicative
 import qualified Control.Exception as E
 import Control.Monad
+import Control.Monad.Primitive
 import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import Data.Bits
@@ -206,7 +207,7 @@ data Solver
   = Solver
   { smtSAT :: !SAT.Solver
   , smtEnc :: !(Tseitin.Encoder IO)
-  , smtEUF :: !EUF.Solver
+  , smtEUF :: !(EUF.Solver (PrimState IO))
   , smtLRA :: !(Simplex.GenericSolver (Delta Rational))
   , smtBV :: !BV.Solver
 
@@ -226,7 +227,7 @@ data Solver
   , smtGlobalDeclarationsRef :: !(IORef Bool)
   , smtFDefs :: !(IORef (Map FSym FDef))
   , smtNamedAssertions :: !(IORef (Map String SAT.Lit))
-  , smtAssertionStack :: !(Vec.Vec AssertionLevel)
+  , smtAssertionStack :: !(Vec.IOVec AssertionLevel)
 
   , smtUnsatAssumptions :: !(IORef [Expr])
   , smtUnsatCore :: !(IORef [String])
